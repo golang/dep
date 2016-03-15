@@ -3,8 +3,6 @@ package vsolver
 import (
 	"container/heap"
 	"fmt"
-
-	"github.com/Masterminds/semver"
 )
 
 type SolveFailure uint
@@ -27,9 +25,9 @@ type solver struct {
 	latest   map[ProjectIdentifier]struct{}
 	sel      *selection
 	unsel    *unselected
+	versions []*VersionQueue
 	rs       Spec
 	rl       Lock
-	versions []*VersionQueue
 }
 
 func (s *solver) Solve(rootSpec Spec, rootLock Lock, toUpgrade []ProjectIdentifier) Result {
@@ -68,6 +66,7 @@ func (s *solver) doSolve() ([]ProjectID, error) {
 				// backtracking succeeded, move to the next unselected ref
 				continue
 			}
+			// TODO handle failures, lolzies
 		}
 	}
 }
@@ -75,7 +74,7 @@ func (s *solver) doSolve() ([]ProjectID, error) {
 func (s *solver) createVersionQueue(ref ProjectIdentifier) (*VersionQueue, error) {
 	// If on the root package, there's no queue to make
 	if ref == s.rs.ID {
-		return NewVersionQueue(ref, nil, nil), nil
+		return NewVersionQueue(ref, nil, s.pf)
 	}
 
 	if !s.pf.ProjectExists(ref) {
@@ -92,26 +91,29 @@ func (s *solver) createVersionQueue(ref ProjectIdentifier) (*VersionQueue, error
 		return nil, err // pass it straight back up
 	}
 
-	// TODO probably use an actual container/list
-	// TODO should probably just make the fetcher return semver already, and
-	// update ProjectID to suit
-	var list []*ProjectID
-	for _, pi := range versions {
-		_, err := semver.NewVersion(pi.Version)
-		if err != nil {
-			// couldn't parse version; moving on
-			// TODO log this at all? would be info/debug-type, at best
-			continue
-		}
-		// this is the lockv, push it to the front
-		if lockv.Version == pi.Version {
-			list = append([]*ProjectID{&pi}, list...)
-		} else {
-			list = append(list, &pi)
-		}
+	//var list []*ProjectID
+	//for _, pi := range versions {
+	//_, err := semver.NewVersion(pi.Version)
+	//if err != nil {
+	//// couldn't parse version; moving on
+	//// TODO log this at all? would be info/debug-type, at best
+	//continue
+	//}
+	//// this is the lockv, push it to the front
+	//if lockv.Version == pi.Version {
+	//list = append([]*ProjectID{&pi}, list...)
+	//} else {
+	//list = append(list, &pi)
+	//}
+	//}
+
+	q, err := NewVersionQueue(ref, lockv, s.pf)
+	if err != nil {
+		// TODO this particular err case needs to be improved to be ONLY for cases
+		// where there's absolutely nothing findable about a given project name
+		return nil, err
 	}
 
-	q := NewVersionQueue(ref, s.checkVersion, list)
 	return q, s.findValidVersion(q)
 }
 
@@ -124,6 +126,7 @@ func (s *solver) findValidVersion(q *VersionQueue) error {
 		panic("version queue is empty, should not happen")
 	}
 
+	// TODO worth adding an isEmpty()-type method to VersionQueue?
 	for {
 		err = s.checkVersion(q.current())
 		if err == nil {
@@ -131,7 +134,11 @@ func (s *solver) findValidVersion(q *VersionQueue) error {
 			return nil
 		}
 
-		q.next()
+		err = q.advance()
+		if err != nil {
+			// Error on advance; have to bail out
+			break
+		}
 	}
 
 	s.fail(s.sel.getDependenciesOn(q.current().ID)[0].Depender.ID)
@@ -156,18 +163,18 @@ func (s *solver) getLockVersionIfValid(ref ProjectIdentifier) *ProjectID {
 	return nil
 }
 
-// createProjectRevisionIterator creates an iterator that retrieves metadata for
-// a given ref, one version at a time.
-func (s *solver) createProjectRevisionIterator(ref ProjectIdentifier, lockv *ProjectID) (*projectRevisionIterator, error) {
-
-	// TODO keep track of all the available revs, as reported by the pf?
-	return &projectRevisionIterator{
-		cur:     lockv,
-		haslock: lockv == nil,
-		ref:     ref,
-		pf:      s.pf,
-	}, nil
-}
+// getAllowedVersions retrieves an ordered list of versions from the source manager for
+// the given identifier. It returns an error if the named project does not exist.
+//
+// ...REALLY NOT NECESSARY, VERSIONQUEUE CAN JUST DO IT DIRECTLY?
+//
+//func (s *solver) getAllowedVersions(ref ProjectIdentifier) (ids []*ProjectID, err error) {
+//ids, err = s.pf.ListVersions(ref)
+//if err != nil {
+//// TODO ...more err handling here?
+//return nil, err
+//}
+//}
 
 func (s *solver) checkVersion(pi *ProjectID) error {
 	if pi == nil {
@@ -353,19 +360,4 @@ func (s *solver) fail(id ProjectIdentifier) {
 
 func (s *solver) choose(id ProjectID) {
 
-}
-
-type projectRevisionIterator struct {
-	cur     *ProjectID
-	haslock bool
-	ref     ProjectIdentifier
-	pf      PackageFetcher
-}
-
-func (pri *projectRevisionIterator) next() bool {
-	// TODO pull the next item from the pf and put it into the current item
-}
-
-func (pri *projectRevisionIterator) current() *ProjectID {
-	return pri.cur
 }
