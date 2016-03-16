@@ -29,6 +29,7 @@ type solver struct {
 	versions []*VersionQueue
 	rs       Spec
 	rl       Lock
+	attempts int
 }
 
 func (s *solver) Solve(rootSpec Spec, rootLock Lock, toUpgrade []ProjectIdentifier) Result {
@@ -47,8 +48,8 @@ func (s *solver) Solve(rootSpec Spec, rootLock Lock, toUpgrade []ProjectIdentifi
 	s.rs = rootSpec
 	s.rl = rootLock
 
-	_, err := s.solve()
-
+	//_, err := s.solve()
+	s.solve()
 	return Result{}
 }
 
@@ -82,7 +83,7 @@ func (s *solver) solve() ([]ProjectID, error) {
 
 func (s *solver) createVersionQueue(ref ProjectIdentifier) (*VersionQueue, error) {
 	// If on the root package, there's no queue to make
-	if ref == s.rs.ID {
+	if ref == s.rs.ID() {
 		return NewVersionQueue(ref, nil, s.pf)
 	}
 
@@ -92,13 +93,6 @@ func (s *solver) createVersionQueue(ref ProjectIdentifier) (*VersionQueue, error
 		return nil, newSolveError(fmt.Sprintf("Project '%s' could not be located.", ref), cannotResolve)
 	}
 	lockv := s.getLockVersionIfValid(ref)
-
-	versions, err := s.pf.ListVersions(ref)
-	if err != nil {
-		// TODO can there actually be an err here? probably just e.g. an
-		// fs-level err
-		return nil, err // pass it straight back up
-	}
 
 	//var list []*ProjectID
 	//for _, pi := range versions {
@@ -155,7 +149,7 @@ func (s *solver) findValidVersion(q *VersionQueue) error {
 }
 
 func (s *solver) getLockVersionIfValid(ref ProjectIdentifier) *ProjectID {
-	lockver := s.rl.GetProject(ref)
+	lockver := s.rl.GetProjectID(ref)
 	if lockver == nil {
 		// Nothing in the lock about this version, so nothing to validate
 		return nil
@@ -283,7 +277,7 @@ func (s *solver) getDependenciesOf(pi ProjectID) ([]ProjectDep, error) {
 	}
 
 	deps := info.GetDependencies()
-	if s.rs.ID == pi.ID {
+	if s.rs.ID() == pi.ID {
 		// Root package has more things to pull in
 		deps = append(deps, info.GetDevDependencies()...)
 
@@ -322,14 +316,31 @@ func (s *solver) backtrack() bool {
 			s.unselectLast()
 		}
 
-		var pi *ProjectID
-		var q *VersionQueue
-
-		q = s.versions[len(s.versions)-1]
-		id := q.current().ID
+		// Grab the last VersionQueue off the list of queues
+		q := s.versions[len(s.versions)-1]
 		// another assert that the last in s.sel's ids is == q.current
 		s.unselectLast()
+
+		// Search for another acceptable version of this failed dep in its queue
+		if err := s.findValidVersion(q); err == nil {
+			// Found one! Put it back on the selected queue and stop
+			// backtracking
+			s.selectVersion(*q.current())
+			break
+		}
+
+		// No solution found; continue backtracking after popping the last
+		// version off the list
+		// GC-friendly pop pointer elem in slice
+		s.versions, s.versions[len(s.versions)-1] = s.versions[:len(s.versions)-1], nil
 	}
+
+	// Backtracking was successful if loop ended before running out of versions
+	if len(s.versions) == 0 {
+		return false
+	}
+	s.attempts++
+	return true
 }
 
 func (s *solver) nextUnselected() (ProjectIdentifier, bool) {
@@ -347,15 +358,16 @@ func (s *solver) unselectedComparator(i, j int) bool {
 		return false
 	}
 
+	rid := s.rs.ID()
 	// *always* put root project first
-	if iname == s.rs.ID {
+	if iname == rid {
 		return true
 	}
-	if jname == s.rs.ID {
+	if jname == rid {
 		return false
 	}
 
-	ilock, jlock := s.rl.GetProject(iname) == nil, s.rl.GetProject(jname) == nil
+	ilock, jlock := s.rl.GetProjectID(iname) == nil, s.rl.GetProjectID(jname) == nil
 
 	if ilock && !jlock {
 		return true
@@ -373,7 +385,7 @@ func (s *solver) unselectedComparator(i, j int) bool {
 
 func (s *solver) fail(id ProjectIdentifier) {
 	// skip if the root project
-	if s.rs.ID == id {
+	if s.rs.ID() == id {
 		return
 	}
 

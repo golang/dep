@@ -38,6 +38,7 @@ type noVersionError struct {
 
 func (e *noVersionError) Error() string {
 	// TODO compose a message out of the data we have
+	return ""
 }
 
 type disjointConstraintFailure struct {
@@ -47,4 +48,5 @@ type disjointConstraintFailure struct {
 
 func (e *disjointConstraintFailure) Error() string {
 	// TODO compose a message out of the data we have
+	return ""
 }

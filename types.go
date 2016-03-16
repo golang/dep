@@ -109,7 +109,7 @@ const (
 
 type PackageFetcher interface {
 	GetProjectInfo(ProjectIdentifier) (ProjectInfo, error)
-	ListVersions(ProjectIdentifier) ([]ProjectID, error)
+	ListVersions(ProjectIdentifier) ([]*ProjectID, error)
 	ProjectExists(ProjectIdentifier) bool
 }
 
@@ -262,33 +262,33 @@ type Dependency struct {
 
 // ProjectInfo holds the spec and lock information for a given ProjectID
 type ProjectInfo struct {
-	ID   ProjectID
-	Spec Spec
-	Lock Lock
+	ID ProjectID
+	Spec
+	Lock
 }
 
-func (pi ProjectInfo) GetDependencies() []ProjectDep {
-
-}
-
-func (pi ProjectInfo) GetDevDependencies() []ProjectDep {
-
-}
-
-type Spec struct {
-	ID ProjectIdentifier
+type Spec interface {
+	ID() ProjectIdentifier
+	GetDependencies() []ProjectDep
+	GetDevDependencies() []ProjectDep
 }
 
 // TODO define format for lockfile
-type Lock struct {
+type lock struct {
 	// The version of the solver used to generate the lock file
 	// TODO impl
 	Version  string
 	Projects []lockedProject
 }
 
-func (l Lock) GetProject(id ProjectIdentifier) *ProjectID {
-
+type Lock interface {
+	// Indicates the version of the solver used to generate this lock file
+	SolverVersion() string
+	// The hash of inputs to the solver that resulted in this lock file
+	InputHash() string
+	// Returns the identifier for a project in the lock file, or nil if the
+	// named project is not present in the lock file
+	GetProjectID(ProjectIdentifier) *ProjectID
 }
 
 type lockedProject struct {
@@ -305,10 +305,8 @@ type VersionQueue struct {
 	failed             bool
 	hasLock, allLoaded bool
 	pf                 PackageFetcher
-	//avf                func(ProjectIdentifier) ([]*ProjectID, error)
 }
 
-//func NewVersionQueue(ref ProjectIdentifier, lockv *ProjectID, avf func(ProjectIdentifier, *ProjectID) []*ProjectID) (*VersionQueue, error) {
 func NewVersionQueue(ref ProjectIdentifier, lockv *ProjectID, pf PackageFetcher) (*VersionQueue, error) {
 	vq := &VersionQueue{
 		ref: ref,
@@ -338,7 +336,7 @@ func NewVersionQueue(ref ProjectIdentifier, lockv *ProjectID, pf PackageFetcher)
 }
 
 func (vq *VersionQueue) current() *ProjectID {
-	if len(vq.pi > 0) {
+	if len(vq.pi) > 0 {
 		return vq.pi[0]
 	}
 
@@ -370,7 +368,7 @@ func (vq *VersionQueue) advance() (err error) {
 		}
 	}
 
-	if len(vq.pi > 0) {
+	if len(vq.pi) > 0 {
 		vq.pi = vq.pi[1:]
 	}
 
