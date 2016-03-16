@@ -1,5 +1,7 @@
 package vsolver
 
+import "strings"
+
 type selection struct {
 	projects []ProjectID
 	deps     map[ProjectIdentifier][]Dependency
@@ -18,7 +20,40 @@ func (s *selection) setDependenciesOn(id ProjectIdentifier, deps []Dependency) {
 }
 
 func (s *selection) getConstraint(id ProjectIdentifier) Constraint {
+	deps, exists := s.deps[id]
+	if !exists {
+		return anyConstraint{}
+	}
 
+	// TODO recomputing this sucks and is quite wasteful. Precompute/cache it
+	// on changes to the constraint set, instead.
+
+	// The solver itself is expected to maintain the invariant that all the
+	// constraints kept here collectively admit a non-empty set of versions. We
+	// assume this is the case here while assembling a composite constraint.
+	//
+	// TODO verify that this invariant is maintained; also verify that the slice
+	// can't be empty
+
+	// If the first constraint requires an exact match, then we know all the
+	// others must be identical, so just return the first one
+	if deps[0].Dep.Constraint.Type()&C_ExactMatch != 0 {
+		return deps[0].Dep.Constraint
+	}
+
+	// Otherwise, we're dealing with semver ranges, so we have to compute the
+	// constraint intersection
+	var cs []string
+	for _, dep := range deps {
+		cs = append(cs, dep.Dep.Constraint.Body())
+	}
+
+	c, err := NewConstraint(C_SemverRange, strings.Join(cs, ", "))
+	if err != nil {
+		panic("canary - something wrong with constraint computation")
+	}
+
+	return c
 }
 
 func (s *selection) selected(id ProjectIdentifier) (ProjectID, bool) {

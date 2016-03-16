@@ -24,6 +24,8 @@ const (
 	C_Version
 	C_Semver
 	C_SemverRange
+	C_ExactMatch = C_Revision | C_Branch | C_Version | C_Semver
+	C_FlexMatch  = C_SemverRange
 )
 
 var VTCTCompat = [...]ConstraintType{
@@ -195,7 +197,27 @@ func (c basicConstraint) Allows(v Version) bool {
 }
 
 func (c basicConstraint) UnionAllowsAny(c2 Constraint) bool {
-	return c2.Type() == c.typ && c2.Body() == c.body
+	return (c2.Type() == c.typ && c2.Body() == c.body) || c2.UnionAllowsAny(c)
+}
+
+// anyConstraint is an unbounded constraint - it matches all other types of
+// constraints.
+type anyConstraint struct{}
+
+func (c anyConstraint) Type() ConstraintType {
+	return C_ExactMatch | C_FlexMatch
+}
+
+func (c anyConstraint) Body() string {
+	return "*"
+}
+
+func (c anyConstraint) Allows(v Version) bool {
+	return true
+}
+
+func (c anyConstraint) UnionAllowsAny(_ Constraint) bool {
+	return true
 }
 
 type semverConstraint struct {
