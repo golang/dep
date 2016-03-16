@@ -2,6 +2,7 @@ package vsolver
 
 import (
 	"container/heap"
+	"errors"
 	"fmt"
 )
 
@@ -46,13 +47,15 @@ func (s *solver) Solve(rootSpec Spec, rootLock Lock, toUpgrade []ProjectIdentifi
 	s.rs = rootSpec
 	s.rl = rootLock
 
-	_, err := s.doSolve()
+	_, err := s.solve()
+
+	return Result{}
 }
 
-func (s *solver) doSolve() ([]ProjectID, error) {
+func (s *solver) solve() ([]ProjectID, error) {
 	for {
-		ref := s.sel.nextUnselected()
-		if ref == "" {
+		ref, has := s.nextUnselected()
+		if has {
 			// no more packages to select - we're done. bail out
 			// TODO compile things in s.sel into a list of ProjectIDs, and return
 			break
@@ -68,7 +71,13 @@ func (s *solver) doSolve() ([]ProjectID, error) {
 			}
 			// TODO handle failures, lolzies
 		}
+
+		s.selectVersion(*queue.current())
+		s.versions = append(s.versions, queue)
 	}
+
+	// juuuust make it compile
+	return nil, errors.New("filler error, because always fail now")
 }
 
 func (s *solver) createVersionQueue(ref ProjectIdentifier) (*VersionQueue, error) {
@@ -208,7 +217,7 @@ func (s *solver) checkVersion(pi *ProjectID) error {
 		return newSolveError(fmt.Sprintf("Project '%s' could not be located.", pi.ID), cannotResolve)
 	}
 
-	deps, err := s.getDependenciesOf(pi)
+	deps, err := s.getDependenciesOf(*pi)
 	if err != nil {
 		// An err here would be from the package fetcher; pass it straight back
 		return err
@@ -240,8 +249,8 @@ func (s *solver) checkVersion(pi *ProjectID) error {
 			}
 		}
 
-		selected := s.sel.selected(dep.ID)
-		if selected != nil && !dep.Constraint.Allows(selected.Version) {
+		selected, exists := s.sel.selected(dep.ID)
+		if exists && !dep.Constraint.Allows(selected.Version) {
 			s.fail(dep.ID)
 
 			// TODO msg
@@ -264,7 +273,7 @@ func (s *solver) checkVersion(pi *ProjectID) error {
 // through any overrides dictated by the root project.
 //
 // If it's the root project, also includes dev dependencies, etc.
-func (s *solver) getDependenciesOf(pi *ProjectID) ([]ProjectDep, error) {
+func (s *solver) getDependenciesOf(pi ProjectID) ([]ProjectDep, error) {
 	info, err := s.pf.GetProjectInfo(pi.ID)
 	if err != nil {
 		// TODO revisit this once a decision is made about better-formed errors;
@@ -276,7 +285,7 @@ func (s *solver) getDependenciesOf(pi *ProjectID) ([]ProjectDep, error) {
 	deps := info.GetDependencies()
 	if s.rs.ID == pi.ID {
 		// Root package has more things to pull in
-		deps = append(deps, info.GetDevDependencies())
+		deps = append(deps, info.GetDevDependencies()...)
 
 		// TODO add overrides here...if we impl the concept (which we should)
 	}
@@ -310,17 +319,25 @@ func (s *solver) backtrack() bool {
 			//q, s.versions := s.versions[len(s.versions)-1], s.versions[:len(s.versions)-1]
 			// pub asserts here that the last in s.sel's ids is == q.current
 			s.versions = s.versions[:len(s.versions)-1]
-			s.sel.unselectLast()
+			s.unselectLast()
 		}
 
 		var pi *ProjectID
 		var q *VersionQueue
 
-		q := s.versions[len(s.versions)-1]
+		q = s.versions[len(s.versions)-1]
 		id := q.current().ID
 		// another assert that the last in s.sel's ids is == q.current
-		s.sel.unselectLast()
+		s.unselectLast()
 	}
+}
+
+func (s *solver) nextUnselected() (ProjectIdentifier, bool) {
+	if len(s.unsel.sl) > 0 {
+		return s.unsel.sl[0], true
+	}
+
+	return "", false
 }
 
 func (s *solver) unselectedComparator(i, j int) bool {
@@ -355,9 +372,68 @@ func (s *solver) unselectedComparator(i, j int) bool {
 }
 
 func (s *solver) fail(id ProjectIdentifier) {
+	// skip if the root project
+	if s.rs.ID == id {
+		return
+	}
 
+	for _, vq := range s.versions {
+		if vq.ref == id {
+			vq.failed = true
+			// just look for the first (oldest) one; the backtracker will
+			// necessarily traverse through and pop off any earlier ones
+			// TODO ...right?
+			return
+		}
+	}
 }
 
-func (s *solver) choose(id ProjectID) {
+func (s *solver) selectVersion(id ProjectID) {
+	s.unsel.remove(id.ID)
+	s.sel.projects = append(s.sel.projects, id)
 
+	deps, err := s.getDependenciesOf(id)
+	if err != nil {
+		// if we're choosing a package that has errors getting its deps, there's
+		// a bigger problem
+		// TODO try to create a test that hits this
+		panic("shouldn't be possible")
+	}
+
+	for _, dep := range deps {
+		siblingsAndSelf := append(s.sel.getDependenciesOn(id.ID), Dependency{Depender: id, Dep: dep})
+		s.sel.deps[id.ID] = siblingsAndSelf
+
+		// add project to unselected queue if this is the first dep on it -
+		// otherwise it's already in there, or been selected
+		// TODO dart has protection (i guess?) against loops back on the root
+		// project here
+		if len(siblingsAndSelf) == 1 {
+			heap.Push(s.unsel, dep.ID)
+		}
+	}
+}
+
+func (s *solver) unselectLast() {
+	var id ProjectID
+	id, s.sel.projects = s.sel.projects[len(s.sel.projects)-1], s.sel.projects[:len(s.sel.projects)-1]
+	heap.Push(s.unsel, id.ID)
+
+	deps, err := s.getDependenciesOf(id)
+	if err != nil {
+		// if we're choosing a package that has errors getting its deps, there's
+		// a bigger problem
+		// TODO try to create a test that hits this
+		panic("shouldn't be possible")
+	}
+
+	for _, dep := range deps {
+		siblings := s.sel.getDependenciesOn(id.ID)
+		s.sel.deps[id.ID] = siblings[:len(siblings)-1]
+
+		// if no siblings, remove from unselected queue
+		if len(siblings) == 0 {
+			s.unsel.remove(dep.ID)
+		}
+	}
 }

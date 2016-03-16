@@ -1,20 +1,16 @@
 package vsolver
 
 type selection struct {
-	projects []ProjectIdentifier
+	projects []ProjectID
 	deps     map[ProjectIdentifier][]Dependency
 }
 
-func (s *selection) nextUnselected() ProjectIdentifier {
-	if len(s.projects) > 0 {
-		return s.projects[0]
-	}
-	// TODO ...should actually pop off the list?
-	return ""
-}
-
 func (s *selection) getDependenciesOn(id ProjectIdentifier) []Dependency {
-	return s.deps[id]
+	if deps, exists := s.deps[id]; exists {
+		return deps
+	}
+
+	return nil
 }
 
 func (s *selection) setDependenciesOn(id ProjectIdentifier, deps []Dependency) {
@@ -25,12 +21,16 @@ func (s *selection) getConstraint(id ProjectIdentifier) Constraint {
 
 }
 
-type ProjectIdentifierQueueItem struct {
-	ident []byte
-	index int
+func (s *selection) selected(id ProjectIdentifier) (ProjectID, bool) {
+	for _, pi := range s.projects {
+		if pi.ID == id {
+			return pi, true
+		}
+	}
+
+	return ProjectID{}, false
 }
 
-//type unselected []*ProjectIdentifierQueueItem
 type unselected struct {
 	sl  []ProjectIdentifier
 	cmp func(i, j int) bool
@@ -60,4 +60,15 @@ func (u *unselected) Pop() (v interface{}) {
 	//*u = old[:len(old)-1]
 	v, u.sl = u.sl[len(u.sl)-1], u.sl[:len(u.sl)-1]
 	return v
+}
+
+// remove takes an ProjectIdentifier out of the priority queue (if it was
+// present), then reapplies the heap invariants.
+func (u *unselected) remove(id ProjectIdentifier) {
+	for k, pi := range u.sl {
+		if pi == id {
+			u.sl = append(u.sl[:k], u.sl[k+1:]...)
+			// TODO need to heap.Fix()? shouldn't have to...
+		}
+	}
 }

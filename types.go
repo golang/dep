@@ -88,7 +88,7 @@ const (
 	// access, whereas BitBucket returns 403 (or 302 login redirect). Thus,
 	// while the ExistsUpstream and UpstreamAccessible bits should always only
 	// be on or off together when interacting with Github, it is possible that a
-	// BitBucket provider might have ExistsUpstream, but not UpstreamAccessible.
+	// BitBucket provider might report ExistsUpstream, but not UpstreamAccessible.
 	//
 	// For most purposes, non-existence and inaccessibility are treated the
 	// same, but clearly delineating the two allows slightly improved UX.
@@ -98,10 +98,6 @@ const (
 	// existence level of a project.
 	ExistenceUnknown ProjectExistence = 0
 )
-
-type DepSpec struct {
-	Identifier, VersionSpec string
-}
 
 type PackageFetcher interface {
 	GetProjectInfo(ProjectIdentifier) (ProjectInfo, error)
@@ -154,6 +150,14 @@ type ProjectInfo struct {
 	Lock Lock
 }
 
+func (pi ProjectInfo) GetDependencies() []ProjectDep {
+
+}
+
+func (pi ProjectInfo) GetDevDependencies() []ProjectDep {
+
+}
+
 type Spec struct {
 	ID ProjectIdentifier
 }
@@ -189,7 +193,7 @@ type VersionQueue struct {
 
 //func NewVersionQueue(ref ProjectIdentifier, lockv *ProjectID, avf func(ProjectIdentifier, *ProjectID) []*ProjectID) (*VersionQueue, error) {
 func NewVersionQueue(ref ProjectIdentifier, lockv *ProjectID, pf PackageFetcher) (*VersionQueue, error) {
-	vq = &VersionQueue{
+	vq := &VersionQueue{
 		ref: ref,
 		//avf: avf,
 		pf: pf,
