@@ -1,5 +1,11 @@
 package vsolver
 
+import (
+	"errors"
+
+	"github.com/Masterminds/semver"
+)
+
 // The type of the version - branch, revision, or version
 type VersionType uint8
 
@@ -114,8 +120,16 @@ type Solver interface {
 // TODO naming lolol
 type ProjectID struct {
 	ID       ProjectIdentifier
-	Version  string
+	Version  Version
 	Packages []string
+}
+
+type Version struct {
+	// The type of version identifier
+	Type VersionType
+	// The version identifier itself
+	Info   string
+	SemVer *semver.Version
 }
 
 type ProjectDep struct {
@@ -123,19 +137,100 @@ type ProjectDep struct {
 	Constraint Constraint
 }
 
-type Constraint struct {
+type Constraint interface {
+	Type() ConstraintType
+	Body() string
+	Allows(Version) bool
+	UnionAllowsAny(Constraint) bool
+}
+
+// NewConstraint constructs an appropriate Constraint object from the input
+// parameters.
+func NewConstraint(t ConstraintType, body string) (Constraint, error) {
+	switch t {
+	case C_Branch, C_Version, C_Revision:
+		return basicConstraint{
+			typ:  t,
+			body: body,
+		}, nil
+	case C_Semver, C_SemverRange:
+		c, err := semver.NewConstraint(body)
+		if err != nil {
+			return nil, err
+		}
+
+		return semverConstraint{
+			typ:  t,
+			body: body,
+			c:    c,
+		}, nil
+	default:
+		return nil, errors.New("Unknown ConstraintType provided")
+	}
+}
+
+type basicConstraint struct {
 	// The type of constraint - version, branch, or revision
-	Type ConstraintType
+	typ ConstraintType
 	// The string text of the constraint
-	Info string
+	body string
 }
 
-func (c Constraint) Allows(version string) bool {
-
+func (c basicConstraint) Type() ConstraintType {
+	return c.typ
 }
 
-func (c Constraint) Intersects(c2 Constraint) bool {
+func (c basicConstraint) Body() string {
+	return c.body
+}
 
+func (c basicConstraint) Allows(v Version) bool {
+	if VTCTCompat[v.Type]&c.typ == 0 {
+		// version and constraint types are incompatible
+		return false
+	}
+
+	// Branches, normal versions, and revisions all must be exact string matches
+	return c.body == v.Info
+}
+
+func (c basicConstraint) UnionAllowsAny(c2 Constraint) bool {
+	return c2.Type() == c.typ && c2.Body() == c.body
+}
+
+type semverConstraint struct {
+	// The type of constraint - single semver, or semver range
+	typ ConstraintType
+	// The string text of the constraint
+	body string
+	c    *semver.Constraints
+}
+
+func (c semverConstraint) Type() ConstraintType {
+	return c.typ
+}
+
+func (c semverConstraint) Body() string {
+	return c.body
+}
+
+func (c semverConstraint) Allows(v Version) bool {
+	if VTCTCompat[v.Type]&c.typ == 0 {
+		// version and constraint types are incompatible
+		return false
+	}
+
+	return c.c.Check(v.SemVer)
+}
+
+func (c semverConstraint) UnionAllowsAny(c2 Constraint) bool {
+	if c2.Type()&(C_Semver|C_SemverRange) == 0 {
+		// Union only possible if other constraint is semverish
+		return false
+	}
+
+	// TODO figure out how we're doing these union checks
+	return false // FIXME
 }
 
 type Dependency struct {

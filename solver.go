@@ -234,10 +234,10 @@ func (s *solver) checkVersion(pi *ProjectID) error {
 		constraint = s.sel.getConstraint(dep.ID)
 		// Ensure the constraint expressed by the dep has at least some possible
 		// overlap with existing constraints.
-		if !constraint.Intersects(dep.Constraint) {
+		if !constraint.UnionAllowsAny(dep.Constraint) {
 			// No match - visit all siblings and identify the disagreement(s)
 			for _, sibling := range selfAndSiblings[:len(selfAndSiblings)-1] {
-				if !sibling.Dep.Constraint.Intersects(dep.Constraint) {
+				if !sibling.Dep.Constraint.UnionAllowsAny(dep.Constraint) {
 					s.fail(sibling.Depender.ID)
 				}
 			}
