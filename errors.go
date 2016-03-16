@@ -30,7 +30,7 @@ func (e *solveError) Error() string {
 }
 
 type noVersionError struct {
-	pi   ProjectID
+	pi   ProjectIdentifier
 	v    string
 	c    Constraint
 	deps []Dependency

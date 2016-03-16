@@ -14,15 +14,16 @@ const (
 	IncompatibleVersionType
 )
 
-func NewSolver(pf PackageFetcher) Solver {
+func NewSolver(sm SourceManager) Solver {
 	return &solver{
-		pf:  pf,
+		sm:  sm,
 		sel: &selection{},
 	}
 }
 
+// solver is a backtracking-style SAT solver.
 type solver struct {
-	pf       PackageFetcher
+	sm       SourceManager
 	latest   map[ProjectIdentifier]struct{}
 	sel      *selection
 	unsel    *unselected
@@ -71,6 +72,7 @@ func (s *solver) solve() ([]ProjectID, error) {
 				continue
 			}
 			// TODO handle failures, lolzies
+			return nil, err
 		}
 
 		s.selectVersion(*queue.current())
@@ -84,10 +86,10 @@ func (s *solver) solve() ([]ProjectID, error) {
 func (s *solver) createVersionQueue(ref ProjectIdentifier) (*VersionQueue, error) {
 	// If on the root package, there's no queue to make
 	if ref == s.rs.ID() {
-		return NewVersionQueue(ref, nil, s.pf)
+		return NewVersionQueue(ref, nil, s.sm)
 	}
 
-	if !s.pf.ProjectExists(ref) {
+	if !s.sm.ProjectExists(ref) {
 		// TODO this check needs to incorporate/admit the possibility that the
 		// upstream no longer exists, but there's something valid in vendor/
 		return nil, newSolveError(fmt.Sprintf("Project '%s' could not be located.", ref), cannotResolve)
@@ -110,7 +112,7 @@ func (s *solver) createVersionQueue(ref ProjectIdentifier) (*VersionQueue, error
 	//}
 	//}
 
-	q, err := NewVersionQueue(ref, lockv, s.pf)
+	q, err := NewVersionQueue(ref, lockv, s.sm)
 	if err != nil {
 		// TODO this particular err case needs to be improved to be ONLY for cases
 		// where there's absolutely nothing findable about a given project name
@@ -198,13 +200,13 @@ func (s *solver) checkVersion(pi *ProjectID) error {
 
 		// TODO msg
 		return &noVersionError{
-			pi:   *pi,
+			pi:   pi.ID,
 			c:    constraint,
 			deps: deps,
 		}
 	}
 
-	if !s.pf.ProjectExists(pi.ID) {
+	if !s.sm.ProjectExists(pi.ID) {
 		// Can get here if the lock file specifies a now-nonexistent project
 		// TODO this check needs to incorporate/accept the possibility that the
 		// upstream no longer exists, but there's something valid in vendor/
@@ -249,7 +251,7 @@ func (s *solver) checkVersion(pi *ProjectID) error {
 
 			// TODO msg
 			return &noVersionError{
-				pi:   dep.ProjectID,
+				pi:   dep.ID,
 				c:    dep.Constraint,
 				deps: selfAndSiblings,
 			}
@@ -268,7 +270,7 @@ func (s *solver) checkVersion(pi *ProjectID) error {
 //
 // If it's the root project, also includes dev dependencies, etc.
 func (s *solver) getDependenciesOf(pi ProjectID) ([]ProjectDep, error) {
-	info, err := s.pf.GetProjectInfo(pi.ID)
+	info, err := s.sm.GetProjectInfo(pi.ID)
 	if err != nil {
 		// TODO revisit this once a decision is made about better-formed errors;
 		// question is, do we expect the fetcher to pass back simple errors, or
