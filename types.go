@@ -27,11 +27,11 @@ type Dependency struct {
 // ProjectInfo holds the spec and lock information for a given ProjectID
 type ProjectInfo struct {
 	pi ProjectID
-	Spec
+	Manifest
 	Lock
 }
 
-type Spec interface {
+type Manifest interface {
 	ID() ProjectIdentifier
 	GetDependencies() []ProjectDep
 	GetDevDependencies() []ProjectDep

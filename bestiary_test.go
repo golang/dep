@@ -193,9 +193,9 @@ func (sm *depspecSourceManager) GetProjectInfo(id ProjectID) (ProjectInfo, error
 	for _, ds := range sm.specs {
 		if id.ID == ds.id.ID && id.Version.Info == ds.id.Version.Info {
 			return ProjectInfo{
-				pi:   ds.id,
-				Spec: ds,
-				Lock: dummyLock{},
+				pi:       ds.id,
+				Manifest: ds,
+				Lock:     dummyLock{},
 			}, nil
 		}
 	}
@@ -229,7 +229,7 @@ func (sm *depspecSourceManager) ProjectExists(id ProjectIdentifier) bool {
 }
 
 // enforce interfaces
-var _ Spec = depspec{}
+var _ Manifest = depspec{}
 var _ Lock = dummyLock{}
 
 // impl Spec interface

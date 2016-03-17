@@ -1,6 +1,6 @@
 package vsolver
 
-type VersionQueue struct {
+type versionQueue struct {
 	ref                ProjectIdentifier
 	pi                 []ProjectID
 	failed             bool
@@ -8,8 +8,8 @@ type VersionQueue struct {
 	sm                 SourceManager
 }
 
-func NewVersionQueue(ref ProjectIdentifier, lockv *ProjectID, sm SourceManager) (*VersionQueue, error) {
-	vq := &VersionQueue{
+func newVersionQueue(ref ProjectIdentifier, lockv *ProjectID, sm SourceManager) (*versionQueue, error) {
+	vq := &versionQueue{
 		ref: ref,
 		sm:  sm,
 	}
@@ -32,7 +32,7 @@ func NewVersionQueue(ref ProjectIdentifier, lockv *ProjectID, sm SourceManager) 
 	return vq, nil
 }
 
-func (vq *VersionQueue) current() ProjectID {
+func (vq *versionQueue) current() ProjectID {
 	if len(vq.pi) > 0 {
 		return vq.pi[0]
 	}
@@ -40,7 +40,7 @@ func (vq *VersionQueue) current() ProjectID {
 	return ProjectID{}
 }
 
-func (vq *VersionQueue) advance() (err error) {
+func (vq *versionQueue) advance() (err error) {
 	// The current version may have failed, but the next one hasn't
 	vq.failed = false
 

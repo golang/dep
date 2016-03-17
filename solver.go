@@ -5,13 +5,13 @@ import (
 	"fmt"
 )
 
-type SolveFailure uint
+//type SolveFailure uint
 
-const (
-	// Indicates that no version solution could be found
-	NoVersionSolution SolveFailure = 1 << iota
-	IncompatibleVersionType
-)
+//const (
+// Indicates that no version solution could be found
+//NoVersionSolution SolveFailure = 1 << iota
+//IncompatibleVersionType
+//)
 
 func NewSolver(sm SourceManager) Solver {
 	return &solver{
@@ -25,7 +25,7 @@ type solver struct {
 	latest   map[ProjectIdentifier]struct{}
 	sel      *selection
 	unsel    *unselected
-	versions []*VersionQueue
+	versions []*versionQueue
 	rp       ProjectInfo
 	attempts int
 }
@@ -91,10 +91,10 @@ func (s *solver) solve() ([]ProjectID, error) {
 	return projs, nil
 }
 
-func (s *solver) createVersionQueue(ref ProjectIdentifier) (*VersionQueue, error) {
+func (s *solver) createVersionQueue(ref ProjectIdentifier) (*versionQueue, error) {
 	// If on the root package, there's no queue to make
 	if ref == s.rp.ID() {
-		return NewVersionQueue(ref, nil, s.sm)
+		return newVersionQueue(ref, nil, s.sm)
 	}
 
 	if !s.sm.ProjectExists(ref) {
@@ -104,7 +104,7 @@ func (s *solver) createVersionQueue(ref ProjectIdentifier) (*VersionQueue, error
 	}
 	lockv := s.getLockVersionIfValid(ref)
 
-	q, err := NewVersionQueue(ref, lockv, s.sm)
+	q, err := newVersionQueue(ref, lockv, s.sm)
 	if err != nil {
 		// TODO this particular err case needs to be improved to be ONLY for cases
 		// where there's absolutely nothing findable about a given project name
@@ -116,7 +116,7 @@ func (s *solver) createVersionQueue(ref ProjectIdentifier) (*VersionQueue, error
 
 // findValidVersion walks through a VersionQueue until it finds a version that's
 // valid, as adjudged by the current constraints.
-func (s *solver) findValidVersion(q *VersionQueue) error {
+func (s *solver) findValidVersion(q *versionQueue) error {
 	var err error
 	if q.current() == emptyPID {
 		// TODO this case shouldn't be reachable, but panic here as a canary

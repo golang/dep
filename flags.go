@@ -29,12 +29,6 @@ var VTCTCompat = [...]ConstraintType{
 	C_Semver | C_SemverRange,
 }
 
-type InfoLevel uint
-
-const (
-	FromCache InfoLevel = 1 << iota
-)
-
 // ProjectExistence values represent the extent to which a project "exists."
 type ProjectExistence uint8
 
