@@ -8,9 +8,8 @@ type Solver interface {
 
 // TODO naming lolol
 type ProjectID struct {
-	ID       ProjectIdentifier
-	Version  Version
-	Packages []string
+	ID      ProjectIdentifier
+	Version Version
 }
 
 type ProjectDep struct {

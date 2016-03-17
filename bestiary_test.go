@@ -185,6 +185,85 @@ var fixtures = []fixture{
 	},
 }
 
+type depspecSourceManager struct {
+	specs []depspec
+}
+
+func (sm *depspecSourceManager) GetProjectInfo(id ProjectID) (ProjectInfo, error) {
+	for _, ds := range sm.specs {
+		if id == ds.id {
+			return ProjectInfo{
+				ID:   ds.id,
+				Spec: ds,
+				Lock: dummyLock{},
+			}, nil
+		}
+	}
+
+	// TODO proper solver-type errors
+	return ProjectInfo{}, fmt.Errorf("Project '%s' at version '%s' could not be found", id.ID, id.Version.Info)
+}
+
+func (sm *depspecSourceManager) ListVersions(id ProjectIdentifier) (pi []*ProjectID, err error) {
+	for _, ds := range sm.specs {
+		if id == ds.id.ID {
+			pi = append(pi, &ds.id)
+		}
+	}
+
+	if len(pi) == 0 {
+		err = fmt.Errorf("Project '%s' could not be found", id)
+	}
+
+	return
+}
+
+func (sm *depspecSourceManager) ProjectExists(id ProjectIdentifier) bool {
+	for _, ds := range sm.specs {
+		if id == ds.id.ID {
+			return true
+		}
+	}
+
+	return false
+}
+
+// enforce interfaces
+var _ Spec = depspec{}
+var _ Lock = dummyLock{}
+
+// impl Spec interface
+func (ds depspec) GetDependencies() []ProjectDep {
+	return ds.deps
+}
+
+// impl Spec interface
+func (ds depspec) GetDevDependencies() []ProjectDep {
+	return nil
+}
+
+// impl Spec interface
+func (ds depspec) ID() ProjectIdentifier {
+	return ds.id.ID
+}
+
+type dummyLock struct{}
+
+// impl Lock interface
+func (_ dummyLock) SolverVersion() string {
+	return "-1"
+}
+
+// impl Lock interface
+func (_ dummyLock) InputHash() string {
+	return "fooooorooooofooorooofoo"
+}
+
+// impl Lock interface
+func (_ dummyLock) GetProjectID(_ ProjectIdentifier) *ProjectID {
+	return nil
+}
+
 // We've borrowed this bestiary from pub's tests:
 // https://github.com/dart-lang/pub/blob/master/test/version_solver_test.dart
 

@@ -168,19 +168,6 @@ func (s *solver) getLockVersionIfValid(ref ProjectIdentifier) *ProjectID {
 	return nil
 }
 
-// getAllowedVersions retrieves an ordered list of versions from the source manager for
-// the given identifier. It returns an error if the named project does not exist.
-//
-// ...REALLY NOT NECESSARY, VERSIONQUEUE CAN JUST DO IT DIRECTLY?
-//
-//func (s *solver) getAllowedVersions(ref ProjectIdentifier) (ids []*ProjectID, err error) {
-//ids, err = s.pf.ListVersions(ref)
-//if err != nil {
-//// TODO ...more err handling here?
-//return nil, err
-//}
-//}
-
 func (s *solver) checkVersion(pi *ProjectID) error {
 	if pi == nil {
 		// TODO we should protect against this case elsewhere, but for now panic
@@ -270,7 +257,7 @@ func (s *solver) checkVersion(pi *ProjectID) error {
 //
 // If it's the root project, also includes dev dependencies, etc.
 func (s *solver) getDependenciesOf(pi ProjectID) ([]ProjectDep, error) {
-	info, err := s.sm.GetProjectInfo(pi.ID)
+	info, err := s.sm.GetProjectInfo(pi)
 	if err != nil {
 		// TODO revisit this once a decision is made about better-formed errors;
 		// question is, do we expect the fetcher to pass back simple errors, or

@@ -19,9 +19,6 @@ func NewVersionQueue(ref ProjectIdentifier, lockv *ProjectID, sm SourceManager) 
 		vq.pi = append(vq.pi, lockv)
 	} else {
 		var err error
-		//vq.pi, err = vq.avf(vq.ref, nil)
-		// TODO should probably just make the fetcher return semver already, and
-		// update ProjectID to suit
 		vq.pi, err = vq.sm.ListVersions(vq.ref)
 		if err != nil {
 			// TODO pushing this error this early entails that we
@@ -52,7 +49,6 @@ func (vq *VersionQueue) advance() (err error) {
 		// should have that
 		lockv := vq.pi[0]
 
-		//vq.pi, err = vq.avf(vq.ref)
 		vq.pi, err = vq.sm.ListVersions(vq.ref)
 		if err != nil {
 			return
