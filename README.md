@@ -17,7 +17,7 @@ Package management is far too complex to be assumption-less. `vsolver` tries to 
 
 Yes, we also think it'd be swell if we didn't need metadata files. We love the idea of Go packages as standalone, self-describing code. Unfortunately, though, that idea goes off the rails as soon as versioning and cross-project/repository dependencies happen, because [universe alignment is hard](https://medium.com/@sdboyer/so-you-want-to-write-a-package-manager-4ae9c17d9527).
 
-Disliking solvers because *"It seems complicated, idiomatic Go things are simple!"* or *"(Tool X) uses a solver and I don't like it"* is just shooting the messenger. Remember, the enemy is not the SAT solver - it's the challenges inherent in the dependency resolution problem domain.
+Disliking solvers because *"It seems complicated, idiomatic Go things are simple!"* or *"(Tool X) uses a solver and I don't like the UX!"* is just shooting the messenger. SAT solvers are not the enemy - it's the challenges inherent in the dependency resolution problem domain.
 
 ## Features
 
