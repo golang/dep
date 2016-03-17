@@ -11,8 +11,8 @@ The current implementation is based heavily on the solver used in Dart's [pub](h
 Package management is far too complex to be assumption-less. `vsolver` tries to keep its assumptions to the minimum, supporting as many situations as is possible while still maintaining a predictable, well-formed system.
 
 * Go 1.6, or 1.5 with `GO15VENDOREXPERIMENT = 1`. While the solver mostly doesn't touch vendor directories themselves, it's basically insane to try to solve this problem without them.
-* A two-file (manifest and lock) approach to tracking project manifest data. The solver takes manifest (and, optionally, lock)-type information as inputs, and produces lock-type information as its output.
-* A **project** concept, where projects comprise the tree of Go packages rooted at the manifest/lock file pair.
+* A manifest-and-lock approach to tracking project manifest data. The solver takes manifest (and, optionally, lock)-type information as inputs, and produces lock-type information as its output. (An implementing tool gets to decide whether these are represented as one or two files).
+* A **project** concept, where projects comprise the set of Go packages in a rooted tree on the filesystem. (Generally, the root should be where the manifest/lock are, but that's up to the tool.)
 * You don't manually change what's under `vendor/` - leave it up to the `vsolver`-driven tool.
 
 Yes, we also think it'd be swell if we didn't need metadata files. We love the idea of Go packages as standalone, self-describing code. Unfortunately, though, that idea goes off the rails as soon as versioning and cross-project/repository dependencies happen, because [universe alignment is hard](https://medium.com/@sdboyer/so-you-want-to-write-a-package-manager-4ae9c17d9527).
