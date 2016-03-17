@@ -2,7 +2,7 @@ package vsolver
 
 type VersionQueue struct {
 	ref                ProjectIdentifier
-	pi                 []*ProjectID
+	pi                 []ProjectID
 	failed             bool
 	hasLock, allLoaded bool
 	sm                 SourceManager
@@ -16,7 +16,7 @@ func NewVersionQueue(ref ProjectIdentifier, lockv *ProjectID, sm SourceManager) 
 
 	if lockv != nil {
 		vq.hasLock = true
-		vq.pi = append(vq.pi, lockv)
+		vq.pi = append(vq.pi, *lockv)
 	} else {
 		var err error
 		vq.pi, err = vq.sm.ListVersions(vq.ref)
@@ -32,12 +32,12 @@ func NewVersionQueue(ref ProjectIdentifier, lockv *ProjectID, sm SourceManager) 
 	return vq, nil
 }
 
-func (vq *VersionQueue) current() *ProjectID {
+func (vq *VersionQueue) current() ProjectID {
 	if len(vq.pi) > 0 {
 		return vq.pi[0]
 	}
 
-	return nil
+	return ProjectID{}
 }
 
 func (vq *VersionQueue) advance() (err error) {
@@ -59,7 +59,8 @@ func (vq *VersionQueue) advance() (err error) {
 		for k, pi := range vq.pi {
 			if pi == lockv {
 				// GC-safe deletion for slice w/pointer elements
-				vq.pi, vq.pi[len(vq.pi)-1] = append(vq.pi[:k], vq.pi[k+1:]...), nil
+				//vq.pi, vq.pi[len(vq.pi)-1] = append(vq.pi[:k], vq.pi[k+1:]...), nil
+				vq.pi = append(vq.pi[:k], vq.pi[k+1:]...)
 			}
 		}
 	}

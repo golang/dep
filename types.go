@@ -3,7 +3,7 @@ package vsolver
 type ProjectIdentifier string
 
 type Solver interface {
-	Solve(rootSpec Spec, rootLock Lock, toUpgrade []ProjectIdentifier) Result
+	Solve(root ProjectInfo, toUpgrade []ProjectIdentifier) Result
 }
 
 // TODO naming lolol
@@ -11,6 +11,8 @@ type ProjectID struct {
 	ID      ProjectIdentifier
 	Version Version
 }
+
+var emptyPID ProjectID
 
 type ProjectDep struct {
 	ID         ProjectIdentifier
@@ -24,7 +26,7 @@ type Dependency struct {
 
 // ProjectInfo holds the spec and lock information for a given ProjectID
 type ProjectInfo struct {
-	ID ProjectID
+	pi ProjectID
 	Spec
 	Lock
 }

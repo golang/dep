@@ -2,7 +2,6 @@ package vsolver
 
 import (
 	"container/heap"
-	"errors"
 	"fmt"
 )
 
@@ -16,8 +15,7 @@ const (
 
 func NewSolver(sm SourceManager) Solver {
 	return &solver{
-		sm:  sm,
-		sel: &selection{},
+		sm: sm,
 	}
 }
 
@@ -28,36 +26,42 @@ type solver struct {
 	sel      *selection
 	unsel    *unselected
 	versions []*VersionQueue
-	rs       Spec
-	rl       Lock
+	rp       ProjectInfo
 	attempts int
 }
 
-func (s *solver) Solve(rootSpec Spec, rootLock Lock, toUpgrade []ProjectIdentifier) Result {
-	// local overrides would need to be handled first. ofc, these don't exist yet
+func (s *solver) Solve(root ProjectInfo, toUpgrade []ProjectIdentifier) Result {
+	// local overrides would need to be handled first.
+	// TODO local overrides! heh
+	s.rp = root
 
 	for _, v := range toUpgrade {
 		s.latest[v] = struct{}{}
 	}
 
+	// Initialize queues
+	s.sel = &selection{
+		deps: make(map[ProjectIdentifier][]Dependency),
+	}
 	s.unsel = &unselected{
 		sl:  make([]ProjectIdentifier, 0),
 		cmp: s.unselectedComparator,
 	}
 	heap.Init(s.unsel)
 
-	s.rs = rootSpec
-	s.rl = rootLock
+	// Prime the queues with the root project
+	s.selectVersion(s.rp.pi)
 
-	//_, err := s.solve()
-	s.solve()
-	return Result{}
+	// Prep is done; actually run the solver
+	var r Result
+	r.Projects, r.SolveFailure = s.solve()
+	return r
 }
 
 func (s *solver) solve() ([]ProjectID, error) {
 	for {
 		ref, has := s.nextUnselected()
-		if has {
+		if !has {
 			// no more packages to select - we're done. bail out
 			// TODO compile things in s.sel into a list of ProjectIDs, and return
 			break
@@ -71,21 +75,25 @@ func (s *solver) solve() ([]ProjectID, error) {
 				// backtracking succeeded, move to the next unselected ref
 				continue
 			}
-			// TODO handle failures, lolzies
+			// TODO handle different failure types appropriately, lolzies
 			return nil, err
 		}
 
-		s.selectVersion(*queue.current())
+		s.selectVersion(queue.current())
 		s.versions = append(s.versions, queue)
 	}
 
-	// juuuust make it compile
-	return nil, errors.New("filler error, because always fail now")
+	// Getting this far means we successfully found a solution
+	var projs []ProjectID
+	for _, p := range s.sel.projects {
+		projs = append(projs, p)
+	}
+	return projs, nil
 }
 
 func (s *solver) createVersionQueue(ref ProjectIdentifier) (*VersionQueue, error) {
 	// If on the root package, there's no queue to make
-	if ref == s.rs.ID() {
+	if ref == s.rp.ID() {
 		return NewVersionQueue(ref, nil, s.sm)
 	}
 
@@ -95,22 +103,6 @@ func (s *solver) createVersionQueue(ref ProjectIdentifier) (*VersionQueue, error
 		return nil, newSolveError(fmt.Sprintf("Project '%s' could not be located.", ref), cannotResolve)
 	}
 	lockv := s.getLockVersionIfValid(ref)
-
-	//var list []*ProjectID
-	//for _, pi := range versions {
-	//_, err := semver.NewVersion(pi.Version)
-	//if err != nil {
-	//// couldn't parse version; moving on
-	//// TODO log this at all? would be info/debug-type, at best
-	//continue
-	//}
-	//// this is the lockv, push it to the front
-	//if lockv.Version == pi.Version {
-	//list = append([]*ProjectID{&pi}, list...)
-	//} else {
-	//list = append(list, &pi)
-	//}
-	//}
 
 	q, err := NewVersionQueue(ref, lockv, s.sm)
 	if err != nil {
@@ -126,7 +118,7 @@ func (s *solver) createVersionQueue(ref ProjectIdentifier) (*VersionQueue, error
 // valid, as adjudged by the current constraints.
 func (s *solver) findValidVersion(q *VersionQueue) error {
 	var err error
-	if q.current() == nil {
+	if q.current() == emptyPID {
 		// TODO this case shouldn't be reachable, but panic here as a canary
 		panic("version queue is empty, should not happen")
 	}
@@ -151,7 +143,7 @@ func (s *solver) findValidVersion(q *VersionQueue) error {
 }
 
 func (s *solver) getLockVersionIfValid(ref ProjectIdentifier) *ProjectID {
-	lockver := s.rl.GetProjectID(ref)
+	lockver := s.rp.GetProjectID(ref)
 	if lockver == nil {
 		// Nothing in the lock about this version, so nothing to validate
 		return nil
@@ -168,8 +160,8 @@ func (s *solver) getLockVersionIfValid(ref ProjectIdentifier) *ProjectID {
 	return nil
 }
 
-func (s *solver) checkVersion(pi *ProjectID) error {
-	if pi == nil {
+func (s *solver) checkVersion(pi ProjectID) error {
+	if emptyPID == pi {
 		// TODO we should protect against this case elsewhere, but for now panic
 		// to canary when it's a problem
 		panic("checking version of nil ProjectID pointer")
@@ -200,7 +192,7 @@ func (s *solver) checkVersion(pi *ProjectID) error {
 		return newSolveError(fmt.Sprintf("Project '%s' could not be located.", pi.ID), cannotResolve)
 	}
 
-	deps, err := s.getDependenciesOf(*pi)
+	deps, err := s.getDependenciesOf(pi)
 	if err != nil {
 		// An err here would be from the package fetcher; pass it straight back
 		return err
@@ -212,7 +204,7 @@ func (s *solver) checkVersion(pi *ProjectID) error {
 		// TODO maybe differentiate between the confirmed items on the list, and
 		// the one we're speculatively adding? or it may be fine b/c we know
 		// it's the last one
-		selfAndSiblings := append(s.sel.getDependenciesOn(dep.ID), Dependency{Depender: *pi, Dep: dep})
+		selfAndSiblings := append(s.sel.getDependenciesOn(dep.ID), Dependency{Depender: pi, Dep: dep})
 
 		constraint = s.sel.getConstraint(dep.ID)
 		// Ensure the constraint expressed by the dep has at least some possible
@@ -266,7 +258,7 @@ func (s *solver) getDependenciesOf(pi ProjectID) ([]ProjectDep, error) {
 	}
 
 	deps := info.GetDependencies()
-	if s.rs.ID() == pi.ID {
+	if s.rp.ID() == pi.ID {
 		// Root package has more things to pull in
 		deps = append(deps, info.GetDevDependencies()...)
 
@@ -314,7 +306,7 @@ func (s *solver) backtrack() bool {
 		if err := s.findValidVersion(q); err == nil {
 			// Found one! Put it back on the selected queue and stop
 			// backtracking
-			s.selectVersion(*q.current())
+			s.selectVersion(q.current())
 			break
 		}
 
@@ -347,7 +339,7 @@ func (s *solver) unselectedComparator(i, j int) bool {
 		return false
 	}
 
-	rid := s.rs.ID()
+	rid := s.rp.ID()
 	// *always* put root project first
 	if iname == rid {
 		return true
@@ -356,7 +348,7 @@ func (s *solver) unselectedComparator(i, j int) bool {
 		return false
 	}
 
-	ilock, jlock := s.rl.GetProjectID(iname) == nil, s.rl.GetProjectID(jname) == nil
+	ilock, jlock := s.rp.GetProjectID(iname) == nil, s.rp.GetProjectID(jname) == nil
 
 	if ilock && !jlock {
 		return true
@@ -374,7 +366,7 @@ func (s *solver) unselectedComparator(i, j int) bool {
 
 func (s *solver) fail(id ProjectIdentifier) {
 	// skip if the root project
-	if s.rs.ID() == id {
+	if s.rp.ID() == id {
 		return
 	}
 

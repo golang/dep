@@ -29,7 +29,7 @@ func nsvSplit(info string) (id string, version string) {
 func mksvpi(info string) ProjectID {
 	id, v := nsvSplit(info)
 
-	sv, err := semver.NewVersion(id)
+	sv, err := semver.NewVersion(v)
 	if err != nil {
 		// don't want to allow bad test data at this level, so just panic
 		panic(fmt.Sprintf("Error when converting '%s' into semver: %s", v, err))
@@ -148,8 +148,8 @@ var fixtures = []fixture{
 		n: "shared dependency with overlapping constraints",
 		ds: []depspec{
 			dsv("root 0.0.0", "a 1.0.0", "b 1.0.0"),
-			dsv("a 1.0.0", "shared >=2.0.0 <4.0.0"),
-			dsv("b 1.0.0", "shared >=3.0.0 <5.0.0"),
+			dsv("a 1.0.0", "shared >=2.0.0, <4.0.0"),
+			dsv("b 1.0.0", "shared >=3.0.0, <5.0.0"),
 			dsv("shared 2.0.0"),
 			dsv("shared 3.0.0"),
 			dsv("shared 3.6.9"),
@@ -191,9 +191,9 @@ type depspecSourceManager struct {
 
 func (sm *depspecSourceManager) GetProjectInfo(id ProjectID) (ProjectInfo, error) {
 	for _, ds := range sm.specs {
-		if id == ds.id {
+		if id.ID == ds.id.ID && id.Version.Info == ds.id.Version.Info {
 			return ProjectInfo{
-				ID:   ds.id,
+				pi:   ds.id,
 				Spec: ds,
 				Lock: dummyLock{},
 			}, nil
@@ -204,10 +204,10 @@ func (sm *depspecSourceManager) GetProjectInfo(id ProjectID) (ProjectInfo, error
 	return ProjectInfo{}, fmt.Errorf("Project '%s' at version '%s' could not be found", id.ID, id.Version.Info)
 }
 
-func (sm *depspecSourceManager) ListVersions(id ProjectIdentifier) (pi []*ProjectID, err error) {
+func (sm *depspecSourceManager) ListVersions(id ProjectIdentifier) (pi []ProjectID, err error) {
 	for _, ds := range sm.specs {
 		if id == ds.id.ID {
-			pi = append(pi, &ds.id)
+			pi = append(pi, ds.id)
 		}
 	}
 
