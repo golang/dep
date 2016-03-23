@@ -97,12 +97,18 @@ func (u *unselected) Pop() (v interface{}) {
 	return v
 }
 
-// remove takes an ProjectIdentifier out of the priority queue (if it was
+// remove takes a ProjectIdentifier out of the priority queue (if it was
 // present), then reapplies the heap invariants.
 func (u *unselected) remove(id ProjectIdentifier) {
 	for k, pi := range u.sl {
 		if pi == id {
-			u.sl = append(u.sl[:k], u.sl[k+1:]...)
+			if k == len(u.sl)-1 {
+				// if we're on the last element, just pop, no splice
+				u.sl = u.sl[:len(u.sl)-1]
+			} else {
+				u.sl = append(u.sl[:k], u.sl[k+1:]...)
+			}
+			break
 			// TODO need to heap.Fix()? shouldn't have to...
 		}
 	}
