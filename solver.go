@@ -63,7 +63,6 @@ func (s *solver) solve() ([]ProjectID, error) {
 		ref, has := s.nextUnselected()
 		if !has {
 			// no more packages to select - we're done. bail out
-			// TODO compile things in s.sel into a list of ProjectIDs, and return
 			break
 		}
 
@@ -394,13 +393,11 @@ func (s *solver) selectVersion(id ProjectID) {
 	}
 
 	for _, dep := range deps {
-		siblingsAndSelf := append(s.sel.getDependenciesOn(id.ID), Dependency{Depender: id, Dep: dep})
+		siblingsAndSelf := append(s.sel.getDependenciesOn(dep.ID), Dependency{Depender: id, Dep: dep})
 		s.sel.deps[id.ID] = siblingsAndSelf
 
 		// add project to unselected queue if this is the first dep on it -
 		// otherwise it's already in there, or been selected
-		// TODO dart has protection (i guess?) against loops back on the root
-		// project here
 		if len(siblingsAndSelf) == 1 {
 			heap.Push(s.unsel, dep.ID)
 		}
