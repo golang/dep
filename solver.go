@@ -121,7 +121,7 @@ func (s *solver) createVersionQueue(ref ProjectIdentifier) (*versionQueue, error
 // valid, as adjudged by the current constraints.
 func (s *solver) findValidVersion(q *versionQueue) error {
 	var err error
-	if q.current() == emptyPID {
+	if emptyPID == q.current() {
 		// TODO this case shouldn't be reachable, but panic here as a canary
 		panic("version queue is empty, should not happen")
 	}
@@ -136,12 +136,17 @@ func (s *solver) findValidVersion(q *versionQueue) error {
 
 		err = q.advance()
 		if err != nil {
-			// Error on advance; have to bail out
+			// Error on advance, have to bail out
+			break
+		}
+		if q.isExhausted() {
+			// Queue is empty, bail with error
+			err = newSolveError(fmt.Sprintf("Exhausted queue for %q without finding a satisfactory version.", q.ref), mustResolve)
 			break
 		}
 	}
 
-	s.fail(s.sel.getDependenciesOn(q.current().ID)[0].Depender.ID)
+	s.fail(s.sel.getDependenciesOn(q.ref)[0].Depender.ID)
 	return err
 }
 

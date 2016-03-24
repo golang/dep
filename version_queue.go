@@ -45,6 +45,7 @@ func (vq *versionQueue) advance() (err error) {
 	vq.failed = false
 
 	if !vq.allLoaded {
+		vq.allLoaded = true
 		// Can only get here if no lock was initially provided, so we know we
 		// should have that
 		lockv := vq.pi[0]
@@ -70,7 +71,20 @@ func (vq *versionQueue) advance() (err error) {
 	}
 
 	// normal end of queue. we don't error; it's left to the caller to infer an
-	// empty queue w/a subsequent call to current(), which will return nil.
+	// empty queue w/a subsequent call to current(), which will return an empty
+	// item.
 	// TODO this approach kinda...sucks
 	return
+}
+
+// isExhausted indicates whether or not the queue has definitely been exhausted,
+// in which case it will return true.
+//
+// It may return false negatives - suggesting that there is more in the queue
+// when a subsequent call to current() will be empty. Plan accordingly.
+func (vq *versionQueue) isExhausted() bool {
+	if !vq.allLoaded {
+		return false
+	}
+	return len(vq.pi) == 0
 }
