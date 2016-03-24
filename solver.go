@@ -78,6 +78,10 @@ func (s *solver) solve() ([]ProjectID, error) {
 			return nil, err
 		}
 
+		if queue.current() == emptyPID {
+			panic("canary - queue is empty, but flow indicates success")
+		}
+
 		s.selectVersion(queue.current())
 		s.versions = append(s.versions, queue)
 	}
@@ -394,7 +398,7 @@ func (s *solver) selectVersion(id ProjectID) {
 
 	for _, dep := range deps {
 		siblingsAndSelf := append(s.sel.getDependenciesOn(dep.ID), Dependency{Depender: id, Dep: dep})
-		s.sel.deps[id.ID] = siblingsAndSelf
+		s.sel.deps[dep.ID] = siblingsAndSelf
 
 		// add project to unselected queue if this is the first dep on it -
 		// otherwise it's already in there, or been selected
