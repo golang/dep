@@ -12,22 +12,22 @@ import (
 //
 // This is for narrow use - panics if there are less than two resulting items in
 // the slice.
-func nsvSplit(info string) (id string, version string) {
+func nsvSplit(info string) (name string, version string) {
 	s := strings.SplitN(info, " ", 2)
 	if len(s) < 2 {
-		panic(fmt.Sprintf("Malformed id/version info string '%s'", info))
+		panic(fmt.Sprintf("Malformed name/version info string '%s'", info))
 	}
 
-	id, version = s[0], s[1]
+	name, version = s[0], s[1]
 	return
 }
 
-// mksvpi - "make semver project id"
+// mksvpa - "make semver project atom"
 //
 // Splits the input string on a space, and uses the first two elements as the
-// project name/id and constraint body, respectively.
-func mksvpi(info string) ProjectID {
-	id, v := nsvSplit(info)
+// project name and constraint body, respectively.
+func mksvpa(info string) ProjectAtom {
+	name, v := nsvSplit(info)
 
 	sv, err := semver.NewVersion(v)
 	if err != nil {
@@ -35,8 +35,8 @@ func mksvpi(info string) ProjectID {
 		panic(fmt.Sprintf("Error when converting '%s' into semver: %s", v, err))
 	}
 
-	return ProjectID{
-		ID: ProjectIdentifier(id),
+	return ProjectAtom{
+		Name: ProjectName(name),
 		Version: Version{
 			Type:   V_Semver,
 			Info:   v,
@@ -59,18 +59,18 @@ func mkc(body string, t ConstraintType) Constraint {
 // mksvd - "make semver dependency"
 //
 // Splits the input string on a space, and uses the first two elements as the
-// project name/id and constraint body, respectively.
+// project name and constraint body, respectively.
 func mksvd(info string) ProjectDep {
-	id, v := nsvSplit(info)
+	name, v := nsvSplit(info)
 
 	return ProjectDep{
-		ID:         ProjectIdentifier(id),
+		Name:       ProjectName(name),
 		Constraint: mkc(v, C_Semver),
 	}
 }
 
 type depspec struct {
-	id   ProjectID
+	name ProjectAtom
 	deps []ProjectDep
 }
 
@@ -82,10 +82,10 @@ type depspec struct {
 // As it assembles from the other shortcut methods, it'll panic if anything's
 // malformed.
 //
-// First string is broken out into the id/semver of the main package.
+// First string is broken out into the name/semver of the main package.
 func dsv(pi string, deps ...string) depspec {
 	ds := depspec{
-		id: mksvpi(pi),
+		name: mksvpa(pi),
 	}
 
 	for _, dep := range deps {
@@ -108,8 +108,8 @@ type fixture struct {
 func mkresults(pairs ...string) map[string]string {
 	m := make(map[string]string)
 	for _, pair := range pairs {
-		id, v := nsvSplit(pair)
-		m[id] = v
+		name, v := nsvSplit(pair)
+		m[name] = v
 	}
 
 	return m
@@ -189,11 +189,11 @@ type depspecSourceManager struct {
 	specs []depspec
 }
 
-func (sm *depspecSourceManager) GetProjectInfo(id ProjectID) (ProjectInfo, error) {
+func (sm *depspecSourceManager) GetProjectInfo(pa ProjectAtom) (ProjectInfo, error) {
 	for _, ds := range sm.specs {
-		if id.ID == ds.id.ID && id.Version.Info == ds.id.Version.Info {
+		if pa.Name == ds.name.Name && pa.Version.Info == ds.name.Version.Info {
 			return ProjectInfo{
-				pi:       ds.id,
+				pa:       ds.name,
 				Manifest: ds,
 				Lock:     dummyLock{},
 			}, nil
@@ -201,26 +201,26 @@ func (sm *depspecSourceManager) GetProjectInfo(id ProjectID) (ProjectInfo, error
 	}
 
 	// TODO proper solver-type errors
-	return ProjectInfo{}, fmt.Errorf("Project '%s' at version '%s' could not be found", id.ID, id.Version.Info)
+	return ProjectInfo{}, fmt.Errorf("Project '%s' at version '%s' could not be found", pa.Name, pa.Version.Info)
 }
 
-func (sm *depspecSourceManager) ListVersions(id ProjectIdentifier) (pi []ProjectID, err error) {
+func (sm *depspecSourceManager) ListVersions(name ProjectName) (pi []ProjectAtom, err error) {
 	for _, ds := range sm.specs {
-		if id == ds.id.ID {
-			pi = append(pi, ds.id)
+		if name == ds.name.Name {
+			pi = append(pi, ds.name)
 		}
 	}
 
 	if len(pi) == 0 {
-		err = fmt.Errorf("Project '%s' could not be found", id)
+		err = fmt.Errorf("Project '%s' could not be found", name)
 	}
 
 	return
 }
 
-func (sm *depspecSourceManager) ProjectExists(id ProjectIdentifier) bool {
+func (sm *depspecSourceManager) ProjectExists(name ProjectName) bool {
 	for _, ds := range sm.specs {
-		if id == ds.id.ID {
+		if name == ds.name.Name {
 			return true
 		}
 	}
@@ -243,8 +243,8 @@ func (ds depspec) GetDevDependencies() []ProjectDep {
 }
 
 // impl Spec interface
-func (ds depspec) ID() ProjectIdentifier {
-	return ds.id.ID
+func (ds depspec) Name() ProjectName {
+	return ds.name.Name
 }
 
 type dummyLock struct{}
@@ -260,7 +260,7 @@ func (_ dummyLock) InputHash() string {
 }
 
 // impl Lock interface
-func (_ dummyLock) GetProjectID(_ ProjectIdentifier) *ProjectID {
+func (_ dummyLock) GetProjectAtom(_ ProjectName) *ProjectAtom {
 	return nil
 }
 

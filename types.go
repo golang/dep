@@ -1,38 +1,37 @@
 package vsolver
 
-type ProjectIdentifier string
+type ProjectName string
 
 type Solver interface {
-	Solve(root ProjectInfo, toUpgrade []ProjectIdentifier) Result
+	Solve(root ProjectInfo, toUpgrade []ProjectName) Result
 }
 
-// TODO naming lolol
-type ProjectID struct {
-	ID      ProjectIdentifier
+type ProjectAtom struct {
+	Name    ProjectName
 	Version Version
 }
 
-var emptyPID ProjectID
+var emptyProjectAtom ProjectAtom
 
 type ProjectDep struct {
-	ID         ProjectIdentifier
+	Name       ProjectName
 	Constraint Constraint
 }
 
 type Dependency struct {
-	Depender ProjectID
+	Depender ProjectAtom
 	Dep      ProjectDep
 }
 
-// ProjectInfo holds the spec and lock information for a given ProjectID
+// ProjectInfo holds the spec and lock information for a given ProjectAtom
 type ProjectInfo struct {
-	pi ProjectID
+	pa ProjectAtom
 	Manifest
 	Lock
 }
 
 type Manifest interface {
-	ID() ProjectIdentifier
+	Name() ProjectName
 	GetDependencies() []ProjectDep
 	GetDevDependencies() []ProjectDep
 }
@@ -52,7 +51,7 @@ type Lock interface {
 	InputHash() string
 	// Returns the identifier for a project in the lock file, or nil if the
 	// named project is not present in the lock file
-	GetProjectID(ProjectIdentifier) *ProjectID
+	GetProjectAtom(ProjectName) *ProjectAtom
 }
 
 type lockedProject struct {

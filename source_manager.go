@@ -1,7 +1,11 @@
 package vsolver
 
 type SourceManager interface {
-	GetProjectInfo(ProjectID) (ProjectInfo, error)
-	ListVersions(ProjectIdentifier) ([]ProjectID, error)
-	ProjectExists(ProjectIdentifier) bool
+	GetProjectInfo(ProjectAtom) (ProjectInfo, error)
+	ListVersions(ProjectName) ([]ProjectAtom, error)
+	ProjectExists(ProjectName) bool
+}
+
+type ProjectManager interface {
+	GetProjectInfo() (ProjectInfo, error)
 }

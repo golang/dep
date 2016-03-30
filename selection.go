@@ -3,11 +3,11 @@ package vsolver
 import "strings"
 
 type selection struct {
-	projects []ProjectID
-	deps     map[ProjectIdentifier][]Dependency
+	projects []ProjectAtom
+	deps     map[ProjectName][]Dependency
 }
 
-func (s *selection) getDependenciesOn(id ProjectIdentifier) []Dependency {
+func (s *selection) getDependenciesOn(id ProjectName) []Dependency {
 	if deps, exists := s.deps[id]; exists {
 		return deps
 	}
@@ -15,11 +15,11 @@ func (s *selection) getDependenciesOn(id ProjectIdentifier) []Dependency {
 	return nil
 }
 
-func (s *selection) setDependenciesOn(id ProjectIdentifier, deps []Dependency) {
+func (s *selection) setDependenciesOn(id ProjectName, deps []Dependency) {
 	s.deps[id] = deps
 }
 
-func (s *selection) getConstraint(id ProjectIdentifier) Constraint {
+func (s *selection) getConstraint(id ProjectName) Constraint {
 	deps, exists := s.deps[id]
 	if !exists {
 		return anyConstraint{}
@@ -56,18 +56,18 @@ func (s *selection) getConstraint(id ProjectIdentifier) Constraint {
 	return c
 }
 
-func (s *selection) selected(id ProjectIdentifier) (ProjectID, bool) {
+func (s *selection) selected(id ProjectName) (ProjectAtom, bool) {
 	for _, pi := range s.projects {
-		if pi.ID == id {
+		if pi.Name == id {
 			return pi, true
 		}
 	}
 
-	return ProjectID{}, false
+	return ProjectAtom{}, false
 }
 
 type unselected struct {
-	sl  []ProjectIdentifier
+	sl  []ProjectName
 	cmp func(i, j int) bool
 }
 
@@ -86,7 +86,7 @@ func (u unselected) Swap(i, j int) {
 
 func (u *unselected) Push(x interface{}) {
 	//*u.sl = append(*u.sl, x.(ProjectIdentifier))
-	u.sl = append(u.sl, x.(ProjectIdentifier))
+	u.sl = append(u.sl, x.(ProjectName))
 }
 
 func (u *unselected) Pop() (v interface{}) {
@@ -99,7 +99,7 @@ func (u *unselected) Pop() (v interface{}) {
 
 // remove takes a ProjectIdentifier out of the priority queue (if it was
 // present), then reapplies the heap invariants.
-func (u *unselected) remove(id ProjectIdentifier) {
+func (u *unselected) remove(id ProjectName) {
 	for k, pi := range u.sl {
 		if pi == id {
 			if k == len(u.sl)-1 {

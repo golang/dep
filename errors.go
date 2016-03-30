@@ -30,7 +30,7 @@ func (e *solveError) Error() string {
 }
 
 type noVersionError struct {
-	pi   ProjectIdentifier
+	pn   ProjectName
 	v    string
 	c    Constraint
 	deps []Dependency
@@ -42,7 +42,7 @@ func (e *noVersionError) Error() string {
 }
 
 type disjointConstraintFailure struct {
-	id   ProjectIdentifier
+	pn   ProjectName
 	deps []Dependency
 }
 

@@ -2,7 +2,7 @@ package vsolver
 
 type Result struct {
 	// A list of the projects selected by the solver. nil if solving failed.
-	Projects []ProjectID
+	Projects []ProjectAtom
 
 	// The number of solutions that were attempted
 	Attempts int
