@@ -9,8 +9,8 @@ import (
 type Constraint interface {
 	Type() ConstraintType
 	Body() string
-	Allows(Version) bool
-	UnionAllowsAny(Constraint) bool
+	Admits(Version) bool
+	AdmitsAny(Constraint) bool
 }
 
 // NewConstraint constructs an appropriate Constraint object from the input
@@ -53,7 +53,7 @@ func (c basicConstraint) Body() string {
 	return c.body
 }
 
-func (c basicConstraint) Allows(v Version) bool {
+func (c basicConstraint) Admits(v Version) bool {
 	if VTCTCompat[v.Type]&c.typ == 0 {
 		// version and constraint types are incompatible
 		return false
@@ -63,8 +63,8 @@ func (c basicConstraint) Allows(v Version) bool {
 	return c.body == v.Info
 }
 
-func (c basicConstraint) UnionAllowsAny(c2 Constraint) bool {
-	return (c2.Type() == c.typ && c2.Body() == c.body) || c2.UnionAllowsAny(c)
+func (c basicConstraint) AdmitsAny(c2 Constraint) bool {
+	return (c2.Type() == c.typ && c2.Body() == c.body) || c2.AdmitsAny(c)
 }
 
 // anyConstraint is an unbounded constraint - it matches all other types of
@@ -79,11 +79,11 @@ func (c anyConstraint) Body() string {
 	return "*"
 }
 
-func (c anyConstraint) Allows(v Version) bool {
+func (c anyConstraint) Admits(v Version) bool {
 	return true
 }
 
-func (c anyConstraint) UnionAllowsAny(_ Constraint) bool {
+func (c anyConstraint) AdmitsAny(_ Constraint) bool {
 	return true
 }
 
@@ -92,7 +92,7 @@ type semverConstraint struct {
 	typ ConstraintType
 	// The string text of the constraint
 	body string
-	c    *semver.Constraints
+	c    semver.Constraint
 }
 
 func (c semverConstraint) Type() ConstraintType {
@@ -103,16 +103,16 @@ func (c semverConstraint) Body() string {
 	return c.body
 }
 
-func (c semverConstraint) Allows(v Version) bool {
+func (c semverConstraint) Admits(v Version) bool {
 	if VTCTCompat[v.Type]&c.typ == 0 {
 		// version and constraint types are incompatible
 		return false
 	}
 
-	return c.c.Check(v.SemVer)
+	return c.c.Admits(v.SemVer) != nil
 }
 
-func (c semverConstraint) UnionAllowsAny(c2 Constraint) bool {
+func (c semverConstraint) AdmitsAny(c2 Constraint) bool {
 	if c2.Type()&(C_Semver|C_SemverRange) == 0 {
 		// Union only possible if other constraint is semverish
 		return false

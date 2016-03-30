@@ -158,7 +158,7 @@ func (s *solver) getLockVersionIfValid(ref ProjectIdentifier) *ProjectID {
 	}
 
 	constraint := s.sel.getConstraint(ref)
-	if !constraint.Allows(lockver.Version) {
+	if !constraint.Admits(lockver.Version) {
 		// TODO msg?
 		return nil
 		//} else {
@@ -172,15 +172,15 @@ func (s *solver) checkVersion(pi ProjectID) error {
 	if emptyPID == pi {
 		// TODO we should protect against this case elsewhere, but for now panic
 		// to canary when it's a problem
-		panic("checking version of nil ProjectID pointer")
+		panic("checking version of empty ProjectID")
 	}
 
 	constraint := s.sel.getConstraint(pi.ID)
-	if !constraint.Allows(pi.Version) {
+	if !constraint.Admits(pi.Version) {
 		deps := s.sel.getDependenciesOn(pi.ID)
 		for _, dep := range deps {
 			// TODO grok why this check is needed
-			if !dep.Dep.Constraint.Allows(pi.Version) {
+			if !dep.Dep.Constraint.Admits(pi.Version) {
 				s.fail(dep.Depender.ID)
 			}
 		}
@@ -217,10 +217,10 @@ func (s *solver) checkVersion(pi ProjectID) error {
 		constraint = s.sel.getConstraint(dep.ID)
 		// Ensure the constraint expressed by the dep has at least some possible
 		// overlap with existing constraints.
-		if !constraint.UnionAllowsAny(dep.Constraint) {
+		if !constraint.AdmitsAny(dep.Constraint) {
 			// No match - visit all siblings and identify the disagreement(s)
 			for _, sibling := range selfAndSiblings[:len(selfAndSiblings)-1] {
-				if !sibling.Dep.Constraint.UnionAllowsAny(dep.Constraint) {
+				if !sibling.Dep.Constraint.AdmitsAny(dep.Constraint) {
 					s.fail(sibling.Depender.ID)
 				}
 			}
@@ -233,7 +233,7 @@ func (s *solver) checkVersion(pi ProjectID) error {
 		}
 
 		selected, exists := s.sel.selected(dep.ID)
-		if exists && !dep.Constraint.Allows(selected.Version) {
+		if exists && !dep.Constraint.Admits(selected.Version) {
 			s.fail(dep.ID)
 
 			// TODO msg
