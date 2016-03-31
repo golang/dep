@@ -33,9 +33,10 @@ well-formed system.
   inputs, and produces lock-type information as its output. (An
   implementing tool gets to decide whether these are represented as
   one or two files).
-* A **project** concept, where projects comprise the set of Go
-  packages in a rooted tree on the filesystem. (Generally, the root
-  should be where the manifest/lock are, but that's up to the tool.)
+* A **project** concept, where projects comprise the set of Go packages in a
+  rooted tree on the filesystem. (Generally, the root should be where the
+  manifest/lock are, but that's up to the tool.) Happily, that’s the same set
+  of packages that a `vendor/` directory covers.
 * You don't manually change what's under `vendor/` - leave it up to
   the `vsolver`-driven tool.
 
