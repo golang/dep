@@ -92,7 +92,7 @@ type semverConstraint struct {
 	typ ConstraintType
 	// The string text of the constraint
 	body string
-	c    semver.Constraint
+	c    *semver.Constraints
 }
 
 func (c semverConstraint) Type() ConstraintType {
@@ -109,7 +109,7 @@ func (c semverConstraint) Admits(v Version) bool {
 		return false
 	}
 
-	return c.c.Admits(v.SemVer) != nil
+	return c.c.Check(v.SemVer)
 }
 
 func (c semverConstraint) AdmitsAny(c2 Constraint) bool {

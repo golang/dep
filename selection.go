@@ -21,7 +21,7 @@ func (s *selection) setDependenciesOn(id ProjectName, deps []Dependency) {
 
 func (s *selection) getConstraint(id ProjectName) Constraint {
 	deps, exists := s.deps[id]
-	if !exists {
+	if !exists || len(deps) == 0 {
 		return anyConstraint{}
 	}
 
