@@ -97,17 +97,20 @@ func (sm *sourceManager) getProjectManager(n ProjectName) (*pmState, error) {
 		//return nil, pme
 	}
 
-	// TODO ensure leading dirs exist
-	repo, err := vcs.NewRepo(string(n), fmt.Sprintf("%s/src/%s", sm.cachedir, n))
+	path := fmt.Sprintf("%s/src/%s", sm.cachedir, n)
+	r, err := vcs.NewRepo(string(n), path)
 	if err != nil {
 		// TODO be better
 		return nil, err
 	}
 
 	pm := &projectManager{
-		name:  n,
-		an:    sm.anafac(n),
-		crepo: repo,
+		name: n,
+		an:   sm.anafac(n),
+		crepo: &repo{
+			rpath: fmt.Sprintf("%s/src/%s", sm.cachedir, n),
+			r:     r,
+		},
 	}
 
 	pms := &pmState{

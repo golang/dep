@@ -19,44 +19,51 @@ type ProjectAnalyzer interface {
 
 type projectManager struct {
 	name ProjectName
-	// Mutex controlling general access to the cache repo
-	crmut sync.RWMutex
-	// Object for controlling the cachce repo
-	crepo vcs.Repo
-	// Whether or not the cache repo has been synced (think dvcs) with upstream
-	synced bool
-	ex     ProjectExistence
+	// Object for the cache repository
+	crepo *repo
+	ex    ProjectExistence
 	// Analyzer, created from the injected factory
 	an       ProjectAnalyzer
-	atominfo map[Version]ProjectInfo // key should be some 'atom' type - a string, i think
-	vmap     map[Version]Version     // value is an atom-version, same as above key
+	atominfo map[Revision]ProjectInfo
+	vmap     map[Version]Revision
+}
+
+type repo struct {
+	// Path to the root of the default working copy (NOT the repo itself)
+	rpath string
+	// Mutex controlling general access to the repo
+	mut sync.RWMutex
+	// Object for direct repo interaction
+	r vcs.Repo
+	// Whether or not the cache repo is in sync (think dvcs) with upstream
+	synced bool
 }
 
 func (pm *projectManager) GetInfoAt(v Version) (ProjectInfo, error) {
-	pm.crmut.Lock()
+	pm.crepo.mut.Lock()
 
-	err := pm.crepo.UpdateVersion(v.Info)
-	pm.crmut.Unlock()
+	err := pm.crepo.r.UpdateVersion(v.Info)
+	pm.crepo.mut.Unlock()
 	if err != nil {
 		// TODO More-er proper-er error
 		fmt.Println(err)
 		panic("canary - why is checkout/whatever failing")
 	}
 
-	pm.crmut.RLock()
+	pm.crepo.mut.RLock()
 	i, err := pm.an.GetInfo()
-	pm.crmut.RUnlock()
+	pm.crepo.mut.RUnlock()
 
 	return i, err
 }
 
 func (pm *projectManager) ListVersions() (vlist []Version, err error) {
-	pm.crmut.Lock()
+	pm.crepo.mut.Lock()
 
 	// TODO rigorously figure out what the existence level changes here are
-	err = pm.crepo.Update()
+	err = pm.crepo.r.Update()
 	// Write segment is done, so release write lock
-	pm.crmut.Unlock()
+	pm.crepo.mut.Unlock()
 	if err != nil {
 		// TODO More-er proper-er error
 		fmt.Println(err)
@@ -64,11 +71,11 @@ func (pm *projectManager) ListVersions() (vlist []Version, err error) {
 	}
 
 	// And grab a read lock
-	pm.crmut.RLock()
-	defer pm.crmut.RUnlock()
+	pm.crepo.mut.RLock()
+	defer pm.crepo.mut.RUnlock()
 
 	// TODO this is WILDLY inefficient. do better
-	tags, err := pm.crepo.Tags()
+	tags, err := pm.crepo.r.Tags()
 	if err != nil {
 		// TODO More-er proper-er error
 		fmt.Println(err)
@@ -76,7 +83,7 @@ func (pm *projectManager) ListVersions() (vlist []Version, err error) {
 	}
 
 	for _, tag := range tags {
-		ci, err := pm.crepo.CommitInfo(tag)
+		ci, err := pm.crepo.r.CommitInfo(tag)
 		if err != nil {
 			// TODO More-er proper-er error
 			fmt.Println(err)
@@ -98,7 +105,7 @@ func (pm *projectManager) ListVersions() (vlist []Version, err error) {
 		vlist = append(vlist, v)
 	}
 
-	branches, err := pm.crepo.Branches()
+	branches, err := pm.crepo.r.Branches()
 	if err != nil {
 		// TODO More-er proper-er error
 		fmt.Println(err)
@@ -106,7 +113,7 @@ func (pm *projectManager) ListVersions() (vlist []Version, err error) {
 	}
 
 	for _, branch := range branches {
-		ci, err := pm.crepo.CommitInfo(branch)
+		ci, err := pm.crepo.r.CommitInfo(branch)
 		if err != nil {
 			// TODO More-er proper-er error
 			fmt.Println(err)
