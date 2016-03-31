@@ -10,13 +10,13 @@ import (
 
 type SourceManager interface {
 	GetProjectInfo(ProjectAtom) (ProjectInfo, error)
-	ListVersions(ProjectName) ([]ProjectAtom, error) // TODO convert return to []Version
+	ListVersions(ProjectName) ([]Version, error)
 	ProjectExists(ProjectName) bool
 }
 
 type ProjectManager interface {
 	GetInfoAt(Version) (ProjectInfo, error)
-	ListVersions() ([]ProjectAtom, error) // TODO convert return to []Version
+	ListVersions() ([]Version, error)
 }
 
 type ProjectAnalyzer interface {
@@ -52,7 +52,7 @@ type pmState struct {
 	pm   ProjectManager
 	vcur bool // indicates that we've called ListVersions()
 	// TODO deal w/ possible local/upstream desync on PAs (e.g., tag moved)
-	pas []ProjectAtom // TODO temporary until we have a coherent, overall cache structure
+	vlist []Version // TODO temporary until we have a coherent, overall cache structure
 }
 
 func NewSourceManager(cachedir, basedir string) (SourceManager, error) {
@@ -81,7 +81,7 @@ func (sm *sourceManager) GetProjectInfo(pa ProjectAtom) (ProjectInfo, error) {
 	return pmc.pm.GetInfoAt(pa.Version)
 }
 
-func (sm *sourceManager) ListVersions(n ProjectName) ([]ProjectAtom, error) {
+func (sm *sourceManager) ListVersions(n ProjectName) ([]Version, error) {
 	pmc, err := sm.getProjectManager(n)
 	if err != nil {
 		// TODO More-er proper-er errors
@@ -89,14 +89,14 @@ func (sm *sourceManager) ListVersions(n ProjectName) ([]ProjectAtom, error) {
 	}
 
 	if !pmc.vcur {
-		pmc.pas, err = pmc.pm.ListVersions()
+		pmc.vlist, err = pmc.pm.ListVersions()
 		// TODO this perhaps-expensively retries in the failure case
 		if err != nil {
 			pmc.vcur = true
 		}
 	}
 
-	return pmc.pas, err
+	return pmc.vlist, err
 }
 
 func (sm *sourceManager) ProjectExists(n ProjectName) bool {
@@ -160,7 +160,7 @@ func (pm *projectManager) GetInfoAt(v Version) (ProjectInfo, error) {
 	return i, err
 }
 
-func (pm *projectManager) ListVersions() (atoms []ProjectAtom, err error) {
+func (pm *projectManager) ListVersions() (vlist []Version, err error) {
 	pm.mut.Lock()
 
 	// TODO rigorously figure out what the existence level changes here are
@@ -193,10 +193,6 @@ func (pm *projectManager) ListVersions() (atoms []ProjectAtom, err error) {
 			panic("canary - why is commit info failing")
 		}
 
-		pa := ProjectAtom{
-			Name: pm.name,
-		}
-
 		v := Version{
 			Type:       V_Version,
 			Info:       tag,
@@ -209,8 +205,7 @@ func (pm *projectManager) ListVersions() (atoms []ProjectAtom, err error) {
 			v.Type = V_Semver
 		}
 
-		pa.Version = v
-		atoms = append(atoms, pa)
+		vlist = append(vlist, v)
 	}
 
 	branches, err := pm.repo.Branches()
@@ -228,17 +223,12 @@ func (pm *projectManager) ListVersions() (atoms []ProjectAtom, err error) {
 			panic("canary - why is commit info failing")
 		}
 
-		pa := ProjectAtom{
-			Name: pm.name,
-			Version: Version{
-				Type:       V_Branch,
-				Info:       branch,
-				Underlying: ci.Commit,
-			},
-		}
-
-		atoms = append(atoms, pa)
+		vlist = append(vlist, Version{
+			Type:       V_Branch,
+			Info:       branch,
+			Underlying: ci.Commit,
+		})
 	}
 
-	return atoms, nil
+	return vlist, nil
 }

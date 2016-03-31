@@ -78,11 +78,14 @@ func (s *solver) solve() ([]ProjectAtom, error) {
 			return nil, err
 		}
 
-		if queue.current() == emptyProjectAtom {
+		if queue.current() == emptyVersion {
 			panic("canary - queue is empty, but flow indicates success")
 		}
 
-		s.selectVersion(queue.current())
+		s.selectVersion(ProjectAtom{
+			Name:    queue.ref,
+			Version: queue.current(),
+		})
 		s.versions = append(s.versions, queue)
 	}
 
@@ -122,19 +125,27 @@ func (s *solver) createVersionQueue(ref ProjectName) (*versionQueue, error) {
 // valid, as adjudged by the current constraints.
 func (s *solver) findValidVersion(q *versionQueue) error {
 	var err error
-	if emptyProjectAtom == q.current() {
+	if emptyVersion == q.current() {
 		// TODO this case shouldn't be reachable, but panic here as a canary
 		panic("version queue is empty, should not happen")
 	}
 
-	// TODO worth adding an isEmpty()-type method to VersionQueue?
+	//var name ProjectName
 	for {
-		err = s.checkVersion(q.current())
+		//pretty.Printf("Checking next version for %q\n", q.ref)
+		err = s.checkVersion(ProjectAtom{
+			Name:    q.ref,
+			Version: q.current(),
+		})
 		if err == nil {
 			// we have a good version, can return safely
+			//pretty.Printf("Found valid version %q for %q\n", q.current().Name, q.current().Version.Info)
 			return nil
 		}
 
+		// store name so we can fail on it if it turns out to be the last
+		// possible version in the queue
+		//name = q.current().Name
 		err = q.advance()
 		if err != nil {
 			// Error on advance, have to bail out
@@ -315,7 +326,10 @@ func (s *solver) backtrack() bool {
 		if err := s.findValidVersion(q); err == nil {
 			// Found one! Put it back on the selected queue and stop
 			// backtracking
-			s.selectVersion(q.current())
+			s.selectVersion(ProjectAtom{
+				Name:    q.ref,
+				Version: q.current(),
+			})
 			break
 		}
 

@@ -189,6 +189,8 @@ type depspecSourceManager struct {
 	specs []depspec
 }
 
+var _ SourceManager = &depspecSourceManager{}
+
 func (sm *depspecSourceManager) GetProjectInfo(pa ProjectAtom) (ProjectInfo, error) {
 	for _, ds := range sm.specs {
 		if pa.Name == ds.name.Name && pa.Version.Info == ds.name.Version.Info {
@@ -204,10 +206,10 @@ func (sm *depspecSourceManager) GetProjectInfo(pa ProjectAtom) (ProjectInfo, err
 	return ProjectInfo{}, fmt.Errorf("Project '%s' at version '%s' could not be found", pa.Name, pa.Version.Info)
 }
 
-func (sm *depspecSourceManager) ListVersions(name ProjectName) (pi []ProjectAtom, err error) {
+func (sm *depspecSourceManager) ListVersions(name ProjectName) (pi []Version, err error) {
 	for _, ds := range sm.specs {
 		if name == ds.name.Name {
-			pi = append(pi, ds.name)
+			pi = append(pi, ds.name.Version)
 		}
 	}
 
