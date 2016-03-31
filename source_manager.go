@@ -2,9 +2,7 @@ package vsolver
 
 import (
 	"fmt"
-	"sync"
 
-	"github.com/Masterminds/semver"
 	"github.com/Masterminds/vcs"
 )
 
@@ -12,15 +10,6 @@ type SourceManager interface {
 	GetProjectInfo(ProjectAtom) (ProjectInfo, error)
 	ListVersions(ProjectName) ([]Version, error)
 	ProjectExists(ProjectName) bool
-}
-
-type ProjectManager interface {
-	GetInfoAt(Version) (ProjectInfo, error)
-	ListVersions() ([]Version, error)
-}
-
-type ProjectAnalyzer interface {
-	GetInfo() (ProjectInfo, error)
 }
 
 // ExistenceError is a specialized error type that, in addition to the standard
@@ -64,12 +53,6 @@ func NewSourceManager(cachedir, basedir string) (SourceManager, error) {
 
 	// TODO drop file lock on cachedir somewhere, here. Caller needs a panic
 	// recovery in a defer to be really proper, though
-}
-
-type projectInfo struct {
-	name     ProjectName
-	atominfo map[Version]ProjectInfo // key should be some 'atom' type - a string, i think
-	vmap     map[Version]Version     // value is an atom-version, same as above key
 }
 
 func (sm *sourceManager) GetProjectInfo(pa ProjectAtom) (ProjectInfo, error) {
@@ -122,9 +105,9 @@ func (sm *sourceManager) getProjectManager(n ProjectName) (*pmState, error) {
 	}
 
 	pm := &projectManager{
-		name: n,
-		an:   sm.anafac(n),
-		repo: repo,
+		name:  n,
+		an:    sm.anafac(n),
+		crepo: repo,
 	}
 
 	pms := &pmState{
@@ -132,103 +115,4 @@ func (sm *sourceManager) getProjectManager(n ProjectName) (*pmState, error) {
 	}
 	sm.pms[n] = pms
 	return pms, nil
-}
-
-type projectManager struct {
-	name ProjectName
-	mut  sync.RWMutex
-	repo vcs.Repo
-	ex   ProjectExistence
-	an   ProjectAnalyzer
-}
-
-func (pm *projectManager) GetInfoAt(v Version) (ProjectInfo, error) {
-	pm.mut.Lock()
-
-	err := pm.repo.UpdateVersion(v.Info)
-	pm.mut.Unlock()
-	if err != nil {
-		// TODO More-er proper-er error
-		fmt.Println(err)
-		panic("canary - why is checkout/whatever failing")
-	}
-
-	pm.mut.RLock()
-	i, err := pm.an.GetInfo()
-	pm.mut.RUnlock()
-
-	return i, err
-}
-
-func (pm *projectManager) ListVersions() (vlist []Version, err error) {
-	pm.mut.Lock()
-
-	// TODO rigorously figure out what the existence level changes here are
-	err = pm.repo.Update()
-	// Write segment is done, so release write lock
-	pm.mut.Unlock()
-	if err != nil {
-		// TODO More-er proper-er error
-		fmt.Println(err)
-		panic("canary - why is update failing")
-	}
-
-	// And grab a read lock
-	pm.mut.RLock()
-	defer pm.mut.RUnlock()
-
-	// TODO this is WILDLY inefficient. do better
-	tags, err := pm.repo.Tags()
-	if err != nil {
-		// TODO More-er proper-er error
-		fmt.Println(err)
-		panic("canary - why is tags failing")
-	}
-
-	for _, tag := range tags {
-		ci, err := pm.repo.CommitInfo(tag)
-		if err != nil {
-			// TODO More-er proper-er error
-			fmt.Println(err)
-			panic("canary - why is commit info failing")
-		}
-
-		v := Version{
-			Type:       V_Version,
-			Info:       tag,
-			Underlying: ci.Commit,
-		}
-
-		sv, err := semver.NewVersion(tag)
-		if err != nil {
-			v.SemVer = sv
-			v.Type = V_Semver
-		}
-
-		vlist = append(vlist, v)
-	}
-
-	branches, err := pm.repo.Branches()
-	if err != nil {
-		// TODO More-er proper-er error
-		fmt.Println(err)
-		panic("canary - why is branches failing")
-	}
-
-	for _, branch := range branches {
-		ci, err := pm.repo.CommitInfo(branch)
-		if err != nil {
-			// TODO More-er proper-er error
-			fmt.Println(err)
-			panic("canary - why is commit info failing")
-		}
-
-		vlist = append(vlist, Version{
-			Type:       V_Branch,
-			Info:       branch,
-			Underlying: ci.Commit,
-		})
-	}
-
-	return vlist, nil
 }
