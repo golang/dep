@@ -1,13 +1,12 @@
 # vsolver
 
-`vsolver` is a
-[SAT solver](https://www.wikiwand.com/en/Boolean_satisfiability_problem)
-specifically built as an engine for Go package management. The initial
-plan is integration into
-[glide](https://github.com/Masterminds/glide), but `vsolver` could be
-used by any tool interested in
-[fully solving](www.mancoosi.org/edos/manager/)
-[the package management problem](https://medium.com/@sdboyer/so-you-want-to-write-a-package-manager-4ae9c17d9527).
+`vsolver` is a specialized [SAT
+solver](https://www.wikiwand.com/en/Boolean_satisfiability_problem), designed
+as an engine for Go package management. The initial plan is integration into
+[glide](https://github.com/Masterminds/glide), but `vsolver` could be used by
+any tool interested in [fully solving](www.mancoosi.org/edos/manager/) [the
+package management
+problem](https://medium.com/@sdboyer/so-you-want-to-write-a-package-manager-4ae9c17d9527).
 
 **NOTE - `vsolver` is super-extra-much not functional yet :)**
 
@@ -46,10 +45,14 @@ code. Unfortunately, though, that idea goes off the rails as soon as
 versioning and cross-project/repository dependencies happen, because
 [universe alignment is hard](https://medium.com/@sdboyer/so-you-want-to-write-a-package-manager-4ae9c17d9527).
 
-Disliking solvers because *"It seems complicated, idiomatic Go things
-are simple!"* or *"(Tool X) uses a solver and I don't like the UX!"*
-is just shooting the messenger. SAT solvers are not the enemy - it's
-the challenges inherent in the dependency resolution problem domain.
+Some folks are against using a solver in Go - even just the concept. Their
+reasons for it often include things like *"(Tool X) uses a solver and I don't
+like that tool’s UX!"* or *"It seems complicated, and idiomatic Go things are
+simple!"* But that’s just shooting the messenger. Dependency resolution is a
+well-understood, NP-complete problem. It’s that problem that’s the enemy, not solvers.
+And especially not this one! It’s a friendly solver - one that aims for
+transparency in the choices it makes, and the resolution failures it
+encounters.
 
 ## Features
 
