@@ -19,13 +19,30 @@ type ProjectAnalyzer interface {
 
 type projectManager struct {
 	name ProjectName
+	// Cache dir and top-level project vendor dir. Basically duplicated from
+	// sourceManager.
+	cachedir, vendordir string
 	// Object for the cache repository
 	crepo *repo
 	ex    ProjectExistence
 	// Analyzer, created from the injected factory
-	an       ProjectAnalyzer
-	atominfo map[Revision]ProjectInfo
-	vmap     map[Version]Revision
+	an ProjectAnalyzer
+	// Whether the cache has the latest info on versions
+	cvsync bool
+	// The list of versions. Kept separate from the data cache because this is
+	// accessed in the hot loop; we don't want to rebuild and realloc for it.
+	vlist []Version
+	// The project metadata cache. This is persisted to disk, for reuse across
+	// solver runs.
+	dc *projectDataCache
+}
+
+// TODO figure out shape of versions, then implement marshaling/unmarshaling
+type projectDataCache struct {
+	Version string                   `json:"version"` // TODO use this
+	Infos   map[Revision]ProjectInfo `json:"infos"`
+	VMap    map[Version]Revision     `json:"vmap"`
+	RMap    map[Revision][]Version   `json:"rmap"`
 }
 
 type repo struct {
@@ -58,24 +75,49 @@ func (pm *projectManager) GetInfoAt(v Version) (ProjectInfo, error) {
 }
 
 func (pm *projectManager) ListVersions() (vlist []Version, err error) {
-	pm.crepo.mut.Lock()
+	if !pm.cvsync {
+		pm.vlist, err = pm.crepo.getCurrentVersionPairs()
+		if err != nil {
+			// TODO More-er proper-er error
+			fmt.Println(err)
+			return nil, err
+		}
+
+		pm.cvsync = true
+
+		// Process the version data into the cache
+		// TODO detect out-of-sync data as we do this?
+		for _, v := range pm.vlist {
+			pm.dc.VMap[v] = v.Underlying
+			pm.dc.RMap[v.Underlying] = append(pm.dc.RMap[v.Underlying], v)
+		}
+	}
+
+	return pm.vlist, nil
+}
+
+func (r *repo) getCurrentVersionPairs() (vlist []Version, err error) {
+	r.mut.Lock()
 
 	// TODO rigorously figure out what the existence level changes here are
-	err = pm.crepo.r.Update()
+	err = r.r.Update()
 	// Write segment is done, so release write lock
-	pm.crepo.mut.Unlock()
+	r.mut.Unlock()
 	if err != nil {
 		// TODO More-er proper-er error
 		fmt.Println(err)
 		panic("canary - why is update failing")
 	}
 
+	// crepo has been synced, mark it as such
+	r.synced = true
+
 	// And grab a read lock
-	pm.crepo.mut.RLock()
-	defer pm.crepo.mut.RUnlock()
+	r.mut.RLock()
+	defer r.mut.RUnlock()
 
 	// TODO this is WILDLY inefficient. do better
-	tags, err := pm.crepo.r.Tags()
+	tags, err := r.r.Tags()
 	if err != nil {
 		// TODO More-er proper-er error
 		fmt.Println(err)
@@ -83,7 +125,7 @@ func (pm *projectManager) ListVersions() (vlist []Version, err error) {
 	}
 
 	for _, tag := range tags {
-		ci, err := pm.crepo.r.CommitInfo(tag)
+		ci, err := r.r.CommitInfo(tag)
 		if err != nil {
 			// TODO More-er proper-er error
 			fmt.Println(err)
@@ -93,7 +135,7 @@ func (pm *projectManager) ListVersions() (vlist []Version, err error) {
 		v := Version{
 			Type:       V_Version,
 			Info:       tag,
-			Underlying: ci.Commit,
+			Underlying: Revision(ci.Commit),
 		}
 
 		sv, err := semver.NewVersion(tag)
@@ -105,7 +147,7 @@ func (pm *projectManager) ListVersions() (vlist []Version, err error) {
 		vlist = append(vlist, v)
 	}
 
-	branches, err := pm.crepo.r.Branches()
+	branches, err := r.r.Branches()
 	if err != nil {
 		// TODO More-er proper-er error
 		fmt.Println(err)
@@ -113,7 +155,7 @@ func (pm *projectManager) ListVersions() (vlist []Version, err error) {
 	}
 
 	for _, branch := range branches {
-		ci, err := pm.crepo.r.CommitInfo(branch)
+		ci, err := r.r.CommitInfo(branch)
 		if err != nil {
 			// TODO More-er proper-er error
 			fmt.Println(err)
@@ -123,7 +165,7 @@ func (pm *projectManager) ListVersions() (vlist []Version, err error) {
 		vlist = append(vlist, Version{
 			Type:       V_Branch,
 			Info:       branch,
-			Underlying: ci.Commit,
+			Underlying: Revision(ci.Commit),
 		})
 	}
 

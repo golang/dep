@@ -105,8 +105,14 @@ func (sm *sourceManager) getProjectManager(n ProjectName) (*pmState, error) {
 	}
 
 	pm := &projectManager{
-		name: n,
-		an:   sm.anafac(n),
+		name:      n,
+		cachedir:  sm.cachedir,
+		vendordir: sm.basedir + "/vendor",
+		an:        sm.anafac(n),
+		dc: &projectDataCache{
+			VMap: make(map[Version]Revision),
+			RMap: make(map[Revision][]Version),
+		},
 		crepo: &repo{
 			rpath: fmt.Sprintf("%s/src/%s", sm.cachedir, n),
 			r:     r,

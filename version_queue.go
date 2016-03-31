@@ -1,14 +1,14 @@
 package vsolver
 
 type versionQueue struct {
-	ref                ProjectIdentifier
-	pi                 []ProjectID
+	ref                ProjectName
+	pi                 []Version
+	sm                 SourceManager
 	failed             bool
 	hasLock, allLoaded bool
-	sm                 SourceManager
 }
 
-func newVersionQueue(ref ProjectIdentifier, lockv *ProjectID, sm SourceManager) (*versionQueue, error) {
+func newVersionQueue(ref ProjectName, lockv *ProjectAtom, sm SourceManager) (*versionQueue, error) {
 	vq := &versionQueue{
 		ref: ref,
 		sm:  sm,
@@ -16,7 +16,7 @@ func newVersionQueue(ref ProjectIdentifier, lockv *ProjectID, sm SourceManager) 
 
 	if lockv != nil {
 		vq.hasLock = true
-		vq.pi = append(vq.pi, *lockv)
+		vq.pi = append(vq.pi, lockv.Version)
 	} else {
 		var err error
 		vq.pi, err = vq.sm.ListVersions(vq.ref)
@@ -32,12 +32,12 @@ func newVersionQueue(ref ProjectIdentifier, lockv *ProjectID, sm SourceManager) 
 	return vq, nil
 }
 
-func (vq *versionQueue) current() ProjectID {
+func (vq *versionQueue) current() Version {
 	if len(vq.pi) > 0 {
 		return vq.pi[0]
 	}
 
-	return ProjectID{}
+	return Version{}
 }
 
 func (vq *versionQueue) advance() (err error) {
