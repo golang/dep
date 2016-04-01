@@ -447,7 +447,7 @@ func (s *solver) backtrack() bool {
 			// pop last vqueue off of versions
 			//q, s.versions := s.versions[len(s.versions)-1], s.versions[:len(s.versions)-1]
 			// pub asserts here that the last in s.sel's ids is == q.current
-			s.versions = s.versions[:len(s.versions)-1]
+			s.versions, s.versions[len(s.versions)-1] = s.versions[:len(s.versions)-1], nil
 			s.unselectLast()
 		}
 
@@ -464,19 +464,28 @@ func (s *solver) backtrack() bool {
 		// another assert that the last in s.sel's ids is == q.current
 		s.unselectLast()
 
-		// Search for another acceptable version of this failed dep in its queue
-		if err := s.findValidVersion(q); err == nil {
-			// Found one! Put it back on the selected queue and stop
-			// backtracking
-			s.selectVersion(ProjectAtom{
-				Name:    q.ref,
-				Version: q.current(),
-			})
-			break
+		// Advance the queue past the current version, which we know is bad
+		if q.advance() == nil && !q.isExhausted() {
+			// Search for another acceptable version of this failed dep in its queue
+			if s.findValidVersion(q) == nil {
+				// Found one! Put it back on the selected queue and stop
+				// backtracking
+				s.selectVersion(ProjectAtom{
+					Name:    q.ref,
+					Version: q.current(),
+				})
+				break
+			}
 		}
 
-		// No solution found; continue backtracking after popping the last
-		// version off the list
+		if s.l.Level >= logrus.InfoLevel {
+			s.l.WithFields(logrus.Fields{
+				"name": q.ref,
+			}).Info("Failed to find a valid version in queue, continuing backtrack")
+		}
+
+		// No solution found; continue backtracking after popping the queue
+		// we just inspected off the list
 		// GC-friendly pop pointer elem in slice
 		s.versions, s.versions[len(s.versions)-1] = s.versions[:len(s.versions)-1], nil
 	}
