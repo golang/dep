@@ -1,17 +1,27 @@
 package vsolver
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/Sirupsen/logrus"
+)
 
 func TestBasicSolves(t *testing.T) {
 	solveAndBasicChecks(0, t)
 	solveAndBasicChecks(1, t)
-	//solveAndBasicChecks(2, t)
+	solveAndBasicChecks(2, t)
 }
 
 func solveAndBasicChecks(fixnum int, t *testing.T) Result {
 	fix := fixtures[fixnum]
 	sm := &depspecSourceManager{specs: fix.ds}
-	s := NewSolver(sm)
+	l := logrus.New()
+
+	if testing.Verbose() {
+		l.Level = logrus.DebugLevel
+	}
+
+	s := NewSolver(sm, l)
 
 	p, err := sm.GetProjectInfo(fix.ds[0].name)
 	if err != nil {

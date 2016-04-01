@@ -3,6 +3,8 @@ package vsolver
 import (
 	"container/heap"
 	"fmt"
+
+	"github.com/Sirupsen/logrus"
 )
 
 //type SolveFailure uint
@@ -13,14 +15,20 @@ import (
 //IncompatibleVersionType
 //)
 
-func NewSolver(sm SourceManager) Solver {
+func NewSolver(sm SourceManager, l *logrus.Logger) Solver {
+	if l == nil {
+		l = logrus.New()
+	}
+
 	return &solver{
 		sm: sm,
+		l:  l,
 	}
 }
 
 // solver is a backtracking-style SAT solver.
 type solver struct {
+	l        *logrus.Logger
 	sm       SourceManager
 	latest   map[ProjectName]struct{}
 	sel      *selection
@@ -61,9 +69,18 @@ func (s *solver) Solve(root ProjectInfo, toUpgrade []ProjectName) Result {
 func (s *solver) solve() ([]ProjectAtom, error) {
 	for {
 		ref, has := s.nextUnselected()
+
 		if !has {
 			// no more packages to select - we're done. bail out
 			break
+		}
+
+		if s.l.Level >= logrus.DebugLevel {
+			s.l.WithFields(logrus.Fields{
+				"attempts": s.attempts,
+				"name":     ref,
+				"selcount": len(s.sel.projects),
+			}).Debug("Beginning step in solve loop")
 		}
 
 		queue, err := s.createVersionQueue(ref)
@@ -82,6 +99,13 @@ func (s *solver) solve() ([]ProjectAtom, error) {
 			panic("canary - queue is empty, but flow indicates success")
 		}
 
+		if s.l.Level >= logrus.InfoLevel {
+			s.l.WithFields(logrus.Fields{
+				"name":    queue.ref,
+				"version": queue.current().Info,
+			}).Info("Found acceptable project atom")
+		}
+
 		s.selectVersion(ProjectAtom{
 			Name:    queue.ref,
 			Version: queue.current(),
@@ -98,7 +122,6 @@ func (s *solver) solve() ([]ProjectAtom, error) {
 }
 
 func (s *solver) createVersionQueue(ref ProjectName) (*versionQueue, error) {
-	//pretty.Printf("Creating VersionQueue for %q\n", ref)
 	// If on the root package, there's no queue to make
 	if ref == s.rp.Name() {
 		return newVersionQueue(ref, nil, s.sm)
@@ -107,6 +130,11 @@ func (s *solver) createVersionQueue(ref ProjectName) (*versionQueue, error) {
 	if !s.sm.ProjectExists(ref) {
 		// TODO this check needs to incorporate/admit the possibility that the
 		// upstream no longer exists, but there's something valid in vendor/
+		if s.l.Level >= logrus.WarnLevel {
+			s.l.WithFields(logrus.Fields{
+				"name": ref,
+			}).Warn("Upstream project does not exist")
+		}
 		return nil, newSolveError(fmt.Sprintf("Project '%s' could not be located.", ref), cannotResolve)
 	}
 	lockv := s.getLockVersionIfValid(ref)
@@ -115,7 +143,26 @@ func (s *solver) createVersionQueue(ref ProjectName) (*versionQueue, error) {
 	if err != nil {
 		// TODO this particular err case needs to be improved to be ONLY for cases
 		// where there's absolutely nothing findable about a given project name
+		if s.l.Level >= logrus.WarnLevel {
+			s.l.WithFields(logrus.Fields{
+				"name": ref,
+				"err":  err,
+			}).Warn("Failed to create a version queue")
+		}
 		return nil, err
+	}
+
+	if s.l.Level >= logrus.DebugLevel {
+		if lockv == nil {
+			s.l.WithFields(logrus.Fields{
+				"name": ref,
+			}).Debug("Created VersionQueue, but no data in lock for project")
+		} else {
+			s.l.WithFields(logrus.Fields{
+				"name":  ref,
+				"lockv": lockv.Version.Info,
+			}).Debug("Created VersionQueue using version found in lock")
+		}
 	}
 
 	return q, s.findValidVersion(q)
@@ -130,30 +177,50 @@ func (s *solver) findValidVersion(q *versionQueue) error {
 		panic("version queue is empty, should not happen")
 	}
 
-	//var name ProjectName
+	if s.l.Level >= logrus.DebugLevel {
+		s.l.WithFields(logrus.Fields{
+			"name":      q.ref,
+			"hasLock":   q.hasLock,
+			"allLoaded": q.allLoaded,
+		}).Debug("Beginning search through VersionQueue for a valid version")
+	}
+
 	for {
-		//pretty.Printf("Checking next version for %q\n", q.ref)
 		err = s.checkVersion(ProjectAtom{
 			Name:    q.ref,
 			Version: q.current(),
 		})
 		if err == nil {
 			// we have a good version, can return safely
-			//pretty.Printf("Found valid version %q for %q\n", q.current().Name, q.current().Version.Info)
+			if s.l.Level >= logrus.DebugLevel {
+				s.l.WithFields(logrus.Fields{
+					"name":    q.ref,
+					"version": q.current().Info,
+				}).Debug("Found acceptable version, returning out")
+			}
 			return nil
 		}
 
-		// store name so we can fail on it if it turns out to be the last
-		// possible version in the queue
-		//name = q.current().Name
 		err = q.advance()
 		if err != nil {
 			// Error on advance, have to bail out
+			if s.l.Level >= logrus.WarnLevel {
+				s.l.WithFields(logrus.Fields{
+					"name": q.ref,
+					"err":  err,
+				}).Warn("Advancing version queue returned unexpected error, marking project as failed")
+			}
 			break
 		}
 		if q.isExhausted() {
 			// Queue is empty, bail with error
 			err = newSolveError(fmt.Sprintf("Exhausted queue for %q without finding a satisfactory version.", q.ref), mustResolve)
+			if s.l.Level >= logrus.InfoLevel {
+				s.l.WithFields(logrus.Fields{
+					"name": q.ref,
+					"err":  err,
+				}).Info("Version queue was completely exhausted, marking project as failed")
+			}
 			break
 		}
 	}
@@ -187,12 +254,36 @@ func (s *solver) checkVersion(pi ProjectAtom) error {
 		panic("checking version of empty ProjectAtom")
 	}
 
+	if s.l.Level >= logrus.DebugLevel {
+		s.l.WithFields(logrus.Fields{
+			"name":    pi.Name,
+			"version": pi.Version.Info,
+		}).Debug("Checking acceptability of project atom against current constraints")
+	}
+
 	constraint := s.sel.getConstraint(pi.Name)
 	if !constraint.Admits(pi.Version) {
+		// TODO collect constraint failure reason
+
+		if s.l.Level >= logrus.InfoLevel {
+			s.l.WithFields(logrus.Fields{
+				"name":       pi.Name,
+				"version":    pi.Version.Info,
+				"constraint": constraint,
+			}).Info("Constraint does not allow version")
+		}
+
 		deps := s.sel.getDependenciesOn(pi.Name)
 		for _, dep := range deps {
 			// TODO grok why this check is needed
 			if !dep.Dep.Constraint.Admits(pi.Version) {
+				if s.l.Level >= logrus.InfoLevel {
+					s.l.WithFields(logrus.Fields{
+						"name":       pi.Name,
+						"othername":  dep.Depender.Name,
+						"constraint": dep.Dep.Constraint,
+					}).Info("Marking other, selected project with conflicting constraint as failed")
+				}
 				s.fail(dep.Depender.Name)
 			}
 		}
@@ -221,18 +312,34 @@ func (s *solver) checkVersion(pi ProjectAtom) error {
 	for _, dep := range deps {
 		// TODO dart skips "magic" deps here; do we need that?
 
-		// TODO maybe differentiate between the confirmed items on the list, and
-		// the one we're speculatively adding? or it may be fine b/c we know
-		// it's the last one
-		selfAndSiblings := append(s.sel.getDependenciesOn(dep.Name), Dependency{Depender: pi, Dep: dep})
+		siblings := s.sel.getDependenciesOn(dep.Name)
 
 		constraint = s.sel.getConstraint(dep.Name)
 		// Ensure the constraint expressed by the dep has at least some possible
-		// overlap with existing constraints.
+		// intersection with the intersection of existing constraints.
 		if !constraint.AdmitsAny(dep.Constraint) {
-			// No match - visit all siblings and identify the disagreement(s)
-			for _, sibling := range selfAndSiblings[:len(selfAndSiblings)-1] {
+			if s.l.Level >= logrus.InfoLevel {
+				s.l.WithFields(logrus.Fields{
+					"name":          pi.Name,
+					"version":       pi.Version.Info,
+					"depname":       dep.Name,
+					"curconstraint": constraint.Body(),
+					"newconstraint": dep.Constraint.Body(),
+				}).Info("Project atom cannot be added; its constraints are disjoint with existing constraints")
+			}
+
+			// No admissible versions - visit all siblings and identify the disagreement(s)
+			for _, sibling := range siblings {
 				if !sibling.Dep.Constraint.AdmitsAny(dep.Constraint) {
+					if s.l.Level >= logrus.InfoLevel {
+						s.l.WithFields(logrus.Fields{
+							"name":          pi.Name,
+							"version":       pi.Version.Info,
+							"depname":       sibling.Depender.Name,
+							"sibconstraint": sibling.Dep.Constraint.Body(),
+							"newconstraint": dep.Constraint.Body(),
+						}).Info("Marking other, selected project as failed because its constraint is disjoint with our input")
+					}
 					s.fail(sibling.Depender.Name)
 				}
 			}
@@ -240,25 +347,41 @@ func (s *solver) checkVersion(pi ProjectAtom) error {
 			// TODO msg
 			return &disjointConstraintFailure{
 				pn:   dep.Name,
-				deps: selfAndSiblings,
+				deps: append(siblings, Dependency{Depender: pi, Dep: dep}),
 			}
 		}
 
 		selected, exists := s.sel.selected(dep.Name)
 		if exists && !dep.Constraint.Admits(selected.Version) {
+			if s.l.Level >= logrus.InfoLevel {
+				s.l.WithFields(logrus.Fields{
+					"name":          pi.Name,
+					"version":       pi.Version.Info,
+					"depname":       dep.Name,
+					"curversion":    selected.Version.Info,
+					"newconstraint": dep.Constraint.Body(),
+				}).Info("Project atom cannot be added; the constraint it introduces on dep does not allow the currently selected version for that dep")
+			}
 			s.fail(dep.Name)
 
 			// TODO msg
 			return &noVersionError{
 				pn:   dep.Name,
 				c:    dep.Constraint,
-				deps: selfAndSiblings,
+				deps: append(siblings, Dependency{Depender: pi, Dep: dep}),
 			}
 		}
 
 		// At this point, dart/pub do things related to 'required' dependencies,
 		// which is about solving loops (i think) and so mostly not something we
 		// have to care about.
+	}
+
+	if s.l.Level >= logrus.DebugLevel {
+		s.l.WithFields(logrus.Fields{
+			"name":    pi.Name,
+			"version": pi.Version.Info,
+		}).Debug("Project atom passed satisfiability test against current state")
 	}
 
 	return nil
@@ -301,8 +424,19 @@ func (s *solver) backtrack() bool {
 		return false
 	}
 
+	if s.l.Level >= logrus.InfoLevel {
+		s.l.WithFields(logrus.Fields{
+			"selcount":   len(s.sel.projects),
+			"queuecount": len(s.versions),
+			"attempts":   s.attempts,
+		}).Info("Beginning backtracking")
+	}
+
 	for {
 		for {
+			if s.l.Level >= logrus.DebugLevel {
+				s.l.WithField("queuecount", len(s.versions)).Debug("Top of search loop for failed queues")
+			}
 			if len(s.versions) == 0 {
 				// no more versions, nowhere further to backtrack
 				return false
@@ -319,6 +453,14 @@ func (s *solver) backtrack() bool {
 
 		// Grab the last VersionQueue off the list of queues
 		q := s.versions[len(s.versions)-1]
+
+		if s.l.Level >= logrus.InfoLevel {
+			s.l.WithFields(logrus.Fields{
+				"name":    q.ref,
+				"failver": q.current().Info,
+			}).Info("Found queue marked failed, attempting move forward")
+		}
+
 		// another assert that the last in s.sel's ids is == q.current
 		s.unselectLast()
 
@@ -423,9 +565,7 @@ func (s *solver) selectVersion(pa ProjectAtom) {
 		// add project to unselected queue if this is the first dep on it -
 		// otherwise it's already in there, or been selected
 		if len(siblingsAndSelf) == 1 {
-			//pretty.Printf("pushing %q onto unselected queue\n", dep.Name)
 			heap.Push(s.unsel, dep.Name)
-			//pretty.Println("unsel after push:", s.unsel.sl)
 		}
 	}
 }
@@ -434,7 +574,6 @@ func (s *solver) unselectLast() {
 	var pa ProjectAtom
 	pa, s.sel.projects = s.sel.projects[len(s.sel.projects)-1], s.sel.projects[:len(s.sel.projects)-1]
 	heap.Push(s.unsel, pa.Name)
-	//pretty.Println("unsel after restore:", s.unsel.sl)
 
 	deps, err := s.getDependenciesOf(pa)
 	if err != nil {
@@ -445,8 +584,8 @@ func (s *solver) unselectLast() {
 	}
 
 	for _, dep := range deps {
-		siblings := s.sel.getDependenciesOn(pa.Name)
-		s.sel.deps[pa.Name] = siblings[:len(siblings)-1]
+		siblings := s.sel.getDependenciesOn(dep.Name)
+		s.sel.deps[dep.Name] = siblings[:len(siblings)-1]
 
 		// if no siblings, remove from unselected queue
 		if len(siblings) == 0 {
