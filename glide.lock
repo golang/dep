@@ -1,6 +1,16 @@
-hash: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
-updated: 2016-03-17T11:16:52.823191803-04:00
+hash: 6327fb979acfc5e3ff565d70623465ed1798d2709f5fce73e7b214408473fc52
+updated: 2016-04-01T00:59:51.731341925-04:00
 imports:
 - name: github.com/Masterminds/semver
-  version: 808ed7761c233af2de3f9729a041d68c62527f3a
+  version: 59762782ee93b06c0e4c54297b95e02b096edb7d
+  repo: git@github.com:sdboyer/semver
+  vcs: git
+- name: github.com/Masterminds/vcs
+  version: b22ee1673cdd03ef47bb0b422736a7f17ff0648c
+- name: github.com/Sirupsen/logrus
+  version: 4b6ea7319e214d98c938f12692336f7ca9348d6b
+- name: golang.org/x/sys
+  version: 320cb01ddbbf0473674c2585f9b6e245721de355
+  subpackages:
+  - unix
 devImports: []

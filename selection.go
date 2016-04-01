@@ -1,7 +1,5 @@
 package vsolver
 
-import "strings"
-
 type selection struct {
 	projects []ProjectAtom
 	deps     map[ProjectName][]Dependency
@@ -31,29 +29,14 @@ func (s *selection) getConstraint(id ProjectName) Constraint {
 	// The solver itself is expected to maintain the invariant that all the
 	// constraints kept here collectively admit a non-empty set of versions. We
 	// assume this is the case here while assembling a composite constraint.
-	//
-	// TODO verify that this invariant is maintained; also verify that the slice
-	// can't be empty
 
-	// If the first constraint requires an exact match, then we know all the
-	// others must be identical, so just return the first one
-	if deps[0].Dep.Constraint.Type()&C_ExactMatch != 0 {
-		return deps[0].Dep.Constraint
-	}
-
-	// Otherwise, we're dealing with semver ranges, so we have to compute the
-	// constraint intersection
-	var cs []string
+	// Start with the open set
+	var ret Constraint = anyConstraint{}
 	for _, dep := range deps {
-		cs = append(cs, dep.Dep.Constraint.Body())
+		ret = ret.Intersect(dep.Dep.Constraint)
 	}
 
-	c, err := NewConstraint(C_SemverRange, strings.Join(cs, ", "))
-	if err != nil {
-		panic("canary - something wrong with constraint computation")
-	}
-
-	return c
+	return ret
 }
 
 func (s *selection) selected(id ProjectName) (ProjectAtom, bool) {

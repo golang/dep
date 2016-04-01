@@ -1,4 +1,8 @@
 package: github.com/sdboyer/vsolver
 import:
 - package: github.com/Masterminds/semver
-  version: ~1.1.0
+  repo: git@github.com:sdboyer/semver
+  version: constraints
+  vcs: git
+- package: github.com/Sirupsen/logrus
+  version: 0.10.0

@@ -1,126 +1,38 @@
 package semver
 
 import (
-	"errors"
 	"fmt"
 	"regexp"
+	"sort"
 	"strings"
 )
 
-// Constraints is one or more constraint that a semantic version can be
-// checked against.
-type Constraints struct {
-	constraints [][]*constraint
-}
-
-// NewConstraint returns a Constraints instance that a Version instance can
-// be checked against. If there is a parse error it will be returned.
-func NewConstraint(c string) (*Constraints, error) {
-
-	// Rewrite - ranges into a comparison operation.
-	c = rewriteRange(c)
-
-	ors := strings.Split(c, "||")
-	or := make([][]*constraint, len(ors))
-	for k, v := range ors {
-		cs := strings.Split(v, ",")
-		result := make([]*constraint, len(cs))
-		for i, s := range cs {
-			pc, err := parseConstraint(s)
-			if err != nil {
-				return nil, err
-			}
-
-			result[i] = pc
-		}
-		or[k] = result
-	}
-
-	o := &Constraints{constraints: or}
-	return o, nil
-}
-
-// Check tests if a version satisfies the constraints.
-func (cs Constraints) Check(v *Version) bool {
-	// loop over the ORs and check the inner ANDs
-	for _, o := range cs.constraints {
-		joy := true
-		for _, c := range o {
-			if !c.check(v) {
-				joy = false
-				break
-			}
-		}
-
-		if joy {
-			return true
-		}
-	}
-
-	return false
-}
-
-// Validate checks if a version satisfies a constraint. If not a slice of
-// reasons for the failure are returned in addition to a bool.
-func (cs Constraints) Validate(v *Version) (bool, []error) {
-	// loop over the ORs and check the inner ANDs
-	var e []error
-	for _, o := range cs.constraints {
-		joy := true
-		for _, c := range o {
-			if !c.check(v) {
-				em := fmt.Errorf(c.msg, v, c.orig)
-				e = append(e, em)
-				joy = false
-			}
-		}
-
-		if joy {
-			return true, []error{}
-		}
-	}
-
-	return false, e
-}
-
-var constraintOps map[string]cfunc
-var constraintMsg map[string]string
 var constraintRegex *regexp.Regexp
+var constraintRangeRegex *regexp.Regexp
+
+const cvRegex string = `v?([0-9|x|X|\*]+)(\.[0-9|x|X|\*]+)?(\.[0-9|x|X|\*]+)?` +
+	`(-([0-9A-Za-z\-]+(\.[0-9A-Za-z\-]+)*))?` +
+	`(\+([0-9A-Za-z\-]+(\.[0-9A-Za-z\-]+)*))?`
 
 func init() {
-	constraintOps = map[string]cfunc{
-		"":   constraintTildeOrEqual,
-		"=":  constraintTildeOrEqual,
-		"!=": constraintNotEqual,
-		">":  constraintGreaterThan,
-		"<":  constraintLessThan,
-		">=": constraintGreaterThanEqual,
-		"=>": constraintGreaterThanEqual,
-		"<=": constraintLessThanEqual,
-		"=<": constraintLessThanEqual,
-		"~":  constraintTilde,
-		"~>": constraintTilde,
-		"^":  constraintCaret,
-	}
-
-	constraintMsg = map[string]string{
-		"":   "%s is not equal to %s",
-		"=":  "%s is not equal to %s",
-		"!=": "%s is equal to %s",
-		">":  "%s is less than or equal to %s",
-		"<":  "%s is greater than or equal to %s",
-		">=": "%s is less than %s",
-		"=>": "%s is less than %s",
-		"<=": "%s is greater than %s",
-		"=<": "%s is greater than %s",
-		"~":  "%s does not have same major and minor version as %s",
-		"~>": "%s does not have same major and minor version as %s",
-		"^":  "%s does not have same major version as %s",
+	constraintOps := []string{
+		"",
+		"=",
+		"!=",
+		">",
+		"<",
+		">=",
+		"=>",
+		"<=",
+		"=<",
+		"~",
+		"~>",
+		"^",
 	}
 
 	ops := make([]string, 0, len(constraintOps))
-	for k := range constraintOps {
-		ops = append(ops, regexp.QuoteMeta(k))
+	for _, op := range constraintOps {
+		ops = append(ops, regexp.QuoteMeta(op))
 	}
 
 	constraintRegex = regexp.MustCompile(fmt.Sprintf(
@@ -133,208 +45,268 @@ func init() {
 		cvRegex, cvRegex))
 }
 
-// An individual constraint
-type constraint struct {
-	// The callback function for the restraint. It performs the logic for
-	// the constraint.
-	function cfunc
+type Constraint interface {
+	// Constraints compose the fmt.Stringer interface. Printing a constraint
+	// will yield a string that, if passed to NewConstraint(), will produce the
+	// original constraint. (Bidirectional serialization)
+	fmt.Stringer
 
-	msg string
+	// Admits checks that a version satisfies the constraint. If it does not,
+	// an error is returned indcating the problem; if it does, the error is nil.
+	Admits(v *Version) error
 
-	// The version used in the constraint check. For example, if a constraint
-	// is '<= 2.0.0' the con a version instance representing 2.0.0.
-	con *Version
+	// Intersect computes the intersection between the receiving Constraint and
+	// passed Constraint, and returns a new Constraint representing the result.
+	Intersect(Constraint) Constraint
 
-	// The original parsed version (e.g., 4.x from != 4.x)
-	orig string
+	// Union computes the union between the receiving Constraint and the passed
+	// Constraint, and returns a new Constraint representing the result.
+	Union(Constraint) Constraint
 
-	// When an x is used as part of the version (e.g., 1.x)
-	minorDirty bool
-	dirty      bool
+	// AdmitsAny returns a bool indicating whether there exists any version that
+	// satisfies both the receiver constraint, and the passed Constraint.
+	//
+	// In other words, this reports whether an intersection would be non-empty.
+	AdmitsAny(Constraint) bool
+
+	// Restrict implementation of this interface to this package. We need the
+	// flexibility of an interface, but we cover all possibilities here; closing
+	// off the interface to external implementation lets us safely do tricks
+	// with types for magic types (none and any)
+	_private()
 }
 
-// Check if a version meets the constraint
-func (c *constraint) check(v *Version) bool {
-	return c.function(v, c)
+// realConstraint is used internally to differentiate between any, none, and
+// unionConstraints, vs. Version and rangeConstraints.
+type realConstraint interface {
+	Constraint
+	_real()
 }
 
-type cfunc func(v *Version, c *constraint) bool
+// Controls whether or not parsed constraints are cached
+var cacheConstraints = true
+var constraintCache = make(map[string]Constraint)
 
-func parseConstraint(c string) (*constraint, error) {
-	m := constraintRegex.FindStringSubmatch(c)
-	if m == nil {
-		return nil, fmt.Errorf("improper constraint: %s", c)
+// NewConstraint takes a string representing a set of semver constraints, and
+// returns a corresponding Constraint object. Constraints are suitable
+// for checking Versions for admissibility, or combining with other Constraint
+// objects.
+//
+// If an invalid constraint string is passed, more information is provided in
+// the returned error string.
+func NewConstraint(in string) (Constraint, error) {
+	if cacheConstraints {
+		// This means reparsing errors, but oh well
+		if final, exists := constraintCache[in]; exists {
+			return final, nil
+		}
 	}
 
-	ver := m[2]
-	orig := ver
-	minorDirty := false
-	dirty := false
-	if isX(m[3]) {
-		ver = "0.0.0"
-		dirty = true
-	} else if isX(strings.TrimPrefix(m[4], ".")) {
-		minorDirty = true
-		dirty = true
-		ver = fmt.Sprintf("%s.0.0%s", m[3], m[6])
-	} else if isX(strings.TrimPrefix(m[5], ".")) {
-		dirty = true
-		ver = fmt.Sprintf("%s%s.0%s", m[3], m[4], m[6])
+	// Rewrite - ranges into a comparison operation.
+	c := rewriteRange(in)
+
+	ors := strings.Split(c, "||")
+	or := make([]Constraint, len(ors))
+	for k, v := range ors {
+		cs := strings.Split(v, ",")
+		result := make([]Constraint, len(cs))
+		for i, s := range cs {
+			pc, err := parseConstraint(s)
+			if err != nil {
+				return nil, err
+			}
+
+			result[i] = pc
+		}
+		or[k] = Intersection(result...)
 	}
 
-	con, err := NewVersion(ver)
-	if err != nil {
-
-		// The constraintRegex should catch any regex parsing errors. So,
-		// we should never get here.
-		return nil, errors.New("constraint Parser Error")
+	final := Union(or...)
+	if cacheConstraints {
+		constraintCache[in] = final
 	}
 
-	cs := &constraint{
-		function:   constraintOps[m[1]],
-		msg:        constraintMsg[m[1]],
-		con:        con,
-		orig:       orig,
-		minorDirty: minorDirty,
-		dirty:      dirty,
-	}
-	return cs, nil
+	return final, nil
 }
 
-// Constraint functions
-func constraintNotEqual(v *Version, c *constraint) bool {
-	if c.dirty {
-		if c.con.Major() != v.Major() {
+// Intersection computes the intersection between N Constraints, returning as
+// compact a representation of the intersection as possible.
+//
+// No error is indicated if all the sets are collectively disjoint; you must inspect the
+// return value to see if the result is the empty set (indicated by both
+// IsMagic() being true, and AdmitsAny() being false).
+func Intersection(cg ...Constraint) Constraint {
+	// If there's zero or one constraints in the group, we can quit fast
+	switch len(cg) {
+	case 0:
+		// Zero members, only sane thing to do is return none
+		return None()
+	case 1:
+		// Just one member means that's our final constraint
+		return cg[0]
+	}
+
+	// Preliminary first pass to look for a none (that would supercede everything
+	// else), and also construct a []realConstraint for everything else
+	var real constraintList
+
+	for _, c := range cg {
+		switch tc := c.(type) {
+		case any:
+			continue
+		case none:
+			return c
+		case *Version:
+			real = append(real, tc)
+		case rangeConstraint:
+			real = append(real, tc)
+		case unionConstraint:
+			real = append(real, tc...)
+		default:
+			panic("unknown constraint type")
+		}
+	}
+
+	sort.Sort(real)
+
+	// Now we know there's no easy wins, so step through and intersect each with
+	// the previous
+	car, cdr := cg[0], cg[1:]
+	for _, c := range cdr {
+		car = car.Intersect(c)
+		if IsNone(car) {
+			return None()
+		}
+	}
+
+	return car
+}
+
+// Union takes a variable number of constraints, and returns the most compact
+// possible representation of those constraints.
+//
+// This effectively ORs together all the provided constraints. If any of the
+// included constraints are the set of all versions (any), that supercedes
+// everything else.
+func Union(cg ...Constraint) Constraint {
+	// If there's zero or one constraints in the group, we can quit fast
+	switch len(cg) {
+	case 0:
+		// Zero members, only sane thing to do is return none
+		return None()
+	case 1:
+		// One member, so the result will just be that
+		return cg[0]
+	}
+
+	// Preliminary pass to look for 'any' in the current set (and bail out early
+	// if found), but also construct a []realConstraint for everything else
+	var real constraintList
+
+	for _, c := range cg {
+		switch tc := c.(type) {
+		case any:
+			return c
+		case none:
+			continue
+		case *Version:
+			real = append(real, tc)
+		case rangeConstraint:
+			real = append(real, tc)
+		case unionConstraint:
+			real = append(real, tc...)
+		default:
+			panic("unknown constraint type")
+		}
+	}
+
+	// Sort both the versions and ranges into ascending order
+	sort.Sort(real)
+
+	// Iteratively merge the constraintList elements
+	var nuc unionConstraint
+	for _, c := range real {
+		if len(nuc) == 0 {
+			nuc = append(nuc, c)
+			continue
+		}
+
+		last := nuc[len(nuc)-1]
+		if last.AdmitsAny(c) || areAdjacent(last, c) {
+			nuc[len(nuc)-1] = last.Union(c).(realConstraint)
+		} else {
+			nuc = append(nuc, c)
+		}
+	}
+
+	if len(nuc) == 1 {
+		return nuc[0]
+	}
+	return nuc
+}
+
+type ascendingRanges []rangeConstraint
+
+func (rs ascendingRanges) Len() int {
+	return len(rs)
+}
+
+func (rs ascendingRanges) Less(i, j int) bool {
+	ir, jr := rs[i].max, rs[j].max
+	inil, jnil := ir == nil, jr == nil
+
+	if !inil && !jnil {
+		if ir.LessThan(jr) {
 			return true
 		}
-		if c.con.Minor() != v.Minor() && !c.minorDirty {
-			return true
-		} else if c.minorDirty {
+		if jr.LessThan(ir) {
 			return false
 		}
 
-		return false
-	}
+		// Last possible - if i is inclusive, but j isn't, then put i after j
+		if !rs[j].includeMax && rs[i].includeMax {
+			return false
+		}
 
-	return !v.Equal(c.con)
-}
-
-func constraintGreaterThan(v *Version, c *constraint) bool {
-	return v.Compare(c.con) == 1
-}
-
-func constraintLessThan(v *Version, c *constraint) bool {
-	if !c.dirty {
-		return v.Compare(c.con) < 0
-	}
-
-	if v.Major() > c.con.Major() {
-		return false
-	} else if v.Minor() > c.con.Minor() && !c.minorDirty {
-		return false
-	}
-
-	return true
-}
-
-func constraintGreaterThanEqual(v *Version, c *constraint) bool {
-	return v.Compare(c.con) >= 0
-}
-
-func constraintLessThanEqual(v *Version, c *constraint) bool {
-	if !c.dirty {
-		return v.Compare(c.con) <= 0
-	}
-
-	if v.Major() > c.con.Major() {
-		return false
-	} else if v.Minor() > c.con.Minor() && !c.minorDirty {
-		return false
-	}
-
-	return true
-}
-
-// ~*, ~>* --> >= 0.0.0 (any)
-// ~2, ~2.x, ~2.x.x, ~>2, ~>2.x ~>2.x.x --> >=2.0.0, <3.0.0
-// ~2.0, ~2.0.x, ~>2.0, ~>2.0.x --> >=2.0.0, <2.1.0
-// ~1.2, ~1.2.x, ~>1.2, ~>1.2.x --> >=1.2.0, <1.3.0
-// ~1.2.3, ~>1.2.3 --> >=1.2.3, <1.3.0
-// ~1.2.0, ~>1.2.0 --> >=1.2.0, <1.3.0
-func constraintTilde(v *Version, c *constraint) bool {
-	if v.LessThan(c.con) {
-		return false
-	}
-
-	// ~0.0.0 is a special case where all constraints are accepted. It's
-	// equivalent to >= 0.0.0.
-	if c.con.Major() == 0 && c.con.Minor() == 0 && c.con.Patch() == 0 {
+		// Or, if j inclusive, but i isn't...but actually, since we can't return
+		// 0 on this comparator, this handles both that and the 'stable' case
 		return true
+	} else if inil || jnil {
+		// ascending, so, if jnil, then j has no max but i does, so i should
+		// come first. thus, return jnil
+		return jnil
 	}
 
-	if v.Major() != c.con.Major() {
-		return false
+	// neither have maxes, so now go by the lowest min
+	ir, jr = rs[i].min, rs[j].min
+	inil, jnil = ir == nil, jr == nil
+
+	if !inil && !jnil {
+		if ir.LessThan(jr) {
+			return true
+		}
+		if jr.LessThan(ir) {
+			return false
+		}
+
+		// Last possible - if j is inclusive, but i isn't, then put i after j
+		if rs[j].includeMin && !rs[i].includeMin {
+			return false
+		}
+
+		// Or, if i inclusive, but j isn't...but actually, since we can't return
+		// 0 on this comparator, this handles both that and the 'stable' case
+		return true
+	} else if inil || jnil {
+		// ascending, so, if inil, then i has no min but j does, so j should
+		// come first. thus, return inil
+		return inil
 	}
 
-	if v.Minor() != c.con.Minor() && !c.minorDirty {
-		return false
-	}
-
+	// Default to keeping i before j
 	return true
 }
 
-// When there is a .x (dirty) status it automatically opts in to ~. Otherwise
-// it's a straight =
-func constraintTildeOrEqual(v *Version, c *constraint) bool {
-	if c.dirty {
-		c.msg = constraintMsg["~"]
-		return constraintTilde(v, c)
-	}
-
-	return v.Equal(c.con)
-}
-
-// ^* --> (any)
-// ^2, ^2.x, ^2.x.x --> >=2.0.0, <3.0.0
-// ^2.0, ^2.0.x --> >=2.0.0, <3.0.0
-// ^1.2, ^1.2.x --> >=1.2.0, <2.0.0
-// ^1.2.3 --> >=1.2.3, <2.0.0
-// ^1.2.0 --> >=1.2.0, <2.0.0
-func constraintCaret(v *Version, c *constraint) bool {
-	if v.LessThan(c.con) {
-		return false
-	}
-
-	if v.Major() != c.con.Major() {
-		return false
-	}
-
-	return true
-}
-
-type rwfunc func(i string) string
-
-var constraintRangeRegex *regexp.Regexp
-
-const cvRegex string = `v?([0-9|x|X|\*]+)(\.[0-9|x|X|\*]+)?(\.[0-9|x|X|\*]+)?` +
-	`(-([0-9A-Za-z\-]+(\.[0-9A-Za-z\-]+)*))?` +
-	`(\+([0-9A-Za-z\-]+(\.[0-9A-Za-z\-]+)*))?`
-
-func isX(x string) bool {
-	l := strings.ToLower(x)
-	return l == "x" || l == "*"
-}
-
-func rewriteRange(i string) string {
-	m := constraintRangeRegex.FindAllStringSubmatch(i, -1)
-	if m == nil {
-		return i
-	}
-	o := i
-	for _, v := range m {
-		t := fmt.Sprintf(">= %s, <= %s", v[1], v[11])
-		o = strings.Replace(o, v[0], t, 1)
-	}
-
-	return o
+func (rs ascendingRanges) Swap(i, j int) {
+	rs[i], rs[j] = rs[j], rs[i]
 }

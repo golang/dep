@@ -19,6 +19,10 @@ var (
 	ErrInvalidSemVer = errors.New("Invalid Semantic Version")
 )
 
+// Controls whether or not parsed constraints are cached
+var cacheVersions = true
+var versionCache = make(map[string]*Version)
+
 // SemVerRegex id the regular expression used to parse a semantic version.
 const SemVerRegex string = `v?([0-9]+)(\.[0-9]+)?(\.[0-9]+)?` +
 	`(-([0-9A-Za-z\-]+(\.[0-9A-Za-z\-]+)*))?` +
@@ -39,6 +43,12 @@ func init() {
 // NewVersion parses a given version and returns an instance of Version or
 // an error if unable to parse the version.
 func NewVersion(v string) (*Version, error) {
+	if cacheVersions {
+		if sv, exists := versionCache[v]; exists {
+			return sv, nil
+		}
+	}
+
 	m := versionRegex.FindStringSubmatch(v)
 	if m == nil {
 		return nil, ErrInvalidSemVer
@@ -75,6 +85,10 @@ func NewVersion(v string) (*Version, error) {
 		sv.patch = temp
 	} else {
 		sv.patch = 0
+	}
+
+	if cacheVersions {
+		versionCache[v] = sv
 	}
 
 	return sv, nil
@@ -131,11 +145,21 @@ func (v *Version) Metadata() string {
 
 // LessThan tests if one version is less than another one.
 func (v *Version) LessThan(o *Version) bool {
+	// If a nil version was passed, fail and bail out early.
+	if o == nil {
+		return false
+	}
+
 	return v.Compare(o) < 0
 }
 
 // GreaterThan tests if one version is greater than another one.
 func (v *Version) GreaterThan(o *Version) bool {
+	// If a nil version was passed, fail and bail out early.
+	if o == nil {
+		return false
+	}
+
 	return v.Compare(o) > 0
 }
 
@@ -143,6 +167,11 @@ func (v *Version) GreaterThan(o *Version) bool {
 // Note, versions can be equal with different metadata since metadata
 // is not considered part of the comparable version.
 func (v *Version) Equal(o *Version) bool {
+	// If a nil version was passed, fail and bail out early.
+	if o == nil {
+		return false
+	}
+
 	return v.Compare(o) == 0
 }
 
@@ -152,12 +181,6 @@ func (v *Version) Equal(o *Version) bool {
 // Versions are compared by X.Y.Z. Build metadata is ignored. Prerelease is
 // lower than the version without a prerelease.
 func (v *Version) Compare(o *Version) int {
-
-	// Fastpath if both versions are the same.
-	if v.String() == o.String() {
-		return 0
-	}
-
 	// Compare the major, minor, and patch version for differences. If a
 	// difference is found return the comparison.
 	if d := compareSegment(v.Major(), o.Major()); d != 0 {
@@ -186,6 +209,48 @@ func (v *Version) Compare(o *Version) int {
 
 	return comparePrerelease(ps, po)
 }
+
+func (v *Version) Admits(v2 *Version) error {
+	if v.Equal(v2) {
+		return nil
+	}
+
+	return versionConstraintError{v: v, other: v2}
+}
+
+func (v *Version) AdmitsAny(c Constraint) bool {
+	if v2, ok := c.(*Version); ok {
+		return false
+	} else {
+		return v.Equal(v2)
+	}
+}
+
+func (v *Version) Intersect(c Constraint) Constraint {
+	if v2, ok := c.(*Version); ok {
+		if v.Equal(v2) {
+			return v
+		}
+		return none{}
+	}
+
+	return c.Intersect(v)
+}
+
+func (v *Version) IsMagic() bool {
+	return false
+}
+
+func (v *Version) Union(c Constraint) Constraint {
+	if v2, ok := c.(*Version); ok && v.Equal(v2) {
+		return v
+	} else {
+		return Union(v, v2)
+	}
+}
+
+func (Version) _private() {}
+func (Version) _real()    {}
 
 func compareSegment(v, o int64) int {
 	if v < o {
@@ -268,4 +333,15 @@ func comparePrePart(s, o string) int {
 		return 1
 	}
 	return -1
+}
+
+func areEq(v1, v2 *Version) bool {
+	if v1 == nil && v2 == nil {
+		return true
+	}
+
+	if v1 != nil && v2 != nil {
+		return v1.Equal(v2)
+	}
+	return false
 }

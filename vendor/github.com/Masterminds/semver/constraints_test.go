@@ -1,27 +1,52 @@
 package semver
 
-import (
-	"reflect"
-	"testing"
-)
+import "testing"
 
 func TestParseConstraint(t *testing.T) {
 	tests := []struct {
 		in  string
-		f   cfunc
-		v   string
+		c   Constraint
 		err bool
 	}{
-		{">= 1.2", constraintGreaterThanEqual, "1.2.0", false},
-		{"1.0", constraintTildeOrEqual, "1.0.0", false},
-		{"foo", nil, "", true},
-		{"<= 1.2", constraintLessThanEqual, "1.2.0", false},
-		{"=< 1.2", constraintLessThanEqual, "1.2.0", false},
-		{"=> 1.2", constraintGreaterThanEqual, "1.2.0", false},
-		{"v1.2", constraintTildeOrEqual, "1.2.0", false},
-		{"=1.5", constraintTildeOrEqual, "1.5.0", false},
-		{"> 1.3", constraintGreaterThan, "1.3.0", false},
-		{"< 1.4.1", constraintLessThan, "1.4.1", false},
+		{"*", Any(), false},
+		{">= 1.2", rangeConstraint{
+			min:        newV(1, 2, 0),
+			includeMin: true,
+		}, false},
+		{"1.0", newV(1, 0, 0), false},
+		{"foo", nil, true},
+		{"<= 1.2", rangeConstraint{
+			max:        newV(1, 2, 0),
+			includeMax: true,
+		}, false},
+		{"=< 1.2", rangeConstraint{
+			max:        newV(1, 2, 0),
+			includeMax: true,
+		}, false},
+		{"=> 1.2", rangeConstraint{
+			min:        newV(1, 2, 0),
+			includeMin: true,
+		}, false},
+		{"v1.2", newV(1, 2, 0), false},
+		{"=1.5", newV(1, 5, 0), false},
+		{"> 1.3", rangeConstraint{
+			min: newV(1, 3, 0),
+		}, false},
+		{"< 1.4.1", rangeConstraint{
+			max: newV(1, 4, 1),
+		}, false},
+		{"~1.1.0", rangeConstraint{
+			min:        newV(1, 1, 0),
+			max:        newV(1, 2, 0),
+			includeMin: true,
+			includeMax: false,
+		}, false},
+		{"^1.1.0", rangeConstraint{
+			min:        newV(1, 1, 0),
+			max:        newV(2, 0, 0),
+			includeMin: true,
+			includeMax: false,
+		}, false},
 	}
 
 	for _, tc := range tests {
@@ -29,7 +54,7 @@ func TestParseConstraint(t *testing.T) {
 		if tc.err && err == nil {
 			t.Errorf("Expected error for %s didn't occur", tc.in)
 		} else if !tc.err && err != nil {
-			t.Errorf("Unexpected error for %s", tc.in)
+			t.Errorf("Unexpected error %q for %s", err, tc.in)
 		}
 
 		// If an error was expected continue the loop and don't try the other
@@ -38,15 +63,84 @@ func TestParseConstraint(t *testing.T) {
 			continue
 		}
 
-		if tc.v != c.con.String() {
+		if !constraintEq(tc.c, c) {
 			t.Errorf("Incorrect version found on %s", tc.in)
 		}
+	}
+}
 
-		f1 := reflect.ValueOf(tc.f)
-		f2 := reflect.ValueOf(c.function)
-		if f1 != f2 {
-			t.Errorf("Wrong constraint found for %s", tc.in)
+func constraintEq(c1, c2 Constraint) bool {
+	switch tc1 := c1.(type) {
+	case any:
+		if _, ok := c2.(any); !ok {
+			return false
 		}
+		return true
+	case none:
+		if _, ok := c2.(none); !ok {
+			return false
+		}
+		return true
+	case *Version:
+		if tc2, ok := c2.(*Version); ok {
+			return tc1.Equal(tc2)
+		}
+		return false
+	case rangeConstraint:
+		if tc2, ok := c2.(rangeConstraint); ok {
+			if len(tc1.excl) != len(tc2.excl) {
+				return false
+			}
+
+			if tc1.min != nil {
+				if !(tc1.includeMin == tc2.includeMin && tc1.min.Equal(tc2.min)) {
+					return false
+				}
+			} else if tc2.min != nil {
+				return false
+			}
+
+			if tc1.max != nil {
+				if !(tc1.includeMax == tc2.includeMax && tc1.max.Equal(tc2.max)) {
+					return false
+				}
+			} else if tc2.max != nil {
+				return false
+			}
+
+			for k, e := range tc1.excl {
+				if !e.Equal(tc2.excl[k]) {
+					return false
+				}
+			}
+			return true
+		}
+		return false
+	case unionConstraint:
+		if tc2, ok := c2.(unionConstraint); ok {
+			if len(tc1) != len(tc2) {
+				return false
+			}
+
+			for k, c := range tc1 {
+				if !constraintEq(c, tc2[k]) {
+					return false
+				}
+			}
+			return true
+		}
+		return false
+	}
+
+	panic("unknown type")
+}
+
+// newV is a helper to create a new Version object.
+func newV(major, minor, patch int64) *Version {
+	return &Version{
+		major: major,
+		minor: minor,
+		patch: patch,
 	}
 }
 
@@ -72,6 +166,8 @@ func TestConstraintCheck(t *testing.T) {
 		{"<=1.1", "0.1.0", true},
 		{"<=1.1", "1.1.0", true},
 		{"<=1.1", "1.1.1", false},
+		//{"<2.0.0", "2.0.0-alpha1", false},
+		//{"<=2.0.0", "2.0.0-alpha1", true},
 	}
 
 	for _, tc := range tests {
@@ -87,7 +183,7 @@ func TestConstraintCheck(t *testing.T) {
 			continue
 		}
 
-		a := c.check(v)
+		a := c.Admits(v) == nil
 		if a != tc.check {
 			t.Errorf("Constraint '%s' failing", tc.constraint)
 		}
@@ -97,22 +193,74 @@ func TestConstraintCheck(t *testing.T) {
 func TestNewConstraint(t *testing.T) {
 	tests := []struct {
 		input string
-		ors   int
-		count int
+		c     Constraint
 		err   bool
 	}{
-		{">= 1.1", 1, 1, false},
-		{"2.0", 1, 1, false},
-		{">= bar", 0, 0, true},
-		{">= 1.2.3, < 2.0", 1, 2, false},
-		{">= 1.2.3, < 2.0 || => 3.0, < 4", 2, 2, false},
-
-		// The 3-4 should be broken into 2 by the range rewriting
-		{"3-4 || => 3.0, < 4", 2, 2, false},
+		{">= 1.1", rangeConstraint{
+			min:        newV(1, 1, 0),
+			includeMin: true,
+		}, false},
+		{"2.0", newV(2, 0, 0), false},
+		{">= bar", nil, true},
+		{"^1.1.0", rangeConstraint{
+			min:        newV(1, 1, 0),
+			max:        newV(2, 0, 0),
+			includeMin: true,
+		}, false},
+		{">= 1.2.3, < 2.0 || => 3.0, < 4", unionConstraint{
+			rangeConstraint{
+				min:        newV(1, 2, 3),
+				max:        newV(2, 0, 0),
+				includeMin: true,
+			},
+			rangeConstraint{
+				min:        newV(3, 0, 0),
+				max:        newV(4, 0, 0),
+				includeMin: true,
+			},
+		}, false},
+		{"3-4 || => 1.0, < 2", Union(
+			rangeConstraint{
+				min:        newV(3, 0, 0),
+				max:        newV(4, 0, 0),
+				includeMin: true,
+				includeMax: true,
+			},
+			rangeConstraint{
+				min:        newV(1, 0, 0),
+				max:        newV(2, 0, 0),
+				includeMin: true,
+			},
+		), false},
+		// demonstrates union compression
+		{"3-4 || => 3.0, < 4", rangeConstraint{
+			min:        newV(3, 0, 0),
+			max:        newV(4, 0, 0),
+			includeMin: true,
+			includeMax: true,
+		}, false},
+		{">=1.1.0, <2.0.0", rangeConstraint{
+			min:        newV(1, 1, 0),
+			max:        newV(2, 0, 0),
+			includeMin: true,
+			includeMax: false,
+		}, false},
+		{"!=1.4.0", rangeConstraint{
+			excl: []*Version{
+				newV(1, 4, 0),
+			},
+		}, false},
+		{">=1.1.0, !=1.4.0", rangeConstraint{
+			min:        newV(1, 1, 0),
+			includeMin: true,
+			excl: []*Version{
+				newV(1, 4, 0),
+			},
+		}, false},
 	}
 
 	for _, tc := range tests {
-		v, err := NewConstraint(tc.input)
+		c, err := NewConstraint(tc.input)
 		if tc.err && err == nil {
 			t.Errorf("expected but did not get error for: %s", tc.input)
 			continue
@@ -124,16 +272,8 @@ func TestNewConstraint(t *testing.T) {
 			continue
 		}
 
-		l := len(v.constraints)
-		if tc.ors != l {
-			t.Errorf("Expected %s to have %d ORs but got %d",
-				tc.input, tc.ors, l)
-		}
-
-		l = len(v.constraints[0])
-		if tc.count != l {
-			t.Errorf("Expected %s to have %d constraints but got %d",
-				tc.input, tc.count, l)
+		if !constraintEq(tc.c, c) {
+			t.Errorf("%q produced constraint %q, but expected %q", tc.input, c, tc.c)
 		}
 	}
 }
@@ -145,7 +285,9 @@ func TestConstraintsCheck(t *testing.T) {
 		check      bool
 	}{
 		{"*", "1.2.3", true},
-		{"~0.0.0", "1.2.3", true},
+		{"~0.0.0", "1.2.3", false}, // npm allows this weird thing, but we don't
+		{"~0.0.0", "0.1.9", false},
+		{"~0.0.0", "0.0.9", true},
 		{"= 2.0", "1.2.3", false},
 		{"= 2.0", "2.0.0", true},
 		{"4.1", "4.1.0", true},
@@ -215,9 +357,13 @@ func TestConstraintsCheck(t *testing.T) {
 			continue
 		}
 
-		a := c.Check(v)
+		a := c.Admits(v) == nil
 		if a != tc.check {
-			t.Errorf("Constraint '%s' failing with '%s'", tc.constraint, tc.version)
+			if a {
+				t.Errorf("Input %q produced constraint %q; should not have admitted %q, but did", tc.constraint, c, tc.version)
+			} else {
+				t.Errorf("Input %q produced constraint %q; should have admitted %q, but did not", tc.constraint, c, tc.version)
+			}
 		}
 	}
 }
@@ -257,172 +403,6 @@ func TestIsX(t *testing.T) {
 		a := isX(tc.t)
 		if a != tc.c {
 			t.Errorf("Function isX error on %s", tc.t)
-		}
-	}
-}
-
-func TestConstraintsValidate(t *testing.T) {
-	tests := []struct {
-		constraint string
-		version    string
-		check      bool
-	}{
-		{"*", "1.2.3", true},
-		{"~0.0.0", "1.2.3", true},
-		{"= 2.0", "1.2.3", false},
-		{"= 2.0", "2.0.0", true},
-		{"4.1", "4.1.0", true},
-		{"4.1.x", "4.1.3", true},
-		{"1.x", "1.4", true},
-		{"!=4.1", "4.1.0", false},
-		{"!=4.1", "5.1.0", true},
-		{"!=4.x", "5.1.0", true},
-		{"!=4.x", "4.1.0", false},
-		{"!=4.1.x", "4.2.0", true},
-		{"!=4.2.x", "4.2.3", false},
-		{">1.1", "4.1.0", true},
-		{">1.1", "1.1.0", false},
-		{"<1.1", "0.1.0", true},
-		{"<1.1", "1.1.0", false},
-		{"<1.1", "1.1.1", false},
-		{"<1.x", "1.1.1", true},
-		{"<1.x", "2.1.1", false},
-		{"<1.1.x", "1.2.1", false},
-		{"<1.1.x", "1.1.500", true},
-		{"<1.2.x", "1.1.1", true},
-		{">=1.1", "4.1.0", true},
-		{">=1.1", "1.1.0", true},
-		{">=1.1", "0.0.9", false},
-		{"<=1.1", "0.1.0", true},
-		{"<=1.1", "1.1.0", true},
-		{"<=1.x", "1.1.0", true},
-		{"<=2.x", "3.1.0", false},
-		{"<=1.1", "1.1.1", false},
-		{"<=1.1.x", "1.2.500", false},
-		{">1.1, <2", "1.1.1", true},
-		{">1.1, <3", "4.3.2", false},
-		{">=1.1, <2, !=1.2.3", "1.2.3", false},
-		{">=1.1, <2, !=1.2.3 || > 3", "3.1.2", true},
-		{">=1.1, <2, !=1.2.3 || >= 3", "3.0.0", true},
-		{">=1.1, <2, !=1.2.3 || > 3", "3.0.0", false},
-		{">=1.1, <2, !=1.2.3 || > 3", "1.2.3", false},
-		{"1.1 - 2", "1.1.1", true},
-		{"1.1-3", "4.3.2", false},
-		{"^1.1", "1.1.1", true},
-		{"^1.1", "4.3.2", false},
-		{"^1.x", "1.1.1", true},
-		{"^2.x", "1.1.1", false},
-		{"^1.x", "2.1.1", false},
-		{"~*", "2.1.1", true},
-		{"~1.x", "2.1.1", false},
-		{"~1.x", "1.3.5", true},
-		{"~1.x", "1.4", true},
-		{"~1.1", "1.1.1", true},
-		{"~1.2.3", "1.2.5", true},
-		{"~1.2.3", "1.2.2", false},
-		{"~1.2.3", "1.3.2", false},
-		{"~1.1", "1.2.3", false},
-		{"~1.3", "2.4.5", false},
-	}
-
-	for _, tc := range tests {
-		c, err := NewConstraint(tc.constraint)
-		if err != nil {
-			t.Errorf("err: %s", err)
-			continue
-		}
-
-		v, err := NewVersion(tc.version)
-		if err != nil {
-			t.Errorf("err: %s", err)
-			continue
-		}
-
-		a, msgs := c.Validate(v)
-		if a != tc.check {
-			t.Errorf("Constraint '%s' failing with '%s'", tc.constraint, tc.version)
-		} else if a == false && len(msgs) == 0 {
-			t.Errorf("%q failed with %q but no errors returned", tc.constraint, tc.version)
-		}
-
-		// if a == false {
-		// 	for _, m := range msgs {
-		// 		t.Errorf("%s", m)
-		// 	}
-		// }
-	}
-
-	v, err := NewVersion("1.2.3")
-	if err != nil {
-		t.Errorf("err: %s", err)
-	}
-
-	c, err := NewConstraint("!= 1.2.5, ^2, <= 1.1.x")
-	if err != nil {
-		t.Errorf("err: %s", err)
-	}
-
-	_, msgs := c.Validate(v)
-	if len(msgs) != 2 {
-		t.Error("Invalid number of validations found")
-	}
-	e := msgs[0].Error()
-	if e != "1.2.3 does not have same major version as 2" {
-		t.Error("Did not get expected message: 1.2.3 does not have same major version as 2")
-	}
-	e = msgs[1].Error()
-	if e != "1.2.3 is greater than 1.1.x" {
-		t.Error("Did not get expected message: 1.2.3 is greater than 1.1.x")
-	}
-
-	tests2 := []struct {
-		constraint, version, msg string
-	}{
-		{"= 2.0", "1.2.3", "1.2.3 is not equal to 2.0"},
-		{"!=4.1", "4.1.0", "4.1.0 is equal to 4.1"},
-		{"!=4.x", "4.1.0", "4.1.0 is equal to 4.x"},
-		{"!=4.2.x", "4.2.3", "4.2.3 is equal to 4.2.x"},
-		{">1.1", "1.1.0", "1.1.0 is less than or equal to 1.1"},
-		{"<1.1", "1.1.0", "1.1.0 is greater than or equal to 1.1"},
-		{"<1.1", "1.1.1", "1.1.1 is greater than or equal to 1.1"},
-		{"<1.x", "2.1.1", "2.1.1 is greater than or equal to 1.x"},
-		{"<1.1.x", "1.2.1", "1.2.1 is greater than or equal to 1.1.x"},
-		{">=1.1", "0.0.9", "0.0.9 is less than 1.1"},
-		{"<=2.x", "3.1.0", "3.1.0 is greater than 2.x"},
-		{"<=1.1", "1.1.1", "1.1.1 is greater than 1.1"},
-		{"<=1.1.x", "1.2.500", "1.2.500 is greater than 1.1.x"},
-		{">1.1, <3", "4.3.2", "4.3.2 is greater than or equal to 3"},
-		{">=1.1, <2, !=1.2.3", "1.2.3", "1.2.3 is equal to 1.2.3"},
-		{">=1.1, <2, !=1.2.3 || > 3", "3.0.0", "3.0.0 is greater than or equal to 2"},
-		{">=1.1, <2, !=1.2.3 || > 3", "1.2.3", "1.2.3 is equal to 1.2.3"},
-		{"1.1-3", "4.3.2", "4.3.2 is greater than 3"},
-		{"^1.1", "4.3.2", "4.3.2 does not have same major version as 1.1"},
-		{"^2.x", "1.1.1", "1.1.1 does not have same major version as 2.x"},
-		{"^1.x", "2.1.1", "2.1.1 does not have same major version as 1.x"},
-		{"~1.x", "2.1.1", "2.1.1 does not have same major and minor version as 1.x"},
-		{"~1.2.3", "1.2.2", "1.2.2 does not have same major and minor version as 1.2.3"},
-		{"~1.2.3", "1.3.2", "1.3.2 does not have same major and minor version as 1.2.3"},
-		{"~1.1", "1.2.3", "1.2.3 does not have same major and minor version as 1.1"},
-		{"~1.3", "2.4.5", "2.4.5 does not have same major and minor version as 1.3"},
-	}
-
-	for _, tc := range tests2 {
-		c, err := NewConstraint(tc.constraint)
-		if err != nil {
-			t.Errorf("err: %s", err)
-			continue
-		}
-
-		v, err := NewVersion(tc.version)
-		if err != nil {
-			t.Errorf("err: %s", err)
-			continue
-		}
-
-		_, msgs := c.Validate(v)
-		e := msgs[0].Error()
-		if e != tc.msg {
-			t.Errorf("Did not get expected message %q: %s", tc.msg, e)
 		}
 	}
 }

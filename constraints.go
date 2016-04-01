@@ -11,6 +11,7 @@ type Constraint interface {
 	Body() string
 	Admits(Version) bool
 	AdmitsAny(Constraint) bool
+	Intersect(Constraint) Constraint
 }
 
 // NewConstraint constructs an appropriate Constraint object from the input
@@ -67,24 +68,36 @@ func (c basicConstraint) AdmitsAny(c2 Constraint) bool {
 	return (c2.Type() == c.typ && c2.Body() == c.body) || c2.AdmitsAny(c)
 }
 
+func (c basicConstraint) Intersect(c2 Constraint) Constraint {
+	if c.AdmitsAny(c2) {
+		return c
+	}
+
+	return noneConstraint{}
+}
+
 // anyConstraint is an unbounded constraint - it matches all other types of
 // constraints.
 type anyConstraint struct{}
 
-func (c anyConstraint) Type() ConstraintType {
+func (anyConstraint) Type() ConstraintType {
 	return C_ExactMatch | C_FlexMatch
 }
 
-func (c anyConstraint) Body() string {
+func (anyConstraint) Body() string {
 	return "*"
 }
 
-func (c anyConstraint) Admits(v Version) bool {
+func (anyConstraint) Admits(v Version) bool {
 	return true
 }
 
-func (c anyConstraint) AdmitsAny(_ Constraint) bool {
+func (anyConstraint) AdmitsAny(Constraint) bool {
 	return true
+}
+
+func (anyConstraint) Intersect(c Constraint) Constraint {
+	return c
 }
 
 type semverConstraint struct {
@@ -92,7 +105,7 @@ type semverConstraint struct {
 	typ ConstraintType
 	// The string text of the constraint
 	body string
-	c    *semver.Constraints
+	c    semver.Constraint
 }
 
 func (c semverConstraint) Type() ConstraintType {
@@ -109,7 +122,7 @@ func (c semverConstraint) Admits(v Version) bool {
 		return false
 	}
 
-	return c.c.Check(v.SemVer)
+	return c.c.Admits(v.SemVer) == nil
 }
 
 func (c semverConstraint) AdmitsAny(c2 Constraint) bool {
@@ -118,6 +131,43 @@ func (c semverConstraint) AdmitsAny(c2 Constraint) bool {
 		return false
 	}
 
-	// TODO figure out how we're doing these union checks
-	return false // FIXME
+	return c.c.AdmitsAny(c2.(semverConstraint).c)
+}
+
+func (c semverConstraint) Intersect(c2 Constraint) Constraint {
+	// TODO This won't actually be OK, long term
+	if sv, ok := c2.(semverConstraint); ok {
+		i := c.c.Intersect(sv.c)
+		if !semver.IsNone(i) {
+			return semverConstraint{
+				typ:  C_SemverRange, // TODO get rid of the range/non-range distinction
+				c:    i,
+				body: i.String(), // TODO this is costly - defer it by making it a method
+			}
+		}
+	}
+
+	return noneConstraint{}
+}
+
+type noneConstraint struct{}
+
+func (noneConstraint) Type() ConstraintType {
+	return C_FlexMatch | C_ExactMatch
+}
+
+func (noneConstraint) Body() string {
+	return ""
+}
+
+func (noneConstraint) Admits(Version) bool {
+	return false
+}
+
+func (noneConstraint) AdmitsAny(Constraint) bool {
+	return false
+}
+
+func (noneConstraint) Intersect(Constraint) Constraint {
+	return noneConstraint{}
 }

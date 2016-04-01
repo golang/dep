@@ -160,7 +160,9 @@ var fixtures = []fixture{
 			"root 0.0.0",
 			"a 1.0.0",
 			"b 1.0.0",
-			"shared 3.6.9",
+			"shared 3.0.0",
+			//"shared 3.6.9", // this will be correct once #3 is in and we
+			//default to upgrading
 		),
 	},
 	{
