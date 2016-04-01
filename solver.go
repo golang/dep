@@ -559,6 +559,7 @@ func (s *solver) unselectedComparator(i, j int) bool {
 func (s *solver) fail(name ProjectName) {
 	// skip if the root project
 	if s.rp.Name() == name {
+		s.l.Debug("Not marking the root project as failed")
 		return
 	}
 
@@ -567,7 +568,6 @@ func (s *solver) fail(name ProjectName) {
 			vq.failed = true
 			// just look for the first (oldest) one; the backtracker will
 			// necessarily traverse through and pop off any earlier ones
-			// TODO ...right?
 			return
 		}
 	}
@@ -612,10 +612,18 @@ func (s *solver) unselectLast() {
 
 	for _, dep := range deps {
 		siblings := s.sel.getDependenciesOn(dep.Name)
-		s.sel.deps[dep.Name] = siblings[:len(siblings)-1]
+		siblings = siblings[:len(siblings)-1]
+		s.sel.deps[dep.Name] = siblings
 
 		// if no siblings, remove from unselected queue
 		if len(siblings) == 0 {
+			if s.l.Level >= logrus.DebugLevel {
+				s.l.WithFields(logrus.Fields{
+					"name":  dep.Name,
+					"pname": pa.Name,
+					"pver":  pa.Version.Info,
+				}).Debug("Removing project from unselected queue; last parent atom was unselected")
+			}
 			s.unsel.remove(dep.Name)
 		}
 	}

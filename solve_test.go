@@ -7,13 +7,13 @@ import (
 )
 
 func TestBasicSolves(t *testing.T) {
-	solveAndBasicChecks(0, t)
-	solveAndBasicChecks(1, t)
-	solveAndBasicChecks(2, t)
+	//solveAndBasicChecks(fixtures[4], t)
+	for _, fix := range fixtures {
+		solveAndBasicChecks(fix, t)
+	}
 }
 
-func solveAndBasicChecks(fixnum int, t *testing.T) Result {
-	fix := fixtures[fixnum]
+func solveAndBasicChecks(fix fixture, t *testing.T) Result {
 	sm := newdepspecSM(fix.ds, true)
 	l := logrus.New()
 

@@ -185,6 +185,22 @@ var fixtures = []fixture{
 			"bang 1.0.0",
 		),
 	},
+	{
+		n: "removed dependency",
+		ds: []depspec{
+			dsv("root 1.0.0", "foo 1.0.0", "bar *"),
+			dsv("foo 1.0.0"),
+			dsv("foo 2.0.0"),
+			dsv("bar 1.0.0"),
+			dsv("bar 2.0.0", "baz 1.0.0"),
+			dsv("baz 1.0.0", "foo 1.0.0"),
+		},
+		r: mkresults(
+			"root 1.0.0",
+			"foo 1.0.0",
+			"bar 1.0.0",
+		), //}, maxTries: 2);
+	},
 }
 
 type depspecSourceManager struct {
@@ -292,26 +308,6 @@ func (_ dummyLock) GetProjectAtom(_ ProjectName) *ProjectAtom {
 
 /*
 func basicGraph() {
-  testResolve("shared dependency where dependent version in turn affects other dependencies", {
-    "myapp 0.0.0": {
-      "foo": "<=1.0.2",
-      "bar": "1.0.0"
-    },
-    "foo 1.0.0": {},
-    "foo 1.0.1": { "bang": "1.0.0" },
-    "foo 1.0.2": { "whoop": "1.0.0" },
-    "foo 1.0.3": { "zoop": "1.0.0" },
-    "bar 1.0.0": { "foo": "<=1.0.1" },
-    "bang 1.0.0": {},
-    "whoop 1.0.0": {},
-    "zoop 1.0.0": {}
-  }, result: {
-    "myapp from root": "0.0.0",
-    "foo": "1.0.1",
-    "bar": "1.0.0",
-    "bang": "1.0.0"
-  }, maxTries: 2);
-
   testResolve("circular dependency", {
     "myapp 1.0.0": {
       "foo": "1.0.0"
@@ -328,25 +324,6 @@ func basicGraph() {
     "bar": "1.0.0"
   });
 
-  testResolve("removed dependency", {
-    "myapp 1.0.0": {
-      "foo": "1.0.0",
-      "bar": "any"
-    },
-    "foo 1.0.0": {},
-    "foo 2.0.0": {},
-    "bar 1.0.0": {},
-    "bar 2.0.0": {
-      "baz": "1.0.0"
-    },
-    "baz 1.0.0": {
-      "foo": "2.0.0"
-    }
-  }, result: {
-    "myapp from root": "1.0.0",
-    "foo": "1.0.0",
-    "bar": "1.0.0"
-  }, maxTries: 2);
 }
 
 func withLockFile() {
