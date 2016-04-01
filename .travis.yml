@@ -9,5 +9,7 @@ sudo: false
 
 # Just test local dir, and make sure vendor flag is on
 script:
+    - go get github.com/Masterminds/glide
+    - glide install
     - GO15VENDOREXPERIMENT=1 go test -v
 
