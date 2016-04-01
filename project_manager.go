@@ -2,6 +2,7 @@ package vsolver
 
 import (
 	"fmt"
+	"sort"
 	"sync"
 
 	"github.com/Masterminds/semver"
@@ -32,6 +33,9 @@ type projectManager struct {
 	// The list of versions. Kept separate from the data cache because this is
 	// accessed in the hot loop; we don't want to rebuild and realloc for it.
 	vlist []Version
+	// Direction to sort the version list in (true is for upgrade, false for
+	// downgrade)
+	sortup bool
 	// The project metadata cache. This is persisted to disk, for reuse across
 	// solver runs.
 	dc *projectDataCache
@@ -90,6 +94,14 @@ func (pm *projectManager) ListVersions() (vlist []Version, err error) {
 		for _, v := range pm.vlist {
 			pm.dc.VMap[v] = v.Underlying
 			pm.dc.RMap[v.Underlying] = append(pm.dc.RMap[v.Underlying], v)
+		}
+
+		// Sort the versions
+		// TODO do this as a heap in the original call
+		if pm.sortup {
+			sort.Sort(upgradeVersionSorter(pm.vlist))
+		} else {
+			sort.Sort(downgradeVersionSorter(pm.vlist))
 		}
 	}
 

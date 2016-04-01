@@ -14,7 +14,7 @@ func TestBasicSolves(t *testing.T) {
 
 func solveAndBasicChecks(fixnum int, t *testing.T) Result {
 	fix := fixtures[fixnum]
-	sm := &depspecSourceManager{specs: fix.ds}
+	sm := newdepspecSM(fix.ds, true)
 	l := logrus.New()
 
 	if testing.Verbose() {

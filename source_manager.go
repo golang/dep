@@ -32,6 +32,7 @@ type sourceManager struct {
 	cachedir, basedir string
 	pms               map[ProjectName]*pmState
 	anafac            func(ProjectName) ProjectAnalyzer
+	sortup            bool
 	//pme               map[ProjectName]error
 }
 
@@ -44,11 +45,12 @@ type pmState struct {
 	vlist []Version // TODO temporary until we have a coherent, overall cache structure
 }
 
-func NewSourceManager(cachedir, basedir string) (SourceManager, error) {
+func NewSourceManager(cachedir, basedir string, upgrade bool) (SourceManager, error) {
 	// TODO try to create dir if doesn't exist
 	return &sourceManager{
 		cachedir: cachedir,
 		pms:      make(map[ProjectName]*pmState),
+		sortup:   upgrade,
 	}, nil
 
 	// TODO drop file lock on cachedir somewhere, here. Caller needs a panic
@@ -124,4 +126,69 @@ func (sm *sourceManager) getProjectManager(n ProjectName) (*pmState, error) {
 	}
 	sm.pms[n] = pms
 	return pms, nil
+}
+
+type upgradeVersionSorter []Version
+type downgradeVersionSorter []Version
+
+func (vs upgradeVersionSorter) Len() int {
+	return len(vs)
+}
+
+func (vs upgradeVersionSorter) Swap(i, j int) {
+	vs[i], vs[j] = vs[j], vs[i]
+}
+
+func (vs downgradeVersionSorter) Len() int {
+	return len(vs)
+}
+
+func (vs downgradeVersionSorter) Swap(i, j int) {
+	vs[i], vs[j] = vs[j], vs[i]
+}
+
+func (vs upgradeVersionSorter) Less(i, j int) bool {
+	l, r := vs[i], vs[j]
+
+	// Start by always sorting higher vtypes earlier
+	// TODO need a new means when we get rid of those types
+	if l.Type != r.Type {
+		return l.Type > r.Type
+	}
+
+	switch l.Type {
+	case V_Branch, V_Version, V_Revision:
+		return l.Info < r.Info
+	}
+
+	// This ensures that pre-release versions are always sorted after ALL
+	// full-release versions
+	lpre, rpre := l.SemVer.Prerelease() == "", r.SemVer.Prerelease() == ""
+	if (lpre && !rpre) || (!lpre && rpre) {
+		return lpre
+	}
+	return l.SemVer.GreaterThan(r.SemVer)
+}
+
+func (vs downgradeVersionSorter) Less(i, j int) bool {
+	l, r := vs[i], vs[j]
+
+	// Start by always sorting higher vtypes earlier
+	// TODO need a new means when we get rid of those types
+	if l.Type != r.Type {
+		return l.Type > r.Type
+	}
+
+	switch l.Type {
+	case V_Branch, V_Version, V_Revision:
+		return l.Info < r.Info
+	}
+
+	// This ensures that pre-release versions are always sorted after ALL
+	// full-release versions
+	lpre, rpre := l.SemVer.Prerelease() == "", r.SemVer.Prerelease() == ""
+	if (lpre && !rpre) || (!lpre && rpre) {
+		return lpre
+	}
+	return l.SemVer.LessThan(r.SemVer)
 }

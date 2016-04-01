@@ -2,6 +2,7 @@ package vsolver
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/Masterminds/semver"
@@ -160,8 +161,7 @@ var fixtures = []fixture{
 			"root 0.0.0",
 			"a 1.0.0",
 			"b 1.0.0",
-			"shared 3.0.0",
-			//"shared 3.6.9", // this will be correct once #3 is in and we
+			"shared 3.6.9",
 			//default to upgrading
 		),
 	},
@@ -189,9 +189,19 @@ var fixtures = []fixture{
 
 type depspecSourceManager struct {
 	specs []depspec
+	//map[ProjectAtom][]Version
+	sortup bool
 }
 
 var _ SourceManager = &depspecSourceManager{}
+
+func newdepspecSM(ds []depspec, upgrade bool) *depspecSourceManager {
+	//TODO precompute the version lists, for speediness?
+	return &depspecSourceManager{
+		specs:  ds,
+		sortup: upgrade,
+	}
+}
 
 func (sm *depspecSourceManager) GetProjectInfo(pa ProjectAtom) (ProjectInfo, error) {
 	for _, ds := range sm.specs {
@@ -217,6 +227,12 @@ func (sm *depspecSourceManager) ListVersions(name ProjectName) (pi []Version, er
 
 	if len(pi) == 0 {
 		err = fmt.Errorf("Project '%s' could not be found", name)
+	}
+
+	if sm.sortup {
+		sort.Sort(upgradeVersionSorter(pi))
+	} else {
+		sort.Sort(downgradeVersionSorter(pi))
 	}
 
 	return
