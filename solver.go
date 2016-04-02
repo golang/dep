@@ -155,20 +155,21 @@ func (s *solver) createVersionQueue(ref ProjectName) (*versionQueue, error) {
 	if s.l.Level >= logrus.DebugLevel {
 		if lockv == nil {
 			s.l.WithFields(logrus.Fields{
-				"name": ref,
-			}).Debug("Created VersionQueue, but no data in lock for project")
+				"name":  ref,
+				"queue": q,
+			}).Debug("Created versionQueue, but no data in lock for project")
 		} else {
 			s.l.WithFields(logrus.Fields{
 				"name":  ref,
-				"lockv": lockv.Version.Info,
-			}).Debug("Created VersionQueue using version found in lock")
+				"queue": q,
+			}).Debug("Created versionQueue using version found in lock")
 		}
 	}
 
 	return q, s.findValidVersion(q)
 }
 
-// findValidVersion walks through a VersionQueue until it finds a version that's
+// findValidVersion walks through a versionQueue until it finds a version that's
 // valid, as adjudged by the current constraints.
 func (s *solver) findValidVersion(q *versionQueue) error {
 	var err error
@@ -182,11 +183,11 @@ func (s *solver) findValidVersion(q *versionQueue) error {
 			"name":      q.ref,
 			"hasLock":   q.hasLock,
 			"allLoaded": q.allLoaded,
-		}).Debug("Beginning search through VersionQueue for a valid version")
+		}).Debug("Beginning search through versionQueue for a valid version")
 	}
 
 	for {
-		err = s.checkVersion(ProjectAtom{
+		err = s.satisfiable(ProjectAtom{
 			Name:    q.ref,
 			Version: q.current(),
 		})
@@ -232,22 +233,38 @@ func (s *solver) findValidVersion(q *versionQueue) error {
 func (s *solver) getLockVersionIfValid(ref ProjectName) *ProjectAtom {
 	lockver := s.rp.GetProjectAtom(ref)
 	if lockver == nil {
+		if s.l.Level >= logrus.DebugLevel {
+			s.l.WithField("name", ref).Debug("Project not present in lock")
+		}
 		// Nothing in the lock about this version, so nothing to validate
 		return nil
 	}
 
 	constraint := s.sel.getConstraint(ref)
 	if !constraint.Admits(lockver.Version) {
-		// TODO msg?
+		if s.l.Level >= logrus.InfoLevel {
+			s.l.WithFields(logrus.Fields{
+				"name":    ref,
+				"version": lockver.Version.Info,
+			}).Info("Project found in lock, but version not allowed by current constraints")
+		}
 		return nil
-		//} else {
-		// TODO msg?
 	}
 
-	return nil
+	if s.l.Level >= logrus.InfoLevel {
+		s.l.WithFields(logrus.Fields{
+			"name":    ref,
+			"version": lockver.Version.Info,
+		}).Info("Project found in lock")
+	}
+
+	return lockver
 }
 
-func (s *solver) checkVersion(pi ProjectAtom) error {
+// satisfiable is the main checking method - it determines if introducing a new
+// project atom would result in a graph where all requirements are still
+// satisfied.
+func (s *solver) satisfiable(pi ProjectAtom) error {
 	if emptyProjectAtom == pi {
 		// TODO we should protect against this case elsewhere, but for now panic
 		// to canary when it's a problem
@@ -258,7 +275,7 @@ func (s *solver) checkVersion(pi ProjectAtom) error {
 		s.l.WithFields(logrus.Fields{
 			"name":    pi.Name,
 			"version": pi.Version.Info,
-		}).Debug("Checking acceptability of project atom against current constraints")
+		}).Debug("Checking satisfiability of project atom against current constraints")
 	}
 
 	constraint := s.sel.getConstraint(pi.Name)
@@ -359,7 +376,7 @@ func (s *solver) checkVersion(pi ProjectAtom) error {
 					"depname":       dep.Name,
 					"curversion":    selected.Version.Info,
 					"newconstraint": dep.Constraint.Body(),
-				}).Debug("Project atom cannot be added; the constraint it introduces on dep does not allow the currently selected version for that dep")
+				}).Debug("Project atom cannot be added; a constraint it introduces does not allow a currently selected version")
 			}
 			s.fail(dep.Name)
 
@@ -371,9 +388,7 @@ func (s *solver) checkVersion(pi ProjectAtom) error {
 			}
 		}
 
-		// At this point, dart/pub do things related to 'required' dependencies,
-		// which is about solving loops (i think) and so mostly not something we
-		// have to care about.
+		// TODO add check that fails if adding this atom would create a loop
 	}
 
 	if s.l.Level >= logrus.DebugLevel {
@@ -456,7 +471,7 @@ func (s *solver) backtrack() bool {
 			s.unselectLast()
 		}
 
-		// Grab the last VersionQueue off the list of queues
+		// Grab the last versionQueue off the list of queues
 		q := s.versions[len(s.versions)-1]
 
 		if s.l.Level >= logrus.DebugLevel {

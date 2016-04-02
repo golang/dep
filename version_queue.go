@@ -1,5 +1,10 @@
 package vsolver
 
+import (
+	"fmt"
+	"strings"
+)
+
 type versionQueue struct {
 	ref                ProjectName
 	pi                 []Version
@@ -44,30 +49,31 @@ func (vq *versionQueue) advance() (err error) {
 	// The current version may have failed, but the next one hasn't
 	vq.failed = false
 
-	if !vq.allLoaded {
-		vq.allLoaded = true
-		// Can only get here if no lock was initially provided, so we know we
-		// should have that
-		lockv := vq.pi[0]
-
-		vq.pi, err = vq.sm.ListVersions(vq.ref)
-		if err != nil {
-			return
+	if vq.allLoaded {
+		if len(vq.pi) > 0 {
+			vq.pi = vq.pi[1:]
 		}
-
-		// search for and remove locked version
-		// TODO should be able to avoid O(n) here each time...if it matters
-		for k, pi := range vq.pi {
-			if pi == lockv {
-				// GC-safe deletion for slice w/pointer elements
-				//vq.pi, vq.pi[len(vq.pi)-1] = append(vq.pi[:k], vq.pi[k+1:]...), nil
-				vq.pi = append(vq.pi[:k], vq.pi[k+1:]...)
-			}
-		}
+		return
 	}
 
-	if len(vq.pi) > 0 {
-		vq.pi = vq.pi[1:]
+	vq.allLoaded = true
+	// Can only get here if no lock was initially provided, so we know we
+	// should have that
+	lockv := vq.pi[0]
+
+	vq.pi, err = vq.sm.ListVersions(vq.ref)
+	if err != nil {
+		return
+	}
+
+	// search for and remove locked version
+	// TODO should be able to avoid O(n) here each time...if it matters
+	for k, pi := range vq.pi {
+		if pi == lockv {
+			// GC-safe deletion for slice w/pointer elements
+			//vq.pi, vq.pi[len(vq.pi)-1] = append(vq.pi[:k], vq.pi[k+1:]...), nil
+			vq.pi = append(vq.pi[:k], vq.pi[k+1:]...)
+		}
 	}
 
 	// normal end of queue. we don't error; it's left to the caller to infer an
@@ -87,4 +93,13 @@ func (vq *versionQueue) isExhausted() bool {
 		return false
 	}
 	return len(vq.pi) == 0
+}
+
+func (vq *versionQueue) String() string {
+	var vs []string
+
+	for _, v := range vq.pi {
+		vs = append(vs, v.Info)
+	}
+	return fmt.Sprintf("[%s]", strings.Join(vs, ", "))
 }

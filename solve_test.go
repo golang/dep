@@ -14,7 +14,7 @@ func TestBasicSolves(t *testing.T) {
 }
 
 func solveAndBasicChecks(fix fixture, t *testing.T) Result {
-	sm := newdepspecSM(fix.ds, true)
+	sm := newdepspecSM(fix.ds, !fix.downgrade)
 	l := logrus.New()
 
 	if testing.Verbose() {
@@ -28,10 +28,21 @@ func solveAndBasicChecks(fix fixture, t *testing.T) Result {
 		t.Error("wtf, couldn't find root project")
 		t.FailNow()
 	}
+
+	if fix.l == nil {
+		p.Lock = dummyLock{}
+	} else {
+		p.Lock = fix.l
+	}
 	result := s.Solve(p, nil)
 
 	if result.SolveFailure != nil {
-		t.Errorf("(fixture: %q) - Solver failed; error was type %T, text: %q", fix.n, result.SolveFailure, result.SolveFailure)
+		t.Errorf("(fixture: %q) Solver failed; error was type %T, text: %q", fix.n, result.SolveFailure, result.SolveFailure)
+		return result
+	}
+
+	if fix.maxAttempts > 0 && result.Attempts > fix.maxAttempts {
+		t.Errorf("(fixture: %q) Solver completed in %v attempts, but expected %v or fewer", result.Attempts, fix.maxAttempts)
 	}
 
 	// Dump result projects into a map for easier interrogation

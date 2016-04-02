@@ -103,6 +103,23 @@ type fixture struct {
 	ds []depspec
 	// results; map of name/version pairs
 	r map[string]string
+	// max attempts the solver should need to find solution. 0 means no limit
+	maxAttempts int
+	// Use downgrade instead of default upgrade sorter
+	downgrade bool
+	// lock file simulator, if one's to be used at all
+	l Lock
+}
+
+// mklock makes a fixLock, suitable to act as a lock file
+func mklock(pairs ...string) fixLock {
+	l := make(fixLock)
+	for _, s := range pairs {
+		pa := mksvpa(s)
+		l[pa.Name] = pa
+	}
+
+	return l
 }
 
 // mkresults makes a result set
@@ -117,6 +134,7 @@ func mkresults(pairs ...string) map[string]string {
 }
 
 var fixtures = []fixture{
+	// basic fixtures
 	{
 		n: "no dependencies",
 		ds: []depspec{
@@ -162,7 +180,6 @@ var fixtures = []fixture{
 			"a 1.0.0",
 			"b 1.0.0",
 			"shared 3.6.9",
-			//default to upgrading
 		),
 	},
 	{
@@ -199,7 +216,100 @@ var fixtures = []fixture{
 			"root 1.0.0",
 			"foo 1.0.0",
 			"bar 1.0.0",
-		), //}, maxTries: 2);
+		),
+		maxAttempts: 2,
+	},
+	// fixtures with locks
+	{
+		n: "with compatible locked dependency",
+		ds: []depspec{
+			dsv("root 0.0.0", "foo *"),
+			dsv("foo 1.0.0", "bar 1.0.0"),
+			dsv("foo 1.0.1", "bar 1.0.1"),
+			dsv("foo 1.0.2", "bar 1.0.2"),
+			dsv("bar 1.0.0"),
+			dsv("bar 1.0.1"),
+			dsv("bar 1.0.2"),
+		},
+		l: mklock(
+			"foo 1.0.1",
+		),
+		r: mkresults(
+			"root 0.0.0",
+			"foo 1.0.1",
+			"bar 1.0.1",
+		),
+	},
+	{
+		n: "with incompatible locked dependency",
+		ds: []depspec{
+			dsv("root 0.0.0", "foo >1.0.1"),
+			dsv("foo 1.0.0", "bar 1.0.0"),
+			dsv("foo 1.0.1", "bar 1.0.1"),
+			dsv("foo 1.0.2", "bar 1.0.2"),
+			dsv("bar 1.0.0"),
+			dsv("bar 1.0.1"),
+			dsv("bar 1.0.2"),
+		},
+		l: mklock(
+			"foo 1.0.1",
+		),
+		r: mkresults(
+			"root 0.0.0",
+			"foo 1.0.2",
+			"bar 1.0.2",
+		),
+	},
+	{
+		n: "with unrelated locked dependency",
+		ds: []depspec{
+			dsv("root 0.0.0", "foo *"),
+			dsv("foo 1.0.0", "bar 1.0.0"),
+			dsv("foo 1.0.1", "bar 1.0.1"),
+			dsv("foo 1.0.2", "bar 1.0.2"),
+			dsv("bar 1.0.0"),
+			dsv("bar 1.0.1"),
+			dsv("bar 1.0.2"),
+			dsv("baz 1.0.0"),
+		},
+		l: mklock(
+			"baz 1.0.0",
+		),
+		r: mkresults(
+			"root 0.0.0",
+			"foo 1.0.2",
+			"bar 1.0.2",
+		),
+	},
+	{
+		n: "unlocks dependencies if necessary to ensure that a new dependency is satisfied",
+		ds: []depspec{
+			dsv("root 0.0.0", "foo *", "newdep *"),
+			dsv("foo 1.0.0", "bar <2.0.0"),
+			dsv("bar 1.0.0", "baz <2.0.0"),
+			dsv("baz 1.0.0", "qux <2.0.0"),
+			dsv("qux 1.0.0"),
+			dsv("foo 2.0.0", "bar <3.0.0"),
+			dsv("bar 2.0.0", "baz <3.0.0"),
+			dsv("baz 2.0.0", "qux <3.0.0"),
+			dsv("qux 2.0.0"),
+			dsv("newdep 2.0.0", "baz >=1.5.0"),
+		},
+		l: mklock(
+			"foo 1.0.0",
+			"bar 1.0.0",
+			"baz 1.0.0",
+			"qux 1.0.0",
+		),
+		r: mkresults(
+			"root 0.0.0",
+			"foo 2.0.0",
+			"bar 2.0.0",
+			"baz 2.0.0",
+			"qux 1.0.0",
+			"newdep 2.0.0",
+		),
+		maxAttempts: 4,
 	},
 }
 
@@ -267,6 +377,7 @@ func (sm *depspecSourceManager) ProjectExists(name ProjectName) bool {
 // enforce interfaces
 var _ Manifest = depspec{}
 var _ Lock = dummyLock{}
+var _ Lock = fixLock{}
 
 // impl Spec interface
 func (ds depspec) GetDependencies() []ProjectDep {
@@ -281,6 +392,25 @@ func (ds depspec) GetDevDependencies() []ProjectDep {
 // impl Spec interface
 func (ds depspec) Name() ProjectName {
 	return ds.name.Name
+}
+
+type fixLock map[ProjectName]ProjectAtom
+
+func (fixLock) SolverVersion() string {
+	return "-1"
+}
+
+// impl Lock interface
+func (fixLock) InputHash() string {
+	return "fooooorooooofooorooofoo"
+}
+
+// impl Lock interface
+func (l fixLock) GetProjectAtom(n ProjectName) *ProjectAtom {
+	if pa, exists := l[n]; exists {
+		return &pa
+	}
+	return nil
 }
 
 type dummyLock struct{}
@@ -327,89 +457,7 @@ func basicGraph() {
 }
 
 func withLockFile() {
-  testResolve("with compatible locked dependency", {
-    "myapp 0.0.0": {
-      "foo": "any"
-    },
-    "foo 1.0.0": { "bar": "1.0.0" },
-    "foo 1.0.1": { "bar": "1.0.1" },
-    "foo 1.0.2": { "bar": "1.0.2" },
-    "bar 1.0.0": {},
-    "bar 1.0.1": {},
-    "bar 1.0.2": {}
-  }, lockfile: {
-    "foo": "1.0.1"
-  }, result: {
-    "myapp from root": "0.0.0",
-    "foo": "1.0.1",
-    "bar": "1.0.1"
-  });
 
-  testResolve("with incompatible locked dependency", {
-    "myapp 0.0.0": {
-      "foo": ">1.0.1"
-    },
-    "foo 1.0.0": { "bar": "1.0.0" },
-    "foo 1.0.1": { "bar": "1.0.1" },
-    "foo 1.0.2": { "bar": "1.0.2" },
-    "bar 1.0.0": {},
-    "bar 1.0.1": {},
-    "bar 1.0.2": {}
-  }, lockfile: {
-    "foo": "1.0.1"
-  }, result: {
-    "myapp from root": "0.0.0",
-    "foo": "1.0.2",
-    "bar": "1.0.2"
-  });
-
-  testResolve("with unrelated locked dependency", {
-    "myapp 0.0.0": {
-      "foo": "any"
-    },
-    "foo 1.0.0": { "bar": "1.0.0" },
-    "foo 1.0.1": { "bar": "1.0.1" },
-    "foo 1.0.2": { "bar": "1.0.2" },
-    "bar 1.0.0": {},
-    "bar 1.0.1": {},
-    "bar 1.0.2": {},
-    "baz 1.0.0": {}
-  }, lockfile: {
-    "baz": "1.0.0"
-  }, result: {
-    "myapp from root": "0.0.0",
-    "foo": "1.0.2",
-    "bar": "1.0.2"
-  });
-
-  testResolve("unlocks dependencies if necessary to ensure that a new "
-      "dependency is satisfied", {
-    "myapp 0.0.0": {
-      "foo": "any",
-      "newdep": "any"
-    },
-    "foo 1.0.0": { "bar": "<2.0.0" },
-    "bar 1.0.0": { "baz": "<2.0.0" },
-    "baz 1.0.0": { "qux": "<2.0.0" },
-    "qux 1.0.0": {},
-    "foo 2.0.0": { "bar": "<3.0.0" },
-    "bar 2.0.0": { "baz": "<3.0.0" },
-    "baz 2.0.0": { "qux": "<3.0.0" },
-    "qux 2.0.0": {},
-    "newdep 2.0.0": { "baz": ">=1.5.0" }
-  }, lockfile: {
-    "foo": "1.0.0",
-    "bar": "1.0.0",
-    "baz": "1.0.0",
-    "qux": "1.0.0"
-  }, result: {
-    "myapp from root": "0.0.0",
-    "foo": "2.0.0",
-    "bar": "2.0.0",
-    "baz": "2.0.0",
-    "qux": "1.0.0",
-    "newdep": "2.0.0"
-  }, maxTries: 4);
 }
 
 func rootDependency() {

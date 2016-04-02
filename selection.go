@@ -49,6 +49,8 @@ func (s *selection) selected(id ProjectName) (ProjectAtom, bool) {
 	return ProjectAtom{}, false
 }
 
+// TODO take a ProjectName, but optionally also a preferred version. This will
+// enable the lock files of dependencies to remain slightly more stable.
 type unselected struct {
 	sl  []ProjectName
 	cmp func(i, j int) bool
