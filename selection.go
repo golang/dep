@@ -83,7 +83,7 @@ func (u *unselected) Pop() (v interface{}) {
 }
 
 // remove takes a ProjectIdentifier out of the priority queue (if it was
-// present), then reapplies the heap invariants.
+// present), then reasserts the heap invariants.
 func (u *unselected) remove(id ProjectName) {
 	for k, pi := range u.sl {
 		if pi == id {

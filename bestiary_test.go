@@ -71,8 +71,9 @@ func mksvd(info string) ProjectDep {
 }
 
 type depspec struct {
-	name ProjectAtom
-	deps []ProjectDep
+	name    ProjectAtom
+	deps    []ProjectDep
+	devdeps []ProjectDep
 }
 
 // dsv - "depspec semver" (make a semver depspec)
@@ -90,7 +91,11 @@ func dsv(pi string, deps ...string) depspec {
 	}
 
 	for _, dep := range deps {
-		ds.deps = append(ds.deps, mksvd(dep))
+		if strings.HasPrefix(dep, "(dev) ") {
+			ds.devdeps = append(ds.devdeps, mksvd(strings.TrimPrefix(dep, "(dev) ")))
+		} else {
+			ds.deps = append(ds.deps, mksvd(dep))
+		}
 	}
 
 	return ds
@@ -311,6 +316,44 @@ var fixtures = []fixture{
 		),
 		maxAttempts: 4,
 	},
+	{
+		n: "includes root package's dev dependencies",
+		ds: []depspec{
+			dsv("root 1.0.0", "(dev) foo 1.0.0", "(dev) bar 1.0.0"),
+			dsv("foo 1.0.0"),
+			dsv("bar 1.0.0"),
+		},
+		r: mkresults(
+			"root 1.0.0",
+			"foo 1.0.0",
+			"bar 1.0.0",
+		),
+	},
+	{
+		n: "includes dev dependency's transitive dependencies",
+		ds: []depspec{
+			dsv("root 1.0.0", "(dev) foo 1.0.0"),
+			dsv("foo 1.0.0", "bar 1.0.0"),
+			dsv("bar 1.0.0"),
+		},
+		r: mkresults(
+			"root 1.0.0",
+			"foo 1.0.0",
+			"bar 1.0.0",
+		),
+	},
+	{
+		n: "ignores transitive dependency's dev dependencies",
+		ds: []depspec{
+			dsv("root 1.0.0", "(dev) foo 1.0.0"),
+			dsv("foo 1.0.0", "(dev) bar 1.0.0"),
+			dsv("bar 1.0.0"),
+		},
+		r: mkresults(
+			"root 1.0.0",
+			"foo 1.0.0",
+		),
+	},
 }
 
 type depspecSourceManager struct {
@@ -386,7 +429,7 @@ func (ds depspec) GetDependencies() []ProjectDep {
 
 // impl Spec interface
 func (ds depspec) GetDevDependencies() []ProjectDep {
-	return nil
+	return ds.devdeps
 }
 
 // impl Spec interface
@@ -506,48 +549,6 @@ func rootDependency() {
       "myapp": "<1.0.0"
     }
   }, error: couldNotSolve);
-}
-
-func devDependency() {
-  testResolve("includes root package's dev dependencies", {
-    "myapp 1.0.0": {
-      "(dev) foo": "1.0.0",
-      "(dev) bar": "1.0.0"
-    },
-    "foo 1.0.0": {},
-    "bar 1.0.0": {}
-  }, result: {
-    "myapp from root": "1.0.0",
-    "foo": "1.0.0",
-    "bar": "1.0.0"
-  });
-
-  testResolve("includes dev dependency's transitive dependencies", {
-    "myapp 1.0.0": {
-      "(dev) foo": "1.0.0"
-    },
-    "foo 1.0.0": {
-      "bar": "1.0.0"
-    },
-    "bar 1.0.0": {}
-  }, result: {
-    "myapp from root": "1.0.0",
-    "foo": "1.0.0",
-    "bar": "1.0.0"
-  });
-
-  testResolve("ignores transitive dependency's dev dependencies", {
-    "myapp 1.0.0": {
-      "foo": "1.0.0"
-    },
-    "foo 1.0.0": {
-      "(dev) bar": "1.0.0"
-    },
-    "bar 1.0.0": {}
-  }, result: {
-    "myapp from root": "1.0.0",
-    "foo": "1.0.0"
-  });
 }
 
 func unsolvable() {
