@@ -7,14 +7,6 @@ import (
 	"github.com/Sirupsen/logrus"
 )
 
-//type SolveFailure uint
-
-//const (
-// Indicates that no version solution could be found
-//NoVersionSolution SolveFailure = 1 << iota
-//IncompatibleVersionType
-//)
-
 func NewSolver(sm SourceManager, l *logrus.Logger) Solver {
 	if l == nil {
 		l = logrus.New()
@@ -169,14 +161,15 @@ func (s *solver) createVersionQueue(ref ProjectName) (*versionQueue, error) {
 	return q, s.findValidVersion(q)
 }
 
-// findValidVersion walks through a versionQueue until it finds a version that's
-// valid, as adjudged by the current constraints.
+// findValidVersion walks through a versionQueue until it finds a version that
+// satisfies the constraints held in the current state of the solver.
 func (s *solver) findValidVersion(q *versionQueue) error {
-	var err error
 	if emptyVersion == q.current() {
 		// TODO this case shouldn't be reachable, but panic here as a canary
 		panic("version queue is empty, should not happen")
 	}
+
+	faillen := len(q.fails)
 
 	if s.l.Level >= logrus.DebugLevel {
 		s.l.WithFields(logrus.Fields{
@@ -185,25 +178,24 @@ func (s *solver) findValidVersion(q *versionQueue) error {
 			"allLoaded": q.allLoaded,
 		}).Debug("Beginning search through versionQueue for a valid version")
 	}
-
 	for {
-		err = s.satisfiable(ProjectAtom{
+		cur := q.current()
+		err := s.satisfiable(ProjectAtom{
 			Name:    q.ref,
-			Version: q.current(),
+			Version: cur,
 		})
 		if err == nil {
 			// we have a good version, can return safely
 			if s.l.Level >= logrus.DebugLevel {
 				s.l.WithFields(logrus.Fields{
 					"name":    q.ref,
-					"version": q.current().Info,
+					"version": cur.Info,
 				}).Debug("Found acceptable version, returning out")
 			}
 			return nil
 		}
 
-		err = q.advance()
-		if err != nil {
+		if q.advance(err) != nil {
 			// Error on advance, have to bail out
 			if s.l.Level >= logrus.WarnLevel {
 				s.l.WithFields(logrus.Fields{
@@ -215,19 +207,26 @@ func (s *solver) findValidVersion(q *versionQueue) error {
 		}
 		if q.isExhausted() {
 			// Queue is empty, bail with error
-			err = newSolveError(fmt.Sprintf("Exhausted queue for %q without finding a satisfactory version.", q.ref), mustResolve)
 			if s.l.Level >= logrus.InfoLevel {
-				s.l.WithFields(logrus.Fields{
-					"name": q.ref,
-					"err":  err,
-				}).Info("Version queue was completely exhausted, marking project as failed")
+				s.l.WithField("name", q.ref).Info("Version queue was completely exhausted, marking project as failed")
 			}
 			break
 		}
 	}
 
 	s.fail(s.sel.getDependenciesOn(q.ref)[0].Depender.Name)
-	return err
+
+	// Return a compound error of all the new errors encountered during this
+	// attempt to find a new, valid version
+	var fails []failedVersion
+	if len(q.fails) > faillen {
+		fails = q.fails[faillen+1:]
+	}
+
+	return &noVersionError{
+		pn:    q.ref,
+		fails: fails,
+	}
 }
 
 func (s *solver) getLockVersionIfValid(ref ProjectName) *ProjectAtom {
@@ -291,6 +290,7 @@ func (s *solver) satisfiable(pi ProjectAtom) error {
 		}
 
 		deps := s.sel.getDependenciesOn(pi.Name)
+		var failparent []Dependency
 		for _, dep := range deps {
 			if !dep.Dep.Constraint.Admits(pi.Version) {
 				if s.l.Level >= logrus.DebugLevel {
@@ -301,14 +301,14 @@ func (s *solver) satisfiable(pi ProjectAtom) error {
 					}).Debug("Marking other, selected project with conflicting constraint as failed")
 				}
 				s.fail(dep.Depender.Name)
+				failparent = append(failparent, dep)
 			}
 		}
 
-		// TODO msg
-		return &noVersionError{
-			pn:   pi.Name,
-			c:    constraint,
-			deps: deps,
+		return &versionNotAllowedFailure{
+			goal:       pi,
+			failparent: failparent,
+			c:          constraint,
 		}
 	}
 
@@ -345,6 +345,8 @@ func (s *solver) satisfiable(pi ProjectAtom) error {
 			}
 
 			// No admissible versions - visit all siblings and identify the disagreement(s)
+			var failsib []Dependency
+			var nofailsib []Dependency
 			for _, sibling := range siblings {
 				if !sibling.Dep.Constraint.AdmitsAny(dep.Constraint) {
 					if s.l.Level >= logrus.DebugLevel {
@@ -354,16 +356,20 @@ func (s *solver) satisfiable(pi ProjectAtom) error {
 							"depname":       sibling.Depender.Name,
 							"sibconstraint": sibling.Dep.Constraint.Body(),
 							"newconstraint": dep.Constraint.Body(),
-						}).Debug("Marking other, selected project as failed because its constraint is disjoint with our input")
+						}).Debug("Marking other, selected project as failed because its constraint is disjoint with our testee")
 					}
 					s.fail(sibling.Depender.Name)
+					failsib = append(failsib, sibling)
+				} else {
+					nofailsib = append(nofailsib, sibling)
 				}
 			}
 
-			// TODO msg
 			return &disjointConstraintFailure{
-				pn:   dep.Name,
-				deps: append(siblings, Dependency{Depender: pi, Dep: dep}),
+				goal:      Dependency{Depender: pi, Dep: dep},
+				failsib:   failsib,
+				nofailsib: nofailsib,
+				c:         constraint,
 			}
 		}
 
@@ -380,11 +386,9 @@ func (s *solver) satisfiable(pi ProjectAtom) error {
 			}
 			s.fail(dep.Name)
 
-			// TODO msg
-			return &noVersionError{
-				pn:   dep.Name,
-				c:    dep.Constraint,
-				deps: append(siblings, Dependency{Depender: pi, Dep: dep}),
+			return &constraintNotAllowedFailure{
+				goal: Dependency{Depender: pi, Dep: dep},
+				v:    selected.Version,
 			}
 		}
 
@@ -485,7 +489,8 @@ func (s *solver) backtrack() bool {
 		s.unselectLast()
 
 		// Advance the queue past the current version, which we know is bad
-		if q.advance() == nil && !q.isExhausted() {
+		// TODO is it feasible to make available the failure reason here?
+		if q.advance(nil) == nil && !q.isExhausted() {
 			// Search for another acceptable version of this failed dep in its queue
 			if s.findValidVersion(q) == nil {
 				if s.l.Level >= logrus.InfoLevel {

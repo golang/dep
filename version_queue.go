@@ -5,9 +5,15 @@ import (
 	"strings"
 )
 
+type failedVersion struct {
+	v Version
+	f error
+}
+
 type versionQueue struct {
 	ref                ProjectName
 	pi                 []Version
+	fails              []failedVersion
 	sm                 SourceManager
 	failed             bool
 	hasLock, allLoaded bool
@@ -45,14 +51,20 @@ func (vq *versionQueue) current() Version {
 	return Version{}
 }
 
-func (vq *versionQueue) advance() (err error) {
+func (vq *versionQueue) advance(fail error) (err error) {
 	// The current version may have failed, but the next one hasn't
 	vq.failed = false
 
+	if len(vq.pi) == 0 {
+		return
+	}
+
+	vq.fails = append(vq.fails, failedVersion{
+		v: vq.pi[0],
+		f: fail,
+	})
 	if vq.allLoaded {
-		if len(vq.pi) > 0 {
-			vq.pi = vq.pi[1:]
-		}
+		vq.pi = vq.pi[1:]
 		return
 	}
 

@@ -114,6 +114,8 @@ type fixture struct {
 	downgrade bool
 	// lock file simulator, if one's to be used at all
 	l Lock
+	// projects expected to have errors, if any
+	errp []string
 }
 
 // mklock makes a fixLock, suitable to act as a lock file
@@ -354,6 +356,15 @@ var fixtures = []fixture{
 			"foo 1.0.0",
 		),
 	},
+	{
+		n: "no version that matches requirement",
+		ds: []depspec{
+			dsv("root 0.0.0", "foo >=1.0.0, <2.0.0"),
+			dsv("foo 2.0.0"),
+			dsv("foo 2.1.3"),
+		},
+		errp: []string{"foo", "root"},
+	},
 }
 
 type depspecSourceManager struct {
@@ -552,14 +563,6 @@ func rootDependency() {
 }
 
 func unsolvable() {
-  testResolve("no version that matches requirement", {
-    "myapp 0.0.0": {
-      "foo": ">=1.0.0 <2.0.0"
-    },
-    "foo 2.0.0": {},
-    "foo 2.1.3": {}
-  }, error: noVersion(["myapp", "foo"]));
-
   testResolve("no version that matches combined constraint", {
     "myapp 0.0.0": {
       "foo": "1.0.0",
