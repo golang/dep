@@ -33,20 +33,19 @@ var VTCTCompat = [...]ConstraintType{
 type ProjectExistence uint8
 
 const (
-	// DoesNotExist indicates that a particular project URI cannot be located,
-	// at any level. It is represented as 1, rather than 0, to differentiate it
-	// from the zero-value (which is ExistenceUnknown).
-	DoesNotExist ProjectExistence = 1 << iota
-
 	// ExistsInLock indicates that a project exists (i.e., is mentioned in) a
 	// lock file.
 	// TODO not sure if it makes sense to have this IF it's just the source
 	// manager's responsibility for putting this together - the implication is
 	// that this is the root lock file, right?
-	ExistsInLock
+	ExistsInLock = 1 << iota
 
-	// ExistsInVendor indicates that a project exists in a vendor directory at
-	// the predictable location based on import path. It does NOT imply, much
+	// ExistsInManifest indicates that a project exists (i.e., is mentioned in)
+	// a manifest.
+	ExistsInManifest
+
+	// ExistsInVendorRoot indicates that a project exists in a vendor directory
+	// at the predictable location based on import path. It does NOT imply, much
 	// less guarantee, any of the following:
 	//   - That the code at the expected location under vendor is at the version
 	//   given in a lock file
@@ -56,11 +55,11 @@ const (
 	//   unexpected/nested location under vendor
 	//   - That the full repository history is available. In fact, the
 	//   assumption should be that if only this flag is on, the full repository
-	//   history is likely not available locally
+	//   history is likely not available (locally)
 	//
-	// In short, the information encoded in this flag should in no way be
-	// construed as exhaustive.
-	ExistsInVendor
+	// In short, the information encoded in this flag should not be construed as
+	// exhaustive.
+	ExistsInVendorRoot
 
 	// ExistsInCache indicates that a project exists on-disk in the local cache.
 	// It does not guarantee that an upstream exists, thus it cannot imply
@@ -75,22 +74,11 @@ const (
 	// ExistsUpstream indicates that a project repository was locatable at the
 	// path provided by a project's URI (a base import path).
 	ExistsUpstream
+)
 
-	// Indicates that the upstream project, in addition to existing, is also
-	// accessible.
-	//
-	// Different hosting providers treat unauthorized access differently:
-	// GitHub, for example, returns 404 (or the equivalent) when attempting unauthorized
-	// access, whereas BitBucket returns 403 (or 302 login redirect). Thus,
-	// while the ExistsUpstream and UpstreamAccessible bits should always only
-	// be on or off together when interacting with Github, it is possible that a
-	// BitBucket provider might report ExistsUpstream, but not UpstreamAccessible.
-	//
-	// For most purposes, non-existence and inaccessibility are treated the
-	// same, but clearly delineating the two allows slightly improved UX.
-	UpstreamAccessible
-
-	// The zero value; indicates that no work has yet been done to determine the
-	// existence level of a project.
-	ExistenceUnknown ProjectExistence = 0
+const (
+	// Bitmask for existence levels that are managed by the ProjectManager
+	pmexLvls ProjectExistence = ExistsInVendorRoot | ExistsInCache | ExistsUpstream
+	// Bitmask for existence levels that are managed by the SourceManager
+	smexLvls ProjectExistence = ExistsInLock | ExistsInManifest
 )

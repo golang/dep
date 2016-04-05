@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path"
 
 	"github.com/Masterminds/vcs"
 )
@@ -11,7 +12,10 @@ import (
 type SourceManager interface {
 	GetProjectInfo(ProjectAtom) (ProjectInfo, error)
 	ListVersions(ProjectName) ([]Version, error)
-	ProjectExists(ProjectName) bool
+	RepoExists(ProjectName) (bool, error)
+	VendorCodeExists(ProjectName) (bool, error)
+	Release()
+	// Flush()
 }
 
 // ExistenceError is a specialized error type that, in addition to the standard
@@ -34,7 +38,8 @@ type sourceManager struct {
 	cachedir, basedir string
 	pms               map[ProjectName]*pmState
 	anafac            func(ProjectName) ProjectAnalyzer
-	sortup            bool
+	// Whether to sort versions for upgrade or downgrade
+	sortup bool
 	//pme               map[ProjectName]error
 }
 
@@ -48,16 +53,32 @@ type pmState struct {
 	vlist []Version // TODO temporary until we have a coherent, overall cache structure
 }
 
-func NewSourceManager(cachedir, basedir string, upgrade bool) (SourceManager, error) {
-	// TODO try to create dir if doesn't exist
+func NewSourceManager(cachedir, basedir string, upgrade, force bool) (SourceManager, error) {
+	err := os.MkdirAll(cachedir, 0777)
+	if err != nil {
+		return nil, err
+	}
+
+	glpath := path.Join(cachedir, "sm.lock")
+	_, err = os.Stat(glpath)
+	if err != nil && !force {
+		return nil, fmt.Errorf("Another process has locked the cachedir, or crashed without cleaning itself properly. Pass force=true to override.")
+	}
+	_, err = os.OpenFile(glpath, os.O_CREATE|os.O_RDONLY, 0700) // is 0700 sane for this purpose?
+	if err != nil {
+		return nil, fmt.Errorf("Failed to create global cache lock file at %s with err %s", glpath, err)
+	}
+
 	return &sourceManager{
 		cachedir: cachedir,
 		pms:      make(map[ProjectName]*pmState),
 		sortup:   upgrade,
 	}, nil
-
-	// TODO drop file lock on cachedir somewhere, here. Caller needs a panic
 	// recovery in a defer to be really proper, though
+}
+
+func (sm *sourceManager) Release() {
+	os.Remove(path.Join(sm.cachedir, "sm.lock"))
 }
 
 func (sm *sourceManager) GetProjectInfo(pa ProjectAtom) (ProjectInfo, error) {
@@ -87,8 +108,22 @@ func (sm *sourceManager) ListVersions(n ProjectName) ([]Version, error) {
 	return pmc.vlist, err
 }
 
-func (sm *sourceManager) ProjectExists(n ProjectName) bool {
-	panic("not implemented")
+func (sm *sourceManager) VendorCodeExists(n ProjectName) (bool, error) {
+	pms, err := sm.getProjectManager(n)
+	if err != nil {
+		return false, err
+	}
+
+	return pms.pm.CheckExistence(ExistsInCache) || pms.pm.CheckExistence(ExistsUpstream), nil
+}
+
+func (sm *sourceManager) RepoExists(n ProjectName) (bool, error) {
+	pms, err := sm.getProjectManager(n)
+	if err != nil {
+		return false, err
+	}
+
+	return pms.pm.CheckExistence(ExistsInVendorRoot), nil
 }
 
 // getProjectManager gets the project manager for the given ProjectName.
@@ -102,7 +137,7 @@ func (sm *sourceManager) getProjectManager(n ProjectName) (*pmState, error) {
 		//return nil, pme
 	}
 
-	repodir := fmt.Sprintf("%s/src/%s", sm.cachedir, n)
+	repodir := path.Join(sm.cachedir, "src", string(n))
 	r, err := vcs.NewRepo(string(n), repodir)
 	if err != nil {
 		// TODO be better
@@ -110,8 +145,7 @@ func (sm *sourceManager) getProjectManager(n ProjectName) (*pmState, error) {
 	}
 
 	// Ensure cache dir exists
-	// TODO be better
-	metadir := fmt.Sprintf("%s/metadata/%s", sm.cachedir, n)
+	metadir := path.Join(sm.cachedir, "metadata", string(n))
 	err = os.MkdirAll(metadir, 0777)
 	if err != nil {
 		// TODO be better
@@ -119,10 +153,11 @@ func (sm *sourceManager) getProjectManager(n ProjectName) (*pmState, error) {
 	}
 
 	pms := &pmState{}
-	fi, err := os.Stat(metadir + "/cache.json")
+	cpath := path.Join(metadir, "cache.json")
+	fi, err := os.Stat(cpath)
 	var dc *projectDataCache
 	if fi != nil {
-		pms.cf, err = os.OpenFile(metadir+"/cache.json", os.O_RDWR, 0777)
+		pms.cf, err = os.OpenFile(cpath, os.O_RDWR, 0777)
 		if err != nil {
 			// TODO be better
 			return nil, err
@@ -134,7 +169,7 @@ func (sm *sourceManager) getProjectManager(n ProjectName) (*pmState, error) {
 			return nil, err
 		}
 	} else {
-		pms.cf, err = os.Create(metadir + "/cache.json")
+		pms.cf, err = os.Create(cpath)
 		if err != nil {
 			// TODO be better
 			return nil, err

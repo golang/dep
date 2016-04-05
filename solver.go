@@ -118,16 +118,33 @@ func (s *solver) createVersionQueue(ref ProjectName) (*versionQueue, error) {
 		return newVersionQueue(ref, nil, s.sm)
 	}
 
-	if !s.sm.ProjectExists(ref) {
-		// TODO this check needs to incorporate/admit the possibility that the
-		// upstream no longer exists, but there's something valid in vendor/
-		if s.l.Level >= logrus.WarnLevel {
-			s.l.WithFields(logrus.Fields{
-				"name": ref,
-			}).Warn("Upstream project does not exist")
-		}
-		return nil, newSolveError(fmt.Sprintf("Project '%s' could not be located.", ref), cannotResolve)
+	exists, err := s.sm.RepoExists(ref)
+	if err != nil {
+		return nil, err
 	}
+	if !exists {
+		exists, err = s.sm.VendorCodeExists(ref)
+		if err != nil {
+			return nil, err
+		}
+		if exists {
+			// Project exists only in vendor (and in some manifest somewhere)
+			// TODO mark this for special handling, somehow?
+			if s.l.Level >= logrus.WarnLevel {
+				s.l.WithFields(logrus.Fields{
+					"name": ref,
+				}).Warn("Code found in vendor for project, but no history was found upstream or in cache")
+			}
+		} else {
+			if s.l.Level >= logrus.WarnLevel {
+				s.l.WithFields(logrus.Fields{
+					"name": ref,
+				}).Warn("Upstream project does not exist")
+			}
+			return nil, newSolveError(fmt.Sprintf("Project '%s' could not be located.", ref), cannotResolve)
+		}
+	}
+
 	lockv := s.getLockVersionIfValid(ref)
 
 	q, err := newVersionQueue(ref, lockv, s.sm)
@@ -304,13 +321,6 @@ func (s *solver) satisfiable(pi ProjectAtom) error {
 			failparent: failparent,
 			c:          constraint,
 		}
-	}
-
-	if !s.sm.ProjectExists(pi.Name) {
-		// Can get here if the lock file specifies a now-nonexistent project
-		// TODO this check needs to incorporate/accept the possibility that the
-		// upstream no longer exists, but there's something valid in vendor/
-		return newSolveError(fmt.Sprintf("Project '%s' could not be located.", pi.Name), cannotResolve)
 	}
 
 	deps, err := s.getDependenciesOf(pi)

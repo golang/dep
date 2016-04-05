@@ -131,7 +131,6 @@ func solveAndBasicChecks(fix fixture, t *testing.T) Result {
 	}
 
 	return result
-
 }
 
 func getFailureCausingProjects(err error) (projs []string) {

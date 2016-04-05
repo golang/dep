@@ -635,15 +635,21 @@ func (sm *depspecSourceManager) ListVersions(name ProjectName) (pi []Version, er
 	return
 }
 
-func (sm *depspecSourceManager) ProjectExists(name ProjectName) bool {
+func (sm *depspecSourceManager) RepoExists(name ProjectName) (bool, error) {
 	for _, ds := range sm.specs {
 		if name == ds.name.Name {
-			return true
+			return true, nil
 		}
 	}
 
-	return false
+	return false, nil
 }
+
+func (sm *depspecSourceManager) VendorCodeExists(name ProjectName) (bool, error) {
+	return false, nil
+}
+
+func (sm *depspecSourceManager) Release() {}
 
 // enforce interfaces
 var _ Manifest = depspec{}

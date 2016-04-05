@@ -2,6 +2,8 @@ package vsolver
 
 import (
 	"fmt"
+	"os"
+	"path"
 	"sort"
 	"sync"
 
@@ -12,6 +14,7 @@ import (
 type ProjectManager interface {
 	GetInfoAt(Version) (ProjectInfo, error)
 	ListVersions() ([]Version, error)
+	CheckExistence(ProjectExistence) bool
 }
 
 type ProjectAnalyzer interface {
@@ -25,7 +28,9 @@ type projectManager struct {
 	cacheroot, vendordir string
 	// Object for the cache repository
 	crepo *repo
-	ex    ProjectExistence
+	// Indicates the extent to which we have searched for, and verified, the
+	// existence of the project/repo.
+	ex existence
 	// Analyzer, created from the injected factory
 	an ProjectAnalyzer
 	// Whether the cache has the latest info on versions
@@ -39,6 +44,13 @@ type projectManager struct {
 	// The project metadata cache. This is persisted to disk, for reuse across
 	// solver runs.
 	dc *projectDataCache
+}
+
+type existence struct {
+	// The existence levels for which a search/check has been performed
+	s ProjectExistence
+	// The existence levels verified to be present through searching
+	f ProjectExistence
 }
 
 // TODO figure out shape of versions, then implement marshaling/unmarshaling
@@ -61,12 +73,20 @@ type repo struct {
 }
 
 func (pm *projectManager) GetInfoAt(v Version) (ProjectInfo, error) {
+	// Technically, we could attempt to return straight from the metadata cache
+	// even if the repo cache doesn't exist on disk. But that would allow weird
+	// state inconsistencies (cache exists, but no repo...how does that even
+	// happen?) that it'd be better to just not allow so that we don't have to
+	// think about it elsewhere
+	if !pm.CheckExistence(ExistsInCache) {
+		return ProjectInfo{}, fmt.Errorf("Project repository cache for %s does not exist", pm.n)
+	}
+
 	if pi, exists := pm.dc.Infos[v.Underlying]; exists {
 		return pi, nil
 	}
 
 	pm.crepo.mut.Lock()
-
 	err := pm.crepo.r.UpdateVersion(v.Info)
 	pm.crepo.mut.Unlock()
 	if err != nil {
@@ -84,6 +104,7 @@ func (pm *projectManager) GetInfoAt(v Version) (ProjectInfo, error) {
 
 func (pm *projectManager) ListVersions() (vlist []Version, err error) {
 	if !pm.cvsync {
+		pm.ex.s |= ExistsInCache | ExistsUpstream
 		pm.vlist, err = pm.crepo.getCurrentVersionPairs()
 		if err != nil {
 			// TODO More-er proper-er error
@@ -91,6 +112,7 @@ func (pm *projectManager) ListVersions() (vlist []Version, err error) {
 			return nil, err
 		}
 
+		pm.ex.f |= ExistsInCache | ExistsUpstream
 		pm.cvsync = true
 
 		// Process the version data into the cache
@@ -110,6 +132,34 @@ func (pm *projectManager) ListVersions() (vlist []Version, err error) {
 	}
 
 	return pm.vlist, nil
+}
+
+// CheckExistence provides a direct method for querying existence levels of the
+// project. It will only perform actual searches
+func (pm *projectManager) CheckExistence(ex ProjectExistence) bool {
+	if pm.ex.s&ex != ex {
+		if ex&ExistsInVendorRoot != 0 && pm.ex.s&ExistsInVendorRoot == 0 {
+			pm.ex.s |= ExistsInVendorRoot
+
+			fi, err := os.Stat(path.Join(pm.vendordir, string(pm.n)))
+			if err != nil && fi.IsDir() {
+				pm.ex.f |= ExistsInVendorRoot
+			}
+		}
+		if ex&ExistsInCache != 0 && pm.ex.s&ExistsInCache == 0 {
+			pm.ex.s |= ExistsInCache
+			if pm.crepo.r.CheckLocal() {
+				pm.ex.f |= ExistsInCache
+			}
+		}
+		if ex&ExistsUpstream != 0 && pm.ex.s&ExistsUpstream == 0 {
+			//pm.ex.s |= ExistsUpstream
+			// TODO maybe need a method to do this as cheaply as possible,
+			// per-repo type
+		}
+	}
+
+	return ex&pm.ex.f == ex
 }
 
 func (r *repo) getCurrentVersionPairs() (vlist []Version, err error) {
