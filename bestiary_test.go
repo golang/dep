@@ -454,10 +454,11 @@ var fixtures = []fixture{
 		maxAttempts: 3,
 	},
 	{
-		// Ensures the solver doesn"t exhaustively search all versions of b when it's
-		// a-2.0.0 whose dependency on c-2.0.0-nonexistent led to the problem. We
-		// make sure b has more versions than a so that the solver tries a first
-		// since it sorts sibling dependencies by number of versions.
+		// Ensures the solver doesn"t exhaustively search all versions of b when
+		// it's a-2.0.0 whose dependency on c-2.0.0-nonexistent led to the
+		// problem. We make sure b has more versions than a so that the solver
+		// tries a first since it sorts sibling dependencies by number of
+		// versions.
 		n: "simple transitive",
 		ds: []depspec{
 			dsv("root 0.0.0", "a *", "b *"),
@@ -476,6 +477,111 @@ var fixtures = []fixture{
 		),
 		maxAttempts: 2,
 	},
+	{
+		// Dependencies are ordered so that packages with fewer versions are
+		// tried first. Here, there are two valid solutions (either a or b must
+		// be downgraded once). The chosen one depends on which dep is traversed
+		// first. Since b has fewer versions, it will be traversed first, which
+		// means a will come later. Since later selections are revised first, a
+		// gets downgraded.
+		n: "traverse into package with fewer versions first",
+		ds: []depspec{
+			dsv("root 0.0.0", "a *", "b *"),
+			dsv("a 1.0.0", "c *"),
+			dsv("a 2.0.0", "c *"),
+			dsv("a 3.0.0", "c *"),
+			dsv("a 4.0.0", "c *"),
+			dsv("a 5.0.0", "c 1.0.0"),
+			dsv("b 1.0.0", "c *"),
+			dsv("b 2.0.0", "c *"),
+			dsv("b 3.0.0", "c *"),
+			dsv("b 4.0.0", "c 2.0.0"),
+			dsv("c 1.0.0"),
+			dsv("c 2.0.0"),
+		},
+		r: mkresults(
+			"root 0.0.0",
+			"a 4.0.0",
+			"b 4.0.0",
+			"c 2.0.0",
+		),
+		maxAttempts: 2,
+	},
+	{
+		// This is similar to the preceding fixture. When getting the number of
+		// versions of a package to determine which to traverse first, versions
+		// that are disallowed by the root package"s constraints should not be
+		// considered. Here, foo has more versions of bar in total (4), but
+		// fewer that meet myapp"s constraints (only 2). There is no solution,
+		// but we will do less backtracking if foo is tested first.
+		n: "traverse into package with fewer versions first",
+		ds: []depspec{
+			dsv("root 0.0.0", "foo *", "bar *"),
+			dsv("foo 1.0.0", "none 2.0.0"),
+			dsv("foo 2.0.0", "none 2.0.0"),
+			dsv("foo 3.0.0", "none 2.0.0"),
+			dsv("foo 4.0.0", "none 2.0.0"),
+			dsv("bar 1.0.0"),
+			dsv("bar 2.0.0"),
+			dsv("bar 3.0.0"),
+			dsv("none 1.0.0"),
+		},
+		errp:        []string{"none", "foo"},
+		maxAttempts: 2,
+	},
+	{
+		// If there"s a disjoint constraint on a package, then selecting other
+		// versions of it is a waste of time: no possible versions can match. We
+		// need to jump past it to the most recent package that affected the
+		// constraint.
+		n: "backjump past failed package on disjoint constraint",
+		ds: []depspec{
+			dsv("root 0.0.0", "a *", "foo *"),
+			dsv("a 1.0.0", "foo *"),
+			dsv("a 2.0.0", "foo <1.0.0"),
+			dsv("foo 2.0.0"),
+			dsv("foo 2.0.1"),
+			dsv("foo 2.0.2"),
+			dsv("foo 2.0.3"),
+			dsv("foo 2.0.4"),
+			dsv("none 1.0.0"),
+		},
+		r: mkresults(
+			"root 0.0.0",
+			"a 1.0.0",
+			"foo 2.0.4",
+		),
+		maxAttempts: 2,
+	},
+}
+
+func init() {
+	// This sets up a hundred versions of foo and bar, 0.0.0 through 9.9.0. Each
+	// version of foo depends on a baz with the same major version. Each version
+	// of bar depends on a baz with the same minor version. There is only one
+	// version of baz, 0.0.0, so only older versions of foo and bar will
+	// satisfy it.
+	fix := fixture{
+		n: "complex backtrack",
+		ds: []depspec{
+			dsv("root 0.0.0", "foo *", "bar *"),
+			dsv("baz 0.0.0"),
+		},
+		r: mkresults(
+			"root 0.0.0",
+			"foo 0.9.0",
+			"bar 9.0.0",
+			"baz 0.0.0",
+		),
+		maxAttempts: 10,
+	}
+
+	for i := 0; i < 10; i++ {
+		for j := 0; j < 10; j++ {
+			fix.ds = append(fix.ds, dsv(fmt.Sprintf("foo %v.%v.0", i, j), fmt.Sprintf("baz %v.0.0", i)))
+			fix.ds = append(fix.ds, dsv(fmt.Sprintf("bar %v.%v.0", i, j), fmt.Sprintf("baz 0.%v.0", j)))
+		}
+	}
 }
 
 type depspecSourceManager struct {
@@ -902,107 +1008,6 @@ func backtracking() {
     "c 4.0.0": {},
     "c 5.0.0": {},
   }, error: descriptionMismatch("a", "myapp", "b"), maxTries: 1);
-
-  // Dependencies are ordered so that packages with fewer versions are tried
-  // first. Here, there are two valid solutions (either a or b must be
-  // downgraded once). The chosen one depends on which dep is traversed first.
-  // Since b has fewer versions, it will be traversed first, which means a will
-  // come later. Since later selections are revised first, a gets downgraded.
-  testResolve("traverse into package with fewer versions first", {
-    "myapp 0.0.0": {
-      "a": "any",
-      "b": "any"
-    },
-    "a 1.0.0": {"c": "any"},
-    "a 2.0.0": {"c": "any"},
-    "a 3.0.0": {"c": "any"},
-    "a 4.0.0": {"c": "any"},
-    "a 5.0.0": {"c": "1.0.0"},
-    "b 1.0.0": {"c": "any"},
-    "b 2.0.0": {"c": "any"},
-    "b 3.0.0": {"c": "any"},
-    "b 4.0.0": {"c": "2.0.0"},
-    "c 1.0.0": {},
-    "c 2.0.0": {},
-  }, result: {
-    "myapp from root": "0.0.0",
-    "a": "4.0.0",
-    "b": "4.0.0",
-    "c": "2.0.0"
-  }, maxTries: 2);
-
-  // This is similar to the above test. When getting the number of versions of
-  // a package to determine which to traverse first, versions that are
-  // disallowed by the root package"s constraints should not be considered.
-  // Here, foo has more versions of bar in total (4), but fewer that meet
-  // myapp"s constraints (only 2). There is no solution, but we will do less
-  // backtracking if foo is tested first.
-  testResolve("take root package constraints into counting versions", {
-    "myapp 0.0.0": {
-      "foo": ">2.0.0",
-      "bar": "any"
-    },
-    "foo 1.0.0": {"none": "2.0.0"},
-    "foo 2.0.0": {"none": "2.0.0"},
-    "foo 3.0.0": {"none": "2.0.0"},
-    "foo 4.0.0": {"none": "2.0.0"},
-    "bar 1.0.0": {},
-    "bar 2.0.0": {},
-    "bar 3.0.0": {},
-    "none 1.0.0": {}
-  }, error: noVersion(["foo", "none"]), maxTries: 2);
-
-  // This sets up a hundred versions of foo and bar, 0.0.0 through 9.9.0. Each
-  // version of foo depends on a baz with the same major version. Each version
-  // of bar depends on a baz with the same minor version. There is only one
-  // version of baz, 0.0.0, so only older versions of foo and bar will
-  // satisfy it.
-  var mapp = {
-    "myapp 0.0.0": {
-      "foo": "any",
-      "bar": "any"
-    },
-    "baz 0.0.0": {}
-  };
-
-  for (var i = 0; i < 10; i++) {
-    for (var j = 0; j < 10; j++) {
-      mapp["foo $i.$j.0"] = {"baz": "$i.0.0"};
-      mapp["bar $i.$j.0"] = {"baz": "0.$j.0"};
-    }
-  }
-
-  testResolve("complex backtrack", map, result: {
-    "myapp from root": "0.0.0",
-    "foo": "0.9.0",
-    "bar": "9.0.0",
-    "baz": "0.0.0"
-  }, maxTries: 10);
-
-  // If there"s a disjoint constraint on a package, then selecting other
-  // versions of it is a waste of time: no possible versions can match. We need
-  // to jump past it to the most recent package that affected the constraint.
-  testResolve("backjump past failed package on disjoint constraint", {
-    "myapp 0.0.0": {
-      "a": "any",
-      "foo": ">2.0.0"
-    },
-    "a 1.0.0": {
-      "foo": "any" // ok
-    },
-    "a 2.0.0": {
-      "foo": "<1.0.0" // disjoint with myapp"s constraint on foo
-    },
-    "foo 2.0.0": {},
-    "foo 2.0.1": {},
-    "foo 2.0.2": {},
-    "foo 2.0.3": {},
-    "foo 2.0.4": {}
-  }, result: {
-    "myapp from root": "0.0.0",
-    "a": "1.0.0",
-    "foo": "2.0.4"
-  }, maxTries: 2);
 
   // This is a regression test for #18666. It was possible for the solver to
   // "forget" that a package had previously led to an error. In that case, it

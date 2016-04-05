@@ -60,7 +60,8 @@ encounters.
 Yes, most people will probably find most of this list incomprehensible
 right now. We'll improve/add explanatory links as we go!
 
-* [ ] Actually working/passing tests
+* [x] [Passing bestiary of tests](https://github.com/sdboyer/vsolver/issues/1)
+  brought over from dart
 * [x] Dependency constraints based on [SemVer](http://semver.org/),
       branches, and revisions. AKA, "all the ways you might depend on
       Go code now, but coherently organized."
