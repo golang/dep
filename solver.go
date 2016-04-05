@@ -83,7 +83,6 @@ func (s *solver) solve() ([]ProjectAtom, error) {
 				// backtracking succeeded, move to the next unselected ref
 				continue
 			}
-			// TODO handle different failure types appropriately, lolzies
 			return nil, err
 		}
 
@@ -218,14 +217,9 @@ func (s *solver) findValidVersion(q *versionQueue) error {
 
 	// Return a compound error of all the new errors encountered during this
 	// attempt to find a new, valid version
-	var fails []failedVersion
-	if len(q.fails) > faillen {
-		fails = q.fails[faillen+1:]
-	}
-
 	return &noVersionError{
 		pn:    q.ref,
-		fails: fails,
+		fails: q.fails[faillen:],
 	}
 }
 

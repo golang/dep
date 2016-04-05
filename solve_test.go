@@ -8,7 +8,7 @@ import (
 )
 
 func TestBasicSolves(t *testing.T) {
-	//solveAndBasicChecks(fixtures[4], t)
+	//solveAndBasicChecks(fixtures[len(fixtures)-1], t)
 	for _, fix := range fixtures {
 		solveAndBasicChecks(fix, t)
 	}
@@ -36,6 +36,10 @@ func solveAndBasicChecks(fix fixture, t *testing.T) Result {
 		p.Lock = fix.l
 	}
 	result := s.Solve(p, nil)
+
+	if fix.maxAttempts > 0 && result.Attempts > fix.maxAttempts {
+		t.Errorf("(fixture: %q) Solver completed in %v attempts, but expected %v or fewer", result.Attempts, fix.maxAttempts)
+	}
 
 	if len(fix.errp) > 0 {
 		if result.SolveFailure == nil {
@@ -88,10 +92,6 @@ func solveAndBasicChecks(fix fixture, t *testing.T) Result {
 		if result.SolveFailure != nil {
 			t.Errorf("(fixture: %q) Solver failed; error was type %T, text: %q", fix.n, result.SolveFailure, result.SolveFailure)
 			return result
-		}
-
-		if fix.maxAttempts > 0 && result.Attempts > fix.maxAttempts {
-			t.Errorf("(fixture: %q) Solver completed in %v attempts, but expected %v or fewer", result.Attempts, fix.maxAttempts)
 		}
 
 		// Dump result projects into a map for easier interrogation

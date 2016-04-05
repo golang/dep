@@ -365,6 +365,117 @@ var fixtures = []fixture{
 		},
 		errp: []string{"foo", "root"},
 	},
+	{
+		n: "no version that matches combined constraint",
+		ds: []depspec{
+			dsv("root 0.0.0", "foo 1.0.0", "bar 1.0.0"),
+			dsv("foo 1.0.0", "shared >=2.0.0, <3.0.0"),
+			dsv("bar 1.0.0", "shared >=2.9.0, <4.0.0"),
+			dsv("shared 2.5.0"),
+			dsv("shared 3.5.0"),
+		},
+		errp: []string{"shared", "foo", "bar"},
+	},
+	{
+		n: "disjoint constraints",
+		ds: []depspec{
+			dsv("root 0.0.0", "foo 1.0.0", "bar 1.0.0"),
+			dsv("foo 1.0.0", "shared <=2.0.0"),
+			dsv("bar 1.0.0", "shared >3.0.0"),
+			dsv("shared 2.0.0"),
+			dsv("shared 4.0.0"),
+		},
+		//errp: []string{"shared", "foo", "bar"}, // dart's has this...
+		errp: []string{"foo", "bar"},
+	},
+	{
+		n: "no valid solution",
+		ds: []depspec{
+			dsv("root 0.0.0", "a *", "b *"),
+			dsv("a 1.0.0", "b 1.0.0"),
+			dsv("a 2.0.0", "b 2.0.0"),
+			dsv("b 1.0.0", "a 2.0.0"),
+			dsv("b 2.0.0", "a 1.0.0"),
+		},
+		errp:        []string{"b", "a"},
+		maxAttempts: 2,
+	},
+	{
+		n: "no version that matches while backtracking",
+		ds: []depspec{
+			dsv("root 0.0.0", "a *", "b >1.0.0"),
+			dsv("a 1.0.0"),
+			dsv("b 1.0.0"),
+		},
+		errp: []string{"b", "root"},
+	},
+	{
+		// The latest versions of a and b disagree on c. An older version of either
+		// will resolve the problem. This test validates that b, which is farther
+		// in the dependency graph from myapp is downgraded first.
+		n: "rolls back leaf versions first",
+		ds: []depspec{
+			dsv("root 0.0.0", "a *"),
+			dsv("a 1.0.0", "b *"),
+			dsv("a 2.0.0", "b *", "c 2.0.0"),
+			dsv("b 1.0.0"),
+			dsv("b 2.0.0", "c 1.0.0"),
+			dsv("c 1.0.0"),
+			dsv("c 2.0.0"),
+		},
+		r: mkresults(
+			"root 0.0.0",
+			"a 2.0.0",
+			"b 1.0.0",
+			"c 2.0.0",
+		),
+		maxAttempts: 2,
+	},
+	{
+		// Only one version of baz, so foo and bar will have to downgrade until they
+		// reach it.
+		n: "simple transitive",
+		ds: []depspec{
+			dsv("root 0.0.0", "foo *"),
+			dsv("foo 1.0.0", "bar 1.0.0"),
+			dsv("foo 2.0.0", "bar 2.0.0"),
+			dsv("foo 3.0.0", "bar 3.0.0"),
+			dsv("bar 1.0.0", "baz *"),
+			dsv("bar 2.0.0", "baz 2.0.0"),
+			dsv("bar 3.0.0", "baz 3.0.0"),
+			dsv("baz 1.0.0"),
+		},
+		r: mkresults(
+			"root 0.0.0",
+			"foo 1.0.0",
+			"bar 1.0.0",
+			"baz 1.0.0",
+		),
+		maxAttempts: 3,
+	},
+	{
+		// Ensures the solver doesn"t exhaustively search all versions of b when it's
+		// a-2.0.0 whose dependency on c-2.0.0-nonexistent led to the problem. We
+		// make sure b has more versions than a so that the solver tries a first
+		// since it sorts sibling dependencies by number of versions.
+		n: "simple transitive",
+		ds: []depspec{
+			dsv("root 0.0.0", "a *", "b *"),
+			dsv("a 1.0.0", "c 1.0.0"),
+			dsv("a 2.0.0", "c 2.0.0"),
+			dsv("b 1.0.0"),
+			dsv("b 2.0.0"),
+			dsv("b 3.0.0"),
+			dsv("c 1.0.0"),
+		},
+		r: mkresults(
+			"root 0.0.0",
+			"a 1.0.0",
+			"b 3.0.0",
+			"c 1.0.0",
+		),
+		maxAttempts: 2,
+	},
 }
 
 type depspecSourceManager struct {
@@ -488,7 +599,6 @@ func (_ dummyLock) GetProjectAtom(_ ProjectName) *ProjectAtom {
 // https://github.com/dart-lang/pub/blob/master/test/version_solver_test.dart
 
 // TODO finish converting all of these
-// TODO ...figure out project-vs-pkg thing so we even know if these are useful
 
 /*
 func basicGraph() {
@@ -563,35 +673,6 @@ func rootDependency() {
 }
 
 func unsolvable() {
-  testResolve("no version that matches combined constraint", {
-    "myapp 0.0.0": {
-      "foo": "1.0.0",
-      "bar": "1.0.0"
-    },
-    "foo 1.0.0": {
-      "shared": ">=2.0.0 <3.0.0"
-    },
-    "bar 1.0.0": {
-      "shared": ">=2.9.0 <4.0.0"
-    },
-    "shared 2.5.0": {},
-    "shared 3.5.0": {}
-  }, error: noVersion(["shared", "foo", "bar"]));
-
-  testResolve("disjoint constraints", {
-    "myapp 0.0.0": {
-      "foo": "1.0.0",
-      "bar": "1.0.0"
-    },
-    "foo 1.0.0": {
-      "shared": "<=2.0.0"
-    },
-    "bar 1.0.0": {
-      "shared": ">3.0.0"
-    },
-    "shared 2.0.0": {},
-    "shared 4.0.0": {}
-  }, error: disjointConstraint(["shared", "foo", "bar"]));
 
   testResolve("mismatched descriptions", {
     "myapp 0.0.0": {
@@ -623,34 +704,6 @@ func unsolvable() {
     "shared 1.0.0 from mock2": {}
   }, error: sourceMismatch("shared", "foo", "bar"));
 
-  testResolve("no valid solution", {
-    "myapp 0.0.0": {
-      "a": "any",
-      "b": "any"
-    },
-    "a 1.0.0": {
-      "b": "1.0.0"
-    },
-    "a 2.0.0": {
-      "b": "2.0.0"
-    },
-    "b 1.0.0": {
-      "a": "2.0.0"
-    },
-    "b 2.0.0": {
-      "a": "1.0.0"
-    }
-  }, error: couldNotSolve, maxTries: 2);
-
-  // This is a regression test for #15550.
-  testResolve("no version that matches while backtracking", {
-    "myapp 0.0.0": {
-      "a": "any",
-      "b": ">1.0.0"
-    },
-    "a 1.0.0": {},
-    "b 1.0.0": {}
-  }, error: noVersion(["myapp", "b"]), maxTries: 1);
 
 
   // This is a regression test for #18300.
@@ -743,73 +796,6 @@ func backtracking() {
   }, result: {
     "myapp from root": "0.0.0",
     "a": "1.0.0"
-  }, maxTries: 2);
-
-  // The latest versions of a and b disagree on c. An older version of either
-  // will resolve the problem. This test validates that b, which is farther
-  // in the dependency graph from myapp is downgraded first.
-  testResolve("rolls back leaf versions first", {
-    "myapp 0.0.0": {
-      "a": "any"
-    },
-    "a 1.0.0": {
-      "b": "any"
-    },
-    "a 2.0.0": {
-      "b": "any",
-      "c": "2.0.0"
-    },
-    "b 1.0.0": {},
-    "b 2.0.0": {
-      "c": "1.0.0"
-    },
-    "c 1.0.0": {},
-    "c 2.0.0": {}
-  }, result: {
-    "myapp from root": "0.0.0",
-    "a": "2.0.0",
-    "b": "1.0.0",
-    "c": "2.0.0"
-  }, maxTries: 2);
-
-  // Only one version of baz, so foo and bar will have to downgrade until they
-  // reach it.
-  testResolve("simple transitive", {
-    "myapp 0.0.0": {"foo": "any"},
-    "foo 1.0.0": {"bar": "1.0.0"},
-    "foo 2.0.0": {"bar": "2.0.0"},
-    "foo 3.0.0": {"bar": "3.0.0"},
-    "bar 1.0.0": {"baz": "any"},
-    "bar 2.0.0": {"baz": "2.0.0"},
-    "bar 3.0.0": {"baz": "3.0.0"},
-    "baz 1.0.0": {}
-  }, result: {
-    "myapp from root": "0.0.0",
-    "foo": "1.0.0",
-    "bar": "1.0.0",
-    "baz": "1.0.0"
-  }, maxTries: 3);
-
-  // This ensures it doesn"t exhaustively search all versions of b when it"s
-  // a-2.0.0 whose dependency on c-2.0.0-nonexistent led to the problem. We
-  // make sure b has more versions than a so that the solver tries a first
-  // since it sorts sibling dependencies by number of versions.
-  testResolve("backjump to nearer unsatisfied package", {
-    "myapp 0.0.0": {
-      "a": "any",
-      "b": "any"
-    },
-    "a 1.0.0": { "c": "1.0.0" },
-    "a 2.0.0": { "c": "2.0.0-nonexistent" },
-    "b 1.0.0": {},
-    "b 2.0.0": {},
-    "b 3.0.0": {},
-    "c 1.0.0": {},
-  }, result: {
-    "myapp from root": "0.0.0",
-    "a": "1.0.0",
-    "b": "3.0.0",
-    "c": "1.0.0"
   }, maxTries: 2);
 
   // Tests that the backjumper will jump past unrelated selections when a
