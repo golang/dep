@@ -113,7 +113,7 @@ type fixture struct {
 	// Use downgrade instead of default upgrade sorter
 	downgrade bool
 	// lock file simulator, if one's to be used at all
-	l Lock
+	l fixLock
 	// projects expected to have errors, if any
 	errp []string
 }

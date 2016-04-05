@@ -30,12 +30,22 @@ func solveAndBasicChecks(fix fixture, t *testing.T) Result {
 		t.FailNow()
 	}
 
+	var latest []ProjectName
 	if fix.l == nil {
 		p.Lock = dummyLock{}
+		for _, ds := range fix.ds[1:] {
+			latest = append(latest, ds.name.Name)
+		}
 	} else {
 		p.Lock = fix.l
+		for _, ds := range fix.ds[1:] {
+			if _, has := fix.l[ds.name.Name]; !has {
+				latest = append(latest, ds.name.Name)
+			}
+		}
 	}
-	result := s.Solve(p, nil)
+
+	result := s.Solve(p, latest)
 
 	if fix.maxAttempts > 0 && result.Attempts > fix.maxAttempts {
 		t.Errorf("(fixture: %q) Solver completed in %v attempts, but expected %v or fewer", result.Attempts, fix.maxAttempts)

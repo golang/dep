@@ -13,8 +13,9 @@ func NewSolver(sm SourceManager, l *logrus.Logger) Solver {
 	}
 
 	return &solver{
-		sm: sm,
-		l:  l,
+		sm:     sm,
+		l:      l,
+		latest: make(map[ProjectName]struct{}),
 	}
 }
 
@@ -241,6 +242,12 @@ func (s *solver) findValidVersion(q *versionQueue) error {
 }
 
 func (s *solver) getLockVersionIfValid(ref ProjectName) *ProjectAtom {
+	// If the project is specifically marked for changes, then don't look for a
+	// locked version.
+	if _, has := s.latest[ref]; has {
+		return nil
+	}
+
 	lockver := s.rp.GetProjectAtom(ref)
 	if lockver == nil {
 		if s.l.Level >= logrus.DebugLevel {
@@ -278,7 +285,7 @@ func (s *solver) satisfiable(pi ProjectAtom) error {
 	if emptyProjectAtom == pi {
 		// TODO we should protect against this case elsewhere, but for now panic
 		// to canary when it's a problem
-		panic("checking version of empty ProjectAtom")
+		panic("canary - checking version of empty ProjectAtom")
 	}
 
 	if s.l.Level >= logrus.DebugLevel {
