@@ -19,10 +19,10 @@ type ProjectAnalyzer interface {
 }
 
 type projectManager struct {
-	name ProjectName
+	n ProjectName
 	// Cache dir and top-level project vendor dir. Basically duplicated from
 	// sourceManager.
-	cachedir, vendordir string
+	cacheroot, vendordir string
 	// Object for the cache repository
 	crepo *repo
 	ex    ProjectExistence
@@ -61,6 +61,10 @@ type repo struct {
 }
 
 func (pm *projectManager) GetInfoAt(v Version) (ProjectInfo, error) {
+	if pi, exists := pm.dc.Infos[v.Underlying]; exists {
+		return pi, nil
+	}
+
 	pm.crepo.mut.Lock()
 
 	err := pm.crepo.r.UpdateVersion(v.Info)

@@ -1,7 +1,9 @@
 package vsolver
 
 import (
+	"encoding/json"
 	"fmt"
+	"os"
 
 	"github.com/Masterminds/vcs"
 )
@@ -40,7 +42,8 @@ type sourceManager struct {
 // about the freshness of those caches
 type pmState struct {
 	pm   ProjectManager
-	vcur bool // indicates that we've called ListVersions()
+	cf   *os.File // handle for the cache file
+	vcur bool     // indicates that we've called ListVersions()
 	// TODO deal w/ possible local/upstream desync on PAs (e.g., tag moved)
 	vlist []Version // TODO temporary until we have a coherent, overall cache structure
 }
@@ -99,31 +102,62 @@ func (sm *sourceManager) getProjectManager(n ProjectName) (*pmState, error) {
 		//return nil, pme
 	}
 
-	path := fmt.Sprintf("%s/src/%s", sm.cachedir, n)
-	r, err := vcs.NewRepo(string(n), path)
+	repodir := fmt.Sprintf("%s/src/%s", sm.cachedir, n)
+	r, err := vcs.NewRepo(string(n), repodir)
 	if err != nil {
 		// TODO be better
 		return nil, err
 	}
 
+	// Ensure cache dir exists
+	// TODO be better
+	metadir := fmt.Sprintf("%s/metadata/%s", sm.cachedir, n)
+	err = os.MkdirAll(metadir, 0777)
+	if err != nil {
+		// TODO be better
+		return nil, err
+	}
+
+	pms := &pmState{}
+	fi, err := os.Stat(metadir + "/cache.json")
+	var dc *projectDataCache
+	if fi != nil {
+		pms.cf, err = os.OpenFile(metadir+"/cache.json", os.O_RDWR, 0777)
+		if err != nil {
+			// TODO be better
+			return nil, err
+		}
+
+		err = json.NewDecoder(pms.cf).Decode(dc)
+		if err != nil {
+			// TODO be better
+			return nil, err
+		}
+	} else {
+		pms.cf, err = os.Create(metadir + "/cache.json")
+		if err != nil {
+			// TODO be better
+			return nil, err
+		}
+
+		dc.Infos = make(map[Revision]ProjectInfo)
+		dc.VMap = make(map[Version]Revision)
+		dc.RMap = make(map[Revision][]Version)
+	}
+
 	pm := &projectManager{
-		name:      n,
-		cachedir:  sm.cachedir,
+		n:         n,
+		cacheroot: sm.cachedir,
 		vendordir: sm.basedir + "/vendor",
 		an:        sm.anafac(n),
-		dc: &projectDataCache{
-			VMap: make(map[Version]Revision),
-			RMap: make(map[Revision][]Version),
-		},
+		dc:        dc,
 		crepo: &repo{
-			rpath: fmt.Sprintf("%s/src/%s", sm.cachedir, n),
+			rpath: repodir,
 			r:     r,
 		},
 	}
 
-	pms := &pmState{
-		pm: pm,
-	}
+	pms.pm = pm
 	sm.pms[n] = pms
 	return pms, nil
 }
