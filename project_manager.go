@@ -135,14 +135,15 @@ func (pm *projectManager) ListVersions() (vlist []Version, err error) {
 }
 
 // CheckExistence provides a direct method for querying existence levels of the
-// project. It will only perform actual searches
+// project. It will only perform actual searching (local fs or over the network)
+// if no previous attempt at that search has been made.
 func (pm *projectManager) CheckExistence(ex ProjectExistence) bool {
 	if pm.ex.s&ex != ex {
 		if ex&ExistsInVendorRoot != 0 && pm.ex.s&ExistsInVendorRoot == 0 {
 			pm.ex.s |= ExistsInVendorRoot
 
 			fi, err := os.Stat(path.Join(pm.vendordir, string(pm.n)))
-			if err != nil && fi.IsDir() {
+			if err == nil && fi.IsDir() {
 				pm.ex.f |= ExistsInVendorRoot
 			}
 		}

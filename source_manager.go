@@ -61,9 +61,10 @@ func NewSourceManager(cachedir, basedir string, upgrade, force bool) (SourceMana
 
 	glpath := path.Join(cachedir, "sm.lock")
 	_, err = os.Stat(glpath)
-	if err != nil && !force {
-		return nil, fmt.Errorf("Another process has locked the cachedir, or crashed without cleaning itself properly. Pass force=true to override.")
+	if err == nil && !force {
+		return nil, fmt.Errorf("Another process has locked the cachedir, or crashed without cleaning itself properly. Pass force=true to override.", err)
 	}
+
 	_, err = os.OpenFile(glpath, os.O_CREATE|os.O_RDONLY, 0700) // is 0700 sane for this purpose?
 	if err != nil {
 		return nil, fmt.Errorf("Failed to create global cache lock file at %s with err %s", glpath, err)
@@ -114,7 +115,7 @@ func (sm *sourceManager) VendorCodeExists(n ProjectName) (bool, error) {
 		return false, err
 	}
 
-	return pms.pm.CheckExistence(ExistsInCache) || pms.pm.CheckExistence(ExistsUpstream), nil
+	return pms.pm.CheckExistence(ExistsInVendorRoot), nil
 }
 
 func (sm *sourceManager) RepoExists(n ProjectName) (bool, error) {
@@ -123,7 +124,7 @@ func (sm *sourceManager) RepoExists(n ProjectName) (bool, error) {
 		return false, err
 	}
 
-	return pms.pm.CheckExistence(ExistsInVendorRoot), nil
+	return pms.pm.CheckExistence(ExistsInCache) || pms.pm.CheckExistence(ExistsUpstream), nil
 }
 
 // getProjectManager gets the project manager for the given ProjectName.
@@ -138,10 +139,20 @@ func (sm *sourceManager) getProjectManager(n ProjectName) (*pmState, error) {
 	}
 
 	repodir := path.Join(sm.cachedir, "src", string(n))
-	r, err := vcs.NewRepo(string(n), repodir)
+	// TODO be more robust about this
+	r, err := vcs.NewRepo("https://"+string(n), repodir)
 	if err != nil {
 		// TODO be better
 		return nil, err
+	}
+	if !r.CheckLocal() {
+		// TODO cloning the repo here puts it on a blocking, and possibly
+		// unnecessary path. defer it
+		err = r.Get()
+		if err != nil {
+			// TODO be better
+			return nil, err
+		}
 	}
 
 	// Ensure cache dir exists
@@ -175,17 +186,19 @@ func (sm *sourceManager) getProjectManager(n ProjectName) (*pmState, error) {
 			return nil, err
 		}
 
-		dc.Infos = make(map[Revision]ProjectInfo)
-		dc.VMap = make(map[Version]Revision)
-		dc.RMap = make(map[Revision][]Version)
+		dc = &projectDataCache{
+			Infos: make(map[Revision]ProjectInfo),
+			VMap:  make(map[Version]Revision),
+			RMap:  make(map[Revision][]Version),
+		}
 	}
 
 	pm := &projectManager{
 		n:         n,
 		cacheroot: sm.cachedir,
 		vendordir: sm.basedir + "/vendor",
-		an:        sm.anafac(n),
-		dc:        dc,
+		//an:        sm.anafac(n), // TODO
+		dc: dc,
 		crepo: &repo{
 			rpath: repodir,
 			r:     r,
