@@ -6,3 +6,7 @@ import:
   vcs: git
 - package: github.com/Sirupsen/logrus
   version: 0.10.0
+- package: github.com/Masterminds/vcs
+  repo: git@github.com:sdboyer/vcs
+  version: tag-and-rev
+  vcs: git
