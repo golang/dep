@@ -164,76 +164,37 @@ func (pm *projectManager) CheckExistence(ex ProjectExistence) bool {
 
 func (r *repo) getCurrentVersionPairs() (vlist []Version, err error) {
 	r.mut.Lock()
+	defer r.mut.Unlock()
 
-	// TODO rigorously figure out what the existence level changes here are
-	err = r.r.Update()
-	// Write segment is done, so release write lock
-	r.mut.Unlock()
-	if err != nil {
-		// TODO More-er proper-er error
-		fmt.Println(err)
-		panic("canary - why is update failing")
+	vis, s, err := r.r.CurrentVersionsWithRevs()
+	// Even if an error occurs, it could have synced
+	if s {
+		r.synced = true
 	}
 
-	// crepo has been synced, mark it as such
-	r.synced = true
-
-	// And grab a read lock
-	r.mut.RLock()
-	defer r.mut.RUnlock()
-
-	// TODO this is WILDLY inefficient. do better
-	tags, err := r.r.Tags()
 	if err != nil {
-		// TODO More-er proper-er error
-		fmt.Println(err)
-		panic("canary - why is tags failing")
+		return nil, err
 	}
 
-	for _, tag := range tags {
-		ci, err := r.r.CommitInfo(tag)
-		if err != nil {
-			// TODO More-er proper-er error
-			fmt.Println(err)
-			panic("canary - why is commit info failing")
-		}
-
+	for _, vi := range vis {
 		v := Version{
 			Type:       V_Version,
-			Info:       tag,
-			Underlying: Revision(ci.Commit),
+			Info:       vi.Name,
+			Underlying: Revision(vi.Revision),
 		}
 
-		sv, err := semver.NewVersion(tag)
-		if err != nil {
-			v.SemVer = sv
-			v.Type = V_Semver
+		if vi.IsBranch {
+			v.Type = V_Branch
+		} else {
+			sv, err := semver.NewVersion(vi.Name)
+			if err == nil {
+				v.SemVer = sv
+				v.Type = V_Semver
+			}
 		}
 
 		vlist = append(vlist, v)
 	}
 
-	branches, err := r.r.Branches()
-	if err != nil {
-		// TODO More-er proper-er error
-		fmt.Println(err)
-		panic("canary - why is branches failing")
-	}
-
-	for _, branch := range branches {
-		ci, err := r.r.CommitInfo(branch)
-		if err != nil {
-			// TODO More-er proper-er error
-			fmt.Println(err)
-			panic("canary - why is commit info failing")
-		}
-
-		vlist = append(vlist, Version{
-			Type:       V_Branch,
-			Info:       branch,
-			Underlying: Revision(ci.Commit),
-		})
-	}
-
-	return vlist, nil
+	return
 }
