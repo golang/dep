@@ -2,6 +2,7 @@ package vsolver
 
 import (
 	"fmt"
+	"go/build"
 	"os"
 	"path"
 	"sort"
@@ -18,20 +19,22 @@ type ProjectManager interface {
 }
 
 type ProjectAnalyzer interface {
-	GetInfo() (ProjectInfo, error)
+	GetInfo(build.Context, ProjectName) (ProjectInfo, error)
 }
 
 type projectManager struct {
 	n ProjectName
-	// Cache dir and top-level project vendor dir. Basically duplicated from
-	// sourceManager.
-	cacheroot, vendordir string
+	// build.Context to  use in any analysis, and to pass to the analyzer
+	ctx build.Context
+	// Top-level project vendor dir
+	vendordir string
 	// Object for the cache repository
 	crepo *repo
 	// Indicates the extent to which we have searched for, and verified, the
 	// existence of the project/repo.
 	ex existence
-	// Analyzer, created from the injected factory
+	// Analyzer, injected by way of the SourceManager and originally from the
+	// sm's creator
 	an ProjectAnalyzer
 	// Whether the cache has the latest info on versions
 	cvsync bool
@@ -96,7 +99,7 @@ func (pm *projectManager) GetInfoAt(v Version) (ProjectInfo, error) {
 	}
 
 	pm.crepo.mut.RLock()
-	i, err := pm.an.GetInfo()
+	i, err := pm.an.GetInfo(pm.ctx, pm.n)
 	pm.crepo.mut.RUnlock()
 
 	return i, err

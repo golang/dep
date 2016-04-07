@@ -3,6 +3,7 @@ package vsolver
 import (
 	"encoding/json"
 	"fmt"
+	"go/build"
 	"os"
 	"path"
 
@@ -25,10 +26,10 @@ type SourceManager interface {
 //
 // ExistenceErrors should *only* be returned if the (lack of) existence of a
 // project was the underling cause of the error.
-type ExistenceError interface {
-	error
-	Existence() (search ProjectExistence, found ProjectExistence)
-}
+//type ExistenceError interface {
+//error
+//Existence() (search ProjectExistence, found ProjectExistence)
+//}
 
 // sourceManager is the default SourceManager for vsolver.
 //
@@ -37,7 +38,8 @@ type ExistenceError interface {
 type sourceManager struct {
 	cachedir, basedir string
 	pms               map[ProjectName]*pmState
-	anafac            func(ProjectName) ProjectAnalyzer
+	an                ProjectAnalyzer
+	ctx               build.Context
 	// Whether to sort versions for upgrade or downgrade
 	sortup bool
 	//pme               map[ProjectName]error
@@ -49,11 +51,13 @@ type pmState struct {
 	pm   ProjectManager
 	cf   *os.File // handle for the cache file
 	vcur bool     // indicates that we've called ListVersions()
-	// TODO deal w/ possible local/upstream desync on PAs (e.g., tag moved)
-	vlist []Version // TODO temporary until we have a coherent, overall cache structure
 }
 
-func NewSourceManager(cachedir, basedir string, upgrade, force bool) (SourceManager, error) {
+func NewSourceManager(cachedir, basedir string, upgrade, force bool, an ProjectAnalyzer) (SourceManager, error) {
+	if an == nil {
+		return nil, fmt.Errorf("A ProjectAnalyzer must be provided to the SourceManager.")
+	}
+
 	err := os.MkdirAll(cachedir, 0777)
 	if err != nil {
 		return nil, err
@@ -62,7 +66,7 @@ func NewSourceManager(cachedir, basedir string, upgrade, force bool) (SourceMana
 	glpath := path.Join(cachedir, "sm.lock")
 	_, err = os.Stat(glpath)
 	if err == nil && !force {
-		return nil, fmt.Errorf("Another process has locked the cachedir, or crashed without cleaning itself properly. Pass force=true to override.", err)
+		return nil, fmt.Errorf("Another process has locked the cachedir, or crashed without cleaning itself properly. Pass force=true to override.")
 	}
 
 	_, err = os.OpenFile(glpath, os.O_CREATE|os.O_RDONLY, 0700) // is 0700 sane for this purpose?
@@ -70,10 +74,15 @@ func NewSourceManager(cachedir, basedir string, upgrade, force bool) (SourceMana
 		return nil, fmt.Errorf("Failed to create global cache lock file at %s with err %s", glpath, err)
 	}
 
+	ctx := build.Default
+	// Replace GOPATH with our cache dir
+	ctx.GOPATH = cachedir
+
 	return &sourceManager{
 		cachedir: cachedir,
 		pms:      make(map[ProjectName]*pmState),
 		sortup:   upgrade,
+		ctx:      ctx,
 	}, nil
 	// recovery in a defer to be really proper, though
 }
@@ -98,15 +107,7 @@ func (sm *sourceManager) ListVersions(n ProjectName) ([]Version, error) {
 		return nil, err
 	}
 
-	if !pmc.vcur {
-		pmc.vlist, err = pmc.pm.ListVersions()
-		// TODO this perhaps-expensively retries in the failure case
-		if err != nil {
-			pmc.vcur = true
-		}
-	}
-
-	return pmc.vlist, err
+	return pmc.pm.ListVersions()
 }
 
 func (sm *sourceManager) VendorCodeExists(n ProjectName) (bool, error) {
@@ -195,10 +196,10 @@ func (sm *sourceManager) getProjectManager(n ProjectName) (*pmState, error) {
 
 	pm := &projectManager{
 		n:         n,
-		cacheroot: sm.cachedir,
+		ctx:       sm.ctx,
 		vendordir: sm.basedir + "/vendor",
-		//an:        sm.anafac(n), // TODO
-		dc: dc,
+		an:        sm.an,
+		dc:        dc,
 		crepo: &repo{
 			rpath: repodir,
 			r:     r,
