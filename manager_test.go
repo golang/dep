@@ -1,6 +1,8 @@
 package vsolver
 
 import (
+	"fmt"
+	"go/build"
 	"os"
 	"path"
 	"runtime"
@@ -12,6 +14,12 @@ import (
 var cpath = path.Join(os.TempDir(), "smcache")
 var bd string
 
+type dummyAnalyzer struct{}
+
+func (dummyAnalyzer) GetInfo(ctx build.Context, p ProjectName) (ProjectInfo, error) {
+	return ProjectInfo{}, fmt.Errorf("just a dummy analyzer")
+}
+
 func init() {
 	_, filename, _, _ := runtime.Caller(1)
 	bd = path.Dir(filename)
@@ -21,18 +29,18 @@ func TestSourceManagerInit(t *testing.T) {
 	// Just to ensure it's all clean
 	os.RemoveAll(cpath)
 
-	_, err := NewSourceManager(cpath, bd, true, false)
+	_, err := NewSourceManager(cpath, bd, true, false, dummyAnalyzer{})
 
 	if err != nil {
 		t.Errorf("Unexpected error on SourceManager creation: %s", err)
 	}
 
-	_, err = NewSourceManager(cpath, bd, true, false)
+	_, err = NewSourceManager(cpath, bd, true, false, dummyAnalyzer{})
 	if err == nil {
 		t.Errorf("Creating second SourceManager should have failed due to file lock contention")
 	}
 
-	sm, err := NewSourceManager(cpath, bd, true, true)
+	sm, err := NewSourceManager(cpath, bd, true, true, dummyAnalyzer{})
 	defer sm.Release()
 	if err != nil {
 		t.Errorf("Creating second SourceManager should have succeeded when force flag was passed, but failed with err %s", err)
@@ -46,7 +54,7 @@ func TestSourceManagerInit(t *testing.T) {
 func TestProjectManagerInit(t *testing.T) {
 	// Just to ensure it's all clean
 	os.RemoveAll(cpath)
-	sm, err := NewSourceManager(cpath, bd, true, false)
+	sm, err := NewSourceManager(cpath, bd, true, false, dummyAnalyzer{})
 	defer sm.Release()
 
 	if err != nil {
