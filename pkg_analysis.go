@@ -2,6 +2,7 @@ package vsolver
 
 import (
 	"bytes"
+	"fmt"
 	"go/build"
 	"io"
 	"os"
@@ -22,6 +23,176 @@ func init() {
 
 	archListString := "386 amd64 amd64p32 arm armbe arm64 arm64be ppc64 ppc64le mips mipsle mips64 mips64le mips64p32 mips64p32le ppc s390 s390x sparc sparc64"
 	archList = strings.Split(archListString, " ")
+}
+
+// ExternalReach takes a base directory (a project root), and computes the list
+// of external dependencies (not under the tree at that project root) that are
+// imported by packages in that project tree.
+//
+// projname indicates the import path-level name that constitutes the root of
+// the project tree (used to decide whether an encountered import path is
+// "internal" or "external"), as basedir will not necessarily always be the same
+// as the project's root import path.
+func ExternalReach(basedir, projname string) (rm map[string][]string, err error) {
+	ctx := build.Default
+	ctx.UseAllFiles = true // optimistic, but we do it for the first try
+
+	type wm struct {
+		ex map[string]struct{}
+		in map[string]struct{}
+	}
+	// world's simplest adjacency list
+	workmap := make(map[string]wm)
+
+	err = filepath.Walk(basedir, func(path string, fi os.FileInfo, err error) error {
+		if err != nil && err != filepath.SkipDir {
+			return err
+		}
+		if !fi.IsDir() {
+			return nil
+		}
+
+		// Skip a few types of dirs
+		if !localSrcDir(fi) {
+			return filepath.SkipDir
+		}
+
+		// Scan for dependencies, and anything that's not part of the local
+		// package gets added to the scan list.
+		p, err := ctx.ImportDir(path, 0)
+		var imps []string
+		if err != nil {
+			switch err.(type) {
+			case *build.NoGoError:
+				return nil
+			case *build.MultiplePackageError:
+				// Multiple package names declared in the dir, which causes
+				// ImportDir() to choke; use our custom iterative scanner.
+				imps, err = IterativeScan(path)
+				if err != nil {
+					return err
+				}
+			default:
+				return err
+			}
+		} else {
+			imps = p.Imports
+		}
+
+		w := wm{
+			ex: make(map[string]struct{}),
+			in: make(map[string]struct{}),
+		}
+
+		for _, imp := range imps {
+			if !strings.HasPrefix(imp, projname) {
+				w.ex[imp] = struct{}{}
+			} else {
+				if w2, seen := workmap[imp]; seen {
+					for i := range w2.ex {
+						w.ex[i] = struct{}{}
+					}
+					for i := range w2.in {
+						w.in[i] = struct{}{}
+					}
+				} else {
+					w.in[imp] = struct{}{}
+				}
+			}
+		}
+
+		workmap[path] = w
+		return nil
+	})
+
+	if err != nil {
+		return
+	}
+
+	// Now just brute-force through the workmap, repeating until we make
+	// no progress, either because no packages have any unresolved internal
+	// packages left (in which case we're done), or because some packages can't
+	// find something in the 'in' list (which shouldn't be possible)
+	//
+	// This implementation is hilariously inefficient in pure computational
+	// complexity terms - worst case is probably O(n³)-ish, versus O(n) for the
+	// filesystem scan itself. However, the constant multiplier for filesystem
+	// access is so much larger than for memory twiddling that it would probably
+	// take an absurdly large and snaky project to ever have that worst-case
+	// polynomial growth become deciding (or even significant) over the linear
+	// side.
+	//
+	// But, if that day comes, we can improve this algorithm.
+	rm = make(map[string][]string)
+	complete := true
+	for !complete {
+		var progress bool
+		complete = true
+
+		for pkg, w := range workmap {
+			if len(w.in) == 0 {
+				continue
+			}
+			complete = false
+			// Each pass should always empty the original in list, but there
+			// could be more in lists inherited from the other package
+			// (transitive internal deps)
+			for in := range w.in {
+				if w2, exists := workmap[in]; !exists {
+					return nil, fmt.Errorf("Should be impossible: %s depends on %s, but %s not in workmap", pkg, w2, w2)
+				} else {
+					progress = true
+					delete(w.in, in)
+
+					for i := range w2.ex {
+						w.ex[i] = struct{}{}
+					}
+					for i := range w2.in {
+						w.in[i] = struct{}{}
+					}
+				}
+			}
+		}
+
+		if !complete && !progress {
+			// Can't conceive of a way that we'd hit this, but this guards
+			// against infinite loop
+			panic("unreachable")
+		}
+	}
+
+	// finally, transform to slice for return
+	rm = make(map[string][]string)
+	// ensure we have a version of the basedir w/trailing slash, for stripping
+	rt := strings.TrimSuffix(basedir, string(os.PathSeparator)) + string(os.PathSeparator)
+
+	for pkg, w := range workmap {
+		edeps := make([]string, len(w.ex))
+		k := 0
+		for opkg := range w.ex {
+			edeps[k] = opkg
+			k++
+		}
+
+		rm[strings.TrimPrefix(pkg, rt)] = edeps
+	}
+
+	return
+}
+
+func localSrcDir(fi os.FileInfo) bool {
+	// Ignore _foo and .foo
+	if strings.HasPrefix(fi.Name(), "_") || strings.HasPrefix(fi.Name(), ".") {
+		return false
+	}
+
+	// Ignore dirs that are expressly intended for non-project source
+	switch fi.Name() {
+	case "vendor", "Godeps":
+		return false
+	default:
+		return true
+	}
 }
 
 // IterativeScan attempts to obtain a list of imported dependencies from a
