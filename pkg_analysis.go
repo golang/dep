@@ -31,8 +31,7 @@ func init() {
 //
 // projname indicates the import path-level name that constitutes the root of
 // the project tree (used to decide whether an encountered import path is
-// "internal" or "external"), as basedir will not necessarily always be the same
-// as the project's root import path.
+// "internal" or "external").
 func ExternalReach(basedir, projname string) (rm map[string][]string, err error) {
 	ctx := build.Default
 	ctx.UseAllFiles = true // optimistic, but we do it for the first try
@@ -87,6 +86,7 @@ func ExternalReach(basedir, projname string) (rm map[string][]string, err error)
 		for _, imp := range imps {
 			if !strings.HasPrefix(imp, projname) {
 				w.ex[imp] = struct{}{}
+				// TODO handle relative paths correctly, too
 			} else {
 				if w2, seen := workmap[imp]; seen {
 					for i := range w2.ex {
@@ -369,9 +369,9 @@ func readGoContents(fp string) ([]byte, error) {
 		}
 	}
 
-	buf := bytes.NewBufferString("")
+	var buf bytes.Buffer
 	f.Seek(0, 0)
-	_, err = io.CopyN(buf, f, int64(pos.Offset))
+	_, err = io.CopyN(&buf, f, int64(pos.Offset))
 	if err != nil {
 		return []byte{}, err
 	}

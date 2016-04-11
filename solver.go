@@ -19,7 +19,8 @@ func NewSolver(sm SourceManager, l *logrus.Logger) Solver {
 	}
 }
 
-// solver is a backtracking-style SAT solver.
+// solver is a specialized backtracking SAT solver with satisfiability
+// conditions hardcoded to the needs of the Go package management problem space.
 type solver struct {
 	l        *logrus.Logger
 	sm       SourceManager
@@ -31,6 +32,9 @@ type solver struct {
 	attempts int
 }
 
+// Solve takes a ProjectInfo describing the root project, and a list of
+// ProjectNames which should be upgraded, and attempts to find a complete
+// solution that satisfies all constraints.
 func (s *solver) Solve(root ProjectInfo, toUpgrade []ProjectName) Result {
 	// local overrides would need to be handled first.
 	// TODO local overrides! heh
@@ -48,7 +52,6 @@ func (s *solver) Solve(root ProjectInfo, toUpgrade []ProjectName) Result {
 		sl:  make([]ProjectName, 0),
 		cmp: s.unselectedComparator,
 	}
-	heap.Init(s.unsel)
 
 	// Prime the queues with the root project
 	s.selectVersion(s.rp.pa)
@@ -245,7 +248,13 @@ func (s *solver) getLockVersionIfValid(ref ProjectName) *ProjectAtom {
 	// If the project is specifically marked for changes, then don't look for a
 	// locked version.
 	if _, has := s.latest[ref]; has {
-		return nil
+		exist, _ := s.sm.RepoExists(ref)
+		// For projects without an upstream or cache repository, we still have
+		// to try to use what they have in the lock, because that's the only
+		// version we'll be able to actually get for them.
+		if exist {
+			return nil
+		}
 	}
 
 	lockver := s.rp.GetProjectAtom(ref)
