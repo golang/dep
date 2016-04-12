@@ -180,6 +180,69 @@ func ExternalReach(basedir, projname string) (rm map[string][]string, err error)
 	return
 }
 
+func listExternalDeps(basedir, projname string) ([]string, error) {
+	ctx := build.Default
+	ctx.UseAllFiles = true // optimistic, but we do it for the first try
+	exm := make(map[string]struct{})
+
+	err := filepath.Walk(basedir, func(path string, fi os.FileInfo, err error) error {
+		if err != nil && err != filepath.SkipDir {
+			return err
+		}
+		if !fi.IsDir() {
+			return nil
+		}
+
+		// Skip a few types of dirs
+		if !localSrcDir(fi) {
+			return filepath.SkipDir
+		}
+
+		// Scan for dependencies, and anything that's not part of the local
+		// package gets added to the scan list.
+		p, err := ctx.ImportDir(path, 0)
+		var imps []string
+		if err != nil {
+			switch err.(type) {
+			case *build.NoGoError:
+				return nil
+			case *build.MultiplePackageError:
+				// Multiple package names declared in the dir, which causes
+				// ImportDir() to choke; use our custom iterative scanner.
+				imps, err = IterativeScan(path)
+				if err != nil {
+					return err
+				}
+			default:
+				return err
+			}
+		} else {
+			imps = p.Imports
+		}
+
+		for _, imp := range imps {
+			if !strings.HasPrefix(imp, projname) {
+				exm[imp] = struct{}{}
+				// TODO handle relative paths correctly, too
+			}
+		}
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	ex := make([]string, len(exm))
+	k := 0
+	for p := range exm {
+		ex[k] = p
+		k++
+	}
+
+	return ex, nil
+}
+
 func localSrcDir(fi os.FileInfo) bool {
 	// Ignore _foo and .foo
 	if strings.HasPrefix(fi.Name(), "_") || strings.HasPrefix(fi.Name(), ".") {
