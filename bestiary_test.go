@@ -651,6 +651,10 @@ func (sm *depspecSourceManager) VendorCodeExists(name ProjectName) (bool, error)
 
 func (sm *depspecSourceManager) Release() {}
 
+func (sm *depspecSourceManager) ExportAtomTo(pa ProjectAtom, to string) error {
+	return fmt.Errorf("dummy sm doesn't support exporting")
+}
+
 // enforce interfaces
 var _ Manifest = depspec{}
 var _ Lock = dummyLock{}
