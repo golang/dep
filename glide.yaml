@@ -7,8 +7,6 @@ import:
 - package: github.com/Sirupsen/logrus
   version: 0.10.0
 - package: github.com/Masterminds/vcs
-  version: tag-and-rev
-  repo: git@github.com:sdboyer/vcs
   vcs: git
 - package: github.com/termie/go-shutil
   version: bcacb06fecaeec8dc42af03c87c6949f4a05c74c

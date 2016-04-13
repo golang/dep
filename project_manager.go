@@ -1,6 +1,7 @@
 package vsolver
 
 import (
+	"bytes"
 	"fmt"
 	"go/build"
 	"os"
@@ -114,14 +115,17 @@ func (pm *projectManager) GetInfoAt(v Version) (ProjectInfo, error) {
 func (pm *projectManager) ListVersions() (vlist []Version, err error) {
 	if !pm.cvsync {
 		pm.ex.s |= ExistsInCache | ExistsUpstream
-		pm.vlist, err = pm.crepo.getCurrentVersionPairs()
+
+		var exbits ProjectExistence
+		pm.vlist, exbits, err = pm.crepo.getCurrentVersionPairs()
+		pm.ex.f |= exbits
+
 		if err != nil {
 			// TODO More-er proper-er error
 			fmt.Println(err)
 			return nil, err
 		}
 
-		pm.ex.f |= ExistsInCache | ExistsUpstream
 		pm.cvsync = true
 
 		// Process the version data into the cache
@@ -176,38 +180,189 @@ func (pm *projectManager) ExportVersionTo(v Version, to string) error {
 	return pm.crepo.exportVersionTo(v, to)
 }
 
-func (r *repo) getCurrentVersionPairs() (vlist []Version, err error) {
+func (r *repo) getCurrentVersionPairs() (vlist []Version, exbits ProjectExistence, err error) {
 	r.mut.Lock()
 	defer r.mut.Unlock()
 
-	vis, s, err := r.r.CurrentVersionsWithRevs()
-	// Even if an error occurs, it could have synced
-	if s {
-		r.synced = true
-	}
+	switch r.r.(type) {
+	case *vcs.GitRepo:
+		var out []byte
+		c := exec.Command("git", "ls-remote", r.r.Remote())
+		// Ensure no terminal prompting for PWs
+		c.Env = mergeEnvLists([]string{"GIT_TERMINAL_PROMPT=0"}, os.Environ())
+		out, err = c.CombinedOutput()
 
-	if err != nil {
-		return nil, err
-	}
-
-	for _, vi := range vis {
-		v := Version{
-			Type:       V_Version,
-			Info:       vi.Name,
-			Underlying: Revision(vi.Revision),
-		}
-
-		if vi.IsBranch {
-			v.Type = V_Branch
-		} else {
-			sv, err := semver.NewVersion(vi.Name)
-			if err == nil {
-				v.SemVer = sv
-				v.Type = V_Semver
+		all := bytes.Split(bytes.TrimSpace(out), []byte("\n"))
+		if err != nil || len(all) == 0 {
+			// ls-remote failed, probably due to bad communication or a faulty
+			// upstream implementation. So fetch updates, then build the list
+			// locally
+			err = r.r.Update()
+			if err != nil {
+				// Definitely have a problem, now - bail out
+				return
 			}
+
+			// Upstream and cache must exist, so add that to exbits
+			exbits |= ExistsUpstream | ExistsInCache
+			// Also, local is definitely now synced
+			r.synced = true
+
+			out, err = r.r.RunFromDir("git", "show-ref", "--dereference")
+			if err != nil {
+				return
+			}
+
+			all = bytes.Split(bytes.TrimSpace(out), []byte("\n"))
+		}
+		// Local cache may not actually exist here, but upstream definitely does
+		exbits |= ExistsUpstream
+
+		var v Version
+		for _, pair := range all {
+			if string(pair[46:51]) == "heads" {
+				v = Version{
+					Type:       V_Branch,
+					Info:       string(pair[52:]),
+					Underlying: Revision(pair[:40]),
+				}
+			} else if string(pair[46:50]) == "tags" {
+				// TODO deal with dereferenced tags
+				n := string(pair[51:])
+				v = Version{
+					Type:       V_Version,
+					Info:       n,
+					Underlying: Revision(pair[:40]),
+				}
+
+				sv, err := semver.NewVersion(n)
+				if err == nil {
+					v.Type = V_Semver
+					v.SemVer = sv
+				}
+			} else {
+				continue
+			}
+			vlist = append(vlist, v)
+		}
+	case *vcs.BzrRepo:
+		var out []byte
+		// Update the local first
+		err = r.r.Update()
+		if err != nil {
+			return
+		}
+		// Upstream and cache must exist, so add that to exbits
+		exbits |= ExistsUpstream | ExistsInCache
+		// Also, local is definitely now synced
+		r.synced = true
+
+		// Now, list all the tags
+		out, err = r.r.RunFromDir("bzr", "tags", "--show-ids", "-v")
+		if err != nil {
+			return
 		}
 
-		vlist = append(vlist, v)
+		all := bytes.Split(bytes.TrimSpace(out), []byte("\n"))
+		for _, line := range all {
+			idx := bytes.IndexByte(line, 32) // space
+			n := string(line[:idx])
+			v := Version{
+				Type:       V_Version,
+				Info:       n,
+				Underlying: Revision(bytes.TrimSpace(line[idx:])),
+			}
+			sv, err := semver.NewVersion(n)
+			if err == nil {
+				v.Type = V_Semver
+				v.SemVer = sv
+			}
+			vlist = append(vlist, v)
+		}
+
+	case *vcs.HgRepo:
+		var out []byte
+		err = r.r.Update()
+		if err != nil {
+			return
+		}
+
+		// Upstream and cache must exist, so add that to exbits
+		exbits |= ExistsUpstream | ExistsInCache
+		// Also, local is definitely now synced
+		r.synced = true
+
+		out, err = r.r.RunFromDir("hg", "tags", "--debug", "--verbose")
+		if err != nil {
+			return
+		}
+
+		all := bytes.Split(bytes.TrimSpace(out), []byte("\n"))
+		lbyt := []byte("local")
+		nulrev := []byte("0000000000000000000000000000000000000000")
+		for _, line := range all {
+			if bytes.Equal(lbyt, line[len(line)-len(lbyt):]) {
+				// Skip local tags
+				continue
+			}
+
+			// tip is magic, don't include it
+			if bytes.HasPrefix(line, []byte("tip")) {
+				continue
+			}
+
+			// Split on colon; this gets us the rev and the tag plus local revno
+			pair := bytes.Split(line, []byte(":"))
+			if bytes.Equal(nulrev, pair[1]) {
+				// null rev indicates this tag is marked for deletion
+				continue
+			}
+
+			idx := bytes.IndexByte(pair[0], 32) // space
+			n := string(pair[0][:idx])
+			v := Version{
+				Type:       V_Version,
+				Info:       n,
+				Underlying: Revision(pair[1]),
+			}
+
+			sv, err := semver.NewVersion(n)
+			if err == nil {
+				v.Type = V_Semver
+				v.SemVer = sv
+			}
+			vlist = append(vlist, v)
+		}
+
+		out, err = r.r.RunFromDir("hg", "branches", "--debug", "--verbose")
+		if err != nil {
+			// better nothing than incomplete
+			vlist = nil
+			return
+		}
+
+		all = bytes.Split(bytes.TrimSpace(out), []byte("\n"))
+		lbyt = []byte("(inactive)")
+		for _, line := range all {
+			if bytes.Equal(lbyt, line[len(line)-len(lbyt):]) {
+				// Skip inactive branches
+				continue
+			}
+
+			// Split on colon; this gets us the rev and the branch plus local revno
+			pair := bytes.Split(line, []byte(":"))
+			idx := bytes.IndexByte(pair[0], 32) // space
+			vlist = append(vlist, Version{
+				Type:       V_Branch,
+				Info:       string(pair[0][:idx]),
+				Underlying: Revision(pair[1]),
+			})
+		}
+	case *vcs.SvnRepo:
+		// TODO is it ok to return empty vlist and no error?
+		// TODO ...gotta do something for svn, right?
+	default:
+		panic("unknown repo type")
 	}
 
 	return
@@ -229,7 +384,7 @@ func (r *repo) exportVersionTo(v Version, to string) error {
 		// TODO could have an err here
 		defer os.Rename(bak, idx)
 
-		_, err = r.runFromDir("git", "read-tree", v.Info)
+		_, err = r.r.RunFromDir("git", "read-tree", v.Info)
 		if err != nil {
 			return err
 		}
@@ -243,7 +398,7 @@ func (r *repo) exportVersionTo(v Version, to string) error {
 		// the alternative is using plain checkout, though we have a bunch of
 		// housekeeping to do to set up, then tear down, the sparse checkout
 		// controls, as well as restore the original index and HEAD.
-		_, err = r.runFromDir("git", "checkout-index", "-a", "--prefix="+to)
+		_, err = r.r.RunFromDir("git", "checkout-index", "-a", "--prefix="+to)
 		if err != nil {
 			return err
 		}
@@ -277,18 +432,7 @@ func (r *repo) exportVersionTo(v Version, to string) error {
 	}
 }
 
-// These three funcs copied from Masterminds/vcs so we can exec our own commands
-func (r *repo) runFromDir(cmd string, args ...string) ([]byte, error) {
-	c := exec.Command(cmd, args...)
-	c.Dir, c.Env = r.rpath, envForDir(r.rpath)
-
-	return c.CombinedOutput()
-}
-
-func envForDir(dir string) []string {
-	return mergeEnvLists([]string{"PWD=" + dir}, os.Environ())
-}
-
+// This func copied from Masterminds/vcs so we can exec our own commands
 func mergeEnvLists(in, out []string) []string {
 NextVar:
 	for _, inkv := range in {

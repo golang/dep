@@ -1,13 +1,12 @@
-hash: 1d20f83f26d2445a9be60bc11d748da13b49e760e8ae5a3ee5c622dd85bc91e2
-updated: 2016-04-13T02:47:26.104211067-04:00
+hash: c881fdebf747f08a9d28f0c42cfce09e9d987ed8578d92c2957eaa11664e032d
+updated: 2016-04-13T12:35:33.512197757-04:00
 imports:
 - name: github.com/Masterminds/semver
   version: dc6f778231d838c084d36709ac95105ced2a3b4e
   repo: git@github.com:sdboyer/semver
   vcs: git
 - name: github.com/Masterminds/vcs
-  version: 6fc9287eeaeac4f303da50c0450f060c075f2360
-  repo: git@github.com:sdboyer/vcs
+  version: 7a21de0acff824ccf45f633cc844a19625149c2f
   vcs: git
 - name: github.com/Sirupsen/logrus
   version: 4b6ea7319e214d98c938f12692336f7ca9348d6b
