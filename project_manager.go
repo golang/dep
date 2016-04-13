@@ -105,6 +105,7 @@ func (pm *projectManager) GetInfoAt(v Version) (ProjectInfo, error) {
 
 	pm.crepo.mut.RLock()
 	i, err := pm.an.GetInfo(pm.ctx, pm.n)
+	// TODO cache results
 	pm.crepo.mut.RUnlock()
 
 	return i, err

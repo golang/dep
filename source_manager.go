@@ -84,6 +84,7 @@ func NewSourceManager(cachedir, basedir string, upgrade, force bool, an ProjectA
 		pms:      make(map[ProjectName]*pmState),
 		sortup:   upgrade,
 		ctx:      ctx,
+		an:       an,
 	}, nil
 	// recovery in a defer to be really proper, though
 }
@@ -182,20 +183,21 @@ func (sm *sourceManager) getProjectManager(n ProjectName) (*pmState, error) {
 		pms.cf, err = os.OpenFile(cpath, os.O_RDWR, 0777)
 		if err != nil {
 			// TODO be better
-			return nil, err
+			return nil, fmt.Errorf("Err on opening metadata cache file: %s", err)
 		}
 
 		err = json.NewDecoder(pms.cf).Decode(dc)
 		if err != nil {
 			// TODO be better
-			return nil, err
+			return nil, fmt.Errorf("Err on JSON decoding metadata cache file: %s", err)
 		}
 	} else {
-		pms.cf, err = os.Create(cpath)
-		if err != nil {
-			// TODO be better
-			return nil, err
-		}
+		// TODO commented this out for now, until we manage it correctly
+		//pms.cf, err = os.Create(cpath)
+		//if err != nil {
+		//// TODO be better
+		//return nil, fmt.Errorf("Err on creating metadata cache file: %s", err)
+		//}
 
 		dc = &projectDataCache{
 			Infos: make(map[Revision]ProjectInfo),
