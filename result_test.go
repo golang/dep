@@ -2,6 +2,7 @@ package vsolver
 
 import (
 	"fmt"
+	"go/build"
 	"os"
 	"path"
 	"testing"
@@ -10,6 +11,16 @@ import (
 )
 
 var basicResult Result
+var kub ProjectAtom
+
+// An analyzer that passes nothing back, but doesn't error. This expressly
+// creates a situation that shouldn't be able to happen from a general solver
+// perspective, so it's only useful for particular situations in tests
+type passthruAnalyzer struct{}
+
+func (passthruAnalyzer) GetInfo(ctx build.Context, p ProjectName) (ProjectInfo, error) {
+	return ProjectInfo{}, nil
+}
 
 func init() {
 	sv1, _ := semver.NewVersion("1.0.0")
@@ -35,6 +46,18 @@ func init() {
 			},
 		},
 	}
+
+	// just in case something needs punishing, kubernetes is happy to oblige
+	sv2, _ := semver.NewVersion("v1.2.2")
+	kub = ProjectAtom{
+		Name: "github.com/kubernetes/kubernetes",
+		Version: Version{
+			Type:       V_Semver,
+			Info:       "v1.2.2",
+			Underlying: "528f879e7d3790ea4287687ef0ab3f2a01cc2718",
+			SemVer:     sv2,
+		},
+	}
 }
 
 func TestResultCreateVendorTree(t *testing.T) {
@@ -43,9 +66,8 @@ func TestResultCreateVendorTree(t *testing.T) {
 
 	tmp := path.Join(os.TempDir(), "vsolvtest")
 	os.RemoveAll(tmp)
-	//fmt.Println(tmp)
 
-	sm, err := NewSourceManager(path.Join(tmp, "cache"), path.Join(tmp, "base"), true, false, dummyAnalyzer{})
+	sm, err := NewSourceManager(path.Join(tmp, "cache"), path.Join(tmp, "base"), true, false, passthruAnalyzer{})
 	if err != nil {
 		t.Errorf("NewSourceManager errored unexpectedly: %q", err)
 	}
@@ -66,4 +88,49 @@ func TestResultCreateVendorTree(t *testing.T) {
 	}
 
 	// TODO add more checks
+}
+
+func BenchmarkCreateVendorTree(b *testing.B) {
+	// We're fs-bound here, so restrict to single parallelism
+	b.SetParallelism(1)
+
+	r := basicResult
+	tmp := path.Join(os.TempDir(), "vsolvtest")
+
+	clean := true
+	sm, err := NewSourceManager(path.Join(tmp, "cache"), path.Join(tmp, "base"), true, true, passthruAnalyzer{})
+	if err != nil {
+		b.Errorf("NewSourceManager errored unexpectedly: %q", err)
+		clean = false
+	}
+
+	// Prefetch the projects before timer starts
+	for _, pa := range r.Projects {
+		_, err := sm.GetProjectInfo(pa)
+		if err != nil {
+			b.Errorf("failed getting project info during prefetch: %s", err)
+			clean = false
+		}
+	}
+
+	if clean {
+		b.ResetTimer()
+		b.StopTimer()
+		exp := path.Join(tmp, "export")
+		for i := 0; i < b.N; i++ {
+			// Order the loop this way to make it easy to disable final cleanup, to
+			// ease manual inspection
+			os.RemoveAll(exp)
+			b.StartTimer()
+			err = r.CreateVendorTree(exp, sm)
+			b.StopTimer()
+			if err != nil {
+				b.Errorf("unexpected error after %v iterations: %s", i, err)
+				break
+			}
+		}
+	}
+
+	sm.Release()
+	os.RemoveAll(tmp) // comment this to leave temp dir behind for inspection
 }
