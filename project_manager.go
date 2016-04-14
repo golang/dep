@@ -203,6 +203,9 @@ func (r *repo) getCurrentVersionPairs() (vlist []Version, exbits ProjectExistenc
 
 		all := bytes.Split(bytes.TrimSpace(out), []byte("\n"))
 		if err != nil || len(all) == 0 {
+			// TODO remove this path? it really just complicates things, for
+			// probably not much benefit
+
 			// ls-remote failed, probably due to bad communication or a faulty
 			// upstream implementation. So fetch updates, then build the list
 			// locally
