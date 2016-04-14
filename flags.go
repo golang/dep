@@ -13,19 +13,19 @@ const (
 type ConstraintType uint8
 
 const (
-	C_Revision ConstraintType = 1 << iota
-	C_Branch
-	C_Version
+	RevisionConstraint ConstraintType = 1 << iota
+	BranchConstraint
+	VersionConstraint
 	C_Semver
 	C_SemverRange
-	C_ExactMatch = C_Revision | C_Branch | C_Version | C_Semver
+	C_ExactMatch = RevisionConstraint | BranchConstraint | VersionConstraint | C_Semver
 	C_FlexMatch  = C_SemverRange
 )
 
 var VTCTCompat = [...]ConstraintType{
-	C_Revision,
-	C_Branch,
-	C_Version,
+	RevisionConstraint,
+	BranchConstraint,
+	VersionConstraint,
 	C_Semver | C_SemverRange,
 }
 

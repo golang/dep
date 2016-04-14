@@ -312,7 +312,7 @@ func (s *solver) satisfiable(pi ProjectAtom) error {
 			s.l.WithFields(logrus.Fields{
 				"name":          pi.Name,
 				"version":       pi.Version.Info,
-				"curconstraint": constraint.Body(),
+				"curconstraint": constraint.String(),
 			}).Info("Current constraints do not allow version")
 		}
 
@@ -324,7 +324,7 @@ func (s *solver) satisfiable(pi ProjectAtom) error {
 					s.l.WithFields(logrus.Fields{
 						"name":       pi.Name,
 						"othername":  dep.Depender.Name,
-						"constraint": dep.Dep.Constraint.Body(),
+						"constraint": dep.Dep.Constraint.String(),
 					}).Debug("Marking other, selected project with conflicting constraint as failed")
 				}
 				s.fail(dep.Depender.Name)
@@ -359,8 +359,8 @@ func (s *solver) satisfiable(pi ProjectAtom) error {
 					"name":          pi.Name,
 					"version":       pi.Version.Info,
 					"depname":       dep.Name,
-					"curconstraint": constraint.Body(),
-					"newconstraint": dep.Constraint.Body(),
+					"curconstraint": constraint.String(),
+					"newconstraint": dep.Constraint.String(),
 				}).Debug("Project atom cannot be added; its constraints are disjoint with existing constraints")
 			}
 
@@ -374,8 +374,8 @@ func (s *solver) satisfiable(pi ProjectAtom) error {
 							"name":          pi.Name,
 							"version":       pi.Version.Info,
 							"depname":       sibling.Depender.Name,
-							"sibconstraint": sibling.Dep.Constraint.Body(),
-							"newconstraint": dep.Constraint.Body(),
+							"sibconstraint": sibling.Dep.Constraint.String(),
+							"newconstraint": dep.Constraint.String(),
 						}).Debug("Marking other, selected project as failed because its constraint is disjoint with our testee")
 					}
 					s.fail(sibling.Depender.Name)
@@ -401,7 +401,7 @@ func (s *solver) satisfiable(pi ProjectAtom) error {
 					"version":       pi.Version.Info,
 					"depname":       dep.Name,
 					"curversion":    selected.Version.Info,
-					"newconstraint": dep.Constraint.Body(),
+					"newconstraint": dep.Constraint.String(),
 				}).Debug("Project atom cannot be added; a constraint it introduces does not allow a currently selected version")
 			}
 			s.fail(dep.Name)
