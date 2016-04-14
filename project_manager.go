@@ -150,6 +150,10 @@ func (pm *projectManager) ListVersions() (vlist []Version, err error) {
 // CheckExistence provides a direct method for querying existence levels of the
 // project. It will only perform actual searching (local fs or over the network)
 // if no previous attempt at that search has been made.
+//
+// Note that this may perform read-ish operations on the cache repo, and it
+// takes a lock accordingly. Deadlock may result from calling it during a
+// segment where the cache repo mutex is already write-locked.
 func (pm *projectManager) CheckExistence(ex ProjectExistence) bool {
 	if pm.ex.s&ex != ex {
 		if ex&ExistsInVendorRoot != 0 && pm.ex.s&ExistsInVendorRoot == 0 {
@@ -161,15 +165,20 @@ func (pm *projectManager) CheckExistence(ex ProjectExistence) bool {
 			}
 		}
 		if ex&ExistsInCache != 0 && pm.ex.s&ExistsInCache == 0 {
+			pm.crepo.mut.RLock()
 			pm.ex.s |= ExistsInCache
 			if pm.crepo.r.CheckLocal() {
 				pm.ex.f |= ExistsInCache
 			}
+			pm.crepo.mut.RUnlock()
 		}
 		if ex&ExistsUpstream != 0 && pm.ex.s&ExistsUpstream == 0 {
-			//pm.ex.s |= ExistsUpstream
-			// TODO maybe need a method to do this as cheaply as possible,
-			// per-repo type
+			pm.crepo.mut.RLock()
+			pm.ex.s |= ExistsUpstream
+			if pm.crepo.r.Ping() {
+				pm.ex.f |= ExistsUpstream
+			}
+			pm.crepo.mut.RUnlock()
 		}
 	}
 
