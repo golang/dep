@@ -22,7 +22,7 @@ func NewConstraint(t ConstraintType, body string) (Constraint, error) {
 		return floatingVersion{body: body}, nil
 	case RevisionConstraint:
 		return immutableVersion{body: body}, nil
-	case VersionConstraint, C_Semver, C_SemverRange:
+	case VersionConstraint:
 		c, err := semver.NewConstraint(body)
 		if err != nil {
 			return plainVersion{body: body}, nil
@@ -43,7 +43,7 @@ func (c semverC) String() string {
 
 func (c semverC) Admits(v V) bool {
 	if sv, ok := v.(semverVersion); ok {
-		return c.c.Admits(sv.sv) != nil
+		return c.c.Admits(sv.sv) == nil
 	}
 
 	return false

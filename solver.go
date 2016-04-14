@@ -97,7 +97,7 @@ func (s *solver) solve() ([]ProjectAtom, error) {
 		if s.l.Level >= logrus.InfoLevel {
 			s.l.WithFields(logrus.Fields{
 				"name":    queue.ref,
-				"version": queue.current().Info,
+				"version": queue.current(),
 			}).Info("Accepted project atom")
 		}
 
@@ -209,7 +209,7 @@ func (s *solver) findValidVersion(q *versionQueue) error {
 			if s.l.Level >= logrus.DebugLevel {
 				s.l.WithFields(logrus.Fields{
 					"name":    q.ref,
-					"version": cur.Info,
+					"version": cur,
 				}).Debug("Found acceptable version, returning out")
 			}
 			return nil
@@ -271,7 +271,7 @@ func (s *solver) getLockVersionIfValid(ref ProjectName) *ProjectAtom {
 		if s.l.Level >= logrus.InfoLevel {
 			s.l.WithFields(logrus.Fields{
 				"name":    ref,
-				"version": lockver.Version.Info,
+				"version": lockver.Version,
 			}).Info("Project found in lock, but version not allowed by current constraints")
 		}
 		return nil
@@ -280,7 +280,7 @@ func (s *solver) getLockVersionIfValid(ref ProjectName) *ProjectAtom {
 	if s.l.Level >= logrus.InfoLevel {
 		s.l.WithFields(logrus.Fields{
 			"name":    ref,
-			"version": lockver.Version.Info,
+			"version": lockver.Version,
 		}).Info("Project found in lock")
 	}
 
@@ -300,7 +300,7 @@ func (s *solver) satisfiable(pi ProjectAtom) error {
 	if s.l.Level >= logrus.DebugLevel {
 		s.l.WithFields(logrus.Fields{
 			"name":    pi.Name,
-			"version": pi.Version.Info,
+			"version": pi.Version,
 		}).Debug("Checking satisfiability of project atom against current constraints")
 	}
 
@@ -311,7 +311,7 @@ func (s *solver) satisfiable(pi ProjectAtom) error {
 		if s.l.Level >= logrus.InfoLevel {
 			s.l.WithFields(logrus.Fields{
 				"name":          pi.Name,
-				"version":       pi.Version.Info,
+				"version":       pi.Version,
 				"curconstraint": constraint.String(),
 			}).Info("Current constraints do not allow version")
 		}
@@ -357,7 +357,7 @@ func (s *solver) satisfiable(pi ProjectAtom) error {
 			if s.l.Level >= logrus.DebugLevel {
 				s.l.WithFields(logrus.Fields{
 					"name":          pi.Name,
-					"version":       pi.Version.Info,
+					"version":       pi.Version,
 					"depname":       dep.Name,
 					"curconstraint": constraint.String(),
 					"newconstraint": dep.Constraint.String(),
@@ -372,7 +372,7 @@ func (s *solver) satisfiable(pi ProjectAtom) error {
 					if s.l.Level >= logrus.DebugLevel {
 						s.l.WithFields(logrus.Fields{
 							"name":          pi.Name,
-							"version":       pi.Version.Info,
+							"version":       pi.Version,
 							"depname":       sibling.Depender.Name,
 							"sibconstraint": sibling.Dep.Constraint.String(),
 							"newconstraint": dep.Constraint.String(),
@@ -398,9 +398,9 @@ func (s *solver) satisfiable(pi ProjectAtom) error {
 			if s.l.Level >= logrus.DebugLevel {
 				s.l.WithFields(logrus.Fields{
 					"name":          pi.Name,
-					"version":       pi.Version.Info,
+					"version":       pi.Version,
 					"depname":       dep.Name,
-					"curversion":    selected.Version.Info,
+					"curversion":    selected.Version,
 					"newconstraint": dep.Constraint.String(),
 				}).Debug("Project atom cannot be added; a constraint it introduces does not allow a currently selected version")
 			}
@@ -418,7 +418,7 @@ func (s *solver) satisfiable(pi ProjectAtom) error {
 	if s.l.Level >= logrus.DebugLevel {
 		s.l.WithFields(logrus.Fields{
 			"name":    pi.Name,
-			"version": pi.Version.Info,
+			"version": pi.Version,
 		}).Debug("Project atom passed satisfiability test against current state")
 	}
 
@@ -501,7 +501,7 @@ func (s *solver) backtrack() bool {
 		if s.l.Level >= logrus.DebugLevel {
 			s.l.WithFields(logrus.Fields{
 				"name":    q.ref,
-				"failver": q.current().Info,
+				"failver": q.current(),
 			}).Debug("Trying failed queue with next version")
 		}
 
@@ -516,7 +516,7 @@ func (s *solver) backtrack() bool {
 				if s.l.Level >= logrus.InfoLevel {
 					s.l.WithFields(logrus.Fields{
 						"name":    q.ref,
-						"version": q.current().Info,
+						"version": q.current(),
 					}).Info("Backtracking found valid version, attempting next solution")
 				}
 
@@ -661,7 +661,7 @@ func (s *solver) unselectLast() {
 				s.l.WithFields(logrus.Fields{
 					"name":  dep.Name,
 					"pname": pa.Name,
-					"pver":  pa.Version.Info,
+					"pver":  pa.Version,
 				}).Debug("Removing project from unselected queue; last parent atom was unselected")
 			}
 			s.unsel.remove(dep.Name)

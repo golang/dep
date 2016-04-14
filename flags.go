@@ -13,21 +13,10 @@ const (
 type ConstraintType uint8
 
 const (
-	RevisionConstraint ConstraintType = 1 << iota
+	RevisionConstraint ConstraintType = iota
 	BranchConstraint
 	VersionConstraint
-	C_Semver
-	C_SemverRange
-	C_ExactMatch = RevisionConstraint | BranchConstraint | VersionConstraint | C_Semver
-	C_FlexMatch  = C_SemverRange
 )
-
-var VTCTCompat = [...]ConstraintType{
-	RevisionConstraint,
-	BranchConstraint,
-	VersionConstraint,
-	C_Semver | C_SemverRange,
-}
 
 // ProjectExistence values represent the extent to which a project "exists."
 type ProjectExistence uint8

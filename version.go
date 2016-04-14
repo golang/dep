@@ -30,9 +30,9 @@ type V interface {
 	fmt.Stringer
 }
 
-type ImmV interface {
+type VPair interface {
 	V
-	Underlying() string
+	Underlying() Revision
 }
 
 type floatingVersion struct {
@@ -141,6 +141,14 @@ type versionWithImmut struct {
 	immut Revision
 }
 
+func (v versionWithImmut) String() string {
+	return v.main.String()
+}
+
+func (v versionWithImmut) Underlying() Revision {
+	return v.immut
+}
+
 func NewFloatingVersion(body string) V {
 	return floatingVersion{body: body}
 }
@@ -152,4 +160,66 @@ func NewVersion(body string) V {
 		return plainVersion{body: body}
 	}
 	return semverVersion{sv: sv}
+}
+
+func compareVersionType(l, r V) int {
+	// Big fugly double type switch. No reflect, because this can be smack in a hot loop
+	switch l.(type) {
+	case immutableVersion:
+		switch r.(type) {
+		case immutableVersion:
+			return 0
+		case floatingVersion, plainVersion, semverVersion:
+			return -1
+		default:
+			panic("unknown version type")
+		}
+	case floatingVersion:
+		switch r.(type) {
+		case immutableVersion:
+			return 1
+		case floatingVersion:
+			return 0
+		case plainVersion, semverVersion:
+			return -1
+		default:
+			panic("unknown version type")
+		}
+
+	case plainVersion:
+		switch r.(type) {
+		case immutableVersion, floatingVersion:
+			return 1
+		case plainVersion:
+			return 0
+		case semverVersion:
+			return -1
+		default:
+			panic("unknown version type")
+		}
+
+	case semverVersion:
+		switch r.(type) {
+		case immutableVersion, floatingVersion, plainVersion:
+			return -1
+		case semverVersion:
+			return 0
+		default:
+			panic("unknown version type")
+		}
+	default:
+		panic("unknown version type")
+	}
+}
+
+func WithRevision(v V, r Revision) V {
+	switch v.(type) {
+	case versionWithImmut, immutableVersion:
+		return v
+	}
+
+	return versionWithImmut{
+		main:  v,
+		immut: r,
+	}
 }

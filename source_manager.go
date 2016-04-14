@@ -12,7 +12,7 @@ import (
 
 type SourceManager interface {
 	GetProjectInfo(ProjectAtom) (ProjectInfo, error)
-	ListVersions(ProjectName) ([]Version, error)
+	ListVersions(ProjectName) ([]V, error)
 	RepoExists(ProjectName) (bool, error)
 	VendorCodeExists(ProjectName) (bool, error)
 	ExportAtomTo(ProjectAtom, string) error
@@ -102,7 +102,7 @@ func (sm *sourceManager) GetProjectInfo(pa ProjectAtom) (ProjectInfo, error) {
 	return pmc.pm.GetInfoAt(pa.Version)
 }
 
-func (sm *sourceManager) ListVersions(n ProjectName) ([]Version, error) {
+func (sm *sourceManager) ListVersions(n ProjectName) ([]V, error) {
 	pmc, err := sm.getProjectManager(n)
 	if err != nil {
 		// TODO More-er proper-er errors
@@ -201,8 +201,8 @@ func (sm *sourceManager) getProjectManager(n ProjectName) (*pmState, error) {
 
 		dc = &projectDataCache{
 			Infos: make(map[Revision]ProjectInfo),
-			VMap:  make(map[Version]Revision),
-			RMap:  make(map[Revision][]Version),
+			VMap:  make(map[V]Revision),
+			RMap:  make(map[Revision][]V),
 		}
 	}
 
@@ -223,8 +223,8 @@ func (sm *sourceManager) getProjectManager(n ProjectName) (*pmState, error) {
 	return pms, nil
 }
 
-type upgradeVersionSorter []Version
-type downgradeVersionSorter []Version
+type upgradeVersionSorter []V
+type downgradeVersionSorter []V
 
 func (vs upgradeVersionSorter) Len() int {
 	return len(vs)
@@ -245,45 +245,59 @@ func (vs downgradeVersionSorter) Swap(i, j int) {
 func (vs upgradeVersionSorter) Less(i, j int) bool {
 	l, r := vs[i], vs[j]
 
-	// Start by always sorting higher vtypes earlier
-	// TODO need a new means when we get rid of those types
-	if l.Type != r.Type {
-		return l.Type > r.Type
+	switch compareVersionType(l, r) {
+	case -1:
+		return false
+	case 1:
+		return true
+	case 0:
+		break
+	default:
+		panic("unreachable")
 	}
 
-	switch l.Type {
-	case V_Branch, V_Version, V_Revision:
-		return l.Info < r.Info
+	switch l.(type) {
+	// For these, now nothing to do but alpha sort
+	case immutableVersion, floatingVersion, plainVersion:
+		return l.String() > r.String()
 	}
 
 	// This ensures that pre-release versions are always sorted after ALL
 	// full-release versions
-	lpre, rpre := l.SemVer.Prerelease() == "", r.SemVer.Prerelease() == ""
+	lsv, rsv := l.(semverVersion).sv, r.(semverVersion).sv
+	lpre, rpre := lsv.Prerelease() == "", rsv.Prerelease() == ""
 	if (lpre && !rpre) || (!lpre && rpre) {
 		return lpre
 	}
-	return l.SemVer.GreaterThan(r.SemVer)
+	return lsv.GreaterThan(rsv)
 }
 
 func (vs downgradeVersionSorter) Less(i, j int) bool {
 	l, r := vs[i], vs[j]
 
-	// Start by always sorting higher vtypes earlier
-	// TODO need a new means when we get rid of those types
-	if l.Type != r.Type {
-		return l.Type > r.Type
+	switch compareVersionType(l, r) {
+	case -1:
+		return false
+	case 1:
+		return true
+	case 0:
+		break
+	default:
+		panic("unreachable")
 	}
 
-	switch l.Type {
-	case V_Branch, V_Version, V_Revision:
-		return l.Info < r.Info
+	switch l.(type) {
+	// For these, now nothing to do but alpha
+	case immutableVersion, floatingVersion, plainVersion:
+		return l.String() < r.String()
 	}
 
 	// This ensures that pre-release versions are always sorted after ALL
 	// full-release versions
-	lpre, rpre := l.SemVer.Prerelease() == "", r.SemVer.Prerelease() == ""
+	lsv, rsv := l.(semverVersion).sv, r.(semverVersion).sv
+	lpre, rpre := lsv.Prerelease() == "", rsv.Prerelease() == ""
 	if (lpre && !rpre) || (!lpre && rpre) {
 		return lpre
 	}
-	return l.SemVer.LessThan(r.SemVer)
+	return lsv.LessThan(rsv)
 }

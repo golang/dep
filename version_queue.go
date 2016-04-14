@@ -6,13 +6,13 @@ import (
 )
 
 type failedVersion struct {
-	v Version
+	v V
 	f error
 }
 
 type versionQueue struct {
 	ref                ProjectName
-	pi                 []Version
+	pi                 []V
 	fails              []failedVersion
 	sm                 SourceManager
 	failed             bool
@@ -43,7 +43,7 @@ func newVersionQueue(ref ProjectName, lockv *ProjectAtom, sm SourceManager) (*ve
 	return vq, nil
 }
 
-func (vq *versionQueue) current() Version {
+func (vq *versionQueue) current() V {
 	if len(vq.pi) > 0 {
 		return vq.pi[0]
 	}
@@ -111,7 +111,7 @@ func (vq *versionQueue) String() string {
 	var vs []string
 
 	for _, v := range vq.pi {
-		vs = append(vs, v.Info)
+		vs = append(vs, v.String())
 	}
 	return fmt.Sprintf("[%s]", strings.Join(vs, ", "))
 }

@@ -8,7 +8,7 @@ type Solver interface {
 
 type ProjectAtom struct {
 	Name    ProjectName
-	Version Version
+	Version V
 }
 
 var emptyProjectAtom ProjectAtom
