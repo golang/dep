@@ -15,35 +15,48 @@ import (
 //   need other types)
 // - the implementation relies on type magic under the hood, which would
 //   be unsafe to do if other dynamic types could be hiding behind the interface.
-type V interface {
+type Version interface {
 	// Version composes Stringer to ensure that all versions can be serialized
 	// to a string
 	fmt.Stringer
 	_private()
 }
 
-func (floatingVersion) _private()  {}
-func (plainVersion) _private()     {}
-func (semverVersion) _private()    {}
-func (versionWithImmut) _private() {}
-func (Revision) _private()         {}
-
 // VersionPair represents a normal Version, but paired with its corresponding,
 // underlying Revision.
-type VPair interface {
-	V
+type VersionPair interface {
+	Version
 	Underlying() Revision
+	_pair(int)
 }
+
+// UnpairedVersion represents a normal Version, with a method for creating a
+// VersionPair by indicating the version's corresponding, underlying Revision.
+type UnpairedVersion interface {
+	Version
+	Is(Revision) VersionPair
+	_pair(bool)
+}
+
+func (floatingVersion) _private()  {}
+func (floatingVersion) _pair(bool) {}
+func (plainVersion) _private()     {}
+func (plainVersion) _pair(bool)    {}
+func (semverVersion) _private()    {}
+func (semverVersion) _pair(bool)   {}
+func (versionWithImmut) _private() {}
+func (versionWithImmut) _pair(int) {}
+func (Revision) _private()         {}
 
 // NewFloatingVersion creates a new Version to represent a floating version (in
 // general, a branch).
-func NewFloatingVersion(body string) V {
+func NewFloatingVersion(body string) UnpairedVersion {
 	return floatingVersion(body)
 }
 
 // NewVersion creates a Semver-typed Version if the provided version string is
 // valid semver, and a plain/non-semver version if not.
-func NewVersion(body string) V {
+func NewVersion(body string) UnpairedVersion {
 	sv, err := semver.NewVersion(body)
 
 	if err != nil {
@@ -62,7 +75,7 @@ func (r Revision) String() string {
 
 // Admits is the Revision acting as a constraint; it checks to see if the provided
 // version is the same Revision as itself.
-func (r Revision) Admits(v V) bool {
+func (r Revision) Admits(v Version) bool {
 	if r2, ok := v.(Revision); ok {
 		return r == r2
 	}
@@ -93,7 +106,7 @@ func (v floatingVersion) String() string {
 	return string(v)
 }
 
-func (v floatingVersion) Admits(v2 V) bool {
+func (v floatingVersion) Admits(v2 Version) bool {
 	if fv, ok := v2.(floatingVersion); ok {
 		return v == fv
 	}
@@ -116,13 +129,20 @@ func (v floatingVersion) Intersect(c Constraint) Constraint {
 	return noneConstraint{}
 }
 
+func (v floatingVersion) Is(r Revision) VersionPair {
+	return versionWithImmut{
+		main:  v,
+		immut: r,
+	}
+}
+
 type plainVersion string
 
 func (v plainVersion) String() string {
 	return string(v)
 }
 
-func (v plainVersion) Admits(v2 V) bool {
+func (v plainVersion) Admits(v2 Version) bool {
 	if fv, ok := v2.(plainVersion); ok {
 		return v == fv
 	}
@@ -145,6 +165,13 @@ func (v plainVersion) Intersect(c Constraint) Constraint {
 	return noneConstraint{}
 }
 
+func (v plainVersion) Is(r Revision) VersionPair {
+	return versionWithImmut{
+		main:  v,
+		immut: r,
+	}
+}
+
 type semverVersion struct {
 	sv *semver.Version
 }
@@ -153,8 +180,15 @@ func (v semverVersion) String() string {
 	return v.sv.String()
 }
 
+func (v semverVersion) Is(r Revision) VersionPair {
+	return versionWithImmut{
+		main:  v,
+		immut: r,
+	}
+}
+
 type versionWithImmut struct {
-	main  V
+	main  Version
 	immut Revision
 }
 
@@ -171,7 +205,7 @@ func (v versionWithImmut) Underlying() Revision {
 //
 // Make sure that l and r have already been converted from versionWithImmut (if
 // applicable).
-func compareVersionType(l, r V) int {
+func compareVersionType(l, r Version) int {
 	// Big fugly double type switch. No reflect, because this can be smack in a hot loop
 	switch l.(type) {
 	case Revision:
@@ -218,21 +252,5 @@ func compareVersionType(l, r V) int {
 		}
 	default:
 		panic("unknown version type")
-	}
-}
-
-func WithRevision(v V, r Revision) V {
-	if v == nil {
-		return r
-	}
-
-	switch v.(type) {
-	case versionWithImmut, Revision:
-		panic("canary - no double dipping")
-	}
-
-	return versionWithImmut{
-		main:  v,
-		immut: r,
 	}
 }

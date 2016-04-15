@@ -6,13 +6,13 @@ import (
 )
 
 type failedVersion struct {
-	v V
+	v Version
 	f error
 }
 
 type versionQueue struct {
 	ref                ProjectName
-	pi                 []V
+	pi                 []Version
 	fails              []failedVersion
 	sm                 SourceManager
 	failed             bool
@@ -43,7 +43,7 @@ func newVersionQueue(ref ProjectName, lockv *ProjectAtom, sm SourceManager) (*ve
 	return vq, nil
 }
 
-func (vq *versionQueue) current() V {
+func (vq *versionQueue) current() Version {
 	if len(vq.pi) > 0 {
 		return vq.pi[0]
 	}

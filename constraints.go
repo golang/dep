@@ -9,7 +9,7 @@ import (
 
 type Constraint interface {
 	fmt.Stringer
-	Admits(V) bool
+	Admits(Version) bool
 	AdmitsAny(Constraint) bool
 	Intersect(Constraint) Constraint
 }
@@ -41,7 +41,7 @@ func (c semverC) String() string {
 	return c.c.String()
 }
 
-func (c semverC) Admits(v V) bool {
+func (c semverC) Admits(v Version) bool {
 	if sv, ok := v.(semverVersion); ok {
 		return c.c.Admits(sv.sv) == nil
 	}
@@ -76,7 +76,7 @@ func (anyConstraint) String() string {
 	return "*"
 }
 
-func (anyConstraint) Admits(V) bool {
+func (anyConstraint) Admits(Version) bool {
 	return true
 }
 
@@ -96,7 +96,7 @@ func (noneConstraint) String() string {
 	return ""
 }
 
-func (noneConstraint) Admits(V) bool {
+func (noneConstraint) Admits(Version) bool {
 	return false
 }
 

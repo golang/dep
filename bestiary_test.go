@@ -611,7 +611,7 @@ func (sm *depspecSourceManager) GetProjectInfo(pa ProjectAtom) (ProjectInfo, err
 	return ProjectInfo{}, fmt.Errorf("Project '%s' at version '%s' could not be found", pa.Name, pa.Version)
 }
 
-func (sm *depspecSourceManager) ListVersions(name ProjectName) (pi []V, err error) {
+func (sm *depspecSourceManager) ListVersions(name ProjectName) (pi []Version, err error) {
 	for _, ds := range sm.specs {
 		if name == ds.name.Name {
 			pi = append(pi, ds.name.Version)

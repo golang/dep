@@ -26,11 +26,11 @@ func init() {
 		Projects: []ProjectAtom{
 			ProjectAtom{
 				Name:    "github.com/sdboyer/testrepo",
-				Version: WithRevision(NewFloatingVersion("master"), Revision("4d59fb584b15a94d7401e356d2875c472d76ef45")),
+				Version: NewFloatingVersion("master").Is(Revision("4d59fb584b15a94d7401e356d2875c472d76ef45")),
 			},
 			ProjectAtom{
 				Name:    "github.com/Masterminds/VCSTestRepo",
-				Version: WithRevision(NewVersion("1.0.0"), Revision("30605f6ac35fcb075ad0bfa9296f90a7d891523e")),
+				Version: NewVersion("1.0.0").Is(Revision("30605f6ac35fcb075ad0bfa9296f90a7d891523e")),
 			},
 		},
 	}
@@ -38,7 +38,7 @@ func init() {
 	// just in case something needs punishing, kubernetes is happy to oblige
 	kub = ProjectAtom{
 		Name:    "github.com/kubernetes/kubernetes",
-		Version: WithRevision(NewVersion("1.0.0"), Revision("528f879e7d3790ea4287687ef0ab3f2a01cc2718")),
+		Version: NewVersion("1.0.0").Is(Revision("528f879e7d3790ea4287687ef0ab3f2a01cc2718")),
 	}
 }
 

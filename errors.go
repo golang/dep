@@ -93,7 +93,7 @@ func (e *disjointConstraintFailure) Error() string {
 // project.
 type constraintNotAllowedFailure struct {
 	goal Dependency
-	v    V
+	v    Version
 }
 
 func (e *constraintNotAllowedFailure) Error() string {

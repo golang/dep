@@ -7,16 +7,16 @@ import (
 
 func TestVersionSorts(t *testing.T) {
 	rev := Revision("flooboofoobooo")
-	v1 := WithRevision(NewFloatingVersion("master"), rev)
-	v2 := WithRevision(NewFloatingVersion("test"), rev)
-	v3 := WithRevision(NewVersion("1.0.0"), rev)
+	v1 := NewFloatingVersion("master").Is(rev)
+	v2 := NewFloatingVersion("test").Is(rev)
+	v3 := NewVersion("1.0.0").Is(rev)
 	v4 := NewVersion("1.0.1")
 	v5 := NewVersion("v2.0.5")
 	v6 := NewVersion("2.0.5.2")
 	v7 := NewFloatingVersion("unwrapped")
 	v8 := NewVersion("20.0.5.2")
 
-	start := []V{
+	start := []Version{
 		v1,
 		v2,
 		v3,
@@ -28,19 +28,19 @@ func TestVersionSorts(t *testing.T) {
 		rev,
 	}
 
-	down := make([]V, len(start))
+	down := make([]Version, len(start))
 	copy(down, start)
-	up := make([]V, len(start))
+	up := make([]Version, len(start))
 	copy(up, start)
 
-	edown := []V{
+	edown := []Version{
 		v3, v4, v5, // semvers
 		v6, v8, // plain versions
 		v1, v2, v7, // floating/branches
 		rev, // revs
 	}
 
-	eup := []V{
+	eup := []Version{
 		v5, v4, v3, // semvers
 		v6, v8, // plain versions
 		v1, v2, v7, // floating/branches

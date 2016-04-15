@@ -12,7 +12,7 @@ import (
 
 type SourceManager interface {
 	GetProjectInfo(ProjectAtom) (ProjectInfo, error)
-	ListVersions(ProjectName) ([]V, error)
+	ListVersions(ProjectName) ([]Version, error)
 	RepoExists(ProjectName) (bool, error)
 	VendorCodeExists(ProjectName) (bool, error)
 	ExportAtomTo(ProjectAtom, string) error
@@ -102,7 +102,7 @@ func (sm *sourceManager) GetProjectInfo(pa ProjectAtom) (ProjectInfo, error) {
 	return pmc.pm.GetInfoAt(pa.Version)
 }
 
-func (sm *sourceManager) ListVersions(n ProjectName) ([]V, error) {
+func (sm *sourceManager) ListVersions(n ProjectName) ([]Version, error) {
 	pmc, err := sm.getProjectManager(n)
 	if err != nil {
 		// TODO More-er proper-er errors
@@ -201,8 +201,8 @@ func (sm *sourceManager) getProjectManager(n ProjectName) (*pmState, error) {
 
 		dc = &projectDataCache{
 			Infos: make(map[Revision]ProjectInfo),
-			VMap:  make(map[V]Revision),
-			RMap:  make(map[Revision][]V),
+			VMap:  make(map[Version]Revision),
+			RMap:  make(map[Revision][]Version),
 		}
 	}
 
@@ -224,8 +224,8 @@ func (sm *sourceManager) getProjectManager(n ProjectName) (*pmState, error) {
 	return pms, nil
 }
 
-type upgradeVersionSorter []V
-type downgradeVersionSorter []V
+type upgradeVersionSorter []Version
+type downgradeVersionSorter []Version
 
 func (vs upgradeVersionSorter) Len() int {
 	return len(vs)

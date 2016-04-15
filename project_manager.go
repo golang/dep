@@ -17,10 +17,10 @@ import (
 )
 
 type ProjectManager interface {
-	GetInfoAt(V) (ProjectInfo, error)
-	ListVersions() ([]V, error)
+	GetInfoAt(Version) (ProjectInfo, error)
+	ListVersions() ([]Version, error)
 	CheckExistence(ProjectExistence) bool
-	ExportVersionTo(V, string) error
+	ExportVersionTo(Version, string) error
 }
 
 type ProjectAnalyzer interface {
@@ -45,7 +45,7 @@ type projectManager struct {
 	cvsync bool
 	// The list of versions. Kept separate from the data cache because this is
 	// accessed in the hot loop; we don't want to rebuild and realloc for it.
-	vlist []V
+	vlist []Version
 	// Direction to sort the version list in (true is for upgrade, false for
 	// downgrade)
 	sortup bool
@@ -65,8 +65,8 @@ type existence struct {
 type projectDataCache struct {
 	Version string                   `json:"version"` // TODO use this
 	Infos   map[Revision]ProjectInfo `json:"infos"`
-	VMap    map[V]Revision           `json:"vmap"`
-	RMap    map[Revision][]V         `json:"rmap"`
+	VMap    map[Version]Revision     `json:"vmap"`
+	RMap    map[Revision][]Version   `json:"rmap"`
 }
 
 type repo struct {
@@ -80,7 +80,7 @@ type repo struct {
 	synced bool
 }
 
-func (pm *projectManager) GetInfoAt(v V) (ProjectInfo, error) {
+func (pm *projectManager) GetInfoAt(v Version) (ProjectInfo, error) {
 	// Technically, we could attempt to return straight from the metadata cache
 	// even if the repo cache doesn't exist on disk. But that would allow weird
 	// state inconsistencies (cache exists, but no repo...how does that even
@@ -113,7 +113,7 @@ func (pm *projectManager) GetInfoAt(v V) (ProjectInfo, error) {
 	return i, err
 }
 
-func (pm *projectManager) ListVersions() (vlist []V, err error) {
+func (pm *projectManager) ListVersions() (vlist []Version, err error) {
 	if !pm.cvsync {
 		pm.ex.s |= ExistsInCache | ExistsUpstream
 
@@ -126,7 +126,7 @@ func (pm *projectManager) ListVersions() (vlist []V, err error) {
 			return nil, err
 		}
 
-		pm.vlist = make([]V, len(vpairs))
+		pm.vlist = make([]Version, len(vpairs))
 		pm.cvsync = true
 		// Process the version data into the cache
 		// TODO detect out-of-sync data as we do this?
@@ -186,11 +186,11 @@ func (pm *projectManager) CheckExistence(ex ProjectExistence) bool {
 	return ex&pm.ex.f == ex
 }
 
-func (pm *projectManager) ExportVersionTo(v V, to string) error {
+func (pm *projectManager) ExportVersionTo(v Version, to string) error {
 	return pm.crepo.exportVersionTo(v, to)
 }
 
-func (r *repo) getCurrentVersionPairs() (vlist []VPair, exbits ProjectExistence, err error) {
+func (r *repo) getCurrentVersionPairs() (vlist []VersionPair, exbits ProjectExistence, err error) {
 	r.mut.Lock()
 	defer r.mut.Unlock()
 
@@ -232,12 +232,12 @@ func (r *repo) getCurrentVersionPairs() (vlist []VPair, exbits ProjectExistence,
 		exbits |= ExistsUpstream
 
 		for _, pair := range all {
-			var v VPair
+			var v VersionPair
 			if string(pair[46:51]) == "heads" {
-				v = WithRevision(NewFloatingVersion(string(pair[52:])), Revision(pair[:40])).(VPair)
+				v = NewFloatingVersion(string(pair[52:])).Is(Revision(pair[:40])).(VersionPair)
 			} else if string(pair[46:50]) == "tags" {
 				// TODO deal with dereferenced tags
-				v = WithRevision(NewVersion(string(pair[51:])), Revision(pair[:40])).(VPair)
+				v = NewVersion(string(pair[51:])).Is(Revision(pair[:40])).(VersionPair)
 			} else {
 				continue
 			}
@@ -264,7 +264,7 @@ func (r *repo) getCurrentVersionPairs() (vlist []VPair, exbits ProjectExistence,
 		all := bytes.Split(bytes.TrimSpace(out), []byte("\n"))
 		for _, line := range all {
 			idx := bytes.IndexByte(line, 32) // space
-			v := WithRevision(NewVersion(string(line[:idx])), Revision(bytes.TrimSpace(line[idx:]))).(VPair)
+			v := NewVersion(string(line[:idx])).Is(Revision(bytes.TrimSpace(line[idx:]))).(VersionPair)
 			vlist = append(vlist, v)
 		}
 
@@ -307,7 +307,7 @@ func (r *repo) getCurrentVersionPairs() (vlist []VPair, exbits ProjectExistence,
 			}
 
 			idx := bytes.IndexByte(pair[0], 32) // space
-			v := WithRevision(NewVersion(string(pair[0][:idx])), Revision(pair[1])).(VPair)
+			v := NewVersion(string(pair[0][:idx])).Is(Revision(pair[1])).(VersionPair)
 			vlist = append(vlist, v)
 		}
 
@@ -329,7 +329,7 @@ func (r *repo) getCurrentVersionPairs() (vlist []VPair, exbits ProjectExistence,
 			// Split on colon; this gets us the rev and the branch plus local revno
 			pair := bytes.Split(line, []byte(":"))
 			idx := bytes.IndexByte(pair[0], 32) // space
-			v := WithRevision(NewFloatingVersion(string(pair[0][:idx])), Revision(pair[1])).(VPair)
+			v := NewFloatingVersion(string(pair[0][:idx])).Is(Revision(pair[1])).(VersionPair)
 			vlist = append(vlist, v)
 		}
 	case *vcs.SvnRepo:
@@ -342,7 +342,7 @@ func (r *repo) getCurrentVersionPairs() (vlist []VPair, exbits ProjectExistence,
 	return
 }
 
-func (r *repo) exportVersionTo(v V, to string) error {
+func (r *repo) exportVersionTo(v Version, to string) error {
 	r.mut.Lock()
 	defer r.mut.Unlock()
 
