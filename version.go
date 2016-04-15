@@ -44,8 +44,8 @@ func (plainVersion) _private()     {}
 func (plainVersion) _pair(bool)    {}
 func (semverVersion) _private()    {}
 func (semverVersion) _pair(bool)   {}
-func (versionWithImmut) _private() {}
-func (versionWithImmut) _pair(int) {}
+func (versionPair) _private()      {}
+func (versionPair) _pair(int)      {}
 func (Revision) _private()         {}
 
 // NewFloatingVersion creates a new Version to represent a floating version (in
@@ -76,27 +76,41 @@ func (r Revision) String() string {
 // Admits is the Revision acting as a constraint; it checks to see if the provided
 // version is the same Revision as itself.
 func (r Revision) Matches(v Version) bool {
-	if r2, ok := v.(Revision); ok {
-		return r == r2
+	switch tv := v.(type) {
+	case Revision:
+		return r == tv
+	case versionPair:
+		return r == tv.r
 	}
+
 	return false
 }
 
 // AdmitsAny is the Revision acting as a constraint; it checks to see if the provided
 // version is the same Revision as itself.
 func (r Revision) MatchesAny(c Constraint) bool {
-	if r2, ok := c.(Revision); ok {
-		return r == r2
+	switch tc := c.(type) {
+	case Revision:
+		return r == tc
+	case versionPair:
+		return r == tc.r
 	}
+
 	return false
 }
 
 func (r Revision) Intersect(c Constraint) Constraint {
-	if r2, ok := c.(Revision); ok {
-		if r == r2 {
+	switch tc := c.(type) {
+	case Revision:
+		if r == tc {
+			return r
+		}
+	case versionPair:
+		if r == tc.r {
 			return r
 		}
 	}
+
 	return noneConstraint{}
 }
 
@@ -107,32 +121,51 @@ func (v floatingVersion) String() string {
 }
 
 func (v floatingVersion) Matches(v2 Version) bool {
-	if fv, ok := v2.(floatingVersion); ok {
-		return v == fv
+	switch tv := v2.(type) {
+	case floatingVersion:
+		return v == tv
+	case versionPair:
+		if tv2, ok := tv.v.(floatingVersion); ok {
+			return tv2 == v
+		}
 	}
 	return false
 }
 
 func (v floatingVersion) MatchesAny(c Constraint) bool {
-	if fv, ok := c.(floatingVersion); ok {
-		return v == fv
+	switch tc := c.(type) {
+	case floatingVersion:
+		return v == tc
+	case versionPair:
+		if tc2, ok := tc.v.(floatingVersion); ok {
+			return tc2 == v
+		}
 	}
+
 	return false
 }
 
 func (v floatingVersion) Intersect(c Constraint) Constraint {
-	if fv, ok := c.(floatingVersion); ok {
-		if v == fv {
+	switch tc := c.(type) {
+	case floatingVersion:
+		if v == tc {
 			return v
 		}
+	case versionPair:
+		if tc2, ok := tc.v.(floatingVersion); ok {
+			if v == tc2 {
+				return v
+			}
+		}
 	}
+
 	return noneConstraint{}
 }
 
 func (v floatingVersion) Is(r Revision) VersionPair {
-	return versionWithImmut{
-		main:  v,
-		immut: r,
+	return versionPair{
+		v: v,
+		r: r,
 	}
 }
 
@@ -143,32 +176,51 @@ func (v plainVersion) String() string {
 }
 
 func (v plainVersion) Matches(v2 Version) bool {
-	if fv, ok := v2.(plainVersion); ok {
-		return v == fv
+	switch tv := v2.(type) {
+	case plainVersion:
+		return v == tv
+	case versionPair:
+		if tv2, ok := tv.v.(plainVersion); ok {
+			return tv2 == v
+		}
 	}
 	return false
 }
 
 func (v plainVersion) MatchesAny(c Constraint) bool {
-	if fv, ok := c.(plainVersion); ok {
-		return v == fv
+	switch tc := c.(type) {
+	case plainVersion:
+		return v == tc
+	case versionPair:
+		if tc2, ok := tc.v.(plainVersion); ok {
+			return tc2 == v
+		}
 	}
+
 	return false
 }
 
 func (v plainVersion) Intersect(c Constraint) Constraint {
-	if fv, ok := c.(plainVersion); ok {
-		if v == fv {
+	switch tc := c.(type) {
+	case plainVersion:
+		if v == tc {
 			return v
 		}
+	case versionPair:
+		if tc2, ok := tc.v.(plainVersion); ok {
+			if v == tc2 {
+				return v
+			}
+		}
 	}
+
 	return noneConstraint{}
 }
 
 func (v plainVersion) Is(r Revision) VersionPair {
-	return versionWithImmut{
-		main:  v,
-		immut: r,
+	return versionPair{
+		v: v,
+		r: r,
 	}
 }
 
@@ -180,24 +232,126 @@ func (v semverVersion) String() string {
 	return v.sv.String()
 }
 
+func (v semverVersion) Matches(v2 Version) bool {
+	switch tv := v2.(type) {
+	case semverVersion:
+		return v.sv.Equal(tv.sv)
+	case versionPair:
+		if tv2, ok := tv.v.(semverVersion); ok {
+			return tv2.sv.Equal(v.sv)
+		}
+	}
+	return false
+}
+
+func (v semverVersion) MatchesAny(c Constraint) bool {
+	switch tc := c.(type) {
+	case semverVersion:
+		return v.sv.Equal(tc.sv)
+	case versionPair:
+		if tc2, ok := tc.v.(semverVersion); ok {
+			return tc2.sv.Equal(v.sv)
+		}
+	}
+
+	return false
+}
+
+func (v semverVersion) Intersect(c Constraint) Constraint {
+	switch tc := c.(type) {
+	case semverVersion:
+		if v.sv.Equal(tc.sv) {
+			return v
+		}
+	case versionPair:
+		if tc2, ok := tc.v.(semverVersion); ok {
+			if v.sv.Equal(tc2.sv) {
+				return v
+			}
+		}
+	}
+
+	return noneConstraint{}
+}
+
 func (v semverVersion) Is(r Revision) VersionPair {
-	return versionWithImmut{
-		main:  v,
-		immut: r,
+	return versionPair{
+		v: v,
+		r: r,
 	}
 }
 
-type versionWithImmut struct {
-	main  Version
-	immut Revision
+type versionPair struct {
+	v Version
+	r Revision
 }
 
-func (v versionWithImmut) String() string {
-	return v.main.String()
+func (v versionPair) String() string {
+	return v.v.String()
 }
 
-func (v versionWithImmut) Underlying() Revision {
-	return v.immut
+func (v versionPair) Underlying() Revision {
+	return v.r
+}
+
+func (v versionPair) Matches(v2 Version) bool {
+	switch tv2 := v2.(type) {
+	case versionPair:
+		return v.r == tv2.r
+	case Revision:
+		return v.r == tv2
+	}
+
+	switch tv := v.v.(type) {
+	case plainVersion:
+		if tv.Matches(v2) {
+			return true
+		}
+	case floatingVersion:
+		if tv.Matches(v2) {
+			return true
+		}
+	case semverVersion:
+		if tv2, ok := v2.(semverVersion); ok {
+			if tv.sv.Equal(tv2.sv) {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+func (v versionPair) MatchesAny(c2 Constraint) bool {
+	return c2.Matches(v)
+}
+
+func (v versionPair) Intersect(c2 Constraint) Constraint {
+	switch tv2 := c2.(type) {
+	case versionPair:
+		if v.r == tv2.r {
+			return v.r
+		}
+	case Revision:
+		if v.r == tv2 {
+			return v.r
+		}
+	}
+
+	switch tv := v.v.(type) {
+	case plainVersion, floatingVersion:
+		if c2.Matches(v) {
+			return v
+		}
+	case semverVersion:
+		if tv2, ok := c2.(semverVersion); ok {
+			if tv.sv.Equal(tv2.sv) {
+				return v
+			}
+		}
+	}
+
+	return noneConstraint{}
 }
 
 // compareVersionType is a sort func helper that makes a coarse-grained sorting

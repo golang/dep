@@ -246,11 +246,11 @@ func (vs downgradeVersionSorter) Swap(i, j int) {
 func (vs upgradeVersionSorter) Less(i, j int) bool {
 	l, r := vs[i], vs[j]
 
-	if tl, ispair := l.(versionWithImmut); ispair {
-		l = tl.main
+	if tl, ispair := l.(versionPair); ispair {
+		l = tl.v
 	}
-	if tr, ispair := r.(versionWithImmut); ispair {
-		r = tr.main
+	if tr, ispair := r.(versionPair); ispair {
+		r = tr.v
 	}
 
 	switch compareVersionType(l, r) {
@@ -283,11 +283,11 @@ func (vs upgradeVersionSorter) Less(i, j int) bool {
 func (vs downgradeVersionSorter) Less(i, j int) bool {
 	l, r := vs[i], vs[j]
 
-	if tl, ispair := l.(versionWithImmut); ispair {
-		l = tl.main
+	if tl, ispair := l.(versionPair); ispair {
+		l = tl.v
 	}
-	if tr, ispair := r.(versionWithImmut); ispair {
-		r = tr.main
+	if tr, ispair := r.(versionPair); ispair {
+		r = tr.v
 	}
 
 	switch compareVersionType(l, r) {

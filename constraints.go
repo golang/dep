@@ -7,6 +7,8 @@ import (
 	"github.com/Masterminds/semver"
 )
 
+// A Constraint provides structured limitations on the versions that are
+// admissible for a given project.
 type Constraint interface {
 	fmt.Stringer
 	Matches(Version) bool
@@ -27,45 +29,65 @@ func NewConstraint(t ConstraintType, body string) (Constraint, error) {
 		if err != nil {
 			return plainVersion(body), nil
 		}
-		return semverC{c: c}, nil
+		return semverConstraint{c: c}, nil
 	default:
 		return nil, errors.New("Unknown ConstraintType provided")
 	}
 }
 
-type semverC struct {
+type semverConstraint struct {
 	c semver.Constraint
 }
 
-func (c semverC) String() string {
+func (c semverConstraint) String() string {
 	return c.c.String()
 }
 
-func (c semverC) Matches(v Version) bool {
-	if sv, ok := v.(semverVersion); ok {
-		return c.c.Matches(sv.sv) == nil
-	}
-
-	return false
-}
-
-func (c semverC) MatchesAny(c2 Constraint) bool {
-	if sc, ok := c2.(semverC); ok {
-		return c.c.MatchesAny(sc.c)
-	}
-
-	return false
-}
-
-func (c semverC) Intersect(c2 Constraint) Constraint {
-	if sc, ok := c2.(semverC); ok {
-		i := c.c.Intersect(sc.c)
-		if !semver.IsNone(i) {
-			return semverC{c: i}
+func (c semverConstraint) Matches(v Version) bool {
+	switch tv := v.(type) {
+	case semverVersion:
+		return c.c.Matches(tv.sv) == nil
+	case versionPair:
+		if tv2, ok := tv.v.(semverVersion); ok {
+			return c.c.Matches(tv2.sv) == nil
 		}
 	}
 
-	return noneConstraint{}
+	return false
+}
+
+func (c semverConstraint) MatchesAny(c2 Constraint) bool {
+	switch tc := c2.(type) {
+	case semverVersion:
+		return c.c.MatchesAny(tc.sv)
+	case semverConstraint:
+		return c.c.MatchesAny(tc.c)
+	case versionPair:
+		if tc2, ok := tc.v.(semverVersion); ok {
+			return c.c.MatchesAny(tc2.sv)
+		}
+	}
+
+	return false
+}
+
+func (c semverConstraint) Intersect(c2 Constraint) Constraint {
+	var rc semver.Constraint
+	switch tc := c2.(type) {
+	case semverVersion:
+		rc = c.c.Intersect(tc.sv)
+	case semverConstraint:
+		rc = c.c.Intersect(tc.c)
+	case versionPair:
+		if tc2, ok := tc.v.(semverVersion); ok {
+			rc = c.c.Intersect(tc2.sv)
+		}
+	}
+
+	if semver.IsNone(rc) {
+		return noneConstraint{}
+	}
+	return semverConstraint{c: rc}
 }
 
 // anyConstraint is an unbounded constraint - it matches all other types of

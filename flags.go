@@ -1,15 +1,5 @@
 package vsolver
 
-// The type of the version - branch, revision, or version
-type VersionType uint8
-
-const (
-	V_Revision VersionType = iota
-	V_Branch
-	V_Version
-	V_Semver
-)
-
 type ConstraintType uint8
 
 const (
