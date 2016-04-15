@@ -1,9 +1,8 @@
-hash: c881fdebf747f08a9d28f0c42cfce09e9d987ed8578d92c2957eaa11664e032d
-updated: 2016-04-13T12:35:33.512197757-04:00
+hash: f3bcd8dbd2ab556604fb9b7a2b67335e5a07259580801ffc15808590889802a1
+updated: 2016-04-14T22:30:56.806524724-04:00
 imports:
 - name: github.com/Masterminds/semver
-  version: dc6f778231d838c084d36709ac95105ced2a3b4e
-  repo: git@github.com:sdboyer/semver
+  version: 0a2c9fc0eee2c4cbb9526877c4a54da047fdcadd
   vcs: git
 - name: github.com/Masterminds/vcs
   version: 7a21de0acff824ccf45f633cc844a19625149c2f

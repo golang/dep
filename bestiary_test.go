@@ -213,7 +213,7 @@ var fixtures = []fixture{
 			dsv("foo 2.0.0"),
 			dsv("bar 1.0.0"),
 			dsv("bar 2.0.0", "baz 1.0.0"),
-			dsv("baz 1.0.0", "foo 1.0.0"),
+			dsv("baz 1.0.0", "foo 2.0.0"),
 		},
 		r: mkresults(
 			"root 1.0.0",

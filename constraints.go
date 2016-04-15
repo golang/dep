@@ -9,8 +9,8 @@ import (
 
 type Constraint interface {
 	fmt.Stringer
-	Admits(Version) bool
-	AdmitsAny(Constraint) bool
+	Matches(Version) bool
+	MatchesAny(Constraint) bool
 	Intersect(Constraint) Constraint
 }
 
@@ -41,17 +41,17 @@ func (c semverC) String() string {
 	return c.c.String()
 }
 
-func (c semverC) Admits(v Version) bool {
+func (c semverC) Matches(v Version) bool {
 	if sv, ok := v.(semverVersion); ok {
-		return c.c.Admits(sv.sv) == nil
+		return c.c.Matches(sv.sv) == nil
 	}
 
 	return false
 }
 
-func (c semverC) AdmitsAny(c2 Constraint) bool {
+func (c semverC) MatchesAny(c2 Constraint) bool {
 	if sc, ok := c2.(semverC); ok {
-		return c.c.AdmitsAny(sc.c)
+		return c.c.MatchesAny(sc.c)
 	}
 
 	return false
@@ -76,11 +76,11 @@ func (anyConstraint) String() string {
 	return "*"
 }
 
-func (anyConstraint) Admits(Version) bool {
+func (anyConstraint) Matches(Version) bool {
 	return true
 }
 
-func (anyConstraint) AdmitsAny(Constraint) bool {
+func (anyConstraint) MatchesAny(Constraint) bool {
 	return true
 }
 
@@ -96,11 +96,11 @@ func (noneConstraint) String() string {
 	return ""
 }
 
-func (noneConstraint) Admits(Version) bool {
+func (noneConstraint) Matches(Version) bool {
 	return false
 }
 
-func (noneConstraint) AdmitsAny(Constraint) bool {
+func (noneConstraint) MatchesAny(Constraint) bool {
 	return false
 }
 

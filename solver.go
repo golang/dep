@@ -267,7 +267,7 @@ func (s *solver) getLockVersionIfValid(ref ProjectName) *ProjectAtom {
 	}
 
 	constraint := s.sel.getConstraint(ref)
-	if !constraint.Admits(lockver.Version) {
+	if !constraint.Matches(lockver.Version) {
 		if s.l.Level >= logrus.InfoLevel {
 			s.l.WithFields(logrus.Fields{
 				"name":    ref,
@@ -305,7 +305,7 @@ func (s *solver) satisfiable(pi ProjectAtom) error {
 	}
 
 	constraint := s.sel.getConstraint(pi.Name)
-	if !constraint.Admits(pi.Version) {
+	if !constraint.Matches(pi.Version) {
 		// TODO collect constraint failure reason
 
 		if s.l.Level >= logrus.InfoLevel {
@@ -319,7 +319,7 @@ func (s *solver) satisfiable(pi ProjectAtom) error {
 		deps := s.sel.getDependenciesOn(pi.Name)
 		var failparent []Dependency
 		for _, dep := range deps {
-			if !dep.Dep.Constraint.Admits(pi.Version) {
+			if !dep.Dep.Constraint.Matches(pi.Version) {
 				if s.l.Level >= logrus.DebugLevel {
 					s.l.WithFields(logrus.Fields{
 						"name":       pi.Name,
@@ -353,7 +353,7 @@ func (s *solver) satisfiable(pi ProjectAtom) error {
 		constraint = s.sel.getConstraint(dep.Name)
 		// Ensure the constraint expressed by the dep has at least some possible
 		// intersection with the intersection of existing constraints.
-		if !constraint.AdmitsAny(dep.Constraint) {
+		if !constraint.MatchesAny(dep.Constraint) {
 			if s.l.Level >= logrus.DebugLevel {
 				s.l.WithFields(logrus.Fields{
 					"name":          pi.Name,
@@ -368,7 +368,7 @@ func (s *solver) satisfiable(pi ProjectAtom) error {
 			var failsib []Dependency
 			var nofailsib []Dependency
 			for _, sibling := range siblings {
-				if !sibling.Dep.Constraint.AdmitsAny(dep.Constraint) {
+				if !sibling.Dep.Constraint.MatchesAny(dep.Constraint) {
 					if s.l.Level >= logrus.DebugLevel {
 						s.l.WithFields(logrus.Fields{
 							"name":          pi.Name,
@@ -394,7 +394,7 @@ func (s *solver) satisfiable(pi ProjectAtom) error {
 		}
 
 		selected, exists := s.sel.selected(dep.Name)
-		if exists && !dep.Constraint.Admits(selected.Version) {
+		if exists && !dep.Constraint.Matches(selected.Version) {
 			if s.l.Level >= logrus.DebugLevel {
 				s.l.WithFields(logrus.Fields{
 					"name":          pi.Name,
@@ -580,19 +580,44 @@ func (s *solver) unselectedComparator(i, j int) bool {
 		return false
 	}
 
-	ilock, jlock := s.rp.GetProjectAtom(iname) == nil, s.rp.GetProjectAtom(jname) == nil
+	ilock, jlock := s.rp.GetProjectAtom(iname) != nil, s.rp.GetProjectAtom(jname) != nil
 
-	if ilock && !jlock {
+	switch {
+	case ilock && !jlock:
 		return true
-	}
-	if !ilock && jlock {
+	case !ilock && jlock:
 		return false
+	case ilock && jlock:
+		return iname < jname
 	}
-	//if ilock && jlock {
-	//return iname < jname
-	//}
 
-	// TODO impl version-counting for next set of checks. but until then...
+	// Now, sort by number of available versions. This will trigger network
+	// activity, but at this point we know that the project we're looking at
+	// isn't locked by the root. And, because being locked by root is the only
+	// way avoid that call when making a version queue, we know we're gonna have
+	// to pay that cost anyway.
+	//
+	// TODO ...at least, 'til we allow 'preferred' versions via non-root locks
+
+	// Ignore err here - if there is actually an issue, it'll be picked up very
+	// soon somewhere else saner in the solving algorithm
+	ivl, _ := s.sm.ListVersions(iname)
+	jvl, _ := s.sm.ListVersions(jname)
+	iv, jv := len(ivl), len(jvl)
+
+	// Packages with fewer versions to pick from are less likely to benefit from
+	// backtracking, so deal with them earlier in order to minimize the amount
+	// of superfluous backtracking through them we do.
+	switch {
+	case iv == 0 && jv != 0:
+		return true
+	case iv != 0 && jv == 0:
+		return false
+	case iv != jv:
+		return iv < jv
+	}
+
+	// Finally, if all else fails, fall back to comparing by name
 	return iname < jname
 }
 

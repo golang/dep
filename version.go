@@ -75,7 +75,7 @@ func (r Revision) String() string {
 
 // Admits is the Revision acting as a constraint; it checks to see if the provided
 // version is the same Revision as itself.
-func (r Revision) Admits(v Version) bool {
+func (r Revision) Matches(v Version) bool {
 	if r2, ok := v.(Revision); ok {
 		return r == r2
 	}
@@ -84,7 +84,7 @@ func (r Revision) Admits(v Version) bool {
 
 // AdmitsAny is the Revision acting as a constraint; it checks to see if the provided
 // version is the same Revision as itself.
-func (r Revision) AdmitsAny(c Constraint) bool {
+func (r Revision) MatchesAny(c Constraint) bool {
 	if r2, ok := c.(Revision); ok {
 		return r == r2
 	}
@@ -106,14 +106,14 @@ func (v floatingVersion) String() string {
 	return string(v)
 }
 
-func (v floatingVersion) Admits(v2 Version) bool {
+func (v floatingVersion) Matches(v2 Version) bool {
 	if fv, ok := v2.(floatingVersion); ok {
 		return v == fv
 	}
 	return false
 }
 
-func (v floatingVersion) AdmitsAny(c Constraint) bool {
+func (v floatingVersion) MatchesAny(c Constraint) bool {
 	if fv, ok := c.(floatingVersion); ok {
 		return v == fv
 	}
@@ -142,14 +142,14 @@ func (v plainVersion) String() string {
 	return string(v)
 }
 
-func (v plainVersion) Admits(v2 Version) bool {
+func (v plainVersion) Matches(v2 Version) bool {
 	if fv, ok := v2.(plainVersion); ok {
 		return v == fv
 	}
 	return false
 }
 
-func (v plainVersion) AdmitsAny(c Constraint) bool {
+func (v plainVersion) MatchesAny(c Constraint) bool {
 	if fv, ok := c.(plainVersion); ok {
 		return v == fv
 	}

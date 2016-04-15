@@ -70,14 +70,10 @@ func (u unselected) Swap(i, j int) {
 }
 
 func (u *unselected) Push(x interface{}) {
-	//*u.sl = append(*u.sl, x.(ProjectIdentifier))
 	u.sl = append(u.sl, x.(ProjectName))
 }
 
 func (u *unselected) Pop() (v interface{}) {
-	//old := *u.sl
-	//v := old[len(old)-1]
-	//*u = old[:len(old)-1]
 	v, u.sl = u.sl[len(u.sl)-1], u.sl[:len(u.sl)-1]
 	return v
 }
