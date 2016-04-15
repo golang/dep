@@ -48,7 +48,7 @@ func (vq *versionQueue) current() V {
 		return vq.pi[0]
 	}
 
-	return Version{}
+	return nil
 }
 
 func (vq *versionQueue) advance(fail error) (err error) {

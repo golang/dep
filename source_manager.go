@@ -212,6 +212,7 @@ func (sm *sourceManager) getProjectManager(n ProjectName) (*pmState, error) {
 		vendordir: sm.basedir + "/vendor",
 		an:        sm.an,
 		dc:        dc,
+		sortup:    sm.sortup,
 		crepo: &repo{
 			rpath: repodir,
 			r:     r,
@@ -245,11 +246,18 @@ func (vs downgradeVersionSorter) Swap(i, j int) {
 func (vs upgradeVersionSorter) Less(i, j int) bool {
 	l, r := vs[i], vs[j]
 
+	if tl, ispair := l.(versionWithImmut); ispair {
+		l = tl.main
+	}
+	if tr, ispair := r.(versionWithImmut); ispair {
+		r = tr.main
+	}
+
 	switch compareVersionType(l, r) {
 	case -1:
-		return false
-	case 1:
 		return true
+	case 1:
+		return false
 	case 0:
 		break
 	default:
@@ -258,8 +266,8 @@ func (vs upgradeVersionSorter) Less(i, j int) bool {
 
 	switch l.(type) {
 	// For these, now nothing to do but alpha sort
-	case immutableVersion, floatingVersion, plainVersion:
-		return l.String() > r.String()
+	case Revision, floatingVersion, plainVersion:
+		return l.String() < r.String()
 	}
 
 	// This ensures that pre-release versions are always sorted after ALL
@@ -275,11 +283,18 @@ func (vs upgradeVersionSorter) Less(i, j int) bool {
 func (vs downgradeVersionSorter) Less(i, j int) bool {
 	l, r := vs[i], vs[j]
 
+	if tl, ispair := l.(versionWithImmut); ispair {
+		l = tl.main
+	}
+	if tr, ispair := r.(versionWithImmut); ispair {
+		r = tr.main
+	}
+
 	switch compareVersionType(l, r) {
 	case -1:
-		return false
-	case 1:
 		return true
+	case 1:
+		return false
 	case 0:
 		break
 	default:
@@ -288,7 +303,7 @@ func (vs downgradeVersionSorter) Less(i, j int) bool {
 
 	switch l.(type) {
 	// For these, now nothing to do but alpha
-	case immutableVersion, floatingVersion, plainVersion:
+	case Revision, floatingVersion, plainVersion:
 		return l.String() < r.String()
 	}
 

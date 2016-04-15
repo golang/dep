@@ -6,23 +6,34 @@ import (
 	"github.com/Masterminds/semver"
 )
 
-var emptyVersion = Version{}
-
-type Version struct {
-	// The type of version identifier
-	Type VersionType
-	// The version identifier itself
-	Info string
-	// The underlying revision
-	Underlying Revision
-	SemVer     *semver.Version
-}
-
-func (v Version) String() string {
-	return v.Info
-}
-
 type Revision string
+
+func (r Revision) String() string {
+	return string(r)
+}
+
+func (r Revision) Admits(v V) bool {
+	if r2, ok := v.(Revision); ok {
+		return r == r2
+	}
+	return false
+}
+
+func (r Revision) AdmitsAny(c Constraint) bool {
+	if r2, ok := c.(Revision); ok {
+		return r == r2
+	}
+	return false
+}
+
+func (r Revision) Intersect(c Constraint) Constraint {
+	if r2, ok := c.(Revision); ok {
+		if r == r2 {
+			return r
+		}
+	}
+	return noneConstraint{}
+}
 
 type V interface {
 	// Version composes Stringer to ensure that all versions can be serialized
@@ -105,37 +116,6 @@ func (v semverVersion) String() string {
 	return v.sv.String()
 }
 
-type immutableVersion struct {
-	body string
-}
-
-func (v immutableVersion) String() string {
-	return v.body
-}
-
-func (v immutableVersion) Admits(v2 V) bool {
-	if fv, ok := v2.(immutableVersion); ok {
-		return v.body == fv.body
-	}
-	return false
-}
-
-func (v immutableVersion) AdmitsAny(c Constraint) bool {
-	if fv, ok := c.(immutableVersion); ok {
-		return v.body == fv.body
-	}
-	return false
-}
-
-func (v immutableVersion) Intersect(c Constraint) Constraint {
-	if fv, ok := c.(immutableVersion); ok {
-		if v.body == fv.body {
-			return v
-		}
-	}
-	return noneConstraint{}
-}
-
 type versionWithImmut struct {
 	main  V
 	immut Revision
@@ -165,42 +145,42 @@ func NewVersion(body string) V {
 func compareVersionType(l, r V) int {
 	// Big fugly double type switch. No reflect, because this can be smack in a hot loop
 	switch l.(type) {
-	case immutableVersion:
+	case Revision:
 		switch r.(type) {
-		case immutableVersion:
+		case Revision:
 			return 0
 		case floatingVersion, plainVersion, semverVersion:
-			return -1
+			return 1
 		default:
 			panic("unknown version type")
 		}
 	case floatingVersion:
 		switch r.(type) {
-		case immutableVersion:
-			return 1
+		case Revision:
+			return -1
 		case floatingVersion:
 			return 0
 		case plainVersion, semverVersion:
-			return -1
+			return 1
 		default:
 			panic("unknown version type")
 		}
 
 	case plainVersion:
 		switch r.(type) {
-		case immutableVersion, floatingVersion:
-			return 1
+		case Revision, floatingVersion:
+			return -1
 		case plainVersion:
 			return 0
 		case semverVersion:
-			return -1
+			return 1
 		default:
 			panic("unknown version type")
 		}
 
 	case semverVersion:
 		switch r.(type) {
-		case immutableVersion, floatingVersion, plainVersion:
+		case Revision, floatingVersion, plainVersion:
 			return -1
 		case semverVersion:
 			return 0
@@ -213,9 +193,13 @@ func compareVersionType(l, r V) int {
 }
 
 func WithRevision(v V, r Revision) V {
+	if v == nil {
+		return r
+	}
+
 	switch v.(type) {
-	case versionWithImmut, immutableVersion:
-		return v
+	case versionWithImmut, Revision:
+		panic("canary - no double dipping")
 	}
 
 	return versionWithImmut{

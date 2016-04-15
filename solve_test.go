@@ -107,7 +107,7 @@ func solveAndBasicChecks(fix fixture, t *testing.T) Result {
 		// Dump result projects into a map for easier interrogation
 		rp := make(map[string]string)
 		for _, p := range result.Projects {
-			rp[string(p.Name)] = p.Version.Info
+			rp[string(p.Name)] = p.Version.String()
 		}
 
 		fixlen, rlen := len(fix.r), len(rp)

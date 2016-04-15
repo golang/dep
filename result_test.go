@@ -6,8 +6,6 @@ import (
 	"os"
 	"path"
 	"testing"
-
-	"github.com/Masterminds/semver"
 )
 
 var basicResult Result
@@ -23,40 +21,24 @@ func (passthruAnalyzer) GetInfo(ctx build.Context, p ProjectName) (ProjectInfo, 
 }
 
 func init() {
-	sv1, _ := semver.NewVersion("1.0.0")
 	basicResult = Result{
 		Attempts: 1,
 		Projects: []ProjectAtom{
 			ProjectAtom{
-				Name: "github.com/sdboyer/testrepo",
-				Version: Version{
-					Type:       V_Branch,
-					Info:       "master",
-					Underlying: "4d59fb584b15a94d7401e356d2875c472d76ef45",
-				},
+				Name:    "github.com/sdboyer/testrepo",
+				Version: WithRevision(NewFloatingVersion("master"), Revision("4d59fb584b15a94d7401e356d2875c472d76ef45")),
 			},
 			ProjectAtom{
-				Name: "github.com/Masterminds/VCSTestRepo",
-				Version: Version{
-					Type:       V_Semver,
-					Info:       "1.0.0",
-					Underlying: "30605f6ac35fcb075ad0bfa9296f90a7d891523e",
-					SemVer:     sv1,
-				},
+				Name:    "github.com/Masterminds/VCSTestRepo",
+				Version: WithRevision(NewVersion("1.0.0"), Revision("30605f6ac35fcb075ad0bfa9296f90a7d891523e")),
 			},
 		},
 	}
 
 	// just in case something needs punishing, kubernetes is happy to oblige
-	sv2, _ := semver.NewVersion("v1.2.2")
 	kub = ProjectAtom{
-		Name: "github.com/kubernetes/kubernetes",
-		Version: Version{
-			Type:       V_Semver,
-			Info:       "v1.2.2",
-			Underlying: "528f879e7d3790ea4287687ef0ab3f2a01cc2718",
-			SemVer:     sv2,
-		},
+		Name:    "github.com/kubernetes/kubernetes",
+		Version: WithRevision(NewVersion("1.0.0"), Revision("528f879e7d3790ea4287687ef0ab3f2a01cc2718")),
 	}
 }
 

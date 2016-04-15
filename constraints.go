@@ -21,7 +21,7 @@ func NewConstraint(t ConstraintType, body string) (Constraint, error) {
 	case BranchConstraint:
 		return floatingVersion{body: body}, nil
 	case RevisionConstraint:
-		return immutableVersion{body: body}, nil
+		return Revision(body), nil
 	case VersionConstraint:
 		c, err := semver.NewConstraint(body)
 		if err != nil {

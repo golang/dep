@@ -90,7 +90,7 @@ func (s *solver) solve() ([]ProjectAtom, error) {
 			return nil, err
 		}
 
-		if queue.current() == emptyVersion {
+		if queue.current() == nil {
 			panic("canary - queue is empty, but flow indicates success")
 		}
 
@@ -184,7 +184,7 @@ func (s *solver) createVersionQueue(ref ProjectName) (*versionQueue, error) {
 // findValidVersion walks through a versionQueue until it finds a version that
 // satisfies the constraints held in the current state of the solver.
 func (s *solver) findValidVersion(q *versionQueue) error {
-	if emptyVersion == q.current() {
+	if nil == q.current() {
 		// TODO this case shouldn't be reachable, but panic here as a canary
 		panic("version queue is empty, should not happen")
 	}
