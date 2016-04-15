@@ -90,14 +90,14 @@ func (s *solver) solve() ([]ProjectAtom, error) {
 			return nil, err
 		}
 
-		if queue.current() == emptyVersion {
+		if queue.current() == nil {
 			panic("canary - queue is empty, but flow indicates success")
 		}
 
 		if s.l.Level >= logrus.InfoLevel {
 			s.l.WithFields(logrus.Fields{
 				"name":    queue.ref,
-				"version": queue.current().Info,
+				"version": queue.current(),
 			}).Info("Accepted project atom")
 		}
 
@@ -184,7 +184,7 @@ func (s *solver) createVersionQueue(ref ProjectName) (*versionQueue, error) {
 // findValidVersion walks through a versionQueue until it finds a version that
 // satisfies the constraints held in the current state of the solver.
 func (s *solver) findValidVersion(q *versionQueue) error {
-	if emptyVersion == q.current() {
+	if nil == q.current() {
 		// TODO this case shouldn't be reachable, but panic here as a canary
 		panic("version queue is empty, should not happen")
 	}
@@ -209,7 +209,7 @@ func (s *solver) findValidVersion(q *versionQueue) error {
 			if s.l.Level >= logrus.DebugLevel {
 				s.l.WithFields(logrus.Fields{
 					"name":    q.ref,
-					"version": cur.Info,
+					"version": cur,
 				}).Debug("Found acceptable version, returning out")
 			}
 			return nil
@@ -267,11 +267,11 @@ func (s *solver) getLockVersionIfValid(ref ProjectName) *ProjectAtom {
 	}
 
 	constraint := s.sel.getConstraint(ref)
-	if !constraint.Admits(lockver.Version) {
+	if !constraint.Matches(lockver.Version) {
 		if s.l.Level >= logrus.InfoLevel {
 			s.l.WithFields(logrus.Fields{
 				"name":    ref,
-				"version": lockver.Version.Info,
+				"version": lockver.Version,
 			}).Info("Project found in lock, but version not allowed by current constraints")
 		}
 		return nil
@@ -280,7 +280,7 @@ func (s *solver) getLockVersionIfValid(ref ProjectName) *ProjectAtom {
 	if s.l.Level >= logrus.InfoLevel {
 		s.l.WithFields(logrus.Fields{
 			"name":    ref,
-			"version": lockver.Version.Info,
+			"version": lockver.Version,
 		}).Info("Project found in lock")
 	}
 
@@ -300,31 +300,31 @@ func (s *solver) satisfiable(pi ProjectAtom) error {
 	if s.l.Level >= logrus.DebugLevel {
 		s.l.WithFields(logrus.Fields{
 			"name":    pi.Name,
-			"version": pi.Version.Info,
+			"version": pi.Version,
 		}).Debug("Checking satisfiability of project atom against current constraints")
 	}
 
 	constraint := s.sel.getConstraint(pi.Name)
-	if !constraint.Admits(pi.Version) {
+	if !constraint.Matches(pi.Version) {
 		// TODO collect constraint failure reason
 
 		if s.l.Level >= logrus.InfoLevel {
 			s.l.WithFields(logrus.Fields{
 				"name":          pi.Name,
-				"version":       pi.Version.Info,
-				"curconstraint": constraint.Body(),
+				"version":       pi.Version,
+				"curconstraint": constraint.String(),
 			}).Info("Current constraints do not allow version")
 		}
 
 		deps := s.sel.getDependenciesOn(pi.Name)
 		var failparent []Dependency
 		for _, dep := range deps {
-			if !dep.Dep.Constraint.Admits(pi.Version) {
+			if !dep.Dep.Constraint.Matches(pi.Version) {
 				if s.l.Level >= logrus.DebugLevel {
 					s.l.WithFields(logrus.Fields{
 						"name":       pi.Name,
 						"othername":  dep.Depender.Name,
-						"constraint": dep.Dep.Constraint.Body(),
+						"constraint": dep.Dep.Constraint.String(),
 					}).Debug("Marking other, selected project with conflicting constraint as failed")
 				}
 				s.fail(dep.Depender.Name)
@@ -353,14 +353,14 @@ func (s *solver) satisfiable(pi ProjectAtom) error {
 		constraint = s.sel.getConstraint(dep.Name)
 		// Ensure the constraint expressed by the dep has at least some possible
 		// intersection with the intersection of existing constraints.
-		if !constraint.AdmitsAny(dep.Constraint) {
+		if !constraint.MatchesAny(dep.Constraint) {
 			if s.l.Level >= logrus.DebugLevel {
 				s.l.WithFields(logrus.Fields{
 					"name":          pi.Name,
-					"version":       pi.Version.Info,
+					"version":       pi.Version,
 					"depname":       dep.Name,
-					"curconstraint": constraint.Body(),
-					"newconstraint": dep.Constraint.Body(),
+					"curconstraint": constraint.String(),
+					"newconstraint": dep.Constraint.String(),
 				}).Debug("Project atom cannot be added; its constraints are disjoint with existing constraints")
 			}
 
@@ -368,14 +368,14 @@ func (s *solver) satisfiable(pi ProjectAtom) error {
 			var failsib []Dependency
 			var nofailsib []Dependency
 			for _, sibling := range siblings {
-				if !sibling.Dep.Constraint.AdmitsAny(dep.Constraint) {
+				if !sibling.Dep.Constraint.MatchesAny(dep.Constraint) {
 					if s.l.Level >= logrus.DebugLevel {
 						s.l.WithFields(logrus.Fields{
 							"name":          pi.Name,
-							"version":       pi.Version.Info,
+							"version":       pi.Version,
 							"depname":       sibling.Depender.Name,
-							"sibconstraint": sibling.Dep.Constraint.Body(),
-							"newconstraint": dep.Constraint.Body(),
+							"sibconstraint": sibling.Dep.Constraint.String(),
+							"newconstraint": dep.Constraint.String(),
 						}).Debug("Marking other, selected project as failed because its constraint is disjoint with our testee")
 					}
 					s.fail(sibling.Depender.Name)
@@ -394,14 +394,14 @@ func (s *solver) satisfiable(pi ProjectAtom) error {
 		}
 
 		selected, exists := s.sel.selected(dep.Name)
-		if exists && !dep.Constraint.Admits(selected.Version) {
+		if exists && !dep.Constraint.Matches(selected.Version) {
 			if s.l.Level >= logrus.DebugLevel {
 				s.l.WithFields(logrus.Fields{
 					"name":          pi.Name,
-					"version":       pi.Version.Info,
+					"version":       pi.Version,
 					"depname":       dep.Name,
-					"curversion":    selected.Version.Info,
-					"newconstraint": dep.Constraint.Body(),
+					"curversion":    selected.Version,
+					"newconstraint": dep.Constraint.String(),
 				}).Debug("Project atom cannot be added; a constraint it introduces does not allow a currently selected version")
 			}
 			s.fail(dep.Name)
@@ -418,7 +418,7 @@ func (s *solver) satisfiable(pi ProjectAtom) error {
 	if s.l.Level >= logrus.DebugLevel {
 		s.l.WithFields(logrus.Fields{
 			"name":    pi.Name,
-			"version": pi.Version.Info,
+			"version": pi.Version,
 		}).Debug("Project atom passed satisfiability test against current state")
 	}
 
@@ -501,7 +501,7 @@ func (s *solver) backtrack() bool {
 		if s.l.Level >= logrus.DebugLevel {
 			s.l.WithFields(logrus.Fields{
 				"name":    q.ref,
-				"failver": q.current().Info,
+				"failver": q.current(),
 			}).Debug("Trying failed queue with next version")
 		}
 
@@ -516,7 +516,7 @@ func (s *solver) backtrack() bool {
 				if s.l.Level >= logrus.InfoLevel {
 					s.l.WithFields(logrus.Fields{
 						"name":    q.ref,
-						"version": q.current().Info,
+						"version": q.current(),
 					}).Info("Backtracking found valid version, attempting next solution")
 				}
 
@@ -580,19 +580,44 @@ func (s *solver) unselectedComparator(i, j int) bool {
 		return false
 	}
 
-	ilock, jlock := s.rp.GetProjectAtom(iname) == nil, s.rp.GetProjectAtom(jname) == nil
+	ilock, jlock := s.rp.GetProjectAtom(iname) != nil, s.rp.GetProjectAtom(jname) != nil
 
-	if ilock && !jlock {
+	switch {
+	case ilock && !jlock:
 		return true
-	}
-	if !ilock && jlock {
+	case !ilock && jlock:
 		return false
+	case ilock && jlock:
+		return iname < jname
 	}
-	//if ilock && jlock {
-	//return iname < jname
-	//}
 
-	// TODO impl version-counting for next set of checks. but until then...
+	// Now, sort by number of available versions. This will trigger network
+	// activity, but at this point we know that the project we're looking at
+	// isn't locked by the root. And, because being locked by root is the only
+	// way avoid that call when making a version queue, we know we're gonna have
+	// to pay that cost anyway.
+	//
+	// TODO ...at least, 'til we allow 'preferred' versions via non-root locks
+
+	// Ignore err here - if there is actually an issue, it'll be picked up very
+	// soon somewhere else saner in the solving algorithm
+	ivl, _ := s.sm.ListVersions(iname)
+	jvl, _ := s.sm.ListVersions(jname)
+	iv, jv := len(ivl), len(jvl)
+
+	// Packages with fewer versions to pick from are less likely to benefit from
+	// backtracking, so deal with them earlier in order to minimize the amount
+	// of superfluous backtracking through them we do.
+	switch {
+	case iv == 0 && jv != 0:
+		return true
+	case iv != 0 && jv == 0:
+		return false
+	case iv != jv:
+		return iv < jv
+	}
+
+	// Finally, if all else fails, fall back to comparing by name
 	return iname < jname
 }
 
@@ -661,7 +686,7 @@ func (s *solver) unselectLast() {
 				s.l.WithFields(logrus.Fields{
 					"name":  dep.Name,
 					"pname": pa.Name,
-					"pver":  pa.Version.Info,
+					"pver":  pa.Version,
 				}).Debug("Removing project from unselected queue; last parent atom was unselected")
 			}
 			s.unsel.remove(dep.Name)

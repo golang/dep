@@ -20,6 +20,15 @@ func (dummyAnalyzer) GetInfo(ctx build.Context, p ProjectName) (ProjectInfo, err
 	return ProjectInfo{}, fmt.Errorf("just a dummy analyzer")
 }
 
+func sv(s string) *semver.Version {
+	sv, err := semver.NewVersion(s)
+	if err != nil {
+		panic(fmt.Sprintf("Error creating semver from %q: %s", s, err))
+	}
+
+	return sv
+}
+
 func init() {
 	_, filename, _, _ := runtime.Caller(1)
 	bd = path.Dir(filename)
@@ -71,30 +80,16 @@ func TestProjectManagerInit(t *testing.T) {
 	if len(v) != 3 {
 		t.Errorf("Expected three version results from the test repo, got %v", len(v))
 	} else {
-		sv, _ := semver.NewVersion("1.0.0")
 		rev := Revision("30605f6ac35fcb075ad0bfa9296f90a7d891523e")
 		expected := []Version{
-			Version{
-				Type:       V_Semver,
-				Info:       "1.0.0",
-				Underlying: rev,
-				SemVer:     sv,
-			},
-			Version{
-				Type:       V_Branch,
-				Info:       "master",
-				Underlying: rev,
-			},
-			Version{
-				Type:       V_Branch,
-				Info:       "test",
-				Underlying: rev,
-			},
+			NewVersion("1.0.0").Is(rev),
+			NewFloatingVersion("master").Is(rev),
+			NewFloatingVersion("test").Is(rev),
 		}
 
 		for k, e := range expected {
 			if v[k] != e {
-				t.Errorf("Returned version in position %v had unexpected values:", v[k])
+				t.Errorf("Expected version %s in position %v but got %s", e, k, v[k])
 			}
 		}
 	}
@@ -139,4 +134,100 @@ func TestProjectManagerInit(t *testing.T) {
 	if !pms.pm.CheckExistence(ExistsUpstream) {
 		t.Errorf("ExistsUpstream flag not being correctly set the project")
 	}
+}
+
+func TestRepoVersionFetching(t *testing.T) {
+	os.RemoveAll(cpath)
+	smi, err := NewSourceManager(cpath, bd, true, false, dummyAnalyzer{})
+	if err != nil {
+		t.Errorf("Unexpected error on SourceManager creation: %s", err)
+		t.FailNow()
+	}
+
+	sm := smi.(*sourceManager)
+	upstreams := []ProjectName{
+		"github.com/Masterminds/VCSTestRepo",
+		"bitbucket.org/mattfarina/testhgrepo",
+		"launchpad.net/govcstestbzrrepo",
+	}
+
+	pms := make([]*projectManager, len(upstreams))
+	for k, u := range upstreams {
+		pmi, err := sm.getProjectManager(u)
+		if err != nil {
+			sm.Release()
+			t.Errorf("Unexpected error on ProjectManager creation: %s", err)
+			t.FailNow()
+		}
+		pms[k] = pmi.pm.(*projectManager)
+	}
+
+	defer sm.Release()
+
+	// test git first
+	vlist, exbits, err := pms[0].crepo.getCurrentVersionPairs()
+	if err != nil {
+		t.Errorf("Unexpected error getting version pairs from git repo: %s", err)
+	}
+	if exbits != ExistsUpstream {
+		t.Errorf("git pair fetch should only set upstream existence bits, but got %v", exbits)
+	}
+	if len(vlist) != 3 {
+		t.Errorf("git test repo should've produced three versions, got %v", len(vlist))
+	} else {
+		v := NewFloatingVersion("master").Is(Revision("30605f6ac35fcb075ad0bfa9296f90a7d891523e"))
+		if vlist[0] != v {
+			t.Errorf("git pair fetch reported incorrect first version, got %s", vlist[0])
+		}
+
+		v = NewFloatingVersion("test").Is(Revision("30605f6ac35fcb075ad0bfa9296f90a7d891523e"))
+		if vlist[1] != v {
+			t.Errorf("git pair fetch reported incorrect second version, got %s", vlist[1])
+		}
+
+		v = NewVersion("1.0.0").Is(Revision("30605f6ac35fcb075ad0bfa9296f90a7d891523e"))
+		if vlist[2] != v {
+			t.Errorf("git pair fetch reported incorrect third version, got %s", vlist[2])
+		}
+	}
+
+	// now hg
+	vlist, exbits, err = pms[1].crepo.getCurrentVersionPairs()
+	if err != nil {
+		t.Errorf("Unexpected error getting version pairs from hg repo: %s", err)
+	}
+	if exbits != ExistsUpstream|ExistsInCache {
+		t.Errorf("hg pair fetch should set upstream and cache existence bits, but got %v", exbits)
+	}
+	if len(vlist) != 2 {
+		t.Errorf("hg test repo should've produced two versions, got %v", len(vlist))
+	} else {
+		v := NewVersion("1.0.0").Is(Revision("d680e82228d206935ab2eaa88612587abe68db07"))
+		if vlist[0] != v {
+			t.Errorf("hg pair fetch reported incorrect first version, got %s", vlist[0])
+		}
+
+		v = NewFloatingVersion("test").Is(Revision("6c44ee3fe5d87763616c19bf7dbcadb24ff5a5ce"))
+		if vlist[1] != v {
+			t.Errorf("hg pair fetch reported incorrect second version, got %s", vlist[1])
+		}
+	}
+
+	// bzr last
+	vlist, exbits, err = pms[2].crepo.getCurrentVersionPairs()
+	if err != nil {
+		t.Errorf("Unexpected error getting version pairs from bzr repo: %s", err)
+	}
+	if exbits != ExistsUpstream|ExistsInCache {
+		t.Errorf("bzr pair fetch should set upstream and cache existence bits, but got %v", exbits)
+	}
+	if len(vlist) != 1 {
+		t.Errorf("bzr test repo should've produced one version, got %v", len(vlist))
+	} else {
+		v := NewVersion("1.0.0").Is(Revision("matt@mattfarina.com-20150731135137-pbphasfppmygpl68"))
+		if vlist[0] != v {
+			t.Errorf("bzr pair fetch reported incorrect first version, got %s", vlist[0])
+		}
+	}
+	// no svn for now, because...svn
 }

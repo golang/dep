@@ -212,6 +212,7 @@ func (sm *sourceManager) getProjectManager(n ProjectName) (*pmState, error) {
 		vendordir: sm.basedir + "/vendor",
 		an:        sm.an,
 		dc:        dc,
+		sortup:    sm.sortup,
 		crepo: &repo{
 			rpath: repodir,
 			r:     r,
@@ -245,45 +246,73 @@ func (vs downgradeVersionSorter) Swap(i, j int) {
 func (vs upgradeVersionSorter) Less(i, j int) bool {
 	l, r := vs[i], vs[j]
 
-	// Start by always sorting higher vtypes earlier
-	// TODO need a new means when we get rid of those types
-	if l.Type != r.Type {
-		return l.Type > r.Type
+	if tl, ispair := l.(versionPair); ispair {
+		l = tl.v
+	}
+	if tr, ispair := r.(versionPair); ispair {
+		r = tr.v
 	}
 
-	switch l.Type {
-	case V_Branch, V_Version, V_Revision:
-		return l.Info < r.Info
+	switch compareVersionType(l, r) {
+	case -1:
+		return true
+	case 1:
+		return false
+	case 0:
+		break
+	default:
+		panic("unreachable")
+	}
+
+	switch l.(type) {
+	// For these, now nothing to do but alpha sort
+	case Revision, floatingVersion, plainVersion:
+		return l.String() < r.String()
 	}
 
 	// This ensures that pre-release versions are always sorted after ALL
 	// full-release versions
-	lpre, rpre := l.SemVer.Prerelease() == "", r.SemVer.Prerelease() == ""
+	lsv, rsv := l.(semverVersion).sv, r.(semverVersion).sv
+	lpre, rpre := lsv.Prerelease() == "", rsv.Prerelease() == ""
 	if (lpre && !rpre) || (!lpre && rpre) {
 		return lpre
 	}
-	return l.SemVer.GreaterThan(r.SemVer)
+	return lsv.GreaterThan(rsv)
 }
 
 func (vs downgradeVersionSorter) Less(i, j int) bool {
 	l, r := vs[i], vs[j]
 
-	// Start by always sorting higher vtypes earlier
-	// TODO need a new means when we get rid of those types
-	if l.Type != r.Type {
-		return l.Type > r.Type
+	if tl, ispair := l.(versionPair); ispair {
+		l = tl.v
+	}
+	if tr, ispair := r.(versionPair); ispair {
+		r = tr.v
 	}
 
-	switch l.Type {
-	case V_Branch, V_Version, V_Revision:
-		return l.Info < r.Info
+	switch compareVersionType(l, r) {
+	case -1:
+		return true
+	case 1:
+		return false
+	case 0:
+		break
+	default:
+		panic("unreachable")
+	}
+
+	switch l.(type) {
+	// For these, now nothing to do but alpha
+	case Revision, floatingVersion, plainVersion:
+		return l.String() < r.String()
 	}
 
 	// This ensures that pre-release versions are always sorted after ALL
 	// full-release versions
-	lpre, rpre := l.SemVer.Prerelease() == "", r.SemVer.Prerelease() == ""
+	lsv, rsv := l.(semverVersion).sv, r.(semverVersion).sv
+	lpre, rpre := lsv.Prerelease() == "", rsv.Prerelease() == ""
 	if (lpre && !rpre) || (!lpre && rpre) {
 		return lpre
 	}
-	return l.SemVer.LessThan(r.SemVer)
+	return lsv.LessThan(rsv)
 }

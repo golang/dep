@@ -2,97 +2,126 @@ package vsolver
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/Masterminds/semver"
 )
 
+var (
+	none = noneConstraint{}
+	any  = anyConstraint{}
+)
+
+// A Constraint provides structured limitations on the versions that are
+// admissible for a given project.
+//
+// As with Version, it has a private method because the vsolver's internal
+// implementation of the problem is complete, and the system relies on type
+// magic to operate.
 type Constraint interface {
-	Type() ConstraintType
-	Body() string
-	Admits(Version) bool
-	AdmitsAny(Constraint) bool
+	fmt.Stringer
+	// Matches indicates if the provided Version is allowed by the Constraint.
+	Matches(Version) bool
+	// MatchesAny indicates if the intersection of the Constraint with the
+	// provided Constraint would yield a Constraint that could allow *any*
+	// Version.
+	MatchesAny(Constraint) bool
+	// Intersect computes the intersection of the Constraint with the provided
+	// Constraint.
 	Intersect(Constraint) Constraint
+	_private()
 }
+
+func (semverConstraint) _private() {}
+func (anyConstraint) _private()    {}
+func (noneConstraint) _private()   {}
 
 // NewConstraint constructs an appropriate Constraint object from the input
 // parameters.
 func NewConstraint(t ConstraintType, body string) (Constraint, error) {
 	switch t {
-	case C_Branch, C_Version, C_Revision:
-		return basicConstraint{
-			typ:  t,
-			body: body,
-		}, nil
-	case C_Semver, C_SemverRange:
+	case BranchConstraint:
+		return floatingVersion(body), nil
+	case RevisionConstraint:
+		return Revision(body), nil
+	case VersionConstraint:
+		return plainVersion(body), nil
+	case SemverConstraint:
 		c, err := semver.NewConstraint(body)
 		if err != nil {
 			return nil, err
 		}
-
-		return semverConstraint{
-			typ:  t,
-			body: body,
-			c:    c,
-		}, nil
+		return semverConstraint{c: c}, nil
 	default:
 		return nil, errors.New("Unknown ConstraintType provided")
 	}
 }
 
-type basicConstraint struct {
-	// The type of constraint - version, branch, or revision
-	typ ConstraintType
-	// The string text of the constraint
-	body string
+type semverConstraint struct {
+	c semver.Constraint
 }
 
-func (c basicConstraint) Type() ConstraintType {
-	return c.typ
+func (c semverConstraint) String() string {
+	return c.c.String()
 }
 
-func (c basicConstraint) Body() string {
-	return c.body
-}
-
-func (c basicConstraint) Admits(v Version) bool {
-	if VTCTCompat[v.Type]&c.typ == 0 {
-		// version and constraint types are incompatible
-		return false
+func (c semverConstraint) Matches(v Version) bool {
+	switch tv := v.(type) {
+	case semverVersion:
+		return c.c.Matches(tv.sv) == nil
+	case versionPair:
+		if tv2, ok := tv.v.(semverVersion); ok {
+			return c.c.Matches(tv2.sv) == nil
+		}
 	}
 
-	// Branches, normal versions, and revisions all must be exact string matches
-	return c.body == v.Info
+	return false
 }
 
-func (c basicConstraint) AdmitsAny(c2 Constraint) bool {
-	return (c2.Type() == c.typ && c2.Body() == c.body) || c2.AdmitsAny(c)
+func (c semverConstraint) MatchesAny(c2 Constraint) bool {
+	return c.Intersect(c2) != none
 }
 
-func (c basicConstraint) Intersect(c2 Constraint) Constraint {
-	if c.AdmitsAny(c2) {
-		return c
+func (c semverConstraint) Intersect(c2 Constraint) Constraint {
+	switch tc := c2.(type) {
+	case semverConstraint:
+		rc := c.c.Intersect(tc.c)
+		if !semver.IsNone(rc) {
+			return semverConstraint{c: rc}
+		}
+	case semverVersion:
+		rc := c.c.Intersect(tc.sv)
+		if !semver.IsNone(rc) {
+			// If single version intersected with constraint, we know the result
+			// must be the single version, so just return it back out
+			return c2
+		}
+	case versionPair:
+		if tc2, ok := tc.v.(semverVersion); ok {
+			rc := c.c.Intersect(tc2.sv)
+			if !semver.IsNone(rc) {
+				// same reasoning as previous case
+				return c2
+			}
+		}
 	}
 
-	return noneConstraint{}
+	return none
 }
 
 // anyConstraint is an unbounded constraint - it matches all other types of
-// constraints.
+// constraints. It mirrors the behavior of the semver package's any type.
 type anyConstraint struct{}
 
-func (anyConstraint) Type() ConstraintType {
-	return C_ExactMatch | C_FlexMatch
-}
-
-func (anyConstraint) Body() string {
+func (anyConstraint) String() string {
 	return "*"
 }
 
-func (anyConstraint) Admits(v Version) bool {
+func (anyConstraint) Matches(Version) bool {
 	return true
 }
 
-func (anyConstraint) AdmitsAny(Constraint) bool {
+func (anyConstraint) MatchesAny(Constraint) bool {
 	return true
 }
 
@@ -100,74 +129,22 @@ func (anyConstraint) Intersect(c Constraint) Constraint {
 	return c
 }
 
-type semverConstraint struct {
-	// The type of constraint - single semver, or semver range
-	typ ConstraintType
-	// The string text of the constraint
-	body string
-	c    semver.Constraint
-}
-
-func (c semverConstraint) Type() ConstraintType {
-	return c.typ
-}
-
-func (c semverConstraint) Body() string {
-	return c.body
-}
-
-func (c semverConstraint) Admits(v Version) bool {
-	if VTCTCompat[v.Type]&c.typ == 0 {
-		// version and constraint types are incompatible
-		return false
-	}
-
-	return c.c.Admits(v.SemVer) == nil
-}
-
-func (c semverConstraint) AdmitsAny(c2 Constraint) bool {
-	if c2.Type()&(C_Semver|C_SemverRange) == 0 {
-		// Union only possible if other constraint is semverish
-		return false
-	}
-
-	return c.c.AdmitsAny(c2.(semverConstraint).c)
-}
-
-func (c semverConstraint) Intersect(c2 Constraint) Constraint {
-	// TODO This won't actually be OK, long term
-	if sv, ok := c2.(semverConstraint); ok {
-		i := c.c.Intersect(sv.c)
-		if !semver.IsNone(i) {
-			return semverConstraint{
-				typ:  C_SemverRange, // TODO get rid of the range/non-range distinction
-				c:    i,
-				body: i.String(), // TODO this is costly - defer it by making it a method
-			}
-		}
-	}
-
-	return noneConstraint{}
-}
-
+// noneConstraint is the empty set - it matches no versions. It mirrors the
+// behavior of the semver package's none type.
 type noneConstraint struct{}
 
-func (noneConstraint) Type() ConstraintType {
-	return C_FlexMatch | C_ExactMatch
-}
-
-func (noneConstraint) Body() string {
+func (noneConstraint) String() string {
 	return ""
 }
 
-func (noneConstraint) Admits(Version) bool {
+func (noneConstraint) Matches(Version) bool {
 	return false
 }
 
-func (noneConstraint) AdmitsAny(Constraint) bool {
+func (noneConstraint) MatchesAny(Constraint) bool {
 	return false
 }
 
 func (noneConstraint) Intersect(Constraint) Constraint {
-	return noneConstraint{}
+	return none
 }

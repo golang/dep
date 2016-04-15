@@ -1,33 +1,13 @@
 package vsolver
 
-// The type of the version - branch, revision, or version
-type VersionType uint8
-
-const (
-	V_Revision VersionType = iota
-	V_Branch
-	V_Version
-	V_Semver
-)
-
 type ConstraintType uint8
 
 const (
-	C_Revision ConstraintType = 1 << iota
-	C_Branch
-	C_Version
-	C_Semver
-	C_SemverRange
-	C_ExactMatch = C_Revision | C_Branch | C_Version | C_Semver
-	C_FlexMatch  = C_SemverRange
+	RevisionConstraint ConstraintType = iota
+	BranchConstraint
+	VersionConstraint
+	SemverConstraint
 )
-
-var VTCTCompat = [...]ConstraintType{
-	C_Revision,
-	C_Branch,
-	C_Version,
-	C_Semver | C_SemverRange,
-}
 
 // ProjectExistence values represent the extent to which a project "exists."
 type ProjectExistence uint8

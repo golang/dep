@@ -30,19 +30,15 @@ func nsvSplit(info string) (name string, version string) {
 func mksvpa(info string) ProjectAtom {
 	name, v := nsvSplit(info)
 
-	sv, err := semver.NewVersion(v)
+	_, err := semver.NewVersion(v)
 	if err != nil {
 		// don't want to allow bad test data at this level, so just panic
 		panic(fmt.Sprintf("Error when converting '%s' into semver: %s", v, err))
 	}
 
 	return ProjectAtom{
-		Name: ProjectName(name),
-		Version: Version{
-			Type:   V_Semver,
-			Info:   v,
-			SemVer: sv,
-		},
+		Name:    ProjectName(name),
+		Version: NewVersion(v),
 	}
 }
 
@@ -66,7 +62,7 @@ func mksvd(info string) ProjectDep {
 
 	return ProjectDep{
 		Name:       ProjectName(name),
-		Constraint: mkc(v, C_Semver),
+		Constraint: mkc(v, SemverConstraint),
 	}
 }
 
@@ -217,7 +213,7 @@ var fixtures = []fixture{
 			dsv("foo 2.0.0"),
 			dsv("bar 1.0.0"),
 			dsv("bar 2.0.0", "baz 1.0.0"),
-			dsv("baz 1.0.0", "foo 1.0.0"),
+			dsv("baz 1.0.0", "foo 2.0.0"),
 		},
 		r: mkresults(
 			"root 1.0.0",
@@ -602,7 +598,7 @@ func newdepspecSM(ds []depspec, upgrade bool) *depspecSourceManager {
 
 func (sm *depspecSourceManager) GetProjectInfo(pa ProjectAtom) (ProjectInfo, error) {
 	for _, ds := range sm.specs {
-		if pa.Name == ds.name.Name && pa.Version.Info == ds.name.Version.Info {
+		if pa.Name == ds.name.Name && pa.Version == ds.name.Version {
 			return ProjectInfo{
 				pa:       ds.name,
 				Manifest: ds,
@@ -612,7 +608,7 @@ func (sm *depspecSourceManager) GetProjectInfo(pa ProjectAtom) (ProjectInfo, err
 	}
 
 	// TODO proper solver-type errors
-	return ProjectInfo{}, fmt.Errorf("Project '%s' at version '%s' could not be found", pa.Name, pa.Version.Info)
+	return ProjectInfo{}, fmt.Errorf("Project '%s' at version '%s' could not be found", pa.Name, pa.Version)
 }
 
 func (sm *depspecSourceManager) ListVersions(name ProjectName) (pi []Version, err error) {

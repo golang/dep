@@ -48,7 +48,7 @@ func (vq *versionQueue) current() Version {
 		return vq.pi[0]
 	}
 
-	return Version{}
+	return nil
 }
 
 func (vq *versionQueue) advance(fail error) (err error) {
@@ -111,7 +111,7 @@ func (vq *versionQueue) String() string {
 	var vs []string
 
 	for _, v := range vq.pi {
-		vs = append(vs, v.Info)
+		vs = append(vs, v.String())
 	}
 	return fmt.Sprintf("[%s]", strings.Join(vs, ", "))
 }

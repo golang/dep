@@ -20,7 +20,7 @@ func (s *selection) setDependenciesOn(id ProjectName, deps []Dependency) {
 func (s *selection) getConstraint(id ProjectName) Constraint {
 	deps, exists := s.deps[id]
 	if !exists || len(deps) == 0 {
-		return anyConstraint{}
+		return any
 	}
 
 	// TODO recomputing this sucks and is quite wasteful. Precompute/cache it
@@ -31,7 +31,7 @@ func (s *selection) getConstraint(id ProjectName) Constraint {
 	// assume this is the case here while assembling a composite constraint.
 
 	// Start with the open set
-	var ret Constraint = anyConstraint{}
+	var ret Constraint = any
 	for _, dep := range deps {
 		ret = ret.Intersect(dep.Dep.Constraint)
 	}
@@ -70,14 +70,10 @@ func (u unselected) Swap(i, j int) {
 }
 
 func (u *unselected) Push(x interface{}) {
-	//*u.sl = append(*u.sl, x.(ProjectIdentifier))
 	u.sl = append(u.sl, x.(ProjectName))
 }
 
 func (u *unselected) Pop() (v interface{}) {
-	//old := *u.sl
-	//v := old[len(old)-1]
-	//*u = old[:len(old)-1]
 	v, u.sl = u.sl[len(u.sl)-1], u.sl[:len(u.sl)-1]
 	return v
 }

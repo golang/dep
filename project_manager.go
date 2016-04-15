@@ -12,7 +12,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/Masterminds/semver"
 	"github.com/Masterminds/vcs"
 	"github.com/termie/go-shutil"
 )
@@ -91,12 +90,14 @@ func (pm *projectManager) GetInfoAt(v Version) (ProjectInfo, error) {
 		return ProjectInfo{}, fmt.Errorf("Project repository cache for %s does not exist", pm.n)
 	}
 
-	if pi, exists := pm.dc.Infos[v.Underlying]; exists {
-		return pi, nil
+	if r, exists := pm.dc.VMap[v]; exists {
+		if pi, exists := pm.dc.Infos[r]; exists {
+			return pi, nil
+		}
 	}
 
 	pm.crepo.mut.Lock()
-	err := pm.crepo.r.UpdateVersion(v.Info)
+	err := pm.crepo.r.UpdateVersion(v.String())
 	pm.crepo.mut.Unlock()
 	if err != nil {
 		// TODO More-er proper-er error
@@ -116,8 +117,7 @@ func (pm *projectManager) ListVersions() (vlist []Version, err error) {
 	if !pm.cvsync {
 		pm.ex.s |= ExistsInCache | ExistsUpstream
 
-		var exbits ProjectExistence
-		pm.vlist, exbits, err = pm.crepo.getCurrentVersionPairs()
+		vpairs, exbits, err := pm.crepo.getCurrentVersionPairs()
 		pm.ex.f |= exbits
 
 		if err != nil {
@@ -126,13 +126,14 @@ func (pm *projectManager) ListVersions() (vlist []Version, err error) {
 			return nil, err
 		}
 
+		pm.vlist = make([]Version, len(vpairs))
 		pm.cvsync = true
-
 		// Process the version data into the cache
 		// TODO detect out-of-sync data as we do this?
-		for _, v := range pm.vlist {
-			pm.dc.VMap[v] = v.Underlying
-			pm.dc.RMap[v.Underlying] = append(pm.dc.RMap[v.Underlying], v)
+		for k, v := range vpairs {
+			pm.dc.VMap[v] = v.Underlying()
+			pm.dc.RMap[v.Underlying()] = append(pm.dc.RMap[v.Underlying()], v)
+			pm.vlist[k] = v
 		}
 
 		// Sort the versions
@@ -150,6 +151,10 @@ func (pm *projectManager) ListVersions() (vlist []Version, err error) {
 // CheckExistence provides a direct method for querying existence levels of the
 // project. It will only perform actual searching (local fs or over the network)
 // if no previous attempt at that search has been made.
+//
+// Note that this may perform read-ish operations on the cache repo, and it
+// takes a lock accordingly. Deadlock may result from calling it during a
+// segment where the cache repo mutex is already write-locked.
 func (pm *projectManager) CheckExistence(ex ProjectExistence) bool {
 	if pm.ex.s&ex != ex {
 		if ex&ExistsInVendorRoot != 0 && pm.ex.s&ExistsInVendorRoot == 0 {
@@ -161,15 +166,20 @@ func (pm *projectManager) CheckExistence(ex ProjectExistence) bool {
 			}
 		}
 		if ex&ExistsInCache != 0 && pm.ex.s&ExistsInCache == 0 {
+			pm.crepo.mut.RLock()
 			pm.ex.s |= ExistsInCache
 			if pm.crepo.r.CheckLocal() {
 				pm.ex.f |= ExistsInCache
 			}
+			pm.crepo.mut.RUnlock()
 		}
 		if ex&ExistsUpstream != 0 && pm.ex.s&ExistsUpstream == 0 {
-			//pm.ex.s |= ExistsUpstream
-			// TODO maybe need a method to do this as cheaply as possible,
-			// per-repo type
+			pm.crepo.mut.RLock()
+			pm.ex.s |= ExistsUpstream
+			if pm.crepo.r.Ping() {
+				pm.ex.f |= ExistsUpstream
+			}
+			pm.crepo.mut.RUnlock()
 		}
 	}
 
@@ -180,7 +190,7 @@ func (pm *projectManager) ExportVersionTo(v Version, to string) error {
 	return pm.crepo.exportVersionTo(v, to)
 }
 
-func (r *repo) getCurrentVersionPairs() (vlist []Version, exbits ProjectExistence, err error) {
+func (r *repo) getCurrentVersionPairs() (vlist []PairedVersion, exbits ProjectExistence, err error) {
 	r.mut.Lock()
 	defer r.mut.Unlock()
 
@@ -194,6 +204,9 @@ func (r *repo) getCurrentVersionPairs() (vlist []Version, exbits ProjectExistenc
 
 		all := bytes.Split(bytes.TrimSpace(out), []byte("\n"))
 		if err != nil || len(all) == 0 {
+			// TODO remove this path? it really just complicates things, for
+			// probably not much benefit
+
 			// ls-remote failed, probably due to bad communication or a faulty
 			// upstream implementation. So fetch updates, then build the list
 			// locally
@@ -218,28 +231,13 @@ func (r *repo) getCurrentVersionPairs() (vlist []Version, exbits ProjectExistenc
 		// Local cache may not actually exist here, but upstream definitely does
 		exbits |= ExistsUpstream
 
-		var v Version
 		for _, pair := range all {
+			var v PairedVersion
 			if string(pair[46:51]) == "heads" {
-				v = Version{
-					Type:       V_Branch,
-					Info:       string(pair[52:]),
-					Underlying: Revision(pair[:40]),
-				}
+				v = NewFloatingVersion(string(pair[52:])).Is(Revision(pair[:40])).(PairedVersion)
 			} else if string(pair[46:50]) == "tags" {
 				// TODO deal with dereferenced tags
-				n := string(pair[51:])
-				v = Version{
-					Type:       V_Version,
-					Info:       n,
-					Underlying: Revision(pair[:40]),
-				}
-
-				sv, err := semver.NewVersion(n)
-				if err == nil {
-					v.Type = V_Semver
-					v.SemVer = sv
-				}
+				v = NewVersion(string(pair[51:])).Is(Revision(pair[:40])).(PairedVersion)
 			} else {
 				continue
 			}
@@ -266,17 +264,7 @@ func (r *repo) getCurrentVersionPairs() (vlist []Version, exbits ProjectExistenc
 		all := bytes.Split(bytes.TrimSpace(out), []byte("\n"))
 		for _, line := range all {
 			idx := bytes.IndexByte(line, 32) // space
-			n := string(line[:idx])
-			v := Version{
-				Type:       V_Version,
-				Info:       n,
-				Underlying: Revision(bytes.TrimSpace(line[idx:])),
-			}
-			sv, err := semver.NewVersion(n)
-			if err == nil {
-				v.Type = V_Semver
-				v.SemVer = sv
-			}
+			v := NewVersion(string(line[:idx])).Is(Revision(bytes.TrimSpace(line[idx:]))).(PairedVersion)
 			vlist = append(vlist, v)
 		}
 
@@ -319,18 +307,7 @@ func (r *repo) getCurrentVersionPairs() (vlist []Version, exbits ProjectExistenc
 			}
 
 			idx := bytes.IndexByte(pair[0], 32) // space
-			n := string(pair[0][:idx])
-			v := Version{
-				Type:       V_Version,
-				Info:       n,
-				Underlying: Revision(pair[1]),
-			}
-
-			sv, err := semver.NewVersion(n)
-			if err == nil {
-				v.Type = V_Semver
-				v.SemVer = sv
-			}
+			v := NewVersion(string(pair[0][:idx])).Is(Revision(pair[1])).(PairedVersion)
 			vlist = append(vlist, v)
 		}
 
@@ -352,11 +329,8 @@ func (r *repo) getCurrentVersionPairs() (vlist []Version, exbits ProjectExistenc
 			// Split on colon; this gets us the rev and the branch plus local revno
 			pair := bytes.Split(line, []byte(":"))
 			idx := bytes.IndexByte(pair[0], 32) // space
-			vlist = append(vlist, Version{
-				Type:       V_Branch,
-				Info:       string(pair[0][:idx]),
-				Underlying: Revision(pair[1]),
-			})
+			v := NewFloatingVersion(string(pair[0][:idx])).Is(Revision(pair[1])).(PairedVersion)
+			vlist = append(vlist, v)
 		}
 	case *vcs.SvnRepo:
 		// TODO is it ok to return empty vlist and no error?
@@ -384,7 +358,7 @@ func (r *repo) exportVersionTo(v Version, to string) error {
 		// TODO could have an err here
 		defer os.Rename(bak, idx)
 
-		_, err = r.r.RunFromDir("git", "read-tree", v.Info)
+		_, err = r.r.RunFromDir("git", "read-tree", v.String())
 		if err != nil {
 			return err
 		}
@@ -407,7 +381,7 @@ func (r *repo) exportVersionTo(v Version, to string) error {
 	default:
 		// TODO This is a dumb, slow approach, but we're punting on making these
 		// fast for now because git is the OVERWHELMING case
-		r.r.UpdateVersion(v.Info)
+		r.r.UpdateVersion(v.String())
 
 		cfg := &shutil.CopyTreeOptions{
 			Symlinks:     true,
