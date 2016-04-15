@@ -19,13 +19,13 @@ type Constraint interface {
 func NewConstraint(t ConstraintType, body string) (Constraint, error) {
 	switch t {
 	case BranchConstraint:
-		return floatingVersion{body: body}, nil
+		return floatingVersion(body), nil
 	case RevisionConstraint:
 		return Revision(body), nil
 	case VersionConstraint:
 		c, err := semver.NewConstraint(body)
 		if err != nil {
-			return plainVersion{body: body}, nil
+			return plainVersion(body), nil
 		}
 		return semverC{c: c}, nil
 	default:
