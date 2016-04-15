@@ -45,9 +45,11 @@ func NewConstraint(t ConstraintType, body string) (Constraint, error) {
 	case RevisionConstraint:
 		return Revision(body), nil
 	case VersionConstraint:
+		return plainVersion(body), nil
+	case SemverConstraint:
 		c, err := semver.NewConstraint(body)
 		if err != nil {
-			return plainVersion(body), nil
+			return nil, err
 		}
 		return semverConstraint{c: c}, nil
 	default:
@@ -81,23 +83,30 @@ func (c semverConstraint) MatchesAny(c2 Constraint) bool {
 }
 
 func (c semverConstraint) Intersect(c2 Constraint) Constraint {
-	var rc semver.Constraint = semver.None()
-
 	switch tc := c2.(type) {
-	case semverVersion:
-		rc = c.c.Intersect(tc.sv)
 	case semverConstraint:
-		rc = c.c.Intersect(tc.c)
+		rc := c.c.Intersect(tc.c)
+		if !semver.IsNone(rc) {
+			return semverConstraint{c: rc}
+		}
+	case semverVersion:
+		rc := c.c.Intersect(tc.sv)
+		if !semver.IsNone(rc) {
+			// If single version intersected with constraint, we know the result
+			// must be the single version, so just return it back out
+			return c2
+		}
 	case versionPair:
 		if tc2, ok := tc.v.(semverVersion); ok {
-			rc = c.c.Intersect(tc2.sv)
+			rc := c.c.Intersect(tc2.sv)
+			if !semver.IsNone(rc) {
+				// same reasoning as previous case
+				return c2
+			}
 		}
 	}
 
-	if semver.IsNone(rc) {
-		return none
-	}
-	return semverConstraint{c: rc}
+	return none
 }
 
 // anyConstraint is an unbounded constraint - it matches all other types of

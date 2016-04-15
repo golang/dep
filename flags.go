@@ -6,6 +6,7 @@ const (
 	RevisionConstraint ConstraintType = iota
 	BranchConstraint
 	VersionConstraint
+	SemverConstraint
 )
 
 // ProjectExistence values represent the extent to which a project "exists."

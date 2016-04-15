@@ -62,7 +62,7 @@ func mksvd(info string) ProjectDep {
 
 	return ProjectDep{
 		Name:       ProjectName(name),
-		Constraint: mkc(v, VersionConstraint),
+		Constraint: mkc(v, SemverConstraint),
 	}
 }
 
