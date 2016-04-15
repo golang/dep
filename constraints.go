@@ -7,14 +7,34 @@ import (
 	"github.com/Masterminds/semver"
 )
 
+var (
+	none = noneConstraint{}
+	any  = anyConstraint{}
+)
+
 // A Constraint provides structured limitations on the versions that are
 // admissible for a given project.
+//
+// As with Version, it has a private method because the vsolver's internal
+// implementation of the problem is complete, and the system relies on type
+// magic to operate.
 type Constraint interface {
 	fmt.Stringer
+	// Matches indicates if the provided Version is allowed by the Constraint.
 	Matches(Version) bool
+	// MatchesAny indicates if the intersection of the Constraint with the
+	// provided Constraint would yield a Constraint that could allow *any*
+	// Version.
 	MatchesAny(Constraint) bool
+	// Intersect computes the intersection of the Constraint with the provided
+	// Constraint.
 	Intersect(Constraint) Constraint
+	_private()
 }
+
+func (semverConstraint) _private() {}
+func (anyConstraint) _private()    {}
+func (noneConstraint) _private()   {}
 
 // NewConstraint constructs an appropriate Constraint object from the input
 // parameters.
@@ -57,22 +77,12 @@ func (c semverConstraint) Matches(v Version) bool {
 }
 
 func (c semverConstraint) MatchesAny(c2 Constraint) bool {
-	switch tc := c2.(type) {
-	case semverVersion:
-		return c.c.MatchesAny(tc.sv)
-	case semverConstraint:
-		return c.c.MatchesAny(tc.c)
-	case versionPair:
-		if tc2, ok := tc.v.(semverVersion); ok {
-			return c.c.MatchesAny(tc2.sv)
-		}
-	}
-
-	return false
+	return c.Intersect(c2) != none
 }
 
 func (c semverConstraint) Intersect(c2 Constraint) Constraint {
-	var rc semver.Constraint
+	var rc semver.Constraint = semver.None()
+
 	switch tc := c2.(type) {
 	case semverVersion:
 		rc = c.c.Intersect(tc.sv)
@@ -85,7 +95,7 @@ func (c semverConstraint) Intersect(c2 Constraint) Constraint {
 	}
 
 	if semver.IsNone(rc) {
-		return noneConstraint{}
+		return none
 	}
 	return semverConstraint{c: rc}
 }
@@ -127,5 +137,5 @@ func (noneConstraint) MatchesAny(Constraint) bool {
 }
 
 func (noneConstraint) Intersect(Constraint) Constraint {
-	return noneConstraint{}
+	return none
 }

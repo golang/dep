@@ -8,13 +8,13 @@ import (
 // gu - helper func for stringifying what we assume is a VersionPair (otherwise
 // will panic), but is given as a Constraint
 func gu(v Constraint) string {
-	return fmt.Sprintf("%q at rev %q", v, v.(VersionPair).Underlying())
+	return fmt.Sprintf("%q at rev %q", v, v.(PairedVersion).Underlying())
 }
 
 func TestBranchConstraintOps(t *testing.T) {
 	v1 := NewFloatingVersion("master").(floatingVersion)
 	v2 := NewFloatingVersion("test").(floatingVersion)
-	none := noneConstraint{}
+	none := none
 
 	if v1.Matches(v2) {
 		t.Errorf("%s should not match %s", v1, v2)
@@ -105,7 +105,7 @@ func TestBranchConstraintOps(t *testing.T) {
 func TestVersionConstraintOps(t *testing.T) {
 	v1 := NewVersion("ab123").(plainVersion)
 	v2 := NewVersion("b2a13").(plainVersion)
-	none := noneConstraint{}
+	none := none
 
 	if v1.Matches(v2) {
 		t.Errorf("%s should not match %s", v1, v2)
@@ -193,7 +193,7 @@ func TestVersionConstraintOps(t *testing.T) {
 func TestSemverVersionConstraintOps(t *testing.T) {
 	v1 := NewVersion("1.0.0").(semverVersion)
 	v2 := NewVersion("2.0.0").(semverVersion)
-	none := noneConstraint{}
+	none := none
 
 	if v1.Matches(v2) {
 		t.Errorf("%s should not match %s", v1, v2)

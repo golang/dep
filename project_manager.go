@@ -190,7 +190,7 @@ func (pm *projectManager) ExportVersionTo(v Version, to string) error {
 	return pm.crepo.exportVersionTo(v, to)
 }
 
-func (r *repo) getCurrentVersionPairs() (vlist []VersionPair, exbits ProjectExistence, err error) {
+func (r *repo) getCurrentVersionPairs() (vlist []PairedVersion, exbits ProjectExistence, err error) {
 	r.mut.Lock()
 	defer r.mut.Unlock()
 
@@ -232,12 +232,12 @@ func (r *repo) getCurrentVersionPairs() (vlist []VersionPair, exbits ProjectExis
 		exbits |= ExistsUpstream
 
 		for _, pair := range all {
-			var v VersionPair
+			var v PairedVersion
 			if string(pair[46:51]) == "heads" {
-				v = NewFloatingVersion(string(pair[52:])).Is(Revision(pair[:40])).(VersionPair)
+				v = NewFloatingVersion(string(pair[52:])).Is(Revision(pair[:40])).(PairedVersion)
 			} else if string(pair[46:50]) == "tags" {
 				// TODO deal with dereferenced tags
-				v = NewVersion(string(pair[51:])).Is(Revision(pair[:40])).(VersionPair)
+				v = NewVersion(string(pair[51:])).Is(Revision(pair[:40])).(PairedVersion)
 			} else {
 				continue
 			}
@@ -264,7 +264,7 @@ func (r *repo) getCurrentVersionPairs() (vlist []VersionPair, exbits ProjectExis
 		all := bytes.Split(bytes.TrimSpace(out), []byte("\n"))
 		for _, line := range all {
 			idx := bytes.IndexByte(line, 32) // space
-			v := NewVersion(string(line[:idx])).Is(Revision(bytes.TrimSpace(line[idx:]))).(VersionPair)
+			v := NewVersion(string(line[:idx])).Is(Revision(bytes.TrimSpace(line[idx:]))).(PairedVersion)
 			vlist = append(vlist, v)
 		}
 
@@ -307,7 +307,7 @@ func (r *repo) getCurrentVersionPairs() (vlist []VersionPair, exbits ProjectExis
 			}
 
 			idx := bytes.IndexByte(pair[0], 32) // space
-			v := NewVersion(string(pair[0][:idx])).Is(Revision(pair[1])).(VersionPair)
+			v := NewVersion(string(pair[0][:idx])).Is(Revision(pair[1])).(PairedVersion)
 			vlist = append(vlist, v)
 		}
 
@@ -329,7 +329,7 @@ func (r *repo) getCurrentVersionPairs() (vlist []VersionPair, exbits ProjectExis
 			// Split on colon; this gets us the rev and the branch plus local revno
 			pair := bytes.Split(line, []byte(":"))
 			idx := bytes.IndexByte(pair[0], 32) // space
-			v := NewFloatingVersion(string(pair[0][:idx])).Is(Revision(pair[1])).(VersionPair)
+			v := NewFloatingVersion(string(pair[0][:idx])).Is(Revision(pair[1])).(PairedVersion)
 			vlist = append(vlist, v)
 		}
 	case *vcs.SvnRepo:

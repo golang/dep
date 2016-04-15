@@ -22,11 +22,14 @@ type Version interface {
 	_private()
 }
 
-// VersionPair represents a normal Version, but paired with its corresponding,
+// PairedVersion represents a normal Version, but paired with its corresponding,
 // underlying Revision.
-type VersionPair interface {
+type PairedVersion interface {
 	Version
+	// Underlying returns the immutable Revision that identifies this Version.
 	Underlying() Revision
+	// Ensures it is impossible to be both a PairedVersion and an
+	// UnpairedVersion
 	_pair(int)
 }
 
@@ -34,7 +37,11 @@ type VersionPair interface {
 // VersionPair by indicating the version's corresponding, underlying Revision.
 type UnpairedVersion interface {
 	Version
-	Is(Revision) VersionPair
+	// Is takes the underlying Revision that this (Unpaired)Version corresponds
+	// to and unites them into a PairedVersion.
+	Is(Revision) PairedVersion
+	// Ensures it is impossible to be both a PairedVersion and an
+	// UnpairedVersion
 	_pair(bool)
 }
 
@@ -111,7 +118,7 @@ func (r Revision) Intersect(c Constraint) Constraint {
 		}
 	}
 
-	return noneConstraint{}
+	return none
 }
 
 type floatingVersion string
@@ -159,10 +166,10 @@ func (v floatingVersion) Intersect(c Constraint) Constraint {
 		}
 	}
 
-	return noneConstraint{}
+	return none
 }
 
-func (v floatingVersion) Is(r Revision) VersionPair {
+func (v floatingVersion) Is(r Revision) PairedVersion {
 	return versionPair{
 		v: v,
 		r: r,
@@ -214,10 +221,10 @@ func (v plainVersion) Intersect(c Constraint) Constraint {
 		}
 	}
 
-	return noneConstraint{}
+	return none
 }
 
-func (v plainVersion) Is(r Revision) VersionPair {
+func (v plainVersion) Is(r Revision) PairedVersion {
 	return versionPair{
 		v: v,
 		r: r,
@@ -271,10 +278,10 @@ func (v semverVersion) Intersect(c Constraint) Constraint {
 		}
 	}
 
-	return noneConstraint{}
+	return none
 }
 
-func (v semverVersion) Is(r Revision) VersionPair {
+func (v semverVersion) Is(r Revision) PairedVersion {
 	return versionPair{
 		v: v,
 		r: r,
@@ -351,13 +358,13 @@ func (v versionPair) Intersect(c2 Constraint) Constraint {
 		}
 	}
 
-	return noneConstraint{}
+	return none
 }
 
 // compareVersionType is a sort func helper that makes a coarse-grained sorting
 // decision based on version type.
 //
-// Make sure that l and r have already been converted from versionWithImmut (if
+// Make sure that l and r have already been converted from versionPair (if
 // applicable).
 func compareVersionType(l, r Version) int {
 	// Big fugly double type switch. No reflect, because this can be smack in a hot loop
