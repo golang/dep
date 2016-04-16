@@ -24,12 +24,12 @@ type ProjectManager interface {
 }
 
 type ProjectAnalyzer interface {
-	GetInfo(build.Context, ProjectName) (ProjectInfo, error)
+	GetInfo(build.Context, ProjectName) (Manifest, Lock, error)
 }
 
 type projectManager struct {
 	n ProjectName
-	// build.Context to  use in any analysis, and to pass to the analyzer
+	// build.Context to use in any analysis, and to pass to the analyzer
 	ctx build.Context
 	// Top-level project vendor dir
 	vendordir string
@@ -106,11 +106,22 @@ func (pm *projectManager) GetInfoAt(v Version) (ProjectInfo, error) {
 	}
 
 	pm.crepo.mut.RLock()
-	i, err := pm.an.GetInfo(pm.ctx, pm.n)
+	m, l, err := pm.an.GetInfo(pm.ctx, pm.n)
 	// TODO cache results
 	pm.crepo.mut.RUnlock()
 
-	return i, err
+	if err == nil {
+		return ProjectInfo{
+			pa: ProjectAtom{
+				Name:    pm.n,
+				Version: v,
+			},
+			Manifest: m,
+			Lock:     l,
+		}, nil
+	}
+
+	return ProjectInfo{}, err
 }
 
 func (pm *projectManager) ListVersions() (vlist []Version, err error) {

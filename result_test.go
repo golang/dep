@@ -16,8 +16,8 @@ var kub ProjectAtom
 // perspective, so it's only useful for particular situations in tests
 type passthruAnalyzer struct{}
 
-func (passthruAnalyzer) GetInfo(ctx build.Context, p ProjectName) (ProjectInfo, error) {
-	return ProjectInfo{}, nil
+func (passthruAnalyzer) GetInfo(ctx build.Context, p ProjectName) (Manifest, Lock, error) {
+	return nil, nil, nil
 }
 
 func init() {

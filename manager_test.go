@@ -16,8 +16,8 @@ var bd string
 
 type dummyAnalyzer struct{}
 
-func (dummyAnalyzer) GetInfo(ctx build.Context, p ProjectName) (ProjectInfo, error) {
-	return ProjectInfo{}, fmt.Errorf("just a dummy analyzer")
+func (dummyAnalyzer) GetInfo(ctx build.Context, p ProjectName) (Manifest, Lock, error) {
+	return nil, nil, fmt.Errorf("just a dummy analyzer")
 }
 
 func sv(s string) *semver.Version {
