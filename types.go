@@ -57,7 +57,7 @@ type ProjectInfo struct {
 // Manifest lists, it is considered an error that will eliminate that version
 // from consideration in the solving algorithm.
 type Manifest interface {
-	Name() ProjectName
+	//Name() ProjectName
 	GetDependencies() []ProjectDep
 	GetDevDependencies() []ProjectDep
 }
