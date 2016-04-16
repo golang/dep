@@ -252,8 +252,14 @@ func (s *solver) getLockVersionIfValid(ref ProjectName) *ProjectAtom {
 		// For projects without an upstream or cache repository, we still have
 		// to try to use what they have in the lock, because that's the only
 		// version we'll be able to actually get for them.
-		if exist {
 			return nil
+		//
+		// TODO to make this work well, we need to differentiate between
+		// implicit and explicit selection of packages to upgrade (with an 'all'
+		// vs itemized approach). Then, if explicit, we have to error out
+		// completely...somewhere. But if implicit, it's ok to ignore, albeit
+		// with a warning
+		if !exist {
 		}
 	}
 
