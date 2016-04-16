@@ -44,7 +44,7 @@ func mksvpa(info string) ProjectAtom {
 
 // mkc - "make constraint"
 func mkc(body string, t ConstraintType) Constraint {
-	c, err := NewConstraint(t, body)
+	c, err := NewConstraint(body, t)
 	if err != nil {
 		// don't want bad test data at this level, so just panic
 		panic(fmt.Sprintf("Error when converting '%s' into semver constraint: %s", body, err))

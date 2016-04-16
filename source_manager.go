@@ -200,9 +200,9 @@ func (sm *sourceManager) getProjectManager(n ProjectName) (*pmState, error) {
 		//}
 
 		dc = &projectDataCache{
-			Infos: make(map[Revision]ProjectInfo),
-			VMap:  make(map[Version]Revision),
-			RMap:  make(map[Revision][]Version),
+			Infos: make(map[revision]ProjectInfo),
+			VMap:  make(map[Version]revision),
+			RMap:  make(map[revision][]Version),
 		}
 	}
 
@@ -266,13 +266,13 @@ func (vs upgradeVersionSorter) Less(i, j int) bool {
 
 	switch l.(type) {
 	// For these, now nothing to do but alpha sort
-	case Revision, floatingVersion, plainVersion:
+	case revision, branchVersion, plainVersion:
 		return l.String() < r.String()
 	}
 
 	// This ensures that pre-release versions are always sorted after ALL
 	// full-release versions
-	lsv, rsv := l.(semverVersion).sv, r.(semverVersion).sv
+	lsv, rsv := l.(semVersion).sv, r.(semVersion).sv
 	lpre, rpre := lsv.Prerelease() == "", rsv.Prerelease() == ""
 	if (lpre && !rpre) || (!lpre && rpre) {
 		return lpre
@@ -303,13 +303,13 @@ func (vs downgradeVersionSorter) Less(i, j int) bool {
 
 	switch l.(type) {
 	// For these, now nothing to do but alpha
-	case Revision, floatingVersion, plainVersion:
+	case revision, branchVersion, plainVersion:
 		return l.String() < r.String()
 	}
 
 	// This ensures that pre-release versions are always sorted after ALL
 	// full-release versions
-	lsv, rsv := l.(semverVersion).sv, r.(semverVersion).sv
+	lsv, rsv := l.(semVersion).sv, r.(semVersion).sv
 	lpre, rpre := lsv.Prerelease() == "", rsv.Prerelease() == ""
 	if (lpre && !rpre) || (!lpre && rpre) {
 		return lpre

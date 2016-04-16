@@ -38,12 +38,12 @@ func (noneConstraint) _private()   {}
 
 // NewConstraint constructs an appropriate Constraint object from the input
 // parameters.
-func NewConstraint(t ConstraintType, body string) (Constraint, error) {
+func NewConstraint(body string, t ConstraintType) (Constraint, error) {
 	switch t {
 	case BranchConstraint:
-		return floatingVersion(body), nil
+		return branchVersion(body), nil
 	case RevisionConstraint:
-		return Revision(body), nil
+		return revision(body), nil
 	case VersionConstraint:
 		return plainVersion(body), nil
 	case SemverConstraint:
@@ -67,10 +67,10 @@ func (c semverConstraint) String() string {
 
 func (c semverConstraint) Matches(v Version) bool {
 	switch tv := v.(type) {
-	case semverVersion:
+	case semVersion:
 		return c.c.Matches(tv.sv) == nil
 	case versionPair:
-		if tv2, ok := tv.v.(semverVersion); ok {
+		if tv2, ok := tv.v.(semVersion); ok {
 			return c.c.Matches(tv2.sv) == nil
 		}
 	}
@@ -89,7 +89,7 @@ func (c semverConstraint) Intersect(c2 Constraint) Constraint {
 		if !semver.IsNone(rc) {
 			return semverConstraint{c: rc}
 		}
-	case semverVersion:
+	case semVersion:
 		rc := c.c.Intersect(tc.sv)
 		if !semver.IsNone(rc) {
 			// If single version intersected with constraint, we know the result
@@ -97,7 +97,7 @@ func (c semverConstraint) Intersect(c2 Constraint) Constraint {
 			return c2
 		}
 	case versionPair:
-		if tc2, ok := tc.v.(semverVersion); ok {
+		if tc2, ok := tc.v.(semVersion); ok {
 			rc := c.c.Intersect(tc2.sv)
 			if !semver.IsNone(rc) {
 				// same reasoning as previous case

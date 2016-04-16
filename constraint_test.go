@@ -12,8 +12,8 @@ func gu(v Constraint) string {
 }
 
 func TestBranchConstraintOps(t *testing.T) {
-	v1 := NewFloatingVersion("master").(floatingVersion)
-	v2 := NewFloatingVersion("test").(floatingVersion)
+	v1 := NewBranch("master").(branchVersion)
+	v2 := NewBranch("test").(branchVersion)
 	none := none
 
 	if v1.Matches(v2) {
@@ -29,7 +29,7 @@ func TestBranchConstraintOps(t *testing.T) {
 	}
 
 	// Add rev to one
-	snuffster := Revision("snuffleupagus")
+	snuffster := revision("snuffleupagus")
 	v3 := v1.Is(snuffster).(versionPair)
 	if v2.Matches(v3) {
 		t.Errorf("%s should not match %s", v2, gu(v3))
@@ -53,7 +53,7 @@ func TestBranchConstraintOps(t *testing.T) {
 	}
 
 	// Add different rev to the other
-	v4 := v2.Is(Revision("cookie monster")).(versionPair)
+	v4 := v2.Is(revision("cookie monster")).(versionPair)
 	if v4.Matches(v3) {
 		t.Errorf("%s should not match %s", gu(v4), gu(v3))
 	}
@@ -79,7 +79,7 @@ func TestBranchConstraintOps(t *testing.T) {
 	// TODO this might not actually be a good idea, when you consider the
 	// semantics of floating versions...matching on an underlying rev might be
 	// nice in the short term, but it's probably shit most of the time
-	v5 := v2.Is(Revision("snuffleupagus")).(versionPair)
+	v5 := v2.Is(revision("snuffleupagus")).(versionPair)
 	if !v5.Matches(v3) {
 		t.Errorf("%s should match %s", gu(v5), gu(v3))
 	}
@@ -102,9 +102,9 @@ func TestBranchConstraintOps(t *testing.T) {
 	}
 
 	// Set up for cross-type constraint ops
-	cookie := Revision("cookie monster")
+	cookie := revision("cookie monster")
 	o1 := NewVersion("master").(plainVersion)
-	o2 := NewVersion("1.0.0").(semverVersion)
+	o2 := NewVersion("1.0.0").(semVersion)
 	o3 := o1.Is(cookie).(versionPair)
 	o4 := o2.Is(cookie).(versionPair)
 	v6 := v1.Is(cookie).(versionPair)
@@ -200,7 +200,7 @@ func TestVersionConstraintOps(t *testing.T) {
 	}
 
 	// Add rev to one
-	snuffster := Revision("snuffleupagus")
+	snuffster := revision("snuffleupagus")
 	v3 := v1.Is(snuffster).(versionPair)
 	if v2.Matches(v3) {
 		t.Errorf("%s should not match %s", v2, gu(v3))
@@ -224,7 +224,7 @@ func TestVersionConstraintOps(t *testing.T) {
 	}
 
 	// Add different rev to the other
-	v4 := v2.Is(Revision("cookie monster")).(versionPair)
+	v4 := v2.Is(revision("cookie monster")).(versionPair)
 	if v4.Matches(v3) {
 		t.Errorf("%s should not match %s", gu(v4), gu(v3))
 	}
@@ -247,7 +247,7 @@ func TestVersionConstraintOps(t *testing.T) {
 	}
 
 	// Now add same rev to different versions, and things should line up
-	v5 := v2.Is(Revision("snuffleupagus")).(versionPair)
+	v5 := v2.Is(revision("snuffleupagus")).(versionPair)
 	if !v5.Matches(v3) {
 		t.Errorf("%s should match %s", gu(v5), gu(v3))
 	}
@@ -270,9 +270,9 @@ func TestVersionConstraintOps(t *testing.T) {
 	}
 
 	// Set up for cross-type constraint ops
-	cookie := Revision("cookie monster")
-	o1 := NewFloatingVersion("master").(floatingVersion)
-	o2 := NewVersion("1.0.0").(semverVersion)
+	cookie := revision("cookie monster")
+	o1 := NewBranch("master").(branchVersion)
+	o2 := NewVersion("1.0.0").(semVersion)
 	o3 := o1.Is(cookie).(versionPair)
 	o4 := o2.Is(cookie).(versionPair)
 	v6 := v1.Is(cookie).(versionPair)
@@ -351,8 +351,8 @@ func TestVersionConstraintOps(t *testing.T) {
 }
 
 func TestSemverVersionConstraintOps(t *testing.T) {
-	v1 := NewVersion("1.0.0").(semverVersion)
-	v2 := NewVersion("2.0.0").(semverVersion)
+	v1 := NewVersion("1.0.0").(semVersion)
+	v2 := NewVersion("2.0.0").(semVersion)
 	none := none
 
 	if v1.Matches(v2) {
@@ -368,7 +368,7 @@ func TestSemverVersionConstraintOps(t *testing.T) {
 	}
 
 	// Add rev to one
-	snuffster := Revision("snuffleupagus")
+	snuffster := revision("snuffleupagus")
 	v3 := v1.Is(snuffster).(versionPair)
 	if v2.Matches(v3) {
 		t.Errorf("%s should not match %s", v2, gu(v3))
@@ -392,7 +392,7 @@ func TestSemverVersionConstraintOps(t *testing.T) {
 	}
 
 	// Add different rev to the other
-	v4 := v2.Is(Revision("cookie monster")).(versionPair)
+	v4 := v2.Is(revision("cookie monster")).(versionPair)
 	if v4.Matches(v3) {
 		t.Errorf("%s should not match %s", gu(v4), gu(v3))
 	}
@@ -415,7 +415,7 @@ func TestSemverVersionConstraintOps(t *testing.T) {
 	}
 
 	// Now add same rev to different versions, and things should line up
-	v5 := v2.Is(Revision("snuffleupagus")).(versionPair)
+	v5 := v2.Is(revision("snuffleupagus")).(versionPair)
 	if !v5.Matches(v3) {
 		t.Errorf("%s should match %s", gu(v5), gu(v3))
 	}
@@ -438,8 +438,8 @@ func TestSemverVersionConstraintOps(t *testing.T) {
 	}
 
 	// Set up for cross-type constraint ops
-	cookie := Revision("cookie monster")
-	o1 := NewFloatingVersion("master").(floatingVersion)
+	cookie := revision("cookie monster")
+	o1 := NewBranch("master").(branchVersion)
 	o2 := NewVersion("ab123").(plainVersion)
 	o3 := o1.Is(cookie).(versionPair)
 	o4 := o2.Is(cookie).(versionPair)
@@ -520,16 +520,16 @@ func TestSemverVersionConstraintOps(t *testing.T) {
 
 // The other test is about the semverVersion, this is about semverConstraint
 func TestSemverConstraintOps(t *testing.T) {
-	v1 := NewFloatingVersion("master").(floatingVersion)
+	v1 := NewBranch("master").(branchVersion)
 	v2 := NewVersion("ab123").(plainVersion)
-	v3 := NewVersion("1.0.0").(semverVersion)
+	v3 := NewVersion("1.0.0").(semVersion)
 
-	fozzie := Revision("fozzie bear")
+	fozzie := revision("fozzie bear")
 	v4 := v1.Is(fozzie).(versionPair)
 	v5 := v2.Is(fozzie).(versionPair)
 	v6 := v3.Is(fozzie).(versionPair)
 
-	c1, err := NewConstraint(SemverConstraint, ">= 1.0.0")
+	c1, err := NewConstraint(">= 1.0.0", SemverConstraint)
 	if err != nil {
 		t.Errorf("Failed to create constraint: %s", err)
 		t.FailNow()

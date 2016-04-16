@@ -1,12 +1,12 @@
 package vsolver
 
-import (
-	"fmt"
-
-	"github.com/Masterminds/semver"
-)
+import "github.com/Masterminds/semver"
 
 // Version represents one of the different types of versions used by vsolver.
+//
+// Version composes Constraint, because all versions can be used as a constraint
+// (where they allow one, and only one, version - themselves), but constraints
+// are not necessarily discrete versions.
 //
 // Version is an interface, but it contains private methods, which restricts it
 // to vsolver's own internal implementations. We do this for the confluence of
@@ -16,10 +16,9 @@ import (
 // - the implementation relies on type magic under the hood, which would
 //   be unsafe to do if other dynamic types could be hiding behind the interface.
 type Version interface {
-	// Version composes Stringer to ensure that all versions can be serialized
-	// to a string
-	fmt.Stringer
-	_private()
+	Constraint
+	// Indicates the type of version - Revision, Branch, Version, or Semver
+	Type() string
 }
 
 // PairedVersion represents a normal Version, but paired with its corresponding,
@@ -27,7 +26,7 @@ type Version interface {
 type PairedVersion interface {
 	Version
 	// Underlying returns the immutable Revision that identifies this Version.
-	Underlying() Revision
+	Underlying() revision
 	// Ensures it is impossible to be both a PairedVersion and an
 	// UnpairedVersion
 	_pair(int)
@@ -39,26 +38,27 @@ type UnpairedVersion interface {
 	Version
 	// Is takes the underlying Revision that this (Unpaired)Version corresponds
 	// to and unites them into a PairedVersion.
-	Is(Revision) PairedVersion
+	Is(revision) PairedVersion
 	// Ensures it is impossible to be both a PairedVersion and an
 	// UnpairedVersion
 	_pair(bool)
 }
 
-func (floatingVersion) _private()  {}
-func (floatingVersion) _pair(bool) {}
-func (plainVersion) _private()     {}
-func (plainVersion) _pair(bool)    {}
-func (semverVersion) _private()    {}
-func (semverVersion) _pair(bool)   {}
-func (versionPair) _private()      {}
-func (versionPair) _pair(int)      {}
-func (Revision) _private()         {}
+// types are weird
+func (branchVersion) _private()  {}
+func (branchVersion) _pair(bool) {}
+func (plainVersion) _private()   {}
+func (plainVersion) _pair(bool)  {}
+func (semVersion) _private()     {}
+func (semVersion) _pair(bool)    {}
+func (versionPair) _private()    {}
+func (versionPair) _pair(int)    {}
+func (revision) _private()       {}
 
-// NewFloatingVersion creates a new Version to represent a floating version (in
+// NewBranch creates a new Version to represent a floating version (in
 // general, a branch).
-func NewFloatingVersion(body string) UnpairedVersion {
-	return floatingVersion(body)
+func NewBranch(body string) UnpairedVersion {
+	return branchVersion(body)
 }
 
 // NewVersion creates a Semver-typed Version if the provided version string is
@@ -69,22 +69,31 @@ func NewVersion(body string) UnpairedVersion {
 	if err != nil {
 		return plainVersion(body)
 	}
-	return semverVersion{sv: sv}
+	return semVersion{sv: sv}
+}
+
+// NewRevision creates a new revision-typed Version.
+func NewRevision(body string) Version {
+	return revision(body)
 }
 
 // A Revision represents an immutable versioning identifier.
-type Revision string
+type revision string
 
 // String converts the Revision back into a string.
-func (r Revision) String() string {
+func (r revision) String() string {
 	return string(r)
+}
+
+func (r revision) Type() string {
+	return "rev"
 }
 
 // Admits is the Revision acting as a constraint; it checks to see if the provided
 // version is the same Revision as itself.
-func (r Revision) Matches(v Version) bool {
+func (r revision) Matches(v Version) bool {
 	switch tv := v.(type) {
-	case Revision:
+	case revision:
 		return r == tv
 	case versionPair:
 		return r == tv.r
@@ -95,9 +104,9 @@ func (r Revision) Matches(v Version) bool {
 
 // AdmitsAny is the Revision acting as a constraint; it checks to see if the provided
 // version is the same Revision as itself.
-func (r Revision) MatchesAny(c Constraint) bool {
+func (r revision) MatchesAny(c Constraint) bool {
 	switch tc := c.(type) {
-	case Revision:
+	case revision:
 		return r == tc
 	case versionPair:
 		return r == tc.r
@@ -106,9 +115,9 @@ func (r Revision) MatchesAny(c Constraint) bool {
 	return false
 }
 
-func (r Revision) Intersect(c Constraint) Constraint {
+func (r revision) Intersect(c Constraint) Constraint {
 	switch tc := c.(type) {
-	case Revision:
+	case revision:
 		if r == tc {
 			return r
 		}
@@ -121,30 +130,34 @@ func (r Revision) Intersect(c Constraint) Constraint {
 	return none
 }
 
-type floatingVersion string
+type branchVersion string
 
-func (v floatingVersion) String() string {
+func (v branchVersion) String() string {
 	return string(v)
 }
 
-func (v floatingVersion) Matches(v2 Version) bool {
+func (r branchVersion) Type() string {
+	return "branch"
+}
+
+func (v branchVersion) Matches(v2 Version) bool {
 	switch tv := v2.(type) {
-	case floatingVersion:
+	case branchVersion:
 		return v == tv
 	case versionPair:
-		if tv2, ok := tv.v.(floatingVersion); ok {
+		if tv2, ok := tv.v.(branchVersion); ok {
 			return tv2 == v
 		}
 	}
 	return false
 }
 
-func (v floatingVersion) MatchesAny(c Constraint) bool {
+func (v branchVersion) MatchesAny(c Constraint) bool {
 	switch tc := c.(type) {
-	case floatingVersion:
+	case branchVersion:
 		return v == tc
 	case versionPair:
-		if tc2, ok := tc.v.(floatingVersion); ok {
+		if tc2, ok := tc.v.(branchVersion); ok {
 			return tc2 == v
 		}
 	}
@@ -152,14 +165,14 @@ func (v floatingVersion) MatchesAny(c Constraint) bool {
 	return false
 }
 
-func (v floatingVersion) Intersect(c Constraint) Constraint {
+func (v branchVersion) Intersect(c Constraint) Constraint {
 	switch tc := c.(type) {
-	case floatingVersion:
+	case branchVersion:
 		if v == tc {
 			return v
 		}
 	case versionPair:
-		if tc2, ok := tc.v.(floatingVersion); ok {
+		if tc2, ok := tc.v.(branchVersion); ok {
 			if v == tc2 {
 				return v
 			}
@@ -169,7 +182,7 @@ func (v floatingVersion) Intersect(c Constraint) Constraint {
 	return none
 }
 
-func (v floatingVersion) Is(r Revision) PairedVersion {
+func (v branchVersion) Is(r revision) PairedVersion {
 	return versionPair{
 		v: v,
 		r: r,
@@ -180,6 +193,10 @@ type plainVersion string
 
 func (v plainVersion) String() string {
 	return string(v)
+}
+
+func (r plainVersion) Type() string {
+	return "version"
 }
 
 func (v plainVersion) Matches(v2 Version) bool {
@@ -224,39 +241,43 @@ func (v plainVersion) Intersect(c Constraint) Constraint {
 	return none
 }
 
-func (v plainVersion) Is(r Revision) PairedVersion {
+func (v plainVersion) Is(r revision) PairedVersion {
 	return versionPair{
 		v: v,
 		r: r,
 	}
 }
 
-type semverVersion struct {
+type semVersion struct {
 	sv *semver.Version
 }
 
-func (v semverVersion) String() string {
+func (v semVersion) String() string {
 	return v.sv.String()
 }
 
-func (v semverVersion) Matches(v2 Version) bool {
+func (r semVersion) Type() string {
+	return "semver"
+}
+
+func (v semVersion) Matches(v2 Version) bool {
 	switch tv := v2.(type) {
-	case semverVersion:
+	case semVersion:
 		return v.sv.Equal(tv.sv)
 	case versionPair:
-		if tv2, ok := tv.v.(semverVersion); ok {
+		if tv2, ok := tv.v.(semVersion); ok {
 			return tv2.sv.Equal(v.sv)
 		}
 	}
 	return false
 }
 
-func (v semverVersion) MatchesAny(c Constraint) bool {
+func (v semVersion) MatchesAny(c Constraint) bool {
 	switch tc := c.(type) {
-	case semverVersion:
+	case semVersion:
 		return v.sv.Equal(tc.sv)
 	case versionPair:
-		if tc2, ok := tc.v.(semverVersion); ok {
+		if tc2, ok := tc.v.(semVersion); ok {
 			return tc2.sv.Equal(v.sv)
 		}
 	}
@@ -264,14 +285,14 @@ func (v semverVersion) MatchesAny(c Constraint) bool {
 	return false
 }
 
-func (v semverVersion) Intersect(c Constraint) Constraint {
+func (v semVersion) Intersect(c Constraint) Constraint {
 	switch tc := c.(type) {
-	case semverVersion:
+	case semVersion:
 		if v.sv.Equal(tc.sv) {
 			return v
 		}
 	case versionPair:
-		if tc2, ok := tc.v.(semverVersion); ok {
+		if tc2, ok := tc.v.(semVersion); ok {
 			if v.sv.Equal(tc2.sv) {
 				return v
 			}
@@ -281,7 +302,7 @@ func (v semverVersion) Intersect(c Constraint) Constraint {
 	return none
 }
 
-func (v semverVersion) Is(r Revision) PairedVersion {
+func (v semVersion) Is(r revision) PairedVersion {
 	return versionPair{
 		v: v,
 		r: r,
@@ -290,14 +311,18 @@ func (v semverVersion) Is(r Revision) PairedVersion {
 
 type versionPair struct {
 	v Version
-	r Revision
+	r revision
 }
 
 func (v versionPair) String() string {
 	return v.v.String()
 }
 
-func (v versionPair) Underlying() Revision {
+func (v versionPair) Type() string {
+	return v.v.Type()
+}
+
+func (v versionPair) Underlying() revision {
 	return v.r
 }
 
@@ -305,7 +330,7 @@ func (v versionPair) Matches(v2 Version) bool {
 	switch tv2 := v2.(type) {
 	case versionPair:
 		return v.r == tv2.r
-	case Revision:
+	case revision:
 		return v.r == tv2
 	}
 
@@ -314,12 +339,12 @@ func (v versionPair) Matches(v2 Version) bool {
 		if tv.Matches(v2) {
 			return true
 		}
-	case floatingVersion:
+	case branchVersion:
 		if tv.Matches(v2) {
 			return true
 		}
-	case semverVersion:
-		if tv2, ok := v2.(semverVersion); ok {
+	case semVersion:
+		if tv2, ok := v2.(semVersion); ok {
 			if tv.sv.Equal(tv2.sv) {
 				return true
 			}
@@ -339,19 +364,19 @@ func (v versionPair) Intersect(c2 Constraint) Constraint {
 		if v.r == tv2.r {
 			return v.r
 		}
-	case Revision:
+	case revision:
 		if v.r == tv2 {
 			return v.r
 		}
 	}
 
 	switch tv := v.v.(type) {
-	case plainVersion, floatingVersion:
+	case plainVersion, branchVersion:
 		if c2.Matches(v) {
 			return v
 		}
-	case semverVersion:
-		if tv2, ok := c2.(semverVersion); ok {
+	case semVersion:
+		if tv2, ok := c2.(semVersion); ok {
 			if tv.sv.Equal(tv2.sv) {
 				return v
 			}
@@ -369,22 +394,22 @@ func (v versionPair) Intersect(c2 Constraint) Constraint {
 func compareVersionType(l, r Version) int {
 	// Big fugly double type switch. No reflect, because this can be smack in a hot loop
 	switch l.(type) {
-	case Revision:
+	case revision:
 		switch r.(type) {
-		case Revision:
+		case revision:
 			return 0
-		case floatingVersion, plainVersion, semverVersion:
+		case branchVersion, plainVersion, semVersion:
 			return 1
 		default:
 			panic("unknown version type")
 		}
-	case floatingVersion:
+	case branchVersion:
 		switch r.(type) {
-		case Revision:
+		case revision:
 			return -1
-		case floatingVersion:
+		case branchVersion:
 			return 0
-		case plainVersion, semverVersion:
+		case plainVersion, semVersion:
 			return 1
 		default:
 			panic("unknown version type")
@@ -392,21 +417,21 @@ func compareVersionType(l, r Version) int {
 
 	case plainVersion:
 		switch r.(type) {
-		case Revision, floatingVersion:
+		case revision, branchVersion:
 			return -1
 		case plainVersion:
 			return 0
-		case semverVersion:
+		case semVersion:
 			return 1
 		default:
 			panic("unknown version type")
 		}
 
-	case semverVersion:
+	case semVersion:
 		switch r.(type) {
-		case Revision, floatingVersion, plainVersion:
+		case revision, branchVersion, plainVersion:
 			return -1
-		case semverVersion:
+		case semVersion:
 			return 0
 		default:
 			panic("unknown version type")

@@ -64,9 +64,9 @@ type existence struct {
 // TODO figure out shape of versions, then implement marshaling/unmarshaling
 type projectDataCache struct {
 	Version string                   `json:"version"` // TODO use this
-	Infos   map[Revision]ProjectInfo `json:"infos"`
-	VMap    map[Version]Revision     `json:"vmap"`
-	RMap    map[Revision][]Version   `json:"rmap"`
+	Infos   map[revision]ProjectInfo `json:"infos"`
+	VMap    map[Version]revision     `json:"vmap"`
+	RMap    map[revision][]Version   `json:"rmap"`
 }
 
 type repo struct {
@@ -245,10 +245,10 @@ func (r *repo) getCurrentVersionPairs() (vlist []PairedVersion, exbits ProjectEx
 		for _, pair := range all {
 			var v PairedVersion
 			if string(pair[46:51]) == "heads" {
-				v = NewFloatingVersion(string(pair[52:])).Is(Revision(pair[:40])).(PairedVersion)
+				v = NewBranch(string(pair[52:])).Is(revision(pair[:40])).(PairedVersion)
 			} else if string(pair[46:50]) == "tags" {
 				// TODO deal with dereferenced tags
-				v = NewVersion(string(pair[51:])).Is(Revision(pair[:40])).(PairedVersion)
+				v = NewVersion(string(pair[51:])).Is(revision(pair[:40])).(PairedVersion)
 			} else {
 				continue
 			}
@@ -275,7 +275,7 @@ func (r *repo) getCurrentVersionPairs() (vlist []PairedVersion, exbits ProjectEx
 		all := bytes.Split(bytes.TrimSpace(out), []byte("\n"))
 		for _, line := range all {
 			idx := bytes.IndexByte(line, 32) // space
-			v := NewVersion(string(line[:idx])).Is(Revision(bytes.TrimSpace(line[idx:]))).(PairedVersion)
+			v := NewVersion(string(line[:idx])).Is(revision(bytes.TrimSpace(line[idx:]))).(PairedVersion)
 			vlist = append(vlist, v)
 		}
 
@@ -318,7 +318,7 @@ func (r *repo) getCurrentVersionPairs() (vlist []PairedVersion, exbits ProjectEx
 			}
 
 			idx := bytes.IndexByte(pair[0], 32) // space
-			v := NewVersion(string(pair[0][:idx])).Is(Revision(pair[1])).(PairedVersion)
+			v := NewVersion(string(pair[0][:idx])).Is(revision(pair[1])).(PairedVersion)
 			vlist = append(vlist, v)
 		}
 
@@ -340,7 +340,7 @@ func (r *repo) getCurrentVersionPairs() (vlist []PairedVersion, exbits ProjectEx
 			// Split on colon; this gets us the rev and the branch plus local revno
 			pair := bytes.Split(line, []byte(":"))
 			idx := bytes.IndexByte(pair[0], 32) // space
-			v := NewFloatingVersion(string(pair[0][:idx])).Is(Revision(pair[1])).(PairedVersion)
+			v := NewBranch(string(pair[0][:idx])).Is(revision(pair[1])).(PairedVersion)
 			vlist = append(vlist, v)
 		}
 	case *vcs.SvnRepo:
