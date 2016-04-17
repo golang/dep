@@ -200,9 +200,9 @@ func (sm *sourceManager) getProjectManager(n ProjectName) (*pmState, error) {
 		//}
 
 		dc = &projectDataCache{
-			Infos: make(map[revision]ProjectInfo),
-			VMap:  make(map[Version]revision),
-			RMap:  make(map[revision][]Version),
+			Infos: make(map[Revision]ProjectInfo),
+			VMap:  make(map[Version]Revision),
+			RMap:  make(map[Revision][]Version),
 		}
 	}
 
@@ -266,7 +266,7 @@ func (vs upgradeVersionSorter) Less(i, j int) bool {
 
 	switch l.(type) {
 	// For these, now nothing to do but alpha sort
-	case revision, branchVersion, plainVersion:
+	case Revision, branchVersion, plainVersion:
 		return l.String() < r.String()
 	}
 
@@ -303,7 +303,7 @@ func (vs downgradeVersionSorter) Less(i, j int) bool {
 
 	switch l.(type) {
 	// For these, now nothing to do but alpha
-	case revision, branchVersion, plainVersion:
+	case Revision, branchVersion, plainVersion:
 		return l.String() < r.String()
 	}
 

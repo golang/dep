@@ -19,13 +19,13 @@ type versionQueue struct {
 	hasLock, allLoaded bool
 }
 
-func newVersionQueue(ref ProjectName, lockv *ProjectAtom, sm SourceManager) (*versionQueue, error) {
+func newVersionQueue(ref ProjectName, lockv ProjectAtom, sm SourceManager) (*versionQueue, error) {
 	vq := &versionQueue{
 		ref: ref,
 		sm:  sm,
 	}
 
-	if lockv != nil {
+	if lockv != nilpa {
 		vq.hasLock = true
 		vq.pi = append(vq.pi, lockv.Version)
 	} else {

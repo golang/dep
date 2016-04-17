@@ -3,8 +3,17 @@ package vsolver
 import (
 	"container/heap"
 	"fmt"
+	"math/rand"
+	"strconv"
 
 	"github.com/Sirupsen/logrus"
+)
+
+var (
+	// With a random revision and no name, collisions are unlikely
+	nilpa = ProjectAtom{
+		Version: Revision(strconv.FormatInt(rand.Int63(), 36)),
+	}
 )
 
 func NewSolver(sm SourceManager, l *logrus.Logger) Solver {
@@ -16,6 +25,7 @@ func NewSolver(sm SourceManager, l *logrus.Logger) Solver {
 		sm:     sm,
 		l:      l,
 		latest: make(map[ProjectName]struct{}),
+		rlm:    make(map[ProjectName]LockedProject),
 	}
 }
 
@@ -29,6 +39,7 @@ type solver struct {
 	unsel    *unselected
 	versions []*versionQueue
 	rp       ProjectInfo
+	rlm      map[ProjectName]LockedProject
 	attempts int
 }
 
@@ -39,6 +50,12 @@ func (s *solver) Solve(root ProjectInfo, toUpgrade []ProjectName) Result {
 	// local overrides would need to be handled first.
 	// TODO local overrides! heh
 	s.rp = root
+
+	if root.Lock != nil {
+		for _, lp := range root.Lock.Projects() {
+			s.rlm[lp.Name] = lp
+		}
+	}
 
 	for _, v := range toUpgrade {
 		s.latest[v] = struct{}{}
@@ -119,7 +136,7 @@ func (s *solver) solve() ([]ProjectAtom, error) {
 func (s *solver) createVersionQueue(ref ProjectName) (*versionQueue, error) {
 	// If on the root package, there's no queue to make
 	if ref == s.rp.Name() {
-		return newVersionQueue(ref, nil, s.sm)
+		return newVersionQueue(ref, nilpa, s.sm)
 	}
 
 	exists, err := s.sm.RepoExists(ref)
@@ -165,7 +182,7 @@ func (s *solver) createVersionQueue(ref ProjectName) (*versionQueue, error) {
 	}
 
 	if s.l.Level >= logrus.DebugLevel {
-		if lockv == nil {
+		if lockv == nilpa {
 			s.l.WithFields(logrus.Fields{
 				"name":  ref,
 				"queue": q,
@@ -244,7 +261,7 @@ func (s *solver) findValidVersion(q *versionQueue) error {
 	}
 }
 
-func (s *solver) getLockVersionIfValid(ref ProjectName) *ProjectAtom {
+func (s *solver) getLockVersionIfValid(ref ProjectName) ProjectAtom {
 	// If the project is specifically marked for changes, then don't look for a
 	// locked version.
 	if _, has := s.latest[ref]; has {
@@ -252,7 +269,6 @@ func (s *solver) getLockVersionIfValid(ref ProjectName) *ProjectAtom {
 		// For projects without an upstream or cache repository, we still have
 		// to try to use what they have in the lock, because that's the only
 		// version we'll be able to actually get for them.
-			return nil
 		//
 		// TODO to make this work well, we need to differentiate between
 		// implicit and explicit selection of packages to upgrade (with an 'all'
@@ -260,37 +276,40 @@ func (s *solver) getLockVersionIfValid(ref ProjectName) *ProjectAtom {
 		// completely...somewhere. But if implicit, it's ok to ignore, albeit
 		// with a warning
 		if !exist {
+			return nilpa
 		}
 	}
 
-	lockver := s.rp.GetProjectAtom(ref)
-	if lockver == nil {
+	lp, exists := s.rlm[ref]
+	if !exists {
 		if s.l.Level >= logrus.DebugLevel {
 			s.l.WithField("name", ref).Debug("Project not present in lock")
 		}
-		// Nothing in the lock about this version, so nothing to validate
-		return nil
+		return nilpa
 	}
 
 	constraint := s.sel.getConstraint(ref)
-	if !constraint.Matches(lockver.Version) {
+	if !constraint.Matches(lp.Version) {
 		if s.l.Level >= logrus.InfoLevel {
 			s.l.WithFields(logrus.Fields{
 				"name":    ref,
-				"version": lockver.Version,
+				"version": lp.Version,
 			}).Info("Project found in lock, but version not allowed by current constraints")
 		}
-		return nil
+		return nilpa
 	}
 
 	if s.l.Level >= logrus.InfoLevel {
 		s.l.WithFields(logrus.Fields{
 			"name":    ref,
-			"version": lockver.Version,
+			"version": lp.Version,
 		}).Info("Project found in lock")
 	}
 
-	return lockver
+	return ProjectAtom{
+		Name:    lp.Name,
+		Version: lp.Version,
+	}
 }
 
 // satisfiable is the main checking method - it determines if introducing a new
@@ -586,7 +605,8 @@ func (s *solver) unselectedComparator(i, j int) bool {
 		return false
 	}
 
-	ilock, jlock := s.rp.GetProjectAtom(iname) != nil, s.rp.GetProjectAtom(jname) != nil
+	_, ilock := s.rlm[iname]
+	_, jlock := s.rlm[jname]
 
 	switch {
 	case ilock && !jlock:

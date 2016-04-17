@@ -80,7 +80,7 @@ func TestProjectManagerInit(t *testing.T) {
 	if len(v) != 3 {
 		t.Errorf("Expected three version results from the test repo, got %v", len(v))
 	} else {
-		rev := revision("30605f6ac35fcb075ad0bfa9296f90a7d891523e")
+		rev := Revision("30605f6ac35fcb075ad0bfa9296f90a7d891523e")
 		expected := []Version{
 			NewVersion("1.0.0").Is(rev),
 			NewBranch("master").Is(rev),
@@ -175,17 +175,17 @@ func TestRepoVersionFetching(t *testing.T) {
 	if len(vlist) != 3 {
 		t.Errorf("git test repo should've produced three versions, got %v", len(vlist))
 	} else {
-		v := NewBranch("master").Is(revision("30605f6ac35fcb075ad0bfa9296f90a7d891523e"))
+		v := NewBranch("master").Is(Revision("30605f6ac35fcb075ad0bfa9296f90a7d891523e"))
 		if vlist[0] != v {
 			t.Errorf("git pair fetch reported incorrect first version, got %s", vlist[0])
 		}
 
-		v = NewBranch("test").Is(revision("30605f6ac35fcb075ad0bfa9296f90a7d891523e"))
+		v = NewBranch("test").Is(Revision("30605f6ac35fcb075ad0bfa9296f90a7d891523e"))
 		if vlist[1] != v {
 			t.Errorf("git pair fetch reported incorrect second version, got %s", vlist[1])
 		}
 
-		v = NewVersion("1.0.0").Is(revision("30605f6ac35fcb075ad0bfa9296f90a7d891523e"))
+		v = NewVersion("1.0.0").Is(Revision("30605f6ac35fcb075ad0bfa9296f90a7d891523e"))
 		if vlist[2] != v {
 			t.Errorf("git pair fetch reported incorrect third version, got %s", vlist[2])
 		}
@@ -202,12 +202,12 @@ func TestRepoVersionFetching(t *testing.T) {
 	if len(vlist) != 2 {
 		t.Errorf("hg test repo should've produced two versions, got %v", len(vlist))
 	} else {
-		v := NewVersion("1.0.0").Is(revision("d680e82228d206935ab2eaa88612587abe68db07"))
+		v := NewVersion("1.0.0").Is(Revision("d680e82228d206935ab2eaa88612587abe68db07"))
 		if vlist[0] != v {
 			t.Errorf("hg pair fetch reported incorrect first version, got %s", vlist[0])
 		}
 
-		v = NewBranch("test").Is(revision("6c44ee3fe5d87763616c19bf7dbcadb24ff5a5ce"))
+		v = NewBranch("test").Is(Revision("6c44ee3fe5d87763616c19bf7dbcadb24ff5a5ce"))
 		if vlist[1] != v {
 			t.Errorf("hg pair fetch reported incorrect second version, got %s", vlist[1])
 		}
@@ -224,7 +224,7 @@ func TestRepoVersionFetching(t *testing.T) {
 	if len(vlist) != 1 {
 		t.Errorf("bzr test repo should've produced one version, got %v", len(vlist))
 	} else {
-		v := NewVersion("1.0.0").Is(revision("matt@mattfarina.com-20150731135137-pbphasfppmygpl68"))
+		v := NewVersion("1.0.0").Is(Revision("matt@mattfarina.com-20150731135137-pbphasfppmygpl68"))
 		if vlist[0] != v {
 			t.Errorf("bzr pair fetch reported incorrect first version, got %s", vlist[0])
 		}

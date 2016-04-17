@@ -8,7 +8,7 @@ import (
 )
 
 func TestBasicSolves(t *testing.T) {
-	//solveAndBasicChecks(fixtures[len(fixtures)-1], t)
+	//solveAndBasicChecks(fixtures[5], t)
 	for _, fix := range fixtures {
 		solveAndBasicChecks(fix, t)
 	}
@@ -39,7 +39,15 @@ func solveAndBasicChecks(fix fixture, t *testing.T) Result {
 	} else {
 		p.Lock = fix.l
 		for _, ds := range fix.ds[1:] {
-			if _, has := fix.l[ds.name.Name]; !has {
+			var has bool
+			for _, lp := range fix.l {
+				if ds.name.Name == lp.Name {
+					has = true
+					break
+				}
+			}
+
+			if !has {
 				latest = append(latest, ds.name.Name)
 			}
 		}

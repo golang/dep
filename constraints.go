@@ -43,7 +43,7 @@ func NewConstraint(body string, t ConstraintType) (Constraint, error) {
 	case BranchConstraint:
 		return branchVersion(body), nil
 	case RevisionConstraint:
-		return revision(body), nil
+		return Revision(body), nil
 	case VersionConstraint:
 		return plainVersion(body), nil
 	case SemverConstraint:

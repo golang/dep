@@ -29,7 +29,7 @@ func TestBranchConstraintOps(t *testing.T) {
 	}
 
 	// Add rev to one
-	snuffster := revision("snuffleupagus")
+	snuffster := Revision("snuffleupagus")
 	v3 := v1.Is(snuffster).(versionPair)
 	if v2.Matches(v3) {
 		t.Errorf("%s should not match %s", v2, gu(v3))
@@ -53,7 +53,7 @@ func TestBranchConstraintOps(t *testing.T) {
 	}
 
 	// Add different rev to the other
-	v4 := v2.Is(revision("cookie monster")).(versionPair)
+	v4 := v2.Is(Revision("cookie monster")).(versionPair)
 	if v4.Matches(v3) {
 		t.Errorf("%s should not match %s", gu(v4), gu(v3))
 	}
@@ -79,7 +79,7 @@ func TestBranchConstraintOps(t *testing.T) {
 	// TODO this might not actually be a good idea, when you consider the
 	// semantics of floating versions...matching on an underlying rev might be
 	// nice in the short term, but it's probably shit most of the time
-	v5 := v2.Is(revision("snuffleupagus")).(versionPair)
+	v5 := v2.Is(Revision("snuffleupagus")).(versionPair)
 	if !v5.Matches(v3) {
 		t.Errorf("%s should match %s", gu(v5), gu(v3))
 	}
@@ -102,7 +102,7 @@ func TestBranchConstraintOps(t *testing.T) {
 	}
 
 	// Set up for cross-type constraint ops
-	cookie := revision("cookie monster")
+	cookie := Revision("cookie monster")
 	o1 := NewVersion("master").(plainVersion)
 	o2 := NewVersion("1.0.0").(semVersion)
 	o3 := o1.Is(cookie).(versionPair)
@@ -200,7 +200,7 @@ func TestVersionConstraintOps(t *testing.T) {
 	}
 
 	// Add rev to one
-	snuffster := revision("snuffleupagus")
+	snuffster := Revision("snuffleupagus")
 	v3 := v1.Is(snuffster).(versionPair)
 	if v2.Matches(v3) {
 		t.Errorf("%s should not match %s", v2, gu(v3))
@@ -224,7 +224,7 @@ func TestVersionConstraintOps(t *testing.T) {
 	}
 
 	// Add different rev to the other
-	v4 := v2.Is(revision("cookie monster")).(versionPair)
+	v4 := v2.Is(Revision("cookie monster")).(versionPair)
 	if v4.Matches(v3) {
 		t.Errorf("%s should not match %s", gu(v4), gu(v3))
 	}
@@ -247,7 +247,7 @@ func TestVersionConstraintOps(t *testing.T) {
 	}
 
 	// Now add same rev to different versions, and things should line up
-	v5 := v2.Is(revision("snuffleupagus")).(versionPair)
+	v5 := v2.Is(Revision("snuffleupagus")).(versionPair)
 	if !v5.Matches(v3) {
 		t.Errorf("%s should match %s", gu(v5), gu(v3))
 	}
@@ -270,7 +270,7 @@ func TestVersionConstraintOps(t *testing.T) {
 	}
 
 	// Set up for cross-type constraint ops
-	cookie := revision("cookie monster")
+	cookie := Revision("cookie monster")
 	o1 := NewBranch("master").(branchVersion)
 	o2 := NewVersion("1.0.0").(semVersion)
 	o3 := o1.Is(cookie).(versionPair)
@@ -368,7 +368,7 @@ func TestSemverVersionConstraintOps(t *testing.T) {
 	}
 
 	// Add rev to one
-	snuffster := revision("snuffleupagus")
+	snuffster := Revision("snuffleupagus")
 	v3 := v1.Is(snuffster).(versionPair)
 	if v2.Matches(v3) {
 		t.Errorf("%s should not match %s", v2, gu(v3))
@@ -392,7 +392,7 @@ func TestSemverVersionConstraintOps(t *testing.T) {
 	}
 
 	// Add different rev to the other
-	v4 := v2.Is(revision("cookie monster")).(versionPair)
+	v4 := v2.Is(Revision("cookie monster")).(versionPair)
 	if v4.Matches(v3) {
 		t.Errorf("%s should not match %s", gu(v4), gu(v3))
 	}
@@ -415,7 +415,7 @@ func TestSemverVersionConstraintOps(t *testing.T) {
 	}
 
 	// Now add same rev to different versions, and things should line up
-	v5 := v2.Is(revision("snuffleupagus")).(versionPair)
+	v5 := v2.Is(Revision("snuffleupagus")).(versionPair)
 	if !v5.Matches(v3) {
 		t.Errorf("%s should match %s", gu(v5), gu(v3))
 	}
@@ -438,7 +438,7 @@ func TestSemverVersionConstraintOps(t *testing.T) {
 	}
 
 	// Set up for cross-type constraint ops
-	cookie := revision("cookie monster")
+	cookie := Revision("cookie monster")
 	o1 := NewBranch("master").(branchVersion)
 	o2 := NewVersion("ab123").(plainVersion)
 	o3 := o1.Is(cookie).(versionPair)
@@ -524,7 +524,7 @@ func TestSemverConstraintOps(t *testing.T) {
 	v2 := NewVersion("ab123").(plainVersion)
 	v3 := NewVersion("1.0.0").(semVersion)
 
-	fozzie := revision("fozzie bear")
+	fozzie := Revision("fozzie bear")
 	v4 := v1.Is(fozzie).(versionPair)
 	v5 := v2.Is(fozzie).(versionPair)
 	v6 := v3.Is(fozzie).(versionPair)

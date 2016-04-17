@@ -30,6 +30,20 @@ type ProjectInfo struct {
 	Lock
 }
 
+// LockedProject is a single project entry from a lock file. It expresses the
+// project's name, the paired version (version and underlying rev), the URI for
+// accessing it, and the path at which it should be placed within a vendor
+// directory.
+//
+// TODO note that sometime soon, we also plan to allow pkgs. this'll change
+type LockedProject struct {
+	Name ProjectName
+	// TODO requiring PairedVersion may be problematic
+	Version PairedVersion
+	URL     string
+	Path    string
+}
+
 // TODO undecided on whether having a struct lke this is good/helpful
 // PI (Project Info) holds the two key pieces of information that an analyzer
 // can produce about a project: a Manifest, describing its intended dependencies
@@ -57,17 +71,9 @@ type ProjectInfo struct {
 // Manifest lists, it is considered an error that will eliminate that version
 // from consideration in the solving algorithm.
 type Manifest interface {
-	//Name() ProjectName
+	Name() ProjectName
 	GetDependencies() []ProjectDep
 	GetDevDependencies() []ProjectDep
-}
-
-// TODO define format for lockfile
-type lock struct {
-	// The version of the solver used to generate the lock file
-	// TODO impl
-	Version  string
-	Projects []lockedProject
 }
 
 // Lock represents data from a lock file (or however the implementing tool
@@ -76,17 +82,14 @@ type lock struct {
 //
 // In general, the information produced by vsolver on finding a successful
 // solution is all that would be necessary to constitute a lock file, though
-// tools can mix other information in their files as they choose.
+// tools can include whatever other information they want in their storage.
 type Lock interface {
 	// Indicates the version of the solver used to generate this lock data
-	SolverVersion() string
+	//SolverVersion() string
+
 	// The hash of inputs to vsolver that resulted in this lock data
 	InputHash() string
-	// Returns the identifier for a project in the lock data, or nil if the
-	// named project is not present in the lock file
-	GetProjectAtom(ProjectName) *ProjectAtom
-}
 
-type lockedProject struct {
-	Name, Revision, Version string
+	// Projects returns the list of LockedProjects contained in the lock data.
+	Projects() []LockedProject
 }

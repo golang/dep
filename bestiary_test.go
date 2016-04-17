@@ -116,10 +116,20 @@ type fixture struct {
 
 // mklock makes a fixLock, suitable to act as a lock file
 func mklock(pairs ...string) fixLock {
-	l := make(fixLock)
+	l := make(fixLock, 0)
 	for _, s := range pairs {
 		pa := mksvpa(s)
-		l[pa.Name] = pa
+		var v PairedVersion
+		if pv, ok := pa.Version.(PairedVersion); ok {
+			v = pv
+		} else {
+			v = pa.Version.(UnpairedVersion).Is(Revision("haberdasher"))
+		}
+
+		l = append(l, LockedProject{
+			Name:    pa.Name,
+			Version: v,
+		})
 	}
 
 	return l
@@ -598,7 +608,7 @@ func newdepspecSM(ds []depspec, upgrade bool) *depspecSourceManager {
 
 func (sm *depspecSourceManager) GetProjectInfo(pa ProjectAtom) (ProjectInfo, error) {
 	for _, ds := range sm.specs {
-		if pa.Name == ds.name.Name && pa.Version == ds.name.Version {
+		if pa.Name == ds.name.Name && pa.Version.Matches(ds.name.Version) {
 			return ProjectInfo{
 				pa:       ds.name,
 				Manifest: ds,
@@ -671,7 +681,7 @@ func (ds depspec) Name() ProjectName {
 	return ds.name.Name
 }
 
-type fixLock map[ProjectName]ProjectAtom
+type fixLock []LockedProject
 
 func (fixLock) SolverVersion() string {
 	return "-1"
@@ -683,11 +693,8 @@ func (fixLock) InputHash() string {
 }
 
 // impl Lock interface
-func (l fixLock) GetProjectAtom(n ProjectName) *ProjectAtom {
-	if pa, exists := l[n]; exists {
-		return &pa
-	}
-	return nil
+func (l fixLock) Projects() []LockedProject {
+	return l
 }
 
 type dummyLock struct{}
@@ -703,7 +710,7 @@ func (_ dummyLock) InputHash() string {
 }
 
 // impl Lock interface
-func (_ dummyLock) GetProjectAtom(_ ProjectName) *ProjectAtom {
+func (_ dummyLock) Projects() []LockedProject {
 	return nil
 }
 

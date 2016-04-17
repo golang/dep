@@ -6,7 +6,7 @@ import (
 )
 
 func TestVersionSorts(t *testing.T) {
-	rev := revision("flooboofoobooo")
+	rev := Revision("flooboofoobooo")
 	v1 := NewBranch("master").Is(rev)
 	v2 := NewBranch("test").Is(rev)
 	v3 := NewVersion("1.0.0").Is(rev)
