@@ -53,7 +53,7 @@ func (s *solver) Solve(root ProjectInfo, toUpgrade []ProjectName) Result {
 
 	if root.Lock != nil {
 		for _, lp := range root.Lock.Projects() {
-			s.rlm[lp.Name] = lp
+			s.rlm[lp.n] = lp
 		}
 	}
 
@@ -289,11 +289,11 @@ func (s *solver) getLockVersionIfValid(ref ProjectName) ProjectAtom {
 	}
 
 	constraint := s.sel.getConstraint(ref)
-	if !constraint.Matches(lp.Version) {
+	if !constraint.Matches(lp.v) {
 		if s.l.Level >= logrus.InfoLevel {
 			s.l.WithFields(logrus.Fields{
 				"name":    ref,
-				"version": lp.Version,
+				"version": lp.v,
 			}).Info("Project found in lock, but version not allowed by current constraints")
 		}
 		return nilpa
@@ -302,13 +302,13 @@ func (s *solver) getLockVersionIfValid(ref ProjectName) ProjectAtom {
 	if s.l.Level >= logrus.InfoLevel {
 		s.l.WithFields(logrus.Fields{
 			"name":    ref,
-			"version": lp.Version,
+			"version": lp.v,
 		}).Info("Project found in lock")
 	}
 
 	return ProjectAtom{
-		Name:    lp.Name,
-		Version: lp.Version,
+		Name:    lp.n,
+		Version: lp.v,
 	}
 }
 

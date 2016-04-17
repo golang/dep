@@ -54,11 +54,12 @@ Complaining about this is shooting the messenger.
 
 Selecting acceptable versions out of a big dependency graph is a [boolean
 satisfiability](https://en.wikipedia.org/wiki/Boolean_satisfiability_problem)
-(or SAT) problem: given all the possible dependencies and their versions, we’re
-trying to find a set that satisfies all the requirements. These obvious form of
-these requirements is that version numbers line up, but it can also (and
-`vsolver` will/does) enforce invariants like “no import cycles” and type
-compatibility between packages.
+(or SAT) problem: given all possible combinations of valid dependencies, we’re
+trying to find a set that satisfies all the mutual requirements. Obviously that
+requires version numbers lining up, but it can also (and `vsolver` will/does)
+enforce invariants like “no import cycles” and type compatibility between
+packages. All of those requirements must be rechecked *every time* we discovery
+and add a new project to the graph.
 
 SAT was one of the very first problems to be proven NP-complete. **OF COURSE
 IT’S COMPLICATED**. We didn’t make it that way. Truth is, though, solvers are

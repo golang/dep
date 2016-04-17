@@ -41,7 +41,7 @@ func solveAndBasicChecks(fix fixture, t *testing.T) Result {
 		for _, ds := range fix.ds[1:] {
 			var has bool
 			for _, lp := range fix.l {
-				if ds.name.Name == lp.Name {
+				if ds.name.Name == lp.n {
 					has = true
 					break
 				}

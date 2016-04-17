@@ -119,6 +119,7 @@ func mklock(pairs ...string) fixLock {
 	l := make(fixLock, 0)
 	for _, s := range pairs {
 		pa := mksvpa(s)
+
 		var v PairedVersion
 		if pv, ok := pa.Version.(PairedVersion); ok {
 			v = pv
@@ -126,10 +127,7 @@ func mklock(pairs ...string) fixLock {
 			v = pa.Version.(UnpairedVersion).Is(Revision("haberdasher"))
 		}
 
-		l = append(l, LockedProject{
-			Name:    pa.Name,
-			Version: v,
-		})
+		l = append(l, NewLockedProject(pa.Name, v, "", ""))
 	}
 
 	return l

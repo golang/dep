@@ -305,7 +305,7 @@ func (v semVersion) Is(r Revision) PairedVersion {
 }
 
 type versionPair struct {
-	v Version
+	v UnpairedVersion
 	r Revision
 }
 
