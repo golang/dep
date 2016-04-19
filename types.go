@@ -160,3 +160,43 @@ type Lock interface {
 	// Projects returns the list of LockedProjects contained in the lock data.
 	Projects() []LockedProject
 }
+
+// SimpleLock is a helper for tools to simply enumerate lock data when they know
+// that no hash, or other complex information, is available.
+type SimpleLock []LockedProject
+
+// InputHash always returns an empty string for SimpleLock. This makes it useless
+// as a stable lock to be written to disk, but still useful for some ephemeral
+// purposes.
+func (SimpleLock) InputHash() string {
+	return ""
+}
+
+// Projects returns the entire contents of the SimpleLock.
+func (l SimpleLock) Projects() []LockedProject {
+	return l
+}
+
+// SimpleManifest is a helper for tools to enumerate manifest data. It's
+// intended for ephemeral manifests, such as those created by Analyzers on the
+// fly.
+type SimpleManifest struct {
+	N  ProjectName
+	P  []ProjectDep
+	DP []ProjectDep
+}
+
+// Name returns the name of the project described by the manifest.
+func (m SimpleManifest) Name() ProjectName {
+	return m.N
+}
+
+// GetDependencies returns the project's dependencies.
+func (m SimpleManifest) GetDependencies() []ProjectDep {
+	return m.P
+}
+
+// GetDependencies returns the project's test dependencies.
+func (m SimpleManifest) GetDevDependencies() []ProjectDep {
+	return m.DP
+}
