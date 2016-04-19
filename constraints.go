@@ -109,6 +109,11 @@ func (c semverConstraint) Intersect(c2 Constraint) Constraint {
 	return none
 }
 
+// Any returns a constraint that will match anything.
+func Any() Constraint {
+	return anyConstraint{}
+}
+
 // anyConstraint is an unbounded constraint - it matches all other types of
 // constraints. It mirrors the behavior of the semver package's any type.
 type anyConstraint struct{}
