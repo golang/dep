@@ -3,7 +3,7 @@ package vsolver
 type ProjectName string
 
 type Solver interface {
-	Solve(root ProjectInfo, toUpgrade []ProjectName) Result
+	Solve(root ProjectInfo, changeAll bool, toUpgrade []ProjectName) Result
 }
 
 type ProjectAtom struct {

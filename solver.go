@@ -32,21 +32,23 @@ func NewSolver(sm SourceManager, l *logrus.Logger) Solver {
 // solver is a specialized backtracking SAT solver with satisfiability
 // conditions hardcoded to the needs of the Go package management problem space.
 type solver struct {
-	l        *logrus.Logger
-	sm       SourceManager
-	latest   map[ProjectName]struct{}
-	sel      *selection
-	unsel    *unselected
-	versions []*versionQueue
-	rp       ProjectInfo
-	rlm      map[ProjectName]LockedProject
-	attempts int
+	l         *logrus.Logger
+	sm        SourceManager
+	changeAll bool
+	latest    map[ProjectName]struct{}
+	sel       *selection
+	unsel     *unselected
+	versions  []*versionQueue
+	rp        ProjectInfo
+	rlm       map[ProjectName]LockedProject
+	attempts  int
 }
 
 // Solve takes a ProjectInfo describing the root project, and a list of
-// ProjectNames which should be upgraded, and attempts to find a complete
+// ProjectNames which should be allowed to change, typically for an upgrade (or
+// a flag indicating that all can change), and attempts to find a complete
 // solution that satisfies all constraints.
-func (s *solver) Solve(root ProjectInfo, toUpgrade []ProjectName) Result {
+func (s *solver) Solve(root ProjectInfo, changeAll bool, change []ProjectName) Result {
 	// local overrides would need to be handled first.
 	// TODO local overrides! heh
 	s.rp = root
@@ -57,7 +59,8 @@ func (s *solver) Solve(root ProjectInfo, toUpgrade []ProjectName) Result {
 		}
 	}
 
-	for _, v := range toUpgrade {
+	s.changeAll = changeAll
+	for _, v := range change {
 		s.latest[v] = struct{}{}
 	}
 
@@ -166,7 +169,12 @@ func (s *solver) createVersionQueue(ref ProjectName) (*versionQueue, error) {
 		}
 	}
 
-	lockv := s.getLockVersionIfValid(ref)
+	lockv, err := s.getLockVersionIfValid(ref)
+	if err != nil {
+		// Can only get an error here if an upgrade was expressly requested on
+		// code that exists only in vendor
+		return nil, err
+	}
 
 	q, err := newVersionQueue(ref, lockv, s.sm)
 	if err != nil {
@@ -261,22 +269,26 @@ func (s *solver) findValidVersion(q *versionQueue) error {
 	}
 }
 
-func (s *solver) getLockVersionIfValid(ref ProjectName) ProjectAtom {
+func (s *solver) getLockVersionIfValid(ref ProjectName) (ProjectAtom, error) {
 	// If the project is specifically marked for changes, then don't look for a
 	// locked version.
-	if _, has := s.latest[ref]; has {
-		exist, _ := s.sm.RepoExists(ref)
+	if _, explicit := s.latest[ref]; explicit || s.changeAll {
+		if exist, _ := s.sm.RepoExists(ref); exist {
+			return nilpa, nil
+		}
+
 		// For projects without an upstream or cache repository, we still have
 		// to try to use what they have in the lock, because that's the only
 		// version we'll be able to actually get for them.
 		//
-		// TODO to make this work well, we need to differentiate between
-		// implicit and explicit selection of packages to upgrade (with an 'all'
-		// vs itemized approach). Then, if explicit, we have to error out
-		// completely...somewhere. But if implicit, it's ok to ignore, albeit
-		// with a warning
-		if !exist {
-			return nilpa
+		// However, if a change was expressly requested for something that
+		// exists only in vendor, then that guarantees we don't have enough
+		// information to complete a solution. In that case, error out.
+		if explicit {
+			return nilpa, &missingSourceFailure{
+				goal: ref,
+				prob: "Cannot upgrade %s, as no source repository could be found.",
+			}
 		}
 	}
 
@@ -285,7 +297,7 @@ func (s *solver) getLockVersionIfValid(ref ProjectName) ProjectAtom {
 		if s.l.Level >= logrus.DebugLevel {
 			s.l.WithField("name", ref).Debug("Project not present in lock")
 		}
-		return nilpa
+		return nilpa, nil
 	}
 
 	constraint := s.sel.getConstraint(ref)
@@ -296,7 +308,7 @@ func (s *solver) getLockVersionIfValid(ref ProjectName) ProjectAtom {
 				"version": lp.v,
 			}).Info("Project found in lock, but version not allowed by current constraints")
 		}
-		return nilpa
+		return nilpa, nil
 	}
 
 	if s.l.Level >= logrus.InfoLevel {
@@ -309,7 +321,7 @@ func (s *solver) getLockVersionIfValid(ref ProjectName) ProjectAtom {
 	return ProjectAtom{
 		Name:    lp.n,
 		Version: lp.v,
-	}
+	}, nil
 }
 
 // satisfiable is the main checking method - it determines if introducing a new

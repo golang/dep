@@ -124,3 +124,12 @@ func (e *versionNotAllowedFailure) Error() string {
 
 	return buf.String()
 }
+
+type missingSourceFailure struct {
+	goal ProjectName
+	prob string
+}
+
+func (e *missingSourceFailure) Error() string {
+	return fmt.Sprintf(e.prob, e.goal)
+}
