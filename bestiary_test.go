@@ -151,7 +151,7 @@ var fixtures = []fixture{
 		ds: []depspec{
 			dsv("root 0.0.0"),
 		},
-		r: mkresults("root 0.0.0"),
+		r: mkresults(),
 	},
 	{
 		n: "simple dependency tree",
@@ -165,7 +165,6 @@ var fixtures = []fixture{
 			dsv("bb 1.0.0"),
 		},
 		r: mkresults(
-			"root 0.0.0",
 			"a 1.0.0",
 			"aa 1.0.0",
 			"ab 1.0.0",
@@ -187,7 +186,6 @@ var fixtures = []fixture{
 			dsv("shared 5.0.0"),
 		},
 		r: mkresults(
-			"root 0.0.0",
 			"a 1.0.0",
 			"b 1.0.0",
 			"shared 3.6.9",
@@ -207,7 +205,6 @@ var fixtures = []fixture{
 			dsv("zoop 1.0.0"),
 		},
 		r: mkresults(
-			"root 0.0.0",
 			"foo 1.0.1",
 			"bar 1.0.0",
 			"bang 1.0.0",
@@ -224,7 +221,6 @@ var fixtures = []fixture{
 			dsv("baz 1.0.0", "foo 2.0.0"),
 		},
 		r: mkresults(
-			"root 1.0.0",
 			"foo 1.0.0",
 			"bar 1.0.0",
 		),
@@ -246,7 +242,6 @@ var fixtures = []fixture{
 			"foo 1.0.1",
 		),
 		r: mkresults(
-			"root 0.0.0",
 			"foo 1.0.1",
 			"bar 1.0.1",
 		),
@@ -266,7 +261,6 @@ var fixtures = []fixture{
 			"foo 1.0.1",
 		),
 		r: mkresults(
-			"root 0.0.0",
 			"foo 1.0.2",
 			"bar 1.0.2",
 		),
@@ -287,7 +281,6 @@ var fixtures = []fixture{
 			"baz 1.0.0",
 		),
 		r: mkresults(
-			"root 0.0.0",
 			"foo 1.0.2",
 			"bar 1.0.2",
 		),
@@ -313,7 +306,6 @@ var fixtures = []fixture{
 			"qux 1.0.0",
 		),
 		r: mkresults(
-			"root 0.0.0",
 			"foo 2.0.0",
 			"bar 2.0.0",
 			"baz 2.0.0",
@@ -330,7 +322,6 @@ var fixtures = []fixture{
 			dsv("bar 1.0.0"),
 		},
 		r: mkresults(
-			"root 1.0.0",
 			"foo 1.0.0",
 			"bar 1.0.0",
 		),
@@ -343,7 +334,6 @@ var fixtures = []fixture{
 			dsv("bar 1.0.0"),
 		},
 		r: mkresults(
-			"root 1.0.0",
 			"foo 1.0.0",
 			"bar 1.0.0",
 		),
@@ -356,7 +346,6 @@ var fixtures = []fixture{
 			dsv("bar 1.0.0"),
 		},
 		r: mkresults(
-			"root 1.0.0",
 			"foo 1.0.0",
 		),
 	},
@@ -428,7 +417,6 @@ var fixtures = []fixture{
 			dsv("c 2.0.0"),
 		},
 		r: mkresults(
-			"root 0.0.0",
 			"a 2.0.0",
 			"b 1.0.0",
 			"c 2.0.0",
@@ -450,7 +438,6 @@ var fixtures = []fixture{
 			dsv("baz 1.0.0"),
 		},
 		r: mkresults(
-			"root 0.0.0",
 			"foo 1.0.0",
 			"bar 1.0.0",
 			"baz 1.0.0",
@@ -474,7 +461,6 @@ var fixtures = []fixture{
 			dsv("c 1.0.0"),
 		},
 		r: mkresults(
-			"root 0.0.0",
 			"a 1.0.0",
 			"b 3.0.0",
 			"c 1.0.0",
@@ -504,7 +490,6 @@ var fixtures = []fixture{
 			dsv("c 2.0.0"),
 		},
 		r: mkresults(
-			"root 0.0.0",
 			"a 4.0.0",
 			"b 4.0.0",
 			"c 2.0.0",
@@ -551,7 +536,6 @@ var fixtures = []fixture{
 			dsv("none 1.0.0"),
 		},
 		r: mkresults(
-			"root 0.0.0",
 			"a 1.0.0",
 			"foo 2.0.4",
 		),
@@ -572,7 +556,6 @@ func init() {
 			dsv("baz 0.0.0"),
 		},
 		r: mkresults(
-			"root 0.0.0",
 			"foo 0.9.0",
 			"bar 9.0.0",
 			"baz 0.0.0",

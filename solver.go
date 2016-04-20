@@ -130,7 +130,9 @@ func (s *solver) solve() ([]ProjectAtom, error) {
 
 	// Getting this far means we successfully found a solution
 	var projs []ProjectAtom
-	for _, p := range s.sel.projects {
+	// Skip the first project - it's always the root, and we don't want to
+	// include that in the results.
+	for _, p := range s.sel.projects[1:] {
 		projs = append(projs, p)
 	}
 	return projs, nil
