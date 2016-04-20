@@ -1,6 +1,7 @@
 package vsolver
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -16,28 +17,29 @@ func TestBasicSolves(t *testing.T) {
 
 func solveAndBasicChecks(fix fixture, t *testing.T) Result {
 	sm := newdepspecSM(fix.ds, !fix.downgrade)
-	l := logrus.New()
 
+	l := logrus.New()
 	if testing.Verbose() {
 		l.Level = logrus.DebugLevel
 	}
 
 	s := NewSolver(sm, l)
 
-	p, err := sm.GetProjectInfo(fix.ds[0].name)
+	o := SolveOpts{
+		Root: string(fix.ds[0].Name()),
+		N:    ProjectName(fix.ds[0].Name()),
+		M:    fix.ds[0],
+		L:    dummyLock{},
+	}
+
+	if fix.l != nil {
+		o.L = fix.l
+	}
+
+	result, err := s.Solve(o)
 	if err != nil {
-		t.Error("wtf, couldn't find root project")
-		t.FailNow()
+		t.Error("Unexpected solve error: %s", err)
 	}
-
-	var latest []ProjectName
-	if fix.l == nil {
-		p.Lock = dummyLock{}
-	} else {
-		p.Lock = fix.l
-	}
-
-	result := s.Solve(p, false, latest)
 
 	if fix.maxAttempts > 0 && result.Attempts > fix.maxAttempts {
 		t.Errorf("(fixture: %q) Solver completed in %v attempts, but expected %v or fewer", result.Attempts, fix.maxAttempts)
@@ -88,7 +90,7 @@ func solveAndBasicChecks(fix fixture, t *testing.T) Result {
 
 		default:
 			// TODO round these out
-			panic("unhandled solve failure type")
+			panic(fmt.Sprintf("unhandled solve failure type: %s", result.SolveFailure))
 		}
 	} else {
 		if result.SolveFailure != nil {
@@ -155,4 +157,40 @@ func getFailureCausingProjects(err error) (projs []string) {
 	}
 
 	return
+}
+
+func TestBadSolveOpts(t *testing.T) {
+	sm := newdepspecSM(fixtures[0].ds, true)
+
+	l := logrus.New()
+	if testing.Verbose() {
+		l.Level = logrus.DebugLevel
+	}
+
+	s := NewSolver(sm, l)
+
+	o := SolveOpts{}
+	_, err := s.Solve(o)
+	if err == nil {
+		t.Errorf("Should have errored on missing manifest")
+	}
+
+	p, _ := sm.GetProjectInfo(fixtures[0].ds[0].name)
+	o.M = p.Manifest
+	_, err = s.Solve(o)
+	if err == nil {
+		t.Errorf("Should have errored on empty root")
+	}
+
+	o.Root = "foo"
+	_, err = s.Solve(o)
+	if err == nil {
+		t.Errorf("Should have errored on empty name")
+	}
+
+	o.N = "bar"
+	_, err = s.Solve(o)
+	if err != nil {
+		t.Errorf("Basic conditions satisfied, solve should have gone through")
+	}
 }

@@ -16,6 +16,21 @@ var (
 	}
 )
 
+type Solver interface {
+	Solve(opts SolveOpts) (Result, error)
+}
+
+// SolveOpts holds both options that govern solving behavior, and the actual
+// inputs to the solving process.
+type SolveOpts struct {
+	Root      string
+	N         ProjectName
+	M         Manifest
+	L         Lock
+	ChangeAll bool
+	ToChange  []ProjectName
+}
+
 func NewSolver(sm SourceManager, l *logrus.Logger) Solver {
 	if l == nil {
 		l = logrus.New()
@@ -32,35 +47,52 @@ func NewSolver(sm SourceManager, l *logrus.Logger) Solver {
 // solver is a specialized backtracking SAT solver with satisfiability
 // conditions hardcoded to the needs of the Go package management problem space.
 type solver struct {
-	l         *logrus.Logger
-	sm        SourceManager
-	changeAll bool
-	latest    map[ProjectName]struct{}
-	sel       *selection
-	unsel     *unselected
-	versions  []*versionQueue
-	rp        ProjectInfo
-	rlm       map[ProjectName]LockedProject
-	attempts  int
+	l        *logrus.Logger
+	o        SolveOpts
+	sm       SourceManager
+	latest   map[ProjectName]struct{}
+	sel      *selection
+	unsel    *unselected
+	versions []*versionQueue
+	rlm      map[ProjectName]LockedProject
+	attempts int
 }
 
 // Solve takes a ProjectInfo describing the root project, and a list of
 // ProjectNames which should be allowed to change, typically for an upgrade (or
 // a flag indicating that all can change), and attempts to find a complete
 // solution that satisfies all constraints.
-func (s *solver) Solve(root ProjectInfo, changeAll bool, change []ProjectName) Result {
+func (s *solver) Solve(opts SolveOpts) (Result, error) {
 	// local overrides would need to be handled first.
 	// TODO local overrides! heh
-	s.rp = root
 
-	if root.Lock != nil {
-		for _, lp := range root.Lock.Projects() {
+	if opts.M == nil {
+		return Result{}, BadOptsFailure("Opts must include a manifest.")
+	}
+	if opts.Root == "" {
+		return Result{}, BadOptsFailure("Opts must specify a non-empty string for the project root directory.")
+	}
+	if opts.N == "" {
+		return Result{}, BadOptsFailure("Opts must include a project name.")
+	}
+
+	// TODO this check needs to go somewhere, but having the solver interact
+	// directly with the filesystem is icky
+	//if fi, err := os.Stat(opts.Root); err != nil {
+	//return Result{}, fmt.Errorf("Project root must exist.")
+	//} else if !fi.IsDir() {
+	//return Result{}, fmt.Errorf("Project root must be a directory.")
+	//}
+
+	s.o = opts
+
+	if s.o.L != nil {
+		for _, lp := range s.o.L.Projects() {
 			s.rlm[lp.n] = lp
 		}
 	}
 
-	s.changeAll = changeAll
-	for _, v := range change {
+	for _, v := range s.o.ToChange {
 		s.latest[v] = struct{}{}
 	}
 
@@ -74,12 +106,19 @@ func (s *solver) Solve(root ProjectInfo, changeAll bool, change []ProjectName) R
 	}
 
 	// Prime the queues with the root project
-	s.selectVersion(s.rp.pa)
+	s.selectVersion(ProjectAtom{
+		Name: s.o.N,
+		// This is a hack so that the root project doesn't have a nil version.
+		// It's sort of OK because the root never makes it out into the results.
+		// We may need a more elegant solution if we discover other side
+		// effects, though.
+		Version: Revision(""),
+	})
 
 	// Prep is done; actually run the solver
 	var r Result
 	r.Projects, r.SolveFailure = s.solve()
-	return r
+	return r, nil
 }
 
 func (s *solver) solve() ([]ProjectAtom, error) {
@@ -140,7 +179,7 @@ func (s *solver) solve() ([]ProjectAtom, error) {
 
 func (s *solver) createVersionQueue(ref ProjectName) (*versionQueue, error) {
 	// If on the root package, there's no queue to make
-	if ref == s.rp.Name() {
+	if ref == s.o.M.Name() {
 		return newVersionQueue(ref, nilpa, s.sm)
 	}
 
@@ -274,7 +313,7 @@ func (s *solver) findValidVersion(q *versionQueue) error {
 func (s *solver) getLockVersionIfValid(ref ProjectName) (ProjectAtom, error) {
 	// If the project is specifically marked for changes, then don't look for a
 	// locked version.
-	if _, explicit := s.latest[ref]; explicit || s.changeAll {
+	if _, explicit := s.latest[ref]; explicit || s.o.ChangeAll {
 		if exist, _ := s.sm.RepoExists(ref); exist {
 			return nilpa, nil
 		}
@@ -468,20 +507,22 @@ func (s *solver) satisfiable(pi ProjectAtom) error {
 // through any overrides dictated by the root project.
 //
 // If it's the root project, also includes dev dependencies, etc.
-func (s *solver) getDependenciesOf(pi ProjectAtom) ([]ProjectDep, error) {
-	info, err := s.sm.GetProjectInfo(pi)
-	if err != nil {
-		// TODO revisit this once a decision is made about better-formed errors;
-		// question is, do we expect the fetcher to pass back simple errors, or
-		// well-typed solver errors?
-		return nil, err
-	}
+func (s *solver) getDependenciesOf(pa ProjectAtom) ([]ProjectDep, error) {
+	var deps []ProjectDep
 
-	deps := info.GetDependencies()
-	if s.rp.Name() == pi.Name {
-		// Root package has more things to pull in
-		deps = append(deps, info.GetDevDependencies()...)
+	// If we're looking for root's deps, get it from opts rather than sm
+	if s.o.M.Name() == pa.Name {
+		deps = append(s.o.M.GetDependencies(), s.o.M.GetDevDependencies()...)
+	} else {
+		info, err := s.sm.GetProjectInfo(pa)
+		if err != nil {
+			// TODO revisit this once a decision is made about better-formed errors;
+			// question is, do we expect the fetcher to pass back simple errors, or
+			// well-typed solver errors?
+			return nil, err
+		}
 
+		deps = info.GetDependencies()
 		// TODO add overrides here...if we impl the concept (which we should)
 	}
 
@@ -610,7 +651,7 @@ func (s *solver) unselectedComparator(i, j int) bool {
 		return false
 	}
 
-	rname := s.rp.Name()
+	rname := s.o.M.Name()
 	// *always* put root project first
 	if iname == rname {
 		return true
@@ -663,7 +704,7 @@ func (s *solver) unselectedComparator(i, j int) bool {
 
 func (s *solver) fail(name ProjectName) {
 	// skip if the root project
-	if s.rp.Name() == name {
+	if s.o.M.Name() == name {
 		s.l.Debug("Not marking the root project as failed")
 		return
 	}

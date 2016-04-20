@@ -2,11 +2,6 @@ package vsolver
 
 type ProjectName string
 
-type Solver interface {
-	Solve(root ProjectInfo, changeAll bool, toUpgrade []ProjectName) Result
-	HashInputs(path string, m Manifest) []byte
-}
-
 type ProjectAtom struct {
 	Name    ProjectName
 	Version Version

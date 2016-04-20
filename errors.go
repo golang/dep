@@ -133,3 +133,9 @@ type missingSourceFailure struct {
 func (e *missingSourceFailure) Error() string {
 	return fmt.Sprintf(e.prob, e.goal)
 }
+
+type BadOptsFailure string
+
+func (e BadOptsFailure) Error() string {
+	return string(e)
+}
