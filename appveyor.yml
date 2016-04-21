@@ -1,0 +1,23 @@
+version: build-{build}.{branch}
+
+clone_folder: C:\gopath\src\github.com\sdboyer\vsolver
+shallow_clone: true
+
+environment:
+  GOPATH: C:\gopath
+
+platform:
+  - x64
+
+install:
+  - go version
+  - go env
+
+build_script:
+  - go get github.com/Masterminds/glide
+  - C:\gopath\bin\glide install
+
+test_script:
+  - go test -v
+
+deploy: off
