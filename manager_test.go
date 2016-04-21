@@ -64,12 +64,12 @@ func TestProjectManagerInit(t *testing.T) {
 	// Just to ensure it's all clean
 	os.RemoveAll(cpath)
 	sm, err := NewSourceManager(cpath, bd, true, false, dummyAnalyzer{})
-	defer sm.Release()
 
 	if err != nil {
 		t.Errorf("Unexpected error on SourceManager creation: %s", err)
 		t.FailNow()
 	}
+	defer sm.Release()
 
 	pn := ProjectName("github.com/Masterminds/VCSTestRepo")
 	v, err := sm.ListVersions(pn)
