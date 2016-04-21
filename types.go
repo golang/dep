@@ -167,11 +167,13 @@ type Lock interface {
 // that no hash, or other complex information, is available.
 type SimpleLock []LockedProject
 
+var _ Lock = SimpleLock{}
+
 // InputHash always returns an empty string for SimpleLock. This makes it useless
 // as a stable lock to be written to disk, but still useful for some ephemeral
 // purposes.
-func (SimpleLock) InputHash() string {
-	return ""
+func (SimpleLock) InputHash() []byte {
+	return nil
 }
 
 // Projects returns the entire contents of the SimpleLock.
@@ -187,6 +189,8 @@ type SimpleManifest struct {
 	P  []ProjectDep
 	DP []ProjectDep
 }
+
+var _ Manifest = SimpleManifest{}
 
 // Name returns the name of the project described by the manifest.
 func (m SimpleManifest) Name() ProjectName {
