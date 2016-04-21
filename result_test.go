@@ -1,14 +1,13 @@
 package vsolver
 
 import (
-	"fmt"
 	"go/build"
 	"os"
 	"path"
 	"testing"
 )
 
-var basicResult Result
+var basicResult result
 var kub ProjectAtom
 
 // An analyzer that passes nothing back, but doesn't error. This expressly
@@ -21,17 +20,17 @@ func (passthruAnalyzer) GetInfo(ctx build.Context, p ProjectName) (Manifest, Loc
 }
 
 func init() {
-	basicResult = Result{
-		Attempts: 1,
-		Projects: []ProjectAtom{
-			ProjectAtom{
+	basicResult = result{
+		att: 1,
+		p: []LockedProject{
+			pa2lp(ProjectAtom{
 				Name:    "github.com/sdboyer/testrepo",
 				Version: NewBranch("master").Is(Revision("4d59fb584b15a94d7401e356d2875c472d76ef45")),
-			},
-			ProjectAtom{
+			}),
+			pa2lp(ProjectAtom{
 				Name:    "github.com/Masterminds/VCSTestRepo",
 				Version: NewVersion("1.0.0").Is(Revision("30605f6ac35fcb075ad0bfa9296f90a7d891523e")),
-			},
+			}),
 		},
 	}
 
@@ -44,7 +43,6 @@ func init() {
 
 func TestResultCreateVendorTree(t *testing.T) {
 	r := basicResult
-	r.SolveFailure = fmt.Errorf("dummy error")
 
 	tmp := path.Join(os.TempDir(), "vsolvtest")
 	os.RemoveAll(tmp)
@@ -54,17 +52,7 @@ func TestResultCreateVendorTree(t *testing.T) {
 		t.Errorf("NewSourceManager errored unexpectedly: %q", err)
 	}
 
-	err = r.CreateVendorTree(path.Join(tmp, "export"), sm)
-	if err == fmt.Errorf("Cannot create vendor tree from failed solution. Failure was dummy error") {
-		if err == nil {
-			t.Errorf("Expected error due to result having solve failure, but no error")
-		} else {
-			t.Errorf("Expected error due to result having solve failure, but got %s", err)
-		}
-	}
-
-	r.SolveFailure = nil
-	err = r.CreateVendorTree(path.Join(tmp, "export"), sm)
+	err = CreateVendorTree(path.Join(tmp, "export"), r, sm)
 	if err != nil {
 		t.Errorf("Unexpected error while creating vendor tree: %s", err)
 	}
@@ -87,8 +75,8 @@ func BenchmarkCreateVendorTree(b *testing.B) {
 	}
 
 	// Prefetch the projects before timer starts
-	for _, pa := range r.Projects {
-		_, err := sm.GetProjectInfo(pa)
+	for _, lp := range r.p {
+		_, err := sm.GetProjectInfo(lp.toAtom())
 		if err != nil {
 			b.Errorf("failed getting project info during prefetch: %s", err)
 			clean = false
@@ -104,7 +92,7 @@ func BenchmarkCreateVendorTree(b *testing.B) {
 			// ease manual inspection
 			os.RemoveAll(exp)
 			b.StartTimer()
-			err = r.CreateVendorTree(exp, sm)
+			err = CreateVendorTree(exp, r, sm)
 			b.StopTimer()
 			if err != nil {
 				b.Errorf("unexpected error after %v iterations: %s", i, err)

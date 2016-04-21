@@ -107,15 +107,21 @@ func (lp LockedProject) Path() string {
 	return lp.path
 }
 
-// TODO undecided on whether having a struct lke this is good/helpful
-// PI (Project Info) holds the two key pieces of information that an analyzer
-// can produce about a project: a Manifest, describing its intended dependencies
-// and certain governing configuration
-//type PI struct {
-//Manifest
-//Lock
-////Extra interface{} // TODO allow analyzers to tuck data away if they want
-//}
+func (lp LockedProject) toAtom() ProjectAtom {
+	pa := ProjectAtom{
+		Name: lp.n,
+	}
+
+	if lp.v == nil {
+		pa.Version = lp.r
+	} else if lp.r != "" {
+		pa.Version = lp.v.Is(lp.r)
+	} else {
+		pa.Version = lp.v
+	}
+
+	return pa
+}
 
 // Manifest represents the data from a manifest file (or however the
 // implementing tool chooses to store it) at a particular version that is
@@ -151,7 +157,7 @@ type Lock interface {
 	//SolverVersion() string
 
 	// The hash of inputs to vsolver that resulted in this lock data
-	InputHash() string
+	InputHash() []byte
 
 	// Projects returns the list of LockedProjects contained in the lock data.
 	Projects() []LockedProject

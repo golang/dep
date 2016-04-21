@@ -15,7 +15,7 @@ func TestBasicSolves(t *testing.T) {
 	}
 }
 
-func solveAndBasicChecks(fix fixture, t *testing.T) Result {
+func solveAndBasicChecks(fix fixture, t *testing.T) (res Result, err error) {
 	sm := newdepspecSM(fix.ds, !fix.downgrade)
 
 	l := logrus.New()
@@ -36,21 +36,15 @@ func solveAndBasicChecks(fix fixture, t *testing.T) Result {
 		o.L = fix.l
 	}
 
-	result, err := s.Solve(o)
+	res, err = s.Solve(o)
 	if err != nil {
-		t.Error("Unexpected solve error: %s", err)
-	}
-
-	if fix.maxAttempts > 0 && result.Attempts > fix.maxAttempts {
-		t.Errorf("(fixture: %q) Solver completed in %v attempts, but expected %v or fewer", result.Attempts, fix.maxAttempts)
-	}
-
-	if len(fix.errp) > 0 {
-		if result.SolveFailure == nil {
-			t.Errorf("(fixture: %q) Solver succeeded, but expected failure")
+		if len(fix.errp) == 0 {
+			t.Errorf("(fixture: %q) Solver failed; error was type %T, text: %q", fix.n, err, err)
 		}
 
-		switch fail := result.SolveFailure.(type) {
+		switch fail := err.(type) {
+		case *BadOptsFailure:
+			t.Error("Unexpected bad opts failure solve error: %s", err)
 		case *noVersionError:
 			if fix.errp[0] != string(fail.pn) {
 				t.Errorf("Expected failure on project %s, but was on project %s", fail.pn, fix.errp[0])
@@ -90,18 +84,21 @@ func solveAndBasicChecks(fix fixture, t *testing.T) Result {
 
 		default:
 			// TODO round these out
-			panic(fmt.Sprintf("unhandled solve failure type: %s", result.SolveFailure))
+			panic(fmt.Sprintf("unhandled solve failure type: %s", err))
 		}
+	} else if len(fix.errp) > 0 {
+		t.Errorf("(fixture: %q) Solver succeeded, but expected failure")
 	} else {
-		if result.SolveFailure != nil {
-			t.Errorf("(fixture: %q) Solver failed; error was type %T, text: %q", fix.n, result.SolveFailure, result.SolveFailure)
-			return result
+		r := res.(result)
+		if fix.maxAttempts > 0 && r.att > fix.maxAttempts {
+			t.Errorf("(fixture: %q) Solver completed in %v attempts, but expected %v or fewer", r.att, fix.maxAttempts)
 		}
 
 		// Dump result projects into a map for easier interrogation
 		rp := make(map[string]string)
-		for _, p := range result.Projects {
-			rp[string(p.Name)] = p.Version.String()
+		for _, p := range r.p {
+			pa := p.toAtom()
+			rp[string(pa.Name)] = pa.Version.String()
 		}
 
 		fixlen, rlen := len(fix.r), len(rp)
@@ -134,7 +131,7 @@ func solveAndBasicChecks(fix fixture, t *testing.T) Result {
 		}
 	}
 
-	return result
+	return
 }
 
 func getFailureCausingProjects(err error) (projs []string) {
@@ -188,7 +185,7 @@ func TestBadSolveOpts(t *testing.T) {
 		t.Errorf("Should have errored on empty name")
 	}
 
-	o.N = "bar"
+	o.N = "root"
 	_, err = s.Solve(o)
 	if err != nil {
 		t.Errorf("Basic conditions satisfied, solve should have gone through")

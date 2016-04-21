@@ -669,8 +669,8 @@ func (fixLock) SolverVersion() string {
 }
 
 // impl Lock interface
-func (fixLock) InputHash() string {
-	return "fooooorooooofooorooofoo"
+func (fixLock) InputHash() []byte {
+	return []byte("fooooorooooofooorooofoo")
 }
 
 // impl Lock interface
@@ -686,8 +686,8 @@ func (_ dummyLock) SolverVersion() string {
 }
 
 // impl Lock interface
-func (_ dummyLock) InputHash() string {
-	return "fooooorooooofooorooofoo"
+func (_ dummyLock) InputHash() []byte {
+	return []byte("fooooorooooofooorooofoo")
 }
 
 // impl Lock interface

@@ -67,13 +67,13 @@ func (s *solver) Solve(opts SolveOpts) (Result, error) {
 	// TODO local overrides! heh
 
 	if opts.M == nil {
-		return Result{}, BadOptsFailure("Opts must include a manifest.")
+		return result{}, BadOptsFailure("Opts must include a manifest.")
 	}
 	if opts.Root == "" {
-		return Result{}, BadOptsFailure("Opts must specify a non-empty string for the project root directory.")
+		return result{}, BadOptsFailure("Opts must specify a non-empty string for the project root directory.")
 	}
 	if opts.N == "" {
-		return Result{}, BadOptsFailure("Opts must include a project name.")
+		return result{}, BadOptsFailure("Opts must include a project name.")
 	}
 
 	// TODO this check needs to go somewhere, but having the solver interact
@@ -116,8 +116,25 @@ func (s *solver) Solve(opts SolveOpts) (Result, error) {
 	})
 
 	// Prep is done; actually run the solver
-	var r Result
-	r.Projects, r.SolveFailure = s.solve()
+	pa, err := s.solve()
+
+	// Solver finished with an err; return that and we're done
+	if err != nil {
+		return nil, err
+	}
+
+	// Solved successfully, create and return a result
+	r := result{
+		att: s.attempts,
+		hd:  opts.HashInputs(),
+	}
+
+	// Convert ProjectAtoms into LockedProjects
+	r.p = make([]LockedProject, len(pa))
+	for k, p := range pa {
+		r.p[k] = pa2lp(p)
+	}
+
 	return r, nil
 }
 
@@ -728,7 +745,7 @@ func (s *solver) selectVersion(pa ProjectAtom) {
 		// if we're choosing a package that has errors getting its deps, there's
 		// a bigger problem
 		// TODO try to create a test that hits this
-		panic("shouldn't be possible")
+		panic(fmt.Sprintf("shouldn't be possible %s", err))
 	}
 
 	for _, dep := range deps {
@@ -773,4 +790,29 @@ func (s *solver) unselectLast() {
 			s.unsel.remove(dep.Name)
 		}
 	}
+}
+
+// simple (temporary?) helper just to convert atoms into locked projects
+func pa2lp(pa ProjectAtom) LockedProject {
+	// TODO will need to revisit this once we flesh out the relationship between
+	// names, uris, etc.
+	lp := LockedProject{
+		n:    pa.Name,
+		path: string(pa.Name),
+		uri:  string(pa.Name),
+	}
+
+	switch v := pa.Version.(type) {
+	case UnpairedVersion:
+		lp.v = v
+	case Revision:
+		lp.r = v
+	case versionPair:
+		lp.v = v.v
+		lp.r = v.r
+	default:
+		panic("unreachable")
+	}
+
+	return lp
 }
