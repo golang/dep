@@ -45,9 +45,9 @@ func (e *noVersionError) Error() string {
 	}
 
 	var buf bytes.Buffer
-	fmt.Fprintf(&buf, "Could not find any versions of %s that met constraints:\n", e.pn)
+	fmt.Fprintf(&buf, "Could not find any versions of %s that met constraints:", e.pn)
 	for _, f := range e.fails {
-		fmt.Fprintf(&buf, "\t%s: %s", f.v, f.f.Error())
+		fmt.Fprintf(&buf, "\n\t%s: %s", f.v, f.f.Error())
 	}
 
 	return buf.String()
