@@ -8,6 +8,8 @@ import (
 	"github.com/Sirupsen/logrus"
 )
 
+// TODO regression test ensuring that locks with only revs for projects don't cause errors
+
 func TestBasicSolves(t *testing.T) {
 	//solveAndBasicChecks(fixtures[5], t)
 	for _, fix := range fixtures {

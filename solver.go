@@ -363,7 +363,7 @@ func (s *solver) getLockVersionIfValid(ref ProjectName) (ProjectAtom, error) {
 		if s.l.Level >= logrus.InfoLevel {
 			s.l.WithFields(logrus.Fields{
 				"name":    ref,
-				"version": lp.v,
+				"version": lp.Version(),
 			}).Info("Project found in lock, but version not allowed by current constraints")
 		}
 		return nilpa, nil
@@ -372,13 +372,13 @@ func (s *solver) getLockVersionIfValid(ref ProjectName) (ProjectAtom, error) {
 	if s.l.Level >= logrus.InfoLevel {
 		s.l.WithFields(logrus.Fields{
 			"name":    ref,
-			"version": lp.v,
+			"version": lp.Version(),
 		}).Info("Project found in lock")
 	}
 
 	return ProjectAtom{
 		Name:    lp.n,
-		Version: lp.v,
+		Version: lp.Version(),
 	}, nil
 }
 
