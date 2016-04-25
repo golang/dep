@@ -14,7 +14,20 @@ func gu(v Constraint) string {
 func TestBranchConstraintOps(t *testing.T) {
 	v1 := NewBranch("master").(branchVersion)
 	v2 := NewBranch("test").(branchVersion)
-	none := none
+
+	if !v1.MatchesAny(any) {
+		t.Errorf("Branches should always match the any constraint")
+	}
+	if v1.Intersect(any) != v1 {
+		t.Errorf("Branches should always return self when intersecting the any constraint, but got %s", v1.Intersect(any))
+	}
+
+	if v1.MatchesAny(none) {
+		t.Errorf("Branches should never match the none constraint")
+	}
+	if v1.Intersect(none) != none {
+		t.Errorf("Branches should always return none when intersecting the none constraint, but got %s", v1.Intersect(none))
+	}
 
 	if v1.Matches(v2) {
 		t.Errorf("%s should not match %s", v1, v2)
@@ -185,7 +198,20 @@ func TestBranchConstraintOps(t *testing.T) {
 func TestVersionConstraintOps(t *testing.T) {
 	v1 := NewVersion("ab123").(plainVersion)
 	v2 := NewVersion("b2a13").(plainVersion)
-	none := none
+
+	if !v1.MatchesAny(any) {
+		t.Errorf("Versions should always match the any constraint")
+	}
+	if v1.Intersect(any) != v1 {
+		t.Errorf("Versions should always return self when intersecting the any constraint, but got %s", v1.Intersect(any))
+	}
+
+	if v1.MatchesAny(none) {
+		t.Errorf("Versions should never match the none constraint")
+	}
+	if v1.Intersect(none) != none {
+		t.Errorf("Versions should always return none when intersecting the none constraint, but got %s", v1.Intersect(none))
+	}
 
 	if v1.Matches(v2) {
 		t.Errorf("%s should not match %s", v1, v2)
@@ -353,7 +379,20 @@ func TestVersionConstraintOps(t *testing.T) {
 func TestSemverVersionConstraintOps(t *testing.T) {
 	v1 := NewVersion("1.0.0").(semVersion)
 	v2 := NewVersion("2.0.0").(semVersion)
-	none := none
+
+	if !v1.MatchesAny(any) {
+		t.Errorf("Semvers should always match the any constraint")
+	}
+	if v1.Intersect(any) != v1 {
+		t.Errorf("Semvers should always return self when intersecting the any constraint, but got %s", v1.Intersect(any))
+	}
+
+	if v1.MatchesAny(none) {
+		t.Errorf("Semvers should never match the none constraint")
+	}
+	if v1.Intersect(none) != none {
+		t.Errorf("Semvers should always return none when intersecting the none constraint, but got %s", v1.Intersect(none))
+	}
 
 	if v1.Matches(v2) {
 		t.Errorf("%s should not match %s", v1, v2)
@@ -529,7 +568,29 @@ func TestSemverConstraintOps(t *testing.T) {
 	v5 := v2.Is(fozzie).(versionPair)
 	v6 := v3.Is(fozzie).(versionPair)
 
-	c1, err := NewConstraint(">= 1.0.0", SemverConstraint)
+	// TODO we can't use the same range as below b/c semver.rangeConstraint is
+	// still an incomparable type
+	c1, err := NewConstraint("=1.0.0", SemverConstraint)
+	if err != nil {
+		t.Errorf("Failed to create constraint: %s", err)
+		t.FailNow()
+	}
+
+	if !c1.MatchesAny(any) {
+		t.Errorf("Semver constraints should always match the any constraint")
+	}
+	if c1.Intersect(any) != c1 {
+		t.Errorf("Semver constraints should always return self when intersecting the any constraint, but got %s", c1.Intersect(any))
+	}
+
+	if c1.MatchesAny(none) {
+		t.Errorf("Semver constraints should never match the none constraint")
+	}
+	if c1.Intersect(none) != none {
+		t.Errorf("Semver constraints should always return none when intersecting the none constraint, but got %s", c1.Intersect(none))
+	}
+
+	c1, err = NewConstraint(">= 1.0.0", SemverConstraint)
 	if err != nil {
 		t.Errorf("Failed to create constraint: %s", err)
 		t.FailNow()

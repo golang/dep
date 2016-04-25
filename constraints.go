@@ -84,6 +84,8 @@ func (c semverConstraint) MatchesAny(c2 Constraint) bool {
 
 func (c semverConstraint) Intersect(c2 Constraint) Constraint {
 	switch tc := c2.(type) {
+	case anyConstraint:
+		return c
 	case semverConstraint:
 		rc := c.c.Intersect(tc.c)
 		if !semver.IsNone(rc) {

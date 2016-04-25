@@ -101,6 +101,10 @@ func (r Revision) Matches(v Version) bool {
 // version is the same Revision as itself.
 func (r Revision) MatchesAny(c Constraint) bool {
 	switch tc := c.(type) {
+	case anyConstraint:
+		return true
+	case noneConstraint:
+		return false
 	case Revision:
 		return r == tc
 	case versionPair:
@@ -112,6 +116,10 @@ func (r Revision) MatchesAny(c Constraint) bool {
 
 func (r Revision) Intersect(c Constraint) Constraint {
 	switch tc := c.(type) {
+	case anyConstraint:
+		return r
+	case noneConstraint:
+		return none
 	case Revision:
 		if r == tc {
 			return r
@@ -149,6 +157,10 @@ func (v branchVersion) Matches(v2 Version) bool {
 
 func (v branchVersion) MatchesAny(c Constraint) bool {
 	switch tc := c.(type) {
+	case anyConstraint:
+		return true
+	case noneConstraint:
+		return false
 	case branchVersion:
 		return v == tc
 	case versionPair:
@@ -162,6 +174,10 @@ func (v branchVersion) MatchesAny(c Constraint) bool {
 
 func (v branchVersion) Intersect(c Constraint) Constraint {
 	switch tc := c.(type) {
+	case anyConstraint:
+		return v
+	case noneConstraint:
+		return none
 	case branchVersion:
 		if v == tc {
 			return v
@@ -208,6 +224,10 @@ func (v plainVersion) Matches(v2 Version) bool {
 
 func (v plainVersion) MatchesAny(c Constraint) bool {
 	switch tc := c.(type) {
+	case anyConstraint:
+		return true
+	case noneConstraint:
+		return false
 	case plainVersion:
 		return v == tc
 	case versionPair:
@@ -221,6 +241,10 @@ func (v plainVersion) MatchesAny(c Constraint) bool {
 
 func (v plainVersion) Intersect(c Constraint) Constraint {
 	switch tc := c.(type) {
+	case anyConstraint:
+		return v
+	case noneConstraint:
+		return none
 	case plainVersion:
 		if v == tc {
 			return v
@@ -269,6 +293,10 @@ func (v semVersion) Matches(v2 Version) bool {
 
 func (v semVersion) MatchesAny(c Constraint) bool {
 	switch tc := c.(type) {
+	case anyConstraint:
+		return true
+	case noneConstraint:
+		return false
 	case semVersion:
 		return v.sv.Equal(tc.sv)
 	case versionPair:
@@ -282,6 +310,10 @@ func (v semVersion) MatchesAny(c Constraint) bool {
 
 func (v semVersion) Intersect(c Constraint) Constraint {
 	switch tc := c.(type) {
+	case anyConstraint:
+		return v
+	case noneConstraint:
+		return none
 	case semVersion:
 		if v.sv.Equal(tc.sv) {
 			return v
@@ -355,6 +387,10 @@ func (v versionPair) MatchesAny(c2 Constraint) bool {
 
 func (v versionPair) Intersect(c2 Constraint) Constraint {
 	switch tv2 := c2.(type) {
+	case anyConstraint:
+		return v
+	case noneConstraint:
+		return none
 	case versionPair:
 		if v.r == tv2.r {
 			return v.r
