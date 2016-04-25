@@ -96,13 +96,26 @@ func (pm *projectManager) GetInfoAt(v Version) (ProjectInfo, error) {
 		}
 	}
 
+	var err error
+	if !pm.cvsync {
+		err = pm.crepo.r.Update()
+		if err != nil {
+			return ProjectInfo{}, fmt.Errorf("Could not fetch latest updates into repository")
+		}
+		pm.cvsync = true
+	}
+
 	pm.crepo.mut.Lock()
-	err := pm.crepo.r.UpdateVersion(v.String())
+	// Always prefer a rev, if it's available
+	if pv, ok := v.(PairedVersion); ok {
+		err = pm.crepo.r.UpdateVersion(pv.Underlying().String())
+	} else {
+		err = pm.crepo.r.UpdateVersion(v.String())
+	}
 	pm.crepo.mut.Unlock()
 	if err != nil {
 		// TODO More-er proper-er error
-		fmt.Println(err)
-		panic("canary - why is checkout/whatever failing")
+		panic(fmt.Sprintf("canary - why is checkout/whatever failing: %s", err))
 	}
 
 	pm.crepo.mut.RLock()
