@@ -2,10 +2,15 @@ package: github.com/sdboyer/vsolver
 import:
 - package: github.com/Masterminds/semver
   version: 2.x
+  vtype: branch
   vcs: git
 - package: github.com/Sirupsen/logrus
   version: 0.10.0
+  vtype: semver
+  vcs: git
 - package: github.com/Masterminds/vcs
   vcs: git
 - package: github.com/termie/go-shutil
+  vcs: git
   version: bcacb06fecaeec8dc42af03c87c6949f4a05c74c
+  vtype: revision
