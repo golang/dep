@@ -279,6 +279,7 @@ func (s *solver) findValidVersion(q *versionQueue) error {
 			"name":      q.ref,
 			"hasLock":   q.hasLock,
 			"allLoaded": q.allLoaded,
+			"queue":     q,
 		}).Debug("Beginning search through versionQueue for a valid version")
 	}
 	for {

@@ -11,7 +11,7 @@ import (
 // TODO regression test ensuring that locks with only revs for projects don't cause errors
 
 func TestBasicSolves(t *testing.T) {
-	//solveAndBasicChecks(fixtures[5], t)
+	//solveAndBasicChecks(fixtures[8], t)
 	for _, fix := range fixtures {
 		solveAndBasicChecks(fix, t)
 	}
@@ -93,14 +93,14 @@ func solveAndBasicChecks(fix fixture, t *testing.T) (res Result, err error) {
 	} else {
 		r := res.(result)
 		if fix.maxAttempts > 0 && r.att > fix.maxAttempts {
-			t.Errorf("(fixture: %q) Solver completed in %v attempts, but expected %v or fewer", r.att, fix.maxAttempts)
+			t.Errorf("(fixture: %q) Solver completed in %v attempts, but expected %v or fewer", fix.n, r.att, fix.maxAttempts)
 		}
 
 		// Dump result projects into a map for easier interrogation
-		rp := make(map[string]string)
+		rp := make(map[string]Version)
 		for _, p := range r.p {
 			pa := p.toAtom()
-			rp[string(pa.Name)] = pa.Version.String()
+			rp[string(pa.Name)] = pa.Version
 		}
 
 		fixlen, rlen := len(fix.r), len(rp)

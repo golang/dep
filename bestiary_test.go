@@ -23,22 +23,49 @@ func nsvSplit(info string) (name string, version string) {
 	return
 }
 
+// nsvrSplit splits an "info" string on " " into the triplet of name,
+// version/constraint, and revision, and returns each individually.
+//
+// It will work fine if only name and version/constraint are provided.
+//
+// This is for narrow use - panics if there are less than two resulting items in
+// the slice.
+func nsvrSplit(info string) (name, version string, revision Revision) {
+	s := strings.SplitN(info, " ", 3)
+	if len(s) < 2 {
+		panic(fmt.Sprintf("Malformed name/version info string '%s'", info))
+	}
+
+	name, version = s[0], s[1]
+	if len(s) == 3 {
+		revision = Revision(s[2])
+	}
+
+	return
+}
+
 // mksvpa - "make semver project atom"
 //
 // Splits the input string on a space, and uses the first two elements as the
 // project name and constraint body, respectively.
 func mksvpa(info string) ProjectAtom {
-	name, v := nsvSplit(info)
+	name, ver, rev := nsvrSplit(info)
 
-	_, err := semver.NewVersion(v)
+	_, err := semver.NewVersion(ver)
 	if err != nil {
 		// don't want to allow bad test data at this level, so just panic
-		panic(fmt.Sprintf("Error when converting '%s' into semver: %s", v, err))
+		panic(fmt.Sprintf("Error when converting '%s' into semver: %s", ver, err))
+	}
+
+	var v Version
+	v = NewVersion(ver)
+	if rev != "" {
+		v = v.(UnpairedVersion).Is(rev)
 	}
 
 	return ProjectAtom{
 		Name:    ProjectName(name),
-		Version: NewVersion(v),
+		Version: v,
 	}
 }
 
@@ -103,7 +130,7 @@ type fixture struct {
 	// depspecs. always treat first as root
 	ds []depspec
 	// results; map of name/version pairs
-	r map[string]string
+	r map[string]Version
 	// max attempts the solver should need to find solution. 0 means no limit
 	maxAttempts int
 	// Use downgrade instead of default upgrade sorter
@@ -119,25 +146,24 @@ func mklock(pairs ...string) fixLock {
 	l := make(fixLock, 0)
 	for _, s := range pairs {
 		pa := mksvpa(s)
-
-		var v PairedVersion
-		if pv, ok := pa.Version.(PairedVersion); ok {
-			v = pv
-		} else {
-			v = pa.Version.(UnpairedVersion).Is(Revision("haberdasher"))
-		}
-
-		l = append(l, NewLockedProject(pa.Name, v, "", ""))
+		l = append(l, NewLockedProject(pa.Name, pa.Version, "", ""))
 	}
 
 	return l
 }
 
 // mkresults makes a result set
-func mkresults(pairs ...string) map[string]string {
-	m := make(map[string]string)
+func mkresults(pairs ...string) map[string]Version {
+	m := make(map[string]Version)
 	for _, pair := range pairs {
-		name, v := nsvSplit(pair)
+		name, ver, rev := nsvrSplit(pair)
+
+		var v Version
+		v = NewVersion(ver)
+		if rev != "" {
+			v = v.(UnpairedVersion).Is(rev)
+		}
+
 		m[name] = v
 	}
 
@@ -275,10 +301,10 @@ var fixtures = []fixture{
 			dsv("bar 1.0.0"),
 			dsv("bar 1.0.1"),
 			dsv("bar 1.0.2"),
-			dsv("baz 1.0.0"),
+			dsv("baz 1.0.0 bazrev"),
 		},
 		l: mklock(
-			"baz 1.0.0",
+			"baz 1.0.0 bazrev",
 		),
 		r: mkresults(
 			"foo 1.0.2",
@@ -289,10 +315,10 @@ var fixtures = []fixture{
 		n: "unlocks dependencies if necessary to ensure that a new dependency is satisfied",
 		ds: []depspec{
 			dsv("root 0.0.0", "foo *", "newdep *"),
-			dsv("foo 1.0.0", "bar <2.0.0"),
-			dsv("bar 1.0.0", "baz <2.0.0"),
-			dsv("baz 1.0.0", "qux <2.0.0"),
-			dsv("qux 1.0.0"),
+			dsv("foo 1.0.0 foorev", "bar <2.0.0"),
+			dsv("bar 1.0.0 barrev", "baz <2.0.0"),
+			dsv("baz 1.0.0 bazrev", "qux <2.0.0"),
+			dsv("qux 1.0.0 quxrev"),
 			dsv("foo 2.0.0", "bar <3.0.0"),
 			dsv("bar 2.0.0", "baz <3.0.0"),
 			dsv("baz 2.0.0", "qux <3.0.0"),
@@ -300,16 +326,16 @@ var fixtures = []fixture{
 			dsv("newdep 2.0.0", "baz >=1.5.0"),
 		},
 		l: mklock(
-			"foo 1.0.0",
-			"bar 1.0.0",
-			"baz 1.0.0",
-			"qux 1.0.0",
+			"foo 1.0.0 foorev",
+			"bar 1.0.0 barrev",
+			"baz 1.0.0 bazrev",
+			"qux 1.0.0 quxrev",
 		),
 		r: mkresults(
 			"foo 2.0.0",
 			"bar 2.0.0",
 			"baz 2.0.0",
-			"qux 1.0.0",
+			"qux 1.0.0 quxrev",
 			"newdep 2.0.0",
 		),
 		maxAttempts: 4,
