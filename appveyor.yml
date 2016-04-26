@@ -18,6 +18,6 @@ build_script:
   - C:\gopath\bin\glide install
 
 test_script:
-  - go test -v
+  - go test
 
 deploy: off
