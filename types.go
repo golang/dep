@@ -1,16 +1,21 @@
 package vsolver
 
+type ProjectIdentifier struct {
+	Name       ProjectName
+	NetworkURI string
+}
+
 type ProjectName string
 
 type ProjectAtom struct {
-	Name    ProjectName
+	Name    ProjectName // TODO to ProjectIdentifier
 	Version Version
 }
 
 var emptyProjectAtom ProjectAtom
 
 type ProjectDep struct {
-	Name       ProjectName
+	Name       ProjectName // TODO to ProjectIdentifier
 	Constraint Constraint
 }
 
