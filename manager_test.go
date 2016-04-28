@@ -112,7 +112,7 @@ func TestProjectManagerInit(t *testing.T) {
 		vlists: make(map[ProjectName][]Version),
 	}
 
-	v, err = smc.listVersions(pn)
+	v, err = smc.listVersions(ProjectIdentifier{LocalName: pn})
 	if err != nil {
 		t.Errorf("Unexpected error during initial project setup/fetching %s", err)
 	}

@@ -30,12 +30,23 @@ func (c *smAdapter) getProjectInfo(pa ProjectAtom) (ProjectInfo, error) {
 	return c.sm.GetProjectInfo(pa)
 }
 
-func (c *smAdapter) listVersions(n ProjectName) ([]Version, error) {
-	if vl, exists := c.vlists[n]; exists {
+func (c *smAdapter) key(id ProjectIdentifier) ProjectName {
+	k := ProjectName(id.NetworkName)
+	if k == "" {
+		k = id.LocalName
+	}
+
+	return k
+}
+
+func (c *smAdapter) listVersions(id ProjectIdentifier) ([]Version, error) {
+	k := c.key(id)
+
+	if vl, exists := c.vlists[k]; exists {
 		return vl, nil
 	}
 
-	vl, err := c.sm.ListVersions(n)
+	vl, err := c.sm.ListVersions(k)
 	// TODO cache errors, too?
 	if err != nil {
 		return nil, err
@@ -47,16 +58,18 @@ func (c *smAdapter) listVersions(n ProjectName) ([]Version, error) {
 		sort.Sort(upgradeVersionSorter(vl))
 	}
 
-	c.vlists[n] = vl
+	c.vlists[k] = vl
 	return vl, nil
 }
 
-func (c *smAdapter) repoExists(n ProjectName) (bool, error) {
-	return c.sm.RepoExists(n)
+func (c *smAdapter) repoExists(id ProjectIdentifier) (bool, error) {
+	k := c.key(id)
+	return c.sm.RepoExists(k)
 }
 
-func (c *smAdapter) vendorCodeExists(n ProjectName) (bool, error) {
-	return c.sm.VendorCodeExists(n)
+func (c *smAdapter) vendorCodeExists(id ProjectIdentifier) (bool, error) {
+	k := c.key(id)
+	return c.sm.VendorCodeExists(k)
 }
 
 type upgradeVersionSorter []Version

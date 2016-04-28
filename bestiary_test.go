@@ -87,7 +87,8 @@ func mksvd(info string) ProjectDep {
 	name, v := nsvSplit(info)
 
 	return ProjectDep{
-		Name:       ProjectName(name),
+		// TODO allow 'from' syntax
+		Ident:      ProjectIdentifier{LocalName: ProjectName(name)},
 		Constraint: mkc(v, SemverConstraint),
 	}
 }
@@ -113,11 +114,17 @@ func dsv(pi string, deps ...string) depspec {
 	}
 
 	for _, dep := range deps {
+		var sl *[]ProjectDep
 		if strings.HasPrefix(dep, "(dev) ") {
-			ds.devdeps = append(ds.devdeps, mksvd(strings.TrimPrefix(dep, "(dev) ")))
+			dep = strings.TrimPrefix(dep, "(dev) ")
+			sl = &ds.devdeps
 		} else {
-			ds.deps = append(ds.deps, mksvd(dep))
+			sl = &ds.deps
 		}
+		//if strings.Contains(dep, " from ") {
+		//}
+
+		*sl = append(*sl, mksvd(dep))
 	}
 
 	return ds

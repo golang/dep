@@ -52,8 +52,8 @@ func solveAndBasicChecks(fix fixture, t *testing.T) (res Result, err error) {
 		case *BadOptsFailure:
 			t.Error("Unexpected bad opts failure solve error: %s", err)
 		case *noVersionError:
-			if fix.errp[0] != string(fail.pn) {
-				t.Errorf("Expected failure on project %s, but was on project %s", fail.pn, fix.errp[0])
+			if fix.errp[0] != string(fail.pn.LocalName) { // TODO identifierify
+				t.Errorf("Expected failure on project %s, but was on project %s", fail.pn.LocalName, fix.errp[0])
 			}
 
 			ep := make(map[string]struct{})
@@ -143,7 +143,7 @@ func solveAndBasicChecks(fix fixture, t *testing.T) (res Result, err error) {
 func getFailureCausingProjects(err error) (projs []string) {
 	switch e := err.(type) {
 	case *noVersionError:
-		projs = append(projs, string(e.pn))
+		projs = append(projs, string(e.pn.LocalName)) // TODO identifierify
 	case *disjointConstraintFailure:
 		for _, f := range e.failsib {
 			projs = append(projs, string(f.Depender.Name))

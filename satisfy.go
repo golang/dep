@@ -94,7 +94,7 @@ func (s *solver) checkAtomAllowable(pa ProjectAtom) error {
 // checkDepsConstraintsAllowable checks that the constraints of an atom on a
 // given dep would not result in UNSAT.
 func (s *solver) checkDepsConstraintsAllowable(pa ProjectAtom, dep ProjectDep) error {
-	constraint := s.sel.getConstraint(dep.Name)
+	constraint := s.sel.getConstraint(dep.Ident)
 	// Ensure the constraint expressed by the dep has at least some possible
 	// intersection with the intersection of existing constraints.
 	if constraint.MatchesAny(dep.Constraint) {
@@ -105,13 +105,13 @@ func (s *solver) checkDepsConstraintsAllowable(pa ProjectAtom, dep ProjectDep) e
 		s.l.WithFields(logrus.Fields{
 			"name":          pa.Name,
 			"version":       pa.Version,
-			"depname":       dep.Name,
+			"depname":       dep.Ident,
 			"curconstraint": constraint.String(),
 			"newconstraint": dep.Constraint.String(),
 		}).Debug("Project atom cannot be added; its constraints are disjoint with existing constraints")
 	}
 
-	siblings := s.sel.getDependenciesOn(dep.Name)
+	siblings := s.sel.getDependenciesOn(dep.Ident)
 	// No admissible versions - visit all siblings and identify the disagreement(s)
 	var failsib []Dependency
 	var nofailsib []Dependency
@@ -145,18 +145,18 @@ func (s *solver) checkDepsConstraintsAllowable(pa ProjectAtom, dep ProjectDep) e
 // dep are not incompatible with the version of that dep that's already been
 // selected.
 func (s *solver) checkDepsDisallowsSelected(pa ProjectAtom, dep ProjectDep) error {
-	selected, exists := s.sel.selected(dep.Name)
+	selected, exists := s.sel.selected(dep.Ident)
 	if exists && !dep.Constraint.Matches(selected.Version) {
 		if s.l.Level >= logrus.DebugLevel {
 			s.l.WithFields(logrus.Fields{
 				"name":          pa.Name,
 				"version":       pa.Version,
-				"depname":       dep.Name,
+				"depname":       dep.Ident,
 				"curversion":    selected.Version,
 				"newconstraint": dep.Constraint.String(),
 			}).Debug("Project atom cannot be added; a constraint it introduces does not allow a currently selected version")
 		}
-		s.fail(dep.Name)
+		s.fail(dep.Ident.LocalName)
 
 		return &constraintNotAllowedFailure{
 			goal: Dependency{Depender: pa, Dep: dep},
