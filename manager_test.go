@@ -6,6 +6,7 @@ import (
 	"os"
 	"path"
 	"runtime"
+	"sort"
 	"testing"
 
 	"github.com/Masterminds/semver"
@@ -87,12 +88,20 @@ func TestProjectManagerInit(t *testing.T) {
 			NewBranch("test").Is(rev),
 		}
 
+		// SourceManager itself doesn't guarantee ordering; sort them here so we
+		// can dependably check output
+		sort.Sort(upgradeVersionSorter(v))
+
 		for k, e := range expected {
 			if v[k] != e {
 				t.Errorf("Expected version %s in position %v but got %s", e, k, v[k])
 			}
 		}
 	}
+
+	// Two birds, one stone - make sure the internal ProjectManager vlist cache
+	// works by asking for the versions again, and do it through smcache to
+	// ensure its sorting works, as well.
 
 	// Ensure that the appropriate cache dirs and files exist
 	_, err = os.Stat(path.Join(cpath, "src", "github.com", "Masterminds", "VCSTestRepo", ".git"))
