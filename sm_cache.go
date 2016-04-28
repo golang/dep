@@ -5,9 +5,9 @@ import "sort"
 type smcache struct {
 	// The decorated/underlying SourceManager
 	sm SourceManager
-	// Direction to sort the version list. True indicates sorting for upgrades;
-	// false for downgrades.
-	sortup bool
+	// Direction to sort the version list. False indicates sorting for upgrades;
+	// true for downgrades.
+	sortdown bool
 	// Map of project root name to their available version list. This cache is
 	// layered on top of the proper SourceManager's cache; the only difference
 	// is that this keeps the versions sorted in the direction required by the
@@ -33,10 +33,10 @@ func (c *smcache) ListVersions(n ProjectName) ([]Version, error) {
 		return nil, err
 	}
 
-	if c.sortup {
-		sort.Sort(upgradeVersionSorter(vl))
-	} else {
+	if c.sortdown {
 		sort.Sort(downgradeVersionSorter(vl))
+	} else {
+		sort.Sort(upgradeVersionSorter(vl))
 	}
 
 	c.vlists[n] = vl

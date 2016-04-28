@@ -102,6 +102,32 @@ func TestProjectManagerInit(t *testing.T) {
 	// Two birds, one stone - make sure the internal ProjectManager vlist cache
 	// works by asking for the versions again, and do it through smcache to
 	// ensure its sorting works, as well.
+	smc := &smcache{
+		sm:     sm,
+		vlists: make(map[ProjectName][]Version),
+	}
+
+	v, err = smc.ListVersions(pn)
+	if err != nil {
+		t.Errorf("Unexpected error during initial project setup/fetching %s", err)
+	}
+
+	if len(v) != 3 {
+		t.Errorf("Expected three version results from the test repo, got %v", len(v))
+	} else {
+		rev := Revision("30605f6ac35fcb075ad0bfa9296f90a7d891523e")
+		expected := []Version{
+			NewVersion("1.0.0").Is(rev),
+			NewBranch("master").Is(rev),
+			NewBranch("test").Is(rev),
+		}
+
+		for k, e := range expected {
+			if v[k] != e {
+				t.Errorf("Expected version %s in position %v but got %s", e, k, v[k])
+			}
+		}
+	}
 
 	// Ensure that the appropriate cache dirs and files exist
 	_, err = os.Stat(path.Join(cpath, "src", "github.com", "Masterminds", "VCSTestRepo", ".git"))

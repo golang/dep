@@ -23,12 +23,12 @@ type Solver interface {
 // SolveOpts holds both options that govern solving behavior, and the actual
 // inputs to the solving process.
 type SolveOpts struct {
-	Root      string
-	N         ProjectName
-	M         Manifest
-	L         Lock
-	ChangeAll bool
-	ToChange  []ProjectName
+	Root                 string
+	N                    ProjectName
+	M                    Manifest
+	L                    Lock
+	Downgrade, ChangeAll bool
+	ToChange             []ProjectName
 }
 
 func NewSolver(sm SourceManager, l *logrus.Logger) Solver {
@@ -37,7 +37,7 @@ func NewSolver(sm SourceManager, l *logrus.Logger) Solver {
 	}
 
 	return &solver{
-		sm:     sm,
+		sm:     &smcache{sm: sm},
 		l:      l,
 		latest: make(map[ProjectName]struct{}),
 		rlm:    make(map[ProjectName]LockedProject),
@@ -49,7 +49,7 @@ func NewSolver(sm SourceManager, l *logrus.Logger) Solver {
 type solver struct {
 	l        *logrus.Logger
 	o        SolveOpts
-	sm       SourceManager
+	sm       *smcache
 	latest   map[ProjectName]struct{}
 	sel      *selection
 	unsel    *unselected
@@ -58,10 +58,10 @@ type solver struct {
 	attempts int
 }
 
-// Solve takes a ProjectInfo describing the root project, and a list of
-// ProjectNames which should be allowed to change, typically for an upgrade (or
-// a flag indicating that all can change), and attempts to find a complete
-// solution that satisfies all constraints.
+// Solve attempts to find a dependency solution for the given project, as
+// represented by the provided SolveOpts.
+//
+// This is the entry point to vsolver's main workhorse.
 func (s *solver) Solve(opts SolveOpts) (Result, error) {
 	// local overrides would need to be handled first.
 	// TODO local overrides! heh
@@ -83,6 +83,10 @@ func (s *solver) Solve(opts SolveOpts) (Result, error) {
 	//} else if !fi.IsDir() {
 	//return Result{}, fmt.Errorf("Project root must be a directory.")
 	//}
+
+	// Init/reset the smcache
+	s.sm.sortdown = opts.Downgrade
+	s.sm.vlists = make(map[ProjectName][]Version)
 
 	s.o = opts
 
