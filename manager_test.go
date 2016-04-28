@@ -3,6 +3,7 @@ package vsolver
 import (
 	"fmt"
 	"go/build"
+	"io/ioutil"
 	"os"
 	"path"
 	"runtime"
@@ -12,7 +13,6 @@ import (
 	"github.com/Masterminds/semver"
 )
 
-var cpath = path.Join(os.TempDir(), "smcache")
 var bd string
 
 type dummyAnalyzer struct{}
@@ -36,14 +36,16 @@ func init() {
 }
 
 func TestSourceManagerInit(t *testing.T) {
-	// Just to ensure it's all clean
-	os.RemoveAll(cpath)
-
-	_, err := NewSourceManager(cpath, bd, false, dummyAnalyzer{})
+	cpath, err := ioutil.TempDir("", "smcache")
+	if err != nil {
+		t.Errorf("Failed to create temp dir: %s", err)
+	}
+	_, err = NewSourceManager(cpath, bd, false, dummyAnalyzer{})
 
 	if err != nil {
 		t.Errorf("Unexpected error on SourceManager creation: %s", err)
 	}
+	defer os.RemoveAll(cpath)
 
 	_, err = NewSourceManager(cpath, bd, false, dummyAnalyzer{})
 	if err == nil {
@@ -62,8 +64,10 @@ func TestSourceManagerInit(t *testing.T) {
 }
 
 func TestProjectManagerInit(t *testing.T) {
-	// Just to ensure it's all clean
-	os.RemoveAll(cpath)
+	cpath, err := ioutil.TempDir("", "smcache")
+	if err != nil {
+		t.Errorf("Failed to create temp dir: %s", err)
+	}
 	sm, err := NewSourceManager(cpath, bd, false, dummyAnalyzer{})
 
 	if err != nil {
@@ -71,6 +75,7 @@ func TestProjectManagerInit(t *testing.T) {
 		t.FailNow()
 	}
 	defer sm.Release()
+	defer os.RemoveAll(cpath)
 
 	pn := ProjectName("github.com/Masterminds/VCSTestRepo")
 	v, err := sm.ListVersions(pn)
@@ -172,7 +177,11 @@ func TestProjectManagerInit(t *testing.T) {
 }
 
 func TestRepoVersionFetching(t *testing.T) {
-	os.RemoveAll(cpath)
+	cpath, err := ioutil.TempDir("", "smcache")
+	if err != nil {
+		t.Errorf("Failed to create temp dir: %s", err)
+	}
+
 	smi, err := NewSourceManager(cpath, bd, false, dummyAnalyzer{})
 	if err != nil {
 		t.Errorf("Unexpected error on SourceManager creation: %s", err)
@@ -191,6 +200,7 @@ func TestRepoVersionFetching(t *testing.T) {
 		pmi, err := sm.getProjectManager(u)
 		if err != nil {
 			sm.Release()
+			os.RemoveAll(cpath)
 			t.Errorf("Unexpected error on ProjectManager creation: %s", err)
 			t.FailNow()
 		}
@@ -198,6 +208,7 @@ func TestRepoVersionFetching(t *testing.T) {
 	}
 
 	defer sm.Release()
+	defer os.RemoveAll(cpath)
 
 	// test git first
 	vlist, exbits, err := pms[0].crepo.getCurrentVersionPairs()

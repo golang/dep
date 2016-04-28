@@ -12,7 +12,8 @@ platform:
 install:
   - go version
   - go env
-
+  - choco install bzr hg
+  - set PATH=C:\Program Files (x86)\Bazaar\;C:\Program Files\Mercurial\;%PATH%
 build_script:
   - go get github.com/Masterminds/glide
   - C:\gopath\bin\glide install
