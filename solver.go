@@ -336,15 +336,16 @@ func (s *solver) getLockVersionIfValid(ref ProjectName) (ProjectAtom, error) {
 	// If the project is specifically marked for changes, then don't look for a
 	// locked version.
 	if _, explicit := s.latest[ref]; explicit || s.o.ChangeAll {
+		// For projects with an upstream or cache repository, it's safe to
+		// ignore what's in the lock, because there's presumably more versions
+		// to be found and attempted in the repository. If it's only in vendor,
+		// though, then we have to try to use what's in the lock, because that's
+		// the only version we'll be able to get.
 		if exist, _ := s.sm.RepoExists(ref); exist {
 			return nilpa, nil
 		}
 
-		// For projects without an upstream or cache repository, we still have
-		// to try to use what they have in the lock, because that's the only
-		// version we'll be able to actually get for them.
-		//
-		// However, if a change was expressly requested for something that
+		// However, if a change was *expressly* requested for something that
 		// exists only in vendor, then that guarantees we don't have enough
 		// information to complete a solution. In that case, error out.
 		if explicit {
