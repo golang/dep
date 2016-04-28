@@ -2,7 +2,6 @@ package vsolver
 
 import (
 	"fmt"
-	"sort"
 	"strings"
 
 	"github.com/Masterminds/semver"
@@ -605,11 +604,10 @@ type depspecSourceManager struct {
 
 var _ SourceManager = &depspecSourceManager{}
 
-func newdepspecSM(ds []depspec, upgrade bool) *depspecSourceManager {
+func newdepspecSM(ds []depspec) *depspecSourceManager {
 	//TODO precompute the version lists, for speediness?
 	return &depspecSourceManager{
-		specs:  ds,
-		sortup: upgrade,
+		specs: ds,
 	}
 }
 
@@ -637,12 +635,6 @@ func (sm *depspecSourceManager) ListVersions(name ProjectName) (pi []Version, er
 
 	if len(pi) == 0 {
 		err = fmt.Errorf("Project '%s' could not be found", name)
-	}
-
-	if sm.sortup {
-		sort.Sort(upgradeVersionSorter(pi))
-	} else {
-		sort.Sort(downgradeVersionSorter(pi))
 	}
 
 	return

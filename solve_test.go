@@ -18,20 +18,23 @@ func TestBasicSolves(t *testing.T) {
 }
 
 func solveAndBasicChecks(fix fixture, t *testing.T) (res Result, err error) {
-	sm := newdepspecSM(fix.ds, !fix.downgrade)
+	sm := newdepspecSM(fix.ds)
 
 	l := logrus.New()
 	if testing.Verbose() {
 		l.Level = logrus.DebugLevel
+	} else {
+		l.Level = logrus.WarnLevel
 	}
 
 	s := NewSolver(sm, l)
 
 	o := SolveOpts{
-		Root: string(fix.ds[0].Name()),
-		N:    ProjectName(fix.ds[0].Name()),
-		M:    fix.ds[0],
-		L:    dummyLock{},
+		Root:      string(fix.ds[0].Name()),
+		N:         ProjectName(fix.ds[0].Name()),
+		M:         fix.ds[0],
+		L:         dummyLock{},
+		Downgrade: fix.downgrade,
 	}
 
 	if fix.l != nil {
@@ -159,7 +162,7 @@ func getFailureCausingProjects(err error) (projs []string) {
 }
 
 func TestBadSolveOpts(t *testing.T) {
-	sm := newdepspecSM(fixtures[0].ds, true)
+	sm := newdepspecSM(fixtures[0].ds)
 
 	l := logrus.New()
 	if testing.Verbose() {

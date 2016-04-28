@@ -8,7 +8,6 @@ import (
 	"os/exec"
 	"path"
 	"path/filepath"
-	"sort"
 	"strings"
 	"sync"
 
@@ -43,12 +42,6 @@ type projectManager struct {
 	an ProjectAnalyzer
 	// Whether the cache has the latest info on versions
 	cvsync bool
-	// The list of versions. Kept separate from the data cache because this is
-	// accessed in the hot loop; we don't want to rebuild and realloc for it.
-	vlist []Version
-	// Direction to sort the version list in (true is for upgrade, false for
-	// downgrade)
-	sortup bool
 	// The project metadata cache. This is persisted to disk, for reuse across
 	// solver runs.
 	dc *projectDataCache
@@ -150,26 +143,27 @@ func (pm *projectManager) ListVersions() (vlist []Version, err error) {
 			return nil, err
 		}
 
-		pm.vlist = make([]Version, len(vpairs))
+		vlist = make([]Version, len(vpairs))
 		pm.cvsync = true
 		// Process the version data into the cache
 		// TODO detect out-of-sync data as we do this?
 		for k, v := range vpairs {
 			pm.dc.VMap[v] = v.Underlying()
 			pm.dc.RMap[v.Underlying()] = append(pm.dc.RMap[v.Underlying()], v)
-			pm.vlist[k] = v
+			vlist[k] = v
 		}
-
-		// Sort the versions
-		// TODO do this as a heap in the original call
-		if pm.sortup {
-			sort.Sort(upgradeVersionSorter(pm.vlist))
-		} else {
-			sort.Sort(downgradeVersionSorter(pm.vlist))
+	} else {
+		vlist = make([]Version, len(pm.dc.VMap))
+		k := 0
+		// TODO key type of VMap should be string; recombine here
+		//for v, r := range pm.dc.VMap {
+		for v, _ := range pm.dc.VMap {
+			vlist[k] = v
+			k++
 		}
 	}
 
-	return pm.vlist, nil
+	return
 }
 
 // CheckExistence provides a direct method for querying existence levels of the

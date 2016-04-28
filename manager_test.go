@@ -3,15 +3,16 @@ package vsolver
 import (
 	"fmt"
 	"go/build"
+	"io/ioutil"
 	"os"
 	"path"
 	"runtime"
+	"sort"
 	"testing"
 
 	"github.com/Masterminds/semver"
 )
 
-var cpath = path.Join(os.TempDir(), "smcache")
 var bd string
 
 type dummyAnalyzer struct{}
@@ -35,21 +36,23 @@ func init() {
 }
 
 func TestSourceManagerInit(t *testing.T) {
-	// Just to ensure it's all clean
-	os.RemoveAll(cpath)
-
-	_, err := NewSourceManager(cpath, bd, true, false, dummyAnalyzer{})
+	cpath, err := ioutil.TempDir("", "smcache")
+	if err != nil {
+		t.Errorf("Failed to create temp dir: %s", err)
+	}
+	_, err = NewSourceManager(cpath, bd, false, dummyAnalyzer{})
 
 	if err != nil {
 		t.Errorf("Unexpected error on SourceManager creation: %s", err)
 	}
+	defer os.RemoveAll(cpath)
 
-	_, err = NewSourceManager(cpath, bd, true, false, dummyAnalyzer{})
+	_, err = NewSourceManager(cpath, bd, false, dummyAnalyzer{})
 	if err == nil {
 		t.Errorf("Creating second SourceManager should have failed due to file lock contention")
 	}
 
-	sm, err := NewSourceManager(cpath, bd, true, true, dummyAnalyzer{})
+	sm, err := NewSourceManager(cpath, bd, true, dummyAnalyzer{})
 	defer sm.Release()
 	if err != nil {
 		t.Errorf("Creating second SourceManager should have succeeded when force flag was passed, but failed with err %s", err)
@@ -61,18 +64,55 @@ func TestSourceManagerInit(t *testing.T) {
 }
 
 func TestProjectManagerInit(t *testing.T) {
-	// Just to ensure it's all clean
-	os.RemoveAll(cpath)
-	sm, err := NewSourceManager(cpath, bd, true, false, dummyAnalyzer{})
+	cpath, err := ioutil.TempDir("", "smcache")
+	if err != nil {
+		t.Errorf("Failed to create temp dir: %s", err)
+	}
+	sm, err := NewSourceManager(cpath, bd, false, dummyAnalyzer{})
 
 	if err != nil {
 		t.Errorf("Unexpected error on SourceManager creation: %s", err)
 		t.FailNow()
 	}
 	defer sm.Release()
+	defer os.RemoveAll(cpath)
 
 	pn := ProjectName("github.com/Masterminds/VCSTestRepo")
 	v, err := sm.ListVersions(pn)
+	if err != nil {
+		t.Errorf("Unexpected error during initial project setup/fetching %s", err)
+	}
+
+	if len(v) != 3 {
+		t.Errorf("Expected three version results from the test repo, got %v", len(v))
+	} else {
+		rev := Revision("30605f6ac35fcb075ad0bfa9296f90a7d891523e")
+		expected := []Version{
+			NewVersion("1.0.0").Is(rev),
+			NewBranch("master").Is(rev),
+			NewBranch("test").Is(rev),
+		}
+
+		// SourceManager itself doesn't guarantee ordering; sort them here so we
+		// can dependably check output
+		sort.Sort(upgradeVersionSorter(v))
+
+		for k, e := range expected {
+			if v[k] != e {
+				t.Errorf("Expected version %s in position %v but got %s", e, k, v[k])
+			}
+		}
+	}
+
+	// Two birds, one stone - make sure the internal ProjectManager vlist cache
+	// works by asking for the versions again, and do it through smcache to
+	// ensure its sorting works, as well.
+	smc := &smcache{
+		sm:     sm,
+		vlists: make(map[ProjectName][]Version),
+	}
+
+	v, err = smc.ListVersions(pn)
 	if err != nil {
 		t.Errorf("Unexpected error during initial project setup/fetching %s", err)
 	}
@@ -137,8 +177,12 @@ func TestProjectManagerInit(t *testing.T) {
 }
 
 func TestRepoVersionFetching(t *testing.T) {
-	os.RemoveAll(cpath)
-	smi, err := NewSourceManager(cpath, bd, true, false, dummyAnalyzer{})
+	cpath, err := ioutil.TempDir("", "smcache")
+	if err != nil {
+		t.Errorf("Failed to create temp dir: %s", err)
+	}
+
+	smi, err := NewSourceManager(cpath, bd, false, dummyAnalyzer{})
 	if err != nil {
 		t.Errorf("Unexpected error on SourceManager creation: %s", err)
 		t.FailNow()
@@ -156,6 +200,7 @@ func TestRepoVersionFetching(t *testing.T) {
 		pmi, err := sm.getProjectManager(u)
 		if err != nil {
 			sm.Release()
+			os.RemoveAll(cpath)
 			t.Errorf("Unexpected error on ProjectManager creation: %s", err)
 			t.FailNow()
 		}
@@ -163,6 +208,7 @@ func TestRepoVersionFetching(t *testing.T) {
 	}
 
 	defer sm.Release()
+	defer os.RemoveAll(cpath)
 
 	// test git first
 	vlist, exbits, err := pms[0].crepo.getCurrentVersionPairs()
