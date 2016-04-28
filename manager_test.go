@@ -39,18 +39,18 @@ func TestSourceManagerInit(t *testing.T) {
 	// Just to ensure it's all clean
 	os.RemoveAll(cpath)
 
-	_, err := NewSourceManager(cpath, bd, true, false, dummyAnalyzer{})
+	_, err := NewSourceManager(cpath, bd, false, dummyAnalyzer{})
 
 	if err != nil {
 		t.Errorf("Unexpected error on SourceManager creation: %s", err)
 	}
 
-	_, err = NewSourceManager(cpath, bd, true, false, dummyAnalyzer{})
+	_, err = NewSourceManager(cpath, bd, false, dummyAnalyzer{})
 	if err == nil {
 		t.Errorf("Creating second SourceManager should have failed due to file lock contention")
 	}
 
-	sm, err := NewSourceManager(cpath, bd, true, true, dummyAnalyzer{})
+	sm, err := NewSourceManager(cpath, bd, true, dummyAnalyzer{})
 	defer sm.Release()
 	if err != nil {
 		t.Errorf("Creating second SourceManager should have succeeded when force flag was passed, but failed with err %s", err)
@@ -64,7 +64,7 @@ func TestSourceManagerInit(t *testing.T) {
 func TestProjectManagerInit(t *testing.T) {
 	// Just to ensure it's all clean
 	os.RemoveAll(cpath)
-	sm, err := NewSourceManager(cpath, bd, true, false, dummyAnalyzer{})
+	sm, err := NewSourceManager(cpath, bd, false, dummyAnalyzer{})
 
 	if err != nil {
 		t.Errorf("Unexpected error on SourceManager creation: %s", err)
@@ -173,7 +173,7 @@ func TestProjectManagerInit(t *testing.T) {
 
 func TestRepoVersionFetching(t *testing.T) {
 	os.RemoveAll(cpath)
-	smi, err := NewSourceManager(cpath, bd, true, false, dummyAnalyzer{})
+	smi, err := NewSourceManager(cpath, bd, false, dummyAnalyzer{})
 	if err != nil {
 		t.Errorf("Unexpected error on SourceManager creation: %s", err)
 		t.FailNow()

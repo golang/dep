@@ -41,8 +41,6 @@ type sourceManager struct {
 	pms               map[ProjectName]*pmState
 	an                ProjectAnalyzer
 	ctx               build.Context
-	// Whether to sort versions for upgrade or downgrade
-	sortup bool
 	//pme               map[ProjectName]error
 }
 
@@ -54,7 +52,7 @@ type pmState struct {
 	vcur bool     // indicates that we've called ListVersions()
 }
 
-func NewSourceManager(cachedir, basedir string, upgrade, force bool, an ProjectAnalyzer) (SourceManager, error) {
+func NewSourceManager(cachedir, basedir string, force bool, an ProjectAnalyzer) (SourceManager, error) {
 	if an == nil {
 		return nil, fmt.Errorf("A ProjectAnalyzer must be provided to the SourceManager.")
 	}
@@ -82,7 +80,6 @@ func NewSourceManager(cachedir, basedir string, upgrade, force bool, an ProjectA
 	return &sourceManager{
 		cachedir: cachedir,
 		pms:      make(map[ProjectName]*pmState),
-		sortup:   upgrade,
 		ctx:      ctx,
 		an:       an,
 	}, nil
