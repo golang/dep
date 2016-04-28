@@ -2,6 +2,17 @@ package vsolver
 
 import "sort"
 
+// smcache is a pseudo-decorator around a proper SourceManager.
+//
+// It provides localized caching that's tailored to the requirements of a
+// particular solve run.
+//
+// It also performs transformations between ProjectIdentifiers, which is what
+// the solver primarily deals in, and ProjectName, which is what the
+// SourceManager primarily deals in. This separation is helpful because it keeps
+// the complexities of deciding what a particular name "means" entirely within
+// the solver, while the SourceManager can traffic exclusively in
+// globally-unique network names.
 type smcache struct {
 	// The decorated/underlying SourceManager
 	sm SourceManager
@@ -15,14 +26,11 @@ type smcache struct {
 	vlists map[ProjectName][]Version
 }
 
-// ensure interface fulfillment
-var _ SourceManager = &smcache{}
-
-func (c *smcache) GetProjectInfo(pa ProjectAtom) (ProjectInfo, error) {
+func (c *smcache) getProjectInfo(pa ProjectAtom) (ProjectInfo, error) {
 	return c.sm.GetProjectInfo(pa)
 }
 
-func (c *smcache) ListVersions(n ProjectName) ([]Version, error) {
+func (c *smcache) listVersions(n ProjectName) ([]Version, error) {
 	if vl, exists := c.vlists[n]; exists {
 		return vl, nil
 	}
@@ -43,22 +51,12 @@ func (c *smcache) ListVersions(n ProjectName) ([]Version, error) {
 	return vl, nil
 }
 
-func (c *smcache) RepoExists(n ProjectName) (bool, error) {
+func (c *smcache) repoExists(n ProjectName) (bool, error) {
 	return c.sm.RepoExists(n)
 }
 
-func (c *smcache) VendorCodeExists(n ProjectName) (bool, error) {
+func (c *smcache) vendorCodeExists(n ProjectName) (bool, error) {
 	return c.sm.VendorCodeExists(n)
-}
-
-func (c *smcache) ExportAtomTo(ProjectAtom, string) error {
-	// No reason this should ever be called, as smcache's use is strictly
-	// solver-internal and the solver never exports atoms
-	panic("*smcache should never be asked to export an atom")
-}
-
-func (c *smcache) Release() {
-	c.sm.Release()
 }
 
 type upgradeVersionSorter []Version

@@ -204,12 +204,12 @@ func (s *solver) createVersionQueue(ref ProjectName) (*versionQueue, error) {
 		return newVersionQueue(ref, nilpa, s.sm)
 	}
 
-	exists, err := s.sm.RepoExists(ref)
+	exists, err := s.sm.repoExists(ref)
 	if err != nil {
 		return nil, err
 	}
 	if !exists {
-		exists, err = s.sm.VendorCodeExists(ref)
+		exists, err = s.sm.vendorCodeExists(ref)
 		if err != nil {
 			return nil, err
 		}
@@ -341,7 +341,7 @@ func (s *solver) getLockVersionIfValid(ref ProjectName) (ProjectAtom, error) {
 		// to be found and attempted in the repository. If it's only in vendor,
 		// though, then we have to try to use what's in the lock, because that's
 		// the only version we'll be able to get.
-		if exist, _ := s.sm.RepoExists(ref); exist {
+		if exist, _ := s.sm.repoExists(ref); exist {
 			return nilpa, nil
 		}
 
@@ -399,7 +399,7 @@ func (s *solver) getDependenciesOf(pa ProjectAtom) ([]ProjectDep, error) {
 	if s.o.M.Name() == pa.Name {
 		deps = append(s.o.M.GetDependencies(), s.o.M.GetDevDependencies()...)
 	} else {
-		info, err := s.sm.GetProjectInfo(pa)
+		info, err := s.sm.getProjectInfo(pa)
 		if err != nil {
 			// TODO revisit this once a decision is made about better-formed errors;
 			// question is, do we expect the fetcher to pass back simple errors, or
@@ -567,8 +567,8 @@ func (s *solver) unselectedComparator(i, j int) bool {
 
 	// Ignore err here - if there is actually an issue, it'll be picked up very
 	// soon somewhere else saner in the solving algorithm
-	ivl, _ := s.sm.ListVersions(iname)
-	jvl, _ := s.sm.ListVersions(jname)
+	ivl, _ := s.sm.listVersions(iname)
+	jvl, _ := s.sm.listVersions(jname)
 	iv, jv := len(ivl), len(jvl)
 
 	// Packages with fewer versions to pick from are less likely to benefit from

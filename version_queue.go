@@ -14,12 +14,12 @@ type versionQueue struct {
 	ref                ProjectName
 	pi                 []Version
 	fails              []failedVersion
-	sm                 SourceManager
+	sm                 *smcache
 	failed             bool
 	hasLock, allLoaded bool
 }
 
-func newVersionQueue(ref ProjectName, lockv ProjectAtom, sm SourceManager) (*versionQueue, error) {
+func newVersionQueue(ref ProjectName, lockv ProjectAtom, sm *smcache) (*versionQueue, error) {
 	vq := &versionQueue{
 		ref: ref,
 		sm:  sm,
@@ -30,7 +30,7 @@ func newVersionQueue(ref ProjectName, lockv ProjectAtom, sm SourceManager) (*ver
 		vq.pi = append(vq.pi, lockv.Version)
 	} else {
 		var err error
-		vq.pi, err = vq.sm.ListVersions(vq.ref)
+		vq.pi, err = vq.sm.listVersions(vq.ref)
 		if err != nil {
 			// TODO pushing this error this early entails that we
 			// unconditionally deep scan (e.g. vendor), as well as hitting the
@@ -73,7 +73,7 @@ func (vq *versionQueue) advance(fail error) (err error) {
 	// should have that
 	lockv := vq.pi[0]
 
-	vq.pi, err = vq.sm.ListVersions(vq.ref)
+	vq.pi, err = vq.sm.listVersions(vq.ref)
 	if err != nil {
 		return
 	}
