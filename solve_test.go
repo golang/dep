@@ -35,6 +35,7 @@ func solveAndBasicChecks(fix fixture, t *testing.T) (res Result, err error) {
 		M:         fix.ds[0],
 		L:         dummyLock{},
 		Downgrade: fix.downgrade,
+		ChangeAll: fix.changeall,
 	}
 
 	if fix.l != nil {

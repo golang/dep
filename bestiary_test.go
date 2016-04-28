@@ -138,6 +138,8 @@ type fixture struct {
 	l fixLock
 	// projects expected to have errors, if any
 	errp []string
+	// request up/downgrade to all projects
+	changeall bool
 }
 
 // mklock makes a fixLock, suitable to act as a lock file
@@ -217,6 +219,25 @@ var fixtures = []fixture{
 		),
 	},
 	{
+		n: "downgrade on overlapping constraints",
+		ds: []depspec{
+			dsv("root 0.0.0", "a 1.0.0", "b 1.0.0"),
+			dsv("a 1.0.0", "shared >=2.0.0, <=4.0.0"),
+			dsv("b 1.0.0", "shared >=3.0.0, <5.0.0"),
+			dsv("shared 2.0.0"),
+			dsv("shared 3.0.0"),
+			dsv("shared 3.6.9"),
+			dsv("shared 4.0.0"),
+			dsv("shared 5.0.0"),
+		},
+		r: mkresults(
+			"a 1.0.0",
+			"b 1.0.0",
+			"shared 3.0.0",
+		),
+		downgrade: true,
+	},
+	{
 		n: "shared dependency where dependent version in turn affects other dependencies",
 		ds: []depspec{
 			dsv("root 0.0.0", "foo <=1.0.2", "bar 1.0.0"),
@@ -270,6 +291,47 @@ var fixtures = []fixture{
 			"foo 1.0.1",
 			"bar 1.0.1",
 		),
+	},
+	{
+		n: "upgrade through lock",
+		ds: []depspec{
+			dsv("root 0.0.0", "foo *"),
+			dsv("foo 1.0.0", "bar 1.0.0"),
+			dsv("foo 1.0.1", "bar 1.0.1"),
+			dsv("foo 1.0.2", "bar 1.0.2"),
+			dsv("bar 1.0.0"),
+			dsv("bar 1.0.1"),
+			dsv("bar 1.0.2"),
+		},
+		l: mklock(
+			"foo 1.0.1",
+		),
+		r: mkresults(
+			"foo 1.0.2",
+			"bar 1.0.2",
+		),
+		changeall: true,
+	},
+	{
+		n: "downgrade through lock",
+		ds: []depspec{
+			dsv("root 0.0.0", "foo *"),
+			dsv("foo 1.0.0", "bar 1.0.0"),
+			dsv("foo 1.0.1", "bar 1.0.1"),
+			dsv("foo 1.0.2", "bar 1.0.2"),
+			dsv("bar 1.0.0"),
+			dsv("bar 1.0.1"),
+			dsv("bar 1.0.2"),
+		},
+		l: mklock(
+			"foo 1.0.1",
+		),
+		r: mkresults(
+			"foo 1.0.0",
+			"bar 1.0.0",
+		),
+		changeall: true,
+		downgrade: true,
 	},
 	{
 		n: "with incompatible locked dependency",
