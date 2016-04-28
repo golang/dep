@@ -37,7 +37,7 @@ func NewSolver(sm SourceManager, l *logrus.Logger) Solver {
 	}
 
 	return &solver{
-		sm:     &smcache{sm: sm},
+		sm:     &smAdapter{sm: sm},
 		l:      l,
 		latest: make(map[ProjectName]struct{}),
 		rlm:    make(map[ProjectName]LockedProject),
@@ -49,7 +49,7 @@ func NewSolver(sm SourceManager, l *logrus.Logger) Solver {
 type solver struct {
 	l        *logrus.Logger
 	o        SolveOpts
-	sm       *smcache
+	sm       *smAdapter
 	latest   map[ProjectName]struct{}
 	sel      *selection
 	unsel    *unselected
@@ -84,7 +84,7 @@ func (s *solver) Solve(opts SolveOpts) (Result, error) {
 	//return Result{}, fmt.Errorf("Project root must be a directory.")
 	//}
 
-	// Init/reset the smcache
+	// Init/reset the smAdapter
 	s.sm.sortdown = opts.Downgrade
 	s.sm.vlists = make(map[ProjectName][]Version)
 

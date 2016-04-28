@@ -107,7 +107,7 @@ func TestProjectManagerInit(t *testing.T) {
 	// Two birds, one stone - make sure the internal ProjectManager vlist cache
 	// works by asking for the versions again, and do it through smcache to
 	// ensure its sorting works, as well.
-	smc := &smcache{
+	smc := &smAdapter{
 		sm:     sm,
 		vlists: make(map[ProjectName][]Version),
 	}

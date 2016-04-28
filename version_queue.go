@@ -14,12 +14,12 @@ type versionQueue struct {
 	ref                ProjectName
 	pi                 []Version
 	fails              []failedVersion
-	sm                 *smcache
+	sm                 *smAdapter
 	failed             bool
 	hasLock, allLoaded bool
 }
 
-func newVersionQueue(ref ProjectName, lockv ProjectAtom, sm *smcache) (*versionQueue, error) {
+func newVersionQueue(ref ProjectName, lockv ProjectAtom, sm *smAdapter) (*versionQueue, error) {
 	vq := &versionQueue{
 		ref: ref,
 		sm:  sm,

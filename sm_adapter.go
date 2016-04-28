@@ -2,7 +2,7 @@ package vsolver
 
 import "sort"
 
-// smcache is a pseudo-decorator around a proper SourceManager.
+// smAdapter is an adapter and around a proper SourceManager.
 //
 // It provides localized caching that's tailored to the requirements of a
 // particular solve run.
@@ -13,8 +13,8 @@ import "sort"
 // the complexities of deciding what a particular name "means" entirely within
 // the solver, while the SourceManager can traffic exclusively in
 // globally-unique network names.
-type smcache struct {
-	// The decorated/underlying SourceManager
+type smAdapter struct {
+	// The underlying, adapted-to SourceManager
 	sm SourceManager
 	// Direction to sort the version list. False indicates sorting for upgrades;
 	// true for downgrades.
@@ -26,11 +26,11 @@ type smcache struct {
 	vlists map[ProjectName][]Version
 }
 
-func (c *smcache) getProjectInfo(pa ProjectAtom) (ProjectInfo, error) {
+func (c *smAdapter) getProjectInfo(pa ProjectAtom) (ProjectInfo, error) {
 	return c.sm.GetProjectInfo(pa)
 }
 
-func (c *smcache) listVersions(n ProjectName) ([]Version, error) {
+func (c *smAdapter) listVersions(n ProjectName) ([]Version, error) {
 	if vl, exists := c.vlists[n]; exists {
 		return vl, nil
 	}
@@ -51,11 +51,11 @@ func (c *smcache) listVersions(n ProjectName) ([]Version, error) {
 	return vl, nil
 }
 
-func (c *smcache) repoExists(n ProjectName) (bool, error) {
+func (c *smAdapter) repoExists(n ProjectName) (bool, error) {
 	return c.sm.RepoExists(n)
 }
 
-func (c *smcache) vendorCodeExists(n ProjectName) (bool, error) {
+func (c *smAdapter) vendorCodeExists(n ProjectName) (bool, error) {
 	return c.sm.VendorCodeExists(n)
 }
 
