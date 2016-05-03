@@ -2,6 +2,7 @@ package vsolver
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/Masterminds/semver"
@@ -89,7 +90,6 @@ func mksvd(info string) ProjectDep {
 	name, v := nsvSplit(info)
 
 	return ProjectDep{
-		// TODO allow 'from' syntax
 		Ident:      ProjectIdentifier{LocalName: ProjectName(name)},
 		Constraint: mkc(v, SemverConstraint),
 	}
@@ -123,10 +123,17 @@ func dsv(pi string, deps ...string) depspec {
 		} else {
 			sl = &ds.deps
 		}
-		//if strings.Contains(dep, " from ") {
-		//}
 
-		*sl = append(*sl, mksvd(dep))
+		if strings.Contains(dep, " from ") {
+			r := regexp.MustCompile(`^(\w*) from (\w*) ([0-9\.]*)$`)
+			parts := r.FindStringSubmatch(dep)
+			pd := mksvd(parts[1] + " " + parts[3])
+			pd.Ident.NetworkName = parts[2]
+			*sl = append(*sl, pd)
+		} else {
+			*sl = append(*sl, mksvd(dep))
+		}
+
 	}
 
 	return ds
@@ -280,6 +287,15 @@ var fixtures = []fixture{
 			"bar 1.0.0",
 		),
 		maxAttempts: 2,
+	},
+	{
+		n: "with mismatched net addrs",
+		ds: []depspec{
+			dsv("root 1.0.0", "foo 1.0.0", "bar 1.0.0"),
+			dsv("foo 1.0.0", "bar from baz 1.0.0"),
+			dsv("bar 1.0.0"),
+		},
+		errp: []string{"foo", "root"},
 	},
 	// fixtures with locks
 	{
@@ -837,19 +853,6 @@ func rootDependency() {
     "myapp from root": "1.0.0",
     "foo": "1.0.0"
   });
-
-  testResolve("with mismatched sources", {
-    "myapp 1.0.0": {
-      "foo": "1.0.0",
-      "bar": "1.0.0"
-    },
-    "foo 1.0.0": {
-      "myapp": ">=1.0.0"
-    },
-    "bar 1.0.0": {
-      "myapp from mock2": ">=1.0.0"
-    }
-  }, error: sourceMismatch("myapp", "foo", "bar"));
 
   testResolve("with wrong version", {
     "myapp 1.0.0": {

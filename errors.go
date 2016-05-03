@@ -3,6 +3,7 @@ package vsolver
 import (
 	"bytes"
 	"fmt"
+	"strings"
 )
 
 type errorLevel uint8
@@ -98,7 +99,7 @@ type constraintNotAllowedFailure struct {
 
 func (e *constraintNotAllowedFailure) Error() string {
 	str := "Could not introduce %s at %s, as it has a dependency on %s with constraint %s, which does not allow the currently selected version of %s"
-	return fmt.Sprintf(str, e.goal.Depender.Ident, e.goal.Depender.Version, e.goal.Dep.Ident.errString(), e.goal.Dep.Constraint, e.v)
+	return fmt.Sprintf(str, e.goal.Depender.Ident.errString(), e.goal.Depender.Version, e.goal.Dep.Ident.errString(), e.goal.Dep.Constraint, e.v)
 }
 
 type versionNotAllowedFailure struct {
@@ -138,4 +139,21 @@ type BadOptsFailure string
 
 func (e BadOptsFailure) Error() string {
 	return string(e)
+}
+
+type sourceMismatchFailure struct {
+	shared            ProjectName
+	sel               []Dependency
+	current, mismatch string
+	prob              ProjectAtom
+}
+
+func (e *sourceMismatchFailure) Error() string {
+	var cur []string
+	for _, c := range e.sel {
+		cur = append(cur, string(c.Depender.Ident.LocalName))
+	}
+
+	str := "Could not introduce %s at %s, as it depends on %s from %s, but %s is already marked as coming from %s by %s"
+	return fmt.Sprintf(str, e.prob.Ident.errString(), e.prob.Version, e.shared, e.mismatch, e.shared, e.current, strings.Join(cur, ", "))
 }

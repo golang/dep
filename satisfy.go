@@ -30,6 +30,9 @@ func (s *solver) satisfiable(pa ProjectAtom) error {
 	}
 
 	for _, dep := range deps {
+		if err := s.checkIdentMatches(pa, dep); err != nil {
+			return err
+		}
 		// TODO dart skips "magic" deps here; do we need that?
 		if err := s.checkDepsConstraintsAllowable(pa, dep); err != nil {
 			return err
@@ -163,5 +166,22 @@ func (s *solver) checkDepsDisallowsSelected(pa ProjectAtom, dep ProjectDep) erro
 			v:    selected.Version,
 		}
 	}
+	return nil
+}
+
+func (s *solver) checkIdentMatches(pa ProjectAtom, dep ProjectDep) error {
+	if cur, exists := s.names[dep.Ident.LocalName]; exists {
+		if cur != dep.Ident.netName() {
+			deps := s.sel.getDependenciesOn(pa.Ident)
+			return &sourceMismatchFailure{
+				shared:   dep.Ident.LocalName,
+				sel:      deps,
+				current:  cur,
+				mismatch: dep.Ident.netName(),
+				prob:     pa,
+			}
+		}
+	}
+
 	return nil
 }

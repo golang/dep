@@ -155,6 +155,11 @@ func getFailureCausingProjects(err error) (projs []string) {
 	case *constraintNotAllowedFailure:
 		// No sane way of knowing why the currently selected version is
 		// selected, so do nothing
+	case *sourceMismatchFailure:
+		projs = append(projs, string(e.prob.Ident.LocalName))
+		for _, c := range e.sel {
+			projs = append(projs, string(c.Depender.Ident.LocalName))
+		}
 	default:
 		panic("unknown failtype")
 	}

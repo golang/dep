@@ -37,25 +37,24 @@ func NewSolver(sm SourceManager, l *logrus.Logger) Solver {
 	}
 
 	return &solver{
-		sm:     &smAdapter{sm: sm},
-		l:      l,
-		latest: make(map[ProjectName]struct{}),
-		rlm:    make(map[ProjectName]LockedProject),
+		sm: &smAdapter{sm: sm},
+		l:  l,
 	}
 }
 
 // solver is a specialized backtracking SAT solver with satisfiability
 // conditions hardcoded to the needs of the Go package management problem space.
 type solver struct {
-	l        *logrus.Logger
+	attempts int
 	o        SolveOpts
+	l        *logrus.Logger
 	sm       *smAdapter
-	latest   map[ProjectName]struct{}
 	sel      *selection
 	unsel    *unselected
 	versions []*versionQueue
+	latest   map[ProjectName]struct{}
+	names    map[ProjectName]string
 	rlm      map[ProjectName]LockedProject
-	attempts int
 }
 
 // Solve attempts to find a dependency solution for the given project, as
@@ -89,6 +88,12 @@ func (s *solver) Solve(opts SolveOpts) (Result, error) {
 	s.sm.vlists = make(map[ProjectName][]Version)
 
 	s.o = opts
+
+	// Initialize maps
+
+	s.latest = make(map[ProjectName]struct{})
+	s.rlm = make(map[ProjectName]LockedProject)
+	s.names = make(map[ProjectName]string)
 
 	if s.o.L != nil {
 		for _, lp := range s.o.L.Projects() {
@@ -622,11 +627,12 @@ func (s *solver) selectVersion(pa ProjectAtom) {
 
 	for _, dep := range deps {
 		siblingsAndSelf := append(s.sel.getDependenciesOn(dep.Ident), Dependency{Depender: pa, Dep: dep})
-		s.sel.deps[dep.Ident] = siblingsAndSelf
+		s.sel.setDependenciesOn(dep.Ident, siblingsAndSelf)
 
 		// add project to unselected queue if this is the first dep on it -
 		// otherwise it's already in there, or been selected
 		if len(siblingsAndSelf) == 1 {
+			s.names[dep.Ident.LocalName] = dep.Ident.netName()
 			heap.Push(s.unsel, dep.Ident)
 		}
 	}
@@ -659,6 +665,7 @@ func (s *solver) unselectLast() {
 					"pver":  pa.Version,
 				}).Debug("Removing project from unselected queue; last parent atom was unselected")
 			}
+			delete(s.names, dep.Ident.LocalName)
 			s.unsel.remove(dep.Ident)
 		}
 	}

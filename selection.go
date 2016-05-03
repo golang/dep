@@ -3,6 +3,7 @@ package vsolver
 type selection struct {
 	projects []ProjectAtom
 	deps     map[ProjectIdentifier][]Dependency
+	names    map[ProjectName]struct{}
 }
 
 func (s *selection) getDependenciesOn(id ProjectIdentifier) []Dependency {
@@ -91,7 +92,6 @@ func (u *unselected) remove(id ProjectIdentifier) {
 				u.sl = append(u.sl[:k], u.sl[k+1:]...)
 			}
 			break
-			// TODO need to heap.Fix()? shouldn't have to...
 		}
 	}
 }
