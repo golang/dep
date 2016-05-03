@@ -295,7 +295,8 @@ var fixtures = []fixture{
 			dsv("foo 1.0.0", "bar from baz 1.0.0"),
 			dsv("bar 1.0.0"),
 		},
-		errp: []string{"foo", "root"},
+		// TODO ugh; do real error comparison instead of shitty abstraction
+		errp: []string{"foo", "foo", "root"},
 	},
 	// fixtures with locks
 	{
