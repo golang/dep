@@ -156,7 +156,7 @@ func (s *solver) checkDepsDisallowsSelected(pa ProjectAtom, dep ProjectDep) erro
 				"newconstraint": dep.Constraint.String(),
 			}).Debug("Project atom cannot be added; a constraint it introduces does not allow a currently selected version")
 		}
-		s.fail(dep.Ident.LocalName)
+		s.fail(dep.Ident)
 
 		return &constraintNotAllowedFailure{
 			goal: Dependency{Depender: pa, Dep: dep},

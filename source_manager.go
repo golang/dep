@@ -11,7 +11,7 @@ import (
 )
 
 type SourceManager interface {
-	GetProjectInfo(ProjectAtom) (ProjectInfo, error)
+	GetProjectInfo(ProjectName, Version) (ProjectInfo, error)
 	ListVersions(ProjectName) ([]Version, error)
 	RepoExists(ProjectName) (bool, error)
 	VendorCodeExists(ProjectName) (bool, error)
@@ -90,13 +90,13 @@ func (sm *sourceManager) Release() {
 	os.Remove(path.Join(sm.cachedir, "sm.lock"))
 }
 
-func (sm *sourceManager) GetProjectInfo(pa ProjectAtom) (ProjectInfo, error) {
-	pmc, err := sm.getProjectManager(pa.Name)
+func (sm *sourceManager) GetProjectInfo(n ProjectName, v Version) (ProjectInfo, error) {
+	pmc, err := sm.getProjectManager(n)
 	if err != nil {
 		return ProjectInfo{}, err
 	}
 
-	return pmc.pm.GetInfoAt(pa.Version)
+	return pmc.pm.GetInfoAt(v)
 }
 
 func (sm *sourceManager) ListVersions(n ProjectName) ([]Version, error) {
@@ -128,7 +128,8 @@ func (sm *sourceManager) RepoExists(n ProjectName) (bool, error) {
 }
 
 func (sm *sourceManager) ExportAtomTo(pa ProjectAtom, to string) error {
-	pms, err := sm.getProjectManager(pa.Name)
+	// TODO break up this atom, too?
+	pms, err := sm.getProjectManager(pa.Name.LocalName)
 	if err != nil {
 		return err
 	}

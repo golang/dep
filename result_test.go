@@ -19,16 +19,22 @@ func (passthruAnalyzer) GetInfo(ctx build.Context, p ProjectName) (Manifest, Loc
 	return nil, nil, nil
 }
 
+func pi(n string) ProjectIdentifier {
+	return ProjectIdentifier{
+		LocalName: ProjectName(n),
+	}
+}
+
 func init() {
 	basicResult = result{
 		att: 1,
 		p: []LockedProject{
 			pa2lp(ProjectAtom{
-				Name:    "github.com/sdboyer/testrepo",
+				Name:    pi("github.com/sdboyer/testrepo"),
 				Version: NewBranch("master").Is(Revision("4d59fb584b15a94d7401e356d2875c472d76ef45")),
 			}),
 			pa2lp(ProjectAtom{
-				Name:    "github.com/Masterminds/VCSTestRepo",
+				Name:    pi("github.com/Masterminds/VCSTestRepo"),
 				Version: NewVersion("1.0.0").Is(Revision("30605f6ac35fcb075ad0bfa9296f90a7d891523e")),
 			}),
 		},
@@ -36,7 +42,7 @@ func init() {
 
 	// just in case something needs punishing, kubernetes is happy to oblige
 	kub = ProjectAtom{
-		Name:    "github.com/kubernetes/kubernetes",
+		Name:    pi("github.com/kubernetes/kubernetes"),
 		Version: NewVersion("1.0.0").Is(Revision("528f879e7d3790ea4287687ef0ab3f2a01cc2718")),
 	}
 }
@@ -76,7 +82,7 @@ func BenchmarkCreateVendorTree(b *testing.B) {
 
 	// Prefetch the projects before timer starts
 	for _, lp := range r.p {
-		_, err := sm.GetProjectInfo(lp.toAtom())
+		_, err := sm.GetProjectInfo(lp.n, lp.Version())
 		if err != nil {
 			b.Errorf("failed getting project info during prefetch: %s", err)
 			clean = false

@@ -111,7 +111,9 @@ func (s *solver) Solve(opts SolveOpts) (Result, error) {
 
 	// Prime the queues with the root project
 	s.selectVersion(ProjectAtom{
-		Name: s.o.N,
+		Name: ProjectIdentifier{
+			LocalName: s.o.N,
+		},
 		// This is a hack so that the root project doesn't have a nil version.
 		// It's sort of OK because the root never makes it out into the results.
 		// We may need a more elegant solution if we discover other side
@@ -182,7 +184,7 @@ func (s *solver) solve() ([]ProjectAtom, error) {
 		}
 
 		s.selectVersion(ProjectAtom{
-			Name:    queue.id.LocalName, // TODO network or local?
+			Name:    queue.id,
 			Version: queue.current(),
 		})
 		s.versions = append(s.versions, queue)
@@ -356,6 +358,7 @@ func (s *solver) getLockVersionIfValid(id ProjectIdentifier) (ProjectAtom, error
 		}
 	}
 
+	// TODO need to make rlm operate on the full ProjectIdentifier
 	lp, exists := s.rlm[id.LocalName]
 	if !exists {
 		if s.l.Level >= logrus.DebugLevel {
@@ -383,7 +386,7 @@ func (s *solver) getLockVersionIfValid(id ProjectIdentifier) (ProjectAtom, error
 	}
 
 	return ProjectAtom{
-		Name:    lp.n,
+		Name:    id,
 		Version: lp.Version(),
 	}, nil
 }
@@ -396,7 +399,7 @@ func (s *solver) getDependenciesOf(pa ProjectAtom) ([]ProjectDep, error) {
 	var deps []ProjectDep
 
 	// If we're looking for root's deps, get it from opts rather than sm
-	if s.o.M.Name() == pa.Name {
+	if s.o.M.Name() == pa.Name.LocalName {
 		deps = append(s.o.M.GetDependencies(), s.o.M.GetDevDependencies()...)
 	} else {
 		info, err := s.sm.getProjectInfo(pa)
@@ -588,9 +591,9 @@ func (s *solver) unselectedComparator(i, j int) bool {
 	return iname.less(jname)
 }
 
-func (s *solver) fail(n ProjectName) {
+func (s *solver) fail(i ProjectIdentifier) {
 	// skip if the root project
-	if s.o.M.Name() == n {
+	if s.o.M.Name() == i.LocalName {
 		s.l.Debug("Not marking the root project as failed")
 		return
 	}
@@ -598,7 +601,7 @@ func (s *solver) fail(n ProjectName) {
 	// just look for the first (oldest) one; the backtracker will necessarily
 	// traverse through and pop off any earlier ones
 	for _, vq := range s.versions {
-		if vq.id.LocalName == n {
+		if vq.id.LocalName == i.LocalName {
 			vq.failed = true
 			return
 		}
@@ -663,12 +666,12 @@ func (s *solver) unselectLast() {
 
 // simple (temporary?) helper just to convert atoms into locked projects
 func pa2lp(pa ProjectAtom) LockedProject {
-	// TODO will need to revisit this once we flesh out the relationship between
-	// names, uris, etc.
 	lp := LockedProject{
-		n:    pa.Name,
-		path: string(pa.Name),
-		uri:  string(pa.Name),
+		n: pa.Name.LocalName,
+		// path is mostly duplicate information now, but if we ever allow
+		// nesting as a conflict resolution mechanism, it will become valuable
+		path: string(pa.Name.LocalName),
+		uri:  pa.Name.netName(),
 	}
 
 	switch v := pa.Version.(type) {

@@ -119,7 +119,10 @@ func (lp LockedProject) Path() string {
 
 func (lp LockedProject) toAtom() ProjectAtom {
 	pa := ProjectAtom{
-		Name: lp.n,
+		Name: ProjectIdentifier{
+			LocalName:   lp.n,
+			NetworkName: lp.uri,
+		},
 	}
 
 	if lp.v == nil {

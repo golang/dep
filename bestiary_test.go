@@ -63,7 +63,9 @@ func mksvpa(info string) ProjectAtom {
 	}
 
 	return ProjectAtom{
-		Name:    ProjectName(name),
+		Name: ProjectIdentifier{
+			LocalName: ProjectName(name),
+		},
 		Version: v,
 	}
 }
@@ -154,7 +156,7 @@ func mklock(pairs ...string) fixLock {
 	l := make(fixLock, 0)
 	for _, s := range pairs {
 		pa := mksvpa(s)
-		l = append(l, NewLockedProject(pa.Name, pa.Version, "", ""))
+		l = append(l, NewLockedProject(pa.Name.LocalName, pa.Version, pa.Name.netName(), ""))
 	}
 
 	return l
@@ -680,9 +682,9 @@ func newdepspecSM(ds []depspec) *depspecSourceManager {
 	}
 }
 
-func (sm *depspecSourceManager) GetProjectInfo(pa ProjectAtom) (ProjectInfo, error) {
+func (sm *depspecSourceManager) GetProjectInfo(n ProjectName, v Version) (ProjectInfo, error) {
 	for _, ds := range sm.specs {
-		if pa.Name == ds.name.Name && pa.Version.Matches(ds.name.Version) {
+		if string(n) == ds.name.Name.netName() && v.Matches(ds.name.Version) {
 			return ProjectInfo{
 				pa:       ds.name,
 				Manifest: ds,
@@ -692,12 +694,12 @@ func (sm *depspecSourceManager) GetProjectInfo(pa ProjectAtom) (ProjectInfo, err
 	}
 
 	// TODO proper solver-type errors
-	return ProjectInfo{}, fmt.Errorf("Project '%s' at version '%s' could not be found", pa.Name, pa.Version)
+	return ProjectInfo{}, fmt.Errorf("Project '%s' at version '%s' could not be found", n, v)
 }
 
 func (sm *depspecSourceManager) ListVersions(name ProjectName) (pi []Version, err error) {
 	for _, ds := range sm.specs {
-		if name == ds.name.Name {
+		if string(name) == ds.name.Name.netName() {
 			pi = append(pi, ds.name.Version)
 		}
 	}
@@ -711,7 +713,7 @@ func (sm *depspecSourceManager) ListVersions(name ProjectName) (pi []Version, er
 
 func (sm *depspecSourceManager) RepoExists(name ProjectName) (bool, error) {
 	for _, ds := range sm.specs {
-		if name == ds.name.Name {
+		if string(name) == ds.name.Name.netName() {
 			return true, nil
 		}
 	}
@@ -746,7 +748,7 @@ func (ds depspec) GetDevDependencies() []ProjectDep {
 
 // impl Spec interface
 func (ds depspec) Name() ProjectName {
-	return ds.name.Name
+	return ds.name.Name.LocalName
 }
 
 type fixLock []LockedProject

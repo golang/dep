@@ -119,7 +119,10 @@ func (pm *projectManager) GetInfoAt(v Version) (ProjectInfo, error) {
 	if err == nil {
 		return ProjectInfo{
 			pa: ProjectAtom{
-				Name:    pm.n,
+				// TODO probably don't want atoms in here anymore
+				Name: ProjectIdentifier{
+					LocalName: pm.n,
+				},
 				Version: v,
 			},
 			Manifest: m,
