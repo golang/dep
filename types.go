@@ -51,7 +51,7 @@ func (i ProjectIdentifier) errString() string {
 type ProjectName string
 
 type ProjectAtom struct {
-	Name    ProjectIdentifier // TODO rename to Ident
+	Ident   ProjectIdentifier
 	Version Version
 }
 

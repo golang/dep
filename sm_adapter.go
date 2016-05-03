@@ -27,7 +27,7 @@ type smAdapter struct {
 }
 
 func (c *smAdapter) getProjectInfo(pa ProjectAtom) (ProjectInfo, error) {
-	return c.sm.GetProjectInfo(ProjectName(pa.Name.netName()), pa.Version)
+	return c.sm.GetProjectInfo(ProjectName(pa.Ident.netName()), pa.Version)
 }
 
 func (c *smAdapter) key(id ProjectIdentifier) ProjectName {

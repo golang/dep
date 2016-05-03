@@ -129,7 +129,7 @@ func (sm *sourceManager) RepoExists(n ProjectName) (bool, error) {
 
 func (sm *sourceManager) ExportAtomTo(pa ProjectAtom, to string) error {
 	// TODO break up this atom, too?
-	pms, err := sm.getProjectManager(pa.Name.LocalName)
+	pms, err := sm.getProjectManager(pa.Ident.LocalName)
 	if err != nil {
 		return err
 	}

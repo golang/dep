@@ -104,7 +104,7 @@ func solveAndBasicChecks(fix fixture, t *testing.T) (res Result, err error) {
 		rp := make(map[string]Version)
 		for _, p := range r.p {
 			pa := p.toAtom()
-			rp[string(pa.Name.LocalName)] = pa.Version
+			rp[string(pa.Ident.LocalName)] = pa.Version
 		}
 
 		fixlen, rlen := len(fix.r), len(rp)
@@ -146,11 +146,11 @@ func getFailureCausingProjects(err error) (projs []string) {
 		projs = append(projs, string(e.pn.LocalName)) // TODO identifierify
 	case *disjointConstraintFailure:
 		for _, f := range e.failsib {
-			projs = append(projs, string(f.Depender.Name.LocalName))
+			projs = append(projs, string(f.Depender.Ident.LocalName))
 		}
 	case *versionNotAllowedFailure:
 		for _, f := range e.failparent {
-			projs = append(projs, string(f.Depender.Name.LocalName))
+			projs = append(projs, string(f.Depender.Ident.LocalName))
 		}
 	case *constraintNotAllowedFailure:
 		// No sane way of knowing why the currently selected version is
@@ -178,7 +178,7 @@ func TestBadSolveOpts(t *testing.T) {
 		t.Errorf("Should have errored on missing manifest")
 	}
 
-	p, _ := sm.GetProjectInfo(ProjectName(fixtures[0].ds[0].name.Name.netName()), fixtures[0].ds[0].name.Version)
+	p, _ := sm.GetProjectInfo(ProjectName(fixtures[0].ds[0].name.Ident.netName()), fixtures[0].ds[0].name.Version)
 	o.M = p.Manifest
 	_, err = s.Solve(o)
 	if err == nil {

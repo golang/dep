@@ -14,7 +14,7 @@ func (s *solver) satisfiable(pa ProjectAtom) error {
 
 	if s.l.Level >= logrus.DebugLevel {
 		s.l.WithFields(logrus.Fields{
-			"name":    pa.Name,
+			"name":    pa.Ident,
 			"version": pa.Version,
 		}).Debug("Checking satisfiability of project atom against current constraints")
 	}
@@ -43,7 +43,7 @@ func (s *solver) satisfiable(pa ProjectAtom) error {
 
 	if s.l.Level >= logrus.DebugLevel {
 		s.l.WithFields(logrus.Fields{
-			"name":    pa.Name,
+			"name":    pa.Ident,
 			"version": pa.Version,
 		}).Debug("Project atom passed satisfiability test against current state")
 	}
@@ -54,7 +54,7 @@ func (s *solver) satisfiable(pa ProjectAtom) error {
 // checkAtomAllowable ensures that an atom itself is acceptable with respect to
 // the constraints established by the current solution.
 func (s *solver) checkAtomAllowable(pa ProjectAtom) error {
-	constraint := s.sel.getConstraint(pa.Name)
+	constraint := s.sel.getConstraint(pa.Ident)
 	if constraint.Matches(pa.Version) {
 		return nil
 	}
@@ -62,24 +62,24 @@ func (s *solver) checkAtomAllowable(pa ProjectAtom) error {
 
 	if s.l.Level >= logrus.InfoLevel {
 		s.l.WithFields(logrus.Fields{
-			"name":          pa.Name,
+			"name":          pa.Ident,
 			"version":       pa.Version,
 			"curconstraint": constraint.String(),
 		}).Info("Current constraints do not allow version")
 	}
 
-	deps := s.sel.getDependenciesOn(pa.Name)
+	deps := s.sel.getDependenciesOn(pa.Ident)
 	var failparent []Dependency
 	for _, dep := range deps {
 		if !dep.Dep.Constraint.Matches(pa.Version) {
 			if s.l.Level >= logrus.DebugLevel {
 				s.l.WithFields(logrus.Fields{
-					"name":       pa.Name,
-					"othername":  dep.Depender.Name,
+					"name":       pa.Ident,
+					"othername":  dep.Depender.Ident,
 					"constraint": dep.Dep.Constraint.String(),
 				}).Debug("Marking other, selected project with conflicting constraint as failed")
 			}
-			s.fail(dep.Depender.Name)
+			s.fail(dep.Depender.Ident)
 			failparent = append(failparent, dep)
 		}
 	}
@@ -103,7 +103,7 @@ func (s *solver) checkDepsConstraintsAllowable(pa ProjectAtom, dep ProjectDep) e
 
 	if s.l.Level >= logrus.DebugLevel {
 		s.l.WithFields(logrus.Fields{
-			"name":          pa.Name,
+			"name":          pa.Ident,
 			"version":       pa.Version,
 			"depname":       dep.Ident,
 			"curconstraint": constraint.String(),
@@ -119,14 +119,14 @@ func (s *solver) checkDepsConstraintsAllowable(pa ProjectAtom, dep ProjectDep) e
 		if !sibling.Dep.Constraint.MatchesAny(dep.Constraint) {
 			if s.l.Level >= logrus.DebugLevel {
 				s.l.WithFields(logrus.Fields{
-					"name":          pa.Name,
+					"name":          pa.Ident,
 					"version":       pa.Version,
-					"depname":       sibling.Depender.Name,
+					"depname":       sibling.Depender.Ident,
 					"sibconstraint": sibling.Dep.Constraint.String(),
 					"newconstraint": dep.Constraint.String(),
 				}).Debug("Marking other, selected project as failed because its constraint is disjoint with our testee")
 			}
-			s.fail(sibling.Depender.Name)
+			s.fail(sibling.Depender.Ident)
 			failsib = append(failsib, sibling)
 		} else {
 			nofailsib = append(nofailsib, sibling)
@@ -149,7 +149,7 @@ func (s *solver) checkDepsDisallowsSelected(pa ProjectAtom, dep ProjectDep) erro
 	if exists && !dep.Constraint.Matches(selected.Version) {
 		if s.l.Level >= logrus.DebugLevel {
 			s.l.WithFields(logrus.Fields{
-				"name":          pa.Name,
+				"name":          pa.Ident,
 				"version":       pa.Version,
 				"depname":       dep.Ident,
 				"curversion":    selected.Version,

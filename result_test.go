@@ -30,11 +30,11 @@ func init() {
 		att: 1,
 		p: []LockedProject{
 			pa2lp(ProjectAtom{
-				Name:    pi("github.com/sdboyer/testrepo"),
+				Ident:   pi("github.com/sdboyer/testrepo"),
 				Version: NewBranch("master").Is(Revision("4d59fb584b15a94d7401e356d2875c472d76ef45")),
 			}),
 			pa2lp(ProjectAtom{
-				Name:    pi("github.com/Masterminds/VCSTestRepo"),
+				Ident:   pi("github.com/Masterminds/VCSTestRepo"),
 				Version: NewVersion("1.0.0").Is(Revision("30605f6ac35fcb075ad0bfa9296f90a7d891523e")),
 			}),
 		},
@@ -42,7 +42,7 @@ func init() {
 
 	// just in case something needs punishing, kubernetes is happy to oblige
 	kub = ProjectAtom{
-		Name:    pi("github.com/kubernetes/kubernetes"),
+		Ident:   pi("github.com/kubernetes/kubernetes"),
 		Version: NewVersion("1.0.0").Is(Revision("528f879e7d3790ea4287687ef0ab3f2a01cc2718")),
 	}
 }

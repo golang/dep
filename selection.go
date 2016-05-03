@@ -42,7 +42,7 @@ func (s *selection) getConstraint(id ProjectIdentifier) Constraint {
 func (s *selection) selected(id ProjectIdentifier) (ProjectAtom, bool) {
 	for _, pi := range s.projects {
 		// TODO do we change this on ProjectAtom too, or not?
-		if pi.Name.eq(id) {
+		if pi.Ident.eq(id) {
 			return pi, true
 		}
 	}

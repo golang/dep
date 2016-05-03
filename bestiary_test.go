@@ -63,7 +63,7 @@ func mksvpa(info string) ProjectAtom {
 	}
 
 	return ProjectAtom{
-		Name: ProjectIdentifier{
+		Ident: ProjectIdentifier{
 			LocalName: ProjectName(name),
 		},
 		Version: v,
@@ -156,7 +156,7 @@ func mklock(pairs ...string) fixLock {
 	l := make(fixLock, 0)
 	for _, s := range pairs {
 		pa := mksvpa(s)
-		l = append(l, NewLockedProject(pa.Name.LocalName, pa.Version, pa.Name.netName(), ""))
+		l = append(l, NewLockedProject(pa.Ident.LocalName, pa.Version, pa.Ident.netName(), ""))
 	}
 
 	return l
@@ -684,7 +684,7 @@ func newdepspecSM(ds []depspec) *depspecSourceManager {
 
 func (sm *depspecSourceManager) GetProjectInfo(n ProjectName, v Version) (ProjectInfo, error) {
 	for _, ds := range sm.specs {
-		if string(n) == ds.name.Name.netName() && v.Matches(ds.name.Version) {
+		if string(n) == ds.name.Ident.netName() && v.Matches(ds.name.Version) {
 			return ProjectInfo{
 				pa:       ds.name,
 				Manifest: ds,
@@ -699,7 +699,7 @@ func (sm *depspecSourceManager) GetProjectInfo(n ProjectName, v Version) (Projec
 
 func (sm *depspecSourceManager) ListVersions(name ProjectName) (pi []Version, err error) {
 	for _, ds := range sm.specs {
-		if string(name) == ds.name.Name.netName() {
+		if string(name) == ds.name.Ident.netName() {
 			pi = append(pi, ds.name.Version)
 		}
 	}
@@ -713,7 +713,7 @@ func (sm *depspecSourceManager) ListVersions(name ProjectName) (pi []Version, er
 
 func (sm *depspecSourceManager) RepoExists(name ProjectName) (bool, error) {
 	for _, ds := range sm.specs {
-		if string(name) == ds.name.Name.netName() {
+		if string(name) == ds.name.Ident.netName() {
 			return true, nil
 		}
 	}
@@ -748,7 +748,7 @@ func (ds depspec) GetDevDependencies() []ProjectDep {
 
 // impl Spec interface
 func (ds depspec) Name() ProjectName {
-	return ds.name.Name.LocalName
+	return ds.name.Ident.LocalName
 }
 
 type fixLock []LockedProject

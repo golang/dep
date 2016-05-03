@@ -111,7 +111,7 @@ func (s *solver) Solve(opts SolveOpts) (Result, error) {
 
 	// Prime the queues with the root project
 	s.selectVersion(ProjectAtom{
-		Name: ProjectIdentifier{
+		Ident: ProjectIdentifier{
 			LocalName: s.o.N,
 		},
 		// This is a hack so that the root project doesn't have a nil version.
@@ -184,7 +184,7 @@ func (s *solver) solve() ([]ProjectAtom, error) {
 		}
 
 		s.selectVersion(ProjectAtom{
-			Name:    queue.id,
+			Ident:   queue.id,
 			Version: queue.current(),
 		})
 		s.versions = append(s.versions, queue)
@@ -291,7 +291,7 @@ func (s *solver) findValidVersion(q *versionQueue) error {
 	for {
 		cur := q.current()
 		err := s.satisfiable(ProjectAtom{
-			Name:    q.id,
+			Ident:   q.id,
 			Version: cur,
 		})
 		if err == nil {
@@ -324,7 +324,7 @@ func (s *solver) findValidVersion(q *versionQueue) error {
 		}
 	}
 
-	s.fail(s.sel.getDependenciesOn(q.id)[0].Depender.Name)
+	s.fail(s.sel.getDependenciesOn(q.id)[0].Depender.Ident)
 
 	// Return a compound error of all the new errors encountered during this
 	// attempt to find a new, valid version
@@ -386,7 +386,7 @@ func (s *solver) getLockVersionIfValid(id ProjectIdentifier) (ProjectAtom, error
 	}
 
 	return ProjectAtom{
-		Name:    id,
+		Ident:   id,
 		Version: lp.Version(),
 	}, nil
 }
@@ -399,7 +399,7 @@ func (s *solver) getDependenciesOf(pa ProjectAtom) ([]ProjectDep, error) {
 	var deps []ProjectDep
 
 	// If we're looking for root's deps, get it from opts rather than sm
-	if s.o.M.Name() == pa.Name.LocalName {
+	if s.o.M.Name() == pa.Ident.LocalName {
 		deps = append(s.o.M.GetDependencies(), s.o.M.GetDevDependencies()...)
 	} else {
 		info, err := s.sm.getProjectInfo(pa)
@@ -491,7 +491,7 @@ func (s *solver) backtrack() bool {
 				// Found one! Put it back on the selected queue and stop
 				// backtracking
 				s.selectVersion(ProjectAtom{
-					Name:    q.id,
+					Ident:   q.id,
 					Version: q.current(),
 				})
 				break
@@ -609,7 +609,7 @@ func (s *solver) fail(i ProjectIdentifier) {
 }
 
 func (s *solver) selectVersion(pa ProjectAtom) {
-	s.unsel.remove(pa.Name)
+	s.unsel.remove(pa.Ident)
 	s.sel.projects = append(s.sel.projects, pa)
 
 	deps, err := s.getDependenciesOf(pa)
@@ -635,7 +635,7 @@ func (s *solver) selectVersion(pa ProjectAtom) {
 func (s *solver) unselectLast() {
 	var pa ProjectAtom
 	pa, s.sel.projects = s.sel.projects[len(s.sel.projects)-1], s.sel.projects[:len(s.sel.projects)-1]
-	heap.Push(s.unsel, pa.Name)
+	heap.Push(s.unsel, pa.Ident)
 
 	deps, err := s.getDependenciesOf(pa)
 	if err != nil {
@@ -655,7 +655,7 @@ func (s *solver) unselectLast() {
 			if s.l.Level >= logrus.DebugLevel {
 				s.l.WithFields(logrus.Fields{
 					"name":  dep.Ident,
-					"pname": pa.Name,
+					"pname": pa.Ident,
 					"pver":  pa.Version,
 				}).Debug("Removing project from unselected queue; last parent atom was unselected")
 			}
@@ -667,11 +667,11 @@ func (s *solver) unselectLast() {
 // simple (temporary?) helper just to convert atoms into locked projects
 func pa2lp(pa ProjectAtom) LockedProject {
 	lp := LockedProject{
-		n: pa.Name.LocalName,
+		n: pa.Ident.LocalName,
 		// path is mostly duplicate information now, but if we ever allow
 		// nesting as a conflict resolution mechanism, it will become valuable
-		path: string(pa.Name.LocalName),
-		uri:  pa.Name.netName(),
+		path: string(pa.Ident.LocalName),
+		uri:  pa.Ident.netName(),
 	}
 
 	switch v := pa.Version.(type) {
