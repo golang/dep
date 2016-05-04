@@ -3,7 +3,6 @@ package vsolver
 type selection struct {
 	projects []ProjectAtom
 	deps     map[ProjectIdentifier][]Dependency
-	names    map[ProjectName]struct{}
 }
 
 func (s *selection) getDependenciesOn(id ProjectIdentifier) []Dependency {
@@ -42,7 +41,6 @@ func (s *selection) getConstraint(id ProjectIdentifier) Constraint {
 
 func (s *selection) selected(id ProjectIdentifier) (ProjectAtom, bool) {
 	for _, pi := range s.projects {
-		// TODO do we change this on ProjectAtom too, or not?
 		if pi.Ident.eq(id) {
 			return pi, true
 		}
@@ -58,7 +56,6 @@ type unselected struct {
 	cmp func(i, j int) bool
 }
 
-// TODO should these be pointer receivers? container/heap examples aren't
 func (u unselected) Len() int {
 	return len(u.sl)
 }
@@ -80,8 +77,7 @@ func (u *unselected) Pop() (v interface{}) {
 	return v
 }
 
-// remove takes a ProjectIdentifier out of the priority queue (if it was
-// present), then reasserts the heap invariants.
+// remove takes a ProjectIdentifier out of the priority queue, if present.
 func (u *unselected) remove(id ProjectIdentifier) {
 	for k, pi := range u.sl {
 		if pi == id {
