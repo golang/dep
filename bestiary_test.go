@@ -114,7 +114,8 @@ func mksvd(info string) ProjectDep {
 }
 
 type depspec struct {
-	name    ProjectAtom
+	n       ProjectName
+	v       Version
 	deps    []ProjectDep
 	devdeps []ProjectDep
 }
@@ -129,12 +130,14 @@ type depspec struct {
 //
 // First string is broken out into the name/semver of the main package.
 func dsv(pi string, deps ...string) depspec {
-	ds := depspec{
-		name: mksvpa(pi),
+	pa := mksvpa(pi)
+	if string(pa.Ident.LocalName) != pa.Ident.NetworkName {
+		panic("alternate source on self makes no sense")
 	}
 
-	if string(ds.name.Ident.LocalName) != ds.name.Ident.NetworkName {
-		panic("alternate source on self makes no sense")
+	ds := depspec{
+		n: pa.Ident.LocalName,
+		v: pa.Version,
 	}
 
 	for _, dep := range deps {
@@ -728,9 +731,10 @@ func newdepspecSM(ds []depspec) *depspecSourceManager {
 
 func (sm *depspecSourceManager) GetProjectInfo(n ProjectName, v Version) (ProjectInfo, error) {
 	for _, ds := range sm.specs {
-		if string(n) == ds.name.Ident.netName() && v.Matches(ds.name.Version) {
+		if n == ds.n && v.Matches(ds.v) {
 			return ProjectInfo{
-				pa:       ds.name,
+				N:        ds.n,
+				V:        ds.v,
 				Manifest: ds,
 				Lock:     dummyLock{},
 			}, nil
@@ -743,8 +747,8 @@ func (sm *depspecSourceManager) GetProjectInfo(n ProjectName, v Version) (Projec
 
 func (sm *depspecSourceManager) ListVersions(name ProjectName) (pi []Version, err error) {
 	for _, ds := range sm.specs {
-		if string(name) == ds.name.Ident.netName() {
-			pi = append(pi, ds.name.Version)
+		if name == ds.n {
+			pi = append(pi, ds.v)
 		}
 	}
 
@@ -757,7 +761,7 @@ func (sm *depspecSourceManager) ListVersions(name ProjectName) (pi []Version, er
 
 func (sm *depspecSourceManager) RepoExists(name ProjectName) (bool, error) {
 	for _, ds := range sm.specs {
-		if string(name) == ds.name.Ident.netName() {
+		if name == ds.n {
 			return true, nil
 		}
 	}
@@ -792,7 +796,7 @@ func (ds depspec) GetDevDependencies() []ProjectDep {
 
 // impl Spec interface
 func (ds depspec) Name() ProjectName {
-	return ds.name.Ident.LocalName
+	return ds.n
 }
 
 type fixLock []LockedProject

@@ -183,7 +183,7 @@ func TestBadSolveOpts(t *testing.T) {
 		t.Errorf("Should have errored on missing manifest")
 	}
 
-	p, _ := sm.GetProjectInfo(ProjectName(fixtures[0].ds[0].name.Ident.netName()), fixtures[0].ds[0].name.Version)
+	p, _ := sm.GetProjectInfo(fixtures[0].ds[0].n, fixtures[0].ds[0].v)
 	o.M = p.Manifest
 	_, err = s.Solve(o)
 	if err == nil {

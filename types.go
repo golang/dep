@@ -75,9 +75,10 @@ type Dependency struct {
 	Dep      ProjectDep
 }
 
-// ProjectInfo holds the spec and lock information for a given ProjectAtom
+// ProjectInfo holds manifest and lock for a ProjectName at a Version
 type ProjectInfo struct {
-	pa ProjectAtom
+	N ProjectName
+	V Version
 	Manifest
 	Lock
 }
