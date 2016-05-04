@@ -118,10 +118,8 @@ func (pm *projectManager) GetInfoAt(v Version) (ProjectInfo, error) {
 
 	if err == nil {
 		return ProjectInfo{
-			pa: ProjectAtom{
-				Name:    pm.n,
-				Version: v,
-			},
+			N:        pm.n,
+			V:        v,
 			Manifest: m,
 			Lock:     l,
 		}, nil

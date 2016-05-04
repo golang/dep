@@ -2,8 +2,8 @@ package vsolver
 
 import "github.com/Sirupsen/logrus"
 
-// satisfiable is the main checking method - it determines if introducing a new
-// project atom would result in a graph where all requirements are still
+// satisfiable is the main checking method. It determines if introducing a new
+// project atom would result in a state where all solver requirements are still
 // satisfied.
 func (s *solver) satisfiable(pa ProjectAtom) error {
 	if emptyProjectAtom == pa {
@@ -14,7 +14,7 @@ func (s *solver) satisfiable(pa ProjectAtom) error {
 
 	if s.l.Level >= logrus.DebugLevel {
 		s.l.WithFields(logrus.Fields{
-			"name":    pa.Name,
+			"name":    pa.Ident,
 			"version": pa.Version,
 		}).Debug("Checking satisfiability of project atom against current constraints")
 	}
@@ -30,6 +30,9 @@ func (s *solver) satisfiable(pa ProjectAtom) error {
 	}
 
 	for _, dep := range deps {
+		if err := s.checkIdentMatches(pa, dep); err != nil {
+			return err
+		}
 		// TODO dart skips "magic" deps here; do we need that?
 		if err := s.checkDepsConstraintsAllowable(pa, dep); err != nil {
 			return err
@@ -43,7 +46,7 @@ func (s *solver) satisfiable(pa ProjectAtom) error {
 
 	if s.l.Level >= logrus.DebugLevel {
 		s.l.WithFields(logrus.Fields{
-			"name":    pa.Name,
+			"name":    pa.Ident,
 			"version": pa.Version,
 		}).Debug("Project atom passed satisfiability test against current state")
 	}
@@ -54,7 +57,7 @@ func (s *solver) satisfiable(pa ProjectAtom) error {
 // checkAtomAllowable ensures that an atom itself is acceptable with respect to
 // the constraints established by the current solution.
 func (s *solver) checkAtomAllowable(pa ProjectAtom) error {
-	constraint := s.sel.getConstraint(pa.Name)
+	constraint := s.sel.getConstraint(pa.Ident)
 	if constraint.Matches(pa.Version) {
 		return nil
 	}
@@ -62,24 +65,24 @@ func (s *solver) checkAtomAllowable(pa ProjectAtom) error {
 
 	if s.l.Level >= logrus.InfoLevel {
 		s.l.WithFields(logrus.Fields{
-			"name":          pa.Name,
+			"name":          pa.Ident,
 			"version":       pa.Version,
 			"curconstraint": constraint.String(),
 		}).Info("Current constraints do not allow version")
 	}
 
-	deps := s.sel.getDependenciesOn(pa.Name)
+	deps := s.sel.getDependenciesOn(pa.Ident)
 	var failparent []Dependency
 	for _, dep := range deps {
 		if !dep.Dep.Constraint.Matches(pa.Version) {
 			if s.l.Level >= logrus.DebugLevel {
 				s.l.WithFields(logrus.Fields{
-					"name":       pa.Name,
-					"othername":  dep.Depender.Name,
+					"name":       pa.Ident,
+					"othername":  dep.Depender.Ident,
 					"constraint": dep.Dep.Constraint.String(),
 				}).Debug("Marking other, selected project with conflicting constraint as failed")
 			}
-			s.fail(dep.Depender.Name)
+			s.fail(dep.Depender.Ident)
 			failparent = append(failparent, dep)
 		}
 	}
@@ -94,7 +97,7 @@ func (s *solver) checkAtomAllowable(pa ProjectAtom) error {
 // checkDepsConstraintsAllowable checks that the constraints of an atom on a
 // given dep would not result in UNSAT.
 func (s *solver) checkDepsConstraintsAllowable(pa ProjectAtom, dep ProjectDep) error {
-	constraint := s.sel.getConstraint(dep.Name)
+	constraint := s.sel.getConstraint(dep.Ident)
 	// Ensure the constraint expressed by the dep has at least some possible
 	// intersection with the intersection of existing constraints.
 	if constraint.MatchesAny(dep.Constraint) {
@@ -103,15 +106,15 @@ func (s *solver) checkDepsConstraintsAllowable(pa ProjectAtom, dep ProjectDep) e
 
 	if s.l.Level >= logrus.DebugLevel {
 		s.l.WithFields(logrus.Fields{
-			"name":          pa.Name,
+			"name":          pa.Ident,
 			"version":       pa.Version,
-			"depname":       dep.Name,
+			"depname":       dep.Ident,
 			"curconstraint": constraint.String(),
 			"newconstraint": dep.Constraint.String(),
 		}).Debug("Project atom cannot be added; its constraints are disjoint with existing constraints")
 	}
 
-	siblings := s.sel.getDependenciesOn(dep.Name)
+	siblings := s.sel.getDependenciesOn(dep.Ident)
 	// No admissible versions - visit all siblings and identify the disagreement(s)
 	var failsib []Dependency
 	var nofailsib []Dependency
@@ -119,14 +122,14 @@ func (s *solver) checkDepsConstraintsAllowable(pa ProjectAtom, dep ProjectDep) e
 		if !sibling.Dep.Constraint.MatchesAny(dep.Constraint) {
 			if s.l.Level >= logrus.DebugLevel {
 				s.l.WithFields(logrus.Fields{
-					"name":          pa.Name,
+					"name":          pa.Ident,
 					"version":       pa.Version,
-					"depname":       sibling.Depender.Name,
+					"depname":       sibling.Depender.Ident,
 					"sibconstraint": sibling.Dep.Constraint.String(),
 					"newconstraint": dep.Constraint.String(),
 				}).Debug("Marking other, selected project as failed because its constraint is disjoint with our testee")
 			}
-			s.fail(sibling.Depender.Name)
+			s.fail(sibling.Depender.Ident)
 			failsib = append(failsib, sibling)
 		} else {
 			nofailsib = append(nofailsib, sibling)
@@ -145,23 +148,46 @@ func (s *solver) checkDepsConstraintsAllowable(pa ProjectAtom, dep ProjectDep) e
 // dep are not incompatible with the version of that dep that's already been
 // selected.
 func (s *solver) checkDepsDisallowsSelected(pa ProjectAtom, dep ProjectDep) error {
-	selected, exists := s.sel.selected(dep.Name)
+	selected, exists := s.sel.selected(dep.Ident)
 	if exists && !dep.Constraint.Matches(selected.Version) {
 		if s.l.Level >= logrus.DebugLevel {
 			s.l.WithFields(logrus.Fields{
-				"name":          pa.Name,
+				"name":          pa.Ident,
 				"version":       pa.Version,
-				"depname":       dep.Name,
+				"depname":       dep.Ident,
 				"curversion":    selected.Version,
 				"newconstraint": dep.Constraint.String(),
 			}).Debug("Project atom cannot be added; a constraint it introduces does not allow a currently selected version")
 		}
-		s.fail(dep.Name)
+		s.fail(dep.Ident)
 
 		return &constraintNotAllowedFailure{
 			goal: Dependency{Depender: pa, Dep: dep},
 			v:    selected.Version,
 		}
 	}
+	return nil
+}
+
+// checkIdentMatches ensures that the LocalName of a dep introduced by an atom,
+// has the same NetworkName as what's already been selected (assuming anything's
+// been selected).
+//
+// In other words, this ensures that the solver never simultaneously selects two
+// identifiers that disagree about where their upstream source is.
+func (s *solver) checkIdentMatches(pa ProjectAtom, dep ProjectDep) error {
+	if cur, exists := s.names[dep.Ident.LocalName]; exists {
+		if cur != dep.Ident.netName() {
+			deps := s.sel.getDependenciesOn(pa.Ident)
+			return &sourceMismatchFailure{
+				shared:   dep.Ident.LocalName,
+				sel:      deps,
+				current:  cur,
+				mismatch: dep.Ident.netName(),
+				prob:     pa,
+			}
+		}
+	}
+
 	return nil
 }

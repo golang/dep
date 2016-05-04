@@ -2,8 +2,19 @@ package vsolver
 
 import "sort"
 
-type smcache struct {
-	// The decorated/underlying SourceManager
+// smAdapter is an adapter and around a proper SourceManager.
+//
+// It provides localized caching that's tailored to the requirements of a
+// particular solve run.
+//
+// It also performs transformations between ProjectIdentifiers, which is what
+// the solver primarily deals in, and ProjectName, which is what the
+// SourceManager primarily deals in. This separation is helpful because it keeps
+// the complexities of deciding what a particular name "means" entirely within
+// the solver, while the SourceManager can traffic exclusively in
+// globally-unique network names.
+type smAdapter struct {
+	// The underlying, adapted-to SourceManager
 	sm SourceManager
 	// Direction to sort the version list. False indicates sorting for upgrades;
 	// true for downgrades.
@@ -15,19 +26,27 @@ type smcache struct {
 	vlists map[ProjectName][]Version
 }
 
-// ensure interface fulfillment
-var _ SourceManager = &smcache{}
-
-func (c *smcache) GetProjectInfo(pa ProjectAtom) (ProjectInfo, error) {
-	return c.sm.GetProjectInfo(pa)
+func (c *smAdapter) getProjectInfo(pa ProjectAtom) (ProjectInfo, error) {
+	return c.sm.GetProjectInfo(ProjectName(pa.Ident.netName()), pa.Version)
 }
 
-func (c *smcache) ListVersions(n ProjectName) ([]Version, error) {
-	if vl, exists := c.vlists[n]; exists {
+func (c *smAdapter) key(id ProjectIdentifier) ProjectName {
+	k := ProjectName(id.NetworkName)
+	if k == "" {
+		k = id.LocalName
+	}
+
+	return k
+}
+
+func (c *smAdapter) listVersions(id ProjectIdentifier) ([]Version, error) {
+	k := c.key(id)
+
+	if vl, exists := c.vlists[k]; exists {
 		return vl, nil
 	}
 
-	vl, err := c.sm.ListVersions(n)
+	vl, err := c.sm.ListVersions(k)
 	// TODO cache errors, too?
 	if err != nil {
 		return nil, err
@@ -39,26 +58,18 @@ func (c *smcache) ListVersions(n ProjectName) ([]Version, error) {
 		sort.Sort(upgradeVersionSorter(vl))
 	}
 
-	c.vlists[n] = vl
+	c.vlists[k] = vl
 	return vl, nil
 }
 
-func (c *smcache) RepoExists(n ProjectName) (bool, error) {
-	return c.sm.RepoExists(n)
+func (c *smAdapter) repoExists(id ProjectIdentifier) (bool, error) {
+	k := c.key(id)
+	return c.sm.RepoExists(k)
 }
 
-func (c *smcache) VendorCodeExists(n ProjectName) (bool, error) {
-	return c.sm.VendorCodeExists(n)
-}
-
-func (c *smcache) ExportAtomTo(ProjectAtom, string) error {
-	// No reason this should ever be called, as smcache's use is strictly
-	// solver-internal and the solver never exports atoms
-	panic("*smcache should never be asked to export an atom")
-}
-
-func (c *smcache) Release() {
-	c.sm.Release()
+func (c *smAdapter) vendorCodeExists(id ProjectIdentifier) (bool, error) {
+	k := c.key(id)
+	return c.sm.VendorCodeExists(k)
 }
 
 type upgradeVersionSorter []Version

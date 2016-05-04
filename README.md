@@ -8,7 +8,7 @@ integration into [glide](https://github.com/Masterminds/glide), but
 solving](www.mancoosi.org/edos/manager/) [the package management
 problem](https://medium.com/@sdboyer/so-you-want-to-write-a-package-manager-4ae9c17d9527).
 
-**NOTE - `vsolver` is super-extra-much not functional yet :)**
+**NOTE - `vsolver` isn’t ready yet, but it’s getting close.**
 
 The implementation is derived from the solver used in Dart's
 [pub](https://github.com/dart-lang/pub/tree/master/lib/src/solver)
@@ -86,6 +86,8 @@ right now. We'll improve/add explanatory links as we go!
 * [x] Dependency constraints based on [SemVer](http://semver.org/),
       branches, and revisions. AKA, "all the ways you might depend on
       Go code now, but coherently organized."
+* [x] Define different network addresses for a given import path
+* [ ] Global project aliasing. This is a bit different than the previous.
 * [ ] Bi-modal analysis (project-level and package-level)
 * [ ] Specific sub-package dependencies
 * [ ] Enforcing an acyclic project graph (mirroring the Go compiler's

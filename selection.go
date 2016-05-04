@@ -2,10 +2,10 @@ package vsolver
 
 type selection struct {
 	projects []ProjectAtom
-	deps     map[ProjectName][]Dependency
+	deps     map[ProjectIdentifier][]Dependency
 }
 
-func (s *selection) getDependenciesOn(id ProjectName) []Dependency {
+func (s *selection) getDependenciesOn(id ProjectIdentifier) []Dependency {
 	if deps, exists := s.deps[id]; exists {
 		return deps
 	}
@@ -13,11 +13,11 @@ func (s *selection) getDependenciesOn(id ProjectName) []Dependency {
 	return nil
 }
 
-func (s *selection) setDependenciesOn(id ProjectName, deps []Dependency) {
+func (s *selection) setDependenciesOn(id ProjectIdentifier, deps []Dependency) {
 	s.deps[id] = deps
 }
 
-func (s *selection) getConstraint(id ProjectName) Constraint {
+func (s *selection) getConstraint(id ProjectIdentifier) Constraint {
 	deps, exists := s.deps[id]
 	if !exists || len(deps) == 0 {
 		return any
@@ -39,24 +39,23 @@ func (s *selection) getConstraint(id ProjectName) Constraint {
 	return ret
 }
 
-func (s *selection) selected(id ProjectName) (ProjectAtom, bool) {
+func (s *selection) selected(id ProjectIdentifier) (ProjectAtom, bool) {
 	for _, pi := range s.projects {
-		if pi.Name == id {
+		if pi.Ident.eq(id) {
 			return pi, true
 		}
 	}
 
-	return ProjectAtom{}, false
+	return nilpa, false
 }
 
 // TODO take a ProjectName, but optionally also a preferred version. This will
 // enable the lock files of dependencies to remain slightly more stable.
 type unselected struct {
-	sl  []ProjectName
+	sl  []ProjectIdentifier
 	cmp func(i, j int) bool
 }
 
-// TODO should these be pointer receivers? container/heap examples aren't
 func (u unselected) Len() int {
 	return len(u.sl)
 }
@@ -70,7 +69,7 @@ func (u unselected) Swap(i, j int) {
 }
 
 func (u *unselected) Push(x interface{}) {
-	u.sl = append(u.sl, x.(ProjectName))
+	u.sl = append(u.sl, x.(ProjectIdentifier))
 }
 
 func (u *unselected) Pop() (v interface{}) {
@@ -78,9 +77,8 @@ func (u *unselected) Pop() (v interface{}) {
 	return v
 }
 
-// remove takes a ProjectIdentifier out of the priority queue (if it was
-// present), then reasserts the heap invariants.
-func (u *unselected) remove(id ProjectName) {
+// remove takes a ProjectIdentifier out of the priority queue, if present.
+func (u *unselected) remove(id ProjectIdentifier) {
 	for k, pi := range u.sl {
 		if pi == id {
 			if k == len(u.sl)-1 {
@@ -90,7 +88,6 @@ func (u *unselected) remove(id ProjectName) {
 				u.sl = append(u.sl[:k], u.sl[k+1:]...)
 			}
 			break
-			// TODO need to heap.Fix()? shouldn't have to...
 		}
 	}
 }

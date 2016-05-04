@@ -52,8 +52,8 @@ func solveAndBasicChecks(fix fixture, t *testing.T) (res Result, err error) {
 		case *BadOptsFailure:
 			t.Error("Unexpected bad opts failure solve error: %s", err)
 		case *noVersionError:
-			if fix.errp[0] != string(fail.pn) {
-				t.Errorf("Expected failure on project %s, but was on project %s", fail.pn, fix.errp[0])
+			if fix.errp[0] != string(fail.pn.LocalName) { // TODO identifierify
+				t.Errorf("Expected failure on project %s, but was on project %s", fail.pn.LocalName, fix.errp[0])
 			}
 
 			ep := make(map[string]struct{})
@@ -104,7 +104,7 @@ func solveAndBasicChecks(fix fixture, t *testing.T) (res Result, err error) {
 		rp := make(map[string]Version)
 		for _, p := range r.p {
 			pa := p.toAtom()
-			rp[string(pa.Name)] = pa.Version
+			rp[string(pa.Ident.LocalName)] = pa.Version
 		}
 
 		fixlen, rlen := len(fix.r), len(rp)
@@ -143,18 +143,23 @@ func solveAndBasicChecks(fix fixture, t *testing.T) (res Result, err error) {
 func getFailureCausingProjects(err error) (projs []string) {
 	switch e := err.(type) {
 	case *noVersionError:
-		projs = append(projs, string(e.pn))
+		projs = append(projs, string(e.pn.LocalName)) // TODO identifierify
 	case *disjointConstraintFailure:
 		for _, f := range e.failsib {
-			projs = append(projs, string(f.Depender.Name))
+			projs = append(projs, string(f.Depender.Ident.LocalName))
 		}
 	case *versionNotAllowedFailure:
 		for _, f := range e.failparent {
-			projs = append(projs, string(f.Depender.Name))
+			projs = append(projs, string(f.Depender.Ident.LocalName))
 		}
 	case *constraintNotAllowedFailure:
 		// No sane way of knowing why the currently selected version is
 		// selected, so do nothing
+	case *sourceMismatchFailure:
+		projs = append(projs, string(e.prob.Ident.LocalName))
+		for _, c := range e.sel {
+			projs = append(projs, string(c.Depender.Ident.LocalName))
+		}
 	default:
 		panic("unknown failtype")
 	}
@@ -178,7 +183,7 @@ func TestBadSolveOpts(t *testing.T) {
 		t.Errorf("Should have errored on missing manifest")
 	}
 
-	p, _ := sm.GetProjectInfo(fixtures[0].ds[0].name)
+	p, _ := sm.GetProjectInfo(fixtures[0].ds[0].n, fixtures[0].ds[0].v)
 	o.M = p.Manifest
 	_, err = s.Solve(o)
 	if err == nil {

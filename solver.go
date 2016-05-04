@@ -23,12 +23,37 @@ type Solver interface {
 // SolveOpts holds both options that govern solving behavior, and the actual
 // inputs to the solving process.
 type SolveOpts struct {
-	Root                 string
-	N                    ProjectName
-	M                    Manifest
-	L                    Lock
-	Downgrade, ChangeAll bool
-	ToChange             []ProjectName
+	// The path to the root of the project on which the solver is working.
+	Root string
+	// The 'name' of the project. Required. This should (must?) correspond to subpath of
+	// Root that exists under a GOPATH.
+	N ProjectName
+	// The root manifest. Required. This contains all the dependencies, constraints, and
+	// other controls available to the root project.
+	M Manifest
+	// The root lock. Optional. Generally, this lock is the output of a previous solve run.
+	//
+	// If provided, the solver will attempt to preserve the versions specified
+	// in the lock, unless ToChange or ChangeAll settings indicate otherwise.
+	L Lock
+	// Downgrade indicates whether the solver will attempt to upgrade (false) or
+	// downgrade (true) projects that are not locked, or are marked for change.
+	//
+	// Upgrading is, by far, the most typical case. The field is named
+	// 'Downgrade' so that the bool's zero value corresponds to that most
+	// typical case.
+	Downgrade bool
+	// ChangeAll indicates that all projects should be changed - that is, any
+	// versions specified in the root lock file should be ignored.
+	ChangeAll bool
+	// ToChange is a list of project names that should be changed - that is, any
+	// versions specified for those projects in the root lock file should be
+	// ignored.
+	//
+	// Passing ChangeAll has subtly different behavior from enumerating all
+	// projects into ToChange. In general, ToChange should *only* be used if the
+	// user expressly requested an upgrade for a specific project.
+	ToChange []ProjectName
 }
 
 func NewSolver(sm SourceManager, l *logrus.Logger) Solver {
@@ -37,25 +62,52 @@ func NewSolver(sm SourceManager, l *logrus.Logger) Solver {
 	}
 
 	return &solver{
-		sm:     &smcache{sm: sm},
-		l:      l,
-		latest: make(map[ProjectName]struct{}),
-		rlm:    make(map[ProjectName]LockedProject),
+		sm: &smAdapter{sm: sm},
+		l:  l,
 	}
 }
 
 // solver is a specialized backtracking SAT solver with satisfiability
 // conditions hardcoded to the needs of the Go package management problem space.
 type solver struct {
-	l        *logrus.Logger
-	o        SolveOpts
-	sm       *smcache
-	latest   map[ProjectName]struct{}
-	sel      *selection
-	unsel    *unselected
-	versions []*versionQueue
-	rlm      map[ProjectName]LockedProject
 	attempts int
+	// SolveOpts are the configuration options provided to the solver. The
+	// solver will abort early if certain options are not appropriately set.
+	o SolveOpts
+	l *logrus.Logger
+	// An adapter around a standard SourceManager. The adapter does some local
+	// caching of pre-sorted version lists, as well as translation between the
+	// full-on ProjectIdentifiers that the solver deals with and the simplified
+	// names a SourceManager operates on.
+	sm *smAdapter
+	// The list of projects currently "selected" - that is, they have passed all
+	// satisfiability checks, and are part of the current solution.
+	//
+	// The *selection type is mostly just a dumb data container; the solver
+	// itself is responsible for maintaining that invariant.
+	sel *selection
+	// The current list of projects that we need to incorporate into the solution in
+	// order for the solution to be complete. This list is implemented as a
+	// priority queue that places projects least likely to induce errors at the
+	// front, in order to minimize the amount of backtracking required to find a
+	// solution.
+	//
+	// Entries are added to and removed from this list by the solver at the same
+	// time that the selected queue is updated, either with an addition or
+	// removal.
+	unsel *unselected
+	// A list of all the currently active versionQueues in the solver. The set
+	// of projects represented here corresponds closely to what's in s.sel,
+	// although s.sel will always contain the root project, and s.versions never
+	// will.
+	versions []*versionQueue
+	// A map of the ProjectName (local names) that should be allowed to change
+	chng map[ProjectName]struct{}
+	// A map of the ProjectName (local names) that are currently selected, and
+	// the network name to which they currently correspond.
+	names map[ProjectName]string
+	// A map of the names listed in the root's lock.
+	rlm map[ProjectIdentifier]LockedProject
 }
 
 // Solve attempts to find a dependency solution for the given project, as
@@ -84,34 +136,41 @@ func (s *solver) Solve(opts SolveOpts) (Result, error) {
 	//return Result{}, fmt.Errorf("Project root must be a directory.")
 	//}
 
-	// Init/reset the smcache
+	// Init/reset the smAdapter
 	s.sm.sortdown = opts.Downgrade
 	s.sm.vlists = make(map[ProjectName][]Version)
 
 	s.o = opts
 
+	// Initialize maps
+	s.chng = make(map[ProjectName]struct{})
+	s.rlm = make(map[ProjectIdentifier]LockedProject)
+	s.names = make(map[ProjectName]string)
+
 	if s.o.L != nil {
 		for _, lp := range s.o.L.Projects() {
-			s.rlm[lp.n] = lp
+			s.rlm[lp.Ident()] = lp
 		}
 	}
 
 	for _, v := range s.o.ToChange {
-		s.latest[v] = struct{}{}
+		s.chng[v] = struct{}{}
 	}
 
 	// Initialize queues
 	s.sel = &selection{
-		deps: make(map[ProjectName][]Dependency),
+		deps: make(map[ProjectIdentifier][]Dependency),
 	}
 	s.unsel = &unselected{
-		sl:  make([]ProjectName, 0),
+		sl:  make([]ProjectIdentifier, 0),
 		cmp: s.unselectedComparator,
 	}
 
 	// Prime the queues with the root project
 	s.selectVersion(ProjectAtom{
-		Name: s.o.N,
+		Ident: ProjectIdentifier{
+			LocalName: s.o.N,
+		},
 		// This is a hack so that the root project doesn't have a nil version.
 		// It's sort of OK because the root never makes it out into the results.
 		// We may need a more elegant solution if we discover other side
@@ -144,7 +203,7 @@ func (s *solver) Solve(opts SolveOpts) (Result, error) {
 
 func (s *solver) solve() ([]ProjectAtom, error) {
 	for {
-		ref, has := s.nextUnselected()
+		id, has := s.nextUnselected()
 
 		if !has {
 			// no more packages to select - we're done. bail out
@@ -154,17 +213,17 @@ func (s *solver) solve() ([]ProjectAtom, error) {
 		if s.l.Level >= logrus.DebugLevel {
 			s.l.WithFields(logrus.Fields{
 				"attempts": s.attempts,
-				"name":     ref,
+				"name":     id,
 				"selcount": len(s.sel.projects),
 			}).Debug("Beginning step in solve loop")
 		}
 
-		queue, err := s.createVersionQueue(ref)
+		queue, err := s.createVersionQueue(id)
 
 		if err != nil {
 			// Err means a failure somewhere down the line; try backtracking.
 			if s.backtrack() {
-				// backtracking succeeded, move to the next unselected ref
+				// backtracking succeeded, move to the next unselected id
 				continue
 			}
 			return nil, err
@@ -176,13 +235,13 @@ func (s *solver) solve() ([]ProjectAtom, error) {
 
 		if s.l.Level >= logrus.InfoLevel {
 			s.l.WithFields(logrus.Fields{
-				"name":    queue.ref,
+				"name":    queue.id,
 				"version": queue.current(),
 			}).Info("Accepted project atom")
 		}
 
 		s.selectVersion(ProjectAtom{
-			Name:    queue.ref,
+			Ident:   queue.id,
 			Version: queue.current(),
 		})
 		s.versions = append(s.versions, queue)
@@ -198,18 +257,18 @@ func (s *solver) solve() ([]ProjectAtom, error) {
 	return projs, nil
 }
 
-func (s *solver) createVersionQueue(ref ProjectName) (*versionQueue, error) {
+func (s *solver) createVersionQueue(id ProjectIdentifier) (*versionQueue, error) {
 	// If on the root package, there's no queue to make
-	if ref == s.o.M.Name() {
-		return newVersionQueue(ref, nilpa, s.sm)
+	if id.LocalName == s.o.M.Name() {
+		return newVersionQueue(id, nilpa, s.sm)
 	}
 
-	exists, err := s.sm.RepoExists(ref)
+	exists, err := s.sm.repoExists(id)
 	if err != nil {
 		return nil, err
 	}
 	if !exists {
-		exists, err = s.sm.VendorCodeExists(ref)
+		exists, err = s.sm.vendorCodeExists(id)
 		if err != nil {
 			return nil, err
 		}
@@ -218,33 +277,33 @@ func (s *solver) createVersionQueue(ref ProjectName) (*versionQueue, error) {
 			// TODO mark this for special handling, somehow?
 			if s.l.Level >= logrus.WarnLevel {
 				s.l.WithFields(logrus.Fields{
-					"name": ref,
+					"name": id,
 				}).Warn("Code found in vendor for project, but no history was found upstream or in cache")
 			}
 		} else {
 			if s.l.Level >= logrus.WarnLevel {
 				s.l.WithFields(logrus.Fields{
-					"name": ref,
+					"name": id,
 				}).Warn("Upstream project does not exist")
 			}
-			return nil, newSolveError(fmt.Sprintf("Project '%s' could not be located.", ref), cannotResolve)
+			return nil, newSolveError(fmt.Sprintf("Project '%s' could not be located.", id), cannotResolve)
 		}
 	}
 
-	lockv, err := s.getLockVersionIfValid(ref)
+	lockv, err := s.getLockVersionIfValid(id)
 	if err != nil {
 		// Can only get an error here if an upgrade was expressly requested on
 		// code that exists only in vendor
 		return nil, err
 	}
 
-	q, err := newVersionQueue(ref, lockv, s.sm)
+	q, err := newVersionQueue(id, lockv, s.sm)
 	if err != nil {
 		// TODO this particular err case needs to be improved to be ONLY for cases
 		// where there's absolutely nothing findable about a given project name
 		if s.l.Level >= logrus.WarnLevel {
 			s.l.WithFields(logrus.Fields{
-				"name": ref,
+				"name": id,
 				"err":  err,
 			}).Warn("Failed to create a version queue")
 		}
@@ -254,12 +313,12 @@ func (s *solver) createVersionQueue(ref ProjectName) (*versionQueue, error) {
 	if s.l.Level >= logrus.DebugLevel {
 		if lockv == nilpa {
 			s.l.WithFields(logrus.Fields{
-				"name":  ref,
+				"name":  id,
 				"queue": q,
 			}).Debug("Created versionQueue, but no data in lock for project")
 		} else {
 			s.l.WithFields(logrus.Fields{
-				"name":  ref,
+				"name":  id,
 				"queue": q,
 			}).Debug("Created versionQueue using version found in lock")
 		}
@@ -280,7 +339,7 @@ func (s *solver) findValidVersion(q *versionQueue) error {
 
 	if s.l.Level >= logrus.DebugLevel {
 		s.l.WithFields(logrus.Fields{
-			"name":      q.ref,
+			"name":      q.id.errString(),
 			"hasLock":   q.hasLock,
 			"allLoaded": q.allLoaded,
 			"queue":     q,
@@ -289,14 +348,14 @@ func (s *solver) findValidVersion(q *versionQueue) error {
 	for {
 		cur := q.current()
 		err := s.satisfiable(ProjectAtom{
-			Name:    q.ref,
+			Ident:   q.id,
 			Version: cur,
 		})
 		if err == nil {
 			// we have a good version, can return safely
 			if s.l.Level >= logrus.DebugLevel {
 				s.l.WithFields(logrus.Fields{
-					"name":    q.ref,
+					"name":    q.id.errString(),
 					"version": cur,
 				}).Debug("Found acceptable version, returning out")
 			}
@@ -307,7 +366,7 @@ func (s *solver) findValidVersion(q *versionQueue) error {
 			// Error on advance, have to bail out
 			if s.l.Level >= logrus.WarnLevel {
 				s.l.WithFields(logrus.Fields{
-					"name": q.ref,
+					"name": q.id.errString(),
 					"err":  err,
 				}).Warn("Advancing version queue returned unexpected error, marking project as failed")
 			}
@@ -316,58 +375,68 @@ func (s *solver) findValidVersion(q *versionQueue) error {
 		if q.isExhausted() {
 			// Queue is empty, bail with error
 			if s.l.Level >= logrus.InfoLevel {
-				s.l.WithField("name", q.ref).Info("Version queue was completely exhausted, marking project as failed")
+				s.l.WithField("name", q.id.errString()).Info("Version queue was completely exhausted, marking project as failed")
 			}
 			break
 		}
 	}
 
-	s.fail(s.sel.getDependenciesOn(q.ref)[0].Depender.Name)
+	s.fail(s.sel.getDependenciesOn(q.id)[0].Depender.Ident)
 
 	// Return a compound error of all the new errors encountered during this
 	// attempt to find a new, valid version
 	return &noVersionError{
-		pn:    q.ref,
+		pn:    q.id,
 		fails: q.fails[faillen:],
 	}
 }
 
-func (s *solver) getLockVersionIfValid(ref ProjectName) (ProjectAtom, error) {
+// getLockVersionIfValid finds an atom for the given ProjectIdentifier from the
+// root lock, assuming:
+//
+// 1. A root lock was provided
+// 2. The general flag to change all projects was not passed
+// 3. A flag to change this particular ProjectIdentifier was not passed
+//
+// If any of these three conditions are true (or if the id cannot be found in
+// the root lock), then no atom will be returned.
+func (s *solver) getLockVersionIfValid(id ProjectIdentifier) (ProjectAtom, error) {
 	// If the project is specifically marked for changes, then don't look for a
 	// locked version.
-	if _, explicit := s.latest[ref]; explicit || s.o.ChangeAll {
-		if exist, _ := s.sm.RepoExists(ref); exist {
+	if _, explicit := s.chng[id.LocalName]; explicit || s.o.ChangeAll {
+		// For projects with an upstream or cache repository, it's safe to
+		// ignore what's in the lock, because there's presumably more versions
+		// to be found and attempted in the repository. If it's only in vendor,
+		// though, then we have to try to use what's in the lock, because that's
+		// the only version we'll be able to get.
+		if exist, _ := s.sm.repoExists(id); exist {
 			return nilpa, nil
 		}
 
-		// For projects without an upstream or cache repository, we still have
-		// to try to use what they have in the lock, because that's the only
-		// version we'll be able to actually get for them.
-		//
-		// However, if a change was expressly requested for something that
+		// However, if a change was *expressly* requested for something that
 		// exists only in vendor, then that guarantees we don't have enough
 		// information to complete a solution. In that case, error out.
 		if explicit {
 			return nilpa, &missingSourceFailure{
-				goal: ref,
+				goal: id,
 				prob: "Cannot upgrade %s, as no source repository could be found.",
 			}
 		}
 	}
 
-	lp, exists := s.rlm[ref]
+	lp, exists := s.rlm[id]
 	if !exists {
 		if s.l.Level >= logrus.DebugLevel {
-			s.l.WithField("name", ref).Debug("Project not present in lock")
+			s.l.WithField("name", id).Debug("Project not present in lock")
 		}
 		return nilpa, nil
 	}
 
-	constraint := s.sel.getConstraint(ref)
+	constraint := s.sel.getConstraint(id)
 	if !constraint.Matches(lp.v) {
 		if s.l.Level >= logrus.InfoLevel {
 			s.l.WithFields(logrus.Fields{
-				"name":    ref,
+				"name":    id,
 				"version": lp.Version(),
 			}).Info("Project found in lock, but version not allowed by current constraints")
 		}
@@ -376,13 +445,13 @@ func (s *solver) getLockVersionIfValid(ref ProjectName) (ProjectAtom, error) {
 
 	if s.l.Level >= logrus.InfoLevel {
 		s.l.WithFields(logrus.Fields{
-			"name":    ref,
+			"name":    id,
 			"version": lp.Version(),
 		}).Info("Project found in lock")
 	}
 
 	return ProjectAtom{
-		Name:    lp.n,
+		Ident:   id,
 		Version: lp.Version(),
 	}, nil
 }
@@ -395,10 +464,10 @@ func (s *solver) getDependenciesOf(pa ProjectAtom) ([]ProjectDep, error) {
 	var deps []ProjectDep
 
 	// If we're looking for root's deps, get it from opts rather than sm
-	if s.o.M.Name() == pa.Name {
+	if s.o.M.Name() == pa.Ident.LocalName {
 		deps = append(s.o.M.GetDependencies(), s.o.M.GetDevDependencies()...)
 	} else {
-		info, err := s.sm.GetProjectInfo(pa)
+		info, err := s.sm.getProjectInfo(pa)
 		if err != nil {
 			// TODO revisit this once a decision is made about better-formed errors;
 			// question is, do we expect the fetcher to pass back simple errors, or
@@ -450,7 +519,7 @@ func (s *solver) backtrack() bool {
 
 			if s.l.Level >= logrus.InfoLevel {
 				s.l.WithFields(logrus.Fields{
-					"name":      s.versions[len(s.versions)-1].ref,
+					"name":      s.versions[len(s.versions)-1].id,
 					"wasfailed": false,
 				}).Info("Backtracking popped off project")
 			}
@@ -464,7 +533,7 @@ func (s *solver) backtrack() bool {
 
 		if s.l.Level >= logrus.DebugLevel {
 			s.l.WithFields(logrus.Fields{
-				"name":    q.ref,
+				"name":    q.id.errString(),
 				"failver": q.current(),
 			}).Debug("Trying failed queue with next version")
 		}
@@ -479,7 +548,7 @@ func (s *solver) backtrack() bool {
 			if s.findValidVersion(q) == nil {
 				if s.l.Level >= logrus.InfoLevel {
 					s.l.WithFields(logrus.Fields{
-						"name":    q.ref,
+						"name":    q.id.errString(),
 						"version": q.current(),
 					}).Info("Backtracking found valid version, attempting next solution")
 				}
@@ -487,7 +556,7 @@ func (s *solver) backtrack() bool {
 				// Found one! Put it back on the selected queue and stop
 				// backtracking
 				s.selectVersion(ProjectAtom{
-					Name:    q.ref,
+					Ident:   q.id,
 					Version: q.current(),
 				})
 				break
@@ -496,7 +565,7 @@ func (s *solver) backtrack() bool {
 
 		if s.l.Level >= logrus.DebugLevel {
 			s.l.WithFields(logrus.Fields{
-				"name": q.ref,
+				"name": q.id.errString(),
 			}).Debug("Failed to find a valid version in queue, continuing backtrack")
 		}
 
@@ -504,7 +573,7 @@ func (s *solver) backtrack() bool {
 		// we just inspected off the list
 		if s.l.Level >= logrus.InfoLevel {
 			s.l.WithFields(logrus.Fields{
-				"name":      s.versions[len(s.versions)-1].ref,
+				"name":      s.versions[len(s.versions)-1].id.errString(),
 				"wasfailed": true,
 			}).Info("Backtracking popped off project")
 		}
@@ -520,27 +589,27 @@ func (s *solver) backtrack() bool {
 	return true
 }
 
-func (s *solver) nextUnselected() (ProjectName, bool) {
+func (s *solver) nextUnselected() (ProjectIdentifier, bool) {
 	if len(s.unsel.sl) > 0 {
 		return s.unsel.sl[0], true
 	}
 
-	return "", false
+	return ProjectIdentifier{}, false
 }
 
 func (s *solver) unselectedComparator(i, j int) bool {
 	iname, jname := s.unsel.sl[i], s.unsel.sl[j]
 
-	if iname == jname {
+	if iname.eq(jname) {
 		return false
 	}
 
 	rname := s.o.M.Name()
 	// *always* put root project first
-	if iname == rname {
+	if iname.LocalName == rname {
 		return true
 	}
-	if jname == rname {
+	if jname.LocalName == rname {
 		return false
 	}
 
@@ -553,7 +622,7 @@ func (s *solver) unselectedComparator(i, j int) bool {
 	case !ilock && jlock:
 		return false
 	case ilock && jlock:
-		return iname < jname
+		return iname.less(jname)
 	}
 
 	// Now, sort by number of available versions. This will trigger network
@@ -564,10 +633,11 @@ func (s *solver) unselectedComparator(i, j int) bool {
 	//
 	// TODO ...at least, 'til we allow 'preferred' versions via non-root locks
 
-	// Ignore err here - if there is actually an issue, it'll be picked up very
-	// soon somewhere else saner in the solving algorithm
-	ivl, _ := s.sm.ListVersions(iname)
-	jvl, _ := s.sm.ListVersions(jname)
+	// We can safely ignore an err from ListVersions here because, if there is
+	// an actual problem, it'll be noted and handled somewhere else saner in the
+	// solving algorithm.
+	ivl, _ := s.sm.listVersions(iname)
+	jvl, _ := s.sm.listVersions(jname)
 	iv, jv := len(ivl), len(jvl)
 
 	// Packages with fewer versions to pick from are less likely to benefit from
@@ -583,28 +653,28 @@ func (s *solver) unselectedComparator(i, j int) bool {
 	}
 
 	// Finally, if all else fails, fall back to comparing by name
-	return iname < jname
+	return iname.less(jname)
 }
 
-func (s *solver) fail(name ProjectName) {
+func (s *solver) fail(i ProjectIdentifier) {
 	// skip if the root project
-	if s.o.M.Name() == name {
+	if s.o.M.Name() == i.LocalName {
 		s.l.Debug("Not marking the root project as failed")
 		return
 	}
 
+	// just look for the first (oldest) one; the backtracker will necessarily
+	// traverse through and pop off any earlier ones
 	for _, vq := range s.versions {
-		if vq.ref == name {
+		if vq.id.LocalName == i.LocalName {
 			vq.failed = true
-			// just look for the first (oldest) one; the backtracker will
-			// necessarily traverse through and pop off any earlier ones
 			return
 		}
 	}
 }
 
 func (s *solver) selectVersion(pa ProjectAtom) {
-	s.unsel.remove(pa.Name)
+	s.unsel.remove(pa.Ident)
 	s.sel.projects = append(s.sel.projects, pa)
 
 	deps, err := s.getDependenciesOf(pa)
@@ -616,13 +686,14 @@ func (s *solver) selectVersion(pa ProjectAtom) {
 	}
 
 	for _, dep := range deps {
-		siblingsAndSelf := append(s.sel.getDependenciesOn(dep.Name), Dependency{Depender: pa, Dep: dep})
-		s.sel.deps[dep.Name] = siblingsAndSelf
+		siblingsAndSelf := append(s.sel.getDependenciesOn(dep.Ident), Dependency{Depender: pa, Dep: dep})
+		s.sel.setDependenciesOn(dep.Ident, siblingsAndSelf)
 
 		// add project to unselected queue if this is the first dep on it -
 		// otherwise it's already in there, or been selected
 		if len(siblingsAndSelf) == 1 {
-			heap.Push(s.unsel, dep.Name)
+			s.names[dep.Ident.LocalName] = dep.Ident.netName()
+			heap.Push(s.unsel, dep.Ident)
 		}
 	}
 }
@@ -630,7 +701,7 @@ func (s *solver) selectVersion(pa ProjectAtom) {
 func (s *solver) unselectLast() {
 	var pa ProjectAtom
 	pa, s.sel.projects = s.sel.projects[len(s.sel.projects)-1], s.sel.projects[:len(s.sel.projects)-1]
-	heap.Push(s.unsel, pa.Name)
+	heap.Push(s.unsel, pa.Ident)
 
 	deps, err := s.getDependenciesOf(pa)
 	if err != nil {
@@ -641,32 +712,33 @@ func (s *solver) unselectLast() {
 	}
 
 	for _, dep := range deps {
-		siblings := s.sel.getDependenciesOn(dep.Name)
+		siblings := s.sel.getDependenciesOn(dep.Ident)
 		siblings = siblings[:len(siblings)-1]
-		s.sel.deps[dep.Name] = siblings
+		s.sel.deps[dep.Ident] = siblings
 
 		// if no siblings, remove from unselected queue
 		if len(siblings) == 0 {
 			if s.l.Level >= logrus.DebugLevel {
 				s.l.WithFields(logrus.Fields{
-					"name":  dep.Name,
-					"pname": pa.Name,
+					"name":  dep.Ident,
+					"pname": pa.Ident,
 					"pver":  pa.Version,
 				}).Debug("Removing project from unselected queue; last parent atom was unselected")
 			}
-			s.unsel.remove(dep.Name)
+			delete(s.names, dep.Ident.LocalName)
+			s.unsel.remove(dep.Ident)
 		}
 	}
 }
 
 // simple (temporary?) helper just to convert atoms into locked projects
 func pa2lp(pa ProjectAtom) LockedProject {
-	// TODO will need to revisit this once we flesh out the relationship between
-	// names, uris, etc.
 	lp := LockedProject{
-		n:    pa.Name,
-		path: string(pa.Name),
-		uri:  string(pa.Name),
+		n: pa.Ident.LocalName,
+		// path is mostly duplicate information now, but if we ever allow
+		// nesting as a conflict resolution mechanism, it will become valuable
+		path: string(pa.Ident.LocalName),
+		uri:  pa.Ident.netName(),
 	}
 
 	switch v := pa.Version.(type) {

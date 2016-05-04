@@ -3,6 +3,7 @@ package vsolver
 import (
 	"bytes"
 	"fmt"
+	"strings"
 )
 
 type errorLevel uint8
@@ -35,7 +36,7 @@ func (e *solveError) Error() string {
 }
 
 type noVersionError struct {
-	pn    ProjectName
+	pn    ProjectIdentifier
 	fails []failedVersion
 }
 
@@ -63,7 +64,7 @@ type disjointConstraintFailure struct {
 func (e *disjointConstraintFailure) Error() string {
 	if len(e.failsib) == 1 {
 		str := "Could not introduce %s at %s, as it has a dependency on %s with constraint %s, which has no overlap with existing constraint %s from %s at %s"
-		return fmt.Sprintf(str, e.goal.Depender.Name, e.goal.Depender.Version, e.goal.Dep.Name, e.goal.Dep.Constraint.String(), e.failsib[0].Dep.Constraint.String(), e.failsib[0].Depender.Name, e.failsib[0].Depender.Version)
+		return fmt.Sprintf(str, e.goal.Depender.Ident, e.goal.Depender.Version, e.goal.Dep.Ident.errString(), e.goal.Dep.Constraint.String(), e.failsib[0].Dep.Constraint.String(), e.failsib[0].Depender.Ident, e.failsib[0].Depender.Version)
 	}
 
 	var buf bytes.Buffer
@@ -73,16 +74,16 @@ func (e *disjointConstraintFailure) Error() string {
 		sibs = e.failsib
 
 		str := "Could not introduce %s at %s, as it has a dependency on %s with constraint %s, which has no overlap with the following existing constraints:\n"
-		fmt.Fprintf(&buf, str, e.goal.Depender.Name, e.goal.Depender.Version, e.goal.Dep.Name, e.goal.Dep.Constraint.String())
+		fmt.Fprintf(&buf, str, e.goal.Depender.Ident, e.goal.Depender.Version, e.goal.Dep.Ident.errString(), e.goal.Dep.Constraint.String())
 	} else {
 		sibs = e.nofailsib
 
 		str := "Could not introduce %s at %s, as it has a dependency on %s with constraint %s, which does not overlap with the intersection of existing constraints from other currently selected packages:\n"
-		fmt.Fprintf(&buf, str, e.goal.Depender.Name, e.goal.Depender.Version, e.goal.Dep.Name, e.goal.Dep.Constraint.String())
+		fmt.Fprintf(&buf, str, e.goal.Depender.Ident, e.goal.Depender.Version, e.goal.Dep.Ident.errString(), e.goal.Dep.Constraint.String())
 	}
 
 	for _, c := range sibs {
-		fmt.Fprintf(&buf, "\t%s at %s with constraint %s\n", c.Depender.Name, c.Depender.Version, c.Dep.Constraint.String())
+		fmt.Fprintf(&buf, "\t%s at %s with constraint %s\n", c.Depender.Ident, c.Depender.Version, c.Dep.Constraint.String())
 	}
 
 	return buf.String()
@@ -98,7 +99,7 @@ type constraintNotAllowedFailure struct {
 
 func (e *constraintNotAllowedFailure) Error() string {
 	str := "Could not introduce %s at %s, as it has a dependency on %s with constraint %s, which does not allow the currently selected version of %s"
-	return fmt.Sprintf(str, e.goal.Depender.Name, e.goal.Depender.Version, e.goal.Dep.Name, e.goal.Dep.Constraint, e.v)
+	return fmt.Sprintf(str, e.goal.Depender.Ident.errString(), e.goal.Depender.Version, e.goal.Dep.Ident.errString(), e.goal.Dep.Constraint, e.v)
 }
 
 type versionNotAllowedFailure struct {
@@ -110,23 +111,23 @@ type versionNotAllowedFailure struct {
 func (e *versionNotAllowedFailure) Error() string {
 	if len(e.failparent) == 1 {
 		str := "Could not introduce %s at %s, as it is not allowed by constraint %s from project %s."
-		return fmt.Sprintf(str, e.goal.Name, e.goal.Version, e.failparent[0].Dep.Constraint.String(), e.failparent[0].Depender.Name)
+		return fmt.Sprintf(str, e.goal.Ident, e.goal.Version, e.failparent[0].Dep.Constraint.String(), e.failparent[0].Depender.Ident)
 	}
 
 	var buf bytes.Buffer
 
 	str := "Could not introduce %s at %s, as it is not allowed by constraints from the following projects:\n"
-	fmt.Fprintf(&buf, str, e.goal.Name, e.goal.Version)
+	fmt.Fprintf(&buf, str, e.goal.Ident, e.goal.Version)
 
 	for _, f := range e.failparent {
-		fmt.Fprintf(&buf, "\t%s at %s with constraint %s\n", f.Depender.Name, f.Depender.Version, f.Dep.Constraint.String())
+		fmt.Fprintf(&buf, "\t%s at %s with constraint %s\n", f.Depender.Ident, f.Depender.Version, f.Dep.Constraint.String())
 	}
 
 	return buf.String()
 }
 
 type missingSourceFailure struct {
-	goal ProjectName
+	goal ProjectIdentifier
 	prob string
 }
 
@@ -138,4 +139,21 @@ type BadOptsFailure string
 
 func (e BadOptsFailure) Error() string {
 	return string(e)
+}
+
+type sourceMismatchFailure struct {
+	shared            ProjectName
+	sel               []Dependency
+	current, mismatch string
+	prob              ProjectAtom
+}
+
+func (e *sourceMismatchFailure) Error() string {
+	var cur []string
+	for _, c := range e.sel {
+		cur = append(cur, string(c.Depender.Ident.LocalName))
+	}
+
+	str := "Could not introduce %s at %s, as it depends on %s from %s, but %s is already marked as coming from %s by %s"
+	return fmt.Sprintf(str, e.prob.Ident.errString(), e.prob.Version, e.shared, e.mismatch, e.shared, e.current, strings.Join(cur, ", "))
 }

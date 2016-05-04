@@ -20,7 +20,7 @@ func TestHashInputs(t *testing.T) {
 	dig := opts.HashInputs()
 
 	h := sha256.New()
-	for _, v := range []string{"a", "1.0.0", "b", "1.0.0"} {
+	for _, v := range []string{"a", "a", "1.0.0", "b", "b", "1.0.0"} {
 		h.Write([]byte(v))
 	}
 	correct := h.Sum(nil)
