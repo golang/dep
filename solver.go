@@ -1,7 +1,6 @@
 package vsolver
 
 import (
-	"bytes"
 	"container/heap"
 	"fmt"
 	"log"
@@ -217,6 +216,7 @@ func (s *solver) solve() ([]ProjectAtom, error) {
 			break
 		}
 
+		s.logStart(id)
 		queue, err := s.createVersionQueue(id)
 
 		if err != nil {
@@ -610,43 +610,60 @@ func (s *solver) unselectLast() {
 	}
 }
 
+func (s *solver) logStart(id ProjectIdentifier) {
+	prefix := strings.Repeat("| ", len(s.versions)+1)
+	s.tl.Printf("%s\n", tracePrefix(fmt.Sprintf("? attempting %s", id.errString()), prefix, prefix))
+}
+
 func (s *solver) logSolve(args ...interface{}) {
 	if !s.o.Trace {
 		return
 	}
 
+	preflen := len(s.versions)
 	var msg string
 	if len(args) == 0 {
 		// Generate message based on current solver state
 		if len(s.versions) == 0 {
-			msg = "* (root)"
+			msg = "✓ (root)"
 		} else {
 			vq := s.versions[len(s.versions)-1]
-			msg = fmt.Sprintf("* select %s at %s", vq.id.errString(), vq.current())
+			msg = fmt.Sprintf("✓ select %s at %s", vq.id.errString(), vq.current())
 		}
-	} else if str, ok := args[0].(string); ok {
-		msg = tracePrefix(fmt.Sprintf(str, args[1:]), "| ")
-	} else if err, ok := args[0].(error); ok {
-		// If we got an error, just reuse its error text
-		msg = tracePrefix(err.Error(), "| ")
 	} else {
-		// panic here because this can *only* mean a stupid internal bug
-		panic("canary - must pass a string as first arg to logSolve, or no args at all")
+		// Use longer prefix length for these cases, as they're the intermediate
+		// work
+		preflen++
+		switch data := args[0].(type) {
+		case string:
+			msg = tracePrefix(fmt.Sprintf(data, args[1:]), "| ", "| ")
+		case traceError:
+			// We got a special traceError, use its custom method
+			msg = tracePrefix(data.traceString(), "| ", "x ")
+		case error:
+			// Regular error; still use the x leader but default Error() string
+			msg = tracePrefix(data.Error(), "| ", "x ")
+		default:
+			// panic here because this can *only* mean a stupid internal bug
+			panic("canary - must pass a string as first arg to logSolve, or no args at all")
+		}
 	}
 
-	s.tl.Printf("%s\n", tracePrefix(msg, strings.Repeat("| ", len(s.versions))))
+	prefix := strings.Repeat("| ", preflen)
+	s.tl.Printf("%s\n", tracePrefix(msg, prefix, prefix))
 }
 
-func tracePrefix(msg, sep string) string {
-	// TODO pool?
-	var buf bytes.Buffer
-
-	parts := strings.Split(msg, "\n")
-	for _, str := range parts {
-		fmt.Fprintf(&buf, "%s%s", sep, str)
+func tracePrefix(msg, sep, fsep string) string {
+	parts := strings.Split(strings.TrimSuffix(msg, "\n"), "\n")
+	for k, str := range parts {
+		if k == 0 {
+			parts[k] = fmt.Sprintf("%s%s", fsep, str)
+		} else {
+			parts[k] = fmt.Sprintf("%s%s", sep, str)
+		}
 	}
 
-	return buf.String()
+	return strings.Join(parts, "\n")
 }
 
 // simple (temporary?) helper just to convert atoms into locked projects

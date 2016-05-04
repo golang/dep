@@ -22,6 +22,10 @@ type SolveError interface {
 	Children() []error
 }
 
+type traceError interface {
+	traceString() string
+}
+
 type solveError struct {
 	lvl errorLevel
 	msg string
@@ -49,6 +53,24 @@ func (e *noVersionError) Error() string {
 	fmt.Fprintf(&buf, "Could not find any versions of %s that met constraints:", e.pn)
 	for _, f := range e.fails {
 		fmt.Fprintf(&buf, "\n\t%s: %s", f.v, f.f.Error())
+	}
+
+	return buf.String()
+}
+
+func (e *noVersionError) traceString() string {
+	if len(e.fails) == 0 {
+		return fmt.Sprintf("No versions found")
+	}
+
+	var buf bytes.Buffer
+	fmt.Fprintf(&buf, "No versions of %s met constraints:", e.pn.LocalName)
+	for _, f := range e.fails {
+		if te, ok := f.f.(traceError); ok {
+			fmt.Fprintf(&buf, "\n  %s: %s", f.v, te.traceString())
+		} else {
+			fmt.Fprintf(&buf, "\n  %s: %s", f.v, f.f.Error())
+		}
 	}
 
 	return buf.String()
@@ -89,6 +111,19 @@ func (e *disjointConstraintFailure) Error() string {
 	return buf.String()
 }
 
+func (e *disjointConstraintFailure) traceString() string {
+	var buf bytes.Buffer
+	fmt.Fprintf(&buf, "constraint %s on %s disjoint with other dependers:\n", e.goal.Dep.Constraint.String(), e.goal.Dep.Ident.errString())
+	for _, f := range e.failsib {
+		fmt.Fprintf(&buf, "%s from %s at %s (no overlap)\n", f.Dep.Constraint.String(), f.Depender.Ident.LocalName, f.Depender.Version)
+	}
+	for _, f := range e.nofailsib {
+		fmt.Fprintf(&buf, "%s from %s at %s (some overlap)\n", f.Dep.Constraint.String(), f.Depender.Ident.LocalName, f.Depender.Version)
+	}
+
+	return buf.String()
+}
+
 // Indicates that an atom could not be introduced because one of its dep
 // constraints does not admit the currently-selected version of the target
 // project.
@@ -100,6 +135,11 @@ type constraintNotAllowedFailure struct {
 func (e *constraintNotAllowedFailure) Error() string {
 	str := "Could not introduce %s at %s, as it has a dependency on %s with constraint %s, which does not allow the currently selected version of %s"
 	return fmt.Sprintf(str, e.goal.Depender.Ident.errString(), e.goal.Depender.Version, e.goal.Dep.Ident.errString(), e.goal.Dep.Constraint, e.v)
+}
+
+func (e *constraintNotAllowedFailure) traceString() string {
+	str := "%s at %s depends on %s with %s, but that's already selected at %s"
+	return fmt.Sprintf(str, e.goal.Depender.Ident.LocalName, e.goal.Depender.Version, e.goal.Dep.Ident.LocalName, e.goal.Dep.Constraint, e.v)
 }
 
 type versionNotAllowedFailure struct {
@@ -121,6 +161,17 @@ func (e *versionNotAllowedFailure) Error() string {
 
 	for _, f := range e.failparent {
 		fmt.Fprintf(&buf, "\t%s from %s at %s\n", f.Dep.Constraint.String(), f.Depender.Ident.errString(), f.Depender.Version)
+	}
+
+	return buf.String()
+}
+
+func (e *versionNotAllowedFailure) traceString() string {
+	var buf bytes.Buffer
+
+	fmt.Fprintf(&buf, "%s at %s not allowed by constraint %s:\n", e.goal.Ident.LocalName, e.goal.Version, e.c.String())
+	for _, f := range e.failparent {
+		fmt.Fprintf(&buf, "  %s from %s at %s\n", f.Dep.Constraint.String(), f.Depender.Ident.LocalName, f.Depender.Version)
 	}
 
 	return buf.String()
@@ -156,4 +207,16 @@ func (e *sourceMismatchFailure) Error() string {
 
 	str := "Could not introduce %s at %s, as it depends on %s from %s, but %s is already marked as coming from %s by %s"
 	return fmt.Sprintf(str, e.prob.Ident.errString(), e.prob.Version, e.shared, e.mismatch, e.shared, e.current, strings.Join(cur, ", "))
+}
+
+func (e *sourceMismatchFailure) traceString() string {
+	var buf bytes.Buffer
+	fmt.Fprintf(&buf, "disagreement on network addr for %s:\n", e.shared)
+
+	fmt.Fprintf(&buf, "  %s from %s\n", e.mismatch, e.prob.Ident.errString())
+	for _, dep := range e.sel {
+		fmt.Fprintf(&buf, "  %s from %s\n", e.current, dep.Depender.Ident.errString())
+	}
+
+	return buf.String()
 }
