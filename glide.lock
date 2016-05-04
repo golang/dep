@@ -1,5 +1,5 @@
-hash: f3bcd8dbd2ab556604fb9b7a2b67335e5a07259580801ffc15808590889802a1
-updated: 2016-04-14T22:30:56.806524724-04:00
+hash: 6bd3b42b8d3ffd99e2ed2c4b75b1a6f9f1a96ea78714fe5b59f7333b8056656a
+updated: 2016-05-04T00:16:45.75684042-04:00
 imports:
 - name: github.com/Masterminds/semver
   version: 0a2c9fc0eee2c4cbb9526877c4a54da047fdcadd
@@ -7,12 +7,7 @@ imports:
 - name: github.com/Masterminds/vcs
   version: 7a21de0acff824ccf45f633cc844a19625149c2f
   vcs: git
-- name: github.com/Sirupsen/logrus
-  version: 4b6ea7319e214d98c938f12692336f7ca9348d6b
 - name: github.com/termie/go-shutil
   version: bcacb06fecaeec8dc42af03c87c6949f4a05c74c
-- name: golang.org/x/sys
-  version: b323466d0bc6669362b0836480b30452d2c00db9
-  subpackages:
-  - unix
+  vcs: git
 devImports: []

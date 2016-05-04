@@ -2,32 +2,29 @@ package vsolver
 
 import (
 	"fmt"
+	"log"
+	"os"
 	"strings"
 	"testing"
-
-	"github.com/Sirupsen/logrus"
 )
 
 // TODO regression test ensuring that locks with only revs for projects don't cause errors
+
+var stderrlog = log.New(os.Stderr, "", 0)
 
 func TestBasicSolves(t *testing.T) {
 	//solveAndBasicChecks(fixtures[8], t)
 	for _, fix := range fixtures {
 		solveAndBasicChecks(fix, t)
+		if testing.Verbose() {
+			// insert a line break between tests
+			stderrlog.Println("")
+		}
 	}
 }
 
 func solveAndBasicChecks(fix fixture, t *testing.T) (res Result, err error) {
 	sm := newdepspecSM(fix.ds)
-
-	l := logrus.New()
-	if testing.Verbose() {
-		l.Level = logrus.DebugLevel
-	} else {
-		l.Level = logrus.WarnLevel
-	}
-
-	s := NewSolver(sm, l)
 
 	o := SolveOpts{
 		Root:      string(fix.ds[0].Name()),
@@ -37,6 +34,12 @@ func solveAndBasicChecks(fix fixture, t *testing.T) (res Result, err error) {
 		Downgrade: fix.downgrade,
 		ChangeAll: fix.changeall,
 	}
+
+	if testing.Verbose() {
+		o.Trace = true
+	}
+
+	s := NewSolver(sm, stderrlog)
 
 	if fix.l != nil {
 		o.L = fix.l
@@ -170,12 +173,7 @@ func getFailureCausingProjects(err error) (projs []string) {
 func TestBadSolveOpts(t *testing.T) {
 	sm := newdepspecSM(fixtures[0].ds)
 
-	l := logrus.New()
-	if testing.Verbose() {
-		l.Level = logrus.DebugLevel
-	}
-
-	s := NewSolver(sm, l)
+	s := NewSolver(sm, nil)
 
 	o := SolveOpts{}
 	_, err := s.Solve(o)
