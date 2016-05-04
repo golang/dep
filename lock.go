@@ -87,9 +87,18 @@ func NewLockedProject(n ProjectName, v Version, uri, path string) LockedProject 
 	return lp
 }
 
-// Name returns the name of the locked project.
-func (lp LockedProject) Name() ProjectName {
-	return lp.n
+// Ident returns the identifier describing the project. This includes both the
+// local name (the root name by which the project is referenced in import paths)
+// and the network name, where the upstream source lives.
+func (lp LockedProject) Ident() ProjectIdentifier {
+	id := ProjectIdentifier{
+		LocalName:   lp.n,
+		NetworkName: lp.uri,
+	}
+
+	// Keep things sane for things like map keys by ensuring the NetworkName is
+	// always set, even if it's the same as the LocalName.
+	return id.normalize()
 }
 
 // Version assembles together whatever version and/or revision data is
@@ -106,11 +115,6 @@ func (lp LockedProject) Version() Version {
 	return lp.v.Is(lp.r)
 }
 
-// URI returns the upstream URI of the locked project.
-func (lp LockedProject) URI() string {
-	return lp.uri
-}
-
 // Path returns the path relative to the vendor directory to which the locked
 // project should be checked out.
 func (lp LockedProject) Path() string {
@@ -119,10 +123,7 @@ func (lp LockedProject) Path() string {
 
 func (lp LockedProject) toAtom() ProjectAtom {
 	pa := ProjectAtom{
-		Ident: ProjectIdentifier{
-			LocalName:   lp.n,
-			NetworkName: lp.uri,
-		},
+		Ident: lp.Ident(),
 	}
 
 	if lp.v == nil {

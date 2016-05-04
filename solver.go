@@ -107,7 +107,7 @@ type solver struct {
 	// the network name to which they currently correspond.
 	names map[ProjectName]string
 	// A map of the names listed in the root's lock.
-	rlm map[ProjectName]LockedProject
+	rlm map[ProjectIdentifier]LockedProject
 }
 
 // Solve attempts to find a dependency solution for the given project, as
@@ -144,12 +144,12 @@ func (s *solver) Solve(opts SolveOpts) (Result, error) {
 
 	// Initialize maps
 	s.chng = make(map[ProjectName]struct{})
-	s.rlm = make(map[ProjectName]LockedProject)
+	s.rlm = make(map[ProjectIdentifier]LockedProject)
 	s.names = make(map[ProjectName]string)
 
 	if s.o.L != nil {
 		for _, lp := range s.o.L.Projects() {
-			s.rlm[lp.n] = lp
+			s.rlm[lp.Ident()] = lp
 		}
 	}
 
@@ -424,8 +424,7 @@ func (s *solver) getLockVersionIfValid(id ProjectIdentifier) (ProjectAtom, error
 		}
 	}
 
-	// TODO need to make rlm operate on the full ProjectIdentifier
-	lp, exists := s.rlm[id.LocalName]
+	lp, exists := s.rlm[id]
 	if !exists {
 		if s.l.Level >= logrus.DebugLevel {
 			s.l.WithField("name", id).Debug("Project not present in lock")
@@ -614,8 +613,8 @@ func (s *solver) unselectedComparator(i, j int) bool {
 		return false
 	}
 
-	_, ilock := s.rlm[iname.LocalName]
-	_, jlock := s.rlm[jname.LocalName]
+	_, ilock := s.rlm[iname]
+	_, jlock := s.rlm[jname]
 
 	switch {
 	case ilock && !jlock:

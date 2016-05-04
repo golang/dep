@@ -441,6 +441,20 @@ var fixtures = []fixture{
 		maxAttempts: 4,
 	},
 	{
+		n: "locked atoms are matched on both local and net name",
+		ds: []depspec{
+			dsv("root 0.0.0", "foo *"),
+			dsv("foo 1.0.0 foorev"),
+			dsv("foo 2.0.0 foorev2"),
+		},
+		l: mklock(
+			"foo from baz 1.0.0 foorev",
+		),
+		r: mkresults(
+			"foo 2.0.0 foorev2",
+		),
+	},
+	{
 		n: "includes root package's dev dependencies",
 		ds: []depspec{
 			dsv("root 1.0.0", "(dev) foo 1.0.0", "(dev) bar 1.0.0"),

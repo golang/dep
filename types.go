@@ -48,6 +48,14 @@ func (i ProjectIdentifier) errString() string {
 	return fmt.Sprintf("%s (from %s)", i.LocalName, i.NetworkName)
 }
 
+func (i ProjectIdentifier) normalize() ProjectIdentifier {
+	if i.NetworkName == "" {
+		i.NetworkName = string(i.LocalName)
+	}
+
+	return i
+}
+
 type ProjectName string
 
 type ProjectAtom struct {
