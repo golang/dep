@@ -1,10 +1,13 @@
 package vsolver
 
 import (
+	"bytes"
 	"container/heap"
 	"fmt"
+	"log"
 	"math/rand"
 	"strconv"
+	"strings"
 
 	"github.com/Sirupsen/logrus"
 )
@@ -54,9 +57,12 @@ type SolveOpts struct {
 	// projects into ToChange. In general, ToChange should *only* be used if the
 	// user expressly requested an upgrade for a specific project.
 	ToChange []ProjectName
+	// Trace controls whether the solver will generate informative trace output
+	// as it moves through the solving process.
+	Trace bool
 }
 
-func NewSolver(sm SourceManager, l *logrus.Logger) Solver {
+func NewSolver(sm SourceManager, l *logrus.Logger, l2 *log.Logger) Solver {
 	if l == nil {
 		l = logrus.New()
 	}
@@ -64,6 +70,7 @@ func NewSolver(sm SourceManager, l *logrus.Logger) Solver {
 	return &solver{
 		sm: &smAdapter{sm: sm},
 		l:  l,
+		tl: l2,
 	}
 }
 
@@ -75,6 +82,8 @@ type solver struct {
 	// solver will abort early if certain options are not appropriately set.
 	o SolveOpts
 	l *logrus.Logger
+	// Logger used exclusively for trace output, if the trace option is set.
+	tl *log.Logger
 	// An adapter around a standard SourceManager. The adapter does some local
 	// caching of pre-sorted version lists, as well as translation between the
 	// full-on ProjectIdentifiers that the solver deals with and the simplified
@@ -142,6 +151,11 @@ func (s *solver) Solve(opts SolveOpts) (Result, error) {
 
 	s.o = opts
 
+	// Force trace to false if no real logger was provided.
+	if s.tl == nil {
+		s.o.Trace = false
+	}
+
 	// Initialize maps
 	s.chng = make(map[ProjectName]struct{})
 	s.rlm = make(map[ProjectIdentifier]LockedProject)
@@ -179,6 +193,7 @@ func (s *solver) Solve(opts SolveOpts) (Result, error) {
 	})
 
 	// Prep is done; actually run the solver
+	s.logSolve()
 	pa, err := s.solve()
 
 	// Solver finished with an err; return that and we're done
@@ -233,18 +248,12 @@ func (s *solver) solve() ([]ProjectAtom, error) {
 			panic("canary - queue is empty, but flow indicates success")
 		}
 
-		if s.l.Level >= logrus.InfoLevel {
-			s.l.WithFields(logrus.Fields{
-				"name":    queue.id,
-				"version": queue.current(),
-			}).Info("Accepted project atom")
-		}
-
 		s.selectVersion(ProjectAtom{
 			Ident:   queue.id,
 			Version: queue.current(),
 		})
 		s.versions = append(s.versions, queue)
+		s.logSolve()
 	}
 
 	// Getting this far means we successfully found a solution
@@ -440,9 +449,11 @@ func (s *solver) getLockVersionIfValid(id ProjectIdentifier) (ProjectAtom, error
 				"version": lp.Version(),
 			}).Info("Project found in lock, but version not allowed by current constraints")
 		}
+		s.logSolve("%s in root lock, but current constraints disallow it", id.errString())
 		return nilpa, nil
 	}
 
+	s.logSolve("using root lock's version of %s", id.errString())
 	if s.l.Level >= logrus.InfoLevel {
 		s.l.WithFields(logrus.Fields{
 			"name":    id,
@@ -546,6 +557,7 @@ func (s *solver) backtrack() bool {
 		if q.advance(nil) == nil && !q.isExhausted() {
 			// Search for another acceptable version of this failed dep in its queue
 			if s.findValidVersion(q) == nil {
+				s.logSolve()
 				if s.l.Level >= logrus.InfoLevel {
 					s.l.WithFields(logrus.Fields{
 						"name":    q.id.errString(),
@@ -563,6 +575,7 @@ func (s *solver) backtrack() bool {
 			}
 		}
 
+		s.logSolve("no more versions of %s, backtracking")
 		if s.l.Level >= logrus.DebugLevel {
 			s.l.WithFields(logrus.Fields{
 				"name": q.id.errString(),
@@ -729,6 +742,45 @@ func (s *solver) unselectLast() {
 			s.unsel.remove(dep.Ident)
 		}
 	}
+}
+
+func (s *solver) logSolve(args ...interface{}) {
+	if !s.o.Trace {
+		return
+	}
+
+	var msg string
+	if len(args) == 0 {
+		// Generate message based on current solver state
+		if len(s.versions) == 0 {
+			msg = "* (root)"
+		} else {
+			vq := s.versions[len(s.versions)-1]
+			msg = fmt.Sprintf("* select %s at %s", vq.id.errString(), vq.current())
+		}
+	} else if str, ok := args[0].(string); ok {
+		msg = tracePrefix(fmt.Sprintf(str, args[1:]), "| ")
+	} else if err, ok := args[0].(error); ok {
+		// If we got an error, just reuse its error text
+		msg = tracePrefix(err.Error(), "| ")
+	} else {
+		// panic here because this can *only* mean a stupid internal bug
+		panic("canary - must pass a string as first arg to logSolve, or no args at all")
+	}
+
+	s.tl.Printf("%s\n", tracePrefix(msg, strings.Repeat("| ", len(s.versions))))
+}
+
+func tracePrefix(msg, sep string) string {
+	// TODO pool?
+	var buf bytes.Buffer
+
+	parts := strings.Split(msg, "\n")
+	for _, str := range parts {
+		fmt.Fprintf(&buf, "%s%s", sep, str)
+	}
+
+	return buf.String()
 }
 
 // simple (temporary?) helper just to convert atoms into locked projects

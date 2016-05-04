@@ -2,6 +2,8 @@ package vsolver
 
 import (
 	"fmt"
+	"log"
+	"os"
 	"strings"
 	"testing"
 
@@ -20,15 +22,6 @@ func TestBasicSolves(t *testing.T) {
 func solveAndBasicChecks(fix fixture, t *testing.T) (res Result, err error) {
 	sm := newdepspecSM(fix.ds)
 
-	l := logrus.New()
-	if testing.Verbose() {
-		l.Level = logrus.DebugLevel
-	} else {
-		l.Level = logrus.WarnLevel
-	}
-
-	s := NewSolver(sm, l)
-
 	o := SolveOpts{
 		Root:      string(fix.ds[0].Name()),
 		N:         ProjectName(fix.ds[0].Name()),
@@ -37,6 +30,17 @@ func solveAndBasicChecks(fix fixture, t *testing.T) (res Result, err error) {
 		Downgrade: fix.downgrade,
 		ChangeAll: fix.changeall,
 	}
+
+	l := logrus.New()
+	if testing.Verbose() {
+		//l.Level = logrus.DebugLevel
+		l.Level = logrus.WarnLevel
+		o.Trace = true
+	} else {
+		l.Level = logrus.WarnLevel
+	}
+
+	s := NewSolver(sm, l, log.New(os.Stderr, "", 0))
 
 	if fix.l != nil {
 		o.L = fix.l
@@ -175,7 +179,7 @@ func TestBadSolveOpts(t *testing.T) {
 		l.Level = logrus.DebugLevel
 	}
 
-	s := NewSolver(sm, l)
+	s := NewSolver(sm, l, nil)
 
 	o := SolveOpts{}
 	_, err := s.Solve(o)

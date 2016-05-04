@@ -33,7 +33,6 @@ func (s *solver) satisfiable(pa ProjectAtom) error {
 		if err := s.checkIdentMatches(pa, dep); err != nil {
 			return err
 		}
-		// TODO dart skips "magic" deps here; do we need that?
 		if err := s.checkDepsConstraintsAllowable(pa, dep); err != nil {
 			return err
 		}
@@ -87,11 +86,14 @@ func (s *solver) checkAtomAllowable(pa ProjectAtom) error {
 		}
 	}
 
-	return &versionNotAllowedFailure{
+	err := &versionNotAllowedFailure{
 		goal:       pa,
 		failparent: failparent,
 		c:          constraint,
 	}
+
+	s.logSolve(err)
+	return err
 }
 
 // checkDepsConstraintsAllowable checks that the constraints of an atom on a
@@ -136,12 +138,14 @@ func (s *solver) checkDepsConstraintsAllowable(pa ProjectAtom, dep ProjectDep) e
 		}
 	}
 
-	return &disjointConstraintFailure{
+	err := &disjointConstraintFailure{
 		goal:      Dependency{Depender: pa, Dep: dep},
 		failsib:   failsib,
 		nofailsib: nofailsib,
 		c:         constraint,
 	}
+	s.logSolve(err)
+	return err
 }
 
 // checkDepsDisallowsSelected ensures that an atom's constraints on a particular
@@ -161,10 +165,12 @@ func (s *solver) checkDepsDisallowsSelected(pa ProjectAtom, dep ProjectDep) erro
 		}
 		s.fail(dep.Ident)
 
-		return &constraintNotAllowedFailure{
+		err := &constraintNotAllowedFailure{
 			goal: Dependency{Depender: pa, Dep: dep},
 			v:    selected.Version,
 		}
+		s.logSolve(err)
+		return err
 	}
 	return nil
 }
@@ -179,13 +185,21 @@ func (s *solver) checkIdentMatches(pa ProjectAtom, dep ProjectDep) error {
 	if cur, exists := s.names[dep.Ident.LocalName]; exists {
 		if cur != dep.Ident.netName() {
 			deps := s.sel.getDependenciesOn(pa.Ident)
-			return &sourceMismatchFailure{
+			// Fail all the other deps, as there's no way atom can ever be
+			// compatible with them
+			for _, d := range deps {
+				s.fail(d.Depender.Ident)
+			}
+
+			err := &sourceMismatchFailure{
 				shared:   dep.Ident.LocalName,
 				sel:      deps,
 				current:  cur,
 				mismatch: dep.Ident.netName(),
 				prob:     pa,
 			}
+			s.logSolve(err)
+			return err
 		}
 	}
 
