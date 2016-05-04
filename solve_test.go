@@ -12,10 +12,16 @@ import (
 
 // TODO regression test ensuring that locks with only revs for projects don't cause errors
 
+var stderrlog = log.New(os.Stderr, "", 0)
+
 func TestBasicSolves(t *testing.T) {
 	//solveAndBasicChecks(fixtures[8], t)
 	for _, fix := range fixtures {
 		solveAndBasicChecks(fix, t)
+		if testing.Verbose() {
+			// insert a line break between tests
+			stderrlog.Println("")
+		}
 	}
 }
 
@@ -40,7 +46,7 @@ func solveAndBasicChecks(fix fixture, t *testing.T) (res Result, err error) {
 		l.Level = logrus.WarnLevel
 	}
 
-	s := NewSolver(sm, l, log.New(os.Stderr, "", 0))
+	s := NewSolver(sm, l, stderrlog)
 
 	if fix.l != nil {
 		o.L = fix.l

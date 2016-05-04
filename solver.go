@@ -575,7 +575,7 @@ func (s *solver) backtrack() bool {
 			}
 		}
 
-		s.logSolve("no more versions of %s, backtracking")
+		s.logSolve("no more versions of %s, backtracking", q.id.errString())
 		if s.l.Level >= logrus.DebugLevel {
 			s.l.WithFields(logrus.Fields{
 				"name": q.id.errString(),

@@ -180,7 +180,8 @@ func (s *solver) checkDepsDisallowsSelected(pa ProjectAtom, dep ProjectDep) erro
 // been selected).
 //
 // In other words, this ensures that the solver never simultaneously selects two
-// identifiers that disagree about where their upstream source is.
+// identifiers with the same local name, but that disagree about where their
+// network source is.
 func (s *solver) checkIdentMatches(pa ProjectAtom, dep ProjectDep) error {
 	if cur, exists := s.names[dep.Ident.LocalName]; exists {
 		if cur != dep.Ident.netName() {
