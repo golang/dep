@@ -2,8 +2,8 @@ package vsolver
 
 import "github.com/Sirupsen/logrus"
 
-// satisfiable is the main checking method - it determines if introducing a new
-// project atom would result in a graph where all requirements are still
+// satisfiable is the main checking method. It determines if introducing a new
+// project atom would result in a state where all solver requirements are still
 // satisfied.
 func (s *solver) satisfiable(pa ProjectAtom) error {
 	if emptyProjectAtom == pa {
@@ -169,6 +169,12 @@ func (s *solver) checkDepsDisallowsSelected(pa ProjectAtom, dep ProjectDep) erro
 	return nil
 }
 
+// checkIdentMatches ensures that the LocalName of a dep introduced by an atom,
+// has the same NetworkName as what's already been selected (assuming anything's
+// been selected).
+//
+// In other words, this ensures that the solver never simultaneously selects two
+// identifiers that disagree about where their upstream source is.
 func (s *solver) checkIdentMatches(pa ProjectAtom, dep ProjectDep) error {
 	if cur, exists := s.names[dep.Ident.LocalName]; exists {
 		if cur != dep.Ident.netName() {
