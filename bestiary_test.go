@@ -8,18 +8,29 @@ import (
 	"github.com/Masterminds/semver"
 )
 
+var regfrom = regexp.MustCompile(`^(\w*) from (\w*) ([0-9\.]*)`)
+
 // nsvSplit splits an "info" string on " " into the pair of name and
 // version/constraint, and returns each individually.
 //
 // This is for narrow use - panics if there are less than two resulting items in
 // the slice.
-func nsvSplit(info string) (name string, version string) {
+func nsvSplit(info string) (id ProjectIdentifier, version string) {
+	if strings.Contains(info, " from ") {
+		parts := regfrom.FindStringSubmatch(info)
+		info = parts[1] + " " + parts[3]
+		id.NetworkName = parts[2]
+	}
+
 	s := strings.SplitN(info, " ", 2)
 	if len(s) < 2 {
 		panic(fmt.Sprintf("Malformed name/version info string '%s'", info))
 	}
 
-	name, version = s[0], s[1]
+	id.LocalName, version = ProjectName(s[0]), s[1]
+	if id.NetworkName == "" {
+		id.NetworkName = string(id.LocalName)
+	}
 	return
 }
 
@@ -30,17 +41,26 @@ func nsvSplit(info string) (name string, version string) {
 //
 // This is for narrow use - panics if there are less than two resulting items in
 // the slice.
-func nsvrSplit(info string) (name, version string, revision Revision) {
+func nsvrSplit(info string) (id ProjectIdentifier, version string, revision Revision) {
+	if strings.Contains(info, " from ") {
+		parts := regfrom.FindStringSubmatch(info)
+		info = parts[1] + " " + parts[3]
+		id.NetworkName = parts[2]
+	}
+
 	s := strings.SplitN(info, " ", 3)
 	if len(s) < 2 {
 		panic(fmt.Sprintf("Malformed name/version info string '%s'", info))
 	}
 
-	name, version = s[0], s[1]
+	id.LocalName, version = ProjectName(s[0]), s[1]
+	if id.NetworkName == "" {
+		id.NetworkName = string(id.LocalName)
+	}
+
 	if len(s) == 3 {
 		revision = Revision(s[2])
 	}
-
 	return
 }
 
@@ -49,7 +69,7 @@ func nsvrSplit(info string) (name, version string, revision Revision) {
 // Splits the input string on a space, and uses the first two elements as the
 // project name and constraint body, respectively.
 func mksvpa(info string) ProjectAtom {
-	name, ver, rev := nsvrSplit(info)
+	id, ver, rev := nsvrSplit(info)
 
 	_, err := semver.NewVersion(ver)
 	if err != nil {
@@ -64,9 +84,7 @@ func mksvpa(info string) ProjectAtom {
 	}
 
 	return ProjectAtom{
-		Ident: ProjectIdentifier{
-			LocalName: ProjectName(name),
-		},
+		Ident:   id,
 		Version: v,
 	}
 }
@@ -87,10 +105,10 @@ func mkc(body string, t ConstraintType) Constraint {
 // Splits the input string on a space, and uses the first two elements as the
 // project name and constraint body, respectively.
 func mksvd(info string) ProjectDep {
-	name, v := nsvSplit(info)
+	id, v := nsvSplit(info)
 
 	return ProjectDep{
-		Ident:      ProjectIdentifier{LocalName: ProjectName(name)},
+		Ident:      id,
 		Constraint: mkc(v, SemverConstraint),
 	}
 }
@@ -115,6 +133,10 @@ func dsv(pi string, deps ...string) depspec {
 		name: mksvpa(pi),
 	}
 
+	if string(ds.name.Ident.LocalName) != ds.name.Ident.NetworkName {
+		panic("alternate source on self makes no sense")
+	}
+
 	for _, dep := range deps {
 		var sl *[]ProjectDep
 		if strings.HasPrefix(dep, "(dev) ") {
@@ -124,16 +146,7 @@ func dsv(pi string, deps ...string) depspec {
 			sl = &ds.deps
 		}
 
-		if strings.Contains(dep, " from ") {
-			r := regexp.MustCompile(`^(\w*) from (\w*) ([0-9\.]*)$`)
-			parts := r.FindStringSubmatch(dep)
-			pd := mksvd(parts[1] + " " + parts[3])
-			pd.Ident.NetworkName = parts[2]
-			*sl = append(*sl, pd)
-		} else {
-			*sl = append(*sl, mksvd(dep))
-		}
-
+		*sl = append(*sl, mksvd(dep))
 	}
 
 	return ds
@@ -181,7 +194,7 @@ func mkresults(pairs ...string) map[string]Version {
 			v = v.(UnpairedVersion).Is(rev)
 		}
 
-		m[name] = v
+		m[string(name.LocalName)] = v
 	}
 
 	return m
