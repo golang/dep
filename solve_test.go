@@ -6,8 +6,6 @@ import (
 	"os"
 	"strings"
 	"testing"
-
-	"github.com/Sirupsen/logrus"
 )
 
 // TODO regression test ensuring that locks with only revs for projects don't cause errors
@@ -37,16 +35,11 @@ func solveAndBasicChecks(fix fixture, t *testing.T) (res Result, err error) {
 		ChangeAll: fix.changeall,
 	}
 
-	l := logrus.New()
 	if testing.Verbose() {
-		//l.Level = logrus.DebugLevel
-		l.Level = logrus.WarnLevel
 		o.Trace = true
-	} else {
-		l.Level = logrus.WarnLevel
 	}
 
-	s := NewSolver(sm, l, stderrlog)
+	s := NewSolver(sm, stderrlog)
 
 	if fix.l != nil {
 		o.L = fix.l
@@ -180,12 +173,7 @@ func getFailureCausingProjects(err error) (projs []string) {
 func TestBadSolveOpts(t *testing.T) {
 	sm := newdepspecSM(fixtures[0].ds)
 
-	l := logrus.New()
-	if testing.Verbose() {
-		l.Level = logrus.DebugLevel
-	}
-
-	s := NewSolver(sm, l, nil)
+	s := NewSolver(sm, nil)
 
 	o := SolveOpts{}
 	_, err := s.Solve(o)

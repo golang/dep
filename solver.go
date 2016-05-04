@@ -8,8 +8,6 @@ import (
 	"math/rand"
 	"strconv"
 	"strings"
-
-	"github.com/Sirupsen/logrus"
 )
 
 var (
@@ -62,15 +60,10 @@ type SolveOpts struct {
 	Trace bool
 }
 
-func NewSolver(sm SourceManager, l *logrus.Logger, l2 *log.Logger) Solver {
-	if l == nil {
-		l = logrus.New()
-	}
-
+func NewSolver(sm SourceManager, l *log.Logger) Solver {
 	return &solver{
 		sm: &smAdapter{sm: sm},
-		l:  l,
-		tl: l2,
+		tl: l,
 	}
 }
 
@@ -81,7 +74,6 @@ type solver struct {
 	// SolveOpts are the configuration options provided to the solver. The
 	// solver will abort early if certain options are not appropriately set.
 	o SolveOpts
-	l *logrus.Logger
 	// Logger used exclusively for trace output, if the trace option is set.
 	tl *log.Logger
 	// An adapter around a standard SourceManager. The adapter does some local
@@ -225,14 +217,6 @@ func (s *solver) solve() ([]ProjectAtom, error) {
 			break
 		}
 
-		if s.l.Level >= logrus.DebugLevel {
-			s.l.WithFields(logrus.Fields{
-				"attempts": s.attempts,
-				"name":     id,
-				"selcount": len(s.sel.projects),
-			}).Debug("Beginning step in solve loop")
-		}
-
 		queue, err := s.createVersionQueue(id)
 
 		if err != nil {
@@ -284,17 +268,7 @@ func (s *solver) createVersionQueue(id ProjectIdentifier) (*versionQueue, error)
 		if exists {
 			// Project exists only in vendor (and in some manifest somewhere)
 			// TODO mark this for special handling, somehow?
-			if s.l.Level >= logrus.WarnLevel {
-				s.l.WithFields(logrus.Fields{
-					"name": id,
-				}).Warn("Code found in vendor for project, but no history was found upstream or in cache")
-			}
 		} else {
-			if s.l.Level >= logrus.WarnLevel {
-				s.l.WithFields(logrus.Fields{
-					"name": id,
-				}).Warn("Upstream project does not exist")
-			}
 			return nil, newSolveError(fmt.Sprintf("Project '%s' could not be located.", id), cannotResolve)
 		}
 	}
@@ -310,27 +284,7 @@ func (s *solver) createVersionQueue(id ProjectIdentifier) (*versionQueue, error)
 	if err != nil {
 		// TODO this particular err case needs to be improved to be ONLY for cases
 		// where there's absolutely nothing findable about a given project name
-		if s.l.Level >= logrus.WarnLevel {
-			s.l.WithFields(logrus.Fields{
-				"name": id,
-				"err":  err,
-			}).Warn("Failed to create a version queue")
-		}
 		return nil, err
-	}
-
-	if s.l.Level >= logrus.DebugLevel {
-		if lockv == nilpa {
-			s.l.WithFields(logrus.Fields{
-				"name":  id,
-				"queue": q,
-			}).Debug("Created versionQueue, but no data in lock for project")
-		} else {
-			s.l.WithFields(logrus.Fields{
-				"name":  id,
-				"queue": q,
-			}).Debug("Created versionQueue using version found in lock")
-		}
 	}
 
 	return q, s.findValidVersion(q)
@@ -346,14 +300,6 @@ func (s *solver) findValidVersion(q *versionQueue) error {
 
 	faillen := len(q.fails)
 
-	if s.l.Level >= logrus.DebugLevel {
-		s.l.WithFields(logrus.Fields{
-			"name":      q.id.errString(),
-			"hasLock":   q.hasLock,
-			"allLoaded": q.allLoaded,
-			"queue":     q,
-		}).Debug("Beginning search through versionQueue for a valid version")
-	}
 	for {
 		cur := q.current()
 		err := s.satisfiable(ProjectAtom{
@@ -362,30 +308,15 @@ func (s *solver) findValidVersion(q *versionQueue) error {
 		})
 		if err == nil {
 			// we have a good version, can return safely
-			if s.l.Level >= logrus.DebugLevel {
-				s.l.WithFields(logrus.Fields{
-					"name":    q.id.errString(),
-					"version": cur,
-				}).Debug("Found acceptable version, returning out")
-			}
 			return nil
 		}
 
 		if q.advance(err) != nil {
 			// Error on advance, have to bail out
-			if s.l.Level >= logrus.WarnLevel {
-				s.l.WithFields(logrus.Fields{
-					"name": q.id.errString(),
-					"err":  err,
-				}).Warn("Advancing version queue returned unexpected error, marking project as failed")
-			}
 			break
 		}
 		if q.isExhausted() {
 			// Queue is empty, bail with error
-			if s.l.Level >= logrus.InfoLevel {
-				s.l.WithField("name", q.id.errString()).Info("Version queue was completely exhausted, marking project as failed")
-			}
 			break
 		}
 	}
@@ -435,31 +366,16 @@ func (s *solver) getLockVersionIfValid(id ProjectIdentifier) (ProjectAtom, error
 
 	lp, exists := s.rlm[id]
 	if !exists {
-		if s.l.Level >= logrus.DebugLevel {
-			s.l.WithField("name", id).Debug("Project not present in lock")
-		}
 		return nilpa, nil
 	}
 
 	constraint := s.sel.getConstraint(id)
 	if !constraint.Matches(lp.v) {
-		if s.l.Level >= logrus.InfoLevel {
-			s.l.WithFields(logrus.Fields{
-				"name":    id,
-				"version": lp.Version(),
-			}).Info("Project found in lock, but version not allowed by current constraints")
-		}
 		s.logSolve("%s in root lock, but current constraints disallow it", id.errString())
 		return nilpa, nil
 	}
 
 	s.logSolve("using root lock's version of %s", id.errString())
-	if s.l.Level >= logrus.InfoLevel {
-		s.l.WithFields(logrus.Fields{
-			"name":    id,
-			"version": lp.Version(),
-		}).Info("Project found in lock")
-	}
 
 	return ProjectAtom{
 		Ident:   id,
@@ -506,20 +422,8 @@ func (s *solver) backtrack() bool {
 		return false
 	}
 
-	if s.l.Level >= logrus.DebugLevel {
-		s.l.WithFields(logrus.Fields{
-			"selcount":   len(s.sel.projects),
-			"queuecount": len(s.versions),
-			"attempts":   s.attempts,
-		}).Debug("Beginning backtracking")
-	}
-
 	for {
 		for {
-			if s.l.Level >= logrus.DebugLevel {
-				s.l.WithField("queuecount", len(s.versions)).Debug("Top of search loop for failed queues")
-			}
-
 			if len(s.versions) == 0 {
 				// no more versions, nowhere further to backtrack
 				return false
@@ -528,12 +432,6 @@ func (s *solver) backtrack() bool {
 				break
 			}
 
-			if s.l.Level >= logrus.InfoLevel {
-				s.l.WithFields(logrus.Fields{
-					"name":      s.versions[len(s.versions)-1].id,
-					"wasfailed": false,
-				}).Info("Backtracking popped off project")
-			}
 			// pub asserts here that the last in s.sel's ids is == q.current
 			s.versions, s.versions[len(s.versions)-1] = s.versions[:len(s.versions)-1], nil
 			s.unselectLast()
@@ -541,13 +439,6 @@ func (s *solver) backtrack() bool {
 
 		// Grab the last versionQueue off the list of queues
 		q := s.versions[len(s.versions)-1]
-
-		if s.l.Level >= logrus.DebugLevel {
-			s.l.WithFields(logrus.Fields{
-				"name":    q.id.errString(),
-				"failver": q.current(),
-			}).Debug("Trying failed queue with next version")
-		}
 
 		// another assert that the last in s.sel's ids is == q.current
 		s.unselectLast()
@@ -558,12 +449,6 @@ func (s *solver) backtrack() bool {
 			// Search for another acceptable version of this failed dep in its queue
 			if s.findValidVersion(q) == nil {
 				s.logSolve()
-				if s.l.Level >= logrus.InfoLevel {
-					s.l.WithFields(logrus.Fields{
-						"name":    q.id.errString(),
-						"version": q.current(),
-					}).Info("Backtracking found valid version, attempting next solution")
-				}
 
 				// Found one! Put it back on the selected queue and stop
 				// backtracking
@@ -576,20 +461,9 @@ func (s *solver) backtrack() bool {
 		}
 
 		s.logSolve("no more versions of %s, backtracking", q.id.errString())
-		if s.l.Level >= logrus.DebugLevel {
-			s.l.WithFields(logrus.Fields{
-				"name": q.id.errString(),
-			}).Debug("Failed to find a valid version in queue, continuing backtrack")
-		}
 
 		// No solution found; continue backtracking after popping the queue
 		// we just inspected off the list
-		if s.l.Level >= logrus.InfoLevel {
-			s.l.WithFields(logrus.Fields{
-				"name":      s.versions[len(s.versions)-1].id.errString(),
-				"wasfailed": true,
-			}).Info("Backtracking popped off project")
-		}
 		// GC-friendly pop pointer elem in slice
 		s.versions, s.versions[len(s.versions)-1] = s.versions[:len(s.versions)-1], nil
 	}
@@ -672,7 +546,6 @@ func (s *solver) unselectedComparator(i, j int) bool {
 func (s *solver) fail(i ProjectIdentifier) {
 	// skip if the root project
 	if s.o.M.Name() == i.LocalName {
-		s.l.Debug("Not marking the root project as failed")
 		return
 	}
 
@@ -731,13 +604,6 @@ func (s *solver) unselectLast() {
 
 		// if no siblings, remove from unselected queue
 		if len(siblings) == 0 {
-			if s.l.Level >= logrus.DebugLevel {
-				s.l.WithFields(logrus.Fields{
-					"name":  dep.Ident,
-					"pname": pa.Ident,
-					"pver":  pa.Version,
-				}).Debug("Removing project from unselected queue; last parent atom was unselected")
-			}
 			delete(s.names, dep.Ident.LocalName)
 			s.unsel.remove(dep.Ident)
 		}
