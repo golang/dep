@@ -269,6 +269,7 @@ func (r *repo) getCurrentVersionPairs() (vlist []PairedVersion, exbits ProjectEx
 			var v PairedVersion
 			if string(pair[46:51]) == "heads" {
 				v = NewBranch(string(pair[52:])).Is(Revision(pair[:40])).(PairedVersion)
+				vlist = append(vlist, v)
 			} else if string(pair[46:50]) == "tags" {
 				vstr := string(pair[51:])
 				if strings.HasSuffix(vstr, "^{}") {
@@ -285,10 +286,7 @@ func (r *repo) getCurrentVersionPairs() (vlist []PairedVersion, exbits ProjectEx
 				}
 				v = NewVersion(vstr).Is(Revision(pair[:40])).(PairedVersion)
 				tmap[vstr] = v
-			} else {
-				continue
 			}
-			vlist = append(vlist, v)
 		}
 
 		// Append all the deref'd (if applicable) tags into the list
