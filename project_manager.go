@@ -80,7 +80,16 @@ func (pm *projectManager) GetInfoAt(v Version) (ProjectInfo, error) {
 	// happen?) that it'd be better to just not allow so that we don't have to
 	// think about it elsewhere
 	if !pm.CheckExistence(ExistsInCache) {
-		return ProjectInfo{}, fmt.Errorf("Project repository cache for %s does not exist", pm.n)
+		if pm.CheckExistence(ExistsUpstream) {
+			err := pm.crepo.r.Get()
+			if err != nil {
+				return ProjectInfo{}, fmt.Errorf("Failed to create repository cache for %s", pm.n)
+			}
+			pm.ex.s |= ExistsInCache
+			pm.ex.f |= ExistsInCache
+		} else {
+			return ProjectInfo{}, fmt.Errorf("Project repository cache for %s does not exist", pm.n)
+		}
 	}
 
 	if r, exists := pm.dc.VMap[v]; exists {
@@ -108,7 +117,7 @@ func (pm *projectManager) GetInfoAt(v Version) (ProjectInfo, error) {
 	pm.crepo.mut.Unlock()
 	if err != nil {
 		// TODO More-er proper-er error
-		panic(fmt.Sprintf("canary - why is checkout/whatever failing: %s", err))
+		panic(fmt.Sprintf("canary - why is checkout/whatever failing: %s %s %s", pm.n, v.String(), err))
 	}
 
 	pm.crepo.mut.RLock()
@@ -130,9 +139,11 @@ func (pm *projectManager) GetInfoAt(v Version) (ProjectInfo, error) {
 
 func (pm *projectManager) ListVersions() (vlist []Version, err error) {
 	if !pm.cvsync {
-		pm.ex.s |= ExistsInCache | ExistsUpstream
-
+		// This check only guarantees that the upstream exists, not the cache
+		pm.ex.s |= ExistsUpstream
 		vpairs, exbits, err := pm.crepo.getCurrentVersionPairs()
+		// But it *may* also check the local existence
+		pm.ex.s |= exbits
 		pm.ex.f |= exbits
 
 		if err != nil {
@@ -142,7 +153,11 @@ func (pm *projectManager) ListVersions() (vlist []Version, err error) {
 		}
 
 		vlist = make([]Version, len(vpairs))
-		pm.cvsync = true
+		// only mark as synced if the callback indicated ExistsInCache
+		if exbits&ExistsInCache == ExistsInCache {
+			pm.cvsync = true
+		}
+
 		// Process the version data into the cache
 		// TODO detect out-of-sync data as we do this?
 		for k, v := range vpairs {
