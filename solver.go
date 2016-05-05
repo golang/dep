@@ -611,6 +611,10 @@ func (s *solver) unselectLast() {
 }
 
 func (s *solver) logStart(id ProjectIdentifier) {
+	if !s.o.Trace {
+		return
+	}
+
 	prefix := strings.Repeat("| ", len(s.versions)+1)
 	s.tl.Printf("%s\n", tracePrefix(fmt.Sprintf("? attempting %s", id.errString()), prefix, prefix))
 }
