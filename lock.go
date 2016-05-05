@@ -91,14 +91,10 @@ func NewLockedProject(n ProjectName, v Version, uri, path string) LockedProject 
 // local name (the root name by which the project is referenced in import paths)
 // and the network name, where the upstream source lives.
 func (lp LockedProject) Ident() ProjectIdentifier {
-	id := ProjectIdentifier{
+	return ProjectIdentifier{
 		LocalName:   lp.n,
 		NetworkName: lp.uri,
 	}
-
-	// Keep things sane for things like map keys by ensuring the NetworkName is
-	// always set, even if it's the same as the LocalName.
-	return id.normalize()
 }
 
 // Version assembles together whatever version and/or revision data is
@@ -135,4 +131,12 @@ func (lp LockedProject) toAtom() ProjectAtom {
 	}
 
 	return pa
+}
+
+// normalizedLock is used internally by the solver to represent incoming root
+// locks that may have provided only a revision, where a revision and tag were
+// actually available.
+type normalizedLock struct {
+	id ProjectIdentifier
+	vl []Version
 }

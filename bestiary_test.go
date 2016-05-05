@@ -185,6 +185,18 @@ func mklock(pairs ...string) fixLock {
 	return l
 }
 
+// mkrevlock makes a fixLock, suitable to act as a lock file, with only a name
+// and a rev
+func mkrevlock(pairs ...string) fixLock {
+	l := make(fixLock, 0)
+	for _, s := range pairs {
+		pa := mksvpa(s)
+		l = append(l, NewLockedProject(pa.Ident.LocalName, pa.Version.(PairedVersion).Underlying(), pa.Ident.netName(), ""))
+	}
+
+	return l
+}
+
 // mkresults makes a result set
 func mkresults(pairs ...string) map[string]Version {
 	m := make(map[string]Version)
@@ -455,6 +467,63 @@ var fixtures = []fixture{
 		),
 		r: mkresults(
 			"foo 2.0.0 foorev2",
+		),
+	},
+	{
+		n: "pairs bare revs in lock with versions",
+		ds: []depspec{
+			dsv("root 0.0.0", "foo ~1.0.1"),
+			dsv("foo 1.0.0", "bar 1.0.0"),
+			dsv("foo 1.0.1 foorev", "bar 1.0.1"),
+			dsv("foo 1.0.2", "bar 1.0.2"),
+			dsv("bar 1.0.0"),
+			dsv("bar 1.0.1"),
+			dsv("bar 1.0.2"),
+		},
+		l: mkrevlock(
+			"foo 1.0.1 foorev", // mkrevlock drops the 1.0.1
+		),
+		r: mkresults(
+			"foo 1.0.1 foorev",
+			"bar 1.0.1",
+		),
+	},
+	{
+		n: "pairs bare revs in lock with all versions",
+		ds: []depspec{
+			dsv("root 0.0.0", "foo ~1.0.1"),
+			dsv("foo 1.0.0", "bar 1.0.0"),
+			dsv("foo 1.0.1 foorev", "bar 1.0.1"),
+			dsv("foo 1.0.2 foorev", "bar 1.0.2"),
+			dsv("bar 1.0.0"),
+			dsv("bar 1.0.1"),
+			dsv("bar 1.0.2"),
+		},
+		l: mkrevlock(
+			"foo 1.0.1 foorev", // mkrevlock drops the 1.0.1
+		),
+		r: mkresults(
+			"foo 1.0.2 foorev",
+			"bar 1.0.1",
+		),
+	},
+	{
+		n: "does not pair bare revs in manifest with unpaired lock version",
+		ds: []depspec{
+			dsv("root 0.0.0", "foo ~1.0.1"),
+			dsv("foo 1.0.0", "bar 1.0.0"),
+			dsv("foo 1.0.1 foorev", "bar 1.0.1"),
+			dsv("foo 1.0.2", "bar 1.0.2"),
+			dsv("bar 1.0.0"),
+			dsv("bar 1.0.1"),
+			dsv("bar 1.0.2"),
+		},
+		l: mkrevlock(
+			"foo 1.0.1 foorev", // mkrevlock drops the 1.0.1
+		),
+		r: mkresults(
+			"foo 1.0.1 foorev",
+			"bar 1.0.1",
 		),
 	},
 	{

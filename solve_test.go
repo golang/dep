@@ -35,17 +35,21 @@ func solveAndBasicChecks(fix fixture, t *testing.T) (res Result, err error) {
 		ChangeAll: fix.changeall,
 	}
 
+	if fix.l != nil {
+		o.L = fix.l
+	}
+
 	if testing.Verbose() {
 		o.Trace = true
 	}
 
 	s := NewSolver(sm, stderrlog)
-
-	if fix.l != nil {
-		o.L = fix.l
-	}
-
 	res, err = s.Solve(o)
+
+	return fixtureSolveBasicChecks(fix, res, err, t)
+}
+
+func fixtureSolveBasicChecks(fix fixture, res Result, err error, t *testing.T) (Result, error) {
 	if err != nil {
 		if len(fix.errp) == 0 {
 			t.Errorf("(fixture: %q) Solver failed; error was type %T, text: %q", fix.n, err, err)
@@ -140,7 +144,60 @@ func solveAndBasicChecks(fix fixture, t *testing.T) (res Result, err error) {
 		}
 	}
 
-	return
+	return res, err
+}
+
+// This tests that, when a root lock is underspecified (has only a version) we
+// don't allow a match on that version from a rev in the manifest. We may allow
+// this in the future, but disallow it for now because going from an immutable
+// requirement to a mutable lock automagically is a bad direction that could
+// produce weird side effects.
+func TestRootLockNoVersionPairMatching(t *testing.T) {
+	fix := fixture{
+		n: "does not pair bare revs in manifest with unpaired lock version",
+		ds: []depspec{
+			dsv("root 0.0.0", "foo *"), // foo's constraint rewritten below to foorev
+			dsv("foo 1.0.0", "bar 1.0.0"),
+			dsv("foo 1.0.1 foorev", "bar 1.0.1"),
+			dsv("foo 1.0.2 foorev", "bar 1.0.2"),
+			dsv("bar 1.0.0"),
+			dsv("bar 1.0.1"),
+			dsv("bar 1.0.2"),
+		},
+		l: mklock(
+			"foo 1.0.1",
+		),
+		r: mkresults(
+			"foo 1.0.2 foorev",
+			"bar 1.0.1",
+		),
+	}
+
+	pd := fix.ds[0].deps[0]
+	pd.Constraint = Revision("foorev")
+	fix.ds[0].deps[0] = pd
+
+	sm := newdepspecSM(fix.ds)
+
+	l2 := make(fixLock, 1)
+	copy(l2, fix.l)
+	l2[0].v = nil
+
+	o := SolveOpts{
+		Root: string(fix.ds[0].Name()),
+		N:    ProjectName(fix.ds[0].Name()),
+		M:    fix.ds[0],
+		L:    l2,
+	}
+
+	if testing.Verbose() {
+		o.Trace = true
+	}
+
+	s := NewSolver(sm, stderrlog)
+	res, err := s.Solve(o)
+
+	fixtureSolveBasicChecks(fix, res, err, t)
 }
 
 func getFailureCausingProjects(err error) (projs []string) {

@@ -154,7 +154,7 @@ func (s *solver) Solve(opts SolveOpts) (Result, error) {
 
 	if s.o.L != nil {
 		for _, lp := range s.o.L.Projects() {
-			s.rlm[lp.Ident()] = lp
+			s.rlm[lp.Ident().normalize()] = lp
 		}
 	}
 
@@ -273,11 +273,14 @@ func (s *solver) createVersionQueue(id ProjectIdentifier) (*versionQueue, error)
 		}
 	}
 
-	lockv, err := s.getLockVersionIfValid(id)
-	if err != nil {
-		// Can only get an error here if an upgrade was expressly requested on
-		// code that exists only in vendor
-		return nil, err
+	lockv := nilpa
+	if len(s.rlm) > 0 {
+		lockv, err = s.getLockVersionIfValid(id)
+		if err != nil {
+			// Can only get an error here if an upgrade was expressly requested on
+			// code that exists only in vendor
+			return nil, err
+		}
 	}
 
 	q, err := newVersionQueue(id, lockv, s.sm)
@@ -370,16 +373,43 @@ func (s *solver) getLockVersionIfValid(id ProjectIdentifier) (ProjectAtom, error
 	}
 
 	constraint := s.sel.getConstraint(id)
-	if !constraint.Matches(lp.v) {
-		s.logSolve("%s in root lock, but current constraints disallow it", id.errString())
-		return nilpa, nil
+	v := lp.Version()
+	if !constraint.Matches(v) {
+		var found bool
+		if tv, ok := v.(Revision); ok {
+			// If we only have a revision from the root's lock, allow matching
+			// against other versions that have that revision
+			for _, pv := range s.sm.pairRevision(id, tv) {
+				if constraint.Matches(pv) {
+					v = pv
+					found = true
+					break
+				}
+			}
+			//} else if _, ok := constraint.(Revision); ok {
+			//// If the current constraint is itself a revision, and the lock gave
+			//// an unpaired version, see if they match up
+			////
+			//if u, ok := v.(UnpairedVersion); ok {
+			//pv := s.sm.pairVersion(id, u)
+			//if constraint.Matches(pv) {
+			//v = pv
+			//found = true
+			//}
+			//}
+		}
+
+		if !found {
+			s.logSolve("%s in root lock, but current constraints disallow it", id.errString())
+			return nilpa, nil
+		}
 	}
 
 	s.logSolve("using root lock's version of %s", id.errString())
 
 	return ProjectAtom{
 		Ident:   id,
-		Version: lp.Version(),
+		Version: v,
 	}, nil
 }
 
@@ -579,7 +609,7 @@ func (s *solver) selectVersion(pa ProjectAtom) {
 		// otherwise it's already in there, or been selected
 		if len(siblingsAndSelf) == 1 {
 			s.names[dep.Ident.LocalName] = dep.Ident.netName()
-			heap.Push(s.unsel, dep.Ident)
+			heap.Push(s.unsel, dep.Ident.normalize())
 		}
 	}
 }

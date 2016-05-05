@@ -72,6 +72,43 @@ func (c *smAdapter) vendorCodeExists(id ProjectIdentifier) (bool, error) {
 	return c.sm.VendorCodeExists(k)
 }
 
+func (c *smAdapter) pairVersion(id ProjectIdentifier, v UnpairedVersion) PairedVersion {
+	vl, err := c.listVersions(id)
+	if err != nil {
+		return nil
+	}
+
+	// doing it like this is a bit sloppy
+	for _, v2 := range vl {
+		if p, ok := v2.(PairedVersion); ok {
+			if p.Matches(v) {
+				return p
+			}
+		}
+	}
+
+	return nil
+}
+
+func (c *smAdapter) pairRevision(id ProjectIdentifier, r Revision) []Version {
+	vl, err := c.listVersions(id)
+	if err != nil {
+		return nil
+	}
+
+	p := []Version{r}
+	// doing it like this is a bit sloppy
+	for _, v2 := range vl {
+		if pv, ok := v2.(PairedVersion); ok {
+			if pv.Matches(r) {
+				p = append(p, pv)
+			}
+		}
+	}
+
+	return p
+}
+
 type upgradeVersionSorter []Version
 type downgradeVersionSorter []Version
 
