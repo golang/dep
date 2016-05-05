@@ -4,12 +4,10 @@ owners:
   email: tech@samboyer.org
 import:
 - package: github.com/Masterminds/semver
-  version: 2.x
-  vtype: branch
+  branch: 2.x
   vcs: git
 - package: github.com/Masterminds/vcs
   vcs: git
 - package: github.com/termie/go-shutil
   vcs: git
   version: bcacb06fecaeec8dc42af03c87c6949f4a05c74c
-  vtype: revision
