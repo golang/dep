@@ -1,6 +1,7 @@
 package vsolver
 
 import (
+	"fmt"
 	"os"
 	"path"
 )
@@ -39,7 +40,7 @@ func CreateVendorTree(basedir string, l Lock, sm SourceManager) error {
 		err = sm.ExportAtomTo(p.toAtom(), to)
 		if err != nil {
 			os.RemoveAll(basedir)
-			return err
+			return fmt.Errorf("Error while exporting %s: %s", p.Ident().LocalName, err)
 		}
 		// TODO dump version metadata file
 	}

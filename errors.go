@@ -46,11 +46,11 @@ type noVersionError struct {
 
 func (e *noVersionError) Error() string {
 	if len(e.fails) == 0 {
-		return fmt.Sprintf("No versions could be found for project %q.", e.pn)
+		return fmt.Sprintf("No versions found for project %q.", e.pn.LocalName)
 	}
 
 	var buf bytes.Buffer
-	fmt.Fprintf(&buf, "Could not find any versions of %s that met constraints:", e.pn)
+	fmt.Fprintf(&buf, "No versions of %s met constraints:", e.pn.LocalName)
 	for _, f := range e.fails {
 		fmt.Fprintf(&buf, "\n\t%s: %s", f.v, f.f.Error())
 	}

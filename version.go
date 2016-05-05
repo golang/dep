@@ -272,7 +272,7 @@ type semVersion struct {
 }
 
 func (v semVersion) String() string {
-	return v.sv.String()
+	return v.sv.Original()
 }
 
 func (r semVersion) Type() string {

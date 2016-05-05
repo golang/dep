@@ -262,16 +262,35 @@ func (r *repo) getCurrentVersionPairs() (vlist []PairedVersion, exbits ProjectEx
 		// Local cache may not actually exist here, but upstream definitely does
 		exbits |= ExistsUpstream
 
+		tmap := make(map[string]PairedVersion)
 		for _, pair := range all {
 			var v PairedVersion
 			if string(pair[46:51]) == "heads" {
 				v = NewBranch(string(pair[52:])).Is(Revision(pair[:40])).(PairedVersion)
 			} else if string(pair[46:50]) == "tags" {
-				// TODO deal with dereferenced tags
-				v = NewVersion(string(pair[51:])).Is(Revision(pair[:40])).(PairedVersion)
+				vstr := string(pair[51:])
+				if strings.HasSuffix(vstr, "^{}") {
+					// If the suffix is there, then we *know* this is the rev of
+					// the underlying commit object that we actually want
+					vstr = strings.TrimSuffix(vstr, "^{}")
+				} else if _, exists := tmap[vstr]; exists {
+					// Already saw the deref'd version of this tag, if one
+					// exists, so skip this.
+					continue
+					// Can only hit this branch if we somehow got the deref'd
+					// version first. Which should be impossible, but this
+					// covers us in case of weirdness, anyway.
+				}
+				v = NewVersion(vstr).Is(Revision(pair[:40])).(PairedVersion)
+				tmap[vstr] = v
 			} else {
 				continue
 			}
+			vlist = append(vlist, v)
+		}
+
+		// Append all the deref'd (if applicable) tags into the list
+		for _, v := range tmap {
 			vlist = append(vlist, v)
 		}
 	case *vcs.BzrRepo:
