@@ -111,6 +111,12 @@ func (c semverConstraint) Intersect(c2 Constraint) Constraint {
 	return none
 }
 
+// IsAny indicates if the provided constraint is the wildcard "Any" constraint.
+func IsAny(c Constraint) bool {
+	_, ok := c.(anyConstraint)
+	return ok
+}
+
 // Any returns a constraint that will match anything.
 func Any() Constraint {
 	return anyConstraint{}
