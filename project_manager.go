@@ -100,6 +100,8 @@ func (pm *projectManager) GetInfoAt(v Version) (ProjectInfo, error) {
 
 	var err error
 	if !pm.cvsync {
+		// TODO this may not be sufficient - git, for example, will fetch down
+		// the new revs, but local ones will remain unchanged
 		err = pm.crepo.r.Update()
 		if err != nil {
 			return ProjectInfo{}, fmt.Errorf("Could not fetch latest updates into repository")
@@ -408,7 +410,11 @@ func (r *repo) exportVersionTo(v Version, to string) error {
 		// TODO could have an err here
 		defer os.Rename(bak, idx)
 
-		_, err = r.r.RunFromDir("git", "read-tree", v.String())
+		vstr := v.String()
+		if rv, ok := v.(PairedVersion); ok {
+			vstr = rv.Underlying().String()
+		}
+		_, err = r.r.RunFromDir("git", "read-tree", vstr)
 		if err != nil {
 			return err
 		}
