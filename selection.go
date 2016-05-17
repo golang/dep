@@ -34,7 +34,7 @@ func (s *selection) getConstraint(id ProjectIdentifier) Constraint {
 	// Start with the open set
 	var ret Constraint = any
 	for _, dep := range deps {
-		ret = ret.Intersect(dep.Dep.Constraint)
+		ret = s.sm.intersect(id, ret, dep.Dep.Constraint)
 	}
 
 	return ret
