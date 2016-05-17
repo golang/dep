@@ -226,31 +226,53 @@ func (c *smAdapter) matches(id ProjectIdentifier, c2 Constraint, v Version) bool
 }
 
 // matchesAny is the authoritative version of Constraint.MatchesAny.
-//func (c *smAdapter) matchesAny(id ProjectIdentifier, c1, c2 Constraint) bool {
-//if c1.MatchesAny(c2) {
-//return true
-//}
+func (c *smAdapter) matchesAny(id ProjectIdentifier, c1, c2 Constraint) bool {
+	if c1.MatchesAny(c2) {
+		return true
+	}
 
-//if c.intersect(id, c1, c2) != none {
-//return true
-//}
-//return false
-//}
+	// This approach is slightly wasteful, but just SO much less verbose, and
+	// more easily understood.
+	var uc1, uc2 Constraint
+	if v1, ok := c1.(Version); ok {
+		uc1 = c.vtypeUnion(id, v1)
+	} else {
+		uc1 = c1
+	}
+
+	if v2, ok := c2.(Version); ok {
+		uc2 = c.vtypeUnion(id, v2)
+	} else {
+		uc2 = c2
+	}
+
+	return uc1.MatchesAny(uc2)
+}
 
 // intersect is the authoritative version of Constraint.Intersect.
-//func (c *smAdapter) intersect(id ProjectIdentifier, c1, c2 Constraint) Constraint {
-//rc := c1.Intersect(c2)
-//if rc != none {
-//return rc
-//}
+func (c *smAdapter) intersect(id ProjectIdentifier, c1, c2 Constraint) Constraint {
+	rc := c1.Intersect(c2)
+	if rc != none {
+		return rc
+	}
 
-//rc = c.doIntersect(id, c1, c2)
-//if rc == none {
-//rc = c.doIntersect(id, c2, c1)
-//}
+	// This approach is slightly wasteful, but just SO much less verbose, and
+	// more easily understood.
+	var uc1, uc2 Constraint
+	if v1, ok := c1.(Version); ok {
+		uc1 = c.vtypeUnion(id, v1)
+	} else {
+		uc1 = c1
+	}
 
-//return rc
-//}
+	if v2, ok := c2.(Version); ok {
+		uc2 = c.vtypeUnion(id, v2)
+	} else {
+		uc2 = c2
+	}
+
+	return uc1.Intersect(uc2)
+}
 
 //func (c *smAdapter) doIntersect(id ProjectIdentifier, c1, c2 Constraint) Constraint {
 //switch tc1 := c1.(type) {
@@ -267,31 +289,30 @@ func (c *smAdapter) matches(id ProjectIdentifier, c2 Constraint, v Version) bool
 //}
 //}
 //}
-
 //}
 
-func (c *smAdapter) allEquivalentVersions(id ProjectIdentifier, v Version) allVariantsVersion {
+func (c *smAdapter) vtypeUnion(id ProjectIdentifier, v Version) versionTypeUnion {
 	switch tv := v.(type) {
 	case Revision:
-		return allVariantsVersion(c.pairRevision(id, tv))
+		return versionTypeUnion(c.pairRevision(id, tv))
 	case PairedVersion:
-		return allVariantsVersion(c.pairRevision(id, tv.Underlying()))
+		return versionTypeUnion(c.pairRevision(id, tv.Underlying()))
 	case UnpairedVersion:
 		pv := c.pairVersion(id, tv)
 		if pv == nil {
-			return allVariantsVersion{tv}
+			return versionTypeUnion{tv}
 		}
 
-		return allVariantsVersion(c.pairRevision(id, pv.Underlying()))
+		return versionTypeUnion(c.pairRevision(id, pv.Underlying()))
 	}
 
 	return nil
 }
 
-type allVariantsVersion []Version
+type versionTypeUnion []Version
 
 // This should generally not be called, but just in case
-func (av allVariantsVersion) String() string {
+func (av versionTypeUnion) String() string {
 	if len(av) > 0 {
 		return av[0].String()
 	}
@@ -300,7 +321,7 @@ func (av allVariantsVersion) String() string {
 }
 
 // This should generally not be called, but just in case
-func (av allVariantsVersion) Type() string {
+func (av versionTypeUnion) Type() string {
 	if len(av) > 0 {
 		return av[0].Type()
 	}
@@ -308,8 +329,8 @@ func (av allVariantsVersion) Type() string {
 	return ""
 }
 
-func (av allVariantsVersion) Matches(v Version) bool {
-	av2, oav := v.(allVariantsVersion)
+func (av versionTypeUnion) Matches(v Version) bool {
+	av2, oav := v.(versionTypeUnion)
 
 	for _, v1 := range av {
 		if oav {
@@ -326,8 +347,8 @@ func (av allVariantsVersion) Matches(v Version) bool {
 	return false
 }
 
-func (av allVariantsVersion) MatchesAny(c Constraint) bool {
-	av2, oav := c.(allVariantsVersion)
+func (av versionTypeUnion) MatchesAny(c Constraint) bool {
+	av2, oav := c.(versionTypeUnion)
 
 	for _, v1 := range av {
 		if oav {
@@ -344,8 +365,8 @@ func (av allVariantsVersion) MatchesAny(c Constraint) bool {
 	return false
 }
 
-func (av allVariantsVersion) Intersect(c Constraint) Constraint {
-	av2, oav := c.(allVariantsVersion)
+func (av versionTypeUnion) Intersect(c Constraint) Constraint {
+	av2, oav := c.(versionTypeUnion)
 
 	for _, v1 := range av {
 		if oav {
@@ -362,7 +383,7 @@ func (av allVariantsVersion) Intersect(c Constraint) Constraint {
 	return none
 }
 
-func (av allVariantsVersion) _private() {}
+func (av versionTypeUnion) _private() {}
 
 type upgradeVersionSorter []Version
 type downgradeVersionSorter []Version
