@@ -221,7 +221,148 @@ func (c *smAdapter) matches(id ProjectIdentifier, c2 Constraint, v Version) bool
 	default:
 		panic("unreachable")
 	}
+
+	return false
 }
+
+// matchesAny is the authoritative version of Constraint.MatchesAny.
+//func (c *smAdapter) matchesAny(id ProjectIdentifier, c1, c2 Constraint) bool {
+//if c1.MatchesAny(c2) {
+//return true
+//}
+
+//if c.intersect(id, c1, c2) != none {
+//return true
+//}
+//return false
+//}
+
+// intersect is the authoritative version of Constraint.Intersect.
+//func (c *smAdapter) intersect(id ProjectIdentifier, c1, c2 Constraint) Constraint {
+//rc := c1.Intersect(c2)
+//if rc != none {
+//return rc
+//}
+
+//rc = c.doIntersect(id, c1, c2)
+//if rc == none {
+//rc = c.doIntersect(id, c2, c1)
+//}
+
+//return rc
+//}
+
+//func (c *smAdapter) doIntersect(id ProjectIdentifier, c1, c2 Constraint) Constraint {
+//switch tc1 := c1.(type) {
+//case semverConstraint:
+//switch tc2 := c2.(type) {
+//// Two semver constraints, or either a paired or unpaired version, both
+//// guarantee simple intersect was authoritative
+//case semverConstraint, PairedVersion, UnpairedVersion:
+//return none
+//// If it's a revision, then expand it out to all matching versions
+//case Revision:
+//for _, ttv := range c.pairRevision(id, tc2) {
+
+//}
+//}
+//}
+
+//}
+
+func (c *smAdapter) allEquivalentVersions(id ProjectIdentifier, v Version) allVariantsVersion {
+	switch tv := v.(type) {
+	case Revision:
+		return allVariantsVersion(c.pairRevision(id, tv))
+	case PairedVersion:
+		return allVariantsVersion(c.pairRevision(id, tv.Underlying()))
+	case UnpairedVersion:
+		pv := c.pairVersion(id, tv)
+		if pv == nil {
+			return allVariantsVersion{tv}
+		}
+
+		return allVariantsVersion(c.pairRevision(id, pv.Underlying()))
+	}
+
+	return nil
+}
+
+type allVariantsVersion []Version
+
+// This should generally not be called, but just in case
+func (av allVariantsVersion) String() string {
+	if len(av) > 0 {
+		return av[0].String()
+	}
+
+	return ""
+}
+
+// This should generally not be called, but just in case
+func (av allVariantsVersion) Type() string {
+	if len(av) > 0 {
+		return av[0].Type()
+	}
+
+	return ""
+}
+
+func (av allVariantsVersion) Matches(v Version) bool {
+	av2, oav := v.(allVariantsVersion)
+
+	for _, v1 := range av {
+		if oav {
+			for _, v2 := range av2 {
+				if v1.Matches(v2) {
+					return true
+				}
+			}
+		} else if v1.Matches(v) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func (av allVariantsVersion) MatchesAny(c Constraint) bool {
+	av2, oav := c.(allVariantsVersion)
+
+	for _, v1 := range av {
+		if oav {
+			for _, v2 := range av2 {
+				if v1.MatchesAny(v2) {
+					return true
+				}
+			}
+		} else if v1.MatchesAny(c) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func (av allVariantsVersion) Intersect(c Constraint) Constraint {
+	av2, oav := c.(allVariantsVersion)
+
+	for _, v1 := range av {
+		if oav {
+			for _, v2 := range av2 {
+				if rc := v1.Intersect(v2); rc != none {
+					return rc
+				}
+			}
+		} else if rc := v1.Intersect(c); rc != none {
+			return rc
+		}
+	}
+
+	return none
+}
+
+func (av allVariantsVersion) _private() {}
 
 type upgradeVersionSorter []Version
 type downgradeVersionSorter []Version
