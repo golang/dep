@@ -311,22 +311,18 @@ func (c *smAdapter) vtypeUnion(id ProjectIdentifier, v Version) versionTypeUnion
 
 type versionTypeUnion []Version
 
-// This should generally not be called, but just in case
+// This should generally not be called, but is required for the interface. If it
+// is called, we have a bigger problem (the type has escaped the solver); thus,
+// panic.
 func (av versionTypeUnion) String() string {
-	if len(av) > 0 {
-		return av[0].String()
-	}
-
-	return ""
+	panic("versionTypeUnion should never be turned into a string; it is solver internal-only")
 }
 
-// This should generally not be called, but just in case
+// This should generally not be called, but is required for the interface. If it
+// is called, we have a bigger problem (the type has escaped the solver); thus,
+// panic.
 func (av versionTypeUnion) Type() string {
-	if len(av) > 0 {
-		return av[0].Type()
-	}
-
-	return ""
+	panic("versionTypeUnion should never need to answer a Type() call; it is solver internal-only")
 }
 
 func (av versionTypeUnion) Matches(v Version) bool {

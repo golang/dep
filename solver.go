@@ -165,6 +165,7 @@ func (s *solver) Solve(opts SolveOpts) (Result, error) {
 	// Initialize queues
 	s.sel = &selection{
 		deps: make(map[ProjectIdentifier][]Dependency),
+		sm:   s.sm,
 	}
 	s.unsel = &unselected{
 		sl:  make([]ProjectIdentifier, 0),
