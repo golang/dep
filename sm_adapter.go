@@ -235,13 +235,13 @@ func (c *smAdapter) matchesAny(id ProjectIdentifier, c1, c2 Constraint) bool {
 	// more easily understood.
 	var uc1, uc2 Constraint
 	if v1, ok := c1.(Version); ok {
-		uc1 = c.vtypeUnion(id, v1)
+		uc1 = c.vtu(id, v1)
 	} else {
 		uc1 = c1
 	}
 
 	if v2, ok := c2.(Version); ok {
-		uc2 = c.vtypeUnion(id, v2)
+		uc2 = c.vtu(id, v2)
 	} else {
 		uc2 = c2
 	}
@@ -260,13 +260,13 @@ func (c *smAdapter) intersect(id ProjectIdentifier, c1, c2 Constraint) Constrain
 	// more easily understood.
 	var uc1, uc2 Constraint
 	if v1, ok := c1.(Version); ok {
-		uc1 = c.vtypeUnion(id, v1)
+		uc1 = c.vtu(id, v1)
 	} else {
 		uc1 = c1
 	}
 
 	if v2, ok := c2.(Version); ok {
-		uc2 = c.vtypeUnion(id, v2)
+		uc2 = c.vtu(id, v2)
 	} else {
 		uc2 = c2
 	}
@@ -274,7 +274,12 @@ func (c *smAdapter) intersect(id ProjectIdentifier, c1, c2 Constraint) Constrain
 	return uc1.Intersect(uc2)
 }
 
-func (c *smAdapter) vtypeUnion(id ProjectIdentifier, v Version) versionTypeUnion {
+// vtu creates a versionTypeUnion for the provided version.
+//
+// This union may (and typically will) end up being nothing more than the single
+// input version, but creating a versionTypeUnion guarantees that 'local'
+// constraint checks (direct method calls) are authoritative.
+func (c *smAdapter) vtu(id ProjectIdentifier, v Version) versionTypeUnion {
 	switch tv := v.(type) {
 	case Revision:
 		return versionTypeUnion(c.pairRevision(id, tv))
@@ -292,6 +297,20 @@ func (c *smAdapter) vtypeUnion(id ProjectIdentifier, v Version) versionTypeUnion
 	return nil
 }
 
+// versionTypeUnion represents a set of versions that are, within the scope of
+// this solve operation, equivalent. The simple case here is just a pair (normal
+// version plus its underlying revision), but if a tag or branch point at the
+// same rev, then they are equivalent - but only for the duration of this
+// solve.
+//
+// The union members are treated as being OR'd together:  all constraint
+// operations attempt each member, and will take the most open/optimistic
+// answer.
+//
+// This technically does allow tags to match branches - something we
+// otherwise try hard to avoid - but because the original input constraint never
+// actually changes (and is never written out in the Result), there's no harmful
+// case of a user suddenly riding a branch when they expected a fixed tag.
 type versionTypeUnion []Version
 
 // This should generally not be called, but is required for the interface. If it
