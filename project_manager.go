@@ -99,14 +99,12 @@ func (pm *projectManager) GetInfoAt(v Version) (ProjectInfo, error) {
 	}
 
 	var err error
-	if !pm.cvsync {
-		// TODO this may not be sufficient - git, for example, will fetch down
-		// the new revs, but local ones will remain unchanged
+	if !pm.crepo.synced {
 		err = pm.crepo.r.Update()
 		if err != nil {
 			return ProjectInfo{}, fmt.Errorf("Could not fetch latest updates into repository")
 		}
-		pm.cvsync = true
+		pm.crepo.synced = true
 	}
 
 	pm.crepo.mut.Lock()
@@ -155,8 +153,8 @@ func (pm *projectManager) ListVersions() (vlist []Version, err error) {
 		}
 
 		vlist = make([]Version, len(vpairs))
-		// only mark as synced if the callback indicated ExistsInCache
-		if exbits&ExistsInCache == ExistsInCache {
+		// mark our cache as synced if we got ExistsUpstream back
+		if exbits&ExistsUpstream == ExistsUpstream {
 			pm.cvsync = true
 		}
 

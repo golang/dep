@@ -18,7 +18,7 @@ var bd string
 type dummyAnalyzer struct{}
 
 func (dummyAnalyzer) GetInfo(ctx build.Context, p ProjectName) (Manifest, Lock, error) {
-	return nil, nil, fmt.Errorf("just a dummy analyzer")
+	return SimpleManifest{N: p}, nil, nil
 }
 
 func sv(s string) *semver.Version {
@@ -286,4 +286,43 @@ func TestRepoVersionFetching(t *testing.T) {
 		}
 	}
 	// no svn for now, because...svn
+}
+
+// Regression test for #32
+func TestGetInfoListVersionsOrdering(t *testing.T) {
+	// This test is quite slow, skip it on -short
+	if testing.Short() {
+		t.Skip("Skipping slow test in short mode")
+	}
+
+	cpath, err := ioutil.TempDir("", "smcache")
+	if err != nil {
+		t.Errorf("Failed to create temp dir: %s", err)
+	}
+	sm, err := NewSourceManager(cpath, bd, false, dummyAnalyzer{})
+
+	if err != nil {
+		t.Errorf("Unexpected error on SourceManager creation: %s", err)
+		t.FailNow()
+	}
+	defer sm.Release()
+	defer os.RemoveAll(cpath)
+
+	// setup done, now do the test
+
+	pn := ProjectName("github.com/Masterminds/VCSTestRepo")
+
+	_, err = sm.GetProjectInfo(pn, NewVersion("1.0.0"))
+	if err != nil {
+		t.Errorf("Unexpected error from GetInfoAt %s", err)
+	}
+
+	v, err := sm.ListVersions(pn)
+	if err != nil {
+		t.Errorf("Unexpected error from ListVersions %s", err)
+	}
+
+	if len(v) != 3 {
+		t.Errorf("Expected three results from ListVersions, got %v", len(v))
+	}
 }
