@@ -671,3 +671,147 @@ func TestSemverConstraintOps(t *testing.T) {
 		t.Errorf("Semver constraint should return input when intersected with a paired semver version in its range")
 	}
 }
+
+// Test that certain types of cross-version comparisons work when they are
+// expressed as a version union (but that others don't).
+func TestVersionUnion(t *testing.T) {
+	rev := Revision("flooboofoobooo")
+	v1 := NewBranch("master")
+	v2 := NewBranch("test")
+	v3 := NewVersion("1.0.0").Is(rev)
+	v4 := NewVersion("1.0.1")
+	v5 := NewVersion("v2.0.5").Is(Revision("notamatch"))
+
+	uv1 := versionTypeUnion{v1, v4, rev}
+
+	if uv1.MatchesAny(none) {
+		t.Errorf("Union can't match none")
+	}
+	if none.MatchesAny(uv1) {
+		t.Errorf("Union can't match none")
+	}
+
+	if !uv1.MatchesAny(any) {
+		t.Errorf("Union must match any")
+	}
+	if !any.MatchesAny(uv1) {
+		t.Errorf("Union must match any")
+	}
+
+	// Basic matching
+	if !uv1.Matches(v4) {
+		t.Errorf("Union should match on branch to branch")
+	}
+	if !v4.Matches(uv1) {
+		t.Errorf("Union should reverse-match on branch to branch")
+	}
+
+	if !uv1.Matches(v3) {
+		t.Errorf("Union should match on rev to paired rev")
+	}
+	if !v3.Matches(uv1) {
+		t.Errorf("Union should reverse-match on rev to paired rev")
+	}
+
+	if uv1.Matches(v2) {
+		t.Errorf("Union should not match on anything in disjoint unpaired")
+	}
+	if v2.Matches(uv1) {
+		t.Errorf("Union should not reverse-match on anything in disjoint unpaired")
+	}
+
+	if uv1.Matches(v5) {
+		t.Errorf("Union should not match on anything in disjoint pair")
+	}
+	if v5.Matches(uv1) {
+		t.Errorf("Union should not reverse-match on anything in disjoint pair")
+	}
+
+	// MatchesAny - repeat Matches for safety, but add more, too
+	if !uv1.MatchesAny(v4) {
+		t.Errorf("Union should match on branch to branch")
+	}
+	if !v4.MatchesAny(uv1) {
+		t.Errorf("Union should reverse-match on branch to branch")
+	}
+
+	if !uv1.MatchesAny(v3) {
+		t.Errorf("Union should match on rev to paired rev")
+	}
+	if !v3.MatchesAny(uv1) {
+		t.Errorf("Union should reverse-match on rev to paired rev")
+	}
+
+	if uv1.MatchesAny(v2) {
+		t.Errorf("Union should not match on anything in disjoint unpaired")
+	}
+	if v2.MatchesAny(uv1) {
+		t.Errorf("Union should not reverse-match on anything in disjoint unpaired")
+	}
+
+	if uv1.MatchesAny(v5) {
+		t.Errorf("Union should not match on anything in disjoint pair")
+	}
+	if v5.MatchesAny(uv1) {
+		t.Errorf("Union should not reverse-match on anything in disjoint pair")
+	}
+
+	c1, _ := NewConstraint("~1.0.0", SemverConstraint)
+	c2, _ := NewConstraint("~2.0.0", SemverConstraint)
+	if !uv1.MatchesAny(c1) {
+		t.Errorf("Union should have some overlap due to containing 1.0.1 version")
+	}
+	if !c1.MatchesAny(uv1) {
+		t.Errorf("Union should have some overlap due to containing 1.0.1 version")
+	}
+
+	if uv1.MatchesAny(c2) {
+		t.Errorf("Union should have no overlap with ~2.0.0 semver range")
+	}
+	if c2.MatchesAny(uv1) {
+		t.Errorf("Union should have no overlap with ~2.0.0 semver range")
+	}
+
+	// Intersect - repeat all previous
+	if uv1.Intersect(v4) != v4 {
+		t.Errorf("Union intersection on contained version should return that version")
+	}
+	if v4.Intersect(uv1) != v4 {
+		t.Errorf("Union reverse-intersection on contained version should return that version")
+	}
+
+	if uv1.Intersect(v3) != rev {
+		t.Errorf("Union intersection on paired version w/matching rev should return rev, got %s", uv1.Intersect(v3))
+	}
+	if v3.Intersect(uv1) != rev {
+		t.Errorf("Union reverse-intersection on paired version w/matching rev should return rev, got %s", v3.Intersect(uv1))
+	}
+
+	if uv1.Intersect(v2) != none {
+		t.Errorf("Union should not intersect with anything in disjoint unpaired")
+	}
+	if v2.Intersect(uv1) != none {
+		t.Errorf("Union should not reverse-intersect with anything in disjoint unpaired")
+	}
+
+	if uv1.Intersect(v5) != none {
+		t.Errorf("Union should not intersect with anything in disjoint pair")
+	}
+	if v5.Intersect(uv1) != none {
+		t.Errorf("Union should not reverse-intersect with anything in disjoint pair")
+	}
+
+	if uv1.Intersect(c1) != v4 {
+		t.Errorf("Union intersecting with semver range should return 1.0.1 version, got %s", uv1.Intersect(c1))
+	}
+	if c1.Intersect(uv1) != v4 {
+		t.Errorf("Union reverse-intersecting with semver range should return 1.0.1 version, got %s", c1.Intersect(uv1))
+	}
+
+	if uv1.Intersect(c2) != none {
+		t.Errorf("Union intersecting with non-overlapping semver range should return none, got %s", uv1.Intersect(c2))
+	}
+	if c2.Intersect(uv1) != none {
+		t.Errorf("Union reverse-intersecting with non-overlapping semver range should return none, got %s", uv1.Intersect(c2))
+	}
+}

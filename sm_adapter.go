@@ -274,23 +274,6 @@ func (c *smAdapter) intersect(id ProjectIdentifier, c1, c2 Constraint) Constrain
 	return uc1.Intersect(uc2)
 }
 
-//func (c *smAdapter) doIntersect(id ProjectIdentifier, c1, c2 Constraint) Constraint {
-//switch tc1 := c1.(type) {
-//case semverConstraint:
-//switch tc2 := c2.(type) {
-//// Two semver constraints, or either a paired or unpaired version, both
-//// guarantee simple intersect was authoritative
-//case semverConstraint, PairedVersion, UnpairedVersion:
-//return none
-//// If it's a revision, then expand it out to all matching versions
-//case Revision:
-//for _, ttv := range c.pairRevision(id, tc2) {
-
-//}
-//}
-//}
-//}
-
 func (c *smAdapter) vtypeUnion(id ProjectIdentifier, v Version) versionTypeUnion {
 	switch tv := v.(type) {
 	case Revision:
@@ -325,6 +308,10 @@ func (av versionTypeUnion) Type() string {
 	panic("versionTypeUnion should never need to answer a Type() call; it is solver internal-only")
 }
 
+// Matches takes a version, and returns true if that version matches any version
+// contained in the union.
+//
+// This DOES allow tags to match branches, albeit indirectly through a revision.
 func (av versionTypeUnion) Matches(v Version) bool {
 	av2, oav := v.(versionTypeUnion)
 
@@ -343,6 +330,9 @@ func (av versionTypeUnion) Matches(v Version) bool {
 	return false
 }
 
+// MatchesAny returns true if any of the contained versions (which are also
+// constraints) in the union successfully MatchAny with the provided
+// constraint.
 func (av versionTypeUnion) MatchesAny(c Constraint) bool {
 	av2, oav := c.(versionTypeUnion)
 
@@ -361,6 +351,13 @@ func (av versionTypeUnion) MatchesAny(c Constraint) bool {
 	return false
 }
 
+// Intersect takes a constraint, and attempts to intersect it with all the
+// versions contained in the union until one returns non-none. If that never
+// happens, then none is returned.
+//
+// In order to avoid weird version floating elsewhere in the solver, the union
+// always returns the input constraint. (This is probably obviously correct, but
+// is still worth noting.)
 func (av versionTypeUnion) Intersect(c Constraint) Constraint {
 	av2, oav := c.(versionTypeUnion)
 

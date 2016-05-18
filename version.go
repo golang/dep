@@ -383,6 +383,8 @@ func (v versionPair) Underlying() Revision {
 
 func (v versionPair) Matches(v2 Version) bool {
 	switch tv2 := v2.(type) {
+	case versionTypeUnion:
+		return tv2.Matches(v)
 	case versionPair:
 		return v.r == tv2.r
 	case Revision:
@@ -419,6 +421,8 @@ func (v versionPair) Intersect(c2 Constraint) Constraint {
 		return v
 	case noneConstraint:
 		return none
+	case versionTypeUnion:
+		return tc.Intersect(v)
 	case versionPair:
 		if v.r == tc.r {
 			return v.r
