@@ -555,6 +555,24 @@ func TestSemverVersionConstraintOps(t *testing.T) {
 	if v6.Intersect(o4) != cookie {
 		t.Errorf("Intersection of %s (semver) with %s (branch) should return shared underlying rev", gu(v6), gu(o4))
 	}
+
+	// Regression check - make sure that semVersion -> semverConstraint works
+	// the same as verified in the other test
+	c1, _ := NewConstraint("=1.0.0", SemverConstraint)
+	if !v1.MatchesAny(c1) {
+		t.Errorf("%s (semver) should allow some matches - itself - when combined with an equivalent semverConstraint", gu(v1))
+	}
+	if v1.Intersect(c1) != v1 {
+		t.Errorf("Intersection of %s (semver) with equivalent semver constraint should return self, got %s", gu(v1), v1.Intersect(c1))
+	}
+
+	if !v6.MatchesAny(c1) {
+		t.Errorf("%s (semver pair) should allow some matches - itself - when combined with an equivalent semverConstraint", gu(v6))
+	}
+	if v6.Intersect(c1) != v6 {
+		t.Errorf("Intersection of %s (semver pair) with equivalent semver constraint should return self, got %s", gu(v6), v6.Intersect(c1))
+	}
+
 }
 
 // The other test is about the semverVersion, this is about semverConstraint
