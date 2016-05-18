@@ -30,7 +30,7 @@ func CreateVendorTree(basedir string, l Lock, sm SourceManager) error {
 
 	// TODO parallelize
 	for _, p := range l.Projects() {
-		to := path.Join(basedir, string(p.n))
+		to := path.Join(basedir, string(p.Ident().LocalName))
 
 		err := os.MkdirAll(to, 0777)
 		if err != nil {

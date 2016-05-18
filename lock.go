@@ -19,16 +19,16 @@ type Lock interface {
 }
 
 // LockedProject is a single project entry from a lock file. It expresses the
-// project's name, one or both of version and underlying revision, the URI for
-// accessing it, and the path at which it should be placed within a vendor
-// directory.
+// project's name, one or both of version and underlying revision, the network
+// URI for accessing it, and the path at which it should be placed within a
+// vendor directory.
 //
 // TODO note that sometime soon, we also plan to allow pkgs. this'll change
 type LockedProject struct {
-	n         ProjectName
-	v         UnpairedVersion
-	r         Revision
-	path, uri string
+	pi   ProjectIdentifier
+	v    UnpairedVersion
+	r    Revision
+	path string
 }
 
 // SimpleLock is a helper for tools to easily describe lock data when they know
@@ -65,8 +65,10 @@ func NewLockedProject(n ProjectName, v Version, uri, path string) LockedProject 
 	}
 
 	lp := LockedProject{
-		n:    n,
-		uri:  uri,
+		pi: ProjectIdentifier{
+			LocalName:   n,
+			NetworkName: uri,
+		},
 		path: path,
 	}
 
@@ -91,10 +93,7 @@ func NewLockedProject(n ProjectName, v Version, uri, path string) LockedProject 
 // local name (the root name by which the project is referenced in import paths)
 // and the network name, where the upstream source lives.
 func (lp LockedProject) Ident() ProjectIdentifier {
-	return ProjectIdentifier{
-		LocalName:   lp.n,
-		NetworkName: lp.uri,
-	}
+	return lp.pi
 }
 
 // Version assembles together whatever version and/or revision data is
@@ -133,10 +132,39 @@ func (lp LockedProject) toAtom() ProjectAtom {
 	return pa
 }
 
-// normalizedLock is used internally by the solver to represent incoming root
-// locks that may have provided only a revision, where a revision and tag were
-// actually available.
-type normalizedLock struct {
-	id ProjectIdentifier
-	vl []Version
+type safeLock struct {
+	h []byte
+	p []LockedProject
+}
+
+func (sl safeLock) InputHash() []byte {
+	return sl.h
+}
+
+func (sl safeLock) Projects() []LockedProject {
+	return sl.p
+}
+
+// prepLock ensures a lock is prepared and safe for use by the solver.
+// This entails two things:
+//
+//  * Ensuring that all LockedProject's identifiers are normalized.
+//  * Defensively ensuring that no outside routine can modify the lock while the
+//  solver is in-flight.
+//
+// This is achieved by copying the lock's data into a new safeLock.
+func prepLock(l Lock) Lock {
+	pl := l.Projects()
+
+	rl := safeLock{
+		h: l.InputHash(),
+		p: make([]LockedProject, len(pl)),
+	}
+
+	for k, lp := range pl {
+		lp.pi = lp.pi.normalize()
+		rl.p[k] = lp
+	}
+
+	return rl
 }

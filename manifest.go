@@ -48,3 +48,34 @@ func (m SimpleManifest) GetDependencies() []ProjectDep {
 func (m SimpleManifest) GetDevDependencies() []ProjectDep {
 	return m.DP
 }
+
+// prepManifest ensures a manifest is prepared and safe for use by the solver.
+// This entails two things:
+//
+//  * Ensuring that all ProjectIdentifiers are normalized (otherwise matching
+//  can get screwy and the queues go out of alignment)
+//  * Defensively ensuring that no outside routine can modify the manifest while
+//  the solver is in-flight.
+//
+// This is achieved by copying the manifest's data into a new SimpleManifest.
+func prepManifest(m Manifest) Manifest {
+	deps := m.GetDependencies()
+	ddeps := m.GetDevDependencies()
+
+	rm := SimpleManifest{
+		N:  m.Name(),
+		P:  make([]ProjectDep, len(deps)),
+		DP: make([]ProjectDep, len(ddeps)),
+	}
+
+	for k, d := range deps {
+		d.Ident = d.Ident.normalize()
+		rm.P[k] = d
+	}
+	for k, d := range ddeps {
+		d.Ident = d.Ident.normalize()
+		rm.DP[k] = d
+	}
+
+	return rm
+}

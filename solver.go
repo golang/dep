@@ -20,22 +20,26 @@ type Solver interface {
 	Solve(opts SolveOpts) (Result, error)
 }
 
-// SolveOpts holds both options that govern solving behavior, and the actual
-// inputs to the solving process.
+// SolveOpts holds options that govern solving behavior, and the proper inputs
+// to the solving process.
 type SolveOpts struct {
 	// The path to the root of the project on which the solver is working.
 	Root string
+
 	// The 'name' of the project. Required. This should (must?) correspond to subpath of
 	// Root that exists under a GOPATH.
 	N ProjectName
+
 	// The root manifest. Required. This contains all the dependencies, constraints, and
 	// other controls available to the root project.
 	M Manifest
+
 	// The root lock. Optional. Generally, this lock is the output of a previous solve run.
 	//
 	// If provided, the solver will attempt to preserve the versions specified
 	// in the lock, unless ToChange or ChangeAll settings indicate otherwise.
 	L Lock
+
 	// Downgrade indicates whether the solver will attempt to upgrade (false) or
 	// downgrade (true) projects that are not locked, or are marked for change.
 	//
@@ -43,9 +47,11 @@ type SolveOpts struct {
 	// 'Downgrade' so that the bool's zero value corresponds to that most
 	// typical case.
 	Downgrade bool
+
 	// ChangeAll indicates that all projects should be changed - that is, any
 	// versions specified in the root lock file should be ignored.
 	ChangeAll bool
+
 	// ToChange is a list of project names that should be changed - that is, any
 	// versions specified for those projects in the root lock file should be
 	// ignored.
@@ -54,6 +60,7 @@ type SolveOpts struct {
 	// projects into ToChange. In general, ToChange should *only* be used if the
 	// user expressly requested an upgrade for a specific project.
 	ToChange []ProjectName
+
 	// Trace controls whether the solver will generate informative trace output
 	// as it moves through the solving process.
 	Trace bool
@@ -69,23 +76,31 @@ func NewSolver(sm SourceManager, l *log.Logger) Solver {
 // solver is a specialized backtracking SAT solver with satisfiability
 // conditions hardcoded to the needs of the Go package management problem space.
 type solver struct {
+	// The current number of attempts made over the course of this solve. This
+	// number increments each time the algorithm completes a backtrack and
+	// starts moving forward again.
 	attempts int
+
 	// SolveOpts are the configuration options provided to the solver. The
 	// solver will abort early if certain options are not appropriately set.
 	o SolveOpts
+
 	// Logger used exclusively for trace output, if the trace option is set.
 	tl *log.Logger
+
 	// An adapter around a standard SourceManager. The adapter does some local
 	// caching of pre-sorted version lists, as well as translation between the
 	// full-on ProjectIdentifiers that the solver deals with and the simplified
 	// names a SourceManager operates on.
 	sm *smAdapter
+
 	// The list of projects currently "selected" - that is, they have passed all
 	// satisfiability checks, and are part of the current solution.
 	//
 	// The *selection type is mostly just a dumb data container; the solver
 	// itself is responsible for maintaining that invariant.
 	sel *selection
+
 	// The current list of projects that we need to incorporate into the solution in
 	// order for the solution to be complete. This list is implemented as a
 	// priority queue that places projects least likely to induce errors at the
@@ -96,18 +111,25 @@ type solver struct {
 	// time that the selected queue is updated, either with an addition or
 	// removal.
 	unsel *unselected
+
 	// A list of all the currently active versionQueues in the solver. The set
 	// of projects represented here corresponds closely to what's in s.sel,
 	// although s.sel will always contain the root project, and s.versions never
 	// will.
 	versions []*versionQueue
+
 	// A map of the ProjectName (local names) that should be allowed to change
 	chng map[ProjectName]struct{}
+
 	// A map of the ProjectName (local names) that are currently selected, and
 	// the network name to which they currently correspond.
 	names map[ProjectName]string
+
 	// A map of the names listed in the root's lock.
 	rlm map[ProjectIdentifier]LockedProject
+
+	// A normalized, copied version of the root manifest.
+	rm Manifest
 }
 
 // Solve attempts to find a dependency solution for the given project, as
@@ -151,6 +173,9 @@ func (s *solver) Solve(opts SolveOpts) (Result, error) {
 	s.chng = make(map[ProjectName]struct{})
 	s.rlm = make(map[ProjectIdentifier]LockedProject)
 	s.names = make(map[ProjectName]string)
+
+	// Prep safe, normalized versions of root manifest and lock data
+	s.rm = prepManifest(s.o.M)
 
 	if s.o.L != nil {
 		for _, lp := range s.o.L.Projects() {
@@ -253,7 +278,7 @@ func (s *solver) solve() ([]ProjectAtom, error) {
 
 func (s *solver) createVersionQueue(id ProjectIdentifier) (*versionQueue, error) {
 	// If on the root package, there's no queue to make
-	if id.LocalName == s.o.M.Name() {
+	if id.LocalName == s.rm.Name() {
 		return newVersionQueue(id, nilpa, s.sm)
 	}
 
@@ -422,8 +447,8 @@ func (s *solver) getDependenciesOf(pa ProjectAtom) ([]ProjectDep, error) {
 	var deps []ProjectDep
 
 	// If we're looking for root's deps, get it from opts rather than sm
-	if s.o.M.Name() == pa.Ident.LocalName {
-		deps = append(s.o.M.GetDependencies(), s.o.M.GetDevDependencies()...)
+	if s.rm.Name() == pa.Ident.LocalName {
+		deps = append(s.rm.GetDependencies(), s.rm.GetDevDependencies()...)
 	} else {
 		info, err := s.sm.getProjectInfo(pa)
 		if err != nil {
@@ -522,7 +547,7 @@ func (s *solver) unselectedComparator(i, j int) bool {
 		return false
 	}
 
-	rname := s.o.M.Name()
+	rname := s.rm.Name()
 	// *always* put root project first
 	if iname.LocalName == rname {
 		return true
@@ -576,7 +601,7 @@ func (s *solver) unselectedComparator(i, j int) bool {
 
 func (s *solver) fail(i ProjectIdentifier) {
 	// skip if the root project
-	if s.o.M.Name() == i.LocalName {
+	if s.rm.Name() == i.LocalName {
 		return
 	}
 
@@ -610,7 +635,7 @@ func (s *solver) selectVersion(pa ProjectAtom) {
 		// otherwise it's already in there, or been selected
 		if len(siblingsAndSelf) == 1 {
 			s.names[dep.Ident.LocalName] = dep.Ident.netName()
-			heap.Push(s.unsel, dep.Ident.normalize())
+			heap.Push(s.unsel, dep.Ident)
 		}
 	}
 }
@@ -704,11 +729,10 @@ func tracePrefix(msg, sep, fsep string) string {
 // simple (temporary?) helper just to convert atoms into locked projects
 func pa2lp(pa ProjectAtom) LockedProject {
 	lp := LockedProject{
-		n: pa.Ident.LocalName,
-		// path is mostly duplicate information now, but if we ever allow
+		pi: pa.Ident.normalize(), // shouldn't be necessary, but normalize just in case
+		// path is unnecessary duplicate information now, but if we ever allow
 		// nesting as a conflict resolution mechanism, it will become valuable
 		path: string(pa.Ident.LocalName),
-		uri:  pa.Ident.netName(),
 	}
 
 	switch v := pa.Version.(type) {

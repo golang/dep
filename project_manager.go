@@ -27,21 +27,30 @@ type ProjectAnalyzer interface {
 }
 
 type projectManager struct {
+	// The identifier of the project. At this level, corresponds to the
+	// '$GOPATH/src'-relative path, *and* the network name.
 	n ProjectName
+
 	// build.Context to use in any analysis, and to pass to the analyzer
 	ctx build.Context
+
 	// Top-level project vendor dir
 	vendordir string
+
 	// Object for the cache repository
 	crepo *repo
+
 	// Indicates the extent to which we have searched for, and verified, the
 	// existence of the project/repo.
 	ex existence
+
 	// Analyzer, injected by way of the SourceManager and originally from the
 	// sm's creator
 	an ProjectAnalyzer
+
 	// Whether the cache has the latest info on versions
 	cvsync bool
+
 	// The project metadata cache. This is persisted to disk, for reuse across
 	// solver runs.
 	dc *projectDataCache
@@ -50,6 +59,7 @@ type projectManager struct {
 type existence struct {
 	// The existence levels for which a search/check has been performed
 	s ProjectExistence
+
 	// The existence levels verified to be present through searching
 	f ProjectExistence
 }
@@ -65,10 +75,13 @@ type projectDataCache struct {
 type repo struct {
 	// Path to the root of the default working copy (NOT the repo itself)
 	rpath string
+
 	// Mutex controlling general access to the repo
 	mut sync.RWMutex
+
 	// Object for direct repo interaction
 	r vcs.Repo
+
 	// Whether or not the cache repo is in sync (think dvcs) with upstream
 	synced bool
 }
@@ -125,11 +138,16 @@ func (pm *projectManager) GetInfoAt(v Version) (ProjectInfo, error) {
 	// TODO cache results
 	pm.crepo.mut.RUnlock()
 
+	// TODO check if manifest is nil, probably error out if it is
+
+	if l != nil {
+		l = prepLock(l)
+	}
 	if err == nil {
 		return ProjectInfo{
 			N:        pm.n,
 			V:        v,
-			Manifest: m,
+			Manifest: prepManifest(m),
 			Lock:     l,
 		}, nil
 	}
