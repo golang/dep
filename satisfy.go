@@ -41,7 +41,7 @@ func (s *solver) satisfiable(pa ProjectAtom) error {
 // the constraints established by the current solution.
 func (s *solver) checkAtomAllowable(pa ProjectAtom) error {
 	constraint := s.sel.getConstraint(pa.Ident)
-	if constraint.Matches(pa.Version) {
+	if s.sm.matches(pa.Ident, constraint, pa.Version) {
 		return nil
 	}
 	// TODO collect constraint failure reason
@@ -49,7 +49,7 @@ func (s *solver) checkAtomAllowable(pa ProjectAtom) error {
 	deps := s.sel.getDependenciesOn(pa.Ident)
 	var failparent []Dependency
 	for _, dep := range deps {
-		if !dep.Dep.Constraint.Matches(pa.Version) {
+		if !s.sm.matches(pa.Ident, dep.Dep.Constraint, pa.Version) {
 			s.fail(dep.Depender.Ident)
 			failparent = append(failparent, dep)
 		}
@@ -71,7 +71,7 @@ func (s *solver) checkDepsConstraintsAllowable(pa ProjectAtom, dep ProjectDep) e
 	constraint := s.sel.getConstraint(dep.Ident)
 	// Ensure the constraint expressed by the dep has at least some possible
 	// intersection with the intersection of existing constraints.
-	if constraint.MatchesAny(dep.Constraint) {
+	if s.sm.matchesAny(dep.Ident, constraint, dep.Constraint) {
 		return nil
 	}
 
@@ -80,7 +80,7 @@ func (s *solver) checkDepsConstraintsAllowable(pa ProjectAtom, dep ProjectDep) e
 	var failsib []Dependency
 	var nofailsib []Dependency
 	for _, sibling := range siblings {
-		if !sibling.Dep.Constraint.MatchesAny(dep.Constraint) {
+		if !s.sm.matchesAny(dep.Ident, sibling.Dep.Constraint, dep.Constraint) {
 			s.fail(sibling.Depender.Ident)
 			failsib = append(failsib, sibling)
 		} else {
@@ -103,7 +103,7 @@ func (s *solver) checkDepsConstraintsAllowable(pa ProjectAtom, dep ProjectDep) e
 // selected.
 func (s *solver) checkDepsDisallowsSelected(pa ProjectAtom, dep ProjectDep) error {
 	selected, exists := s.sel.selected(dep.Ident)
-	if exists && !dep.Constraint.Matches(selected.Version) {
+	if exists && !s.sm.matches(dep.Ident, dep.Constraint, selected.Version) {
 		s.fail(dep.Ident)
 
 		err := &constraintNotAllowedFailure{

@@ -64,6 +64,11 @@ func TestSourceManagerInit(t *testing.T) {
 }
 
 func TestProjectManagerInit(t *testing.T) {
+	// This test is a bit slow, skip it on -short
+	if testing.Short() {
+		t.Skip("Skipping project manager init test in short mode")
+	}
+
 	cpath, err := ioutil.TempDir("", "smcache")
 	if err != nil {
 		t.Errorf("Failed to create temp dir: %s", err)
@@ -177,6 +182,11 @@ func TestProjectManagerInit(t *testing.T) {
 }
 
 func TestRepoVersionFetching(t *testing.T) {
+	// This test is quite slow, skip it on -short
+	if testing.Short() {
+		t.Skip("Skipping repo version fetching test in short mode")
+	}
+
 	cpath, err := ioutil.TempDir("", "smcache")
 	if err != nil {
 		t.Errorf("Failed to create temp dir: %s", err)

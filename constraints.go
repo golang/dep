@@ -67,6 +67,12 @@ func (c semverConstraint) String() string {
 
 func (c semverConstraint) Matches(v Version) bool {
 	switch tv := v.(type) {
+	case versionTypeUnion:
+		for _, elem := range tv {
+			if c.Matches(elem) {
+				return true
+			}
+		}
 	case semVersion:
 		return c.c.Matches(tv.sv) == nil
 	case versionPair:
@@ -86,6 +92,12 @@ func (c semverConstraint) Intersect(c2 Constraint) Constraint {
 	switch tc := c2.(type) {
 	case anyConstraint:
 		return c
+	case versionTypeUnion:
+		for _, elem := range tc {
+			if rc := c.Intersect(elem); rc != none {
+				return rc
+			}
+		}
 	case semverConstraint:
 		rc := c.c.Intersect(tc.c)
 		if !semver.IsNone(rc) {

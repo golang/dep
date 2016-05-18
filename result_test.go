@@ -48,6 +48,11 @@ func init() {
 }
 
 func TestResultCreateVendorTree(t *testing.T) {
+	// This test is a bit slow, skip it on -short
+	if testing.Short() {
+		t.Skip("Skipping vendor tree creation test in short mode")
+	}
+
 	r := basicResult
 
 	tmp := path.Join(os.TempDir(), "vsolvtest")

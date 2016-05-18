@@ -1,6 +1,7 @@
 package vsolver
 
 import (
+	"flag"
 	"fmt"
 	"log"
 	"os"
@@ -8,17 +9,23 @@ import (
 	"testing"
 )
 
+var fixtorun string
+
 // TODO regression test ensuring that locks with only revs for projects don't cause errors
+func init() {
+	flag.StringVar(&fixtorun, "vsolver.fix", "", "A single fixture to run in TestBasicSolves")
+}
 
 var stderrlog = log.New(os.Stderr, "", 0)
 
 func TestBasicSolves(t *testing.T) {
-	//solveAndBasicChecks(fixtures[8], t)
 	for _, fix := range fixtures {
-		solveAndBasicChecks(fix, t)
-		if testing.Verbose() {
-			// insert a line break between tests
-			stderrlog.Println("")
+		if fixtorun == "" || fixtorun == fix.n {
+			solveAndBasicChecks(fix, t)
+			if testing.Verbose() {
+				// insert a line break between tests
+				stderrlog.Println("")
+			}
 		}
 	}
 }
@@ -57,10 +64,10 @@ func fixtureSolveBasicChecks(fix fixture, res Result, err error, t *testing.T) (
 
 		switch fail := err.(type) {
 		case *BadOptsFailure:
-			t.Error("Unexpected bad opts failure solve error: %s", err)
+			t.Error("(fixture: %q) Unexpected bad opts failure solve error: %s", fix.n, err)
 		case *noVersionError:
 			if fix.errp[0] != string(fail.pn.LocalName) { // TODO identifierify
-				t.Errorf("Expected failure on project %s, but was on project %s", fail.pn.LocalName, fix.errp[0])
+				t.Errorf("(fixture: %q) Expected failure on project %s, but was on project %s", fix.n, fail.pn.LocalName, fix.errp[0])
 			}
 
 			ep := make(map[string]struct{})
@@ -83,7 +90,7 @@ func fixtureSolveBasicChecks(fix fixture, res Result, err error, t *testing.T) (
 				}
 			}
 			if len(extra) > 0 {
-				t.Errorf("Expected solve failures due to projects %s, but solve failures also arose from %s", strings.Join(fix.errp[1:], ", "), strings.Join(extra, ", "))
+				t.Errorf("(fixture: %q) Expected solve failures due to projects %s, but solve failures also arose from %s", fix.n, strings.Join(fix.errp[1:], ", "), strings.Join(extra, ", "))
 			}
 
 			for p, _ := range ep {
@@ -92,7 +99,7 @@ func fixtureSolveBasicChecks(fix fixture, res Result, err error, t *testing.T) (
 				}
 			}
 			if len(missing) > 0 {
-				t.Errorf("Expected solve failures due to projects %s, but %s had no failures", strings.Join(fix.errp[1:], ", "), strings.Join(missing, ", "))
+				t.Errorf("(fixture: %q) Expected solve failures due to projects %s, but %s had no failures", fix.n, strings.Join(fix.errp[1:], ", "), strings.Join(missing, ", "))
 			}
 
 		default:

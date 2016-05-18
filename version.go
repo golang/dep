@@ -84,10 +84,12 @@ func (r Revision) Type() string {
 	return "rev"
 }
 
-// Admits is the Revision acting as a constraint; it checks to see if the provided
+// Matches is the Revision acting as a constraint; it checks to see if the provided
 // version is the same Revision as itself.
 func (r Revision) Matches(v Version) bool {
 	switch tv := v.(type) {
+	case versionTypeUnion:
+		return tv.Matches(r)
 	case Revision:
 		return r == tv
 	case versionPair:
@@ -97,7 +99,7 @@ func (r Revision) Matches(v Version) bool {
 	return false
 }
 
-// AdmitsAny is the Revision acting as a constraint; it checks to see if the provided
+// MatchesAny is the Revision acting as a constraint; it checks to see if the provided
 // version is the same Revision as itself.
 func (r Revision) MatchesAny(c Constraint) bool {
 	switch tc := c.(type) {
@@ -105,6 +107,8 @@ func (r Revision) MatchesAny(c Constraint) bool {
 		return true
 	case noneConstraint:
 		return false
+	case versionTypeUnion:
+		return tc.MatchesAny(r)
 	case Revision:
 		return r == tc
 	case versionPair:
@@ -120,6 +124,8 @@ func (r Revision) Intersect(c Constraint) Constraint {
 		return r
 	case noneConstraint:
 		return none
+	case versionTypeUnion:
+		return tc.Intersect(r)
 	case Revision:
 		if r == tc {
 			return r
@@ -145,6 +151,8 @@ func (r branchVersion) Type() string {
 
 func (v branchVersion) Matches(v2 Version) bool {
 	switch tv := v2.(type) {
+	case versionTypeUnion:
+		return tv.Matches(v)
 	case branchVersion:
 		return v == tv
 	case versionPair:
@@ -161,6 +169,8 @@ func (v branchVersion) MatchesAny(c Constraint) bool {
 		return true
 	case noneConstraint:
 		return false
+	case versionTypeUnion:
+		return tc.MatchesAny(v)
 	case branchVersion:
 		return v == tc
 	case versionPair:
@@ -178,6 +188,8 @@ func (v branchVersion) Intersect(c Constraint) Constraint {
 		return v
 	case noneConstraint:
 		return none
+	case versionTypeUnion:
+		return tc.Intersect(v)
 	case branchVersion:
 		if v == tc {
 			return v
@@ -212,6 +224,8 @@ func (r plainVersion) Type() string {
 
 func (v plainVersion) Matches(v2 Version) bool {
 	switch tv := v2.(type) {
+	case versionTypeUnion:
+		return tv.Matches(v)
 	case plainVersion:
 		return v == tv
 	case versionPair:
@@ -228,6 +242,8 @@ func (v plainVersion) MatchesAny(c Constraint) bool {
 		return true
 	case noneConstraint:
 		return false
+	case versionTypeUnion:
+		return tc.MatchesAny(v)
 	case plainVersion:
 		return v == tc
 	case versionPair:
@@ -245,6 +261,8 @@ func (v plainVersion) Intersect(c Constraint) Constraint {
 		return v
 	case noneConstraint:
 		return none
+	case versionTypeUnion:
+		return tc.Intersect(v)
 	case plainVersion:
 		if v == tc {
 			return v
@@ -281,6 +299,8 @@ func (r semVersion) Type() string {
 
 func (v semVersion) Matches(v2 Version) bool {
 	switch tv := v2.(type) {
+	case versionTypeUnion:
+		return tv.Matches(v)
 	case semVersion:
 		return v.sv.Equal(tv.sv)
 	case versionPair:
@@ -297,8 +317,12 @@ func (v semVersion) MatchesAny(c Constraint) bool {
 		return true
 	case noneConstraint:
 		return false
+	case versionTypeUnion:
+		return tc.MatchesAny(v)
 	case semVersion:
 		return v.sv.Equal(tc.sv)
+	case semverConstraint:
+		return tc.Intersect(v) != none
 	case versionPair:
 		if tc2, ok := tc.v.(semVersion); ok {
 			return tc2.sv.Equal(v.sv)
@@ -314,10 +338,14 @@ func (v semVersion) Intersect(c Constraint) Constraint {
 		return v
 	case noneConstraint:
 		return none
+	case versionTypeUnion:
+		return tc.Intersect(v)
 	case semVersion:
 		if v.sv.Equal(tc.sv) {
 			return v
 		}
+	case semverConstraint:
+		return tc.Intersect(v)
 	case versionPair:
 		if tc2, ok := tc.v.(semVersion); ok {
 			if v.sv.Equal(tc2.sv) {
@@ -355,6 +383,8 @@ func (v versionPair) Underlying() Revision {
 
 func (v versionPair) Matches(v2 Version) bool {
 	switch tv2 := v2.(type) {
+	case versionTypeUnion:
+		return tv2.Matches(v)
 	case versionPair:
 		return v.r == tv2.r
 	case Revision:
@@ -386,19 +416,29 @@ func (v versionPair) MatchesAny(c2 Constraint) bool {
 }
 
 func (v versionPair) Intersect(c2 Constraint) Constraint {
-	switch tv2 := c2.(type) {
+	switch tc := c2.(type) {
 	case anyConstraint:
 		return v
 	case noneConstraint:
 		return none
+	case versionTypeUnion:
+		return tc.Intersect(v)
 	case versionPair:
-		if v.r == tv2.r {
+		if v.r == tc.r {
 			return v.r
 		}
 	case Revision:
-		if v.r == tv2 {
+		if v.r == tc {
 			return v.r
 		}
+	case semverConstraint:
+		if tv, ok := v.v.(semVersion); ok {
+			if tc.Intersect(tv) == v.v {
+				return v
+			}
+		}
+		// If the semver intersection failed, we know nothing could work
+		return none
 	}
 
 	switch tv := v.v.(type) {
