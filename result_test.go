@@ -63,7 +63,7 @@ func TestResultCreateVendorTree(t *testing.T) {
 		t.Errorf("NewSourceManager errored unexpectedly: %q", err)
 	}
 
-	err = CreateVendorTree(path.Join(tmp, "export"), r, sm)
+	err = CreateVendorTree(path.Join(tmp, "export"), r, sm, true)
 	if err != nil {
 		t.Errorf("Unexpected error while creating vendor tree: %s", err)
 	}
@@ -103,7 +103,7 @@ func BenchmarkCreateVendorTree(b *testing.B) {
 			// ease manual inspection
 			os.RemoveAll(exp)
 			b.StartTimer()
-			err = CreateVendorTree(exp, r, sm)
+			err = CreateVendorTree(exp, r, sm, true)
 			b.StopTimer()
 			if err != nil {
 				b.Errorf("unexpected error after %v iterations: %s", i, err)

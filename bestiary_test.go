@@ -844,7 +844,7 @@ func (sm *depspecSourceManager) VendorCodeExists(name ProjectName) (bool, error)
 
 func (sm *depspecSourceManager) Release() {}
 
-func (sm *depspecSourceManager) ExportAtomTo(pa ProjectAtom, to string) error {
+func (sm *depspecSourceManager) ExportProject(n ProjectName, v Version, to string) error {
 	return fmt.Errorf("dummy sm doesn't support exporting")
 }
 

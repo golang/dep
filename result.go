@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"path/filepath"
 )
 
 type Result interface {
@@ -22,7 +23,13 @@ type result struct {
 	hd []byte
 }
 
-func CreateVendorTree(basedir string, l Lock, sm SourceManager) error {
+// CreateVendorTree takes a basedir and a Lock, and exports all the projects
+// listed in the lock to the appropriate target location within the basedir.
+//
+// It requires a SourceManager to do the work, and takes a flag indicating
+// whether or not to strip vendor directories contained in the exported
+// dependencies.
+func CreateVendorTree(basedir string, l Lock, sm SourceManager, sv bool) error {
 	err := os.MkdirAll(basedir, 0777)
 	if err != nil {
 		return err
@@ -37,10 +44,13 @@ func CreateVendorTree(basedir string, l Lock, sm SourceManager) error {
 			return err
 		}
 
-		err = sm.ExportAtomTo(p.toAtom(), to)
+		err = sm.ExportProject(p.Ident().LocalName, p.Version(), to)
 		if err != nil {
 			os.RemoveAll(basedir)
 			return fmt.Errorf("Error while exporting %s: %s", p.Ident().LocalName, err)
+		}
+		if sv {
+			filepath.Walk(to, stripVendor)
 		}
 		// TODO dump version metadata file
 	}

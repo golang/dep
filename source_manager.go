@@ -15,7 +15,7 @@ type SourceManager interface {
 	ListVersions(ProjectName) ([]Version, error)
 	RepoExists(ProjectName) (bool, error)
 	VendorCodeExists(ProjectName) (bool, error)
-	ExportAtomTo(ProjectAtom, string) error
+	ExportProject(ProjectName, Version, string) error
 	Release()
 	// Flush()
 }
@@ -127,14 +127,13 @@ func (sm *sourceManager) RepoExists(n ProjectName) (bool, error) {
 	return pms.pm.CheckExistence(ExistsInCache) || pms.pm.CheckExistence(ExistsUpstream), nil
 }
 
-func (sm *sourceManager) ExportAtomTo(pa ProjectAtom, to string) error {
-	// TODO break up this atom, too?
-	pms, err := sm.getProjectManager(pa.Ident.LocalName)
+func (sm *sourceManager) ExportProject(n ProjectName, v Version, to string) error {
+	pms, err := sm.getProjectManager(n)
 	if err != nil {
 		return err
 	}
 
-	return pms.pm.ExportVersionTo(pa.Version, to)
+	return pms.pm.ExportVersionTo(v, to)
 }
 
 // getProjectManager gets the project manager for the given ProjectName.

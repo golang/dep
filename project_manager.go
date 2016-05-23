@@ -7,7 +7,6 @@ import (
 	"os"
 	"os/exec"
 	"path"
-	"path/filepath"
 	"strings"
 	"sync"
 
@@ -443,11 +442,7 @@ func (r *repo) exportVersionTo(v Version, to string) error {
 		// housekeeping to do to set up, then tear down, the sparse checkout
 		// controls, as well as restore the original index and HEAD.
 		_, err = r.r.RunFromDir("git", "checkout-index", "-a", "--prefix="+to)
-		if err != nil {
-			return err
-		}
-
-		return filepath.Walk(to, stripVendor)
+		return err
 	default:
 		// TODO This is a dumb, slow approach, but we're punting on making these
 		// fast for now because git is the OVERWHELMING case
