@@ -74,19 +74,17 @@ func ExternalReach(basedir, projname string) (rm map[string][]string, err error)
 			default:
 				return err
 			}
-		} else {
-			imps = p.Imports
 		}
 
+		imps = p.Imports
 		w := wm{
 			ex: make(map[string]struct{}),
 			in: make(map[string]struct{}),
 		}
 
 		for _, imp := range imps {
-			if !strings.HasPrefix(imp, projname) {
+			if !strings.HasPrefix(filepath.Clean(imp), projname) {
 				w.ex[imp] = struct{}{}
-				// TODO handle relative paths correctly, too
 			} else {
 				if w2, seen := workmap[imp]; seen {
 					for i := range w2.ex {
@@ -116,11 +114,10 @@ func ExternalReach(basedir, projname string) (rm map[string][]string, err error)
 	//
 	// This implementation is hilariously inefficient in pure computational
 	// complexity terms - worst case is probably O(n³)-ish, versus O(n) for the
-	// filesystem scan itself. However, the constant multiplier for filesystem
-	// access is so much larger than for memory twiddling that it would probably
-	// take an absurdly large and snaky project to ever have that worst-case
-	// polynomial growth become deciding (or even significant) over the linear
-	// side.
+	// filesystem scan itself. However, the coefficient for filesystem access is
+	// so much larger than for memory twiddling that it would probably take an
+	// absurdly large and snaky project to ever have that worst-case polynomial
+	// growth supercede (or even become comparable to) the linear side.
 	//
 	// But, if that day comes, we can improve this algorithm.
 	rm = make(map[string][]string)

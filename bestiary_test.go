@@ -814,6 +814,10 @@ func (sm *depspecSourceManager) GetProjectInfo(n ProjectName, v Version) (Projec
 	return ProjectInfo{}, fmt.Errorf("Project '%s' at version '%s' could not be found", n, v)
 }
 
+func (sm *depspecSourceManager) ExternalReach(n ProjectName, v Version) (map[string][]string, error) {
+	panic("panic for now, impl soon")
+}
+
 func (sm *depspecSourceManager) ListVersions(name ProjectName) (pi []Version, err error) {
 	for _, ds := range sm.specs {
 		if name == ds.n {
