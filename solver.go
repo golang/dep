@@ -73,8 +73,8 @@ func NewSolver(sm SourceManager, l *log.Logger) Solver {
 	}
 }
 
-// solver is a specialized backtracking SAT solver with satisfiability
-// conditions hardcoded to the needs of the Go package management problem space.
+// solver is a CDCL-style SAT solver with satisfiability conditions hardcoded to
+// the needs of the Go package management problem space.
 type solver struct {
 	// The current number of attempts made over the course of this solve. This
 	// number increments each time the algorithm completes a backtrack and

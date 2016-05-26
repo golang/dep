@@ -155,25 +155,6 @@ func dsv(pi string, deps ...string) depspec {
 	return ds
 }
 
-type fixture struct {
-	// name of this fixture datum
-	n string
-	// depspecs. always treat first as root
-	ds []depspec
-	// results; map of name/version pairs
-	r map[string]Version
-	// max attempts the solver should need to find solution. 0 means no limit
-	maxAttempts int
-	// Use downgrade instead of default upgrade sorter
-	downgrade bool
-	// lock file simulator, if one's to be used at all
-	l fixLock
-	// projects expected to have errors, if any
-	errp []string
-	// request up/downgrade to all projects
-	changeall bool
-}
-
 // mklock makes a fixLock, suitable to act as a lock file
 func mklock(pairs ...string) fixLock {
 	l := make(fixLock, 0)
@@ -213,6 +194,58 @@ func mkresults(pairs ...string) map[string]Version {
 	}
 
 	return m
+}
+
+// computeReachMap takes a depspec and computes a reach map which is identical
+// to the explicit depgraph.
+func computeReachMap(ds []depspec) map[pident][]string {
+	rm := make(map[pident][]string)
+
+	for k, d := range ds {
+		id := pident{
+			n: d.n,
+			v: d.v,
+		}
+
+		for _, dep := range d.deps {
+			rm[id] = append(rm[id], string(dep.Ident.LocalName))
+		}
+
+		// first is root
+		if k == 0 {
+			for _, dep := range d.devdeps {
+				rm[id] = append(rm[id], string(dep.Ident.LocalName))
+			}
+		}
+	}
+
+	return rm
+}
+
+type pident struct {
+	n ProjectName
+	v Version
+}
+
+type fixture struct {
+	// name of this fixture datum
+	n string
+	// depspecs. always treat first as root
+	ds []depspec
+	// reachability map for each name
+	rm map[pident][]string
+	// results; map of name/version pairs
+	r map[string]Version
+	// max attempts the solver should need to find solution. 0 means no limit
+	maxAttempts int
+	// Use downgrade instead of default upgrade sorter
+	downgrade bool
+	// lock file simulator, if one's to be used at all
+	l fixLock
+	// projects expected to have errors, if any
+	errp []string
+	// request up/downgrade to all projects
+	changeall bool
 }
 
 var fixtures = []fixture{
@@ -781,20 +814,27 @@ func init() {
 			fix.ds = append(fix.ds, dsv(fmt.Sprintf("bar %v.%v.0", i, j), fmt.Sprintf("baz 0.%v.0", j)))
 		}
 	}
+
+	fixtures = append(fixtures, fix)
+
+	for k, f := range fixtures {
+		f.rm = computeReachMap(f.ds)
+		fixtures[k] = f
+	}
 }
 
 type depspecSourceManager struct {
-	specs []depspec
-	//map[ProjectAtom][]Version
+	specs  []depspec
+	rm     map[pident][]string
 	sortup bool
 }
 
 var _ SourceManager = &depspecSourceManager{}
 
-func newdepspecSM(ds []depspec) *depspecSourceManager {
-	//TODO precompute the version lists, for speediness?
+func newdepspecSM(ds []depspec, rm map[pident][]string) *depspecSourceManager {
 	return &depspecSourceManager{
 		specs: ds,
+		rm:    rm,
 	}
 }
 
@@ -815,7 +855,23 @@ func (sm *depspecSourceManager) GetProjectInfo(n ProjectName, v Version) (Projec
 }
 
 func (sm *depspecSourceManager) ExternalReach(n ProjectName, v Version) (map[string][]string, error) {
-	panic("panic for now, impl soon")
+	id := pident{n: n, v: v}
+	if r, exists := sm.rm[id]; exists {
+		m := make(map[string][]string)
+		m[string(n)] = r
+
+		return m, nil
+	}
+	return nil, fmt.Errorf("No reach data for %q at version %q", n, v)
+}
+
+func (sm *depspecSourceManager) ListExternal(n ProjectName, v Version) ([]string, error) {
+	// This should only be called for the root
+	id := pident{n: n, v: v}
+	if r, exists := sm.rm[id]; exists {
+		return r, nil
+	}
+	return nil, fmt.Errorf("No reach data for %q at version %q", n, v)
 }
 
 func (sm *depspecSourceManager) ListVersions(name ProjectName) (pi []Version, err error) {

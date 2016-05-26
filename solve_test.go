@@ -31,7 +31,7 @@ func TestBasicSolves(t *testing.T) {
 }
 
 func solveAndBasicChecks(fix fixture, t *testing.T) (res Result, err error) {
-	sm := newdepspecSM(fix.ds)
+	sm := newdepspecSM(fix.ds, fix.rm)
 
 	o := SolveOpts{
 		Root:      string(fix.ds[0].Name()),
@@ -184,7 +184,7 @@ func TestRootLockNoVersionPairMatching(t *testing.T) {
 	pd.Constraint = Revision("foorev")
 	fix.ds[0].deps[0] = pd
 
-	sm := newdepspecSM(fix.ds)
+	sm := newdepspecSM(fix.ds, fix.rm)
 
 	l2 := make(fixLock, 1)
 	copy(l2, fix.l)
@@ -235,7 +235,7 @@ func getFailureCausingProjects(err error) (projs []string) {
 }
 
 func TestBadSolveOpts(t *testing.T) {
-	sm := newdepspecSM(fixtures[0].ds)
+	sm := newdepspecSM(fixtures[0].ds, fixtures[0].rm)
 
 	s := NewSolver(sm, nil)
 
