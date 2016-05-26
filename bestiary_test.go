@@ -90,8 +90,8 @@ func mksvpa(info string) ProjectAtom {
 }
 
 // mkc - "make constraint"
-func mkc(body string, t ConstraintType) Constraint {
-	c, err := NewConstraint(body, t)
+func mkc(body string) Constraint {
+	c, err := NewSemverConstraint(body)
 	if err != nil {
 		// don't want bad test data at this level, so just panic
 		panic(fmt.Sprintf("Error when converting '%s' into semver constraint: %s", body, err))
@@ -109,7 +109,7 @@ func mksvd(info string) ProjectDep {
 
 	return ProjectDep{
 		Ident:      id,
-		Constraint: mkc(v, SemverConstraint),
+		Constraint: mkc(v),
 	}
 }
 

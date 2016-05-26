@@ -1,14 +1,5 @@
 package vsolver
 
-type ConstraintType uint8
-
-const (
-	RevisionConstraint ConstraintType = iota
-	BranchConstraint
-	VersionConstraint
-	SemverConstraint
-)
-
 // ProjectExistence values represent the extent to which a project "exists."
 type ProjectExistence uint8
 
