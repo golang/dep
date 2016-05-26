@@ -32,7 +32,11 @@ func init() {
 // projname indicates the import path-level name that constitutes the root of
 // the project tree (used to decide whether an encountered import path is
 // "internal" or "external").
-func ExternalReach(basedir, projname string) (rm map[string][]string, err error) {
+//
+// main indicates whether (true) or not (false) to include main packages in the
+// analysis. main packages should generally be excluded when analyzing the
+// non-root dependency, as they inherently can't be imported.
+func ExternalReach(basedir, projname string, main bool) (rm map[string][]string, err error) {
 	ctx := build.Default
 	ctx.UseAllFiles = true // optimistic, but we do it for the first try
 
@@ -74,6 +78,11 @@ func ExternalReach(basedir, projname string) (rm map[string][]string, err error)
 			default:
 				return err
 			}
+		}
+
+		// Skip main packages, unless param says otherwise
+		if p.Name == "main" && !main {
+			return nil
 		}
 
 		imps = p.Imports
@@ -218,7 +227,7 @@ func listExternalDeps(basedir, projname string) ([]string, error) {
 		}
 
 		for _, imp := range imps {
-			if !strings.HasPrefix(imp, projname) {
+			if !strings.HasPrefix(filepath.Clean(imp), projname) {
 				exm[imp] = struct{}{}
 				// TODO handle relative paths correctly, too
 			}
