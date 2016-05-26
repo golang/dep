@@ -781,6 +781,8 @@ func init() {
 			fix.ds = append(fix.ds, dsv(fmt.Sprintf("bar %v.%v.0", i, j), fmt.Sprintf("baz 0.%v.0", j)))
 		}
 	}
+
+	fixtures = append(fixtures, fix)
 }
 
 type depspecSourceManager struct {
