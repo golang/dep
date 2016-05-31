@@ -2,6 +2,20 @@ package vsolver
 
 import "sort"
 
+// sourceBridges provide an adapter to SourceManagers that tailor operations
+// for a particular solve run
+type sourceBridge interface {
+	getProjectInfo(pa ProjectAtom) (ProjectInfo, error)
+	listVersions(id ProjectIdentifier) ([]Version, error)
+	pairRevision(id ProjectIdentifier) []Version
+	pairVersion(id ProjectIdentifier) PairedVersion
+	repoExists(id ProjectIdentifier) (bool, error)
+	vendorExists(id ProjectIdentifier) (bool, error)
+	matches(id ProjectIdentifier, c Constraint, v Version) bool
+	matchesAny(id ProjectIdentifier, c1, c2 Constraint) bool
+	intersect(id ProjectIdentifier, c1, c2 Constraint) Constraint
+}
+
 // smAdapter is an adapter and around a proper SourceManager.
 //
 // It provides localized caching that's tailored to the requirements of a
