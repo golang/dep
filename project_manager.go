@@ -197,7 +197,11 @@ func (pm *projectManager) ListExternal(v Version) ([]string, error) {
 		err = pm.crepo.r.UpdateVersion(v.String())
 	}
 
-	ex, err := listExternalDeps(filepath.Join(pm.ctx.GOPATH, "src", string(pm.n)), string(pm.n))
+	// Nothing within the SourceManager is responsible for computing deps of a
+	// root package; it's assumed we're always operating on libraries.
+	// Consequently, we never want to include main packages, so we hardcode
+	// false for the third param.
+	ex, err := listExternalDeps(filepath.Join(pm.ctx.GOPATH, "src", string(pm.n)), string(pm.n), false)
 	pm.crepo.mut.Unlock()
 
 	return ex, err

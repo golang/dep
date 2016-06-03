@@ -186,7 +186,7 @@ func ExternalReach(basedir, projname string, main bool) (rm map[string][]string,
 	return
 }
 
-func listExternalDeps(basedir, projname string) ([]string, error) {
+func listExternalDeps(basedir, projname string, main bool) ([]string, error) {
 	ctx := build.Default
 	ctx.UseAllFiles = true // optimistic, but we do it for the first try
 	exm := make(map[string]struct{})
@@ -226,10 +226,12 @@ func listExternalDeps(basedir, projname string) ([]string, error) {
 			imps = p.Imports
 		}
 
-		for _, imp := range imps {
-			if !strings.HasPrefix(filepath.Clean(imp), projname) {
-				exm[imp] = struct{}{}
-				// TODO handle relative paths correctly, too
+		// Skip main packages, unless param says otherwise
+		if p.Name != "main" || main {
+			for _, imp := range imps {
+				if !strings.HasPrefix(filepath.Clean(imp), projname) {
+					exm[imp] = struct{}{}
+				}
 			}
 		}
 		return nil
