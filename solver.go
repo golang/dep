@@ -64,13 +64,10 @@ type SolveOpts struct {
 	// Trace controls whether the solver will generate informative trace output
 	// as it moves through the solving process.
 	Trace bool
-}
 
-func NewSolver(sm SourceManager, l *log.Logger) Solver {
-	return &solver{
-		b:  &bridge{sm: sm},
-		tl: l,
-	}
+	// TraceLogger is the logger to use for generating trace output. If Trace is
+	// true but no logger is provided, solving will result in an error.
+	TraceLogger *log.Logger
 }
 
 // solver is a CDCL-style SAT solver with satisfiability conditions hardcoded to
@@ -92,7 +89,7 @@ type solver struct {
 	// caching of pre-sorted version lists, as well as translation between the
 	// full-on ProjectIdentifiers that the solver deals with and the simplified
 	// names a SourceManager operates on.
-	b *bridge
+	b sourceBridge
 
 	// The list of projects currently "selected" - that is, they have passed all
 	// satisfiability checks, and are part of the current solution.
@@ -135,38 +132,38 @@ type solver struct {
 // Solve attempts to find a dependency solution for the given project, as
 // represented by the provided SolveOpts.
 //
-// This is the entry point to vsolver's main workhorse.
-func (s *solver) Solve(opts SolveOpts) (Result, error) {
+// This is the entry point to the main vsolver workhorse.
+func Solve(o SolveOpts, sm SourceManager) (Result, error) {
+	s, err := prepareSolver(o, sm)
+	if err != nil {
+		return nil, err
+	}
+
+	return s.run()
+}
+
+// prepare reads from the SolveOpts and prepare the solver to run.
+func prepareSolver(opts SolveOpts, sm SourceManager) (*solver, error) {
 	// local overrides would need to be handled first.
 	// TODO local overrides! heh
 
 	if opts.M == nil {
-		return result{}, BadOptsFailure("Opts must include a manifest.")
+		return nil, BadOptsFailure("Opts must include a manifest.")
 	}
 	if opts.Root == "" {
-		return result{}, BadOptsFailure("Opts must specify a non-empty string for the project root directory.")
+		return nil, BadOptsFailure("Opts must specify a non-empty string for the project root directory.")
 	}
 	if opts.N == "" {
-		return result{}, BadOptsFailure("Opts must include a project name.")
+		return nil, BadOptsFailure("Opts must include a project name.")
+	}
+	if opts.Trace && opts.TraceLogger == nil {
+		return nil, BadOptsFailure("Trace requested, but no logger provided.")
 	}
 
-	// TODO this check needs to go somewhere, but having the solver interact
-	// directly with the filesystem is icky
-	//if fi, err := os.Stat(opts.Root); err != nil {
-	//return Result{}, fmt.Errorf("Project root must exist.")
-	//} else if !fi.IsDir() {
-	//return Result{}, fmt.Errorf("Project root must be a directory.")
-	//}
-
-	// Init/reset the smAdapter
-	s.b.sortdown = opts.Downgrade
-	s.b.vlists = make(map[ProjectName][]Version)
-
-	s.o = opts
-
-	// Force trace to false if no real logger was provided.
-	if s.tl == nil {
-		s.o.Trace = false
+	s := &solver{
+		o:  opts,
+		b:  newBridge(sm, opts.Downgrade),
+		tl: opts.TraceLogger,
 	}
 
 	// Initialize maps
@@ -197,6 +194,22 @@ func (s *solver) Solve(opts SolveOpts) (Result, error) {
 		cmp: s.unselectedComparator,
 	}
 
+	return s, nil
+}
+
+// run executes the solver and creates an appropriate result.
+func (s *solver) run() (Result, error) {
+	// TODO this check needs to go somewhere, but having the solver interact
+	// directly with the filesystem is icky
+	//if fi, err := os.Stat(opts.Root); err != nil {
+	//return Result{}, fmt.Errorf("Project root must exist.")
+	//} else if !fi.IsDir() {
+	//return Result{}, fmt.Errorf("Project root must be a directory.")
+	//}
+
+	// Init/reset the smAdapter, if one isn't already there. This nilable state
+	// is PURELY to allow injections by tests.
+
 	// Prime the queues with the root project
 	s.selectVersion(ProjectAtom{
 		Ident: ProjectIdentifier{
@@ -209,7 +222,7 @@ func (s *solver) Solve(opts SolveOpts) (Result, error) {
 		Version: Revision(""),
 	})
 
-	// Prep is done; actually run the solver
+	// Log initial step
 	s.logSolve()
 	pa, err := s.solve()
 
@@ -221,7 +234,7 @@ func (s *solver) Solve(opts SolveOpts) (Result, error) {
 	// Solved successfully, create and return a result
 	r := result{
 		att: s.attempts,
-		hd:  opts.HashInputs(),
+		hd:  s.o.HashInputs(),
 	}
 
 	// Convert ProjectAtoms into LockedProjects
@@ -233,7 +246,9 @@ func (s *solver) Solve(opts SolveOpts) (Result, error) {
 	return r, nil
 }
 
+// solve is the top-level loop for the SAT solving process.
 func (s *solver) solve() ([]ProjectAtom, error) {
+	// Main solving loop
 	for {
 		id, has := s.nextUnselected()
 

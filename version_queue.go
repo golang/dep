@@ -14,12 +14,12 @@ type versionQueue struct {
 	id                 ProjectIdentifier
 	pi                 []Version
 	fails              []failedVersion
-	sm                 *bridge
+	sm                 sourceBridge
 	failed             bool
 	hasLock, allLoaded bool
 }
 
-func newVersionQueue(id ProjectIdentifier, lockv ProjectAtom, sm *bridge) (*versionQueue, error) {
+func newVersionQueue(id ProjectIdentifier, lockv ProjectAtom, sm sourceBridge) (*versionQueue, error) {
 	vq := &versionQueue{
 		id: id,
 		sm: sm,

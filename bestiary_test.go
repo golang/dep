@@ -908,6 +908,20 @@ func (sm *depspecSourceManager) ExportProject(n ProjectName, v Version, to strin
 	return fmt.Errorf("dummy sm doesn't support exporting")
 }
 
+type depspecBridge bridge
+
+func (b *depspecBridge) computeRootReach(n string) ([]string, error) {
+	// This only gets called for the root project, so grab that one off the test
+	// source manager
+	dsm := b.sm.(*depspecSourceManager)
+	root := dsm.specs[0]
+	if string(root.n) != n {
+		return nil, fmt.Errorf("Expected only root project %q to computeRootReach(), got %q", root.n, n)
+	}
+
+	return dsm.ListExternal(root.n, root.v)
+}
+
 // enforce interfaces
 var _ Manifest = depspec{}
 var _ Lock = dummyLock{}

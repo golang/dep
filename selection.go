@@ -3,7 +3,7 @@ package vsolver
 type selection struct {
 	projects []ProjectAtom
 	deps     map[ProjectIdentifier][]Dependency
-	sm       *bridge
+	sm       sourceBridge
 }
 
 func (s *selection) getDependenciesOn(id ProjectIdentifier) []Dependency {

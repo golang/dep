@@ -3,6 +3,7 @@ package vsolver
 import (
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
 	"strings"
@@ -34,12 +35,13 @@ func solveAndBasicChecks(fix fixture, t *testing.T) (res Result, err error) {
 	sm := newdepspecSM(fix.ds, fix.rm)
 
 	o := SolveOpts{
-		Root:      string(fix.ds[0].Name()),
-		N:         ProjectName(fix.ds[0].Name()),
-		M:         fix.ds[0],
-		L:         dummyLock{},
-		Downgrade: fix.downgrade,
-		ChangeAll: fix.changeall,
+		Root:        string(fix.ds[0].Name()),
+		N:           ProjectName(fix.ds[0].Name()),
+		M:           fix.ds[0],
+		L:           dummyLock{},
+		Downgrade:   fix.downgrade,
+		ChangeAll:   fix.changeall,
+		TraceLogger: stderrlog,
 	}
 
 	if fix.l != nil {
@@ -50,8 +52,7 @@ func solveAndBasicChecks(fix fixture, t *testing.T) (res Result, err error) {
 		o.Trace = true
 	}
 
-	s := NewSolver(sm, stderrlog)
-	res, err = s.Solve(o)
+	res, err = Solve(o, sm)
 
 	return fixtureSolveBasicChecks(fix, res, err, t)
 }
@@ -191,18 +192,18 @@ func TestRootLockNoVersionPairMatching(t *testing.T) {
 	l2[0].v = nil
 
 	o := SolveOpts{
-		Root: string(fix.ds[0].Name()),
-		N:    ProjectName(fix.ds[0].Name()),
-		M:    fix.ds[0],
-		L:    l2,
+		Root:        string(fix.ds[0].Name()),
+		N:           ProjectName(fix.ds[0].Name()),
+		M:           fix.ds[0],
+		L:           l2,
+		TraceLogger: stderrlog,
 	}
 
 	if testing.Verbose() {
 		o.Trace = true
 	}
 
-	s := NewSolver(sm, stderrlog)
-	res, err := s.Solve(o)
+	res, err := Solve(o, sm)
 
 	fixtureSolveBasicChecks(fix, res, err, t)
 }
@@ -237,30 +238,41 @@ func getFailureCausingProjects(err error) (projs []string) {
 func TestBadSolveOpts(t *testing.T) {
 	sm := newdepspecSM(fixtures[0].ds, fixtures[0].rm)
 
-	s := NewSolver(sm, nil)
-
 	o := SolveOpts{}
-	_, err := s.Solve(o)
+	_, err := Solve(o, sm)
 	if err == nil {
 		t.Errorf("Should have errored on missing manifest")
 	}
 
 	p, _ := sm.GetProjectInfo(fixtures[0].ds[0].n, fixtures[0].ds[0].v)
 	o.M = p.Manifest
-	_, err = s.Solve(o)
+	_, err = Solve(o, sm)
 	if err == nil {
 		t.Errorf("Should have errored on empty root")
 	}
 
 	o.Root = "foo"
-	_, err = s.Solve(o)
+	_, err = Solve(o, sm)
 	if err == nil {
 		t.Errorf("Should have errored on empty name")
 	}
 
 	o.N = "root"
-	_, err = s.Solve(o)
+	_, err = Solve(o, sm)
 	if err != nil {
 		t.Errorf("Basic conditions satisfied, solve should have gone through")
 	}
+
+	o.Trace = true
+	_, err = Solve(o, sm)
+	if err == nil {
+		t.Errorf("Should have errored on trace with no logger")
+	}
+
+	o.TraceLogger = log.New(ioutil.Discard, "", 0)
+	_, err = Solve(o, sm)
+	if err != nil {
+		t.Errorf("Basic conditions re-satisfied, solve should have gone through")
+	}
+
 }

@@ -7,15 +7,23 @@ import "sort"
 type sourceBridge interface {
 	getProjectInfo(pa ProjectAtom) (ProjectInfo, error)
 	listVersions(id ProjectIdentifier) ([]Version, error)
-	pairRevision(id ProjectIdentifier) []Version
-	pairVersion(id ProjectIdentifier) PairedVersion
+	pairRevision(id ProjectIdentifier, r Revision) []Version
+	pairVersion(id ProjectIdentifier, v UnpairedVersion) PairedVersion
 	repoExists(id ProjectIdentifier) (bool, error)
-	vendorExists(id ProjectIdentifier) (bool, error)
+	vendorCodeExists(id ProjectIdentifier) (bool, error)
 	matches(id ProjectIdentifier, c Constraint, v Version) bool
 	matchesAny(id ProjectIdentifier, c1, c2 Constraint) bool
 	intersect(id ProjectIdentifier, c1, c2 Constraint) Constraint
 	listExternal(n ProjectIdentifier, v Version) ([]string, error)
 	computeRootReach(path string) ([]string, error)
+}
+
+func newBridge(sm SourceManager, downgrade bool) sourceBridge {
+	return &bridge{
+		sm:       sm,
+		sortdown: downgrade,
+		vlists:   make(map[ProjectName][]Version),
+	}
 }
 
 // smAdapter is an adapter and around a proper SourceManager.
@@ -313,6 +321,12 @@ func (b *bridge) vtu(id ProjectIdentifier, v Version) versionTypeUnion {
 	}
 
 	return nil
+}
+
+// listExternal calls back directly to the SourceManager's ListExternal()
+// method.
+func (b *bridge) listExternal(id ProjectIdentifier, v Version) ([]string, error) {
+	return b.sm.ListExternal(b.key(id), v)
 }
 
 // computeRootReach is a specialized, less stringent version of listExternal
