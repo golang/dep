@@ -68,7 +68,7 @@ type SolveOpts struct {
 
 func NewSolver(sm SourceManager, l *log.Logger) Solver {
 	return &solver{
-		sm: &smAdapter{sm: sm},
+		b:  &bridge{sm: sm},
 		tl: l,
 	}
 }
@@ -88,11 +88,11 @@ type solver struct {
 	// Logger used exclusively for trace output, if the trace option is set.
 	tl *log.Logger
 
-	// An adapter around a standard SourceManager. The adapter does some local
+	// A bridge to the standard SourceManager. The adapter does some local
 	// caching of pre-sorted version lists, as well as translation between the
 	// full-on ProjectIdentifiers that the solver deals with and the simplified
 	// names a SourceManager operates on.
-	sm *smAdapter
+	b *bridge
 
 	// The list of projects currently "selected" - that is, they have passed all
 	// satisfiability checks, and are part of the current solution.
@@ -159,8 +159,8 @@ func (s *solver) Solve(opts SolveOpts) (Result, error) {
 	//}
 
 	// Init/reset the smAdapter
-	s.sm.sortdown = opts.Downgrade
-	s.sm.vlists = make(map[ProjectName][]Version)
+	s.b.sortdown = opts.Downgrade
+	s.b.vlists = make(map[ProjectName][]Version)
 
 	s.o = opts
 
@@ -190,7 +190,7 @@ func (s *solver) Solve(opts SolveOpts) (Result, error) {
 	// Initialize queues
 	s.sel = &selection{
 		deps: make(map[ProjectIdentifier][]Dependency),
-		sm:   s.sm,
+		sm:   s.b,
 	}
 	s.unsel = &unselected{
 		sl:  make([]ProjectIdentifier, 0),
@@ -279,15 +279,15 @@ func (s *solver) solve() ([]ProjectAtom, error) {
 func (s *solver) createVersionQueue(id ProjectIdentifier) (*versionQueue, error) {
 	// If on the root package, there's no queue to make
 	if id.LocalName == s.rm.Name() {
-		return newVersionQueue(id, nilpa, s.sm)
+		return newVersionQueue(id, nilpa, s.b)
 	}
 
-	exists, err := s.sm.repoExists(id)
+	exists, err := s.b.repoExists(id)
 	if err != nil {
 		return nil, err
 	}
 	if !exists {
-		exists, err = s.sm.vendorCodeExists(id)
+		exists, err = s.b.vendorCodeExists(id)
 		if err != nil {
 			return nil, err
 		}
@@ -309,7 +309,7 @@ func (s *solver) createVersionQueue(id ProjectIdentifier) (*versionQueue, error)
 		}
 	}
 
-	q, err := newVersionQueue(id, lockv, s.sm)
+	q, err := newVersionQueue(id, lockv, s.b)
 	if err != nil {
 		// TODO this particular err case needs to be improved to be ONLY for cases
 		// where there's absolutely nothing findable about a given project name
@@ -378,7 +378,7 @@ func (s *solver) getLockVersionIfValid(id ProjectIdentifier) (ProjectAtom, error
 		// to be found and attempted in the repository. If it's only in vendor,
 		// though, then we have to try to use what's in the lock, because that's
 		// the only version we'll be able to get.
-		if exist, _ := s.sm.repoExists(id); exist {
+		if exist, _ := s.b.repoExists(id); exist {
 			return nilpa, nil
 		}
 
@@ -405,7 +405,7 @@ func (s *solver) getLockVersionIfValid(id ProjectIdentifier) (ProjectAtom, error
 		if tv, ok := v.(Revision); ok {
 			// If we only have a revision from the root's lock, allow matching
 			// against other versions that have that revision
-			for _, pv := range s.sm.pairRevision(id, tv) {
+			for _, pv := range s.b.pairRevision(id, tv) {
 				if constraint.Matches(pv) {
 					v = pv
 					found = true
@@ -450,7 +450,7 @@ func (s *solver) getDependenciesOf(pa ProjectAtom) ([]ProjectDep, error) {
 	if s.rm.Name() == pa.Ident.LocalName {
 		deps = append(s.rm.GetDependencies(), s.rm.GetDevDependencies()...)
 	} else {
-		info, err := s.sm.getProjectInfo(pa)
+		info, err := s.b.getProjectInfo(pa)
 		if err != nil {
 			// TODO revisit this once a decision is made about better-formed errors;
 			// question is, do we expect the fetcher to pass back simple errors, or
@@ -579,8 +579,8 @@ func (s *solver) unselectedComparator(i, j int) bool {
 	// We can safely ignore an err from ListVersions here because, if there is
 	// an actual problem, it'll be noted and handled somewhere else saner in the
 	// solving algorithm.
-	ivl, _ := s.sm.listVersions(iname)
-	jvl, _ := s.sm.listVersions(jname)
+	ivl, _ := s.b.listVersions(iname)
+	jvl, _ := s.b.listVersions(jname)
 	iv, jv := len(ivl), len(jvl)
 
 	// Packages with fewer versions to pick from are less likely to benefit from
