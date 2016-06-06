@@ -16,10 +16,6 @@ var (
 	}
 )
 
-type Solver interface {
-	Solve(opts SolveOpts) (Result, error)
-}
-
 // SolveOpts holds options that govern solving behavior, and the proper inputs
 // to the solving process.
 type SolveOpts struct {
@@ -171,19 +167,6 @@ func prepareSolver(opts SolveOpts, sm SourceManager) (*solver, error) {
 	s.rlm = make(map[ProjectIdentifier]LockedProject)
 	s.names = make(map[ProjectName]string)
 
-	// Prep safe, normalized versions of root manifest and lock data
-	s.rm = prepManifest(s.o.M)
-
-	if s.o.L != nil {
-		for _, lp := range s.o.L.Projects() {
-			s.rlm[lp.Ident().normalize()] = lp
-		}
-	}
-
-	for _, v := range s.o.ToChange {
-		s.chng[v] = struct{}{}
-	}
-
 	// Initialize queues
 	s.sel = &selection{
 		deps: make(map[ProjectIdentifier][]Dependency),
@@ -199,16 +182,24 @@ func prepareSolver(opts SolveOpts, sm SourceManager) (*solver, error) {
 
 // run executes the solver and creates an appropriate result.
 func (s *solver) run() (Result, error) {
-	// TODO this check needs to go somewhere, but having the solver interact
-	// directly with the filesystem is icky
-	//if fi, err := os.Stat(opts.Root); err != nil {
-	//return Result{}, fmt.Errorf("Project root must exist.")
-	//} else if !fi.IsDir() {
-	//return Result{}, fmt.Errorf("Project root must be a directory.")
-	//}
+	// Ensure the root is in good, working order before doing anything else
+	err := s.b.verifyRoot(s.o.Root)
+	if err != nil {
+		return nil, err
+	}
 
-	// Init/reset the smAdapter, if one isn't already there. This nilable state
-	// is PURELY to allow injections by tests.
+	// Prep safe, normalized versions of root manifest and lock data
+	s.rm = prepManifest(s.o.M)
+
+	if s.o.L != nil {
+		for _, lp := range s.o.L.Projects() {
+			s.rlm[lp.Ident().normalize()] = lp
+		}
+	}
+
+	for _, v := range s.o.ToChange {
+		s.chng[v] = struct{}{}
+	}
 
 	// Prime the queues with the root project
 	s.selectVersion(ProjectAtom{

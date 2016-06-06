@@ -1,6 +1,10 @@
 package vsolver
 
-import "sort"
+import (
+	"fmt"
+	"os"
+	"sort"
+)
 
 // sourceBridges provide an adapter to SourceManagers that tailor operations
 // for a single solve run.
@@ -16,6 +20,7 @@ type sourceBridge interface {
 	intersect(id ProjectIdentifier, c1, c2 Constraint) Constraint
 	listExternal(n ProjectIdentifier, v Version) ([]string, error)
 	computeRootReach(path string) ([]string, error)
+	verifyRoot(path string) error
 }
 
 func newBridge(sm SourceManager, downgrade bool) sourceBridge {
@@ -26,10 +31,8 @@ func newBridge(sm SourceManager, downgrade bool) sourceBridge {
 	}
 }
 
-// smAdapter is an adapter and around a proper SourceManager.
-//
-// It provides localized caching that's tailored to the requirements of a
-// particular solve run.
+// bridge is an adapter around a proper SourceManager. It provides localized
+// caching that's tailored to the requirements of a particular solve run.
 //
 // It also performs transformations between ProjectIdentifiers, which is what
 // the solver primarily deals in, and ProjectName, which is what the
@@ -346,6 +349,19 @@ func (b *bridge) computeRootReach(path string) ([]string, error) {
 	// in the analysis was OK. so, for now, we just compute list of
 	// externally-touched packages.
 	return listExternalDeps(path, path, true)
+}
+
+// verifyRoot ensures that the provided path to the project root is in good
+// working condition. This check is made only once, at the beginning of a solve
+// run.
+func (b *bridge) verifyRoot(path string) error {
+	if fi, err := os.Stat(path); err != nil {
+		return fmt.Errorf("Project root must exist.")
+	} else if !fi.IsDir() {
+		return fmt.Errorf("Project root must be a directory.")
+	}
+
+	return nil
 }
 
 // versionTypeUnion represents a set of versions that are, within the scope of

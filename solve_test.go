@@ -24,6 +24,7 @@ func fixSolve(o SolveOpts, sm SourceManager) (Result, error) {
 		o.Trace = true
 		o.TraceLogger = stderrlog
 	}
+
 	s, err := prepareSolver(o, sm)
 	if err != nil {
 		return nil, err
@@ -259,7 +260,7 @@ func TestBadSolveOpts(t *testing.T) {
 		t.Errorf("Should have errored on empty root")
 	}
 
-	o.Root = "foo"
+	o.Root = "root"
 	_, err = fixSolve(o, sm)
 	if err == nil {
 		t.Errorf("Should have errored on empty name")
@@ -268,7 +269,7 @@ func TestBadSolveOpts(t *testing.T) {
 	o.N = "root"
 	_, err = fixSolve(o, sm)
 	if err != nil {
-		t.Errorf("Basic conditions satisfied, solve should have gone through")
+		t.Errorf("Basic conditions satisfied, solve should have gone through, err was %s", err)
 	}
 
 	o.Trace = true
@@ -280,7 +281,7 @@ func TestBadSolveOpts(t *testing.T) {
 	o.TraceLogger = log.New(ioutil.Discard, "", 0)
 	_, err = fixSolve(o, sm)
 	if err != nil {
-		t.Errorf("Basic conditions re-satisfied, solve should have gone through")
+		t.Errorf("Basic conditions re-satisfied, solve should have gone through, err was %s", err)
 	}
 
 }

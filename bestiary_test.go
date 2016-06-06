@@ -912,16 +912,29 @@ type depspecBridge struct {
 	*bridge
 }
 
-func (b *depspecBridge) computeRootReach(n string) ([]string, error) {
+// override computeRootReach() on bridge to read directly out of the depspecs
+func (b *depspecBridge) computeRootReach(path string) ([]string, error) {
 	// This only gets called for the root project, so grab that one off the test
 	// source manager
 	dsm := b.sm.(*depspecSourceManager)
 	root := dsm.specs[0]
-	if string(root.n) != n {
-		return nil, fmt.Errorf("Expected only root project %q to computeRootReach(), got %q", root.n, n)
+	if string(root.n) != path {
+		return nil, fmt.Errorf("Expected only root project %q to computeRootReach(), got %q", root.n, path)
 	}
 
 	return dsm.ListExternal(root.n, root.v)
+}
+
+// override verifyRoot() on bridge to prevent any filesystem checks
+func (b *depspecBridge) verifyRoot(path string) error {
+	// Do error if it's not checking what we think the root is, though
+	dsm := b.sm.(*depspecSourceManager)
+	root := dsm.specs[0]
+	if string(root.n) != path {
+		return fmt.Errorf("Expected only root project %q to computeRootReach(), got %q", root.n, path)
+	}
+
+	return nil
 }
 
 // enforce interfaces
