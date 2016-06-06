@@ -19,6 +19,24 @@ func init() {
 
 var stderrlog = log.New(os.Stderr, "", 0)
 
+func fixSolve(o SolveOpts, sm SourceManager) (Result, error) {
+	if testing.Verbose() {
+		o.Trace = true
+		o.TraceLogger = stderrlog
+	}
+	s, err := prepareSolver(o, sm)
+	if err != nil {
+		return nil, err
+	}
+
+	fixb := &depspecBridge{
+		s.b.(*bridge),
+	}
+	s.b = fixb
+
+	return s.run()
+}
+
 func TestBasicSolves(t *testing.T) {
 	for _, fix := range fixtures {
 		if fixtorun == "" || fixtorun == fix.n {
@@ -35,24 +53,19 @@ func solveAndBasicChecks(fix fixture, t *testing.T) (res Result, err error) {
 	sm := newdepspecSM(fix.ds, fix.rm)
 
 	o := SolveOpts{
-		Root:        string(fix.ds[0].Name()),
-		N:           ProjectName(fix.ds[0].Name()),
-		M:           fix.ds[0],
-		L:           dummyLock{},
-		Downgrade:   fix.downgrade,
-		ChangeAll:   fix.changeall,
-		TraceLogger: stderrlog,
+		Root:      string(fix.ds[0].Name()),
+		N:         ProjectName(fix.ds[0].Name()),
+		M:         fix.ds[0],
+		L:         dummyLock{},
+		Downgrade: fix.downgrade,
+		ChangeAll: fix.changeall,
 	}
 
 	if fix.l != nil {
 		o.L = fix.l
 	}
 
-	if testing.Verbose() {
-		o.Trace = true
-	}
-
-	res, err = Solve(o, sm)
+	res, err = fixSolve(o, sm)
 
 	return fixtureSolveBasicChecks(fix, res, err, t)
 }
@@ -192,18 +205,13 @@ func TestRootLockNoVersionPairMatching(t *testing.T) {
 	l2[0].v = nil
 
 	o := SolveOpts{
-		Root:        string(fix.ds[0].Name()),
-		N:           ProjectName(fix.ds[0].Name()),
-		M:           fix.ds[0],
-		L:           l2,
-		TraceLogger: stderrlog,
+		Root: string(fix.ds[0].Name()),
+		N:    ProjectName(fix.ds[0].Name()),
+		M:    fix.ds[0],
+		L:    l2,
 	}
 
-	if testing.Verbose() {
-		o.Trace = true
-	}
-
-	res, err := Solve(o, sm)
+	res, err := fixSolve(o, sm)
 
 	fixtureSolveBasicChecks(fix, res, err, t)
 }
@@ -239,38 +247,38 @@ func TestBadSolveOpts(t *testing.T) {
 	sm := newdepspecSM(fixtures[0].ds, fixtures[0].rm)
 
 	o := SolveOpts{}
-	_, err := Solve(o, sm)
+	_, err := fixSolve(o, sm)
 	if err == nil {
 		t.Errorf("Should have errored on missing manifest")
 	}
 
 	p, _ := sm.GetProjectInfo(fixtures[0].ds[0].n, fixtures[0].ds[0].v)
 	o.M = p.Manifest
-	_, err = Solve(o, sm)
+	_, err = fixSolve(o, sm)
 	if err == nil {
 		t.Errorf("Should have errored on empty root")
 	}
 
 	o.Root = "foo"
-	_, err = Solve(o, sm)
+	_, err = fixSolve(o, sm)
 	if err == nil {
 		t.Errorf("Should have errored on empty name")
 	}
 
 	o.N = "root"
-	_, err = Solve(o, sm)
+	_, err = fixSolve(o, sm)
 	if err != nil {
 		t.Errorf("Basic conditions satisfied, solve should have gone through")
 	}
 
 	o.Trace = true
-	_, err = Solve(o, sm)
+	_, err = fixSolve(o, sm)
 	if err == nil {
 		t.Errorf("Should have errored on trace with no logger")
 	}
 
 	o.TraceLogger = log.New(ioutil.Discard, "", 0)
-	_, err = Solve(o, sm)
+	_, err = fixSolve(o, sm)
 	if err != nil {
 		t.Errorf("Basic conditions re-satisfied, solve should have gone through")
 	}

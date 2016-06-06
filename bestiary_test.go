@@ -908,7 +908,9 @@ func (sm *depspecSourceManager) ExportProject(n ProjectName, v Version, to strin
 	return fmt.Errorf("dummy sm doesn't support exporting")
 }
 
-type depspecBridge bridge
+type depspecBridge struct {
+	*bridge
+}
 
 func (b *depspecBridge) computeRootReach(n string) ([]string, error) {
 	// This only gets called for the root project, so grab that one off the test
