@@ -558,7 +558,7 @@ func TestSemverVersionConstraintOps(t *testing.T) {
 
 	// Regression check - make sure that semVersion -> semverConstraint works
 	// the same as verified in the other test
-	c1, _ := NewConstraint("=1.0.0", SemverConstraint)
+	c1, _ := NewSemverConstraint("=1.0.0")
 	if !v1.MatchesAny(c1) {
 		t.Errorf("%s (semver) should allow some matches - itself - when combined with an equivalent semverConstraint", gu(v1))
 	}
@@ -588,7 +588,7 @@ func TestSemverConstraintOps(t *testing.T) {
 
 	// TODO we can't use the same range as below b/c semver.rangeConstraint is
 	// still an incomparable type
-	c1, err := NewConstraint("=1.0.0", SemverConstraint)
+	c1, err := NewSemverConstraint("=1.0.0")
 	if err != nil {
 		t.Errorf("Failed to create constraint: %s", err)
 		t.FailNow()
@@ -608,7 +608,7 @@ func TestSemverConstraintOps(t *testing.T) {
 		t.Errorf("Semver constraints should always return none when intersecting the none constraint, but got %s", c1.Intersect(none))
 	}
 
-	c1, err = NewConstraint(">= 1.0.0", SemverConstraint)
+	c1, err = NewSemverConstraint(">= 1.0.0")
 	if err != nil {
 		t.Errorf("Failed to create constraint: %s", err)
 		t.FailNow()
@@ -756,8 +756,8 @@ func TestVersionUnion(t *testing.T) {
 		t.Errorf("Union should not reverse-match on anything in disjoint pair")
 	}
 
-	c1, _ := NewConstraint("~1.0.0", SemverConstraint)
-	c2, _ := NewConstraint("~2.0.0", SemverConstraint)
+	c1, _ := NewSemverConstraint("~1.0.0")
+	c2, _ := NewSemverConstraint("~2.0.0")
 	if !uv1.MatchesAny(c1) {
 		t.Errorf("Union should have some overlap due to containing 1.0.1 version")
 	}

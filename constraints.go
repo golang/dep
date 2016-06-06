@@ -1,7 +1,6 @@
 package vsolver
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/Masterminds/semver"
@@ -36,25 +35,17 @@ func (semverConstraint) _private() {}
 func (anyConstraint) _private()    {}
 func (noneConstraint) _private()   {}
 
-// NewConstraint constructs an appropriate Constraint object from the input
-// parameters.
-func NewConstraint(body string, t ConstraintType) (Constraint, error) {
-	switch t {
-	case BranchConstraint:
-		return branchVersion(body), nil
-	case RevisionConstraint:
-		return Revision(body), nil
-	case VersionConstraint:
-		return plainVersion(body), nil
-	case SemverConstraint:
-		c, err := semver.NewConstraint(body)
-		if err != nil {
-			return nil, err
-		}
-		return semverConstraint{c: c}, nil
-	default:
-		return nil, errors.New("Unknown ConstraintType provided")
+// NewSemverConstraint attempts to construct a semver Constraint object from the
+// input string.
+//
+// If the input string cannot be made into a valid semver Constraint, an error
+// is returned.
+func NewSemverConstraint(body string) (Constraint, error) {
+	c, err := semver.NewConstraint(body)
+	if err != nil {
+		return nil, err
 	}
+	return semverConstraint{c: c}, nil
 }
 
 type semverConstraint struct {
