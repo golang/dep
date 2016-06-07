@@ -1,6 +1,12 @@
-hash: 6bd3b42b8d3ffd99e2ed2c4b75b1a6f9f1a96ea78714fe5b59f7333b8056656a
-updated: 2016-05-04T00:16:45.75684042-04:00
+hash: 2252a285ab27944a4d7adcba8dbd03980f59ba652f12db39fa93b927c345593e
+updated: 2016-06-06T22:10:37.696580463-04:00
 imports:
+- name: github.com/armon/go-radix
+  version: 4239b77079c7b5d1243b7b4736304ce8ddb6f0f2
+- name: github.com/hashicorp/go-immutable-radix
+  version: b568b01ef9abe166ff01e207adc4a390ff98ae71
+- name: github.com/hashicorp/golang-lru
+  version: b568b01ef9abe166ff01e207adc4a390ff98ae71
 - name: github.com/Masterminds/semver
   version: 0a2c9fc0eee2c4cbb9526877c4a54da047fdcadd
   vcs: git

@@ -345,6 +345,7 @@ func (b *bridge) listExternal(id ProjectIdentifier, v Version) ([]string, error)
 // potentially messy root project source location on disk. Together, this means
 // that we can't ask the real SourceManager to do it.
 func (b *bridge) computeRootReach(path string) ([]string, error) {
+	// TODO cache this
 	// TODO i now cannot remember the reasons why i thought being less stringent
 	// in the analysis was OK. so, for now, we just compute list of
 	// externally-touched packages.

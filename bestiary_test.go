@@ -925,7 +925,7 @@ func (b *depspecBridge) computeRootReach(path string) ([]string, error) {
 	return dsm.ListExternal(root.n, root.v)
 }
 
-// override verifyRoot() on bridge to prevent any filesystem checks
+// override verifyRoot() on bridge to prevent any filesystem interaction
 func (b *depspecBridge) verifyRoot(path string) error {
 	// Do error if it's not checking what we think the root is, though
 	dsm := b.sm.(*depspecSourceManager)

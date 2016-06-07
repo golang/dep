@@ -7,6 +7,9 @@ import (
 	"math/rand"
 	"strconv"
 	"strings"
+
+	"github.com/armon/go-radix"
+	"github.com/hashicorp/go-immutable-radix"
 )
 
 var (
@@ -123,6 +126,10 @@ type solver struct {
 
 	// A normalized, copied version of the root manifest.
 	rm Manifest
+
+	// A radix tree representing the immediate externally reachable packages, as
+	// determined by static analysis of the root project.
+	xt *iradix.Tree
 }
 
 // Solve attempts to find a dependency solution for the given project, as
@@ -454,24 +461,82 @@ func (s *solver) getDependenciesOf(pa ProjectAtom) ([]ProjectDep, error) {
 
 	// If we're looking for root's deps, get it from opts rather than sm
 	if s.rm.Name() == pa.Ident.LocalName {
-		deps = append(s.rm.GetDependencies(), s.rm.GetDevDependencies()...)
+		mdeps := append(s.rm.GetDependencies(), s.rm.GetDevDependencies()...)
+
+		reach, err := s.b.computeRootReach(s.o.Root)
+		if err != nil {
+			return nil, err
+		}
+
+		// Create a radix tree with all the projects we know from the manifest
+		// TODO make this smarter once we allow non-root inputs as 'projects'
+		xt := radix.New()
+		for _, dep := range mdeps {
+			xt.Insert(string(dep.Ident.LocalName), dep)
+		}
+
+		// Step through the reached packages; if they have [prefix] matches in
+		// the trie, just assume that's a correct correspondence.
+		// TODO this may be a bad assumption.
+		dmap := make(map[ProjectDep]struct{})
+		for _, rp := range reach {
+			// Look for a match, and ensure it's strictly a parent of the input
+			if k, dep, match := xt.LongestPrefix(rp); match && strings.HasPrefix(rp, k) {
+				// There's a match; add it to the dep map (thereby avoiding
+				// duplicates) and move along
+				dmap[dep.(ProjectDep)] = struct{}{}
+				continue
+			}
+
+			// If it's a stdlib package, skip it.
+			// TODO this just hardcodes us to the packages in tip - should we
+			// have go version magic here, too?
+			if _, exists := stdlib[rp]; exists {
+				continue
+			}
+
+			// No match. Let the SourceManager try to figure out the root
+			// TODO impl this
+			root, err := s.b.detectRepoRoot(rp)
+			if err != nil {
+				// Nothing we can do if we can't suss out a root
+				return nil, err
+			}
+
+			// Try again with the radix trie, because the repo root can have
+			// just so very much nothing to do with the name
+			if k, dep, match := xt.LongestPrefix(rp); match && strings.HasPrefix(rp, k) {
+				dmap[dep.(ProjectDep)] = struct{}{}
+				continue
+			}
+
+			// Still no matches; make a new ProjectDep with an open constraint
+			dep := ProjectDep{
+				Ident: ProjectIdentifier{
+					LocalName:   ProjectName(root),
+					NetworkName: root,
+				},
+				Constraint: Any(),
+			}
+			dmap[dep] = struct{}{}
+		}
+
+		// Dump all the deps from the map into the expected return slice
+		deps = make([]ProjectDep, len(dmap))
+		k := 0
+		for dep := range dmap {
+			deps[k] = dep
+			k++
+		}
 	} else {
 		info, err := s.b.getProjectInfo(pa)
 		if err != nil {
-			// TODO revisit this once a decision is made about better-formed errors;
-			// question is, do we expect the fetcher to pass back simple errors, or
-			// well-typed solver errors?
 			return nil, err
 		}
 
 		deps = info.GetDependencies()
 		// TODO add overrides here...if we impl the concept (which we should)
 	}
-
-	// TODO we have to validate well-formedness of a project's manifest
-	// somewhere. this may be a good spot. alternatively, the fetcher may
-	// validate well-formedness, whereas here we validate availability of the
-	// named deps here. (the latter is sorta what pub does here)
 
 	return deps, nil
 }

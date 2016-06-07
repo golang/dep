@@ -79,7 +79,7 @@ func fixtureSolveBasicChecks(fix fixture, res Result, err error, t *testing.T) (
 
 		switch fail := err.(type) {
 		case *BadOptsFailure:
-			t.Error("(fixture: %q) Unexpected bad opts failure solve error: %s", fix.n, err)
+			t.Errorf("(fixture: %q) Unexpected bad opts failure solve error: %s", fix.n, err)
 		case *noVersionError:
 			if fix.errp[0] != string(fail.pn.LocalName) { // TODO identifierify
 				t.Errorf("(fixture: %q) Expected failure on project %s, but was on project %s", fix.n, fail.pn.LocalName, fix.errp[0])
@@ -122,7 +122,7 @@ func fixtureSolveBasicChecks(fix fixture, res Result, err error, t *testing.T) (
 			panic(fmt.Sprintf("unhandled solve failure type: %s", err))
 		}
 	} else if len(fix.errp) > 0 {
-		t.Errorf("(fixture: %q) Solver succeeded, but expected failure")
+		t.Errorf("(fixture: %q) Solver succeeded, but expected failure", fix.n)
 	} else {
 		r := res.(result)
 		if fix.maxAttempts > 0 && r.att > fix.maxAttempts {
