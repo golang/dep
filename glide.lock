@@ -4,9 +4,9 @@ imports:
 - name: github.com/armon/go-radix
   version: 4239b77079c7b5d1243b7b4736304ce8ddb6f0f2
 - name: github.com/hashicorp/go-immutable-radix
-  version: b568b01ef9abe166ff01e207adc4a390ff98ae71
+  version: 8e8ed81f8f0bf1bdd829593fdd5c29922c1ea990
 - name: github.com/hashicorp/golang-lru
-  version: b568b01ef9abe166ff01e207adc4a390ff98ae71
+  version: a0d98a5f288019575c6d1f4bb1573fef2d1fcdc4
 - name: github.com/Masterminds/semver
   version: 0a2c9fc0eee2c4cbb9526877c4a54da047fdcadd
   vcs: git
