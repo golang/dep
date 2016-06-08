@@ -52,6 +52,30 @@ func TestDeduceRemotes(t *testing.T) {
 				VCS:     []string{"git"},
 			},
 		},
+		{
+			"gopkg.in/sdboyer/vsolver.v0",
+			&remoteRepo{
+				Base:   "gopkg.in/sdboyer/vsolver.v0",
+				RelPkg: "",
+				CloneURL: &url.URL{
+					Host: "github.com",
+					Path: "sdboyer/vsolver",
+				},
+				VCS: []string{"git"},
+			},
+		},
+		{
+			"gopkg.in/sdboyer/vsolver.v0/foo",
+			&remoteRepo{
+				Base:   "gopkg.in/sdboyer/vsolver.v0",
+				RelPkg: "foo",
+				CloneURL: &url.URL{
+					Host: "github.com",
+					Path: "sdboyer/vsolver",
+				},
+				VCS: []string{"git"},
+			},
+		},
 	}
 
 	for _, fix := range fixtures {
@@ -69,6 +93,7 @@ func TestDeduceRemotes(t *testing.T) {
 
 		if err != nil {
 			t.Errorf("deduceRemoteRepo(%q): %v", fix.path, err)
+			continue
 		}
 
 		if got.Base != want.Base {

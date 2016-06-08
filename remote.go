@@ -31,8 +31,8 @@ type remoteRepo struct {
 // Regexes for the different known import path flavors
 var (
 	ghRegex      = regexp.MustCompile(`^(?P<root>github\.com/([A-Za-z0-9_.\-]+/[A-Za-z0-9_.\-]+))(/[A-Za-z0-9_.\-]+)*$`)
-	gpinNewRegex = regexp.MustCompile(`^(?P<root>gopkg\.in/(?:([a-zA-Z0-9][-a-zA-Z0-9]+)/)?([a-zA-Z][-.a-zA-Z0-9]*)\.((?:v0|v[1-9][0-9]*)(?:\.0|\.[1-9][0-9]*){0,2}(-unstable)?)(?:\.git))?((?:/[a-zA-Z0-9][-.a-zA-Z0-9]*)*)$`)
-	//gpinOldRegex = regexp.MustCompile(`^(?P<root>gopkg\.in/(?:([a-z0-9][-a-z0-9]+)/)?((?:v0|v[1-9][0-9]*)(?:\.0|\.[1-9][0-9]*){0,2}(-unstable)?))/([a-zA-Z][-a-zA-Z0-9]*)(?:\.git)?((?:/[a-zA-Z][-a-zA-Z0-9]*)*)$`)
+	gpinNewRegex = regexp.MustCompile(`^(?P<root>gopkg\.in/(?:([a-zA-Z0-9][-a-zA-Z0-9]+)/)?([a-zA-Z][-.a-zA-Z0-9]*)\.((?:v0|v[1-9][0-9]*)(?:\.0|\.[1-9][0-9]*){0,2}(-unstable)?)(?:\.git)?)((?:/[a-zA-Z0-9][-.a-zA-Z0-9]*)*)$`)
+	//gpinOldRegex = regexp.MustCompile(`^(?P<root>gopkg\.in/(?:([a-z0-9][-a-z0-9]+)/)?((?:v0|v[1-9][0-9]*)(?:\.0|\.[1-9][0-9]*){0,2}(-unstable)?)/([a-zA-Z][-a-zA-Z0-9]*)(?:\.git)?)((?:/[a-zA-Z][-a-zA-Z0-9]*)*)$`)
 	bbRegex = regexp.MustCompile(`^(?P<root>bitbucket\.org/(?P<bitname>[A-Za-z0-9_.\-]+/[A-Za-z0-9_.\-]+))(/[A-Za-z0-9_.\-]+)*$`)
 	lpRegex = regexp.MustCompile(`^(?P<root>launchpad.net/([A-Za-z0-9-._]+)(/[A-Za-z0-9-._]+)?)(/.+)?`)
 	//glpRegex = regexp.MustCompile(`^(?P<root>git\.launchpad\.net/(([A-Za-z0-9_.\-]+)|~[A-Za-z0-9_.\-]+/(\+git|[A-Za-z0-9_.\-]+)/[A-Za-z0-9_.\-]+))$`)
@@ -93,7 +93,6 @@ func deduceRemoteRepo(path string) (rr *remoteRepo, err error) {
 
 	case gpinNewRegex.MatchString(path):
 		v := gpinNewRegex.FindStringSubmatch(path)
-
 		// Duplicate some logic from the gopkg.in server in order to validate
 		// the import path string without having to hit the server
 		if strings.Contains(v[4], ".") {
@@ -101,14 +100,15 @@ func deduceRemoteRepo(path string) (rr *remoteRepo, err error) {
 				path, v[4][:strings.Index(v[4], ".")], v[4])
 		}
 
+		// gopkg.in is always backed by github
+		rr.CloneURL.Host = "github.com"
 		// If the third position is empty, it's the shortened form that expands
 		// to the go-pkg github user
-		if v[3] != "" {
-			rr.CloneURL.Path = "go-pkg/" + v[4]
+		if v[2] == "" {
+			rr.CloneURL.Path = "go-pkg/" + v[3]
 		} else {
-			rr.CloneURL.Path = v[2] + v[4]
+			rr.CloneURL.Path = v[2] + "/" + v[3]
 		}
-		rr.CloneURL.Host = "github.com"
 		rr.Base = v[1]
 		rr.RelPkg = strings.TrimPrefix(v[6], "/")
 		rr.VCS = []string{"git"}
@@ -214,5 +214,5 @@ func deduceRemoteRepo(path string) (rr *remoteRepo, err error) {
 	}
 
 	// TODO use HTTP metadata to resolve vanity imports
-	return nil, fmt.Errorf("unable to deduct repository and source type for: %q", path)
+	return nil, fmt.Errorf("unable to deduce repository and source type for: %q", path)
 }
