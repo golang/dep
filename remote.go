@@ -51,7 +51,8 @@ var (
 // deduceRemoteRepo takes a potential import path and returns a RemoteRepo
 // representing the remote location of the source of an import path. Remote
 // repositories can be bare import paths, or urls including a checkout scheme.
-func deduceRemoteRepo(path string) (rr remoteRepo, err error) {
+func deduceRemoteRepo(path string) (rr *remoteRepo, err error) {
+	rr = &remoteRepo{}
 	if m := scpSyntaxRe.FindStringSubmatch(path); m != nil {
 		// Match SCP-like syntax and convert it to a URL.
 		// Eg, "git@github.com:user/repo" becomes
@@ -65,13 +66,13 @@ func deduceRemoteRepo(path string) (rr remoteRepo, err error) {
 	} else {
 		rr.CloneURL, err = url.Parse(path)
 		if err != nil {
-			return remoteRepo{}, fmt.Errorf("%q is not a valid import path", path)
+			return nil, fmt.Errorf("%q is not a valid import path", path)
 		}
 	}
 
 	path = rr.CloneURL.Host + rr.CloneURL.Path
 	if !pathvld.MatchString(path) {
-		return remoteRepo{}, fmt.Errorf("%q is not a valid import path", path)
+		return nil, fmt.Errorf("%q is not a valid import path", path)
 	}
 
 	if rr.CloneURL.Scheme != "" {
@@ -96,7 +97,7 @@ func deduceRemoteRepo(path string) (rr remoteRepo, err error) {
 		// Duplicate some logic from the gopkg.in server in order to validate
 		// the import path string without having to hit the server
 		if strings.Contains(v[4], ".") {
-			return remoteRepo{}, fmt.Errorf("%q is not a valid import path; gopkg.in only allows major versions (%q instead of %q)",
+			return nil, fmt.Errorf("%q is not a valid import path; gopkg.in only allows major versions (%q instead of %q)",
 				path, v[4][:strings.Index(v[4], ".")], v[4])
 		}
 
@@ -208,10 +209,10 @@ func deduceRemoteRepo(path string) (rr remoteRepo, err error) {
 			rr.RelPkg = strings.TrimPrefix(v[6], "/")
 			return
 		default:
-			return remoteRepo{}, fmt.Errorf("unknown repository type: %q", v[5])
+			return nil, fmt.Errorf("unknown repository type: %q", v[5])
 		}
 	}
 
 	// TODO use HTTP metadata to resolve vanity imports
-	return remoteRepo{}, fmt.Errorf("unable to deduct repository and source type for: %q", path)
+	return nil, fmt.Errorf("unable to deduct repository and source type for: %q", path)
 }
