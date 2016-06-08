@@ -496,8 +496,7 @@ func (s *solver) getDependenciesOf(pa ProjectAtom) ([]ProjectDep, error) {
 			}
 
 			// No match. Let the SourceManager try to figure out the root
-			// TODO impl this
-			root, err := s.b.detectRepoRoot(rp)
+			root, err := deduceRemoteRepo(rp)
 			if err != nil {
 				// Nothing we can do if we can't suss out a root
 				return nil, err
@@ -513,8 +512,8 @@ func (s *solver) getDependenciesOf(pa ProjectAtom) ([]ProjectDep, error) {
 			// Still no matches; make a new ProjectDep with an open constraint
 			dep := ProjectDep{
 				Ident: ProjectIdentifier{
-					LocalName:   ProjectName(root),
-					NetworkName: root,
+					LocalName:   ProjectName(root.Base),
+					NetworkName: root.Base,
 				},
 				Constraint: Any(),
 			}
