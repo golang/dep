@@ -38,6 +38,7 @@ var (
 	//glpRegex = regexp.MustCompile(`^(?P<root>git\.launchpad\.net/(([A-Za-z0-9_.\-]+)|~[A-Za-z0-9_.\-]+/(\+git|[A-Za-z0-9_.\-]+)/[A-Za-z0-9_.\-]+))$`)
 	//gcRegex      = regexp.MustCompile(`^(?P<root>code\.google\.com/[pr]/(?P<project>[a-z0-9\-]+)(\.(?P<subrepo>[a-z0-9\-]+))?)(/[A-Za-z0-9_.\-]+)*$`)
 	jazzRegex    = regexp.MustCompile(`^(?P<root>hub\.jazz\.net/git/[a-z0-9]+/[A-Za-z0-9_.\-]+)(/[A-Za-z0-9_.\-]+)*$`)
+	apacheRegex  = regexp.MustCompile(`^(?P<root>git.apache.org/[a-z0-9_.\-]+\.git)(/[A-Za-z0-9_.\-]+)*$`)
 	genericRegex = regexp.MustCompile(`^(?P<root>(?P<repo>([a-z0-9.\-]+\.)+[a-z0-9.\-]+(:[0-9]+)?/[A-Za-z0-9_.\-/~]*?)\.(?P<vcs>bzr|git|hg|svn))([/A-Za-z0-9_.\-]+)*$`)
 )
 
@@ -152,6 +153,27 @@ func deduceRemoteRepo(path string) (rr remoteRepo, err error) {
 			// launchpad.net/project/series"
 			rr.Base = fmt.Sprintf("https://launchpad.net/%s/%s", v[2], v[3])
 		}
+		return
+
+	case jazzRegex.MatchString(path):
+		v := jazzRegex.FindStringSubmatch(path)
+
+		rr.CloneURL.Host = "hub.jazz.net"
+		rr.CloneURL.Path = "git" + v[2]
+		rr.Base = v[1]
+		rr.RelPkg = strings.TrimPrefix(v[2], "/")
+		rr.VCS = []string{"git"}
+
+		return
+
+	case apacheRegex.MatchString(path):
+		v := apacheRegex.FindStringSubmatch(path)
+
+		rr.CloneURL.Host = "git.apache.org"
+		rr.Base = v[1]
+		rr.RelPkg = strings.TrimPrefix(v[2], "/")
+		rr.VCS = []string{"git"}
+
 		return
 
 	//case glpRegex.MatchString(path):
