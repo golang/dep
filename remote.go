@@ -64,7 +64,7 @@ func deduceRemoteRepo(path string) (rr remoteRepo, err error) {
 	} else {
 		rr.CloneURL, err = url.Parse(path)
 		if err != nil {
-			return nil, "", fmt.Errorf("%q is not a valid import path", path)
+			return remoteRepo{}, fmt.Errorf("%q is not a valid import path", path)
 		}
 	}
 
@@ -73,8 +73,8 @@ func deduceRemoteRepo(path string) (rr remoteRepo, err error) {
 		return remoteRepo{}, fmt.Errorf("%q is not a valid import path", path)
 	}
 
-	if u.Scheme != "" {
-		rr.Schemes = []string{u.Scheme}
+	if rr.CloneURL.Scheme != "" {
+		rr.Schemes = []string{rr.CloneURL.Scheme}
 	}
 
 	switch {
@@ -176,25 +176,18 @@ func deduceRemoteRepo(path string) (rr remoteRepo, err error) {
 	case genericRegex.MatchString(path):
 		v := genericRegex.FindStringSubmatch(path)
 		switch v[5] {
-		case "git":
+		case "git", "hg", "bzr":
 			x := strings.SplitN(v[1], "/", 2)
+			// TODO is this actually correct for bzr?
 			rr.CloneURL.Host = x[0]
 			rr.CloneURL.Path = x[1]
-			rr.VCS = []string{"git"}
-		case "hg":
-			x := strings.SplitN(v[1], "/", 2)
-			rr.CloneURL.Host = x[0]
-			rr.CloneURL.Path = x[1]
-			rr.VCS = []string{"hg"}
-		case "bzr":
-			repo, err := Bzrrepo("https://" + v[1])
-			rr.VCS = []string{"bzr"}
+			rr.VCS = []string{v[5]}
+			rr.Base = v[1]
+			rr.RelPkg = strings.TrimPrefix(v[6], "/")
+			return
 		default:
 			return remoteRepo{}, fmt.Errorf("unknown repository type: %q", v[5])
-
 		}
-		rr.RelPkg = strings.TrimPrefix(v[6], "/")
-		return
 	}
 
 	// TODO use HTTP metadata to resolve vanity imports

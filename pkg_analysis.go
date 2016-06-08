@@ -13,7 +13,7 @@ import (
 
 var osList []string
 var archList []string
-var stdlib map[string]struct{}
+var stdlib = make(map[string]struct{})
 
 func init() {
 	// The supported systems are listed in
