@@ -67,6 +67,23 @@ func TestDeduceRemotes(t *testing.T) {
 				VCS:     []string{"git"},
 			},
 		},
+		// some invalid github username patterns
+		{
+			"github.com/-sdboyer/vsolver/foo",
+			nil,
+		},
+		{
+			"github.com/sdboyer-/vsolver/foo",
+			nil,
+		},
+		{
+			"github.com/sdbo.yer/vsolver/foo",
+			nil,
+		},
+		{
+			"github.com/sdbo_yer/vsolver/foo",
+			nil,
+		},
 		{
 			"gopkg.in/sdboyer/vsolver.v0",
 			&remoteRepo{
