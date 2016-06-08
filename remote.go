@@ -58,10 +58,12 @@ func deduceRemoteRepo(path string) (rr *remoteRepo, err error) {
 		// Eg, "git@github.com:user/repo" becomes
 		// "ssh://git@github.com/user/repo".
 		rr.CloneURL = &url.URL{
-			Scheme:  "ssh",
-			User:    url.User(m[1]),
-			Host:    m[2],
-			RawPath: m[3],
+			Scheme: "ssh",
+			User:   url.User(m[1]),
+			Host:   m[2],
+			Path:   "/" + m[3],
+			// TODO This is what stdlib sets; grok why better
+			//RawPath: m[3],
 		}
 	} else {
 		rr.CloneURL, err = url.Parse(path)
@@ -70,7 +72,12 @@ func deduceRemoteRepo(path string) (rr *remoteRepo, err error) {
 		}
 	}
 
-	path = rr.CloneURL.Host + rr.CloneURL.Path
+	if rr.CloneURL.Host != "" {
+		path = rr.CloneURL.Host + "/" + strings.TrimPrefix(rr.CloneURL.Path, "/")
+	} else {
+		path = rr.CloneURL.Path
+	}
+
 	if !pathvld.MatchString(path) {
 		return nil, fmt.Errorf("%q is not a valid import path", path)
 	}

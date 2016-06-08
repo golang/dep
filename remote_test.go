@@ -39,6 +39,21 @@ func TestDeduceRemotes(t *testing.T) {
 			},
 		},
 		{
+			"git@github.com:sdboyer/vsolver",
+			&remoteRepo{
+				Base:   "github.com/sdboyer/vsolver",
+				RelPkg: "",
+				CloneURL: &url.URL{
+					Scheme: "ssh",
+					User:   url.User("git"),
+					Host:   "github.com",
+					Path:   "sdboyer/vsolver",
+				},
+				Schemes: []string{"ssh"},
+				VCS:     []string{"git"},
+			},
+		},
+		{
 			"https://github.com/sdboyer/vsolver/foo",
 			&remoteRepo{
 				Base:   "github.com/sdboyer/vsolver",
