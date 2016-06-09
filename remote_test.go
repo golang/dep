@@ -67,6 +67,20 @@ func TestDeduceRemotes(t *testing.T) {
 				VCS:     []string{"git"},
 			},
 		},
+		{
+			"https://github.com/sdboyer/vsolver/foo/bar",
+			&remoteRepo{
+				Base:   "github.com/sdboyer/vsolver",
+				RelPkg: "foo/bar",
+				CloneURL: &url.URL{
+					Scheme: "https",
+					Host:   "github.com",
+					Path:   "sdboyer/vsolver",
+				},
+				Schemes: []string{"https"},
+				VCS:     []string{"git"},
+			},
+		},
 		// some invalid github username patterns
 		{
 			"github.com/-sdboyer/vsolver/foo",
@@ -109,6 +123,48 @@ func TestDeduceRemotes(t *testing.T) {
 			},
 		},
 		{
+			"gopkg.in/sdboyer/vsolver.v0/foo/bar",
+			&remoteRepo{
+				Base:   "gopkg.in/sdboyer/vsolver.v0",
+				RelPkg: "foo/bar",
+				CloneURL: &url.URL{
+					Host: "github.com",
+					Path: "sdboyer/vsolver",
+				},
+				VCS: []string{"git"},
+			},
+		},
+		{
+			"gopkg.in/yaml.v1",
+			&remoteRepo{
+				Base:   "gopkg.in/yaml.v1",
+				RelPkg: "",
+				CloneURL: &url.URL{
+					Host: "github.com",
+					Path: "go-pkg/yaml",
+				},
+				VCS: []string{"git"},
+			},
+		},
+		{
+			"gopkg.in/yaml.v1/foo/bar",
+			&remoteRepo{
+				Base:   "gopkg.in/yaml.v1",
+				RelPkg: "foo/bar",
+				CloneURL: &url.URL{
+					Host: "github.com",
+					Path: "go-pkg/yaml",
+				},
+				VCS: []string{"git"},
+			},
+		},
+		{
+			// gopkg.in only allows specifying major version in import path
+			"gopkg.in/yaml.v1.2",
+			nil,
+		},
+		// IBM hub devops services - fixtures borrowed from go get
+		{
 			"hub.jazz.net/git/user1/pkgname",
 			&remoteRepo{
 				Base:   "hub.jazz.net/git/user1/pkgname",
@@ -132,7 +188,6 @@ func TestDeduceRemotes(t *testing.T) {
 				VCS: []string{"git"},
 			},
 		},
-		// IBM hub devops services - fixtures borrowed from go get
 		{
 			"hub.jazz.net",
 			nil,
@@ -179,6 +234,136 @@ func TestDeduceRemotes(t *testing.T) {
 		{
 			"hub.jazz.net/git/USER/pkgname",
 			nil,
+		},
+		{
+			"bitbucket.org/sdboyer/reporoot",
+			&remoteRepo{
+				Base:   "bitbucket.org/sdboyer/reporoot",
+				RelPkg: "",
+				CloneURL: &url.URL{
+					Host: "bitbucket.org",
+					Path: "sdboyer/reporoot",
+				},
+				VCS: []string{"git", "hg"},
+			},
+		},
+		{
+			"bitbucket.org/sdboyer/reporoot/foo/bar",
+			&remoteRepo{
+				Base:   "bitbucket.org/sdboyer/reporoot",
+				RelPkg: "foo/bar",
+				CloneURL: &url.URL{
+					Host: "bitbucket.org",
+					Path: "sdboyer/reporoot",
+				},
+				VCS: []string{"git", "hg"},
+			},
+		},
+		{
+			"https://bitbucket.org/sdboyer/reporoot/foo/bar",
+			&remoteRepo{
+				Base:   "bitbucket.org/sdboyer/reporoot",
+				RelPkg: "foo/bar",
+				CloneURL: &url.URL{
+					Scheme: "https",
+					Host:   "bitbucket.org",
+					Path:   "sdboyer/reporoot",
+				},
+				Schemes: []string{"https"},
+				VCS:     []string{"git", "hg"},
+			},
+		},
+		{
+			"launchpad.net/govcstestbzrrepo",
+			&remoteRepo{
+				Base:   "launchpad.net/govcstestbzrrepo",
+				RelPkg: "",
+				CloneURL: &url.URL{
+					Host: "launchpad.net",
+					Path: "govcstestbzrrepo",
+				},
+				VCS: []string{"bzr"},
+			},
+		},
+		{
+			"launchpad.net/govcstestbzrrepo/foo/bar",
+			&remoteRepo{
+				Base:   "launchpad.net/govcstestbzrrepo",
+				RelPkg: "foo/bar",
+				CloneURL: &url.URL{
+					Host: "launchpad.net",
+					Path: "govcstestbzrrepo",
+				},
+				VCS: []string{"bzr"},
+			},
+		},
+		{
+			"launchpad.net/repo root",
+			nil,
+		},
+		{
+			"git.launchpad.net/reporoot",
+			&remoteRepo{
+				Base:   "git.launchpad.net/reporoot",
+				RelPkg: "",
+				CloneURL: &url.URL{
+					Host: "git.launchpad.net",
+					Path: "reporoot",
+				},
+				VCS: []string{"git"},
+			},
+		},
+		{
+			"git.launchpad.net/reporoot/foo/bar",
+			&remoteRepo{
+				Base:   "git.launchpad.net/reporoot",
+				RelPkg: "foo/bar",
+				CloneURL: &url.URL{
+					Host: "git.launchpad.net",
+					Path: "reporoot",
+				},
+				VCS: []string{"git"},
+			},
+		},
+		{
+			"git.launchpad.net/reporoot",
+			&remoteRepo{
+				Base:   "git.launchpad.net/reporoot",
+				RelPkg: "",
+				CloneURL: &url.URL{
+					Host: "git.launchpad.net",
+					Path: "reporoot",
+				},
+				VCS: []string{"git"},
+			},
+		},
+		{
+			"git.launchpad.net/repo root",
+			nil,
+		},
+		{
+			"git.apache.org/package-name.git",
+			&remoteRepo{
+				Base:   "git.apache.org/package-name.git",
+				RelPkg: "",
+				CloneURL: &url.URL{
+					Host: "git.apache.org",
+					Path: "package-name.git",
+				},
+				VCS: []string{"git"},
+			},
+		},
+		{
+			"git.apache.org/package-name.git/foo/bar",
+			&remoteRepo{
+				Base:   "git.apache.org/package-name.git",
+				RelPkg: "foo/bar",
+				CloneURL: &url.URL{
+					Host: "git.apache.org",
+					Path: "package-name.git",
+				},
+				VCS: []string{"git"},
+			},
 		},
 	}
 
