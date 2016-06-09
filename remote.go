@@ -31,19 +31,18 @@ type remoteRepo struct {
 // Regexes for the different known import path flavors
 var (
 	// This regex allowed some usernames that github currently disallows. They
-	// may have allowed them in the past, so keeping it in case we need to
-	// revert.
+	// may have allowed them in the past; keeping it in case we need to revert.
 	//ghRegex      = regexp.MustCompile(`^(?P<root>github\.com/([A-Za-z0-9_.\-]+/[A-Za-z0-9_.\-]+))(/[A-Za-z0-9_.\-]+)*$`)
-	ghRegex      = regexp.MustCompile(`^(?P<root>github\.com/([A-Za-z0-9][-A-Za-z0-9]+[A-Za-z0-9]/[A-Za-z0-9_.\-]+))(/[A-Za-z0-9_.\-]+)*$`)
+	ghRegex      = regexp.MustCompile(`^(?P<root>github\.com/([A-Za-z0-9][-A-Za-z0-9]+[A-Za-z0-9]/[A-Za-z0-9_.\-]+))((?:/[A-Za-z0-9_.\-]+)*)$`)
 	gpinNewRegex = regexp.MustCompile(`^(?P<root>gopkg\.in/(?:([a-zA-Z0-9][-a-zA-Z0-9]+)/)?([a-zA-Z][-.a-zA-Z0-9]*)\.((?:v0|v[1-9][0-9]*)(?:\.0|\.[1-9][0-9]*){0,2}(-unstable)?)(?:\.git)?)((?:/[a-zA-Z0-9][-.a-zA-Z0-9]*)*)$`)
 	//gpinOldRegex = regexp.MustCompile(`^(?P<root>gopkg\.in/(?:([a-z0-9][-a-z0-9]+)/)?((?:v0|v[1-9][0-9]*)(?:\.0|\.[1-9][0-9]*){0,2}(-unstable)?)/([a-zA-Z][-a-zA-Z0-9]*)(?:\.git)?)((?:/[a-zA-Z][-a-zA-Z0-9]*)*)$`)
-	bbRegex = regexp.MustCompile(`^(?P<root>bitbucket\.org/(?P<bitname>[A-Za-z0-9_.\-]+/[A-Za-z0-9_.\-]+))(/[A-Za-z0-9_.\-]+)*$`)
+	bbRegex = regexp.MustCompile(`^(?P<root>bitbucket\.org/(?P<bitname>[A-Za-z0-9_.\-]+/[A-Za-z0-9_.\-]+))((?:/[A-Za-z0-9_.\-]+)*)$`)
 	lpRegex = regexp.MustCompile(`^(?P<root>launchpad\.net/([A-Za-z0-9-._]+)(/[A-Za-z0-9-._]+)?)(/.+)?`)
 	//glpRegex = regexp.MustCompile(`^(?P<root>git\.launchpad\.net/(([A-Za-z0-9_.\-]+)|~[A-Za-z0-9_.\-]+/(\+git|[A-Za-z0-9_.\-]+)/[A-Za-z0-9_.\-]+))$`)
 	//gcRegex      = regexp.MustCompile(`^(?P<root>code\.google\.com/[pr]/(?P<project>[a-z0-9\-]+)(\.(?P<subrepo>[a-z0-9\-]+))?)(/[A-Za-z0-9_.\-]+)*$`)
 	jazzRegex    = regexp.MustCompile(`^(?P<root>hub\.jazz\.net/(git/[a-z0-9]+/[A-Za-z0-9_.\-]+))((?:/[A-Za-z0-9_.\-]+)*)$`)
-	apacheRegex  = regexp.MustCompile(`^(?P<root>git\.apache\.org/[a-z0-9_.\-]+\.git)(/[A-Za-z0-9_.\-]+)*$`)
-	genericRegex = regexp.MustCompile(`^(?P<root>(?P<repo>([a-z0-9.\-]+\.)+[a-z0-9.\-]+(:[0-9]+)?/[A-Za-z0-9_.\-/~]*?)\.(?P<vcs>bzr|git|hg|svn))([/A-Za-z0-9_.\-]+)*$`)
+	apacheRegex  = regexp.MustCompile(`^(?P<root>git\.apache\.org/[a-z0-9_.\-]+\.git)((?:/[A-Za-z0-9_.\-]+)*)$`)
+	genericRegex = regexp.MustCompile(`^(?P<root>(?P<repo>([a-z0-9.\-]+\.)+[a-z0-9.\-]+(:[0-9]+)?/[A-Za-z0-9_.\-/~]*?)\.(?P<vcs>bzr|git|hg|svn))((?:/[A-Za-z0-9_.\-]+)*)$`)
 )
 
 // Other helper regexes
