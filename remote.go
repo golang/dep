@@ -38,11 +38,11 @@ var (
 	gpinNewRegex = regexp.MustCompile(`^(?P<root>gopkg\.in/(?:([a-zA-Z0-9][-a-zA-Z0-9]+)/)?([a-zA-Z][-.a-zA-Z0-9]*)\.((?:v0|v[1-9][0-9]*)(?:\.0|\.[1-9][0-9]*){0,2}(-unstable)?)(?:\.git)?)((?:/[a-zA-Z0-9][-.a-zA-Z0-9]*)*)$`)
 	//gpinOldRegex = regexp.MustCompile(`^(?P<root>gopkg\.in/(?:([a-z0-9][-a-z0-9]+)/)?((?:v0|v[1-9][0-9]*)(?:\.0|\.[1-9][0-9]*){0,2}(-unstable)?)/([a-zA-Z][-a-zA-Z0-9]*)(?:\.git)?)((?:/[a-zA-Z][-a-zA-Z0-9]*)*)$`)
 	bbRegex = regexp.MustCompile(`^(?P<root>bitbucket\.org/(?P<bitname>[A-Za-z0-9_.\-]+/[A-Za-z0-9_.\-]+))(/[A-Za-z0-9_.\-]+)*$`)
-	lpRegex = regexp.MustCompile(`^(?P<root>launchpad.net/([A-Za-z0-9-._]+)(/[A-Za-z0-9-._]+)?)(/.+)?`)
+	lpRegex = regexp.MustCompile(`^(?P<root>launchpad\.net/([A-Za-z0-9-._]+)(/[A-Za-z0-9-._]+)?)(/.+)?`)
 	//glpRegex = regexp.MustCompile(`^(?P<root>git\.launchpad\.net/(([A-Za-z0-9_.\-]+)|~[A-Za-z0-9_.\-]+/(\+git|[A-Za-z0-9_.\-]+)/[A-Za-z0-9_.\-]+))$`)
 	//gcRegex      = regexp.MustCompile(`^(?P<root>code\.google\.com/[pr]/(?P<project>[a-z0-9\-]+)(\.(?P<subrepo>[a-z0-9\-]+))?)(/[A-Za-z0-9_.\-]+)*$`)
-	jazzRegex    = regexp.MustCompile(`^(?P<root>hub\.jazz\.net/git/[a-z0-9]+/[A-Za-z0-9_.\-]+)(/[A-Za-z0-9_.\-]+)*$`)
-	apacheRegex  = regexp.MustCompile(`^(?P<root>git.apache.org/[a-z0-9_.\-]+\.git)(/[A-Za-z0-9_.\-]+)*$`)
+	jazzRegex    = regexp.MustCompile(`^(?P<root>hub\.jazz\.net/(git/[a-z0-9]+/[A-Za-z0-9_.\-]+))((?:/[A-Za-z0-9_.\-]+)*)$`)
+	apacheRegex  = regexp.MustCompile(`^(?P<root>git\.apache\.org/[a-z0-9_.\-]+\.git)(/[A-Za-z0-9_.\-]+)*$`)
 	genericRegex = regexp.MustCompile(`^(?P<root>(?P<repo>([a-z0-9.\-]+\.)+[a-z0-9.\-]+(:[0-9]+)?/[A-Za-z0-9_.\-/~]*?)\.(?P<vcs>bzr|git|hg|svn))([/A-Za-z0-9_.\-]+)*$`)
 )
 
@@ -171,9 +171,9 @@ func deduceRemoteRepo(path string) (rr *remoteRepo, err error) {
 		v := jazzRegex.FindStringSubmatch(path)
 
 		rr.CloneURL.Host = "hub.jazz.net"
-		rr.CloneURL.Path = "git" + v[2]
+		rr.CloneURL.Path = v[2]
 		rr.Base = v[1]
-		rr.RelPkg = strings.TrimPrefix(v[2], "/")
+		rr.RelPkg = strings.TrimPrefix(v[3], "/")
 		rr.VCS = []string{"git"}
 
 		return

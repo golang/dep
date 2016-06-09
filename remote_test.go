@@ -108,6 +108,78 @@ func TestDeduceRemotes(t *testing.T) {
 				VCS: []string{"git"},
 			},
 		},
+		{
+			"hub.jazz.net/git/user1/pkgname",
+			&remoteRepo{
+				Base:   "hub.jazz.net/git/user1/pkgname",
+				RelPkg: "",
+				CloneURL: &url.URL{
+					Host: "hub.jazz.net",
+					Path: "git/user1/pkgname",
+				},
+				VCS: []string{"git"},
+			},
+		},
+		{
+			"hub.jazz.net/git/user1/pkgname/submodule/submodule/submodule",
+			&remoteRepo{
+				Base:   "hub.jazz.net/git/user1/pkgname",
+				RelPkg: "submodule/submodule/submodule",
+				CloneURL: &url.URL{
+					Host: "hub.jazz.net",
+					Path: "git/user1/pkgname",
+				},
+				VCS: []string{"git"},
+			},
+		},
+		// IBM hub devops services - fixtures borrowed from go get
+		{
+			"hub.jazz.net",
+			nil,
+		},
+		{
+			"hub2.jazz.net",
+			nil,
+		},
+		{
+			"hub.jazz.net/someotherprefix",
+			nil,
+		},
+		{
+			"hub.jazz.net/someotherprefix/user1/pkgname",
+			nil,
+		},
+		// Spaces are not valid in user names or package names
+		{
+			"hub.jazz.net/git/User 1/pkgname",
+			nil,
+		},
+		{
+			"hub.jazz.net/git/user1/pkg name",
+			nil,
+		},
+		// Dots are not valid in user names
+		{
+			"hub.jazz.net/git/user.1/pkgname",
+			nil,
+		},
+		{
+			"hub.jazz.net/git/user/pkg.name",
+			&remoteRepo{
+				Base:   "hub.jazz.net/git/user/pkg.name",
+				RelPkg: "",
+				CloneURL: &url.URL{
+					Host: "hub.jazz.net",
+					Path: "git/user/pkg.name",
+				},
+				VCS: []string{"git"},
+			},
+		},
+		// User names cannot have uppercase letters
+		{
+			"hub.jazz.net/git/USER/pkgname",
+			nil,
+		},
 	}
 
 	for _, fix := range fixtures {
