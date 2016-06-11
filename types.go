@@ -81,14 +81,14 @@ type ProjectDep struct {
 // under that root.
 type completeDep struct {
 	// The base ProjectDep
-	pd ProjectDep
+	ProjectDep
 	// The specific packages required from the ProjectDep
 	pl []string
 }
 
 type Dependency struct {
 	Depender ProjectAtom
-	Dep      ProjectDep
+	Dep      completeDep
 }
 
 // ProjectInfo holds manifest and lock for a ProjectName at a Version

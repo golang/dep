@@ -14,6 +14,16 @@ func (s *selection) getDependenciesOn(id ProjectIdentifier) []Dependency {
 	return nil
 }
 
+func (s *selection) pushDep(dep Dependency) {
+	s.deps[dep.Dep.Ident] = append(s.deps[dep.Dep.Ident], dep)
+}
+
+func (s *selection) popDep(id ProjectIdentifier) (dep Dependency) {
+	deps := s.deps[id]
+	dep, s.deps[id] = deps[len(deps)-1], deps[:len(deps)-1]
+	return dep
+}
+
 func (s *selection) setDependenciesOn(id ProjectIdentifier, deps []Dependency) {
 	s.deps[id] = deps
 }
