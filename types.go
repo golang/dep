@@ -73,7 +73,6 @@ type atomWithPackages struct {
 type ProjectDep struct {
 	Ident      ProjectIdentifier
 	Constraint Constraint
-	Packages   []string
 }
 
 // completeDep (name hopefully to change) provides the whole picture of a

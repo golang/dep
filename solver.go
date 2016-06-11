@@ -295,14 +295,15 @@ func (s *solver) selectRoot() {
 
 }
 
-func (s *solver) getImportsAndConstraintsOf(pa ProjectAtom) []completeDep {
+func (s *solver) getImportsAndConstraintsOf(pa ProjectAtom) ([]completeDep, error) {
 	var reach []string
+	var deps []ProjectDep
 	var err error
 
 	if s.rm.Name() == pa.Ident.LocalName {
 		// If we're looking for root's deps, get it from opts and local root
 		// analysis, rather than having the sm do it
-		deps := append(s.rm.GetDependencies(), s.rm.GetDevDependencies()...)
+		deps = append(s.rm.GetDependencies(), s.rm.GetDevDependencies()...)
 
 		reach, err = s.b.computeRootReach(s.o.Root)
 		if err != nil {
@@ -353,6 +354,7 @@ func (s *solver) getImportsAndConstraintsOf(pa ProjectAtom) []completeDep {
 
 	// Create a radix tree with all the projects we know from the manifest
 	// TODO make this smarter once we allow non-root inputs as 'projects'
+	xt := radix.New()
 	for _, dep := range deps {
 		xt.Insert(string(dep.Ident.LocalName), dep)
 	}
@@ -414,12 +416,14 @@ func (s *solver) getImportsAndConstraintsOf(pa ProjectAtom) []completeDep {
 	}
 
 	// Dump all the deps from the map into the expected return slice
-	deps = make([]completeDep, len(dmap))
+	cdeps := make([]completeDep, len(dmap))
 	k := 0
-	for cdep := range dmap {
-		deps[k] = cdep
+	for _, cdep := range dmap {
+		cdeps[k] = cdep
 		k++
 	}
+
+	return cdeps, nil
 }
 
 func (s *solver) createVersionQueue(id ProjectIdentifier) (*versionQueue, error) {
