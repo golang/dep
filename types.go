@@ -65,9 +65,26 @@ type ProjectAtom struct {
 
 var emptyProjectAtom ProjectAtom
 
+type atomWithPackages struct {
+	atom ProjectAtom
+	pl   []string
+}
+
 type ProjectDep struct {
 	Ident      ProjectIdentifier
 	Constraint Constraint
+	Packages   []string
+}
+
+// completeDep (name hopefully to change) provides the whole picture of a
+// dependency - the root (repo and project, since currently we assume the two
+// are the same) name, a constraint, and the actual packages needed that are
+// under that root.
+type completeDep struct {
+	// The base ProjectDep
+	pd ProjectDep
+	// The specific packages required from the ProjectDep
+	pl []string
 }
 
 type Dependency struct {

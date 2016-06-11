@@ -289,6 +289,139 @@ func (s *solver) solve() ([]ProjectAtom, error) {
 	return projs, nil
 }
 
+// selectRoot is a specialized selectAtomWithPackages, used to initially
+// populate the queues at the beginning of a solve run.
+func (s *solver) selectRoot() {
+
+}
+
+func (s *solver) getImportsAndConstraintsOf(pa ProjectAtom) []completeDep {
+	var reach []string
+	var err error
+
+	if s.rm.Name() == pa.Ident.LocalName {
+		// If we're looking for root's deps, get it from opts and local root
+		// analysis, rather than having the sm do it
+		deps := append(s.rm.GetDependencies(), s.rm.GetDevDependencies()...)
+
+		reach, err = s.b.computeRootReach(s.o.Root)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		// Otherwise, work through the source manager to get project info and
+		// static analysis information.
+		info, err := s.b.getProjectInfo(pa)
+		if err != nil {
+			return nil, err
+		}
+
+		deps = info.GetDependencies()
+		// TODO add overrides here...if we impl the concept (which we should)
+
+		allex, err := s.b.externalReach(pa.Ident, pa.Version)
+		if err != nil {
+			return nil, err
+		}
+
+		// TODO impl this
+		curp := s.sel.getSelectedPackagesIn(pa.Ident)
+		// Use a map to dedupe the unique external packages
+		exmap := make(map[string]struct{})
+		for _, pkg := range curp {
+			if expkgs, exists := allex[pkg]; !exists {
+				// It should be impossible for there to be a selected package
+				// that's not in the external reach map; such a condition should
+				// have been caught earlier during satisfiability checks. So,
+				// explicitly panic here (rather than implicitly when we try to
+				// retrieve a nonexistent map entry) as a canary.
+				panic("canary - selection contains an atom with pkgs that apparently don't actually exist")
+			} else {
+				for _, ex := range expkgs {
+					exmap[ex] = struct{}{}
+				}
+			}
+		}
+
+		reach = make([]string, len(exmap))
+		k := 0
+		for pkg := range exmap {
+			reach[k] = pkg
+			k++
+		}
+	}
+
+	// Create a radix tree with all the projects we know from the manifest
+	// TODO make this smarter once we allow non-root inputs as 'projects'
+	for _, dep := range deps {
+		xt.Insert(string(dep.Ident.LocalName), dep)
+	}
+
+	// Step through the reached packages; if they have [prefix] matches in
+	// the trie, just assume that's a correct correspondence.
+	// TODO could this be a bad assumption...?
+	dmap := make(map[ProjectName]completeDep)
+	for _, rp := range reach {
+		// If it's a stdlib package, skip it.
+		// TODO this just hardcodes us to the packages in tip - should we
+		// have go version magic here, too?
+		if _, exists := stdlib[rp]; exists {
+			continue
+		}
+
+		// Look for a prefix match; it'll be the root project/repo containing
+		// the reached package
+		if k, idep, match := xt.LongestPrefix(rp); match { //&& strings.HasPrefix(rp, k) {
+			// Valid match found. Put it in the dmap, either creating a new
+			// completeDep or appending it to the existing one for this base
+			// project/prefix.
+			dep := idep.(ProjectDep)
+			if cdep, exists := dmap[dep.Ident.LocalName]; exists {
+				cdep.pl = append(cdep.pl, rp)
+				dmap[dep.Ident.LocalName] = cdep
+			} else {
+				dmap[dep.Ident.LocalName] = completeDep{
+					pd: dep,
+					pl: []string{rp},
+				}
+			}
+			continue
+		}
+
+		// No match. Let the SourceManager try to figure out the root
+		root, err := deduceRemoteRepo(rp)
+		if err != nil {
+			// Nothing we can do if we can't suss out a root
+			return nil, err
+		}
+
+		// Still no matches; make a new completeDep with an open constraint
+		pd := ProjectDep{
+			Ident: ProjectIdentifier{
+				LocalName:   ProjectName(root.Base),
+				NetworkName: root.Base,
+			},
+			Constraint: Any(),
+		}
+		// Insert the pd into the trie so that further deps from this
+		// project get caught by the prefix search
+		xt.Insert(root.Base, pd)
+		// And also put the complete dep into the dmap
+		dmap[ProjectName(root.Base)] = completeDep{
+			pd: pd,
+			pl: []string{rp},
+		}
+	}
+
+	// Dump all the deps from the map into the expected return slice
+	deps = make([]completeDep, len(dmap))
+	k := 0
+	for cdep := range dmap {
+		deps[k] = cdep
+		k++
+	}
+}
+
 func (s *solver) createVersionQueue(id ProjectIdentifier) (*versionQueue, error) {
 	// If on the root package, there's no queue to make
 	if id.LocalName == s.rm.Name() {
@@ -500,13 +633,6 @@ func (s *solver) getDependenciesOf(pa ProjectAtom) ([]ProjectDep, error) {
 			if err != nil {
 				// Nothing we can do if we can't suss out a root
 				return nil, err
-			}
-
-			// Try again with the radix trie, because the repo root can have
-			// just so very much nothing to do with the name
-			if k, dep, match := xt.LongestPrefix(rp); match && strings.HasPrefix(rp, k) {
-				dmap[dep.(ProjectDep)] = struct{}{}
-				continue
 			}
 
 			// Still no matches; make a new ProjectDep with an open constraint

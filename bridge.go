@@ -18,6 +18,7 @@ type sourceBridge interface {
 	matches(id ProjectIdentifier, c Constraint, v Version) bool
 	matchesAny(id ProjectIdentifier, c1, c2 Constraint) bool
 	intersect(id ProjectIdentifier, c1, c2 Constraint) Constraint
+	externalReach(n ProjectIdentifier, v Version) ([]string, error)
 	listExternal(n ProjectIdentifier, v Version) ([]string, error)
 	computeRootReach(path string) ([]string, error)
 	verifyRoot(path string) error
@@ -326,8 +327,12 @@ func (b *bridge) vtu(id ProjectIdentifier, v Version) versionTypeUnion {
 	return nil
 }
 
-// listExternal calls back directly to the SourceManager's ListExternal()
-// method.
+// externalReach wraps the SourceManager's ExternalReach() method.
+func (b *bridge) listExternal(id ProjectIdentifier, v Version) (map[string][]string, error) {
+	return b.sm.ExternalReach(b.key(id), v)
+}
+
+// listExternal wraps the SourceManager's ListExternal() method.
 func (b *bridge) listExternal(id ProjectIdentifier, v Version) ([]string, error) {
 	return b.sm.ListExternal(b.key(id), v)
 }

@@ -786,6 +786,8 @@ var fixtures = []fixture{
 		),
 		maxAttempts: 2,
 	},
+	// TODO add fixture that tests proper handling of loops via aliases (where
+	// a project that wouldn't be a loop is aliased to a project that is a loop)
 }
 
 func init() {
