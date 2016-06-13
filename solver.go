@@ -776,12 +776,16 @@ func (s *solver) fail(i ProjectIdentifier) {
 }
 
 func (s *solver) selectAtomWithPackages(a atomWithPackages) {
+	// TODO so...i guess maybe this is just totally redudant with
+	// selectVersion()? ugh. well, at least for now, until we things exercise
+	// bimodality
+
 	// TODO the unselected queue doesn't carry the package information; we
-	// retrieve that from current selection deps state  when considering a
+	// retrieve that from current selection deps state when considering a
 	// project. Make sure there's no possibility of dropping that data.
 	s.unsel.remove(a.atom.Ident)
 	if _, is := s.sel.selected(a.atom.Ident); !is {
-		s.sel.projects = append(s.sel.projects)
+		s.sel.projects = append(s.sel.projects, a.atom)
 	}
 
 	deps, err := s.getImportsAndConstraintsOf(a)
@@ -805,6 +809,7 @@ func (s *solver) selectAtomWithPackages(a atomWithPackages) {
 			// push the dep into the unselected queue? or maybe we just change
 			// the unseleced queue to dedupe on input? what side effects would
 			// that have? would it still be safe to backtrack on that queue?
+			s.names[dep.Ident.LocalName] = dep.Ident.netName()
 			heap.Push(s.unsel, dep.Ident)
 		}
 	}
