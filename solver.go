@@ -209,7 +209,7 @@ func (s *solver) run() (Result, error) {
 	}
 
 	// Prime the queues with the root project
-	err := s.selectRoot()
+	err = s.selectRoot()
 	if err != nil {
 		// TODO this properly with errs, yar
 		panic("couldn't select root, yikes")
@@ -767,6 +767,41 @@ func (s *solver) fail(i ProjectIdentifier) {
 	}
 }
 
+func (s *solver) selectAtomWithPackages(a atomWithPackages) {
+	// TODO the unselected queue doesn't carry the package information; we
+	// retrieve that from current selection deps state  when considering a
+	// project. Make sure there's no possibility of dropping that data.
+	s.unsel.remove(a.atom.Ident)
+	if _, is := s.sel.selected(a.atom.Ident); !is {
+		s.sel.projects = append(s.sel.projects)
+	}
+
+	deps, err := s.getImportsAndConstraintsOf(a.atom)
+	if err != nil {
+		// if we're choosing a package that has errors getting its deps, there's
+		// a bigger problem
+		// TODO try to create a test that hits this
+		panic(fmt.Sprintf("shouldn't be possible %s", err))
+	}
+
+	for _, dep := range deps {
+		s.sel.pushDep(Dependency{Depender: a.atom, Dep: dep})
+		// Add this dep to the unselected queue if the selection contains only
+		// the one bit of information we just pushed in...
+		if s.sel.depperCount(dep.Ident) == 1 {
+			// ...or if the dep is already selected, and the atom we're
+			// selecting imports new packages from the dep that aren't already
+			// selected
+
+			// ugh ok so...do we search what's in the pkg deps list, and then
+			// push the dep into the unselected queue? or maybe we just change
+			// the unseleced queue to dedupe on input? what side effects would
+			// that have? would it still be safe to backtrack on that queue?
+			heap.Push(s.unsel, dep.Ident)
+		}
+	}
+}
+
 func (s *solver) selectVersion(pa ProjectAtom) {
 	s.unsel.remove(pa.Ident)
 	s.sel.projects = append(s.sel.projects, pa)
@@ -780,7 +815,7 @@ func (s *solver) selectVersion(pa ProjectAtom) {
 	}
 
 	for _, dep := range deps {
-		siblingsAndSelf := append(s.sel.getDependenciesOn(dep.Ident), Dependency{Depender: pa, Dep: dep})
+		siblingsAndSelf := append(s.sel.getDependenciesOn(dep.Ident), Dependency{Depender: pa, Dep: completeDep{ProjectDep: dep}})
 		s.sel.setDependenciesOn(dep.Ident, siblingsAndSelf)
 
 		// add project to unselected queue if this is the first dep on it -
