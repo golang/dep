@@ -819,7 +819,7 @@ func (s *solver) selectVersion(pa ProjectAtom) {
 	s.unsel.remove(pa.Ident)
 	s.sel.projects = append(s.sel.projects, pa)
 
-	deps, err := s.getDependenciesOf(pa)
+	deps, err := s.getImportsAndConstraintsOf(atomWithPackages{atom: pa})
 	if err != nil {
 		// if we're choosing a package that has errors getting its deps, there's
 		// a bigger problem
@@ -828,12 +828,11 @@ func (s *solver) selectVersion(pa ProjectAtom) {
 	}
 
 	for _, dep := range deps {
-		siblingsAndSelf := append(s.sel.getDependenciesOn(dep.Ident), Dependency{Depender: pa, Dep: completeDep{ProjectDep: dep}})
-		s.sel.setDependenciesOn(dep.Ident, siblingsAndSelf)
+		s.sel.pushDep(Dependency{Depender: pa, Dep: dep})
 
 		// add project to unselected queue if this is the first dep on it -
 		// otherwise it's already in there, or been selected
-		if len(siblingsAndSelf) == 1 {
+		if s.sel.depperCount(dep.Ident) == 1 {
 			s.names[dep.Ident.LocalName] = dep.Ident.netName()
 			heap.Push(s.unsel, dep.Ident)
 		}
