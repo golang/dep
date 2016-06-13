@@ -14,7 +14,8 @@ func (s *solver) satisfiable(pa ProjectAtom) error {
 		return err
 	}
 
-	deps, err := s.getDependenciesOf(pa)
+	//deps, err := s.getDependenciesOf(pa)
+	deps, err := s.getImportsAndConstraintsOf(atomWithPackages{atom: pa})
 	if err != nil {
 		// An err here would be from the package fetcher; pass it straight back
 		return err
@@ -67,7 +68,8 @@ func (s *solver) checkAtomAllowable(pa ProjectAtom) error {
 
 // checkDepsConstraintsAllowable checks that the constraints of an atom on a
 // given dep would not result in UNSAT.
-func (s *solver) checkDepsConstraintsAllowable(pa ProjectAtom, dep ProjectDep) error {
+func (s *solver) checkDepsConstraintsAllowable(pa ProjectAtom, cdep completeDep) error {
+	dep := cdep.ProjectDep
 	constraint := s.sel.getConstraint(dep.Ident)
 	// Ensure the constraint expressed by the dep has at least some possible
 	// intersection with the intersection of existing constraints.
@@ -89,7 +91,7 @@ func (s *solver) checkDepsConstraintsAllowable(pa ProjectAtom, dep ProjectDep) e
 	}
 
 	err := &disjointConstraintFailure{
-		goal:      Dependency{Depender: pa, Dep: dep},
+		goal:      Dependency{Depender: pa, Dep: cdep},
 		failsib:   failsib,
 		nofailsib: nofailsib,
 		c:         constraint,
@@ -101,13 +103,14 @@ func (s *solver) checkDepsConstraintsAllowable(pa ProjectAtom, dep ProjectDep) e
 // checkDepsDisallowsSelected ensures that an atom's constraints on a particular
 // dep are not incompatible with the version of that dep that's already been
 // selected.
-func (s *solver) checkDepsDisallowsSelected(pa ProjectAtom, dep ProjectDep) error {
+func (s *solver) checkDepsDisallowsSelected(pa ProjectAtom, cdep completeDep) error {
+	dep := cdep.ProjectDep
 	selected, exists := s.sel.selected(dep.Ident)
 	if exists && !s.b.matches(dep.Ident, dep.Constraint, selected.Version) {
 		s.fail(dep.Ident)
 
 		err := &constraintNotAllowedFailure{
-			goal: Dependency{Depender: pa, Dep: dep},
+			goal: Dependency{Depender: pa, Dep: cdep},
 			v:    selected.Version,
 		}
 		s.logSolve(err)
@@ -123,7 +126,8 @@ func (s *solver) checkDepsDisallowsSelected(pa ProjectAtom, dep ProjectDep) erro
 // In other words, this ensures that the solver never simultaneously selects two
 // identifiers with the same local name, but that disagree about where their
 // network source is.
-func (s *solver) checkIdentMatches(pa ProjectAtom, dep ProjectDep) error {
+func (s *solver) checkIdentMatches(pa ProjectAtom, cdep completeDep) error {
+	dep := cdep.ProjectDep
 	if cur, exists := s.names[dep.Ident.LocalName]; exists {
 		if cur != dep.Ident.netName() {
 			deps := s.sel.getDependenciesOn(pa.Ident)
