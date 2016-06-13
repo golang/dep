@@ -334,26 +334,22 @@ func (s *solver) getImportsAndConstraintsOf(pa ProjectAtom) ([]completeDep, erro
 		panic("Should never need to recheck imports/constraints from root during solve")
 	}
 
-	// Otherwise, work through the source manager to get project info and
-	// static analysis information.
+	// Work through the source manager to get project info and static analysis
+	// information.
 	info, err := s.b.getProjectInfo(pa)
 	if err != nil {
 		return nil, err
 	}
-
-	deps := info.GetDependencies()
-	// TODO add overrides here...if we impl the concept (which we should)
 
 	allex, err := s.b.externalReach(pa.Ident, pa.Version)
 	if err != nil {
 		return nil, err
 	}
 
-	// TODO impl this
 	curp := s.sel.getSelectedPackagesIn(pa.Ident)
 	// Use a map to dedupe the unique external packages
 	exmap := make(map[string]struct{})
-	for _, pkg := range curp {
+	for pkg := range curp {
 		if expkgs, exists := allex[pkg]; !exists {
 			// It should be impossible for there to be a selected package
 			// that's not in the external reach map; such a condition should
@@ -374,6 +370,9 @@ func (s *solver) getImportsAndConstraintsOf(pa ProjectAtom) ([]completeDep, erro
 		reach[k] = pkg
 		k++
 	}
+
+	deps := info.GetDependencies()
+	// TODO add overrides here...if we impl the concept (which we should)
 
 	return intersectConstraintsWithImports(deps, reach)
 }
