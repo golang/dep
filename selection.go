@@ -24,8 +24,28 @@ func (s *selection) popDep(id ProjectIdentifier) (dep Dependency) {
 	return dep
 }
 
+func (s *selection) depperCount(id ProjectIdentifier) int {
+	return len(s.deps[id])
+}
+
 func (s *selection) setDependenciesOn(id ProjectIdentifier, deps []Dependency) {
 	s.deps[id] = deps
+}
+
+// Compute a unique list of the currently selected packages within a given
+// ProjectIdentifier.
+func (s *selection) getSelectedPackagesIn(id ProjectIdentifier) map[string]struct{} {
+	// TODO this is horribly inefficient to do on the fly; we need a method to
+	// precompute it on pushing a new dep, and preferably with an immut
+	// structure so that we can pop with zero cost.
+	uniq := make(map[string]struct{})
+	for _, dep := range s.deps[id] {
+		for _, pkg := range dep.Dep.pl {
+			uniq[pkg] = struct{}{}
+		}
+	}
+
+	return uniq
 }
 
 func (s *selection) getConstraint(id ProjectIdentifier) Constraint {
