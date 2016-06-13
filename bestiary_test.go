@@ -207,6 +207,9 @@ func computeReachMap(ds []depspec) map[pident][]string {
 			v: d.v,
 		}
 
+		// Ensure we capture things even with no deps
+		rm[id] = nil
+
 		for _, dep := range d.deps {
 			rm[id] = append(rm[id], string(dep.Ident.LocalName))
 		}
@@ -864,7 +867,7 @@ func (sm *depspecSourceManager) ExternalReach(n ProjectName, v Version) (map[str
 
 		return m, nil
 	}
-	return nil, fmt.Errorf("No reach data for %q at version %q", n, v)
+	return nil, fmt.Errorf("No reach data for %s at version %s", n, v)
 }
 
 func (sm *depspecSourceManager) ListExternal(n ProjectName, v Version) ([]string, error) {
@@ -873,7 +876,7 @@ func (sm *depspecSourceManager) ListExternal(n ProjectName, v Version) ([]string
 	if r, exists := sm.rm[id]; exists {
 		return r, nil
 	}
-	return nil, fmt.Errorf("No reach data for %q at version %q", n, v)
+	return nil, fmt.Errorf("No reach data for %s at version %s", n, v)
 }
 
 func (sm *depspecSourceManager) ListVersions(name ProjectName) (pi []Version, err error) {

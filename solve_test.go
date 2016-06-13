@@ -75,6 +75,7 @@ func fixtureSolveBasicChecks(fix fixture, res Result, err error, t *testing.T) (
 	if err != nil {
 		if len(fix.errp) == 0 {
 			t.Errorf("(fixture: %q) Solver failed; error was type %T, text: %q", fix.n, err, err)
+			return res, err
 		}
 
 		switch fail := err.(type) {
@@ -198,6 +199,7 @@ func TestRootLockNoVersionPairMatching(t *testing.T) {
 	pd := fix.ds[0].deps[0]
 	pd.Constraint = Revision("foorev")
 	fix.ds[0].deps[0] = pd
+	fix.rm = computeReachMap(fix.ds)
 
 	sm := newdepspecSM(fix.ds, fix.rm)
 
