@@ -327,28 +327,37 @@ func (s *solver) selectRoot() error {
 	return nil
 }
 
-func (s *solver) getImportsAndConstraintsOf(pa ProjectAtom) ([]completeDep, error) {
+func (s *solver) getImportsAndConstraintsOf(a atomWithPackages) ([]completeDep, error) {
 	var err error
 
-	if s.rm.Name() == pa.Ident.LocalName {
+	if s.rm.Name() == a.atom.Ident.LocalName {
 		panic("Should never need to recheck imports/constraints from root during solve")
 	}
 
 	// Work through the source manager to get project info and static analysis
 	// information.
-	info, err := s.b.getProjectInfo(pa)
+	info, err := s.b.getProjectInfo(a.atom)
 	if err != nil {
 		return nil, err
 	}
 
-	allex, err := s.b.externalReach(pa.Ident, pa.Version)
+	allex, err := s.b.externalReach(a.atom.Ident, a.atom.Version)
 	if err != nil {
 		return nil, err
 	}
 
-	curp := s.sel.getSelectedPackagesIn(pa.Ident)
 	// Use a map to dedupe the unique external packages
 	exmap := make(map[string]struct{})
+	// Add the packages explicitly listed in the atom to the reach list
+	for _, pkg := range a.pl {
+		exmap[pkg] = struct{}{}
+	}
+
+	// Now, add in the ones we already knew about
+	// FIXME this is almost certainly wrong, as it is jumping the gap between
+	// projects that have actually been selected, and the imports and
+	// constraints expressed by those projects.
+	curp := s.sel.getSelectedPackagesIn(a.atom.Ident)
 	for pkg := range curp {
 		if expkgs, exists := allex[pkg]; !exists {
 			// It should be impossible for there to be a selected package
@@ -775,7 +784,7 @@ func (s *solver) selectAtomWithPackages(a atomWithPackages) {
 		s.sel.projects = append(s.sel.projects)
 	}
 
-	deps, err := s.getImportsAndConstraintsOf(a.atom)
+	deps, err := s.getImportsAndConstraintsOf(a)
 	if err != nil {
 		// if we're choosing a package that has errors getting its deps, there's
 		// a bigger problem
@@ -958,7 +967,7 @@ func intersectConstraintsWithImports(deps []ProjectDep, reach []string) ([]compl
 
 		// Look for a prefix match; it'll be the root project/repo containing
 		// the reached package
-		if k, idep, match := xt.LongestPrefix(rp); match { //&& strings.HasPrefix(rp, k) {
+		if _, idep, match := xt.LongestPrefix(rp); match { //&& strings.HasPrefix(rp, k) {
 			// Valid match found. Put it in the dmap, either creating a new
 			// completeDep or appending it to the existing one for this base
 			// project/prefix.
