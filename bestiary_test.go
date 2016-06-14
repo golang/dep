@@ -922,7 +922,14 @@ type depspecBridge struct {
 func (b *depspecBridge) computeRootReach(path string) ([]string, error) {
 	// This only gets called for the root project, so grab that one off the test
 	// source manager
-	dsm := b.sm.(*depspecSourceManager)
+
+	// Ugh
+	var dsm *depspecSourceManager
+	var ok bool
+	if dsm, ok = b.sm.(*depspecSourceManager); !ok {
+		dsm = &(b.sm.(*bmSourceManager).depspecSourceManager)
+	}
+
 	root := dsm.specs[0]
 	if string(root.n) != path {
 		return nil, fmt.Errorf("Expected only root project %q to computeRootReach(), got %q", root.n, path)
@@ -933,8 +940,13 @@ func (b *depspecBridge) computeRootReach(path string) ([]string, error) {
 
 // override verifyRoot() on bridge to prevent any filesystem interaction
 func (b *depspecBridge) verifyRoot(path string) error {
-	// Do error if it's not checking what we think the root is, though
-	dsm := b.sm.(*depspecSourceManager)
+	// Ugh
+	var dsm *depspecSourceManager
+	var ok bool
+	if dsm, ok = b.sm.(*depspecSourceManager); !ok {
+		dsm = &(b.sm.(*bmSourceManager).depspecSourceManager)
+	}
+
 	root := dsm.specs[0]
 	if string(root.n) != path {
 		return fmt.Errorf("Expected only root project %q to computeRootReach(), got %q", root.n, path)

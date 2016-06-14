@@ -180,3 +180,59 @@ type bimodalFixture struct {
 	// request up/downgrade to all projects
 	changeall bool
 }
+
+type bmSourceManager struct {
+	depspecSourceManager
+}
+
+var _ SourceManager = &bmSourceManager{}
+
+func newbmSM(ds []depspec) *bmSourceManager {
+	sm := &bmSourceManager{}
+	sm.specs = ds
+	sm.rm = computeBimodalExternalMap(ds)
+
+	return sm
+}
+
+func (sm *bmSourceManager) ExternalReach(n ProjectName, v Version) (map[string][]string, error) {
+	for _, ds := range sm.specs {
+		if ds.n == n && v.Matches(ds.v) {
+			rm := make(map[string][]string)
+			for _, pkg := range ds.pkgs {
+				rm[pkg.path] = pkg.imports
+			}
+
+			return rm, nil
+		}
+	}
+
+	// TODO proper solver errs
+	return nil, fmt.Errorf("No reach data for %s at version %s", n, v)
+}
+
+func computeBimodalExternalMap(ds []depspec) map[pident][]string {
+	rm := make(map[pident][]string)
+
+	for _, d := range ds {
+		exmap := make(map[string]struct{})
+
+		for _, pkg := range d.pkgs {
+			for _, ex := range pkg.imports {
+				exmap[ex] = struct{}{}
+			}
+		}
+
+		var list []string
+		for ex := range exmap {
+			list = append(list, ex)
+		}
+		id := pident{
+			n: d.n,
+			v: d.v,
+		}
+		rm[id] = list
+	}
+
+	return rm
+}

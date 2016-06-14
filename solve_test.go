@@ -38,10 +38,13 @@ func fixSolve(o SolveOpts, sm SourceManager) (Result, error) {
 	return s.run()
 }
 
+// Test all the basic table fixtures.
+//
+// Or, just the one named in the fix arg.
 func TestBasicSolves(t *testing.T) {
 	for _, fix := range basicFixtures {
 		if fixtorun == "" || fixtorun == fix.n {
-			solveAndBasicChecks(fix, t)
+			solveBasicsAndCheck(fix, t)
 			if testing.Verbose() {
 				// insert a line break between tests
 				stderrlog.Println("")
@@ -50,7 +53,7 @@ func TestBasicSolves(t *testing.T) {
 	}
 }
 
-func solveAndBasicChecks(fix basicFixture, t *testing.T) (res Result, err error) {
+func solveBasicsAndCheck(fix basicFixture, t *testing.T) (res Result, err error) {
 	sm := newdepspecSM(fix.ds, fix.rm)
 
 	o := SolveOpts{
@@ -69,6 +72,43 @@ func solveAndBasicChecks(fix basicFixture, t *testing.T) (res Result, err error)
 	res, err = fixSolve(o, sm)
 
 	return fixtureSolveBasicChecks(fix, res, err, t)
+}
+
+// Test all the bimodal table fixtures.
+//
+// Or, just the one named in the fix arg.
+func TestBimodalSolves(t *testing.T) {
+	for _, fix := range bimodalFixtures {
+		if fixtorun == "" || fixtorun == fix.n {
+			solveBimodalAndCheck(fix, t)
+			if testing.Verbose() {
+				// insert a line break between tests
+				stderrlog.Println("")
+			}
+		}
+	}
+}
+
+func solveBimodalAndCheck(fix bimodalFixture, t *testing.T) (res Result, err error) {
+	sm := newbmSM(fix.ds)
+
+	o := SolveOpts{
+		Root:      string(fix.ds[0].Name()),
+		N:         ProjectName(fix.ds[0].Name()),
+		M:         fix.ds[0],
+		L:         dummyLock{},
+		Downgrade: fix.downgrade,
+		ChangeAll: fix.changeall,
+	}
+
+	if fix.l != nil {
+		o.L = fix.l
+	}
+
+	res, err = fixSolve(o, sm)
+
+	//return fixtureSolveBasicChecks(fix, res, err, t)
+	return res, err
 }
 
 func fixtureSolveBasicChecks(fix basicFixture, res Result, err error, t *testing.T) (Result, error) {
