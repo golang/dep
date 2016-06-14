@@ -118,6 +118,7 @@ type depspec struct {
 	v       Version
 	deps    []ProjectDep
 	devdeps []ProjectDep
+	pkgs    []tpkg
 }
 
 // dsv - "depspec semver" (make a semver depspec)
@@ -961,6 +962,8 @@ func (ds depspec) GetDevDependencies() []ProjectDep {
 func (ds depspec) Name() ProjectName {
 	return ds.n
 }
+
+func (depspec) _bmelem() {}
 
 type fixLock []LockedProject
 
