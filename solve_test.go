@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"sort"
 	"strings"
 	"testing"
 )
@@ -81,9 +82,20 @@ func solveBasicsAndCheck(fix basicFixture, t *testing.T) (res Result, err error)
 //
 // Or, just the one named in the fix arg.
 func TestBimodalSolves(t *testing.T) {
-	for _, fix := range bimodalFixtures {
-		if fixtorun == "" || fixtorun == fix.n {
+	if fixtorun != "" {
+		if fix, exists := bimodalFixtures[fixtorun]; exists {
 			solveBimodalAndCheck(fix, t)
+		}
+	} else {
+		// sort them by their keys so we get stable output
+		var names []string
+		for n := range bimodalFixtures {
+			names = append(names, n)
+		}
+
+		sort.Strings(names)
+		for _, n := range names {
+			solveBimodalAndCheck(bimodalFixtures[n], t)
 			if testing.Verbose() {
 				// insert a line break between tests
 				stderrlog.Println("")

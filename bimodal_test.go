@@ -136,12 +136,6 @@ type tpkg struct {
 	imports []string
 }
 
-type bmelem interface {
-	_bmelem()
-}
-
-func (p tpkg) _bmelem() {}
-
 type bimodalFixture struct {
 	// name of this fixture datum
 	n string

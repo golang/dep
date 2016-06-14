@@ -1018,8 +1018,6 @@ func (ds depspec) Name() ProjectName {
 	return ds.n
 }
 
-func (depspec) _bmelem() {}
-
 type fixLock []LockedProject
 
 func (fixLock) SolverVersion() string {
