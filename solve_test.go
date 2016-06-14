@@ -39,7 +39,7 @@ func fixSolve(o SolveOpts, sm SourceManager) (Result, error) {
 }
 
 func TestBasicSolves(t *testing.T) {
-	for _, fix := range fixtures {
+	for _, fix := range basicFixtures {
 		if fixtorun == "" || fixtorun == fix.n {
 			solveAndBasicChecks(fix, t)
 			if testing.Verbose() {
@@ -50,7 +50,7 @@ func TestBasicSolves(t *testing.T) {
 	}
 }
 
-func solveAndBasicChecks(fix fixture, t *testing.T) (res Result, err error) {
+func solveAndBasicChecks(fix basicFixture, t *testing.T) (res Result, err error) {
 	sm := newdepspecSM(fix.ds, fix.rm)
 
 	o := SolveOpts{
@@ -71,7 +71,7 @@ func solveAndBasicChecks(fix fixture, t *testing.T) (res Result, err error) {
 	return fixtureSolveBasicChecks(fix, res, err, t)
 }
 
-func fixtureSolveBasicChecks(fix fixture, res Result, err error, t *testing.T) (Result, error) {
+func fixtureSolveBasicChecks(fix basicFixture, res Result, err error, t *testing.T) (Result, error) {
 	if err != nil {
 		if len(fix.errp) == 0 {
 			t.Errorf("(fixture: %q) Solver failed; error was type %T, text: %q", fix.n, err, err)
@@ -176,7 +176,7 @@ func fixtureSolveBasicChecks(fix fixture, res Result, err error, t *testing.T) (
 // requirement to a mutable lock automagically is a bad direction that could
 // produce weird side effects.
 func TestRootLockNoVersionPairMatching(t *testing.T) {
-	fix := fixture{
+	fix := basicFixture{
 		n: "does not pair bare revs in manifest with unpaired lock version",
 		ds: []depspec{
 			dsv("root 0.0.0", "foo *"), // foo's constraint rewritten below to foorev
@@ -247,7 +247,7 @@ func getFailureCausingProjects(err error) (projs []string) {
 }
 
 func TestBadSolveOpts(t *testing.T) {
-	sm := newdepspecSM(fixtures[0].ds, fixtures[0].rm)
+	sm := newdepspecSM(basicFixtures[0].ds, basicFixtures[0].rm)
 
 	o := SolveOpts{}
 	_, err := fixSolve(o, sm)
@@ -255,7 +255,7 @@ func TestBadSolveOpts(t *testing.T) {
 		t.Errorf("Should have errored on missing manifest")
 	}
 
-	p, _ := sm.GetProjectInfo(fixtures[0].ds[0].n, fixtures[0].ds[0].v)
+	p, _ := sm.GetProjectInfo(basicFixtures[0].ds[0].n, basicFixtures[0].ds[0].v)
 	o.M = p.Manifest
 	_, err = fixSolve(o, sm)
 	if err == nil {

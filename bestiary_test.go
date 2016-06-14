@@ -230,7 +230,7 @@ type pident struct {
 	v Version
 }
 
-type fixture struct {
+type basicFixture struct {
 	// name of this fixture datum
 	n string
 	// depspecs. always treat first as root
@@ -251,7 +251,7 @@ type fixture struct {
 	changeall bool
 }
 
-var fixtures = []fixture{
+var basicFixtures = []basicFixture{
 	// basic fixtures
 	{
 		n: "no dependencies",
@@ -799,7 +799,7 @@ func init() {
 	// of bar depends on a baz with the same minor version. There is only one
 	// version of baz, 0.0.0, so only older versions of foo and bar will
 	// satisfy it.
-	fix := fixture{
+	fix := basicFixture{
 		n: "complex backtrack",
 		ds: []depspec{
 			dsv("root 0.0.0", "foo *", "bar *"),
@@ -820,11 +820,11 @@ func init() {
 		}
 	}
 
-	fixtures = append(fixtures, fix)
+	basicFixtures = append(basicFixtures, fix)
 
-	for k, f := range fixtures {
+	for k, f := range basicFixtures {
 		f.rm = computeReachMap(f.ds)
-		fixtures[k] = f
+		basicFixtures[k] = f
 	}
 }
 

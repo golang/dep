@@ -7,7 +7,7 @@ import (
 )
 
 func TestHashInputs(t *testing.T) {
-	fix := fixtures[2]
+	fix := basicFixtures[2]
 
 	opts := SolveOpts{
 		// TODO path is ignored right now, but we'll have to deal with that once
