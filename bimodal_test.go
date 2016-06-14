@@ -93,6 +93,83 @@ var bimodalFixtures = map[string]bimodalFixture{
 			"b 1.0.0",
 		),
 	},
+	// Constraints apply only if the project that declares them has a
+	// reachable import
+	"constraints activated by import": {
+		ds: []depspec{
+			dsp(dsv("root 0.0.0", "b 1.0.0"),
+				pkg("root", "root/foo"),
+				pkg("root/foo", "a"),
+			),
+			dsp(dsv("a 1.0.0"),
+				pkg("a", "b"),
+			),
+			dsp(dsv("b 1.0.0"),
+				pkg("b"),
+			),
+			dsp(dsv("b 1.1.0"),
+				pkg("b"),
+			),
+		},
+		r: mkresults(
+			"a 1.0.0",
+			"b 1.1.0",
+		),
+	},
+	// Import jump is in a dep, and points to a transitive dep - but only in not
+	// the first version we try
+	"transitive bm-add on older version": {
+		ds: []depspec{
+			dsp(dsv("root 0.0.0", "a ~1.0.0"),
+				pkg("root", "root/foo"),
+				pkg("root/foo", "a"),
+			),
+			dsp(dsv("a 1.0.0"),
+				pkg("a", "b"),
+			),
+			dsp(dsv("a 1.1.0"),
+				pkg("a"),
+			),
+			dsp(dsv("b 1.0.0"),
+				pkg("b"),
+			),
+		},
+		r: mkresults(
+			"a 1.0.0",
+			"b 1.0.0",
+		),
+	},
+	// Import jump is in a dep, and points to a transitive dep - but will only
+	// get there via backtracking
+	"backtrack to dep on bm-add": {
+		ds: []depspec{
+			dsp(dsv("root 0.0.0"),
+				pkg("root", "root/foo"),
+				pkg("root/foo", "a", "b"),
+			),
+			dsp(dsv("a 1.0.0"),
+				pkg("a", "c"),
+			),
+			dsp(dsv("a 1.1.0"),
+				pkg("a"),
+			),
+			// Include two versions of b, otherwise it'll be selected first
+			dsp(dsv("b 0.9.0"),
+				pkg("b", "c"),
+			),
+			dsp(dsv("b 1.0.0"),
+				pkg("b", "c"),
+			),
+			dsp(dsv("c 1.0.0", "a 1.0.0"),
+				pkg("c", "a"),
+			),
+		},
+		r: mkresults(
+			"a 1.0.0",
+			"b 1.0.0",
+			"c 1.0.0",
+		),
+	},
 	// Import jump is in a dep subpkg, and points to a transitive dep
 	"transitive subpkg bm-add": {
 		ds: []depspec{
@@ -103,6 +180,30 @@ var bimodalFixtures = map[string]bimodalFixture{
 			dsp(dsv("a 1.0.0"),
 				pkg("a", "a/bar"),
 				pkg("a/bar", "b"),
+			),
+			dsp(dsv("b 1.0.0"),
+				pkg("b"),
+			),
+		},
+		r: mkresults(
+			"a 1.0.0",
+			"b 1.0.0",
+		),
+	},
+	// Import jump is in a dep subpkg, pointing to a transitive dep, but only in
+	// not the first version we try
+	"transitive subpkg bm-add on older version": {
+		ds: []depspec{
+			dsp(dsv("root 0.0.0", "a ~1.0.0"),
+				pkg("root", "root/foo"),
+				pkg("root/foo", "a"),
+			),
+			dsp(dsv("a 1.0.0"),
+				pkg("a", "a/bar"),
+				pkg("a/bar", "b"),
+			),
+			dsp(dsv("a 1.1.0"),
+				pkg("a", "a/bar"),
 			),
 			dsp(dsv("b 1.0.0"),
 				pkg("b"),
@@ -126,6 +227,34 @@ var bimodalFixtures = map[string]bimodalFixture{
 			),
 		},
 		r: mkresults(),
+	},
+	// Transitive deps from one project (a) get incrementally included as other
+	// deps incorporate its various packages.
+	"multi-stage pkg incorporation": {
+		ds: []depspec{
+			dsp(dsv("root 0.0.0"),
+				pkg("root", "a", "d"),
+			),
+			dsp(dsv("a 1.0.0"),
+				pkg("a", "b"),
+				pkg("a/second", "c"),
+			),
+			dsp(dsv("b 2.0.0"),
+				pkg("b"),
+			),
+			dsp(dsv("c 1.2.0"),
+				pkg("c"),
+			),
+			dsp(dsv("d 1.0.0"),
+				pkg("d", "a/second"),
+			),
+		},
+		r: mkresults(
+			"a 1.0.0",
+			"b 2.0.0",
+			"c 1.2.0",
+			"d 1.0.0",
+		),
 	},
 }
 
