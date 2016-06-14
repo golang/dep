@@ -296,40 +296,39 @@ func TestBadSolveOpts(t *testing.T) {
 	sm := newdepspecSM(basicFixtures[0].ds, basicFixtures[0].rm)
 
 	o := SolveOpts{}
-	_, err := fixSolve(o, sm)
+	_, err := prepareSolver(o, sm)
 	if err == nil {
 		t.Errorf("Should have errored on missing manifest")
 	}
 
 	p, _ := sm.GetProjectInfo(basicFixtures[0].ds[0].n, basicFixtures[0].ds[0].v)
 	o.M = p.Manifest
-	_, err = fixSolve(o, sm)
+	_, err = prepareSolver(o, sm)
 	if err == nil {
 		t.Errorf("Should have errored on empty root")
 	}
 
 	o.Root = "root"
-	_, err = fixSolve(o, sm)
+	_, err = prepareSolver(o, sm)
 	if err == nil {
 		t.Errorf("Should have errored on empty name")
 	}
 
 	o.N = "root"
-	_, err = fixSolve(o, sm)
+	_, err = prepareSolver(o, sm)
 	if err != nil {
 		t.Errorf("Basic conditions satisfied, solve should have gone through, err was %s", err)
 	}
 
 	o.Trace = true
-	_, err = fixSolve(o, sm)
+	_, err = prepareSolver(o, sm)
 	if err == nil {
 		t.Errorf("Should have errored on trace with no logger")
 	}
 
 	o.TraceLogger = log.New(ioutil.Discard, "", 0)
-	_, err = fixSolve(o, sm)
+	_, err = prepareSolver(o, sm)
 	if err != nil {
 		t.Errorf("Basic conditions re-satisfied, solve should have gone through, err was %s", err)
 	}
-
 }
