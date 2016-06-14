@@ -2,6 +2,7 @@ package vsolver
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/armon/go-radix"
 )
@@ -55,7 +56,7 @@ func mkbmu(list ...bmelem) (ret []depspec) {
 	val, _ := xt.Get(rootname)
 	ret = append(ret, val.(depspec))
 	for _, pi := range xt.ToMap() {
-		if p, ok := pi.(depspec); ok {
+		if p, ok := pi.(depspec); ok && string(p.n) != rootname {
 			ret = append(ret, p)
 		}
 	}
