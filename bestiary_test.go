@@ -863,7 +863,13 @@ type depspecSourceManager struct {
 	sortup bool
 }
 
-var _ SourceManager = &depspecSourceManager{}
+type fixSM interface {
+	SourceManager
+	rootSpec() depspec
+	allSpecs() []depspec
+}
+
+var _ fixSM = &depspecSourceManager{}
 
 func newdepspecSM(ds []depspec, rm map[pident][]string) *depspecSourceManager {
 	return &depspecSourceManager{
@@ -942,6 +948,14 @@ func (sm *depspecSourceManager) ExportProject(n ProjectName, v Version, to strin
 	return fmt.Errorf("dummy sm doesn't support exporting")
 }
 
+func (sm *depspecSourceManager) rootSpec() depspec {
+	return sm.specs[0]
+}
+
+func (sm *depspecSourceManager) allSpecs() []depspec {
+	return sm.specs
+}
+
 type depspecBridge struct {
 	*bridge
 }
@@ -950,15 +964,8 @@ type depspecBridge struct {
 func (b *depspecBridge) computeRootReach(path string) ([]string, error) {
 	// This only gets called for the root project, so grab that one off the test
 	// source manager
-
-	// Ugh
-	var dsm *depspecSourceManager
-	var ok bool
-	if dsm, ok = b.sm.(*depspecSourceManager); !ok {
-		dsm = &(b.sm.(*bmSourceManager).depspecSourceManager)
-	}
-
-	root := dsm.specs[0]
+	dsm := b.sm.(fixSM)
+	root := dsm.rootSpec()
 	if string(root.n) != path {
 		return nil, fmt.Errorf("Expected only root project %q to computeRootReach(), got %q", root.n, path)
 	}
@@ -968,19 +975,27 @@ func (b *depspecBridge) computeRootReach(path string) ([]string, error) {
 
 // override verifyRoot() on bridge to prevent any filesystem interaction
 func (b *depspecBridge) verifyRoot(path string) error {
-	// Ugh
-	var dsm *depspecSourceManager
-	var ok bool
-	if dsm, ok = b.sm.(*depspecSourceManager); !ok {
-		dsm = &(b.sm.(*bmSourceManager).depspecSourceManager)
-	}
-
-	root := dsm.specs[0]
+	root := b.sm.(fixSM).rootSpec()
 	if string(root.n) != path {
 		return fmt.Errorf("Expected only root project %q to computeRootReach(), got %q", root.n, path)
 	}
 
 	return nil
+}
+
+// override deduceRemoteRepo on bridge to make all our pkg/project mappings work
+// as expected
+func (b *depspecBridge) deduceRemoteRepo(path string) (*remoteRepo, error) {
+	for _, ds := range b.sm.(fixSM).allSpecs() {
+		n := string(ds.n)
+		if strings.HasPrefix(path, n) {
+			return &remoteRepo{
+				Base:   n,
+				RelPkg: strings.TrimPrefix(path, n+"/"),
+			}, nil
+		}
+	}
+	return nil, fmt.Errorf("Could not find %s, or any parent, in list of known fixtures")
 }
 
 // enforce interfaces

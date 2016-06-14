@@ -311,7 +311,7 @@ func (s *solver) selectRoot() error {
 		return err
 	}
 
-	deps, err := intersectConstraintsWithImports(mdeps, reach)
+	deps, err := s.intersectConstraintsWithImports(mdeps, reach)
 	if err != nil {
 		// TODO this could well happen; handle it with a more graceful error
 		panic(fmt.Sprintf("shouldn't be possible %s", err))
@@ -383,7 +383,86 @@ func (s *solver) getImportsAndConstraintsOf(a atomWithPackages) ([]completeDep, 
 	deps := info.GetDependencies()
 	// TODO add overrides here...if we impl the concept (which we should)
 
-	return intersectConstraintsWithImports(deps, reach)
+	return s.intersectConstraintsWithImports(deps, reach)
+}
+
+// intersectConstraintsWithImports takes a list of constraints and a list of
+// externally reached packages, and creates a []completeDep that is guaranteed
+// to include all packages named by import reach, using constraints where they
+// are available, or Any() where they are not.
+func (s *solver) intersectConstraintsWithImports(deps []ProjectDep, reach []string) ([]completeDep, error) {
+	// Create a radix tree with all the projects we know from the manifest
+	// TODO make this smarter once we allow non-root inputs as 'projects'
+	xt := radix.New()
+	for _, dep := range deps {
+		xt.Insert(string(dep.Ident.LocalName), dep)
+	}
+
+	// Step through the reached packages; if they have prefix matches in
+	// the trie, just assume that's a correct correspondence.
+	// TODO could this be a bad assumption...?
+	dmap := make(map[ProjectName]completeDep)
+	for _, rp := range reach {
+		// If it's a stdlib package, skip it.
+		// TODO this just hardcodes us to the packages in tip - should we
+		// have go version magic here, too?
+		if _, exists := stdlib[rp]; exists {
+			continue
+		}
+
+		// Look for a prefix match; it'll be the root project/repo containing
+		// the reached package
+		if _, idep, match := xt.LongestPrefix(rp); match { //&& strings.HasPrefix(rp, k) {
+			// Valid match found. Put it in the dmap, either creating a new
+			// completeDep or appending it to the existing one for this base
+			// project/prefix.
+			dep := idep.(ProjectDep)
+			if cdep, exists := dmap[dep.Ident.LocalName]; exists {
+				cdep.pl = append(cdep.pl, rp)
+				dmap[dep.Ident.LocalName] = cdep
+			} else {
+				dmap[dep.Ident.LocalName] = completeDep{
+					ProjectDep: dep,
+					pl:         []string{rp},
+				}
+			}
+			continue
+		}
+
+		// No match. Let the SourceManager try to figure out the root
+		root, err := s.b.deduceRemoteRepo(rp)
+		if err != nil {
+			// Nothing we can do if we can't suss out a root
+			return nil, err
+		}
+
+		// Still no matches; make a new completeDep with an open constraint
+		pd := ProjectDep{
+			Ident: ProjectIdentifier{
+				LocalName:   ProjectName(root.Base),
+				NetworkName: root.Base,
+			},
+			Constraint: Any(),
+		}
+		// Insert the pd into the trie so that further deps from this
+		// project get caught by the prefix search
+		xt.Insert(root.Base, pd)
+		// And also put the complete dep into the dmap
+		dmap[ProjectName(root.Base)] = completeDep{
+			ProjectDep: pd,
+			pl:         []string{rp},
+		}
+	}
+
+	// Dump all the deps from the map into the expected return slice
+	cdeps := make([]completeDep, len(dmap))
+	k := 0
+	for _, cdep := range dmap {
+		cdeps[k] = cdep
+		k++
+	}
+
+	return cdeps, nil
 }
 
 func (s *solver) createVersionQueue(id ProjectIdentifier) (*versionQueue, error) {
@@ -947,79 +1026,4 @@ func pa2lp(pa ProjectAtom) LockedProject {
 	}
 
 	return lp
-}
-
-func intersectConstraintsWithImports(deps []ProjectDep, reach []string) ([]completeDep, error) {
-	// Create a radix tree with all the projects we know from the manifest
-	// TODO make this smarter once we allow non-root inputs as 'projects'
-	xt := radix.New()
-	for _, dep := range deps {
-		xt.Insert(string(dep.Ident.LocalName), dep)
-	}
-
-	// Step through the reached packages; if they have prefix matches in
-	// the trie, just assume that's a correct correspondence.
-	// TODO could this be a bad assumption...?
-	dmap := make(map[ProjectName]completeDep)
-	for _, rp := range reach {
-		// If it's a stdlib package, skip it.
-		// TODO this just hardcodes us to the packages in tip - should we
-		// have go version magic here, too?
-		if _, exists := stdlib[rp]; exists {
-			continue
-		}
-
-		// Look for a prefix match; it'll be the root project/repo containing
-		// the reached package
-		if _, idep, match := xt.LongestPrefix(rp); match { //&& strings.HasPrefix(rp, k) {
-			// Valid match found. Put it in the dmap, either creating a new
-			// completeDep or appending it to the existing one for this base
-			// project/prefix.
-			dep := idep.(ProjectDep)
-			if cdep, exists := dmap[dep.Ident.LocalName]; exists {
-				cdep.pl = append(cdep.pl, rp)
-				dmap[dep.Ident.LocalName] = cdep
-			} else {
-				dmap[dep.Ident.LocalName] = completeDep{
-					ProjectDep: dep,
-					pl:         []string{rp},
-				}
-			}
-			continue
-		}
-
-		// No match. Let the SourceManager try to figure out the root
-		root, err := deduceRemoteRepo(rp)
-		if err != nil {
-			// Nothing we can do if we can't suss out a root
-			return nil, err
-		}
-
-		// Still no matches; make a new completeDep with an open constraint
-		pd := ProjectDep{
-			Ident: ProjectIdentifier{
-				LocalName:   ProjectName(root.Base),
-				NetworkName: root.Base,
-			},
-			Constraint: Any(),
-		}
-		// Insert the pd into the trie so that further deps from this
-		// project get caught by the prefix search
-		xt.Insert(root.Base, pd)
-		// And also put the complete dep into the dmap
-		dmap[ProjectName(root.Base)] = completeDep{
-			ProjectDep: pd,
-			pl:         []string{rp},
-		}
-	}
-
-	// Dump all the deps from the map into the expected return slice
-	cdeps := make([]completeDep, len(dmap))
-	k := 0
-	for _, cdep := range dmap {
-		cdeps[k] = cdep
-		k++
-	}
-
-	return cdeps, nil
 }

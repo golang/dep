@@ -22,6 +22,7 @@ type sourceBridge interface {
 	listExternal(n ProjectIdentifier, v Version) ([]string, error)
 	computeRootReach(path string) ([]string, error)
 	verifyRoot(path string) error
+	deduceRemoteRepo(path string) (*remoteRepo, error)
 }
 
 func newBridge(sm SourceManager, downgrade bool) sourceBridge {
@@ -368,6 +369,12 @@ func (b *bridge) verifyRoot(path string) error {
 	}
 
 	return nil
+}
+
+// deduceRemoteRepo deduces certain network-oriented properties about an import
+// path.
+func (b *bridge) deduceRemoteRepo(path string) (*remoteRepo, error) {
+	return deduceRemoteRepo(path)
 }
 
 // versionTypeUnion represents a set of versions that are, within the scope of
