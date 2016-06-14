@@ -240,7 +240,9 @@ func computeBimodalExternalMap(ds []depspec) map[pident][]string {
 
 		for _, pkg := range d.pkgs {
 			for _, ex := range pkg.imports {
-				exmap[ex] = struct{}{}
+				if !strings.HasPrefix(ex, string(d.n)) {
+					exmap[ex] = struct{}{}
+				}
 			}
 		}
 

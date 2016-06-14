@@ -69,6 +69,9 @@ func solveBasicsAndCheck(fix basicFixture, t *testing.T) (res Result, err error)
 		o.L = fix.l
 	}
 
+	if testing.Verbose() {
+		stderrlog.Printf("[[fixture %q]]", fix.n)
+	}
 	res, err = fixSolve(o, sm)
 
 	return fixtureSolveSimpleChecks(fix, res, err, t)
@@ -105,6 +108,9 @@ func solveBimodalAndCheck(fix bimodalFixture, t *testing.T) (res Result, err err
 		o.L = fix.l
 	}
 
+	if testing.Verbose() {
+		stderrlog.Printf("[[fixture %q]]", fix.n)
+	}
 	res, err = fixSolve(o, sm)
 
 	return fixtureSolveSimpleChecks(fix, res, err, t)
