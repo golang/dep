@@ -181,6 +181,26 @@ type bimodalFixture struct {
 	changeall bool
 }
 
+func (f bimodalFixture) name() string {
+	return f.n
+}
+
+func (f bimodalFixture) specs() []depspec {
+	return f.ds
+}
+
+func (f bimodalFixture) maxTries() int {
+	return f.maxAttempts
+}
+
+func (f bimodalFixture) expectErrs() []string {
+	return f.errp
+}
+
+func (f bimodalFixture) result() map[string]Version {
+	return f.r
+}
+
 type bmSourceManager struct {
 	depspecSourceManager
 }

@@ -71,7 +71,7 @@ func solveBasicsAndCheck(fix basicFixture, t *testing.T) (res Result, err error)
 
 	res, err = fixSolve(o, sm)
 
-	return fixtureSolveBasicChecks(fix, res, err, t)
+	return fixtureSolveSimpleChecks(fix, res, err, t)
 }
 
 // Test all the bimodal table fixtures.
@@ -107,27 +107,27 @@ func solveBimodalAndCheck(fix bimodalFixture, t *testing.T) (res Result, err err
 
 	res, err = fixSolve(o, sm)
 
-	//return fixtureSolveBasicChecks(fix, res, err, t)
-	return res, err
+	return fixtureSolveSimpleChecks(fix, res, err, t)
 }
 
-func fixtureSolveBasicChecks(fix basicFixture, res Result, err error, t *testing.T) (Result, error) {
+func fixtureSolveSimpleChecks(fix specfix, res Result, err error, t *testing.T) (Result, error) {
 	if err != nil {
-		if len(fix.errp) == 0 {
-			t.Errorf("(fixture: %q) Solver failed; error was type %T, text: %q", fix.n, err, err)
+		errp := fix.expectErrs()
+		if len(errp) == 0 {
+			t.Errorf("(fixture: %q) Solver failed; error was type %T, text: %q", fix.name(), err, err)
 			return res, err
 		}
 
 		switch fail := err.(type) {
 		case *BadOptsFailure:
-			t.Errorf("(fixture: %q) Unexpected bad opts failure solve error: %s", fix.n, err)
+			t.Errorf("(fixture: %q) Unexpected bad opts failure solve error: %s", fix.name(), err)
 		case *noVersionError:
-			if fix.errp[0] != string(fail.pn.LocalName) { // TODO identifierify
-				t.Errorf("(fixture: %q) Expected failure on project %s, but was on project %s", fix.n, fail.pn.LocalName, fix.errp[0])
+			if errp[0] != string(fail.pn.LocalName) { // TODO identifierify
+				t.Errorf("(fixture: %q) Expected failure on project %s, but was on project %s", fix.name(), fail.pn.LocalName, errp[0])
 			}
 
 			ep := make(map[string]struct{})
-			for _, p := range fix.errp[1:] {
+			for _, p := range errp[1:] {
 				ep[p] = struct{}{}
 			}
 
@@ -146,7 +146,7 @@ func fixtureSolveBasicChecks(fix basicFixture, res Result, err error, t *testing
 				}
 			}
 			if len(extra) > 0 {
-				t.Errorf("(fixture: %q) Expected solve failures due to projects %s, but solve failures also arose from %s", fix.n, strings.Join(fix.errp[1:], ", "), strings.Join(extra, ", "))
+				t.Errorf("(fixture: %q) Expected solve failures due to projects %s, but solve failures also arose from %s", fix.name(), strings.Join(errp[1:], ", "), strings.Join(extra, ", "))
 			}
 
 			for p, _ := range ep {
@@ -155,19 +155,19 @@ func fixtureSolveBasicChecks(fix basicFixture, res Result, err error, t *testing
 				}
 			}
 			if len(missing) > 0 {
-				t.Errorf("(fixture: %q) Expected solve failures due to projects %s, but %s had no failures", fix.n, strings.Join(fix.errp[1:], ", "), strings.Join(missing, ", "))
+				t.Errorf("(fixture: %q) Expected solve failures due to projects %s, but %s had no failures", fix.name(), strings.Join(errp[1:], ", "), strings.Join(missing, ", "))
 			}
 
 		default:
 			// TODO round these out
 			panic(fmt.Sprintf("unhandled solve failure type: %s", err))
 		}
-	} else if len(fix.errp) > 0 {
-		t.Errorf("(fixture: %q) Solver succeeded, but expected failure", fix.n)
+	} else if len(fix.expectErrs()) > 0 {
+		t.Errorf("(fixture: %q) Solver succeeded, but expected failure", fix.name())
 	} else {
 		r := res.(result)
-		if fix.maxAttempts > 0 && r.att > fix.maxAttempts {
-			t.Errorf("(fixture: %q) Solver completed in %v attempts, but expected %v or fewer", fix.n, r.att, fix.maxAttempts)
+		if fix.maxTries() > 0 && r.att > fix.maxTries() {
+			t.Errorf("(fixture: %q) Solver completed in %v attempts, but expected %v or fewer", fix.name(), r.att, fix.maxTries())
 		}
 
 		// Dump result projects into a map for easier interrogation
@@ -177,32 +177,32 @@ func fixtureSolveBasicChecks(fix basicFixture, res Result, err error, t *testing
 			rp[string(pa.Ident.LocalName)] = pa.Version
 		}
 
-		fixlen, rlen := len(fix.r), len(rp)
+		fixlen, rlen := len(fix.result()), len(rp)
 		if fixlen != rlen {
 			// Different length, so they definitely disagree
-			t.Errorf("(fixture: %q) Solver reported %v package results, result expected %v", fix.n, rlen, fixlen)
+			t.Errorf("(fixture: %q) Solver reported %v package results, result expected %v", fix.name(), rlen, fixlen)
 		}
 
 		// Whether or not len is same, still have to verify that results agree
 		// Walk through fixture/expected results first
-		for p, v := range fix.r {
+		for p, v := range fix.result() {
 			if av, exists := rp[p]; !exists {
-				t.Errorf("(fixture: %q) Project %q expected but missing from results", fix.n, p)
+				t.Errorf("(fixture: %q) Project %q expected but missing from results", fix.name(), p)
 			} else {
 				// delete result from map so we skip it on the reverse pass
 				delete(rp, p)
 				if v != av {
-					t.Errorf("(fixture: %q) Expected version %q of project %q, but actual version was %q", fix.n, v, p, av)
+					t.Errorf("(fixture: %q) Expected version %q of project %q, but actual version was %q", fix.name(), v, p, av)
 				}
 			}
 		}
 
 		// Now walk through remaining actual results
 		for p, v := range rp {
-			if fv, exists := fix.r[p]; !exists {
-				t.Errorf("(fixture: %q) Unexpected project %q present in results", fix.n, p)
+			if fv, exists := fix.result()[p]; !exists {
+				t.Errorf("(fixture: %q) Unexpected project %q present in results", fix.name(), p)
 			} else if v != fv {
-				t.Errorf("(fixture: %q) Got version %q of project %q, but expected version was %q", fix.n, v, p, fv)
+				t.Errorf("(fixture: %q) Got version %q of project %q, but expected version was %q", fix.name(), v, p, fv)
 			}
 		}
 	}
@@ -256,7 +256,7 @@ func TestRootLockNoVersionPairMatching(t *testing.T) {
 
 	res, err := fixSolve(o, sm)
 
-	fixtureSolveBasicChecks(fix, res, err, t)
+	fixtureSolveSimpleChecks(fix, res, err, t)
 }
 
 func getFailureCausingProjects(err error) (projs []string) {

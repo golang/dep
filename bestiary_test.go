@@ -231,6 +231,14 @@ type pident struct {
 	v Version
 }
 
+type specfix interface {
+	name() string
+	specs() []depspec
+	maxTries() int
+	expectErrs() []string
+	result() map[string]Version
+}
+
 type basicFixture struct {
 	// name of this fixture datum
 	n string
@@ -250,6 +258,26 @@ type basicFixture struct {
 	errp []string
 	// request up/downgrade to all projects
 	changeall bool
+}
+
+func (f basicFixture) name() string {
+	return f.n
+}
+
+func (f basicFixture) specs() []depspec {
+	return f.ds
+}
+
+func (f basicFixture) maxTries() int {
+	return f.maxAttempts
+}
+
+func (f basicFixture) expectErrs() []string {
+	return f.errp
+}
+
+func (f basicFixture) result() map[string]Version {
+	return f.r
 }
 
 var basicFixtures = []basicFixture{
