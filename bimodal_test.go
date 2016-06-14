@@ -13,8 +13,8 @@ func dsp(ds depspec, pkgs ...tpkg) depspec {
 	return ds
 }
 
-// pk makes a tpkg appropriate for use in bimodal testing
-func pk(path string, imports ...string) tpkg {
+// pkg makes a tpkg appropriate for use in bimodal testing
+func pkg(path string, imports ...string) tpkg {
 	return tpkg{
 		path:    path,
 		imports: imports,
@@ -35,12 +35,12 @@ func init() {
 var bimodalFixtures = map[string]bimodalFixture{
 	// Simple case, ensures that we do the very basics of picking up and
 	// including a single, simple import that is expressed an import
-	"simple bimodal add": {
+	"simple bm-add": {
 		ds: []depspec{
 			dsp(dsv("root 0.0.0"),
-				pk("root", "a")),
+				pkg("root", "a")),
 			dsp(dsv("a 1.0.0"),
-				pk("a")),
+				pkg("a")),
 		},
 		r: mkresults(
 			"a 1.0.0",
@@ -48,32 +48,83 @@ var bimodalFixtures = map[string]bimodalFixture{
 	},
 	// Ensure it works when the import jump is not from the package with the
 	// same path as root, but from a subpkg
-	"subpkg bimodal add": {
-		ds: mkbmu(
+	"subpkg bm-add": {
+		ds: []depspec{
 			dsp(dsv("root 0.0.0"),
-				pk("root", "root/foo"),
-				pk("root/foo", "a"),
+				pkg("root", "root/foo"),
+				pkg("root/foo", "a"),
 			),
 			dsp(dsv("a 1.0.0"),
-				pk("a"),
+				pkg("a"),
 			),
-		),
+		},
 		r: mkresults(
 			"a 1.0.0",
+		),
+	},
+	// Importing package from project with no root package
+	"bm-add on project with no pkg in root dir": {
+		ds: []depspec{
+			dsp(dsv("root 0.0.0"),
+				pkg("root", "a/foo")),
+			dsp(dsv("a 1.0.0"),
+				pkg("a/foo")),
+		},
+		r: mkresults(
+			"a 1.0.0",
+		),
+	},
+	// Import jump is in a dep, and points to a transitive dep
+	"transitive bm-add": {
+		ds: []depspec{
+			dsp(dsv("root 0.0.0"),
+				pkg("root", "root/foo"),
+				pkg("root/foo", "a"),
+			),
+			dsp(dsv("a 1.0.0"),
+				pkg("a", "b"),
+			),
+			dsp(dsv("b 1.0.0"),
+				pkg("b"),
+			),
+		},
+		r: mkresults(
+			"a 1.0.0",
+			"b 1.0.0",
+		),
+	},
+	// Import jump is in a dep subpkg, and points to a transitive dep
+	"transitive subpkg bm-add": {
+		ds: []depspec{
+			dsp(dsv("root 0.0.0"),
+				pkg("root", "root/foo"),
+				pkg("root/foo", "a"),
+			),
+			dsp(dsv("a 1.0.0"),
+				pkg("a", "a/bar"),
+				pkg("a/bar", "b"),
+			),
+			dsp(dsv("b 1.0.0"),
+				pkg("b"),
+			),
+		},
+		r: mkresults(
+			"a 1.0.0",
+			"b 1.0.0",
 		),
 	},
 	// Ensure that if a constraint is expressed, but no actual import exists,
 	// then the constraint is disregarded - the project named in the constraint
 	// is not part of the solution.
 	"ignore constraint without import": {
-		ds: mkbmu(
+		ds: []depspec{
 			dsp(dsv("root 0.0.0", "a 1.0.0"),
-				pk("root", "root/foo"),
+				pkg("root", "root/foo"),
 			),
 			dsp(dsv("a 1.0.0"),
-				pk("a"),
+				pkg("a"),
 			),
-		),
+		},
 		r: mkresults(),
 	},
 }
