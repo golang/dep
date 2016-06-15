@@ -258,6 +258,65 @@ func listExternalDeps(basedir, projname string, main bool) ([]string, error) {
 	return ex, nil
 }
 
+// listPackages lists all packages, optionally including main packages,
+// contained at or below the provided path.
+//
+// Directories without any valid Go files are excluded. Directories with
+// multiple packages are excluded. (TODO - maybe accommodate that?)
+//
+// A map of import path to package name is returned.
+func listPackages(basedir, prefix string, main bool) (map[string]string, error) {
+	ctx := build.Default
+	ctx.UseAllFiles = true // optimistic, but we do it for the first try
+	exm := make(map[string]string)
+
+	err := filepath.Walk(basedir, func(path string, fi os.FileInfo, err error) error {
+		if err != nil && err != filepath.SkipDir {
+			return err
+		}
+		if !fi.IsDir() {
+			return nil
+		}
+
+		// Skip a few types of dirs
+		if !localSrcDir(fi) {
+			return filepath.SkipDir
+		}
+
+		// Scan for dependencies, and anything that's not part of the local
+		// package gets added to the scan list.
+		p, err := ctx.ImportDir(path, 0)
+		var imps []string
+		if err != nil {
+			switch err.(type) {
+			case *build.NoGoError:
+				return nil
+			case *build.MultiplePackageError:
+				// Multiple package names declared in the dir, which causes
+				// ImportDir() to choke; use our custom iterative scanner.
+				imps, err = IterativeScan(path)
+				if err != nil {
+					return err
+				}
+			default:
+				return err
+			}
+		} else {
+			if prefix == "" {
+				exm[path] = path
+			} else {
+				exm[path] = prefix + os.PathSeparator + path
+			}
+		}
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return exm, nil
+}
+
 func localSrcDir(fi os.FileInfo) bool {
 	// Ignore _foo and .foo
 	if strings.HasPrefix(fi.Name(), "_") || strings.HasPrefix(fi.Name(), ".") {

@@ -25,10 +25,12 @@ type sourceBridge interface {
 	deduceRemoteRepo(path string) (*remoteRepo, error)
 }
 
-func newBridge(sm SourceManager, downgrade bool) sourceBridge {
+func newBridge(name ProjectName, root string, sm SourceManager, downgrade bool) sourceBridge {
 	return &bridge{
 		sm:       sm,
 		sortdown: downgrade,
+		name:     name,
+		root:     root,
 		vlists:   make(map[ProjectName][]Version),
 	}
 }
@@ -53,6 +55,14 @@ type bridge struct {
 	// Direction to sort the version list. False indicates sorting for upgrades;
 	// true for downgrades.
 	sortdown bool
+
+	// The name of the root project we're operating on. Used to redirect some
+	// calls that would ordinarily go to the SourceManager to a root-specific
+	// logical path, instead.
+	name ProjectName
+
+	// The path to the base directory of the root project.
+	root string
 
 	// Map of project root name to their available version list. This cache is
 	// layered on top of the proper SourceManager's cache; the only difference
@@ -356,6 +366,18 @@ func (b *bridge) computeRootReach(path string) ([]string, error) {
 	// in the analysis was OK. so, for now, we just compute list of
 	// externally-touched packages.
 	return listExternalDeps(path, path, true)
+}
+
+// listPackages lists all the packages contained within the given project at a
+// particular version.
+//
+// Special handling is done for the root project.
+func (b *bridge) listPackages(id ProjectIdentifier, v Version) (map[string]string, error) {
+	if id.LocalName != b.name {
+		return b.sm.ListPackages(b.key(id), v)
+	}
+
+	return listPackages(b.root, string(b.name), true)
 }
 
 // verifyRoot ensures that the provided path to the project root is in good

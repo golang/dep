@@ -165,7 +165,7 @@ func prepareSolver(opts SolveOpts, sm SourceManager) (*solver, error) {
 
 	s := &solver{
 		o:  opts,
-		b:  newBridge(sm, opts.Downgrade),
+		b:  newBridge(o.N, o.Root, sm, opts.Downgrade),
 		tl: opts.TraceLogger,
 	}
 
