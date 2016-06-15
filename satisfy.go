@@ -3,7 +3,8 @@ package vsolver
 // satisfiable is the main checking method. It determines if introducing a new
 // project atom would result in a state where all solver requirements are still
 // satisfied.
-func (s *solver) satisfiable(pa ProjectAtom) error {
+func (s *solver) satisfiable(a atomWithPackages) error {
+	pa := a.atom
 	if emptyProjectAtom == pa {
 		// TODO we should protect against this case elsewhere, but for now panic
 		// to canary when it's a problem
@@ -15,20 +16,20 @@ func (s *solver) satisfiable(pa ProjectAtom) error {
 	}
 
 	//deps, err := s.getDependenciesOf(pa)
-	deps, err := s.getImportsAndConstraintsOf(atomWithPackages{atom: pa})
+	deps, err := s.getImportsAndConstraintsOf(a)
 	if err != nil {
 		// An err here would be from the package fetcher; pass it straight back
 		return err
 	}
 
 	for _, dep := range deps {
-		if err := s.checkIdentMatches(pa, dep); err != nil {
+		if err := s.checkIdentMatches(a, dep); err != nil {
 			return err
 		}
-		if err := s.checkDepsConstraintsAllowable(pa, dep); err != nil {
+		if err := s.checkDepsConstraintsAllowable(a, dep); err != nil {
 			return err
 		}
-		if err := s.checkDepsDisallowsSelected(pa, dep); err != nil {
+		if err := s.checkDepsDisallowsSelected(a, dep); err != nil {
 			return err
 		}
 
@@ -67,8 +68,8 @@ func (s *solver) checkAtomAllowable(pa ProjectAtom) error {
 }
 
 // checkDepsConstraintsAllowable checks that the constraints of an atom on a
-// given dep would not result in UNSAT.
-func (s *solver) checkDepsConstraintsAllowable(pa ProjectAtom, cdep completeDep) error {
+// given dep are valid with respect to existing constraints.
+func (s *solver) checkDepsConstraintsAllowable(a atomWithPackages, cdep completeDep) error {
 	dep := cdep.ProjectDep
 	constraint := s.sel.getConstraint(dep.Ident)
 	// Ensure the constraint expressed by the dep has at least some possible
@@ -91,7 +92,7 @@ func (s *solver) checkDepsConstraintsAllowable(pa ProjectAtom, cdep completeDep)
 	}
 
 	err := &disjointConstraintFailure{
-		goal:      Dependency{Depender: pa, Dep: cdep},
+		goal:      Dependency{Depender: a.atom, Dep: cdep},
 		failsib:   failsib,
 		nofailsib: nofailsib,
 		c:         constraint,
@@ -103,14 +104,14 @@ func (s *solver) checkDepsConstraintsAllowable(pa ProjectAtom, cdep completeDep)
 // checkDepsDisallowsSelected ensures that an atom's constraints on a particular
 // dep are not incompatible with the version of that dep that's already been
 // selected.
-func (s *solver) checkDepsDisallowsSelected(pa ProjectAtom, cdep completeDep) error {
+func (s *solver) checkDepsDisallowsSelected(a atomWithPackages, cdep completeDep) error {
 	dep := cdep.ProjectDep
 	selected, exists := s.sel.selected(dep.Ident)
 	if exists && !s.b.matches(dep.Ident, dep.Constraint, selected.atom.Version) {
 		s.fail(dep.Ident)
 
 		err := &constraintNotAllowedFailure{
-			goal: Dependency{Depender: pa, Dep: cdep},
+			goal: Dependency{Depender: a.atom, Dep: cdep},
 			v:    selected.atom.Version,
 		}
 		s.logSolve(err)
@@ -126,11 +127,11 @@ func (s *solver) checkDepsDisallowsSelected(pa ProjectAtom, cdep completeDep) er
 // In other words, this ensures that the solver never simultaneously selects two
 // identifiers with the same local name, but that disagree about where their
 // network source is.
-func (s *solver) checkIdentMatches(pa ProjectAtom, cdep completeDep) error {
+func (s *solver) checkIdentMatches(a atomWithPackages, cdep completeDep) error {
 	dep := cdep.ProjectDep
 	if cur, exists := s.names[dep.Ident.LocalName]; exists {
 		if cur != dep.Ident.netName() {
-			deps := s.sel.getDependenciesOn(pa.Ident)
+			deps := s.sel.getDependenciesOn(a.atom.Ident)
 			// Fail all the other deps, as there's no way atom can ever be
 			// compatible with them
 			for _, d := range deps {
@@ -142,7 +143,7 @@ func (s *solver) checkIdentMatches(pa ProjectAtom, cdep completeDep) error {
 				sel:      deps,
 				current:  cur,
 				mismatch: dep.Ident.netName(),
-				prob:     pa,
+				prob:     a.atom,
 			}
 			s.logSolve(err)
 			return err

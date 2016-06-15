@@ -243,35 +243,48 @@ func (s *solver) run() (Result, error) {
 func (s *solver) solve() ([]ProjectAtom, error) {
 	// Main solving loop
 	for {
-		id, has := s.nextUnselected()
+		bmi, has := s.nextUnselected()
 
 		if !has {
-			// no more packages to select - we're done. bail out
+			// no more packages to select - we're done.
 			break
 		}
 
-		s.logStart(id)
-		queue, err := s.createVersionQueue(id)
-
-		if err != nil {
-			// Err means a failure somewhere down the line; try backtracking.
-			if s.backtrack() {
-				// backtracking succeeded, move to the next unselected id
-				continue
+		// This split is the heart of "bimodal solving": we follow different
+		// satisfiability and selection paths depending on whether we've already
+		// selected the base project/repo that came off the unselected queue.
+		//
+		// (If we already have selected the project, other parts of the
+		// algorithm guarantee the bmi will contain at least one package from
+		// this project that has yet to be selected.)
+		if _, is := s.sel.selected(bmi.id); !is {
+			// Analysis path for when we haven't selected the project yet - need
+			// to create a version queue.
+			s.logStart(bmi)
+			queue, err := s.createVersionQueue(bmi)
+			if err != nil {
+				// Err means a failure somewhere down the line; try backtracking.
+				if s.backtrack() {
+					// backtracking succeeded, move to the next unselected id
+					continue
+				}
+				return nil, err
 			}
-			return nil, err
-		}
 
-		if queue.current() == nil {
-			panic("canary - queue is empty, but flow indicates success")
-		}
+			if queue.current() == nil {
+				panic("canary - queue is empty, but flow indicates success")
+			}
 
-		s.selectVersion(ProjectAtom{
-			Ident:   queue.id,
-			Version: queue.current(),
-		})
-		s.versions = append(s.versions, queue)
-		s.logSolve()
+			s.selectVersion(ProjectAtom{
+				Ident:   queue.id,
+				Version: queue.current(),
+			})
+			s.versions = append(s.versions, queue)
+			s.logSolve()
+		} else {
+			// TODO fill in this path - when we're adding more pkgs to an
+			// existing, already-selected project
+		}
 	}
 
 	// Getting this far means we successfully found a solution
@@ -482,7 +495,8 @@ func (s *solver) intersectConstraintsWithImports(deps []ProjectDep, reach []stri
 	return cdeps, nil
 }
 
-func (s *solver) createVersionQueue(id ProjectIdentifier) (*versionQueue, error) {
+func (s *solver) createVersionQueue(bmi bimodalIdentifier) (*versionQueue, error) {
+	id := bmi.id
 	// If on the root package, there's no queue to make
 	if id.LocalName == s.rm.Name() {
 		return newVersionQueue(id, nilpa, s.b)
@@ -522,12 +536,16 @@ func (s *solver) createVersionQueue(id ProjectIdentifier) (*versionQueue, error)
 		return nil, err
 	}
 
-	return q, s.findValidVersion(q)
+	return q, s.findValidVersion(q, bmi.pl)
 }
 
 // findValidVersion walks through a versionQueue until it finds a version that
 // satisfies the constraints held in the current state of the solver.
-func (s *solver) findValidVersion(q *versionQueue) error {
+//
+// The satisfiability checks triggered from here are constrained to operate only
+// on those dependencies induced by the list of packages given in the second
+// parameter.
+func (s *solver) findValidVersion(q *versionQueue, pl []string) error {
 	if nil == q.current() {
 		// TODO this case shouldn't be reachable, but panic here as a canary
 		panic("version queue is empty, should not happen")
@@ -537,9 +555,12 @@ func (s *solver) findValidVersion(q *versionQueue) error {
 
 	for {
 		cur := q.current()
-		err := s.satisfiable(ProjectAtom{
-			Ident:   q.id,
-			Version: cur,
+		err := s.satisfiable(atomWithPackages{
+			atom: ProjectAtom{
+				Ident:   q.id,
+				Version: cur,
+			},
+			pl: pl,
 		})
 		if err == nil {
 			// we have a good version, can return safely
@@ -788,12 +809,12 @@ func (s *solver) backtrack() bool {
 	return true
 }
 
-func (s *solver) nextUnselected() (ProjectIdentifier, bool) {
+func (s *solver) nextUnselected() (bimodalIdentifier, bool) {
 	if len(s.unsel.sl) > 0 {
 		return s.unsel.sl[0], true
 	}
 
-	return ProjectIdentifier{}, false
+	return bimodalIdentifier{}, false
 }
 
 func (s *solver) unselectedComparator(i, j int) bool {
