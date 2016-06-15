@@ -258,6 +258,8 @@ var bimodalFixtures = map[string]bimodalFixture{
 	},
 }
 
+// tpkg is a representation of a single package. It has its own import path, as
+// well as a list of paths it itself "imports".
 type tpkg struct {
 	// Full import path of this package
 	path string
@@ -304,6 +306,9 @@ func (f bimodalFixture) result() map[string]Version {
 	return f.r
 }
 
+// bmSourceManager is an SM specifically for the bimodal fixtures. It composes
+// the general depspec SM, and differs from it only in how it answers
+// ExternalReach() calls.
 type bmSourceManager struct {
 	depspecSourceManager
 }
@@ -334,6 +339,13 @@ func (sm *bmSourceManager) ExternalReach(n ProjectName, v Version) (map[string][
 	return nil, fmt.Errorf("No reach data for %s at version %s", n, v)
 }
 
+// computeBimodalExternalMap takes a set of depspecs and computes an
+// internally-versioned external reach map that is useful for quickly answering
+// ListExternal()-type calls.
+//
+// Note that it does not do things like stripping out stdlib packages - these
+// maps are intended for use in SM fixtures, and that's a higher-level
+// responsibility within the system.
 func computeBimodalExternalMap(ds []depspec) map[pident][]string {
 	rm := make(map[pident][]string)
 

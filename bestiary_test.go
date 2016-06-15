@@ -995,7 +995,7 @@ func (b *depspecBridge) deduceRemoteRepo(path string) (*remoteRepo, error) {
 			}, nil
 		}
 	}
-	return nil, fmt.Errorf("Could not find %s, or any parent, in list of known fixtures")
+	return nil, fmt.Errorf("Could not find %s, or any parent, in list of known fixtures", path)
 }
 
 // enforce interfaces

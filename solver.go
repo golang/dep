@@ -645,7 +645,7 @@ func (s *solver) getDependenciesOf(pa ProjectAtom) ([]ProjectDep, error) {
 		}
 
 		// Create a radix tree with all the projects we know from the manifest
-		// TODO make this smarter once we allow non-root inputs as 'projects'
+		// TODO make this smarter if/when non-repo-root dirs can be 'projects'
 		xt := radix.New()
 		for _, dep := range mdeps {
 			xt.Insert(string(dep.Ident.LocalName), dep)
@@ -923,7 +923,7 @@ func (s *solver) unselectLast() {
 	pa, s.sel.projects = s.sel.projects[len(s.sel.projects)-1], s.sel.projects[:len(s.sel.projects)-1]
 	heap.Push(s.unsel, pa.Ident)
 
-	deps, err := s.getDependenciesOf(pa)
+	deps, err := s.getImportsAndConstraintsOf(atomWithPackages{atom: pa})
 	if err != nil {
 		// if we're choosing a package that has errors getting its deps, there's
 		// a bigger problem
@@ -932,12 +932,10 @@ func (s *solver) unselectLast() {
 	}
 
 	for _, dep := range deps {
-		siblings := s.sel.getDependenciesOn(dep.Ident)
-		siblings = siblings[:len(siblings)-1]
-		s.sel.deps[dep.Ident] = siblings
+		s.sel.popDep(dep.Ident)
 
-		// if no siblings, remove from unselected queue
-		if len(siblings) == 0 {
+		// if no parents/importers, remove from unselected queue
+		if s.sel.depperCount(dep.Ident) == 0 {
 			delete(s.names, dep.Ident.LocalName)
 			s.unsel.remove(dep.Ident)
 		}
