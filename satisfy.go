@@ -106,12 +106,12 @@ func (s *solver) checkDepsConstraintsAllowable(pa ProjectAtom, cdep completeDep)
 func (s *solver) checkDepsDisallowsSelected(pa ProjectAtom, cdep completeDep) error {
 	dep := cdep.ProjectDep
 	selected, exists := s.sel.selected(dep.Ident)
-	if exists && !s.b.matches(dep.Ident, dep.Constraint, selected.Version) {
+	if exists && !s.b.matches(dep.Ident, dep.Constraint, selected.atom.Version) {
 		s.fail(dep.Ident)
 
 		err := &constraintNotAllowedFailure{
 			goal: Dependency{Depender: pa, Dep: cdep},
-			v:    selected.Version,
+			v:    selected.atom.Version,
 		}
 		s.logSolve(err)
 		return err

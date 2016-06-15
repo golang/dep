@@ -56,6 +56,12 @@ func (i ProjectIdentifier) normalize() ProjectIdentifier {
 	return i
 }
 
+// bimodalIdentifiers are used to track work to be done in the unselected queue.
+type bimodalIdentifier struct {
+	id ProjectIdentifier
+	pl []string
+}
+
 type ProjectName string
 
 type ProjectAtom struct {

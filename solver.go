@@ -165,7 +165,7 @@ func prepareSolver(opts SolveOpts, sm SourceManager) (*solver, error) {
 
 	s := &solver{
 		o:  opts,
-		b:  newBridge(o.N, o.Root, sm, opts.Downgrade),
+		b:  newBridge(opts.N, opts.Root, sm, opts.Downgrade),
 		tl: opts.TraceLogger,
 	}
 
@@ -180,7 +180,7 @@ func prepareSolver(opts SolveOpts, sm SourceManager) (*solver, error) {
 		sm:   s.b,
 	}
 	s.unsel = &unselected{
-		sl:  make([]ProjectIdentifier, 0),
+		sl:  make([]bimodalIdentifier, 0),
 		cmp: s.unselectedComparator,
 	}
 
@@ -298,14 +298,30 @@ func (s *solver) selectRoot() error {
 		Version: Revision(""),
 	}
 
+	pkgs, err := s.b.listPackages(pa.Ident, nil)
+	if err != nil {
+		return err
+	}
+
+	list := make([]string, len(pkgs))
+	k := 0
+	for path := range pkgs {
+		list[k] = path
+		k++
+	}
+
+	a := atomWithPackages{
+		atom: pa,
+		pl:   list,
+	}
+
 	// Push the root project onto the queue.
 	// TODO maybe it'd just be better to skip this?
-	s.sel.projects = append(s.sel.projects, pa)
+	s.sel.projects = append(s.sel.projects, a)
 
 	// If we're looking for root's deps, get it from opts and local root
 	// analysis, rather than having the sm do it
 	mdeps := append(s.rm.GetDependencies(), s.rm.GetDevDependencies()...)
-
 	reach, err := s.b.computeRootReach(s.o.Root)
 	if err != nil {
 		return err
@@ -321,7 +337,7 @@ func (s *solver) selectRoot() error {
 		s.sel.pushDep(Dependency{Depender: pa, Dep: dep})
 		// Add all to unselected queue
 		s.names[dep.Ident.LocalName] = dep.Ident.netName()
-		heap.Push(s.unsel, dep.Ident)
+		heap.Push(s.unsel, bimodalIdentifier{id: dep.Ident, pl: dep.pl})
 	}
 
 	return nil
@@ -444,6 +460,7 @@ func (s *solver) intersectConstraintsWithImports(deps []ProjectDep, reach []stri
 			},
 			Constraint: Any(),
 		}
+
 		// Insert the pd into the trie so that further deps from this
 		// project get caught by the prefix search
 		xt.Insert(root.Base, pd)
@@ -780,7 +797,7 @@ func (s *solver) nextUnselected() (ProjectIdentifier, bool) {
 }
 
 func (s *solver) unselectedComparator(i, j int) bool {
-	iname, jname := s.unsel.sl[i], s.unsel.sl[j]
+	iname, jname := s.unsel.sl[i].id, s.unsel.sl[j].id
 
 	if iname.eq(jname) {
 		return false
@@ -858,14 +875,12 @@ func (s *solver) selectAtomWithPackages(a atomWithPackages) {
 	// TODO so...i guess maybe this is just totally redudant with
 	// selectVersion()? ugh. well, at least for now, until we things exercise
 	// bimodality
+	s.unsel.remove(bimodalIdentifier{
+		id: a.atom.Ident,
+		pl: a.pl,
+	})
 
-	// TODO the unselected queue doesn't carry the package information; we
-	// retrieve that from current selection deps state when considering a
-	// project. Make sure there's no possibility of dropping that data.
-	s.unsel.remove(a.atom.Ident)
-	if _, is := s.sel.selected(a.atom.Ident); !is {
-		s.sel.projects = append(s.sel.projects, a.atom)
-	}
+	s.sel.projects = append(s.sel.projects, a.atom)
 
 	deps, err := s.getImportsAndConstraintsOf(a)
 	if err != nil {
@@ -878,7 +893,8 @@ func (s *solver) selectAtomWithPackages(a atomWithPackages) {
 	for _, dep := range deps {
 		s.sel.pushDep(Dependency{Depender: a.atom, Dep: dep})
 		// Add this dep to the unselected queue if the selection contains only
-		// the one bit of information we just pushed in...
+		// the one bit of information we just pushed in.
+
 		if s.sel.depperCount(dep.Ident) == 1 {
 			// ...or if the dep is already selected, and the atom we're
 			// selecting imports new packages from the dep that aren't already

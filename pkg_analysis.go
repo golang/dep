@@ -302,11 +302,7 @@ func listPackages(basedir, prefix string, main bool) (map[string]string, error) 
 				return err
 			}
 		} else {
-			if prefix == "" {
-				exm[path] = path
-			} else {
-				exm[path] = prefix + os.PathSeparator + path
-			}
+			exm[path] = filepath.Join(prefix, path)
 		}
 	})
 
