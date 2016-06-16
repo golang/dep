@@ -3,6 +3,7 @@ package vsolver
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"sort"
 )
 
@@ -340,8 +341,15 @@ func (b *bridge) vtu(id ProjectIdentifier, v Version) versionTypeUnion {
 }
 
 // externalReach wraps the SourceManager's ExternalReach() method.
+//
+// The root project is handled separately, as the source manager isn't
+// responsible for that code.
 func (b *bridge) externalReach(id ProjectIdentifier, v Version) (map[string][]string, error) {
-	return b.sm.ExternalReach(b.key(id), v)
+	if id.LocalName != b.name {
+		return b.sm.ExternalReach(b.key(id), v)
+	}
+
+	m, err := ExternalReach(filepath.Join(pm.ctx.GOPATH, "src", string(id.LocalName)), string(pm.n), false)
 }
 
 // listExternal wraps the SourceManager's ListExternal() method.
@@ -372,8 +380,8 @@ func (b *bridge) computeRootReach(path string) ([]string, error) {
 // listPackages lists all the packages contained within the given project at a
 // particular version.
 //
-// The root project is handled separately, as the source manager isn't managing
-// that code.
+// The root project is handled separately, as the source manager isn't
+// responsible for that code.
 func (b *bridge) listPackages(id ProjectIdentifier, v Version) (map[string]string, error) {
 	if id.LocalName != b.name {
 		return b.sm.ListPackages(b.key(id), v)
