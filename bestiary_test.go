@@ -914,6 +914,13 @@ func (sm *depspecSourceManager) ListExternal(n ProjectName, v Version) ([]string
 	return nil, fmt.Errorf("No reach data for %s at version %s", n, v)
 }
 
+func (sm *depspecSourceManager) ListPackages(n ProjectName, v Version) (map[string]string, error) {
+	m := make(map[string]string)
+	m[string(n)] = string(n)
+
+	return m, nil
+}
+
 func (sm *depspecSourceManager) ListVersions(name ProjectName) (pi []Version, err error) {
 	for _, ds := range sm.specs {
 		if name == ds.n {

@@ -323,6 +323,22 @@ func newbmSM(ds []depspec) *bmSourceManager {
 	return sm
 }
 
+func (sm *bmSourceManager) ListPackages(n ProjectName, v Version) (map[string]string, error) {
+	for _, ds := range sm.specs {
+		if n == ds.n && v.Matches(ds.v) {
+			m := make(map[string]string)
+
+			for _, pkg := range ds.pkgs {
+				m[pkg.path] = pkg.path
+			}
+
+			return m, nil
+		}
+	}
+
+	return nil, fmt.Errorf("Project %s at version %s could not be found", n, v)
+}
+
 func (sm *bmSourceManager) ExternalReach(n ProjectName, v Version) (map[string][]string, error) {
 	for _, ds := range sm.specs {
 		if ds.n == n && v.Matches(ds.v) {

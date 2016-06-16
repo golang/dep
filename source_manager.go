@@ -120,7 +120,7 @@ func (sm *sourceManager) ListExternal(n ProjectName, v Version) ([]string, error
 	return pmc.pm.ListExternal(v)
 }
 
-func (sm *sourceManager) ListPackages(n ProjectName, v Version) ([]string, error) {
+func (sm *sourceManager) ListPackages(n ProjectName, v Version) (map[string]string, error) {
 	pmc, err := sm.getProjectManager(n)
 	if err != nil {
 		return nil, err
