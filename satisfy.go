@@ -39,6 +39,30 @@ func (s *solver) satisfiable(a atomWithPackages) error {
 	return nil
 }
 
+func (s *solver) checkPackage(a atomWithPackages) error {
+	// The base atom was already validated, so we can skip the
+	// checkAtomAllowable step.
+	deps, err := s.getImportsAndConstraintsOf(a)
+	if err != nil {
+		// An err here would be from the package fetcher; pass it straight back
+		return err
+	}
+
+	for _, dep := range deps {
+		if err := s.checkIdentMatches(a, dep); err != nil {
+			return err
+		}
+		if err := s.checkDepsConstraintsAllowable(a, dep); err != nil {
+			return err
+		}
+		if err := s.checkDepsDisallowsSelected(a, dep); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 // checkAtomAllowable ensures that an atom itself is acceptable with respect to
 // the constraints established by the current solution.
 func (s *solver) checkAtomAllowable(pa ProjectAtom) error {

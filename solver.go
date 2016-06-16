@@ -261,7 +261,7 @@ func (s *solver) solve() (map[ProjectAtom]map[string]struct{}, error) {
 		// (If we already have selected the project, other parts of the
 		// algorithm guarantee the bmi will contain at least one package from
 		// this project that has yet to be selected.)
-		if _, is := s.sel.selected(bmi.id); !is {
+		if awp, is := s.sel.selected(bmi.id); !is {
 			// Analysis path for when we haven't selected the project yet - need
 			// to create a version queue.
 			s.logStart(bmi)
@@ -289,8 +289,40 @@ func (s *solver) solve() (map[ProjectAtom]map[string]struct{}, error) {
 			s.versions = append(s.versions, queue)
 			s.logSolve()
 		} else {
-			// TODO fill in this path - when we're adding more pkgs to an
-			// existing, already-selected project
+			// We're just trying to add packages to an already-selected project.
+			// That means it's not OK to burn through the version queue for that
+			// project as we do when first selecting a project, as doing so
+			// would upend the guarantees on which all previous selections of
+			// the project are based (both the initial one, and any package-only
+			// ones).
+
+			// Because we can only safely operate within the scope of the
+			// single, currently selected version, we can skip looking for the
+			// queue and just use the version given in what came back from
+			// s.sel.selected().
+			nawp := atomWithPackages{
+				atom: ProjectAtom{
+					Ident:   bmi.id,
+					Version: awp.atom.Version,
+				},
+				pl: bmi.pl,
+			}
+
+			s.logStart(bmi) // TODO different special start logger for this path
+			err := s.checkPackage(nawp)
+			if err != nil {
+				// Err means a failure somewhere down the line; try backtracking.
+				if s.backtrack() {
+					// backtracking succeeded, move to the next unselected id
+					continue
+				}
+				return nil, err
+			}
+			s.selectAtomWithPackages(nawp)
+			// We don't add anything to the stack of version queues because the
+			// backtracker knows not to popping the vqstack if it backtracks
+			// across a package addition.
+			s.logSolve()
 		}
 	}
 
@@ -400,6 +432,9 @@ func (s *solver) getImportsAndConstraintsOf(a atomWithPackages) ([]completeDep, 
 	}
 
 	// Now, add in the ones we already knew about
+	// TODO could we just skip this completely and be safe? It seems redundant
+	// right now. Maybe not, once we start allowing multiple versions of
+	// projects?
 	curp := s.sel.getRequiredPackagesIn(a.atom.Ident)
 	for pkg := range curp {
 		if expkgs, exists := allex[pkg]; !exists {
@@ -892,18 +927,16 @@ func (s *solver) unselectedComparator(i, j int) bool {
 	return iname.less(jname)
 }
 
-func (s *solver) fail(i ProjectIdentifier) {
+func (s *solver) fail(id ProjectIdentifier) {
 	// skip if the root project
-	if s.rm.Name() == i.LocalName {
-		return
-	}
-
-	// just look for the first (oldest) one; the backtracker will necessarily
-	// traverse through and pop off any earlier ones
-	for _, vq := range s.versions {
-		if vq.id.LocalName == i.LocalName {
-			vq.failed = true
-			return
+	if s.rm.Name() != id.LocalName {
+		// just look for the first (oldest) one; the backtracker will necessarily
+		// traverse through and pop off any earlier ones
+		for _, vq := range s.versions {
+			if vq.id.eq(id) {
+				vq.failed = true
+				return
+			}
 		}
 	}
 }

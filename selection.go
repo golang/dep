@@ -99,6 +99,13 @@ func (s *selection) getConstraint(id ProjectIdentifier) Constraint {
 	return ret
 }
 
+// selected checks to see if the given ProjectIdentifier has been selected, and
+// if so, returns the corresponding atomWithPackages.
+//
+// It walks the projects selection list from front to back and returns the first
+// match it finds, which means it will always and only return the base selection
+// of the project, without any additional package selections that may or may not
+// have happened later.
 func (s *selection) selected(id ProjectIdentifier) (atomWithPackages, bool) {
 	for _, pi := range s.projects {
 		if pi.atom.Ident.eq(id) {
