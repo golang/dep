@@ -112,7 +112,7 @@ type solver struct {
 	// of projects represented here corresponds closely to what's in s.sel,
 	// although s.sel will always contain the root project, and s.versions never
 	// will.
-	versions []*versionQueue
+	versions []*versionQueue // TODO rename to pvq
 
 	// A map of the ProjectName (local names) that should be allowed to change
 	chng map[ProjectName]struct{}
@@ -275,9 +275,12 @@ func (s *solver) solve() ([]ProjectAtom, error) {
 				panic("canary - queue is empty, but flow indicates success")
 			}
 
-			s.selectVersion(ProjectAtom{
-				Ident:   queue.id,
-				Version: queue.current(),
+			s.selectAtomWithPackages(atomWithPackages{
+				atom: ProjectAtom{
+					Ident:   queue.id,
+					Version: queue.current(),
+				},
+				pl: bmi.pl,
 			})
 			s.versions = append(s.versions, queue)
 			s.logSolve()
@@ -765,7 +768,6 @@ func (s *solver) backtrack() bool {
 				break
 			}
 
-			// pub asserts here that the last in s.sel's ids is == q.current
 			s.versions, s.versions[len(s.versions)-1] = s.versions[:len(s.versions)-1], nil
 			s.unselectLast()
 		}
@@ -774,20 +776,23 @@ func (s *solver) backtrack() bool {
 		q := s.versions[len(s.versions)-1]
 
 		// another assert that the last in s.sel's ids is == q.current
-		s.unselectLast()
+		atom := s.unselectLast()
 
 		// Advance the queue past the current version, which we know is bad
 		// TODO is it feasible to make available the failure reason here?
 		if q.advance(nil) == nil && !q.isExhausted() {
 			// Search for another acceptable version of this failed dep in its queue
-			if s.findValidVersion(q) == nil {
+			if s.findValidVersion(q, atom.pl) == nil {
 				s.logSolve()
 
 				// Found one! Put it back on the selected queue and stop
 				// backtracking
-				s.selectVersion(ProjectAtom{
-					Ident:   q.id,
-					Version: q.current(),
+				s.selectAtomWithPackages(atomWithPackages{
+					atom: ProjectAtom{
+						Ident:   q.id,
+						Version: q.current(),
+					},
+					pl: atom.pl,
 				})
 				break
 			}
@@ -901,7 +906,7 @@ func (s *solver) selectAtomWithPackages(a atomWithPackages) {
 		pl: a.pl,
 	})
 
-	s.sel.projects = append(s.sel.projects, a.atom)
+	s.sel.projects = append(s.sel.projects, a)
 
 	deps, err := s.getImportsAndConstraintsOf(a)
 	if err != nil {
@@ -931,36 +936,36 @@ func (s *solver) selectAtomWithPackages(a atomWithPackages) {
 	}
 }
 
-func (s *solver) selectVersion(pa ProjectAtom) {
-	s.unsel.remove(pa.Ident)
-	s.sel.projects = append(s.sel.projects, pa)
+//func (s *solver) selectVersion(pa ProjectAtom) {
+//s.unsel.remove(pa.Ident)
+//s.sel.projects = append(s.sel.projects, pa)
 
-	deps, err := s.getImportsAndConstraintsOf(atomWithPackages{atom: pa})
-	if err != nil {
-		// if we're choosing a package that has errors getting its deps, there's
-		// a bigger problem
-		// TODO try to create a test that hits this
-		panic(fmt.Sprintf("shouldn't be possible %s", err))
-	}
+//deps, err := s.getImportsAndConstraintsOf(atomWithPackages{atom: pa})
+//if err != nil {
+//// if we're choosing a package that has errors getting its deps, there's
+//// a bigger problem
+//// TODO try to create a test that hits this
+//panic(fmt.Sprintf("shouldn't be possible %s", err))
+//}
 
-	for _, dep := range deps {
-		s.sel.pushDep(Dependency{Depender: pa, Dep: dep})
+//for _, dep := range deps {
+//s.sel.pushDep(Dependency{Depender: pa, Dep: dep})
 
-		// add project to unselected queue if this is the first dep on it -
-		// otherwise it's already in there, or been selected
-		if s.sel.depperCount(dep.Ident) == 1 {
-			s.names[dep.Ident.LocalName] = dep.Ident.netName()
-			heap.Push(s.unsel, dep.Ident)
-		}
-	}
-}
+//// add project to unselected queue if this is the first dep on it -
+//// otherwise it's already in there, or been selected
+//if s.sel.depperCount(dep.Ident) == 1 {
+//s.names[dep.Ident.LocalName] = dep.Ident.netName()
+//heap.Push(s.unsel, dep.Ident)
+//}
+//}
+//}
 
-func (s *solver) unselectLast() {
-	var pa ProjectAtom
-	pa, s.sel.projects = s.sel.projects[len(s.sel.projects)-1], s.sel.projects[:len(s.sel.projects)-1]
-	heap.Push(s.unsel, pa.Ident)
+func (s *solver) unselectLast() atomWithPackages {
+	var awp atomWithPackages
+	awp, s.sel.projects = s.sel.projects[len(s.sel.projects)-1], s.sel.projects[:len(s.sel.projects)-1]
+	heap.Push(s.unsel, awp.atom.Ident)
 
-	deps, err := s.getImportsAndConstraintsOf(atomWithPackages{atom: pa})
+	deps, err := s.getImportsAndConstraintsOf(awp)
 	if err != nil {
 		// if we're choosing a package that has errors getting its deps, there's
 		// a bigger problem
@@ -974,9 +979,11 @@ func (s *solver) unselectLast() {
 		// if no parents/importers, remove from unselected queue
 		if s.sel.depperCount(dep.Ident) == 0 {
 			delete(s.names, dep.Ident.LocalName)
-			s.unsel.remove(dep.Ident)
+			s.unsel.remove(bimodalIdentifier{id: dep.Ident, pl: dep.pl})
 		}
 	}
+
+	return awp
 }
 
 func (s *solver) logStart(id ProjectIdentifier) {

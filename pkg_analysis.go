@@ -298,12 +298,16 @@ func listPackages(basedir, prefix string, main bool) (map[string]string, error) 
 				if err != nil {
 					return err
 				}
+				// TODO for now, we'll just take the first pkg name we find
+				exm[path] = filepath.Join(prefix, imps[0])
 			default:
 				return err
 			}
 		} else {
 			exm[path] = filepath.Join(prefix, path)
 		}
+
+		return nil
 	})
 
 	if err != nil {
