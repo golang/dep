@@ -77,7 +77,7 @@ func ExternalReach(basedir, projname string, main bool) (rm map[string][]string,
 			case *build.MultiplePackageError:
 				// Multiple package names declared in the dir, which causes
 				// ImportDir() to choke; use our custom iterative scanner.
-				imps, err = IterativeScan(path)
+				imps, _, err = IterativeScan(path)
 				if err != nil {
 					return err
 				}
@@ -222,7 +222,7 @@ func listExternalDeps(basedir, projname string, main bool) ([]string, error) {
 			case *build.MultiplePackageError:
 				// Multiple package names declared in the dir, which causes
 				// ImportDir() to choke; use our custom iterative scanner.
-				imps, err = IterativeScan(path)
+				imps, _, err = IterativeScan(path)
 				if err != nil {
 					return err
 				}
@@ -286,7 +286,6 @@ func listPackages(basedir, prefix string, main bool) (map[string]string, error) 
 		// Scan for dependencies, and anything that's not part of the local
 		// package gets added to the scan list.
 		p, err := ctx.ImportDir(path, 0)
-		var imps []string
 		if err != nil {
 			switch err.(type) {
 			case *build.NoGoError:
@@ -294,17 +293,17 @@ func listPackages(basedir, prefix string, main bool) (map[string]string, error) 
 			case *build.MultiplePackageError:
 				// Multiple package names declared in the dir, which causes
 				// ImportDir() to choke; use our custom iterative scanner.
-				imps, err = IterativeScan(path)
+				_, name, err := IterativeScan(path)
 				if err != nil {
 					return err
 				}
 				// TODO for now, we'll just take the first pkg name we find
-				exm[path] = filepath.Join(prefix, imps[0])
+				exm[path] = filepath.Join(prefix, name)
 			default:
 				return err
 			}
 		} else {
-			exm[path] = filepath.Join(prefix, path)
+			exm[path] = filepath.Join(prefix, p.Name)
 		}
 
 		return nil
@@ -341,7 +340,7 @@ func localSrcDir(fi os.FileInfo) bool {
 // Note, there are cases where multiple packages are in the same directory. This
 // usually happens with an example that has a main package and a +build tag
 // of ignore. This is a bit of a hack. It causes UseAllFiles to have errors.
-func IterativeScan(path string) ([]string, error) {
+func IterativeScan(path string) ([]string, string, error) {
 
 	// TODO(mattfarina): Add support for release tags.
 
@@ -350,6 +349,7 @@ func IterativeScan(path string) ([]string, error) {
 	tgs = append(tgs, "")
 
 	var pkgs []string
+	var name string
 	for _, tt := range tgs {
 
 		// split the tag combination to look at permutations.
@@ -413,9 +413,13 @@ func IterativeScan(path string) ([]string, error) {
 			continue
 		} else if err != nil {
 			//msg.Debug("Problem parsing package at %s for %s %s", path, ops, arch)
-			return []string{}, err
+			return nil, "", err
 		}
 
+		// For now at least, just take the first package name we get
+		if name == "" {
+			name = pk.Name
+		}
 		for _, dep := range pk.Imports {
 			found := false
 			for _, p := range pkgs {
@@ -429,7 +433,7 @@ func IterativeScan(path string) ([]string, error) {
 		}
 	}
 
-	return pkgs, nil
+	return pkgs, name, nil
 }
 
 func readBuildTags(p string) ([]string, error) {

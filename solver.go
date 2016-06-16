@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log"
 	"math/rand"
+	"os"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -217,7 +219,7 @@ func (s *solver) run() (Result, error) {
 
 	// Log initial step
 	s.logSolve()
-	pa, err := s.solve()
+	all, err := s.solve()
 
 	// Solver finished with an err; return that and we're done
 	if err != nil {
@@ -231,16 +233,18 @@ func (s *solver) run() (Result, error) {
 	}
 
 	// Convert ProjectAtoms into LockedProjects
-	r.p = make([]LockedProject, len(pa))
-	for k, p := range pa {
-		r.p[k] = pa2lp(p)
+	r.p = make([]LockedProject, len(all))
+	k := 0
+	for pa, pl := range all {
+		r.p[k] = pa2lp(pa, pl)
+		k++
 	}
 
 	return r, nil
 }
 
 // solve is the top-level loop for the SAT solving process.
-func (s *solver) solve() ([]ProjectAtom, error) {
+func (s *solver) solve() (map[ProjectAtom]map[string]struct{}, error) {
 	// Main solving loop
 	for {
 		bmi, has := s.nextUnselected()
@@ -290,12 +294,21 @@ func (s *solver) solve() ([]ProjectAtom, error) {
 		}
 	}
 
-	// Getting this far means we successfully found a solution
-	var projs []ProjectAtom
-	// Skip the first project - it's always the root, and we don't want to
-	// include that in the results.
-	for _, p := range s.sel.projects[1:] {
-		projs = append(projs, p)
+	// Getting this far means we successfully found a solution. Combine the
+	// selected projects and packages.
+	projs := make(map[ProjectAtom]map[string]struct{})
+
+	// Skip the first project. It's always the root, and that shouldn't be
+	// included in results.
+	for _, awp := range s.sel.projects[1:] {
+		pm, exists := projs[awp.atom]
+		if !exists {
+			projs[awp.atom] = make(map[string]struct{})
+		}
+
+		for _, path := range awp.pl {
+			pm[path] = struct{}{}
+		}
 	}
 	return projs, nil
 }
@@ -1048,7 +1061,7 @@ func tracePrefix(msg, sep, fsep string) string {
 }
 
 // simple (temporary?) helper just to convert atoms into locked projects
-func pa2lp(pa ProjectAtom) LockedProject {
+func pa2lp(pa ProjectAtom, pkgs map[string]struct{}) LockedProject {
 	lp := LockedProject{
 		pi: pa.Ident.normalize(), // shouldn't be necessary, but normalize just in case
 		// path is unnecessary duplicate information now, but if we ever allow
@@ -1067,6 +1080,11 @@ func pa2lp(pa ProjectAtom) LockedProject {
 	default:
 		panic("unreachable")
 	}
+
+	for pkg := range pkgs {
+		lp.pkgs = append(lp.pkgs, strings.TrimPrefix(pkg, string(pa.Ident.LocalName)+string(os.PathSeparator)))
+	}
+	sort.Strings(lp.pkgs)
 
 	return lp
 }

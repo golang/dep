@@ -20,15 +20,14 @@ type Lock interface {
 
 // LockedProject is a single project entry from a lock file. It expresses the
 // project's name, one or both of version and underlying revision, the network
-// URI for accessing it, and the path at which it should be placed within a
-// vendor directory.
-//
-// TODO note that sometime soon, we also plan to allow pkgs. this'll change
+// URI for accessing it, the path at which it should be placed within a vendor
+// directory, and the packages that are used in it.
 type LockedProject struct {
 	pi   ProjectIdentifier
 	v    UnpairedVersion
 	r    Revision
 	path string
+	pkgs []string
 }
 
 // SimpleLock is a helper for tools to easily describe lock data when they know
@@ -59,7 +58,7 @@ func (l SimpleLock) Projects() []LockedProject {
 // to simply dismiss that project. By creating a hard failure case via panic
 // instead, we are trying to avoid inflicting the resulting pain on the user by
 // instead forcing a decision on the Analyzer implementation.
-func NewLockedProject(n ProjectName, v Version, uri, path string) LockedProject {
+func NewLockedProject(n ProjectName, v Version, uri, path string, pkgs []string) LockedProject {
 	if v == nil {
 		panic("must provide a non-nil version to create a LockedProject")
 	}
@@ -70,6 +69,7 @@ func NewLockedProject(n ProjectName, v Version, uri, path string) LockedProject 
 			NetworkName: uri,
 		},
 		path: path,
+		pkgs: pkgs,
 	}
 
 	switch tv := v.(type) {
