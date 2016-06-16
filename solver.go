@@ -400,10 +400,7 @@ func (s *solver) getImportsAndConstraintsOf(a atomWithPackages) ([]completeDep, 
 	}
 
 	// Now, add in the ones we already knew about
-	// FIXME this is almost certainly wrong, as it is jumping the gap between
-	// projects that have actually been selected, and the imports and
-	// constraints expressed by those projects.
-	curp := s.sel.getSelectedPackagesIn(a.atom.Ident)
+	curp := s.sel.getRequiredPackagesIn(a.atom.Ident)
 	for pkg := range curp {
 		if expkgs, exists := allex[pkg]; !exists {
 			// It should be impossible for there to be a selected package
@@ -912,9 +909,6 @@ func (s *solver) fail(i ProjectIdentifier) {
 }
 
 func (s *solver) selectAtomWithPackages(a atomWithPackages) {
-	// TODO so...i guess maybe this is just totally redudant with
-	// selectVersion()? ugh. well, at least for now, until we things exercise
-	// bimodality
 	s.unsel.remove(bimodalIdentifier{
 		id: a.atom.Ident,
 		pl: a.pl,
