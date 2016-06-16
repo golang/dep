@@ -1,9 +1,14 @@
 package vsolver
 
 type selection struct {
-	projects []atomWithPackages
+	projects []selected
 	deps     map[ProjectIdentifier][]Dependency
 	sm       sourceBridge
+}
+
+type selected struct {
+	a     atomWithPackages
+	first bool
 }
 
 func (s *selection) getDependenciesOn(id ProjectIdentifier) []Dependency {
@@ -12,6 +17,26 @@ func (s *selection) getDependenciesOn(id ProjectIdentifier) []Dependency {
 	}
 
 	return nil
+}
+
+// pushSelection pushes a new atomWithPackages onto the selection stack, along
+// with an indicator as to whether this selection indicates a new project *and*
+// packages, or merely some new packages on a project that was already selected.
+func (s *selection) pushSelection(a atomWithPackages, first bool) {
+	s.projects = append(s.projects, selected{
+		a:     a,
+		first: first,
+	})
+}
+
+// popSelection removes and returns the last atomWithPackages from the selection
+// stack, along with an indication of whether that element was the first from
+// that project - that is, if it represented an addition of both a project and
+// one or more packages to the overall selection.
+func (s *selection) popSelection() (atomWithPackages, bool) {
+	var sel selected
+	sel, s.projects = s.projects[len(s.projects)-1], s.projects[:len(s.projects)-1]
+	return sel.a, sel.first
 }
 
 func (s *selection) pushDep(dep Dependency) {
@@ -62,8 +87,8 @@ func (s *selection) getSelectedPackagesIn(id ProjectIdentifier) map[string]int {
 	// structure so that we can pop with zero cost.
 	uniq := make(map[string]int)
 	for _, p := range s.projects {
-		if p.atom.Ident.eq(id) {
-			for _, pkg := range p.pl {
+		if p.a.atom.Ident.eq(id) {
+			for _, pkg := range p.a.pl {
 				if count, has := uniq[pkg]; has {
 					count++
 					uniq[pkg] = count
@@ -107,9 +132,9 @@ func (s *selection) getConstraint(id ProjectIdentifier) Constraint {
 // of the project, without any additional package selections that may or may not
 // have happened later.
 func (s *selection) selected(id ProjectIdentifier) (atomWithPackages, bool) {
-	for _, pi := range s.projects {
-		if pi.atom.Ident.eq(id) {
-			return pi, true
+	for _, p := range s.projects {
+		if p.a.atom.Ident.eq(id) {
+			return p.a, true
 		}
 	}
 

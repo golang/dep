@@ -176,7 +176,7 @@ func prepareSolver(opts SolveOpts, sm SourceManager) (*solver, error) {
 	s.rlm = make(map[ProjectIdentifier]LockedProject)
 	s.names = make(map[ProjectName]string)
 
-	// Initialize queues
+	// Initialize stacks and queues
 	s.sel = &selection{
 		deps: make(map[ProjectIdentifier][]Dependency),
 		sm:   s.b,
@@ -332,14 +332,14 @@ func (s *solver) solve() (map[ProjectAtom]map[string]struct{}, error) {
 
 	// Skip the first project. It's always the root, and that shouldn't be
 	// included in results.
-	for _, awp := range s.sel.projects[1:] {
-		pm, exists := projs[awp.atom]
+	for _, sel := range s.sel.projects[1:] {
+		pm, exists := projs[sel.a.atom]
 		if !exists {
 			pm = make(map[string]struct{})
-			projs[awp.atom] = pm
+			projs[sel.a.atom] = pm
 		}
 
-		for _, path := range awp.pl {
+		for _, path := range sel.a.pl {
 			pm[path] = struct{}{}
 		}
 	}
@@ -379,7 +379,7 @@ func (s *solver) selectRoot() error {
 
 	// Push the root project onto the queue.
 	// TODO maybe it'd just be better to skip this?
-	s.sel.projects = append(s.sel.projects, a)
+	s.sel.pushSelection(a, true)
 
 	// If we're looking for root's deps, get it from opts and local root
 	// analysis, rather than having the sm do it
@@ -815,20 +815,33 @@ func (s *solver) backtrack() bool {
 			}
 
 			s.versions, s.versions[len(s.versions)-1] = s.versions[:len(s.versions)-1], nil
-			s.unselectLast()
+
+			// Pop selections off until we get to a project.
+			var proj bool
+			for !proj {
+				_, proj = s.unselectLast()
+			}
 		}
 
 		// Grab the last versionQueue off the list of queues
 		q := s.versions[len(s.versions)-1]
+		// Walk back to the next project
+		var awp atomWithPackages
+		var proj bool
 
-		// another assert that the last in s.sel's ids is == q.current
-		atom := s.unselectLast()
+		for !proj {
+			awp, proj = s.unselectLast()
+		}
+
+		if !q.id.eq(awp.atom.Ident) {
+			panic("canary - version queue stack and selected project stack are out of alignment")
+		}
 
 		// Advance the queue past the current version, which we know is bad
 		// TODO is it feasible to make available the failure reason here?
 		if q.advance(nil) == nil && !q.isExhausted() {
 			// Search for another acceptable version of this failed dep in its queue
-			if s.findValidVersion(q, atom.pl) == nil {
+			if s.findValidVersion(q, awp.pl) == nil {
 				s.logSolve()
 
 				// Found one! Put it back on the selected queue and stop
@@ -838,7 +851,7 @@ func (s *solver) backtrack() bool {
 						Ident:   q.id,
 						Version: q.current(),
 					},
-					pl: atom.pl,
+					pl: awp.pl,
 				})
 				break
 			}
@@ -947,7 +960,7 @@ func (s *solver) selectAtomWithPackages(a atomWithPackages) {
 		pl: a.pl,
 	})
 
-	s.sel.projects = append(s.sel.projects, a)
+	s.sel.pushSelection(a, true)
 
 	deps, err := s.getImportsAndConstraintsOf(a)
 	if err != nil {
@@ -977,33 +990,15 @@ func (s *solver) selectAtomWithPackages(a atomWithPackages) {
 	}
 }
 
-//func (s *solver) selectVersion(pa ProjectAtom) {
-//s.unsel.remove(pa.Ident)
-//s.sel.projects = append(s.sel.projects, pa)
+func (s *solver) selectPackages(a atomWithPackages) {
+	s.unsel.remove(bimodalIdentifier{
+		id: a.atom.Ident,
+		pl: a.pl,
+	})
+}
 
-//deps, err := s.getImportsAndConstraintsOf(atomWithPackages{atom: pa})
-//if err != nil {
-//// if we're choosing a package that has errors getting its deps, there's
-//// a bigger problem
-//// TODO try to create a test that hits this
-//panic(fmt.Sprintf("shouldn't be possible %s", err))
-//}
-
-//for _, dep := range deps {
-//s.sel.pushDep(Dependency{Depender: pa, Dep: dep})
-
-//// add project to unselected queue if this is the first dep on it -
-//// otherwise it's already in there, or been selected
-//if s.sel.depperCount(dep.Ident) == 1 {
-//s.names[dep.Ident.LocalName] = dep.Ident.netName()
-//heap.Push(s.unsel, dep.Ident)
-//}
-//}
-//}
-
-func (s *solver) unselectLast() atomWithPackages {
-	var awp atomWithPackages
-	awp, s.sel.projects = s.sel.projects[len(s.sel.projects)-1], s.sel.projects[:len(s.sel.projects)-1]
+func (s *solver) unselectLast() (atomWithPackages, bool) {
+	awp, first := s.sel.popSelection()
 	heap.Push(s.unsel, bimodalIdentifier{id: awp.atom.Ident, pl: awp.pl})
 
 	deps, err := s.getImportsAndConstraintsOf(awp)
@@ -1024,7 +1019,7 @@ func (s *solver) unselectLast() atomWithPackages {
 		}
 	}
 
-	return awp
+	return awp, first
 }
 
 func (s *solver) logStart(bmi bimodalIdentifier) {
