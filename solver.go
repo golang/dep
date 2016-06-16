@@ -986,13 +986,14 @@ func (s *solver) unselectLast() atomWithPackages {
 	return awp
 }
 
-func (s *solver) logStart(id ProjectIdentifier) {
+func (s *solver) logStart(bmi bimodalIdentifier) {
 	if !s.o.Trace {
 		return
 	}
 
 	prefix := strings.Repeat("| ", len(s.versions)+1)
-	s.tl.Printf("%s\n", tracePrefix(fmt.Sprintf("? attempting %s", id.errString()), prefix, prefix))
+	// TODO how...to list the packages in the limited space we have?
+	s.tl.Printf("%s\n", tracePrefix(fmt.Sprintf("? attempting %s (with %v packages)", bmi.id.errString(), len(bmi.pl)), prefix, prefix))
 }
 
 func (s *solver) logSolve(args ...interface{}) {
