@@ -3,7 +3,6 @@ package vsolver
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 	"sort"
 )
 
@@ -349,7 +348,7 @@ func (b *bridge) externalReach(id ProjectIdentifier, v Version) (map[string][]st
 		return b.sm.ExternalReach(b.key(id), v)
 	}
 
-	m, err := ExternalReach(filepath.Join(pm.ctx.GOPATH, "src", string(id.LocalName)), string(pm.n), false)
+	return ExternalReach(b.root, string(b.name), true)
 }
 
 // listExternal wraps the SourceManager's ListExternal() method.

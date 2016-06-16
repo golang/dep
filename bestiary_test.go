@@ -990,6 +990,13 @@ func (b *depspecBridge) verifyRoot(path string) error {
 	return nil
 }
 
+func (b *depspecBridge) externalReach(id ProjectIdentifier, v Version) (map[string][]string, error) {
+	return b.sm.ExternalReach(b.key(id), v)
+}
+func (b *depspecBridge) listPackages(id ProjectIdentifier, v Version) (map[string]string, error) {
+	return b.sm.ListPackages(b.key(id), v)
+}
+
 // override deduceRemoteRepo on bridge to make all our pkg/project mappings work
 // as expected
 func (b *depspecBridge) deduceRemoteRepo(path string) (*remoteRepo, error) {

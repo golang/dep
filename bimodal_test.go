@@ -324,8 +324,9 @@ func newbmSM(ds []depspec) *bmSourceManager {
 }
 
 func (sm *bmSourceManager) ListPackages(n ProjectName, v Version) (map[string]string, error) {
-	for _, ds := range sm.specs {
-		if n == ds.n && v.Matches(ds.v) {
+	for k, ds := range sm.specs {
+		// Cheat for root, otherwise we blow up b/c version is empty
+		if n == ds.n && (k == 0 || ds.v.Matches(v)) {
 			m := make(map[string]string)
 
 			for _, pkg := range ds.pkgs {

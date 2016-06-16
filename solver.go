@@ -303,7 +303,8 @@ func (s *solver) solve() (map[ProjectAtom]map[string]struct{}, error) {
 	for _, awp := range s.sel.projects[1:] {
 		pm, exists := projs[awp.atom]
 		if !exists {
-			projs[awp.atom] = make(map[string]struct{})
+			pm = make(map[string]struct{})
+			projs[awp.atom] = pm
 		}
 
 		for _, path := range awp.pl {
@@ -944,7 +945,7 @@ func (s *solver) selectAtomWithPackages(a atomWithPackages) {
 			// the unseleced queue to dedupe on input? what side effects would
 			// that have? would it still be safe to backtrack on that queue?
 			s.names[dep.Ident.LocalName] = dep.Ident.netName()
-			heap.Push(s.unsel, dep.Ident)
+			heap.Push(s.unsel, bimodalIdentifier{id: dep.Ident, pl: dep.pl})
 		}
 	}
 }
@@ -976,7 +977,7 @@ func (s *solver) selectAtomWithPackages(a atomWithPackages) {
 func (s *solver) unselectLast() atomWithPackages {
 	var awp atomWithPackages
 	awp, s.sel.projects = s.sel.projects[len(s.sel.projects)-1], s.sel.projects[:len(s.sel.projects)-1]
-	heap.Push(s.unsel, awp.atom.Ident)
+	heap.Push(s.unsel, bimodalIdentifier{id: awp.atom.Ident, pl: awp.pl})
 
 	deps, err := s.getImportsAndConstraintsOf(awp)
 	if err != nil {
