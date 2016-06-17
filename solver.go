@@ -818,7 +818,26 @@ func (s *solver) nextUnselected() (bimodalIdentifier, bool) {
 }
 
 func (s *solver) unselectedComparator(i, j int) bool {
-	iname, jname := s.unsel.sl[i].id, s.unsel.sl[j].id
+	ibmi, jbmi := s.unsel.sl[i], s.unsel.sl[j]
+	iname, jname := ibmi.id, jbmi.id
+
+	// Most important thing is pushing package additions ahead of project
+	// additions. Package additions can't walk their version queue, so all they
+	// do is narrow the possibility of success; better to find out early and
+	// fast if they're going to fail than wait until after we've done real work
+	// on a project and have to backtrack across it.
+
+	// FIXME the impl here is currently O(n) in the number of selections; it
+	// absolutely cannot stay in a hot sorting path like this
+	_, isel := s.sel.selected(iname)
+	_, jsel := s.sel.selected(jname)
+
+	if isel && !jsel {
+		return true
+	}
+	if !isel && jsel {
+		return false
+	}
 
 	if iname.eq(jname) {
 		return false
