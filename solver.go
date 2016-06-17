@@ -318,7 +318,7 @@ func (s *solver) solve() (map[ProjectAtom]map[string]struct{}, error) {
 				}
 				return nil, err
 			}
-			s.selectAtomWithPackages(nawp)
+			s.selectPackages(nawp)
 			// We don't add anything to the stack of version queues because the
 			// backtracker knows not to popping the vqstack if it backtracks
 			// across a package addition.
@@ -954,6 +954,10 @@ func (s *solver) fail(id ProjectIdentifier) {
 	}
 }
 
+// selectAtomWithPackages handles the selection case where a new project is
+// being added to the selection queue, alongside some number of its contained
+// packages. This method pushes them onto the selection queue, then adds any
+// new resultant deps to the unselected queue.
 func (s *solver) selectAtomWithPackages(a atomWithPackages) {
 	s.unsel.remove(bimodalIdentifier{
 		id: a.atom.Ident,
@@ -967,34 +971,72 @@ func (s *solver) selectAtomWithPackages(a atomWithPackages) {
 		// if we're choosing a package that has errors getting its deps, there's
 		// a bigger problem
 		// TODO try to create a test that hits this
-		panic(fmt.Sprintf("shouldn't be possible %s", err))
+		panic(fmt.Sprintf("canary - shouldn't be possible %s", err))
 	}
 
 	for _, dep := range deps {
 		s.sel.pushDep(Dependency{Depender: a.atom, Dep: dep})
-		// Add this dep to the unselected queue if the selection contains only
-		// the one bit of information we just pushed in.
+		// Go through all the packages introduced on this dep, selecting only
+		// the ones where the only depper on them is what we pushed in. Then,
+		// put those into the unselected queue.
+		rpm := s.sel.getRequiredPackagesIn(dep.Ident)
+		var newp []string
+		for _, pkg := range dep.pl {
+			if rpm[pkg] == 1 {
+				newp = append(newp, pkg)
+			}
+		}
+
+		if len(newp) > 0 {
+			heap.Push(s.unsel, bimodalIdentifier{id: dep.Ident, pl: newp})
+		}
 
 		if s.sel.depperCount(dep.Ident) == 1 {
-			// ...or if the dep is already selected, and the atom we're
-			// selecting imports new packages from the dep that aren't already
-			// selected
-
-			// ugh ok so...do we search what's in the pkg deps list, and then
-			// push the dep into the unselected queue? or maybe we just change
-			// the unseleced queue to dedupe on input? what side effects would
-			// that have? would it still be safe to backtrack on that queue?
 			s.names[dep.Ident.LocalName] = dep.Ident.netName()
-			heap.Push(s.unsel, bimodalIdentifier{id: dep.Ident, pl: dep.pl})
 		}
 	}
 }
 
+// selectPackages handles the selection case where we're just adding some new
+// packages to a project that was already selected. After pushing the selection,
+// it adds any newly-discovered deps to the unselected queue.
+//
+// It also takes an atomWithPackages because we need that same information in
+// order to enqueue the selection.
 func (s *solver) selectPackages(a atomWithPackages) {
 	s.unsel.remove(bimodalIdentifier{
 		id: a.atom.Ident,
 		pl: a.pl,
 	})
+
+	s.sel.pushSelection(a, false)
+
+	deps, err := s.getImportsAndConstraintsOf(a)
+	if err != nil {
+		panic(fmt.Sprintf("canary - shouldn't be possible %s", err))
+	}
+
+	for _, dep := range deps {
+		s.sel.pushDep(Dependency{Depender: a.atom, Dep: dep})
+		// Go through all the packages introduced on this dep, selecting only
+		// the ones where the only depper on them is what we pushed in. Then,
+		// put those into the unselected queue.
+		rpm := s.sel.getRequiredPackagesIn(dep.Ident)
+		var newp []string
+		for _, pkg := range dep.pl {
+			if rpm[pkg] == 1 {
+				newp = append(newp, pkg)
+			}
+		}
+
+		if len(newp) > 0 {
+			heap.Push(s.unsel, bimodalIdentifier{id: dep.Ident, pl: newp})
+		}
+
+		if s.sel.depperCount(dep.Ident) == 1 {
+			s.names[dep.Ident.LocalName] = dep.Ident.netName()
+		}
+	}
 }
 
 func (s *solver) unselectLast() (atomWithPackages, bool) {

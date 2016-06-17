@@ -374,8 +374,6 @@ func TestDeduceRemotes(t *testing.T) {
 		if want == nil {
 			if err == nil {
 				t.Errorf("deduceRemoteRepo(%q): Error expected but not received", fix.path)
-			} else if testing.Verbose() {
-				t.Logf("deduceRemoteRepo(%q) expected err: %v", fix.path, err)
 			}
 			continue
 		}
