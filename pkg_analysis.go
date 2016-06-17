@@ -42,18 +42,14 @@ func init() {
 // main indicates whether (true) or not (false) to include main packages in the
 // analysis. main packages should generally be excluded when analyzing the
 // non-root dependency, as they inherently can't be imported.
-func ExternalReach(basedir, projname string, main bool) (rm map[string][]string, err error) {
+func ExternalReach(basedir, projname string, main bool) (map[string][]string, error) {
 	ctx := build.Default
 	ctx.UseAllFiles = true // optimistic, but we do it for the first try
 
-	type wm struct {
-		ex map[string]struct{}
-		in map[string]struct{}
-	}
 	// world's simplest adjacency list
 	workmap := make(map[string]wm)
 
-	err = filepath.Walk(basedir, func(path string, fi os.FileInfo, err error) error {
+	err := filepath.Walk(basedir, func(path string, fi os.FileInfo, err error) error {
 		if err != nil && err != filepath.SkipDir {
 			return err
 		}
@@ -119,11 +115,27 @@ func ExternalReach(basedir, projname string, main bool) (rm map[string][]string,
 	})
 
 	if err != nil {
-		return
+		return nil, err
 	}
 
-	// Now just brute-force through the workmap, repeating until we make
-	// no progress, either because no packages have any unresolved internal
+	return wmToReach(workmap, basedir)
+}
+
+type wm struct {
+	ex map[string]struct{}
+	in map[string]struct{}
+}
+
+// wmToReach takes an ExternalReach()-style workmap and transitively walks all
+// internal imports until they reach an external path or terminate, then
+// translates the results into a slice of external imports for each internal
+// pkg.
+//
+// The basedir string, with a trailing slash ensured, will be stripped from the
+// keys of the returned map.
+func wmToReach(workmap map[string]wm, basedir string) (rm map[string][]string, err error) {
+	// Just brute-force through the workmap, repeating until we make no
+	// progress, either because no packages have any unresolved internal
 	// packages left (in which case we're done), or because some packages can't
 	// find something in the 'in' list (which shouldn't be possible)
 	//
@@ -190,7 +202,7 @@ func ExternalReach(basedir, projname string, main bool) (rm map[string][]string,
 		rm[strings.TrimPrefix(pkg, rt)] = edeps
 	}
 
-	return
+	return rm, nil
 }
 
 func listExternalDeps(basedir, projname string, main bool) ([]string, error) {

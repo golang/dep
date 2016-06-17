@@ -2,6 +2,7 @@ package vsolver
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 )
 
@@ -34,7 +35,7 @@ func init() {
 // them down in init().
 var bimodalFixtures = map[string]bimodalFixture{
 	// Simple case, ensures that we do the very basics of picking up and
-	// including a single, simple import that is expressed an import
+	// including a single, simple import that is not expressed as a constraint
 	"simple bm-add": {
 		ds: []depspec{
 			dsp(dsv("root 0.0.0"),
@@ -53,6 +54,38 @@ var bimodalFixtures = map[string]bimodalFixture{
 			dsp(dsv("root 0.0.0"),
 				pkg("root", "root/foo"),
 				pkg("root/foo", "a"),
+			),
+			dsp(dsv("a 1.0.0"),
+				pkg("a"),
+			),
+		},
+		r: mkresults(
+			"a 1.0.0",
+		),
+	},
+	// The same, but with a jump through two subpkgs
+	"double-subpkg bm-add": {
+		ds: []depspec{
+			dsp(dsv("root 0.0.0"),
+				pkg("root", "root/foo"),
+				pkg("root/foo", "root/bar"),
+				pkg("root/bar", "a"),
+			),
+			dsp(dsv("a 1.0.0"),
+				pkg("a"),
+			),
+		},
+		r: mkresults(
+			"a 1.0.0",
+		),
+	},
+	// Same again, but now nest the subpkgs
+	"double nested subpkg bm-add": {
+		ds: []depspec{
+			dsp(dsv("root 0.0.0"),
+				pkg("root", "root/foo"),
+				pkg("root/foo", "root/foo/bar"),
+				pkg("root/foo/bar", "a"),
 			),
 			dsp(dsv("a 1.0.0"),
 				pkg("a"),
@@ -360,22 +393,6 @@ func (sm *bmSourceManager) ListPackages(n ProjectName, v Version) (map[string]st
 	return nil, fmt.Errorf("Project %s at version %s could not be found", n, v)
 }
 
-func (sm *bmSourceManager) ExternalReach(n ProjectName, v Version) (map[string][]string, error) {
-	for _, ds := range sm.specs {
-		if ds.n == n && v.Matches(ds.v) {
-			rm := make(map[string][]string)
-			for _, pkg := range ds.pkgs {
-				rm[pkg.path] = pkg.imports
-			}
-
-			return rm, nil
-		}
-	}
-
-	// TODO proper solver errs
-	return nil, fmt.Errorf("No reach data for %s at version %s", n, v)
-}
-
 // computeBimodalExternalMap takes a set of depspecs and computes an
 // internally-versioned external reach map that is useful for quickly answering
 // ListExternal()-type calls.
@@ -383,29 +400,59 @@ func (sm *bmSourceManager) ExternalReach(n ProjectName, v Version) (map[string][
 // Note that it does not do things like stripping out stdlib packages - these
 // maps are intended for use in SM fixtures, and that's a higher-level
 // responsibility within the system.
-func computeBimodalExternalMap(ds []depspec) map[pident][]string {
-	rm := make(map[pident][]string)
+func computeBimodalExternalMap(ds []depspec) map[pident]map[string][]string {
+	// map of project name+version -> map of subpkg name -> external pkg list
+	rm := make(map[pident]map[string][]string)
 
+	// algorithm adapted from ExternalReach()
 	for _, d := range ds {
-		exmap := make(map[string]struct{})
+		// Keeps a list of all internal and external reaches for packages within
+		// a given root. We create one on each pass through, rather than doing
+		// them all at once, because the depspec set may (read: is expected to)
+		// have multiple versions of the same base project, and each of those
+		// must be calculated independently.
+		workmap := make(map[string]wm)
 
 		for _, pkg := range d.pkgs {
-			for _, ex := range pkg.imports {
-				if !strings.HasPrefix(ex, string(d.n)) {
-					exmap[ex] = struct{}{}
+			if !strings.HasPrefix(filepath.Clean(pkg.path), string(d.n)) {
+				panic(fmt.Sprintf("pkg %s is not a child of %s, cannot be a part of that project", pkg.path, d.n))
+			}
+
+			w := wm{
+				ex: make(map[string]struct{}),
+				in: make(map[string]struct{}),
+			}
+
+			for _, imp := range pkg.imports {
+				if !strings.HasPrefix(filepath.Clean(imp), string(d.n)) {
+					// Easy case - if the import is not a child of the base
+					// project path, put it in the external map
+					w.ex[imp] = struct{}{}
+				} else {
+					if w2, seen := workmap[imp]; seen {
+						// If it is, and we've seen that path, dereference it
+						// immediately
+						for i := range w2.ex {
+							w.ex[i] = struct{}{}
+						}
+						for i := range w2.in {
+							w.in[i] = struct{}{}
+						}
+					} else {
+						// Otherwise, put it in the 'in' map for later
+						// reprocessing
+						w.in[imp] = struct{}{}
+					}
 				}
 			}
+			workmap[pkg.path] = w
 		}
 
-		var list []string
-		for ex := range exmap {
-			list = append(list, ex)
+		drm, err := wmToReach(workmap, "")
+		if err != nil {
+			panic(err)
 		}
-		id := pident{
-			n: d.n,
-			v: d.v,
-		}
-		rm[id] = list
+		rm[pident{n: d.n, v: d.v}] = drm
 	}
 
 	return rm

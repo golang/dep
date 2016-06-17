@@ -55,7 +55,7 @@ func TestBasicSolves(t *testing.T) {
 }
 
 func solveBasicsAndCheck(fix basicFixture, t *testing.T) (res Result, err error) {
-	sm := newdepspecSM(fix.ds, fix.rm)
+	sm := newdepspecSM(fix.ds, computeBasicReachMap(fix.ds))
 
 	o := SolveOpts{
 		Root:      string(fix.ds[0].Name()),
@@ -257,9 +257,8 @@ func TestRootLockNoVersionPairMatching(t *testing.T) {
 	pd := fix.ds[0].deps[0]
 	pd.Constraint = Revision("foorev")
 	fix.ds[0].deps[0] = pd
-	fix.rm = computeReachMap(fix.ds)
 
-	sm := newdepspecSM(fix.ds, fix.rm)
+	sm := newdepspecSM(fix.ds, computeBasicReachMap(fix.ds))
 
 	l2 := make(fixLock, 1)
 	copy(l2, fix.l)
@@ -305,7 +304,7 @@ func getFailureCausingProjects(err error) (projs []string) {
 }
 
 func TestBadSolveOpts(t *testing.T) {
-	sm := newdepspecSM(basicFixtures[0].ds, basicFixtures[0].rm)
+	sm := newdepspecSM(basicFixtures[0].ds, computeBasicReachMap(basicFixtures[0].ds))
 
 	o := SolveOpts{}
 	_, err := prepareSolver(o, sm)

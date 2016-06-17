@@ -197,28 +197,27 @@ func mkresults(pairs ...string) map[string]Version {
 	return m
 }
 
-// computeReachMap takes a depspec and computes a reach map which is identical
-// to the explicit depgraph.
-func computeReachMap(ds []depspec) map[pident][]string {
-	rm := make(map[pident][]string)
+// computeBasicReachMap takes a depspec and computes a reach map which is
+// identical to the explicit depgraph.
+//
+// Using a reachMap here is overkill for what the basic fixtures actually need,
+// but we use it anyway for congruence with the more general cases.
+func computeBasicReachMap(ds []depspec) reachMap {
+	rm := make(reachMap)
 
 	for k, d := range ds {
-		id := pident{
-			n: d.n,
-			v: d.v,
-		}
-
-		// Ensure we capture things even with no deps
-		rm[id] = nil
+		lm := make(map[string][]string)
+		rm[pident{n: d.n, v: d.v}] = lm
+		n := string(d.n)
 
 		for _, dep := range d.deps {
-			rm[id] = append(rm[id], string(dep.Ident.LocalName))
+			lm[n] = append(lm[n], string(dep.Ident.LocalName))
 		}
 
 		// first is root
 		if k == 0 {
 			for _, dep := range d.devdeps {
-				rm[id] = append(rm[id], string(dep.Ident.LocalName))
+				lm[n] = append(lm[n], string(dep.Ident.LocalName))
 			}
 		}
 	}
@@ -244,8 +243,6 @@ type basicFixture struct {
 	n string
 	// depspecs. always treat first as root
 	ds []depspec
-	// reachability map for each name
-	rm map[pident][]string
 	// results; map of name/version pairs
 	r map[string]Version
 	// max attempts the solver should need to find solution. 0 means no limit
@@ -850,16 +847,15 @@ func init() {
 	}
 
 	basicFixtures = append(basicFixtures, fix)
-
-	for k, f := range basicFixtures {
-		f.rm = computeReachMap(f.ds)
-		basicFixtures[k] = f
-	}
 }
+
+// reachMaps contain ExternalReach()-type data for a given depspec fixture's
+// universe of proejcts, packages, and versions.
+type reachMap map[pident]map[string][]string
 
 type depspecSourceManager struct {
 	specs  []depspec
-	rm     map[pident][]string
+	rm     reachMap
 	sortup bool
 }
 
@@ -871,7 +867,7 @@ type fixSM interface {
 
 var _ fixSM = &depspecSourceManager{}
 
-func newdepspecSM(ds []depspec, rm map[pident][]string) *depspecSourceManager {
+func newdepspecSM(ds []depspec, rm reachMap) *depspecSourceManager {
 	return &depspecSourceManager{
 		specs: ds,
 		rm:    rm,
@@ -896,10 +892,7 @@ func (sm *depspecSourceManager) GetProjectInfo(n ProjectName, v Version) (Projec
 
 func (sm *depspecSourceManager) ExternalReach(n ProjectName, v Version) (map[string][]string, error) {
 	id := pident{n: n, v: v}
-	if r, exists := sm.rm[id]; exists {
-		m := make(map[string][]string)
-		m[string(n)] = r
-
+	if m, exists := sm.rm[id]; exists {
 		return m, nil
 	}
 	return nil, fmt.Errorf("No reach data for %s at version %s", n, v)
@@ -909,7 +902,7 @@ func (sm *depspecSourceManager) ListExternal(n ProjectName, v Version) ([]string
 	// This should only be called for the root
 	id := pident{n: n, v: v}
 	if r, exists := sm.rm[id]; exists {
-		return r, nil
+		return r[string(n)], nil
 	}
 	return nil, fmt.Errorf("No reach data for %s at version %s", n, v)
 }

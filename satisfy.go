@@ -1,13 +1,13 @@
 package vsolver
 
-// satisfiable is the main checking method. It determines if introducing a new
-// project atom would result in a state where all solver requirements are still
-// satisfied.
-func (s *solver) satisfiable(a atomWithPackages) error {
+// checkProject performs all constraint checks on a new project (with packages)
+// that we want to select. It determines if selecting the atom would result in
+// a state where all solver requirements are still satisfied.
+func (s *solver) checkProject(a atomWithPackages) error {
 	pa := a.atom
 	if emptyProjectAtom == pa {
-		// TODO we should protect against this case elsewhere, but for now panic
-		// to canary when it's a problem
+		// This shouldn't be able to happen, but if it does, it unequivocally
+		// indicates a logical bug somewhere, so blowing up is preferable
 		panic("canary - checking version of empty ProjectAtom")
 	}
 
@@ -15,7 +15,6 @@ func (s *solver) satisfiable(a atomWithPackages) error {
 		return err
 	}
 
-	//deps, err := s.getDependenciesOf(pa)
 	deps, err := s.getImportsAndConstraintsOf(a)
 	if err != nil {
 		// An err here would be from the package fetcher; pass it straight back
@@ -39,7 +38,16 @@ func (s *solver) satisfiable(a atomWithPackages) error {
 	return nil
 }
 
+// checkPackages performs all constraint checks new packages being added to an
+// already-selected project. It determines if selecting the packages would
+// result in a state where all solver requirements are still satisfied.
 func (s *solver) checkPackage(a atomWithPackages) error {
+	if emptyProjectAtom == a.atom {
+		// This shouldn't be able to happen, but if it does, it unequivocally
+		// indicates a logical bug somewhere, so blowing up is preferable
+		panic("canary - checking version of empty ProjectAtom")
+	}
+
 	// The base atom was already validated, so we can skip the
 	// checkAtomAllowable step.
 	deps, err := s.getImportsAndConstraintsOf(a)

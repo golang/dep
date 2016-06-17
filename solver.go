@@ -11,7 +11,6 @@ import (
 	"strings"
 
 	"github.com/armon/go-radix"
-	"github.com/hashicorp/go-immutable-radix"
 )
 
 var (
@@ -128,10 +127,6 @@ type solver struct {
 
 	// A normalized, copied version of the root manifest.
 	rm Manifest
-
-	// A radix tree representing the immediate externally reachable packages, as
-	// determined by static analysis of the root project.
-	xt *iradix.Tree
 }
 
 // Solve attempts to find a dependency solution for the given project, as
@@ -426,30 +421,37 @@ func (s *solver) getImportsAndConstraintsOf(a atomWithPackages) ([]completeDep, 
 
 	// Use a map to dedupe the unique external packages
 	exmap := make(map[string]struct{})
-	// Add the packages explicitly listed in the atom to the reach list
+	// Add the packages reached by the packages explicitly listed in the atom to
+	// the list
 	for _, pkg := range a.pl {
-		exmap[pkg] = struct{}{}
-	}
-
-	// Now, add in the ones we already knew about
-	// TODO could we just skip this completely and be safe? It seems redundant
-	// right now. Maybe not, once we start allowing multiple versions of
-	// projects?
-	curp := s.sel.getRequiredPackagesIn(a.atom.Ident)
-	for pkg := range curp {
 		if expkgs, exists := allex[pkg]; !exists {
-			// It should be impossible for there to be a selected package
-			// that's not in the external reach map; such a condition should
-			// have been caught earlier during satisfiability checks. So,
-			// explicitly panic here (rather than implicitly when we try to
-			// retrieve a nonexistent map entry) as a canary.
-			panic("canary - selection contains an atom with pkgs that apparently don't actually exist")
+			return nil, fmt.Errorf("Package %s does not exist within project %s", pkg, a.atom.Ident.errString())
 		} else {
 			for _, ex := range expkgs {
 				exmap[ex] = struct{}{}
 			}
 		}
 	}
+
+	// Now, add in the ones we already knew about
+	// TODO could we just skip this completely and be safe? It seems redundant
+	// right now. Maybe not, once we start allowing multiple versions of
+	// projects?
+	//curp := s.sel.getRequiredPackagesIn(a.atom.Ident)
+	//for pkg := range curp {
+	//if expkgs, exists := allex[pkg]; !exists {
+	//// It should be impossible for there to be a selected package
+	//// that's not in the external reach map; such a condition should
+	//// have been caught earlier during satisfiability checks. So,
+	//// explicitly panic here (rather than implicitly when we try to
+	//// retrieve a nonexistent map entry) as a canary.
+	//panic("canary - selection contains an atom with pkgs that apparently don't actually exist")
+	//} else {
+	//for _, ex := range expkgs {
+	//exmap[ex] = struct{}{}
+	//}
+	//}
+	//}
 
 	reach := make([]string, len(exmap))
 	k := 0
@@ -462,6 +464,9 @@ func (s *solver) getImportsAndConstraintsOf(a atomWithPackages) ([]completeDep, 
 	// TODO add overrides here...if we impl the concept (which we should)
 
 	return s.intersectConstraintsWithImports(deps, reach)
+	//z, x := s.intersectConstraintsWithImports(deps, reach)
+	//pretty.Println(a.atom.Ident.LocalName, z)
+	//return z, x
 }
 
 // intersectConstraintsWithImports takes a list of constraints and a list of
@@ -616,7 +621,7 @@ func (s *solver) findValidVersion(q *versionQueue, pl []string) error {
 
 	for {
 		cur := q.current()
-		err := s.satisfiable(atomWithPackages{
+		err := s.checkProject(atomWithPackages{
 			atom: ProjectAtom{
 				Ident:   q.id,
 				Version: cur,
@@ -902,6 +907,7 @@ func (s *solver) unselectedComparator(i, j int) bool {
 
 	rname := s.rm.Name()
 	// *always* put root project first
+	// TODO wait, it shouldn't be possible to have root in here...?
 	if iname.LocalName == rname {
 		return true
 	}

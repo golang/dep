@@ -176,8 +176,8 @@ func (u *unselected) Pop() (v interface{}) {
 // during backtracking, when an item becomes unnecessary because the item that
 // induced it was popped off.
 //
-// The worst case for both of these is O(n), but the first case will always
-// complete quickly, as we iterate the queue from front to back.
+// The worst case for both of these is O(n), but in practice the first case is
+// be O(1), as we iterate the queue from front to back.
 func (u *unselected) remove(bmi bimodalIdentifier) {
 	// TODO is it worth implementing a binary search here?
 	for k, pi := range u.sl {
