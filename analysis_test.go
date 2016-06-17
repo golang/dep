@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-// ExternalReach uses an easily separable algorithm, wmToReach(), to turn a
+// externalReach() uses an easily separable algorithm, wmToReach(), to turn a
 // discovered set of packages and their imports into a proper external reach
 // map.
 //

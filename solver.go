@@ -433,26 +433,6 @@ func (s *solver) getImportsAndConstraintsOf(a atomWithPackages) ([]completeDep, 
 		}
 	}
 
-	// Now, add in the ones we already knew about
-	// TODO could we just skip this completely and be safe? It seems redundant
-	// right now. Maybe not, once we start allowing multiple versions of
-	// projects?
-	//curp := s.sel.getRequiredPackagesIn(a.atom.Ident)
-	//for pkg := range curp {
-	//if expkgs, exists := allex[pkg]; !exists {
-	//// It should be impossible for there to be a selected package
-	//// that's not in the external reach map; such a condition should
-	//// have been caught earlier during satisfiability checks. So,
-	//// explicitly panic here (rather than implicitly when we try to
-	//// retrieve a nonexistent map entry) as a canary.
-	//panic("canary - selection contains an atom with pkgs that apparently don't actually exist")
-	//} else {
-	//for _, ex := range expkgs {
-	//exmap[ex] = struct{}{}
-	//}
-	//}
-	//}
-
 	reach := make([]string, len(exmap))
 	k := 0
 	for pkg := range exmap {
@@ -464,9 +444,6 @@ func (s *solver) getImportsAndConstraintsOf(a atomWithPackages) ([]completeDep, 
 	// TODO add overrides here...if we impl the concept (which we should)
 
 	return s.intersectConstraintsWithImports(deps, reach)
-	//z, x := s.intersectConstraintsWithImports(deps, reach)
-	//pretty.Println(a.atom.Ident.LocalName, z)
-	//return z, x
 }
 
 // intersectConstraintsWithImports takes a list of constraints and a list of

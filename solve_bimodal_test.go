@@ -362,8 +362,8 @@ func (f bimodalFixture) result() map[string]Version {
 }
 
 // bmSourceManager is an SM specifically for the bimodal fixtures. It composes
-// the general depspec SM, and differs from it only in how it answers
-// ExternalReach() calls.
+// the general depspec SM, and differs from it only in the way that it answers
+// some static analysis-type calls.
 type bmSourceManager struct {
 	depspecSourceManager
 }
@@ -406,7 +406,7 @@ func computeBimodalExternalMap(ds []depspec) map[pident]map[string][]string {
 	// map of project name+version -> map of subpkg name -> external pkg list
 	rm := make(map[pident]map[string][]string)
 
-	// algorithm adapted from ExternalReach()
+	// algorithm adapted from externalReach()
 	for _, d := range ds {
 		// Keeps a list of all internal and external reaches for packages within
 		// a given root. We create one on each pass through, rather than doing

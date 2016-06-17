@@ -851,7 +851,7 @@ func init() {
 	basicFixtures = append(basicFixtures, fix)
 }
 
-// reachMaps contain ExternalReach()-type data for a given depspec fixture's
+// reachMaps contain externalReach()-type data for a given depspec fixture's
 // universe of proejcts, packages, and versions.
 type reachMap map[pident]map[string][]string
 

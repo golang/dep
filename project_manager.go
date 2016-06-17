@@ -168,7 +168,7 @@ func (pm *projectManager) ExternalReach(v Version) (map[string][]string, error) 
 		err = pm.crepo.r.UpdateVersion(v.String())
 	}
 
-	m, err := ExternalReach(filepath.Join(pm.ctx.GOPATH, "src", string(pm.n)), string(pm.n), false)
+	m, err := externalReach(filepath.Join(pm.ctx.GOPATH, "src", string(pm.n)), string(pm.n), false)
 	pm.crepo.mut.Unlock()
 
 	return m, err

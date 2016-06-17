@@ -348,7 +348,7 @@ func (b *bridge) externalReach(id ProjectIdentifier, v Version) (map[string][]st
 		return b.sm.ExternalReach(b.key(id), v)
 	}
 
-	return ExternalReach(b.root, string(b.name), true)
+	return externalReach(b.root, string(b.name), true)
 }
 
 // listExternal wraps the SourceManager's ListExternal() method.

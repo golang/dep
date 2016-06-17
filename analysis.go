@@ -32,7 +32,7 @@ func init() {
 	}
 }
 
-// ExternalReach takes a base directory (a project root), and computes the list
+// externalReach takes a base directory (a project root), and computes the list
 // of external dependencies (not under the tree at that project root) that are
 // imported by packages in that project tree.
 //
@@ -43,7 +43,7 @@ func init() {
 // main indicates whether (true) or not (false) to include main packages in the
 // analysis. main packages should generally be excluded when analyzing the
 // non-root dependency, as they inherently can't be imported.
-func ExternalReach(basedir, projname string, main bool) (map[string][]string, error) {
+func externalReach(basedir, projname string, main bool) (map[string][]string, error) {
 	ctx := build.Default
 	ctx.UseAllFiles = true // optimistic, but we do it for the first try
 
@@ -127,7 +127,7 @@ type wm struct {
 	in map[string]struct{}
 }
 
-// wmToReach takes an ExternalReach()-style workmap and transitively walks all
+// wmToReach takes an externalReach()-style workmap and transitively walks all
 // internal imports until they reach an external path or terminate, then
 // translates the results into a slice of external imports for each internal
 // pkg.
@@ -142,11 +142,11 @@ func wmToReach(workmap map[string]wm, basedir string) (rm map[string][]string, e
 	//
 	// This implementation is hilariously inefficient in pure computational
 	// complexity terms - worst case is some flavor of polynomial, versus O(n)
-	// for the filesystem scan itself. However, the coefficient for filesystem
-	// access is so much larger than for memory twiddling that it would probably
-	// take an absurdly large and snaky project to ever have that worst-case
-	// polynomial growth supercede (or even become comparable to) the linear
-	// side.
+	// for the filesystem scan done in externalReach(). However, the coefficient
+	// for filesystem access is so much larger than for memory twiddling that it
+	// would probably take an absurdly large and snaky project to ever have that
+	// worst-case polynomial growth supercede (or even become comparable to) the
+	// linear side.
 	//
 	// But, if that day comes, we can improve this algorithm.
 	rm = make(map[string][]string)
