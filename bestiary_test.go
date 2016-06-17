@@ -1002,7 +1002,7 @@ func (b *depspecBridge) listPackages(id ProjectIdentifier, v Version) (map[strin
 func (b *depspecBridge) deduceRemoteRepo(path string) (*remoteRepo, error) {
 	for _, ds := range b.sm.(fixSM).allSpecs() {
 		n := string(ds.n)
-		if strings.HasPrefix(path, n) {
+		if path == n || strings.HasPrefix(path, n+"/") {
 			return &remoteRepo{
 				Base:   n,
 				RelPkg: strings.TrimPrefix(path, n+"/"),

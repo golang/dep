@@ -477,8 +477,7 @@ func (s *solver) intersectConstraintsWithImports(deps []ProjectDep, reach []stri
 	}
 
 	// Step through the reached packages; if they have prefix matches in
-	// the trie, just assume that's a correct correspondence.
-	// TODO could this be a bad assumption...?
+	// the trie, assume (mostly) it's a correct correspondence.
 	dmap := make(map[ProjectName]completeDep)
 	for _, rp := range reach {
 		// If it's a stdlib package, skip it.
@@ -490,21 +489,34 @@ func (s *solver) intersectConstraintsWithImports(deps []ProjectDep, reach []stri
 
 		// Look for a prefix match; it'll be the root project/repo containing
 		// the reached package
-		if _, idep, match := xt.LongestPrefix(rp); match { //&& strings.HasPrefix(rp, k) {
-			// Valid match found. Put it in the dmap, either creating a new
-			// completeDep or appending it to the existing one for this base
-			// project/prefix.
-			dep := idep.(ProjectDep)
-			if cdep, exists := dmap[dep.Ident.LocalName]; exists {
-				cdep.pl = append(cdep.pl, rp)
-				dmap[dep.Ident.LocalName] = cdep
-			} else {
-				dmap[dep.Ident.LocalName] = completeDep{
-					ProjectDep: dep,
-					pl:         []string{rp},
+		if k, idep, match := xt.LongestPrefix(rp); match {
+			// The radix tree gets it mostly right, but we have to guard against
+			// possibilities like this:
+			//
+			// github.com/sdboyer/foo
+			// github.com/sdboyer/foobar/baz
+			//
+			// The latter would incorrectly be conflated in with the former. So,
+			// as we know we're operating on strings that describe paths, guard
+			// against this case by verifying that either the input is the same
+			// length as the match (in which case we know they're equal), or
+			// that the next character is the is the PathSeparator.
+			if len(k) == len(rp) || strings.IndexRune(rp[:len(k)], os.PathSeparator) == 0 {
+				// Match is valid; put it in the dmap, either creating a new
+				// completeDep or appending it to the existing one for this base
+				// project/prefix.
+				dep := idep.(ProjectDep)
+				if cdep, exists := dmap[dep.Ident.LocalName]; exists {
+					cdep.pl = append(cdep.pl, rp)
+					dmap[dep.Ident.LocalName] = cdep
+				} else {
+					dmap[dep.Ident.LocalName] = completeDep{
+						ProjectDep: dep,
+						pl:         []string{rp},
+					}
 				}
+				continue
 			}
-			continue
 		}
 
 		// No match. Let the SourceManager try to figure out the root

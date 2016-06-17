@@ -256,6 +256,26 @@ var bimodalFixtures = map[string]bimodalFixture{
 			"d 1.0.0",
 		),
 	},
+	// Regression - make sure that the the constraint/import intersector only
+	// accepts a project 'match' if exactly equal, or a separating slash is
+	// present.
+	"radix path separator post-check": {
+		ds: []depspec{
+			dsp(dsv("root 0.0.0"),
+				pkg("root", "foo", "foobar"),
+			),
+			dsp(dsv("foo 1.0.0"),
+				pkg("foo"),
+			),
+			dsp(dsv("foobar 1.0.0"),
+				pkg("foobar"),
+			),
+		},
+		r: mkresults(
+			"foo 1.0.0",
+			"foobar 1.0.0",
+		),
+	},
 }
 
 // tpkg is a representation of a single package. It has its own import path, as
