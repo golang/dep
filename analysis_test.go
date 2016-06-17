@@ -12,6 +12,10 @@ import (
 // That algorithm is purely symbolic (no filesystem interaction), and thus is
 // easy to test. This is that test.
 func TestWorkmapToReach(t *testing.T) {
+	empty := func() map[string]struct{} {
+		return make(map[string]struct{})
+	}
+
 	table := map[string]struct {
 		name    string
 		workmap map[string]wm
@@ -22,8 +26,8 @@ func TestWorkmapToReach(t *testing.T) {
 		"single": {
 			workmap: map[string]wm{
 				"foo": {
-					ex: make(map[string]struct{}),
-					in: make(map[string]struct{}),
+					ex: empty(),
+					in: empty(),
 				},
 			},
 			out: map[string][]string{
@@ -33,12 +37,12 @@ func TestWorkmapToReach(t *testing.T) {
 		"no external": {
 			workmap: map[string]wm{
 				"foo": {
-					ex: make(map[string]struct{}),
-					in: make(map[string]struct{}),
+					ex: empty(),
+					in: empty(),
 				},
 				"foo/bar": {
-					ex: make(map[string]struct{}),
-					in: make(map[string]struct{}),
+					ex: empty(),
+					in: empty(),
 				},
 			},
 			out: map[string][]string{
@@ -49,14 +53,14 @@ func TestWorkmapToReach(t *testing.T) {
 		"no external with subpkg": {
 			workmap: map[string]wm{
 				"foo": {
-					ex: make(map[string]struct{}),
+					ex: empty(),
 					in: map[string]struct{}{
 						"foo/bar": struct{}{},
 					},
 				},
 				"foo/bar": {
-					ex: make(map[string]struct{}),
-					in: make(map[string]struct{}),
+					ex: empty(),
+					in: empty(),
 				},
 			},
 			out: map[string][]string{
@@ -67,7 +71,7 @@ func TestWorkmapToReach(t *testing.T) {
 		"simple base transitive": {
 			workmap: map[string]wm{
 				"foo": {
-					ex: make(map[string]struct{}),
+					ex: empty(),
 					in: map[string]struct{}{
 						"foo/bar": struct{}{},
 					},
@@ -76,7 +80,7 @@ func TestWorkmapToReach(t *testing.T) {
 					ex: map[string]struct{}{
 						"baz": struct{}{},
 					},
-					in: make(map[string]struct{}),
+					in: empty(),
 				},
 			},
 			out: map[string][]string{
