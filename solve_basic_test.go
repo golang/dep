@@ -856,9 +856,8 @@ func init() {
 type reachMap map[pident]map[string][]string
 
 type depspecSourceManager struct {
-	specs  []depspec
-	rm     reachMap
-	sortup bool
+	specs []depspec
+	rm    reachMap
 }
 
 type fixSM interface {
@@ -869,10 +868,10 @@ type fixSM interface {
 
 var _ fixSM = &depspecSourceManager{}
 
-func newdepspecSM(ds []depspec, rm reachMap) *depspecSourceManager {
+func newdepspecSM(ds []depspec) *depspecSourceManager {
 	return &depspecSourceManager{
 		specs: ds,
-		rm:    rm,
+		rm:    computeBasicReachMap(ds),
 	}
 }
 
