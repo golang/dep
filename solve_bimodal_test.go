@@ -237,6 +237,7 @@ var bimodalFixtures = map[string]bimodalFixture{
 			),
 			dsp(dsv("a 1.1.0"),
 				pkg("a", "a/bar"),
+				pkg("a/bar"),
 			),
 			dsp(dsv("b 1.0.0"),
 				pkg("b"),
@@ -254,6 +255,7 @@ var bimodalFixtures = map[string]bimodalFixture{
 		ds: []depspec{
 			dsp(dsv("root 0.0.0", "a 1.0.0"),
 				pkg("root", "root/foo"),
+				pkg("root/foo"),
 			),
 			dsp(dsv("a 1.0.0"),
 				pkg("a"),

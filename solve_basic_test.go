@@ -206,9 +206,11 @@ func computeBasicReachMap(ds []depspec) reachMap {
 	rm := make(reachMap)
 
 	for k, d := range ds {
-		lm := make(map[string][]string)
-		rm[pident{n: d.n, v: d.v}] = lm
 		n := string(d.n)
+		lm := map[string][]string{
+			n: nil,
+		}
+		rm[pident{n: d.n, v: d.v}] = lm
 
 		for _, dep := range d.deps {
 			lm[n] = append(lm[n], string(dep.Ident.LocalName))

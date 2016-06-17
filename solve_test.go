@@ -55,6 +55,9 @@ func TestBasicSolves(t *testing.T) {
 }
 
 func solveBasicsAndCheck(fix basicFixture, t *testing.T) (res Result, err error) {
+	if testing.Verbose() {
+		stderrlog.Printf("[[fixture %q]]", fix.n)
+	}
 	sm := newdepspecSM(fix.ds, computeBasicReachMap(fix.ds))
 
 	o := SolveOpts{
@@ -70,9 +73,6 @@ func solveBasicsAndCheck(fix basicFixture, t *testing.T) (res Result, err error)
 		o.L = fix.l
 	}
 
-	if testing.Verbose() {
-		stderrlog.Printf("[[fixture %q]]", fix.n)
-	}
 	res, err = fixSolve(o, sm)
 
 	return fixtureSolveSimpleChecks(fix, res, err, t)
@@ -105,6 +105,9 @@ func TestBimodalSolves(t *testing.T) {
 }
 
 func solveBimodalAndCheck(fix bimodalFixture, t *testing.T) (res Result, err error) {
+	if testing.Verbose() {
+		stderrlog.Printf("[[fixture %q]]", fix.n)
+	}
 	sm := newbmSM(fix.ds)
 
 	o := SolveOpts{
@@ -120,9 +123,6 @@ func solveBimodalAndCheck(fix bimodalFixture, t *testing.T) (res Result, err err
 		o.L = fix.l
 	}
 
-	if testing.Verbose() {
-		stderrlog.Printf("[[fixture %q]]", fix.n)
-	}
 	res, err = fixSolve(o, sm)
 
 	return fixtureSolveSimpleChecks(fix, res, err, t)

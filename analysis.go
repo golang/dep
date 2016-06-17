@@ -149,7 +149,7 @@ func wmToReach(workmap map[string]wm, basedir string) (rm map[string][]string, e
 	//
 	// But, if that day comes, we can improve this algorithm.
 	rm = make(map[string][]string)
-	complete := true
+	var complete bool
 	for !complete {
 		var progress bool
 		complete = true
@@ -164,7 +164,7 @@ func wmToReach(workmap map[string]wm, basedir string) (rm map[string][]string, e
 			// (transitive internal deps)
 			for in := range w.in {
 				if w2, exists := workmap[in]; !exists {
-					return nil, fmt.Errorf("Should be impossible: %s depends on %s, but %s not in workmap", pkg, w2, w2)
+					return nil, fmt.Errorf("Should be impossible: %s depends on %s, but %s not in workmap", pkg, in, in)
 				} else {
 					progress = true
 					delete(w.in, in)
