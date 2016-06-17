@@ -23,6 +23,7 @@ func TestHashInputs(t *testing.T) {
 	for _, v := range []string{"a", "a", "1.0.0", "b", "b", "1.0.0"} {
 		h.Write([]byte(v))
 	}
+	h.Write([]byte(stdlibPkgs))
 	correct := h.Sum(nil)
 
 	if !bytes.Equal(dig, correct) {

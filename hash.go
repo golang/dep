@@ -30,6 +30,11 @@ func (o SolveOpts) HashInputs() []byte {
 		h.Write([]byte(pd.Constraint.String()))
 	}
 
+	// The stdlib packages play the same functional role in solving as ignores.
+	// Because they change, albeit quite infrequently, we have to include them
+	// in the hash.
+	h.Write([]byte(stdlibPkgs))
+
 	// TODO static analysis
 	// TODO overrides
 	// TODO aliases
