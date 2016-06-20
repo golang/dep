@@ -22,7 +22,7 @@ type ProjectManager interface {
 	ExportVersionTo(Version, string) error
 	ExternalReach(Version) (map[string][]string, error)
 	ListExternal(Version) ([]string, error)
-	ListPackages(Version) (map[string]string, error)
+	ListPackages(Version) (map[string]Package, error)
 }
 
 type ProjectAnalyzer interface {

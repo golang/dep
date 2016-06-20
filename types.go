@@ -81,6 +81,20 @@ type ProjectDep struct {
 	Constraint Constraint
 }
 
+// Package represents a Go package. It contains a subset of the information
+// go/build.Package does.
+type Package struct {
+	ImportPath, CommentPath string
+	Name                    string
+	Imports                 []string
+}
+
+type byImportPath []Package
+
+func (s byImportpath) Len() int           { return len(s) }
+func (s byImportpath) Less(i, j int) bool { return s[i].ImportPath < s[j].ImportPath }
+func (s byImportpath) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
+
 // completeDep (name hopefully to change) provides the whole picture of a
 // dependency - the root (repo and project, since currently we assume the two
 // are the same) name, a constraint, and the actual packages needed that are
