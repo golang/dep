@@ -11,6 +11,13 @@ import (
 	"text/scanner"
 )
 
+type PackageTree map[string]PackageOrErr
+
+type PackageOrErr struct {
+	P   Package
+	Err error
+}
+
 var osList []string
 var archList []string
 var stdlib = make(map[string]struct{})

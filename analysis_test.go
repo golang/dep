@@ -1,6 +1,7 @@
 package vsolver
 
 import (
+	"go/build"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -127,21 +128,48 @@ func TestListPackages(t *testing.T) {
 		fileRoot   string // if left empty, will be filled to <cwd>/_testdata/src
 		importRoot string
 		tests      bool
-		out        []Package
+		out        PackageTree
 		err        error
 	}{
+		"empty": {
+			fileRoot:   j("empty"),
+			importRoot: "empty",
+			tests:      true,
+			out:        nil,
+			err:        nil,
+		},
 		"code only": {
 			fileRoot:   j("simple"),
 			importRoot: "simple",
 			tests:      true,
-			out: []Package{
-				{
-					ImportPath:  "simple",
-					CommentPath: "",
-					Name:        "simple",
-					Imports: []string{
-						"github.com/sdboyer/vsolver",
-						"sort",
+			out: PackageTree{
+				"simple": PackageOrErr{
+					P: Package{
+						ImportPath:  "simple",
+						CommentPath: "",
+						Name:        "simple",
+						Imports: []string{
+							"github.com/sdboyer/vsolver",
+							"sort",
+						},
+					},
+				},
+			},
+		},
+		"impose import path": {
+			fileRoot:   j("simple"),
+			importRoot: "arbitrary",
+			tests:      true,
+			out: PackageTree{
+				"arbitrary": PackageOrErr{
+					P: Package{
+						ImportPath:  "arbitrary",
+						CommentPath: "",
+						Name:        "simple",
+						Imports: []string{
+							"github.com/sdboyer/vsolver",
+							"sort",
+						},
 					},
 				},
 			},
@@ -150,14 +178,17 @@ func TestListPackages(t *testing.T) {
 			fileRoot:   j("t"),
 			importRoot: "simple",
 			tests:      true,
-			out: []Package{
-				{
-					ImportPath:  "simple",
-					CommentPath: "",
-					Name:        "simple",
-					TestImports: []string{
-						"math/rand",
-						"strconv",
+			out: PackageTree{
+				"simple": PackageOrErr{
+					P: Package{
+						ImportPath:  "simple",
+						CommentPath: "",
+						Name:        "simple",
+						Imports:     []string{},
+						TestImports: []string{
+							"math/rand",
+							"strconv",
+						},
 					},
 				},
 			},
@@ -166,14 +197,17 @@ func TestListPackages(t *testing.T) {
 			fileRoot:   j("xt"),
 			importRoot: "simple",
 			tests:      true,
-			out: []Package{
-				{
-					ImportPath:  "simple",
-					CommentPath: "",
-					Name:        "simple",
-					TestImports: []string{
-						"sort",
-						"strconv",
+			out: PackageTree{
+				"simple": PackageOrErr{
+					P: Package{
+						ImportPath:  "simple",
+						CommentPath: "",
+						Name:        "simple",
+						Imports:     []string{},
+						TestImports: []string{
+							"sort",
+							"strconv",
+						},
 					},
 				},
 			},
@@ -182,18 +216,20 @@ func TestListPackages(t *testing.T) {
 			fileRoot:   j("simplet"),
 			importRoot: "simple",
 			tests:      true,
-			out: []Package{
-				{
-					ImportPath:  "simple",
-					CommentPath: "",
-					Name:        "simple",
-					Imports: []string{
-						"github.com/sdboyer/vsolver",
-						"sort",
-					},
-					TestImports: []string{
-						"math/rand",
-						"strconv",
+			out: PackageTree{
+				"simple": PackageOrErr{
+					P: Package{
+						ImportPath:  "simple",
+						CommentPath: "",
+						Name:        "simple",
+						Imports: []string{
+							"github.com/sdboyer/vsolver",
+							"sort",
+						},
+						TestImports: []string{
+							"math/rand",
+							"strconv",
+						},
 					},
 				},
 			},
@@ -202,18 +238,20 @@ func TestListPackages(t *testing.T) {
 			fileRoot:   j("simplext"),
 			importRoot: "simple",
 			tests:      true,
-			out: []Package{
-				{
-					ImportPath:  "simple",
-					CommentPath: "",
-					Name:        "simple",
-					Imports: []string{
-						"github.com/sdboyer/vsolver",
-						"sort",
-					},
-					TestImports: []string{
-						"sort",
-						"strconv",
+			out: PackageTree{
+				"simple": PackageOrErr{
+					P: Package{
+						ImportPath:  "simple",
+						CommentPath: "",
+						Name:        "simple",
+						Imports: []string{
+							"github.com/sdboyer/vsolver",
+							"sort",
+						},
+						TestImports: []string{
+							"sort",
+							"strconv",
+						},
 					},
 				},
 			},
@@ -222,19 +260,105 @@ func TestListPackages(t *testing.T) {
 			fileRoot:   j("simpleallt"),
 			importRoot: "simple",
 			tests:      true,
-			out: []Package{
-				{
-					ImportPath:  "simple",
-					CommentPath: "",
-					Name:        "simple",
-					Imports: []string{
-						"github.com/sdboyer/vsolver",
-						"sort",
+			out: PackageTree{
+				"simple": PackageOrErr{
+					P: Package{
+						ImportPath:  "simple",
+						CommentPath: "",
+						Name:        "simple",
+						Imports: []string{
+							"github.com/sdboyer/vsolver",
+							"sort",
+						},
+						TestImports: []string{
+							"math/rand",
+							"sort",
+							"strconv",
+						},
 					},
-					TestImports: []string{
-						"math/rand",
-						"sort",
-						"strconv",
+				},
+			},
+		},
+		"one pkg multifile": {
+			fileRoot:   j("m1p"),
+			importRoot: "m1p",
+			tests:      true,
+			out: PackageTree{
+				"m1p": PackageOrErr{
+					P: Package{
+						ImportPath:  "m1p",
+						CommentPath: "",
+						Name:        "m1p",
+						Imports: []string{
+							"github.com/sdboyer/vsolver",
+							"os",
+							"sort",
+						},
+					},
+				},
+			},
+		},
+		"one nested below": {
+			fileRoot:   j("nest"),
+			importRoot: "nest",
+			tests:      true,
+			out: PackageTree{
+				"nest": PackageOrErr{
+					P: Package{
+						ImportPath:  "nest",
+						CommentPath: "",
+						Name:        "simple",
+						Imports: []string{
+							"github.com/sdboyer/vsolver",
+							"sort",
+						},
+					},
+				},
+				"nest/m1p": PackageOrErr{
+					P: Package{
+						ImportPath:  "nest/m1p",
+						CommentPath: "",
+						Name:        "m1p",
+						Imports: []string{
+							"github.com/sdboyer/vsolver",
+							"os",
+							"sort",
+						},
+					},
+				},
+			},
+		},
+		"two nested under empty root": {
+			fileRoot:   j("ren"),
+			importRoot: "ren",
+			tests:      true,
+			out: PackageTree{
+				"ren": PackageOrErr{
+					Err: &build.NoGoError{
+						Dir: j("ren"),
+					},
+				},
+				"ren/m1p": PackageOrErr{
+					P: Package{
+						ImportPath:  "ren/m1p",
+						CommentPath: "",
+						Name:        "m1p",
+						Imports: []string{
+							"github.com/sdboyer/vsolver",
+							"os",
+							"sort",
+						},
+					},
+				},
+				"ren/simple": PackageOrErr{
+					P: Package{
+						ImportPath:  "ren/simple",
+						CommentPath: "",
+						Name:        "simple",
+						Imports: []string{
+							"github.com/sdboyer/vsolver",
+							"sort",
+						},
 					},
 				},
 			},
@@ -247,24 +371,22 @@ func TestListPackages(t *testing.T) {
 			continue
 		}
 
-		out, err := listPackages(fix.fileRoot, fix.importRoot)
+		out, err := llistPackages(fix.fileRoot, fix.importRoot, fix.tests)
 
-		if fix.out == nil {
-			if err == nil {
-				t.Errorf("listPackages(%q): Error expected but not received", name)
-			} else if !reflect.DeepEqual(fix.err, err) {
+		if err != nil && fix.err == nil {
+			t.Errorf("listPackages(%q): Received error but none expected: %s", name, err)
+		} else if fix.err != nil && err == nil {
+			t.Errorf("listPackages(%q): Error expected but none received", name)
+		} else if fix.err != nil && err != nil {
+			if !reflect.DeepEqual(fix.err, err) {
 				t.Errorf("listPackages(%q): Did not receive expected error:\n\t(GOT): %s\n\t(WNT): %s", name, err, fix.err)
 			}
-			continue
 		}
 
-		if err != nil {
-			t.Errorf("listPackages(%q): %v", name, err)
-			continue
-		}
-
-		if !reflect.DeepEqual(out, fix.out) {
-			t.Errorf("listPackages(%q): Did not get expected package set:\n\t(GOT): %s\n\t(WNT): %s", name, out, fix.out)
+		if fix.out != nil {
+			if !reflect.DeepEqual(out, fix.out) {
+				t.Errorf("listPackages(%q): Did not receive expected package:\n\t(GOT): %s\n\t(WNT): %s", name, out, fix.out)
+			}
 		}
 	}
 }
