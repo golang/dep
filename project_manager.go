@@ -20,8 +20,6 @@ type ProjectManager interface {
 	ListVersions() ([]Version, error)
 	CheckExistence(ProjectExistence) bool
 	ExportVersionTo(Version, string) error
-	ExternalReach(Version) (map[string][]string, error)
-	ListExternal(Version) ([]string, error)
 	ListPackages(Version) (PackageTree, error)
 }
 
@@ -142,70 +140,6 @@ func (pm *projectManager) GetInfoAt(v Version) (ProjectInfo, error) {
 	}
 
 	return ProjectInfo{}, err
-}
-
-func (pm *projectManager) ExternalReach(v Version) (map[string][]string, error) {
-	var err error
-	if err = pm.ensureCacheExistence(); err != nil {
-		return nil, err
-	}
-
-	pm.crepo.mut.Lock()
-	// Check out the desired version for analysis
-	if pv, ok := v.(PairedVersion); ok {
-		// Always prefer a rev, if it's available
-		err = pm.crepo.r.UpdateVersion(pv.Underlying().String())
-	} else {
-		// If we don't have a rev, ensure the repo is up to date, otherwise we
-		// could have a desync issue
-		if !pm.crepo.synced {
-			err = pm.crepo.r.Update()
-			if err != nil {
-				return nil, fmt.Errorf("Could not fetch latest updates into repository")
-			}
-			pm.crepo.synced = true
-		}
-		err = pm.crepo.r.UpdateVersion(v.String())
-	}
-
-	m, err := externalReach(filepath.Join(pm.ctx.GOPATH, "src", string(pm.n)), string(pm.n), false)
-	pm.crepo.mut.Unlock()
-
-	return m, err
-}
-
-func (pm *projectManager) ListExternal(v Version) ([]string, error) {
-	var err error
-	if err = pm.ensureCacheExistence(); err != nil {
-		return nil, err
-	}
-
-	pm.crepo.mut.Lock()
-	// Check out the desired version for analysis
-	if pv, ok := v.(PairedVersion); ok {
-		// Always prefer a rev, if it's available
-		err = pm.crepo.r.UpdateVersion(pv.Underlying().String())
-	} else {
-		// If we don't have a rev, ensure the repo is up to date, otherwise we
-		// could have a desync issue
-		if !pm.crepo.synced {
-			err = pm.crepo.r.Update()
-			if err != nil {
-				return nil, fmt.Errorf("Could not fetch latest updates into repository")
-			}
-			pm.crepo.synced = true
-		}
-		err = pm.crepo.r.UpdateVersion(v.String())
-	}
-
-	// Nothing within the SourceManager is responsible for computing deps of a
-	// root package; it's assumed we're always operating on libraries.
-	// Consequently, we never want to include main packages, so we hardcode
-	// false for the third param.
-	ex, err := listExternalDeps(filepath.Join(pm.ctx.GOPATH, "src", string(pm.n)), string(pm.n), false)
-	pm.crepo.mut.Unlock()
-
-	return ex, err
 }
 
 func (pm *projectManager) ListPackages(v Version) (PackageTree, error) {

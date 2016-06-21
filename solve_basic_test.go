@@ -1007,10 +1007,6 @@ func (b *depspecBridge) verifyRoot(path string) error {
 	return nil
 }
 
-func (b *depspecBridge) externalReach(id ProjectIdentifier, v Version) (map[string][]string, error) {
-	return b.sm.ExternalReach(b.key(id), v)
-}
-
 func (b *depspecBridge) listPackages(id ProjectIdentifier, v Version) (PackageTree, error) {
 	return b.sm.ListPackages(b.key(id), v)
 }

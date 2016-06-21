@@ -18,9 +18,7 @@ type sourceBridge interface {
 	matches(id ProjectIdentifier, c Constraint, v Version) bool
 	matchesAny(id ProjectIdentifier, c1, c2 Constraint) bool
 	intersect(id ProjectIdentifier, c1, c2 Constraint) Constraint
-	externalReach(id ProjectIdentifier, v Version) (map[string][]string, error)
 	listPackages(id ProjectIdentifier, v Version) (PackageTree, error)
-	listExternal(id ProjectIdentifier, v Version) ([]string, error)
 	computeRootReach(path string) ([]string, error)
 	verifyRoot(path string) error
 	deduceRemoteRepo(path string) (*remoteRepo, error)
@@ -337,23 +335,6 @@ func (b *bridge) vtu(id ProjectIdentifier, v Version) versionTypeUnion {
 	}
 
 	return nil
-}
-
-// externalReach wraps the SourceManager's ExternalReach() method.
-//
-// The root project is handled separately, as the source manager isn't
-// responsible for that code.
-func (b *bridge) externalReach(id ProjectIdentifier, v Version) (map[string][]string, error) {
-	if id.LocalName != b.name {
-		return b.sm.ExternalReach(b.key(id), v)
-	}
-
-	return externalReach(b.root, string(b.name), true)
-}
-
-// listExternal wraps the SourceManager's ListExternal() method.
-func (b *bridge) listExternal(id ProjectIdentifier, v Version) ([]string, error) {
-	return b.sm.ListExternal(b.key(id), v)
 }
 
 // computeRootReach is a specialized, less stringent version of listExternal

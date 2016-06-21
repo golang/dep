@@ -38,7 +38,7 @@ func init() {
 // optionally folding in data from test files as well.
 //
 // Directories without any valid Go files are excluded. Directories with
-// multiple packages are excluded. (TODO - maybe accommodate that?)
+// multiple packages are excluded.
 //
 // The importRoot parameter is prepended to the relative path when determining
 // the import path for each package. The obvious case is for something typical,
@@ -249,96 +249,6 @@ func listPackages(fileRoot, importRoot string) (PackageTree, error) {
 	return ptree, nil
 }
 
-// externalReach takes a base directory (a project root), and computes the list
-// of external dependencies (not under the tree at that project root) that are
-// imported by packages in that project tree.
-//
-// projname indicates the import path-level name that constitutes the root of
-// the project tree (used to decide whether an encountered import path is
-// "internal" or "external").
-//
-// main indicates whether (true) or not (false) to include main packages in the
-// analysis. main packages should generally be excluded when analyzing the
-// non-root dependency, as they inherently can't be imported.
-func externalReach(basedir, projname string, main bool) (map[string][]string, error) {
-	ctx := build.Default
-	ctx.UseAllFiles = true // optimistic, but we do it for the first try
-
-	// world's simplest adjacency list
-	workmap := make(map[string]wm)
-
-	err := filepath.Walk(basedir, func(path string, fi os.FileInfo, err error) error {
-		if err != nil && err != filepath.SkipDir {
-			return err
-		}
-		if !fi.IsDir() {
-			return nil
-		}
-
-		// Skip a few types of dirs
-		if !localSrcDir(fi) {
-			return filepath.SkipDir
-		}
-
-		// Scan for dependencies, and anything that's not part of the local
-		// package gets added to the scan list.
-		p, err := ctx.ImportDir(path, 0)
-		var imps []string
-		if err != nil {
-			switch err.(type) {
-			case *build.NoGoError:
-				return nil
-			case *build.MultiplePackageError:
-				// Multiple package names declared in the dir, which causes
-				// ImportDir() to choke; use our custom iterative scanner.
-				//imps, _, err = IterativeScan(path)
-				if err != nil {
-					return err
-				}
-			default:
-				return err
-			}
-		}
-
-		// Skip main packages, unless param says otherwise
-		if p.Name == "main" && !main {
-			return nil
-		}
-
-		imps = p.Imports
-		w := wm{
-			ex: make(map[string]struct{}),
-			in: make(map[string]struct{}),
-		}
-
-		for _, imp := range imps {
-			if !strings.HasPrefix(filepath.Clean(imp), projname) {
-				w.ex[imp] = struct{}{}
-			} else {
-				if w2, seen := workmap[imp]; seen {
-					for i := range w2.ex {
-						w.ex[i] = struct{}{}
-					}
-					for i := range w2.in {
-						w.in[i] = struct{}{}
-					}
-				} else {
-					w.in[imp] = struct{}{}
-				}
-			}
-		}
-
-		workmap[path] = w
-		return nil
-	})
-
-	if err != nil {
-		return nil, err
-	}
-
-	return wmToReach(workmap, basedir)
-}
-
 type wm struct {
 	ex map[string]struct{}
 	in map[string]struct{}
@@ -421,71 +331,6 @@ func wmToReach(workmap map[string]wm, basedir string) (rm map[string][]string, e
 	}
 
 	return rm, nil
-}
-
-func listExternalDeps(basedir, projname string, main bool) ([]string, error) {
-	ctx := build.Default
-	ctx.UseAllFiles = true // optimistic, but we do it for the first try
-	exm := make(map[string]struct{})
-
-	err := filepath.Walk(basedir, func(path string, fi os.FileInfo, err error) error {
-		if err != nil && err != filepath.SkipDir {
-			return err
-		}
-		if !fi.IsDir() {
-			return nil
-		}
-
-		// Skip a few types of dirs
-		if !localSrcDir(fi) {
-			return filepath.SkipDir
-		}
-
-		// Scan for dependencies, and anything that's not part of the local
-		// package gets added to the scan list.
-		p, err := ctx.ImportDir(path, 0)
-		var imps []string
-		if err != nil {
-			switch err.(type) {
-			case *build.NoGoError:
-				return nil
-			case *build.MultiplePackageError:
-				// Multiple package names declared in the dir, which causes
-				// ImportDir() to choke; use our custom iterative scanner.
-				//imps, _, err = IterativeScan(path)
-				if err != nil {
-					return err
-				}
-			default:
-				return err
-			}
-		} else {
-			imps = p.Imports
-		}
-
-		// Skip main packages, unless param says otherwise
-		if p.Name != "main" || main {
-			for _, imp := range imps {
-				if !strings.HasPrefix(filepath.Clean(imp), projname) {
-					exm[imp] = struct{}{}
-				}
-			}
-		}
-		return nil
-	})
-
-	if err != nil {
-		return nil, err
-	}
-
-	ex := make([]string, len(exm))
-	k := 0
-	for p := range exm {
-		ex[k] = p
-		k++
-	}
-
-	return ex, nil
 }
 
 func localSrcDir(fi os.FileInfo) bool {
