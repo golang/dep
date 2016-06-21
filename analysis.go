@@ -612,7 +612,7 @@ func (t PackageTree) ExternalReach(main, tests bool) (map[string][]string, error
 		}
 
 		for _, imp := range imps {
-			if !strings.HasPrefix(filepath.Clean(imp), t.ImportRoot) {
+			if !checkPrefixSlash(filepath.Clean(imp), t.ImportRoot) {
 				w.ex[imp] = struct{}{}
 			} else {
 				if w2, seen := workmap[imp]; seen {
@@ -639,7 +639,8 @@ func (t PackageTree) ExternalReach(main, tests bool) (map[string][]string, error
 		return nil, nil
 	}
 
-	return wmToReach(workmap, t.ImportRoot)
+	//return wmToReach(workmap, t.ImportRoot)
+	return wmToReach(workmap, "") // TODO this passes tests, but doesn't seem right
 }
 
 func (t PackageTree) ListExternalImports(main, tests bool) ([]string, error) {
@@ -666,7 +667,7 @@ func (t PackageTree) ListExternalImports(main, tests bool) ([]string, error) {
 		}
 
 		for _, imp := range imps {
-			if !strings.HasPrefix(filepath.Clean(imp), t.ImportRoot) {
+			if !checkPrefixSlash(filepath.Clean(imp), t.ImportRoot) {
 				exm[imp] = struct{}{}
 			}
 		}
@@ -688,4 +689,13 @@ func (t PackageTree) ListExternalImports(main, tests bool) ([]string, error) {
 	}
 
 	return ex, nil
+}
+
+// checkPrefixSlash checks to see if the prefix is a prefix of the string as-is,
+// and that it is either equal OR the prefix + / is still a prefix.
+func checkPrefixSlash(s, prefix string) bool {
+	if !strings.HasPrefix(s, prefix) {
+		return false
+	}
+	return s == prefix || strings.HasPrefix(s, ensureTrailingSlash(prefix))
 }

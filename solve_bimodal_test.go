@@ -3,7 +3,6 @@ package vsolver
 import (
 	"fmt"
 	"path/filepath"
-	"strings"
 )
 
 // dsp - "depspec with packages"
@@ -424,7 +423,7 @@ func computeBimodalExternalMap(ds []depspec) map[pident]map[string][]string {
 		workmap := make(map[string]wm)
 
 		for _, pkg := range d.pkgs {
-			if !strings.HasPrefix(filepath.Clean(pkg.path), string(d.n)) {
+			if !checkPrefixSlash(filepath.Clean(pkg.path), string(d.n)) {
 				panic(fmt.Sprintf("pkg %s is not a child of %s, cannot be a part of that project", pkg.path, d.n))
 			}
 
@@ -434,7 +433,7 @@ func computeBimodalExternalMap(ds []depspec) map[pident]map[string][]string {
 			}
 
 			for _, imp := range pkg.imports {
-				if !strings.HasPrefix(filepath.Clean(imp), string(d.n)) {
+				if !checkPrefixSlash(filepath.Clean(imp), string(d.n)) {
 					// Easy case - if the import is not a child of the base
 					// project path, put it in the external map
 					w.ex[imp] = struct{}{}
