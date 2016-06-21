@@ -17,7 +17,7 @@ type SourceManager interface {
 	VendorCodeExists(ProjectName) (bool, error)
 	ExternalReach(ProjectName, Version) (map[string][]string, error)
 	ListExternal(ProjectName, Version) ([]string, error)
-	ListPackages(ProjectName, Version) (map[string]Package, error)
+	ListPackages(ProjectName, Version) (PackageTree, error)
 	ExportProject(ProjectName, Version, string) error
 	Release()
 	// Flush()
@@ -120,10 +120,10 @@ func (sm *sourceManager) ListExternal(n ProjectName, v Version) ([]string, error
 	return pmc.pm.ListExternal(v)
 }
 
-func (sm *sourceManager) ListPackages(n ProjectName, v Version) (map[string]Package, error) {
+func (sm *sourceManager) ListPackages(n ProjectName, v Version) (PackageTree, error) {
 	pmc, err := sm.getProjectManager(n)
 	if err != nil {
-		return nil, err
+		return PackageTree{}, err
 	}
 
 	return pmc.pm.ListPackages(v)

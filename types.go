@@ -87,13 +87,14 @@ type Package struct {
 	ImportPath, CommentPath string
 	Name                    string
 	Imports                 []string
+	TestImports             []string
 }
 
 type byImportPath []Package
 
-func (s byImportpath) Len() int           { return len(s) }
-func (s byImportpath) Less(i, j int) bool { return s[i].ImportPath < s[j].ImportPath }
-func (s byImportpath) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
+func (s byImportPath) Len() int           { return len(s) }
+func (s byImportPath) Less(i, j int) bool { return s[i].ImportPath < s[j].ImportPath }
+func (s byImportPath) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
 
 // completeDep (name hopefully to change) provides the whole picture of a
 // dependency - the root (repo and project, since currently we assume the two

@@ -210,7 +210,12 @@ func computeBasicReachMap(ds []depspec) reachMap {
 		lm := map[string][]string{
 			n: nil,
 		}
-		rm[pident{n: d.n, v: d.v}] = lm
+		v := d.v
+		if k == 0 {
+			// Put the root in with a nil rev, to accommodate the solver
+			v = nil
+		}
+		rm[pident{n: d.n, v: v}] = lm
 
 		for _, dep := range d.deps {
 			lm[n] = append(lm[n], string(dep.Ident.LocalName))
@@ -908,11 +913,25 @@ func (sm *depspecSourceManager) ListExternal(n ProjectName, v Version) ([]string
 	return nil, fmt.Errorf("No reach data for %s at version %s", n, v)
 }
 
-func (sm *depspecSourceManager) ListPackages(n ProjectName, v Version) (map[string]string, error) {
-	m := make(map[string]string)
-	m[string(n)] = string(n)
+func (sm *depspecSourceManager) ListPackages(n ProjectName, v Version) (PackageTree, error) {
+	id := pident{n: n, v: v}
+	if r, exists := sm.rm[id]; exists {
+		ptree := PackageTree{
+			ImportRoot: string(n),
+			Packages: map[string]PackageOrErr{
+				string(n): PackageOrErr{
+					P: Package{
+						ImportPath: string(n),
+						Name:       string(n),
+						Imports:    r[string(n)],
+					},
+				},
+			},
+		}
+		return ptree, nil
+	}
 
-	return m, nil
+	return PackageTree{}, fmt.Errorf("Project %s at version %s could not be found", n, v)
 }
 
 func (sm *depspecSourceManager) ListVersions(name ProjectName) (pi []Version, err error) {
@@ -971,7 +990,11 @@ func (b *depspecBridge) computeRootReach(path string) ([]string, error) {
 		return nil, fmt.Errorf("Expected only root project %q to computeRootReach(), got %q", root.n, path)
 	}
 
-	return dsm.ListExternal(root.n, root.v)
+	ptree, err := dsm.ListPackages(root.n, nil)
+	if err != nil {
+		return nil, err
+	}
+	return ptree.ListExternalImports(true, true)
 }
 
 // override verifyRoot() on bridge to prevent any filesystem interaction
@@ -987,7 +1010,8 @@ func (b *depspecBridge) verifyRoot(path string) error {
 func (b *depspecBridge) externalReach(id ProjectIdentifier, v Version) (map[string][]string, error) {
 	return b.sm.ExternalReach(b.key(id), v)
 }
-func (b *depspecBridge) listPackages(id ProjectIdentifier, v Version) (map[string]string, error) {
+
+func (b *depspecBridge) listPackages(id ProjectIdentifier, v Version) (PackageTree, error) {
 	return b.sm.ListPackages(b.key(id), v)
 }
 

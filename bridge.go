@@ -19,7 +19,7 @@ type sourceBridge interface {
 	matchesAny(id ProjectIdentifier, c1, c2 Constraint) bool
 	intersect(id ProjectIdentifier, c1, c2 Constraint) Constraint
 	externalReach(id ProjectIdentifier, v Version) (map[string][]string, error)
-	listPackages(id ProjectIdentifier, v Version) (map[string]string, error)
+	listPackages(id ProjectIdentifier, v Version) (PackageTree, error)
 	listExternal(id ProjectIdentifier, v Version) ([]string, error)
 	computeRootReach(path string) ([]string, error)
 	verifyRoot(path string) error
@@ -373,7 +373,12 @@ func (b *bridge) computeRootReach(path string) ([]string, error) {
 	// TODO i now cannot remember the reasons why i thought being less stringent
 	// in the analysis was OK. so, for now, we just compute list of
 	// externally-touched packages.
-	return listExternalDeps(path, path, true)
+	ptree, err := listPackages(path, string(b.name))
+	if err != nil {
+		return nil, err
+	}
+
+	return ptree.ListExternalImports(true, true)
 }
 
 // listPackages lists all the packages contained within the given project at a
@@ -381,12 +386,14 @@ func (b *bridge) computeRootReach(path string) ([]string, error) {
 //
 // The root project is handled separately, as the source manager isn't
 // responsible for that code.
-func (b *bridge) listPackages(id ProjectIdentifier, v Version) (map[string]string, error) {
+func (b *bridge) listPackages(id ProjectIdentifier, v Version) (PackageTree, error) {
 	if id.LocalName != b.name {
+		// FIXME if we're aliasing here, the returned PackageTree will have
+		// unaliased import paths, which is super not correct
 		return b.sm.ListPackages(b.key(id), v)
 	}
 
-	return listPackages(b.root, string(b.name), true)
+	return listPackages(b.root, string(b.name))
 }
 
 // verifyRoot ensures that the provided path to the project root is in good

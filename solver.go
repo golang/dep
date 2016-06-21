@@ -355,14 +355,14 @@ func (s *solver) selectRoot() error {
 		Version: Revision(""),
 	}
 
-	pkgs, err := s.b.listPackages(pa.Ident, nil)
+	ptree, err := s.b.listPackages(pa.Ident, nil)
 	if err != nil {
 		return err
 	}
 
-	list := make([]string, len(pkgs))
+	list := make([]string, len(ptree.Packages))
 	k := 0
-	for path := range pkgs {
+	for path := range ptree.Packages {
 		list[k] = path
 		k++
 	}
@@ -414,7 +414,12 @@ func (s *solver) getImportsAndConstraintsOf(a atomWithPackages) ([]completeDep, 
 		return nil, err
 	}
 
-	allex, err := s.b.externalReach(a.atom.Ident, a.atom.Version)
+	ptree, err := s.b.listPackages(a.atom.Ident, a.atom.Version)
+	if err != nil {
+		return nil, err
+	}
+
+	allex, err := ptree.ExternalReach(false, false)
 	if err != nil {
 		return nil, err
 	}

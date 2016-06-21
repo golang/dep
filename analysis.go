@@ -123,32 +123,6 @@ func listPackages(fileRoot, importRoot string) (PackageTree, error) {
 		return
 	}
 
-	// helper func to merge, dedupe, and sort strings
-	dedupe := func(s1, s2 []string) (r []string) {
-		dedupe := make(map[string]bool)
-
-		if len(s1) > 0 && len(s2) > 0 {
-			for _, i := range s1 {
-				dedupe[i] = true
-			}
-			for _, i := range s2 {
-				dedupe[i] = true
-			}
-
-			for i := range dedupe {
-				r = append(r, i)
-			}
-			// And then re-sort them
-			sort.Strings(r)
-		} else if len(s1) > 0 {
-			r = s1
-		} else if len(s2) > 0 {
-			r = s2
-		}
-
-		return
-	}
-
 	// helper func to create a Package from a *build.Package
 	happy := func(importPath string, p *build.Package) Package {
 		// Happy path - simple parsing worked
@@ -157,7 +131,7 @@ func listPackages(fileRoot, importRoot string) (PackageTree, error) {
 			CommentPath: p.ImportComment,
 			Name:        p.Name,
 			Imports:     p.Imports,
-			TestImports: dedupe(p.TestImports, p.XTestImports),
+			TestImports: dedupeStrings(p.TestImports, p.XTestImports),
 		}
 
 		return pkg
@@ -254,8 +228,8 @@ func listPackages(fileRoot, importRoot string) (PackageTree, error) {
 				// Use the other files as baseline, they're the main stuff
 				pkg = happy(ip, po)
 				mpkg := happy(ip, pi)
-				pkg.Imports = dedupe(pkg.Imports, mpkg.Imports)
-				pkg.TestImports = dedupe(pkg.TestImports, mpkg.TestImports)
+				pkg.Imports = dedupeStrings(pkg.Imports, mpkg.Imports)
+				pkg.TestImports = dedupeStrings(pkg.TestImports, mpkg.TestImports)
 			default:
 				return err
 			}
@@ -713,9 +687,35 @@ func isSupportedArch(n string) bool {
 	return false
 }
 
-//func ensureTrailingSlash(s string) string {
-//return strings.TrimSuffix(s, string(os.PathSeparator)) + string(os.PathSeparator)
-//}
+func ensureTrailingSlash(s string) string {
+	return strings.TrimSuffix(s, string(os.PathSeparator)) + string(os.PathSeparator)
+}
+
+// helper func to merge, dedupe, and sort strings
+func dedupeStrings(s1, s2 []string) (r []string) {
+	dedupe := make(map[string]bool)
+
+	if len(s1) > 0 && len(s2) > 0 {
+		for _, i := range s1 {
+			dedupe[i] = true
+		}
+		for _, i := range s2 {
+			dedupe[i] = true
+		}
+
+		for i := range dedupe {
+			r = append(r, i)
+		}
+		// And then re-sort them
+		sort.Strings(r)
+	} else if len(s1) > 0 {
+		r = s1
+	} else if len(s2) > 0 {
+		r = s2
+	}
+
+	return
+}
 
 type PackageTree struct {
 	ImportRoot string
@@ -727,10 +727,120 @@ type PackageOrErr struct {
 	Err error
 }
 
-//func (t PackageTree) ExternalReach(main, tests bool) (map[string][]string, error) {
+// ExternalReach looks through a PackageTree and computes the list of external
+// dependencies (not under the tree at its designated import root) that are
+// imported by packages in the tree.
+//
+// main indicates whether (true) or not (false) to include main packages in the
+// analysis. main packages should generally be excluded when analyzing the
+// non-root dependency, as they inherently can't be imported.
+//
+// tests indicates whether (true) or not (false) to include imports from test
+// files in packages when computing the reach map.
+func (t PackageTree) ExternalReach(main, tests bool) (map[string][]string, error) {
+	var someerrs bool
 
-//}
+	// world's simplest adjacency list
+	workmap := make(map[string]wm)
 
-//func (t PackageTree) ListExternalImports(main, tests bool) ([]string, error) {
+	var imps []string
+	for ip, perr := range t.Packages {
+		if perr.Err != nil {
+			someerrs = true
+			continue
+		}
+		p := perr.P
+		// Skip main packages, unless param says otherwise
+		if p.Name == "main" && !main {
+			continue
+		}
 
-//}
+		imps = imps[:0]
+		imps = p.Imports
+		if tests {
+			imps = dedupeStrings(imps, p.TestImports)
+		}
+
+		w := wm{
+			ex: make(map[string]struct{}),
+			in: make(map[string]struct{}),
+		}
+
+		for _, imp := range imps {
+			if !strings.HasPrefix(filepath.Clean(imp), t.ImportRoot) {
+				w.ex[imp] = struct{}{}
+			} else {
+				if w2, seen := workmap[imp]; seen {
+					for i := range w2.ex {
+						w.ex[i] = struct{}{}
+					}
+					for i := range w2.in {
+						w.in[i] = struct{}{}
+					}
+				} else {
+					w.in[imp] = struct{}{}
+				}
+			}
+		}
+
+		workmap[ip] = w
+	}
+
+	if len(workmap) == 0 {
+		if someerrs {
+			// TODO proper errs
+			return nil, fmt.Errorf("No packages without errors in %s", t.ImportRoot)
+		}
+		return nil, nil
+	}
+
+	return wmToReach(workmap, t.ImportRoot)
+}
+
+func (t PackageTree) ListExternalImports(main, tests bool) ([]string, error) {
+	var someerrs bool
+	exm := make(map[string]struct{})
+
+	var imps []string
+	for _, perr := range t.Packages {
+		if perr.Err != nil {
+			someerrs = true
+			continue
+		}
+
+		p := perr.P
+		// Skip main packages, unless param says otherwise
+		if p.Name == "main" && !main {
+			continue
+		}
+
+		imps = imps[:0]
+		imps = p.Imports
+		if tests {
+			imps = dedupeStrings(imps, p.TestImports)
+		}
+
+		for _, imp := range imps {
+			if !strings.HasPrefix(filepath.Clean(imp), t.ImportRoot) {
+				exm[imp] = struct{}{}
+			}
+		}
+	}
+
+	if len(exm) == 0 {
+		if someerrs {
+			// TODO proper errs
+			return nil, fmt.Errorf("No packages without errors in %s", t.ImportRoot)
+		}
+		return nil, nil
+	}
+
+	ex := make([]string, len(exm))
+	k := 0
+	for p := range exm {
+		ex[k] = p
+		k++
+	}
+
+	return ex, nil
+}

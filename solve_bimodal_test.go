@@ -378,21 +378,29 @@ func newbmSM(ds []depspec) *bmSourceManager {
 	return sm
 }
 
-func (sm *bmSourceManager) ListPackages(n ProjectName, v Version) (map[string]string, error) {
+func (sm *bmSourceManager) ListPackages(n ProjectName, v Version) (PackageTree, error) {
 	for k, ds := range sm.specs {
 		// Cheat for root, otherwise we blow up b/c version is empty
 		if n == ds.n && (k == 0 || ds.v.Matches(v)) {
-			m := make(map[string]string)
-
+			ptree := PackageTree{
+				ImportRoot: string(n),
+				Packages:   make(map[string]PackageOrErr),
+			}
 			for _, pkg := range ds.pkgs {
-				m[pkg.path] = pkg.path
+				ptree.Packages[pkg.path] = PackageOrErr{
+					P: Package{
+						ImportPath: pkg.path,
+						Name:       filepath.Base(pkg.path),
+						Imports:    pkg.imports,
+					},
+				}
 			}
 
-			return m, nil
+			return ptree, nil
 		}
 	}
 
-	return nil, fmt.Errorf("Project %s at version %s could not be found", n, v)
+	return PackageTree{}, fmt.Errorf("Project %s at version %s could not be found", n, v)
 }
 
 // computeBimodalExternalMap takes a set of depspecs and computes an

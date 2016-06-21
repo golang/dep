@@ -22,7 +22,7 @@ type ProjectManager interface {
 	ExportVersionTo(Version, string) error
 	ExternalReach(Version) (map[string][]string, error)
 	ListExternal(Version) ([]string, error)
-	ListPackages(Version) (map[string]Package, error)
+	ListPackages(Version) (PackageTree, error)
 }
 
 type ProjectAnalyzer interface {
@@ -208,10 +208,10 @@ func (pm *projectManager) ListExternal(v Version) ([]string, error) {
 	return ex, err
 }
 
-func (pm *projectManager) ListPackages(v Version) (map[string]string, error) {
+func (pm *projectManager) ListPackages(v Version) (PackageTree, error) {
 	var err error
 	if err = pm.ensureCacheExistence(); err != nil {
-		return nil, err
+		return PackageTree{}, err
 	}
 
 	pm.crepo.mut.Lock()
@@ -225,18 +225,14 @@ func (pm *projectManager) ListPackages(v Version) (map[string]string, error) {
 		if !pm.crepo.synced {
 			err = pm.crepo.r.Update()
 			if err != nil {
-				return nil, fmt.Errorf("Could not fetch latest updates into repository")
+				return PackageTree{}, fmt.Errorf("Could not fetch latest updates into repository")
 			}
 			pm.crepo.synced = true
 		}
 		err = pm.crepo.r.UpdateVersion(v.String())
 	}
 
-	// Nothing within the SourceManager is responsible for computing deps of a
-	// root package; it's assumed we're always operating on libraries.
-	// Consequently, we never want to include main packages, so we hardcode
-	// false for the third param.
-	ex, err := listPackages(filepath.Join(pm.ctx.GOPATH, "src", string(pm.n)), string(pm.n), true)
+	ex, err := listPackages(filepath.Join(pm.ctx.GOPATH, "src", string(pm.n)), string(pm.n))
 	pm.crepo.mut.Unlock()
 
 	return ex, err
