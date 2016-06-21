@@ -5,18 +5,13 @@ import (
 	"fmt"
 	"go/build"
 	"io"
+	"io/ioutil"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"text/scanner"
 )
-
-type PackageTree map[string]PackageOrErr
-
-type PackageOrErr struct {
-	P   Package
-	Err error
-}
 
 var osList []string
 var archList []string
@@ -37,6 +32,247 @@ func init() {
 	for _, pkg := range strings.Split(stdlibPkgs, " ") {
 		stdlib[pkg] = struct{}{}
 	}
+}
+
+// listPackages lists info for all packages at or below the provided fileRoot,
+// optionally folding in data from test files as well.
+//
+// Directories without any valid Go files are excluded. Directories with
+// multiple packages are excluded. (TODO - maybe accommodate that?)
+//
+// The importRoot parameter is prepended to the relative path when determining
+// the import path for each package. The obvious case is for something typical,
+// like:
+//
+// fileRoot = /home/user/go/src/github.com/foo/bar
+// importRoot = github.com/foo/bar
+//
+// Where the fileRoot and importRoot align. However, if you provide:
+//
+// fileRoot = /home/user/workspace/path/to/repo
+// importRoot = github.com/foo/bar
+//
+// then the root package at path/to/repo will be ascribed import path
+// "github.com/foo/bar", and its subpackage "baz" will be
+// "github.com/foo/bar/baz".
+//
+// A PackageTree is returned, which contains the ImportRoot and map of import path
+// to PackageOrErr - each path under the root that exists will have either a
+// Package, or an error describing why the package is not valid.
+func listPackages(fileRoot, importRoot string, tests bool) (PackageTree, error) {
+	// Set up a build.ctx for parsing
+	ctx := build.Default
+	ctx.GOROOT = ""
+	//ctx.GOPATH = strings.TrimSuffix(parent, "/src")
+	ctx.GOPATH = ""
+	ctx.UseAllFiles = true
+
+	// basedir is the real root of the filesystem tree we're going to walk.
+	// This is generally, though not necessarily, a repo root.
+	//basedir := filepath.Join(parent, importRoot)
+	// filepath.Dir strips off the last element to get its containing dir, which
+	// is what we need to prefix the paths in the walkFn in order to get the
+	// full import path.
+	//impPrfx := filepath.Dir(importRoot)
+
+	//frslash := ensureTrailingSlash(fileRoot)
+	//pretty.Printf("parent:\t\t%s\n", parent)
+	//pretty.Printf("frslash:\t%s\n", frslash)
+	//pretty.Printf("basedir:\t%s\n", basedir)
+	//pretty.Printf("importRoot:\t%s\n", importRoot)
+	//pretty.Printf("impPrfx:\t%s\n", impPrfx)
+	//pretty.Println(parent, importRoot, impPrfx, basedir)
+	//pretty.Println(ctx)
+
+	ptree := PackageTree{
+		ImportRoot: importRoot,
+		Packages:   make(map[string]PackageOrErr),
+	}
+
+	// mkfilter returns two funcs that can be injected into a
+	// build.Context, letting us filter the results into an "in" and "out" set.
+	mkfilter := func(files map[string]struct{}) (in, out func(dir string) (fi []os.FileInfo, err error)) {
+		in = func(dir string) (fi []os.FileInfo, err error) {
+			all, err := ioutil.ReadDir(dir)
+			if err != nil {
+				return nil, err
+			}
+
+			for _, f := range all {
+				if _, exists := files[f.Name()]; exists {
+					fi = append(fi, f)
+				}
+			}
+			return fi, nil
+		}
+
+		out = func(dir string) (fi []os.FileInfo, err error) {
+			all, err := ioutil.ReadDir(dir)
+			if err != nil {
+				return nil, err
+			}
+
+			for _, f := range all {
+				if _, exists := files[f.Name()]; !exists {
+					fi = append(fi, f)
+				}
+			}
+			return fi, nil
+		}
+
+		return
+	}
+
+	// helper func to merge, dedupe, and sort strings
+	dedupe := func(s1, s2 []string) (r []string) {
+		dedupe := make(map[string]bool)
+
+		if len(s1) > 0 && len(s2) > 0 {
+			for _, i := range s1 {
+				dedupe[i] = true
+			}
+			for _, i := range s2 {
+				dedupe[i] = true
+			}
+
+			for i := range dedupe {
+				r = append(r, i)
+			}
+			// And then re-sort them
+			sort.Strings(r)
+		} else if len(s1) > 0 {
+			r = s1
+		} else if len(s2) > 0 {
+			r = s2
+		}
+
+		return
+	}
+
+	// helper func to create a Package from a *build.Package
+	happy := func(importPath string, p *build.Package) Package {
+		// Happy path - simple parsing worked
+		pkg := Package{
+			ImportPath:  importPath,
+			CommentPath: p.ImportComment,
+			Name:        p.Name,
+			Imports:     p.Imports,
+			TestImports: dedupe(p.TestImports, p.XTestImports),
+		}
+
+		return pkg
+	}
+
+	err := filepath.Walk(fileRoot, func(path string, fi os.FileInfo, err error) error {
+		if err != nil && err != filepath.SkipDir {
+			return err
+		}
+		if !fi.IsDir() {
+			return nil
+		}
+
+		// Skip a few types of dirs
+		if !localSrcDir(fi) {
+			return filepath.SkipDir
+		}
+
+		ip := filepath.Join(importRoot, strings.TrimPrefix(path, fileRoot))
+		//pretty.Printf("path:\t\t%s\n", path)
+		//pretty.Printf("ip:\t\t%s\n", ip)
+
+		// Find all the imports, across all os/arch combos
+		p, err := ctx.ImportDir(path, build.ImportComment|build.IgnoreVendor)
+		var pkg Package
+		if err == nil {
+			pkg = happy(ip, p)
+		} else {
+			//pretty.Println(p, err)
+			switch terr := err.(type) {
+			case *build.NoGoError:
+				ptree.Packages[ip] = PackageOrErr{
+					Err: err,
+				}
+				return nil
+			case *build.MultiplePackageError:
+				// Set this up preemptively, so we can easily just return out if
+				// something goes wrong. Otherwise, it'll get transparently
+				// overwritten later.
+				ptree.Packages[ip] = PackageOrErr{
+					Err: err,
+				}
+
+				// For now, we're punting entirely on dealing with os/arch
+				// combinations. That will be a more significant refactor.
+				//
+				// However, there is one case we want to allow here - a single
+				// file, with "+build ignore", that's a main package. (Ignore is
+				// just a convention, but for now it's good enough to just check
+				// that.) This is a fairly common way to make a more
+				// sophisticated build system than a Makefile allows, so we want
+				// to support that case. So, transparently lump the deps
+				// together.
+				mains := make(map[string]struct{})
+				for k, pkgname := range terr.Packages {
+					if pkgname == "main" {
+						tags, err2 := readFileBuildTags(filepath.Join(path, terr.Files[k]))
+						if err2 != nil {
+							return nil
+						}
+
+						var hasignore bool
+						for _, t := range tags {
+							if t == "ignore" {
+								hasignore = true
+								break
+							}
+						}
+						if !hasignore {
+							// No ignore tag found - bail out
+							return nil
+						}
+						mains[terr.Files[k]] = struct{}{}
+					}
+				}
+				// Make filtering funcs that will let us look only at the main
+				// files, and exclude the main files; inf and outf, respectively
+				inf, outf := mkfilter(mains)
+
+				// outf first; if there's another err there, we bail out with a
+				// return
+				ctx.ReadDir = outf
+				po, err2 := ctx.ImportDir(path, build.ImportComment|build.IgnoreVendor)
+				if err2 != nil {
+					return nil
+				}
+				ctx.ReadDir = inf
+				pi, err2 := ctx.ImportDir(path, build.ImportComment|build.IgnoreVendor)
+				if err2 != nil {
+					return nil
+				}
+				ctx.ReadDir = nil
+
+				// Use the other files as baseline, they're the main stuff
+				pkg = happy(ip, po)
+				mpkg := happy(ip, pi)
+				pkg.Imports = dedupe(pkg.Imports, mpkg.Imports)
+				pkg.TestImports = dedupe(pkg.TestImports, mpkg.TestImports)
+			default:
+				return err
+			}
+		}
+
+		ptree.Packages[ip] = PackageOrErr{
+			P: pkg,
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return PackageTree{}, err
+	}
+
+	return ptree, nil
 }
 
 // externalReach takes a base directory (a project root), and computes the list
@@ -81,7 +317,7 @@ func externalReach(basedir, projname string, main bool) (map[string][]string, er
 			case *build.MultiplePackageError:
 				// Multiple package names declared in the dir, which causes
 				// ImportDir() to choke; use our custom iterative scanner.
-				imps, _, err = IterativeScan(path)
+				//imps, _, err = IterativeScan(path)
 				if err != nil {
 					return err
 				}
@@ -242,7 +478,7 @@ func listExternalDeps(basedir, projname string, main bool) ([]string, error) {
 			case *build.MultiplePackageError:
 				// Multiple package names declared in the dir, which causes
 				// ImportDir() to choke; use our custom iterative scanner.
-				imps, _, err = IterativeScan(path)
+				//imps, _, err = IterativeScan(path)
 				if err != nil {
 					return err
 				}
@@ -278,182 +514,20 @@ func listExternalDeps(basedir, projname string, main bool) ([]string, error) {
 	return ex, nil
 }
 
-// listPackages lists all packages, optionally including main packages,
-// contained at or below the provided path.
-//
-// Directories without any valid Go files are excluded. Directories with
-// multiple packages are excluded. (TODO - maybe accommodate that?)
-//
-// A map of import path to package name is returned.
-func listPackages(basedir, prefix string, main bool) (map[string]string, error) {
-	ctx := build.Default
-	ctx.UseAllFiles = true // optimistic, but we do it for the first try
-	exm := make(map[string]string)
-
-	err := filepath.Walk(basedir, func(path string, fi os.FileInfo, err error) error {
-		if err != nil && err != filepath.SkipDir {
-			return err
-		}
-		if !fi.IsDir() {
-			return nil
-		}
-
-		// Skip a few types of dirs
-		if !localSrcDir(fi) {
-			return filepath.SkipDir
-		}
-
-		// Scan for dependencies, and anything that's not part of the local
-		// package gets added to the scan list.
-		p, err := ctx.ImportDir(path, 0)
-		if err != nil {
-			switch err.(type) {
-			case *build.NoGoError:
-				return nil
-			case *build.MultiplePackageError:
-				// Multiple package names declared in the dir, which causes
-				// ImportDir() to choke; use our custom iterative scanner.
-				_, name, err := IterativeScan(path)
-				if err != nil {
-					return err
-				}
-				// TODO for now, we'll just take the first pkg name we find
-				exm[path] = filepath.Join(prefix, name)
-			default:
-				return err
-			}
-		} else {
-			exm[path] = filepath.Join(prefix, p.Name)
-		}
-
-		return nil
-	})
-
-	if err != nil {
-		return nil, err
-	}
-
-	return exm, nil
-}
-
 func localSrcDir(fi os.FileInfo) bool {
-	// Ignore _foo and .foo
-	if strings.HasPrefix(fi.Name(), "_") || strings.HasPrefix(fi.Name(), ".") {
+	// Ignore _foo and .foo, and testdata
+	name := fi.Name()
+	if strings.HasPrefix(name, ".") || strings.HasPrefix(name, "_") || name == "testdata" {
 		return false
 	}
 
 	// Ignore dirs that are expressly intended for non-project source
-	switch fi.Name() {
+	switch name {
 	case "vendor", "Godeps":
 		return false
 	default:
 		return true
 	}
-}
-
-// IterativeScan attempts to obtain a list of imported dependencies from a
-// package. This scanning is different from ImportDir as part of the go/build
-// package. It looks over different permutations of the supported OS/Arch to
-// try and find all imports. This is different from setting UseAllFiles to
-// true on the build Context. It scopes down to just the supported OS/Arch.
-//
-// Note, there are cases where multiple packages are in the same directory. This
-// usually happens with an example that has a main package and a +build tag
-// of ignore. This is a bit of a hack. It causes UseAllFiles to have errors.
-func IterativeScan(path string) ([]string, string, error) {
-
-	// TODO(mattfarina): Add support for release tags.
-
-	tgs, _ := readBuildTags(path)
-	// Handle the case of scanning with no tags
-	tgs = append(tgs, "")
-
-	var pkgs []string
-	var name string
-	for _, tt := range tgs {
-
-		// split the tag combination to look at permutations.
-		ts := strings.Split(tt, ",")
-		var ttgs []string
-		var arch string
-		var ops string
-		for _, ttt := range ts {
-			dirty := false
-			if strings.HasPrefix(ttt, "!") {
-				dirty = true
-				ttt = strings.TrimPrefix(ttt, "!")
-			}
-			if isSupportedOs(ttt) {
-				if dirty {
-					ops = getOsValue(ttt)
-				} else {
-					ops = ttt
-				}
-			} else if isSupportedArch(ttt) {
-				if dirty {
-					arch = getArchValue(ttt)
-				} else {
-					arch = ttt
-				}
-			} else {
-				if !dirty {
-					ttgs = append(ttgs, ttt)
-				}
-			}
-		}
-
-		// Handle the case where there are no tags but we need to iterate
-		// on something.
-		if len(ttgs) == 0 {
-			ttgs = append(ttgs, "")
-		}
-
-		b := build.Default
-
-		// Make sure use all files is off
-		b.UseAllFiles = false
-
-		// Set the OS and Arch for this pass
-		b.GOARCH = arch
-		b.GOOS = ops
-		b.BuildTags = ttgs
-		//msg.Debug("Scanning with Arch(%s), OS(%s), and Build Tags(%v)", arch, ops, ttgs)
-
-		pk, err := b.ImportDir(path, 0)
-
-		// If there are no buildable souce with this permutation we skip it.
-		if err != nil && strings.HasPrefix(err.Error(), "no buildable Go source files in") {
-			continue
-		} else if err != nil && strings.HasPrefix(err.Error(), "found packages ") {
-			// A permutation may cause multiple packages to appear. For example,
-			// an example file with an ignore build tag. If this happens we
-			// ignore it.
-			// TODO(mattfarina): Find a better way.
-			//msg.Debug("Found multiple packages while scanning %s: %s", path, err)
-			continue
-		} else if err != nil {
-			//msg.Debug("Problem parsing package at %s for %s %s", path, ops, arch)
-			return nil, "", err
-		}
-
-		// For now at least, just take the first package name we get
-		if name == "" {
-			name = pk.Name
-		}
-		for _, dep := range pk.Imports {
-			found := false
-			for _, p := range pkgs {
-				if p == dep {
-					found = true
-				}
-			}
-			if !found {
-				pkgs = append(pkgs, dep)
-			}
-		}
-	}
-
-	return pkgs, name, nil
 }
 
 func readBuildTags(p string) ([]string, error) {
@@ -498,6 +572,32 @@ func readBuildTags(p string) ([]string, error) {
 						tags = append(tags, tg)
 					}
 				}
+			}
+		}
+	}
+
+	return tags, nil
+}
+
+func readFileBuildTags(fp string) ([]string, error) {
+	co, err := readGoContents(fp)
+	if err != nil {
+		return []string{}, err
+	}
+
+	var tags []string
+	// Only look at places where we had a code comment.
+	if len(co) > 0 {
+		t := findTags(co)
+		for _, tg := range t {
+			found := false
+			for _, tt := range tags {
+				if tt == tg {
+					found = true
+				}
+			}
+			if !found {
+				tags = append(tags, tg)
 			}
 		}
 	}
@@ -612,3 +712,25 @@ func isSupportedArch(n string) bool {
 
 	return false
 }
+
+//func ensureTrailingSlash(s string) string {
+//return strings.TrimSuffix(s, string(os.PathSeparator)) + string(os.PathSeparator)
+//}
+
+type PackageTree struct {
+	ImportRoot string
+	Packages   map[string]PackageOrErr
+}
+
+type PackageOrErr struct {
+	P   Package
+	Err error
+}
+
+//func (t PackageTree) ExternalReach(main, tests bool) (map[string][]string, error) {
+
+//}
+
+//func (t PackageTree) ListExternalImports(main, tests bool) ([]string, error) {
+
+//}
