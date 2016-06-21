@@ -127,14 +127,12 @@ func TestListPackages(t *testing.T) {
 	table := map[string]struct {
 		fileRoot   string
 		importRoot string
-		tests      bool
 		out        PackageTree
 		err        error
 	}{
 		"empty": {
 			fileRoot:   j("empty"),
 			importRoot: "empty",
-			tests:      true,
 			out: PackageTree{
 				ImportRoot: "empty",
 				Packages: map[string]PackageOrErr{
@@ -150,7 +148,6 @@ func TestListPackages(t *testing.T) {
 		"code only": {
 			fileRoot:   j("simple"),
 			importRoot: "simple",
-			tests:      true,
 			out: PackageTree{
 				ImportRoot: "simple",
 				Packages: map[string]PackageOrErr{
@@ -171,7 +168,6 @@ func TestListPackages(t *testing.T) {
 		"impose import path": {
 			fileRoot:   j("simple"),
 			importRoot: "arbitrary",
-			tests:      true,
 			out: PackageTree{
 				ImportRoot: "arbitrary",
 				Packages: map[string]PackageOrErr{
@@ -192,7 +188,6 @@ func TestListPackages(t *testing.T) {
 		"test only": {
 			fileRoot:   j("t"),
 			importRoot: "simple",
-			tests:      true,
 			out: PackageTree{
 				ImportRoot: "simple",
 				Packages: map[string]PackageOrErr{
@@ -214,7 +209,6 @@ func TestListPackages(t *testing.T) {
 		"xtest only": {
 			fileRoot:   j("xt"),
 			importRoot: "simple",
-			tests:      true,
 			out: PackageTree{
 				ImportRoot: "simple",
 				Packages: map[string]PackageOrErr{
@@ -236,7 +230,6 @@ func TestListPackages(t *testing.T) {
 		"code and test": {
 			fileRoot:   j("simplet"),
 			importRoot: "simple",
-			tests:      true,
 			out: PackageTree{
 				ImportRoot: "simple",
 				Packages: map[string]PackageOrErr{
@@ -261,7 +254,6 @@ func TestListPackages(t *testing.T) {
 		"code and xtest": {
 			fileRoot:   j("simplext"),
 			importRoot: "simple",
-			tests:      true,
 			out: PackageTree{
 				ImportRoot: "simple",
 				Packages: map[string]PackageOrErr{
@@ -286,7 +278,6 @@ func TestListPackages(t *testing.T) {
 		"code, test, xtest": {
 			fileRoot:   j("simpleallt"),
 			importRoot: "simple",
-			tests:      true,
 			out: PackageTree{
 				ImportRoot: "simple",
 				Packages: map[string]PackageOrErr{
@@ -312,7 +303,6 @@ func TestListPackages(t *testing.T) {
 		"one pkg multifile": {
 			fileRoot:   j("m1p"),
 			importRoot: "m1p",
-			tests:      true,
 			out: PackageTree{
 				ImportRoot: "m1p",
 				Packages: map[string]PackageOrErr{
@@ -334,7 +324,6 @@ func TestListPackages(t *testing.T) {
 		"one nested below": {
 			fileRoot:   j("nest"),
 			importRoot: "nest",
-			tests:      true,
 			out: PackageTree{
 				ImportRoot: "nest",
 				Packages: map[string]PackageOrErr{
@@ -367,7 +356,6 @@ func TestListPackages(t *testing.T) {
 		"two nested under empty root": {
 			fileRoot:   j("ren"),
 			importRoot: "ren",
-			tests:      true,
 			out: PackageTree{
 				ImportRoot: "ren",
 				Packages: map[string]PackageOrErr{
@@ -405,7 +393,6 @@ func TestListPackages(t *testing.T) {
 		"code and ignored main": {
 			fileRoot:   j("igmain"),
 			importRoot: "simple",
-			tests:      true,
 			out: PackageTree{
 				ImportRoot: "simple",
 				Packages: map[string]PackageOrErr{
@@ -427,7 +414,6 @@ func TestListPackages(t *testing.T) {
 		"code, tests, and ignored main": {
 			fileRoot:   j("igmaint"),
 			importRoot: "simple",
-			tests:      true,
 			out: PackageTree{
 				ImportRoot: "simple",
 				Packages: map[string]PackageOrErr{
@@ -453,7 +439,6 @@ func TestListPackages(t *testing.T) {
 		"two pkgs": {
 			fileRoot:   j("twopkgs"),
 			importRoot: "twopkgs",
-			tests:      true,
 			out: PackageTree{
 				ImportRoot: "twopkgs",
 				Packages: map[string]PackageOrErr{
@@ -475,7 +460,7 @@ func TestListPackages(t *testing.T) {
 			continue
 		}
 
-		out, err := llistPackages(fix.fileRoot, fix.importRoot, fix.tests)
+		out, err := listPackages(fix.fileRoot, fix.importRoot)
 
 		if err != nil && fix.err == nil {
 			t.Errorf("listPackages(%q): Received error but none expected: %s", name, err)
