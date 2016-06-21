@@ -35,7 +35,25 @@ func (o SolveOpts) HashInputs() []byte {
 	// in the hash.
 	h.Write([]byte(stdlibPkgs))
 
-	// TODO static analysis
+	// TODO deal with an err here
+	// TODO encap within bridge
+	ptree, _ := listPackages(o.Root, string(o.N))
+	for _, perr := range ptree.Packages {
+		if perr.Err != nil {
+			h.Write([]byte(perr.Err.Error()))
+		} else {
+			h.Write([]byte(perr.P.Name))
+			h.Write([]byte(perr.P.CommentPath))
+			h.Write([]byte(perr.P.ImportPath))
+			for _, imp := range perr.P.Imports {
+				h.Write([]byte(imp))
+			}
+			for _, imp := range perr.P.TestImports {
+				h.Write([]byte(imp))
+			}
+		}
+	}
+
 	// TODO overrides
 	// TODO aliases
 	// TODO ignores

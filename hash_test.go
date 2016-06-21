@@ -20,6 +20,7 @@ func TestHashInputs(t *testing.T) {
 	dig := opts.HashInputs()
 
 	h := sha256.New()
+	//for _, v := range []string{"a", "a", "1.0.0", "b", "b", "1.0.0", "root", "", "root", "a", "b"} {
 	for _, v := range []string{"a", "a", "1.0.0", "b", "b", "1.0.0"} {
 		h.Write([]byte(v))
 	}
