@@ -155,9 +155,7 @@ func listPackages(fileRoot, importRoot string) (PackageTree, error) {
 		//pretty.Printf("ip:\t\t%s\n", ip)
 
 		// Find all the imports, across all os/arch combos
-		// 0x8 is build.IgnoreVendor, but that was introduced in go1.6. This
-		// gives us easy backwards compat.
-		p, err := ctx.ImportDir(path, build.ImportComment|0x8)
+		p, err := ctx.ImportDir(path, analysisImportMode())
 		var pkg Package
 		if err == nil {
 			pkg = happy(ip, p)
@@ -216,12 +214,12 @@ func listPackages(fileRoot, importRoot string) (PackageTree, error) {
 				// outf first; if there's another err there, we bail out with a
 				// return
 				ctx.ReadDir = outf
-				po, err2 := ctx.ImportDir(path, build.ImportComment|0x8)
+				po, err2 := ctx.ImportDir(path, analysisImportMode())
 				if err2 != nil {
 					return nil
 				}
 				ctx.ReadDir = inf
-				pi, err2 := ctx.ImportDir(path, build.ImportComment|0x8)
+				pi, err2 := ctx.ImportDir(path, analysisImportMode())
 				if err2 != nil {
 					return nil
 				}
