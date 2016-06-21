@@ -150,7 +150,10 @@ func listPackages(fileRoot, importRoot string) (PackageTree, error) {
 			return filepath.SkipDir
 		}
 
-		ip := filepath.Join(importRoot, strings.TrimPrefix(path, fileRoot))
+		// Compute the import path. Run the result through ToSlash(), so that windows
+		// paths are normalized to Unix separators, as import paths are expected
+		// to be.
+		ip := filepath.ToSlash(filepath.Join(importRoot, strings.TrimPrefix(path, fileRoot)))
 		//pretty.Printf("path:\t\t%s\n", path)
 		//pretty.Printf("ip:\t\t%s\n", ip)
 
