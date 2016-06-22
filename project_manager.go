@@ -531,7 +531,7 @@ func stripVendor(path string, info os.FileInfo, err error) error {
 	if info.Name() == "vendor" {
 		if _, err := os.Lstat(path); err == nil {
 			if info.IsDir() {
-				return os.RemoveAll(path)
+				return removeAll(path)
 			}
 		}
 	}

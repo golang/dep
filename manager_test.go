@@ -45,7 +45,12 @@ func TestSourceManagerInit(t *testing.T) {
 	if err != nil {
 		t.Errorf("Unexpected error on SourceManager creation: %s", err)
 	}
-	defer os.RemoveAll(cpath)
+	defer func() {
+		err := removeAll(cpath)
+		if err != nil {
+			t.Errorf("removeAll failed: %s", err)
+		}
+	}()
 
 	_, err = NewSourceManager(cpath, bd, false, dummyAnalyzer{})
 	if err == nil {
@@ -79,8 +84,13 @@ func TestProjectManagerInit(t *testing.T) {
 		t.Errorf("Unexpected error on SourceManager creation: %s", err)
 		t.FailNow()
 	}
+	defer func() {
+		err := removeAll(cpath)
+		if err != nil {
+			t.Errorf("removeAll failed: %s", err)
+		}
+	}()
 	defer sm.Release()
-	defer os.RemoveAll(cpath)
 
 	pn := ProjectName("github.com/Masterminds/VCSTestRepo")
 	v, err := sm.ListVersions(pn)
@@ -210,15 +220,20 @@ func TestRepoVersionFetching(t *testing.T) {
 		pmi, err := sm.getProjectManager(u)
 		if err != nil {
 			sm.Release()
-			os.RemoveAll(cpath)
+			removeAll(cpath)
 			t.Errorf("Unexpected error on ProjectManager creation: %s", err)
 			t.FailNow()
 		}
 		pms[k] = pmi.pm.(*projectManager)
 	}
 
+	defer func() {
+		err := removeAll(cpath)
+		if err != nil {
+			t.Errorf("removeAll failed: %s", err)
+		}
+	}()
 	defer sm.Release()
-	defer os.RemoveAll(cpath)
 
 	// test git first
 	vlist, exbits, err := pms[0].crepo.getCurrentVersionPairs()
@@ -305,8 +320,13 @@ func TestGetInfoListVersionsOrdering(t *testing.T) {
 		t.Errorf("Unexpected error on SourceManager creation: %s", err)
 		t.FailNow()
 	}
+	defer func() {
+		err := removeAll(cpath)
+		if err != nil {
+			t.Errorf("removeAll failed: %s", err)
+		}
+	}()
 	defer sm.Release()
-	defer os.RemoveAll(cpath)
 
 	// setup done, now do the test
 
