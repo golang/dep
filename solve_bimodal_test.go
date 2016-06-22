@@ -30,8 +30,8 @@ func init() {
 }
 
 // Fixtures that rely on simulated bimodal (project and package-level)
-// analysis for correct operation. These all have some extra work done on
-// them down in init().
+// analysis for correct operation. The name given in the map gets assigned into
+// the fixture itself in init().
 var bimodalFixtures = map[string]bimodalFixture{
 	// Simple case, ensures that we do the very basics of picking up and
 	// including a single, simple import that is not expressed as a constraint
@@ -309,6 +309,43 @@ var bimodalFixtures = map[string]bimodalFixture{
 			"foo 1.0.0",
 			"foobar 1.0.0",
 		),
+	},
+	// Well-formed failure when there's a dependency on a pkg that doesn't exist
+	"fail when imports nonexistent package": {
+		ds: []depspec{
+			dsp(dsv("root 0.0.0", "a 1.0.0"),
+				pkg("root", "a/foo"),
+			),
+			dsp(dsv("a 1.0.0"),
+				pkg("a"),
+			),
+		},
+		errp: []string{"a", "root"},
+	},
+	// Transitive deps from one project (a) get incrementally included as other
+	// deps incorporate its various packages, and fail with proper error when we
+	// discover one incrementally that isn't present
+	"fail multi-stage missing pkg": {
+		ds: []depspec{
+			dsp(dsv("root 0.0.0"),
+				pkg("root", "a", "d"),
+			),
+			dsp(dsv("a 1.0.0"),
+				pkg("a", "b"),
+				pkg("a/second", "c"),
+			),
+			dsp(dsv("b 2.0.0"),
+				pkg("b"),
+			),
+			dsp(dsv("c 1.2.0"),
+				pkg("c"),
+			),
+			dsp(dsv("d 1.0.0"),
+				pkg("d", "a/second"),
+				pkg("d", "a/nonexistent"),
+			),
+		},
+		errp: []string{"d", "a"},
 	},
 }
 
