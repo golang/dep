@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"path/filepath"
 	"strings"
 	"sync"
 
@@ -19,6 +20,7 @@ type ProjectManager interface {
 	ListVersions() ([]Version, error)
 	CheckExistence(ProjectExistence) bool
 	ExportVersionTo(Version, string) error
+	ListPackages(Version) (PackageTree, error)
 }
 
 type ProjectAnalyzer interface {
@@ -86,22 +88,8 @@ type repo struct {
 }
 
 func (pm *projectManager) GetInfoAt(v Version) (ProjectInfo, error) {
-	// Technically, we could attempt to return straight from the metadata cache
-	// even if the repo cache doesn't exist on disk. But that would allow weird
-	// state inconsistencies (cache exists, but no repo...how does that even
-	// happen?) that it'd be better to just not allow so that we don't have to
-	// think about it elsewhere
-	if !pm.CheckExistence(ExistsInCache) {
-		if pm.CheckExistence(ExistsUpstream) {
-			err := pm.crepo.r.Get()
-			if err != nil {
-				return ProjectInfo{}, fmt.Errorf("Failed to create repository cache for %s", pm.n)
-			}
-			pm.ex.s |= ExistsInCache
-			pm.ex.f |= ExistsInCache
-		} else {
-			return ProjectInfo{}, fmt.Errorf("Project repository cache for %s does not exist", pm.n)
-		}
+	if err := pm.ensureCacheExistence(); err != nil {
+		return ProjectInfo{}, err
 	}
 
 	if r, exists := pm.dc.VMap[v]; exists {
@@ -110,6 +98,7 @@ func (pm *projectManager) GetInfoAt(v Version) (ProjectInfo, error) {
 		}
 	}
 
+	pm.crepo.mut.Lock()
 	var err error
 	if !pm.crepo.synced {
 		err = pm.crepo.r.Update()
@@ -119,7 +108,6 @@ func (pm *projectManager) GetInfoAt(v Version) (ProjectInfo, error) {
 		pm.crepo.synced = true
 	}
 
-	pm.crepo.mut.Lock()
 	// Always prefer a rev, if it's available
 	if pv, ok := v.(PairedVersion); ok {
 		err = pm.crepo.r.UpdateVersion(pv.Underlying().String())
@@ -152,6 +140,58 @@ func (pm *projectManager) GetInfoAt(v Version) (ProjectInfo, error) {
 	}
 
 	return ProjectInfo{}, err
+}
+
+func (pm *projectManager) ListPackages(v Version) (PackageTree, error) {
+	var err error
+	if err = pm.ensureCacheExistence(); err != nil {
+		return PackageTree{}, err
+	}
+
+	pm.crepo.mut.Lock()
+	// Check out the desired version for analysis
+	if pv, ok := v.(PairedVersion); ok {
+		// Always prefer a rev, if it's available
+		err = pm.crepo.r.UpdateVersion(pv.Underlying().String())
+	} else {
+		// If we don't have a rev, ensure the repo is up to date, otherwise we
+		// could have a desync issue
+		if !pm.crepo.synced {
+			err = pm.crepo.r.Update()
+			if err != nil {
+				return PackageTree{}, fmt.Errorf("Could not fetch latest updates into repository")
+			}
+			pm.crepo.synced = true
+		}
+		err = pm.crepo.r.UpdateVersion(v.String())
+	}
+
+	ex, err := listPackages(filepath.Join(pm.ctx.GOPATH, "src", string(pm.n)), string(pm.n))
+	pm.crepo.mut.Unlock()
+
+	return ex, err
+}
+
+func (pm *projectManager) ensureCacheExistence() error {
+	// Technically, methods could could attempt to return straight from the
+	// metadata cache even if the repo cache doesn't exist on disk. But that
+	// would allow weird state inconsistencies (cache exists, but no repo...how
+	// does that even happen?) that it'd be better to just not allow so that we
+	// don't have to think about it elsewhere
+	if !pm.CheckExistence(ExistsInCache) {
+		if pm.CheckExistence(ExistsUpstream) {
+			err := pm.crepo.r.Get()
+			if err != nil {
+				return fmt.Errorf("Failed to create repository cache for %s", pm.n)
+			}
+			pm.ex.s |= ExistsInCache
+			pm.ex.f |= ExistsInCache
+		} else {
+			return fmt.Errorf("Project repository cache for %s does not exist", pm.n)
+		}
+	}
+
+	return nil
 }
 
 func (pm *projectManager) ListVersions() (vlist []Version, err error) {

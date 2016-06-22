@@ -1,12 +1,13 @@
 package vsolver
 
-// satisfiable is the main checking method. It determines if introducing a new
-// project atom would result in a state where all solver requirements are still
-// satisfied.
-func (s *solver) satisfiable(pa ProjectAtom) error {
-	if emptyProjectAtom == pa {
-		// TODO we should protect against this case elsewhere, but for now panic
-		// to canary when it's a problem
+// checkProject performs all constraint checks on a new project (with packages)
+// that we want to select. It determines if selecting the atom would result in
+// a state where all solver requirements are still satisfied.
+func (s *solver) checkProject(a atomWithPackages) error {
+	pa := a.atom
+	if nilpa == pa {
+		// This shouldn't be able to happen, but if it does, it unequivocally
+		// indicates a logical bug somewhere, so blowing up is preferable
 		panic("canary - checking version of empty ProjectAtom")
 	}
 
@@ -14,20 +15,27 @@ func (s *solver) satisfiable(pa ProjectAtom) error {
 		return err
 	}
 
-	deps, err := s.getDependenciesOf(pa)
+	if err := s.checkRequiredPackagesExist(a); err != nil {
+		return err
+	}
+
+	deps, err := s.getImportsAndConstraintsOf(a)
 	if err != nil {
 		// An err here would be from the package fetcher; pass it straight back
 		return err
 	}
 
 	for _, dep := range deps {
-		if err := s.checkIdentMatches(pa, dep); err != nil {
+		if err := s.checkIdentMatches(a, dep); err != nil {
 			return err
 		}
-		if err := s.checkDepsConstraintsAllowable(pa, dep); err != nil {
+		if err := s.checkDepsConstraintsAllowable(a, dep); err != nil {
 			return err
 		}
-		if err := s.checkDepsDisallowsSelected(pa, dep); err != nil {
+		if err := s.checkDepsDisallowsSelected(a, dep); err != nil {
+			return err
+		}
+		if err := s.checkPackageImportsFromDepExist(a, dep); err != nil {
 			return err
 		}
 
@@ -37,19 +45,55 @@ func (s *solver) satisfiable(pa ProjectAtom) error {
 	return nil
 }
 
+// checkPackages performs all constraint checks new packages being added to an
+// already-selected project. It determines if selecting the packages would
+// result in a state where all solver requirements are still satisfied.
+func (s *solver) checkPackage(a atomWithPackages) error {
+	if nilpa == a.atom {
+		// This shouldn't be able to happen, but if it does, it unequivocally
+		// indicates a logical bug somewhere, so blowing up is preferable
+		panic("canary - checking version of empty ProjectAtom")
+	}
+
+	// The base atom was already validated, so we can skip the
+	// checkAtomAllowable step.
+	deps, err := s.getImportsAndConstraintsOf(a)
+	if err != nil {
+		// An err here would be from the package fetcher; pass it straight back
+		return err
+	}
+
+	for _, dep := range deps {
+		if err := s.checkIdentMatches(a, dep); err != nil {
+			return err
+		}
+		if err := s.checkDepsConstraintsAllowable(a, dep); err != nil {
+			return err
+		}
+		if err := s.checkDepsDisallowsSelected(a, dep); err != nil {
+			return err
+		}
+		if err := s.checkPackageImportsFromDepExist(a, dep); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 // checkAtomAllowable ensures that an atom itself is acceptable with respect to
 // the constraints established by the current solution.
 func (s *solver) checkAtomAllowable(pa ProjectAtom) error {
 	constraint := s.sel.getConstraint(pa.Ident)
-	if s.sm.matches(pa.Ident, constraint, pa.Version) {
+	if s.b.matches(pa.Ident, constraint, pa.Version) {
 		return nil
 	}
-	// TODO collect constraint failure reason
+	// TODO collect constraint failure reason (wait...aren't we, below?)
 
 	deps := s.sel.getDependenciesOn(pa.Ident)
 	var failparent []Dependency
 	for _, dep := range deps {
-		if !s.sm.matches(pa.Ident, dep.Dep.Constraint, pa.Version) {
+		if !s.b.matches(pa.Ident, dep.Dep.Constraint, pa.Version) {
 			s.fail(dep.Depender.Ident)
 			failparent = append(failparent, dep)
 		}
@@ -65,13 +109,56 @@ func (s *solver) checkAtomAllowable(pa ProjectAtom) error {
 	return err
 }
 
+// checkRequiredPackagesExist ensures that all required packages enumerated by
+// existing dependencies on this atom are actually present in the atom.
+func (s *solver) checkRequiredPackagesExist(a atomWithPackages) error {
+	ptree, err := s.b.listPackages(a.atom.Ident, a.atom.Version)
+	if err != nil {
+		// TODO handle this more gracefully
+		return err
+	}
+
+	deps := s.sel.getDependenciesOn(a.atom.Ident)
+	fp := make(map[string]errDeppers)
+	// We inspect these in a bit of a roundabout way, in order to incrementally
+	// build up the failure we'd return if there is, indeed, a missing package.
+	// TODO rechecking all of these every time is wasteful. Is there a shortcut?
+	for _, dep := range deps {
+		for _, pkg := range dep.Dep.pl {
+			if errdep, seen := fp[pkg]; seen {
+				errdep.deppers = append(errdep.deppers, dep.Depender)
+				fp[pkg] = errdep
+			} else {
+				perr, has := ptree.Packages[pkg]
+				if !has || perr.Err != nil {
+					fp[pkg] = errDeppers{
+						err:     perr.Err,
+						deppers: []ProjectAtom{dep.Depender},
+					}
+				}
+			}
+		}
+	}
+
+	if len(fp) > 0 {
+		e := &checkeeHasProblemPackagesFailure{
+			goal:    a.atom,
+			failpkg: fp,
+		}
+		s.logSolve(e)
+		return e
+	}
+	return nil
+}
+
 // checkDepsConstraintsAllowable checks that the constraints of an atom on a
-// given dep would not result in UNSAT.
-func (s *solver) checkDepsConstraintsAllowable(pa ProjectAtom, dep ProjectDep) error {
+// given dep are valid with respect to existing constraints.
+func (s *solver) checkDepsConstraintsAllowable(a atomWithPackages, cdep completeDep) error {
+	dep := cdep.ProjectDep
 	constraint := s.sel.getConstraint(dep.Ident)
 	// Ensure the constraint expressed by the dep has at least some possible
 	// intersection with the intersection of existing constraints.
-	if s.sm.matchesAny(dep.Ident, constraint, dep.Constraint) {
+	if s.b.matchesAny(dep.Ident, constraint, dep.Constraint) {
 		return nil
 	}
 
@@ -80,7 +167,7 @@ func (s *solver) checkDepsConstraintsAllowable(pa ProjectAtom, dep ProjectDep) e
 	var failsib []Dependency
 	var nofailsib []Dependency
 	for _, sibling := range siblings {
-		if !s.sm.matchesAny(dep.Ident, sibling.Dep.Constraint, dep.Constraint) {
+		if !s.b.matchesAny(dep.Ident, sibling.Dep.Constraint, dep.Constraint) {
 			s.fail(sibling.Depender.Ident)
 			failsib = append(failsib, sibling)
 		} else {
@@ -89,7 +176,7 @@ func (s *solver) checkDepsConstraintsAllowable(pa ProjectAtom, dep ProjectDep) e
 	}
 
 	err := &disjointConstraintFailure{
-		goal:      Dependency{Depender: pa, Dep: dep},
+		goal:      Dependency{Depender: a.atom, Dep: cdep},
 		failsib:   failsib,
 		nofailsib: nofailsib,
 		c:         constraint,
@@ -101,14 +188,15 @@ func (s *solver) checkDepsConstraintsAllowable(pa ProjectAtom, dep ProjectDep) e
 // checkDepsDisallowsSelected ensures that an atom's constraints on a particular
 // dep are not incompatible with the version of that dep that's already been
 // selected.
-func (s *solver) checkDepsDisallowsSelected(pa ProjectAtom, dep ProjectDep) error {
+func (s *solver) checkDepsDisallowsSelected(a atomWithPackages, cdep completeDep) error {
+	dep := cdep.ProjectDep
 	selected, exists := s.sel.selected(dep.Ident)
-	if exists && !s.sm.matches(dep.Ident, dep.Constraint, selected.Version) {
+	if exists && !s.b.matches(dep.Ident, dep.Constraint, selected.atom.Version) {
 		s.fail(dep.Ident)
 
 		err := &constraintNotAllowedFailure{
-			goal: Dependency{Depender: pa, Dep: dep},
-			v:    selected.Version,
+			goal: Dependency{Depender: a.atom, Dep: cdep},
+			v:    selected.atom.Version,
 		}
 		s.logSolve(err)
 		return err
@@ -123,10 +211,11 @@ func (s *solver) checkDepsDisallowsSelected(pa ProjectAtom, dep ProjectDep) erro
 // In other words, this ensures that the solver never simultaneously selects two
 // identifiers with the same local name, but that disagree about where their
 // network source is.
-func (s *solver) checkIdentMatches(pa ProjectAtom, dep ProjectDep) error {
+func (s *solver) checkIdentMatches(a atomWithPackages, cdep completeDep) error {
+	dep := cdep.ProjectDep
 	if cur, exists := s.names[dep.Ident.LocalName]; exists {
 		if cur != dep.Ident.netName() {
-			deps := s.sel.getDependenciesOn(pa.Ident)
+			deps := s.sel.getDependenciesOn(a.atom.Ident)
 			// Fail all the other deps, as there's no way atom can ever be
 			// compatible with them
 			for _, d := range deps {
@@ -138,12 +227,53 @@ func (s *solver) checkIdentMatches(pa ProjectAtom, dep ProjectDep) error {
 				sel:      deps,
 				current:  cur,
 				mismatch: dep.Ident.netName(),
-				prob:     pa,
+				prob:     a.atom,
 			}
 			s.logSolve(err)
 			return err
 		}
 	}
 
+	return nil
+}
+
+// checkPackageImportsFromDepExist ensures that, if the dep is already selected,
+// the newly-required set of packages being placed on it exist and are valid.
+func (s *solver) checkPackageImportsFromDepExist(a atomWithPackages, cdep completeDep) error {
+	sel, is := s.sel.selected(cdep.ProjectDep.Ident)
+	if !is {
+		// dep is not already selected; nothing to do
+		return nil
+	}
+
+	ptree, err := s.b.listPackages(sel.atom.Ident, sel.atom.Version)
+	if err != nil {
+		// TODO handle this more gracefully
+		return err
+	}
+
+	e := &depHasProblemPackagesFailure{
+		goal: Dependency{
+			Depender: a.atom,
+			Dep:      cdep,
+		},
+		v:    sel.atom.Version,
+		prob: make(map[string]error),
+	}
+
+	for _, pkg := range cdep.pl {
+		perr, has := ptree.Packages[pkg]
+		if !has || perr.Err != nil {
+			e.pl = append(e.pl, pkg)
+			if has {
+				e.prob[pkg] = perr.Err
+			}
+		}
+	}
+
+	if len(e.pl) > 0 {
+		s.logSolve(e)
+		return e
+	}
 	return nil
 }

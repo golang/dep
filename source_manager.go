@@ -15,6 +15,7 @@ type SourceManager interface {
 	ListVersions(ProjectName) ([]Version, error)
 	RepoExists(ProjectName) (bool, error)
 	VendorCodeExists(ProjectName) (bool, error)
+	ListPackages(ProjectName, Version) (PackageTree, error)
 	ExportProject(ProjectName, Version, string) error
 	Release()
 	// Flush()
@@ -97,6 +98,15 @@ func (sm *sourceManager) GetProjectInfo(n ProjectName, v Version) (ProjectInfo, 
 	}
 
 	return pmc.pm.GetInfoAt(v)
+}
+
+func (sm *sourceManager) ListPackages(n ProjectName, v Version) (PackageTree, error) {
+	pmc, err := sm.getProjectManager(n)
+	if err != nil {
+		return PackageTree{}, err
+	}
+
+	return pmc.pm.ListPackages(v)
 }
 
 func (sm *sourceManager) ListVersions(n ProjectName) ([]Version, error) {

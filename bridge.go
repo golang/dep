@@ -1,11 +1,41 @@
 package vsolver
 
-import "sort"
+import (
+	"fmt"
+	"os"
+	"sort"
+)
 
-// smAdapter is an adapter and around a proper SourceManager.
-//
-// It provides localized caching that's tailored to the requirements of a
-// particular solve run.
+// sourceBridges provide an adapter to SourceManagers that tailor operations
+// for a single solve run.
+type sourceBridge interface {
+	getProjectInfo(pa ProjectAtom) (ProjectInfo, error)
+	listVersions(id ProjectIdentifier) ([]Version, error)
+	pairRevision(id ProjectIdentifier, r Revision) []Version
+	pairVersion(id ProjectIdentifier, v UnpairedVersion) PairedVersion
+	repoExists(id ProjectIdentifier) (bool, error)
+	vendorCodeExists(id ProjectIdentifier) (bool, error)
+	matches(id ProjectIdentifier, c Constraint, v Version) bool
+	matchesAny(id ProjectIdentifier, c1, c2 Constraint) bool
+	intersect(id ProjectIdentifier, c1, c2 Constraint) Constraint
+	listPackages(id ProjectIdentifier, v Version) (PackageTree, error)
+	computeRootReach(path string) ([]string, error)
+	verifyRoot(path string) error
+	deduceRemoteRepo(path string) (*remoteRepo, error)
+}
+
+func newBridge(name ProjectName, root string, sm SourceManager, downgrade bool) sourceBridge {
+	return &bridge{
+		sm:       sm,
+		sortdown: downgrade,
+		name:     name,
+		root:     root,
+		vlists:   make(map[ProjectName][]Version),
+	}
+}
+
+// bridge is an adapter around a proper SourceManager. It provides localized
+// caching that's tailored to the requirements of a particular solve run.
 //
 // It also performs transformations between ProjectIdentifiers, which is what
 // the solver primarily deals in, and ProjectName, which is what the
@@ -17,12 +47,22 @@ import "sort"
 // Finally, it provides authoritative version/constraint operations, ensuring
 // that any possible approach to a match - even those not literally encoded in
 // the inputs - is achieved.
-type smAdapter struct {
+type bridge struct {
 	// The underlying, adapted-to SourceManager
 	sm SourceManager
+
 	// Direction to sort the version list. False indicates sorting for upgrades;
 	// true for downgrades.
 	sortdown bool
+
+	// The name of the root project we're operating on. Used to redirect some
+	// calls that would ordinarily go to the SourceManager to a root-specific
+	// logical path, instead.
+	name ProjectName
+
+	// The path to the base directory of the root project.
+	root string
+
 	// Map of project root name to their available version list. This cache is
 	// layered on top of the proper SourceManager's cache; the only difference
 	// is that this keeps the versions sorted in the direction required by the
@@ -30,11 +70,11 @@ type smAdapter struct {
 	vlists map[ProjectName][]Version
 }
 
-func (c *smAdapter) getProjectInfo(pa ProjectAtom) (ProjectInfo, error) {
-	return c.sm.GetProjectInfo(ProjectName(pa.Ident.netName()), pa.Version)
+func (b *bridge) getProjectInfo(pa ProjectAtom) (ProjectInfo, error) {
+	return b.sm.GetProjectInfo(ProjectName(pa.Ident.netName()), pa.Version)
 }
 
-func (c *smAdapter) key(id ProjectIdentifier) ProjectName {
+func (b *bridge) key(id ProjectIdentifier) ProjectName {
 	k := ProjectName(id.NetworkName)
 	if k == "" {
 		k = id.LocalName
@@ -43,41 +83,41 @@ func (c *smAdapter) key(id ProjectIdentifier) ProjectName {
 	return k
 }
 
-func (c *smAdapter) listVersions(id ProjectIdentifier) ([]Version, error) {
-	k := c.key(id)
+func (b *bridge) listVersions(id ProjectIdentifier) ([]Version, error) {
+	k := b.key(id)
 
-	if vl, exists := c.vlists[k]; exists {
+	if vl, exists := b.vlists[k]; exists {
 		return vl, nil
 	}
 
-	vl, err := c.sm.ListVersions(k)
+	vl, err := b.sm.ListVersions(k)
 	// TODO cache errors, too?
 	if err != nil {
 		return nil, err
 	}
 
-	if c.sortdown {
+	if b.sortdown {
 		sort.Sort(downgradeVersionSorter(vl))
 	} else {
 		sort.Sort(upgradeVersionSorter(vl))
 	}
 
-	c.vlists[k] = vl
+	b.vlists[k] = vl
 	return vl, nil
 }
 
-func (c *smAdapter) repoExists(id ProjectIdentifier) (bool, error) {
-	k := c.key(id)
-	return c.sm.RepoExists(k)
+func (b *bridge) repoExists(id ProjectIdentifier) (bool, error) {
+	k := b.key(id)
+	return b.sm.RepoExists(k)
 }
 
-func (c *smAdapter) vendorCodeExists(id ProjectIdentifier) (bool, error) {
-	k := c.key(id)
-	return c.sm.VendorCodeExists(k)
+func (b *bridge) vendorCodeExists(id ProjectIdentifier) (bool, error) {
+	k := b.key(id)
+	return b.sm.VendorCodeExists(k)
 }
 
-func (c *smAdapter) pairVersion(id ProjectIdentifier, v UnpairedVersion) PairedVersion {
-	vl, err := c.listVersions(id)
+func (b *bridge) pairVersion(id ProjectIdentifier, v UnpairedVersion) PairedVersion {
+	vl, err := b.listVersions(id)
 	if err != nil {
 		return nil
 	}
@@ -94,8 +134,8 @@ func (c *smAdapter) pairVersion(id ProjectIdentifier, v UnpairedVersion) PairedV
 	return nil
 }
 
-func (c *smAdapter) pairRevision(id ProjectIdentifier, r Revision) []Version {
-	vl, err := c.listVersions(id)
+func (b *bridge) pairRevision(id ProjectIdentifier, r Revision) []Version {
+	vl, err := b.listVersions(id)
 	if err != nil {
 		return nil
 	}
@@ -117,7 +157,7 @@ func (c *smAdapter) pairRevision(id ProjectIdentifier, r Revision) []Version {
 // constraint. If that basic check fails and the provided version is incomplete
 // (e.g. an unpaired version or bare revision), it will attempt to gather more
 // information on one or the other and re-perform the comparison.
-func (c *smAdapter) matches(id ProjectIdentifier, c2 Constraint, v Version) bool {
+func (b *bridge) matches(id ProjectIdentifier, c2 Constraint, v Version) bool {
 	if c2.Matches(v) {
 		return true
 	}
@@ -135,7 +175,7 @@ func (c *smAdapter) matches(id ProjectIdentifier, c2 Constraint, v Version) bool
 		case UnpairedVersion:
 			// Only way paired and unpaired could match is if they share an
 			// underlying rev
-			pv := c.pairVersion(id, tc)
+			pv := b.pairVersion(id, tc)
 			if pv == nil {
 				return false
 			}
@@ -143,7 +183,7 @@ func (c *smAdapter) matches(id ProjectIdentifier, c2 Constraint, v Version) bool
 		case semverConstraint:
 			// Have to check all the possible versions for that rev to see if
 			// any match the semver constraint
-			for _, pv := range c.pairRevision(id, tv.Underlying()) {
+			for _, pv := range b.pairRevision(id, tv.Underlying()) {
 				if tc.Matches(pv) {
 					return true
 				}
@@ -159,7 +199,7 @@ func (c *smAdapter) matches(id ProjectIdentifier, c2 Constraint, v Version) bool
 		case UnpairedVersion:
 			// Only way paired and unpaired could match is if they share an
 			// underlying rev
-			pv := c.pairVersion(id, tc)
+			pv := b.pairVersion(id, tc)
 			if pv == nil {
 				return false
 			}
@@ -167,7 +207,7 @@ func (c *smAdapter) matches(id ProjectIdentifier, c2 Constraint, v Version) bool
 		case semverConstraint:
 			// Have to check all the possible versions for the rev to see if
 			// any match the semver constraint
-			for _, pv := range c.pairRevision(id, tv) {
+			for _, pv := range b.pairRevision(id, tv) {
 				if tc.Matches(pv) {
 					return true
 				}
@@ -185,19 +225,19 @@ func (c *smAdapter) matches(id ProjectIdentifier, c2 Constraint, v Version) bool
 		case Revision, PairedVersion:
 			// Easy case for both - just pair the uv and see if it matches the revision
 			// constraint
-			pv := c.pairVersion(id, tv)
+			pv := b.pairVersion(id, tv)
 			if pv == nil {
 				return false
 			}
 			return tc.Matches(pv)
 		case UnpairedVersion:
 			// Both are unpaired versions. See if they share an underlying rev.
-			pv := c.pairVersion(id, tv)
+			pv := b.pairVersion(id, tv)
 			if pv == nil {
 				return false
 			}
 
-			pc := c.pairVersion(id, tc)
+			pc := b.pairVersion(id, tc)
 			if pc == nil {
 				return false
 			}
@@ -206,12 +246,12 @@ func (c *smAdapter) matches(id ProjectIdentifier, c2 Constraint, v Version) bool
 		case semverConstraint:
 			// semverConstraint can't ever match a rev, but we do need to check
 			// if any other versions corresponding to this rev work.
-			pv := c.pairVersion(id, tv)
+			pv := b.pairVersion(id, tv)
 			if pv == nil {
 				return false
 			}
 
-			for _, ttv := range c.pairRevision(id, pv.Underlying()) {
+			for _, ttv := range b.pairRevision(id, pv.Underlying()) {
 				if c2.Matches(ttv) {
 					return true
 				}
@@ -226,7 +266,7 @@ func (c *smAdapter) matches(id ProjectIdentifier, c2 Constraint, v Version) bool
 }
 
 // matchesAny is the authoritative version of Constraint.MatchesAny.
-func (c *smAdapter) matchesAny(id ProjectIdentifier, c1, c2 Constraint) bool {
+func (b *bridge) matchesAny(id ProjectIdentifier, c1, c2 Constraint) bool {
 	if c1.MatchesAny(c2) {
 		return true
 	}
@@ -235,13 +275,13 @@ func (c *smAdapter) matchesAny(id ProjectIdentifier, c1, c2 Constraint) bool {
 	// more easily understood.
 	var uc1, uc2 Constraint
 	if v1, ok := c1.(Version); ok {
-		uc1 = c.vtu(id, v1)
+		uc1 = b.vtu(id, v1)
 	} else {
 		uc1 = c1
 	}
 
 	if v2, ok := c2.(Version); ok {
-		uc2 = c.vtu(id, v2)
+		uc2 = b.vtu(id, v2)
 	} else {
 		uc2 = c2
 	}
@@ -250,7 +290,7 @@ func (c *smAdapter) matchesAny(id ProjectIdentifier, c1, c2 Constraint) bool {
 }
 
 // intersect is the authoritative version of Constraint.Intersect.
-func (c *smAdapter) intersect(id ProjectIdentifier, c1, c2 Constraint) Constraint {
+func (b *bridge) intersect(id ProjectIdentifier, c1, c2 Constraint) Constraint {
 	rc := c1.Intersect(c2)
 	if rc != none {
 		return rc
@@ -260,13 +300,13 @@ func (c *smAdapter) intersect(id ProjectIdentifier, c1, c2 Constraint) Constrain
 	// more easily understood.
 	var uc1, uc2 Constraint
 	if v1, ok := c1.(Version); ok {
-		uc1 = c.vtu(id, v1)
+		uc1 = b.vtu(id, v1)
 	} else {
 		uc1 = c1
 	}
 
 	if v2, ok := c2.(Version); ok {
-		uc2 = c.vtu(id, v2)
+		uc2 = b.vtu(id, v2)
 	} else {
 		uc2 = c2
 	}
@@ -279,29 +319,90 @@ func (c *smAdapter) intersect(id ProjectIdentifier, c1, c2 Constraint) Constrain
 // This union may (and typically will) end up being nothing more than the single
 // input version, but creating a versionTypeUnion guarantees that 'local'
 // constraint checks (direct method calls) are authoritative.
-func (c *smAdapter) vtu(id ProjectIdentifier, v Version) versionTypeUnion {
+func (b *bridge) vtu(id ProjectIdentifier, v Version) versionTypeUnion {
 	switch tv := v.(type) {
 	case Revision:
-		return versionTypeUnion(c.pairRevision(id, tv))
+		return versionTypeUnion(b.pairRevision(id, tv))
 	case PairedVersion:
-		return versionTypeUnion(c.pairRevision(id, tv.Underlying()))
+		return versionTypeUnion(b.pairRevision(id, tv.Underlying()))
 	case UnpairedVersion:
-		pv := c.pairVersion(id, tv)
+		pv := b.pairVersion(id, tv)
 		if pv == nil {
 			return versionTypeUnion{tv}
 		}
 
-		return versionTypeUnion(c.pairRevision(id, pv.Underlying()))
+		return versionTypeUnion(b.pairRevision(id, pv.Underlying()))
 	}
 
 	return nil
 }
 
+// computeRootReach is a specialized, less stringent version of listExternal
+// that allows for a bit of fuzziness in the source inputs.
+//
+// Specifically, we need to:
+//  - Analyze test-type files as well as typical source files
+//  - Make a best-effort attempt even if the code doesn't compile
+//  - Include main packages in the analysis
+//
+// Perhaps most important is that we don't want to have the results of this
+// analysis be in any permanent cache, and we want to read directly from our
+// potentially messy root project source location on disk. Together, this means
+// that we can't ask the real SourceManager to do it.
+func (b *bridge) computeRootReach(path string) ([]string, error) {
+	// TODO cache this
+	// TODO i now cannot remember the reasons why i thought being less stringent
+	// in the analysis was OK. so, for now, we just compute list of
+	// externally-touched packages.
+	ptree, err := listPackages(path, string(b.name))
+	if err != nil {
+		return nil, err
+	}
+
+	return ptree.ListExternalImports(true, true)
+}
+
+// listPackages lists all the packages contained within the given project at a
+// particular version.
+//
+// The root project is handled separately, as the source manager isn't
+// responsible for that code.
+func (b *bridge) listPackages(id ProjectIdentifier, v Version) (PackageTree, error) {
+	if id.LocalName != b.name {
+		// FIXME if we're aliasing here, the returned PackageTree will have
+		// unaliased import paths, which is super not correct
+		return b.sm.ListPackages(b.key(id), v)
+	}
+
+	return listPackages(b.root, string(b.name))
+}
+
+// verifyRoot ensures that the provided path to the project root is in good
+// working condition. This check is made only once, at the beginning of a solve
+// run.
+func (b *bridge) verifyRoot(path string) error {
+	if fi, err := os.Stat(path); err != nil {
+		return fmt.Errorf("Project root must exist.")
+	} else if !fi.IsDir() {
+		return fmt.Errorf("Project root must be a directory.")
+	}
+
+	return nil
+}
+
+// deduceRemoteRepo deduces certain network-oriented properties about an import
+// path.
+func (b *bridge) deduceRemoteRepo(path string) (*remoteRepo, error) {
+	return deduceRemoteRepo(path)
+}
+
 // versionTypeUnion represents a set of versions that are, within the scope of
-// this solve operation, equivalent. The simple case here is just a pair (normal
-// version plus its underlying revision), but if a tag or branch point at the
-// same rev, then they are equivalent - but only for the duration of this
-// solve.
+// this solver run, equivalent.
+//
+// The simple case here is just a pair - a normal version plus its underlying
+// revision - but if a tag or branch point at the same rev, then we consider
+// them equivalent. Again, however, this equivalency is short-lived; it must be
+// re-assessed during every solver run.
 //
 // The union members are treated as being OR'd together:  all constraint
 // operations attempt each member, and will take the most open/optimistic

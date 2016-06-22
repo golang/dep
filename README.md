@@ -88,7 +88,7 @@ right now. We'll improve/add explanatory links as we go!
       Go code now, but coherently organized."
 * [x] Define different network addresses for a given import path
 * [ ] Global project aliasing. This is a bit different than the previous.
-* [ ] Bi-modal analysis (project-level and package-level)
+* [x] Bi-modal analysis (project-level and package-level)
 * [ ] Specific sub-package dependencies
 * [ ] Enforcing an acyclic project graph (mirroring the Go compiler's
       enforcement of an acyclic package import graph)

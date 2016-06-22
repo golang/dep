@@ -118,6 +118,7 @@ type depspec struct {
 	v       Version
 	deps    []ProjectDep
 	devdeps []ProjectDep
+	pkgs    []tpkg
 }
 
 // dsv - "depspec semver" (make a semver depspec)
@@ -155,31 +156,12 @@ func dsv(pi string, deps ...string) depspec {
 	return ds
 }
 
-type fixture struct {
-	// name of this fixture datum
-	n string
-	// depspecs. always treat first as root
-	ds []depspec
-	// results; map of name/version pairs
-	r map[string]Version
-	// max attempts the solver should need to find solution. 0 means no limit
-	maxAttempts int
-	// Use downgrade instead of default upgrade sorter
-	downgrade bool
-	// lock file simulator, if one's to be used at all
-	l fixLock
-	// projects expected to have errors, if any
-	errp []string
-	// request up/downgrade to all projects
-	changeall bool
-}
-
 // mklock makes a fixLock, suitable to act as a lock file
 func mklock(pairs ...string) fixLock {
 	l := make(fixLock, 0)
 	for _, s := range pairs {
 		pa := mksvpa(s)
-		l = append(l, NewLockedProject(pa.Ident.LocalName, pa.Version, pa.Ident.netName(), ""))
+		l = append(l, NewLockedProject(pa.Ident.LocalName, pa.Version, pa.Ident.netName(), "", nil))
 	}
 
 	return l
@@ -191,7 +173,7 @@ func mkrevlock(pairs ...string) fixLock {
 	l := make(fixLock, 0)
 	for _, s := range pairs {
 		pa := mksvpa(s)
-		l = append(l, NewLockedProject(pa.Ident.LocalName, pa.Version.(PairedVersion).Underlying(), pa.Ident.netName(), ""))
+		l = append(l, NewLockedProject(pa.Ident.LocalName, pa.Version.(PairedVersion).Underlying(), pa.Ident.netName(), "", nil))
 	}
 
 	return l
@@ -215,7 +197,94 @@ func mkresults(pairs ...string) map[string]Version {
 	return m
 }
 
-var fixtures = []fixture{
+// computeBasicReachMap takes a depspec and computes a reach map which is
+// identical to the explicit depgraph.
+//
+// Using a reachMap here is overkill for what the basic fixtures actually need,
+// but we use it anyway for congruence with the more general cases.
+func computeBasicReachMap(ds []depspec) reachMap {
+	rm := make(reachMap)
+
+	for k, d := range ds {
+		n := string(d.n)
+		lm := map[string][]string{
+			n: nil,
+		}
+		v := d.v
+		if k == 0 {
+			// Put the root in with a nil rev, to accommodate the solver
+			v = nil
+		}
+		rm[pident{n: d.n, v: v}] = lm
+
+		for _, dep := range d.deps {
+			lm[n] = append(lm[n], string(dep.Ident.LocalName))
+		}
+
+		// first is root
+		if k == 0 {
+			for _, dep := range d.devdeps {
+				lm[n] = append(lm[n], string(dep.Ident.LocalName))
+			}
+		}
+	}
+
+	return rm
+}
+
+type pident struct {
+	n ProjectName
+	v Version
+}
+
+type specfix interface {
+	name() string
+	specs() []depspec
+	maxTries() int
+	expectErrs() []string
+	result() map[string]Version
+}
+
+type basicFixture struct {
+	// name of this fixture datum
+	n string
+	// depspecs. always treat first as root
+	ds []depspec
+	// results; map of name/version pairs
+	r map[string]Version
+	// max attempts the solver should need to find solution. 0 means no limit
+	maxAttempts int
+	// Use downgrade instead of default upgrade sorter
+	downgrade bool
+	// lock file simulator, if one's to be used at all
+	l fixLock
+	// projects expected to have errors, if any
+	errp []string
+	// request up/downgrade to all projects
+	changeall bool
+}
+
+func (f basicFixture) name() string {
+	return f.n
+}
+
+func (f basicFixture) specs() []depspec {
+	return f.ds
+}
+
+func (f basicFixture) maxTries() int {
+	return f.maxAttempts
+}
+
+func (f basicFixture) expectErrs() []string {
+	return f.errp
+}
+
+func (f basicFixture) result() map[string]Version {
+	return f.r
+}
+
+var basicFixtures = []basicFixture{
 	// basic fixtures
 	{
 		n: "no dependencies",
@@ -753,6 +822,8 @@ var fixtures = []fixture{
 		),
 		maxAttempts: 2,
 	},
+	// TODO add fixture that tests proper handling of loops via aliases (where
+	// a project that wouldn't be a loop is aliased to a project that is a loop)
 }
 
 func init() {
@@ -761,7 +832,7 @@ func init() {
 	// of bar depends on a baz with the same minor version. There is only one
 	// version of baz, 0.0.0, so only older versions of foo and bar will
 	// satisfy it.
-	fix := fixture{
+	fix := basicFixture{
 		n: "complex backtrack",
 		ds: []depspec{
 			dsv("root 0.0.0", "foo *", "bar *"),
@@ -782,21 +853,30 @@ func init() {
 		}
 	}
 
-	fixtures = append(fixtures, fix)
+	basicFixtures = append(basicFixtures, fix)
 }
+
+// reachMaps contain externalReach()-type data for a given depspec fixture's
+// universe of proejcts, packages, and versions.
+type reachMap map[pident]map[string][]string
 
 type depspecSourceManager struct {
 	specs []depspec
-	//map[ProjectAtom][]Version
-	sortup bool
+	rm    reachMap
 }
 
-var _ SourceManager = &depspecSourceManager{}
+type fixSM interface {
+	SourceManager
+	rootSpec() depspec
+	allSpecs() []depspec
+}
+
+var _ fixSM = &depspecSourceManager{}
 
 func newdepspecSM(ds []depspec) *depspecSourceManager {
-	//TODO precompute the version lists, for speediness?
 	return &depspecSourceManager{
 		specs: ds,
+		rm:    computeBasicReachMap(ds),
 	}
 }
 
@@ -814,6 +894,44 @@ func (sm *depspecSourceManager) GetProjectInfo(n ProjectName, v Version) (Projec
 
 	// TODO proper solver-type errors
 	return ProjectInfo{}, fmt.Errorf("Project '%s' at version '%s' could not be found", n, v)
+}
+
+func (sm *depspecSourceManager) ExternalReach(n ProjectName, v Version) (map[string][]string, error) {
+	id := pident{n: n, v: v}
+	if m, exists := sm.rm[id]; exists {
+		return m, nil
+	}
+	return nil, fmt.Errorf("No reach data for %s at version %s", n, v)
+}
+
+func (sm *depspecSourceManager) ListExternal(n ProjectName, v Version) ([]string, error) {
+	// This should only be called for the root
+	id := pident{n: n, v: v}
+	if r, exists := sm.rm[id]; exists {
+		return r[string(n)], nil
+	}
+	return nil, fmt.Errorf("No reach data for %s at version %s", n, v)
+}
+
+func (sm *depspecSourceManager) ListPackages(n ProjectName, v Version) (PackageTree, error) {
+	id := pident{n: n, v: v}
+	if r, exists := sm.rm[id]; exists {
+		ptree := PackageTree{
+			ImportRoot: string(n),
+			Packages: map[string]PackageOrErr{
+				string(n): PackageOrErr{
+					P: Package{
+						ImportPath: string(n),
+						Name:       string(n),
+						Imports:    r[string(n)],
+					},
+				},
+			},
+		}
+		return ptree, nil
+	}
+
+	return PackageTree{}, fmt.Errorf("Project %s at version %s could not be found", n, v)
 }
 
 func (sm *depspecSourceManager) ListVersions(name ProjectName) (pi []Version, err error) {
@@ -848,6 +966,64 @@ func (sm *depspecSourceManager) Release() {}
 
 func (sm *depspecSourceManager) ExportProject(n ProjectName, v Version, to string) error {
 	return fmt.Errorf("dummy sm doesn't support exporting")
+}
+
+func (sm *depspecSourceManager) rootSpec() depspec {
+	return sm.specs[0]
+}
+
+func (sm *depspecSourceManager) allSpecs() []depspec {
+	return sm.specs
+}
+
+type depspecBridge struct {
+	*bridge
+}
+
+// override computeRootReach() on bridge to read directly out of the depspecs
+func (b *depspecBridge) computeRootReach(path string) ([]string, error) {
+	// This only gets called for the root project, so grab that one off the test
+	// source manager
+	dsm := b.sm.(fixSM)
+	root := dsm.rootSpec()
+	if string(root.n) != path {
+		return nil, fmt.Errorf("Expected only root project %q to computeRootReach(), got %q", root.n, path)
+	}
+
+	ptree, err := dsm.ListPackages(root.n, nil)
+	if err != nil {
+		return nil, err
+	}
+	return ptree.ListExternalImports(true, true)
+}
+
+// override verifyRoot() on bridge to prevent any filesystem interaction
+func (b *depspecBridge) verifyRoot(path string) error {
+	root := b.sm.(fixSM).rootSpec()
+	if string(root.n) != path {
+		return fmt.Errorf("Expected only root project %q to computeRootReach(), got %q", root.n, path)
+	}
+
+	return nil
+}
+
+func (b *depspecBridge) listPackages(id ProjectIdentifier, v Version) (PackageTree, error) {
+	return b.sm.ListPackages(b.key(id), v)
+}
+
+// override deduceRemoteRepo on bridge to make all our pkg/project mappings work
+// as expected
+func (b *depspecBridge) deduceRemoteRepo(path string) (*remoteRepo, error) {
+	for _, ds := range b.sm.(fixSM).allSpecs() {
+		n := string(ds.n)
+		if path == n || strings.HasPrefix(path, n+"/") {
+			return &remoteRepo{
+				Base:   n,
+				RelPkg: strings.TrimPrefix(path, n+"/"),
+			}, nil
+		}
+	}
+	return nil, fmt.Errorf("Could not find %s, or any parent, in list of known fixtures", path)
 }
 
 // enforce interfaces

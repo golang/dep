@@ -56,6 +56,12 @@ func (i ProjectIdentifier) normalize() ProjectIdentifier {
 	return i
 }
 
+// bimodalIdentifiers are used to track work to be done in the unselected queue.
+type bimodalIdentifier struct {
+	id ProjectIdentifier
+	pl []string
+}
+
 type ProjectName string
 
 type ProjectAtom struct {
@@ -63,16 +69,45 @@ type ProjectAtom struct {
 	Version Version
 }
 
-var emptyProjectAtom ProjectAtom
+type atomWithPackages struct {
+	atom ProjectAtom
+	pl   []string
+}
 
 type ProjectDep struct {
 	Ident      ProjectIdentifier
 	Constraint Constraint
 }
 
+// Package represents a Go package. It contains a subset of the information
+// go/build.Package does.
+type Package struct {
+	ImportPath, CommentPath string
+	Name                    string
+	Imports                 []string
+	TestImports             []string
+}
+
+type byImportPath []Package
+
+func (s byImportPath) Len() int           { return len(s) }
+func (s byImportPath) Less(i, j int) bool { return s[i].ImportPath < s[j].ImportPath }
+func (s byImportPath) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
+
+// completeDep (name hopefully to change) provides the whole picture of a
+// dependency - the root (repo and project, since currently we assume the two
+// are the same) name, a constraint, and the actual packages needed that are
+// under that root.
+type completeDep struct {
+	// The base ProjectDep
+	ProjectDep
+	// The specific packages required from the ProjectDep
+	pl []string
+}
+
 type Dependency struct {
 	Depender ProjectAtom
-	Dep      ProjectDep
+	Dep      completeDep
 }
 
 // ProjectInfo holds manifest and lock for a ProjectName at a Version

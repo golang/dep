@@ -220,3 +220,163 @@ func (e *sourceMismatchFailure) traceString() string {
 
 	return buf.String()
 }
+
+type errDeppers struct {
+	err     error
+	deppers []ProjectAtom
+}
+type checkeeHasProblemPackagesFailure struct {
+	goal    ProjectAtom
+	failpkg map[string]errDeppers
+}
+
+func (e *checkeeHasProblemPackagesFailure) Error() string {
+	var buf bytes.Buffer
+	indent := ""
+
+	if len(e.failpkg) > 1 {
+		indent = "\t"
+		fmt.Fprintf(
+			&buf, "Could not introduce %s at %s due to multiple problematic subpackages:\n",
+			e.goal.Ident.errString(),
+			e.goal.Version,
+		)
+	}
+
+	for pkg, errdep := range e.failpkg {
+		var cause string
+		if errdep.err == nil {
+			cause = "is missing"
+		} else {
+			cause = fmt.Sprintf("does not contain usable Go code (%T).", errdep.err)
+		}
+
+		if len(e.failpkg) == 1 {
+			fmt.Fprintf(
+				&buf, "Could not introduce %s at %s, as its subpackage %s %s.",
+				e.goal.Ident.errString(),
+				e.goal.Version,
+				pkg,
+				cause,
+			)
+		} else {
+			fmt.Fprintf(&buf, "\tSubpackage %s %s.", pkg, cause)
+		}
+
+		if len(errdep.deppers) == 1 {
+			fmt.Fprintf(
+				&buf, " (Package is required by %s at %s.)",
+				errdep.deppers[0].Ident.errString(),
+				errdep.deppers[0].Version,
+			)
+		} else {
+			fmt.Fprintf(&buf, " Package is required by:")
+			for _, pa := range errdep.deppers {
+				fmt.Fprintf(&buf, "\n%s\t%s at %s", indent, pa.Ident.errString(), pa.Version)
+			}
+		}
+	}
+
+	return buf.String()
+}
+
+func (e *checkeeHasProblemPackagesFailure) traceString() string {
+	var buf bytes.Buffer
+
+	fmt.Fprintf(&buf, "%s at %s has problem subpkg(s):\n", e.goal.Ident.LocalName, e.goal.Version)
+	for pkg, errdep := range e.failpkg {
+		if errdep.err == nil {
+			fmt.Fprintf(&buf, "\t%s is missing; ", pkg)
+		} else {
+			fmt.Fprintf(&buf, "\t%s has err (%T); ", pkg, errdep.err)
+		}
+
+		if len(errdep.deppers) == 1 {
+			fmt.Fprintf(
+				&buf, "required by %s at %s.",
+				errdep.deppers[0].Ident.errString(),
+				errdep.deppers[0].Version,
+			)
+		} else {
+			fmt.Fprintf(&buf, " required by:")
+			for _, pa := range errdep.deppers {
+				fmt.Fprintf(&buf, "\n\t\t%s at %s", pa.Ident.errString(), pa.Version)
+			}
+		}
+	}
+
+	return buf.String()
+}
+
+type depHasProblemPackagesFailure struct {
+	goal Dependency
+	v    Version
+	pl   []string
+	prob map[string]error
+}
+
+func (e *depHasProblemPackagesFailure) Error() string {
+	fcause := func(pkg string) string {
+		var cause string
+		if err, has := e.prob[pkg]; has {
+			cause = fmt.Sprintf("does not contain usable Go code (%T).", err)
+		} else {
+			cause = "is missing."
+		}
+		return cause
+	}
+
+	if len(e.pl) == 1 {
+		return fmt.Sprintf(
+			"Could not introduce %s at %s, as it requires package %s from %s, but in version %s that package %s",
+			e.goal.Depender.Ident.errString(),
+			e.goal.Depender.Version,
+			e.pl[0],
+			e.goal.Dep.Ident.errString(),
+			e.v,
+			fcause(e.pl[0]),
+		)
+	}
+
+	var buf bytes.Buffer
+	fmt.Fprintf(
+		&buf, "Could not introduce %s at %s, as it requires problematic packages from %s (current version %s):",
+		e.goal.Depender.Ident.errString(),
+		e.goal.Depender.Version,
+		e.goal.Dep.Ident.errString(),
+		e.v,
+	)
+
+	for _, pkg := range e.pl {
+		fmt.Fprintf(&buf, "\t%s %s", pkg, fcause(pkg))
+	}
+
+	return buf.String()
+}
+
+func (e *depHasProblemPackagesFailure) traceString() string {
+	var buf bytes.Buffer
+	fcause := func(pkg string) string {
+		var cause string
+		if err, has := e.prob[pkg]; has {
+			cause = fmt.Sprintf("has parsing err (%T).", err)
+		} else {
+			cause = "is missing"
+		}
+		return cause
+	}
+
+	fmt.Fprintf(
+		&buf, "%s at %s depping on %s at %s has problem subpkg(s):",
+		e.goal.Depender.Ident.errString(),
+		e.goal.Depender.Version,
+		e.goal.Dep.Ident.errString(),
+		e.v,
+	)
+
+	for _, pkg := range e.pl {
+		fmt.Fprintf(&buf, "\t%s %s", pkg, fcause(pkg))
+	}
+
+	return buf.String()
+}
