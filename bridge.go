@@ -63,6 +63,12 @@ type bridge struct {
 	// The path to the base directory of the root project.
 	root string
 
+	// Simple, local cache of the root's PackageTree
+	crp *struct {
+		ptree PackageTree
+		err   error
+	}
+
 	// Map of project root name to their available version list. This cache is
 	// layered on top of the proper SourceManager's cache; the only difference
 	// is that this keeps the versions sorted in the direction required by the
@@ -350,16 +356,25 @@ func (b *bridge) vtu(id ProjectIdentifier, v Version) versionTypeUnion {
 // potentially messy root project source location on disk. Together, this means
 // that we can't ask the real SourceManager to do it.
 func (b *bridge) computeRootReach(path string) ([]string, error) {
-	// TODO cache this
 	// TODO i now cannot remember the reasons why i thought being less stringent
 	// in the analysis was OK. so, for now, we just compute list of
 	// externally-touched packages.
-	ptree, err := listPackages(path, string(b.name))
-	if err != nil {
-		return nil, err
+
+	if b.crp == nil {
+		ptree, err := listPackages(b.root, string(b.name))
+		b.crp = &struct {
+			ptree PackageTree
+			err   error
+		}{
+			ptree: ptree,
+			err:   err,
+		}
+	}
+	if b.crp.err != nil {
+		return nil, b.crp.err
 	}
 
-	return ptree.ListExternalImports(true, true)
+	return b.crp.ptree.ListExternalImports(true, true)
 }
 
 // listPackages lists all the packages contained within the given project at a
@@ -373,8 +388,18 @@ func (b *bridge) listPackages(id ProjectIdentifier, v Version) (PackageTree, err
 		// unaliased import paths, which is super not correct
 		return b.sm.ListPackages(b.key(id), v)
 	}
+	if b.crp == nil {
+		ptree, err := listPackages(b.root, string(b.name))
+		b.crp = &struct {
+			ptree PackageTree
+			err   error
+		}{
+			ptree: ptree,
+			err:   err,
+		}
+	}
 
-	return listPackages(b.root, string(b.name))
+	return b.crp.ptree, b.crp.err
 }
 
 // verifyRoot ensures that the provided path to the project root is in good
@@ -382,9 +407,9 @@ func (b *bridge) listPackages(id ProjectIdentifier, v Version) (PackageTree, err
 // run.
 func (b *bridge) verifyRoot(path string) error {
 	if fi, err := os.Stat(path); err != nil {
-		return fmt.Errorf("Project root must exist.")
+		return BadOptsFailure(fmt.Sprintf("Could not read project root (%s): %s", path, err))
 	} else if !fi.IsDir() {
-		return fmt.Errorf("Project root must be a directory.")
+		return BadOptsFailure(fmt.Sprintf("Project root (%s) is a file, not a directory.", path))
 	}
 
 	return nil

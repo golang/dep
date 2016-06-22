@@ -20,9 +20,8 @@ var (
 	}
 )
 
-// SolveOpts holds options that govern solving behavior, and the proper inputs
-// to the solving process.
-type SolveOpts struct {
+// SolveArgs comprise the required inputs for a Solve run.
+type SolveArgs struct {
 	// The path to the root of the project on which the solver is working.
 	Root string
 
@@ -39,7 +38,10 @@ type SolveOpts struct {
 	// If provided, the solver will attempt to preserve the versions specified
 	// in the lock, unless ToChange or ChangeAll settings indicate otherwise.
 	L Lock
+}
 
+// SolveOpts holds additional options that govern solving behavior.
+type SolveOpts struct {
 	// Downgrade indicates whether the solver will attempt to upgrade (false) or
 	// downgrade (true) projects that are not locked, or are marked for change.
 	//
@@ -77,6 +79,10 @@ type solver struct {
 	// number increments each time the algorithm completes a backtrack and
 	// starts moving forward again.
 	attempts int
+
+	// SolveArgs are the essential inputs to the solver. The solver will abort
+	// early if these options are not appropriately set.
+	args SolveArgs
 
 	// SolveOpts are the configuration options provided to the solver. The
 	// solver will abort early if certain options are not appropriately set.
@@ -129,41 +135,40 @@ type solver struct {
 	rm Manifest
 }
 
-// Solve attempts to find a dependency solution for the given project, as
-// represented by the provided SolveOpts.
-//
-// This is the entry point to the main vsolver workhorse.
-func Solve(o SolveOpts, sm SourceManager) (Result, error) {
-	s, err := prepareSolver(o, sm)
-	if err != nil {
-		return nil, err
-	}
-
-	return s.run()
+// A Solver is the main workhorse of vsolver: given a set of project inputs, it
+// performs a constraint solving analysis to develop a complete Result that can
+// be used as a lock file, and to populate a vendor directory.
+type Solver interface {
+	HashInputs() ([]byte, error)
+	Solve() (Result, error)
 }
 
-// prepare reads from the SolveOpts and prepare the solver to run.
-func prepareSolver(opts SolveOpts, sm SourceManager) (*solver, error) {
+// Prepare reads and validates the provided SolveArgs and SolveOpts.
+//
+// If a problem with the inputs is detected, an error is returned. Otherwise, a
+// Solver is returned, ready to hash and check inputs or perform a solving run.
+func Prepare(in SolveArgs, opts SolveOpts, sm SourceManager) (Solver, error) {
 	// local overrides would need to be handled first.
 	// TODO local overrides! heh
 
-	if opts.M == nil {
+	if in.M == nil {
 		return nil, BadOptsFailure("Opts must include a manifest.")
 	}
-	if opts.Root == "" {
-		return nil, BadOptsFailure("Opts must specify a non-empty string for the project root directory.")
+	if in.Root == "" {
+		return nil, BadOptsFailure("Opts must specify a non-empty string for the project root directory. If cwd is desired, use \".\"")
 	}
-	if opts.N == "" {
-		return nil, BadOptsFailure("Opts must include a project name.")
+	if in.N == "" {
+		return nil, BadOptsFailure("Opts must include a project name. This should be the intended root import path of the project.")
 	}
 	if opts.Trace && opts.TraceLogger == nil {
 		return nil, BadOptsFailure("Trace requested, but no logger provided.")
 	}
 
 	s := &solver{
-		o:  opts,
-		b:  newBridge(opts.N, opts.Root, sm, opts.Downgrade),
-		tl: opts.TraceLogger,
+		args: in,
+		o:    opts,
+		b:    newBridge(in.N, in.Root, sm, opts.Downgrade),
+		tl:   opts.TraceLogger,
 	}
 
 	// Initialize maps
@@ -184,19 +189,23 @@ func prepareSolver(opts SolveOpts, sm SourceManager) (*solver, error) {
 	return s, nil
 }
 
-// run executes the solver and creates an appropriate result.
-func (s *solver) run() (Result, error) {
+// Solve attempts to find a dependency solution for the given project, as
+// represented by the SolveArgs and accompanying SolveOpts with which this
+// Solver was created.
+//
+// This is the entry point to the main vsolver workhorse.
+func (s *solver) Solve() (Result, error) {
 	// Ensure the root is in good, working order before doing anything else
-	err := s.b.verifyRoot(s.o.Root)
+	err := s.b.verifyRoot(s.args.Root)
 	if err != nil {
 		return nil, err
 	}
 
 	// Prep safe, normalized versions of root manifest and lock data
-	s.rm = prepManifest(s.o.M)
+	s.rm = prepManifest(s.args.M)
 
-	if s.o.L != nil {
-		for _, lp := range s.o.L.Projects() {
+	if s.args.L != nil {
+		for _, lp := range s.args.L.Projects() {
 			s.rlm[lp.Ident().normalize()] = lp
 		}
 	}
@@ -221,11 +230,13 @@ func (s *solver) run() (Result, error) {
 		return nil, err
 	}
 
-	// Solved successfully, create and return a result
 	r := result{
 		att: s.attempts,
-		hd:  s.o.HashInputs(),
 	}
+
+	// An err here is impossible at this point; we already know the root tree is
+	// fine
+	r.hd, _ = s.HashInputs()
 
 	// Convert ProjectAtoms into LockedProjects
 	r.p = make([]LockedProject, len(all))
@@ -346,7 +357,7 @@ func (s *solver) solve() (map[ProjectAtom]map[string]struct{}, error) {
 func (s *solver) selectRoot() error {
 	pa := ProjectAtom{
 		Ident: ProjectIdentifier{
-			LocalName: s.o.N,
+			LocalName: s.args.N,
 		},
 		// This is a hack so that the root project doesn't have a nil version.
 		// It's sort of OK because the root never makes it out into the results.
@@ -379,7 +390,7 @@ func (s *solver) selectRoot() error {
 	// If we're looking for root's deps, get it from opts and local root
 	// analysis, rather than having the sm do it
 	mdeps := append(s.rm.GetDependencies(), s.rm.GetDevDependencies()...)
-	reach, err := s.b.computeRootReach(s.o.Root)
+	reach, err := s.b.computeRootReach(s.args.Root)
 	if err != nil {
 		return err
 	}

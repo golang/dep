@@ -9,22 +9,33 @@ import (
 func TestHashInputs(t *testing.T) {
 	fix := basicFixtures[2]
 
-	opts := SolveOpts{
-		// TODO path is ignored right now, but we'll have to deal with that once
-		// static analysis is in
-		Root: "foo",
-		N:    ProjectName("root"),
+	args := SolveArgs{
+		Root: string(fix.ds[0].Name()),
+		N:    fix.ds[0].Name(),
 		M:    fix.ds[0],
 	}
 
-	dig := opts.HashInputs()
+	// prep a fixture-overridden solver
+	si, err := Prepare(args, SolveOpts{}, newdepspecSM(fix.ds))
+	s := si.(*solver)
+	if err != nil {
+		t.Fatalf("Could not prepare solver due to err: %s", err)
+	}
+
+	fixb := &depspecBridge{
+		s.b.(*bridge),
+	}
+	s.b = fixb
+
+	dig, err := s.HashInputs()
+	if err != nil {
+		t.Fatalf("HashInputs returned unexpected err: %s", err)
+	}
 
 	h := sha256.New()
-	//for _, v := range []string{"a", "a", "1.0.0", "b", "b", "1.0.0", "root", "", "root", "a", "b"} {
-	for _, v := range []string{"a", "a", "1.0.0", "b", "b", "1.0.0"} {
+	for _, v := range []string{"a", "a", "1.0.0", "b", "b", "1.0.0", stdlibPkgs, "root", "", "root", "a", "b"} {
 		h.Write([]byte(v))
 	}
-	h.Write([]byte(stdlibPkgs))
 	correct := h.Sum(nil)
 
 	if !bytes.Equal(dig, correct) {

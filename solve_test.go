@@ -20,13 +20,14 @@ func init() {
 
 var stderrlog = log.New(os.Stderr, "", 0)
 
-func fixSolve(o SolveOpts, sm SourceManager) (Result, error) {
+func fixSolve(args SolveArgs, o SolveOpts, sm SourceManager) (Result, error) {
 	if testing.Verbose() {
 		o.Trace = true
 		o.TraceLogger = stderrlog
 	}
 
-	s, err := prepareSolver(o, sm)
+	si, err := Prepare(args, o, sm)
+	s := si.(*solver)
 	if err != nil {
 		return nil, err
 	}
@@ -36,7 +37,7 @@ func fixSolve(o SolveOpts, sm SourceManager) (Result, error) {
 	}
 	s.b = fixb
 
-	return s.run()
+	return s.Solve()
 }
 
 // Test all the basic table fixtures.
@@ -60,20 +61,23 @@ func solveBasicsAndCheck(fix basicFixture, t *testing.T) (res Result, err error)
 	}
 	sm := newdepspecSM(fix.ds)
 
+	args := SolveArgs{
+		Root: string(fix.ds[0].Name()),
+		N:    ProjectName(fix.ds[0].Name()),
+		M:    fix.ds[0],
+		L:    dummyLock{},
+	}
+
 	o := SolveOpts{
-		Root:      string(fix.ds[0].Name()),
-		N:         ProjectName(fix.ds[0].Name()),
-		M:         fix.ds[0],
-		L:         dummyLock{},
 		Downgrade: fix.downgrade,
 		ChangeAll: fix.changeall,
 	}
 
 	if fix.l != nil {
-		o.L = fix.l
+		args.L = fix.l
 	}
 
-	res, err = fixSolve(o, sm)
+	res, err = fixSolve(args, o, sm)
 
 	return fixtureSolveSimpleChecks(fix, res, err, t)
 }
@@ -110,20 +114,23 @@ func solveBimodalAndCheck(fix bimodalFixture, t *testing.T) (res Result, err err
 	}
 	sm := newbmSM(fix.ds)
 
+	args := SolveArgs{
+		Root: string(fix.ds[0].Name()),
+		N:    ProjectName(fix.ds[0].Name()),
+		M:    fix.ds[0],
+		L:    dummyLock{},
+	}
+
 	o := SolveOpts{
-		Root:      string(fix.ds[0].Name()),
-		N:         ProjectName(fix.ds[0].Name()),
-		M:         fix.ds[0],
-		L:         dummyLock{},
 		Downgrade: fix.downgrade,
 		ChangeAll: fix.changeall,
 	}
 
 	if fix.l != nil {
-		o.L = fix.l
+		args.L = fix.l
 	}
 
-	res, err = fixSolve(o, sm)
+	res, err = fixSolve(args, o, sm)
 
 	return fixtureSolveSimpleChecks(fix, res, err, t)
 }
@@ -264,14 +271,14 @@ func TestRootLockNoVersionPairMatching(t *testing.T) {
 	copy(l2, fix.l)
 	l2[0].v = nil
 
-	o := SolveOpts{
+	args := SolveArgs{
 		Root: string(fix.ds[0].Name()),
 		N:    ProjectName(fix.ds[0].Name()),
 		M:    fix.ds[0],
 		L:    l2,
 	}
 
-	res, err := fixSolve(o, sm)
+	res, err := fixSolve(args, SolveOpts{}, sm)
 
 	fixtureSolveSimpleChecks(fix, res, err, t)
 }
@@ -316,38 +323,39 @@ func TestBadSolveOpts(t *testing.T) {
 	sm := newdepspecSM(basicFixtures[0].ds)
 
 	o := SolveOpts{}
-	_, err := prepareSolver(o, sm)
+	args := SolveArgs{}
+	_, err := Prepare(args, o, sm)
 	if err == nil {
 		t.Errorf("Should have errored on missing manifest")
 	}
 
 	p, _ := sm.GetProjectInfo(basicFixtures[0].ds[0].n, basicFixtures[0].ds[0].v)
-	o.M = p.Manifest
-	_, err = prepareSolver(o, sm)
+	args.M = p.Manifest
+	_, err = Prepare(args, o, sm)
 	if err == nil {
 		t.Errorf("Should have errored on empty root")
 	}
 
-	o.Root = "root"
-	_, err = prepareSolver(o, sm)
+	args.Root = "root"
+	_, err = Prepare(args, o, sm)
 	if err == nil {
 		t.Errorf("Should have errored on empty name")
 	}
 
-	o.N = "root"
-	_, err = prepareSolver(o, sm)
+	args.N = "root"
+	_, err = Prepare(args, o, sm)
 	if err != nil {
 		t.Errorf("Basic conditions satisfied, solve should have gone through, err was %s", err)
 	}
 
 	o.Trace = true
-	_, err = prepareSolver(o, sm)
+	_, err = Prepare(args, o, sm)
 	if err == nil {
 		t.Errorf("Should have errored on trace with no logger")
 	}
 
 	o.TraceLogger = log.New(ioutil.Discard, "", 0)
-	_, err = prepareSolver(o, sm)
+	_, err = Prepare(args, o, sm)
 	if err != nil {
 		t.Errorf("Basic conditions re-satisfied, solve should have gone through, err was %s", err)
 	}

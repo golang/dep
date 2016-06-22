@@ -2,6 +2,7 @@ package vsolver
 
 import (
 	"crypto/sha256"
+	"fmt"
 	"sort"
 )
 
@@ -15,18 +16,36 @@ import (
 // unnecessary.
 //
 // (Basically, this is for memoization.)
-func (o SolveOpts) HashInputs() []byte {
-	d, dd := o.M.GetDependencies(), o.M.GetDevDependencies()
+func (s *solver) HashInputs() ([]byte, error) {
+	// Do these checks up front before any other work is needed, as they're the
+	// only things that can cause errors
+	if err := s.b.verifyRoot(s.args.Root); err != nil {
+		// This will already be a BadOptsFailure
+		return nil, err
+	}
+
+	// Pass in magic root values, and the bridge will analyze the right thing
+	ptree, err := s.b.listPackages(ProjectIdentifier{LocalName: s.args.N}, nil)
+	if err != nil {
+		return nil, BadOptsFailure(fmt.Sprintf("Error while parsing imports under %s: %s", s.args.Root, err.Error()))
+	}
+
+	d, dd := s.args.M.GetDependencies(), s.args.M.GetDevDependencies()
 	p := make(sortedDeps, len(d))
 	copy(p, d)
 	p = append(p, dd...)
 
 	sort.Stable(p)
 
+	// We have everything we need; now, compute the hash.
 	h := sha256.New()
 	for _, pd := range p {
 		h.Write([]byte(pd.Ident.LocalName))
 		h.Write([]byte(pd.Ident.NetworkName))
+		// FIXME Constraint.String() is a surjective-only transformation - tags
+		// and branches with the same name are written out as the same string.
+		// This could, albeit rarely, result in input collisions when a real
+		// change has occurred.
 		h.Write([]byte(pd.Constraint.String()))
 	}
 
@@ -35,9 +54,8 @@ func (o SolveOpts) HashInputs() []byte {
 	// in the hash.
 	h.Write([]byte(stdlibPkgs))
 
-	// TODO deal with an err here
-	// TODO encap within bridge
-	ptree, _ := listPackages(o.Root, string(o.N))
+	// Write each of the packages, or the errors that were found for a
+	// particular subpath, into the hash.
 	for _, perr := range ptree.Packages {
 		if perr.Err != nil {
 			h.Write([]byte(perr.Err.Error()))
@@ -57,7 +75,7 @@ func (o SolveOpts) HashInputs() []byte {
 	// TODO overrides
 	// TODO aliases
 	// TODO ignores
-	return h.Sum(nil)
+	return h.Sum(nil), nil
 }
 
 type sortedDeps []ProjectDep
