@@ -69,8 +69,6 @@ type ProjectAtom struct {
 	Version Version
 }
 
-var emptyProjectAtom ProjectAtom
-
 type atomWithPackages struct {
 	atom ProjectAtom
 	pl   []string

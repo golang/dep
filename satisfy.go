@@ -5,7 +5,7 @@ package vsolver
 // a state where all solver requirements are still satisfied.
 func (s *solver) checkProject(a atomWithPackages) error {
 	pa := a.atom
-	if emptyProjectAtom == pa {
+	if nilpa == pa {
 		// This shouldn't be able to happen, but if it does, it unequivocally
 		// indicates a logical bug somewhere, so blowing up is preferable
 		panic("canary - checking version of empty ProjectAtom")
@@ -46,7 +46,7 @@ func (s *solver) checkProject(a atomWithPackages) error {
 // already-selected project. It determines if selecting the packages would
 // result in a state where all solver requirements are still satisfied.
 func (s *solver) checkPackage(a atomWithPackages) error {
-	if emptyProjectAtom == a.atom {
+	if nilpa == a.atom {
 		// This shouldn't be able to happen, but if it does, it unequivocally
 		// indicates a logical bug somewhere, so blowing up is preferable
 		panic("canary - checking version of empty ProjectAtom")
