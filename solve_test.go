@@ -296,6 +296,13 @@ func getFailureCausingProjects(err error) (projs []string) {
 		for _, c := range e.sel {
 			projs = append(projs, string(c.Depender.Ident.LocalName))
 		}
+	case *checkeeHasProblemPackagesFailure:
+		projs = append(projs, string(e.goal.Ident.LocalName))
+		for _, errdep := range e.failpkg {
+			for _, atom := range errdep.deppers {
+				projs = append(projs, string(atom.Ident.LocalName))
+			}
+		}
 	default:
 		panic("unknown failtype")
 	}

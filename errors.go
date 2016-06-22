@@ -220,3 +220,90 @@ func (e *sourceMismatchFailure) traceString() string {
 
 	return buf.String()
 }
+
+type errDeppers struct {
+	err     error
+	deppers []ProjectAtom
+}
+type checkeeHasProblemPackagesFailure struct {
+	goal    ProjectAtom
+	failpkg map[string]errDeppers
+}
+
+func (e *checkeeHasProblemPackagesFailure) Error() string {
+	var buf bytes.Buffer
+	indent := ""
+
+	if len(e.failpkg) > 1 {
+		indent = "\t"
+		fmt.Fprintf(
+			&buf, "Could not introduce %s at %s due to multiple problematic subpackages:\n",
+			e.goal.Ident.errString(),
+			e.goal.Version,
+		)
+	}
+
+	for pkg, errdep := range e.failpkg {
+		var cause string
+		if errdep.err == nil {
+			cause = "is missing"
+		} else {
+			cause = fmt.Sprintf("does not contain usable Go code (%T).", errdep.err)
+		}
+
+		if len(e.failpkg) == 1 {
+			fmt.Fprintf(
+				&buf, "Could not introduce %s at %s, as its subpackage %s %s.",
+				e.goal.Ident.errString(),
+				e.goal.Version,
+				pkg,
+				cause,
+			)
+		} else {
+			fmt.Fprintf(&buf, "\tSubpackage %s %s.", pkg, cause)
+		}
+
+		if len(errdep.deppers) == 1 {
+			fmt.Fprintf(
+				&buf, " (Package is required by %s at %s.)",
+				errdep.deppers[0].Ident.errString(),
+				errdep.deppers[0].Version,
+			)
+		} else {
+			fmt.Fprintf(&buf, " Package is required by:")
+			for _, pa := range errdep.deppers {
+				fmt.Fprintf(&buf, "\n%s\t%s at %s", indent, pa.Ident.errString(), pa.Version)
+			}
+		}
+	}
+
+	return buf.String()
+}
+
+func (e *checkeeHasProblemPackagesFailure) traceString() string {
+	var buf bytes.Buffer
+
+	fmt.Fprintf(&buf, "%s at %s has problem subpkg(s):\n", e.goal.Ident.LocalName, e.goal.Version)
+	for pkg, errdep := range e.failpkg {
+		if errdep.err == nil {
+			fmt.Fprintf(&buf, "\t%s is missing; ", pkg)
+		} else {
+			fmt.Fprintf(&buf, "\t%s has err (%T); ", pkg, errdep.err)
+		}
+
+		if len(errdep.deppers) == 1 {
+			fmt.Fprintf(
+				&buf, "required by %s at %s.",
+				errdep.deppers[0].Ident.errString(),
+				errdep.deppers[0].Version,
+			)
+		} else {
+			fmt.Fprintf(&buf, " required by:")
+			for _, pa := range errdep.deppers {
+				fmt.Fprintf(&buf, "\n\t\t%s at %s", pa.Ident.errString(), pa.Version)
+			}
+		}
+	}
+
+	return buf.String()
+}

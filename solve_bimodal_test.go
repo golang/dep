@@ -320,7 +320,7 @@ var bimodalFixtures = map[string]bimodalFixture{
 				pkg("a"),
 			),
 		},
-		errp: []string{"a", "root"},
+		errp: []string{"a", "root", "a"},
 	},
 	// Transitive deps from one project (a) get incrementally included as other
 	// deps incorporate its various packages, and fail with proper error when we

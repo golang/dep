@@ -879,6 +879,9 @@ func (s *solver) unselectedComparator(i, j int) bool {
 }
 
 func (s *solver) fail(id ProjectIdentifier) {
+	// TODO does this need updating, now that we have non-project package
+	// selection?
+
 	// skip if the root project
 	if s.rm.Name() != id.LocalName {
 		// just look for the first (oldest) one; the backtracker will necessarily
@@ -906,9 +909,8 @@ func (s *solver) selectAtomWithPackages(a atomWithPackages) {
 
 	deps, err := s.getImportsAndConstraintsOf(a)
 	if err != nil {
-		// if we're choosing a package that has errors getting its deps, there's
-		// a bigger problem
-		// TODO try to create a test that hits this
+		// This shouldn't be possible; other checks should have ensured all
+		// packages and deps are present for any argument passed to this method.
 		panic(fmt.Sprintf("canary - shouldn't be possible %s", err))
 	}
 
@@ -951,6 +953,8 @@ func (s *solver) selectPackages(a atomWithPackages) {
 
 	deps, err := s.getImportsAndConstraintsOf(a)
 	if err != nil {
+		// This shouldn't be possible; other checks should have ensured all
+		// packages and deps are present for any argument passed to this method.
 		panic(fmt.Sprintf("canary - shouldn't be possible %s", err))
 	}
 
@@ -983,10 +987,9 @@ func (s *solver) unselectLast() (atomWithPackages, bool) {
 
 	deps, err := s.getImportsAndConstraintsOf(awp)
 	if err != nil {
-		// if we're choosing a package that has errors getting its deps, there's
-		// a bigger problem
-		// TODO try to create a test that hits this
-		panic("shouldn't be possible")
+		// This shouldn't be possible; other checks should have ensured all
+		// packages and deps are present for any argument passed to this method.
+		panic(fmt.Sprintf("canary - shouldn't be possible %s", err))
 	}
 
 	for _, dep := range deps {

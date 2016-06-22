@@ -15,6 +15,10 @@ func (s *solver) checkProject(a atomWithPackages) error {
 		return err
 	}
 
+	if err := s.checkRequiredPackagesExist(a); err != nil {
+		return err
+	}
+
 	deps, err := s.getImportsAndConstraintsOf(a)
 	if err != nil {
 		// An err here would be from the package fetcher; pass it straight back
@@ -78,7 +82,7 @@ func (s *solver) checkAtomAllowable(pa ProjectAtom) error {
 	if s.b.matches(pa.Ident, constraint, pa.Version) {
 		return nil
 	}
-	// TODO collect constraint failure reason
+	// TODO collect constraint failure reason (wait...aren't we, below?)
 
 	deps := s.sel.getDependenciesOn(pa.Ident)
 	var failparent []Dependency
@@ -97,6 +101,46 @@ func (s *solver) checkAtomAllowable(pa ProjectAtom) error {
 
 	s.logSolve(err)
 	return err
+}
+
+// checkRequiredPackagesExist ensures that all required packages enumerated by
+// existing dependencies on this atom are actually present in the atom.
+func (s *solver) checkRequiredPackagesExist(a atomWithPackages) error {
+	ptree, err := s.b.listPackages(a.atom.Ident, a.atom.Version)
+	if err != nil {
+		// TODO handle this more gracefully
+		return err
+	}
+
+	deps := s.sel.getDependenciesOn(a.atom.Ident)
+	fp := make(map[string]errDeppers)
+	// We inspect these in a bit of a roundabout way, in order to incrementally
+	// build up the failure we'd return if there is, indeed, a missing package.
+	// TODO rechecking all of these every time is wasteful. Is there a shortcut?
+	for _, dep := range deps {
+		for _, pkg := range dep.Dep.pl {
+			if errdep, seen := fp[pkg]; seen {
+				errdep.deppers = append(errdep.deppers, dep.Depender)
+				fp[pkg] = errdep
+			} else {
+				perr, has := ptree.Packages[pkg]
+				if !has || perr.Err != nil {
+					fp[pkg] = errDeppers{
+						err:     perr.Err,
+						deppers: []ProjectAtom{dep.Depender},
+					}
+				}
+			}
+		}
+	}
+
+	if len(fp) > 0 {
+		return &checkeeHasProblemPackagesFailure{
+			goal:    a.atom,
+			failpkg: fp,
+		}
+	}
+	return nil
 }
 
 // checkDepsConstraintsAllowable checks that the constraints of an atom on a
