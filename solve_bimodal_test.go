@@ -345,7 +345,7 @@ var bimodalFixtures = map[string]bimodalFixture{
 				pkg("d", "a/nonexistent"),
 			),
 		},
-		errp: []string{"d", "a"},
+		errp: []string{"d", "a", "d"},
 	},
 }
 

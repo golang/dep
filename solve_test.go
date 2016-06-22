@@ -303,6 +303,8 @@ func getFailureCausingProjects(err error) (projs []string) {
 				projs = append(projs, string(atom.Ident.LocalName))
 			}
 		}
+	case *depHasProblemPackagesFailure:
+		projs = append(projs, string(e.goal.Depender.Ident.LocalName), string(e.goal.Dep.Ident.LocalName))
 	default:
 		panic("unknown failtype")
 	}

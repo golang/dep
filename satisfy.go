@@ -35,6 +35,9 @@ func (s *solver) checkProject(a atomWithPackages) error {
 		if err := s.checkDepsDisallowsSelected(a, dep); err != nil {
 			return err
 		}
+		if err := s.checkPackageImportsFromDepExist(a, dep); err != nil {
+			return err
+		}
 
 		// TODO add check that fails if adding this atom would create a loop
 	}
@@ -68,6 +71,9 @@ func (s *solver) checkPackage(a atomWithPackages) error {
 			return err
 		}
 		if err := s.checkDepsDisallowsSelected(a, dep); err != nil {
+			return err
+		}
+		if err := s.checkPackageImportsFromDepExist(a, dep); err != nil {
 			return err
 		}
 	}
@@ -135,10 +141,12 @@ func (s *solver) checkRequiredPackagesExist(a atomWithPackages) error {
 	}
 
 	if len(fp) > 0 {
-		return &checkeeHasProblemPackagesFailure{
+		e := &checkeeHasProblemPackagesFailure{
 			goal:    a.atom,
 			failpkg: fp,
 		}
+		s.logSolve(e)
+		return e
 	}
 	return nil
 }
@@ -226,5 +234,46 @@ func (s *solver) checkIdentMatches(a atomWithPackages, cdep completeDep) error {
 		}
 	}
 
+	return nil
+}
+
+// checkPackageImportsFromDepExist ensures that, if the dep is already selected,
+// the newly-required set of packages being placed on it exist and are valid.
+func (s *solver) checkPackageImportsFromDepExist(a atomWithPackages, cdep completeDep) error {
+	sel, is := s.sel.selected(cdep.ProjectDep.Ident)
+	if !is {
+		// dep is not already selected; nothing to do
+		return nil
+	}
+
+	ptree, err := s.b.listPackages(sel.atom.Ident, sel.atom.Version)
+	if err != nil {
+		// TODO handle this more gracefully
+		return err
+	}
+
+	e := &depHasProblemPackagesFailure{
+		goal: Dependency{
+			Depender: a.atom,
+			Dep:      cdep,
+		},
+		v:    sel.atom.Version,
+		prob: make(map[string]error),
+	}
+
+	for _, pkg := range cdep.pl {
+		perr, has := ptree.Packages[pkg]
+		if !has || perr.Err != nil {
+			e.pl = append(e.pl, pkg)
+			if has {
+				e.prob[pkg] = perr.Err
+			}
+		}
+	}
+
+	if len(e.pl) > 0 {
+		s.logSolve(e)
+		return e
+	}
 	return nil
 }
