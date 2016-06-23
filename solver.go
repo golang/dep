@@ -202,7 +202,7 @@ func (s *solver) Solve() (Result, error) {
 	}
 
 	// Prep safe, normalized versions of root manifest and lock data
-	s.rm = prepManifest(s.args.M)
+	s.rm = prepManifest(s.args.M, s.args.N)
 
 	if s.args.L != nil {
 		for _, lp := range s.args.L.Projects() {

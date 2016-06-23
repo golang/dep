@@ -125,16 +125,18 @@ func (pm *projectManager) GetInfoAt(v Version) (ProjectInfo, error) {
 	// TODO cache results
 	pm.crepo.mut.RUnlock()
 
-	// TODO check if manifest is nil, probably error out if it is
-
-	if l != nil {
-		l = prepLock(l)
-	}
 	if err == nil {
+		if l != nil {
+			l = prepLock(l)
+		}
+
+		// If m is nil, prepManifest will provide an empty one.
 		return ProjectInfo{
-			N:        pm.n,
+			// TODO disagreement between the manifest's name and N is still
+			// scary
 			V:        v,
-			Manifest: prepManifest(m),
+			N:        pm.n,
+			Manifest: prepManifest(m, pm.n),
 			Lock:     l,
 		}, nil
 	}

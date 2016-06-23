@@ -58,7 +58,15 @@ func (m SimpleManifest) GetDevDependencies() []ProjectDep {
 //  the solver is in-flight.
 //
 // This is achieved by copying the manifest's data into a new SimpleManifest.
-func prepManifest(m Manifest) Manifest {
+func prepManifest(m Manifest, n ProjectName) Manifest {
+	if m == nil {
+		// Only use the provided ProjectName if making an empty manifest;
+		// otherwise, we trust the input manifest.
+		return SimpleManifest{
+			N: n,
+		}
+	}
+
 	deps := m.GetDependencies()
 	ddeps := m.GetDevDependencies()
 
