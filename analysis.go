@@ -63,26 +63,8 @@ func listPackages(fileRoot, importRoot string) (PackageTree, error) {
 	// Set up a build.ctx for parsing
 	ctx := build.Default
 	ctx.GOROOT = ""
-	//ctx.GOPATH = strings.TrimSuffix(parent, "/src")
 	ctx.GOPATH = ""
 	ctx.UseAllFiles = true
-
-	// basedir is the real root of the filesystem tree we're going to walk.
-	// This is generally, though not necessarily, a repo root.
-	//basedir := filepath.Join(parent, importRoot)
-	// filepath.Dir strips off the last element to get its containing dir, which
-	// is what we need to prefix the paths in the walkFn in order to get the
-	// full import path.
-	//impPrfx := filepath.Dir(importRoot)
-
-	//frslash := ensureTrailingSlash(fileRoot)
-	//pretty.Printf("parent:\t\t%s\n", parent)
-	//pretty.Printf("frslash:\t%s\n", frslash)
-	//pretty.Printf("basedir:\t%s\n", basedir)
-	//pretty.Printf("importRoot:\t%s\n", importRoot)
-	//pretty.Printf("impPrfx:\t%s\n", impPrfx)
-	//pretty.Println(parent, importRoot, impPrfx, basedir)
-	//pretty.Println(ctx)
 
 	ptree := PackageTree{
 		ImportRoot: importRoot,
@@ -154,8 +136,6 @@ func listPackages(fileRoot, importRoot string) (PackageTree, error) {
 		// paths are normalized to Unix separators, as import paths are expected
 		// to be.
 		ip := filepath.ToSlash(filepath.Join(importRoot, strings.TrimPrefix(path, fileRoot)))
-		//pretty.Printf("path:\t\t%s\n", path)
-		//pretty.Printf("ip:\t\t%s\n", ip)
 
 		// Find all the imports, across all os/arch combos
 		p, err := ctx.ImportDir(path, analysisImportMode())
@@ -163,7 +143,6 @@ func listPackages(fileRoot, importRoot string) (PackageTree, error) {
 		if err == nil {
 			pkg = happy(ip, p)
 		} else {
-			//pretty.Println(p, err)
 			switch terr := err.(type) {
 			case *build.NoGoError:
 				ptree.Packages[ip] = PackageOrErr{
