@@ -365,6 +365,20 @@ func TestDeduceRemotes(t *testing.T) {
 				VCS: []string{"git"},
 			},
 		},
+		// Regression - gh does allow 2-letter usernames
+		{
+			"github.com/kr/pretty",
+			&remoteRepo{
+				Base:   "github.com/kr/pretty",
+				RelPkg: "",
+				CloneURL: &url.URL{
+					Host: "github.com",
+					Path: "kr/pretty",
+				},
+				Schemes: nil,
+				VCS:     []string{"git"},
+			},
+		},
 	}
 
 	for _, fix := range fixtures {
