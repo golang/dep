@@ -2,7 +2,10 @@ package vsolver
 
 import (
 	"fmt"
+	"io"
+	"net/http"
 	"net/url"
+	"os"
 	"regexp"
 	"strings"
 )
@@ -218,6 +221,87 @@ func deduceRemoteRepo(path string) (rr *remoteRepo, err error) {
 		}
 	}
 
-	// TODO use HTTP metadata to resolve vanity imports
-	return nil, fmt.Errorf("unable to deduce repository and source type for: %q", path)
+	// No luck so far. maybe it's one of them vanity imports?
+	importroot, vcs, reporoot, err := parseMetadata(path)
+	if err != nil {
+		return nil, fmt.Errorf("unable to deduce repository and source type for: %q", path)
+	}
+
+	// If we got something back at all, then it supercedes the actual input for
+	// the real URL to hit
+	rr.CloneURL, err = url.Parse(reporoot)
+	if err != nil {
+		return nil, fmt.Errorf("server returned bad URL when searching for vanity import: %q", reporoot)
+	}
+
+	// We have a real URL. Set the other values and return.
+	rr.Base = importroot
+	rr.RelPkg = strings.TrimPrefix(path[len(importroot):], string(os.PathSeparator))
+
+	rr.VCS = []string{vcs}
+	if rr.CloneURL.Scheme != "" {
+		rr.Schemes = []string{rr.CloneURL.Scheme}
+	}
+
+	return rr, nil
+}
+
+// fetchMetadata fetchs the remote metadata for path.
+func fetchMetadata(path string) (rc io.ReadCloser, err error) {
+	defer func() {
+		if err != nil {
+			err = fmt.Errorf("unable to determine remote metadata protocol: %s", err)
+		}
+	}()
+
+	// try https first
+	rc, err = doFetchMetadata("https", path)
+	if err == nil {
+		return
+	}
+
+	rc, err = doFetchMetadata("http", path)
+	return
+}
+
+func doFetchMetadata(scheme, path string) (io.ReadCloser, error) {
+	url := fmt.Sprintf("%s://%s?go-get=1", scheme, path)
+	switch scheme {
+	case "https", "http":
+		resp, err := http.Get(url)
+		if err != nil {
+			return nil, fmt.Errorf("failed to access url %q", url)
+		}
+		return resp.Body, nil
+	default:
+		return nil, fmt.Errorf("unknown remote protocol scheme: %q", scheme)
+	}
+}
+
+// parseMetadata fetches and decodes remote metadata for path.
+func parseMetadata(path string) (string, string, string, error) {
+	rc, err := fetchMetadata(path)
+	if err != nil {
+		return "", "", "", err
+	}
+	defer rc.Close()
+
+	imports, err := parseMetaGoImports(rc)
+	if err != nil {
+		return "", "", "", err
+	}
+	match := -1
+	for i, im := range imports {
+		if !strings.HasPrefix(path, im.Prefix) {
+			continue
+		}
+		if match != -1 {
+			return "", "", "", fmt.Errorf("multiple meta tags match import path %q", path)
+		}
+		match = i
+	}
+	if match == -1 {
+		return "", "", "", fmt.Errorf("go-import metadata not found")
+	}
+	return imports[match].Prefix, imports[match].VCS, imports[match].RepoRoot, nil
 }

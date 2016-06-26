@@ -8,6 +8,10 @@ import (
 )
 
 func TestDeduceRemotes(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping remote deduction test in short mode")
+	}
+
 	fixtures := []struct {
 		path string
 		want *remoteRepo
@@ -365,7 +369,50 @@ func TestDeduceRemotes(t *testing.T) {
 				VCS: []string{"git"},
 			},
 		},
-		// Regression - gh does allow 2-letter usernames
+		// Vanity imports
+		{
+			"golang.org/x/exp",
+			&remoteRepo{
+				Base:   "golang.org/x/exp",
+				RelPkg: "",
+				CloneURL: &url.URL{
+					Scheme: "https",
+					Host:   "go.googlesource.com",
+					Path:   "/exp",
+				},
+				Schemes: []string{"https"},
+				VCS:     []string{"git"},
+			},
+		},
+		{
+			"golang.org/x/exp/inotify",
+			&remoteRepo{
+				Base:   "golang.org/x/exp",
+				RelPkg: "inotify",
+				CloneURL: &url.URL{
+					Scheme: "https",
+					Host:   "go.googlesource.com",
+					Path:   "/exp",
+				},
+				Schemes: []string{"https"},
+				VCS:     []string{"git"},
+			},
+		},
+		{
+			"rsc.io/pdf",
+			&remoteRepo{
+				Base:   "rsc.io/pdf",
+				RelPkg: "",
+				CloneURL: &url.URL{
+					Scheme: "https",
+					Host:   "github.com",
+					Path:   "/rsc/pdf",
+				},
+				Schemes: []string{"https"},
+				VCS:     []string{"git"},
+			},
+		},
+		// Regression - gh does allow two-letter usernames
 		{
 			"github.com/kr/pretty",
 			&remoteRepo{
