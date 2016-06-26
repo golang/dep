@@ -5,7 +5,6 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"os"
 	"regexp"
 	"strings"
 )
@@ -236,7 +235,7 @@ func deduceRemoteRepo(path string) (rr *remoteRepo, err error) {
 
 	// We have a real URL. Set the other values and return.
 	rr.Base = importroot
-	rr.RelPkg = strings.TrimPrefix(path[len(importroot):], string(os.PathSeparator))
+	rr.RelPkg = strings.TrimPrefix(path[len(importroot):], "/")
 
 	rr.VCS = []string{vcs}
 	if rr.CloneURL.Scheme != "" {
