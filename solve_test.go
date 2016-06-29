@@ -62,10 +62,10 @@ func solveBasicsAndCheck(fix basicFixture, t *testing.T) (res Result, err error)
 	sm := newdepspecSM(fix.ds)
 
 	args := SolveArgs{
-		Root: string(fix.ds[0].Name()),
-		N:    ProjectName(fix.ds[0].Name()),
-		M:    fix.ds[0],
-		L:    dummyLock{},
+		Root:     string(fix.ds[0].Name()),
+		Name:     ProjectName(fix.ds[0].Name()),
+		Manifest: fix.ds[0],
+		Lock:     dummyLock{},
 	}
 
 	o := SolveOpts{
@@ -74,7 +74,7 @@ func solveBasicsAndCheck(fix basicFixture, t *testing.T) (res Result, err error)
 	}
 
 	if fix.l != nil {
-		args.L = fix.l
+		args.Lock = fix.l
 	}
 
 	res, err = fixSolve(args, o, sm)
@@ -115,10 +115,10 @@ func solveBimodalAndCheck(fix bimodalFixture, t *testing.T) (res Result, err err
 	sm := newbmSM(fix.ds)
 
 	args := SolveArgs{
-		Root: string(fix.ds[0].Name()),
-		N:    ProjectName(fix.ds[0].Name()),
-		M:    fix.ds[0],
-		L:    dummyLock{},
+		Root:     string(fix.ds[0].Name()),
+		Name:     ProjectName(fix.ds[0].Name()),
+		Manifest: fix.ds[0],
+		Lock:     dummyLock{},
 	}
 
 	o := SolveOpts{
@@ -127,7 +127,7 @@ func solveBimodalAndCheck(fix bimodalFixture, t *testing.T) (res Result, err err
 	}
 
 	if fix.l != nil {
-		args.L = fix.l
+		args.Lock = fix.l
 	}
 
 	res, err = fixSolve(args, o, sm)
@@ -272,10 +272,10 @@ func TestRootLockNoVersionPairMatching(t *testing.T) {
 	l2[0].v = nil
 
 	args := SolveArgs{
-		Root: string(fix.ds[0].Name()),
-		N:    ProjectName(fix.ds[0].Name()),
-		M:    fix.ds[0],
-		L:    l2,
+		Root:     string(fix.ds[0].Name()),
+		Name:     ProjectName(fix.ds[0].Name()),
+		Manifest: fix.ds[0],
+		Lock:     l2,
 	}
 
 	res, err := fixSolve(args, SolveOpts{}, sm)
@@ -330,7 +330,7 @@ func TestBadSolveOpts(t *testing.T) {
 	}
 
 	p, _ := sm.GetProjectInfo(basicFixtures[0].ds[0].n, basicFixtures[0].ds[0].v)
-	args.M = p.Manifest
+	args.Manifest = p.Manifest
 	_, err = Prepare(args, o, sm)
 	if err == nil {
 		t.Errorf("Should have errored on empty root")
@@ -342,7 +342,7 @@ func TestBadSolveOpts(t *testing.T) {
 		t.Errorf("Should have errored on empty name")
 	}
 
-	args.N = "root"
+	args.Name = "root"
 	_, err = Prepare(args, o, sm)
 	if err != nil {
 		t.Errorf("Basic conditions satisfied, solve should have gone through, err was %s", err)

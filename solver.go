@@ -27,17 +27,17 @@ type SolveArgs struct {
 
 	// The 'name' of the project. Required. This should (must?) correspond to subpath of
 	// Root that exists under a GOPATH.
-	N ProjectName
+	Name ProjectName
 
 	// The root manifest. Required. This contains all the dependencies, constraints, and
 	// other controls available to the root project.
-	M Manifest
+	Manifest Manifest
 
 	// The root lock. Optional. Generally, this lock is the output of a previous solve run.
 	//
 	// If provided, the solver will attempt to preserve the versions specified
 	// in the lock, unless ToChange or ChangeAll settings indicate otherwise.
-	L Lock
+	Lock Lock
 }
 
 // SolveOpts holds additional options that govern solving behavior.
@@ -151,13 +151,13 @@ func Prepare(in SolveArgs, opts SolveOpts, sm SourceManager) (Solver, error) {
 	// local overrides would need to be handled first.
 	// TODO local overrides! heh
 
-	if in.M == nil {
+	if in.Manifest == nil {
 		return nil, BadOptsFailure("Opts must include a manifest.")
 	}
 	if in.Root == "" {
 		return nil, BadOptsFailure("Opts must specify a non-empty string for the project root directory. If cwd is desired, use \".\"")
 	}
-	if in.N == "" {
+	if in.Name == "" {
 		return nil, BadOptsFailure("Opts must include a project name. This should be the intended root import path of the project.")
 	}
 	if opts.Trace && opts.TraceLogger == nil {
@@ -167,7 +167,7 @@ func Prepare(in SolveArgs, opts SolveOpts, sm SourceManager) (Solver, error) {
 	s := &solver{
 		args: in,
 		o:    opts,
-		b:    newBridge(in.N, in.Root, sm, opts.Downgrade),
+		b:    newBridge(in.Name, in.Root, sm, opts.Downgrade),
 		tl:   opts.TraceLogger,
 	}
 
@@ -202,10 +202,10 @@ func (s *solver) Solve() (Result, error) {
 	}
 
 	// Prep safe, normalized versions of root manifest and lock data
-	s.rm = prepManifest(s.args.M, s.args.N)
+	s.rm = prepManifest(s.args.Manifest, s.args.Name)
 
-	if s.args.L != nil {
-		for _, lp := range s.args.L.Projects() {
+	if s.args.Lock != nil {
+		for _, lp := range s.args.Lock.Projects() {
 			s.rlm[lp.Ident().normalize()] = lp
 		}
 	}
@@ -357,7 +357,7 @@ func (s *solver) solve() (map[ProjectAtom]map[string]struct{}, error) {
 func (s *solver) selectRoot() error {
 	pa := ProjectAtom{
 		Ident: ProjectIdentifier{
-			LocalName: s.args.N,
+			LocalName: s.args.Name,
 		},
 		// This is a hack so that the root project doesn't have a nil version.
 		// It's sort of OK because the root never makes it out into the results.

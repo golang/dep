@@ -10,9 +10,9 @@ func TestHashInputs(t *testing.T) {
 	fix := basicFixtures[2]
 
 	args := SolveArgs{
-		Root: string(fix.ds[0].Name()),
-		N:    fix.ds[0].Name(),
-		M:    fix.ds[0],
+		Root:     string(fix.ds[0].Name()),
+		Name:     fix.ds[0].Name(),
+		Manifest: fix.ds[0],
 	}
 
 	// prep a fixture-overridden solver
