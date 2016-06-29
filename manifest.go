@@ -2,11 +2,8 @@ package vsolver
 
 // Manifest represents the data from a manifest file (or however the
 // implementing tool chooses to store it) at a particular version that is
-// relevant to the satisfiability solving process:
-//
-// - A list of dependencies: project name, and a constraint
-// - A list of development-time dependencies (e.g. for testing - only
-// the root project's are incorporated)
+// relevant to the satisfiability solving process. That means constraints on
+// dependencies, both for normal dependencies and for tests.
 //
 // Finding a solution that satisfies the constraints expressed by all of these
 // dependencies (and those from all other projects, transitively), is what the

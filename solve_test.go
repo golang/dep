@@ -191,7 +191,7 @@ func fixtureSolveSimpleChecks(fix specfix, res Result, err error, t *testing.T) 
 		t.Errorf("(fixture: %q) Solver succeeded, but expected failure", fix.name())
 	} else {
 		r := res.(result)
-		if fix.maxTries() > 0 && r.att > fix.maxTries() {
+		if fix.maxTries() > 0 && r.Attempts() > fix.maxTries() {
 			t.Errorf("(fixture: %q) Solver completed in %v attempts, but expected %v or fewer", fix.name(), r.att, fix.maxTries())
 		}
 

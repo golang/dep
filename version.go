@@ -10,11 +10,10 @@ import "github.com/Masterminds/semver"
 //
 // Version is an interface, but it contains private methods, which restricts it
 // to vsolver's own internal implementations. We do this for the confluence of
-// two reasons:
-// - the implementation of Versions is complete (there is no case in which we'd
-//   need other types)
-// - the implementation relies on type magic under the hood, which would
-//   be unsafe to do if other dynamic types could be hiding behind the interface.
+// two reasons: the implementation of Versions is complete (there is no case in
+// which we'd need other types), and the implementation relies on type magic
+// under the hood, which would be unsafe to do if other dynamic types could be
+// hiding behind the interface.
 type Version interface {
 	Constraint
 	// Indicates the type of version - Revision, Branch, Version, or Semver
@@ -36,7 +35,7 @@ type PairedVersion interface {
 // VersionPair by indicating the version's corresponding, underlying Revision.
 type UnpairedVersion interface {
 	Version
-	// Is takes the underlying Revision that this (Unpaired)Version corresponds
+	// Is takes the underlying Revision that this UnpairedVersion corresponds
 	// to and unites them into a PairedVersion.
 	Is(Revision) PairedVersion
 	// Ensures it is impossible to be both a PairedVersion and an
