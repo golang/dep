@@ -53,7 +53,7 @@ type pmState struct {
 	vcur bool     // indicates that we've called ListVersions()
 }
 
-func NewSourceManager(cachedir, basedir string, force bool, an ProjectAnalyzer) (SourceManager, error) {
+func NewSourceManager(an ProjectAnalyzer, cachedir, basedir string, force bool) (SourceManager, error) {
 	if an == nil {
 		return nil, fmt.Errorf("A ProjectAnalyzer must be provided to the SourceManager.")
 	}

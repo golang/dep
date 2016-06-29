@@ -58,7 +58,7 @@ func TestResultCreateVendorTree(t *testing.T) {
 	tmp := path.Join(os.TempDir(), "vsolvtest")
 	os.RemoveAll(tmp)
 
-	sm, err := NewSourceManager(path.Join(tmp, "cache"), path.Join(tmp, "base"), false, passthruAnalyzer{})
+	sm, err := NewSourceManager(passthruAnalyzer{}, path.Join(tmp, "cache"), path.Join(tmp, "base"), false)
 	if err != nil {
 		t.Errorf("NewSourceManager errored unexpectedly: %q", err)
 	}
@@ -79,7 +79,7 @@ func BenchmarkCreateVendorTree(b *testing.B) {
 	tmp := path.Join(os.TempDir(), "vsolvtest")
 
 	clean := true
-	sm, err := NewSourceManager(path.Join(tmp, "cache"), path.Join(tmp, "base"), true, passthruAnalyzer{})
+	sm, err := NewSourceManager(passthruAnalyzer{}, path.Join(tmp, "cache"), path.Join(tmp, "base"), true)
 	if err != nil {
 		b.Errorf("NewSourceManager errored unexpectedly: %q", err)
 		clean = false
