@@ -2,7 +2,7 @@ package vsolver
 
 type selection struct {
 	projects []selected
-	deps     map[ProjectIdentifier][]Dependency
+	deps     map[ProjectIdentifier][]dependency
 	sm       sourceBridge
 }
 
@@ -11,7 +11,7 @@ type selected struct {
 	first bool
 }
 
-func (s *selection) getDependenciesOn(id ProjectIdentifier) []Dependency {
+func (s *selection) getDependenciesOn(id ProjectIdentifier) []dependency {
 	if deps, exists := s.deps[id]; exists {
 		return deps
 	}
@@ -39,11 +39,11 @@ func (s *selection) popSelection() (atomWithPackages, bool) {
 	return sel.a, sel.first
 }
 
-func (s *selection) pushDep(dep Dependency) {
-	s.deps[dep.Dep.Ident] = append(s.deps[dep.Dep.Ident], dep)
+func (s *selection) pushDep(dep dependency) {
+	s.deps[dep.dep.Ident] = append(s.deps[dep.dep.Ident], dep)
 }
 
-func (s *selection) popDep(id ProjectIdentifier) (dep Dependency) {
+func (s *selection) popDep(id ProjectIdentifier) (dep dependency) {
 	deps := s.deps[id]
 	dep, s.deps[id] = deps[len(deps)-1], deps[:len(deps)-1]
 	return dep
@@ -53,7 +53,7 @@ func (s *selection) depperCount(id ProjectIdentifier) int {
 	return len(s.deps[id])
 }
 
-func (s *selection) setDependenciesOn(id ProjectIdentifier, deps []Dependency) {
+func (s *selection) setDependenciesOn(id ProjectIdentifier, deps []dependency) {
 	s.deps[id] = deps
 }
 
@@ -65,7 +65,7 @@ func (s *selection) getRequiredPackagesIn(id ProjectIdentifier) map[string]int {
 	// structure so that we can pop with zero cost.
 	uniq := make(map[string]int)
 	for _, dep := range s.deps[id] {
-		for _, pkg := range dep.Dep.pl {
+		for _, pkg := range dep.dep.pl {
 			if count, has := uniq[pkg]; has {
 				count++
 				uniq[pkg] = count
@@ -87,7 +87,7 @@ func (s *selection) getSelectedPackagesIn(id ProjectIdentifier) map[string]int {
 	// structure so that we can pop with zero cost.
 	uniq := make(map[string]int)
 	for _, p := range s.projects {
-		if p.a.atom.Ident.eq(id) {
+		if p.a.a.id.eq(id) {
 			for _, pkg := range p.a.pl {
 				if count, has := uniq[pkg]; has {
 					count++
@@ -118,7 +118,7 @@ func (s *selection) getConstraint(id ProjectIdentifier) Constraint {
 	// Start with the open set
 	var ret Constraint = any
 	for _, dep := range deps {
-		ret = s.sm.intersect(id, ret, dep.Dep.Constraint)
+		ret = s.sm.intersect(id, ret, dep.dep.Constraint)
 	}
 
 	return ret
@@ -133,12 +133,12 @@ func (s *selection) getConstraint(id ProjectIdentifier) Constraint {
 // have happened later.
 func (s *selection) selected(id ProjectIdentifier) (atomWithPackages, bool) {
 	for _, p := range s.projects {
-		if p.a.atom.Ident.eq(id) {
+		if p.a.a.id.eq(id) {
 			return p.a, true
 		}
 	}
 
-	return atomWithPackages{atom: nilpa}, false
+	return atomWithPackages{a: nilpa}, false
 }
 
 // TODO take a ProjectName, but optionally also a preferred version. This will

@@ -19,7 +19,7 @@ type versionQueue struct {
 	hasLock, allLoaded bool
 }
 
-func newVersionQueue(id ProjectIdentifier, lockv ProjectAtom, sm sourceBridge) (*versionQueue, error) {
+func newVersionQueue(id ProjectIdentifier, lockv atom, sm sourceBridge) (*versionQueue, error) {
 	vq := &versionQueue{
 		id: id,
 		sm: sm,
@@ -27,7 +27,7 @@ func newVersionQueue(id ProjectIdentifier, lockv ProjectAtom, sm sourceBridge) (
 
 	if lockv != nilpa {
 		vq.hasLock = true
-		vq.pi = append(vq.pi, lockv.Version)
+		vq.pi = append(vq.pi, lockv.v)
 	} else {
 		var err error
 		vq.pi, err = vq.sm.listVersions(vq.id)

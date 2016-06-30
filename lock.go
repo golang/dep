@@ -116,17 +116,17 @@ func (lp LockedProject) Path() string {
 	return lp.path
 }
 
-func (lp LockedProject) toAtom() ProjectAtom {
-	pa := ProjectAtom{
-		Ident: lp.Ident(),
+func (lp LockedProject) toAtom() atom {
+	pa := atom{
+		id: lp.Ident(),
 	}
 
 	if lp.v == nil {
-		pa.Version = lp.r
+		pa.v = lp.r
 	} else if lp.r != "" {
-		pa.Version = lp.v.Is(lp.r)
+		pa.v = lp.v.Is(lp.r)
 	} else {
-		pa.Version = lp.v
+		pa.v = lp.v
 	}
 
 	return pa

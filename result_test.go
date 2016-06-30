@@ -8,7 +8,7 @@ import (
 )
 
 var basicResult result
-var kub ProjectAtom
+var kub atom
 
 // An analyzer that passes nothing back, but doesn't error. This expressly
 // creates a situation that shouldn't be able to happen from a general solver
@@ -29,21 +29,21 @@ func init() {
 	basicResult = result{
 		att: 1,
 		p: []LockedProject{
-			pa2lp(ProjectAtom{
-				Ident:   pi("github.com/sdboyer/testrepo"),
-				Version: NewBranch("master").Is(Revision("4d59fb584b15a94d7401e356d2875c472d76ef45")),
+			pa2lp(atom{
+				id: pi("github.com/sdboyer/testrepo"),
+				v:  NewBranch("master").Is(Revision("4d59fb584b15a94d7401e356d2875c472d76ef45")),
 			}, nil),
-			pa2lp(ProjectAtom{
-				Ident:   pi("github.com/Masterminds/VCSTestRepo"),
-				Version: NewVersion("1.0.0").Is(Revision("30605f6ac35fcb075ad0bfa9296f90a7d891523e")),
+			pa2lp(atom{
+				id: pi("github.com/Masterminds/VCSTestRepo"),
+				v:  NewVersion("1.0.0").Is(Revision("30605f6ac35fcb075ad0bfa9296f90a7d891523e")),
 			}, nil),
 		},
 	}
 
 	// just in case something needs punishing, kubernetes is happy to oblige
-	kub = ProjectAtom{
-		Ident:   pi("github.com/kubernetes/kubernetes"),
-		Version: NewVersion("1.0.0").Is(Revision("528f879e7d3790ea4287687ef0ab3f2a01cc2718")),
+	kub = atom{
+		id: pi("github.com/kubernetes/kubernetes"),
+		v:  NewVersion("1.0.0").Is(Revision("528f879e7d3790ea4287687ef0ab3f2a01cc2718")),
 	}
 }
 

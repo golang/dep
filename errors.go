@@ -72,35 +72,35 @@ func (e *noVersionError) traceString() string {
 }
 
 type disjointConstraintFailure struct {
-	goal      Dependency
-	failsib   []Dependency
-	nofailsib []Dependency
+	goal      dependency
+	failsib   []dependency
+	nofailsib []dependency
 	c         Constraint
 }
 
 func (e *disjointConstraintFailure) Error() string {
 	if len(e.failsib) == 1 {
 		str := "Could not introduce %s at %s, as it has a dependency on %s with constraint %s, which has no overlap with existing constraint %s from %s at %s"
-		return fmt.Sprintf(str, e.goal.Depender.Ident.errString(), e.goal.Depender.Version, e.goal.Dep.Ident.errString(), e.goal.Dep.Constraint.String(), e.failsib[0].Dep.Constraint.String(), e.failsib[0].Depender.Ident.errString(), e.failsib[0].Depender.Version)
+		return fmt.Sprintf(str, e.goal.depender.id.errString(), e.goal.depender.v, e.goal.dep.Ident.errString(), e.goal.dep.Constraint.String(), e.failsib[0].dep.Constraint.String(), e.failsib[0].depender.id.errString(), e.failsib[0].depender.v)
 	}
 
 	var buf bytes.Buffer
 
-	var sibs []Dependency
+	var sibs []dependency
 	if len(e.failsib) > 1 {
 		sibs = e.failsib
 
 		str := "Could not introduce %s at %s, as it has a dependency on %s with constraint %s, which has no overlap with the following existing constraints:\n"
-		fmt.Fprintf(&buf, str, e.goal.Depender.Ident.errString(), e.goal.Depender.Version, e.goal.Dep.Ident.errString(), e.goal.Dep.Constraint.String())
+		fmt.Fprintf(&buf, str, e.goal.depender.id.errString(), e.goal.depender.v, e.goal.dep.Ident.errString(), e.goal.dep.Constraint.String())
 	} else {
 		sibs = e.nofailsib
 
 		str := "Could not introduce %s at %s, as it has a dependency on %s with constraint %s, which does not overlap with the intersection of existing constraints from other currently selected packages:\n"
-		fmt.Fprintf(&buf, str, e.goal.Depender.Ident.errString(), e.goal.Depender.Version, e.goal.Dep.Ident.errString(), e.goal.Dep.Constraint.String())
+		fmt.Fprintf(&buf, str, e.goal.depender.id.errString(), e.goal.depender.v, e.goal.dep.Ident.errString(), e.goal.dep.Constraint.String())
 	}
 
 	for _, c := range sibs {
-		fmt.Fprintf(&buf, "\t%s from %s at %s\n", c.Dep.Constraint.String(), c.Depender.Ident.errString(), c.Depender.Version)
+		fmt.Fprintf(&buf, "\t%s from %s at %s\n", c.dep.Constraint.String(), c.depender.id.errString(), c.depender.v)
 	}
 
 	return buf.String()
@@ -108,12 +108,12 @@ func (e *disjointConstraintFailure) Error() string {
 
 func (e *disjointConstraintFailure) traceString() string {
 	var buf bytes.Buffer
-	fmt.Fprintf(&buf, "constraint %s on %s disjoint with other dependers:\n", e.goal.Dep.Constraint.String(), e.goal.Dep.Ident.errString())
+	fmt.Fprintf(&buf, "constraint %s on %s disjoint with other dependers:\n", e.goal.dep.Constraint.String(), e.goal.dep.Ident.errString())
 	for _, f := range e.failsib {
-		fmt.Fprintf(&buf, "%s from %s at %s (no overlap)\n", f.Dep.Constraint.String(), f.Depender.Ident.LocalName, f.Depender.Version)
+		fmt.Fprintf(&buf, "%s from %s at %s (no overlap)\n", f.dep.Constraint.String(), f.depender.id.LocalName, f.depender.v)
 	}
 	for _, f := range e.nofailsib {
-		fmt.Fprintf(&buf, "%s from %s at %s (some overlap)\n", f.Dep.Constraint.String(), f.Depender.Ident.LocalName, f.Depender.Version)
+		fmt.Fprintf(&buf, "%s from %s at %s (some overlap)\n", f.dep.Constraint.String(), f.depender.id.LocalName, f.depender.v)
 	}
 
 	return buf.String()
@@ -123,39 +123,39 @@ func (e *disjointConstraintFailure) traceString() string {
 // constraints does not admit the currently-selected version of the target
 // project.
 type constraintNotAllowedFailure struct {
-	goal Dependency
+	goal dependency
 	v    Version
 }
 
 func (e *constraintNotAllowedFailure) Error() string {
 	str := "Could not introduce %s at %s, as it has a dependency on %s with constraint %s, which does not allow the currently selected version of %s"
-	return fmt.Sprintf(str, e.goal.Depender.Ident.errString(), e.goal.Depender.Version, e.goal.Dep.Ident.errString(), e.goal.Dep.Constraint, e.v)
+	return fmt.Sprintf(str, e.goal.depender.id.errString(), e.goal.depender.v, e.goal.dep.Ident.errString(), e.goal.dep.Constraint, e.v)
 }
 
 func (e *constraintNotAllowedFailure) traceString() string {
 	str := "%s at %s depends on %s with %s, but that's already selected at %s"
-	return fmt.Sprintf(str, e.goal.Depender.Ident.LocalName, e.goal.Depender.Version, e.goal.Dep.Ident.LocalName, e.goal.Dep.Constraint, e.v)
+	return fmt.Sprintf(str, e.goal.depender.id.LocalName, e.goal.depender.v, e.goal.dep.Ident.LocalName, e.goal.dep.Constraint, e.v)
 }
 
 type versionNotAllowedFailure struct {
-	goal       ProjectAtom
-	failparent []Dependency
+	goal       atom
+	failparent []dependency
 	c          Constraint
 }
 
 func (e *versionNotAllowedFailure) Error() string {
 	if len(e.failparent) == 1 {
 		str := "Could not introduce %s at %s, as it is not allowed by constraint %s from project %s."
-		return fmt.Sprintf(str, e.goal.Ident.errString(), e.goal.Version, e.failparent[0].Dep.Constraint.String(), e.failparent[0].Depender.Ident.errString())
+		return fmt.Sprintf(str, e.goal.id.errString(), e.goal.v, e.failparent[0].dep.Constraint.String(), e.failparent[0].depender.id.errString())
 	}
 
 	var buf bytes.Buffer
 
 	str := "Could not introduce %s at %s, as it is not allowed by constraints from the following projects:\n"
-	fmt.Fprintf(&buf, str, e.goal.Ident.errString(), e.goal.Version)
+	fmt.Fprintf(&buf, str, e.goal.id.errString(), e.goal.v)
 
 	for _, f := range e.failparent {
-		fmt.Fprintf(&buf, "\t%s from %s at %s\n", f.Dep.Constraint.String(), f.Depender.Ident.errString(), f.Depender.Version)
+		fmt.Fprintf(&buf, "\t%s from %s at %s\n", f.dep.Constraint.String(), f.depender.id.errString(), f.depender.v)
 	}
 
 	return buf.String()
@@ -164,9 +164,9 @@ func (e *versionNotAllowedFailure) Error() string {
 func (e *versionNotAllowedFailure) traceString() string {
 	var buf bytes.Buffer
 
-	fmt.Fprintf(&buf, "%s at %s not allowed by constraint %s:\n", e.goal.Ident.LocalName, e.goal.Version, e.c.String())
+	fmt.Fprintf(&buf, "%s at %s not allowed by constraint %s:\n", e.goal.id.LocalName, e.goal.v, e.c.String())
 	for _, f := range e.failparent {
-		fmt.Fprintf(&buf, "  %s from %s at %s\n", f.Dep.Constraint.String(), f.Depender.Ident.LocalName, f.Depender.Version)
+		fmt.Fprintf(&buf, "  %s from %s at %s\n", f.dep.Constraint.String(), f.depender.id.LocalName, f.depender.v)
 	}
 
 	return buf.String()
@@ -189,28 +189,28 @@ func (e badOptsFailure) Error() string {
 
 type sourceMismatchFailure struct {
 	shared            ProjectName
-	sel               []Dependency
+	sel               []dependency
 	current, mismatch string
-	prob              ProjectAtom
+	prob              atom
 }
 
 func (e *sourceMismatchFailure) Error() string {
 	var cur []string
 	for _, c := range e.sel {
-		cur = append(cur, string(c.Depender.Ident.LocalName))
+		cur = append(cur, string(c.depender.id.LocalName))
 	}
 
 	str := "Could not introduce %s at %s, as it depends on %s from %s, but %s is already marked as coming from %s by %s"
-	return fmt.Sprintf(str, e.prob.Ident.errString(), e.prob.Version, e.shared, e.mismatch, e.shared, e.current, strings.Join(cur, ", "))
+	return fmt.Sprintf(str, e.prob.id.errString(), e.prob.v, e.shared, e.mismatch, e.shared, e.current, strings.Join(cur, ", "))
 }
 
 func (e *sourceMismatchFailure) traceString() string {
 	var buf bytes.Buffer
 	fmt.Fprintf(&buf, "disagreement on network addr for %s:\n", e.shared)
 
-	fmt.Fprintf(&buf, "  %s from %s\n", e.mismatch, e.prob.Ident.errString())
+	fmt.Fprintf(&buf, "  %s from %s\n", e.mismatch, e.prob.id.errString())
 	for _, dep := range e.sel {
-		fmt.Fprintf(&buf, "  %s from %s\n", e.current, dep.Depender.Ident.errString())
+		fmt.Fprintf(&buf, "  %s from %s\n", e.current, dep.depender.id.errString())
 	}
 
 	return buf.String()
@@ -218,10 +218,10 @@ func (e *sourceMismatchFailure) traceString() string {
 
 type errDeppers struct {
 	err     error
-	deppers []ProjectAtom
+	deppers []atom
 }
 type checkeeHasProblemPackagesFailure struct {
-	goal    ProjectAtom
+	goal    atom
 	failpkg map[string]errDeppers
 }
 
@@ -233,8 +233,8 @@ func (e *checkeeHasProblemPackagesFailure) Error() string {
 		indent = "\t"
 		fmt.Fprintf(
 			&buf, "Could not introduce %s at %s due to multiple problematic subpackages:\n",
-			e.goal.Ident.errString(),
-			e.goal.Version,
+			e.goal.id.errString(),
+			e.goal.v,
 		)
 	}
 
@@ -249,8 +249,8 @@ func (e *checkeeHasProblemPackagesFailure) Error() string {
 		if len(e.failpkg) == 1 {
 			fmt.Fprintf(
 				&buf, "Could not introduce %s at %s, as its subpackage %s %s.",
-				e.goal.Ident.errString(),
-				e.goal.Version,
+				e.goal.id.errString(),
+				e.goal.v,
 				pkg,
 				cause,
 			)
@@ -261,13 +261,13 @@ func (e *checkeeHasProblemPackagesFailure) Error() string {
 		if len(errdep.deppers) == 1 {
 			fmt.Fprintf(
 				&buf, " (Package is required by %s at %s.)",
-				errdep.deppers[0].Ident.errString(),
-				errdep.deppers[0].Version,
+				errdep.deppers[0].id.errString(),
+				errdep.deppers[0].v,
 			)
 		} else {
 			fmt.Fprintf(&buf, " Package is required by:")
 			for _, pa := range errdep.deppers {
-				fmt.Fprintf(&buf, "\n%s\t%s at %s", indent, pa.Ident.errString(), pa.Version)
+				fmt.Fprintf(&buf, "\n%s\t%s at %s", indent, pa.id.errString(), pa.v)
 			}
 		}
 	}
@@ -278,7 +278,7 @@ func (e *checkeeHasProblemPackagesFailure) Error() string {
 func (e *checkeeHasProblemPackagesFailure) traceString() string {
 	var buf bytes.Buffer
 
-	fmt.Fprintf(&buf, "%s at %s has problem subpkg(s):\n", e.goal.Ident.LocalName, e.goal.Version)
+	fmt.Fprintf(&buf, "%s at %s has problem subpkg(s):\n", e.goal.id.LocalName, e.goal.v)
 	for pkg, errdep := range e.failpkg {
 		if errdep.err == nil {
 			fmt.Fprintf(&buf, "\t%s is missing; ", pkg)
@@ -289,13 +289,13 @@ func (e *checkeeHasProblemPackagesFailure) traceString() string {
 		if len(errdep.deppers) == 1 {
 			fmt.Fprintf(
 				&buf, "required by %s at %s.",
-				errdep.deppers[0].Ident.errString(),
-				errdep.deppers[0].Version,
+				errdep.deppers[0].id.errString(),
+				errdep.deppers[0].v,
 			)
 		} else {
 			fmt.Fprintf(&buf, " required by:")
 			for _, pa := range errdep.deppers {
-				fmt.Fprintf(&buf, "\n\t\t%s at %s", pa.Ident.errString(), pa.Version)
+				fmt.Fprintf(&buf, "\n\t\t%s at %s", pa.id.errString(), pa.v)
 			}
 		}
 	}
@@ -304,7 +304,7 @@ func (e *checkeeHasProblemPackagesFailure) traceString() string {
 }
 
 type depHasProblemPackagesFailure struct {
-	goal Dependency
+	goal dependency
 	v    Version
 	pl   []string
 	prob map[string]error
@@ -324,10 +324,10 @@ func (e *depHasProblemPackagesFailure) Error() string {
 	if len(e.pl) == 1 {
 		return fmt.Sprintf(
 			"Could not introduce %s at %s, as it requires package %s from %s, but in version %s that package %s",
-			e.goal.Depender.Ident.errString(),
-			e.goal.Depender.Version,
+			e.goal.depender.id.errString(),
+			e.goal.depender.v,
 			e.pl[0],
-			e.goal.Dep.Ident.errString(),
+			e.goal.dep.Ident.errString(),
 			e.v,
 			fcause(e.pl[0]),
 		)
@@ -336,9 +336,9 @@ func (e *depHasProblemPackagesFailure) Error() string {
 	var buf bytes.Buffer
 	fmt.Fprintf(
 		&buf, "Could not introduce %s at %s, as it requires problematic packages from %s (current version %s):",
-		e.goal.Depender.Ident.errString(),
-		e.goal.Depender.Version,
-		e.goal.Dep.Ident.errString(),
+		e.goal.depender.id.errString(),
+		e.goal.depender.v,
+		e.goal.dep.Ident.errString(),
 		e.v,
 	)
 
@@ -363,9 +363,9 @@ func (e *depHasProblemPackagesFailure) traceString() string {
 
 	fmt.Fprintf(
 		&buf, "%s at %s depping on %s at %s has problem subpkg(s):",
-		e.goal.Depender.Ident.errString(),
-		e.goal.Depender.Version,
-		e.goal.Dep.Ident.errString(),
+		e.goal.depender.id.errString(),
+		e.goal.depender.v,
+		e.goal.dep.Ident.errString(),
 		e.v,
 	)
 

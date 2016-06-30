@@ -68,7 +68,7 @@ func nsvrSplit(info string) (id ProjectIdentifier, version string, revision Revi
 //
 // Splits the input string on a space, and uses the first two elements as the
 // project name and constraint body, respectively.
-func mksvpa(info string) ProjectAtom {
+func mksvpa(info string) atom {
 	id, ver, rev := nsvrSplit(info)
 
 	_, err := semver.NewVersion(ver)
@@ -83,9 +83,9 @@ func mksvpa(info string) ProjectAtom {
 		v = v.(UnpairedVersion).Is(rev)
 	}
 
-	return ProjectAtom{
-		Ident:   id,
-		Version: v,
+	return atom{
+		id: id,
+		v:  v,
 	}
 }
 
@@ -132,13 +132,13 @@ type depspec struct {
 // First string is broken out into the name/semver of the main package.
 func dsv(pi string, deps ...string) depspec {
 	pa := mksvpa(pi)
-	if string(pa.Ident.LocalName) != pa.Ident.NetworkName {
+	if string(pa.id.LocalName) != pa.id.NetworkName {
 		panic("alternate source on self makes no sense")
 	}
 
 	ds := depspec{
-		n: pa.Ident.LocalName,
-		v: pa.Version,
+		n: pa.id.LocalName,
+		v: pa.v,
 	}
 
 	for _, dep := range deps {
@@ -161,7 +161,7 @@ func mklock(pairs ...string) fixLock {
 	l := make(fixLock, 0)
 	for _, s := range pairs {
 		pa := mksvpa(s)
-		l = append(l, NewLockedProject(pa.Ident.LocalName, pa.Version, pa.Ident.netName(), "", nil))
+		l = append(l, NewLockedProject(pa.id.LocalName, pa.v, pa.id.netName(), "", nil))
 	}
 
 	return l
@@ -173,7 +173,7 @@ func mkrevlock(pairs ...string) fixLock {
 	l := make(fixLock, 0)
 	for _, s := range pairs {
 		pa := mksvpa(s)
-		l = append(l, NewLockedProject(pa.Ident.LocalName, pa.Version.(PairedVersion).Underlying(), pa.Ident.netName(), "", nil))
+		l = append(l, NewLockedProject(pa.id.LocalName, pa.v.(PairedVersion).Underlying(), pa.id.netName(), "", nil))
 	}
 
 	return l
