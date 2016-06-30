@@ -153,16 +153,16 @@ func Prepare(in SolveArgs, opts SolveOpts, sm SourceManager) (Solver, error) {
 	// TODO local overrides! heh
 
 	if in.Manifest == nil {
-		return nil, BadOptsFailure("Opts must include a manifest.")
+		return nil, badOptsFailure("Opts must include a manifest.")
 	}
 	if in.Root == "" {
-		return nil, BadOptsFailure("Opts must specify a non-empty string for the project root directory. If cwd is desired, use \".\"")
+		return nil, badOptsFailure("Opts must specify a non-empty string for the project root directory. If cwd is desired, use \".\"")
 	}
 	if in.Name == "" {
-		return nil, BadOptsFailure("Opts must include a project name. This should be the intended root import path of the project.")
+		return nil, badOptsFailure("Opts must include a project name. This should be the intended root import path of the project.")
 	}
 	if opts.Trace && opts.TraceLogger == nil {
-		return nil, BadOptsFailure("Trace requested, but no logger provided.")
+		return nil, badOptsFailure("Trace requested, but no logger provided.")
 	}
 
 	s := &solver{

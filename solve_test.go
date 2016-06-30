@@ -144,7 +144,7 @@ func fixtureSolveSimpleChecks(fix specfix, res Result, err error, t *testing.T) 
 		}
 
 		switch fail := err.(type) {
-		case *BadOptsFailure:
+		case *badOptsFailure:
 			t.Errorf("(fixture: %q) Unexpected bad opts failure solve error: %s", fix.name(), err)
 		case *noVersionError:
 			if errp[0] != string(fail.pn.LocalName) { // TODO identifierify

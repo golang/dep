@@ -17,11 +17,6 @@ const (
 	cannotResolve
 )
 
-type SolveError interface {
-	error
-	Children() []error
-}
-
 type traceError interface {
 	traceString() string
 }
@@ -186,9 +181,9 @@ func (e *missingSourceFailure) Error() string {
 	return fmt.Sprintf(e.prob, e.goal)
 }
 
-type BadOptsFailure string
+type badOptsFailure string
 
-func (e BadOptsFailure) Error() string {
+func (e badOptsFailure) Error() string {
 	return string(e)
 }
 

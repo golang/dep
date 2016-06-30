@@ -407,9 +407,9 @@ func (b *bridge) listPackages(id ProjectIdentifier, v Version) (PackageTree, err
 // run.
 func (b *bridge) verifyRoot(path string) error {
 	if fi, err := os.Stat(path); err != nil {
-		return BadOptsFailure(fmt.Sprintf("Could not read project root (%s): %s", path, err))
+		return badOptsFailure(fmt.Sprintf("Could not read project root (%s): %s", path, err))
 	} else if !fi.IsDir() {
-		return BadOptsFailure(fmt.Sprintf("Project root (%s) is a file, not a directory.", path))
+		return badOptsFailure(fmt.Sprintf("Project root (%s) is a file, not a directory.", path))
 	}
 
 	return nil
