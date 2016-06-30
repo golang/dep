@@ -666,8 +666,8 @@ func (t PackageTree) ExternalReach(main, tests bool, ignore map[string]bool) (ma
 	return wmToReach(workmap, "") // TODO this passes tests, but doesn't seem right
 }
 
-// ListExternalImports computes a deduplicated list of all the external packages
-// that are imported by all packages in the PackageTree.
+// ListExternalImports computes a sorted, deduplicated list of all the external
+// packages that are imported by all packages in the PackageTree.
 //
 // "External" is defined as anything not prefixed, after path cleaning, by the
 // PackageTree.ImportRoot. This includes stdlib.
@@ -740,6 +740,7 @@ func (t PackageTree) ListExternalImports(main, tests bool, ignore map[string]boo
 		k++
 	}
 
+	sort.Strings(ex)
 	return ex, nil
 }
 
