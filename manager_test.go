@@ -186,7 +186,7 @@ func TestProjectManagerInit(t *testing.T) {
 	}
 
 	// Check upstream existence flag
-	if !pms.pm.CheckExistence(ExistsUpstream) {
+	if !pms.pm.CheckExistence(existsUpstream) {
 		t.Errorf("ExistsUpstream flag not being correctly set the project")
 	}
 }
@@ -240,7 +240,7 @@ func TestRepoVersionFetching(t *testing.T) {
 	if err != nil {
 		t.Errorf("Unexpected error getting version pairs from git repo: %s", err)
 	}
-	if exbits != ExistsUpstream {
+	if exbits != existsUpstream {
 		t.Errorf("git pair fetch should only set upstream existence bits, but got %v", exbits)
 	}
 	if len(vlist) != 3 {
@@ -267,7 +267,7 @@ func TestRepoVersionFetching(t *testing.T) {
 	if err != nil {
 		t.Errorf("Unexpected error getting version pairs from hg repo: %s", err)
 	}
-	if exbits != ExistsUpstream|ExistsInCache {
+	if exbits != existsUpstream|existsInCache {
 		t.Errorf("hg pair fetch should set upstream and cache existence bits, but got %v", exbits)
 	}
 	if len(vlist) != 2 {
@@ -289,7 +289,7 @@ func TestRepoVersionFetching(t *testing.T) {
 	if err != nil {
 		t.Errorf("Unexpected error getting version pairs from bzr repo: %s", err)
 	}
-	if exbits != ExistsUpstream|ExistsInCache {
+	if exbits != existsUpstream|existsInCache {
 		t.Errorf("bzr pair fetch should set upstream and cache existence bits, but got %v", exbits)
 	}
 	if len(vlist) != 1 {

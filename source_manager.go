@@ -199,7 +199,7 @@ func (sm *sourceManager) VendorCodeExists(n ProjectName) (bool, error) {
 		return false, err
 	}
 
-	return pms.pm.CheckExistence(ExistsInVendorRoot), nil
+	return pms.pm.CheckExistence(existsInVendorRoot), nil
 }
 
 func (sm *sourceManager) RepoExists(n ProjectName) (bool, error) {
@@ -208,7 +208,7 @@ func (sm *sourceManager) RepoExists(n ProjectName) (bool, error) {
 		return false, err
 	}
 
-	return pms.pm.CheckExistence(ExistsInCache) || pms.pm.CheckExistence(ExistsUpstream), nil
+	return pms.pm.CheckExistence(existsInCache) || pms.pm.CheckExistence(existsUpstream), nil
 }
 
 // ExportProject writes out the tree of the provided import path, at the

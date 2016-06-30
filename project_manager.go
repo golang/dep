@@ -176,14 +176,14 @@ func (pm *projectManager) ensureCacheExistence() error {
 	// would allow weird state inconsistencies (cache exists, but no repo...how
 	// does that even happen?) that it'd be better to just not allow so that we
 	// don't have to think about it elsewhere
-	if !pm.CheckExistence(ExistsInCache) {
-		if pm.CheckExistence(ExistsUpstream) {
+	if !pm.CheckExistence(existsInCache) {
+		if pm.CheckExistence(existsUpstream) {
 			err := pm.crepo.r.Get()
 			if err != nil {
 				return fmt.Errorf("Failed to create repository cache for %s", pm.n)
 			}
-			pm.ex.s |= ExistsInCache
-			pm.ex.f |= ExistsInCache
+			pm.ex.s |= existsInCache
+			pm.ex.f |= existsInCache
 		} else {
 			return fmt.Errorf("Project repository cache for %s does not exist", pm.n)
 		}
@@ -195,7 +195,7 @@ func (pm *projectManager) ensureCacheExistence() error {
 func (pm *projectManager) ListVersions() (vlist []Version, err error) {
 	if !pm.cvsync {
 		// This check only guarantees that the upstream exists, not the cache
-		pm.ex.s |= ExistsUpstream
+		pm.ex.s |= existsUpstream
 		vpairs, exbits, err := pm.crepo.getCurrentVersionPairs()
 		// But it *may* also check the local existence
 		pm.ex.s |= exbits
@@ -209,7 +209,7 @@ func (pm *projectManager) ListVersions() (vlist []Version, err error) {
 
 		vlist = make([]Version, len(vpairs))
 		// mark our cache as synced if we got ExistsUpstream back
-		if exbits&ExistsUpstream == ExistsUpstream {
+		if exbits&existsUpstream == existsUpstream {
 			pm.cvsync = true
 		}
 
@@ -243,27 +243,27 @@ func (pm *projectManager) ListVersions() (vlist []Version, err error) {
 // segment where the cache repo mutex is already write-locked.
 func (pm *projectManager) CheckExistence(ex projectExistence) bool {
 	if pm.ex.s&ex != ex {
-		if ex&ExistsInVendorRoot != 0 && pm.ex.s&ExistsInVendorRoot == 0 {
-			pm.ex.s |= ExistsInVendorRoot
+		if ex&existsInVendorRoot != 0 && pm.ex.s&existsInVendorRoot == 0 {
+			pm.ex.s |= existsInVendorRoot
 
 			fi, err := os.Stat(path.Join(pm.vendordir, string(pm.n)))
 			if err == nil && fi.IsDir() {
-				pm.ex.f |= ExistsInVendorRoot
+				pm.ex.f |= existsInVendorRoot
 			}
 		}
-		if ex&ExistsInCache != 0 && pm.ex.s&ExistsInCache == 0 {
+		if ex&existsInCache != 0 && pm.ex.s&existsInCache == 0 {
 			pm.crepo.mut.RLock()
-			pm.ex.s |= ExistsInCache
+			pm.ex.s |= existsInCache
 			if pm.crepo.r.CheckLocal() {
-				pm.ex.f |= ExistsInCache
+				pm.ex.f |= existsInCache
 			}
 			pm.crepo.mut.RUnlock()
 		}
-		if ex&ExistsUpstream != 0 && pm.ex.s&ExistsUpstream == 0 {
+		if ex&existsUpstream != 0 && pm.ex.s&existsUpstream == 0 {
 			pm.crepo.mut.RLock()
-			pm.ex.s |= ExistsUpstream
+			pm.ex.s |= existsUpstream
 			if pm.crepo.r.Ping() {
-				pm.ex.f |= ExistsUpstream
+				pm.ex.f |= existsUpstream
 			}
 			pm.crepo.mut.RUnlock()
 		}
@@ -303,7 +303,7 @@ func (r *repo) getCurrentVersionPairs() (vlist []PairedVersion, exbits projectEx
 			}
 
 			// Upstream and cache must exist, so add that to exbits
-			exbits |= ExistsUpstream | ExistsInCache
+			exbits |= existsUpstream | existsInCache
 			// Also, local is definitely now synced
 			r.synced = true
 
@@ -315,7 +315,7 @@ func (r *repo) getCurrentVersionPairs() (vlist []PairedVersion, exbits projectEx
 			all = bytes.Split(bytes.TrimSpace(out), []byte("\n"))
 		}
 		// Local cache may not actually exist here, but upstream definitely does
-		exbits |= ExistsUpstream
+		exbits |= existsUpstream
 
 		tmap := make(map[string]PairedVersion)
 		for _, pair := range all {
@@ -354,7 +354,7 @@ func (r *repo) getCurrentVersionPairs() (vlist []PairedVersion, exbits projectEx
 			return
 		}
 		// Upstream and cache must exist, so add that to exbits
-		exbits |= ExistsUpstream | ExistsInCache
+		exbits |= existsUpstream | existsInCache
 		// Also, local is definitely now synced
 		r.synced = true
 
@@ -379,7 +379,7 @@ func (r *repo) getCurrentVersionPairs() (vlist []PairedVersion, exbits projectEx
 		}
 
 		// Upstream and cache must exist, so add that to exbits
-		exbits |= ExistsUpstream | ExistsInCache
+		exbits |= existsUpstream | existsInCache
 		// Also, local is definitely now synced
 		r.synced = true
 

@@ -19,7 +19,7 @@ const (
 	//
 	// In short, the information encoded in this flag should not be construed as
 	// exhaustive.
-	ExistsInVendorRoot projectExistence = 1 << iota
+	existsInVendorRoot projectExistence = 1 << iota
 
 	// ExistsInCache indicates that a project exists on-disk in the local cache.
 	// It does not guarantee that an upstream exists, thus it cannot imply
@@ -29,9 +29,9 @@ const (
 	// Additionally, this refers only to the existence of the local repository
 	// itself; it says nothing about the existence or completeness of the
 	// separate metadata cache.
-	ExistsInCache
+	existsInCache
 
 	// ExistsUpstream indicates that a project repository was locatable at the
 	// path provided by a project's URI (a base import path).
-	ExistsUpstream
+	existsUpstream
 )
