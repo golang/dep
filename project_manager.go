@@ -15,18 +15,6 @@ import (
 	"github.com/termie/go-shutil"
 )
 
-type ProjectManager interface {
-	GetInfoAt(Version) (Manifest, Lock, error)
-	ListVersions() ([]Version, error)
-	CheckExistence(projectExistence) bool
-	ExportVersionTo(Version, string) error
-	ListPackages(Version) (PackageTree, error)
-}
-
-type ProjectAnalyzer interface {
-	GetInfo(build.Context, ProjectName) (Manifest, Lock, error)
-}
-
 type projectManager struct {
 	// The identifier of the project. At this level, corresponds to the
 	// '$GOPATH/src'-relative path, *and* the network name.

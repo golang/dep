@@ -48,6 +48,12 @@ type SourceManager interface {
 	Release()
 }
 
+// A ProjectAnalyzer is responsible for analyzing a path for Manifest and Lock
+// information. Tools relying on vsolver must implement one.
+type ProjectAnalyzer interface {
+	GetInfo(build.Context, ProjectName) (Manifest, Lock, error)
+}
+
 // ExistenceError is a specialized error type that, in addition to the standard
 // error interface, also indicates the amount of searching for a project's
 // existence that has been performed, and what level of existence has been
@@ -72,10 +78,10 @@ type sourceManager struct {
 	//pme               map[ProjectName]error
 }
 
-// Holds a ProjectManager, caches of the managed project's data, and information
+// Holds a projectManager, caches of the managed project's data, and information
 // about the freshness of those caches
 type pmState struct {
-	pm   ProjectManager
+	pm   *projectManager
 	cf   *os.File // handle for the cache file
 	vcur bool     // indicates that we've called ListVersions()
 }

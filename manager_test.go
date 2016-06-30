@@ -224,7 +224,7 @@ func TestRepoVersionFetching(t *testing.T) {
 			t.Errorf("Unexpected error on ProjectManager creation: %s", err)
 			t.FailNow()
 		}
-		pms[k] = pmi.pm.(*projectManager)
+		pms[k] = pmi.pm
 	}
 
 	defer func() {
