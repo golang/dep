@@ -59,7 +59,7 @@ func solveBasicsAndCheck(fix basicFixture, t *testing.T) (res Result, err error)
 	if testing.Verbose() {
 		stderrlog.Printf("[[fixture %q]]", fix.n)
 	}
-	sm := newdepspecSM(fix.ds)
+	sm := newdepspecSM(fix.ds, nil)
 
 	args := SolveArgs{
 		Root:     string(fix.ds[0].Name()),
@@ -112,13 +112,14 @@ func solveBimodalAndCheck(fix bimodalFixture, t *testing.T) (res Result, err err
 	if testing.Verbose() {
 		stderrlog.Printf("[[fixture %q]]", fix.n)
 	}
-	sm := newbmSM(fix.ds)
+	sm := newbmSM(fix.ds, fix.ignore)
 
 	args := SolveArgs{
 		Root:     string(fix.ds[0].Name()),
 		Name:     ProjectName(fix.ds[0].Name()),
 		Manifest: fix.ds[0],
 		Lock:     dummyLock{},
+		Ignore:   fix.ignore,
 	}
 
 	o := SolveOpts{
@@ -265,7 +266,7 @@ func TestRootLockNoVersionPairMatching(t *testing.T) {
 	pd.Constraint = Revision("foorev")
 	fix.ds[0].deps[0] = pd
 
-	sm := newdepspecSM(fix.ds)
+	sm := newdepspecSM(fix.ds, nil)
 
 	l2 := make(fixLock, 1)
 	copy(l2, fix.l)
@@ -320,7 +321,7 @@ func getFailureCausingProjects(err error) (projs []string) {
 }
 
 func TestBadSolveOpts(t *testing.T) {
-	sm := newdepspecSM(basicFixtures[0].ds)
+	sm := newdepspecSM(basicFixtures[0].ds, nil)
 
 	o := SolveOpts{}
 	args := SolveArgs{}

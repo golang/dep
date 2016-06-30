@@ -16,7 +16,7 @@ func TestHashInputs(t *testing.T) {
 	}
 
 	// prep a fixture-overridden solver
-	si, err := Prepare(args, SolveOpts{}, newdepspecSM(fix.ds))
+	si, err := Prepare(args, SolveOpts{}, newdepspecSM(fix.ds, nil))
 	s := si.(*solver)
 	if err != nil {
 		t.Fatalf("Could not prepare solver due to err: %s", err)

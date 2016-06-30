@@ -863,20 +863,27 @@ type reachMap map[pident]map[string][]string
 type depspecSourceManager struct {
 	specs []depspec
 	rm    reachMap
+	ig    map[string]bool
 }
 
 type fixSM interface {
 	SourceManager
 	rootSpec() depspec
 	allSpecs() []depspec
+	ignore() map[string]bool
 }
 
 var _ fixSM = &depspecSourceManager{}
 
-func newdepspecSM(ds []depspec) *depspecSourceManager {
+func newdepspecSM(ds []depspec, ignore map[string]bool) *depspecSourceManager {
+	if ignore == nil {
+		ignore = make(map[string]bool)
+	}
+
 	return &depspecSourceManager{
 		specs: ds,
 		rm:    computeBasicReachMap(ds),
+		ig:    ignore,
 	}
 }
 
@@ -971,24 +978,27 @@ func (sm *depspecSourceManager) allSpecs() []depspec {
 	return sm.specs
 }
 
+func (sm *depspecSourceManager) ignore() map[string]bool {
+	return sm.ig
+}
+
 type depspecBridge struct {
 	*bridge
 }
 
 // override computeRootReach() on bridge to read directly out of the depspecs
-func (b *depspecBridge) computeRootReach(path string) ([]string, error) {
+func (b *depspecBridge) computeRootReach() ([]string, error) {
 	// This only gets called for the root project, so grab that one off the test
 	// source manager
 	dsm := b.sm.(fixSM)
 	root := dsm.rootSpec()
-	if string(root.n) != path {
-		return nil, fmt.Errorf("Expected only root project %q to computeRootReach(), got %q", root.n, path)
-	}
 
 	ptree, err := dsm.ListPackages(root.n, nil)
 	if err != nil {
 		return nil, err
 	}
+
+	pruneIgnoredPackages(ptree, dsm.ignore())
 	return ptree.ListExternalImports(true, true)
 }
 
