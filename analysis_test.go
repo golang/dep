@@ -452,6 +452,89 @@ func TestListPackages(t *testing.T) {
 				},
 			},
 		},
+		// This case mostly exists for the PackageTree methods, but it does
+		// cover a bit of range
+		"varied": {
+			fileRoot:   j("varied"),
+			importRoot: "varied",
+			out: PackageTree{
+				ImportRoot: "varied",
+				Packages: map[string]PackageOrErr{
+					"varied": PackageOrErr{
+						P: Package{
+							ImportPath:  "varied",
+							CommentPath: "",
+							Name:        "main",
+							Imports: []string{
+								"net/http",
+								"varied/namemismatch",
+								"varied/otherpath",
+								"varied/simple",
+							},
+						},
+					},
+					"varied/otherpath": PackageOrErr{
+						P: Package{
+							ImportPath:  "varied/otherpath",
+							CommentPath: "",
+							Name:        "otherpath",
+							Imports: []string{
+								"varied/m1p",
+							},
+						},
+					},
+					"varied/simple": PackageOrErr{
+						P: Package{
+							ImportPath:  "varied/simple",
+							CommentPath: "",
+							Name:        "simple",
+							Imports: []string{
+								"github.com/sdboyer/vsolver",
+								"go/parser",
+								"varied/simple/another",
+							},
+						},
+					},
+					"varied/simple/another": PackageOrErr{
+						P: Package{
+							ImportPath:  "varied/simple/another",
+							CommentPath: "",
+							Name:        "another",
+							Imports: []string{
+								"hash",
+								"varied/m1p",
+							},
+							TestImports: []string{
+								"encoding/binary",
+							},
+						},
+					},
+					"varied/namemismatch": PackageOrErr{
+						P: Package{
+							ImportPath:  "varied/namemismatch",
+							CommentPath: "",
+							Name:        "nm",
+							Imports: []string{
+								"github.com/Masterminds/semver",
+								"os",
+							},
+						},
+					},
+					"varied/m1p": PackageOrErr{
+						P: Package{
+							ImportPath:  "varied/m1p",
+							CommentPath: "",
+							Name:        "m1p",
+							Imports: []string{
+								"github.com/sdboyer/vsolver",
+								"os",
+								"sort",
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 
 	for name, fix := range table {
@@ -474,7 +557,39 @@ func TestListPackages(t *testing.T) {
 
 		if fix.out.ImportRoot != "" && fix.out.Packages != nil {
 			if !reflect.DeepEqual(out, fix.out) {
-				t.Errorf("listPackages(%q): Did not receive expected package:\n\t(GOT): %s\n\t(WNT): %s", name, out, fix.out)
+				if fix.out.ImportRoot != out.ImportRoot {
+					t.Errorf("listPackages(%q): Expected ImportRoot %s, got %s", name, fix.out.ImportRoot, out.ImportRoot)
+				}
+
+				// overwrite the out one to see if we still have a real problem
+				out.ImportRoot = fix.out.ImportRoot
+
+				if !reflect.DeepEqual(out, fix.out) {
+					if len(fix.out.Packages) < 2 {
+						t.Errorf("listPackages(%q): Did not get expected PackageOrErrs:\n\t(GOT): %s\n\t(WNT): %s", name, out, fix.out)
+					} else {
+						seen := make(map[string]bool)
+						for path, perr := range fix.out.Packages {
+							seen[path] = true
+							if operr, exists := out.Packages[path]; !exists {
+								t.Errorf("listPackages(%q): Expected PackageOrErr for path %s was missing from output:\n\t%s", path, perr)
+							} else {
+								if !reflect.DeepEqual(perr, operr) {
+									t.Errorf("listPackages(%q): PkgOrErr for path %s was not as expected:\n\t(GOT): %s\n\t(WNT): %s", name, path, operr, perr)
+
+								}
+							}
+						}
+
+						for path, operr := range out.Packages {
+							if seen[path] {
+								continue
+							}
+
+							t.Errorf("listPackages(%q): Got PackageOrErr for path %s, but none was expected:\n\t%s", path, operr)
+						}
+					}
+				}
 			}
 		}
 	}
