@@ -9,7 +9,7 @@ import (
 // sourceBridges provide an adapter to SourceManagers that tailor operations
 // for a single solve run.
 type sourceBridge interface {
-	getProjectInfo(pa ProjectAtom) (ProjectInfo, error)
+	getProjectInfo(pa ProjectAtom) (Manifest, Lock, error)
 	listVersions(id ProjectIdentifier) ([]Version, error)
 	pairRevision(id ProjectIdentifier, r Revision) []Version
 	pairVersion(id ProjectIdentifier, v UnpairedVersion) PairedVersion
@@ -76,7 +76,7 @@ type bridge struct {
 	vlists map[ProjectName][]Version
 }
 
-func (b *bridge) getProjectInfo(pa ProjectAtom) (ProjectInfo, error) {
+func (b *bridge) getProjectInfo(pa ProjectAtom) (Manifest, Lock, error) {
 	return b.sm.GetProjectInfo(ProjectName(pa.Ident.netName()), pa.Version)
 }
 

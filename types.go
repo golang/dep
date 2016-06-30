@@ -109,11 +109,3 @@ type Dependency struct {
 	Depender ProjectAtom
 	Dep      completeDep
 }
-
-// ProjectInfo holds manifest and lock for a ProjectName at a Version
-type ProjectInfo struct {
-	N ProjectName
-	V Version
-	Manifest
-	Lock
-}

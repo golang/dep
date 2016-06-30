@@ -38,7 +38,7 @@ type SourceManager interface {
 	// import path. vsolver currently requires that projects be rooted at their
 	// repository root, which means that this ProjectName must also be a
 	// repository root.
-	GetProjectInfo(ProjectName, Version) (ProjectInfo, error)
+	GetProjectInfo(ProjectName, Version) (Manifest, Lock, error)
 
 	// ExportProject writes out the tree of the provided import path, at the
 	// provided version, to the provided directory.
@@ -144,10 +144,10 @@ func (sm *sourceManager) Release() {
 //
 // The work of producing the manifest and lock information is delegated to the
 // injected ProjectAnalyzer.
-func (sm *sourceManager) GetProjectInfo(n ProjectName, v Version) (ProjectInfo, error) {
+func (sm *sourceManager) GetProjectInfo(n ProjectName, v Version) (Manifest, Lock, error) {
 	pmc, err := sm.getProjectManager(n)
 	if err != nil {
-		return ProjectInfo{}, err
+		return nil, nil, err
 	}
 
 	return pmc.pm.GetInfoAt(v)
@@ -277,7 +277,7 @@ func (sm *sourceManager) getProjectManager(n ProjectName) (*pmState, error) {
 		//}
 
 		dc = &projectDataCache{
-			Infos: make(map[Revision]ProjectInfo),
+			Infos: make(map[Revision]projectInfo),
 			VMap:  make(map[Version]Revision),
 			RMap:  make(map[Revision][]Version),
 		}

@@ -421,7 +421,7 @@ func (s *solver) getImportsAndConstraintsOf(a atomWithPackages) ([]completeDep, 
 
 	// Work through the source manager to get project info and static analysis
 	// information.
-	info, err := s.b.getProjectInfo(a.atom)
+	m, _, err := s.b.getProjectInfo(a.atom)
 	if err != nil {
 		return nil, err
 	}
@@ -457,7 +457,7 @@ func (s *solver) getImportsAndConstraintsOf(a atomWithPackages) ([]completeDep, 
 		k++
 	}
 
-	deps := info.GetDependencies()
+	deps := m.GetDependencies()
 	// TODO add overrides here...if we impl the concept (which we should)
 
 	return s.intersectConstraintsWithImports(deps, reach)

@@ -329,8 +329,8 @@ func TestBadSolveOpts(t *testing.T) {
 		t.Errorf("Should have errored on missing manifest")
 	}
 
-	p, _ := sm.GetProjectInfo(basicFixtures[0].ds[0].n, basicFixtures[0].ds[0].v)
-	args.Manifest = p.Manifest
+	m, _, _ := sm.GetProjectInfo(basicFixtures[0].ds[0].n, basicFixtures[0].ds[0].v)
+	args.Manifest = m
 	_, err = Prepare(args, o, sm)
 	if err == nil {
 		t.Errorf("Should have errored on empty root")

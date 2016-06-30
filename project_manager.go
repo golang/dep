@@ -16,7 +16,7 @@ import (
 )
 
 type ProjectManager interface {
-	GetInfoAt(Version) (ProjectInfo, error)
+	GetInfoAt(Version) (Manifest, Lock, error)
 	ListVersions() ([]Version, error)
 	CheckExistence(ProjectExistence) bool
 	ExportVersionTo(Version, string) error
@@ -68,9 +68,15 @@ type existence struct {
 // TODO figure out shape of versions, then implement marshaling/unmarshaling
 type projectDataCache struct {
 	Version string                   `json:"version"` // TODO use this
-	Infos   map[Revision]ProjectInfo `json:"infos"`
+	Infos   map[Revision]projectInfo `json:"infos"`
 	VMap    map[Version]Revision     `json:"vmap"`
 	RMap    map[Revision][]Version   `json:"rmap"`
+}
+
+// projectInfo holds manifest and lock
+type projectInfo struct {
+	Manifest
+	Lock
 }
 
 type repo struct {
@@ -87,14 +93,14 @@ type repo struct {
 	synced bool
 }
 
-func (pm *projectManager) GetInfoAt(v Version) (ProjectInfo, error) {
+func (pm *projectManager) GetInfoAt(v Version) (Manifest, Lock, error) {
 	if err := pm.ensureCacheExistence(); err != nil {
-		return ProjectInfo{}, err
+		return nil, nil, err
 	}
 
 	if r, exists := pm.dc.VMap[v]; exists {
 		if pi, exists := pm.dc.Infos[r]; exists {
-			return pi, nil
+			return pi.Manifest, pi.Lock, nil
 		}
 	}
 
@@ -103,7 +109,7 @@ func (pm *projectManager) GetInfoAt(v Version) (ProjectInfo, error) {
 	if !pm.crepo.synced {
 		err = pm.crepo.r.Update()
 		if err != nil {
-			return ProjectInfo{}, fmt.Errorf("Could not fetch latest updates into repository")
+			return nil, nil, fmt.Errorf("Could not fetch latest updates into repository")
 		}
 		pm.crepo.synced = true
 	}
@@ -131,17 +137,19 @@ func (pm *projectManager) GetInfoAt(v Version) (ProjectInfo, error) {
 		}
 
 		// If m is nil, prepManifest will provide an empty one.
-		return ProjectInfo{
-			// TODO disagreement between the manifest's name and N is still
-			// scary
-			V:        v,
-			N:        pm.n,
+		pi := projectInfo{
 			Manifest: prepManifest(m, pm.n),
 			Lock:     l,
-		}, nil
+		}
+
+		if r, exists := pm.dc.VMap[v]; exists {
+			pm.dc.Infos[r] = pi
+		}
+
+		return pi.Manifest, pi.Lock, nil
 	}
 
-	return ProjectInfo{}, err
+	return nil, nil, err
 }
 
 func (pm *projectManager) ListPackages(v Version) (PackageTree, error) {

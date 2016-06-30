@@ -880,20 +880,15 @@ func newdepspecSM(ds []depspec) *depspecSourceManager {
 	}
 }
 
-func (sm *depspecSourceManager) GetProjectInfo(n ProjectName, v Version) (ProjectInfo, error) {
+func (sm *depspecSourceManager) GetProjectInfo(n ProjectName, v Version) (Manifest, Lock, error) {
 	for _, ds := range sm.specs {
 		if n == ds.n && v.Matches(ds.v) {
-			return ProjectInfo{
-				N:        ds.n,
-				V:        ds.v,
-				Manifest: ds,
-				Lock:     dummyLock{},
-			}, nil
+			return ds, dummyLock{}, nil
 		}
 	}
 
 	// TODO proper solver-type errors
-	return ProjectInfo{}, fmt.Errorf("Project '%s' at version '%s' could not be found", n, v)
+	return nil, nil, fmt.Errorf("Project '%s' at version '%s' could not be found", n, v)
 }
 
 func (sm *depspecSourceManager) ExternalReach(n ProjectName, v Version) (map[string][]string, error) {

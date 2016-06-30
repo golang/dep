@@ -332,7 +332,7 @@ func TestGetInfoListVersionsOrdering(t *testing.T) {
 
 	pn := ProjectName("github.com/Masterminds/VCSTestRepo")
 
-	_, err = sm.GetProjectInfo(pn, NewVersion("1.0.0"))
+	_, _, err = sm.GetProjectInfo(pn, NewVersion("1.0.0"))
 	if err != nil {
 		t.Errorf("Unexpected error from GetInfoAt %s", err)
 	}
