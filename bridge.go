@@ -363,9 +363,6 @@ func (b *bridge) computeRootReach() ([]string, error) {
 func (b *bridge) listRootPackages() (PackageTree, error) {
 	if b.crp == nil {
 		ptree, err := listPackages(b.root, string(b.name))
-		if err == nil {
-			pruneIgnoredPackages(ptree, b.ignore)
-		}
 
 		b.crp = &struct {
 			ptree PackageTree
@@ -382,17 +379,6 @@ func (b *bridge) listRootPackages() (PackageTree, error) {
 	return b.crp.ptree, nil
 }
 
-// helper for reuse...and so that tests can use it.
-func pruneIgnoredPackages(ptree PackageTree, ignore map[string]bool) {
-	// TODO use prefix-matching on ignore list to potentially avoid O(n) in
-	// number of listed packages here
-	for ipath := range ptree.Packages {
-		if ignore[ipath] {
-			delete(ptree.Packages, ipath)
-		}
-	}
-}
-
 // listPackages lists all the packages contained within the given project at a
 // particular version.
 //
@@ -405,13 +391,7 @@ func (b *bridge) listPackages(id ProjectIdentifier, v Version) (PackageTree, err
 
 	// FIXME if we're aliasing here, the returned PackageTree will have
 	// unaliased import paths, which is super not correct
-	ptree, err := b.sm.ListPackages(b.key(id), v)
-	if err == nil {
-		// TODO cache this, recomputing it is pointless
-		pruneIgnoredPackages(ptree, b.ignore)
-	}
-
-	return ptree, nil
+	return b.sm.ListPackages(b.key(id), v)
 }
 
 // verifyRoot ensures that the provided path to the project root is in good

@@ -448,7 +448,7 @@ func (s *solver) getImportsAndConstraintsOf(a atomWithPackages) ([]completeDep, 
 		return nil, err
 	}
 
-	allex, err := ptree.ExternalReach(false, false)
+	allex, err := ptree.ExternalReach(false, false, s.args.Ignore)
 	if err != nil {
 		return nil, err
 	}
@@ -459,7 +459,7 @@ func (s *solver) getImportsAndConstraintsOf(a atomWithPackages) ([]completeDep, 
 	// the list
 	for _, pkg := range a.pl {
 		if expkgs, exists := allex[pkg]; !exists {
-			return nil, fmt.Errorf("Package %s does not exist within project %s", pkg, a.a.id.errString())
+			return nil, fmt.Errorf("package %s does not exist within project %s", pkg, a.a.id.errString())
 		} else {
 			for _, ex := range expkgs {
 				exmap[ex] = struct{}{}
