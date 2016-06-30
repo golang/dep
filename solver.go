@@ -38,6 +38,11 @@ type SolveArgs struct {
 	// If provided, the solver will attempt to preserve the versions specified
 	// in the lock, unless ToChange or ChangeAll settings indicate otherwise.
 	Lock Lock
+
+	// A list of packages (import paths) to ignore. These can be in the root
+	// project, or from elsewhere. Ignoring a package means that its imports
+	// will not be considered by any solver operation.
+	Ignore map[string]bool
 }
 
 // SolveOpts holds additional options that govern solving behavior.
@@ -148,28 +153,40 @@ type Solver interface {
 // This function reads and validates the provided SolveArgs and SolveOpts. If a
 // problem with the inputs is detected, an error is returned. Otherwise, a
 // Solver is returned, ready to hash and check inputs or perform a solving run.
-func Prepare(in SolveArgs, opts SolveOpts, sm SourceManager) (Solver, error) {
+func Prepare(args SolveArgs, opts SolveOpts, sm SourceManager) (Solver, error) {
 	// local overrides would need to be handled first.
 	// TODO local overrides! heh
 
-	if in.Manifest == nil {
+	if args.Manifest == nil {
 		return nil, badOptsFailure("Opts must include a manifest.")
 	}
-	if in.Root == "" {
+	if args.Root == "" {
 		return nil, badOptsFailure("Opts must specify a non-empty string for the project root directory. If cwd is desired, use \".\"")
 	}
-	if in.Name == "" {
+	if args.Name == "" {
 		return nil, badOptsFailure("Opts must include a project name. This should be the intended root import path of the project.")
 	}
 	if opts.Trace && opts.TraceLogger == nil {
 		return nil, badOptsFailure("Trace requested, but no logger provided.")
 	}
 
+	// Ensure the ignore map is at least initialized
+	if args.Ignore == nil {
+		args.Ignore = make(map[string]bool)
+	}
+
 	s := &solver{
-		args: in,
+		args: args,
 		o:    opts,
-		b:    newBridge(in.Name, in.Root, sm, opts.Downgrade),
-		tl:   opts.TraceLogger,
+		b: &bridge{
+			sm:       sm,
+			sortdown: opts.Downgrade,
+			name:     args.Name,
+			root:     args.Root,
+			ignore:   args.Ignore,
+			vlists:   make(map[ProjectName][]Version),
+		},
+		tl: opts.TraceLogger,
 	}
 
 	// Initialize maps
@@ -391,7 +408,7 @@ func (s *solver) selectRoot() error {
 	// If we're looking for root's deps, get it from opts and local root
 	// analysis, rather than having the sm do it
 	mdeps := append(s.rm.DependencyConstraints(), s.rm.TestDependencyConstraints()...)
-	reach, err := s.b.computeRootReach(s.args.Root)
+	reach, err := s.b.computeRootReach()
 	if err != nil {
 		return err
 	}
