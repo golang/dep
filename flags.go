@@ -1,20 +1,9 @@
 package vsolver
 
-// ProjectExistence values represent the extent to which a project "exists."
-type ProjectExistence uint8
+// projectExistence values represent the extent to which a project "exists."
+type projectExistence uint8
 
 const (
-	// ExistsInLock indicates that a project exists (i.e., is mentioned in) a
-	// lock file.
-	// TODO not sure if it makes sense to have this IF it's just the source
-	// manager's responsibility for putting this together - the implication is
-	// that this is the root lock file, right?
-	ExistsInLock = 1 << iota
-
-	// ExistsInManifest indicates that a project exists (i.e., is mentioned in)
-	// a manifest.
-	ExistsInManifest
-
 	// ExistsInVendorRoot indicates that a project exists in a vendor directory
 	// at the predictable location based on import path. It does NOT imply, much
 	// less guarantee, any of the following:
@@ -30,7 +19,7 @@ const (
 	//
 	// In short, the information encoded in this flag should not be construed as
 	// exhaustive.
-	ExistsInVendorRoot
+	ExistsInVendorRoot projectExistence = 1 << iota
 
 	// ExistsInCache indicates that a project exists on-disk in the local cache.
 	// It does not guarantee that an upstream exists, thus it cannot imply
@@ -45,11 +34,4 @@ const (
 	// ExistsUpstream indicates that a project repository was locatable at the
 	// path provided by a project's URI (a base import path).
 	ExistsUpstream
-)
-
-const (
-	// Bitmask for existence levels that are managed by the ProjectManager
-	pmexLvls ProjectExistence = ExistsInVendorRoot | ExistsInCache | ExistsUpstream
-	// Bitmask for existence levels that are managed by the SourceManager
-	smexLvls ProjectExistence = ExistsInLock | ExistsInManifest
 )

@@ -18,7 +18,7 @@ import (
 type ProjectManager interface {
 	GetInfoAt(Version) (Manifest, Lock, error)
 	ListVersions() ([]Version, error)
-	CheckExistence(ProjectExistence) bool
+	CheckExistence(projectExistence) bool
 	ExportVersionTo(Version, string) error
 	ListPackages(Version) (PackageTree, error)
 }
@@ -59,10 +59,10 @@ type projectManager struct {
 
 type existence struct {
 	// The existence levels for which a search/check has been performed
-	s ProjectExistence
+	s projectExistence
 
 	// The existence levels verified to be present through searching
-	f ProjectExistence
+	f projectExistence
 }
 
 // TODO figure out shape of versions, then implement marshaling/unmarshaling
@@ -253,7 +253,7 @@ func (pm *projectManager) ListVersions() (vlist []Version, err error) {
 // Note that this may perform read-ish operations on the cache repo, and it
 // takes a lock accordingly. Deadlock may result from calling it during a
 // segment where the cache repo mutex is already write-locked.
-func (pm *projectManager) CheckExistence(ex ProjectExistence) bool {
+func (pm *projectManager) CheckExistence(ex projectExistence) bool {
 	if pm.ex.s&ex != ex {
 		if ex&ExistsInVendorRoot != 0 && pm.ex.s&ExistsInVendorRoot == 0 {
 			pm.ex.s |= ExistsInVendorRoot
@@ -288,7 +288,7 @@ func (pm *projectManager) ExportVersionTo(v Version, to string) error {
 	return pm.crepo.exportVersionTo(v, to)
 }
 
-func (r *repo) getCurrentVersionPairs() (vlist []PairedVersion, exbits ProjectExistence, err error) {
+func (r *repo) getCurrentVersionPairs() (vlist []PairedVersion, exbits projectExistence, err error) {
 	r.mut.Lock()
 	defer r.mut.Unlock()
 
