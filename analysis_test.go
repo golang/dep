@@ -595,6 +595,157 @@ func TestListPackages(t *testing.T) {
 	}
 }
 
+func TestListExternalImports(t *testing.T) {
+	// There's enough in the 'varied' test case to test most of what matters
+	vptree, err := listPackages(filepath.Join(getwd(t), "_testdata", "src", "varied"), "varied")
+	if err != nil {
+		t.Fatalf("listPackages failed on varied test case: %s", err)
+	}
+
+	var expect []string
+	var name string
+	var ignore map[string]bool
+	var main, tests bool
+
+	validate := func() {
+		result, err := vptree.ListExternalImports(main, tests, ignore)
+		if err != nil {
+			t.Errorf("%q case returned err: %s", name, err)
+		}
+		if !reflect.DeepEqual(expect, result) {
+			t.Errorf("Wrong imports in %q case:\n\t(GOT): %s\n\t(WNT): %s", name, result, expect)
+		}
+	}
+
+	all := []string{
+		"encoding/binary",
+		"github.com/Masterminds/semver",
+		"github.com/sdboyer/vsolver",
+		"go/parser",
+		"hash",
+		"net/http",
+		"os",
+		"sort",
+	}
+
+	// helper to rewrite expect, except for  a couple packages
+	//
+	// this makes it easier to see what we're taking out on each test
+	except := func(not ...string) {
+		expect = make([]string, len(all)-len(not))
+
+		drop := make(map[string]bool)
+		for _, npath := range not {
+			drop[npath] = true
+		}
+
+		k := 0
+		for _, path := range all {
+			if !drop[path] {
+				expect[k] = path
+				k++
+			}
+		}
+	}
+
+	// everything on
+	name = "simple"
+	except()
+	main, tests = true, true
+	validate()
+
+	// Now without tests, which should just cut one
+	name = "no tests"
+	tests = false
+	except("encoding/binary")
+	validate()
+
+	// Now skip main, which still just cuts out one
+	name = "no main"
+	main, tests = false, true
+	except("net/http")
+	validate()
+
+	// No test and no main, which should be additive
+	name = "no test, no main"
+	main, tests = false, false
+	except("net/http", "encoding/binary")
+	validate()
+
+	// now, the ignore tests. turn main and tests back on
+	main, tests = true, true
+
+	// start with non-matching
+	name = "non-matching ignore"
+	ignore = map[string]bool{
+		"nomatch": true,
+	}
+	except()
+	validate()
+
+	// should have the same effect as ignoring main
+	name = "ignore the root"
+	ignore = map[string]bool{
+		"varied": true,
+	}
+	except("net/http")
+	validate()
+
+	// now drop a more interesting one
+	name = "ignore simple"
+	ignore = map[string]bool{
+		"varied/simple": true,
+	}
+	// we get github.com/sdboyer/vsolver from m1p, too, so it should still be
+	// there
+	except("go/parser")
+	validate()
+
+	// now drop two
+	name = "ignore simple and namemismatch"
+	ignore = map[string]bool{
+		"varied/simple":       true,
+		"varied/namemismatch": true,
+	}
+	except("go/parser", "github.com/Masterminds/semver")
+	validate()
+
+	// make sure tests and main play nice with ignore
+	name = "ignore simple and namemismatch, and no tests"
+	tests = false
+	except("go/parser", "github.com/Masterminds/semver", "encoding/binary")
+	validate()
+	name = "ignore simple and namemismatch, and no main"
+	main, tests = false, true
+	except("go/parser", "github.com/Masterminds/semver", "net/http")
+	validate()
+	name = "ignore simple and namemismatch, and no main or tests"
+	main, tests = false, false
+	except("go/parser", "github.com/Masterminds/semver", "net/http", "encoding/binary")
+	validate()
+
+	main, tests = true, true
+
+	// ignore two that should knock out vsolver
+	name = "ignore both importers"
+	ignore = map[string]bool{
+		"varied/simple": true,
+		"varied/m1p":    true,
+	}
+	except("sort", "github.com/sdboyer/vsolver", "go/parser")
+	validate()
+
+	// finally, directly ignore some external packages
+	name = "ignore external"
+	ignore = map[string]bool{
+		"github.com/sdboyer/vsolver": true,
+		"go/parser":                  true,
+		"sort":                       true,
+	}
+	except("sort", "github.com/sdboyer/vsolver", "go/parser")
+	validate()
+}
+
 func getwd(t *testing.T) string {
 	cwd, err := os.Getwd()
 	if err != nil {
