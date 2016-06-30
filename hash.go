@@ -30,7 +30,7 @@ func (s *solver) HashInputs() ([]byte, error) {
 		return nil, badOptsFailure(fmt.Sprintf("Error while parsing imports under %s: %s", s.args.Root, err.Error()))
 	}
 
-	d, dd := s.args.Manifest.GetDependencies(), s.args.Manifest.GetDevDependencies()
+	d, dd := s.args.Manifest.DependencyConstraints(), s.args.Manifest.TestDependencyConstraints()
 	p := make(sortedDeps, len(d))
 	copy(p, d)
 	p = append(p, dd...)

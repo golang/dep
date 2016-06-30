@@ -1027,12 +1027,12 @@ var _ Lock = dummyLock{}
 var _ Lock = fixLock{}
 
 // impl Spec interface
-func (ds depspec) GetDependencies() []ProjectDep {
+func (ds depspec) DependencyConstraints() []ProjectDep {
 	return ds.deps
 }
 
 // impl Spec interface
-func (ds depspec) GetDevDependencies() []ProjectDep {
+func (ds depspec) TestDependencyConstraints() []ProjectDep {
 	return ds.devdeps
 }
 

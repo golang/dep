@@ -390,7 +390,7 @@ func (s *solver) selectRoot() error {
 
 	// If we're looking for root's deps, get it from opts and local root
 	// analysis, rather than having the sm do it
-	mdeps := append(s.rm.GetDependencies(), s.rm.GetDevDependencies()...)
+	mdeps := append(s.rm.DependencyConstraints(), s.rm.TestDependencyConstraints()...)
 	reach, err := s.b.computeRootReach(s.args.Root)
 	if err != nil {
 		return err
@@ -457,7 +457,7 @@ func (s *solver) getImportsAndConstraintsOf(a atomWithPackages) ([]completeDep, 
 		k++
 	}
 
-	deps := m.GetDependencies()
+	deps := m.DependencyConstraints()
 	// TODO add overrides here...if we impl the concept (which we should)
 
 	return s.intersectConstraintsWithImports(deps, reach)
