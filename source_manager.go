@@ -10,15 +10,42 @@ import (
 	"github.com/Masterminds/vcs"
 )
 
+// A SourceManager is responsible for retrieving, managing, and interrogating
+// source repositories. Its primary purpose is to serve the needs of a Solver,
+// but it is handy for other purposes, as well.
+//
+// vsolver's built-in SourceManager, accessible via NewSourceManager(), is
+// intended to be generic and sufficient for any purpose. It provides some
+// additional semantics around the methods defined here.
 type SourceManager interface {
-	GetProjectInfo(ProjectName, Version) (ProjectInfo, error)
-	ListVersions(ProjectName) ([]Version, error)
+	// RepoExists checks if a repository exists, either upstream or in the
+	// SourceManager's central repository cache.
 	RepoExists(ProjectName) (bool, error)
+
+	// VendorCodeExists checks if a code tree exists within the stored vendor
+	// directory for the the provided import path name.
 	VendorCodeExists(ProjectName) (bool, error)
+
+	// ListVersions retrieves a list of the available versions for a given
+	// repository name.
+	ListVersions(ProjectName) ([]Version, error)
+
+	// ListPackages retrieves a tree of the Go packages at or below the provided
+	// import path, at the provided version.
 	ListPackages(ProjectName, Version) (PackageTree, error)
+
+	// GetProjectInfo returns manifest and lock information for the provided
+	// import path. vsolver currently requires that projects be rooted at their
+	// repository root, which means that this ProjectName must also be a
+	// repository root.
+	GetProjectInfo(ProjectName, Version) (ProjectInfo, error)
+
+	// ExportProject writes out the tree of the provided import path, at the
+	// provided version, to the provided directory.
 	ExportProject(ProjectName, Version, string) error
+
+	// Release lets go of any locks held by the SourceManager.
 	Release()
-	// Flush()
 }
 
 // ExistenceError is a specialized error type that, in addition to the standard
@@ -53,6 +80,24 @@ type pmState struct {
 	vcur bool     // indicates that we've called ListVersions()
 }
 
+// NewSourceManager produces an instance of vsolver's built-in SourceManager. It
+// takes a cache directory (where local instances of upstream repositories are
+// stored), a base directory for the project currently being worked on, and a
+// force flag indicating whether to overwrite the global cache lock file (if
+// present).
+//
+// The returned SourceManager aggressively caches
+// information wherever possible. It is recommended that, if tools need to do preliminary,
+// work involving upstream repository analysis prior to invoking a solve run,
+// that they create this SourceManager as early as possible and use it to their
+// ends. That way, the solver can benefit from any caches that may have already
+// been warmed.
+//
+// vsolver's SourceManager is intended to be threadsafe (if it's not, please
+// file a bug!). It should certainly be safe to reuse from one solving run to
+// the next; however, the fact that it takes a basedir as an argument makes it
+// much less useful for simultaneous use by separate solvers operating on
+// different root projects. This architecture may change in the future.
 func NewSourceManager(an ProjectAnalyzer, cachedir, basedir string, force bool) (SourceManager, error) {
 	if an == nil {
 		return nil, fmt.Errorf("A ProjectAnalyzer must be provided to the SourceManager.")
@@ -84,13 +129,21 @@ func NewSourceManager(an ProjectAnalyzer, cachedir, basedir string, force bool) 
 		ctx:      ctx,
 		an:       an,
 	}, nil
-	// recovery in a defer to be really proper, though
 }
 
+// Release lets go of any locks held by the SourceManager.
+//
+// This will also call Flush(), which will write any relevant caches to disk.
 func (sm *sourceManager) Release() {
 	os.Remove(path.Join(sm.cachedir, "sm.lock"))
 }
 
+// GetProjectInfo returns manifest and lock information for the provided import
+// path. vsolver currently requires that projects be rooted at their repository
+// root, which means that this ProjectName must also be a repository root.
+//
+// The work of producing the manifest and lock information is delegated to the
+// injected ProjectAnalyzer.
 func (sm *sourceManager) GetProjectInfo(n ProjectName, v Version) (ProjectInfo, error) {
 	pmc, err := sm.getProjectManager(n)
 	if err != nil {
@@ -100,6 +153,8 @@ func (sm *sourceManager) GetProjectInfo(n ProjectName, v Version) (ProjectInfo, 
 	return pmc.pm.GetInfoAt(v)
 }
 
+// ListPackages retrieves a tree of the Go packages at or below the provided
+// import path, at the provided version.
 func (sm *sourceManager) ListPackages(n ProjectName, v Version) (PackageTree, error) {
 	pmc, err := sm.getProjectManager(n)
 	if err != nil {
@@ -109,6 +164,17 @@ func (sm *sourceManager) ListPackages(n ProjectName, v Version) (PackageTree, er
 	return pmc.pm.ListPackages(v)
 }
 
+// ListVersions retrieves a list of the available versions for a given
+// repository name.
+//
+// The list is not sorted; while it may be retuend in the order that the
+// underlying VCS reports version information, no guarantee is made. It is
+// expected that the caller either not care about order, or sort the result
+// themselves.
+//
+// This list is always retrieved from upstream; if upstream is not accessible
+// (network outage, access issues, or the resource actually went away), an error
+// will be returned.
 func (sm *sourceManager) ListVersions(n ProjectName) ([]Version, error) {
 	pmc, err := sm.getProjectManager(n)
 	if err != nil {
@@ -119,6 +185,8 @@ func (sm *sourceManager) ListVersions(n ProjectName) ([]Version, error) {
 	return pmc.pm.ListVersions()
 }
 
+// VendorCodeExists checks if a code tree exists within the stored vendor
+// directory for the the provided import path name.
 func (sm *sourceManager) VendorCodeExists(n ProjectName) (bool, error) {
 	pms, err := sm.getProjectManager(n)
 	if err != nil {
@@ -137,6 +205,8 @@ func (sm *sourceManager) RepoExists(n ProjectName) (bool, error) {
 	return pms.pm.CheckExistence(ExistsInCache) || pms.pm.CheckExistence(ExistsUpstream), nil
 }
 
+// ExportProject writes out the tree of the provided import path, at the
+// provided version, to the provided directory.
 func (sm *sourceManager) ExportProject(n ProjectName, v Version, to string) error {
 	pms, err := sm.getProjectManager(n)
 	if err != nil {

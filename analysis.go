@@ -544,11 +544,16 @@ func dedupeStrings(s1, s2 []string) (r []string) {
 	return
 }
 
+// A PackageTree represents the results of recursively parsing a tree of
+// packages, starting at the ImportRoot. The results of parsing each import path
+// - a Package or an error - are stored in the map keyed by that import path.
 type PackageTree struct {
 	ImportRoot string
 	Packages   map[string]PackageOrErr
 }
 
+// PackageOrErr stores the results of attempting to parse a single directory for
+// Go source code.
 type PackageOrErr struct {
 	P   Package
 	Err error
@@ -625,6 +630,11 @@ func (t PackageTree) ExternalReach(main, tests bool) (map[string][]string, error
 	return wmToReach(workmap, "") // TODO this passes tests, but doesn't seem right
 }
 
+// ListExternalImports computes a deduplicated list of all the external packages
+// that are imported by all packages in the PackageTree.
+//
+// "External" is defined as anything not prefixed, after path cleaning, by the
+// PackageTree.ImportRoot. This includes stdlib.
 func (t PackageTree) ListExternalImports(main, tests bool) ([]string, error) {
 	var someerrs bool
 	exm := make(map[string]struct{})

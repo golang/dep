@@ -119,7 +119,7 @@ type solver struct {
 	// of projects represented here corresponds closely to what's in s.sel,
 	// although s.sel will always contain the root project, and s.versions never
 	// will.
-	versions []*versionQueue // TODO rename to pvq
+	versions []*versionQueue // TODO rename to vq
 
 	// A map of the ProjectName (local names) that should be allowed to change
 	chng map[ProjectName]struct{}
@@ -143,9 +143,10 @@ type Solver interface {
 	Solve() (Result, error)
 }
 
-// Prepare reads and validates the provided SolveArgs and SolveOpts.
+// Prepare readies a Solver for use.
 //
-// If a problem with the inputs is detected, an error is returned. Otherwise, a
+// This function reads and validates the provided SolveArgs and SolveOpts. If a
+// problem with the inputs is detected, an error is returned. Otherwise, a
 // Solver is returned, ready to hash and check inputs or perform a solving run.
 func Prepare(in SolveArgs, opts SolveOpts, sm SourceManager) (Solver, error) {
 	// local overrides would need to be handled first.

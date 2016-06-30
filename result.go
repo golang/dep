@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 )
 
+// A Result is returned by a solver run. It is mostly just a Lock, with some
+// additional methods that report information about the solve run.
 type Result interface {
 	Lock
 	Attempts() int
