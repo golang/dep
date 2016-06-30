@@ -569,8 +569,36 @@ type PackageOrErr struct {
 //
 // tests indicates whether (true) or not (false) to include imports from test
 // files in packages when computing the reach map.
-func (t PackageTree) ExternalReach(main, tests bool) (map[string][]string, error) {
+//
+// ignore is a map of import paths that, if encountered, should be excluded from
+// analysis. This exclusion applies to both internal and external packages. If
+// an external import path is ignored, it is simply omitted from the results.
+//
+// If an internal path is ignored, then it is excluded from all transitive
+// dependency chains and does not appear as a key in the final map. That is, if
+// you ignore A/foo, then the external package list for all internal packages
+// that import A/foo will not include external packages were only reachable
+// through A/foo.
+//
+// Visually, this means that, given a PackageTree with root A and packages at A,
+// A/foo, and A/bar, and the following import chain:
+//
+//  A -> A/foo -> A/bar -> B/baz
+//
+// If you ignore A/foo, then the returned map would be:
+//
+//  map[string][]string{
+// 	"A": []string{},
+// 	"A/bar": []string{"B/baz"},
+//  }
+//
+// It is safe to pass a nil map if there are no packages to ignore.
+func (t PackageTree) ExternalReach(main, tests bool, ignore map[string]bool) (map[string][]string, error) {
 	var someerrs bool
+
+	if ignore == nil {
+		ignore = make(map[string]bool)
+	}
 
 	// world's simplest adjacency list
 	workmap := make(map[string]wm)
@@ -586,6 +614,10 @@ func (t PackageTree) ExternalReach(main, tests bool) (map[string][]string, error
 		if p.Name == "main" && !main {
 			continue
 		}
+		// Skip ignored packages
+		if ignore[ip] {
+			continue
+		}
 
 		imps = imps[:0]
 		imps = p.Imports
@@ -599,6 +631,10 @@ func (t PackageTree) ExternalReach(main, tests bool) (map[string][]string, error
 		}
 
 		for _, imp := range imps {
+			if ignore[imp] {
+				continue
+			}
+
 			if !checkPrefixSlash(filepath.Clean(imp), t.ImportRoot) {
 				w.ex[imp] = struct{}{}
 			} else {
@@ -621,7 +657,7 @@ func (t PackageTree) ExternalReach(main, tests bool) (map[string][]string, error
 	if len(workmap) == 0 {
 		if someerrs {
 			// TODO proper errs
-			return nil, fmt.Errorf("No packages without errors in %s", t.ImportRoot)
+			return nil, fmt.Errorf("no packages without errors in %s", t.ImportRoot)
 		}
 		return nil, nil
 	}
@@ -635,12 +671,32 @@ func (t PackageTree) ExternalReach(main, tests bool) (map[string][]string, error
 //
 // "External" is defined as anything not prefixed, after path cleaning, by the
 // PackageTree.ImportRoot. This includes stdlib.
-func (t PackageTree) ListExternalImports(main, tests bool) ([]string, error) {
+//
+// If an internal path is ignored, all of the external packages that it uniquely
+// imports are omitted. Note, however, that no internal transitivity checks are
+// made here - every non-ignored package in the tree is considered
+// independently. That means, given a PackageTree with root A and packages at A,
+// A/foo, and A/bar, and the following import chain:
+//
+//  A -> A/foo -> A/bar -> B/baz
+//
+// If you ignore A or A/foo, A/bar will still be visited, and B/baz will be
+// returned, because this method visits ALL packages in the tree, not only those reachable
+// from the root (or any other) packages. If your use case requires interrogating
+// external imports with respect to only specific package entry points, you need
+// ExternalReach() instead.
+//
+// It is safe to pass a nil map if there are no packages to ignore.
+func (t PackageTree) ListExternalImports(main, tests bool, ignore map[string]bool) ([]string, error) {
 	var someerrs bool
 	exm := make(map[string]struct{})
 
+	if ignore == nil {
+		ignore = make(map[string]bool)
+	}
+
 	var imps []string
-	for _, perr := range t.Packages {
+	for ip, perr := range t.Packages {
 		if perr.Err != nil {
 			someerrs = true
 			continue
@@ -651,6 +707,10 @@ func (t PackageTree) ListExternalImports(main, tests bool) ([]string, error) {
 		if p.Name == "main" && !main {
 			continue
 		}
+		// Skip ignored packages
+		if ignore[ip] {
+			continue
+		}
 
 		imps = imps[:0]
 		imps = p.Imports
@@ -659,7 +719,7 @@ func (t PackageTree) ListExternalImports(main, tests bool) ([]string, error) {
 		}
 
 		for _, imp := range imps {
-			if !checkPrefixSlash(filepath.Clean(imp), t.ImportRoot) {
+			if !checkPrefixSlash(filepath.Clean(imp), t.ImportRoot) && !ignore[imp] {
 				exm[imp] = struct{}{}
 			}
 		}
