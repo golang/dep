@@ -34,8 +34,7 @@ func init() {
 	}
 }
 
-// listPackages lists info for all packages at or below the provided fileRoot,
-// optionally folding in data from test files as well.
+// listPackages lists info for all packages at or below the provided fileRoot.
 //
 // Directories without any valid Go files are excluded. Directories with
 // multiple packages are excluded.
@@ -44,13 +43,13 @@ func init() {
 // the import path for each package. The obvious case is for something typical,
 // like:
 //
-// fileRoot = /home/user/go/src/github.com/foo/bar
-// importRoot = github.com/foo/bar
+//  fileRoot = "/home/user/go/src/github.com/foo/bar"
+//  importRoot = "github.com/foo/bar"
 //
 // Where the fileRoot and importRoot align. However, if you provide:
 //
-// fileRoot = /home/user/workspace/path/to/repo
-// importRoot = github.com/foo/bar
+//  fileRoot = "/home/user/workspace/path/to/repo"
+//  importRoot = "github.com/foo/bar"
 //
 // then the root package at path/to/repo will be ascribed import path
 // "github.com/foo/bar", and its subpackage "baz" will be
@@ -58,7 +57,7 @@ func init() {
 //
 // A PackageTree is returned, which contains the ImportRoot and map of import path
 // to PackageOrErr - each path under the root that exists will have either a
-// Package, or an error describing why the package is not valid.
+// Package, or an error describing why the directory is not a valid package.
 func listPackages(fileRoot, importRoot string) (PackageTree, error) {
 	// Set up a build.ctx for parsing
 	ctx := build.Default
@@ -545,8 +544,9 @@ func dedupeStrings(s1, s2 []string) (r []string) {
 }
 
 // A PackageTree represents the results of recursively parsing a tree of
-// packages, starting at the ImportRoot. The results of parsing each import path
-// - a Package or an error - are stored in the map keyed by that import path.
+// packages, starting at the ImportRoot. The results of parsing the files in the
+// directory identified by each import path - a Package or an error - are stored
+// in the Packages map, keyed by that import path.
 type PackageTree struct {
 	ImportRoot string
 	Packages   map[string]PackageOrErr
@@ -560,8 +560,8 @@ type PackageOrErr struct {
 }
 
 // ExternalReach looks through a PackageTree and computes the list of external
-// dependencies (not under the tree at its designated import root) that are
-// imported by packages in the tree.
+// packages (not logical children of PackageTree.ImportRoot) that are
+// transitively imported by the internal packages in the tree.
 //
 // main indicates whether (true) or not (false) to include main packages in the
 // analysis. main packages should generally be excluded when analyzing the
