@@ -478,7 +478,8 @@ func TestListPackages(t *testing.T) {
 							ImportPath:  "varied/otherpath",
 							CommentPath: "",
 							Name:        "otherpath",
-							Imports: []string{
+							Imports:     []string{},
+							TestImports: []string{
 								"varied/m1p",
 							},
 						},
@@ -576,7 +577,6 @@ func TestListPackages(t *testing.T) {
 							} else {
 								if !reflect.DeepEqual(perr, operr) {
 									t.Errorf("listPackages(%q): PkgOrErr for path %s was not as expected:\n\t(GOT): %s\n\t(WNT): %s", name, path, operr, perr)
-
 								}
 							}
 						}
@@ -628,7 +628,7 @@ func TestListExternalImports(t *testing.T) {
 		"sort",
 	}
 
-	// helper to rewrite expect, except for  a couple packages
+	// helper to rewrite expect, except for a couple packages
 	//
 	// this makes it easier to see what we're taking out on each test
 	except := func(not ...string) {
