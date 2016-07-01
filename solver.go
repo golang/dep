@@ -40,9 +40,9 @@ type SolveArgs struct {
 	Lock Lock
 
 	// A list of packages (import paths) to ignore. These can be in the root
-	// project, or from elsewhere. Ignoring a package means that its imports
-	// will not be considered by any solver operation.
-	Ignore map[string]bool
+	// project, or from elsewhere. Ignoring a package means that both it and its
+	// imports will be disregarded by all relevant solver operations.
+	Ignore []string
 }
 
 // SolveOpts holds additional options that govern solving behavior.
@@ -120,6 +120,10 @@ type solver struct {
 	// removal.
 	unsel *unselected
 
+	// Map of packages to ignore. This is derived by converting SolveArgs.Ignore
+	// into a map during solver prep - which also, nicely, deduplicates it.
+	ig map[string]bool
+
 	// A list of all the currently active versionQueues in the solver. The set
 	// of projects represented here corresponds closely to what's in s.sel,
 	// although s.sel will always contain the root project, and s.versions never
@@ -171,19 +175,23 @@ func Prepare(args SolveArgs, opts SolveOpts, sm SourceManager) (Solver, error) {
 	}
 
 	// Ensure the ignore map is at least initialized
-	if args.Ignore == nil {
-		args.Ignore = make(map[string]bool)
+	ig := make(map[string]bool)
+	if len(args.Ignore) > 0 {
+		for _, pkg := range args.Ignore {
+			ig[pkg] = true
+		}
 	}
 
 	s := &solver{
 		args: args,
 		o:    opts,
+		ig:   ig,
 		b: &bridge{
 			sm:       sm,
 			sortdown: opts.Downgrade,
 			name:     args.Name,
 			root:     args.Root,
-			ignore:   args.Ignore,
+			ignore:   ig,
 			vlists:   make(map[ProjectName][]Version),
 		},
 		tl: opts.TraceLogger,
@@ -448,7 +456,7 @@ func (s *solver) getImportsAndConstraintsOf(a atomWithPackages) ([]completeDep, 
 		return nil, err
 	}
 
-	allex, err := ptree.ExternalReach(false, false, s.args.Ignore)
+	allex, err := ptree.ExternalReach(false, false, s.ig)
 	if err != nil {
 		return nil, err
 	}

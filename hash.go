@@ -73,11 +73,11 @@ func (s *solver) HashInputs() ([]byte, error) {
 	}
 
 	// Add the package ignores, if any.
-	if len(s.args.Ignore) > 0 {
+	if len(s.ig) > 0 {
 		// Dump and sort the ignores
-		ig := make([]string, len(s.args.Ignore))
+		ig := make([]string, len(s.ig))
 		k := 0
-		for pkg := range s.args.Ignore {
+		for pkg := range s.ig {
 			ig[k] = pkg
 			k++
 		}

@@ -875,15 +875,18 @@ type fixSM interface {
 
 var _ fixSM = &depspecSourceManager{}
 
-func newdepspecSM(ds []depspec, ignore map[string]bool) *depspecSourceManager {
-	if ignore == nil {
-		ignore = make(map[string]bool)
+func newdepspecSM(ds []depspec, ignore []string) *depspecSourceManager {
+	ig := make(map[string]bool)
+	if len(ignore) > 0 {
+		for _, pkg := range ignore {
+			ig[pkg] = true
+		}
 	}
 
 	return &depspecSourceManager{
 		specs: ds,
 		rm:    computeBasicReachMap(ds),
-		ig:    ignore,
+		ig:    ig,
 	}
 }
 

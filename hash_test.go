@@ -13,10 +13,7 @@ func TestHashInputs(t *testing.T) {
 		Root:     string(fix.ds[0].Name()),
 		Name:     fix.ds[0].Name(),
 		Manifest: fix.ds[0],
-		Ignore: map[string]bool{
-			"foo": true,
-			"bar": true,
-		},
+		Ignore:   []string{"foo", "bar"},
 	}
 
 	// prep a fixture-overridden solver

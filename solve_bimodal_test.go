@@ -362,9 +362,7 @@ var bimodalFixtures = map[string]bimodalFixture{
 				pkg("b"),
 			),
 		},
-		ignore: map[string]bool{
-			"root/bar": true,
-		},
+		ignore: []string{"root/bar"},
 		r: mkresults(
 			"b 1.0.0",
 		),
@@ -384,9 +382,7 @@ var bimodalFixtures = map[string]bimodalFixture{
 				pkg("b"),
 			),
 		},
-		ignore: map[string]bool{
-			"a/bar": true,
-		},
+		ignore: []string{"a/bar"},
 		r: mkresults(
 			"a 1.0.0",
 		),
@@ -420,7 +416,7 @@ type bimodalFixture struct {
 	// request up/downgrade to all projects
 	changeall bool
 	// pkgs to ignore
-	ignore map[string]bool
+	ignore []string
 }
 
 func (f bimodalFixture) name() string {
@@ -452,15 +448,11 @@ type bmSourceManager struct {
 
 var _ SourceManager = &bmSourceManager{}
 
-func newbmSM(ds []depspec, ignore map[string]bool) *bmSourceManager {
-	sm := &bmSourceManager{}
-	sm.specs = ds
-	sm.rm = computeBimodalExternalMap(ds)
-
-	if ignore == nil {
-		ignore = make(map[string]bool)
+func newbmSM(ds []depspec, ignore []string) *bmSourceManager {
+	sm := &bmSourceManager{
+		depspecSourceManager: *newdepspecSM(ds, ignore),
 	}
-	sm.ig = ignore
+	sm.rm = computeBimodalExternalMap(ds)
 
 	return sm
 }
