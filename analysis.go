@@ -301,6 +301,11 @@ func wmToReach(workmap map[string]wm, basedir string) (rm map[string][]string, e
 	rt := strings.TrimSuffix(basedir, string(os.PathSeparator)) + string(os.PathSeparator)
 
 	for pkg, w := range workmap {
+		if len(w.ex) == 0 {
+			rm[strings.TrimPrefix(pkg, rt)] = nil
+			continue
+		}
+
 		edeps := make([]string, len(w.ex))
 		k := 0
 		for opkg := range w.ex {
@@ -308,6 +313,7 @@ func wmToReach(workmap map[string]wm, basedir string) (rm map[string][]string, e
 			k++
 		}
 
+		sort.Strings(edeps)
 		rm[strings.TrimPrefix(pkg, rt)] = edeps
 	}
 
