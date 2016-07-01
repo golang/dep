@@ -72,9 +72,24 @@ func (s *solver) HashInputs() ([]byte, error) {
 		}
 	}
 
+	// Add the package ignores, if any.
+	if len(s.ig) > 0 {
+		// Dump and sort the ignores
+		ig := make([]string, len(s.ig))
+		k := 0
+		for pkg := range s.ig {
+			ig[k] = pkg
+			k++
+		}
+		sort.Strings(ig)
+
+		for _, igp := range ig {
+			h.Write([]byte(igp))
+		}
+	}
+
 	// TODO overrides
 	// TODO aliases
-	// TODO ignores
 	return h.Sum(nil), nil
 }
 

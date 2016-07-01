@@ -347,6 +347,46 @@ var bimodalFixtures = map[string]bimodalFixture{
 		},
 		errp: []string{"d", "a", "d"},
 	},
+	// Check ignores on the root project
+	"ignore in double-subpkg": {
+		ds: []depspec{
+			dsp(dsv("root 0.0.0"),
+				pkg("root", "root/foo"),
+				pkg("root/foo", "root/bar", "b"),
+				pkg("root/bar", "a"),
+			),
+			dsp(dsv("a 1.0.0"),
+				pkg("a"),
+			),
+			dsp(dsv("b 1.0.0"),
+				pkg("b"),
+			),
+		},
+		ignore: []string{"root/bar"},
+		r: mkresults(
+			"b 1.0.0",
+		),
+	},
+	// Ignores on a dep pkg
+	"ignore through dep pkg": {
+		ds: []depspec{
+			dsp(dsv("root 0.0.0"),
+				pkg("root", "root/foo"),
+				pkg("root/foo", "a"),
+			),
+			dsp(dsv("a 1.0.0"),
+				pkg("a", "a/bar"),
+				pkg("a/bar", "b"),
+			),
+			dsp(dsv("b 1.0.0"),
+				pkg("b"),
+			),
+		},
+		ignore: []string{"a/bar"},
+		r: mkresults(
+			"a 1.0.0",
+		),
+	},
 }
 
 // tpkg is a representation of a single package. It has its own import path, as
@@ -375,6 +415,8 @@ type bimodalFixture struct {
 	errp []string
 	// request up/downgrade to all projects
 	changeall bool
+	// pkgs to ignore
+	ignore []string
 }
 
 func (f bimodalFixture) name() string {
@@ -406,9 +448,10 @@ type bmSourceManager struct {
 
 var _ SourceManager = &bmSourceManager{}
 
-func newbmSM(ds []depspec) *bmSourceManager {
-	sm := &bmSourceManager{}
-	sm.specs = ds
+func newbmSM(ds []depspec, ignore []string) *bmSourceManager {
+	sm := &bmSourceManager{
+		depspecSourceManager: *newdepspecSM(ds, ignore),
+	}
 	sm.rm = computeBimodalExternalMap(ds)
 
 	return sm

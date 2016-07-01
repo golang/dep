@@ -19,19 +19,9 @@ type sourceBridge interface {
 	matchesAny(id ProjectIdentifier, c1, c2 Constraint) bool
 	intersect(id ProjectIdentifier, c1, c2 Constraint) Constraint
 	listPackages(id ProjectIdentifier, v Version) (PackageTree, error)
-	computeRootReach(path string) ([]string, error)
+	computeRootReach() ([]string, error)
 	verifyRoot(path string) error
 	deduceRemoteRepo(path string) (*remoteRepo, error)
-}
-
-func newBridge(name ProjectName, root string, sm SourceManager, downgrade bool) sourceBridge {
-	return &bridge{
-		sm:       sm,
-		sortdown: downgrade,
-		name:     name,
-		root:     root,
-		vlists:   make(map[ProjectName][]Version),
-	}
 }
 
 // bridge is an adapter around a proper SourceManager. It provides localized
@@ -68,6 +58,9 @@ type bridge struct {
 		ptree PackageTree
 		err   error
 	}
+
+	// A map of packages to ignore.
+	ignore map[string]bool
 
 	// Map of project root name to their available version list. This cache is
 	// layered on top of the proper SourceManager's cache; the only difference
@@ -355,13 +348,22 @@ func (b *bridge) vtu(id ProjectIdentifier, v Version) versionTypeUnion {
 // analysis be in any permanent cache, and we want to read directly from our
 // potentially messy root project source location on disk. Together, this means
 // that we can't ask the real SourceManager to do it.
-func (b *bridge) computeRootReach(path string) ([]string, error) {
+func (b *bridge) computeRootReach() ([]string, error) {
 	// TODO i now cannot remember the reasons why i thought being less stringent
-	// in the analysis was OK. so, for now, we just compute list of
-	// externally-touched packages.
+	// in the analysis was OK. so, for now, we just compute a bog-standard list
+	// of externally-touched packages, including mains and test.
+	ptree, err := b.listRootPackages()
+	if err != nil {
+		return nil, err
+	}
 
+	return ptree.ListExternalImports(true, true, b.ignore)
+}
+
+func (b *bridge) listRootPackages() (PackageTree, error) {
 	if b.crp == nil {
 		ptree, err := listPackages(b.root, string(b.name))
+
 		b.crp = &struct {
 			ptree PackageTree
 			err   error
@@ -371,10 +373,10 @@ func (b *bridge) computeRootReach(path string) ([]string, error) {
 		}
 	}
 	if b.crp.err != nil {
-		return nil, b.crp.err
+		return PackageTree{}, b.crp.err
 	}
 
-	return b.crp.ptree.ListExternalImports(true, true)
+	return b.crp.ptree, nil
 }
 
 // listPackages lists all the packages contained within the given project at a
@@ -383,23 +385,13 @@ func (b *bridge) computeRootReach(path string) ([]string, error) {
 // The root project is handled separately, as the source manager isn't
 // responsible for that code.
 func (b *bridge) listPackages(id ProjectIdentifier, v Version) (PackageTree, error) {
-	if id.LocalName != b.name {
-		// FIXME if we're aliasing here, the returned PackageTree will have
-		// unaliased import paths, which is super not correct
-		return b.sm.ListPackages(b.key(id), v)
-	}
-	if b.crp == nil {
-		ptree, err := listPackages(b.root, string(b.name))
-		b.crp = &struct {
-			ptree PackageTree
-			err   error
-		}{
-			ptree: ptree,
-			err:   err,
-		}
+	if id.LocalName == b.name {
+		return b.listRootPackages()
 	}
 
-	return b.crp.ptree, b.crp.err
+	// FIXME if we're aliasing here, the returned PackageTree will have
+	// unaliased import paths, which is super not correct
+	return b.sm.ListPackages(b.key(id), v)
 }
 
 // verifyRoot ensures that the provided path to the project root is in good

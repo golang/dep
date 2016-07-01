@@ -38,6 +38,11 @@ type SolveArgs struct {
 	// If provided, the solver will attempt to preserve the versions specified
 	// in the lock, unless ToChange or ChangeAll settings indicate otherwise.
 	Lock Lock
+
+	// A list of packages (import paths) to ignore. These can be in the root
+	// project, or from elsewhere. Ignoring a package means that both it and its
+	// imports will be disregarded by all relevant solver operations.
+	Ignore []string
 }
 
 // SolveOpts holds additional options that govern solving behavior.
@@ -115,6 +120,10 @@ type solver struct {
 	// removal.
 	unsel *unselected
 
+	// Map of packages to ignore. This is derived by converting SolveArgs.Ignore
+	// into a map during solver prep - which also, nicely, deduplicates it.
+	ig map[string]bool
+
 	// A list of all the currently active versionQueues in the solver. The set
 	// of projects represented here corresponds closely to what's in s.sel,
 	// although s.sel will always contain the root project, and s.versions never
@@ -148,28 +157,44 @@ type Solver interface {
 // This function reads and validates the provided SolveArgs and SolveOpts. If a
 // problem with the inputs is detected, an error is returned. Otherwise, a
 // Solver is returned, ready to hash and check inputs or perform a solving run.
-func Prepare(in SolveArgs, opts SolveOpts, sm SourceManager) (Solver, error) {
+func Prepare(args SolveArgs, opts SolveOpts, sm SourceManager) (Solver, error) {
 	// local overrides would need to be handled first.
 	// TODO local overrides! heh
 
-	if in.Manifest == nil {
+	if args.Manifest == nil {
 		return nil, badOptsFailure("Opts must include a manifest.")
 	}
-	if in.Root == "" {
+	if args.Root == "" {
 		return nil, badOptsFailure("Opts must specify a non-empty string for the project root directory. If cwd is desired, use \".\"")
 	}
-	if in.Name == "" {
+	if args.Name == "" {
 		return nil, badOptsFailure("Opts must include a project name. This should be the intended root import path of the project.")
 	}
 	if opts.Trace && opts.TraceLogger == nil {
 		return nil, badOptsFailure("Trace requested, but no logger provided.")
 	}
 
+	// Ensure the ignore map is at least initialized
+	ig := make(map[string]bool)
+	if len(args.Ignore) > 0 {
+		for _, pkg := range args.Ignore {
+			ig[pkg] = true
+		}
+	}
+
 	s := &solver{
-		args: in,
+		args: args,
 		o:    opts,
-		b:    newBridge(in.Name, in.Root, sm, opts.Downgrade),
-		tl:   opts.TraceLogger,
+		ig:   ig,
+		b: &bridge{
+			sm:       sm,
+			sortdown: opts.Downgrade,
+			name:     args.Name,
+			root:     args.Root,
+			ignore:   ig,
+			vlists:   make(map[ProjectName][]Version),
+		},
+		tl: opts.TraceLogger,
 	}
 
 	// Initialize maps
@@ -391,7 +416,7 @@ func (s *solver) selectRoot() error {
 	// If we're looking for root's deps, get it from opts and local root
 	// analysis, rather than having the sm do it
 	mdeps := append(s.rm.DependencyConstraints(), s.rm.TestDependencyConstraints()...)
-	reach, err := s.b.computeRootReach(s.args.Root)
+	reach, err := s.b.computeRootReach()
 	if err != nil {
 		return err
 	}
@@ -431,7 +456,7 @@ func (s *solver) getImportsAndConstraintsOf(a atomWithPackages) ([]completeDep, 
 		return nil, err
 	}
 
-	allex, err := ptree.ExternalReach(false, false)
+	allex, err := ptree.ExternalReach(false, false, s.ig)
 	if err != nil {
 		return nil, err
 	}
@@ -442,7 +467,7 @@ func (s *solver) getImportsAndConstraintsOf(a atomWithPackages) ([]completeDep, 
 	// the list
 	for _, pkg := range a.pl {
 		if expkgs, exists := allex[pkg]; !exists {
-			return nil, fmt.Errorf("Package %s does not exist within project %s", pkg, a.a.id.errString())
+			return nil, fmt.Errorf("package %s does not exist within project %s", pkg, a.a.id.errString())
 		} else {
 			for _, ex := range expkgs {
 				exmap[ex] = struct{}{}
