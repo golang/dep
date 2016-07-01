@@ -998,7 +998,6 @@ func (b *depspecBridge) computeRootReach() ([]string, error) {
 		return nil, err
 	}
 
-	//pruneIgnoredPackages(ptree, dsm.ignore())
 	return ptree.ListExternalImports(true, true, dsm.ignore())
 }
 
@@ -1014,10 +1013,6 @@ func (b *depspecBridge) verifyRoot(path string) error {
 
 func (b *depspecBridge) listPackages(id ProjectIdentifier, v Version) (PackageTree, error) {
 	return b.sm.(fixSM).ListPackages(b.key(id), v)
-	//if err == nil {
-	//pruneIgnoredPackages(ptree, dsm.ignore())
-	//}
-	//return ptree, err
 }
 
 // override deduceRemoteRepo on bridge to make all our pkg/project mappings work

@@ -46,7 +46,7 @@ func init() {
 //  fileRoot = "/home/user/go/src/github.com/foo/bar"
 //  importRoot = "github.com/foo/bar"
 //
-// Where the fileRoot and importRoot align. However, if you provide:
+// where the fileRoot and importRoot align. However, if you provide:
 //
 //  fileRoot = "/home/user/workspace/path/to/repo"
 //  importRoot = "github.com/foo/bar"

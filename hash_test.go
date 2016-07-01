@@ -13,6 +13,10 @@ func TestHashInputs(t *testing.T) {
 		Root:     string(fix.ds[0].Name()),
 		Name:     fix.ds[0].Name(),
 		Manifest: fix.ds[0],
+		Ignore: map[string]bool{
+			"foo": true,
+			"bar": true,
+		},
 	}
 
 	// prep a fixture-overridden solver
@@ -33,7 +37,7 @@ func TestHashInputs(t *testing.T) {
 	}
 
 	h := sha256.New()
-	for _, v := range []string{"a", "a", "1.0.0", "b", "b", "1.0.0", stdlibPkgs, "root", "", "root", "a", "b"} {
+	for _, v := range []string{"a", "a", "1.0.0", "b", "b", "1.0.0", stdlibPkgs, "root", "", "root", "a", "b", "bar", "foo"} {
 		h.Write([]byte(v))
 	}
 	correct := h.Sum(nil)
