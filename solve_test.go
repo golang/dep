@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"reflect"
 	"sort"
 	"strings"
 	"testing"
@@ -359,5 +360,29 @@ func TestBadSolveOpts(t *testing.T) {
 	_, err = Prepare(args, o, sm)
 	if err != nil {
 		t.Errorf("Basic conditions re-satisfied, solve should have gone through, err was %s", err)
+	}
+}
+
+func TestIgnoreDedupe(t *testing.T) {
+	fix := basicFixtures[0]
+
+	ig := []string{"foo", "foo", "bar"}
+	args := SolveArgs{
+		Root:     string(fix.ds[0].Name()),
+		Name:     ProjectName(fix.ds[0].Name()),
+		Manifest: fix.ds[0],
+		Ignore:   ig,
+	}
+
+	s, _ := Prepare(args, SolveOpts{}, newdepspecSM(basicFixtures[0].ds, nil))
+	ts := s.(*solver)
+
+	expect := map[string]bool{
+		"foo": true,
+		"bar": true,
+	}
+
+	if !reflect.DeepEqual(ts.ig, expect) {
+		t.Errorf("Expected solver's ignore list to be deduplicated map, got %s", ts.ig)
 	}
 }
