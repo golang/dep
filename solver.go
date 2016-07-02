@@ -604,7 +604,7 @@ func (s *solver) createVersionQueue(bmi bimodalIdentifier) (*versionQueue, error
 		}
 	}
 
-	lockv := nilpa
+	var lockv Version
 	if len(s.rlm) > 0 {
 		lockv, err = s.getLockVersionIfValid(id)
 		if err != nil {
@@ -632,7 +632,8 @@ func (s *solver) createVersionQueue(bmi bimodalIdentifier) (*versionQueue, error
 // parameter.
 func (s *solver) findValidVersion(q *versionQueue, pl []string) error {
 	if nil == q.current() {
-		// TODO this case shouldn't be reachable, but panic here as a canary
+		// this case should not be reachable, but reflects improper solver state
+		// if it is, so panic immediately
 		panic("version queue is empty, should not happen")
 	}
 
@@ -681,7 +682,7 @@ func (s *solver) findValidVersion(q *versionQueue, pl []string) error {
 //
 // If any of these three conditions are true (or if the id cannot be found in
 // the root lock), then no atom will be returned.
-func (s *solver) getLockVersionIfValid(id ProjectIdentifier) (atom, error) {
+func (s *solver) getLockVersionIfValid(id ProjectIdentifier) (Version, error) {
 	// If the project is specifically marked for changes, then don't look for a
 	// locked version.
 	if _, explicit := s.chng[id.LocalName]; explicit || s.o.ChangeAll {
@@ -691,14 +692,14 @@ func (s *solver) getLockVersionIfValid(id ProjectIdentifier) (atom, error) {
 		// though, then we have to try to use what's in the lock, because that's
 		// the only version we'll be able to get.
 		if exist, _ := s.b.repoExists(id); exist {
-			return nilpa, nil
+			return nil, nil
 		}
 
 		// However, if a change was *expressly* requested for something that
 		// exists only in vendor, then that guarantees we don't have enough
 		// information to complete a solution. In that case, error out.
 		if explicit {
-			return nilpa, &missingSourceFailure{
+			return nil, &missingSourceFailure{
 				goal: id,
 				prob: "Cannot upgrade %s, as no source repository could be found.",
 			}
@@ -707,7 +708,7 @@ func (s *solver) getLockVersionIfValid(id ProjectIdentifier) (atom, error) {
 
 	lp, exists := s.rlm[id]
 	if !exists {
-		return nilpa, nil
+		return nil, nil
 	}
 
 	constraint := s.sel.getConstraint(id)
@@ -739,16 +740,13 @@ func (s *solver) getLockVersionIfValid(id ProjectIdentifier) (atom, error) {
 
 		if !found {
 			s.logSolve("%s in root lock, but current constraints disallow it", id.errString())
-			return nilpa, nil
+			return nil, nil
 		}
 	}
 
 	s.logSolve("using root lock's version of %s", id.errString())
 
-	return atom{
-		id: id,
-		v:  v,
-	}, nil
+	return v, nil
 }
 
 // backtrack works backwards from the current failed solution to find the next
