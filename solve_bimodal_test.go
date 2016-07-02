@@ -387,6 +387,20 @@ var bimodalFixtures = map[string]bimodalFixture{
 			"a 1.0.0",
 		),
 	},
+	// Preferred version, as derived from a dep's lock, is attempted first
+	// TODO
+
+	// Preferred version, as derived from a dep's lock, is attempted first, even
+	// if the root also has a direct dep on it (root doesn't need to use
+	// preferreds, because it has direct control)
+	// TODO
+
+	// Preferred versions can only work if the thing offering it has been
+	// selected, or at least marked in the unselected queue
+	// TODO
+
+	// Revision enters vqueue if a dep has a constraint on that revision
+	// TODO
 }
 
 // tpkg is a representation of a single package. It has its own import path, as
@@ -411,6 +425,9 @@ type bimodalFixture struct {
 	downgrade bool
 	// lock file simulator, if one's to be used at all
 	l fixLock
+	// map of locks for deps, if any. keys should be of the form:
+	// "<project> <version>"
+	lm map[string]fixLock
 	// projects expected to have errors, if any
 	errp []string
 	// request up/downgrade to all projects
@@ -440,19 +457,21 @@ func (f bimodalFixture) result() map[string]Version {
 }
 
 // bmSourceManager is an SM specifically for the bimodal fixtures. It composes
-// the general depspec SM, and differs from it only in the way that it answers
-// some static analysis-type calls.
+// the general depspec SM, and differs from it in how it answers static analysis
+// calls, and its support for package ignores and dep lock data.
 type bmSourceManager struct {
 	depspecSourceManager
+	lm map[string]fixLock
 }
 
 var _ SourceManager = &bmSourceManager{}
 
-func newbmSM(ds []depspec, ignore []string) *bmSourceManager {
+func newbmSM(bmf bimodalFixture) *bmSourceManager {
 	sm := &bmSourceManager{
-		depspecSourceManager: *newdepspecSM(ds, ignore),
+		depspecSourceManager: *newdepspecSM(bmf.ds, bmf.ignore),
 	}
-	sm.rm = computeBimodalExternalMap(ds)
+	sm.rm = computeBimodalExternalMap(bmf.ds)
+	sm.lm = bmf.lm
 
 	return sm
 }
@@ -480,6 +499,21 @@ func (sm *bmSourceManager) ListPackages(n ProjectName, v Version) (PackageTree, 
 	}
 
 	return PackageTree{}, fmt.Errorf("Project %s at version %s could not be found", n, v)
+}
+
+func (sm *bmSourceManager) GetProjectInfo(n ProjectName, v Version) (Manifest, Lock, error) {
+	for _, ds := range sm.specs {
+		if n == ds.n && v.Matches(ds.v) {
+			if l, exists := sm.lm[string(n)+" "+v.String()]; exists {
+				return ds, l, nil
+			} else {
+				return ds, dummyLock{}, nil
+			}
+		}
+	}
+
+	// TODO proper solver-type errors
+	return nil, nil, fmt.Errorf("Project '%s' at version '%s' could not be found", n, v)
 }
 
 // computeBimodalExternalMap takes a set of depspecs and computes an

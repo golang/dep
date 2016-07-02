@@ -113,7 +113,7 @@ func solveBimodalAndCheck(fix bimodalFixture, t *testing.T) (res Result, err err
 	if testing.Verbose() {
 		stderrlog.Printf("[[fixture %q]]", fix.n)
 	}
-	sm := newbmSM(fix.ds, fix.ignore)
+	sm := newbmSM(fix)
 
 	args := SolveArgs{
 		Root:     string(fix.ds[0].Name()),
