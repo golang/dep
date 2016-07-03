@@ -57,9 +57,17 @@ func (i ProjectIdentifier) normalize() ProjectIdentifier {
 }
 
 // bimodalIdentifiers are used to track work to be done in the unselected queue.
+// TODO marker for root, to know to ignore prefv...or can we do unselected queue
+// sorting only?
 type bimodalIdentifier struct {
 	id ProjectIdentifier
+	// List of packages required within/under the ProjectIdentifier
 	pl []string
+	// prefv is used to indicate a 'preferred' version. This is expected to be
+	// derived from a dep's lock data, or else is empty.
+	prefv Version
+	// Indicates that the bmi came from the root project originally
+	fromRoot bool
 }
 
 type ProjectName string

@@ -614,7 +614,17 @@ func (s *solver) createVersionQueue(bmi bimodalIdentifier) (*versionQueue, error
 		}
 	}
 
-	q, err := newVersionQueue(id, lockv, nil, s.b)
+	var prefv Version
+	if bmi.fromRoot {
+		// If this bmi came from the root, then we want to search the unselected
+		// queue to see if anything *else* wants this ident, in which case we
+		// pick up that prefv
+	} else {
+		// Otherwise, just use the preferred version expressed in the bmi
+		prefv = bmi.prefv
+	}
+
+	q, err := newVersionQueue(id, lockv, prefv, s.b)
 	if err != nil {
 		// TODO this particular err case needs to be improved to be ONLY for cases
 		// where there's absolutely nothing findable about a given project name
