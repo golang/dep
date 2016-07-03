@@ -584,7 +584,7 @@ func (s *solver) createVersionQueue(bmi bimodalIdentifier) (*versionQueue, error
 	id := bmi.id
 	// If on the root package, there's no queue to make
 	if id.LocalName == s.rm.Name() {
-		return newVersionQueue(id, nilpa, s.b)
+		return newVersionQueue(id, nil, nil, s.b)
 	}
 
 	exists, err := s.b.repoExists(id)
@@ -614,7 +614,7 @@ func (s *solver) createVersionQueue(bmi bimodalIdentifier) (*versionQueue, error
 		}
 	}
 
-	q, err := newVersionQueue(id, lockv, s.b)
+	q, err := newVersionQueue(id, lockv, nil, s.b)
 	if err != nil {
 		// TODO this particular err case needs to be improved to be ONLY for cases
 		// where there's absolutely nothing findable about a given project name
