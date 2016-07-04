@@ -388,16 +388,85 @@ var bimodalFixtures = map[string]bimodalFixture{
 		),
 	},
 	// Preferred version, as derived from a dep's lock, is attempted first
-	// TODO
-
+	"respect prefv, simple case": {
+		ds: []depspec{
+			dsp(dsv("root 0.0.0"),
+				pkg("root", "a")),
+			dsp(dsv("a 1.0.0"),
+				pkg("a", "b")),
+			dsp(dsv("b 1.0.0 foorev"),
+				pkg("b")),
+			dsp(dsv("b 2.0.0 barrev"),
+				pkg("b")),
+		},
+		lm: map[string]fixLock{
+			"a 1.0.0": mklock(
+				"b 1.0.0 foorev",
+			),
+		},
+		r: mkresults(
+			"a 1.0.0",
+			"b 1.0.0 foorev",
+		),
+	},
 	// Preferred version, as derived from a dep's lock, is attempted first, even
 	// if the root also has a direct dep on it (root doesn't need to use
-	// preferreds, because it has direct control)
-	// TODO
+	// preferreds, because it has direct control AND because the root lock
+	// already supercedes dep lock "preferences")
+	"respect dep prefv with root import": {
+		ds: []depspec{
+			dsp(dsv("root 0.0.0"),
+				pkg("root", "a", "b")),
+			dsp(dsv("a 1.0.0"),
+				pkg("a", "b")),
+			//dsp(dsv("a 1.0.1"),
+			//pkg("a", "b")),
+			//dsp(dsv("a 1.1.0"),
+			//pkg("a", "b")),
+			dsp(dsv("b 1.0.0 foorev"),
+				pkg("b")),
+			dsp(dsv("b 2.0.0 barrev"),
+				pkg("b")),
+		},
+		lm: map[string]fixLock{
+			"a 1.0.0": mklock(
+				"b 1.0.0 foorev",
+			),
+		},
+		r: mkresults(
+			"a 1.0.0",
+			"b 1.0.0 foorev",
+		),
+	},
 
 	// Preferred versions can only work if the thing offering it has been
 	// selected, or at least marked in the unselected queue
-	// TODO
+	"prefv only works if depper is selected": {
+		ds: []depspec{
+			dsp(dsv("root 0.0.0"),
+				pkg("root", "a", "b")),
+			// Three atoms for a, which will mean it gets visited after b
+			dsp(dsv("a 1.0.0"),
+				pkg("a", "b")),
+			dsp(dsv("a 1.0.1"),
+				pkg("a", "b")),
+			dsp(dsv("a 1.1.0"),
+				pkg("a", "b")),
+			dsp(dsv("b 1.0.0 foorev"),
+				pkg("b")),
+			dsp(dsv("b 2.0.0 barrev"),
+				pkg("b")),
+		},
+		lm: map[string]fixLock{
+			"a 1.0.0": mklock(
+				"b 1.0.0 foorev",
+			),
+		},
+		r: mkresults(
+			"a 1.1.0",
+			"b 2.0.0 barrev",
+		),
+	},
 
 	// Revision enters vqueue if a dep has a constraint on that revision
 	// TODO
