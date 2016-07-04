@@ -431,7 +431,7 @@ func (s *solver) selectRoot() error {
 		s.sel.pushDep(dependency{depender: pa, dep: dep})
 		// Add all to unselected queue
 		s.names[dep.Ident.LocalName] = dep.Ident.netName()
-		heap.Push(s.unsel, bimodalIdentifier{id: dep.Ident, pl: dep.pl})
+		heap.Push(s.unsel, bimodalIdentifier{id: dep.Ident, pl: dep.pl, fromRoot: true})
 	}
 
 	return nil
@@ -616,9 +616,40 @@ func (s *solver) createVersionQueue(bmi bimodalIdentifier) (*versionQueue, error
 
 	var prefv Version
 	if bmi.fromRoot {
+		// If this bmi came from the root, then we want to search through things
+		// with a dependency on it in order to see if any have a lock that might
+		// express a prefv
+		//
+		// TODO nested loop; prime candidate for a cache somewhere
+		for _, dep := range s.sel.getDependenciesOn(bmi.id) {
+			_, l, err := s.b.getProjectInfo(dep.depender)
+			if err != nil {
+				// This really shouldn't be possible, but just skip if it if it
+				// does happen somehow
+				continue
+			}
+
+			for _, lp := range l.Projects() {
+				if lp.Ident().eq(bmi.id) {
+					prefv = lp.Version()
+				}
+			}
+		}
+
+		// OTHER APPROACH, WRONG, BUT MAYBE USEFUL FOR REFERENCE?
 		// If this bmi came from the root, then we want to search the unselected
 		// queue to see if anything *else* wants this ident, in which case we
 		// pick up that prefv
+		//for _, bmi2 := range s.unsel.sl {
+		//// Take the first thing from the queue that's for the same ident,
+		//// and has a non-nil prefv
+		//if bmi.id.eq(bmi2.id) {
+		//if bmi2.prefv != nil {
+		//prefv = bmi2.prefv
+		//}
+		//}
+		//}
+
 	} else {
 		// Otherwise, just use the preferred version expressed in the bmi
 		prefv = bmi.prefv
@@ -887,8 +918,6 @@ func (s *solver) unselectedComparator(i, j int) bool {
 	// isn't locked by the root. And, because being locked by root is the only
 	// way avoid that call when making a version queue, we know we're gonna have
 	// to pay that cost anyway.
-	//
-	// TODO ...at least, 'til we allow 'preferred' versions via non-root locks
 
 	// We can safely ignore an err from ListVersions here because, if there is
 	// an actual problem, it'll be noted and handled somewhere else saner in the
@@ -949,6 +978,14 @@ func (s *solver) selectAtomWithPackages(a atomWithPackages) {
 		panic(fmt.Sprintf("canary - shouldn't be possible %s", err))
 	}
 
+	// If this atom has a lock, pull it out so that we can potentially inject
+	// preferred versions into any bmis we enqueue
+	_, l, err := s.b.getProjectInfo(a.a)
+	lmap := make(map[ProjectIdentifier]Version)
+	for _, lp := range l.Projects() {
+		lmap[lp.Ident()] = lp.Version()
+	}
+
 	for _, dep := range deps {
 		s.sel.pushDep(dependency{depender: a.a, dep: dep})
 		// Go through all the packages introduced on this dep, selecting only
@@ -963,7 +1000,14 @@ func (s *solver) selectAtomWithPackages(a atomWithPackages) {
 		}
 
 		if len(newp) > 0 {
-			heap.Push(s.unsel, bimodalIdentifier{id: dep.Ident, pl: newp})
+			bmi := bimodalIdentifier{
+				id: dep.Ident,
+				pl: newp,
+				// This puts in a preferred version if one's in the map, else
+				// drops in the zero value (nil)
+				prefv: lmap[dep.Ident],
+			}
+			heap.Push(s.unsel, bmi)
 		}
 
 		if s.sel.depperCount(dep.Ident) == 1 {
@@ -993,6 +1037,14 @@ func (s *solver) selectPackages(a atomWithPackages) {
 		panic(fmt.Sprintf("canary - shouldn't be possible %s", err))
 	}
 
+	// If this atom has a lock, pull it out so that we can potentially inject
+	// preferred versions into any bmis we enqueue
+	_, l, err := s.b.getProjectInfo(a.a)
+	lmap := make(map[ProjectIdentifier]Version)
+	for _, lp := range l.Projects() {
+		lmap[lp.Ident()] = lp.Version()
+	}
+
 	for _, dep := range deps {
 		s.sel.pushDep(dependency{depender: a.a, dep: dep})
 		// Go through all the packages introduced on this dep, selecting only
@@ -1007,7 +1059,14 @@ func (s *solver) selectPackages(a atomWithPackages) {
 		}
 
 		if len(newp) > 0 {
-			heap.Push(s.unsel, bimodalIdentifier{id: dep.Ident, pl: newp})
+			bmi := bimodalIdentifier{
+				id: dep.Ident,
+				pl: newp,
+				// This puts in a preferred version if one's in the map, else
+				// drops in the zero value (nil)
+				prefv: lmap[dep.Ident],
+			}
+			heap.Push(s.unsel, bmi)
 		}
 
 		if s.sel.depperCount(dep.Ident) == 1 {
