@@ -59,7 +59,7 @@ type bridge struct {
 		err   error
 	}
 
-	// A map of packages to ignore.
+	// A map of packages to ignore
 	ignore map[string]bool
 
 	// Map of project root name to their available version list. This cache is

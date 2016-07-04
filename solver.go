@@ -870,16 +870,6 @@ func (s *solver) unselectedComparator(i, j int) bool {
 		return false
 	}
 
-	rname := s.rm.Name()
-	// *always* put root project first
-	// TODO wait, it shouldn't be possible to have root in here...?
-	if iname.LocalName == rname {
-		return true
-	}
-	if jname.LocalName == rname {
-		return false
-	}
-
 	_, ilock := s.rlm[iname]
 	_, jlock := s.rlm[jname]
 
