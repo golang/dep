@@ -89,27 +89,107 @@ func mksvpa(info string) atom {
 	}
 }
 
-// mkc - "make constraint"
-func mkc(body string) Constraint {
-	c, err := NewSemverConstraint(body)
-	if err != nil {
-		// don't want bad test data at this level, so just panic
-		panic(fmt.Sprintf("Error when converting '%s' into semver constraint: %s", body, err))
+// mkmvpa - "make variable version project atom"
+//
+// Splits the input string on a space, and uses the first two elements as the
+// project identifier and version, respectively.
+//
+// The version segment may have a leading character indicating the type of
+// version to create:
+//
+//  p: create a "plain" (non-semver) version.
+//  b: create a branch version.
+//  r: create a revision.
+//
+// No prefix is assumed to indicate a semver version.
+//
+// If a third space-delimited element is provided, it will be interepreted as a
+// revision, and used as the underlying version in a PairedVersion. No prefix
+// should be provided in this case. It is an error (and will panic) to try to
+// pass a revision with an underlying revision.
+func mkmvpa(info string) atom {
+	id, ver, rev := nsvrSplit(info)
+
+	var v Version
+	switch ver[0] {
+	case 'r':
+		if rev != "" {
+			panic("Cannot pair a revision with a revision")
+		}
+		v = Revision(ver[1:])
+	case 'p':
+		v = NewVersion(ver[1:])
+	case 'b':
+		v = NewBranch(ver[1:])
+	default:
+		_, err := semver.NewVersion(ver)
+		if err != nil {
+			// don't want to allow bad test data at this level, so just panic
+			panic(fmt.Sprintf("Error when converting '%s' into semver: %s", ver, err))
+		}
+		v = NewVersion(ver)
 	}
 
-	return c
+	if rev != "" {
+		v = v.(UnpairedVersion).Is(rev)
+	}
+
+	return atom{
+		id: id,
+		v:  v,
+	}
 }
 
 // mksvd - "make semver dependency"
 //
 // Splits the input string on a space, and uses the first two elements as the
-// project name and constraint body, respectively.
+// project identifier and constraint body, respectively.
+//
+// The constraint body may have a leading character indicating the type of
+// version to create:
+//
+//  p: create a "plain" (non-semver) version.
+//  b: create a branch version.
+//  r: create a revision.
+//
+// If no leading character is used, a semver constraint is assumed.
 func mksvd(info string) ProjectDep {
-	id, v := nsvSplit(info)
+	id, ver, rev := nsvrSplit(info)
+
+	var c Constraint
+	switch ver[0] {
+	case 'r':
+		c = Revision(ver[1:])
+	case 'p':
+		c = NewVersion(ver[1:])
+	case 'b':
+		c = NewBranch(ver[1:])
+	default:
+		// Without one of those leading characters, we know it's a proper semver
+		// expression, so use the other parser that doesn't look for a rev
+		rev = ""
+		id, ver = nsvSplit(info)
+		var err error
+		c, err = NewSemverConstraint(ver)
+		if err != nil {
+			// don't want bad test data at this level, so just panic
+			panic(fmt.Sprintf("Error when converting '%s' into semver constraint: %s (full info: %s)", ver, err, info))
+		}
+	}
+
+	// There's no practical reason that a real tool would need to produce a
+	// constraint that's a PairedVersion, but it is a possibility admitted by the
+	// system, so we at least allow for it in our testing harness.
+	if rev != "" {
+		// Of course, this *will* panic if the predicate is a revision or a
+		// semver constraint, neither of which implement UnpairedVersion. This
+		// is as intended, to prevent bad data from entering the system.
+		c = c.(UnpairedVersion).Is(rev)
+	}
 
 	return ProjectDep{
 		Ident:      id,
-		Constraint: mkc(v),
+		Constraint: c,
 	}
 }
 
@@ -131,7 +211,45 @@ type depspec struct {
 //
 // First string is broken out into the name/semver of the main package.
 func dsv(pi string, deps ...string) depspec {
-	pa := mksvpa(pi)
+	pa := mkmvpa(pi)
+	if string(pa.id.LocalName) != pa.id.NetworkName {
+		panic("alternate source on self makes no sense")
+	}
+
+	ds := depspec{
+		n: pa.id.LocalName,
+		v: pa.v,
+	}
+
+	for _, dep := range deps {
+		var sl *[]ProjectDep
+		if strings.HasPrefix(dep, "(dev) ") {
+			dep = strings.TrimPrefix(dep, "(dev) ")
+			sl = &ds.devdeps
+		} else {
+			sl = &ds.deps
+		}
+
+		*sl = append(*sl, mksvd(dep))
+	}
+
+	return ds
+}
+
+// dmv - "depspec multiversion" (make a depspec with variable version types)
+//
+// Creates depspecs by processing a series of strings, each of which contains a
+// version segment. See the docs on
+//
+// The first string is broken out into the name and version of the package being
+// described - see the docs on mkmvpa for details. subsequent strings are
+// interpreted as dep constraints of that dep at that version. See the docs on
+// mksvd for details.
+//
+// If a string other than the first includes a "(dev) " prefix, it will be
+// treated as a test-only dependency.
+func dmv(pi string, deps ...string) depspec {
+	pa := mkmvpa(pi)
 	if string(pa.id.LocalName) != pa.id.NetworkName {
 		panic("alternate source on self makes no sense")
 	}
@@ -160,7 +278,7 @@ func dsv(pi string, deps ...string) depspec {
 func mklock(pairs ...string) fixLock {
 	l := make(fixLock, 0)
 	for _, s := range pairs {
-		pa := mksvpa(s)
+		pa := mkmvpa(s)
 		l = append(l, NewLockedProject(pa.id.LocalName, pa.v, pa.id.netName(), "", nil))
 	}
 
@@ -172,7 +290,7 @@ func mklock(pairs ...string) fixLock {
 func mkrevlock(pairs ...string) fixLock {
 	l := make(fixLock, 0)
 	for _, s := range pairs {
-		pa := mksvpa(s)
+		pa := mkmvpa(s)
 		l = append(l, NewLockedProject(pa.id.LocalName, pa.v.(PairedVersion).Underlying(), pa.id.netName(), "", nil))
 	}
 

@@ -636,7 +636,7 @@ func (s *solver) createVersionQueue(bmi bimodalIdentifier) (*versionQueue, error
 			}
 		}
 
-		// OTHER APPROACH, WRONG, BUT MAYBE USEFUL FOR REFERENCE?
+		// OTHER APPROACH - WRONG, BUT MAYBE USEFUL FOR REFERENCE?
 		// If this bmi came from the root, then we want to search the unselected
 		// queue to see if anything *else* wants this ident, in which case we
 		// pick up that prefv
