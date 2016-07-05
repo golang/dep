@@ -141,7 +141,7 @@ func fixtureSolveSimpleChecks(fix specfix, res Result, err error, t *testing.T) 
 	if err != nil {
 		errp := fix.expectErrs()
 		if len(errp) == 0 {
-			t.Errorf("(fixture: %q) Solver failed; error was type %T, text: %q", fix.name(), err, err)
+			t.Errorf("(fixture: %q) Solver failed; error was type %T, text:\n%s", fix.name(), err, err)
 			return res, err
 		}
 

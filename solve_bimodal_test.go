@@ -438,7 +438,6 @@ var bimodalFixtures = map[string]bimodalFixture{
 			"b 1.0.0 foorev",
 		),
 	},
-
 	// Preferred versions can only work if the thing offering it has been
 	// selected, or at least marked in the unselected queue
 	"prefv only works if depper is selected": {
@@ -467,12 +466,6 @@ var bimodalFixtures = map[string]bimodalFixture{
 			"b 2.0.0 barrev",
 		),
 	},
-
-	// Revision enters vqueue if a dep has a constraint on that revision
-	// TODO
-
-	// Solve fails if revision constraint is placed on a nonexistent revision
-	// TODO
 }
 
 // tpkg is a representation of a single package. It has its own import path, as

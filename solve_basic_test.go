@@ -891,6 +891,31 @@ var basicFixtures = []basicFixture{
 		),
 		maxAttempts: 2,
 	},
+	{
+		// Revision enters vqueue if a dep has a constraint on that revision
+		n: "revision injected into vqueue",
+		ds: []depspec{
+			mkDepspec("root 0.0.0", "foo r123abc"),
+			mkDepspec("foo r123abc"),
+			mkDepspec("foo 1.0.0 foorev"),
+			mkDepspec("foo 2.0.0 foorev2"),
+		},
+		r: mkresults(
+			"foo 123abc",
+		),
+	},
+	{
+		// Solve fails if revision constraint calls for a nonexistent revision
+		n: "fail on missing revision",
+		ds: []depspec{
+			mkDepspec("root 0.0.0", "foo r123abc"),
+			mkDepspec("foo r123nomatch"),
+			mkDepspec("foo 1.0.0"),
+			mkDepspec("foo 2.0.0"),
+		},
+		errp: []string{"foo", "root"},
+	},
+
 	// TODO add fixture that tests proper handling of loops via aliases (where
 	// a project that wouldn't be a loop is aliased to a project that is a loop)
 }
@@ -1010,7 +1035,9 @@ func (sm *depspecSourceManager) ListPackages(n ProjectName, v Version) (PackageT
 
 func (sm *depspecSourceManager) ListVersions(name ProjectName) (pi []Version, err error) {
 	for _, ds := range sm.specs {
-		if name == ds.n {
+		// To simulate the behavior of the real SourceManager, we do not return
+		// revisions from ListVersions().
+		if _, isrev := ds.v.(Revision); !isrev && name == ds.n {
 			pi = append(pi, ds.v)
 		}
 	}
