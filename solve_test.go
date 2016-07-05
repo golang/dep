@@ -246,13 +246,13 @@ func TestRootLockNoVersionPairMatching(t *testing.T) {
 	fix := basicFixture{
 		n: "does not pair bare revs in manifest with unpaired lock version",
 		ds: []depspec{
-			dsv("root 0.0.0", "foo *"), // foo's constraint rewritten below to foorev
-			dsv("foo 1.0.0", "bar 1.0.0"),
-			dsv("foo 1.0.1 foorev", "bar 1.0.1"),
-			dsv("foo 1.0.2 foorev", "bar 1.0.2"),
-			dsv("bar 1.0.0"),
-			dsv("bar 1.0.1"),
-			dsv("bar 1.0.2"),
+			mkDepspec("root 0.0.0", "foo *"), // foo's constraint rewritten below to foorev
+			mkDepspec("foo 1.0.0", "bar 1.0.0"),
+			mkDepspec("foo 1.0.1 foorev", "bar 1.0.1"),
+			mkDepspec("foo 1.0.2 foorev", "bar 1.0.2"),
+			mkDepspec("bar 1.0.0"),
+			mkDepspec("bar 1.0.1"),
+			mkDepspec("bar 1.0.2"),
 		},
 		l: mklock(
 			"foo 1.0.1",
