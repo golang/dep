@@ -662,6 +662,30 @@ func (s *solver) createVersionQueue(bmi bimodalIdentifier) (*versionQueue, error
 		return nil, err
 	}
 
+	// Hack in support for revisions.
+	//
+	// By design, revs aren't returned from ListVersion(). Thus, if the dep in
+	// the bmi was has a rev constraint, it is (almost) guaranteed to fail, even
+	// if that rev does exist in the repo. So, detect a rev and push it into the
+	// vq here, instead.
+	//
+	// Happily, the solver maintains the invariant that constraints on a given
+	// ident cannot be incompatible,so we know that if we find one rev, then any
+	// other deps will have to also be on that rev (or Any).
+	//
+	// TODO while this wdoes work, it bypasses the interface-implied guarantees
+	// of the version queue, and is therefore not a great strategy for API
+	// coherency. Folding this in to a formal interface would be better.
+	switch tc := s.sel.getConstraint(bmi.id).(type) {
+	case Revision:
+		// We know this is the only thing that could possibly match, so put it
+		// in at the front - if it isn't there already.
+		if q.pi[0] != tc {
+			q.pi = append([]Version{tc}, q.pi...)
+		}
+	}
+
+	// Having assembled the queue, search it for a valid version.
 	return q, s.findValidVersion(q, bmi.pl)
 }
 
