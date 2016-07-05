@@ -237,15 +237,9 @@ func mkrevlock(pairs ...string) fixLock {
 func mkresults(pairs ...string) map[string]Version {
 	m := make(map[string]Version)
 	for _, pair := range pairs {
-		name, ver, rev := nvrSplit(pair)
-
-		var v Version
-		v = NewVersion(ver)
-		if rev != "" {
-			v = v.(UnpairedVersion).Is(rev)
-		}
-
-		m[string(name.LocalName)] = v
+		a := mkAtom(pair)
+		// TODO identifierify
+		m[string(a.id.LocalName)] = a.v
 	}
 
 	return m
@@ -901,7 +895,7 @@ var basicFixtures = []basicFixture{
 			mkDepspec("foo 2.0.0 foorev2"),
 		},
 		r: mkresults(
-			"foo 123abc",
+			"foo r123abc",
 		),
 	},
 	{
@@ -992,7 +986,7 @@ func (sm *depspecSourceManager) GetProjectInfo(n ProjectName, v Version) (Manife
 	}
 
 	// TODO proper solver-type errors
-	return nil, nil, fmt.Errorf("Project '%s' at version '%s' could not be found", n, v)
+	return nil, nil, fmt.Errorf("Project %s at version %s could not be found", n, v)
 }
 
 func (sm *depspecSourceManager) ExternalReach(n ProjectName, v Version) (map[string][]string, error) {
@@ -1043,7 +1037,7 @@ func (sm *depspecSourceManager) ListVersions(name ProjectName) (pi []Version, er
 	}
 
 	if len(pi) == 0 {
-		err = fmt.Errorf("Project '%s' could not be found", name)
+		err = fmt.Errorf("Project %s could not be found", name)
 	}
 
 	return

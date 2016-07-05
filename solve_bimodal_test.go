@@ -578,7 +578,7 @@ func (sm *bmSourceManager) GetProjectInfo(n ProjectName, v Version) (Manifest, L
 	}
 
 	// TODO proper solver-type errors
-	return nil, nil, fmt.Errorf("Project '%s' at version '%s' could not be found", n, v)
+	return nil, nil, fmt.Errorf("Project %s at version %s could not be found", n, v)
 }
 
 // computeBimodalExternalMap takes a set of depspecs and computes an
