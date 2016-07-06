@@ -670,8 +670,8 @@ func (s *solver) createVersionQueue(bmi bimodalIdentifier) (*versionQueue, error
 	// vq here, instead.
 	//
 	// Happily, the solver maintains the invariant that constraints on a given
-	// ident cannot be incompatible,so we know that if we find one rev, then any
-	// other deps will have to also be on that rev (or Any).
+	// ident cannot be incompatible, so we know that if we find one rev, then
+	// any other deps will have to also be on that rev (or Any).
 	//
 	// TODO while this does work, it bypasses the interface-implied guarantees
 	// of the version queue, and is therefore not a great strategy for API
@@ -681,6 +681,7 @@ func (s *solver) createVersionQueue(bmi bimodalIdentifier) (*versionQueue, error
 		// We know this is the only thing that could possibly match, so put it
 		// in at the front - if it isn't there already.
 		if q.pi[0] != tc {
+			// Existence of the revision is guaranteed by checkRevisionExists().
 			q.pi = append([]Version{tc}, q.pi...)
 		}
 	}

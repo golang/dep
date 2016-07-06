@@ -12,30 +12,41 @@ func (s *solver) checkProject(a atomWithPackages) error {
 	}
 
 	if err := s.checkAtomAllowable(pa); err != nil {
+		s.logSolve(err)
 		return err
 	}
 
 	if err := s.checkRequiredPackagesExist(a); err != nil {
+		s.logSolve(err)
 		return err
 	}
 
 	deps, err := s.getImportsAndConstraintsOf(a)
 	if err != nil {
 		// An err here would be from the package fetcher; pass it straight back
+		// TODO can we logSolve this?
 		return err
 	}
 
 	for _, dep := range deps {
 		if err := s.checkIdentMatches(a, dep); err != nil {
+			s.logSolve(err)
 			return err
 		}
 		if err := s.checkDepsConstraintsAllowable(a, dep); err != nil {
+			s.logSolve(err)
 			return err
 		}
 		if err := s.checkDepsDisallowsSelected(a, dep); err != nil {
+			s.logSolve(err)
+			return err
+		}
+		if err := s.checkRevisionExists(a, dep); err != nil {
+			s.logSolve(err)
 			return err
 		}
 		if err := s.checkPackageImportsFromDepExist(a, dep); err != nil {
+			s.logSolve(err)
 			return err
 		}
 
@@ -45,8 +56,8 @@ func (s *solver) checkProject(a atomWithPackages) error {
 	return nil
 }
 
-// checkPackages performs all constraint checks new packages being added to an
-// already-selected project. It determines if selecting the packages would
+// checkPackages performs all constraint checks for new packages being added to
+// an already-selected project. It determines if selecting the packages would
 // result in a state where all solver requirements are still satisfied.
 func (s *solver) checkPackage(a atomWithPackages) error {
 	if nilpa == a.a {
@@ -60,20 +71,29 @@ func (s *solver) checkPackage(a atomWithPackages) error {
 	deps, err := s.getImportsAndConstraintsOf(a)
 	if err != nil {
 		// An err here would be from the package fetcher; pass it straight back
+		// TODO can we logSolve this?
 		return err
 	}
 
 	for _, dep := range deps {
 		if err := s.checkIdentMatches(a, dep); err != nil {
+			s.logSolve(err)
 			return err
 		}
 		if err := s.checkDepsConstraintsAllowable(a, dep); err != nil {
+			s.logSolve(err)
 			return err
 		}
 		if err := s.checkDepsDisallowsSelected(a, dep); err != nil {
+			s.logSolve(err)
+			return err
+		}
+		if err := s.checkRevisionExists(a, dep); err != nil {
+			s.logSolve(err)
 			return err
 		}
 		if err := s.checkPackageImportsFromDepExist(a, dep); err != nil {
+			s.logSolve(err)
 			return err
 		}
 	}
@@ -105,7 +125,6 @@ func (s *solver) checkAtomAllowable(pa atom) error {
 		c:          constraint,
 	}
 
-	s.logSolve(err)
 	return err
 }
 
@@ -141,12 +160,10 @@ func (s *solver) checkRequiredPackagesExist(a atomWithPackages) error {
 	}
 
 	if len(fp) > 0 {
-		e := &checkeeHasProblemPackagesFailure{
+		return &checkeeHasProblemPackagesFailure{
 			goal:    a.a,
 			failpkg: fp,
 		}
-		s.logSolve(e)
-		return e
 	}
 	return nil
 }
@@ -175,14 +192,12 @@ func (s *solver) checkDepsConstraintsAllowable(a atomWithPackages, cdep complete
 		}
 	}
 
-	err := &disjointConstraintFailure{
+	return &disjointConstraintFailure{
 		goal:      dependency{depender: a.a, dep: cdep},
 		failsib:   failsib,
 		nofailsib: nofailsib,
 		c:         constraint,
 	}
-	s.logSolve(err)
-	return err
 }
 
 // checkDepsDisallowsSelected ensures that an atom's constraints on a particular
@@ -194,12 +209,10 @@ func (s *solver) checkDepsDisallowsSelected(a atomWithPackages, cdep completeDep
 	if exists && !s.b.matches(dep.Ident, dep.Constraint, selected.a.v) {
 		s.fail(dep.Ident)
 
-		err := &constraintNotAllowedFailure{
+		return &constraintNotAllowedFailure{
 			goal: dependency{depender: a.a, dep: cdep},
 			v:    selected.a.v,
 		}
-		s.logSolve(err)
-		return err
 	}
 	return nil
 }
@@ -222,15 +235,13 @@ func (s *solver) checkIdentMatches(a atomWithPackages, cdep completeDep) error {
 				s.fail(d.depender.id)
 			}
 
-			err := &sourceMismatchFailure{
+			return &sourceMismatchFailure{
 				shared:   dep.Ident.LocalName,
 				sel:      deps,
 				current:  cur,
 				mismatch: dep.Ident.netName(),
 				prob:     a.a,
 			}
-			s.logSolve(err)
-			return err
 		}
 	}
 
@@ -272,8 +283,30 @@ func (s *solver) checkPackageImportsFromDepExist(a atomWithPackages, cdep comple
 	}
 
 	if len(e.pl) > 0 {
-		s.logSolve(e)
 		return e
 	}
 	return nil
+}
+
+// checkRevisionExists ensures that if a dependency is constrained by a
+// revision, that that revision actually exists.
+func (s *solver) checkRevisionExists(a atomWithPackages, cdep completeDep) error {
+	r, isrev := cdep.Constraint.(Revision)
+	if !isrev {
+		// Constraint is not a revision; nothing to do
+		return nil
+	}
+
+	present, _ := s.b.revisionPresentIn(cdep.Ident, r)
+	if present {
+		return nil
+	}
+
+	return &nonexistentRevisionFailure{
+		goal: dependency{
+			depender: a.a,
+			dep:      cdep,
+		},
+		r: r,
+	}
 }
