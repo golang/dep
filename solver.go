@@ -623,9 +623,9 @@ func (s *solver) createVersionQueue(bmi bimodalIdentifier) (*versionQueue, error
 		// TODO nested loop; prime candidate for a cache somewhere
 		for _, dep := range s.sel.getDependenciesOn(bmi.id) {
 			_, l, err := s.b.getProjectInfo(dep.depender)
-			if err != nil {
-				// This really shouldn't be possible, but just skip if it if it
-				// does happen somehow
+			if err != nil || l == nil {
+				// err being non-nil really shouldn't be possible, but the lock
+				// being nil is quite likely
 				continue
 			}
 
@@ -1006,9 +1006,12 @@ func (s *solver) selectAtomWithPackages(a atomWithPackages) {
 	// If this atom has a lock, pull it out so that we can potentially inject
 	// preferred versions into any bmis we enqueue
 	_, l, err := s.b.getProjectInfo(a.a)
-	lmap := make(map[ProjectIdentifier]Version)
-	for _, lp := range l.Projects() {
-		lmap[lp.Ident()] = lp.Version()
+	var lmap map[ProjectIdentifier]Version
+	if l != nil {
+		lmap = make(map[ProjectIdentifier]Version)
+		for _, lp := range l.Projects() {
+			lmap[lp.Ident()] = lp.Version()
+		}
 	}
 
 	for _, dep := range deps {
@@ -1065,9 +1068,12 @@ func (s *solver) selectPackages(a atomWithPackages) {
 	// If this atom has a lock, pull it out so that we can potentially inject
 	// preferred versions into any bmis we enqueue
 	_, l, err := s.b.getProjectInfo(a.a)
-	lmap := make(map[ProjectIdentifier]Version)
-	for _, lp := range l.Projects() {
-		lmap[lp.Ident()] = lp.Version()
+	var lmap map[ProjectIdentifier]Version
+	if l != nil {
+		lmap = make(map[ProjectIdentifier]Version)
+		for _, lp := range l.Projects() {
+			lmap[lp.Ident()] = lp.Version()
+		}
 	}
 
 	for _, dep := range deps {
