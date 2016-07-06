@@ -375,3 +375,31 @@ func (e *depHasProblemPackagesFailure) traceString() string {
 
 	return buf.String()
 }
+
+// nonexistentRevisionFailure indicates that a revision constraint was specified
+// for a given project, but that that revision does not exist in the source
+// repository.
+type nonexistentRevisionFailure struct {
+	goal dependency
+	r    Revision
+}
+
+func (e *nonexistentRevisionFailure) Error() string {
+	return fmt.Sprintf(
+		"Could not introduce %s at %s, as it requires %s at revision %s, but that revision does not exist",
+		e.goal.depender.id.errString(),
+		e.goal.depender.v,
+		e.goal.dep.Ident.errString(),
+		e.r,
+	)
+}
+
+func (e *nonexistentRevisionFailure) traceString() string {
+	return fmt.Sprintf(
+		"%s at %s wants missing rev %s of %s",
+		e.goal.depender.id.errString(),
+		e.goal.depender.v,
+		e.r,
+		e.goal.dep.Ident.errString(),
+	)
+}

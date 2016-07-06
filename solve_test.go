@@ -314,6 +314,8 @@ func getFailureCausingProjects(err error) (projs []string) {
 		}
 	case *depHasProblemPackagesFailure:
 		projs = append(projs, string(e.goal.depender.id.LocalName), string(e.goal.dep.Ident.LocalName))
+	case *nonexistentRevisionFailure:
+		projs = append(projs, string(e.goal.depender.id.LocalName), string(e.goal.dep.Ident.LocalName))
 	default:
 		panic(fmt.Sprintf("unknown failtype %T, msg: %s", err, err))
 	}
