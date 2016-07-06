@@ -11,26 +11,36 @@ type failedVersion struct {
 }
 
 type versionQueue struct {
-	id                 ProjectIdentifier
-	pi                 []Version
-	fails              []failedVersion
-	sm                 sourceBridge
-	failed             bool
-	hasLock, allLoaded bool
+	id           ProjectIdentifier
+	pi           []Version
+	lockv, prefv Version
+	fails        []failedVersion
+	b            sourceBridge
+	failed       bool
+	allLoaded    bool
 }
 
-func newVersionQueue(id ProjectIdentifier, lockv atom, sm sourceBridge) (*versionQueue, error) {
+func newVersionQueue(id ProjectIdentifier, lockv, prefv Version, b sourceBridge) (*versionQueue, error) {
 	vq := &versionQueue{
 		id: id,
-		sm: sm,
+		b:  b,
 	}
 
-	if lockv != nilpa {
-		vq.hasLock = true
-		vq.pi = append(vq.pi, lockv.v)
-	} else {
+	// Lock goes in first, if present
+	if lockv != nil {
+		vq.lockv = lockv
+		vq.pi = append(vq.pi, lockv)
+	}
+
+	// Preferred version next
+	if prefv != nil {
+		vq.prefv = prefv
+		vq.pi = append(vq.pi, prefv)
+	}
+
+	if len(vq.pi) == 0 {
 		var err error
-		vq.pi, err = vq.sm.listVersions(vq.id)
+		vq.pi, err = vq.b.listVersions(vq.id)
 		if err != nil {
 			// TODO pushing this error this early entails that we
 			// unconditionally deep scan (e.g. vendor), as well as hitting the
@@ -51,47 +61,62 @@ func (vq *versionQueue) current() Version {
 	return nil
 }
 
+// advance moves the versionQueue forward to the next available version,
+// recording the failure that eliminated the current version.
 func (vq *versionQueue) advance(fail error) (err error) {
-	// The current version may have failed, but the next one hasn't
-	vq.failed = false
-
+	// Nothing in the queue means...nothing in the queue, nicely enough
 	if len(vq.pi) == 0 {
 		return
 	}
 
+	// Record the fail reason and pop the queue
 	vq.fails = append(vq.fails, failedVersion{
 		v: vq.pi[0],
 		f: fail,
 	})
-	if vq.allLoaded {
-		vq.pi = vq.pi[1:]
-		return
-	}
+	vq.pi = vq.pi[1:]
 
-	vq.allLoaded = true
-	// Can only get here if no lock was initially provided, so we know we
-	// should have that
-	lockv := vq.pi[0]
+	// *now*, if the queue is empty, ensure all versions have been loaded
+	if len(vq.pi) == 0 {
+		if vq.allLoaded {
+			// This branch gets hit when the queue is first fully exhausted,
+			// after having been populated by ListVersions() on a previous
+			// advance()
+			return
+		}
 
-	vq.pi, err = vq.sm.listVersions(vq.id)
-	if err != nil {
-		return
-	}
+		vq.allLoaded = true
+		vq.pi, err = vq.b.listVersions(vq.id)
+		if err != nil {
+			return err
+		}
 
-	// search for and remove locked version
-	// TODO should be able to avoid O(n) here each time...if it matters
-	for k, pi := range vq.pi {
-		if pi == lockv {
-			// GC-safe deletion for slice w/pointer elements
-			//vq.pi, vq.pi[len(vq.pi)-1] = append(vq.pi[:k], vq.pi[k+1:]...), nil
-			vq.pi = append(vq.pi[:k], vq.pi[k+1:]...)
+		// search for and remove locked and pref versions
+		//
+		// could use the version comparator for binary search here to avoid
+		// O(n) each time...if it matters
+		for k, pi := range vq.pi {
+			if pi == vq.lockv || pi == vq.prefv {
+				// GC-safe deletion for slice w/pointer elements
+				vq.pi, vq.pi[len(vq.pi)-1] = append(vq.pi[:k], vq.pi[k+1:]...), nil
+				//vq.pi = append(vq.pi[:k], vq.pi[k+1:]...)
+			}
+		}
+
+		if len(vq.pi) == 0 {
+			// If listing versions added nothing (new), then return now
+			return
 		}
 	}
 
-	// normal end of queue. we don't error; it's left to the caller to infer an
-	// empty queue w/a subsequent call to current(), which will return an empty
-	// item.
-	// TODO this approach kinda...sucks
+	// We're finally sure that there's something in the queue. Remove the
+	// failure marker, as the current version may have failed, but the next one
+	// hasn't yet
+	vq.failed = false
+
+	// If all have been loaded and the queue is empty, we're definitely out
+	// of things to try. Return empty, though, because vq semantics dictate
+	// that we don't explicitly indicate the end of the queue here.
 	return
 }
 

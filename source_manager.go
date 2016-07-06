@@ -30,6 +30,10 @@ type SourceManager interface {
 	// repository name.
 	ListVersions(ProjectName) ([]Version, error)
 
+	// RevisionPresentIn indicates whether the provided Version is present in the given
+	// repository. A nil response indicates the version is valid.
+	RevisionPresentIn(ProjectName, Revision) (bool, error)
+
 	// ListPackages retrieves a tree of the Go packages at or below the provided
 	// import path, at the provided version.
 	ListPackages(ProjectName, Version) (PackageTree, error)
@@ -173,7 +177,7 @@ func (sm *sourceManager) ListPackages(n ProjectName, v Version) (PackageTree, er
 // ListVersions retrieves a list of the available versions for a given
 // repository name.
 //
-// The list is not sorted; while it may be retuend in the order that the
+// The list is not sorted; while it may be returned in the order that the
 // underlying VCS reports version information, no guarantee is made. It is
 // expected that the caller either not care about order, or sort the result
 // themselves.
@@ -189,6 +193,18 @@ func (sm *sourceManager) ListVersions(n ProjectName) ([]Version, error) {
 	}
 
 	return pmc.pm.ListVersions()
+}
+
+// RevisionPresentIn indicates whether the provided Revision is present in the given
+// repository. A nil response indicates the revision is valid.
+func (sm *sourceManager) RevisionPresentIn(n ProjectName, r Revision) (bool, error) {
+	pmc, err := sm.getProjectManager(n)
+	if err != nil {
+		// TODO More-er proper-er errors
+		return false, err
+	}
+
+	return pmc.pm.RevisionPresentIn(r)
 }
 
 // VendorCodeExists checks if a code tree exists within the stored vendor

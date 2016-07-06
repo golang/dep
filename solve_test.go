@@ -113,7 +113,7 @@ func solveBimodalAndCheck(fix bimodalFixture, t *testing.T) (res Result, err err
 	if testing.Verbose() {
 		stderrlog.Printf("[[fixture %q]]", fix.n)
 	}
-	sm := newbmSM(fix.ds, fix.ignore)
+	sm := newbmSM(fix)
 
 	args := SolveArgs{
 		Root:     string(fix.ds[0].Name()),
@@ -141,7 +141,7 @@ func fixtureSolveSimpleChecks(fix specfix, res Result, err error, t *testing.T) 
 	if err != nil {
 		errp := fix.expectErrs()
 		if len(errp) == 0 {
-			t.Errorf("(fixture: %q) Solver failed; error was type %T, text: %q", fix.name(), err, err)
+			t.Errorf("(fixture: %q) Solver failed; error was type %T, text:\n%s", fix.name(), err, err)
 			return res, err
 		}
 
@@ -150,7 +150,7 @@ func fixtureSolveSimpleChecks(fix specfix, res Result, err error, t *testing.T) 
 			t.Errorf("(fixture: %q) Unexpected bad opts failure solve error: %s", fix.name(), err)
 		case *noVersionError:
 			if errp[0] != string(fail.pn.LocalName) { // TODO identifierify
-				t.Errorf("(fixture: %q) Expected failure on project %s, but was on project %s", fix.name(), fail.pn.LocalName, errp[0])
+				t.Errorf("(fixture: %q) Expected failure on project %s, but was on project %s", fix.name(), errp[0], fail.pn.LocalName)
 			}
 
 			ep := make(map[string]struct{})
@@ -246,13 +246,13 @@ func TestRootLockNoVersionPairMatching(t *testing.T) {
 	fix := basicFixture{
 		n: "does not pair bare revs in manifest with unpaired lock version",
 		ds: []depspec{
-			dsv("root 0.0.0", "foo *"), // foo's constraint rewritten below to foorev
-			dsv("foo 1.0.0", "bar 1.0.0"),
-			dsv("foo 1.0.1 foorev", "bar 1.0.1"),
-			dsv("foo 1.0.2 foorev", "bar 1.0.2"),
-			dsv("bar 1.0.0"),
-			dsv("bar 1.0.1"),
-			dsv("bar 1.0.2"),
+			mkDepspec("root 0.0.0", "foo *"), // foo's constraint rewritten below to foorev
+			mkDepspec("foo 1.0.0", "bar 1.0.0"),
+			mkDepspec("foo 1.0.1 foorev", "bar 1.0.1"),
+			mkDepspec("foo 1.0.2 foorev", "bar 1.0.2"),
+			mkDepspec("bar 1.0.0"),
+			mkDepspec("bar 1.0.1"),
+			mkDepspec("bar 1.0.2"),
 		},
 		l: mklock(
 			"foo 1.0.1",
@@ -314,8 +314,10 @@ func getFailureCausingProjects(err error) (projs []string) {
 		}
 	case *depHasProblemPackagesFailure:
 		projs = append(projs, string(e.goal.depender.id.LocalName), string(e.goal.dep.Ident.LocalName))
+	case *nonexistentRevisionFailure:
+		projs = append(projs, string(e.goal.depender.id.LocalName), string(e.goal.dep.Ident.LocalName))
 	default:
-		panic("unknown failtype")
+		panic(fmt.Sprintf("unknown failtype %T, msg: %s", err, err))
 	}
 
 	return

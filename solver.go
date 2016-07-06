@@ -431,7 +431,7 @@ func (s *solver) selectRoot() error {
 		s.sel.pushDep(dependency{depender: pa, dep: dep})
 		// Add all to unselected queue
 		s.names[dep.Ident.LocalName] = dep.Ident.netName()
-		heap.Push(s.unsel, bimodalIdentifier{id: dep.Ident, pl: dep.pl})
+		heap.Push(s.unsel, bimodalIdentifier{id: dep.Ident, pl: dep.pl, fromRoot: true})
 	}
 
 	return nil
@@ -584,7 +584,7 @@ func (s *solver) createVersionQueue(bmi bimodalIdentifier) (*versionQueue, error
 	id := bmi.id
 	// If on the root package, there's no queue to make
 	if id.LocalName == s.rm.Name() {
-		return newVersionQueue(id, nilpa, s.b)
+		return newVersionQueue(id, nil, nil, s.b)
 	}
 
 	exists, err := s.b.repoExists(id)
@@ -604,7 +604,7 @@ func (s *solver) createVersionQueue(bmi bimodalIdentifier) (*versionQueue, error
 		}
 	}
 
-	lockv := nilpa
+	var lockv Version
 	if len(s.rlm) > 0 {
 		lockv, err = s.getLockVersionIfValid(id)
 		if err != nil {
@@ -614,13 +614,79 @@ func (s *solver) createVersionQueue(bmi bimodalIdentifier) (*versionQueue, error
 		}
 	}
 
-	q, err := newVersionQueue(id, lockv, s.b)
+	var prefv Version
+	if bmi.fromRoot {
+		// If this bmi came from the root, then we want to search through things
+		// with a dependency on it in order to see if any have a lock that might
+		// express a prefv
+		//
+		// TODO nested loop; prime candidate for a cache somewhere
+		for _, dep := range s.sel.getDependenciesOn(bmi.id) {
+			_, l, err := s.b.getProjectInfo(dep.depender)
+			if err != nil {
+				// This really shouldn't be possible, but just skip if it if it
+				// does happen somehow
+				continue
+			}
+
+			for _, lp := range l.Projects() {
+				if lp.Ident().eq(bmi.id) {
+					prefv = lp.Version()
+				}
+			}
+		}
+
+		// OTHER APPROACH - WRONG, BUT MAYBE USEFUL FOR REFERENCE?
+		// If this bmi came from the root, then we want to search the unselected
+		// queue to see if anything *else* wants this ident, in which case we
+		// pick up that prefv
+		//for _, bmi2 := range s.unsel.sl {
+		//// Take the first thing from the queue that's for the same ident,
+		//// and has a non-nil prefv
+		//if bmi.id.eq(bmi2.id) {
+		//if bmi2.prefv != nil {
+		//prefv = bmi2.prefv
+		//}
+		//}
+		//}
+
+	} else {
+		// Otherwise, just use the preferred version expressed in the bmi
+		prefv = bmi.prefv
+	}
+
+	q, err := newVersionQueue(id, lockv, prefv, s.b)
 	if err != nil {
 		// TODO this particular err case needs to be improved to be ONLY for cases
 		// where there's absolutely nothing findable about a given project name
 		return nil, err
 	}
 
+	// Hack in support for revisions.
+	//
+	// By design, revs aren't returned from ListVersion(). Thus, if the dep in
+	// the bmi was has a rev constraint, it is (almost) guaranteed to fail, even
+	// if that rev does exist in the repo. So, detect a rev and push it into the
+	// vq here, instead.
+	//
+	// Happily, the solver maintains the invariant that constraints on a given
+	// ident cannot be incompatible, so we know that if we find one rev, then
+	// any other deps will have to also be on that rev (or Any).
+	//
+	// TODO while this does work, it bypasses the interface-implied guarantees
+	// of the version queue, and is therefore not a great strategy for API
+	// coherency. Folding this in to a formal interface would be better.
+	switch tc := s.sel.getConstraint(bmi.id).(type) {
+	case Revision:
+		// We know this is the only thing that could possibly match, so put it
+		// in at the front - if it isn't there already.
+		if q.pi[0] != tc {
+			// Existence of the revision is guaranteed by checkRevisionExists().
+			q.pi = append([]Version{tc}, q.pi...)
+		}
+	}
+
+	// Having assembled the queue, search it for a valid version.
 	return q, s.findValidVersion(q, bmi.pl)
 }
 
@@ -632,7 +698,8 @@ func (s *solver) createVersionQueue(bmi bimodalIdentifier) (*versionQueue, error
 // parameter.
 func (s *solver) findValidVersion(q *versionQueue, pl []string) error {
 	if nil == q.current() {
-		// TODO this case shouldn't be reachable, but panic here as a canary
+		// this case should not be reachable, but reflects improper solver state
+		// if it is, so panic immediately
 		panic("version queue is empty, should not happen")
 	}
 
@@ -681,7 +748,7 @@ func (s *solver) findValidVersion(q *versionQueue, pl []string) error {
 //
 // If any of these three conditions are true (or if the id cannot be found in
 // the root lock), then no atom will be returned.
-func (s *solver) getLockVersionIfValid(id ProjectIdentifier) (atom, error) {
+func (s *solver) getLockVersionIfValid(id ProjectIdentifier) (Version, error) {
 	// If the project is specifically marked for changes, then don't look for a
 	// locked version.
 	if _, explicit := s.chng[id.LocalName]; explicit || s.o.ChangeAll {
@@ -691,14 +758,14 @@ func (s *solver) getLockVersionIfValid(id ProjectIdentifier) (atom, error) {
 		// though, then we have to try to use what's in the lock, because that's
 		// the only version we'll be able to get.
 		if exist, _ := s.b.repoExists(id); exist {
-			return nilpa, nil
+			return nil, nil
 		}
 
 		// However, if a change was *expressly* requested for something that
 		// exists only in vendor, then that guarantees we don't have enough
 		// information to complete a solution. In that case, error out.
 		if explicit {
-			return nilpa, &missingSourceFailure{
+			return nil, &missingSourceFailure{
 				goal: id,
 				prob: "Cannot upgrade %s, as no source repository could be found.",
 			}
@@ -707,7 +774,7 @@ func (s *solver) getLockVersionIfValid(id ProjectIdentifier) (atom, error) {
 
 	lp, exists := s.rlm[id]
 	if !exists {
-		return nilpa, nil
+		return nil, nil
 	}
 
 	constraint := s.sel.getConstraint(id)
@@ -739,16 +806,13 @@ func (s *solver) getLockVersionIfValid(id ProjectIdentifier) (atom, error) {
 
 		if !found {
 			s.logSolve("%s in root lock, but current constraints disallow it", id.errString())
-			return nilpa, nil
+			return nil, nil
 		}
 	}
 
 	s.logSolve("using root lock's version of %s", id.errString())
 
-	return atom{
-		id: id,
-		v:  v,
-	}, nil
+	return v, nil
 }
 
 // backtrack works backwards from the current failed solution to find the next
@@ -862,16 +926,6 @@ func (s *solver) unselectedComparator(i, j int) bool {
 		return false
 	}
 
-	rname := s.rm.Name()
-	// *always* put root project first
-	// TODO wait, it shouldn't be possible to have root in here...?
-	if iname.LocalName == rname {
-		return true
-	}
-	if jname.LocalName == rname {
-		return false
-	}
-
 	_, ilock := s.rlm[iname]
 	_, jlock := s.rlm[jname]
 
@@ -889,8 +943,6 @@ func (s *solver) unselectedComparator(i, j int) bool {
 	// isn't locked by the root. And, because being locked by root is the only
 	// way avoid that call when making a version queue, we know we're gonna have
 	// to pay that cost anyway.
-	//
-	// TODO ...at least, 'til we allow 'preferred' versions via non-root locks
 
 	// We can safely ignore an err from ListVersions here because, if there is
 	// an actual problem, it'll be noted and handled somewhere else saner in the
@@ -951,6 +1003,14 @@ func (s *solver) selectAtomWithPackages(a atomWithPackages) {
 		panic(fmt.Sprintf("canary - shouldn't be possible %s", err))
 	}
 
+	// If this atom has a lock, pull it out so that we can potentially inject
+	// preferred versions into any bmis we enqueue
+	_, l, err := s.b.getProjectInfo(a.a)
+	lmap := make(map[ProjectIdentifier]Version)
+	for _, lp := range l.Projects() {
+		lmap[lp.Ident()] = lp.Version()
+	}
+
 	for _, dep := range deps {
 		s.sel.pushDep(dependency{depender: a.a, dep: dep})
 		// Go through all the packages introduced on this dep, selecting only
@@ -965,7 +1025,14 @@ func (s *solver) selectAtomWithPackages(a atomWithPackages) {
 		}
 
 		if len(newp) > 0 {
-			heap.Push(s.unsel, bimodalIdentifier{id: dep.Ident, pl: newp})
+			bmi := bimodalIdentifier{
+				id: dep.Ident,
+				pl: newp,
+				// This puts in a preferred version if one's in the map, else
+				// drops in the zero value (nil)
+				prefv: lmap[dep.Ident],
+			}
+			heap.Push(s.unsel, bmi)
 		}
 
 		if s.sel.depperCount(dep.Ident) == 1 {
@@ -995,6 +1062,14 @@ func (s *solver) selectPackages(a atomWithPackages) {
 		panic(fmt.Sprintf("canary - shouldn't be possible %s", err))
 	}
 
+	// If this atom has a lock, pull it out so that we can potentially inject
+	// preferred versions into any bmis we enqueue
+	_, l, err := s.b.getProjectInfo(a.a)
+	lmap := make(map[ProjectIdentifier]Version)
+	for _, lp := range l.Projects() {
+		lmap[lp.Ident()] = lp.Version()
+	}
+
 	for _, dep := range deps {
 		s.sel.pushDep(dependency{depender: a.a, dep: dep})
 		// Go through all the packages introduced on this dep, selecting only
@@ -1009,7 +1084,14 @@ func (s *solver) selectPackages(a atomWithPackages) {
 		}
 
 		if len(newp) > 0 {
-			heap.Push(s.unsel, bimodalIdentifier{id: dep.Ident, pl: newp})
+			bmi := bimodalIdentifier{
+				id: dep.Ident,
+				pl: newp,
+				// This puts in a preferred version if one's in the map, else
+				// drops in the zero value (nil)
+				prefv: lmap[dep.Ident],
+			}
+			heap.Push(s.unsel, bmi)
 		}
 
 		if s.sel.depperCount(dep.Ident) == 1 {

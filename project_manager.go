@@ -42,6 +42,7 @@ type projectManager struct {
 
 	// The project metadata cache. This is persisted to disk, for reuse across
 	// solver runs.
+	// TODO protect with mutex
 	dc *projectDataCache
 }
 
@@ -130,6 +131,8 @@ func (pm *projectManager) GetInfoAt(v Version) (Manifest, Lock, error) {
 			Lock:     l,
 		}
 
+		// TODO this just clobbers all over and ignores the paired/unpaired
+		// distinction; serious fix is needed
 		if r, exists := pm.dc.VMap[v]; exists {
 			pm.dc.Infos[r] = pi
 		}
@@ -178,14 +181,17 @@ func (pm *projectManager) ensureCacheExistence() error {
 	// don't have to think about it elsewhere
 	if !pm.CheckExistence(existsInCache) {
 		if pm.CheckExistence(existsUpstream) {
+			pm.crepo.mut.Lock()
 			err := pm.crepo.r.Get()
+			pm.crepo.mut.Unlock()
+
 			if err != nil {
-				return fmt.Errorf("Failed to create repository cache for %s", pm.n)
+				return fmt.Errorf("failed to create repository cache for %s", pm.n)
 			}
 			pm.ex.s |= existsInCache
 			pm.ex.f |= existsInCache
 		} else {
-			return fmt.Errorf("Project repository cache for %s does not exist", pm.n)
+			return fmt.Errorf("project %s does not exist upstream", pm.n)
 		}
 	}
 
@@ -232,6 +238,25 @@ func (pm *projectManager) ListVersions() (vlist []Version, err error) {
 	}
 
 	return
+}
+
+func (pm *projectManager) RevisionPresentIn(r Revision) (bool, error) {
+	// First and fastest path is to check the data cache to see if the rev is
+	// present. This could give us false positives, but the cases where that can
+	// occur would require a type of cache staleness that seems *exceedingly*
+	// unlikely to occur.
+	if _, has := pm.dc.Infos[r]; has {
+		return true, nil
+	} else if _, has := pm.dc.RMap[r]; has {
+		return true, nil
+	}
+
+	// For now at least, just run GetInfoAt(); it basically accomplishes the
+	// same thing.
+	if _, _, err := pm.GetInfoAt(r); err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 // CheckExistence provides a direct method for querying existence levels of the

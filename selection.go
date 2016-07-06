@@ -141,8 +141,6 @@ func (s *selection) selected(id ProjectIdentifier) (atomWithPackages, bool) {
 	return atomWithPackages{a: nilpa}, false
 }
 
-// TODO take a ProjectName, but optionally also a preferred version. This will
-// enable the lock files of dependencies to remain slightly more stable.
 type unselected struct {
 	sl  []bimodalIdentifier
 	cmp func(i, j int) bool
@@ -179,7 +177,6 @@ func (u *unselected) Pop() (v interface{}) {
 // The worst case for both of these is O(n), but in practice the first case is
 // be O(1), as we iterate the queue from front to back.
 func (u *unselected) remove(bmi bimodalIdentifier) {
-	// TODO is it worth implementing a binary search here?
 	for k, pi := range u.sl {
 		if pi.id.eq(bmi.id) {
 			// Simple slice comparison - assume they're both sorted the same

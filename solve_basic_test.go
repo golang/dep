@@ -10,12 +10,12 @@ import (
 
 var regfrom = regexp.MustCompile(`^(\w*) from (\w*) ([0-9\.]*)`)
 
-// nsvSplit splits an "info" string on " " into the pair of name and
+// nvSplit splits an "info" string on " " into the pair of name and
 // version/constraint, and returns each individually.
 //
 // This is for narrow use - panics if there are less than two resulting items in
 // the slice.
-func nsvSplit(info string) (id ProjectIdentifier, version string) {
+func nvSplit(info string) (id ProjectIdentifier, version string) {
 	if strings.Contains(info, " from ") {
 		parts := regfrom.FindStringSubmatch(info)
 		info = parts[1] + " " + parts[3]
@@ -34,14 +34,14 @@ func nsvSplit(info string) (id ProjectIdentifier, version string) {
 	return
 }
 
-// nsvrSplit splits an "info" string on " " into the triplet of name,
+// nvrSplit splits an "info" string on " " into the triplet of name,
 // version/constraint, and revision, and returns each individually.
 //
 // It will work fine if only name and version/constraint are provided.
 //
 // This is for narrow use - panics if there are less than two resulting items in
 // the slice.
-func nsvrSplit(info string) (id ProjectIdentifier, version string, revision Revision) {
+func nvrSplit(info string) (id ProjectIdentifier, version string, revision Revision) {
 	if strings.Contains(info, " from ") {
 		parts := regfrom.FindStringSubmatch(info)
 		info = parts[1] + " " + parts[3]
@@ -64,21 +64,45 @@ func nsvrSplit(info string) (id ProjectIdentifier, version string, revision Revi
 	return
 }
 
-// mksvpa - "make semver project atom"
+// mkAtom splits the input string on a space, and uses the first two elements as
+// the project identifier and version, respectively.
 //
-// Splits the input string on a space, and uses the first two elements as the
-// project name and constraint body, respectively.
-func mksvpa(info string) atom {
-	id, ver, rev := nsvrSplit(info)
-
-	_, err := semver.NewVersion(ver)
-	if err != nil {
-		// don't want to allow bad test data at this level, so just panic
-		panic(fmt.Sprintf("Error when converting '%s' into semver: %s", ver, err))
-	}
+// The version segment may have a leading character indicating the type of
+// version to create:
+//
+//  p: create a "plain" (non-semver) version.
+//  b: create a branch version.
+//  r: create a revision.
+//
+// No prefix is assumed to indicate a semver version.
+//
+// If a third space-delimited element is provided, it will be interepreted as a
+// revision, and used as the underlying version in a PairedVersion. No prefix
+// should be provided in this case. It is an error (and will panic) to try to
+// pass a revision with an underlying revision.
+func mkAtom(info string) atom {
+	id, ver, rev := nvrSplit(info)
 
 	var v Version
-	v = NewVersion(ver)
+	switch ver[0] {
+	case 'r':
+		if rev != "" {
+			panic("Cannot pair a revision with a revision")
+		}
+		v = Revision(ver[1:])
+	case 'p':
+		v = NewVersion(ver[1:])
+	case 'b':
+		v = NewBranch(ver[1:])
+	default:
+		_, err := semver.NewVersion(ver)
+		if err != nil {
+			// don't want to allow bad test data at this level, so just panic
+			panic(fmt.Sprintf("Error when converting '%s' into semver: %s", ver, err))
+		}
+		v = NewVersion(ver)
+	}
+
 	if rev != "" {
 		v = v.(UnpairedVersion).Is(rev)
 	}
@@ -89,30 +113,59 @@ func mksvpa(info string) atom {
 	}
 }
 
-// mkc - "make constraint"
-func mkc(body string) Constraint {
-	c, err := NewSemverConstraint(body)
-	if err != nil {
-		// don't want bad test data at this level, so just panic
-		panic(fmt.Sprintf("Error when converting '%s' into semver constraint: %s", body, err))
+// mkPDep splits the input string on a space, and uses the first two elements
+// as the project identifier and constraint body, respectively.
+//
+// The constraint body may have a leading character indicating the type of
+// version to create:
+//
+//  p: create a "plain" (non-semver) version.
+//  b: create a branch version.
+//  r: create a revision.
+//
+// If no leading character is used, a semver constraint is assumed.
+func mkPDep(info string) ProjectDep {
+	id, ver, rev := nvrSplit(info)
+
+	var c Constraint
+	switch ver[0] {
+	case 'r':
+		c = Revision(ver[1:])
+	case 'p':
+		c = NewVersion(ver[1:])
+	case 'b':
+		c = NewBranch(ver[1:])
+	default:
+		// Without one of those leading characters, we know it's a proper semver
+		// expression, so use the other parser that doesn't look for a rev
+		rev = ""
+		id, ver = nvSplit(info)
+		var err error
+		c, err = NewSemverConstraint(ver)
+		if err != nil {
+			// don't want bad test data at this level, so just panic
+			panic(fmt.Sprintf("Error when converting '%s' into semver constraint: %s (full info: %s)", ver, err, info))
+		}
 	}
 
-	return c
-}
-
-// mksvd - "make semver dependency"
-//
-// Splits the input string on a space, and uses the first two elements as the
-// project name and constraint body, respectively.
-func mksvd(info string) ProjectDep {
-	id, v := nsvSplit(info)
+	// There's no practical reason that a real tool would need to produce a
+	// constraint that's a PairedVersion, but it is a possibility admitted by the
+	// system, so we at least allow for it in our testing harness.
+	if rev != "" {
+		// Of course, this *will* panic if the predicate is a revision or a
+		// semver constraint, neither of which implement UnpairedVersion. This
+		// is as intended, to prevent bad data from entering the system.
+		c = c.(UnpairedVersion).Is(rev)
+	}
 
 	return ProjectDep{
 		Ident:      id,
-		Constraint: mkc(v),
+		Constraint: c,
 	}
 }
 
+// A depspec is a fixture representing all the information a SourceManager would
+// ordinarily glean directly from interrogating a repository.
 type depspec struct {
 	n       ProjectName
 	v       Version
@@ -121,17 +174,18 @@ type depspec struct {
 	pkgs    []tpkg
 }
 
-// dsv - "depspec semver" (make a semver depspec)
+// mkDepspec creates a depspec by processing a series of strings, each of which
+// contains an identiifer and version information.
 //
-// Wraps up all the other semver-making-helper funcs to create a depspec with
-// both semver versions and constraints.
+// The first string is broken out into the name and version of the package being
+// described - see the docs on mkAtom for details. subsequent strings are
+// interpreted as dep constraints of that dep at that version. See the docs on
+// mkPDep for details.
 //
-// As it assembles from the other shortcut methods, it'll panic if anything's
-// malformed.
-//
-// First string is broken out into the name/semver of the main package.
-func dsv(pi string, deps ...string) depspec {
-	pa := mksvpa(pi)
+// If a string other than the first includes a "(dev) " prefix, it will be
+// treated as a test-only dependency.
+func mkDepspec(pi string, deps ...string) depspec {
+	pa := mkAtom(pi)
 	if string(pa.id.LocalName) != pa.id.NetworkName {
 		panic("alternate source on self makes no sense")
 	}
@@ -150,7 +204,7 @@ func dsv(pi string, deps ...string) depspec {
 			sl = &ds.deps
 		}
 
-		*sl = append(*sl, mksvd(dep))
+		*sl = append(*sl, mkPDep(dep))
 	}
 
 	return ds
@@ -160,7 +214,7 @@ func dsv(pi string, deps ...string) depspec {
 func mklock(pairs ...string) fixLock {
 	l := make(fixLock, 0)
 	for _, s := range pairs {
-		pa := mksvpa(s)
+		pa := mkAtom(s)
 		l = append(l, NewLockedProject(pa.id.LocalName, pa.v, pa.id.netName(), "", nil))
 	}
 
@@ -172,7 +226,7 @@ func mklock(pairs ...string) fixLock {
 func mkrevlock(pairs ...string) fixLock {
 	l := make(fixLock, 0)
 	for _, s := range pairs {
-		pa := mksvpa(s)
+		pa := mkAtom(s)
 		l = append(l, NewLockedProject(pa.id.LocalName, pa.v.(PairedVersion).Underlying(), pa.id.netName(), "", nil))
 	}
 
@@ -183,15 +237,9 @@ func mkrevlock(pairs ...string) fixLock {
 func mkresults(pairs ...string) map[string]Version {
 	m := make(map[string]Version)
 	for _, pair := range pairs {
-		name, ver, rev := nsvrSplit(pair)
-
-		var v Version
-		v = NewVersion(ver)
-		if rev != "" {
-			v = v.(UnpairedVersion).Is(rev)
-		}
-
-		m[string(name.LocalName)] = v
+		a := mkAtom(pair)
+		// TODO identifierify
+		m[string(a.id.LocalName)] = a.v
 	}
 
 	return m
@@ -245,6 +293,20 @@ type specfix interface {
 	result() map[string]Version
 }
 
+// A basicFixture is a declarative test fixture that can cover a wide variety of
+// solver cases. All cases, however, maintain one invariant: package == project.
+// There are no subpackages, and so it is impossible for them to trigger or
+// require bimodal solving.
+//
+// This type is separate from bimodalFixture in part for legacy reasons - many
+// of these were adapted from similar tests in dart's pub lib, where there is no
+// such thing as "bimodal solving".
+//
+// But it's also useful to keep them separate because bimodal solving involves
+// considerably more complexity than simple solving, both in terms of fixture
+// declaration and actual solving mechanics. Thus, we gain a lot of value for
+// contributors and maintainers by keeping comprehension costs relatively low
+// while still covering important cases.
 type basicFixture struct {
 	// name of this fixture datum
 	n string
@@ -284,25 +346,26 @@ func (f basicFixture) result() map[string]Version {
 	return f.r
 }
 
+// A table of basicFixtures, used in the basic solving test set.
 var basicFixtures = []basicFixture{
 	// basic fixtures
 	{
 		n: "no dependencies",
 		ds: []depspec{
-			dsv("root 0.0.0"),
+			mkDepspec("root 0.0.0"),
 		},
 		r: mkresults(),
 	},
 	{
 		n: "simple dependency tree",
 		ds: []depspec{
-			dsv("root 0.0.0", "a 1.0.0", "b 1.0.0"),
-			dsv("a 1.0.0", "aa 1.0.0", "ab 1.0.0"),
-			dsv("aa 1.0.0"),
-			dsv("ab 1.0.0"),
-			dsv("b 1.0.0", "ba 1.0.0", "bb 1.0.0"),
-			dsv("ba 1.0.0"),
-			dsv("bb 1.0.0"),
+			mkDepspec("root 0.0.0", "a 1.0.0", "b 1.0.0"),
+			mkDepspec("a 1.0.0", "aa 1.0.0", "ab 1.0.0"),
+			mkDepspec("aa 1.0.0"),
+			mkDepspec("ab 1.0.0"),
+			mkDepspec("b 1.0.0", "ba 1.0.0", "bb 1.0.0"),
+			mkDepspec("ba 1.0.0"),
+			mkDepspec("bb 1.0.0"),
 		},
 		r: mkresults(
 			"a 1.0.0",
@@ -316,14 +379,14 @@ var basicFixtures = []basicFixture{
 	{
 		n: "shared dependency with overlapping constraints",
 		ds: []depspec{
-			dsv("root 0.0.0", "a 1.0.0", "b 1.0.0"),
-			dsv("a 1.0.0", "shared >=2.0.0, <4.0.0"),
-			dsv("b 1.0.0", "shared >=3.0.0, <5.0.0"),
-			dsv("shared 2.0.0"),
-			dsv("shared 3.0.0"),
-			dsv("shared 3.6.9"),
-			dsv("shared 4.0.0"),
-			dsv("shared 5.0.0"),
+			mkDepspec("root 0.0.0", "a 1.0.0", "b 1.0.0"),
+			mkDepspec("a 1.0.0", "shared >=2.0.0, <4.0.0"),
+			mkDepspec("b 1.0.0", "shared >=3.0.0, <5.0.0"),
+			mkDepspec("shared 2.0.0"),
+			mkDepspec("shared 3.0.0"),
+			mkDepspec("shared 3.6.9"),
+			mkDepspec("shared 4.0.0"),
+			mkDepspec("shared 5.0.0"),
 		},
 		r: mkresults(
 			"a 1.0.0",
@@ -334,14 +397,14 @@ var basicFixtures = []basicFixture{
 	{
 		n: "downgrade on overlapping constraints",
 		ds: []depspec{
-			dsv("root 0.0.0", "a 1.0.0", "b 1.0.0"),
-			dsv("a 1.0.0", "shared >=2.0.0, <=4.0.0"),
-			dsv("b 1.0.0", "shared >=3.0.0, <5.0.0"),
-			dsv("shared 2.0.0"),
-			dsv("shared 3.0.0"),
-			dsv("shared 3.6.9"),
-			dsv("shared 4.0.0"),
-			dsv("shared 5.0.0"),
+			mkDepspec("root 0.0.0", "a 1.0.0", "b 1.0.0"),
+			mkDepspec("a 1.0.0", "shared >=2.0.0, <=4.0.0"),
+			mkDepspec("b 1.0.0", "shared >=3.0.0, <5.0.0"),
+			mkDepspec("shared 2.0.0"),
+			mkDepspec("shared 3.0.0"),
+			mkDepspec("shared 3.6.9"),
+			mkDepspec("shared 4.0.0"),
+			mkDepspec("shared 5.0.0"),
 		},
 		r: mkresults(
 			"a 1.0.0",
@@ -353,15 +416,15 @@ var basicFixtures = []basicFixture{
 	{
 		n: "shared dependency where dependent version in turn affects other dependencies",
 		ds: []depspec{
-			dsv("root 0.0.0", "foo <=1.0.2", "bar 1.0.0"),
-			dsv("foo 1.0.0"),
-			dsv("foo 1.0.1", "bang 1.0.0"),
-			dsv("foo 1.0.2", "whoop 1.0.0"),
-			dsv("foo 1.0.3", "zoop 1.0.0"),
-			dsv("bar 1.0.0", "foo <=1.0.1"),
-			dsv("bang 1.0.0"),
-			dsv("whoop 1.0.0"),
-			dsv("zoop 1.0.0"),
+			mkDepspec("root 0.0.0", "foo <=1.0.2", "bar 1.0.0"),
+			mkDepspec("foo 1.0.0"),
+			mkDepspec("foo 1.0.1", "bang 1.0.0"),
+			mkDepspec("foo 1.0.2", "whoop 1.0.0"),
+			mkDepspec("foo 1.0.3", "zoop 1.0.0"),
+			mkDepspec("bar 1.0.0", "foo <=1.0.1"),
+			mkDepspec("bang 1.0.0"),
+			mkDepspec("whoop 1.0.0"),
+			mkDepspec("zoop 1.0.0"),
 		},
 		r: mkresults(
 			"foo 1.0.1",
@@ -372,12 +435,12 @@ var basicFixtures = []basicFixture{
 	{
 		n: "removed dependency",
 		ds: []depspec{
-			dsv("root 1.0.0", "foo 1.0.0", "bar *"),
-			dsv("foo 1.0.0"),
-			dsv("foo 2.0.0"),
-			dsv("bar 1.0.0"),
-			dsv("bar 2.0.0", "baz 1.0.0"),
-			dsv("baz 1.0.0", "foo 2.0.0"),
+			mkDepspec("root 1.0.0", "foo 1.0.0", "bar *"),
+			mkDepspec("foo 1.0.0"),
+			mkDepspec("foo 2.0.0"),
+			mkDepspec("bar 1.0.0"),
+			mkDepspec("bar 2.0.0", "baz 1.0.0"),
+			mkDepspec("baz 1.0.0", "foo 2.0.0"),
 		},
 		r: mkresults(
 			"foo 1.0.0",
@@ -388,9 +451,9 @@ var basicFixtures = []basicFixture{
 	{
 		n: "with mismatched net addrs",
 		ds: []depspec{
-			dsv("root 1.0.0", "foo 1.0.0", "bar 1.0.0"),
-			dsv("foo 1.0.0", "bar from baz 1.0.0"),
-			dsv("bar 1.0.0"),
+			mkDepspec("root 1.0.0", "foo 1.0.0", "bar 1.0.0"),
+			mkDepspec("foo 1.0.0", "bar from baz 1.0.0"),
+			mkDepspec("bar 1.0.0"),
 		},
 		// TODO ugh; do real error comparison instead of shitty abstraction
 		errp: []string{"foo", "foo", "root"},
@@ -399,13 +462,13 @@ var basicFixtures = []basicFixture{
 	{
 		n: "with compatible locked dependency",
 		ds: []depspec{
-			dsv("root 0.0.0", "foo *"),
-			dsv("foo 1.0.0", "bar 1.0.0"),
-			dsv("foo 1.0.1", "bar 1.0.1"),
-			dsv("foo 1.0.2", "bar 1.0.2"),
-			dsv("bar 1.0.0"),
-			dsv("bar 1.0.1"),
-			dsv("bar 1.0.2"),
+			mkDepspec("root 0.0.0", "foo *"),
+			mkDepspec("foo 1.0.0", "bar 1.0.0"),
+			mkDepspec("foo 1.0.1", "bar 1.0.1"),
+			mkDepspec("foo 1.0.2", "bar 1.0.2"),
+			mkDepspec("bar 1.0.0"),
+			mkDepspec("bar 1.0.1"),
+			mkDepspec("bar 1.0.2"),
 		},
 		l: mklock(
 			"foo 1.0.1",
@@ -418,13 +481,13 @@ var basicFixtures = []basicFixture{
 	{
 		n: "upgrade through lock",
 		ds: []depspec{
-			dsv("root 0.0.0", "foo *"),
-			dsv("foo 1.0.0", "bar 1.0.0"),
-			dsv("foo 1.0.1", "bar 1.0.1"),
-			dsv("foo 1.0.2", "bar 1.0.2"),
-			dsv("bar 1.0.0"),
-			dsv("bar 1.0.1"),
-			dsv("bar 1.0.2"),
+			mkDepspec("root 0.0.0", "foo *"),
+			mkDepspec("foo 1.0.0", "bar 1.0.0"),
+			mkDepspec("foo 1.0.1", "bar 1.0.1"),
+			mkDepspec("foo 1.0.2", "bar 1.0.2"),
+			mkDepspec("bar 1.0.0"),
+			mkDepspec("bar 1.0.1"),
+			mkDepspec("bar 1.0.2"),
 		},
 		l: mklock(
 			"foo 1.0.1",
@@ -438,13 +501,13 @@ var basicFixtures = []basicFixture{
 	{
 		n: "downgrade through lock",
 		ds: []depspec{
-			dsv("root 0.0.0", "foo *"),
-			dsv("foo 1.0.0", "bar 1.0.0"),
-			dsv("foo 1.0.1", "bar 1.0.1"),
-			dsv("foo 1.0.2", "bar 1.0.2"),
-			dsv("bar 1.0.0"),
-			dsv("bar 1.0.1"),
-			dsv("bar 1.0.2"),
+			mkDepspec("root 0.0.0", "foo *"),
+			mkDepspec("foo 1.0.0", "bar 1.0.0"),
+			mkDepspec("foo 1.0.1", "bar 1.0.1"),
+			mkDepspec("foo 1.0.2", "bar 1.0.2"),
+			mkDepspec("bar 1.0.0"),
+			mkDepspec("bar 1.0.1"),
+			mkDepspec("bar 1.0.2"),
 		},
 		l: mklock(
 			"foo 1.0.1",
@@ -459,13 +522,13 @@ var basicFixtures = []basicFixture{
 	{
 		n: "with incompatible locked dependency",
 		ds: []depspec{
-			dsv("root 0.0.0", "foo >1.0.1"),
-			dsv("foo 1.0.0", "bar 1.0.0"),
-			dsv("foo 1.0.1", "bar 1.0.1"),
-			dsv("foo 1.0.2", "bar 1.0.2"),
-			dsv("bar 1.0.0"),
-			dsv("bar 1.0.1"),
-			dsv("bar 1.0.2"),
+			mkDepspec("root 0.0.0", "foo >1.0.1"),
+			mkDepspec("foo 1.0.0", "bar 1.0.0"),
+			mkDepspec("foo 1.0.1", "bar 1.0.1"),
+			mkDepspec("foo 1.0.2", "bar 1.0.2"),
+			mkDepspec("bar 1.0.0"),
+			mkDepspec("bar 1.0.1"),
+			mkDepspec("bar 1.0.2"),
 		},
 		l: mklock(
 			"foo 1.0.1",
@@ -478,14 +541,14 @@ var basicFixtures = []basicFixture{
 	{
 		n: "with unrelated locked dependency",
 		ds: []depspec{
-			dsv("root 0.0.0", "foo *"),
-			dsv("foo 1.0.0", "bar 1.0.0"),
-			dsv("foo 1.0.1", "bar 1.0.1"),
-			dsv("foo 1.0.2", "bar 1.0.2"),
-			dsv("bar 1.0.0"),
-			dsv("bar 1.0.1"),
-			dsv("bar 1.0.2"),
-			dsv("baz 1.0.0 bazrev"),
+			mkDepspec("root 0.0.0", "foo *"),
+			mkDepspec("foo 1.0.0", "bar 1.0.0"),
+			mkDepspec("foo 1.0.1", "bar 1.0.1"),
+			mkDepspec("foo 1.0.2", "bar 1.0.2"),
+			mkDepspec("bar 1.0.0"),
+			mkDepspec("bar 1.0.1"),
+			mkDepspec("bar 1.0.2"),
+			mkDepspec("baz 1.0.0 bazrev"),
 		},
 		l: mklock(
 			"baz 1.0.0 bazrev",
@@ -498,16 +561,16 @@ var basicFixtures = []basicFixture{
 	{
 		n: "unlocks dependencies if necessary to ensure that a new dependency is satisfied",
 		ds: []depspec{
-			dsv("root 0.0.0", "foo *", "newdep *"),
-			dsv("foo 1.0.0 foorev", "bar <2.0.0"),
-			dsv("bar 1.0.0 barrev", "baz <2.0.0"),
-			dsv("baz 1.0.0 bazrev", "qux <2.0.0"),
-			dsv("qux 1.0.0 quxrev"),
-			dsv("foo 2.0.0", "bar <3.0.0"),
-			dsv("bar 2.0.0", "baz <3.0.0"),
-			dsv("baz 2.0.0", "qux <3.0.0"),
-			dsv("qux 2.0.0"),
-			dsv("newdep 2.0.0", "baz >=1.5.0"),
+			mkDepspec("root 0.0.0", "foo *", "newdep *"),
+			mkDepspec("foo 1.0.0 foorev", "bar <2.0.0"),
+			mkDepspec("bar 1.0.0 barrev", "baz <2.0.0"),
+			mkDepspec("baz 1.0.0 bazrev", "qux <2.0.0"),
+			mkDepspec("qux 1.0.0 quxrev"),
+			mkDepspec("foo 2.0.0", "bar <3.0.0"),
+			mkDepspec("bar 2.0.0", "baz <3.0.0"),
+			mkDepspec("baz 2.0.0", "qux <3.0.0"),
+			mkDepspec("qux 2.0.0"),
+			mkDepspec("newdep 2.0.0", "baz >=1.5.0"),
 		},
 		l: mklock(
 			"foo 1.0.0 foorev",
@@ -527,9 +590,9 @@ var basicFixtures = []basicFixture{
 	{
 		n: "locked atoms are matched on both local and net name",
 		ds: []depspec{
-			dsv("root 0.0.0", "foo *"),
-			dsv("foo 1.0.0 foorev"),
-			dsv("foo 2.0.0 foorev2"),
+			mkDepspec("root 0.0.0", "foo *"),
+			mkDepspec("foo 1.0.0 foorev"),
+			mkDepspec("foo 2.0.0 foorev2"),
 		},
 		l: mklock(
 			"foo from baz 1.0.0 foorev",
@@ -541,13 +604,13 @@ var basicFixtures = []basicFixture{
 	{
 		n: "pairs bare revs in lock with versions",
 		ds: []depspec{
-			dsv("root 0.0.0", "foo ~1.0.1"),
-			dsv("foo 1.0.0", "bar 1.0.0"),
-			dsv("foo 1.0.1 foorev", "bar 1.0.1"),
-			dsv("foo 1.0.2", "bar 1.0.2"),
-			dsv("bar 1.0.0"),
-			dsv("bar 1.0.1"),
-			dsv("bar 1.0.2"),
+			mkDepspec("root 0.0.0", "foo ~1.0.1"),
+			mkDepspec("foo 1.0.0", "bar 1.0.0"),
+			mkDepspec("foo 1.0.1 foorev", "bar 1.0.1"),
+			mkDepspec("foo 1.0.2", "bar 1.0.2"),
+			mkDepspec("bar 1.0.0"),
+			mkDepspec("bar 1.0.1"),
+			mkDepspec("bar 1.0.2"),
 		},
 		l: mkrevlock(
 			"foo 1.0.1 foorev", // mkrevlock drops the 1.0.1
@@ -560,13 +623,13 @@ var basicFixtures = []basicFixture{
 	{
 		n: "pairs bare revs in lock with all versions",
 		ds: []depspec{
-			dsv("root 0.0.0", "foo ~1.0.1"),
-			dsv("foo 1.0.0", "bar 1.0.0"),
-			dsv("foo 1.0.1 foorev", "bar 1.0.1"),
-			dsv("foo 1.0.2 foorev", "bar 1.0.2"),
-			dsv("bar 1.0.0"),
-			dsv("bar 1.0.1"),
-			dsv("bar 1.0.2"),
+			mkDepspec("root 0.0.0", "foo ~1.0.1"),
+			mkDepspec("foo 1.0.0", "bar 1.0.0"),
+			mkDepspec("foo 1.0.1 foorev", "bar 1.0.1"),
+			mkDepspec("foo 1.0.2 foorev", "bar 1.0.2"),
+			mkDepspec("bar 1.0.0"),
+			mkDepspec("bar 1.0.1"),
+			mkDepspec("bar 1.0.2"),
 		},
 		l: mkrevlock(
 			"foo 1.0.1 foorev", // mkrevlock drops the 1.0.1
@@ -579,13 +642,13 @@ var basicFixtures = []basicFixture{
 	{
 		n: "does not pair bare revs in manifest with unpaired lock version",
 		ds: []depspec{
-			dsv("root 0.0.0", "foo ~1.0.1"),
-			dsv("foo 1.0.0", "bar 1.0.0"),
-			dsv("foo 1.0.1 foorev", "bar 1.0.1"),
-			dsv("foo 1.0.2", "bar 1.0.2"),
-			dsv("bar 1.0.0"),
-			dsv("bar 1.0.1"),
-			dsv("bar 1.0.2"),
+			mkDepspec("root 0.0.0", "foo ~1.0.1"),
+			mkDepspec("foo 1.0.0", "bar 1.0.0"),
+			mkDepspec("foo 1.0.1 foorev", "bar 1.0.1"),
+			mkDepspec("foo 1.0.2", "bar 1.0.2"),
+			mkDepspec("bar 1.0.0"),
+			mkDepspec("bar 1.0.1"),
+			mkDepspec("bar 1.0.2"),
 		},
 		l: mkrevlock(
 			"foo 1.0.1 foorev", // mkrevlock drops the 1.0.1
@@ -598,9 +661,9 @@ var basicFixtures = []basicFixture{
 	{
 		n: "includes root package's dev dependencies",
 		ds: []depspec{
-			dsv("root 1.0.0", "(dev) foo 1.0.0", "(dev) bar 1.0.0"),
-			dsv("foo 1.0.0"),
-			dsv("bar 1.0.0"),
+			mkDepspec("root 1.0.0", "(dev) foo 1.0.0", "(dev) bar 1.0.0"),
+			mkDepspec("foo 1.0.0"),
+			mkDepspec("bar 1.0.0"),
 		},
 		r: mkresults(
 			"foo 1.0.0",
@@ -610,9 +673,9 @@ var basicFixtures = []basicFixture{
 	{
 		n: "includes dev dependency's transitive dependencies",
 		ds: []depspec{
-			dsv("root 1.0.0", "(dev) foo 1.0.0"),
-			dsv("foo 1.0.0", "bar 1.0.0"),
-			dsv("bar 1.0.0"),
+			mkDepspec("root 1.0.0", "(dev) foo 1.0.0"),
+			mkDepspec("foo 1.0.0", "bar 1.0.0"),
+			mkDepspec("bar 1.0.0"),
 		},
 		r: mkresults(
 			"foo 1.0.0",
@@ -622,9 +685,9 @@ var basicFixtures = []basicFixture{
 	{
 		n: "ignores transitive dependency's dev dependencies",
 		ds: []depspec{
-			dsv("root 1.0.0", "(dev) foo 1.0.0"),
-			dsv("foo 1.0.0", "(dev) bar 1.0.0"),
-			dsv("bar 1.0.0"),
+			mkDepspec("root 1.0.0", "(dev) foo 1.0.0"),
+			mkDepspec("foo 1.0.0", "(dev) bar 1.0.0"),
+			mkDepspec("bar 1.0.0"),
 		},
 		r: mkresults(
 			"foo 1.0.0",
@@ -633,31 +696,31 @@ var basicFixtures = []basicFixture{
 	{
 		n: "no version that matches requirement",
 		ds: []depspec{
-			dsv("root 0.0.0", "foo >=1.0.0, <2.0.0"),
-			dsv("foo 2.0.0"),
-			dsv("foo 2.1.3"),
+			mkDepspec("root 0.0.0", "foo >=1.0.0, <2.0.0"),
+			mkDepspec("foo 2.0.0"),
+			mkDepspec("foo 2.1.3"),
 		},
 		errp: []string{"foo", "root"},
 	},
 	{
 		n: "no version that matches combined constraint",
 		ds: []depspec{
-			dsv("root 0.0.0", "foo 1.0.0", "bar 1.0.0"),
-			dsv("foo 1.0.0", "shared >=2.0.0, <3.0.0"),
-			dsv("bar 1.0.0", "shared >=2.9.0, <4.0.0"),
-			dsv("shared 2.5.0"),
-			dsv("shared 3.5.0"),
+			mkDepspec("root 0.0.0", "foo 1.0.0", "bar 1.0.0"),
+			mkDepspec("foo 1.0.0", "shared >=2.0.0, <3.0.0"),
+			mkDepspec("bar 1.0.0", "shared >=2.9.0, <4.0.0"),
+			mkDepspec("shared 2.5.0"),
+			mkDepspec("shared 3.5.0"),
 		},
 		errp: []string{"shared", "foo", "bar"},
 	},
 	{
 		n: "disjoint constraints",
 		ds: []depspec{
-			dsv("root 0.0.0", "foo 1.0.0", "bar 1.0.0"),
-			dsv("foo 1.0.0", "shared <=2.0.0"),
-			dsv("bar 1.0.0", "shared >3.0.0"),
-			dsv("shared 2.0.0"),
-			dsv("shared 4.0.0"),
+			mkDepspec("root 0.0.0", "foo 1.0.0", "bar 1.0.0"),
+			mkDepspec("foo 1.0.0", "shared <=2.0.0"),
+			mkDepspec("bar 1.0.0", "shared >3.0.0"),
+			mkDepspec("shared 2.0.0"),
+			mkDepspec("shared 4.0.0"),
 		},
 		//errp: []string{"shared", "foo", "bar"}, // dart's has this...
 		errp: []string{"foo", "bar"},
@@ -665,11 +728,11 @@ var basicFixtures = []basicFixture{
 	{
 		n: "no valid solution",
 		ds: []depspec{
-			dsv("root 0.0.0", "a *", "b *"),
-			dsv("a 1.0.0", "b 1.0.0"),
-			dsv("a 2.0.0", "b 2.0.0"),
-			dsv("b 1.0.0", "a 2.0.0"),
-			dsv("b 2.0.0", "a 1.0.0"),
+			mkDepspec("root 0.0.0", "a *", "b *"),
+			mkDepspec("a 1.0.0", "b 1.0.0"),
+			mkDepspec("a 2.0.0", "b 2.0.0"),
+			mkDepspec("b 1.0.0", "a 2.0.0"),
+			mkDepspec("b 2.0.0", "a 1.0.0"),
 		},
 		errp:        []string{"b", "a"},
 		maxAttempts: 2,
@@ -677,9 +740,9 @@ var basicFixtures = []basicFixture{
 	{
 		n: "no version that matches while backtracking",
 		ds: []depspec{
-			dsv("root 0.0.0", "a *", "b >1.0.0"),
-			dsv("a 1.0.0"),
-			dsv("b 1.0.0"),
+			mkDepspec("root 0.0.0", "a *", "b >1.0.0"),
+			mkDepspec("a 1.0.0"),
+			mkDepspec("b 1.0.0"),
 		},
 		errp: []string{"b", "root"},
 	},
@@ -689,13 +752,13 @@ var basicFixtures = []basicFixture{
 		// in the dependency graph from myapp is downgraded first.
 		n: "rolls back leaf versions first",
 		ds: []depspec{
-			dsv("root 0.0.0", "a *"),
-			dsv("a 1.0.0", "b *"),
-			dsv("a 2.0.0", "b *", "c 2.0.0"),
-			dsv("b 1.0.0"),
-			dsv("b 2.0.0", "c 1.0.0"),
-			dsv("c 1.0.0"),
-			dsv("c 2.0.0"),
+			mkDepspec("root 0.0.0", "a *"),
+			mkDepspec("a 1.0.0", "b *"),
+			mkDepspec("a 2.0.0", "b *", "c 2.0.0"),
+			mkDepspec("b 1.0.0"),
+			mkDepspec("b 2.0.0", "c 1.0.0"),
+			mkDepspec("c 1.0.0"),
+			mkDepspec("c 2.0.0"),
 		},
 		r: mkresults(
 			"a 2.0.0",
@@ -709,14 +772,14 @@ var basicFixtures = []basicFixture{
 		// reach it.
 		n: "simple transitive",
 		ds: []depspec{
-			dsv("root 0.0.0", "foo *"),
-			dsv("foo 1.0.0", "bar 1.0.0"),
-			dsv("foo 2.0.0", "bar 2.0.0"),
-			dsv("foo 3.0.0", "bar 3.0.0"),
-			dsv("bar 1.0.0", "baz *"),
-			dsv("bar 2.0.0", "baz 2.0.0"),
-			dsv("bar 3.0.0", "baz 3.0.0"),
-			dsv("baz 1.0.0"),
+			mkDepspec("root 0.0.0", "foo *"),
+			mkDepspec("foo 1.0.0", "bar 1.0.0"),
+			mkDepspec("foo 2.0.0", "bar 2.0.0"),
+			mkDepspec("foo 3.0.0", "bar 3.0.0"),
+			mkDepspec("bar 1.0.0", "baz *"),
+			mkDepspec("bar 2.0.0", "baz 2.0.0"),
+			mkDepspec("bar 3.0.0", "baz 3.0.0"),
+			mkDepspec("baz 1.0.0"),
 		},
 		r: mkresults(
 			"foo 1.0.0",
@@ -733,13 +796,13 @@ var basicFixtures = []basicFixture{
 		// versions.
 		n: "simple transitive",
 		ds: []depspec{
-			dsv("root 0.0.0", "a *", "b *"),
-			dsv("a 1.0.0", "c 1.0.0"),
-			dsv("a 2.0.0", "c 2.0.0"),
-			dsv("b 1.0.0"),
-			dsv("b 2.0.0"),
-			dsv("b 3.0.0"),
-			dsv("c 1.0.0"),
+			mkDepspec("root 0.0.0", "a *", "b *"),
+			mkDepspec("a 1.0.0", "c 1.0.0"),
+			mkDepspec("a 2.0.0", "c 2.0.0"),
+			mkDepspec("b 1.0.0"),
+			mkDepspec("b 2.0.0"),
+			mkDepspec("b 3.0.0"),
+			mkDepspec("c 1.0.0"),
 		},
 		r: mkresults(
 			"a 1.0.0",
@@ -757,18 +820,18 @@ var basicFixtures = []basicFixture{
 		// gets downgraded.
 		n: "traverse into package with fewer versions first",
 		ds: []depspec{
-			dsv("root 0.0.0", "a *", "b *"),
-			dsv("a 1.0.0", "c *"),
-			dsv("a 2.0.0", "c *"),
-			dsv("a 3.0.0", "c *"),
-			dsv("a 4.0.0", "c *"),
-			dsv("a 5.0.0", "c 1.0.0"),
-			dsv("b 1.0.0", "c *"),
-			dsv("b 2.0.0", "c *"),
-			dsv("b 3.0.0", "c *"),
-			dsv("b 4.0.0", "c 2.0.0"),
-			dsv("c 1.0.0"),
-			dsv("c 2.0.0"),
+			mkDepspec("root 0.0.0", "a *", "b *"),
+			mkDepspec("a 1.0.0", "c *"),
+			mkDepspec("a 2.0.0", "c *"),
+			mkDepspec("a 3.0.0", "c *"),
+			mkDepspec("a 4.0.0", "c *"),
+			mkDepspec("a 5.0.0", "c 1.0.0"),
+			mkDepspec("b 1.0.0", "c *"),
+			mkDepspec("b 2.0.0", "c *"),
+			mkDepspec("b 3.0.0", "c *"),
+			mkDepspec("b 4.0.0", "c 2.0.0"),
+			mkDepspec("c 1.0.0"),
+			mkDepspec("c 2.0.0"),
 		},
 		r: mkresults(
 			"a 4.0.0",
@@ -786,15 +849,15 @@ var basicFixtures = []basicFixture{
 		// but we will do less backtracking if foo is tested first.
 		n: "traverse into package with fewer versions first",
 		ds: []depspec{
-			dsv("root 0.0.0", "foo *", "bar *"),
-			dsv("foo 1.0.0", "none 2.0.0"),
-			dsv("foo 2.0.0", "none 2.0.0"),
-			dsv("foo 3.0.0", "none 2.0.0"),
-			dsv("foo 4.0.0", "none 2.0.0"),
-			dsv("bar 1.0.0"),
-			dsv("bar 2.0.0"),
-			dsv("bar 3.0.0"),
-			dsv("none 1.0.0"),
+			mkDepspec("root 0.0.0", "foo *", "bar *"),
+			mkDepspec("foo 1.0.0", "none 2.0.0"),
+			mkDepspec("foo 2.0.0", "none 2.0.0"),
+			mkDepspec("foo 3.0.0", "none 2.0.0"),
+			mkDepspec("foo 4.0.0", "none 2.0.0"),
+			mkDepspec("bar 1.0.0"),
+			mkDepspec("bar 2.0.0"),
+			mkDepspec("bar 3.0.0"),
+			mkDepspec("none 1.0.0"),
 		},
 		errp:        []string{"none", "foo"},
 		maxAttempts: 2,
@@ -806,15 +869,15 @@ var basicFixtures = []basicFixture{
 		// constraint.
 		n: "backjump past failed package on disjoint constraint",
 		ds: []depspec{
-			dsv("root 0.0.0", "a *", "foo *"),
-			dsv("a 1.0.0", "foo *"),
-			dsv("a 2.0.0", "foo <1.0.0"),
-			dsv("foo 2.0.0"),
-			dsv("foo 2.0.1"),
-			dsv("foo 2.0.2"),
-			dsv("foo 2.0.3"),
-			dsv("foo 2.0.4"),
-			dsv("none 1.0.0"),
+			mkDepspec("root 0.0.0", "a *", "foo *"),
+			mkDepspec("a 1.0.0", "foo *"),
+			mkDepspec("a 2.0.0", "foo <1.0.0"),
+			mkDepspec("foo 2.0.0"),
+			mkDepspec("foo 2.0.1"),
+			mkDepspec("foo 2.0.2"),
+			mkDepspec("foo 2.0.3"),
+			mkDepspec("foo 2.0.4"),
+			mkDepspec("none 1.0.0"),
 		},
 		r: mkresults(
 			"a 1.0.0",
@@ -822,6 +885,46 @@ var basicFixtures = []basicFixture{
 		),
 		maxAttempts: 2,
 	},
+	{
+		// Revision enters vqueue if a dep has a constraint on that revision
+		n: "revision injected into vqueue",
+		ds: []depspec{
+			mkDepspec("root 0.0.0", "foo r123abc"),
+			mkDepspec("foo r123abc"),
+			mkDepspec("foo 1.0.0 foorev"),
+			mkDepspec("foo 2.0.0 foorev2"),
+		},
+		r: mkresults(
+			"foo r123abc",
+		),
+	},
+	// TODO decide how to refactor the solver in order to re-enable these.
+	// Checking for revision existence is important...but kinda obnoxious.
+	//{
+	//// Solve fails if revision constraint calls for a nonexistent revision
+	//n: "fail on missing revision",
+	//ds: []depspec{
+	//mkDepspec("root 0.0.0", "bar *"),
+	//mkDepspec("bar 1.0.0", "foo r123abc"),
+	//mkDepspec("foo r123nomatch"),
+	//mkDepspec("foo 1.0.0"),
+	//mkDepspec("foo 2.0.0"),
+	//},
+	//errp: []string{"bar", "foo", "bar"},
+	//},
+	//{
+	//// Solve fails if revision constraint calls for a nonexistent revision,
+	//// even if rev constraint is specified by root
+	//n: "fail on missing revision from root",
+	//ds: []depspec{
+	//mkDepspec("root 0.0.0", "foo r123nomatch"),
+	//mkDepspec("foo r123abc"),
+	//mkDepspec("foo 1.0.0"),
+	//mkDepspec("foo 2.0.0"),
+	//},
+	//errp: []string{"foo", "root", "foo"},
+	//},
+
 	// TODO add fixture that tests proper handling of loops via aliases (where
 	// a project that wouldn't be a loop is aliased to a project that is a loop)
 }
@@ -835,8 +938,8 @@ func init() {
 	fix := basicFixture{
 		n: "complex backtrack",
 		ds: []depspec{
-			dsv("root 0.0.0", "foo *", "bar *"),
-			dsv("baz 0.0.0"),
+			mkDepspec("root 0.0.0", "foo *", "bar *"),
+			mkDepspec("baz 0.0.0"),
 		},
 		r: mkresults(
 			"foo 0.9.0",
@@ -848,8 +951,8 @@ func init() {
 
 	for i := 0; i < 10; i++ {
 		for j := 0; j < 10; j++ {
-			fix.ds = append(fix.ds, dsv(fmt.Sprintf("foo %v.%v.0", i, j), fmt.Sprintf("baz %v.0.0", i)))
-			fix.ds = append(fix.ds, dsv(fmt.Sprintf("bar %v.%v.0", i, j), fmt.Sprintf("baz 0.%v.0", j)))
+			fix.ds = append(fix.ds, mkDepspec(fmt.Sprintf("foo %v.%v.0", i, j), fmt.Sprintf("baz %v.0.0", i)))
+			fix.ds = append(fix.ds, mkDepspec(fmt.Sprintf("bar %v.%v.0", i, j), fmt.Sprintf("baz 0.%v.0", j)))
 		}
 	}
 
@@ -898,7 +1001,7 @@ func (sm *depspecSourceManager) GetProjectInfo(n ProjectName, v Version) (Manife
 	}
 
 	// TODO proper solver-type errors
-	return nil, nil, fmt.Errorf("Project '%s' at version '%s' could not be found", n, v)
+	return nil, nil, fmt.Errorf("Project %s at version %s could not be found", n, v)
 }
 
 func (sm *depspecSourceManager) ExternalReach(n ProjectName, v Version) (map[string][]string, error) {
@@ -941,16 +1044,28 @@ func (sm *depspecSourceManager) ListPackages(n ProjectName, v Version) (PackageT
 
 func (sm *depspecSourceManager) ListVersions(name ProjectName) (pi []Version, err error) {
 	for _, ds := range sm.specs {
-		if name == ds.n {
+		// To simulate the behavior of the real SourceManager, we do not return
+		// revisions from ListVersions().
+		if _, isrev := ds.v.(Revision); !isrev && name == ds.n {
 			pi = append(pi, ds.v)
 		}
 	}
 
 	if len(pi) == 0 {
-		err = fmt.Errorf("Project '%s' could not be found", name)
+		err = fmt.Errorf("Project %s could not be found", name)
 	}
 
 	return
+}
+
+func (sm *depspecSourceManager) RevisionPresentIn(name ProjectName, r Revision) (bool, error) {
+	for _, ds := range sm.specs {
+		if name == ds.n && r == ds.v {
+			return true, nil
+		}
+	}
+
+	return false, fmt.Errorf("Project %s has no revision %s", name, r)
 }
 
 func (sm *depspecSourceManager) RepoExists(name ProjectName) (bool, error) {

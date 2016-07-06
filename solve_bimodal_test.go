@@ -37,9 +37,9 @@ var bimodalFixtures = map[string]bimodalFixture{
 	// including a single, simple import that is not expressed as a constraint
 	"simple bm-add": {
 		ds: []depspec{
-			dsp(dsv("root 0.0.0"),
+			dsp(mkDepspec("root 0.0.0"),
 				pkg("root", "a")),
-			dsp(dsv("a 1.0.0"),
+			dsp(mkDepspec("a 1.0.0"),
 				pkg("a")),
 		},
 		r: mkresults(
@@ -50,11 +50,11 @@ var bimodalFixtures = map[string]bimodalFixture{
 	// same path as root, but from a subpkg
 	"subpkg bm-add": {
 		ds: []depspec{
-			dsp(dsv("root 0.0.0"),
+			dsp(mkDepspec("root 0.0.0"),
 				pkg("root", "root/foo"),
 				pkg("root/foo", "a"),
 			),
-			dsp(dsv("a 1.0.0"),
+			dsp(mkDepspec("a 1.0.0"),
 				pkg("a"),
 			),
 		},
@@ -65,12 +65,12 @@ var bimodalFixtures = map[string]bimodalFixture{
 	// The same, but with a jump through two subpkgs
 	"double-subpkg bm-add": {
 		ds: []depspec{
-			dsp(dsv("root 0.0.0"),
+			dsp(mkDepspec("root 0.0.0"),
 				pkg("root", "root/foo"),
 				pkg("root/foo", "root/bar"),
 				pkg("root/bar", "a"),
 			),
-			dsp(dsv("a 1.0.0"),
+			dsp(mkDepspec("a 1.0.0"),
 				pkg("a"),
 			),
 		},
@@ -81,12 +81,12 @@ var bimodalFixtures = map[string]bimodalFixture{
 	// Same again, but now nest the subpkgs
 	"double nested subpkg bm-add": {
 		ds: []depspec{
-			dsp(dsv("root 0.0.0"),
+			dsp(mkDepspec("root 0.0.0"),
 				pkg("root", "root/foo"),
 				pkg("root/foo", "root/foo/bar"),
 				pkg("root/foo/bar", "a"),
 			),
-			dsp(dsv("a 1.0.0"),
+			dsp(mkDepspec("a 1.0.0"),
 				pkg("a"),
 			),
 		},
@@ -97,9 +97,9 @@ var bimodalFixtures = map[string]bimodalFixture{
 	// Importing package from project with no root package
 	"bm-add on project with no pkg in root dir": {
 		ds: []depspec{
-			dsp(dsv("root 0.0.0"),
+			dsp(mkDepspec("root 0.0.0"),
 				pkg("root", "a/foo")),
-			dsp(dsv("a 1.0.0"),
+			dsp(mkDepspec("a 1.0.0"),
 				pkg("a/foo")),
 		},
 		r: mkresults(
@@ -109,14 +109,14 @@ var bimodalFixtures = map[string]bimodalFixture{
 	// Import jump is in a dep, and points to a transitive dep
 	"transitive bm-add": {
 		ds: []depspec{
-			dsp(dsv("root 0.0.0"),
+			dsp(mkDepspec("root 0.0.0"),
 				pkg("root", "root/foo"),
 				pkg("root/foo", "a"),
 			),
-			dsp(dsv("a 1.0.0"),
+			dsp(mkDepspec("a 1.0.0"),
 				pkg("a", "b"),
 			),
-			dsp(dsv("b 1.0.0"),
+			dsp(mkDepspec("b 1.0.0"),
 				pkg("b"),
 			),
 		},
@@ -129,17 +129,17 @@ var bimodalFixtures = map[string]bimodalFixture{
 	// reachable import
 	"constraints activated by import": {
 		ds: []depspec{
-			dsp(dsv("root 0.0.0", "b 1.0.0"),
+			dsp(mkDepspec("root 0.0.0", "b 1.0.0"),
 				pkg("root", "root/foo"),
 				pkg("root/foo", "a"),
 			),
-			dsp(dsv("a 1.0.0"),
+			dsp(mkDepspec("a 1.0.0"),
 				pkg("a", "b"),
 			),
-			dsp(dsv("b 1.0.0"),
+			dsp(mkDepspec("b 1.0.0"),
 				pkg("b"),
 			),
-			dsp(dsv("b 1.1.0"),
+			dsp(mkDepspec("b 1.1.0"),
 				pkg("b"),
 			),
 		},
@@ -152,17 +152,17 @@ var bimodalFixtures = map[string]bimodalFixture{
 	// the first version we try
 	"transitive bm-add on older version": {
 		ds: []depspec{
-			dsp(dsv("root 0.0.0", "a ~1.0.0"),
+			dsp(mkDepspec("root 0.0.0", "a ~1.0.0"),
 				pkg("root", "root/foo"),
 				pkg("root/foo", "a"),
 			),
-			dsp(dsv("a 1.0.0"),
+			dsp(mkDepspec("a 1.0.0"),
 				pkg("a", "b"),
 			),
-			dsp(dsv("a 1.1.0"),
+			dsp(mkDepspec("a 1.1.0"),
 				pkg("a"),
 			),
-			dsp(dsv("b 1.0.0"),
+			dsp(mkDepspec("b 1.0.0"),
 				pkg("b"),
 			),
 		},
@@ -175,24 +175,24 @@ var bimodalFixtures = map[string]bimodalFixture{
 	// get there via backtracking
 	"backtrack to dep on bm-add": {
 		ds: []depspec{
-			dsp(dsv("root 0.0.0"),
+			dsp(mkDepspec("root 0.0.0"),
 				pkg("root", "root/foo"),
 				pkg("root/foo", "a", "b"),
 			),
-			dsp(dsv("a 1.0.0"),
+			dsp(mkDepspec("a 1.0.0"),
 				pkg("a", "c"),
 			),
-			dsp(dsv("a 1.1.0"),
+			dsp(mkDepspec("a 1.1.0"),
 				pkg("a"),
 			),
 			// Include two versions of b, otherwise it'll be selected first
-			dsp(dsv("b 0.9.0"),
+			dsp(mkDepspec("b 0.9.0"),
 				pkg("b", "c"),
 			),
-			dsp(dsv("b 1.0.0"),
+			dsp(mkDepspec("b 1.0.0"),
 				pkg("b", "c"),
 			),
-			dsp(dsv("c 1.0.0", "a 1.0.0"),
+			dsp(mkDepspec("c 1.0.0", "a 1.0.0"),
 				pkg("c", "a"),
 			),
 		},
@@ -205,15 +205,15 @@ var bimodalFixtures = map[string]bimodalFixture{
 	// Import jump is in a dep subpkg, and points to a transitive dep
 	"transitive subpkg bm-add": {
 		ds: []depspec{
-			dsp(dsv("root 0.0.0"),
+			dsp(mkDepspec("root 0.0.0"),
 				pkg("root", "root/foo"),
 				pkg("root/foo", "a"),
 			),
-			dsp(dsv("a 1.0.0"),
+			dsp(mkDepspec("a 1.0.0"),
 				pkg("a", "a/bar"),
 				pkg("a/bar", "b"),
 			),
-			dsp(dsv("b 1.0.0"),
+			dsp(mkDepspec("b 1.0.0"),
 				pkg("b"),
 			),
 		},
@@ -226,19 +226,19 @@ var bimodalFixtures = map[string]bimodalFixture{
 	// not the first version we try
 	"transitive subpkg bm-add on older version": {
 		ds: []depspec{
-			dsp(dsv("root 0.0.0", "a ~1.0.0"),
+			dsp(mkDepspec("root 0.0.0", "a ~1.0.0"),
 				pkg("root", "root/foo"),
 				pkg("root/foo", "a"),
 			),
-			dsp(dsv("a 1.0.0"),
+			dsp(mkDepspec("a 1.0.0"),
 				pkg("a", "a/bar"),
 				pkg("a/bar", "b"),
 			),
-			dsp(dsv("a 1.1.0"),
+			dsp(mkDepspec("a 1.1.0"),
 				pkg("a", "a/bar"),
 				pkg("a/bar"),
 			),
-			dsp(dsv("b 1.0.0"),
+			dsp(mkDepspec("b 1.0.0"),
 				pkg("b"),
 			),
 		},
@@ -252,11 +252,11 @@ var bimodalFixtures = map[string]bimodalFixture{
 	// is not part of the solution.
 	"ignore constraint without import": {
 		ds: []depspec{
-			dsp(dsv("root 0.0.0", "a 1.0.0"),
+			dsp(mkDepspec("root 0.0.0", "a 1.0.0"),
 				pkg("root", "root/foo"),
 				pkg("root/foo"),
 			),
-			dsp(dsv("a 1.0.0"),
+			dsp(mkDepspec("a 1.0.0"),
 				pkg("a"),
 			),
 		},
@@ -266,20 +266,20 @@ var bimodalFixtures = map[string]bimodalFixture{
 	// deps incorporate its various packages.
 	"multi-stage pkg incorporation": {
 		ds: []depspec{
-			dsp(dsv("root 0.0.0"),
+			dsp(mkDepspec("root 0.0.0"),
 				pkg("root", "a", "d"),
 			),
-			dsp(dsv("a 1.0.0"),
+			dsp(mkDepspec("a 1.0.0"),
 				pkg("a", "b"),
 				pkg("a/second", "c"),
 			),
-			dsp(dsv("b 2.0.0"),
+			dsp(mkDepspec("b 2.0.0"),
 				pkg("b"),
 			),
-			dsp(dsv("c 1.2.0"),
+			dsp(mkDepspec("c 1.2.0"),
 				pkg("c"),
 			),
-			dsp(dsv("d 1.0.0"),
+			dsp(mkDepspec("d 1.0.0"),
 				pkg("d", "a/second"),
 			),
 		},
@@ -295,13 +295,13 @@ var bimodalFixtures = map[string]bimodalFixture{
 	// present.
 	"radix path separator post-check": {
 		ds: []depspec{
-			dsp(dsv("root 0.0.0"),
+			dsp(mkDepspec("root 0.0.0"),
 				pkg("root", "foo", "foobar"),
 			),
-			dsp(dsv("foo 1.0.0"),
+			dsp(mkDepspec("foo 1.0.0"),
 				pkg("foo"),
 			),
-			dsp(dsv("foobar 1.0.0"),
+			dsp(mkDepspec("foobar 1.0.0"),
 				pkg("foobar"),
 			),
 		},
@@ -313,10 +313,10 @@ var bimodalFixtures = map[string]bimodalFixture{
 	// Well-formed failure when there's a dependency on a pkg that doesn't exist
 	"fail when imports nonexistent package": {
 		ds: []depspec{
-			dsp(dsv("root 0.0.0", "a 1.0.0"),
+			dsp(mkDepspec("root 0.0.0", "a 1.0.0"),
 				pkg("root", "a/foo"),
 			),
-			dsp(dsv("a 1.0.0"),
+			dsp(mkDepspec("a 1.0.0"),
 				pkg("a"),
 			),
 		},
@@ -327,20 +327,20 @@ var bimodalFixtures = map[string]bimodalFixture{
 	// discover one incrementally that isn't present
 	"fail multi-stage missing pkg": {
 		ds: []depspec{
-			dsp(dsv("root 0.0.0"),
+			dsp(mkDepspec("root 0.0.0"),
 				pkg("root", "a", "d"),
 			),
-			dsp(dsv("a 1.0.0"),
+			dsp(mkDepspec("a 1.0.0"),
 				pkg("a", "b"),
 				pkg("a/second", "c"),
 			),
-			dsp(dsv("b 2.0.0"),
+			dsp(mkDepspec("b 2.0.0"),
 				pkg("b"),
 			),
-			dsp(dsv("c 1.2.0"),
+			dsp(mkDepspec("c 1.2.0"),
 				pkg("c"),
 			),
-			dsp(dsv("d 1.0.0"),
+			dsp(mkDepspec("d 1.0.0"),
 				pkg("d", "a/second"),
 				pkg("d", "a/nonexistent"),
 			),
@@ -350,15 +350,15 @@ var bimodalFixtures = map[string]bimodalFixture{
 	// Check ignores on the root project
 	"ignore in double-subpkg": {
 		ds: []depspec{
-			dsp(dsv("root 0.0.0"),
+			dsp(mkDepspec("root 0.0.0"),
 				pkg("root", "root/foo"),
 				pkg("root/foo", "root/bar", "b"),
 				pkg("root/bar", "a"),
 			),
-			dsp(dsv("a 1.0.0"),
+			dsp(mkDepspec("a 1.0.0"),
 				pkg("a"),
 			),
-			dsp(dsv("b 1.0.0"),
+			dsp(mkDepspec("b 1.0.0"),
 				pkg("b"),
 			),
 		},
@@ -370,21 +370,100 @@ var bimodalFixtures = map[string]bimodalFixture{
 	// Ignores on a dep pkg
 	"ignore through dep pkg": {
 		ds: []depspec{
-			dsp(dsv("root 0.0.0"),
+			dsp(mkDepspec("root 0.0.0"),
 				pkg("root", "root/foo"),
 				pkg("root/foo", "a"),
 			),
-			dsp(dsv("a 1.0.0"),
+			dsp(mkDepspec("a 1.0.0"),
 				pkg("a", "a/bar"),
 				pkg("a/bar", "b"),
 			),
-			dsp(dsv("b 1.0.0"),
+			dsp(mkDepspec("b 1.0.0"),
 				pkg("b"),
 			),
 		},
 		ignore: []string{"a/bar"},
 		r: mkresults(
 			"a 1.0.0",
+		),
+	},
+	// Preferred version, as derived from a dep's lock, is attempted first
+	"respect prefv, simple case": {
+		ds: []depspec{
+			dsp(mkDepspec("root 0.0.0"),
+				pkg("root", "a")),
+			dsp(mkDepspec("a 1.0.0"),
+				pkg("a", "b")),
+			dsp(mkDepspec("b 1.0.0 foorev"),
+				pkg("b")),
+			dsp(mkDepspec("b 2.0.0 barrev"),
+				pkg("b")),
+		},
+		lm: map[string]fixLock{
+			"a 1.0.0": mklock(
+				"b 1.0.0 foorev",
+			),
+		},
+		r: mkresults(
+			"a 1.0.0",
+			"b 1.0.0 foorev",
+		),
+	},
+	// Preferred version, as derived from a dep's lock, is attempted first, even
+	// if the root also has a direct dep on it (root doesn't need to use
+	// preferreds, because it has direct control AND because the root lock
+	// already supercedes dep lock "preferences")
+	"respect dep prefv with root import": {
+		ds: []depspec{
+			dsp(mkDepspec("root 0.0.0"),
+				pkg("root", "a", "b")),
+			dsp(mkDepspec("a 1.0.0"),
+				pkg("a", "b")),
+			//dsp(newDepspec("a 1.0.1"),
+			//pkg("a", "b")),
+			//dsp(newDepspec("a 1.1.0"),
+			//pkg("a", "b")),
+			dsp(mkDepspec("b 1.0.0 foorev"),
+				pkg("b")),
+			dsp(mkDepspec("b 2.0.0 barrev"),
+				pkg("b")),
+		},
+		lm: map[string]fixLock{
+			"a 1.0.0": mklock(
+				"b 1.0.0 foorev",
+			),
+		},
+		r: mkresults(
+			"a 1.0.0",
+			"b 1.0.0 foorev",
+		),
+	},
+	// Preferred versions can only work if the thing offering it has been
+	// selected, or at least marked in the unselected queue
+	"prefv only works if depper is selected": {
+		ds: []depspec{
+			dsp(mkDepspec("root 0.0.0"),
+				pkg("root", "a", "b")),
+			// Three atoms for a, which will mean it gets visited after b
+			dsp(mkDepspec("a 1.0.0"),
+				pkg("a", "b")),
+			dsp(mkDepspec("a 1.0.1"),
+				pkg("a", "b")),
+			dsp(mkDepspec("a 1.1.0"),
+				pkg("a", "b")),
+			dsp(mkDepspec("b 1.0.0 foorev"),
+				pkg("b")),
+			dsp(mkDepspec("b 2.0.0 barrev"),
+				pkg("b")),
+		},
+		lm: map[string]fixLock{
+			"a 1.0.0": mklock(
+				"b 1.0.0 foorev",
+			),
+		},
+		r: mkresults(
+			"a 1.1.0",
+			"b 2.0.0 barrev",
 		),
 	},
 }
@@ -411,6 +490,9 @@ type bimodalFixture struct {
 	downgrade bool
 	// lock file simulator, if one's to be used at all
 	l fixLock
+	// map of locks for deps, if any. keys should be of the form:
+	// "<project> <version>"
+	lm map[string]fixLock
 	// projects expected to have errors, if any
 	errp []string
 	// request up/downgrade to all projects
@@ -440,19 +522,21 @@ func (f bimodalFixture) result() map[string]Version {
 }
 
 // bmSourceManager is an SM specifically for the bimodal fixtures. It composes
-// the general depspec SM, and differs from it only in the way that it answers
-// some static analysis-type calls.
+// the general depspec SM, and differs from it in how it answers static analysis
+// calls, and its support for package ignores and dep lock data.
 type bmSourceManager struct {
 	depspecSourceManager
+	lm map[string]fixLock
 }
 
 var _ SourceManager = &bmSourceManager{}
 
-func newbmSM(ds []depspec, ignore []string) *bmSourceManager {
+func newbmSM(bmf bimodalFixture) *bmSourceManager {
 	sm := &bmSourceManager{
-		depspecSourceManager: *newdepspecSM(ds, ignore),
+		depspecSourceManager: *newdepspecSM(bmf.ds, bmf.ignore),
 	}
-	sm.rm = computeBimodalExternalMap(ds)
+	sm.rm = computeBimodalExternalMap(bmf.ds)
+	sm.lm = bmf.lm
 
 	return sm
 }
@@ -480,6 +564,21 @@ func (sm *bmSourceManager) ListPackages(n ProjectName, v Version) (PackageTree, 
 	}
 
 	return PackageTree{}, fmt.Errorf("Project %s at version %s could not be found", n, v)
+}
+
+func (sm *bmSourceManager) GetProjectInfo(n ProjectName, v Version) (Manifest, Lock, error) {
+	for _, ds := range sm.specs {
+		if n == ds.n && v.Matches(ds.v) {
+			if l, exists := sm.lm[string(n)+" "+v.String()]; exists {
+				return ds, l, nil
+			} else {
+				return ds, dummyLock{}, nil
+			}
+		}
+	}
+
+	// TODO proper solver-type errors
+	return nil, nil, fmt.Errorf("Project %s at version %s could not be found", n, v)
 }
 
 // computeBimodalExternalMap takes a set of depspecs and computes an

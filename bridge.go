@@ -11,6 +11,7 @@ import (
 type sourceBridge interface {
 	getProjectInfo(pa atom) (Manifest, Lock, error)
 	listVersions(id ProjectIdentifier) ([]Version, error)
+	revisionPresentIn(id ProjectIdentifier, r Revision) (bool, error)
 	pairRevision(id ProjectIdentifier, r Revision) []Version
 	pairVersion(id ProjectIdentifier, v UnpairedVersion) PairedVersion
 	repoExists(id ProjectIdentifier) (bool, error)
@@ -59,7 +60,7 @@ type bridge struct {
 		err   error
 	}
 
-	// A map of packages to ignore.
+	// A map of packages to ignore
 	ignore map[string]bool
 
 	// Map of project root name to their available version list. This cache is
@@ -103,6 +104,11 @@ func (b *bridge) listVersions(id ProjectIdentifier) ([]Version, error) {
 
 	b.vlists[k] = vl
 	return vl, nil
+}
+
+func (b *bridge) revisionPresentIn(id ProjectIdentifier, r Revision) (bool, error) {
+	k := b.key(id)
+	return b.sm.RevisionPresentIn(k, r)
 }
 
 func (b *bridge) repoExists(id ProjectIdentifier) (bool, error) {
