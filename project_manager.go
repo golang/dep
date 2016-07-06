@@ -42,6 +42,7 @@ type projectManager struct {
 
 	// The project metadata cache. This is persisted to disk, for reuse across
 	// solver runs.
+	// TODO protect with mutex
 	dc *projectDataCache
 }
 
@@ -130,6 +131,8 @@ func (pm *projectManager) GetInfoAt(v Version) (Manifest, Lock, error) {
 			Lock:     l,
 		}
 
+		// TODO this just clobbers all over and ignores the paired/unpaired
+		// distinction; serious fix is needed
 		if r, exists := pm.dc.VMap[v]; exists {
 			pm.dc.Infos[r] = pi
 		}
@@ -178,14 +181,17 @@ func (pm *projectManager) ensureCacheExistence() error {
 	// don't have to think about it elsewhere
 	if !pm.CheckExistence(existsInCache) {
 		if pm.CheckExistence(existsUpstream) {
+			pm.crepo.mut.Lock()
 			err := pm.crepo.r.Get()
+			pm.crepo.mut.Unlock()
+
 			if err != nil {
-				return fmt.Errorf("Failed to create repository cache for %s", pm.n)
+				return fmt.Errorf("failed to create repository cache for %s", pm.n)
 			}
 			pm.ex.s |= existsInCache
 			pm.ex.f |= existsInCache
 		} else {
-			return fmt.Errorf("Project repository cache for %s does not exist", pm.n)
+			return fmt.Errorf("project %s does not exist upstream", pm.n)
 		}
 	}
 
