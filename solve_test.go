@@ -150,7 +150,7 @@ func fixtureSolveSimpleChecks(fix specfix, res Result, err error, t *testing.T) 
 			t.Errorf("(fixture: %q) Unexpected bad opts failure solve error: %s", fix.name(), err)
 		case *noVersionError:
 			if errp[0] != string(fail.pn.LocalName) { // TODO identifierify
-				t.Errorf("(fixture: %q) Expected failure on project %s, but was on project %s", fix.name(), fail.pn.LocalName, errp[0])
+				t.Errorf("(fixture: %q) Expected failure on project %s, but was on project %s", fix.name(), errp[0], fail.pn.LocalName)
 			}
 
 			ep := make(map[string]struct{})
