@@ -142,6 +142,9 @@ type solver struct {
 
 	// A normalized, copied version of the root manifest.
 	rm Manifest
+
+	// A normalized, copied version of the root lock.
+	rl Lock
 }
 
 // A Solver is the main workhorse of vsolver: given a set of project inputs, it
@@ -186,15 +189,13 @@ func Prepare(args SolveArgs, opts SolveOpts, sm SourceManager) (Solver, error) {
 		args: args,
 		o:    opts,
 		ig:   ig,
-		b: &bridge{
-			sm:       sm,
-			sortdown: opts.Downgrade,
-			name:     args.Name,
-			root:     args.Root,
-			ignore:   ig,
-			vlists:   make(map[ProjectName][]Version),
-		},
-		tl: opts.TraceLogger,
+		tl:   opts.TraceLogger,
+	}
+
+	s.b = &bridge{
+		sm:     sm,
+		s:      s,
+		vlists: make(map[ProjectName][]Version),
 	}
 
 	// Initialize maps
@@ -229,11 +230,14 @@ func (s *solver) Solve() (Result, error) {
 
 	// Prep safe, normalized versions of root manifest and lock data
 	s.rm = prepManifest(s.args.Manifest, s.args.Name)
-
 	if s.args.Lock != nil {
 		for _, lp := range s.args.Lock.Projects() {
 			s.rlm[lp.Ident().normalize()] = lp
 		}
+
+		// Also keep a prepped one, mostly for the bridge. This is probably
+		// wasteful, but only minimally so, and yay symmetry
+		s.rl = prepLock(s.args.Lock)
 	}
 
 	for _, v := range s.o.ToChange {
@@ -622,6 +626,11 @@ func (s *solver) createVersionQueue(bmi bimodalIdentifier) (*versionQueue, error
 		//
 		// TODO nested loop; prime candidate for a cache somewhere
 		for _, dep := range s.sel.getDependenciesOn(bmi.id) {
+			// Skip the root, of course
+			if dep.depender.id.LocalName == s.rm.Name() {
+				continue
+			}
+
 			_, l, err := s.b.getProjectInfo(dep.depender)
 			if err != nil || l == nil {
 				// err being non-nil really shouldn't be possible, but the lock

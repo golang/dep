@@ -42,26 +42,18 @@ type bridge struct {
 	// The underlying, adapted-to SourceManager
 	sm SourceManager
 
-	// Direction to sort the version list. False indicates sorting for upgrades;
-	// true for downgrades.
-	sortdown bool
-
-	// The name of the root project we're operating on. Used to redirect some
-	// calls that would ordinarily go to the SourceManager to a root-specific
-	// logical path, instead.
-	name ProjectName
-
-	// The path to the base directory of the root project.
-	root string
+	// The solver which we're assisting.
+	//
+	// The link between solver and bridge is circular, which is typically a bit
+	// awkward, but the bridge needs access to so many of the input arguments
+	// held by the solver that it ends up being easier and saner to do this.
+	s *solver
 
 	// Simple, local cache of the root's PackageTree
 	crp *struct {
 		ptree PackageTree
 		err   error
 	}
-
-	// A map of packages to ignore
-	ignore map[string]bool
 
 	// Map of project root name to their available version list. This cache is
 	// layered on top of the proper SourceManager's cache; the only difference
@@ -71,6 +63,9 @@ type bridge struct {
 }
 
 func (b *bridge) getProjectInfo(pa atom) (Manifest, Lock, error) {
+	if pa.id.LocalName == b.s.args.Name {
+		return b.s.rm, b.s.rl, nil
+	}
 	return b.sm.GetProjectInfo(ProjectName(pa.id.netName()), pa.v)
 }
 
@@ -96,7 +91,7 @@ func (b *bridge) listVersions(id ProjectIdentifier) ([]Version, error) {
 		return nil, err
 	}
 
-	if b.sortdown {
+	if b.s.o.Downgrade {
 		sort.Sort(downgradeVersionSorter(vl))
 	} else {
 		sort.Sort(upgradeVersionSorter(vl))
@@ -363,12 +358,12 @@ func (b *bridge) computeRootReach() ([]string, error) {
 		return nil, err
 	}
 
-	return ptree.ListExternalImports(true, true, b.ignore)
+	return ptree.ListExternalImports(true, true, b.s.ig)
 }
 
 func (b *bridge) listRootPackages() (PackageTree, error) {
 	if b.crp == nil {
-		ptree, err := listPackages(b.root, string(b.name))
+		ptree, err := listPackages(b.s.args.Root, string(b.s.args.Name))
 
 		b.crp = &struct {
 			ptree PackageTree
@@ -391,7 +386,7 @@ func (b *bridge) listRootPackages() (PackageTree, error) {
 // The root project is handled separately, as the source manager isn't
 // responsible for that code.
 func (b *bridge) listPackages(id ProjectIdentifier, v Version) (PackageTree, error) {
-	if id.LocalName == b.name {
+	if id.LocalName == b.s.args.Name {
 		return b.listRootPackages()
 	}
 
