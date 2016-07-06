@@ -56,10 +56,11 @@ type existence struct {
 
 // TODO figure out shape of versions, then implement marshaling/unmarshaling
 type projectDataCache struct {
-	Version string                   `json:"version"` // TODO use this
-	Infos   map[Revision]projectInfo `json:"infos"`
-	VMap    map[Version]Revision     `json:"vmap"`
-	RMap    map[Revision][]Version   `json:"rmap"`
+	Version  string                   `json:"version"` // TODO use this
+	Infos    map[Revision]projectInfo `json:"infos"`
+	Packages map[Revision]PackageTree `json:"packages"`
+	VMap     map[Version]Revision     `json:"vmap"`
+	RMap     map[Revision][]Version   `json:"rmap"`
 }
 
 // projectInfo holds manifest and lock
@@ -143,34 +144,62 @@ func (pm *projectManager) GetInfoAt(v Version) (Manifest, Lock, error) {
 	return nil, nil, err
 }
 
-func (pm *projectManager) ListPackages(v Version) (PackageTree, error) {
-	var err error
+func (pm *projectManager) ListPackages(v Version) (ptree PackageTree, err error) {
 	if err = pm.ensureCacheExistence(); err != nil {
-		return PackageTree{}, err
+		return
 	}
 
+	// See if we can find it in the cache
+	var r Revision
+	switch v.(type) {
+	case Revision, PairedVersion:
+		var ok bool
+		if r, ok = v.(Revision); !ok {
+			r = v.(PairedVersion).Underlying()
+		}
+
+		if ptree, cached := pm.dc.Packages[r]; cached {
+			return ptree, nil
+		}
+	default:
+		var has bool
+		if r, has = pm.dc.VMap[v]; has {
+			if ptree, cached := pm.dc.Packages[r]; cached {
+				return ptree, nil
+			}
+		}
+	}
+
+	// TODO handle the case where we have a version w/out rev, and not in cache
+
+	// Not in the cache; check out the version and do the analysis
 	pm.crepo.mut.Lock()
 	// Check out the desired version for analysis
-	if pv, ok := v.(PairedVersion); ok {
+	if r != "" {
 		// Always prefer a rev, if it's available
-		err = pm.crepo.r.UpdateVersion(pv.Underlying().String())
+		err = pm.crepo.r.UpdateVersion(string(r))
 	} else {
 		// If we don't have a rev, ensure the repo is up to date, otherwise we
 		// could have a desync issue
 		if !pm.crepo.synced {
 			err = pm.crepo.r.Update()
 			if err != nil {
-				return PackageTree{}, fmt.Errorf("Could not fetch latest updates into repository")
+				return PackageTree{}, fmt.Errorf("Could not fetch latest updates into repository: %s", err)
 			}
 			pm.crepo.synced = true
 		}
 		err = pm.crepo.r.UpdateVersion(v.String())
 	}
 
-	ex, err := listPackages(filepath.Join(pm.ctx.GOPATH, "src", string(pm.n)), string(pm.n))
+	ptree, err = listPackages(filepath.Join(pm.ctx.GOPATH, "src", string(pm.n)), string(pm.n))
 	pm.crepo.mut.Unlock()
 
-	return ex, err
+	// TODO cache errs?
+	if err != nil {
+		pm.dc.Packages[r] = ptree
+	}
+
+	return
 }
 
 func (pm *projectManager) ensureCacheExistence() error {

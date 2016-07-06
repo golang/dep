@@ -299,9 +299,10 @@ func (sm *sourceManager) getProjectManager(n ProjectName) (*pmState, error) {
 		//}
 
 		dc = &projectDataCache{
-			Infos: make(map[Revision]projectInfo),
-			VMap:  make(map[Version]Revision),
-			RMap:  make(map[Revision][]Version),
+			Infos:    make(map[Revision]projectInfo),
+			Packages: make(map[Revision]PackageTree),
+			VMap:     make(map[Version]Revision),
+			RMap:     make(map[Revision][]Version),
 		}
 	}
 

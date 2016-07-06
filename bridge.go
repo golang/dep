@@ -11,6 +11,8 @@ import (
 type sourceBridge interface {
 	getProjectInfo(pa atom) (Manifest, Lock, error)
 	listVersions(id ProjectIdentifier) ([]Version, error)
+	listPackages(id ProjectIdentifier, v Version) (PackageTree, error)
+	computeRootReach() ([]string, error)
 	revisionPresentIn(id ProjectIdentifier, r Revision) (bool, error)
 	pairRevision(id ProjectIdentifier, r Revision) []Version
 	pairVersion(id ProjectIdentifier, v UnpairedVersion) PairedVersion
@@ -19,8 +21,6 @@ type sourceBridge interface {
 	matches(id ProjectIdentifier, c Constraint, v Version) bool
 	matchesAny(id ProjectIdentifier, c1, c2 Constraint) bool
 	intersect(id ProjectIdentifier, c1, c2 Constraint) Constraint
-	listPackages(id ProjectIdentifier, v Version) (PackageTree, error)
-	computeRootReach() ([]string, error)
 	verifyRoot(path string) error
 	deduceRemoteRepo(path string) (*remoteRepo, error)
 }
