@@ -216,8 +216,38 @@ func listPackages(fileRoot, importRoot string) (PackageTree, error) {
 			}
 		}
 
-		ptree.Packages[ip] = PackageOrErr{
-			P: pkg,
+		// This area has some...fuzzy rules, but check all the imports for
+		// local/relative/dot-ness, and record an error for the package if we
+		// see any.
+		var lim []string
+		for _, imp := range append(pkg.Imports, pkg.TestImports...) {
+			switch {
+			// Do allow the single-dot, at least for now
+			case imp == "..":
+				lim = append(lim, imp)
+				// ignore stdlib done this way, b/c that's what the go tooling does
+			case strings.HasPrefix(imp, "./"):
+				if _, has := stdlib[imp[2:]]; !has {
+					lim = append(lim, imp)
+				}
+			case strings.HasPrefix(imp, "../"):
+				if _, has := stdlib[imp[3:]]; !has {
+					lim = append(lim, imp)
+				}
+			}
+		}
+
+		if len(lim) > 0 {
+			ptree.Packages[ip] = PackageOrErr{
+				Err: &LocalImportsError{
+					Dir:          ip,
+					LocalImports: lim,
+				},
+			}
+		} else {
+			ptree.Packages[ip] = PackageOrErr{
+				P: pkg,
+			}
 		}
 
 		return nil
@@ -228,6 +258,19 @@ func listPackages(fileRoot, importRoot string) (PackageTree, error) {
 	}
 
 	return ptree, nil
+}
+
+// LocalImportsError indicates that a package contains at least one relative
+// import that will prevent it from compiling.
+//
+// TODO add a Files property once we're doing our own per-file parsing
+type LocalImportsError struct {
+	Dir          string
+	LocalImports []string
+}
+
+func (e *LocalImportsError) Error() string {
+	return fmt.Sprintf("import path %s had problematic local imports")
 }
 
 type wm struct {
