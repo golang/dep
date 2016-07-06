@@ -41,10 +41,12 @@ func (s *solver) checkProject(a atomWithPackages) error {
 			s.logSolve(err)
 			return err
 		}
-		if err := s.checkRevisionExists(a, dep); err != nil {
-			s.logSolve(err)
-			return err
-		}
+		// TODO decide how to refactor in order to re-enable this. Checking for
+		// revision existence is important...but kinda obnoxious.
+		//if err := s.checkRevisionExists(a, dep); err != nil {
+		//s.logSolve(err)
+		//return err
+		//}
 		if err := s.checkPackageImportsFromDepExist(a, dep); err != nil {
 			s.logSolve(err)
 			return err
@@ -88,10 +90,12 @@ func (s *solver) checkPackage(a atomWithPackages) error {
 			s.logSolve(err)
 			return err
 		}
-		if err := s.checkRevisionExists(a, dep); err != nil {
-			s.logSolve(err)
-			return err
-		}
+		// TODO decide how to refactor in order to re-enable this. Checking for
+		// revision existence is important...but kinda obnoxious.
+		//if err := s.checkRevisionExists(a, dep); err != nil {
+		//s.logSolve(err)
+		//return err
+		//}
 		if err := s.checkPackageImportsFromDepExist(a, dep); err != nil {
 			s.logSolve(err)
 			return err
