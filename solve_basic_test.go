@@ -1043,6 +1043,16 @@ func (sm *depspecSourceManager) ListVersions(name ProjectName) (pi []Version, er
 	return
 }
 
+func (sm *depspecSourceManager) RevisionPresentIn(name ProjectName, r Revision) (bool, error) {
+	for _, ds := range sm.specs {
+		if name == ds.n && r == ds.v {
+			return true, nil
+		}
+	}
+
+	return false, fmt.Errorf("Project %s has no revision %s", name, r)
+}
+
 func (sm *depspecSourceManager) RepoExists(name ProjectName) (bool, error) {
 	for _, ds := range sm.specs {
 		if name == ds.n {

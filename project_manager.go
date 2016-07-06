@@ -240,6 +240,25 @@ func (pm *projectManager) ListVersions() (vlist []Version, err error) {
 	return
 }
 
+func (pm *projectManager) RevisionPresentIn(r Revision) (bool, error) {
+	// First and fastest path is to check the data cache to see if the rev is
+	// present. This could give us false positives, but the cases where that can
+	// occur would require a type of cache staleness that seems *exceedingly*
+	// unlikely to occur.
+	if _, has := pm.dc.Infos[r]; has {
+		return true, nil
+	} else if _, has := pm.dc.RMap[r]; has {
+		return true, nil
+	}
+
+	// For now at least, just run GetInfoAt(); it basically accomplishes the
+	// same thing.
+	if _, _, err := pm.GetInfoAt(r); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
 // CheckExistence provides a direct method for querying existence levels of the
 // project. It will only perform actual searching (local fs or over the network)
 // if no previous attempt at that search has been made.

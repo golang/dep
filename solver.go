@@ -673,7 +673,7 @@ func (s *solver) createVersionQueue(bmi bimodalIdentifier) (*versionQueue, error
 	// ident cannot be incompatible,so we know that if we find one rev, then any
 	// other deps will have to also be on that rev (or Any).
 	//
-	// TODO while this wdoes work, it bypasses the interface-implied guarantees
+	// TODO while this does work, it bypasses the interface-implied guarantees
 	// of the version queue, and is therefore not a great strategy for API
 	// coherency. Folding this in to a formal interface would be better.
 	switch tc := s.sel.getConstraint(bmi.id).(type) {
