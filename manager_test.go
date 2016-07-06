@@ -125,6 +125,9 @@ func TestProjectManagerInit(t *testing.T) {
 	smc := &bridge{
 		sm:     sm,
 		vlists: make(map[ProjectName][]Version),
+		s: &solver{
+			o: SolveOpts{},
+		},
 	}
 
 	v, err = smc.listVersions(ProjectIdentifier{LocalName: pn})
