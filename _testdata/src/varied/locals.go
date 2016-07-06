@@ -1,13 +1,13 @@
 package main
 
 import (
-	"varied/otherpath"
 	"varied/namemismatch"
+	"varied/otherpath"
 	"varied/simple"
 )
 
 var (
-  _ = simple.S
-  _ = nm.V
+	_ = simple.S
+	_ = nm.V
 	_ = otherpath.O
 )

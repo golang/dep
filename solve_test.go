@@ -167,7 +167,7 @@ func fixtureSolveSimpleChecks(fix specfix, res Result, err error, t *testing.T) 
 
 			var missing []string
 			var extra []string
-			for p, _ := range found {
+			for p := range found {
 				if _, has := ep[p]; !has {
 					extra = append(extra, p)
 				}
@@ -176,7 +176,7 @@ func fixtureSolveSimpleChecks(fix specfix, res Result, err error, t *testing.T) 
 				t.Errorf("(fixture: %q) Expected solve failures due to projects %s, but solve failures also arose from %s", fix.name(), strings.Join(errp[1:], ", "), strings.Join(extra, ", "))
 			}
 
-			for p, _ := range ep {
+			for p := range ep {
 				if _, has := found[p]; !has {
 					missing = append(missing, p)
 				}

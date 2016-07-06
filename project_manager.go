@@ -260,7 +260,7 @@ func (pm *projectManager) ListVersions() (vlist []Version, err error) {
 		k := 0
 		// TODO key type of VMap should be string; recombine here
 		//for v, r := range pm.dc.VMap {
-		for v, _ := range pm.dc.VMap {
+		for v := range pm.dc.VMap {
 			vlist[k] = v
 			k++
 		}

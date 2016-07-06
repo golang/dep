@@ -1027,7 +1027,7 @@ func (sm *depspecSourceManager) ListPackages(n ProjectName, v Version) (PackageT
 		ptree := PackageTree{
 			ImportRoot: string(n),
 			Packages: map[string]PackageOrErr{
-				string(n): PackageOrErr{
+				string(n): {
 					P: Package{
 						ImportPath: string(n),
 						Name:       string(n),

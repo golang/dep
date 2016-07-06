@@ -59,7 +59,7 @@ func TestWorkmapToReach(t *testing.T) {
 				"foo": {
 					ex: empty(),
 					in: map[string]struct{}{
-						"foo/bar": struct{}{},
+						"foo/bar": {},
 					},
 				},
 				"foo/bar": {
@@ -77,12 +77,12 @@ func TestWorkmapToReach(t *testing.T) {
 				"foo": {
 					ex: empty(),
 					in: map[string]struct{}{
-						"foo/bar": struct{}{},
+						"foo/bar": {},
 					},
 				},
 				"foo/bar": {
 					ex: map[string]struct{}{
-						"baz": struct{}{},
+						"baz": {},
 					},
 					in: empty(),
 				},
@@ -137,7 +137,7 @@ func TestListPackages(t *testing.T) {
 			out: PackageTree{
 				ImportRoot: "empty",
 				Packages: map[string]PackageOrErr{
-					"empty": PackageOrErr{
+					"empty": {
 						Err: &build.NoGoError{
 							Dir: j("empty"),
 						},
@@ -152,7 +152,7 @@ func TestListPackages(t *testing.T) {
 			out: PackageTree{
 				ImportRoot: "simple",
 				Packages: map[string]PackageOrErr{
-					"simple": PackageOrErr{
+					"simple": {
 						P: Package{
 							ImportPath:  "simple",
 							CommentPath: "",
@@ -172,7 +172,7 @@ func TestListPackages(t *testing.T) {
 			out: PackageTree{
 				ImportRoot: "arbitrary",
 				Packages: map[string]PackageOrErr{
-					"arbitrary": PackageOrErr{
+					"arbitrary": {
 						P: Package{
 							ImportPath:  "arbitrary",
 							CommentPath: "",
@@ -192,7 +192,7 @@ func TestListPackages(t *testing.T) {
 			out: PackageTree{
 				ImportRoot: "simple",
 				Packages: map[string]PackageOrErr{
-					"simple": PackageOrErr{
+					"simple": {
 						P: Package{
 							ImportPath:  "simple",
 							CommentPath: "",
@@ -213,7 +213,7 @@ func TestListPackages(t *testing.T) {
 			out: PackageTree{
 				ImportRoot: "simple",
 				Packages: map[string]PackageOrErr{
-					"simple": PackageOrErr{
+					"simple": {
 						P: Package{
 							ImportPath:  "simple",
 							CommentPath: "",
@@ -234,7 +234,7 @@ func TestListPackages(t *testing.T) {
 			out: PackageTree{
 				ImportRoot: "simple",
 				Packages: map[string]PackageOrErr{
-					"simple": PackageOrErr{
+					"simple": {
 						P: Package{
 							ImportPath:  "simple",
 							CommentPath: "",
@@ -258,7 +258,7 @@ func TestListPackages(t *testing.T) {
 			out: PackageTree{
 				ImportRoot: "simple",
 				Packages: map[string]PackageOrErr{
-					"simple": PackageOrErr{
+					"simple": {
 						P: Package{
 							ImportPath:  "simple",
 							CommentPath: "",
@@ -282,7 +282,7 @@ func TestListPackages(t *testing.T) {
 			out: PackageTree{
 				ImportRoot: "simple",
 				Packages: map[string]PackageOrErr{
-					"simple": PackageOrErr{
+					"simple": {
 						P: Package{
 							ImportPath:  "simple",
 							CommentPath: "",
@@ -307,7 +307,7 @@ func TestListPackages(t *testing.T) {
 			out: PackageTree{
 				ImportRoot: "m1p",
 				Packages: map[string]PackageOrErr{
-					"m1p": PackageOrErr{
+					"m1p": {
 						P: Package{
 							ImportPath:  "m1p",
 							CommentPath: "",
@@ -328,7 +328,7 @@ func TestListPackages(t *testing.T) {
 			out: PackageTree{
 				ImportRoot: "nest",
 				Packages: map[string]PackageOrErr{
-					"nest": PackageOrErr{
+					"nest": {
 						P: Package{
 							ImportPath:  "nest",
 							CommentPath: "",
@@ -339,7 +339,7 @@ func TestListPackages(t *testing.T) {
 							},
 						},
 					},
-					"nest/m1p": PackageOrErr{
+					"nest/m1p": {
 						P: Package{
 							ImportPath:  "nest/m1p",
 							CommentPath: "",
@@ -360,12 +360,12 @@ func TestListPackages(t *testing.T) {
 			out: PackageTree{
 				ImportRoot: "ren",
 				Packages: map[string]PackageOrErr{
-					"ren": PackageOrErr{
+					"ren": {
 						Err: &build.NoGoError{
 							Dir: j("ren"),
 						},
 					},
-					"ren/m1p": PackageOrErr{
+					"ren/m1p": {
 						P: Package{
 							ImportPath:  "ren/m1p",
 							CommentPath: "",
@@ -377,7 +377,7 @@ func TestListPackages(t *testing.T) {
 							},
 						},
 					},
-					"ren/simple": PackageOrErr{
+					"ren/simple": {
 						P: Package{
 							ImportPath:  "ren/simple",
 							CommentPath: "",
@@ -397,7 +397,7 @@ func TestListPackages(t *testing.T) {
 			out: PackageTree{
 				ImportRoot: "simple",
 				Packages: map[string]PackageOrErr{
-					"simple": PackageOrErr{
+					"simple": {
 						P: Package{
 							ImportPath:  "simple",
 							CommentPath: "",
@@ -418,7 +418,7 @@ func TestListPackages(t *testing.T) {
 			out: PackageTree{
 				ImportRoot: "simple",
 				Packages: map[string]PackageOrErr{
-					"simple": PackageOrErr{
+					"simple": {
 						P: Package{
 							ImportPath:  "simple",
 							CommentPath: "",
@@ -443,7 +443,7 @@ func TestListPackages(t *testing.T) {
 			out: PackageTree{
 				ImportRoot: "twopkgs",
 				Packages: map[string]PackageOrErr{
-					"twopkgs": PackageOrErr{
+					"twopkgs": {
 						Err: &build.MultiplePackageError{
 							Dir:      j("twopkgs"),
 							Packages: []string{"simple", "m1p"},
@@ -461,7 +461,7 @@ func TestListPackages(t *testing.T) {
 			out: PackageTree{
 				ImportRoot: "varied",
 				Packages: map[string]PackageOrErr{
-					"varied": PackageOrErr{
+					"varied": {
 						P: Package{
 							ImportPath:  "varied",
 							CommentPath: "",
@@ -474,7 +474,7 @@ func TestListPackages(t *testing.T) {
 							},
 						},
 					},
-					"varied/otherpath": PackageOrErr{
+					"varied/otherpath": {
 						P: Package{
 							ImportPath:  "varied/otherpath",
 							CommentPath: "",
@@ -485,7 +485,7 @@ func TestListPackages(t *testing.T) {
 							},
 						},
 					},
-					"varied/simple": PackageOrErr{
+					"varied/simple": {
 						P: Package{
 							ImportPath:  "varied/simple",
 							CommentPath: "",
@@ -497,7 +497,7 @@ func TestListPackages(t *testing.T) {
 							},
 						},
 					},
-					"varied/simple/another": PackageOrErr{
+					"varied/simple/another": {
 						P: Package{
 							ImportPath:  "varied/simple/another",
 							CommentPath: "",
@@ -511,7 +511,7 @@ func TestListPackages(t *testing.T) {
 							},
 						},
 					},
-					"varied/namemismatch": PackageOrErr{
+					"varied/namemismatch": {
 						P: Package{
 							ImportPath:  "varied/namemismatch",
 							CommentPath: "",
@@ -522,7 +522,7 @@ func TestListPackages(t *testing.T) {
 							},
 						},
 					},
-					"varied/m1p": PackageOrErr{
+					"varied/m1p": {
 						P: Package{
 							ImportPath:  "varied/m1p",
 							CommentPath: "",
