@@ -126,8 +126,12 @@ func listPackages(fileRoot, importRoot string) (PackageTree, error) {
 			return nil
 		}
 
-		// Skip a few types of dirs
-		if !localSrcDir(fi) {
+		// Skip a dirs that are known to hold non-local/dependency code.
+		//
+		// We don't skip .*, _*, or testdata dirs because, while it may be poor
+		// form, it's not a compiler error to import them.
+		switch fi.Name() {
+		case "vendor", "Godeps":
 			return filepath.SkipDir
 		}
 
@@ -465,23 +469,7 @@ func wmToReach(workmap map[string]wm, basedir string) map[string][]string {
 		rm[strings.TrimPrefix(pkg, rt)] = edeps
 	}
 
-	return rm, nil
-}
-
-func localSrcDir(fi os.FileInfo) bool {
-	// Ignore _foo and .foo, and testdata
-	name := fi.Name()
-	if strings.HasPrefix(name, ".") || strings.HasPrefix(name, "_") || name == "testdata" {
-		return false
-	}
-
-	// Ignore dirs that are expressly intended for non-project source
-	switch name {
-	case "vendor", "Godeps":
-		return false
-	default:
-		return true
-	}
+	return rm
 }
 
 func readBuildTags(p string) ([]string, error) {
