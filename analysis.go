@@ -371,10 +371,10 @@ func wmToReach(workmap map[string]wm, basedir string) map[string][]string {
 
 			// Now, recurse until done, or a false bubbles up, indicating the
 			// path is poisoned.
-			var poisoned bool
+			var clean bool
 			for in := range w.in {
-				poisoned = dfe(in, path)
-				if poisoned {
+				clean = dfe(in, path)
+				if !clean {
 					// Path is poisoned. Our reachmap was already deleted by the
 					// path we're returning from; mark ourselves black, then
 					// bubble up the poison. This is OK to do early, before
