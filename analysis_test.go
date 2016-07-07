@@ -22,11 +22,9 @@ func TestWorkmapToReach(t *testing.T) {
 	}
 
 	table := map[string]struct {
-		name    string
 		workmap map[string]wm
 		basedir string
 		out     map[string][]string
-		err     error
 	}{
 		"single": {
 			workmap: map[string]wm{
@@ -218,20 +216,7 @@ func TestWorkmapToReach(t *testing.T) {
 	}
 
 	for name, fix := range table {
-		out, err := wmToReach(fix.workmap, fix.basedir)
-
-		if fix.out == nil {
-			if err == nil {
-				t.Errorf("wmToReach(%q): Error expected but not received", name)
-			}
-			continue
-		}
-
-		if err != nil {
-			t.Errorf("wmToReach(%q): %v", name, err)
-			continue
-		}
-
+		out := wmToReach(fix.workmap, fix.basedir)
 		if !reflect.DeepEqual(out, fix.out) {
 			t.Errorf("wmToReach(%q): Did not get expected reach map:\n\t(GOT): %s\n\t(WNT): %s", name, out, fix.out)
 		}
