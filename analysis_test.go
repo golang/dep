@@ -1,6 +1,7 @@
 package vsolver
 
 import (
+	"fmt"
 	"go/build"
 	"os"
 	"path/filepath"
@@ -9,23 +10,21 @@ import (
 	"testing"
 )
 
-// externalReach() uses an easily separable algorithm, wmToReach(), to turn a
-// discovered set of packages and their imports into a proper external reach
-// map.
+// PackageTree.ExternalReach() uses an easily separable algorithm, wmToReach(),
+// to turn a discovered set of packages and their imports into a proper external
+// reach map.
 //
 // That algorithm is purely symbolic (no filesystem interaction), and thus is
 // easy to test. This is that test.
 func TestWorkmapToReach(t *testing.T) {
-	empty := func() map[string]struct{} {
-		return make(map[string]struct{})
+	empty := func() map[string]bool {
+		return make(map[string]bool)
 	}
 
 	table := map[string]struct {
-		name    string
 		workmap map[string]wm
 		basedir string
 		out     map[string][]string
-		err     error
 	}{
 		"single": {
 			workmap: map[string]wm{
@@ -58,8 +57,8 @@ func TestWorkmapToReach(t *testing.T) {
 			workmap: map[string]wm{
 				"foo": {
 					ex: empty(),
-					in: map[string]struct{}{
-						"foo/bar": {},
+					in: map[string]bool{
+						"foo/bar": true,
 					},
 				},
 				"foo/bar": {
@@ -76,13 +75,13 @@ func TestWorkmapToReach(t *testing.T) {
 			workmap: map[string]wm{
 				"foo": {
 					ex: empty(),
-					in: map[string]struct{}{
-						"foo/bar": {},
+					in: map[string]bool{
+						"foo/bar": true,
 					},
 				},
 				"foo/bar": {
-					ex: map[string]struct{}{
-						"baz": {},
+					ex: map[string]bool{
+						"baz": true,
 					},
 					in: empty(),
 				},
@@ -96,23 +95,128 @@ func TestWorkmapToReach(t *testing.T) {
 				},
 			},
 		},
+		"missing package is poison": {
+			workmap: map[string]wm{
+				"A": {
+					ex: map[string]bool{
+						"B/foo": true,
+					},
+					in: map[string]bool{
+						"A/foo": true, // missing
+						"A/bar": true,
+					},
+				},
+				"A/bar": {
+					ex: map[string]bool{
+						"B/baz": true,
+					},
+					in: empty(),
+				},
+			},
+			out: map[string][]string{
+				"A/bar": {
+					"B/baz",
+				},
+			},
+		},
+		"transitive missing package is poison": {
+			workmap: map[string]wm{
+				"A": {
+					ex: map[string]bool{
+						"B/foo": true,
+					},
+					in: map[string]bool{
+						"A/foo":  true, // transitively missing
+						"A/quux": true,
+					},
+				},
+				"A/foo": {
+					ex: map[string]bool{
+						"C/flugle": true,
+					},
+					in: map[string]bool{
+						"A/bar": true, // missing
+					},
+				},
+				"A/quux": {
+					ex: map[string]bool{
+						"B/baz": true,
+					},
+					in: empty(),
+				},
+			},
+			out: map[string][]string{
+				"A/quux": {
+					"B/baz",
+				},
+			},
+		},
+		"err'd package is poison": {
+			workmap: map[string]wm{
+				"A": {
+					ex: map[string]bool{
+						"B/foo": true,
+					},
+					in: map[string]bool{
+						"A/foo": true, // err'd
+						"A/bar": true,
+					},
+				},
+				"A/foo": {
+					err: fmt.Errorf("err pkg"),
+				},
+				"A/bar": {
+					ex: map[string]bool{
+						"B/baz": true,
+					},
+					in: empty(),
+				},
+			},
+			out: map[string][]string{
+				"A/bar": {
+					"B/baz",
+				},
+			},
+		},
+		"transitive err'd package is poison": {
+			workmap: map[string]wm{
+				"A": {
+					ex: map[string]bool{
+						"B/foo": true,
+					},
+					in: map[string]bool{
+						"A/foo":  true, // transitively err'd
+						"A/quux": true,
+					},
+				},
+				"A/foo": {
+					ex: map[string]bool{
+						"C/flugle": true,
+					},
+					in: map[string]bool{
+						"A/bar": true, // err'd
+					},
+				},
+				"A/bar": {
+					err: fmt.Errorf("err pkg"),
+				},
+				"A/quux": {
+					ex: map[string]bool{
+						"B/baz": true,
+					},
+					in: empty(),
+				},
+			},
+			out: map[string][]string{
+				"A/quux": {
+					"B/baz",
+				},
+			},
+		},
 	}
 
 	for name, fix := range table {
-		out, err := wmToReach(fix.workmap, fix.basedir)
-
-		if fix.out == nil {
-			if err == nil {
-				t.Errorf("wmToReach(%q): Error expected but not received", name)
-			}
-			continue
-		}
-
-		if err != nil {
-			t.Errorf("wmToReach(%q): %v", name, err)
-			continue
-		}
-
+		out := wmToReach(fix.workmap, fix.basedir)
 		if !reflect.DeepEqual(out, fix.out) {
 			t.Errorf("wmToReach(%q): Did not get expected reach map:\n\t(GOT): %s\n\t(WNT): %s", name, out, fix.out)
 		}
@@ -391,6 +495,92 @@ func TestListPackages(t *testing.T) {
 				},
 			},
 		},
+		"internal name mismatch": {
+			fileRoot:   j("doublenest"),
+			importRoot: "doublenest",
+			out: PackageTree{
+				ImportRoot: "doublenest",
+				Packages: map[string]PackageOrErr{
+					"doublenest": {
+						P: Package{
+							ImportPath:  "doublenest",
+							CommentPath: "",
+							Name:        "base",
+							Imports: []string{
+								"github.com/sdboyer/vsolver",
+								"go/parser",
+							},
+						},
+					},
+					"doublenest/namemismatch": {
+						P: Package{
+							ImportPath:  "doublenest/namemismatch",
+							CommentPath: "",
+							Name:        "nm",
+							Imports: []string{
+								"github.com/Masterminds/semver",
+								"os",
+							},
+						},
+					},
+					"doublenest/namemismatch/m1p": {
+						P: Package{
+							ImportPath:  "doublenest/namemismatch/m1p",
+							CommentPath: "",
+							Name:        "m1p",
+							Imports: []string{
+								"github.com/sdboyer/vsolver",
+								"os",
+								"sort",
+							},
+						},
+					},
+				},
+			},
+		},
+		"file and importroot mismatch": {
+			fileRoot:   j("doublenest"),
+			importRoot: "other",
+			out: PackageTree{
+				ImportRoot: "other",
+				Packages: map[string]PackageOrErr{
+					"other": {
+						P: Package{
+							ImportPath:  "other",
+							CommentPath: "",
+							Name:        "base",
+							Imports: []string{
+								"github.com/sdboyer/vsolver",
+								"go/parser",
+							},
+						},
+					},
+					"other/namemismatch": {
+						P: Package{
+							ImportPath:  "other/namemismatch",
+							CommentPath: "",
+							Name:        "nm",
+							Imports: []string{
+								"github.com/Masterminds/semver",
+								"os",
+							},
+						},
+					},
+					"other/namemismatch/m1p": {
+						P: Package{
+							ImportPath:  "other/namemismatch/m1p",
+							CommentPath: "",
+							Name:        "m1p",
+							Imports: []string{
+								"github.com/sdboyer/vsolver",
+								"os",
+								"sort",
+							},
+						},
+					},
+				},
+			},
+		},
 		"code and ignored main": {
 			fileRoot:   j("igmain"),
 			importRoot: "simple",
@@ -448,6 +638,40 @@ func TestListPackages(t *testing.T) {
 							Dir:      j("twopkgs"),
 							Packages: []string{"simple", "m1p"},
 							Files:    []string{"a.go", "b.go"},
+						},
+					},
+				},
+			},
+		},
+		// imports a missing pkg
+		"missing import": {
+			fileRoot:   j("missing"),
+			importRoot: "missing",
+			out: PackageTree{
+				ImportRoot: "missing",
+				Packages: map[string]PackageOrErr{
+					"missing": {
+						P: Package{
+							ImportPath:  "missing",
+							CommentPath: "",
+							Name:        "simple",
+							Imports: []string{
+								"github.com/sdboyer/vsolver",
+								"missing/missing",
+								"sort",
+							},
+						},
+					},
+					"missing/m1p": {
+						P: Package{
+							ImportPath:  "missing/m1p",
+							CommentPath: "",
+							Name:        "m1p",
+							Imports: []string{
+								"github.com/sdboyer/vsolver",
+								"os",
+								"sort",
+							},
 						},
 					},
 				},
@@ -574,7 +798,7 @@ func TestListPackages(t *testing.T) {
 						for path, perr := range fix.out.Packages {
 							seen[path] = true
 							if operr, exists := out.Packages[path]; !exists {
-								t.Errorf("listPackages(%q): Expected PackageOrErr for path %s was missing from output:\n\t%s", path, perr)
+								t.Errorf("listPackages(%q): Expected PackageOrErr for path %s was missing from output:\n\t%s", name, path, perr)
 							} else {
 								if !reflect.DeepEqual(perr, operr) {
 									t.Errorf("listPackages(%q): PkgOrErr for path %s was not as expected:\n\t(GOT): %s\n\t(WNT): %s", name, path, operr, perr)
@@ -587,7 +811,7 @@ func TestListPackages(t *testing.T) {
 								continue
 							}
 
-							t.Errorf("listPackages(%q): Got PackageOrErr for path %s, but none was expected:\n\t%s", path, operr)
+							t.Errorf("listPackages(%q): Got PackageOrErr for path %s, but none was expected:\n\t%s", name, path, operr)
 						}
 					}
 				}

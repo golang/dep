@@ -607,39 +607,36 @@ func computeBimodalExternalMap(ds []depspec) map[pident]map[string][]string {
 			}
 
 			w := wm{
-				ex: make(map[string]struct{}),
-				in: make(map[string]struct{}),
+				ex: make(map[string]bool),
+				in: make(map[string]bool),
 			}
 
 			for _, imp := range pkg.imports {
 				if !checkPrefixSlash(filepath.Clean(imp), string(d.n)) {
 					// Easy case - if the import is not a child of the base
 					// project path, put it in the external map
-					w.ex[imp] = struct{}{}
+					w.ex[imp] = true
 				} else {
 					if w2, seen := workmap[imp]; seen {
 						// If it is, and we've seen that path, dereference it
 						// immediately
 						for i := range w2.ex {
-							w.ex[i] = struct{}{}
+							w.ex[i] = true
 						}
 						for i := range w2.in {
-							w.in[i] = struct{}{}
+							w.in[i] = true
 						}
 					} else {
 						// Otherwise, put it in the 'in' map for later
 						// reprocessing
-						w.in[imp] = struct{}{}
+						w.in[imp] = true
 					}
 				}
 			}
 			workmap[pkg.path] = w
 		}
 
-		drm, err := wmToReach(workmap, "")
-		if err != nil {
-			panic(err)
-		}
+		drm := wmToReach(workmap, "")
 		rm[pident{n: d.n, v: d.v}] = drm
 	}
 
