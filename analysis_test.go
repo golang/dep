@@ -495,6 +495,92 @@ func TestListPackages(t *testing.T) {
 				},
 			},
 		},
+		"internal name mismatch": {
+			fileRoot:   j("doublenest"),
+			importRoot: "doublenest",
+			out: PackageTree{
+				ImportRoot: "doublenest",
+				Packages: map[string]PackageOrErr{
+					"doublenest": {
+						P: Package{
+							ImportPath:  "doublenest",
+							CommentPath: "",
+							Name:        "base",
+							Imports: []string{
+								"github.com/sdboyer/vsolver",
+								"go/parser",
+							},
+						},
+					},
+					"doublenest/namemismatch": {
+						P: Package{
+							ImportPath:  "doublenest/namemismatch",
+							CommentPath: "",
+							Name:        "nm",
+							Imports: []string{
+								"github.com/Masterminds/semver",
+								"os",
+							},
+						},
+					},
+					"doublenest/namemismatch/m1p": {
+						P: Package{
+							ImportPath:  "doublenest/namemismatch/m1p",
+							CommentPath: "",
+							Name:        "m1p",
+							Imports: []string{
+								"github.com/sdboyer/vsolver",
+								"os",
+								"sort",
+							},
+						},
+					},
+				},
+			},
+		},
+		"file and importroot mismatch": {
+			fileRoot:   j("doublenest"),
+			importRoot: "other",
+			out: PackageTree{
+				ImportRoot: "other",
+				Packages: map[string]PackageOrErr{
+					"other": {
+						P: Package{
+							ImportPath:  "other",
+							CommentPath: "",
+							Name:        "base",
+							Imports: []string{
+								"github.com/sdboyer/vsolver",
+								"go/parser",
+							},
+						},
+					},
+					"other/namemismatch": {
+						P: Package{
+							ImportPath:  "other/namemismatch",
+							CommentPath: "",
+							Name:        "nm",
+							Imports: []string{
+								"github.com/Masterminds/semver",
+								"os",
+							},
+						},
+					},
+					"other/namemismatch/m1p": {
+						P: Package{
+							ImportPath:  "other/namemismatch/m1p",
+							CommentPath: "",
+							Name:        "m1p",
+							Imports: []string{
+								"github.com/sdboyer/vsolver",
+								"os",
+								"sort",
+							},
+						},
+					},
+				},
+			},
+		},
 		"code and ignored main": {
 			fileRoot:   j("igmain"),
 			importRoot: "simple",
@@ -571,7 +657,7 @@ func TestListPackages(t *testing.T) {
 							Name:        "simple",
 							Imports: []string{
 								"github.com/sdboyer/vsolver",
-								"simple/missing",
+								"missing/missing",
 								"sort",
 							},
 						},
