@@ -274,8 +274,9 @@ func (e *LocalImportsError) Error() string {
 }
 
 type wm struct {
-	ex map[string]struct{}
-	in map[string]struct{}
+	err error
+	ex  map[string]bool
+	in  map[string]bool
 }
 
 // wmToReach takes an externalReach()-style workmap and transitively walks all

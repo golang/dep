@@ -1,6 +1,7 @@
 package vsolver
 
 import (
+	"fmt"
 	"go/build"
 	"os"
 	"path/filepath"
@@ -9,15 +10,15 @@ import (
 	"testing"
 )
 
-// externalReach() uses an easily separable algorithm, wmToReach(), to turn a
-// discovered set of packages and their imports into a proper external reach
-// map.
+// PackageTree.ExternalReach() uses an easily separable algorithm, wmToReach(),
+// to turn a discovered set of packages and their imports into a proper external
+// reach map.
 //
 // That algorithm is purely symbolic (no filesystem interaction), and thus is
 // easy to test. This is that test.
 func TestWorkmapToReach(t *testing.T) {
-	empty := func() map[string]struct{} {
-		return make(map[string]struct{})
+	empty := func() map[string]bool {
+		return make(map[string]bool)
 	}
 
 	table := map[string]struct {
@@ -58,8 +59,8 @@ func TestWorkmapToReach(t *testing.T) {
 			workmap: map[string]wm{
 				"foo": {
 					ex: empty(),
-					in: map[string]struct{}{
-						"foo/bar": {},
+					in: map[string]bool{
+						"foo/bar": true,
 					},
 				},
 				"foo/bar": {
@@ -76,13 +77,13 @@ func TestWorkmapToReach(t *testing.T) {
 			workmap: map[string]wm{
 				"foo": {
 					ex: empty(),
-					in: map[string]struct{}{
-						"foo/bar": {},
+					in: map[string]bool{
+						"foo/bar": true,
 					},
 				},
 				"foo/bar": {
-					ex: map[string]struct{}{
-						"baz": {},
+					ex: map[string]bool{
+						"baz": true,
 					},
 					in: empty(),
 				},
@@ -93,6 +94,124 @@ func TestWorkmapToReach(t *testing.T) {
 				},
 				"foo/bar": {
 					"baz",
+				},
+			},
+		},
+		"missing package is poison": {
+			workmap: map[string]wm{
+				"A": {
+					ex: map[string]bool{
+						"B/foo": true,
+					},
+					in: map[string]bool{
+						"A/foo": true, // missing
+						"A/bar": true,
+					},
+				},
+				"A/bar": {
+					ex: map[string]bool{
+						"B/baz": true,
+					},
+					in: empty(),
+				},
+			},
+			out: map[string][]string{
+				"A/bar": {
+					"B/baz",
+				},
+			},
+		},
+		"transitive missing package is poison": {
+			workmap: map[string]wm{
+				"A": {
+					ex: map[string]bool{
+						"B/foo": true,
+					},
+					in: map[string]bool{
+						"A/foo":  true, // transitively missing
+						"A/quux": true,
+					},
+				},
+				"A/foo": {
+					ex: map[string]bool{
+						"C/flugle": true,
+					},
+					in: map[string]bool{
+						"A/bar": true, // missing
+					},
+				},
+				"A/quux": {
+					ex: map[string]bool{
+						"B/baz": true,
+					},
+					in: empty(),
+				},
+			},
+			out: map[string][]string{
+				"A/quux": {
+					"B/baz",
+				},
+			},
+		},
+		"err'd package is poison": {
+			workmap: map[string]wm{
+				"A": {
+					ex: map[string]bool{
+						"B/foo": true,
+					},
+					in: map[string]bool{
+						"A/foo": true, // err'd
+						"A/bar": true,
+					},
+				},
+				"A/foo": {
+					err: fmt.Errorf("err pkg"),
+				},
+				"A/bar": {
+					ex: map[string]bool{
+						"B/baz": true,
+					},
+					in: empty(),
+				},
+			},
+			out: map[string][]string{
+				"A/bar": {
+					"B/baz",
+				},
+			},
+		},
+		"transitive err'd package is poison": {
+			workmap: map[string]wm{
+				"A": {
+					ex: map[string]bool{
+						"B/foo": true,
+					},
+					in: map[string]bool{
+						"A/foo":  true, // transitively err'd
+						"A/quux": true,
+					},
+				},
+				"A/foo": {
+					ex: map[string]bool{
+						"C/flugle": true,
+					},
+					in: map[string]bool{
+						"A/bar": true, // err'd
+					},
+				},
+				"A/bar": {
+					err: fmt.Errorf("err pkg"),
+				},
+				"A/quux": {
+					ex: map[string]bool{
+						"B/baz": true,
+					},
+					in: empty(),
+				},
+			},
+			out: map[string][]string{
+				"A/quux": {
+					"B/baz",
 				},
 			},
 		},
