@@ -557,6 +557,40 @@ func TestListPackages(t *testing.T) {
 				},
 			},
 		},
+		// imports a missing pkg
+		"missing import": {
+			fileRoot:   j("missing"),
+			importRoot: "missing",
+			out: PackageTree{
+				ImportRoot: "missing",
+				Packages: map[string]PackageOrErr{
+					"missing": {
+						P: Package{
+							ImportPath:  "missing",
+							CommentPath: "",
+							Name:        "simple",
+							Imports: []string{
+								"github.com/sdboyer/vsolver",
+								"simple/missing",
+								"sort",
+							},
+						},
+					},
+					"missing/m1p": {
+						P: Package{
+							ImportPath:  "missing/m1p",
+							CommentPath: "",
+							Name:        "m1p",
+							Imports: []string{
+								"github.com/sdboyer/vsolver",
+								"os",
+								"sort",
+							},
+						},
+					},
+				},
+			},
+		},
 		// This case mostly exists for the PackageTree methods, but it does
 		// cover a bit of range
 		"varied": {
@@ -678,7 +712,7 @@ func TestListPackages(t *testing.T) {
 						for path, perr := range fix.out.Packages {
 							seen[path] = true
 							if operr, exists := out.Packages[path]; !exists {
-								t.Errorf("listPackages(%q): Expected PackageOrErr for path %s was missing from output:\n\t%s", path, perr)
+								t.Errorf("listPackages(%q): Expected PackageOrErr for path %s was missing from output:\n\t%s", name, path, perr)
 							} else {
 								if !reflect.DeepEqual(perr, operr) {
 									t.Errorf("listPackages(%q): PkgOrErr for path %s was not as expected:\n\t(GOT): %s\n\t(WNT): %s", name, path, operr, perr)
@@ -691,7 +725,7 @@ func TestListPackages(t *testing.T) {
 								continue
 							}
 
-							t.Errorf("listPackages(%q): Got PackageOrErr for path %s, but none was expected:\n\t%s", path, operr)
+							t.Errorf("listPackages(%q): Got PackageOrErr for path %s, but none was expected:\n\t%s", name, path, operr)
 						}
 					}
 				}
