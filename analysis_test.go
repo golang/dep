@@ -602,6 +602,27 @@ func TestListPackages(t *testing.T) {
 				},
 			},
 		},
+		"code and ignored main with comment leader": {
+			fileRoot:   j("igmainlong"),
+			importRoot: "simple",
+			out: PackageTree{
+				ImportRoot: "simple",
+				Packages: map[string]PackageOrErr{
+					"simple": {
+						P: Package{
+							ImportPath:  "simple",
+							CommentPath: "",
+							Name:        "simple",
+							Imports: []string{
+								"github.com/sdboyer/vsolver",
+								"sort",
+								"unicode",
+							},
+						},
+					},
+				},
+			},
+		},
 		"code, tests, and ignored main": {
 			fileRoot:   j("igmaint"),
 			importRoot: "simple",
