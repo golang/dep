@@ -21,7 +21,7 @@ func init() {
 
 var stderrlog = log.New(os.Stderr, "", 0)
 
-func fixSolve(args SolveArgs, o SolveOpts, sm SourceManager) (Result, error) {
+func fixSolve(args SolveArgs, o SolveOpts, sm SourceManager) (Solution, error) {
 	if testing.Verbose() {
 		o.Trace = true
 		o.TraceLogger = stderrlog
@@ -56,7 +56,7 @@ func TestBasicSolves(t *testing.T) {
 	}
 }
 
-func solveBasicsAndCheck(fix basicFixture, t *testing.T) (res Result, err error) {
+func solveBasicsAndCheck(fix basicFixture, t *testing.T) (res Solution, err error) {
 	if testing.Verbose() {
 		stderrlog.Printf("[[fixture %q]]", fix.n)
 	}
@@ -109,7 +109,7 @@ func TestBimodalSolves(t *testing.T) {
 	}
 }
 
-func solveBimodalAndCheck(fix bimodalFixture, t *testing.T) (res Result, err error) {
+func solveBimodalAndCheck(fix bimodalFixture, t *testing.T) (res Solution, err error) {
 	if testing.Verbose() {
 		stderrlog.Printf("[[fixture %q]]", fix.n)
 	}
@@ -137,7 +137,7 @@ func solveBimodalAndCheck(fix bimodalFixture, t *testing.T) (res Result, err err
 	return fixtureSolveSimpleChecks(fix, res, err, t)
 }
 
-func fixtureSolveSimpleChecks(fix specfix, res Result, err error, t *testing.T) (Result, error) {
+func fixtureSolveSimpleChecks(fix specfix, res Solution, err error, t *testing.T) (Solution, error) {
 	if err != nil {
 		errp := fix.expectErrs()
 		if len(errp) == 0 {
@@ -192,7 +192,7 @@ func fixtureSolveSimpleChecks(fix specfix, res Result, err error, t *testing.T) 
 	} else if len(fix.expectErrs()) > 0 {
 		t.Errorf("(fixture: %q) Solver succeeded, but expected failure", fix.name())
 	} else {
-		r := res.(result)
+		r := res.(solution)
 		if fix.maxTries() > 0 && r.Attempts() > fix.maxTries() {
 			t.Errorf("(fixture: %q) Solver completed in %v attempts, but expected %v or fewer", fix.name(), r.att, fix.maxTries())
 		}
@@ -204,7 +204,7 @@ func fixtureSolveSimpleChecks(fix specfix, res Result, err error, t *testing.T) 
 			rp[string(pa.id.LocalName)] = pa.v
 		}
 
-		fixlen, rlen := len(fix.result()), len(rp)
+		fixlen, rlen := len(fix.solution()), len(rp)
 		if fixlen != rlen {
 			// Different length, so they definitely disagree
 			t.Errorf("(fixture: %q) Solver reported %v package results, result expected %v", fix.name(), rlen, fixlen)
@@ -212,7 +212,7 @@ func fixtureSolveSimpleChecks(fix specfix, res Result, err error, t *testing.T) 
 
 		// Whether or not len is same, still have to verify that results agree
 		// Walk through fixture/expected results first
-		for p, v := range fix.result() {
+		for p, v := range fix.solution() {
 			if av, exists := rp[p]; !exists {
 				t.Errorf("(fixture: %q) Project %q expected but missing from results", fix.name(), p)
 			} else {
@@ -226,7 +226,7 @@ func fixtureSolveSimpleChecks(fix specfix, res Result, err error, t *testing.T) 
 
 		// Now walk through remaining actual results
 		for p, v := range rp {
-			if fv, exists := fix.result()[p]; !exists {
+			if fv, exists := fix.solution()[p]; !exists {
 				t.Errorf("(fixture: %q) Unexpected project %q present in results", fix.name(), p)
 			} else if v != fv {
 				t.Errorf("(fixture: %q) Got version %q of project %q, but expected version was %q", fix.name(), v, p, fv)
@@ -257,7 +257,7 @@ func TestRootLockNoVersionPairMatching(t *testing.T) {
 		l: mklock(
 			"foo 1.0.1",
 		),
-		r: mkresults(
+		r: mksolution(
 			"foo 1.0.2 foorev",
 			"bar 1.0.1",
 		),

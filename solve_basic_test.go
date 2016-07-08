@@ -233,8 +233,8 @@ func mkrevlock(pairs ...string) fixLock {
 	return l
 }
 
-// mkresults makes a result set
-func mkresults(pairs ...string) map[string]Version {
+// mksolution makes a result set
+func mksolution(pairs ...string) map[string]Version {
 	m := make(map[string]Version)
 	for _, pair := range pairs {
 		a := mkAtom(pair)
@@ -290,7 +290,7 @@ type specfix interface {
 	specs() []depspec
 	maxTries() int
 	expectErrs() []string
-	result() map[string]Version
+	solution() map[string]Version
 }
 
 // A basicFixture is a declarative test fixture that can cover a wide variety of
@@ -342,7 +342,7 @@ func (f basicFixture) expectErrs() []string {
 	return f.errp
 }
 
-func (f basicFixture) result() map[string]Version {
+func (f basicFixture) solution() map[string]Version {
 	return f.r
 }
 
@@ -354,7 +354,7 @@ var basicFixtures = []basicFixture{
 		ds: []depspec{
 			mkDepspec("root 0.0.0"),
 		},
-		r: mkresults(),
+		r: mksolution(),
 	},
 	{
 		n: "simple dependency tree",
@@ -367,7 +367,7 @@ var basicFixtures = []basicFixture{
 			mkDepspec("ba 1.0.0"),
 			mkDepspec("bb 1.0.0"),
 		},
-		r: mkresults(
+		r: mksolution(
 			"a 1.0.0",
 			"aa 1.0.0",
 			"ab 1.0.0",
@@ -388,7 +388,7 @@ var basicFixtures = []basicFixture{
 			mkDepspec("shared 4.0.0"),
 			mkDepspec("shared 5.0.0"),
 		},
-		r: mkresults(
+		r: mksolution(
 			"a 1.0.0",
 			"b 1.0.0",
 			"shared 3.6.9",
@@ -406,7 +406,7 @@ var basicFixtures = []basicFixture{
 			mkDepspec("shared 4.0.0"),
 			mkDepspec("shared 5.0.0"),
 		},
-		r: mkresults(
+		r: mksolution(
 			"a 1.0.0",
 			"b 1.0.0",
 			"shared 3.0.0",
@@ -426,7 +426,7 @@ var basicFixtures = []basicFixture{
 			mkDepspec("whoop 1.0.0"),
 			mkDepspec("zoop 1.0.0"),
 		},
-		r: mkresults(
+		r: mksolution(
 			"foo 1.0.1",
 			"bar 1.0.0",
 			"bang 1.0.0",
@@ -442,7 +442,7 @@ var basicFixtures = []basicFixture{
 			mkDepspec("bar 2.0.0", "baz 1.0.0"),
 			mkDepspec("baz 1.0.0", "foo 2.0.0"),
 		},
-		r: mkresults(
+		r: mksolution(
 			"foo 1.0.0",
 			"bar 1.0.0",
 		),
@@ -473,7 +473,7 @@ var basicFixtures = []basicFixture{
 		l: mklock(
 			"foo 1.0.1",
 		),
-		r: mkresults(
+		r: mksolution(
 			"foo 1.0.1",
 			"bar 1.0.1",
 		),
@@ -492,7 +492,7 @@ var basicFixtures = []basicFixture{
 		l: mklock(
 			"foo 1.0.1",
 		),
-		r: mkresults(
+		r: mksolution(
 			"foo 1.0.2",
 			"bar 1.0.2",
 		),
@@ -512,7 +512,7 @@ var basicFixtures = []basicFixture{
 		l: mklock(
 			"foo 1.0.1",
 		),
-		r: mkresults(
+		r: mksolution(
 			"foo 1.0.0",
 			"bar 1.0.0",
 		),
@@ -533,7 +533,7 @@ var basicFixtures = []basicFixture{
 		l: mklock(
 			"foo 1.0.1",
 		),
-		r: mkresults(
+		r: mksolution(
 			"foo 1.0.2",
 			"bar 1.0.2",
 		),
@@ -553,7 +553,7 @@ var basicFixtures = []basicFixture{
 		l: mklock(
 			"baz 1.0.0 bazrev",
 		),
-		r: mkresults(
+		r: mksolution(
 			"foo 1.0.2",
 			"bar 1.0.2",
 		),
@@ -578,7 +578,7 @@ var basicFixtures = []basicFixture{
 			"baz 1.0.0 bazrev",
 			"qux 1.0.0 quxrev",
 		),
-		r: mkresults(
+		r: mksolution(
 			"foo 2.0.0",
 			"bar 2.0.0",
 			"baz 2.0.0",
@@ -597,7 +597,7 @@ var basicFixtures = []basicFixture{
 		l: mklock(
 			"foo from baz 1.0.0 foorev",
 		),
-		r: mkresults(
+		r: mksolution(
 			"foo 2.0.0 foorev2",
 		),
 	},
@@ -615,7 +615,7 @@ var basicFixtures = []basicFixture{
 		l: mkrevlock(
 			"foo 1.0.1 foorev", // mkrevlock drops the 1.0.1
 		),
-		r: mkresults(
+		r: mksolution(
 			"foo 1.0.1 foorev",
 			"bar 1.0.1",
 		),
@@ -634,7 +634,7 @@ var basicFixtures = []basicFixture{
 		l: mkrevlock(
 			"foo 1.0.1 foorev", // mkrevlock drops the 1.0.1
 		),
-		r: mkresults(
+		r: mksolution(
 			"foo 1.0.2 foorev",
 			"bar 1.0.1",
 		),
@@ -653,7 +653,7 @@ var basicFixtures = []basicFixture{
 		l: mkrevlock(
 			"foo 1.0.1 foorev", // mkrevlock drops the 1.0.1
 		),
-		r: mkresults(
+		r: mksolution(
 			"foo 1.0.1 foorev",
 			"bar 1.0.1",
 		),
@@ -665,7 +665,7 @@ var basicFixtures = []basicFixture{
 			mkDepspec("foo 1.0.0"),
 			mkDepspec("bar 1.0.0"),
 		},
-		r: mkresults(
+		r: mksolution(
 			"foo 1.0.0",
 			"bar 1.0.0",
 		),
@@ -677,7 +677,7 @@ var basicFixtures = []basicFixture{
 			mkDepspec("foo 1.0.0", "bar 1.0.0"),
 			mkDepspec("bar 1.0.0"),
 		},
-		r: mkresults(
+		r: mksolution(
 			"foo 1.0.0",
 			"bar 1.0.0",
 		),
@@ -689,7 +689,7 @@ var basicFixtures = []basicFixture{
 			mkDepspec("foo 1.0.0", "(dev) bar 1.0.0"),
 			mkDepspec("bar 1.0.0"),
 		},
-		r: mkresults(
+		r: mksolution(
 			"foo 1.0.0",
 		),
 	},
@@ -760,7 +760,7 @@ var basicFixtures = []basicFixture{
 			mkDepspec("c 1.0.0"),
 			mkDepspec("c 2.0.0"),
 		},
-		r: mkresults(
+		r: mksolution(
 			"a 2.0.0",
 			"b 1.0.0",
 			"c 2.0.0",
@@ -781,7 +781,7 @@ var basicFixtures = []basicFixture{
 			mkDepspec("bar 3.0.0", "baz 3.0.0"),
 			mkDepspec("baz 1.0.0"),
 		},
-		r: mkresults(
+		r: mksolution(
 			"foo 1.0.0",
 			"bar 1.0.0",
 			"baz 1.0.0",
@@ -804,7 +804,7 @@ var basicFixtures = []basicFixture{
 			mkDepspec("b 3.0.0"),
 			mkDepspec("c 1.0.0"),
 		},
-		r: mkresults(
+		r: mksolution(
 			"a 1.0.0",
 			"b 3.0.0",
 			"c 1.0.0",
@@ -833,7 +833,7 @@ var basicFixtures = []basicFixture{
 			mkDepspec("c 1.0.0"),
 			mkDepspec("c 2.0.0"),
 		},
-		r: mkresults(
+		r: mksolution(
 			"a 4.0.0",
 			"b 4.0.0",
 			"c 2.0.0",
@@ -879,7 +879,7 @@ var basicFixtures = []basicFixture{
 			mkDepspec("foo 2.0.4"),
 			mkDepspec("none 1.0.0"),
 		},
-		r: mkresults(
+		r: mksolution(
 			"a 1.0.0",
 			"foo 2.0.4",
 		),
@@ -894,7 +894,7 @@ var basicFixtures = []basicFixture{
 			mkDepspec("foo 1.0.0 foorev"),
 			mkDepspec("foo 2.0.0 foorev2"),
 		},
-		r: mkresults(
+		r: mksolution(
 			"foo r123abc",
 		),
 	},
@@ -941,7 +941,7 @@ func init() {
 			mkDepspec("root 0.0.0", "foo *", "bar *"),
 			mkDepspec("baz 0.0.0"),
 		},
-		r: mkresults(
+		r: mksolution(
 			"foo 0.9.0",
 			"bar 9.0.0",
 			"baz 0.0.0",

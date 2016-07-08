@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-var basicResult result
+var basicResult solution
 var kub atom
 
 // An analyzer that passes nothing back, but doesn't error. This expressly
@@ -26,7 +26,7 @@ func pi(n string) ProjectIdentifier {
 }
 
 func init() {
-	basicResult = result{
+	basicResult = solution{
 		att: 1,
 		p: []LockedProject{
 			pa2lp(atom{

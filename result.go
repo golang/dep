@@ -7,14 +7,14 @@ import (
 	"path/filepath"
 )
 
-// A Result is returned by a solver run. It is mostly just a Lock, with some
+// A Solution is returned by a solver run. It is mostly just a Lock, with some
 // additional methods that report information about the solve run.
-type Result interface {
+type Solution interface {
 	Lock
 	Attempts() int
 }
 
-type result struct {
+type solution struct {
 	// A list of the projects selected by the solver.
 	p []LockedProject
 
@@ -60,14 +60,14 @@ func CreateVendorTree(basedir string, l Lock, sm SourceManager, sv bool) error {
 	return nil
 }
 
-func (r result) Projects() []LockedProject {
+func (r solution) Projects() []LockedProject {
 	return r.p
 }
 
-func (r result) Attempts() int {
+func (r solution) Attempts() int {
 	return r.att
 }
 
-func (r result) InputHash() []byte {
+func (r solution) InputHash() []byte {
 	return r.hd
 }

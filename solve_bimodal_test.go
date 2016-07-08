@@ -42,7 +42,7 @@ var bimodalFixtures = map[string]bimodalFixture{
 			dsp(mkDepspec("a 1.0.0"),
 				pkg("a")),
 		},
-		r: mkresults(
+		r: mksolution(
 			"a 1.0.0",
 		),
 	},
@@ -58,7 +58,7 @@ var bimodalFixtures = map[string]bimodalFixture{
 				pkg("a"),
 			),
 		},
-		r: mkresults(
+		r: mksolution(
 			"a 1.0.0",
 		),
 	},
@@ -74,7 +74,7 @@ var bimodalFixtures = map[string]bimodalFixture{
 				pkg("a"),
 			),
 		},
-		r: mkresults(
+		r: mksolution(
 			"a 1.0.0",
 		),
 	},
@@ -90,7 +90,7 @@ var bimodalFixtures = map[string]bimodalFixture{
 				pkg("a"),
 			),
 		},
-		r: mkresults(
+		r: mksolution(
 			"a 1.0.0",
 		),
 	},
@@ -102,7 +102,7 @@ var bimodalFixtures = map[string]bimodalFixture{
 			dsp(mkDepspec("a 1.0.0"),
 				pkg("a/foo")),
 		},
-		r: mkresults(
+		r: mksolution(
 			"a 1.0.0",
 		),
 	},
@@ -120,7 +120,7 @@ var bimodalFixtures = map[string]bimodalFixture{
 				pkg("b"),
 			),
 		},
-		r: mkresults(
+		r: mksolution(
 			"a 1.0.0",
 			"b 1.0.0",
 		),
@@ -143,7 +143,7 @@ var bimodalFixtures = map[string]bimodalFixture{
 				pkg("b"),
 			),
 		},
-		r: mkresults(
+		r: mksolution(
 			"a 1.0.0",
 			"b 1.1.0",
 		),
@@ -166,7 +166,7 @@ var bimodalFixtures = map[string]bimodalFixture{
 				pkg("b"),
 			),
 		},
-		r: mkresults(
+		r: mksolution(
 			"a 1.0.0",
 			"b 1.0.0",
 		),
@@ -196,7 +196,7 @@ var bimodalFixtures = map[string]bimodalFixture{
 				pkg("c", "a"),
 			),
 		},
-		r: mkresults(
+		r: mksolution(
 			"a 1.0.0",
 			"b 1.0.0",
 			"c 1.0.0",
@@ -217,7 +217,7 @@ var bimodalFixtures = map[string]bimodalFixture{
 				pkg("b"),
 			),
 		},
-		r: mkresults(
+		r: mksolution(
 			"a 1.0.0",
 			"b 1.0.0",
 		),
@@ -242,7 +242,7 @@ var bimodalFixtures = map[string]bimodalFixture{
 				pkg("b"),
 			),
 		},
-		r: mkresults(
+		r: mksolution(
 			"a 1.0.0",
 			"b 1.0.0",
 		),
@@ -260,7 +260,7 @@ var bimodalFixtures = map[string]bimodalFixture{
 				pkg("a"),
 			),
 		},
-		r: mkresults(),
+		r: mksolution(),
 	},
 	// Transitive deps from one project (a) get incrementally included as other
 	// deps incorporate its various packages.
@@ -283,7 +283,7 @@ var bimodalFixtures = map[string]bimodalFixture{
 				pkg("d", "a/second"),
 			),
 		},
-		r: mkresults(
+		r: mksolution(
 			"a 1.0.0",
 			"b 2.0.0",
 			"c 1.2.0",
@@ -305,7 +305,7 @@ var bimodalFixtures = map[string]bimodalFixture{
 				pkg("foobar"),
 			),
 		},
-		r: mkresults(
+		r: mksolution(
 			"foo 1.0.0",
 			"foobar 1.0.0",
 		),
@@ -363,7 +363,7 @@ var bimodalFixtures = map[string]bimodalFixture{
 			),
 		},
 		ignore: []string{"root/bar"},
-		r: mkresults(
+		r: mksolution(
 			"b 1.0.0",
 		),
 	},
@@ -383,7 +383,7 @@ var bimodalFixtures = map[string]bimodalFixture{
 			),
 		},
 		ignore: []string{"a/bar"},
-		r: mkresults(
+		r: mksolution(
 			"a 1.0.0",
 		),
 	},
@@ -404,7 +404,7 @@ var bimodalFixtures = map[string]bimodalFixture{
 				"b 1.0.0 foorev",
 			),
 		},
-		r: mkresults(
+		r: mksolution(
 			"a 1.0.0",
 			"b 1.0.0 foorev",
 		),
@@ -433,7 +433,7 @@ var bimodalFixtures = map[string]bimodalFixture{
 				"b 1.0.0 foorev",
 			),
 		},
-		r: mkresults(
+		r: mksolution(
 			"a 1.0.0",
 			"b 1.0.0 foorev",
 		),
@@ -461,7 +461,7 @@ var bimodalFixtures = map[string]bimodalFixture{
 				"b 1.0.0 foorev",
 			),
 		},
-		r: mkresults(
+		r: mksolution(
 			"a 1.1.0",
 			"b 2.0.0 barrev",
 		),
@@ -517,7 +517,7 @@ func (f bimodalFixture) expectErrs() []string {
 	return f.errp
 }
 
-func (f bimodalFixture) result() map[string]Version {
+func (f bimodalFixture) solution() map[string]Version {
 	return f.r
 }
 

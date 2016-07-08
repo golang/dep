@@ -152,7 +152,7 @@ type solver struct {
 // be used as a lock file, and to populate a vendor directory.
 type Solver interface {
 	HashInputs() ([]byte, error)
-	Solve() (Result, error)
+	Solve() (Solution, error)
 }
 
 // Prepare readies a Solver for use.
@@ -221,7 +221,7 @@ func Prepare(args SolveArgs, opts SolveOpts, sm SourceManager) (Solver, error) {
 // Solver was created.
 //
 // This is the entry point to the main vsolver workhorse.
-func (s *solver) Solve() (Result, error) {
+func (s *solver) Solve() (Solution, error) {
 	// Ensure the root is in good, working order before doing anything else
 	err := s.b.verifyRoot(s.args.Root)
 	if err != nil {
@@ -260,7 +260,7 @@ func (s *solver) Solve() (Result, error) {
 		return nil, err
 	}
 
-	r := result{
+	r := solution{
 		att: s.attempts,
 	}
 
