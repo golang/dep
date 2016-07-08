@@ -467,6 +467,15 @@ func (s *solver) getImportsAndConstraintsOf(a atomWithPackages) ([]completeDep, 
 	// the list
 	for _, pkg := range a.pl {
 		if expkgs, exists := allex[pkg]; !exists {
+			// missing package here *should* only happen if the target pkg was
+			// poisoned somehow - check the original ptree.
+			if perr, exists := ptree.Packages[pkg]; exists {
+				if perr.Err != nil {
+					return nil, fmt.Errorf("package %s has errors: %s", pkg, perr.Err)
+				}
+				return nil, fmt.Errorf("package %s depends on some other package within %s with errors", pkg, a.a.id.errString())
+			}
+			// Nope, it's actually not there. This shouldn't happen.
 			return nil, fmt.Errorf("package %s does not exist within project %s", pkg, a.a.id.errString())
 		} else {
 			for _, ex := range expkgs {
