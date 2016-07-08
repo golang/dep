@@ -34,7 +34,7 @@ func TestHashInputs(t *testing.T) {
 	}
 
 	h := sha256.New()
-	for _, v := range []string{"a", "a", "1.0.0", "b", "b", "1.0.0", stdlibPkgs, "root", "", "root", "a", "b", "bar", "foo"} {
+	for _, v := range []string{"a", "a", "1.0.0", "b", "b", "1.0.0", stdlibPkgs, appenginePkgs, "root", "", "root", "a", "b", "bar", "foo"} {
 		h.Write([]byte(v))
 	}
 	correct := h.Sum(nil)

@@ -511,7 +511,7 @@ func (s *solver) intersectConstraintsWithImports(deps []ProjectDep, reach []stri
 		// If it's a stdlib package, skip it.
 		// TODO this just hardcodes us to the packages in tip - should we
 		// have go version magic here, too?
-		if _, exists := stdlib[rp]; exists {
+		if stdlib[rp] {
 			continue
 		}
 
