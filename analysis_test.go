@@ -1006,10 +1006,7 @@ func TestExternalReach(t *testing.T) {
 	var ignore map[string]bool
 
 	validate := func() {
-		result, err := vptree.ExternalReach(main, tests, ignore)
-		if err != nil {
-			t.Errorf("ver(%q): case returned err: %s", name, err)
-		}
+		result := vptree.ExternalReach(main, tests, ignore)
 		if !reflect.DeepEqual(expect, result) {
 			seen := make(map[string]bool)
 			for ip, epkgs := range expect {

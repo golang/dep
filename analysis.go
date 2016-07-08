@@ -746,9 +746,7 @@ type PackageOrErr struct {
 //  }
 //
 // It is safe to pass a nil map if there are no packages to ignore.
-func (t PackageTree) ExternalReach(main, tests bool, ignore map[string]bool) (map[string][]string, error) {
-	var someerrs bool
-
+func (t PackageTree) ExternalReach(main, tests bool, ignore map[string]bool) map[string][]string {
 	if ignore == nil {
 		ignore = make(map[string]bool)
 	}
@@ -762,7 +760,6 @@ func (t PackageTree) ExternalReach(main, tests bool, ignore map[string]bool) (ma
 			workmap[ip] = wm{
 				err: perr.Err,
 			}
-			someerrs = true
 			continue
 		}
 		p := perr.P
@@ -812,16 +809,8 @@ func (t PackageTree) ExternalReach(main, tests bool, ignore map[string]bool) (ma
 		workmap[ip] = w
 	}
 
-	if len(workmap) == 0 {
-		if someerrs {
-			// TODO proper errs
-			return nil, fmt.Errorf("no packages without errors in %s", t.ImportRoot)
-		}
-		return nil, nil
-	}
-
 	//return wmToReach(workmap, t.ImportRoot)
-	return wmToReach(workmap, ""), nil // TODO this passes tests, but doesn't seem right
+	return wmToReach(workmap, "") // TODO this passes tests, but doesn't seem right
 }
 
 // ListExternalImports computes a sorted, deduplicated list of all the external

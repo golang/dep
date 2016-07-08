@@ -460,11 +460,7 @@ func (s *solver) getImportsAndConstraintsOf(a atomWithPackages) ([]completeDep, 
 		return nil, err
 	}
 
-	allex, err := ptree.ExternalReach(false, false, s.ig)
-	if err != nil {
-		return nil, err
-	}
-
+	allex := ptree.ExternalReach(false, false, s.ig)
 	// Use a map to dedupe the unique external packages
 	exmap := make(map[string]struct{})
 	// Add the packages reached by the packages explicitly listed in the atom to
