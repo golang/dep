@@ -14,26 +14,43 @@ import (
 )
 
 var (
-	// With a random revision and no name, collisions are unlikely
+	// With a random revision and no name, collisions are...unlikely
 	nilpa = atom{
 		v: Revision(strconv.FormatInt(rand.Int63(), 36)),
 	}
 )
 
-// SolveArgs comprise the required inputs for a Solve run.
+// SolveArgs contain the main solving parameters.
 type SolveArgs struct {
-	// The path to the root of the project on which the solver is working.
-	Root string
+	// The path to the root of the project on which the solver should operate.
+	// This should point to the directory that should contain the vendor/
+	// directory.
+	//
+	// In general, it is wise for this to be under an active GOPATH, though it
+	// is not (currently) required.
+	//
+	// A real path to a readable directory is required.
+	RootDir string
 
-	// The 'name' of the project. Required. This should (must?) correspond to subpath of
-	// Root that exists under a GOPATH.
-	Name ProjectName
+	// The import path at the base of all import paths covered by the project.
+	// For example, the appropriate value for gps itself here is:
+	//
+	//  github.com/sdboyer/gps
+	//
+	// In most cases, this should match the latter portion of RootDir. However,
+	// that is not (currently) required.
+	//
+	// A non-empty string is required.
+	ImportRoot ProjectName
 
-	// The root manifest. Required. This contains all the dependencies, constraints, and
+	// The root manifest. This contains all the dependencies, constraints, and
 	// other controls available to the root project.
+	//
+	// May be nil, but for most cases, that would be unwise.
 	Manifest Manifest
 
-	// The root lock. Optional. Generally, this lock is the output of a previous solve run.
+	// The root lock. Optional. Generally, this lock is the output of a previous
+	// solve run.
 	//
 	// If provided, the solver will attempt to preserve the versions specified
 	// in the lock, unless ToChange or ChangeAll settings indicate otherwise.
@@ -167,10 +184,10 @@ func Prepare(args SolveArgs, opts SolveOpts, sm SourceManager) (Solver, error) {
 	if args.Manifest == nil {
 		return nil, badOptsFailure("Opts must include a manifest.")
 	}
-	if args.Root == "" {
+	if args.RootDir == "" {
 		return nil, badOptsFailure("Opts must specify a non-empty string for the project root directory. If cwd is desired, use \".\"")
 	}
-	if args.Name == "" {
+	if args.ImportRoot == "" {
 		return nil, badOptsFailure("Opts must include a project name. This should be the intended root import path of the project.")
 	}
 	if opts.Trace && opts.TraceLogger == nil {
@@ -223,13 +240,13 @@ func Prepare(args SolveArgs, opts SolveOpts, sm SourceManager) (Solver, error) {
 // This is the entry point to the main vsolver workhorse.
 func (s *solver) Solve() (Solution, error) {
 	// Ensure the root is in good, working order before doing anything else
-	err := s.b.verifyRoot(s.args.Root)
+	err := s.b.verifyRoot(s.args.RootDir)
 	if err != nil {
 		return nil, err
 	}
 
 	// Prep safe, normalized versions of root manifest and lock data
-	s.rm = prepManifest(s.args.Manifest, s.args.Name)
+	s.rm = prepManifest(s.args.Manifest, s.args.ImportRoot)
 	if s.args.Lock != nil {
 		for _, lp := range s.args.Lock.Projects() {
 			s.rlm[lp.Ident().normalize()] = lp
@@ -387,7 +404,7 @@ func (s *solver) solve() (map[atom]map[string]struct{}, error) {
 func (s *solver) selectRoot() error {
 	pa := atom{
 		id: ProjectIdentifier{
-			LocalName: s.args.Name,
+			LocalName: s.args.ImportRoot,
 		},
 		// This is a hack so that the root project doesn't have a nil version.
 		// It's sort of OK because the root never makes it out into the results.

@@ -63,10 +63,10 @@ func solveBasicsAndCheck(fix basicFixture, t *testing.T) (res Solution, err erro
 	sm := newdepspecSM(fix.ds, nil)
 
 	args := SolveArgs{
-		Root:     string(fix.ds[0].Name()),
-		Name:     ProjectName(fix.ds[0].Name()),
-		Manifest: fix.ds[0],
-		Lock:     dummyLock{},
+		RootDir:    string(fix.ds[0].Name()),
+		ImportRoot: ProjectName(fix.ds[0].Name()),
+		Manifest:   fix.ds[0],
+		Lock:       dummyLock{},
 	}
 
 	o := SolveOpts{
@@ -116,11 +116,11 @@ func solveBimodalAndCheck(fix bimodalFixture, t *testing.T) (res Solution, err e
 	sm := newbmSM(fix)
 
 	args := SolveArgs{
-		Root:     string(fix.ds[0].Name()),
-		Name:     ProjectName(fix.ds[0].Name()),
-		Manifest: fix.ds[0],
-		Lock:     dummyLock{},
-		Ignore:   fix.ignore,
+		RootDir:    string(fix.ds[0].Name()),
+		ImportRoot: ProjectName(fix.ds[0].Name()),
+		Manifest:   fix.ds[0],
+		Lock:       dummyLock{},
+		Ignore:     fix.ignore,
 	}
 
 	o := SolveOpts{
@@ -274,10 +274,10 @@ func TestRootLockNoVersionPairMatching(t *testing.T) {
 	l2[0].v = nil
 
 	args := SolveArgs{
-		Root:     string(fix.ds[0].Name()),
-		Name:     ProjectName(fix.ds[0].Name()),
-		Manifest: fix.ds[0],
-		Lock:     l2,
+		RootDir:    string(fix.ds[0].Name()),
+		ImportRoot: ProjectName(fix.ds[0].Name()),
+		Manifest:   fix.ds[0],
+		Lock:       l2,
 	}
 
 	res, err := fixSolve(args, SolveOpts{}, sm)
@@ -340,13 +340,13 @@ func TestBadSolveOpts(t *testing.T) {
 		t.Errorf("Should have errored on empty root")
 	}
 
-	args.Root = "root"
+	args.RootDir = "root"
 	_, err = Prepare(args, o, sm)
 	if err == nil {
 		t.Errorf("Should have errored on empty name")
 	}
 
-	args.Name = "root"
+	args.ImportRoot = "root"
 	_, err = Prepare(args, o, sm)
 	if err != nil {
 		t.Errorf("Basic conditions satisfied, solve should have gone through, err was %s", err)
@@ -370,10 +370,10 @@ func TestIgnoreDedupe(t *testing.T) {
 
 	ig := []string{"foo", "foo", "bar"}
 	args := SolveArgs{
-		Root:     string(fix.ds[0].Name()),
-		Name:     ProjectName(fix.ds[0].Name()),
-		Manifest: fix.ds[0],
-		Ignore:   ig,
+		RootDir:    string(fix.ds[0].Name()),
+		ImportRoot: ProjectName(fix.ds[0].Name()),
+		Manifest:   fix.ds[0],
+		Ignore:     ig,
 	}
 
 	s, _ := Prepare(args, SolveOpts{}, newdepspecSM(basicFixtures[0].ds, nil))

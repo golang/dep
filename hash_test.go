@@ -10,10 +10,10 @@ func TestHashInputs(t *testing.T) {
 	fix := basicFixtures[2]
 
 	args := SolveArgs{
-		Root:     string(fix.ds[0].Name()),
-		Name:     fix.ds[0].Name(),
-		Manifest: fix.ds[0],
-		Ignore:   []string{"foo", "bar"},
+		RootDir:    string(fix.ds[0].Name()),
+		ImportRoot: fix.ds[0].Name(),
+		Manifest:   fix.ds[0],
+		Ignore:     []string{"foo", "bar"},
 	}
 
 	// prep a fixture-overridden solver

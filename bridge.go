@@ -63,7 +63,7 @@ type bridge struct {
 }
 
 func (b *bridge) getProjectInfo(pa atom) (Manifest, Lock, error) {
-	if pa.id.LocalName == b.s.args.Name {
+	if pa.id.LocalName == b.s.args.ImportRoot {
 		return b.s.rm, b.s.rl, nil
 	}
 	return b.sm.GetProjectInfo(ProjectName(pa.id.netName()), pa.v)
@@ -363,7 +363,7 @@ func (b *bridge) computeRootReach() ([]string, error) {
 
 func (b *bridge) listRootPackages() (PackageTree, error) {
 	if b.crp == nil {
-		ptree, err := listPackages(b.s.args.Root, string(b.s.args.Name))
+		ptree, err := listPackages(b.s.args.RootDir, string(b.s.args.ImportRoot))
 
 		b.crp = &struct {
 			ptree PackageTree
@@ -386,7 +386,7 @@ func (b *bridge) listRootPackages() (PackageTree, error) {
 // The root project is handled separately, as the source manager isn't
 // responsible for that code.
 func (b *bridge) listPackages(id ProjectIdentifier, v Version) (PackageTree, error) {
-	if id.LocalName == b.s.args.Name {
+	if id.LocalName == b.s.args.ImportRoot {
 		return b.listRootPackages()
 	}
 
