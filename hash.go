@@ -19,18 +19,18 @@ import (
 func (s *solver) HashInputs() ([]byte, error) {
 	// Do these checks up front before any other work is needed, as they're the
 	// only things that can cause errors
-	if err := s.b.verifyRootDir(s.args.RootDir); err != nil {
+	if err := s.b.verifyRootDir(s.params.RootDir); err != nil {
 		// This will already be a BadOptsFailure
 		return nil, err
 	}
 
 	// Pass in magic root values, and the bridge will analyze the right thing
-	ptree, err := s.b.listPackages(ProjectIdentifier{LocalName: s.args.ImportRoot}, nil)
+	ptree, err := s.b.listPackages(ProjectIdentifier{LocalName: s.params.ImportRoot}, nil)
 	if err != nil {
-		return nil, badOptsFailure(fmt.Sprintf("Error while parsing imports under %s: %s", s.args.RootDir, err.Error()))
+		return nil, badOptsFailure(fmt.Sprintf("Error while parsing imports under %s: %s", s.params.RootDir, err.Error()))
 	}
 
-	d, dd := s.args.Manifest.DependencyConstraints(), s.args.Manifest.TestDependencyConstraints()
+	d, dd := s.params.Manifest.DependencyConstraints(), s.params.Manifest.TestDependencyConstraints()
 	p := make(sortedDeps, len(d))
 	copy(p, d)
 	p = append(p, dd...)

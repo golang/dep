@@ -11,8 +11,14 @@ import (
 	"github.com/armon/go-radix"
 )
 
-// SolveArgs contain the main solving parameters.
-type SolveArgs struct {
+// SolveParameters hold all arguments to a solver run.
+//
+// Only RootDir and ImportRoot are absolutely required, though there are very
+// few cases in which passing a nil Manifest makes much sense.
+//
+// Of these properties, only Manifest and Ignore are (directly) incorporated in
+// memoization hashing.
+type SolveParameters struct {
 	// The path to the root of the project on which the solver should operate.
 	// This should point to the directory that should contain the vendor/
 	// directory.
@@ -51,10 +57,7 @@ type SolveArgs struct {
 	// project, or from elsewhere. Ignoring a package means that both it and its
 	// imports will be disregarded by all relevant solver operations.
 	Ignore []string
-}
 
-// SolveOpts holds additional options that govern solving behavior.
-type SolveOpts struct {
 	// ToChange is a list of project names that should be changed - that is, any
 	// versions specified for those projects in the root lock file should be
 	// ignored.
@@ -93,13 +96,13 @@ type solver struct {
 	// starts moving forward again.
 	attempts int
 
-	// SolveArgs are the essential inputs to the solver. The solver will abort
-	// early if these options are not appropriately set.
-	args SolveArgs
-
-	// SolveOpts are the configuration options provided to the solver. The
-	// solver will abort early if certain options are not appropriately set.
-	o SolveOpts
+	// SolveParameters are the inputs to the solver. They determine both what
+	// data the solver should operate on, and certain aspects of how solving
+	// proceeds.
+	//
+	// Prepare() validates these, so by the time we have a *solver instance, we
+	// know they're valid.
+	params SolveParameters
 
 	// Logger used exclusively for trace output, if the trace option is set.
 	tl *log.Logger
@@ -128,7 +131,7 @@ type solver struct {
 	// removal.
 	unsel *unselected
 
-	// Map of packages to ignore. This is derived by converting SolveArgs.Ignore
+	// Map of packages to ignore. Derived by converting SolveParameters.Ignore
 	// into a map during solver prep - which also, nicely, deduplicates it.
 	ig map[string]bool
 
@@ -165,47 +168,46 @@ type Solver interface {
 
 // Prepare readies a Solver for use.
 //
-// This function reads and validates the provided SolveArgs and SolveOpts. If a
-// problem with the inputs is detected, an error is returned. Otherwise, a
-// Solver is returned, ready to hash and check inputs or perform a solving run.
-func Prepare(args SolveArgs, opts SolveOpts, sm SourceManager) (Solver, error) {
+// This function reads and validates the provided SolveParameters. If a problem
+// with the inputs is detected, an error is returned. Otherwise, a Solver is
+// returned, ready to hash and check inputs or perform a solving run.
+func Prepare(params SolveParameters, sm SourceManager) (Solver, error) {
 	// local overrides would need to be handled first.
 	// TODO local overrides! heh
 
-	if args.RootDir == "" {
-		return nil, badOptsFailure("args must specify a non-empty root directory")
+	if params.RootDir == "" {
+		return nil, badOptsFailure("params must specify a non-empty root directory")
 	}
-	if args.ImportRoot == "" {
-		return nil, badOptsFailure("args must include a non-empty import root")
+	if params.ImportRoot == "" {
+		return nil, badOptsFailure("params must include a non-empty import root")
 	}
-	if opts.Trace && opts.TraceLogger == nil {
+	if params.Trace && params.TraceLogger == nil {
 		return nil, badOptsFailure("trace requested, but no logger provided")
 	}
 
-	if args.Manifest == nil {
-		args.Manifest = SimpleManifest{}
+	if params.Manifest == nil {
+		params.Manifest = SimpleManifest{}
 	}
 
 	// Ensure the ignore map is at least initialized
 	ig := make(map[string]bool)
-	if len(args.Ignore) > 0 {
-		for _, pkg := range args.Ignore {
+	if len(params.Ignore) > 0 {
+		for _, pkg := range params.Ignore {
 			ig[pkg] = true
 		}
 	}
 
 	s := &solver{
-		args: args,
-		o:    opts,
-		ig:   ig,
-		tl:   opts.TraceLogger,
+		params: params,
+		ig:     ig,
+		tl:     params.TraceLogger,
 	}
 
 	// Set up the bridge and ensure the root dir is in good, working order
 	// before doing anything else. (This call is stubbed out in tests, via
 	// overriding mkBridge(), so we can run with virtual RootDir.)
 	s.b = mkBridge(s, sm)
-	err := s.b.verifyRootDir(s.args.RootDir)
+	err := s.b.verifyRootDir(s.params.RootDir)
 	if err != nil {
 		return nil, err
 	}
@@ -215,7 +217,7 @@ func Prepare(args SolveArgs, opts SolveOpts, sm SourceManager) (Solver, error) {
 	s.rlm = make(map[ProjectIdentifier]LockedProject)
 	s.names = make(map[ProjectName]string)
 
-	for _, v := range s.o.ToChange {
+	for _, v := range s.params.ToChange {
 		s.chng[v] = struct{}{}
 	}
 
@@ -230,23 +232,22 @@ func Prepare(args SolveArgs, opts SolveOpts, sm SourceManager) (Solver, error) {
 	}
 
 	// Prep safe, normalized versions of root manifest and lock data
-	s.rm = prepManifest(s.args.Manifest)
-	if s.args.Lock != nil {
-		for _, lp := range s.args.Lock.Projects() {
+	s.rm = prepManifest(s.params.Manifest)
+	if s.params.Lock != nil {
+		for _, lp := range s.params.Lock.Projects() {
 			s.rlm[lp.Ident().normalize()] = lp
 		}
 
 		// Also keep a prepped one, mostly for the bridge. This is probably
 		// wasteful, but only minimally so, and yay symmetry
-		s.rl = prepLock(s.args.Lock)
+		s.rl = prepLock(s.params.Lock)
 	}
 
 	return s, nil
 }
 
 // Solve attempts to find a dependency solution for the given project, as
-// represented by the SolveArgs and accompanying SolveOpts with which this
-// Solver was created.
+// represented by the SolveParameters with which this Solver was created.
 //
 // This is the entry point to the main vsolver workhorse.
 func (s *solver) Solve() (Solution, error) {
@@ -393,7 +394,7 @@ func (s *solver) solve() (map[atom]map[string]struct{}, error) {
 func (s *solver) selectRoot() error {
 	pa := atom{
 		id: ProjectIdentifier{
-			LocalName: s.args.ImportRoot,
+			LocalName: s.params.ImportRoot,
 		},
 		// This is a hack so that the root project doesn't have a nil version.
 		// It's sort of OK because the root never makes it out into the results.
@@ -450,7 +451,7 @@ func (s *solver) selectRoot() error {
 func (s *solver) getImportsAndConstraintsOf(a atomWithPackages) ([]completeDep, error) {
 	var err error
 
-	if s.args.ImportRoot == a.a.id.LocalName {
+	if s.params.ImportRoot == a.a.id.LocalName {
 		panic("Should never need to recheck imports/constraints from root during solve")
 	}
 
@@ -598,7 +599,7 @@ func (s *solver) intersectConstraintsWithImports(deps []ProjectDep, reach []stri
 func (s *solver) createVersionQueue(bmi bimodalIdentifier) (*versionQueue, error) {
 	id := bmi.id
 	// If on the root package, there's no queue to make
-	if s.args.ImportRoot == id.LocalName {
+	if s.params.ImportRoot == id.LocalName {
 		return newVersionQueue(id, nil, nil, s.b)
 	}
 
@@ -638,7 +639,7 @@ func (s *solver) createVersionQueue(bmi bimodalIdentifier) (*versionQueue, error
 		// TODO nested loop; prime candidate for a cache somewhere
 		for _, dep := range s.sel.getDependenciesOn(bmi.id) {
 			// Skip the root, of course
-			if s.args.ImportRoot == dep.depender.id.LocalName {
+			if s.params.ImportRoot == dep.depender.id.LocalName {
 				continue
 			}
 
@@ -771,7 +772,7 @@ func (s *solver) findValidVersion(q *versionQueue, pl []string) error {
 func (s *solver) getLockVersionIfValid(id ProjectIdentifier) (Version, error) {
 	// If the project is specifically marked for changes, then don't look for a
 	// locked version.
-	if _, explicit := s.chng[id.LocalName]; explicit || s.o.ChangeAll {
+	if _, explicit := s.chng[id.LocalName]; explicit || s.params.ChangeAll {
 		// For projects with an upstream or cache repository, it's safe to
 		// ignore what's in the lock, because there's presumably more versions
 		// to be found and attempted in the repository. If it's only in vendor,
@@ -992,7 +993,7 @@ func (s *solver) fail(id ProjectIdentifier) {
 	// selection?
 
 	// skip if the root project
-	if s.args.ImportRoot != id.LocalName {
+	if s.params.ImportRoot != id.LocalName {
 		// just look for the first (oldest) one; the backtracker will necessarily
 		// traverse through and pop off any earlier ones
 		for _, vq := range s.versions {
@@ -1151,7 +1152,7 @@ func (s *solver) unselectLast() (atomWithPackages, bool) {
 }
 
 func (s *solver) logStart(bmi bimodalIdentifier) {
-	if !s.o.Trace {
+	if !s.params.Trace {
 		return
 	}
 
@@ -1161,7 +1162,7 @@ func (s *solver) logStart(bmi bimodalIdentifier) {
 }
 
 func (s *solver) logSolve(args ...interface{}) {
-	if !s.o.Trace {
+	if !s.params.Trace {
 		return
 	}
 

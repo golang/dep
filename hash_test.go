@@ -9,14 +9,14 @@ import (
 func TestHashInputs(t *testing.T) {
 	fix := basicFixtures[2]
 
-	args := SolveArgs{
+	params := SolveParameters{
 		RootDir:    string(fix.ds[0].n),
 		ImportRoot: fix.ds[0].n,
 		Manifest:   fix.ds[0],
 		Ignore:     []string{"foo", "bar"},
 	}
 
-	s, err := Prepare(args, SolveOpts{}, newdepspecSM(fix.ds, nil))
+	s, err := Prepare(params, newdepspecSM(fix.ds, nil))
 
 	dig, err := s.HashInputs()
 	if err != nil {

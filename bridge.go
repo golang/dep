@@ -73,7 +73,7 @@ var mkBridge func(*solver, SourceManager) sourceBridge = func(s *solver, sm Sour
 }
 
 func (b *bridge) getProjectInfo(pa atom) (Manifest, Lock, error) {
-	if pa.id.LocalName == b.s.args.ImportRoot {
+	if pa.id.LocalName == b.s.params.ImportRoot {
 		return b.s.rm, b.s.rl, nil
 	}
 	return b.sm.GetProjectInfo(ProjectName(pa.id.netName()), pa.v)
@@ -101,7 +101,7 @@ func (b *bridge) listVersions(id ProjectIdentifier) ([]Version, error) {
 		return nil, err
 	}
 
-	if b.s.o.Downgrade {
+	if b.s.params.Downgrade {
 		sort.Sort(downgradeVersionSorter(vl))
 	} else {
 		sort.Sort(upgradeVersionSorter(vl))
@@ -373,7 +373,7 @@ func (b *bridge) computeRootReach() ([]string, error) {
 
 func (b *bridge) listRootPackages() (PackageTree, error) {
 	if b.crp == nil {
-		ptree, err := listPackages(b.s.args.RootDir, string(b.s.args.ImportRoot))
+		ptree, err := listPackages(b.s.params.RootDir, string(b.s.params.ImportRoot))
 
 		b.crp = &struct {
 			ptree PackageTree
@@ -396,7 +396,7 @@ func (b *bridge) listRootPackages() (PackageTree, error) {
 // The root project is handled separately, as the source manager isn't
 // responsible for that code.
 func (b *bridge) listPackages(id ProjectIdentifier, v Version) (PackageTree, error) {
-	if id.LocalName == b.s.args.ImportRoot {
+	if id.LocalName == b.s.params.ImportRoot {
 		return b.listRootPackages()
 	}
 
