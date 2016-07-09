@@ -18,7 +18,7 @@ var bd string
 type dummyAnalyzer struct{}
 
 func (dummyAnalyzer) GetInfo(ctx build.Context, p ProjectName) (Manifest, Lock, error) {
-	return SimpleManifest{N: p}, nil, nil
+	return SimpleManifest{}, nil, nil
 }
 
 func sv(s string) *semver.Version {

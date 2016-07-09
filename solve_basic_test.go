@@ -1163,11 +1163,6 @@ func (ds depspec) TestDependencyConstraints() []ProjectDep {
 	return ds.devdeps
 }
 
-// impl Spec interface
-func (ds depspec) Name() ProjectName {
-	return ds.n
-}
-
 type fixLock []LockedProject
 
 func (fixLock) SolverVersion() string {

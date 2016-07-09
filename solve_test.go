@@ -63,8 +63,8 @@ func solveBasicsAndCheck(fix basicFixture, t *testing.T) (res Solution, err erro
 	sm := newdepspecSM(fix.ds, nil)
 
 	args := SolveArgs{
-		RootDir:    string(fix.ds[0].Name()),
-		ImportRoot: ProjectName(fix.ds[0].Name()),
+		RootDir:    string(fix.ds[0].n),
+		ImportRoot: ProjectName(fix.ds[0].n),
 		Manifest:   fix.ds[0],
 		Lock:       dummyLock{},
 	}
@@ -116,8 +116,8 @@ func solveBimodalAndCheck(fix bimodalFixture, t *testing.T) (res Solution, err e
 	sm := newbmSM(fix)
 
 	args := SolveArgs{
-		RootDir:    string(fix.ds[0].Name()),
-		ImportRoot: ProjectName(fix.ds[0].Name()),
+		RootDir:    string(fix.ds[0].n),
+		ImportRoot: ProjectName(fix.ds[0].n),
 		Manifest:   fix.ds[0],
 		Lock:       dummyLock{},
 		Ignore:     fix.ignore,
@@ -274,8 +274,8 @@ func TestRootLockNoVersionPairMatching(t *testing.T) {
 	l2[0].v = nil
 
 	args := SolveArgs{
-		RootDir:    string(fix.ds[0].Name()),
-		ImportRoot: ProjectName(fix.ds[0].Name()),
+		RootDir:    string(fix.ds[0].n),
+		ImportRoot: ProjectName(fix.ds[0].n),
 		Manifest:   fix.ds[0],
 		Lock:       l2,
 	}
@@ -370,8 +370,8 @@ func TestIgnoreDedupe(t *testing.T) {
 
 	ig := []string{"foo", "foo", "bar"}
 	args := SolveArgs{
-		RootDir:    string(fix.ds[0].Name()),
-		ImportRoot: ProjectName(fix.ds[0].Name()),
+		RootDir:    string(fix.ds[0].n),
+		ImportRoot: ProjectName(fix.ds[0].n),
 		Manifest:   fix.ds[0],
 		Ignore:     ig,
 	}

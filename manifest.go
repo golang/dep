@@ -1,21 +1,24 @@
 package vsolver
 
-// Manifest represents the data from a manifest file (or however the
-// implementing tool chooses to store it) at a particular version that is
-// relevant to the satisfiability solving process. That means constraints on
-// dependencies, both for normal dependencies and for tests.
+// Manifest represents manifest-type data for a project at a particular version.
+// That means dependency constraints, both for normal dependencies and for
+// tests. The constraints expressed in a manifest determine the set of versions that
+// are acceptable to try for a given project.
 //
-// Finding a solution that satisfies the constraints expressed by all of these
-// dependencies (and those from all other projects, transitively), is what the
-// solver does.
+// Expressing a constraint in a manifest does not guarantee that a particular
+// dependency will be present. It only guarantees that if packages in the
+// project specified by the dependency are discovered through static analysis of
+// the (transitive) import graph, then they will conform to the constraint.
 //
-// Note that vsolver does perform static analysis on all projects' codebases;
-// if dependencies it finds through that analysis are missing from what the
-// Manifest lists, it is considered an error that will eliminate that version
-// from consideration in the solving algorithm.
+// This does entail that manifests can express constraints on projects they do
+// not themselves import. This is by design, but its implications are complex.
+// See the gps docs for more information: https://github.com/sdboyer/gps/wiki
 type Manifest interface {
-	Name() ProjectName
+	// Returns a list of project constraints that will be  universally to
+	// the depgraph.
 	DependencyConstraints() []ProjectDep
+	// Returns a list of constraints applicable to test imports. Note that this
+	// will only be consulted for root manifests.
 	TestDependencyConstraints() []ProjectDep
 }
 
@@ -24,17 +27,11 @@ type Manifest interface {
 // the fly for projects with no manifest metadata, or metadata through a foreign
 // tool's idioms.
 type SimpleManifest struct {
-	N        ProjectName
 	Deps     []ProjectDep
 	TestDeps []ProjectDep
 }
 
 var _ Manifest = SimpleManifest{}
-
-// Name returns the name of the project described by the manifest.
-func (m SimpleManifest) Name() ProjectName {
-	return m.N
-}
 
 // GetDependencies returns the project's dependencies.
 func (m SimpleManifest) DependencyConstraints() []ProjectDep {
@@ -55,20 +52,15 @@ func (m SimpleManifest) TestDependencyConstraints() []ProjectDep {
 //  the solver is in-flight.
 //
 // This is achieved by copying the manifest's data into a new SimpleManifest.
-func prepManifest(m Manifest, n ProjectName) Manifest {
+func prepManifest(m Manifest) Manifest {
 	if m == nil {
-		// Only use the provided ProjectName if making an empty manifest;
-		// otherwise, we trust the input manifest.
-		return SimpleManifest{
-			N: n,
-		}
+		return SimpleManifest{}
 	}
 
 	deps := m.DependencyConstraints()
 	ddeps := m.TestDependencyConstraints()
 
 	rm := SimpleManifest{
-		N:        m.Name(),
 		Deps:     make([]ProjectDep, len(deps)),
 		TestDeps: make([]ProjectDep, len(ddeps)),
 	}

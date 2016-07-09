@@ -81,8 +81,8 @@ func listPackages(fileRoot, importRoot string) (PackageTree, error) {
 		Packages:   make(map[string]PackageOrErr),
 	}
 
-	// mkfilter returns two funcs that can be injected into a
-	// build.Context, letting us filter the results into an "in" and "out" set.
+	// mkfilter returns two funcs that can be injected into a build.Context,
+	// letting us filter the results into an "in" and "out" set.
 	mkfilter := func(files map[string]struct{}) (in, out func(dir string) (fi []os.FileInfo, err error)) {
 		in = func(dir string) (fi []os.FileInfo, err error) {
 			all, err := ioutil.ReadDir(dir)

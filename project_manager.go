@@ -128,7 +128,7 @@ func (pm *projectManager) GetInfoAt(v Version) (Manifest, Lock, error) {
 
 		// If m is nil, prepManifest will provide an empty one.
 		pi := projectInfo{
-			Manifest: prepManifest(m, pm.n),
+			Manifest: prepManifest(m),
 			Lock:     l,
 		}
 

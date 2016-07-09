@@ -246,7 +246,7 @@ func (s *solver) Solve() (Solution, error) {
 	}
 
 	// Prep safe, normalized versions of root manifest and lock data
-	s.rm = prepManifest(s.args.Manifest, s.args.ImportRoot)
+	s.rm = prepManifest(s.args.Manifest)
 	if s.args.Lock != nil {
 		for _, lp := range s.args.Lock.Projects() {
 			s.rlm[lp.Ident().normalize()] = lp
@@ -461,7 +461,7 @@ func (s *solver) selectRoot() error {
 func (s *solver) getImportsAndConstraintsOf(a atomWithPackages) ([]completeDep, error) {
 	var err error
 
-	if s.rm.Name() == a.a.id.LocalName {
+	if s.args.ImportRoot == a.a.id.LocalName {
 		panic("Should never need to recheck imports/constraints from root during solve")
 	}
 
@@ -609,7 +609,7 @@ func (s *solver) intersectConstraintsWithImports(deps []ProjectDep, reach []stri
 func (s *solver) createVersionQueue(bmi bimodalIdentifier) (*versionQueue, error) {
 	id := bmi.id
 	// If on the root package, there's no queue to make
-	if id.LocalName == s.rm.Name() {
+	if s.args.ImportRoot == id.LocalName {
 		return newVersionQueue(id, nil, nil, s.b)
 	}
 
@@ -649,7 +649,7 @@ func (s *solver) createVersionQueue(bmi bimodalIdentifier) (*versionQueue, error
 		// TODO nested loop; prime candidate for a cache somewhere
 		for _, dep := range s.sel.getDependenciesOn(bmi.id) {
 			// Skip the root, of course
-			if dep.depender.id.LocalName == s.rm.Name() {
+			if s.args.ImportRoot == dep.depender.id.LocalName {
 				continue
 			}
 
@@ -1003,7 +1003,7 @@ func (s *solver) fail(id ProjectIdentifier) {
 	// selection?
 
 	// skip if the root project
-	if s.rm.Name() != id.LocalName {
+	if s.args.ImportRoot != id.LocalName {
 		// just look for the first (oldest) one; the backtracker will necessarily
 		// traverse through and pop off any earlier ones
 		for _, vq := range s.versions {

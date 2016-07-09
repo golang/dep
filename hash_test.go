@@ -10,8 +10,8 @@ func TestHashInputs(t *testing.T) {
 	fix := basicFixtures[2]
 
 	args := SolveArgs{
-		RootDir:    string(fix.ds[0].Name()),
-		ImportRoot: fix.ds[0].Name(),
+		RootDir:    string(fix.ds[0].n),
+		ImportRoot: fix.ds[0].n,
 		Manifest:   fix.ds[0],
 		Ignore:     []string{"foo", "bar"},
 	}
