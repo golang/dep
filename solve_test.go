@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"math/rand"
 	"os"
 	"reflect"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -328,40 +330,36 @@ func TestBadSolveOpts(t *testing.T) {
 
 	o := SolveOpts{}
 	args := SolveArgs{}
+
 	_, err := Prepare(args, o, sm)
 	if err == nil {
-		t.Errorf("Should have errored on missing manifest")
+		t.Errorf("Prepare should have errored on empty root")
+	} else if !strings.Contains(err.Error(), "non-empty root directory") {
+		t.Error("Prepare should have given error on empty root, but gave:", err)
 	}
 
-	m, _, _ := sm.GetProjectInfo(basicFixtures[0].ds[0].n, basicFixtures[0].ds[0].v)
-	args.Manifest = m
-	_, err = Prepare(args, o, sm)
-	if err == nil {
-		t.Errorf("Should have errored on empty root")
-	}
-
+	args.RootDir = strconv.FormatInt(rand.Int63(), 36)
 	args.RootDir = "root"
 	_, err = Prepare(args, o, sm)
 	if err == nil {
-		t.Errorf("Should have errored on empty name")
+		t.Errorf("Prepare should have errored on empty name")
+	} else if !strings.Contains(err.Error(), "non-empty import root") {
+		t.Error("Prepare should have given error on empty import root, but gave:", err)
 	}
 
 	args.ImportRoot = "root"
-	_, err = Prepare(args, o, sm)
-	if err != nil {
-		t.Errorf("Basic conditions satisfied, solve should have gone through, err was %s", err)
-	}
-
 	o.Trace = true
 	_, err = Prepare(args, o, sm)
 	if err == nil {
 		t.Errorf("Should have errored on trace with no logger")
+	} else if !strings.Contains(err.Error(), "no logger provided") {
+		t.Error("Prepare should have given error on missing trace logger, but gave:", err)
 	}
 
 	o.TraceLogger = log.New(ioutil.Discard, "", 0)
 	_, err = Prepare(args, o, sm)
 	if err != nil {
-		t.Errorf("Basic conditions re-satisfied, solve should have gone through, err was %s", err)
+		t.Error("Basic conditions satisfied, prepare should have completed successfully, err was:", err)
 	}
 }
 

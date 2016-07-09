@@ -4,20 +4,11 @@ import (
 	"container/heap"
 	"fmt"
 	"log"
-	"math/rand"
 	"os"
 	"sort"
-	"strconv"
 	"strings"
 
 	"github.com/armon/go-radix"
-)
-
-var (
-	// With a random revision and no name, collisions are...unlikely
-	nilpa = atom{
-		v: Revision(strconv.FormatInt(rand.Int63(), 36)),
-	}
 )
 
 // SolveArgs contain the main solving parameters.
@@ -64,18 +55,6 @@ type SolveArgs struct {
 
 // SolveOpts holds additional options that govern solving behavior.
 type SolveOpts struct {
-	// Downgrade indicates whether the solver will attempt to upgrade (false) or
-	// downgrade (true) projects that are not locked, or are marked for change.
-	//
-	// Upgrading is, by far, the most typical case. The field is named
-	// 'Downgrade' so that the bool's zero value corresponds to that most
-	// typical case.
-	Downgrade bool
-
-	// ChangeAll indicates that all projects should be changed - that is, any
-	// versions specified in the root lock file should be ignored.
-	ChangeAll bool
-
 	// ToChange is a list of project names that should be changed - that is, any
 	// versions specified for those projects in the root lock file should be
 	// ignored.
@@ -84,6 +63,18 @@ type SolveOpts struct {
 	// projects into ToChange. In general, ToChange should *only* be used if the
 	// user expressly requested an upgrade for a specific project.
 	ToChange []ProjectName
+
+	// ChangeAll indicates that all projects should be changed - that is, any
+	// versions specified in the root lock file should be ignored.
+	ChangeAll bool
+
+	// Downgrade indicates whether the solver will attempt to upgrade (false) or
+	// downgrade (true) projects that are not locked, or are marked for change.
+	//
+	// Upgrading is, by far, the most typical case. The field is named
+	// 'Downgrade' so that the bool's zero value corresponds to that most
+	// typical case.
+	Downgrade bool
 
 	// Trace controls whether the solver will generate informative trace output
 	// as it moves through the solving process.
@@ -181,17 +172,18 @@ func Prepare(args SolveArgs, opts SolveOpts, sm SourceManager) (Solver, error) {
 	// local overrides would need to be handled first.
 	// TODO local overrides! heh
 
-	if args.Manifest == nil {
-		return nil, badOptsFailure("Opts must include a manifest.")
-	}
 	if args.RootDir == "" {
-		return nil, badOptsFailure("Opts must specify a non-empty string for the project root directory. If cwd is desired, use \".\"")
+		return nil, badOptsFailure("args must specify a non-empty root directory")
 	}
 	if args.ImportRoot == "" {
-		return nil, badOptsFailure("Opts must include a project name. This should be the intended root import path of the project.")
+		return nil, badOptsFailure("args must include a non-empty import root")
 	}
 	if opts.Trace && opts.TraceLogger == nil {
-		return nil, badOptsFailure("Trace requested, but no logger provided.")
+		return nil, badOptsFailure("trace requested, but no logger provided")
+	}
+
+	if args.Manifest == nil {
+		args.Manifest = SimpleManifest{}
 	}
 
 	// Ensure the ignore map is at least initialized
@@ -220,6 +212,10 @@ func Prepare(args SolveArgs, opts SolveOpts, sm SourceManager) (Solver, error) {
 	s.rlm = make(map[ProjectIdentifier]LockedProject)
 	s.names = make(map[ProjectName]string)
 
+	for _, v := range s.o.ToChange {
+		s.chng[v] = struct{}{}
+	}
+
 	// Initialize stacks and queues
 	s.sel = &selection{
 		deps: make(map[ProjectIdentifier][]dependency),
@@ -228,6 +224,18 @@ func Prepare(args SolveArgs, opts SolveOpts, sm SourceManager) (Solver, error) {
 	s.unsel = &unselected{
 		sl:  make([]bimodalIdentifier, 0),
 		cmp: s.unselectedComparator,
+	}
+
+	// Prep safe, normalized versions of root manifest and lock data
+	s.rm = prepManifest(s.args.Manifest)
+	if s.args.Lock != nil {
+		for _, lp := range s.args.Lock.Projects() {
+			s.rlm[lp.Ident().normalize()] = lp
+		}
+
+		// Also keep a prepped one, mostly for the bridge. This is probably
+		// wasteful, but only minimally so, and yay symmetry
+		s.rl = prepLock(s.args.Lock)
 	}
 
 	return s, nil
@@ -243,22 +251,6 @@ func (s *solver) Solve() (Solution, error) {
 	err := s.b.verifyRoot(s.args.RootDir)
 	if err != nil {
 		return nil, err
-	}
-
-	// Prep safe, normalized versions of root manifest and lock data
-	s.rm = prepManifest(s.args.Manifest)
-	if s.args.Lock != nil {
-		for _, lp := range s.args.Lock.Projects() {
-			s.rlm[lp.Ident().normalize()] = lp
-		}
-
-		// Also keep a prepped one, mostly for the bridge. This is probably
-		// wasteful, but only minimally so, and yay symmetry
-		s.rl = prepLock(s.args.Lock)
-	}
-
-	for _, v := range s.o.ToChange {
-		s.chng[v] = struct{}{}
 	}
 
 	// Prime the queues with the root project

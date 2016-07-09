@@ -1,6 +1,10 @@
 package vsolver
 
-import "fmt"
+import (
+	"fmt"
+	"math/rand"
+	"strconv"
+)
 
 type ProjectIdentifier struct {
 	LocalName   ProjectName
@@ -75,6 +79,11 @@ type ProjectName string
 type atom struct {
 	id ProjectIdentifier
 	v  Version
+}
+
+// With a random revision and no name, collisions are...unlikely
+var nilpa = atom{
+	v: Revision(strconv.FormatInt(rand.Int63(), 36)),
 }
 
 type atomWithPackages struct {
