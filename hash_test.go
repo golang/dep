@@ -7,7 +7,7 @@ import (
 )
 
 func TestHashInputs(t *testing.T) {
-	fix := basicFixtures[2]
+	fix := basicFixtures["shared dependency with overlapping constraints"]
 
 	params := SolveParameters{
 		RootDir:    string(fix.ds[0].n),

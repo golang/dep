@@ -57,9 +57,20 @@ func fixSolve(params SolveParameters, sm SourceManager) (Solution, error) {
 //
 // Or, just the one named in the fix arg.
 func TestBasicSolves(t *testing.T) {
-	for _, fix := range basicFixtures {
-		if fixtorun == "" || fixtorun == fix.n {
+	if fixtorun != "" {
+		if fix, exists := basicFixtures[fixtorun]; exists {
 			solveBasicsAndCheck(fix, t)
+		}
+	} else {
+		// sort them by their keys so we get stable output
+		var names []string
+		for n := range basicFixtures {
+			names = append(names, n)
+		}
+
+		sort.Strings(names)
+		for _, n := range names {
+			solveBasicsAndCheck(basicFixtures[n], t)
 			if testing.Verbose() {
 				// insert a line break between tests
 				stderrlog.Println("")
@@ -331,7 +342,7 @@ func getFailureCausingProjects(err error) (projs []string) {
 
 func TestBadSolveOpts(t *testing.T) {
 	pn := strconv.FormatInt(rand.Int63(), 36)
-	fix := basicFixtures[0]
+	fix := basicFixtures["no dependencies"]
 	fix.ds[0].n = ProjectRoot(pn)
 	sm := newdepspecSM(fix.ds, nil)
 
@@ -398,7 +409,7 @@ func TestBadSolveOpts(t *testing.T) {
 }
 
 func TestIgnoreDedupe(t *testing.T) {
-	fix := basicFixtures[0]
+	fix := basicFixtures["no dependencies"]
 
 	ig := []string{"foo", "foo", "bar"}
 	params := SolveParameters{
@@ -408,7 +419,7 @@ func TestIgnoreDedupe(t *testing.T) {
 		Ignore:     ig,
 	}
 
-	s, _ := Prepare(params, newdepspecSM(basicFixtures[0].ds, nil))
+	s, _ := Prepare(params, newdepspecSM(basicFixtures["no dependencies"].ds, nil))
 	ts := s.(*solver)
 
 	expect := map[string]bool{
