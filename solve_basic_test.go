@@ -1120,7 +1120,7 @@ func (b *depspecBridge) computeRootReach() ([]string, error) {
 }
 
 // override verifyRoot() on bridge to prevent any filesystem interaction
-func (b *depspecBridge) verifyRoot(path string) error {
+func (b *depspecBridge) verifyRootDir(path string) error {
 	root := b.sm.(fixSM).rootSpec()
 	if string(root.n) != path {
 		return fmt.Errorf("Expected only root project %q to computeRootReach(), got %q", root.n, path)

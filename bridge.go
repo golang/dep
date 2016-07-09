@@ -21,7 +21,7 @@ type sourceBridge interface {
 	matches(id ProjectIdentifier, c Constraint, v Version) bool
 	matchesAny(id ProjectIdentifier, c1, c2 Constraint) bool
 	intersect(id ProjectIdentifier, c1, c2 Constraint) Constraint
-	verifyRoot(path string) error
+	verifyRootDir(path string) error
 	deduceRemoteRepo(path string) (*remoteRepo, error)
 }
 
@@ -60,6 +60,16 @@ type bridge struct {
 	// is that this keeps the versions sorted in the direction required by the
 	// current solve run
 	vlists map[ProjectName][]Version
+}
+
+// Global factory func to create a bridge. This exists solely to allow tests to
+// override it with a custom bridge and sm.
+var mkBridge func(*solver, SourceManager) sourceBridge = func(s *solver, sm SourceManager) sourceBridge {
+	return &bridge{
+		sm:     sm,
+		s:      s,
+		vlists: make(map[ProjectName][]Version),
+	}
 }
 
 func (b *bridge) getProjectInfo(pa atom) (Manifest, Lock, error) {
@@ -398,11 +408,11 @@ func (b *bridge) listPackages(id ProjectIdentifier, v Version) (PackageTree, err
 // verifyRoot ensures that the provided path to the project root is in good
 // working condition. This check is made only once, at the beginning of a solve
 // run.
-func (b *bridge) verifyRoot(path string) error {
+func (b *bridge) verifyRootDir(path string) error {
 	if fi, err := os.Stat(path); err != nil {
-		return badOptsFailure(fmt.Sprintf("Could not read project root (%s): %s", path, err))
+		return badOptsFailure(fmt.Sprintf("could not read project root (%s): %s", path, err))
 	} else if !fi.IsDir() {
-		return badOptsFailure(fmt.Sprintf("Project root (%s) is a file, not a directory.", path))
+		return badOptsFailure(fmt.Sprintf("project root (%s) is a file, not a directory", path))
 	}
 
 	return nil

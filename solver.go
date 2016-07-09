@@ -201,10 +201,13 @@ func Prepare(args SolveArgs, opts SolveOpts, sm SourceManager) (Solver, error) {
 		tl:   opts.TraceLogger,
 	}
 
-	s.b = &bridge{
-		sm:     sm,
-		s:      s,
-		vlists: make(map[ProjectName][]Version),
+	// Set up the bridge and ensure the root dir is in good, working order
+	// before doing anything else. (This call is stubbed out in tests, via
+	// overriding mkBridge(), so we can run with virtual RootDir.)
+	s.b = mkBridge(s, sm)
+	err := s.b.verifyRootDir(s.args.RootDir)
+	if err != nil {
+		return nil, err
 	}
 
 	// Initialize maps
@@ -247,14 +250,8 @@ func Prepare(args SolveArgs, opts SolveOpts, sm SourceManager) (Solver, error) {
 //
 // This is the entry point to the main vsolver workhorse.
 func (s *solver) Solve() (Solution, error) {
-	// Ensure the root is in good, working order before doing anything else
-	err := s.b.verifyRoot(s.args.RootDir)
-	if err != nil {
-		return nil, err
-	}
-
 	// Prime the queues with the root project
-	err = s.selectRoot()
+	err := s.selectRoot()
 	if err != nil {
 		// TODO this properly with errs, yar
 		panic("couldn't select root, yikes")

@@ -19,7 +19,7 @@ import (
 func (s *solver) HashInputs() ([]byte, error) {
 	// Do these checks up front before any other work is needed, as they're the
 	// only things that can cause errors
-	if err := s.b.verifyRoot(s.args.RootDir); err != nil {
+	if err := s.b.verifyRootDir(s.args.RootDir); err != nil {
 		// This will already be a BadOptsFailure
 		return nil, err
 	}

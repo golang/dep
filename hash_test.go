@@ -16,17 +16,7 @@ func TestHashInputs(t *testing.T) {
 		Ignore:     []string{"foo", "bar"},
 	}
 
-	// prep a fixture-overridden solver
-	si, err := Prepare(args, SolveOpts{}, newdepspecSM(fix.ds, nil))
-	s := si.(*solver)
-	if err != nil {
-		t.Fatalf("Could not prepare solver due to err: %s", err)
-	}
-
-	fixb := &depspecBridge{
-		s.b.(*bridge),
-	}
-	s.b = fixb
+	s, err := Prepare(args, SolveOpts{}, newdepspecSM(fix.ds, nil))
 
 	dig, err := s.HashInputs()
 	if err != nil {

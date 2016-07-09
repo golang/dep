@@ -19,6 +19,22 @@ var fixtorun string
 // TODO regression test ensuring that locks with only revs for projects don't cause errors
 func init() {
 	flag.StringVar(&fixtorun, "vsolver.fix", "", "A single fixture to run in TestBasicSolves")
+	overrideMkBridge()
+}
+
+// sets the mkBridge global func to one that allows virtualized RootDirs
+func overrideMkBridge() {
+	// For all tests, override the base bridge with the depspecBridge that skips
+	// verifyRootDir calls
+	mkBridge = func(s *solver, sm SourceManager) sourceBridge {
+		return &depspecBridge{
+			&bridge{
+				sm:     sm,
+				s:      s,
+				vlists: make(map[ProjectName][]Version),
+			},
+		}
+	}
 }
 
 var stderrlog = log.New(os.Stderr, "", 0)
@@ -29,16 +45,10 @@ func fixSolve(args SolveArgs, o SolveOpts, sm SourceManager) (Solution, error) {
 		o.TraceLogger = stderrlog
 	}
 
-	si, err := Prepare(args, o, sm)
-	s := si.(*solver)
+	s, err := Prepare(args, o, sm)
 	if err != nil {
 		return nil, err
 	}
-
-	fixb := &depspecBridge{
-		s.b.(*bridge),
-	}
-	s.b = fixb
 
 	return s.Solve()
 }
@@ -326,7 +336,10 @@ func getFailureCausingProjects(err error) (projs []string) {
 }
 
 func TestBadSolveOpts(t *testing.T) {
-	sm := newdepspecSM(basicFixtures[0].ds, nil)
+	pn := strconv.FormatInt(rand.Int63(), 36)
+	fix := basicFixtures[0]
+	fix.ds[0].n = ProjectName(pn)
+	sm := newdepspecSM(fix.ds, nil)
 
 	o := SolveOpts{}
 	args := SolveArgs{}
@@ -338,8 +351,7 @@ func TestBadSolveOpts(t *testing.T) {
 		t.Error("Prepare should have given error on empty root, but gave:", err)
 	}
 
-	args.RootDir = strconv.FormatInt(rand.Int63(), 36)
-	args.RootDir = "root"
+	args.RootDir = pn
 	_, err = Prepare(args, o, sm)
 	if err == nil {
 		t.Errorf("Prepare should have errored on empty name")
@@ -347,7 +359,7 @@ func TestBadSolveOpts(t *testing.T) {
 		t.Error("Prepare should have given error on empty import root, but gave:", err)
 	}
 
-	args.ImportRoot = "root"
+	args.ImportRoot = ProjectName(pn)
 	o.Trace = true
 	_, err = Prepare(args, o, sm)
 	if err == nil {
@@ -361,6 +373,35 @@ func TestBadSolveOpts(t *testing.T) {
 	if err != nil {
 		t.Error("Basic conditions satisfied, prepare should have completed successfully, err was:", err)
 	}
+
+	// swap out the test mkBridge override temporarily, just to make sure we get
+	// the right error
+	mkBridge = func(s *solver, sm SourceManager) sourceBridge {
+		return &bridge{
+			sm:     sm,
+			s:      s,
+			vlists: make(map[ProjectName][]Version),
+		}
+	}
+
+	_, err = Prepare(args, o, sm)
+	if err == nil {
+		t.Errorf("Should have errored on nonexistent root")
+	} else if !strings.Contains(err.Error(), "could not read project root") {
+		t.Error("Prepare should have given error nonexistent project root dir, but gave:", err)
+	}
+
+	// Pointing it at a file should also be an err
+	args.RootDir = "solve_test.go"
+	_, err = Prepare(args, o, sm)
+	if err == nil {
+		t.Errorf("Should have errored on file for RootDir")
+	} else if !strings.Contains(err.Error(), "is a file, not a directory") {
+		t.Error("Prepare should have given error on file as RootDir, but gave:", err)
+	}
+
+	// swap them back...not sure if this matters, but just in case
+	overrideMkBridge()
 }
 
 func TestIgnoreDedupe(t *testing.T) {
