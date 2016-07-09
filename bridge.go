@@ -29,7 +29,7 @@ type sourceBridge interface {
 // caching that's tailored to the requirements of a particular solve run.
 //
 // It also performs transformations between ProjectIdentifiers, which is what
-// the solver primarily deals in, and ProjectName, which is what the
+// the solver primarily deals in, and ProjectRoot, which is what the
 // SourceManager primarily deals in. This separation is helpful because it keeps
 // the complexities of deciding what a particular name "means" entirely within
 // the solver, while the SourceManager can traffic exclusively in
@@ -59,7 +59,7 @@ type bridge struct {
 	// layered on top of the proper SourceManager's cache; the only difference
 	// is that this keeps the versions sorted in the direction required by the
 	// current solve run
-	vlists map[ProjectName][]Version
+	vlists map[ProjectRoot][]Version
 }
 
 // Global factory func to create a bridge. This exists solely to allow tests to
@@ -68,21 +68,21 @@ var mkBridge func(*solver, SourceManager) sourceBridge = func(s *solver, sm Sour
 	return &bridge{
 		sm:     sm,
 		s:      s,
-		vlists: make(map[ProjectName][]Version),
+		vlists: make(map[ProjectRoot][]Version),
 	}
 }
 
 func (b *bridge) getProjectInfo(pa atom) (Manifest, Lock, error) {
-	if pa.id.LocalName == b.s.params.ImportRoot {
+	if pa.id.ProjectRoot == b.s.params.ImportRoot {
 		return b.s.rm, b.s.rl, nil
 	}
-	return b.sm.GetProjectInfo(ProjectName(pa.id.netName()), pa.v)
+	return b.sm.GetProjectInfo(ProjectRoot(pa.id.netName()), pa.v)
 }
 
-func (b *bridge) key(id ProjectIdentifier) ProjectName {
-	k := ProjectName(id.NetworkName)
+func (b *bridge) key(id ProjectIdentifier) ProjectRoot {
+	k := ProjectRoot(id.NetworkName)
 	if k == "" {
-		k = id.LocalName
+		k = id.ProjectRoot
 	}
 
 	return k
@@ -396,7 +396,7 @@ func (b *bridge) listRootPackages() (PackageTree, error) {
 // The root project is handled separately, as the source manager isn't
 // responsible for that code.
 func (b *bridge) listPackages(id ProjectIdentifier, v Version) (PackageTree, error) {
-	if id.LocalName == b.s.params.ImportRoot {
+	if id.ProjectRoot == b.s.params.ImportRoot {
 		return b.listRootPackages()
 	}
 

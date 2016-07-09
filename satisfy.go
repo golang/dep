@@ -175,7 +175,7 @@ func (s *solver) checkRequiredPackagesExist(a atomWithPackages) error {
 // checkDepsConstraintsAllowable checks that the constraints of an atom on a
 // given dep are valid with respect to existing constraints.
 func (s *solver) checkDepsConstraintsAllowable(a atomWithPackages, cdep completeDep) error {
-	dep := cdep.ProjectDep
+	dep := cdep.ProjectConstraint
 	constraint := s.sel.getConstraint(dep.Ident)
 	// Ensure the constraint expressed by the dep has at least some possible
 	// intersection with the intersection of existing constraints.
@@ -208,7 +208,7 @@ func (s *solver) checkDepsConstraintsAllowable(a atomWithPackages, cdep complete
 // dep are not incompatible with the version of that dep that's already been
 // selected.
 func (s *solver) checkDepsDisallowsSelected(a atomWithPackages, cdep completeDep) error {
-	dep := cdep.ProjectDep
+	dep := cdep.ProjectConstraint
 	selected, exists := s.sel.selected(dep.Ident)
 	if exists && !s.b.matches(dep.Ident, dep.Constraint, selected.a.v) {
 		s.fail(dep.Ident)
@@ -229,8 +229,8 @@ func (s *solver) checkDepsDisallowsSelected(a atomWithPackages, cdep completeDep
 // identifiers with the same local name, but that disagree about where their
 // network source is.
 func (s *solver) checkIdentMatches(a atomWithPackages, cdep completeDep) error {
-	dep := cdep.ProjectDep
-	if cur, exists := s.names[dep.Ident.LocalName]; exists {
+	dep := cdep.ProjectConstraint
+	if cur, exists := s.names[dep.Ident.ProjectRoot]; exists {
 		if cur != dep.Ident.netName() {
 			deps := s.sel.getDependenciesOn(a.a.id)
 			// Fail all the other deps, as there's no way atom can ever be
@@ -240,7 +240,7 @@ func (s *solver) checkIdentMatches(a atomWithPackages, cdep completeDep) error {
 			}
 
 			return &sourceMismatchFailure{
-				shared:   dep.Ident.LocalName,
+				shared:   dep.Ident.ProjectRoot,
 				sel:      deps,
 				current:  cur,
 				mismatch: dep.Ident.netName(),
@@ -255,7 +255,7 @@ func (s *solver) checkIdentMatches(a atomWithPackages, cdep completeDep) error {
 // checkPackageImportsFromDepExist ensures that, if the dep is already selected,
 // the newly-required set of packages being placed on it exist and are valid.
 func (s *solver) checkPackageImportsFromDepExist(a atomWithPackages, cdep completeDep) error {
-	sel, is := s.sel.selected(cdep.ProjectDep.Ident)
+	sel, is := s.sel.selected(cdep.ProjectConstraint.Ident)
 	if !is {
 		// dep is not already selected; nothing to do
 		return nil

@@ -27,9 +27,9 @@ func nvSplit(info string) (id ProjectIdentifier, version string) {
 		panic(fmt.Sprintf("Malformed name/version info string '%s'", info))
 	}
 
-	id.LocalName, version = ProjectName(s[0]), s[1]
+	id.ProjectRoot, version = ProjectRoot(s[0]), s[1]
 	if id.NetworkName == "" {
-		id.NetworkName = string(id.LocalName)
+		id.NetworkName = string(id.ProjectRoot)
 	}
 	return
 }
@@ -53,9 +53,9 @@ func nvrSplit(info string) (id ProjectIdentifier, version string, revision Revis
 		panic(fmt.Sprintf("Malformed name/version info string '%s'", info))
 	}
 
-	id.LocalName, version = ProjectName(s[0]), s[1]
+	id.ProjectRoot, version = ProjectRoot(s[0]), s[1]
 	if id.NetworkName == "" {
-		id.NetworkName = string(id.LocalName)
+		id.NetworkName = string(id.ProjectRoot)
 	}
 
 	if len(s) == 3 {
@@ -124,7 +124,7 @@ func mkAtom(info string) atom {
 //  r: create a revision.
 //
 // If no leading character is used, a semver constraint is assumed.
-func mkPDep(info string) ProjectDep {
+func mkPDep(info string) ProjectConstraint {
 	id, ver, rev := nvrSplit(info)
 
 	var c Constraint
@@ -158,7 +158,7 @@ func mkPDep(info string) ProjectDep {
 		c = c.(UnpairedVersion).Is(rev)
 	}
 
-	return ProjectDep{
+	return ProjectConstraint{
 		Ident:      id,
 		Constraint: c,
 	}
@@ -167,10 +167,10 @@ func mkPDep(info string) ProjectDep {
 // A depspec is a fixture representing all the information a SourceManager would
 // ordinarily glean directly from interrogating a repository.
 type depspec struct {
-	n       ProjectName
+	n       ProjectRoot
 	v       Version
-	deps    []ProjectDep
-	devdeps []ProjectDep
+	deps    []ProjectConstraint
+	devdeps []ProjectConstraint
 	pkgs    []tpkg
 }
 
@@ -186,17 +186,17 @@ type depspec struct {
 // treated as a test-only dependency.
 func mkDepspec(pi string, deps ...string) depspec {
 	pa := mkAtom(pi)
-	if string(pa.id.LocalName) != pa.id.NetworkName {
+	if string(pa.id.ProjectRoot) != pa.id.NetworkName {
 		panic("alternate source on self makes no sense")
 	}
 
 	ds := depspec{
-		n: pa.id.LocalName,
+		n: pa.id.ProjectRoot,
 		v: pa.v,
 	}
 
 	for _, dep := range deps {
-		var sl *[]ProjectDep
+		var sl *[]ProjectConstraint
 		if strings.HasPrefix(dep, "(dev) ") {
 			dep = strings.TrimPrefix(dep, "(dev) ")
 			sl = &ds.devdeps
@@ -215,7 +215,7 @@ func mklock(pairs ...string) fixLock {
 	l := make(fixLock, 0)
 	for _, s := range pairs {
 		pa := mkAtom(s)
-		l = append(l, NewLockedProject(pa.id.LocalName, pa.v, pa.id.netName(), "", nil))
+		l = append(l, NewLockedProject(pa.id.ProjectRoot, pa.v, pa.id.netName(), "", nil))
 	}
 
 	return l
@@ -227,7 +227,7 @@ func mkrevlock(pairs ...string) fixLock {
 	l := make(fixLock, 0)
 	for _, s := range pairs {
 		pa := mkAtom(s)
-		l = append(l, NewLockedProject(pa.id.LocalName, pa.v.(PairedVersion).Underlying(), pa.id.netName(), "", nil))
+		l = append(l, NewLockedProject(pa.id.ProjectRoot, pa.v.(PairedVersion).Underlying(), pa.id.netName(), "", nil))
 	}
 
 	return l
@@ -239,7 +239,7 @@ func mksolution(pairs ...string) map[string]Version {
 	for _, pair := range pairs {
 		a := mkAtom(pair)
 		// TODO identifierify
-		m[string(a.id.LocalName)] = a.v
+		m[string(a.id.ProjectRoot)] = a.v
 	}
 
 	return m
@@ -266,13 +266,13 @@ func computeBasicReachMap(ds []depspec) reachMap {
 		rm[pident{n: d.n, v: v}] = lm
 
 		for _, dep := range d.deps {
-			lm[n] = append(lm[n], string(dep.Ident.LocalName))
+			lm[n] = append(lm[n], string(dep.Ident.ProjectRoot))
 		}
 
 		// first is root
 		if k == 0 {
 			for _, dep := range d.devdeps {
-				lm[n] = append(lm[n], string(dep.Ident.LocalName))
+				lm[n] = append(lm[n], string(dep.Ident.ProjectRoot))
 			}
 		}
 	}
@@ -281,7 +281,7 @@ func computeBasicReachMap(ds []depspec) reachMap {
 }
 
 type pident struct {
-	n ProjectName
+	n ProjectRoot
 	v Version
 }
 
@@ -993,7 +993,7 @@ func newdepspecSM(ds []depspec, ignore []string) *depspecSourceManager {
 	}
 }
 
-func (sm *depspecSourceManager) GetProjectInfo(n ProjectName, v Version) (Manifest, Lock, error) {
+func (sm *depspecSourceManager) GetProjectInfo(n ProjectRoot, v Version) (Manifest, Lock, error) {
 	for _, ds := range sm.specs {
 		if n == ds.n && v.Matches(ds.v) {
 			return ds, dummyLock{}, nil
@@ -1004,7 +1004,7 @@ func (sm *depspecSourceManager) GetProjectInfo(n ProjectName, v Version) (Manife
 	return nil, nil, fmt.Errorf("Project %s at version %s could not be found", n, v)
 }
 
-func (sm *depspecSourceManager) ExternalReach(n ProjectName, v Version) (map[string][]string, error) {
+func (sm *depspecSourceManager) ExternalReach(n ProjectRoot, v Version) (map[string][]string, error) {
 	id := pident{n: n, v: v}
 	if m, exists := sm.rm[id]; exists {
 		return m, nil
@@ -1012,7 +1012,7 @@ func (sm *depspecSourceManager) ExternalReach(n ProjectName, v Version) (map[str
 	return nil, fmt.Errorf("No reach data for %s at version %s", n, v)
 }
 
-func (sm *depspecSourceManager) ListExternal(n ProjectName, v Version) ([]string, error) {
+func (sm *depspecSourceManager) ListExternal(n ProjectRoot, v Version) ([]string, error) {
 	// This should only be called for the root
 	id := pident{n: n, v: v}
 	if r, exists := sm.rm[id]; exists {
@@ -1021,7 +1021,7 @@ func (sm *depspecSourceManager) ListExternal(n ProjectName, v Version) ([]string
 	return nil, fmt.Errorf("No reach data for %s at version %s", n, v)
 }
 
-func (sm *depspecSourceManager) ListPackages(n ProjectName, v Version) (PackageTree, error) {
+func (sm *depspecSourceManager) ListPackages(n ProjectRoot, v Version) (PackageTree, error) {
 	id := pident{n: n, v: v}
 	if r, exists := sm.rm[id]; exists {
 		ptree := PackageTree{
@@ -1042,7 +1042,7 @@ func (sm *depspecSourceManager) ListPackages(n ProjectName, v Version) (PackageT
 	return PackageTree{}, fmt.Errorf("Project %s at version %s could not be found", n, v)
 }
 
-func (sm *depspecSourceManager) ListVersions(name ProjectName) (pi []Version, err error) {
+func (sm *depspecSourceManager) ListVersions(name ProjectRoot) (pi []Version, err error) {
 	for _, ds := range sm.specs {
 		// To simulate the behavior of the real SourceManager, we do not return
 		// revisions from ListVersions().
@@ -1058,7 +1058,7 @@ func (sm *depspecSourceManager) ListVersions(name ProjectName) (pi []Version, er
 	return
 }
 
-func (sm *depspecSourceManager) RevisionPresentIn(name ProjectName, r Revision) (bool, error) {
+func (sm *depspecSourceManager) RevisionPresentIn(name ProjectRoot, r Revision) (bool, error) {
 	for _, ds := range sm.specs {
 		if name == ds.n && r == ds.v {
 			return true, nil
@@ -1068,7 +1068,7 @@ func (sm *depspecSourceManager) RevisionPresentIn(name ProjectName, r Revision) 
 	return false, fmt.Errorf("Project %s has no revision %s", name, r)
 }
 
-func (sm *depspecSourceManager) RepoExists(name ProjectName) (bool, error) {
+func (sm *depspecSourceManager) RepoExists(name ProjectRoot) (bool, error) {
 	for _, ds := range sm.specs {
 		if name == ds.n {
 			return true, nil
@@ -1078,13 +1078,13 @@ func (sm *depspecSourceManager) RepoExists(name ProjectName) (bool, error) {
 	return false, nil
 }
 
-func (sm *depspecSourceManager) VendorCodeExists(name ProjectName) (bool, error) {
+func (sm *depspecSourceManager) VendorCodeExists(name ProjectRoot) (bool, error) {
 	return false, nil
 }
 
 func (sm *depspecSourceManager) Release() {}
 
-func (sm *depspecSourceManager) ExportProject(n ProjectName, v Version, to string) error {
+func (sm *depspecSourceManager) ExportProject(n ProjectRoot, v Version, to string) error {
 	return fmt.Errorf("dummy sm doesn't support exporting")
 }
 
@@ -1154,12 +1154,12 @@ var _ Lock = dummyLock{}
 var _ Lock = fixLock{}
 
 // impl Spec interface
-func (ds depspec) DependencyConstraints() []ProjectDep {
+func (ds depspec) DependencyConstraints() []ProjectConstraint {
 	return ds.deps
 }
 
 // impl Spec interface
-func (ds depspec) TestDependencyConstraints() []ProjectDep {
+func (ds depspec) TestDependencyConstraints() []ProjectConstraint {
 	return ds.devdeps
 }
 

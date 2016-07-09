@@ -20,33 +20,33 @@ import (
 type SourceManager interface {
 	// RepoExists checks if a repository exists, either upstream or in the
 	// SourceManager's central repository cache.
-	RepoExists(ProjectName) (bool, error)
+	RepoExists(ProjectRoot) (bool, error)
 
 	// VendorCodeExists checks if a code tree exists within the stored vendor
 	// directory for the the provided import path name.
-	VendorCodeExists(ProjectName) (bool, error)
+	VendorCodeExists(ProjectRoot) (bool, error)
 
 	// ListVersions retrieves a list of the available versions for a given
 	// repository name.
-	ListVersions(ProjectName) ([]Version, error)
+	ListVersions(ProjectRoot) ([]Version, error)
 
 	// RevisionPresentIn indicates whether the provided Version is present in the given
 	// repository. A nil response indicates the version is valid.
-	RevisionPresentIn(ProjectName, Revision) (bool, error)
+	RevisionPresentIn(ProjectRoot, Revision) (bool, error)
 
 	// ListPackages retrieves a tree of the Go packages at or below the provided
 	// import path, at the provided version.
-	ListPackages(ProjectName, Version) (PackageTree, error)
+	ListPackages(ProjectRoot, Version) (PackageTree, error)
 
 	// GetProjectInfo returns manifest and lock information for the provided
 	// import path. vsolver currently requires that projects be rooted at their
-	// repository root, which means that this ProjectName must also be a
+	// repository root, which means that this ProjectRoot must also be a
 	// repository root.
-	GetProjectInfo(ProjectName, Version) (Manifest, Lock, error)
+	GetProjectInfo(ProjectRoot, Version) (Manifest, Lock, error)
 
 	// ExportProject writes out the tree of the provided import path, at the
 	// provided version, to the provided directory.
-	ExportProject(ProjectName, Version, string) error
+	ExportProject(ProjectRoot, Version, string) error
 
 	// Release lets go of any locks held by the SourceManager.
 	Release()
@@ -55,7 +55,7 @@ type SourceManager interface {
 // A ProjectAnalyzer is responsible for analyzing a path for Manifest and Lock
 // information. Tools relying on vsolver must implement one.
 type ProjectAnalyzer interface {
-	GetInfo(build.Context, ProjectName) (Manifest, Lock, error)
+	GetInfo(build.Context, ProjectRoot) (Manifest, Lock, error)
 }
 
 // ExistenceError is a specialized error type that, in addition to the standard
@@ -76,10 +76,10 @@ type ProjectAnalyzer interface {
 // tools; control via dependency injection is intended to be sufficient.
 type sourceManager struct {
 	cachedir, basedir string
-	pms               map[ProjectName]*pmState
+	pms               map[ProjectRoot]*pmState
 	an                ProjectAnalyzer
 	ctx               build.Context
-	//pme               map[ProjectName]error
+	//pme               map[ProjectRoot]error
 }
 
 // Holds a projectManager, caches of the managed project's data, and information
@@ -135,7 +135,7 @@ func NewSourceManager(an ProjectAnalyzer, cachedir, basedir string, force bool) 
 
 	return &sourceManager{
 		cachedir: cachedir,
-		pms:      make(map[ProjectName]*pmState),
+		pms:      make(map[ProjectRoot]*pmState),
 		ctx:      ctx,
 		an:       an,
 	}, nil
@@ -150,11 +150,11 @@ func (sm *sourceManager) Release() {
 
 // GetProjectInfo returns manifest and lock information for the provided import
 // path. vsolver currently requires that projects be rooted at their repository
-// root, which means that this ProjectName must also be a repository root.
+// root, which means that this ProjectRoot must also be a repository root.
 //
 // The work of producing the manifest and lock information is delegated to the
 // injected ProjectAnalyzer.
-func (sm *sourceManager) GetProjectInfo(n ProjectName, v Version) (Manifest, Lock, error) {
+func (sm *sourceManager) GetProjectInfo(n ProjectRoot, v Version) (Manifest, Lock, error) {
 	pmc, err := sm.getProjectManager(n)
 	if err != nil {
 		return nil, nil, err
@@ -165,7 +165,7 @@ func (sm *sourceManager) GetProjectInfo(n ProjectName, v Version) (Manifest, Loc
 
 // ListPackages retrieves a tree of the Go packages at or below the provided
 // import path, at the provided version.
-func (sm *sourceManager) ListPackages(n ProjectName, v Version) (PackageTree, error) {
+func (sm *sourceManager) ListPackages(n ProjectRoot, v Version) (PackageTree, error) {
 	pmc, err := sm.getProjectManager(n)
 	if err != nil {
 		return PackageTree{}, err
@@ -185,7 +185,7 @@ func (sm *sourceManager) ListPackages(n ProjectName, v Version) (PackageTree, er
 // This list is always retrieved from upstream; if upstream is not accessible
 // (network outage, access issues, or the resource actually went away), an error
 // will be returned.
-func (sm *sourceManager) ListVersions(n ProjectName) ([]Version, error) {
+func (sm *sourceManager) ListVersions(n ProjectRoot) ([]Version, error) {
 	pmc, err := sm.getProjectManager(n)
 	if err != nil {
 		// TODO More-er proper-er errors
@@ -197,7 +197,7 @@ func (sm *sourceManager) ListVersions(n ProjectName) ([]Version, error) {
 
 // RevisionPresentIn indicates whether the provided Revision is present in the given
 // repository. A nil response indicates the revision is valid.
-func (sm *sourceManager) RevisionPresentIn(n ProjectName, r Revision) (bool, error) {
+func (sm *sourceManager) RevisionPresentIn(n ProjectRoot, r Revision) (bool, error) {
 	pmc, err := sm.getProjectManager(n)
 	if err != nil {
 		// TODO More-er proper-er errors
@@ -209,7 +209,7 @@ func (sm *sourceManager) RevisionPresentIn(n ProjectName, r Revision) (bool, err
 
 // VendorCodeExists checks if a code tree exists within the stored vendor
 // directory for the the provided import path name.
-func (sm *sourceManager) VendorCodeExists(n ProjectName) (bool, error) {
+func (sm *sourceManager) VendorCodeExists(n ProjectRoot) (bool, error) {
 	pms, err := sm.getProjectManager(n)
 	if err != nil {
 		return false, err
@@ -218,7 +218,7 @@ func (sm *sourceManager) VendorCodeExists(n ProjectName) (bool, error) {
 	return pms.pm.CheckExistence(existsInVendorRoot), nil
 }
 
-func (sm *sourceManager) RepoExists(n ProjectName) (bool, error) {
+func (sm *sourceManager) RepoExists(n ProjectRoot) (bool, error) {
 	pms, err := sm.getProjectManager(n)
 	if err != nil {
 		return false, err
@@ -229,7 +229,7 @@ func (sm *sourceManager) RepoExists(n ProjectName) (bool, error) {
 
 // ExportProject writes out the tree of the provided import path, at the
 // provided version, to the provided directory.
-func (sm *sourceManager) ExportProject(n ProjectName, v Version, to string) error {
+func (sm *sourceManager) ExportProject(n ProjectRoot, v Version, to string) error {
 	pms, err := sm.getProjectManager(n)
 	if err != nil {
 		return err
@@ -238,10 +238,10 @@ func (sm *sourceManager) ExportProject(n ProjectName, v Version, to string) erro
 	return pms.pm.ExportVersionTo(v, to)
 }
 
-// getProjectManager gets the project manager for the given ProjectName.
+// getProjectManager gets the project manager for the given ProjectRoot.
 //
 // If no such manager yet exists, it attempts to create one.
-func (sm *sourceManager) getProjectManager(n ProjectName) (*pmState, error) {
+func (sm *sourceManager) getProjectManager(n ProjectRoot) (*pmState, error) {
 	// Check pm cache and errcache first
 	if pm, exists := sm.pms[n]; exists {
 		return pm, nil

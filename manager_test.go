@@ -17,7 +17,7 @@ var bd string
 
 type dummyAnalyzer struct{}
 
-func (dummyAnalyzer) GetInfo(ctx build.Context, p ProjectName) (Manifest, Lock, error) {
+func (dummyAnalyzer) GetInfo(ctx build.Context, p ProjectRoot) (Manifest, Lock, error) {
 	return SimpleManifest{}, nil, nil
 }
 
@@ -92,7 +92,7 @@ func TestProjectManagerInit(t *testing.T) {
 	}()
 	defer sm.Release()
 
-	pn := ProjectName("github.com/Masterminds/VCSTestRepo")
+	pn := ProjectRoot("github.com/Masterminds/VCSTestRepo")
 	v, err := sm.ListVersions(pn)
 	if err != nil {
 		t.Errorf("Unexpected error during initial project setup/fetching %s", err)
@@ -124,11 +124,11 @@ func TestProjectManagerInit(t *testing.T) {
 	// ensure its sorting works, as well.
 	smc := &bridge{
 		sm:     sm,
-		vlists: make(map[ProjectName][]Version),
+		vlists: make(map[ProjectRoot][]Version),
 		s:      &solver{},
 	}
 
-	v, err = smc.listVersions(ProjectIdentifier{LocalName: pn})
+	v, err = smc.listVersions(ProjectIdentifier{ProjectRoot: pn})
 	if err != nil {
 		t.Errorf("Unexpected error during initial project setup/fetching %s", err)
 	}
@@ -210,7 +210,7 @@ func TestRepoVersionFetching(t *testing.T) {
 	}
 
 	sm := smi.(*sourceManager)
-	upstreams := []ProjectName{
+	upstreams := []ProjectRoot{
 		"github.com/Masterminds/VCSTestRepo",
 		"bitbucket.org/mattfarina/testhgrepo",
 		"launchpad.net/govcstestbzrrepo",
@@ -331,7 +331,7 @@ func TestGetInfoListVersionsOrdering(t *testing.T) {
 
 	// setup done, now do the test
 
-	pn := ProjectName("github.com/Masterminds/VCSTestRepo")
+	pn := ProjectRoot("github.com/Masterminds/VCSTestRepo")
 
 	_, _, err = sm.GetProjectInfo(pn, NewVersion("1.0.0"))
 	if err != nil {

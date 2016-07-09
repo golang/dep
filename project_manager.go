@@ -18,7 +18,7 @@ import (
 type projectManager struct {
 	// The identifier of the project. At this level, corresponds to the
 	// '$GOPATH/src'-relative path, *and* the network name.
-	n ProjectName
+	n ProjectRoot
 
 	// build.Context to use in any analysis, and to pass to the analyzer
 	ctx build.Context

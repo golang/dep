@@ -39,17 +39,17 @@ func CreateVendorTree(basedir string, l Lock, sm SourceManager, sv bool) error {
 
 	// TODO parallelize
 	for _, p := range l.Projects() {
-		to := path.Join(basedir, string(p.Ident().LocalName))
+		to := path.Join(basedir, string(p.Ident().ProjectRoot))
 
 		err := os.MkdirAll(to, 0777)
 		if err != nil {
 			return err
 		}
 
-		err = sm.ExportProject(p.Ident().LocalName, p.Version(), to)
+		err = sm.ExportProject(p.Ident().ProjectRoot, p.Version(), to)
 		if err != nil {
 			removeAll(basedir)
-			return fmt.Errorf("Error while exporting %s: %s", p.Ident().LocalName, err)
+			return fmt.Errorf("Error while exporting %s: %s", p.Ident().ProjectRoot, err)
 		}
 		if sv {
 			filepath.Walk(to, stripVendor)

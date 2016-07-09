@@ -31,7 +31,7 @@ func overrideMkBridge() {
 			&bridge{
 				sm:     sm,
 				s:      s,
-				vlists: make(map[ProjectName][]Version),
+				vlists: make(map[ProjectRoot][]Version),
 			},
 		}
 	}
@@ -76,7 +76,7 @@ func solveBasicsAndCheck(fix basicFixture, t *testing.T) (res Solution, err erro
 
 	params := SolveParameters{
 		RootDir:    string(fix.ds[0].n),
-		ImportRoot: ProjectName(fix.ds[0].n),
+		ImportRoot: ProjectRoot(fix.ds[0].n),
 		Manifest:   fix.ds[0],
 		Lock:       dummyLock{},
 		Downgrade:  fix.downgrade,
@@ -126,7 +126,7 @@ func solveBimodalAndCheck(fix bimodalFixture, t *testing.T) (res Solution, err e
 
 	params := SolveParameters{
 		RootDir:    string(fix.ds[0].n),
-		ImportRoot: ProjectName(fix.ds[0].n),
+		ImportRoot: ProjectRoot(fix.ds[0].n),
 		Manifest:   fix.ds[0],
 		Lock:       dummyLock{},
 		Ignore:     fix.ignore,
@@ -155,8 +155,8 @@ func fixtureSolveSimpleChecks(fix specfix, res Solution, err error, t *testing.T
 		case *badOptsFailure:
 			t.Errorf("(fixture: %q) Unexpected bad opts failure solve error: %s", fix.name(), err)
 		case *noVersionError:
-			if errp[0] != string(fail.pn.LocalName) { // TODO identifierify
-				t.Errorf("(fixture: %q) Expected failure on project %s, but was on project %s", fix.name(), errp[0], fail.pn.LocalName)
+			if errp[0] != string(fail.pn.ProjectRoot) { // TODO identifierify
+				t.Errorf("(fixture: %q) Expected failure on project %s, but was on project %s", fix.name(), errp[0], fail.pn.ProjectRoot)
 			}
 
 			ep := make(map[string]struct{})
@@ -207,7 +207,7 @@ func fixtureSolveSimpleChecks(fix specfix, res Solution, err error, t *testing.T
 		rp := make(map[string]Version)
 		for _, p := range r.p {
 			pa := p.toAtom()
-			rp[string(pa.id.LocalName)] = pa.v
+			rp[string(pa.id.ProjectRoot)] = pa.v
 		}
 
 		fixlen, rlen := len(fix.solution()), len(rp)
@@ -281,7 +281,7 @@ func TestRootLockNoVersionPairMatching(t *testing.T) {
 
 	params := SolveParameters{
 		RootDir:    string(fix.ds[0].n),
-		ImportRoot: ProjectName(fix.ds[0].n),
+		ImportRoot: ProjectRoot(fix.ds[0].n),
 		Manifest:   fix.ds[0],
 		Lock:       l2,
 	}
@@ -294,34 +294,34 @@ func TestRootLockNoVersionPairMatching(t *testing.T) {
 func getFailureCausingProjects(err error) (projs []string) {
 	switch e := err.(type) {
 	case *noVersionError:
-		projs = append(projs, string(e.pn.LocalName)) // TODO identifierify
+		projs = append(projs, string(e.pn.ProjectRoot)) // TODO identifierify
 	case *disjointConstraintFailure:
 		for _, f := range e.failsib {
-			projs = append(projs, string(f.depender.id.LocalName))
+			projs = append(projs, string(f.depender.id.ProjectRoot))
 		}
 	case *versionNotAllowedFailure:
 		for _, f := range e.failparent {
-			projs = append(projs, string(f.depender.id.LocalName))
+			projs = append(projs, string(f.depender.id.ProjectRoot))
 		}
 	case *constraintNotAllowedFailure:
 		// No sane way of knowing why the currently selected version is
 		// selected, so do nothing
 	case *sourceMismatchFailure:
-		projs = append(projs, string(e.prob.id.LocalName))
+		projs = append(projs, string(e.prob.id.ProjectRoot))
 		for _, c := range e.sel {
-			projs = append(projs, string(c.depender.id.LocalName))
+			projs = append(projs, string(c.depender.id.ProjectRoot))
 		}
 	case *checkeeHasProblemPackagesFailure:
-		projs = append(projs, string(e.goal.id.LocalName))
+		projs = append(projs, string(e.goal.id.ProjectRoot))
 		for _, errdep := range e.failpkg {
 			for _, atom := range errdep.deppers {
-				projs = append(projs, string(atom.id.LocalName))
+				projs = append(projs, string(atom.id.ProjectRoot))
 			}
 		}
 	case *depHasProblemPackagesFailure:
-		projs = append(projs, string(e.goal.depender.id.LocalName), string(e.goal.dep.Ident.LocalName))
+		projs = append(projs, string(e.goal.depender.id.ProjectRoot), string(e.goal.dep.Ident.ProjectRoot))
 	case *nonexistentRevisionFailure:
-		projs = append(projs, string(e.goal.depender.id.LocalName), string(e.goal.dep.Ident.LocalName))
+		projs = append(projs, string(e.goal.depender.id.ProjectRoot), string(e.goal.dep.Ident.ProjectRoot))
 	default:
 		panic(fmt.Sprintf("unknown failtype %T, msg: %s", err, err))
 	}
@@ -332,7 +332,7 @@ func getFailureCausingProjects(err error) (projs []string) {
 func TestBadSolveOpts(t *testing.T) {
 	pn := strconv.FormatInt(rand.Int63(), 36)
 	fix := basicFixtures[0]
-	fix.ds[0].n = ProjectName(pn)
+	fix.ds[0].n = ProjectRoot(pn)
 	sm := newdepspecSM(fix.ds, nil)
 
 	params := SolveParameters{}
@@ -352,7 +352,7 @@ func TestBadSolveOpts(t *testing.T) {
 		t.Error("Prepare should have given error on empty import root, but gave:", err)
 	}
 
-	params.ImportRoot = ProjectName(pn)
+	params.ImportRoot = ProjectRoot(pn)
 	params.Trace = true
 	_, err = Prepare(params, sm)
 	if err == nil {
@@ -373,7 +373,7 @@ func TestBadSolveOpts(t *testing.T) {
 		return &bridge{
 			sm:     sm,
 			s:      s,
-			vlists: make(map[ProjectName][]Version),
+			vlists: make(map[ProjectRoot][]Version),
 		}
 	}
 
@@ -403,7 +403,7 @@ func TestIgnoreDedupe(t *testing.T) {
 	ig := []string{"foo", "foo", "bar"}
 	params := SolveParameters{
 		RootDir:    string(fix.ds[0].n),
-		ImportRoot: ProjectName(fix.ds[0].n),
+		ImportRoot: ProjectRoot(fix.ds[0].n),
 		Manifest:   fix.ds[0],
 		Ignore:     ig,
 	}

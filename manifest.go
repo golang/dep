@@ -16,10 +16,10 @@ package vsolver
 type Manifest interface {
 	// Returns a list of project constraints that will be  universally to
 	// the depgraph.
-	DependencyConstraints() []ProjectDep
+	DependencyConstraints() []ProjectConstraint
 	// Returns a list of constraints applicable to test imports. Note that this
 	// will only be consulted for root manifests.
-	TestDependencyConstraints() []ProjectDep
+	TestDependencyConstraints() []ProjectConstraint
 }
 
 // SimpleManifest is a helper for tools to enumerate manifest data. It's
@@ -27,19 +27,19 @@ type Manifest interface {
 // the fly for projects with no manifest metadata, or metadata through a foreign
 // tool's idioms.
 type SimpleManifest struct {
-	Deps     []ProjectDep
-	TestDeps []ProjectDep
+	Deps     []ProjectConstraint
+	TestDeps []ProjectConstraint
 }
 
 var _ Manifest = SimpleManifest{}
 
 // GetDependencies returns the project's dependencies.
-func (m SimpleManifest) DependencyConstraints() []ProjectDep {
+func (m SimpleManifest) DependencyConstraints() []ProjectConstraint {
 	return m.Deps
 }
 
 // GetDependencies returns the project's test dependencies.
-func (m SimpleManifest) TestDependencyConstraints() []ProjectDep {
+func (m SimpleManifest) TestDependencyConstraints() []ProjectConstraint {
 	return m.TestDeps
 }
 
@@ -61,8 +61,8 @@ func prepManifest(m Manifest) Manifest {
 	ddeps := m.TestDependencyConstraints()
 
 	rm := SimpleManifest{
-		Deps:     make([]ProjectDep, len(deps)),
-		TestDeps: make([]ProjectDep, len(ddeps)),
+		Deps:     make([]ProjectConstraint, len(deps)),
+		TestDeps: make([]ProjectConstraint, len(ddeps)),
 	}
 
 	for k, d := range deps {

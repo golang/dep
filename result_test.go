@@ -15,13 +15,13 @@ var kub atom
 // perspective, so it's only useful for particular situations in tests
 type passthruAnalyzer struct{}
 
-func (passthruAnalyzer) GetInfo(ctx build.Context, p ProjectName) (Manifest, Lock, error) {
+func (passthruAnalyzer) GetInfo(ctx build.Context, p ProjectRoot) (Manifest, Lock, error) {
 	return nil, nil, nil
 }
 
 func pi(n string) ProjectIdentifier {
 	return ProjectIdentifier{
-		LocalName: ProjectName(n),
+		ProjectRoot: ProjectRoot(n),
 	}
 }
 
@@ -87,7 +87,7 @@ func BenchmarkCreateVendorTree(b *testing.B) {
 
 	// Prefetch the projects before timer starts
 	for _, lp := range r.p {
-		_, _, err := sm.GetProjectInfo(lp.Ident().LocalName, lp.Version())
+		_, _, err := sm.GetProjectInfo(lp.Ident().ProjectRoot, lp.Version())
 		if err != nil {
 			b.Errorf("failed getting project info during prefetch: %s", err)
 			clean = false

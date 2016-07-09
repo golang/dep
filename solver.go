@@ -13,8 +13,8 @@ import (
 
 // SolveParameters hold all arguments to a solver run.
 //
-// Only RootDir and ImportRoot are absolutely required, though there are very
-// few cases in which passing a nil Manifest makes much sense.
+// Only RootDir and ImportRoot are absolutely required. A nil Manifest is
+// allowed, though it usually makes little sense.
 //
 // Of these properties, only Manifest and Ignore are (directly) incorporated in
 // memoization hashing.
@@ -38,7 +38,7 @@ type SolveParameters struct {
 	// that is not (currently) required.
 	//
 	// A non-empty string is required.
-	ImportRoot ProjectName
+	ImportRoot ProjectRoot
 
 	// The root manifest. This contains all the dependencies, constraints, and
 	// other controls available to the root project.
@@ -65,7 +65,7 @@ type SolveParameters struct {
 	// Passing ChangeAll has subtly different behavior from enumerating all
 	// projects into ToChange. In general, ToChange should *only* be used if the
 	// user expressly requested an upgrade for a specific project.
-	ToChange []ProjectName
+	ToChange []ProjectRoot
 
 	// ChangeAll indicates that all projects should be changed - that is, any
 	// versions specified in the root lock file should be ignored.
@@ -113,8 +113,9 @@ type solver struct {
 	// names a SourceManager operates on.
 	b sourceBridge
 
-	// The list of projects currently "selected" - that is, they have passed all
-	// satisfiability checks, and are part of the current solution.
+	// A stack containing projects and packages that are currently "selected" -
+	// that is, they have passed all satisfiability checks, and are part of the
+	// current solution.
 	//
 	// The *selection type is mostly just a dumb data container; the solver
 	// itself is responsible for maintaining that invariant.
@@ -135,18 +136,20 @@ type solver struct {
 	// into a map during solver prep - which also, nicely, deduplicates it.
 	ig map[string]bool
 
-	// A list of all the currently active versionQueues in the solver. The set
+	// A stack of all the currently active versionQueues in the solver. The set
 	// of projects represented here corresponds closely to what's in s.sel,
-	// although s.sel will always contain the root project, and s.versions never
-	// will.
-	versions []*versionQueue // TODO rename to vq
+	// although s.sel will always contain the root project, and s.vqs never
+	// will. Also, s.vqs is only added to (or popped from during backtracking)
+	// when a new project is selected; it is untouched when new packages are
+	// added to an existing project.
+	vqs []*versionQueue
 
-	// A map of the ProjectName (local names) that should be allowed to change
-	chng map[ProjectName]struct{}
+	// A map of the ProjectRoot (local names) that should be allowed to change
+	chng map[ProjectRoot]struct{}
 
-	// A map of the ProjectName (local names) that are currently selected, and
+	// A map of the ProjectRoot (local names) that are currently selected, and
 	// the network name to which they currently correspond.
-	names map[ProjectName]string
+	names map[ProjectRoot]string
 
 	// A map of the names listed in the root's lock.
 	rlm map[ProjectIdentifier]LockedProject
@@ -213,9 +216,9 @@ func Prepare(params SolveParameters, sm SourceManager) (Solver, error) {
 	}
 
 	// Initialize maps
-	s.chng = make(map[ProjectName]struct{})
+	s.chng = make(map[ProjectRoot]struct{})
 	s.rlm = make(map[ProjectIdentifier]LockedProject)
-	s.names = make(map[ProjectName]string)
+	s.names = make(map[ProjectRoot]string)
 
 	for _, v := range s.params.ToChange {
 		s.chng[v] = struct{}{}
@@ -329,7 +332,7 @@ func (s *solver) solve() (map[atom]map[string]struct{}, error) {
 				},
 				pl: bmi.pl,
 			})
-			s.versions = append(s.versions, queue)
+			s.vqs = append(s.vqs, queue)
 			s.logSolve()
 		} else {
 			// We're just trying to add packages to an already-selected project.
@@ -363,8 +366,8 @@ func (s *solver) solve() (map[atom]map[string]struct{}, error) {
 			}
 			s.selectPackages(nawp)
 			// We don't add anything to the stack of version queues because the
-			// backtracker knows not to popping the vqstack if it backtracks
-			// across a package addition.
+			// backtracker knows not to pop the vqstack if it backtracks
+			// across a pure-package addition.
 			s.logSolve()
 		}
 	}
@@ -394,7 +397,7 @@ func (s *solver) solve() (map[atom]map[string]struct{}, error) {
 func (s *solver) selectRoot() error {
 	pa := atom{
 		id: ProjectIdentifier{
-			LocalName: s.params.ImportRoot,
+			ProjectRoot: s.params.ImportRoot,
 		},
 		// This is a hack so that the root project doesn't have a nil version.
 		// It's sort of OK because the root never makes it out into the results.
@@ -441,7 +444,7 @@ func (s *solver) selectRoot() error {
 	for _, dep := range deps {
 		s.sel.pushDep(dependency{depender: pa, dep: dep})
 		// Add all to unselected queue
-		s.names[dep.Ident.LocalName] = dep.Ident.netName()
+		s.names[dep.Ident.ProjectRoot] = dep.Ident.netName()
 		heap.Push(s.unsel, bimodalIdentifier{id: dep.Ident, pl: dep.pl, fromRoot: true})
 	}
 
@@ -451,7 +454,7 @@ func (s *solver) selectRoot() error {
 func (s *solver) getImportsAndConstraintsOf(a atomWithPackages) ([]completeDep, error) {
 	var err error
 
-	if s.params.ImportRoot == a.a.id.LocalName {
+	if s.params.ImportRoot == a.a.id.ProjectRoot {
 		panic("Should never need to recheck imports/constraints from root during solve")
 	}
 
@@ -508,17 +511,17 @@ func (s *solver) getImportsAndConstraintsOf(a atomWithPackages) ([]completeDep, 
 // externally reached packages, and creates a []completeDep that is guaranteed
 // to include all packages named by import reach, using constraints where they
 // are available, or Any() where they are not.
-func (s *solver) intersectConstraintsWithImports(deps []ProjectDep, reach []string) ([]completeDep, error) {
+func (s *solver) intersectConstraintsWithImports(deps []ProjectConstraint, reach []string) ([]completeDep, error) {
 	// Create a radix tree with all the projects we know from the manifest
 	// TODO make this smarter once we allow non-root inputs as 'projects'
 	xt := radix.New()
 	for _, dep := range deps {
-		xt.Insert(string(dep.Ident.LocalName), dep)
+		xt.Insert(string(dep.Ident.ProjectRoot), dep)
 	}
 
 	// Step through the reached packages; if they have prefix matches in
 	// the trie, assume (mostly) it's a correct correspondence.
-	dmap := make(map[ProjectName]completeDep)
+	dmap := make(map[ProjectRoot]completeDep)
 	for _, rp := range reach {
 		// If it's a stdlib package, skip it.
 		// TODO this just hardcodes us to the packages in tip - should we
@@ -545,14 +548,14 @@ func (s *solver) intersectConstraintsWithImports(deps []ProjectDep, reach []stri
 				// Match is valid; put it in the dmap, either creating a new
 				// completeDep or appending it to the existing one for this base
 				// project/prefix.
-				dep := idep.(ProjectDep)
-				if cdep, exists := dmap[dep.Ident.LocalName]; exists {
+				dep := idep.(ProjectConstraint)
+				if cdep, exists := dmap[dep.Ident.ProjectRoot]; exists {
 					cdep.pl = append(cdep.pl, rp)
-					dmap[dep.Ident.LocalName] = cdep
+					dmap[dep.Ident.ProjectRoot] = cdep
 				} else {
-					dmap[dep.Ident.LocalName] = completeDep{
-						ProjectDep: dep,
-						pl:         []string{rp},
+					dmap[dep.Ident.ProjectRoot] = completeDep{
+						ProjectConstraint: dep,
+						pl:                []string{rp},
 					}
 				}
 				continue
@@ -567,9 +570,9 @@ func (s *solver) intersectConstraintsWithImports(deps []ProjectDep, reach []stri
 		}
 
 		// Still no matches; make a new completeDep with an open constraint
-		pd := ProjectDep{
+		pd := ProjectConstraint{
 			Ident: ProjectIdentifier{
-				LocalName:   ProjectName(root.Base),
+				ProjectRoot: ProjectRoot(root.Base),
 				NetworkName: root.Base,
 			},
 			Constraint: Any(),
@@ -579,9 +582,9 @@ func (s *solver) intersectConstraintsWithImports(deps []ProjectDep, reach []stri
 		// project get caught by the prefix search
 		xt.Insert(root.Base, pd)
 		// And also put the complete dep into the dmap
-		dmap[ProjectName(root.Base)] = completeDep{
-			ProjectDep: pd,
-			pl:         []string{rp},
+		dmap[ProjectRoot(root.Base)] = completeDep{
+			ProjectConstraint: pd,
+			pl:                []string{rp},
 		}
 	}
 
@@ -599,7 +602,7 @@ func (s *solver) intersectConstraintsWithImports(deps []ProjectDep, reach []stri
 func (s *solver) createVersionQueue(bmi bimodalIdentifier) (*versionQueue, error) {
 	id := bmi.id
 	// If on the root package, there's no queue to make
-	if s.params.ImportRoot == id.LocalName {
+	if s.params.ImportRoot == id.ProjectRoot {
 		return newVersionQueue(id, nil, nil, s.b)
 	}
 
@@ -639,7 +642,7 @@ func (s *solver) createVersionQueue(bmi bimodalIdentifier) (*versionQueue, error
 		// TODO nested loop; prime candidate for a cache somewhere
 		for _, dep := range s.sel.getDependenciesOn(bmi.id) {
 			// Skip the root, of course
-			if s.params.ImportRoot == dep.depender.id.LocalName {
+			if s.params.ImportRoot == dep.depender.id.ProjectRoot {
 				continue
 			}
 
@@ -772,7 +775,7 @@ func (s *solver) findValidVersion(q *versionQueue, pl []string) error {
 func (s *solver) getLockVersionIfValid(id ProjectIdentifier) (Version, error) {
 	// If the project is specifically marked for changes, then don't look for a
 	// locked version.
-	if _, explicit := s.chng[id.LocalName]; explicit || s.params.ChangeAll {
+	if _, explicit := s.chng[id.ProjectRoot]; explicit || s.params.ChangeAll {
 		// For projects with an upstream or cache repository, it's safe to
 		// ignore what's in the lock, because there's presumably more versions
 		// to be found and attempted in the repository. If it's only in vendor,
@@ -839,22 +842,22 @@ func (s *solver) getLockVersionIfValid(id ProjectIdentifier) (Version, error) {
 // backtrack works backwards from the current failed solution to find the next
 // solution to try.
 func (s *solver) backtrack() bool {
-	if len(s.versions) == 0 {
+	if len(s.vqs) == 0 {
 		// nothing to backtrack to
 		return false
 	}
 
 	for {
 		for {
-			if len(s.versions) == 0 {
+			if len(s.vqs) == 0 {
 				// no more versions, nowhere further to backtrack
 				return false
 			}
-			if s.versions[len(s.versions)-1].failed {
+			if s.vqs[len(s.vqs)-1].failed {
 				break
 			}
 
-			s.versions, s.versions[len(s.versions)-1] = s.versions[:len(s.versions)-1], nil
+			s.vqs, s.vqs[len(s.vqs)-1] = s.vqs[:len(s.vqs)-1], nil
 
 			// Pop selections off until we get to a project.
 			var proj bool
@@ -864,7 +867,7 @@ func (s *solver) backtrack() bool {
 		}
 
 		// Grab the last versionQueue off the list of queues
-		q := s.versions[len(s.versions)-1]
+		q := s.vqs[len(s.vqs)-1]
 		// Walk back to the next project
 		var awp atomWithPackages
 		var proj bool
@@ -902,11 +905,11 @@ func (s *solver) backtrack() bool {
 		// No solution found; continue backtracking after popping the queue
 		// we just inspected off the list
 		// GC-friendly pop pointer elem in slice
-		s.versions, s.versions[len(s.versions)-1] = s.versions[:len(s.versions)-1], nil
+		s.vqs, s.vqs[len(s.vqs)-1] = s.vqs[:len(s.vqs)-1], nil
 	}
 
 	// Backtracking was successful if loop ended before running out of versions
-	if len(s.versions) == 0 {
+	if len(s.vqs) == 0 {
 		return false
 	}
 	s.attempts++
@@ -993,10 +996,10 @@ func (s *solver) fail(id ProjectIdentifier) {
 	// selection?
 
 	// skip if the root project
-	if s.params.ImportRoot != id.LocalName {
+	if s.params.ImportRoot != id.ProjectRoot {
 		// just look for the first (oldest) one; the backtracker will necessarily
 		// traverse through and pop off any earlier ones
-		for _, vq := range s.versions {
+		for _, vq := range s.vqs {
 			if vq.id.eq(id) {
 				vq.failed = true
 				return
@@ -1060,7 +1063,7 @@ func (s *solver) selectAtomWithPackages(a atomWithPackages) {
 		}
 
 		if s.sel.depperCount(dep.Ident) == 1 {
-			s.names[dep.Ident.LocalName] = dep.Ident.netName()
+			s.names[dep.Ident.ProjectRoot] = dep.Ident.netName()
 		}
 	}
 }
@@ -1122,7 +1125,7 @@ func (s *solver) selectPackages(a atomWithPackages) {
 		}
 
 		if s.sel.depperCount(dep.Ident) == 1 {
-			s.names[dep.Ident.LocalName] = dep.Ident.netName()
+			s.names[dep.Ident.ProjectRoot] = dep.Ident.netName()
 		}
 	}
 }
@@ -1143,7 +1146,7 @@ func (s *solver) unselectLast() (atomWithPackages, bool) {
 
 		// if no parents/importers, remove from unselected queue
 		if s.sel.depperCount(dep.Ident) == 0 {
-			delete(s.names, dep.Ident.LocalName)
+			delete(s.names, dep.Ident.ProjectRoot)
 			s.unsel.remove(bimodalIdentifier{id: dep.Ident, pl: dep.pl})
 		}
 	}
@@ -1156,7 +1159,7 @@ func (s *solver) logStart(bmi bimodalIdentifier) {
 		return
 	}
 
-	prefix := strings.Repeat("| ", len(s.versions)+1)
+	prefix := strings.Repeat("| ", len(s.vqs)+1)
 	// TODO how...to list the packages in the limited space we have?
 	s.tl.Printf("%s\n", tracePrefix(fmt.Sprintf("? attempting %s (with %v packages)", bmi.id.errString(), len(bmi.pl)), prefix, prefix))
 }
@@ -1166,14 +1169,14 @@ func (s *solver) logSolve(args ...interface{}) {
 		return
 	}
 
-	preflen := len(s.versions)
+	preflen := len(s.vqs)
 	var msg string
 	if len(args) == 0 {
 		// Generate message based on current solver state
-		if len(s.versions) == 0 {
+		if len(s.vqs) == 0 {
 			msg = "✓ (root)"
 		} else {
-			vq := s.versions[len(s.versions)-1]
+			vq := s.vqs[len(s.vqs)-1]
 			msg = fmt.Sprintf("✓ select %s at %s", vq.id.errString(), vq.current())
 		}
 	} else {
@@ -1218,7 +1221,7 @@ func pa2lp(pa atom, pkgs map[string]struct{}) LockedProject {
 		pi: pa.id.normalize(), // shouldn't be necessary, but normalize just in case
 		// path is unnecessary duplicate information now, but if we ever allow
 		// nesting as a conflict resolution mechanism, it will become valuable
-		path: string(pa.id.LocalName),
+		path: string(pa.id.ProjectRoot),
 	}
 
 	switch v := pa.v.(type) {
@@ -1234,7 +1237,7 @@ func pa2lp(pa atom, pkgs map[string]struct{}) LockedProject {
 	}
 
 	for pkg := range pkgs {
-		lp.pkgs = append(lp.pkgs, strings.TrimPrefix(pkg, string(pa.id.LocalName)+string(os.PathSeparator)))
+		lp.pkgs = append(lp.pkgs, strings.TrimPrefix(pkg, string(pa.id.ProjectRoot)+string(os.PathSeparator)))
 	}
 	sort.Strings(lp.pkgs)
 

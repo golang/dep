@@ -41,11 +41,11 @@ type noVersionError struct {
 
 func (e *noVersionError) Error() string {
 	if len(e.fails) == 0 {
-		return fmt.Sprintf("No versions found for project %q.", e.pn.LocalName)
+		return fmt.Sprintf("No versions found for project %q.", e.pn.ProjectRoot)
 	}
 
 	var buf bytes.Buffer
-	fmt.Fprintf(&buf, "No versions of %s met constraints:", e.pn.LocalName)
+	fmt.Fprintf(&buf, "No versions of %s met constraints:", e.pn.ProjectRoot)
 	for _, f := range e.fails {
 		fmt.Fprintf(&buf, "\n\t%s: %s", f.v, f.f.Error())
 	}
@@ -59,7 +59,7 @@ func (e *noVersionError) traceString() string {
 	}
 
 	var buf bytes.Buffer
-	fmt.Fprintf(&buf, "No versions of %s met constraints:", e.pn.LocalName)
+	fmt.Fprintf(&buf, "No versions of %s met constraints:", e.pn.ProjectRoot)
 	for _, f := range e.fails {
 		if te, ok := f.f.(traceError); ok {
 			fmt.Fprintf(&buf, "\n  %s: %s", f.v, te.traceString())
@@ -110,10 +110,10 @@ func (e *disjointConstraintFailure) traceString() string {
 	var buf bytes.Buffer
 	fmt.Fprintf(&buf, "constraint %s on %s disjoint with other dependers:\n", e.goal.dep.Constraint.String(), e.goal.dep.Ident.errString())
 	for _, f := range e.failsib {
-		fmt.Fprintf(&buf, "%s from %s at %s (no overlap)\n", f.dep.Constraint.String(), f.depender.id.LocalName, f.depender.v)
+		fmt.Fprintf(&buf, "%s from %s at %s (no overlap)\n", f.dep.Constraint.String(), f.depender.id.ProjectRoot, f.depender.v)
 	}
 	for _, f := range e.nofailsib {
-		fmt.Fprintf(&buf, "%s from %s at %s (some overlap)\n", f.dep.Constraint.String(), f.depender.id.LocalName, f.depender.v)
+		fmt.Fprintf(&buf, "%s from %s at %s (some overlap)\n", f.dep.Constraint.String(), f.depender.id.ProjectRoot, f.depender.v)
 	}
 
 	return buf.String()
@@ -134,7 +134,7 @@ func (e *constraintNotAllowedFailure) Error() string {
 
 func (e *constraintNotAllowedFailure) traceString() string {
 	str := "%s at %s depends on %s with %s, but that's already selected at %s"
-	return fmt.Sprintf(str, e.goal.depender.id.LocalName, e.goal.depender.v, e.goal.dep.Ident.LocalName, e.goal.dep.Constraint, e.v)
+	return fmt.Sprintf(str, e.goal.depender.id.ProjectRoot, e.goal.depender.v, e.goal.dep.Ident.ProjectRoot, e.goal.dep.Constraint, e.v)
 }
 
 type versionNotAllowedFailure struct {
@@ -164,9 +164,9 @@ func (e *versionNotAllowedFailure) Error() string {
 func (e *versionNotAllowedFailure) traceString() string {
 	var buf bytes.Buffer
 
-	fmt.Fprintf(&buf, "%s at %s not allowed by constraint %s:\n", e.goal.id.LocalName, e.goal.v, e.c.String())
+	fmt.Fprintf(&buf, "%s at %s not allowed by constraint %s:\n", e.goal.id.ProjectRoot, e.goal.v, e.c.String())
 	for _, f := range e.failparent {
-		fmt.Fprintf(&buf, "  %s from %s at %s\n", f.dep.Constraint.String(), f.depender.id.LocalName, f.depender.v)
+		fmt.Fprintf(&buf, "  %s from %s at %s\n", f.dep.Constraint.String(), f.depender.id.ProjectRoot, f.depender.v)
 	}
 
 	return buf.String()
@@ -188,7 +188,7 @@ func (e badOptsFailure) Error() string {
 }
 
 type sourceMismatchFailure struct {
-	shared            ProjectName
+	shared            ProjectRoot
 	sel               []dependency
 	current, mismatch string
 	prob              atom
@@ -197,7 +197,7 @@ type sourceMismatchFailure struct {
 func (e *sourceMismatchFailure) Error() string {
 	var cur []string
 	for _, c := range e.sel {
-		cur = append(cur, string(c.depender.id.LocalName))
+		cur = append(cur, string(c.depender.id.ProjectRoot))
 	}
 
 	str := "Could not introduce %s at %s, as it depends on %s from %s, but %s is already marked as coming from %s by %s"
@@ -278,7 +278,7 @@ func (e *checkeeHasProblemPackagesFailure) Error() string {
 func (e *checkeeHasProblemPackagesFailure) traceString() string {
 	var buf bytes.Buffer
 
-	fmt.Fprintf(&buf, "%s at %s has problem subpkg(s):\n", e.goal.id.LocalName, e.goal.v)
+	fmt.Fprintf(&buf, "%s at %s has problem subpkg(s):\n", e.goal.id.ProjectRoot, e.goal.v)
 	for pkg, errdep := range e.failpkg {
 		if errdep.err == nil {
 			fmt.Fprintf(&buf, "\t%s is missing; ", pkg)

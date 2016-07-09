@@ -25,7 +25,7 @@ func (s *solver) HashInputs() ([]byte, error) {
 	}
 
 	// Pass in magic root values, and the bridge will analyze the right thing
-	ptree, err := s.b.listPackages(ProjectIdentifier{LocalName: s.params.ImportRoot}, nil)
+	ptree, err := s.b.listPackages(ProjectIdentifier{ProjectRoot: s.params.ImportRoot}, nil)
 	if err != nil {
 		return nil, badOptsFailure(fmt.Sprintf("Error while parsing imports under %s: %s", s.params.RootDir, err.Error()))
 	}
@@ -40,7 +40,7 @@ func (s *solver) HashInputs() ([]byte, error) {
 	// We have everything we need; now, compute the hash.
 	h := sha256.New()
 	for _, pd := range p {
-		h.Write([]byte(pd.Ident.LocalName))
+		h.Write([]byte(pd.Ident.ProjectRoot))
 		h.Write([]byte(pd.Ident.NetworkName))
 		// FIXME Constraint.String() is a surjective-only transformation - tags
 		// and branches with the same name are written out as the same string.
@@ -94,7 +94,7 @@ func (s *solver) HashInputs() ([]byte, error) {
 	return h.Sum(nil), nil
 }
 
-type sortedDeps []ProjectDep
+type sortedDeps []ProjectConstraint
 
 func (s sortedDeps) Len() int {
 	return len(s)
