@@ -181,7 +181,7 @@ func TestProjectManagerInit(t *testing.T) {
 	}
 
 	// Now reach inside the black box
-	pms, err := sm.(*sourceManager).getProjectManager(pn)
+	pms, err := sm.getProjectManager(pn)
 	if err != nil {
 		t.Errorf("Error on grabbing project manager obj: %s", err)
 	}
@@ -203,13 +203,12 @@ func TestRepoVersionFetching(t *testing.T) {
 		t.Errorf("Failed to create temp dir: %s", err)
 	}
 
-	smi, err := NewSourceManager(dummyAnalyzer{}, cpath, bd, false)
+	sm, err := NewSourceManager(dummyAnalyzer{}, cpath, bd, false)
 	if err != nil {
 		t.Errorf("Unexpected error on SourceManager creation: %s", err)
 		t.FailNow()
 	}
 
-	sm := smi.(*sourceManager)
 	upstreams := []ProjectRoot{
 		"github.com/Masterminds/VCSTestRepo",
 		"bitbucket.org/mattfarina/testhgrepo",

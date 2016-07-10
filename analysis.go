@@ -730,7 +730,7 @@ type PackageOrErr struct {
 // If an internal path is ignored, then it is excluded from all transitive
 // dependency chains and does not appear as a key in the final map. That is, if
 // you ignore A/foo, then the external package list for all internal packages
-// that import A/foo will not include external packages were only reachable
+// that import A/foo will not include external packages that are only reachable
 // through A/foo.
 //
 // Visually, this means that, given a PackageTree with root A and packages at A,
@@ -818,10 +818,8 @@ func (t PackageTree) ExternalReach(main, tests bool, ignore map[string]bool) map
 // PackageTree.
 //
 // main and tests determine whether main packages and test imports should be
-// included in the calculation.
-//
-// "External" is defined as anything not prefixed, after path cleaning, by the
-// PackageTree.ImportRoot. This includes stdlib.
+// included in the calculation. "External" is defined as anything not prefixed,
+// after path cleaning, by the PackageTree.ImportRoot. This includes stdlib.
 //
 // If an internal path is ignored, all of the external packages that it uniquely
 // imports are omitted. Note, however, that no internal transitivity checks are

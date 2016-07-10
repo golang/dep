@@ -30,8 +30,8 @@ type SourceManager interface {
 	// repository name.
 	ListVersions(ProjectRoot) ([]Version, error)
 
-	// RevisionPresentIn indicates whether the provided Version is present in the given
-	// repository. A nil response indicates the version is valid.
+	// RevisionPresentIn indicates whether the provided Version is present in
+	// the given repository.
 	RevisionPresentIn(ProjectRoot, Revision) (bool, error)
 
 	// ListPackages retrieves a tree of the Go packages at or below the provided
@@ -58,29 +58,19 @@ type ProjectAnalyzer interface {
 	GetInfo(build.Context, ProjectRoot) (Manifest, Lock, error)
 }
 
-// ExistenceError is a specialized error type that, in addition to the standard
-// error interface, also indicates the amount of searching for a project's
-// existence that has been performed, and what level of existence has been
-// ascertained.
-//
-// ExistenceErrors should *only* be returned if the (lack of) existence of a
-// project was the underling cause of the error.
-//type ExistenceError interface {
-//error
-//Existence() (search ProjectExistence, found ProjectExistence)
-//}
-
-// sourceManager is the default SourceManager for vsolver.
+// SourceMgr is the default SourceManager for vsolver.
 //
 // There's no (planned) reason why it would need to be reimplemented by other
 // tools; control via dependency injection is intended to be sufficient.
-type sourceManager struct {
+type SourceMgr struct {
 	cachedir, basedir string
 	pms               map[ProjectRoot]*pmState
 	an                ProjectAnalyzer
 	ctx               build.Context
 	//pme               map[ProjectRoot]error
 }
+
+var _ SourceManager = &SourceMgr{}
 
 // Holds a projectManager, caches of the managed project's data, and information
 // about the freshness of those caches
@@ -96,19 +86,18 @@ type pmState struct {
 // force flag indicating whether to overwrite the global cache lock file (if
 // present).
 //
-// The returned SourceManager aggressively caches
-// information wherever possible. It is recommended that, if tools need to do preliminary,
-// work involving upstream repository analysis prior to invoking a solve run,
-// that they create this SourceManager as early as possible and use it to their
-// ends. That way, the solver can benefit from any caches that may have already
-// been warmed.
+// The returned SourceManager aggressively caches information wherever possible.
+// It is recommended that, if tools need to do preliminary, work involving
+// upstream repository analysis prior to invoking a solve run, that they create
+// this SourceManager as early as possible and use it to their ends. That way,
+// the solver can benefit from any caches that may have already been warmed.
 //
 // vsolver's SourceManager is intended to be threadsafe (if it's not, please
 // file a bug!). It should certainly be safe to reuse from one solving run to
 // the next; however, the fact that it takes a basedir as an argument makes it
 // much less useful for simultaneous use by separate solvers operating on
 // different root projects. This architecture may change in the future.
-func NewSourceManager(an ProjectAnalyzer, cachedir, basedir string, force bool) (SourceManager, error) {
+func NewSourceManager(an ProjectAnalyzer, cachedir, basedir string, force bool) (*SourceMgr, error) {
 	if an == nil {
 		return nil, fmt.Errorf("A ProjectAnalyzer must be provided to the SourceManager.")
 	}
@@ -133,7 +122,7 @@ func NewSourceManager(an ProjectAnalyzer, cachedir, basedir string, force bool) 
 	// Replace GOPATH with our cache dir
 	ctx.GOPATH = cachedir
 
-	return &sourceManager{
+	return &SourceMgr{
 		cachedir: cachedir,
 		pms:      make(map[ProjectRoot]*pmState),
 		ctx:      ctx,
@@ -142,9 +131,7 @@ func NewSourceManager(an ProjectAnalyzer, cachedir, basedir string, force bool) 
 }
 
 // Release lets go of any locks held by the SourceManager.
-//
-// This will also call Flush(), which will write any relevant caches to disk.
-func (sm *sourceManager) Release() {
+func (sm *SourceMgr) Release() {
 	os.Remove(path.Join(sm.cachedir, "sm.lock"))
 }
 
@@ -154,7 +141,7 @@ func (sm *sourceManager) Release() {
 //
 // The work of producing the manifest and lock information is delegated to the
 // injected ProjectAnalyzer.
-func (sm *sourceManager) GetProjectInfo(n ProjectRoot, v Version) (Manifest, Lock, error) {
+func (sm *SourceMgr) GetProjectInfo(n ProjectRoot, v Version) (Manifest, Lock, error) {
 	pmc, err := sm.getProjectManager(n)
 	if err != nil {
 		return nil, nil, err
@@ -165,7 +152,7 @@ func (sm *sourceManager) GetProjectInfo(n ProjectRoot, v Version) (Manifest, Loc
 
 // ListPackages retrieves a tree of the Go packages at or below the provided
 // import path, at the provided version.
-func (sm *sourceManager) ListPackages(n ProjectRoot, v Version) (PackageTree, error) {
+func (sm *SourceMgr) ListPackages(n ProjectRoot, v Version) (PackageTree, error) {
 	pmc, err := sm.getProjectManager(n)
 	if err != nil {
 		return PackageTree{}, err
@@ -185,7 +172,7 @@ func (sm *sourceManager) ListPackages(n ProjectRoot, v Version) (PackageTree, er
 // This list is always retrieved from upstream; if upstream is not accessible
 // (network outage, access issues, or the resource actually went away), an error
 // will be returned.
-func (sm *sourceManager) ListVersions(n ProjectRoot) ([]Version, error) {
+func (sm *SourceMgr) ListVersions(n ProjectRoot) ([]Version, error) {
 	pmc, err := sm.getProjectManager(n)
 	if err != nil {
 		// TODO More-er proper-er errors
@@ -196,8 +183,8 @@ func (sm *sourceManager) ListVersions(n ProjectRoot) ([]Version, error) {
 }
 
 // RevisionPresentIn indicates whether the provided Revision is present in the given
-// repository. A nil response indicates the revision is valid.
-func (sm *sourceManager) RevisionPresentIn(n ProjectRoot, r Revision) (bool, error) {
+// repository.
+func (sm *SourceMgr) RevisionPresentIn(n ProjectRoot, r Revision) (bool, error) {
 	pmc, err := sm.getProjectManager(n)
 	if err != nil {
 		// TODO More-er proper-er errors
@@ -208,8 +195,8 @@ func (sm *sourceManager) RevisionPresentIn(n ProjectRoot, r Revision) (bool, err
 }
 
 // VendorCodeExists checks if a code tree exists within the stored vendor
-// directory for the the provided import path name.
-func (sm *sourceManager) VendorCodeExists(n ProjectRoot) (bool, error) {
+// directory for the the provided ProjectRoot.
+func (sm *SourceMgr) VendorCodeExists(n ProjectRoot) (bool, error) {
 	pms, err := sm.getProjectManager(n)
 	if err != nil {
 		return false, err
@@ -218,7 +205,9 @@ func (sm *sourceManager) VendorCodeExists(n ProjectRoot) (bool, error) {
 	return pms.pm.CheckExistence(existsInVendorRoot), nil
 }
 
-func (sm *sourceManager) RepoExists(n ProjectRoot) (bool, error) {
+// RepoExists checks if a repository exists, either upstream or in the cache,
+// for the provided ProjectRoot.
+func (sm *SourceMgr) RepoExists(n ProjectRoot) (bool, error) {
 	pms, err := sm.getProjectManager(n)
 	if err != nil {
 		return false, err
@@ -229,7 +218,7 @@ func (sm *sourceManager) RepoExists(n ProjectRoot) (bool, error) {
 
 // ExportProject writes out the tree of the provided import path, at the
 // provided version, to the provided directory.
-func (sm *sourceManager) ExportProject(n ProjectRoot, v Version, to string) error {
+func (sm *SourceMgr) ExportProject(n ProjectRoot, v Version, to string) error {
 	pms, err := sm.getProjectManager(n)
 	if err != nil {
 		return err
@@ -241,7 +230,7 @@ func (sm *sourceManager) ExportProject(n ProjectRoot, v Version, to string) erro
 // getProjectManager gets the project manager for the given ProjectRoot.
 //
 // If no such manager yet exists, it attempts to create one.
-func (sm *sourceManager) getProjectManager(n ProjectRoot) (*pmState, error) {
+func (sm *SourceMgr) getProjectManager(n ProjectRoot) (*pmState, error) {
 	// Check pm cache and errcache first
 	if pm, exists := sm.pms[n]; exists {
 		return pm, nil
