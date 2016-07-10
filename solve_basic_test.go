@@ -215,7 +215,7 @@ func mklock(pairs ...string) fixLock {
 	l := make(fixLock, 0)
 	for _, s := range pairs {
 		pa := mkAtom(s)
-		l = append(l, NewLockedProject(pa.id.ProjectRoot, pa.v, pa.id.netName(), "", nil))
+		l = append(l, NewLockedProject(pa.id.ProjectRoot, pa.v, pa.id.netName(), nil))
 	}
 
 	return l
@@ -227,7 +227,7 @@ func mkrevlock(pairs ...string) fixLock {
 	l := make(fixLock, 0)
 	for _, s := range pairs {
 		pa := mkAtom(s)
-		l = append(l, NewLockedProject(pa.id.ProjectRoot, pa.v.(PairedVersion).Underlying(), pa.id.netName(), "", nil))
+		l = append(l, NewLockedProject(pa.id.ProjectRoot, pa.v.(PairedVersion).Underlying(), pa.id.netName(), nil))
 	}
 
 	return l

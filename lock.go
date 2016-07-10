@@ -26,7 +26,6 @@ type LockedProject struct {
 	pi   ProjectIdentifier
 	v    UnpairedVersion
 	r    Revision
-	path string
 	pkgs []string
 }
 
@@ -49,8 +48,7 @@ func (l SimpleLock) Projects() []LockedProject {
 }
 
 // NewLockedProject creates a new LockedProject struct with a given name,
-// version, upstream repository URI, and on-disk path at which the project is to
-// be checked out under a vendor directory.
+// version, and upstream repository URL.
 //
 // Note that passing a nil version will cause a panic. This is a correctness
 // measure to ensure that the solver is never exposed to a version-less lock
@@ -58,7 +56,7 @@ func (l SimpleLock) Projects() []LockedProject {
 // to simply dismiss that project. By creating a hard failure case via panic
 // instead, we are trying to avoid inflicting the resulting pain on the user by
 // instead forcing a decision on the Analyzer implementation.
-func NewLockedProject(n ProjectRoot, v Version, uri, path string, pkgs []string) LockedProject {
+func NewLockedProject(n ProjectRoot, v Version, url string, pkgs []string) LockedProject {
 	if v == nil {
 		panic("must provide a non-nil version to create a LockedProject")
 	}
@@ -66,9 +64,8 @@ func NewLockedProject(n ProjectRoot, v Version, uri, path string, pkgs []string)
 	lp := LockedProject{
 		pi: ProjectIdentifier{
 			ProjectRoot: n,
-			NetworkName: uri,
+			NetworkName: url,
 		},
-		path: path,
 		pkgs: pkgs,
 	}
 
@@ -108,12 +105,6 @@ func (lp LockedProject) Version() Version {
 	}
 
 	return lp.v.Is(lp.r)
-}
-
-// Path returns the path relative to the vendor directory to which the locked
-// project should be checked out.
-func (lp LockedProject) Path() string {
-	return lp.path
 }
 
 func (lp LockedProject) toAtom() atom {

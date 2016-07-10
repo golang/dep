@@ -1219,9 +1219,6 @@ func tracePrefix(msg, sep, fsep string) string {
 func pa2lp(pa atom, pkgs map[string]struct{}) LockedProject {
 	lp := LockedProject{
 		pi: pa.id.normalize(), // shouldn't be necessary, but normalize just in case
-		// path is unnecessary duplicate information now, but if we ever allow
-		// nesting as a conflict resolution mechanism, it will become valuable
-		path: string(pa.id.ProjectRoot),
 	}
 
 	switch v := pa.v.(type) {
