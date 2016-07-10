@@ -344,11 +344,18 @@ func TestBadSolveOpts(t *testing.T) {
 	pn := strconv.FormatInt(rand.Int63(), 36)
 	fix := basicFixtures["no dependencies"]
 	fix.ds[0].n = ProjectRoot(pn)
-	sm := newdepspecSM(fix.ds, nil)
 
+	sm := newdepspecSM(fix.ds, nil)
 	params := SolveParameters{}
 
-	_, err := Prepare(params, sm)
+	_, err := Prepare(params, nil)
+	if err == nil {
+		t.Errorf("Prepare should have errored on nil SourceManager")
+	} else if !strings.Contains(err.Error(), "non-nil SourceManager") {
+		t.Error("Prepare should have given error on nil SourceManager, but gave:", err)
+	}
+
+	_, err = Prepare(params, sm)
 	if err == nil {
 		t.Errorf("Prepare should have errored on empty root")
 	} else if !strings.Contains(err.Error(), "non-empty root directory") {

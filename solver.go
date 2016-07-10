@@ -178,6 +178,9 @@ func Prepare(params SolveParameters, sm SourceManager) (Solver, error) {
 	// local overrides would need to be handled first.
 	// TODO local overrides! heh
 
+	if sm == nil {
+		return nil, badOptsFailure("must provide non-nil SourceManager")
+	}
 	if params.RootDir == "" {
 		return nil, badOptsFailure("params must specify a non-empty root directory")
 	}
