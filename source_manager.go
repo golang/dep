@@ -99,7 +99,7 @@ type pmState struct {
 // different root projects. This architecture may change in the future.
 func NewSourceManager(an ProjectAnalyzer, cachedir, basedir string, force bool) (*SourceMgr, error) {
 	if an == nil {
-		return nil, fmt.Errorf("A ProjectAnalyzer must be provided to the SourceManager.")
+		return nil, fmt.Errorf("a ProjectAnalyzer must be provided to the SourceManager")
 	}
 
 	err := os.MkdirAll(cachedir, 0777)
@@ -110,12 +110,12 @@ func NewSourceManager(an ProjectAnalyzer, cachedir, basedir string, force bool) 
 	glpath := path.Join(cachedir, "sm.lock")
 	_, err = os.Stat(glpath)
 	if err == nil && !force {
-		return nil, fmt.Errorf("Another process has locked the cachedir, or crashed without cleaning itself properly. Pass force=true to override.")
+		return nil, fmt.Errorf("cache lock file %s exists - another process crashed or is still running?", glpath)
 	}
 
 	_, err = os.OpenFile(glpath, os.O_CREATE|os.O_RDONLY, 0700) // is 0700 sane for this purpose?
 	if err != nil {
-		return nil, fmt.Errorf("Failed to create global cache lock file at %s with err %s", glpath, err)
+		return nil, fmt.Errorf("failed to create global cache lock file at %s with err %s", glpath, err)
 	}
 
 	ctx := build.Default
