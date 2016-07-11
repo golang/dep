@@ -3,6 +3,7 @@ package vsolver
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"sort"
 )
 
@@ -122,8 +123,14 @@ func (b *bridge) repoExists(id ProjectIdentifier) (bool, error) {
 }
 
 func (b *bridge) vendorCodeExists(id ProjectIdentifier) (bool, error) {
-	k := b.key(id)
-	return b.sm.VendorCodeExists(k)
+	fi, err := os.Stat(filepath.Join(b.s.params.RootDir, "vendor", string(id.ProjectRoot)))
+	if err != nil {
+		return false, err
+	} else if fi.IsDir() {
+		return true, nil
+	}
+
+	return false, nil
 }
 
 func (b *bridge) pairVersion(id ProjectIdentifier, v UnpairedVersion) PairedVersion {

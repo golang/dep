@@ -40,7 +40,7 @@ func TestSourceManagerInit(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to create temp dir: %s", err)
 	}
-	_, err = NewSourceManager(dummyAnalyzer{}, cpath, bd, false)
+	_, err = NewSourceManager(dummyAnalyzer{}, cpath, false)
 
 	if err != nil {
 		t.Errorf("Unexpected error on SourceManager creation: %s", err)
@@ -52,12 +52,12 @@ func TestSourceManagerInit(t *testing.T) {
 		}
 	}()
 
-	_, err = NewSourceManager(dummyAnalyzer{}, cpath, bd, false)
+	_, err = NewSourceManager(dummyAnalyzer{}, cpath, false)
 	if err == nil {
 		t.Errorf("Creating second SourceManager should have failed due to file lock contention")
 	}
 
-	sm, err := NewSourceManager(dummyAnalyzer{}, cpath, bd, true)
+	sm, err := NewSourceManager(dummyAnalyzer{}, cpath, true)
 	defer sm.Release()
 	if err != nil {
 		t.Errorf("Creating second SourceManager should have succeeded when force flag was passed, but failed with err %s", err)
@@ -78,7 +78,7 @@ func TestProjectManagerInit(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to create temp dir: %s", err)
 	}
-	sm, err := NewSourceManager(dummyAnalyzer{}, cpath, bd, false)
+	sm, err := NewSourceManager(dummyAnalyzer{}, cpath, false)
 
 	if err != nil {
 		t.Errorf("Unexpected error on SourceManager creation: %s", err)
@@ -172,14 +172,6 @@ func TestProjectManagerInit(t *testing.T) {
 		t.Error("Repo should exist after non-erroring call to ListVersions")
 	}
 
-	exists, err = sm.VendorCodeExists(pn)
-	if err != nil {
-		t.Errorf("Error on checking VendorCodeExists: %s", err)
-	}
-	if exists {
-		t.Error("Shouldn't be any vendor code after just calling ListVersions")
-	}
-
 	// Now reach inside the black box
 	pms, err := sm.getProjectManager(pn)
 	if err != nil {
@@ -203,7 +195,7 @@ func TestRepoVersionFetching(t *testing.T) {
 		t.Errorf("Failed to create temp dir: %s", err)
 	}
 
-	sm, err := NewSourceManager(dummyAnalyzer{}, cpath, bd, false)
+	sm, err := NewSourceManager(dummyAnalyzer{}, cpath, false)
 	if err != nil {
 		t.Errorf("Unexpected error on SourceManager creation: %s", err)
 		t.FailNow()
@@ -314,7 +306,7 @@ func TestGetInfoListVersionsOrdering(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to create temp dir: %s", err)
 	}
-	sm, err := NewSourceManager(dummyAnalyzer{}, cpath, bd, false)
+	sm, err := NewSourceManager(dummyAnalyzer{}, cpath, false)
 
 	if err != nil {
 		t.Errorf("Unexpected error on SourceManager creation: %s", err)

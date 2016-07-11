@@ -23,9 +23,6 @@ type projectManager struct {
 	// build.Context to use in any analysis, and to pass to the analyzer
 	ctx build.Context
 
-	// Top-level project vendor dir
-	vendordir string
-
 	// Object for the cache repository
 	crepo *repo
 
@@ -298,12 +295,7 @@ func (pm *projectManager) RevisionPresentIn(r Revision) (bool, error) {
 func (pm *projectManager) CheckExistence(ex projectExistence) bool {
 	if pm.ex.s&ex != ex {
 		if ex&existsInVendorRoot != 0 && pm.ex.s&existsInVendorRoot == 0 {
-			pm.ex.s |= existsInVendorRoot
-
-			fi, err := os.Stat(path.Join(pm.vendordir, string(pm.n)))
-			if err == nil && fi.IsDir() {
-				pm.ex.f |= existsInVendorRoot
-			}
+			panic("should now be implemented in bridge")
 		}
 		if ex&existsInCache != 0 && pm.ex.s&existsInCache == 0 {
 			pm.crepo.mut.RLock()

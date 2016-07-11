@@ -22,10 +22,6 @@ type SourceManager interface {
 	// SourceManager's central repository cache.
 	RepoExists(ProjectRoot) (bool, error)
 
-	// VendorCodeExists checks if a code tree exists within the stored vendor
-	// directory for the the provided import path name.
-	VendorCodeExists(ProjectRoot) (bool, error)
-
 	// ListVersions retrieves a list of the available versions for a given
 	// repository name.
 	ListVersions(ProjectRoot) ([]Version, error)
@@ -63,10 +59,10 @@ type ProjectAnalyzer interface {
 // There's no (planned) reason why it would need to be reimplemented by other
 // tools; control via dependency injection is intended to be sufficient.
 type SourceMgr struct {
-	cachedir, basedir string
-	pms               map[ProjectRoot]*pmState
-	an                ProjectAnalyzer
-	ctx               build.Context
+	cachedir string
+	pms      map[ProjectRoot]*pmState
+	an       ProjectAnalyzer
+	ctx      build.Context
 	//pme               map[ProjectRoot]error
 }
 
@@ -82,7 +78,7 @@ type pmState struct {
 
 // NewSourceManager produces an instance of vsolver's built-in SourceManager. It
 // takes a cache directory (where local instances of upstream repositories are
-// stored), a base directory for the project currently being worked on, and a
+// stored), a vendor directory for the project currently being worked on, and a
 // force flag indicating whether to overwrite the global cache lock file (if
 // present).
 //
@@ -97,7 +93,7 @@ type pmState struct {
 // the next; however, the fact that it takes a basedir as an argument makes it
 // much less useful for simultaneous use by separate solvers operating on
 // different root projects. This architecture may change in the future.
-func NewSourceManager(an ProjectAnalyzer, cachedir, basedir string, force bool) (*SourceMgr, error) {
+func NewSourceManager(an ProjectAnalyzer, cachedir string, force bool) (*SourceMgr, error) {
 	if an == nil {
 		return nil, fmt.Errorf("a ProjectAnalyzer must be provided to the SourceManager")
 	}
@@ -194,17 +190,6 @@ func (sm *SourceMgr) RevisionPresentIn(n ProjectRoot, r Revision) (bool, error) 
 	return pmc.pm.RevisionPresentIn(r)
 }
 
-// VendorCodeExists checks if a code tree exists within the stored vendor
-// directory for the the provided ProjectRoot.
-func (sm *SourceMgr) VendorCodeExists(n ProjectRoot) (bool, error) {
-	pms, err := sm.getProjectManager(n)
-	if err != nil {
-		return false, err
-	}
-
-	return pms.pm.CheckExistence(existsInVendorRoot), nil
-}
-
 // RepoExists checks if a repository exists, either upstream or in the cache,
 // for the provided ProjectRoot.
 func (sm *SourceMgr) RepoExists(n ProjectRoot) (bool, error) {
@@ -296,11 +281,10 @@ func (sm *SourceMgr) getProjectManager(n ProjectRoot) (*pmState, error) {
 	}
 
 	pm := &projectManager{
-		n:         n,
-		ctx:       sm.ctx,
-		vendordir: sm.basedir + "/vendor",
-		an:        sm.an,
-		dc:        dc,
+		n:   n,
+		ctx: sm.ctx,
+		an:  sm.an,
+		dc:  dc,
 		crepo: &repo{
 			rpath: repodir,
 			r:     r,

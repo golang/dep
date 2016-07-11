@@ -1191,10 +1191,10 @@ func (s *solver) logSolve(args ...interface{}) {
 			msg = tracePrefix(fmt.Sprintf(data, args[1:]), "| ", "| ")
 		case traceError:
 			// We got a special traceError, use its custom method
-			msg = tracePrefix(data.traceString(), "| ", "x ")
+			msg = tracePrefix(data.traceString(), "| ", "✗ ")
 		case error:
 			// Regular error; still use the x leader but default Error() string
-			msg = tracePrefix(data.Error(), "| ", "x ")
+			msg = tracePrefix(data.Error(), "| ", "✗ ")
 		default:
 			// panic here because this can *only* mean a stupid internal bug
 			panic("canary - must pass a string as first arg to logSolve, or no args at all")
