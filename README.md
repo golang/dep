@@ -1,4 +1,6 @@
 # gps
+![map-marker-icon copy](https://cloud.githubusercontent.com/assets/21599/16779217/4f5cdc6c-483f-11e6-9de3-661f13d9b215.png)
+--
 
 `gps` is the Go Packaging Solver. It is an engine for tackling dependency
 management problems in Go. You can replicate the fetching bits of `go get`,
@@ -10,17 +12,15 @@ that package management (and adjacent) tools can use to solve the
 [hard](https://en.wikipedia.org/wiki/Boolean_satisfiability_problem) parts of
 the problem in a consistent,
 [holistic](https://medium.com/@sdboyer/so-you-want-to-write-a-package-manager-4ae9c17d9527)
-way.
+way. `gps` is [on track](https://github.com/Masterminds/glide/pull/384) to become the engine behind [glide](https://glide.sh).
 
-`gps` is currently [on track](https://github.com/Masterminds/glide/pull/384) to become the engine powering [glide](https://glide.sh).
-
-The wiki has a [general introduction to the
+The wiki has a [general introduction the `gps`
 approach](https://github.com/sdboyer/vsolver/wiki/Introduction-to-gps), as well
 as guides for folks [implementing
 tools](https://github.com/sdboyer/vsolver/wiki/gps-for-Implementors) or [looking
 to contribute](https://github.com/sdboyer/vsolver/wiki/Introduction-to-gps).
 
-### Wait...a package management _library_?!
+## Wait...a package management _library_?!
 
 Yup. Because it's what the Go ecosystem needs right now.
 
@@ -54,7 +54,7 @@ hope, could improve interoperability, reduce harm to the community, and make the
 communal process of figuring out what's right for Go more about collaboration,
 and less about fiefdoms.
 
-## Assumptions
+### Assumptions
 
 Ideally, `gps` could provide this shared foundation with no additional
 assumptions beyond pure Go source files. Sadly, package management is too
@@ -81,3 +81,10 @@ code. Unfortunately, the wheels come off that idea as soon as versioning and
 cross-project/repository dependencies happen. But Universe alignment is hard;
 trying to intermix version information directly with the code would only make
 matters worse.
+
+## Contributing
+
+Yay, contributing! Please see
+[CONTRIBUTING.md](https://github.com/sdboyer/vsolver/blob/master/CONTRIBUTING.md).
+Note that `gps` also abides by a [Code of
+Conduct](https://github.com/sdboyer/vsolver/blob/master/CODE_OF_CONDUCT.md), and is MIT-licensed.
