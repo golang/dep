@@ -137,7 +137,7 @@ func listPackages(fileRoot, importRoot string) (PackageTree, error) {
 			return nil
 		}
 
-		// Skip a dirs that are known to hold non-local/dependency code.
+		// Skip dirs that are known to hold non-local/dependency code.
 		//
 		// We don't skip .*, _*, or testdata dirs because, while it may be poor
 		// form, it's not a compiler error to import them.
@@ -174,13 +174,13 @@ func listPackages(fileRoot, importRoot string) (PackageTree, error) {
 				// For now, we're punting entirely on dealing with os/arch
 				// combinations. That will be a more significant refactor.
 				//
-				// However, there is one case we want to allow here - a single
-				// file, with "+build ignore", that's a main package. (Ignore is
-				// just a convention, but for now it's good enough to just check
-				// that.) This is a fairly common way to make a more
-				// sophisticated build system than a Makefile allows, so we want
-				// to support that case. So, transparently lump the deps
-				// together.
+				// However, there is one case we want to allow here - one or
+				// more files with "+build ignore" with package `main`. (Ignore
+				// is just a convention, but for now it's good enough to just
+				// check that.) This is a fairly common way to give examples,
+				// and to make a more sophisticated build system than a Makefile
+				// allows, so we want to support that case. So, transparently
+				// lump the deps together.
 				mains := make(map[string]struct{})
 				for k, pkgname := range terr.Packages {
 					if pkgname == "main" {

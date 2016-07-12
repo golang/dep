@@ -2,7 +2,6 @@ package vsolver
 
 import (
 	"fmt"
-	"go/build"
 	"io/ioutil"
 	"os"
 	"path"
@@ -15,10 +14,13 @@ import (
 
 var bd string
 
-type dummyAnalyzer struct{}
+// An analyzer that passes nothing back, but doesn't error. This is the naive
+// case - no constraints, no lock, and no errors. The SourceMgr will interpret
+// this as open/Any constraints on everything in the import graph.
+type naiveAnalyzer struct{}
 
-func (dummyAnalyzer) GetInfo(ctx build.Context, p ProjectRoot) (Manifest, Lock, error) {
-	return SimpleManifest{}, nil, nil
+func (naiveAnalyzer) GetInfo(string, ProjectRoot) (Manifest, Lock, error) {
+	return nil, nil, nil
 }
 
 func sv(s string) *semver.Version {
@@ -40,7 +42,7 @@ func TestSourceManagerInit(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to create temp dir: %s", err)
 	}
-	_, err = NewSourceManager(dummyAnalyzer{}, cpath, false)
+	_, err = NewSourceManager(naiveAnalyzer{}, cpath, false)
 
 	if err != nil {
 		t.Errorf("Unexpected error on SourceManager creation: %s", err)
@@ -52,12 +54,12 @@ func TestSourceManagerInit(t *testing.T) {
 		}
 	}()
 
-	_, err = NewSourceManager(dummyAnalyzer{}, cpath, false)
+	_, err = NewSourceManager(naiveAnalyzer{}, cpath, false)
 	if err == nil {
 		t.Errorf("Creating second SourceManager should have failed due to file lock contention")
 	}
 
-	sm, err := NewSourceManager(dummyAnalyzer{}, cpath, true)
+	sm, err := NewSourceManager(naiveAnalyzer{}, cpath, true)
 	defer sm.Release()
 	if err != nil {
 		t.Errorf("Creating second SourceManager should have succeeded when force flag was passed, but failed with err %s", err)
@@ -78,7 +80,7 @@ func TestProjectManagerInit(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to create temp dir: %s", err)
 	}
-	sm, err := NewSourceManager(dummyAnalyzer{}, cpath, false)
+	sm, err := NewSourceManager(naiveAnalyzer{}, cpath, false)
 
 	if err != nil {
 		t.Errorf("Unexpected error on SourceManager creation: %s", err)
@@ -195,7 +197,7 @@ func TestRepoVersionFetching(t *testing.T) {
 		t.Errorf("Failed to create temp dir: %s", err)
 	}
 
-	sm, err := NewSourceManager(dummyAnalyzer{}, cpath, false)
+	sm, err := NewSourceManager(naiveAnalyzer{}, cpath, false)
 	if err != nil {
 		t.Errorf("Unexpected error on SourceManager creation: %s", err)
 		t.FailNow()
@@ -306,7 +308,7 @@ func TestGetInfoListVersionsOrdering(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to create temp dir: %s", err)
 	}
-	sm, err := NewSourceManager(dummyAnalyzer{}, cpath, false)
+	sm, err := NewSourceManager(naiveAnalyzer{}, cpath, false)
 
 	if err != nil {
 		t.Errorf("Unexpected error on SourceManager creation: %s", err)

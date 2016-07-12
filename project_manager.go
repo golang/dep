@@ -114,7 +114,7 @@ func (pm *projectManager) GetInfoAt(v Version) (Manifest, Lock, error) {
 	}
 
 	pm.crepo.mut.RLock()
-	m, l, err := pm.an.GetInfo(pm.ctx, pm.n)
+	m, l, err := pm.an.GetInfo(filepath.Join(pm.ctx.GOPATH, "src", string(pm.n)), pm.n)
 	// TODO cache results
 	pm.crepo.mut.RUnlock()
 

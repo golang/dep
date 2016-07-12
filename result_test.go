@@ -1,7 +1,6 @@
 package vsolver
 
 import (
-	"go/build"
 	"os"
 	"path"
 	"testing"
@@ -9,15 +8,6 @@ import (
 
 var basicResult solution
 var kub atom
-
-// An analyzer that passes nothing back, but doesn't error. This expressly
-// creates a situation that shouldn't be able to happen from a general solver
-// perspective, so it's only useful for particular situations in tests
-type passthruAnalyzer struct{}
-
-func (passthruAnalyzer) GetInfo(ctx build.Context, p ProjectRoot) (Manifest, Lock, error) {
-	return nil, nil, nil
-}
 
 func pi(n string) ProjectIdentifier {
 	return ProjectIdentifier{
@@ -58,7 +48,7 @@ func TestResultCreateVendorTree(t *testing.T) {
 	tmp := path.Join(os.TempDir(), "vsolvtest")
 	os.RemoveAll(tmp)
 
-	sm, err := NewSourceManager(passthruAnalyzer{}, path.Join(tmp, "cache"), false)
+	sm, err := NewSourceManager(naiveAnalyzer{}, path.Join(tmp, "cache"), false)
 	if err != nil {
 		t.Errorf("NewSourceManager errored unexpectedly: %q", err)
 	}
@@ -79,7 +69,7 @@ func BenchmarkCreateVendorTree(b *testing.B) {
 	tmp := path.Join(os.TempDir(), "vsolvtest")
 
 	clean := true
-	sm, err := NewSourceManager(passthruAnalyzer{}, path.Join(tmp, "cache"), true)
+	sm, err := NewSourceManager(naiveAnalyzer{}, path.Join(tmp, "cache"), true)
 	if err != nil {
 		b.Errorf("NewSourceManager errored unexpectedly: %q", err)
 		clean = false

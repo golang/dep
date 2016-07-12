@@ -51,7 +51,7 @@ type SourceManager interface {
 // A ProjectAnalyzer is responsible for analyzing a path for Manifest and Lock
 // information. Tools relying on vsolver must implement one.
 type ProjectAnalyzer interface {
-	GetInfo(build.Context, ProjectRoot) (Manifest, Lock, error)
+	GetInfo(string, ProjectRoot) (Manifest, Lock, error)
 }
 
 // SourceMgr is the default SourceManager for vsolver.
