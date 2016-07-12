@@ -37,4 +37,19 @@ appreciated:
   kick the tires!
 
 `gps` is still beta-ish software. APIs are subject to change (though they are
-stabilizing), and there are plenty of bugs to squash. 
+stabilizing), and there are plenty of bugs to squash.
+
+## Issues and Pull Requests
+
+Pull requests are the preferred way to submit changes to 'gps'. Unless the
+changes are quite small, pull requests should generally reference an
+already-opened issue. Make sure to explain clearly in the body of the PR what
+the reasoning behind the change is.
+
+The changes themselves should generally conform to the following guidelines:
+
+* Git commit messages should be [well-written](http://chris.beams.io/posts/git-commit/#seven-rules).
+* Code should be `gofmt`-ed.
+* New or changed logic should be accompanied by tests.
+* Maintainable, table-based tests are strongly preferred, even if it means
+  writing a new testing harness to execute them.
