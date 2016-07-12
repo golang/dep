@@ -2,11 +2,11 @@
 
 :+1::tada: First, we're thrilled you're thinking about contributing! :tada::+1:
 
-As a library trying to cover all the bases in the Go package management space,
-it's crucial that we incorporate a broad range of experiences and use cases.
-There is a strong, motivating design behind `gps`, but we are always open to
-discussion on ways we can improve the library, particularly if it allows `gps`
-to cover more of the Go package management possibility space.
+As a library trying to cover all the bases in Go package management, it's
+crucial that we incorporate a broad range of experiences and use cases. There is
+a strong, motivating design behind `gps`, but we are always open to discussion
+on ways we can improve the library, particularly if it allows `gps` to cover
+more of the Go package management possibility space.
 
 `gps` has no CLA, but we do have a [Code of Conduct](https://github.com/sdboyer/gps/blob/master/CODE_OF_CONDUCT.md). By
 participating, you are expected to uphold this code.
@@ -23,21 +23,24 @@ that lays out the big-picture goals and considerations driving the `gps` design.
 There are a number of ways to contribute, all highly valuable and deeply
 appreciated:
 
-* Helping "translate" existing issues: as `gps` exits its larval stage, it still
-  has a number of issues that may be incomprehensible to everyone except the
-  author. Simply asking clarifying questions on these issues is helpful!
-* Identifying missed use cases: the loose `gps` rule of thumb is, "if you can do
+* **Helping "translate" existing issues:** as `gps` exits its larval stage, it still
+  has a number of issues that may be incomprehensible to everyone except
+  @sdboyer. Simply asking clarifying questions on these issues is helpful!
+* **Identifying missed use cases:** the loose `gps` rule of thumb is, "if you can do
   it in Go, we support it in `gps`." Posting issues about cases we've missed
   helps us reach that goal.
-  Writing tests: in the same vein, `gps` has a [large suite](https://github.com/sdboyer/gps/blob/master/CODE_OF_CONDUCT.md) of solving tests, but
+* **Writing tests:** in the same vein, `gps` has a [large suite](https://github.com/sdboyer/gps/blob/master/CODE_OF_CONDUCT.md) of solving tests, but
   they still only scratch the surface. Writing tests is not only helpful, but is
   also a great way to get a feel for how `gps` works.
-* Suggesting enhancements: `gps` has plenty of rough edges Help smooth them out!
-* Building experimental tools with `gps`: probably the best and fastest ways to
+* **Suggesting enhancements:** `gps` has plenty of missing chunks. Help fill them in!
+* **Reporting bugs**: `gps` being a library means this isn't always the easiest.
+  However, you could always compile the [example](https://github.com/sdboyer/vsolver/blob/master/example.go), run that against some of
+  your projects, and report problems you encounter.
+* **Building experimental tools with `gps`:** probably the best and fastest ways to
   kick the tires!
 
-`gps` is still beta-ish software. APIs are subject to change (though they are
-stabilizing), and there are plenty of bugs to squash.
+`gps` is still beta-ish software. There are plenty of bugs to squash! APIs are
+stabilizing, but are still subject to change.
 
 ## Issues and Pull Requests
 
