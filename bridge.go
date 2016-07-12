@@ -97,7 +97,7 @@ func (b *bridge) listVersions(id ProjectIdentifier) ([]Version, error) {
 	}
 
 	vl, err := b.sm.ListVersions(k)
-	// TODO cache errors, too?
+	// TODO(sdboyer) cache errors, too?
 	if err != nil {
 		return nil, err
 	}
@@ -367,7 +367,7 @@ func (b *bridge) vtu(id ProjectIdentifier, v Version) versionTypeUnion {
 // potentially messy root project source location on disk. Together, this means
 // that we can't ask the real SourceManager to do it.
 func (b *bridge) computeRootReach() ([]string, error) {
-	// TODO i now cannot remember the reasons why i thought being less stringent
+	// TODO(sdboyer) i now cannot remember the reasons why i thought being less stringent
 	// in the analysis was OK. so, for now, we just compute a bog-standard list
 	// of externally-touched packages, including mains and test.
 	ptree, err := b.listRootPackages()

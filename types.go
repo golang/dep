@@ -107,7 +107,7 @@ func (i ProjectIdentifier) eq(j ProjectIdentifier) bool {
 		return true
 	}
 
-	// TODO attempt conversion to URL and compare base + path
+	// TODO(sdboyer) attempt conversion to URL and compare base + path
 
 	return false
 }
@@ -144,7 +144,7 @@ type Package struct {
 }
 
 // bimodalIdentifiers are used to track work to be done in the unselected queue.
-// TODO marker for root, to know to ignore prefv...or can we do unselected queue
+// TODO(sdboyer) marker for root, to know to ignore prefv...or can we do unselected queue
 // sorting only?
 type bimodalIdentifier struct {
 	id ProjectIdentifier

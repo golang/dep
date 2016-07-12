@@ -577,7 +577,7 @@ func (sm *bmSourceManager) GetProjectInfo(n ProjectRoot, v Version) (Manifest, L
 		}
 	}
 
-	// TODO proper solver-type errors
+	// TODO(sdboyer) proper solver-type errors
 	return nil, nil, fmt.Errorf("Project %s at version %s could not be found", n, v)
 }
 

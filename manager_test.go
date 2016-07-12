@@ -160,7 +160,7 @@ func TestProjectManagerInit(t *testing.T) {
 
 	_, err = os.Stat(path.Join(cpath, "metadata", "github.com", "Masterminds", "VCSTestRepo", "cache.json"))
 	if err != nil {
-		// TODO temporarily disabled until we turn caching back on
+		// TODO(sdboyer) temporarily disabled until we turn caching back on
 		//t.Error("Metadata cache json file does not exist in expected location")
 	}
 

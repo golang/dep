@@ -8,7 +8,7 @@ import (
 
 type errorLevel uint8
 
-// TODO consistent, sensible way of handling 'type' and 'severity' - or figure
+// TODO(sdboyer) consistent, sensible way of handling 'type' and 'severity' - or figure
 // out that they're not orthogonal and collapse into just 'type'
 
 const (

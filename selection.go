@@ -60,7 +60,7 @@ func (s *selection) setDependenciesOn(id ProjectIdentifier, deps []dependency) {
 // Compute a list of the unique packages within the given ProjectIdentifier that
 // have dependers, and the number of dependers they have.
 func (s *selection) getRequiredPackagesIn(id ProjectIdentifier) map[string]int {
-	// TODO this is horribly inefficient to do on the fly; we need a method to
+	// TODO(sdboyer) this is horribly inefficient to do on the fly; we need a method to
 	// precompute it on pushing a new dep, and preferably with an immut
 	// structure so that we can pop with zero cost.
 	uniq := make(map[string]int)
@@ -82,7 +82,7 @@ func (s *selection) getRequiredPackagesIn(id ProjectIdentifier) map[string]int {
 // are currently selected, and the number of times each package has been
 // independently selected.
 func (s *selection) getSelectedPackagesIn(id ProjectIdentifier) map[string]int {
-	// TODO this is horribly inefficient to do on the fly; we need a method to
+	// TODO(sdboyer) this is horribly inefficient to do on the fly; we need a method to
 	// precompute it on pushing a new dep, and preferably with an immut
 	// structure so that we can pop with zero cost.
 	uniq := make(map[string]int)
@@ -108,7 +108,7 @@ func (s *selection) getConstraint(id ProjectIdentifier) Constraint {
 		return any
 	}
 
-	// TODO recomputing this sucks and is quite wasteful. Precompute/cache it
+	// TODO(sdboyer) recomputing this sucks and is quite wasteful. Precompute/cache it
 	// on changes to the constraint set, instead.
 
 	// The solver itself is expected to maintain the invariant that all the

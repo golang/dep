@@ -41,7 +41,7 @@ func init() {
 	}
 
 	// Also ignore C
-	// TODO actually figure out how to deal with cgo
+	// TODO(sdboyer) actually figure out how to deal with cgo
 	stdlib["C"] = true
 }
 
@@ -281,7 +281,7 @@ func listPackages(fileRoot, importRoot string) (PackageTree, error) {
 // LocalImportsError indicates that a package contains at least one relative
 // import that will prevent it from compiling.
 //
-// TODO add a Files property once we're doing our own per-file parsing
+// TODO(sdboyer) add a Files property once we're doing our own per-file parsing
 type LocalImportsError struct {
 	Dir          string
 	LocalImports []string
@@ -336,7 +336,7 @@ func wmToReach(workmap map[string]wm, basedir string) map[string][]string {
 	// indicates whether the level completed successfully (true) or if it was
 	// poisoned (false).
 	//
-	// TODO some deft improvements could probably be made by passing the list of
+	// TODO(sdboyer) some deft improvements could probably be made by passing the list of
 	// parent reachsets, rather than a list of parent package string names.
 	// might be able to eliminate the use of allreachsets map-of-maps entirely.
 	dfe = func(pkg string, path []string) bool {
@@ -360,7 +360,7 @@ func wmToReach(workmap map[string]wm, basedir string) map[string][]string {
 			// pkg exists with no errs. mark it as in-process (grey), and start
 			// a reachmap for it
 			//
-			// TODO use sync.Pool here? can be lots of explicit map alloc/dealloc
+			// TODO(sdboyer) use sync.Pool here? can be lots of explicit map alloc/dealloc
 			rs := make(map[string]struct{})
 
 			// Push self onto the path slice. Passing this as a value has the
@@ -813,7 +813,7 @@ func (t PackageTree) ExternalReach(main, tests bool, ignore map[string]bool) map
 	}
 
 	//return wmToReach(workmap, t.ImportRoot)
-	return wmToReach(workmap, "") // TODO this passes tests, but doesn't seem right
+	return wmToReach(workmap, "") // TODO(sdboyer) this passes tests, but doesn't seem right
 }
 
 // ListExternalImports computes a sorted, deduplicated list of all the external
@@ -894,7 +894,7 @@ func (t PackageTree) ListExternalImports(main, tests bool, ignore map[string]boo
 
 	if len(exm) == 0 {
 		if someerrs {
-			// TODO proper errs
+			// TODO(sdboyer) proper errs
 			return nil, fmt.Errorf("No packages without errors in %s", t.ImportRoot)
 		}
 		return nil, nil

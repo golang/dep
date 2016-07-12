@@ -42,7 +42,7 @@ func newVersionQueue(id ProjectIdentifier, lockv, prefv Version, b sourceBridge)
 		var err error
 		vq.pi, err = vq.b.listVersions(vq.id)
 		if err != nil {
-			// TODO pushing this error this early entails that we
+			// TODO(sdboyer) pushing this error this early entails that we
 			// unconditionally deep scan (e.g. vendor), as well as hitting the
 			// network.
 			return nil, err

@@ -84,8 +84,8 @@ func (s *solver) HashInputs() ([]byte, error) {
 		}
 	}
 
-	// TODO overrides
-	// TODO aliases
+	// TODO(sdboyer) overrides
+	// TODO(sdboyer) aliases
 	return h.Sum(nil), nil
 }
 

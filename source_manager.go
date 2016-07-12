@@ -171,7 +171,7 @@ func (sm *SourceMgr) ListPackages(n ProjectRoot, v Version) (PackageTree, error)
 func (sm *SourceMgr) ListVersions(n ProjectRoot) ([]Version, error) {
 	pmc, err := sm.getProjectManager(n)
 	if err != nil {
-		// TODO More-er proper-er errors
+		// TODO(sdboyer) More-er proper-er errors
 		return nil, err
 	}
 
@@ -183,7 +183,7 @@ func (sm *SourceMgr) ListVersions(n ProjectRoot) ([]Version, error) {
 func (sm *SourceMgr) RevisionPresentIn(n ProjectRoot, r Revision) (bool, error) {
 	pmc, err := sm.getProjectManager(n)
 	if err != nil {
-		// TODO More-er proper-er errors
+		// TODO(sdboyer) More-er proper-er errors
 		return false, err
 	}
 
@@ -224,18 +224,18 @@ func (sm *SourceMgr) getProjectManager(n ProjectRoot) (*pmState, error) {
 	}
 
 	repodir := path.Join(sm.cachedir, "src", string(n))
-	// TODO be more robust about this
+	// TODO(sdboyer) be more robust about this
 	r, err := vcs.NewRepo("https://"+string(n), repodir)
 	if err != nil {
-		// TODO be better
+		// TODO(sdboyer) be better
 		return nil, err
 	}
 	if !r.CheckLocal() {
-		// TODO cloning the repo here puts it on a blocking, and possibly
+		// TODO(sdboyer) cloning the repo here puts it on a blocking, and possibly
 		// unnecessary path. defer it
 		err = r.Get()
 		if err != nil {
-			// TODO be better
+			// TODO(sdboyer) be better
 			return nil, err
 		}
 	}
@@ -244,7 +244,7 @@ func (sm *SourceMgr) getProjectManager(n ProjectRoot) (*pmState, error) {
 	metadir := path.Join(sm.cachedir, "metadata", string(n))
 	err = os.MkdirAll(metadir, 0777)
 	if err != nil {
-		// TODO be better
+		// TODO(sdboyer) be better
 		return nil, err
 	}
 
@@ -255,20 +255,20 @@ func (sm *SourceMgr) getProjectManager(n ProjectRoot) (*pmState, error) {
 	if fi != nil {
 		pms.cf, err = os.OpenFile(cpath, os.O_RDWR, 0777)
 		if err != nil {
-			// TODO be better
+			// TODO(sdboyer) be better
 			return nil, fmt.Errorf("Err on opening metadata cache file: %s", err)
 		}
 
 		err = json.NewDecoder(pms.cf).Decode(dc)
 		if err != nil {
-			// TODO be better
+			// TODO(sdboyer) be better
 			return nil, fmt.Errorf("Err on JSON decoding metadata cache file: %s", err)
 		}
 	} else {
-		// TODO commented this out for now, until we manage it correctly
+		// TODO(sdboyer) commented this out for now, until we manage it correctly
 		//pms.cf, err = os.Create(cpath)
 		//if err != nil {
-		//// TODO be better
+		//// TODO(sdboyer) be better
 		//return nil, fmt.Errorf("Err on creating metadata cache file: %s", err)
 		//}
 

@@ -176,7 +176,7 @@ type Solver interface {
 // returned, ready to hash and check inputs or perform a solving run.
 func Prepare(params SolveParameters, sm SourceManager) (Solver, error) {
 	// local overrides would need to be handled first.
-	// TODO local overrides! heh
+	// TODO(sdboyer) local overrides! heh
 
 	if sm == nil {
 		return nil, badOptsFailure("must provide non-nil SourceManager")
@@ -260,7 +260,7 @@ func (s *solver) Solve() (Solution, error) {
 	// Prime the queues with the root project
 	err := s.selectRoot()
 	if err != nil {
-		// TODO this properly with errs, yar
+		// TODO(sdboyer) this properly with errs, yar
 		return nil, err
 	}
 
@@ -357,7 +357,7 @@ func (s *solver) solve() (map[atom]map[string]struct{}, error) {
 				pl: bmi.pl,
 			}
 
-			s.logStart(bmi) // TODO different special start logger for this path
+			s.logStart(bmi) // TODO(sdboyer) different special start logger for this path
 			err := s.checkPackage(nawp)
 			if err != nil {
 				// Err means a failure somewhere down the line; try backtracking.
@@ -427,7 +427,7 @@ func (s *solver) selectRoot() error {
 	}
 
 	// Push the root project onto the queue.
-	// TODO maybe it'd just be better to skip this?
+	// TODO(sdboyer) maybe it'd just be better to skip this?
 	s.sel.pushSelection(a, true)
 
 	// If we're looking for root's deps, get it from opts and local root
@@ -440,7 +440,7 @@ func (s *solver) selectRoot() error {
 
 	deps, err := s.intersectConstraintsWithImports(mdeps, reach)
 	if err != nil {
-		// TODO this could well happen; handle it with a more graceful error
+		// TODO(sdboyer) this could well happen; handle it with a more graceful error
 		panic(fmt.Sprintf("shouldn't be possible %s", err))
 	}
 
@@ -505,7 +505,7 @@ func (s *solver) getImportsAndConstraintsOf(a atomWithPackages) ([]completeDep, 
 	}
 
 	deps := m.DependencyConstraints()
-	// TODO add overrides here...if we impl the concept (which we should)
+	// TODO(sdboyer) add overrides here...if we impl the concept (which we should)
 
 	return s.intersectConstraintsWithImports(deps, reach)
 }
@@ -516,7 +516,7 @@ func (s *solver) getImportsAndConstraintsOf(a atomWithPackages) ([]completeDep, 
 // are available, or Any() where they are not.
 func (s *solver) intersectConstraintsWithImports(deps []ProjectConstraint, reach []string) ([]completeDep, error) {
 	// Create a radix tree with all the projects we know from the manifest
-	// TODO make this smarter once we allow non-root inputs as 'projects'
+	// TODO(sdboyer) make this smarter once we allow non-root inputs as 'projects'
 	xt := radix.New()
 	for _, dep := range deps {
 		xt.Insert(string(dep.Ident.ProjectRoot), dep)
@@ -527,7 +527,7 @@ func (s *solver) intersectConstraintsWithImports(deps []ProjectConstraint, reach
 	dmap := make(map[ProjectRoot]completeDep)
 	for _, rp := range reach {
 		// If it's a stdlib package, skip it.
-		// TODO this just hardcodes us to the packages in tip - should we
+		// TODO(sdboyer) this just hardcodes us to the packages in tip - should we
 		// have go version magic here, too?
 		if stdlib[rp] {
 			continue
@@ -620,7 +620,7 @@ func (s *solver) createVersionQueue(bmi bimodalIdentifier) (*versionQueue, error
 		}
 		if exists {
 			// Project exists only in vendor (and in some manifest somewhere)
-			// TODO mark this for special handling, somehow?
+			// TODO(sdboyer) mark this for special handling, somehow?
 		} else {
 			return nil, newSolveError(fmt.Sprintf("Project '%s' could not be located.", id), cannotResolve)
 		}
@@ -642,7 +642,7 @@ func (s *solver) createVersionQueue(bmi bimodalIdentifier) (*versionQueue, error
 		// with a dependency on it in order to see if any have a lock that might
 		// express a prefv
 		//
-		// TODO nested loop; prime candidate for a cache somewhere
+		// TODO(sdboyer) nested loop; prime candidate for a cache somewhere
 		for _, dep := range s.sel.getDependenciesOn(bmi.id) {
 			// Skip the root, of course
 			if s.params.ImportRoot == dep.depender.id.ProjectRoot {
@@ -684,7 +684,7 @@ func (s *solver) createVersionQueue(bmi bimodalIdentifier) (*versionQueue, error
 
 	q, err := newVersionQueue(id, lockv, prefv, s.b)
 	if err != nil {
-		// TODO this particular err case needs to be improved to be ONLY for cases
+		// TODO(sdboyer) this particular err case needs to be improved to be ONLY for cases
 		// where there's absolutely nothing findable about a given project name
 		return nil, err
 	}
@@ -700,7 +700,7 @@ func (s *solver) createVersionQueue(bmi bimodalIdentifier) (*versionQueue, error
 	// ident cannot be incompatible, so we know that if we find one rev, then
 	// any other deps will have to also be on that rev (or Any).
 	//
-	// TODO while this does work, it bypasses the interface-implied guarantees
+	// TODO(sdboyer) while this does work, it bypasses the interface-implied guarantees
 	// of the version queue, and is therefore not a great strategy for API
 	// coherency. Folding this in to a formal interface would be better.
 	switch tc := s.sel.getConstraint(bmi.id).(type) {
@@ -884,7 +884,7 @@ func (s *solver) backtrack() bool {
 		}
 
 		// Advance the queue past the current version, which we know is bad
-		// TODO is it feasible to make available the failure reason here?
+		// TODO(sdboyer) is it feasible to make available the failure reason here?
 		if q.advance(nil) == nil && !q.isExhausted() {
 			// Search for another acceptable version of this failed dep in its queue
 			if s.findValidVersion(q, awp.pl) == nil {
@@ -995,7 +995,7 @@ func (s *solver) unselectedComparator(i, j int) bool {
 }
 
 func (s *solver) fail(id ProjectIdentifier) {
-	// TODO does this need updating, now that we have non-project package
+	// TODO(sdboyer) does this need updating, now that we have non-project package
 	// selection?
 
 	// skip if the root project
@@ -1163,7 +1163,7 @@ func (s *solver) logStart(bmi bimodalIdentifier) {
 	}
 
 	prefix := strings.Repeat("| ", len(s.vqs)+1)
-	// TODO how...to list the packages in the limited space we have?
+	// TODO(sdboyer) how...to list the packages in the limited space we have?
 	s.tl.Printf("%s\n", tracePrefix(fmt.Sprintf("? attempting %s (with %v packages)", bmi.id.errString(), len(bmi.pl)), prefix, prefix))
 }
 

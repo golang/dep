@@ -58,7 +58,7 @@ func TestResultCreateVendorTree(t *testing.T) {
 		t.Errorf("Unexpected error while creating vendor tree: %s", err)
 	}
 
-	// TODO add more checks
+	// TODO(sdboyer) add more checks
 }
 
 func BenchmarkCreateVendorTree(b *testing.B) {

@@ -37,7 +37,7 @@ func CreateVendorTree(basedir string, l Lock, sm SourceManager, sv bool) error {
 		return err
 	}
 
-	// TODO parallelize
+	// TODO(sdboyer) parallelize
 	for _, p := range l.Projects() {
 		to := path.Join(basedir, string(p.Ident().ProjectRoot))
 
@@ -54,7 +54,7 @@ func CreateVendorTree(basedir string, l Lock, sm SourceManager, sv bool) error {
 		if sv {
 			filepath.Walk(to, stripVendor)
 		}
-		// TODO dump version metadata file
+		// TODO(sdboyer) dump version metadata file
 	}
 
 	return nil

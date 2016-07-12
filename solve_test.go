@@ -16,7 +16,7 @@ import (
 
 var fixtorun string
 
-// TODO regression test ensuring that locks with only revs for projects don't cause errors
+// TODO(sdboyer) regression test ensuring that locks with only revs for projects don't cause errors
 func init() {
 	flag.StringVar(&fixtorun, "vsolver.fix", "", "A single fixture to run in TestBasicSolves")
 	overrideMkBridge()
@@ -166,7 +166,7 @@ func fixtureSolveSimpleChecks(fix specfix, res Solution, err error, t *testing.T
 		case *badOptsFailure:
 			t.Errorf("(fixture: %q) Unexpected bad opts failure solve error: %s", fix.name(), err)
 		case *noVersionError:
-			if errp[0] != string(fail.pn.ProjectRoot) { // TODO identifierify
+			if errp[0] != string(fail.pn.ProjectRoot) { // TODO(sdboyer) identifierify
 				t.Errorf("(fixture: %q) Expected failure on project %s, but was on project %s", fix.name(), errp[0], fail.pn.ProjectRoot)
 			}
 
@@ -203,7 +203,7 @@ func fixtureSolveSimpleChecks(fix specfix, res Solution, err error, t *testing.T
 			}
 
 		default:
-			// TODO round these out
+			// TODO(sdboyer) round these out
 			panic(fmt.Sprintf("unhandled solve failure type: %s", err))
 		}
 	} else if len(fix.expectErrs()) > 0 {
@@ -305,7 +305,7 @@ func TestRootLockNoVersionPairMatching(t *testing.T) {
 func getFailureCausingProjects(err error) (projs []string) {
 	switch e := err.(type) {
 	case *noVersionError:
-		projs = append(projs, string(e.pn.ProjectRoot)) // TODO identifierify
+		projs = append(projs, string(e.pn.ProjectRoot)) // TODO(sdboyer) identifierify
 	case *disjointConstraintFailure:
 		for _, f := range e.failsib {
 			projs = append(projs, string(f.depender.id.ProjectRoot))

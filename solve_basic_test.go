@@ -238,7 +238,7 @@ func mksolution(pairs ...string) map[string]Version {
 	m := make(map[string]Version)
 	for _, pair := range pairs {
 		a := mkAtom(pair)
-		// TODO identifierify
+		// TODO(sdboyer) identifierify
 		m[string(a.id.ProjectRoot)] = a.v
 	}
 
@@ -448,7 +448,7 @@ var basicFixtures = map[string]basicFixture{
 			mkDepspec("foo 1.0.0", "bar from baz 1.0.0"),
 			mkDepspec("bar 1.0.0"),
 		},
-		// TODO ugh; do real error comparison instead of shitty abstraction
+		// TODO(sdboyer) ugh; do real error comparison instead of shitty abstraction
 		errp: []string{"foo", "foo", "root"},
 	},
 	// fixtures with locks
@@ -866,7 +866,7 @@ var basicFixtures = map[string]basicFixture{
 			"foo r123abc",
 		),
 	},
-	// TODO decide how to refactor the solver in order to re-enable these.
+	// TODO(sdboyer) decide how to refactor the solver in order to re-enable these.
 	// Checking for revision existence is important...but kinda obnoxious.
 	//{
 	//// Solve fails if revision constraint calls for a nonexistent revision
@@ -893,7 +893,7 @@ var basicFixtures = map[string]basicFixture{
 	//errp: []string{"foo", "root", "foo"},
 	//},
 
-	// TODO add fixture that tests proper handling of loops via aliases (where
+	// TODO(sdboyer) add fixture that tests proper handling of loops via aliases (where
 	// a project that wouldn't be a loop is aliased to a project that is a loop)
 }
 
@@ -973,7 +973,7 @@ func (sm *depspecSourceManager) GetProjectInfo(n ProjectRoot, v Version) (Manife
 		}
 	}
 
-	// TODO proper solver-type errors
+	// TODO(sdboyer) proper solver-type errors
 	return nil, nil, fmt.Errorf("Project %s at version %s could not be found", n, v)
 }
 
@@ -1172,7 +1172,7 @@ func (_ dummyLock) Projects() []LockedProject {
 // We've borrowed this bestiary from pub's tests:
 // https://github.com/dart-lang/pub/blob/master/test/version_solver_test.dart
 
-// TODO finish converting all of these
+// TODO(sdboyer) finish converting all of these
 
 /*
 func basicGraph() {

@@ -24,7 +24,7 @@ func (s *solver) checkProject(a atomWithPackages) error {
 	deps, err := s.getImportsAndConstraintsOf(a)
 	if err != nil {
 		// An err here would be from the package fetcher; pass it straight back
-		// TODO can we logSolve this?
+		// TODO(sdboyer) can we logSolve this?
 		return err
 	}
 
@@ -41,7 +41,7 @@ func (s *solver) checkProject(a atomWithPackages) error {
 			s.logSolve(err)
 			return err
 		}
-		// TODO decide how to refactor in order to re-enable this. Checking for
+		// TODO(sdboyer) decide how to refactor in order to re-enable this. Checking for
 		// revision existence is important...but kinda obnoxious.
 		//if err := s.checkRevisionExists(a, dep); err != nil {
 		//s.logSolve(err)
@@ -52,7 +52,7 @@ func (s *solver) checkProject(a atomWithPackages) error {
 			return err
 		}
 
-		// TODO add check that fails if adding this atom would create a loop
+		// TODO(sdboyer) add check that fails if adding this atom would create a loop
 	}
 
 	return nil
@@ -73,7 +73,7 @@ func (s *solver) checkPackage(a atomWithPackages) error {
 	deps, err := s.getImportsAndConstraintsOf(a)
 	if err != nil {
 		// An err here would be from the package fetcher; pass it straight back
-		// TODO can we logSolve this?
+		// TODO(sdboyer) can we logSolve this?
 		return err
 	}
 
@@ -90,7 +90,7 @@ func (s *solver) checkPackage(a atomWithPackages) error {
 			s.logSolve(err)
 			return err
 		}
-		// TODO decide how to refactor in order to re-enable this. Checking for
+		// TODO(sdboyer) decide how to refactor in order to re-enable this. Checking for
 		// revision existence is important...but kinda obnoxious.
 		//if err := s.checkRevisionExists(a, dep); err != nil {
 		//s.logSolve(err)
@@ -112,7 +112,7 @@ func (s *solver) checkAtomAllowable(pa atom) error {
 	if s.b.matches(pa.id, constraint, pa.v) {
 		return nil
 	}
-	// TODO collect constraint failure reason (wait...aren't we, below?)
+	// TODO(sdboyer) collect constraint failure reason (wait...aren't we, below?)
 
 	deps := s.sel.getDependenciesOn(pa.id)
 	var failparent []dependency
@@ -137,7 +137,7 @@ func (s *solver) checkAtomAllowable(pa atom) error {
 func (s *solver) checkRequiredPackagesExist(a atomWithPackages) error {
 	ptree, err := s.b.listPackages(a.a.id, a.a.v)
 	if err != nil {
-		// TODO handle this more gracefully
+		// TODO(sdboyer) handle this more gracefully
 		return err
 	}
 
@@ -145,7 +145,7 @@ func (s *solver) checkRequiredPackagesExist(a atomWithPackages) error {
 	fp := make(map[string]errDeppers)
 	// We inspect these in a bit of a roundabout way, in order to incrementally
 	// build up the failure we'd return if there is, indeed, a missing package.
-	// TODO rechecking all of these every time is wasteful. Is there a shortcut?
+	// TODO(sdboyer) rechecking all of these every time is wasteful. Is there a shortcut?
 	for _, dep := range deps {
 		for _, pkg := range dep.dep.pl {
 			if errdep, seen := fp[pkg]; seen {
@@ -263,7 +263,7 @@ func (s *solver) checkPackageImportsFromDepExist(a atomWithPackages, cdep comple
 
 	ptree, err := s.b.listPackages(sel.a.id, sel.a.v)
 	if err != nil {
-		// TODO handle this more gracefully
+		// TODO(sdboyer) handle this more gracefully
 		return err
 	}
 
