@@ -5,7 +5,7 @@
 `gps` is the Go Packaging Solver. It is an engine for tackling dependency
 management problems in Go. You can replicate the fetching bits of `go get`,
 modulo arguments, [in about 30 lines of
-code](https://github.com/sdboyer/vsolver/blob/master/example.go) with `gps`.
+code](https://github.com/sdboyer/gps/blob/master/example.go) with `gps`.
 
 `gps` is _not_ Yet Another Go Package Management Tool. Rather, it's a library
 that package management (and adjacent) tools can use to solve the
@@ -15,10 +15,10 @@ the problem in a consistent,
 way. `gps` is [on track](https://github.com/Masterminds/glide/pull/384) to become the engine behind [glide](https://glide.sh).
 
 The wiki has a [general introduction the `gps`
-approach](https://github.com/sdboyer/vsolver/wiki/Introduction-to-gps), as well
+approach](https://github.com/sdboyer/gps/wiki/Introduction-to-gps), as well
 as guides for folks [implementing
-tools](https://github.com/sdboyer/vsolver/wiki/gps-for-Implementors) or [looking
-to contribute](https://github.com/sdboyer/vsolver/wiki/Introduction-to-gps).
+tools](https://github.com/sdboyer/gps/wiki/gps-for-Implementors) or [looking
+to contribute](https://github.com/sdboyer/gps/wiki/Introduction-to-gps).
 
 ## Wait...a package management _library_?!
 
@@ -85,6 +85,6 @@ matters worse.
 ## Contributing
 
 Yay, contributing! Please see
-[CONTRIBUTING.md](https://github.com/sdboyer/vsolver/blob/master/CONTRIBUTING.md).
+[CONTRIBUTING.md](https://github.com/sdboyer/gps/blob/master/CONTRIBUTING.md).
 Note that `gps` also abides by a [Code of
-Conduct](https://github.com/sdboyer/vsolver/blob/master/CODE_OF_CONDUCT.md), and is MIT-licensed.
+Conduct](https://github.com/sdboyer/gps/blob/master/CODE_OF_CONDUCT.md), and is MIT-licensed.

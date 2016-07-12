@@ -1,4 +1,4 @@
-package vsolver
+package gps
 
 import (
 	"container/heap"
@@ -161,7 +161,7 @@ type solver struct {
 	rl Lock
 }
 
-// A Solver is the main workhorse of vsolver: given a set of project inputs, it
+// A Solver is the main workhorse of gps: given a set of project inputs, it
 // performs a constraint solving analysis to develop a complete Result that can
 // be used as a lock file, and to populate a vendor directory.
 type Solver interface {
@@ -255,7 +255,7 @@ func Prepare(params SolveParameters, sm SourceManager) (Solver, error) {
 // Solve attempts to find a dependency solution for the given project, as
 // represented by the SolveParameters with which this Solver was created.
 //
-// This is the entry point to the main vsolver workhorse.
+// This is the entry point to the main gps workhorse.
 func (s *solver) Solve() (Solution, error) {
 	// Prime the queues with the root project
 	err := s.selectRoot()

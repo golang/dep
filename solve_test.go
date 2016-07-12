@@ -1,4 +1,4 @@
-package vsolver
+package gps
 
 import (
 	"flag"
@@ -18,7 +18,7 @@ var fixtorun string
 
 // TODO(sdboyer) regression test ensuring that locks with only revs for projects don't cause errors
 func init() {
-	flag.StringVar(&fixtorun, "vsolver.fix", "", "A single fixture to run in TestBasicSolves")
+	flag.StringVar(&fixtorun, "gps.fix", "", "A single fixture to run in TestBasicSolves")
 	overrideMkBridge()
 }
 

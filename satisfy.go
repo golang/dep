@@ -1,4 +1,4 @@
-package vsolver
+package gps
 
 // checkProject performs all constraint checks on a new project (with packages)
 // that we want to select. It determines if selecting the atom would result in

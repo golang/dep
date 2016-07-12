@@ -4,11 +4,11 @@ import (
 	"sort"
 
 	"missing/missing"
-	"github.com/sdboyer/vsolver"
+	"github.com/sdboyer/gps"
 )
 
 var (
 	_ = sort.Strings
-	_ = vsolver.Solve
+	_ = gps.Solve
 	_ = missing.Foo
 )

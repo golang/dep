@@ -1,17 +1,17 @@
-package vsolver
+package gps
 
 // Lock represents data from a lock file (or however the implementing tool
 // chooses to store it) at a particular version that is relevant to the
 // satisfiability solving process.
 //
-// In general, the information produced by vsolver on finding a successful
+// In general, the information produced by gps on finding a successful
 // solution is all that would be necessary to constitute a lock file, though
 // tools can include whatever other information they want in their storage.
 type Lock interface {
 	// Indicates the version of the solver used to generate this lock data
 	//SolverVersion() string
 
-	// The hash of inputs to vsolver that resulted in this lock data
+	// The hash of inputs to gps that resulted in this lock data
 	InputHash() []byte
 
 	// Projects returns the list of LockedProjects contained in the lock data.

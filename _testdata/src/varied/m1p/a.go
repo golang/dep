@@ -3,10 +3,10 @@ package m1p
 import (
 	"sort"
 
-	"github.com/sdboyer/vsolver"
+	"github.com/sdboyer/gps"
 )
 
 var (
 	M = sort.Strings
-	_ = vsolver.Solve
+	_ = gps.Solve
 )

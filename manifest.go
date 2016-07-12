@@ -1,4 +1,4 @@
-package vsolver
+package gps
 
 // Manifest represents manifest-type data for a project at a particular version.
 // That means dependency constraints, both for normal dependencies and for

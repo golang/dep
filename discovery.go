@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package vsolver
+package gps
 
 // This code is taken from cmd/go/discovery.go; it is the logic go get itself
 // uses to interpret meta imports information.

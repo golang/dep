@@ -1,15 +1,15 @@
-package vsolver
+package gps
 
 import "github.com/Masterminds/semver"
 
-// Version represents one of the different types of versions used by vsolver.
+// Version represents one of the different types of versions used by gps.
 //
 // Version composes Constraint, because all versions can be used as a constraint
 // (where they allow one, and only one, version - themselves), but constraints
 // are not necessarily discrete versions.
 //
 // Version is an interface, but it contains private methods, which restricts it
-// to vsolver's own internal implementations. We do this for the confluence of
+// to gps's own internal implementations. We do this for the confluence of
 // two reasons: the implementation of Versions is complete (there is no case in
 // which we'd need other types), and the implementation relies on type magic
 // under the hood, which would be unsafe to do if other dynamic types could be

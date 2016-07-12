@@ -1,4 +1,4 @@
-package vsolver
+package gps
 
 import (
 	"encoding/json"
@@ -14,7 +14,7 @@ import (
 // source repositories. Its primary purpose is to serve the needs of a Solver,
 // but it is handy for other purposes, as well.
 //
-// vsolver's built-in SourceManager, accessible via NewSourceManager(), is
+// gps's built-in SourceManager, accessible via NewSourceManager(), is
 // intended to be generic and sufficient for any purpose. It provides some
 // additional semantics around the methods defined here.
 type SourceManager interface {
@@ -35,7 +35,7 @@ type SourceManager interface {
 	ListPackages(ProjectRoot, Version) (PackageTree, error)
 
 	// GetProjectInfo returns manifest and lock information for the provided
-	// import path. vsolver currently requires that projects be rooted at their
+	// import path. gps currently requires that projects be rooted at their
 	// repository root, which means that this ProjectRoot must also be a
 	// repository root.
 	GetProjectInfo(ProjectRoot, Version) (Manifest, Lock, error)
@@ -49,12 +49,12 @@ type SourceManager interface {
 }
 
 // A ProjectAnalyzer is responsible for analyzing a path for Manifest and Lock
-// information. Tools relying on vsolver must implement one.
+// information. Tools relying on gps must implement one.
 type ProjectAnalyzer interface {
 	GetInfo(string, ProjectRoot) (Manifest, Lock, error)
 }
 
-// SourceMgr is the default SourceManager for vsolver.
+// SourceMgr is the default SourceManager for gps.
 //
 // There's no (planned) reason why it would need to be reimplemented by other
 // tools; control via dependency injection is intended to be sufficient.
@@ -76,7 +76,7 @@ type pmState struct {
 	vcur bool     // indicates that we've called ListVersions()
 }
 
-// NewSourceManager produces an instance of vsolver's built-in SourceManager. It
+// NewSourceManager produces an instance of gps's built-in SourceManager. It
 // takes a cache directory (where local instances of upstream repositories are
 // stored), a vendor directory for the project currently being worked on, and a
 // force flag indicating whether to overwrite the global cache lock file (if
@@ -88,7 +88,7 @@ type pmState struct {
 // this SourceManager as early as possible and use it to their ends. That way,
 // the solver can benefit from any caches that may have already been warmed.
 //
-// vsolver's SourceManager is intended to be threadsafe (if it's not, please
+// gps's SourceManager is intended to be threadsafe (if it's not, please
 // file a bug!). It should certainly be safe to reuse from one solving run to
 // the next; however, the fact that it takes a basedir as an argument makes it
 // much less useful for simultaneous use by separate solvers operating on
@@ -132,7 +132,7 @@ func (sm *SourceMgr) Release() {
 }
 
 // GetProjectInfo returns manifest and lock information for the provided import
-// path. vsolver currently requires that projects be rooted at their repository
+// path. gps currently requires that projects be rooted at their repository
 // root, which means that this ProjectRoot must also be a repository root.
 //
 // The work of producing the manifest and lock information is delegated to the

@@ -14,9 +14,9 @@ participating, you are expected to uphold this code.
 ## How can I contribute?
 
 It may be best to start by getting a handle on what `gps` actually is. Our
-wiki has a [general introduction](https://github.com/sdboyer/vsolver/wiki/Introduction-to-gps), a
-[guide for tool implementors](https://github.com/sdboyer/vsolver/wiki/gps-for-Implementors), and
-a [guide for contributors](https://github.com/sdboyer/vsolver/wiki/gps-for-contributors).
+wiki has a [general introduction](https://github.com/sdboyer/gps/wiki/Introduction-to-gps), a
+[guide for tool implementors](https://github.com/sdboyer/gps/wiki/gps-for-Implementors), and
+a [guide for contributors](https://github.com/sdboyer/gps/wiki/gps-for-contributors).
 There's also a [discursive essay](https://medium.com/@sdboyer/so-you-want-to-write-a-package-manager-4ae9c17d9527)
 that lays out the big-picture goals and considerations driving the `gps` design.
 
@@ -34,7 +34,7 @@ appreciated:
   also a great way to get a feel for how `gps` works.
 * **Suggesting enhancements:** `gps` has plenty of missing chunks. Help fill them in!
 * **Reporting bugs**: `gps` being a library means this isn't always the easiest.
-  However, you could always compile the [example](https://github.com/sdboyer/vsolver/blob/master/example.go), run that against some of
+  However, you could always compile the [example](https://github.com/sdboyer/gps/blob/master/example.go), run that against some of
   your projects, and report problems you encounter.
 * **Building experimental tools with `gps`:** probably the best and fastest ways to
   kick the tires!

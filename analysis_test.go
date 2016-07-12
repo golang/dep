@@ -1,4 +1,4 @@
-package vsolver
+package gps
 
 import (
 	"fmt"
@@ -262,7 +262,7 @@ func TestListPackages(t *testing.T) {
 							CommentPath: "",
 							Name:        "simple",
 							Imports: []string{
-								"github.com/sdboyer/vsolver",
+								"github.com/sdboyer/gps",
 								"sort",
 							},
 						},
@@ -282,7 +282,7 @@ func TestListPackages(t *testing.T) {
 							CommentPath: "",
 							Name:        "simple",
 							Imports: []string{
-								"github.com/sdboyer/vsolver",
+								"github.com/sdboyer/gps",
 								"sort",
 							},
 						},
@@ -344,7 +344,7 @@ func TestListPackages(t *testing.T) {
 							CommentPath: "",
 							Name:        "simple",
 							Imports: []string{
-								"github.com/sdboyer/vsolver",
+								"github.com/sdboyer/gps",
 								"sort",
 							},
 							TestImports: []string{
@@ -368,7 +368,7 @@ func TestListPackages(t *testing.T) {
 							CommentPath: "",
 							Name:        "simple",
 							Imports: []string{
-								"github.com/sdboyer/vsolver",
+								"github.com/sdboyer/gps",
 								"sort",
 							},
 							TestImports: []string{
@@ -392,7 +392,7 @@ func TestListPackages(t *testing.T) {
 							CommentPath: "",
 							Name:        "simple",
 							Imports: []string{
-								"github.com/sdboyer/vsolver",
+								"github.com/sdboyer/gps",
 								"sort",
 							},
 							TestImports: []string{
@@ -417,7 +417,7 @@ func TestListPackages(t *testing.T) {
 							CommentPath: "",
 							Name:        "m1p",
 							Imports: []string{
-								"github.com/sdboyer/vsolver",
+								"github.com/sdboyer/gps",
 								"os",
 								"sort",
 							},
@@ -438,7 +438,7 @@ func TestListPackages(t *testing.T) {
 							CommentPath: "",
 							Name:        "simple",
 							Imports: []string{
-								"github.com/sdboyer/vsolver",
+								"github.com/sdboyer/gps",
 								"sort",
 							},
 						},
@@ -449,7 +449,7 @@ func TestListPackages(t *testing.T) {
 							CommentPath: "",
 							Name:        "m1p",
 							Imports: []string{
-								"github.com/sdboyer/vsolver",
+								"github.com/sdboyer/gps",
 								"os",
 								"sort",
 							},
@@ -475,7 +475,7 @@ func TestListPackages(t *testing.T) {
 							CommentPath: "",
 							Name:        "m1p",
 							Imports: []string{
-								"github.com/sdboyer/vsolver",
+								"github.com/sdboyer/gps",
 								"os",
 								"sort",
 							},
@@ -487,7 +487,7 @@ func TestListPackages(t *testing.T) {
 							CommentPath: "",
 							Name:        "simple",
 							Imports: []string{
-								"github.com/sdboyer/vsolver",
+								"github.com/sdboyer/gps",
 								"sort",
 							},
 						},
@@ -507,7 +507,7 @@ func TestListPackages(t *testing.T) {
 							CommentPath: "",
 							Name:        "base",
 							Imports: []string{
-								"github.com/sdboyer/vsolver",
+								"github.com/sdboyer/gps",
 								"go/parser",
 							},
 						},
@@ -529,7 +529,7 @@ func TestListPackages(t *testing.T) {
 							CommentPath: "",
 							Name:        "m1p",
 							Imports: []string{
-								"github.com/sdboyer/vsolver",
+								"github.com/sdboyer/gps",
 								"os",
 								"sort",
 							},
@@ -550,7 +550,7 @@ func TestListPackages(t *testing.T) {
 							CommentPath: "",
 							Name:        "base",
 							Imports: []string{
-								"github.com/sdboyer/vsolver",
+								"github.com/sdboyer/gps",
 								"go/parser",
 							},
 						},
@@ -572,7 +572,7 @@ func TestListPackages(t *testing.T) {
 							CommentPath: "",
 							Name:        "m1p",
 							Imports: []string{
-								"github.com/sdboyer/vsolver",
+								"github.com/sdboyer/gps",
 								"os",
 								"sort",
 							},
@@ -593,7 +593,7 @@ func TestListPackages(t *testing.T) {
 							CommentPath: "",
 							Name:        "simple",
 							Imports: []string{
-								"github.com/sdboyer/vsolver",
+								"github.com/sdboyer/gps",
 								"sort",
 								"unicode",
 							},
@@ -614,7 +614,7 @@ func TestListPackages(t *testing.T) {
 							CommentPath: "",
 							Name:        "simple",
 							Imports: []string{
-								"github.com/sdboyer/vsolver",
+								"github.com/sdboyer/gps",
 								"sort",
 								"unicode",
 							},
@@ -635,7 +635,7 @@ func TestListPackages(t *testing.T) {
 							CommentPath: "",
 							Name:        "simple",
 							Imports: []string{
-								"github.com/sdboyer/vsolver",
+								"github.com/sdboyer/gps",
 								"sort",
 								"unicode",
 							},
@@ -677,7 +677,7 @@ func TestListPackages(t *testing.T) {
 							CommentPath: "",
 							Name:        "simple",
 							Imports: []string{
-								"github.com/sdboyer/vsolver",
+								"github.com/sdboyer/gps",
 								"missing/missing",
 								"sort",
 							},
@@ -689,7 +689,7 @@ func TestListPackages(t *testing.T) {
 							CommentPath: "",
 							Name:        "m1p",
 							Imports: []string{
-								"github.com/sdboyer/vsolver",
+								"github.com/sdboyer/gps",
 								"os",
 								"sort",
 							},
@@ -736,7 +736,7 @@ func TestListPackages(t *testing.T) {
 							CommentPath: "",
 							Name:        "simple",
 							Imports: []string{
-								"github.com/sdboyer/vsolver",
+								"github.com/sdboyer/gps",
 								"go/parser",
 								"varied/simple/another",
 							},
@@ -773,7 +773,7 @@ func TestListPackages(t *testing.T) {
 							CommentPath: "",
 							Name:        "m1p",
 							Imports: []string{
-								"github.com/sdboyer/vsolver",
+								"github.com/sdboyer/gps",
 								"os",
 								"sort",
 							},
@@ -866,7 +866,7 @@ func TestListExternalImports(t *testing.T) {
 	all := []string{
 		"encoding/binary",
 		"github.com/Masterminds/semver",
-		"github.com/sdboyer/vsolver",
+		"github.com/sdboyer/gps",
 		"go/parser",
 		"hash",
 		"net/http",
@@ -942,7 +942,7 @@ func TestListExternalImports(t *testing.T) {
 	ignore = map[string]bool{
 		"varied/simple": true,
 	}
-	// we get github.com/sdboyer/vsolver from m1p, too, so it should still be
+	// we get github.com/sdboyer/gps from m1p, too, so it should still be
 	// there
 	except("go/parser")
 	validate()
@@ -972,23 +972,23 @@ func TestListExternalImports(t *testing.T) {
 
 	main, tests = true, true
 
-	// ignore two that should knock out vsolver
+	// ignore two that should knock out gps
 	name = "ignore both importers"
 	ignore = map[string]bool{
 		"varied/simple": true,
 		"varied/m1p":    true,
 	}
-	except("sort", "github.com/sdboyer/vsolver", "go/parser")
+	except("sort", "github.com/sdboyer/gps", "go/parser")
 	validate()
 
 	// finally, directly ignore some external packages
 	name = "ignore external"
 	ignore = map[string]bool{
-		"github.com/sdboyer/vsolver": true,
+		"github.com/sdboyer/gps": true,
 		"go/parser":                  true,
 		"sort":                       true,
 	}
-	except("sort", "github.com/sdboyer/vsolver", "go/parser")
+	except("sort", "github.com/sdboyer/gps", "go/parser")
 	validate()
 }
 
@@ -1030,12 +1030,12 @@ func TestExternalReach(t *testing.T) {
 	}
 
 	all := map[string][]string{
-		"varied":                {"encoding/binary", "github.com/Masterminds/semver", "github.com/sdboyer/vsolver", "go/parser", "hash", "net/http", "os", "sort"},
-		"varied/m1p":            {"github.com/sdboyer/vsolver", "os", "sort"},
+		"varied":                {"encoding/binary", "github.com/Masterminds/semver", "github.com/sdboyer/gps", "go/parser", "hash", "net/http", "os", "sort"},
+		"varied/m1p":            {"github.com/sdboyer/gps", "os", "sort"},
 		"varied/namemismatch":   {"github.com/Masterminds/semver", "os"},
-		"varied/otherpath":      {"github.com/sdboyer/vsolver", "os", "sort"},
-		"varied/simple":         {"encoding/binary", "github.com/sdboyer/vsolver", "go/parser", "hash", "os", "sort"},
-		"varied/simple/another": {"encoding/binary", "github.com/sdboyer/vsolver", "hash", "os", "sort"},
+		"varied/otherpath":      {"github.com/sdboyer/gps", "os", "sort"},
+		"varied/simple":         {"encoding/binary", "github.com/sdboyer/gps", "go/parser", "hash", "os", "sort"},
+		"varied/simple/another": {"encoding/binary", "github.com/sdboyer/gps", "hash", "os", "sort"},
 	}
 	// build a map to validate the exception inputs. do this because shit is
 	// hard enough to keep track of that it's preferable not to have silent
@@ -1133,7 +1133,7 @@ func TestExternalReach(t *testing.T) {
 		"varied encoding/binary",
 		"varied/simple encoding/binary",
 		"varied/simple/another encoding/binary",
-		"varied/otherpath github.com/sdboyer/vsolver os sort",
+		"varied/otherpath github.com/sdboyer/gps os sort",
 	)
 
 	// almost the same as previous, but varied just goes away completely
@@ -1143,7 +1143,7 @@ func TestExternalReach(t *testing.T) {
 		"varied",
 		"varied/simple encoding/binary",
 		"varied/simple/another encoding/binary",
-		"varied/otherpath github.com/sdboyer/vsolver os sort",
+		"varied/otherpath github.com/sdboyer/gps os sort",
 	)
 	validate()
 
@@ -1171,7 +1171,7 @@ func TestExternalReach(t *testing.T) {
 	}
 	except(
 		// root pkg loses on everything in varied/simple/another and varied/m1p
-		"varied hash encoding/binary go/parser github.com/sdboyer/vsolver sort",
+		"varied hash encoding/binary go/parser github.com/sdboyer/gps sort",
 		"varied/otherpath",
 		"varied/simple",
 	)
@@ -1182,7 +1182,7 @@ func TestExternalReach(t *testing.T) {
 	ignore["varied/namemismatch"] = true
 	except(
 		// root pkg loses on everything in varied/simple/another and varied/m1p
-		"varied hash encoding/binary go/parser github.com/sdboyer/vsolver sort os github.com/Masterminds/semver",
+		"varied hash encoding/binary go/parser github.com/sdboyer/gps sort os github.com/Masterminds/semver",
 		"varied/otherpath",
 		"varied/simple",
 		"varied/namemismatch",
@@ -1192,12 +1192,12 @@ func TestExternalReach(t *testing.T) {
 }
 
 var _ = map[string][]string{
-	"varied":                {"encoding/binary", "github.com/Masterminds/semver", "github.com/sdboyer/vsolver", "go/parser", "hash", "net/http", "os", "sort"},
-	"varied/m1p":            {"github.com/sdboyer/vsolver", "os", "sort"},
+	"varied":                {"encoding/binary", "github.com/Masterminds/semver", "github.com/sdboyer/gps", "go/parser", "hash", "net/http", "os", "sort"},
+	"varied/m1p":            {"github.com/sdboyer/gps", "os", "sort"},
 	"varied/namemismatch":   {"github.com/Masterminds/semver", "os"},
-	"varied/otherpath":      {"github.com/sdboyer/vsolver", "os", "sort"},
-	"varied/simple":         {"encoding/binary", "github.com/sdboyer/vsolver", "go/parser", "hash", "os", "sort"},
-	"varied/simple/another": {"encoding/binary", "github.com/sdboyer/vsolver", "hash", "os", "sort"},
+	"varied/otherpath":      {"github.com/sdboyer/gps", "os", "sort"},
+	"varied/simple":         {"encoding/binary", "github.com/sdboyer/gps", "go/parser", "hash", "os", "sort"},
+	"varied/simple/another": {"encoding/binary", "github.com/sdboyer/gps", "hash", "os", "sort"},
 }
 
 func getwd(t *testing.T) string {

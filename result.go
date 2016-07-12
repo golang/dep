@@ -1,4 +1,4 @@
-package vsolver
+package gps
 
 import (
 	"fmt"

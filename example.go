@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	gps "github.com/sdboyer/vsolver"
+	gps "github.com/sdboyer/gps"
 )
 
 // This is probably the simplest possible implementation of gps. It does the

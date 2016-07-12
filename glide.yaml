@@ -1,4 +1,4 @@
-package: github.com/sdboyer/vsolver
+package: github.com/sdboyer/gps
 owners:
 - name: Sam Boyer
   email: tech@samboyer.org

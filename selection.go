@@ -1,4 +1,4 @@
-package vsolver
+package gps
 
 type selection struct {
 	projects []selected
