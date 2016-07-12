@@ -261,7 +261,7 @@ func (s *solver) Solve() (Solution, error) {
 	err := s.selectRoot()
 	if err != nil {
 		// TODO this properly with errs, yar
-		panic("couldn't select root, yikes")
+		return nil, err
 	}
 
 	// Log initial step
