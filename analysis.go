@@ -145,6 +145,9 @@ func listPackages(fileRoot, importRoot string) (PackageTree, error) {
 		case "vendor", "Godeps":
 			return filepath.SkipDir
 		}
+		if strings.HasPrefix(fi.Name(), ".") {
+			return filepath.SkipDir
+		}
 
 		// Compute the import path. Run the result through ToSlash(), so that windows
 		// paths are normalized to Unix separators, as import paths are expected
