@@ -17,7 +17,7 @@ func main() {
 	root, _ := os.Getwd()
 	// Assume the current directory is correctly placed on a GOPATH, and derive
 	// the ProjectRoot from it
-	importroot := strings.TrimPrefix(filepath.Join(build.Default.GOPATH, "src"), root)
+	importroot := strings.TrimPrefix(root, filepath.Join(build.Default.GOPATH, "src")+string(filepath.Separator))
 
 	params := gps.SolveParameters{
 		RootDir:     root,
@@ -26,7 +26,7 @@ func main() {
 		TraceLogger: log.New(os.Stdout, "", 0),
 	}
 
-	sourcemgr, _ := gps.NewSourceManager(MyAnalyzer{}, "path/to/repocache", false)
+	sourcemgr, _ := gps.NewSourceManager(MyAnalyzer{}, ".repocache", false)
 	defer sourcemgr.Release()
 
 	solver, _ := gps.Prepare(params, sourcemgr)
