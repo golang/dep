@@ -1,4 +1,4 @@
-package vsolver
+package gps
 
 import (
 	"encoding/json"
@@ -14,73 +14,59 @@ import (
 // source repositories. Its primary purpose is to serve the needs of a Solver,
 // but it is handy for other purposes, as well.
 //
-// vsolver's built-in SourceManager, accessible via NewSourceManager(), is
+// gps's built-in SourceManager, accessible via NewSourceManager(), is
 // intended to be generic and sufficient for any purpose. It provides some
 // additional semantics around the methods defined here.
 type SourceManager interface {
 	// RepoExists checks if a repository exists, either upstream or in the
 	// SourceManager's central repository cache.
-	RepoExists(ProjectName) (bool, error)
-
-	// VendorCodeExists checks if a code tree exists within the stored vendor
-	// directory for the the provided import path name.
-	VendorCodeExists(ProjectName) (bool, error)
+	RepoExists(ProjectRoot) (bool, error)
 
 	// ListVersions retrieves a list of the available versions for a given
 	// repository name.
-	ListVersions(ProjectName) ([]Version, error)
+	ListVersions(ProjectRoot) ([]Version, error)
 
-	// RevisionPresentIn indicates whether the provided Version is present in the given
-	// repository. A nil response indicates the version is valid.
-	RevisionPresentIn(ProjectName, Revision) (bool, error)
+	// RevisionPresentIn indicates whether the provided Version is present in
+	// the given repository.
+	RevisionPresentIn(ProjectRoot, Revision) (bool, error)
 
 	// ListPackages retrieves a tree of the Go packages at or below the provided
 	// import path, at the provided version.
-	ListPackages(ProjectName, Version) (PackageTree, error)
+	ListPackages(ProjectRoot, Version) (PackageTree, error)
 
 	// GetProjectInfo returns manifest and lock information for the provided
-	// import path. vsolver currently requires that projects be rooted at their
-	// repository root, which means that this ProjectName must also be a
+	// import path. gps currently requires that projects be rooted at their
+	// repository root, which means that this ProjectRoot must also be a
 	// repository root.
-	GetProjectInfo(ProjectName, Version) (Manifest, Lock, error)
+	GetProjectInfo(ProjectRoot, Version) (Manifest, Lock, error)
 
 	// ExportProject writes out the tree of the provided import path, at the
 	// provided version, to the provided directory.
-	ExportProject(ProjectName, Version, string) error
+	ExportProject(ProjectRoot, Version, string) error
 
 	// Release lets go of any locks held by the SourceManager.
 	Release()
 }
 
 // A ProjectAnalyzer is responsible for analyzing a path for Manifest and Lock
-// information. Tools relying on vsolver must implement one.
+// information. Tools relying on gps must implement one.
 type ProjectAnalyzer interface {
-	GetInfo(build.Context, ProjectName) (Manifest, Lock, error)
+	GetInfo(string, ProjectRoot) (Manifest, Lock, error)
 }
 
-// ExistenceError is a specialized error type that, in addition to the standard
-// error interface, also indicates the amount of searching for a project's
-// existence that has been performed, and what level of existence has been
-// ascertained.
-//
-// ExistenceErrors should *only* be returned if the (lack of) existence of a
-// project was the underling cause of the error.
-//type ExistenceError interface {
-//error
-//Existence() (search ProjectExistence, found ProjectExistence)
-//}
-
-// sourceManager is the default SourceManager for vsolver.
+// SourceMgr is the default SourceManager for gps.
 //
 // There's no (planned) reason why it would need to be reimplemented by other
 // tools; control via dependency injection is intended to be sufficient.
-type sourceManager struct {
-	cachedir, basedir string
-	pms               map[ProjectName]*pmState
-	an                ProjectAnalyzer
-	ctx               build.Context
-	//pme               map[ProjectName]error
+type SourceMgr struct {
+	cachedir string
+	pms      map[ProjectRoot]*pmState
+	an       ProjectAnalyzer
+	ctx      build.Context
+	//pme               map[ProjectRoot]error
 }
+
+var _ SourceManager = &SourceMgr{}
 
 // Holds a projectManager, caches of the managed project's data, and information
 // about the freshness of those caches
@@ -90,27 +76,26 @@ type pmState struct {
 	vcur bool     // indicates that we've called ListVersions()
 }
 
-// NewSourceManager produces an instance of vsolver's built-in SourceManager. It
+// NewSourceManager produces an instance of gps's built-in SourceManager. It
 // takes a cache directory (where local instances of upstream repositories are
-// stored), a base directory for the project currently being worked on, and a
+// stored), a vendor directory for the project currently being worked on, and a
 // force flag indicating whether to overwrite the global cache lock file (if
 // present).
 //
-// The returned SourceManager aggressively caches
-// information wherever possible. It is recommended that, if tools need to do preliminary,
-// work involving upstream repository analysis prior to invoking a solve run,
-// that they create this SourceManager as early as possible and use it to their
-// ends. That way, the solver can benefit from any caches that may have already
-// been warmed.
+// The returned SourceManager aggressively caches information wherever possible.
+// It is recommended that, if tools need to do preliminary, work involving
+// upstream repository analysis prior to invoking a solve run, that they create
+// this SourceManager as early as possible and use it to their ends. That way,
+// the solver can benefit from any caches that may have already been warmed.
 //
-// vsolver's SourceManager is intended to be threadsafe (if it's not, please
+// gps's SourceManager is intended to be threadsafe (if it's not, please
 // file a bug!). It should certainly be safe to reuse from one solving run to
 // the next; however, the fact that it takes a basedir as an argument makes it
 // much less useful for simultaneous use by separate solvers operating on
 // different root projects. This architecture may change in the future.
-func NewSourceManager(an ProjectAnalyzer, cachedir, basedir string, force bool) (SourceManager, error) {
+func NewSourceManager(an ProjectAnalyzer, cachedir string, force bool) (*SourceMgr, error) {
 	if an == nil {
-		return nil, fmt.Errorf("A ProjectAnalyzer must be provided to the SourceManager.")
+		return nil, fmt.Errorf("a ProjectAnalyzer must be provided to the SourceManager")
 	}
 
 	err := os.MkdirAll(cachedir, 0777)
@@ -121,40 +106,38 @@ func NewSourceManager(an ProjectAnalyzer, cachedir, basedir string, force bool) 
 	glpath := path.Join(cachedir, "sm.lock")
 	_, err = os.Stat(glpath)
 	if err == nil && !force {
-		return nil, fmt.Errorf("Another process has locked the cachedir, or crashed without cleaning itself properly. Pass force=true to override.")
+		return nil, fmt.Errorf("cache lock file %s exists - another process crashed or is still running?", glpath)
 	}
 
 	_, err = os.OpenFile(glpath, os.O_CREATE|os.O_RDONLY, 0700) // is 0700 sane for this purpose?
 	if err != nil {
-		return nil, fmt.Errorf("Failed to create global cache lock file at %s with err %s", glpath, err)
+		return nil, fmt.Errorf("failed to create global cache lock file at %s with err %s", glpath, err)
 	}
 
 	ctx := build.Default
 	// Replace GOPATH with our cache dir
 	ctx.GOPATH = cachedir
 
-	return &sourceManager{
+	return &SourceMgr{
 		cachedir: cachedir,
-		pms:      make(map[ProjectName]*pmState),
+		pms:      make(map[ProjectRoot]*pmState),
 		ctx:      ctx,
 		an:       an,
 	}, nil
 }
 
 // Release lets go of any locks held by the SourceManager.
-//
-// This will also call Flush(), which will write any relevant caches to disk.
-func (sm *sourceManager) Release() {
+func (sm *SourceMgr) Release() {
 	os.Remove(path.Join(sm.cachedir, "sm.lock"))
 }
 
 // GetProjectInfo returns manifest and lock information for the provided import
-// path. vsolver currently requires that projects be rooted at their repository
-// root, which means that this ProjectName must also be a repository root.
+// path. gps currently requires that projects be rooted at their repository
+// root, which means that this ProjectRoot must also be a repository root.
 //
 // The work of producing the manifest and lock information is delegated to the
 // injected ProjectAnalyzer.
-func (sm *sourceManager) GetProjectInfo(n ProjectName, v Version) (Manifest, Lock, error) {
+func (sm *SourceMgr) GetProjectInfo(n ProjectRoot, v Version) (Manifest, Lock, error) {
 	pmc, err := sm.getProjectManager(n)
 	if err != nil {
 		return nil, nil, err
@@ -165,7 +148,7 @@ func (sm *sourceManager) GetProjectInfo(n ProjectName, v Version) (Manifest, Loc
 
 // ListPackages retrieves a tree of the Go packages at or below the provided
 // import path, at the provided version.
-func (sm *sourceManager) ListPackages(n ProjectName, v Version) (PackageTree, error) {
+func (sm *SourceMgr) ListPackages(n ProjectRoot, v Version) (PackageTree, error) {
 	pmc, err := sm.getProjectManager(n)
 	if err != nil {
 		return PackageTree{}, err
@@ -185,10 +168,10 @@ func (sm *sourceManager) ListPackages(n ProjectName, v Version) (PackageTree, er
 // This list is always retrieved from upstream; if upstream is not accessible
 // (network outage, access issues, or the resource actually went away), an error
 // will be returned.
-func (sm *sourceManager) ListVersions(n ProjectName) ([]Version, error) {
+func (sm *SourceMgr) ListVersions(n ProjectRoot) ([]Version, error) {
 	pmc, err := sm.getProjectManager(n)
 	if err != nil {
-		// TODO More-er proper-er errors
+		// TODO(sdboyer) More-er proper-er errors
 		return nil, err
 	}
 
@@ -196,29 +179,20 @@ func (sm *sourceManager) ListVersions(n ProjectName) ([]Version, error) {
 }
 
 // RevisionPresentIn indicates whether the provided Revision is present in the given
-// repository. A nil response indicates the revision is valid.
-func (sm *sourceManager) RevisionPresentIn(n ProjectName, r Revision) (bool, error) {
+// repository.
+func (sm *SourceMgr) RevisionPresentIn(n ProjectRoot, r Revision) (bool, error) {
 	pmc, err := sm.getProjectManager(n)
 	if err != nil {
-		// TODO More-er proper-er errors
+		// TODO(sdboyer) More-er proper-er errors
 		return false, err
 	}
 
 	return pmc.pm.RevisionPresentIn(r)
 }
 
-// VendorCodeExists checks if a code tree exists within the stored vendor
-// directory for the the provided import path name.
-func (sm *sourceManager) VendorCodeExists(n ProjectName) (bool, error) {
-	pms, err := sm.getProjectManager(n)
-	if err != nil {
-		return false, err
-	}
-
-	return pms.pm.CheckExistence(existsInVendorRoot), nil
-}
-
-func (sm *sourceManager) RepoExists(n ProjectName) (bool, error) {
+// RepoExists checks if a repository exists, either upstream or in the cache,
+// for the provided ProjectRoot.
+func (sm *SourceMgr) RepoExists(n ProjectRoot) (bool, error) {
 	pms, err := sm.getProjectManager(n)
 	if err != nil {
 		return false, err
@@ -229,7 +203,7 @@ func (sm *sourceManager) RepoExists(n ProjectName) (bool, error) {
 
 // ExportProject writes out the tree of the provided import path, at the
 // provided version, to the provided directory.
-func (sm *sourceManager) ExportProject(n ProjectName, v Version, to string) error {
+func (sm *SourceMgr) ExportProject(n ProjectRoot, v Version, to string) error {
 	pms, err := sm.getProjectManager(n)
 	if err != nil {
 		return err
@@ -238,10 +212,10 @@ func (sm *sourceManager) ExportProject(n ProjectName, v Version, to string) erro
 	return pms.pm.ExportVersionTo(v, to)
 }
 
-// getProjectManager gets the project manager for the given ProjectName.
+// getProjectManager gets the project manager for the given ProjectRoot.
 //
 // If no such manager yet exists, it attempts to create one.
-func (sm *sourceManager) getProjectManager(n ProjectName) (*pmState, error) {
+func (sm *SourceMgr) getProjectManager(n ProjectRoot) (*pmState, error) {
 	// Check pm cache and errcache first
 	if pm, exists := sm.pms[n]; exists {
 		return pm, nil
@@ -250,18 +224,18 @@ func (sm *sourceManager) getProjectManager(n ProjectName) (*pmState, error) {
 	}
 
 	repodir := path.Join(sm.cachedir, "src", string(n))
-	// TODO be more robust about this
+	// TODO(sdboyer) be more robust about this
 	r, err := vcs.NewRepo("https://"+string(n), repodir)
 	if err != nil {
-		// TODO be better
+		// TODO(sdboyer) be better
 		return nil, err
 	}
 	if !r.CheckLocal() {
-		// TODO cloning the repo here puts it on a blocking, and possibly
+		// TODO(sdboyer) cloning the repo here puts it on a blocking, and possibly
 		// unnecessary path. defer it
 		err = r.Get()
 		if err != nil {
-			// TODO be better
+			// TODO(sdboyer) be better
 			return nil, err
 		}
 	}
@@ -270,7 +244,7 @@ func (sm *sourceManager) getProjectManager(n ProjectName) (*pmState, error) {
 	metadir := path.Join(sm.cachedir, "metadata", string(n))
 	err = os.MkdirAll(metadir, 0777)
 	if err != nil {
-		// TODO be better
+		// TODO(sdboyer) be better
 		return nil, err
 	}
 
@@ -281,20 +255,20 @@ func (sm *sourceManager) getProjectManager(n ProjectName) (*pmState, error) {
 	if fi != nil {
 		pms.cf, err = os.OpenFile(cpath, os.O_RDWR, 0777)
 		if err != nil {
-			// TODO be better
+			// TODO(sdboyer) be better
 			return nil, fmt.Errorf("Err on opening metadata cache file: %s", err)
 		}
 
 		err = json.NewDecoder(pms.cf).Decode(dc)
 		if err != nil {
-			// TODO be better
+			// TODO(sdboyer) be better
 			return nil, fmt.Errorf("Err on JSON decoding metadata cache file: %s", err)
 		}
 	} else {
-		// TODO commented this out for now, until we manage it correctly
+		// TODO(sdboyer) commented this out for now, until we manage it correctly
 		//pms.cf, err = os.Create(cpath)
 		//if err != nil {
-		//// TODO be better
+		//// TODO(sdboyer) be better
 		//return nil, fmt.Errorf("Err on creating metadata cache file: %s", err)
 		//}
 
@@ -307,11 +281,10 @@ func (sm *sourceManager) getProjectManager(n ProjectName) (*pmState, error) {
 	}
 
 	pm := &projectManager{
-		n:         n,
-		ctx:       sm.ctx,
-		vendordir: sm.basedir + "/vendor",
-		an:        sm.an,
-		dc:        dc,
+		n:   n,
+		ctx: sm.ctx,
+		an:  sm.an,
+		dc:  dc,
 		crepo: &repo{
 			rpath: repodir,
 			r:     r,

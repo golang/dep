@@ -1,4 +1,4 @@
-package vsolver
+package gps
 
 import (
 	"bytes"
@@ -7,26 +7,16 @@ import (
 )
 
 func TestHashInputs(t *testing.T) {
-	fix := basicFixtures[2]
+	fix := basicFixtures["shared dependency with overlapping constraints"]
 
-	args := SolveArgs{
-		Root:     string(fix.ds[0].Name()),
-		Name:     fix.ds[0].Name(),
-		Manifest: fix.ds[0],
-		Ignore:   []string{"foo", "bar"},
+	params := SolveParameters{
+		RootDir:    string(fix.ds[0].n),
+		ImportRoot: fix.ds[0].n,
+		Manifest:   fix.ds[0],
+		Ignore:     []string{"foo", "bar"},
 	}
 
-	// prep a fixture-overridden solver
-	si, err := Prepare(args, SolveOpts{}, newdepspecSM(fix.ds, nil))
-	s := si.(*solver)
-	if err != nil {
-		t.Fatalf("Could not prepare solver due to err: %s", err)
-	}
-
-	fixb := &depspecBridge{
-		s.b.(*bridge),
-	}
-	s.b = fixb
+	s, err := Prepare(params, newdepspecSM(fix.ds, nil))
 
 	dig, err := s.HashInputs()
 	if err != nil {

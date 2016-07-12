@@ -1,42 +1,54 @@
-package vsolver
+package gps
 
 import (
 	"flag"
 	"fmt"
 	"io/ioutil"
 	"log"
+	"math/rand"
 	"os"
 	"reflect"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
 )
 
 var fixtorun string
 
-// TODO regression test ensuring that locks with only revs for projects don't cause errors
+// TODO(sdboyer) regression test ensuring that locks with only revs for projects don't cause errors
 func init() {
-	flag.StringVar(&fixtorun, "vsolver.fix", "", "A single fixture to run in TestBasicSolves")
+	flag.StringVar(&fixtorun, "gps.fix", "", "A single fixture to run in TestBasicSolves")
+	overrideMkBridge()
+}
+
+// sets the mkBridge global func to one that allows virtualized RootDirs
+func overrideMkBridge() {
+	// For all tests, override the base bridge with the depspecBridge that skips
+	// verifyRootDir calls
+	mkBridge = func(s *solver, sm SourceManager) sourceBridge {
+		return &depspecBridge{
+			&bridge{
+				sm:     sm,
+				s:      s,
+				vlists: make(map[ProjectRoot][]Version),
+			},
+		}
+	}
 }
 
 var stderrlog = log.New(os.Stderr, "", 0)
 
-func fixSolve(args SolveArgs, o SolveOpts, sm SourceManager) (Solution, error) {
+func fixSolve(params SolveParameters, sm SourceManager) (Solution, error) {
 	if testing.Verbose() {
-		o.Trace = true
-		o.TraceLogger = stderrlog
+		params.Trace = true
+		params.TraceLogger = stderrlog
 	}
 
-	si, err := Prepare(args, o, sm)
-	s := si.(*solver)
+	s, err := Prepare(params, sm)
 	if err != nil {
 		return nil, err
 	}
-
-	fixb := &depspecBridge{
-		s.b.(*bridge),
-	}
-	s.b = fixb
 
 	return s.Solve()
 }
@@ -45,9 +57,20 @@ func fixSolve(args SolveArgs, o SolveOpts, sm SourceManager) (Solution, error) {
 //
 // Or, just the one named in the fix arg.
 func TestBasicSolves(t *testing.T) {
-	for _, fix := range basicFixtures {
-		if fixtorun == "" || fixtorun == fix.n {
+	if fixtorun != "" {
+		if fix, exists := basicFixtures[fixtorun]; exists {
 			solveBasicsAndCheck(fix, t)
+		}
+	} else {
+		// sort them by their keys so we get stable output
+		var names []string
+		for n := range basicFixtures {
+			names = append(names, n)
+		}
+
+		sort.Strings(names)
+		for _, n := range names {
+			solveBasicsAndCheck(basicFixtures[n], t)
 			if testing.Verbose() {
 				// insert a line break between tests
 				stderrlog.Println("")
@@ -62,23 +85,20 @@ func solveBasicsAndCheck(fix basicFixture, t *testing.T) (res Solution, err erro
 	}
 	sm := newdepspecSM(fix.ds, nil)
 
-	args := SolveArgs{
-		Root:     string(fix.ds[0].Name()),
-		Name:     ProjectName(fix.ds[0].Name()),
-		Manifest: fix.ds[0],
-		Lock:     dummyLock{},
-	}
-
-	o := SolveOpts{
-		Downgrade: fix.downgrade,
-		ChangeAll: fix.changeall,
+	params := SolveParameters{
+		RootDir:    string(fix.ds[0].n),
+		ImportRoot: ProjectRoot(fix.ds[0].n),
+		Manifest:   fix.ds[0],
+		Lock:       dummyLock{},
+		Downgrade:  fix.downgrade,
+		ChangeAll:  fix.changeall,
 	}
 
 	if fix.l != nil {
-		args.Lock = fix.l
+		params.Lock = fix.l
 	}
 
-	res, err = fixSolve(args, o, sm)
+	res, err = fixSolve(params, sm)
 
 	return fixtureSolveSimpleChecks(fix, res, err, t)
 }
@@ -115,24 +135,21 @@ func solveBimodalAndCheck(fix bimodalFixture, t *testing.T) (res Solution, err e
 	}
 	sm := newbmSM(fix)
 
-	args := SolveArgs{
-		Root:     string(fix.ds[0].Name()),
-		Name:     ProjectName(fix.ds[0].Name()),
-		Manifest: fix.ds[0],
-		Lock:     dummyLock{},
-		Ignore:   fix.ignore,
-	}
-
-	o := SolveOpts{
-		Downgrade: fix.downgrade,
-		ChangeAll: fix.changeall,
+	params := SolveParameters{
+		RootDir:    string(fix.ds[0].n),
+		ImportRoot: ProjectRoot(fix.ds[0].n),
+		Manifest:   fix.ds[0],
+		Lock:       dummyLock{},
+		Ignore:     fix.ignore,
+		Downgrade:  fix.downgrade,
+		ChangeAll:  fix.changeall,
 	}
 
 	if fix.l != nil {
-		args.Lock = fix.l
+		params.Lock = fix.l
 	}
 
-	res, err = fixSolve(args, o, sm)
+	res, err = fixSolve(params, sm)
 
 	return fixtureSolveSimpleChecks(fix, res, err, t)
 }
@@ -149,8 +166,8 @@ func fixtureSolveSimpleChecks(fix specfix, res Solution, err error, t *testing.T
 		case *badOptsFailure:
 			t.Errorf("(fixture: %q) Unexpected bad opts failure solve error: %s", fix.name(), err)
 		case *noVersionError:
-			if errp[0] != string(fail.pn.LocalName) { // TODO identifierify
-				t.Errorf("(fixture: %q) Expected failure on project %s, but was on project %s", fix.name(), errp[0], fail.pn.LocalName)
+			if errp[0] != string(fail.pn.ProjectRoot) { // TODO(sdboyer) identifierify
+				t.Errorf("(fixture: %q) Expected failure on project %s, but was on project %s", fix.name(), errp[0], fail.pn.ProjectRoot)
 			}
 
 			ep := make(map[string]struct{})
@@ -186,7 +203,7 @@ func fixtureSolveSimpleChecks(fix specfix, res Solution, err error, t *testing.T
 			}
 
 		default:
-			// TODO round these out
+			// TODO(sdboyer) round these out
 			panic(fmt.Sprintf("unhandled solve failure type: %s", err))
 		}
 	} else if len(fix.expectErrs()) > 0 {
@@ -201,7 +218,7 @@ func fixtureSolveSimpleChecks(fix specfix, res Solution, err error, t *testing.T
 		rp := make(map[string]Version)
 		for _, p := range r.p {
 			pa := p.toAtom()
-			rp[string(pa.id.LocalName)] = pa.v
+			rp[string(pa.id.ProjectRoot)] = pa.v
 		}
 
 		fixlen, rlen := len(fix.solution()), len(rp)
@@ -273,14 +290,14 @@ func TestRootLockNoVersionPairMatching(t *testing.T) {
 	copy(l2, fix.l)
 	l2[0].v = nil
 
-	args := SolveArgs{
-		Root:     string(fix.ds[0].Name()),
-		Name:     ProjectName(fix.ds[0].Name()),
-		Manifest: fix.ds[0],
-		Lock:     l2,
+	params := SolveParameters{
+		RootDir:    string(fix.ds[0].n),
+		ImportRoot: ProjectRoot(fix.ds[0].n),
+		Manifest:   fix.ds[0],
+		Lock:       l2,
 	}
 
-	res, err := fixSolve(args, SolveOpts{}, sm)
+	res, err := fixSolve(params, sm)
 
 	fixtureSolveSimpleChecks(fix, res, err, t)
 }
@@ -288,34 +305,34 @@ func TestRootLockNoVersionPairMatching(t *testing.T) {
 func getFailureCausingProjects(err error) (projs []string) {
 	switch e := err.(type) {
 	case *noVersionError:
-		projs = append(projs, string(e.pn.LocalName)) // TODO identifierify
+		projs = append(projs, string(e.pn.ProjectRoot)) // TODO(sdboyer) identifierify
 	case *disjointConstraintFailure:
 		for _, f := range e.failsib {
-			projs = append(projs, string(f.depender.id.LocalName))
+			projs = append(projs, string(f.depender.id.ProjectRoot))
 		}
 	case *versionNotAllowedFailure:
 		for _, f := range e.failparent {
-			projs = append(projs, string(f.depender.id.LocalName))
+			projs = append(projs, string(f.depender.id.ProjectRoot))
 		}
 	case *constraintNotAllowedFailure:
 		// No sane way of knowing why the currently selected version is
 		// selected, so do nothing
 	case *sourceMismatchFailure:
-		projs = append(projs, string(e.prob.id.LocalName))
+		projs = append(projs, string(e.prob.id.ProjectRoot))
 		for _, c := range e.sel {
-			projs = append(projs, string(c.depender.id.LocalName))
+			projs = append(projs, string(c.depender.id.ProjectRoot))
 		}
 	case *checkeeHasProblemPackagesFailure:
-		projs = append(projs, string(e.goal.id.LocalName))
+		projs = append(projs, string(e.goal.id.ProjectRoot))
 		for _, errdep := range e.failpkg {
 			for _, atom := range errdep.deppers {
-				projs = append(projs, string(atom.id.LocalName))
+				projs = append(projs, string(atom.id.ProjectRoot))
 			}
 		}
 	case *depHasProblemPackagesFailure:
-		projs = append(projs, string(e.goal.depender.id.LocalName), string(e.goal.dep.Ident.LocalName))
+		projs = append(projs, string(e.goal.depender.id.ProjectRoot), string(e.goal.dep.Ident.ProjectRoot))
 	case *nonexistentRevisionFailure:
-		projs = append(projs, string(e.goal.depender.id.LocalName), string(e.goal.dep.Ident.LocalName))
+		projs = append(projs, string(e.goal.depender.id.ProjectRoot), string(e.goal.dep.Ident.ProjectRoot))
 	default:
 		panic(fmt.Sprintf("unknown failtype %T, msg: %s", err, err))
 	}
@@ -324,59 +341,92 @@ func getFailureCausingProjects(err error) (projs []string) {
 }
 
 func TestBadSolveOpts(t *testing.T) {
-	sm := newdepspecSM(basicFixtures[0].ds, nil)
+	pn := strconv.FormatInt(rand.Int63(), 36)
+	fix := basicFixtures["no dependencies"]
+	fix.ds[0].n = ProjectRoot(pn)
 
-	o := SolveOpts{}
-	args := SolveArgs{}
-	_, err := Prepare(args, o, sm)
+	sm := newdepspecSM(fix.ds, nil)
+	params := SolveParameters{}
+
+	_, err := Prepare(params, nil)
 	if err == nil {
-		t.Errorf("Should have errored on missing manifest")
+		t.Errorf("Prepare should have errored on nil SourceManager")
+	} else if !strings.Contains(err.Error(), "non-nil SourceManager") {
+		t.Error("Prepare should have given error on nil SourceManager, but gave:", err)
 	}
 
-	m, _, _ := sm.GetProjectInfo(basicFixtures[0].ds[0].n, basicFixtures[0].ds[0].v)
-	args.Manifest = m
-	_, err = Prepare(args, o, sm)
+	_, err = Prepare(params, sm)
 	if err == nil {
-		t.Errorf("Should have errored on empty root")
+		t.Errorf("Prepare should have errored on empty root")
+	} else if !strings.Contains(err.Error(), "non-empty root directory") {
+		t.Error("Prepare should have given error on empty root, but gave:", err)
 	}
 
-	args.Root = "root"
-	_, err = Prepare(args, o, sm)
+	params.RootDir = pn
+	_, err = Prepare(params, sm)
 	if err == nil {
-		t.Errorf("Should have errored on empty name")
+		t.Errorf("Prepare should have errored on empty name")
+	} else if !strings.Contains(err.Error(), "non-empty import root") {
+		t.Error("Prepare should have given error on empty import root, but gave:", err)
 	}
 
-	args.Name = "root"
-	_, err = Prepare(args, o, sm)
-	if err != nil {
-		t.Errorf("Basic conditions satisfied, solve should have gone through, err was %s", err)
-	}
-
-	o.Trace = true
-	_, err = Prepare(args, o, sm)
+	params.ImportRoot = ProjectRoot(pn)
+	params.Trace = true
+	_, err = Prepare(params, sm)
 	if err == nil {
 		t.Errorf("Should have errored on trace with no logger")
+	} else if !strings.Contains(err.Error(), "no logger provided") {
+		t.Error("Prepare should have given error on missing trace logger, but gave:", err)
 	}
 
-	o.TraceLogger = log.New(ioutil.Discard, "", 0)
-	_, err = Prepare(args, o, sm)
+	params.TraceLogger = log.New(ioutil.Discard, "", 0)
+	_, err = Prepare(params, sm)
 	if err != nil {
-		t.Errorf("Basic conditions re-satisfied, solve should have gone through, err was %s", err)
+		t.Error("Basic conditions satisfied, prepare should have completed successfully, err as:", err)
 	}
+
+	// swap out the test mkBridge override temporarily, just to make sure we get
+	// the right error
+	mkBridge = func(s *solver, sm SourceManager) sourceBridge {
+		return &bridge{
+			sm:     sm,
+			s:      s,
+			vlists: make(map[ProjectRoot][]Version),
+		}
+	}
+
+	_, err = Prepare(params, sm)
+	if err == nil {
+		t.Errorf("Should have errored on nonexistent root")
+	} else if !strings.Contains(err.Error(), "could not read project root") {
+		t.Error("Prepare should have given error nonexistent project root dir, but gave:", err)
+	}
+
+	// Pointing it at a file should also be an err
+	params.RootDir = "solve_test.go"
+	_, err = Prepare(params, sm)
+	if err == nil {
+		t.Errorf("Should have errored on file for RootDir")
+	} else if !strings.Contains(err.Error(), "is a file, not a directory") {
+		t.Error("Prepare should have given error on file as RootDir, but gave:", err)
+	}
+
+	// swap them back...not sure if this matters, but just in case
+	overrideMkBridge()
 }
 
 func TestIgnoreDedupe(t *testing.T) {
-	fix := basicFixtures[0]
+	fix := basicFixtures["no dependencies"]
 
 	ig := []string{"foo", "foo", "bar"}
-	args := SolveArgs{
-		Root:     string(fix.ds[0].Name()),
-		Name:     ProjectName(fix.ds[0].Name()),
-		Manifest: fix.ds[0],
-		Ignore:   ig,
+	params := SolveParameters{
+		RootDir:    string(fix.ds[0].n),
+		ImportRoot: ProjectRoot(fix.ds[0].n),
+		Manifest:   fix.ds[0],
+		Ignore:     ig,
 	}
 
-	s, _ := Prepare(args, SolveOpts{}, newdepspecSM(basicFixtures[0].ds, nil))
+	s, _ := Prepare(params, newdepspecSM(basicFixtures["no dependencies"].ds, nil))
 	ts := s.(*solver)
 
 	expect := map[string]bool{

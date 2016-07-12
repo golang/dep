@@ -1,17 +1,17 @@
-package vsolver
+package gps
 
 // Lock represents data from a lock file (or however the implementing tool
 // chooses to store it) at a particular version that is relevant to the
 // satisfiability solving process.
 //
-// In general, the information produced by vsolver on finding a successful
+// In general, the information produced by gps on finding a successful
 // solution is all that would be necessary to constitute a lock file, though
 // tools can include whatever other information they want in their storage.
 type Lock interface {
 	// Indicates the version of the solver used to generate this lock data
 	//SolverVersion() string
 
-	// The hash of inputs to vsolver that resulted in this lock data
+	// The hash of inputs to gps that resulted in this lock data
 	InputHash() []byte
 
 	// Projects returns the list of LockedProjects contained in the lock data.
@@ -26,7 +26,6 @@ type LockedProject struct {
 	pi   ProjectIdentifier
 	v    UnpairedVersion
 	r    Revision
-	path string
 	pkgs []string
 }
 
@@ -49,8 +48,7 @@ func (l SimpleLock) Projects() []LockedProject {
 }
 
 // NewLockedProject creates a new LockedProject struct with a given name,
-// version, upstream repository URI, and on-disk path at which the project is to
-// be checked out under a vendor directory.
+// version, and upstream repository URL.
 //
 // Note that passing a nil version will cause a panic. This is a correctness
 // measure to ensure that the solver is never exposed to a version-less lock
@@ -58,17 +56,16 @@ func (l SimpleLock) Projects() []LockedProject {
 // to simply dismiss that project. By creating a hard failure case via panic
 // instead, we are trying to avoid inflicting the resulting pain on the user by
 // instead forcing a decision on the Analyzer implementation.
-func NewLockedProject(n ProjectName, v Version, uri, path string, pkgs []string) LockedProject {
+func NewLockedProject(n ProjectRoot, v Version, url string, pkgs []string) LockedProject {
 	if v == nil {
 		panic("must provide a non-nil version to create a LockedProject")
 	}
 
 	lp := LockedProject{
 		pi: ProjectIdentifier{
-			LocalName:   n,
-			NetworkName: uri,
+			ProjectRoot: n,
+			NetworkName: url,
 		},
-		path: path,
 		pkgs: pkgs,
 	}
 
@@ -108,12 +105,6 @@ func (lp LockedProject) Version() Version {
 	}
 
 	return lp.v.Is(lp.r)
-}
-
-// Path returns the path relative to the vendor directory to which the locked
-// project should be checked out.
-func (lp LockedProject) Path() string {
-	return lp.path
 }
 
 func (lp LockedProject) toAtom() atom {

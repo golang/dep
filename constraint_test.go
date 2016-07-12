@@ -1,4 +1,4 @@
-package vsolver
+package gps
 
 import (
 	"fmt"
@@ -89,7 +89,7 @@ func TestBranchConstraintOps(t *testing.T) {
 	}
 
 	// Now add same rev to different branches
-	// TODO this might not actually be a good idea, when you consider the
+	// TODO(sdboyer) this might not actually be a good idea, when you consider the
 	// semantics of floating versions...matching on an underlying rev might be
 	// nice in the short term, but it's probably shit most of the time
 	v5 := v2.Is(Revision("snuffleupagus")).(versionPair)
@@ -586,7 +586,7 @@ func TestSemverConstraintOps(t *testing.T) {
 	v5 := v2.Is(fozzie).(versionPair)
 	v6 := v3.Is(fozzie).(versionPair)
 
-	// TODO we can't use the same range as below b/c semver.rangeConstraint is
+	// TODO(sdboyer) we can't use the same range as below b/c semver.rangeConstraint is
 	// still an incomparable type
 	c1, err := NewSemverConstraint("=1.0.0")
 	if err != nil {

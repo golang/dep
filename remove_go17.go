@@ -1,6 +1,6 @@
 // +build go1.7
 
-package vsolver
+package gps
 
 import "os"
 

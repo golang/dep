@@ -1,4 +1,4 @@
-package: github.com/sdboyer/vsolver
+package: github.com/sdboyer/gps
 owners:
 - name: Sam Boyer
   email: tech@samboyer.org
@@ -11,5 +11,4 @@ import:
 - package: github.com/termie/go-shutil
   version: bcacb06fecaeec8dc42af03c87c6949f4a05c74c
   vcs: git
-- package: github.com/hashicorp/go-immutable-radix
 - package: github.com/armon/go-radix

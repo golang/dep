@@ -1,35 +1,75 @@
-# vsolver
+# gps
+![map-marker-icon copy](https://cloud.githubusercontent.com/assets/21599/16779217/4f5cdc6c-483f-11e6-9de3-661f13d9b215.png)
+--
 
-`vsolver` is a specialized [SAT
-solver](https://en.wikipedia.org/wiki/Boolean_satisfiability_problem),
-designed as an engine for Go package management. The initial plan is
-integration into [glide](https://github.com/Masterminds/glide), but
-`vsolver` could be used by any tool interested in [fully
-solving](www.mancoosi.org/edos/manager/) [the package management
-problem](https://medium.com/@sdboyer/so-you-want-to-write-a-package-manager-4ae9c17d9527).
+`gps` is the Go Packaging Solver. It is an engine for tackling dependency
+management problems in Go. You can replicate the fetching bits of `go get`,
+modulo arguments, [in about 30 lines of
+code](https://github.com/sdboyer/gps/blob/master/example.go) with `gps`.
 
-**NOTE - `vsolver` isn’t ready yet, but it’s getting close.**
+`gps` is _not_ Yet Another Go Package Management Tool. Rather, it's a library
+that package management (and adjacent) tools can use to solve the
+[hard](https://en.wikipedia.org/wiki/Boolean_satisfiability_problem) parts of
+the problem in a consistent,
+[holistic](https://medium.com/@sdboyer/so-you-want-to-write-a-package-manager-4ae9c17d9527)
+way. `gps` is [on track](https://github.com/Masterminds/glide/pull/384) to become the engine behind [glide](https://glide.sh).
 
-The implementation is derived from the solver used in Dart's
-[pub](https://github.com/dart-lang/pub/tree/master/lib/src/solver)
-package management tool.
+The wiki has a [general introduction the `gps`
+approach](https://github.com/sdboyer/gps/wiki/Introduction-to-gps), as well
+as guides for folks [implementing
+tools](https://github.com/sdboyer/gps/wiki/gps-for-Implementors) or [looking
+to contribute](https://github.com/sdboyer/gps/wiki/Introduction-to-gps).
 
-## Assumptions
+## Wait...a package management _library_?!
 
-Package management is far too complex to be assumption-less. `vsolver`
-tries to keep its assumptions to the minimum, supporting as many
-situations as is possible while still maintaining a predictable,
-well-formed system.
+Yup. Because it's what the Go ecosystem needs right now.
 
-* Go 1.6, or 1.5 with `GO15VENDOREXPERIMENT = 1` set. `vendor`
+There are [scads of
+tools](https://github.com/golang/go/wiki/PackageManagementTools) out there, each
+tackling some slice of the Go package management domain. Some handle more than
+others, some impose more restrictions than others, and most are mutually
+incompatible (or mutually indifferent, which amounts to the same). This
+fragments the Go FLOSS ecosystem, harming the community as a whole.
+
+As in all epic software arguments, some of the points of disagreement between
+tools/their authors are a bit silly. Many, though, are based on legitimate
+differences of opinion about what workflows, controls, and interfaces are
+best to give Go developers.
+
+Now, we're certainly no less opinionated than anyone else. But part of the
+challenge has been that, with a problem as
+[complex](https://medium.com/@sdboyer/so-you-want-to-write-a-package-manager-4ae9c17d9527)
+as package management, subtle design decisions made in pursuit of a particular
+workflow or interface can have far-reaching effects on architecture, leading to
+deep incompatibilities between tools and approaches.
+
+We believe that many of [these
+differences](https://docs.google.com/document/d/1xrV9D5u8AKu1ip-A1W9JqhUmmeOhoI6d6zjVwvdn5mc/edit?usp=sharing)
+are incidental - and, given the right general solution, reconcilable. `gps` is
+our attempt at such a solution.
+
+By separating out the underlying problem into a comprehensible library, we are
+hoping to provide a common foundation for different tools. Such a foundation, we
+hope, could improve interoperability, reduce harm to the community, and make the
+communal process of figuring out what's right for Go more about collaboration,
+and less about fiefdoms.
+
+### Assumptions
+
+Ideally, `gps` could provide this shared foundation with no additional
+assumptions beyond pure Go source files. Sadly, package management is too
+complex to be assumption-less. So, `gps` tries to keep its assumptions to the
+minimum, supporting as many situations as possible while still maintaining a
+predictable, well-formed system.
+
+* Go 1.6, or 1.5 with `GO15VENDOREXPERIMENT = 1` set. `vendor/`
   directories are a requirement.
 * You don't manually change what's under `vendor/`. That’s tooling’s
   job.
-* A **project** concept, where projects comprise the set of Go packages
-  in a rooted tree on the filesystem.  By happy (not) accident, that
-  rooted tree is exactly the same set of packages covered by a `vendor/`
-  directory.
-* A manifest-and-lock approach to tracking project manifest data. The
+* A **project** concept, where projects comprise the set of Go packages in a
+  rooted directory tree.  By happy (not) accident, `vendor/` directories also
+  just happen to cover a rooted tree.
+* A **manifest** and **lock** approach to tracking project manifest data. The
   solver takes manifest (and, optionally, lock)-type data as inputs, and
   produces lock-type data as its output. Tools decide how to actually
   store this data, but these should generally be at the root of the
@@ -38,68 +78,13 @@ well-formed system.
 Manifests? Locks? Eeew. Yes, we also think it'd be swell if we didn't need
 metadata files. We love the idea of Go packages as standalone, self-describing
 code. Unfortunately, the wheels come off that idea as soon as versioning and
-cross-project/repository dependencies happen. [Universe alignment is
-hard](https://medium.com/@sdboyer/so-you-want-to-write-a-package-manager-4ae9c17d9527);
+cross-project/repository dependencies happen. But Universe alignment is hard;
 trying to intermix version information directly with the code would only make
 matters worse.
 
-## Arguments
+## Contributing
 
-Some folks are against using a solver in Go. Even the concept is repellent.
-These are some of the arguments that are raised:
-
-> "It seems complicated, and idiomatic Go things are simple!"
-
-Complaining about this is shooting the messenger.
-
-Selecting acceptable versions out of a big dependency graph is a [boolean
-satisfiability](https://en.wikipedia.org/wiki/Boolean_satisfiability_problem)
-(or SAT) problem: given all possible combinations of valid dependencies, we’re
-trying to find a set that satisfies all the mutual requirements. Obviously that
-requires version numbers lining up, but it can also (and `vsolver` will/does)
-enforce invariants like “no import cycles” and type compatibility between
-packages. All of those requirements must be rechecked *every time* we discovery
-and add a new project to the graph.
-
-SAT was one of the very first problems to be proven NP-complete. **OF COURSE
-IT’S COMPLICATED**. We didn’t make it that way. Truth is, though, solvers are
-an ideal way of tackling this kind of problem: it lets us walk the line between
-pretending like versions don’t exist (a la `go get`) and pretending like only
-one version of a dep could ever work, ever (most of the current community
-tools).
-
-> "(Tool X) uses a solver and I don't like that tool’s UX!"
-
-Sure, there are plenty of abstruse package managers relying on SAT
-solvers out there. But that doesn’t mean they ALL have to be confusing.
-`vsolver`’s algorithms are artisinally handcrafted with ❤️ for Go’s
-use case, and we are committed to making Go dependency management a
-grokkable process.
-
-## Features
-
-Yes, most people will probably find most of this list incomprehensible
-right now. We'll improve/add explanatory links as we go!
-
-* [x] [Passing bestiary of tests](https://github.com/sdboyer/vsolver/issues/1)
-  brought over from dart
-* [x] Dependency constraints based on [SemVer](http://semver.org/),
-      branches, and revisions. AKA, "all the ways you might depend on
-      Go code now, but coherently organized."
-* [x] Define different network addresses for a given import path
-* [ ] Global project aliasing. This is a bit different than the previous.
-* [x] Bi-modal analysis (project-level and package-level)
-* [ ] Specific sub-package dependencies
-* [ ] Enforcing an acyclic project graph (mirroring the Go compiler's
-      enforcement of an acyclic package import graph)
-* [ ] On-the-fly static analysis (e.g. for incompatibility assessment,
-      type escaping)
-* [ ] Optional package duplication as a conflict resolution mechanism
-* [ ] Faaaast, enabled by aggressive caching of project metadata
-* [ ] Lock information parameterized by build tags (including, but not
-      limited to, `GOOS`/`GOARCH`)
-* [ ] Non-repository root and nested manifest/lock pairs
-
-Note that these goals are not fixed - we may drop some as we continue
-working. Some are also probably out of scope for the solver itself,
-but still related to the solver's operation.
+Yay, contributing! Please see
+[CONTRIBUTING.md](https://github.com/sdboyer/gps/blob/master/CONTRIBUTING.md).
+Note that `gps` also abides by a [Code of
+Conduct](https://github.com/sdboyer/gps/blob/master/CODE_OF_CONDUCT.md), and is MIT-licensed.

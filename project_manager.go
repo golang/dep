@@ -1,4 +1,4 @@
-package vsolver
+package gps
 
 import (
 	"bytes"
@@ -18,13 +18,10 @@ import (
 type projectManager struct {
 	// The identifier of the project. At this level, corresponds to the
 	// '$GOPATH/src'-relative path, *and* the network name.
-	n ProjectName
+	n ProjectRoot
 
 	// build.Context to use in any analysis, and to pass to the analyzer
 	ctx build.Context
-
-	// Top-level project vendor dir
-	vendordir string
 
 	// Object for the cache repository
 	crepo *repo
@@ -42,7 +39,7 @@ type projectManager struct {
 
 	// The project metadata cache. This is persisted to disk, for reuse across
 	// solver runs.
-	// TODO protect with mutex
+	// TODO(sdboyer) protect with mutex
 	dc *projectDataCache
 }
 
@@ -54,9 +51,9 @@ type existence struct {
 	f projectExistence
 }
 
-// TODO figure out shape of versions, then implement marshaling/unmarshaling
+// TODO(sdboyer) figure out shape of versions, then implement marshaling/unmarshaling
 type projectDataCache struct {
-	Version  string                   `json:"version"` // TODO use this
+	Version  string                   `json:"version"` // TODO(sdboyer) use this
 	Infos    map[Revision]projectInfo `json:"infos"`
 	Packages map[Revision]PackageTree `json:"packages"`
 	VMap     map[Version]Revision     `json:"vmap"`
@@ -112,13 +109,13 @@ func (pm *projectManager) GetInfoAt(v Version) (Manifest, Lock, error) {
 	}
 	pm.crepo.mut.Unlock()
 	if err != nil {
-		// TODO More-er proper-er error
+		// TODO(sdboyer) More-er proper-er error
 		panic(fmt.Sprintf("canary - why is checkout/whatever failing: %s %s %s", pm.n, v.String(), err))
 	}
 
 	pm.crepo.mut.RLock()
-	m, l, err := pm.an.GetInfo(pm.ctx, pm.n)
-	// TODO cache results
+	m, l, err := pm.an.GetInfo(filepath.Join(pm.ctx.GOPATH, "src", string(pm.n)), pm.n)
+	// TODO(sdboyer) cache results
 	pm.crepo.mut.RUnlock()
 
 	if err == nil {
@@ -128,11 +125,11 @@ func (pm *projectManager) GetInfoAt(v Version) (Manifest, Lock, error) {
 
 		// If m is nil, prepManifest will provide an empty one.
 		pi := projectInfo{
-			Manifest: prepManifest(m, pm.n),
+			Manifest: prepManifest(m),
 			Lock:     l,
 		}
 
-		// TODO this just clobbers all over and ignores the paired/unpaired
+		// TODO(sdboyer) this just clobbers all over and ignores the paired/unpaired
 		// distinction; serious fix is needed
 		if r, exists := pm.dc.VMap[v]; exists {
 			pm.dc.Infos[r] = pi
@@ -170,7 +167,7 @@ func (pm *projectManager) ListPackages(v Version) (ptree PackageTree, err error)
 		}
 	}
 
-	// TODO handle the case where we have a version w/out rev, and not in cache
+	// TODO(sdboyer) handle the case where we have a version w/out rev, and not in cache
 
 	// Not in the cache; check out the version and do the analysis
 	pm.crepo.mut.Lock()
@@ -194,7 +191,7 @@ func (pm *projectManager) ListPackages(v Version) (ptree PackageTree, err error)
 	ptree, err = listPackages(filepath.Join(pm.ctx.GOPATH, "src", string(pm.n)), string(pm.n))
 	pm.crepo.mut.Unlock()
 
-	// TODO cache errs?
+	// TODO(sdboyer) cache errs?
 	if err != nil {
 		pm.dc.Packages[r] = ptree
 	}
@@ -237,7 +234,7 @@ func (pm *projectManager) ListVersions() (vlist []Version, err error) {
 		pm.ex.f |= exbits
 
 		if err != nil {
-			// TODO More-er proper-er error
+			// TODO(sdboyer) More-er proper-er error
 			fmt.Println(err)
 			return nil, err
 		}
@@ -249,7 +246,7 @@ func (pm *projectManager) ListVersions() (vlist []Version, err error) {
 		}
 
 		// Process the version data into the cache
-		// TODO detect out-of-sync data as we do this?
+		// TODO(sdboyer) detect out-of-sync data as we do this?
 		for k, v := range vpairs {
 			pm.dc.VMap[v] = v.Underlying()
 			pm.dc.RMap[v.Underlying()] = append(pm.dc.RMap[v.Underlying()], v)
@@ -258,7 +255,7 @@ func (pm *projectManager) ListVersions() (vlist []Version, err error) {
 	} else {
 		vlist = make([]Version, len(pm.dc.VMap))
 		k := 0
-		// TODO key type of VMap should be string; recombine here
+		// TODO(sdboyer) key type of VMap should be string; recombine here
 		//for v, r := range pm.dc.VMap {
 		for v := range pm.dc.VMap {
 			vlist[k] = v
@@ -298,12 +295,7 @@ func (pm *projectManager) RevisionPresentIn(r Revision) (bool, error) {
 func (pm *projectManager) CheckExistence(ex projectExistence) bool {
 	if pm.ex.s&ex != ex {
 		if ex&existsInVendorRoot != 0 && pm.ex.s&existsInVendorRoot == 0 {
-			pm.ex.s |= existsInVendorRoot
-
-			fi, err := os.Stat(path.Join(pm.vendordir, string(pm.n)))
-			if err == nil && fi.IsDir() {
-				pm.ex.f |= existsInVendorRoot
-			}
+			panic("should now be implemented in bridge")
 		}
 		if ex&existsInCache != 0 && pm.ex.s&existsInCache == 0 {
 			pm.crepo.mut.RLock()
@@ -344,7 +336,7 @@ func (r *repo) getCurrentVersionPairs() (vlist []PairedVersion, exbits projectEx
 
 		all := bytes.Split(bytes.TrimSpace(out), []byte("\n"))
 		if err != nil || len(all) == 0 {
-			// TODO remove this path? it really just complicates things, for
+			// TODO(sdboyer) remove this path? it really just complicates things, for
 			// probably not much benefit
 
 			// ls-remote failed, probably due to bad communication or a faulty
@@ -490,8 +482,8 @@ func (r *repo) getCurrentVersionPairs() (vlist []PairedVersion, exbits projectEx
 			vlist = append(vlist, v)
 		}
 	case *vcs.SvnRepo:
-		// TODO is it ok to return empty vlist and no error?
-		// TODO ...gotta do something for svn, right?
+		// TODO(sdboyer) is it ok to return empty vlist and no error?
+		// TODO(sdboyer) ...gotta do something for svn, right?
 	default:
 		panic("unknown repo type")
 	}
@@ -512,7 +504,7 @@ func (r *repo) exportVersionTo(v Version, to string) error {
 			return err
 		}
 
-		// TODO could have an err here
+		// TODO(sdboyer) could have an err here
 		defer os.Rename(bak, idx)
 
 		vstr := v.String()
@@ -536,7 +528,7 @@ func (r *repo) exportVersionTo(v Version, to string) error {
 		_, err = r.r.RunFromDir("git", "checkout-index", "-a", "--prefix="+to)
 		return err
 	default:
-		// TODO This is a dumb, slow approach, but we're punting on making these
+		// TODO(sdboyer) This is a dumb, slow approach, but we're punting on making these
 		// fast for now because git is the OVERWHELMING case
 		r.r.UpdateVersion(v.String())
 

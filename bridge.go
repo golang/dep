@@ -1,8 +1,9 @@
-package vsolver
+package gps
 
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"sort"
 )
 
@@ -21,7 +22,7 @@ type sourceBridge interface {
 	matches(id ProjectIdentifier, c Constraint, v Version) bool
 	matchesAny(id ProjectIdentifier, c1, c2 Constraint) bool
 	intersect(id ProjectIdentifier, c1, c2 Constraint) Constraint
-	verifyRoot(path string) error
+	verifyRootDir(path string) error
 	deduceRemoteRepo(path string) (*remoteRepo, error)
 }
 
@@ -29,7 +30,7 @@ type sourceBridge interface {
 // caching that's tailored to the requirements of a particular solve run.
 //
 // It also performs transformations between ProjectIdentifiers, which is what
-// the solver primarily deals in, and ProjectName, which is what the
+// the solver primarily deals in, and ProjectRoot, which is what the
 // SourceManager primarily deals in. This separation is helpful because it keeps
 // the complexities of deciding what a particular name "means" entirely within
 // the solver, while the SourceManager can traffic exclusively in
@@ -59,20 +60,30 @@ type bridge struct {
 	// layered on top of the proper SourceManager's cache; the only difference
 	// is that this keeps the versions sorted in the direction required by the
 	// current solve run
-	vlists map[ProjectName][]Version
+	vlists map[ProjectRoot][]Version
+}
+
+// Global factory func to create a bridge. This exists solely to allow tests to
+// override it with a custom bridge and sm.
+var mkBridge func(*solver, SourceManager) sourceBridge = func(s *solver, sm SourceManager) sourceBridge {
+	return &bridge{
+		sm:     sm,
+		s:      s,
+		vlists: make(map[ProjectRoot][]Version),
+	}
 }
 
 func (b *bridge) getProjectInfo(pa atom) (Manifest, Lock, error) {
-	if pa.id.LocalName == b.s.args.Name {
+	if pa.id.ProjectRoot == b.s.params.ImportRoot {
 		return b.s.rm, b.s.rl, nil
 	}
-	return b.sm.GetProjectInfo(ProjectName(pa.id.netName()), pa.v)
+	return b.sm.GetProjectInfo(ProjectRoot(pa.id.netName()), pa.v)
 }
 
-func (b *bridge) key(id ProjectIdentifier) ProjectName {
-	k := ProjectName(id.NetworkName)
+func (b *bridge) key(id ProjectIdentifier) ProjectRoot {
+	k := ProjectRoot(id.NetworkName)
 	if k == "" {
-		k = id.LocalName
+		k = id.ProjectRoot
 	}
 
 	return k
@@ -86,12 +97,12 @@ func (b *bridge) listVersions(id ProjectIdentifier) ([]Version, error) {
 	}
 
 	vl, err := b.sm.ListVersions(k)
-	// TODO cache errors, too?
+	// TODO(sdboyer) cache errors, too?
 	if err != nil {
 		return nil, err
 	}
 
-	if b.s.o.Downgrade {
+	if b.s.params.Downgrade {
 		sort.Sort(downgradeVersionSorter(vl))
 	} else {
 		sort.Sort(upgradeVersionSorter(vl))
@@ -112,8 +123,14 @@ func (b *bridge) repoExists(id ProjectIdentifier) (bool, error) {
 }
 
 func (b *bridge) vendorCodeExists(id ProjectIdentifier) (bool, error) {
-	k := b.key(id)
-	return b.sm.VendorCodeExists(k)
+	fi, err := os.Stat(filepath.Join(b.s.params.RootDir, "vendor", string(id.ProjectRoot)))
+	if err != nil {
+		return false, err
+	} else if fi.IsDir() {
+		return true, nil
+	}
+
+	return false, nil
 }
 
 func (b *bridge) pairVersion(id ProjectIdentifier, v UnpairedVersion) PairedVersion {
@@ -350,7 +367,7 @@ func (b *bridge) vtu(id ProjectIdentifier, v Version) versionTypeUnion {
 // potentially messy root project source location on disk. Together, this means
 // that we can't ask the real SourceManager to do it.
 func (b *bridge) computeRootReach() ([]string, error) {
-	// TODO i now cannot remember the reasons why i thought being less stringent
+	// TODO(sdboyer) i now cannot remember the reasons why i thought being less stringent
 	// in the analysis was OK. so, for now, we just compute a bog-standard list
 	// of externally-touched packages, including mains and test.
 	ptree, err := b.listRootPackages()
@@ -363,7 +380,7 @@ func (b *bridge) computeRootReach() ([]string, error) {
 
 func (b *bridge) listRootPackages() (PackageTree, error) {
 	if b.crp == nil {
-		ptree, err := listPackages(b.s.args.Root, string(b.s.args.Name))
+		ptree, err := listPackages(b.s.params.RootDir, string(b.s.params.ImportRoot))
 
 		b.crp = &struct {
 			ptree PackageTree
@@ -386,7 +403,7 @@ func (b *bridge) listRootPackages() (PackageTree, error) {
 // The root project is handled separately, as the source manager isn't
 // responsible for that code.
 func (b *bridge) listPackages(id ProjectIdentifier, v Version) (PackageTree, error) {
-	if id.LocalName == b.s.args.Name {
+	if id.ProjectRoot == b.s.params.ImportRoot {
 		return b.listRootPackages()
 	}
 
@@ -398,11 +415,11 @@ func (b *bridge) listPackages(id ProjectIdentifier, v Version) (PackageTree, err
 // verifyRoot ensures that the provided path to the project root is in good
 // working condition. This check is made only once, at the beginning of a solve
 // run.
-func (b *bridge) verifyRoot(path string) error {
+func (b *bridge) verifyRootDir(path string) error {
 	if fi, err := os.Stat(path); err != nil {
-		return badOptsFailure(fmt.Sprintf("Could not read project root (%s): %s", path, err))
+		return badOptsFailure(fmt.Sprintf("could not read project root (%s): %s", path, err))
 	} else if !fi.IsDir() {
-		return badOptsFailure(fmt.Sprintf("Project root (%s) is a file, not a directory.", path))
+		return badOptsFailure(fmt.Sprintf("project root (%s) is a file, not a directory", path))
 	}
 
 	return nil

@@ -1,4 +1,4 @@
-package vsolver
+package gps
 
 import (
 	"fmt"
@@ -17,69 +17,69 @@ func TestDeduceRemotes(t *testing.T) {
 		want *remoteRepo
 	}{
 		{
-			"github.com/sdboyer/vsolver",
+			"github.com/sdboyer/gps",
 			&remoteRepo{
-				Base:   "github.com/sdboyer/vsolver",
+				Base:   "github.com/sdboyer/gps",
 				RelPkg: "",
 				CloneURL: &url.URL{
 					Host: "github.com",
-					Path: "sdboyer/vsolver",
+					Path: "sdboyer/gps",
 				},
 				Schemes: nil,
 				VCS:     []string{"git"},
 			},
 		},
 		{
-			"github.com/sdboyer/vsolver/foo",
+			"github.com/sdboyer/gps/foo",
 			&remoteRepo{
-				Base:   "github.com/sdboyer/vsolver",
+				Base:   "github.com/sdboyer/gps",
 				RelPkg: "foo",
 				CloneURL: &url.URL{
 					Host: "github.com",
-					Path: "sdboyer/vsolver",
+					Path: "sdboyer/gps",
 				},
 				Schemes: nil,
 				VCS:     []string{"git"},
 			},
 		},
 		{
-			"git@github.com:sdboyer/vsolver",
+			"git@github.com:sdboyer/gps",
 			&remoteRepo{
-				Base:   "github.com/sdboyer/vsolver",
+				Base:   "github.com/sdboyer/gps",
 				RelPkg: "",
 				CloneURL: &url.URL{
 					Scheme: "ssh",
 					User:   url.User("git"),
 					Host:   "github.com",
-					Path:   "sdboyer/vsolver",
+					Path:   "sdboyer/gps",
 				},
 				Schemes: []string{"ssh"},
 				VCS:     []string{"git"},
 			},
 		},
 		{
-			"https://github.com/sdboyer/vsolver/foo",
+			"https://github.com/sdboyer/gps/foo",
 			&remoteRepo{
-				Base:   "github.com/sdboyer/vsolver",
+				Base:   "github.com/sdboyer/gps",
 				RelPkg: "foo",
 				CloneURL: &url.URL{
 					Scheme: "https",
 					Host:   "github.com",
-					Path:   "sdboyer/vsolver",
+					Path:   "sdboyer/gps",
 				},
 				Schemes: []string{"https"},
 				VCS:     []string{"git"},
 			},
 		},
 		{
-			"https://github.com/sdboyer/vsolver/foo/bar",
+			"https://github.com/sdboyer/gps/foo/bar",
 			&remoteRepo{
-				Base:   "github.com/sdboyer/vsolver",
+				Base:   "github.com/sdboyer/gps",
 				RelPkg: "foo/bar",
 				CloneURL: &url.URL{
 					Scheme: "https",
 					Host:   "github.com",
-					Path:   "sdboyer/vsolver",
+					Path:   "sdboyer/gps",
 				},
 				Schemes: []string{"https"},
 				VCS:     []string{"git"},
@@ -87,53 +87,53 @@ func TestDeduceRemotes(t *testing.T) {
 		},
 		// some invalid github username patterns
 		{
-			"github.com/-sdboyer/vsolver/foo",
+			"github.com/-sdboyer/gps/foo",
 			nil,
 		},
 		{
-			"github.com/sdboyer-/vsolver/foo",
+			"github.com/sdboyer-/gps/foo",
 			nil,
 		},
 		{
-			"github.com/sdbo.yer/vsolver/foo",
+			"github.com/sdbo.yer/gps/foo",
 			nil,
 		},
 		{
-			"github.com/sdbo_yer/vsolver/foo",
+			"github.com/sdbo_yer/gps/foo",
 			nil,
 		},
 		{
-			"gopkg.in/sdboyer/vsolver.v0",
+			"gopkg.in/sdboyer/gps.v0",
 			&remoteRepo{
-				Base:   "gopkg.in/sdboyer/vsolver.v0",
+				Base:   "gopkg.in/sdboyer/gps.v0",
 				RelPkg: "",
 				CloneURL: &url.URL{
 					Host: "github.com",
-					Path: "sdboyer/vsolver",
+					Path: "sdboyer/gps",
 				},
 				VCS: []string{"git"},
 			},
 		},
 		{
-			"gopkg.in/sdboyer/vsolver.v0/foo",
+			"gopkg.in/sdboyer/gps.v0/foo",
 			&remoteRepo{
-				Base:   "gopkg.in/sdboyer/vsolver.v0",
+				Base:   "gopkg.in/sdboyer/gps.v0",
 				RelPkg: "foo",
 				CloneURL: &url.URL{
 					Host: "github.com",
-					Path: "sdboyer/vsolver",
+					Path: "sdboyer/gps",
 				},
 				VCS: []string{"git"},
 			},
 		},
 		{
-			"gopkg.in/sdboyer/vsolver.v0/foo/bar",
+			"gopkg.in/sdboyer/gps.v0/foo/bar",
 			&remoteRepo{
-				Base:   "gopkg.in/sdboyer/vsolver.v0",
+				Base:   "gopkg.in/sdboyer/gps.v0",
 				RelPkg: "foo/bar",
 				CloneURL: &url.URL{
 					Host: "github.com",
-					Path: "sdboyer/vsolver",
+					Path: "sdboyer/gps",
 				},
 				VCS: []string{"git"},
 			},

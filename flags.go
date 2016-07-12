@@ -1,4 +1,4 @@
-package vsolver
+package gps
 
 // projectExistence values represent the extent to which a project "exists."
 type projectExistence uint8

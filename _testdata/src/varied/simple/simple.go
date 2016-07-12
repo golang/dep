@@ -3,10 +3,10 @@ package simple
 import (
 	"go/parser"
 
-	"github.com/sdboyer/vsolver"
+	"github.com/sdboyer/gps"
 )
 
 var (
 	_ = parser.ParseFile
-	S = vsolver.Prepare
+	S = gps.Prepare
 )

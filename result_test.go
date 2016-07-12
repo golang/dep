@@ -1,7 +1,6 @@
-package vsolver
+package gps
 
 import (
-	"go/build"
 	"os"
 	"path"
 	"testing"
@@ -10,18 +9,9 @@ import (
 var basicResult solution
 var kub atom
 
-// An analyzer that passes nothing back, but doesn't error. This expressly
-// creates a situation that shouldn't be able to happen from a general solver
-// perspective, so it's only useful for particular situations in tests
-type passthruAnalyzer struct{}
-
-func (passthruAnalyzer) GetInfo(ctx build.Context, p ProjectName) (Manifest, Lock, error) {
-	return nil, nil, nil
-}
-
 func pi(n string) ProjectIdentifier {
 	return ProjectIdentifier{
-		LocalName: ProjectName(n),
+		ProjectRoot: ProjectRoot(n),
 	}
 }
 
@@ -58,7 +48,7 @@ func TestResultCreateVendorTree(t *testing.T) {
 	tmp := path.Join(os.TempDir(), "vsolvtest")
 	os.RemoveAll(tmp)
 
-	sm, err := NewSourceManager(passthruAnalyzer{}, path.Join(tmp, "cache"), path.Join(tmp, "base"), false)
+	sm, err := NewSourceManager(naiveAnalyzer{}, path.Join(tmp, "cache"), false)
 	if err != nil {
 		t.Errorf("NewSourceManager errored unexpectedly: %q", err)
 	}
@@ -68,7 +58,7 @@ func TestResultCreateVendorTree(t *testing.T) {
 		t.Errorf("Unexpected error while creating vendor tree: %s", err)
 	}
 
-	// TODO add more checks
+	// TODO(sdboyer) add more checks
 }
 
 func BenchmarkCreateVendorTree(b *testing.B) {
@@ -79,7 +69,7 @@ func BenchmarkCreateVendorTree(b *testing.B) {
 	tmp := path.Join(os.TempDir(), "vsolvtest")
 
 	clean := true
-	sm, err := NewSourceManager(passthruAnalyzer{}, path.Join(tmp, "cache"), path.Join(tmp, "base"), true)
+	sm, err := NewSourceManager(naiveAnalyzer{}, path.Join(tmp, "cache"), true)
 	if err != nil {
 		b.Errorf("NewSourceManager errored unexpectedly: %q", err)
 		clean = false
@@ -87,7 +77,7 @@ func BenchmarkCreateVendorTree(b *testing.B) {
 
 	// Prefetch the projects before timer starts
 	for _, lp := range r.p {
-		_, _, err := sm.GetProjectInfo(lp.Ident().LocalName, lp.Version())
+		_, _, err := sm.GetProjectInfo(lp.Ident().ProjectRoot, lp.Version())
 		if err != nil {
 			b.Errorf("failed getting project info during prefetch: %s", err)
 			clean = false

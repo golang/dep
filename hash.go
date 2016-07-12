@@ -1,4 +1,4 @@
-package vsolver
+package gps
 
 import (
 	"crypto/sha256"
@@ -19,18 +19,13 @@ import (
 func (s *solver) HashInputs() ([]byte, error) {
 	// Do these checks up front before any other work is needed, as they're the
 	// only things that can cause errors
-	if err := s.b.verifyRoot(s.args.Root); err != nil {
-		// This will already be a BadOptsFailure
-		return nil, err
-	}
-
 	// Pass in magic root values, and the bridge will analyze the right thing
-	ptree, err := s.b.listPackages(ProjectIdentifier{LocalName: s.args.Name}, nil)
+	ptree, err := s.b.listPackages(ProjectIdentifier{ProjectRoot: s.params.ImportRoot}, nil)
 	if err != nil {
-		return nil, badOptsFailure(fmt.Sprintf("Error while parsing imports under %s: %s", s.args.Root, err.Error()))
+		return nil, badOptsFailure(fmt.Sprintf("Error while parsing packages under %s: %s", s.params.RootDir, err.Error()))
 	}
 
-	d, dd := s.args.Manifest.DependencyConstraints(), s.args.Manifest.TestDependencyConstraints()
+	d, dd := s.params.Manifest.DependencyConstraints(), s.params.Manifest.TestDependencyConstraints()
 	p := make(sortedDeps, len(d))
 	copy(p, d)
 	p = append(p, dd...)
@@ -40,7 +35,7 @@ func (s *solver) HashInputs() ([]byte, error) {
 	// We have everything we need; now, compute the hash.
 	h := sha256.New()
 	for _, pd := range p {
-		h.Write([]byte(pd.Ident.LocalName))
+		h.Write([]byte(pd.Ident.ProjectRoot))
 		h.Write([]byte(pd.Ident.NetworkName))
 		// FIXME Constraint.String() is a surjective-only transformation - tags
 		// and branches with the same name are written out as the same string.
@@ -89,12 +84,12 @@ func (s *solver) HashInputs() ([]byte, error) {
 		}
 	}
 
-	// TODO overrides
-	// TODO aliases
+	// TODO(sdboyer) overrides
+	// TODO(sdboyer) aliases
 	return h.Sum(nil), nil
 }
 
-type sortedDeps []ProjectDep
+type sortedDeps []ProjectConstraint
 
 func (s sortedDeps) Len() int {
 	return len(s)

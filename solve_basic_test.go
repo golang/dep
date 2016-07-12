@@ -1,4 +1,4 @@
-package vsolver
+package gps
 
 import (
 	"fmt"
@@ -27,9 +27,9 @@ func nvSplit(info string) (id ProjectIdentifier, version string) {
 		panic(fmt.Sprintf("Malformed name/version info string '%s'", info))
 	}
 
-	id.LocalName, version = ProjectName(s[0]), s[1]
+	id.ProjectRoot, version = ProjectRoot(s[0]), s[1]
 	if id.NetworkName == "" {
-		id.NetworkName = string(id.LocalName)
+		id.NetworkName = string(id.ProjectRoot)
 	}
 	return
 }
@@ -53,9 +53,9 @@ func nvrSplit(info string) (id ProjectIdentifier, version string, revision Revis
 		panic(fmt.Sprintf("Malformed name/version info string '%s'", info))
 	}
 
-	id.LocalName, version = ProjectName(s[0]), s[1]
+	id.ProjectRoot, version = ProjectRoot(s[0]), s[1]
 	if id.NetworkName == "" {
-		id.NetworkName = string(id.LocalName)
+		id.NetworkName = string(id.ProjectRoot)
 	}
 
 	if len(s) == 3 {
@@ -124,7 +124,7 @@ func mkAtom(info string) atom {
 //  r: create a revision.
 //
 // If no leading character is used, a semver constraint is assumed.
-func mkPDep(info string) ProjectDep {
+func mkPDep(info string) ProjectConstraint {
 	id, ver, rev := nvrSplit(info)
 
 	var c Constraint
@@ -158,7 +158,7 @@ func mkPDep(info string) ProjectDep {
 		c = c.(UnpairedVersion).Is(rev)
 	}
 
-	return ProjectDep{
+	return ProjectConstraint{
 		Ident:      id,
 		Constraint: c,
 	}
@@ -167,10 +167,10 @@ func mkPDep(info string) ProjectDep {
 // A depspec is a fixture representing all the information a SourceManager would
 // ordinarily glean directly from interrogating a repository.
 type depspec struct {
-	n       ProjectName
+	n       ProjectRoot
 	v       Version
-	deps    []ProjectDep
-	devdeps []ProjectDep
+	deps    []ProjectConstraint
+	devdeps []ProjectConstraint
 	pkgs    []tpkg
 }
 
@@ -186,17 +186,17 @@ type depspec struct {
 // treated as a test-only dependency.
 func mkDepspec(pi string, deps ...string) depspec {
 	pa := mkAtom(pi)
-	if string(pa.id.LocalName) != pa.id.NetworkName {
+	if string(pa.id.ProjectRoot) != pa.id.NetworkName {
 		panic("alternate source on self makes no sense")
 	}
 
 	ds := depspec{
-		n: pa.id.LocalName,
+		n: pa.id.ProjectRoot,
 		v: pa.v,
 	}
 
 	for _, dep := range deps {
-		var sl *[]ProjectDep
+		var sl *[]ProjectConstraint
 		if strings.HasPrefix(dep, "(dev) ") {
 			dep = strings.TrimPrefix(dep, "(dev) ")
 			sl = &ds.devdeps
@@ -215,7 +215,7 @@ func mklock(pairs ...string) fixLock {
 	l := make(fixLock, 0)
 	for _, s := range pairs {
 		pa := mkAtom(s)
-		l = append(l, NewLockedProject(pa.id.LocalName, pa.v, pa.id.netName(), "", nil))
+		l = append(l, NewLockedProject(pa.id.ProjectRoot, pa.v, pa.id.netName(), nil))
 	}
 
 	return l
@@ -227,7 +227,7 @@ func mkrevlock(pairs ...string) fixLock {
 	l := make(fixLock, 0)
 	for _, s := range pairs {
 		pa := mkAtom(s)
-		l = append(l, NewLockedProject(pa.id.LocalName, pa.v.(PairedVersion).Underlying(), pa.id.netName(), "", nil))
+		l = append(l, NewLockedProject(pa.id.ProjectRoot, pa.v.(PairedVersion).Underlying(), pa.id.netName(), nil))
 	}
 
 	return l
@@ -238,8 +238,8 @@ func mksolution(pairs ...string) map[string]Version {
 	m := make(map[string]Version)
 	for _, pair := range pairs {
 		a := mkAtom(pair)
-		// TODO identifierify
-		m[string(a.id.LocalName)] = a.v
+		// TODO(sdboyer) identifierify
+		m[string(a.id.ProjectRoot)] = a.v
 	}
 
 	return m
@@ -266,13 +266,13 @@ func computeBasicReachMap(ds []depspec) reachMap {
 		rm[pident{n: d.n, v: v}] = lm
 
 		for _, dep := range d.deps {
-			lm[n] = append(lm[n], string(dep.Ident.LocalName))
+			lm[n] = append(lm[n], string(dep.Ident.ProjectRoot))
 		}
 
 		// first is root
 		if k == 0 {
 			for _, dep := range d.devdeps {
-				lm[n] = append(lm[n], string(dep.Ident.LocalName))
+				lm[n] = append(lm[n], string(dep.Ident.ProjectRoot))
 			}
 		}
 	}
@@ -281,7 +281,7 @@ func computeBasicReachMap(ds []depspec) reachMap {
 }
 
 type pident struct {
-	n ProjectName
+	n ProjectRoot
 	v Version
 }
 
@@ -347,17 +347,15 @@ func (f basicFixture) solution() map[string]Version {
 }
 
 // A table of basicFixtures, used in the basic solving test set.
-var basicFixtures = []basicFixture{
+var basicFixtures = map[string]basicFixture{
 	// basic fixtures
-	{
-		n: "no dependencies",
+	"no dependencies": {
 		ds: []depspec{
 			mkDepspec("root 0.0.0"),
 		},
 		r: mksolution(),
 	},
-	{
-		n: "simple dependency tree",
+	"simple dependency tree": {
 		ds: []depspec{
 			mkDepspec("root 0.0.0", "a 1.0.0", "b 1.0.0"),
 			mkDepspec("a 1.0.0", "aa 1.0.0", "ab 1.0.0"),
@@ -376,8 +374,7 @@ var basicFixtures = []basicFixture{
 			"bb 1.0.0",
 		),
 	},
-	{
-		n: "shared dependency with overlapping constraints",
+	"shared dependency with overlapping constraints": {
 		ds: []depspec{
 			mkDepspec("root 0.0.0", "a 1.0.0", "b 1.0.0"),
 			mkDepspec("a 1.0.0", "shared >=2.0.0, <4.0.0"),
@@ -394,8 +391,7 @@ var basicFixtures = []basicFixture{
 			"shared 3.6.9",
 		),
 	},
-	{
-		n: "downgrade on overlapping constraints",
+	"downgrade on overlapping constraints": {
 		ds: []depspec{
 			mkDepspec("root 0.0.0", "a 1.0.0", "b 1.0.0"),
 			mkDepspec("a 1.0.0", "shared >=2.0.0, <=4.0.0"),
@@ -413,8 +409,7 @@ var basicFixtures = []basicFixture{
 		),
 		downgrade: true,
 	},
-	{
-		n: "shared dependency where dependent version in turn affects other dependencies",
+	"shared dependency where dependent version in turn affects other dependencies": {
 		ds: []depspec{
 			mkDepspec("root 0.0.0", "foo <=1.0.2", "bar 1.0.0"),
 			mkDepspec("foo 1.0.0"),
@@ -432,8 +427,7 @@ var basicFixtures = []basicFixture{
 			"bang 1.0.0",
 		),
 	},
-	{
-		n: "removed dependency",
+	"removed dependency": {
 		ds: []depspec{
 			mkDepspec("root 1.0.0", "foo 1.0.0", "bar *"),
 			mkDepspec("foo 1.0.0"),
@@ -448,19 +442,17 @@ var basicFixtures = []basicFixture{
 		),
 		maxAttempts: 2,
 	},
-	{
-		n: "with mismatched net addrs",
+	"with mismatched net addrs": {
 		ds: []depspec{
 			mkDepspec("root 1.0.0", "foo 1.0.0", "bar 1.0.0"),
 			mkDepspec("foo 1.0.0", "bar from baz 1.0.0"),
 			mkDepspec("bar 1.0.0"),
 		},
-		// TODO ugh; do real error comparison instead of shitty abstraction
+		// TODO(sdboyer) ugh; do real error comparison instead of shitty abstraction
 		errp: []string{"foo", "foo", "root"},
 	},
 	// fixtures with locks
-	{
-		n: "with compatible locked dependency",
+	"with compatible locked dependency": {
 		ds: []depspec{
 			mkDepspec("root 0.0.0", "foo *"),
 			mkDepspec("foo 1.0.0", "bar 1.0.0"),
@@ -478,8 +470,7 @@ var basicFixtures = []basicFixture{
 			"bar 1.0.1",
 		),
 	},
-	{
-		n: "upgrade through lock",
+	"upgrade through lock": {
 		ds: []depspec{
 			mkDepspec("root 0.0.0", "foo *"),
 			mkDepspec("foo 1.0.0", "bar 1.0.0"),
@@ -498,8 +489,7 @@ var basicFixtures = []basicFixture{
 		),
 		changeall: true,
 	},
-	{
-		n: "downgrade through lock",
+	"downgrade through lock": {
 		ds: []depspec{
 			mkDepspec("root 0.0.0", "foo *"),
 			mkDepspec("foo 1.0.0", "bar 1.0.0"),
@@ -519,8 +509,7 @@ var basicFixtures = []basicFixture{
 		changeall: true,
 		downgrade: true,
 	},
-	{
-		n: "with incompatible locked dependency",
+	"with incompatible locked dependency": {
 		ds: []depspec{
 			mkDepspec("root 0.0.0", "foo >1.0.1"),
 			mkDepspec("foo 1.0.0", "bar 1.0.0"),
@@ -538,8 +527,7 @@ var basicFixtures = []basicFixture{
 			"bar 1.0.2",
 		),
 	},
-	{
-		n: "with unrelated locked dependency",
+	"with unrelated locked dependency": {
 		ds: []depspec{
 			mkDepspec("root 0.0.0", "foo *"),
 			mkDepspec("foo 1.0.0", "bar 1.0.0"),
@@ -558,8 +546,7 @@ var basicFixtures = []basicFixture{
 			"bar 1.0.2",
 		),
 	},
-	{
-		n: "unlocks dependencies if necessary to ensure that a new dependency is satisfied",
+	"unlocks dependencies if necessary to ensure that a new dependency is satisfied": {
 		ds: []depspec{
 			mkDepspec("root 0.0.0", "foo *", "newdep *"),
 			mkDepspec("foo 1.0.0 foorev", "bar <2.0.0"),
@@ -587,8 +574,7 @@ var basicFixtures = []basicFixture{
 		),
 		maxAttempts: 4,
 	},
-	{
-		n: "locked atoms are matched on both local and net name",
+	"locked atoms are matched on both local and net name": {
 		ds: []depspec{
 			mkDepspec("root 0.0.0", "foo *"),
 			mkDepspec("foo 1.0.0 foorev"),
@@ -601,8 +587,7 @@ var basicFixtures = []basicFixture{
 			"foo 2.0.0 foorev2",
 		),
 	},
-	{
-		n: "pairs bare revs in lock with versions",
+	"pairs bare revs in lock with versions": {
 		ds: []depspec{
 			mkDepspec("root 0.0.0", "foo ~1.0.1"),
 			mkDepspec("foo 1.0.0", "bar 1.0.0"),
@@ -620,8 +605,7 @@ var basicFixtures = []basicFixture{
 			"bar 1.0.1",
 		),
 	},
-	{
-		n: "pairs bare revs in lock with all versions",
+	"pairs bare revs in lock with all versions": {
 		ds: []depspec{
 			mkDepspec("root 0.0.0", "foo ~1.0.1"),
 			mkDepspec("foo 1.0.0", "bar 1.0.0"),
@@ -639,8 +623,7 @@ var basicFixtures = []basicFixture{
 			"bar 1.0.1",
 		),
 	},
-	{
-		n: "does not pair bare revs in manifest with unpaired lock version",
+	"does not pair bare revs in manifest with unpaired lock version": {
 		ds: []depspec{
 			mkDepspec("root 0.0.0", "foo ~1.0.1"),
 			mkDepspec("foo 1.0.0", "bar 1.0.0"),
@@ -658,8 +641,7 @@ var basicFixtures = []basicFixture{
 			"bar 1.0.1",
 		),
 	},
-	{
-		n: "includes root package's dev dependencies",
+	"includes root package's dev dependencies": {
 		ds: []depspec{
 			mkDepspec("root 1.0.0", "(dev) foo 1.0.0", "(dev) bar 1.0.0"),
 			mkDepspec("foo 1.0.0"),
@@ -670,8 +652,7 @@ var basicFixtures = []basicFixture{
 			"bar 1.0.0",
 		),
 	},
-	{
-		n: "includes dev dependency's transitive dependencies",
+	"includes dev dependency's transitive dependencies": {
 		ds: []depspec{
 			mkDepspec("root 1.0.0", "(dev) foo 1.0.0"),
 			mkDepspec("foo 1.0.0", "bar 1.0.0"),
@@ -682,8 +663,7 @@ var basicFixtures = []basicFixture{
 			"bar 1.0.0",
 		),
 	},
-	{
-		n: "ignores transitive dependency's dev dependencies",
+	"ignores transitive dependency's dev dependencies": {
 		ds: []depspec{
 			mkDepspec("root 1.0.0", "(dev) foo 1.0.0"),
 			mkDepspec("foo 1.0.0", "(dev) bar 1.0.0"),
@@ -693,8 +673,7 @@ var basicFixtures = []basicFixture{
 			"foo 1.0.0",
 		),
 	},
-	{
-		n: "no version that matches requirement",
+	"no version that matches requirement": {
 		ds: []depspec{
 			mkDepspec("root 0.0.0", "foo >=1.0.0, <2.0.0"),
 			mkDepspec("foo 2.0.0"),
@@ -702,8 +681,7 @@ var basicFixtures = []basicFixture{
 		},
 		errp: []string{"foo", "root"},
 	},
-	{
-		n: "no version that matches combined constraint",
+	"no version that matches combined constraint": {
 		ds: []depspec{
 			mkDepspec("root 0.0.0", "foo 1.0.0", "bar 1.0.0"),
 			mkDepspec("foo 1.0.0", "shared >=2.0.0, <3.0.0"),
@@ -713,8 +691,7 @@ var basicFixtures = []basicFixture{
 		},
 		errp: []string{"shared", "foo", "bar"},
 	},
-	{
-		n: "disjoint constraints",
+	"disjoint constraints": {
 		ds: []depspec{
 			mkDepspec("root 0.0.0", "foo 1.0.0", "bar 1.0.0"),
 			mkDepspec("foo 1.0.0", "shared <=2.0.0"),
@@ -725,8 +702,7 @@ var basicFixtures = []basicFixture{
 		//errp: []string{"shared", "foo", "bar"}, // dart's has this...
 		errp: []string{"foo", "bar"},
 	},
-	{
-		n: "no valid solution",
+	"no valid solution": {
 		ds: []depspec{
 			mkDepspec("root 0.0.0", "a *", "b *"),
 			mkDepspec("a 1.0.0", "b 1.0.0"),
@@ -737,8 +713,7 @@ var basicFixtures = []basicFixture{
 		errp:        []string{"b", "a"},
 		maxAttempts: 2,
 	},
-	{
-		n: "no version that matches while backtracking",
+	"no version that matches while backtracking": {
 		ds: []depspec{
 			mkDepspec("root 0.0.0", "a *", "b >1.0.0"),
 			mkDepspec("a 1.0.0"),
@@ -746,11 +721,10 @@ var basicFixtures = []basicFixture{
 		},
 		errp: []string{"b", "root"},
 	},
-	{
-		// The latest versions of a and b disagree on c. An older version of either
-		// will resolve the problem. This test validates that b, which is farther
-		// in the dependency graph from myapp is downgraded first.
-		n: "rolls back leaf versions first",
+	// The latest versions of a and b disagree on c. An older version of either
+	// will resolve the problem. This test validates that b, which is farther
+	// in the dependency graph from myapp is downgraded first.
+	"rolls back leaf versions first": {
 		ds: []depspec{
 			mkDepspec("root 0.0.0", "a *"),
 			mkDepspec("a 1.0.0", "b *"),
@@ -767,10 +741,9 @@ var basicFixtures = []basicFixture{
 		),
 		maxAttempts: 2,
 	},
-	{
-		// Only one version of baz, so foo and bar will have to downgrade until they
-		// reach it.
-		n: "simple transitive",
+	// Only one version of baz, so foo and bar will have to downgrade until they
+	// reach it.
+	"mutual downgrading": {
 		ds: []depspec{
 			mkDepspec("root 0.0.0", "foo *"),
 			mkDepspec("foo 1.0.0", "bar 1.0.0"),
@@ -788,13 +761,12 @@ var basicFixtures = []basicFixture{
 		),
 		maxAttempts: 3,
 	},
-	{
-		// Ensures the solver doesn"t exhaustively search all versions of b when
-		// it's a-2.0.0 whose dependency on c-2.0.0-nonexistent led to the
-		// problem. We make sure b has more versions than a so that the solver
-		// tries a first since it sorts sibling dependencies by number of
-		// versions.
-		n: "simple transitive",
+	// Ensures the solver doesn't exhaustively search all versions of b when
+	// it's a-2.0.0 whose dependency on c-2.0.0-nonexistent led to the
+	// problem. We make sure b has more versions than a so that the solver
+	// tries a first since it sorts sibling dependencies by number of
+	// versions.
+	"search real failer": {
 		ds: []depspec{
 			mkDepspec("root 0.0.0", "a *", "b *"),
 			mkDepspec("a 1.0.0", "c 1.0.0"),
@@ -811,14 +783,13 @@ var basicFixtures = []basicFixture{
 		),
 		maxAttempts: 2,
 	},
-	{
-		// Dependencies are ordered so that packages with fewer versions are
-		// tried first. Here, there are two valid solutions (either a or b must
-		// be downgraded once). The chosen one depends on which dep is traversed
-		// first. Since b has fewer versions, it will be traversed first, which
-		// means a will come later. Since later selections are revised first, a
-		// gets downgraded.
-		n: "traverse into package with fewer versions first",
+	// Dependencies are ordered so that packages with fewer versions are tried
+	// first. Here, there are two valid solutions (either a or b must be
+	// downgraded once). The chosen one depends on which dep is traversed first.
+	// Since b has fewer versions, it will be traversed first, which means a
+	// will come later. Since later selections are revised first, a gets
+	// downgraded.
+	"traverse into package with fewer versions first": {
 		ds: []depspec{
 			mkDepspec("root 0.0.0", "a *", "b *"),
 			mkDepspec("a 1.0.0", "c *"),
@@ -840,14 +811,13 @@ var basicFixtures = []basicFixture{
 		),
 		maxAttempts: 2,
 	},
-	{
-		// This is similar to the preceding fixture. When getting the number of
-		// versions of a package to determine which to traverse first, versions
-		// that are disallowed by the root package"s constraints should not be
-		// considered. Here, foo has more versions of bar in total (4), but
-		// fewer that meet myapp"s constraints (only 2). There is no solution,
-		// but we will do less backtracking if foo is tested first.
-		n: "traverse into package with fewer versions first",
+	// This is similar to the preceding fixture. When getting the number of
+	// versions of a package to determine which to traverse first, versions that
+	// are disallowed by the root package's constraints should not be
+	// considered. Here, foo has more versions than bar in total (4), but fewer
+	// that meet myapp"s constraints (only 2). There is no solution, but we will
+	// do less backtracking if foo is tested first.
+	"root constraints pre-eliminate versions": {
 		ds: []depspec{
 			mkDepspec("root 0.0.0", "foo *", "bar *"),
 			mkDepspec("foo 1.0.0", "none 2.0.0"),
@@ -860,14 +830,13 @@ var basicFixtures = []basicFixture{
 			mkDepspec("none 1.0.0"),
 		},
 		errp:        []string{"none", "foo"},
-		maxAttempts: 2,
+		maxAttempts: 1,
 	},
-	{
-		// If there"s a disjoint constraint on a package, then selecting other
-		// versions of it is a waste of time: no possible versions can match. We
-		// need to jump past it to the most recent package that affected the
-		// constraint.
-		n: "backjump past failed package on disjoint constraint",
+	// If there"s a disjoint constraint on a package, then selecting other
+	// versions of it is a waste of time: no possible versions can match. We
+	// need to jump past it to the most recent package that affected the
+	// constraint.
+	"backjump past failed package on disjoint constraint": {
 		ds: []depspec{
 			mkDepspec("root 0.0.0", "a *", "foo *"),
 			mkDepspec("a 1.0.0", "foo *"),
@@ -885,9 +854,8 @@ var basicFixtures = []basicFixture{
 		),
 		maxAttempts: 2,
 	},
-	{
-		// Revision enters vqueue if a dep has a constraint on that revision
-		n: "revision injected into vqueue",
+	// Revision enters vqueue if a dep has a constraint on that revision
+	"revision injected into vqueue": {
 		ds: []depspec{
 			mkDepspec("root 0.0.0", "foo r123abc"),
 			mkDepspec("foo r123abc"),
@@ -898,7 +866,7 @@ var basicFixtures = []basicFixture{
 			"foo r123abc",
 		),
 	},
-	// TODO decide how to refactor the solver in order to re-enable these.
+	// TODO(sdboyer) decide how to refactor the solver in order to re-enable these.
 	// Checking for revision existence is important...but kinda obnoxious.
 	//{
 	//// Solve fails if revision constraint calls for a nonexistent revision
@@ -925,7 +893,7 @@ var basicFixtures = []basicFixture{
 	//errp: []string{"foo", "root", "foo"},
 	//},
 
-	// TODO add fixture that tests proper handling of loops via aliases (where
+	// TODO(sdboyer) add fixture that tests proper handling of loops via aliases (where
 	// a project that wouldn't be a loop is aliased to a project that is a loop)
 }
 
@@ -936,7 +904,6 @@ func init() {
 	// version of baz, 0.0.0, so only older versions of foo and bar will
 	// satisfy it.
 	fix := basicFixture{
-		n: "complex backtrack",
 		ds: []depspec{
 			mkDepspec("root 0.0.0", "foo *", "bar *"),
 			mkDepspec("baz 0.0.0"),
@@ -956,7 +923,13 @@ func init() {
 		}
 	}
 
-	basicFixtures = append(basicFixtures, fix)
+	basicFixtures["complex backtrack"] = fix
+
+	for k, fix := range basicFixtures {
+		// Assign the name into the fixture itself
+		fix.n = k
+		basicFixtures[k] = fix
+	}
 }
 
 // reachMaps contain externalReach()-type data for a given depspec fixture's
@@ -993,18 +966,18 @@ func newdepspecSM(ds []depspec, ignore []string) *depspecSourceManager {
 	}
 }
 
-func (sm *depspecSourceManager) GetProjectInfo(n ProjectName, v Version) (Manifest, Lock, error) {
+func (sm *depspecSourceManager) GetProjectInfo(n ProjectRoot, v Version) (Manifest, Lock, error) {
 	for _, ds := range sm.specs {
 		if n == ds.n && v.Matches(ds.v) {
 			return ds, dummyLock{}, nil
 		}
 	}
 
-	// TODO proper solver-type errors
+	// TODO(sdboyer) proper solver-type errors
 	return nil, nil, fmt.Errorf("Project %s at version %s could not be found", n, v)
 }
 
-func (sm *depspecSourceManager) ExternalReach(n ProjectName, v Version) (map[string][]string, error) {
+func (sm *depspecSourceManager) ExternalReach(n ProjectRoot, v Version) (map[string][]string, error) {
 	id := pident{n: n, v: v}
 	if m, exists := sm.rm[id]; exists {
 		return m, nil
@@ -1012,7 +985,7 @@ func (sm *depspecSourceManager) ExternalReach(n ProjectName, v Version) (map[str
 	return nil, fmt.Errorf("No reach data for %s at version %s", n, v)
 }
 
-func (sm *depspecSourceManager) ListExternal(n ProjectName, v Version) ([]string, error) {
+func (sm *depspecSourceManager) ListExternal(n ProjectRoot, v Version) ([]string, error) {
 	// This should only be called for the root
 	id := pident{n: n, v: v}
 	if r, exists := sm.rm[id]; exists {
@@ -1021,7 +994,7 @@ func (sm *depspecSourceManager) ListExternal(n ProjectName, v Version) ([]string
 	return nil, fmt.Errorf("No reach data for %s at version %s", n, v)
 }
 
-func (sm *depspecSourceManager) ListPackages(n ProjectName, v Version) (PackageTree, error) {
+func (sm *depspecSourceManager) ListPackages(n ProjectRoot, v Version) (PackageTree, error) {
 	id := pident{n: n, v: v}
 	if r, exists := sm.rm[id]; exists {
 		ptree := PackageTree{
@@ -1042,7 +1015,7 @@ func (sm *depspecSourceManager) ListPackages(n ProjectName, v Version) (PackageT
 	return PackageTree{}, fmt.Errorf("Project %s at version %s could not be found", n, v)
 }
 
-func (sm *depspecSourceManager) ListVersions(name ProjectName) (pi []Version, err error) {
+func (sm *depspecSourceManager) ListVersions(name ProjectRoot) (pi []Version, err error) {
 	for _, ds := range sm.specs {
 		// To simulate the behavior of the real SourceManager, we do not return
 		// revisions from ListVersions().
@@ -1058,7 +1031,7 @@ func (sm *depspecSourceManager) ListVersions(name ProjectName) (pi []Version, er
 	return
 }
 
-func (sm *depspecSourceManager) RevisionPresentIn(name ProjectName, r Revision) (bool, error) {
+func (sm *depspecSourceManager) RevisionPresentIn(name ProjectRoot, r Revision) (bool, error) {
 	for _, ds := range sm.specs {
 		if name == ds.n && r == ds.v {
 			return true, nil
@@ -1068,7 +1041,7 @@ func (sm *depspecSourceManager) RevisionPresentIn(name ProjectName, r Revision) 
 	return false, fmt.Errorf("Project %s has no revision %s", name, r)
 }
 
-func (sm *depspecSourceManager) RepoExists(name ProjectName) (bool, error) {
+func (sm *depspecSourceManager) RepoExists(name ProjectRoot) (bool, error) {
 	for _, ds := range sm.specs {
 		if name == ds.n {
 			return true, nil
@@ -1078,13 +1051,13 @@ func (sm *depspecSourceManager) RepoExists(name ProjectName) (bool, error) {
 	return false, nil
 }
 
-func (sm *depspecSourceManager) VendorCodeExists(name ProjectName) (bool, error) {
+func (sm *depspecSourceManager) VendorCodeExists(name ProjectRoot) (bool, error) {
 	return false, nil
 }
 
 func (sm *depspecSourceManager) Release() {}
 
-func (sm *depspecSourceManager) ExportProject(n ProjectName, v Version, to string) error {
+func (sm *depspecSourceManager) ExportProject(n ProjectRoot, v Version, to string) error {
 	return fmt.Errorf("dummy sm doesn't support exporting")
 }
 
@@ -1120,7 +1093,7 @@ func (b *depspecBridge) computeRootReach() ([]string, error) {
 }
 
 // override verifyRoot() on bridge to prevent any filesystem interaction
-func (b *depspecBridge) verifyRoot(path string) error {
+func (b *depspecBridge) verifyRootDir(path string) error {
 	root := b.sm.(fixSM).rootSpec()
 	if string(root.n) != path {
 		return fmt.Errorf("Expected only root project %q to computeRootReach(), got %q", root.n, path)
@@ -1154,18 +1127,13 @@ var _ Lock = dummyLock{}
 var _ Lock = fixLock{}
 
 // impl Spec interface
-func (ds depspec) DependencyConstraints() []ProjectDep {
+func (ds depspec) DependencyConstraints() []ProjectConstraint {
 	return ds.deps
 }
 
 // impl Spec interface
-func (ds depspec) TestDependencyConstraints() []ProjectDep {
+func (ds depspec) TestDependencyConstraints() []ProjectConstraint {
 	return ds.devdeps
-}
-
-// impl Spec interface
-func (ds depspec) Name() ProjectName {
-	return ds.n
 }
 
 type fixLock []LockedProject
@@ -1204,7 +1172,7 @@ func (_ dummyLock) Projects() []LockedProject {
 // We've borrowed this bestiary from pub's tests:
 // https://github.com/dart-lang/pub/blob/master/test/version_solver_test.dart
 
-// TODO finish converting all of these
+// TODO(sdboyer) finish converting all of these
 
 /*
 func basicGraph() {

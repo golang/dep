@@ -1,4 +1,4 @@
-package vsolver
+package gps
 
 import (
 	"bytes"
@@ -41,7 +41,7 @@ func init() {
 	}
 
 	// Also ignore C
-	// TODO actually figure out how to deal with cgo
+	// TODO(sdboyer) actually figure out how to deal with cgo
 	stdlib["C"] = true
 }
 
@@ -81,8 +81,8 @@ func listPackages(fileRoot, importRoot string) (PackageTree, error) {
 		Packages:   make(map[string]PackageOrErr),
 	}
 
-	// mkfilter returns two funcs that can be injected into a
-	// build.Context, letting us filter the results into an "in" and "out" set.
+	// mkfilter returns two funcs that can be injected into a build.Context,
+	// letting us filter the results into an "in" and "out" set.
 	mkfilter := func(files map[string]struct{}) (in, out func(dir string) (fi []os.FileInfo, err error)) {
 		in = func(dir string) (fi []os.FileInfo, err error) {
 			all, err := ioutil.ReadDir(dir)
@@ -137,12 +137,15 @@ func listPackages(fileRoot, importRoot string) (PackageTree, error) {
 			return nil
 		}
 
-		// Skip a dirs that are known to hold non-local/dependency code.
+		// Skip dirs that are known to hold non-local/dependency code.
 		//
 		// We don't skip .*, _*, or testdata dirs because, while it may be poor
 		// form, it's not a compiler error to import them.
 		switch fi.Name() {
 		case "vendor", "Godeps":
+			return filepath.SkipDir
+		}
+		if strings.HasPrefix(fi.Name(), ".") {
 			return filepath.SkipDir
 		}
 
@@ -174,13 +177,13 @@ func listPackages(fileRoot, importRoot string) (PackageTree, error) {
 				// For now, we're punting entirely on dealing with os/arch
 				// combinations. That will be a more significant refactor.
 				//
-				// However, there is one case we want to allow here - a single
-				// file, with "+build ignore", that's a main package. (Ignore is
-				// just a convention, but for now it's good enough to just check
-				// that.) This is a fairly common way to make a more
-				// sophisticated build system than a Makefile allows, so we want
-				// to support that case. So, transparently lump the deps
-				// together.
+				// However, there is one case we want to allow here - one or
+				// more files with "+build ignore" with package `main`. (Ignore
+				// is just a convention, but for now it's good enough to just
+				// check that.) This is a fairly common way to give examples,
+				// and to make a more sophisticated build system than a Makefile
+				// allows, so we want to support that case. So, transparently
+				// lump the deps together.
 				mains := make(map[string]struct{})
 				for k, pkgname := range terr.Packages {
 					if pkgname == "main" {
@@ -278,7 +281,7 @@ func listPackages(fileRoot, importRoot string) (PackageTree, error) {
 // LocalImportsError indicates that a package contains at least one relative
 // import that will prevent it from compiling.
 //
-// TODO add a Files property once we're doing our own per-file parsing
+// TODO(sdboyer) add a Files property once we're doing our own per-file parsing
 type LocalImportsError struct {
 	Dir          string
 	LocalImports []string
@@ -333,7 +336,7 @@ func wmToReach(workmap map[string]wm, basedir string) map[string][]string {
 	// indicates whether the level completed successfully (true) or if it was
 	// poisoned (false).
 	//
-	// TODO some deft improvements could probably be made by passing the list of
+	// TODO(sdboyer) some deft improvements could probably be made by passing the list of
 	// parent reachsets, rather than a list of parent package string names.
 	// might be able to eliminate the use of allreachsets map-of-maps entirely.
 	dfe = func(pkg string, path []string) bool {
@@ -357,7 +360,7 @@ func wmToReach(workmap map[string]wm, basedir string) map[string][]string {
 			// pkg exists with no errs. mark it as in-process (grey), and start
 			// a reachmap for it
 			//
-			// TODO use sync.Pool here? can be lots of explicit map alloc/dealloc
+			// TODO(sdboyer) use sync.Pool here? can be lots of explicit map alloc/dealloc
 			rs := make(map[string]struct{})
 
 			// Push self onto the path slice. Passing this as a value has the
@@ -730,7 +733,7 @@ type PackageOrErr struct {
 // If an internal path is ignored, then it is excluded from all transitive
 // dependency chains and does not appear as a key in the final map. That is, if
 // you ignore A/foo, then the external package list for all internal packages
-// that import A/foo will not include external packages were only reachable
+// that import A/foo will not include external packages that are only reachable
 // through A/foo.
 //
 // Visually, this means that, given a PackageTree with root A and packages at A,
@@ -810,7 +813,7 @@ func (t PackageTree) ExternalReach(main, tests bool, ignore map[string]bool) map
 	}
 
 	//return wmToReach(workmap, t.ImportRoot)
-	return wmToReach(workmap, "") // TODO this passes tests, but doesn't seem right
+	return wmToReach(workmap, "") // TODO(sdboyer) this passes tests, but doesn't seem right
 }
 
 // ListExternalImports computes a sorted, deduplicated list of all the external
@@ -818,10 +821,8 @@ func (t PackageTree) ExternalReach(main, tests bool, ignore map[string]bool) map
 // PackageTree.
 //
 // main and tests determine whether main packages and test imports should be
-// included in the calculation.
-//
-// "External" is defined as anything not prefixed, after path cleaning, by the
-// PackageTree.ImportRoot. This includes stdlib.
+// included in the calculation. "External" is defined as anything not prefixed,
+// after path cleaning, by the PackageTree.ImportRoot. This includes stdlib.
 //
 // If an internal path is ignored, all of the external packages that it uniquely
 // imports are omitted. Note, however, that no internal transitivity checks are
@@ -893,7 +894,7 @@ func (t PackageTree) ListExternalImports(main, tests bool, ignore map[string]boo
 
 	if len(exm) == 0 {
 		if someerrs {
-			// TODO proper errs
+			// TODO(sdboyer) proper errs
 			return nil, fmt.Errorf("No packages without errors in %s", t.ImportRoot)
 		}
 		return nil, nil

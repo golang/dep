@@ -1,4 +1,4 @@
-package vsolver
+package gps
 
 import (
 	"fmt"
@@ -27,7 +27,7 @@ type remoteRepo struct {
 //err error
 //}
 
-// TODO sync access to this map
+// TODO(sdboyer) sync access to this map
 //var remoteCache = make(map[string]remoteResult)
 
 // Regexes for the different known import path flavors
@@ -69,7 +69,7 @@ func deduceRemoteRepo(path string) (rr *remoteRepo, err error) {
 			User:   url.User(m[1]),
 			Host:   m[2],
 			Path:   "/" + m[3],
-			// TODO This is what stdlib sets; grok why better
+			// TODO(sdboyer) This is what stdlib sets; grok why better
 			//RawPath: m[3],
 		}
 	} else {
@@ -93,7 +93,7 @@ func deduceRemoteRepo(path string) (rr *remoteRepo, err error) {
 		rr.Schemes = []string{rr.CloneURL.Scheme}
 	}
 
-	// TODO instead of a switch, encode base domain in radix tree and pick
+	// TODO(sdboyer) instead of a switch, encode base domain in radix tree and pick
 	// detector from there; if failure, then fall back on metadata work
 
 	switch {
@@ -156,7 +156,7 @@ func deduceRemoteRepo(path string) (rr *remoteRepo, err error) {
 	//return
 
 	case lpRegex.MatchString(path):
-		// TODO lp handling is nasty - there's ambiguities which can only really
+		// TODO(sdboyer) lp handling is nasty - there's ambiguities which can only really
 		// be resolved with a metadata request. See https://github.com/golang/go/issues/11436
 		v := lpRegex.FindStringSubmatch(path)
 
@@ -169,7 +169,7 @@ func deduceRemoteRepo(path string) (rr *remoteRepo, err error) {
 		return
 
 	case glpRegex.MatchString(path):
-		// TODO same ambiguity issues as with normal bzr lp
+		// TODO(sdboyer) same ambiguity issues as with normal bzr lp
 		v := glpRegex.FindStringSubmatch(path)
 
 		rr.CloneURL.Host = "git.launchpad.net"
@@ -208,7 +208,7 @@ func deduceRemoteRepo(path string) (rr *remoteRepo, err error) {
 		switch v[5] {
 		case "git", "hg", "bzr":
 			x := strings.SplitN(v[1], "/", 2)
-			// TODO is this actually correct for bzr?
+			// TODO(sdboyer) is this actually correct for bzr?
 			rr.CloneURL.Host = x[0]
 			rr.CloneURL.Path = x[1]
 			rr.VCS = []string{v[5]}

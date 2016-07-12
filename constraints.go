@@ -1,4 +1,4 @@
-package vsolver
+package gps
 
 import (
 	"fmt"
@@ -14,7 +14,7 @@ var (
 // A Constraint provides structured limitations on the versions that are
 // admissible for a given project.
 //
-// As with Version, it has a private method because the vsolver's internal
+// As with Version, it has a private method because the gps's internal
 // implementation of the problem is complete, and the system relies on type
 // magic to operate.
 type Constraint interface {

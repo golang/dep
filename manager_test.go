@@ -1,8 +1,7 @@
-package vsolver
+package gps
 
 import (
 	"fmt"
-	"go/build"
 	"io/ioutil"
 	"os"
 	"path"
@@ -15,10 +14,13 @@ import (
 
 var bd string
 
-type dummyAnalyzer struct{}
+// An analyzer that passes nothing back, but doesn't error. This is the naive
+// case - no constraints, no lock, and no errors. The SourceMgr will interpret
+// this as open/Any constraints on everything in the import graph.
+type naiveAnalyzer struct{}
 
-func (dummyAnalyzer) GetInfo(ctx build.Context, p ProjectName) (Manifest, Lock, error) {
-	return SimpleManifest{N: p}, nil, nil
+func (naiveAnalyzer) GetInfo(string, ProjectRoot) (Manifest, Lock, error) {
+	return nil, nil, nil
 }
 
 func sv(s string) *semver.Version {
@@ -40,7 +42,7 @@ func TestSourceManagerInit(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to create temp dir: %s", err)
 	}
-	_, err = NewSourceManager(dummyAnalyzer{}, cpath, bd, false)
+	_, err = NewSourceManager(naiveAnalyzer{}, cpath, false)
 
 	if err != nil {
 		t.Errorf("Unexpected error on SourceManager creation: %s", err)
@@ -52,12 +54,12 @@ func TestSourceManagerInit(t *testing.T) {
 		}
 	}()
 
-	_, err = NewSourceManager(dummyAnalyzer{}, cpath, bd, false)
+	_, err = NewSourceManager(naiveAnalyzer{}, cpath, false)
 	if err == nil {
 		t.Errorf("Creating second SourceManager should have failed due to file lock contention")
 	}
 
-	sm, err := NewSourceManager(dummyAnalyzer{}, cpath, bd, true)
+	sm, err := NewSourceManager(naiveAnalyzer{}, cpath, true)
 	defer sm.Release()
 	if err != nil {
 		t.Errorf("Creating second SourceManager should have succeeded when force flag was passed, but failed with err %s", err)
@@ -78,7 +80,7 @@ func TestProjectManagerInit(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to create temp dir: %s", err)
 	}
-	sm, err := NewSourceManager(dummyAnalyzer{}, cpath, bd, false)
+	sm, err := NewSourceManager(naiveAnalyzer{}, cpath, false)
 
 	if err != nil {
 		t.Errorf("Unexpected error on SourceManager creation: %s", err)
@@ -92,7 +94,7 @@ func TestProjectManagerInit(t *testing.T) {
 	}()
 	defer sm.Release()
 
-	pn := ProjectName("github.com/Masterminds/VCSTestRepo")
+	pn := ProjectRoot("github.com/Masterminds/VCSTestRepo")
 	v, err := sm.ListVersions(pn)
 	if err != nil {
 		t.Errorf("Unexpected error during initial project setup/fetching %s", err)
@@ -124,13 +126,11 @@ func TestProjectManagerInit(t *testing.T) {
 	// ensure its sorting works, as well.
 	smc := &bridge{
 		sm:     sm,
-		vlists: make(map[ProjectName][]Version),
-		s: &solver{
-			o: SolveOpts{},
-		},
+		vlists: make(map[ProjectRoot][]Version),
+		s:      &solver{},
 	}
 
-	v, err = smc.listVersions(ProjectIdentifier{LocalName: pn})
+	v, err = smc.listVersions(ProjectIdentifier{ProjectRoot: pn})
 	if err != nil {
 		t.Errorf("Unexpected error during initial project setup/fetching %s", err)
 	}
@@ -160,7 +160,7 @@ func TestProjectManagerInit(t *testing.T) {
 
 	_, err = os.Stat(path.Join(cpath, "metadata", "github.com", "Masterminds", "VCSTestRepo", "cache.json"))
 	if err != nil {
-		// TODO temporarily disabled until we turn caching back on
+		// TODO(sdboyer) temporarily disabled until we turn caching back on
 		//t.Error("Metadata cache json file does not exist in expected location")
 	}
 
@@ -174,16 +174,8 @@ func TestProjectManagerInit(t *testing.T) {
 		t.Error("Repo should exist after non-erroring call to ListVersions")
 	}
 
-	exists, err = sm.VendorCodeExists(pn)
-	if err != nil {
-		t.Errorf("Error on checking VendorCodeExists: %s", err)
-	}
-	if exists {
-		t.Error("Shouldn't be any vendor code after just calling ListVersions")
-	}
-
 	// Now reach inside the black box
-	pms, err := sm.(*sourceManager).getProjectManager(pn)
+	pms, err := sm.getProjectManager(pn)
 	if err != nil {
 		t.Errorf("Error on grabbing project manager obj: %s", err)
 	}
@@ -205,14 +197,13 @@ func TestRepoVersionFetching(t *testing.T) {
 		t.Errorf("Failed to create temp dir: %s", err)
 	}
 
-	smi, err := NewSourceManager(dummyAnalyzer{}, cpath, bd, false)
+	sm, err := NewSourceManager(naiveAnalyzer{}, cpath, false)
 	if err != nil {
 		t.Errorf("Unexpected error on SourceManager creation: %s", err)
 		t.FailNow()
 	}
 
-	sm := smi.(*sourceManager)
-	upstreams := []ProjectName{
+	upstreams := []ProjectRoot{
 		"github.com/Masterminds/VCSTestRepo",
 		"bitbucket.org/mattfarina/testhgrepo",
 		"launchpad.net/govcstestbzrrepo",
@@ -317,7 +308,7 @@ func TestGetInfoListVersionsOrdering(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to create temp dir: %s", err)
 	}
-	sm, err := NewSourceManager(dummyAnalyzer{}, cpath, bd, false)
+	sm, err := NewSourceManager(naiveAnalyzer{}, cpath, false)
 
 	if err != nil {
 		t.Errorf("Unexpected error on SourceManager creation: %s", err)
@@ -333,7 +324,7 @@ func TestGetInfoListVersionsOrdering(t *testing.T) {
 
 	// setup done, now do the test
 
-	pn := ProjectName("github.com/Masterminds/VCSTestRepo")
+	pn := ProjectRoot("github.com/Masterminds/VCSTestRepo")
 
 	_, _, err = sm.GetProjectInfo(pn, NewVersion("1.0.0"))
 	if err != nil {
