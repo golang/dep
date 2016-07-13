@@ -22,6 +22,8 @@ as guides for folks [implementing
 tools](https://github.com/sdboyer/gps/wiki/gps-for-Implementors) or [looking
 to contribute](https://github.com/sdboyer/gps/wiki/Introduction-to-gps).
 
+**`gps` is still early-ish beta, with a liberal sprinkling of panics.**
+
 ## Wait...a package management _library_?!
 
 Yup. Because it's what the Go ecosystem needs right now.
@@ -71,11 +73,12 @@ predictable, well-formed system.
 * A **project** concept, where projects comprise the set of Go packages in a
   rooted directory tree.  By happy (not) accident, `vendor/` directories also
   just happen to cover a rooted tree.
-* A **manifest** and **lock** approach to tracking project manifest data. The
-  solver takes manifest (and, optionally, lock)-type data as inputs, and
-  produces lock-type data as its output. Tools decide how to actually
-  store this data, but these should generally be at the root of the
-  project tree.
+* A [**manifest**](https://godoc.org/github.com/sdboyer/gps#Manifest) and
+  [**lock**](https://godoc.org/github.com/sdboyer/gps#Lock) approach to
+  tracking version and constraint information. The solver takes manifest (and,
+  optionally, lock)-type data as inputs, and produces lock-type data as its
+  output. Tools decide how to actually store this data, but these should
+  generally be at the root of the project tree.
 
 Manifests? Locks? Eeew. Yes, we also think it'd be swell if we didn't need
 metadata files. We love the idea of Go packages as standalone, self-describing
