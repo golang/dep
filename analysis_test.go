@@ -698,6 +698,50 @@ func TestListPackages(t *testing.T) {
 				},
 			},
 		},
+		// has disallowed dir names
+		"disallowed dirs": {
+			fileRoot:   j("disallow"),
+			importRoot: "disallow",
+			out: PackageTree{
+				ImportRoot: "disallow",
+				Packages: map[string]PackageOrErr{
+					"disallow": {
+						P: Package{
+							ImportPath:  "disallow",
+							CommentPath: "",
+							Name:        "disallow",
+							Imports: []string{
+								"disallow/.m1p",
+								"github.com/sdboyer/gps",
+								"sort",
+							},
+						},
+					},
+					"disallow/.m1p": {
+						P: Package{
+							ImportPath:  "disallow/.m1p",
+							CommentPath: "",
+							Name:        "m1p",
+							Imports: []string{
+								"github.com/sdboyer/gps",
+								"os",
+								"sort",
+							},
+						},
+					},
+					"disallow/testdata": {
+						P: Package{
+							ImportPath:  "disallow/testdata",
+							CommentPath: "",
+							Name:        "testdata",
+							Imports: []string{
+								"hash",
+							},
+						},
+					},
+				},
+			},
+		},
 		// This case mostly exists for the PackageTree methods, but it does
 		// cover a bit of range
 		"varied": {
@@ -854,10 +898,7 @@ func TestListExternalImports(t *testing.T) {
 	var main, tests bool
 
 	validate := func() {
-		result, err := vptree.ListExternalImports(main, tests, ignore)
-		if err != nil {
-			t.Errorf("%q case returned err: %s", name, err)
-		}
+		result := vptree.ListExternalImports(main, tests, ignore)
 		if !reflect.DeepEqual(expect, result) {
 			t.Errorf("Wrong imports in %q case:\n\t(GOT): %s\n\t(WNT): %s", name, result, expect)
 		}
@@ -942,8 +983,7 @@ func TestListExternalImports(t *testing.T) {
 	ignore = map[string]bool{
 		"varied/simple": true,
 	}
-	// we get github.com/sdboyer/gps from m1p, too, so it should still be
-	// there
+	// we get github.com/sdboyer/gps from m1p, too, so it should still be there
 	except("go/parser")
 	validate()
 
@@ -990,6 +1030,18 @@ func TestListExternalImports(t *testing.T) {
 	}
 	except("sort", "github.com/sdboyer/gps", "go/parser")
 	validate()
+
+	// The only thing varied *doesn't* cover is disallowed path patterns
+	ptree, err := listPackages(filepath.Join(getwd(t), "_testdata", "src", "disallow"), "disallow")
+	if err != nil {
+		t.Fatalf("listPackages failed on disallow test case: %s", err)
+	}
+
+	result := ptree.ListExternalImports(false, false, nil)
+	expect = []string{"github.com/sdboyer/gps", "os", "sort"}
+	if !reflect.DeepEqual(expect, result) {
+		t.Errorf("Wrong imports in %q case:\n\t(GOT): %s\n\t(WNT): %s", name, result, expect)
+	}
 }
 
 func TestExternalReach(t *testing.T) {
@@ -1188,7 +1240,6 @@ func TestExternalReach(t *testing.T) {
 		"varied/namemismatch",
 	)
 	validate()
-
 }
 
 var _ = map[string][]string{

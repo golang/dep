@@ -14,8 +14,7 @@ package gps
 // not themselves import. This is by design, but its implications are complex.
 // See the gps docs for more information: https://github.com/sdboyer/gps/wiki
 type Manifest interface {
-	// Returns a list of project constraints that will be  universally to
-	// the depgraph.
+	// Returns a list of project-level constraints.
 	DependencyConstraints() []ProjectConstraint
 	// Returns a list of constraints applicable to test imports. Note that this
 	// will only be consulted for root manifests.

@@ -433,10 +433,10 @@ func (s *solver) selectRoot() error {
 	// If we're looking for root's deps, get it from opts and local root
 	// analysis, rather than having the sm do it
 	mdeps := append(s.rm.DependencyConstraints(), s.rm.TestDependencyConstraints()...)
-	reach, err := s.b.computeRootReach()
-	if err != nil {
-		return err
-	}
+
+	// Err is not possible at this point, as it could only come from
+	// listPackages(), which if we're here already succeeded for root
+	reach, _ := s.b.computeRootReach()
 
 	deps, err := s.intersectConstraintsWithImports(mdeps, reach)
 	if err != nil {

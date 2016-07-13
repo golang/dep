@@ -139,12 +139,18 @@ func listPackages(fileRoot, importRoot string) (PackageTree, error) {
 
 		// Skip dirs that are known to hold non-local/dependency code.
 		//
-		// We don't skip .*, _*, or testdata dirs because, while it may be poor
-		// form, it's not a compiler error to import them.
+		// We don't skip _*, or testdata dirs because, while it may be poor
+		// form, importing them is not a compilation error.
 		switch fi.Name() {
 		case "vendor", "Godeps":
 			return filepath.SkipDir
 		}
+		// We do skip dot-dirs, though, because it's such a ubiquitous standard
+		// that they not be visited by normal commands, and because things get
+		// really weird if we don't.
+		//
+		// TODO(sdboyer) does this entail that we should chuck dot-led import
+		// paths later on?
 		if strings.HasPrefix(fi.Name(), ".") {
 			return filepath.SkipDir
 		}
@@ -391,6 +397,14 @@ func wmToReach(workmap map[string]wm, basedir string) map[string][]string {
 			// path is poisoned.
 			var clean bool
 			for in := range w.in {
+				// It's possible, albeit weird, for a package to import itself.
+				// If we try to visit self, though, then it erroneously poisons
+				// the path, as it would be interpreted as grey. In reality,
+				// this becomes a no-op, so just skip it.
+				if in == pkg {
+					continue
+				}
+
 				clean = dfe(in, path)
 				if !clean {
 					// Path is poisoned. Our reachmap was already deleted by the
@@ -720,8 +734,8 @@ type PackageOrErr struct {
 // transitively imported by the internal packages in the tree.
 //
 // main indicates whether (true) or not (false) to include main packages in the
-// analysis. main packages should generally be excluded when analyzing the
-// non-root dependency, as they inherently can't be imported.
+// analysis. main packages are generally excluded when analyzing anything other
+// than the root project, as they inherently can't be imported.
 //
 // tests indicates whether (true) or not (false) to include imports from test
 // files in packages when computing the reach map.
@@ -826,9 +840,10 @@ func (t PackageTree) ExternalReach(main, tests bool, ignore map[string]bool) map
 //
 // If an internal path is ignored, all of the external packages that it uniquely
 // imports are omitted. Note, however, that no internal transitivity checks are
-// made here - every non-ignored package in the tree is considered
-// independently. That means, given a PackageTree with root A and packages at A,
-// A/foo, and A/bar, and the following import chain:
+// made here - every non-ignored package in the tree is considered independently
+// (with one set of exceptions, noted below). That means, given a PackageTree
+// with root A and packages at A, A/foo, and A/bar, and the following import
+// chain:
 //
 //  A -> A/foo -> A/bar -> B/baz
 //
@@ -854,50 +869,64 @@ func (t PackageTree) ExternalReach(main, tests bool, ignore map[string]bool) map
 // consideration; neither B/foo nor B/baz will be in the results. If A/bar, with
 // its errors, is ignored, however, then A will remain, and B/foo will be in the
 // results.
-func (t PackageTree) ListExternalImports(main, tests bool, ignore map[string]bool) ([]string, error) {
-	var someerrs bool
+//
+// Finally, note that if a directory is named "testdata", or has a leading dot
+// or underscore, it will not be directly analyzed as a source. This is in
+// keeping with Go tooling conventions that such directories should be ignored.
+// So, if:
+//
+//  A -> B/foo
+//  A/.bar -> B/baz
+//  A/_qux -> B/baz
+//  A/testdata -> B/baz
+//
+// Then B/foo will be returned, but B/baz will not, because all three of the
+// packages that import it are in directories with disallowed names.
+//
+// HOWEVER, in keeping with the Go compiler, if one of those packages in a
+// disallowed directory is imported by a package in an allowed directory, then
+// it *will* be used. That is, while tools like go list will ignore a directory
+// named .foo, you can still import from .foo. Thus, it must be included. So,
+// if:
+//
+//    -> B/foo
+//   /
+//  A
+//   \
+//    -> A/.bar -> B/baz
+//
+// A is legal, and it imports A/.bar, so the results will include B/baz.
+func (t PackageTree) ListExternalImports(main, tests bool, ignore map[string]bool) []string {
+	// First, we need a reachmap
+	rm := t.ExternalReach(main, tests, ignore)
+
 	exm := make(map[string]struct{})
-
-	if ignore == nil {
-		ignore = make(map[string]bool)
-	}
-
-	var imps []string
-	for ip, perr := range t.Packages {
-		if perr.Err != nil {
-			someerrs = true
-			continue
+	for pkg, reach := range rm {
+		// Eliminate import paths with any elements having leading dots, leading
+		// underscores, or testdata. If these are internally reachable (which is
+		// a no-no, but possible), any external imports will have already been
+		// pulled up through ExternalReach. The key here is that we don't want
+		// to treat such packages as themselves being sources.
+		//
+		// TODO(sdboyer) strings.Split will always heap alloc, which isn't great to do
+		// in a loop like this. We could also just parse it ourselves...
+		var skip bool
+		for _, elem := range strings.Split(pkg, "/") {
+			if strings.HasPrefix(elem, ".") || strings.HasPrefix(elem, "_") || elem == "testdata" {
+				skip = true
+				break
+			}
 		}
 
-		p := perr.P
-		// Skip main packages, unless param says otherwise
-		if p.Name == "main" && !main {
-			continue
-		}
-		// Skip ignored packages
-		if ignore[ip] {
-			continue
-		}
-
-		imps = imps[:0]
-		imps = p.Imports
-		if tests {
-			imps = dedupeStrings(imps, p.TestImports)
-		}
-
-		for _, imp := range imps {
-			if !checkPrefixSlash(filepath.Clean(imp), t.ImportRoot) && !ignore[imp] {
-				exm[imp] = struct{}{}
+		if !skip {
+			for _, ex := range reach {
+				exm[ex] = struct{}{}
 			}
 		}
 	}
 
 	if len(exm) == 0 {
-		if someerrs {
-			// TODO(sdboyer) proper errs
-			return nil, fmt.Errorf("No packages without errors in %s", t.ImportRoot)
-		}
-		return nil, nil
+		return nil
 	}
 
 	ex := make([]string, len(exm))
@@ -908,7 +937,7 @@ func (t PackageTree) ListExternalImports(main, tests bool, ignore map[string]boo
 	}
 
 	sort.Strings(ex)
-	return ex, nil
+	return ex
 }
 
 // checkPrefixSlash checks to see if the prefix is a prefix of the string as-is,

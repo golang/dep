@@ -375,7 +375,7 @@ func (b *bridge) computeRootReach() ([]string, error) {
 		return nil, err
 	}
 
-	return ptree.ListExternalImports(true, true, b.s.ig)
+	return ptree.ListExternalImports(true, true, b.s.ig), nil
 }
 
 func (b *bridge) listRootPackages() (PackageTree, error) {
