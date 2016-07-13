@@ -2,7 +2,7 @@ package disallow
 
 import (
 	"sort"
-	"disallow/.m1p"
+	"disallow/testdata"
 
 	"github.com/sdboyer/gps"
 )
@@ -10,5 +10,5 @@ import (
 var (
 	_ = sort.Strings
 	_ = gps.Solve
-	_ = m1p.S
+	_ = testdata.H
 )

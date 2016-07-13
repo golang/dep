@@ -711,24 +711,26 @@ func TestListPackages(t *testing.T) {
 							CommentPath: "",
 							Name:        "disallow",
 							Imports: []string{
-								"disallow/.m1p",
+								"disallow/testdata",
 								"github.com/sdboyer/gps",
 								"sort",
 							},
 						},
 					},
-					"disallow/.m1p": {
-						P: Package{
-							ImportPath:  "disallow/.m1p",
-							CommentPath: "",
-							Name:        "m1p",
-							Imports: []string{
-								"github.com/sdboyer/gps",
-								"os",
-								"sort",
-							},
-						},
-					},
+					// disallow/.m1p is ignored by listPackages...for now. Kept
+					// here commented because this might change again...
+					//"disallow/.m1p": {
+					//P: Package{
+					//ImportPath:  "disallow/.m1p",
+					//CommentPath: "",
+					//Name:        "m1p",
+					//Imports: []string{
+					//"github.com/sdboyer/gps",
+					//"os",
+					//"sort",
+					//},
+					//},
+					//},
 					"disallow/testdata": {
 						P: Package{
 							ImportPath:  "disallow/testdata",
@@ -1038,7 +1040,7 @@ func TestListExternalImports(t *testing.T) {
 	}
 
 	result := ptree.ListExternalImports(false, false, nil)
-	expect = []string{"github.com/sdboyer/gps", "os", "sort"}
+	expect = []string{"github.com/sdboyer/gps", "hash", "sort"}
 	if !reflect.DeepEqual(expect, result) {
 		t.Errorf("Wrong imports in %q case:\n\t(GOT): %s\n\t(WNT): %s", name, result, expect)
 	}
