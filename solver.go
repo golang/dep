@@ -479,7 +479,8 @@ func (s *solver) getImportsAndConstraintsOf(a atomWithPackages) ([]completeDep, 
 	// Add the packages reached by the packages explicitly listed in the atom to
 	// the list
 	for _, pkg := range a.pl {
-		if expkgs, exists := allex[pkg]; !exists {
+		expkgs, exists := allex[pkg]
+		if !exists {
 			// missing package here *should* only happen if the target pkg was
 			// poisoned somehow - check the original ptree.
 			if perr, exists := ptree.Packages[pkg]; exists {
@@ -490,10 +491,10 @@ func (s *solver) getImportsAndConstraintsOf(a atomWithPackages) ([]completeDep, 
 			}
 			// Nope, it's actually not there. This shouldn't happen.
 			return nil, fmt.Errorf("package %s does not exist within project %s", pkg, a.a.id.errString())
-		} else {
-			for _, ex := range expkgs {
-				exmap[ex] = struct{}{}
-			}
+		}
+
+		for _, ex := range expkgs {
+			exmap[ex] = struct{}{}
 		}
 	}
 
@@ -1032,7 +1033,7 @@ func (s *solver) selectAtomWithPackages(a atomWithPackages) {
 
 	// If this atom has a lock, pull it out so that we can potentially inject
 	// preferred versions into any bmis we enqueue
-	_, l, err := s.b.getProjectInfo(a.a)
+	_, l, _ := s.b.getProjectInfo(a.a)
 	var lmap map[ProjectIdentifier]Version
 	if l != nil {
 		lmap = make(map[ProjectIdentifier]Version)
@@ -1094,7 +1095,7 @@ func (s *solver) selectPackages(a atomWithPackages) {
 
 	// If this atom has a lock, pull it out so that we can potentially inject
 	// preferred versions into any bmis we enqueue
-	_, l, err := s.b.getProjectInfo(a.a)
+	_, l, _ := s.b.getProjectInfo(a.a)
 	var lmap map[ProjectIdentifier]Version
 	if l != nil {
 		lmap = make(map[ProjectIdentifier]Version)

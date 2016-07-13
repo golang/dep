@@ -571,9 +571,8 @@ func (sm *bmSourceManager) GetProjectInfo(n ProjectRoot, v Version) (Manifest, L
 		if n == ds.n && v.Matches(ds.v) {
 			if l, exists := sm.lm[string(n)+" "+v.String()]; exists {
 				return ds, l, nil
-			} else {
-				return ds, dummyLock{}, nil
 			}
+			return ds, dummyLock{}, nil
 		}
 	}
 

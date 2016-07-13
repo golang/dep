@@ -1155,17 +1155,17 @@ func (l fixLock) Projects() []LockedProject {
 type dummyLock struct{}
 
 // impl Lock interface
-func (_ dummyLock) SolverVersion() string {
+func (dummyLock) SolverVersion() string {
 	return "-1"
 }
 
 // impl Lock interface
-func (_ dummyLock) InputHash() []byte {
+func (dummyLock) InputHash() []byte {
 	return []byte("fooooorooooofooorooofoo")
 }
 
 // impl Lock interface
-func (_ dummyLock) Projects() []LockedProject {
+func (dummyLock) Projects() []LockedProject {
 	return nil
 }
 

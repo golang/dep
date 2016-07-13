@@ -435,6 +435,6 @@ func TestIgnoreDedupe(t *testing.T) {
 	}
 
 	if !reflect.DeepEqual(ts.ig, expect) {
-		t.Errorf("Expected solver's ignore list to be deduplicated map, got %s", ts.ig)
+		t.Errorf("Expected solver's ignore list to be deduplicated map, got %v", ts.ig)
 	}
 }

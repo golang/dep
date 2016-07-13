@@ -288,7 +288,7 @@ type LocalImportsError struct {
 }
 
 func (e *LocalImportsError) Error() string {
-	return fmt.Sprintf("import path %s had problematic local imports")
+	return fmt.Sprintf("import path %s had problematic local imports", e.Dir)
 }
 
 type wm struct {

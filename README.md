@@ -2,6 +2,8 @@
 ![map-marker-icon copy](https://cloud.githubusercontent.com/assets/21599/16779217/4f5cdc6c-483f-11e6-9de3-661f13d9b215.png)
 --
 
+[![CircleCI](https://circleci.com/gh/sdboyer/gps.svg?style=svg)](https://circleci.com/gh/sdboyer/gps) [![Go Report Card](https://goreportcard.com/badge/github.com/sdboyer/gps)](https://goreportcard.com/report/github.com/sdboyer/gps) [![GoDoc](https://godoc.org/github.com/sdboyer/gps?status.svg)](https://godoc.org/github.com/sdboyer/gps)
+
 `gps` is the Go Packaging Solver. It is an engine for tackling dependency
 management problems in Go. You can replicate the fetching bits of `go get`,
 modulo arguments, [in about 30 lines of

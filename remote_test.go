@@ -451,7 +451,7 @@ func TestDeduceRemotes(t *testing.T) {
 			t.Errorf("deduceRemoteRepo(%q): RelPkg was %s, wanted %s", fix.path, got.RelPkg, want.RelPkg)
 		}
 		if !reflect.DeepEqual(got.CloneURL, want.CloneURL) {
-			// mispelling things is cool when it makes columns line up
+			// misspelling things is cool when it makes columns line up
 			t.Errorf("deduceRemoteRepo(%q): CloneURL disagreement:\n(GOT) %s\n(WNT) %s", fix.path, ufmt(got.CloneURL), ufmt(want.CloneURL))
 		}
 		if !reflect.DeepEqual(got.VCS, want.VCS) {

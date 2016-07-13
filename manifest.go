@@ -33,12 +33,12 @@ type SimpleManifest struct {
 
 var _ Manifest = SimpleManifest{}
 
-// GetDependencies returns the project's dependencies.
+// DependencyConstraints returns the project's dependencies.
 func (m SimpleManifest) DependencyConstraints() []ProjectConstraint {
 	return m.Deps
 }
 
-// GetDependencies returns the project's test dependencies.
+// TestDependencyConstraints returns the project's test dependencies.
 func (m SimpleManifest) TestDependencyConstraints() []ProjectConstraint {
 	return m.TestDeps
 }

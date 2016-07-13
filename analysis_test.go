@@ -985,8 +985,8 @@ func TestListExternalImports(t *testing.T) {
 	name = "ignore external"
 	ignore = map[string]bool{
 		"github.com/sdboyer/gps": true,
-		"go/parser":                  true,
-		"sort":                       true,
+		"go/parser":              true,
+		"sort":                   true,
 	}
 	except("sort", "github.com/sdboyer/gps", "go/parser")
 	validate()
