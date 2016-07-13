@@ -13,8 +13,13 @@ import (
 )
 
 // This is probably the simplest possible implementation of gps. It does the
-// substantive work that `go get` does, except it drops the resulting tree into
-// vendor/, and prefers semver tags (if available) over branches.
+// substantive work that `go get` does, except:
+//  1. It drops the resulting tree into vendor instead of GOPATH
+//  2. It prefers semver tags (if available) over branches
+//  3. It removes any vendor directories nested within dependencies
+//
+//  This will compile and work...and then blow away the vendor directory present
+//  in the cwd, if any. Be careful!
 func main() {
 	// Operate on the current directory
 	root, _ := os.Getwd()
