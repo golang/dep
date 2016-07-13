@@ -14,7 +14,7 @@ the problem in a consistent,
 [holistic](https://medium.com/@sdboyer/so-you-want-to-write-a-package-manager-4ae9c17d9527)
 way. `gps` is [on track](https://github.com/Masterminds/glide/pull/384) to become the engine behind [glide](https://glide.sh).
 
-The wiki has a [general introduction the `gps`
+The wiki has a [general introduction to the `gps`
 approach](https://github.com/sdboyer/gps/wiki/Introduction-to-gps), as well
 as guides for folks [implementing
 tools](https://github.com/sdboyer/gps/wiki/gps-for-Implementors) or [looking
@@ -48,9 +48,9 @@ differences](https://docs.google.com/document/d/1xrV9D5u8AKu1ip-A1W9JqhUmmeOhoI6
 are incidental - and, given the right general solution, reconcilable. `gps` is
 our attempt at such a solution.
 
-By separating out the underlying problem into a comprehensible library, we are
-hoping to provide a common foundation for different tools. Such a foundation, we
-hope, could improve interoperability, reduce harm to the community, and make the
+By separating out the underlying problem into a standalone library, we are
+hoping to provide a common foundation for different tools. Such a foundation
+could improve interoperability, reduce harm to the ecosystem, and make the
 communal process of figuring out what's right for Go more about collaboration,
 and less about fiefdoms.
 
@@ -78,7 +78,7 @@ predictable, well-formed system.
 Manifests? Locks? Eeew. Yes, we also think it'd be swell if we didn't need
 metadata files. We love the idea of Go packages as standalone, self-describing
 code. Unfortunately, the wheels come off that idea as soon as versioning and
-cross-project/repository dependencies happen. But Universe alignment is hard;
+cross-project/repository dependencies happen. But universe alignment is hard;
 trying to intermix version information directly with the code would only make
 matters worse.
 
