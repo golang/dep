@@ -20,7 +20,7 @@ The wiki has a [general introduction to the `gps`
 approach](https://github.com/sdboyer/gps/wiki/Introduction-to-gps), as well
 as guides for folks [implementing
 tools](https://github.com/sdboyer/gps/wiki/gps-for-Implementors) or [looking
-to contribute](https://github.com/sdboyer/gps/wiki/Introduction-to-gps).
+to contribute](https://github.com/sdboyer/gps/wiki/gps-for-Contributors).
 
 **`gps` is progressing rapidly, but still in beta, with a concomitantly liberal sprinkling of panics.**
 
