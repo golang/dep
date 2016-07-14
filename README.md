@@ -22,7 +22,7 @@ as guides for folks [implementing
 tools](https://github.com/sdboyer/gps/wiki/gps-for-Implementors) or [looking
 to contribute](https://github.com/sdboyer/gps/wiki/Introduction-to-gps).
 
-**`gps` is progressing rapidly, but still beta, with a liberal sprinkling of panics.**
+**`gps` is progressing rapidly, but still in beta, with a concomitantly liberal sprinkling of panics.**
 
 ## Wait...a package management _library_?!
 
