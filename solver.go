@@ -162,9 +162,19 @@ type solver struct {
 }
 
 // A Solver is the main workhorse of gps: given a set of project inputs, it
-// performs a constraint solving analysis to develop a complete Result that can
-// be used as a lock file, and to populate a vendor directory.
+// performs a constraint solving analysis to develop a complete Solution, or
+// else fail with an informative error.
+//
+// If a Solution is found, an implementing tool may persist it - typically into
+// what a "lock file" - and/or use it to write out a directory tree of
+// dependencies, suitable to be a vendor directory, via CreateVendorTree.
 type Solver interface {
+	// HashInputs produces a hash digest representing the unique inputs to this
+	// solver. It is guaranteed that, if the hash digest is equal to the digest
+	// from a previous Solution.InputHash(), that that Solution is valid for
+	// this Solver's inputs.
+	//
+	// In such a case, it may not be necessary to run Solve() at all.
 	HashInputs() ([]byte, error)
 	Solve() (Solution, error)
 }
