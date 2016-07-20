@@ -79,33 +79,24 @@ func (s *solver) traceInfo(args ...interface{}) {
 		return
 	}
 
-	preflen := len(s.vqs)
-	var msg string
 	if len(args) == 0 {
-		// Generate message based on current solver state
-		if len(s.vqs) == 0 {
-			msg = successCharSp + "(root)"
-		} else {
-			vq := s.vqs[len(s.vqs)-1]
-			msg = fmt.Sprintf("%s select %s at %s", successChar, vq.id.errString(), vq.current())
-		}
-	} else {
-		// Use longer prefix length for these cases, as they're the intermediate
-		// work
-		preflen++
-		switch data := args[0].(type) {
-		case string:
-			msg = tracePrefix(fmt.Sprintf(data, args[1:]), "| ", "| ")
-		case traceError:
-			// We got a special traceError, use its custom method
-			msg = tracePrefix(data.traceString(), "| ", failCharSp)
-		case error:
-			// Regular error; still use the x leader but default Error() string
-			msg = tracePrefix(data.Error(), "| ", failCharSp)
-		default:
-			// panic here because this can *only* mean a stupid internal bug
-			panic("canary - must pass a string as first arg to traceInfo, or no args at all")
-		}
+		panic("must pass at least one param to traceInfo")
+	}
+
+	preflen := len(s.vqs) + 1
+	var msg string
+	switch data := args[0].(type) {
+	case string:
+		msg = tracePrefix(fmt.Sprintf(data, args[1:]), "| ", "| ")
+	case traceError:
+		// We got a special traceError, use its custom method
+		msg = tracePrefix(data.traceString(), "| ", failCharSp)
+	case error:
+		// Regular error; still use the x leader but default Error() string
+		msg = tracePrefix(data.Error(), "| ", failCharSp)
+	default:
+		// panic here because this can *only* mean a stupid internal bug
+		panic(fmt.Sprintf("canary - unknown type passed as first param to traceInfo %T", data))
 	}
 
 	prefix := strings.Repeat("| ", preflen)
