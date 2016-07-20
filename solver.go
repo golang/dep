@@ -280,12 +280,14 @@ func (s *solver) Solve() (Solution, error) {
 
 	// Solver finished with an err; return that and we're done
 	if err != nil {
+		s.logFailure(err)
 		return nil, err
 	}
 
 	r := solution{
 		att: s.attempts,
 	}
+	s.logSuccess(r)
 
 	// An err here is impossible at this point; we already know the root tree is
 	// fine
@@ -1183,6 +1185,27 @@ func (s *solver) logStart(bmi bimodalIdentifier) {
 	prefix := strings.Repeat("| ", len(s.vqs)+1)
 	// TODO(sdboyer) how...to list the packages in the limited space we have?
 	s.tl.Printf("%s\n", tracePrefix(fmt.Sprintf("? attempting %s (with %v packages)", bmi.id.errString(), len(bmi.pl)), prefix, prefix))
+}
+
+func (s *solver) logSuccess(sol solution) {
+	if !s.params.Trace {
+		return
+	}
+
+	var pkgcount int
+	for _, lp := range sol.Projects() {
+		pkgcount += len(lp.pkgs)
+	}
+
+	s.tl.Printf("%s found solution with %v packages from %v projects", successChar, pkgcount, len(sol.Projects()))
+}
+
+func (s *solver) logFailure(e error) {
+	if !s.params.Trace {
+		return
+	}
+
+	s.tl.Printf("%s solving failed", failChar)
 }
 
 func (s *solver) logSolve(args ...interface{}) {
