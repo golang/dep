@@ -1168,6 +1168,13 @@ func (s *solver) unselectLast() (atomWithPackages, bool) {
 	return awp, first
 }
 
+const (
+	successChar   = "✓"
+	successCharSp = successChar + " "
+	failChar      = "✗"
+	failCharSp    = failChar + " "
+)
+
 func (s *solver) logStart(bmi bimodalIdentifier) {
 	if !s.params.Trace {
 		return
@@ -1188,10 +1195,10 @@ func (s *solver) logSolve(args ...interface{}) {
 	if len(args) == 0 {
 		// Generate message based on current solver state
 		if len(s.vqs) == 0 {
-			msg = "✓ (root)"
+			msg = successCharSp + "(root)"
 		} else {
 			vq := s.vqs[len(s.vqs)-1]
-			msg = fmt.Sprintf("✓ select %s at %s", vq.id.errString(), vq.current())
+			msg = fmt.Sprintf("%s select %s at %s", successChar, vq.id.errString(), vq.current())
 		}
 	} else {
 		// Use longer prefix length for these cases, as they're the intermediate
@@ -1202,10 +1209,10 @@ func (s *solver) logSolve(args ...interface{}) {
 			msg = tracePrefix(fmt.Sprintf(data, args[1:]), "| ", "| ")
 		case traceError:
 			// We got a special traceError, use its custom method
-			msg = tracePrefix(data.traceString(), "| ", "✗ ")
+			msg = tracePrefix(data.traceString(), "| ", failCharSp)
 		case error:
 			// Regular error; still use the x leader but default Error() string
-			msg = tracePrefix(data.Error(), "| ", "✗ ")
+			msg = tracePrefix(data.Error(), "| ", failCharSp)
 		default:
 			// panic here because this can *only* mean a stupid internal bug
 			panic("canary - must pass a string as first arg to logSolve, or no args at all")
