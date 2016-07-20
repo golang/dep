@@ -12,43 +12,43 @@ func (s *solver) checkProject(a atomWithPackages) error {
 	}
 
 	if err := s.checkAtomAllowable(pa); err != nil {
-		s.logSolve(err)
+		s.traceInfo(err)
 		return err
 	}
 
 	if err := s.checkRequiredPackagesExist(a); err != nil {
-		s.logSolve(err)
+		s.traceInfo(err)
 		return err
 	}
 
 	deps, err := s.getImportsAndConstraintsOf(a)
 	if err != nil {
 		// An err here would be from the package fetcher; pass it straight back
-		// TODO(sdboyer) can we logSolve this?
+		// TODO(sdboyer) can we traceInfo this?
 		return err
 	}
 
 	for _, dep := range deps {
 		if err := s.checkIdentMatches(a, dep); err != nil {
-			s.logSolve(err)
+			s.traceInfo(err)
 			return err
 		}
 		if err := s.checkDepsConstraintsAllowable(a, dep); err != nil {
-			s.logSolve(err)
+			s.traceInfo(err)
 			return err
 		}
 		if err := s.checkDepsDisallowsSelected(a, dep); err != nil {
-			s.logSolve(err)
+			s.traceInfo(err)
 			return err
 		}
 		// TODO(sdboyer) decide how to refactor in order to re-enable this. Checking for
 		// revision existence is important...but kinda obnoxious.
 		//if err := s.checkRevisionExists(a, dep); err != nil {
-		//s.logSolve(err)
+		//s.traceInfo(err)
 		//return err
 		//}
 		if err := s.checkPackageImportsFromDepExist(a, dep); err != nil {
-			s.logSolve(err)
+			s.traceInfo(err)
 			return err
 		}
 
@@ -73,31 +73,31 @@ func (s *solver) checkPackage(a atomWithPackages) error {
 	deps, err := s.getImportsAndConstraintsOf(a)
 	if err != nil {
 		// An err here would be from the package fetcher; pass it straight back
-		// TODO(sdboyer) can we logSolve this?
+		// TODO(sdboyer) can we traceInfo this?
 		return err
 	}
 
 	for _, dep := range deps {
 		if err := s.checkIdentMatches(a, dep); err != nil {
-			s.logSolve(err)
+			s.traceInfo(err)
 			return err
 		}
 		if err := s.checkDepsConstraintsAllowable(a, dep); err != nil {
-			s.logSolve(err)
+			s.traceInfo(err)
 			return err
 		}
 		if err := s.checkDepsDisallowsSelected(a, dep); err != nil {
-			s.logSolve(err)
+			s.traceInfo(err)
 			return err
 		}
 		// TODO(sdboyer) decide how to refactor in order to re-enable this. Checking for
 		// revision existence is important...but kinda obnoxious.
 		//if err := s.checkRevisionExists(a, dep); err != nil {
-		//s.logSolve(err)
+		//s.traceInfo(err)
 		//return err
 		//}
 		if err := s.checkPackageImportsFromDepExist(a, dep); err != nil {
-			s.logSolve(err)
+			s.traceInfo(err)
 			return err
 		}
 	}

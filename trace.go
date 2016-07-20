@@ -12,7 +12,7 @@ const (
 	failCharSp    = failChar + " "
 )
 
-func (s *solver) logVisit(bmi bimodalIdentifier) {
+func (s *solver) traceVisit(bmi bimodalIdentifier) {
 	if !s.params.Trace {
 		return
 	}
@@ -23,7 +23,7 @@ func (s *solver) logVisit(bmi bimodalIdentifier) {
 }
 
 // Called just once after solving has finished, whether success or not
-func (s *solver) logFinish(sol solution, err error) {
+func (s *solver) traceFinish(sol solution, err error) {
 	if !s.params.Trace {
 		return
 	}
@@ -39,8 +39,8 @@ func (s *solver) logFinish(sol solution, err error) {
 	}
 }
 
-// logSelectRoot is called just once, when the root project is selected
-func (s *solver) logSelectRoot(ptree PackageTree, cdeps []completeDep) {
+// traceSelectRoot is called just once, when the root project is selected
+func (s *solver) traceSelectRoot(ptree PackageTree, cdeps []completeDep) {
 	if !s.params.Trace {
 		return
 	}
@@ -62,8 +62,8 @@ func (s *solver) logSelectRoot(ptree PackageTree, cdeps []completeDep) {
 	s.tl.Printf(successCharSp + "select (root)")
 }
 
-// logSelect is called when an atom is successfully selected
-func (s *solver) logSelect(awp atomWithPackages) {
+// traceSelect is called when an atom is successfully selected
+func (s *solver) traceSelect(awp atomWithPackages) {
 	if !s.params.Trace {
 		return
 	}
@@ -74,7 +74,7 @@ func (s *solver) logSelect(awp atomWithPackages) {
 	s.tl.Printf("%s\n", tracePrefix(msg, prefix, prefix))
 }
 
-func (s *solver) logSolve(args ...interface{}) {
+func (s *solver) traceInfo(args ...interface{}) {
 	if !s.params.Trace {
 		return
 	}
@@ -104,7 +104,7 @@ func (s *solver) logSolve(args ...interface{}) {
 			msg = tracePrefix(data.Error(), "| ", failCharSp)
 		default:
 			// panic here because this can *only* mean a stupid internal bug
-			panic("canary - must pass a string as first arg to logSolve, or no args at all")
+			panic("canary - must pass a string as first arg to traceInfo, or no args at all")
 		}
 	}
 

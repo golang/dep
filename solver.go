@@ -295,7 +295,7 @@ func (s *solver) Solve() (Solution, error) {
 		}
 	}
 
-	s.logFinish(soln, err)
+	s.traceFinish(soln, err)
 	return soln, err
 }
 
@@ -320,7 +320,7 @@ func (s *solver) solve() (map[atom]map[string]struct{}, error) {
 		if awp, is := s.sel.selected(bmi.id); !is {
 			// Analysis path for when we haven't selected the project yet - need
 			// to create a version queue.
-			s.logVisit(bmi)
+			s.traceVisit(bmi)
 			queue, err := s.createVersionQueue(bmi)
 			if err != nil {
 				// Err means a failure somewhere down the line; try backtracking.
@@ -344,7 +344,7 @@ func (s *solver) solve() (map[atom]map[string]struct{}, error) {
 			}
 			s.selectAtomWithPackages(awp)
 			s.vqs = append(s.vqs, queue)
-			s.logSelect(awp)
+			s.traceSelect(awp)
 		} else {
 			// We're just trying to add packages to an already-selected project.
 			// That means it's not OK to burn through the version queue for that
@@ -365,7 +365,7 @@ func (s *solver) solve() (map[atom]map[string]struct{}, error) {
 				pl: bmi.pl,
 			}
 
-			s.logVisit(bmi) // TODO(sdboyer) different special start logger for this path
+			s.traceVisit(bmi) // TODO(sdboyer) different special start logger for this path
 			err := s.checkPackage(nawp)
 			if err != nil {
 				// Err means a failure somewhere down the line; try backtracking.
@@ -379,7 +379,7 @@ func (s *solver) solve() (map[atom]map[string]struct{}, error) {
 			// We don't add anything to the stack of version queues because the
 			// backtracker knows not to pop the vqstack if it backtracks
 			// across a pure-package addition.
-			s.logSelect(nawp)
+			s.traceSelect(nawp)
 		}
 	}
 
@@ -459,7 +459,7 @@ func (s *solver) selectRoot() error {
 		heap.Push(s.unsel, bimodalIdentifier{id: dep.Ident, pl: dep.pl, fromRoot: true})
 	}
 
-	s.logSelectRoot(ptree, deps)
+	s.traceSelectRoot(ptree, deps)
 	return nil
 }
 
@@ -842,12 +842,12 @@ func (s *solver) getLockVersionIfValid(id ProjectIdentifier) (Version, error) {
 		}
 
 		if !found {
-			s.logSolve("%s in root lock, but current constraints disallow it", id.errString())
+			s.traceInfo("%s in root lock, but current constraints disallow it", id.errString())
 			return nil, nil
 		}
 	}
 
-	s.logSolve("using root lock's version of %s", id.errString())
+	s.traceInfo("using root lock's version of %s", id.errString())
 
 	return v, nil
 }
@@ -904,12 +904,12 @@ func (s *solver) backtrack() bool {
 				// reusing the old awp is fine
 				awp.a.v = q.current()
 				s.selectAtomWithPackages(awp)
-				s.logSelect(awp)
+				s.traceSelect(awp)
 				break
 			}
 		}
 
-		s.logSolve("no more versions of %s, backtracking", q.id.errString())
+		s.traceInfo("no more versions of %s, backtracking", q.id.errString())
 
 		// No solution found; continue backtracking after popping the queue
 		// we just inspected off the list
