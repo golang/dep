@@ -14,7 +14,13 @@ that package management (and adjacent) tools can use to solve the
 [hard](https://en.wikipedia.org/wiki/Boolean_satisfiability_problem) parts of
 the problem in a consistent,
 [holistic](https://medium.com/@sdboyer/so-you-want-to-write-a-package-manager-4ae9c17d9527)
-way. `gps` is [on track](https://github.com/Masterminds/glide/pull/384) to become the engine behind [glide](https://glide.sh).
+way. It is a distillation of the ideas behind language package managers like
+[bundler](http://bundler.io), [npm](https://www.npmjs.com/),
+[elm-package](https://github.com/elm-lang/elm-package),
+[cargo](https://crates.io/) (and others) into a library, artisanally
+handcrafted with ❤️ for Go's specific requirements.
+
+`gps` is [on track](https://github.com/Masterminds/glide/pull/384) to become the engine behind [glide](https://glide.sh).
 
 The wiki has a [general introduction to the `gps`
 approach](https://github.com/sdboyer/gps/wiki/Introduction-to-gps), as well
@@ -26,66 +32,66 @@ to contribute](https://github.com/sdboyer/gps/wiki/gps-for-Contributors).
 
 ## Wait...a package management _library_?!
 
-Yup. Because it's what the Go ecosystem needs right now.
+Yup. See [the rationale](https://github.com/sdboyer/gps/wiki/Rationale).
 
-There are [scads of
-tools](https://github.com/golang/go/wiki/PackageManagementTools) out there, each
-tackling some slice of the Go package management domain. Some handle more than
-others, some impose more restrictions than others, and most are mutually
-incompatible (or mutually indifferent, which amounts to the same). This
-fragments the Go FLOSS ecosystem, harming the community as a whole.
+## Features
 
-As in all epic software arguments, some of the points of disagreement between
-tools/their authors are a bit silly. Many, though, are based on legitimate
-differences of opinion about what workflows, controls, and interfaces are
-best to give Go developers.
+A feature list for a package management library is a bit different than one for
+a package management tool. Instead of listing the things an end-user can do,
+we list the choices a tool *can* make and offer, in some form, to its users, as
+well as the non-choices/assumptions/constraints that `gps` imposes on a tool.
 
-Now, we're certainly no less opinionated than anyone else. But part of the
-challenge has been that, with a problem as
-[complex](https://medium.com/@sdboyer/so-you-want-to-write-a-package-manager-4ae9c17d9527)
-as package management, subtle design decisions made in pursuit of a particular
-workflow or interface can have far-reaching effects on architecture, leading to
-deep incompatibilities between tools and approaches.
+### Non-Choices
 
-We believe that many of [these
-differences](https://docs.google.com/document/d/1xrV9D5u8AKu1ip-A1W9JqhUmmeOhoI6d6zjVwvdn5mc/edit?usp=sharing)
-are incidental - and, given the right general solution, reconcilable. `gps` is
-our attempt at such a solution.
+We'd love for `gps`'s non-choices to be noncontroversial. But that's not always
+the case. Nevertheless, we have them because together, they tend to make
+experiments and discussion around Go package management coherent and
+productive.
 
-By separating out the underlying problem into a standalone library, we are
-hoping to provide a common foundation for different tools. Such a foundation
-could improve interoperability, reduce harm to the ecosystem, and make the
-communal process of figuring out what's right for Go more about collaboration,
-and less about fiefdoms.
+* Go >=1.6, or 1.5 with `GO15VENDOREXPERIMENT = 1` set
+* Everything under `vendor/` is volatile and controlled solely by the tool
+* A central cache of repositories is used (cannot be `GOPATH`)
+* A [**project**](https://godoc.org/github.com/sdboyer/gps#ProjectRoot) concept:
+  a tree of packages, all covered by one `vendor` directory
+* A [**manifest** and
+  **lock**](https://github.com/sdboyer/gps/wiki/gps-for-Implementors#manifests-and-locks)
+  approach to tracking version and constraint information
+* Source repositories can be `git`, `bzr`, `hg` or `svn` (Most of the work here is through a [separate lib](https://github.com/Masterminds/vcs))
+* What the available versions are for a given project/repository
+  * Branches, tags, and revisions are the units of versioning
+  * Tags are divided into [semver](https://semver.org) and not
+  * In general, semver tags before plain tags, before branches
+* The actual packages required (determined through import graph static analysis)
+  * How the import graph is statically analyzed (Similar to `go/build`, but with a combinatorial view of build tags)
+* Package import cycles are not allowed ([not yet implemented](https://github.com/sdboyer/gps/issues/66))
 
-### Assumptions
+There are also some current non-choices that we would like to push into the realm of choice:
 
-Ideally, `gps` could provide this shared foundation with no additional
-assumptions beyond pure Go source files. Sadly, package management is too
-complex to be assumption-less. So, `gps` tries to keep its assumptions to the
-minimum, supporting as many situations as possible while still maintaining a
-predictable, well-formed system.
+* Different versions of packages from the same repository cannot be used
+* Importable projects that are not bound to the repository root
 
-* Go 1.6, or 1.5 with `GO15VENDOREXPERIMENT = 1` set. `vendor/`
-  directories are a requirement.
-* You don't manually change what's under `vendor/`. That’s tooling’s
-  job.
-* A **project** concept, where projects comprise the set of Go packages in a
-  rooted directory tree.  By happy (not) accident, `vendor/` directories also
-  just happen to cover a rooted tree.
-* A [**manifest**](https://godoc.org/github.com/sdboyer/gps#Manifest) and
-  [**lock**](https://godoc.org/github.com/sdboyer/gps#Lock) approach to
-  tracking version and constraint information. The solver takes manifest (and,
-  optionally, lock)-type data as inputs, and produces lock-type data as its
-  output. Tools decide how to actually store this data, but these should
-  generally be at the root of the project tree.
+### Choices
 
-Manifests? Locks? Eeew. Yes, we also think it'd be swell if we didn't need
-metadata files. We love the idea of Go packages as standalone, self-describing
-code. Unfortunately, the wheels come off that idea as soon as versioning and
-cross-project/repository dependencies happen. But universe alignment is hard;
-trying to intermix version information directly with the code would only make
-matters worse.
+These choices represent many of the ways that `gps`-based tools could
+substantively differ from each other. In general, these are things on which
+reasonable people could, or have, disagreed as to how tooling should work.
+
+* How to store manifest and lock information (file(s)? a db?)
+* Which of the other package managers to interoperate with
+* Which types of version constraints to allow the user to specify (e.g., allowing [semver ranges](https://docs.npmjs.com/misc/semver) or not)
+* Whether or not to strip nested `vendor` directories
+* Which packages in the import graph to [ignore](https://github.com/sdboyer/gps/wiki/gps-for-Implementors#ignoring-packages)
+* What [informational output](https://github.com/sdboyer/gps/wiki/gps-for-Implementors#trace-and-tracelogger) to show the end user
+* What dependency version constraints are declared by the [root project](https://github.com/sdboyer/gps/wiki/gps-for-Implementors#manifest-data)
+* What dependency version constraints are declared by [all dependencies](https://github.com/sdboyer/gps/wiki/gps-for-Implementors#the-projectanalyzer)
+* Given a [previous solution](https://github.com/sdboyer/gps/wiki/gps-for-Implementors#lock-data), [which versions to let change, and how](https://github.com/sdboyer/gps/wiki/gps-for-Implementors#tochange-changeall-and-downgrade)
+  * In the absence of a previous solution, whether or not to use [preferred versions](https://github.com/sdboyer/gps/wiki/gps-for-Implementors#preferred-versions)
+* Allowing, or not, the user to [swap in different network names](https://github.com/sdboyer/gps/wiki/gps-for-Implementors#projectidentifier) for import paths (e.g. forks)
+* Specifying additional input/source packages not reachable from the root import graph ([not complete]((https://github.com/sdboyer/gps/issues/42)))
+
+This list may not be exhaustive - see the
+[implementor's guide](https://github.com/sdboyer/gps/wiki/gps-for-Implementors)
+for a proper treatment.
 
 ## Contributing
 
