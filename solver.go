@@ -278,30 +278,28 @@ func (s *solver) Solve() (Solution, error) {
 	s.logSolve()
 	all, err := s.solve()
 
-	// Solver finished with an err; return that and we're done
-	if err != nil {
-		s.logFailure(err)
-		return nil, err
+	var soln solution
+	if err == nil {
+		soln = solution{
+			att: s.attempts,
+		}
+
+		// An err here is impossible; it could only be caused by a parsing error
+		// of the root tree, but that necessarily succeeded back up
+		// selectRoot(), so we can ignore this err
+		soln.hd, _ = s.HashInputs()
+
+		// Convert ProjectAtoms into LockedProjects
+		soln.p = make([]LockedProject, len(all))
+		k := 0
+		for pa, pl := range all {
+			soln.p[k] = pa2lp(pa, pl)
+			k++
+		}
 	}
 
-	r := solution{
-		att: s.attempts,
-	}
-	s.logSuccess(r)
-
-	// An err here is impossible at this point; we already know the root tree is
-	// fine
-	r.hd, _ = s.HashInputs()
-
-	// Convert ProjectAtoms into LockedProjects
-	r.p = make([]LockedProject, len(all))
-	k := 0
-	for pa, pl := range all {
-		r.p[k] = pa2lp(pa, pl)
-		k++
-	}
-
-	return r, nil
+	s.logFinish(soln, err)
+	return soln, err
 }
 
 // solve is the top-level loop for the SAT solving process.
@@ -1187,25 +1185,20 @@ func (s *solver) logStart(bmi bimodalIdentifier) {
 	s.tl.Printf("%s\n", tracePrefix(fmt.Sprintf("? attempting %s (with %v packages)", bmi.id.errString(), len(bmi.pl)), prefix, prefix))
 }
 
-func (s *solver) logSuccess(sol solution) {
+func (s *solver) logFinish(sol solution, err error) {
 	if !s.params.Trace {
 		return
 	}
 
-	var pkgcount int
-	for _, lp := range sol.Projects() {
-		pkgcount += len(lp.pkgs)
+	if err == nil {
+		var pkgcount int
+		for _, lp := range sol.Projects() {
+			pkgcount += len(lp.pkgs)
+		}
+		s.tl.Printf("%s found solution with %v packages from %v projects", successChar, pkgcount, len(sol.Projects()))
+	} else {
+		s.tl.Printf("%s solving failed", failChar)
 	}
-
-	s.tl.Printf("%s found solution with %v packages from %v projects", successChar, pkgcount, len(sol.Projects()))
-}
-
-func (s *solver) logFailure(e error) {
-	if !s.params.Trace {
-		return
-	}
-
-	s.tl.Printf("%s solving failed", failChar)
 }
 
 func (s *solver) logSolve(args ...interface{}) {
