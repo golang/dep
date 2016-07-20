@@ -270,12 +270,9 @@ func (s *solver) Solve() (Solution, error) {
 	// Prime the queues with the root project
 	err := s.selectRoot()
 	if err != nil {
-		// TODO(sdboyer) this properly with errs, yar
 		return nil, err
 	}
 
-	// Log initial step
-	s.logSolve()
 	all, err := s.solve()
 
 	var soln solution
@@ -323,7 +320,7 @@ func (s *solver) solve() (map[atom]map[string]struct{}, error) {
 		if awp, is := s.sel.selected(bmi.id); !is {
 			// Analysis path for when we haven't selected the project yet - need
 			// to create a version queue.
-			s.logStart(bmi)
+			s.logVisit(bmi)
 			queue, err := s.createVersionQueue(bmi)
 			if err != nil {
 				// Err means a failure somewhere down the line; try backtracking.
@@ -338,15 +335,16 @@ func (s *solver) solve() (map[atom]map[string]struct{}, error) {
 				panic("canary - queue is empty, but flow indicates success")
 			}
 
-			s.selectAtomWithPackages(atomWithPackages{
+			awp := atomWithPackages{
 				a: atom{
 					id: queue.id,
 					v:  queue.current(),
 				},
 				pl: bmi.pl,
-			})
+			}
+			s.selectAtomWithPackages(awp)
 			s.vqs = append(s.vqs, queue)
-			s.logSolve()
+			s.logSelect(awp)
 		} else {
 			// We're just trying to add packages to an already-selected project.
 			// That means it's not OK to burn through the version queue for that
@@ -367,7 +365,7 @@ func (s *solver) solve() (map[atom]map[string]struct{}, error) {
 				pl: bmi.pl,
 			}
 
-			s.logStart(bmi) // TODO(sdboyer) different special start logger for this path
+			s.logVisit(bmi) // TODO(sdboyer) different special start logger for this path
 			err := s.checkPackage(nawp)
 			if err != nil {
 				// Err means a failure somewhere down the line; try backtracking.
@@ -381,7 +379,7 @@ func (s *solver) solve() (map[atom]map[string]struct{}, error) {
 			// We don't add anything to the stack of version queues because the
 			// backtracker knows not to pop the vqstack if it backtracks
 			// across a pure-package addition.
-			s.logSolve()
+			s.logSelect(nawp)
 		}
 	}
 
@@ -461,6 +459,7 @@ func (s *solver) selectRoot() error {
 		heap.Push(s.unsel, bimodalIdentifier{id: dep.Ident, pl: dep.pl, fromRoot: true})
 	}
 
+	s.logSelectRoot(ptree, deps)
 	return nil
 }
 
@@ -899,17 +898,13 @@ func (s *solver) backtrack() bool {
 		if q.advance(nil) == nil && !q.isExhausted() {
 			// Search for another acceptable version of this failed dep in its queue
 			if s.findValidVersion(q, awp.pl) == nil {
-				s.logSolve()
-
 				// Found one! Put it back on the selected queue and stop
 				// backtracking
-				s.selectAtomWithPackages(atomWithPackages{
-					a: atom{
-						id: q.id,
-						v:  q.current(),
-					},
-					pl: awp.pl,
-				})
+
+				// reusing the old awp is fine
+				awp.a.v = q.current()
+				s.selectAtomWithPackages(awp)
+				s.logSelect(awp)
 				break
 			}
 		}

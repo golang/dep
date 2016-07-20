@@ -12,7 +12,7 @@ const (
 	failCharSp    = failChar + " "
 )
 
-func (s *solver) logStart(bmi bimodalIdentifier) {
+func (s *solver) logVisit(bmi bimodalIdentifier) {
 	if !s.params.Trace {
 		return
 	}
@@ -22,6 +22,7 @@ func (s *solver) logStart(bmi bimodalIdentifier) {
 	s.tl.Printf("%s\n", tracePrefix(fmt.Sprintf("? attempting %s (with %v packages)", bmi.id.errString(), len(bmi.pl)), prefix, prefix))
 }
 
+// Called just once after solving has finished, whether success or not
 func (s *solver) logFinish(sol solution, err error) {
 	if !s.params.Trace {
 		return
@@ -36,6 +37,41 @@ func (s *solver) logFinish(sol solution, err error) {
 	} else {
 		s.tl.Printf("%s solving failed", failChar)
 	}
+}
+
+// logSelectRoot is called just once, when the root project is selected
+func (s *solver) logSelectRoot(ptree PackageTree, cdeps []completeDep) {
+	if !s.params.Trace {
+		return
+	}
+
+	// This duplicates work a bit, but we're in trace mode and it's only once,
+	// so who cares
+	rm := ptree.ExternalReach(true, true, s.ig)
+
+	s.tl.Printf("Root project is %q", s.params.ImportRoot)
+
+	var expkgs int
+	for _, cdep := range cdeps {
+		expkgs += len(cdep.pl)
+	}
+
+	// TODO(sdboyer) include info on ignored pkgs/imports, etc.
+	s.tl.Printf(" %v transitively valid internal packages", len(rm))
+	s.tl.Printf(" %v external packages imported from %v projects", expkgs, len(cdeps))
+	s.tl.Printf(successCharSp + "select (root)")
+}
+
+// logSelect is called when an atom is successfully selected
+func (s *solver) logSelect(awp atomWithPackages) {
+	if !s.params.Trace {
+		return
+	}
+
+	prefix := strings.Repeat("| ", len(s.vqs))
+	msg := fmt.Sprintf("%s select %s at %s", successChar, awp.a.id.errString(), awp.a.v)
+
+	s.tl.Printf("%s\n", tracePrefix(msg, prefix, prefix))
 }
 
 func (s *solver) logSolve(args ...interface{}) {
