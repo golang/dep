@@ -11,6 +11,8 @@ import (
 	"github.com/armon/go-radix"
 )
 
+var rootRev = Revision("")
+
 // SolveParameters hold all arguments to a solver run.
 //
 // Only RootDir and ImportRoot are absolutely required. A nil Manifest is
@@ -412,7 +414,7 @@ func (s *solver) selectRoot() error {
 		// It's sort of OK because the root never makes it out into the results.
 		// We may need a more elegant solution if we discover other side
 		// effects, though.
-		v: Revision(""),
+		v: rootRev,
 	}
 
 	ptree, err := s.b.listPackages(pa.id, nil)
