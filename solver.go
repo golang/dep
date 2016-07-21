@@ -874,8 +874,10 @@ func (s *solver) backtrack() bool {
 
 			// Pop selections off until we get to a project.
 			var proj bool
+			var awp atomWithPackages
 			for !proj {
-				_, proj = s.unselectLast()
+				awp, proj = s.unselectLast()
+				s.traceBacktrack(awp, !proj)
 			}
 		}
 
@@ -887,6 +889,11 @@ func (s *solver) backtrack() bool {
 
 		for !proj {
 			awp, proj = s.unselectLast()
+			if !proj {
+				// Don't want to trace this unless it's just packages, as we
+				// might be going forward
+				s.traceBacktrack(awp, !proj)
+			}
 		}
 
 		if !q.id.eq(awp.a.id) {

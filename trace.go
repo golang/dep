@@ -26,6 +26,19 @@ func (s *solver) traceVisit(bmi bimodalIdentifier, pkgonly bool) {
 	}
 }
 
+func (s *solver) traceBacktrack(a atomWithPackages, pkgonly bool) {
+	if !s.params.Trace {
+		return
+	}
+
+	prefix := strings.Repeat("| ", len(s.vqs)+1)
+	if pkgonly {
+		s.tl.Printf("%s\n", tracePrefix(fmt.Sprintf("%s backtrack: popped %v pkgs from %s", failChar, len(a.pl), a.a.id.errString()), prefix, prefix))
+	} else {
+		s.tl.Printf("%s\n", tracePrefix(fmt.Sprintf("%s backtrack: popped %s", failChar, a.a.id.errString()), prefix, prefix))
+	}
+}
+
 // Called just once after solving has finished, whether success or not
 func (s *solver) traceFinish(sol solution, err error) {
 	if !s.params.Trace {
@@ -72,7 +85,7 @@ func (s *solver) traceSelect(awp atomWithPackages) {
 		return
 	}
 
-	prefix := strings.Repeat("| ", len(s.vqs))
+	prefix := strings.Repeat("| ", len(s.vqs)+1)
 	msg := fmt.Sprintf("%s select %s at %s", successChar, awp.a.id.errString(), awp.a.v)
 
 	s.tl.Printf("%s\n", tracePrefix(msg, prefix, prefix))
@@ -111,9 +124,9 @@ func tracePrefix(msg, sep, fsep string) string {
 	parts := strings.Split(strings.TrimSuffix(msg, "\n"), "\n")
 	for k, str := range parts {
 		if k == 0 {
-			parts[k] = fmt.Sprintf("%s%s", fsep, str)
+			parts[k] = fsep + str
 		} else {
-			parts[k] = fmt.Sprintf("%s%s", sep, str)
+			parts[k] = sep + str
 		}
 	}
 
