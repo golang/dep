@@ -44,7 +44,9 @@ well as the non-choices/assumptions/constraints that `gps` imposes on a tool.
 ### Non-Choices
 
 We'd love for `gps`'s non-choices to be noncontroversial. But that's not always
-the case. Nevertheless, we have them because together, they tend to make
+the case.
+
+Nevertheless, these non-choices remain because, taken as a whole, they make
 experiments and discussion around Go package management coherent and
 productive.
 
@@ -57,10 +59,8 @@ productive.
   **lock**](https://github.com/sdboyer/gps/wiki/gps-for-Implementors#manifests-and-locks)
   approach to tracking version and constraint information
 * Source repositories can be `git`, `bzr`, `hg` or `svn` (Most of the work here is through a [separate lib](https://github.com/Masterminds/vcs))
-* What the available versions are for a given project/repository
-  * Branches, tags, and revisions are the units of versioning
-  * Tags are divided into [semver](https://semver.org) and not
-  * In general, semver tags before plain tags, before branches
+* What the available versions are for a given project/repository (all branches, tags, or revs are eligible)
+  * In general, semver tags are preferred to plain tags, are preferred to branches
 * The actual packages required (determined through import graph static analysis)
   * How the import graph is statically analyzed (Similar to `go/build`, but with a combinatorial view of build tags)
 * Package import cycles are not allowed ([not yet implemented](https://github.com/sdboyer/gps/issues/66))
@@ -73,8 +73,11 @@ There are also some current non-choices that we would like to push into the real
 ### Choices
 
 These choices represent many of the ways that `gps`-based tools could
-substantively differ from each other. In general, these are things on which
-reasonable people could, or have, disagreed as to how tooling should work.
+substantively differ from each other.
+
+Some of these are choices designed to encompass all options for topics on which
+reasonable people have disagreed. Others are simply important controls that no
+general library could know _a priori_.
 
 * How to store manifest and lock information (file(s)? a db?)
 * Which of the other package managers to interoperate with
@@ -87,7 +90,7 @@ reasonable people could, or have, disagreed as to how tooling should work.
 * Given a [previous solution](https://github.com/sdboyer/gps/wiki/gps-for-Implementors#lock-data), [which versions to let change, and how](https://github.com/sdboyer/gps/wiki/gps-for-Implementors#tochange-changeall-and-downgrade)
   * In the absence of a previous solution, whether or not to use [preferred versions](https://github.com/sdboyer/gps/wiki/gps-for-Implementors#preferred-versions)
 * Allowing, or not, the user to [swap in different network names](https://github.com/sdboyer/gps/wiki/gps-for-Implementors#projectidentifier) for import paths (e.g. forks)
-* Specifying additional input/source packages not reachable from the root import graph ([not complete]((https://github.com/sdboyer/gps/issues/42)))
+* Specifying additional input/source packages not reachable from the root import graph ([not complete](https://github.com/sdboyer/gps/issues/42))
 
 This list may not be exhaustive - see the
 [implementor's guide](https://github.com/sdboyer/gps/wiki/gps-for-Implementors)
