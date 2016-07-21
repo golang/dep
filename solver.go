@@ -366,7 +366,7 @@ func (s *solver) solve() (map[atom]map[string]struct{}, error) {
 			}
 
 			s.traceVisit(bmi, true)
-			err := s.checkPackage(nawp)
+			err := s.check(nawp, true)
 			if err != nil {
 				// Err means a failure somewhere down the line; try backtracking.
 				if s.backtrack() {
@@ -744,13 +744,13 @@ func (s *solver) findValidVersion(q *versionQueue, pl []string) error {
 
 	for {
 		cur := q.current()
-		err := s.checkProject(atomWithPackages{
+		err := s.check(atomWithPackages{
 			a: atom{
 				id: q.id,
 				v:  cur,
 			},
 			pl: pl,
-		})
+		}, false)
 		if err == nil {
 			// we have a good version, can return safely
 			return nil

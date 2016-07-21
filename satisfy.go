@@ -1,9 +1,12 @@
 package gps
 
-// checkProject performs all constraint checks on a new project (with packages)
-// that we want to select. It determines if selecting the atom would result in
-// a state where all solver requirements are still satisfied.
-func (s *solver) checkProject(a atomWithPackages) error {
+// check performs constraint checks on the provided atom. The set of checks
+// differ slightly depending on whether the atom is pkgonly, or if it's the
+// entire project being added for the first time.
+//
+// The goal is to determine whether selecting the atom would result in a state
+// where all the solver requirements are still satisfied.
+func (s *solver) check(a atomWithPackages, pkgonly bool) error {
 	pa := a.a
 	if nilpa == pa {
 		// This shouldn't be able to happen, but if it does, it unequivocally
@@ -11,9 +14,13 @@ func (s *solver) checkProject(a atomWithPackages) error {
 		panic("canary - checking version of empty ProjectAtom")
 	}
 
-	if err := s.checkAtomAllowable(pa); err != nil {
-		s.traceInfo(err)
-		return err
+	// If we're pkgonly, then base atom was already determined to be allowable,
+	// so we can skip the checkAtomAllowable step.
+	if !pkgonly {
+		if err := s.checkAtomAllowable(pa); err != nil {
+			s.traceInfo(err)
+			return err
+		}
 	}
 
 	if err := s.checkRequiredPackagesExist(a); err != nil {
@@ -53,53 +60,6 @@ func (s *solver) checkProject(a atomWithPackages) error {
 		}
 
 		// TODO(sdboyer) add check that fails if adding this atom would create a loop
-	}
-
-	return nil
-}
-
-// checkPackages performs all constraint checks for new packages being added to
-// an already-selected project. It determines if selecting the packages would
-// result in a state where all solver requirements are still satisfied.
-func (s *solver) checkPackage(a atomWithPackages) error {
-	if nilpa == a.a {
-		// This shouldn't be able to happen, but if it does, it unequivocally
-		// indicates a logical bug somewhere, so blowing up is preferable
-		panic("canary - checking version of empty ProjectAtom")
-	}
-
-	// The base atom was already validated, so we can skip the
-	// checkAtomAllowable step.
-	deps, err := s.getImportsAndConstraintsOf(a)
-	if err != nil {
-		// An err here would be from the package fetcher; pass it straight back
-		// TODO(sdboyer) can we traceInfo this?
-		return err
-	}
-
-	for _, dep := range deps {
-		if err := s.checkIdentMatches(a, dep); err != nil {
-			s.traceInfo(err)
-			return err
-		}
-		if err := s.checkDepsConstraintsAllowable(a, dep); err != nil {
-			s.traceInfo(err)
-			return err
-		}
-		if err := s.checkDepsDisallowsSelected(a, dep); err != nil {
-			s.traceInfo(err)
-			return err
-		}
-		// TODO(sdboyer) decide how to refactor in order to re-enable this. Checking for
-		// revision existence is important...but kinda obnoxious.
-		//if err := s.checkRevisionExists(a, dep); err != nil {
-		//s.traceInfo(err)
-		//return err
-		//}
-		if err := s.checkPackageImportsFromDepExist(a, dep); err != nil {
-			s.traceInfo(err)
-			return err
-		}
 	}
 
 	return nil
