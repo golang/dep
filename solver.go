@@ -11,6 +11,8 @@ import (
 	"github.com/armon/go-radix"
 )
 
+var rootRev = Revision("")
+
 // SolveParameters hold all arguments to a solver run.
 //
 // Only RootDir and ImportRoot are absolutely required. A nil Manifest is
@@ -270,36 +272,33 @@ func (s *solver) Solve() (Solution, error) {
 	// Prime the queues with the root project
 	err := s.selectRoot()
 	if err != nil {
-		// TODO(sdboyer) this properly with errs, yar
 		return nil, err
 	}
 
-	// Log initial step
-	s.logSolve()
 	all, err := s.solve()
 
-	// Solver finished with an err; return that and we're done
-	if err != nil {
-		return nil, err
+	var soln solution
+	if err == nil {
+		soln = solution{
+			att: s.attempts,
+		}
+
+		// An err here is impossible; it could only be caused by a parsing error
+		// of the root tree, but that necessarily succeeded back up
+		// selectRoot(), so we can ignore this err
+		soln.hd, _ = s.HashInputs()
+
+		// Convert ProjectAtoms into LockedProjects
+		soln.p = make([]LockedProject, len(all))
+		k := 0
+		for pa, pl := range all {
+			soln.p[k] = pa2lp(pa, pl)
+			k++
+		}
 	}
 
-	r := solution{
-		att: s.attempts,
-	}
-
-	// An err here is impossible at this point; we already know the root tree is
-	// fine
-	r.hd, _ = s.HashInputs()
-
-	// Convert ProjectAtoms into LockedProjects
-	r.p = make([]LockedProject, len(all))
-	k := 0
-	for pa, pl := range all {
-		r.p[k] = pa2lp(pa, pl)
-		k++
-	}
-
-	return r, nil
+	s.traceFinish(soln, err)
+	return soln, err
 }
 
 // solve is the top-level loop for the SAT solving process.
@@ -323,10 +322,11 @@ func (s *solver) solve() (map[atom]map[string]struct{}, error) {
 		if awp, is := s.sel.selected(bmi.id); !is {
 			// Analysis path for when we haven't selected the project yet - need
 			// to create a version queue.
-			s.logStart(bmi)
 			queue, err := s.createVersionQueue(bmi)
 			if err != nil {
 				// Err means a failure somewhere down the line; try backtracking.
+				s.traceStartBacktrack(bmi, err, false)
+				//s.traceBacktrack(bmi, false)
 				if s.backtrack() {
 					// backtracking succeeded, move to the next unselected id
 					continue
@@ -338,15 +338,15 @@ func (s *solver) solve() (map[atom]map[string]struct{}, error) {
 				panic("canary - queue is empty, but flow indicates success")
 			}
 
-			s.selectAtomWithPackages(atomWithPackages{
+			awp := atomWithPackages{
 				a: atom{
 					id: queue.id,
 					v:  queue.current(),
 				},
 				pl: bmi.pl,
-			})
+			}
+			s.selectAtom(awp, false)
 			s.vqs = append(s.vqs, queue)
-			s.logSolve()
 		} else {
 			// We're just trying to add packages to an already-selected project.
 			// That means it's not OK to burn through the version queue for that
@@ -367,21 +367,21 @@ func (s *solver) solve() (map[atom]map[string]struct{}, error) {
 				pl: bmi.pl,
 			}
 
-			s.logStart(bmi) // TODO(sdboyer) different special start logger for this path
-			err := s.checkPackage(nawp)
+			s.traceCheckPkgs(bmi)
+			err := s.check(nawp, true)
 			if err != nil {
 				// Err means a failure somewhere down the line; try backtracking.
+				s.traceStartBacktrack(bmi, err, true)
 				if s.backtrack() {
 					// backtracking succeeded, move to the next unselected id
 					continue
 				}
 				return nil, err
 			}
-			s.selectPackages(nawp)
+			s.selectAtom(nawp, true)
 			// We don't add anything to the stack of version queues because the
 			// backtracker knows not to pop the vqstack if it backtracks
 			// across a pure-package addition.
-			s.logSolve()
 		}
 	}
 
@@ -416,7 +416,7 @@ func (s *solver) selectRoot() error {
 		// It's sort of OK because the root never makes it out into the results.
 		// We may need a more elegant solution if we discover other side
 		// effects, though.
-		v: Revision(""),
+		v: rootRev,
 	}
 
 	ptree, err := s.b.listPackages(pa.id, nil)
@@ -461,6 +461,7 @@ func (s *solver) selectRoot() error {
 		heap.Push(s.unsel, bimodalIdentifier{id: dep.Ident, pl: dep.pl, fromRoot: true})
 	}
 
+	s.traceSelectRoot(ptree, deps)
 	return nil
 }
 
@@ -725,6 +726,7 @@ func (s *solver) createVersionQueue(bmi bimodalIdentifier) (*versionQueue, error
 	}
 
 	// Having assembled the queue, search it for a valid version.
+	s.traceCheckQueue(q, bmi, false, 1)
 	return q, s.findValidVersion(q, bmi.pl)
 }
 
@@ -745,13 +747,14 @@ func (s *solver) findValidVersion(q *versionQueue, pl []string) error {
 
 	for {
 		cur := q.current()
-		err := s.checkProject(atomWithPackages{
+		s.traceInfo("try %s@%s", q.id.errString(), cur)
+		err := s.check(atomWithPackages{
 			a: atom{
 				id: q.id,
 				v:  cur,
 			},
 			pl: pl,
-		})
+		}, false)
 		if err == nil {
 			// we have a good version, can return safely
 			return nil
@@ -843,12 +846,9 @@ func (s *solver) getLockVersionIfValid(id ProjectIdentifier) (Version, error) {
 		}
 
 		if !found {
-			s.logSolve("%s in root lock, but current constraints disallow it", id.errString())
 			return nil, nil
 		}
 	}
-
-	s.logSolve("using root lock's version of %s", id.errString())
 
 	return v, nil
 }
@@ -875,46 +875,44 @@ func (s *solver) backtrack() bool {
 
 			// Pop selections off until we get to a project.
 			var proj bool
+			var awp atomWithPackages
 			for !proj {
-				_, proj = s.unselectLast()
+				awp, proj = s.unselectLast()
+				s.traceBacktrack(awp.bmi(), !proj)
 			}
 		}
 
 		// Grab the last versionQueue off the list of queues
 		q := s.vqs[len(s.vqs)-1]
-		// Walk back to the next project
-		var awp atomWithPackages
-		var proj bool
 
-		for !proj {
-			awp, proj = s.unselectLast()
+		// Walk back to the next project
+		awp, proj := s.unselectLast()
+		if !proj {
+			panic("canary - *should* be impossible to have a pkg-only selection here")
 		}
 
 		if !q.id.eq(awp.a.id) {
-			panic("canary - version queue stack and selected project stack are out of alignment")
+			panic("canary - version queue stack and selected project stack are misaligned")
 		}
 
 		// Advance the queue past the current version, which we know is bad
 		// TODO(sdboyer) is it feasible to make available the failure reason here?
 		if q.advance(nil) == nil && !q.isExhausted() {
 			// Search for another acceptable version of this failed dep in its queue
+			s.traceCheckQueue(q, awp.bmi(), true, 0)
 			if s.findValidVersion(q, awp.pl) == nil {
-				s.logSolve()
-
 				// Found one! Put it back on the selected queue and stop
 				// backtracking
-				s.selectAtomWithPackages(atomWithPackages{
-					a: atom{
-						id: q.id,
-						v:  q.current(),
-					},
-					pl: awp.pl,
-				})
+
+				// reusing the old awp is fine
+				awp.a.v = q.current()
+				s.selectAtom(awp, false)
 				break
 			}
 		}
 
-		s.logSolve("no more versions of %s, backtracking", q.id.errString())
+		s.traceBacktrack(awp.bmi(), false)
+		//s.traceInfo("no more versions of %s, backtracking", q.id.errString())
 
 		// No solution found; continue backtracking after popping the queue
 		// we just inspected off the list
@@ -1022,79 +1020,18 @@ func (s *solver) fail(id ProjectIdentifier) {
 	}
 }
 
-// selectAtomWithPackages handles the selection case where a new project is
-// being added to the selection queue, alongside some number of its contained
-// packages. This method pushes them onto the selection queue, then adds any
-// new resultant deps to the unselected queue.
-func (s *solver) selectAtomWithPackages(a atomWithPackages) {
-	s.unsel.remove(bimodalIdentifier{
-		id: a.a.id,
-		pl: a.pl,
-	})
-
-	s.sel.pushSelection(a, true)
-
-	deps, err := s.getImportsAndConstraintsOf(a)
-	if err != nil {
-		// This shouldn't be possible; other checks should have ensured all
-		// packages and deps are present for any argument passed to this method.
-		panic(fmt.Sprintf("canary - shouldn't be possible %s", err))
-	}
-
-	// If this atom has a lock, pull it out so that we can potentially inject
-	// preferred versions into any bmis we enqueue
-	_, l, _ := s.b.getProjectInfo(a.a)
-	var lmap map[ProjectIdentifier]Version
-	if l != nil {
-		lmap = make(map[ProjectIdentifier]Version)
-		for _, lp := range l.Projects() {
-			lmap[lp.Ident()] = lp.Version()
-		}
-	}
-
-	for _, dep := range deps {
-		s.sel.pushDep(dependency{depender: a.a, dep: dep})
-		// Go through all the packages introduced on this dep, selecting only
-		// the ones where the only depper on them is what we pushed in. Then,
-		// put those into the unselected queue.
-		rpm := s.sel.getRequiredPackagesIn(dep.Ident)
-		var newp []string
-		for _, pkg := range dep.pl {
-			if rpm[pkg] == 1 {
-				newp = append(newp, pkg)
-			}
-		}
-
-		if len(newp) > 0 {
-			bmi := bimodalIdentifier{
-				id: dep.Ident,
-				pl: newp,
-				// This puts in a preferred version if one's in the map, else
-				// drops in the zero value (nil)
-				prefv: lmap[dep.Ident],
-			}
-			heap.Push(s.unsel, bmi)
-		}
-
-		if s.sel.depperCount(dep.Ident) == 1 {
-			s.names[dep.Ident.ProjectRoot] = dep.Ident.netName()
-		}
-	}
-}
-
-// selectPackages handles the selection case where we're just adding some new
-// packages to a project that was already selected. After pushing the selection,
-// it adds any newly-discovered deps to the unselected queue.
+// selectAtom pulls an atom into the selection stack, alongside some of
+// its contained packages. New resultant dependency requirements are added to
+// the unselected priority queue.
 //
-// It also takes an atomWithPackages because we need that same information in
-// order to enqueue the selection.
-func (s *solver) selectPackages(a atomWithPackages) {
+// Behavior is slightly diffferent if pkgonly is true.
+func (s *solver) selectAtom(a atomWithPackages, pkgonly bool) {
 	s.unsel.remove(bimodalIdentifier{
 		id: a.a.id,
 		pl: a.pl,
 	})
 
-	s.sel.pushSelection(a, false)
+	s.sel.pushSelection(a, pkgonly)
 
 	deps, err := s.getImportsAndConstraintsOf(a)
 	if err != nil {
@@ -1142,6 +1079,8 @@ func (s *solver) selectPackages(a atomWithPackages) {
 			s.names[dep.Ident.ProjectRoot] = dep.Ident.netName()
 		}
 	}
+
+	s.traceSelect(a, pkgonly)
 }
 
 func (s *solver) unselectLast() (atomWithPackages, bool) {
@@ -1166,67 +1105,6 @@ func (s *solver) unselectLast() (atomWithPackages, bool) {
 	}
 
 	return awp, first
-}
-
-func (s *solver) logStart(bmi bimodalIdentifier) {
-	if !s.params.Trace {
-		return
-	}
-
-	prefix := strings.Repeat("| ", len(s.vqs)+1)
-	// TODO(sdboyer) how...to list the packages in the limited space we have?
-	s.tl.Printf("%s\n", tracePrefix(fmt.Sprintf("? attempting %s (with %v packages)", bmi.id.errString(), len(bmi.pl)), prefix, prefix))
-}
-
-func (s *solver) logSolve(args ...interface{}) {
-	if !s.params.Trace {
-		return
-	}
-
-	preflen := len(s.vqs)
-	var msg string
-	if len(args) == 0 {
-		// Generate message based on current solver state
-		if len(s.vqs) == 0 {
-			msg = "✓ (root)"
-		} else {
-			vq := s.vqs[len(s.vqs)-1]
-			msg = fmt.Sprintf("✓ select %s at %s", vq.id.errString(), vq.current())
-		}
-	} else {
-		// Use longer prefix length for these cases, as they're the intermediate
-		// work
-		preflen++
-		switch data := args[0].(type) {
-		case string:
-			msg = tracePrefix(fmt.Sprintf(data, args[1:]), "| ", "| ")
-		case traceError:
-			// We got a special traceError, use its custom method
-			msg = tracePrefix(data.traceString(), "| ", "✗ ")
-		case error:
-			// Regular error; still use the x leader but default Error() string
-			msg = tracePrefix(data.Error(), "| ", "✗ ")
-		default:
-			// panic here because this can *only* mean a stupid internal bug
-			panic("canary - must pass a string as first arg to logSolve, or no args at all")
-		}
-	}
-
-	prefix := strings.Repeat("| ", preflen)
-	s.tl.Printf("%s\n", tracePrefix(msg, prefix, prefix))
-}
-
-func tracePrefix(msg, sep, fsep string) string {
-	parts := strings.Split(strings.TrimSuffix(msg, "\n"), "\n")
-	for k, str := range parts {
-		if k == 0 {
-			parts[k] = fmt.Sprintf("%s%s", fsep, str)
-		} else {
-			parts[k] = fmt.Sprintf("%s%s", sep, str)
-		}
-	}
-
-	return strings.Join(parts, "\n")
 }
 
 // simple (temporary?) helper just to convert atoms into locked projects

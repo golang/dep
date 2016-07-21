@@ -22,10 +22,10 @@ func (s *selection) getDependenciesOn(id ProjectIdentifier) []dependency {
 // pushSelection pushes a new atomWithPackages onto the selection stack, along
 // with an indicator as to whether this selection indicates a new project *and*
 // packages, or merely some new packages on a project that was already selected.
-func (s *selection) pushSelection(a atomWithPackages, first bool) {
+func (s *selection) pushSelection(a atomWithPackages, pkgonly bool) {
 	s.projects = append(s.projects, selected{
 		a:     a,
-		first: first,
+		first: !pkgonly,
 	})
 }
 
