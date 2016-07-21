@@ -342,9 +342,8 @@ func (s *solver) solve() (map[atom]map[string]struct{}, error) {
 				},
 				pl: bmi.pl,
 			}
-			s.selectAtomWithPackages(awp)
+			s.selectAtom(awp, false)
 			s.vqs = append(s.vqs, queue)
-			s.traceSelect(awp)
 		} else {
 			// We're just trying to add packages to an already-selected project.
 			// That means it's not OK to burn through the version queue for that
@@ -375,11 +374,10 @@ func (s *solver) solve() (map[atom]map[string]struct{}, error) {
 				}
 				return nil, err
 			}
-			s.selectPackages(nawp)
+			s.selectAtom(nawp, true)
 			// We don't add anything to the stack of version queues because the
 			// backtracker knows not to pop the vqstack if it backtracks
 			// across a pure-package addition.
-			s.traceSelect(nawp)
 		}
 	}
 
@@ -903,8 +901,7 @@ func (s *solver) backtrack() bool {
 
 				// reusing the old awp is fine
 				awp.a.v = q.current()
-				s.selectAtomWithPackages(awp)
-				s.traceSelect(awp)
+				s.selectAtom(awp, false)
 				break
 			}
 		}
@@ -1017,79 +1014,18 @@ func (s *solver) fail(id ProjectIdentifier) {
 	}
 }
 
-// selectAtomWithPackages handles the selection case where a new project is
-// being added to the selection queue, alongside some number of its contained
-// packages. This method pushes them onto the selection queue, then adds any
-// new resultant deps to the unselected queue.
-func (s *solver) selectAtomWithPackages(a atomWithPackages) {
-	s.unsel.remove(bimodalIdentifier{
-		id: a.a.id,
-		pl: a.pl,
-	})
-
-	s.sel.pushSelection(a, true)
-
-	deps, err := s.getImportsAndConstraintsOf(a)
-	if err != nil {
-		// This shouldn't be possible; other checks should have ensured all
-		// packages and deps are present for any argument passed to this method.
-		panic(fmt.Sprintf("canary - shouldn't be possible %s", err))
-	}
-
-	// If this atom has a lock, pull it out so that we can potentially inject
-	// preferred versions into any bmis we enqueue
-	_, l, _ := s.b.getProjectInfo(a.a)
-	var lmap map[ProjectIdentifier]Version
-	if l != nil {
-		lmap = make(map[ProjectIdentifier]Version)
-		for _, lp := range l.Projects() {
-			lmap[lp.Ident()] = lp.Version()
-		}
-	}
-
-	for _, dep := range deps {
-		s.sel.pushDep(dependency{depender: a.a, dep: dep})
-		// Go through all the packages introduced on this dep, selecting only
-		// the ones where the only depper on them is what we pushed in. Then,
-		// put those into the unselected queue.
-		rpm := s.sel.getRequiredPackagesIn(dep.Ident)
-		var newp []string
-		for _, pkg := range dep.pl {
-			if rpm[pkg] == 1 {
-				newp = append(newp, pkg)
-			}
-		}
-
-		if len(newp) > 0 {
-			bmi := bimodalIdentifier{
-				id: dep.Ident,
-				pl: newp,
-				// This puts in a preferred version if one's in the map, else
-				// drops in the zero value (nil)
-				prefv: lmap[dep.Ident],
-			}
-			heap.Push(s.unsel, bmi)
-		}
-
-		if s.sel.depperCount(dep.Ident) == 1 {
-			s.names[dep.Ident.ProjectRoot] = dep.Ident.netName()
-		}
-	}
-}
-
-// selectPackages handles the selection case where we're just adding some new
-// packages to a project that was already selected. After pushing the selection,
-// it adds any newly-discovered deps to the unselected queue.
+// selectAtom pulls an atom into the selection stack, alongside some of
+// its contained packages. New resultant dependency requirements are added to
+// the unselected priority queue.
 //
-// It also takes an atomWithPackages because we need that same information in
-// order to enqueue the selection.
-func (s *solver) selectPackages(a atomWithPackages) {
+// Behavior is slightly diffferent if pkgonly is true.
+func (s *solver) selectAtom(a atomWithPackages, pkgonly bool) {
 	s.unsel.remove(bimodalIdentifier{
 		id: a.a.id,
 		pl: a.pl,
 	})
 
-	s.sel.pushSelection(a, false)
+	s.sel.pushSelection(a, pkgonly)
 
 	deps, err := s.getImportsAndConstraintsOf(a)
 	if err != nil {
@@ -1137,6 +1073,8 @@ func (s *solver) selectPackages(a atomWithPackages) {
 			s.names[dep.Ident.ProjectRoot] = dep.Ident.netName()
 		}
 	}
+
+	s.traceSelect(a)
 }
 
 func (s *solver) unselectLast() (atomWithPackages, bool) {
