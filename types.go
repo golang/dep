@@ -170,6 +170,18 @@ type atomWithPackages struct {
 	pl []string
 }
 
+// bmi converts an atomWithPackages into a bimodalIdentifier.
+//
+// This is mostly intended for (read-only) trace use, so the package list slice
+// is not copied. It is the callers responsibility to not modify the pl slice,
+// lest that backpropagate and cause inconsistencies.
+func (awp atomWithPackages) bmi() bimodalIdentifier {
+	return bimodalIdentifier{
+		id: awp.a.id,
+		pl: awp.pl,
+	}
+}
+
 //type byImportPath []Package
 
 //func (s byImportPath) Len() int           { return len(s) }

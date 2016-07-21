@@ -322,10 +322,11 @@ func (s *solver) solve() (map[atom]map[string]struct{}, error) {
 		if awp, is := s.sel.selected(bmi.id); !is {
 			// Analysis path for when we haven't selected the project yet - need
 			// to create a version queue.
-			s.traceVisit(bmi, false)
 			queue, err := s.createVersionQueue(bmi)
 			if err != nil {
 				// Err means a failure somewhere down the line; try backtracking.
+				s.traceStartBacktrack(bmi, err, false)
+				//s.traceBacktrack(bmi, false)
 				if s.backtrack() {
 					// backtracking succeeded, move to the next unselected id
 					continue
@@ -366,10 +367,11 @@ func (s *solver) solve() (map[atom]map[string]struct{}, error) {
 				pl: bmi.pl,
 			}
 
-			s.traceVisit(bmi, true)
+			s.traceCheckPkgs(bmi)
 			err := s.check(nawp, true)
 			if err != nil {
 				// Err means a failure somewhere down the line; try backtracking.
+				s.traceStartBacktrack(bmi, err, true)
 				if s.backtrack() {
 					// backtracking succeeded, move to the next unselected id
 					continue
@@ -724,6 +726,7 @@ func (s *solver) createVersionQueue(bmi bimodalIdentifier) (*versionQueue, error
 	}
 
 	// Having assembled the queue, search it for a valid version.
+	s.traceCheckQueue(q, bmi, false, 1)
 	return q, s.findValidVersion(q, bmi.pl)
 }
 
@@ -744,6 +747,7 @@ func (s *solver) findValidVersion(q *versionQueue, pl []string) error {
 
 	for {
 		cur := q.current()
+		s.traceInfo("try %s@%s", q.id.errString(), cur)
 		err := s.check(atomWithPackages{
 			a: atom{
 				id: q.id,
@@ -842,12 +846,9 @@ func (s *solver) getLockVersionIfValid(id ProjectIdentifier) (Version, error) {
 		}
 
 		if !found {
-			s.traceInfo("%s in root lock, but current constraints disallow it", id.errString())
 			return nil, nil
 		}
 	}
-
-	s.traceInfo("using root lock's version of %s", id.errString())
 
 	return v, nil
 }
@@ -877,33 +878,28 @@ func (s *solver) backtrack() bool {
 			var awp atomWithPackages
 			for !proj {
 				awp, proj = s.unselectLast()
-				s.traceBacktrack(awp, !proj)
+				s.traceBacktrack(awp.bmi(), !proj)
 			}
 		}
 
 		// Grab the last versionQueue off the list of queues
 		q := s.vqs[len(s.vqs)-1]
-		// Walk back to the next project
-		var awp atomWithPackages
-		var proj bool
 
-		for !proj {
-			awp, proj = s.unselectLast()
-			if !proj {
-				// Don't want to trace this unless it's just packages, as we
-				// might be going forward
-				s.traceBacktrack(awp, !proj)
-			}
+		// Walk back to the next project
+		awp, proj := s.unselectLast()
+		if !proj {
+			panic("canary - *should* be impossible to have a pkg-only selection here")
 		}
 
 		if !q.id.eq(awp.a.id) {
-			panic("canary - version queue stack and selected project stack are out of alignment")
+			panic("canary - version queue stack and selected project stack are misaligned")
 		}
 
 		// Advance the queue past the current version, which we know is bad
 		// TODO(sdboyer) is it feasible to make available the failure reason here?
 		if q.advance(nil) == nil && !q.isExhausted() {
 			// Search for another acceptable version of this failed dep in its queue
+			s.traceCheckQueue(q, awp.bmi(), true, 0)
 			if s.findValidVersion(q, awp.pl) == nil {
 				// Found one! Put it back on the selected queue and stop
 				// backtracking
@@ -915,7 +911,8 @@ func (s *solver) backtrack() bool {
 			}
 		}
 
-		s.traceInfo("no more versions of %s, backtracking", q.id.errString())
+		s.traceBacktrack(awp.bmi(), false)
+		//s.traceInfo("no more versions of %s, backtracking", q.id.errString())
 
 		// No solution found; continue backtracking after popping the queue
 		// we just inspected off the list
@@ -1083,7 +1080,7 @@ func (s *solver) selectAtom(a atomWithPackages, pkgonly bool) {
 		}
 	}
 
-	s.traceSelect(a)
+	s.traceSelect(a, pkgonly)
 }
 
 func (s *solver) unselectLast() (atomWithPackages, bool) {

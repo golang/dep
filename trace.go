@@ -2,6 +2,7 @@ package gps
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 )
 
@@ -10,33 +11,75 @@ const (
 	successCharSp = successChar + " "
 	failChar      = "✗"
 	failCharSp    = failChar + " "
+	backChar      = "←"
 )
 
-func (s *solver) traceVisit(bmi bimodalIdentifier, pkgonly bool) {
+func (s *solver) traceCheckPkgs(bmi bimodalIdentifier) {
 	if !s.params.Trace {
 		return
 	}
 
 	prefix := strings.Repeat("| ", len(s.vqs)+1)
-	// TODO(sdboyer) how...to list the packages in the limited space we have?
-	if pkgonly {
-		s.tl.Printf("%s\n", tracePrefix(fmt.Sprintf("? revisiting %s to add %v pkgs", bmi.id.errString(), len(bmi.pl)), prefix, prefix))
-	} else {
-		s.tl.Printf("%s\n", tracePrefix(fmt.Sprintf("? attempting %s (with %v pkgs)", bmi.id.errString(), len(bmi.pl)), prefix, prefix))
-	}
+	s.tl.Printf("%s\n", tracePrefix(fmt.Sprintf("? revisit %s to add %v pkgs", bmi.id.errString(), len(bmi.pl)), prefix, prefix))
 }
 
-func (s *solver) traceBacktrack(a atomWithPackages, pkgonly bool) {
+func (s *solver) traceCheckQueue(q *versionQueue, bmi bimodalIdentifier, cont bool, offset int) {
 	if !s.params.Trace {
 		return
 	}
 
-	prefix := strings.Repeat("| ", len(s.vqs)+1)
-	if pkgonly {
-		s.tl.Printf("%s\n", tracePrefix(fmt.Sprintf("%s backtrack: popped %v pkgs from %s", failChar, len(a.pl), a.a.id.errString()), prefix, prefix))
-	} else {
-		s.tl.Printf("%s\n", tracePrefix(fmt.Sprintf("%s backtrack: popped %s", failChar, a.a.id.errString()), prefix, prefix))
+	prefix := strings.Repeat("| ", len(s.vqs)+offset)
+	vlen := strconv.Itoa(len(q.pi))
+	if !q.allLoaded {
+		vlen = "at least " + vlen
 	}
+
+	// TODO(sdboyer) how...to list the packages in the limited space we have?
+	var verb string
+	if cont {
+		verb = "continue"
+		vlen = vlen + " more"
+	} else {
+		verb = "attempt"
+	}
+
+	s.tl.Printf("%s\n", tracePrefix(fmt.Sprintf("? %s %s with %v pkgs; %s versions to try", verb, bmi.id.errString(), len(bmi.pl), vlen), prefix, prefix))
+}
+
+// traceStartBacktrack is called with the bmi that first failed, thus initiating
+// backtracking
+func (s *solver) traceStartBacktrack(bmi bimodalIdentifier, err error, pkgonly bool) {
+	if !s.params.Trace {
+		return
+	}
+
+	var msg string
+	if pkgonly {
+		msg = fmt.Sprintf("%s could not add %v pkgs to %s; begin backtrack", backChar, len(bmi.pl), bmi.id.errString())
+	} else {
+		msg = fmt.Sprintf("%s no more versions of %s to try; begin backtrack", backChar, bmi.id.errString())
+	}
+
+	prefix := strings.Repeat("| ", len(s.sel.projects))
+	s.tl.Printf("%s\n", tracePrefix(msg, prefix, prefix))
+}
+
+// traceBacktrack is called when a package or project is poppped off during
+// backtracking
+func (s *solver) traceBacktrack(bmi bimodalIdentifier, pkgonly bool) {
+	if !s.params.Trace {
+		return
+	}
+
+	var msg string
+	if pkgonly {
+		msg = fmt.Sprintf("%s backtrack: popped %v pkgs from %s", backChar, len(bmi.pl), bmi.id.errString())
+	} else {
+		msg = fmt.Sprintf("%s backtrack: no more versions of %s to try", backChar, bmi.id.errString())
+	}
+
+	prefix := strings.Repeat("| ", len(s.sel.projects))
+	s.tl.Printf("%s\n", tracePrefix(msg, prefix, prefix))
 }
 
 // Called just once after solving has finished, whether success or not
@@ -80,14 +123,19 @@ func (s *solver) traceSelectRoot(ptree PackageTree, cdeps []completeDep) {
 }
 
 // traceSelect is called when an atom is successfully selected
-func (s *solver) traceSelect(awp atomWithPackages) {
+func (s *solver) traceSelect(awp atomWithPackages, pkgonly bool) {
 	if !s.params.Trace {
 		return
 	}
 
-	prefix := strings.Repeat("| ", len(s.vqs)+1)
-	msg := fmt.Sprintf("%s select %s at %s", successChar, awp.a.id.errString(), awp.a.v)
+	var msg string
+	if pkgonly {
+		msg = fmt.Sprintf("%s include %v more pkgs from %s", successChar, len(awp.pl), a2vs(awp.a))
+	} else {
+		msg = fmt.Sprintf("%s select %s w/%v pkgs", successChar, a2vs(awp.a), len(awp.pl))
+	}
 
+	prefix := strings.Repeat("| ", len(s.sel.projects)-1)
 	s.tl.Printf("%s\n", tracePrefix(msg, prefix, prefix))
 }
 
@@ -100,12 +148,13 @@ func (s *solver) traceInfo(args ...interface{}) {
 		panic("must pass at least one param to traceInfo")
 	}
 
-	preflen := len(s.vqs) + 1
+	preflen := len(s.sel.projects)
 	var msg string
 	switch data := args[0].(type) {
 	case string:
-		msg = tracePrefix(fmt.Sprintf(data, args[1:]), "| ", "| ")
+		msg = tracePrefix(fmt.Sprintf(data, args[1:]...), "| ", "| ")
 	case traceError:
+		preflen += 1
 		// We got a special traceError, use its custom method
 		msg = tracePrefix(data.traceString(), "| ", failCharSp)
 	case error:

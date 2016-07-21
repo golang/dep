@@ -22,7 +22,7 @@ func a2vs(a atom) string {
 		return "(root)"
 	}
 
-	return fmt.Sprintf("%s at %s", a.id.errString(), a.v)
+	return fmt.Sprintf("%s@%s", a.id.errString(), a.v)
 }
 
 type traceError interface {
