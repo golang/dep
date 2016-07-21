@@ -12,14 +12,18 @@ const (
 	failCharSp    = failChar + " "
 )
 
-func (s *solver) traceVisit(bmi bimodalIdentifier) {
+func (s *solver) traceVisit(bmi bimodalIdentifier, pkgonly bool) {
 	if !s.params.Trace {
 		return
 	}
 
 	prefix := strings.Repeat("| ", len(s.vqs)+1)
 	// TODO(sdboyer) how...to list the packages in the limited space we have?
-	s.tl.Printf("%s\n", tracePrefix(fmt.Sprintf("? attempting %s (with %v packages)", bmi.id.errString(), len(bmi.pl)), prefix, prefix))
+	if pkgonly {
+		s.tl.Printf("%s\n", tracePrefix(fmt.Sprintf("? revisiting %s to add %v pkgs", bmi.id.errString(), len(bmi.pl)), prefix, prefix))
+	} else {
+		s.tl.Printf("%s\n", tracePrefix(fmt.Sprintf("? attempting %s (with %v pkgs)", bmi.id.errString(), len(bmi.pl)), prefix, prefix))
+	}
 }
 
 // Called just once after solving has finished, whether success or not

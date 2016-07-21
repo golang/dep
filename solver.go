@@ -320,7 +320,7 @@ func (s *solver) solve() (map[atom]map[string]struct{}, error) {
 		if awp, is := s.sel.selected(bmi.id); !is {
 			// Analysis path for when we haven't selected the project yet - need
 			// to create a version queue.
-			s.traceVisit(bmi)
+			s.traceVisit(bmi, false)
 			queue, err := s.createVersionQueue(bmi)
 			if err != nil {
 				// Err means a failure somewhere down the line; try backtracking.
@@ -365,7 +365,7 @@ func (s *solver) solve() (map[atom]map[string]struct{}, error) {
 				pl: bmi.pl,
 			}
 
-			s.traceVisit(bmi) // TODO(sdboyer) different special start logger for this path
+			s.traceVisit(bmi, true)
 			err := s.checkPackage(nawp)
 			if err != nil {
 				// Err means a failure somewhere down the line; try backtracking.
