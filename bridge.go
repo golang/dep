@@ -80,7 +80,7 @@ func (b *bridge) getProjectInfo(pa atom) (Manifest, Lock, error) {
 	if pa.id.ProjectRoot == b.s.params.ImportRoot {
 		return b.s.rm, b.s.rl, nil
 	}
-	return b.sm.GetProjectInfo(ProjectRoot(pa.id.netName()), pa.v)
+	return b.sm.GetManifestAndLock(ProjectRoot(pa.id.netName()), pa.v)
 }
 
 func (b *bridge) analyzerInfo() (string, *semver.Version) {

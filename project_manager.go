@@ -114,7 +114,7 @@ func (pm *projectManager) GetInfoAt(v Version) (Manifest, Lock, error) {
 	}
 
 	pm.crepo.mut.RLock()
-	m, l, err := pm.an.Analyze(filepath.Join(pm.ctx.GOPATH, "src", string(pm.n)), pm.n)
+	m, l, err := pm.an.DeriveManifestAndLock(filepath.Join(pm.ctx.GOPATH, "src", string(pm.n)), pm.n)
 	// TODO(sdboyer) cache results
 	pm.crepo.mut.RUnlock()
 

@@ -35,14 +35,16 @@ type SourceManager interface {
 	// import path, at the provided version.
 	ListPackages(ProjectRoot, Version) (PackageTree, error)
 
-	// GetProjectInfo returns manifest and lock information for the provided
-	// import path. gps currently requires that projects be rooted at their
+	// GetManifestAndLock returns manifest and lock information for the provided
+	// root import path.
+	//
+	// gps currently requires that projects be rooted at their
 	// repository root, necessitating that this ProjectRoot must also be a
 	// repository root.
-	GetProjectInfo(ProjectRoot, Version) (Manifest, Lock, error)
+	GetManifestAndLock(ProjectRoot, Version) (Manifest, Lock, error)
 
 	// AnalyzerInfo reports the name and version of the logic used to service
-	// AnalyzeProject().
+	// GetManifestAndLock().
 	AnalyzerInfo() (name string, version *semver.Version)
 
 	// ExportProject writes out the tree of the provided import path, at the
@@ -56,9 +58,10 @@ type SourceManager interface {
 // A ProjectAnalyzer is responsible for analyzing a given path for Manifest and
 // Lock information. Tools relying on gps must implement one.
 type ProjectAnalyzer interface {
-	// Perform analysis of the filesystem tree rooted at path, which has the
-	// root import path importRoot.
-	Analyze(path string, importRoot ProjectRoot) (Manifest, Lock, error)
+	// Perform analysis of the filesystem tree rooted at path, with the
+	// root import path importRoot, to determine the project's constraints, as
+	// indicated by a Manifest and Lock.
+	DeriveManifestAndLock(path string, importRoot ProjectRoot) (Manifest, Lock, error)
 	// Report the name and version of this ProjectAnalyzer.
 	Info() (name string, version *semver.Version)
 }
@@ -145,13 +148,13 @@ func (sm *SourceMgr) AnalyzerInfo() (name string, version *semver.Version) {
 	return sm.an.Info()
 }
 
-// GetProjectInfo returns manifest and lock information for the provided import
+// GetManifestAndLock returns manifest and lock information for the provided import
 // path. gps currently requires that projects be rooted at their repository
 // root, which means that this ProjectRoot must also be a repository root.
 //
-// The work of producing the manifest and lock information is delegated to the
-// injected ProjectAnalyzer.
-func (sm *SourceMgr) GetProjectInfo(n ProjectRoot, v Version) (Manifest, Lock, error) {
+// The work of producing the manifest and lock is delegated to the injected
+// ProjectAnalyzer's DeriveManifestAndLock() method.
+func (sm *SourceMgr) GetManifestAndLock(n ProjectRoot, v Version) (Manifest, Lock, error) {
 	pmc, err := sm.getProjectManager(n)
 	if err != nil {
 		return nil, nil, err
