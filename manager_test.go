@@ -23,6 +23,10 @@ func (naiveAnalyzer) GetInfo(string, ProjectRoot) (Manifest, Lock, error) {
 	return nil, nil, nil
 }
 
+func (a naiveAnalyzer) Info() (name string, version *semver.Version) {
+	return "naive-analyzer", sv("v0.0.1")
+}
+
 func sv(s string) *semver.Version {
 	sv, err := semver.NewVersion(s)
 	if err != nil {

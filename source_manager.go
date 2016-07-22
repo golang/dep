@@ -7,6 +7,7 @@ import (
 	"os"
 	"path"
 
+	"github.com/Masterminds/semver"
 	"github.com/Masterminds/vcs"
 )
 
@@ -40,6 +41,10 @@ type SourceManager interface {
 	// repository root.
 	GetProjectInfo(ProjectRoot, Version) (Manifest, Lock, error)
 
+	// AnalyzerInfo reports the name and version of the logic used to service
+	// AnalyzeProject().
+	AnalyzerInfo() (name string, version *semver.Version)
+
 	// ExportProject writes out the tree of the provided import path, at the
 	// provided version, to the provided directory.
 	ExportProject(ProjectRoot, Version, string) error
@@ -48,10 +53,14 @@ type SourceManager interface {
 	Release()
 }
 
-// A ProjectAnalyzer is responsible for analyzing a path for Manifest and Lock
-// information. Tools relying on gps must implement one.
+// A ProjectAnalyzer is responsible for analyzing a given path for Manifest and
+// Lock information. Tools relying on gps must implement one.
 type ProjectAnalyzer interface {
-	GetInfo(string, ProjectRoot) (Manifest, Lock, error)
+	// Perform analysis of the filesystem tree rooted at path, which has the
+	// root import path importRoot.
+	GetInfo(path string, importRoot ProjectRoot) (Manifest, Lock, error)
+	// Report the name and version of this ProjectAnalyzer.
+	Info() (name string, version *semver.Version)
 }
 
 // SourceMgr is the default SourceManager for gps.
@@ -129,6 +138,11 @@ func NewSourceManager(an ProjectAnalyzer, cachedir string, force bool) (*SourceM
 // Release lets go of any locks held by the SourceManager.
 func (sm *SourceMgr) Release() {
 	os.Remove(path.Join(sm.cachedir, "sm.lock"))
+}
+
+// AnalyzerInfo reports the name and version of the injected ProjectAnalyzer.
+func (sm *SourceMgr) AnalyzerInfo() (name string, version *semver.Version) {
+	return sm.an.Info()
 }
 
 // GetProjectInfo returns manifest and lock information for the provided import

@@ -977,6 +977,10 @@ func (sm *depspecSourceManager) GetProjectInfo(n ProjectRoot, v Version) (Manife
 	return nil, nil, fmt.Errorf("Project %s at version %s could not be found", n, v)
 }
 
+func (sm *depspecSourceManager) AnalyzerInfo() (string, *semver.Version) {
+	return "depspec-sm-builtin", sv("v1.0.0")
+}
+
 func (sm *depspecSourceManager) ExternalReach(n ProjectRoot, v Version) (map[string][]string, error) {
 	id := pident{n: n, v: v}
 	if m, exists := sm.rm[id]; exists {
