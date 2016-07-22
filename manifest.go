@@ -21,6 +21,28 @@ type Manifest interface {
 	TestDependencyConstraints() []ProjectConstraint
 }
 
+// RootManifest extends Manifest to add special controls over solving that are
+// only afforded to the root project.
+type RootManifest interface {
+	Manifest
+
+	// Overrides returns a list of ProjectConstraints that will unconditionally
+	// supercede any ProjectConstraint declarations made in either the root
+	// manifest, or in any dependency's manifest.
+	//
+	// Overrides are a special control afforded only to root manifests. Tool
+	// users should be encouraged to use them only as a last resort; they do not
+	// "play well with others" (that is their express goal), and overreliance on
+	// them can harm the ecosystem as a whole.
+	Overrides() []ProjectConstraint
+
+	// IngorePackages returns a list of import paths to ignore. These import
+	// paths can be in the root project, or from elsewhere. Ignoring a package
+	// means that both it and its (unique) imports will be disregarded by all
+	// relevant solver operations.
+	IgnorePackages() []string
+}
+
 // SimpleManifest is a helper for tools to enumerate manifest data. It's
 // generally intended for ephemeral manifests, such as those Analyzers create on
 // the fly for projects with no manifest metadata, or metadata through a foreign
