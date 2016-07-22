@@ -20,5 +20,6 @@ build_script:
 
 test_script:
   - go test
+  - go build example.go
 
 deploy: off
