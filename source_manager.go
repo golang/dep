@@ -58,7 +58,7 @@ type SourceManager interface {
 type ProjectAnalyzer interface {
 	// Perform analysis of the filesystem tree rooted at path, which has the
 	// root import path importRoot.
-	GetInfo(path string, importRoot ProjectRoot) (Manifest, Lock, error)
+	Analyze(path string, importRoot ProjectRoot) (Manifest, Lock, error)
 	// Report the name and version of this ProjectAnalyzer.
 	Info() (name string, version *semver.Version)
 }

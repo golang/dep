@@ -19,7 +19,7 @@ var bd string
 // this as open/Any constraints on everything in the import graph.
 type naiveAnalyzer struct{}
 
-func (naiveAnalyzer) GetInfo(string, ProjectRoot) (Manifest, Lock, error) {
+func (naiveAnalyzer) Analyze(string, ProjectRoot) (Manifest, Lock, error) {
 	return nil, nil, nil
 }
 

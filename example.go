@@ -54,7 +54,7 @@ func main() {
 
 type NaiveAnalyzer struct{}
 
-func (a NaiveAnalyzer) GetInfo(path string, n gps.ProjectRoot) (gps.Manifest, gps.Lock, error) {
+func (a NaiveAnalyzer) Analyze(path string, n gps.ProjectRoot) (gps.Manifest, gps.Lock, error) {
 	return nil, nil, nil
 }
 
