@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+
+	"github.com/Masterminds/semver"
 )
 
 // sourceBridges provide an adapter to SourceManagers that tailor operations
@@ -23,6 +25,7 @@ type sourceBridge interface {
 	matchesAny(id ProjectIdentifier, c1, c2 Constraint) bool
 	intersect(id ProjectIdentifier, c1, c2 Constraint) Constraint
 	verifyRootDir(path string) error
+	analyzerInfo() (string, *semver.Version)
 	deduceRemoteRepo(path string) (*remoteRepo, error)
 }
 
@@ -78,6 +81,10 @@ func (b *bridge) getProjectInfo(pa atom) (Manifest, Lock, error) {
 		return b.s.rm, b.s.rl, nil
 	}
 	return b.sm.GetProjectInfo(ProjectRoot(pa.id.netName()), pa.v)
+}
+
+func (b *bridge) analyzerInfo() (string, *semver.Version) {
+	return b.sm.AnalyzerInfo()
 }
 
 func (b *bridge) key(id ProjectIdentifier) ProjectRoot {

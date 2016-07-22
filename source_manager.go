@@ -37,7 +37,7 @@ type SourceManager interface {
 
 	// GetProjectInfo returns manifest and lock information for the provided
 	// import path. gps currently requires that projects be rooted at their
-	// repository root, which means that this ProjectRoot must also be a
+	// repository root, necessitating that this ProjectRoot must also be a
 	// repository root.
 	GetProjectInfo(ProjectRoot, Version) (Manifest, Lock, error)
 

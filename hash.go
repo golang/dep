@@ -84,6 +84,10 @@ func (s *solver) HashInputs() ([]byte, error) {
 		}
 	}
 
+	an, av := s.b.analyzerInfo()
+	h.Write([]byte(an))
+	h.Write([]byte(av.String()))
+
 	// TODO(sdboyer) overrides
 	// TODO(sdboyer) aliases
 	return h.Sum(nil), nil
