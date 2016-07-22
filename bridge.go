@@ -12,7 +12,7 @@ import (
 // sourceBridges provide an adapter to SourceManagers that tailor operations
 // for a single solve run.
 type sourceBridge interface {
-	getProjectInfo(pa atom) (Manifest, Lock, error)
+	getManifestAndLock(pa atom) (Manifest, Lock, error)
 	listVersions(id ProjectIdentifier) ([]Version, error)
 	listPackages(id ProjectIdentifier, v Version) (PackageTree, error)
 	computeRootReach() ([]string, error)
@@ -76,7 +76,7 @@ var mkBridge func(*solver, SourceManager) sourceBridge = func(s *solver, sm Sour
 	}
 }
 
-func (b *bridge) getProjectInfo(pa atom) (Manifest, Lock, error) {
+func (b *bridge) getManifestAndLock(pa atom) (Manifest, Lock, error) {
 	if pa.id.ProjectRoot == b.s.params.ImportRoot {
 		return b.s.rm, b.s.rl, nil
 	}
