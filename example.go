@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/Masterminds/semver"
 	"github.com/sdboyer/gps"
 )
 
@@ -53,6 +54,11 @@ func main() {
 
 type NaiveAnalyzer struct{}
 
-func (a NaiveAnalyzer) GetInfo(path string, n gps.ProjectRoot) (gps.Manifest, gps.Lock, error) {
+func (a NaiveAnalyzer) Analyze(path string, n gps.ProjectRoot) (gps.Manifest, gps.Lock, error) {
 	return nil, nil, nil
+}
+
+func (a NaiveAnalyzer) Info() (name string, version *semver.Version) {
+	v, _ := semver.NewVersion("v0.0.1")
+	return "example-analyzer", v
 }

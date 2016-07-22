@@ -966,7 +966,7 @@ func newdepspecSM(ds []depspec, ignore []string) *depspecSourceManager {
 	}
 }
 
-func (sm *depspecSourceManager) GetProjectInfo(n ProjectRoot, v Version) (Manifest, Lock, error) {
+func (sm *depspecSourceManager) GetManifestAndLock(n ProjectRoot, v Version) (Manifest, Lock, error) {
 	for _, ds := range sm.specs {
 		if n == ds.n && v.Matches(ds.v) {
 			return ds, dummyLock{}, nil
@@ -975,6 +975,10 @@ func (sm *depspecSourceManager) GetProjectInfo(n ProjectRoot, v Version) (Manife
 
 	// TODO(sdboyer) proper solver-type errors
 	return nil, nil, fmt.Errorf("Project %s at version %s could not be found", n, v)
+}
+
+func (sm *depspecSourceManager) AnalyzerInfo() (string, *semver.Version) {
+	return "depspec-sm-builtin", sv("v1.0.0")
 }
 
 func (sm *depspecSourceManager) ExternalReach(n ProjectRoot, v Version) (map[string][]string, error) {

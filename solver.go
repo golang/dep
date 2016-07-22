@@ -474,7 +474,7 @@ func (s *solver) getImportsAndConstraintsOf(a atomWithPackages) ([]completeDep, 
 
 	// Work through the source manager to get project info and static analysis
 	// information.
-	m, _, err := s.b.getProjectInfo(a.a)
+	m, _, err := s.b.getManifestAndLock(a.a)
 	if err != nil {
 		return nil, err
 	}
@@ -661,7 +661,7 @@ func (s *solver) createVersionQueue(bmi bimodalIdentifier) (*versionQueue, error
 				continue
 			}
 
-			_, l, err := s.b.getProjectInfo(dep.depender)
+			_, l, err := s.b.getManifestAndLock(dep.depender)
 			if err != nil || l == nil {
 				// err being non-nil really shouldn't be possible, but the lock
 				// being nil is quite likely
@@ -1042,7 +1042,7 @@ func (s *solver) selectAtom(a atomWithPackages, pkgonly bool) {
 
 	// If this atom has a lock, pull it out so that we can potentially inject
 	// preferred versions into any bmis we enqueue
-	_, l, _ := s.b.getProjectInfo(a.a)
+	_, l, _ := s.b.getManifestAndLock(a.a)
 	var lmap map[ProjectIdentifier]Version
 	if l != nil {
 		lmap = make(map[ProjectIdentifier]Version)

@@ -5,12 +5,14 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+
+	"github.com/Masterminds/semver"
 )
 
 // sourceBridges provide an adapter to SourceManagers that tailor operations
 // for a single solve run.
 type sourceBridge interface {
-	getProjectInfo(pa atom) (Manifest, Lock, error)
+	getManifestAndLock(pa atom) (Manifest, Lock, error)
 	listVersions(id ProjectIdentifier) ([]Version, error)
 	listPackages(id ProjectIdentifier, v Version) (PackageTree, error)
 	computeRootReach() ([]string, error)
@@ -23,6 +25,7 @@ type sourceBridge interface {
 	matchesAny(id ProjectIdentifier, c1, c2 Constraint) bool
 	intersect(id ProjectIdentifier, c1, c2 Constraint) Constraint
 	verifyRootDir(path string) error
+	analyzerInfo() (string, *semver.Version)
 	deduceRemoteRepo(path string) (*remoteRepo, error)
 }
 
@@ -73,11 +76,15 @@ var mkBridge func(*solver, SourceManager) sourceBridge = func(s *solver, sm Sour
 	}
 }
 
-func (b *bridge) getProjectInfo(pa atom) (Manifest, Lock, error) {
+func (b *bridge) getManifestAndLock(pa atom) (Manifest, Lock, error) {
 	if pa.id.ProjectRoot == b.s.params.ImportRoot {
 		return b.s.rm, b.s.rl, nil
 	}
-	return b.sm.GetProjectInfo(ProjectRoot(pa.id.netName()), pa.v)
+	return b.sm.GetManifestAndLock(ProjectRoot(pa.id.netName()), pa.v)
+}
+
+func (b *bridge) analyzerInfo() (string, *semver.Version) {
+	return b.sm.AnalyzerInfo()
 }
 
 func (b *bridge) key(id ProjectIdentifier) ProjectRoot {

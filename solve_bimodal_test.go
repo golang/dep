@@ -566,7 +566,7 @@ func (sm *bmSourceManager) ListPackages(n ProjectRoot, v Version) (PackageTree, 
 	return PackageTree{}, fmt.Errorf("Project %s at version %s could not be found", n, v)
 }
 
-func (sm *bmSourceManager) GetProjectInfo(n ProjectRoot, v Version) (Manifest, Lock, error) {
+func (sm *bmSourceManager) GetManifestAndLock(n ProjectRoot, v Version) (Manifest, Lock, error) {
 	for _, ds := range sm.specs {
 		if n == ds.n && v.Matches(ds.v) {
 			if l, exists := sm.lm[string(n)+" "+v.String()]; exists {

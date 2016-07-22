@@ -19,8 +19,12 @@ var bd string
 // this as open/Any constraints on everything in the import graph.
 type naiveAnalyzer struct{}
 
-func (naiveAnalyzer) GetInfo(string, ProjectRoot) (Manifest, Lock, error) {
+func (naiveAnalyzer) DeriveManifestAndLock(string, ProjectRoot) (Manifest, Lock, error) {
 	return nil, nil, nil
+}
+
+func (a naiveAnalyzer) Info() (name string, version *semver.Version) {
+	return "naive-analyzer", sv("v0.0.1")
 }
 
 func sv(s string) *semver.Version {
@@ -326,7 +330,7 @@ func TestGetInfoListVersionsOrdering(t *testing.T) {
 
 	pn := ProjectRoot("github.com/Masterminds/VCSTestRepo")
 
-	_, _, err = sm.GetProjectInfo(pn, NewVersion("1.0.0"))
+	_, _, err = sm.GetManifestAndLock(pn, NewVersion("1.0.0"))
 	if err != nil {
 		t.Errorf("Unexpected error from GetInfoAt %s", err)
 	}
