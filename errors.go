@@ -206,10 +206,18 @@ func (e badOptsFailure) Error() string {
 }
 
 type sourceMismatchFailure struct {
-	shared            ProjectRoot
-	sel               []dependency
-	current, mismatch string
-	prob              atom
+	// The ProjectRoot over which there is disagreement about where it should be
+	// sourced from
+	shared ProjectRoot
+	// The current value for the network source
+	current string
+	// The mismatched value for the network source
+	mismatch string
+	// The currently selected dependencies which have agreed upon/established
+	// the given network source
+	sel []dependency
+	// The atom with the constraint that has the new, incompatible network source
+	prob atom
 }
 
 func (e *sourceMismatchFailure) Error() string {
