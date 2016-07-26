@@ -154,7 +154,7 @@ func solveBimodalAndCheck(fix bimodalFixture, t *testing.T) (res Solution, err e
 	return fixtureSolveSimpleChecks(fix, res, err, t)
 }
 
-func fixtureSolveSimpleChecks(fix specfix, res Solution, err error, t *testing.T) (Solution, error) {
+func fixtureSolveSimpleChecks(fix specfix, soln Solution, err error, t *testing.T) (Solution, error) {
 	if err != nil {
 		errp := fix.expectErrs()
 		fixfail := fix.failure()
@@ -162,14 +162,13 @@ func fixtureSolveSimpleChecks(fix specfix, res Solution, err error, t *testing.T
 			if !reflect.DeepEqual(fixfail, err) {
 				t.Errorf("(fixture: %q) Failure mismatch:\n\t(GOT): %s\n\t(WNT): %s", fix.name(), err, fixfail)
 			}
-			return res, err
+			return soln, err
 		}
 
-		// TODO(sdboyer) remove this once transition to proper errors is
-		// complete
+		// TODO(sdboyer) remove all this after transition to proper errors
 		if len(errp) == 0 {
 			t.Errorf("(fixture: %q) Solver failed; error was type %T, text:\n%s", fix.name(), err, err)
-			return res, err
+			return soln, err
 		}
 
 		switch fail := err.(type) {
@@ -219,7 +218,7 @@ func fixtureSolveSimpleChecks(fix specfix, res Solution, err error, t *testing.T
 	} else if len(fix.expectErrs()) > 0 {
 		t.Errorf("(fixture: %q) Solver succeeded, but expected failure", fix.name())
 	} else {
-		r := res.(solution)
+		r := soln.(solution)
 		if fix.maxTries() > 0 && r.Attempts() > fix.maxTries() {
 			t.Errorf("(fixture: %q) Solver completed in %v attempts, but expected %v or fewer", fix.name(), r.att, fix.maxTries())
 		}
@@ -261,7 +260,7 @@ func fixtureSolveSimpleChecks(fix specfix, res Solution, err error, t *testing.T
 		}
 	}
 
-	return res, err
+	return soln, err
 }
 
 // This tests that, when a root lock is underspecified (has only a version) we
