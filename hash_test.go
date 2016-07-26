@@ -9,6 +9,51 @@ import (
 func TestHashInputs(t *testing.T) {
 	fix := basicFixtures["shared dependency with overlapping constraints"]
 
+	params := SolveParameters{
+		RootDir:    string(fix.ds[0].n),
+		ImportRoot: fix.ds[0].n,
+		Manifest:   fix.rootmanifest(),
+	}
+
+	s, err := Prepare(params, newdepspecSM(fix.ds, nil))
+
+	dig, err := s.HashInputs()
+	if err != nil {
+		t.Fatalf("HashInputs returned unexpected err: %s", err)
+	}
+
+	h := sha256.New()
+
+	elems := []string{
+		"a",
+		"a",
+		"1.0.0",
+		"b",
+		"b",
+		"1.0.0",
+		stdlibPkgs,
+		appenginePkgs,
+		"root",
+		"",
+		"root",
+		"a",
+		"b",
+		"depspec-sm-builtin",
+		"1.0.0",
+	}
+	for _, v := range elems {
+		h.Write([]byte(v))
+	}
+	correct := h.Sum(nil)
+
+	if !bytes.Equal(dig, correct) {
+		t.Errorf("Hashes are not equal")
+	}
+}
+
+func TestHashInputsIgnores(t *testing.T) {
+	fix := basicFixtures["shared dependency with overlapping constraints"]
+
 	rm := fix.rootmanifest().(simpleRootManifest)
 	rm.ig = map[string]bool{
 		"foo": true,
@@ -28,10 +73,303 @@ func TestHashInputs(t *testing.T) {
 	}
 
 	h := sha256.New()
-	for _, v := range []string{"a", "a", "1.0.0", "b", "b", "1.0.0", stdlibPkgs, appenginePkgs, "root", "", "root", "a", "b", "bar", "foo", "depspec-sm-builtin", "1.0.0"} {
+
+	elems := []string{
+		"a",
+		"a",
+		"1.0.0",
+		"b",
+		"b",
+		"1.0.0",
+		stdlibPkgs,
+		appenginePkgs,
+		"root",
+		"",
+		"root",
+		"a",
+		"b",
+		"bar",
+		"foo",
+		"depspec-sm-builtin",
+		"1.0.0",
+	}
+	for _, v := range elems {
 		h.Write([]byte(v))
 	}
 	correct := h.Sum(nil)
+
+	if !bytes.Equal(dig, correct) {
+		t.Errorf("Hashes are not equal")
+	}
+}
+
+func TestHashInputsOverrides(t *testing.T) {
+	fix := basicFixtures["shared dependency with overlapping constraints"]
+
+	rm := fix.rootmanifest().(simpleRootManifest)
+	// First case - override something not in the root, just with network name
+	rm.ovr = map[ProjectRoot]Override{
+		"c": Override{
+			NetworkName: "car",
+		},
+	}
+	params := SolveParameters{
+		RootDir:    string(fix.ds[0].n),
+		ImportRoot: fix.ds[0].n,
+		Manifest:   rm,
+	}
+
+	s, err := Prepare(params, newdepspecSM(fix.ds, nil))
+
+	dig, err := s.HashInputs()
+	if err != nil {
+		t.Fatalf("HashInputs returned unexpected err: %s", err)
+	}
+
+	h := sha256.New()
+
+	elems := []string{
+		"a",
+		"a",
+		"1.0.0",
+		"b",
+		"b",
+		"1.0.0",
+		stdlibPkgs,
+		appenginePkgs,
+		"root",
+		"",
+		"root",
+		"a",
+		"b",
+		"c",
+		"car",
+		"depspec-sm-builtin",
+		"1.0.0",
+	}
+	for _, v := range elems {
+		h.Write([]byte(v))
+	}
+	correct := h.Sum(nil)
+
+	if !bytes.Equal(dig, correct) {
+		t.Errorf("Hashes are not equal")
+	}
+
+	// Override not in root, just with constraint
+	rm.ovr["d"] = Override{
+		Constraint: NewBranch("foobranch"),
+	}
+	dig, err = s.HashInputs()
+	if err != nil {
+		t.Fatalf("HashInputs returned unexpected err: %s", err)
+	}
+
+	h = sha256.New()
+
+	elems = []string{
+		"a",
+		"a",
+		"1.0.0",
+		"b",
+		"b",
+		"1.0.0",
+		stdlibPkgs,
+		appenginePkgs,
+		"root",
+		"",
+		"root",
+		"a",
+		"b",
+		"c",
+		"car",
+		"d",
+		"foobranch",
+		"depspec-sm-builtin",
+		"1.0.0",
+	}
+	for _, v := range elems {
+		h.Write([]byte(v))
+	}
+	correct = h.Sum(nil)
+
+	if !bytes.Equal(dig, correct) {
+		t.Errorf("Hashes are not equal")
+	}
+
+	// Override not in root, both constraint and network name
+	rm.ovr["e"] = Override{
+		NetworkName: "groucho",
+		Constraint:  NewBranch("plexiglass"),
+	}
+	dig, err = s.HashInputs()
+	if err != nil {
+		t.Fatalf("HashInputs returned unexpected err: %s", err)
+	}
+
+	h = sha256.New()
+
+	elems = []string{
+		"a",
+		"a",
+		"1.0.0",
+		"b",
+		"b",
+		"1.0.0",
+		stdlibPkgs,
+		appenginePkgs,
+		"root",
+		"",
+		"root",
+		"a",
+		"b",
+		"c",
+		"car",
+		"d",
+		"foobranch",
+		"e",
+		"groucho",
+		"plexiglass",
+		"depspec-sm-builtin",
+		"1.0.0",
+	}
+	for _, v := range elems {
+		h.Write([]byte(v))
+	}
+	correct = h.Sum(nil)
+
+	if !bytes.Equal(dig, correct) {
+		t.Errorf("Hashes are not equal")
+	}
+
+	// Override in root, just constraint
+	rm.ovr["a"] = Override{
+		Constraint: NewVersion("fluglehorn"),
+	}
+	dig, err = s.HashInputs()
+	if err != nil {
+		t.Fatalf("HashInputs returned unexpected err: %s", err)
+	}
+
+	h = sha256.New()
+
+	elems = []string{
+		"b",
+		"b",
+		"1.0.0",
+		stdlibPkgs,
+		appenginePkgs,
+		"root",
+		"",
+		"root",
+		"a",
+		"b",
+		"a",
+		"a",
+		"fluglehorn",
+		"c",
+		"car",
+		"d",
+		"foobranch",
+		"e",
+		"groucho",
+		"plexiglass",
+		"depspec-sm-builtin",
+		"1.0.0",
+	}
+	for _, v := range elems {
+		h.Write([]byte(v))
+	}
+	correct = h.Sum(nil)
+
+	if !bytes.Equal(dig, correct) {
+		t.Errorf("Hashes are not equal")
+	}
+
+	// Override in root, only network name
+	rm.ovr["a"] = Override{
+		NetworkName: "nota",
+	}
+	dig, err = s.HashInputs()
+	if err != nil {
+		t.Fatalf("HashInputs returned unexpected err: %s", err)
+	}
+
+	h = sha256.New()
+
+	elems = []string{
+		"b",
+		"b",
+		"1.0.0",
+		stdlibPkgs,
+		appenginePkgs,
+		"root",
+		"",
+		"root",
+		"a",
+		"b",
+		"a",
+		"nota",
+		"1.0.0",
+		"c",
+		"car",
+		"d",
+		"foobranch",
+		"e",
+		"groucho",
+		"plexiglass",
+		"depspec-sm-builtin",
+		"1.0.0",
+	}
+	for _, v := range elems {
+		h.Write([]byte(v))
+	}
+	correct = h.Sum(nil)
+
+	if !bytes.Equal(dig, correct) {
+		t.Errorf("Hashes are not equal")
+	}
+
+	// Override in root, network name and constraint
+	rm.ovr["a"] = Override{
+		NetworkName: "nota",
+		Constraint:  NewVersion("fluglehorn"),
+	}
+	dig, err = s.HashInputs()
+	if err != nil {
+		t.Fatalf("HashInputs returned unexpected err: %s", err)
+	}
+
+	h = sha256.New()
+
+	elems = []string{
+		"b",
+		"b",
+		"1.0.0",
+		stdlibPkgs,
+		appenginePkgs,
+		"root",
+		"",
+		"root",
+		"a",
+		"b",
+		"a",
+		"nota",
+		"fluglehorn",
+		"c",
+		"car",
+		"d",
+		"foobranch",
+		"e",
+		"groucho",
+		"plexiglass",
+		"depspec-sm-builtin",
+		"1.0.0",
+	}
+	for _, v := range elems {
+		h.Write([]byte(v))
+	}
+	correct = h.Sum(nil)
 
 	if !bytes.Equal(dig, correct) {
 		t.Errorf("Hashes are not equal")
