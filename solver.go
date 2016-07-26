@@ -42,11 +42,12 @@ type SolveParameters struct {
 	// A non-empty string is required.
 	ImportRoot ProjectRoot
 
-	// The root manifest. This contains all the dependencies, constraints, and
-	// other controls available to the root project.
+	// The root manifest. This contains all the dependency constraints
+	// associated with normal Manifests, as well as the particular controls
+	// afforded only to the root project.
 	//
 	// May be nil, but for most cases, that would be unwise.
-	Manifest Manifest
+	Manifest RootManifest
 
 	// The root lock. Optional. Generally, this lock is the output of a previous
 	// solve run.
@@ -54,11 +55,6 @@ type SolveParameters struct {
 	// If provided, the solver will attempt to preserve the versions specified
 	// in the lock, unless ToChange or ChangeAll settings indicate otherwise.
 	Lock Lock
-
-	// A list of packages (import paths) to ignore. These can be in the root
-	// project, or from elsewhere. Ignoring a package means that both it and its
-	// imports will be disregarded by all relevant solver operations.
-	Ignore []string
 
 	// ToChange is a list of project names that should be changed - that is, any
 	// versions specified for those projects in the root lock file should be
@@ -90,8 +86,8 @@ type SolveParameters struct {
 	TraceLogger *log.Logger
 }
 
-// solver is a CDCL-style SAT solver with satisfiability conditions hardcoded to
-// the needs of the Go package management problem space.
+// solver is a CDCL-style constraint solver with satisfiability conditions
+// hardcoded to the needs of the Go package management problem space.
 type solver struct {
 	// The current number of attempts made over the course of this solve. This
 	// number increments each time the algorithm completes a backtrack and
@@ -153,6 +149,10 @@ type solver struct {
 	// the network name to which they currently correspond.
 	names map[ProjectRoot]string
 
+	// A map of ProjectRoot (import path names) to the ProjectConstraint that
+	// should be enforced for those names.
+	ovr map[ProjectRoot]Override
+
 	// A map of the names listed in the root's lock.
 	rlm map[ProjectIdentifier]LockedProject
 
@@ -204,21 +204,18 @@ func Prepare(params SolveParameters, sm SourceManager) (Solver, error) {
 	}
 
 	if params.Manifest == nil {
-		params.Manifest = SimpleManifest{}
-	}
-
-	// Ensure the ignore map is at least initialized
-	ig := make(map[string]bool)
-	if len(params.Ignore) > 0 {
-		for _, pkg := range params.Ignore {
-			ig[pkg] = true
-		}
+		params.Manifest = simpleRootManifest{}
 	}
 
 	s := &solver{
 		params: params,
-		ig:     ig,
+		ig:     params.Manifest.IgnorePackages(),
 		tl:     params.TraceLogger,
+	}
+
+	// Ensure the ignore map is at least initialized
+	if s.ig == nil {
+		s.ig = make(map[string]bool)
 	}
 
 	// Set up the bridge and ensure the root dir is in good, working order

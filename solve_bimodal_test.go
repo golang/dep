@@ -521,6 +521,19 @@ func (f bimodalFixture) solution() map[string]Version {
 	return f.r
 }
 
+func (f bimodalFixture) rootmanifest() RootManifest {
+	m := simpleRootManifest{
+		c:  f.ds[0].deps,
+		tc: f.ds[0].devdeps,
+		ig: make(map[string]bool),
+	}
+	for _, ig := range f.ignore {
+		m.ig[ig] = true
+	}
+
+	return m
+}
+
 // bmSourceManager is an SM specifically for the bimodal fixtures. It composes
 // the general depspec SM, and differs from it in how it answers static analysis
 // calls, and its support for package ignores and dep lock data.

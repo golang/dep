@@ -9,11 +9,15 @@ import (
 func TestHashInputs(t *testing.T) {
 	fix := basicFixtures["shared dependency with overlapping constraints"]
 
+	rm := fix.rootmanifest().(simpleRootManifest)
+	rm.ig = map[string]bool{
+		"foo": true,
+		"bar": true,
+	}
 	params := SolveParameters{
 		RootDir:    string(fix.ds[0].n),
 		ImportRoot: fix.ds[0].n,
-		Manifest:   fix.ds[0],
-		Ignore:     []string{"foo", "bar"},
+		Manifest:   rm,
 	}
 
 	s, err := Prepare(params, newdepspecSM(fix.ds, nil))

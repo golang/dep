@@ -34,13 +34,13 @@ type RootManifest interface {
 	// users should be encouraged to use them only as a last resort; they do not
 	// "play well with others" (that is their express goal), and overreliance on
 	// them can harm the ecosystem as a whole.
-	Overrides() []ProjectConstraint
+	Overrides() map[ProjectRoot]Override
 
-	// IngorePackages returns a list of import paths to ignore. These import
-	// paths can be in the root project, or from elsewhere. Ignoring a package
-	// means that both it and its (unique) imports will be disregarded by all
-	// relevant solver operations.
-	IgnorePackages() []string
+	// IngorePackages returns a set of import paths to ignore. These import
+	// paths can be within the root project, or part of other projects. Ignoring
+	// a package means that both it and its (unique) imports will be disregarded
+	// by all relevant solver operations.
+	IgnorePackages() map[string]bool
 }
 
 // SimpleManifest is a helper for tools to enumerate manifest data. It's
@@ -62,6 +62,30 @@ func (m SimpleManifest) DependencyConstraints() []ProjectConstraint {
 // TestDependencyConstraints returns the project's test dependencies.
 func (m SimpleManifest) TestDependencyConstraints() []ProjectConstraint {
 	return m.TestDeps
+}
+
+// simpleRootManifest exists so that we have a safe value to swap into solver
+// params when a nil Manifest is provided.
+//
+// Also, for tests.
+type simpleRootManifest struct {
+	c   []ProjectConstraint
+	tc  []ProjectConstraint
+	ovr map[ProjectRoot]Override
+	ig  map[string]bool
+}
+
+func (m simpleRootManifest) DependencyConstraints() []ProjectConstraint {
+	return m.c
+}
+func (m simpleRootManifest) TestDependencyConstraints() []ProjectConstraint {
+	return m.tc
+}
+func (m simpleRootManifest) Overrides() map[ProjectRoot]Override {
+	return m.ovr
+}
+func (m simpleRootManifest) IgnorePackages() map[string]bool {
+	return m.ig
 }
 
 // prepManifest ensures a manifest is prepared and safe for use by the solver.

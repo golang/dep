@@ -287,6 +287,7 @@ type pident struct {
 
 type specfix interface {
 	name() string
+	rootmanifest() RootManifest
 	specs() []depspec
 	maxTries() int
 	expectErrs() []string
@@ -344,6 +345,13 @@ func (f basicFixture) expectErrs() []string {
 
 func (f basicFixture) solution() map[string]Version {
 	return f.r
+}
+
+func (f basicFixture) rootmanifest() RootManifest {
+	return simpleRootManifest{
+		c:  f.ds[0].deps,
+		tc: f.ds[0].devdeps,
+	}
 }
 
 // A table of basicFixtures, used in the basic solving test set.

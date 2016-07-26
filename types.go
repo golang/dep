@@ -134,6 +134,13 @@ func (i ProjectIdentifier) normalize() ProjectIdentifier {
 	return i
 }
 
+// An Override can be provided by the RootManifest to designate a network name
+// and constraint that should *always* be used for a given ProjectRoot.
+type Override struct {
+	NetworkName string
+	Constraint  Constraint
+}
+
 // Package represents a Go package. It contains a subset of the information
 // go/build.Package does.
 type Package struct {
