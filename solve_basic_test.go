@@ -81,6 +81,17 @@ func nvrSplit(info string) (id ProjectIdentifier, version string, revision Revis
 // should be provided in this case. It is an error (and will panic) to try to
 // pass a revision with an underlying revision.
 func mkAtom(info string) atom {
+	// if info is "root", special case it to use the root "version"
+	if info == "root" {
+		return atom{
+			id: ProjectIdentifier{
+				ProjectRoot: ProjectRoot("root"),
+				NetworkName: "root",
+			},
+			v: rootRev,
+		}
+	}
+
 	id, ver, rev := nvrSplit(info)
 
 	var v Version
@@ -164,6 +175,17 @@ func mkPDep(info string) ProjectConstraint {
 	}
 }
 
+// mkCDep composes a completeDep struct from the inputs.
+//
+// The only real work here is passing the initial string to mkPDep. All the
+// other args are taken as package names.
+func mkCDep(pdep string, pl ...string) completeDep {
+	return completeDep{
+		ProjectConstraint: mkPDep(pdep),
+		pl:                pl,
+	}
+}
+
 // A depspec is a fixture representing all the information a SourceManager would
 // ordinarily glean directly from interrogating a repository.
 type depspec struct {
@@ -208,6 +230,22 @@ func mkDepspec(pi string, deps ...string) depspec {
 	}
 
 	return ds
+}
+
+func mkDep(atom, pdep string, pl ...string) dependency {
+	return dependency{
+		depender: mkAtom(atom),
+		dep:      mkCDep(pdep, pl...),
+	}
+}
+
+// pinrm creates a ProjectIdentifier with the ProjectRoot as the provided
+// string, and with the NetworkName normalized to be the same.
+func pinrm(root string) ProjectIdentifier {
+	return ProjectIdentifier{
+		ProjectRoot: ProjectRoot(root),
+		NetworkName: root,
+	}
 }
 
 // mklock makes a fixLock, suitable to act as a lock file
@@ -322,6 +360,8 @@ type basicFixture struct {
 	l fixLock
 	// projects expected to have errors, if any
 	errp []string
+	// solve failure expected, if any
+	fail error
 	// request up/downgrade to all projects
 	changeall bool
 }
@@ -448,8 +488,22 @@ var basicFixtures = map[string]basicFixture{
 			mkDepspec("foo 1.0.0", "bar from baz 1.0.0"),
 			mkDepspec("bar 1.0.0"),
 		},
-		// TODO(sdboyer) ugh; do real error comparison instead of shitty abstraction
 		errp: []string{"foo", "foo", "root"},
+		fail: &noVersionError{
+			pn: pinrm("foo"),
+			fails: []failedVersion{
+				{
+					v: NewVersion("1.0.0"),
+					f: &sourceMismatchFailure{
+						shared:   ProjectRoot("bar"),
+						current:  "bar",
+						mismatch: "baz",
+						prob:     mkAtom("foo 1.0.0"),
+						sel:      []dependency{mkDep("root", "foo 1.0.0", "foo")},
+					},
+				},
+			},
+		},
 	},
 	// fixtures with locks
 	"with compatible locked dependency": {
