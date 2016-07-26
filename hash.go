@@ -26,7 +26,7 @@ func (s *solver) HashInputs() ([]byte, error) {
 	}
 
 	d, dd := s.params.Manifest.DependencyConstraints(), s.params.Manifest.TestDependencyConstraints()
-	p := make(sortedDeps, len(d))
+	p := make(sortedConstraints, len(d))
 	copy(p, d)
 	p = append(p, dd...)
 
@@ -93,16 +93,16 @@ func (s *solver) HashInputs() ([]byte, error) {
 	return h.Sum(nil), nil
 }
 
-type sortedDeps []ProjectConstraint
+type sortedConstraints []ProjectConstraint
 
-func (s sortedDeps) Len() int {
+func (s sortedConstraints) Len() int {
 	return len(s)
 }
 
-func (s sortedDeps) Swap(i, j int) {
+func (s sortedConstraints) Swap(i, j int) {
 	s[i], s[j] = s[j], s[i]
 }
 
-func (s sortedDeps) Less(i, j int) bool {
+func (s sortedConstraints) Less(i, j int) bool {
 	return s[i].Ident.less(s[j].Ident)
 }
