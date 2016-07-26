@@ -29,19 +29,6 @@ type traceError interface {
 	traceString() string
 }
 
-type solveError struct {
-	lvl errorLevel
-	msg string
-}
-
-func newSolveError(msg string, lvl errorLevel) error {
-	return &solveError{msg: msg, lvl: lvl}
-}
-
-func (e *solveError) Error() string {
-	return e.msg
-}
-
 type noVersionError struct {
 	pn    ProjectIdentifier
 	fails []failedVersion
