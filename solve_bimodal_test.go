@@ -495,6 +495,8 @@ type bimodalFixture struct {
 	lm map[string]fixLock
 	// projects expected to have errors, if any
 	errp []string
+	// solve failure expected, if any
+	fail error
 	// request up/downgrade to all projects
 	changeall bool
 	// pkgs to ignore
@@ -519,6 +521,10 @@ func (f bimodalFixture) expectErrs() []string {
 
 func (f bimodalFixture) solution() map[string]Version {
 	return f.r
+}
+
+func (f bimodalFixture) failure() error {
+	return f.fail
 }
 
 // bmSourceManager is an SM specifically for the bimodal fixtures. It composes

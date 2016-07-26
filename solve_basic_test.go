@@ -328,6 +328,7 @@ type specfix interface {
 	maxTries() int
 	expectErrs() []string
 	solution() map[string]Version
+	failure() error
 }
 
 // A basicFixture is a declarative test fixture that can cover a wide variety of
@@ -383,6 +384,10 @@ func (f basicFixture) expectErrs() []string {
 
 func (f basicFixture) solution() map[string]Version {
 	return f.r
+}
+
+func (f basicFixture) failure() error {
+	return f.fail
 }
 
 // A table of basicFixtures, used in the basic solving test set.
@@ -487,7 +492,6 @@ var basicFixtures = map[string]basicFixture{
 			mkDepspec("foo 1.0.0", "bar from baz 1.0.0"),
 			mkDepspec("bar 1.0.0"),
 		},
-		errp: []string{"foo", "foo", "root"},
 		fail: &noVersionError{
 			pn: pinrm("foo"),
 			fails: []failedVersion{

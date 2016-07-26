@@ -157,6 +157,16 @@ func solveBimodalAndCheck(fix bimodalFixture, t *testing.T) (res Solution, err e
 func fixtureSolveSimpleChecks(fix specfix, res Solution, err error, t *testing.T) (Solution, error) {
 	if err != nil {
 		errp := fix.expectErrs()
+		fixfail := fix.failure()
+		if fixfail != nil {
+			if !reflect.DeepEqual(fixfail, err) {
+				t.Errorf("(fixture: %q) Failure mismatch:\n\t(GOT): %s\n\t(WNT): %s", fix.name(), err, fixfail)
+			}
+			return res, err
+		}
+
+		// TODO(sdboyer) remove this once transition to proper errors is
+		// complete
 		if len(errp) == 0 {
 			t.Errorf("(fixture: %q) Solver failed; error was type %T, text:\n%s", fix.name(), err, err)
 			return res, err
