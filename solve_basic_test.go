@@ -86,7 +86,6 @@ func mkAtom(info string) atom {
 		return atom{
 			id: ProjectIdentifier{
 				ProjectRoot: ProjectRoot("root"),
-				NetworkName: "root",
 			},
 			v: rootRev,
 		}
