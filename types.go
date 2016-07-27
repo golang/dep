@@ -75,14 +75,6 @@ type ProjectIdentifier struct {
 	NetworkName string
 }
 
-// A ProjectConstraint combines a ProjectIdentifier with a Constraint. It
-// indicates that, if packages contained in the ProjectIdentifier enter the
-// depgraph, they must do so at a version that is allowed by the Constraint.
-type ProjectConstraint struct {
-	Ident      ProjectIdentifier
-	Constraint Constraint
-}
-
 func (i ProjectIdentifier) less(j ProjectIdentifier) bool {
 	if i.ProjectRoot < j.ProjectRoot {
 		return true

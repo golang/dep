@@ -165,9 +165,46 @@ func (noneConstraint) Intersect(Constraint) Constraint {
 	return none
 }
 
+// A ProjectConstraint combines a ProjectIdentifier with a Constraint. It
+// indicates that, if packages contained in the ProjectIdentifier enter the
+// depgraph, they must do so at a version that is allowed by the Constraint.
+type ProjectConstraint struct {
+	Ident      ProjectIdentifier
+	Constraint Constraint
+}
+
+type workingConstraint struct {
+	Ident                     ProjectIdentifier
+	Constraint                Constraint
+	overrNet, overrConstraint bool
+}
+
 type ProjectConstraints map[ProjectRoot]ProjectProperties
 
-//func mergePCSlices( ProjectConstraints, wother ProjectConstraints) {
-//final := make(ProjectConstraints)
+func mergePCSlices(l []ProjectConstraint, r []ProjectConstraint) ProjectConstraints {
+	final := make(ProjectConstraints)
 
-//}
+	for _, pc := range l {
+		final[pc.Ident.LocalName] = ProjectProperties{
+			NetworkName: pc.Ident.netName(),
+			Constraint:  pc.Constraint,
+		}
+	}
+
+	for _, pc := range r {
+		if pp, exists := final[pc.Ident.LocalName]; exists {
+			// Technically this should be done through a bridge for
+			// cross-version-type matching...but this is a one off for root and
+			// that's just ridiculous for this.
+			pp.Constraint = pp.Constraint.Intersect(pc.Constraint)
+			final[pc.Ident.LocalName] = pp
+		} else {
+			final[pc.Ident.LocalName] = ProjectProperties{
+				NetworkName: pc.Ident.netName(),
+				Constraint:  pc.Constraint,
+			}
+		}
+	}
+
+	return final
+}
