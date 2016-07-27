@@ -2,6 +2,7 @@ package gps
 
 import (
 	"fmt"
+	"sort"
 
 	"github.com/Masterminds/semver"
 )
@@ -185,21 +186,21 @@ func mergePCSlices(l []ProjectConstraint, r []ProjectConstraint) ProjectConstrai
 	final := make(ProjectConstraints)
 
 	for _, pc := range l {
-		final[pc.Ident.LocalName] = ProjectProperties{
+		final[pc.Ident.ProjectRoot] = ProjectProperties{
 			NetworkName: pc.Ident.netName(),
 			Constraint:  pc.Constraint,
 		}
 	}
 
 	for _, pc := range r {
-		if pp, exists := final[pc.Ident.LocalName]; exists {
+		if pp, exists := final[pc.Ident.ProjectRoot]; exists {
 			// Technically this should be done through a bridge for
 			// cross-version-type matching...but this is a one off for root and
 			// that's just ridiculous for this.
 			pp.Constraint = pp.Constraint.Intersect(pc.Constraint)
-			final[pc.Ident.LocalName] = pp
+			final[pc.Ident.ProjectRoot] = pp
 		} else {
-			final[pc.Ident.LocalName] = ProjectProperties{
+			final[pc.Ident.ProjectRoot] = ProjectProperties{
 				NetworkName: pc.Ident.netName(),
 				Constraint:  pc.Constraint,
 			}
@@ -207,4 +208,55 @@ func mergePCSlices(l []ProjectConstraint, r []ProjectConstraint) ProjectConstrai
 	}
 
 	return final
+}
+
+func (m ProjectConstraints) asSortedSlice() []ProjectConstraint {
+	pcs := make([]ProjectConstraint, len(m))
+
+	k := 0
+	for pr, pp := range m {
+		pcs[k] = ProjectConstraint{
+			Ident: ProjectIdentifier{
+				ProjectRoot: pr,
+				NetworkName: pp.NetworkName,
+			},
+			Constraint: pp.Constraint,
+		}
+		k++
+	}
+
+	sort.Stable(sortedConstraints(pcs))
+	return pcs
+}
+
+func (m ProjectConstraints) override(in []ProjectConstraint) (out []workingConstraint) {
+	out = make([]workingConstraint, len(in))
+	k := 0
+	for _, pc := range in {
+		wc := workingConstraint{
+			Ident:      pc.Ident.normalize(), // necessary to normalize?
+			Constraint: pc.Constraint,
+		}
+
+		pr := pc.Ident.ProjectRoot
+		if pp, has := m[pr]; has {
+			// The rule for overrides is that *any* non-zero value for the prop
+			// should be considered an override, even if it's equal to what's
+			// already there.
+			if pp.Constraint != nil {
+				wc.Constraint = pp.Constraint
+				wc.overrConstraint = true
+			}
+
+			if pp.NetworkName != "" {
+				wc.Ident.NetworkName = pp.NetworkName
+				wc.overrNet = true
+			}
+
+		}
+		out[k] = wc
+		k++
+	}
+
+	return
 }
