@@ -66,11 +66,25 @@ func (e *noVersionError) traceString() string {
 	return buf.String()
 }
 
+// disjointConstraintFailure occurs when attempting to introduce an atom that
+// itself has an acceptable version, but one of its dependency constraints is
+// disjoint with one or more dependency constraints already active for that
+// identifier.
 type disjointConstraintFailure struct {
-	goal      dependency
-	failsib   []dependency
+	// goal is the dependency with the problematic constraint, forcing us to
+	// reject the atom that introduces it.
+	goal dependency
+	// failsib is the list of active dependencies that are disjoint with the
+	// goal dependency. This will be at least one, but may not be all of the
+	// active dependencies.
+	failsib []dependency
+	// nofailsib is the list of active dependencies that are NOT disjoint with
+	// the goal dependency. The total of nofailsib and failsib will always be
+	// the total number of active dependencies on target identifier.
 	nofailsib []dependency
-	c         Constraint
+	// c is the current constraint on the target identifier. It is intersection
+	// of all the active dependencies' constraints.
+	c Constraint
 }
 
 func (e *disjointConstraintFailure) Error() string {
@@ -161,15 +175,15 @@ func (e *constraintNotAllowedFailure) traceString() string {
 //
 // (This is one of the more straightforward types of failures)
 type versionNotAllowedFailure struct {
-	// The atom that was rejected by current constraints.
+	// goal is the atom that was rejected by current constraints.
 	goal atom
-	// The active dependencies that caused the atom to be rejected. Note that
-	// this only includes dependencies that actually rejected the atom, which
-	// will be at least one, but may not be all the active dependencies on the
-	// atom's identifier.
+	// failparent is the list of active dependencies that caused the atom to be
+	// rejected. Note that this only includes dependencies that actually
+	// rejected the atom, which will be at least one, but may not be all the
+	// active dependencies on the atom's identifier.
 	failparent []dependency
-	// The current constraint on the atom's identifier. This is the composite of
-	// all active dependencies' constraints.
+	// c is the current constraint on the atom's identifier. This is the intersection
+	// of all active dependencies' constraints.
 	c Constraint
 }
 

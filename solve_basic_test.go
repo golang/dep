@@ -805,8 +805,20 @@ var basicFixtures = map[string]basicFixture{
 			mkDepspec("shared 2.0.0"),
 			mkDepspec("shared 4.0.0"),
 		},
-		//errp: []string{"shared", "foo", "bar"}, // dart's has this...
-		errp: []string{"foo", "bar"},
+		fail: &noVersionError{
+			pn: mkPI("foo"),
+			fails: []failedVersion{
+				{
+					v: NewVersion("1.0.0"),
+					f: &disjointConstraintFailure{
+						goal:      mkDep("foo 1.0.0", "shared <=2.0.0", "shared"),
+						failsib:   []dependency{mkDep("bar 1.0.0", "shared >3.0.0", "shared")},
+						nofailsib: nil,
+						c:         mkSVC(">3.0.0"),
+					},
+				},
+			},
+		},
 	},
 	"no valid solution": {
 		ds: []depspec{
