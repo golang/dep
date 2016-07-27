@@ -147,11 +147,12 @@ type solver struct {
 
 	// A map of the ProjectRoot (local names) that are currently selected, and
 	// the network name to which they currently correspond.
+	// TODO(sdboyer) i think this is cruft and can be removed
 	names map[ProjectRoot]string
 
-	// A map of ProjectRoot (import path names) to the ProjectConstraint that
-	// should be enforced for those names.
-	ovr map[ProjectRoot]ProjectProperties
+	// A ProjectConstraints map containing the validated (guaranteed non-empty)
+	// overrides declared by the root manifest.
+	ovr ProjectConstraints
 
 	// A map of the names listed in the root's lock.
 	rlm map[ProjectIdentifier]LockedProject
@@ -216,7 +217,26 @@ func Prepare(params SolveParameters, sm SourceManager) (Solver, error) {
 		s.ig = make(map[string]bool)
 	}
 	if s.ovr == nil {
-		s.ovr = make(map[ProjectRoot]ProjectProperties)
+		s.ovr = make(ProjectConstraints)
+	}
+
+	// Validate no empties in the overrides map
+	var eovr []string
+	for pr, pp := range s.ovr {
+		if pp.Constraint == nil && pp.NetworkName == "" {
+			eovr = append(eovr, string(pr))
+		}
+	}
+
+	if eovr != nil {
+		// Maybe it's a little nitpicky to do this (we COULD proceed; empty
+		// overrides have no effect), but this errs on the side of letting the
+		// tool/user know there's bad input. Purely as a principle, that seems
+		// preferable to silently allowing progress with icky input.
+		if len(eovr) > 1 {
+			return nil, badOptsFailure(fmt.Sprintf("Overrides lacked any non-zero properties for multiple project roots: %s", strings.Join(eovr, " ")))
+		}
+		return nil, badOptsFailure(fmt.Sprintf("An override was declared for %s, but without any non-zero properties", eovr[0]))
 	}
 
 	// Set up the bridge and ensure the root dir is in good, working order

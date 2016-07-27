@@ -296,8 +296,21 @@ func TestBadSolveOpts(t *testing.T) {
 	} else if !strings.Contains(err.Error(), "no logger provided") {
 		t.Error("Prepare should have given error on missing trace logger, but gave:", err)
 	}
-
 	params.TraceLogger = log.New(ioutil.Discard, "", 0)
+
+	params.Manifest = simpleRootManifest{
+		ovr: ProjectConstraints{
+			ProjectRoot("foo"): ProjectProperties{},
+		},
+	}
+	_, err = Prepare(params, sm)
+	if err == nil {
+		t.Errorf("Should have errored on override with empty ProjectProperties")
+	} else if !strings.Contains(err.Error(), "foo, but without any non-zero properties") {
+		t.Error("Prepare should have given error override with empty ProjectProperties, but gave:", err)
+	}
+	params.Manifest = nil
+
 	_, err = Prepare(params, sm)
 	if err != nil {
 		t.Error("Basic conditions satisfied, prepare should have completed successfully, err as:", err)
