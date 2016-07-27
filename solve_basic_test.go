@@ -775,7 +775,27 @@ var basicFixtures = map[string]basicFixture{
 			mkDepspec("shared 2.5.0"),
 			mkDepspec("shared 3.5.0"),
 		},
-		errp: []string{"shared", "foo", "bar"},
+		fail: &noVersionError{
+			pn: mkPI("shared"),
+			fails: []failedVersion{
+				{
+					v: NewVersion("3.5.0"),
+					f: &versionNotAllowedFailure{
+						goal:       mkAtom("shared 3.5.0"),
+						failparent: []dependency{mkDep("foo 1.0.0", "shared >=2.0.0, <3.0.0", "shared")},
+						c:          mkSVC(">=2.9.0, <3.0.0"),
+					},
+				},
+				{
+					v: NewVersion("2.5.0"),
+					f: &versionNotAllowedFailure{
+						goal:       mkAtom("shared 2.5.0"),
+						failparent: []dependency{mkDep("bar 1.0.0", "shared >=2.9.0, <4.0.0", "shared")},
+						c:          mkSVC(">=2.9.0, <3.0.0"),
+					},
+				},
+			},
+		},
 	},
 	"disjoint constraints": {
 		ds: []depspec{
@@ -805,7 +825,19 @@ var basicFixtures = map[string]basicFixture{
 			mkDepspec("a 1.0.0"),
 			mkDepspec("b 1.0.0"),
 		},
-		errp: []string{"b", "root"},
+		fail: &noVersionError{
+			pn: mkPI("b"),
+			fails: []failedVersion{
+				{
+					v: NewVersion("1.0.0"),
+					f: &versionNotAllowedFailure{
+						goal:       mkAtom("b 1.0.0"),
+						failparent: []dependency{mkDep("root", "b >1.0.0", "b")},
+						c:          mkSVC(">1.0.0"),
+					},
+				},
+			},
+		},
 	},
 	// The latest versions of a and b disagree on c. An older version of either
 	// will resolve the problem. This test validates that b, which is farther
@@ -915,8 +947,19 @@ var basicFixtures = map[string]basicFixture{
 			mkDepspec("bar 3.0.0"),
 			mkDepspec("none 1.0.0"),
 		},
-		errp:        []string{"none", "foo"},
-		maxAttempts: 1,
+		fail: &noVersionError{
+			pn: mkPI("none"),
+			fails: []failedVersion{
+				{
+					v: NewVersion("1.0.0"),
+					f: &versionNotAllowedFailure{
+						goal:       mkAtom("none 1.0.0"),
+						failparent: []dependency{mkDep("foo 1.0.0", "none 2.0.0", "none")},
+						c:          mkSVC("2.0.0"),
+					},
+				},
+			},
+		},
 	},
 	// If there"s a disjoint constraint on a package, then selecting other
 	// versions of it is a waste of time: no possible versions can match. We
