@@ -351,7 +351,6 @@ type specfix interface {
 	name() string
 	specs() []depspec
 	maxTries() int
-	expectErrs() []string
 	solution() map[string]Version
 	failure() error
 }
@@ -383,8 +382,6 @@ type basicFixture struct {
 	downgrade bool
 	// lock file simulator, if one's to be used at all
 	l fixLock
-	// projects expected to have errors, if any
-	errp []string
 	// solve failure expected, if any
 	fail error
 	// request up/downgrade to all projects
@@ -401,10 +398,6 @@ func (f basicFixture) specs() []depspec {
 
 func (f basicFixture) maxTries() int {
 	return f.maxAttempts
-}
-
-func (f basicFixture) expectErrs() []string {
-	return f.errp
 }
 
 func (f basicFixture) solution() map[string]Version {

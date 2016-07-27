@@ -525,8 +525,6 @@ type bimodalFixture struct {
 	// map of locks for deps, if any. keys should be of the form:
 	// "<project> <version>"
 	lm map[string]fixLock
-	// projects expected to have errors, if any
-	errp []string
 	// solve failure expected, if any
 	fail error
 	// request up/downgrade to all projects
@@ -545,10 +543,6 @@ func (f bimodalFixture) specs() []depspec {
 
 func (f bimodalFixture) maxTries() int {
 	return f.maxAttempts
-}
-
-func (f bimodalFixture) expectErrs() []string {
-	return f.errp
 }
 
 func (f bimodalFixture) solution() map[string]Version {

@@ -2,7 +2,6 @@ package gps
 
 import (
 	"flag"
-	"fmt"
 	"io/ioutil"
 	"log"
 	"math/rand"
@@ -155,70 +154,17 @@ func solveBimodalAndCheck(fix bimodalFixture, t *testing.T) (res Solution, err e
 }
 
 func fixtureSolveSimpleChecks(fix specfix, soln Solution, err error, t *testing.T) (Solution, error) {
+	fixfail := fix.failure()
 	if err != nil {
-		errp := fix.expectErrs()
-		fixfail := fix.failure()
-		if fixfail != nil {
-			// TODO(sdboyer) reflect.DeepEqual works for now, but once we start modeling
-			// more complex cases, this should probably become more robust
-			if !reflect.DeepEqual(fixfail, err) {
-				t.Errorf("(fixture: %q) Failure mismatch:\n\t(GOT): %s\n\t(WNT): %s", fix.name(), err, fixfail)
-			}
-			return soln, err
+		if fixfail == nil {
+			t.Errorf("(fixture: %q) Solve failed unexpectedly:\n%s", fix.name(), err)
+		} else if !reflect.DeepEqual(fixfail, err) {
+			// TODO(sdboyer) reflect.DeepEqual works for now, but once we start
+			// modeling more complex cases, this should probably become more robust
+			t.Errorf("(fixture: %q) Failure mismatch:\n\t(GOT): %s\n\t(WNT): %s", fix.name(), err, fixfail)
 		}
-
-		// TODO(sdboyer) remove all this after transition to proper errors
-		if len(errp) == 0 {
-			t.Errorf("(fixture: %q) Solver failed; error was type %T, text:\n%s", fix.name(), err, err)
-			return soln, err
-		}
-
-		switch fail := err.(type) {
-		case *badOptsFailure:
-			t.Errorf("(fixture: %q) Unexpected bad opts failure solve error: %s", fix.name(), err)
-		case *noVersionError:
-			if errp[0] != string(fail.pn.ProjectRoot) { // TODO(sdboyer) identifierify
-				t.Errorf("(fixture: %q) Expected failure on project %s, but was on project %s", fix.name(), errp[0], fail.pn.ProjectRoot)
-			}
-
-			ep := make(map[string]struct{})
-			for _, p := range errp[1:] {
-				ep[p] = struct{}{}
-			}
-
-			found := make(map[string]struct{})
-			for _, vf := range fail.fails {
-				for _, f := range getFailureCausingProjects(vf.f) {
-					found[f] = struct{}{}
-				}
-			}
-
-			var missing []string
-			var extra []string
-			for p := range found {
-				if _, has := ep[p]; !has {
-					extra = append(extra, p)
-				}
-			}
-			if len(extra) > 0 {
-				t.Errorf("(fixture: %q) Expected solve failures due to projects %s, but solve failures also arose from %s", fix.name(), strings.Join(errp[1:], ", "), strings.Join(extra, ", "))
-			}
-
-			for p := range ep {
-				if _, has := found[p]; !has {
-					missing = append(missing, p)
-				}
-			}
-			if len(missing) > 0 {
-				t.Errorf("(fixture: %q) Expected solve failures due to projects %s, but %s had no failures", fix.name(), strings.Join(errp[1:], ", "), strings.Join(missing, ", "))
-			}
-
-		default:
-			// TODO(sdboyer) round these out
-			panic(fmt.Sprintf("unhandled solve failure type: %s", err))
-		}
-	} else if len(fix.expectErrs()) > 0 {
-		t.Errorf("(fixture: %q) Solver succeeded, but expected failure", fix.name())
+	} else if fixfail != nil {
+		t.Errorf("(fixture: %q) Solver succeeded, but expecting failure:\n%s", fix.name(), fixfail)
 	} else {
 		r := soln.(solution)
 		if fix.maxTries() > 0 && r.Attempts() > fix.maxTries() {
@@ -311,44 +257,6 @@ func TestRootLockNoVersionPairMatching(t *testing.T) {
 	res, err := fixSolve(params, sm)
 
 	fixtureSolveSimpleChecks(fix, res, err, t)
-}
-
-func getFailureCausingProjects(err error) (projs []string) {
-	switch e := err.(type) {
-	case *noVersionError:
-		projs = append(projs, string(e.pn.ProjectRoot)) // TODO(sdboyer) identifierify
-	case *disjointConstraintFailure:
-		for _, f := range e.failsib {
-			projs = append(projs, string(f.depender.id.ProjectRoot))
-		}
-	case *versionNotAllowedFailure:
-		for _, f := range e.failparent {
-			projs = append(projs, string(f.depender.id.ProjectRoot))
-		}
-	case *constraintNotAllowedFailure:
-		// No sane way of knowing why the currently selected version is
-		// selected, so do nothing
-	case *sourceMismatchFailure:
-		projs = append(projs, string(e.prob.id.ProjectRoot))
-		for _, c := range e.sel {
-			projs = append(projs, string(c.depender.id.ProjectRoot))
-		}
-	case *checkeeHasProblemPackagesFailure:
-		projs = append(projs, string(e.goal.id.ProjectRoot))
-		for _, errdep := range e.failpkg {
-			for _, atom := range errdep.deppers {
-				projs = append(projs, string(atom.id.ProjectRoot))
-			}
-		}
-	case *depHasProblemPackagesFailure:
-		projs = append(projs, string(e.goal.depender.id.ProjectRoot), string(e.goal.dep.Ident.ProjectRoot))
-	case *nonexistentRevisionFailure:
-		projs = append(projs, string(e.goal.depender.id.ProjectRoot), string(e.goal.dep.Ident.ProjectRoot))
-	default:
-		panic(fmt.Sprintf("unknown failtype %T, msg: %s", err, err))
-	}
-
-	return
 }
 
 func TestBadSolveOpts(t *testing.T) {
