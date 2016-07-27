@@ -1085,6 +1085,22 @@ var basicFixtures = map[string]basicFixture{
 			"b 2.0.0",
 		),
 	},
+	"overridden mismatched net addrs, alt in dep, back to default": {
+		ds: []depspec{
+			mkDepspec("root 1.0.0", "foo 1.0.0", "bar 1.0.0"),
+			mkDepspec("foo 1.0.0", "bar from baz 1.0.0"),
+			mkDepspec("bar 1.0.0"),
+		},
+		ovr: ProjectConstraints{
+			ProjectRoot("bar"): ProjectProperties{
+				NetworkName: "bar",
+			},
+		},
+		r: mksolution(
+			"foo 1.0.0",
+			"bar 1.0.0",
+		),
+	},
 
 	// TODO(sdboyer) decide how to refactor the solver in order to re-enable these.
 	// Checking for revision existence is important...but kinda obnoxious.

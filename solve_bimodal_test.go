@@ -516,6 +516,48 @@ var bimodalFixtures = map[string]bimodalFixture{
 			"a 1.0.0",
 		),
 	},
+	"overridden mismatched net addrs, alt in dep": {
+		ds: []depspec{
+			dsp(mkDepspec("root 0.0.0"),
+				pkg("root", "foo")),
+			dsp(mkDepspec("foo 1.0.0", "bar from baz 1.0.0"),
+				pkg("foo", "bar")),
+			dsp(mkDepspec("bar 1.0.0"),
+				pkg("bar")),
+			dsp(mkDepspec("baz 1.0.0"),
+				pkg("bar")),
+		},
+		ovr: ProjectConstraints{
+			ProjectRoot("bar"): ProjectProperties{
+				NetworkName: "baz",
+			},
+		},
+		r: mksolution(
+			"foo 1.0.0",
+			"bar from baz 1.0.0",
+		),
+	},
+	"overridden mismatched net addrs, alt in root": {
+		ds: []depspec{
+			dsp(mkDepspec("root 0.0.0", "bar from baz 1.0.0"),
+				pkg("root", "foo")),
+			dsp(mkDepspec("foo 1.0.0"),
+				pkg("foo", "bar")),
+			dsp(mkDepspec("bar 1.0.0"),
+				pkg("bar")),
+			dsp(mkDepspec("baz 1.0.0"),
+				pkg("bar")),
+		},
+		ovr: ProjectConstraints{
+			ProjectRoot("bar"): ProjectProperties{
+				NetworkName: "baz",
+			},
+		},
+		r: mksolution(
+			"foo 1.0.0",
+			"bar from baz 1.0.0",
+		),
+	},
 }
 
 // tpkg is a representation of a single package. It has its own import path, as
@@ -667,10 +709,6 @@ func computeBimodalExternalMap(ds []depspec) map[pident]map[string][]string {
 		workmap := make(map[string]wm)
 
 		for _, pkg := range d.pkgs {
-			if !checkPrefixSlash(filepath.Clean(pkg.path), string(d.n)) {
-				panic(fmt.Sprintf("pkg %s is not a child of %s, cannot be a part of that project", pkg.path, d.n))
-			}
-
 			w := wm{
 				ex: make(map[string]bool),
 				in: make(map[string]bool),
