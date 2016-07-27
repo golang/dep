@@ -6,8 +6,8 @@ import (
 	"sort"
 )
 
-// HashInputs computes a hash digest of all data in a SolveOpts that are as
-// function inputs to Solve().
+// HashInputs computes a hash digest of all data in SolveParams and the
+// RootManifest that act as function inputs to Solve().
 //
 // The digest returned from this function is the same as the digest that would
 // be included with a Solve() Result. As such, it's appropriate for comparison
@@ -25,12 +25,11 @@ func (s *solver) HashInputs() ([]byte, error) {
 		return nil, badOptsFailure(fmt.Sprintf("Error while parsing packages under %s: %s", s.params.RootDir, err.Error()))
 	}
 
-	d, dd := s.params.Manifest.DependencyConstraints(), s.params.Manifest.TestDependencyConstraints()
-	p := make(sortedConstraints, len(d))
-	copy(p, d)
-	p = append(p, dd...)
-
-	sort.Stable(p)
+	c, tc := s.params.Manifest.DependencyConstraints(), s.params.Manifest.TestDependencyConstraints()
+	// Apply overrides to the constraints from the root. Otherwise, the hash
+	// would be computed on the basis of a constraint from root that doesn't
+	// actually affect solving.
+	p := s.ovr.override(mergePCSlices(c, tc).asSortedSlice())
 
 	// We have everything we need; now, compute the hash.
 	h := sha256.New()
@@ -84,12 +83,20 @@ func (s *solver) HashInputs() ([]byte, error) {
 		}
 	}
 
+	for _, pc := range s.ovr.asSortedSlice() {
+		h.Write([]byte(pc.Ident.ProjectRoot))
+		if pc.Ident.NetworkName != "" {
+			h.Write([]byte(pc.Ident.NetworkName))
+		}
+		if pc.Constraint != nil {
+			h.Write([]byte(pc.Constraint.String()))
+		}
+	}
+
 	an, av := s.b.analyzerInfo()
 	h.Write([]byte(an))
 	h.Write([]byte(av.String()))
 
-	// TODO(sdboyer) overrides
-	// TODO(sdboyer) aliases
 	return h.Sum(nil), nil
 }
 

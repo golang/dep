@@ -34,7 +34,6 @@ func TestHashInputs(t *testing.T) {
 		stdlibPkgs,
 		appenginePkgs,
 		"root",
-		"",
 		"root",
 		"a",
 		"b",
@@ -254,6 +253,9 @@ func TestHashInputsOverrides(t *testing.T) {
 	h = sha256.New()
 
 	elems = []string{
+		"a",
+		"a",
+		"fluglehorn",
 		"b",
 		"b",
 		"1.0.0",
@@ -264,7 +266,6 @@ func TestHashInputsOverrides(t *testing.T) {
 		"root",
 		"a",
 		"b",
-		"a",
 		"a",
 		"fluglehorn",
 		"c",
@@ -298,6 +299,9 @@ func TestHashInputsOverrides(t *testing.T) {
 	h = sha256.New()
 
 	elems = []string{
+		"a",
+		"nota",
+		"1.0.0",
 		"b",
 		"b",
 		"1.0.0",
@@ -310,7 +314,6 @@ func TestHashInputsOverrides(t *testing.T) {
 		"b",
 		"a",
 		"nota",
-		"1.0.0",
 		"c",
 		"car",
 		"d",
@@ -343,6 +346,9 @@ func TestHashInputsOverrides(t *testing.T) {
 	h = sha256.New()
 
 	elems = []string{
+		"a",
+		"nota",
+		"fluglehorn",
 		"b",
 		"b",
 		"1.0.0",
