@@ -123,7 +123,7 @@ func mkAtom(info string) atom {
 	}
 }
 
-// mkPDep splits the input string on a space, and uses the first two elements
+// mkPCstrnt splits the input string on a space, and uses the first two elements
 // as the project identifier and constraint body, respectively.
 //
 // The constraint body may have a leading character indicating the type of
@@ -134,7 +134,7 @@ func mkAtom(info string) atom {
 //  r: create a revision.
 //
 // If no leading character is used, a semver constraint is assumed.
-func mkPDep(info string) ProjectConstraint {
+func mkPCstrnt(info string) ProjectConstraint {
 	id, ver, rev := nvrSplit(info)
 
 	var c Constraint
@@ -180,7 +180,7 @@ func mkPDep(info string) ProjectConstraint {
 // other args are taken as package names.
 func mkCDep(pdep string, pl ...string) completeDep {
 	return completeDep{
-		ProjectConstraint: mkPDep(pdep),
+		ProjectConstraint: mkPCstrnt(pdep),
 		pl:                pl,
 	}
 }
@@ -225,7 +225,7 @@ func mkDepspec(pi string, deps ...string) depspec {
 			sl = &ds.deps
 		}
 
-		*sl = append(*sl, mkPDep(dep))
+		*sl = append(*sl, mkPCstrnt(dep))
 	}
 
 	return ds
@@ -238,13 +238,22 @@ func mkDep(atom, pdep string, pl ...string) dependency {
 	}
 }
 
-// pinrm creates a ProjectIdentifier with the ProjectRoot as the provided
+// mkPI creates a ProjectIdentifier with the ProjectRoot as the provided
 // string, and with the NetworkName normalized to be the same.
-func pinrm(root string) ProjectIdentifier {
+func mkPI(root string) ProjectIdentifier {
 	return ProjectIdentifier{
 		ProjectRoot: ProjectRoot(root),
 		NetworkName: root,
 	}
+}
+
+// mkSVC creates a new semver constraint, panicking if an error is returned.
+func mkSVC(body string) Constraint {
+	c, err := NewSemverConstraint(body)
+	if err != nil {
+		panic(fmt.Sprintf("Error while trying to create semver constraint from %s: %s", body, err.Error()))
+	}
+	return c
 }
 
 // mklock makes a fixLock, suitable to act as a lock file
@@ -493,7 +502,7 @@ var basicFixtures = map[string]basicFixture{
 			mkDepspec("bar 1.0.0"),
 		},
 		fail: &noVersionError{
-			pn: pinrm("foo"),
+			pn: mkPI("foo"),
 			fails: []failedVersion{
 				{
 					v: NewVersion("1.0.0"),
@@ -736,7 +745,27 @@ var basicFixtures = map[string]basicFixture{
 			mkDepspec("foo 2.0.0"),
 			mkDepspec("foo 2.1.3"),
 		},
-		errp: []string{"foo", "root"},
+		fail: &noVersionError{
+			pn: mkPI("foo"),
+			fails: []failedVersion{
+				{
+					v: NewVersion("2.1.3"),
+					f: &versionNotAllowedFailure{
+						goal:       mkAtom("foo 2.1.3"),
+						failparent: []dependency{mkDep("root", "foo ^1.0.0", "foo")},
+						c:          mkSVC("^1.0.0"),
+					},
+				},
+				{
+					v: NewVersion("2.0.0"),
+					f: &versionNotAllowedFailure{
+						goal:       mkAtom("foo 2.0.0"),
+						failparent: []dependency{mkDep("root", "foo ^1.0.0", "foo")},
+						c:          mkSVC("^1.0.0"),
+					},
+				},
+			},
+		},
 	},
 	"no version that matches combined constraint": {
 		ds: []depspec{

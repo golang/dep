@@ -152,10 +152,21 @@ func (e *constraintNotAllowedFailure) traceString() string {
 	)
 }
 
+// versionNotAllowedFailure describes a failure where an atom is rejected
+// because its version is not allowed by current constraints.
+//
+// (This is one of the more straightforward types of failures)
 type versionNotAllowedFailure struct {
-	goal       atom
+	// The atom that was rejected by current constraints.
+	goal atom
+	// The active dependencies that caused the atom to be rejected. Note that
+	// this only includes dependencies that actually rejected the atom, which
+	// will be at least one, but may not be all the active dependencies on the
+	// atom's identifier.
 	failparent []dependency
-	c          Constraint
+	// The current constraint on the atom's identifier. This is the composite of
+	// all active dependencies' constraints.
+	c Constraint
 }
 
 func (e *versionNotAllowedFailure) Error() string {
