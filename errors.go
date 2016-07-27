@@ -275,8 +275,17 @@ type errDeppers struct {
 	err     error
 	deppers []atom
 }
+
+// checkeeHasProblemPackagesFailure indicates that the goal atom was rejected
+// because one or more of the packages required by its deppers had errors.
+//
+// "errors" includes package nonexistence, which is indicated by a nil err in
+// the corresponding errDeppers failpkg map value.
 type checkeeHasProblemPackagesFailure struct {
-	goal    atom
+	// goal is the atom that was rejected due to problematic packages.
+	goal atom
+	// failpkg is a map of package names to the error describing the problem
+	// with them, plus a list of the selected atoms that require that package.
 	failpkg map[string]errDeppers
 }
 

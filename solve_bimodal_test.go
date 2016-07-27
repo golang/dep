@@ -320,7 +320,26 @@ var bimodalFixtures = map[string]bimodalFixture{
 				pkg("a"),
 			),
 		},
-		errp: []string{"a", "root", "a"},
+		//errp: []string{"a", "root", "a"},
+		fail: &noVersionError{
+			pn: mkPI("a"),
+			fails: []failedVersion{
+				{
+					v: NewVersion("1.0.0"),
+					f: &checkeeHasProblemPackagesFailure{
+						goal: mkAtom("a 1.0.0"),
+						failpkg: map[string]errDeppers{
+							"a/foo": errDeppers{
+								err: nil, // nil indicates package is missing
+								deppers: []atom{
+									mkAtom("root"),
+								},
+							},
+						},
+					},
+				},
+			},
+		},
 	},
 	// Transitive deps from one project (a) get incrementally included as other
 	// deps incorporate its various packages, and fail with proper error when we
