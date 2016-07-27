@@ -498,6 +498,24 @@ var bimodalFixtures = map[string]bimodalFixture{
 			"b 2.0.0 barrev",
 		),
 	},
+	"override unconstrained root import": {
+		ds: []depspec{
+			dsp(mkDepspec("root 0.0.0"),
+				pkg("root", "a")),
+			dsp(mkDepspec("a 1.0.0"),
+				pkg("a")),
+			dsp(mkDepspec("a 2.0.0"),
+				pkg("a")),
+		},
+		ovr: ProjectConstraints{
+			ProjectRoot("a"): ProjectProperties{
+				Constraint: NewVersion("1.0.0"),
+			},
+		},
+		r: mksolution(
+			"a 1.0.0",
+		),
+	},
 }
 
 // tpkg is a representation of a single package. It has its own import path, as
@@ -527,6 +545,8 @@ type bimodalFixture struct {
 	lm map[string]fixLock
 	// solve failure expected, if any
 	fail error
+	// overrides, if any
+	ovr ProjectConstraints
 	// request up/downgrade to all projects
 	changeall bool
 	// pkgs to ignore
@@ -551,9 +571,10 @@ func (f bimodalFixture) solution() map[string]Version {
 
 func (f bimodalFixture) rootmanifest() RootManifest {
 	m := simpleRootManifest{
-		c:  f.ds[0].deps,
-		tc: f.ds[0].devdeps,
-		ig: make(map[string]bool),
+		c:   f.ds[0].deps,
+		tc:  f.ds[0].devdeps,
+		ovr: f.ovr,
+		ig:  make(map[string]bool),
 	}
 	for _, ig := range f.ignore {
 		m.ig[ig] = true

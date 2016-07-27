@@ -385,6 +385,8 @@ type basicFixture struct {
 	l fixLock
 	// solve failure expected, if any
 	fail error
+	// overrides, if any
+	ovr ProjectConstraints
 	// request up/downgrade to all projects
 	changeall bool
 }
@@ -407,8 +409,9 @@ func (f basicFixture) solution() map[string]Version {
 
 func (f basicFixture) rootmanifest() RootManifest {
 	return simpleRootManifest{
-		c:  f.ds[0].deps,
-		tc: f.ds[0].devdeps,
+		c:   f.ds[0].deps,
+		tc:  f.ds[0].devdeps,
+		ovr: f.ovr,
 	}
 }
 
@@ -1040,6 +1043,42 @@ var basicFixtures = map[string]basicFixture{
 		},
 		r: mksolution(
 			"foo r123abc",
+		),
+	},
+	// Some basic override checks
+	"override root's own constraint": {
+		ds: []depspec{
+			mkDepspec("root 0.0.0", "a *", "b *"),
+			mkDepspec("a 1.0.0", "b 1.0.0"),
+			mkDepspec("a 2.0.0", "b 1.0.0"),
+			mkDepspec("b 1.0.0"),
+		},
+		ovr: ProjectConstraints{
+			ProjectRoot("a"): ProjectProperties{
+				Constraint: NewVersion("1.0.0"),
+			},
+		},
+		r: mksolution(
+			"a 1.0.0",
+			"b 1.0.0",
+		),
+	},
+	"override dep's constraint": {
+		ds: []depspec{
+			mkDepspec("root 0.0.0", "a *"),
+			mkDepspec("a 1.0.0", "b 1.0.0"),
+			mkDepspec("a 2.0.0", "b 1.0.0"),
+			mkDepspec("b 1.0.0"),
+			mkDepspec("b 2.0.0"),
+		},
+		ovr: ProjectConstraints{
+			ProjectRoot("b"): ProjectProperties{
+				Constraint: NewVersion("2.0.0"),
+			},
+		},
+		r: mksolution(
+			"a 2.0.0",
+			"b 2.0.0",
 		),
 	},
 
