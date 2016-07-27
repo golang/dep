@@ -29,7 +29,7 @@ func (s *solver) HashInputs() ([]byte, error) {
 	// Apply overrides to the constraints from the root. Otherwise, the hash
 	// would be computed on the basis of a constraint from root that doesn't
 	// actually affect solving.
-	p := s.ovr.override(mergePCSlices(c, tc).asSortedSlice())
+	p := s.ovr.override(pcSliceToMap(c, tc).asSortedSlice())
 
 	// We have everything we need; now, compute the hash.
 	h := sha256.New()
@@ -98,18 +98,4 @@ func (s *solver) HashInputs() ([]byte, error) {
 	h.Write([]byte(av.String()))
 
 	return h.Sum(nil), nil
-}
-
-type sortedConstraints []ProjectConstraint
-
-func (s sortedConstraints) Len() int {
-	return len(s)
-}
-
-func (s sortedConstraints) Swap(i, j int) {
-	s[i], s[j] = s[j], s[i]
-}
-
-func (s sortedConstraints) Less(i, j int) bool {
-	return s[i].Ident.less(s[j].Ident)
 }

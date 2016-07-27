@@ -182,7 +182,7 @@ type workingConstraint struct {
 
 type ProjectConstraints map[ProjectRoot]ProjectProperties
 
-func mergePCSlices(l []ProjectConstraint, r []ProjectConstraint) ProjectConstraints {
+func pcSliceToMap(l []ProjectConstraint, r ...[]ProjectConstraint) ProjectConstraints {
 	final := make(ProjectConstraints)
 
 	for _, pc := range l {
@@ -192,17 +192,19 @@ func mergePCSlices(l []ProjectConstraint, r []ProjectConstraint) ProjectConstrai
 		}
 	}
 
-	for _, pc := range r {
-		if pp, exists := final[pc.Ident.ProjectRoot]; exists {
-			// Technically this should be done through a bridge for
-			// cross-version-type matching...but this is a one off for root and
-			// that's just ridiculous for this.
-			pp.Constraint = pp.Constraint.Intersect(pc.Constraint)
-			final[pc.Ident.ProjectRoot] = pp
-		} else {
-			final[pc.Ident.ProjectRoot] = ProjectProperties{
-				NetworkName: pc.Ident.netName(),
-				Constraint:  pc.Constraint,
+	for _, pcs := range r {
+		for _, pc := range pcs {
+			if pp, exists := final[pc.Ident.ProjectRoot]; exists {
+				// Technically this should be done through a bridge for
+				// cross-version-type matching...but this is a one off for root and
+				// that's just ridiculous for this.
+				pp.Constraint = pp.Constraint.Intersect(pc.Constraint)
+				final[pc.Ident.ProjectRoot] = pp
+			} else {
+				final[pc.Ident.ProjectRoot] = ProjectProperties{
+					NetworkName: pc.Ident.netName(),
+					Constraint:  pc.Constraint,
+				}
 			}
 		}
 	}
@@ -229,6 +231,11 @@ func (m ProjectConstraints) asSortedSlice() []ProjectConstraint {
 	return pcs
 }
 
+// override treats the ProjectConstraints map as an override map, and applies
+// overridden values to the input.
+//
+// A slice of workingConstraint is returned, allowing differentiation between
+// values that were or were not overridden.
 func (m ProjectConstraints) override(in []ProjectConstraint) (out []workingConstraint) {
 	out = make([]workingConstraint, len(in))
 	k := 0
@@ -259,4 +266,18 @@ func (m ProjectConstraints) override(in []ProjectConstraint) (out []workingConst
 	}
 
 	return
+}
+
+type sortedConstraints []ProjectConstraint
+
+func (s sortedConstraints) Len() int {
+	return len(s)
+}
+
+func (s sortedConstraints) Swap(i, j int) {
+	s[i], s[j] = s[j], s[i]
+}
+
+func (s sortedConstraints) Less(i, j int) bool {
+	return s[i].Ident.less(s[j].Ident)
 }
