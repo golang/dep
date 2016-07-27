@@ -42,11 +42,12 @@ type SolveParameters struct {
 	// A non-empty string is required.
 	ImportRoot ProjectRoot
 
-	// The root manifest. This contains all the dependencies, constraints, and
-	// other controls available to the root project.
+	// The root manifest. This contains all the dependency constraints
+	// associated with normal Manifests, as well as the particular controls
+	// afforded only to the root project.
 	//
 	// May be nil, but for most cases, that would be unwise.
-	Manifest Manifest
+	Manifest RootManifest
 
 	// The root lock. Optional. Generally, this lock is the output of a previous
 	// solve run.
@@ -54,11 +55,6 @@ type SolveParameters struct {
 	// If provided, the solver will attempt to preserve the versions specified
 	// in the lock, unless ToChange or ChangeAll settings indicate otherwise.
 	Lock Lock
-
-	// A list of packages (import paths) to ignore. These can be in the root
-	// project, or from elsewhere. Ignoring a package means that both it and its
-	// imports will be disregarded by all relevant solver operations.
-	Ignore []string
 
 	// ToChange is a list of project names that should be changed - that is, any
 	// versions specified for those projects in the root lock file should be
@@ -90,8 +86,8 @@ type SolveParameters struct {
 	TraceLogger *log.Logger
 }
 
-// solver is a CDCL-style SAT solver with satisfiability conditions hardcoded to
-// the needs of the Go package management problem space.
+// solver is a CDCL-style constraint solver with satisfiability conditions
+// hardcoded to the needs of the Go package management problem space.
 type solver struct {
 	// The current number of attempts made over the course of this solve. This
 	// number increments each time the algorithm completes a backtrack and
@@ -151,7 +147,12 @@ type solver struct {
 
 	// A map of the ProjectRoot (local names) that are currently selected, and
 	// the network name to which they currently correspond.
+	// TODO(sdboyer) i think this is cruft and can be removed
 	names map[ProjectRoot]string
+
+	// A ProjectConstraints map containing the validated (guaranteed non-empty)
+	// overrides declared by the root manifest.
+	ovr ProjectConstraints
 
 	// A map of the names listed in the root's lock.
 	rlm map[ProjectIdentifier]LockedProject
@@ -187,9 +188,6 @@ type Solver interface {
 // with the inputs is detected, an error is returned. Otherwise, a Solver is
 // returned, ready to hash and check inputs or perform a solving run.
 func Prepare(params SolveParameters, sm SourceManager) (Solver, error) {
-	// local overrides would need to be handled first.
-	// TODO(sdboyer) local overrides! heh
-
 	if sm == nil {
 		return nil, badOptsFailure("must provide non-nil SourceManager")
 	}
@@ -204,21 +202,41 @@ func Prepare(params SolveParameters, sm SourceManager) (Solver, error) {
 	}
 
 	if params.Manifest == nil {
-		params.Manifest = SimpleManifest{}
-	}
-
-	// Ensure the ignore map is at least initialized
-	ig := make(map[string]bool)
-	if len(params.Ignore) > 0 {
-		for _, pkg := range params.Ignore {
-			ig[pkg] = true
-		}
+		params.Manifest = simpleRootManifest{}
 	}
 
 	s := &solver{
 		params: params,
-		ig:     ig,
+		ig:     params.Manifest.IgnorePackages(),
+		ovr:    params.Manifest.Overrides(),
 		tl:     params.TraceLogger,
+	}
+
+	// Ensure the ignore and overrides maps are at least initialized
+	if s.ig == nil {
+		s.ig = make(map[string]bool)
+	}
+	if s.ovr == nil {
+		s.ovr = make(ProjectConstraints)
+	}
+
+	// Validate no empties in the overrides map
+	var eovr []string
+	for pr, pp := range s.ovr {
+		if pp.Constraint == nil && pp.NetworkName == "" {
+			eovr = append(eovr, string(pr))
+		}
+	}
+
+	if eovr != nil {
+		// Maybe it's a little nitpicky to do this (we COULD proceed; empty
+		// overrides have no effect), but this errs on the side of letting the
+		// tool/user know there's bad input. Purely as a principle, that seems
+		// preferable to silently allowing progress with icky input.
+		if len(eovr) > 1 {
+			return nil, badOptsFailure(fmt.Sprintf("Overrides lacked any non-zero properties for multiple project roots: %s", strings.Join(eovr, " ")))
+		}
+		return nil, badOptsFailure(fmt.Sprintf("An override was declared for %s, but without any non-zero properties", eovr[0]))
 	}
 
 	// Set up the bridge and ensure the root dir is in good, working order
@@ -442,7 +460,8 @@ func (s *solver) selectRoot() error {
 
 	// If we're looking for root's deps, get it from opts and local root
 	// analysis, rather than having the sm do it
-	mdeps := append(s.rm.DependencyConstraints(), s.rm.TestDependencyConstraints()...)
+	c, tc := s.rm.DependencyConstraints(), s.rm.TestDependencyConstraints()
+	mdeps := s.ovr.overrideAll(pcSliceToMap(c, tc).asSortedSlice())
 
 	// Err is not possible at this point, as it could only come from
 	// listPackages(), which if we're here already succeeded for root
@@ -516,8 +535,7 @@ func (s *solver) getImportsAndConstraintsOf(a atomWithPackages) ([]completeDep, 
 		k++
 	}
 
-	deps := m.DependencyConstraints()
-	// TODO(sdboyer) add overrides here...if we impl the concept (which we should)
+	deps := s.ovr.overrideAll(m.DependencyConstraints())
 
 	return s.intersectConstraintsWithImports(deps, reach)
 }
@@ -526,7 +544,7 @@ func (s *solver) getImportsAndConstraintsOf(a atomWithPackages) ([]completeDep, 
 // externally reached packages, and creates a []completeDep that is guaranteed
 // to include all packages named by import reach, using constraints where they
 // are available, or Any() where they are not.
-func (s *solver) intersectConstraintsWithImports(deps []ProjectConstraint, reach []string) ([]completeDep, error) {
+func (s *solver) intersectConstraintsWithImports(deps []workingConstraint, reach []string) ([]completeDep, error) {
 	// Create a radix tree with all the projects we know from the manifest
 	// TODO(sdboyer) make this smarter once we allow non-root inputs as 'projects'
 	xt := radix.New()
@@ -554,8 +572,8 @@ func (s *solver) intersectConstraintsWithImports(deps []ProjectConstraint, reach
 			// github.com/sdboyer/foo
 			// github.com/sdboyer/foobar/baz
 			//
-			// The latter would incorrectly be conflated in with the former. So,
-			// as we know we're operating on strings that describe paths, guard
+			// The latter would incorrectly be conflated with the former. So, as
+			// we know we're operating on strings that describe paths, guard
 			// against this case by verifying that either the input is the same
 			// length as the match (in which case we know they're equal), or
 			// that the next character is the is the PathSeparator.
@@ -563,13 +581,13 @@ func (s *solver) intersectConstraintsWithImports(deps []ProjectConstraint, reach
 				// Match is valid; put it in the dmap, either creating a new
 				// completeDep or appending it to the existing one for this base
 				// project/prefix.
-				dep := idep.(ProjectConstraint)
+				dep := idep.(workingConstraint)
 				if cdep, exists := dmap[dep.Ident.ProjectRoot]; exists {
 					cdep.pl = append(cdep.pl, rp)
 					dmap[dep.Ident.ProjectRoot] = cdep
 				} else {
 					dmap[dep.Ident.ProjectRoot] = completeDep{
-						ProjectConstraint: dep,
+						workingConstraint: dep,
 						pl:                []string{rp},
 					}
 				}
@@ -584,21 +602,21 @@ func (s *solver) intersectConstraintsWithImports(deps []ProjectConstraint, reach
 			return nil, err
 		}
 
-		// Still no matches; make a new completeDep with an open constraint
-		pd := ProjectConstraint{
+		// Make a new completeDep with an open constraint, respecting overrides
+		pd := s.ovr.override(ProjectConstraint{
 			Ident: ProjectIdentifier{
 				ProjectRoot: ProjectRoot(root.Base),
 				NetworkName: root.Base,
 			},
 			Constraint: Any(),
-		}
+		})
 
 		// Insert the pd into the trie so that further deps from this
 		// project get caught by the prefix search
 		xt.Insert(root.Base, pd)
 		// And also put the complete dep into the dmap
 		dmap[ProjectRoot(root.Base)] = completeDep{
-			ProjectConstraint: pd,
+			workingConstraint: pd,
 			pl:                []string{rp},
 		}
 	}

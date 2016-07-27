@@ -87,7 +87,7 @@ func solveBasicsAndCheck(fix basicFixture, t *testing.T) (res Solution, err erro
 	params := SolveParameters{
 		RootDir:    string(fix.ds[0].n),
 		ImportRoot: ProjectRoot(fix.ds[0].n),
-		Manifest:   fix.ds[0],
+		Manifest:   fix.rootmanifest(),
 		Lock:       dummyLock{},
 		Downgrade:  fix.downgrade,
 		ChangeAll:  fix.changeall,
@@ -137,9 +137,8 @@ func solveBimodalAndCheck(fix bimodalFixture, t *testing.T) (res Solution, err e
 	params := SolveParameters{
 		RootDir:    string(fix.ds[0].n),
 		ImportRoot: ProjectRoot(fix.ds[0].n),
-		Manifest:   fix.ds[0],
+		Manifest:   fix.rootmanifest(),
 		Lock:       dummyLock{},
-		Ignore:     fix.ignore,
 		Downgrade:  fix.downgrade,
 		ChangeAll:  fix.changeall,
 	}
@@ -250,7 +249,7 @@ func TestRootLockNoVersionPairMatching(t *testing.T) {
 	params := SolveParameters{
 		RootDir:    string(fix.ds[0].n),
 		ImportRoot: ProjectRoot(fix.ds[0].n),
-		Manifest:   fix.ds[0],
+		Manifest:   fix.rootmanifest(),
 		Lock:       l2,
 	}
 
@@ -297,8 +296,21 @@ func TestBadSolveOpts(t *testing.T) {
 	} else if !strings.Contains(err.Error(), "no logger provided") {
 		t.Error("Prepare should have given error on missing trace logger, but gave:", err)
 	}
-
 	params.TraceLogger = log.New(ioutil.Discard, "", 0)
+
+	params.Manifest = simpleRootManifest{
+		ovr: ProjectConstraints{
+			ProjectRoot("foo"): ProjectProperties{},
+		},
+	}
+	_, err = Prepare(params, sm)
+	if err == nil {
+		t.Errorf("Should have errored on override with empty ProjectProperties")
+	} else if !strings.Contains(err.Error(), "foo, but without any non-zero properties") {
+		t.Error("Prepare should have given error override with empty ProjectProperties, but gave:", err)
+	}
+	params.Manifest = nil
+
 	_, err = Prepare(params, sm)
 	if err != nil {
 		t.Error("Basic conditions satisfied, prepare should have completed successfully, err as:", err)
@@ -332,28 +344,4 @@ func TestBadSolveOpts(t *testing.T) {
 
 	// swap them back...not sure if this matters, but just in case
 	overrideMkBridge()
-}
-
-func TestIgnoreDedupe(t *testing.T) {
-	fix := basicFixtures["no dependencies"]
-
-	ig := []string{"foo", "foo", "bar"}
-	params := SolveParameters{
-		RootDir:    string(fix.ds[0].n),
-		ImportRoot: ProjectRoot(fix.ds[0].n),
-		Manifest:   fix.ds[0],
-		Ignore:     ig,
-	}
-
-	s, _ := Prepare(params, newdepspecSM(basicFixtures["no dependencies"].ds, nil))
-	ts := s.(*solver)
-
-	expect := map[string]bool{
-		"foo": true,
-		"bar": true,
-	}
-
-	if !reflect.DeepEqual(ts.ig, expect) {
-		t.Errorf("Expected solver's ignore list to be deduplicated map, got %v", ts.ig)
-	}
 }

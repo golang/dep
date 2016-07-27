@@ -179,9 +179,13 @@ func mkPCstrnt(info string) ProjectConstraint {
 // The only real work here is passing the initial string to mkPDep. All the
 // other args are taken as package names.
 func mkCDep(pdep string, pl ...string) completeDep {
+	pc := mkPCstrnt(pdep)
 	return completeDep{
-		ProjectConstraint: mkPCstrnt(pdep),
-		pl:                pl,
+		workingConstraint: workingConstraint{
+			Ident:      pc.Ident,
+			Constraint: pc.Constraint,
+		},
+		pl: pl,
 	}
 }
 
@@ -242,7 +246,7 @@ func mkADep(atom, pdep string, c Constraint, pl ...string) dependency {
 	return dependency{
 		depender: mkAtom(atom),
 		dep: completeDep{
-			ProjectConstraint: ProjectConstraint{
+			workingConstraint: workingConstraint{
 				Ident: ProjectIdentifier{
 					ProjectRoot: ProjectRoot(pdep),
 					NetworkName: pdep,
@@ -349,6 +353,7 @@ type pident struct {
 
 type specfix interface {
 	name() string
+	rootmanifest() RootManifest
 	specs() []depspec
 	maxTries() int
 	solution() map[string]Version
@@ -384,6 +389,8 @@ type basicFixture struct {
 	l fixLock
 	// solve failure expected, if any
 	fail error
+	// overrides, if any
+	ovr ProjectConstraints
 	// request up/downgrade to all projects
 	changeall bool
 }
@@ -402,6 +409,14 @@ func (f basicFixture) maxTries() int {
 
 func (f basicFixture) solution() map[string]Version {
 	return f.r
+}
+
+func (f basicFixture) rootmanifest() RootManifest {
+	return simpleRootManifest{
+		c:   f.ds[0].deps,
+		tc:  f.ds[0].devdeps,
+		ovr: f.ovr,
+	}
 }
 
 func (f basicFixture) failure() error {
@@ -1034,6 +1049,59 @@ var basicFixtures = map[string]basicFixture{
 			"foo r123abc",
 		),
 	},
+	// Some basic override checks
+	"override root's own constraint": {
+		ds: []depspec{
+			mkDepspec("root 0.0.0", "a *", "b *"),
+			mkDepspec("a 1.0.0", "b 1.0.0"),
+			mkDepspec("a 2.0.0", "b 1.0.0"),
+			mkDepspec("b 1.0.0"),
+		},
+		ovr: ProjectConstraints{
+			ProjectRoot("a"): ProjectProperties{
+				Constraint: NewVersion("1.0.0"),
+			},
+		},
+		r: mksolution(
+			"a 1.0.0",
+			"b 1.0.0",
+		),
+	},
+	"override dep's constraint": {
+		ds: []depspec{
+			mkDepspec("root 0.0.0", "a *"),
+			mkDepspec("a 1.0.0", "b 1.0.0"),
+			mkDepspec("a 2.0.0", "b 1.0.0"),
+			mkDepspec("b 1.0.0"),
+			mkDepspec("b 2.0.0"),
+		},
+		ovr: ProjectConstraints{
+			ProjectRoot("b"): ProjectProperties{
+				Constraint: NewVersion("2.0.0"),
+			},
+		},
+		r: mksolution(
+			"a 2.0.0",
+			"b 2.0.0",
+		),
+	},
+	"overridden mismatched net addrs, alt in dep, back to default": {
+		ds: []depspec{
+			mkDepspec("root 1.0.0", "foo 1.0.0", "bar 1.0.0"),
+			mkDepspec("foo 1.0.0", "bar from baz 1.0.0"),
+			mkDepspec("bar 1.0.0"),
+		},
+		ovr: ProjectConstraints{
+			ProjectRoot("bar"): ProjectProperties{
+				NetworkName: "bar",
+			},
+		},
+		r: mksolution(
+			"foo 1.0.0",
+			"bar 1.0.0",
+		),
+	},
+
 	// TODO(sdboyer) decide how to refactor the solver in order to re-enable these.
 	// Checking for revision existence is important...but kinda obnoxious.
 	//{

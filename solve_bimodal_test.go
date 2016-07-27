@@ -498,6 +498,66 @@ var bimodalFixtures = map[string]bimodalFixture{
 			"b 2.0.0 barrev",
 		),
 	},
+	"override unconstrained root import": {
+		ds: []depspec{
+			dsp(mkDepspec("root 0.0.0"),
+				pkg("root", "a")),
+			dsp(mkDepspec("a 1.0.0"),
+				pkg("a")),
+			dsp(mkDepspec("a 2.0.0"),
+				pkg("a")),
+		},
+		ovr: ProjectConstraints{
+			ProjectRoot("a"): ProjectProperties{
+				Constraint: NewVersion("1.0.0"),
+			},
+		},
+		r: mksolution(
+			"a 1.0.0",
+		),
+	},
+	"overridden mismatched net addrs, alt in dep": {
+		ds: []depspec{
+			dsp(mkDepspec("root 0.0.0"),
+				pkg("root", "foo")),
+			dsp(mkDepspec("foo 1.0.0", "bar from baz 1.0.0"),
+				pkg("foo", "bar")),
+			dsp(mkDepspec("bar 1.0.0"),
+				pkg("bar")),
+			dsp(mkDepspec("baz 1.0.0"),
+				pkg("bar")),
+		},
+		ovr: ProjectConstraints{
+			ProjectRoot("bar"): ProjectProperties{
+				NetworkName: "baz",
+			},
+		},
+		r: mksolution(
+			"foo 1.0.0",
+			"bar from baz 1.0.0",
+		),
+	},
+	"overridden mismatched net addrs, alt in root": {
+		ds: []depspec{
+			dsp(mkDepspec("root 0.0.0", "bar from baz 1.0.0"),
+				pkg("root", "foo")),
+			dsp(mkDepspec("foo 1.0.0"),
+				pkg("foo", "bar")),
+			dsp(mkDepspec("bar 1.0.0"),
+				pkg("bar")),
+			dsp(mkDepspec("baz 1.0.0"),
+				pkg("bar")),
+		},
+		ovr: ProjectConstraints{
+			ProjectRoot("bar"): ProjectProperties{
+				NetworkName: "baz",
+			},
+		},
+		r: mksolution(
+			"foo 1.0.0",
+			"bar from baz 1.0.0",
+		),
+	},
 }
 
 // tpkg is a representation of a single package. It has its own import path, as
@@ -527,6 +587,8 @@ type bimodalFixture struct {
 	lm map[string]fixLock
 	// solve failure expected, if any
 	fail error
+	// overrides, if any
+	ovr ProjectConstraints
 	// request up/downgrade to all projects
 	changeall bool
 	// pkgs to ignore
@@ -547,6 +609,20 @@ func (f bimodalFixture) maxTries() int {
 
 func (f bimodalFixture) solution() map[string]Version {
 	return f.r
+}
+
+func (f bimodalFixture) rootmanifest() RootManifest {
+	m := simpleRootManifest{
+		c:   f.ds[0].deps,
+		tc:  f.ds[0].devdeps,
+		ovr: f.ovr,
+		ig:  make(map[string]bool),
+	}
+	for _, ig := range f.ignore {
+		m.ig[ig] = true
+	}
+
+	return m
 }
 
 func (f bimodalFixture) failure() error {
@@ -633,10 +709,6 @@ func computeBimodalExternalMap(ds []depspec) map[pident]map[string][]string {
 		workmap := make(map[string]wm)
 
 		for _, pkg := range d.pkgs {
-			if !checkPrefixSlash(filepath.Clean(pkg.path), string(d.n)) {
-				panic(fmt.Sprintf("pkg %s is not a child of %s, cannot be a part of that project", pkg.path, d.n))
-			}
-
 			w := wm{
 				ex: make(map[string]bool),
 				in: make(map[string]bool),

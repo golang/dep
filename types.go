@@ -75,14 +75,6 @@ type ProjectIdentifier struct {
 	NetworkName string
 }
 
-// A ProjectConstraint combines a ProjectIdentifier with a Constraint. It
-// indicates that, if packages contained in the ProjectIdentifier enter the
-// depgraph, they must do so at a version that is allowed by the Constraint.
-type ProjectConstraint struct {
-	Ident      ProjectIdentifier
-	Constraint Constraint
-}
-
 func (i ProjectIdentifier) less(j ProjectIdentifier) bool {
 	if i.ProjectRoot < j.ProjectRoot {
 		return true
@@ -132,6 +124,16 @@ func (i ProjectIdentifier) normalize() ProjectIdentifier {
 	}
 
 	return i
+}
+
+// ProjectProperties comprise the properties that can attached to a ProjectRoot.
+//
+// In general, these are declared in the context of a map of ProjectRoot to its
+// ProjectProperties; they make little sense without their corresponding
+// ProjectRoot.
+type ProjectProperties struct {
+	NetworkName string
+	Constraint  Constraint
 }
 
 // Package represents a Go package. It contains a subset of the information
@@ -193,8 +195,8 @@ func (awp atomWithPackages) bmi() bimodalIdentifier {
 // are the same) name, a constraint, and the actual packages needed that are
 // under that root.
 type completeDep struct {
-	// The base ProjectConstraint
-	ProjectConstraint
+	// The base workingConstraint
+	workingConstraint
 	// The specific packages required from the ProjectDep
 	pl []string
 }

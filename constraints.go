@@ -2,6 +2,7 @@ package gps
 
 import (
 	"fmt"
+	"sort"
 
 	"github.com/Masterminds/semver"
 )
@@ -163,4 +164,127 @@ func (noneConstraint) MatchesAny(Constraint) bool {
 
 func (noneConstraint) Intersect(Constraint) Constraint {
 	return none
+}
+
+// A ProjectConstraint combines a ProjectIdentifier with a Constraint. It
+// indicates that, if packages contained in the ProjectIdentifier enter the
+// depgraph, they must do so at a version that is allowed by the Constraint.
+type ProjectConstraint struct {
+	Ident      ProjectIdentifier
+	Constraint Constraint
+}
+
+type workingConstraint struct {
+	Ident                     ProjectIdentifier
+	Constraint                Constraint
+	overrNet, overrConstraint bool
+}
+
+type ProjectConstraints map[ProjectRoot]ProjectProperties
+
+func pcSliceToMap(l []ProjectConstraint, r ...[]ProjectConstraint) ProjectConstraints {
+	final := make(ProjectConstraints)
+
+	for _, pc := range l {
+		final[pc.Ident.ProjectRoot] = ProjectProperties{
+			NetworkName: pc.Ident.netName(),
+			Constraint:  pc.Constraint,
+		}
+	}
+
+	for _, pcs := range r {
+		for _, pc := range pcs {
+			if pp, exists := final[pc.Ident.ProjectRoot]; exists {
+				// Technically this should be done through a bridge for
+				// cross-version-type matching...but this is a one off for root and
+				// that's just ridiculous for this.
+				pp.Constraint = pp.Constraint.Intersect(pc.Constraint)
+				final[pc.Ident.ProjectRoot] = pp
+			} else {
+				final[pc.Ident.ProjectRoot] = ProjectProperties{
+					NetworkName: pc.Ident.netName(),
+					Constraint:  pc.Constraint,
+				}
+			}
+		}
+	}
+
+	return final
+}
+
+func (m ProjectConstraints) asSortedSlice() []ProjectConstraint {
+	pcs := make([]ProjectConstraint, len(m))
+
+	k := 0
+	for pr, pp := range m {
+		pcs[k] = ProjectConstraint{
+			Ident: ProjectIdentifier{
+				ProjectRoot: pr,
+				NetworkName: pp.NetworkName,
+			},
+			Constraint: pp.Constraint,
+		}
+		k++
+	}
+
+	sort.Stable(sortedConstraints(pcs))
+	return pcs
+}
+
+// overrideAll treats the ProjectConstraints map as an override map, and applies
+// overridden values to the input.
+//
+// A slice of workingConstraint is returned, allowing differentiation between
+// values that were or were not overridden.
+func (m ProjectConstraints) overrideAll(in []ProjectConstraint) (out []workingConstraint) {
+	out = make([]workingConstraint, len(in))
+	k := 0
+	for _, pc := range in {
+		out[k] = m.override(pc)
+		k++
+	}
+
+	return
+}
+
+// override replaces a single ProjectConstraint with a workingConstraint,
+// overriding its values if a corresponding entry exists in the
+// ProjectConstraints map.
+func (m ProjectConstraints) override(pc ProjectConstraint) workingConstraint {
+	wc := workingConstraint{
+		Ident:      pc.Ident.normalize(), // necessary to normalize?
+		Constraint: pc.Constraint,
+	}
+
+	if pp, has := m[pc.Ident.ProjectRoot]; has {
+		// The rule for overrides is that *any* non-zero value for the prop
+		// should be considered an override, even if it's equal to what's
+		// already there.
+		if pp.Constraint != nil {
+			wc.Constraint = pp.Constraint
+			wc.overrConstraint = true
+		}
+
+		if pp.NetworkName != "" {
+			wc.Ident.NetworkName = pp.NetworkName
+			wc.overrNet = true
+		}
+
+	}
+
+	return wc
+}
+
+type sortedConstraints []ProjectConstraint
+
+func (s sortedConstraints) Len() int {
+	return len(s)
+}
+
+func (s sortedConstraints) Swap(i, j int) {
+	s[i], s[j] = s[j], s[i]
+}
+
+func (s sortedConstraints) Less(i, j int) bool {
+	return s[i].Ident.less(s[j].Ident)
 }
