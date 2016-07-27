@@ -108,8 +108,8 @@ func TestHashInputsOverrides(t *testing.T) {
 
 	rm := fix.rootmanifest().(simpleRootManifest)
 	// First case - override something not in the root, just with network name
-	rm.ovr = map[ProjectRoot]Override{
-		"c": Override{
+	rm.ovr = map[ProjectRoot]ProjectProperties{
+		"c": ProjectProperties{
 			NetworkName: "car",
 		},
 	}
@@ -157,7 +157,7 @@ func TestHashInputsOverrides(t *testing.T) {
 	}
 
 	// Override not in root, just with constraint
-	rm.ovr["d"] = Override{
+	rm.ovr["d"] = ProjectProperties{
 		Constraint: NewBranch("foobranch"),
 	}
 	dig, err = s.HashInputs()
@@ -198,7 +198,7 @@ func TestHashInputsOverrides(t *testing.T) {
 	}
 
 	// Override not in root, both constraint and network name
-	rm.ovr["e"] = Override{
+	rm.ovr["e"] = ProjectProperties{
 		NetworkName: "groucho",
 		Constraint:  NewBranch("plexiglass"),
 	}
@@ -243,7 +243,7 @@ func TestHashInputsOverrides(t *testing.T) {
 	}
 
 	// Override in root, just constraint
-	rm.ovr["a"] = Override{
+	rm.ovr["a"] = ProjectProperties{
 		Constraint: NewVersion("fluglehorn"),
 	}
 	dig, err = s.HashInputs()
@@ -287,7 +287,7 @@ func TestHashInputsOverrides(t *testing.T) {
 	}
 
 	// Override in root, only network name
-	rm.ovr["a"] = Override{
+	rm.ovr["a"] = ProjectProperties{
 		NetworkName: "nota",
 	}
 	dig, err = s.HashInputs()
@@ -331,7 +331,7 @@ func TestHashInputsOverrides(t *testing.T) {
 	}
 
 	// Override in root, network name and constraint
-	rm.ovr["a"] = Override{
+	rm.ovr["a"] = ProjectProperties{
 		NetworkName: "nota",
 		Constraint:  NewVersion("fluglehorn"),
 	}

@@ -164,3 +164,10 @@ func (noneConstraint) MatchesAny(Constraint) bool {
 func (noneConstraint) Intersect(Constraint) Constraint {
 	return none
 }
+
+type ProjectConstraints map[ProjectRoot]ProjectProperties
+
+//func mergePCSlices( ProjectConstraints, wother ProjectConstraints) {
+//final := make(ProjectConstraints)
+
+//}

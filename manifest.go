@@ -16,8 +16,11 @@ package gps
 type Manifest interface {
 	// Returns a list of project-level constraints.
 	DependencyConstraints() []ProjectConstraint
-	// Returns a list of constraints applicable to test imports. Note that this
-	// will only be consulted for root manifests.
+
+	// Returns a list of constraints applicable to test imports.
+	//
+	// These are applied only when tests are incorporated. Typically, that
+	// will only be for root manifests.
 	TestDependencyConstraints() []ProjectConstraint
 }
 
@@ -34,7 +37,7 @@ type RootManifest interface {
 	// users should be encouraged to use them only as a last resort; they do not
 	// "play well with others" (that is their express goal), and overreliance on
 	// them can harm the ecosystem as a whole.
-	Overrides() map[ProjectRoot]Override
+	Overrides() ProjectConstraints
 
 	// IngorePackages returns a set of import paths to ignore. These import
 	// paths can be within the root project, or part of other projects. Ignoring
@@ -71,7 +74,7 @@ func (m SimpleManifest) TestDependencyConstraints() []ProjectConstraint {
 type simpleRootManifest struct {
 	c   []ProjectConstraint
 	tc  []ProjectConstraint
-	ovr map[ProjectRoot]Override
+	ovr ProjectConstraints
 	ig  map[string]bool
 }
 
@@ -81,7 +84,7 @@ func (m simpleRootManifest) DependencyConstraints() []ProjectConstraint {
 func (m simpleRootManifest) TestDependencyConstraints() []ProjectConstraint {
 	return m.tc
 }
-func (m simpleRootManifest) Overrides() map[ProjectRoot]Override {
+func (m simpleRootManifest) Overrides() ProjectConstraints {
 	return m.ovr
 }
 func (m simpleRootManifest) IgnorePackages() map[string]bool {

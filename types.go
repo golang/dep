@@ -134,9 +134,12 @@ func (i ProjectIdentifier) normalize() ProjectIdentifier {
 	return i
 }
 
-// An Override can be provided by the RootManifest to designate a network name
-// and constraint that should *always* be used for a given ProjectRoot.
-type Override struct {
+// ProjectProperties comprise the properties that can attached to a ProjectRoot.
+//
+// In general, these are declared in the context of a map of ProjectRoot to its
+// ProjectProperties; they make little sense without their corresponding
+// ProjectRoot.
+type ProjectProperties struct {
 	NetworkName string
 	Constraint  Constraint
 }

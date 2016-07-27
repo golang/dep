@@ -1042,6 +1042,7 @@ var basicFixtures = map[string]basicFixture{
 			"foo r123abc",
 		),
 	},
+
 	// TODO(sdboyer) decide how to refactor the solver in order to re-enable these.
 	// Checking for revision existence is important...but kinda obnoxious.
 	//{

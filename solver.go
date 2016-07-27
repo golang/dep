@@ -151,7 +151,7 @@ type solver struct {
 
 	// A map of ProjectRoot (import path names) to the ProjectConstraint that
 	// should be enforced for those names.
-	ovr map[ProjectRoot]Override
+	ovr map[ProjectRoot]ProjectProperties
 
 	// A map of the names listed in the root's lock.
 	rlm map[ProjectIdentifier]LockedProject
@@ -187,9 +187,6 @@ type Solver interface {
 // with the inputs is detected, an error is returned. Otherwise, a Solver is
 // returned, ready to hash and check inputs or perform a solving run.
 func Prepare(params SolveParameters, sm SourceManager) (Solver, error) {
-	// local overrides would need to be handled first.
-	// TODO(sdboyer) local overrides! heh
-
 	if sm == nil {
 		return nil, badOptsFailure("must provide non-nil SourceManager")
 	}
@@ -210,12 +207,16 @@ func Prepare(params SolveParameters, sm SourceManager) (Solver, error) {
 	s := &solver{
 		params: params,
 		ig:     params.Manifest.IgnorePackages(),
+		ovr:    params.Manifest.Overrides(),
 		tl:     params.TraceLogger,
 	}
 
-	// Ensure the ignore map is at least initialized
+	// Ensure the ignore and overrides maps are at least initialized
 	if s.ig == nil {
 		s.ig = make(map[string]bool)
+	}
+	if s.ovr == nil {
+		s.ovr = make(map[ProjectRoot]ProjectProperties)
 	}
 
 	// Set up the bridge and ensure the root dir is in good, working order
@@ -551,8 +552,8 @@ func (s *solver) intersectConstraintsWithImports(deps []ProjectConstraint, reach
 			// github.com/sdboyer/foo
 			// github.com/sdboyer/foobar/baz
 			//
-			// The latter would incorrectly be conflated in with the former. So,
-			// as we know we're operating on strings that describe paths, guard
+			// The latter would incorrectly be conflated with the former. So, as
+			// we know we're operating on strings that describe paths, guard
 			// against this case by verifying that either the input is the same
 			// length as the match (in which case we know they're equal), or
 			// that the next character is the is the PathSeparator.
