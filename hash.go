@@ -25,11 +25,11 @@ func (s *solver) HashInputs() ([]byte, error) {
 		return nil, badOptsFailure(fmt.Sprintf("Error while parsing packages under %s: %s", s.params.RootDir, err.Error()))
 	}
 
-	c, tc := s.params.Manifest.DependencyConstraints(), s.params.Manifest.TestDependencyConstraints()
+	c, tc := s.rm.DependencyConstraints(), s.rm.TestDependencyConstraints()
 	// Apply overrides to the constraints from the root. Otherwise, the hash
 	// would be computed on the basis of a constraint from root that doesn't
 	// actually affect solving.
-	p := s.ovr.override(pcSliceToMap(c, tc).asSortedSlice())
+	p := s.ovr.overrideAll(pcSliceToMap(c, tc).asSortedSlice())
 
 	// We have everything we need; now, compute the hash.
 	h := sha256.New()

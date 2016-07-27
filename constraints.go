@@ -231,41 +231,48 @@ func (m ProjectConstraints) asSortedSlice() []ProjectConstraint {
 	return pcs
 }
 
-// override treats the ProjectConstraints map as an override map, and applies
+// overrideAll treats the ProjectConstraints map as an override map, and applies
 // overridden values to the input.
 //
 // A slice of workingConstraint is returned, allowing differentiation between
 // values that were or were not overridden.
-func (m ProjectConstraints) override(in []ProjectConstraint) (out []workingConstraint) {
+func (m ProjectConstraints) overrideAll(in []ProjectConstraint) (out []workingConstraint) {
 	out = make([]workingConstraint, len(in))
 	k := 0
 	for _, pc := range in {
-		wc := workingConstraint{
-			Ident:      pc.Ident.normalize(), // necessary to normalize?
-			Constraint: pc.Constraint,
-		}
-
-		pr := pc.Ident.ProjectRoot
-		if pp, has := m[pr]; has {
-			// The rule for overrides is that *any* non-zero value for the prop
-			// should be considered an override, even if it's equal to what's
-			// already there.
-			if pp.Constraint != nil {
-				wc.Constraint = pp.Constraint
-				wc.overrConstraint = true
-			}
-
-			if pp.NetworkName != "" {
-				wc.Ident.NetworkName = pp.NetworkName
-				wc.overrNet = true
-			}
-
-		}
-		out[k] = wc
+		out[k] = m.override(pc)
 		k++
 	}
 
 	return
+}
+
+// override replaces a single ProjectConstraint with a workingConstraint,
+// overriding its values if a corresponding entry exists in the
+// ProjectConstraints map.
+func (m ProjectConstraints) override(pc ProjectConstraint) workingConstraint {
+	wc := workingConstraint{
+		Ident:      pc.Ident.normalize(), // necessary to normalize?
+		Constraint: pc.Constraint,
+	}
+
+	if pp, has := m[pc.Ident.ProjectRoot]; has {
+		// The rule for overrides is that *any* non-zero value for the prop
+		// should be considered an override, even if it's equal to what's
+		// already there.
+		if pp.Constraint != nil {
+			wc.Constraint = pp.Constraint
+			wc.overrConstraint = true
+		}
+
+		if pp.NetworkName != "" {
+			wc.Ident.NetworkName = pp.NetworkName
+			wc.overrNet = true
+		}
+
+	}
+
+	return wc
 }
 
 type sortedConstraints []ProjectConstraint

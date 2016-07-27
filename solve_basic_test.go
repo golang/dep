@@ -179,9 +179,13 @@ func mkPCstrnt(info string) ProjectConstraint {
 // The only real work here is passing the initial string to mkPDep. All the
 // other args are taken as package names.
 func mkCDep(pdep string, pl ...string) completeDep {
+	pc := mkPCstrnt(pdep)
 	return completeDep{
-		ProjectConstraint: mkPCstrnt(pdep),
-		pl:                pl,
+		workingConstraint: workingConstraint{
+			Ident:      pc.Ident,
+			Constraint: pc.Constraint,
+		},
+		pl: pl,
 	}
 }
 
@@ -242,7 +246,7 @@ func mkADep(atom, pdep string, c Constraint, pl ...string) dependency {
 	return dependency{
 		depender: mkAtom(atom),
 		dep: completeDep{
-			ProjectConstraint: ProjectConstraint{
+			workingConstraint: workingConstraint{
 				Ident: ProjectIdentifier{
 					ProjectRoot: ProjectRoot(pdep),
 					NetworkName: pdep,

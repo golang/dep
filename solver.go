@@ -460,7 +460,8 @@ func (s *solver) selectRoot() error {
 
 	// If we're looking for root's deps, get it from opts and local root
 	// analysis, rather than having the sm do it
-	mdeps := append(s.rm.DependencyConstraints(), s.rm.TestDependencyConstraints()...)
+	c, tc := s.rm.DependencyConstraints(), s.rm.TestDependencyConstraints()
+	mdeps := s.ovr.overrideAll(pcSliceToMap(c, tc).asSortedSlice())
 
 	// Err is not possible at this point, as it could only come from
 	// listPackages(), which if we're here already succeeded for root
@@ -534,8 +535,7 @@ func (s *solver) getImportsAndConstraintsOf(a atomWithPackages) ([]completeDep, 
 		k++
 	}
 
-	deps := m.DependencyConstraints()
-	// TODO(sdboyer) add overrides here...if we impl the concept (which we should)
+	deps := s.ovr.overrideAll(m.DependencyConstraints())
 
 	return s.intersectConstraintsWithImports(deps, reach)
 }
@@ -544,7 +544,7 @@ func (s *solver) getImportsAndConstraintsOf(a atomWithPackages) ([]completeDep, 
 // externally reached packages, and creates a []completeDep that is guaranteed
 // to include all packages named by import reach, using constraints where they
 // are available, or Any() where they are not.
-func (s *solver) intersectConstraintsWithImports(deps []ProjectConstraint, reach []string) ([]completeDep, error) {
+func (s *solver) intersectConstraintsWithImports(deps []workingConstraint, reach []string) ([]completeDep, error) {
 	// Create a radix tree with all the projects we know from the manifest
 	// TODO(sdboyer) make this smarter once we allow non-root inputs as 'projects'
 	xt := radix.New()
@@ -581,13 +581,13 @@ func (s *solver) intersectConstraintsWithImports(deps []ProjectConstraint, reach
 				// Match is valid; put it in the dmap, either creating a new
 				// completeDep or appending it to the existing one for this base
 				// project/prefix.
-				dep := idep.(ProjectConstraint)
+				dep := idep.(workingConstraint)
 				if cdep, exists := dmap[dep.Ident.ProjectRoot]; exists {
 					cdep.pl = append(cdep.pl, rp)
 					dmap[dep.Ident.ProjectRoot] = cdep
 				} else {
 					dmap[dep.Ident.ProjectRoot] = completeDep{
-						ProjectConstraint: dep,
+						workingConstraint: dep,
 						pl:                []string{rp},
 					}
 				}
@@ -602,21 +602,21 @@ func (s *solver) intersectConstraintsWithImports(deps []ProjectConstraint, reach
 			return nil, err
 		}
 
-		// Still no matches; make a new completeDep with an open constraint
-		pd := ProjectConstraint{
+		// Make a new completeDep with an open constraint, respecting overrides
+		pd := s.ovr.override(ProjectConstraint{
 			Ident: ProjectIdentifier{
 				ProjectRoot: ProjectRoot(root.Base),
 				NetworkName: root.Base,
 			},
 			Constraint: Any(),
-		}
+		})
 
 		// Insert the pd into the trie so that further deps from this
 		// project get caught by the prefix search
 		xt.Insert(root.Base, pd)
 		// And also put the complete dep into the dmap
 		dmap[ProjectRoot(root.Base)] = completeDep{
-			ProjectConstraint: pd,
+			workingConstraint: pd,
 			pl:                []string{rp},
 		}
 	}
