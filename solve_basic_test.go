@@ -816,8 +816,26 @@ var basicFixtures = map[string]basicFixture{
 			mkDepspec("b 1.0.0", "a 2.0.0"),
 			mkDepspec("b 2.0.0", "a 1.0.0"),
 		},
-		errp:        []string{"b", "a"},
-		maxAttempts: 2,
+		fail: &noVersionError{
+			pn: mkPI("b"),
+			fails: []failedVersion{
+				{
+					v: NewVersion("2.0.0"),
+					f: &versionNotAllowedFailure{
+						goal:       mkAtom("b 2.0.0"),
+						failparent: []dependency{mkDep("a 1.0.0", "b 1.0.0", "b")},
+						c:          mkSVC("1.0.0"),
+					},
+				},
+				{
+					v: NewVersion("1.0.0"),
+					f: &constraintNotAllowedFailure{
+						goal: mkDep("b 1.0.0", "a 2.0.0", "a"),
+						v:    NewVersion("1.0.0"),
+					},
+				},
+			},
+		},
 	},
 	"no version that matches while backtracking": {
 		ds: []depspec{

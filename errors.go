@@ -128,8 +128,12 @@ func (e *disjointConstraintFailure) traceString() string {
 // constraints does not admit the currently-selected version of the target
 // project.
 type constraintNotAllowedFailure struct {
+	// The dependency with the problematic constraint that could not be
+	// introduced.
 	goal dependency
-	v    Version
+	// The (currently selected) version of the target project that was not
+	// admissible by the goal dependency.
+	v Version
 }
 
 func (e *constraintNotAllowedFailure) Error() string {
