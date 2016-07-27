@@ -239,14 +239,15 @@ func (s *solver) checkPackageImportsFromDepExist(a atomWithPackages, cdep comple
 	for _, pkg := range cdep.pl {
 		perr, has := ptree.Packages[pkg]
 		if !has || perr.Err != nil {
-			e.pl = append(e.pl, pkg)
 			if has {
 				e.prob[pkg] = perr.Err
+			} else {
+				e.prob[pkg] = nil
 			}
 		}
 	}
 
-	if len(e.pl) > 0 {
+	if len(e.prob) > 0 {
 		return e
 	}
 	return nil

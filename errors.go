@@ -3,6 +3,7 @@ package gps
 import (
 	"bytes"
 	"fmt"
+	"sort"
 	"strings"
 )
 
@@ -281,6 +282,10 @@ type errDeppers struct {
 //
 // "errors" includes package nonexistence, which is indicated by a nil err in
 // the corresponding errDeppers failpkg map value.
+//
+// checkeeHasProblemPackagesFailure complements depHasProblemPackagesFailure;
+// one or the other could appear to describe the same fundamental issue,
+// depending on the order in which dependencies were visited.
 type checkeeHasProblemPackagesFailure struct {
 	// goal is the atom that was rejected due to problematic packages.
 	goal atom
@@ -360,32 +365,51 @@ func (e *checkeeHasProblemPackagesFailure) traceString() string {
 	return buf.String()
 }
 
+// depHasProblemPackagesFailure indicates that the goal dependency was rejected
+// because there were problems with one or more of the packages the dependency
+// requires in the atom currently selected for that dependency. (This failure
+// can only occur if the target dependency is already selected.)
+//
+// "errors" includes package nonexistence, which is indicated by a nil err as
+// the corresponding prob map value.
+//
+// depHasProblemPackagesFailure complements checkeeHasProblemPackagesFailure;
+// one or the other could appear to describe the same fundamental issue,
+// depending on the order in which dependencies were visited.
 type depHasProblemPackagesFailure struct {
+	// goal is the dependency that was rejected due to the atom currently
+	// selected for the dependency's target id having errors (including, and
+	// probably most commonly,
+	// nonexistence) in one or more packages named by the dependency.
 	goal dependency
-	v    Version
-	pl   []string
+	// v is the version of the currently selected atom targeted by the goal
+	// dependency.
+	v Version
+	// prob is a map of problem packages to their specific error. It does not
+	// include missing packages.
 	prob map[string]error
 }
 
 func (e *depHasProblemPackagesFailure) Error() string {
 	fcause := func(pkg string) string {
-		var cause string
-		if err, has := e.prob[pkg]; has {
-			cause = fmt.Sprintf("does not contain usable Go code (%T).", err)
-		} else {
-			cause = "is missing."
+		if err := e.prob[pkg]; err != nil {
+			return fmt.Sprintf("does not contain usable Go code (%T).", err)
 		}
-		return cause
+		return "is missing."
 	}
 
-	if len(e.pl) == 1 {
+	if len(e.prob) == 1 {
+		var pkg string
+		for pkg = range e.prob {
+		}
+
 		return fmt.Sprintf(
 			"Could not introduce %s, as it requires package %s from %s, but in version %s that package %s",
 			a2vs(e.goal.depender),
-			e.pl[0],
+			pkg,
 			e.goal.dep.Ident.errString(),
 			e.v,
-			fcause(e.pl[0]),
+			fcause(pkg),
 		)
 	}
 
@@ -397,7 +421,14 @@ func (e *depHasProblemPackagesFailure) Error() string {
 		e.v,
 	)
 
-	for _, pkg := range e.pl {
+	pkgs := make([]string, len(e.prob))
+	k := 0
+	for pkg := range e.prob {
+		pkgs[k] = pkg
+		k++
+	}
+	sort.Strings(pkgs)
+	for _, pkg := range pkgs {
 		fmt.Fprintf(&buf, "\t%s %s", pkg, fcause(pkg))
 	}
 
@@ -407,13 +438,10 @@ func (e *depHasProblemPackagesFailure) Error() string {
 func (e *depHasProblemPackagesFailure) traceString() string {
 	var buf bytes.Buffer
 	fcause := func(pkg string) string {
-		var cause string
-		if err, has := e.prob[pkg]; has {
-			cause = fmt.Sprintf("has parsing err (%T).", err)
-		} else {
-			cause = "is missing"
+		if err := e.prob[pkg]; err != nil {
+			return fmt.Sprintf("has parsing err (%T).", err)
 		}
-		return cause
+		return "is missing"
 	}
 
 	fmt.Fprintf(
@@ -423,7 +451,14 @@ func (e *depHasProblemPackagesFailure) traceString() string {
 		e.v,
 	)
 
-	for _, pkg := range e.pl {
+	pkgs := make([]string, len(e.prob))
+	k := 0
+	for pkg := range e.prob {
+		pkgs[k] = pkg
+		k++
+	}
+	sort.Strings(pkgs)
+	for _, pkg := range pkgs {
 		fmt.Fprintf(&buf, "\t%s %s", pkg, fcause(pkg))
 	}
 

@@ -320,7 +320,6 @@ var bimodalFixtures = map[string]bimodalFixture{
 				pkg("a"),
 			),
 		},
-		//errp: []string{"a", "root", "a"},
 		fail: &noVersionError{
 			pn: mkPI("a"),
 			fails: []failedVersion{
@@ -364,7 +363,21 @@ var bimodalFixtures = map[string]bimodalFixture{
 				pkg("d", "a/nonexistent"),
 			),
 		},
-		errp: []string{"d", "a", "d"},
+		fail: &noVersionError{
+			pn: mkPI("d"),
+			fails: []failedVersion{
+				{
+					v: NewVersion("1.0.0"),
+					f: &depHasProblemPackagesFailure{
+						goal: mkADep("d 1.0.0", "a", Any(), "a/nonexistent"),
+						v:    NewVersion("1.0.0"),
+						prob: map[string]error{
+							"a/nonexistent": nil,
+						},
+					},
+				},
+			},
+		},
 	},
 	// Check ignores on the root project
 	"ignore in double-subpkg": {

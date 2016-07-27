@@ -238,6 +238,22 @@ func mkDep(atom, pdep string, pl ...string) dependency {
 	}
 }
 
+func mkADep(atom, pdep string, c Constraint, pl ...string) dependency {
+	return dependency{
+		depender: mkAtom(atom),
+		dep: completeDep{
+			ProjectConstraint: ProjectConstraint{
+				Ident: ProjectIdentifier{
+					ProjectRoot: ProjectRoot(pdep),
+					NetworkName: pdep,
+				},
+				Constraint: c,
+			},
+			pl: pl,
+		},
+	}
+}
+
 // mkPI creates a ProjectIdentifier with the ProjectRoot as the provided
 // string, and with the NetworkName normalized to be the same.
 func mkPI(root string) ProjectIdentifier {
