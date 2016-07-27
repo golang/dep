@@ -81,6 +81,16 @@ func nvrSplit(info string) (id ProjectIdentifier, version string, revision Revis
 // should be provided in this case. It is an error (and will panic) to try to
 // pass a revision with an underlying revision.
 func mkAtom(info string) atom {
+	// if info is "root", special case it to use the root "version"
+	if info == "root" {
+		return atom{
+			id: ProjectIdentifier{
+				ProjectRoot: ProjectRoot("root"),
+			},
+			v: rootRev,
+		}
+	}
+
 	id, ver, rev := nvrSplit(info)
 
 	var v Version
@@ -113,7 +123,7 @@ func mkAtom(info string) atom {
 	}
 }
 
-// mkPDep splits the input string on a space, and uses the first two elements
+// mkPCstrnt splits the input string on a space, and uses the first two elements
 // as the project identifier and constraint body, respectively.
 //
 // The constraint body may have a leading character indicating the type of
@@ -124,7 +134,7 @@ func mkAtom(info string) atom {
 //  r: create a revision.
 //
 // If no leading character is used, a semver constraint is assumed.
-func mkPDep(info string) ProjectConstraint {
+func mkPCstrnt(info string) ProjectConstraint {
 	id, ver, rev := nvrSplit(info)
 
 	var c Constraint
@@ -161,6 +171,17 @@ func mkPDep(info string) ProjectConstraint {
 	return ProjectConstraint{
 		Ident:      id,
 		Constraint: c,
+	}
+}
+
+// mkCDep composes a completeDep struct from the inputs.
+//
+// The only real work here is passing the initial string to mkPDep. All the
+// other args are taken as package names.
+func mkCDep(pdep string, pl ...string) completeDep {
+	return completeDep{
+		ProjectConstraint: mkPCstrnt(pdep),
+		pl:                pl,
 	}
 }
 
@@ -204,10 +225,51 @@ func mkDepspec(pi string, deps ...string) depspec {
 			sl = &ds.deps
 		}
 
-		*sl = append(*sl, mkPDep(dep))
+		*sl = append(*sl, mkPCstrnt(dep))
 	}
 
 	return ds
+}
+
+func mkDep(atom, pdep string, pl ...string) dependency {
+	return dependency{
+		depender: mkAtom(atom),
+		dep:      mkCDep(pdep, pl...),
+	}
+}
+
+func mkADep(atom, pdep string, c Constraint, pl ...string) dependency {
+	return dependency{
+		depender: mkAtom(atom),
+		dep: completeDep{
+			ProjectConstraint: ProjectConstraint{
+				Ident: ProjectIdentifier{
+					ProjectRoot: ProjectRoot(pdep),
+					NetworkName: pdep,
+				},
+				Constraint: c,
+			},
+			pl: pl,
+		},
+	}
+}
+
+// mkPI creates a ProjectIdentifier with the ProjectRoot as the provided
+// string, and with the NetworkName normalized to be the same.
+func mkPI(root string) ProjectIdentifier {
+	return ProjectIdentifier{
+		ProjectRoot: ProjectRoot(root),
+		NetworkName: root,
+	}
+}
+
+// mkSVC creates a new semver constraint, panicking if an error is returned.
+func mkSVC(body string) Constraint {
+	c, err := NewSemverConstraint(body)
+	if err != nil {
+		panic(fmt.Sprintf("Error while trying to create semver constraint from %s: %s", body, err.Error()))
+	}
+	return c
 }
 
 // mklock makes a fixLock, suitable to act as a lock file
@@ -289,8 +351,8 @@ type specfix interface {
 	name() string
 	specs() []depspec
 	maxTries() int
-	expectErrs() []string
 	solution() map[string]Version
+	failure() error
 }
 
 // A basicFixture is a declarative test fixture that can cover a wide variety of
@@ -320,8 +382,8 @@ type basicFixture struct {
 	downgrade bool
 	// lock file simulator, if one's to be used at all
 	l fixLock
-	// projects expected to have errors, if any
-	errp []string
+	// solve failure expected, if any
+	fail error
 	// request up/downgrade to all projects
 	changeall bool
 }
@@ -338,12 +400,12 @@ func (f basicFixture) maxTries() int {
 	return f.maxAttempts
 }
 
-func (f basicFixture) expectErrs() []string {
-	return f.errp
-}
-
 func (f basicFixture) solution() map[string]Version {
 	return f.r
+}
+
+func (f basicFixture) failure() error {
+	return f.fail
 }
 
 // A table of basicFixtures, used in the basic solving test set.
@@ -448,8 +510,21 @@ var basicFixtures = map[string]basicFixture{
 			mkDepspec("foo 1.0.0", "bar from baz 1.0.0"),
 			mkDepspec("bar 1.0.0"),
 		},
-		// TODO(sdboyer) ugh; do real error comparison instead of shitty abstraction
-		errp: []string{"foo", "foo", "root"},
+		fail: &noVersionError{
+			pn: mkPI("foo"),
+			fails: []failedVersion{
+				{
+					v: NewVersion("1.0.0"),
+					f: &sourceMismatchFailure{
+						shared:   ProjectRoot("bar"),
+						current:  "bar",
+						mismatch: "baz",
+						prob:     mkAtom("foo 1.0.0"),
+						sel:      []dependency{mkDep("root", "foo 1.0.0", "foo")},
+					},
+				},
+			},
+		},
 	},
 	// fixtures with locks
 	"with compatible locked dependency": {
@@ -679,7 +754,27 @@ var basicFixtures = map[string]basicFixture{
 			mkDepspec("foo 2.0.0"),
 			mkDepspec("foo 2.1.3"),
 		},
-		errp: []string{"foo", "root"},
+		fail: &noVersionError{
+			pn: mkPI("foo"),
+			fails: []failedVersion{
+				{
+					v: NewVersion("2.1.3"),
+					f: &versionNotAllowedFailure{
+						goal:       mkAtom("foo 2.1.3"),
+						failparent: []dependency{mkDep("root", "foo ^1.0.0", "foo")},
+						c:          mkSVC("^1.0.0"),
+					},
+				},
+				{
+					v: NewVersion("2.0.0"),
+					f: &versionNotAllowedFailure{
+						goal:       mkAtom("foo 2.0.0"),
+						failparent: []dependency{mkDep("root", "foo ^1.0.0", "foo")},
+						c:          mkSVC("^1.0.0"),
+					},
+				},
+			},
+		},
 	},
 	"no version that matches combined constraint": {
 		ds: []depspec{
@@ -689,7 +784,27 @@ var basicFixtures = map[string]basicFixture{
 			mkDepspec("shared 2.5.0"),
 			mkDepspec("shared 3.5.0"),
 		},
-		errp: []string{"shared", "foo", "bar"},
+		fail: &noVersionError{
+			pn: mkPI("shared"),
+			fails: []failedVersion{
+				{
+					v: NewVersion("3.5.0"),
+					f: &versionNotAllowedFailure{
+						goal:       mkAtom("shared 3.5.0"),
+						failparent: []dependency{mkDep("foo 1.0.0", "shared >=2.0.0, <3.0.0", "shared")},
+						c:          mkSVC(">=2.9.0, <3.0.0"),
+					},
+				},
+				{
+					v: NewVersion("2.5.0"),
+					f: &versionNotAllowedFailure{
+						goal:       mkAtom("shared 2.5.0"),
+						failparent: []dependency{mkDep("bar 1.0.0", "shared >=2.9.0, <4.0.0", "shared")},
+						c:          mkSVC(">=2.9.0, <3.0.0"),
+					},
+				},
+			},
+		},
 	},
 	"disjoint constraints": {
 		ds: []depspec{
@@ -699,8 +814,20 @@ var basicFixtures = map[string]basicFixture{
 			mkDepspec("shared 2.0.0"),
 			mkDepspec("shared 4.0.0"),
 		},
-		//errp: []string{"shared", "foo", "bar"}, // dart's has this...
-		errp: []string{"foo", "bar"},
+		fail: &noVersionError{
+			pn: mkPI("foo"),
+			fails: []failedVersion{
+				{
+					v: NewVersion("1.0.0"),
+					f: &disjointConstraintFailure{
+						goal:      mkDep("foo 1.0.0", "shared <=2.0.0", "shared"),
+						failsib:   []dependency{mkDep("bar 1.0.0", "shared >3.0.0", "shared")},
+						nofailsib: nil,
+						c:         mkSVC(">3.0.0"),
+					},
+				},
+			},
+		},
 	},
 	"no valid solution": {
 		ds: []depspec{
@@ -710,8 +837,26 @@ var basicFixtures = map[string]basicFixture{
 			mkDepspec("b 1.0.0", "a 2.0.0"),
 			mkDepspec("b 2.0.0", "a 1.0.0"),
 		},
-		errp:        []string{"b", "a"},
-		maxAttempts: 2,
+		fail: &noVersionError{
+			pn: mkPI("b"),
+			fails: []failedVersion{
+				{
+					v: NewVersion("2.0.0"),
+					f: &versionNotAllowedFailure{
+						goal:       mkAtom("b 2.0.0"),
+						failparent: []dependency{mkDep("a 1.0.0", "b 1.0.0", "b")},
+						c:          mkSVC("1.0.0"),
+					},
+				},
+				{
+					v: NewVersion("1.0.0"),
+					f: &constraintNotAllowedFailure{
+						goal: mkDep("b 1.0.0", "a 2.0.0", "a"),
+						v:    NewVersion("1.0.0"),
+					},
+				},
+			},
+		},
 	},
 	"no version that matches while backtracking": {
 		ds: []depspec{
@@ -719,7 +864,19 @@ var basicFixtures = map[string]basicFixture{
 			mkDepspec("a 1.0.0"),
 			mkDepspec("b 1.0.0"),
 		},
-		errp: []string{"b", "root"},
+		fail: &noVersionError{
+			pn: mkPI("b"),
+			fails: []failedVersion{
+				{
+					v: NewVersion("1.0.0"),
+					f: &versionNotAllowedFailure{
+						goal:       mkAtom("b 1.0.0"),
+						failparent: []dependency{mkDep("root", "b >1.0.0", "b")},
+						c:          mkSVC(">1.0.0"),
+					},
+				},
+			},
+		},
 	},
 	// The latest versions of a and b disagree on c. An older version of either
 	// will resolve the problem. This test validates that b, which is farther
@@ -829,8 +986,19 @@ var basicFixtures = map[string]basicFixture{
 			mkDepspec("bar 3.0.0"),
 			mkDepspec("none 1.0.0"),
 		},
-		errp:        []string{"none", "foo"},
-		maxAttempts: 1,
+		fail: &noVersionError{
+			pn: mkPI("none"),
+			fails: []failedVersion{
+				{
+					v: NewVersion("1.0.0"),
+					f: &versionNotAllowedFailure{
+						goal:       mkAtom("none 1.0.0"),
+						failparent: []dependency{mkDep("foo 1.0.0", "none 2.0.0", "none")},
+						c:          mkSVC("2.0.0"),
+					},
+				},
+			},
+		},
 	},
 	// If there"s a disjoint constraint on a package, then selecting other
 	// versions of it is a waste of time: no possible versions can match. We

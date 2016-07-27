@@ -634,7 +634,7 @@ func (s *solver) createVersionQueue(bmi bimodalIdentifier) (*versionQueue, error
 			// Project exists only in vendor (and in some manifest somewhere)
 			// TODO(sdboyer) mark this for special handling, somehow?
 		} else {
-			return nil, newSolveError(fmt.Sprintf("Project '%s' could not be located.", id), cannotResolve)
+			return nil, fmt.Errorf("Project '%s' could not be located.", id)
 		}
 	}
 
