@@ -35,6 +35,10 @@ func (s *solver) check(a atomWithPackages, pkgonly bool) error {
 		return err
 	}
 
+	// TODO(sdboyer) this deps list contains only packages not already selected
+	// from the target atom (assuming one is selected at all). It's fine for
+	// now, but won't be good enough when we get around to doing static
+	// analysis.
 	for _, dep := range deps {
 		if err := s.checkIdentMatches(a, dep); err != nil {
 			s.traceInfo(err)
@@ -239,14 +243,15 @@ func (s *solver) checkPackageImportsFromDepExist(a atomWithPackages, cdep comple
 	for _, pkg := range cdep.pl {
 		perr, has := ptree.Packages[pkg]
 		if !has || perr.Err != nil {
-			e.pl = append(e.pl, pkg)
 			if has {
 				e.prob[pkg] = perr.Err
+			} else {
+				e.prob[pkg] = nil
 			}
 		}
 	}
 
-	if len(e.pl) > 0 {
+	if len(e.prob) > 0 {
 		return e
 	}
 	return nil

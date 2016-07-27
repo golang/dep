@@ -200,7 +200,7 @@ func (awp atomWithPackages) bmi() bimodalIdentifier {
 // are the same) name, a constraint, and the actual packages needed that are
 // under that root.
 type completeDep struct {
-	// The base ProjectDep
+	// The base ProjectConstraint
 	ProjectConstraint
 	// The specific packages required from the ProjectDep
 	pl []string

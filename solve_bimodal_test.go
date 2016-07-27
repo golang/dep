@@ -320,7 +320,25 @@ var bimodalFixtures = map[string]bimodalFixture{
 				pkg("a"),
 			),
 		},
-		errp: []string{"a", "root", "a"},
+		fail: &noVersionError{
+			pn: mkPI("a"),
+			fails: []failedVersion{
+				{
+					v: NewVersion("1.0.0"),
+					f: &checkeeHasProblemPackagesFailure{
+						goal: mkAtom("a 1.0.0"),
+						failpkg: map[string]errDeppers{
+							"a/foo": errDeppers{
+								err: nil, // nil indicates package is missing
+								deppers: []atom{
+									mkAtom("root"),
+								},
+							},
+						},
+					},
+				},
+			},
+		},
 	},
 	// Transitive deps from one project (a) get incrementally included as other
 	// deps incorporate its various packages, and fail with proper error when we
@@ -345,7 +363,21 @@ var bimodalFixtures = map[string]bimodalFixture{
 				pkg("d", "a/nonexistent"),
 			),
 		},
-		errp: []string{"d", "a", "d"},
+		fail: &noVersionError{
+			pn: mkPI("d"),
+			fails: []failedVersion{
+				{
+					v: NewVersion("1.0.0"),
+					f: &depHasProblemPackagesFailure{
+						goal: mkADep("d 1.0.0", "a", Any(), "a/nonexistent"),
+						v:    NewVersion("1.0.0"),
+						prob: map[string]error{
+							"a/nonexistent": nil,
+						},
+					},
+				},
+			},
+		},
 	},
 	// Check ignores on the root project
 	"ignore in double-subpkg": {
@@ -493,8 +525,8 @@ type bimodalFixture struct {
 	// map of locks for deps, if any. keys should be of the form:
 	// "<project> <version>"
 	lm map[string]fixLock
-	// projects expected to have errors, if any
-	errp []string
+	// solve failure expected, if any
+	fail error
 	// request up/downgrade to all projects
 	changeall bool
 	// pkgs to ignore
@@ -513,10 +545,6 @@ func (f bimodalFixture) maxTries() int {
 	return f.maxAttempts
 }
 
-func (f bimodalFixture) expectErrs() []string {
-	return f.errp
-}
-
 func (f bimodalFixture) solution() map[string]Version {
 	return f.r
 }
@@ -532,6 +560,10 @@ func (f bimodalFixture) rootmanifest() RootManifest {
 	}
 
 	return m
+}
+
+func (f bimodalFixture) failure() error {
+	return f.fail
 }
 
 // bmSourceManager is an SM specifically for the bimodal fixtures. It composes

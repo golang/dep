@@ -3,6 +3,7 @@ package gps
 import (
 	"bytes"
 	"fmt"
+	"sort"
 	"strings"
 )
 
@@ -27,19 +28,6 @@ func a2vs(a atom) string {
 
 type traceError interface {
 	traceString() string
-}
-
-type solveError struct {
-	lvl errorLevel
-	msg string
-}
-
-func newSolveError(msg string, lvl errorLevel) error {
-	return &solveError{msg: msg, lvl: lvl}
-}
-
-func (e *solveError) Error() string {
-	return e.msg
 }
 
 type noVersionError struct {
@@ -79,11 +67,25 @@ func (e *noVersionError) traceString() string {
 	return buf.String()
 }
 
+// disjointConstraintFailure occurs when attempting to introduce an atom that
+// itself has an acceptable version, but one of its dependency constraints is
+// disjoint with one or more dependency constraints already active for that
+// identifier.
 type disjointConstraintFailure struct {
-	goal      dependency
-	failsib   []dependency
+	// goal is the dependency with the problematic constraint, forcing us to
+	// reject the atom that introduces it.
+	goal dependency
+	// failsib is the list of active dependencies that are disjoint with the
+	// goal dependency. This will be at least one, but may not be all of the
+	// active dependencies.
+	failsib []dependency
+	// nofailsib is the list of active dependencies that are NOT disjoint with
+	// the goal dependency. The total of nofailsib and failsib will always be
+	// the total number of active dependencies on target identifier.
 	nofailsib []dependency
-	c         Constraint
+	// c is the current constraint on the target identifier. It is intersection
+	// of all the active dependencies' constraints.
+	c Constraint
 }
 
 func (e *disjointConstraintFailure) Error() string {
@@ -141,8 +143,12 @@ func (e *disjointConstraintFailure) traceString() string {
 // constraints does not admit the currently-selected version of the target
 // project.
 type constraintNotAllowedFailure struct {
+	// The dependency with the problematic constraint that could not be
+	// introduced.
 	goal dependency
-	v    Version
+	// The (currently selected) version of the target project that was not
+	// admissible by the goal dependency.
+	v Version
 }
 
 func (e *constraintNotAllowedFailure) Error() string {
@@ -165,10 +171,21 @@ func (e *constraintNotAllowedFailure) traceString() string {
 	)
 }
 
+// versionNotAllowedFailure describes a failure where an atom is rejected
+// because its version is not allowed by current constraints.
+//
+// (This is one of the more straightforward types of failures)
 type versionNotAllowedFailure struct {
-	goal       atom
+	// goal is the atom that was rejected by current constraints.
+	goal atom
+	// failparent is the list of active dependencies that caused the atom to be
+	// rejected. Note that this only includes dependencies that actually
+	// rejected the atom, which will be at least one, but may not be all the
+	// active dependencies on the atom's identifier.
 	failparent []dependency
-	c          Constraint
+	// c is the current constraint on the atom's identifier. This is the intersection
+	// of all active dependencies' constraints.
+	c Constraint
 }
 
 func (e *versionNotAllowedFailure) Error() string {
@@ -219,10 +236,18 @@ func (e badOptsFailure) Error() string {
 }
 
 type sourceMismatchFailure struct {
-	shared            ProjectRoot
-	sel               []dependency
-	current, mismatch string
-	prob              atom
+	// The ProjectRoot over which there is disagreement about where it should be
+	// sourced from
+	shared ProjectRoot
+	// The current value for the network source
+	current string
+	// The mismatched value for the network source
+	mismatch string
+	// The currently selected dependencies which have agreed upon/established
+	// the given network source
+	sel []dependency
+	// The atom with the constraint that has the new, incompatible network source
+	prob atom
 }
 
 func (e *sourceMismatchFailure) Error() string {
@@ -251,8 +276,21 @@ type errDeppers struct {
 	err     error
 	deppers []atom
 }
+
+// checkeeHasProblemPackagesFailure indicates that the goal atom was rejected
+// because one or more of the packages required by its deppers had errors.
+//
+// "errors" includes package nonexistence, which is indicated by a nil err in
+// the corresponding errDeppers failpkg map value.
+//
+// checkeeHasProblemPackagesFailure complements depHasProblemPackagesFailure;
+// one or the other could appear to describe the same fundamental issue,
+// depending on the order in which dependencies were visited.
 type checkeeHasProblemPackagesFailure struct {
-	goal    atom
+	// goal is the atom that was rejected due to problematic packages.
+	goal atom
+	// failpkg is a map of package names to the error describing the problem
+	// with them, plus a list of the selected atoms that require that package.
 	failpkg map[string]errDeppers
 }
 
@@ -327,32 +365,51 @@ func (e *checkeeHasProblemPackagesFailure) traceString() string {
 	return buf.String()
 }
 
+// depHasProblemPackagesFailure indicates that the goal dependency was rejected
+// because there were problems with one or more of the packages the dependency
+// requires in the atom currently selected for that dependency. (This failure
+// can only occur if the target dependency is already selected.)
+//
+// "errors" includes package nonexistence, which is indicated by a nil err as
+// the corresponding prob map value.
+//
+// depHasProblemPackagesFailure complements checkeeHasProblemPackagesFailure;
+// one or the other could appear to describe the same fundamental issue,
+// depending on the order in which dependencies were visited.
 type depHasProblemPackagesFailure struct {
+	// goal is the dependency that was rejected due to the atom currently
+	// selected for the dependency's target id having errors (including, and
+	// probably most commonly,
+	// nonexistence) in one or more packages named by the dependency.
 	goal dependency
-	v    Version
-	pl   []string
+	// v is the version of the currently selected atom targeted by the goal
+	// dependency.
+	v Version
+	// prob is a map of problem packages to their specific error. It does not
+	// include missing packages.
 	prob map[string]error
 }
 
 func (e *depHasProblemPackagesFailure) Error() string {
 	fcause := func(pkg string) string {
-		var cause string
-		if err, has := e.prob[pkg]; has {
-			cause = fmt.Sprintf("does not contain usable Go code (%T).", err)
-		} else {
-			cause = "is missing."
+		if err := e.prob[pkg]; err != nil {
+			return fmt.Sprintf("does not contain usable Go code (%T).", err)
 		}
-		return cause
+		return "is missing."
 	}
 
-	if len(e.pl) == 1 {
+	if len(e.prob) == 1 {
+		var pkg string
+		for pkg = range e.prob {
+		}
+
 		return fmt.Sprintf(
 			"Could not introduce %s, as it requires package %s from %s, but in version %s that package %s",
 			a2vs(e.goal.depender),
-			e.pl[0],
+			pkg,
 			e.goal.dep.Ident.errString(),
 			e.v,
-			fcause(e.pl[0]),
+			fcause(pkg),
 		)
 	}
 
@@ -364,7 +421,14 @@ func (e *depHasProblemPackagesFailure) Error() string {
 		e.v,
 	)
 
-	for _, pkg := range e.pl {
+	pkgs := make([]string, len(e.prob))
+	k := 0
+	for pkg := range e.prob {
+		pkgs[k] = pkg
+		k++
+	}
+	sort.Strings(pkgs)
+	for _, pkg := range pkgs {
 		fmt.Fprintf(&buf, "\t%s %s", pkg, fcause(pkg))
 	}
 
@@ -374,13 +438,10 @@ func (e *depHasProblemPackagesFailure) Error() string {
 func (e *depHasProblemPackagesFailure) traceString() string {
 	var buf bytes.Buffer
 	fcause := func(pkg string) string {
-		var cause string
-		if err, has := e.prob[pkg]; has {
-			cause = fmt.Sprintf("has parsing err (%T).", err)
-		} else {
-			cause = "is missing"
+		if err := e.prob[pkg]; err != nil {
+			return fmt.Sprintf("has parsing err (%T).", err)
 		}
-		return cause
+		return "is missing"
 	}
 
 	fmt.Fprintf(
@@ -390,7 +451,14 @@ func (e *depHasProblemPackagesFailure) traceString() string {
 		e.v,
 	)
 
-	for _, pkg := range e.pl {
+	pkgs := make([]string, len(e.prob))
+	k := 0
+	for pkg := range e.prob {
+		pkgs[k] = pkg
+		k++
+	}
+	sort.Strings(pkgs)
+	for _, pkg := range pkgs {
 		fmt.Fprintf(&buf, "\t%s %s", pkg, fcause(pkg))
 	}
 
