@@ -83,7 +83,8 @@ general library could know _a priori_.
 * Which of the other package managers to interoperate with
 * Which types of version constraints to allow the user to specify (e.g., allowing [semver ranges](https://docs.npmjs.com/misc/semver) or not)
 * Whether or not to strip nested `vendor` directories
-* Which packages in the import graph to [ignore](https://github.com/sdboyer/gps/wiki/gps-for-Implementors#ignoring-packages)
+* Which packages in the import graph to [ignore](https://github.com/sdboyer/gps/wiki/gps-for-Implementors#ignoring-packages) (if any)
+* What constraint [overrides](https://github.com/sdboyer/gps/wiki/gps-for-Implementors#overrides) to apply (if any)
 * What [informational output](https://github.com/sdboyer/gps/wiki/gps-for-Implementors#trace-and-tracelogger) to show the end user
 * What dependency version constraints are declared by the [root project](https://github.com/sdboyer/gps/wiki/gps-for-Implementors#manifest-data)
 * What dependency version constraints are declared by [all dependencies](https://github.com/sdboyer/gps/wiki/gps-for-Implementors#the-projectanalyzer)
