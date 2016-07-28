@@ -40,7 +40,7 @@ func newVersionQueue(id ProjectIdentifier, lockv, prefv Version, b sourceBridge)
 
 	if len(vq.pi) == 0 {
 		var err error
-		vq.pi, err = vq.b.listVersions(vq.id)
+		vq.pi, err = vq.b.ListVersions(vq.id)
 		if err != nil {
 			// TODO(sdboyer) pushing this error this early entails that we
 			// unconditionally deep scan (e.g. vendor), as well as hitting the
@@ -86,7 +86,7 @@ func (vq *versionQueue) advance(fail error) (err error) {
 		}
 
 		vq.allLoaded = true
-		vq.pi, err = vq.b.listVersions(vq.id)
+		vq.pi, err = vq.b.ListVersions(vq.id)
 		if err != nil {
 			return err
 		}

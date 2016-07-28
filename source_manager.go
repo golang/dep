@@ -21,6 +21,7 @@ import (
 type SourceManager interface {
 	// RepoExists checks if a repository exists, either upstream or in the
 	// SourceManager's central repository cache.
+	// TODO rename to SourceExists
 	RepoExists(ProjectIdentifier) (bool, error)
 
 	// ListVersions retrieves a list of the available versions for a given

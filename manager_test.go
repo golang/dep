@@ -134,7 +134,7 @@ func TestProjectManagerInit(t *testing.T) {
 		s:      &solver{},
 	}
 
-	v, err = smc.listVersions(ProjectIdentifier{ProjectRoot: pn})
+	v, err = smc.ListVersions(ProjectIdentifier{ProjectRoot: pn})
 	if err != nil {
 		t.Errorf("Unexpected error during initial project setup/fetching %s", err)
 	}

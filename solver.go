@@ -437,7 +437,7 @@ func (s *solver) selectRoot() error {
 		v: rootRev,
 	}
 
-	ptree, err := s.b.listPackages(pa.id, nil)
+	ptree, err := s.b.ListPackages(pa.id, nil)
 	if err != nil {
 		return err
 	}
@@ -493,12 +493,12 @@ func (s *solver) getImportsAndConstraintsOf(a atomWithPackages) ([]completeDep, 
 
 	// Work through the source manager to get project info and static analysis
 	// information.
-	m, _, err := s.b.getManifestAndLock(a.a)
+	m, _, err := s.b.GetManifestAndLock(a.a)
 	if err != nil {
 		return nil, err
 	}
 
-	ptree, err := s.b.listPackages(a.a.id, a.a.v)
+	ptree, err := s.b.ListPackages(a.a.id, a.a.v)
 	if err != nil {
 		return nil, err
 	}
@@ -639,7 +639,7 @@ func (s *solver) createVersionQueue(bmi bimodalIdentifier) (*versionQueue, error
 		return newVersionQueue(id, nil, nil, s.b)
 	}
 
-	exists, err := s.b.repoExists(id)
+	exists, err := s.b.RepoExists(id)
 	if err != nil {
 		return nil, err
 	}
@@ -679,7 +679,7 @@ func (s *solver) createVersionQueue(bmi bimodalIdentifier) (*versionQueue, error
 				continue
 			}
 
-			_, l, err := s.b.getManifestAndLock(dep.depender)
+			_, l, err := s.b.GetManifestAndLock(dep.depender)
 			if err != nil || l == nil {
 				// err being non-nil really shouldn't be possible, but the lock
 				// being nil is quite likely
@@ -816,7 +816,7 @@ func (s *solver) getLockVersionIfValid(id ProjectIdentifier) (Version, error) {
 		// to be found and attempted in the repository. If it's only in vendor,
 		// though, then we have to try to use what's in the lock, because that's
 		// the only version we'll be able to get.
-		if exist, _ := s.b.repoExists(id); exist {
+		if exist, _ := s.b.RepoExists(id); exist {
 			return nil, nil
 		}
 
@@ -1001,8 +1001,8 @@ func (s *solver) unselectedComparator(i, j int) bool {
 	// We can safely ignore an err from ListVersions here because, if there is
 	// an actual problem, it'll be noted and handled somewhere else saner in the
 	// solving algorithm.
-	ivl, _ := s.b.listVersions(iname)
-	jvl, _ := s.b.listVersions(jname)
+	ivl, _ := s.b.ListVersions(iname)
+	jvl, _ := s.b.ListVersions(jname)
 	iv, jv := len(ivl), len(jvl)
 
 	// Packages with fewer versions to pick from are less likely to benefit from
@@ -1060,7 +1060,7 @@ func (s *solver) selectAtom(a atomWithPackages, pkgonly bool) {
 
 	// If this atom has a lock, pull it out so that we can potentially inject
 	// preferred versions into any bmis we enqueue
-	_, l, _ := s.b.getManifestAndLock(a.a)
+	_, l, _ := s.b.GetManifestAndLock(a.a)
 	var lmap map[ProjectIdentifier]Version
 	if l != nil {
 		lmap = make(map[ProjectIdentifier]Version)

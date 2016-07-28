@@ -12,20 +12,15 @@ import (
 // sourceBridges provide an adapter to SourceManagers that tailor operations
 // for a single solve run.
 type sourceBridge interface {
-	getManifestAndLock(pa atom) (Manifest, Lock, error)
-	listVersions(id ProjectIdentifier) ([]Version, error)
-	listPackages(id ProjectIdentifier, v Version) (PackageTree, error)
+	SourceManager // composes SourceManager
+	verifyRootDir(path string) error
 	computeRootReach() ([]string, error)
-	revisionPresentIn(id ProjectIdentifier, r Revision) (bool, error)
 	pairRevision(id ProjectIdentifier, r Revision) []Version
 	pairVersion(id ProjectIdentifier, v UnpairedVersion) PairedVersion
-	repoExists(id ProjectIdentifier) (bool, error)
 	vendorCodeExists(id ProjectIdentifier) (bool, error)
 	matches(id ProjectIdentifier, c Constraint, v Version) bool
 	matchesAny(id ProjectIdentifier, c1, c2 Constraint) bool
 	intersect(id ProjectIdentifier, c1, c2 Constraint) Constraint
-	verifyRootDir(path string) error
-	analyzerInfo() (string, *semver.Version)
 	deduceRemoteRepo(path string) (*remoteRepo, error)
 }
 
@@ -76,14 +71,14 @@ var mkBridge func(*solver, SourceManager) sourceBridge = func(s *solver, sm Sour
 	}
 }
 
-func (b *bridge) getManifestAndLock(pa atom) (Manifest, Lock, error) {
+func (b *bridge) GetManifestAndLock(pa atom) (Manifest, Lock, error) {
 	if pa.id.ProjectRoot == b.s.params.ImportRoot {
 		return b.s.rm, b.s.rl, nil
 	}
 	return b.sm.GetManifestAndLock(ProjectRoot(pa.id.netName()), pa.v)
 }
 
-func (b *bridge) analyzerInfo() (string, *semver.Version) {
+func (b *bridge) AnalyzerInfo() (string, *semver.Version) {
 	return b.sm.AnalyzerInfo()
 }
 
@@ -96,7 +91,7 @@ func (b *bridge) key(id ProjectIdentifier) ProjectRoot {
 	return k
 }
 
-func (b *bridge) listVersions(id ProjectIdentifier) ([]Version, error) {
+func (b *bridge) ListVersions(id ProjectIdentifier) ([]Version, error) {
 	k := b.key(id)
 
 	if vl, exists := b.vlists[k]; exists {
@@ -119,12 +114,12 @@ func (b *bridge) listVersions(id ProjectIdentifier) ([]Version, error) {
 	return vl, nil
 }
 
-func (b *bridge) revisionPresentIn(id ProjectIdentifier, r Revision) (bool, error) {
+func (b *bridge) RevisionPresentIn(id ProjectIdentifier, r Revision) (bool, error) {
 	k := b.key(id)
 	return b.sm.RevisionPresentIn(k, r)
 }
 
-func (b *bridge) repoExists(id ProjectIdentifier) (bool, error) {
+func (b *bridge) RepoExists(id ProjectIdentifier) (bool, error) {
 	k := b.key(id)
 	return b.sm.RepoExists(k)
 }
@@ -141,7 +136,7 @@ func (b *bridge) vendorCodeExists(id ProjectIdentifier) (bool, error) {
 }
 
 func (b *bridge) pairVersion(id ProjectIdentifier, v UnpairedVersion) PairedVersion {
-	vl, err := b.listVersions(id)
+	vl, err := b.ListVersions(id)
 	if err != nil {
 		return nil
 	}
@@ -159,7 +154,7 @@ func (b *bridge) pairVersion(id ProjectIdentifier, v UnpairedVersion) PairedVers
 }
 
 func (b *bridge) pairRevision(id ProjectIdentifier, r Revision) []Version {
-	vl, err := b.listVersions(id)
+	vl, err := b.ListVersions(id)
 	if err != nil {
 		return nil
 	}
@@ -409,7 +404,7 @@ func (b *bridge) listRootPackages() (PackageTree, error) {
 //
 // The root project is handled separately, as the source manager isn't
 // responsible for that code.
-func (b *bridge) listPackages(id ProjectIdentifier, v Version) (PackageTree, error) {
+func (b *bridge) ListPackages(id ProjectIdentifier, v Version) (PackageTree, error) {
 	if id.ProjectRoot == b.s.params.ImportRoot {
 		return b.listRootPackages()
 	}

@@ -99,7 +99,7 @@ func (s *solver) checkAtomAllowable(pa atom) error {
 // checkRequiredPackagesExist ensures that all required packages enumerated by
 // existing dependencies on this atom are actually present in the atom.
 func (s *solver) checkRequiredPackagesExist(a atomWithPackages) error {
-	ptree, err := s.b.listPackages(a.a.id, a.a.v)
+	ptree, err := s.b.ListPackages(a.a.id, a.a.v)
 	if err != nil {
 		// TODO(sdboyer) handle this more gracefully
 		return err
@@ -225,7 +225,7 @@ func (s *solver) checkPackageImportsFromDepExist(a atomWithPackages, cdep comple
 		return nil
 	}
 
-	ptree, err := s.b.listPackages(sel.a.id, sel.a.v)
+	ptree, err := s.b.ListPackages(sel.a.id, sel.a.v)
 	if err != nil {
 		// TODO(sdboyer) handle this more gracefully
 		return err
@@ -266,7 +266,7 @@ func (s *solver) checkRevisionExists(a atomWithPackages, cdep completeDep) error
 		return nil
 	}
 
-	present, _ := s.b.revisionPresentIn(cdep.Ident, r)
+	present, _ := s.b.RevisionPresentIn(cdep.Ident, r)
 	if present {
 		return nil
 	}

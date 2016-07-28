@@ -1342,7 +1342,7 @@ func (b *depspecBridge) verifyRootDir(path string) error {
 	return nil
 }
 
-func (b *depspecBridge) listPackages(id ProjectIdentifier, v Version) (PackageTree, error) {
+func (b *depspecBridge) ListPackages(id ProjectIdentifier, v Version) (PackageTree, error) {
 	return b.sm.(fixSM).ListPackages(b.key(id), v)
 }
 
