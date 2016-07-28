@@ -649,7 +649,7 @@ func newbmSM(bmf bimodalFixture) *bmSourceManager {
 	return sm
 }
 
-func (sm *bmSourceManager) ListPackages(n ProjectRoot, v Version) (PackageTree, error) {
+func (sm *bmSourceManager) ListPackages(id ProjectIdentifier, v Version) (PackageTree, error) {
 	for k, ds := range sm.specs {
 		// Cheat for root, otherwise we blow up b/c version is empty
 		if n == ds.n && (k == 0 || ds.v.Matches(v)) {
@@ -674,7 +674,7 @@ func (sm *bmSourceManager) ListPackages(n ProjectRoot, v Version) (PackageTree, 
 	return PackageTree{}, fmt.Errorf("Project %s at version %s could not be found", n, v)
 }
 
-func (sm *bmSourceManager) GetManifestAndLock(n ProjectRoot, v Version) (Manifest, Lock, error) {
+func (sm *bmSourceManager) GetManifestAndLock(id ProjectIdentifier, v Version) (Manifest, Lock, error) {
 	for _, ds := range sm.specs {
 		if n == ds.n && v.Matches(ds.v) {
 			if l, exists := sm.lm[string(n)+" "+v.String()]; exists {

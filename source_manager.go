@@ -15,41 +15,41 @@ import (
 // source repositories. Its primary purpose is to serve the needs of a Solver,
 // but it is handy for other purposes, as well.
 //
-// gps's built-in SourceManager, accessible via NewSourceManager(), is
-// intended to be generic and sufficient for any purpose. It provides some
-// additional semantics around the methods defined here.
+// gps's built-in SourceManager, SourceMgr, is intended to be generic and
+// sufficient for any purpose. It provides some additional semantics around the
+// methods defined here.
 type SourceManager interface {
 	// RepoExists checks if a repository exists, either upstream or in the
 	// SourceManager's central repository cache.
-	RepoExists(ProjectRoot) (bool, error)
+	RepoExists(ProjectIdentifier) (bool, error)
 
 	// ListVersions retrieves a list of the available versions for a given
 	// repository name.
-	ListVersions(ProjectRoot) ([]Version, error)
+	ListVersions(ProjectIdentifier) ([]Version, error)
 
 	// RevisionPresentIn indicates whether the provided Version is present in
 	// the given repository.
-	RevisionPresentIn(ProjectRoot, Revision) (bool, error)
+	RevisionPresentIn(ProjectIdentifier, Revision) (bool, error)
 
-	// ListPackages retrieves a tree of the Go packages at or below the provided
-	// import path, at the provided version.
-	ListPackages(ProjectRoot, Version) (PackageTree, error)
+	// ListPackages parses the tree of the Go packages at or below root of the
+	// provided ProjectIdentifier, at the provided version.
+	ListPackages(ProjectIdentifier, Version) (PackageTree, error)
 
 	// GetManifestAndLock returns manifest and lock information for the provided
 	// root import path.
 	//
-	// gps currently requires that projects be rooted at their
-	// repository root, necessitating that this ProjectRoot must also be a
+	// gps currently requires that projects be rooted at their repository root,
+	// necessitating that the ProjectIdentifier's ProjectRoot must also be a
 	// repository root.
-	GetManifestAndLock(ProjectRoot, Version) (Manifest, Lock, error)
+	GetManifestAndLock(ProjectIdentifier, Version) (Manifest, Lock, error)
+
+	// ExportProject writes out the tree of the provided import path, at the
+	// provided version, to the provided directory.
+	ExportProject(ProjectIdentifier, Version, string) error
 
 	// AnalyzerInfo reports the name and version of the logic used to service
 	// GetManifestAndLock().
 	AnalyzerInfo() (name string, version *semver.Version)
-
-	// ExportProject writes out the tree of the provided import path, at the
-	// provided version, to the provided directory.
-	ExportProject(ProjectRoot, Version, string) error
 
 	// Release lets go of any locks held by the SourceManager.
 	Release()
@@ -72,10 +72,9 @@ type ProjectAnalyzer interface {
 // tools; control via dependency injection is intended to be sufficient.
 type SourceMgr struct {
 	cachedir string
-	pms      map[ProjectRoot]*pmState
+	pms      map[ProjectIdentifier]*pmState
 	an       ProjectAnalyzer
 	ctx      build.Context
-	//pme               map[ProjectRoot]error
 }
 
 var _ SourceManager = &SourceMgr{}
@@ -148,13 +147,14 @@ func (sm *SourceMgr) AnalyzerInfo() (name string, version *semver.Version) {
 	return sm.an.Info()
 }
 
-// GetManifestAndLock returns manifest and lock information for the provided import
-// path. gps currently requires that projects be rooted at their repository
-// root, which means that this ProjectRoot must also be a repository root.
+// GetManifestAndLock returns manifest and lock information for the provided
+// import path. gps currently requires that projects be rooted at their
+// repository root, necessitating that the ProjectIdentifier's ProjectRoot must
+// also be a repository root.
 //
 // The work of producing the manifest and lock is delegated to the injected
 // ProjectAnalyzer's DeriveManifestAndLock() method.
-func (sm *SourceMgr) GetManifestAndLock(n ProjectRoot, v Version) (Manifest, Lock, error) {
+func (sm *SourceMgr) GetManifestAndLock(id ProjectIdentifier, v Version) (Manifest, Lock, error) {
 	pmc, err := sm.getProjectManager(n)
 	if err != nil {
 		return nil, nil, err
@@ -163,9 +163,9 @@ func (sm *SourceMgr) GetManifestAndLock(n ProjectRoot, v Version) (Manifest, Loc
 	return pmc.pm.GetInfoAt(v)
 }
 
-// ListPackages retrieves a tree of the Go packages at or below the provided
-// import path, at the provided version.
-func (sm *SourceMgr) ListPackages(n ProjectRoot, v Version) (PackageTree, error) {
+// ListPackages parses the tree of the Go packages at and below the ProjectRoot
+// of the given ProjectIdentifier, at the given version.
+func (sm *SourceMgr) ListPackages(id ProjectIdentifier, v Version) (PackageTree, error) {
 	pmc, err := sm.getProjectManager(n)
 	if err != nil {
 		return PackageTree{}, err
@@ -182,10 +182,11 @@ func (sm *SourceMgr) ListPackages(n ProjectRoot, v Version) (PackageTree, error)
 // expected that the caller either not care about order, or sort the result
 // themselves.
 //
-// This list is always retrieved from upstream; if upstream is not accessible
-// (network outage, access issues, or the resource actually went away), an error
-// will be returned.
-func (sm *SourceMgr) ListVersions(n ProjectRoot) ([]Version, error) {
+// This list is always retrieved from upstream on the first call. Subsequent
+// calls will return a cached version of the first call's results. if upstream
+// is not accessible (network outage, access issues, or the resource actually
+// went away), an error will be returned.
+func (sm *SourceMgr) ListVersions(id ProjectIdentifier) ([]Version, error) {
 	pmc, err := sm.getProjectManager(n)
 	if err != nil {
 		// TODO(sdboyer) More-er proper-er errors
@@ -197,7 +198,7 @@ func (sm *SourceMgr) ListVersions(n ProjectRoot) ([]Version, error) {
 
 // RevisionPresentIn indicates whether the provided Revision is present in the given
 // repository.
-func (sm *SourceMgr) RevisionPresentIn(n ProjectRoot, r Revision) (bool, error) {
+func (sm *SourceMgr) RevisionPresentIn(id ProjectIdentifier, r Revision) (bool, error) {
 	pmc, err := sm.getProjectManager(n)
 	if err != nil {
 		// TODO(sdboyer) More-er proper-er errors
@@ -208,8 +209,8 @@ func (sm *SourceMgr) RevisionPresentIn(n ProjectRoot, r Revision) (bool, error) 
 }
 
 // RepoExists checks if a repository exists, either upstream or in the cache,
-// for the provided ProjectRoot.
-func (sm *SourceMgr) RepoExists(n ProjectRoot) (bool, error) {
+// for the provided ProjectIdentifier.
+func (sm *SourceMgr) RepoExists(id ProjectIdentifier) (bool, error) {
 	pms, err := sm.getProjectManager(n)
 	if err != nil {
 		return false, err
@@ -218,9 +219,9 @@ func (sm *SourceMgr) RepoExists(n ProjectRoot) (bool, error) {
 	return pms.pm.CheckExistence(existsInCache) || pms.pm.CheckExistence(existsUpstream), nil
 }
 
-// ExportProject writes out the tree of the provided import path, at the
-// provided version, to the provided directory.
-func (sm *SourceMgr) ExportProject(n ProjectRoot, v Version, to string) error {
+// ExportProject writes out the tree of the provided ProjectIdentifier's
+// ProjectRoot, at the provided version, to the provided directory.
+func (sm *SourceMgr) ExportProject(id ProjectIdentifier, v Version, to string) error {
 	pms, err := sm.getProjectManager(n)
 	if err != nil {
 		return err
@@ -229,10 +230,10 @@ func (sm *SourceMgr) ExportProject(n ProjectRoot, v Version, to string) error {
 	return pms.pm.ExportVersionTo(v, to)
 }
 
-// getProjectManager gets the project manager for the given ProjectRoot.
+// getProjectManager gets the project manager for the given ProjectIdentifier.
 //
 // If no such manager yet exists, it attempts to create one.
-func (sm *SourceMgr) getProjectManager(n ProjectRoot) (*pmState, error) {
+func (sm *SourceMgr) getProjectManager(id ProjectIdentifier) (*pmState, error) {
 	// Check pm cache and errcache first
 	if pm, exists := sm.pms[n]; exists {
 		return pm, nil

@@ -1202,7 +1202,7 @@ func newdepspecSM(ds []depspec, ignore []string) *depspecSourceManager {
 	}
 }
 
-func (sm *depspecSourceManager) GetManifestAndLock(n ProjectRoot, v Version) (Manifest, Lock, error) {
+func (sm *depspecSourceManager) GetManifestAndLock(id ProjectIdentifier, v Version) (Manifest, Lock, error) {
 	for _, ds := range sm.specs {
 		if n == ds.n && v.Matches(ds.v) {
 			return ds, dummyLock{}, nil
@@ -1217,7 +1217,7 @@ func (sm *depspecSourceManager) AnalyzerInfo() (string, *semver.Version) {
 	return "depspec-sm-builtin", sv("v1.0.0")
 }
 
-func (sm *depspecSourceManager) ExternalReach(n ProjectRoot, v Version) (map[string][]string, error) {
+func (sm *depspecSourceManager) ExternalReach(id ProjectIdentifier, v Version) (map[string][]string, error) {
 	id := pident{n: n, v: v}
 	if m, exists := sm.rm[id]; exists {
 		return m, nil
@@ -1225,7 +1225,7 @@ func (sm *depspecSourceManager) ExternalReach(n ProjectRoot, v Version) (map[str
 	return nil, fmt.Errorf("No reach data for %s at version %s", n, v)
 }
 
-func (sm *depspecSourceManager) ListExternal(n ProjectRoot, v Version) ([]string, error) {
+func (sm *depspecSourceManager) ListExternal(id ProjectIdentifier, v Version) ([]string, error) {
 	// This should only be called for the root
 	id := pident{n: n, v: v}
 	if r, exists := sm.rm[id]; exists {
@@ -1234,7 +1234,7 @@ func (sm *depspecSourceManager) ListExternal(n ProjectRoot, v Version) ([]string
 	return nil, fmt.Errorf("No reach data for %s at version %s", n, v)
 }
 
-func (sm *depspecSourceManager) ListPackages(n ProjectRoot, v Version) (PackageTree, error) {
+func (sm *depspecSourceManager) ListPackages(id ProjectIdentifier, v Version) (PackageTree, error) {
 	id := pident{n: n, v: v}
 	if r, exists := sm.rm[id]; exists {
 		ptree := PackageTree{
@@ -1297,7 +1297,7 @@ func (sm *depspecSourceManager) VendorCodeExists(name ProjectRoot) (bool, error)
 
 func (sm *depspecSourceManager) Release() {}
 
-func (sm *depspecSourceManager) ExportProject(n ProjectRoot, v Version, to string) error {
+func (sm *depspecSourceManager) ExportProject(id ProjectIdentifier, v Version, to string) error {
 	return fmt.Errorf("dummy sm doesn't support exporting")
 }
 
