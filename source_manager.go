@@ -6,10 +6,17 @@ import (
 	"go/build"
 	"os"
 	"path"
+	"path/filepath"
+	"strings"
 
 	"github.com/Masterminds/semver"
 	"github.com/Masterminds/vcs"
 )
+
+// Used to compute a friendly filepath from a URL-shaped input
+//
+// TODO(sdboyer) this is awful. Right?
+var sanitizer = strings.NewReplacer(":", "-", "/", "-", "+", "-")
 
 // A SourceManager is responsible for retrieving, managing, and interrogating
 // source repositories. Its primary purpose is to serve the needs of a Solver,
@@ -107,7 +114,7 @@ func NewSourceManager(an ProjectAnalyzer, cachedir string, force bool) (*SourceM
 		return nil, fmt.Errorf("a ProjectAnalyzer must be provided to the SourceManager")
 	}
 
-	err := os.MkdirAll(cachedir, 0777)
+	err := os.MkdirAll(filepath.Join(cachedir, "sources"), 0777)
 	if err != nil {
 		return nil, err
 	}
@@ -232,30 +239,96 @@ func (sm *SourceMgr) ExportProject(id ProjectIdentifier, v Version, to string) e
 //
 // If no such manager yet exists, it attempts to create one.
 func (sm *SourceMgr) getProjectManager(id ProjectIdentifier) (*pmState, error) {
-	// Check pm cache and errcache first
+	// TODO(sdboyer) finish this, it's not sufficient (?)
+	n := id.netName()
+	var sn string
+
+	// Early check to see if we already have a pm in the cache for this net name
 	if pm, exists := sm.pms[n]; exists {
 		return pm, nil
-		//} else if pme, errexists := sm.pme[name]; errexists {
-		//return nil, pme
 	}
 
-	repodir := filepath.Join(sm.cachedir, "src")
-	// TODO(sdboyer) be more robust about this
-	r, err := vcs.NewRepo("https://"+string(n), repodir)
+	// Figure out the remote repo path
+	rr, err := deduceRemoteRepo(n)
 	if err != nil {
-		// TODO(sdboyer) be better
+		// Not a valid import path, must reject
+		// TODO(sdboyer) wrap error
 		return nil, err
 	}
-	if !r.CheckLocal() {
-		// TODO(sdboyer) cloning the repo here puts it on a blocking, and possibly
-		// unnecessary path. defer it
-		err = r.Get()
-		if err != nil {
-			// TODO(sdboyer) be better
-			return nil, err
+
+	// Check the cache again, see if exact resulting clone url is in there
+	if pm, exists := sm.pms[rr.CloneURL.String()]; exists {
+		// Found it - re-register this PM at the original netname so that it
+		// doesn't need to deduce next time
+		// TODO(sdboyer) is this OK to do? are there consistency side effects?
+		sm.pms[n] = pm
+		return pm, nil
+	}
+
+	// No luck again. Now, walk through the scheme options the deducer returned,
+	// checking if each is in the cache
+	for _, scheme := range rr.Schemes {
+		rr.CloneURL.Scheme = scheme
+		// See if THIS scheme has a match, now
+		if pm, exists := sm.pms[rr.CloneURL.String()]; exists {
+			// Yep - again, re-register this PM at the original netname so that it
+			// doesn't need to deduce next time
+			// TODO(sdboyer) is this OK to do? are there consistency side effects?
+			sm.pms[n] = pm
+			return pm, nil
 		}
 	}
 
+	// Definitively no match for anything in the cache, so we know we have to
+	// create the entry. Next question is whether there's already a repo on disk
+	// for any of the schemes, or if we need to create that, too.
+
+	// TODO(sdboyer) this strategy kinda locks in the scheme to use over
+	// multiple invocations in a way that maybe isn't the best.
+	var r vcs.Repo
+	for _, scheme := range rr.Schemes {
+		rr.CloneURL.Scheme = scheme
+		url := rr.CloneURL.String()
+		sn := sanitizer.Replace(url)
+		path := filepath.Join(sm.cachedir, "sources", sn)
+
+		if fi, err := os.Stat(path); err == nil && fi.IsDir() {
+			// This one exists, so set up here
+			r, err = vcs.NewRepo(url, path)
+			if err != nil {
+				return nil, err
+			}
+			goto decided
+		}
+	}
+
+	// Nothing on disk, either. Iterate through the schemes, trying each and
+	// failing out only if none resulted in successfully setting up the local.
+	for _, scheme := range rr.Schemes {
+		rr.CloneURL.Scheme = scheme
+		url := rr.CloneURL.String()
+		sn := sanitizer.Replace(url)
+		path := filepath.Join(sm.cachedir, "sources", sn)
+
+		r, err := vcs.NewRepo(url, path)
+		if err != nil {
+			continue
+		}
+
+		// FIXME(sdboyer) cloning the repo here puts it on a blocking path. that
+		// aspect of state management needs to be deferred into the
+		// projectManager
+		err = r.Get()
+		if err != nil {
+			continue
+		}
+		goto decided
+	}
+
+	// If we've gotten this far, we got some brokeass input.
+	return nil, fmt.Errorf("Could not reach source repository for %s", n)
+
+decided:
 	// Ensure cache dir exists
 	metadir := path.Join(sm.cachedir, "metadata", string(n))
 	err = os.MkdirAll(metadir, 0777)
@@ -297,12 +370,10 @@ func (sm *SourceMgr) getProjectManager(id ProjectIdentifier) (*pmState, error) {
 	}
 
 	pm := &projectManager{
-		n:   id.ProjectRoot,
-		ctx: sm.ctx,
-		an:  sm.an,
-		dc:  dc,
+		an: sm.an,
+		dc: dc,
 		crepo: &repo{
-			rpath: repodir,
+			rpath: sn,
 			r:     r,
 		},
 	}
