@@ -470,8 +470,6 @@ func compareVersionType(l, r Version) int {
 			return 0
 		case branchVersion, plainVersion, semVersion:
 			return 1
-		default:
-			panic("unknown version type")
 		}
 	case branchVersion:
 		switch r.(type) {
@@ -481,8 +479,6 @@ func compareVersionType(l, r Version) int {
 			return 0
 		case plainVersion, semVersion:
 			return 1
-		default:
-			panic("unknown version type")
 		}
 
 	case plainVersion:
@@ -493,8 +489,6 @@ func compareVersionType(l, r Version) int {
 			return 0
 		case semVersion:
 			return 1
-		default:
-			panic("unknown version type")
 		}
 
 	case semVersion:
@@ -503,10 +497,7 @@ func compareVersionType(l, r Version) int {
 			return -1
 		case semVersion:
 			return 0
-		default:
-			panic("unknown version type")
 		}
-	default:
-		panic("unknown version type")
 	}
+	panic("unknown version type")
 }
