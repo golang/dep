@@ -1,21 +1,25 @@
 machine:
-    environment:
-        GO15VENDOREXPERIMENT: 1
-        IMPORT_PATH: "github.com/$CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME"
+  environment:
+    GO15VENDOREXPERIMENT: 1
+    IMPORT_PATH: "github.com/$CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME"
 dependencies:
-    pre:
-        - wget https://github.com/Masterminds/glide/releases/download/0.10.1/glide-0.10.1-linux-amd64.tar.gz
-        - tar -vxz -C $HOME/bin --strip=1 -f glide-0.10.1-linux-amd64.tar.gz
-    override:
-        - mkdir -p "$GOPATH/src/$IMPORT_PATH"
-        - rsync -azC --delete ./ "$GOPATH/src/$IMPORT_PATH/"
-        - glide --home $HOME/.glide -y glide.yaml install --cache
-    cache_directories:
-        - "~/.glide"
+  pre:
+    - wget https://github.com/Masterminds/glide/releases/download/0.10.1/glide-0.10.1-linux-amd64.tar.gz
+    - tar -vxz -C $HOME/bin --strip=1 -f glide-0.10.1-linux-amd64.tar.gz
+  override:
+    - mkdir -p "$GOPATH/src/$IMPORT_PATH"
+    - rsync -azC --delete ./ "$GOPATH/src/$IMPORT_PATH/"
+    - glide --home $HOME/.glide -y glide.yaml install --cache:
+      pwd: "$GOPATH/src/$IMPORT_PATH"
+  cache_directories:
+    - "~/.glide"
 test:
-    pre:
-        - go vet
-    override:
-        - go test -v -coverprofile=coverage.txt -covermode=atomic
-        - go build example.go
-        - bash <(curl -s https://codecov.io/bash)
+  pre:
+    - go vet
+  override:
+    - go test -v -coverprofile=coverage.txt -covermode=atomic:
+      pwd: "$GOPATH/src/$IMPORT_PATH"
+    - go build example.go:
+      pwd: "$GOPATH/src/$IMPORT_PATH"
+    - bash <(curl -s https://codecov.io/bash):
+      pwd: "$GOPATH/src/$IMPORT_PATH"
