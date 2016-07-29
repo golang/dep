@@ -1,0 +1,5 @@
+coverage:
+  ignore:
+  - remove_16.go
+  - remove_17.go
+  - errors.go
