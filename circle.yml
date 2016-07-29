@@ -2,21 +2,22 @@ machine:
   environment:
     GO15VENDOREXPERIMENT: 1
     PROJECT_ROOT: "github.com/$CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME"
+    RD: "$HOME/.go_workspace/src/$PROJECT_ROOT"
 dependencies:
   pre:
     - wget https://github.com/Masterminds/glide/releases/download/0.10.1/glide-0.10.1-linux-amd64.tar.gz
     - tar -vxz -C $HOME/bin --strip=1 -f glide-0.10.1-linux-amd64.tar.gz
   override:
     - glide --home $HOME/.glide -y glide.yaml install --cache
-    #- mkdir -p "$HOME/.go_workspace/src/$PROJECT_ROOT"
-    #- rsync -azC --delete ./ "$HOME/.go_workspace/src/$PROJECT_ROOT/"
-    - ln -Tsf "$HOME/$CIRCLE_PROJECT_REPONAME" "$HOME/.go_workspace/src/$PROJECT_ROOT"
+    - mkdir -p $RD
+    - rsync -azC --delete ./ $RD
+    #- ln -Tsf "$HOME/$CIRCLE_PROJECT_REPONAME" "$HOME/.go_workspace/src/$PROJECT_ROOT"
   cache_directories:
     - "~/.glide"
 test:
   pre:
     - go vet
   override:
-    - go test -v -coverprofile=coverage.txt -covermode=atomic
-    - go build example.go
-    - bash <(curl -s https://codecov.io/bash)
+    - cd $RD && go test -v -coverprofile=coverage.txt -covermode=atomic
+    - cd $RD && go build example.go
+    - cd $RD && bash <(curl -s https://codecov.io/bash)
