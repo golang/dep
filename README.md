@@ -1,8 +1,16 @@
-# gps
-![map-marker-icon copy](https://cloud.githubusercontent.com/assets/21599/16779217/4f5cdc6c-483f-11e6-9de3-661f13d9b215.png)
---
+<p align="center">
+<img 
+    src="header.png"
+    width="800" height="255" border="0" alt="gps">
+<br>
+<a href="https://circleci.com/gh/sdboyer/gps"><img src="https://circleci.com/gh/sdboyer/gps.svg?style=svg" alt="Build Status"></a>
+<a href="https://ci.appveyor.com/project/sdboyer/gps"><img src="https://ci.appveyor.com/api/projects/status/github/sdboyer/gps?svg=true&passingText=Windows%20-%20OK&failingText=Windows%20-%20failed&pendingText=Windows%20-%20pending" alt="Windows Build Status"></a>
+<a href="https://goreportcard.com/report/github.com/sdboyer/gps"><img src="https://goreportcard.com/badge/github.com/sdboyer/gps" alt="Build Status"></a>
+<a href="https://codecov.io/gh/sdboyer/gps"><img src="https://codecov.io/gh/sdboyer/gps/branch/master/graph/badge.svg" alt="Codecov" /></a>
+<a href="https://godoc.org/github.com/sdboyer/gps"><img src="https://godoc.org/github.com/sdboyer/gps?status.svg" alt="GoDoc"></a>
+</p>
 
-[![CircleCI](https://circleci.com/gh/sdboyer/gps.svg?style=svg)](https://circleci.com/gh/sdboyer/gps) [![Go Report Card](https://goreportcard.com/badge/github.com/sdboyer/gps)](https://goreportcard.com/report/github.com/sdboyer/gps) [![GoDoc](https://godoc.org/github.com/sdboyer/gps?status.svg)](https://godoc.org/github.com/sdboyer/gps)
+--
 
 `gps` is the Go Packaging Solver. It is an engine for tackling dependency
 management problems in Go. It is trivial - [about 35 lines of
