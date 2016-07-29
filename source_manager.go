@@ -21,7 +21,7 @@ import (
 type SourceManager interface {
 	// RepoExists checks if a repository exists, either upstream or in the
 	// SourceManager's central repository cache.
-	// TODO rename to SourceExists
+	// TODO(sdboyer) rename to SourceExists
 	RepoExists(ProjectIdentifier) (bool, error)
 
 	// ListVersions retrieves a list of the available versions for a given
@@ -51,9 +51,6 @@ type SourceManager interface {
 	// AnalyzerInfo reports the name and version of the logic used to service
 	// GetManifestAndLock().
 	AnalyzerInfo() (name string, version *semver.Version)
-
-	// Release lets go of any locks held by the SourceManager.
-	Release()
 }
 
 // A ProjectAnalyzer is responsible for analyzing a given path for Manifest and
@@ -73,7 +70,7 @@ type ProjectAnalyzer interface {
 // tools; control via dependency injection is intended to be sufficient.
 type SourceMgr struct {
 	cachedir string
-	pms      map[ProjectIdentifier]*pmState
+	pms      map[string]*pmState
 	an       ProjectAnalyzer
 	ctx      build.Context
 }
@@ -132,7 +129,7 @@ func NewSourceManager(an ProjectAnalyzer, cachedir string, force bool) (*SourceM
 
 	return &SourceMgr{
 		cachedir: cachedir,
-		pms:      make(map[ProjectRoot]*pmState),
+		pms:      make(map[string]*pmState),
 		ctx:      ctx,
 		an:       an,
 	}, nil
@@ -156,7 +153,7 @@ func (sm *SourceMgr) AnalyzerInfo() (name string, version *semver.Version) {
 // The work of producing the manifest and lock is delegated to the injected
 // ProjectAnalyzer's DeriveManifestAndLock() method.
 func (sm *SourceMgr) GetManifestAndLock(id ProjectIdentifier, v Version) (Manifest, Lock, error) {
-	pmc, err := sm.getProjectManager(n)
+	pmc, err := sm.getProjectManager(id)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -167,7 +164,7 @@ func (sm *SourceMgr) GetManifestAndLock(id ProjectIdentifier, v Version) (Manife
 // ListPackages parses the tree of the Go packages at and below the ProjectRoot
 // of the given ProjectIdentifier, at the given version.
 func (sm *SourceMgr) ListPackages(id ProjectIdentifier, v Version) (PackageTree, error) {
-	pmc, err := sm.getProjectManager(n)
+	pmc, err := sm.getProjectManager(id)
 	if err != nil {
 		return PackageTree{}, err
 	}
@@ -188,7 +185,7 @@ func (sm *SourceMgr) ListPackages(id ProjectIdentifier, v Version) (PackageTree,
 // is not accessible (network outage, access issues, or the resource actually
 // went away), an error will be returned.
 func (sm *SourceMgr) ListVersions(id ProjectIdentifier) ([]Version, error) {
-	pmc, err := sm.getProjectManager(n)
+	pmc, err := sm.getProjectManager(id)
 	if err != nil {
 		// TODO(sdboyer) More-er proper-er errors
 		return nil, err
@@ -200,7 +197,7 @@ func (sm *SourceMgr) ListVersions(id ProjectIdentifier) ([]Version, error) {
 // RevisionPresentIn indicates whether the provided Revision is present in the given
 // repository.
 func (sm *SourceMgr) RevisionPresentIn(id ProjectIdentifier, r Revision) (bool, error) {
-	pmc, err := sm.getProjectManager(n)
+	pmc, err := sm.getProjectManager(id)
 	if err != nil {
 		// TODO(sdboyer) More-er proper-er errors
 		return false, err
@@ -212,7 +209,7 @@ func (sm *SourceMgr) RevisionPresentIn(id ProjectIdentifier, r Revision) (bool, 
 // RepoExists checks if a repository exists, either upstream or in the cache,
 // for the provided ProjectIdentifier.
 func (sm *SourceMgr) RepoExists(id ProjectIdentifier) (bool, error) {
-	pms, err := sm.getProjectManager(n)
+	pms, err := sm.getProjectManager(id)
 	if err != nil {
 		return false, err
 	}
@@ -223,7 +220,7 @@ func (sm *SourceMgr) RepoExists(id ProjectIdentifier) (bool, error) {
 // ExportProject writes out the tree of the provided ProjectIdentifier's
 // ProjectRoot, at the provided version, to the provided directory.
 func (sm *SourceMgr) ExportProject(id ProjectIdentifier, v Version, to string) error {
-	pms, err := sm.getProjectManager(n)
+	pms, err := sm.getProjectManager(id)
 	if err != nil {
 		return err
 	}
@@ -242,7 +239,7 @@ func (sm *SourceMgr) getProjectManager(id ProjectIdentifier) (*pmState, error) {
 		//return nil, pme
 	}
 
-	repodir := path.Join(sm.cachedir, "src", string(n))
+	repodir := filepath.Join(sm.cachedir, "src")
 	// TODO(sdboyer) be more robust about this
 	r, err := vcs.NewRepo("https://"+string(n), repodir)
 	if err != nil {
@@ -300,7 +297,7 @@ func (sm *SourceMgr) getProjectManager(id ProjectIdentifier) (*pmState, error) {
 	}
 
 	pm := &projectManager{
-		n:   n,
+		n:   id.ProjectRoot,
 		ctx: sm.ctx,
 		an:  sm.an,
 		dc:  dc,

@@ -58,7 +58,7 @@ type bridge struct {
 	// layered on top of the proper SourceManager's cache; the only difference
 	// is that this keeps the versions sorted in the direction required by the
 	// current solve run
-	vlists map[ProjectRoot][]Version
+	vlists map[ProjectIdentifier][]Version
 }
 
 // Global factory func to create a bridge. This exists solely to allow tests to
@@ -67,38 +67,27 @@ var mkBridge func(*solver, SourceManager) sourceBridge = func(s *solver, sm Sour
 	return &bridge{
 		sm:     sm,
 		s:      s,
-		vlists: make(map[ProjectRoot][]Version),
+		vlists: make(map[ProjectIdentifier][]Version),
 	}
 }
 
-func (b *bridge) GetManifestAndLock(pa atom) (Manifest, Lock, error) {
-	if pa.id.ProjectRoot == b.s.params.ImportRoot {
+func (b *bridge) GetManifestAndLock(id ProjectIdentifier, v Version) (Manifest, Lock, error) {
+	if id.ProjectRoot == b.s.params.ImportRoot {
 		return b.s.rm, b.s.rl, nil
 	}
-	return b.sm.GetManifestAndLock(ProjectRoot(pa.id.netName()), pa.v)
+	return b.sm.GetManifestAndLock(id, v)
 }
 
 func (b *bridge) AnalyzerInfo() (string, *semver.Version) {
 	return b.sm.AnalyzerInfo()
 }
 
-func (b *bridge) key(id ProjectIdentifier) ProjectRoot {
-	k := ProjectRoot(id.NetworkName)
-	if k == "" {
-		k = id.ProjectRoot
-	}
-
-	return k
-}
-
 func (b *bridge) ListVersions(id ProjectIdentifier) ([]Version, error) {
-	k := b.key(id)
-
-	if vl, exists := b.vlists[k]; exists {
+	if vl, exists := b.vlists[id]; exists {
 		return vl, nil
 	}
 
-	vl, err := b.sm.ListVersions(k)
+	vl, err := b.sm.ListVersions(id)
 	// TODO(sdboyer) cache errors, too?
 	if err != nil {
 		return nil, err
@@ -110,18 +99,16 @@ func (b *bridge) ListVersions(id ProjectIdentifier) ([]Version, error) {
 		sort.Sort(upgradeVersionSorter(vl))
 	}
 
-	b.vlists[k] = vl
+	b.vlists[id] = vl
 	return vl, nil
 }
 
 func (b *bridge) RevisionPresentIn(id ProjectIdentifier, r Revision) (bool, error) {
-	k := b.key(id)
-	return b.sm.RevisionPresentIn(k, r)
+	return b.sm.RevisionPresentIn(id, r)
 }
 
 func (b *bridge) RepoExists(id ProjectIdentifier) (bool, error) {
-	k := b.key(id)
-	return b.sm.RepoExists(k)
+	return b.sm.RepoExists(id)
 }
 
 func (b *bridge) vendorCodeExists(id ProjectIdentifier) (bool, error) {
@@ -409,9 +396,12 @@ func (b *bridge) ListPackages(id ProjectIdentifier, v Version) (PackageTree, err
 		return b.listRootPackages()
 	}
 
-	// FIXME if we're aliasing here, the returned PackageTree will have
-	// unaliased import paths, which is super not correct
-	return b.sm.ListPackages(b.key(id), v)
+	return b.sm.ListPackages(id, v)
+}
+
+func (b *bridge) ExportProject(id ProjectIdentifier, v Version, path string) error {
+	//return b.sm.ExportProject(id, v, path)
+	panic("bridge should never be used to ExportProject")
 }
 
 // verifyRoot ensures that the provided path to the project root is in good

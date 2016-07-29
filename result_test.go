@@ -77,7 +77,7 @@ func BenchmarkCreateVendorTree(b *testing.B) {
 
 	// Prefetch the projects before timer starts
 	for _, lp := range r.p {
-		_, _, err := sm.GetManifestAndLock(lp.Ident().ProjectRoot, lp.Version())
+		_, _, err := sm.GetManifestAndLock(lp.Ident(), lp.Version())
 		if err != nil {
 			b.Errorf("failed getting project info during prefetch: %s", err)
 			clean = false

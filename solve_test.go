@@ -30,7 +30,7 @@ func overrideMkBridge() {
 			&bridge{
 				sm:     sm,
 				s:      s,
-				vlists: make(map[ProjectRoot][]Version),
+				vlists: make(map[ProjectIdentifier][]Version),
 			},
 		}
 	}
@@ -322,7 +322,7 @@ func TestBadSolveOpts(t *testing.T) {
 		return &bridge{
 			sm:     sm,
 			s:      s,
-			vlists: make(map[ProjectRoot][]Version),
+			vlists: make(map[ProjectIdentifier][]Version),
 		}
 	}
 

@@ -98,8 +98,8 @@ func TestProjectManagerInit(t *testing.T) {
 	}()
 	defer sm.Release()
 
-	pn := ProjectRoot("github.com/Masterminds/VCSTestRepo")
-	v, err := sm.ListVersions(pn)
+	id := mkPI("github.com/Masterminds/VCSTestRepo")
+	v, err := sm.ListVersions(id)
 	if err != nil {
 		t.Errorf("Unexpected error during initial project setup/fetching %s", err)
 	}
@@ -130,11 +130,11 @@ func TestProjectManagerInit(t *testing.T) {
 	// ensure its sorting works, as well.
 	smc := &bridge{
 		sm:     sm,
-		vlists: make(map[ProjectRoot][]Version),
+		vlists: make(map[ProjectIdentifier][]Version),
 		s:      &solver{},
 	}
 
-	v, err = smc.ListVersions(ProjectIdentifier{ProjectRoot: pn})
+	v, err = smc.ListVersions(id)
 	if err != nil {
 		t.Errorf("Unexpected error during initial project setup/fetching %s", err)
 	}
@@ -170,7 +170,7 @@ func TestProjectManagerInit(t *testing.T) {
 
 	// Ensure project existence values are what we expect
 	var exists bool
-	exists, err = sm.RepoExists(pn)
+	exists, err = sm.RepoExists(id)
 	if err != nil {
 		t.Errorf("Error on checking RepoExists: %s", err)
 	}
@@ -179,7 +179,7 @@ func TestProjectManagerInit(t *testing.T) {
 	}
 
 	// Now reach inside the black box
-	pms, err := sm.getProjectManager(pn)
+	pms, err := sm.getProjectManager(id)
 	if err != nil {
 		t.Errorf("Error on grabbing project manager obj: %s", err)
 	}
@@ -207,10 +207,10 @@ func TestRepoVersionFetching(t *testing.T) {
 		t.FailNow()
 	}
 
-	upstreams := []ProjectRoot{
-		"github.com/Masterminds/VCSTestRepo",
-		"bitbucket.org/mattfarina/testhgrepo",
-		"launchpad.net/govcstestbzrrepo",
+	upstreams := []ProjectIdentifier{
+		mkPI("github.com/Masterminds/VCSTestRepo"),
+		mkPI("bitbucket.org/mattfarina/testhgrepo"),
+		mkPI("launchpad.net/govcstestbzrrepo"),
 	}
 
 	pms := make([]*projectManager, len(upstreams))
@@ -328,14 +328,14 @@ func TestGetInfoListVersionsOrdering(t *testing.T) {
 
 	// setup done, now do the test
 
-	pn := ProjectRoot("github.com/Masterminds/VCSTestRepo")
+	id := mkPI("github.com/Masterminds/VCSTestRepo")
 
-	_, _, err = sm.GetManifestAndLock(pn, NewVersion("1.0.0"))
+	_, _, err = sm.GetManifestAndLock(id, NewVersion("1.0.0"))
 	if err != nil {
 		t.Errorf("Unexpected error from GetInfoAt %s", err)
 	}
 
-	v, err := sm.ListVersions(pn)
+	v, err := sm.ListVersions(id)
 	if err != nil {
 		t.Errorf("Unexpected error from ListVersions %s", err)
 	}
