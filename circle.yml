@@ -7,9 +7,9 @@ dependencies:
     override:
         - mkdir -pv $HOME/.go_workspace/src/github.com/$CIRCLE_PROJECT_USERNAME
         - ln -Tsf $HOME/$CIRCLE_PROJECT_REPONAME $HOME/.go_workspace/src/github.com/$CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME
-        # Glide 0.11.1
-        - wget https://github.com/Masterminds/glide/releases/download/v0.11.1/glide-v0.11.1-linux-amd64.tar.gz
-        - tar -vxz -C $HOME/bin --strip=1 -f glide-v0.11.1-linux-amd64.tar.gz
+        # Glide 0.10.1
+        - wget https://github.com/Masterminds/glide/releases/download/0.10.1/glide-0.10.1-linux-amd64.tar.gz
+        - tar -vxz -C $HOME/bin --strip=1 -f glide-0.10.1-linux-amd64.tar.gz
         # Fetch deps with glide
         - glide --home $HOME/.glide -y glide.yaml install --cache
     cache_directories:
