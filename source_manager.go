@@ -165,7 +165,7 @@ func (sm *SourceMgr) GetManifestAndLock(id ProjectIdentifier, v Version) (Manife
 		return nil, nil, err
 	}
 
-	return pmc.pm.GetInfoAt(v)
+	return pmc.pm.GetManifestAndLock(id.ProjectRoot, v)
 }
 
 // ListPackages parses the tree of the Go packages at and below the ProjectRoot
@@ -176,7 +176,7 @@ func (sm *SourceMgr) ListPackages(id ProjectIdentifier, v Version) (PackageTree,
 		return PackageTree{}, err
 	}
 
-	return pmc.pm.ListPackages(v)
+	return pmc.pm.ListPackages(id.ProjectRoot, v)
 }
 
 // ListVersions retrieves a list of the available versions for a given
@@ -210,7 +210,7 @@ func (sm *SourceMgr) RevisionPresentIn(id ProjectIdentifier, r Revision) (bool, 
 		return false, err
 	}
 
-	return pmc.pm.RevisionPresentIn(r)
+	return pmc.pm.RevisionPresentIn(id.ProjectRoot, r)
 }
 
 // RepoExists checks if a repository exists, either upstream or in the cache,
@@ -370,6 +370,7 @@ decided:
 	}
 
 	pm := &projectManager{
+		n:  n,
 		an: sm.an,
 		dc: dc,
 		crepo: &repo{

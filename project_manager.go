@@ -7,7 +7,6 @@ import (
 	"os"
 	"os/exec"
 	"path"
-	"path/filepath"
 	"strings"
 	"sync"
 
@@ -16,9 +15,8 @@ import (
 )
 
 type projectManager struct {
-	// The identifier of the project. At this level, corresponds to the
-	// '$GOPATH/src'-relative path, *and* the network name.
-	n ProjectRoot
+	// The upstream URL from which the project is sourced.
+	n string
 
 	// build.Context to use in any analysis, and to pass to the analyzer
 	ctx build.Context
@@ -80,7 +78,7 @@ type repo struct {
 	synced bool
 }
 
-func (pm *projectManager) GetInfoAt(v Version) (Manifest, Lock, error) {
+func (pm *projectManager) GetManifestAndLock(r ProjectRoot, v Version) (Manifest, Lock, error) {
 	if err := pm.ensureCacheExistence(); err != nil {
 		return nil, nil, err
 	}
@@ -114,7 +112,7 @@ func (pm *projectManager) GetInfoAt(v Version) (Manifest, Lock, error) {
 	}
 
 	pm.crepo.mut.RLock()
-	m, l, err := pm.an.DeriveManifestAndLock(filepath.Join(pm.ctx.GOPATH, "src", string(pm.n)), pm.n)
+	m, l, err := pm.an.DeriveManifestAndLock(pm.crepo.rpath, r)
 	// TODO(sdboyer) cache results
 	pm.crepo.mut.RUnlock()
 
@@ -141,7 +139,7 @@ func (pm *projectManager) GetInfoAt(v Version) (Manifest, Lock, error) {
 	return nil, nil, err
 }
 
-func (pm *projectManager) ListPackages(v Version) (ptree PackageTree, err error) {
+func (pm *projectManager) ListPackages(pr ProjectRoot, v Version) (ptree PackageTree, err error) {
 	if err = pm.ensureCacheExistence(); err != nil {
 		return
 	}
@@ -188,7 +186,7 @@ func (pm *projectManager) ListPackages(v Version) (ptree PackageTree, err error)
 		err = pm.crepo.r.UpdateVersion(v.String())
 	}
 
-	ptree, err = listPackages(filepath.Join(pm.ctx.GOPATH, "src", string(pm.n)), string(pm.n))
+	ptree, err = listPackages(pm.crepo.rpath, string(pr))
 	pm.crepo.mut.Unlock()
 
 	// TODO(sdboyer) cache errs?
@@ -266,7 +264,7 @@ func (pm *projectManager) ListVersions() (vlist []Version, err error) {
 	return
 }
 
-func (pm *projectManager) RevisionPresentIn(r Revision) (bool, error) {
+func (pm *projectManager) RevisionPresentIn(pr ProjectRoot, r Revision) (bool, error) {
 	// First and fastest path is to check the data cache to see if the rev is
 	// present. This could give us false positives, but the cases where that can
 	// occur would require a type of cache staleness that seems *exceedingly*
@@ -279,7 +277,7 @@ func (pm *projectManager) RevisionPresentIn(r Revision) (bool, error) {
 
 	// For now at least, just run GetInfoAt(); it basically accomplishes the
 	// same thing.
-	if _, _, err := pm.GetInfoAt(r); err != nil {
+	if _, _, err := pm.GetManifestAndLock(pr, r); err != nil {
 		return false, err
 	}
 	return true, nil
