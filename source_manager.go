@@ -310,7 +310,7 @@ func (sm *SourceMgr) getProjectManager(id ProjectIdentifier) (*pmState, error) {
 		sn := sanitizer.Replace(url)
 		path := filepath.Join(sm.cachedir, "sources", sn)
 
-		r, err := vcs.NewRepo(url, path)
+		r, err = vcs.NewRepo(url, path)
 		if err != nil {
 			continue
 		}
