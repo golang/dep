@@ -22,6 +22,13 @@ type remoteRepo struct {
 	VCS      []string
 }
 
+var (
+	gitSchemes = []string{"https", "ssh", "git", "http"}
+	bzrSchemes = []string{"https", "bzr+ssh", "bzr", "http"}
+	hgSchemes  = []string{"https", "ssh", "http"}
+	svnSchemes = []string{"https", "http", "svn", "svn+ssh"}
+)
+
 //type remoteResult struct {
 //r   remoteRepo
 //err error
@@ -105,6 +112,10 @@ func deduceRemoteRepo(path string) (rr *remoteRepo, err error) {
 		rr.Base = v[1]
 		rr.RelPkg = strings.TrimPrefix(v[3], "/")
 		rr.VCS = []string{"git"}
+		// If no scheme was already recorded, then add the possible schemes for github
+		if rr.Schemes == nil {
+			rr.Schemes = gitSchemes
+		}
 
 		return
 
@@ -129,6 +140,10 @@ func deduceRemoteRepo(path string) (rr *remoteRepo, err error) {
 		rr.Base = v[1]
 		rr.RelPkg = strings.TrimPrefix(v[6], "/")
 		rr.VCS = []string{"git"}
+		// If no scheme was already recorded, then add the possible schemes for github
+		if rr.Schemes == nil {
+			rr.Schemes = gitSchemes
+		}
 
 		return
 	//case gpinOldRegex.MatchString(path):
@@ -141,6 +156,12 @@ func deduceRemoteRepo(path string) (rr *remoteRepo, err error) {
 		rr.Base = v[1]
 		rr.RelPkg = strings.TrimPrefix(v[3], "/")
 		rr.VCS = []string{"git", "hg"}
+		// FIXME(sdboyer) this ambiguity of vcs kills us on schemes, as schemes
+		// are inherently vcs-specific. Fixing this requires a wider refactor.
+		// For now, we only allow the intersection, which is just the hg schemes
+		if rr.Schemes == nil {
+			rr.Schemes = hgSchemes
+		}
 
 		return
 
@@ -165,6 +186,9 @@ func deduceRemoteRepo(path string) (rr *remoteRepo, err error) {
 		rr.Base = v[1]
 		rr.RelPkg = strings.TrimPrefix(v[3], "/")
 		rr.VCS = []string{"bzr"}
+		if rr.Schemes == nil {
+			rr.Schemes = bzrSchemes
+		}
 
 		return
 
@@ -177,6 +201,9 @@ func deduceRemoteRepo(path string) (rr *remoteRepo, err error) {
 		rr.Base = v[1]
 		rr.RelPkg = strings.TrimPrefix(v[3], "/")
 		rr.VCS = []string{"git"}
+		if rr.Schemes == nil {
+			rr.Schemes = gitSchemes
+		}
 
 		return
 
@@ -188,6 +215,9 @@ func deduceRemoteRepo(path string) (rr *remoteRepo, err error) {
 		rr.Base = v[1]
 		rr.RelPkg = strings.TrimPrefix(v[3], "/")
 		rr.VCS = []string{"git"}
+		if rr.Schemes == nil {
+			rr.Schemes = gitSchemes
+		}
 
 		return
 
@@ -199,6 +229,9 @@ func deduceRemoteRepo(path string) (rr *remoteRepo, err error) {
 		rr.Base = v[1]
 		rr.RelPkg = strings.TrimPrefix(v[3], "/")
 		rr.VCS = []string{"git"}
+		if rr.Schemes == nil {
+			rr.Schemes = gitSchemes
+		}
 
 		return
 
@@ -214,6 +247,17 @@ func deduceRemoteRepo(path string) (rr *remoteRepo, err error) {
 			rr.VCS = []string{v[5]}
 			rr.Base = v[1]
 			rr.RelPkg = strings.TrimPrefix(v[6], "/")
+
+			if rr.Schemes == nil {
+				if v[5] == "git" {
+					rr.Schemes = gitSchemes
+				} else if v[5] == "bzr" {
+					rr.Schemes = bzrSchemes
+				} else if v[5] == "hg" {
+					rr.Schemes = hgSchemes
+				}
+			}
+
 			return
 		default:
 			return nil, fmt.Errorf("unknown repository type: %q", v[5])
