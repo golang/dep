@@ -240,7 +240,7 @@ func (sm *SourceMgr) ExportProject(id ProjectIdentifier, v Version, to string) e
 func (sm *SourceMgr) getProjectManager(id ProjectIdentifier) (*pmState, error) {
 	// TODO(sdboyer) finish this, it's not sufficient (?)
 	n := id.netName()
-	var sn string
+	var rpath string
 
 	// Early check to see if we already have a pm in the cache for this net name
 	if pm, exists := sm.pms[n]; exists {
@@ -289,11 +289,11 @@ func (sm *SourceMgr) getProjectManager(id ProjectIdentifier) (*pmState, error) {
 		rr.CloneURL.Scheme = scheme
 		url := rr.CloneURL.String()
 		sn := sanitizer.Replace(url)
-		path := filepath.Join(sm.cachedir, "sources", sn)
+		rpath = filepath.Join(sm.cachedir, "sources", sn)
 
-		if fi, err := os.Stat(path); err == nil && fi.IsDir() {
+		if fi, err := os.Stat(rpath); err == nil && fi.IsDir() {
 			// This one exists, so set up here
-			r, err = vcs.NewRepo(url, path)
+			r, err = vcs.NewRepo(url, rpath)
 			if err != nil {
 				return nil, err
 			}
@@ -307,9 +307,9 @@ func (sm *SourceMgr) getProjectManager(id ProjectIdentifier) (*pmState, error) {
 		rr.CloneURL.Scheme = scheme
 		url := rr.CloneURL.String()
 		sn := sanitizer.Replace(url)
-		path := filepath.Join(sm.cachedir, "sources", sn)
+		rpath = filepath.Join(sm.cachedir, "sources", sn)
 
-		r, err = vcs.NewRepo(url, path)
+		r, err = vcs.NewRepo(url, rpath)
 		if err != nil {
 			continue
 		}
@@ -373,7 +373,7 @@ decided:
 		an: sm.an,
 		dc: dc,
 		crepo: &repo{
-			rpath: sn,
+			rpath: rpath,
 			r:     r,
 		},
 	}
