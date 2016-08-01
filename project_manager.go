@@ -6,7 +6,7 @@ import (
 	"go/build"
 	"os"
 	"os/exec"
-	"path"
+	"path/filepath"
 	"strings"
 	"sync"
 
@@ -496,7 +496,7 @@ func (r *repo) exportVersionTo(v Version, to string) error {
 	switch r.r.(type) {
 	case *vcs.GitRepo:
 		// Back up original index
-		idx, bak := path.Join(r.rpath, ".git", "index"), path.Join(r.rpath, ".git", "origindex")
+		idx, bak := filepath.Join(r.rpath, ".git", "index"), filepath.Join(r.rpath, ".git", "origindex")
 		err := os.Rename(idx, bak)
 		if err != nil {
 			return err

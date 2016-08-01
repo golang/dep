@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"go/build"
 	"os"
-	"path"
 	"path/filepath"
 	"strings"
 
@@ -119,7 +118,7 @@ func NewSourceManager(an ProjectAnalyzer, cachedir string, force bool) (*SourceM
 		return nil, err
 	}
 
-	glpath := path.Join(cachedir, "sm.lock")
+	glpath := filepath.Join(cachedir, "sm.lock")
 	_, err = os.Stat(glpath)
 	if err == nil && !force {
 		return nil, fmt.Errorf("cache lock file %s exists - another process crashed or is still running?", glpath)
@@ -144,7 +143,7 @@ func NewSourceManager(an ProjectAnalyzer, cachedir string, force bool) (*SourceM
 
 // Release lets go of any locks held by the SourceManager.
 func (sm *SourceMgr) Release() {
-	os.Remove(path.Join(sm.cachedir, "sm.lock"))
+	os.Remove(filepath.Join(sm.cachedir, "sm.lock"))
 }
 
 // AnalyzerInfo reports the name and version of the injected ProjectAnalyzer.
@@ -330,7 +329,7 @@ func (sm *SourceMgr) getProjectManager(id ProjectIdentifier) (*pmState, error) {
 
 decided:
 	// Ensure cache dir exists
-	metadir := path.Join(sm.cachedir, "metadata", string(n))
+	metadir := filepath.Join(sm.cachedir, "metadata", string(n))
 	err = os.MkdirAll(metadir, 0777)
 	if err != nil {
 		// TODO(sdboyer) be better
@@ -338,7 +337,7 @@ decided:
 	}
 
 	pms := &pmState{}
-	cpath := path.Join(metadir, "cache.json")
+	cpath := filepath.Join(metadir, "cache.json")
 	fi, err := os.Stat(cpath)
 	var dc *projectDataCache
 	if fi != nil {
