@@ -157,14 +157,14 @@ func TestProjectManagerInit(t *testing.T) {
 	}
 
 	// Ensure that the appropriate cache dirs and files exist
-	_, err = os.Stat(path.Join(cpath, "src", "github.com", "Masterminds", "VCSTestRepo", ".git"))
+	_, err = os.Stat(path.Join(cpath, "sources", "https---github.com-Masterminds-VCSTestRepo", ".git"))
 	if err != nil {
 		t.Error("Cache repo does not exist in expected location")
 	}
 
 	_, err = os.Stat(path.Join(cpath, "metadata", "github.com", "Masterminds", "VCSTestRepo", "cache.json"))
 	if err != nil {
-		// TODO(sdboyer) temporarily disabled until we turn caching back on
+		// TODO(sdboyer) disabled until we get caching working
 		//t.Error("Metadata cache json file does not exist in expected location")
 	}
 
