@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/Masterminds/semver"
 	"github.com/Masterminds/vcs"
@@ -77,8 +78,14 @@ type ProjectAnalyzer interface {
 type SourceMgr struct {
 	cachedir string
 	pms      map[string]*pmState
-	an       ProjectAnalyzer
-	ctx      build.Context
+	pmut     sync.RWMutex
+	rr       map[string]struct {
+		rr  *remoteRepo
+		err error
+	}
+	rmut sync.RWMutex
+	an   ProjectAnalyzer
+	ctx  build.Context
 }
 
 var _ SourceManager = &SourceMgr{}
@@ -136,8 +143,12 @@ func NewSourceManager(an ProjectAnalyzer, cachedir string, force bool) (*SourceM
 	return &SourceMgr{
 		cachedir: cachedir,
 		pms:      make(map[string]*pmState),
-		ctx:      ctx,
-		an:       an,
+		rr: make(map[string]struct {
+			rr  *remoteRepo
+			err error
+		}),
+		ctx: ctx,
+		an:  an,
 	}, nil
 }
 
@@ -381,4 +392,30 @@ decided:
 	pms.pm = pm
 	sm.pms[n] = pms
 	return pms, nil
+}
+
+func (sm *SourceMgr) whatsInAName(nn string) (*remoteRepo, error) {
+	sm.rmut.RLock()
+	tuple, exists := sm.rr[nn]
+	sm.rmut.RUnlock()
+	if exists {
+		return tuple.rr, tuple.err
+	}
+
+	// Don't lock around the deduceRemoteRepo call, because that itself can be
+	// slow. The tradeoff is that it's possible we might duplicate work if two
+	// calls for the same id were to made simultaneously, but as those results
+	// would be the same, clobbering is OK, and better than the alternative of
+	// serializing all calls.
+	rr, err := deduceRemoteRepo(nn)
+	sm.rmut.Lock()
+	sm.rr[nn] = struct {
+		rr  *remoteRepo
+		err error
+	}{
+		rr:  rr,
+		err: err,
+	}
+	sm.rmut.Unlock()
+	return rr, err
 }

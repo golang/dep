@@ -29,14 +29,6 @@ var (
 	svnSchemes = []string{"https", "http", "svn", "svn+ssh"}
 )
 
-//type remoteResult struct {
-//r   remoteRepo
-//err error
-//}
-
-// TODO(sdboyer) sync access to this map
-//var remoteCache = make(map[string]remoteResult)
-
 // Regexes for the different known import path flavors
 var (
 	// This regex allowed some usernames that github currently disallows. They
