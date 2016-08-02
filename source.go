@@ -1,9 +1,11 @@
 package gps
 
 import (
+	"bytes"
 	"fmt"
 	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -58,7 +60,7 @@ type gitSource struct {
 
 func (m maybeGitSource) try(cachedir string, an ProjectAnalyzer) (source, error) {
 	path := filepath.Join(cachedir, "sources", sanitizer.Replace(m.url.String()))
-	r, err := vcs.NewGitRepo(path, m.url.String())
+	r, err := vcs.NewGitRepo(m.url.String(), path)
 	if err != nil {
 		return nil, err
 	}
@@ -357,4 +359,108 @@ func (s *gitSource) exportVersionTo(v Version, to string) error {
 	// controls, as well as restore the original index and HEAD.
 	_, err = r.RunFromDir("git", "checkout-index", "-a", "--prefix="+to)
 	return err
+}
+
+func (s *gitSource) listVersions() (vlist []Version, err error) {
+	if s.cvsync {
+		vlist = make([]Version, len(s.dc.VMap))
+		k := 0
+		// TODO(sdboyer) key type of VMap should be string; recombine here
+		//for v, r := range s.dc.VMap {
+		for v := range s.dc.VMap {
+			vlist[k] = v
+			k++
+		}
+
+		return
+	}
+
+	r := s.crepo.r
+	var out []byte
+	c := exec.Command("git", "ls-remote", r.Remote())
+	// Ensure no terminal prompting for PWs
+	c.Env = mergeEnvLists([]string{"GIT_TERMINAL_PROMPT=0"}, os.Environ())
+	out, err = c.CombinedOutput()
+
+	all := bytes.Split(bytes.TrimSpace(out), []byte("\n"))
+	if err != nil || len(all) == 0 {
+		// TODO(sdboyer) remove this path? it really just complicates things, for
+		// probably not much benefit
+
+		// ls-remote failed, probably due to bad communication or a faulty
+		// upstream implementation. So fetch updates, then build the list
+		// locally
+		s.crepo.mut.Lock()
+		err = r.Update()
+		s.crepo.mut.Unlock()
+		if err != nil {
+			// Definitely have a problem, now - bail out
+			return
+		}
+
+		// Upstream and cache must exist for this to have worked, so add that to
+		// searched and found
+		s.ex.s |= existsUpstream | existsInCache
+		s.ex.f |= existsUpstream | existsInCache
+		// Also, local is definitely now synced
+		s.crepo.synced = true
+
+		out, err = r.RunFromDir("git", "show-ref", "--dereference")
+		if err != nil {
+			// TODO(sdboyer) More-er proper-er error
+			return
+		}
+
+		all = bytes.Split(bytes.TrimSpace(out), []byte("\n"))
+	}
+
+	// Local cache may not actually exist here, but upstream definitely does
+	s.ex.s |= existsUpstream
+	s.ex.f |= existsUpstream
+
+	tmap := make(map[string]PairedVersion)
+	for _, pair := range all {
+		var v PairedVersion
+		if string(pair[46:51]) == "heads" {
+			bname := string(pair[52:])
+			v = NewBranch(bname).Is(Revision(pair[:40])).(PairedVersion)
+			tmap["heads"+bname] = v
+		} else if string(pair[46:50]) == "tags" {
+			vstr := string(pair[51:])
+			if strings.HasSuffix(vstr, "^{}") {
+				// If the suffix is there, then we *know* this is the rev of
+				// the underlying commit object that we actually want
+				vstr = strings.TrimSuffix(vstr, "^{}")
+			} else if _, exists := tmap[vstr]; exists {
+				// Already saw the deref'd version of this tag, if one
+				// exists, so skip this.
+				continue
+				// Can only hit this branch if we somehow got the deref'd
+				// version first. Which should be impossible, but this
+				// covers us in case of weirdness, anyway.
+			}
+			v = NewVersion(vstr).Is(Revision(pair[:40])).(PairedVersion)
+			tmap["tags"+vstr] = v
+		}
+	}
+
+	// Process the version data into the cache
+	//
+	// reset the rmap and vmap, as they'll be fully repopulated by this
+	// TODO(sdboyer) detect out-of-sync pairings as we do this?
+	s.dc.VMap = make(map[Version]Revision)
+	s.dc.RMap = make(map[Revision][]Version)
+
+	vlist = make([]Version, len(tmap))
+	k := 0
+	for _, v := range tmap {
+		s.dc.VMap[v] = v.Underlying()
+		s.dc.RMap[v.Underlying()] = append(s.dc.RMap[v.Underlying()], v)
+		vlist[k] = v
+		k++
+	}
+	// Mark the cache as being in sync with upstream's version list
+	s.cvsync = true
+
+	return
 }

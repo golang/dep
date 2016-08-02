@@ -69,21 +69,21 @@ func TestGitVersionFetching(t *testing.T) {
 	}
 
 	if len(vlist) != 3 {
-		t.Errorf("git test repo should've produced three versions, got %v", len(vlist))
+		t.Errorf("git test repo should've produced three versions, got %v: %s", len(vlist), vlist)
 	} else {
 		v := NewBranch("master").Is(Revision("30605f6ac35fcb075ad0bfa9296f90a7d891523e"))
 		if vlist[0] != v {
-			t.Errorf("git pair fetch reported incorrect first version, got %s", vlist[0])
+			t.Errorf("gitSource.listVersions() reported incorrect first version, got %s", vlist[0])
 		}
 
 		v = NewBranch("test").Is(Revision("30605f6ac35fcb075ad0bfa9296f90a7d891523e"))
 		if vlist[1] != v {
-			t.Errorf("git pair fetch reported incorrect second version, got %s", vlist[1])
+			t.Errorf("gitSource.listVersions() reported incorrect second version, got %s", vlist[1])
 		}
 
 		v = NewVersion("1.0.0").Is(Revision("30605f6ac35fcb075ad0bfa9296f90a7d891523e"))
 		if vlist[2] != v {
-			t.Errorf("git pair fetch reported incorrect third version, got %s", vlist[2])
+			t.Errorf("gitSource.listVersions() reported incorrect third version, got %s", vlist[2])
 		}
 	}
 }
