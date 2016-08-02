@@ -3,7 +3,9 @@ package gps
 import (
 	"fmt"
 	"net/url"
+	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/Masterminds/vcs"
 )
@@ -50,20 +52,29 @@ type maybeGitSource struct {
 	url *url.URL
 }
 
-func (s maybeGitSource) try(cachedir string, an ProjectAnalyzer) (source, error) {
-	path := filepath.Join(cachedir, "sources", sanitizer.Replace(s.url.String()))
+type gitSource struct {
+	baseSource
+}
+
+func (m maybeGitSource) try(cachedir string, an ProjectAnalyzer) (source, error) {
+	path := filepath.Join(cachedir, "sources", sanitizer.Replace(m.url.String()))
+	r, err := vcs.NewGitRepo(path, m.url.String())
+	if err != nil {
+		return nil, err
+	}
+
 	pm := &gitSource{
 		baseSource: baseSource{
 			an: an,
 			dc: newDataCache(),
 			crepo: &repo{
-				r:     vcs.NewGitRepo(path, s.url.String()),
+				r:     r,
 				rpath: path,
 			},
 		},
 	}
 
-	_, err := pm.ListVersions()
+	_, err = pm.listVersions()
 	if err != nil {
 		return nil, err
 		//} else if pm.ex.f&existsUpstream == existsUpstream {
@@ -73,7 +84,7 @@ func (s maybeGitSource) try(cachedir string, an ProjectAnalyzer) (source, error)
 	return pm, nil
 }
 
-type baseSource struct {
+type baseSource struct { // TODO(sdboyer) rename to baseVCSSource
 	// Object for the cache repository
 	crepo *repo
 
@@ -123,11 +134,11 @@ func (bs *baseSource) getManifestAndLock(r ProjectRoot, v Version) (Manifest, Lo
 	bs.crepo.mut.Unlock()
 	if err != nil {
 		// TODO(sdboyer) More-er proper-er error
-		panic(fmt.Sprintf("canary - why is checkout/whatever failing: %s %s %s", bs.n, v.String(), err))
+		panic(fmt.Sprintf("canary - why is checkout/whatever failing: %s %s %s", bs.crepo.r.LocalPath(), v.String(), err))
 	}
 
 	bs.crepo.mut.RLock()
-	m, l, err := bs.an.DeriveManifestAndLock(bs.crepo.rpath, r)
+	m, l, err := bs.an.DeriveManifestAndLock(bs.crepo.r.LocalPath(), r)
 	// TODO(sdboyer) cache results
 	bs.crepo.mut.RUnlock()
 
@@ -138,7 +149,7 @@ func (bs *baseSource) getManifestAndLock(r ProjectRoot, v Version) (Manifest, Lo
 
 		// If m is nil, prebsanifest will provide an empty one.
 		pi := projectInfo{
-			Manifest: prebsanifest(m),
+			Manifest: prepManifest(m),
 			Lock:     l,
 		}
 
@@ -154,6 +165,196 @@ func (bs *baseSource) getManifestAndLock(r ProjectRoot, v Version) (Manifest, Lo
 	return nil, nil, err
 }
 
-type gitSource struct {
-	bs baseSource
+func (bs *baseSource) listVersions() (vlist []Version, err error) {
+	if !bs.cvsync {
+		// This check only guarantees that the upstream exists, not the cache
+		bs.ex.s |= existsUpstream
+		vpairs, exbits, err := bs.crepo.getCurrentVersionPairs()
+		// But it *may* also check the local existence
+		bs.ex.s |= exbits
+		bs.ex.f |= exbits
+
+		if err != nil {
+			// TODO(sdboyer) More-er proper-er error
+			return nil, err
+		}
+
+		vlist = make([]Version, len(vpairs))
+		// mark our cache as synced if we got ExistsUpstream back
+		if exbits&existsUpstream == existsUpstream {
+			bs.cvsync = true
+		}
+
+		// Process the version data into the cache
+		// TODO(sdboyer) detect out-of-sync data as we do this?
+		for k, v := range vpairs {
+			bs.dc.VMap[v] = v.Underlying()
+			bs.dc.RMap[v.Underlying()] = append(bs.dc.RMap[v.Underlying()], v)
+			vlist[k] = v
+		}
+	} else {
+		vlist = make([]Version, len(bs.dc.VMap))
+		k := 0
+		// TODO(sdboyer) key type of VMap should be string; recombine here
+		//for v, r := range bs.dc.VMap {
+		for v := range bs.dc.VMap {
+			vlist[k] = v
+			k++
+		}
+	}
+
+	return
+}
+
+func (bs *baseSource) ensureCacheExistence() error {
+	// Technically, methods could could attempt to return straight from the
+	// metadata cache even if the repo cache doesn't exist on disk. But that
+	// would allow weird state inconsistencies (cache exists, but no repo...how
+	// does that even happen?) that it'd be better to just not allow so that we
+	// don't have to think about it elsewhere
+	if !bs.checkExistence(existsInCache) {
+		if bs.checkExistence(existsUpstream) {
+			bs.crepo.mut.Lock()
+			err := bs.crepo.r.Get()
+			bs.crepo.mut.Unlock()
+
+			if err != nil {
+				return fmt.Errorf("failed to create repository cache for %s", bs.crepo.r.Remote())
+			}
+			bs.ex.s |= existsInCache
+			bs.ex.f |= existsInCache
+		} else {
+			return fmt.Errorf("project %s does not exist upstream", bs.crepo.r.Remote())
+		}
+	}
+
+	return nil
+}
+
+// checkExistence provides a direct method for querying existence levels of the
+// source. It will only perform actual searching (local fs or over the network)
+// if no previous attempt at that search has been made.
+//
+// Note that this may perform read-ish operations on the cache repo, and it
+// takes a lock accordingly. This makes it unsafe to call from a segment where
+// the cache repo mutex is already write-locked, as deadlock will occur.
+func (bs *baseSource) checkExistence(ex projectExistence) bool {
+	if bs.ex.s&ex != ex {
+		if ex&existsInVendorRoot != 0 && bs.ex.s&existsInVendorRoot == 0 {
+			panic("should now be implemented in bridge")
+		}
+		if ex&existsInCache != 0 && bs.ex.s&existsInCache == 0 {
+			bs.crepo.mut.RLock()
+			bs.ex.s |= existsInCache
+			if bs.crepo.r.CheckLocal() {
+				bs.ex.f |= existsInCache
+			}
+			bs.crepo.mut.RUnlock()
+		}
+		if ex&existsUpstream != 0 && bs.ex.s&existsUpstream == 0 {
+			bs.crepo.mut.RLock()
+			bs.ex.s |= existsUpstream
+			if bs.crepo.r.Ping() {
+				bs.ex.f |= existsUpstream
+			}
+			bs.crepo.mut.RUnlock()
+		}
+	}
+
+	return ex&bs.ex.f == ex
+}
+
+func (bs *baseSource) listPackages(pr ProjectRoot, v Version) (ptree PackageTree, err error) {
+	if err = bs.ensureCacheExistence(); err != nil {
+		return
+	}
+
+	// See if we can find it in the cache
+	var r Revision
+	switch v.(type) {
+	case Revision, PairedVersion:
+		var ok bool
+		if r, ok = v.(Revision); !ok {
+			r = v.(PairedVersion).Underlying()
+		}
+
+		if ptree, cached := bs.dc.Packages[r]; cached {
+			return ptree, nil
+		}
+	default:
+		var has bool
+		if r, has = bs.dc.VMap[v]; has {
+			if ptree, cached := bs.dc.Packages[r]; cached {
+				return ptree, nil
+			}
+		}
+	}
+
+	// TODO(sdboyer) handle the case where we have a version w/out rev, and not in cache
+
+	// Not in the cache; check out the version and do the analysis
+	bs.crepo.mut.Lock()
+	// Check out the desired version for analysis
+	if r != "" {
+		// Always prefer a rev, if it's available
+		err = bs.crepo.r.UpdateVersion(string(r))
+	} else {
+		// If we don't have a rev, ensure the repo is up to date, otherwise we
+		// could have a desync issue
+		if !bs.crepo.synced {
+			err = bs.crepo.r.Update()
+			if err != nil {
+				return PackageTree{}, fmt.Errorf("Could not fetch latest updates into repository: %s", err)
+			}
+			bs.crepo.synced = true
+		}
+		err = bs.crepo.r.UpdateVersion(v.String())
+	}
+
+	ptree, err = listPackages(bs.crepo.r.LocalPath(), string(pr))
+	bs.crepo.mut.Unlock()
+
+	// TODO(sdboyer) cache errs?
+	if err != nil {
+		bs.dc.Packages[r] = ptree
+	}
+
+	return
+}
+
+func (s *gitSource) exportVersionTo(v Version, to string) error {
+	s.crepo.mut.Lock()
+	defer s.crepo.mut.Unlock()
+
+	r := s.crepo.r
+	// Back up original index
+	idx, bak := filepath.Join(r.LocalPath(), ".git", "index"), filepath.Join(r.LocalPath(), ".git", "origindex")
+	err := os.Rename(idx, bak)
+	if err != nil {
+		return err
+	}
+
+	// TODO(sdboyer) could have an err here
+	defer os.Rename(bak, idx)
+
+	vstr := v.String()
+	if rv, ok := v.(PairedVersion); ok {
+		vstr = rv.Underlying().String()
+	}
+	_, err = r.RunFromDir("git", "read-tree", vstr)
+	if err != nil {
+		return err
+	}
+
+	// Ensure we have exactly one trailing slash
+	to = strings.TrimSuffix(to, string(os.PathSeparator)) + string(os.PathSeparator)
+	// Checkout from our temporary index to the desired target location on disk;
+	// now it's git's job to make it fast. Sadly, this approach *does* also
+	// write out vendor dirs. There doesn't appear to be a way to make
+	// checkout-index respect sparse checkout rules (-a supercedes it);
+	// the alternative is using plain checkout, though we have a bunch of
+	// housekeeping to do to set up, then tear down, the sparse checkout
+	// controls, as well as restore the original index and HEAD.
+	_, err = r.RunFromDir("git", "checkout-index", "-a", "--prefix="+to)
+	return err
 }
