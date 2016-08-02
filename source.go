@@ -17,12 +17,17 @@ type source interface {
 	revisionPresentIn(ProjectRoot, Revision) (bool, error)
 }
 
+// TODO(sdboyer) de-export these fields
 type projectDataCache struct {
 	Version  string                   `json:"version"` // TODO(sdboyer) use this
 	Infos    map[Revision]projectInfo `json:"infos"`
 	Packages map[Revision]PackageTree `json:"packages"`
 	VMap     map[Version]Revision     `json:"vmap"`
 	RMap     map[Revision][]Version   `json:"rmap"`
+	// granular mutexes for each map. this has major complexity costs, so we
+	// handle elsewhere - but keep these mutexes here as a TODO(sdboyer) to
+	// remind that we may want to do this eventually
+	//imut, pmut, vmut, rmut sync.RWMutex
 }
 
 func newDataCache() *projectDataCache {
