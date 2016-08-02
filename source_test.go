@@ -3,6 +3,8 @@ package gps
 import (
 	"io/ioutil"
 	"net/url"
+	"reflect"
+	"sort"
 	"testing"
 )
 
@@ -69,21 +71,16 @@ func TestGitVersionFetching(t *testing.T) {
 	}
 
 	if len(vlist) != 3 {
-		t.Errorf("git test repo should've produced three versions, got %v: %s", len(vlist), vlist)
+		t.Errorf("git test repo should've produced three versions, got %v: vlist was %s", len(vlist), vlist)
 	} else {
-		v := NewBranch("master").Is(Revision("30605f6ac35fcb075ad0bfa9296f90a7d891523e"))
-		if vlist[0] != v {
-			t.Errorf("gitSource.listVersions() reported incorrect first version, got %s", vlist[0])
+		sort.Sort(upgradeVersionSorter(vlist))
+		evl := []Version{
+			NewVersion("1.0.0").Is(Revision("30605f6ac35fcb075ad0bfa9296f90a7d891523e")),
+			NewBranch("master").Is(Revision("30605f6ac35fcb075ad0bfa9296f90a7d891523e")),
+			NewBranch("test").Is(Revision("30605f6ac35fcb075ad0bfa9296f90a7d891523e")),
 		}
-
-		v = NewBranch("test").Is(Revision("30605f6ac35fcb075ad0bfa9296f90a7d891523e"))
-		if vlist[1] != v {
-			t.Errorf("gitSource.listVersions() reported incorrect second version, got %s", vlist[1])
-		}
-
-		v = NewVersion("1.0.0").Is(Revision("30605f6ac35fcb075ad0bfa9296f90a7d891523e"))
-		if vlist[2] != v {
-			t.Errorf("gitSource.listVersions() reported incorrect third version, got %s", vlist[2])
+		if !reflect.DeepEqual(vlist, evl) {
+			t.Errorf("Version list was not what we expected:\n\t(GOT): %s\n\t(WNT): %s", vlist, evl)
 		}
 	}
 }
