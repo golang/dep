@@ -21,25 +21,21 @@ type source interface {
 	revisionPresentIn(Revision) (bool, error)
 }
 
-// TODO(sdboyer) de-export these fields
-type projectDataCache struct {
-	Version  string                   `json:"version"` // TODO(sdboyer) use this
-	Infos    map[Revision]projectInfo `json:"infos"`
-	Packages map[Revision]PackageTree `json:"packages"`
-	VMap     map[Version]Revision     `json:"vmap"`
-	RMap     map[Revision][]Version   `json:"rmap"`
-	// granular mutexes for each map. this has major complexity costs, so we
-	// should handle elsewhere - but keep these mutexes here as a TODO(sdboyer)
-	// to remind that we may want to do this eventually
-	//imut, pmut, vmut, rmut sync.RWMutex
+type sourceMetaCache struct {
+	//Version  string                   // TODO(sdboyer) use this
+	infos  map[Revision]projectInfo
+	ptrees map[Revision]PackageTree
+	vMap   map[Version]Revision
+	rMap   map[Revision][]Version
+	// TODO(sdboyer) mutexes. actually probably just one, b/c complexity
 }
 
-func newDataCache() *projectDataCache {
-	return &projectDataCache{
-		Infos:    make(map[Revision]projectInfo),
-		Packages: make(map[Revision]PackageTree),
-		VMap:     make(map[Version]Revision),
-		RMap:     make(map[Revision][]Version),
+func newDataCache() *sourceMetaCache {
+	return &sourceMetaCache{
+		infos:  make(map[Revision]projectInfo),
+		ptrees: make(map[Revision]PackageTree),
+		vMap:   make(map[Version]Revision),
+		rMap:   make(map[Revision][]Version),
 	}
 }
 
@@ -103,7 +99,7 @@ type baseSource struct { // TODO(sdboyer) rename to baseVCSSource
 	// The project metadata cache. This is persisted to disk, for reuse across
 	// solver runs.
 	// TODO(sdboyer) protect with mutex
-	dc *projectDataCache
+	dc *sourceMetaCache
 }
 
 func (bs *baseSource) getManifestAndLock(r ProjectRoot, v Version) (Manifest, Lock, error) {
@@ -111,8 +107,8 @@ func (bs *baseSource) getManifestAndLock(r ProjectRoot, v Version) (Manifest, Lo
 		return nil, nil, err
 	}
 
-	if r, exists := bs.dc.VMap[v]; exists {
-		if pi, exists := bs.dc.Infos[r]; exists {
+	if r, exists := bs.dc.vMap[v]; exists {
+		if pi, exists := bs.dc.infos[r]; exists {
 			return pi.Manifest, pi.Lock, nil
 		}
 	}
@@ -157,8 +153,8 @@ func (bs *baseSource) getManifestAndLock(r ProjectRoot, v Version) (Manifest, Lo
 
 		// TODO(sdboyer) this just clobbers all over and ignores the paired/unpaired
 		// distinction; serious fix is needed
-		if r, exists := bs.dc.VMap[v]; exists {
-			bs.dc.Infos[r] = pi
+		if r, exists := bs.dc.vMap[v]; exists {
+			bs.dc.infos[r] = pi
 		}
 
 		return pi.Manifest, pi.Lock, nil
@@ -190,16 +186,16 @@ func (bs *baseSource) listVersions() (vlist []Version, err error) {
 		// Process the version data into the cache
 		// TODO(sdboyer) detect out-of-sync data as we do this?
 		for k, v := range vpairs {
-			bs.dc.VMap[v] = v.Underlying()
-			bs.dc.RMap[v.Underlying()] = append(bs.dc.RMap[v.Underlying()], v)
+			bs.dc.vMap[v] = v.Underlying()
+			bs.dc.rMap[v.Underlying()] = append(bs.dc.rMap[v.Underlying()], v)
 			vlist[k] = v
 		}
 	} else {
-		vlist = make([]Version, len(bs.dc.VMap))
+		vlist = make([]Version, len(bs.dc.vMap))
 		k := 0
 		// TODO(sdboyer) key type of VMap should be string; recombine here
 		//for v, r := range bs.dc.VMap {
-		for v := range bs.dc.VMap {
+		for v := range bs.dc.vMap {
 			vlist[k] = v
 			k++
 		}
@@ -213,9 +209,9 @@ func (bs *baseSource) revisionPresentIn(r Revision) (bool, error) {
 	// present. This could give us false positives, but the cases where that can
 	// occur would require a type of cache staleness that seems *exceedingly*
 	// unlikely to occur.
-	if _, has := bs.dc.Infos[r]; has {
+	if _, has := bs.dc.infos[r]; has {
 		return true, nil
-	} else if _, has := bs.dc.RMap[r]; has {
+	} else if _, has := bs.dc.rMap[r]; has {
 		return true, nil
 	}
 
@@ -301,13 +297,13 @@ func (bs *baseSource) listPackages(pr ProjectRoot, v Version) (ptree PackageTree
 			r = v.(PairedVersion).Underlying()
 		}
 
-		if ptree, cached := bs.dc.Packages[r]; cached {
+		if ptree, cached := bs.dc.ptrees[r]; cached {
 			return ptree, nil
 		}
 	default:
 		var has bool
-		if r, has = bs.dc.VMap[v]; has {
-			if ptree, cached := bs.dc.Packages[r]; cached {
+		if r, has = bs.dc.vMap[v]; has {
+			if ptree, cached := bs.dc.ptrees[r]; cached {
 				return ptree, nil
 			}
 		}
@@ -339,7 +335,7 @@ func (bs *baseSource) listPackages(pr ProjectRoot, v Version) (ptree PackageTree
 
 	// TODO(sdboyer) cache errs?
 	if err != nil {
-		bs.dc.Packages[r] = ptree
+		bs.dc.ptrees[r] = ptree
 	}
 
 	return
@@ -384,11 +380,11 @@ func (s *gitSource) exportVersionTo(v Version, to string) error {
 
 func (s *gitSource) listVersions() (vlist []Version, err error) {
 	if s.cvsync {
-		vlist = make([]Version, len(s.dc.VMap))
+		vlist = make([]Version, len(s.dc.vMap))
 		k := 0
 		// TODO(sdboyer) key type of VMap should be string; recombine here
 		//for v, r := range s.dc.VMap {
-		for v := range s.dc.VMap {
+		for v := range s.dc.vMap {
 			vlist[k] = v
 			k++
 		}
@@ -479,13 +475,13 @@ func (s *gitSource) listVersions() (vlist []Version, err error) {
 	//
 	// reset the rmap and vmap, as they'll be fully repopulated by this
 	// TODO(sdboyer) detect out-of-sync pairings as we do this?
-	s.dc.VMap = make(map[Version]Revision)
-	s.dc.RMap = make(map[Revision][]Version)
+	s.dc.vMap = make(map[Version]Revision)
+	s.dc.rMap = make(map[Revision][]Version)
 
 	for _, v := range vlist {
 		pv := v.(PairedVersion)
-		s.dc.VMap[v] = pv.Underlying()
-		s.dc.RMap[pv.Underlying()] = append(s.dc.RMap[pv.Underlying()], v)
+		s.dc.vMap[v] = pv.Underlying()
+		s.dc.rMap[pv.Underlying()] = append(s.dc.rMap[pv.Underlying()], v)
 	}
 	// Mark the cache as being in sync with upstream's version list
 	s.cvsync = true

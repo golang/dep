@@ -38,7 +38,7 @@ type projectManager struct {
 	// The project metadata cache. This is persisted to disk, for reuse across
 	// solver runs.
 	// TODO(sdboyer) protect with mutex
-	dc *projectDataCache
+	dc *sourceMetaCache
 }
 
 type existence struct {
@@ -74,8 +74,8 @@ func (pm *projectManager) GetManifestAndLock(r ProjectRoot, v Version) (Manifest
 		return nil, nil, err
 	}
 
-	if r, exists := pm.dc.VMap[v]; exists {
-		if pi, exists := pm.dc.Infos[r]; exists {
+	if r, exists := pm.dc.vMap[v]; exists {
+		if pi, exists := pm.dc.infos[r]; exists {
 			return pi.Manifest, pi.Lock, nil
 		}
 	}
@@ -120,8 +120,8 @@ func (pm *projectManager) GetManifestAndLock(r ProjectRoot, v Version) (Manifest
 
 		// TODO(sdboyer) this just clobbers all over and ignores the paired/unpaired
 		// distinction; serious fix is needed
-		if r, exists := pm.dc.VMap[v]; exists {
-			pm.dc.Infos[r] = pi
+		if r, exists := pm.dc.vMap[v]; exists {
+			pm.dc.infos[r] = pi
 		}
 
 		return pi.Manifest, pi.Lock, nil
@@ -144,13 +144,13 @@ func (pm *projectManager) ListPackages(pr ProjectRoot, v Version) (ptree Package
 			r = v.(PairedVersion).Underlying()
 		}
 
-		if ptree, cached := pm.dc.Packages[r]; cached {
+		if ptree, cached := pm.dc.ptrees[r]; cached {
 			return ptree, nil
 		}
 	default:
 		var has bool
-		if r, has = pm.dc.VMap[v]; has {
-			if ptree, cached := pm.dc.Packages[r]; cached {
+		if r, has = pm.dc.vMap[v]; has {
+			if ptree, cached := pm.dc.ptrees[r]; cached {
 				return ptree, nil
 			}
 		}
@@ -182,7 +182,7 @@ func (pm *projectManager) ListPackages(pr ProjectRoot, v Version) (ptree Package
 
 	// TODO(sdboyer) cache errs?
 	if err != nil {
-		pm.dc.Packages[r] = ptree
+		pm.dc.ptrees[r] = ptree
 	}
 
 	return
@@ -236,16 +236,16 @@ func (pm *projectManager) ListVersions() (vlist []Version, err error) {
 		// Process the version data into the cache
 		// TODO(sdboyer) detect out-of-sync data as we do this?
 		for k, v := range vpairs {
-			pm.dc.VMap[v] = v.Underlying()
-			pm.dc.RMap[v.Underlying()] = append(pm.dc.RMap[v.Underlying()], v)
+			pm.dc.vMap[v] = v.Underlying()
+			pm.dc.rMap[v.Underlying()] = append(pm.dc.rMap[v.Underlying()], v)
 			vlist[k] = v
 		}
 	} else {
-		vlist = make([]Version, len(pm.dc.VMap))
+		vlist = make([]Version, len(pm.dc.vMap))
 		k := 0
 		// TODO(sdboyer) key type of VMap should be string; recombine here
 		//for v, r := range pm.dc.VMap {
-		for v := range pm.dc.VMap {
+		for v := range pm.dc.vMap {
 			vlist[k] = v
 			k++
 		}
@@ -259,9 +259,9 @@ func (pm *projectManager) RevisionPresentIn(pr ProjectRoot, r Revision) (bool, e
 	// present. This could give us false positives, but the cases where that can
 	// occur would require a type of cache staleness that seems *exceedingly*
 	// unlikely to occur.
-	if _, has := pm.dc.Infos[r]; has {
+	if _, has := pm.dc.infos[r]; has {
 		return true, nil
-	} else if _, has := pm.dc.RMap[r]; has {
+	} else if _, has := pm.dc.rMap[r]; has {
 		return true, nil
 	}
 

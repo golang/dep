@@ -350,7 +350,7 @@ decided:
 	pms := &pmState{}
 	cpath := filepath.Join(metadir, "cache.json")
 	fi, err := os.Stat(cpath)
-	var dc *projectDataCache
+	var dc *sourceMetaCache
 	if fi != nil {
 		pms.cf, err = os.OpenFile(cpath, os.O_RDWR, 0777)
 		if err != nil {
@@ -371,11 +371,11 @@ decided:
 		//return nil, fmt.Errorf("Err on creating metadata cache file: %s", err)
 		//}
 
-		dc = &projectDataCache{
-			Infos:    make(map[Revision]projectInfo),
-			Packages: make(map[Revision]PackageTree),
-			VMap:     make(map[Version]Revision),
-			RMap:     make(map[Revision][]Version),
+		dc = &sourceMetaCache{
+			infos:  make(map[Revision]projectInfo),
+			ptrees: make(map[Revision]PackageTree),
+			vMap:   make(map[Version]Revision),
+			rMap:   make(map[Revision][]Version),
 		}
 	}
 
