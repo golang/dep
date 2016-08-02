@@ -412,26 +412,31 @@ func (s *gitSource) listVersions() (vlist []Version, err error) {
 		}
 
 		all = bytes.Split(bytes.TrimSpace(out), []byte("\n"))
+		if len(all) == 0 {
+			return nil, fmt.Errorf("No versions available for %s (this is weird)", r.Remote())
+		}
 	}
 
 	// Local cache may not actually exist here, but upstream definitely does
 	s.ex.s |= existsUpstream
 	s.ex.f |= existsUpstream
 
-	tmap := make(map[string]PairedVersion)
+	smap := make(map[string]bool)
+	uniq := 0
+	vlist = make([]Version, len(all)-1) // less 1, because always ignore HEAD
 	for _, pair := range all {
 		var v PairedVersion
 		if string(pair[46:51]) == "heads" {
-			bname := string(pair[52:])
-			v = NewBranch(bname).Is(Revision(pair[:40])).(PairedVersion)
-			tmap["heads"+bname] = v
+			v = NewBranch(string(pair[52:])).Is(Revision(pair[:40])).(PairedVersion)
+			vlist[uniq] = v
+			uniq++
 		} else if string(pair[46:50]) == "tags" {
 			vstr := string(pair[51:])
 			if strings.HasSuffix(vstr, "^{}") {
 				// If the suffix is there, then we *know* this is the rev of
 				// the underlying commit object that we actually want
 				vstr = strings.TrimSuffix(vstr, "^{}")
-			} else if _, exists := tmap[vstr]; exists {
+			} else if smap[vstr] {
 				// Already saw the deref'd version of this tag, if one
 				// exists, so skip this.
 				continue
@@ -440,9 +445,14 @@ func (s *gitSource) listVersions() (vlist []Version, err error) {
 				// covers us in case of weirdness, anyway.
 			}
 			v = NewVersion(vstr).Is(Revision(pair[:40])).(PairedVersion)
-			tmap["tags"+vstr] = v
+			smap[vstr] = true
+			vlist[uniq] = v
+			uniq++
 		}
 	}
+
+	// Trim off excess from the slice
+	vlist = vlist[:uniq]
 
 	// Process the version data into the cache
 	//
@@ -451,16 +461,12 @@ func (s *gitSource) listVersions() (vlist []Version, err error) {
 	s.dc.VMap = make(map[Version]Revision)
 	s.dc.RMap = make(map[Revision][]Version)
 
-	vlist = make([]Version, len(tmap))
-	k := 0
-	for _, v := range tmap {
-		s.dc.VMap[v] = v.Underlying()
-		s.dc.RMap[v.Underlying()] = append(s.dc.RMap[v.Underlying()], v)
-		vlist[k] = v
-		k++
+	for _, v := range vlist {
+		pv := v.(PairedVersion)
+		s.dc.VMap[v] = pv.Underlying()
+		s.dc.RMap[pv.Underlying()] = append(s.dc.RMap[pv.Underlying()], v)
 	}
 	// Mark the cache as being in sync with upstream's version list
 	s.cvsync = true
-
 	return
 }
