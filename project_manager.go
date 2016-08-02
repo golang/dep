@@ -49,15 +49,6 @@ type existence struct {
 	f projectExistence
 }
 
-// TODO(sdboyer) figure out shape of versions, then implement marshaling/unmarshaling
-type projectDataCache struct {
-	Version  string                   `json:"version"` // TODO(sdboyer) use this
-	Infos    map[Revision]projectInfo `json:"infos"`
-	Packages map[Revision]PackageTree `json:"packages"`
-	VMap     map[Version]Revision     `json:"vmap"`
-	RMap     map[Revision][]Version   `json:"rmap"`
-}
-
 // projectInfo holds manifest and lock
 type projectInfo struct {
 	Manifest
@@ -233,7 +224,6 @@ func (pm *projectManager) ListVersions() (vlist []Version, err error) {
 
 		if err != nil {
 			// TODO(sdboyer) More-er proper-er error
-			fmt.Println(err)
 			return nil, err
 		}
 
