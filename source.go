@@ -18,7 +18,7 @@ type source interface {
 	getManifestAndLock(ProjectRoot, Version) (Manifest, Lock, error)
 	listPackages(ProjectRoot, Version) (PackageTree, error)
 	listVersions() ([]Version, error)
-	revisionPresentIn(ProjectRoot, Revision) (bool, error)
+	revisionPresentIn(Revision) (bool, error)
 }
 
 // TODO(sdboyer) de-export these fields
@@ -29,8 +29,8 @@ type projectDataCache struct {
 	VMap     map[Version]Revision     `json:"vmap"`
 	RMap     map[Revision][]Version   `json:"rmap"`
 	// granular mutexes for each map. this has major complexity costs, so we
-	// handle elsewhere - but keep these mutexes here as a TODO(sdboyer) to
-	// remind that we may want to do this eventually
+	// should handle elsewhere - but keep these mutexes here as a TODO(sdboyer)
+	// to remind that we may want to do this eventually
 	//imut, pmut, vmut, rmut sync.RWMutex
 }
 
@@ -149,7 +149,7 @@ func (bs *baseSource) getManifestAndLock(r ProjectRoot, v Version) (Manifest, Lo
 			l = prepLock(l)
 		}
 
-		// If m is nil, prebsanifest will provide an empty one.
+		// If m is nil, prepManifest will provide an empty one.
 		pi := projectInfo{
 			Manifest: prepManifest(m),
 			Lock:     l,
@@ -206,6 +206,27 @@ func (bs *baseSource) listVersions() (vlist []Version, err error) {
 	}
 
 	return
+}
+
+func (bs *baseSource) revisionPresentIn(r Revision) (bool, error) {
+	// First and fastest path is to check the data cache to see if the rev is
+	// present. This could give us false positives, but the cases where that can
+	// occur would require a type of cache staleness that seems *exceedingly*
+	// unlikely to occur.
+	if _, has := bs.dc.Infos[r]; has {
+		return true, nil
+	} else if _, has := bs.dc.RMap[r]; has {
+		return true, nil
+	}
+
+	err := bs.ensureCacheExistence()
+	if err != nil {
+		return false, err
+	}
+
+	bs.crepo.mut.RLock()
+	defer bs.crepo.mut.RUnlock()
+	return bs.crepo.r.IsReference(string(r)), nil
 }
 
 func (bs *baseSource) ensureCacheExistence() error {
