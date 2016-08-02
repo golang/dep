@@ -252,7 +252,6 @@ func (sm *SourceMgr) getProjectManager(id ProjectIdentifier) (*pmState, error) {
 	// TODO(sdboyer) finish this, it's not sufficient (?)
 	n := id.netName()
 	var rpath string
-
 	// Early check to see if we already have a pm in the cache for this net name
 	if pm, exists := sm.pms[n]; exists {
 		return pm, nil

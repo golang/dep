@@ -15,11 +15,17 @@ import (
 // one is not a guarantee that the resource it identifies actually exists or is
 // accessible.
 type remoteRepo struct {
-	Base     string
-	RelPkg   string
-	CloneURL *url.URL
-	Schemes  []string
-	VCS      []string
+	repoRoot string
+	relPkg   string
+	try      []maybeRemoteSource
+}
+
+// maybeRemoteSource represents a set of instructions for accessing a possible
+// remote resource, without knowing whether that resource actually
+// works/exists/is accessible, etc.
+type maybeRemoteSource struct {
+	vcs string
+	url *url.URL
 }
 
 var (
@@ -59,11 +65,13 @@ var (
 // repositories can be bare import paths, or urls including a checkout scheme.
 func deduceRemoteRepo(path string) (rr *remoteRepo, err error) {
 	rr = &remoteRepo{}
+	var u *url.Url
+
 	if m := scpSyntaxRe.FindStringSubmatch(path); m != nil {
 		// Match SCP-like syntax and convert it to a URL.
 		// Eg, "git@github.com:user/repo" becomes
 		// "ssh://git@github.com/user/repo".
-		rr.CloneURL = &url.URL{
+		u = &url.URL{
 			Scheme: "ssh",
 			User:   url.User(m[1]),
 			Host:   m[2],
@@ -72,24 +80,20 @@ func deduceRemoteRepo(path string) (rr *remoteRepo, err error) {
 			//RawPath: m[3],
 		}
 	} else {
-		rr.CloneURL, err = url.Parse(path)
+		u, err = url.Parse(path)
 		if err != nil {
 			return nil, fmt.Errorf("%q is not a valid import path", path)
 		}
 	}
 
-	if rr.CloneURL.Host != "" {
-		path = rr.CloneURL.Host + "/" + strings.TrimPrefix(rr.CloneURL.Path, "/")
+	if u.Host != "" {
+		path = u.Host + "/" + strings.TrimPrefix(u.Path, "/")
 	} else {
-		path = rr.CloneURL.Path
+		path = u.Path
 	}
 
 	if !pathvld.MatchString(path) {
 		return nil, fmt.Errorf("%q is not a valid import path", path)
-	}
-
-	if rr.CloneURL.Scheme != "" {
-		rr.Schemes = []string{rr.CloneURL.Scheme}
 	}
 
 	// TODO(sdboyer) instead of a switch, encode base domain in radix tree and pick
@@ -99,10 +103,19 @@ func deduceRemoteRepo(path string) (rr *remoteRepo, err error) {
 	case ghRegex.MatchString(path):
 		v := ghRegex.FindStringSubmatch(path)
 
-		rr.CloneURL.Host = "github.com"
-		rr.CloneURL.Path = v[2]
-		rr.Base = v[1]
-		rr.RelPkg = strings.TrimPrefix(v[3], "/")
+		rr.repoRoot = v[1]
+		rr.relPkg = strings.TrimPrefix(v[3], "/")
+
+		//rr.CloneURL.User = url.User("git")
+		u.CloneURL.Host = "github.com"
+		u.CloneURL.Path = v[2]
+		if u.Scheme == "" {
+			for _, scheme := range gitSchemes {
+				u2 := *u
+				u2.Scheme = scheme
+				rr.try = append(rr.try, &u2)
+			}
+		}
 		rr.VCS = []string{"git"}
 		// If no scheme was already recorded, then add the possible schemes for github
 		if rr.Schemes == nil {
@@ -121,6 +134,7 @@ func deduceRemoteRepo(path string) (rr *remoteRepo, err error) {
 		}
 
 		// gopkg.in is always backed by github
+		//rr.CloneURL.User = url.User("git")
 		rr.CloneURL.Host = "github.com"
 		// If the third position is empty, it's the shortened form that expands
 		// to the go-pkg github user
@@ -129,8 +143,8 @@ func deduceRemoteRepo(path string) (rr *remoteRepo, err error) {
 		} else {
 			rr.CloneURL.Path = v[2] + "/" + v[3]
 		}
-		rr.Base = v[1]
-		rr.RelPkg = strings.TrimPrefix(v[6], "/")
+		rr.repoRoot = v[1]
+		rr.relPkg = strings.TrimPrefix(v[6], "/")
 		rr.VCS = []string{"git"}
 		// If no scheme was already recorded, then add the possible schemes for github
 		if rr.Schemes == nil {
@@ -145,8 +159,8 @@ func deduceRemoteRepo(path string) (rr *remoteRepo, err error) {
 
 		rr.CloneURL.Host = "bitbucket.org"
 		rr.CloneURL.Path = v[2]
-		rr.Base = v[1]
-		rr.RelPkg = strings.TrimPrefix(v[3], "/")
+		rr.repoRoot = v[1]
+		rr.relPkg = strings.TrimPrefix(v[3], "/")
 		rr.VCS = []string{"git", "hg"}
 		// FIXME(sdboyer) this ambiguity of vcs kills us on schemes, as schemes
 		// are inherently vcs-specific. Fixing this requires a wider refactor.
@@ -175,8 +189,8 @@ func deduceRemoteRepo(path string) (rr *remoteRepo, err error) {
 
 		rr.CloneURL.Host = "launchpad.net"
 		rr.CloneURL.Path = v[2]
-		rr.Base = v[1]
-		rr.RelPkg = strings.TrimPrefix(v[3], "/")
+		rr.repoRoot = v[1]
+		rr.relPkg = strings.TrimPrefix(v[3], "/")
 		rr.VCS = []string{"bzr"}
 		if rr.Schemes == nil {
 			rr.Schemes = bzrSchemes
@@ -190,8 +204,8 @@ func deduceRemoteRepo(path string) (rr *remoteRepo, err error) {
 
 		rr.CloneURL.Host = "git.launchpad.net"
 		rr.CloneURL.Path = v[2]
-		rr.Base = v[1]
-		rr.RelPkg = strings.TrimPrefix(v[3], "/")
+		rr.repoRoot = v[1]
+		rr.relPkg = strings.TrimPrefix(v[3], "/")
 		rr.VCS = []string{"git"}
 		if rr.Schemes == nil {
 			rr.Schemes = gitSchemes
@@ -204,8 +218,8 @@ func deduceRemoteRepo(path string) (rr *remoteRepo, err error) {
 
 		rr.CloneURL.Host = "hub.jazz.net"
 		rr.CloneURL.Path = v[2]
-		rr.Base = v[1]
-		rr.RelPkg = strings.TrimPrefix(v[3], "/")
+		rr.repoRoot = v[1]
+		rr.relPkg = strings.TrimPrefix(v[3], "/")
 		rr.VCS = []string{"git"}
 		if rr.Schemes == nil {
 			rr.Schemes = gitSchemes
@@ -218,8 +232,8 @@ func deduceRemoteRepo(path string) (rr *remoteRepo, err error) {
 
 		rr.CloneURL.Host = "git.apache.org"
 		rr.CloneURL.Path = v[2]
-		rr.Base = v[1]
-		rr.RelPkg = strings.TrimPrefix(v[3], "/")
+		rr.repoRoot = v[1]
+		rr.relPkg = strings.TrimPrefix(v[3], "/")
 		rr.VCS = []string{"git"}
 		if rr.Schemes == nil {
 			rr.Schemes = gitSchemes
@@ -237,8 +251,8 @@ func deduceRemoteRepo(path string) (rr *remoteRepo, err error) {
 			rr.CloneURL.Host = x[0]
 			rr.CloneURL.Path = x[1]
 			rr.VCS = []string{v[5]}
-			rr.Base = v[1]
-			rr.RelPkg = strings.TrimPrefix(v[6], "/")
+			rr.repoRoot = v[1]
+			rr.relPkg = strings.TrimPrefix(v[6], "/")
 
 			if rr.Schemes == nil {
 				if v[5] == "git" {
@@ -270,8 +284,8 @@ func deduceRemoteRepo(path string) (rr *remoteRepo, err error) {
 	}
 
 	// We have a real URL. Set the other values and return.
-	rr.Base = importroot
-	rr.RelPkg = strings.TrimPrefix(path[len(importroot):], "/")
+	rr.repoRoot = importroot
+	rr.relPkg = strings.TrimPrefix(path[len(importroot):], "/")
 
 	rr.VCS = []string{vcs}
 	if rr.CloneURL.Scheme != "" {

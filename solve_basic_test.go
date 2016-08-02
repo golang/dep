@@ -1355,8 +1355,8 @@ func (b *depspecBridge) deduceRemoteRepo(path string) (*remoteRepo, error) {
 		n := string(ds.n)
 		if path == n || strings.HasPrefix(path, n+"/") {
 			return &remoteRepo{
-				Base:   n,
-				RelPkg: strings.TrimPrefix(path, n+"/"),
+				repoRoot: n,
+				relPkg:   strings.TrimPrefix(path, n+"/"),
 			}, nil
 		}
 	}
