@@ -605,17 +605,17 @@ func (s *solver) intersectConstraintsWithImports(deps []workingConstraint, reach
 		// Make a new completeDep with an open constraint, respecting overrides
 		pd := s.ovr.override(ProjectConstraint{
 			Ident: ProjectIdentifier{
-				ProjectRoot: ProjectRoot(root.repoRoot),
-				NetworkName: root.repoRoot,
+				ProjectRoot: ProjectRoot(root.Base),
+				NetworkName: root.Base,
 			},
 			Constraint: Any(),
 		})
 
 		// Insert the pd into the trie so that further deps from this
 		// project get caught by the prefix search
-		xt.Insert(root.repoRoot, pd)
+		xt.Insert(root.Base, pd)
 		// And also put the complete dep into the dmap
-		dmap[ProjectRoot(root.repoRoot)] = completeDep{
+		dmap[ProjectRoot(root.Base)] = completeDep{
 			workingConstraint: pd,
 			pl:                []string{rp},
 		}

@@ -19,8 +19,8 @@ func TestDeduceRemotes(t *testing.T) {
 		{
 			"github.com/sdboyer/gps",
 			&remoteRepo{
-				repoRoot: "github.com/sdboyer/gps",
-				relPkg:   "",
+				Base:   "github.com/sdboyer/gps",
+				RelPkg: "",
 				CloneURL: &url.URL{
 					Host: "github.com",
 					Path: "sdboyer/gps",
@@ -32,8 +32,8 @@ func TestDeduceRemotes(t *testing.T) {
 		{
 			"github.com/sdboyer/gps/foo",
 			&remoteRepo{
-				repoRoot: "github.com/sdboyer/gps",
-				relPkg:   "foo",
+				Base:   "github.com/sdboyer/gps",
+				RelPkg: "foo",
 				CloneURL: &url.URL{
 					Host: "github.com",
 					Path: "sdboyer/gps",
@@ -45,8 +45,8 @@ func TestDeduceRemotes(t *testing.T) {
 		{
 			"git@github.com:sdboyer/gps",
 			&remoteRepo{
-				repoRoot: "github.com/sdboyer/gps",
-				relPkg:   "",
+				Base:   "github.com/sdboyer/gps",
+				RelPkg: "",
 				CloneURL: &url.URL{
 					Scheme: "ssh",
 					User:   url.User("git"),
@@ -60,8 +60,8 @@ func TestDeduceRemotes(t *testing.T) {
 		{
 			"https://github.com/sdboyer/gps/foo",
 			&remoteRepo{
-				repoRoot: "github.com/sdboyer/gps",
-				relPkg:   "foo",
+				Base:   "github.com/sdboyer/gps",
+				RelPkg: "foo",
 				CloneURL: &url.URL{
 					Scheme: "https",
 					Host:   "github.com",
@@ -74,8 +74,8 @@ func TestDeduceRemotes(t *testing.T) {
 		{
 			"https://github.com/sdboyer/gps/foo/bar",
 			&remoteRepo{
-				repoRoot: "github.com/sdboyer/gps",
-				relPkg:   "foo/bar",
+				Base:   "github.com/sdboyer/gps",
+				RelPkg: "foo/bar",
 				CloneURL: &url.URL{
 					Scheme: "https",
 					Host:   "github.com",
@@ -105,8 +105,8 @@ func TestDeduceRemotes(t *testing.T) {
 		{
 			"gopkg.in/sdboyer/gps.v0",
 			&remoteRepo{
-				repoRoot: "gopkg.in/sdboyer/gps.v0",
-				relPkg:   "",
+				Base:   "gopkg.in/sdboyer/gps.v0",
+				RelPkg: "",
 				CloneURL: &url.URL{
 					Host: "github.com",
 					Path: "sdboyer/gps",
@@ -118,8 +118,8 @@ func TestDeduceRemotes(t *testing.T) {
 		{
 			"gopkg.in/sdboyer/gps.v0/foo",
 			&remoteRepo{
-				repoRoot: "gopkg.in/sdboyer/gps.v0",
-				relPkg:   "foo",
+				Base:   "gopkg.in/sdboyer/gps.v0",
+				RelPkg: "foo",
 				CloneURL: &url.URL{
 					Host: "github.com",
 					Path: "sdboyer/gps",
@@ -131,8 +131,8 @@ func TestDeduceRemotes(t *testing.T) {
 		{
 			"gopkg.in/sdboyer/gps.v0/foo/bar",
 			&remoteRepo{
-				repoRoot: "gopkg.in/sdboyer/gps.v0",
-				relPkg:   "foo/bar",
+				Base:   "gopkg.in/sdboyer/gps.v0",
+				RelPkg: "foo/bar",
 				CloneURL: &url.URL{
 					Host: "github.com",
 					Path: "sdboyer/gps",
@@ -144,8 +144,8 @@ func TestDeduceRemotes(t *testing.T) {
 		{
 			"gopkg.in/yaml.v1",
 			&remoteRepo{
-				repoRoot: "gopkg.in/yaml.v1",
-				relPkg:   "",
+				Base:   "gopkg.in/yaml.v1",
+				RelPkg: "",
 				CloneURL: &url.URL{
 					Host: "github.com",
 					Path: "go-pkg/yaml",
@@ -157,8 +157,8 @@ func TestDeduceRemotes(t *testing.T) {
 		{
 			"gopkg.in/yaml.v1/foo/bar",
 			&remoteRepo{
-				repoRoot: "gopkg.in/yaml.v1",
-				relPkg:   "foo/bar",
+				Base:   "gopkg.in/yaml.v1",
+				RelPkg: "foo/bar",
 				CloneURL: &url.URL{
 					Host: "github.com",
 					Path: "go-pkg/yaml",
@@ -176,8 +176,8 @@ func TestDeduceRemotes(t *testing.T) {
 		{
 			"hub.jazz.net/git/user1/pkgname",
 			&remoteRepo{
-				repoRoot: "hub.jazz.net/git/user1/pkgname",
-				relPkg:   "",
+				Base:   "hub.jazz.net/git/user1/pkgname",
+				RelPkg: "",
 				CloneURL: &url.URL{
 					Host: "hub.jazz.net",
 					Path: "git/user1/pkgname",
@@ -189,8 +189,8 @@ func TestDeduceRemotes(t *testing.T) {
 		{
 			"hub.jazz.net/git/user1/pkgname/submodule/submodule/submodule",
 			&remoteRepo{
-				repoRoot: "hub.jazz.net/git/user1/pkgname",
-				relPkg:   "submodule/submodule/submodule",
+				Base:   "hub.jazz.net/git/user1/pkgname",
+				RelPkg: "submodule/submodule/submodule",
 				CloneURL: &url.URL{
 					Host: "hub.jazz.net",
 					Path: "git/user1/pkgname",
@@ -232,8 +232,8 @@ func TestDeduceRemotes(t *testing.T) {
 		{
 			"hub.jazz.net/git/user/pkg.name",
 			&remoteRepo{
-				repoRoot: "hub.jazz.net/git/user/pkg.name",
-				relPkg:   "",
+				Base:   "hub.jazz.net/git/user/pkg.name",
+				RelPkg: "",
 				CloneURL: &url.URL{
 					Host: "hub.jazz.net",
 					Path: "git/user/pkg.name",
@@ -250,8 +250,8 @@ func TestDeduceRemotes(t *testing.T) {
 		{
 			"bitbucket.org/sdboyer/reporoot",
 			&remoteRepo{
-				repoRoot: "bitbucket.org/sdboyer/reporoot",
-				relPkg:   "",
+				Base:   "bitbucket.org/sdboyer/reporoot",
+				RelPkg: "",
 				CloneURL: &url.URL{
 					Host: "bitbucket.org",
 					Path: "sdboyer/reporoot",
@@ -263,8 +263,8 @@ func TestDeduceRemotes(t *testing.T) {
 		{
 			"bitbucket.org/sdboyer/reporoot/foo/bar",
 			&remoteRepo{
-				repoRoot: "bitbucket.org/sdboyer/reporoot",
-				relPkg:   "foo/bar",
+				Base:   "bitbucket.org/sdboyer/reporoot",
+				RelPkg: "foo/bar",
 				CloneURL: &url.URL{
 					Host: "bitbucket.org",
 					Path: "sdboyer/reporoot",
@@ -276,8 +276,8 @@ func TestDeduceRemotes(t *testing.T) {
 		{
 			"https://bitbucket.org/sdboyer/reporoot/foo/bar",
 			&remoteRepo{
-				repoRoot: "bitbucket.org/sdboyer/reporoot",
-				relPkg:   "foo/bar",
+				Base:   "bitbucket.org/sdboyer/reporoot",
+				RelPkg: "foo/bar",
 				CloneURL: &url.URL{
 					Scheme: "https",
 					Host:   "bitbucket.org",
@@ -290,8 +290,8 @@ func TestDeduceRemotes(t *testing.T) {
 		{
 			"launchpad.net/govcstestbzrrepo",
 			&remoteRepo{
-				repoRoot: "launchpad.net/govcstestbzrrepo",
-				relPkg:   "",
+				Base:   "launchpad.net/govcstestbzrrepo",
+				RelPkg: "",
 				CloneURL: &url.URL{
 					Host: "launchpad.net",
 					Path: "govcstestbzrrepo",
@@ -303,8 +303,8 @@ func TestDeduceRemotes(t *testing.T) {
 		{
 			"launchpad.net/govcstestbzrrepo/foo/bar",
 			&remoteRepo{
-				repoRoot: "launchpad.net/govcstestbzrrepo",
-				relPkg:   "foo/bar",
+				Base:   "launchpad.net/govcstestbzrrepo",
+				RelPkg: "foo/bar",
 				CloneURL: &url.URL{
 					Host: "launchpad.net",
 					Path: "govcstestbzrrepo",
@@ -320,8 +320,8 @@ func TestDeduceRemotes(t *testing.T) {
 		{
 			"git.launchpad.net/reporoot",
 			&remoteRepo{
-				repoRoot: "git.launchpad.net/reporoot",
-				relPkg:   "",
+				Base:   "git.launchpad.net/reporoot",
+				RelPkg: "",
 				CloneURL: &url.URL{
 					Host: "git.launchpad.net",
 					Path: "reporoot",
@@ -333,8 +333,8 @@ func TestDeduceRemotes(t *testing.T) {
 		{
 			"git.launchpad.net/reporoot/foo/bar",
 			&remoteRepo{
-				repoRoot: "git.launchpad.net/reporoot",
-				relPkg:   "foo/bar",
+				Base:   "git.launchpad.net/reporoot",
+				RelPkg: "foo/bar",
 				CloneURL: &url.URL{
 					Host: "git.launchpad.net",
 					Path: "reporoot",
@@ -346,8 +346,8 @@ func TestDeduceRemotes(t *testing.T) {
 		{
 			"git.launchpad.net/reporoot",
 			&remoteRepo{
-				repoRoot: "git.launchpad.net/reporoot",
-				relPkg:   "",
+				Base:   "git.launchpad.net/reporoot",
+				RelPkg: "",
 				CloneURL: &url.URL{
 					Host: "git.launchpad.net",
 					Path: "reporoot",
@@ -363,8 +363,8 @@ func TestDeduceRemotes(t *testing.T) {
 		{
 			"git.apache.org/package-name.git",
 			&remoteRepo{
-				repoRoot: "git.apache.org/package-name.git",
-				relPkg:   "",
+				Base:   "git.apache.org/package-name.git",
+				RelPkg: "",
 				CloneURL: &url.URL{
 					Host: "git.apache.org",
 					Path: "package-name.git",
@@ -376,8 +376,8 @@ func TestDeduceRemotes(t *testing.T) {
 		{
 			"git.apache.org/package-name.git/foo/bar",
 			&remoteRepo{
-				repoRoot: "git.apache.org/package-name.git",
-				relPkg:   "foo/bar",
+				Base:   "git.apache.org/package-name.git",
+				RelPkg: "foo/bar",
 				CloneURL: &url.URL{
 					Host: "git.apache.org",
 					Path: "package-name.git",
@@ -390,8 +390,8 @@ func TestDeduceRemotes(t *testing.T) {
 		{
 			"golang.org/x/exp",
 			&remoteRepo{
-				repoRoot: "golang.org/x/exp",
-				relPkg:   "",
+				Base:   "golang.org/x/exp",
+				RelPkg: "",
 				CloneURL: &url.URL{
 					Scheme: "https",
 					Host:   "go.googlesource.com",
@@ -404,8 +404,8 @@ func TestDeduceRemotes(t *testing.T) {
 		{
 			"golang.org/x/exp/inotify",
 			&remoteRepo{
-				repoRoot: "golang.org/x/exp",
-				relPkg:   "inotify",
+				Base:   "golang.org/x/exp",
+				RelPkg: "inotify",
 				CloneURL: &url.URL{
 					Scheme: "https",
 					Host:   "go.googlesource.com",
@@ -418,8 +418,8 @@ func TestDeduceRemotes(t *testing.T) {
 		{
 			"rsc.io/pdf",
 			&remoteRepo{
-				repoRoot: "rsc.io/pdf",
-				relPkg:   "",
+				Base:   "rsc.io/pdf",
+				RelPkg: "",
 				CloneURL: &url.URL{
 					Scheme: "https",
 					Host:   "github.com",
@@ -433,8 +433,8 @@ func TestDeduceRemotes(t *testing.T) {
 		{
 			"github.com/kr/pretty",
 			&remoteRepo{
-				repoRoot: "github.com/kr/pretty",
-				relPkg:   "",
+				Base:   "github.com/kr/pretty",
+				RelPkg: "",
 				CloneURL: &url.URL{
 					Host: "github.com",
 					Path: "kr/pretty",
@@ -461,11 +461,11 @@ func TestDeduceRemotes(t *testing.T) {
 			continue
 		}
 
-		if got.repoRoot != want.repoRoot {
-			t.Errorf("deduceRemoteRepo(%q): Base was %s, wanted %s", fix.path, got.repoRoot, want.repoRoot)
+		if got.Base != want.Base {
+			t.Errorf("deduceRemoteRepo(%q): Base was %s, wanted %s", fix.path, got.Base, want.Base)
 		}
-		if got.relPkg != want.relPkg {
-			t.Errorf("deduceRemoteRepo(%q): RelPkg was %s, wanted %s", fix.path, got.relPkg, want.relPkg)
+		if got.RelPkg != want.RelPkg {
+			t.Errorf("deduceRemoteRepo(%q): RelPkg was %s, wanted %s", fix.path, got.RelPkg, want.RelPkg)
 		}
 		if !reflect.DeepEqual(got.CloneURL, want.CloneURL) {
 			// misspelling things is cool when it makes columns line up
