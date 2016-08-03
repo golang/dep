@@ -78,7 +78,7 @@ func (bs *baseSource) getManifestAndLock(r ProjectRoot, v Version) (Manifest, Lo
 	if !bs.crepo.synced {
 		err = bs.crepo.r.Update()
 		if err != nil {
-			return nil, nil, fmt.Errorf("Could not fetch latest updates into repository")
+			return nil, nil, fmt.Errorf("could not fetch latest updates into repository")
 		}
 		bs.crepo.synced = true
 	}
@@ -156,7 +156,7 @@ func (dc *sourceMetaCache) toUnpaired(v Version) UnpairedVersion {
 		}
 		return nil
 	default:
-		panic(fmt.Sprintf("Unknown version type %T", v))
+		panic(fmt.Sprintf("unknown version type %T", v))
 	}
 }
 
@@ -308,7 +308,7 @@ func (bs *baseSource) listPackages(pr ProjectRoot, v Version) (ptree PackageTree
 		if !bs.crepo.synced {
 			err = bs.crepo.r.Update()
 			if err != nil {
-				return PackageTree{}, fmt.Errorf("Could not fetch latest updates into repository: %s", err)
+				return PackageTree{}, fmt.Errorf("could not fetch latest updates into repository: %s", err)
 			}
 			bs.crepo.synced = true
 		}
@@ -344,7 +344,7 @@ func (bs *baseSource) toRevOrErr(v Version) (r Revision, err error) {
 		}
 		// If we still don't have a rev, then the version's no good
 		if r == "" {
-			err = fmt.Errorf("Version %s does not exist in source %s", v, bs.crepo.r.Remote())
+			err = fmt.Errorf("version %s does not exist in source %s", v, bs.crepo.r.Remote())
 		}
 	}
 
@@ -402,10 +402,8 @@ func (s *gitSource) listVersions() (vlist []Version, err error) {
 	if s.cvsync {
 		vlist = make([]Version, len(s.dc.vMap))
 		k := 0
-		// TODO(sdboyer) key type of VMap should be string; recombine here
-		//for v, r := range s.dc.VMap {
-		for v := range s.dc.vMap {
-			vlist[k] = v
+		for v, r := range s.dc.vMap {
+			vlist[k] = v.Is(r)
 			k++
 		}
 
@@ -452,7 +450,7 @@ func (s *gitSource) listVersions() (vlist []Version, err error) {
 
 		all = bytes.Split(bytes.TrimSpace(out), []byte("\n"))
 		if len(all) == 0 {
-			return nil, fmt.Errorf("No versions available for %s (this is weird)", r.Remote())
+			return nil, fmt.Errorf("no versions available for %s (this is weird)", r.Remote())
 		}
 	}
 

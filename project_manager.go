@@ -74,18 +74,21 @@ func (pm *projectManager) GetManifestAndLock(r ProjectRoot, v Version) (Manifest
 		return nil, nil, err
 	}
 
-	if r, exists := pm.dc.vMap[v]; exists {
-		if pi, exists := pm.dc.infos[r]; exists {
-			return pi.Manifest, pi.Lock, nil
-		}
+	rev, err := pm.toRevOrErr(v)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Return the info from the cache, if we already have it
+	if pi, exists := pm.dc.infos[rev]; exists {
+		return pi.Manifest, pi.Lock, nil
 	}
 
 	pm.crepo.mut.Lock()
-	var err error
 	if !pm.crepo.synced {
 		err = pm.crepo.r.Update()
 		if err != nil {
-			return nil, nil, fmt.Errorf("Could not fetch latest updates into repository")
+			return nil, nil, fmt.Errorf("could not fetch latest updates into repository")
 		}
 		pm.crepo.synced = true
 	}
@@ -120,9 +123,7 @@ func (pm *projectManager) GetManifestAndLock(r ProjectRoot, v Version) (Manifest
 
 		// TODO(sdboyer) this just clobbers all over and ignores the paired/unpaired
 		// distinction; serious fix is needed
-		if r, exists := pm.dc.vMap[v]; exists {
-			pm.dc.infos[r] = pi
-		}
+		pm.dc.infos[rev] = pi
 
 		return pi.Manifest, pi.Lock, nil
 	}
@@ -135,28 +136,16 @@ func (pm *projectManager) ListPackages(pr ProjectRoot, v Version) (ptree Package
 		return
 	}
 
-	// See if we can find it in the cache
 	var r Revision
-	switch v.(type) {
-	case Revision, PairedVersion:
-		var ok bool
-		if r, ok = v.(Revision); !ok {
-			r = v.(PairedVersion).Underlying()
-		}
-
-		if ptree, cached := pm.dc.ptrees[r]; cached {
-			return ptree, nil
-		}
-	default:
-		var has bool
-		if r, has = pm.dc.vMap[v]; has {
-			if ptree, cached := pm.dc.ptrees[r]; cached {
-				return ptree, nil
-			}
-		}
+	if r, err = pm.toRevOrErr(v); err != nil {
+		return
 	}
 
-	// TODO(sdboyer) handle the case where we have a version w/out rev, and not in cache
+	// Return the ptree from the cache, if we already have it
+	var exists bool
+	if ptree, exists = pm.dc.ptrees[r]; exists {
+		return
+	}
 
 	// Not in the cache; check out the version and do the analysis
 	pm.crepo.mut.Lock()
@@ -170,7 +159,7 @@ func (pm *projectManager) ListPackages(pr ProjectRoot, v Version) (ptree Package
 		if !pm.crepo.synced {
 			err = pm.crepo.r.Update()
 			if err != nil {
-				return PackageTree{}, fmt.Errorf("Could not fetch latest updates into repository: %s", err)
+				return PackageTree{}, fmt.Errorf("could not fetch latest updates into repository: %s", err)
 			}
 			pm.crepo.synced = true
 		}
@@ -236,18 +225,41 @@ func (pm *projectManager) ListVersions() (vlist []Version, err error) {
 		// Process the version data into the cache
 		// TODO(sdboyer) detect out-of-sync data as we do this?
 		for k, v := range vpairs {
-			pm.dc.vMap[v] = v.Underlying()
-			pm.dc.rMap[v.Underlying()] = append(pm.dc.rMap[v.Underlying()], v)
+			u, r := v.Unpair(), v.Underlying()
+			pm.dc.vMap[u] = r
+			pm.dc.rMap[r] = append(pm.dc.rMap[r], u)
 			vlist[k] = v
 		}
 	} else {
 		vlist = make([]Version, len(pm.dc.vMap))
 		k := 0
-		// TODO(sdboyer) key type of VMap should be string; recombine here
-		//for v, r := range pm.dc.VMap {
-		for v := range pm.dc.vMap {
-			vlist[k] = v
+		for v, r := range pm.dc.vMap {
+			vlist[k] = v.Is(r)
 			k++
+		}
+	}
+
+	return
+}
+
+// toRevOrErr makes all efforts to convert a Version into a rev, including
+// updating the cache repo (if needed). It does not guarantee that the returned
+// Revision actually exists in the repository (as one of the cheaper methods may
+// have had bad data).
+func (pm *projectManager) toRevOrErr(v Version) (r Revision, err error) {
+	r = pm.dc.toRevision(v)
+	if r == "" {
+		// Rev can be empty if:
+		//  - The cache is unsynced
+		//  - A version was passed that used to exist, but no longer does
+		//  - A garbage version was passed. (Functionally indistinguishable from
+		//  the previous)
+		if !pm.cvsync {
+			_, err = pm.ListVersions()
+		}
+		// If we still don't have a rev, then the version's no good
+		if r == "" {
+			err = fmt.Errorf("version %s does not exist in source %s", v, pm.crepo.r.Remote())
 		}
 	}
 
