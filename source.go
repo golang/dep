@@ -454,3 +454,77 @@ func (s *gitSource) listVersions() (vlist []Version, err error) {
 	s.cvsync = true
 	return
 }
+
+// bzrSource is a generic bzr repository implementation that should work with
+// all standard git remotes.
+type bzrSource struct {
+	baseSource
+}
+
+func (s *bzrSource) listVersions() (vlist []Version, err error) {
+	if s.cvsync {
+		vlist = make([]Version, len(s.dc.vMap))
+		k := 0
+		// TODO(sdboyer) key type of VMap should be string; recombine here
+		//for v, r := range s.dc.VMap {
+		for v := range s.dc.vMap {
+			vlist[k] = v
+			k++
+		}
+
+		return
+	}
+
+	// Must first ensure cache checkout's existence
+	err = s.ensureCacheExistence()
+	if err != nil {
+		return
+	}
+
+	// Local repo won't have all the latest refs if ensureCacheExistence()
+	// didn't create it
+	if !s.crepo.synced {
+		r := s.crepo.r
+
+		s.crepo.mut.Lock()
+		err = r.Update()
+		s.crepo.mut.Unlock()
+		if err != nil {
+			return
+		}
+
+		s.crepo.synced = true
+	}
+
+	var out []byte
+
+	// Now, list all the tags
+	out, err = r.RunFromDir("bzr", "tags", "--show-ids", "-v")
+	if err != nil {
+		return
+	}
+
+	all := bytes.Split(bytes.TrimSpace(out), []byte("\n"))
+
+	// reset the rmap and vmap, as they'll be fully repopulated by this
+	// TODO(sdboyer) detect out-of-sync pairings as we do this?
+	s.dc.vMap = make(map[Version]Revision)
+	s.dc.rMap = make(map[Revision][]Version)
+
+	vlist = make([]Version, len(all))
+	k := 0
+	for _, line := range all {
+		idx := bytes.IndexByte(line, 32) // space
+		v := NewVersion(string(line[:idx]))
+		r := Revision(bytes.TrimSpace(line[idx:]))
+
+		s.dc.vMap[v] = r
+		s.dc.rMap[r] = append(s.dc.rMap[r], v)
+		vlist[k] = v.Is(r)
+		k++
+	}
+
+	// Cache is now in sync with upstream's version list
+	s.cvsync = true
+	return
+}
