@@ -371,12 +371,7 @@ decided:
 		//return nil, fmt.Errorf("Err on creating metadata cache file: %s", err)
 		//}
 
-		dc = &sourceMetaCache{
-			infos:  make(map[Revision]projectInfo),
-			ptrees: make(map[Revision]PackageTree),
-			vMap:   make(map[Version]Revision),
-			rMap:   make(map[Revision][]Version),
-		}
+		dc = newMetaCache()
 	}
 
 	pm := &projectManager{

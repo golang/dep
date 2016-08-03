@@ -29,7 +29,7 @@ func (m maybeGitSource) try(cachedir string, an ProjectAnalyzer) (source, error)
 	src := &gitSource{
 		baseSource: baseSource{
 			an: an,
-			dc: newDataCache(),
+			dc: newMetaCache(),
 			crepo: &repo{
 				r:     r,
 				rpath: path,
@@ -65,7 +65,7 @@ func (m maybeBzrSource) try(cachedir string, an ProjectAnalyzer) (source, error)
 	return &bzrSource{
 		baseSource: baseSource{
 			an: an,
-			dc: newDataCache(),
+			dc: newMetaCache(),
 			crepo: &repo{
 				r:     r,
 				rpath: path,
@@ -92,7 +92,7 @@ func (m maybeHgSource) try(cachedir string, an ProjectAnalyzer) (source, error) 
 	return &hgSource{
 		baseSource: baseSource{
 			an: an,
-			dc: newDataCache(),
+			dc: newMetaCache(),
 			crepo: &repo{
 				r:     r,
 				rpath: path,

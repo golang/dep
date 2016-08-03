@@ -22,17 +22,17 @@ type sourceMetaCache struct {
 	//Version  string                   // TODO(sdboyer) use this
 	infos  map[Revision]projectInfo
 	ptrees map[Revision]PackageTree
-	vMap   map[Version]Revision
-	rMap   map[Revision][]Version
+	vMap   map[UnpairedVersion]Revision
+	rMap   map[Revision][]UnpairedVersion
 	// TODO(sdboyer) mutexes. actually probably just one, b/c complexity
 }
 
-func newDataCache() *sourceMetaCache {
+func newMetaCache() *sourceMetaCache {
 	return &sourceMetaCache{
 		infos:  make(map[Revision]projectInfo),
 		ptrees: make(map[Revision]PackageTree),
-		vMap:   make(map[Version]Revision),
-		rMap:   make(map[Revision][]Version),
+		vMap:   make(map[UnpairedVersion]Revision),
+		rMap:   make(map[Revision][]UnpairedVersion),
 	}
 }
 
@@ -117,6 +117,46 @@ func (bs *baseSource) getManifestAndLock(r ProjectRoot, v Version) (Manifest, Lo
 	return nil, nil, err
 }
 
+// toRevision turns a Version into a Revision, if doing so is possible based on
+// the information contained in the version itself, or in the cache maps.
+func (dc *sourceMetaCache) toRevision(v Version) Revision {
+	switch t := v.(type) {
+	case Revision:
+		return t
+	case PairedVersion:
+		return t.Underlying()
+	case UnpairedVersion:
+		// This will return the empty rev (empty string) if we don't have a
+		// record of it. It's up to the caller to decide, for example, if
+		// it's appropriate to update the cache.
+		return dc.vMap[t]
+	default:
+		panic(fmt.Sprintf("Unknown version type %T", v))
+	}
+}
+
+// toUnpaired turns a Version into an UnpairedVersion, if doing so is possible
+// based on the information contained in the version itself, or in the cache
+// maps.
+//
+// If the input is a revision and multiple UnpairedVersions are associated with
+// it, whatever happens to be the first is returned.
+func (dc *sourceMetaCache) toUnpaired(v Version) UnpairedVersion {
+	switch t := v.(type) {
+	case UnpairedVersion:
+		return t
+	case PairedVersion:
+		return t.Underlying()
+	case Revision:
+		if upv, has := dc.rMap[t]; has && len(upv) > 0 {
+			return upv[0]
+		}
+		return nil
+	default:
+		panic(fmt.Sprintf("Unknown version type %T", v))
+	}
+}
+
 func (bs *baseSource) listVersions() (vlist []Version, err error) {
 	if !bs.cvsync {
 		// This check only guarantees that the upstream exists, not the cache
@@ -140,15 +180,14 @@ func (bs *baseSource) listVersions() (vlist []Version, err error) {
 		// Process the version data into the cache
 		// TODO(sdboyer) detect out-of-sync data as we do this?
 		for k, v := range vpairs {
-			bs.dc.vMap[v] = v.Underlying()
-			bs.dc.rMap[v.Underlying()] = append(bs.dc.rMap[v.Underlying()], v)
+			u, r := v.Unpair(), v.Underlying()
+			bs.dc.vMap[u] = r
+			bs.dc.rMap[r] = append(bs.dc.rMap[r], u)
 			vlist[k] = v
 		}
 	} else {
 		vlist = make([]Version, len(bs.dc.vMap))
 		k := 0
-		// TODO(sdboyer) key type of VMap should be string; recombine here
-		//for v, r := range bs.dc.VMap {
 		for v := range bs.dc.vMap {
 			vlist[k] = v
 			k++
@@ -442,13 +481,14 @@ func (s *gitSource) listVersions() (vlist []Version, err error) {
 	//
 	// reset the rmap and vmap, as they'll be fully repopulated by this
 	// TODO(sdboyer) detect out-of-sync pairings as we do this?
-	s.dc.vMap = make(map[Version]Revision)
-	s.dc.rMap = make(map[Revision][]Version)
+	s.dc.vMap = make(map[UnpairedVersion]Revision)
+	s.dc.rMap = make(map[Revision][]UnpairedVersion)
 
 	for _, v := range vlist {
 		pv := v.(PairedVersion)
-		s.dc.vMap[v] = pv.Underlying()
-		s.dc.rMap[pv.Underlying()] = append(s.dc.rMap[pv.Underlying()], v)
+		u, r := pv.Unpair(), pv.Underlying()
+		s.dc.vMap[u] = r
+		s.dc.rMap[r] = append(s.dc.rMap[r], u)
 	}
 	// Mark the cache as being in sync with upstream's version list
 	s.cvsync = true
@@ -466,7 +506,7 @@ func (s *bzrSource) listVersions() (vlist []Version, err error) {
 		vlist = make([]Version, len(s.dc.vMap))
 		k := 0
 		for v, r := range s.dc.vMap {
-			vlist[k] = v.(UnpairedVersion).Is(r)
+			vlist[k] = v.Is(r)
 			k++
 		}
 
@@ -505,8 +545,8 @@ func (s *bzrSource) listVersions() (vlist []Version, err error) {
 
 	// reset the rmap and vmap, as they'll be fully repopulated by this
 	// TODO(sdboyer) detect out-of-sync pairings as we do this?
-	s.dc.vMap = make(map[Version]Revision)
-	s.dc.rMap = make(map[Revision][]Version)
+	s.dc.vMap = make(map[UnpairedVersion]Revision)
+	s.dc.rMap = make(map[Revision][]UnpairedVersion)
 
 	vlist = make([]Version, len(all))
 	k := 0
@@ -536,8 +576,8 @@ func (s *hgSource) listVersions() (vlist []Version, err error) {
 	if s.cvsync {
 		vlist = make([]Version, len(s.dc.vMap))
 		k := 0
-		for v := range s.dc.vMap {
-			vlist[k] = v
+		for v, r := range s.dc.vMap {
+			vlist[k] = v.Is(r)
 			k++
 		}
 
@@ -622,13 +662,14 @@ func (s *hgSource) listVersions() (vlist []Version, err error) {
 
 	// reset the rmap and vmap, as they'll be fully repopulated by this
 	// TODO(sdboyer) detect out-of-sync pairings as we do this?
-	s.dc.vMap = make(map[Version]Revision)
-	s.dc.rMap = make(map[Revision][]Version)
+	s.dc.vMap = make(map[UnpairedVersion]Revision)
+	s.dc.rMap = make(map[Revision][]UnpairedVersion)
 
 	for _, v := range vlist {
 		pv := v.(PairedVersion)
-		s.dc.vMap[v] = pv.Underlying()
-		s.dc.rMap[pv.Underlying()] = append(s.dc.rMap[pv.Underlying()], v)
+		u, r := pv.Unpair(), pv.Underlying()
+		s.dc.vMap[u] = r
+		s.dc.rMap[r] = append(s.dc.rMap[r], u)
 	}
 
 	// Cache is now in sync with upstream's version list
