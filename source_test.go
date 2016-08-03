@@ -84,3 +84,89 @@ func TestGitVersionFetching(t *testing.T) {
 		}
 	}
 }
+
+func TestBzrVersionFetching(t *testing.T) {
+	// This test is quite slow (ugh bzr), so skip it on -short
+	if testing.Short() {
+		t.Skip("Skipping bzr source version fetching test in short mode")
+	}
+
+	cpath, err := ioutil.TempDir("", "smcache")
+	if err != nil {
+		t.Errorf("Failed to create temp dir: %s", err)
+	}
+	rf := func() {
+		err := removeAll(cpath)
+		if err != nil {
+			t.Errorf("removeAll failed: %s", err)
+		}
+	}
+
+	n := "launchpad.net/govcstestbzrrepo"
+	u, err := url.Parse("https://" + n)
+	if err != nil {
+		t.Errorf("URL was bad, lolwut? errtext: %s", err)
+		rf()
+		t.FailNow()
+	}
+	mb := maybeBzrSource{
+		n:   n,
+		url: u,
+	}
+
+	isrc, err := mb.try(cpath, naiveAnalyzer{})
+	if err != nil {
+		t.Errorf("Unexpected error while setting up bzrSource for test repo: %s", err)
+		rf()
+		t.FailNow()
+	}
+	src, ok := isrc.(*bzrSource)
+	if !ok {
+		t.Errorf("Expected a bzrSource, got a %T", isrc)
+		rf()
+		t.FailNow()
+	}
+
+	vlist, err := src.listVersions()
+	if err != nil {
+		t.Errorf("Unexpected error getting version pairs from bzr repo: %s", err)
+	}
+
+	if src.ex.s&existsUpstream|existsInCache != existsUpstream|existsInCache {
+		t.Errorf("bzrSource.listVersions() should have set the upstream and cache existence bits for search")
+	}
+	if src.ex.f&existsUpstream|existsInCache != existsUpstream|existsInCache {
+		t.Errorf("bzrSource.listVersions() should have set the upstream and cache existence bits for found")
+	}
+
+	if len(vlist) != 1 {
+		t.Errorf("bzr test repo should've produced one version, got %v", len(vlist))
+	} else {
+		v := NewVersion("1.0.0").Is(Revision("matt@mattfarina.com-20150731135137-pbphasfppmygpl68"))
+		if vlist[0] != v {
+			t.Errorf("bzr pair fetch reported incorrect first version, got %s", vlist[0])
+		}
+	}
+
+	// Run again, this time to ensure cache outputs correctly
+	vlist, err = src.listVersions()
+	if err != nil {
+		t.Errorf("Unexpected error getting version pairs from bzr repo: %s", err)
+	}
+
+	if src.ex.s&existsUpstream|existsInCache != existsUpstream|existsInCache {
+		t.Errorf("bzrSource.listVersions() should have set the upstream and cache existence bits for search")
+	}
+	if src.ex.f&existsUpstream|existsInCache != existsUpstream|existsInCache {
+		t.Errorf("bzrSource.listVersions() should have set the upstream and cache existence bits for found")
+	}
+
+	if len(vlist) != 1 {
+		t.Errorf("bzr test repo should've produced one version, got %v", len(vlist))
+	} else {
+		v := NewVersion("1.0.0").Is(Revision("matt@mattfarina.com-20150731135137-pbphasfppmygpl68"))
+		if vlist[0] != v {
+			t.Errorf("bzr pair fetch reported incorrect first version, got %s", vlist[0])
+		}
+	}
+}
