@@ -73,3 +73,30 @@ func (m maybeBzrSource) try(cachedir string, an ProjectAnalyzer) (source, error)
 		},
 	}, nil
 }
+
+type maybeHgSource struct {
+	n   string
+	url *url.URL
+}
+
+func (m maybeHgSource) try(cachedir string, an ProjectAnalyzer) (source, error) {
+	path := filepath.Join(cachedir, "sources", sanitizer.Replace(m.url.String()))
+	r, err := vcs.NewHgRepo(m.url.String(), path)
+	if err != nil {
+		return nil, err
+	}
+	if !r.Ping() {
+		return nil, fmt.Errorf("Remote repository at %s does not exist, or is inaccessible", m.url.String())
+	}
+
+	return &hgSource{
+		baseSource: baseSource{
+			an: an,
+			dc: newDataCache(),
+			crepo: &repo{
+				r:     r,
+				rpath: path,
+			},
+		},
+	}, nil
+}

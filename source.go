@@ -456,7 +456,7 @@ func (s *gitSource) listVersions() (vlist []Version, err error) {
 }
 
 // bzrSource is a generic bzr repository implementation that should work with
-// all standard git remotes.
+// all standard bazaar remotes.
 type bzrSource struct {
 	baseSource
 }
@@ -483,7 +483,6 @@ func (s *bzrSource) listVersions() (vlist []Version, err error) {
 	// Local repo won't have all the latest refs if ensureCacheExistence()
 	// didn't create it
 	if !s.crepo.synced {
-
 		s.crepo.mut.Lock()
 		err = r.Update()
 		s.crepo.mut.Unlock()
@@ -520,6 +519,116 @@ func (s *bzrSource) listVersions() (vlist []Version, err error) {
 		s.dc.rMap[r] = append(s.dc.rMap[r], v)
 		vlist[k] = v.Is(r)
 		k++
+	}
+
+	// Cache is now in sync with upstream's version list
+	s.cvsync = true
+	return
+}
+
+// hgSource is a generic hg repository implementation that should work with
+// all standard mercurial servers.
+type hgSource struct {
+	baseSource
+}
+
+func (s *hgSource) listVersions() (vlist []Version, err error) {
+	if s.cvsync {
+		vlist = make([]Version, len(s.dc.vMap))
+		k := 0
+		for v := range s.dc.vMap {
+			vlist[k] = v
+			k++
+		}
+
+		return
+	}
+
+	// Must first ensure cache checkout's existence
+	err = s.ensureCacheExistence()
+	if err != nil {
+		return
+	}
+	r := s.crepo.r
+
+	// Local repo won't have all the latest refs if ensureCacheExistence()
+	// didn't create it
+	if !s.crepo.synced {
+		s.crepo.mut.Lock()
+		err = r.Update()
+		s.crepo.mut.Unlock()
+		if err != nil {
+			return
+		}
+
+		s.crepo.synced = true
+	}
+
+	var out []byte
+
+	// Now, list all the tags
+	out, err = r.RunFromDir("hg", "tags", "--debug", "--verbose")
+	if err != nil {
+		return
+	}
+
+	all := bytes.Split(bytes.TrimSpace(out), []byte("\n"))
+	lbyt := []byte("local")
+	nulrev := []byte("0000000000000000000000000000000000000000")
+	for _, line := range all {
+		if bytes.Equal(lbyt, line[len(line)-len(lbyt):]) {
+			// Skip local tags
+			continue
+		}
+
+		// tip is magic, don't include it
+		if bytes.HasPrefix(line, []byte("tip")) {
+			continue
+		}
+
+		// Split on colon; this gets us the rev and the tag plus local revno
+		pair := bytes.Split(line, []byte(":"))
+		if bytes.Equal(nulrev, pair[1]) {
+			// null rev indicates this tag is marked for deletion
+			continue
+		}
+
+		idx := bytes.IndexByte(pair[0], 32) // space
+		v := NewVersion(string(pair[0][:idx])).Is(Revision(pair[1])).(PairedVersion)
+		vlist = append(vlist, v)
+	}
+
+	out, err = r.RunFromDir("hg", "branches", "--debug", "--verbose")
+	if err != nil {
+		// better nothing than partial and misleading
+		vlist = nil
+		return
+	}
+
+	all = bytes.Split(bytes.TrimSpace(out), []byte("\n"))
+	lbyt = []byte("(inactive)")
+	for _, line := range all {
+		if bytes.Equal(lbyt, line[len(line)-len(lbyt):]) {
+			// Skip inactive branches
+			continue
+		}
+
+		// Split on colon; this gets us the rev and the branch plus local revno
+		pair := bytes.Split(line, []byte(":"))
+		idx := bytes.IndexByte(pair[0], 32) // space
+		v := NewBranch(string(pair[0][:idx])).Is(Revision(pair[1])).(PairedVersion)
+		vlist = append(vlist, v)
+	}
+
+	// reset the rmap and vmap, as they'll be fully repopulated by this
+	// TODO(sdboyer) detect out-of-sync pairings as we do this?
+	s.dc.vMap = make(map[Version]Revision)
+	s.dc.rMap = make(map[Revision][]Version)
+
+	for _, v := range vlist {
+		pv := v.(PairedVersion)
+		s.dc.vMap[v] = pv.Underlying()
+		s.dc.rMap[pv.Underlying()] = append(s.dc.rMap[pv.Underlying()], v)
 	}
 
 	// Cache is now in sync with upstream's version list
