@@ -341,7 +341,12 @@ func (bs *baseSource) toRevOrErr(v Version) (r Revision, err error) {
 		if !bs.cvsync {
 			// call the lvfunc to sync the meta cache
 			_, err = bs.lvfunc()
+			if err != nil {
+				return
+			}
 		}
+
+		r = bs.dc.toRevision(v)
 		// If we still don't have a rev, then the version's no good
 		if r == "" {
 			err = fmt.Errorf("version %s does not exist in source %s", v, bs.crepo.r.Remote())

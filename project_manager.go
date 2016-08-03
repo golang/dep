@@ -256,7 +256,12 @@ func (pm *projectManager) toRevOrErr(v Version) (r Revision, err error) {
 		//  the previous)
 		if !pm.cvsync {
 			_, err = pm.ListVersions()
+			if err != nil {
+				return
+			}
 		}
+
+		r = pm.dc.toRevision(v)
 		// If we still don't have a rev, then the version's no good
 		if r == "" {
 			err = fmt.Errorf("version %s does not exist in source %s", v, pm.crepo.r.Remote())
