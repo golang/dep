@@ -9,7 +9,7 @@ import (
 )
 
 func TestGitVersionFetching(t *testing.T) {
-	// This test is quite slow, skip it on -short
+	// This test is slowish, skip it on -short
 	if testing.Short() {
 		t.Skip("Skipping git source version fetching test in short mode")
 	}

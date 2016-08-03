@@ -465,10 +465,8 @@ func (s *bzrSource) listVersions() (vlist []Version, err error) {
 	if s.cvsync {
 		vlist = make([]Version, len(s.dc.vMap))
 		k := 0
-		// TODO(sdboyer) key type of VMap should be string; recombine here
-		//for v, r := range s.dc.VMap {
-		for v := range s.dc.vMap {
-			vlist[k] = v
+		for v, r := range s.dc.vMap {
+			vlist[k] = v.(UnpairedVersion).Is(r)
 			k++
 		}
 
@@ -480,11 +478,11 @@ func (s *bzrSource) listVersions() (vlist []Version, err error) {
 	if err != nil {
 		return
 	}
+	r := s.crepo.r
 
 	// Local repo won't have all the latest refs if ensureCacheExistence()
 	// didn't create it
 	if !s.crepo.synced {
-		r := s.crepo.r
 
 		s.crepo.mut.Lock()
 		err = r.Update()
