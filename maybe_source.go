@@ -25,7 +25,7 @@ func (m maybeGitSource) try(cachedir string, an ProjectAnalyzer) (source, error)
 		return nil, err
 	}
 
-	pm := &gitSource{
+	src := &gitSource{
 		baseSource: baseSource{
 			an: an,
 			dc: newDataCache(),
@@ -36,12 +36,12 @@ func (m maybeGitSource) try(cachedir string, an ProjectAnalyzer) (source, error)
 		},
 	}
 
-	_, err = pm.listVersions()
+	_, err = src.listVersions()
 	if err != nil {
 		return nil, err
 		//} else if pm.ex.f&existsUpstream == existsUpstream {
 		//return pm, nil
 	}
 
-	return pm, nil
+	return src, nil
 }

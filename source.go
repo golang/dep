@@ -36,10 +36,6 @@ func newDataCache() *sourceMetaCache {
 	}
 }
 
-type gitSource struct {
-	baseSource
-}
-
 type baseSource struct { // TODO(sdboyer) rename to baseVCSSource
 	// Object for the cache repository
 	crepo *repo
@@ -198,6 +194,7 @@ func (bs *baseSource) ensureCacheExistence() error {
 			if err != nil {
 				return fmt.Errorf("failed to create repository cache for %s", bs.crepo.r.Remote())
 			}
+			bs.crepo.synced = true
 			bs.ex.s |= existsInCache
 			bs.ex.f |= existsInCache
 		} else {
@@ -303,6 +300,12 @@ func (bs *baseSource) exportVersionTo(v Version, to string) error {
 	return bs.crepo.exportVersionTo(v, to)
 }
 
+// gitSource is a generic git repository implementation that should work with
+// all standard git remotes.
+type gitSource struct {
+	baseSource
+}
+
 func (s *gitSource) exportVersionTo(v Version, to string) error {
 	s.crepo.mut.Lock()
 	defer s.crepo.mut.Unlock()
@@ -384,7 +387,9 @@ func (s *gitSource) listVersions() (vlist []Version, err error) {
 		// Also, local is definitely now synced
 		s.crepo.synced = true
 
+		s.crepo.mut.RLock()
 		out, err = r.RunFromDir("git", "show-ref", "--dereference")
+		s.crepo.mut.RUnlock()
 		if err != nil {
 			// TODO(sdboyer) More-er proper-er error
 			return
