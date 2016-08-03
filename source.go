@@ -50,10 +50,13 @@ type baseSource struct { // TODO(sdboyer) rename to baseVCSSource
 	// Whether the cache has the latest info on versions
 	cvsync bool
 
-	// The project metadata cache. This is persisted to disk, for reuse across
-	// solver runs.
-	// TODO(sdboyer) protect with mutex
+	// The project metadata cache. This is (or is intended to be) persisted to
+	// disk, for reuse across solver runs.
 	dc *sourceMetaCache
+
+	// lvfunc allows the other vcs source types that embed this type to inject
+	// their listVersions func into the baseSource, for use as needed.
+	lvfunc func() (vlist []Version, err error)
 }
 
 func (bs *baseSource) getManifestAndLock(r ProjectRoot, v Version) (Manifest, Lock, error) {
@@ -61,14 +64,17 @@ func (bs *baseSource) getManifestAndLock(r ProjectRoot, v Version) (Manifest, Lo
 		return nil, nil, err
 	}
 
-	if r, exists := bs.dc.vMap[v]; exists {
-		if pi, exists := bs.dc.infos[r]; exists {
-			return pi.Manifest, pi.Lock, nil
-		}
+	rev, err := bs.toRevOrErr(v)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Return the info from the cache, if we already have it
+	if pi, exists := bs.dc.infos[rev]; exists {
+		return pi.Manifest, pi.Lock, nil
 	}
 
 	bs.crepo.mut.Lock()
-	var err error
 	if !bs.crepo.synced {
 		err = bs.crepo.r.Update()
 		if err != nil {
@@ -84,6 +90,7 @@ func (bs *baseSource) getManifestAndLock(r ProjectRoot, v Version) (Manifest, Lo
 		err = bs.crepo.r.UpdateVersion(v.String())
 	}
 	bs.crepo.mut.Unlock()
+
 	if err != nil {
 		// TODO(sdboyer) More-er proper-er error
 		panic(fmt.Sprintf("canary - why is checkout/whatever failing: %s %s %s", bs.crepo.r.LocalPath(), v.String(), err))
@@ -105,11 +112,7 @@ func (bs *baseSource) getManifestAndLock(r ProjectRoot, v Version) (Manifest, Lo
 			Lock:     l,
 		}
 
-		// TODO(sdboyer) this just clobbers all over and ignores the paired/unpaired
-		// distinction; serious fix is needed
-		if r, exists := bs.dc.vMap[v]; exists {
-			bs.dc.infos[r] = pi
-		}
+		bs.dc.infos[rev] = pi
 
 		return pi.Manifest, pi.Lock, nil
 	}
@@ -146,7 +149,7 @@ func (dc *sourceMetaCache) toUnpaired(v Version) UnpairedVersion {
 	case UnpairedVersion:
 		return t
 	case PairedVersion:
-		return t.Underlying()
+		return t.Unpair()
 	case Revision:
 		if upv, has := dc.rMap[t]; has && len(upv) > 0 {
 			return upv[0]
@@ -282,28 +285,16 @@ func (bs *baseSource) listPackages(pr ProjectRoot, v Version) (ptree PackageTree
 		return
 	}
 
-	// See if we can find it in the cache
 	var r Revision
-	switch v.(type) {
-	case Revision, PairedVersion:
-		var ok bool
-		if r, ok = v.(Revision); !ok {
-			r = v.(PairedVersion).Underlying()
-		}
-
-		if ptree, cached := bs.dc.ptrees[r]; cached {
-			return ptree, nil
-		}
-	default:
-		var has bool
-		if r, has = bs.dc.vMap[v]; has {
-			if ptree, cached := bs.dc.ptrees[r]; cached {
-				return ptree, nil
-			}
-		}
+	if r, err = bs.toRevOrErr(v); err != nil {
+		return
 	}
 
-	// TODO(sdboyer) handle the case where we have a version w/out rev, and not in cache
+	// Return the ptree from the cache, if we already have it
+	var exists bool
+	if ptree, exists = bs.dc.ptrees[r]; exists {
+		return
+	}
 
 	// Not in the cache; check out the version and do the analysis
 	bs.crepo.mut.Lock()
@@ -330,6 +321,31 @@ func (bs *baseSource) listPackages(pr ProjectRoot, v Version) (ptree PackageTree
 	// TODO(sdboyer) cache errs?
 	if err != nil {
 		bs.dc.ptrees[r] = ptree
+	}
+
+	return
+}
+
+// toRevOrErr makes all efforts to convert a Version into a rev, including
+// updating the cache repo (if needed). It does not guarantee that the returned
+// Revision actually exists in the repository (as one of the cheaper methods may
+// have had bad data).
+func (bs *baseSource) toRevOrErr(v Version) (r Revision, err error) {
+	r = bs.dc.toRevision(v)
+	if r == "" {
+		// Rev can be empty if:
+		//  - The cache is unsynced
+		//  - A version was passed that used to exist, but no longer does
+		//  - A garbage version was passed. (Functionally indistinguishable from
+		//  the previous)
+		if !bs.cvsync {
+			// call the lvfunc to sync the meta cache
+			_, err = bs.lvfunc()
+		}
+		// If we still don't have a rev, then the version's no good
+		if r == "" {
+			err = fmt.Errorf("Version %s does not exist in source %s", v, bs.crepo.r.Remote())
+		}
 	}
 
 	return
