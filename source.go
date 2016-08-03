@@ -36,7 +36,7 @@ func newMetaCache() *sourceMetaCache {
 	}
 }
 
-type baseSource struct { // TODO(sdboyer) rename to baseVCSSource
+type baseVCSSource struct {
 	// Object for the cache repository
 	crepo *repo
 
@@ -59,7 +59,7 @@ type baseSource struct { // TODO(sdboyer) rename to baseVCSSource
 	lvfunc func() (vlist []Version, err error)
 }
 
-func (bs *baseSource) getManifestAndLock(r ProjectRoot, v Version) (Manifest, Lock, error) {
+func (bs *baseVCSSource) getManifestAndLock(r ProjectRoot, v Version) (Manifest, Lock, error) {
 	if err := bs.ensureCacheExistence(); err != nil {
 		return nil, nil, err
 	}
@@ -160,7 +160,7 @@ func (dc *sourceMetaCache) toUnpaired(v Version) UnpairedVersion {
 	}
 }
 
-func (bs *baseSource) listVersions() (vlist []Version, err error) {
+func (bs *baseVCSSource) listVersions() (vlist []Version, err error) {
 	if !bs.cvsync {
 		// This check only guarantees that the upstream exists, not the cache
 		bs.ex.s |= existsUpstream
@@ -200,7 +200,7 @@ func (bs *baseSource) listVersions() (vlist []Version, err error) {
 	return
 }
 
-func (bs *baseSource) revisionPresentIn(r Revision) (bool, error) {
+func (bs *baseVCSSource) revisionPresentIn(r Revision) (bool, error) {
 	// First and fastest path is to check the data cache to see if the rev is
 	// present. This could give us false positives, but the cases where that can
 	// occur would require a type of cache staleness that seems *exceedingly*
@@ -221,7 +221,7 @@ func (bs *baseSource) revisionPresentIn(r Revision) (bool, error) {
 	return bs.crepo.r.IsReference(string(r)), nil
 }
 
-func (bs *baseSource) ensureCacheExistence() error {
+func (bs *baseVCSSource) ensureCacheExistence() error {
 	// Technically, methods could could attempt to return straight from the
 	// metadata cache even if the repo cache doesn't exist on disk. But that
 	// would allow weird state inconsistencies (cache exists, but no repo...how
@@ -254,7 +254,7 @@ func (bs *baseSource) ensureCacheExistence() error {
 // Note that this may perform read-ish operations on the cache repo, and it
 // takes a lock accordingly. This makes it unsafe to call from a segment where
 // the cache repo mutex is already write-locked, as deadlock will occur.
-func (bs *baseSource) checkExistence(ex projectExistence) bool {
+func (bs *baseVCSSource) checkExistence(ex projectExistence) bool {
 	if bs.ex.s&ex != ex {
 		if ex&existsInVendorRoot != 0 && bs.ex.s&existsInVendorRoot == 0 {
 			panic("should now be implemented in bridge")
@@ -280,7 +280,7 @@ func (bs *baseSource) checkExistence(ex projectExistence) bool {
 	return ex&bs.ex.f == ex
 }
 
-func (bs *baseSource) listPackages(pr ProjectRoot, v Version) (ptree PackageTree, err error) {
+func (bs *baseVCSSource) listPackages(pr ProjectRoot, v Version) (ptree PackageTree, err error) {
 	if err = bs.ensureCacheExistence(); err != nil {
 		return
 	}
@@ -330,7 +330,7 @@ func (bs *baseSource) listPackages(pr ProjectRoot, v Version) (ptree PackageTree
 // updating the cache repo (if needed). It does not guarantee that the returned
 // Revision actually exists in the repository (as one of the cheaper methods may
 // have had bad data).
-func (bs *baseSource) toRevOrErr(v Version) (r Revision, err error) {
+func (bs *baseVCSSource) toRevOrErr(v Version) (r Revision, err error) {
 	r = bs.dc.toRevision(v)
 	if r == "" {
 		// Rev can be empty if:
@@ -356,14 +356,14 @@ func (bs *baseSource) toRevOrErr(v Version) (r Revision, err error) {
 	return
 }
 
-func (bs *baseSource) exportVersionTo(v Version, to string) error {
+func (bs *baseVCSSource) exportVersionTo(v Version, to string) error {
 	return bs.crepo.exportVersionTo(v, to)
 }
 
 // gitSource is a generic git repository implementation that should work with
 // all standard git remotes.
 type gitSource struct {
-	baseSource
+	baseVCSSource
 }
 
 func (s *gitSource) exportVersionTo(v Version, to string) error {
@@ -517,7 +517,7 @@ func (s *gitSource) listVersions() (vlist []Version, err error) {
 // bzrSource is a generic bzr repository implementation that should work with
 // all standard bazaar remotes.
 type bzrSource struct {
-	baseSource
+	baseVCSSource
 }
 
 func (s *bzrSource) listVersions() (vlist []Version, err error) {
@@ -588,7 +588,7 @@ func (s *bzrSource) listVersions() (vlist []Version, err error) {
 // hgSource is a generic hg repository implementation that should work with
 // all standard mercurial servers.
 type hgSource struct {
-	baseSource
+	baseVCSSource
 }
 
 func (s *hgSource) listVersions() (vlist []Version, err error) {
