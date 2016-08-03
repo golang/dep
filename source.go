@@ -3,13 +3,10 @@ package gps
 import (
 	"bytes"
 	"fmt"
-	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
-
-	"github.com/Masterminds/vcs"
 )
 
 type source interface {
@@ -39,47 +36,8 @@ func newDataCache() *sourceMetaCache {
 	}
 }
 
-type maybeSource interface {
-	try(cachedir string, an ProjectAnalyzer) (source, error)
-}
-
-type maybeSources []maybeSource
-
-type maybeGitSource struct {
-	n   string
-	url *url.URL
-}
-
 type gitSource struct {
 	baseSource
-}
-
-func (m maybeGitSource) try(cachedir string, an ProjectAnalyzer) (source, error) {
-	path := filepath.Join(cachedir, "sources", sanitizer.Replace(m.url.String()))
-	r, err := vcs.NewGitRepo(m.url.String(), path)
-	if err != nil {
-		return nil, err
-	}
-
-	pm := &gitSource{
-		baseSource: baseSource{
-			an: an,
-			dc: newDataCache(),
-			crepo: &repo{
-				r:     r,
-				rpath: path,
-			},
-		},
-	}
-
-	_, err = pm.listVersions()
-	if err != nil {
-		return nil, err
-		//} else if pm.ex.f&existsUpstream == existsUpstream {
-		//return pm, nil
-	}
-
-	return pm, nil
 }
 
 type baseSource struct { // TODO(sdboyer) rename to baseVCSSource
@@ -339,6 +297,10 @@ func (bs *baseSource) listPackages(pr ProjectRoot, v Version) (ptree PackageTree
 	}
 
 	return
+}
+
+func (bs *baseSource) exportVersionTo(v Version, to string) error {
+	return bs.crepo.exportVersionTo(v, to)
 }
 
 func (s *gitSource) exportVersionTo(v Version, to string) error {
