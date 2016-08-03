@@ -69,6 +69,7 @@ There are also some current non-choices that we would like to push into the real
 
 * Different versions of packages from the same repository cannot be used
 * Importable projects that are not bound to the repository root
+* Source inference around different import path patterns (e.g., how `github.com/*` or `my_company/*` are handled)
 
 ### Choices
 
