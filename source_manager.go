@@ -3,7 +3,6 @@ package gps
 import (
 	"encoding/json"
 	"fmt"
-	"go/build"
 	"os"
 	"path/filepath"
 	"strings"
@@ -85,7 +84,6 @@ type SourceMgr struct {
 	}
 	rmut sync.RWMutex
 	an   ProjectAnalyzer
-	ctx  build.Context
 }
 
 var _ SourceManager = &SourceMgr{}
@@ -136,10 +134,6 @@ func NewSourceManager(an ProjectAnalyzer, cachedir string, force bool) (*SourceM
 		return nil, fmt.Errorf("failed to create global cache lock file at %s with err %s", glpath, err)
 	}
 
-	ctx := build.Default
-	// Replace GOPATH with our cache dir
-	ctx.GOPATH = cachedir
-
 	return &SourceMgr{
 		cachedir: cachedir,
 		pms:      make(map[string]*pmState),
@@ -147,8 +141,7 @@ func NewSourceManager(an ProjectAnalyzer, cachedir string, force bool) (*SourceM
 			rr  *remoteRepo
 			err error
 		}),
-		ctx: ctx,
-		an:  an,
+		an: an,
 	}, nil
 }
 
