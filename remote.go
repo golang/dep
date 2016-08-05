@@ -22,10 +22,6 @@ type remoteRepo struct {
 	VCS      []string
 }
 
-type stringFuture func() (string, error)
-type sourceFuture func() (source, error)
-type partialSourceFuture func(string, ProjectAnalyzer) sourceFuture
-
 var (
 	gitSchemes = []string{"https", "ssh", "git", "http"}
 	bzrSchemes = []string{"https", "bzr+ssh", "bzr", "http"}
@@ -81,49 +77,25 @@ var (
 	pathvld     = regexp.MustCompile(`^([A-Za-z0-9-]+)(\.[A-Za-z0-9-]+)+(/[A-Za-z0-9-_.~]+)*$`)
 )
 
-func simpleStringFuture(s string) stringFuture {
-	return func() (string, error) {
-		return s, nil
-	}
-}
-
-func sourceFutureFactory(mb maybeSource) func(string, ProjectAnalyzer) sourceFuture {
-	return func(cachedir string, an ProjectAnalyzer) sourceFuture {
-		var src source
-		var err error
-
-		c := make(chan struct{}, 1)
-		go func() {
-			defer close(c)
-			src, err = mb.try(cachedir, an)
-		}()
-
-		return func() (source, error) {
-			<-c
-			return src, err
-		}
-	}
-}
-
 type pathDeducer interface {
-	deduceRoot(string) (stringFuture, error)
-	deduceSource(string, *url.URL) (func(string, ProjectAnalyzer) sourceFuture, error)
+	deduceRoot(string) (string, error)
+	deduceSource(string, *url.URL) (maybeSource, error)
 }
 
 type githubDeducer struct {
 	regexp *regexp.Regexp
 }
 
-func (m githubDeducer) deduceRoot(path string) (stringFuture, error) {
+func (m githubDeducer) deduceRoot(path string) (string, error) {
 	v := m.regexp.FindStringSubmatch(path)
 	if v == nil {
-		return nil, fmt.Errorf("%s is not a valid path for a source on github.com", path)
+		return "", fmt.Errorf("%s is not a valid path for a source on github.com", path)
 	}
 
-	return simpleStringFuture("github.com/" + v[2]), nil
+	return "github.com/" + v[2], nil
 }
 
-func (m githubDeducer) deduceSource(path string, u *url.URL) (func(string, ProjectAnalyzer) sourceFuture, error) {
+func (m githubDeducer) deduceSource(path string, u *url.URL) (maybeSource, error) {
 	v := m.regexp.FindStringSubmatch(path)
 	if v == nil {
 		return nil, fmt.Errorf("%s is not a valid path for a source on github.com", path)
@@ -134,7 +106,7 @@ func (m githubDeducer) deduceSource(path string, u *url.URL) (func(string, Proje
 		if !validateVCSScheme(u.Scheme, "git") {
 			return nil, fmt.Errorf("%s is not a valid scheme for accessing a git repository", u.Scheme)
 		}
-		return sourceFutureFactory(maybeGitSource{url: u}), nil
+		return maybeGitSource{url: u}, nil
 	}
 
 	mb := make(maybeSources, len(gitSchemes))
@@ -144,23 +116,23 @@ func (m githubDeducer) deduceSource(path string, u *url.URL) (func(string, Proje
 		mb[k] = maybeGitSource{url: &u2}
 	}
 
-	return sourceFutureFactory(mb), nil
+	return mb, nil
 }
 
 type bitbucketDeducer struct {
 	regexp *regexp.Regexp
 }
 
-func (m bitbucketDeducer) deduceRoot(path string) (stringFuture, error) {
+func (m bitbucketDeducer) deduceRoot(path string) (string, error) {
 	v := m.regexp.FindStringSubmatch(path)
 	if v == nil {
-		return nil, fmt.Errorf("%s is not a valid path for a source on bitbucket.org", path)
+		return "", fmt.Errorf("%s is not a valid path for a source on bitbucket.org", path)
 	}
 
-	return simpleStringFuture("bitbucket.org/" + v[2]), nil
+	return "bitbucket.org/" + v[2], nil
 }
 
-func (m bitbucketDeducer) deduceSource(path string, u *url.URL) (func(string, ProjectAnalyzer) sourceFuture, error) {
+func (m bitbucketDeducer) deduceSource(path string, u *url.URL) (maybeSource, error) {
 	v := m.regexp.FindStringSubmatch(path)
 	if v == nil {
 		return nil, fmt.Errorf("%s is not a valid path for a source on bitbucket.org", path)
@@ -177,22 +149,22 @@ func (m bitbucketDeducer) deduceSource(path string, u *url.URL) (func(string, Pr
 			if !validgit {
 				return nil, fmt.Errorf("%s is not a valid scheme for accessing a git repository", u.Scheme)
 			}
-			return sourceFutureFactory(maybeGitSource{url: u}), nil
+			return maybeGitSource{url: u}, nil
 		} else if ishg {
 			if !validhg {
 				return nil, fmt.Errorf("%s is not a valid scheme for accessing an hg repository", u.Scheme)
 			}
-			return sourceFutureFactory(maybeHgSource{url: u}), nil
+			return maybeHgSource{url: u}, nil
 		} else if !validgit && !validhg {
 			return nil, fmt.Errorf("%s is not a valid scheme for accessing either a git or hg repository", u.Scheme)
 		}
 
 		// No other choice, make an option for both git and hg
-		return sourceFutureFactory(maybeSources{
+		return maybeSources{
 			// Git first, because it's a) faster and b) git
 			maybeGitSource{url: u},
 			maybeHgSource{url: u},
-		}), nil
+		}, nil
 	}
 
 	mb := make(maybeSources, 0)
@@ -212,24 +184,23 @@ func (m bitbucketDeducer) deduceSource(path string, u *url.URL) (func(string, Pr
 		}
 	}
 
-	return sourceFutureFactory(mb), nil
+	return mb, nil
 }
 
 type gopkginDeducer struct {
 	regexp *regexp.Regexp
 }
 
-func (m gopkginDeducer) deduceRoot(path string) (stringFuture, error) {
+func (m gopkginDeducer) deduceRoot(path string) (string, error) {
 	v := m.regexp.FindStringSubmatch(path)
 	if v == nil {
-		return nil, fmt.Errorf("%s is not a valid path for a source on gopkg.in", path)
+		return "", fmt.Errorf("%s is not a valid path for a source on gopkg.in", path)
 	}
 
-	return simpleStringFuture("gopkg.in/" + v[2]), nil
+	return "gopkg.in/" + v[2], nil
 }
 
-func (m gopkginDeducer) deduceSource(path string, u *url.URL) (func(string, ProjectAnalyzer) sourceFuture, error) {
-
+func (m gopkginDeducer) deduceSource(path string, u *url.URL) (maybeSource, error) {
 	v := m.regexp.FindStringSubmatch(path)
 	if v == nil {
 		return nil, fmt.Errorf("%s is not a valid path for a source on gopkg.in", path)
@@ -264,25 +235,25 @@ func (m gopkginDeducer) deduceSource(path string, u *url.URL) (func(string, Proj
 		mb[k] = maybeGitSource{url: &u2}
 	}
 
-	return sourceFutureFactory(mb), nil
+	return mb, nil
 }
 
 type launchpadDeducer struct {
 	regexp *regexp.Regexp
 }
 
-func (m launchpadDeducer) deduceRoot(path string) (stringFuture, error) {
+func (m launchpadDeducer) deduceRoot(path string) (string, error) {
 	// TODO(sdboyer) lp handling is nasty - there's ambiguities which can only really
 	// be resolved with a metadata request. See https://github.com/golang/go/issues/11436
 	v := m.regexp.FindStringSubmatch(path)
 	if v == nil {
-		return nil, fmt.Errorf("%s is not a valid path for a source on launchpad.net", path)
+		return "", fmt.Errorf("%s is not a valid path for a source on launchpad.net", path)
 	}
 
-	return simpleStringFuture("launchpad.net/" + v[2]), nil
+	return "launchpad.net/" + v[2], nil
 }
 
-func (m launchpadDeducer) deduceSource(path string, u *url.URL) (func(string, ProjectAnalyzer) sourceFuture, error) {
+func (m launchpadDeducer) deduceSource(path string, u *url.URL) (maybeSource, error) {
 	v := m.regexp.FindStringSubmatch(path)
 	if v == nil {
 		return nil, fmt.Errorf("%s is not a valid path for a source on launchpad.net", path)
@@ -293,7 +264,7 @@ func (m launchpadDeducer) deduceSource(path string, u *url.URL) (func(string, Pr
 		if !validateVCSScheme(u.Scheme, "bzr") {
 			return nil, fmt.Errorf("%s is not a valid scheme for accessing a bzr repository", u.Scheme)
 		}
-		return sourceFutureFactory(maybeBzrSource{url: u}), nil
+		return maybeBzrSource{url: u}, nil
 	}
 
 	mb := make(maybeSources, len(bzrSchemes))
@@ -303,24 +274,24 @@ func (m launchpadDeducer) deduceSource(path string, u *url.URL) (func(string, Pr
 		mb[k] = maybeBzrSource{url: &u2}
 	}
 
-	return sourceFutureFactory(mb), nil
+	return mb, nil
 }
 
 type launchpadGitDeducer struct {
 	regexp *regexp.Regexp
 }
 
-func (m launchpadGitDeducer) deduceRoot(path string) (stringFuture, error) {
+func (m launchpadGitDeducer) deduceRoot(path string) (string, error) {
 	// TODO(sdboyer) same ambiguity issues as with normal bzr lp
 	v := m.regexp.FindStringSubmatch(path)
 	if v == nil {
-		return nil, fmt.Errorf("%s is not a valid path for a source on git.launchpad.net", path)
+		return "", fmt.Errorf("%s is not a valid path for a source on git.launchpad.net", path)
 	}
 
-	return simpleStringFuture("git.launchpad.net/" + v[2]), nil
+	return "git.launchpad.net/" + v[2], nil
 }
 
-func (m launchpadGitDeducer) deduceSource(path string, u *url.URL) (func(string, ProjectAnalyzer) sourceFuture, error) {
+func (m launchpadGitDeducer) deduceSource(path string, u *url.URL) (maybeSource, error) {
 	v := m.regexp.FindStringSubmatch(path)
 	if v == nil {
 		return nil, fmt.Errorf("%s is not a valid path for a source on git.launchpad.net", path)
@@ -331,7 +302,7 @@ func (m launchpadGitDeducer) deduceSource(path string, u *url.URL) (func(string,
 		if !validateVCSScheme(u.Scheme, "git") {
 			return nil, fmt.Errorf("%s is not a valid scheme for accessing a git repository", u.Scheme)
 		}
-		return sourceFutureFactory(maybeGitSource{url: u}), nil
+		return maybeGitSource{url: u}, nil
 	}
 
 	mb := make(maybeSources, len(bzrSchemes))
@@ -341,23 +312,23 @@ func (m launchpadGitDeducer) deduceSource(path string, u *url.URL) (func(string,
 		mb[k] = maybeGitSource{url: &u2}
 	}
 
-	return sourceFutureFactory(mb), nil
+	return mb, nil
 }
 
 type jazzDeducer struct {
 	regexp *regexp.Regexp
 }
 
-func (m jazzDeducer) deduceRoot(path string) (stringFuture, error) {
+func (m jazzDeducer) deduceRoot(path string) (string, error) {
 	v := m.regexp.FindStringSubmatch(path)
 	if v == nil {
-		return nil, fmt.Errorf("%s is not a valid path for a source on hub.jazz.net", path)
+		return "", fmt.Errorf("%s is not a valid path for a source on hub.jazz.net", path)
 	}
 
-	return simpleStringFuture("hub.jazz.net/" + v[2]), nil
+	return "hub.jazz.net/" + v[2], nil
 }
 
-func (m jazzDeducer) deduceSource(path string, u *url.URL) (func(string, ProjectAnalyzer) sourceFuture, error) {
+func (m jazzDeducer) deduceSource(path string, u *url.URL) (maybeSource, error) {
 	v := m.regexp.FindStringSubmatch(path)
 	if v == nil {
 		return nil, fmt.Errorf("%s is not a valid path for a source on hub.jazz.net", path)
@@ -368,7 +339,7 @@ func (m jazzDeducer) deduceSource(path string, u *url.URL) (func(string, Project
 		if !validateVCSScheme(u.Scheme, "git") {
 			return nil, fmt.Errorf("%s is not a valid scheme for accessing a git repository", u.Scheme)
 		}
-		return sourceFutureFactory(maybeGitSource{url: u}), nil
+		return maybeGitSource{url: u}, nil
 	}
 
 	mb := make(maybeSources, len(gitSchemes))
@@ -378,23 +349,23 @@ func (m jazzDeducer) deduceSource(path string, u *url.URL) (func(string, Project
 		mb[k] = maybeGitSource{url: &u2}
 	}
 
-	return sourceFutureFactory(mb), nil
+	return mb, nil
 }
 
 type apacheDeducer struct {
 	regexp *regexp.Regexp
 }
 
-func (m apacheDeducer) deduceRoot(path string) (stringFuture, error) {
+func (m apacheDeducer) deduceRoot(path string) (string, error) {
 	v := m.regexp.FindStringSubmatch(path)
 	if v == nil {
-		return nil, fmt.Errorf("%s is not a valid path for a source on git.apache.org", path)
+		return "", fmt.Errorf("%s is not a valid path for a source on git.apache.org", path)
 	}
 
-	return simpleStringFuture("git.apache.org/" + v[2]), nil
+	return "git.apache.org/" + v[2], nil
 }
 
-func (m apacheDeducer) deduceSource(path string, u *url.URL) (func(string, ProjectAnalyzer) sourceFuture, error) {
+func (m apacheDeducer) deduceSource(path string, u *url.URL) (maybeSource, error) {
 	v := m.regexp.FindStringSubmatch(path)
 	if v == nil {
 		return nil, fmt.Errorf("%s is not a valid path for a source on git.apache.org", path)
@@ -405,7 +376,7 @@ func (m apacheDeducer) deduceSource(path string, u *url.URL) (func(string, Proje
 		if !validateVCSScheme(u.Scheme, "git") {
 			return nil, fmt.Errorf("%s is not a valid scheme for accessing a git repository", u.Scheme)
 		}
-		return sourceFutureFactory(maybeGitSource{url: u}), nil
+		return maybeGitSource{url: u}, nil
 	}
 
 	mb := make(maybeSources, len(gitSchemes))
@@ -415,23 +386,23 @@ func (m apacheDeducer) deduceSource(path string, u *url.URL) (func(string, Proje
 		mb[k] = maybeGitSource{url: &u2}
 	}
 
-	return sourceFutureFactory(mb), nil
+	return mb, nil
 }
 
 type vcsExtensionDeducer struct {
 	regexp *regexp.Regexp
 }
 
-func (m vcsExtensionDeducer) deduceRoot(path string) (stringFuture, error) {
+func (m vcsExtensionDeducer) deduceRoot(path string) (string, error) {
 	v := m.regexp.FindStringSubmatch(path)
 	if v == nil {
-		return nil, fmt.Errorf("%s contains no vcs extension hints for matching", path)
+		return "", fmt.Errorf("%s contains no vcs extension hints for matching", path)
 	}
 
-	return simpleStringFuture(v[1]), nil
+	return v[1], nil
 }
 
-func (m vcsExtensionDeducer) deduceSource(path string, u *url.URL) (func(string, ProjectAnalyzer) sourceFuture, error) {
+func (m vcsExtensionDeducer) deduceSource(path string, u *url.URL) (maybeSource, error) {
 	v := m.regexp.FindStringSubmatch(path)
 	if v == nil {
 		return nil, fmt.Errorf("%s contains no vcs extension hints for matching", path)
@@ -451,11 +422,11 @@ func (m vcsExtensionDeducer) deduceSource(path string, u *url.URL) (func(string,
 
 			switch v[5] {
 			case "git":
-				return sourceFutureFactory(maybeGitSource{url: u}), nil
+				return maybeGitSource{url: u}, nil
 			case "bzr":
-				return sourceFutureFactory(maybeBzrSource{url: u}), nil
+				return maybeBzrSource{url: u}, nil
 			case "hg":
-				return sourceFutureFactory(maybeHgSource{url: u}), nil
+				return maybeHgSource{url: u}, nil
 			}
 		}
 
@@ -487,46 +458,79 @@ func (m vcsExtensionDeducer) deduceSource(path string, u *url.URL) (func(string,
 			f(k, &u2)
 		}
 
-		return sourceFutureFactory(mb), nil
+		return mb, nil
 	default:
 		return nil, fmt.Errorf("unknown repository type: %q", v[5])
 	}
 }
 
-// deduceFromPath takes an import path and converts it into a valid source root.
+type stringFuture func() (string, error)
+type sourceFuture func() (source, error)
+type partialSourceFuture func(string, ProjectAnalyzer) sourceFuture
+
+// deduceFromPath takes an import path and attempts to deduce various
+// metadata about it - what type of source should handle it, and where its
+// "root" is (for vcs repositories, the repository root).
 //
-// The result is wrapped in a future, as some import path patterns may require
-// network activity to correctly determine them via the parsing of "go get" HTTP
-// meta tags.
-func (sm *SourceMgr) deduceFromPath(path string) (root stringFuture, src partialSourceFuture, err error) {
+// The results are wrapped in futures, as most of these operations require at
+// least some network activity to complete. For the first return value, network
+// activity will be triggered when the future is called. For the second,
+// network activity is triggered only when calling the sourceFuture returned
+// from the partialSourceFuture.
+func (sm *SourceMgr) deduceFromPath(path string) (stringFuture, partialSourceFuture, error) {
 	u, err := normalizeURI(path)
 	if err != nil {
 		return nil, nil, err
 	}
 
+	// Helpers to futurize the results from deducers
+	strfut := func(s string) stringFuture {
+		return func() (string, error) {
+			return s, nil
+		}
+	}
+
+	srcfut := func(mb maybeSource) func(string, ProjectAnalyzer) sourceFuture {
+		return func(cachedir string, an ProjectAnalyzer) sourceFuture {
+			var src source
+			var err error
+
+			c := make(chan struct{}, 1)
+			go func() {
+				defer close(c)
+				src, err = mb.try(cachedir, an)
+			}()
+
+			return func() (source, error) {
+				<-c
+				return src, err
+			}
+		}
+	}
+
 	// First, try the root path-based matches
 	if _, mtchi, has := sm.rootxt.LongestPrefix(path); has {
 		mtch := mtchi.(pathDeducer)
-		root, err = mtch.deduceRoot(path)
+		root, err := mtch.deduceRoot(path)
 		if err != nil {
 			return nil, nil, err
 		}
-		src, err = mtch.deduceSource(path, u)
+		mb, err := mtch.deduceSource(path, u)
 		if err != nil {
 			return nil, nil, err
 		}
 
-		return
+		return strfut(root), srcfut(mb), nil
 	}
 
 	// Next, try the vcs extension-based (infix) matcher
 	exm := vcsExtensionDeducer{regexp: vcsExtensionRegex}
-	if root, err = exm.deduceRoot(path); err == nil {
-		src, err = exm.deduceSource(path, u)
+	if root, err := exm.deduceRoot(path); err == nil {
+		mb, err := exm.deduceSource(path, u)
 		if err != nil {
-			root, src = nil, nil
+			return nil, nil, err
 		}
-		return
+		return strfut(root), srcfut(mb), nil
 	}
 
 	// No luck so far. maybe it's one of them vanity imports?
@@ -561,12 +565,12 @@ func (sm *SourceMgr) deduceFromPath(path string) (root stringFuture, src partial
 	}()
 
 	// Set up the root func to catch the result
-	root = func() (string, error) {
+	root := func() (string, error) {
 		<-c
 		return importroot, futerr
 	}
 
-	src = func(cachedir string, an ProjectAnalyzer) sourceFuture {
+	src := func(cachedir string, an ProjectAnalyzer) sourceFuture {
 		var src source
 		var err error
 
@@ -603,7 +607,7 @@ func (sm *SourceMgr) deduceFromPath(path string) (root stringFuture, src partial
 		}
 	}
 
-	return
+	return root, src, nil
 }
 
 func normalizeURI(path string) (u *url.URL, err error) {
