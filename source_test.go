@@ -33,7 +33,6 @@ func TestGitVersionFetching(t *testing.T) {
 		t.FailNow()
 	}
 	mb := maybeGitSource{
-		n:   n,
 		url: u,
 	}
 
@@ -110,7 +109,6 @@ func TestBzrVersionFetching(t *testing.T) {
 		t.FailNow()
 	}
 	mb := maybeBzrSource{
-		n:   n,
 		url: u,
 	}
 
@@ -196,7 +194,6 @@ func TestHgVersionFetching(t *testing.T) {
 		t.FailNow()
 	}
 	mb := maybeHgSource{
-		n:   n,
 		url: u,
 	}
 

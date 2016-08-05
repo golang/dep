@@ -29,6 +29,29 @@ var (
 	svnSchemes = []string{"https", "http", "svn", "svn+ssh"}
 )
 
+func validateVCSScheme(scheme, typ string) bool {
+	var schemes []string
+	switch typ {
+	case "git":
+		schemes = gitSchemes
+	case "bzr":
+		schemes = bzrSchemes
+	case "hg":
+		schemes = hgSchemes
+	case "svn":
+		schemes = svnSchemes
+	default:
+		panic(fmt.Sprint("unsupported vcs type", scheme))
+	}
+
+	for _, valid := range schemes {
+		if scheme == valid {
+			return true
+		}
+	}
+	return false
+}
+
 // Regexes for the different known import path flavors
 var (
 	// This regex allowed some usernames that github currently disallows. They
@@ -43,9 +66,9 @@ var (
 	//glpRegex = regexp.MustCompile(`^(?P<root>git\.launchpad\.net/([A-Za-z0-9_.\-]+)|~[A-Za-z0-9_.\-]+/(\+git|[A-Za-z0-9_.\-]+)/[A-Za-z0-9_.\-]+)$`)
 	glpRegex = regexp.MustCompile(`^(?P<root>git\.launchpad\.net/([A-Za-z0-9_.\-]+))((?:/[A-Za-z0-9_.\-]+)*)$`)
 	//gcRegex      = regexp.MustCompile(`^(?P<root>code\.google\.com/[pr]/(?P<project>[a-z0-9\-]+)(\.(?P<subrepo>[a-z0-9\-]+))?)(/[A-Za-z0-9_.\-]+)*$`)
-	jazzRegex    = regexp.MustCompile(`^(?P<root>hub\.jazz\.net/(git/[a-z0-9]+/[A-Za-z0-9_.\-]+))((?:/[A-Za-z0-9_.\-]+)*)$`)
-	apacheRegex  = regexp.MustCompile(`^(?P<root>git\.apache\.org/([a-z0-9_.\-]+\.git))((?:/[A-Za-z0-9_.\-]+)*)$`)
-	genericRegex = regexp.MustCompile(`^(?P<root>(?P<repo>([a-z0-9.\-]+\.)+[a-z0-9.\-]+(:[0-9]+)?/[A-Za-z0-9_.\-/~]*?)\.(?P<vcs>bzr|git|hg|svn))((?:/[A-Za-z0-9_.\-]+)*)$`)
+	jazzRegex         = regexp.MustCompile(`^(?P<root>hub\.jazz\.net/(git/[a-z0-9]+/[A-Za-z0-9_.\-]+))((?:/[A-Za-z0-9_.\-]+)*)$`)
+	apacheRegex       = regexp.MustCompile(`^(?P<root>git\.apache\.org/([a-z0-9_.\-]+\.git))((?:/[A-Za-z0-9_.\-]+)*)$`)
+	vcsExtensionRegex = regexp.MustCompile(`^(?P<root>(?P<repo>([a-z0-9.\-]+\.)+[a-z0-9.\-]+(:[0-9]+)?/[A-Za-z0-9_.\-/~]*?)\.(?P<vcs>bzr|git|hg|svn))((?:/[A-Za-z0-9_.\-]+)*)$`)
 )
 
 // Other helper regexes
@@ -53,6 +76,554 @@ var (
 	scpSyntaxRe = regexp.MustCompile(`^([a-zA-Z0-9_]+)@([a-zA-Z0-9._-]+):(.*)$`)
 	pathvld     = regexp.MustCompile(`^([A-Za-z0-9-]+)(\.[A-Za-z0-9-]+)+(/[A-Za-z0-9-_.~]+)*$`)
 )
+
+func simpleStringFuture(s string) futureString {
+	return func() (string, error) {
+		return s, nil
+	}
+}
+
+func sourceFutureFactory(mb maybeSource) func(string, ProjectAnalyzer) futureSource {
+	return func(cachedir string, an ProjectAnalyzer) futureSource {
+		var src source
+		var err error
+
+		c := make(chan struct{}, 1)
+		go func() {
+			defer close(c)
+			src, err = mb.try(cachedir, an)
+		}()
+
+		return func() (source, error) {
+			<-c
+			return src, err
+		}
+	}
+}
+
+type matcher interface {
+	deduceRoot(string) (futureString, error)
+	deduceSource(string, *url.URL) (func(string, ProjectAnalyzer) futureSource, error)
+}
+
+type githubMatcher struct {
+	regexp *regexp.Regexp
+}
+
+func (m githubMatcher) deduceRoot(path string) (futureString, error) {
+	v := m.regexp.FindStringSubmatch(path)
+	if v == nil {
+		return nil, fmt.Errorf("%s is not a valid path for a source on github.com", path)
+	}
+
+	return simpleStringFuture("github.com/" + v[2]), nil
+}
+
+func (m githubMatcher) deduceSource(path string, u *url.URL) (func(string, ProjectAnalyzer) futureSource, error) {
+	v := m.regexp.FindStringSubmatch(path)
+	if v == nil {
+		return nil, fmt.Errorf("%s is not a valid path for a source on github.com", path)
+	}
+
+	u.Path = v[2]
+	if u.Scheme != "" {
+		if !validateVCSScheme(u.Scheme, "git") {
+			return nil, fmt.Errorf("%s is not a valid scheme for accessing a git repository", u.Scheme)
+		}
+		return sourceFutureFactory(maybeGitSource{url: u}), nil
+	}
+
+	mb := make(maybeSources, len(gitSchemes))
+	for k, scheme := range gitSchemes {
+		u2 := *u
+		u2.Scheme = scheme
+		mb[k] = maybeGitSource{url: &u2}
+	}
+
+	return sourceFutureFactory(mb), nil
+}
+
+type bitbucketMatcher struct {
+	regexp *regexp.Regexp
+}
+
+func (m bitbucketMatcher) deduceRoot(path string) (futureString, error) {
+	v := m.regexp.FindStringSubmatch(path)
+	if v == nil {
+		return nil, fmt.Errorf("%s is not a valid path for a source on bitbucket.org", path)
+	}
+
+	return simpleStringFuture("bitbucket.org/" + v[2]), nil
+}
+
+func (m bitbucketMatcher) deduceSource(path string, u *url.URL) (func(string, ProjectAnalyzer) futureSource, error) {
+	v := m.regexp.FindStringSubmatch(path)
+	if v == nil {
+		return nil, fmt.Errorf("%s is not a valid path for a source on bitbucket.org", path)
+	}
+	u.Path = v[2]
+
+	// This isn't definitive, but it'll probably catch most
+	isgit := strings.HasSuffix(u.Path, ".git") || u.User.Username() == "git"
+	ishg := strings.HasSuffix(u.Path, ".hg") || u.User.Username() == "hg"
+
+	if u.Scheme != "" {
+		validgit, validhg := validateVCSScheme(u.Scheme, "git"), validateVCSScheme(u.Scheme, "hg")
+		if isgit {
+			if !validgit {
+				return nil, fmt.Errorf("%s is not a valid scheme for accessing a git repository", u.Scheme)
+			}
+			return sourceFutureFactory(maybeGitSource{url: u}), nil
+		} else if ishg {
+			if !validhg {
+				return nil, fmt.Errorf("%s is not a valid scheme for accessing an hg repository", u.Scheme)
+			}
+			return sourceFutureFactory(maybeHgSource{url: u}), nil
+		} else if !validgit && !validhg {
+			return nil, fmt.Errorf("%s is not a valid scheme for accessing either a git or hg repository", u.Scheme)
+		}
+
+		// No other choice, make an option for both git and hg
+		return sourceFutureFactory(maybeSources{
+			// Git first, because it's a) faster and b) git
+			maybeGitSource{url: u},
+			maybeHgSource{url: u},
+		}), nil
+	}
+
+	mb := make(maybeSources, 0)
+	if !ishg {
+		for _, scheme := range gitSchemes {
+			u2 := *u
+			u2.Scheme = scheme
+			mb = append(mb, maybeGitSource{url: &u2})
+		}
+	}
+
+	if !isgit {
+		for _, scheme := range hgSchemes {
+			u2 := *u
+			u2.Scheme = scheme
+			mb = append(mb, maybeHgSource{url: &u2})
+		}
+	}
+
+	return sourceFutureFactory(mb), nil
+}
+
+type gopkginMatcher struct {
+	regexp *regexp.Regexp
+}
+
+func (m gopkginMatcher) deduceRoot(path string) (futureString, error) {
+	v := m.regexp.FindStringSubmatch(path)
+	if v == nil {
+		return nil, fmt.Errorf("%s is not a valid path for a source on gopkg.in", path)
+	}
+
+	return simpleStringFuture("gopkg.in/" + v[2]), nil
+}
+
+func (m gopkginMatcher) deduceSource(path string, u *url.URL) (func(string, ProjectAnalyzer) futureSource, error) {
+
+	v := m.regexp.FindStringSubmatch(path)
+	if v == nil {
+		return nil, fmt.Errorf("%s is not a valid path for a source on gopkg.in", path)
+	}
+
+	// Duplicate some logic from the gopkg.in server in order to validate
+	// the import path string without having to hit the server
+	if strings.Contains(v[4], ".") {
+		return nil, fmt.Errorf("%q is not a valid import path; gopkg.in only allows major versions (%q instead of %q)",
+			path, v[4][:strings.Index(v[4], ".")], v[4])
+	}
+
+	// Putting a scheme on gopkg.in would be really weird, disallow it
+	if u.Scheme != "" {
+		return nil, fmt.Errorf("Specifying alternate schemes on gopkg.in imports is not permitted")
+	}
+
+	// gopkg.in is always backed by github
+	u.Host = "github.com"
+	// If the third position is empty, it's the shortened form that expands
+	// to the go-pkg github user
+	if v[2] == "" {
+		u.Path = "go-pkg/" + v[3]
+	} else {
+		u.Path = v[2] + "/" + v[3]
+	}
+
+	mb := make(maybeSources, len(gitSchemes))
+	for k, scheme := range gitSchemes {
+		u2 := *u
+		u2.Scheme = scheme
+		mb[k] = maybeGitSource{url: &u2}
+	}
+
+	return sourceFutureFactory(mb), nil
+}
+
+type launchpadMatcher struct {
+	regexp *regexp.Regexp
+}
+
+func (m launchpadMatcher) deduceRoot(path string) (futureString, error) {
+	// TODO(sdboyer) lp handling is nasty - there's ambiguities which can only really
+	// be resolved with a metadata request. See https://github.com/golang/go/issues/11436
+	v := m.regexp.FindStringSubmatch(path)
+	if v == nil {
+		return nil, fmt.Errorf("%s is not a valid path for a source on launchpad.net", path)
+	}
+
+	return simpleStringFuture("launchpad.net/" + v[2]), nil
+}
+
+func (m launchpadMatcher) deduceSource(path string, u *url.URL) (func(string, ProjectAnalyzer) futureSource, error) {
+	v := m.regexp.FindStringSubmatch(path)
+	if v == nil {
+		return nil, fmt.Errorf("%s is not a valid path for a source on launchpad.net", path)
+	}
+
+	u.Path = v[2]
+	if u.Scheme != "" {
+		if !validateVCSScheme(u.Scheme, "bzr") {
+			return nil, fmt.Errorf("%s is not a valid scheme for accessing a bzr repository", u.Scheme)
+		}
+		return sourceFutureFactory(maybeBzrSource{url: u}), nil
+	}
+
+	mb := make(maybeSources, len(bzrSchemes))
+	for k, scheme := range bzrSchemes {
+		u2 := *u
+		u2.Scheme = scheme
+		mb[k] = maybeBzrSource{url: &u2}
+	}
+
+	return sourceFutureFactory(mb), nil
+}
+
+type launchpadGitMatcher struct {
+	regexp *regexp.Regexp
+}
+
+func (m launchpadGitMatcher) deduceRoot(path string) (futureString, error) {
+	// TODO(sdboyer) same ambiguity issues as with normal bzr lp
+	v := m.regexp.FindStringSubmatch(path)
+	if v == nil {
+		return nil, fmt.Errorf("%s is not a valid path for a source on git.launchpad.net", path)
+	}
+
+	return simpleStringFuture("git.launchpad.net/" + v[2]), nil
+}
+
+func (m launchpadGitMatcher) deduceSource(path string, u *url.URL) (func(string, ProjectAnalyzer) futureSource, error) {
+	v := m.regexp.FindStringSubmatch(path)
+	if v == nil {
+		return nil, fmt.Errorf("%s is not a valid path for a source on git.launchpad.net", path)
+	}
+
+	u.Path = v[2]
+	if u.Scheme != "" {
+		if !validateVCSScheme(u.Scheme, "git") {
+			return nil, fmt.Errorf("%s is not a valid scheme for accessing a git repository", u.Scheme)
+		}
+		return sourceFutureFactory(maybeGitSource{url: u}), nil
+	}
+
+	mb := make(maybeSources, len(bzrSchemes))
+	for k, scheme := range bzrSchemes {
+		u2 := *u
+		u2.Scheme = scheme
+		mb[k] = maybeGitSource{url: &u2}
+	}
+
+	return sourceFutureFactory(mb), nil
+}
+
+type jazzMatcher struct {
+	regexp *regexp.Regexp
+}
+
+func (m jazzMatcher) deduceRoot(path string) (futureString, error) {
+	v := m.regexp.FindStringSubmatch(path)
+	if v == nil {
+		return nil, fmt.Errorf("%s is not a valid path for a source on hub.jazz.net", path)
+	}
+
+	return simpleStringFuture("hub.jazz.net/" + v[2]), nil
+}
+
+func (m jazzMatcher) deduceSource(path string, u *url.URL) (func(string, ProjectAnalyzer) futureSource, error) {
+	v := m.regexp.FindStringSubmatch(path)
+	if v == nil {
+		return nil, fmt.Errorf("%s is not a valid path for a source on hub.jazz.net", path)
+	}
+
+	u.Path = v[2]
+	if u.Scheme != "" {
+		if !validateVCSScheme(u.Scheme, "git") {
+			return nil, fmt.Errorf("%s is not a valid scheme for accessing a git repository", u.Scheme)
+		}
+		return sourceFutureFactory(maybeGitSource{url: u}), nil
+	}
+
+	mb := make(maybeSources, len(gitSchemes))
+	for k, scheme := range gitSchemes {
+		u2 := *u
+		u2.Scheme = scheme
+		mb[k] = maybeGitSource{url: &u2}
+	}
+
+	return sourceFutureFactory(mb), nil
+}
+
+type apacheMatcher struct {
+	regexp *regexp.Regexp
+}
+
+func (m apacheMatcher) deduceRoot(path string) (futureString, error) {
+	v := m.regexp.FindStringSubmatch(path)
+	if v == nil {
+		return nil, fmt.Errorf("%s is not a valid path for a source on git.apache.org", path)
+	}
+
+	return simpleStringFuture("git.apache.org/" + v[2]), nil
+}
+
+func (m apacheMatcher) deduceSource(path string, u *url.URL) (func(string, ProjectAnalyzer) futureSource, error) {
+	v := m.regexp.FindStringSubmatch(path)
+	if v == nil {
+		return nil, fmt.Errorf("%s is not a valid path for a source on git.apache.org", path)
+	}
+
+	u.Path = v[2]
+	if u.Scheme != "" {
+		if !validateVCSScheme(u.Scheme, "git") {
+			return nil, fmt.Errorf("%s is not a valid scheme for accessing a git repository", u.Scheme)
+		}
+		return sourceFutureFactory(maybeGitSource{url: u}), nil
+	}
+
+	mb := make(maybeSources, len(gitSchemes))
+	for k, scheme := range gitSchemes {
+		u2 := *u
+		u2.Scheme = scheme
+		mb[k] = maybeGitSource{url: &u2}
+	}
+
+	return sourceFutureFactory(mb), nil
+}
+
+type vcsExtensionMatcher struct {
+	regexp *regexp.Regexp
+}
+
+func (m vcsExtensionMatcher) deduceRoot(path string) (futureString, error) {
+	v := m.regexp.FindStringSubmatch(path)
+	if v == nil {
+		return nil, fmt.Errorf("%s contains no vcs extension hints for matching", path)
+	}
+
+	return simpleStringFuture(v[1]), nil
+}
+
+func (m vcsExtensionMatcher) deduceSource(path string, u *url.URL) (func(string, ProjectAnalyzer) futureSource, error) {
+	v := m.regexp.FindStringSubmatch(path)
+	if v == nil {
+		return nil, fmt.Errorf("%s contains no vcs extension hints for matching", path)
+	}
+
+	switch v[5] {
+	case "git", "hg", "bzr":
+		x := strings.SplitN(v[1], "/", 2)
+		// TODO(sdboyer) is this actually correct for bzr?
+		u.Host = x[0]
+		u.Path = x[1]
+
+		if u.Scheme != "" {
+			if !validateVCSScheme(u.Scheme, v[5]) {
+				return nil, fmt.Errorf("%s is not a valid scheme for accessing %s repositories (path %s)", u.Scheme, v[5], path)
+			}
+
+			switch v[5] {
+			case "git":
+				return sourceFutureFactory(maybeGitSource{url: u}), nil
+			case "bzr":
+				return sourceFutureFactory(maybeBzrSource{url: u}), nil
+			case "hg":
+				return sourceFutureFactory(maybeHgSource{url: u}), nil
+			}
+		}
+
+		var schemes []string
+		var mb maybeSources
+		var f func(k int, u *url.URL)
+		switch v[5] {
+		case "git":
+			schemes = gitSchemes
+			f = func(k int, u *url.URL) {
+				mb[k] = maybeGitSource{url: u}
+			}
+		case "bzr":
+			schemes = bzrSchemes
+			f = func(k int, u *url.URL) {
+				mb[k] = maybeBzrSource{url: u}
+			}
+		case "hg":
+			schemes = hgSchemes
+			f = func(k int, u *url.URL) {
+				mb[k] = maybeHgSource{url: u}
+			}
+		}
+		mb = make(maybeSources, len(schemes))
+
+		for k, scheme := range gitSchemes {
+			u2 := *u
+			u2.Scheme = scheme
+			f(k, &u2)
+		}
+
+		return sourceFutureFactory(mb), nil
+	default:
+		return nil, fmt.Errorf("unknown repository type: %q", v[5])
+	}
+}
+
+type doubleFut struct {
+	root futureString
+	src  func(string, ProjectAnalyzer) futureSource
+}
+
+func (fut doubleFut) importRoot() (string, error) {
+	return fut.root()
+}
+
+func (fut doubleFut) source(cachedir string, an ProjectAnalyzer) (source, error) {
+	return fut.src(cachedir, an)()
+}
+
+// deduceFromPath takes an import path and converts it into a valid source root.
+//
+// The result is wrapped in a future, as some import path patterns may require
+// network activity to correctly determine them via the parsing of "go get" HTTP
+// meta tags.
+func (sm *SourceMgr) deduceFromPath(path string) (sourceFuture, error) {
+	u, err := normalizeURI(path)
+	if err != nil {
+		return nil, err
+	}
+
+	df := doubleFut{}
+	// First, try the root path-based matches
+	if _, mtchi, has := sm.rootxt.LongestPrefix(path); has {
+		mtch := mtchi.(matcher)
+		df.root, err = mtch.deduceRoot(path)
+		if err != nil {
+			return nil, err
+		}
+		df.src, err = mtch.deduceSource(path, u)
+		if err != nil {
+			return nil, err
+		}
+
+		return df, nil
+	}
+
+	// Next, try the vcs extension-based (infix) matcher
+	exm := vcsExtensionMatcher{regexp: vcsExtensionRegex}
+	if df.root, err = exm.deduceRoot(path); err == nil {
+		df.src, err = exm.deduceSource(path, u)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	// Still no luck. Fall back on "go get"-style metadata
+	var importroot, vcs, reporoot string
+	df.root = stringFuture(func() (string, error) {
+		var err error
+		importroot, vcs, reporoot, err = parseMetadata(path)
+		if err != nil {
+			return "", fmt.Errorf("unable to deduce repository and source type for: %q", path)
+		}
+
+		// If we got something back at all, then it supercedes the actual input for
+		// the real URL to hit
+		_, err = url.Parse(reporoot)
+		if err != nil {
+			return "", fmt.Errorf("server returned bad URL when searching for vanity import: %q", reporoot)
+		}
+
+		return importroot, nil
+	})
+
+	df.src = srcFuture(func(cachedir string, an ProjectAnalyzer) (source, error) {
+		// make sure the metadata future is finished, and without errors
+		_, err := df.root()
+		if err != nil {
+			return nil, err
+		}
+
+		// we know it can't error b/c it already parsed successfully in the
+		// other future
+		u, _ := url.Parse(reporoot)
+
+		switch vcs {
+		case "git":
+			m := maybeGitSource{
+				url: u,
+			}
+			return m.try(cachedir, an)
+		case "bzr":
+			m := maybeBzrSource{
+				url: u,
+			}
+			return m.try(cachedir, an)
+		case "hg":
+			m := maybeHgSource{
+				url: u,
+			}
+			return m.try(cachedir, an)
+		default:
+			return nil, fmt.Errorf("unsupported vcs type %s", vcs)
+		}
+	})
+
+	return df, nil
+}
+
+func normalizeURI(path string) (u *url.URL, err error) {
+	if m := scpSyntaxRe.FindStringSubmatch(path); m != nil {
+		// Match SCP-like syntax and convert it to a URL.
+		// Eg, "git@github.com:user/repo" becomes
+		// "ssh://git@github.com/user/repo".
+		u = &url.URL{
+			Scheme: "ssh",
+			User:   url.User(m[1]),
+			Host:   m[2],
+			Path:   "/" + m[3],
+			// TODO(sdboyer) This is what stdlib sets; grok why better
+			//RawPath: m[3],
+		}
+	} else {
+		u, err = url.Parse(path)
+		if err != nil {
+			return nil, fmt.Errorf("%q is not a valid URI", path)
+		}
+	}
+
+	if u.Host != "" {
+		path = u.Host + "/" + strings.TrimPrefix(u.Path, "/")
+	} else {
+		path = u.Path
+	}
+
+	if !pathvld.MatchString(path) {
+		return nil, fmt.Errorf("%q is not a valid import path", path)
+	}
+
+	return
+}
 
 // deduceRemoteRepo takes a potential import path and returns a RemoteRepo
 // representing the remote location of the source of an import path. Remote
@@ -95,180 +666,10 @@ func deduceRemoteRepo(path string) (rr *remoteRepo, err error) {
 	// TODO(sdboyer) instead of a switch, encode base domain in radix tree and pick
 	// detector from there; if failure, then fall back on metadata work
 
-	switch {
-	case ghRegex.MatchString(path):
-		v := ghRegex.FindStringSubmatch(path)
-
-		rr.CloneURL.Host = "github.com"
-		rr.CloneURL.Path = v[2]
-		rr.Base = v[1]
-		rr.RelPkg = strings.TrimPrefix(v[3], "/")
-		rr.VCS = []string{"git"}
-		// If no scheme was already recorded, then add the possible schemes for github
-		if rr.Schemes == nil {
-			rr.Schemes = gitSchemes
-		}
-
-		return
-
-	case gpinNewRegex.MatchString(path):
-		v := gpinNewRegex.FindStringSubmatch(path)
-		// Duplicate some logic from the gopkg.in server in order to validate
-		// the import path string without having to hit the server
-		if strings.Contains(v[4], ".") {
-			return nil, fmt.Errorf("%q is not a valid import path; gopkg.in only allows major versions (%q instead of %q)",
-				path, v[4][:strings.Index(v[4], ".")], v[4])
-		}
-
-		// gopkg.in is always backed by github
-		rr.CloneURL.Host = "github.com"
-		// If the third position is empty, it's the shortened form that expands
-		// to the go-pkg github user
-		if v[2] == "" {
-			rr.CloneURL.Path = "go-pkg/" + v[3]
-		} else {
-			rr.CloneURL.Path = v[2] + "/" + v[3]
-		}
-		rr.Base = v[1]
-		rr.RelPkg = strings.TrimPrefix(v[6], "/")
-		rr.VCS = []string{"git"}
-		// If no scheme was already recorded, then add the possible schemes for github
-		if rr.Schemes == nil {
-			rr.Schemes = gitSchemes
-		}
-
-		return
-	//case gpinOldRegex.MatchString(path):
-
-	case bbRegex.MatchString(path):
-		v := bbRegex.FindStringSubmatch(path)
-
-		rr.CloneURL.Host = "bitbucket.org"
-		rr.CloneURL.Path = v[2]
-		rr.Base = v[1]
-		rr.RelPkg = strings.TrimPrefix(v[3], "/")
-		rr.VCS = []string{"git", "hg"}
-		// FIXME(sdboyer) this ambiguity of vcs kills us on schemes, as schemes
-		// are inherently vcs-specific. Fixing this requires a wider refactor.
-		// For now, we only allow the intersection, which is just the hg schemes
-		if rr.Schemes == nil {
-			rr.Schemes = hgSchemes
-		}
-
-		return
-
-	//case gcRegex.MatchString(path):
-	//v := gcRegex.FindStringSubmatch(path)
-
-	//rr.CloneURL.Host = "code.google.com"
-	//rr.CloneURL.Path = "p/" + v[2]
-	//rr.Base = v[1]
-	//rr.RelPkg = strings.TrimPrefix(v[5], "/")
-	//rr.VCS = []string{"hg", "git"}
-
-	//return
-
-	case lpRegex.MatchString(path):
-		// TODO(sdboyer) lp handling is nasty - there's ambiguities which can only really
-		// be resolved with a metadata request. See https://github.com/golang/go/issues/11436
-		v := lpRegex.FindStringSubmatch(path)
-
-		rr.CloneURL.Host = "launchpad.net"
-		rr.CloneURL.Path = v[2]
-		rr.Base = v[1]
-		rr.RelPkg = strings.TrimPrefix(v[3], "/")
-		rr.VCS = []string{"bzr"}
-		if rr.Schemes == nil {
-			rr.Schemes = bzrSchemes
-		}
-
-		return
-
-	case glpRegex.MatchString(path):
-		// TODO(sdboyer) same ambiguity issues as with normal bzr lp
-		v := glpRegex.FindStringSubmatch(path)
-
-		rr.CloneURL.Host = "git.launchpad.net"
-		rr.CloneURL.Path = v[2]
-		rr.Base = v[1]
-		rr.RelPkg = strings.TrimPrefix(v[3], "/")
-		rr.VCS = []string{"git"}
-		if rr.Schemes == nil {
-			rr.Schemes = gitSchemes
-		}
-
-		return
-
-	case jazzRegex.MatchString(path):
-		v := jazzRegex.FindStringSubmatch(path)
-
-		rr.CloneURL.Host = "hub.jazz.net"
-		rr.CloneURL.Path = v[2]
-		rr.Base = v[1]
-		rr.RelPkg = strings.TrimPrefix(v[3], "/")
-		rr.VCS = []string{"git"}
-		if rr.Schemes == nil {
-			rr.Schemes = gitSchemes
-		}
-
-		return
-
-	case apacheRegex.MatchString(path):
-		v := apacheRegex.FindStringSubmatch(path)
-
-		rr.CloneURL.Host = "git.apache.org"
-		rr.CloneURL.Path = v[2]
-		rr.Base = v[1]
-		rr.RelPkg = strings.TrimPrefix(v[3], "/")
-		rr.VCS = []string{"git"}
-		if rr.Schemes == nil {
-			rr.Schemes = gitSchemes
-		}
-
-		return
-
-	// try the general syntax
-	case genericRegex.MatchString(path):
-		v := genericRegex.FindStringSubmatch(path)
-		switch v[5] {
-		case "git", "hg", "bzr":
-			x := strings.SplitN(v[1], "/", 2)
-			// TODO(sdboyer) is this actually correct for bzr?
-			rr.CloneURL.Host = x[0]
-			rr.CloneURL.Path = x[1]
-			rr.VCS = []string{v[5]}
-			rr.Base = v[1]
-			rr.RelPkg = strings.TrimPrefix(v[6], "/")
-
-			if rr.Schemes == nil {
-				if v[5] == "git" {
-					rr.Schemes = gitSchemes
-				} else if v[5] == "bzr" {
-					rr.Schemes = bzrSchemes
-				} else if v[5] == "hg" {
-					rr.Schemes = hgSchemes
-				}
-			}
-
-			return
-		default:
-			return nil, fmt.Errorf("unknown repository type: %q", v[5])
-		}
-	}
-
 	// No luck so far. maybe it's one of them vanity imports?
-	importroot, vcs, reporoot, err := parseMetadata(path)
-	if err != nil {
-		return nil, fmt.Errorf("unable to deduce repository and source type for: %q", path)
-	}
-
-	// If we got something back at all, then it supercedes the actual input for
-	// the real URL to hit
-	rr.CloneURL, err = url.Parse(reporoot)
-	if err != nil {
-		return nil, fmt.Errorf("server returned bad URL when searching for vanity import: %q", reporoot)
-	}
-
+	// We have to get a little fancier for the metadata lookup - wrap a future
+	// around a future
+	var importroot, vcs string
 	// We have a real URL. Set the other values and return.
 	rr.Base = importroot
 	rr.RelPkg = strings.TrimPrefix(path[len(importroot):], "/")

@@ -10,6 +10,7 @@ import (
 
 	"github.com/Masterminds/semver"
 	"github.com/Masterminds/vcs"
+	"github.com/armon/go-radix"
 )
 
 // Used to compute a friendly filepath from a URL-shaped input
@@ -82,8 +83,9 @@ type SourceMgr struct {
 		rr  *remoteRepo
 		err error
 	}
-	rmut sync.RWMutex
-	an   ProjectAnalyzer
+	rmut   sync.RWMutex
+	an     ProjectAnalyzer
+	rootxt *radix.Tree
 }
 
 var _ SourceManager = &SourceMgr{}
@@ -141,7 +143,8 @@ func NewSourceManager(an ProjectAnalyzer, cachedir string, force bool) (*SourceM
 			rr  *remoteRepo
 			err error
 		}),
-		an: an,
+		an:     an,
+		rootxt: radix.New(),
 	}, nil
 }
 
