@@ -223,7 +223,16 @@ func (m gopkginDeducer) deduceSource(path string, u *url.URL) (maybeSource, erro
 	// If the third position is empty, it's the shortened form that expands
 	// to the go-pkg github user
 	if v[2] == "" {
-		u.Path = "go-pkg/" + v[3]
+		var inter string
+		// Apparently gopkg.in special-cases gopkg.in/yaml, violating its own rules?
+		// If we find one more exception, chuck this and just rely on vanity
+		// metadata resolving.
+		if strings.HasPrefix(path, "gopkg.in/yaml") {
+			inter = "go-yaml"
+		} else {
+			inter = "go-pkg"
+		}
+		u.Path = inter + v[3]
 	} else {
 		u.Path = v[2] + "/" + v[3]
 	}

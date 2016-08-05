@@ -148,7 +148,7 @@ func TestDeduceRemotes(t *testing.T) {
 				RelPkg: "",
 				CloneURL: &url.URL{
 					Host: "github.com",
-					Path: "go-pkg/yaml",
+					Path: "go-yaml/yaml",
 				},
 				Schemes: gitSchemes,
 				VCS:     []string{"git"},
@@ -161,7 +161,7 @@ func TestDeduceRemotes(t *testing.T) {
 				RelPkg: "foo/bar",
 				CloneURL: &url.URL{
 					Host: "github.com",
-					Path: "go-pkg/yaml",
+					Path: "go-yaml/yaml",
 				},
 				Schemes: gitSchemes,
 				VCS:     []string{"git"},
