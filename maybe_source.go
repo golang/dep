@@ -1,6 +1,7 @@
 package gps
 
 import (
+	"bytes"
 	"fmt"
 	"net/url"
 	"path/filepath"
@@ -14,8 +15,31 @@ type maybeSource interface {
 
 type maybeSources []maybeSource
 
+func (mbs maybeSources) try(cachedir string, an ProjectAnalyzer) (source, error) {
+	var e sourceFailures
+	for _, mb := range mbs {
+		src, err := mb.try(cachedir, an)
+		if err == nil {
+			return src, nil
+		}
+		e = append(e, err)
+	}
+	return nil, e
+}
+
+type sourceFailures []error
+
+func (sf sourceFailures) Error() string {
+	var buf bytes.Buffer
+	fmt.Fprintf(&buf, "No valid source could be created:\n")
+	for _, e := range sf {
+		fmt.Fprintf(&buf, "\t%s", e.Error())
+	}
+
+	return buf.String()
+}
+
 type maybeGitSource struct {
-	n   string
 	url *url.URL
 }
 
@@ -48,7 +72,6 @@ func (m maybeGitSource) try(cachedir string, an ProjectAnalyzer) (source, error)
 }
 
 type maybeBzrSource struct {
-	n   string
 	url *url.URL
 }
 
@@ -75,7 +98,6 @@ func (m maybeBzrSource) try(cachedir string, an ProjectAnalyzer) (source, error)
 }
 
 type maybeHgSource struct {
-	n   string
 	url *url.URL
 }
 
