@@ -31,6 +31,7 @@ func newMetaCache() *sourceMetaCache {
 
 type futureString func() (string, error)
 type futureSource func() (source, error)
+type deferredFutureSource func(string, ProjectAnalyzer) futureSource
 
 func stringFuture(f func() (string, error)) func() (string, error) {
 	var result string

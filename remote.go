@@ -489,58 +489,45 @@ func (m vcsExtensionMatcher) deduceSource(path string, u *url.URL) (func(string,
 	}
 }
 
-type doubleFut struct {
-	root futureString
-	src  func(string, ProjectAnalyzer) futureSource
-}
-
-func (fut doubleFut) importRoot() (string, error) {
-	return fut.root()
-}
-
-func (fut doubleFut) source(cachedir string, an ProjectAnalyzer) (source, error) {
-	return fut.src(cachedir, an)()
-}
-
 // deduceFromPath takes an import path and converts it into a valid source root.
 //
 // The result is wrapped in a future, as some import path patterns may require
 // network activity to correctly determine them via the parsing of "go get" HTTP
 // meta tags.
-func (sm *SourceMgr) deduceFromPath(path string) (sourceFuture, error) {
+func (sm *SourceMgr) deduceFromPath(path string) (root futureString, src deferredFutureSource, err error) {
 	u, err := normalizeURI(path)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	df := doubleFut{}
 	// First, try the root path-based matches
 	if _, mtchi, has := sm.rootxt.LongestPrefix(path); has {
 		mtch := mtchi.(matcher)
-		df.root, err = mtch.deduceRoot(path)
+		root, err = mtch.deduceRoot(path)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
-		df.src, err = mtch.deduceSource(path, u)
+		src, err = mtch.deduceSource(path, u)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
-		return df, nil
+		return
 	}
 
 	// Next, try the vcs extension-based (infix) matcher
 	exm := vcsExtensionMatcher{regexp: vcsExtensionRegex}
-	if df.root, err = exm.deduceRoot(path); err == nil {
-		df.src, err = exm.deduceSource(path, u)
+	if root, err = exm.deduceRoot(path); err == nil {
+		src, err = exm.deduceSource(path, u)
 		if err != nil {
-			return nil, err
+			root, src = nil, nil
 		}
+		return
 	}
 
 	// Still no luck. Fall back on "go get"-style metadata
 	var importroot, vcs, reporoot string
-	df.root = stringFuture(func() (string, error) {
+	root = stringFuture(func() (string, error) {
 		var err error
 		importroot, vcs, reporoot, err = parseMetadata(path)
 		if err != nil {
@@ -557,9 +544,9 @@ func (sm *SourceMgr) deduceFromPath(path string) (sourceFuture, error) {
 		return importroot, nil
 	})
 
-	df.src = srcFuture(func(cachedir string, an ProjectAnalyzer) (source, error) {
+	src = srcFuture(func(cachedir string, an ProjectAnalyzer) (source, error) {
 		// make sure the metadata future is finished, and without errors
-		_, err := df.root()
+		_, err := root()
 		if err != nil {
 			return nil, err
 		}
@@ -589,7 +576,7 @@ func (sm *SourceMgr) deduceFromPath(path string) (sourceFuture, error) {
 		}
 	})
 
-	return df, nil
+	return
 }
 
 func normalizeURI(path string) (u *url.URL, err error) {
