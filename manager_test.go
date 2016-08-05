@@ -182,6 +182,7 @@ func TestProjectManagerInit(t *testing.T) {
 	pms, err := sm.getProjectManager(id)
 	if err != nil {
 		t.Errorf("Error on grabbing project manager obj: %s", err)
+		t.FailNow()
 	}
 
 	// Check upstream existence flag
