@@ -22,6 +22,10 @@ type remoteRepo struct {
 	VCS      []string
 }
 
+type futureString func() (string, error)
+type futureSource func() (source, error)
+type deferredFutureSource func(string, ProjectAnalyzer) futureSource
+
 var (
 	gitSchemes = []string{"https", "ssh", "git", "http"}
 	bzrSchemes = []string{"https", "bzr+ssh", "bzr", "http"}
@@ -525,56 +529,79 @@ func (sm *SourceMgr) deduceFromPath(path string) (root futureString, src deferre
 		return
 	}
 
-	// Still no luck. Fall back on "go get"-style metadata
-	var importroot, vcs, reporoot string
-	root = stringFuture(func() (string, error) {
-		var err error
-		importroot, vcs, reporoot, err = parseMetadata(path)
-		if err != nil {
-			return "", fmt.Errorf("unable to deduce repository and source type for: %q", path)
+	// No luck so far. maybe it's one of them vanity imports?
+	// We have to get a little fancier for the metadata lookup by chaining the
+	// source future onto the metadata future
+
+	// Declare these out here so they're available for the source future
+	var vcs string
+	var ru *url.URL
+
+	// Kick off the vanity metadata fetch
+	var importroot string
+	var futerr error
+	c := make(chan struct{}, 1)
+	go func() {
+		defer close(c)
+		var reporoot string
+		importroot, vcs, reporoot, futerr = parseMetadata(path)
+		if futerr != nil {
+			futerr = fmt.Errorf("unable to deduce repository and source type for: %q", path)
+			return
 		}
 
 		// If we got something back at all, then it supercedes the actual input for
 		// the real URL to hit
-		_, err = url.Parse(reporoot)
-		if err != nil {
-			return "", fmt.Errorf("server returned bad URL when searching for vanity import: %q", reporoot)
+		ru, futerr = url.Parse(reporoot)
+		if futerr != nil {
+			futerr = fmt.Errorf("server returned bad URL when searching for vanity import: %q", reporoot)
+			importroot = ""
+			return
 		}
+	}()
 
-		return importroot, nil
-	})
+	// Set up the root func to catch the result
+	root = func() (string, error) {
+		<-c
+		return importroot, futerr
+	}
 
-	src = srcFuture(func(cachedir string, an ProjectAnalyzer) (source, error) {
-		// make sure the metadata future is finished, and without errors
-		_, err := root()
-		if err != nil {
-			return nil, err
+	src = func(cachedir string, an ProjectAnalyzer) futureSource {
+		var src source
+		var err error
+
+		c := make(chan struct{}, 1)
+		go func() {
+			defer close(c)
+			// make sure the metadata future is finished (without errors), thus
+			// guaranteeing that ru and vcs will be populated
+			_, err := root()
+			if err != nil {
+				return
+			}
+
+			var m maybeSource
+			switch vcs {
+			case "git":
+				m = maybeGitSource{url: ru}
+			case "bzr":
+				m = maybeBzrSource{url: ru}
+			case "hg":
+				m = maybeHgSource{url: ru}
+			}
+
+			if m != nil {
+				src, err = m.try(cachedir, an)
+			} else {
+				err = fmt.Errorf("unsupported vcs type %s", vcs)
+			}
+		}()
+
+		return func() (source, error) {
+			<-c
+			return src, err
 		}
-
-		// we know it can't error b/c it already parsed successfully in the
-		// other future
-		u, _ := url.Parse(reporoot)
-
-		switch vcs {
-		case "git":
-			m := maybeGitSource{
-				url: u,
-			}
-			return m.try(cachedir, an)
-		case "bzr":
-			m := maybeBzrSource{
-				url: u,
-			}
-			return m.try(cachedir, an)
-		case "hg":
-			m := maybeHgSource{
-				url: u,
-			}
-			return m.try(cachedir, an)
-		default:
-			return nil, fmt.Errorf("unsupported vcs type %s", vcs)
-		}
-	})
+	}
 
 	return
 }

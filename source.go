@@ -29,49 +29,6 @@ func newMetaCache() *sourceMetaCache {
 	}
 }
 
-type futureString func() (string, error)
-type futureSource func() (source, error)
-type deferredFutureSource func(string, ProjectAnalyzer) futureSource
-
-func stringFuture(f func() (string, error)) func() (string, error) {
-	var result string
-	var err error
-
-	c := make(chan struct{}, 1)
-	go func() {
-		defer close(c)
-		result, err = f()
-	}()
-
-	return func() (string, error) {
-		<-c
-		return result, err
-	}
-}
-
-func srcFuture(f func(string, ProjectAnalyzer) (source, error)) func(string, ProjectAnalyzer) futureSource {
-	return func(cachedir string, an ProjectAnalyzer) futureSource {
-		var src source
-		var err error
-
-		c := make(chan struct{}, 1)
-		go func() {
-			defer close(c)
-			src, err = f(cachedir, an)
-		}()
-
-		return func() (source, error) {
-			<-c
-			return src, err
-		}
-	}
-}
-
-type sourceFuture interface {
-	importRoot() (string, error)
-	source(string, ProjectAnalyzer) (source, error)
-}
-
 type baseVCSSource struct {
 	// Object for the cache repository
 	crepo *repo
