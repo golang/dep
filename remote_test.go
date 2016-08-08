@@ -311,7 +311,7 @@ func TestDeduceFromPath(t *testing.T) {
 			},
 		},
 		{
-			"launchpad.net/repo root",
+			in:   "launchpad.net/repo root",
 			rerr: errors.New("launchpad.net/repo root is not a valid path for a source on launchpad.net"),
 		},
 		{
@@ -335,20 +335,7 @@ func TestDeduceFromPath(t *testing.T) {
 			},
 		},
 		{
-			"git.launchpad.net/reporoot",
-			&remoteRepo{
-				Base:   "git.launchpad.net/reporoot",
-				RelPkg: "",
-				CloneURL: &url.URL{
-					Host: "git.launchpad.net",
-					Path: "reporoot",
-				},
-				Schemes: gitSchemes,
-				VCS:     []string{"git"},
-			},
-		},
-		{
-			"git.launchpad.net/repo root",
+			in:   "git.launchpad.net/repo root",
 			rerr: errors.New("git.launchpad.net/repo root is not a valid path for a source on launchpad.net"),
 		},
 		{

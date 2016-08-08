@@ -147,6 +147,8 @@ func (m bitbucketDeducer) deduceSource(path string, u *url.URL) (maybeSource, er
 		validgit, validhg := validateVCSScheme(u.Scheme, "git"), validateVCSScheme(u.Scheme, "hg")
 		if isgit {
 			if !validgit {
+				// This is unreachable for now, as the git schemes are a
+				// superset of the hg schemes
 				return nil, fmt.Errorf("%s is not a valid scheme for accessing a git repository", u.Scheme)
 			}
 			return maybeGitSource{url: u}, nil
@@ -277,6 +279,7 @@ func (m launchpadDeducer) deduceSource(path string, u *url.URL) (maybeSource, er
 	}
 
 	mb := make(maybeSources, len(bzrSchemes))
+	// TODO(sdboyer) is there a generic ssh user for lp? if not, drop bzr+ssh
 	for k, scheme := range bzrSchemes {
 		u2 := *u
 		u2.Scheme = scheme
@@ -499,7 +502,7 @@ func (sm *SourceMgr) deduceFromPath(path string) (stringFuture, partialSourceFut
 		}
 	}
 
-	srcfut := func(mb maybeSource) func(string, ProjectAnalyzer) sourceFuture {
+	srcfut := func(mb maybeSource) partialSourceFuture {
 		return func(cachedir string, an ProjectAnalyzer) sourceFuture {
 			var src source
 			var err error
