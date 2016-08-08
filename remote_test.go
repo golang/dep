@@ -1,346 +1,337 @@
 package gps
 
 import (
+	"errors"
 	"fmt"
+	"io/ioutil"
 	"net/url"
-	"reflect"
 	"testing"
 )
 
-func TestDeduceRemotes(t *testing.T) {
+func TestDeduceFromPath(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping remote deduction test in short mode")
 	}
 
+	cpath, err := ioutil.TempDir("", "smcache")
+	if err != nil {
+		t.Errorf("Failed to create temp dir: %s", err)
+	}
+	sm, err := NewSourceManager(naiveAnalyzer{}, cpath, false)
+
+	if err != nil {
+		t.Errorf("Unexpected error on SourceManager creation: %s", err)
+		t.FailNow()
+	}
+	defer func() {
+		err := removeAll(cpath)
+		if err != nil {
+			t.Errorf("removeAll failed: %s", err)
+		}
+	}()
+	defer sm.Release()
+
+	// helper func to generate testing *url.URLs, panicking on err
+	mkurl := func(s string) (u *url.URL) {
+		var err error
+		u, err = url.Parse(s)
+		if err != nil {
+			panic(fmt.Sprint("string is not a valid URL:", s))
+		}
+		return
+	}
+
 	fixtures := []struct {
-		path string
-		want *remoteRepo
+		in     string
+		root   string
+		rerr   error
+		mb     maybeSource
+		srcerr error
 	}{
 		{
-			"github.com/sdboyer/gps",
-			&remoteRepo{
-				Base:   "github.com/sdboyer/gps",
-				RelPkg: "",
-				CloneURL: &url.URL{
-					Host: "github.com",
-					Path: "sdboyer/gps",
-				},
-				Schemes: gitSchemes,
-				VCS:     []string{"git"},
+			in:   "github.com/sdboyer/gps",
+			root: "github.com/sdboyer/gps",
+			mb: maybeSources{
+				&maybeGitSource{url: mkurl("https://github.com/sdboyer/gps")},
+				&maybeGitSource{url: mkurl("ssh://git@github.com/sdboyer/gps")},
+				&maybeGitSource{url: mkurl("git://github.com/sdboyer/gps")},
+				&maybeGitSource{url: mkurl("http://github.com/sdboyer/gps")},
 			},
 		},
 		{
-			"github.com/sdboyer/gps/foo",
-			&remoteRepo{
-				Base:   "github.com/sdboyer/gps",
-				RelPkg: "foo",
-				CloneURL: &url.URL{
-					Host: "github.com",
-					Path: "sdboyer/gps",
-				},
-				Schemes: gitSchemes,
-				VCS:     []string{"git"},
+			in:   "github.com/sdboyer/gps/foo",
+			root: "github.com/sdboyer/gps",
+			mb: maybeSources{
+				&maybeGitSource{url: mkurl("https://github.com/sdboyer/gps")},
+				&maybeGitSource{url: mkurl("ssh://git@github.com/sdboyer/gps")},
+				&maybeGitSource{url: mkurl("git://github.com/sdboyer/gps")},
+				&maybeGitSource{url: mkurl("http://github.com/sdboyer/gps")},
 			},
 		},
 		{
-			"git@github.com:sdboyer/gps",
-			&remoteRepo{
-				Base:   "github.com/sdboyer/gps",
-				RelPkg: "",
-				CloneURL: &url.URL{
-					Scheme: "ssh",
-					User:   url.User("git"),
-					Host:   "github.com",
-					Path:   "sdboyer/gps",
-				},
-				Schemes: []string{"ssh"},
-				VCS:     []string{"git"},
+			in:   "github.com/sdboyer/gps.git/foo",
+			root: "github.com/sdboyer/gps",
+			mb: maybeSources{
+				&maybeGitSource{url: mkurl("https://github.com/sdboyer/gps")},
+				&maybeGitSource{url: mkurl("ssh://git@github.com/sdboyer/gps")},
+				&maybeGitSource{url: mkurl("git://github.com/sdboyer/gps")},
+				&maybeGitSource{url: mkurl("http://github.com/sdboyer/gps")},
 			},
 		},
 		{
-			"https://github.com/sdboyer/gps/foo",
-			&remoteRepo{
-				Base:   "github.com/sdboyer/gps",
-				RelPkg: "foo",
-				CloneURL: &url.URL{
-					Scheme: "https",
-					Host:   "github.com",
-					Path:   "sdboyer/gps",
-				},
-				Schemes: []string{"https"},
-				VCS:     []string{"git"},
-			},
+			in:   "git@github.com:sdboyer/gps",
+			root: "github.com/sdboyer/gps",
+			mb:   &maybeGitSource{url: mkurl("ssh://git@github.com/sdboyer/gps")},
 		},
 		{
-			"https://github.com/sdboyer/gps/foo/bar",
-			&remoteRepo{
-				Base:   "github.com/sdboyer/gps",
-				RelPkg: "foo/bar",
-				CloneURL: &url.URL{
-					Scheme: "https",
-					Host:   "github.com",
-					Path:   "sdboyer/gps",
-				},
-				Schemes: []string{"https"},
-				VCS:     []string{"git"},
-			},
+			in:   "https://github.com/sdboyer/gps",
+			root: "github.com/sdboyer/gps",
+			mb:   &maybeGitSource{url: mkurl("https://github.com/sdboyer/gps")},
+		},
+		{
+			in:   "https://github.com/sdboyer/gps/foo/bar",
+			root: "github.com/sdboyer/gps",
+			mb:   &maybeGitSource{url: mkurl("https://github.com/sdboyer/gps")},
 		},
 		// some invalid github username patterns
 		{
-			"github.com/-sdboyer/gps/foo",
-			nil,
+			in:   "github.com/-sdboyer/gps/foo",
+			rerr: errors.New("github.com/-sdboyer/gps/foo is not a valid path for a source on github.com"),
 		},
 		{
-			"github.com/sdboyer-/gps/foo",
-			nil,
+			in:   "github.com/sdboyer-/gps/foo",
+			rerr: errors.New("github.com/sdboyer-/gps/foo is not a valid path for a source on github.com"),
 		},
 		{
-			"github.com/sdbo.yer/gps/foo",
-			nil,
+			in:   "github.com/sdbo.yer/gps/foo",
+			rerr: errors.New("github.com/sdbo.yer/gps/foo is not a valid path for a source on github.com"),
 		},
 		{
-			"github.com/sdbo_yer/gps/foo",
-			nil,
+			in:   "github.com/sdbo_yer/gps/foo",
+			rerr: errors.New("github.com/sdbo_yer/gps/foo is not a valid path for a source on github.com"),
 		},
 		{
-			"gopkg.in/sdboyer/gps.v0",
-			&remoteRepo{
-				Base:   "gopkg.in/sdboyer/gps.v0",
-				RelPkg: "",
-				CloneURL: &url.URL{
-					Host: "github.com",
-					Path: "sdboyer/gps",
-				},
-				Schemes: gitSchemes,
-				VCS:     []string{"git"},
+			in:   "gopkg.in/sdboyer/gps.v0",
+			root: "gopkg.in/sdboyer/gps.v0",
+			mb: maybeSources{
+				&maybeGitSource{url: mkurl("https://github.com/sdboyer/gps")},
+				&maybeGitSource{url: mkurl("ssh://git@github.com/sdboyer/gps")},
+				&maybeGitSource{url: mkurl("git://github.com/sdboyer/gps")},
+				&maybeGitSource{url: mkurl("http://github.com/sdboyer/gps")},
 			},
 		},
 		{
-			"gopkg.in/sdboyer/gps.v0/foo",
-			&remoteRepo{
-				Base:   "gopkg.in/sdboyer/gps.v0",
-				RelPkg: "foo",
-				CloneURL: &url.URL{
-					Host: "github.com",
-					Path: "sdboyer/gps",
-				},
-				Schemes: gitSchemes,
-				VCS:     []string{"git"},
+			in:   "gopkg.in/sdboyer/gps.v0/foo",
+			root: "gopkg.in/sdboyer/gps.v0",
+			mb: maybeSources{
+				&maybeGitSource{url: mkurl("https://github.com/sdboyer/gps")},
+				&maybeGitSource{url: mkurl("ssh://git@github.com/sdboyer/gps")},
+				&maybeGitSource{url: mkurl("git://github.com/sdboyer/gps")},
+				&maybeGitSource{url: mkurl("http://github.com/sdboyer/gps")},
 			},
 		},
 		{
-			"gopkg.in/sdboyer/gps.v0/foo/bar",
-			&remoteRepo{
-				Base:   "gopkg.in/sdboyer/gps.v0",
-				RelPkg: "foo/bar",
-				CloneURL: &url.URL{
-					Host: "github.com",
-					Path: "sdboyer/gps",
-				},
-				Schemes: gitSchemes,
-				VCS:     []string{"git"},
+			in:   "gopkg.in/sdboyer/gps.v1/foo/bar",
+			root: "gopkg.in/sdboyer/gps.v1",
+			mb: maybeSources{
+				&maybeGitSource{url: mkurl("https://github.com/sdboyer/gps")},
+				&maybeGitSource{url: mkurl("ssh://git@github.com/sdboyer/gps")},
+				&maybeGitSource{url: mkurl("git://github.com/sdboyer/gps")},
+				&maybeGitSource{url: mkurl("http://github.com/sdboyer/gps")},
 			},
 		},
 		{
-			"gopkg.in/yaml.v1",
-			&remoteRepo{
-				Base:   "gopkg.in/yaml.v1",
-				RelPkg: "",
-				CloneURL: &url.URL{
-					Host: "github.com",
-					Path: "go-yaml/yaml",
-				},
-				Schemes: gitSchemes,
-				VCS:     []string{"git"},
-			},
+			in:   "gopkg.in/yaml.v1",
+			root: "gopkg.in/yaml.v1",
+			mb:   &maybeGitSource{url: mkurl("https://github.com/go-yaml/yaml")},
 		},
 		{
-			"gopkg.in/yaml.v1/foo/bar",
-			&remoteRepo{
-				Base:   "gopkg.in/yaml.v1",
-				RelPkg: "foo/bar",
-				CloneURL: &url.URL{
-					Host: "github.com",
-					Path: "go-yaml/yaml",
-				},
-				Schemes: gitSchemes,
-				VCS:     []string{"git"},
-			},
+			in:   "gopkg.in/yaml.v1/foo/bar",
+			root: "gopkg.in/yaml.v1",
+			mb:   &maybeGitSource{url: mkurl("https://github.com/go-yaml/yaml")},
 		},
 		{
 			// gopkg.in only allows specifying major version in import path
-			"gopkg.in/yaml.v1.2",
-			nil,
+			root: "gopkg.in/yaml.v1.2",
+			rerr: errors.New("gopkg.in/yaml.v1.2 is not a valid path; gopkg.in only allows major versions (\"v1\" instead of \"v1.2\")"),
 		},
 		// IBM hub devops services - fixtures borrowed from go get
 		{
-			"hub.jazz.net/git/user1/pkgname",
-			&remoteRepo{
-				Base:   "hub.jazz.net/git/user1/pkgname",
-				RelPkg: "",
-				CloneURL: &url.URL{
-					Host: "hub.jazz.net",
-					Path: "git/user1/pkgname",
-				},
-				Schemes: gitSchemes,
-				VCS:     []string{"git"},
+			in:   "hub.jazz.net/git/user1/pkgname",
+			root: "hub.jazz.net/git/user1/pkgname",
+			mb: maybeSources{
+				&maybeGitSource{url: mkurl("https://hub.jazz.net/git/user1/pkgname")},
+				&maybeGitSource{url: mkurl("ssh://git@hub.jazz.net/git/user1/pkgname")},
+				&maybeGitSource{url: mkurl("git://hub.jazz.net/git/user1/pkgname")},
+				&maybeGitSource{url: mkurl("http://hub.jazz.net/git/user1/pkgname")},
 			},
 		},
 		{
-			"hub.jazz.net/git/user1/pkgname/submodule/submodule/submodule",
-			&remoteRepo{
-				Base:   "hub.jazz.net/git/user1/pkgname",
-				RelPkg: "submodule/submodule/submodule",
-				CloneURL: &url.URL{
-					Host: "hub.jazz.net",
-					Path: "git/user1/pkgname",
-				},
-				Schemes: gitSchemes,
-				VCS:     []string{"git"},
+			in:   "hub.jazz.net/git/user1/pkgname/submodule/submodule/submodule",
+			root: "hub.jazz.net/git/user1/pkgname",
+			mb: maybeSources{
+				&maybeGitSource{url: mkurl("https://hub.jazz.net/git/user1/pkgname")},
+				&maybeGitSource{url: mkurl("ssh://git@hub.jazz.net/git/user1/pkgname")},
+				&maybeGitSource{url: mkurl("git://hub.jazz.net/git/user1/pkgname")},
+				&maybeGitSource{url: mkurl("http://hub.jazz.net/git/user1/pkgname")},
 			},
 		},
 		{
-			"hub.jazz.net",
-			nil,
+			in:   "hub.jazz.net",
+			rerr: errors.New("unable to deduce repository and source type for: \"hub.jazz.net\""),
 		},
 		{
-			"hub2.jazz.net",
-			nil,
+			in:   "hub2.jazz.net",
+			rerr: errors.New("unable to deduce repository and source type for: \"hub2.jazz.net\""),
 		},
 		{
-			"hub.jazz.net/someotherprefix",
-			nil,
+			in:   "hub.jazz.net/someotherprefix",
+			rerr: errors.New("unable to deduce repository and source type for: \"hub.jazz.net/someotherprefix\""),
 		},
 		{
-			"hub.jazz.net/someotherprefix/user1/pkgname",
-			nil,
+			in:   "hub.jazz.net/someotherprefix/user1/packagename",
+			rerr: errors.New("unable to deduce repository and source type for: \"hub.jazz.net/someotherprefix/user1/packagename\""),
 		},
 		// Spaces are not valid in user names or package names
 		{
-			"hub.jazz.net/git/User 1/pkgname",
-			nil,
+			in:   "hub.jazz.net/git/User 1/pkgname",
+			rerr: errors.New("hub.jazz.net/git/User 1/pkgname is not a valid path for a source on hub.jazz.net"),
 		},
 		{
-			"hub.jazz.net/git/user1/pkg name",
-			nil,
+			in:   "hub.jazz.net/git/user1/pkg name",
+			rerr: errors.New("hub.jazz.net/git/user1/pkg name is not a valid path for a source on hub.jazz.net"),
 		},
 		// Dots are not valid in user names
 		{
-			"hub.jazz.net/git/user.1/pkgname",
-			nil,
+			in:   "hub.jazz.net/git/user.1/pkgname",
+			rerr: errors.New("hub.jazz.net/git/user.1/pkgname is not a valid path for a source on hub.jazz.net"),
 		},
 		{
-			"hub.jazz.net/git/user/pkg.name",
-			&remoteRepo{
-				Base:   "hub.jazz.net/git/user/pkg.name",
-				RelPkg: "",
-				CloneURL: &url.URL{
-					Host: "hub.jazz.net",
-					Path: "git/user/pkg.name",
-				},
-				Schemes: gitSchemes,
-				VCS:     []string{"git"},
+			in:   "hub.jazz.net/git/user/pkg.name",
+			root: "hub.jazz.net/git/user/pkg.name",
+			mb: maybeSources{
+				&maybeGitSource{url: mkurl("https://hub.jazz.net/git/user1/pkgname")},
+				&maybeGitSource{url: mkurl("ssh://git@hub.jazz.net/git/user1/pkgname")},
+				&maybeGitSource{url: mkurl("git://hub.jazz.net/git/user1/pkgname")},
+				&maybeGitSource{url: mkurl("http://hub.jazz.net/git/user1/pkgname")},
 			},
 		},
 		// User names cannot have uppercase letters
 		{
-			"hub.jazz.net/git/USER/pkgname",
-			nil,
+			in:   "hub.jazz.net/git/USER/pkgname",
+			rerr: errors.New("hub.jazz.net/git/USER/pkgname is not a valid path for a source on hub.jazz.net"),
 		},
 		{
-			"bitbucket.org/sdboyer/reporoot",
-			&remoteRepo{
-				Base:   "bitbucket.org/sdboyer/reporoot",
-				RelPkg: "",
-				CloneURL: &url.URL{
-					Host: "bitbucket.org",
-					Path: "sdboyer/reporoot",
-				},
-				Schemes: hgSchemes,
-				VCS:     []string{"git", "hg"},
+			in:   "bitbucket.org/sdboyer/reporoot",
+			root: "bitbucket.org/sdboyer/reporoot",
+			mb: maybeSources{
+				&maybeGitSource{url: mkurl("https://bitbucket.org/sdboyer/reporoot")},
+				&maybeGitSource{url: mkurl("ssh://git@bitbucket.org/sdboyer/reporoot")},
+				&maybeGitSource{url: mkurl("git://bitbucket.org/sdboyer/reporoot")},
+				&maybeGitSource{url: mkurl("http://bitbucket.org/sdboyer/reporoot")},
+				&maybeHgSource{url: mkurl("https://bitbucket.org/sdboyer/reporoot")},
+				&maybeHgSource{url: mkurl("ssh://hg@bitbucket.org/sdboyer/reporoot")},
+				&maybeHgSource{url: mkurl("http://bitbucket.org/sdboyer/reporoot")},
 			},
 		},
 		{
-			"bitbucket.org/sdboyer/reporoot/foo/bar",
-			&remoteRepo{
-				Base:   "bitbucket.org/sdboyer/reporoot",
-				RelPkg: "foo/bar",
-				CloneURL: &url.URL{
-					Host: "bitbucket.org",
-					Path: "sdboyer/reporoot",
-				},
-				Schemes: hgSchemes,
-				VCS:     []string{"git", "hg"},
+			in:   "bitbucket.org/sdboyer/reporoot/foo/bar",
+			root: "bitbucket.org/sdboyer/reporoot",
+			mb: maybeSources{
+				&maybeGitSource{url: mkurl("https://bitbucket.org/sdboyer/reporoot")},
+				&maybeGitSource{url: mkurl("ssh://git@bitbucket.org/sdboyer/reporoot")},
+				&maybeGitSource{url: mkurl("git://bitbucket.org/sdboyer/reporoot")},
+				&maybeGitSource{url: mkurl("http://bitbucket.org/sdboyer/reporoot")},
+				&maybeHgSource{url: mkurl("https://bitbucket.org/sdboyer/reporoot")},
+				&maybeHgSource{url: mkurl("ssh://hg@bitbucket.org/sdboyer/reporoot")},
+				&maybeHgSource{url: mkurl("http://bitbucket.org/sdboyer/reporoot")},
 			},
 		},
 		{
-			"https://bitbucket.org/sdboyer/reporoot/foo/bar",
-			&remoteRepo{
-				Base:   "bitbucket.org/sdboyer/reporoot",
-				RelPkg: "foo/bar",
-				CloneURL: &url.URL{
-					Scheme: "https",
-					Host:   "bitbucket.org",
-					Path:   "sdboyer/reporoot",
-				},
-				Schemes: []string{"https"},
-				VCS:     []string{"git", "hg"},
+			in:   "https://bitbucket.org/sdboyer/reporoot/foo/bar",
+			root: "bitbucket.org/sdboyer/reporoot",
+			mb: maybeSources{
+				&maybeGitSource{url: mkurl("https://bitbucket.org/sdboyer/reporoot")},
+				&maybeHgSource{url: mkurl("https://bitbucket.org/sdboyer/reporoot")},
+			},
+		},
+		// Less standard behaviors possible due to the hg/git ambiguity
+		{
+			in:   "bitbucket.org/sdboyer/reporoot.git",
+			root: "bitbucket.org/sdboyer/reporoot.git",
+			mb: maybeSources{
+				&maybeGitSource{url: mkurl("https://bitbucket.org/sdboyer/reporoot")},
+				&maybeGitSource{url: mkurl("ssh://git@bitbucket.org/sdboyer/reporoot")},
+				&maybeGitSource{url: mkurl("git://bitbucket.org/sdboyer/reporoot")},
+				&maybeGitSource{url: mkurl("http://bitbucket.org/sdboyer/reporoot")},
 			},
 		},
 		{
-			"launchpad.net/govcstestbzrrepo",
-			&remoteRepo{
-				Base:   "launchpad.net/govcstestbzrrepo",
-				RelPkg: "",
-				CloneURL: &url.URL{
-					Host: "launchpad.net",
-					Path: "govcstestbzrrepo",
-				},
-				Schemes: bzrSchemes,
-				VCS:     []string{"bzr"},
+			in:   "git@bitbucket.org:sdboyer/reporoot.git",
+			root: "bitbucket.org/sdboyer/reporoot.git",
+			mb:   &maybeGitSource{url: mkurl("ssh://git@bitbucket.org/sdboyer/reporoot")},
+		},
+		{
+			in:   "bitbucket.org/sdboyer/reporoot.hg",
+			root: "bitbucket.org/sdboyer/reporoot.hg",
+			mb: maybeSources{
+				&maybeHgSource{url: mkurl("https://bitbucket.org/sdboyer/reporoot")},
+				&maybeHgSource{url: mkurl("ssh://hg@bitbucket.org/sdboyer/reporoot")},
+				&maybeHgSource{url: mkurl("http://bitbucket.org/sdboyer/reporoot")},
 			},
 		},
 		{
-			"launchpad.net/govcstestbzrrepo/foo/bar",
-			&remoteRepo{
-				Base:   "launchpad.net/govcstestbzrrepo",
-				RelPkg: "foo/bar",
-				CloneURL: &url.URL{
-					Host: "launchpad.net",
-					Path: "govcstestbzrrepo",
-				},
-				Schemes: bzrSchemes,
-				VCS:     []string{"bzr"},
+			in:   "hg@bitbucket.org:sdboyer/reporoot",
+			root: "bitbucket.org/sdboyer/reporoot",
+			mb:   &maybeHgSource{url: mkurl("ssh://hg@bitbucket.org/sdboyer/reporoot")},
+		},
+		{
+			in:     "git://bitbucket.org/sdboyer/reporoot.hg",
+			root:   "bitbucket.org/sdboyer/reporoot.hg",
+			srcerr: errors.New("git is not a valid scheme for accessing an hg repository"),
+		},
+		// tests for launchpad, mostly bazaar
+		// TODO(sdboyer) need more tests to deal w/launchpad's oddities
+		{
+			in:   "launchpad.net/govcstestbzrrepo",
+			root: "launchpad.net/govcstestbzrrepo",
+			mb: maybeSources{
+				&maybeBzrSource{url: mkurl("https://launchpad.net/govcstestbzrrepo")},
+				&maybeBzrSource{url: mkurl("bzr://launchpad.net/govcstestbzrrepo")},
+				&maybeBzrSource{url: mkurl("http://launchpad.net/govcstestbzrrepo")},
+			},
+		},
+		{
+			in:   "launchpad.net/govcstestbzrrepo/foo/bar",
+			root: "launchpad.net/govcstestbzrrepo",
+			mb: maybeSources{
+				&maybeBzrSource{url: mkurl("https://launchpad.net/govcstestbzrrepo")},
+				&maybeBzrSource{url: mkurl("bzr://launchpad.net/govcstestbzrrepo")},
+				&maybeBzrSource{url: mkurl("http://launchpad.net/govcstestbzrrepo")},
 			},
 		},
 		{
 			"launchpad.net/repo root",
-			nil,
+			rerr: errors.New("launchpad.net/repo root is not a valid path for a source on launchpad.net"),
 		},
 		{
-			"git.launchpad.net/reporoot",
-			&remoteRepo{
-				Base:   "git.launchpad.net/reporoot",
-				RelPkg: "",
-				CloneURL: &url.URL{
-					Host: "git.launchpad.net",
-					Path: "reporoot",
-				},
-				Schemes: gitSchemes,
-				VCS:     []string{"git"},
+			in:   "git.launchpad.net/reporoot",
+			root: "git.launchpad.net/reporoot",
+			mb: maybeSources{
+				&maybeGitSource{url: mkurl("https://git.launchpad.net/reporoot")},
+				&maybeGitSource{url: mkurl("ssh://git@git.launchpad.net/reporoot")},
+				&maybeGitSource{url: mkurl("git://git.launchpad.net/reporoot")},
+				&maybeGitSource{url: mkurl("http://git.launchpad.net/reporoot")},
 			},
 		},
 		{
-			"git.launchpad.net/reporoot/foo/bar",
-			&remoteRepo{
-				Base:   "git.launchpad.net/reporoot",
-				RelPkg: "foo/bar",
-				CloneURL: &url.URL{
-					Host: "git.launchpad.net",
-					Path: "reporoot",
-				},
-				Schemes: gitSchemes,
-				VCS:     []string{"git"},
+			in:   "git.launchpad.net/reporoot/foo/bar",
+			root: "git.launchpad.net/reporoot",
+			mb: maybeSources{
+				&maybeGitSource{url: mkurl("https://git.launchpad.net/reporoot")},
+				&maybeGitSource{url: mkurl("ssh://git@git.launchpad.net/reporoot")},
+				&maybeGitSource{url: mkurl("git://git.launchpad.net/reporoot")},
+				&maybeGitSource{url: mkurl("http://git.launchpad.net/reporoot")},
 			},
 		},
 		{
@@ -358,126 +349,106 @@ func TestDeduceRemotes(t *testing.T) {
 		},
 		{
 			"git.launchpad.net/repo root",
-			nil,
+			rerr: errors.New("git.launchpad.net/repo root is not a valid path for a source on launchpad.net"),
 		},
 		{
-			"git.apache.org/package-name.git",
-			&remoteRepo{
-				Base:   "git.apache.org/package-name.git",
-				RelPkg: "",
-				CloneURL: &url.URL{
-					Host: "git.apache.org",
-					Path: "package-name.git",
-				},
-				Schemes: gitSchemes,
-				VCS:     []string{"git"},
+			in:   "git.apache.org/package-name.git",
+			root: "git.apache.org/package-name.git",
+			mb: maybeSources{
+				&maybeGitSource{url: mkurl("https://git.apache.org/package-name.git")},
+				&maybeGitSource{url: mkurl("ssh://git@git.apache.org/package-name.git")},
+				&maybeGitSource{url: mkurl("git://git.apache.org/package-name.git")},
+				&maybeGitSource{url: mkurl("http://git.apache.org/package-name.git")},
 			},
 		},
 		{
-			"git.apache.org/package-name.git/foo/bar",
-			&remoteRepo{
-				Base:   "git.apache.org/package-name.git",
-				RelPkg: "foo/bar",
-				CloneURL: &url.URL{
-					Host: "git.apache.org",
-					Path: "package-name.git",
-				},
-				Schemes: gitSchemes,
-				VCS:     []string{"git"},
+			in:   "git.apache.org/package-name.git/foo/bar",
+			root: "git.apache.org/package-name.git",
+			mb: maybeSources{
+				&maybeGitSource{url: mkurl("https://git.apache.org/package-name.git")},
+				&maybeGitSource{url: mkurl("ssh://git@git.apache.org/package-name.git")},
+				&maybeGitSource{url: mkurl("git://git.apache.org/package-name.git")},
+				&maybeGitSource{url: mkurl("http://git.apache.org/package-name.git")},
 			},
 		},
 		// Vanity imports
 		{
-			"golang.org/x/exp",
-			&remoteRepo{
-				Base:   "golang.org/x/exp",
-				RelPkg: "",
-				CloneURL: &url.URL{
-					Scheme: "https",
-					Host:   "go.googlesource.com",
-					Path:   "/exp",
-				},
-				Schemes: []string{"https"},
-				VCS:     []string{"git"},
-			},
+			in:   "golang.org/x/exp",
+			root: "golang.org/x/exp",
+			mb:   &maybeGitSource{url: mkurl("https://go.googlesource.com/exp")},
 		},
 		{
-			"golang.org/x/exp/inotify",
-			&remoteRepo{
-				Base:   "golang.org/x/exp",
-				RelPkg: "inotify",
-				CloneURL: &url.URL{
-					Scheme: "https",
-					Host:   "go.googlesource.com",
-					Path:   "/exp",
-				},
-				Schemes: []string{"https"},
-				VCS:     []string{"git"},
-			},
+			in:   "golang.org/x/exp/inotify",
+			root: "golang.org/x/exp",
+			mb:   &maybeGitSource{url: mkurl("https://go.googlesource.com/exp")},
 		},
 		{
-			"rsc.io/pdf",
-			&remoteRepo{
-				Base:   "rsc.io/pdf",
-				RelPkg: "",
-				CloneURL: &url.URL{
-					Scheme: "https",
-					Host:   "github.com",
-					Path:   "/rsc/pdf",
-				},
-				Schemes: []string{"https"},
-				VCS:     []string{"git"},
-			},
+			in:   "rsc.io/pdf",
+			root: "rsc.io/pdf",
+			mb:   &maybeGitSource{url: mkurl("https://github.com/rsc/pdf")},
 		},
 		// Regression - gh does allow two-letter usernames
 		{
-			"github.com/kr/pretty",
-			&remoteRepo{
-				Base:   "github.com/kr/pretty",
-				RelPkg: "",
-				CloneURL: &url.URL{
-					Host: "github.com",
-					Path: "kr/pretty",
-				},
-				Schemes: gitSchemes,
-				VCS:     []string{"git"},
+			in:   "github.com/kr/pretty",
+			root: "github.com/kr/pretty",
+			mb: maybeSources{
+				&maybeGitSource{url: mkurl("https://github.com/kr/pretty")},
+				&maybeGitSource{url: mkurl("ssh://git@github.com/kr/pretty")},
+				&maybeGitSource{url: mkurl("git://github.com/kr/pretty")},
+				&maybeGitSource{url: mkurl("http://github.com/kr/pretty")},
 			},
+		},
+		// VCS extension-based syntax
+		{
+			in:   "foobar/baz.git",
+			root: "foobar/baz.git",
+			mb: maybeSources{
+				&maybeGitSource{url: mkurl("https://foobar/baz.git")},
+				&maybeGitSource{url: mkurl("git://foobar/baz.git")},
+				&maybeGitSource{url: mkurl("http://foobar/baz.git")},
+			},
+		},
+		{
+			in:   "foobar/baz.git/quark/quizzle.git",
+			rerr: errors.New("not allowed: foobar/baz.git/quark/quizzle.git contains multiple vcs extension hints"),
 		},
 	}
 
-	for _, fix := range fixtures {
-		got, err := deduceRemoteRepo(fix.path)
-		want := fix.want
+	// TODO(sdboyer) this is all the old checking logic; convert it
+	//for _, fix := range fixtures {
+	//got, err := deduceRemoteRepo(fix.path)
+	//want := fix.want
 
-		if want == nil {
-			if err == nil {
-				t.Errorf("deduceRemoteRepo(%q): Error expected but not received", fix.path)
-			}
-			continue
-		}
+	//if want == nil {
+	//if err == nil {
+	//t.Errorf("deduceRemoteRepo(%q): Error expected but not received", fix.path)
+	//}
+	//continue
+	//}
 
-		if err != nil {
-			t.Errorf("deduceRemoteRepo(%q): %v", fix.path, err)
-			continue
-		}
+	//if err != nil {
+	//t.Errorf("deduceRemoteRepo(%q): %v", fix.path, err)
+	//continue
+	//}
 
-		if got.Base != want.Base {
-			t.Errorf("deduceRemoteRepo(%q): Base was %s, wanted %s", fix.path, got.Base, want.Base)
-		}
-		if got.RelPkg != want.RelPkg {
-			t.Errorf("deduceRemoteRepo(%q): RelPkg was %s, wanted %s", fix.path, got.RelPkg, want.RelPkg)
-		}
-		if !reflect.DeepEqual(got.CloneURL, want.CloneURL) {
-			// misspelling things is cool when it makes columns line up
-			t.Errorf("deduceRemoteRepo(%q): CloneURL disagreement:\n(GOT) %s\n(WNT) %s", fix.path, ufmt(got.CloneURL), ufmt(want.CloneURL))
-		}
-		if !reflect.DeepEqual(got.VCS, want.VCS) {
-			t.Errorf("deduceRemoteRepo(%q): VCS was %s, wanted %s", fix.path, got.VCS, want.VCS)
-		}
-		if !reflect.DeepEqual(got.Schemes, want.Schemes) {
-			t.Errorf("deduceRemoteRepo(%q): Schemes was %s, wanted %s", fix.path, got.Schemes, want.Schemes)
-		}
-	}
+	//if got.Base != want.Base {
+	//t.Errorf("deduceRemoteRepo(%q): Base was %s, wanted %s", fix.path, got.Base, want.Base)
+	//}
+	//if got.RelPkg != want.RelPkg {
+	//t.Errorf("deduceRemoteRepo(%q): RelPkg was %s, wanted %s", fix.path, got.RelPkg, want.RelPkg)
+	//}
+	//if !reflect.DeepEqual(got.CloneURL, want.CloneURL) {
+	//// misspelling things is cool when it makes columns line up
+	//t.Errorf("deduceRemoteRepo(%q): CloneURL disagreement:\n(GOT) %s\n(WNT) %s", fix.path, ufmt(got.CloneURL), ufmt(want.CloneURL))
+	//}
+	//if !reflect.DeepEqual(got.VCS, want.VCS) {
+	//t.Errorf("deduceRemoteRepo(%q): VCS was %s, wanted %s", fix.path, got.VCS, want.VCS)
+	//}
+	//if !reflect.DeepEqual(got.Schemes, want.Schemes) {
+	//t.Errorf("deduceRemoteRepo(%q): Schemes was %s, wanted %s", fix.path, got.Schemes, want.Schemes)
+	//}
+	//}
+	t.Error("TODO implement checking of new path deduction fixtures")
 }
 
 // borrow from stdlib
