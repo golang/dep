@@ -140,8 +140,8 @@ func (m bitbucketDeducer) deduceSource(path string, u *url.URL) (maybeSource, er
 	u.Path = v[2]
 
 	// This isn't definitive, but it'll probably catch most
-	isgit := strings.HasSuffix(u.Path, ".git") || u.User.Username() == "git"
-	ishg := strings.HasSuffix(u.Path, ".hg") || u.User.Username() == "hg"
+	isgit := strings.HasSuffix(u.Path, ".git") || (u.User != nil && u.User.Username() == "git")
+	ishg := strings.HasSuffix(u.Path, ".hg") || (u.User != nil && u.User.Username() == "hg")
 
 	if u.Scheme != "" {
 		validgit, validhg := validateVCSScheme(u.Scheme, "git"), validateVCSScheme(u.Scheme, "hg")
@@ -490,7 +490,8 @@ type partialSourceFuture func(string, ProjectAnalyzer) sourceFuture
 // network activity is triggered only when calling the sourceFuture returned
 // from the partialSourceFuture.
 func (sm *SourceMgr) deduceFromPath(path string) (stringFuture, partialSourceFuture, error) {
-	u, err := normalizeURI(path)
+	opath := path
+	u, path, err := normalizeURI(path)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -562,7 +563,7 @@ func (sm *SourceMgr) deduceFromPath(path string) (stringFuture, partialSourceFut
 		var reporoot string
 		importroot, vcs, reporoot, futerr = parseMetadata(path)
 		if futerr != nil {
-			futerr = fmt.Errorf("unable to deduce repository and source type for: %q", path)
+			futerr = fmt.Errorf("unable to deduce repository and source type for: %q", opath)
 			return
 		}
 
@@ -622,7 +623,7 @@ func (sm *SourceMgr) deduceFromPath(path string) (stringFuture, partialSourceFut
 	return root, src, nil
 }
 
-func normalizeURI(path string) (u *url.URL, err error) {
+func normalizeURI(path string) (u *url.URL, newpath string, err error) {
 	if m := scpSyntaxRe.FindStringSubmatch(path); m != nil {
 		// Match SCP-like syntax and convert it to a URL.
 		// Eg, "git@github.com:user/repo" becomes
@@ -638,18 +639,18 @@ func normalizeURI(path string) (u *url.URL, err error) {
 	} else {
 		u, err = url.Parse(path)
 		if err != nil {
-			return nil, fmt.Errorf("%q is not a valid URI", path)
+			return nil, "", fmt.Errorf("%q is not a valid URI", path)
 		}
 	}
 
 	if u.Host != "" {
-		path = u.Host + "/" + strings.TrimPrefix(u.Path, "/")
+		newpath = u.Host + "/" + strings.TrimPrefix(u.Path, "/")
 	} else {
-		path = u.Path
+		newpath = u.Path
 	}
 
-	if !pathvld.MatchString(path) {
-		return nil, fmt.Errorf("%q is not a valid import path", path)
+	if !pathvld.MatchString(newpath) {
+		return nil, "", fmt.Errorf("%q is not a valid import path", newpath)
 	}
 
 	return
