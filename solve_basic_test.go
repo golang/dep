@@ -1283,7 +1283,7 @@ func (sm *depspecSourceManager) RevisionPresentIn(id ProjectIdentifier, r Revisi
 	return false, fmt.Errorf("Project %s has no revision %s", id.errString(), r)
 }
 
-func (sm *depspecSourceManager) RepoExists(id ProjectIdentifier) (bool, error) {
+func (sm *depspecSourceManager) SourceExists(id ProjectIdentifier) (bool, error) {
 	for _, ds := range sm.specs {
 		if id.ProjectRoot == ds.n {
 			return true, nil

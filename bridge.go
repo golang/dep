@@ -107,8 +107,8 @@ func (b *bridge) RevisionPresentIn(id ProjectIdentifier, r Revision) (bool, erro
 	return b.sm.RevisionPresentIn(id, r)
 }
 
-func (b *bridge) RepoExists(id ProjectIdentifier) (bool, error) {
-	return b.sm.RepoExists(id)
+func (b *bridge) SourceExists(id ProjectIdentifier) (bool, error) {
+	return b.sm.SourceExists(id)
 }
 
 func (b *bridge) vendorCodeExists(id ProjectIdentifier) (bool, error) {

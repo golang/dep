@@ -26,10 +26,9 @@ var sanitizer = strings.NewReplacer(":", "-", "/", "-", "+", "-")
 // sufficient for any purpose. It provides some additional semantics around the
 // methods defined here.
 type SourceManager interface {
-	// RepoExists checks if a repository exists, either upstream or in the
+	// SourceExists checks if a repository exists, either upstream or in the
 	// SourceManager's central repository cache.
-	// TODO(sdboyer) rename to SourceExists
-	RepoExists(ProjectIdentifier) (bool, error)
+	SourceExists(ProjectIdentifier) (bool, error)
 
 	// ListVersions retrieves a list of the available versions for a given
 	// repository name.
@@ -219,9 +218,9 @@ func (sm *SourceMgr) RevisionPresentIn(id ProjectIdentifier, r Revision) (bool, 
 	return pmc.pm.RevisionPresentIn(id.ProjectRoot, r)
 }
 
-// RepoExists checks if a repository exists, either upstream or in the cache,
+// SourceExists checks if a repository exists, either upstream or in the cache,
 // for the provided ProjectIdentifier.
-func (sm *SourceMgr) RepoExists(id ProjectIdentifier) (bool, error) {
+func (sm *SourceMgr) SourceExists(id ProjectIdentifier) (bool, error) {
 	pms, err := sm.getProjectManager(id)
 	if err != nil {
 		return false, err

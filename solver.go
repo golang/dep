@@ -639,7 +639,7 @@ func (s *solver) createVersionQueue(bmi bimodalIdentifier) (*versionQueue, error
 		return newVersionQueue(id, nil, nil, s.b)
 	}
 
-	exists, err := s.b.RepoExists(id)
+	exists, err := s.b.SourceExists(id)
 	if err != nil {
 		return nil, err
 	}
@@ -816,7 +816,7 @@ func (s *solver) getLockVersionIfValid(id ProjectIdentifier) (Version, error) {
 		// to be found and attempted in the repository. If it's only in vendor,
 		// though, then we have to try to use what's in the lock, because that's
 		// the only version we'll be able to get.
-		if exist, _ := s.b.RepoExists(id); exist {
+		if exist, _ := s.b.SourceExists(id); exist {
 			return nil, nil
 		}
 

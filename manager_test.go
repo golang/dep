@@ -170,9 +170,9 @@ func TestProjectManagerInit(t *testing.T) {
 
 	// Ensure project existence values are what we expect
 	var exists bool
-	exists, err = sm.RepoExists(id)
+	exists, err = sm.SourceExists(id)
 	if err != nil {
-		t.Errorf("Error on checking RepoExists: %s", err)
+		t.Errorf("Error on checking SourceExists: %s", err)
 	}
 	if !exists {
 		t.Error("Repo should exist after non-erroring call to ListVersions")
