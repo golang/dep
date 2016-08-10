@@ -8,8 +8,6 @@ import (
 	"net/url"
 	"reflect"
 	"testing"
-
-	"github.com/davecgh/go-spew/spew"
 )
 
 type pathDeductionFixture struct {
@@ -53,13 +51,15 @@ var pathDeductionFixtures = map[string][]pathDeductionFixture{
 			},
 		},
 		{
+			// TODO(sdboyer) is this a problem for enforcing uniqueness? do we
+			// need to collapse these extensions?
 			in:   "github.com/sdboyer/gps.git/foo",
-			root: "github.com/sdboyer/gps",
+			root: "github.com/sdboyer/gps.git",
 			mb: maybeSources{
-				maybeGitSource{url: mkurl("https://github.com/sdboyer/gps")},
-				maybeGitSource{url: mkurl("ssh://git@github.com/sdboyer/gps")},
-				maybeGitSource{url: mkurl("git://github.com/sdboyer/gps")},
-				maybeGitSource{url: mkurl("http://github.com/sdboyer/gps")},
+				maybeGitSource{url: mkurl("https://github.com/sdboyer/gps.git")},
+				maybeGitSource{url: mkurl("ssh://git@github.com/sdboyer/gps.git")},
+				maybeGitSource{url: mkurl("git://github.com/sdboyer/gps.git")},
+				maybeGitSource{url: mkurl("http://github.com/sdboyer/gps.git")},
 			},
 		},
 		{
@@ -140,17 +140,27 @@ var pathDeductionFixtures = map[string][]pathDeductionFixture{
 		{
 			in:   "gopkg.in/yaml.v1",
 			root: "gopkg.in/yaml.v1",
-			mb:   maybeGitSource{url: mkurl("https://github.com/go-yaml/yaml")},
+			mb: maybeSources{
+				maybeGitSource{url: mkurl("https://github.com/go-yaml/yaml")},
+				maybeGitSource{url: mkurl("ssh://git@github.com/go-yaml/yaml")},
+				maybeGitSource{url: mkurl("git://github.com/go-yaml/yaml")},
+				maybeGitSource{url: mkurl("http://github.com/go-yaml/yaml")},
+			},
 		},
 		{
 			in:   "gopkg.in/yaml.v1/foo/bar",
 			root: "gopkg.in/yaml.v1",
-			mb:   maybeGitSource{url: mkurl("https://github.com/go-yaml/yaml")},
+			mb: maybeSources{
+				maybeGitSource{url: mkurl("https://github.com/go-yaml/yaml")},
+				maybeGitSource{url: mkurl("ssh://git@github.com/go-yaml/yaml")},
+				maybeGitSource{url: mkurl("git://github.com/go-yaml/yaml")},
+				maybeGitSource{url: mkurl("http://github.com/go-yaml/yaml")},
+			},
 		},
 		{
 			// gopkg.in only allows specifying major version in import path
 			in:   "gopkg.in/yaml.v1.2",
-			rerr: errors.New("gopkg.in/yaml.v1.2 is not a valid path; gopkg.in only allows major versions (\"v1\" instead of \"v1.2\")"),
+			rerr: errors.New("gopkg.in/yaml.v1.2 is not a valid import path; gopkg.in only allows major versions (\"v1\" instead of \"v1.2\")"),
 		},
 	},
 	"jazz": []pathDeductionFixture{
@@ -158,30 +168,20 @@ var pathDeductionFixtures = map[string][]pathDeductionFixture{
 		{
 			in:   "hub.jazz.net/git/user1/pkgname",
 			root: "hub.jazz.net/git/user1/pkgname",
-			mb: maybeSources{
-				maybeGitSource{url: mkurl("https://hub.jazz.net/git/user1/pkgname")},
-				maybeGitSource{url: mkurl("ssh://git@hub.jazz.net/git/user1/pkgname")},
-				maybeGitSource{url: mkurl("git://hub.jazz.net/git/user1/pkgname")},
-				maybeGitSource{url: mkurl("http://hub.jazz.net/git/user1/pkgname")},
-			},
+			mb:   maybeGitSource{url: mkurl("https://hub.jazz.net/git/user1/pkgname")},
 		},
 		{
 			in:   "hub.jazz.net/git/user1/pkgname/submodule/submodule/submodule",
 			root: "hub.jazz.net/git/user1/pkgname",
-			mb: maybeSources{
-				maybeGitSource{url: mkurl("https://hub.jazz.net/git/user1/pkgname")},
-				maybeGitSource{url: mkurl("ssh://git@hub.jazz.net/git/user1/pkgname")},
-				maybeGitSource{url: mkurl("git://hub.jazz.net/git/user1/pkgname")},
-				maybeGitSource{url: mkurl("http://hub.jazz.net/git/user1/pkgname")},
-			},
+			mb:   maybeGitSource{url: mkurl("https://hub.jazz.net/git/user1/pkgname")},
 		},
 		{
 			in:   "hub.jazz.net/someotherprefix",
-			rerr: errors.New("unable to deduce repository and source type for: \"hub.jazz.net/someotherprefix\""),
+			rerr: errors.New("hub.jazz.net/someotherprefix is not a valid path for a source on hub.jazz.net"),
 		},
 		{
 			in:   "hub.jazz.net/someotherprefix/user1/packagename",
-			rerr: errors.New("unable to deduce repository and source type for: \"hub.jazz.net/someotherprefix/user1/packagename\""),
+			rerr: errors.New("hub.jazz.net/someotherprefix/user1/packagename is not a valid path for a source on hub.jazz.net"),
 		},
 		// Spaces are not valid in user names or package names
 		{
@@ -198,20 +198,17 @@ var pathDeductionFixtures = map[string][]pathDeductionFixture{
 			rerr: errors.New("hub.jazz.net/git/user.1/pkgname is not a valid path for a source on hub.jazz.net"),
 		},
 		{
-			in:   "hub.jazz.net/git/user/pkg.name",
-			root: "hub.jazz.net/git/user/pkg.name",
-			mb: maybeSources{
-				maybeGitSource{url: mkurl("https://hub.jazz.net/git/user1/pkgname")},
-				maybeGitSource{url: mkurl("ssh://git@hub.jazz.net/git/user1/pkgname")},
-				maybeGitSource{url: mkurl("git://hub.jazz.net/git/user1/pkgname")},
-				maybeGitSource{url: mkurl("http://hub.jazz.net/git/user1/pkgname")},
-			},
+			in:   "hub.jazz.net/git/user1/pkg.name",
+			root: "hub.jazz.net/git/user1/pkg.name",
+			mb:   maybeGitSource{url: mkurl("https://hub.jazz.net/git/user1/pkg.name")},
 		},
 		// User names cannot have uppercase letters
 		{
 			in:   "hub.jazz.net/git/USER/pkgname",
 			rerr: errors.New("hub.jazz.net/git/USER/pkgname is not a valid path for a source on hub.jazz.net"),
 		},
+	},
+	"bitbucket": []pathDeductionFixture{
 		{
 			in:   "bitbucket.org/sdboyer/reporoot",
 			root: "bitbucket.org/sdboyer/reporoot",
@@ -225,8 +222,6 @@ var pathDeductionFixtures = map[string][]pathDeductionFixture{
 				maybeHgSource{url: mkurl("http://bitbucket.org/sdboyer/reporoot")},
 			},
 		},
-	},
-	"bitbucket": []pathDeductionFixture{
 		{
 			in:   "bitbucket.org/sdboyer/reporoot/foo/bar",
 			root: "bitbucket.org/sdboyer/reporoot",
@@ -253,24 +248,24 @@ var pathDeductionFixtures = map[string][]pathDeductionFixture{
 			in:   "bitbucket.org/sdboyer/reporoot.git",
 			root: "bitbucket.org/sdboyer/reporoot.git",
 			mb: maybeSources{
-				maybeGitSource{url: mkurl("https://bitbucket.org/sdboyer/reporoot")},
-				maybeGitSource{url: mkurl("ssh://git@bitbucket.org/sdboyer/reporoot")},
-				maybeGitSource{url: mkurl("git://bitbucket.org/sdboyer/reporoot")},
-				maybeGitSource{url: mkurl("http://bitbucket.org/sdboyer/reporoot")},
+				maybeGitSource{url: mkurl("https://bitbucket.org/sdboyer/reporoot.git")},
+				maybeGitSource{url: mkurl("ssh://git@bitbucket.org/sdboyer/reporoot.git")},
+				maybeGitSource{url: mkurl("git://bitbucket.org/sdboyer/reporoot.git")},
+				maybeGitSource{url: mkurl("http://bitbucket.org/sdboyer/reporoot.git")},
 			},
 		},
 		{
 			in:   "git@bitbucket.org:sdboyer/reporoot.git",
 			root: "bitbucket.org/sdboyer/reporoot.git",
-			mb:   maybeGitSource{url: mkurl("ssh://git@bitbucket.org/sdboyer/reporoot")},
+			mb:   maybeGitSource{url: mkurl("ssh://git@bitbucket.org/sdboyer/reporoot.git")},
 		},
 		{
 			in:   "bitbucket.org/sdboyer/reporoot.hg",
 			root: "bitbucket.org/sdboyer/reporoot.hg",
 			mb: maybeSources{
-				maybeHgSource{url: mkurl("https://bitbucket.org/sdboyer/reporoot")},
-				maybeHgSource{url: mkurl("ssh://hg@bitbucket.org/sdboyer/reporoot")},
-				maybeHgSource{url: mkurl("http://bitbucket.org/sdboyer/reporoot")},
+				maybeHgSource{url: mkurl("https://bitbucket.org/sdboyer/reporoot.hg")},
+				maybeHgSource{url: mkurl("ssh://hg@bitbucket.org/sdboyer/reporoot.hg")},
+				maybeHgSource{url: mkurl("http://bitbucket.org/sdboyer/reporoot.hg")},
 			},
 		},
 		{
@@ -292,6 +287,7 @@ var pathDeductionFixtures = map[string][]pathDeductionFixture{
 			root: "launchpad.net/govcstestbzrrepo",
 			mb: maybeSources{
 				maybeBzrSource{url: mkurl("https://launchpad.net/govcstestbzrrepo")},
+				maybeBzrSource{url: mkurl("bzr+ssh://launchpad.net/govcstestbzrrepo")},
 				maybeBzrSource{url: mkurl("bzr://launchpad.net/govcstestbzrrepo")},
 				maybeBzrSource{url: mkurl("http://launchpad.net/govcstestbzrrepo")},
 			},
@@ -301,6 +297,7 @@ var pathDeductionFixtures = map[string][]pathDeductionFixture{
 			root: "launchpad.net/govcstestbzrrepo",
 			mb: maybeSources{
 				maybeBzrSource{url: mkurl("https://launchpad.net/govcstestbzrrepo")},
+				maybeBzrSource{url: mkurl("bzr+ssh://launchpad.net/govcstestbzrrepo")},
 				maybeBzrSource{url: mkurl("bzr://launchpad.net/govcstestbzrrepo")},
 				maybeBzrSource{url: mkurl("http://launchpad.net/govcstestbzrrepo")},
 			},
@@ -316,7 +313,7 @@ var pathDeductionFixtures = map[string][]pathDeductionFixture{
 			root: "git.launchpad.net/reporoot",
 			mb: maybeSources{
 				maybeGitSource{url: mkurl("https://git.launchpad.net/reporoot")},
-				maybeGitSource{url: mkurl("ssh://git@git.launchpad.net/reporoot")},
+				maybeGitSource{url: mkurl("ssh://git.launchpad.net/reporoot")},
 				maybeGitSource{url: mkurl("git://git.launchpad.net/reporoot")},
 				maybeGitSource{url: mkurl("http://git.launchpad.net/reporoot")},
 			},
@@ -326,7 +323,7 @@ var pathDeductionFixtures = map[string][]pathDeductionFixture{
 			root: "git.launchpad.net/reporoot",
 			mb: maybeSources{
 				maybeGitSource{url: mkurl("https://git.launchpad.net/reporoot")},
-				maybeGitSource{url: mkurl("ssh://git@git.launchpad.net/reporoot")},
+				maybeGitSource{url: mkurl("ssh://git.launchpad.net/reporoot")},
 				maybeGitSource{url: mkurl("git://git.launchpad.net/reporoot")},
 				maybeGitSource{url: mkurl("http://git.launchpad.net/reporoot")},
 			},
@@ -342,7 +339,7 @@ var pathDeductionFixtures = map[string][]pathDeductionFixture{
 			root: "git.apache.org/package-name.git",
 			mb: maybeSources{
 				maybeGitSource{url: mkurl("https://git.apache.org/package-name.git")},
-				maybeGitSource{url: mkurl("ssh://git@git.apache.org/package-name.git")},
+				maybeGitSource{url: mkurl("ssh://git.apache.org/package-name.git")},
 				maybeGitSource{url: mkurl("git://git.apache.org/package-name.git")},
 				maybeGitSource{url: mkurl("http://git.apache.org/package-name.git")},
 			},
@@ -352,7 +349,7 @@ var pathDeductionFixtures = map[string][]pathDeductionFixture{
 			root: "git.apache.org/package-name.git",
 			mb: maybeSources{
 				maybeGitSource{url: mkurl("https://git.apache.org/package-name.git")},
-				maybeGitSource{url: mkurl("ssh://git@git.apache.org/package-name.git")},
+				maybeGitSource{url: mkurl("ssh://git.apache.org/package-name.git")},
 				maybeGitSource{url: mkurl("git://git.apache.org/package-name.git")},
 				maybeGitSource{url: mkurl("http://git.apache.org/package-name.git")},
 			},
@@ -361,34 +358,80 @@ var pathDeductionFixtures = map[string][]pathDeductionFixture{
 	"vcsext": []pathDeductionFixture{
 		// VCS extension-based syntax
 		{
-			in:   "foobar/baz.git",
-			root: "foobar/baz.git",
+			in:   "foobar.com/baz.git",
+			root: "foobar.com/baz.git",
 			mb: maybeSources{
-				maybeGitSource{url: mkurl("https://foobar/baz.git")},
-				maybeGitSource{url: mkurl("git://foobar/baz.git")},
-				maybeGitSource{url: mkurl("http://foobar/baz.git")},
+				maybeGitSource{url: mkurl("https://foobar.com/baz.git")},
+				maybeGitSource{url: mkurl("ssh://foobar.com/baz.git")},
+				maybeGitSource{url: mkurl("git://foobar.com/baz.git")},
+				maybeGitSource{url: mkurl("http://foobar.com/baz.git")},
 			},
 		},
 		{
-			in:   "foobar/baz.bzr",
-			root: "foobar/baz.bzr",
+			in:   "foobar.com/baz.git/extra/path",
+			root: "foobar.com/baz.git",
 			mb: maybeSources{
-				maybeBzrSource{url: mkurl("https://foobar/baz.bzr")},
-				maybeBzrSource{url: mkurl("bzr://foobar/baz.bzr")},
-				maybeBzrSource{url: mkurl("http://foobar/baz.bzr")},
+				maybeGitSource{url: mkurl("https://foobar.com/baz.git")},
+				maybeGitSource{url: mkurl("ssh://foobar.com/baz.git")},
+				maybeGitSource{url: mkurl("git://foobar.com/baz.git")},
+				maybeGitSource{url: mkurl("http://foobar.com/baz.git")},
 			},
 		},
 		{
-			in:   "foobar/baz.hg",
-			root: "foobar/baz.hg",
+			in:   "foobar.com/baz.bzr",
+			root: "foobar.com/baz.bzr",
 			mb: maybeSources{
-				maybeHgSource{url: mkurl("https://foobar/baz.hg")},
-				maybeHgSource{url: mkurl("http://foobar/baz.hg")},
+				maybeBzrSource{url: mkurl("https://foobar.com/baz.bzr")},
+				maybeBzrSource{url: mkurl("bzr+ssh://foobar.com/baz.bzr")},
+				maybeBzrSource{url: mkurl("bzr://foobar.com/baz.bzr")},
+				maybeBzrSource{url: mkurl("http://foobar.com/baz.bzr")},
 			},
 		},
 		{
-			in:   "foobar/baz.git/quark/quizzle.git",
-			rerr: errors.New("not allowed: foobar/baz.git/quark/quizzle.git contains multiple vcs extension hints"),
+			in:   "foo-bar.com/baz.hg",
+			root: "foo-bar.com/baz.hg",
+			mb: maybeSources{
+				maybeHgSource{url: mkurl("https://foo-bar.com/baz.hg")},
+				maybeHgSource{url: mkurl("ssh://foo-bar.com/baz.hg")},
+				maybeHgSource{url: mkurl("http://foo-bar.com/baz.hg")},
+			},
+		},
+		{
+			in:   "git@foobar.com:baz.git",
+			root: "foobar.com/baz.git",
+			mb:   maybeGitSource{url: mkurl("ssh://git@foobar.com/baz.git")},
+		},
+		{
+			in:   "bzr+ssh://foobar.com/baz.bzr",
+			root: "foobar.com/baz.bzr",
+			mb:   maybeBzrSource{url: mkurl("bzr+ssh://foobar.com/baz.bzr")},
+		},
+		{
+			in:   "ssh://foobar.com/baz.bzr",
+			root: "foobar.com/baz.bzr",
+			mb:   maybeBzrSource{url: mkurl("ssh://foobar.com/baz.bzr")},
+		},
+		{
+			in:   "https://foobar.com/baz.hg",
+			root: "foobar.com/baz.hg",
+			mb:   maybeHgSource{url: mkurl("https://foobar.com/baz.hg")},
+		},
+		{
+			in:     "git://foobar.com/baz.hg",
+			root:   "foobar.com/baz.hg",
+			srcerr: errors.New("git is not a valid scheme for accessing hg repositories (path foobar.com/baz.hg)"),
+		},
+		// who knows why anyone would do this, but having a second vcs ext
+		// shouldn't throw us off - only the first one counts
+		{
+			in:   "foobar.com/baz.git/quark/quizzle.bzr/quorum",
+			root: "foobar.com/baz.git",
+			mb: maybeSources{
+				maybeGitSource{url: mkurl("https://foobar.com/baz.git")},
+				maybeGitSource{url: mkurl("ssh://foobar.com/baz.git")},
+				maybeGitSource{url: mkurl("git://foobar.com/baz.git")},
+				maybeGitSource{url: mkurl("http://foobar.com/baz.git")},
+			},
 		},
 	},
 	"vanity": []pathDeductionFixture{
@@ -485,18 +528,13 @@ func TestDeduceFromPath(t *testing.T) {
 				}
 				continue
 			}
-			if u == nil {
-				spew.Dump(fix, uerr)
-			}
 
 			root, rerr := deducer.deduceRoot(in)
 			if fix.rerr != nil {
-				if fix.rerr != rerr {
-					if rerr == nil {
-						t.Errorf("(in: %s, %T) Expected error on deducing root, got none:\n\t(WNT) %s", in, deducer, fix.rerr)
-					} else {
-						t.Errorf("(in: %s, %T) Got unexpected error on deducing root:\n\t(GOT) %s\n\t(WNT) %s", in, deducer, rerr, fix.rerr)
-					}
+				if rerr == nil {
+					t.Errorf("(in: %s, %T) Expected error on deducing root, got none:\n\t(WNT) %s", in, deducer, fix.rerr)
+				} else if fix.rerr.Error() != rerr.Error() {
+					t.Errorf("(in: %s, %T) Got unexpected error on deducing root:\n\t(GOT) %s\n\t(WNT) %s", in, deducer, rerr, fix.rerr)
 				}
 			} else if rerr != nil {
 				t.Errorf("(in: %s, %T) Got unexpected error on deducing root:\n\t(GOT) %s", in, deducer, rerr)
@@ -504,17 +542,18 @@ func TestDeduceFromPath(t *testing.T) {
 				t.Errorf("(in: %s, %T) Deducer did not return expected root:\n\t(GOT) %s\n\t(WNT) %s", in, deducer, root, fix.root)
 			}
 
-			mb, mberr := deducer.deduceSource(fix.in, u)
+			mb, mberr := deducer.deduceSource(in, u)
 			if fix.srcerr != nil {
-				if fix.srcerr != mberr {
-					if mberr == nil {
-						t.Errorf("(in: %s, %T) Expected error on deducing source, got none:\n\t(WNT) %s", in, deducer, fix.srcerr)
-					} else {
-						t.Errorf("(in: %s, %T) Got unexpected error on deducing source:\n\t(GOT) %s\n\t(WNT) %s", in, deducer, mberr, fix.srcerr)
-					}
+				if mberr == nil {
+					t.Errorf("(in: %s, %T) Expected error on deducing source, got none:\n\t(WNT) %s", in, deducer, fix.srcerr)
+				} else if fix.srcerr.Error() != mberr.Error() {
+					t.Errorf("(in: %s, %T) Got unexpected error on deducing source:\n\t(GOT) %s\n\t(WNT) %s", in, deducer, mberr, fix.srcerr)
 				}
-			} else if mberr != nil && fix.rerr == nil { // don't complain the fix already expected an rerr
-				t.Errorf("(in: %s, %T) Got unexpected error on deducing source:\n\t(GOT) %s", in, deducer, mberr)
+			} else if mberr != nil {
+				// don't complain the fix already expected an rerr
+				if fix.rerr == nil {
+					t.Errorf("(in: %s, %T) Got unexpected error on deducing source:\n\t(GOT) %s", in, deducer, mberr)
+				}
 			} else if !reflect.DeepEqual(mb, fix.mb) {
 				if mb == nil {
 					t.Errorf("(in: %s, %T) Deducer returned source maybes, but none expected:\n\t(GOT) (none)\n\t(WNT) %s", in, deducer, printmb(fix.mb))

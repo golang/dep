@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"path"
 	"regexp"
 	"strings"
 )
@@ -30,6 +31,11 @@ var (
 )
 
 func validateVCSScheme(scheme, typ string) bool {
+	// everything allows plain ssh
+	if scheme == "ssh" {
+		return true
+	}
+
 	var schemes []string
 	switch typ {
 	case "git":
@@ -57,18 +63,18 @@ var (
 	// This regex allowed some usernames that github currently disallows. They
 	// may have allowed them in the past; keeping it in case we need to revert.
 	//ghRegex      = regexp.MustCompile(`^(?P<root>github\.com/([A-Za-z0-9_.\-]+/[A-Za-z0-9_.\-]+))(/[A-Za-z0-9_.\-]+)*$`)
-	ghRegex      = regexp.MustCompile(`^(?P<root>github\.com/([A-Za-z0-9][-A-Za-z0-9]*[A-Za-z0-9]/[A-Za-z0-9_.\-]+))((?:/[A-Za-z0-9_.\-]+)*)$`)
-	gpinNewRegex = regexp.MustCompile(`^(?P<root>gopkg\.in/(?:([a-zA-Z0-9][-a-zA-Z0-9]+)/)?([a-zA-Z][-.a-zA-Z0-9]*)\.((?:v0|v[1-9][0-9]*)(?:\.0|\.[1-9][0-9]*){0,2}(-unstable)?)(?:\.git)?)((?:/[a-zA-Z0-9][-.a-zA-Z0-9]*)*)$`)
+	ghRegex      = regexp.MustCompile(`^(?P<root>github\.com(/[A-Za-z0-9][-A-Za-z0-9]*[A-Za-z0-9]/[A-Za-z0-9_.\-]+))((?:/[A-Za-z0-9_.\-]+)*)$`)
+	gpinNewRegex = regexp.MustCompile(`^(?P<root>gopkg\.in(?:(/[a-zA-Z0-9][-a-zA-Z0-9]+)?)(/[a-zA-Z][-.a-zA-Z0-9]*)\.((?:v0|v[1-9][0-9]*)(?:\.0|\.[1-9][0-9]*){0,2}(?:-unstable)?)(?:\.git)?)((?:/[a-zA-Z0-9][-.a-zA-Z0-9]*)*)$`)
 	//gpinOldRegex = regexp.MustCompile(`^(?P<root>gopkg\.in/(?:([a-z0-9][-a-z0-9]+)/)?((?:v0|v[1-9][0-9]*)(?:\.0|\.[1-9][0-9]*){0,2}(-unstable)?)/([a-zA-Z][-a-zA-Z0-9]*)(?:\.git)?)((?:/[a-zA-Z][-a-zA-Z0-9]*)*)$`)
-	bbRegex = regexp.MustCompile(`^(?P<root>bitbucket\.org/(?P<bitname>[A-Za-z0-9_.\-]+/[A-Za-z0-9_.\-]+))((?:/[A-Za-z0-9_.\-]+)*)$`)
+	bbRegex = regexp.MustCompile(`^(?P<root>bitbucket\.org(?P<bitname>/[A-Za-z0-9_.\-]+/[A-Za-z0-9_.\-]+))((?:/[A-Za-z0-9_.\-]+)*)$`)
 	//lpRegex = regexp.MustCompile(`^(?P<root>launchpad\.net/([A-Za-z0-9-._]+)(/[A-Za-z0-9-._]+)?)(/.+)?`)
-	lpRegex = regexp.MustCompile(`^(?P<root>launchpad\.net/([A-Za-z0-9-._]+))((?:/[A-Za-z0-9_.\-]+)*)?`)
+	lpRegex = regexp.MustCompile(`^(?P<root>launchpad\.net(/[A-Za-z0-9-._]+))((?:/[A-Za-z0-9_.\-]+)*)?`)
 	//glpRegex = regexp.MustCompile(`^(?P<root>git\.launchpad\.net/([A-Za-z0-9_.\-]+)|~[A-Za-z0-9_.\-]+/(\+git|[A-Za-z0-9_.\-]+)/[A-Za-z0-9_.\-]+)$`)
-	glpRegex = regexp.MustCompile(`^(?P<root>git\.launchpad\.net/([A-Za-z0-9_.\-]+))((?:/[A-Za-z0-9_.\-]+)*)$`)
+	glpRegex = regexp.MustCompile(`^(?P<root>git\.launchpad\.net(/[A-Za-z0-9_.\-]+))((?:/[A-Za-z0-9_.\-]+)*)$`)
 	//gcRegex      = regexp.MustCompile(`^(?P<root>code\.google\.com/[pr]/(?P<project>[a-z0-9\-]+)(\.(?P<subrepo>[a-z0-9\-]+))?)(/[A-Za-z0-9_.\-]+)*$`)
-	jazzRegex         = regexp.MustCompile(`^(?P<root>hub\.jazz\.net/(git/[a-z0-9]+/[A-Za-z0-9_.\-]+))((?:/[A-Za-z0-9_.\-]+)*)$`)
-	apacheRegex       = regexp.MustCompile(`^(?P<root>git\.apache\.org/([a-z0-9_.\-]+\.git))((?:/[A-Za-z0-9_.\-]+)*)$`)
-	vcsExtensionRegex = regexp.MustCompile(`^(?P<root>(?P<repo>([a-z0-9.\-]+\.)+[a-z0-9.\-]+(:[0-9]+)?/[A-Za-z0-9_.\-/~]*?)\.(?P<vcs>bzr|git|hg|svn))((?:/[A-Za-z0-9_.\-]+)*)$`)
+	jazzRegex         = regexp.MustCompile(`^(?P<root>hub\.jazz\.net(/git/[a-z0-9]+/[A-Za-z0-9_.\-]+))((?:/[A-Za-z0-9_.\-]+)*)$`)
+	apacheRegex       = regexp.MustCompile(`^(?P<root>git\.apache\.org(/[a-z0-9_.\-]+\.git))((?:/[A-Za-z0-9_.\-]+)*)$`)
+	vcsExtensionRegex = regexp.MustCompile(`^(?P<root>([a-z0-9.\-]+\.)+[a-z0-9.\-]+(:[0-9]+)?/[A-Za-z0-9_.\-/~]*?\.(?P<vcs>bzr|git|hg|svn))((?:/[A-Za-z0-9_.\-]+)*)$`)
 )
 
 // Other helper regexes
@@ -92,7 +98,7 @@ func (m githubDeducer) deduceRoot(path string) (string, error) {
 		return "", fmt.Errorf("%s is not a valid path for a source on github.com", path)
 	}
 
-	return "github.com/" + v[2], nil
+	return "github.com" + v[2], nil
 }
 
 func (m githubDeducer) deduceSource(path string, u *url.URL) (maybeSource, error) {
@@ -101,10 +107,17 @@ func (m githubDeducer) deduceSource(path string, u *url.URL) (maybeSource, error
 		return nil, fmt.Errorf("%s is not a valid path for a source on github.com", path)
 	}
 
+	u.Host = "github.com"
 	u.Path = v[2]
-	if u.Scheme != "" {
+
+	if u.Scheme == "ssh" && u.User != nil && u.User.Username() != "git" {
+		return nil, fmt.Errorf("github ssh must be accessed via the 'git' user; %s was provided", u.User.Username())
+	} else if u.Scheme != "" {
 		if !validateVCSScheme(u.Scheme, "git") {
 			return nil, fmt.Errorf("%s is not a valid scheme for accessing a git repository", u.Scheme)
+		}
+		if u.Scheme == "ssh" {
+			u.User = url.User("git")
 		}
 		return maybeGitSource{url: u}, nil
 	}
@@ -112,6 +125,9 @@ func (m githubDeducer) deduceSource(path string, u *url.URL) (maybeSource, error
 	mb := make(maybeSources, len(gitSchemes))
 	for k, scheme := range gitSchemes {
 		u2 := *u
+		if scheme == "ssh" {
+			u2.User = url.User("git")
+		}
 		u2.Scheme = scheme
 		mb[k] = maybeGitSource{url: &u2}
 	}
@@ -129,7 +145,7 @@ func (m bitbucketDeducer) deduceRoot(path string) (string, error) {
 		return "", fmt.Errorf("%s is not a valid path for a source on bitbucket.org", path)
 	}
 
-	return "bitbucket.org/" + v[2], nil
+	return "bitbucket.org" + v[2], nil
 }
 
 func (m bitbucketDeducer) deduceSource(path string, u *url.URL) (maybeSource, error) {
@@ -137,6 +153,8 @@ func (m bitbucketDeducer) deduceSource(path string, u *url.URL) (maybeSource, er
 	if v == nil {
 		return nil, fmt.Errorf("%s is not a valid path for a source on bitbucket.org", path)
 	}
+
+	u.Host = "bitbucket.org"
 	u.Path = v[2]
 
 	// This isn't definitive, but it'll probably catch most
@@ -173,6 +191,9 @@ func (m bitbucketDeducer) deduceSource(path string, u *url.URL) (maybeSource, er
 	if !ishg {
 		for _, scheme := range gitSchemes {
 			u2 := *u
+			if scheme == "ssh" {
+				u2.User = url.User("git")
+			}
 			u2.Scheme = scheme
 			mb = append(mb, maybeGitSource{url: &u2})
 		}
@@ -181,6 +202,9 @@ func (m bitbucketDeducer) deduceSource(path string, u *url.URL) (maybeSource, er
 	if !isgit {
 		for _, scheme := range hgSchemes {
 			u2 := *u
+			if scheme == "ssh" {
+				u2.User = url.User("hg")
+			}
 			u2.Scheme = scheme
 			mb = append(mb, maybeHgSource{url: &u2})
 		}
@@ -193,26 +217,36 @@ type gopkginDeducer struct {
 	regexp *regexp.Regexp
 }
 
-func (m gopkginDeducer) deduceRoot(path string) (string, error) {
-	v := m.regexp.FindStringSubmatch(path)
-	if v == nil {
-		return "", fmt.Errorf("%s is not a valid path for a source on gopkg.in", path)
+func (m gopkginDeducer) deduceRoot(p string) (string, error) {
+	v, err := m.parseAndValidatePath(p)
+	if err != nil {
+		return "", err
 	}
 
-	return "gopkg.in/" + v[2], nil
+	return v[1], nil
 }
 
-func (m gopkginDeducer) deduceSource(path string, u *url.URL) (maybeSource, error) {
-	v := m.regexp.FindStringSubmatch(path)
+func (m gopkginDeducer) parseAndValidatePath(p string) ([]string, error) {
+	v := m.regexp.FindStringSubmatch(p)
 	if v == nil {
-		return nil, fmt.Errorf("%s is not a valid path for a source on gopkg.in", path)
+		return nil, fmt.Errorf("%s is not a valid path for a source on gopkg.in", p)
 	}
 
-	// Duplicate some logic from the gopkg.in server in order to validate
-	// the import path string without having to hit the server
+	// We duplicate some logic from the gopkg.in server in order to validate the
+	// import path string without having to make a network request
 	if strings.Contains(v[4], ".") {
-		return nil, fmt.Errorf("%q is not a valid import path; gopkg.in only allows major versions (%q instead of %q)",
-			path, v[4][:strings.Index(v[4], ".")], v[4])
+		return nil, fmt.Errorf("%s is not a valid import path; gopkg.in only allows major versions (%q instead of %q)",
+			p, v[4][:strings.Index(v[4], ".")], v[4])
+	}
+
+	return v, nil
+}
+
+func (m gopkginDeducer) deduceSource(p string, u *url.URL) (maybeSource, error) {
+	// Reuse root detection logic for initial validation
+	v, err := m.parseAndValidatePath(p)
+	if err != nil {
+		return nil, err
 	}
 
 	// Putting a scheme on gopkg.in would be really weird, disallow it
@@ -225,23 +259,24 @@ func (m gopkginDeducer) deduceSource(path string, u *url.URL) (maybeSource, erro
 	// If the third position is empty, it's the shortened form that expands
 	// to the go-pkg github user
 	if v[2] == "" {
-		var inter string
 		// Apparently gopkg.in special-cases gopkg.in/yaml, violating its own rules?
 		// If we find one more exception, chuck this and just rely on vanity
 		// metadata resolving.
-		if strings.HasPrefix(path, "gopkg.in/yaml") {
-			inter = "go-yaml"
+		if v[3] == "/yaml" {
+			u.Path = "/go-yaml/yaml"
 		} else {
-			inter = "go-pkg"
+			u.Path = path.Join("/go-pkg", v[3])
 		}
-		u.Path = inter + v[3]
 	} else {
-		u.Path = v[2] + "/" + v[3]
+		u.Path = path.Join(v[2], v[3])
 	}
 
 	mb := make(maybeSources, len(gitSchemes))
 	for k, scheme := range gitSchemes {
 		u2 := *u
+		if scheme == "ssh" {
+			u2.User = url.User("git")
+		}
 		u2.Scheme = scheme
 		mb[k] = maybeGitSource{url: &u2}
 	}
@@ -261,7 +296,7 @@ func (m launchpadDeducer) deduceRoot(path string) (string, error) {
 		return "", fmt.Errorf("%s is not a valid path for a source on launchpad.net", path)
 	}
 
-	return "launchpad.net/" + v[2], nil
+	return "launchpad.net" + v[2], nil
 }
 
 func (m launchpadDeducer) deduceSource(path string, u *url.URL) (maybeSource, error) {
@@ -270,7 +305,9 @@ func (m launchpadDeducer) deduceSource(path string, u *url.URL) (maybeSource, er
 		return nil, fmt.Errorf("%s is not a valid path for a source on launchpad.net", path)
 	}
 
+	u.Host = "launchpad.net"
 	u.Path = v[2]
+
 	if u.Scheme != "" {
 		if !validateVCSScheme(u.Scheme, "bzr") {
 			return nil, fmt.Errorf("%s is not a valid scheme for accessing a bzr repository", u.Scheme)
@@ -279,7 +316,6 @@ func (m launchpadDeducer) deduceSource(path string, u *url.URL) (maybeSource, er
 	}
 
 	mb := make(maybeSources, len(bzrSchemes))
-	// TODO(sdboyer) is there a generic ssh user for lp? if not, drop bzr+ssh
 	for k, scheme := range bzrSchemes {
 		u2 := *u
 		u2.Scheme = scheme
@@ -300,7 +336,7 @@ func (m launchpadGitDeducer) deduceRoot(path string) (string, error) {
 		return "", fmt.Errorf("%s is not a valid path for a source on git.launchpad.net", path)
 	}
 
-	return "git.launchpad.net/" + v[2], nil
+	return "git.launchpad.net" + v[2], nil
 }
 
 func (m launchpadGitDeducer) deduceSource(path string, u *url.URL) (maybeSource, error) {
@@ -309,7 +345,9 @@ func (m launchpadGitDeducer) deduceSource(path string, u *url.URL) (maybeSource,
 		return nil, fmt.Errorf("%s is not a valid path for a source on git.launchpad.net", path)
 	}
 
+	u.Host = "git.launchpad.net"
 	u.Path = v[2]
+
 	if u.Scheme != "" {
 		if !validateVCSScheme(u.Scheme, "git") {
 			return nil, fmt.Errorf("%s is not a valid scheme for accessing a git repository", u.Scheme)
@@ -317,8 +355,8 @@ func (m launchpadGitDeducer) deduceSource(path string, u *url.URL) (maybeSource,
 		return maybeGitSource{url: u}, nil
 	}
 
-	mb := make(maybeSources, len(bzrSchemes))
-	for k, scheme := range bzrSchemes {
+	mb := make(maybeSources, len(gitSchemes))
+	for k, scheme := range gitSchemes {
 		u2 := *u
 		u2.Scheme = scheme
 		mb[k] = maybeGitSource{url: &u2}
@@ -337,7 +375,7 @@ func (m jazzDeducer) deduceRoot(path string) (string, error) {
 		return "", fmt.Errorf("%s is not a valid path for a source on hub.jazz.net", path)
 	}
 
-	return "hub.jazz.net/" + v[2], nil
+	return "hub.jazz.net" + v[2], nil
 }
 
 func (m jazzDeducer) deduceSource(path string, u *url.URL) (maybeSource, error) {
@@ -346,22 +384,18 @@ func (m jazzDeducer) deduceSource(path string, u *url.URL) (maybeSource, error) 
 		return nil, fmt.Errorf("%s is not a valid path for a source on hub.jazz.net", path)
 	}
 
+	u.Host = "hub.jazz.net"
 	u.Path = v[2]
-	if u.Scheme != "" {
-		if !validateVCSScheme(u.Scheme, "git") {
-			return nil, fmt.Errorf("%s is not a valid scheme for accessing a git repository", u.Scheme)
-		}
+
+	switch u.Scheme {
+	case "":
+		u.Scheme = "https"
+		fallthrough
+	case "https":
 		return maybeGitSource{url: u}, nil
+	default:
+		return nil, fmt.Errorf("IBM's jazz hub only supports https, %s is not allowed", u.String())
 	}
-
-	mb := make(maybeSources, len(gitSchemes))
-	for k, scheme := range gitSchemes {
-		u2 := *u
-		u2.Scheme = scheme
-		mb[k] = maybeGitSource{url: &u2}
-	}
-
-	return mb, nil
 }
 
 type apacheDeducer struct {
@@ -374,7 +408,7 @@ func (m apacheDeducer) deduceRoot(path string) (string, error) {
 		return "", fmt.Errorf("%s is not a valid path for a source on git.apache.org", path)
 	}
 
-	return "git.apache.org/" + v[2], nil
+	return "git.apache.org" + v[2], nil
 }
 
 func (m apacheDeducer) deduceSource(path string, u *url.URL) (maybeSource, error) {
@@ -383,7 +417,9 @@ func (m apacheDeducer) deduceSource(path string, u *url.URL) (maybeSource, error
 		return nil, fmt.Errorf("%s is not a valid path for a source on git.apache.org", path)
 	}
 
+	u.Host = "git.apache.org"
 	u.Path = v[2]
+
 	if u.Scheme != "" {
 		if !validateVCSScheme(u.Scheme, "git") {
 			return nil, fmt.Errorf("%s is not a valid scheme for accessing a git repository", u.Scheme)
@@ -420,19 +456,19 @@ func (m vcsExtensionDeducer) deduceSource(path string, u *url.URL) (maybeSource,
 		return nil, fmt.Errorf("%s contains no vcs extension hints for matching", path)
 	}
 
-	switch v[5] {
+	switch v[4] {
 	case "git", "hg", "bzr":
 		x := strings.SplitN(v[1], "/", 2)
 		// TODO(sdboyer) is this actually correct for bzr?
 		u.Host = x[0]
-		u.Path = x[1]
+		u.Path = "/" + x[1]
 
 		if u.Scheme != "" {
-			if !validateVCSScheme(u.Scheme, v[5]) {
-				return nil, fmt.Errorf("%s is not a valid scheme for accessing %s repositories (path %s)", u.Scheme, v[5], path)
+			if !validateVCSScheme(u.Scheme, v[4]) {
+				return nil, fmt.Errorf("%s is not a valid scheme for accessing %s repositories (path %s)", u.Scheme, v[4], path)
 			}
 
-			switch v[5] {
+			switch v[4] {
 			case "git":
 				return maybeGitSource{url: u}, nil
 			case "bzr":
@@ -445,7 +481,8 @@ func (m vcsExtensionDeducer) deduceSource(path string, u *url.URL) (maybeSource,
 		var schemes []string
 		var mb maybeSources
 		var f func(k int, u *url.URL)
-		switch v[5] {
+
+		switch v[4] {
 		case "git":
 			schemes = gitSchemes
 			f = func(k int, u *url.URL) {
@@ -462,9 +499,9 @@ func (m vcsExtensionDeducer) deduceSource(path string, u *url.URL) (maybeSource,
 				mb[k] = maybeHgSource{url: u}
 			}
 		}
-		mb = make(maybeSources, len(schemes))
 
-		for k, scheme := range gitSchemes {
+		mb = make(maybeSources, len(schemes))
+		for k, scheme := range schemes {
 			u2 := *u
 			u2.Scheme = scheme
 			f(k, &u2)
@@ -472,7 +509,7 @@ func (m vcsExtensionDeducer) deduceSource(path string, u *url.URL) (maybeSource,
 
 		return mb, nil
 	default:
-		return nil, fmt.Errorf("unknown repository type: %q", v[5])
+		return nil, fmt.Errorf("unknown repository type: %q", v[4])
 	}
 }
 
@@ -623,8 +660,8 @@ func (sm *SourceMgr) deduceFromPath(path string) (stringFuture, partialSourceFut
 	return root, src, nil
 }
 
-func normalizeURI(path string) (u *url.URL, newpath string, err error) {
-	if m := scpSyntaxRe.FindStringSubmatch(path); m != nil {
+func normalizeURI(p string) (u *url.URL, newpath string, err error) {
+	if m := scpSyntaxRe.FindStringSubmatch(p); m != nil {
 		// Match SCP-like syntax and convert it to a URL.
 		// Eg, "git@github.com:user/repo" becomes
 		// "ssh://git@github.com/user/repo".
@@ -637,16 +674,18 @@ func normalizeURI(path string) (u *url.URL, newpath string, err error) {
 			//RawPath: m[3],
 		}
 	} else {
-		u, err = url.Parse(path)
+		u, err = url.Parse(p)
 		if err != nil {
-			return nil, "", fmt.Errorf("%q is not a valid URI", path)
+			return nil, "", fmt.Errorf("%q is not a valid URI", p)
 		}
 	}
 
-	if u.Host != "" {
-		newpath = u.Host + "/" + strings.TrimPrefix(u.Path, "/")
+	// If no scheme was passed, then the entire path will have been put into
+	// u.Path. Either way, construct the normalized path correctly.
+	if u.Host == "" {
+		newpath = p
 	} else {
-		newpath = u.Path
+		newpath = path.Join(u.Host, u.Path)
 	}
 
 	if !pathvld.MatchString(newpath) {
