@@ -83,6 +83,20 @@ var (
 	pathvld     = regexp.MustCompile(`^([A-Za-z0-9-]+)(\.[A-Za-z0-9-]+)+(/[A-Za-z0-9-_.~]+)*$`)
 )
 
+func pathDeducerTrie() deducerTrie {
+	dxt := newDeducerTrie()
+
+	dxt.Insert("github.com/", githubDeducer{regexp: ghRegex})
+	dxt.Insert("gopkg.in/", gopkginDeducer{regexp: gpinNewRegex})
+	dxt.Insert("bitbucket.org/", bitbucketDeducer{regexp: bbRegex})
+	dxt.Insert("launchpad.net/", launchpadDeducer{regexp: lpRegex})
+	dxt.Insert("git.launchpad.net/", launchpadGitDeducer{regexp: glpRegex})
+	dxt.Insert("hub.jazz.net/", jazzDeducer{regexp: jazzRegex})
+	dxt.Insert("git.apache.org/", apacheDeducer{regexp: apacheRegex})
+
+	return dxt
+}
+
 type pathDeducer interface {
 	deduceRoot(string) (string, error)
 	deduceSource(string, *url.URL) (maybeSource, error)
@@ -559,7 +573,7 @@ func (sm *SourceMgr) deduceFromPath(path string) (stringFuture, partialSourceFut
 	}
 
 	// First, try the root path-based matches
-	if _, mtchi, has := sm.rootxt.LongestPrefix(path); has {
+	if _, mtchi, has := sm.dxt.LongestPrefix(path); has {
 		mtch := mtchi.(pathDeducer)
 		root, err := mtch.deduceRoot(path)
 		if err != nil {
