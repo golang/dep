@@ -531,6 +531,14 @@ type stringFuture func() (string, error)
 type sourceFuture func() (source, error)
 type partialSourceFuture func(string, ProjectAnalyzer) sourceFuture
 
+type deductionFuture struct {
+	// rslow indicates that the root future may be a slow call (that it has to
+	// hit the network for some reason)
+	rslow bool
+	root  stringFuture
+	psf   partialSourceFuture
+}
+
 // deduceFromPath takes an import path and attempts to deduce various
 // metadata about it - what type of source should handle it, and where its
 // "root" is (for vcs repositories, the repository root).
@@ -540,11 +548,11 @@ type partialSourceFuture func(string, ProjectAnalyzer) sourceFuture
 // activity will be triggered when the future is called. For the second,
 // network activity is triggered only when calling the sourceFuture returned
 // from the partialSourceFuture.
-func (sm *SourceMgr) deduceFromPath(path string) (stringFuture, partialSourceFuture, error) {
+func (sm *SourceMgr) deduceFromPath(path string) (deductionFuture, error) {
 	opath := path
 	u, path, err := normalizeURI(path)
 	if err != nil {
-		return nil, nil, err
+		return deductionFuture{}, err
 	}
 
 	// Helpers to futurize the results from deducers
@@ -577,14 +585,18 @@ func (sm *SourceMgr) deduceFromPath(path string) (stringFuture, partialSourceFut
 		mtch := mtchi.(pathDeducer)
 		root, err := mtch.deduceRoot(path)
 		if err != nil {
-			return nil, nil, err
+			return deductionFuture{}, err
 		}
 		mb, err := mtch.deduceSource(path, u)
 		if err != nil {
-			return nil, nil, err
+			return deductionFuture{}, err
 		}
 
-		return strfut(root), srcfut(mb), nil
+		return deductionFuture{
+			rslow: false,
+			root:  strfut(root),
+			psf:   srcfut(mb),
+		}, nil
 	}
 
 	// Next, try the vcs extension-based (infix) matcher
@@ -592,9 +604,14 @@ func (sm *SourceMgr) deduceFromPath(path string) (stringFuture, partialSourceFut
 	if root, err := exm.deduceRoot(path); err == nil {
 		mb, err := exm.deduceSource(path, u)
 		if err != nil {
-			return nil, nil, err
+			return deductionFuture{}, err
 		}
-		return strfut(root), srcfut(mb), nil
+
+		return deductionFuture{
+			rslow: false,
+			root:  strfut(root),
+			psf:   srcfut(mb),
+		}, nil
 	}
 
 	// No luck so far. maybe it's one of them vanity imports?
@@ -671,7 +688,11 @@ func (sm *SourceMgr) deduceFromPath(path string) (stringFuture, partialSourceFut
 		}
 	}
 
-	return root, src, nil
+	return deductionFuture{
+		rslow: true,
+		root:  root,
+		psf:   src,
+	}, nil
 }
 
 func normalizeURI(p string) (u *url.URL, newpath string, err error) {
@@ -766,7 +787,7 @@ func deduceRemoteRepo(path string) (rr *remoteRepo, err error) {
 	return rr, nil
 }
 
-// fetchMetadata fetchs the remote metadata for path.
+// fetchMetadata fetches the remote metadata for path.
 func fetchMetadata(path string) (rc io.ReadCloser, err error) {
 	defer func() {
 		if err != nil {
