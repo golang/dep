@@ -26,7 +26,8 @@ func TestGitVersionFetching(t *testing.T) {
 	}
 
 	n := "github.com/Masterminds/VCSTestRepo"
-	u, err := url.Parse("https://" + n)
+	un := "https://" + n
+	u, err := url.Parse(un)
 	if err != nil {
 		t.Errorf("URL was bad, lolwut? errtext: %s", err)
 		rf()
@@ -36,7 +37,7 @@ func TestGitVersionFetching(t *testing.T) {
 		url: u,
 	}
 
-	isrc, err := mb.try(cpath, naiveAnalyzer{})
+	isrc, ident, err := mb.try(cpath, naiveAnalyzer{})
 	if err != nil {
 		t.Errorf("Unexpected error while setting up gitSource for test repo: %s", err)
 		rf()
@@ -47,6 +48,9 @@ func TestGitVersionFetching(t *testing.T) {
 		t.Errorf("Expected a gitSource, got a %T", isrc)
 		rf()
 		t.FailNow()
+	}
+	if ident != un {
+		t.Errorf("Expected %s as source ident, got %s", un, ident)
 	}
 
 	vlist, err := src.listVersions()
@@ -102,7 +106,8 @@ func TestBzrVersionFetching(t *testing.T) {
 	}
 
 	n := "launchpad.net/govcstestbzrrepo"
-	u, err := url.Parse("https://" + n)
+	un := "https://" + n
+	u, err := url.Parse(un)
 	if err != nil {
 		t.Errorf("URL was bad, lolwut? errtext: %s", err)
 		rf()
@@ -112,7 +117,7 @@ func TestBzrVersionFetching(t *testing.T) {
 		url: u,
 	}
 
-	isrc, err := mb.try(cpath, naiveAnalyzer{})
+	isrc, ident, err := mb.try(cpath, naiveAnalyzer{})
 	if err != nil {
 		t.Errorf("Unexpected error while setting up bzrSource for test repo: %s", err)
 		rf()
@@ -123,6 +128,9 @@ func TestBzrVersionFetching(t *testing.T) {
 		t.Errorf("Expected a bzrSource, got a %T", isrc)
 		rf()
 		t.FailNow()
+	}
+	if ident != un {
+		t.Errorf("Expected %s as source ident, got %s", un, ident)
 	}
 
 	vlist, err := src.listVersions()
@@ -187,7 +195,8 @@ func TestHgVersionFetching(t *testing.T) {
 	}
 
 	n := "bitbucket.org/mattfarina/testhgrepo"
-	u, err := url.Parse("https://" + n)
+	un := "https://" + n
+	u, err := url.Parse(un)
 	if err != nil {
 		t.Errorf("URL was bad, lolwut? errtext: %s", err)
 		rf()
@@ -197,7 +206,7 @@ func TestHgVersionFetching(t *testing.T) {
 		url: u,
 	}
 
-	isrc, err := mb.try(cpath, naiveAnalyzer{})
+	isrc, ident, err := mb.try(cpath, naiveAnalyzer{})
 	if err != nil {
 		t.Errorf("Unexpected error while setting up hgSource for test repo: %s", err)
 		rf()
@@ -208,6 +217,9 @@ func TestHgVersionFetching(t *testing.T) {
 		t.Errorf("Expected a hgSource, got a %T", isrc)
 		rf()
 		t.FailNow()
+	}
+	if ident != un {
+		t.Errorf("Expected %s as source ident, got %s", un, ident)
 	}
 
 	vlist, err := src.listVersions()

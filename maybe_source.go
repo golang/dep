@@ -10,24 +10,36 @@ import (
 )
 
 type maybeSource interface {
-	try(cachedir string, an ProjectAnalyzer) (source, error)
+	try(cachedir string, an ProjectAnalyzer) (source, string, error)
 }
 
 type maybeSources []maybeSource
 
-func (mbs maybeSources) try(cachedir string, an ProjectAnalyzer) (source, error) {
+func (mbs maybeSources) try(cachedir string, an ProjectAnalyzer) (source, string, error) {
 	var e sourceFailures
 	for _, mb := range mbs {
-		src, err := mb.try(cachedir, an)
+		src, ident, err := mb.try(cachedir, an)
 		if err == nil {
-			return src, nil
+			return src, ident, nil
 		}
-		e = append(e, err)
+		e = append(e, sourceSetupFailure{
+			ident: ident,
+			err:   err,
+		})
 	}
-	return nil, e
+	return nil, "", e
 }
 
-type sourceFailures []error
+type sourceSetupFailure struct {
+	ident string
+	err   error
+}
+
+func (e sourceSetupFailure) Error() string {
+	return fmt.Sprintf("failed to set up %q, error %s", e.ident, e.err.Error())
+}
+
+type sourceFailures []sourceSetupFailure
 
 func (sf sourceFailures) Error() string {
 	var buf bytes.Buffer
@@ -43,11 +55,12 @@ type maybeGitSource struct {
 	url *url.URL
 }
 
-func (m maybeGitSource) try(cachedir string, an ProjectAnalyzer) (source, error) {
-	path := filepath.Join(cachedir, "sources", sanitizer.Replace(m.url.String()))
-	r, err := vcs.NewGitRepo(m.url.String(), path)
+func (m maybeGitSource) try(cachedir string, an ProjectAnalyzer) (source, string, error) {
+	ustr := m.url.String()
+	path := filepath.Join(cachedir, "sources", sanitizer.Replace(ustr))
+	r, err := vcs.NewGitRepo(ustr, path)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
 	src := &gitSource{
@@ -63,26 +76,27 @@ func (m maybeGitSource) try(cachedir string, an ProjectAnalyzer) (source, error)
 
 	_, err = src.listVersions()
 	if err != nil {
-		return nil, err
+		return nil, "", err
 		//} else if pm.ex.f&existsUpstream == existsUpstream {
 		//return pm, nil
 	}
 
-	return src, nil
+	return src, ustr, nil
 }
 
 type maybeBzrSource struct {
 	url *url.URL
 }
 
-func (m maybeBzrSource) try(cachedir string, an ProjectAnalyzer) (source, error) {
-	path := filepath.Join(cachedir, "sources", sanitizer.Replace(m.url.String()))
-	r, err := vcs.NewBzrRepo(m.url.String(), path)
+func (m maybeBzrSource) try(cachedir string, an ProjectAnalyzer) (source, string, error) {
+	ustr := m.url.String()
+	path := filepath.Join(cachedir, "sources", sanitizer.Replace(ustr))
+	r, err := vcs.NewBzrRepo(ustr, path)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	if !r.Ping() {
-		return nil, fmt.Errorf("Remote repository at %s does not exist, or is inaccessible", m.url.String())
+		return nil, "", fmt.Errorf("Remote repository at %s does not exist, or is inaccessible", ustr)
 	}
 
 	return &bzrSource{
@@ -94,21 +108,22 @@ func (m maybeBzrSource) try(cachedir string, an ProjectAnalyzer) (source, error)
 				rpath: path,
 			},
 		},
-	}, nil
+	}, ustr, nil
 }
 
 type maybeHgSource struct {
 	url *url.URL
 }
 
-func (m maybeHgSource) try(cachedir string, an ProjectAnalyzer) (source, error) {
-	path := filepath.Join(cachedir, "sources", sanitizer.Replace(m.url.String()))
-	r, err := vcs.NewHgRepo(m.url.String(), path)
+func (m maybeHgSource) try(cachedir string, an ProjectAnalyzer) (source, string, error) {
+	ustr := m.url.String()
+	path := filepath.Join(cachedir, "sources", sanitizer.Replace(ustr))
+	r, err := vcs.NewBzrRepo(ustr, path)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	if !r.Ping() {
-		return nil, fmt.Errorf("Remote repository at %s does not exist, or is inaccessible", m.url.String())
+		return nil, "", fmt.Errorf("Remote repository at %s does not exist, or is inaccessible", ustr)
 	}
 
 	return &hgSource{
@@ -120,5 +135,5 @@ func (m maybeHgSource) try(cachedir string, an ProjectAnalyzer) (source, error) 
 				rpath: path,
 			},
 		},
-	}, nil
+	}, ustr, nil
 }

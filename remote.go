@@ -528,7 +528,7 @@ func (m vcsExtensionDeducer) deduceSource(path string, u *url.URL) (maybeSource,
 }
 
 type stringFuture func() (string, error)
-type sourceFuture func() (source, error)
+type sourceFuture func() (source, string, error)
 type partialSourceFuture func(string, ProjectAnalyzer) sourceFuture
 
 type deductionFuture struct {
@@ -565,17 +565,18 @@ func (sm *SourceMgr) deduceFromPath(path string) (deductionFuture, error) {
 	srcfut := func(mb maybeSource) partialSourceFuture {
 		return func(cachedir string, an ProjectAnalyzer) sourceFuture {
 			var src source
+			var ident string
 			var err error
 
 			c := make(chan struct{}, 1)
 			go func() {
 				defer close(c)
-				src, err = mb.try(cachedir, an)
+				src, ident, err = mb.try(cachedir, an)
 			}()
 
-			return func() (source, error) {
+			return func() (source, string, error) {
 				<-c
-				return src, err
+				return src, ident, err
 			}
 		}
 	}
@@ -653,6 +654,7 @@ func (sm *SourceMgr) deduceFromPath(path string) (deductionFuture, error) {
 
 	src := func(cachedir string, an ProjectAnalyzer) sourceFuture {
 		var src source
+		var ident string
 		var err error
 
 		c := make(chan struct{}, 1)
@@ -664,6 +666,7 @@ func (sm *SourceMgr) deduceFromPath(path string) (deductionFuture, error) {
 			if err != nil {
 				return
 			}
+			ident = ru.String()
 
 			var m maybeSource
 			switch vcs {
@@ -676,15 +679,15 @@ func (sm *SourceMgr) deduceFromPath(path string) (deductionFuture, error) {
 			}
 
 			if m != nil {
-				src, err = m.try(cachedir, an)
+				src, ident, err = m.try(cachedir, an)
 			} else {
 				err = fmt.Errorf("unsupported vcs type %s", vcs)
 			}
 		}()
 
-		return func() (source, error) {
+		return func() (source, string, error) {
 			<-c
-			return src, err
+			return src, ident, err
 		}
 	}
 
