@@ -36,6 +36,28 @@ func sv(s string) *semver.Version {
 	return sv
 }
 
+func mkNaiveSM(t *testing.T) (*SourceMgr, func()) {
+	cpath, err := ioutil.TempDir("", "smcache")
+	if err != nil {
+		t.Errorf("Failed to create temp dir: %s", err)
+		t.FailNow()
+	}
+
+	sm, err := NewSourceManager(naiveAnalyzer{}, cpath, false)
+	if err != nil {
+		t.Errorf("Unexpected error on SourceManager creation: %s", err)
+		t.FailNow()
+	}
+
+	return sm, func() {
+		sm.Release()
+		err := removeAll(cpath)
+		if err != nil {
+			t.Errorf("removeAll failed: %s", err)
+		}
+	}
+}
+
 func init() {
 	_, filename, _, _ := runtime.Caller(1)
 	bd = path.Dir(filename)
@@ -83,20 +105,22 @@ func TestProjectManagerInit(t *testing.T) {
 	cpath, err := ioutil.TempDir("", "smcache")
 	if err != nil {
 		t.Errorf("Failed to create temp dir: %s", err)
+		t.FailNow()
 	}
-	sm, err := NewSourceManager(naiveAnalyzer{}, cpath, false)
 
+	sm, err := NewSourceManager(naiveAnalyzer{}, cpath, false)
 	if err != nil {
 		t.Errorf("Unexpected error on SourceManager creation: %s", err)
 		t.FailNow()
 	}
+
 	defer func() {
+		sm.Release()
 		err := removeAll(cpath)
 		if err != nil {
 			t.Errorf("removeAll failed: %s", err)
 		}
 	}()
-	defer sm.Release()
 
 	id := mkPI("github.com/Masterminds/VCSTestRepo")
 	v, err := sm.ListVersions(id)
@@ -197,16 +221,7 @@ func TestRepoVersionFetching(t *testing.T) {
 		t.Skip("Skipping repo version fetching test in short mode")
 	}
 
-	cpath, err := ioutil.TempDir("", "smcache")
-	if err != nil {
-		t.Errorf("Failed to create temp dir: %s", err)
-	}
-
-	sm, err := NewSourceManager(naiveAnalyzer{}, cpath, false)
-	if err != nil {
-		t.Errorf("Unexpected error on SourceManager creation: %s", err)
-		t.FailNow()
-	}
+	sm, clean := mkNaiveSM(t)
 
 	upstreams := []ProjectIdentifier{
 		mkPI("github.com/Masterminds/VCSTestRepo"),
@@ -218,21 +233,14 @@ func TestRepoVersionFetching(t *testing.T) {
 	for k, u := range upstreams {
 		pmi, err := sm.getProjectManager(u)
 		if err != nil {
-			sm.Release()
-			removeAll(cpath)
+			clean()
 			t.Errorf("Unexpected error on ProjectManager creation: %s", err)
 			t.FailNow()
 		}
 		pms[k] = pmi.pm
 	}
 
-	defer func() {
-		err := removeAll(cpath)
-		if err != nil {
-			t.Errorf("removeAll failed: %s", err)
-		}
-	}()
-	defer sm.Release()
+	defer clean()
 
 	// test git first
 	vlist, exbits, err := pms[0].crepo.getCurrentVersionPairs()
@@ -309,29 +317,14 @@ func TestGetInfoListVersionsOrdering(t *testing.T) {
 		t.Skip("Skipping slow test in short mode")
 	}
 
-	cpath, err := ioutil.TempDir("", "smcache")
-	if err != nil {
-		t.Errorf("Failed to create temp dir: %s", err)
-	}
-	sm, err := NewSourceManager(naiveAnalyzer{}, cpath, false)
-
-	if err != nil {
-		t.Errorf("Unexpected error on SourceManager creation: %s", err)
-		t.FailNow()
-	}
-	defer func() {
-		err := removeAll(cpath)
-		if err != nil {
-			t.Errorf("removeAll failed: %s", err)
-		}
-	}()
-	defer sm.Release()
+	sm, clean := mkNaiveSM(t)
+	defer clean()
 
 	// setup done, now do the test
 
 	id := mkPI("github.com/Masterminds/VCSTestRepo")
 
-	_, _, err = sm.GetManifestAndLock(id, NewVersion("1.0.0"))
+	_, _, err := sm.GetManifestAndLock(id, NewVersion("1.0.0"))
 	if err != nil {
 		t.Errorf("Unexpected error from GetInfoAt %s", err)
 	}

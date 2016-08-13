@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"net/url"
 	"reflect"
 	"testing"
@@ -455,24 +454,6 @@ var pathDeductionFixtures = map[string][]pathDeductionFixture{
 }
 
 func TestDeduceFromPath(t *testing.T) {
-	cpath, err := ioutil.TempDir("", "smcache")
-	if err != nil {
-		t.Errorf("Failed to create temp dir: %s", err)
-	}
-	sm, err := NewSourceManager(naiveAnalyzer{}, cpath, false)
-
-	if err != nil {
-		t.Errorf("Unexpected error on SourceManager creation: %s", err)
-		t.FailNow()
-	}
-	defer func() {
-		err := removeAll(cpath)
-		if err != nil {
-			t.Errorf("removeAll failed: %s", err)
-		}
-	}()
-	defer sm.Release()
-
 	for typ, fixtures := range pathDeductionFixtures {
 		var deducer pathDeducer
 		switch typ {
