@@ -7,6 +7,7 @@ import (
 	"path"
 	"runtime"
 	"sort"
+	"sync"
 	"testing"
 
 	"github.com/Masterminds/semver"
@@ -336,5 +337,143 @@ func TestGetInfoListVersionsOrdering(t *testing.T) {
 
 	if len(v) != 3 {
 		t.Errorf("Expected three results from ListVersions, got %v", len(v))
+	}
+}
+
+func TestDeduceProjectRoot(t *testing.T) {
+	sm, clean := mkNaiveSM(t)
+	defer clean()
+
+	in := "github.com/sdboyer/gps"
+	pr, err := sm.DeduceProjectRoot(in)
+	if err != nil {
+		t.Errorf("Problem while detecting root of %q %s", in, err)
+	}
+	if string(pr) != in {
+		t.Errorf("Wrong project root was deduced;\n\t(GOT) %s\n\t(WNT) %s", pr, in)
+	}
+	if sm.rootxt.Len() != 1 {
+		t.Errorf("Root path trie should have one element after one deduction, has %v", sm.rootxt.Len())
+	}
+
+	pr, err = sm.DeduceProjectRoot(in)
+	if err != nil {
+		t.Errorf("Problem while detecting root of %q %s", in, err)
+	} else if string(pr) != in {
+		t.Errorf("Wrong project root was deduced;\n\t(GOT) %s\n\t(WNT) %s", pr, in)
+	}
+	if sm.rootxt.Len() != 1 {
+		t.Errorf("Root path trie should have one element after performing the same deduction twice; has %v", sm.rootxt.Len())
+	}
+
+	// Now do a subpath
+	sub := path.Join(in, "foo")
+	pr, err = sm.DeduceProjectRoot(sub)
+	if err != nil {
+		t.Errorf("Problem while detecting root of %q %s", sub, err)
+	} else if string(pr) != in {
+		t.Errorf("Wrong project root was deduced;\n\t(GOT) %s\n\t(WNT) %s", pr, in)
+	}
+	if sm.rootxt.Len() != 2 {
+		t.Errorf("Root path trie should have two elements, one for root and one for subpath; has %v", sm.rootxt.Len())
+	}
+
+	// Now do a fully different root, but still on github
+	in2 := "github.com/bagel/lox"
+	sub2 := path.Join(in2, "cheese")
+	pr, err = sm.DeduceProjectRoot(sub2)
+	if err != nil {
+		t.Errorf("Problem while detecting root of %q %s", sub2, err)
+	} else if string(pr) != in2 {
+		t.Errorf("Wrong project root was deduced;\n\t(GOT) %s\n\t(WNT) %s", pr, in)
+	}
+	if sm.rootxt.Len() != 4 {
+		t.Errorf("Root path trie should have four elements, one for each unique root and subpath; has %v", sm.rootxt.Len())
+	}
+
+	// Ensure that our prefixes are bounded by path separators
+	in4 := "github.com/bagel/loxx"
+	pr, err = sm.DeduceProjectRoot(in4)
+	if err != nil {
+		t.Errorf("Problem while detecting root of %q %s", in4, err)
+	} else if string(pr) != in4 {
+		t.Errorf("Wrong project root was deduced;\n\t(GOT) %s\n\t(WNT) %s", pr, in)
+	}
+	if sm.rootxt.Len() != 5 {
+		t.Errorf("Root path trie should have five elements, one for each unique root and subpath; has %v", sm.rootxt.Len())
+	}
+}
+
+// Test that the future returned from SourceMgr.deducePathAndProcess() is safe
+// to call concurrently.
+//
+// Obviously, this is just a heuristic; passage does not guarantee correctness
+// (though failure does guarantee incorrectness)
+func TestMultiDeduceThreadsafe(t *testing.T) {
+	sm, clean := mkNaiveSM(t)
+	defer clean()
+
+	in := "github.com/sdboyer/gps"
+	rootf, srcf, err := sm.deducePathAndProcess(in)
+	if err != nil {
+		t.Errorf("Known-good path %q had unexpected basic deduction error: %s", in, err)
+		t.FailNow()
+	}
+
+	cnum := 50
+	wg := &sync.WaitGroup{}
+
+	// Set up channel for everything else to block on
+	c := make(chan struct{}, 1)
+	f := func(rnum int) {
+		wg.Add(1)
+		defer func() {
+			if e := recover(); e != nil {
+				t.Errorf("goroutine number %v panicked with err: %s", rnum, e)
+			}
+		}()
+		<-c
+		_, err := rootf()
+		if err != nil {
+			t.Errorf("err was non-nil on root detection in goroutine number %v: %s", rnum, err)
+		}
+		wg.Done()
+	}
+
+	for k := range make([]struct{}, cnum) {
+		go f(k)
+		runtime.Gosched()
+	}
+	close(c)
+	wg.Wait()
+	if sm.rootxt.Len() != 1 {
+		t.Errorf("Root path trie should have just one element; has %v", sm.rootxt.Len())
+	}
+
+	// repeat for srcf
+	c = make(chan struct{}, 1)
+	f = func(rnum int) {
+		wg.Add(1)
+		defer func() {
+			if e := recover(); e != nil {
+				t.Errorf("goroutine number %v panicked with err: %s", rnum, e)
+			}
+		}()
+		<-c
+		_, _, err := srcf()
+		if err != nil {
+			t.Errorf("err was non-nil on root detection in goroutine number %v: %s", rnum, err)
+		}
+		wg.Done()
+	}
+
+	for k := range make([]struct{}, cnum) {
+		go f(k)
+		runtime.Gosched()
+	}
+	close(c)
+	wg.Wait()
+	if len(sm.srcs) != 2 {
+		t.Errorf("Sources map should have just two elements, but has %v", len(sm.srcs))
 	}
 }

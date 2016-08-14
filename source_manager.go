@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"github.com/Masterminds/semver"
 	"github.com/Masterminds/vcs"
@@ -77,13 +78,16 @@ type SourceMgr struct {
 	cachedir string
 	pms      map[string]*pmState
 	pmut     sync.RWMutex
+	srcs     map[string]source
+	srcmut   sync.RWMutex
 	rr       map[string]struct {
 		rr  *remoteRepo
 		err error
 	}
-	rmut sync.RWMutex
-	an   ProjectAnalyzer
-	dxt  deducerTrie
+	rmut   sync.RWMutex
+	an     ProjectAnalyzer
+	dxt    deducerTrie
+	rootxt prTrie
 }
 
 var _ SourceManager = &SourceMgr{}
@@ -137,12 +141,14 @@ func NewSourceManager(an ProjectAnalyzer, cachedir string, force bool) (*SourceM
 	return &SourceMgr{
 		cachedir: cachedir,
 		pms:      make(map[string]*pmState),
+		srcs:     make(map[string]source),
 		rr: make(map[string]struct {
 			rr  *remoteRepo
 			err error
 		}),
-		an:  an,
-		dxt: pathDeducerTrie(),
+		an:     an,
+		dxt:    pathDeducerTrie(),
+		rootxt: newProjectRootTrie(),
 	}, nil
 }
 
@@ -237,6 +243,174 @@ func (sm *SourceMgr) ExportProject(id ProjectIdentifier, v Version, to string) e
 	}
 
 	return pms.pm.ExportVersionTo(v, to)
+}
+
+// DeduceRootProject takes an import path and deduces the
+//
+// Note that some import paths may require network activity to correctly
+// determine the root of the path, such as, but not limited to, vanity import
+// paths. (A special exception is written for gopkg.in to minimize network
+// activity, as its behavior is well-structured)
+func (sm *SourceMgr) DeduceProjectRoot(ip string) (ProjectRoot, error) {
+	if prefix, root, has := sm.rootxt.LongestPrefix(ip); has {
+		// The non-matching tail of the import path could still be malformed.
+		// Validate just that part, if it exists
+		if prefix != ip {
+			if !pathvld.MatchString(strings.TrimPrefix(ip, prefix)) {
+				return "", fmt.Errorf("%q is not a valid import path", ip)
+			}
+			// There was one, and it validated fine - add it so we don't have to
+			// revalidate it later
+			sm.rootxt.Insert(ip, root)
+		}
+		return root, nil
+	}
+
+	rootf, _, err := sm.deducePathAndProcess(ip)
+	if err != nil {
+		return "", err
+	}
+
+	r, err := rootf()
+	return ProjectRoot(r), err
+}
+
+func (sm *SourceMgr) getSourceFor(id ProjectIdentifier) (source, error) {
+	nn := id.netName()
+
+	sm.srcmut.RLock()
+	src, has := sm.srcs[nn]
+	sm.srcmut.RUnlock()
+	if has {
+		return src, nil
+	}
+
+	_, srcf, err := sm.deducePathAndProcess(nn)
+	if err != nil {
+		return nil, err
+	}
+
+	// we don't care about the ident here
+	src, _, err = srcf()
+	return src, err
+}
+
+func (sm *SourceMgr) deducePathAndProcess(path string) (stringFuture, sourceFuture, error) {
+	df, err := sm.deduceFromPath(path)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	var rstart, sstart int32
+	rc := make(chan struct{}, 1)
+	sc := make(chan struct{}, 1)
+
+	// Rewrap in a deferred future, so the caller can decide when to trigger it
+	rootf := func() (pr string, err error) {
+		// CAS because a bad interleaving here would panic on double-closing rc
+		if atomic.CompareAndSwapInt32(&rstart, 0, 1) {
+			go func() {
+				defer close(rc)
+				pr, err = df.root()
+				if err != nil {
+					// Don't cache errs. This doesn't really hurt the solver, and is
+					// beneficial for other use cases because it means we don't have to
+					// expose any kind of controls for clearing caches.
+					return
+				}
+
+				tpr := ProjectRoot(pr)
+				sm.rootxt.Insert(pr, tpr)
+				// It's not harmful if the netname was a URL rather than an
+				// import path
+				if pr != path {
+					// Insert the result into the rootxt twice - once at the
+					// root itself, so as to catch siblings/relatives, and again
+					// at the exact provided import path (assuming they were
+					// different), so that on subsequent calls, exact matches
+					// can skip the regex above.
+					sm.rootxt.Insert(path, tpr)
+				}
+			}()
+		}
+
+		<-rc
+		return pr, err
+	}
+
+	// Now, handle the source
+	fut := df.psf(sm.cachedir, sm.an)
+
+	// Rewrap in a deferred future, so the caller can decide when to trigger it
+	srcf := func() (src source, ident string, err error) {
+		// CAS because a bad interleaving here would panic on double-closing sc
+		if atomic.CompareAndSwapInt32(&sstart, 0, 1) {
+			go func() {
+				defer close(sc)
+				src, ident, err = fut()
+				if err != nil {
+					// Don't cache errs. This doesn't really hurt the solver, and is
+					// beneficial for other use cases because it means we don't have
+					// to expose any kind of controls for clearing caches.
+					return
+				}
+
+				sm.srcmut.Lock()
+				defer sm.srcmut.Unlock()
+
+				// Check to make sure a source hasn't shown up in the meantime, or that
+				// there wasn't already one at the ident.
+				var hasi, hasp bool
+				var srci, srcp source
+				if ident != "" {
+					srci, hasi = sm.srcs[ident]
+				}
+				srcp, hasp = sm.srcs[path]
+
+				// if neither the ident nor the input path have an entry for this src,
+				// we're in the simple case - write them both in and we're done
+				if !hasi && !hasp {
+					sm.srcs[path] = src
+					if ident != path && ident != "" {
+						sm.srcs[ident] = src
+					}
+					return
+				}
+
+				// Now, the xors.
+				//
+				// If already present for ident but not for path, copy ident's src
+				// to path. This covers cases like a gopkg.in path referring back
+				// onto a github repository, where something else already explicitly
+				// looked up that same gh repo.
+				if hasi && !hasp {
+					sm.srcs[path] = srci
+					src = srci
+				}
+				// If already present for path but not for ident, do NOT copy path's
+				// src to ident, but use the returned one instead. Really, this case
+				// shouldn't occur at all...? But the crucial thing is that the
+				// path-based one has already discovered what actual ident of source
+				// they want to use, and changing that arbitrarily would have
+				// undefined effects.
+				if hasp && !hasi && ident != "" {
+					sm.srcs[ident] = src
+				}
+
+				// If both are present, then assume we're good, and use the path one
+				if hasp && hasi {
+					// TODO(sdboyer) compare these (somehow? reflect? pointer?) and if they're not the
+					// same object, panic
+					src = srcp
+				}
+			}()
+		}
+
+		<-sc
+		return
+	}
+
+	return rootf, srcf, nil
 }
 
 // getProjectManager gets the project manager for the given ProjectIdentifier.
