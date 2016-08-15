@@ -290,7 +290,8 @@ func (sm *SourceMgr) getSourceFor(id ProjectIdentifier) (source, error) {
 		return nil, err
 	}
 
-	// we don't care about the ident here
+	// we don't care about the ident here, and the future produced by
+	// deducePathAndProcess will dedupe with what's in the sm.srcs map
 	src, _, err = srcf()
 	return src, err
 }
@@ -302,8 +303,7 @@ func (sm *SourceMgr) deducePathAndProcess(path string) (stringFuture, sourceFutu
 	}
 
 	var rstart, sstart int32
-	rc := make(chan struct{}, 1)
-	sc := make(chan struct{}, 1)
+	rc, sc := make(chan struct{}, 1), make(chan struct{}, 1)
 
 	// Rewrap in a deferred future, so the caller can decide when to trigger it
 	rootf := func() (pr string, err error) {

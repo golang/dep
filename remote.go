@@ -202,17 +202,11 @@ func (m bitbucketDeducer) deduceSource(path string, u *url.URL) (maybeSource, er
 	}
 
 	mb := make(maybeSources, 0)
-	if !ishg {
-		for _, scheme := range gitSchemes {
-			u2 := *u
-			if scheme == "ssh" {
-				u2.User = url.User("git")
-			}
-			u2.Scheme = scheme
-			mb = append(mb, maybeGitSource{url: &u2})
-		}
-	}
-
+	// git is probably more common, even on bitbucket. however, bitbucket
+	// appears to fail _extremely_ slowly on git pings (ls-remote) when the
+	// underlying repository is actually an hg repository, so it's better
+	// to try hg first.
+	// TODO(sdboyer) resolve the ambiguity by querying bitbucket's REST API.
 	if !isgit {
 		for _, scheme := range hgSchemes {
 			u2 := *u
@@ -221,6 +215,17 @@ func (m bitbucketDeducer) deduceSource(path string, u *url.URL) (maybeSource, er
 			}
 			u2.Scheme = scheme
 			mb = append(mb, maybeHgSource{url: &u2})
+		}
+	}
+
+	if !ishg {
+		for _, scheme := range gitSchemes {
+			u2 := *u
+			if scheme == "ssh" {
+				u2.User = url.User("git")
+			}
+			u2.Scheme = scheme
+			mb = append(mb, maybeGitSource{url: &u2})
 		}
 	}
 

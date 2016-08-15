@@ -193,14 +193,14 @@ func TestProjectManagerInit(t *testing.T) {
 		//t.Error("Metadata cache json file does not exist in expected location")
 	}
 
-	// Ensure project existence values are what we expect
+	// Ensure source existence values are what we expect
 	var exists bool
 	exists, err = sm.SourceExists(id)
 	if err != nil {
 		t.Errorf("Error on checking SourceExists: %s", err)
 	}
 	if !exists {
-		t.Error("Repo should exist after non-erroring call to ListVersions")
+		t.Error("Source should exist after non-erroring call to ListVersions")
 	}
 
 	// Now reach inside the black box
@@ -216,99 +216,69 @@ func TestProjectManagerInit(t *testing.T) {
 	}
 }
 
-func TestRepoVersionFetching(t *testing.T) {
-	// This test is quite slow, skip it on -short
+func TestGetSources(t *testing.T) {
+	// This test is a tad slow, skip it on -short
 	if testing.Short() {
-		t.Skip("Skipping repo version fetching test in short mode")
+		t.Skip("Skipping source setup test in short mode")
 	}
 
 	sm, clean := mkNaiveSM(t)
 
-	upstreams := []ProjectIdentifier{
+	pil := []ProjectIdentifier{
 		mkPI("github.com/Masterminds/VCSTestRepo"),
 		mkPI("bitbucket.org/mattfarina/testhgrepo"),
 		mkPI("launchpad.net/govcstestbzrrepo"),
 	}
 
-	pms := make([]*projectManager, len(upstreams))
-	for k, u := range upstreams {
-		pmi, err := sm.getProjectManager(u)
-		if err != nil {
-			clean()
-			t.Errorf("Unexpected error on ProjectManager creation: %s", err)
-			t.FailNow()
-		}
-		pms[k] = pmi.pm
+	wg := &sync.WaitGroup{}
+	wg.Add(3)
+	for _, pi := range pil {
+		go func(lpi ProjectIdentifier) {
+			nn := lpi.netName()
+			src, err := sm.getSourceFor(lpi)
+			if err != nil {
+				t.Errorf("(src %q) unexpected error setting up source: %s", nn, err)
+				return
+			}
+
+			// Re-get the same, make sure they are the same
+			src2, err := sm.getSourceFor(lpi)
+			if err != nil {
+				t.Errorf("(src %q) unexpected error re-getting source: %s", nn, err)
+			} else if src != src2 {
+				t.Errorf("(src %q) first and second sources are not eq", nn)
+			}
+
+			// All of them _should_ select https, so this should work
+			lpi.NetworkName = "https://" + lpi.NetworkName
+			src3, err := sm.getSourceFor(lpi)
+			if err != nil {
+				t.Errorf("(src %q) unexpected error getting explicit https source: %s", nn, err)
+			} else if src != src3 {
+				t.Errorf("(src %q) explicit https source should reuse autodetected https source", nn)
+			}
+
+			// Now put in http, and they should differ
+			lpi.NetworkName = "http://" + string(lpi.ProjectRoot)
+			src4, err := sm.getSourceFor(lpi)
+			if err != nil {
+				t.Errorf("(src %q) unexpected error getting explicit http source: %s", nn, err)
+			} else if src == src4 {
+				t.Errorf("(src %q) explicit http source should create a new src", nn)
+			}
+
+			wg.Done()
+		}(pi)
 	}
 
-	defer clean()
+	wg.Wait()
 
-	// test git first
-	vlist, exbits, err := pms[0].crepo.getCurrentVersionPairs()
-	if err != nil {
-		t.Errorf("Unexpected error getting version pairs from git repo: %s", err)
+	// nine entries (of which three are dupes): for each vcs, raw import path,
+	// the https url, and the http url
+	if len(sm.srcs) != 9 {
+		t.Errorf("Should have nine discrete entries in the srcs map, got %v", len(sm.srcs))
 	}
-	if exbits != existsUpstream {
-		t.Errorf("git pair fetch should only set upstream existence bits, but got %v", exbits)
-	}
-	if len(vlist) != 3 {
-		t.Errorf("git test repo should've produced three versions, got %v", len(vlist))
-	} else {
-		v := NewBranch("master").Is(Revision("30605f6ac35fcb075ad0bfa9296f90a7d891523e"))
-		if vlist[0] != v {
-			t.Errorf("git pair fetch reported incorrect first version, got %s", vlist[0])
-		}
-
-		v = NewBranch("test").Is(Revision("30605f6ac35fcb075ad0bfa9296f90a7d891523e"))
-		if vlist[1] != v {
-			t.Errorf("git pair fetch reported incorrect second version, got %s", vlist[1])
-		}
-
-		v = NewVersion("1.0.0").Is(Revision("30605f6ac35fcb075ad0bfa9296f90a7d891523e"))
-		if vlist[2] != v {
-			t.Errorf("git pair fetch reported incorrect third version, got %s", vlist[2])
-		}
-	}
-
-	// now hg
-	vlist, exbits, err = pms[1].crepo.getCurrentVersionPairs()
-	if err != nil {
-		t.Errorf("Unexpected error getting version pairs from hg repo: %s", err)
-	}
-	if exbits != existsUpstream|existsInCache {
-		t.Errorf("hg pair fetch should set upstream and cache existence bits, but got %v", exbits)
-	}
-	if len(vlist) != 2 {
-		t.Errorf("hg test repo should've produced two versions, got %v", len(vlist))
-	} else {
-		v := NewVersion("1.0.0").Is(Revision("d680e82228d206935ab2eaa88612587abe68db07"))
-		if vlist[0] != v {
-			t.Errorf("hg pair fetch reported incorrect first version, got %s", vlist[0])
-		}
-
-		v = NewBranch("test").Is(Revision("6c44ee3fe5d87763616c19bf7dbcadb24ff5a5ce"))
-		if vlist[1] != v {
-			t.Errorf("hg pair fetch reported incorrect second version, got %s", vlist[1])
-		}
-	}
-
-	// bzr last
-	vlist, exbits, err = pms[2].crepo.getCurrentVersionPairs()
-	if err != nil {
-		t.Errorf("Unexpected error getting version pairs from bzr repo: %s", err)
-	}
-	if exbits != existsUpstream|existsInCache {
-		t.Errorf("bzr pair fetch should set upstream and cache existence bits, but got %v", exbits)
-	}
-	if len(vlist) != 1 {
-		t.Errorf("bzr test repo should've produced one version, got %v", len(vlist))
-	} else {
-		v := NewVersion("1.0.0").Is(Revision("matt@mattfarina.com-20150731135137-pbphasfppmygpl68"))
-		if vlist[0] != v {
-			t.Errorf("bzr pair fetch reported incorrect first version, got %s", vlist[0])
-		}
-	}
-	// no svn for now, because...svn
+	clean()
 }
 
 // Regression test for #32
@@ -363,7 +333,7 @@ func TestDeduceProjectRoot(t *testing.T) {
 		t.Errorf("Wrong project root was deduced;\n\t(GOT) %s\n\t(WNT) %s", pr, in)
 	}
 	if sm.rootxt.Len() != 1 {
-		t.Errorf("Root path trie should have one element after performing the same deduction twice; has %v", sm.rootxt.Len())
+		t.Errorf("Root path trie should still have one element after performing the same deduction twice; has %v", sm.rootxt.Len())
 	}
 
 	// Now do a subpath

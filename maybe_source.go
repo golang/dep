@@ -118,7 +118,7 @@ type maybeHgSource struct {
 func (m maybeHgSource) try(cachedir string, an ProjectAnalyzer) (source, string, error) {
 	ustr := m.url.String()
 	path := filepath.Join(cachedir, "sources", sanitizer.Replace(ustr))
-	r, err := vcs.NewBzrRepo(ustr, path)
+	r, err := vcs.NewHgRepo(ustr, path)
 	if err != nil {
 		return nil, "", err
 	}
