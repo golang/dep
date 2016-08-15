@@ -175,6 +175,7 @@ func (m bitbucketDeducer) deduceSource(path string, u *url.URL) (maybeSource, er
 	isgit := strings.HasSuffix(u.Path, ".git") || (u.User != nil && u.User.Username() == "git")
 	ishg := strings.HasSuffix(u.Path, ".hg") || (u.User != nil && u.User.Username() == "hg")
 
+	// TODO(sdboyer) resolve scm ambiguity if needed by querying bitbucket's REST API
 	if u.Scheme != "" {
 		validgit, validhg := validateVCSScheme(u.Scheme, "git"), validateVCSScheme(u.Scheme, "hg")
 		if isgit {
@@ -195,9 +196,8 @@ func (m bitbucketDeducer) deduceSource(path string, u *url.URL) (maybeSource, er
 
 		// No other choice, make an option for both git and hg
 		return maybeSources{
-			// Git first, because it's a) faster and b) git
-			maybeGitSource{url: u},
 			maybeHgSource{url: u},
+			maybeGitSource{url: u},
 		}, nil
 	}
 
@@ -206,7 +206,6 @@ func (m bitbucketDeducer) deduceSource(path string, u *url.URL) (maybeSource, er
 	// appears to fail _extremely_ slowly on git pings (ls-remote) when the
 	// underlying repository is actually an hg repository, so it's better
 	// to try hg first.
-	// TODO(sdboyer) resolve the ambiguity by querying bitbucket's REST API.
 	if !isgit {
 		for _, scheme := range hgSchemes {
 			u2 := *u
