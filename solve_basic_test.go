@@ -1303,6 +1303,16 @@ func (sm *depspecSourceManager) ExportProject(id ProjectIdentifier, v Version, t
 	return fmt.Errorf("dummy sm doesn't support exporting")
 }
 
+func (sm *depspecSourceManager) DeduceProjectRoot(ip string) (ProjectRoot, error) {
+	for _, ds := range sm.allSpecs() {
+		n := string(ds.n)
+		if ip == n || strings.HasPrefix(ip, n+"/") {
+			return ProjectRoot(n), nil
+		}
+	}
+	return "", fmt.Errorf("Could not find %s, or any parent, in list of known fixtures", ip)
+}
+
 func (sm *depspecSourceManager) rootSpec() depspec {
 	return sm.specs[0]
 }

@@ -55,6 +55,10 @@ type SourceManager interface {
 	// AnalyzerInfo reports the name and version of the logic used to service
 	// GetManifestAndLock().
 	AnalyzerInfo() (name string, version *semver.Version)
+
+	// DeduceRootProject takes an import path and deduces the corresponding
+	// project/source root.
+	DeduceProjectRoot(ip string) (ProjectRoot, error)
 }
 
 // A ProjectAnalyzer is responsible for analyzing a given path for Manifest and
@@ -64,6 +68,7 @@ type ProjectAnalyzer interface {
 	// root import path importRoot, to determine the project's constraints, as
 	// indicated by a Manifest and Lock.
 	DeriveManifestAndLock(path string, importRoot ProjectRoot) (Manifest, Lock, error)
+
 	// Report the name and version of this ProjectAnalyzer.
 	Info() (name string, version *semver.Version)
 }

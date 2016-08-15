@@ -596,7 +596,7 @@ func (s *solver) intersectConstraintsWithImports(deps []workingConstraint, reach
 		}
 
 		// No match. Let the SourceManager try to figure out the root
-		root, err := s.b.deduceRemoteRepo(rp)
+		root, err := s.b.DeduceProjectRoot(rp)
 		if err != nil {
 			// Nothing we can do if we can't suss out a root
 			return nil, err
@@ -605,17 +605,17 @@ func (s *solver) intersectConstraintsWithImports(deps []workingConstraint, reach
 		// Make a new completeDep with an open constraint, respecting overrides
 		pd := s.ovr.override(ProjectConstraint{
 			Ident: ProjectIdentifier{
-				ProjectRoot: ProjectRoot(root.Base),
-				NetworkName: root.Base,
+				ProjectRoot: root,
+				NetworkName: string(root),
 			},
 			Constraint: Any(),
 		})
 
 		// Insert the pd into the trie so that further deps from this
 		// project get caught by the prefix search
-		xt.Insert(root.Base, pd)
+		xt.Insert(string(root), pd)
 		// And also put the complete dep into the dmap
-		dmap[ProjectRoot(root.Base)] = completeDep{
+		dmap[root] = completeDep{
 			workingConstraint: pd,
 			pl:                []string{rp},
 		}

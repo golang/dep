@@ -21,18 +21,10 @@ type sourceBridge interface {
 	matches(id ProjectIdentifier, c Constraint, v Version) bool
 	matchesAny(id ProjectIdentifier, c1, c2 Constraint) bool
 	intersect(id ProjectIdentifier, c1, c2 Constraint) Constraint
-	deduceRemoteRepo(path string) (*remoteRepo, error)
 }
 
 // bridge is an adapter around a proper SourceManager. It provides localized
 // caching that's tailored to the requirements of a particular solve run.
-//
-// It also performs transformations between ProjectIdentifiers, which is what
-// the solver primarily deals in, and ProjectRoot, which is what the
-// SourceManager primarily deals in. This separation is helpful because it keeps
-// the complexities of deciding what a particular name "means" entirely within
-// the solver, while the SourceManager can traffic exclusively in
-// globally-unique network names.
 //
 // Finally, it provides authoritative version/constraint operations, ensuring
 // that any possible approach to a match - even those not literally encoded in
@@ -417,10 +409,8 @@ func (b *bridge) verifyRootDir(path string) error {
 	return nil
 }
 
-// deduceRemoteRepo deduces certain network-oriented properties about an import
-// path.
-func (b *bridge) deduceRemoteRepo(path string) (*remoteRepo, error) {
-	return deduceRemoteRepo(path)
+func (b *bridge) DeduceProjectRoot(ip string) (ProjectRoot, error) {
+	return b.sm.DeduceProjectRoot(ip)
 }
 
 // versionTypeUnion represents a set of versions that are, within the scope of
