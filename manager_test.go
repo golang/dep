@@ -389,8 +389,8 @@ func TestMultiDeduceThreadsafe(t *testing.T) {
 	// Set up channel for everything else to block on
 	c := make(chan struct{}, 1)
 	f := func(rnum int) {
-		wg.Add(1)
 		defer func() {
+			wg.Done()
 			if e := recover(); e != nil {
 				t.Errorf("goroutine number %v panicked with err: %s", rnum, e)
 			}
@@ -400,10 +400,10 @@ func TestMultiDeduceThreadsafe(t *testing.T) {
 		if err != nil {
 			t.Errorf("err was non-nil on root detection in goroutine number %v: %s", rnum, err)
 		}
-		wg.Done()
 	}
 
 	for k := range make([]struct{}, cnum) {
+		wg.Add(1)
 		go f(k)
 		runtime.Gosched()
 	}
@@ -414,10 +414,11 @@ func TestMultiDeduceThreadsafe(t *testing.T) {
 	}
 
 	// repeat for srcf
+	wg2 := &sync.WaitGroup{}
 	c = make(chan struct{}, 1)
 	f = func(rnum int) {
-		wg.Add(1)
 		defer func() {
+			wg2.Done()
 			if e := recover(); e != nil {
 				t.Errorf("goroutine number %v panicked with err: %s", rnum, e)
 			}
@@ -427,15 +428,15 @@ func TestMultiDeduceThreadsafe(t *testing.T) {
 		if err != nil {
 			t.Errorf("err was non-nil on root detection in goroutine number %v: %s", rnum, err)
 		}
-		wg.Done()
 	}
 
 	for k := range make([]struct{}, cnum) {
+		wg2.Add(1)
 		go f(k)
 		runtime.Gosched()
 	}
 	close(c)
-	wg.Wait()
+	wg2.Wait()
 	if len(sm.srcs) != 2 {
 		t.Errorf("Sources map should have just two elements, but has %v", len(sm.srcs))
 	}
