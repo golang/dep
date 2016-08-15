@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"path/filepath"
 	"runtime"
 	"sort"
 	"sync"
@@ -181,13 +182,17 @@ func TestProjectManagerInit(t *testing.T) {
 		}
 	}
 
+	// use ListPackages to ensure the repo is actually on disk
+	// TODO(sdboyer) ugh, maybe we do need an explicit prefetch method
+	smc.ListPackages(id, NewVersion("1.0.0"))
+
 	// Ensure that the appropriate cache dirs and files exist
-	_, err = os.Stat(path.Join(cpath, "sources", "https---github.com-Masterminds-VCSTestRepo", ".git"))
+	_, err = os.Stat(filepath.Join(cpath, "sources", "https---github.com-Masterminds-VCSTestRepo", ".git"))
 	if err != nil {
 		t.Error("Cache repo does not exist in expected location")
 	}
 
-	_, err = os.Stat(path.Join(cpath, "metadata", "github.com", "Masterminds", "VCSTestRepo", "cache.json"))
+	_, err = os.Stat(filepath.Join(cpath, "metadata", "github.com", "Masterminds", "VCSTestRepo", "cache.json"))
 	if err != nil {
 		// TODO(sdboyer) disabled until we get caching working
 		//t.Error("Metadata cache json file does not exist in expected location")
@@ -201,18 +206,6 @@ func TestProjectManagerInit(t *testing.T) {
 	}
 	if !exists {
 		t.Error("Source should exist after non-erroring call to ListVersions")
-	}
-
-	// Now reach inside the black box
-	pms, err := sm.getProjectManager(id)
-	if err != nil {
-		t.Errorf("Error on grabbing project manager obj: %s", err)
-		t.FailNow()
-	}
-
-	// Check upstream existence flag
-	if !pms.pm.CheckExistence(existsUpstream) {
-		t.Errorf("ExistsUpstream flag not being correctly set the project")
 	}
 }
 

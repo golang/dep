@@ -1,7 +1,6 @@
 package gps
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -10,7 +9,6 @@ import (
 	"sync/atomic"
 
 	"github.com/Masterminds/semver"
-	"github.com/Masterminds/vcs"
 )
 
 // Used to compute a friendly filepath from a URL-shaped input
@@ -76,8 +74,6 @@ type ProjectAnalyzer interface {
 // tools; control via dependency injection is intended to be sufficient.
 type SourceMgr struct {
 	cachedir string
-	pms      map[string]*pmState
-	pmut     sync.RWMutex
 	srcs     map[string]source
 	srcmut   sync.RWMutex
 	rr       map[string]struct {
@@ -91,14 +87,6 @@ type SourceMgr struct {
 }
 
 var _ SourceManager = &SourceMgr{}
-
-// Holds a projectManager, caches of the managed project's data, and information
-// about the freshness of those caches
-type pmState struct {
-	pm   *projectManager
-	cf   *os.File // handle for the cache file
-	vcur bool     // indicates that we've called ListVersions()
-}
 
 // NewSourceManager produces an instance of gps's built-in SourceManager. It
 // takes a cache directory (where local instances of upstream repositories are
@@ -140,7 +128,6 @@ func NewSourceManager(an ProjectAnalyzer, cachedir string, force bool) (*SourceM
 
 	return &SourceMgr{
 		cachedir: cachedir,
-		pms:      make(map[string]*pmState),
 		srcs:     make(map[string]source),
 		rr: make(map[string]struct {
 			rr  *remoteRepo
@@ -170,23 +157,23 @@ func (sm *SourceMgr) AnalyzerInfo() (name string, version *semver.Version) {
 // The work of producing the manifest and lock is delegated to the injected
 // ProjectAnalyzer's DeriveManifestAndLock() method.
 func (sm *SourceMgr) GetManifestAndLock(id ProjectIdentifier, v Version) (Manifest, Lock, error) {
-	pmc, err := sm.getProjectManager(id)
+	src, err := sm.getSourceFor(id)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	return pmc.pm.GetManifestAndLock(id.ProjectRoot, v)
+	return src.getManifestAndLock(id.ProjectRoot, v)
 }
 
 // ListPackages parses the tree of the Go packages at and below the ProjectRoot
 // of the given ProjectIdentifier, at the given version.
 func (sm *SourceMgr) ListPackages(id ProjectIdentifier, v Version) (PackageTree, error) {
-	pmc, err := sm.getProjectManager(id)
+	src, err := sm.getSourceFor(id)
 	if err != nil {
 		return PackageTree{}, err
 	}
 
-	return pmc.pm.ListPackages(id.ProjectRoot, v)
+	return src.listPackages(id.ProjectRoot, v)
 }
 
 // ListVersions retrieves a list of the available versions for a given
@@ -202,50 +189,51 @@ func (sm *SourceMgr) ListPackages(id ProjectIdentifier, v Version) (PackageTree,
 // is not accessible (network outage, access issues, or the resource actually
 // went away), an error will be returned.
 func (sm *SourceMgr) ListVersions(id ProjectIdentifier) ([]Version, error) {
-	pmc, err := sm.getProjectManager(id)
+	src, err := sm.getSourceFor(id)
 	if err != nil {
 		// TODO(sdboyer) More-er proper-er errors
 		return nil, err
 	}
 
-	return pmc.pm.ListVersions()
+	return src.listVersions()
 }
 
 // RevisionPresentIn indicates whether the provided Revision is present in the given
 // repository.
 func (sm *SourceMgr) RevisionPresentIn(id ProjectIdentifier, r Revision) (bool, error) {
-	pmc, err := sm.getProjectManager(id)
+	src, err := sm.getSourceFor(id)
 	if err != nil {
 		// TODO(sdboyer) More-er proper-er errors
 		return false, err
 	}
 
-	return pmc.pm.RevisionPresentIn(id.ProjectRoot, r)
+	return src.revisionPresentIn(r)
 }
 
 // SourceExists checks if a repository exists, either upstream or in the cache,
 // for the provided ProjectIdentifier.
 func (sm *SourceMgr) SourceExists(id ProjectIdentifier) (bool, error) {
-	pms, err := sm.getProjectManager(id)
+	src, err := sm.getSourceFor(id)
 	if err != nil {
 		return false, err
 	}
 
-	return pms.pm.CheckExistence(existsInCache) || pms.pm.CheckExistence(existsUpstream), nil
+	return src.checkExistence(existsInCache) || src.checkExistence(existsUpstream), nil
 }
 
 // ExportProject writes out the tree of the provided ProjectIdentifier's
 // ProjectRoot, at the provided version, to the provided directory.
 func (sm *SourceMgr) ExportProject(id ProjectIdentifier, v Version, to string) error {
-	pms, err := sm.getProjectManager(id)
+	src, err := sm.getSourceFor(id)
 	if err != nil {
 		return err
 	}
 
-	return pms.pm.ExportVersionTo(v, to)
+	return src.exportVersionTo(v, to)
 }
 
-// DeduceRootProject takes an import path and deduces the
+// DeduceRootProject takes an import path and deduces the corresponding
+// project/source root.
 //
 // Note that some import paths may require network activity to correctly
 // determine the root of the path, such as, but not limited to, vanity import
@@ -411,174 +399,4 @@ func (sm *SourceMgr) deducePathAndProcess(path string) (stringFuture, sourceFutu
 	}
 
 	return rootf, srcf, nil
-}
-
-// getProjectManager gets the project manager for the given ProjectIdentifier.
-//
-// If no such manager yet exists, it attempts to create one.
-func (sm *SourceMgr) getProjectManager(id ProjectIdentifier) (*pmState, error) {
-	// TODO(sdboyer) finish this, it's not sufficient (?)
-	n := id.netName()
-	var rpath string
-
-	// Early check to see if we already have a pm in the cache for this net name
-	if pm, exists := sm.pms[n]; exists {
-		return pm, nil
-	}
-
-	// Figure out the remote repo path
-	rr, err := deduceRemoteRepo(n)
-	if err != nil {
-		// Not a valid import path, must reject
-		// TODO(sdboyer) wrap error
-		return nil, err
-	}
-
-	// Check the cache again, see if exact resulting clone url is in there
-	if pm, exists := sm.pms[rr.CloneURL.String()]; exists {
-		// Found it - re-register this PM at the original netname so that it
-		// doesn't need to deduce next time
-		// TODO(sdboyer) is this OK to do? are there consistency side effects?
-		sm.pms[n] = pm
-		return pm, nil
-	}
-
-	// No luck again. Now, walk through the scheme options the deducer returned,
-	// checking if each is in the cache
-	for _, scheme := range rr.Schemes {
-		rr.CloneURL.Scheme = scheme
-		// See if THIS scheme has a match, now
-		if pm, exists := sm.pms[rr.CloneURL.String()]; exists {
-			// Yep - again, re-register this PM at the original netname so that it
-			// doesn't need to deduce next time
-			// TODO(sdboyer) is this OK to do? are there consistency side effects?
-			sm.pms[n] = pm
-			return pm, nil
-		}
-	}
-
-	// Definitively no match for anything in the cache, so we know we have to
-	// create the entry. Next question is whether there's already a repo on disk
-	// for any of the schemes, or if we need to create that, too.
-
-	// TODO(sdboyer) this strategy kinda locks in the scheme to use over
-	// multiple invocations in a way that maybe isn't the best.
-	var r vcs.Repo
-	for _, scheme := range rr.Schemes {
-		rr.CloneURL.Scheme = scheme
-		url := rr.CloneURL.String()
-		sn := sanitizer.Replace(url)
-		rpath = filepath.Join(sm.cachedir, "sources", sn)
-
-		if fi, err := os.Stat(rpath); err == nil && fi.IsDir() {
-			// This one exists, so set up here
-			r, err = vcs.NewRepo(url, rpath)
-			if err != nil {
-				return nil, err
-			}
-			goto decided
-		}
-	}
-
-	// Nothing on disk, either. Iterate through the schemes, trying each and
-	// failing out only if none resulted in successfully setting up the local.
-	for _, scheme := range rr.Schemes {
-		rr.CloneURL.Scheme = scheme
-		url := rr.CloneURL.String()
-		sn := sanitizer.Replace(url)
-		rpath = filepath.Join(sm.cachedir, "sources", sn)
-
-		r, err = vcs.NewRepo(url, rpath)
-		if err != nil {
-			continue
-		}
-
-		// FIXME(sdboyer) cloning the repo here puts it on a blocking path. that
-		// aspect of state management needs to be deferred into the
-		// projectManager
-		err = r.Get()
-		if err != nil {
-			continue
-		}
-		goto decided
-	}
-
-	// If we've gotten this far, we got some brokeass input.
-	return nil, fmt.Errorf("Could not reach source repository for %s", n)
-
-decided:
-	// Ensure cache dir exists
-	metadir := filepath.Join(sm.cachedir, "metadata", string(n))
-	err = os.MkdirAll(metadir, 0777)
-	if err != nil {
-		// TODO(sdboyer) be better
-		return nil, err
-	}
-
-	pms := &pmState{}
-	cpath := filepath.Join(metadir, "cache.json")
-	fi, err := os.Stat(cpath)
-	var dc *sourceMetaCache
-	if fi != nil {
-		pms.cf, err = os.OpenFile(cpath, os.O_RDWR, 0777)
-		if err != nil {
-			// TODO(sdboyer) be better
-			return nil, fmt.Errorf("Err on opening metadata cache file: %s", err)
-		}
-
-		err = json.NewDecoder(pms.cf).Decode(dc)
-		if err != nil {
-			// TODO(sdboyer) be better
-			return nil, fmt.Errorf("Err on JSON decoding metadata cache file: %s", err)
-		}
-	} else {
-		// TODO(sdboyer) commented this out for now, until we manage it correctly
-		//pms.cf, err = os.Create(cpath)
-		//if err != nil {
-		//// TODO(sdboyer) be better
-		//return nil, fmt.Errorf("Err on creating metadata cache file: %s", err)
-		//}
-
-		dc = newMetaCache()
-	}
-
-	pm := &projectManager{
-		n:  n,
-		an: sm.an,
-		dc: dc,
-		crepo: &repo{
-			rpath: rpath,
-			r:     r,
-		},
-	}
-
-	pms.pm = pm
-	sm.pms[n] = pms
-	return pms, nil
-}
-
-func (sm *SourceMgr) whatsInAName(nn string) (*remoteRepo, error) {
-	sm.rmut.RLock()
-	tuple, exists := sm.rr[nn]
-	sm.rmut.RUnlock()
-	if exists {
-		return tuple.rr, tuple.err
-	}
-
-	// Don't lock around the deduceRemoteRepo call, because that itself can be
-	// slow. The tradeoff is that it's possible we might duplicate work if two
-	// calls for the same id were to made simultaneously, but as those results
-	// would be the same, clobbering is OK, and better than the alternative of
-	// serializing all calls.
-	rr, err := deduceRemoteRepo(nn)
-	sm.rmut.Lock()
-	sm.rr[nn] = struct {
-		rr  *remoteRepo
-		err error
-	}{
-		rr:  rr,
-		err: err,
-	}
-	sm.rmut.Unlock()
-	return rr, err
 }

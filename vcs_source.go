@@ -34,6 +34,12 @@ func (s *gitSource) exportVersionTo(v Version, to string) error {
 	defer s.crepo.mut.Unlock()
 
 	r := s.crepo.r
+	if !r.CheckLocal() {
+		err := r.Get()
+		if err != nil {
+			return fmt.Errorf("failed to clone repo from %s", r.Remote())
+		}
+	}
 	// Back up original index
 	idx, bak := filepath.Join(r.LocalPath(), ".git", "index"), filepath.Join(r.LocalPath(), ".git", "origindex")
 	err := os.Rename(idx, bak)
