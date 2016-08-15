@@ -10,19 +10,6 @@ import (
 	"strings"
 )
 
-// A remoteRepo represents a potential remote repository resource.
-//
-// RemoteRepos are based purely on lexical analysis; successfully constructing
-// one is not a guarantee that the resource it identifies actually exists or is
-// accessible.
-type remoteRepo struct {
-	Base     string
-	RelPkg   string
-	CloneURL *url.URL
-	Schemes  []string
-	VCS      []string
-}
-
 var (
 	gitSchemes = []string{"https", "ssh", "git", "http"}
 	bzrSchemes = []string{"https", "bzr+ssh", "bzr", "http"}
@@ -735,63 +722,6 @@ func normalizeURI(p string) (u *url.URL, newpath string, err error) {
 	}
 
 	return
-}
-
-// deduceRemoteRepo takes a potential import path and returns a RemoteRepo
-// representing the remote location of the source of an import path. Remote
-// repositories can be bare import paths, or urls including a checkout scheme.
-func deduceRemoteRepo(path string) (rr *remoteRepo, err error) {
-	rr = &remoteRepo{}
-	if m := scpSyntaxRe.FindStringSubmatch(path); m != nil {
-		// Match SCP-like syntax and convert it to a URL.
-		// Eg, "git@github.com:user/repo" becomes
-		// "ssh://git@github.com/user/repo".
-		rr.CloneURL = &url.URL{
-			Scheme: "ssh",
-			User:   url.User(m[1]),
-			Host:   m[2],
-			Path:   "/" + m[3],
-			// TODO(sdboyer) This is what stdlib sets; grok why better
-			//RawPath: m[3],
-		}
-	} else {
-		rr.CloneURL, err = url.Parse(path)
-		if err != nil {
-			return nil, fmt.Errorf("%q is not a valid import path", path)
-		}
-	}
-
-	if rr.CloneURL.Host != "" {
-		path = rr.CloneURL.Host + "/" + strings.TrimPrefix(rr.CloneURL.Path, "/")
-	} else {
-		path = rr.CloneURL.Path
-	}
-
-	if !pathvld.MatchString(path) {
-		return nil, fmt.Errorf("%q is not a valid import path", path)
-	}
-
-	if rr.CloneURL.Scheme != "" {
-		rr.Schemes = []string{rr.CloneURL.Scheme}
-	}
-
-	// TODO(sdboyer) instead of a switch, encode base domain in radix tree and pick
-	// detector from there; if failure, then fall back on metadata work
-
-	// No luck so far. maybe it's one of them vanity imports?
-	// We have to get a little fancier for the metadata lookup - wrap a future
-	// around a future
-	var importroot, vcs string
-	// We have a real URL. Set the other values and return.
-	rr.Base = importroot
-	rr.RelPkg = strings.TrimPrefix(path[len(importroot):], "/")
-
-	rr.VCS = []string{vcs}
-	if rr.CloneURL.Scheme != "" {
-		rr.Schemes = []string{rr.CloneURL.Scheme}
-	}
-
-	return rr, nil
 }
 
 // fetchMetadata fetches the remote metadata for path.

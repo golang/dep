@@ -81,14 +81,9 @@ type SourceMgr struct {
 	cachedir string
 	srcs     map[string]source
 	srcmut   sync.RWMutex
-	rr       map[string]struct {
-		rr  *remoteRepo
-		err error
-	}
-	rmut   sync.RWMutex
-	an     ProjectAnalyzer
-	dxt    deducerTrie
-	rootxt prTrie
+	an       ProjectAnalyzer
+	dxt      deducerTrie
+	rootxt   prTrie
 }
 
 var _ SourceManager = &SourceMgr{}
@@ -134,13 +129,9 @@ func NewSourceManager(an ProjectAnalyzer, cachedir string, force bool) (*SourceM
 	return &SourceMgr{
 		cachedir: cachedir,
 		srcs:     make(map[string]source),
-		rr: make(map[string]struct {
-			rr  *remoteRepo
-			err error
-		}),
-		an:     an,
-		dxt:    pathDeducerTrie(),
-		rootxt: newProjectRootTrie(),
+		an:       an,
+		dxt:      pathDeducerTrie(),
+		rootxt:   newProjectRootTrie(),
 	}, nil
 }
 

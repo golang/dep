@@ -1358,21 +1358,6 @@ func (b *depspecBridge) ListPackages(id ProjectIdentifier, v Version) (PackageTr
 	return b.sm.(fixSM).ListPackages(id, v)
 }
 
-// override deduceRemoteRepo on bridge to make all our pkg/project mappings work
-// as expected
-func (b *depspecBridge) deduceRemoteRepo(path string) (*remoteRepo, error) {
-	for _, ds := range b.sm.(fixSM).allSpecs() {
-		n := string(ds.n)
-		if path == n || strings.HasPrefix(path, n+"/") {
-			return &remoteRepo{
-				Base:   n,
-				RelPkg: strings.TrimPrefix(path, n+"/"),
-			}, nil
-		}
-	}
-	return nil, fmt.Errorf("Could not find %s, or any parent, in list of known fixtures", path)
-}
-
 // enforce interfaces
 var _ Manifest = depspec{}
 var _ Lock = dummyLock{}
