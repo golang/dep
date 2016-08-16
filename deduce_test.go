@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/url"
 	"reflect"
+	"sync"
 	"testing"
 )
 
@@ -556,6 +557,51 @@ func TestDeduceFromPath(t *testing.T) {
 			}
 		}
 	}
+}
+
+func TestVanityDeduction(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping slow test in short mode")
+	}
+
+	sm, clean := mkNaiveSM(t)
+	defer clean()
+
+	vanities := pathDeductionFixtures["vanity"]
+	wg := &sync.WaitGroup{}
+	wg.Add(len(vanities))
+
+	for _, fix := range vanities {
+		go func(fix pathDeductionFixture) {
+			defer wg.Done()
+			pr, err := sm.DeduceProjectRoot(fix.in)
+			if err != nil {
+				t.Errorf("(in: %s) Unexpected err on deducing project root: %s", fix.in, err)
+				return
+			} else if string(pr) != fix.root {
+				t.Errorf("(in: %s) Deducer did not return expected root:\n\t(GOT) %s\n\t(WNT) %s", fix.in, pr, fix.root)
+			}
+
+			_, srcf, err := sm.deducePathAndProcess(fix.in)
+			if err != nil {
+				t.Errorf("(in: %s) Unexpected err on deducing source: %s", fix.in, err)
+				return
+			}
+
+			_, ident, err := srcf()
+			if err != nil {
+				t.Errorf("(in: %s) Unexpected err on executing source future: %s", fix.in, err)
+				return
+			}
+
+			ustr := fix.mb.(maybeGitSource).url.String()
+			if ident != ustr {
+				t.Errorf("(in: %s) Deduced repo ident does not match fixture:\n\t(GOT) %s\n\t(WNT) %s", fix.in, ident, ustr)
+			}
+		}(fix)
+	}
+
+	wg.Wait()
 }
 
 // borrow from stdlib

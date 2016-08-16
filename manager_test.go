@@ -365,6 +365,18 @@ func TestDeduceProjectRoot(t *testing.T) {
 	if sm.rootxt.Len() != 5 {
 		t.Errorf("Root path trie should have five elements, one for each unique root and subpath; has %v", sm.rootxt.Len())
 	}
+
+	// Ensure that vcs extension-based matching comes through
+	in5 := "ffffrrrraaaaaapppppdoesnotresolve.com/baz.git"
+	pr, err = sm.DeduceProjectRoot(in5)
+	if err != nil {
+		t.Errorf("Problem while detecting root of %q %s", in5, err)
+	} else if string(pr) != in5 {
+		t.Errorf("Wrong project root was deduced;\n\t(GOT) %s\n\t(WNT) %s", pr, in)
+	}
+	if sm.rootxt.Len() != 6 {
+		t.Errorf("Root path trie should have six elements, one for each unique root and subpath; has %v", sm.rootxt.Len())
+	}
 }
 
 // Test that the future returned from SourceMgr.deducePathAndProcess() is safe
