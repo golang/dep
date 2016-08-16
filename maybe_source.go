@@ -74,11 +74,11 @@ func (m maybeGitSource) try(cachedir string, an ProjectAnalyzer) (source, string
 		},
 	}
 
+	src.baseVCSSource.lvfunc = src.listVersions
+
 	_, err = src.listVersions()
 	if err != nil {
 		return nil, "", err
-		//} else if pm.ex.f&existsUpstream == existsUpstream {
-		//return pm, nil
 	}
 
 	return src, ustr, nil
@@ -99,16 +99,23 @@ func (m maybeBzrSource) try(cachedir string, an ProjectAnalyzer) (source, string
 		return nil, "", fmt.Errorf("Remote repository at %s does not exist, or is inaccessible", ustr)
 	}
 
-	return &bzrSource{
+	src := &bzrSource{
 		baseVCSSource: baseVCSSource{
 			an: an,
 			dc: newMetaCache(),
+			ex: existence{
+				s: existsUpstream,
+				f: existsUpstream,
+			},
 			crepo: &repo{
 				r:     r,
 				rpath: path,
 			},
 		},
-	}, ustr, nil
+	}
+	src.baseVCSSource.lvfunc = src.listVersions
+
+	return src, ustr, nil
 }
 
 type maybeHgSource struct {
@@ -126,14 +133,21 @@ func (m maybeHgSource) try(cachedir string, an ProjectAnalyzer) (source, string,
 		return nil, "", fmt.Errorf("Remote repository at %s does not exist, or is inaccessible", ustr)
 	}
 
-	return &hgSource{
+	src := &hgSource{
 		baseVCSSource: baseVCSSource{
 			an: an,
 			dc: newMetaCache(),
+			ex: existence{
+				s: existsUpstream,
+				f: existsUpstream,
+			},
 			crepo: &repo{
 				r:     r,
 				rpath: path,
 			},
 		},
-	}, ustr, nil
+	}
+	src.baseVCSSource.lvfunc = src.listVersions
+
+	return src, ustr, nil
 }
