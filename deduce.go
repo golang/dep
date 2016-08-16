@@ -261,17 +261,9 @@ func (m gopkginDeducer) deduceSource(p string, u *url.URL) (maybeSource, error) 
 
 	// gopkg.in is always backed by github
 	u.Host = "github.com"
-	// If the third position is empty, it's the shortened form that expands
-	// to the go-pkg github user
 	if v[2] == "" {
-		// Apparently gopkg.in special-cases gopkg.in/yaml, violating its own rules?
-		// If we find one more exception, chuck this and just rely on vanity
-		// metadata resolving.
-		if v[3] == "/yaml" {
-			u.Path = "/go-yaml/yaml"
-		} else {
-			u.Path = path.Join("/go-pkg", v[3])
-		}
+		elem := v[3][1:]
+		u.Path = path.Join("/go-"+elem, elem)
 	} else {
 		u.Path = path.Join(v[2], v[3])
 	}

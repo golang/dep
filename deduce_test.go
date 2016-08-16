@@ -157,6 +157,16 @@ var pathDeductionFixtures = map[string][]pathDeductionFixture{
 			},
 		},
 		{
+			in:   "gopkg.in/inf.v0",
+			root: "gopkg.in/inf.v0",
+			mb: maybeSources{
+				maybeGitSource{url: mkurl("https://github.com/go-inf/inf")},
+				maybeGitSource{url: mkurl("ssh://git@github.com/go-inf/inf")},
+				maybeGitSource{url: mkurl("git://github.com/go-inf/inf")},
+				maybeGitSource{url: mkurl("http://github.com/go-inf/inf")},
+			},
+		},
+		{
 			// gopkg.in only allows specifying major version in import path
 			in:   "gopkg.in/yaml.v1.2",
 			rerr: errors.New("gopkg.in/yaml.v1.2 is not a valid import path; gopkg.in only allows major versions (\"v1\" instead of \"v1.2\")"),
