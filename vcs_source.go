@@ -15,12 +15,12 @@ import (
 
 type vcsSource interface {
 	syncLocal() error
+	ensureLocal() error
 	listLocalVersionPairs() ([]PairedVersion, sourceExistence, error)
 	listUpstreamVersionPairs() ([]PairedVersion, sourceExistence, error)
-	revisionPresentIn(Revision) (bool, error)
+	hasRevision(Revision) (bool, error)
 	checkout(Version) error
-	ping() bool
-	ensureCacheExistence() error
+	exportVersionTo(Version, string) error
 }
 
 // gitSource is a generic git repository implementation that should work with
@@ -377,175 +377,6 @@ type repo struct {
 
 	// Whether or not the cache repo is in sync (think dvcs) with upstream
 	synced bool
-}
-
-func (r *repo) getCurrentVersionPairs() (vlist []PairedVersion, exbits sourceExistence, err error) {
-	r.mut.Lock()
-	defer r.mut.Unlock()
-
-	switch r.r.(type) {
-	case *vcs.GitRepo:
-		var out []byte
-		c := exec.Command("git", "ls-remote", r.r.Remote())
-		// Ensure no terminal prompting for PWs
-		c.Env = mergeEnvLists([]string{"GIT_TERMINAL_PROMPT=0"}, os.Environ())
-		out, err = c.CombinedOutput()
-
-		all := bytes.Split(bytes.TrimSpace(out), []byte("\n"))
-		if err != nil || len(all) == 0 {
-			// TODO(sdboyer) remove this path? it really just complicates things, for
-			// probably not much benefit
-
-			// ls-remote failed, probably due to bad communication or a faulty
-			// upstream implementation. So fetch updates, then build the list
-			// locally
-			err = r.r.Update()
-			if err != nil {
-				// Definitely have a problem, now - bail out
-				return
-			}
-
-			// Upstream and cache must exist, so add that to exbits
-			exbits |= existsUpstream | existsInCache
-			// Also, local is definitely now synced
-			r.synced = true
-
-			out, err = r.r.RunFromDir("git", "show-ref", "--dereference")
-			if err != nil {
-				return
-			}
-
-			all = bytes.Split(bytes.TrimSpace(out), []byte("\n"))
-		}
-		// Local cache may not actually exist here, but upstream definitely does
-		exbits |= existsUpstream
-
-		tmap := make(map[string]PairedVersion)
-		for _, pair := range all {
-			var v PairedVersion
-			if string(pair[46:51]) == "heads" {
-				v = NewBranch(string(pair[52:])).Is(Revision(pair[:40])).(PairedVersion)
-				vlist = append(vlist, v)
-			} else if string(pair[46:50]) == "tags" {
-				vstr := string(pair[51:])
-				if strings.HasSuffix(vstr, "^{}") {
-					// If the suffix is there, then we *know* this is the rev of
-					// the underlying commit object that we actually want
-					vstr = strings.TrimSuffix(vstr, "^{}")
-				} else if _, exists := tmap[vstr]; exists {
-					// Already saw the deref'd version of this tag, if one
-					// exists, so skip this.
-					continue
-					// Can only hit this branch if we somehow got the deref'd
-					// version first. Which should be impossible, but this
-					// covers us in case of weirdness, anyway.
-				}
-				v = NewVersion(vstr).Is(Revision(pair[:40])).(PairedVersion)
-				tmap[vstr] = v
-			}
-		}
-
-		// Append all the deref'd (if applicable) tags into the list
-		for _, v := range tmap {
-			vlist = append(vlist, v)
-		}
-	case *vcs.BzrRepo:
-		var out []byte
-		// Update the local first
-		err = r.r.Update()
-		if err != nil {
-			return
-		}
-		// Upstream and cache must exist, so add that to exbits
-		exbits |= existsUpstream | existsInCache
-		// Also, local is definitely now synced
-		r.synced = true
-
-		// Now, list all the tags
-		out, err = r.r.RunFromDir("bzr", "tags", "--show-ids", "-v")
-		if err != nil {
-			return
-		}
-
-		all := bytes.Split(bytes.TrimSpace(out), []byte("\n"))
-		for _, line := range all {
-			idx := bytes.IndexByte(line, 32) // space
-			v := NewVersion(string(line[:idx])).Is(Revision(bytes.TrimSpace(line[idx:]))).(PairedVersion)
-			vlist = append(vlist, v)
-		}
-
-	case *vcs.HgRepo:
-		var out []byte
-		err = r.r.Update()
-		if err != nil {
-			return
-		}
-
-		// Upstream and cache must exist, so add that to exbits
-		exbits |= existsUpstream | existsInCache
-		// Also, local is definitely now synced
-		r.synced = true
-
-		out, err = r.r.RunFromDir("hg", "tags", "--debug", "--verbose")
-		if err != nil {
-			return
-		}
-
-		all := bytes.Split(bytes.TrimSpace(out), []byte("\n"))
-		lbyt := []byte("local")
-		nulrev := []byte("0000000000000000000000000000000000000000")
-		for _, line := range all {
-			if bytes.Equal(lbyt, line[len(line)-len(lbyt):]) {
-				// Skip local tags
-				continue
-			}
-
-			// tip is magic, don't include it
-			if bytes.HasPrefix(line, []byte("tip")) {
-				continue
-			}
-
-			// Split on colon; this gets us the rev and the tag plus local revno
-			pair := bytes.Split(line, []byte(":"))
-			if bytes.Equal(nulrev, pair[1]) {
-				// null rev indicates this tag is marked for deletion
-				continue
-			}
-
-			idx := bytes.IndexByte(pair[0], 32) // space
-			v := NewVersion(string(pair[0][:idx])).Is(Revision(pair[1])).(PairedVersion)
-			vlist = append(vlist, v)
-		}
-
-		out, err = r.r.RunFromDir("hg", "branches", "--debug", "--verbose")
-		if err != nil {
-			// better nothing than incomplete
-			vlist = nil
-			return
-		}
-
-		all = bytes.Split(bytes.TrimSpace(out), []byte("\n"))
-		lbyt = []byte("(inactive)")
-		for _, line := range all {
-			if bytes.Equal(lbyt, line[len(line)-len(lbyt):]) {
-				// Skip inactive branches
-				continue
-			}
-
-			// Split on colon; this gets us the rev and the branch plus local revno
-			pair := bytes.Split(line, []byte(":"))
-			idx := bytes.IndexByte(pair[0], 32) // space
-			v := NewBranch(string(pair[0][:idx])).Is(Revision(pair[1])).(PairedVersion)
-			vlist = append(vlist, v)
-		}
-	case *vcs.SvnRepo:
-		// TODO(sdboyer) is it ok to return empty vlist and no error?
-		// TODO(sdboyer) ...gotta do something for svn, right?
-	default:
-		panic("unknown repo type")
-	}
-
-	return
 }
 
 func (r *repo) exportVersionTo(v Version, to string) error {

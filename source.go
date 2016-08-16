@@ -167,46 +167,6 @@ func (dc *sourceMetaCache) toUnpaired(v Version) UnpairedVersion {
 	}
 }
 
-func (bs *baseVCSSource) listVersions() (vlist []Version, err error) {
-	if !bs.cvsync {
-		// This check only guarantees that the upstream exists, not the cache
-		bs.ex.s |= existsUpstream
-		vpairs, exbits, err := bs.crepo.getCurrentVersionPairs()
-		// But it *may* also check the local existence
-		bs.ex.s |= exbits
-		bs.ex.f |= exbits
-
-		if err != nil {
-			// TODO(sdboyer) More-er proper-er error
-			return nil, err
-		}
-
-		vlist = make([]Version, len(vpairs))
-		// mark our cache as synced if we got ExistsUpstream back
-		if exbits&existsUpstream == existsUpstream {
-			bs.cvsync = true
-		}
-
-		// Process the version data into the cache
-		// TODO(sdboyer) detect out-of-sync data as we do this?
-		for k, v := range vpairs {
-			u, r := v.Unpair(), v.Underlying()
-			bs.dc.vMap[u] = r
-			bs.dc.rMap[r] = append(bs.dc.rMap[r], u)
-			vlist[k] = v
-		}
-	} else {
-		vlist = make([]Version, len(bs.dc.vMap))
-		k := 0
-		for v := range bs.dc.vMap {
-			vlist[k] = v
-			k++
-		}
-	}
-
-	return
-}
-
 func (bs *baseVCSSource) revisionPresentIn(r Revision) (bool, error) {
 	// First and fastest path is to check the data cache to see if the rev is
 	// present. This could give us false positives, but the cases where that can
