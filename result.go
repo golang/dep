@@ -46,7 +46,7 @@ func CreateVendorTree(basedir string, l Lock, sm SourceManager, sv bool) error {
 			return err
 		}
 
-		err = sm.ExportProject(p.Ident().ProjectRoot, p.Version(), to)
+		err = sm.ExportProject(p.Ident(), p.Version(), to)
 		if err != nil {
 			removeAll(basedir)
 			return fmt.Errorf("Error while exporting %s: %s", p.Ident().ProjectRoot, err)

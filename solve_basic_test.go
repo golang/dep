@@ -1202,41 +1202,43 @@ func newdepspecSM(ds []depspec, ignore []string) *depspecSourceManager {
 	}
 }
 
-func (sm *depspecSourceManager) GetManifestAndLock(n ProjectRoot, v Version) (Manifest, Lock, error) {
+func (sm *depspecSourceManager) GetManifestAndLock(id ProjectIdentifier, v Version) (Manifest, Lock, error) {
 	for _, ds := range sm.specs {
-		if n == ds.n && v.Matches(ds.v) {
+		if id.ProjectRoot == ds.n && v.Matches(ds.v) {
 			return ds, dummyLock{}, nil
 		}
 	}
 
 	// TODO(sdboyer) proper solver-type errors
-	return nil, nil, fmt.Errorf("Project %s at version %s could not be found", n, v)
+	return nil, nil, fmt.Errorf("Project %s at version %s could not be found", id.errString(), v)
 }
 
 func (sm *depspecSourceManager) AnalyzerInfo() (string, *semver.Version) {
 	return "depspec-sm-builtin", sv("v1.0.0")
 }
 
-func (sm *depspecSourceManager) ExternalReach(n ProjectRoot, v Version) (map[string][]string, error) {
-	id := pident{n: n, v: v}
-	if m, exists := sm.rm[id]; exists {
+func (sm *depspecSourceManager) ExternalReach(id ProjectIdentifier, v Version) (map[string][]string, error) {
+	pid := pident{n: id.ProjectRoot, v: v}
+	if m, exists := sm.rm[pid]; exists {
 		return m, nil
 	}
-	return nil, fmt.Errorf("No reach data for %s at version %s", n, v)
+	return nil, fmt.Errorf("No reach data for %s at version %s", id.errString(), v)
 }
 
-func (sm *depspecSourceManager) ListExternal(n ProjectRoot, v Version) ([]string, error) {
+func (sm *depspecSourceManager) ListExternal(id ProjectIdentifier, v Version) ([]string, error) {
 	// This should only be called for the root
-	id := pident{n: n, v: v}
-	if r, exists := sm.rm[id]; exists {
-		return r[string(n)], nil
+	pid := pident{n: id.ProjectRoot, v: v}
+	if r, exists := sm.rm[pid]; exists {
+		return r[string(id.ProjectRoot)], nil
 	}
-	return nil, fmt.Errorf("No reach data for %s at version %s", n, v)
+	return nil, fmt.Errorf("No reach data for %s at version %s", id.errString(), v)
 }
 
-func (sm *depspecSourceManager) ListPackages(n ProjectRoot, v Version) (PackageTree, error) {
-	id := pident{n: n, v: v}
-	if r, exists := sm.rm[id]; exists {
+func (sm *depspecSourceManager) ListPackages(id ProjectIdentifier, v Version) (PackageTree, error) {
+	pid := pident{n: id.ProjectRoot, v: v}
+	n := id.ProjectRoot
+
+	if r, exists := sm.rm[pid]; exists {
 		ptree := PackageTree{
 			ImportRoot: string(n),
 			Packages: map[string]PackageOrErr{
@@ -1255,35 +1257,35 @@ func (sm *depspecSourceManager) ListPackages(n ProjectRoot, v Version) (PackageT
 	return PackageTree{}, fmt.Errorf("Project %s at version %s could not be found", n, v)
 }
 
-func (sm *depspecSourceManager) ListVersions(name ProjectRoot) (pi []Version, err error) {
+func (sm *depspecSourceManager) ListVersions(id ProjectIdentifier) (pi []Version, err error) {
 	for _, ds := range sm.specs {
 		// To simulate the behavior of the real SourceManager, we do not return
 		// revisions from ListVersions().
-		if _, isrev := ds.v.(Revision); !isrev && name == ds.n {
+		if _, isrev := ds.v.(Revision); !isrev && id.ProjectRoot == ds.n {
 			pi = append(pi, ds.v)
 		}
 	}
 
 	if len(pi) == 0 {
-		err = fmt.Errorf("Project %s could not be found", name)
+		err = fmt.Errorf("Project %s could not be found", id.errString())
 	}
 
 	return
 }
 
-func (sm *depspecSourceManager) RevisionPresentIn(name ProjectRoot, r Revision) (bool, error) {
+func (sm *depspecSourceManager) RevisionPresentIn(id ProjectIdentifier, r Revision) (bool, error) {
 	for _, ds := range sm.specs {
-		if name == ds.n && r == ds.v {
+		if id.ProjectRoot == ds.n && r == ds.v {
 			return true, nil
 		}
 	}
 
-	return false, fmt.Errorf("Project %s has no revision %s", name, r)
+	return false, fmt.Errorf("Project %s has no revision %s", id.errString(), r)
 }
 
-func (sm *depspecSourceManager) RepoExists(name ProjectRoot) (bool, error) {
+func (sm *depspecSourceManager) SourceExists(id ProjectIdentifier) (bool, error) {
 	for _, ds := range sm.specs {
-		if name == ds.n {
+		if id.ProjectRoot == ds.n {
 			return true, nil
 		}
 	}
@@ -1291,14 +1293,24 @@ func (sm *depspecSourceManager) RepoExists(name ProjectRoot) (bool, error) {
 	return false, nil
 }
 
-func (sm *depspecSourceManager) VendorCodeExists(name ProjectRoot) (bool, error) {
+func (sm *depspecSourceManager) VendorCodeExists(id ProjectIdentifier) (bool, error) {
 	return false, nil
 }
 
 func (sm *depspecSourceManager) Release() {}
 
-func (sm *depspecSourceManager) ExportProject(n ProjectRoot, v Version, to string) error {
+func (sm *depspecSourceManager) ExportProject(id ProjectIdentifier, v Version, to string) error {
 	return fmt.Errorf("dummy sm doesn't support exporting")
+}
+
+func (sm *depspecSourceManager) DeduceProjectRoot(ip string) (ProjectRoot, error) {
+	for _, ds := range sm.allSpecs() {
+		n := string(ds.n)
+		if ip == n || strings.HasPrefix(ip, n+"/") {
+			return ProjectRoot(n), nil
+		}
+	}
+	return "", fmt.Errorf("Could not find %s, or any parent, in list of known fixtures", ip)
 }
 
 func (sm *depspecSourceManager) rootSpec() depspec {
@@ -1324,7 +1336,7 @@ func (b *depspecBridge) computeRootReach() ([]string, error) {
 	dsm := b.sm.(fixSM)
 	root := dsm.rootSpec()
 
-	ptree, err := dsm.ListPackages(root.n, nil)
+	ptree, err := dsm.ListPackages(mkPI(string(root.n)), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -1342,23 +1354,8 @@ func (b *depspecBridge) verifyRootDir(path string) error {
 	return nil
 }
 
-func (b *depspecBridge) listPackages(id ProjectIdentifier, v Version) (PackageTree, error) {
-	return b.sm.(fixSM).ListPackages(b.key(id), v)
-}
-
-// override deduceRemoteRepo on bridge to make all our pkg/project mappings work
-// as expected
-func (b *depspecBridge) deduceRemoteRepo(path string) (*remoteRepo, error) {
-	for _, ds := range b.sm.(fixSM).allSpecs() {
-		n := string(ds.n)
-		if path == n || strings.HasPrefix(path, n+"/") {
-			return &remoteRepo{
-				Base:   n,
-				RelPkg: strings.TrimPrefix(path, n+"/"),
-			}, nil
-		}
-	}
-	return nil, fmt.Errorf("Could not find %s, or any parent, in list of known fixtures", path)
+func (b *depspecBridge) ListPackages(id ProjectIdentifier, v Version) (PackageTree, error) {
+	return b.sm.(fixSM).ListPackages(id, v)
 }
 
 // enforce interfaces

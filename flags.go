@@ -1,7 +1,7 @@
 package gps
 
-// projectExistence values represent the extent to which a project "exists."
-type projectExistence uint8
+// sourceExistence values represent the extent to which a project "exists."
+type sourceExistence uint8
 
 const (
 	// ExistsInVendorRoot indicates that a project exists in a vendor directory
@@ -19,7 +19,7 @@ const (
 	//
 	// In short, the information encoded in this flag should not be construed as
 	// exhaustive.
-	existsInVendorRoot projectExistence = 1 << iota
+	existsInVendorRoot sourceExistence = 1 << iota
 
 	// ExistsInCache indicates that a project exists on-disk in the local cache.
 	// It does not guarantee that an upstream exists, thus it cannot imply

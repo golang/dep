@@ -5,8 +5,10 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"path/filepath"
 	"runtime"
 	"sort"
+	"sync"
 	"testing"
 
 	"github.com/Masterminds/semver"
@@ -34,6 +36,28 @@ func sv(s string) *semver.Version {
 	}
 
 	return sv
+}
+
+func mkNaiveSM(t *testing.T) (*SourceMgr, func()) {
+	cpath, err := ioutil.TempDir("", "smcache")
+	if err != nil {
+		t.Errorf("Failed to create temp dir: %s", err)
+		t.FailNow()
+	}
+
+	sm, err := NewSourceManager(naiveAnalyzer{}, cpath, false)
+	if err != nil {
+		t.Errorf("Unexpected error on SourceManager creation: %s", err)
+		t.FailNow()
+	}
+
+	return sm, func() {
+		sm.Release()
+		err := removeAll(cpath)
+		if err != nil {
+			t.Errorf("removeAll failed: %s", err)
+		}
+	}
 }
 
 func init() {
@@ -83,23 +107,25 @@ func TestProjectManagerInit(t *testing.T) {
 	cpath, err := ioutil.TempDir("", "smcache")
 	if err != nil {
 		t.Errorf("Failed to create temp dir: %s", err)
+		t.FailNow()
 	}
-	sm, err := NewSourceManager(naiveAnalyzer{}, cpath, false)
 
+	sm, err := NewSourceManager(naiveAnalyzer{}, cpath, false)
 	if err != nil {
 		t.Errorf("Unexpected error on SourceManager creation: %s", err)
 		t.FailNow()
 	}
+
 	defer func() {
+		sm.Release()
 		err := removeAll(cpath)
 		if err != nil {
 			t.Errorf("removeAll failed: %s", err)
 		}
 	}()
-	defer sm.Release()
 
-	pn := ProjectRoot("github.com/Masterminds/VCSTestRepo")
-	v, err := sm.ListVersions(pn)
+	id := mkPI("github.com/Masterminds/VCSTestRepo")
+	v, err := sm.ListVersions(id)
 	if err != nil {
 		t.Errorf("Unexpected error during initial project setup/fetching %s", err)
 	}
@@ -126,15 +152,15 @@ func TestProjectManagerInit(t *testing.T) {
 	}
 
 	// Two birds, one stone - make sure the internal ProjectManager vlist cache
-	// works by asking for the versions again, and do it through smcache to
-	// ensure its sorting works, as well.
+	// works (or at least doesn't not work) by asking for the versions again,
+	// and do it through smcache to ensure its sorting works, as well.
 	smc := &bridge{
 		sm:     sm,
-		vlists: make(map[ProjectRoot][]Version),
+		vlists: make(map[ProjectIdentifier][]Version),
 		s:      &solver{},
 	}
 
-	v, err = smc.listVersions(ProjectIdentifier{ProjectRoot: pn})
+	v, err = smc.ListVersions(id)
 	if err != nil {
 		t.Errorf("Unexpected error during initial project setup/fetching %s", err)
 	}
@@ -156,149 +182,96 @@ func TestProjectManagerInit(t *testing.T) {
 		}
 	}
 
+	// use ListPackages to ensure the repo is actually on disk
+	// TODO(sdboyer) ugh, maybe we do need an explicit prefetch method
+	smc.ListPackages(id, NewVersion("1.0.0"))
+
 	// Ensure that the appropriate cache dirs and files exist
-	_, err = os.Stat(path.Join(cpath, "src", "github.com", "Masterminds", "VCSTestRepo", ".git"))
+	_, err = os.Stat(filepath.Join(cpath, "sources", "https---github.com-Masterminds-VCSTestRepo", ".git"))
 	if err != nil {
 		t.Error("Cache repo does not exist in expected location")
 	}
 
-	_, err = os.Stat(path.Join(cpath, "metadata", "github.com", "Masterminds", "VCSTestRepo", "cache.json"))
+	_, err = os.Stat(filepath.Join(cpath, "metadata", "github.com", "Masterminds", "VCSTestRepo", "cache.json"))
 	if err != nil {
-		// TODO(sdboyer) temporarily disabled until we turn caching back on
+		// TODO(sdboyer) disabled until we get caching working
 		//t.Error("Metadata cache json file does not exist in expected location")
 	}
 
-	// Ensure project existence values are what we expect
+	// Ensure source existence values are what we expect
 	var exists bool
-	exists, err = sm.RepoExists(pn)
+	exists, err = sm.SourceExists(id)
 	if err != nil {
-		t.Errorf("Error on checking RepoExists: %s", err)
+		t.Errorf("Error on checking SourceExists: %s", err)
 	}
 	if !exists {
-		t.Error("Repo should exist after non-erroring call to ListVersions")
-	}
-
-	// Now reach inside the black box
-	pms, err := sm.getProjectManager(pn)
-	if err != nil {
-		t.Errorf("Error on grabbing project manager obj: %s", err)
-	}
-
-	// Check upstream existence flag
-	if !pms.pm.CheckExistence(existsUpstream) {
-		t.Errorf("ExistsUpstream flag not being correctly set the project")
+		t.Error("Source should exist after non-erroring call to ListVersions")
 	}
 }
 
-func TestRepoVersionFetching(t *testing.T) {
-	// This test is quite slow, skip it on -short
+func TestGetSources(t *testing.T) {
+	// This test is a tad slow, skip it on -short
 	if testing.Short() {
-		t.Skip("Skipping repo version fetching test in short mode")
+		t.Skip("Skipping source setup test in short mode")
 	}
 
-	cpath, err := ioutil.TempDir("", "smcache")
-	if err != nil {
-		t.Errorf("Failed to create temp dir: %s", err)
+	sm, clean := mkNaiveSM(t)
+
+	pil := []ProjectIdentifier{
+		mkPI("github.com/Masterminds/VCSTestRepo"),
+		mkPI("bitbucket.org/mattfarina/testhgrepo"),
+		mkPI("launchpad.net/govcstestbzrrepo"),
 	}
 
-	sm, err := NewSourceManager(naiveAnalyzer{}, cpath, false)
-	if err != nil {
-		t.Errorf("Unexpected error on SourceManager creation: %s", err)
-		t.FailNow()
+	wg := &sync.WaitGroup{}
+	wg.Add(3)
+	for _, pi := range pil {
+		go func(lpi ProjectIdentifier) {
+			nn := lpi.netName()
+			src, err := sm.getSourceFor(lpi)
+			if err != nil {
+				t.Errorf("(src %q) unexpected error setting up source: %s", nn, err)
+				return
+			}
+
+			// Re-get the same, make sure they are the same
+			src2, err := sm.getSourceFor(lpi)
+			if err != nil {
+				t.Errorf("(src %q) unexpected error re-getting source: %s", nn, err)
+			} else if src != src2 {
+				t.Errorf("(src %q) first and second sources are not eq", nn)
+			}
+
+			// All of them _should_ select https, so this should work
+			lpi.NetworkName = "https://" + lpi.NetworkName
+			src3, err := sm.getSourceFor(lpi)
+			if err != nil {
+				t.Errorf("(src %q) unexpected error getting explicit https source: %s", nn, err)
+			} else if src != src3 {
+				t.Errorf("(src %q) explicit https source should reuse autodetected https source", nn)
+			}
+
+			// Now put in http, and they should differ
+			lpi.NetworkName = "http://" + string(lpi.ProjectRoot)
+			src4, err := sm.getSourceFor(lpi)
+			if err != nil {
+				t.Errorf("(src %q) unexpected error getting explicit http source: %s", nn, err)
+			} else if src == src4 {
+				t.Errorf("(src %q) explicit http source should create a new src", nn)
+			}
+
+			wg.Done()
+		}(pi)
 	}
 
-	upstreams := []ProjectRoot{
-		"github.com/Masterminds/VCSTestRepo",
-		"bitbucket.org/mattfarina/testhgrepo",
-		"launchpad.net/govcstestbzrrepo",
-	}
+	wg.Wait()
 
-	pms := make([]*projectManager, len(upstreams))
-	for k, u := range upstreams {
-		pmi, err := sm.getProjectManager(u)
-		if err != nil {
-			sm.Release()
-			removeAll(cpath)
-			t.Errorf("Unexpected error on ProjectManager creation: %s", err)
-			t.FailNow()
-		}
-		pms[k] = pmi.pm
+	// nine entries (of which three are dupes): for each vcs, raw import path,
+	// the https url, and the http url
+	if len(sm.srcs) != 9 {
+		t.Errorf("Should have nine discrete entries in the srcs map, got %v", len(sm.srcs))
 	}
-
-	defer func() {
-		err := removeAll(cpath)
-		if err != nil {
-			t.Errorf("removeAll failed: %s", err)
-		}
-	}()
-	defer sm.Release()
-
-	// test git first
-	vlist, exbits, err := pms[0].crepo.getCurrentVersionPairs()
-	if err != nil {
-		t.Errorf("Unexpected error getting version pairs from git repo: %s", err)
-	}
-	if exbits != existsUpstream {
-		t.Errorf("git pair fetch should only set upstream existence bits, but got %v", exbits)
-	}
-	if len(vlist) != 3 {
-		t.Errorf("git test repo should've produced three versions, got %v", len(vlist))
-	} else {
-		v := NewBranch("master").Is(Revision("30605f6ac35fcb075ad0bfa9296f90a7d891523e"))
-		if vlist[0] != v {
-			t.Errorf("git pair fetch reported incorrect first version, got %s", vlist[0])
-		}
-
-		v = NewBranch("test").Is(Revision("30605f6ac35fcb075ad0bfa9296f90a7d891523e"))
-		if vlist[1] != v {
-			t.Errorf("git pair fetch reported incorrect second version, got %s", vlist[1])
-		}
-
-		v = NewVersion("1.0.0").Is(Revision("30605f6ac35fcb075ad0bfa9296f90a7d891523e"))
-		if vlist[2] != v {
-			t.Errorf("git pair fetch reported incorrect third version, got %s", vlist[2])
-		}
-	}
-
-	// now hg
-	vlist, exbits, err = pms[1].crepo.getCurrentVersionPairs()
-	if err != nil {
-		t.Errorf("Unexpected error getting version pairs from hg repo: %s", err)
-	}
-	if exbits != existsUpstream|existsInCache {
-		t.Errorf("hg pair fetch should set upstream and cache existence bits, but got %v", exbits)
-	}
-	if len(vlist) != 2 {
-		t.Errorf("hg test repo should've produced two versions, got %v", len(vlist))
-	} else {
-		v := NewVersion("1.0.0").Is(Revision("d680e82228d206935ab2eaa88612587abe68db07"))
-		if vlist[0] != v {
-			t.Errorf("hg pair fetch reported incorrect first version, got %s", vlist[0])
-		}
-
-		v = NewBranch("test").Is(Revision("6c44ee3fe5d87763616c19bf7dbcadb24ff5a5ce"))
-		if vlist[1] != v {
-			t.Errorf("hg pair fetch reported incorrect second version, got %s", vlist[1])
-		}
-	}
-
-	// bzr last
-	vlist, exbits, err = pms[2].crepo.getCurrentVersionPairs()
-	if err != nil {
-		t.Errorf("Unexpected error getting version pairs from bzr repo: %s", err)
-	}
-	if exbits != existsUpstream|existsInCache {
-		t.Errorf("bzr pair fetch should set upstream and cache existence bits, but got %v", exbits)
-	}
-	if len(vlist) != 1 {
-		t.Errorf("bzr test repo should've produced one version, got %v", len(vlist))
-	} else {
-		v := NewVersion("1.0.0").Is(Revision("matt@mattfarina.com-20150731135137-pbphasfppmygpl68"))
-		if vlist[0] != v {
-			t.Errorf("bzr pair fetch reported incorrect first version, got %s", vlist[0])
-		}
-	}
-	// no svn for now, because...svn
+	clean()
 }
 
 // Regression test for #32
@@ -308,39 +281,175 @@ func TestGetInfoListVersionsOrdering(t *testing.T) {
 		t.Skip("Skipping slow test in short mode")
 	}
 
-	cpath, err := ioutil.TempDir("", "smcache")
-	if err != nil {
-		t.Errorf("Failed to create temp dir: %s", err)
-	}
-	sm, err := NewSourceManager(naiveAnalyzer{}, cpath, false)
-
-	if err != nil {
-		t.Errorf("Unexpected error on SourceManager creation: %s", err)
-		t.FailNow()
-	}
-	defer func() {
-		err := removeAll(cpath)
-		if err != nil {
-			t.Errorf("removeAll failed: %s", err)
-		}
-	}()
-	defer sm.Release()
+	sm, clean := mkNaiveSM(t)
+	defer clean()
 
 	// setup done, now do the test
 
-	pn := ProjectRoot("github.com/Masterminds/VCSTestRepo")
+	id := mkPI("github.com/Masterminds/VCSTestRepo")
 
-	_, _, err = sm.GetManifestAndLock(pn, NewVersion("1.0.0"))
+	_, _, err := sm.GetManifestAndLock(id, NewVersion("1.0.0"))
 	if err != nil {
 		t.Errorf("Unexpected error from GetInfoAt %s", err)
 	}
 
-	v, err := sm.ListVersions(pn)
+	v, err := sm.ListVersions(id)
 	if err != nil {
 		t.Errorf("Unexpected error from ListVersions %s", err)
 	}
 
 	if len(v) != 3 {
 		t.Errorf("Expected three results from ListVersions, got %v", len(v))
+	}
+}
+
+func TestDeduceProjectRoot(t *testing.T) {
+	sm, clean := mkNaiveSM(t)
+	defer clean()
+
+	in := "github.com/sdboyer/gps"
+	pr, err := sm.DeduceProjectRoot(in)
+	if err != nil {
+		t.Errorf("Problem while detecting root of %q %s", in, err)
+	}
+	if string(pr) != in {
+		t.Errorf("Wrong project root was deduced;\n\t(GOT) %s\n\t(WNT) %s", pr, in)
+	}
+	if sm.rootxt.Len() != 1 {
+		t.Errorf("Root path trie should have one element after one deduction, has %v", sm.rootxt.Len())
+	}
+
+	pr, err = sm.DeduceProjectRoot(in)
+	if err != nil {
+		t.Errorf("Problem while detecting root of %q %s", in, err)
+	} else if string(pr) != in {
+		t.Errorf("Wrong project root was deduced;\n\t(GOT) %s\n\t(WNT) %s", pr, in)
+	}
+	if sm.rootxt.Len() != 1 {
+		t.Errorf("Root path trie should still have one element after performing the same deduction twice; has %v", sm.rootxt.Len())
+	}
+
+	// Now do a subpath
+	sub := path.Join(in, "foo")
+	pr, err = sm.DeduceProjectRoot(sub)
+	if err != nil {
+		t.Errorf("Problem while detecting root of %q %s", sub, err)
+	} else if string(pr) != in {
+		t.Errorf("Wrong project root was deduced;\n\t(GOT) %s\n\t(WNT) %s", pr, in)
+	}
+	if sm.rootxt.Len() != 2 {
+		t.Errorf("Root path trie should have two elements, one for root and one for subpath; has %v", sm.rootxt.Len())
+	}
+
+	// Now do a fully different root, but still on github
+	in2 := "github.com/bagel/lox"
+	sub2 := path.Join(in2, "cheese")
+	pr, err = sm.DeduceProjectRoot(sub2)
+	if err != nil {
+		t.Errorf("Problem while detecting root of %q %s", sub2, err)
+	} else if string(pr) != in2 {
+		t.Errorf("Wrong project root was deduced;\n\t(GOT) %s\n\t(WNT) %s", pr, in)
+	}
+	if sm.rootxt.Len() != 4 {
+		t.Errorf("Root path trie should have four elements, one for each unique root and subpath; has %v", sm.rootxt.Len())
+	}
+
+	// Ensure that our prefixes are bounded by path separators
+	in4 := "github.com/bagel/loxx"
+	pr, err = sm.DeduceProjectRoot(in4)
+	if err != nil {
+		t.Errorf("Problem while detecting root of %q %s", in4, err)
+	} else if string(pr) != in4 {
+		t.Errorf("Wrong project root was deduced;\n\t(GOT) %s\n\t(WNT) %s", pr, in)
+	}
+	if sm.rootxt.Len() != 5 {
+		t.Errorf("Root path trie should have five elements, one for each unique root and subpath; has %v", sm.rootxt.Len())
+	}
+
+	// Ensure that vcs extension-based matching comes through
+	in5 := "ffffrrrraaaaaapppppdoesnotresolve.com/baz.git"
+	pr, err = sm.DeduceProjectRoot(in5)
+	if err != nil {
+		t.Errorf("Problem while detecting root of %q %s", in5, err)
+	} else if string(pr) != in5 {
+		t.Errorf("Wrong project root was deduced;\n\t(GOT) %s\n\t(WNT) %s", pr, in)
+	}
+	if sm.rootxt.Len() != 6 {
+		t.Errorf("Root path trie should have six elements, one for each unique root and subpath; has %v", sm.rootxt.Len())
+	}
+}
+
+// Test that the future returned from SourceMgr.deducePathAndProcess() is safe
+// to call concurrently.
+//
+// Obviously, this is just a heuristic; passage does not guarantee correctness
+// (though failure does guarantee incorrectness)
+func TestMultiDeduceThreadsafe(t *testing.T) {
+	sm, clean := mkNaiveSM(t)
+	defer clean()
+
+	in := "github.com/sdboyer/gps"
+	rootf, srcf, err := sm.deducePathAndProcess(in)
+	if err != nil {
+		t.Errorf("Known-good path %q had unexpected basic deduction error: %s", in, err)
+		t.FailNow()
+	}
+
+	cnum := 50
+	wg := &sync.WaitGroup{}
+
+	// Set up channel for everything else to block on
+	c := make(chan struct{}, 1)
+	f := func(rnum int) {
+		defer func() {
+			wg.Done()
+			if e := recover(); e != nil {
+				t.Errorf("goroutine number %v panicked with err: %s", rnum, e)
+			}
+		}()
+		<-c
+		_, err := rootf()
+		if err != nil {
+			t.Errorf("err was non-nil on root detection in goroutine number %v: %s", rnum, err)
+		}
+	}
+
+	for k := range make([]struct{}, cnum) {
+		wg.Add(1)
+		go f(k)
+		runtime.Gosched()
+	}
+	close(c)
+	wg.Wait()
+	if sm.rootxt.Len() != 1 {
+		t.Errorf("Root path trie should have just one element; has %v", sm.rootxt.Len())
+	}
+
+	// repeat for srcf
+	wg2 := &sync.WaitGroup{}
+	c = make(chan struct{}, 1)
+	f = func(rnum int) {
+		defer func() {
+			wg2.Done()
+			if e := recover(); e != nil {
+				t.Errorf("goroutine number %v panicked with err: %s", rnum, e)
+			}
+		}()
+		<-c
+		_, _, err := srcf()
+		if err != nil {
+			t.Errorf("err was non-nil on root detection in goroutine number %v: %s", rnum, err)
+		}
+	}
+
+	for k := range make([]struct{}, cnum) {
+		wg2.Add(1)
+		go f(k)
+		runtime.Gosched()
+	}
+	close(c)
+	wg2.Wait()
+	if len(sm.srcs) != 2 {
+		t.Errorf("Sources map should have just two elements, but has %v", len(sm.srcs))
 	}
 }

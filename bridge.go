@@ -12,32 +12,19 @@ import (
 // sourceBridges provide an adapter to SourceManagers that tailor operations
 // for a single solve run.
 type sourceBridge interface {
-	getManifestAndLock(pa atom) (Manifest, Lock, error)
-	listVersions(id ProjectIdentifier) ([]Version, error)
-	listPackages(id ProjectIdentifier, v Version) (PackageTree, error)
+	SourceManager // composes SourceManager
+	verifyRootDir(path string) error
 	computeRootReach() ([]string, error)
-	revisionPresentIn(id ProjectIdentifier, r Revision) (bool, error)
 	pairRevision(id ProjectIdentifier, r Revision) []Version
 	pairVersion(id ProjectIdentifier, v UnpairedVersion) PairedVersion
-	repoExists(id ProjectIdentifier) (bool, error)
 	vendorCodeExists(id ProjectIdentifier) (bool, error)
 	matches(id ProjectIdentifier, c Constraint, v Version) bool
 	matchesAny(id ProjectIdentifier, c1, c2 Constraint) bool
 	intersect(id ProjectIdentifier, c1, c2 Constraint) Constraint
-	verifyRootDir(path string) error
-	analyzerInfo() (string, *semver.Version)
-	deduceRemoteRepo(path string) (*remoteRepo, error)
 }
 
 // bridge is an adapter around a proper SourceManager. It provides localized
 // caching that's tailored to the requirements of a particular solve run.
-//
-// It also performs transformations between ProjectIdentifiers, which is what
-// the solver primarily deals in, and ProjectRoot, which is what the
-// SourceManager primarily deals in. This separation is helpful because it keeps
-// the complexities of deciding what a particular name "means" entirely within
-// the solver, while the SourceManager can traffic exclusively in
-// globally-unique network names.
 //
 // Finally, it provides authoritative version/constraint operations, ensuring
 // that any possible approach to a match - even those not literally encoded in
@@ -63,7 +50,7 @@ type bridge struct {
 	// layered on top of the proper SourceManager's cache; the only difference
 	// is that this keeps the versions sorted in the direction required by the
 	// current solve run
-	vlists map[ProjectRoot][]Version
+	vlists map[ProjectIdentifier][]Version
 }
 
 // Global factory func to create a bridge. This exists solely to allow tests to
@@ -72,38 +59,27 @@ var mkBridge func(*solver, SourceManager) sourceBridge = func(s *solver, sm Sour
 	return &bridge{
 		sm:     sm,
 		s:      s,
-		vlists: make(map[ProjectRoot][]Version),
+		vlists: make(map[ProjectIdentifier][]Version),
 	}
 }
 
-func (b *bridge) getManifestAndLock(pa atom) (Manifest, Lock, error) {
-	if pa.id.ProjectRoot == b.s.params.ImportRoot {
+func (b *bridge) GetManifestAndLock(id ProjectIdentifier, v Version) (Manifest, Lock, error) {
+	if id.ProjectRoot == b.s.params.ImportRoot {
 		return b.s.rm, b.s.rl, nil
 	}
-	return b.sm.GetManifestAndLock(ProjectRoot(pa.id.netName()), pa.v)
+	return b.sm.GetManifestAndLock(id, v)
 }
 
-func (b *bridge) analyzerInfo() (string, *semver.Version) {
+func (b *bridge) AnalyzerInfo() (string, *semver.Version) {
 	return b.sm.AnalyzerInfo()
 }
 
-func (b *bridge) key(id ProjectIdentifier) ProjectRoot {
-	k := ProjectRoot(id.NetworkName)
-	if k == "" {
-		k = id.ProjectRoot
-	}
-
-	return k
-}
-
-func (b *bridge) listVersions(id ProjectIdentifier) ([]Version, error) {
-	k := b.key(id)
-
-	if vl, exists := b.vlists[k]; exists {
+func (b *bridge) ListVersions(id ProjectIdentifier) ([]Version, error) {
+	if vl, exists := b.vlists[id]; exists {
 		return vl, nil
 	}
 
-	vl, err := b.sm.ListVersions(k)
+	vl, err := b.sm.ListVersions(id)
 	// TODO(sdboyer) cache errors, too?
 	if err != nil {
 		return nil, err
@@ -115,18 +91,16 @@ func (b *bridge) listVersions(id ProjectIdentifier) ([]Version, error) {
 		sort.Sort(upgradeVersionSorter(vl))
 	}
 
-	b.vlists[k] = vl
+	b.vlists[id] = vl
 	return vl, nil
 }
 
-func (b *bridge) revisionPresentIn(id ProjectIdentifier, r Revision) (bool, error) {
-	k := b.key(id)
-	return b.sm.RevisionPresentIn(k, r)
+func (b *bridge) RevisionPresentIn(id ProjectIdentifier, r Revision) (bool, error) {
+	return b.sm.RevisionPresentIn(id, r)
 }
 
-func (b *bridge) repoExists(id ProjectIdentifier) (bool, error) {
-	k := b.key(id)
-	return b.sm.RepoExists(k)
+func (b *bridge) SourceExists(id ProjectIdentifier) (bool, error) {
+	return b.sm.SourceExists(id)
 }
 
 func (b *bridge) vendorCodeExists(id ProjectIdentifier) (bool, error) {
@@ -141,7 +115,7 @@ func (b *bridge) vendorCodeExists(id ProjectIdentifier) (bool, error) {
 }
 
 func (b *bridge) pairVersion(id ProjectIdentifier, v UnpairedVersion) PairedVersion {
-	vl, err := b.listVersions(id)
+	vl, err := b.ListVersions(id)
 	if err != nil {
 		return nil
 	}
@@ -159,7 +133,7 @@ func (b *bridge) pairVersion(id ProjectIdentifier, v UnpairedVersion) PairedVers
 }
 
 func (b *bridge) pairRevision(id ProjectIdentifier, r Revision) []Version {
-	vl, err := b.listVersions(id)
+	vl, err := b.ListVersions(id)
 	if err != nil {
 		return nil
 	}
@@ -409,14 +383,17 @@ func (b *bridge) listRootPackages() (PackageTree, error) {
 //
 // The root project is handled separately, as the source manager isn't
 // responsible for that code.
-func (b *bridge) listPackages(id ProjectIdentifier, v Version) (PackageTree, error) {
+func (b *bridge) ListPackages(id ProjectIdentifier, v Version) (PackageTree, error) {
 	if id.ProjectRoot == b.s.params.ImportRoot {
 		return b.listRootPackages()
 	}
 
-	// FIXME if we're aliasing here, the returned PackageTree will have
-	// unaliased import paths, which is super not correct
-	return b.sm.ListPackages(b.key(id), v)
+	return b.sm.ListPackages(id, v)
+}
+
+func (b *bridge) ExportProject(id ProjectIdentifier, v Version, path string) error {
+	//return b.sm.ExportProject(id, v, path)
+	panic("bridge should never be used to ExportProject")
 }
 
 // verifyRoot ensures that the provided path to the project root is in good
@@ -432,10 +409,8 @@ func (b *bridge) verifyRootDir(path string) error {
 	return nil
 }
 
-// deduceRemoteRepo deduces certain network-oriented properties about an import
-// path.
-func (b *bridge) deduceRemoteRepo(path string) (*remoteRepo, error) {
-	return deduceRemoteRepo(path)
+func (b *bridge) DeduceProjectRoot(ip string) (ProjectRoot, error) {
+	return b.sm.DeduceProjectRoot(ip)
 }
 
 // versionTypeUnion represents a set of versions that are, within the scope of

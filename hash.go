@@ -20,7 +20,7 @@ func (s *solver) HashInputs() ([]byte, error) {
 	// Do these checks up front before any other work is needed, as they're the
 	// only things that can cause errors
 	// Pass in magic root values, and the bridge will analyze the right thing
-	ptree, err := s.b.listPackages(ProjectIdentifier{ProjectRoot: s.params.ImportRoot}, nil)
+	ptree, err := s.b.ListPackages(ProjectIdentifier{ProjectRoot: s.params.ImportRoot}, nil)
 	if err != nil {
 		return nil, badOptsFailure(fmt.Sprintf("Error while parsing packages under %s: %s", s.params.RootDir, err.Error()))
 	}
@@ -93,7 +93,7 @@ func (s *solver) HashInputs() ([]byte, error) {
 		}
 	}
 
-	an, av := s.b.analyzerInfo()
+	an, av := s.b.AnalyzerInfo()
 	h.Write([]byte(an))
 	h.Write([]byte(av.String()))
 
