@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-func TestGitVersionFetching(t *testing.T) {
+func TestGitSourceInteractions(t *testing.T) {
 	// This test is slowish, skip it on -short
 	if testing.Short() {
 		t.Skip("Skipping git source version fetching test in short mode")
@@ -73,6 +73,14 @@ func TestGitVersionFetching(t *testing.T) {
 		t.Errorf("gitSource.listVersions() should not have set the cache existence bit for found")
 	}
 
+	// check that an expected rev is present
+	is, err := src.revisionPresentIn(Revision("30605f6ac35fcb075ad0bfa9296f90a7d891523e"))
+	if err != nil {
+		t.Errorf("Unexpected error while checking revision presence: %s", err)
+	} else if !is {
+		t.Errorf("Revision that should exist was not present")
+	}
+
 	if len(vlist) != 3 {
 		t.Errorf("git test repo should've produced three versions, got %v: vlist was %s", len(vlist), vlist)
 	} else {
@@ -86,9 +94,17 @@ func TestGitVersionFetching(t *testing.T) {
 			t.Errorf("Version list was not what we expected:\n\t(GOT): %s\n\t(WNT): %s", vlist, evl)
 		}
 	}
+
+	// recheck that rev is present, this time interacting with cache differently
+	is, err = src.revisionPresentIn(Revision("30605f6ac35fcb075ad0bfa9296f90a7d891523e"))
+	if err != nil {
+		t.Errorf("Unexpected error while re-checking revision presence: %s", err)
+	} else if !is {
+		t.Errorf("Revision that should exist was not present on re-check")
+	}
 }
 
-func TestBzrVersionFetching(t *testing.T) {
+func TestBzrSourceInteractions(t *testing.T) {
 	// This test is quite slow (ugh bzr), so skip it on -short
 	if testing.Short() {
 		t.Skip("Skipping bzr source version fetching test in short mode")
@@ -133,6 +149,14 @@ func TestBzrVersionFetching(t *testing.T) {
 		t.Errorf("Expected %s as source ident, got %s", un, ident)
 	}
 
+	// check that an expected rev is present
+	is, err := src.revisionPresentIn(Revision("matt@mattfarina.com-20150731135137-pbphasfppmygpl68"))
+	if err != nil {
+		t.Errorf("Unexpected error while checking revision presence: %s", err)
+	} else if !is {
+		t.Errorf("Revision that should exist was not present")
+	}
+
 	vlist, err := src.listVersions()
 	if err != nil {
 		t.Errorf("Unexpected error getting version pairs from bzr repo: %s", err)
@@ -175,9 +199,17 @@ func TestBzrVersionFetching(t *testing.T) {
 			t.Errorf("bzr pair fetch reported incorrect first version, got %s", vlist[0])
 		}
 	}
+
+	// recheck that rev is present, this time interacting with cache differently
+	is, err = src.revisionPresentIn(Revision("matt@mattfarina.com-20150731135137-pbphasfppmygpl68"))
+	if err != nil {
+		t.Errorf("Unexpected error while re-checking revision presence: %s", err)
+	} else if !is {
+		t.Errorf("Revision that should exist was not present on re-check")
+	}
 }
 
-func TestHgVersionFetching(t *testing.T) {
+func TestHgSourceInteractions(t *testing.T) {
 	// This test is slow, so skip it on -short
 	if testing.Short() {
 		t.Skip("Skipping hg source version fetching test in short mode")
@@ -220,6 +252,14 @@ func TestHgVersionFetching(t *testing.T) {
 	}
 	if ident != un {
 		t.Errorf("Expected %s as source ident, got %s", un, ident)
+	}
+
+	// check that an expected rev is present
+	is, err := src.revisionPresentIn(Revision("d680e82228d206935ab2eaa88612587abe68db07"))
+	if err != nil {
+		t.Errorf("Unexpected error while checking revision presence: %s", err)
+	} else if !is {
+		t.Errorf("Revision that should exist was not present")
 	}
 
 	vlist, err := src.listVersions()
@@ -267,5 +307,13 @@ func TestHgVersionFetching(t *testing.T) {
 		if !reflect.DeepEqual(vlist, evl) {
 			t.Errorf("Version list was not what we expected:\n\t(GOT): %s\n\t(WNT): %s", vlist, evl)
 		}
+	}
+
+	// recheck that rev is present, this time interacting with cache differently
+	is, err = src.revisionPresentIn(Revision("d680e82228d206935ab2eaa88612587abe68db07"))
+	if err != nil {
+		t.Errorf("Unexpected error while re-checking revision presence: %s", err)
+	} else if !is {
+		t.Errorf("Revision that should exist was not present on re-check")
 	}
 }
