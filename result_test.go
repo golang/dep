@@ -51,7 +51,7 @@ func TestResultCreateVendorTree(t *testing.T) {
 	sm, clean := mkNaiveSM(t)
 	defer clean()
 
-	err := CreateVendorTree(path.Join(tmp, "export"), r, sm, true)
+	err := WriteDepTree(path.Join(tmp, "export"), r, sm, true)
 	if err != nil {
 		t.Errorf("Unexpected error while creating vendor tree: %s", err)
 	}
@@ -91,7 +91,7 @@ func BenchmarkCreateVendorTree(b *testing.B) {
 			// ease manual inspection
 			os.RemoveAll(exp)
 			b.StartTimer()
-			err = CreateVendorTree(exp, r, sm, true)
+			err = WriteDepTree(exp, r, sm, true)
 			b.StopTimer()
 			if err != nil {
 				b.Errorf("unexpected error after %v iterations: %s", i, err)

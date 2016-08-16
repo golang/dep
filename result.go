@@ -25,13 +25,13 @@ type solution struct {
 	hd []byte
 }
 
-// CreateVendorTree takes a basedir and a Lock, and exports all the projects
+// WriteDepTree takes a basedir and a Lock, and exports all the projects
 // listed in the lock to the appropriate target location within the basedir.
 //
 // It requires a SourceManager to do the work, and takes a flag indicating
 // whether or not to strip vendor directories contained in the exported
 // dependencies.
-func CreateVendorTree(basedir string, l Lock, sm SourceManager, sv bool) error {
+func WriteDepTree(basedir string, l Lock, sm SourceManager, sv bool) error {
 	err := os.MkdirAll(basedir, 0777)
 	if err != nil {
 		return err
