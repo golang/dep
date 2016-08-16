@@ -2,4 +2,4 @@ coverage:
   ignore:
   - remove_go16.go
   - remove_go17.go
-  - errors.go
+  - solve_failures.go
