@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"sync/atomic"
 
 	"github.com/Masterminds/semver"
 )
@@ -21,6 +22,7 @@ type sourceBridge interface {
 	matches(id ProjectIdentifier, c Constraint, v Version) bool
 	matchesAny(id ProjectIdentifier, c1, c2 Constraint) bool
 	intersect(id ProjectIdentifier, c1, c2 Constraint) Constraint
+	breakLock()
 }
 
 // bridge is an adapter around a proper SourceManager. It provides localized
@@ -51,6 +53,9 @@ type bridge struct {
 	// is that this keeps the versions sorted in the direction required by the
 	// current solve run
 	vlists map[ProjectIdentifier][]Version
+
+	// Indicates whether lock breaking has already been run
+	lockbroken int32
 }
 
 // Global factory func to create a bridge. This exists solely to allow tests to
@@ -411,6 +416,32 @@ func (b *bridge) verifyRootDir(path string) error {
 
 func (b *bridge) DeduceProjectRoot(ip string) (ProjectRoot, error) {
 	return b.sm.DeduceProjectRoot(ip)
+}
+
+// breakLock is called when the solver has to break a version recorded in the
+// lock file. It prefetches all the projects in the solver's lock , so that the
+// information is already on hand if/when the solver needs it.
+//
+// Projects that have already been selected are skipped, as it's generally unlikely that the
+// solver will have to backtrack through and fully populate their version queues.
+func (b *bridge) breakLock() {
+	// No real conceivable circumstance in which multiple calls are made to
+	// this, but being that this is the entrance point to a bunch of async work,
+	// protect it with an atomic CAS in case things change in the future.
+	if !atomic.CompareAndSwapInt32(&b.lockbroken, 0, 1) {
+		return
+	}
+
+	for _, lp := range b.s.rl.Projects() {
+		if _, is := b.s.sel.selected(lp.pi); !is {
+			// ListPackages guarantees that all the necessary network work will
+			// be done, so go with that
+			//
+			// TODO(sdboyer) use this as an opportunity to detect
+			// inconsistencies between upstream and the lock (e.g., moved tags)?
+			go b.sm.ListPackages(lp.pi, lp.Version())
+		}
+	}
 }
 
 // versionTypeUnion represents a set of versions that are, within the scope of
