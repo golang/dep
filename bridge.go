@@ -439,7 +439,14 @@ func (b *bridge) breakLock() {
 			//
 			// TODO(sdboyer) use this as an opportunity to detect
 			// inconsistencies between upstream and the lock (e.g., moved tags)?
-			go b.sm.ListPackages(lp.pi, lp.Version())
+			pi, v := lp.pi, lp.Version()
+			go func() {
+				// Sync first
+				b.sm.SyncSourceFor(pi)
+				// Preload the package info for the locked version, too, as
+				// we're more likely to need that
+				b.sm.ListPackages(pi, v)
+			}()
 		}
 	}
 }
