@@ -1,8 +1,12 @@
 package gps
 
-import "fmt"
+import (
+	"fmt"
+	"sync"
+)
 
 type source interface {
+	syncLocal() error
 	checkExistence(sourceExistence) bool
 	exportVersionTo(Version, string) error
 	getManifestAndLock(ProjectRoot, Version) (Manifest, Lock, error)
@@ -54,9 +58,6 @@ type baseVCSSource struct {
 	// ProjectAnalyzer used to fulfill getManifestAndLock
 	an ProjectAnalyzer
 
-	// Whether the cache has the latest info on versions
-	cvsync bool
-
 	// The project metadata cache. This is (or is intended to be) persisted to
 	// disk, for reuse across solver runs.
 	dc *sourceMetaCache
@@ -64,6 +65,20 @@ type baseVCSSource struct {
 	// lvfunc allows the other vcs source types that embed this type to inject
 	// their listVersions func into the baseSource, for use as needed.
 	lvfunc func() (vlist []Version, err error)
+
+	// lock to serialize access to syncLocal
+	synclock sync.Mutex
+
+	// Globalish flag indicating whether a "full" sync has been performed. Also
+	// used as a one-way gate to ensure that the full syncing routine is never
+	// run more than once on a given source instance.
+	allsync bool
+
+	// The error, if any, that occurred on syncLocal
+	syncerr error
+
+	// Whether the cache has the latest info on versions
+	cvsync bool
 }
 
 func (bs *baseVCSSource) getManifestAndLock(r ProjectRoot, v Version) (Manifest, Lock, error) {
@@ -201,7 +216,7 @@ func (bs *baseVCSSource) ensureCacheExistence() error {
 			bs.crepo.mut.Unlock()
 
 			if err != nil {
-				return fmt.Errorf("failed to create repository cache for %s", bs.crepo.r.Remote())
+				return fmt.Errorf("failed to create repository cache for %s with err:\n%s", bs.crepo.r.Remote(), err)
 			}
 			bs.crepo.synced = true
 			bs.ex.s |= existsInCache
@@ -245,6 +260,44 @@ func (bs *baseVCSSource) checkExistence(ex sourceExistence) bool {
 	}
 
 	return ex&bs.ex.f == ex
+}
+
+// syncLocal ensures the local data we have about the source is fully up to date
+// with what's out there over the network.
+func (bs *baseVCSSource) syncLocal() error {
+	// Ensure we only have one goroutine doing this at a time
+	bs.synclock.Lock()
+	defer bs.synclock.Unlock()
+
+	// ...and that we only ever do it once
+	if bs.allsync {
+		// Return the stored err, if any
+		return bs.syncerr
+	}
+
+	bs.allsync = true
+	// First, ensure the local instance exists
+	bs.syncerr = bs.ensureCacheExistence()
+	if bs.syncerr != nil {
+		return bs.syncerr
+	}
+
+	_, bs.syncerr = bs.lvfunc()
+	if bs.syncerr != nil {
+		return bs.syncerr
+	}
+
+	// This case is really just for git repos, where the lvfunc doesn't
+	// guarantee that the local repo is synced
+	if !bs.crepo.synced {
+		bs.syncerr = bs.crepo.r.Update()
+		if bs.syncerr != nil {
+			return bs.syncerr
+		}
+		bs.crepo.synced = true
+	}
+
+	return nil
 }
 
 func (bs *baseVCSSource) listPackages(pr ProjectRoot, v Version) (ptree PackageTree, err error) {

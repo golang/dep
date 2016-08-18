@@ -474,6 +474,13 @@ func (s *solver) selectRoot() error {
 	}
 
 	for _, dep := range deps {
+		// If we have no lock, or if this dep isn't in the lock, then prefetch
+		// it. See explanation longer comment in selectRoot() for how we benefit
+		// from parallelism here.
+		if _, has := s.rlm[dep.Ident]; !has {
+			go s.b.SyncSourceFor(dep.Ident)
+		}
+
 		s.sel.pushDep(dependency{depender: pa, dep: dep})
 		// Add all to unselected queue
 		s.names[dep.Ident.ProjectRoot] = dep.Ident.netName()
@@ -817,6 +824,8 @@ func (s *solver) getLockVersionIfValid(id ProjectIdentifier) (Version, error) {
 		// though, then we have to try to use what's in the lock, because that's
 		// the only version we'll be able to get.
 		if exist, _ := s.b.SourceExists(id); exist {
+			// Upgrades mean breaking the lock
+			s.b.breakLock()
 			return nil, nil
 		}
 
@@ -864,6 +873,8 @@ func (s *solver) getLockVersionIfValid(id ProjectIdentifier) (Version, error) {
 		}
 
 		if !found {
+			// No match found, which means we're going to be breaking the lock
+			s.b.breakLock()
 			return nil, nil
 		}
 	}
@@ -1060,6 +1071,10 @@ func (s *solver) selectAtom(a atomWithPackages, pkgonly bool) {
 
 	// If this atom has a lock, pull it out so that we can potentially inject
 	// preferred versions into any bmis we enqueue
+	//
+	// TODO(sdboyer) making this call here could be the first thing to trigger
+	// network activity...maybe? if so, can we mitigate by deferring the work to
+	// queue consumption time?
 	_, l, _ := s.b.GetManifestAndLock(a.a.id, a.a.v)
 	var lmap map[ProjectIdentifier]Version
 	if l != nil {
@@ -1070,13 +1085,31 @@ func (s *solver) selectAtom(a atomWithPackages, pkgonly bool) {
 	}
 
 	for _, dep := range deps {
+		// If this is dep isn't in the lock, do some prefetching. (If it is, we
+		// might be able to get away with zero network activity for it, so don't
+		// prefetch). This provides an opportunity for some parallelism wins, on
+		// two fronts:
+		//
+		// 1. Because this loop may have multiple deps in it, we could end up
+		// simultaneously fetching both in the background while solving proceeds
+		//
+		// 2. Even if only one dep gets prefetched here, the worst case is that
+		// that same dep comes out of the unselected queue next, and we gain a
+		// few microseconds before blocking later. Best case, the dep doesn't
+		// come up next, but some other dep comes up that wasn't prefetched, and
+		// both fetches proceed in parallel.
+		if _, has := s.rlm[dep.Ident]; !has {
+			go s.b.SyncSourceFor(dep.Ident)
+		}
+
 		s.sel.pushDep(dependency{depender: a.a, dep: dep})
 		// Go through all the packages introduced on this dep, selecting only
-		// the ones where the only depper on them is what we pushed in. Then,
-		// put those into the unselected queue.
+		// the ones where the only depper on them is what the previous line just
+		// pushed in. Then, put those into the unselected queue.
 		rpm := s.sel.getRequiredPackagesIn(dep.Ident)
 		var newp []string
 		for _, pkg := range dep.pl {
+			// Just one means that the dep we're visiting is the sole importer.
 			if rpm[pkg] == 1 {
 				newp = append(newp, pkg)
 			}

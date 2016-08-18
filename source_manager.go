@@ -28,6 +28,10 @@ type SourceManager interface {
 	// SourceManager's central repository cache.
 	SourceExists(ProjectIdentifier) (bool, error)
 
+	// SyncSourceFor will attempt to bring all local information about a source
+	// fully up to date.
+	SyncSourceFor(ProjectIdentifier) error
+
 	// ListVersions retrieves a list of the available versions for a given
 	// repository name.
 	ListVersions(ProjectIdentifier) ([]Version, error)
@@ -215,6 +219,19 @@ func (sm *SourceMgr) SourceExists(id ProjectIdentifier) (bool, error) {
 	}
 
 	return src.checkExistence(existsInCache) || src.checkExistence(existsUpstream), nil
+}
+
+// SyncSourceFor will ensure that all local caches and information about a
+// source are up to date with any network-acccesible information.
+//
+// The primary use case for this is prefetching.
+func (sm *SourceMgr) SyncSourceFor(id ProjectIdentifier) error {
+	src, err := sm.getSourceFor(id)
+	if err != nil {
+		return err
+	}
+
+	return src.syncLocal()
 }
 
 // ExportProject writes out the tree of the provided ProjectIdentifier's
