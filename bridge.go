@@ -444,6 +444,10 @@ func (b *bridge) breakLock() {
 	}
 }
 
+func (b *bridge) SyncSourceFor(id ProjectIdentifier) error {
+	return b.sm.SyncSourceFor(id)
+}
+
 // versionTypeUnion represents a set of versions that are, within the scope of
 // this solver run, equivalent.
 //

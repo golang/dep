@@ -1293,6 +1293,14 @@ func (sm *depspecSourceManager) SourceExists(id ProjectIdentifier) (bool, error)
 	return false, nil
 }
 
+func (sm *depspecSourceManager) SyncSourceFor(id ProjectIdentifier) error {
+	// Ignore err because it can't happen
+	if exist, _ := sm.SourceExists(id); !exist {
+		return fmt.Errorf("Source %s does not exist", id.errString())
+	}
+	return nil
+}
+
 func (sm *depspecSourceManager) VendorCodeExists(id ProjectIdentifier) (bool, error) {
 	return false, nil
 }

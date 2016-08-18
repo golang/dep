@@ -98,7 +98,7 @@ func TestSourceManagerInit(t *testing.T) {
 	}
 }
 
-func TestProjectManagerInit(t *testing.T) {
+func TestSourceInit(t *testing.T) {
 	// This test is a bit slow, skip it on -short
 	if testing.Short() {
 		t.Skip("Skipping project manager init test in short mode")
@@ -165,10 +165,10 @@ func TestProjectManagerInit(t *testing.T) {
 		t.Errorf("Unexpected error during initial project setup/fetching %s", err)
 	}
 
+	rev := Revision("30605f6ac35fcb075ad0bfa9296f90a7d891523e")
 	if len(v) != 3 {
 		t.Errorf("Expected three version results from the test repo, got %v", len(v))
 	} else {
-		rev := Revision("30605f6ac35fcb075ad0bfa9296f90a7d891523e")
 		expected := []Version{
 			NewVersion("1.0.0").Is(rev),
 			NewBranch("master").Is(rev),
@@ -182,9 +182,18 @@ func TestProjectManagerInit(t *testing.T) {
 		}
 	}
 
-	// use ListPackages to ensure the repo is actually on disk
-	// TODO(sdboyer) ugh, maybe we do need an explicit prefetch method
-	smc.ListPackages(id, NewVersion("1.0.0"))
+	present, err := smc.RevisionPresentIn(id, rev)
+	if err != nil {
+		t.Errorf("Should have found revision in source, but got err: %s")
+	} else if !present {
+		t.Errorf("Should have found revision in source, but did not")
+	}
+
+	// SyncSourceFor will ensure we have everything
+	err = smc.SyncSourceFor(id)
+	if err != nil {
+		t.Errorf("SyncSourceFor failed with unexpected error: %s", err)
+	}
 
 	// Ensure that the appropriate cache dirs and files exist
 	_, err = os.Stat(filepath.Join(cpath, "sources", "https---github.com-Masterminds-VCSTestRepo", ".git"))
@@ -206,6 +215,36 @@ func TestProjectManagerInit(t *testing.T) {
 	}
 	if !exists {
 		t.Error("Source should exist after non-erroring call to ListVersions")
+	}
+}
+
+func TestMgrMethodsFailWithBadPath(t *testing.T) {
+	// a symbol will always bork it up
+	bad := mkPI("foo/##&^")
+	sm, clean := mkNaiveSM(t)
+	defer clean()
+
+	var err error
+	if _, err = sm.SourceExists(bad); err == nil {
+		t.Error("SourceExists() did not error on bad input")
+	}
+	if err = sm.SyncSourceFor(bad); err == nil {
+		t.Error("SyncSourceFor() did not error on bad input")
+	}
+	if _, err = sm.ListVersions(bad); err == nil {
+		t.Error("ListVersions() did not error on bad input")
+	}
+	if _, err = sm.RevisionPresentIn(bad, Revision("")); err == nil {
+		t.Error("RevisionPresentIn() did not error on bad input")
+	}
+	if _, err = sm.ListPackages(bad, nil); err == nil {
+		t.Error("ListPackages() did not error on bad input")
+	}
+	if _, _, err = sm.GetManifestAndLock(bad, nil); err == nil {
+		t.Error("GetManifestAndLock() did not error on bad input")
+	}
+	if err = sm.ExportProject(bad, nil, ""); err == nil {
+		t.Error("ExportProject() did not error on bad input")
 	}
 }
 
