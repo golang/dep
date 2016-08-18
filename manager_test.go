@@ -184,7 +184,7 @@ func TestSourceInit(t *testing.T) {
 
 	present, err := smc.RevisionPresentIn(id, rev)
 	if err != nil {
-		t.Errorf("Should have found revision in source, but got err: %s")
+		t.Errorf("Should have found revision in source, but got err: %s", err)
 	} else if !present {
 		t.Errorf("Should have found revision in source, but did not")
 	}
