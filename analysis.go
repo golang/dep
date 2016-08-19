@@ -426,10 +426,12 @@ func wmToReach(workmap map[string]wm, basedir string) map[string][]string {
 			return true
 
 		case grey:
-			// grey means an import cycle; guaranteed badness right here.
+			// grey means an import cycle; guaranteed badness right here. You'd
+			// hope we never encounter it in a dependency (really? you published
+			// that code?), but we have to defend against it.
 			//
-			// FIXME handle import cycles by dropping everything involved. i
-			// think we need to compute SCC, then drop *all* of them?
+			// FIXME handle import cycles by dropping everything involved. (i
+			// think we need to compute SCC, then drop *all* of them?)
 			colors[pkg] = black
 			poison(append(path, pkg)) // poison self and parents
 
@@ -730,12 +732,14 @@ type PackageOrErr struct {
 }
 
 // ExternalReach looks through a PackageTree and computes the list of external
-// packages (not logical children of PackageTree.ImportRoot) that are
-// transitively imported by the internal packages in the tree.
+// import statements (that is, import statements pointing to packages that are
+// not logical children of PackageTree.ImportRoot) that are transitively
+// imported by the internal packages in the tree.
 //
 // main indicates whether (true) or not (false) to include main packages in the
-// analysis. main packages are generally excluded when analyzing anything other
-// than the root project, as they inherently can't be imported.
+// analysis. When utilized by gps' solver, main packages are generally excluded
+// from analyzing anything other than the root project, as they necessarily can't
+// be imported.
 //
 // tests indicates whether (true) or not (false) to include imports from test
 // files in packages when computing the reach map.
@@ -744,25 +748,35 @@ type PackageOrErr struct {
 // analysis. This exclusion applies to both internal and external packages. If
 // an external import path is ignored, it is simply omitted from the results.
 //
-// If an internal path is ignored, then it is excluded from all transitive
-// dependency chains and does not appear as a key in the final map. That is, if
-// you ignore A/foo, then the external package list for all internal packages
-// that import A/foo will not include external packages that are only reachable
-// through A/foo.
+// If an internal path is ignored, then not only does it not appear in the final
+// map, but it is also excluded from the transitive calculations of other
+// internal packages.  That is, if you ignore A/foo, then the external package
+// list for all internal packages that import A/foo will not include external
+// packages that are only reachable through A/foo.
 //
 // Visually, this means that, given a PackageTree with root A and packages at A,
 // A/foo, and A/bar, and the following import chain:
 //
 //  A -> A/foo -> A/bar -> B/baz
 //
-// If you ignore A/foo, then the returned map would be:
+// In this configuration, all of A's packages transitively import B/baz, so the
+// returned map would be:
+//
+//  map[string][]string{
+// 	"A": []string{"B/baz"},
+// 	"A/foo": []string{"B/baz"}
+// 	"A/bar": []string{"B/baz"},
+//  }
+//
+// However, if you ignore A/foo, then A's path to B/baz is broken, and A/foo is
+// omitted entirely. Thus, the returned map would be:
 //
 //  map[string][]string{
 // 	"A": []string{},
 // 	"A/bar": []string{"B/baz"},
 //  }
 //
-// It is safe to pass a nil map if there are no packages to ignore.
+// If there are no packages to ignore, it is safe to pass a nil map.
 func (t PackageTree) ExternalReach(main, tests bool, ignore map[string]bool) map[string][]string {
 	if ignore == nil {
 		ignore = make(map[string]bool)

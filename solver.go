@@ -169,8 +169,8 @@ type solver struct {
 // else fail with an informative error.
 //
 // If a Solution is found, an implementing tool may persist it - typically into
-// what a "lock file" - and/or use it to write out a directory tree of
-// dependencies, suitable to be a vendor directory, via CreateVendorTree.
+// a "lock file" - and/or use it to write out a directory tree of dependencies,
+// suitable to be a vendor directory, via CreateVendorTree.
 type Solver interface {
 	// HashInputs produces a hash digest representing the unique inputs to this
 	// solver. It is guaranteed that, if the hash digest is equal to the digest
@@ -179,6 +179,9 @@ type Solver interface {
 	//
 	// In such a case, it may not be necessary to run Solve() at all.
 	HashInputs() ([]byte, error)
+
+	// Solve initiates a solving run. It will either complete successfully with
+	// a Solution, or fail with an informative error.
 	Solve() (Solution, error)
 }
 

@@ -15,8 +15,8 @@ import (
 // a project's manifest, and apply to all packages in a ProjectRoot's tree.
 // Solving itself mostly proceeds on a project-by-project basis.
 //
-// Aliasing string types is usually a bit of an anti-pattern. We do it here as a
-// means of clarifying API intent. This is important because Go's package
+// Aliasing string types is usually a bit of an anti-pattern. gps does it here
+// as a means of clarifying API intent. This is important because Go's package
 // management domain has lots of different path-ish strings floating around:
 //
 //  actual directories:
@@ -41,9 +41,9 @@ type ProjectRoot string
 // to, but differs in two keys ways from, an import path.
 //
 // First, ProjectIdentifiers do not identify a single package. Rather, they
-// encompasses the whole tree of packages that exist at or below their
+// encompasses the whole tree of packages rooted at and including their
 // ProjectRoot. In gps' current design, this ProjectRoot must correspond to the
-// root of a repository, though this may not always be the case.
+// root of a repository, though this may change in the future.
 //
 // Second, ProjectIdentifiers can optionally carry a NetworkName, which
 // identifies where the underlying source code can be located on the network.
@@ -57,7 +57,8 @@ type ProjectRoot string
 //
 // With plain import paths, network addresses are derived purely through an
 // algorithm. By having an explicit network name, it becomes possible to, for
-// example, transparently substitute a fork for an original upstream repository.
+// example, transparently substitute a fork for the original upstream source
+// repository.
 //
 // Note that gps makes no guarantees about the actual import paths contained in
 // a repository aligning with ImportRoot. If tools, or their users, specify an
@@ -126,7 +127,8 @@ func (i ProjectIdentifier) normalize() ProjectIdentifier {
 	return i
 }
 
-// ProjectProperties comprise the properties that can attached to a ProjectRoot.
+// ProjectProperties comprise the properties that can be attached to a
+// ProjectRoot.
 //
 // In general, these are declared in the context of a map of ProjectRoot to its
 // ProjectProperties; they make little sense without their corresponding
