@@ -3,3 +3,4 @@ coverage:
   - remove_go16.go
   - remove_go17.go
   - solve_failures.go
+  - discovery.go # copied from stdlib, don't need to test
