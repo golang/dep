@@ -7,7 +7,6 @@ import (
 	"path"
 	"path/filepath"
 	"runtime"
-	"sort"
 	"sync"
 	"testing"
 
@@ -142,7 +141,7 @@ func TestSourceInit(t *testing.T) {
 
 		// SourceManager itself doesn't guarantee ordering; sort them here so we
 		// can dependably check output
-		sort.Sort(upgradeVersionSorter(v))
+		SortForUpgrade(v)
 
 		for k, e := range expected {
 			if v[k] != e {

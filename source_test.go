@@ -4,7 +4,6 @@ import (
 	"io/ioutil"
 	"net/url"
 	"reflect"
-	"sort"
 	"testing"
 )
 
@@ -84,7 +83,7 @@ func TestGitSourceInteractions(t *testing.T) {
 	if len(vlist) != 3 {
 		t.Errorf("git test repo should've produced three versions, got %v: vlist was %s", len(vlist), vlist)
 	} else {
-		sort.Sort(upgradeVersionSorter(vlist))
+		SortForUpgrade(vlist)
 		evl := []Version{
 			NewVersion("1.0.0").Is(Revision("30605f6ac35fcb075ad0bfa9296f90a7d891523e")),
 			NewBranch("master").Is(Revision("30605f6ac35fcb075ad0bfa9296f90a7d891523e")),
@@ -281,7 +280,7 @@ func TestHgSourceInteractions(t *testing.T) {
 	if len(vlist) != 2 {
 		t.Errorf("hg test repo should've produced one version, got %v", len(vlist))
 	} else {
-		sort.Sort(upgradeVersionSorter(vlist))
+		SortForUpgrade(vlist)
 		if !reflect.DeepEqual(vlist, evl) {
 			t.Errorf("Version list was not what we expected:\n\t(GOT): %s\n\t(WNT): %s", vlist, evl)
 		}
@@ -303,7 +302,7 @@ func TestHgSourceInteractions(t *testing.T) {
 	if len(vlist) != 2 {
 		t.Errorf("hg test repo should've produced one version, got %v", len(vlist))
 	} else {
-		sort.Sort(upgradeVersionSorter(vlist))
+		SortForUpgrade(vlist)
 		if !reflect.DeepEqual(vlist, evl) {
 			t.Errorf("Version list was not what we expected:\n\t(GOT): %s\n\t(WNT): %s", vlist, evl)
 		}

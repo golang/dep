@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
 	"sync/atomic"
 
 	"github.com/Masterminds/semver"
@@ -91,9 +90,9 @@ func (b *bridge) ListVersions(id ProjectIdentifier) ([]Version, error) {
 	}
 
 	if b.s.params.Downgrade {
-		sort.Sort(downgradeVersionSorter(vl))
+		SortForDowngrade(vl)
 	} else {
-		sort.Sort(upgradeVersionSorter(vl))
+		SortForUpgrade(vl)
 	}
 
 	b.vlists[id] = vl
@@ -556,96 +555,3 @@ func (av versionTypeUnion) Intersect(c Constraint) Constraint {
 }
 
 func (av versionTypeUnion) _private() {}
-
-type upgradeVersionSorter []Version
-type downgradeVersionSorter []Version
-
-func (vs upgradeVersionSorter) Len() int {
-	return len(vs)
-}
-
-func (vs upgradeVersionSorter) Swap(i, j int) {
-	vs[i], vs[j] = vs[j], vs[i]
-}
-
-func (vs downgradeVersionSorter) Len() int {
-	return len(vs)
-}
-
-func (vs downgradeVersionSorter) Swap(i, j int) {
-	vs[i], vs[j] = vs[j], vs[i]
-}
-
-func (vs upgradeVersionSorter) Less(i, j int) bool {
-	l, r := vs[i], vs[j]
-
-	if tl, ispair := l.(versionPair); ispair {
-		l = tl.v
-	}
-	if tr, ispair := r.(versionPair); ispair {
-		r = tr.v
-	}
-
-	switch compareVersionType(l, r) {
-	case -1:
-		return true
-	case 1:
-		return false
-	case 0:
-		break
-	default:
-		panic("unreachable")
-	}
-
-	switch l.(type) {
-	// For these, now nothing to do but alpha sort
-	case Revision, branchVersion, plainVersion:
-		return l.String() < r.String()
-	}
-
-	// This ensures that pre-release versions are always sorted after ALL
-	// full-release versions
-	lsv, rsv := l.(semVersion).sv, r.(semVersion).sv
-	lpre, rpre := lsv.Prerelease() == "", rsv.Prerelease() == ""
-	if (lpre && !rpre) || (!lpre && rpre) {
-		return lpre
-	}
-	return lsv.GreaterThan(rsv)
-}
-
-func (vs downgradeVersionSorter) Less(i, j int) bool {
-	l, r := vs[i], vs[j]
-
-	if tl, ispair := l.(versionPair); ispair {
-		l = tl.v
-	}
-	if tr, ispair := r.(versionPair); ispair {
-		r = tr.v
-	}
-
-	switch compareVersionType(l, r) {
-	case -1:
-		return true
-	case 1:
-		return false
-	case 0:
-		break
-	default:
-		panic("unreachable")
-	}
-
-	switch l.(type) {
-	// For these, now nothing to do but alpha
-	case Revision, branchVersion, plainVersion:
-		return l.String() < r.String()
-	}
-
-	// This ensures that pre-release versions are always sorted after ALL
-	// full-release versions
-	lsv, rsv := l.(semVersion).sv, r.(semVersion).sv
-	lpre, rpre := lsv.Prerelease() == "", rsv.Prerelease() == ""
-	if (lpre && !rpre) || (!lpre && rpre) {
-		return lpre
-	}
-	return lsv.LessThan(rsv)
-}

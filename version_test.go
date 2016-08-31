@@ -1,9 +1,6 @@
 package gps
 
-import (
-	"sort"
-	"testing"
-)
+import "testing"
 
 func TestVersionSorts(t *testing.T) {
 	rev := Revision("flooboofoobooo")
@@ -47,7 +44,7 @@ func TestVersionSorts(t *testing.T) {
 		rev, // revs
 	}
 
-	sort.Sort(upgradeVersionSorter(up))
+	SortForUpgrade(up)
 	var wrong []int
 	for k, v := range up {
 		if eup[k] != v {
@@ -60,7 +57,7 @@ func TestVersionSorts(t *testing.T) {
 		t.Errorf("Upgrade sort positions with wrong versions: %v", wrong)
 	}
 
-	sort.Sort(downgradeVersionSorter(down))
+	SortForDowngrade(down)
 	wrong = wrong[:0]
 	for k, v := range down {
 		if edown[k] != v {
@@ -74,7 +71,7 @@ func TestVersionSorts(t *testing.T) {
 	}
 
 	// Now make sure we sort back the other way correctly...just because
-	sort.Sort(upgradeVersionSorter(down))
+	SortForUpgrade(down)
 	wrong = wrong[:0]
 	for k, v := range down {
 		if eup[k] != v {
@@ -88,7 +85,7 @@ func TestVersionSorts(t *testing.T) {
 	}
 
 	// Now make sure we sort back the other way correctly...just because
-	sort.Sort(downgradeVersionSorter(up))
+	SortForDowngrade(up)
 	wrong = wrong[:0]
 	for k, v := range up {
 		if edown[k] != v {

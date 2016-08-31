@@ -1,6 +1,10 @@
 package gps
 
-import "github.com/Masterminds/semver"
+import (
+	"sort"
+
+	"github.com/Masterminds/semver"
+)
 
 // Version represents one of the different types of versions used by gps.
 //
@@ -512,4 +516,152 @@ func compareVersionType(l, r Version) int {
 		}
 	}
 	panic("unknown version type")
+}
+
+// SortForUpgrade sorts a slice of []Version in roughly descending order, so
+// that presumably newer versions are visited first. The rules are:
+//
+//  - All semver versions come first, and sort mostly according to the semver
+//  2.0 spec (as implemented by github.com/Masterminds/semver lib), with one
+//  exception:
+//  - Semver versions with a prerelease are after *all* non-prerelease semver.
+//  Against each other, they are sorted first by their numerical component, then
+//  lexicographically by their prerelease version.
+//  - All non-semver versions (tags) are next, and sort lexicographically
+//  against each other.
+//  - All branches are next, and sort lexicographically against each other.
+//  - Revisions are last, and sort lexicographically against each other.
+//
+// So, given a slice of the following versions:
+//
+//  - Branch: master devel
+//  - Semver tags: v1.0.0, v1.1.0, v1.1.0-alpha1
+//  - Non-semver tags: footag
+//  - Revision: f6e74e8d
+//
+// Sorting for upgrade will result in the following slice.
+//
+//  [v1.1.0 v1.0.0 v1.1.0-alpha1 footag devel master f6e74e8d]
+func SortForUpgrade(vl []Version) {
+	sort.Sort(upgradeVersionSorter(vl))
+}
+
+// SortForDowngrade sorts a slice of []Version in roughly ascending order, so
+// that presumably older versions are visited first.
+//
+// This is *not* the reverse of the same as SortForUpgrade (or you could simply
+// sort.Reverse(). The type precedence is the same, including the
+// semver vs. semver-with-prerelease relation. Lexicographic comparisons within
+// non-semver tags, branches, and revisions remains the same as well; because
+// these domains have no implicit chronology, there is no reason to reverse
+// them.
+//
+// The only binary relation that is reversed for downgrade is within-type
+// comparisons for semver (with and without prerelease).
+//
+// So, given a slice of the following versions:
+//
+//  - Branch: master devel
+//  - Semver tags: v1.0.0, v1.1.0, v1.1.0-alpha1
+//  - Non-semver tags: footag
+//  - Revision: f6e74e8d
+//
+// Sorting for downgrade will result in the following slice.
+//
+//  [v1.0.0 v1.1.0 v1.1.0-alpha1 footag devel master f6e74e8d]
+func SortForDowngrade(vl []Version) {
+	sort.Sort(downgradeVersionSorter(vl))
+}
+
+type upgradeVersionSorter []Version
+type downgradeVersionSorter []Version
+
+func (vs upgradeVersionSorter) Len() int {
+	return len(vs)
+}
+
+func (vs upgradeVersionSorter) Swap(i, j int) {
+	vs[i], vs[j] = vs[j], vs[i]
+}
+
+func (vs downgradeVersionSorter) Len() int {
+	return len(vs)
+}
+
+func (vs downgradeVersionSorter) Swap(i, j int) {
+	vs[i], vs[j] = vs[j], vs[i]
+}
+
+func (vs upgradeVersionSorter) Less(i, j int) bool {
+	l, r := vs[i], vs[j]
+
+	if tl, ispair := l.(versionPair); ispair {
+		l = tl.v
+	}
+	if tr, ispair := r.(versionPair); ispair {
+		r = tr.v
+	}
+
+	switch compareVersionType(l, r) {
+	case -1:
+		return true
+	case 1:
+		return false
+	case 0:
+		break
+	default:
+		panic("unreachable")
+	}
+
+	switch l.(type) {
+	// For these, now nothing to do but alpha sort
+	case Revision, branchVersion, plainVersion:
+		return l.String() < r.String()
+	}
+
+	// This ensures that pre-release versions are always sorted after ALL
+	// full-release versions
+	lsv, rsv := l.(semVersion).sv, r.(semVersion).sv
+	lpre, rpre := lsv.Prerelease() == "", rsv.Prerelease() == ""
+	if (lpre && !rpre) || (!lpre && rpre) {
+		return lpre
+	}
+	return lsv.GreaterThan(rsv)
+}
+
+func (vs downgradeVersionSorter) Less(i, j int) bool {
+	l, r := vs[i], vs[j]
+
+	if tl, ispair := l.(versionPair); ispair {
+		l = tl.v
+	}
+	if tr, ispair := r.(versionPair); ispair {
+		r = tr.v
+	}
+
+	switch compareVersionType(l, r) {
+	case -1:
+		return true
+	case 1:
+		return false
+	case 0:
+		break
+	default:
+		panic("unreachable")
+	}
+
+	switch l.(type) {
+	// For these, now nothing to do but alpha
+	case Revision, branchVersion, plainVersion:
+		return l.String() < r.String()
+	}
+
+	// This ensures that pre-release versions are always sorted after ALL
+	// full-release versions
+	lsv, rsv := l.(semVersion).sv, r.(semVersion).sv
+	lpre, rpre := lsv.Prerelease() == "", rsv.Prerelease() == ""
+	if (lpre && !rpre) || (!lpre && rpre) {
+		return lpre
+	}
+	return lsv.LessThan(rsv)
 }
