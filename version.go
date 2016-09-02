@@ -301,7 +301,11 @@ type semVersion struct {
 }
 
 func (v semVersion) String() string {
-	return v.sv.Original()
+	str := v.sv.Original()
+	if str == "" {
+		str = v.sv.String()
+	}
+	return str
 }
 
 func (r semVersion) Type() string {
