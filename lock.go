@@ -1,5 +1,7 @@
 package gps
 
+import "sort"
+
 // Lock represents data from a lock file (or however the implementing tool
 // chooses to store it) at a particular version that is relevant to the
 // satisfiability solving process.
@@ -158,4 +160,24 @@ func prepLock(l Lock) Lock {
 	}
 
 	return rl
+}
+
+// SortLockedProjects sorts a slice of LockedProject in alphabetical order by
+// ProjectRoot.
+func SortLockedProjects(lps []LockedProject) {
+	sort.Stable(lpsorter(lps))
+}
+
+type lpsorter []LockedProject
+
+func (lps lpsorter) Swap(i, j int) {
+	lps[i], lps[j] = lps[j], lps[i]
+}
+
+func (lps lpsorter) Len() int {
+	return len(lps)
+}
+
+func (lps lpsorter) Less(i, j int) bool {
+	return lps[i].pi.ProjectRoot < lps[j].pi.ProjectRoot
 }
