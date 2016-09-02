@@ -37,10 +37,10 @@ func init() {
 	}
 }
 
-func TestResultCreateVendorTree(t *testing.T) {
+func TestWriteDepTree(t *testing.T) {
 	// This test is a bit slow, skip it on -short
 	if testing.Short() {
-		t.Skip("Skipping vendor tree creation test in short mode")
+		t.Skip("Skipping dep tree writing test in short mode")
 	}
 
 	r := basicResult
@@ -51,7 +51,13 @@ func TestResultCreateVendorTree(t *testing.T) {
 	sm, clean := mkNaiveSM(t)
 	defer clean()
 
-	err := WriteDepTree(path.Join(tmp, "export"), r, sm, true)
+	// nil lock/result should err immediately
+	err := WriteDepTree(path.Join(tmp, "export"), nil, sm, true)
+	if err == nil {
+		t.Errorf("Should error if nil lock is passed to WriteDepTree")
+	}
+
+	err = WriteDepTree(path.Join(tmp, "export"), r, sm, true)
 	if err != nil {
 		t.Errorf("Unexpected error while creating vendor tree: %s", err)
 	}

@@ -32,6 +32,10 @@ type solution struct {
 // whether or not to strip vendor directories contained in the exported
 // dependencies.
 func WriteDepTree(basedir string, l Lock, sm SourceManager, sv bool) error {
+	if l == nil {
+		return fmt.Errorf("must provide non-nil Lock to WriteDepTree")
+	}
+
 	err := os.MkdirAll(basedir, 0777)
 	if err != nil {
 		return err
@@ -49,7 +53,7 @@ func WriteDepTree(basedir string, l Lock, sm SourceManager, sv bool) error {
 		err = sm.ExportProject(p.Ident(), p.Version(), to)
 		if err != nil {
 			removeAll(basedir)
-			return fmt.Errorf("Error while exporting %s: %s", p.Ident().ProjectRoot, err)
+			return fmt.Errorf("error while exporting %s: %s", p.Ident().ProjectRoot, err)
 		}
 		if sv {
 			filepath.Walk(to, stripVendor)
