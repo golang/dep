@@ -8,7 +8,7 @@ import (
 	"github.com/Masterminds/semver"
 )
 
-var regfrom = regexp.MustCompile(`^(\w*) from (\w*) ([0-9\.]*)`)
+var regfrom = regexp.MustCompile(`^(\w*) from (\w*) ([0-9\.\*]*)`)
 
 // nvSplit splits an "info" string on " " into the pair of name and
 // version/constraint, and returns each individually.
@@ -518,6 +518,30 @@ var basicFixtures = map[string]basicFixture{
 			"bar 1.0.0",
 		),
 		maxAttempts: 2,
+	},
+	"alternate net address": {
+		ds: []depspec{
+			mkDepspec("root 1.0.0", "foo from bar 2.0.0"),
+			mkDepspec("foo 1.0.0"),
+			mkDepspec("bar 1.0.0"),
+			mkDepspec("bar 2.0.0"),
+		},
+		r: mksolution(
+			"foo from bar 2.0.0",
+		),
+	},
+	"alternate net address in dep": {
+		ds: []depspec{
+			mkDepspec("root 1.0.0", "foo 1.0.0"),
+			mkDepspec("foo 1.0.0", "bar from baz 2.0.0"),
+			mkDepspec("bar 1.0.0"),
+			mkDepspec("baz 1.0.0"),
+			mkDepspec("baz 2.0.0"),
+		},
+		r: mksolution(
+			"foo 1.0.0",
+			"bar from baz 2.0.0",
+		),
 	},
 	"with mismatched net addrs": {
 		ds: []depspec{
