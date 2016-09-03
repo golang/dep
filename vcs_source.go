@@ -54,9 +54,10 @@ func (s *gitSource) exportVersionTo(v Version, to string) error {
 	if rv, ok := v.(PairedVersion); ok {
 		vstr = rv.Underlying().String()
 	}
-	_, err = r.RunFromDir("git", "read-tree", vstr)
+
+	out, err := r.RunFromDir("git", "read-tree", vstr)
 	if err != nil {
-		return err
+		return fmt.Errorf("%s: %s", out, err)
 	}
 
 	// Ensure we have exactly one trailing slash
@@ -68,8 +69,11 @@ func (s *gitSource) exportVersionTo(v Version, to string) error {
 	// the alternative is using plain checkout, though we have a bunch of
 	// housekeeping to do to set up, then tear down, the sparse checkout
 	// controls, as well as restore the original index and HEAD.
-	_, err = r.RunFromDir("git", "checkout-index", "-a", "--prefix="+to)
-	return err
+	out, err = r.RunFromDir("git", "checkout-index", "-a", "--prefix="+to)
+	if err != nil {
+		return fmt.Errorf("%s: %s", out, err)
+	}
+	return nil
 }
 
 func (s *gitSource) listVersions() (vlist []Version, err error) {
