@@ -305,8 +305,8 @@ func (s *solver) Solve() (Solution, error) {
 		}
 
 		// An err here is impossible; it could only be caused by a parsing error
-		// of the root tree, but that necessarily succeeded back up
-		// selectRoot(), so we can ignore this err
+		// of the root tree, but that necessarily already succeeded back up in
+		// selectRoot(), so we can ignore the err return here
 		soln.hd, _ = s.HashInputs()
 
 		// Convert ProjectAtoms into LockedProjects
@@ -1164,7 +1164,7 @@ func (s *solver) unselectLast() (atomWithPackages, bool) {
 // simple (temporary?) helper just to convert atoms into locked projects
 func pa2lp(pa atom, pkgs map[string]struct{}) LockedProject {
 	lp := LockedProject{
-		pi: pa.id.normalize(), // shouldn't be necessary, but normalize just in case
+		pi: pa.id,
 	}
 
 	switch v := pa.v.(type) {

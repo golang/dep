@@ -257,7 +257,7 @@ func (m ProjectConstraints) overrideAll(in []ProjectConstraint) (out []workingCo
 // ProjectConstraints map.
 func (m ProjectConstraints) override(pc ProjectConstraint) workingConstraint {
 	wc := workingConstraint{
-		Ident:      pc.Ident.normalize(), // necessary to normalize?
+		Ident:      pc.Ident,
 		Constraint: pc.Constraint,
 	}
 

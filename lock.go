@@ -138,26 +138,16 @@ func (sl safeLock) Projects() []LockedProject {
 	return sl.p
 }
 
-// prepLock ensures a lock is prepared and safe for use by the solver.
-// This entails two things:
-//
-//  * Ensuring that all LockedProject's identifiers are normalized.
-//  * Defensively ensuring that no outside routine can modify the lock while the
-//  solver is in-flight.
+// prepLock ensures a lock is prepared and safe for use by the solver. This is
+// mostly about defensively ensuring that no outside routine can modify the lock
+// while the solver is in-flight.
 //
 // This is achieved by copying the lock's data into a new safeLock.
 func prepLock(l Lock) Lock {
 	pl := l.Projects()
 
-	rl := safeLock{
-		h: l.InputHash(),
-		p: make([]LockedProject, len(pl)),
-	}
-
-	for k, lp := range pl {
-		lp.pi = lp.pi.normalize()
-		rl.p[k] = lp
-	}
+	rl := safeLock{h: l.InputHash()}
+	copy(rl.p, pl)
 
 	return rl
 }

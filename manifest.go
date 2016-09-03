@@ -92,12 +92,8 @@ func (m simpleRootManifest) IgnorePackages() map[string]bool {
 }
 
 // prepManifest ensures a manifest is prepared and safe for use by the solver.
-// This entails two things:
-//
-//  * Ensuring that all ProjectIdentifiers are normalized (otherwise matching
-//  can get screwy and the queues go out of alignment)
-//  * Defensively ensuring that no outside routine can modify the manifest while
-//  the solver is in-flight.
+// This is mostly about ensuring that no outside routine can modify the manifest
+// while the solver is in-flight.
 //
 // This is achieved by copying the manifest's data into a new SimpleManifest.
 func prepManifest(m Manifest) Manifest {
@@ -114,11 +110,9 @@ func prepManifest(m Manifest) Manifest {
 	}
 
 	for k, d := range deps {
-		d.Ident = d.Ident.normalize()
 		rm.Deps[k] = d
 	}
 	for k, d := range ddeps {
-		d.Ident = d.Ident.normalize()
 		rm.TestDeps[k] = d
 	}
 
