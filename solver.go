@@ -147,20 +147,19 @@ type solver struct {
 
 	// A map of the ProjectRoot (local names) that are currently selected, and
 	// the network name to which they currently correspond.
-	// TODO(sdboyer) i think this is cruft and can be removed
 	names map[ProjectRoot]string
 
 	// A ProjectConstraints map containing the validated (guaranteed non-empty)
 	// overrides declared by the root manifest.
 	ovr ProjectConstraints
 
-	// A map of the names listed in the root's lock.
-	rlm map[ProjectIdentifier]LockedProject
+	// A map of the project names listed in the root's lock.
+	rlm map[ProjectRoot]LockedProject
 
-	// A normalized, copied version of the root manifest.
+	// A defensively-copied instance of the root manifest.
 	rm Manifest
 
-	// A normalized, copied version of the root lock.
+	// A defensively-copied instance of the root lock.
 	rl Lock
 }
 
@@ -253,7 +252,7 @@ func Prepare(params SolveParameters, sm SourceManager) (Solver, error) {
 
 	// Initialize maps
 	s.chng = make(map[ProjectRoot]struct{})
-	s.rlm = make(map[ProjectIdentifier]LockedProject)
+	s.rlm = make(map[ProjectRoot]LockedProject)
 	s.names = make(map[ProjectRoot]string)
 
 	for _, v := range s.params.ToChange {
@@ -274,7 +273,7 @@ func Prepare(params SolveParameters, sm SourceManager) (Solver, error) {
 	s.rm = prepManifest(s.params.Manifest)
 	if s.params.Lock != nil {
 		for _, lp := range s.params.Lock.Projects() {
-			s.rlm[lp.Ident().normalize()] = lp
+			s.rlm[lp.Ident().ProjectRoot] = lp
 		}
 
 		// Also keep a prepped one, mostly for the bridge. This is probably
@@ -480,7 +479,7 @@ func (s *solver) selectRoot() error {
 		// If we have no lock, or if this dep isn't in the lock, then prefetch
 		// it. See explanation longer comment in selectRoot() for how we benefit
 		// from parallelism here.
-		if _, has := s.rlm[dep.Ident]; !has {
+		if _, has := s.rlm[dep.Ident.ProjectRoot]; !has {
 			go s.b.SyncSourceFor(dep.Ident)
 		}
 
@@ -843,7 +842,7 @@ func (s *solver) getLockVersionIfValid(id ProjectIdentifier) (Version, error) {
 		}
 	}
 
-	lp, exists := s.rlm[id]
+	lp, exists := s.rlm[id.ProjectRoot]
 	if !exists {
 		return nil, nil
 	}
@@ -980,6 +979,9 @@ func (s *solver) unselectedComparator(i, j int) bool {
 
 	// FIXME the impl here is currently O(n) in the number of selections; it
 	// absolutely cannot stay in a hot sorting path like this
+	// FIXME while other solver invariants probably protect us from it, this
+	// call-out means that it's possible for external state change to invalidate
+	// heap invariants.
 	_, isel := s.sel.selected(iname)
 	_, jsel := s.sel.selected(jname)
 
@@ -994,8 +996,8 @@ func (s *solver) unselectedComparator(i, j int) bool {
 		return false
 	}
 
-	_, ilock := s.rlm[iname]
-	_, jlock := s.rlm[jname]
+	_, ilock := s.rlm[iname.ProjectRoot]
+	_, jlock := s.rlm[jname.ProjectRoot]
 
 	switch {
 	case ilock && !jlock:
@@ -1101,7 +1103,7 @@ func (s *solver) selectAtom(a atomWithPackages, pkgonly bool) {
 		// few microseconds before blocking later. Best case, the dep doesn't
 		// come up next, but some other dep comes up that wasn't prefetched, and
 		// both fetches proceed in parallel.
-		if _, has := s.rlm[dep.Ident]; !has {
+		if _, has := s.rlm[dep.Ident.ProjectRoot]; !has {
 			go s.b.SyncSourceFor(dep.Ident)
 		}
 

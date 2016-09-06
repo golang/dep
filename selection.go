@@ -133,7 +133,7 @@ func (s *selection) getConstraint(id ProjectIdentifier) Constraint {
 // have happened later.
 func (s *selection) selected(id ProjectIdentifier) (atomWithPackages, bool) {
 	for _, p := range s.projects {
-		if p.a.a.id.eq(id) {
+		if p.a.a.id.ProjectRoot == id.ProjectRoot {
 			return p.a, true
 		}
 	}
