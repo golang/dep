@@ -516,6 +516,83 @@ var bimodalFixtures = map[string]bimodalFixture{
 			"a 1.0.0",
 		),
 	},
+	"alternate net address": {
+		ds: []depspec{
+			dsp(mkDepspec("root 1.0.0", "foo from bar 2.0.0"),
+				pkg("root", "foo")),
+			dsp(mkDepspec("foo 1.0.0"),
+				pkg("foo")),
+			dsp(mkDepspec("foo 2.0.0"),
+				pkg("foo")),
+			dsp(mkDepspec("bar 1.0.0"),
+				pkg("foo")),
+			dsp(mkDepspec("bar 2.0.0"),
+				pkg("foo")),
+		},
+		r: mksolution(
+			"foo from bar 2.0.0",
+		),
+	},
+	"alternate net address, version only in alt": {
+		ds: []depspec{
+			dsp(mkDepspec("root 1.0.0", "foo from bar 2.0.0"),
+				pkg("root", "foo")),
+			dsp(mkDepspec("foo 1.0.0"),
+				pkg("foo")),
+			dsp(mkDepspec("bar 1.0.0"),
+				pkg("foo")),
+			dsp(mkDepspec("bar 2.0.0"),
+				pkg("foo")),
+		},
+		r: mksolution(
+			"foo from bar 2.0.0",
+		),
+	},
+	"alternate net address in dep": {
+		ds: []depspec{
+			dsp(mkDepspec("root 1.0.0", "foo 1.0.0"),
+				pkg("root", "foo")),
+			dsp(mkDepspec("foo 1.0.0", "bar from baz 2.0.0"),
+				pkg("foo", "bar")),
+			dsp(mkDepspec("bar 1.0.0"),
+				pkg("bar")),
+			dsp(mkDepspec("baz 1.0.0"),
+				pkg("bar")),
+			dsp(mkDepspec("baz 2.0.0"),
+				pkg("bar")),
+		},
+		r: mksolution(
+			"foo 1.0.0",
+			"bar from baz 2.0.0",
+		),
+	},
+	"with mismatched net addrs": {
+		ds: []depspec{
+			dsp(mkDepspec("root 1.0.0", "foo 1.0.0", "bar 1.0.0"),
+				pkg("root", "foo", "bar")),
+			dsp(mkDepspec("foo 1.0.0", "bar from baz 1.0.0"),
+				pkg("foo", "bar")),
+			dsp(mkDepspec("bar 1.0.0"),
+				pkg("bar")),
+			dsp(mkDepspec("baz 1.0.0"),
+				pkg("bar")),
+		},
+		fail: &noVersionError{
+			pn: mkPI("foo"),
+			fails: []failedVersion{
+				{
+					v: NewVersion("1.0.0"),
+					f: &sourceMismatchFailure{
+						shared:   ProjectRoot("bar"),
+						current:  "bar",
+						mismatch: "baz",
+						prob:     mkAtom("foo 1.0.0"),
+						sel:      []dependency{mkDep("root", "foo 1.0.0", "foo")},
+					},
+				},
+			},
+		},
+	},
 	"overridden mismatched net addrs, alt in dep": {
 		ds: []depspec{
 			dsp(mkDepspec("root 0.0.0"),

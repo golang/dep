@@ -519,52 +519,6 @@ var basicFixtures = map[string]basicFixture{
 		),
 		maxAttempts: 2,
 	},
-	"alternate net address": {
-		ds: []depspec{
-			mkDepspec("root 1.0.0", "foo from bar 2.0.0"),
-			mkDepspec("foo 1.0.0"),
-			mkDepspec("bar 1.0.0"),
-			mkDepspec("bar 2.0.0"),
-		},
-		r: mksolution(
-			"foo from bar 2.0.0",
-		),
-	},
-	"alternate net address in dep": {
-		ds: []depspec{
-			mkDepspec("root 1.0.0", "foo 1.0.0"),
-			mkDepspec("foo 1.0.0", "bar from baz 2.0.0"),
-			mkDepspec("bar 1.0.0"),
-			mkDepspec("baz 1.0.0"),
-			mkDepspec("baz 2.0.0"),
-		},
-		r: mksolution(
-			"foo 1.0.0",
-			"bar from baz 2.0.0",
-		),
-	},
-	"with mismatched net addrs": {
-		ds: []depspec{
-			mkDepspec("root 1.0.0", "foo 1.0.0", "bar 1.0.0"),
-			mkDepspec("foo 1.0.0", "bar from baz 1.0.0"),
-			mkDepspec("bar 1.0.0"),
-		},
-		fail: &noVersionError{
-			pn: mkPI("foo"),
-			fails: []failedVersion{
-				{
-					v: NewVersion("1.0.0"),
-					f: &sourceMismatchFailure{
-						shared:   ProjectRoot("bar"),
-						current:  "bar",
-						mismatch: "baz",
-						prob:     mkAtom("foo 1.0.0"),
-						sel:      []dependency{mkDep("root", "foo 1.0.0", "foo")},
-					},
-				},
-			},
-		},
-	},
 	// fixtures with locks
 	"with compatible locked dependency": {
 		ds: []depspec{
