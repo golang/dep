@@ -194,22 +194,20 @@ func (s *solver) checkDepsDisallowsSelected(a atomWithPackages, cdep completeDep
 // network source is.
 func (s *solver) checkIdentMatches(a atomWithPackages, cdep completeDep) error {
 	dep := cdep.workingConstraint
-	if cur, exists := s.sel.selected(a.a.id); exists {
-		if !cur.a.id.eq(dep.Ident) {
-			deps := s.sel.getDependenciesOn(a.a.id)
-			// Fail all the other deps, as there's no way atom can ever be
-			// compatible with them
-			for _, d := range deps {
-				s.fail(d.depender.id)
-			}
+	if cur, exists := s.sel.selected(dep.Ident); exists && !cur.a.id.eq(dep.Ident) {
+		deps := s.sel.getDependenciesOn(a.a.id)
+		// Fail all the other deps, as there's no way atom can ever be
+		// compatible with them
+		for _, d := range deps {
+			s.fail(d.depender.id)
+		}
 
-			return &sourceMismatchFailure{
-				shared:   dep.Ident.ProjectRoot,
-				sel:      deps,
-				current:  cur.a.id.netName(),
-				mismatch: dep.Ident.netName(),
-				prob:     a.a,
-			}
+		return &sourceMismatchFailure{
+			shared:   dep.Ident.ProjectRoot,
+			sel:      deps,
+			current:  cur.a.id.netName(),
+			mismatch: dep.Ident.netName(),
+			prob:     a.a,
 		}
 	}
 
