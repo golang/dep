@@ -1,7 +1,9 @@
 package gps
 
 import (
+	"bytes"
 	"flag"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"math/rand"
@@ -163,7 +165,12 @@ func fixtureSolveSimpleChecks(fix specfix, soln Solution, err error, t *testing.
 			t.Errorf("(fixture: %q) Failure mismatch:\n\t(GOT): %s\n\t(WNT): %s", fix.name(), err, fixfail)
 		}
 	} else if fixfail != nil {
-		t.Errorf("(fixture: %q) Solver succeeded, but expecting failure:\n%s", fix.name(), fixfail)
+		var buf bytes.Buffer
+		fmt.Fprintf(&buf, "(fixture: %q) Solver succeeded, but expecting failure:\n%s\nProjects in solution:", fix.name(), fixfail)
+		for _, p := range soln.Projects() {
+			fmt.Fprintf(&buf, "\n\t- %s at %s", p.Ident().errString(), p.Version())
+		}
+		t.Error(buf.String())
 	} else {
 		r := soln.(solution)
 		if fix.maxTries() > 0 && r.Attempts() > fix.maxTries() {
