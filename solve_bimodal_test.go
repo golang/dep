@@ -566,6 +566,76 @@ var bimodalFixtures = map[string]bimodalFixture{
 			"bar from baz 2.0.0",
 		),
 	},
+	// Because NOT specifying an alternate net address for a given import path
+	// is taken as an "eh, whatever", if we see an empty net addr after
+	// something else has already set an alternate one, then the second should
+	// just "go along" with whatever's already been specified.
+	"alternate net address with second depper": {
+		ds: []depspec{
+			dsp(mkDepspec("root 1.0.0", "foo from bar 2.0.0"),
+				pkg("root", "foo", "baz")),
+			dsp(mkDepspec("foo 1.0.0"),
+				pkg("foo")),
+			dsp(mkDepspec("foo 2.0.0"),
+				pkg("foo")),
+			dsp(mkDepspec("bar 1.0.0"),
+				pkg("foo")),
+			dsp(mkDepspec("bar 2.0.0"),
+				pkg("foo")),
+			dsp(mkDepspec("baz 1.0.0"),
+				pkg("baz", "foo")),
+		},
+		r: mksolution(
+			"foo from bar 2.0.0",
+			"baz 1.0.0",
+		),
+	},
+	// When a given project is initially brought in using the default (i.e.,
+	// empty) ProjectIdentifier.NetworkName, and a later, presumably
+	// as-yet-undiscovered dependency specifies an alternate net addr for it, we
+	// have to fail - even though, if the deps were visited in the opposite
+	// order (deeper dep w/the alternate location first, default location
+	// second), it would be fine.
+	//
+	// TODO A better solution here would involve restarting the solver w/a
+	// marker to use that alternate, or (ugh) introducing a new failure
+	// path/marker type that changes how backtracking works. (In fact, these
+	// approaches are probably demonstrably equivalent.)
+	"fails with net mismatch when deeper dep specs it": {
+		ds: []depspec{
+			dsp(mkDepspec("root 1.0.0", "foo 1.0.0"),
+				pkg("root", "foo", "baz")),
+			dsp(mkDepspec("foo 1.0.0", "bar 2.0.0"),
+				pkg("foo", "bar")),
+			dsp(mkDepspec("bar 1.0.0"),
+				pkg("bar")),
+			dsp(mkDepspec("bar 2.0.0", "baz from quux 1.0.0"),
+				pkg("bar", "baz")),
+			dsp(mkDepspec("baz 1.0.0"),
+				pkg("baz")),
+			dsp(mkDepspec("baz 2.0.0"),
+				pkg("baz")),
+			dsp(mkDepspec("quux 1.0.0"),
+				pkg("baz")),
+			dsp(mkDepspec("quux 2.0.0"),
+				pkg("baz")),
+		},
+		fail: &noVersionError{
+			pn: mkPI("bar"),
+			fails: []failedVersion{
+				{
+					v: NewVersion("v1.0.0"),
+					f: &sourceMismatchFailure{
+						shared:   ProjectRoot("baz"),
+						current:  "baz",
+						mismatch: "quux",
+						prob:     mkAtom("bar 1.0.0"),
+						sel:      []dependency{mkDep("foo 1.0.0", "bar 2.0.0", "bar")},
+					},
+				},
+			},
+		},
+	},
 	"with mismatched net addrs": {
 		ds: []depspec{
 			dsp(mkDepspec("root 1.0.0", "foo 1.0.0", "bar 1.0.0"),
