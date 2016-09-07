@@ -2,7 +2,7 @@ package gps
 
 type selection struct {
 	projects []selected
-	deps     map[ProjectIdentifier][]dependency
+	deps     map[ProjectRoot][]dependency
 	sm       sourceBridge
 }
 
@@ -12,7 +12,7 @@ type selected struct {
 }
 
 func (s *selection) getDependenciesOn(id ProjectIdentifier) []dependency {
-	if deps, exists := s.deps[id]; exists {
+	if deps, exists := s.deps[id.ProjectRoot]; exists {
 		return deps
 	}
 
@@ -40,21 +40,21 @@ func (s *selection) popSelection() (atomWithPackages, bool) {
 }
 
 func (s *selection) pushDep(dep dependency) {
-	s.deps[dep.dep.Ident] = append(s.deps[dep.dep.Ident], dep)
+	s.deps[dep.dep.Ident.ProjectRoot] = append(s.deps[dep.dep.Ident.ProjectRoot], dep)
 }
 
 func (s *selection) popDep(id ProjectIdentifier) (dep dependency) {
-	deps := s.deps[id]
-	dep, s.deps[id] = deps[len(deps)-1], deps[:len(deps)-1]
+	deps := s.deps[id.ProjectRoot]
+	dep, s.deps[id.ProjectRoot] = deps[len(deps)-1], deps[:len(deps)-1]
 	return dep
 }
 
 func (s *selection) depperCount(id ProjectIdentifier) int {
-	return len(s.deps[id])
+	return len(s.deps[id.ProjectRoot])
 }
 
 func (s *selection) setDependenciesOn(id ProjectIdentifier, deps []dependency) {
-	s.deps[id] = deps
+	s.deps[id.ProjectRoot] = deps
 }
 
 // Compute a list of the unique packages within the given ProjectIdentifier that
@@ -64,7 +64,7 @@ func (s *selection) getRequiredPackagesIn(id ProjectIdentifier) map[string]int {
 	// precompute it on pushing a new dep, and preferably with an immut
 	// structure so that we can pop with zero cost.
 	uniq := make(map[string]int)
-	for _, dep := range s.deps[id] {
+	for _, dep := range s.deps[id.ProjectRoot] {
 		for _, pkg := range dep.dep.pl {
 			if count, has := uniq[pkg]; has {
 				count++
@@ -103,7 +103,7 @@ func (s *selection) getSelectedPackagesIn(id ProjectIdentifier) map[string]int {
 }
 
 func (s *selection) getConstraint(id ProjectIdentifier) Constraint {
-	deps, exists := s.deps[id]
+	deps, exists := s.deps[id.ProjectRoot]
 	if !exists || len(deps) == 0 {
 		return any
 	}

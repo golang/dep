@@ -261,7 +261,7 @@ func Prepare(params SolveParameters, sm SourceManager) (Solver, error) {
 
 	// Initialize stacks and queues
 	s.sel = &selection{
-		deps: make(map[ProjectIdentifier][]dependency),
+		deps: make(map[ProjectRoot][]dependency),
 		sm:   s.b,
 	}
 	s.unsel = &unselected{
