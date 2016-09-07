@@ -100,7 +100,32 @@ func (i ProjectIdentifier) eq(j ProjectIdentifier) bool {
 		return true
 	}
 
-	// TODO(sdboyer) attempt conversion to URL and compare base + path
+	return false
+}
+
+// equiv will check if the two identifiers are "equivalent," under special
+// rules.
+//
+// Given that the ProjectRoots are equal (==), equivalency occurs if:
+//
+// 1. The NetworkNames are equal (==), OR
+// 2. The LEFT (the receiver) NetworkName is non-empty, and the right
+// NetworkName is empty.
+//
+// *This is, very much intentionally, an asymmetric binary relation.* It's
+// specifically intended to facilitate the case where we allow for a
+// ProjectIdentifier with an explicit NetworkName to match one without.
+func (i ProjectIdentifier) equiv(j ProjectIdentifier) bool {
+	if i.ProjectRoot != j.ProjectRoot {
+		return false
+	}
+	if i.NetworkName == j.NetworkName {
+		return true
+	}
+
+	if i.NetworkName != "" && j.NetworkName == "" {
+		return true
+	}
 
 	return false
 }
