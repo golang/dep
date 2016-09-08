@@ -26,24 +26,24 @@ func newDeducerTrie() deducerTrie {
 
 // Delete is used to delete a key, returning the previous value and if it was deleted
 func (t deducerTrie) Delete(s string) (pathDeducer, bool) {
-	if v, had := t.t.Delete(s); had {
-		return v.(pathDeducer), had
+	if d, had := t.t.Delete(s); had {
+		return d.(pathDeducer), had
 	}
 	return nil, false
 }
 
 // Get is used to lookup a specific key, returning the value and if it was found
 func (t deducerTrie) Get(s string) (pathDeducer, bool) {
-	if v, has := t.t.Get(s); has {
-		return v.(pathDeducer), has
+	if d, has := t.t.Get(s); has {
+		return d.(pathDeducer), has
 	}
 	return nil, false
 }
 
 // Insert is used to add a newentry or update an existing entry. Returns if updated.
-func (t deducerTrie) Insert(s string, v pathDeducer) (pathDeducer, bool) {
-	if v2, had := t.t.Insert(s, v); had {
-		return v2.(pathDeducer), had
+func (t deducerTrie) Insert(s string, d pathDeducer) (pathDeducer, bool) {
+	if d2, had := t.t.Insert(s, d); had {
+		return d2.(pathDeducer), had
 	}
 	return nil, false
 }
@@ -56,8 +56,8 @@ func (t deducerTrie) Len() int {
 // LongestPrefix is like Get, but instead of an exact match, it will return the
 // longest prefix match.
 func (t deducerTrie) LongestPrefix(s string) (string, pathDeducer, bool) {
-	if p, v, has := t.t.LongestPrefix(s); has {
-		return p, v.(pathDeducer), has
+	if p, d, has := t.t.LongestPrefix(s); has {
+		return p, d.(pathDeducer), has
 	}
 	return "", nil, false
 }
@@ -65,8 +65,8 @@ func (t deducerTrie) LongestPrefix(s string) (string, pathDeducer, bool) {
 // ToMap is used to walk the tree and convert it to a map.
 func (t deducerTrie) ToMap() map[string]pathDeducer {
 	m := make(map[string]pathDeducer)
-	t.t.Walk(func(s string, v interface{}) bool {
-		m[s] = v.(pathDeducer)
+	t.t.Walk(func(s string, d interface{}) bool {
+		m[s] = d.(pathDeducer)
 		return false
 	})
 
@@ -85,24 +85,24 @@ func newProjectRootTrie() prTrie {
 
 // Delete is used to delete a key, returning the previous value and if it was deleted
 func (t prTrie) Delete(s string) (ProjectRoot, bool) {
-	if v, had := t.t.Delete(s); had {
-		return v.(ProjectRoot), had
+	if pr, had := t.t.Delete(s); had {
+		return pr.(ProjectRoot), had
 	}
 	return "", false
 }
 
 // Get is used to lookup a specific key, returning the value and if it was found
 func (t prTrie) Get(s string) (ProjectRoot, bool) {
-	if v, has := t.t.Get(s); has {
-		return v.(ProjectRoot), has
+	if pr, has := t.t.Get(s); has {
+		return pr.(ProjectRoot), has
 	}
 	return "", false
 }
 
 // Insert is used to add a newentry or update an existing entry. Returns if updated.
-func (t prTrie) Insert(s string, v ProjectRoot) (ProjectRoot, bool) {
-	if v2, had := t.t.Insert(s, v); had {
-		return v2.(ProjectRoot), had
+func (t prTrie) Insert(s string, pr ProjectRoot) (ProjectRoot, bool) {
+	if pr2, had := t.t.Insert(s, pr); had {
+		return pr2.(ProjectRoot), had
 	}
 	return "", false
 }
@@ -115,8 +115,8 @@ func (t prTrie) Len() int {
 // LongestPrefix is like Get, but instead of an exact match, it will return the
 // longest prefix match.
 func (t prTrie) LongestPrefix(s string) (string, ProjectRoot, bool) {
-	if p, v, has := t.t.LongestPrefix(s); has && isPathPrefixOrEqual(p, s) {
-		return p, v.(ProjectRoot), has
+	if p, pr, has := t.t.LongestPrefix(s); has && isPathPrefixOrEqual(p, s) {
+		return p, pr.(ProjectRoot), has
 	}
 	return "", "", false
 }
@@ -124,8 +124,8 @@ func (t prTrie) LongestPrefix(s string) (string, ProjectRoot, bool) {
 // ToMap is used to walk the tree and convert it to a map.
 func (t prTrie) ToMap() map[string]ProjectRoot {
 	m := make(map[string]ProjectRoot)
-	t.t.Walk(func(s string, v interface{}) bool {
-		m[s] = v.(ProjectRoot)
+	t.t.Walk(func(s string, pr interface{}) bool {
+		m[s] = pr.(ProjectRoot)
 		return false
 	})
 
@@ -133,7 +133,8 @@ func (t prTrie) ToMap() map[string]ProjectRoot {
 }
 
 // isPathPrefixOrEqual is an additional helper check to ensure that the literal
-// string prefix returned from a radix tree prefix match is also a tree match.
+// string prefix returned from a radix tree prefix match is also a path tree
+// match.
 //
 // The radix tree gets it mostly right, but we have to guard against
 // possibilities like this:
@@ -142,9 +143,10 @@ func (t prTrie) ToMap() map[string]ProjectRoot {
 // github.com/sdboyer/foobar/baz
 //
 // The latter would incorrectly be conflated with the former. As we know we're
-// operating on strings that describe paths, guard against this case by
+// operating on strings that describe import paths, guard against this case by
 // verifying that either the input is the same length as the match (in which
-// case we know they're equal), or that the next character is a "/".
+// case we know they're equal), or that the next character is a "/". (Import
+// paths are defined to always use "/", not the OS-specific path separator.)
 func isPathPrefixOrEqual(pre, path string) bool {
 	prflen, pathlen := len(pre), len(path)
 	if pathlen == prflen+1 {
