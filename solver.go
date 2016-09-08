@@ -425,7 +425,7 @@ func (s *solver) solve() (map[atom]map[string]struct{}, error) {
 	return projs, nil
 }
 
-// selectRoot is a specialized selectAtomWithPackages, used solely to initially
+// selectRoot is a specialized selectAtom, used solely to initially
 // populate the queues at the beginning of a solve run.
 func (s *solver) selectRoot() error {
 	pa := atom{
@@ -574,19 +574,8 @@ func (s *solver) intersectConstraintsWithImports(deps []workingConstraint, reach
 
 		// Look for a prefix match; it'll be the root project/repo containing
 		// the reached package
-		if k, idep, match := xt.LongestPrefix(rp); match {
-			// The radix tree gets it mostly right, but we have to guard against
-			// possibilities like this:
-			//
-			// github.com/sdboyer/foo
-			// github.com/sdboyer/foobar/baz
-			//
-			// The latter would incorrectly be conflated with the former. So, as
-			// we know we're operating on strings that describe paths, guard
-			// against this case by verifying that either the input is the same
-			// length as the match (in which case we know they're equal), or
-			// that the next character is the is the PathSeparator.
-			if len(k) == len(rp) || strings.IndexRune(rp[:len(k)], os.PathSeparator) == 0 {
+		if pre, idep, match := xt.LongestPrefix(rp); match {
+			if isPathPrefixOrEqual(pre, rp) {
 				// Match is valid; put it in the dmap, either creating a new
 				// completeDep or appending it to the existing one for this base
 				// project/prefix.
