@@ -257,9 +257,11 @@ func (sm *SourceMgr) DeduceProjectRoot(ip string) (ProjectRoot, error) {
 		// The non-matching tail of the import path could still be malformed.
 		// Validate just that part, if it exists
 		if prefix != ip {
-			if !pathvld.MatchString(strings.TrimPrefix(ip, prefix)) {
-				return "", fmt.Errorf("%q is not a valid import path", ip)
-			}
+			// TODO(sdboyer) commented until i find a proper description of how
+			// to validate an import path
+			//if !pathvld.MatchString(strings.TrimPrefix(ip, prefix+"/")) {
+			//return "", fmt.Errorf("%q is not a valid import path", ip)
+			//}
 			// There was one, and it validated fine - add it so we don't have to
 			// revalidate it later
 			sm.rootxt.Insert(ip, root)

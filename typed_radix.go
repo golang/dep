@@ -146,6 +146,13 @@ func (t prTrie) ToMap() map[string]ProjectRoot {
 // verifying that either the input is the same length as the match (in which
 // case we know they're equal), or that the next character is a "/".
 func isPathPrefixOrEqual(pre, path string) bool {
-	prflen := len(pre)
-	return prflen == len(path) || strings.Index(path[:prflen], "/") == 0
+	prflen, pathlen := len(pre), len(path)
+	if pathlen == prflen+1 {
+		// this can never be the case
+		return false
+	}
+
+	// we assume something else (a trie) has done equality check up to the point
+	// of the prefix, so we just check len
+	return prflen == pathlen || strings.Index(path[prflen:], "/") == 0
 }
