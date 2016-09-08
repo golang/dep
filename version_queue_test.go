@@ -8,6 +8,7 @@ import (
 // just need a ListVersions method
 type fakeBridge struct {
 	*bridge
+	vl []Version
 }
 
 var fakevl = []Version{
@@ -24,7 +25,7 @@ func init() {
 
 func (fb *fakeBridge) ListVersions(id ProjectIdentifier) ([]Version, error) {
 	// it's a fixture, we only ever do the one, regardless of id
-	return fakevl, nil
+	return fb.vl, nil
 }
 
 type fakeFailBridge struct {
@@ -41,7 +42,7 @@ func TestVersionQueueSetup(t *testing.T) {
 	id := ProjectIdentifier{ProjectRoot: ProjectRoot("foo")}.normalize()
 
 	// shouldn't even need to embed a real bridge
-	fb := &fakeBridge{}
+	fb := &fakeBridge{vl: fakevl}
 	ffb := &fakeFailBridge{}
 
 	_, err := newVersionQueue(id, nil, nil, ffb)
@@ -129,7 +130,7 @@ func TestVersionQueueSetup(t *testing.T) {
 }
 
 func TestVersionQueueAdvance(t *testing.T) {
-	fb := &fakeBridge{}
+	fb := &fakeBridge{vl: fakevl}
 	id := ProjectIdentifier{ProjectRoot: ProjectRoot("foo")}.normalize()
 
 	// First with no prefv or lockv
@@ -172,6 +173,9 @@ func TestVersionQueueAdvance(t *testing.T) {
 	if vq.String() != "[v1.1.0, v2.0.0]" {
 		t.Error("stringifying vq did not have expected outcome, got", vq.String())
 	}
+	if vq.isExhausted() {
+		t.Error("can't be exhausted, we aren't even 'allLoaded' yet")
+	}
 
 	err = vq.advance(fmt.Errorf("dequeue lockv"))
 	if err != nil {
@@ -209,4 +213,37 @@ func TestVersionQueueAdvance(t *testing.T) {
 	if vq.current() != fakevl[4] {
 		t.Errorf("third elem after ListVersions() should be idx 4 of fakevl (%s), got %s", fakevl[4], vq.current())
 	}
+	vq.advance(nil)
+	if vq.current() != nil || !vq.isExhausted() {
+		t.Error("should be out of versions in the queue")
+	}
+
+	// Make sure we handle things correctly when listVersions adds nothing new
+	fb = &fakeBridge{vl: []Version{lockv, prefv}}
+	vq, err = newVersionQueue(id, lockv, prefv, fb)
+	vq.advance(nil)
+	vq.advance(nil)
+	if vq.current() != nil || !vq.isExhausted() {
+		t.Errorf("should have no versions left, as ListVersions() added nothing new, but still have %s", vq.String())
+	}
+	err = vq.advance(nil)
+	if err != nil {
+		t.Errorf("should be fine to advance on empty queue, per docs, but got err %s", err)
+	}
+
+	// Also handle it well when advancing calls ListVersions() and it gets an
+	// error
+	vq, err = newVersionQueue(id, lockv, nil, &fakeFailBridge{})
+	if err != nil {
+		t.Errorf("should not err on creation when preseeded with lockv, but got err %s", err)
+	}
+	err = vq.advance(nil)
+	if err == nil {
+		t.Error("advancing should trigger call to erroring bridge, but no err")
+	}
+	err = vq.advance(nil)
+	if err == nil {
+		t.Error("err should be stored for reuse on any subsequent calls")
+	}
+
 }

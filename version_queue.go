@@ -104,13 +104,13 @@ func (vq *versionQueue) advance(fail error) error {
 		for k, pi := range vq.pi {
 			if pi == vq.lockv || pi == vq.prefv {
 				delkeys = append(delkeys, k)
-				// GC-safe deletion for slice w/pointer elements
 			}
 		}
 
 		for k, dk := range delkeys {
 			dk -= k
 			copy(vq.pi[dk:], vq.pi[dk+1:])
+			// write nil to final position for GC safety
 			vq.pi[len(vq.pi)-1] = nil
 			vq.pi = vq.pi[:len(vq.pi)-1]
 		}
