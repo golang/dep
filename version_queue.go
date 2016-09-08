@@ -18,6 +18,7 @@ type versionQueue struct {
 	b            sourceBridge
 	failed       bool
 	allLoaded    bool
+	adverr       error
 }
 
 func newVersionQueue(id ProjectIdentifier, lockv, prefv Version, b sourceBridge) (*versionQueue, error) {
@@ -63,10 +64,10 @@ func (vq *versionQueue) current() Version {
 
 // advance moves the versionQueue forward to the next available version,
 // recording the failure that eliminated the current version.
-func (vq *versionQueue) advance(fail error) (err error) {
+func (vq *versionQueue) advance(fail error) error {
 	// Nothing in the queue means...nothing in the queue, nicely enough
-	if len(vq.pi) == 0 {
-		return
+	if vq.adverr != nil || len(vq.pi) == 0 { // should be a redundant check, but just in case
+		return vq.adverr
 	}
 
 	// Record the fail reason and pop the queue
@@ -80,32 +81,43 @@ func (vq *versionQueue) advance(fail error) (err error) {
 	if len(vq.pi) == 0 {
 		if vq.allLoaded {
 			// This branch gets hit when the queue is first fully exhausted,
-			// after having been populated by ListVersions() on a previous
-			// advance()
-			return
+			// after a previous advance() already called ListVersions().
+			return nil
 		}
-
 		vq.allLoaded = true
-		vq.pi, err = vq.b.ListVersions(vq.id)
-		if err != nil {
-			return err
-		}
 
-		// search for and remove locked and pref versions
+		var vltmp []Version
+		vltmp, vq.adverr = vq.b.ListVersions(vq.id)
+		if vq.adverr != nil {
+			return vq.adverr
+		}
+		// defensive copy - calling ListVersions here means slice contents may
+		// be modified when removing prefv/lockv.
+		vq.pi = make([]Version, len(vltmp))
+		copy(vq.pi, vltmp)
+
+		// search for and remove lockv and prefv, in a pointer GC-safe manner
 		//
 		// could use the version comparator for binary search here to avoid
 		// O(n) each time...if it matters
+		var delkeys []int
 		for k, pi := range vq.pi {
 			if pi == vq.lockv || pi == vq.prefv {
+				delkeys = append(delkeys, k)
 				// GC-safe deletion for slice w/pointer elements
-				vq.pi, vq.pi[len(vq.pi)-1] = append(vq.pi[:k], vq.pi[k+1:]...), nil
-				//vq.pi = append(vq.pi[:k], vq.pi[k+1:]...)
 			}
+		}
+
+		for k, dk := range delkeys {
+			dk -= k
+			copy(vq.pi[dk:], vq.pi[dk+1:])
+			vq.pi[len(vq.pi)-1] = nil
+			vq.pi = vq.pi[:len(vq.pi)-1]
 		}
 
 		if len(vq.pi) == 0 {
 			// If listing versions added nothing (new), then return now
-			return
+			return nil
 		}
 	}
 
@@ -117,7 +129,7 @@ func (vq *versionQueue) advance(fail error) (err error) {
 	// If all have been loaded and the queue is empty, we're definitely out
 	// of things to try. Return empty, though, because vq semantics dictate
 	// that we don't explicitly indicate the end of the queue here.
-	return
+	return nil
 }
 
 // isExhausted indicates whether or not the queue has definitely been exhausted,
