@@ -716,7 +716,7 @@ type bimodalFixture struct {
 	// bimodal project. first is always treated as root project
 	ds []depspec
 	// results; map of name/version pairs
-	r map[string]Version
+	r map[ProjectIdentifier]Version
 	// max attempts the solver should need to find solution. 0 means no limit
 	maxAttempts int
 	// Use downgrade instead of default upgrade sorter
@@ -748,7 +748,7 @@ func (f bimodalFixture) maxTries() int {
 	return f.maxAttempts
 }
 
-func (f bimodalFixture) solution() map[string]Version {
+func (f bimodalFixture) solution() map[ProjectIdentifier]Version {
 	return f.r
 }
 

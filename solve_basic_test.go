@@ -300,12 +300,11 @@ func mkrevlock(pairs ...string) fixLock {
 }
 
 // mksolution makes a result set
-func mksolution(pairs ...string) map[string]Version {
-	m := make(map[string]Version)
+func mksolution(pairs ...string) map[ProjectIdentifier]Version {
+	m := make(map[ProjectIdentifier]Version)
 	for _, pair := range pairs {
 		a := mkAtom(pair)
-		// TODO(sdboyer) identifierify
-		m[string(a.id.ProjectRoot)] = a.v
+		m[a.id.normalize()] = a.v
 	}
 
 	return m
@@ -356,7 +355,7 @@ type specfix interface {
 	rootmanifest() RootManifest
 	specs() []depspec
 	maxTries() int
-	solution() map[string]Version
+	solution() map[ProjectIdentifier]Version
 	failure() error
 }
 
@@ -380,7 +379,7 @@ type basicFixture struct {
 	// depspecs. always treat first as root
 	ds []depspec
 	// results; map of name/version pairs
-	r map[string]Version
+	r map[ProjectIdentifier]Version
 	// max attempts the solver should need to find solution. 0 means no limit
 	maxAttempts int
 	// Use downgrade instead of default upgrade sorter
@@ -407,7 +406,7 @@ func (f basicFixture) maxTries() int {
 	return f.maxAttempts
 }
 
-func (f basicFixture) solution() map[string]Version {
+func (f basicFixture) solution() map[ProjectIdentifier]Version {
 	return f.r
 }
 

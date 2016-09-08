@@ -178,10 +178,10 @@ func fixtureSolveSimpleChecks(fix specfix, soln Solution, err error, t *testing.
 		}
 
 		// Dump result projects into a map for easier interrogation
-		rp := make(map[string]Version)
+		rp := make(map[ProjectIdentifier]Version)
 		for _, p := range r.p {
 			pa := p.toAtom()
-			rp[string(pa.id.ProjectRoot)] = pa.v
+			rp[pa.id] = pa.v
 		}
 
 		fixlen, rlen := len(fix.solution()), len(rp)
@@ -194,12 +194,12 @@ func fixtureSolveSimpleChecks(fix specfix, soln Solution, err error, t *testing.
 		// Walk through fixture/expected results first
 		for p, v := range fix.solution() {
 			if av, exists := rp[p]; !exists {
-				t.Errorf("(fixture: %q) Project %q expected but missing from results", fix.name(), p)
+				t.Errorf("(fixture: %q) Project %q expected but missing from results", fix.name(), p.errString())
 			} else {
 				// delete result from map so we skip it on the reverse pass
 				delete(rp, p)
 				if v != av {
-					t.Errorf("(fixture: %q) Expected version %q of project %q, but actual version was %q", fix.name(), v, p, av)
+					t.Errorf("(fixture: %q) Expected version %q of project %q, but actual version was %q", fix.name(), v, p.errString(), av)
 				}
 			}
 		}
@@ -207,9 +207,9 @@ func fixtureSolveSimpleChecks(fix specfix, soln Solution, err error, t *testing.
 		// Now walk through remaining actual results
 		for p, v := range rp {
 			if fv, exists := fix.solution()[p]; !exists {
-				t.Errorf("(fixture: %q) Unexpected project %q present in results", fix.name(), p)
+				t.Errorf("(fixture: %q) Unexpected project %q present in results", fix.name(), p.errString())
 			} else if v != fv {
-				t.Errorf("(fixture: %q) Got version %q of project %q, but expected version was %q", fix.name(), v, p, fv)
+				t.Errorf("(fixture: %q) Got version %q of project %q, but expected version was %q", fix.name(), v, p.errString(), fv)
 			}
 		}
 	}
