@@ -181,7 +181,7 @@ func TestVersionQueueAdvance(t *testing.T) {
 			t.Errorf("current should be prefv (%s) after first advance, got %s", prefv, vq.current())
 		}
 		if len(vq.pi) != 1 {
-			t.Error("should have just prefv elem left in vq, but there are %v:\n\t%s", len(vq.pi), vq.String())
+			t.Errorf("should have just prefv elem left in vq, but there are %v:\n\t%s", len(vq.pi), vq.String())
 		}
 	}
 
