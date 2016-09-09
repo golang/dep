@@ -145,10 +145,6 @@ type solver struct {
 	// A map of the ProjectRoot (local names) that should be allowed to change
 	chng map[ProjectRoot]struct{}
 
-	// A map of the ProjectRoot (local names) that are currently selected, and
-	// the network name to which they currently correspond.
-	names map[ProjectRoot]string
-
 	// A ProjectConstraints map containing the validated (guaranteed non-empty)
 	// overrides declared by the root manifest.
 	ovr ProjectConstraints
@@ -253,7 +249,6 @@ func Prepare(params SolveParameters, sm SourceManager) (Solver, error) {
 	// Initialize maps
 	s.chng = make(map[ProjectRoot]struct{})
 	s.rlm = make(map[ProjectRoot]LockedProject)
-	s.names = make(map[ProjectRoot]string)
 
 	for _, v := range s.params.ToChange {
 		s.chng[v] = struct{}{}
@@ -485,7 +480,6 @@ func (s *solver) selectRoot() error {
 
 		s.sel.pushDep(dependency{depender: pa, dep: dep})
 		// Add all to unselected queue
-		s.names[dep.Ident.ProjectRoot] = dep.Ident.netName()
 		heap.Push(s.unsel, bimodalIdentifier{id: dep.Ident, pl: dep.pl, fromRoot: true})
 	}
 
@@ -545,7 +539,6 @@ func (s *solver) getImportsAndConstraintsOf(a atomWithPackages) ([]completeDep, 
 	}
 
 	deps := s.ovr.overrideAll(m.DependencyConstraints())
-
 	return s.intersectConstraintsWithImports(deps, reach)
 }
 
@@ -1118,10 +1111,6 @@ func (s *solver) selectAtom(a atomWithPackages, pkgonly bool) {
 			}
 			heap.Push(s.unsel, bmi)
 		}
-
-		if s.sel.depperCount(dep.Ident) == 1 {
-			s.names[dep.Ident.ProjectRoot] = dep.Ident.netName()
-		}
 	}
 
 	s.traceSelect(a, pkgonly)
@@ -1143,7 +1132,6 @@ func (s *solver) unselectLast() (atomWithPackages, bool) {
 
 		// if no parents/importers, remove from unselected queue
 		if s.sel.depperCount(dep.Ident) == 0 {
-			delete(s.names, dep.Ident.ProjectRoot)
 			s.unsel.remove(bimodalIdentifier{id: dep.Ident, pl: dep.pl})
 		}
 	}
