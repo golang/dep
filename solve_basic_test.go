@@ -8,7 +8,7 @@ import (
 	"github.com/Masterminds/semver"
 )
 
-var regfrom = regexp.MustCompile(`^(\w*) from (\w*) ([0-9\.]*)`)
+var regfrom = regexp.MustCompile(`^(\w*) from (\w*) ([0-9\.\*]*)`)
 
 // nvSplit splits an "info" string on " " into the pair of name and
 // version/constraint, and returns each individually.
@@ -28,9 +28,6 @@ func nvSplit(info string) (id ProjectIdentifier, version string) {
 	}
 
 	id.ProjectRoot, version = ProjectRoot(s[0]), s[1]
-	if id.NetworkName == "" {
-		id.NetworkName = string(id.ProjectRoot)
-	}
 	return
 }
 
@@ -44,7 +41,7 @@ func nvSplit(info string) (id ProjectIdentifier, version string) {
 func nvrSplit(info string) (id ProjectIdentifier, version string, revision Revision) {
 	if strings.Contains(info, " from ") {
 		parts := regfrom.FindStringSubmatch(info)
-		info = parts[1] + " " + parts[3]
+		info = fmt.Sprintf("%s %s", parts[1], parts[3])
 		id.NetworkName = parts[2]
 	}
 
@@ -54,9 +51,6 @@ func nvrSplit(info string) (id ProjectIdentifier, version string, revision Revis
 	}
 
 	id.ProjectRoot, version = ProjectRoot(s[0]), s[1]
-	if id.NetworkName == "" {
-		id.NetworkName = string(id.ProjectRoot)
-	}
 
 	if len(s) == 3 {
 		revision = Revision(s[2])
@@ -211,7 +205,7 @@ type depspec struct {
 // treated as a test-only dependency.
 func mkDepspec(pi string, deps ...string) depspec {
 	pa := mkAtom(pi)
-	if string(pa.id.ProjectRoot) != pa.id.NetworkName {
+	if string(pa.id.ProjectRoot) != pa.id.NetworkName && pa.id.NetworkName != "" {
 		panic("alternate source on self makes no sense")
 	}
 
@@ -249,7 +243,6 @@ func mkADep(atom, pdep string, c Constraint, pl ...string) dependency {
 			workingConstraint: workingConstraint{
 				Ident: ProjectIdentifier{
 					ProjectRoot: ProjectRoot(pdep),
-					NetworkName: pdep,
 				},
 				Constraint: c,
 			},
@@ -259,11 +252,13 @@ func mkADep(atom, pdep string, c Constraint, pl ...string) dependency {
 }
 
 // mkPI creates a ProjectIdentifier with the ProjectRoot as the provided
-// string, and with the NetworkName normalized to be the same.
+// string, and the NetworkName unset.
+//
+// Call normalize() on the returned value if you need the NetworkName to be be
+// equal to the ProjectRoot.
 func mkPI(root string) ProjectIdentifier {
 	return ProjectIdentifier{
 		ProjectRoot: ProjectRoot(root),
-		NetworkName: root,
 	}
 }
 
@@ -281,7 +276,7 @@ func mklock(pairs ...string) fixLock {
 	l := make(fixLock, 0)
 	for _, s := range pairs {
 		pa := mkAtom(s)
-		l = append(l, NewLockedProject(pa.id.ProjectRoot, pa.v, pa.id.netName(), nil))
+		l = append(l, NewLockedProject(pa.id, pa.v, nil))
 	}
 
 	return l
@@ -293,19 +288,18 @@ func mkrevlock(pairs ...string) fixLock {
 	l := make(fixLock, 0)
 	for _, s := range pairs {
 		pa := mkAtom(s)
-		l = append(l, NewLockedProject(pa.id.ProjectRoot, pa.v.(PairedVersion).Underlying(), pa.id.netName(), nil))
+		l = append(l, NewLockedProject(pa.id, pa.v.(PairedVersion).Underlying(), nil))
 	}
 
 	return l
 }
 
 // mksolution makes a result set
-func mksolution(pairs ...string) map[string]Version {
-	m := make(map[string]Version)
+func mksolution(pairs ...string) map[ProjectIdentifier]Version {
+	m := make(map[ProjectIdentifier]Version)
 	for _, pair := range pairs {
 		a := mkAtom(pair)
-		// TODO(sdboyer) identifierify
-		m[string(a.id.ProjectRoot)] = a.v
+		m[a.id] = a.v
 	}
 
 	return m
@@ -356,7 +350,7 @@ type specfix interface {
 	rootmanifest() RootManifest
 	specs() []depspec
 	maxTries() int
-	solution() map[string]Version
+	solution() map[ProjectIdentifier]Version
 	failure() error
 }
 
@@ -380,7 +374,7 @@ type basicFixture struct {
 	// depspecs. always treat first as root
 	ds []depspec
 	// results; map of name/version pairs
-	r map[string]Version
+	r map[ProjectIdentifier]Version
 	// max attempts the solver should need to find solution. 0 means no limit
 	maxAttempts int
 	// Use downgrade instead of default upgrade sorter
@@ -407,7 +401,7 @@ func (f basicFixture) maxTries() int {
 	return f.maxAttempts
 }
 
-func (f basicFixture) solution() map[string]Version {
+func (f basicFixture) solution() map[ProjectIdentifier]Version {
 	return f.r
 }
 
@@ -518,28 +512,6 @@ var basicFixtures = map[string]basicFixture{
 			"bar 1.0.0",
 		),
 		maxAttempts: 2,
-	},
-	"with mismatched net addrs": {
-		ds: []depspec{
-			mkDepspec("root 1.0.0", "foo 1.0.0", "bar 1.0.0"),
-			mkDepspec("foo 1.0.0", "bar from baz 1.0.0"),
-			mkDepspec("bar 1.0.0"),
-		},
-		fail: &noVersionError{
-			pn: mkPI("foo"),
-			fails: []failedVersion{
-				{
-					v: NewVersion("1.0.0"),
-					f: &sourceMismatchFailure{
-						shared:   ProjectRoot("bar"),
-						current:  "bar",
-						mismatch: "baz",
-						prob:     mkAtom("foo 1.0.0"),
-						sel:      []dependency{mkDep("root", "foo 1.0.0", "foo")},
-					},
-				},
-			},
-		},
 	},
 	// fixtures with locks
 	"with compatible locked dependency": {
@@ -1098,7 +1070,7 @@ var basicFixtures = map[string]basicFixture{
 		},
 		r: mksolution(
 			"foo 1.0.0",
-			"bar 1.0.0",
+			"bar from bar 1.0.0",
 		),
 	},
 
@@ -1204,7 +1176,7 @@ func newdepspecSM(ds []depspec, ignore []string) *depspecSourceManager {
 
 func (sm *depspecSourceManager) GetManifestAndLock(id ProjectIdentifier, v Version) (Manifest, Lock, error) {
 	for _, ds := range sm.specs {
-		if id.ProjectRoot == ds.n && v.Matches(ds.v) {
+		if id.netName() == string(ds.n) && v.Matches(ds.v) {
 			return ds, dummyLock{}, nil
 		}
 	}
@@ -1218,7 +1190,7 @@ func (sm *depspecSourceManager) AnalyzerInfo() (string, *semver.Version) {
 }
 
 func (sm *depspecSourceManager) ExternalReach(id ProjectIdentifier, v Version) (map[string][]string, error) {
-	pid := pident{n: id.ProjectRoot, v: v}
+	pid := pident{n: ProjectRoot(id.netName()), v: v}
 	if m, exists := sm.rm[pid]; exists {
 		return m, nil
 	}
@@ -1227,7 +1199,7 @@ func (sm *depspecSourceManager) ExternalReach(id ProjectIdentifier, v Version) (
 
 func (sm *depspecSourceManager) ListExternal(id ProjectIdentifier, v Version) ([]string, error) {
 	// This should only be called for the root
-	pid := pident{n: id.ProjectRoot, v: v}
+	pid := pident{n: ProjectRoot(id.netName()), v: v}
 	if r, exists := sm.rm[pid]; exists {
 		return r[string(id.ProjectRoot)], nil
 	}
@@ -1235,18 +1207,17 @@ func (sm *depspecSourceManager) ListExternal(id ProjectIdentifier, v Version) ([
 }
 
 func (sm *depspecSourceManager) ListPackages(id ProjectIdentifier, v Version) (PackageTree, error) {
-	pid := pident{n: id.ProjectRoot, v: v}
-	n := id.ProjectRoot
+	pid := pident{n: ProjectRoot(id.netName()), v: v}
 
 	if r, exists := sm.rm[pid]; exists {
 		ptree := PackageTree{
-			ImportRoot: string(n),
+			ImportRoot: string(pid.n),
 			Packages: map[string]PackageOrErr{
-				string(n): {
+				string(pid.n): {
 					P: Package{
-						ImportPath: string(n),
-						Name:       string(n),
-						Imports:    r[string(n)],
+						ImportPath: string(pid.n),
+						Name:       string(pid.n),
+						Imports:    r[string(pid.n)],
 					},
 				},
 			},
@@ -1254,14 +1225,14 @@ func (sm *depspecSourceManager) ListPackages(id ProjectIdentifier, v Version) (P
 		return ptree, nil
 	}
 
-	return PackageTree{}, fmt.Errorf("Project %s at version %s could not be found", n, v)
+	return PackageTree{}, fmt.Errorf("Project %s at version %s could not be found", pid.n, v)
 }
 
 func (sm *depspecSourceManager) ListVersions(id ProjectIdentifier) (pi []Version, err error) {
 	for _, ds := range sm.specs {
 		// To simulate the behavior of the real SourceManager, we do not return
 		// revisions from ListVersions().
-		if _, isrev := ds.v.(Revision); !isrev && id.ProjectRoot == ds.n {
+		if _, isrev := ds.v.(Revision); !isrev && id.netName() == string(ds.n) {
 			pi = append(pi, ds.v)
 		}
 	}
@@ -1275,7 +1246,7 @@ func (sm *depspecSourceManager) ListVersions(id ProjectIdentifier) (pi []Version
 
 func (sm *depspecSourceManager) RevisionPresentIn(id ProjectIdentifier, r Revision) (bool, error) {
 	for _, ds := range sm.specs {
-		if id.ProjectRoot == ds.n && r == ds.v {
+		if id.netName() == string(ds.n) && r == ds.v {
 			return true, nil
 		}
 	}
@@ -1285,7 +1256,7 @@ func (sm *depspecSourceManager) RevisionPresentIn(id ProjectIdentifier, r Revisi
 
 func (sm *depspecSourceManager) SourceExists(id ProjectIdentifier) (bool, error) {
 	for _, ds := range sm.specs {
-		if id.ProjectRoot == ds.n {
+		if id.netName() == string(ds.n) {
 			return true, nil
 		}
 	}

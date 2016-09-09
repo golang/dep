@@ -2,7 +2,7 @@ package gps
 
 type selection struct {
 	projects []selected
-	deps     map[ProjectIdentifier][]dependency
+	deps     map[ProjectRoot][]dependency
 	sm       sourceBridge
 }
 
@@ -12,11 +12,27 @@ type selected struct {
 }
 
 func (s *selection) getDependenciesOn(id ProjectIdentifier) []dependency {
-	if deps, exists := s.deps[id]; exists {
+	if deps, exists := s.deps[id.ProjectRoot]; exists {
 		return deps
 	}
 
 	return nil
+}
+
+// getIdentFor returns the ProjectIdentifier (so, the network name) currently in
+// use for the provided ProjectRoot.
+//
+// If no dependencies are present yet that designate a network name for
+// the provided root, this will return an empty ProjectIdentifier and false.
+func (s *selection) getIdentFor(pr ProjectRoot) (ProjectIdentifier, bool) {
+	deps := s.getDependenciesOn(ProjectIdentifier{ProjectRoot: pr})
+	if len(deps) == 0 {
+		return ProjectIdentifier{}, false
+	}
+
+	// For now, at least, the solver maintains (assumes?) the invariant that
+	// whatever is first in the deps list decides the net name to be used.
+	return deps[0].dep.Ident, true
 }
 
 // pushSelection pushes a new atomWithPackages onto the selection stack, along
@@ -40,21 +56,21 @@ func (s *selection) popSelection() (atomWithPackages, bool) {
 }
 
 func (s *selection) pushDep(dep dependency) {
-	s.deps[dep.dep.Ident] = append(s.deps[dep.dep.Ident], dep)
+	s.deps[dep.dep.Ident.ProjectRoot] = append(s.deps[dep.dep.Ident.ProjectRoot], dep)
 }
 
 func (s *selection) popDep(id ProjectIdentifier) (dep dependency) {
-	deps := s.deps[id]
-	dep, s.deps[id] = deps[len(deps)-1], deps[:len(deps)-1]
+	deps := s.deps[id.ProjectRoot]
+	dep, s.deps[id.ProjectRoot] = deps[len(deps)-1], deps[:len(deps)-1]
 	return dep
 }
 
 func (s *selection) depperCount(id ProjectIdentifier) int {
-	return len(s.deps[id])
+	return len(s.deps[id.ProjectRoot])
 }
 
 func (s *selection) setDependenciesOn(id ProjectIdentifier, deps []dependency) {
-	s.deps[id] = deps
+	s.deps[id.ProjectRoot] = deps
 }
 
 // Compute a list of the unique packages within the given ProjectIdentifier that
@@ -64,7 +80,7 @@ func (s *selection) getRequiredPackagesIn(id ProjectIdentifier) map[string]int {
 	// precompute it on pushing a new dep, and preferably with an immut
 	// structure so that we can pop with zero cost.
 	uniq := make(map[string]int)
-	for _, dep := range s.deps[id] {
+	for _, dep := range s.deps[id.ProjectRoot] {
 		for _, pkg := range dep.dep.pl {
 			if count, has := uniq[pkg]; has {
 				count++
@@ -103,7 +119,7 @@ func (s *selection) getSelectedPackagesIn(id ProjectIdentifier) map[string]int {
 }
 
 func (s *selection) getConstraint(id ProjectIdentifier) Constraint {
-	deps, exists := s.deps[id]
+	deps, exists := s.deps[id.ProjectRoot]
 	if !exists || len(deps) == 0 {
 		return any
 	}
@@ -133,7 +149,7 @@ func (s *selection) getConstraint(id ProjectIdentifier) Constraint {
 // have happened later.
 func (s *selection) selected(id ProjectIdentifier) (atomWithPackages, bool) {
 	for _, p := range s.projects {
-		if p.a.a.id.eq(id) {
+		if p.a.a.id.ProjectRoot == id.ProjectRoot {
 			return p.a, true
 		}
 	}

@@ -26,9 +26,7 @@ func TestHashInputs(t *testing.T) {
 
 	elems := []string{
 		"a",
-		"a",
 		"1.0.0",
-		"b",
 		"b",
 		"1.0.0",
 		stdlibPkgs,
@@ -75,9 +73,7 @@ func TestHashInputsIgnores(t *testing.T) {
 
 	elems := []string{
 		"a",
-		"a",
 		"1.0.0",
-		"b",
 		"b",
 		"1.0.0",
 		stdlibPkgs,
@@ -129,9 +125,7 @@ func TestHashInputsOverrides(t *testing.T) {
 
 	elems := []string{
 		"a",
-		"a",
 		"1.0.0",
-		"b",
 		"b",
 		"1.0.0",
 		stdlibPkgs,
@@ -168,9 +162,7 @@ func TestHashInputsOverrides(t *testing.T) {
 
 	elems = []string{
 		"a",
-		"a",
 		"1.0.0",
-		"b",
 		"b",
 		"1.0.0",
 		stdlibPkgs,
@@ -210,9 +202,7 @@ func TestHashInputsOverrides(t *testing.T) {
 
 	elems = []string{
 		"a",
-		"a",
 		"1.0.0",
-		"b",
 		"b",
 		"1.0.0",
 		stdlibPkgs,
@@ -254,9 +244,7 @@ func TestHashInputsOverrides(t *testing.T) {
 
 	elems = []string{
 		"a",
-		"a",
 		"fluglehorn",
-		"b",
 		"b",
 		"1.0.0",
 		stdlibPkgs,
@@ -303,7 +291,6 @@ func TestHashInputsOverrides(t *testing.T) {
 		"nota",
 		"1.0.0",
 		"b",
-		"b",
 		"1.0.0",
 		stdlibPkgs,
 		appenginePkgs,
@@ -349,7 +336,6 @@ func TestHashInputsOverrides(t *testing.T) {
 		"a",
 		"nota",
 		"fluglehorn",
-		"b",
 		"b",
 		"1.0.0",
 		stdlibPkgs,

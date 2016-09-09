@@ -1,7 +1,9 @@
 package gps
 
 import (
+	"bytes"
 	"flag"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"math/rand"
@@ -153,6 +155,14 @@ func solveBimodalAndCheck(fix bimodalFixture, t *testing.T) (res Solution, err e
 }
 
 func fixtureSolveSimpleChecks(fix specfix, soln Solution, err error, t *testing.T) (Solution, error) {
+	ppi := func(id ProjectIdentifier) string {
+		// need this so we can clearly tell if there's a NetworkName or not
+		if id.NetworkName == "" {
+			return string(id.ProjectRoot)
+		}
+		return fmt.Sprintf("%s (from %s)", id.ProjectRoot, id.NetworkName)
+	}
+
 	fixfail := fix.failure()
 	if err != nil {
 		if fixfail == nil {
@@ -163,7 +173,12 @@ func fixtureSolveSimpleChecks(fix specfix, soln Solution, err error, t *testing.
 			t.Errorf("(fixture: %q) Failure mismatch:\n\t(GOT): %s\n\t(WNT): %s", fix.name(), err, fixfail)
 		}
 	} else if fixfail != nil {
-		t.Errorf("(fixture: %q) Solver succeeded, but expecting failure:\n%s", fix.name(), fixfail)
+		var buf bytes.Buffer
+		fmt.Fprintf(&buf, "(fixture: %q) Solver succeeded, but expecting failure:\n%s\nProjects in solution:", fix.name(), fixfail)
+		for _, p := range soln.Projects() {
+			fmt.Fprintf(&buf, "\n\t- %s at %s", ppi(p.Ident()), p.Version())
+		}
+		t.Error(buf.String())
 	} else {
 		r := soln.(solution)
 		if fix.maxTries() > 0 && r.Attempts() > fix.maxTries() {
@@ -171,10 +186,10 @@ func fixtureSolveSimpleChecks(fix specfix, soln Solution, err error, t *testing.
 		}
 
 		// Dump result projects into a map for easier interrogation
-		rp := make(map[string]Version)
+		rp := make(map[ProjectIdentifier]Version)
 		for _, p := range r.p {
 			pa := p.toAtom()
-			rp[string(pa.id.ProjectRoot)] = pa.v
+			rp[pa.id] = pa.v
 		}
 
 		fixlen, rlen := len(fix.solution()), len(rp)
@@ -187,12 +202,12 @@ func fixtureSolveSimpleChecks(fix specfix, soln Solution, err error, t *testing.
 		// Walk through fixture/expected results first
 		for p, v := range fix.solution() {
 			if av, exists := rp[p]; !exists {
-				t.Errorf("(fixture: %q) Project %q expected but missing from results", fix.name(), p)
+				t.Errorf("(fixture: %q) Project %q expected but missing from results", fix.name(), ppi(p))
 			} else {
 				// delete result from map so we skip it on the reverse pass
 				delete(rp, p)
 				if v != av {
-					t.Errorf("(fixture: %q) Expected version %q of project %q, but actual version was %q", fix.name(), v, p, av)
+					t.Errorf("(fixture: %q) Expected version %q of project %q, but actual version was %q", fix.name(), v, ppi(p), av)
 				}
 			}
 		}
@@ -200,9 +215,9 @@ func fixtureSolveSimpleChecks(fix specfix, soln Solution, err error, t *testing.
 		// Now walk through remaining actual results
 		for p, v := range rp {
 			if fv, exists := fix.solution()[p]; !exists {
-				t.Errorf("(fixture: %q) Unexpected project %q present in results", fix.name(), p)
+				t.Errorf("(fixture: %q) Unexpected project %q present in results", fix.name(), ppi(p))
 			} else if v != fv {
-				t.Errorf("(fixture: %q) Got version %q of project %q, but expected version was %q", fix.name(), v, p, fv)
+				t.Errorf("(fixture: %q) Got version %q of project %q, but expected version was %q", fix.name(), v, ppi(p), fv)
 			}
 		}
 	}

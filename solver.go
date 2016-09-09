@@ -145,22 +145,17 @@ type solver struct {
 	// A map of the ProjectRoot (local names) that should be allowed to change
 	chng map[ProjectRoot]struct{}
 
-	// A map of the ProjectRoot (local names) that are currently selected, and
-	// the network name to which they currently correspond.
-	// TODO(sdboyer) i think this is cruft and can be removed
-	names map[ProjectRoot]string
-
 	// A ProjectConstraints map containing the validated (guaranteed non-empty)
 	// overrides declared by the root manifest.
 	ovr ProjectConstraints
 
-	// A map of the names listed in the root's lock.
-	rlm map[ProjectIdentifier]LockedProject
+	// A map of the project names listed in the root's lock.
+	rlm map[ProjectRoot]LockedProject
 
-	// A normalized, copied version of the root manifest.
+	// A defensively-copied instance of the root manifest.
 	rm Manifest
 
-	// A normalized, copied version of the root lock.
+	// A defensively-copied instance of the root lock.
 	rl Lock
 }
 
@@ -253,8 +248,7 @@ func Prepare(params SolveParameters, sm SourceManager) (Solver, error) {
 
 	// Initialize maps
 	s.chng = make(map[ProjectRoot]struct{})
-	s.rlm = make(map[ProjectIdentifier]LockedProject)
-	s.names = make(map[ProjectRoot]string)
+	s.rlm = make(map[ProjectRoot]LockedProject)
 
 	for _, v := range s.params.ToChange {
 		s.chng[v] = struct{}{}
@@ -262,7 +256,7 @@ func Prepare(params SolveParameters, sm SourceManager) (Solver, error) {
 
 	// Initialize stacks and queues
 	s.sel = &selection{
-		deps: make(map[ProjectIdentifier][]dependency),
+		deps: make(map[ProjectRoot][]dependency),
 		sm:   s.b,
 	}
 	s.unsel = &unselected{
@@ -274,7 +268,7 @@ func Prepare(params SolveParameters, sm SourceManager) (Solver, error) {
 	s.rm = prepManifest(s.params.Manifest)
 	if s.params.Lock != nil {
 		for _, lp := range s.params.Lock.Projects() {
-			s.rlm[lp.Ident().normalize()] = lp
+			s.rlm[lp.Ident().ProjectRoot] = lp
 		}
 
 		// Also keep a prepped one, mostly for the bridge. This is probably
@@ -305,8 +299,8 @@ func (s *solver) Solve() (Solution, error) {
 		}
 
 		// An err here is impossible; it could only be caused by a parsing error
-		// of the root tree, but that necessarily succeeded back up
-		// selectRoot(), so we can ignore this err
+		// of the root tree, but that necessarily already succeeded back up in
+		// selectRoot(), so we can ignore the err return here
 		soln.hd, _ = s.HashInputs()
 
 		// Convert ProjectAtoms into LockedProjects
@@ -426,7 +420,7 @@ func (s *solver) solve() (map[atom]map[string]struct{}, error) {
 	return projs, nil
 }
 
-// selectRoot is a specialized selectAtomWithPackages, used solely to initially
+// selectRoot is a specialized selectAtom, used solely to initially
 // populate the queues at the beginning of a solve run.
 func (s *solver) selectRoot() error {
 	pa := atom{
@@ -480,13 +474,12 @@ func (s *solver) selectRoot() error {
 		// If we have no lock, or if this dep isn't in the lock, then prefetch
 		// it. See longer explanation in selectRoot() for how we benefit from
 		// parallelism here.
-		if _, has := s.rlm[dep.Ident]; !has {
+		if _, has := s.rlm[dep.Ident.ProjectRoot]; !has {
 			go s.b.SyncSourceFor(dep.Ident)
 		}
 
 		s.sel.pushDep(dependency{depender: pa, dep: dep})
 		// Add all to unselected queue
-		s.names[dep.Ident.ProjectRoot] = dep.Ident.netName()
 		heap.Push(s.unsel, bimodalIdentifier{id: dep.Ident, pl: dep.pl, fromRoot: true})
 	}
 
@@ -546,7 +539,6 @@ func (s *solver) getImportsAndConstraintsOf(a atomWithPackages) ([]completeDep, 
 	}
 
 	deps := s.ovr.overrideAll(m.DependencyConstraints())
-
 	return s.intersectConstraintsWithImports(deps, reach)
 }
 
@@ -575,19 +567,8 @@ func (s *solver) intersectConstraintsWithImports(deps []workingConstraint, reach
 
 		// Look for a prefix match; it'll be the root project/repo containing
 		// the reached package
-		if k, idep, match := xt.LongestPrefix(rp); match {
-			// The radix tree gets it mostly right, but we have to guard against
-			// possibilities like this:
-			//
-			// github.com/sdboyer/foo
-			// github.com/sdboyer/foobar/baz
-			//
-			// The latter would incorrectly be conflated with the former. So, as
-			// we know we're operating on strings that describe paths, guard
-			// against this case by verifying that either the input is the same
-			// length as the match (in which case we know they're equal), or
-			// that the next character is the is the PathSeparator.
-			if len(k) == len(rp) || strings.IndexRune(rp[:len(k)], os.PathSeparator) == 0 {
+		if pre, idep, match := xt.LongestPrefix(rp); match {
+			if isPathPrefixOrEqual(pre, rp) {
 				// Match is valid; put it in the dmap, either creating a new
 				// completeDep or appending it to the existing one for this base
 				// project/prefix.
@@ -616,7 +597,6 @@ func (s *solver) intersectConstraintsWithImports(deps []workingConstraint, reach
 		pd := s.ovr.override(ProjectConstraint{
 			Ident: ProjectIdentifier{
 				ProjectRoot: root,
-				NetworkName: string(root),
 			},
 			Constraint: Any(),
 		})
@@ -843,7 +823,7 @@ func (s *solver) getLockVersionIfValid(id ProjectIdentifier) (Version, error) {
 		}
 	}
 
-	lp, exists := s.rlm[id]
+	lp, exists := s.rlm[id.ProjectRoot]
 	if !exists {
 		return nil, nil
 	}
@@ -980,6 +960,9 @@ func (s *solver) unselectedComparator(i, j int) bool {
 
 	// FIXME the impl here is currently O(n) in the number of selections; it
 	// absolutely cannot stay in a hot sorting path like this
+	// FIXME while other solver invariants probably protect us from it, this
+	// call-out means that it's possible for external state change to invalidate
+	// heap invariants.
 	_, isel := s.sel.selected(iname)
 	_, jsel := s.sel.selected(jname)
 
@@ -994,8 +977,8 @@ func (s *solver) unselectedComparator(i, j int) bool {
 		return false
 	}
 
-	_, ilock := s.rlm[iname]
-	_, jlock := s.rlm[jname]
+	_, ilock := s.rlm[iname.ProjectRoot]
+	_, jlock := s.rlm[jname.ProjectRoot]
 
 	switch {
 	case ilock && !jlock:
@@ -1101,7 +1084,7 @@ func (s *solver) selectAtom(a atomWithPackages, pkgonly bool) {
 		// few microseconds before blocking later. Best case, the dep doesn't
 		// come up next, but some other dep comes up that wasn't prefetched, and
 		// both fetches proceed in parallel.
-		if _, has := s.rlm[dep.Ident]; !has {
+		if _, has := s.rlm[dep.Ident.ProjectRoot]; !has {
 			go s.b.SyncSourceFor(dep.Ident)
 		}
 
@@ -1128,10 +1111,6 @@ func (s *solver) selectAtom(a atomWithPackages, pkgonly bool) {
 			}
 			heap.Push(s.unsel, bmi)
 		}
-
-		if s.sel.depperCount(dep.Ident) == 1 {
-			s.names[dep.Ident.ProjectRoot] = dep.Ident.netName()
-		}
 	}
 
 	s.traceSelect(a, pkgonly)
@@ -1153,7 +1132,6 @@ func (s *solver) unselectLast() (atomWithPackages, bool) {
 
 		// if no parents/importers, remove from unselected queue
 		if s.sel.depperCount(dep.Ident) == 0 {
-			delete(s.names, dep.Ident.ProjectRoot)
 			s.unsel.remove(bimodalIdentifier{id: dep.Ident, pl: dep.pl})
 		}
 	}
@@ -1164,7 +1142,7 @@ func (s *solver) unselectLast() (atomWithPackages, bool) {
 // simple (temporary?) helper just to convert atoms into locked projects
 func pa2lp(pa atom, pkgs map[string]struct{}) LockedProject {
 	lp := LockedProject{
-		pi: pa.id.normalize(), // shouldn't be necessary, but normalize just in case
+		pi: pa.id,
 	}
 
 	switch v := pa.v.(type) {

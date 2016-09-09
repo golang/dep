@@ -58,16 +58,13 @@ func (l SimpleLock) Projects() []LockedProject {
 // to simply dismiss that project. By creating a hard failure case via panic
 // instead, we are trying to avoid inflicting the resulting pain on the user by
 // instead forcing a decision on the Analyzer implementation.
-func NewLockedProject(n ProjectRoot, v Version, url string, pkgs []string) LockedProject {
+func NewLockedProject(id ProjectIdentifier, v Version, pkgs []string) LockedProject {
 	if v == nil {
 		panic("must provide a non-nil version to create a LockedProject")
 	}
 
 	lp := LockedProject{
-		pi: ProjectIdentifier{
-			ProjectRoot: n,
-			NetworkName: url,
-		},
+		pi:   id,
 		pkgs: pkgs,
 	}
 
@@ -138,26 +135,16 @@ func (sl safeLock) Projects() []LockedProject {
 	return sl.p
 }
 
-// prepLock ensures a lock is prepared and safe for use by the solver.
-// This entails two things:
-//
-//  * Ensuring that all LockedProject's identifiers are normalized.
-//  * Defensively ensuring that no outside routine can modify the lock while the
-//  solver is in-flight.
+// prepLock ensures a lock is prepared and safe for use by the solver. This is
+// mostly about defensively ensuring that no outside routine can modify the lock
+// while the solver is in-flight.
 //
 // This is achieved by copying the lock's data into a new safeLock.
 func prepLock(l Lock) Lock {
 	pl := l.Projects()
 
-	rl := safeLock{
-		h: l.InputHash(),
-		p: make([]LockedProject, len(pl)),
-	}
-
-	for k, lp := range pl {
-		lp.pi = lp.pi.normalize()
-		rl.p[k] = lp
-	}
+	rl := safeLock{h: l.InputHash()}
+	copy(rl.p, pl)
 
 	return rl
 }
