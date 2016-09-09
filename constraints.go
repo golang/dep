@@ -192,7 +192,8 @@ func pcSliceToMap(l []ProjectConstraint, r ...[]ProjectConstraint) ProjectConstr
 
 	for _, pc := range l {
 		final[pc.Ident.ProjectRoot] = ProjectProperties{
-			Constraint: pc.Constraint,
+			NetworkName: pc.Ident.NetworkName,
+			Constraint:  pc.Constraint,
 		}
 	}
 
@@ -206,7 +207,8 @@ func pcSliceToMap(l []ProjectConstraint, r ...[]ProjectConstraint) ProjectConstr
 				final[pc.Ident.ProjectRoot] = pp
 			} else {
 				final[pc.Ident.ProjectRoot] = ProjectProperties{
-					Constraint: pc.Constraint,
+					NetworkName: pc.Ident.NetworkName,
+					Constraint:  pc.Constraint,
 				}
 			}
 		}
