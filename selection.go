@@ -19,6 +19,22 @@ func (s *selection) getDependenciesOn(id ProjectIdentifier) []dependency {
 	return nil
 }
 
+// getIdentFor returns the ProjectIdentifier (so, the network name) currently in
+// use for the provided ProjectRoot.
+//
+// If no dependencies are present yet that designate a network name for
+// the provided root, this will return an empty ProjectIdentifier and false.
+func (s *selection) getIdentFor(pr ProjectRoot) (ProjectIdentifier, bool) {
+	deps := s.getDependenciesOn(ProjectIdentifier{ProjectRoot: pr})
+	if len(deps) == 0 {
+		return ProjectIdentifier{}, false
+	}
+
+	// For now, at least, the solver maintains (assumes?) the invariant that
+	// whatever is first in the deps list decides the net name to be used.
+	return deps[0].dep.Ident, true
+}
+
 // pushSelection pushes a new atomWithPackages onto the selection stack, along
 // with an indicator as to whether this selection indicates a new project *and*
 // packages, or merely some new packages on a project that was already selected.

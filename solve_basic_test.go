@@ -28,9 +28,6 @@ func nvSplit(info string) (id ProjectIdentifier, version string) {
 	}
 
 	id.ProjectRoot, version = ProjectRoot(s[0]), s[1]
-	if id.NetworkName == "" {
-		id.NetworkName = string(id.ProjectRoot)
-	}
 	return
 }
 
@@ -54,9 +51,6 @@ func nvrSplit(info string) (id ProjectIdentifier, version string, revision Revis
 	}
 
 	id.ProjectRoot, version = ProjectRoot(s[0]), s[1]
-	if id.NetworkName == "" {
-		id.NetworkName = string(id.ProjectRoot)
-	}
 
 	if len(s) == 3 {
 		revision = Revision(s[2])
@@ -211,7 +205,7 @@ type depspec struct {
 // treated as a test-only dependency.
 func mkDepspec(pi string, deps ...string) depspec {
 	pa := mkAtom(pi)
-	if string(pa.id.ProjectRoot) != pa.id.NetworkName {
+	if string(pa.id.ProjectRoot) != pa.id.NetworkName && pa.id.NetworkName != "" {
 		panic("alternate source on self makes no sense")
 	}
 
@@ -249,7 +243,6 @@ func mkADep(atom, pdep string, c Constraint, pl ...string) dependency {
 			workingConstraint: workingConstraint{
 				Ident: ProjectIdentifier{
 					ProjectRoot: ProjectRoot(pdep),
-					NetworkName: pdep,
 				},
 				Constraint: c,
 			},
@@ -259,11 +252,13 @@ func mkADep(atom, pdep string, c Constraint, pl ...string) dependency {
 }
 
 // mkPI creates a ProjectIdentifier with the ProjectRoot as the provided
-// string, and with the NetworkName normalized to be the same.
+// string, and the NetworkName unset.
+//
+// Call normalize() on the returned value if you need the NetworkName to be be
+// equal to the ProjectRoot.
 func mkPI(root string) ProjectIdentifier {
 	return ProjectIdentifier{
 		ProjectRoot: ProjectRoot(root),
-		NetworkName: root,
 	}
 }
 
@@ -304,7 +299,7 @@ func mksolution(pairs ...string) map[ProjectIdentifier]Version {
 	m := make(map[ProjectIdentifier]Version)
 	for _, pair := range pairs {
 		a := mkAtom(pair)
-		m[a.id.normalize()] = a.v
+		m[a.id] = a.v
 	}
 
 	return m
@@ -1075,7 +1070,7 @@ var basicFixtures = map[string]basicFixture{
 		},
 		r: mksolution(
 			"foo 1.0.0",
-			"bar 1.0.0",
+			"bar from bar 1.0.0",
 		),
 	},
 

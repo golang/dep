@@ -590,6 +590,52 @@ var bimodalFixtures = map[string]bimodalFixture{
 			"baz 1.0.0",
 		),
 	},
+	// Same as the previous, except the alternate declaration originates in a
+	// dep, not the root.
+	"alternate net addr from dep, with second default depper": {
+		ds: []depspec{
+			dsp(mkDepspec("root 1.0.0", "foo 1.0.0"),
+				pkg("root", "foo", "bar")),
+			dsp(mkDepspec("foo 1.0.0", "bar 2.0.0"),
+				pkg("foo", "bar")),
+			dsp(mkDepspec("foo 2.0.0", "bar 2.0.0"),
+				pkg("foo", "bar")),
+			dsp(mkDepspec("bar 2.0.0", "baz from quux 1.0.0"),
+				pkg("bar", "baz")),
+			dsp(mkDepspec("baz 1.0.0"),
+				pkg("baz")),
+			dsp(mkDepspec("baz 2.0.0"),
+				pkg("baz")),
+			dsp(mkDepspec("quux 1.0.0"),
+				pkg("baz")),
+		},
+		r: mksolution(
+			"foo 1.0.0",
+			"bar 2.0.0",
+			"baz from quux 1.0.0",
+		),
+	},
+	"alternate net addr from dep, with second default depper2": {
+		ds: []depspec{
+			dsp(mkDepspec("root 1.0.0", "foo 1.0.0"),
+				pkg("root", "foo", "baz")),
+			dsp(mkDepspec("foo 1.0.0", "bar 2.0.0"),
+				pkg("foo", "bar")),
+			dsp(mkDepspec("bar 2.0.0", "baz from quux 1.0.0"),
+				pkg("bar", "baz")),
+			dsp(mkDepspec("baz 1.0.0"),
+				pkg("baz")),
+			dsp(mkDepspec("baz 2.0.0"),
+				pkg("baz")),
+			dsp(mkDepspec("quux 1.0.0"),
+				pkg("baz")),
+		},
+		r: mksolution(
+			"foo 1.0.0",
+			"bar 2.0.0",
+			"baz from quux 1.0.0",
+		),
+	},
 	// When a given project is initially brought in using the default (i.e.,
 	// empty) ProjectIdentifier.NetworkName, and a later, presumably
 	// as-yet-undiscovered dependency specifies an alternate net addr for it, we
