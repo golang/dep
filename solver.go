@@ -604,7 +604,6 @@ func (s *solver) intersectConstraintsWithImports(deps []workingConstraint, reach
 		pd := s.ovr.override(ProjectConstraint{
 			Ident: ProjectIdentifier{
 				ProjectRoot: root,
-				NetworkName: string(root),
 			},
 			Constraint: Any(),
 		})

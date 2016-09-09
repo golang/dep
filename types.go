@@ -84,7 +84,7 @@ func (i ProjectIdentifier) less(j ProjectIdentifier) bool {
 		return false
 	}
 
-	return i.NetworkName < j.NetworkName
+	return i.netName() < j.netName()
 }
 
 func (i ProjectIdentifier) eq(j ProjectIdentifier) bool {
