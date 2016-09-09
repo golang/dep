@@ -472,8 +472,8 @@ func (s *solver) selectRoot() error {
 
 	for _, dep := range deps {
 		// If we have no lock, or if this dep isn't in the lock, then prefetch
-		// it. See explanation longer comment in selectRoot() for how we benefit
-		// from parallelism here.
+		// it. See longer explanation in selectRoot() for how we benefit from
+		// parallelism here.
 		if _, has := s.rlm[dep.Ident.ProjectRoot]; !has {
 			go s.b.SyncSourceFor(dep.Ident)
 		}
