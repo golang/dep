@@ -8,10 +8,10 @@ import (
 func TestLockedProjectSorting(t *testing.T) {
 	// version doesn't matter here
 	lps := []LockedProject{
-		NewLockedProject("github.com/sdboyer/gps", NewVersion("v0.10.0"), "", nil),
-		NewLockedProject("foo", NewVersion("nada"), "", nil),
-		NewLockedProject("bar", NewVersion("zip"), "", nil),
-		NewLockedProject("qux", NewVersion("zilch"), "", nil),
+		NewLockedProject(mkPI("github.com/sdboyer/gps"), NewVersion("v0.10.0"), nil),
+		NewLockedProject(mkPI("foo"), NewVersion("nada"), nil),
+		NewLockedProject(mkPI("bar"), NewVersion("zip"), nil),
+		NewLockedProject(mkPI("qux"), NewVersion("zilch"), nil),
 	}
 	lps2 := make([]LockedProject, len(lps))
 	copy(lps2, lps)

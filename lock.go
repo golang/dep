@@ -58,16 +58,13 @@ func (l SimpleLock) Projects() []LockedProject {
 // to simply dismiss that project. By creating a hard failure case via panic
 // instead, we are trying to avoid inflicting the resulting pain on the user by
 // instead forcing a decision on the Analyzer implementation.
-func NewLockedProject(n ProjectRoot, v Version, url string, pkgs []string) LockedProject {
+func NewLockedProject(id ProjectIdentifier, v Version, pkgs []string) LockedProject {
 	if v == nil {
 		panic("must provide a non-nil version to create a LockedProject")
 	}
 
 	lp := LockedProject{
-		pi: ProjectIdentifier{
-			ProjectRoot: n,
-			NetworkName: url,
-		},
+		pi:   id,
 		pkgs: pkgs,
 	}
 
