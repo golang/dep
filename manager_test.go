@@ -643,3 +643,65 @@ func TestMultiFetchThreadsafe(t *testing.T) {
 	}
 	wg.Wait()
 }
+
+func TestErrAfterRelease(t *testing.T) {
+	sm, clean := mkNaiveSM(t)
+	clean()
+	id := ProjectIdentifier{}
+
+	_, err := sm.SourceExists(id)
+	if err == nil {
+		t.Errorf("SourceExists did not error after calling Release()")
+	} else if terr, ok := err.(smIsReleased); !ok {
+		t.Errorf("SourceExists errored after Release(), but with unexpected error: %T %s", terr, terr.Error())
+	}
+
+	err = sm.SyncSourceFor(id)
+	if err == nil {
+		t.Errorf("SyncSourceFor did not error after calling Release()")
+	} else if terr, ok := err.(smIsReleased); !ok {
+		t.Errorf("SyncSourceFor errored after Release(), but with unexpected error: %T %s", terr, terr.Error())
+	}
+
+	_, err = sm.ListVersions(id)
+	if err == nil {
+		t.Errorf("ListVersions did not error after calling Release()")
+	} else if terr, ok := err.(smIsReleased); !ok {
+		t.Errorf("ListVersions errored after Release(), but with unexpected error: %T %s", terr, terr.Error())
+	}
+
+	_, err = sm.RevisionPresentIn(id, "")
+	if err == nil {
+		t.Errorf("RevisionPresentIn did not error after calling Release()")
+	} else if terr, ok := err.(smIsReleased); !ok {
+		t.Errorf("RevisionPresentIn errored after Release(), but with unexpected error: %T %s", terr, terr.Error())
+	}
+
+	_, err = sm.ListPackages(id, nil)
+	if err == nil {
+		t.Errorf("ListPackages did not error after calling Release()")
+	} else if terr, ok := err.(smIsReleased); !ok {
+		t.Errorf("ListPackages errored after Release(), but with unexpected error: %T %s", terr, terr.Error())
+	}
+
+	_, _, err = sm.GetManifestAndLock(id, nil)
+	if err == nil {
+		t.Errorf("GetManifestAndLock did not error after calling Release()")
+	} else if terr, ok := err.(smIsReleased); !ok {
+		t.Errorf("GetManifestAndLock errored after Release(), but with unexpected error: %T %s", terr, terr.Error())
+	}
+
+	err = sm.ExportProject(id, nil, "")
+	if err == nil {
+		t.Errorf("ExportProject did not error after calling Release()")
+	} else if terr, ok := err.(smIsReleased); !ok {
+		t.Errorf("ExportProject errored after Release(), but with unexpected error: %T %s", terr, terr.Error())
+	}
+
+	_, err = sm.DeduceProjectRoot("")
+	if err == nil {
+		t.Errorf("DeduceProjectRoot did not error after calling Release()")
+	} else if terr, ok := err.(smIsReleased); !ok {
+		t.Errorf("DeduceProjectRoot errored after Release(), but with unexpected error: %T %s", terr, terr.Error())
+	}
+}

@@ -90,6 +90,15 @@ type SourceMgr struct {
 	an       ProjectAnalyzer
 	dxt      deducerTrie
 	rootxt   prTrie
+	qch      chan os.Signal
+	released int32
+	glock    sync.RWMutex
+}
+
+type smIsReleased struct{}
+
+func (smIsReleased) Error() string {
+	return "this SourceMgr has been released, its methods can no longer be called"
 }
 
 type unifiedFuture struct {
@@ -167,7 +176,22 @@ func (e CouldNotCreateLockError) Error() string {
 // Release lets go of any locks held by the SourceManager.
 func (sm *SourceMgr) Release() {
 	sm.lf.Close()
+	// This ensures a signal handling can't interleave with a Release call -
+	// exit early if we're already marked as having initiated a release process.
+	//
+	// Setting it before we acquire the lock also guarantees that no _more_
+	// method calls will stack up.
+	if !atomic.CompareAndSwapInt32(&sm.released, 0, 1) {
+		return
+	}
+
+	// Grab the global sm lock so that we only release once we're sure all other
+	// calls have completed
+	//
+	// (This could deadlock, ofc)
+	sm.glock.Lock()
 	os.Remove(filepath.Join(sm.cachedir, "sm.lock"))
+	sm.glock.Unlock()
 }
 
 // AnalyzerInfo reports the name and version of the injected ProjectAnalyzer.
@@ -183,23 +207,39 @@ func (sm *SourceMgr) AnalyzerInfo() (name string, version *semver.Version) {
 // The work of producing the manifest and lock is delegated to the injected
 // ProjectAnalyzer's DeriveManifestAndLock() method.
 func (sm *SourceMgr) GetManifestAndLock(id ProjectIdentifier, v Version) (Manifest, Lock, error) {
+	if atomic.CompareAndSwapInt32(&sm.released, 1, 1) {
+		return nil, nil, smIsReleased{}
+	}
+	sm.glock.RLock()
+
 	src, err := sm.getSourceFor(id)
 	if err != nil {
+		sm.glock.RUnlock()
 		return nil, nil, err
 	}
 
-	return src.getManifestAndLock(id.ProjectRoot, v)
+	m, l, err := src.getManifestAndLock(id.ProjectRoot, v)
+	sm.glock.RUnlock()
+	return m, l, err
 }
 
 // ListPackages parses the tree of the Go packages at and below the ProjectRoot
 // of the given ProjectIdentifier, at the given version.
 func (sm *SourceMgr) ListPackages(id ProjectIdentifier, v Version) (PackageTree, error) {
+	if atomic.CompareAndSwapInt32(&sm.released, 1, 1) {
+		return PackageTree{}, smIsReleased{}
+	}
+	sm.glock.RLock()
+
 	src, err := sm.getSourceFor(id)
 	if err != nil {
+		sm.glock.RUnlock()
 		return PackageTree{}, err
 	}
 
-	return src.listPackages(id.ProjectRoot, v)
+	pt, err := src.listPackages(id.ProjectRoot, v)
+	sm.glock.RUnlock()
+	return pt, err
 }
 
 // ListVersions retrieves a list of the available versions for a given
@@ -215,36 +255,60 @@ func (sm *SourceMgr) ListPackages(id ProjectIdentifier, v Version) (PackageTree,
 // is not accessible (network outage, access issues, or the resource actually
 // went away), an error will be returned.
 func (sm *SourceMgr) ListVersions(id ProjectIdentifier) ([]Version, error) {
+	if atomic.CompareAndSwapInt32(&sm.released, 1, 1) {
+		return nil, smIsReleased{}
+	}
+	sm.glock.RLock()
+
 	src, err := sm.getSourceFor(id)
 	if err != nil {
+		sm.glock.RUnlock()
 		// TODO(sdboyer) More-er proper-er errors
 		return nil, err
 	}
 
-	return src.listVersions()
+	vl, err := src.listVersions()
+	sm.glock.RUnlock()
+	return vl, err
 }
 
 // RevisionPresentIn indicates whether the provided Revision is present in the given
 // repository.
 func (sm *SourceMgr) RevisionPresentIn(id ProjectIdentifier, r Revision) (bool, error) {
+	if atomic.CompareAndSwapInt32(&sm.released, 1, 1) {
+		return false, smIsReleased{}
+	}
+	sm.glock.RLock()
+
 	src, err := sm.getSourceFor(id)
 	if err != nil {
+		sm.glock.RUnlock()
 		// TODO(sdboyer) More-er proper-er errors
 		return false, err
 	}
 
-	return src.revisionPresentIn(r)
+	is, err := src.revisionPresentIn(r)
+	sm.glock.RUnlock()
+	return is, err
 }
 
 // SourceExists checks if a repository exists, either upstream or in the cache,
 // for the provided ProjectIdentifier.
 func (sm *SourceMgr) SourceExists(id ProjectIdentifier) (bool, error) {
+	if atomic.CompareAndSwapInt32(&sm.released, 1, 1) {
+		return false, smIsReleased{}
+	}
+	sm.glock.RLock()
+
 	src, err := sm.getSourceFor(id)
 	if err != nil {
+		sm.glock.RUnlock()
 		return false, err
 	}
 
-	return src.checkExistence(existsInCache) || src.checkExistence(existsUpstream), nil
+	exists := src.checkExistence(existsInCache) || src.checkExistence(existsUpstream)
+	sm.glock.RUnlock()
+	return exists, nil
 }
 
 // SyncSourceFor will ensure that all local caches and information about a
@@ -252,23 +316,39 @@ func (sm *SourceMgr) SourceExists(id ProjectIdentifier) (bool, error) {
 //
 // The primary use case for this is prefetching.
 func (sm *SourceMgr) SyncSourceFor(id ProjectIdentifier) error {
+	if atomic.CompareAndSwapInt32(&sm.released, 1, 1) {
+		return smIsReleased{}
+	}
+	sm.glock.RLock()
+
 	src, err := sm.getSourceFor(id)
 	if err != nil {
+		sm.glock.RUnlock()
 		return err
 	}
 
-	return src.syncLocal()
+	err = src.syncLocal()
+	sm.glock.RUnlock()
+	return err
 }
 
 // ExportProject writes out the tree of the provided ProjectIdentifier's
 // ProjectRoot, at the provided version, to the provided directory.
 func (sm *SourceMgr) ExportProject(id ProjectIdentifier, v Version, to string) error {
+	if atomic.CompareAndSwapInt32(&sm.released, 1, 1) {
+		return smIsReleased{}
+	}
+	sm.glock.RLock()
+
 	src, err := sm.getSourceFor(id)
 	if err != nil {
+		sm.glock.RUnlock()
 		return err
 	}
 
-	return src.exportVersionTo(v, to)
+	err = src.exportVersionTo(v, to)
+	sm.glock.RUnlock()
+	return err
 }
 
 // DeduceProjectRoot takes an import path and deduces the corresponding
@@ -279,6 +359,11 @@ func (sm *SourceMgr) ExportProject(id ProjectIdentifier, v Version, to string) e
 // paths. (A special exception is written for gopkg.in to minimize network
 // activity, as its behavior is well-structured)
 func (sm *SourceMgr) DeduceProjectRoot(ip string) (ProjectRoot, error) {
+	if atomic.CompareAndSwapInt32(&sm.released, 1, 1) {
+		return "", smIsReleased{}
+	}
+	sm.glock.RLock()
+
 	if prefix, root, has := sm.rootxt.LongestPrefix(ip); has {
 		// The non-matching tail of the import path could still be malformed.
 		// Validate just that part, if it exists
@@ -292,15 +377,18 @@ func (sm *SourceMgr) DeduceProjectRoot(ip string) (ProjectRoot, error) {
 			// revalidate it later
 			sm.rootxt.Insert(ip, root)
 		}
+		sm.glock.RUnlock()
 		return root, nil
 	}
 
 	ft, err := sm.deducePathAndProcess(ip)
 	if err != nil {
+		sm.glock.RUnlock()
 		return "", err
 	}
 
 	r, err := ft.rootf()
+	sm.glock.RUnlock()
 	return ProjectRoot(r), err
 }
 
