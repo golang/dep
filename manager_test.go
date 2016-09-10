@@ -8,7 +8,9 @@ import (
 	"path/filepath"
 	"runtime"
 	"sync"
+	"syscall"
 	"testing"
+	"time"
 
 	"github.com/Masterminds/semver"
 )
@@ -703,5 +705,74 @@ func TestErrAfterRelease(t *testing.T) {
 		t.Errorf("DeduceProjectRoot did not error after calling Release()")
 	} else if terr, ok := err.(smIsReleased); !ok {
 		t.Errorf("DeduceProjectRoot errored after Release(), but with unexpected error: %T %s", terr, terr.Error())
+	}
+}
+
+func TestSignalHandling(t *testing.T) {
+	sm, clean := mkNaiveSM(t)
+	syscall.Kill(syscall.Getpid(), os.Interrupt.(syscall.Signal))
+	<-time.After(100 * time.Millisecond)
+
+	if sm.signaled != 1 {
+		t.Error("Signaled flag did not get set")
+	}
+	if sm.releasing != 1 {
+		t.Error("Releasing flag did not get set")
+	}
+	if sm.released != 1 {
+		t.Error("Released flag did not get set")
+	}
+
+	lpath := filepath.Join(sm.cachedir, "sm.lock")
+	if _, err := os.Stat(lpath); err == nil {
+		t.Error("Expected error on statting what should be an absent lock")
+		t.FailNow()
+	}
+	clean()
+
+	sm, clean = mkNaiveSM(t)
+	// Send it twice, to try to hit both goroutines
+	syscall.Kill(syscall.Getpid(), os.Interrupt.(syscall.Signal))
+	syscall.Kill(syscall.Getpid(), os.Interrupt.(syscall.Signal))
+	// Also directly trigger the release
+	sm.Release()
+	<-time.After(100 * time.Millisecond)
+
+	if sm.signaled != 1 {
+		t.Error("Signaled flag did not get set")
+	}
+	if sm.releasing != 1 {
+		t.Error("Releasing flag did not get set")
+	}
+	if sm.released != 1 {
+		t.Error("Released flag did not get set")
+	}
+
+	lpath = filepath.Join(sm.cachedir, "sm.lock")
+	if _, err := os.Stat(lpath); err == nil {
+		t.Error("Expected error on statting what should be an absent lock")
+		t.FailNow()
+	}
+
+	// Send it twice, to try to hit both goroutines. Also, call release
+	// directly.
+	syscall.Kill(syscall.Getpid(), os.Interrupt.(syscall.Signal))
+	syscall.Kill(syscall.Getpid(), os.Interrupt.(syscall.Signal))
+	sm.Release()
+	<-time.After(100 * time.Millisecond)
+
+	if sm.signaled != 1 {
+		t.Error("Signaled flag did not get set")
+	}
+	if sm.releasing != 1 {
+		t.Error("Releasing flag did not get set")
+	}
+	if sm.released != 1 {
+		t.Error("Released flag did not get set")
+	}
+
+	lpath = filepath.Join(sm.cachedir, "sm.lock")
+	if _, err := os.Stat(lpath); err == nil {
+		t.Error("Expected error on statting what should be an absent lock")
 	}
 }
