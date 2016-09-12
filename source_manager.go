@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -93,11 +94,12 @@ type SourceMgr struct {
 	an                  ProjectAnalyzer
 	dxt                 deducerTrie
 	rootxt              prTrie
-	signaled            int32
 	sigch               chan os.Signal
 	qch                 chan struct{}
-	releasing, released int32
 	glock               sync.RWMutex
+	opcount             int32
+	signaled            int32
+	releasing, released int32
 }
 
 type smIsReleased struct{}
@@ -164,7 +166,7 @@ func NewSourceManager(an ProjectAnalyzer, cachedir string) (*SourceMgr, error) {
 		dxt:      pathDeducerTrie(),
 		rootxt:   newProjectRootTrie(),
 		qch:      make(chan struct{}),
-		sigch:    make(chan os.Signal),
+		sigch:    make(chan os.Signal, 2), // buf to avoid unnecessary blocking
 	}
 
 	signal.Notify(sm.sigch, syscall.SIGINT, syscall.SIGHUP, syscall.SIGTERM, syscall.SIGQUIT, os.Interrupt)
@@ -182,23 +184,45 @@ func NewSourceManager(an ProjectAnalyzer, cachedir string) (*SourceMgr, error) {
 					// Nice path - wait to remove the disk lock file until the
 					// global sm lock is clear.
 					if !atomic.CompareAndSwapInt32(&sm.releasing, 0, 1) {
-						// Something's already begun releasing the sm, so we
+						// Something's already called Release() on this sm, so we
 						// don't have to do anything, as we'd just be redoing
-						// that work. Instead, we can just return.
+						// that work. Instead, just return.
 						return
 					}
 
-					fmt.Println("Cleaning up...")
-					// Now, wait for the global lock to clear
+					// Things could interleave poorly here, but it would just
+					// make for confusing output, not incorrect behavior
+					var waited bool
+					if sm.opcount > 0 {
+						waited = true
+						fmt.Printf("Waiting for %v ops to complete...", sm.opcount)
+					}
+
+					// Mutex interaction in a signal handler is, as a general
+					// rule, unsafe. I'm not clear on whether the guarantees Go
+					// provides around signal handling, or having passed this
+					// through a channel in general, obviate those concerns, but
+					// to be safe, we avoid touching the mutex and immediately
+					// initiate disk cleanup.
 					sm.glock.Lock()
+					if waited && sm.released != 1 {
+						fmt.Println("done.\n")
+					}
 					sm.doRelease()
 					sm.glock.Unlock()
 				} else {
+					// As with above, a poor interleaving would only result in
+					// confusing output, not incorrect behavior
+					if sm.opcount > 0 {
+						fmt.Printf("Stopping without waiting for %v ops to complete\n", sm.opcount)
+					}
+
 					// Aggressive path - we don't care about the global lock,
 					// we're shutting down right away. We don't need to CAS
 					// releasing because it wouldn't change the behavior either
-					// way. Instead, we make sure it's marked so everything else
-					// behaves well.
+					// way. It should already be set, of course, but just to be
+					// sure, we mark it to ensure that no other reading methods
+					// could possibly begin after this point.
 					atomic.StoreInt32(&sm.releasing, 1)
 					sm.doRelease()
 				}
@@ -211,9 +235,9 @@ func NewSourceManager(an ProjectAnalyzer, cachedir string) (*SourceMgr, error) {
 		}
 	}
 
-	// Two, so that the second can hop past the global lock and immediately quit
 	go sigfunc(sm.sigch)
 	go sigfunc(sm.sigch)
+	runtime.Gosched()
 
 	return sm, nil
 }
@@ -230,7 +254,9 @@ func (e CouldNotCreateLockError) Error() string {
 	return e.Err.Error()
 }
 
-// Release lets go of any locks held by the SourceManager.
+// Release lets go of any locks held by the SourceManager. Once called, it is no
+// longer safe to call methods against it; all method calls will immediately
+// result in errors.
 func (sm *SourceMgr) Release() {
 	sm.lf.Close()
 	// This ensures a signal handling can't interleave with a Release call -

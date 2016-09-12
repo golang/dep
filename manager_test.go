@@ -709,12 +709,12 @@ func TestErrAfterRelease(t *testing.T) {
 
 func TestSignalHandling(t *testing.T) {
 	sm, clean := mkNaiveSM(t)
-	// get self proc
-	//proc, err := os.FindProcess(os.Getpid())
-	//if err != nil {
-	//t.Errorf("cannot find self proc")
-	//t.FailNow()
-	//}
+	//get self proc
+	proc, err := os.FindProcess(os.Getpid())
+	if err != nil {
+		t.Errorf("cannot find self proc")
+		t.FailNow()
+	}
 
 	// Set up a channel the test owns to ensure we don't terminate early
 	//c := make(chan os.Signal, 1)
@@ -749,8 +749,6 @@ func TestSignalHandling(t *testing.T) {
 
 	sm, clean = mkNaiveSM(t)
 	// Send sig twice, to hit both goroutines
-	//proc.Signal(os.Interrupt)
-	//proc.Signal(os.Interrupt)
 	sm.sigch <- os.Interrupt
 	sm.sigch <- os.Interrupt
 	<-time.After(100 * time.Millisecond)
@@ -770,12 +768,19 @@ func TestSignalHandling(t *testing.T) {
 		t.Error("Expected error on statting what should be an absent lock file")
 		t.FailNow()
 	}
+	clean()
 
+	sm, clean = mkNaiveSM(t)
+	id := mkPI("github.com/Masterminds/VCSTestRepo").normalize()
+	go sm.ListVersions(id)
+	runtime.Gosched()
 	// Send it twice and call release directly afterward.
-	sm.sigch <- os.Interrupt
-	sm.sigch <- os.Interrupt
-	sm.Release()
-	<-time.After(100 * time.Millisecond)
+	//sm.sigch <- os.Interrupt
+	//sm.sigch <- os.Interrupt
+	proc.Signal(os.Interrupt)
+	proc.Signal(os.Interrupt)
+	//sm.Release()
+	<-time.After(5 * time.Second)
 
 	if sm.signaled != 1 {
 		t.Error("Signaled flag did not get set")
@@ -789,6 +794,7 @@ func TestSignalHandling(t *testing.T) {
 
 	lpath = filepath.Join(sm.cachedir, "sm.lock")
 	if _, err := os.Stat(lpath); err == nil {
-		t.Error("Expected error on statting what should be an absent lock")
+		t.Error("Expected error on statting what should be an absent lock file")
 	}
+	clean()
 }
