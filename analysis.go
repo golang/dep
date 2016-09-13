@@ -148,9 +148,6 @@ func ListPackages(fileRoot, importRoot string) (PackageTree, error) {
 		// We do skip dot-dirs, though, because it's such a ubiquitous standard
 		// that they not be visited by normal commands, and because things get
 		// really weird if we don't.
-		//
-		// TODO(sdboyer) does this entail that we should chuck dot-led import
-		// paths later on?
 		if strings.HasPrefix(fi.Name(), ".") {
 			return filepath.SkipDir
 		}
@@ -303,8 +300,9 @@ type wm struct {
 	in  map[string]bool
 }
 
-// wmToReach takes an externalReach()-style workmap and transitively walks all
-// internal imports until they reach an external path or terminate, then
+// wmToReach takes an internal "workmap" constructed by
+// PackageTree.ExternalReach(), transitively walks (via depth-first traversal)
+// all internal imports until they reach an external path or terminate, then
 // translates the results into a slice of external imports for each internal
 // pkg.
 //
@@ -689,6 +687,12 @@ type PackageOrErr struct {
 	Err error
 }
 
+// ReachMap maps a set of import paths (keys) to the set of external packages
+// transitively reachable from the packages at those import paths.
+//
+// See PackageTree.ExternalReach() for more information.
+type ReachMap map[string][]string
+
 // ExternalReach looks through a PackageTree and computes the list of external
 // import statements (that is, import statements pointing to packages that are
 // not logical children of PackageTree.ImportRoot) that are transitively
@@ -735,7 +739,7 @@ type PackageOrErr struct {
 //  }
 //
 // If there are no packages to ignore, it is safe to pass a nil map.
-func (t PackageTree) ExternalReach(main, tests bool, ignore map[string]bool) map[string][]string {
+func (t PackageTree) ExternalReach(main, tests bool, ignore map[string]bool) ReachMap {
 	if ignore == nil {
 		ignore = make(map[string]bool)
 	}
@@ -803,8 +807,8 @@ func (t PackageTree) ExternalReach(main, tests bool, ignore map[string]bool) map
 }
 
 // ListExternalImports computes a sorted, deduplicated list of all the external
-// packages that are reachable through imports from all valid packages in the
-// PackageTree.
+// packages that are reachable through imports from all valid packages in a
+// ReachMap, as computed by PackageTree.ExternalReach().
 //
 // main and tests determine whether main packages and test imports should be
 // included in the calculation. "External" is defined as anything not prefixed,
@@ -868,10 +872,7 @@ func (t PackageTree) ExternalReach(main, tests bool, ignore map[string]bool) map
 //    -> A/.bar -> B/baz
 //
 // A is legal, and it imports A/.bar, so the results will include B/baz.
-func (t PackageTree) ListExternalImports(main, tests bool, ignore map[string]bool) []string {
-	// First, we need a reachmap
-	rm := t.ExternalReach(main, tests, ignore)
-
+func (rm ReachMap) ListExternalImports() []string {
 	exm := make(map[string]struct{})
 	for pkg, reach := range rm {
 		// Eliminate import paths with any elements having leading dots, leading

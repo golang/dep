@@ -900,7 +900,7 @@ func TestListExternalImports(t *testing.T) {
 	var main, tests bool
 
 	validate := func() {
-		result := vptree.ListExternalImports(main, tests, ignore)
+		result := vptree.ExternalReach(main, tests, ignore).ListExternalImports()
 		if !reflect.DeepEqual(expect, result) {
 			t.Errorf("Wrong imports in %q case:\n\t(GOT): %s\n\t(WNT): %s", name, result, expect)
 		}
@@ -1034,12 +1034,12 @@ func TestListExternalImports(t *testing.T) {
 	validate()
 
 	// The only thing varied *doesn't* cover is disallowed path patterns
-	ptree, err := listPackages(filepath.Join(getwd(t), "_testdata", "src", "disallow"), "disallow")
+	ptree, err := ListPackages(filepath.Join(getwd(t), "_testdata", "src", "disallow"), "disallow")
 	if err != nil {
 		t.Fatalf("listPackages failed on disallow test case: %s", err)
 	}
 
-	result := ptree.ListExternalImports(false, false, nil)
+	result := ptree.ExternalReach(false, false, nil).ListExternalImports()
 	expect = []string{"github.com/sdboyer/gps", "hash", "sort"}
 	if !reflect.DeepEqual(expect, result) {
 		t.Errorf("Wrong imports in %q case:\n\t(GOT): %s\n\t(WNT): %s", name, result, expect)

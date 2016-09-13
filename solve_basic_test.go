@@ -1316,7 +1316,7 @@ func (b *depspecBridge) computeRootReach() ([]string, error) {
 		return nil, err
 	}
 
-	return ptree.ListExternalImports(true, true, dsm.ignore()), nil
+	return ptree.ExternalReach(true, true, dsm.ignore()).ListExternalImports(), nil
 }
 
 // override verifyRoot() on bridge to prevent any filesystem interaction
