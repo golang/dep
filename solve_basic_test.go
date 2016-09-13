@@ -1272,10 +1272,6 @@ func (sm *depspecSourceManager) SyncSourceFor(id ProjectIdentifier) error {
 	return nil
 }
 
-func (sm *depspecSourceManager) VendorCodeExists(id ProjectIdentifier) (bool, error) {
-	return false, nil
-}
-
 func (sm *depspecSourceManager) Release() {}
 
 func (sm *depspecSourceManager) ExportProject(id ProjectIdentifier, v Version, to string) error {
@@ -1335,6 +1331,10 @@ func (b *depspecBridge) verifyRootDir(path string) error {
 
 func (b *depspecBridge) ListPackages(id ProjectIdentifier, v Version) (PackageTree, error) {
 	return b.sm.(fixSM).ListPackages(id, v)
+}
+
+func (sm *depspecBridge) vendorCodeExists(id ProjectIdentifier) (bool, error) {
+	return false, nil
 }
 
 // enforce interfaces
