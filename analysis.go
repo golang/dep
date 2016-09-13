@@ -69,7 +69,7 @@ func init() {
 // A PackageTree is returned, which contains the ImportRoot and map of import path
 // to PackageOrErr - each path under the root that exists will have either a
 // Package, or an error describing why the directory is not a valid package.
-func listPackages(fileRoot, importRoot string) (PackageTree, error) {
+func ListPackages(fileRoot, importRoot string) (PackageTree, error) {
 	// Set up a build.ctx for parsing
 	ctx := build.Default
 	ctx.GOROOT = ""

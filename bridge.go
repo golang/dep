@@ -360,12 +360,12 @@ func (b *bridge) computeRootReach() ([]string, error) {
 		return nil, err
 	}
 
-	return ptree.ListExternalImports(true, true, b.s.ig), nil
+	return ptree.ExternalReach(true, true, b.s.ig).ListExternalImports(), nil
 }
 
 func (b *bridge) listRootPackages() (PackageTree, error) {
 	if b.crp == nil {
-		ptree, err := listPackages(b.s.params.RootDir, string(b.s.params.ImportRoot))
+		ptree, err := ListPackages(b.s.params.RootDir, string(b.s.params.ImportRoot))
 
 		b.crp = &struct {
 			ptree PackageTree

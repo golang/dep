@@ -335,7 +335,7 @@ func (bs *baseVCSSource) listPackages(pr ProjectRoot, v Version) (ptree PackageT
 		err = bs.crepo.r.UpdateVersion(v.String())
 	}
 
-	ptree, err = listPackages(bs.crepo.r.LocalPath(), string(pr))
+	ptree, err = ListPackages(bs.crepo.r.LocalPath(), string(pr))
 	bs.crepo.mut.Unlock()
 
 	// TODO(sdboyer) cache errs?

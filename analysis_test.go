@@ -836,7 +836,7 @@ func TestListPackages(t *testing.T) {
 			continue
 		}
 
-		out, err := listPackages(fix.fileRoot, fix.importRoot)
+		out, err := ListPackages(fix.fileRoot, fix.importRoot)
 
 		if err != nil && fix.err == nil {
 			t.Errorf("listPackages(%q): Received error but none expected: %s", name, err)
@@ -889,7 +889,7 @@ func TestListPackages(t *testing.T) {
 
 func TestListExternalImports(t *testing.T) {
 	// There's enough in the 'varied' test case to test most of what matters
-	vptree, err := listPackages(filepath.Join(getwd(t), "_testdata", "src", "varied"), "varied")
+	vptree, err := ListPackages(filepath.Join(getwd(t), "_testdata", "src", "varied"), "varied")
 	if err != nil {
 		t.Fatalf("listPackages failed on varied test case: %s", err)
 	}
@@ -1048,7 +1048,7 @@ func TestListExternalImports(t *testing.T) {
 
 func TestExternalReach(t *testing.T) {
 	// There's enough in the 'varied' test case to test most of what matters
-	vptree, err := listPackages(filepath.Join(getwd(t), "_testdata", "src", "varied"), "varied")
+	vptree, err := ListPackages(filepath.Join(getwd(t), "_testdata", "src", "varied"), "varied")
 	if err != nil {
 		t.Fatalf("listPackages failed on varied test case: %s", err)
 	}
