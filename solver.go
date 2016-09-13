@@ -316,7 +316,7 @@ func (s *solver) Solve() (Solution, error) {
 	return soln, err
 }
 
-// solve is the top-level loop for the SAT solving process.
+// solve is the top-level loop for the solving process.
 func (s *solver) solve() (map[atom]map[string]struct{}, error) {
 	// Main solving loop
 	for {
@@ -331,9 +331,9 @@ func (s *solver) solve() (map[atom]map[string]struct{}, error) {
 		// satisfiability and selection paths depending on whether we've already
 		// selected the base project/repo that came off the unselected queue.
 		//
-		// (If we already have selected the project, other parts of the
-		// algorithm guarantee the bmi will contain at least one package from
-		// this project that has yet to be selected.)
+		// (If we've already selected the project, other parts of the algorithm
+		// guarantee the bmi will contain at least one package from this project
+		// that has yet to be selected.)
 		if awp, is := s.sel.selected(bmi.id); !is {
 			// Analysis path for when we haven't selected the project yet - need
 			// to create a version queue.

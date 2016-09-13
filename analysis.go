@@ -643,48 +643,6 @@ func findTags(co []byte) []string {
 	return tgs
 }
 
-// Get an OS value that's not the one passed in.
-func getOsValue(n string) string {
-	for _, o := range osList {
-		if o != n {
-			return o
-		}
-	}
-
-	return n
-}
-
-func isSupportedOs(n string) bool {
-	for _, o := range osList {
-		if o == n {
-			return true
-		}
-	}
-
-	return false
-}
-
-// Get an Arch value that's not the one passed in.
-func getArchValue(n string) string {
-	for _, o := range archList {
-		if o != n {
-			return o
-		}
-	}
-
-	return n
-}
-
-func isSupportedArch(n string) bool {
-	for _, o := range archList {
-		if o == n {
-			return true
-		}
-	}
-
-	return false
-}
-
 func ensureTrailingSlash(s string) string {
 	return strings.TrimSuffix(s, string(os.PathSeparator)) + string(os.PathSeparator)
 }
