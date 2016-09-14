@@ -69,7 +69,7 @@ func init() {
 // A PackageTree is returned, which contains the ImportRoot and map of import path
 // to PackageOrErr - each path under the root that exists will have either a
 // Package, or an error describing why the directory is not a valid package.
-func listPackages(fileRoot, importRoot string) (PackageTree, error) {
+func ListPackages(fileRoot, importRoot string) (PackageTree, error) {
 	// Set up a build.ctx for parsing
 	ctx := build.Default
 	ctx.GOROOT = ""
@@ -148,9 +148,6 @@ func listPackages(fileRoot, importRoot string) (PackageTree, error) {
 		// We do skip dot-dirs, though, because it's such a ubiquitous standard
 		// that they not be visited by normal commands, and because things get
 		// really weird if we don't.
-		//
-		// TODO(sdboyer) does this entail that we should chuck dot-led import
-		// paths later on?
 		if strings.HasPrefix(fi.Name(), ".") {
 			return filepath.SkipDir
 		}
@@ -297,19 +294,279 @@ func (e *LocalImportsError) Error() string {
 	return fmt.Sprintf("import path %s had problematic local imports", e.Dir)
 }
 
+func readFileBuildTags(fp string) ([]string, error) {
+	co, err := readGoContents(fp)
+	if err != nil {
+		return []string{}, err
+	}
+
+	var tags []string
+	// Only look at places where we had a code comment.
+	if len(co) > 0 {
+		t := findTags(co)
+		for _, tg := range t {
+			found := false
+			for _, tt := range tags {
+				if tt == tg {
+					found = true
+				}
+			}
+			if !found {
+				tags = append(tags, tg)
+			}
+		}
+	}
+
+	return tags, nil
+}
+
+// Read contents of a Go file up to the package declaration. This can be used
+// to find the the build tags.
+func readGoContents(fp string) ([]byte, error) {
+	f, err := os.Open(fp)
+	defer f.Close()
+	if err != nil {
+		return []byte{}, err
+	}
+
+	var s scanner.Scanner
+	s.Init(f)
+	var tok rune
+	var pos scanner.Position
+	for tok != scanner.EOF {
+		tok = s.Scan()
+
+		// Getting the token text will skip comments by default.
+		tt := s.TokenText()
+		// build tags will not be after the package declaration.
+		if tt == "package" {
+			pos = s.Position
+			break
+		}
+	}
+
+	var buf bytes.Buffer
+	f.Seek(0, 0)
+	_, err = io.CopyN(&buf, f, int64(pos.Offset))
+	if err != nil {
+		return []byte{}, err
+	}
+
+	return buf.Bytes(), nil
+}
+
+// From a byte slice of a Go file find the tags.
+func findTags(co []byte) []string {
+	p := co
+	var tgs []string
+	for len(p) > 0 {
+		line := p
+		if i := bytes.IndexByte(line, '\n'); i >= 0 {
+			line, p = line[:i], p[i+1:]
+		} else {
+			p = p[len(p):]
+		}
+		line = bytes.TrimSpace(line)
+		// Only look at comment lines that are well formed in the Go style
+		if bytes.HasPrefix(line, []byte("//")) {
+			line = bytes.TrimSpace(line[len([]byte("//")):])
+			if len(line) > 0 && line[0] == '+' {
+				f := strings.Fields(string(line))
+
+				// We've found a +build tag line.
+				if f[0] == "+build" {
+					for _, tg := range f[1:] {
+						tgs = append(tgs, tg)
+					}
+				}
+			}
+		}
+	}
+
+	return tgs
+}
+
+// A PackageTree represents the results of recursively parsing a tree of
+// packages, starting at the ImportRoot. The results of parsing the files in the
+// directory identified by each import path - a Package or an error - are stored
+// in the Packages map, keyed by that import path.
+type PackageTree struct {
+	ImportRoot string
+	Packages   map[string]PackageOrErr
+}
+
+// dup copies the PackageTree.
+//
+// This is really only useful as a defensive measure to prevent external state
+// mutations.
+func (t PackageTree) dup() PackageTree {
+	t2 := PackageTree{
+		ImportRoot: t.ImportRoot,
+		Packages:   map[string]PackageOrErr{},
+	}
+
+	for path, poe := range t.Packages {
+		poe2 := PackageOrErr{
+			Err: poe.Err,
+			P:   poe.P,
+		}
+		if len(poe.P.Imports) > 0 {
+			poe2.P.Imports = make([]string, len(poe.P.Imports))
+			copy(poe2.P.Imports, poe.P.Imports)
+		}
+		if len(poe.P.TestImports) > 0 {
+			poe2.P.TestImports = make([]string, len(poe.P.TestImports))
+			copy(poe2.P.TestImports, poe.P.TestImports)
+		}
+
+		t2.Packages[path] = poe2
+	}
+
+	return t2
+}
+
 type wm struct {
 	err error
 	ex  map[string]bool
 	in  map[string]bool
 }
 
-// wmToReach takes an externalReach()-style workmap and transitively walks all
-// internal imports until they reach an external path or terminate, then
+// PackageOrErr stores the results of attempting to parse a single directory for
+// Go source code.
+type PackageOrErr struct {
+	P   Package
+	Err error
+}
+
+// ReachMap maps a set of import paths (keys) to the set of external packages
+// transitively reachable from the packages at those import paths.
+//
+// See PackageTree.ExternalReach() for more information.
+type ReachMap map[string][]string
+
+// ExternalReach looks through a PackageTree and computes the list of external
+// import statements (that is, import statements pointing to packages that are
+// not logical children of PackageTree.ImportRoot) that are transitively
+// imported by the internal packages in the tree.
+//
+// main indicates whether (true) or not (false) to include main packages in the
+// analysis. When utilized by gps' solver, main packages are generally excluded
+// from analyzing anything other than the root project, as they necessarily can't
+// be imported.
+//
+// tests indicates whether (true) or not (false) to include imports from test
+// files in packages when computing the reach map.
+//
+// ignore is a map of import paths that, if encountered, should be excluded from
+// analysis. This exclusion applies to both internal and external packages. If
+// an external import path is ignored, it is simply omitted from the results.
+//
+// If an internal path is ignored, then not only does it not appear in the final
+// map, but it is also excluded from the transitive calculations of other
+// internal packages.  That is, if you ignore A/foo, then the external package
+// list for all internal packages that import A/foo will not include external
+// packages that are only reachable through A/foo.
+//
+// Visually, this means that, given a PackageTree with root A and packages at A,
+// A/foo, and A/bar, and the following import chain:
+//
+//  A -> A/foo -> A/bar -> B/baz
+//
+// In this configuration, all of A's packages transitively import B/baz, so the
+// returned map would be:
+//
+//  map[string][]string{
+// 	"A": []string{"B/baz"},
+// 	"A/foo": []string{"B/baz"}
+// 	"A/bar": []string{"B/baz"},
+//  }
+//
+// However, if you ignore A/foo, then A's path to B/baz is broken, and A/foo is
+// omitted entirely. Thus, the returned map would be:
+//
+//  map[string][]string{
+// 	"A": []string{},
+// 	"A/bar": []string{"B/baz"},
+//  }
+//
+// If there are no packages to ignore, it is safe to pass a nil map.
+func (t PackageTree) ExternalReach(main, tests bool, ignore map[string]bool) ReachMap {
+	if ignore == nil {
+		ignore = make(map[string]bool)
+	}
+
+	// world's simplest adjacency list
+	workmap := make(map[string]wm)
+
+	var imps []string
+	for ip, perr := range t.Packages {
+		if perr.Err != nil {
+			workmap[ip] = wm{
+				err: perr.Err,
+			}
+			continue
+		}
+		p := perr.P
+
+		// Skip main packages, unless param says otherwise
+		if p.Name == "main" && !main {
+			continue
+		}
+		// Skip ignored packages
+		if ignore[ip] {
+			continue
+		}
+
+		imps = imps[:0]
+		imps = p.Imports
+		if tests {
+			imps = dedupeStrings(imps, p.TestImports)
+		}
+
+		w := wm{
+			ex: make(map[string]bool),
+			in: make(map[string]bool),
+		}
+
+		for _, imp := range imps {
+			// Skip ignored imports
+			if ignore[imp] {
+				continue
+			}
+
+			if !checkPrefixSlash(filepath.Clean(imp), t.ImportRoot) {
+				w.ex[imp] = true
+			} else {
+				if w2, seen := workmap[imp]; seen {
+					for i := range w2.ex {
+						w.ex[i] = true
+					}
+					for i := range w2.in {
+						w.in[i] = true
+					}
+				} else {
+					w.in[imp] = true
+				}
+			}
+		}
+
+		workmap[ip] = w
+	}
+
+	//return wmToReach(workmap, t.ImportRoot)
+	return wmToReach(workmap, "") // TODO(sdboyer) this passes tests, but doesn't seem right
+}
+
+// wmToReach takes an internal "workmap" constructed by
+// PackageTree.ExternalReach(), transitively walks (via depth-first traversal)
+// all internal imports until they reach an external path or terminate, then
 // translates the results into a slice of external imports for each internal
 // pkg.
 //
 // The basedir string, with a trailing slash ensured, will be stripped from the
 // keys of the returned map.
+//
+// This is mostly separated out for testing purposes.
 func wmToReach(workmap map[string]wm, basedir string) map[string][]string {
 	// Uses depth-first exploration to compute reachability into external
 	// packages, dropping any internal packages on "poisoned paths" - a path
@@ -502,309 +759,9 @@ func wmToReach(workmap map[string]wm, basedir string) map[string][]string {
 	return rm
 }
 
-func readBuildTags(p string) ([]string, error) {
-	_, err := os.Stat(p)
-	if err != nil {
-		return []string{}, err
-	}
-
-	d, err := os.Open(p)
-	if err != nil {
-		return []string{}, err
-	}
-
-	objects, err := d.Readdir(-1)
-	if err != nil {
-		return []string{}, err
-	}
-
-	var tags []string
-	for _, obj := range objects {
-
-		// only process Go files
-		if strings.HasSuffix(obj.Name(), ".go") {
-			fp := filepath.Join(p, obj.Name())
-
-			co, err := readGoContents(fp)
-			if err != nil {
-				return []string{}, err
-			}
-
-			// Only look at places where we had a code comment.
-			if len(co) > 0 {
-				t := findTags(co)
-				for _, tg := range t {
-					found := false
-					for _, tt := range tags {
-						if tt == tg {
-							found = true
-						}
-					}
-					if !found {
-						tags = append(tags, tg)
-					}
-				}
-			}
-		}
-	}
-
-	return tags, nil
-}
-
-func readFileBuildTags(fp string) ([]string, error) {
-	co, err := readGoContents(fp)
-	if err != nil {
-		return []string{}, err
-	}
-
-	var tags []string
-	// Only look at places where we had a code comment.
-	if len(co) > 0 {
-		t := findTags(co)
-		for _, tg := range t {
-			found := false
-			for _, tt := range tags {
-				if tt == tg {
-					found = true
-				}
-			}
-			if !found {
-				tags = append(tags, tg)
-			}
-		}
-	}
-
-	return tags, nil
-}
-
-// Read contents of a Go file up to the package declaration. This can be used
-// to find the the build tags.
-func readGoContents(fp string) ([]byte, error) {
-	f, err := os.Open(fp)
-	defer f.Close()
-	if err != nil {
-		return []byte{}, err
-	}
-
-	var s scanner.Scanner
-	s.Init(f)
-	var tok rune
-	var pos scanner.Position
-	for tok != scanner.EOF {
-		tok = s.Scan()
-
-		// Getting the token text will skip comments by default.
-		tt := s.TokenText()
-		// build tags will not be after the package declaration.
-		if tt == "package" {
-			pos = s.Position
-			break
-		}
-	}
-
-	var buf bytes.Buffer
-	f.Seek(0, 0)
-	_, err = io.CopyN(&buf, f, int64(pos.Offset))
-	if err != nil {
-		return []byte{}, err
-	}
-
-	return buf.Bytes(), nil
-}
-
-// From a byte slice of a Go file find the tags.
-func findTags(co []byte) []string {
-	p := co
-	var tgs []string
-	for len(p) > 0 {
-		line := p
-		if i := bytes.IndexByte(line, '\n'); i >= 0 {
-			line, p = line[:i], p[i+1:]
-		} else {
-			p = p[len(p):]
-		}
-		line = bytes.TrimSpace(line)
-		// Only look at comment lines that are well formed in the Go style
-		if bytes.HasPrefix(line, []byte("//")) {
-			line = bytes.TrimSpace(line[len([]byte("//")):])
-			if len(line) > 0 && line[0] == '+' {
-				f := strings.Fields(string(line))
-
-				// We've found a +build tag line.
-				if f[0] == "+build" {
-					for _, tg := range f[1:] {
-						tgs = append(tgs, tg)
-					}
-				}
-			}
-		}
-	}
-
-	return tgs
-}
-
-func ensureTrailingSlash(s string) string {
-	return strings.TrimSuffix(s, string(os.PathSeparator)) + string(os.PathSeparator)
-}
-
-// helper func to merge, dedupe, and sort strings
-func dedupeStrings(s1, s2 []string) (r []string) {
-	dedupe := make(map[string]bool)
-
-	if len(s1) > 0 && len(s2) > 0 {
-		for _, i := range s1 {
-			dedupe[i] = true
-		}
-		for _, i := range s2 {
-			dedupe[i] = true
-		}
-
-		for i := range dedupe {
-			r = append(r, i)
-		}
-		// And then re-sort them
-		sort.Strings(r)
-	} else if len(s1) > 0 {
-		r = s1
-	} else if len(s2) > 0 {
-		r = s2
-	}
-
-	return
-}
-
-// A PackageTree represents the results of recursively parsing a tree of
-// packages, starting at the ImportRoot. The results of parsing the files in the
-// directory identified by each import path - a Package or an error - are stored
-// in the Packages map, keyed by that import path.
-type PackageTree struct {
-	ImportRoot string
-	Packages   map[string]PackageOrErr
-}
-
-// PackageOrErr stores the results of attempting to parse a single directory for
-// Go source code.
-type PackageOrErr struct {
-	P   Package
-	Err error
-}
-
-// ExternalReach looks through a PackageTree and computes the list of external
-// import statements (that is, import statements pointing to packages that are
-// not logical children of PackageTree.ImportRoot) that are transitively
-// imported by the internal packages in the tree.
-//
-// main indicates whether (true) or not (false) to include main packages in the
-// analysis. When utilized by gps' solver, main packages are generally excluded
-// from analyzing anything other than the root project, as they necessarily can't
-// be imported.
-//
-// tests indicates whether (true) or not (false) to include imports from test
-// files in packages when computing the reach map.
-//
-// ignore is a map of import paths that, if encountered, should be excluded from
-// analysis. This exclusion applies to both internal and external packages. If
-// an external import path is ignored, it is simply omitted from the results.
-//
-// If an internal path is ignored, then not only does it not appear in the final
-// map, but it is also excluded from the transitive calculations of other
-// internal packages.  That is, if you ignore A/foo, then the external package
-// list for all internal packages that import A/foo will not include external
-// packages that are only reachable through A/foo.
-//
-// Visually, this means that, given a PackageTree with root A and packages at A,
-// A/foo, and A/bar, and the following import chain:
-//
-//  A -> A/foo -> A/bar -> B/baz
-//
-// In this configuration, all of A's packages transitively import B/baz, so the
-// returned map would be:
-//
-//  map[string][]string{
-// 	"A": []string{"B/baz"},
-// 	"A/foo": []string{"B/baz"}
-// 	"A/bar": []string{"B/baz"},
-//  }
-//
-// However, if you ignore A/foo, then A's path to B/baz is broken, and A/foo is
-// omitted entirely. Thus, the returned map would be:
-//
-//  map[string][]string{
-// 	"A": []string{},
-// 	"A/bar": []string{"B/baz"},
-//  }
-//
-// If there are no packages to ignore, it is safe to pass a nil map.
-func (t PackageTree) ExternalReach(main, tests bool, ignore map[string]bool) map[string][]string {
-	if ignore == nil {
-		ignore = make(map[string]bool)
-	}
-
-	// world's simplest adjacency list
-	workmap := make(map[string]wm)
-
-	var imps []string
-	for ip, perr := range t.Packages {
-		if perr.Err != nil {
-			workmap[ip] = wm{
-				err: perr.Err,
-			}
-			continue
-		}
-		p := perr.P
-
-		// Skip main packages, unless param says otherwise
-		if p.Name == "main" && !main {
-			continue
-		}
-		// Skip ignored packages
-		if ignore[ip] {
-			continue
-		}
-
-		imps = imps[:0]
-		imps = p.Imports
-		if tests {
-			imps = dedupeStrings(imps, p.TestImports)
-		}
-
-		w := wm{
-			ex: make(map[string]bool),
-			in: make(map[string]bool),
-		}
-
-		for _, imp := range imps {
-			// Skip ignored imports
-			if ignore[imp] {
-				continue
-			}
-
-			if !checkPrefixSlash(filepath.Clean(imp), t.ImportRoot) {
-				w.ex[imp] = true
-			} else {
-				if w2, seen := workmap[imp]; seen {
-					for i := range w2.ex {
-						w.ex[i] = true
-					}
-					for i := range w2.in {
-						w.in[i] = true
-					}
-				} else {
-					w.in[imp] = true
-				}
-			}
-		}
-
-		workmap[ip] = w
-	}
-
-	//return wmToReach(workmap, t.ImportRoot)
-	return wmToReach(workmap, "") // TODO(sdboyer) this passes tests, but doesn't seem right
-}
-
 // ListExternalImports computes a sorted, deduplicated list of all the external
-// packages that are reachable through imports from all valid packages in the
-// PackageTree.
+// packages that are reachable through imports from all valid packages in a
+// ReachMap, as computed by PackageTree.ExternalReach().
 //
 // main and tests determine whether main packages and test imports should be
 // included in the calculation. "External" is defined as anything not prefixed,
@@ -868,10 +825,7 @@ func (t PackageTree) ExternalReach(main, tests bool, ignore map[string]bool) map
 //    -> A/.bar -> B/baz
 //
 // A is legal, and it imports A/.bar, so the results will include B/baz.
-func (t PackageTree) ListExternalImports(main, tests bool, ignore map[string]bool) []string {
-	// First, we need a reachmap
-	rm := t.ExternalReach(main, tests, ignore)
-
+func (rm ReachMap) ListExternalImports() []string {
 	exm := make(map[string]struct{})
 	for pkg, reach := range rm {
 		// Eliminate import paths with any elements having leading dots, leading
@@ -919,4 +873,34 @@ func checkPrefixSlash(s, prefix string) bool {
 		return false
 	}
 	return s == prefix || strings.HasPrefix(s, ensureTrailingSlash(prefix))
+}
+
+func ensureTrailingSlash(s string) string {
+	return strings.TrimSuffix(s, string(os.PathSeparator)) + string(os.PathSeparator)
+}
+
+// helper func to merge, dedupe, and sort strings
+func dedupeStrings(s1, s2 []string) (r []string) {
+	dedupe := make(map[string]bool)
+
+	if len(s1) > 0 && len(s2) > 0 {
+		for _, i := range s1 {
+			dedupe[i] = true
+		}
+		for _, i := range s2 {
+			dedupe[i] = true
+		}
+
+		for i := range dedupe {
+			r = append(r, i)
+		}
+		// And then re-sort them
+		sort.Strings(r)
+	} else if len(s1) > 0 {
+		r = s1
+	} else if len(s2) > 0 {
+		r = s2
+	}
+
+	return
 }

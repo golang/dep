@@ -32,10 +32,10 @@ func main() {
 	// Set up params, including tracing
 	params := gps.SolveParameters{
 		RootDir:     root,
-		ImportRoot:  gps.ProjectRoot(importroot),
 		Trace:       true,
 		TraceLogger: log.New(os.Stdout, "", 0),
 	}
+	params.RootPackageTree, _ = gps.ListPackages(root, importroot)
 
 	// Set up a SourceManager with the NaiveAnalyzer
 	sourcemgr, _ := gps.NewSourceManager(NaiveAnalyzer{}, ".repocache", false)

@@ -10,9 +10,9 @@ func TestHashInputs(t *testing.T) {
 	fix := basicFixtures["shared dependency with overlapping constraints"]
 
 	params := SolveParameters{
-		RootDir:    string(fix.ds[0].n),
-		ImportRoot: fix.ds[0].n,
-		Manifest:   fix.rootmanifest(),
+		RootDir:         string(fix.ds[0].n),
+		RootPackageTree: fix.rootTree(),
+		Manifest:        fix.rootmanifest(),
 	}
 
 	s, err := Prepare(params, newdepspecSM(fix.ds, nil))
@@ -51,15 +51,16 @@ func TestHashInputs(t *testing.T) {
 func TestHashInputsIgnores(t *testing.T) {
 	fix := basicFixtures["shared dependency with overlapping constraints"]
 
-	rm := fix.rootmanifest().(simpleRootManifest)
+	rm := fix.rootmanifest().(simpleRootManifest).dup()
 	rm.ig = map[string]bool{
 		"foo": true,
 		"bar": true,
 	}
+
 	params := SolveParameters{
-		RootDir:    string(fix.ds[0].n),
-		ImportRoot: fix.ds[0].n,
-		Manifest:   rm,
+		RootDir:         string(fix.ds[0].n),
+		RootPackageTree: fix.rootTree(),
+		Manifest:        rm,
 	}
 
 	s, err := Prepare(params, newdepspecSM(fix.ds, nil))
@@ -101,7 +102,7 @@ func TestHashInputsIgnores(t *testing.T) {
 func TestHashInputsOverrides(t *testing.T) {
 	fix := basicFixtures["shared dependency with overlapping constraints"]
 
-	rm := fix.rootmanifest().(simpleRootManifest)
+	rm := fix.rootmanifest().(simpleRootManifest).dup()
 	// First case - override something not in the root, just with network name
 	rm.ovr = map[ProjectRoot]ProjectProperties{
 		"c": ProjectProperties{
@@ -109,9 +110,9 @@ func TestHashInputsOverrides(t *testing.T) {
 		},
 	}
 	params := SolveParameters{
-		RootDir:    string(fix.ds[0].n),
-		ImportRoot: fix.ds[0].n,
-		Manifest:   rm,
+		RootDir:         string(fix.ds[0].n),
+		RootPackageTree: fix.rootTree(),
+		Manifest:        rm,
 	}
 
 	s, err := Prepare(params, newdepspecSM(fix.ds, nil))

@@ -109,7 +109,7 @@ func (s *solver) traceSelectRoot(ptree PackageTree, cdeps []completeDep) {
 	// so who cares
 	rm := ptree.ExternalReach(true, true, s.ig)
 
-	s.tl.Printf("Root project is %q", s.params.ImportRoot)
+	s.tl.Printf("Root project is %q", s.rpt.ImportRoot)
 
 	var expkgs int
 	for _, cdep := range cdeps {

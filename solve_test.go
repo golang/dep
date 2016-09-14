@@ -87,12 +87,12 @@ func solveBasicsAndCheck(fix basicFixture, t *testing.T) (res Solution, err erro
 	sm := newdepspecSM(fix.ds, nil)
 
 	params := SolveParameters{
-		RootDir:    string(fix.ds[0].n),
-		ImportRoot: ProjectRoot(fix.ds[0].n),
-		Manifest:   fix.rootmanifest(),
-		Lock:       dummyLock{},
-		Downgrade:  fix.downgrade,
-		ChangeAll:  fix.changeall,
+		RootDir:         string(fix.ds[0].n),
+		RootPackageTree: fix.rootTree(),
+		Manifest:        fix.rootmanifest(),
+		Lock:            dummyLock{},
+		Downgrade:       fix.downgrade,
+		ChangeAll:       fix.changeall,
 	}
 
 	if fix.l != nil {
@@ -137,12 +137,12 @@ func solveBimodalAndCheck(fix bimodalFixture, t *testing.T) (res Solution, err e
 	sm := newbmSM(fix)
 
 	params := SolveParameters{
-		RootDir:    string(fix.ds[0].n),
-		ImportRoot: ProjectRoot(fix.ds[0].n),
-		Manifest:   fix.rootmanifest(),
-		Lock:       dummyLock{},
-		Downgrade:  fix.downgrade,
-		ChangeAll:  fix.changeall,
+		RootDir:         string(fix.ds[0].n),
+		RootPackageTree: fix.rootTree(),
+		Manifest:        fix.rootmanifest(),
+		Lock:            dummyLock{},
+		Downgrade:       fix.downgrade,
+		ChangeAll:       fix.changeall,
 	}
 
 	if fix.l != nil {
@@ -262,10 +262,10 @@ func TestRootLockNoVersionPairMatching(t *testing.T) {
 	l2[0].v = nil
 
 	params := SolveParameters{
-		RootDir:    string(fix.ds[0].n),
-		ImportRoot: ProjectRoot(fix.ds[0].n),
-		Manifest:   fix.rootmanifest(),
-		Lock:       l2,
+		RootDir:         string(fix.ds[0].n),
+		RootPackageTree: fix.rootTree(),
+		Manifest:        fix.rootmanifest(),
+		Lock:            l2,
 	}
 
 	res, err := fixSolve(params, sm)
@@ -303,7 +303,27 @@ func TestBadSolveOpts(t *testing.T) {
 		t.Error("Prepare should have given error on empty import root, but gave:", err)
 	}
 
-	params.ImportRoot = ProjectRoot(pn)
+	params.RootPackageTree = PackageTree{
+		ImportRoot: pn,
+	}
+	_, err = Prepare(params, sm)
+	if err == nil {
+		t.Errorf("Prepare should have errored on empty name")
+	} else if !strings.Contains(err.Error(), "at least one package") {
+		t.Error("Prepare should have given error on empty import root, but gave:", err)
+	}
+
+	params.RootPackageTree = PackageTree{
+		ImportRoot: pn,
+		Packages: map[string]PackageOrErr{
+			pn: {
+				P: Package{
+					ImportPath: pn,
+					Name:       pn,
+				},
+			},
+		},
+	}
 	params.Trace = true
 	_, err = Prepare(params, sm)
 	if err == nil {
