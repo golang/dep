@@ -163,6 +163,13 @@ func fixtureSolveSimpleChecks(fix specfix, soln Solution, err error, t *testing.
 		return fmt.Sprintf("%s (from %s)", id.ProjectRoot, id.NetworkName)
 	}
 
+	pv := func(v Version) string {
+		if pv, ok := v.(PairedVersion); ok {
+			return fmt.Sprintf("%s (%s)", pv.Unpair(), pv.Underlying())
+		}
+		return v.String()
+	}
+
 	fixfail := fix.failure()
 	if err != nil {
 		if fixfail == nil {
@@ -207,7 +214,7 @@ func fixtureSolveSimpleChecks(fix specfix, soln Solution, err error, t *testing.
 				// delete result from map so we skip it on the reverse pass
 				delete(rp, p)
 				if v != av {
-					t.Errorf("(fixture: %q) Expected version %q of project %q, but actual version was %q", fix.name(), v, ppi(p), av)
+					t.Errorf("(fixture: %q) Expected version %q of project %q, but actual version was %q", fix.name(), pv(v), ppi(p), pv(av))
 				}
 			}
 		}
@@ -217,7 +224,7 @@ func fixtureSolveSimpleChecks(fix specfix, soln Solution, err error, t *testing.
 			if fv, exists := fix.solution()[p]; !exists {
 				t.Errorf("(fixture: %q) Unexpected project %q present in results", fix.name(), ppi(p))
 			} else if v != fv {
-				t.Errorf("(fixture: %q) Got version %q of project %q, but expected version was %q", fix.name(), v, ppi(p), fv)
+				t.Errorf("(fixture: %q) Got version %q of project %q, but expected version was %q", fix.name(), pv(v), ppi(p), pv(fv))
 			}
 		}
 	}
@@ -232,7 +239,7 @@ func fixtureSolveSimpleChecks(fix specfix, soln Solution, err error, t *testing.
 // produce weird side effects.
 func TestRootLockNoVersionPairMatching(t *testing.T) {
 	fix := basicFixture{
-		n: "does not pair bare revs in manifest with unpaired lock version",
+		n: "does not match unpaired lock versions with paired real versions",
 		ds: []depspec{
 			mkDepspec("root 0.0.0", "foo *"), // foo's constraint rewritten below to foorev
 			mkDepspec("foo 1.0.0", "bar 1.0.0"),
@@ -247,7 +254,7 @@ func TestRootLockNoVersionPairMatching(t *testing.T) {
 		),
 		r: mksolution(
 			"foo 1.0.2 foorev",
-			"bar 1.0.1",
+			"bar 1.0.2",
 		),
 	}
 

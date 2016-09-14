@@ -411,11 +411,7 @@ func (v versionPair) Matches(v2 Version) bool {
 	}
 
 	switch tv := v.v.(type) {
-	case plainVersion:
-		if tv.Matches(v2) {
-			return true
-		}
-	case branchVersion:
+	case plainVersion, branchVersion:
 		if tv.Matches(v2) {
 			return true
 		}
