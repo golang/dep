@@ -680,6 +680,36 @@ type PackageTree struct {
 	Packages   map[string]PackageOrErr
 }
 
+// dup copies the PackageTree.
+//
+// This is really only useful as a defensive measure to prevent external state
+// mutations.
+func (t PackageTree) dup() PackageTree {
+	t2 := PackageTree{
+		ImportRoot: t.ImportRoot,
+		Packages:   map[string]PackageOrErr{},
+	}
+
+	for path, poe := range t.Packages {
+		poe2 := PackageOrErr{
+			Err: poe.Err,
+			P:   poe.P,
+		}
+		if len(poe.P.Imports) > 0 {
+			poe2.P.Imports = make([]string, len(poe.P.Imports))
+			copy(poe2.P.Imports, poe.P.Imports)
+		}
+		if len(poe.P.TestImports) > 0 {
+			poe2.P.TestImports = make([]string, len(poe.P.TestImports))
+			copy(poe2.P.TestImports, poe.P.TestImports)
+		}
+
+		t2.Packages[path] = poe2
+	}
+
+	return t2
+}
+
 // PackageOrErr stores the results of attempting to parse a single directory for
 // Go source code.
 type PackageOrErr struct {

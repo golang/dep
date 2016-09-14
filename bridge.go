@@ -14,7 +14,6 @@ import (
 type sourceBridge interface {
 	SourceManager // composes SourceManager
 	verifyRootDir(path string) error
-	computeRootReach() ([]string, error)
 	pairRevision(id ProjectIdentifier, r Revision) []Version
 	pairVersion(id ProjectIdentifier, v UnpairedVersion) PairedVersion
 	vendorCodeExists(id ProjectIdentifier) (bool, error)
@@ -68,7 +67,7 @@ var mkBridge func(*solver, SourceManager) sourceBridge = func(s *solver, sm Sour
 }
 
 func (b *bridge) GetManifestAndLock(id ProjectIdentifier, v Version) (Manifest, Lock, error) {
-	if id.ProjectRoot == b.s.params.ImportRoot {
+	if id.ProjectRoot == ProjectRoot(b.s.params.Tree.ImportRoot) {
 		return b.s.rm, b.s.rl, nil
 	}
 	return b.sm.GetManifestAndLock(id, v)
@@ -339,57 +338,14 @@ func (b *bridge) vtu(id ProjectIdentifier, v Version) versionTypeUnion {
 	return nil
 }
 
-// computeRootReach is a specialized, less stringent version of listExternal
-// that allows for a bit of fuzziness in the source inputs.
-//
-// Specifically, we need to:
-//  - Analyze test-type files as well as typical source files
-//  - Make a best-effort attempt even if the code doesn't compile
-//  - Include main packages in the analysis
-//
-// Perhaps most important is that we don't want to have the results of this
-// analysis be in any permanent cache, and we want to read directly from our
-// potentially messy root project source location on disk. Together, this means
-// that we can't ask the real SourceManager to do it.
-func (b *bridge) computeRootReach() ([]string, error) {
-	// TODO(sdboyer) i now cannot remember the reasons why i thought being less stringent
-	// in the analysis was OK. so, for now, we just compute a bog-standard list
-	// of externally-touched packages, including mains and test.
-	ptree, err := b.listRootPackages()
-	if err != nil {
-		return nil, err
-	}
-
-	return ptree.ExternalReach(true, true, b.s.ig).ListExternalImports(), nil
-}
-
-func (b *bridge) listRootPackages() (PackageTree, error) {
-	if b.crp == nil {
-		ptree, err := ListPackages(b.s.params.RootDir, string(b.s.params.ImportRoot))
-
-		b.crp = &struct {
-			ptree PackageTree
-			err   error
-		}{
-			ptree: ptree,
-			err:   err,
-		}
-	}
-	if b.crp.err != nil {
-		return PackageTree{}, b.crp.err
-	}
-
-	return b.crp.ptree, nil
-}
-
 // listPackages lists all the packages contained within the given project at a
 // particular version.
 //
 // The root project is handled separately, as the source manager isn't
 // responsible for that code.
 func (b *bridge) ListPackages(id ProjectIdentifier, v Version) (PackageTree, error) {
-	if id.ProjectRoot == b.s.params.ImportRoot {
-		return b.listRootPackages()
+	if id.ProjectRoot == ProjectRoot(b.s.params.Tree.ImportRoot) {
+		panic("should never call ListPackages on root project")
 	}
 
 	return b.sm.ListPackages(id, v)

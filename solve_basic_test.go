@@ -348,6 +348,7 @@ type pident struct {
 type specfix interface {
 	name() string
 	rootmanifest() RootManifest
+	rootTree() PackageTree
 	specs() []depspec
 	maxTries() int
 	solution() map[ProjectIdentifier]Version
@@ -411,6 +412,33 @@ func (f basicFixture) rootmanifest() RootManifest {
 		tc:  f.ds[0].devdeps,
 		ovr: f.ovr,
 	}
+}
+
+func (f basicFixture) rootTree() PackageTree {
+	var imp, timp []string
+	for _, dep := range f.ds[0].deps {
+		imp = append(imp, string(dep.Ident.ProjectRoot))
+	}
+	for _, dep := range f.ds[0].devdeps {
+		timp = append(timp, string(dep.Ident.ProjectRoot))
+	}
+
+	n := string(f.ds[0].n)
+	pt := PackageTree{
+		ImportRoot: n,
+		Packages: map[string]PackageOrErr{
+			string(n): {
+				P: Package{
+					ImportPath:  n,
+					Name:        n,
+					Imports:     imp,
+					TestImports: timp,
+				},
+			},
+		},
+	}
+
+	return pt
 }
 
 func (f basicFixture) failure() error {
@@ -1304,26 +1332,11 @@ type depspecBridge struct {
 	*bridge
 }
 
-// override computeRootReach() on bridge to read directly out of the depspecs
-func (b *depspecBridge) computeRootReach() ([]string, error) {
-	// This only gets called for the root project, so grab that one off the test
-	// source manager
-	dsm := b.sm.(fixSM)
-	root := dsm.rootSpec()
-
-	ptree, err := dsm.ListPackages(mkPI(string(root.n)), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return ptree.ExternalReach(true, true, dsm.ignore()).ListExternalImports(), nil
-}
-
 // override verifyRoot() on bridge to prevent any filesystem interaction
 func (b *depspecBridge) verifyRootDir(path string) error {
 	root := b.sm.(fixSM).rootSpec()
 	if string(root.n) != path {
-		return fmt.Errorf("Expected only root project %q to computeRootReach(), got %q", root.n, path)
+		return fmt.Errorf("Expected only root project %q to verifyRootDir(), got %q", root.n, path)
 	}
 
 	return nil

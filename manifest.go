@@ -90,6 +90,26 @@ func (m simpleRootManifest) Overrides() ProjectConstraints {
 func (m simpleRootManifest) IgnorePackages() map[string]bool {
 	return m.ig
 }
+func (m simpleRootManifest) dup() simpleRootManifest {
+	m2 := simpleRootManifest{
+		c:   make([]ProjectConstraint, len(m.c)),
+		tc:  make([]ProjectConstraint, len(m.tc)),
+		ovr: ProjectConstraints{},
+		ig:  map[string]bool{},
+	}
+
+	copy(m2.c, m.c)
+	copy(m2.tc, m.tc)
+
+	for k, v := range m.ovr {
+		m2.ovr[k] = v
+	}
+	for k, v := range m.ig {
+		m2.ig[k] = v
+	}
+
+	return m2
+}
 
 // prepManifest ensures a manifest is prepared and safe for use by the solver.
 // This is mostly about ensuring that no outside routine can modify the manifest

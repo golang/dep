@@ -31,16 +31,15 @@ type SolveParameters struct {
 	// A real path to a readable directory is required.
 	RootDir string
 
-	// The import path at the base of all import paths covered by the project.
-	// For example, the appropriate value for gps itself here is:
+	// The tree of packages that comprise the root project, as well as the
+	// import path that should identify the root of that tree.
 	//
-	//  github.com/sdboyer/gps
+	// In most situations, tools should simply pass the result of ListPackages()
+	// directly through here.
 	//
-	// In most cases, this should match the latter portion of RootDir. However,
-	// that is not (currently) required.
-	//
-	// A non-empty string is required.
-	ImportRoot ProjectRoot
+	// The ImportRoot property must be a non-empty string, and at least one
+	// element must be present in the Packages map.
+	Tree PackageTree
 
 	// The root manifest. This contains all the dependency constraints
 	// associated with normal Manifests, as well as the particular controls
@@ -157,6 +156,9 @@ type solver struct {
 
 	// A defensively-copied instance of the root lock.
 	rl Lock
+
+	// A defensively-copied instance of params.RootPackageTree
+	rpt PackageTree
 }
 
 // A Solver is the main workhorse of gps: given a set of project inputs, it
@@ -192,8 +194,11 @@ func Prepare(params SolveParameters, sm SourceManager) (Solver, error) {
 	if params.RootDir == "" {
 		return nil, badOptsFailure("params must specify a non-empty root directory")
 	}
-	if params.ImportRoot == "" {
+	if params.Tree.ImportRoot == "" {
 		return nil, badOptsFailure("params must include a non-empty import root")
+	}
+	if len(params.Tree.Packages) == 0 {
+		return nil, badOptsFailure("at least one package must be present in the PackageTree")
 	}
 	if params.Trace && params.TraceLogger == nil {
 		return nil, badOptsFailure("trace requested, but no logger provided")
@@ -208,6 +213,7 @@ func Prepare(params SolveParameters, sm SourceManager) (Solver, error) {
 		ig:     params.Manifest.IgnorePackages(),
 		ovr:    params.Manifest.Overrides(),
 		tl:     params.TraceLogger,
+		rpt:    params.Tree.dup(),
 	}
 
 	// Ensure the ignore and overrides maps are at least initialized
@@ -425,7 +431,7 @@ func (s *solver) solve() (map[atom]map[string]struct{}, error) {
 func (s *solver) selectRoot() error {
 	pa := atom{
 		id: ProjectIdentifier{
-			ProjectRoot: s.params.ImportRoot,
+			ProjectRoot: ProjectRoot(s.params.Tree.ImportRoot),
 		},
 		// This is a hack so that the root project doesn't have a nil version.
 		// It's sort of OK because the root never makes it out into the results.
@@ -462,7 +468,7 @@ func (s *solver) selectRoot() error {
 
 	// Err is not possible at this point, as it could only come from
 	// listPackages(), which if we're here already succeeded for root
-	reach, _ := s.b.computeRootReach()
+	reach := s.rpt.ExternalReach(true, true, s.ig).ListExternalImports()
 
 	deps, err := s.intersectConstraintsWithImports(mdeps, reach)
 	if err != nil {
@@ -490,7 +496,7 @@ func (s *solver) selectRoot() error {
 func (s *solver) getImportsAndConstraintsOf(a atomWithPackages) ([]completeDep, error) {
 	var err error
 
-	if s.params.ImportRoot == a.a.id.ProjectRoot {
+	if ProjectRoot(s.params.Tree.ImportRoot) == a.a.id.ProjectRoot {
 		panic("Should never need to recheck imports/constraints from root during solve")
 	}
 
@@ -625,7 +631,7 @@ func (s *solver) intersectConstraintsWithImports(deps []workingConstraint, reach
 func (s *solver) createVersionQueue(bmi bimodalIdentifier) (*versionQueue, error) {
 	id := bmi.id
 	// If on the root package, there's no queue to make
-	if s.params.ImportRoot == id.ProjectRoot {
+	if ProjectRoot(s.params.Tree.ImportRoot) == id.ProjectRoot {
 		return newVersionQueue(id, nil, nil, s.b)
 	}
 
@@ -665,7 +671,7 @@ func (s *solver) createVersionQueue(bmi bimodalIdentifier) (*versionQueue, error
 		// TODO(sdboyer) nested loop; prime candidate for a cache somewhere
 		for _, dep := range s.sel.getDependenciesOn(bmi.id) {
 			// Skip the root, of course
-			if s.params.ImportRoot == dep.depender.id.ProjectRoot {
+			if ProjectRoot(s.params.Tree.ImportRoot) == dep.depender.id.ProjectRoot {
 				continue
 			}
 
@@ -1023,7 +1029,7 @@ func (s *solver) fail(id ProjectIdentifier) {
 	// selection?
 
 	// skip if the root project
-	if s.params.ImportRoot != id.ProjectRoot {
+	if ProjectRoot(s.params.Tree.ImportRoot) != id.ProjectRoot {
 		// just look for the first (oldest) one; the backtracker will necessarily
 		// traverse through and pop off any earlier ones
 		for _, vq := range s.vqs {

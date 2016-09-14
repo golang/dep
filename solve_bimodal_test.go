@@ -3,6 +3,7 @@ package gps
 import (
 	"fmt"
 	"path/filepath"
+	"strings"
 )
 
 // dsp - "depspec with packages"
@@ -789,6 +790,28 @@ func (f bimodalFixture) rootmanifest() RootManifest {
 	}
 
 	return m
+}
+
+func (f bimodalFixture) rootTree() PackageTree {
+	pt := PackageTree{
+		ImportRoot: string(f.ds[0].n),
+		Packages:   map[string]PackageOrErr{},
+	}
+
+	for _, pkg := range f.ds[0].pkgs {
+		elems := strings.Split(pkg.path, "/")
+		pt.Packages[pkg.path] = PackageOrErr{
+			P: Package{
+				ImportPath: pkg.path,
+				Name:       elems[len(elems)-1],
+				// TODO(sdboyer) ugh, tpkg type has no space for supporting test
+				// imports...
+				Imports: pkg.imports,
+			},
+		}
+	}
+
+	return pt
 }
 
 func (f bimodalFixture) failure() error {
