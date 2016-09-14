@@ -39,7 +39,7 @@ type SolveParameters struct {
 	//
 	// The ImportRoot property must be a non-empty string, and at least one
 	// element must be present in the Packages map.
-	Tree PackageTree
+	RootPackageTree PackageTree
 
 	// The root manifest. This contains all the dependency constraints
 	// associated with normal Manifests, as well as the particular controls
@@ -194,10 +194,10 @@ func Prepare(params SolveParameters, sm SourceManager) (Solver, error) {
 	if params.RootDir == "" {
 		return nil, badOptsFailure("params must specify a non-empty root directory")
 	}
-	if params.Tree.ImportRoot == "" {
+	if params.RootPackageTree.ImportRoot == "" {
 		return nil, badOptsFailure("params must include a non-empty import root")
 	}
-	if len(params.Tree.Packages) == 0 {
+	if len(params.RootPackageTree.Packages) == 0 {
 		return nil, badOptsFailure("at least one package must be present in the PackageTree")
 	}
 	if params.Trace && params.TraceLogger == nil {
@@ -213,7 +213,7 @@ func Prepare(params SolveParameters, sm SourceManager) (Solver, error) {
 		ig:     params.Manifest.IgnorePackages(),
 		ovr:    params.Manifest.Overrides(),
 		tl:     params.TraceLogger,
-		rpt:    params.Tree.dup(),
+		rpt:    params.RootPackageTree.dup(),
 	}
 
 	// Ensure the ignore and overrides maps are at least initialized
@@ -431,7 +431,7 @@ func (s *solver) solve() (map[atom]map[string]struct{}, error) {
 func (s *solver) selectRoot() error {
 	pa := atom{
 		id: ProjectIdentifier{
-			ProjectRoot: ProjectRoot(s.params.Tree.ImportRoot),
+			ProjectRoot: ProjectRoot(s.rpt.ImportRoot),
 		},
 		// This is a hack so that the root project doesn't have a nil version.
 		// It's sort of OK because the root never makes it out into the results.
@@ -496,7 +496,7 @@ func (s *solver) selectRoot() error {
 func (s *solver) getImportsAndConstraintsOf(a atomWithPackages) ([]completeDep, error) {
 	var err error
 
-	if ProjectRoot(s.params.Tree.ImportRoot) == a.a.id.ProjectRoot {
+	if ProjectRoot(s.rpt.ImportRoot) == a.a.id.ProjectRoot {
 		panic("Should never need to recheck imports/constraints from root during solve")
 	}
 
@@ -631,7 +631,7 @@ func (s *solver) intersectConstraintsWithImports(deps []workingConstraint, reach
 func (s *solver) createVersionQueue(bmi bimodalIdentifier) (*versionQueue, error) {
 	id := bmi.id
 	// If on the root package, there's no queue to make
-	if ProjectRoot(s.params.Tree.ImportRoot) == id.ProjectRoot {
+	if ProjectRoot(s.rpt.ImportRoot) == id.ProjectRoot {
 		return newVersionQueue(id, nil, nil, s.b)
 	}
 
@@ -671,7 +671,7 @@ func (s *solver) createVersionQueue(bmi bimodalIdentifier) (*versionQueue, error
 		// TODO(sdboyer) nested loop; prime candidate for a cache somewhere
 		for _, dep := range s.sel.getDependenciesOn(bmi.id) {
 			// Skip the root, of course
-			if ProjectRoot(s.params.Tree.ImportRoot) == dep.depender.id.ProjectRoot {
+			if ProjectRoot(s.rpt.ImportRoot) == dep.depender.id.ProjectRoot {
 				continue
 			}
 
@@ -1029,7 +1029,7 @@ func (s *solver) fail(id ProjectIdentifier) {
 	// selection?
 
 	// skip if the root project
-	if ProjectRoot(s.params.Tree.ImportRoot) != id.ProjectRoot {
+	if ProjectRoot(s.rpt.ImportRoot) != id.ProjectRoot {
 		// just look for the first (oldest) one; the backtracker will necessarily
 		// traverse through and pop off any earlier ones
 		for _, vq := range s.vqs {

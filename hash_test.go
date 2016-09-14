@@ -10,9 +10,9 @@ func TestHashInputs(t *testing.T) {
 	fix := basicFixtures["shared dependency with overlapping constraints"]
 
 	params := SolveParameters{
-		RootDir:  string(fix.ds[0].n),
-		Tree:     fix.rootTree(),
-		Manifest: fix.rootmanifest(),
+		RootDir:         string(fix.ds[0].n),
+		RootPackageTree: fix.rootTree(),
+		Manifest:        fix.rootmanifest(),
 	}
 
 	s, err := Prepare(params, newdepspecSM(fix.ds, nil))
@@ -58,9 +58,9 @@ func TestHashInputsIgnores(t *testing.T) {
 	}
 
 	params := SolveParameters{
-		RootDir:  string(fix.ds[0].n),
-		Tree:     fix.rootTree(),
-		Manifest: rm,
+		RootDir:         string(fix.ds[0].n),
+		RootPackageTree: fix.rootTree(),
+		Manifest:        rm,
 	}
 
 	s, err := Prepare(params, newdepspecSM(fix.ds, nil))
@@ -110,9 +110,9 @@ func TestHashInputsOverrides(t *testing.T) {
 		},
 	}
 	params := SolveParameters{
-		RootDir:  string(fix.ds[0].n),
-		Tree:     fix.rootTree(),
-		Manifest: rm,
+		RootDir:         string(fix.ds[0].n),
+		RootPackageTree: fix.rootTree(),
+		Manifest:        rm,
 	}
 
 	s, err := Prepare(params, newdepspecSM(fix.ds, nil))

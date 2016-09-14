@@ -67,7 +67,7 @@ var mkBridge func(*solver, SourceManager) sourceBridge = func(s *solver, sm Sour
 }
 
 func (b *bridge) GetManifestAndLock(id ProjectIdentifier, v Version) (Manifest, Lock, error) {
-	if id.ProjectRoot == ProjectRoot(b.s.params.Tree.ImportRoot) {
+	if id.ProjectRoot == ProjectRoot(b.s.rpt.ImportRoot) {
 		return b.s.rm, b.s.rl, nil
 	}
 	return b.sm.GetManifestAndLock(id, v)
@@ -344,7 +344,7 @@ func (b *bridge) vtu(id ProjectIdentifier, v Version) versionTypeUnion {
 // The root project is handled separately, as the source manager isn't
 // responsible for that code.
 func (b *bridge) ListPackages(id ProjectIdentifier, v Version) (PackageTree, error) {
-	if id.ProjectRoot == ProjectRoot(b.s.params.Tree.ImportRoot) {
+	if id.ProjectRoot == ProjectRoot(b.s.rpt.ImportRoot) {
 		panic("should never call ListPackages on root project")
 	}
 
