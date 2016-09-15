@@ -32,15 +32,15 @@ func TestVersionSorts(t *testing.T) {
 
 	edown := []Version{
 		v3, v4, v5, // semvers
-		v6, v8, // plain versions
 		v1, v2, v7, // floating/branches
+		v6, v8, // plain versions
 		rev, // revs
 	}
 
 	eup := []Version{
 		v5, v4, v3, // semvers
-		v6, v8, // plain versions
 		v1, v2, v7, // floating/branches
+		v6, v8, // plain versions
 		rev, // revs
 	}
 

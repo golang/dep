@@ -487,21 +487,22 @@ func compareVersionType(l, r Version) int {
 		case branchVersion, plainVersion, semVersion:
 			return 1
 		}
-	case branchVersion:
-		switch r.(type) {
-		case Revision:
-			return -1
-		case branchVersion:
-			return 0
-		case plainVersion, semVersion:
-			return 1
-		}
 
 	case plainVersion:
 		switch r.(type) {
-		case Revision, branchVersion:
+		case Revision:
 			return -1
 		case plainVersion:
+			return 0
+		case branchVersion, semVersion:
+			return 1
+		}
+
+	case branchVersion:
+		switch r.(type) {
+		case Revision, plainVersion:
+			return -1
+		case branchVersion:
 			return 0
 		case semVersion:
 			return 1
@@ -527,9 +528,9 @@ func compareVersionType(l, r Version) int {
 //  - Semver versions with a prerelease are after *all* non-prerelease semver.
 //  Against each other, they are sorted first by their numerical component, then
 //  lexicographically by their prerelease version.
+//  - All branches are next, and sort lexicographically against each other.
 //  - All non-semver versions (tags) are next, and sort lexicographically
 //  against each other.
-//  - All branches are next, and sort lexicographically against each other.
 //  - Revisions are last, and sort lexicographically against each other.
 //
 // So, given a slice of the following versions:
@@ -549,14 +550,15 @@ func SortForUpgrade(vl []Version) {
 // SortForDowngrade sorts a slice of []Version in roughly ascending order, so
 // that presumably older versions are visited first.
 //
-// This is *not* the reverse of the same as SortForUpgrade (or you could simply
-// sort.Reverse(). The type precedence is the same, including the
-// semver vs. semver-with-prerelease relation. Lexicographic comparisons within
-// non-semver tags, branches, and revisions remains the same as well; because
-// these domains have no implicit chronology, there is no reason to reverse
+// This is *not* the same as reversing SortForUpgrade (or you could simply
+// sort.Reverse()). The type precedence is the same, including the semver vs.
+// semver-with-prerelease relation. Lexicographic comparisons within non-semver
+// tags, branches, and revisions remains the same as well; because we treat
+// these domains as having no ordering relations (chronology), there can be no
+// real concept of "upgrade" vs "downgrade", so there is no reason to reverse
 // them.
 //
-// The only binary relation that is reversed for downgrade is within-type
+// Thus, the only binary relation that is reversed for downgrade is within-type
 // comparisons for semver (with and without prerelease).
 //
 // So, given a slice of the following versions:
