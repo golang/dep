@@ -10,7 +10,7 @@ func TestVersionSorts(t *testing.T) {
 	v4 := NewVersion("1.0.1")
 	v5 := NewVersion("v2.0.5")
 	v6 := NewVersion("2.0.5.2")
-	v7 := branchVersion{name: "unwrapped", isDefault: true}
+	v7 := newDefaultBranch("unwrapped")
 	v8 := NewVersion("20.0.5.2")
 
 	start := []Version{

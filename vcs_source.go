@@ -136,13 +136,59 @@ func (s *gitSource) listVersions() (vlist []Version, err error) {
 	s.ex.s |= existsUpstream
 	s.ex.f |= existsUpstream
 
+	// pull out the HEAD rev (it's always first) so we know what branches to
+	// mark as default. This is, perhaps, not the best way to glean this, but it
+	// was good enough for git itself until 1.8.5. Also, the alternative is
+	// sniffing data out of the pack protocol, which is a separate request, and
+	// also waaaay more than we want to do right now.
+	//
+	// The cost is that we could potentially have multiple branches marked as
+	// the default. If that does occur, a later check (again, emulating git
+	// <1.8.5 behavior) further narrows the failure mode by choosing master as
+	// the sole default branch if a) master exists and b) master is one of the
+	// branches marked as a default.
+	//
+	// This all reduces the failure mode to a very narrow range of
+	// circumstances. Nevertheless, if we do end up emitting multiple
+	// default branches, it is possible that a user could end up following a
+	// non-default branch, IF:
+	//
+	// * Multiple branches match the HEAD rev
+	// * None of them are master
+	// * The solver makes it into the branch list in the version queue
+	// * The user has provided no constraint, or DefaultBranch
+	// * A branch that is not actually the default, but happens to share the
+	// rev, is lexicographically earlier than the true default branch
+	//
+	// Then the user could end up with an erroneous non-default branch in their
+	// lock file.
+	headrev := Revision(all[0][:40])
+	var onedef, multidef, defmaster bool
+
 	smap := make(map[string]bool)
 	uniq := 0
 	vlist = make([]Version, len(all)-1) // less 1, because always ignore HEAD
 	for _, pair := range all {
 		var v PairedVersion
 		if string(pair[46:51]) == "heads" {
-			v = NewBranch(string(pair[52:])).Is(Revision(pair[:40])).(PairedVersion)
+			rev := Revision(pair[:40])
+
+			isdef := rev == headrev
+			n := string(pair[52:])
+			if isdef {
+				if onedef {
+					multidef = true
+				}
+				onedef = true
+				if n == "master" {
+					defmaster = true
+				}
+			}
+			v = branchVersion{
+				name:      n,
+				isDefault: isdef,
+			}.Is(rev).(PairedVersion)
+
 			vlist[uniq] = v
 			uniq++
 		} else if string(pair[46:50]) == "tags" {
@@ -168,6 +214,20 @@ func (s *gitSource) listVersions() (vlist []Version, err error) {
 
 	// Trim off excess from the slice
 	vlist = vlist[:uniq]
+
+	// There were multiple default branches, but one was master. So, go through
+	// and strip the default flag from all the non-master branches.
+	if multidef && defmaster {
+		for k, v := range vlist {
+			pv := v.(PairedVersion)
+			if bv, ok := pv.Unpair().(branchVersion); ok {
+				if bv.name != "master" && bv.isDefault == true {
+					bv.isDefault = false
+					vlist[k] = bv.Is(pv.Underlying())
+				}
+			}
+		}
+	}
 
 	// Process the version data into the cache
 	//

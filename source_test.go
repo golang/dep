@@ -86,7 +86,7 @@ func TestGitSourceInteractions(t *testing.T) {
 		SortForUpgrade(vlist)
 		evl := []Version{
 			NewVersion("1.0.0").Is(Revision("30605f6ac35fcb075ad0bfa9296f90a7d891523e")),
-			NewBranch("master").Is(Revision("30605f6ac35fcb075ad0bfa9296f90a7d891523e")),
+			newDefaultBranch("master").Is(Revision("30605f6ac35fcb075ad0bfa9296f90a7d891523e")),
 			NewBranch("test").Is(Revision("30605f6ac35fcb075ad0bfa9296f90a7d891523e")),
 		}
 		if !reflect.DeepEqual(vlist, evl) {
