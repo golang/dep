@@ -69,7 +69,16 @@ func (Revision) _private()       {}
 // NewBranch creates a new Version to represent a floating version (in
 // general, a branch).
 func NewBranch(body string) UnpairedVersion {
-	return branchVersion(body)
+	return branchVersion{
+		name: body,
+		// We always set isDefault to false here, because the property is
+		// specifically designed to be internal-only: only the SourceManager
+		// gets to mark it. This is OK because nothing that client code is
+		// responsible for needs to care about has to touch it it.
+		//
+		// TODO(sdboyer) ...maybe. this just ugly.
+		isDefault: false,
+	}
 }
 
 // NewVersion creates a Semver-typed Version if the provided version string is
@@ -150,13 +159,16 @@ func (r Revision) Intersect(c Constraint) Constraint {
 	return none
 }
 
-type branchVersion string
-
-func (v branchVersion) String() string {
-	return string(v)
+type branchVersion struct {
+	name      string
+	isDefault bool
 }
 
-func (r branchVersion) Type() string {
+func (v branchVersion) String() string {
+	return string(v.name)
+}
+
+func (v branchVersion) Type() string {
 	return "branch"
 }
 
@@ -165,10 +177,10 @@ func (v branchVersion) Matches(v2 Version) bool {
 	case versionTypeUnion:
 		return tv.Matches(v)
 	case branchVersion:
-		return v == tv
+		return v.name == tv.name
 	case versionPair:
 		if tv2, ok := tv.v.(branchVersion); ok {
-			return tv2 == v
+			return tv2.name == v.name
 		}
 	}
 	return false
@@ -183,10 +195,10 @@ func (v branchVersion) MatchesAny(c Constraint) bool {
 	case versionTypeUnion:
 		return tc.MatchesAny(v)
 	case branchVersion:
-		return v == tc
+		return v.name == tc.name
 	case versionPair:
 		if tc2, ok := tc.v.(branchVersion); ok {
-			return tc2 == v
+			return tc2.name == v.name
 		}
 	}
 
@@ -202,12 +214,12 @@ func (v branchVersion) Intersect(c Constraint) Constraint {
 	case versionTypeUnion:
 		return tc.Intersect(v)
 	case branchVersion:
-		if v == tc {
+		if v.name == tc.name {
 			return v
 		}
 	case versionPair:
 		if tc2, ok := tc.v.(branchVersion); ok {
-			if v == tc2 {
+			if v.name == tc2.name {
 				return v
 			}
 		}
@@ -615,9 +627,19 @@ func (vs upgradeVersionSorter) Less(i, j int) bool {
 		panic("unreachable")
 	}
 
-	switch l.(type) {
-	// For these, now nothing to do but alpha sort
-	case Revision, branchVersion, plainVersion:
+	switch tl := l.(type) {
+	case branchVersion:
+		tr := r.(branchVersion)
+		if tl.isDefault != tr.isDefault {
+			// If they're not both defaults, then return the left val: if left
+			// is the default, then it is "less" (true) b/c we want it earlier.
+			// Else the right is the default, and so the left should be later
+			// (false).
+			return tl.isDefault
+		}
+		return l.String() < r.String()
+	case Revision, plainVersion:
+		// All that we can do now is alpha sort
 		return l.String() < r.String()
 	}
 
@@ -652,9 +674,19 @@ func (vs downgradeVersionSorter) Less(i, j int) bool {
 		panic("unreachable")
 	}
 
-	switch l.(type) {
-	// For these, now nothing to do but alpha
-	case Revision, branchVersion, plainVersion:
+	switch tl := l.(type) {
+	case branchVersion:
+		tr := r.(branchVersion)
+		if tl.isDefault != tr.isDefault {
+			// If they're not both defaults, then return the left val: if left
+			// is the default, then it is "less" (true) b/c we want it earlier.
+			// Else the right is the default, and so the left should be later
+			// (false).
+			return tl.isDefault
+		}
+		return l.String() < r.String()
+	case Revision, plainVersion:
+		// All that we can do now is alpha sort
 		return l.String() < r.String()
 	}
 
