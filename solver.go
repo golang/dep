@@ -449,6 +449,7 @@ func (s *solver) selectRoot() error {
 		}
 	}
 	list = list[:k]
+	sort.Strings(list)
 
 	a := atomWithPackages{
 		a:  pa,
@@ -513,8 +514,8 @@ func (s *solver) getImportsAndConstraintsOf(a atomWithPackages) ([]completeDep, 
 	allex := ptree.ExternalReach(false, false, s.ig)
 	// Use a map to dedupe the unique external packages
 	exmap := make(map[string]struct{})
-	// Add the packages reached by the packages explicitly listed in the atom to
-	// the list
+	// Add to the list those packages that are reached by the packages
+	// explicitly listed in the atom
 	for _, pkg := range a.pl {
 		expkgs, exists := allex[pkg]
 		if !exists {
@@ -541,6 +542,7 @@ func (s *solver) getImportsAndConstraintsOf(a atomWithPackages) ([]completeDep, 
 		reach[k] = pkg
 		k++
 	}
+	sort.Strings(reach)
 
 	deps := s.ovr.overrideAll(m.DependencyConstraints())
 	return s.intersectConstraintsWithImports(deps, reach)
