@@ -211,12 +211,6 @@ func (awp atomWithPackages) bmi() bimodalIdentifier {
 	}
 }
 
-//type byImportPath []Package
-
-//func (s byImportPath) Len() int           { return len(s) }
-//func (s byImportPath) Less(i, j int) bool { return s[i].ImportPath < s[j].ImportPath }
-//func (s byImportPath) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
-
 // completeDep (name hopefully to change) provides the whole picture of a
 // dependency - the root (repo and project, since currently we assume the two
 // are the same) name, a constraint, and the actual packages needed that are

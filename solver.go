@@ -440,17 +440,15 @@ func (s *solver) selectRoot() error {
 		v: rootRev,
 	}
 
-	ptree, err := s.b.ListPackages(pa.id, nil)
-	if err != nil {
-		return err
-	}
-
-	list := make([]string, len(ptree.Packages))
+	list := make([]string, len(s.rpt.Packages))
 	k := 0
-	for path := range ptree.Packages {
-		list[k] = path
-		k++
+	for path, pkg := range s.rpt.Packages {
+		if pkg.Err != nil {
+			list[k] = path
+			k++
+		}
 	}
+	list = list[:k]
 
 	a := atomWithPackages{
 		a:  pa,
@@ -489,7 +487,7 @@ func (s *solver) selectRoot() error {
 		heap.Push(s.unsel, bimodalIdentifier{id: dep.Ident, pl: dep.pl, fromRoot: true})
 	}
 
-	s.traceSelectRoot(ptree, deps)
+	s.traceSelectRoot(s.rpt, deps)
 	return nil
 }
 
