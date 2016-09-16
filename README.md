@@ -66,16 +66,16 @@ productive.
 * A [**manifest** and
   **lock**](https://github.com/sdboyer/gps/wiki/gps-for-Implementors#manifests-and-locks)
   approach to tracking version and constraint information
-* Source repositories can be `git`, `bzr`, `hg` or `svn` (Most of the work here is through a [separate lib](https://github.com/Masterminds/vcs))
+* Upstream sources are one of `git`, `bzr`, `hg` or `svn` repositories
 * What the available versions are for a given project/repository (all branches, tags, or revs are eligible)
-  * In general, semver tags are preferred to plain tags, are preferred to branches
-* The actual packages required (determined through import graph static analysis)
+  * In general, semver tags are preferred to branches, are preferred to plain tags
+* The actual packages that must be present (determined through import graph static analysis)
   * How the import graph is statically analyzed (Similar to `go/build`, but with a combinatorial view of build tags)
+* All packages from the same source (repository) must be the same version
 * Package import cycles are not allowed ([not yet implemented](https://github.com/sdboyer/gps/issues/66))
 
 There are also some current non-choices that we would like to push into the realm of choice:
 
-* Different versions of packages from the same repository cannot be used
 * Importable projects that are not bound to the repository root
 * Source inference around different import path patterns (e.g., how `github.com/*` or `my_company/*` are handled)
 
