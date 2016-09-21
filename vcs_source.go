@@ -308,13 +308,6 @@ func (s *bzrSource) listVersions() (vlist []Version, err error) {
 	s.dc.rMap = make(map[Revision][]UnpairedVersion)
 	vlist = make([]Version, len(all)+1)
 
-	// Add the default branch, hardcoding the visual representation of it
-	// that bzr uses when operating in the workflow mode we're using.
-	v := newDefaultBranch("(default)")
-	rev := Revision(string(branchrev))
-	s.dc.vMap[v] = rev
-	s.dc.rMap[rev] = append(s.dc.rMap[rev], v)
-
 	// Now, all the tags.
 	for k, line := range all {
 		idx := bytes.IndexByte(line, 32) // space
@@ -325,6 +318,14 @@ func (s *bzrSource) listVersions() (vlist []Version, err error) {
 		s.dc.rMap[r] = append(s.dc.rMap[r], v)
 		vlist[k] = v.Is(r)
 	}
+
+	// Last, add the default branch, hardcoding the visual representation of it
+	// that bzr uses when operating in the workflow mode we're using.
+	v := newDefaultBranch("(default)")
+	rev := Revision(string(branchrev))
+	s.dc.vMap[v] = rev
+	s.dc.rMap[rev] = append(s.dc.rMap[rev], v)
+	vlist[len(vlist)-1] = v.Is(rev)
 
 	// Cache is now in sync with upstream's version list
 	s.cvsync = true
