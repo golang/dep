@@ -295,14 +295,27 @@ func (s *bzrSource) listVersions() (vlist []Version, err error) {
 
 	all := bytes.Split(bytes.TrimSpace(out), []byte("\n"))
 
-	// reset the rmap and vmap, as they'll be fully repopulated by this
-	// TODO(sdboyer) detect out-of-sync pairings as we do this?
+	branchrev, err := r.RunFromDir("bzr", "version-info", "--custom", "--template='{revision_id}'", "-r branch:.")
+	if err != nil {
+		return
+	}
+
+	// Both commands completed successfully, so there's no further possibility
+	// of errors. That means it's now safe to reset the rmap and vmap, as
+	// they're about to be fully repopulated.
 	s.dc.vMap = make(map[UnpairedVersion]Revision)
 	s.dc.rMap = make(map[Revision][]UnpairedVersion)
+	vlist = make([]Version, len(all)+1)
 
-	vlist = make([]Version, len(all))
-	k := 0
-	for _, line := range all {
+	// Add the default branch, hardcoding the visual representation of it
+	// that bzr uses when operating in the workflow mode we're using.
+	v := newDefaultBranch("(default)")
+	rev := Revision(string(branchrev))
+	s.dc.vMap[v] = rev
+	s.dc.rMap[rev] = append(s.dc.rMap[rev], v)
+
+	// Now, all the tags.
+	for k, line := range all {
 		idx := bytes.IndexByte(line, 32) // space
 		v := NewVersion(string(line[:idx]))
 		r := Revision(bytes.TrimSpace(line[idx:]))
@@ -310,7 +323,6 @@ func (s *bzrSource) listVersions() (vlist []Version, err error) {
 		s.dc.vMap[v] = r
 		s.dc.rMap[r] = append(s.dc.rMap[r], v)
 		vlist[k] = v.Is(r)
-		k++
 	}
 
 	// Cache is now in sync with upstream's version list
