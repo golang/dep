@@ -83,6 +83,7 @@ type ProjectAnalyzer interface {
 // tools; control via dependency injection is intended to be sufficient.
 type SourceMgr struct {
 	cachedir string
+	lf       *os.File
 	srcs     map[string]source
 	srcmut   sync.RWMutex
 	an       ProjectAnalyzer
@@ -125,13 +126,14 @@ func NewSourceManager(an ProjectAnalyzer, cachedir string, force bool) (*SourceM
 		return nil, fmt.Errorf("cache lock file %s exists - another process crashed or is still running?", glpath)
 	}
 
-	_, err = os.OpenFile(glpath, os.O_CREATE|os.O_RDONLY, 0700) // is 0700 sane for this purpose?
+	fi, err := os.OpenFile(glpath, os.O_CREATE, 0600) // is 0600 sane for this purpose?
 	if err != nil {
 		return nil, fmt.Errorf("failed to create global cache lock file at %s with err %s", glpath, err)
 	}
 
 	return &SourceMgr{
 		cachedir: cachedir,
+		lf:       fi,
 		srcs:     make(map[string]source),
 		an:       an,
 		dxt:      pathDeducerTrie(),
@@ -141,6 +143,7 @@ func NewSourceManager(an ProjectAnalyzer, cachedir string, force bool) (*SourceM
 
 // Release lets go of any locks held by the SourceManager.
 func (sm *SourceMgr) Release() {
+	sm.lf.Close()
 	os.Remove(filepath.Join(sm.cachedir, "sm.lock"))
 }
 

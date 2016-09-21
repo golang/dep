@@ -69,12 +69,13 @@ func TestSourceManagerInit(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to create temp dir: %s", err)
 	}
-	_, err = NewSourceManager(naiveAnalyzer{}, cpath, false)
+	sm, err := NewSourceManager(naiveAnalyzer{}, cpath, false)
 
 	if err != nil {
 		t.Errorf("Unexpected error on SourceManager creation: %s", err)
 	}
 	defer func() {
+		sm.Release()
 		err := removeAll(cpath)
 		if err != nil {
 			t.Errorf("removeAll failed: %s", err)
@@ -86,14 +87,19 @@ func TestSourceManagerInit(t *testing.T) {
 		t.Errorf("Creating second SourceManager should have failed due to file lock contention")
 	}
 
-	sm, err := NewSourceManager(naiveAnalyzer{}, cpath, true)
-	defer sm.Release()
+	sm, err = NewSourceManager(naiveAnalyzer{}, cpath, true)
 	if err != nil {
 		t.Errorf("Creating second SourceManager should have succeeded when force flag was passed, but failed with err %s", err)
 	}
 
 	if _, err = os.Stat(path.Join(cpath, "sm.lock")); err != nil {
 		t.Errorf("Global cache lock file not created correctly")
+		t.FailNow()
+	}
+
+	sm.Release()
+	if _, err = os.Stat(path.Join(cpath, "sm.lock")); !os.IsNotExist(err) {
+		t.Errorf("Global cache lock file not cleared correctly on Release()")
 	}
 }
 
