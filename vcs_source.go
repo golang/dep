@@ -402,7 +402,44 @@ func (s *hgSource) listVersions() (vlist []Version, err error) {
 		vlist = append(vlist, v)
 	}
 
-	out, err = r.RunFromDir("hg", "branches", "--debug", "--verbose")
+	// bookmarks next, because the presence of the magic @ bookmark has to
+	// determine how we handle the branches
+	var magicAt bool
+	out, err = r.RunFromDir("hg", "bookmarks", "--debug")
+	if err != nil {
+		// better nothing than partial and misleading
+		vlist = nil
+		return
+	}
+
+	out = bytes.TrimSpace(out)
+	if !bytes.Equal(out, []byte("no bookmarks set")) {
+		all = bytes.Split(out, []byte("\n"))
+		for _, line := range all {
+			// Trim leading spaces, and * marker if present
+			line = bytes.TrimLeft(line, " *")
+			pair := bytes.Split(line, []byte(":"))
+			// if this doesn't split exactly once, we have something weird
+			if len(pair) != 2 {
+				continue
+			}
+
+			// Split on colon; this gets us the rev and the branch plus local revno
+			idx := bytes.IndexByte(pair[0], 32) // space
+			// if it's the magic @ marker, make that the default branch
+			str := string(pair[0][:idx])
+			var v Version
+			if str == "@" {
+				magicAt = true
+				v = newDefaultBranch(str).Is(Revision(pair[1])).(PairedVersion)
+			} else {
+				v = NewBranch(str).Is(Revision(pair[1])).(PairedVersion)
+			}
+			vlist = append(vlist, v)
+		}
+	}
+
+	out, err = r.RunFromDir("hg", "branches", "-c", "--debug")
 	if err != nil {
 		// better nothing than partial and misleading
 		vlist = nil
@@ -410,22 +447,28 @@ func (s *hgSource) listVersions() (vlist []Version, err error) {
 	}
 
 	all = bytes.Split(bytes.TrimSpace(out), []byte("\n"))
-	lbyt = []byte("(inactive)")
 	for _, line := range all {
-		if bytes.Equal(lbyt, line[len(line)-len(lbyt):]) {
-			// Skip inactive branches
-			continue
-		}
+		// Trim inactive and closed suffixes, if present; we represent these
+		// anyway
+		line = bytes.TrimSuffix(line, []byte(" (inactive)"))
+		line = bytes.TrimSuffix(line, []byte(" (closed)"))
 
 		// Split on colon; this gets us the rev and the branch plus local revno
 		pair := bytes.Split(line, []byte(":"))
 		idx := bytes.IndexByte(pair[0], 32) // space
-		v := NewBranch(string(pair[0][:idx])).Is(Revision(pair[1])).(PairedVersion)
+		str := string(pair[0][:idx])
+		// if there was no magic @ bookmark, and this is mercurial's magic
+		// "default" branch, then mark it as default branch
+		var v Version
+		if !magicAt && str == "default" {
+			v = newDefaultBranch(str).Is(Revision(pair[1])).(PairedVersion)
+		} else {
+			v = NewBranch(str).Is(Revision(pair[1])).(PairedVersion)
+		}
 		vlist = append(vlist, v)
 	}
 
 	// reset the rmap and vmap, as they'll be fully repopulated by this
-	// TODO(sdboyer) detect out-of-sync pairings as we do this?
 	s.dc.vMap = make(map[UnpairedVersion]Revision)
 	s.dc.rMap = make(map[Revision][]UnpairedVersion)
 
