@@ -147,6 +147,10 @@ func TestBzrSourceInteractions(t *testing.T) {
 	if ident != un {
 		t.Errorf("Expected %s as source ident, got %s", un, ident)
 	}
+	evl := []Version{
+		NewVersion("1.0.0").Is(Revision("matt@mattfarina.com-20150731135137-pbphasfppmygpl68")),
+		newDefaultBranch("(default)").Is(Revision("matt@mattfarina.com-20150731135137-pbphasfppmygpl68")),
+	}
 
 	// check that an expected rev is present
 	is, err := src.revisionPresentIn(Revision("matt@mattfarina.com-20150731135137-pbphasfppmygpl68"))
@@ -168,12 +172,11 @@ func TestBzrSourceInteractions(t *testing.T) {
 		t.Errorf("bzrSource.listVersions() should have set the upstream and cache existence bits for found")
 	}
 
-	if len(vlist) != 1 {
-		t.Errorf("bzr test repo should've produced one version, got %v", len(vlist))
+	if len(vlist) != 2 {
+		t.Errorf("bzr test repo should've produced two versions, got %v", len(vlist))
 	} else {
-		v := NewVersion("1.0.0").Is(Revision("matt@mattfarina.com-20150731135137-pbphasfppmygpl68"))
-		if vlist[0] != v {
-			t.Errorf("bzr pair fetch reported incorrect first version, got %s", vlist[0])
+		if !reflect.DeepEqual(vlist, evl) {
+			t.Errorf("bzr version list was not what we expected:\n\t(GOT): %s\n\t(WNT): %s", vlist, evl)
 		}
 	}
 
@@ -190,8 +193,8 @@ func TestBzrSourceInteractions(t *testing.T) {
 		t.Errorf("bzrSource.listVersions() should have set the upstream and cache existence bits for found")
 	}
 
-	if len(vlist) != 1 {
-		t.Errorf("bzr test repo should've produced one version, got %v", len(vlist))
+	if len(vlist) != 2 {
+		t.Errorf("bzr test repo should've produced two versions, got %v", len(vlist))
 	} else {
 		v := NewVersion("1.0.0").Is(Revision("matt@mattfarina.com-20150731135137-pbphasfppmygpl68"))
 		if vlist[0] != v {
