@@ -286,18 +286,19 @@ func (s *bzrSource) listVersions() (vlist []Version, err error) {
 	}
 
 	var out []byte
-
 	// Now, list all the tags
 	out, err = r.RunFromDir("bzr", "tags", "--show-ids", "-v")
 	if err != nil {
-		return
+		return nil, fmt.Errorf("%s: %s", err, string(out))
 	}
 
 	all := bytes.Split(bytes.TrimSpace(out), []byte("\n"))
 
-	branchrev, err := r.RunFromDir("bzr", "version-info", "--custom", "--template='{revision_id}'", "-r branch:.")
+	var branchrev []byte
+	branchrev, err = r.RunFromDir("bzr", "version-info", "--custom", "--template={revision_id}", "--revision=branch:.")
+	br := string(branchrev)
 	if err != nil {
-		return
+		return nil, fmt.Errorf("%s: %s", err, br)
 	}
 
 	// Both commands completed successfully, so there's no further possibility
@@ -373,7 +374,7 @@ func (s *hgSource) listVersions() (vlist []Version, err error) {
 	// Now, list all the tags
 	out, err = r.RunFromDir("hg", "tags", "--debug", "--verbose")
 	if err != nil {
-		return
+		return nil, fmt.Errorf("%s: %s", err, string(out))
 	}
 
 	all := bytes.Split(bytes.TrimSpace(out), []byte("\n"))
@@ -408,8 +409,7 @@ func (s *hgSource) listVersions() (vlist []Version, err error) {
 	out, err = r.RunFromDir("hg", "bookmarks", "--debug")
 	if err != nil {
 		// better nothing than partial and misleading
-		vlist = nil
-		return
+		return nil, fmt.Errorf("%s: %s", err, string(out))
 	}
 
 	out = bytes.TrimSpace(out)
@@ -442,8 +442,7 @@ func (s *hgSource) listVersions() (vlist []Version, err error) {
 	out, err = r.RunFromDir("hg", "branches", "-c", "--debug")
 	if err != nil {
 		// better nothing than partial and misleading
-		vlist = nil
-		return
+		return nil, fmt.Errorf("%s: %s", err, string(out))
 	}
 
 	all = bytes.Split(bytes.TrimSpace(out), []byte("\n"))
