@@ -157,9 +157,16 @@ func TestSourceInit(t *testing.T) {
 		SortForUpgrade(v)
 
 		for k, e := range expected {
-			if v[k] != e {
+			if !v[k].Matches(e) {
 				t.Errorf("Expected version %s in position %v but got %s", e, k, v[k])
 			}
+		}
+
+		if !v[1].(versionPair).v.(branchVersion).isDefault {
+			t.Error("Expected master branch version to have isDefault flag, but it did not")
+		}
+		if v[2].(versionPair).v.(branchVersion).isDefault {
+			t.Error("Expected test branch version not to have isDefault flag, but it did")
 		}
 	}
 
@@ -188,9 +195,16 @@ func TestSourceInit(t *testing.T) {
 		}
 
 		for k, e := range expected {
-			if v[k] != e {
+			if !v[k].Matches(e) {
 				t.Errorf("Expected version %s in position %v but got %s", e, k, v[k])
 			}
+		}
+
+		if !v[1].(versionPair).v.(branchVersion).isDefault {
+			t.Error("Expected master branch version to have isDefault flag, but it did not")
+		}
+		if v[2].(versionPair).v.(branchVersion).isDefault {
+			t.Error("Expected test branch version not to have isDefault flag, but it did")
 		}
 	}
 
@@ -227,6 +241,51 @@ func TestSourceInit(t *testing.T) {
 	}
 	if !exists {
 		t.Error("Source should exist after non-erroring call to ListVersions")
+	}
+}
+
+func TestDefaultBranchAssignment(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping default branch assignment test in short mode")
+	}
+
+	sm, clean := mkNaiveSM(t)
+	defer clean()
+
+	id := mkPI("github.com/sdboyer/test-multibranch")
+	v, err := sm.ListVersions(id)
+	if err != nil {
+		t.Errorf("Unexpected error during initial project setup/fetching %s", err)
+	}
+
+	if len(v) != 3 {
+		t.Errorf("Expected three version results from the test repo, got %v", len(v))
+	} else {
+		brev := Revision("fda020843ac81352004b9dca3fcccdd517600149")
+		mrev := Revision("9f9c3a591773d9b28128309ac7a9a72abcab267d")
+		expected := []Version{
+			NewBranch("branchone").Is(brev),
+			NewBranch("otherbranch").Is(brev),
+			NewBranch("master").Is(mrev),
+		}
+
+		SortForUpgrade(v)
+
+		for k, e := range expected {
+			if !v[k].Matches(e) {
+				t.Errorf("Expected version %s in position %v but got %s", e, k, v[k])
+			}
+		}
+
+		if !v[0].(versionPair).v.(branchVersion).isDefault {
+			t.Error("Expected branchone branch version to have isDefault flag, but it did not")
+		}
+		if !v[0].(versionPair).v.(branchVersion).isDefault {
+			t.Error("Expected otherbranch branch version to have isDefault flag, but it did not")
+		}
+		if v[2].(versionPair).v.(branchVersion).isDefault {
+			t.Error("Expected master branch version not to have isDefault flag, but it did")
+		}
 	}
 }
 

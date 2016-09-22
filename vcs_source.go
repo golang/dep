@@ -136,13 +136,59 @@ func (s *gitSource) listVersions() (vlist []Version, err error) {
 	s.ex.s |= existsUpstream
 	s.ex.f |= existsUpstream
 
+	// pull out the HEAD rev (it's always first) so we know what branches to
+	// mark as default. This is, perhaps, not the best way to glean this, but it
+	// was good enough for git itself until 1.8.5. Also, the alternative is
+	// sniffing data out of the pack protocol, which is a separate request, and
+	// also waaaay more than we want to do right now.
+	//
+	// The cost is that we could potentially have multiple branches marked as
+	// the default. If that does occur, a later check (again, emulating git
+	// <1.8.5 behavior) further narrows the failure mode by choosing master as
+	// the sole default branch if a) master exists and b) master is one of the
+	// branches marked as a default.
+	//
+	// This all reduces the failure mode to a very narrow range of
+	// circumstances. Nevertheless, if we do end up emitting multiple
+	// default branches, it is possible that a user could end up following a
+	// non-default branch, IF:
+	//
+	// * Multiple branches match the HEAD rev
+	// * None of them are master
+	// * The solver makes it into the branch list in the version queue
+	// * The user has provided no constraint, or DefaultBranch
+	// * A branch that is not actually the default, but happens to share the
+	// rev, is lexicographically earlier than the true default branch
+	//
+	// Then the user could end up with an erroneous non-default branch in their
+	// lock file.
+	headrev := Revision(all[0][:40])
+	var onedef, multidef, defmaster bool
+
 	smap := make(map[string]bool)
 	uniq := 0
 	vlist = make([]Version, len(all)-1) // less 1, because always ignore HEAD
 	for _, pair := range all {
 		var v PairedVersion
 		if string(pair[46:51]) == "heads" {
-			v = NewBranch(string(pair[52:])).Is(Revision(pair[:40])).(PairedVersion)
+			rev := Revision(pair[:40])
+
+			isdef := rev == headrev
+			n := string(pair[52:])
+			if isdef {
+				if onedef {
+					multidef = true
+				}
+				onedef = true
+				if n == "master" {
+					defmaster = true
+				}
+			}
+			v = branchVersion{
+				name:      n,
+				isDefault: isdef,
+			}.Is(rev).(PairedVersion)
+
 			vlist[uniq] = v
 			uniq++
 		} else if string(pair[46:50]) == "tags" {
@@ -168,6 +214,20 @@ func (s *gitSource) listVersions() (vlist []Version, err error) {
 
 	// Trim off excess from the slice
 	vlist = vlist[:uniq]
+
+	// There were multiple default branches, but one was master. So, go through
+	// and strip the default flag from all the non-master branches.
+	if multidef && defmaster {
+		for k, v := range vlist {
+			pv := v.(PairedVersion)
+			if bv, ok := pv.Unpair().(branchVersion); ok {
+				if bv.name != "master" && bv.isDefault == true {
+					bv.isDefault = false
+					vlist[k] = bv.Is(pv.Underlying())
+				}
+			}
+		}
+	}
 
 	// Process the version data into the cache
 	//
@@ -226,23 +286,30 @@ func (s *bzrSource) listVersions() (vlist []Version, err error) {
 	}
 
 	var out []byte
-
 	// Now, list all the tags
 	out, err = r.RunFromDir("bzr", "tags", "--show-ids", "-v")
 	if err != nil {
-		return
+		return nil, fmt.Errorf("%s: %s", err, string(out))
 	}
 
 	all := bytes.Split(bytes.TrimSpace(out), []byte("\n"))
 
-	// reset the rmap and vmap, as they'll be fully repopulated by this
-	// TODO(sdboyer) detect out-of-sync pairings as we do this?
+	var branchrev []byte
+	branchrev, err = r.RunFromDir("bzr", "version-info", "--custom", "--template={revision_id}", "--revision=branch:.")
+	br := string(branchrev)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %s", err, br)
+	}
+
+	// Both commands completed successfully, so there's no further possibility
+	// of errors. That means it's now safe to reset the rmap and vmap, as
+	// they're about to be fully repopulated.
 	s.dc.vMap = make(map[UnpairedVersion]Revision)
 	s.dc.rMap = make(map[Revision][]UnpairedVersion)
+	vlist = make([]Version, len(all)+1)
 
-	vlist = make([]Version, len(all))
-	k := 0
-	for _, line := range all {
+	// Now, all the tags.
+	for k, line := range all {
 		idx := bytes.IndexByte(line, 32) // space
 		v := NewVersion(string(line[:idx]))
 		r := Revision(bytes.TrimSpace(line[idx:]))
@@ -250,8 +317,15 @@ func (s *bzrSource) listVersions() (vlist []Version, err error) {
 		s.dc.vMap[v] = r
 		s.dc.rMap[r] = append(s.dc.rMap[r], v)
 		vlist[k] = v.Is(r)
-		k++
 	}
+
+	// Last, add the default branch, hardcoding the visual representation of it
+	// that bzr uses when operating in the workflow mode we're using.
+	v := newDefaultBranch("(default)")
+	rev := Revision(string(branchrev))
+	s.dc.vMap[v] = rev
+	s.dc.rMap[rev] = append(s.dc.rMap[rev], v)
+	vlist[len(vlist)-1] = v.Is(rev)
 
 	// Cache is now in sync with upstream's version list
 	s.cvsync = true
@@ -301,7 +375,7 @@ func (s *hgSource) listVersions() (vlist []Version, err error) {
 	// Now, list all the tags
 	out, err = r.RunFromDir("hg", "tags", "--debug", "--verbose")
 	if err != nil {
-		return
+		return nil, fmt.Errorf("%s: %s", err, string(out))
 	}
 
 	all := bytes.Split(bytes.TrimSpace(out), []byte("\n"))
@@ -330,30 +404,71 @@ func (s *hgSource) listVersions() (vlist []Version, err error) {
 		vlist = append(vlist, v)
 	}
 
-	out, err = r.RunFromDir("hg", "branches", "--debug", "--verbose")
+	// bookmarks next, because the presence of the magic @ bookmark has to
+	// determine how we handle the branches
+	var magicAt bool
+	out, err = r.RunFromDir("hg", "bookmarks", "--debug")
 	if err != nil {
 		// better nothing than partial and misleading
-		vlist = nil
-		return
+		return nil, fmt.Errorf("%s: %s", err, string(out))
+	}
+
+	out = bytes.TrimSpace(out)
+	if !bytes.Equal(out, []byte("no bookmarks set")) {
+		all = bytes.Split(out, []byte("\n"))
+		for _, line := range all {
+			// Trim leading spaces, and * marker if present
+			line = bytes.TrimLeft(line, " *")
+			pair := bytes.Split(line, []byte(":"))
+			// if this doesn't split exactly once, we have something weird
+			if len(pair) != 2 {
+				continue
+			}
+
+			// Split on colon; this gets us the rev and the branch plus local revno
+			idx := bytes.IndexByte(pair[0], 32) // space
+			// if it's the magic @ marker, make that the default branch
+			str := string(pair[0][:idx])
+			var v Version
+			if str == "@" {
+				magicAt = true
+				v = newDefaultBranch(str).Is(Revision(pair[1])).(PairedVersion)
+			} else {
+				v = NewBranch(str).Is(Revision(pair[1])).(PairedVersion)
+			}
+			vlist = append(vlist, v)
+		}
+	}
+
+	out, err = r.RunFromDir("hg", "branches", "-c", "--debug")
+	if err != nil {
+		// better nothing than partial and misleading
+		return nil, fmt.Errorf("%s: %s", err, string(out))
 	}
 
 	all = bytes.Split(bytes.TrimSpace(out), []byte("\n"))
-	lbyt = []byte("(inactive)")
 	for _, line := range all {
-		if bytes.Equal(lbyt, line[len(line)-len(lbyt):]) {
-			// Skip inactive branches
-			continue
-		}
+		// Trim inactive and closed suffixes, if present; we represent these
+		// anyway
+		line = bytes.TrimSuffix(line, []byte(" (inactive)"))
+		line = bytes.TrimSuffix(line, []byte(" (closed)"))
 
 		// Split on colon; this gets us the rev and the branch plus local revno
 		pair := bytes.Split(line, []byte(":"))
 		idx := bytes.IndexByte(pair[0], 32) // space
-		v := NewBranch(string(pair[0][:idx])).Is(Revision(pair[1])).(PairedVersion)
+		str := string(pair[0][:idx])
+		// if there was no magic @ bookmark, and this is mercurial's magic
+		// "default" branch, then mark it as default branch
+		var v Version
+		if !magicAt && str == "default" {
+			v = newDefaultBranch(str).Is(Revision(pair[1])).(PairedVersion)
+		} else {
+			v = NewBranch(str).Is(Revision(pair[1])).(PairedVersion)
+		}
 		vlist = append(vlist, v)
 	}
 
 	// reset the rmap and vmap, as they'll be fully repopulated by this
-	// TODO(sdboyer) detect out-of-sync pairings as we do this?
 	s.dc.vMap = make(map[UnpairedVersion]Revision)
 	s.dc.rMap = make(map[Revision][]UnpairedVersion)
 

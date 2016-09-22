@@ -86,7 +86,7 @@ func TestGitSourceInteractions(t *testing.T) {
 		SortForUpgrade(vlist)
 		evl := []Version{
 			NewVersion("1.0.0").Is(Revision("30605f6ac35fcb075ad0bfa9296f90a7d891523e")),
-			NewBranch("master").Is(Revision("30605f6ac35fcb075ad0bfa9296f90a7d891523e")),
+			newDefaultBranch("master").Is(Revision("30605f6ac35fcb075ad0bfa9296f90a7d891523e")),
 			NewBranch("test").Is(Revision("30605f6ac35fcb075ad0bfa9296f90a7d891523e")),
 		}
 		if !reflect.DeepEqual(vlist, evl) {
@@ -147,6 +147,10 @@ func TestBzrSourceInteractions(t *testing.T) {
 	if ident != un {
 		t.Errorf("Expected %s as source ident, got %s", un, ident)
 	}
+	evl := []Version{
+		NewVersion("1.0.0").Is(Revision("matt@mattfarina.com-20150731135137-pbphasfppmygpl68")),
+		newDefaultBranch("(default)").Is(Revision("matt@mattfarina.com-20150731135137-pbphasfppmygpl68")),
+	}
 
 	// check that an expected rev is present
 	is, err := src.revisionPresentIn(Revision("matt@mattfarina.com-20150731135137-pbphasfppmygpl68"))
@@ -168,12 +172,11 @@ func TestBzrSourceInteractions(t *testing.T) {
 		t.Errorf("bzrSource.listVersions() should have set the upstream and cache existence bits for found")
 	}
 
-	if len(vlist) != 1 {
-		t.Errorf("bzr test repo should've produced one version, got %v", len(vlist))
+	if len(vlist) != 2 {
+		t.Errorf("bzr test repo should've produced two versions, got %v", len(vlist))
 	} else {
-		v := NewVersion("1.0.0").Is(Revision("matt@mattfarina.com-20150731135137-pbphasfppmygpl68"))
-		if vlist[0] != v {
-			t.Errorf("bzr pair fetch reported incorrect first version, got %s", vlist[0])
+		if !reflect.DeepEqual(vlist, evl) {
+			t.Errorf("bzr version list was not what we expected:\n\t(GOT): %s\n\t(WNT): %s", vlist, evl)
 		}
 	}
 
@@ -190,8 +193,8 @@ func TestBzrSourceInteractions(t *testing.T) {
 		t.Errorf("bzrSource.listVersions() should have set the upstream and cache existence bits for found")
 	}
 
-	if len(vlist) != 1 {
-		t.Errorf("bzr test repo should've produced one version, got %v", len(vlist))
+	if len(vlist) != 2 {
+		t.Errorf("bzr test repo should've produced two versions, got %v", len(vlist))
 	} else {
 		v := NewVersion("1.0.0").Is(Revision("matt@mattfarina.com-20150731135137-pbphasfppmygpl68"))
 		if vlist[0] != v {
@@ -225,94 +228,111 @@ func TestHgSourceInteractions(t *testing.T) {
 		}
 	}
 
-	n := "bitbucket.org/mattfarina/testhgrepo"
-	un := "https://" + n
-	u, err := url.Parse(un)
-	if err != nil {
-		t.Errorf("URL was bad, lolwut? errtext: %s", err)
-		rf()
-		t.FailNow()
-	}
-	mb := maybeHgSource{
-		url: u,
-	}
+	tfunc := func(n string, evl []Version) {
+		un := "https://" + n
+		u, err := url.Parse(un)
+		if err != nil {
+			t.Errorf("URL was bad, lolwut? errtext: %s", err)
+			return
+		}
+		mb := maybeHgSource{
+			url: u,
+		}
 
-	isrc, ident, err := mb.try(cpath, naiveAnalyzer{})
-	if err != nil {
-		t.Errorf("Unexpected error while setting up hgSource for test repo: %s", err)
-		rf()
-		t.FailNow()
-	}
-	src, ok := isrc.(*hgSource)
-	if !ok {
-		t.Errorf("Expected a hgSource, got a %T", isrc)
-		rf()
-		t.FailNow()
-	}
-	if ident != un {
-		t.Errorf("Expected %s as source ident, got %s", un, ident)
-	}
+		isrc, ident, err := mb.try(cpath, naiveAnalyzer{})
+		if err != nil {
+			t.Errorf("Unexpected error while setting up hgSource for test repo: %s", err)
+			return
+		}
+		src, ok := isrc.(*hgSource)
+		if !ok {
+			t.Errorf("Expected a hgSource, got a %T", isrc)
+			return
+		}
+		if ident != un {
+			t.Errorf("Expected %s as source ident, got %s", un, ident)
+		}
 
-	// check that an expected rev is present
-	is, err := src.revisionPresentIn(Revision("d680e82228d206935ab2eaa88612587abe68db07"))
-	if err != nil {
-		t.Errorf("Unexpected error while checking revision presence: %s", err)
-	} else if !is {
-		t.Errorf("Revision that should exist was not present")
-	}
+		// check that an expected rev is present
+		is, err := src.revisionPresentIn(Revision("103d1bddef2199c80aad7c42041223083d613ef9"))
+		if err != nil {
+			t.Errorf("Unexpected error while checking revision presence: %s", err)
+		} else if !is {
+			t.Errorf("Revision that should exist was not present")
+		}
 
-	vlist, err := src.listVersions()
-	if err != nil {
-		t.Errorf("Unexpected error getting version pairs from hg repo: %s", err)
-	}
-	evl := []Version{
-		NewVersion("1.0.0").Is(Revision("d680e82228d206935ab2eaa88612587abe68db07")),
-		NewBranch("test").Is(Revision("6c44ee3fe5d87763616c19bf7dbcadb24ff5a5ce")),
-	}
+		vlist, err := src.listVersions()
+		if err != nil {
+			t.Errorf("Unexpected error getting version pairs from hg repo: %s", err)
+		}
 
-	if src.ex.s&existsUpstream|existsInCache != existsUpstream|existsInCache {
-		t.Errorf("hgSource.listVersions() should have set the upstream and cache existence bits for search")
-	}
-	if src.ex.f&existsUpstream|existsInCache != existsUpstream|existsInCache {
-		t.Errorf("hgSource.listVersions() should have set the upstream and cache existence bits for found")
-	}
+		if src.ex.s&existsUpstream|existsInCache != existsUpstream|existsInCache {
+			t.Errorf("hgSource.listVersions() should have set the upstream and cache existence bits for search")
+		}
+		if src.ex.f&existsUpstream|existsInCache != existsUpstream|existsInCache {
+			t.Errorf("hgSource.listVersions() should have set the upstream and cache existence bits for found")
+		}
 
-	if len(vlist) != 2 {
-		t.Errorf("hg test repo should've produced one version, got %v", len(vlist))
-	} else {
-		SortForUpgrade(vlist)
-		if !reflect.DeepEqual(vlist, evl) {
-			t.Errorf("Version list was not what we expected:\n\t(GOT): %s\n\t(WNT): %s", vlist, evl)
+		if len(vlist) != len(evl) {
+			t.Errorf("hg test repo should've produced %v versions, got %v", len(evl), len(vlist))
+		} else {
+			SortForUpgrade(vlist)
+			if !reflect.DeepEqual(vlist, evl) {
+				t.Errorf("Version list was not what we expected:\n\t(GOT): %s\n\t(WNT): %s", vlist, evl)
+			}
+		}
+
+		// Run again, this time to ensure cache outputs correctly
+		vlist, err = src.listVersions()
+		if err != nil {
+			t.Errorf("Unexpected error getting version pairs from hg repo: %s", err)
+		}
+
+		if src.ex.s&existsUpstream|existsInCache != existsUpstream|existsInCache {
+			t.Errorf("hgSource.listVersions() should have set the upstream and cache existence bits for search")
+		}
+		if src.ex.f&existsUpstream|existsInCache != existsUpstream|existsInCache {
+			t.Errorf("hgSource.listVersions() should have set the upstream and cache existence bits for found")
+		}
+
+		if len(vlist) != len(evl) {
+			t.Errorf("hg test repo should've produced %v versions, got %v", len(evl), len(vlist))
+		} else {
+			SortForUpgrade(vlist)
+			if !reflect.DeepEqual(vlist, evl) {
+				t.Errorf("Version list was not what we expected:\n\t(GOT): %s\n\t(WNT): %s", vlist, evl)
+			}
+		}
+
+		// recheck that rev is present, this time interacting with cache differently
+		is, err = src.revisionPresentIn(Revision("103d1bddef2199c80aad7c42041223083d613ef9"))
+		if err != nil {
+			t.Errorf("Unexpected error while re-checking revision presence: %s", err)
+		} else if !is {
+			t.Errorf("Revision that should exist was not present on re-check")
 		}
 	}
 
-	// Run again, this time to ensure cache outputs correctly
-	vlist, err = src.listVersions()
-	if err != nil {
-		t.Errorf("Unexpected error getting version pairs from hg repo: %s", err)
-	}
+	// simultaneously run for both the repo with and without the magic bookmark
+	donech := make(chan struct{})
+	go func() {
+		tfunc("bitbucket.org/sdboyer/withbm", []Version{
+			NewVersion("v1.0.0").Is(Revision("aa110802a0c64195d0a6c375c9f66668827c90b4")),
+			newDefaultBranch("@").Is(Revision("b10d05d581e5401f383e48ccfeb84b48fde99d06")),
+			NewBranch("another").Is(Revision("b10d05d581e5401f383e48ccfeb84b48fde99d06")),
+			NewBranch("default").Is(Revision("3d466f437f6616da594bbab6446cc1cb4328d1bb")),
+			NewBranch("newbranch").Is(Revision("5e2a01be9aee942098e44590ae545c7143da9675")),
+		})
+		close(donech)
+	}()
 
-	if src.ex.s&existsUpstream|existsInCache != existsUpstream|existsInCache {
-		t.Errorf("hgSource.listVersions() should have set the upstream and cache existence bits for search")
-	}
-	if src.ex.f&existsUpstream|existsInCache != existsUpstream|existsInCache {
-		t.Errorf("hgSource.listVersions() should have set the upstream and cache existence bits for found")
-	}
+	tfunc("bitbucket.org/sdboyer/nobm", []Version{
+		NewVersion("v1.0.0").Is(Revision("aa110802a0c64195d0a6c375c9f66668827c90b4")),
+		newDefaultBranch("default").Is(Revision("3d466f437f6616da594bbab6446cc1cb4328d1bb")),
+		NewBranch("another").Is(Revision("b10d05d581e5401f383e48ccfeb84b48fde99d06")),
+		NewBranch("newbranch").Is(Revision("5e2a01be9aee942098e44590ae545c7143da9675")),
+	})
 
-	if len(vlist) != 2 {
-		t.Errorf("hg test repo should've produced one version, got %v", len(vlist))
-	} else {
-		SortForUpgrade(vlist)
-		if !reflect.DeepEqual(vlist, evl) {
-			t.Errorf("Version list was not what we expected:\n\t(GOT): %s\n\t(WNT): %s", vlist, evl)
-		}
-	}
-
-	// recheck that rev is present, this time interacting with cache differently
-	is, err = src.revisionPresentIn(Revision("d680e82228d206935ab2eaa88612587abe68db07"))
-	if err != nil {
-		t.Errorf("Unexpected error while re-checking revision presence: %s", err)
-	} else if !is {
-		t.Errorf("Revision that should exist was not present on re-check")
-	}
+	<-donech
+	rf()
 }
