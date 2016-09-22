@@ -73,7 +73,7 @@ func BenchmarkCreateVendorTree(b *testing.B) {
 	tmp := path.Join(os.TempDir(), "vsolvtest")
 
 	clean := true
-	sm, err := NewSourceManager(naiveAnalyzer{}, path.Join(tmp, "cache"), true)
+	sm, err := NewSourceManager(naiveAnalyzer{}, path.Join(tmp, "cache"))
 	if err != nil {
 		b.Errorf("NewSourceManager errored unexpectedly: %q", err)
 		clean = false
@@ -81,7 +81,7 @@ func BenchmarkCreateVendorTree(b *testing.B) {
 
 	// Prefetch the projects before timer starts
 	for _, lp := range r.p {
-		_, _, err := sm.GetManifestAndLock(lp.Ident(), lp.Version())
+		err := sm.SyncSourceFor(lp.Ident())
 		if err != nil {
 			b.Errorf("failed getting project info during prefetch: %s", err)
 			clean = false

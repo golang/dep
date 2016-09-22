@@ -44,7 +44,7 @@ func mkNaiveSM(t *testing.T) (*SourceMgr, func()) {
 		t.FailNow()
 	}
 
-	sm, err := NewSourceManager(naiveAnalyzer{}, cpath, false)
+	sm, err := NewSourceManager(naiveAnalyzer{}, cpath)
 	if err != nil {
 		t.Errorf("Unexpected error on SourceManager creation: %s", err)
 		t.FailNow()
@@ -69,37 +69,44 @@ func TestSourceManagerInit(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to create temp dir: %s", err)
 	}
-	sm, err := NewSourceManager(naiveAnalyzer{}, cpath, false)
+	sm, err := NewSourceManager(naiveAnalyzer{}, cpath)
 
 	if err != nil {
 		t.Errorf("Unexpected error on SourceManager creation: %s", err)
 	}
-	defer func() {
-		sm.Release()
-		err := removeAll(cpath)
-		if err != nil {
-			t.Errorf("removeAll failed: %s", err)
-		}
-	}()
 
-	_, err = NewSourceManager(naiveAnalyzer{}, cpath, false)
+	_, err = NewSourceManager(naiveAnalyzer{}, cpath)
 	if err == nil {
 		t.Errorf("Creating second SourceManager should have failed due to file lock contention")
-	}
-
-	sm, err = NewSourceManager(naiveAnalyzer{}, cpath, true)
-	if err != nil {
-		t.Errorf("Creating second SourceManager should have succeeded when force flag was passed, but failed with err %s", err)
+	} else if te, ok := err.(CouldNotCreateLockError); !ok {
+		t.Errorf("Should have gotten CouldNotCreateLockError error type, but got %T", te)
 	}
 
 	if _, err = os.Stat(path.Join(cpath, "sm.lock")); err != nil {
 		t.Errorf("Global cache lock file not created correctly")
-		t.FailNow()
 	}
 
 	sm.Release()
+	err = removeAll(cpath)
+	if err != nil {
+		t.Errorf("removeAll failed: %s", err)
+	}
+
 	if _, err = os.Stat(path.Join(cpath, "sm.lock")); !os.IsNotExist(err) {
 		t.Errorf("Global cache lock file not cleared correctly on Release()")
+		t.FailNow()
+	}
+
+	// Set another one up at the same spot now, just to be sure
+	sm, err = NewSourceManager(naiveAnalyzer{}, cpath)
+	if err != nil {
+		t.Errorf("Creating a second SourceManager should have succeeded when the first was released, but failed with err %s", err)
+	}
+
+	sm.Release()
+	err = removeAll(cpath)
+	if err != nil {
+		t.Errorf("removeAll failed: %s", err)
 	}
 }
 
@@ -115,7 +122,7 @@ func TestSourceInit(t *testing.T) {
 		t.FailNow()
 	}
 
-	sm, err := NewSourceManager(naiveAnalyzer{}, cpath, false)
+	sm, err := NewSourceManager(naiveAnalyzer{}, cpath)
 	if err != nil {
 		t.Errorf("Unexpected error on SourceManager creation: %s", err)
 		t.FailNow()
