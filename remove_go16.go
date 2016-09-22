@@ -24,8 +24,8 @@ func removeAll(path string) error {
 	}
 
 	// make sure all files are writable so we can delete them
-	return filepath.Walk(path, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
+	err = filepath.Walk(path, func(path string, info os.FileInfo, err error) error {
+		if err != nil && err != filepath.SkipDir {
 			// walk gave us some error, give it back.
 			return err
 		}
@@ -33,6 +33,12 @@ func removeAll(path string) error {
 		if mode|0200 == mode {
 			return nil
 		}
+
 		return os.Chmod(path, mode|0200)
 	})
+	if err != nil {
+		return err
+	}
+
+	return os.Remove(path)
 }

@@ -83,6 +83,7 @@ type ProjectAnalyzer interface {
 // tools; control via dependency injection is intended to be sufficient.
 type SourceMgr struct {
 	cachedir string
+	lf       *os.File
 	srcs     map[string]source
 	srcmut   sync.RWMutex
 	an       ProjectAnalyzer
@@ -94,22 +95,19 @@ var _ SourceManager = &SourceMgr{}
 
 // NewSourceManager produces an instance of gps's built-in SourceManager. It
 // takes a cache directory (where local instances of upstream repositories are
-// stored), a vendor directory for the project currently being worked on, and a
-// force flag indicating whether to overwrite the global cache lock file (if
-// present).
+// stored), and a ProjectAnalyzer that is used to extract manifest and lock
+// information from source trees.
 //
 // The returned SourceManager aggressively caches information wherever possible.
-// It is recommended that, if tools need to do preliminary, work involving
-// upstream repository analysis prior to invoking a solve run, that they create
-// this SourceManager as early as possible and use it to their ends. That way,
-// the solver can benefit from any caches that may have already been warmed.
+// If tools need to do preliminary work involving upstream repository analysis
+// prior to invoking a solve run, it is recommended that they create this
+// SourceManager as early as possible and use it to their ends. That way, the
+// solver can benefit from any caches that may have already been warmed.
 //
-// gps's SourceManager is intended to be threadsafe (if it's not, please
-// file a bug!). It should certainly be safe to reuse from one solving run to
-// the next; however, the fact that it takes a basedir as an argument makes it
-// much less useful for simultaneous use by separate solvers operating on
-// different root projects. This architecture may change in the future.
-func NewSourceManager(an ProjectAnalyzer, cachedir string, force bool) (*SourceMgr, error) {
+// gps's SourceManager is intended to be threadsafe (if it's not, please file a
+// bug!). It should be safe to reuse across concurrent solving runs, even on
+// unrelated projects.
+func NewSourceManager(an ProjectAnalyzer, cachedir string) (*SourceMgr, error) {
 	if an == nil {
 		return nil, fmt.Errorf("a ProjectAnalyzer must be provided to the SourceManager")
 	}
@@ -121,17 +119,24 @@ func NewSourceManager(an ProjectAnalyzer, cachedir string, force bool) (*SourceM
 
 	glpath := filepath.Join(cachedir, "sm.lock")
 	_, err = os.Stat(glpath)
-	if err == nil && !force {
-		return nil, fmt.Errorf("cache lock file %s exists - another process crashed or is still running?", glpath)
+	if err == nil {
+		return nil, CouldNotCreateLockError{
+			Path: glpath,
+			Err:  fmt.Errorf("cache lock file %s exists - another process crashed or is still running?", glpath),
+		}
 	}
 
-	_, err = os.OpenFile(glpath, os.O_CREATE|os.O_RDONLY, 0700) // is 0700 sane for this purpose?
+	fi, err := os.OpenFile(glpath, os.O_CREATE|os.O_EXCL, 0600) // is 0600 sane for this purpose?
 	if err != nil {
-		return nil, fmt.Errorf("failed to create global cache lock file at %s with err %s", glpath, err)
+		return nil, CouldNotCreateLockError{
+			Path: glpath,
+			Err:  fmt.Errorf("err on attempting to create global cache lock: %s", err),
+		}
 	}
 
 	return &SourceMgr{
 		cachedir: cachedir,
+		lf:       fi,
 		srcs:     make(map[string]source),
 		an:       an,
 		dxt:      pathDeducerTrie(),
@@ -139,8 +144,18 @@ func NewSourceManager(an ProjectAnalyzer, cachedir string, force bool) (*SourceM
 	}, nil
 }
 
+type CouldNotCreateLockError struct {
+	Path string
+	Err  error
+}
+
+func (e CouldNotCreateLockError) Error() string {
+	return e.Err.Error()
+}
+
 // Release lets go of any locks held by the SourceManager.
 func (sm *SourceMgr) Release() {
+	sm.lf.Close()
 	os.Remove(filepath.Join(sm.cachedir, "sm.lock"))
 }
 
