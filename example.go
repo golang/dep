@@ -38,7 +38,7 @@ func main() {
 	params.RootPackageTree, _ = gps.ListPackages(root, importroot)
 
 	// Set up a SourceManager with the NaiveAnalyzer
-	sourcemgr, _ := gps.NewSourceManager(NaiveAnalyzer{}, ".repocache", false)
+	sourcemgr, _ := gps.NewSourceManager(NaiveAnalyzer{}, ".repocache")
 	defer sourcemgr.Release()
 
 	// Prep and run the solver
