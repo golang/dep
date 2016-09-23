@@ -196,9 +196,8 @@ func TestBzrSourceInteractions(t *testing.T) {
 	if len(vlist) != 2 {
 		t.Errorf("bzr test repo should've produced two versions, got %v", len(vlist))
 	} else {
-		v := NewVersion("1.0.0").Is(Revision("matt@mattfarina.com-20150731135137-pbphasfppmygpl68"))
-		if vlist[0] != v {
-			t.Errorf("bzr pair fetch reported incorrect first version, got %s", vlist[0])
+		if !reflect.DeepEqual(vlist, evl) {
+			t.Errorf("bzr version list was not what we expected:\n\t(GOT): %s\n\t(WNT): %s", vlist, evl)
 		}
 	}
 
