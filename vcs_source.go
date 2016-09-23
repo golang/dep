@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/Masterminds/semver"
 	"github.com/Masterminds/vcs"
 	"github.com/termie/go-shutil"
 )
@@ -99,7 +100,6 @@ func (s *gitSource) listVersions() (vlist []Version, err error) {
 	// Process the version data into the cache
 	//
 	// reset the rmap and vmap, as they'll be fully repopulated by this
-	// TODO(sdboyer) detect out-of-sync pairings as we do this?
 	s.dc.vMap = make(map[UnpairedVersion]Revision)
 	s.dc.rMap = make(map[Revision][]UnpairedVersion)
 
@@ -256,6 +256,93 @@ func (s *gitSource) doListVersions() (vlist []Version, err error) {
 		}
 	}
 
+	return
+}
+
+// gopkginSource is a specialized git source that performs additional filtering
+// according to the input URL.
+type gopkginSource struct {
+	gitSource
+	major int64
+}
+
+func (s *gopkginSource) listVersions() (vlist []Version, err error) {
+	if s.cvsync {
+		vlist = make([]Version, len(s.dc.vMap))
+		k := 0
+		for v, r := range s.dc.vMap {
+			vlist[k] = v.Is(r)
+			k++
+		}
+
+		return
+	}
+
+	ovlist, err := s.doListVersions()
+	if err != nil {
+		return nil, err
+	}
+
+	// Apply gopkg.in's filtering rules
+	vlist := make([]Version, len(ovlist))
+	k := 0
+	var dbranch int // index of branch to be marked default
+	var bsv *semver.Version
+	for _, v := range ovlist {
+		// all git versions will always be paired
+		pv := v.(versionPair)
+		switch tv := pv.v.(type) {
+		case semVersion:
+			if tv.sv.Major() == s.major {
+				vlist[k] = v
+				k++
+			}
+		case branchVersion:
+			// The semver lib isn't exactly the same as gopkg.in's logic, but
+			// it's close enough that it's probably fine to use. We can be more
+			// exact if real problems crop up.
+			sv, err := semver.NewVersion(tv.name)
+			if err != nil || sv.Major() != s.major {
+				// not a semver-shaped branch name at all, or not the same major
+				// version as specified in the import path constraint
+				continue
+			}
+
+			// Turn off the default branch marker unconditionally; we can't know
+			// which one to mark as default until we've seen them all
+			tv.isDefault = false
+			// Figure out if this is the current leader for default branch
+			if bsv == nil || bsv.LessThan(sv) {
+				bsv = sv
+				dbranch = k
+			}
+			pv.v = tv
+			vlist[k] = pv
+			k++
+		}
+		// The switch skips plainVersions because they cannot possibly meet
+		// gopkg.in's requirements
+	}
+
+	vlist = vlist[:k]
+	if bsv != nil {
+		vlist[dbranch].(versionPair).v.(branchVersion).isDefault = true
+	}
+
+	// Process the filtered version data into the cache
+	//
+	// reset the rmap and vmap, as they'll be fully repopulated by this
+	s.dc.vMap = make(map[UnpairedVersion]Revision)
+	s.dc.rMap = make(map[Revision][]UnpairedVersion)
+
+	for _, v := range vlist {
+		pv := v.(PairedVersion)
+		u, r := pv.Unpair(), pv.Underlying()
+		s.dc.vMap[u] = r
+		s.dc.rMap[r] = append(s.dc.rMap[r], u)
+	}
+	// Mark the cache as being in sync with upstream's version list
+	s.cvsync = true
 	return
 }
 
