@@ -91,6 +91,30 @@ func (s *gitSource) listVersions() (vlist []Version, err error) {
 		return
 	}
 
+	vlist, err = s.doListVersions()
+	if err != nil {
+		return nil, err
+	}
+
+	// Process the version data into the cache
+	//
+	// reset the rmap and vmap, as they'll be fully repopulated by this
+	// TODO(sdboyer) detect out-of-sync pairings as we do this?
+	s.dc.vMap = make(map[UnpairedVersion]Revision)
+	s.dc.rMap = make(map[Revision][]UnpairedVersion)
+
+	for _, v := range vlist {
+		pv := v.(PairedVersion)
+		u, r := pv.Unpair(), pv.Underlying()
+		s.dc.vMap[u] = r
+		s.dc.rMap[r] = append(s.dc.rMap[r], u)
+	}
+	// Mark the cache as being in sync with upstream's version list
+	s.cvsync = true
+	return
+}
+
+func (s *gitSource) doListVersions() (vlist []Version, err error) {
 	r := s.crepo.r
 	var out []byte
 	c := exec.Command("git", "ls-remote", r.Remote())
@@ -139,7 +163,7 @@ func (s *gitSource) listVersions() (vlist []Version, err error) {
 	s.ex.s |= existsUpstream
 	s.ex.f |= existsUpstream
 
-	// pull out the HEAD rev (it's always first) so we know what branches to
+	// Pull out the HEAD rev (it's always first) so we know what branches to
 	// mark as default. This is, perhaps, not the best way to glean this, but it
 	// was good enough for git itself until 1.8.5. Also, the alternative is
 	// sniffing data out of the pack protocol, which is a separate request, and
@@ -159,12 +183,12 @@ func (s *gitSource) listVersions() (vlist []Version, err error) {
 	// * Multiple branches match the HEAD rev
 	// * None of them are master
 	// * The solver makes it into the branch list in the version queue
-	// * The user has provided no constraint, or DefaultBranch
+	// * The user/tool has provided no constraint (so, anyConstraint)
 	// * A branch that is not actually the default, but happens to share the
-	// rev, is lexicographically earlier than the true default branch
+	//   rev, is lexicographically less than the true default branch
 	//
-	// Then the user could end up with an erroneous non-default branch in their
-	// lock file.
+	// If all of those conditions are met, then the user would end up with an
+	// erroneous non-default branch in their lock file.
 	headrev := Revision(all[0][:40])
 	var onedef, multidef, defmaster bool
 
@@ -232,21 +256,6 @@ func (s *gitSource) listVersions() (vlist []Version, err error) {
 		}
 	}
 
-	// Process the version data into the cache
-	//
-	// reset the rmap and vmap, as they'll be fully repopulated by this
-	// TODO(sdboyer) detect out-of-sync pairings as we do this?
-	s.dc.vMap = make(map[UnpairedVersion]Revision)
-	s.dc.rMap = make(map[Revision][]UnpairedVersion)
-
-	for _, v := range vlist {
-		pv := v.(PairedVersion)
-		u, r := pv.Unpair(), pv.Underlying()
-		s.dc.vMap[u] = r
-		s.dc.rMap[r] = append(s.dc.rMap[r], u)
-	}
-	// Mark the cache as being in sync with upstream's version list
-	s.cvsync = true
 	return
 }
 
