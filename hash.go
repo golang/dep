@@ -2,7 +2,6 @@ package gps
 
 import (
 	"crypto/sha256"
-	"fmt"
 	"sort"
 )
 
@@ -16,15 +15,7 @@ import (
 // unnecessary.
 //
 // (Basically, this is for memoization.)
-func (s *solver) HashInputs() ([]byte, error) {
-	// Do these checks up front before any other work is needed, as they're the
-	// only things that can cause errors
-	// Pass in magic root values, and the bridge will analyze the right thing
-	ptree, err := s.b.ListPackages(ProjectIdentifier{ProjectRoot: ProjectRoot(s.params.RootPackageTree.ImportRoot)}, nil)
-	if err != nil {
-		return nil, badOptsFailure(fmt.Sprintf("Error while parsing packages under %s: %s", s.params.RootDir, err.Error()))
-	}
-
+func (s *solver) HashInputs() []byte {
 	c, tc := s.rm.DependencyConstraints(), s.rm.TestDependencyConstraints()
 	// Apply overrides to the constraints from the root. Otherwise, the hash
 	// would be computed on the basis of a constraint from root that doesn't
@@ -51,7 +42,7 @@ func (s *solver) HashInputs() ([]byte, error) {
 
 	// Write each of the packages, or the errors that were found for a
 	// particular subpath, into the hash.
-	for _, perr := range ptree.Packages {
+	for _, perr := range s.rpt.Packages {
 		if perr.Err != nil {
 			h.Write([]byte(perr.Err.Error()))
 		} else {
@@ -97,5 +88,5 @@ func (s *solver) HashInputs() ([]byte, error) {
 	h.Write([]byte(an))
 	h.Write([]byte(av.String()))
 
-	return h.Sum(nil), nil
+	return h.Sum(nil)
 }

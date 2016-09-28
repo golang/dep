@@ -16,12 +16,12 @@ func TestHashInputs(t *testing.T) {
 	}
 
 	s, err := Prepare(params, newdepspecSM(fix.ds, nil))
-
-	dig, err := s.HashInputs()
 	if err != nil {
-		t.Fatalf("HashInputs returned unexpected err: %s", err)
+		t.Errorf("Unexpected error while prepping solver: %s", err)
+		t.FailNow()
 	}
 
+	dig := s.HashInputs()
 	h := sha256.New()
 
 	elems := []string{
@@ -64,12 +64,12 @@ func TestHashInputsIgnores(t *testing.T) {
 	}
 
 	s, err := Prepare(params, newdepspecSM(fix.ds, nil))
-
-	dig, err := s.HashInputs()
 	if err != nil {
-		t.Fatalf("HashInputs returned unexpected err: %s", err)
+		t.Errorf("Unexpected error while prepping solver: %s", err)
+		t.FailNow()
 	}
 
+	dig := s.HashInputs()
 	h := sha256.New()
 
 	elems := []string{
@@ -116,12 +116,12 @@ func TestHashInputsOverrides(t *testing.T) {
 	}
 
 	s, err := Prepare(params, newdepspecSM(fix.ds, nil))
-
-	dig, err := s.HashInputs()
 	if err != nil {
-		t.Fatalf("HashInputs returned unexpected err: %s", err)
+		t.Errorf("Unexpected error while prepping solver: %s", err)
+		t.FailNow()
 	}
 
+	dig := s.HashInputs()
 	h := sha256.New()
 
 	elems := []string{
@@ -154,11 +154,7 @@ func TestHashInputsOverrides(t *testing.T) {
 	rm.ovr["d"] = ProjectProperties{
 		Constraint: NewBranch("foobranch"),
 	}
-	dig, err = s.HashInputs()
-	if err != nil {
-		t.Fatalf("HashInputs returned unexpected err: %s", err)
-	}
-
+	dig = s.HashInputs()
 	h = sha256.New()
 
 	elems = []string{
@@ -194,11 +190,7 @@ func TestHashInputsOverrides(t *testing.T) {
 		NetworkName: "groucho",
 		Constraint:  NewBranch("plexiglass"),
 	}
-	dig, err = s.HashInputs()
-	if err != nil {
-		t.Fatalf("HashInputs returned unexpected err: %s", err)
-	}
-
+	dig = s.HashInputs()
 	h = sha256.New()
 
 	elems = []string{
@@ -236,11 +228,7 @@ func TestHashInputsOverrides(t *testing.T) {
 	rm.ovr["a"] = ProjectProperties{
 		Constraint: NewVersion("fluglehorn"),
 	}
-	dig, err = s.HashInputs()
-	if err != nil {
-		t.Fatalf("HashInputs returned unexpected err: %s", err)
-	}
-
+	dig = s.HashInputs()
 	h = sha256.New()
 
 	elems = []string{
@@ -280,11 +268,7 @@ func TestHashInputsOverrides(t *testing.T) {
 	rm.ovr["a"] = ProjectProperties{
 		NetworkName: "nota",
 	}
-	dig, err = s.HashInputs()
-	if err != nil {
-		t.Fatalf("HashInputs returned unexpected err: %s", err)
-	}
-
+	dig = s.HashInputs()
 	h = sha256.New()
 
 	elems = []string{
@@ -326,11 +310,7 @@ func TestHashInputsOverrides(t *testing.T) {
 		NetworkName: "nota",
 		Constraint:  NewVersion("fluglehorn"),
 	}
-	dig, err = s.HashInputs()
-	if err != nil {
-		t.Fatalf("HashInputs returned unexpected err: %s", err)
-	}
-
+	dig = s.HashInputs()
 	h = sha256.New()
 
 	elems = []string{
