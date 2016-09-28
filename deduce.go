@@ -282,6 +282,7 @@ func (m gopkginDeducer) deduceSource(p string, u *url.URL) (maybeSource, error) 
 		}
 		u2.Scheme = scheme
 		mb[k] = maybeGopkginSource{
+			opath: v[1],
 			url:   &u2,
 			major: major,
 		}

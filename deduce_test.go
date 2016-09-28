@@ -111,60 +111,60 @@ var pathDeductionFixtures = map[string][]pathDeductionFixture{
 			in:   "gopkg.in/sdboyer/gps.v0",
 			root: "gopkg.in/sdboyer/gps.v0",
 			mb: maybeSources{
-				maybeGopkginSource{url: mkurl("https://github.com/sdboyer/gps"), major: 0},
-				maybeGopkginSource{url: mkurl("ssh://git@github.com/sdboyer/gps"), major: 0},
-				maybeGopkginSource{url: mkurl("git://github.com/sdboyer/gps"), major: 0},
-				maybeGopkginSource{url: mkurl("http://github.com/sdboyer/gps"), major: 0},
+				maybeGopkginSource{opath: "gopkg.in/sdboyer/gps.v0", url: mkurl("https://github.com/sdboyer/gps"), major: 0},
+				maybeGopkginSource{opath: "gopkg.in/sdboyer/gps.v0", url: mkurl("ssh://git@github.com/sdboyer/gps"), major: 0},
+				maybeGopkginSource{opath: "gopkg.in/sdboyer/gps.v0", url: mkurl("git://github.com/sdboyer/gps"), major: 0},
+				maybeGopkginSource{opath: "gopkg.in/sdboyer/gps.v0", url: mkurl("http://github.com/sdboyer/gps"), major: 0},
 			},
 		},
 		{
 			in:   "gopkg.in/sdboyer/gps.v0/foo",
 			root: "gopkg.in/sdboyer/gps.v0",
 			mb: maybeSources{
-				maybeGopkginSource{url: mkurl("https://github.com/sdboyer/gps"), major: 0},
-				maybeGopkginSource{url: mkurl("ssh://git@github.com/sdboyer/gps"), major: 0},
-				maybeGopkginSource{url: mkurl("git://github.com/sdboyer/gps"), major: 0},
-				maybeGopkginSource{url: mkurl("http://github.com/sdboyer/gps"), major: 0},
+				maybeGopkginSource{opath: "gopkg.in/sdboyer/gps.v0", url: mkurl("https://github.com/sdboyer/gps"), major: 0},
+				maybeGopkginSource{opath: "gopkg.in/sdboyer/gps.v0", url: mkurl("ssh://git@github.com/sdboyer/gps"), major: 0},
+				maybeGopkginSource{opath: "gopkg.in/sdboyer/gps.v0", url: mkurl("git://github.com/sdboyer/gps"), major: 0},
+				maybeGopkginSource{opath: "gopkg.in/sdboyer/gps.v0", url: mkurl("http://github.com/sdboyer/gps"), major: 0},
 			},
 		},
 		{
 			in:   "gopkg.in/sdboyer/gps.v1/foo/bar",
 			root: "gopkg.in/sdboyer/gps.v1",
 			mb: maybeSources{
-				maybeGopkginSource{url: mkurl("https://github.com/sdboyer/gps"), major: 1},
-				maybeGopkginSource{url: mkurl("ssh://git@github.com/sdboyer/gps"), major: 1},
-				maybeGopkginSource{url: mkurl("git://github.com/sdboyer/gps"), major: 1},
-				maybeGopkginSource{url: mkurl("http://github.com/sdboyer/gps"), major: 1},
+				maybeGopkginSource{opath: "gopkg.in/sdboyer/gps.v1", url: mkurl("https://github.com/sdboyer/gps"), major: 1},
+				maybeGopkginSource{opath: "gopkg.in/sdboyer/gps.v1", url: mkurl("ssh://git@github.com/sdboyer/gps"), major: 1},
+				maybeGopkginSource{opath: "gopkg.in/sdboyer/gps.v1", url: mkurl("git://github.com/sdboyer/gps"), major: 1},
+				maybeGopkginSource{opath: "gopkg.in/sdboyer/gps.v1", url: mkurl("http://github.com/sdboyer/gps"), major: 1},
 			},
 		},
 		{
 			in:   "gopkg.in/yaml.v1",
 			root: "gopkg.in/yaml.v1",
 			mb: maybeSources{
-				maybeGopkginSource{url: mkurl("https://github.com/go-yaml/yaml"), major: 1},
-				maybeGopkginSource{url: mkurl("ssh://git@github.com/go-yaml/yaml"), major: 1},
-				maybeGopkginSource{url: mkurl("git://github.com/go-yaml/yaml"), major: 1},
-				maybeGopkginSource{url: mkurl("http://github.com/go-yaml/yaml"), major: 1},
+				maybeGopkginSource{opath: "gopkg.in/yaml.v1", url: mkurl("https://github.com/go-yaml/yaml"), major: 1},
+				maybeGopkginSource{opath: "gopkg.in/yaml.v1", url: mkurl("ssh://git@github.com/go-yaml/yaml"), major: 1},
+				maybeGopkginSource{opath: "gopkg.in/yaml.v1", url: mkurl("git://github.com/go-yaml/yaml"), major: 1},
+				maybeGopkginSource{opath: "gopkg.in/yaml.v1", url: mkurl("http://github.com/go-yaml/yaml"), major: 1},
 			},
 		},
 		{
 			in:   "gopkg.in/yaml.v1/foo/bar",
 			root: "gopkg.in/yaml.v1",
 			mb: maybeSources{
-				maybeGopkginSource{url: mkurl("https://github.com/go-yaml/yaml"), major: 1},
-				maybeGopkginSource{url: mkurl("ssh://git@github.com/go-yaml/yaml"), major: 1},
-				maybeGopkginSource{url: mkurl("git://github.com/go-yaml/yaml"), major: 1},
-				maybeGopkginSource{url: mkurl("http://github.com/go-yaml/yaml"), major: 1},
+				maybeGopkginSource{opath: "gopkg.in/yaml.v1", url: mkurl("https://github.com/go-yaml/yaml"), major: 1},
+				maybeGopkginSource{opath: "gopkg.in/yaml.v1", url: mkurl("ssh://git@github.com/go-yaml/yaml"), major: 1},
+				maybeGopkginSource{opath: "gopkg.in/yaml.v1", url: mkurl("git://github.com/go-yaml/yaml"), major: 1},
+				maybeGopkginSource{opath: "gopkg.in/yaml.v1", url: mkurl("http://github.com/go-yaml/yaml"), major: 1},
 			},
 		},
 		{
 			in:   "gopkg.in/inf.v0",
 			root: "gopkg.in/inf.v0",
 			mb: maybeSources{
-				maybeGopkginSource{url: mkurl("https://github.com/go-inf/inf"), major: 0},
-				maybeGopkginSource{url: mkurl("ssh://git@github.com/go-inf/inf"), major: 0},
-				maybeGopkginSource{url: mkurl("git://github.com/go-inf/inf"), major: 0},
-				maybeGopkginSource{url: mkurl("http://github.com/go-inf/inf"), major: 0},
+				maybeGopkginSource{opath: "gopkg.in/inf.v0", url: mkurl("https://github.com/go-inf/inf"), major: 0},
+				maybeGopkginSource{opath: "gopkg.in/inf.v0", url: mkurl("ssh://git@github.com/go-inf/inf"), major: 0},
+				maybeGopkginSource{opath: "gopkg.in/inf.v0", url: mkurl("git://github.com/go-inf/inf"), major: 0},
+				maybeGopkginSource{opath: "gopkg.in/inf.v0", url: mkurl("http://github.com/go-inf/inf"), major: 0},
 			},
 		},
 		{
@@ -506,7 +506,7 @@ func TestDeduceFromPath(t *testing.T) {
 			case maybeHgSource:
 				return fmt.Sprintf("%T: %s", tmb, ufmt(tmb.url))
 			case maybeGopkginSource:
-				return fmt.Sprintf("%T: %s (v%v)", tmb, ufmt(tmb.url), tmb.major)
+				return fmt.Sprintf("%T: %s (v%v) %s ", tmb, tmb.opath, tmb.major, ufmt(tmb.url))
 			default:
 				t.Errorf("Unknown maybeSource type: %T", mb)
 				t.FailNow()

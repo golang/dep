@@ -121,7 +121,7 @@ func TestGopkginSourceInteractions(t *testing.T) {
 		}
 	}
 
-	tfunc := func(n string, major int64, evl []Version) {
+	tfunc := func(opath, n string, major int64, evl []Version) {
 		un := "https://" + n
 		u, err := url.Parse(un)
 		if err != nil {
@@ -129,6 +129,7 @@ func TestGopkginSourceInteractions(t *testing.T) {
 			return
 		}
 		mb := maybeGopkginSource{
+			opath: opath,
 			url:   u,
 			major: major,
 		}
@@ -215,7 +216,7 @@ func TestGopkginSourceInteractions(t *testing.T) {
 	wg := &sync.WaitGroup{}
 	wg.Add(3)
 	go func() {
-		tfunc("github.com/sdboyer/gpkt", 1, []Version{
+		tfunc("gopkg.in/sdboyer/gpkt.v1", "github.com/sdboyer/gpkt", 1, []Version{
 			NewVersion("v1.1.0").Is(Revision("b2cb48dda625f6640b34d9ffb664533359ac8b91")),
 			NewVersion("v1.0.0").Is(Revision("bf85021c0405edbc4f3648b0603818d641674f72")),
 			newDefaultBranch("v1.1").Is(Revision("f1fbc520489a98306eb28c235204e39fa8a89c84")),
@@ -225,14 +226,14 @@ func TestGopkginSourceInteractions(t *testing.T) {
 	}()
 
 	go func() {
-		tfunc("github.com/sdboyer/gpkt", 2, []Version{
+		tfunc("gopkg.in/sdboyer/gpkt.v2", "github.com/sdboyer/gpkt", 2, []Version{
 			NewVersion("v2.0.0").Is(Revision("4a54adf81c75375d26d376459c00d5ff9b703e5e")),
 		})
 		wg.Done()
 	}()
 
 	go func() {
-		tfunc("github.com/sdboyer/gpkt", 3, []Version{
+		tfunc("gopkg.in/sdboyer/gpkt.v3", "github.com/sdboyer/gpkt", 3, []Version{
 			newDefaultBranch("v3").Is(Revision("4a54adf81c75375d26d376459c00d5ff9b703e5e")),
 		})
 		wg.Done()

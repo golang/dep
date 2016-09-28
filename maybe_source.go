@@ -92,13 +92,23 @@ func (m maybeGitSource) try(cachedir string, an ProjectAnalyzer) (source, string
 }
 
 type maybeGopkginSource struct {
-	url   *url.URL
+	// the original gopkg.in import path. this is used to create the on-disk
+	// location to avoid duplicate resource management - e.g., if instances of
+	// a gopkg.in project are accessed via different schemes, or if the
+	// underlying github repository is accessed directly.
+	opath string
+	// the actual upstream URL - always github
+	url *url.URL
+	// the major version to apply for filtering
 	major int64
 }
 
 func (m maybeGopkginSource) try(cachedir string, an ProjectAnalyzer) (source, string, error) {
+	// We don't actually need a fully consistent transform into the on-disk path
+	// - just something that's unique to the particular gopkg.in domain context.
+	// So, it's OK to just dumb-join the scheme with the path.
+	path := filepath.Join(cachedir, "sources", sanitizer.Replace(m.url.Scheme+"/"+m.opath))
 	ustr := m.url.String()
-	path := filepath.Join(cachedir, "sources", sanitizer.Replace(ustr))
 	r, err := vcs.NewGitRepo(ustr, path)
 	if err != nil {
 		return nil, "", err
