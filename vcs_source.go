@@ -9,19 +9,23 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/Masterminds/semver"
 	"github.com/Masterminds/vcs"
 	"github.com/termie/go-shutil"
 )
 
-type vcsSource interface {
-	syncLocal() error
-	ensureLocal() error
-	listLocalVersionPairs() ([]PairedVersion, sourceExistence, error)
-	listUpstreamVersionPairs() ([]PairedVersion, sourceExistence, error)
-	hasRevision(Revision) (bool, error)
-	checkout(Version) error
-	exportVersionTo(Version, string) error
-}
+// Kept here as a reference in case it does become important to implement a
+// vcsSource interface. Remove if/when it becomes clear we're never going to do
+// this.
+//type vcsSource interface {
+//syncLocal() error
+//ensureLocal() error
+//listLocalVersionPairs() ([]PairedVersion, sourceExistence, error)
+//listUpstreamVersionPairs() ([]PairedVersion, sourceExistence, error)
+//hasRevision(Revision) (bool, error)
+//checkout(Version) error
+//exportVersionTo(Version, string) error
+//}
 
 // gitSource is a generic git repository implementation that should work with
 // all standard git remotes.
@@ -106,6 +110,29 @@ func (s *gitSource) listVersions() (vlist []Version, err error) {
 		return
 	}
 
+	vlist, err = s.doListVersions()
+	if err != nil {
+		return nil, err
+	}
+
+	// Process the version data into the cache
+	//
+	// reset the rmap and vmap, as they'll be fully repopulated by this
+	s.dc.vMap = make(map[UnpairedVersion]Revision)
+	s.dc.rMap = make(map[Revision][]UnpairedVersion)
+
+	for _, v := range vlist {
+		pv := v.(PairedVersion)
+		u, r := pv.Unpair(), pv.Underlying()
+		s.dc.vMap[u] = r
+		s.dc.rMap[r] = append(s.dc.rMap[r], u)
+	}
+	// Mark the cache as being in sync with upstream's version list
+	s.cvsync = true
+	return
+}
+
+func (s *gitSource) doListVersions() (vlist []Version, err error) {
 	r := s.crepo.r
 	var out []byte
 	c := exec.Command("git", "ls-remote", r.Remote())
@@ -154,7 +181,7 @@ func (s *gitSource) listVersions() (vlist []Version, err error) {
 	s.ex.s |= existsUpstream
 	s.ex.f |= existsUpstream
 
-	// pull out the HEAD rev (it's always first) so we know what branches to
+	// Pull out the HEAD rev (it's always first) so we know what branches to
 	// mark as default. This is, perhaps, not the best way to glean this, but it
 	// was good enough for git itself until 1.8.5. Also, the alternative is
 	// sniffing data out of the pack protocol, which is a separate request, and
@@ -174,12 +201,12 @@ func (s *gitSource) listVersions() (vlist []Version, err error) {
 	// * Multiple branches match the HEAD rev
 	// * None of them are master
 	// * The solver makes it into the branch list in the version queue
-	// * The user has provided no constraint, or DefaultBranch
+	// * The user/tool has provided no constraint (so, anyConstraint)
 	// * A branch that is not actually the default, but happens to share the
-	// rev, is lexicographically earlier than the true default branch
+	//   rev, is lexicographically less than the true default branch
 	//
-	// Then the user could end up with an erroneous non-default branch in their
-	// lock file.
+	// If all of those conditions are met, then the user would end up with an
+	// erroneous non-default branch in their lock file.
 	headrev := Revision(all[0][:40])
 	var onedef, multidef, defmaster bool
 
@@ -247,10 +274,88 @@ func (s *gitSource) listVersions() (vlist []Version, err error) {
 		}
 	}
 
-	// Process the version data into the cache
+	return
+}
+
+// gopkginSource is a specialized git source that performs additional filtering
+// according to the input URL.
+type gopkginSource struct {
+	gitSource
+	major int64
+}
+
+func (s *gopkginSource) listVersions() (vlist []Version, err error) {
+	if s.cvsync {
+		vlist = make([]Version, len(s.dc.vMap))
+		k := 0
+		for v, r := range s.dc.vMap {
+			vlist[k] = v.Is(r)
+			k++
+		}
+
+		return
+	}
+
+	ovlist, err := s.doListVersions()
+	if err != nil {
+		return nil, err
+	}
+
+	// Apply gopkg.in's filtering rules
+	vlist = make([]Version, len(ovlist))
+	k := 0
+	var dbranch int // index of branch to be marked default
+	var bsv *semver.Version
+	for _, v := range ovlist {
+		// all git versions will always be paired
+		pv := v.(versionPair)
+		switch tv := pv.v.(type) {
+		case semVersion:
+			if tv.sv.Major() == s.major {
+				vlist[k] = v
+				k++
+			}
+		case branchVersion:
+			// The semver lib isn't exactly the same as gopkg.in's logic, but
+			// it's close enough that it's probably fine to use. We can be more
+			// exact if real problems crop up. The most obvious vector for
+			// problems is that we totally ignore the "unstable" designation
+			// right now.
+			sv, err := semver.NewVersion(tv.name)
+			if err != nil || sv.Major() != s.major {
+				// not a semver-shaped branch name at all, or not the same major
+				// version as specified in the import path constraint
+				continue
+			}
+
+			// Turn off the default branch marker unconditionally; we can't know
+			// which one to mark as default until we've seen them all
+			tv.isDefault = false
+			// Figure out if this is the current leader for default branch
+			if bsv == nil || bsv.LessThan(sv) {
+				bsv = sv
+				dbranch = k
+			}
+			pv.v = tv
+			vlist[k] = pv
+			k++
+		}
+		// The switch skips plainVersions because they cannot possibly meet
+		// gopkg.in's requirements
+	}
+
+	vlist = vlist[:k]
+	if bsv != nil {
+		dbv := vlist[dbranch].(versionPair)
+		vlist[dbranch] = branchVersion{
+			name:      dbv.v.(branchVersion).name,
+			isDefault: true,
+		}.Is(dbv.r)
+	}
+
+	// Process the filtered version data into the cache
 	//
 	// reset the rmap and vmap, as they'll be fully repopulated by this
-	// TODO(sdboyer) detect out-of-sync pairings as we do this?
 	s.dc.vMap = make(map[UnpairedVersion]Revision)
 	s.dc.rMap = make(map[Revision][]UnpairedVersion)
 
