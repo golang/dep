@@ -175,6 +175,7 @@ func TestBzrSourceInteractions(t *testing.T) {
 	if len(vlist) != 2 {
 		t.Errorf("bzr test repo should've produced two versions, got %v", len(vlist))
 	} else {
+		SortForUpgrade(vlist)
 		if !reflect.DeepEqual(vlist, evl) {
 			t.Errorf("bzr version list was not what we expected:\n\t(GOT): %s\n\t(WNT): %s", vlist, evl)
 		}
@@ -196,6 +197,7 @@ func TestBzrSourceInteractions(t *testing.T) {
 	if len(vlist) != 2 {
 		t.Errorf("bzr test repo should've produced two versions, got %v", len(vlist))
 	} else {
+		SortForUpgrade(vlist)
 		if !reflect.DeepEqual(vlist, evl) {
 			t.Errorf("bzr version list was not what we expected:\n\t(GOT): %s\n\t(WNT): %s", vlist, evl)
 		}
