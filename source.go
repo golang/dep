@@ -100,7 +100,7 @@ func (bs *baseVCSSource) getManifestAndLock(r ProjectRoot, v Version) (Manifest,
 	if !bs.crepo.synced {
 		err = bs.crepo.r.Update()
 		if err != nil {
-			return nil, nil, fmt.Errorf("could not fetch latest updates into repository")
+			return nil, nil, fmt.Errorf("failed fetching latest updates with err: %s", err.Error())
 		}
 		bs.crepo.synced = true
 	}

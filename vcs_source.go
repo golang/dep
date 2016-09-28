@@ -30,50 +30,68 @@ type gitSource struct {
 }
 
 func (s *gitSource) exportVersionTo(v Version, to string) error {
-	s.crepo.mut.Lock()
-	defer s.crepo.mut.Unlock()
-
+	// Get away without syncing local, if we can
 	r := s.crepo.r
-	if !r.CheckLocal() {
-		err := r.Get()
-		if err != nil {
-			return fmt.Errorf("failed to clone repo from %s", r.Remote())
-		}
-	}
-	// Back up original index
-	idx, bak := filepath.Join(r.LocalPath(), ".git", "index"), filepath.Join(r.LocalPath(), ".git", "origindex")
-	err := os.Rename(idx, bak)
-	if err != nil {
+	// ...but local repo does have to at least exist
+	if err := s.ensureCacheExistence(); err != nil {
 		return err
 	}
 
-	// TODO(sdboyer) could have an err here
-	defer os.Rename(bak, idx)
+	do := func() error {
+		s.crepo.mut.Lock()
+		defer s.crepo.mut.Unlock()
 
-	vstr := v.String()
-	if rv, ok := v.(PairedVersion); ok {
-		vstr = rv.Underlying().String()
+		// Back up original index
+		idx, bak := filepath.Join(r.LocalPath(), ".git", "index"), filepath.Join(r.LocalPath(), ".git", "origindex")
+		err := os.Rename(idx, bak)
+		if err != nil {
+			return err
+		}
+
+		// could have an err here...but it's hard to imagine how?
+		defer os.Rename(bak, idx)
+
+		vstr := v.String()
+		if rv, ok := v.(PairedVersion); ok {
+			vstr = rv.Underlying().String()
+		}
+
+		out, err := r.RunFromDir("git", "read-tree", vstr)
+		if err != nil {
+			return fmt.Errorf("%s: %s", out, err)
+		}
+
+		// Ensure we have exactly one trailing slash
+		to = strings.TrimSuffix(to, string(os.PathSeparator)) + string(os.PathSeparator)
+		// Checkout from our temporary index to the desired target location on
+		// disk; now it's git's job to make it fast.
+		//
+		// Sadly, this approach *does* also write out vendor dirs. There doesn't
+		// appear to be a way to make checkout-index respect sparse checkout
+		// rules (-a supercedes it). The alternative is using plain checkout,
+		// though we have a bunch of housekeeping to do to set up, then tear
+		// down, the sparse checkout controls, as well as restore the original
+		// index and HEAD.
+		out, err = r.RunFromDir("git", "checkout-index", "-a", "--prefix="+to)
+		if err != nil {
+			return fmt.Errorf("%s: %s", out, err)
+		}
+		return nil
 	}
 
-	out, err := r.RunFromDir("git", "read-tree", vstr)
-	if err != nil {
-		return fmt.Errorf("%s: %s", out, err)
+	err := do()
+	if err != nil && !s.crepo.synced {
+		// If there was an err, and the repo cache is stale, it might've been
+		// beacuse we were missing the rev/ref. Try syncing, then run the export
+		// op again.
+		err = s.syncLocal()
+		if err != nil {
+			return err
+		}
+		err = do()
 	}
 
-	// Ensure we have exactly one trailing slash
-	to = strings.TrimSuffix(to, string(os.PathSeparator)) + string(os.PathSeparator)
-	// Checkout from our temporary index to the desired target location on disk;
-	// now it's git's job to make it fast. Sadly, this approach *does* also
-	// write out vendor dirs. There doesn't appear to be a way to make
-	// checkout-index respect sparse checkout rules (-a supercedes it);
-	// the alternative is using plain checkout, though we have a bunch of
-	// housekeeping to do to set up, then tear down, the sparse checkout
-	// controls, as well as restore the original index and HEAD.
-	out, err = r.RunFromDir("git", "checkout-index", "-a", "--prefix="+to)
-	if err != nil {
-		return fmt.Errorf("%s: %s", out, err)
-	}
-	return nil
+	return err
 }
 
 func (s *gitSource) listVersions() (vlist []Version, err error) {
@@ -502,10 +520,19 @@ func (r *repo) exportVersionTo(v Version, to string) error {
 	r.mut.Lock()
 	defer r.mut.Unlock()
 
+	// TODO(sdboyer) sloppy - this update may not be necessary
+	if !r.synced {
+		err := r.r.Update()
+		if err != nil {
+			return fmt.Errorf("err on attempting to update repo: %s", err.Error())
+		}
+	}
+
+	r.r.UpdateVersion(v.String())
+
 	// TODO(sdboyer) This is a dumb, slow approach, but we're punting on making
 	// these fast for now because git is the OVERWHELMING case (it's handled in
 	// its own method)
-	r.r.UpdateVersion(v.String())
 
 	cfg := &shutil.CopyTreeOptions{
 		Symlinks:     true,
