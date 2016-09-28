@@ -9,6 +9,13 @@ import (
 	"github.com/Masterminds/vcs"
 )
 
+// A maybeSource represents a set of information that, given some
+// typically-expensive network effort, could be transformed into a proper source.
+//
+// Wrapping these up as their own type kills two birds with one stone:
+//
+// * Allows control over when deduction logic triggers network activity
+// * Makes it easy to attempt multiple URLs for a given import path
 type maybeSource interface {
 	try(cachedir string, an ProjectAnalyzer) (source, string, error)
 }
@@ -72,6 +79,43 @@ func (m maybeGitSource) try(cachedir string, an ProjectAnalyzer) (source, string
 				rpath: path,
 			},
 		},
+	}
+
+	src.baseVCSSource.lvfunc = src.listVersions
+
+	_, err = src.listVersions()
+	if err != nil {
+		return nil, "", err
+	}
+
+	return src, ustr, nil
+}
+
+type maybeGopkginSource struct {
+	url   *url.URL
+	major int64
+}
+
+func (m maybeGopkginSource) try(cachedir string, an ProjectAnalyzer) (source, string, error) {
+	ustr := m.url.String()
+	path := filepath.Join(cachedir, "sources", sanitizer.Replace(ustr))
+	r, err := vcs.NewGitRepo(ustr, path)
+	if err != nil {
+		return nil, "", err
+	}
+
+	src := &gopkginSource{
+		gitSource: gitSource{
+			baseVCSSource: baseVCSSource{
+				an: an,
+				dc: newMetaCache(),
+				crepo: &repo{
+					r:     r,
+					rpath: path,
+				},
+			},
+		},
+		major: m.major,
 	}
 
 	src.baseVCSSource.lvfunc = src.listVersions

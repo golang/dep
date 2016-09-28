@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"path"
 	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -256,7 +257,7 @@ func (m gopkginDeducer) deduceSource(p string, u *url.URL) (maybeSource, error) 
 
 	// Putting a scheme on gopkg.in would be really weird, disallow it
 	if u.Scheme != "" {
-		return nil, fmt.Errorf("Specifying alternate schemes on gopkg.in imports is not permitted")
+		return nil, fmt.Errorf("specifying alternate schemes on gopkg.in imports is not permitted")
 	}
 
 	// gopkg.in is always backed by github
@@ -267,6 +268,11 @@ func (m gopkginDeducer) deduceSource(p string, u *url.URL) (maybeSource, error) 
 	} else {
 		u.Path = path.Join(v[2], v[3])
 	}
+	major, err := strconv.ParseInt(v[4][1:], 10, 64)
+	if err != nil {
+		// this should only be reachable if there's an error in the regex
+		return nil, fmt.Errorf("could not parse %q as a gopkg.in major version", v[4][1:])
+	}
 
 	mb := make(maybeSources, len(gitSchemes))
 	for k, scheme := range gitSchemes {
@@ -275,7 +281,10 @@ func (m gopkginDeducer) deduceSource(p string, u *url.URL) (maybeSource, error) 
 			u2.User = url.User("git")
 		}
 		u2.Scheme = scheme
-		mb[k] = maybeGitSource{url: &u2}
+		mb[k] = maybeGopkginSource{
+			url:   &u2,
+			major: major,
+		}
 	}
 
 	return mb, nil

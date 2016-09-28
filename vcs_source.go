@@ -284,7 +284,7 @@ func (s *gopkginSource) listVersions() (vlist []Version, err error) {
 	}
 
 	// Apply gopkg.in's filtering rules
-	vlist := make([]Version, len(ovlist))
+	vlist = make([]Version, len(ovlist))
 	k := 0
 	var dbranch int // index of branch to be marked default
 	var bsv *semver.Version
@@ -300,7 +300,9 @@ func (s *gopkginSource) listVersions() (vlist []Version, err error) {
 		case branchVersion:
 			// The semver lib isn't exactly the same as gopkg.in's logic, but
 			// it's close enough that it's probably fine to use. We can be more
-			// exact if real problems crop up.
+			// exact if real problems crop up. The most obvious vector for
+			// problems is that we totally ignore the "unstable" designation
+			// right now.
 			sv, err := semver.NewVersion(tv.name)
 			if err != nil || sv.Major() != s.major {
 				// not a semver-shaped branch name at all, or not the same major
@@ -326,7 +328,11 @@ func (s *gopkginSource) listVersions() (vlist []Version, err error) {
 
 	vlist = vlist[:k]
 	if bsv != nil {
-		vlist[dbranch].(versionPair).v.(branchVersion).isDefault = true
+		dbv := vlist[dbranch].(versionPair)
+		vlist[dbranch] = branchVersion{
+			name:      dbv.v.(branchVersion).name,
+			isDefault: true,
+		}.Is(dbv.r)
 	}
 
 	// Process the filtered version data into the cache
