@@ -683,6 +683,7 @@ func TestVersionUnion(t *testing.T) {
 	v5 := NewVersion("v2.0.5").Is(Revision("notamatch"))
 
 	uv1 := versionTypeUnion{v1, v4, rev}
+	uv2 := versionTypeUnion{v2, v3}
 
 	if uv1.MatchesAny(none) {
 		t.Errorf("Union can't match none")
@@ -725,6 +726,10 @@ func TestVersionUnion(t *testing.T) {
 	}
 	if v5.Matches(uv1) {
 		t.Errorf("Union should not reverse-match on anything in disjoint pair")
+	}
+
+	if !uv1.Matches(uv2) {
+		t.Errorf("Union should succeed on matching comparison to other union with some overlap")
 	}
 
 	// MatchesAny - repeat Matches for safety, but add more, too
@@ -772,6 +777,10 @@ func TestVersionUnion(t *testing.T) {
 		t.Errorf("Union should have no overlap with ~2.0.0 semver range")
 	}
 
+	if !uv1.MatchesAny(uv2) {
+		t.Errorf("Union should succeed on MatchAny against other union with some overlap")
+	}
+
 	// Intersect - repeat all previous
 	if uv1.Intersect(v4) != v4 {
 		t.Errorf("Union intersection on contained version should return that version")
@@ -814,4 +823,28 @@ func TestVersionUnion(t *testing.T) {
 	if c2.Intersect(uv1) != none {
 		t.Errorf("Union reverse-intersecting with non-overlapping semver range should return none, got %s", uv1.Intersect(c2))
 	}
+
+	if uv1.Intersect(uv2) != rev {
+		t.Errorf("Unions should intersect down to rev, but got %s", uv1.Intersect(uv2))
+	}
+}
+
+func TestVersionUnionPanicOnType(t *testing.T) {
+	// versionTypeUnions need to panic if Type() gets called
+	defer func() {
+		if err := recover(); err == nil {
+			t.Error("versionTypeUnion did not panic on Type() call")
+		}
+	}()
+	versionTypeUnion{}.Type()
+}
+
+func TestVersionUnionPanicOnString(t *testing.T) {
+	// versionStringUnions need to panic if String() gets called
+	defer func() {
+		if err := recover(); err == nil {
+			t.Error("versionStringUnion did not panic on String() call")
+		}
+	}()
+	versionTypeUnion{}.String()
 }

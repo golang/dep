@@ -352,7 +352,6 @@ func (b *bridge) ListPackages(id ProjectIdentifier, v Version) (PackageTree, err
 }
 
 func (b *bridge) ExportProject(id ProjectIdentifier, v Version, path string) error {
-	//return b.sm.ExportProject(id, v, path)
 	panic("bridge should never be used to ExportProject")
 }
 
