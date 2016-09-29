@@ -158,112 +158,23 @@ func (b *bridge) pairRevision(id ProjectIdentifier, r Revision) []Version {
 // constraint. If that basic check fails and the provided version is incomplete
 // (e.g. an unpaired version or bare revision), it will attempt to gather more
 // information on one or the other and re-perform the comparison.
-func (b *bridge) matches(id ProjectIdentifier, c2 Constraint, v Version) bool {
-	if c2.Matches(v) {
+func (b *bridge) matches(id ProjectIdentifier, c Constraint, v Version) bool {
+	if c.Matches(v) {
 		return true
 	}
 
-	// There's a wide field of possible ways that pairing might result in a
-	// match. For each possible type of version, start by carving out all the
-	// cases where the constraint would have provided an authoritative match
-	// result.
-	switch tv := v.(type) {
-	case PairedVersion:
-		switch tc := c2.(type) {
-		case PairedVersion, Revision, noneConstraint:
-			// These three would all have been authoritative matches
-			return false
-		case UnpairedVersion:
-			// Only way paired and unpaired could match is if they share an
-			// underlying rev
-			pv := b.pairVersion(id, tc)
-			if pv == nil {
-				return false
-			}
-			return pv.Matches(v)
-		case semverConstraint:
-			// Have to check all the possible versions for that rev to see if
-			// any match the semver constraint
-			for _, pv := range b.pairRevision(id, tv.Underlying()) {
-				if tc.Matches(pv) {
-					return true
-				}
-			}
-			return false
-		}
+	// This approach is slightly wasteful, but just SO much less verbose, and
+	// more easily understood.
+	vtu := b.vtu(id, v)
 
-	case Revision:
-		switch tc := c2.(type) {
-		case PairedVersion, Revision, noneConstraint:
-			// These three would all have been authoritative matches
-			return false
-		case UnpairedVersion:
-			// Only way paired and unpaired could match is if they share an
-			// underlying rev
-			pv := b.pairVersion(id, tc)
-			if pv == nil {
-				return false
-			}
-			return pv.Matches(v)
-		case semverConstraint:
-			// Have to check all the possible versions for the rev to see if
-			// any match the semver constraint
-			for _, pv := range b.pairRevision(id, tv) {
-				if tc.Matches(pv) {
-					return true
-				}
-			}
-			return false
-		}
-
-	// UnpairedVersion as input has the most weird cases. It's also the one
-	// we'll probably see the least
-	case UnpairedVersion:
-		switch tc := c2.(type) {
-		case noneConstraint:
-			// obviously
-			return false
-		case Revision, PairedVersion:
-			// Easy case for both - just pair the uv and see if it matches the revision
-			// constraint
-			pv := b.pairVersion(id, tv)
-			if pv == nil {
-				return false
-			}
-			return tc.Matches(pv)
-		case UnpairedVersion:
-			// Both are unpaired versions. See if they share an underlying rev.
-			pv := b.pairVersion(id, tv)
-			if pv == nil {
-				return false
-			}
-
-			pc := b.pairVersion(id, tc)
-			if pc == nil {
-				return false
-			}
-			return pc.Matches(pv)
-
-		case semverConstraint:
-			// semverConstraint can't ever match a rev, but we do need to check
-			// if any other versions corresponding to this rev work.
-			pv := b.pairVersion(id, tv)
-			if pv == nil {
-				return false
-			}
-
-			for _, ttv := range b.pairRevision(id, pv.Underlying()) {
-				if c2.Matches(ttv) {
-					return true
-				}
-			}
-			return false
-		}
-	default:
-		panic("unreachable")
+	var uc Constraint
+	if cv, ok := c.(Version); ok {
+		uc = b.vtu(id, cv)
+	} else {
+		uc = c
 	}
 
-	return false
+	return uc.Matches(vtu)
 }
 
 // matchesAny is the authoritative version of Constraint.MatchesAny.
