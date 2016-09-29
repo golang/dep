@@ -456,11 +456,12 @@ var pathDeductionFixtures = map[string][]pathDeductionFixture{
 			root: "golang.org/x/exp",
 			mb:   maybeGitSource{url: mkurl("https://go.googlesource.com/exp")},
 		},
-		{
-			in:   "rsc.io/pdf",
-			root: "rsc.io/pdf",
-			mb:   maybeGitSource{url: mkurl("https://github.com/rsc/pdf")},
-		},
+		// rsc.io appears to have broken
+		//{
+		//in:   "rsc.io/pdf",
+		//root: "rsc.io/pdf",
+		//mb:   maybeGitSource{url: mkurl("https://github.com/rsc/pdf")},
+		//},
 	},
 }
 
