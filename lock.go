@@ -143,7 +143,10 @@ func (sl safeLock) Projects() []LockedProject {
 func prepLock(l Lock) Lock {
 	pl := l.Projects()
 
-	rl := safeLock{h: l.InputHash()}
+	rl := safeLock{
+		h: l.InputHash(),
+		p: make([]LockedProject, len(pl)),
+	}
 	copy(rl.p, pl)
 
 	return rl

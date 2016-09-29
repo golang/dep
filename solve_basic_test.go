@@ -664,6 +664,24 @@ var basicFixtures = map[string]basicFixture{
 		),
 		maxAttempts: 4,
 	},
+	"break lock when only the deps necessitate it": {
+		ds: []depspec{
+			mkDepspec("root 0.0.0", "foo *", "bar *"),
+			mkDepspec("foo 1.0.0 foorev", "bar <2.0.0"),
+			mkDepspec("foo 2.0.0", "bar <3.0.0"),
+			mkDepspec("bar 2.0.0", "baz <3.0.0"),
+			mkDepspec("baz 2.0.0", "foo >1.0.0"),
+		},
+		l: mklock(
+			"foo 1.0.0 foorev",
+		),
+		r: mksolution(
+			"foo 2.0.0",
+			"bar 2.0.0",
+			"baz 2.0.0",
+		),
+		maxAttempts: 4,
+	},
 	"locked atoms are matched on both local and net name": {
 		ds: []depspec{
 			mkDepspec("root 0.0.0", "foo *"),
