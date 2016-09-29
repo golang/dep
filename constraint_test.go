@@ -836,7 +836,7 @@ func TestVersionUnionPanicOnType(t *testing.T) {
 			t.Error("versionTypeUnion did not panic on Type() call")
 		}
 	}()
-	versionTypeUnion{}.Type()
+	_ = versionTypeUnion{}.Type()
 }
 
 func TestVersionUnionPanicOnString(t *testing.T) {
@@ -846,5 +846,5 @@ func TestVersionUnionPanicOnString(t *testing.T) {
 			t.Error("versionStringUnion did not panic on String() call")
 		}
 	}()
-	versionTypeUnion{}.String()
+	_ = versionTypeUnion{}.String()
 }
