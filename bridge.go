@@ -373,7 +373,7 @@ func (b *bridge) DeduceProjectRoot(ip string) (ProjectRoot, error) {
 }
 
 // breakLock is called when the solver has to break a version recorded in the
-// lock file. It prefetches all the projects in the solver's lock , so that the
+// lock file. It prefetches all the projects in the solver's lock, so that the
 // information is already on hand if/when the solver needs it.
 //
 // Projects that have already been selected are skipped, as it's generally unlikely that the
@@ -388,9 +388,6 @@ func (b *bridge) breakLock() {
 
 	for _, lp := range b.s.rl.Projects() {
 		if _, is := b.s.sel.selected(lp.pi); !is {
-			// ListPackages guarantees that all the necessary network work will
-			// be done, so go with that
-			//
 			// TODO(sdboyer) use this as an opportunity to detect
 			// inconsistencies between upstream and the lock (e.g., moved tags)?
 			pi, v := lp.pi, lp.Version()
@@ -430,14 +427,14 @@ type versionTypeUnion []Version
 // This should generally not be called, but is required for the interface. If it
 // is called, we have a bigger problem (the type has escaped the solver); thus,
 // panic.
-func (av versionTypeUnion) String() string {
+func (vtu versionTypeUnion) String() string {
 	panic("versionTypeUnion should never be turned into a string; it is solver internal-only")
 }
 
 // This should generally not be called, but is required for the interface. If it
 // is called, we have a bigger problem (the type has escaped the solver); thus,
 // panic.
-func (av versionTypeUnion) Type() string {
+func (vtu versionTypeUnion) Type() string {
 	panic("versionTypeUnion should never need to answer a Type() call; it is solver internal-only")
 }
 
@@ -445,12 +442,12 @@ func (av versionTypeUnion) Type() string {
 // contained in the union.
 //
 // This DOES allow tags to match branches, albeit indirectly through a revision.
-func (av versionTypeUnion) Matches(v Version) bool {
-	av2, oav := v.(versionTypeUnion)
+func (vtu versionTypeUnion) Matches(v Version) bool {
+	vtu2, otherIs := v.(versionTypeUnion)
 
-	for _, v1 := range av {
-		if oav {
-			for _, v2 := range av2 {
+	for _, v1 := range vtu {
+		if otherIs {
+			for _, v2 := range vtu2 {
 				if v1.Matches(v2) {
 					return true
 				}
@@ -466,12 +463,12 @@ func (av versionTypeUnion) Matches(v Version) bool {
 // MatchesAny returns true if any of the contained versions (which are also
 // constraints) in the union successfully MatchAny with the provided
 // constraint.
-func (av versionTypeUnion) MatchesAny(c Constraint) bool {
-	av2, oav := c.(versionTypeUnion)
+func (vtu versionTypeUnion) MatchesAny(c Constraint) bool {
+	vtu2, otherIs := c.(versionTypeUnion)
 
-	for _, v1 := range av {
-		if oav {
-			for _, v2 := range av2 {
+	for _, v1 := range vtu {
+		if otherIs {
+			for _, v2 := range vtu2 {
 				if v1.MatchesAny(v2) {
 					return true
 				}
@@ -491,12 +488,12 @@ func (av versionTypeUnion) MatchesAny(c Constraint) bool {
 // In order to avoid weird version floating elsewhere in the solver, the union
 // always returns the input constraint. (This is probably obviously correct, but
 // is still worth noting.)
-func (av versionTypeUnion) Intersect(c Constraint) Constraint {
-	av2, oav := c.(versionTypeUnion)
+func (vtu versionTypeUnion) Intersect(c Constraint) Constraint {
+	vtu2, otherIs := c.(versionTypeUnion)
 
-	for _, v1 := range av {
-		if oav {
-			for _, v2 := range av2 {
+	for _, v1 := range vtu {
+		if otherIs {
+			for _, v2 := range vtu2 {
 				if rc := v1.Intersect(v2); rc != none {
 					return rc
 				}
@@ -509,4 +506,4 @@ func (av versionTypeUnion) Intersect(c Constraint) Constraint {
 	return none
 }
 
-func (av versionTypeUnion) _private() {}
+func (vtu versionTypeUnion) _private() {}
