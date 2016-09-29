@@ -20,6 +20,7 @@ var fixtorun string
 // TODO(sdboyer) regression test ensuring that locks with only revs for projects don't cause errors
 func init() {
 	flag.StringVar(&fixtorun, "gps.fix", "", "A single fixture to run in TestBasicSolves or TestBimodalSolves")
+	mkBridge(nil, nil)
 	overrideMkBridge()
 }
 
@@ -193,10 +194,10 @@ func fixtureSolveSimpleChecks(fix specfix, soln Solution, err error, t *testing.
 		}
 
 		// Dump result projects into a map for easier interrogation
-		rp := make(map[ProjectIdentifier]Version)
+		rp := make(map[ProjectIdentifier]atomWithPackages)
 		for _, p := range r.p {
 			pa := p.toAtom()
-			rp[pa.id] = pa.v
+			rp[pa.a.id] = pa
 		}
 
 		fixlen, rlen := len(fix.solution()), len(rp)
@@ -208,23 +209,23 @@ func fixtureSolveSimpleChecks(fix specfix, soln Solution, err error, t *testing.
 		// Whether or not len is same, still have to verify that results agree
 		// Walk through fixture/expected results first
 		for p, v := range fix.solution() {
-			if av, exists := rp[p]; !exists {
+			if awp, exists := rp[p]; !exists {
 				t.Errorf("(fixture: %q) Project %q expected but missing from results", fix.name(), ppi(p))
 			} else {
 				// delete result from map so we skip it on the reverse pass
 				delete(rp, p)
-				if v != av {
-					t.Errorf("(fixture: %q) Expected version %q of project %q, but actual version was %q", fix.name(), pv(v), ppi(p), pv(av))
+				if v != awp.a.v {
+					t.Errorf("(fixture: %q) Expected version %q of project %q, but actual version was %q", fix.name(), pv(v), ppi(p), pv(awp.a.v))
 				}
 			}
 		}
 
 		// Now walk through remaining actual results
-		for p, v := range rp {
-			if fv, exists := fix.solution()[p]; !exists {
-				t.Errorf("(fixture: %q) Unexpected project %q present in results", fix.name(), ppi(p))
-			} else if v != fv {
-				t.Errorf("(fixture: %q) Got version %q of project %q, but expected version was %q", fix.name(), pv(v), ppi(p), pv(fv))
+		for pi, awp := range rp {
+			if fv, exists := fix.solution()[pi]; !exists {
+				t.Errorf("(fixture: %q) Unexpected project %q present in results", fix.name(), ppi(pi))
+			} else if awp.a.v != fv {
+				t.Errorf("(fixture: %q) Got version %q of project %q, but expected version was %q", fix.name(), pv(awp.a.v), ppi(pi), pv(fv))
 			}
 		}
 	}

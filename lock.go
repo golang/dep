@@ -49,8 +49,9 @@ func (l SimpleLock) Projects() []LockedProject {
 	return l
 }
 
-// NewLockedProject creates a new LockedProject struct with a given name,
-// version, and upstream repository URL.
+// NewLockedProject creates a new LockedProject struct with a given
+// ProjectIdentifier (name and optional upstream source URL), version. and list
+// of packages required from the project.
 //
 // Note that passing a nil version will cause a panic. This is a correctness
 // measure to ensure that the solver is never exposed to a version-less lock
@@ -106,7 +107,7 @@ func (lp LockedProject) Version() Version {
 	return lp.v.Is(lp.r)
 }
 
-func (lp LockedProject) toAtom() atom {
+func (lp LockedProject) toAtom() atomWithPackages {
 	pa := atom{
 		id: lp.Ident(),
 	}
@@ -119,7 +120,10 @@ func (lp LockedProject) toAtom() atom {
 		pa.v = lp.v
 	}
 
-	return pa
+	return atomWithPackages{
+		a:  pa,
+		pl: lp.pkgs,
+	}
 }
 
 type safeLock struct {

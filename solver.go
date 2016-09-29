@@ -1160,8 +1160,18 @@ func pa2lp(pa atom, pkgs map[string]struct{}) LockedProject {
 		panic("unreachable")
 	}
 
+	lp.pkgs = make([]string, len(pkgs))
+	k := 0
+
+	pr := string(pa.id.ProjectRoot)
+	trim := pr + string(os.PathSeparator)
 	for pkg := range pkgs {
-		lp.pkgs = append(lp.pkgs, strings.TrimPrefix(pkg, string(pa.id.ProjectRoot)+string(os.PathSeparator)))
+		if pkg == string(pa.id.ProjectRoot) {
+			lp.pkgs[k] = "."
+		} else {
+			lp.pkgs[k] = strings.TrimPrefix(pkg, trim)
+		}
+		k++
 	}
 	sort.Strings(lp.pkgs)
 
