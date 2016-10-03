@@ -194,10 +194,9 @@ func fixtureSolveSimpleChecks(fix specfix, soln Solution, err error, t *testing.
 		}
 
 		// Dump result projects into a map for easier interrogation
-		rp := make(map[ProjectIdentifier]atomWithPackages)
-		for _, p := range r.p {
-			pa := p.toAtom()
-			rp[pa.a.id] = pa
+		rp := make(map[ProjectIdentifier]LockedProject)
+		for _, lp := range r.p {
+			rp[lp.pi] = lp
 		}
 
 		fixlen, rlen := len(fix.solution()), len(rp)
@@ -208,24 +207,26 @@ func fixtureSolveSimpleChecks(fix specfix, soln Solution, err error, t *testing.
 
 		// Whether or not len is same, still have to verify that results agree
 		// Walk through fixture/expected results first
-		for p, v := range fix.solution() {
-			if awp, exists := rp[p]; !exists {
-				t.Errorf("(fixture: %q) Project %q expected but missing from results", fix.name(), ppi(p))
+		for id, flp := range fix.solution() {
+			if lp, exists := rp[id]; !exists {
+				t.Errorf("(fixture: %q) Project %q expected but missing from results", fix.name(), ppi(id))
 			} else {
 				// delete result from map so we skip it on the reverse pass
-				delete(rp, p)
-				if v != awp.a.v {
-					t.Errorf("(fixture: %q) Expected version %q of project %q, but actual version was %q", fix.name(), pv(v), ppi(p), pv(awp.a.v))
+				delete(rp, id)
+				if flp.Version() != lp.Version() {
+					t.Errorf("(fixture: %q) Expected version %q of project %q, but actual version was %q", fix.name(), pv(flp.Version()), ppi(id), pv(lp.Version()))
+				}
+
+				if !reflect.DeepEqual(lp.pkgs, flp.pkgs) {
+					t.Errorf("(fixture: %q) Package list was not not as expected for project %s@%s:\n\t(GOT) %s\n\t(WNT) %s", fix.name(), ppi(id), pv(lp.Version()), lp.pkgs, flp.pkgs)
 				}
 			}
 		}
 
 		// Now walk through remaining actual results
-		for pi, awp := range rp {
-			if fv, exists := fix.solution()[pi]; !exists {
-				t.Errorf("(fixture: %q) Unexpected project %q present in results", fix.name(), ppi(pi))
-			} else if awp.a.v != fv {
-				t.Errorf("(fixture: %q) Got version %q of project %q, but expected version was %q", fix.name(), pv(awp.a.v), ppi(pi), pv(fv))
+		for id, lp := range rp {
+			if _, exists := fix.solution()[id]; !exists {
+				t.Errorf("(fixture: %q) Unexpected project %s@%s present in results, with pkgs:\n\t%s", fix.name(), ppi(id), pv(lp.Version()), lp.pkgs)
 			}
 		}
 	}

@@ -294,12 +294,15 @@ func mkrevlock(pairs ...string) fixLock {
 	return l
 }
 
-// mksolution makes a result set
-func mksolution(pairs ...string) map[ProjectIdentifier]Version {
-	m := make(map[ProjectIdentifier]Version)
+// mksolution makes a simplified result set, where each LockedProject contains
+// exactly one package, which is the same as the input name.
+//
+// This mirrors the way that basic solves are set up.
+func mksolution(pairs ...string) map[ProjectIdentifier]LockedProject {
+	m := make(map[ProjectIdentifier]LockedProject)
 	for _, pair := range pairs {
 		a := mkAtom(pair)
-		m[a.id] = a.v
+		m[a.id] = NewLockedProject(a.id, a.v, []string{string(a.id.ProjectRoot)})
 	}
 
 	return m
@@ -351,7 +354,7 @@ type specfix interface {
 	rootTree() PackageTree
 	specs() []depspec
 	maxTries() int
-	solution() map[ProjectIdentifier]Version
+	solution() map[ProjectIdentifier]LockedProject
 	failure() error
 }
 
@@ -374,8 +377,8 @@ type basicFixture struct {
 	n string
 	// depspecs. always treat first as root
 	ds []depspec
-	// results; map of name/version pairs
-	r map[ProjectIdentifier]Version
+	// results; map of name/atom pairs
+	r map[ProjectIdentifier]LockedProject
 	// max attempts the solver should need to find solution. 0 means no limit
 	maxAttempts int
 	// Use downgrade instead of default upgrade sorter
@@ -402,7 +405,7 @@ func (f basicFixture) maxTries() int {
 	return f.maxAttempts
 }
 
-func (f basicFixture) solution() map[ProjectIdentifier]Version {
+func (f basicFixture) solution() map[ProjectIdentifier]LockedProject {
 	return f.r
 }
 
