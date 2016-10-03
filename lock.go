@@ -120,25 +120,6 @@ func (lp LockedProject) Packages() []string {
 	return lp.pkgs
 }
 
-func (lp LockedProject) toAtom() atomWithPackages {
-	pa := atom{
-		id: lp.Ident(),
-	}
-
-	if lp.v == nil {
-		pa.v = lp.r
-	} else if lp.r != "" {
-		pa.v = lp.v.Is(lp.r)
-	} else {
-		pa.v = lp.v
-	}
-
-	return atomWithPackages{
-		a:  pa,
-		pl: lp.pkgs,
-	}
-}
-
 type safeLock struct {
 	h []byte
 	p []LockedProject
