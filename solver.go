@@ -4,7 +4,6 @@ import (
 	"container/heap"
 	"fmt"
 	"log"
-	"os"
 	"sort"
 	"strings"
 
@@ -1164,7 +1163,7 @@ func pa2lp(pa atom, pkgs map[string]struct{}) LockedProject {
 	k := 0
 
 	pr := string(pa.id.ProjectRoot)
-	trim := pr + string(os.PathSeparator)
+	trim := pr + "/"
 	for pkg := range pkgs {
 		if pkg == string(pa.id.ProjectRoot) {
 			lp.pkgs[k] = "."
