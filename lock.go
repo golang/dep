@@ -107,6 +107,19 @@ func (lp LockedProject) Version() Version {
 	return lp.v.Is(lp.r)
 }
 
+// Packages returns the list of packages from within the LockedProject that are
+// actually used in the import graph. Some caveats:
+//
+//  * The names given are relative to the root import path for the project. If
+//    the root package itself is imported, it's represented as ".".
+//  * Just because a package path isn't included in this list doesn't mean it's
+//    safe to remove - it could contain C files, or other assets, that can't be
+//    safely removed.
+//  * The slice is not a copy. If you need to modify it, copy it first.
+func (lp LockedProject) Packages() []string {
+	return lp.pkgs
+}
+
 func (lp LockedProject) toAtom() atomWithPackages {
 	pa := atom{
 		id: lp.Ident(),
