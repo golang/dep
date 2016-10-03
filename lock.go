@@ -49,8 +49,9 @@ func (l SimpleLock) Projects() []LockedProject {
 	return l
 }
 
-// NewLockedProject creates a new LockedProject struct with a given name,
-// version, and upstream repository URL.
+// NewLockedProject creates a new LockedProject struct with a given
+// ProjectIdentifier (name and optional upstream source URL), version. and list
+// of packages required from the project.
 //
 // Note that passing a nil version will cause a panic. This is a correctness
 // measure to ensure that the solver is never exposed to a version-less lock
@@ -106,20 +107,17 @@ func (lp LockedProject) Version() Version {
 	return lp.v.Is(lp.r)
 }
 
-func (lp LockedProject) toAtom() atom {
-	pa := atom{
-		id: lp.Ident(),
-	}
-
-	if lp.v == nil {
-		pa.v = lp.r
-	} else if lp.r != "" {
-		pa.v = lp.v.Is(lp.r)
-	} else {
-		pa.v = lp.v
-	}
-
-	return pa
+// Packages returns the list of packages from within the LockedProject that are
+// actually used in the import graph. Some caveats:
+//
+//  * The names given are relative to the root import path for the project. If
+//    the root package itself is imported, it's represented as ".".
+//  * Just because a package path isn't included in this list doesn't mean it's
+//    safe to remove - it could contain C files, or other assets, that can't be
+//    safely removed.
+//  * The slice is not a copy. If you need to modify it, copy it first.
+func (lp LockedProject) Packages() []string {
+	return lp.pkgs
 }
 
 type safeLock struct {
