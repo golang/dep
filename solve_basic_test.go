@@ -294,18 +294,38 @@ func mkrevlock(pairs ...string) fixLock {
 	return l
 }
 
-// mksolution makes a simplified result set, where each LockedProject contains
-// exactly one package, which is the same as the input name.
+// mksolution makes creates a map of project identifiers to their LockedProject
+// result, which is sufficient to act as a solution fixture for the purposes of
+// most tests.
 //
-// This mirrors the way that basic solves are set up.
-func mksolution(pairs ...string) map[ProjectIdentifier]LockedProject {
+// Either strings or LockedProjects can be provided. If a string is provided, it
+// is assumed that we're in the default, "basic" case where there is exactly one
+// package in a project, and it is the root of the project - meaning that only
+// the "." package should be listed. If a LockedProject is provided (e.g. as
+// returned from mklp()), then it's incorporated directly.
+//
+// If any other type is provided, the func will panic.
+func mksolution(inputs ...interface{}) map[ProjectIdentifier]LockedProject {
 	m := make(map[ProjectIdentifier]LockedProject)
-	for _, pair := range pairs {
-		a := mkAtom(pair)
-		m[a.id] = NewLockedProject(a.id, a.v, []string{string(a.id.ProjectRoot)})
+	for _, in := range inputs {
+		switch t := in.(type) {
+		case string:
+			a := mkAtom(t)
+			m[a.id] = NewLockedProject(a.id, a.v, []string{"."})
+		case LockedProject:
+			m[t.pi] = t
+		default:
+			panic(fmt.Sprintf("unexpected input to mksolution: %T %s", in, in))
+		}
 	}
 
 	return m
+}
+
+// mklp creates a LockedProject from string inputs
+func mklp(pair string, pkgs ...string) LockedProject {
+	a := mkAtom(pair)
+	return NewLockedProject(a.id, a.v, pkgs)
 }
 
 // computeBasicReachMap takes a depspec and computes a reach map which is

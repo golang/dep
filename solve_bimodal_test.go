@@ -104,7 +104,7 @@ var bimodalFixtures = map[string]bimodalFixture{
 				pkg("a/foo")),
 		},
 		r: mksolution(
-			"a 1.0.0",
+			mklp("a 1.0.0", "foo"),
 		),
 	},
 	// Import jump is in a dep, and points to a transitive dep
@@ -285,7 +285,7 @@ var bimodalFixtures = map[string]bimodalFixture{
 			),
 		},
 		r: mksolution(
-			"a 1.0.0",
+			mklp("a 1.0.0", ".", "second"),
 			"b 2.0.0",
 			"c 1.2.0",
 			"d 1.0.0",
