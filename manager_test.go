@@ -161,13 +161,6 @@ func TestSourceInit(t *testing.T) {
 				t.Errorf("Expected version %s in position %v but got %s", e, k, v[k])
 			}
 		}
-
-		if !v[1].(versionPair).v.(branchVersion).isDefault {
-			t.Error("Expected master branch version to have isDefault flag, but it did not")
-		}
-		if v[2].(versionPair).v.(branchVersion).isDefault {
-			t.Error("Expected test branch version not to have isDefault flag, but it did")
-		}
 	}
 
 	// Two birds, one stone - make sure the internal ProjectManager vlist cache
