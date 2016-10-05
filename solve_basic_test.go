@@ -411,6 +411,8 @@ type basicFixture struct {
 	ovr ProjectConstraints
 	// request up/downgrade to all projects
 	changeall bool
+	// individual projects to change
+	changelist []ProjectRoot
 }
 
 func (f basicFixture) name() string {
@@ -621,6 +623,111 @@ var basicFixtures = map[string]basicFixture{
 		),
 		changeall: true,
 		downgrade: true,
+	},
+	"update one with only one": {
+		ds: []depspec{
+			mkDepspec("root 0.0.0", "foo *"),
+			mkDepspec("foo 1.0.0"),
+			mkDepspec("foo 1.0.1"),
+			mkDepspec("foo 1.0.2"),
+		},
+		l: mklock(
+			"foo 1.0.1",
+		),
+		r: mksolution(
+			"foo 1.0.2",
+		),
+		changelist: []ProjectRoot{"foo"},
+	},
+	"update one of multi": {
+		ds: []depspec{
+			mkDepspec("root 0.0.0", "foo *", "bar *"),
+			mkDepspec("foo 1.0.0"),
+			mkDepspec("foo 1.0.1"),
+			mkDepspec("foo 1.0.2"),
+			mkDepspec("bar 1.0.0"),
+			mkDepspec("bar 1.0.1"),
+			mkDepspec("bar 1.0.2"),
+		},
+		l: mklock(
+			"foo 1.0.1",
+			"bar 1.0.1",
+		),
+		r: mksolution(
+			"foo 1.0.2",
+			"bar 1.0.1",
+		),
+		changelist: []ProjectRoot{"foo"},
+	},
+	"update both of multi": {
+		ds: []depspec{
+			mkDepspec("root 0.0.0", "foo *", "bar *"),
+			mkDepspec("foo 1.0.0"),
+			mkDepspec("foo 1.0.1"),
+			mkDepspec("foo 1.0.2"),
+			mkDepspec("bar 1.0.0"),
+			mkDepspec("bar 1.0.1"),
+			mkDepspec("bar 1.0.2"),
+		},
+		l: mklock(
+			"foo 1.0.1",
+			"bar 1.0.1",
+		),
+		r: mksolution(
+			"foo 1.0.2",
+			"bar 1.0.2",
+		),
+		changelist: []ProjectRoot{"foo", "bar"},
+	},
+	"update two of more": {
+		ds: []depspec{
+			mkDepspec("root 0.0.0", "foo *", "bar *", "baz *"),
+			mkDepspec("foo 1.0.0"),
+			mkDepspec("foo 1.0.1"),
+			mkDepspec("foo 1.0.2"),
+			mkDepspec("bar 1.0.0"),
+			mkDepspec("bar 1.0.1"),
+			mkDepspec("bar 1.0.2"),
+			mkDepspec("baz 1.0.0"),
+			mkDepspec("baz 1.0.1"),
+			mkDepspec("baz 1.0.2"),
+		},
+		l: mklock(
+			"foo 1.0.1",
+			"bar 1.0.1",
+			"baz 1.0.1",
+		),
+		r: mksolution(
+			"foo 1.0.2",
+			"bar 1.0.2",
+			"baz 1.0.1",
+		),
+		changelist: []ProjectRoot{"foo", "bar"},
+	},
+	"break other lock with targeted update": {
+		ds: []depspec{
+			mkDepspec("root 0.0.0", "foo *", "baz *"),
+			mkDepspec("foo 1.0.0", "bar 1.0.0"),
+			mkDepspec("foo 1.0.1", "bar 1.0.1"),
+			mkDepspec("foo 1.0.2", "bar 1.0.2"),
+			mkDepspec("bar 1.0.0"),
+			mkDepspec("bar 1.0.1"),
+			mkDepspec("bar 1.0.2"),
+			mkDepspec("baz 1.0.0"),
+			mkDepspec("baz 1.0.1"),
+			mkDepspec("baz 1.0.2"),
+		},
+		l: mklock(
+			"foo 1.0.1",
+			"bar 1.0.1",
+			"baz 1.0.1",
+		),
+		r: mksolution(
+			"foo 1.0.2",
+			"bar 1.0.2",
+			"baz 1.0.1",
+		),
+		changelist: []ProjectRoot{"foo", "bar"},
 	},
 	"with incompatible locked dependency": {
 		ds: []depspec{

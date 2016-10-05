@@ -202,6 +202,9 @@ func Prepare(params SolveParameters, sm SourceManager) (Solver, error) {
 	if params.Trace && params.TraceLogger == nil {
 		return nil, badOptsFailure("trace requested, but no logger provided")
 	}
+	if params.Lock == nil && len(params.ToChange) != 0 {
+		return nil, badOptsFailure(fmt.Sprintf("update specifically requested for %s, but no lock was provided to upgrade from", params.ToChange))
+	}
 
 	if params.Manifest == nil {
 		params.Manifest = simpleRootManifest{}
@@ -255,10 +258,6 @@ func Prepare(params SolveParameters, sm SourceManager) (Solver, error) {
 	s.chng = make(map[ProjectRoot]struct{})
 	s.rlm = make(map[ProjectRoot]LockedProject)
 
-	for _, v := range s.params.ToChange {
-		s.chng[v] = struct{}{}
-	}
-
 	// Initialize stacks and queues
 	s.sel = &selection{
 		deps: make(map[ProjectRoot][]dependency),
@@ -279,6 +278,13 @@ func Prepare(params SolveParameters, sm SourceManager) (Solver, error) {
 		// Also keep a prepped one, mostly for the bridge. This is probably
 		// wasteful, but only minimally so, and yay symmetry
 		s.rl = prepLock(s.params.Lock)
+	}
+
+	for _, p := range s.params.ToChange {
+		if _, exists := s.rlm[p]; !exists {
+			return nil, badOptsFailure(fmt.Sprintf("cannot update %s as it is not in the lock", p))
+		}
+		s.chng[p] = struct{}{}
 	}
 
 	return s, nil

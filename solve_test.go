@@ -94,6 +94,7 @@ func solveBasicsAndCheck(fix basicFixture, t *testing.T) (res Solution, err erro
 		Lock:            dummyLock{},
 		Downgrade:       fix.downgrade,
 		ChangeAll:       fix.changeall,
+		ToChange:        fix.changelist,
 	}
 
 	if fix.l != nil {
@@ -355,6 +356,27 @@ func TestBadSolveOpts(t *testing.T) {
 	}
 	params.Manifest = nil
 
+	params.ToChange = []ProjectRoot{"foo"}
+	_, err = Prepare(params, sm)
+	if err == nil {
+		t.Errorf("Should have errored on non-empty ToChange without a lock provided")
+	} else if !strings.Contains(err.Error(), "update specifically requested for") {
+		t.Error("Prepare should have given error on ToChange without Lock, but gave:", err)
+	}
+
+	params.Lock = safeLock{
+		p: []LockedProject{
+			NewLockedProject(mkPI("bar"), Revision("makebelieve"), nil),
+		},
+	}
+	_, err = Prepare(params, sm)
+	if err == nil {
+		t.Errorf("Should have errored on ToChange containing project not in lock")
+	} else if !strings.Contains(err.Error(), "cannot update foo as it is not in the lock") {
+		t.Error("Prepare should have given error on ToChange with item not present in Lock, but gave:", err)
+	}
+
+	params.Lock, params.ToChange = nil, nil
 	_, err = Prepare(params, sm)
 	if err != nil {
 		t.Error("Basic conditions satisfied, prepare should have completed successfully, err as:", err)
