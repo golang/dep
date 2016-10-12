@@ -136,20 +136,23 @@ func TestSourceInit(t *testing.T) {
 		}
 	}()
 
-	id := mkPI("github.com/Masterminds/VCSTestRepo").normalize()
+	id := mkPI("github.com/sdboyer/gpkt").normalize()
 	v, err := sm.ListVersions(id)
 	if err != nil {
 		t.Errorf("Unexpected error during initial project setup/fetching %s", err)
 	}
 
-	if len(v) != 3 {
-		t.Errorf("Expected three version results from the test repo, got %v", len(v))
+	if len(v) != 7 {
+		t.Errorf("Expected seven version results from the test repo, got %v", len(v))
 	} else {
-		rev := Revision("30605f6ac35fcb075ad0bfa9296f90a7d891523e")
 		expected := []Version{
-			NewVersion("1.0.0").Is(rev),
-			NewBranch("master").Is(rev),
-			NewBranch("test").Is(rev),
+			NewVersion("v2.0.0").Is(Revision("4a54adf81c75375d26d376459c00d5ff9b703e5e")),
+			NewVersion("v1.1.0").Is(Revision("b2cb48dda625f6640b34d9ffb664533359ac8b91")),
+			NewVersion("v1.0.0").Is(Revision("bf85021c0405edbc4f3648b0603818d641674f72")),
+			newDefaultBranch("master").Is(Revision("bf85021c0405edbc4f3648b0603818d641674f72")),
+			NewBranch("v1").Is(Revision("e3777f683305eafca223aefe56b4e8ecf103f467")),
+			NewBranch("v1.1").Is(Revision("f1fbc520489a98306eb28c235204e39fa8a89c84")),
+			NewBranch("v3").Is(Revision("4a54adf81c75375d26d376459c00d5ff9b703e5e")),
 		}
 
 		// SourceManager itself doesn't guarantee ordering; sort them here so we
@@ -177,14 +180,17 @@ func TestSourceInit(t *testing.T) {
 		t.Errorf("Unexpected error during initial project setup/fetching %s", err)
 	}
 
-	rev := Revision("30605f6ac35fcb075ad0bfa9296f90a7d891523e")
-	if len(v) != 3 {
-		t.Errorf("Expected three version results from the test repo, got %v", len(v))
+	if len(v) != 7 {
+		t.Errorf("Expected seven version results from the test repo, got %v", len(v))
 	} else {
 		expected := []Version{
-			NewVersion("1.0.0").Is(rev),
-			NewBranch("master").Is(rev),
-			NewBranch("test").Is(rev),
+			NewVersion("v2.0.0").Is(Revision("4a54adf81c75375d26d376459c00d5ff9b703e5e")),
+			NewVersion("v1.1.0").Is(Revision("b2cb48dda625f6640b34d9ffb664533359ac8b91")),
+			NewVersion("v1.0.0").Is(Revision("bf85021c0405edbc4f3648b0603818d641674f72")),
+			newDefaultBranch("master").Is(Revision("bf85021c0405edbc4f3648b0603818d641674f72")),
+			NewBranch("v1").Is(Revision("e3777f683305eafca223aefe56b4e8ecf103f467")),
+			NewBranch("v1.1").Is(Revision("f1fbc520489a98306eb28c235204e39fa8a89c84")),
+			NewBranch("v3").Is(Revision("4a54adf81c75375d26d376459c00d5ff9b703e5e")),
 		}
 
 		for k, e := range expected {
@@ -193,15 +199,21 @@ func TestSourceInit(t *testing.T) {
 			}
 		}
 
-		if !v[1].(versionPair).v.(branchVersion).isDefault {
+		if !v[3].(versionPair).v.(branchVersion).isDefault {
 			t.Error("Expected master branch version to have isDefault flag, but it did not")
 		}
-		if v[2].(versionPair).v.(branchVersion).isDefault {
-			t.Error("Expected test branch version not to have isDefault flag, but it did")
+		if v[4].(versionPair).v.(branchVersion).isDefault {
+			t.Error("Expected v1 branch version not to have isDefault flag, but it did")
+		}
+		if v[5].(versionPair).v.(branchVersion).isDefault {
+			t.Error("Expected v1.1 branch version not to have isDefault flag, but it did")
+		}
+		if v[6].(versionPair).v.(branchVersion).isDefault {
+			t.Error("Expected v3 branch version not to have isDefault flag, but it did")
 		}
 	}
 
-	present, err := smc.RevisionPresentIn(id, rev)
+	present, err := smc.RevisionPresentIn(id, Revision("4a54adf81c75375d26d376459c00d5ff9b703e5e"))
 	if err != nil {
 		t.Errorf("Should have found revision in source, but got err: %s", err)
 	} else if !present {
@@ -215,12 +227,12 @@ func TestSourceInit(t *testing.T) {
 	}
 
 	// Ensure that the appropriate cache dirs and files exist
-	_, err = os.Stat(filepath.Join(cpath, "sources", "https---github.com-Masterminds-VCSTestRepo", ".git"))
+	_, err = os.Stat(filepath.Join(cpath, "sources", "https---github.com-sdboyer-gpkt", ".git"))
 	if err != nil {
 		t.Error("Cache repo does not exist in expected location")
 	}
 
-	_, err = os.Stat(filepath.Join(cpath, "metadata", "github.com", "Masterminds", "VCSTestRepo", "cache.json"))
+	_, err = os.Stat(filepath.Join(cpath, "metadata", "github.com", "sdboyer", "gpkt", "cache.json"))
 	if err != nil {
 		// TODO(sdboyer) disabled until we get caching working
 		//t.Error("Metadata cache json file does not exist in expected location")
@@ -389,9 +401,9 @@ func TestGetInfoListVersionsOrdering(t *testing.T) {
 
 	// setup done, now do the test
 
-	id := mkPI("github.com/Masterminds/VCSTestRepo").normalize()
+	id := mkPI("github.com/sdboyer/gpkt").normalize()
 
-	_, _, err := sm.GetManifestAndLock(id, NewVersion("1.0.0"))
+	_, _, err := sm.GetManifestAndLock(id, NewVersion("v1.0.0"))
 	if err != nil {
 		t.Errorf("Unexpected error from GetInfoAt %s", err)
 	}
@@ -401,8 +413,8 @@ func TestGetInfoListVersionsOrdering(t *testing.T) {
 		t.Errorf("Unexpected error from ListVersions %s", err)
 	}
 
-	if len(v) != 3 {
-		t.Errorf("Expected three results from ListVersions, got %v", len(v))
+	if len(v) != 7 {
+		t.Errorf("Expected seven results from ListVersions, got %v", len(v))
 	}
 }
 

@@ -25,7 +25,7 @@ func TestGitSourceInteractions(t *testing.T) {
 		}
 	}
 
-	n := "github.com/Masterminds/VCSTestRepo"
+	n := "github.com/sdboyer/gpkt"
 	un := "https://" + n
 	u, err := url.Parse(un)
 	if err != nil {
@@ -74,21 +74,25 @@ func TestGitSourceInteractions(t *testing.T) {
 	}
 
 	// check that an expected rev is present
-	is, err := src.revisionPresentIn(Revision("30605f6ac35fcb075ad0bfa9296f90a7d891523e"))
+	is, err := src.revisionPresentIn(Revision("4a54adf81c75375d26d376459c00d5ff9b703e5e"))
 	if err != nil {
 		t.Errorf("Unexpected error while checking revision presence: %s", err)
 	} else if !is {
 		t.Errorf("Revision that should exist was not present")
 	}
 
-	if len(vlist) != 3 {
-		t.Errorf("git test repo should've produced three versions, got %v: vlist was %s", len(vlist), vlist)
+	if len(vlist) != 7 {
+		t.Errorf("git test repo should've produced seven versions, got %v: vlist was %s", len(vlist), vlist)
 	} else {
 		SortForUpgrade(vlist)
 		evl := []Version{
-			NewVersion("1.0.0").Is(Revision("30605f6ac35fcb075ad0bfa9296f90a7d891523e")),
-			newDefaultBranch("master").Is(Revision("30605f6ac35fcb075ad0bfa9296f90a7d891523e")),
-			NewBranch("test").Is(Revision("30605f6ac35fcb075ad0bfa9296f90a7d891523e")),
+			NewVersion("v2.0.0").Is(Revision("4a54adf81c75375d26d376459c00d5ff9b703e5e")),
+			NewVersion("v1.1.0").Is(Revision("b2cb48dda625f6640b34d9ffb664533359ac8b91")),
+			NewVersion("v1.0.0").Is(Revision("bf85021c0405edbc4f3648b0603818d641674f72")),
+			newDefaultBranch("master").Is(Revision("bf85021c0405edbc4f3648b0603818d641674f72")),
+			NewBranch("v1").Is(Revision("e3777f683305eafca223aefe56b4e8ecf103f467")),
+			NewBranch("v1.1").Is(Revision("f1fbc520489a98306eb28c235204e39fa8a89c84")),
+			NewBranch("v3").Is(Revision("4a54adf81c75375d26d376459c00d5ff9b703e5e")),
 		}
 		if !reflect.DeepEqual(vlist, evl) {
 			t.Errorf("Version list was not what we expected:\n\t(GOT): %s\n\t(WNT): %s", vlist, evl)
