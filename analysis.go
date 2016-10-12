@@ -45,7 +45,8 @@ func init() {
 	stdlib["C"] = true
 }
 
-// listPackages lists info for all packages at or below the provided fileRoot.
+// ListPackages reports Go package information about all directories in the tree
+// at or below the provided fileRoot.
 //
 // Directories without any valid Go files are excluded. Directories with
 // multiple packages are excluded.
@@ -63,8 +64,8 @@ func init() {
 //  importRoot = "github.com/foo/bar"
 //
 // then the root package at path/to/repo will be ascribed import path
-// "github.com/foo/bar", and its subpackage "baz" will be
-// "github.com/foo/bar/baz".
+// "github.com/foo/bar", and the package at
+// "/home/user/workspace/path/to/repo/baz" will be "github.com/foo/bar/baz".
 //
 // A PackageTree is returned, which contains the ImportRoot and map of import path
 // to PackageOrErr - each path under the root that exists will have either a
