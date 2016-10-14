@@ -618,12 +618,7 @@ func (s *solver) intersectConstraintsWithImports(deps []workingConstraint, reach
 		}
 
 		// Make a new completeDep with an open constraint, respecting overrides
-		pd := s.ovr.override(ProjectConstraint{
-			Ident: ProjectIdentifier{
-				ProjectRoot: root,
-			},
-			Constraint: Any(),
-		})
+		pd := s.ovr.override(root, ProjectProperties{Constraint: Any()})
 
 		// Insert the pd into the trie so that further deps from this
 		// project get caught by the prefix search

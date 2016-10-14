@@ -262,13 +262,7 @@ func (m ProjectConstraints) overrideAll(all ...ProjectConstraints) (out []workin
 	k := 0
 	for _, pcm := range all {
 		for pr, pp := range pcm {
-			out[k] = m.override(ProjectConstraint{
-				Ident: ProjectIdentifier{
-					ProjectRoot: pr,
-					NetworkName: pp.NetworkName,
-				},
-				Constraint: pp.Constraint,
-			})
+			out[k] = m.override(pr, pp)
 		}
 	}
 
@@ -279,23 +273,34 @@ func (m ProjectConstraints) overrideAll(all ...ProjectConstraints) (out []workin
 // override replaces a single ProjectConstraint with a workingConstraint,
 // overriding its values if a corresponding entry exists in the
 // ProjectConstraints map.
-func (m ProjectConstraints) override(pc ProjectConstraint) workingConstraint {
+func (m ProjectConstraints) override(pr ProjectRoot, pp ProjectProperties) workingConstraint {
 	wc := workingConstraint{
-		Ident:      pc.Ident,
-		Constraint: pc.Constraint,
+		Ident: ProjectIdentifier{
+			ProjectRoot: pr,
+			NetworkName: pp.NetworkName,
+		},
+		Constraint: pp.Constraint,
 	}
 
-	if pp, has := m[pc.Ident.ProjectRoot]; has {
+	if opp, has := m[pr]; has {
 		// The rule for overrides is that *any* non-zero value for the prop
 		// should be considered an override, even if it's equal to what's
 		// already there.
-		if pp.Constraint != nil {
-			wc.Constraint = pp.Constraint
+		if opp.Constraint != nil {
+			wc.Constraint = opp.Constraint
 			wc.overrConstraint = true
 		}
 
+		// This may seem odd, because the solver encodes meaning into the empty
+		// string for NetworkName (it means that it would use the import path by
+		// default, but could be coerced into using an alternate URL). However,
+		// that 'coercion' can only happen if there's a disagreement between
+		// projects on where a dependency should be sourced from. Such
+		// disagreement is exactly what overrides preclude, so there's no need
+		// to preserve the meaning of "" here - thus, we can treat it as a zero
+		// value and ignore it, rather than applying it.
 		if pp.NetworkName != "" {
-			wc.Ident.NetworkName = pp.NetworkName
+			wc.Ident.NetworkName = opp.NetworkName
 			wc.overrNet = true
 		}
 	}
