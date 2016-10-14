@@ -100,7 +100,7 @@ func (bs *baseVCSSource) getManifestAndLock(r ProjectRoot, v Version) (Manifest,
 	if !bs.crepo.synced {
 		err = bs.crepo.r.Update()
 		if err != nil {
-			return nil, nil, fmt.Errorf("failed fetching latest updates with err: %s", err.Error())
+			return nil, nil, fmt.Errorf("failed fetching latest updates with err: %s", unwrapVcsErr(err))
 		}
 		bs.crepo.synced = true
 	}
@@ -115,7 +115,7 @@ func (bs *baseVCSSource) getManifestAndLock(r ProjectRoot, v Version) (Manifest,
 
 	if err != nil {
 		// TODO(sdboyer) More-er proper-er error
-		panic(fmt.Sprintf("canary - why is checkout/whatever failing: %s %s %s", bs.crepo.r.LocalPath(), v.String(), err))
+		panic(fmt.Sprintf("canary - why is checkout/whatever failing: %s %s %s", bs.crepo.r.LocalPath(), v.String(), unwrapVcsErr(err)))
 	}
 
 	bs.crepo.mut.RLock()
@@ -139,7 +139,7 @@ func (bs *baseVCSSource) getManifestAndLock(r ProjectRoot, v Version) (Manifest,
 		return pi.Manifest, pi.Lock, nil
 	}
 
-	return nil, nil, err
+	return nil, nil, unwrapVcsErr(err)
 }
 
 // toRevision turns a Version into a Revision, if doing so is possible based on
@@ -216,8 +216,9 @@ func (bs *baseVCSSource) ensureCacheExistence() error {
 			bs.crepo.mut.Unlock()
 
 			if err != nil {
-				return fmt.Errorf("failed to create repository cache for %s with err:\n%s", bs.crepo.r.Remote(), err)
+				return fmt.Errorf("failed to create repository cache for %s with err:\n%s", bs.crepo.r.Remote(), unwrapVcsErr(err))
 			}
+
 			bs.crepo.synced = true
 			bs.ex.s |= existsInCache
 			bs.ex.f |= existsInCache
@@ -290,7 +291,7 @@ func (bs *baseVCSSource) syncLocal() error {
 	// This case is really just for git repos, where the lvfunc doesn't
 	// guarantee that the local repo is synced
 	if !bs.crepo.synced {
-		bs.syncerr = bs.crepo.r.Update()
+		bs.syncerr = unwrapVcsErr(bs.crepo.r.Update())
 		if bs.syncerr != nil {
 			return bs.syncerr
 		}
@@ -328,7 +329,7 @@ func (bs *baseVCSSource) listPackages(pr ProjectRoot, v Version) (ptree PackageT
 		if !bs.crepo.synced {
 			err = bs.crepo.r.Update()
 			if err != nil {
-				return PackageTree{}, fmt.Errorf("could not fetch latest updates into repository: %s", err)
+				return PackageTree{}, fmt.Errorf("could not fetch latest updates into repository: %s", unwrapVcsErr(err))
 			}
 			bs.crepo.synced = true
 		}
@@ -337,6 +338,7 @@ func (bs *baseVCSSource) listPackages(pr ProjectRoot, v Version) (ptree PackageT
 
 	ptree, err = ListPackages(bs.crepo.r.LocalPath(), string(pr))
 	bs.crepo.mut.Unlock()
+	err = unwrapVcsErr(err)
 
 	// TODO(sdboyer) cache errs?
 	if err != nil {

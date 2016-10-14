@@ -484,7 +484,7 @@ func (s *hgSource) listVersions() (vlist []Version, err error) {
 	// didn't create it
 	if !s.crepo.synced {
 		s.crepo.mut.Lock()
-		err = r.Update()
+		err = unwrapVcsErr(r.Update())
 		s.crepo.mut.Unlock()
 		if err != nil {
 			return
@@ -629,7 +629,7 @@ func (r *repo) exportVersionTo(v Version, to string) error {
 	if !r.synced {
 		err := r.r.Update()
 		if err != nil {
-			return fmt.Errorf("err on attempting to update repo: %s", err.Error())
+			return fmt.Errorf("err on attempting to update repo: %s", unwrapVcsErr(err))
 		}
 	}
 
