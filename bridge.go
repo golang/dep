@@ -283,7 +283,10 @@ func (b *bridge) ListPackages(id ProjectIdentifier, v Version) (PackageTree, err
 		panic("should never call ListPackages on root project")
 	}
 
-	return b.sm.ListPackages(id, v)
+	b.s.mtr.push("b-list-pkgs")
+	pt, err := b.sm.ListPackages(id, v)
+	b.s.mtr.pop()
+	return pt, err
 }
 
 func (b *bridge) ExportProject(id ProjectIdentifier, v Version, path string) error {
