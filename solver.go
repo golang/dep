@@ -480,8 +480,7 @@ func (s *solver) selectRoot() error {
 
 	// If we're looking for root's deps, get it from opts and local root
 	// analysis, rather than having the sm do it
-	c, tc := s.rm.DependencyConstraints(), s.rm.TestDependencyConstraints()
-	mdeps := s.ovr.overrideAll(pcSliceToMap(c, tc).asSortedSlice())
+	mdeps := s.ovr.overrideAll(s.rm.DependencyConstraints().merge(s.rm.TestDependencyConstraints()))
 
 	// Err is not possible at this point, as it could only come from
 	// listPackages(), which if we're here already succeeded for root
@@ -619,12 +618,7 @@ func (s *solver) intersectConstraintsWithImports(deps []workingConstraint, reach
 		}
 
 		// Make a new completeDep with an open constraint, respecting overrides
-		pd := s.ovr.override(ProjectConstraint{
-			Ident: ProjectIdentifier{
-				ProjectRoot: root,
-			},
-			Constraint: Any(),
-		})
+		pd := s.ovr.override(root, ProjectProperties{Constraint: Any()})
 
 		// Insert the pd into the trie so that further deps from this
 		// project get caught by the prefix search
