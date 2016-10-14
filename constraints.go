@@ -240,7 +240,7 @@ func (m ProjectConstraints) asSortedSlice() []ProjectConstraint {
 // merging them with the receiver into a new ProjectConstraints map.
 //
 // If duplicate ProjectRoots are encountered, the constraints are intersected
-// together and the latter's NetworkName is taken.
+// together and the latter's NetworkName, if non-empty, is taken.
 func (m ProjectConstraints) merge(other ...ProjectConstraints) (out ProjectConstraints) {
 	plen := len(m)
 	for _, pcm := range other {
@@ -256,6 +256,9 @@ func (m ProjectConstraints) merge(other ...ProjectConstraints) (out ProjectConst
 		for pr, pp := range pcm {
 			if rpp, exists := out[pr]; exists {
 				pp.Constraint = pp.Constraint.Intersect(rpp.Constraint)
+				if pp.NetworkName == "" {
+					pp.NetworkName = rpp.NetworkName
+				}
 			}
 			out[pr] = pp
 		}
@@ -310,7 +313,7 @@ func (m ProjectConstraints) override(pr ProjectRoot, pp ProjectProperties) worki
 		// from. Such disagreement is exactly what overrides preclude, so
 		// there's no need to preserve the meaning of "" here - thus, we can
 		// treat it as a zero value and ignore it, rather than applying it.
-		if pp.NetworkName != "" {
+		if opp.NetworkName != "" {
 			wc.Ident.NetworkName = opp.NetworkName
 			wc.overrNet = true
 		}
