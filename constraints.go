@@ -236,19 +236,44 @@ func (m ProjectConstraints) asSortedSlice() []ProjectConstraint {
 	return pcs
 }
 
-// overrideAll treats the ProjectConstraints map as an override map, and applies
-// overridden values to the input.
+// overrideAll treats the receiver ProjectConstraints map as a set of override
+// instructions, and applies overridden values to the ProjectConstraints.
 //
 // A slice of workingConstraint is returned, allowing differentiation between
 // values that were or were not overridden.
-func (m ProjectConstraints) overrideAll(in []ProjectConstraint) (out []workingConstraint) {
-	out = make([]workingConstraint, len(in))
-	k := 0
-	for _, pc := range in {
-		out[k] = m.override(pc)
-		k++
+//
+// Note that if a later map has properties for a ProjectRoot that was already
+// present in an earlier map, the returned slice will have a duplicate entry,
+// resulting in undefined solver behavior.
+func (m ProjectConstraints) overrideAll(all ...ProjectConstraints) (out []workingConstraint) {
+	var in []ProjectConstraint
+	var plen int
+	switch len(all) {
+	case 0:
+		return
+	case 1:
+		plen := len(all[0])
+	default:
+		for _, pc := range all {
+			plen += len(in)
+		}
 	}
 
+	out = make([]workingConstraint, plen)
+	k := 0
+	for _, m := range all {
+		for pr, pp := range m {
+			out[k] = m.override(ProjectConstraint{
+				Ident: ProjectIdentifier{
+					ProjectRoot: pr,
+					NetworkName: pp.NetworkName,
+				},
+				Constraint: pp.Constraint,
+			})
+		}
+	}
+
+	sort.Stable(sortedWC(out))
 	return
 }
 
@@ -282,14 +307,12 @@ func (m ProjectConstraints) override(pc ProjectConstraint) workingConstraint {
 
 type sortedConstraints []ProjectConstraint
 
-func (s sortedConstraints) Len() int {
-	return len(s)
-}
+func (s sortedConstraints) Len() int           { return len(s) }
+func (s sortedConstraints) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
+func (s sortedConstraints) Less(i, j int) bool { return s[i].Ident.less(s[j].Ident) }
 
-func (s sortedConstraints) Swap(i, j int) {
-	s[i], s[j] = s[j], s[i]
-}
+type sortedWC []workingConstraint
 
-func (s sortedConstraints) Less(i, j int) bool {
-	return s[i].Ident.less(s[j].Ident)
-}
+func (s sortedWC) Len() int           { return len(s) }
+func (s sortedWC) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
+func (s sortedWC) Less(i, j int) bool { return s[i].Ident.less(s[j].Ident) }
