@@ -1,6 +1,13 @@
 package gps
 
-import "time"
+import (
+	"bytes"
+	"fmt"
+	"log"
+	"sort"
+	"text/tabwriter"
+	"time"
+)
 
 type metrics struct {
 	stack []string
@@ -33,3 +40,42 @@ func (m *metrics) pop() {
 	m.stack = m.stack[:len(m.stack)-1]
 	m.last = time.Now()
 }
+
+func (m *metrics) dump(l *log.Logger) {
+	s := make(ndpairs, len(m.times))
+	k := 0
+	for n, d := range m.times {
+		s[k] = ndpair{
+			n: n,
+			d: d,
+		}
+		k++
+	}
+
+	sort.Sort(sort.Reverse(s))
+
+	var tot time.Duration
+	var buf bytes.Buffer
+	w := tabwriter.NewWriter(&buf, 0, 0, 1, ' ', tabwriter.AlignRight)
+	for _, nd := range s {
+		tot += nd.d
+		fmt.Fprintf(w, "\t%s:\t%v\t\n", nd.n, nd.d)
+	}
+	fmt.Fprintf(w, "\n\tTOTAL:\t%v\t\n", tot)
+
+	l.Println("\nSolver wall times by segment:")
+	w.Flush()
+	fmt.Println((&buf).String())
+
+}
+
+type ndpair struct {
+	n string
+	d time.Duration
+}
+
+type ndpairs []ndpair
+
+func (s ndpairs) Less(i, j int) bool { return s[i].d < s[j].d }
+func (s ndpairs) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
+func (s ndpairs) Len() int           { return len(s) }

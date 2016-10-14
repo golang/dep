@@ -328,6 +328,9 @@ func (s *solver) Solve() (Solution, error) {
 	}
 
 	s.traceFinish(soln, err)
+	if s.params.Trace {
+		s.mtr.dump(s.params.TraceLogger)
+	}
 	return soln, err
 }
 
@@ -357,7 +360,7 @@ func (s *solver) solve() (map[atom]map[string]struct{}, error) {
 			if err != nil {
 				// Err means a failure somewhere down the line; try backtracking.
 				s.traceStartBacktrack(bmi, err, false)
-				mtr.pop()
+				s.mtr.pop()
 				if s.backtrack() {
 					// backtracking succeeded, move to the next unselected id
 					continue
