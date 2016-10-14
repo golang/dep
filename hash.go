@@ -1,6 +1,7 @@
 package gps
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"sort"
 )
@@ -21,38 +22,38 @@ func (s *solver) HashInputs() []byte {
 	// actually affect solving.
 	p := s.ovr.overrideAll(s.rm.DependencyConstraints().merge(s.rm.TestDependencyConstraints()))
 
-	// We have everything we need; now, compute the hash.
-	h := sha256.New()
+	// Build up a buffer of all the inputs.
+	buf := new(bytes.Buffer)
 	for _, pd := range p {
-		h.Write([]byte(pd.Ident.ProjectRoot))
-		h.Write([]byte(pd.Ident.NetworkName))
+		buf.WriteString(string(pd.Ident.ProjectRoot))
+		buf.WriteString(pd.Ident.NetworkName)
 		// FIXME Constraint.String() is a surjective-only transformation - tags
 		// and branches with the same name are written out as the same string.
 		// This could, albeit rarely, result in input collisions when a real
 		// change has occurred.
-		h.Write([]byte(pd.Constraint.String()))
+		buf.WriteString(pd.Constraint.String())
 	}
 
 	// The stdlib and old appengine packages play the same functional role in
 	// solving as ignores. Because they change, albeit quite infrequently, we
 	// have to include them in the hash.
-	h.Write([]byte(stdlibPkgs))
-	h.Write([]byte(appenginePkgs))
+	buf.WriteString(stdlibPkgs)
+	buf.WriteString(appenginePkgs)
 
 	// Write each of the packages, or the errors that were found for a
 	// particular subpath, into the hash.
 	for _, perr := range s.rpt.Packages {
 		if perr.Err != nil {
-			h.Write([]byte(perr.Err.Error()))
+			buf.WriteString(perr.Err.Error())
 		} else {
-			h.Write([]byte(perr.P.Name))
-			h.Write([]byte(perr.P.CommentPath))
-			h.Write([]byte(perr.P.ImportPath))
+			buf.WriteString(perr.P.Name)
+			buf.WriteString(perr.P.CommentPath)
+			buf.WriteString(perr.P.ImportPath)
 			for _, imp := range perr.P.Imports {
-				h.Write([]byte(imp))
+				buf.WriteString(imp)
 			}
 			for _, imp := range perr.P.TestImports {
-				h.Write([]byte(imp))
+				buf.WriteString(imp)
 			}
 		}
 	}
@@ -69,23 +70,24 @@ func (s *solver) HashInputs() []byte {
 		sort.Strings(ig)
 
 		for _, igp := range ig {
-			h.Write([]byte(igp))
+			buf.WriteString(igp)
 		}
 	}
 
 	for _, pc := range s.ovr.asSortedSlice() {
-		h.Write([]byte(pc.Ident.ProjectRoot))
+		buf.WriteString(string(pc.Ident.ProjectRoot))
 		if pc.Ident.NetworkName != "" {
-			h.Write([]byte(pc.Ident.NetworkName))
+			buf.WriteString(pc.Ident.NetworkName)
 		}
 		if pc.Constraint != nil {
-			h.Write([]byte(pc.Constraint.String()))
+			buf.WriteString(pc.Constraint.String())
 		}
 	}
 
 	an, av := s.b.AnalyzerInfo()
-	h.Write([]byte(an))
-	h.Write([]byte(av.String()))
+	buf.WriteString(an)
+	buf.WriteString(av.String())
 
-	return h.Sum(nil)
+	hd := sha256.Sum256(buf.Bytes())
+	return hd[:]
 }

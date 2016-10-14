@@ -480,7 +480,7 @@ func (s *solver) selectRoot() error {
 
 	// If we're looking for root's deps, get it from opts and local root
 	// analysis, rather than having the sm do it
-	mdeps := s.ovr.overrideAll(s.rm.DependencyConstraints(), s.rm.TestDependencyConstraints())
+	mdeps := s.ovr.overrideAll(s.rm.DependencyConstraints().merge(s.rm.TestDependencyConstraints()))
 
 	// Err is not possible at this point, as it could only come from
 	// listPackages(), which if we're here already succeeded for root
