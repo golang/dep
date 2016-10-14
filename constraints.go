@@ -236,34 +236,45 @@ func (m ProjectConstraints) asSortedSlice() []ProjectConstraint {
 	return pcs
 }
 
+// merge pulls in all the constraints from other ProjectConstraints map(s),
+// merging them with the receiver into a new ProjectConstraints map.
+//
+// If duplicate ProjectRoots are encountered, the constraints are intersected
+// together and the latter's NetworkName is taken.
+func (m ProjectConstraints) merge(other ...ProjectConstraints) (out ProjectConstraints) {
+	plen := len(m)
+	for _, pcm := range other {
+		plen += len(pcm)
+	}
+
+	out = make(ProjectConstraints, plen)
+	for pr, pp := range m {
+		out[pr] = pp
+	}
+
+	for _, pcm := range other {
+		for pr, pp := range pcm {
+			if rpp, exists := out[pr]; exists {
+				pp.Constraint = pp.Constraint.Intersect(rpp.Constraint)
+			}
+			out[pr] = pp
+		}
+	}
+
+	return
+}
+
 // overrideAll treats the receiver ProjectConstraints map as a set of override
 // instructions, and applies overridden values to the ProjectConstraints.
 //
 // A slice of workingConstraint is returned, allowing differentiation between
 // values that were or were not overridden.
-//
-// Note that if a later map has properties for a ProjectRoot that was already
-// present in an earlier map, the returned slice will have a duplicate entry,
-// resulting in undefined solver behavior.
-func (m ProjectConstraints) overrideAll(all ...ProjectConstraints) (out []workingConstraint) {
-	var plen int
-	switch len(all) {
-	case 0:
-		return
-	case 1:
-		plen = len(all[0])
-	default:
-		for _, pcm := range all {
-			plen += len(pcm)
-		}
-	}
-
-	out = make([]workingConstraint, plen)
+func (m ProjectConstraints) overrideAll(pcm ProjectConstraints) (out []workingConstraint) {
+	out = make([]workingConstraint, len(pcm))
 	k := 0
-	for _, pcm := range all {
-		for pr, pp := range pcm {
-			out[k] = m.override(pr, pp)
-		}
+	for pr, pp := range pcm {
+		out[k] = m.override(pr, pp)
+		k++
 	}
 
 	sort.Stable(sortedWC(out))
@@ -291,14 +302,14 @@ func (m ProjectConstraints) override(pr ProjectRoot, pp ProjectProperties) worki
 			wc.overrConstraint = true
 		}
 
-		// This may seem odd, because the solver encodes meaning into the empty
-		// string for NetworkName (it means that it would use the import path by
-		// default, but could be coerced into using an alternate URL). However,
-		// that 'coercion' can only happen if there's a disagreement between
-		// projects on where a dependency should be sourced from. Such
-		// disagreement is exactly what overrides preclude, so there's no need
-		// to preserve the meaning of "" here - thus, we can treat it as a zero
-		// value and ignore it, rather than applying it.
+		// This may appear incorrect, because the solver encodes meaning into
+		// the empty string for NetworkName (it means that it would use the
+		// import path by default, but could be coerced into using an alternate
+		// URL). However, that 'coercion' can only happen if there's a
+		// disagreement between projects on where a dependency should be sourced
+		// from. Such disagreement is exactly what overrides preclude, so
+		// there's no need to preserve the meaning of "" here - thus, we can
+		// treat it as a zero value and ignore it, rather than applying it.
 		if pp.NetworkName != "" {
 			wc.Ident.NetworkName = opp.NetworkName
 			wc.overrNet = true
