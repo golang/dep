@@ -158,6 +158,9 @@ type solver struct {
 
 	// A defensively-copied instance of params.RootPackageTree
 	rpt PackageTree
+
+	// metrics for the current solve run.
+	mtr *metrics
 }
 
 // A Solver is the main workhorse of gps: given a set of project inputs, it
@@ -295,6 +298,9 @@ func Prepare(params SolveParameters, sm SourceManager) (Solver, error) {
 //
 // This is the entry point to the main gps workhorse.
 func (s *solver) Solve() (Solution, error) {
+	// Set up a metrics object
+	s.mtr = newMetrics()
+
 	// Prime the queues with the root project
 	err := s.selectRoot()
 	if err != nil {
@@ -303,6 +309,7 @@ func (s *solver) Solve() (Solution, error) {
 
 	all, err := s.solve()
 
+	s.mtr.pop()
 	var soln solution
 	if err == nil {
 		soln = solution{
@@ -321,6 +328,9 @@ func (s *solver) Solve() (Solution, error) {
 	}
 
 	s.traceFinish(soln, err)
+	if s.params.Trace {
+		s.mtr.dump(s.params.TraceLogger)
+	}
 	return soln, err
 }
 
@@ -343,13 +353,14 @@ func (s *solver) solve() (map[atom]map[string]struct{}, error) {
 		// guarantee the bmi will contain at least one package from this project
 		// that has yet to be selected.)
 		if awp, is := s.sel.selected(bmi.id); !is {
+			s.mtr.push("new-atom")
 			// Analysis path for when we haven't selected the project yet - need
 			// to create a version queue.
 			queue, err := s.createVersionQueue(bmi)
 			if err != nil {
 				// Err means a failure somewhere down the line; try backtracking.
 				s.traceStartBacktrack(bmi, err, false)
-				//s.traceBacktrack(bmi, false)
+				s.mtr.pop()
 				if s.backtrack() {
 					// backtracking succeeded, move to the next unselected id
 					continue
@@ -370,7 +381,9 @@ func (s *solver) solve() (map[atom]map[string]struct{}, error) {
 			}
 			s.selectAtom(awp, false)
 			s.vqs = append(s.vqs, queue)
+			s.mtr.pop()
 		} else {
+			s.mtr.push("add-atom")
 			// We're just trying to add packages to an already-selected project.
 			// That means it's not OK to burn through the version queue for that
 			// project as we do when first selecting a project, as doing so
@@ -399,12 +412,14 @@ func (s *solver) solve() (map[atom]map[string]struct{}, error) {
 					// backtracking succeeded, move to the next unselected id
 					continue
 				}
+				s.mtr.pop()
 				return nil, err
 			}
 			s.selectAtom(nawp, true)
 			// We don't add anything to the stack of version queues because the
 			// backtracker knows not to pop the vqstack if it backtracks
 			// across a pure-package addition.
+			s.mtr.pop()
 		}
 	}
 
@@ -431,6 +446,7 @@ func (s *solver) solve() (map[atom]map[string]struct{}, error) {
 // selectRoot is a specialized selectAtom, used solely to initially
 // populate the queues at the beginning of a solve run.
 func (s *solver) selectRoot() error {
+	s.mtr.push("select-root")
 	pa := atom{
 		id: ProjectIdentifier{
 			ProjectRoot: ProjectRoot(s.rpt.ImportRoot),
@@ -479,7 +495,7 @@ func (s *solver) selectRoot() error {
 
 	for _, dep := range deps {
 		// If we have no lock, or if this dep isn't in the lock, then prefetch
-		// it. See longer explanation in selectRoot() for how we benefit from
+		// it. See longer explanation in selectAtom() for how we benefit from
 		// parallelism here.
 		if _, has := s.rlm[dep.Ident.ProjectRoot]; !has {
 			go s.b.SyncSourceFor(dep.Ident)
@@ -491,6 +507,7 @@ func (s *solver) selectRoot() error {
 	}
 
 	s.traceSelectRoot(s.rpt, deps)
+	s.mtr.pop()
 	return nil
 }
 
@@ -881,6 +898,7 @@ func (s *solver) backtrack() bool {
 		return false
 	}
 
+	s.mtr.push("backtrack")
 	for {
 		for {
 			if len(s.vqs) == 0 {
@@ -940,6 +958,7 @@ func (s *solver) backtrack() bool {
 		s.vqs, s.vqs[len(s.vqs)-1] = s.vqs[:len(s.vqs)-1], nil
 	}
 
+	s.mtr.pop()
 	// Backtracking was successful if loop ended before running out of versions
 	if len(s.vqs) == 0 {
 		return false
@@ -1049,6 +1068,7 @@ func (s *solver) fail(id ProjectIdentifier) {
 //
 // Behavior is slightly diffferent if pkgonly is true.
 func (s *solver) selectAtom(a atomWithPackages, pkgonly bool) {
+	s.mtr.push("select-atom")
 	s.unsel.remove(bimodalIdentifier{
 		id: a.a.id,
 		pl: a.pl,
@@ -1122,9 +1142,11 @@ func (s *solver) selectAtom(a atomWithPackages, pkgonly bool) {
 	}
 
 	s.traceSelect(a, pkgonly)
+	s.mtr.pop()
 }
 
 func (s *solver) unselectLast() (atomWithPackages, bool) {
+	s.mtr.push("unselect")
 	awp, first := s.sel.popSelection()
 	heap.Push(s.unsel, bimodalIdentifier{id: awp.a.id, pl: awp.pl})
 
@@ -1144,6 +1166,7 @@ func (s *solver) unselectLast() (atomWithPackages, bool) {
 		}
 	}
 
+	s.mtr.pop()
 	return awp, first
 }
 

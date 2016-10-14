@@ -70,7 +70,11 @@ func (b *bridge) GetManifestAndLock(id ProjectIdentifier, v Version) (Manifest, 
 	if id.ProjectRoot == ProjectRoot(b.s.rpt.ImportRoot) {
 		return b.s.rm, b.s.rl, nil
 	}
-	return b.sm.GetManifestAndLock(id, v)
+
+	b.s.mtr.push("b-gmal")
+	m, l, e := b.sm.GetManifestAndLock(id, v)
+	b.s.mtr.pop()
+	return m, l, e
 }
 
 func (b *bridge) AnalyzerInfo() (string, *semver.Version) {
@@ -82,9 +86,11 @@ func (b *bridge) ListVersions(id ProjectIdentifier) ([]Version, error) {
 		return vl, nil
 	}
 
+	b.s.mtr.push("b-list-versions")
 	vl, err := b.sm.ListVersions(id)
 	// TODO(sdboyer) cache errors, too?
 	if err != nil {
+		b.s.mtr.pop()
 		return nil, err
 	}
 
@@ -95,15 +101,22 @@ func (b *bridge) ListVersions(id ProjectIdentifier) ([]Version, error) {
 	}
 
 	b.vlists[id] = vl
+	b.s.mtr.pop()
 	return vl, nil
 }
 
 func (b *bridge) RevisionPresentIn(id ProjectIdentifier, r Revision) (bool, error) {
-	return b.sm.RevisionPresentIn(id, r)
+	b.s.mtr.push("b-rev-present-in")
+	i, e := b.sm.RevisionPresentIn(id, r)
+	b.s.mtr.pop()
+	return i, e
 }
 
 func (b *bridge) SourceExists(id ProjectIdentifier) (bool, error) {
-	return b.sm.SourceExists(id)
+	b.s.mtr.push("b-source-exists")
+	i, e := b.sm.SourceExists(id)
+	b.s.mtr.pop()
+	return i, e
 }
 
 func (b *bridge) vendorCodeExists(id ProjectIdentifier) (bool, error) {
@@ -123,15 +136,18 @@ func (b *bridge) pairVersion(id ProjectIdentifier, v UnpairedVersion) PairedVers
 		return nil
 	}
 
+	b.s.mtr.push("b-pair-version")
 	// doing it like this is a bit sloppy
 	for _, v2 := range vl {
 		if p, ok := v2.(PairedVersion); ok {
 			if p.Matches(v) {
+				b.s.mtr.pop()
 				return p
 			}
 		}
 	}
 
+	b.s.mtr.pop()
 	return nil
 }
 
@@ -141,6 +157,7 @@ func (b *bridge) pairRevision(id ProjectIdentifier, r Revision) []Version {
 		return nil
 	}
 
+	b.s.mtr.push("b-pair-rev")
 	p := []Version{r}
 	// doing it like this is a bit sloppy
 	for _, v2 := range vl {
@@ -151,6 +168,7 @@ func (b *bridge) pairRevision(id ProjectIdentifier, r Revision) []Version {
 		}
 	}
 
+	b.s.mtr.pop()
 	return p
 }
 
@@ -163,6 +181,7 @@ func (b *bridge) matches(id ProjectIdentifier, c Constraint, v Version) bool {
 		return true
 	}
 
+	b.s.mtr.push("b-matches")
 	// This approach is slightly wasteful, but just SO much less verbose, and
 	// more easily understood.
 	vtu := b.vtu(id, v)
@@ -174,6 +193,7 @@ func (b *bridge) matches(id ProjectIdentifier, c Constraint, v Version) bool {
 		uc = c
 	}
 
+	b.s.mtr.pop()
 	return uc.Matches(vtu)
 }
 
@@ -183,6 +203,7 @@ func (b *bridge) matchesAny(id ProjectIdentifier, c1, c2 Constraint) bool {
 		return true
 	}
 
+	b.s.mtr.push("b-matches-any")
 	// This approach is slightly wasteful, but just SO much less verbose, and
 	// more easily understood.
 	var uc1, uc2 Constraint
@@ -198,6 +219,7 @@ func (b *bridge) matchesAny(id ProjectIdentifier, c1, c2 Constraint) bool {
 		uc2 = c2
 	}
 
+	b.s.mtr.pop()
 	return uc1.MatchesAny(uc2)
 }
 
@@ -208,6 +230,7 @@ func (b *bridge) intersect(id ProjectIdentifier, c1, c2 Constraint) Constraint {
 		return rc
 	}
 
+	b.s.mtr.push("b-intersect")
 	// This approach is slightly wasteful, but just SO much less verbose, and
 	// more easily understood.
 	var uc1, uc2 Constraint
@@ -223,6 +246,7 @@ func (b *bridge) intersect(id ProjectIdentifier, c1, c2 Constraint) Constraint {
 		uc2 = c2
 	}
 
+	b.s.mtr.pop()
 	return uc1.Intersect(uc2)
 }
 
@@ -280,7 +304,10 @@ func (b *bridge) verifyRootDir(path string) error {
 }
 
 func (b *bridge) DeduceProjectRoot(ip string) (ProjectRoot, error) {
-	return b.sm.DeduceProjectRoot(ip)
+	b.s.mtr.push("b-deduce-proj-root")
+	pr, e := b.sm.DeduceProjectRoot(ip)
+	b.s.mtr.pop()
+	return pr, e
 }
 
 // breakLock is called when the solver has to break a version recorded in the
@@ -314,6 +341,8 @@ func (b *bridge) breakLock() {
 }
 
 func (b *bridge) SyncSourceFor(id ProjectIdentifier) error {
+	// we don't track metrics here b/c this is often called in its own goroutine
+	// by the solver, and the metrics design is for wall time on a single thread
 	return b.sm.SyncSourceFor(id)
 }
 
