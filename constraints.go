@@ -246,23 +246,22 @@ func (m ProjectConstraints) asSortedSlice() []ProjectConstraint {
 // present in an earlier map, the returned slice will have a duplicate entry,
 // resulting in undefined solver behavior.
 func (m ProjectConstraints) overrideAll(all ...ProjectConstraints) (out []workingConstraint) {
-	var in []ProjectConstraint
 	var plen int
 	switch len(all) {
 	case 0:
 		return
 	case 1:
-		plen := len(all[0])
+		plen = len(all[0])
 	default:
-		for _, pc := range all {
-			plen += len(in)
+		for _, pcm := range all {
+			plen += len(pcm)
 		}
 	}
 
 	out = make([]workingConstraint, plen)
 	k := 0
-	for _, m := range all {
-		for pr, pp := range m {
+	for _, pcm := range all {
+		for pr, pp := range pcm {
 			out[k] = m.override(ProjectConstraint{
 				Ident: ProjectIdentifier{
 					ProjectRoot: pr,
@@ -299,7 +298,6 @@ func (m ProjectConstraints) override(pc ProjectConstraint) workingConstraint {
 			wc.Ident.NetworkName = pp.NetworkName
 			wc.overrNet = true
 		}
-
 	}
 
 	return wc

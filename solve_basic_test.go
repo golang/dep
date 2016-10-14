@@ -433,8 +433,8 @@ func (f basicFixture) solution() map[ProjectIdentifier]LockedProject {
 
 func (f basicFixture) rootmanifest() RootManifest {
 	return simpleRootManifest{
-		c:   f.ds[0].deps,
-		tc:  f.ds[0].devdeps,
+		c:   pcSliceToMap(f.ds[0].deps),
+		tc:  pcSliceToMap(f.ds[0].devdeps),
 		ovr: f.ovr,
 	}
 }
@@ -1568,13 +1568,13 @@ var _ Lock = dummyLock{}
 var _ Lock = fixLock{}
 
 // impl Spec interface
-func (ds depspec) DependencyConstraints() []ProjectConstraint {
-	return ds.deps
+func (ds depspec) DependencyConstraints() ProjectConstraints {
+	return pcSliceToMap(ds.deps)
 }
 
 // impl Spec interface
-func (ds depspec) TestDependencyConstraints() []ProjectConstraint {
-	return ds.devdeps
+func (ds depspec) TestDependencyConstraints() ProjectConstraints {
+	return pcSliceToMap(ds.devdeps)
 }
 
 type fixLock []LockedProject
