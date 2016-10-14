@@ -172,7 +172,7 @@ func TestSourceInit(t *testing.T) {
 	smc := &bridge{
 		sm:     sm,
 		vlists: make(map[ProjectIdentifier][]Version),
-		s:      &solver{},
+		s:      &solver{mtr: newMetrics()},
 	}
 
 	v, err = smc.ListVersions(id)
