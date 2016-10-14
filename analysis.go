@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"go/build"
+	gscan "go/scanner"
 	"io"
 	"io/ioutil"
 	"os"
@@ -165,6 +166,12 @@ func ListPackages(fileRoot, importRoot string) (PackageTree, error) {
 			pkg = happy(ip, p)
 		} else {
 			switch terr := err.(type) {
+			case gscan.ErrorList, *gscan.Error:
+				// This happens if we encounter malformed Go source code
+				ptree.Packages[ip] = PackageOrErr{
+					Err: err,
+				}
+				return nil
 			case *build.NoGoError:
 				ptree.Packages[ip] = PackageOrErr{
 					Err: err,
