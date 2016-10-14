@@ -11,7 +11,7 @@ imports:
   version: 0a2c9fc0eee2c4cbb9526877c4a54da047fdcadd
   vcs: git
 - name: github.com/Masterminds/vcs
-  version: 7a21de0acff824ccf45f633cc844a19625149c2f
+  version: fbe9fb6ad5b5f35b3e82a7c21123cfc526cbf895
   vcs: git
 - name: github.com/termie/go-shutil
   version: bcacb06fecaeec8dc42af03c87c6949f4a05c74c
