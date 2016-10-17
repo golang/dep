@@ -349,13 +349,14 @@ func (bs *baseVCSSource) listPackages(pr ProjectRoot, v Version) (ptree PackageT
 		err = bs.crepo.r.UpdateVersion(v.String())
 	}
 
-	err = unwrapVcsErr(err)
-	if err != nil {
+	if err == nil {
 		ptree, err = ListPackages(bs.crepo.r.LocalPath(), string(pr))
 		// TODO(sdboyer) cache errs?
-		if err != nil {
+		if err == nil {
 			bs.dc.ptrees[r] = ptree
 		}
+	} else {
+		err = unwrapVcsErr(err)
 	}
 	bs.crepo.mut.Unlock()
 
