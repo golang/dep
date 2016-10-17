@@ -96,15 +96,13 @@ func (bs *baseVCSSource) getManifestAndLock(r ProjectRoot, v Version) (Manifest,
 		return pi.Manifest, pi.Lock, nil
 	}
 
-	bs.crepo.mut.Lock()
-	if !bs.crepo.synced {
-		err = bs.crepo.r.Update()
-		if err != nil {
-			return nil, nil, fmt.Errorf("failed fetching latest updates with err: %s", err.Error())
-		}
-		bs.crepo.synced = true
+	// Cache didn't help; ensure our local is fully up to date.
+	err = bs.syncLocal()
+	if err != nil {
+		return nil, nil, err
 	}
 
+	bs.crepo.mut.Lock()
 	// Always prefer a rev, if it's available
 	if pv, ok := v.(PairedVersion); ok {
 		err = bs.crepo.r.UpdateVersion(pv.Underlying().String())
@@ -115,7 +113,7 @@ func (bs *baseVCSSource) getManifestAndLock(r ProjectRoot, v Version) (Manifest,
 
 	if err != nil {
 		// TODO(sdboyer) More-er proper-er error
-		panic(fmt.Sprintf("canary - why is checkout/whatever failing: %s %s %s", bs.crepo.r.LocalPath(), v.String(), err))
+		panic(fmt.Sprintf("canary - why is checkout/whatever failing: %s %s %s", bs.crepo.r.LocalPath(), v.String(), unwrapVcsErr(err)))
 	}
 
 	bs.crepo.mut.RLock()
@@ -139,7 +137,7 @@ func (bs *baseVCSSource) getManifestAndLock(r ProjectRoot, v Version) (Manifest,
 		return pi.Manifest, pi.Lock, nil
 	}
 
-	return nil, nil, err
+	return nil, nil, unwrapVcsErr(err)
 }
 
 // toRevision turns a Version into a Revision, if doing so is possible based on
@@ -212,15 +210,27 @@ func (bs *baseVCSSource) ensureCacheExistence() error {
 	if !bs.checkExistence(existsInCache) {
 		if bs.checkExistence(existsUpstream) {
 			bs.crepo.mut.Lock()
+			if bs.crepo.synced {
+				// A second ensure call coming in while the first is completing
+				// isn't terribly unlikely, especially for a large repo. In that
+				// event, the synced flag will have flipped on by the time we
+				// acquire the lock. If it has, there's no need to do this work
+				// twice.
+				bs.crepo.mut.Unlock()
+				return nil
+			}
+
 			err := bs.crepo.r.Get()
-			bs.crepo.mut.Unlock()
 
 			if err != nil {
-				return fmt.Errorf("failed to create repository cache for %s with err:\n%s", bs.crepo.r.Remote(), err)
+				bs.crepo.mut.Unlock()
+				return fmt.Errorf("failed to create repository cache for %s with err:\n%s", bs.crepo.r.Remote(), unwrapVcsErr(err))
 			}
+
 			bs.crepo.synced = true
 			bs.ex.s |= existsInCache
 			bs.ex.f |= existsInCache
+			bs.crepo.mut.Unlock()
 		} else {
 			return fmt.Errorf("project %s does not exist upstream", bs.crepo.r.Remote())
 		}
@@ -290,11 +300,14 @@ func (bs *baseVCSSource) syncLocal() error {
 	// This case is really just for git repos, where the lvfunc doesn't
 	// guarantee that the local repo is synced
 	if !bs.crepo.synced {
-		bs.syncerr = bs.crepo.r.Update()
+		bs.crepo.mut.Lock()
+		bs.syncerr = fmt.Errorf("failed fetching latest updates with err: %s", unwrapVcsErr(bs.crepo.r.Update()))
 		if bs.syncerr != nil {
+			bs.crepo.mut.Unlock()
 			return bs.syncerr
 		}
 		bs.crepo.synced = true
+		bs.crepo.mut.Unlock()
 	}
 
 	return nil
@@ -328,20 +341,23 @@ func (bs *baseVCSSource) listPackages(pr ProjectRoot, v Version) (ptree PackageT
 		if !bs.crepo.synced {
 			err = bs.crepo.r.Update()
 			if err != nil {
-				return PackageTree{}, fmt.Errorf("could not fetch latest updates into repository: %s", err)
+				err = fmt.Errorf("could not fetch latest updates into repository: %s", unwrapVcsErr(err))
+				return
 			}
 			bs.crepo.synced = true
 		}
 		err = bs.crepo.r.UpdateVersion(v.String())
 	}
 
-	ptree, err = ListPackages(bs.crepo.r.LocalPath(), string(pr))
-	bs.crepo.mut.Unlock()
-
-	// TODO(sdboyer) cache errs?
+	err = unwrapVcsErr(err)
 	if err != nil {
-		bs.dc.ptrees[r] = ptree
+		ptree, err = ListPackages(bs.crepo.r.LocalPath(), string(pr))
+		// TODO(sdboyer) cache errs?
+		if err != nil {
+			bs.dc.ptrees[r] = ptree
+		}
 	}
+	bs.crepo.mut.Unlock()
 
 	return
 }

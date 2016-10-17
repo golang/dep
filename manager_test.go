@@ -504,7 +504,7 @@ func TestMultiDeduceThreadsafe(t *testing.T) {
 	defer clean()
 
 	in := "github.com/sdboyer/gps"
-	rootf, srcf, err := sm.deducePathAndProcess(in)
+	ft, err := sm.deducePathAndProcess(in)
 	if err != nil {
 		t.Errorf("Known-good path %q had unexpected basic deduction error: %s", in, err)
 		t.FailNow()
@@ -523,7 +523,7 @@ func TestMultiDeduceThreadsafe(t *testing.T) {
 			}
 		}()
 		<-c
-		_, err := rootf()
+		_, err := ft.rootf()
 		if err != nil {
 			t.Errorf("err was non-nil on root detection in goroutine number %v: %s", rnum, err)
 		}
@@ -551,7 +551,7 @@ func TestMultiDeduceThreadsafe(t *testing.T) {
 			}
 		}()
 		<-c
-		_, _, err := srcf()
+		_, _, err := ft.srcf()
 		if err != nil {
 			t.Errorf("err was non-nil on root detection in goroutine number %v: %s", rnum, err)
 		}
@@ -567,4 +567,78 @@ func TestMultiDeduceThreadsafe(t *testing.T) {
 	if len(sm.srcs) != 2 {
 		t.Errorf("Sources map should have just two elements, but has %v", len(sm.srcs))
 	}
+}
+
+func TestMultiFetchThreadsafe(t *testing.T) {
+	// This test is quite slow, skip it on -short
+	if testing.Short() {
+		t.Skip("Skipping slow test in short mode")
+	}
+
+	sm, clean := mkNaiveSM(t)
+	defer clean()
+
+	projects := []ProjectIdentifier{
+		mkPI("github.com/sdboyer/gps"),
+		mkPI("github.com/sdboyer/gpkt"),
+		mkPI("github.com/sdboyer/gogl"),
+		mkPI("github.com/sdboyer/gliph"),
+		mkPI("github.com/sdboyer/frozone"),
+		mkPI("gopkg.in/sdboyer/gpkt.v1"),
+		mkPI("gopkg.in/sdboyer/gpkt.v2"),
+		mkPI("github.com/Masterminds/VCSTestRepo"),
+		mkPI("github.com/go-yaml/yaml"),
+		mkPI("github.com/Sirupsen/logrus"),
+		mkPI("github.com/Masterminds/semver"),
+		mkPI("github.com/Masterminds/vcs"),
+		//mkPI("bitbucket.org/sdboyer/withbm"),
+		//mkPI("bitbucket.org/sdboyer/nobm"),
+	}
+
+	// 40 gives us ten calls per op, per project, which is decently likely to
+	// reveal any underlying parallelism problems
+	cnum := len(projects) * 40
+	wg := &sync.WaitGroup{}
+
+	for i := 0; i < cnum; i++ {
+		wg.Add(1)
+
+		go func(id ProjectIdentifier, pass int) {
+			switch pass {
+			case 0:
+				t.Logf("Deducing root for %s", id.errString())
+				_, err := sm.DeduceProjectRoot(string(id.ProjectRoot))
+				if err != nil {
+					t.Errorf("err on deducing project root for %s: %s", id.errString(), err.Error())
+				}
+			case 1:
+				t.Logf("syncing %s", id)
+				err := sm.SyncSourceFor(id)
+				if err != nil {
+					t.Errorf("syncing failed for %s with err %s", id.errString(), err.Error())
+				}
+			case 2:
+				t.Logf("listing versions for %s", id)
+				_, err := sm.ListVersions(id)
+				if err != nil {
+					t.Errorf("listing versions failed for %s with err %s", id.errString(), err.Error())
+				}
+			case 3:
+				t.Logf("Checking source existence for %s", id)
+				y, err := sm.SourceExists(id)
+				if err != nil {
+					t.Errorf("err on checking source existence for %s: %s", id.errString(), err.Error())
+				}
+				if !y {
+					t.Errorf("claims %s source does not exist", id.errString())
+				}
+			default:
+				panic(fmt.Sprintf("wtf, %s %v", id, pass))
+			}
+			wg.Done()
+		}(projects[i%len(projects)], (i/len(projects))%4)
+
+		runtime.Gosched()
+	}
+	wg.Wait()
 }
