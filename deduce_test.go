@@ -585,13 +585,13 @@ func TestVanityDeduction(t *testing.T) {
 				t.Errorf("(in: %s) Deducer did not return expected root:\n\t(GOT) %s\n\t(WNT) %s", fix.in, pr, fix.root)
 			}
 
-			_, srcf, err := sm.deducePathAndProcess(fix.in)
+			ft, err := sm.deducePathAndProcess(fix.in)
 			if err != nil {
 				t.Errorf("(in: %s) Unexpected err on deducing source: %s", fix.in, err)
 				return
 			}
 
-			_, ident, err := srcf()
+			_, ident, err := ft.srcf()
 			if err != nil {
 				t.Errorf("(in: %s) Unexpected err on executing source future: %s", fix.in, err)
 				return
