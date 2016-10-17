@@ -93,10 +93,9 @@ type SourceMgr struct {
 }
 
 type futTracker struct {
-	sstart, rstart int32
-	rc, sc         chan struct{}
-	rootf          stringFuture
-	srcf           sourceFuture
+	rc, sc chan struct{}
+	rootf  stringFuture
+	srcf   sourceFuture
 }
 
 var _ SourceManager = &SourceMgr{}
