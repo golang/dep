@@ -301,8 +301,9 @@ func (bs *baseVCSSource) syncLocal() error {
 	// guarantee that the local repo is synced
 	if !bs.crepo.synced {
 		bs.crepo.mut.Lock()
-		bs.syncerr = fmt.Errorf("failed fetching latest updates with err: %s", unwrapVcsErr(bs.crepo.r.Update()))
-		if bs.syncerr != nil {
+		err := bs.crepo.r.Update()
+		if err != nil {
+			bs.syncerr = fmt.Errorf("failed fetching latest updates with err: %s", unwrapVcsErr(err))
 			bs.crepo.mut.Unlock()
 			return bs.syncerr
 		}
