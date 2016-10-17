@@ -85,14 +85,14 @@ type SourceMgr struct {
 	lf       *os.File
 	srcs     map[string]source
 	srcmut   sync.RWMutex
-	srcfuts  map[string]*futTracker
+	srcfuts  map[string]*unifiedFuture
 	srcfmut  sync.RWMutex
 	an       ProjectAnalyzer
 	dxt      deducerTrie
 	rootxt   prTrie
 }
 
-type futTracker struct {
+type unifiedFuture struct {
 	rc, sc chan struct{}
 	rootf  stringFuture
 	srcf   sourceFuture
@@ -145,7 +145,7 @@ func NewSourceManager(an ProjectAnalyzer, cachedir string) (*SourceMgr, error) {
 		cachedir: cachedir,
 		lf:       fi,
 		srcs:     make(map[string]source),
-		srcfuts:  make(map[string]*futTracker),
+		srcfuts:  make(map[string]*unifiedFuture),
 		an:       an,
 		dxt:      pathDeducerTrie(),
 		rootxt:   newProjectRootTrie(),
@@ -323,7 +323,7 @@ func (sm *SourceMgr) getSourceFor(id ProjectIdentifier) (source, error) {
 	return src, err
 }
 
-func (sm *SourceMgr) deducePathAndProcess(path string) (*futTracker, error) {
+func (sm *SourceMgr) deducePathAndProcess(path string) (*unifiedFuture, error) {
 	// Check for an already-existing future in the map first
 	sm.srcfmut.RLock()
 	ft, exists := sm.srcfuts[path]
@@ -347,7 +347,7 @@ func (sm *SourceMgr) deducePathAndProcess(path string) (*futTracker, error) {
 		return ft, nil
 	}
 
-	ft = &futTracker{
+	ft = &unifiedFuture{
 		rc: make(chan struct{}, 1),
 		sc: make(chan struct{}, 1),
 	}

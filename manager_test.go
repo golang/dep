@@ -494,11 +494,12 @@ func TestDeduceProjectRoot(t *testing.T) {
 	}
 }
 
-// Test that the future returned from SourceMgr.deducePathAndProcess() is safe
-// to call concurrently.
+// Test that the deduction performed in SourceMgr.deducePathAndProcess() is safe
+// for parallel execution - in particular, that parallel calls to the same
+// resource fold in together as expected.
 //
-// Obviously, this is just a heuristic; passage does not guarantee correctness
-// (though failure does guarantee incorrectness)
+// Obviously, this is just a heuristic; while failure means something's
+// definitely broken, success does not guarantee correctness.
 func TestMultiDeduceThreadsafe(t *testing.T) {
 	sm, clean := mkNaiveSM(t)
 	defer clean()
