@@ -9,6 +9,13 @@ import (
 	"github.com/Masterminds/vcs"
 )
 
+// A maybeSource represents a set of information that, given some
+// typically-expensive network effort, could be transformed into a proper source.
+//
+// Wrapping these up as their own type kills two birds with one stone:
+//
+// * Allows control over when deduction logic triggers network activity
+// * Makes it easy to attempt multiple URLs for a given import path
 type maybeSource interface {
 	try(cachedir string, an ProjectAnalyzer) (source, string, error)
 }
@@ -72,6 +79,53 @@ func (m maybeGitSource) try(cachedir string, an ProjectAnalyzer) (source, string
 				rpath: path,
 			},
 		},
+	}
+
+	src.baseVCSSource.lvfunc = src.listVersions
+
+	_, err = src.listVersions()
+	if err != nil {
+		return nil, "", err
+	}
+
+	return src, ustr, nil
+}
+
+type maybeGopkginSource struct {
+	// the original gopkg.in import path. this is used to create the on-disk
+	// location to avoid duplicate resource management - e.g., if instances of
+	// a gopkg.in project are accessed via different schemes, or if the
+	// underlying github repository is accessed directly.
+	opath string
+	// the actual upstream URL - always github
+	url *url.URL
+	// the major version to apply for filtering
+	major int64
+}
+
+func (m maybeGopkginSource) try(cachedir string, an ProjectAnalyzer) (source, string, error) {
+	// We don't actually need a fully consistent transform into the on-disk path
+	// - just something that's unique to the particular gopkg.in domain context.
+	// So, it's OK to just dumb-join the scheme with the path.
+	path := filepath.Join(cachedir, "sources", sanitizer.Replace(m.url.Scheme+"/"+m.opath))
+	ustr := m.url.String()
+	r, err := vcs.NewGitRepo(ustr, path)
+	if err != nil {
+		return nil, "", err
+	}
+
+	src := &gopkginSource{
+		gitSource: gitSource{
+			baseVCSSource: baseVCSSource{
+				an: an,
+				dc: newMetaCache(),
+				crepo: &repo{
+					r:     r,
+					rpath: path,
+				},
+			},
+		},
+		major: m.major,
 	}
 
 	src.baseVCSSource.lvfunc = src.listVersions
