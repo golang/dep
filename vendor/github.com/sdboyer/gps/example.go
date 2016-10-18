@@ -22,10 +22,9 @@ import (
 //  This will compile and work...and then blow away any vendor directory present
 //  in the cwd. Be careful!
 func main() {
-	// Operate on the current directory
+	// Assume the current directory is correctly placed on a GOPATH, and that it's the
+	// root of the project.
 	root, _ := os.Getwd()
-	// Assume the current directory is correctly placed on a GOPATH, and derive
-	// the ProjectRoot from it
 	srcprefix := filepath.Join(build.Default.GOPATH, "src") + string(filepath.Separator)
 	importroot := filepath.ToSlash(strings.TrimPrefix(root, srcprefix))
 
@@ -35,9 +34,10 @@ func main() {
 		Trace:       true,
 		TraceLogger: log.New(os.Stdout, "", 0),
 	}
+	// Perform static analysis on the current project to find all of its imports.
 	params.RootPackageTree, _ = gps.ListPackages(root, importroot)
 
-	// Set up a SourceManager with the NaiveAnalyzer
+	// Set up a SourceManager. This manages interaction with sources (repositories).
 	sourcemgr, _ := gps.NewSourceManager(NaiveAnalyzer{}, ".repocache")
 	defer sourcemgr.Release()
 
@@ -54,14 +54,16 @@ func main() {
 
 type NaiveAnalyzer struct{}
 
-// DeriveManifestAndLock gets called when the solver needs manifest/lock data
-// for a particular project (the gps.ProjectRoot parameter) at a particular
-// version. That version will be checked out in a directory rooted at path.
+// DeriveManifestAndLock is called when the solver needs manifest/lock data
+// for a particular dependency project (identified by the gps.ProjectRoot
+// parameter) at a particular version. That version will be checked out in a
+// directory rooted at path.
 func (a NaiveAnalyzer) DeriveManifestAndLock(path string, n gps.ProjectRoot) (gps.Manifest, gps.Lock, error) {
 	return nil, nil, nil
 }
 
-// Reports the name and version of the analyzer. This is mostly irrelevant.
+// Reports the name and version of the analyzer. This is used internally as part
+// of gps' hashing memoization scheme.
 func (a NaiveAnalyzer) Info() (name string, version *semver.Version) {
 	v, _ := semver.NewVersion("v0.0.1")
 	return "example-analyzer", v

@@ -70,7 +70,11 @@ func (b *bridge) GetManifestAndLock(id ProjectIdentifier, v Version) (Manifest, 
 	if id.ProjectRoot == ProjectRoot(b.s.rpt.ImportRoot) {
 		return b.s.rm, b.s.rl, nil
 	}
-	return b.sm.GetManifestAndLock(id, v)
+
+	b.s.mtr.push("b-gmal")
+	m, l, e := b.sm.GetManifestAndLock(id, v)
+	b.s.mtr.pop()
+	return m, l, e
 }
 
 func (b *bridge) AnalyzerInfo() (string, *semver.Version) {
@@ -82,9 +86,11 @@ func (b *bridge) ListVersions(id ProjectIdentifier) ([]Version, error) {
 		return vl, nil
 	}
 
+	b.s.mtr.push("b-list-versions")
 	vl, err := b.sm.ListVersions(id)
 	// TODO(sdboyer) cache errors, too?
 	if err != nil {
+		b.s.mtr.pop()
 		return nil, err
 	}
 
@@ -95,15 +101,22 @@ func (b *bridge) ListVersions(id ProjectIdentifier) ([]Version, error) {
 	}
 
 	b.vlists[id] = vl
+	b.s.mtr.pop()
 	return vl, nil
 }
 
 func (b *bridge) RevisionPresentIn(id ProjectIdentifier, r Revision) (bool, error) {
-	return b.sm.RevisionPresentIn(id, r)
+	b.s.mtr.push("b-rev-present-in")
+	i, e := b.sm.RevisionPresentIn(id, r)
+	b.s.mtr.pop()
+	return i, e
 }
 
 func (b *bridge) SourceExists(id ProjectIdentifier) (bool, error) {
-	return b.sm.SourceExists(id)
+	b.s.mtr.push("b-source-exists")
+	i, e := b.sm.SourceExists(id)
+	b.s.mtr.pop()
+	return i, e
 }
 
 func (b *bridge) vendorCodeExists(id ProjectIdentifier) (bool, error) {
@@ -123,15 +136,18 @@ func (b *bridge) pairVersion(id ProjectIdentifier, v UnpairedVersion) PairedVers
 		return nil
 	}
 
+	b.s.mtr.push("b-pair-version")
 	// doing it like this is a bit sloppy
 	for _, v2 := range vl {
 		if p, ok := v2.(PairedVersion); ok {
 			if p.Matches(v) {
+				b.s.mtr.pop()
 				return p
 			}
 		}
 	}
 
+	b.s.mtr.pop()
 	return nil
 }
 
@@ -141,6 +157,7 @@ func (b *bridge) pairRevision(id ProjectIdentifier, r Revision) []Version {
 		return nil
 	}
 
+	b.s.mtr.push("b-pair-rev")
 	p := []Version{r}
 	// doing it like this is a bit sloppy
 	for _, v2 := range vl {
@@ -151,6 +168,7 @@ func (b *bridge) pairRevision(id ProjectIdentifier, r Revision) []Version {
 		}
 	}
 
+	b.s.mtr.pop()
 	return p
 }
 
@@ -158,112 +176,25 @@ func (b *bridge) pairRevision(id ProjectIdentifier, r Revision) []Version {
 // constraint. If that basic check fails and the provided version is incomplete
 // (e.g. an unpaired version or bare revision), it will attempt to gather more
 // information on one or the other and re-perform the comparison.
-func (b *bridge) matches(id ProjectIdentifier, c2 Constraint, v Version) bool {
-	if c2.Matches(v) {
+func (b *bridge) matches(id ProjectIdentifier, c Constraint, v Version) bool {
+	if c.Matches(v) {
 		return true
 	}
 
-	// There's a wide field of possible ways that pairing might result in a
-	// match. For each possible type of version, start by carving out all the
-	// cases where the constraint would have provided an authoritative match
-	// result.
-	switch tv := v.(type) {
-	case PairedVersion:
-		switch tc := c2.(type) {
-		case PairedVersion, Revision, noneConstraint:
-			// These three would all have been authoritative matches
-			return false
-		case UnpairedVersion:
-			// Only way paired and unpaired could match is if they share an
-			// underlying rev
-			pv := b.pairVersion(id, tc)
-			if pv == nil {
-				return false
-			}
-			return pv.Matches(v)
-		case semverConstraint:
-			// Have to check all the possible versions for that rev to see if
-			// any match the semver constraint
-			for _, pv := range b.pairRevision(id, tv.Underlying()) {
-				if tc.Matches(pv) {
-					return true
-				}
-			}
-			return false
-		}
+	b.s.mtr.push("b-matches")
+	// This approach is slightly wasteful, but just SO much less verbose, and
+	// more easily understood.
+	vtu := b.vtu(id, v)
 
-	case Revision:
-		switch tc := c2.(type) {
-		case PairedVersion, Revision, noneConstraint:
-			// These three would all have been authoritative matches
-			return false
-		case UnpairedVersion:
-			// Only way paired and unpaired could match is if they share an
-			// underlying rev
-			pv := b.pairVersion(id, tc)
-			if pv == nil {
-				return false
-			}
-			return pv.Matches(v)
-		case semverConstraint:
-			// Have to check all the possible versions for the rev to see if
-			// any match the semver constraint
-			for _, pv := range b.pairRevision(id, tv) {
-				if tc.Matches(pv) {
-					return true
-				}
-			}
-			return false
-		}
-
-	// UnpairedVersion as input has the most weird cases. It's also the one
-	// we'll probably see the least
-	case UnpairedVersion:
-		switch tc := c2.(type) {
-		case noneConstraint:
-			// obviously
-			return false
-		case Revision, PairedVersion:
-			// Easy case for both - just pair the uv and see if it matches the revision
-			// constraint
-			pv := b.pairVersion(id, tv)
-			if pv == nil {
-				return false
-			}
-			return tc.Matches(pv)
-		case UnpairedVersion:
-			// Both are unpaired versions. See if they share an underlying rev.
-			pv := b.pairVersion(id, tv)
-			if pv == nil {
-				return false
-			}
-
-			pc := b.pairVersion(id, tc)
-			if pc == nil {
-				return false
-			}
-			return pc.Matches(pv)
-
-		case semverConstraint:
-			// semverConstraint can't ever match a rev, but we do need to check
-			// if any other versions corresponding to this rev work.
-			pv := b.pairVersion(id, tv)
-			if pv == nil {
-				return false
-			}
-
-			for _, ttv := range b.pairRevision(id, pv.Underlying()) {
-				if c2.Matches(ttv) {
-					return true
-				}
-			}
-			return false
-		}
-	default:
-		panic("unreachable")
+	var uc Constraint
+	if cv, ok := c.(Version); ok {
+		uc = b.vtu(id, cv)
+	} else {
+		uc = c
 	}
 
-	return false
+	b.s.mtr.pop()
+	return uc.Matches(vtu)
 }
 
 // matchesAny is the authoritative version of Constraint.MatchesAny.
@@ -272,6 +203,7 @@ func (b *bridge) matchesAny(id ProjectIdentifier, c1, c2 Constraint) bool {
 		return true
 	}
 
+	b.s.mtr.push("b-matches-any")
 	// This approach is slightly wasteful, but just SO much less verbose, and
 	// more easily understood.
 	var uc1, uc2 Constraint
@@ -287,6 +219,7 @@ func (b *bridge) matchesAny(id ProjectIdentifier, c1, c2 Constraint) bool {
 		uc2 = c2
 	}
 
+	b.s.mtr.pop()
 	return uc1.MatchesAny(uc2)
 }
 
@@ -297,6 +230,7 @@ func (b *bridge) intersect(id ProjectIdentifier, c1, c2 Constraint) Constraint {
 		return rc
 	}
 
+	b.s.mtr.push("b-intersect")
 	// This approach is slightly wasteful, but just SO much less verbose, and
 	// more easily understood.
 	var uc1, uc2 Constraint
@@ -312,6 +246,7 @@ func (b *bridge) intersect(id ProjectIdentifier, c1, c2 Constraint) Constraint {
 		uc2 = c2
 	}
 
+	b.s.mtr.pop()
 	return uc1.Intersect(uc2)
 }
 
@@ -348,11 +283,13 @@ func (b *bridge) ListPackages(id ProjectIdentifier, v Version) (PackageTree, err
 		panic("should never call ListPackages on root project")
 	}
 
-	return b.sm.ListPackages(id, v)
+	b.s.mtr.push("b-list-pkgs")
+	pt, err := b.sm.ListPackages(id, v)
+	b.s.mtr.pop()
+	return pt, err
 }
 
 func (b *bridge) ExportProject(id ProjectIdentifier, v Version, path string) error {
-	//return b.sm.ExportProject(id, v, path)
 	panic("bridge should never be used to ExportProject")
 }
 
@@ -370,11 +307,14 @@ func (b *bridge) verifyRootDir(path string) error {
 }
 
 func (b *bridge) DeduceProjectRoot(ip string) (ProjectRoot, error) {
-	return b.sm.DeduceProjectRoot(ip)
+	b.s.mtr.push("b-deduce-proj-root")
+	pr, e := b.sm.DeduceProjectRoot(ip)
+	b.s.mtr.pop()
+	return pr, e
 }
 
 // breakLock is called when the solver has to break a version recorded in the
-// lock file. It prefetches all the projects in the solver's lock , so that the
+// lock file. It prefetches all the projects in the solver's lock, so that the
 // information is already on hand if/when the solver needs it.
 //
 // Projects that have already been selected are skipped, as it's generally unlikely that the
@@ -389,9 +329,6 @@ func (b *bridge) breakLock() {
 
 	for _, lp := range b.s.rl.Projects() {
 		if _, is := b.s.sel.selected(lp.pi); !is {
-			// ListPackages guarantees that all the necessary network work will
-			// be done, so go with that
-			//
 			// TODO(sdboyer) use this as an opportunity to detect
 			// inconsistencies between upstream and the lock (e.g., moved tags)?
 			pi, v := lp.pi, lp.Version()
@@ -407,6 +344,8 @@ func (b *bridge) breakLock() {
 }
 
 func (b *bridge) SyncSourceFor(id ProjectIdentifier) error {
+	// we don't track metrics here b/c this is often called in its own goroutine
+	// by the solver, and the metrics design is for wall time on a single thread
 	return b.sm.SyncSourceFor(id)
 }
 
@@ -431,14 +370,14 @@ type versionTypeUnion []Version
 // This should generally not be called, but is required for the interface. If it
 // is called, we have a bigger problem (the type has escaped the solver); thus,
 // panic.
-func (av versionTypeUnion) String() string {
+func (vtu versionTypeUnion) String() string {
 	panic("versionTypeUnion should never be turned into a string; it is solver internal-only")
 }
 
 // This should generally not be called, but is required for the interface. If it
 // is called, we have a bigger problem (the type has escaped the solver); thus,
 // panic.
-func (av versionTypeUnion) Type() string {
+func (vtu versionTypeUnion) Type() string {
 	panic("versionTypeUnion should never need to answer a Type() call; it is solver internal-only")
 }
 
@@ -446,12 +385,12 @@ func (av versionTypeUnion) Type() string {
 // contained in the union.
 //
 // This DOES allow tags to match branches, albeit indirectly through a revision.
-func (av versionTypeUnion) Matches(v Version) bool {
-	av2, oav := v.(versionTypeUnion)
+func (vtu versionTypeUnion) Matches(v Version) bool {
+	vtu2, otherIs := v.(versionTypeUnion)
 
-	for _, v1 := range av {
-		if oav {
-			for _, v2 := range av2 {
+	for _, v1 := range vtu {
+		if otherIs {
+			for _, v2 := range vtu2 {
 				if v1.Matches(v2) {
 					return true
 				}
@@ -467,12 +406,12 @@ func (av versionTypeUnion) Matches(v Version) bool {
 // MatchesAny returns true if any of the contained versions (which are also
 // constraints) in the union successfully MatchAny with the provided
 // constraint.
-func (av versionTypeUnion) MatchesAny(c Constraint) bool {
-	av2, oav := c.(versionTypeUnion)
+func (vtu versionTypeUnion) MatchesAny(c Constraint) bool {
+	vtu2, otherIs := c.(versionTypeUnion)
 
-	for _, v1 := range av {
-		if oav {
-			for _, v2 := range av2 {
+	for _, v1 := range vtu {
+		if otherIs {
+			for _, v2 := range vtu2 {
 				if v1.MatchesAny(v2) {
 					return true
 				}
@@ -492,12 +431,12 @@ func (av versionTypeUnion) MatchesAny(c Constraint) bool {
 // In order to avoid weird version floating elsewhere in the solver, the union
 // always returns the input constraint. (This is probably obviously correct, but
 // is still worth noting.)
-func (av versionTypeUnion) Intersect(c Constraint) Constraint {
-	av2, oav := c.(versionTypeUnion)
+func (vtu versionTypeUnion) Intersect(c Constraint) Constraint {
+	vtu2, otherIs := c.(versionTypeUnion)
 
-	for _, v1 := range av {
-		if oav {
-			for _, v2 := range av2 {
+	for _, v1 := range vtu {
+		if otherIs {
+			for _, v2 := range vtu2 {
 				if rc := v1.Intersect(v2); rc != none {
 					return rc
 				}
@@ -510,4 +449,4 @@ func (av versionTypeUnion) Intersect(c Constraint) Constraint {
 	return none
 }
 
-func (av versionTypeUnion) _private() {}
+func (vtu versionTypeUnion) _private() {}

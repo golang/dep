@@ -111,60 +111,60 @@ var pathDeductionFixtures = map[string][]pathDeductionFixture{
 			in:   "gopkg.in/sdboyer/gps.v0",
 			root: "gopkg.in/sdboyer/gps.v0",
 			mb: maybeSources{
-				maybeGitSource{url: mkurl("https://github.com/sdboyer/gps")},
-				maybeGitSource{url: mkurl("ssh://git@github.com/sdboyer/gps")},
-				maybeGitSource{url: mkurl("git://github.com/sdboyer/gps")},
-				maybeGitSource{url: mkurl("http://github.com/sdboyer/gps")},
+				maybeGopkginSource{opath: "gopkg.in/sdboyer/gps.v0", url: mkurl("https://github.com/sdboyer/gps"), major: 0},
+				maybeGopkginSource{opath: "gopkg.in/sdboyer/gps.v0", url: mkurl("ssh://git@github.com/sdboyer/gps"), major: 0},
+				maybeGopkginSource{opath: "gopkg.in/sdboyer/gps.v0", url: mkurl("git://github.com/sdboyer/gps"), major: 0},
+				maybeGopkginSource{opath: "gopkg.in/sdboyer/gps.v0", url: mkurl("http://github.com/sdboyer/gps"), major: 0},
 			},
 		},
 		{
 			in:   "gopkg.in/sdboyer/gps.v0/foo",
 			root: "gopkg.in/sdboyer/gps.v0",
 			mb: maybeSources{
-				maybeGitSource{url: mkurl("https://github.com/sdboyer/gps")},
-				maybeGitSource{url: mkurl("ssh://git@github.com/sdboyer/gps")},
-				maybeGitSource{url: mkurl("git://github.com/sdboyer/gps")},
-				maybeGitSource{url: mkurl("http://github.com/sdboyer/gps")},
+				maybeGopkginSource{opath: "gopkg.in/sdboyer/gps.v0", url: mkurl("https://github.com/sdboyer/gps"), major: 0},
+				maybeGopkginSource{opath: "gopkg.in/sdboyer/gps.v0", url: mkurl("ssh://git@github.com/sdboyer/gps"), major: 0},
+				maybeGopkginSource{opath: "gopkg.in/sdboyer/gps.v0", url: mkurl("git://github.com/sdboyer/gps"), major: 0},
+				maybeGopkginSource{opath: "gopkg.in/sdboyer/gps.v0", url: mkurl("http://github.com/sdboyer/gps"), major: 0},
 			},
 		},
 		{
 			in:   "gopkg.in/sdboyer/gps.v1/foo/bar",
 			root: "gopkg.in/sdboyer/gps.v1",
 			mb: maybeSources{
-				maybeGitSource{url: mkurl("https://github.com/sdboyer/gps")},
-				maybeGitSource{url: mkurl("ssh://git@github.com/sdboyer/gps")},
-				maybeGitSource{url: mkurl("git://github.com/sdboyer/gps")},
-				maybeGitSource{url: mkurl("http://github.com/sdboyer/gps")},
+				maybeGopkginSource{opath: "gopkg.in/sdboyer/gps.v1", url: mkurl("https://github.com/sdboyer/gps"), major: 1},
+				maybeGopkginSource{opath: "gopkg.in/sdboyer/gps.v1", url: mkurl("ssh://git@github.com/sdboyer/gps"), major: 1},
+				maybeGopkginSource{opath: "gopkg.in/sdboyer/gps.v1", url: mkurl("git://github.com/sdboyer/gps"), major: 1},
+				maybeGopkginSource{opath: "gopkg.in/sdboyer/gps.v1", url: mkurl("http://github.com/sdboyer/gps"), major: 1},
 			},
 		},
 		{
 			in:   "gopkg.in/yaml.v1",
 			root: "gopkg.in/yaml.v1",
 			mb: maybeSources{
-				maybeGitSource{url: mkurl("https://github.com/go-yaml/yaml")},
-				maybeGitSource{url: mkurl("ssh://git@github.com/go-yaml/yaml")},
-				maybeGitSource{url: mkurl("git://github.com/go-yaml/yaml")},
-				maybeGitSource{url: mkurl("http://github.com/go-yaml/yaml")},
+				maybeGopkginSource{opath: "gopkg.in/yaml.v1", url: mkurl("https://github.com/go-yaml/yaml"), major: 1},
+				maybeGopkginSource{opath: "gopkg.in/yaml.v1", url: mkurl("ssh://git@github.com/go-yaml/yaml"), major: 1},
+				maybeGopkginSource{opath: "gopkg.in/yaml.v1", url: mkurl("git://github.com/go-yaml/yaml"), major: 1},
+				maybeGopkginSource{opath: "gopkg.in/yaml.v1", url: mkurl("http://github.com/go-yaml/yaml"), major: 1},
 			},
 		},
 		{
 			in:   "gopkg.in/yaml.v1/foo/bar",
 			root: "gopkg.in/yaml.v1",
 			mb: maybeSources{
-				maybeGitSource{url: mkurl("https://github.com/go-yaml/yaml")},
-				maybeGitSource{url: mkurl("ssh://git@github.com/go-yaml/yaml")},
-				maybeGitSource{url: mkurl("git://github.com/go-yaml/yaml")},
-				maybeGitSource{url: mkurl("http://github.com/go-yaml/yaml")},
+				maybeGopkginSource{opath: "gopkg.in/yaml.v1", url: mkurl("https://github.com/go-yaml/yaml"), major: 1},
+				maybeGopkginSource{opath: "gopkg.in/yaml.v1", url: mkurl("ssh://git@github.com/go-yaml/yaml"), major: 1},
+				maybeGopkginSource{opath: "gopkg.in/yaml.v1", url: mkurl("git://github.com/go-yaml/yaml"), major: 1},
+				maybeGopkginSource{opath: "gopkg.in/yaml.v1", url: mkurl("http://github.com/go-yaml/yaml"), major: 1},
 			},
 		},
 		{
 			in:   "gopkg.in/inf.v0",
 			root: "gopkg.in/inf.v0",
 			mb: maybeSources{
-				maybeGitSource{url: mkurl("https://github.com/go-inf/inf")},
-				maybeGitSource{url: mkurl("ssh://git@github.com/go-inf/inf")},
-				maybeGitSource{url: mkurl("git://github.com/go-inf/inf")},
-				maybeGitSource{url: mkurl("http://github.com/go-inf/inf")},
+				maybeGopkginSource{opath: "gopkg.in/inf.v0", url: mkurl("https://github.com/go-inf/inf"), major: 0},
+				maybeGopkginSource{opath: "gopkg.in/inf.v0", url: mkurl("ssh://git@github.com/go-inf/inf"), major: 0},
+				maybeGopkginSource{opath: "gopkg.in/inf.v0", url: mkurl("git://github.com/go-inf/inf"), major: 0},
+				maybeGopkginSource{opath: "gopkg.in/inf.v0", url: mkurl("http://github.com/go-inf/inf"), major: 0},
 			},
 		},
 		{
@@ -456,11 +456,12 @@ var pathDeductionFixtures = map[string][]pathDeductionFixture{
 			root: "golang.org/x/exp",
 			mb:   maybeGitSource{url: mkurl("https://go.googlesource.com/exp")},
 		},
-		{
-			in:   "rsc.io/pdf",
-			root: "rsc.io/pdf",
-			mb:   maybeGitSource{url: mkurl("https://github.com/rsc/pdf")},
-		},
+		// rsc.io appears to have broken
+		//{
+		//in:   "rsc.io/pdf",
+		//root: "rsc.io/pdf",
+		//mb:   maybeGitSource{url: mkurl("https://github.com/rsc/pdf")},
+		//},
 	},
 }
 
@@ -505,6 +506,8 @@ func TestDeduceFromPath(t *testing.T) {
 				return fmt.Sprintf("%T: %s", tmb, ufmt(tmb.url))
 			case maybeHgSource:
 				return fmt.Sprintf("%T: %s", tmb, ufmt(tmb.url))
+			case maybeGopkginSource:
+				return fmt.Sprintf("%T: %s (v%v) %s ", tmb, tmb.opath, tmb.major, ufmt(tmb.url))
 			default:
 				t.Errorf("Unknown maybeSource type: %T", mb)
 				t.FailNow()
@@ -582,13 +585,13 @@ func TestVanityDeduction(t *testing.T) {
 				t.Errorf("(in: %s) Deducer did not return expected root:\n\t(GOT) %s\n\t(WNT) %s", fix.in, pr, fix.root)
 			}
 
-			_, srcf, err := sm.deducePathAndProcess(fix.in)
+			ft, err := sm.deducePathAndProcess(fix.in)
 			if err != nil {
 				t.Errorf("(in: %s) Unexpected err on deducing source: %s", fix.in, err)
 				return
 			}
 
-			_, ident, err := srcf()
+			_, ident, err := ft.srcf()
 			if err != nil {
 				t.Errorf("(in: %s) Unexpected err on executing source future: %s", fix.in, err)
 				return
