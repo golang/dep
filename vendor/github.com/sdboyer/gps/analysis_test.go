@@ -3,6 +3,8 @@ package gps
 import (
 	"fmt"
 	"go/build"
+	"go/scanner"
+	"go/token"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -225,8 +227,8 @@ func TestWorkmapToReach(t *testing.T) {
 
 func TestListPackages(t *testing.T) {
 	srcdir := filepath.Join(getwd(t), "_testdata", "src")
-	j := func(s string) string {
-		return filepath.Join(srcdir, s)
+	j := func(s ...string) string {
+		return filepath.Join(srcdir, filepath.Join(s...))
 	}
 
 	table := map[string]struct {
@@ -452,6 +454,28 @@ func TestListPackages(t *testing.T) {
 								"github.com/sdboyer/gps",
 								"os",
 								"sort",
+							},
+						},
+					},
+				},
+			},
+		},
+		"malformed go file": {
+			fileRoot:   j("bad"),
+			importRoot: "bad",
+			out: PackageTree{
+				ImportRoot: "bad",
+				Packages: map[string]PackageOrErr{
+					"bad": {
+						Err: scanner.ErrorList{
+							&scanner.Error{
+								Pos: token.Position{
+									Filename: j("bad", "bad.go"),
+									Offset:   113,
+									Line:     2,
+									Column:   43,
+								},
+								Msg: "expected 'package', found 'EOF'",
 							},
 						},
 					},
