@@ -9,6 +9,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
+
+	"github.com/sdboyer/gps"
 )
 
 const ManifestName = "manifest.json"
@@ -231,6 +234,7 @@ func findProjectRoot(from string) (string, error) {
 
 type project struct {
 	root string
+	pr   gps.ProjectRoot
 	m    *Manifest
 	l    *Lock
 }
@@ -249,6 +253,23 @@ func loadProject(path string) (p *project, err error) {
 
 	if err != nil {
 		return
+	}
+
+	gopath := os.Getenv("GOPATH")
+	var match bool
+	for _, gp := range filepath.SplitList(gopath) {
+		srcprefix := filepath.Join(gp, "src") + string(filepath.Separator)
+		if strings.HasPrefix(p.root, srcprefix) {
+			gopath = gp
+			match = true
+			// filepath.ToSlash because we're dealing with an import path now,
+			// not an fs path
+			p.pr = gps.ProjectRoot(filepath.ToSlash(strings.TrimPrefix(p.root, srcprefix)))
+			break
+		}
+	}
+	if !match {
+		return nil, fmt.Errorf("could not determine project root - not on GOPATH")
 	}
 
 	mp := filepath.Join(path, ManifestName)
