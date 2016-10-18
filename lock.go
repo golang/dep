@@ -48,7 +48,7 @@ func ReadLock(r io.Reader) (*Lock, error) {
 		P:    make([]gps.LockedProject, len(rl.P)),
 	}
 
-	for k, ld := range rl.P {
+	for i, ld := range rl.P {
 		r := gps.Revision(ld.Revision)
 
 		var v gps.Version
@@ -69,7 +69,7 @@ func ReadLock(r io.Reader) (*Lock, error) {
 			ProjectRoot: gps.ProjectRoot(ld.Name),
 			NetworkName: ld.Repository,
 		}
-		l.P[k] = gps.NewLockedProject(id, v, ld.Packages)
+		l.P[i] = gps.NewLockedProject(id, v, ld.Packages)
 	}
 
 	return l, nil
