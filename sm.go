@@ -12,14 +12,7 @@ import (
 	"github.com/sdboyer/gps"
 )
 
-// Singletons aren't the best, but it's sufficient for experimentation
-var sm *gps.SourceMgr
-
 func getSourceManager() (*gps.SourceMgr, error) {
-	if sm != nil {
-		return sm, nil
-	}
-
 	gopath := os.Getenv("GOPATH")
 	if gopath == "" {
 		return nil, fmt.Errorf("GOPATH is not set")
