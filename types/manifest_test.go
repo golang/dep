@@ -64,7 +64,7 @@ func TestReadManifest(t *testing.T) {
 
 	m2, err := ReadManifest(strings.NewReader(jg))
 	if err != nil {
-		t.Errorf("Should have read Manifest correctly, but got err %q", err)
+		t.Fatalf("Should have read Manifest correctly, but got err %q", err)
 	}
 
 	c, _ := gps.NewSemverConstraint("^v0.12.0")
