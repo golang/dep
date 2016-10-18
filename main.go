@@ -8,7 +8,11 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"path/filepath"
 )
+
+const ManifestName = "manifest.json"
+const LockName = "lock.json"
 
 func main() {
 	flag.Parse()
@@ -185,4 +189,42 @@ var getCmd = &command{
 	Destinations (?)
 		-vendor	(?) get to workspace or vendor directory
 	`,
+}
+
+func findProjectRootFromWD() (string, error) {
+	path, err := os.Getwd()
+	if err != nil {
+		return "", fmt.Errorf("could not get working directory: %s", err)
+	}
+	return findProjectRoot(path)
+}
+
+func findProjectRoot(from string) (string, error) {
+	var f func(string) (string, error)
+	f = func(dir string) (string, error) {
+
+		fullpath := filepath.Join(dir, ManifestName)
+
+		if _, err := os.Stat(fullpath); err == nil {
+			return dir, nil
+		} else if !os.IsNotExist(err) {
+			// Some err other than non-existence - return that out
+			return "", err
+		}
+
+		base := filepath.Dir(dir)
+		if base == dir {
+			return "", fmt.Errorf("cannot resolve parent of %s", base)
+		}
+
+		return f(base)
+	}
+
+	path, err := f(from)
+	if err != nil {
+		return "", fmt.Errorf("error while searching for manifest: %s", err)
+	} else if path == "" {
+		return "", fmt.Errorf("could not find manifest in any parent of %s", from)
+	}
+	return path, nil
 }
