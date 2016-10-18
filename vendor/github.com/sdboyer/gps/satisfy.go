@@ -7,6 +7,7 @@ package gps
 // The goal is to determine whether selecting the atom would result in a state
 // where all the solver requirements are still satisfied.
 func (s *solver) check(a atomWithPackages, pkgonly bool) error {
+	s.mtr.push("satisfy")
 	pa := a.a
 	if nilpa == pa {
 		// This shouldn't be able to happen, but if it does, it unequivocally
@@ -19,12 +20,14 @@ func (s *solver) check(a atomWithPackages, pkgonly bool) error {
 	if !pkgonly {
 		if err := s.checkAtomAllowable(pa); err != nil {
 			s.traceInfo(err)
+			s.mtr.pop()
 			return err
 		}
 	}
 
 	if err := s.checkRequiredPackagesExist(a); err != nil {
 		s.traceInfo(err)
+		s.mtr.pop()
 		return err
 	}
 
@@ -32,6 +35,7 @@ func (s *solver) check(a atomWithPackages, pkgonly bool) error {
 	if err != nil {
 		// An err here would be from the package fetcher; pass it straight back
 		// TODO(sdboyer) can we traceInfo this?
+		s.mtr.pop()
 		return err
 	}
 
@@ -42,14 +46,17 @@ func (s *solver) check(a atomWithPackages, pkgonly bool) error {
 	for _, dep := range deps {
 		if err := s.checkIdentMatches(a, dep); err != nil {
 			s.traceInfo(err)
+			s.mtr.pop()
 			return err
 		}
 		if err := s.checkDepsConstraintsAllowable(a, dep); err != nil {
 			s.traceInfo(err)
+			s.mtr.pop()
 			return err
 		}
 		if err := s.checkDepsDisallowsSelected(a, dep); err != nil {
 			s.traceInfo(err)
+			s.mtr.pop()
 			return err
 		}
 		// TODO(sdboyer) decide how to refactor in order to re-enable this. Checking for
@@ -60,12 +67,14 @@ func (s *solver) check(a atomWithPackages, pkgonly bool) error {
 		//}
 		if err := s.checkPackageImportsFromDepExist(a, dep); err != nil {
 			s.traceInfo(err)
+			s.mtr.pop()
 			return err
 		}
 
 		// TODO(sdboyer) add check that fails if adding this atom would create a loop
 	}
 
+	s.mtr.pop()
 	return nil
 }
 
