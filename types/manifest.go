@@ -95,7 +95,7 @@ func (m *Manifest) DependencyConstraints() gps.ProjectConstraints {
 }
 
 func (m *Manifest) TestDependencyConstraints() gps.ProjectConstraints {
-	// We're not dealing with this (yet?)
+	// TODO decide whether we're going to incorporate this or not
 	return nil
 }
 
