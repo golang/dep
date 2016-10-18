@@ -294,15 +294,38 @@ func mkrevlock(pairs ...string) fixLock {
 	return l
 }
 
-// mksolution makes a result set
-func mksolution(pairs ...string) map[ProjectIdentifier]Version {
-	m := make(map[ProjectIdentifier]Version)
-	for _, pair := range pairs {
-		a := mkAtom(pair)
-		m[a.id] = a.v
+// mksolution makes creates a map of project identifiers to their LockedProject
+// result, which is sufficient to act as a solution fixture for the purposes of
+// most tests.
+//
+// Either strings or LockedProjects can be provided. If a string is provided, it
+// is assumed that we're in the default, "basic" case where there is exactly one
+// package in a project, and it is the root of the project - meaning that only
+// the "." package should be listed. If a LockedProject is provided (e.g. as
+// returned from mklp()), then it's incorporated directly.
+//
+// If any other type is provided, the func will panic.
+func mksolution(inputs ...interface{}) map[ProjectIdentifier]LockedProject {
+	m := make(map[ProjectIdentifier]LockedProject)
+	for _, in := range inputs {
+		switch t := in.(type) {
+		case string:
+			a := mkAtom(t)
+			m[a.id] = NewLockedProject(a.id, a.v, []string{"."})
+		case LockedProject:
+			m[t.pi] = t
+		default:
+			panic(fmt.Sprintf("unexpected input to mksolution: %T %s", in, in))
+		}
 	}
 
 	return m
+}
+
+// mklp creates a LockedProject from string inputs
+func mklp(pair string, pkgs ...string) LockedProject {
+	a := mkAtom(pair)
+	return NewLockedProject(a.id, a.v, pkgs)
 }
 
 // computeBasicReachMap takes a depspec and computes a reach map which is
@@ -351,7 +374,7 @@ type specfix interface {
 	rootTree() PackageTree
 	specs() []depspec
 	maxTries() int
-	solution() map[ProjectIdentifier]Version
+	solution() map[ProjectIdentifier]LockedProject
 	failure() error
 }
 
@@ -374,8 +397,8 @@ type basicFixture struct {
 	n string
 	// depspecs. always treat first as root
 	ds []depspec
-	// results; map of name/version pairs
-	r map[ProjectIdentifier]Version
+	// results; map of name/atom pairs
+	r map[ProjectIdentifier]LockedProject
 	// max attempts the solver should need to find solution. 0 means no limit
 	maxAttempts int
 	// Use downgrade instead of default upgrade sorter
@@ -388,6 +411,8 @@ type basicFixture struct {
 	ovr ProjectConstraints
 	// request up/downgrade to all projects
 	changeall bool
+	// individual projects to change
+	changelist []ProjectRoot
 }
 
 func (f basicFixture) name() string {
@@ -402,14 +427,14 @@ func (f basicFixture) maxTries() int {
 	return f.maxAttempts
 }
 
-func (f basicFixture) solution() map[ProjectIdentifier]Version {
+func (f basicFixture) solution() map[ProjectIdentifier]LockedProject {
 	return f.r
 }
 
 func (f basicFixture) rootmanifest() RootManifest {
 	return simpleRootManifest{
-		c:   f.ds[0].deps,
-		tc:  f.ds[0].devdeps,
+		c:   pcSliceToMap(f.ds[0].deps),
+		tc:  pcSliceToMap(f.ds[0].devdeps),
 		ovr: f.ovr,
 	}
 }
@@ -599,6 +624,111 @@ var basicFixtures = map[string]basicFixture{
 		changeall: true,
 		downgrade: true,
 	},
+	"update one with only one": {
+		ds: []depspec{
+			mkDepspec("root 0.0.0", "foo *"),
+			mkDepspec("foo 1.0.0"),
+			mkDepspec("foo 1.0.1"),
+			mkDepspec("foo 1.0.2"),
+		},
+		l: mklock(
+			"foo 1.0.1",
+		),
+		r: mksolution(
+			"foo 1.0.2",
+		),
+		changelist: []ProjectRoot{"foo"},
+	},
+	"update one of multi": {
+		ds: []depspec{
+			mkDepspec("root 0.0.0", "foo *", "bar *"),
+			mkDepspec("foo 1.0.0"),
+			mkDepspec("foo 1.0.1"),
+			mkDepspec("foo 1.0.2"),
+			mkDepspec("bar 1.0.0"),
+			mkDepspec("bar 1.0.1"),
+			mkDepspec("bar 1.0.2"),
+		},
+		l: mklock(
+			"foo 1.0.1",
+			"bar 1.0.1",
+		),
+		r: mksolution(
+			"foo 1.0.2",
+			"bar 1.0.1",
+		),
+		changelist: []ProjectRoot{"foo"},
+	},
+	"update both of multi": {
+		ds: []depspec{
+			mkDepspec("root 0.0.0", "foo *", "bar *"),
+			mkDepspec("foo 1.0.0"),
+			mkDepspec("foo 1.0.1"),
+			mkDepspec("foo 1.0.2"),
+			mkDepspec("bar 1.0.0"),
+			mkDepspec("bar 1.0.1"),
+			mkDepspec("bar 1.0.2"),
+		},
+		l: mklock(
+			"foo 1.0.1",
+			"bar 1.0.1",
+		),
+		r: mksolution(
+			"foo 1.0.2",
+			"bar 1.0.2",
+		),
+		changelist: []ProjectRoot{"foo", "bar"},
+	},
+	"update two of more": {
+		ds: []depspec{
+			mkDepspec("root 0.0.0", "foo *", "bar *", "baz *"),
+			mkDepspec("foo 1.0.0"),
+			mkDepspec("foo 1.0.1"),
+			mkDepspec("foo 1.0.2"),
+			mkDepspec("bar 1.0.0"),
+			mkDepspec("bar 1.0.1"),
+			mkDepspec("bar 1.0.2"),
+			mkDepspec("baz 1.0.0"),
+			mkDepspec("baz 1.0.1"),
+			mkDepspec("baz 1.0.2"),
+		},
+		l: mklock(
+			"foo 1.0.1",
+			"bar 1.0.1",
+			"baz 1.0.1",
+		),
+		r: mksolution(
+			"foo 1.0.2",
+			"bar 1.0.2",
+			"baz 1.0.1",
+		),
+		changelist: []ProjectRoot{"foo", "bar"},
+	},
+	"break other lock with targeted update": {
+		ds: []depspec{
+			mkDepspec("root 0.0.0", "foo *", "baz *"),
+			mkDepspec("foo 1.0.0", "bar 1.0.0"),
+			mkDepspec("foo 1.0.1", "bar 1.0.1"),
+			mkDepspec("foo 1.0.2", "bar 1.0.2"),
+			mkDepspec("bar 1.0.0"),
+			mkDepspec("bar 1.0.1"),
+			mkDepspec("bar 1.0.2"),
+			mkDepspec("baz 1.0.0"),
+			mkDepspec("baz 1.0.1"),
+			mkDepspec("baz 1.0.2"),
+		},
+		l: mklock(
+			"foo 1.0.1",
+			"bar 1.0.1",
+			"baz 1.0.1",
+		),
+		r: mksolution(
+			"foo 1.0.2",
+			"bar 1.0.2",
+			"baz 1.0.1",
+		),
+		changelist: []ProjectRoot{"foo", "bar"},
+	},
 	"with incompatible locked dependency": {
 		ds: []depspec{
 			mkDepspec("root 0.0.0", "foo >1.0.1"),
@@ -661,6 +791,24 @@ var basicFixtures = map[string]basicFixture{
 			"baz 2.0.0",
 			"qux 1.0.0 quxrev",
 			"newdep 2.0.0",
+		),
+		maxAttempts: 4,
+	},
+	"break lock when only the deps necessitate it": {
+		ds: []depspec{
+			mkDepspec("root 0.0.0", "foo *", "bar *"),
+			mkDepspec("foo 1.0.0 foorev", "bar <2.0.0"),
+			mkDepspec("foo 2.0.0", "bar <3.0.0"),
+			mkDepspec("bar 2.0.0", "baz <3.0.0"),
+			mkDepspec("baz 2.0.0", "foo >1.0.0"),
+		},
+		l: mklock(
+			"foo 1.0.0 foorev",
+		),
+		r: mksolution(
+			"foo 2.0.0",
+			"bar 2.0.0",
+			"baz 2.0.0",
 		),
 		maxAttempts: 4,
 	},
@@ -1420,13 +1568,13 @@ var _ Lock = dummyLock{}
 var _ Lock = fixLock{}
 
 // impl Spec interface
-func (ds depspec) DependencyConstraints() []ProjectConstraint {
-	return ds.deps
+func (ds depspec) DependencyConstraints() ProjectConstraints {
+	return pcSliceToMap(ds.deps)
 }
 
 // impl Spec interface
-func (ds depspec) TestDependencyConstraints() []ProjectConstraint {
-	return ds.devdeps
+func (ds depspec) TestDependencyConstraints() ProjectConstraints {
+	return pcSliceToMap(ds.devdeps)
 }
 
 type fixLock []LockedProject
