@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"go/build"
+	gscan "go/scanner"
 	"io"
 	"io/ioutil"
 	"os"
@@ -45,7 +46,8 @@ func init() {
 	stdlib["C"] = true
 }
 
-// listPackages lists info for all packages at or below the provided fileRoot.
+// ListPackages reports Go package information about all directories in the tree
+// at or below the provided fileRoot.
 //
 // Directories without any valid Go files are excluded. Directories with
 // multiple packages are excluded.
@@ -63,8 +65,8 @@ func init() {
 //  importRoot = "github.com/foo/bar"
 //
 // then the root package at path/to/repo will be ascribed import path
-// "github.com/foo/bar", and its subpackage "baz" will be
-// "github.com/foo/bar/baz".
+// "github.com/foo/bar", and the package at
+// "/home/user/workspace/path/to/repo/baz" will be "github.com/foo/bar/baz".
 //
 // A PackageTree is returned, which contains the ImportRoot and map of import path
 // to PackageOrErr - each path under the root that exists will have either a
@@ -164,6 +166,12 @@ func ListPackages(fileRoot, importRoot string) (PackageTree, error) {
 			pkg = happy(ip, p)
 		} else {
 			switch terr := err.(type) {
+			case gscan.ErrorList, *gscan.Error:
+				// This happens if we encounter malformed Go source code
+				ptree.Packages[ip] = PackageOrErr{
+					Err: err,
+				}
+				return nil
 			case *build.NoGoError:
 				ptree.Packages[ip] = PackageOrErr{
 					Err: err,

@@ -236,45 +236,87 @@ func (m ProjectConstraints) asSortedSlice() []ProjectConstraint {
 	return pcs
 }
 
-// overrideAll treats the ProjectConstraints map as an override map, and applies
-// overridden values to the input.
+// merge pulls in all the constraints from other ProjectConstraints map(s),
+// merging them with the receiver into a new ProjectConstraints map.
+//
+// If duplicate ProjectRoots are encountered, the constraints are intersected
+// together and the latter's NetworkName, if non-empty, is taken.
+func (m ProjectConstraints) merge(other ...ProjectConstraints) (out ProjectConstraints) {
+	plen := len(m)
+	for _, pcm := range other {
+		plen += len(pcm)
+	}
+
+	out = make(ProjectConstraints, plen)
+	for pr, pp := range m {
+		out[pr] = pp
+	}
+
+	for _, pcm := range other {
+		for pr, pp := range pcm {
+			if rpp, exists := out[pr]; exists {
+				pp.Constraint = pp.Constraint.Intersect(rpp.Constraint)
+				if pp.NetworkName == "" {
+					pp.NetworkName = rpp.NetworkName
+				}
+			}
+			out[pr] = pp
+		}
+	}
+
+	return
+}
+
+// overrideAll treats the receiver ProjectConstraints map as a set of override
+// instructions, and applies overridden values to the ProjectConstraints.
 //
 // A slice of workingConstraint is returned, allowing differentiation between
 // values that were or were not overridden.
-func (m ProjectConstraints) overrideAll(in []ProjectConstraint) (out []workingConstraint) {
-	out = make([]workingConstraint, len(in))
+func (m ProjectConstraints) overrideAll(pcm ProjectConstraints) (out []workingConstraint) {
+	out = make([]workingConstraint, len(pcm))
 	k := 0
-	for _, pc := range in {
-		out[k] = m.override(pc)
+	for pr, pp := range pcm {
+		out[k] = m.override(pr, pp)
 		k++
 	}
 
+	sort.Stable(sortedWC(out))
 	return
 }
 
 // override replaces a single ProjectConstraint with a workingConstraint,
 // overriding its values if a corresponding entry exists in the
 // ProjectConstraints map.
-func (m ProjectConstraints) override(pc ProjectConstraint) workingConstraint {
+func (m ProjectConstraints) override(pr ProjectRoot, pp ProjectProperties) workingConstraint {
 	wc := workingConstraint{
-		Ident:      pc.Ident,
-		Constraint: pc.Constraint,
+		Ident: ProjectIdentifier{
+			ProjectRoot: pr,
+			NetworkName: pp.NetworkName,
+		},
+		Constraint: pp.Constraint,
 	}
 
-	if pp, has := m[pc.Ident.ProjectRoot]; has {
+	if opp, has := m[pr]; has {
 		// The rule for overrides is that *any* non-zero value for the prop
 		// should be considered an override, even if it's equal to what's
 		// already there.
-		if pp.Constraint != nil {
-			wc.Constraint = pp.Constraint
+		if opp.Constraint != nil {
+			wc.Constraint = opp.Constraint
 			wc.overrConstraint = true
 		}
 
-		if pp.NetworkName != "" {
-			wc.Ident.NetworkName = pp.NetworkName
+		// This may appear incorrect, because the solver encodes meaning into
+		// the empty string for NetworkName (it means that it would use the
+		// import path by default, but could be coerced into using an alternate
+		// URL). However, that 'coercion' can only happen if there's a
+		// disagreement between projects on where a dependency should be sourced
+		// from. Such disagreement is exactly what overrides preclude, so
+		// there's no need to preserve the meaning of "" here - thus, we can
+		// treat it as a zero value and ignore it, rather than applying it.
+		if opp.NetworkName != "" {
+			wc.Ident.NetworkName = opp.NetworkName
 			wc.overrNet = true
 		}
-
 	}
 
 	return wc
@@ -282,14 +324,12 @@ func (m ProjectConstraints) override(pc ProjectConstraint) workingConstraint {
 
 type sortedConstraints []ProjectConstraint
 
-func (s sortedConstraints) Len() int {
-	return len(s)
-}
+func (s sortedConstraints) Len() int           { return len(s) }
+func (s sortedConstraints) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
+func (s sortedConstraints) Less(i, j int) bool { return s[i].Ident.less(s[j].Ident) }
 
-func (s sortedConstraints) Swap(i, j int) {
-	s[i], s[j] = s[j], s[i]
-}
+type sortedWC []workingConstraint
 
-func (s sortedConstraints) Less(i, j int) bool {
-	return s[i].Ident.less(s[j].Ident)
-}
+func (s sortedWC) Len() int           { return len(s) }
+func (s sortedWC) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
+func (s sortedWC) Less(i, j int) bool { return s[i].Ident.less(s[j].Ident) }
