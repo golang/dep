@@ -228,3 +228,59 @@ func findProjectRoot(from string) (string, error) {
 	}
 	return path, nil
 }
+
+type project struct {
+	root string
+	m    *Manifest
+	l    *Lock
+}
+
+// loadProject searches for a project root from the provided path, then loads
+// the manifest and lock (if any) it finds there.
+//
+// If the provided path is empty, it will search from the path indicated by
+// os.Getwd().
+func loadProject(path string) (p *project, err error) {
+	if path == "" {
+		p.root, err = findProjectRootFromWD()
+	} else {
+		p.root, err = findProjectRoot(path)
+	}
+
+	if err != nil {
+		return
+	}
+
+	mp := filepath.Join(path, ManifestName)
+	mf, err := os.Open(mp)
+	if err != nil {
+		// Should be impossible at this point for the manifest file not to
+		// exist, so this is some other kind of err
+		return nil, fmt.Errorf("could not open %s: %s", mp, err)
+	}
+	defer mf.Close()
+
+	p.m, err = ReadManifest(mf)
+	if err != nil {
+		return nil, fmt.Errorf("error while parsing %s: %s", mp, err)
+	}
+
+	lp := filepath.Join(path, LockName)
+	lf, err := os.Open(lp)
+	if err != nil {
+		if os.IsNotExist(err) {
+			// It's fine for the lock not to exist
+			return p, nil
+		}
+		// But if a lock does exist and we can't open it, that's a problem
+		return nil, fmt.Errorf("could not open %s: %s", lp, err)
+	}
+
+	defer lf.Close()
+	p.l, err = ReadLock(lf)
+	if err != nil {
+		return nil, fmt.Errorf("error while parsing %s: %s", lp, err)
+	}
+
+	return p, nil
+}
