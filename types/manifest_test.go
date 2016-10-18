@@ -73,7 +73,7 @@ func TestReadManifest(t *testing.T) {
 				Constraint: gps.Revision("d05d5aca9f895d19e9265839bffeadd74a2d2ecb"),
 			},
 		},
-		Overrides: map[gps.ProjectRoot]gps.ProjectProperties{
+		Ovr: map[gps.ProjectRoot]gps.ProjectProperties{
 			gps.ProjectRoot("github.com/sdboyer/gps"): {
 				NetworkName: "https://github.com/sdboyer/gps",
 				Constraint:  gps.NewBranch("master"),
@@ -85,7 +85,7 @@ func TestReadManifest(t *testing.T) {
 	if !reflect.DeepEqual(m2.Dependencies, em.Dependencies) {
 		t.Error("Valid manifest's dependencies did not parse as expected")
 	}
-	if !reflect.DeepEqual(m2.Overrides, em.Overrides) {
+	if !reflect.DeepEqual(m2.Ovr, em.Ovr) {
 		t.Error("Valid manifest's overrides did not parse as expected")
 	}
 	if !reflect.DeepEqual(m2.Ignores, em.Ignores) {

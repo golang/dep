@@ -10,7 +10,7 @@ import (
 
 type Manifest struct {
 	Dependencies gps.ProjectConstraints
-	Overrides    gps.ProjectConstraints
+	Ovr          gps.ProjectConstraints
 	Ignores      []string
 }
 
@@ -36,7 +36,7 @@ func ReadManifest(r io.Reader) (*Manifest, error) {
 
 	m := &Manifest{
 		Dependencies: make(gps.ProjectConstraints, len(rm.Dependencies)),
-		Overrides:    make(gps.ProjectConstraints, len(rm.Overrides)),
+		Ovr:          make(gps.ProjectConstraints, len(rm.Overrides)),
 		Ignores:      rm.Ignores,
 	}
 
@@ -48,7 +48,7 @@ func ReadManifest(r io.Reader) (*Manifest, error) {
 	}
 
 	for n, pp := range rm.Overrides {
-		m.Overrides[gps.ProjectRoot(n)], err = toProps(n, pp)
+		m.Ovr[gps.ProjectRoot(n)], err = toProps(n, pp)
 		if err != nil {
 			return nil, err
 		}
@@ -84,4 +84,30 @@ func toProps(n string, p possibleProps) (pp gps.ProjectProperties, err error) {
 
 	pp.NetworkName = p.NetworkName
 	return pp, nil
+}
+
+func (m *Manifest) DependencyConstraints() gps.ProjectConstraints {
+	return m.Dependencies
+}
+
+func (m *Manifest) TestDependencyConstraints() gps.ProjectConstraints {
+	// We're not dealing with this (yet?)
+	return nil
+}
+
+func (m *Manifest) Overrides() gps.ProjectConstraints {
+	return m.Ovr
+}
+
+func (m *Manifest) IgnorePackages() map[string]bool {
+	if len(m.Ignores) == 0 {
+		return nil
+	}
+
+	mp := make(map[string]bool, len(m.Ignores))
+	for _, i := range m.Ignores {
+		mp[i] = true
+	}
+
+	return mp
 }
