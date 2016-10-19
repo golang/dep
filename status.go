@@ -1,8 +1,14 @@
+// Copyright 2016 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
 package main
 
 import (
 	"bytes"
 	"fmt"
+	"os"
+	"text/tabwriter"
 
 	"github.com/sdboyer/gps"
 )
@@ -24,7 +30,6 @@ var statusCmd = &command{
 	  the Manifest)
 	- if -u is specified, whether there are newer versions of this
 	  dependency
-	- VCS state (uncommitted changes? pruned?)
 
 	If packages are specified, or if -a is specified,
 	for each of those dependencies:
@@ -56,6 +61,17 @@ var statusCmd = &command{
 
 	The exit code of status is zero if all repositories are in a "good state".	
 	`,
+}
+
+// BasicStatus contains all the information reported about a single dependency
+// in the summary/list status output mode.
+type BasicStatus struct {
+	ProjectRoot  string
+	Constraint   gps.Constraint
+	Version      gps.UnpairedVersion
+	Revision     gps.Revision
+	Latest       gps.Version
+	PackageCount int
 }
 
 func runStatus(args []string) error {
@@ -96,30 +112,105 @@ func runStatusAll(p *project, sm *gps.SourceMgr) error {
 		}()
 	}
 
-	// Statically analyze code from the current project while the network churns
+	// While the network churns on ListVersions() requests, statically analyze
+	// code from the current project.
 	ptree, err := gps.ListPackages(p.root, string(p.pr))
 
 	// Set up a solver in order to check the InputHash.
 	params := gps.SolveParameters{
-		RootDir:         rd,
-		RootPackageTree: rt,
-		Manifest:        conf,
+		RootDir:         p.root,
+		RootPackageTree: ptree,
+		Manifest:        p.m,
 		// Locks aren't a part of the input hash check, so we can omit it.
 	}
 
-	s, err = gps.Prepare(params, sm)
+	s, err := gps.Prepare(params, sm)
 	if err != nil {
 		return fmt.Errorf("could not set up solver for input hashing, err: %s", err)
 	}
-	digest := s.HashInputs()
-	if bytes.Equal(digest, p.l.Memo) {
+
+	cm := collectConstraints(ptree, p, sm)
+	tw := tabwriter.NewWriter(os.Stdout, 0, 4, 1, ' ', 0)
+	fmt.Fprintf(tw,
+		"Project\tConstraint\tVersion\tRevision\tLatest\tPkgs Used\t\n",
+		bs.ProjectRoot,
+		bs.Constraint,
+		bs.Version(),
+		string(bs.Revision)[:8],
+		bs.Latest,
+		bs.PackageCount,
+	)
+
+	if bytes.Equal(s.HashInputs(), p.l.Memo) {
 		// If these are equal, we're guaranteed that the lock is a transitively
-		// complete picture of all deps. That may change the output we need to
-		// generate
+		// complete picture of all deps. That eliminates the need for at least
+		// some checks.
+		for _, proj := range p.l.Projects() {
+			bs := BasicStatus{
+				ProjectRoot:  string(proj.Ident().ProjectRoot),
+				PackageCount: len(proj.Packages()),
+			}
+
+			// Split apart the version from the lock into its constituent parts
+			switch tv := proj.Version().(type) {
+			case gps.UnpairedVersion:
+				bs.Version = tv
+			case gps.Revision:
+				bs.Revision = tv
+			case gps.PairedVersion:
+				bs.Version = tv.Unpair()
+				bs.Revision = tv.Underlying()
+			}
+
+			// Check if the manifest has an override for this project. If so,
+			// set that as the constraint.
+			if pp, has := p.m.Ovr[proj.Ident().ProjectRoot]; has && pp.Constraint != nil {
+				// TODO note somehow that it's overridden
+				bs.Constraint = pp.Constraint
+			} else {
+				bs.Constraint = gps.Any()
+				for _, c := range cm[bs.ProjectRoot] {
+					bs.Constraint = c.Intersect(bs.Constraint)
+				}
+			}
+
+			// Only if we have a non-rev and non-plain version do/can we display
+			// anything wrt the version's updateability.
+			if bs.Version != nil && bs.Version.Type() != "version" {
+				c, has := p.m.Dependencies[proj.Ident().ProjectRoot]
+				if !has {
+					c = gps.Any()
+				}
+
+				vl := sm.ListVersions(proj.Ident())
+				gps.SortForUpgrade(vl)
+
+				for _, v := range vl {
+					// Because we've sorted the version list for upgrade, the
+					// first version we encounter that matches our constraint
+					// will be what we want
+					if c.Matches(v) {
+						bs.Latest = v
+						break
+					}
+				}
+			}
+			fmt.Fprintf(tw,
+				"%s\t%s\t%s\t%s\t%s\t%s\t\n",
+				bs.ProjectRoot,
+				bs.Constraint,
+				bs.Version(),
+				string(bs.Revision)[:7],
+				bs.Latest,
+				bs.PackageCount,
+			)
+		}
 	} else {
 		// Not equal - the lock may or may not be a complete picture, and even
 		// if it does have all the deps, it may not be a valid set of
 		// constraints.
+		//
+		// TODO
 	}
 
 	return nil
@@ -128,4 +219,9 @@ func runStatusAll(p *project, sm *gps.SourceMgr) error {
 func runStatusDetailed(p *project, sm *gps.SourceMgr, args []string) error {
 	// TODO
 	return fmt.Errorf("not implemented")
+}
+
+func collectConstraints(ptree gps.PackageTree, p *project, sm *gps.SourceMgr) map[string][]gps.Constraint {
+	// TODO
+	return map[string][]gps.Constraint{}
 }
