@@ -15,7 +15,7 @@ import (
 type Manifest struct {
 	Dependencies gps.ProjectConstraints
 	Ovr          gps.ProjectConstraints
-	Ignores      []string
+	Ignores      map[string]bool
 }
 
 type rawManifest struct {
@@ -41,7 +41,7 @@ func ReadManifest(r io.Reader) (*Manifest, error) {
 	m := &Manifest{
 		Dependencies: make(gps.ProjectConstraints, len(rm.Dependencies)),
 		Ovr:          make(gps.ProjectConstraints, len(rm.Overrides)),
-		Ignores:      rm.Ignores,
+		Ignores:      make(map[string]bool, len(rm.Ignores)),
 	}
 
 	for n, pp := range rm.Dependencies {
@@ -56,6 +56,10 @@ func ReadManifest(r io.Reader) (*Manifest, error) {
 		if err != nil {
 			return nil, err
 		}
+	}
+
+	for _, i := range rm.Ignores {
+		m.Ignores[i] = true
 	}
 
 	return m, nil
@@ -104,14 +108,5 @@ func (m *Manifest) Overrides() gps.ProjectConstraints {
 }
 
 func (m *Manifest) IgnorePackages() map[string]bool {
-	if len(m.Ignores) == 0 {
-		return nil
-	}
-
-	mp := make(map[string]bool, len(m.Ignores))
-	for _, i := range m.Ignores {
-		mp[i] = true
-	}
-
-	return mp
+	return m.Ignores
 }

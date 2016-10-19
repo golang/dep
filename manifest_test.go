@@ -83,7 +83,9 @@ func TestReadManifest(t *testing.T) {
 				Constraint:  gps.NewBranch("master"),
 			},
 		},
-		Ignores: []string{"github.com/foo/bar"},
+		Ignores: map[string]bool{
+			"github.com/foo/bar": true,
+		},
 	}
 
 	if !reflect.DeepEqual(m2.Dependencies, em.Dependencies) {
