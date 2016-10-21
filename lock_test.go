@@ -38,20 +38,20 @@ func TestReadLock(t *testing.T) {
     ]
 }`
 
-	_, err := ReadLock(strings.NewReader(le))
+	_, err := readLock(strings.NewReader(le))
 	if err == nil {
 		t.Error("Reading lock with invalid props should have caused error, but did not")
 	} else if !strings.Contains(err.Error(), "both a branch") {
 		t.Errorf("Unexpected error %q; expected multiple version error", err)
 	}
 
-	l, err := ReadLock(strings.NewReader(lg))
+	l, err := readLock(strings.NewReader(lg))
 	if err != nil {
 		t.Fatalf("Should have read Lock correctly, but got err %q", err)
 	}
 
 	b, _ := hex.DecodeString("2252a285ab27944a4d7adcba8dbd03980f59ba652f12db39fa93b927c345593e")
-	l2 := &Lock{
+	l2 := &lock{
 		Memo: b,
 		P: []gps.LockedProject{
 			gps.NewLockedProject(

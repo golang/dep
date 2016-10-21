@@ -13,7 +13,7 @@ import (
 	"github.com/sdboyer/gps"
 )
 
-type Lock struct {
+type lock struct {
 	Memo []byte
 	P    []gps.LockedProject
 }
@@ -32,7 +32,7 @@ type lockedDep struct {
 	Packages   []string `json:"packages"`
 }
 
-func ReadLock(r io.Reader) (*Lock, error) {
+func readLock(r io.Reader) (*lock, error) {
 	rl := rawLock{}
 	err := json.NewDecoder(r).Decode(&rl)
 	if err != nil {
@@ -43,7 +43,7 @@ func ReadLock(r io.Reader) (*Lock, error) {
 	if err != nil {
 		return nil, fmt.Errorf("invalid hash digest in lock's memo field")
 	}
-	l := &Lock{
+	l := &lock{
 		Memo: b,
 		P:    make([]gps.LockedProject, len(rl.P)),
 	}
@@ -75,10 +75,10 @@ func ReadLock(r io.Reader) (*Lock, error) {
 	return l, nil
 }
 
-func (l *Lock) InputHash() []byte {
+func (l *lock) InputHash() []byte {
 	return l.Memo
 }
 
-func (l *Lock) Projects() []gps.LockedProject {
+func (l *lock) Projects() []gps.LockedProject {
 	return l.P
 }
