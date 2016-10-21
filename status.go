@@ -14,7 +14,7 @@ import (
 )
 
 var statusCmd = &command{
-	fn:   noop,
+	fn:   runStatus,
 	name: "status",
 	short: `[flags] [packages]
 	Report the status of the current project's dependencies.
@@ -47,7 +47,7 @@ var statusCmd = &command{
 	  that constraint) are printed
 	- License information
 	- Package source location, if fetched from an alternate location
-	
+
 	Flags:
 	-json		Output in json format
 	-f [template]	Output in text/template format
@@ -59,7 +59,7 @@ var statusCmd = &command{
 
 	-dot		Export dependency graph in GraphViz format
 
-	The exit code of status is zero if all repositories are in a "good state".	
+	The exit code of status is zero if all repositories are in a "good state".
 	`,
 }
 
@@ -88,9 +88,8 @@ func runStatus(args []string) error {
 
 	if len(args) == 0 {
 		return runStatusAll(p, sm)
-	} else {
-		return runStatusDetailed(p, sm, args)
 	}
+	return runStatusDetailed(p, sm, args)
 }
 
 func runStatusAll(p *project, sm *gps.SourceMgr) error {
