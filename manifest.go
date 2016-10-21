@@ -12,7 +12,7 @@ import (
 	"github.com/sdboyer/gps"
 )
 
-type Manifest struct {
+type manifest struct {
 	Dependencies gps.ProjectConstraints
 	Ovr          gps.ProjectConstraints
 	Ignores      []string
@@ -31,14 +31,14 @@ type possibleProps struct {
 	NetworkName string `json:"network_name"`
 }
 
-func ReadManifest(r io.Reader) (*Manifest, error) {
+func readManifest(r io.Reader) (*manifest, error) {
 	rm := rawManifest{}
 	err := json.NewDecoder(r).Decode(&rm)
 	if err != nil {
 		return nil, err
 	}
 
-	m := &Manifest{
+	m := &manifest{
 		Dependencies: make(gps.ProjectConstraints, len(rm.Dependencies)),
 		Ovr:          make(gps.ProjectConstraints, len(rm.Overrides)),
 		Ignores:      rm.Ignores,
@@ -90,20 +90,20 @@ func toProps(n string, p possibleProps) (pp gps.ProjectProperties, err error) {
 	return pp, nil
 }
 
-func (m *Manifest) DependencyConstraints() gps.ProjectConstraints {
+func (m *manifest) DependencyConstraints() gps.ProjectConstraints {
 	return m.Dependencies
 }
 
-func (m *Manifest) TestDependencyConstraints() gps.ProjectConstraints {
+func (m *manifest) TestDependencyConstraints() gps.ProjectConstraints {
 	// TODO decide whether we're going to incorporate this or not
 	return nil
 }
 
-func (m *Manifest) Overrides() gps.ProjectConstraints {
+func (m *manifest) Overrides() gps.ProjectConstraints {
 	return m.Ovr
 }
 
-func (m *Manifest) IgnorePackages() map[string]bool {
+func (m *manifest) IgnorePackages() map[string]bool {
 	if len(m.Ignores) == 0 {
 		return nil
 	}
