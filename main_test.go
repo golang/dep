@@ -35,7 +35,7 @@ func TestFindRoot(t *testing.T) {
 		t.Errorf("findProjectRoot on nonexistent subdir should still work and give %s, got %s", expect, got3)
 	}
 
-	got4, err := findProjectRoot(filepath.Join(expect, ManifestName))
+	got4, err := findProjectRoot(filepath.Join(expect, manifestName))
 	if err == nil {
 		t.Errorf("Should have err'd when trying subdir of file, but returned %s", got4)
 	}

@@ -14,8 +14,8 @@ import (
 	"github.com/sdboyer/gps"
 )
 
-const ManifestName = "manifest.json"
-const LockName = "lock.json"
+const manifestName = "manifest.json"
+const lockName = "lock.json"
 
 func main() {
 	flag.Parse()
@@ -109,7 +109,7 @@ var initCmd = &command{
 	Write Manifest file in the root of the project directory.
 	`,
 	long: `
-	Populates Manifest file with current deps of this project. 
+	Populates Manifest file with current deps of this project.
 	The specified version of each dependent repository is the version
 	available in the user's workspaces (as specified by GOPATH).
 	If the dependency is not present in any workspaces it is not be
@@ -131,7 +131,7 @@ var getCmd = &command{
 		-x	dry run
 		-f	force the given package to be updated to the specified
 			version
-		
+
 	Package specs:
 		<path>[@<version specifier>]
 
@@ -155,7 +155,7 @@ func findProjectRoot(from string) (string, error) {
 	var f func(string) (string, error)
 	f = func(dir string) (string, error) {
 
-		fullpath := filepath.Join(dir, ManifestName)
+		fullpath := filepath.Join(dir, manifestName)
 
 		if _, err := os.Stat(fullpath); err == nil {
 			return dir, nil
@@ -186,8 +186,8 @@ type project struct {
 	absroot string
 	// importroot is the import path of the project's root directory.
 	importroot gps.ProjectRoot
-	m          *Manifest
-	l          *Lock
+	m          *manifest
+	l          *lock
 }
 
 // loadProject searches for a project root from the provided path, then loads
@@ -195,15 +195,19 @@ type project struct {
 //
 // If the provided path is empty, it will search from the path indicated by
 // os.Getwd().
-func loadProject(path string) (p *project, err error) {
-	if path == "" {
+func loadProject(path string) (*project, error) {
+	var err error
+	p := new(project)
+
+	switch path {
+	case "":
 		p.absroot, err = findProjectRootFromWD()
-	} else {
+	default:
 		p.absroot, err = findProjectRoot(path)
 	}
 
 	if err != nil {
-		return
+		return p, err
 	}
 
 	gopath := os.Getenv("GOPATH")
@@ -223,7 +227,7 @@ func loadProject(path string) (p *project, err error) {
 		return nil, fmt.Errorf("could not determine project root - not on GOPATH")
 	}
 
-	mp := filepath.Join(path, ManifestName)
+	mp := filepath.Join(path, manifestName)
 	mf, err := os.Open(mp)
 	if err != nil {
 		// Should be impossible at this point for the manifest file not to
@@ -232,12 +236,12 @@ func loadProject(path string) (p *project, err error) {
 	}
 	defer mf.Close()
 
-	p.m, err = ReadManifest(mf)
+	p.m, err = readManifest(mf)
 	if err != nil {
 		return nil, fmt.Errorf("error while parsing %s: %s", mp, err)
 	}
 
-	lp := filepath.Join(path, LockName)
+	lp := filepath.Join(path, lockName)
 	lf, err := os.Open(lp)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -249,7 +253,7 @@ func loadProject(path string) (p *project, err error) {
 	}
 
 	defer lf.Close()
-	p.l, err = ReadLock(lf)
+	p.l, err = readLock(lf)
 	if err != nil {
 		return nil, fmt.Errorf("error while parsing %s: %s", lp, err)
 	}
