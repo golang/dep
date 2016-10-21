@@ -131,15 +131,8 @@ func runStatusAll(p *project, sm *gps.SourceMgr) error {
 
 	cm := collectConstraints(ptree, p, sm)
 	tw := tabwriter.NewWriter(os.Stdout, 0, 4, 1, ' ', 0)
-	fmt.Fprintf(tw,
-		"Project\tConstraint\tVersion\tRevision\tLatest\tPkgs Used\t\n",
-		bs.ProjectRoot,
-		bs.Constraint,
-		bs.Version(),
-		string(bs.Revision)[:8],
-		bs.Latest,
-		bs.PackageCount,
-	)
+	// Print header row
+	fmt.Fprintf(tw, "Project\tConstraint\tVersion\tRevision\tLatest\tPkgs Used\t\n")
 
 	if bytes.Equal(s.HashInputs(), p.l.Memo) {
 		// If these are equal, we're guaranteed that the lock is a transitively
@@ -179,27 +172,30 @@ func runStatusAll(p *project, sm *gps.SourceMgr) error {
 			if bs.Version != nil && bs.Version.Type() != "version" {
 				c, has := p.m.Dependencies[proj.Ident().ProjectRoot]
 				if !has {
-					c = gps.Any()
+					c.Constraint = gps.Any()
 				}
 
-				vl := sm.ListVersions(proj.Ident())
-				gps.SortForUpgrade(vl)
+				vl, err := sm.ListVersions(proj.Ident())
+				if err != nil {
+					gps.SortForUpgrade(vl)
 
-				for _, v := range vl {
-					// Because we've sorted the version list for upgrade, the
-					// first version we encounter that matches our constraint
-					// will be what we want
-					if c.Matches(v) {
-						bs.Latest = v
-						break
+					for _, v := range vl {
+						// Because we've sorted the version list for upgrade, the
+						// first version we encounter that matches our constraint
+						// will be what we want
+						if c.Constraint.Matches(v) {
+							bs.Latest = v
+							break
+						}
 					}
 				}
 			}
+
 			fmt.Fprintf(tw,
 				"%s\t%s\t%s\t%s\t%s\t%s\t\n",
 				bs.ProjectRoot,
 				bs.Constraint,
-				bs.Version(),
+				bs.Version,
 				string(bs.Revision)[:7],
 				bs.Latest,
 				bs.PackageCount,
