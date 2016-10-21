@@ -114,11 +114,11 @@ func runStatusAll(p *project, sm *gps.SourceMgr) error {
 
 	// While the network churns on ListVersions() requests, statically analyze
 	// code from the current project.
-	ptree, err := gps.ListPackages(p.root, string(p.pr))
+	ptree, err := gps.ListPackages(p.absroot, string(p.importroot))
 
 	// Set up a solver in order to check the InputHash.
 	params := gps.SolveParameters{
-		RootDir:         p.root,
+		RootDir:         p.absroot,
 		RootPackageTree: ptree,
 		Manifest:        p.m,
 		// Locks aren't a part of the input hash check, so we can omit it.
