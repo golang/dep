@@ -182,10 +182,12 @@ func findProjectRoot(from string) (string, error) {
 }
 
 type project struct {
-	root string
-	pr   gps.ProjectRoot
-	m    *Manifest
-	l    *Lock
+	// absroot is the absolute path to the root directory of the project.
+	absroot string
+	// importroot is the import path of the project's root directory.
+	importroot gps.ProjectRoot
+	m          *Manifest
+	l          *Lock
 }
 
 // loadProject searches for a project root from the provided path, then loads
@@ -195,9 +197,9 @@ type project struct {
 // os.Getwd().
 func loadProject(path string) (p *project, err error) {
 	if path == "" {
-		p.root, err = findProjectRootFromWD()
+		p.absroot, err = findProjectRootFromWD()
 	} else {
-		p.root, err = findProjectRoot(path)
+		p.absroot, err = findProjectRoot(path)
 	}
 
 	if err != nil {
@@ -208,12 +210,12 @@ func loadProject(path string) (p *project, err error) {
 	var match bool
 	for _, gp := range filepath.SplitList(gopath) {
 		srcprefix := filepath.Join(gp, "src") + string(filepath.Separator)
-		if strings.HasPrefix(p.root, srcprefix) {
+		if strings.HasPrefix(p.absroot, srcprefix) {
 			gopath = gp
 			match = true
 			// filepath.ToSlash because we're dealing with an import path now,
 			// not an fs path
-			p.pr = gps.ProjectRoot(filepath.ToSlash(strings.TrimPrefix(p.root, srcprefix)))
+			p.importroot = gps.ProjectRoot(filepath.ToSlash(strings.TrimPrefix(p.absroot, srcprefix)))
 			break
 		}
 	}
