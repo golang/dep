@@ -32,10 +32,10 @@ type fakeFailBridge struct {
 	*bridge
 }
 
-var vqerr = fmt.Errorf("vqerr")
+var errVQ = fmt.Errorf("vqerr")
 
 func (fb *fakeFailBridge) ListVersions(id ProjectIdentifier) ([]Version, error) {
-	return nil, vqerr
+	return nil, errVQ
 }
 
 func TestVersionQueueSetup(t *testing.T) {

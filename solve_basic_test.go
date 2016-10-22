@@ -1558,7 +1558,7 @@ func (b *depspecBridge) ListPackages(id ProjectIdentifier, v Version) (PackageTr
 	return b.sm.(fixSM).ListPackages(id, v)
 }
 
-func (sm *depspecBridge) vendorCodeExists(id ProjectIdentifier) (bool, error) {
+func (b *depspecBridge) vendorCodeExists(id ProjectIdentifier) (bool, error) {
 	return false, nil
 }
 

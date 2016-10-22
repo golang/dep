@@ -107,6 +107,7 @@ func (r Revision) String() string {
 	return string(r)
 }
 
+// Type indicates the type of version - for revisions, "rev".
 func (r Revision) Type() string {
 	return "rev"
 }
@@ -145,6 +146,9 @@ func (r Revision) MatchesAny(c Constraint) bool {
 	return false
 }
 
+// Intersect computes the intersection of the Constraint with the provided
+// Constraint. For Revisions, this can only be another, exactly equal
+// Revision, or a PairedVersion whose underlying Revision is exactly equal.
 func (r Revision) Intersect(c Constraint) Constraint {
 	switch tc := c.(type) {
 	case anyConstraint:
@@ -248,7 +252,7 @@ func (v plainVersion) String() string {
 	return string(v)
 }
 
-func (r plainVersion) Type() string {
+func (v plainVersion) Type() string {
 	return "version"
 }
 
@@ -327,7 +331,7 @@ func (v semVersion) String() string {
 	return str
 }
 
-func (r semVersion) Type() string {
+func (v semVersion) Type() string {
 	return "semver"
 }
 

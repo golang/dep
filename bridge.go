@@ -58,7 +58,7 @@ type bridge struct {
 
 // Global factory func to create a bridge. This exists solely to allow tests to
 // override it with a custom bridge and sm.
-var mkBridge func(*solver, SourceManager) sourceBridge = func(s *solver, sm SourceManager) sourceBridge {
+var mkBridge = func(s *solver, sm SourceManager) sourceBridge {
 	return &bridge{
 		sm:     sm,
 		s:      s,
