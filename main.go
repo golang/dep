@@ -9,10 +9,13 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
+
+	"github.com/sdboyer/gps"
 )
 
-const ManifestName = "manifest.json"
-const LockName = "lock.json"
+const manifestName = "manifest.json"
+const lockName = "lock.json"
 
 func main() {
 	flag.Parse()
@@ -106,64 +109,13 @@ var initCmd = &command{
 	Write Manifest file in the root of the project directory.
 	`,
 	long: `
-	Populates Manifest file with current deps of this project. 
+	Populates Manifest file with current deps of this project.
 	The specified version of each dependent repository is the version
 	available in the user's workspaces (as specified by GOPATH).
 	If the dependency is not present in any workspaces it is not be
 	included in the Manifest.
 	Writes Lock file(?)
 	Creates vendor/ directory(?)
-	`,
-}
-
-var statusCmd = &command{
-	fn:   noop,
-	name: "status",
-	short: `[flags] [packages]
-	Report the status of the current project's dependencies.
-	`,
-	long: `
-	If no packages are specified, for each dependency:
-	- root import path
-	- (if present in lock) the currently selected version
-	- (else) that it's missing from the lock
-	- whether it's present in the vendor directory (or if it's in
-	  workspace, if that's a thing?)
-	- the current aggregate constraints on that project (as specified by
-	  the Manifest)
-	- if -u is specified, whether there are newer versions of this
-	  dependency
-	- VCS state (uncommitted changes? pruned?)
-
-	If packages are specified, or if -a is specified,
-	for each of those dependencies:
-	- (if present in lock) the currently selected version
-	- (else) that it's missing from the lock
-	- whether it's present in the vendor directory
-	- The set of possible versions for that project
-	- The upstream source URL(s) from which the project may be retrieved
-	- The type of upstream source (git, hg, bzr, svn, registry)
-	- Other versions that might work, given the current constraints
-	- The list of all projects that import the project within the current
-	  depgraph
-	- The current constraint. If more than one project constrains it, both
-	  the aggregate and the individual components (and which project provides
-	  that constraint) are printed
-	- License information
-	- Package source location, if fetched from an alternate location
-	
-	Flags:
-	-json		Output in json format
-	-f [template]	Output in text/template format
-
-	-old		Only show out of date packages and the current version
-	-missing	Only show missing packages.
-	-unused		Only show unused packages.
-	-modified	Only show modified packages.
-
-	-dot		Export dependency graph in GraphViz format
-
-	The exit code of status is zero if all repositories are in a "good state".	
 	`,
 }
 
@@ -179,7 +131,7 @@ var getCmd = &command{
 		-x	dry run
 		-f	force the given package to be updated to the specified
 			version
-		
+
 	Package specs:
 		<path>[@<version specifier>]
 
@@ -203,7 +155,7 @@ func findProjectRoot(from string) (string, error) {
 	var f func(string) (string, error)
 	f = func(dir string) (string, error) {
 
-		fullpath := filepath.Join(dir, ManifestName)
+		fullpath := filepath.Join(dir, manifestName)
 
 		if _, err := os.Stat(fullpath); err == nil {
 			return dir, nil
@@ -227,4 +179,84 @@ func findProjectRoot(from string) (string, error) {
 		return "", fmt.Errorf("could not find manifest in any parent of %s", from)
 	}
 	return path, nil
+}
+
+type project struct {
+	// absroot is the absolute path to the root directory of the project.
+	absroot string
+	// importroot is the import path of the project's root directory.
+	importroot gps.ProjectRoot
+	m          *manifest
+	l          *lock
+}
+
+// loadProject searches for a project root from the provided path, then loads
+// the manifest and lock (if any) it finds there.
+//
+// If the provided path is empty, it will search from the path indicated by
+// os.Getwd().
+func loadProject(path string) (*project, error) {
+	var err error
+	p := new(project)
+
+	switch path {
+	case "":
+		p.absroot, err = findProjectRootFromWD()
+	default:
+		p.absroot, err = findProjectRoot(path)
+	}
+
+	if err != nil {
+		return p, err
+	}
+
+	gopath := os.Getenv("GOPATH")
+	var match bool
+	for _, gp := range filepath.SplitList(gopath) {
+		srcprefix := filepath.Join(gp, "src") + string(filepath.Separator)
+		if strings.HasPrefix(p.absroot, srcprefix) {
+			gopath = gp
+			match = true
+			// filepath.ToSlash because we're dealing with an import path now,
+			// not an fs path
+			p.importroot = gps.ProjectRoot(filepath.ToSlash(strings.TrimPrefix(p.absroot, srcprefix)))
+			break
+		}
+	}
+	if !match {
+		return nil, fmt.Errorf("could not determine project root - not on GOPATH")
+	}
+
+	mp := filepath.Join(path, manifestName)
+	mf, err := os.Open(mp)
+	if err != nil {
+		// Should be impossible at this point for the manifest file not to
+		// exist, so this is some other kind of err
+		return nil, fmt.Errorf("could not open %s: %s", mp, err)
+	}
+	defer mf.Close()
+
+	p.m, err = readManifest(mf)
+	if err != nil {
+		return nil, fmt.Errorf("error while parsing %s: %s", mp, err)
+	}
+
+	lp := filepath.Join(path, lockName)
+	lf, err := os.Open(lp)
+	if err != nil {
+		if os.IsNotExist(err) {
+			// It's fine for the lock not to exist
+			return p, nil
+		}
+		// But if a lock does exist and we can't open it, that's a problem
+		return nil, fmt.Errorf("could not open %s: %s", lp, err)
+	}
+
+	defer lf.Close()
+	p.l, err = readLock(lf)
+	if err != nil {
+		return nil, fmt.Errorf("error while parsing %s: %s", lp, err)
+	}
+
+	return p, nil
 }
