@@ -1,6 +1,7 @@
 package main
 
 import (
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -13,6 +14,16 @@ func TestFindRoot(t *testing.T) {
 	}
 
 	expect := filepath.Join(wd, "_testdata", "rootfind")
+
+	// Drop a .git file in the project root.
+	// We would commit a file named .git,
+	// but that would confuse git. Silly git.
+	gitFile := filepath.Join(expect, ".git")
+	err = ioutil.WriteFile(gitFile, []byte("not really a .git directory"), 0644)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(gitFile)
 
 	got1, err := findProjectRoot(expect)
 	if err != nil {

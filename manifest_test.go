@@ -12,7 +12,7 @@ import (
 	"github.com/sdboyer/gps"
 )
 
-func TestReadManifest(t *testing.T) {
+func TestreadManifest(t *testing.T) {
 	const je = `{
     "dependencies": {
         "github.com/sdboyer/gps": {
@@ -55,20 +55,20 @@ func TestReadManifest(t *testing.T) {
     ]
 }`
 
-	_, err := ReadManifest(strings.NewReader(je))
+	_, err := readManifest(strings.NewReader(je))
 	if err == nil {
 		t.Error("Reading manifest with invalid props should have caused error, but did not")
 	} else if !strings.Contains(err.Error(), "multiple constraints") {
 		t.Errorf("Unexpected error %q; expected multiple constraint error", err)
 	}
 
-	m2, err := ReadManifest(strings.NewReader(jg))
+	m2, err := readManifest(strings.NewReader(jg))
 	if err != nil {
 		t.Fatalf("Should have read Manifest correctly, but got err %q", err)
 	}
 
 	c, _ := gps.NewSemverConstraint("^v0.12.0")
-	em := Manifest{
+	em := manifest{
 		Dependencies: map[gps.ProjectRoot]gps.ProjectProperties{
 			gps.ProjectRoot("github.com/sdboyer/gps"): {
 				Constraint: c,
