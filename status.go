@@ -106,14 +106,15 @@ func runStatusAll(p *project, sm *gps.SourceMgr) error {
 	// repository cache.
 	for _, proj := range p.l.Projects() {
 		id := proj.Ident()
-		go func() {
-			sm.ListVersions(id)
-		}()
+		go sm.ListVersions(id)
 	}
 
 	// While the network churns on ListVersions() requests, statically analyze
 	// code from the current project.
 	ptree, err := gps.ListPackages(p.absroot, string(p.importroot))
+	if err != nil {
+		return fmt.Errorf("analysis of local packages failed: %v", err)
+	}
 
 	// Set up a solver in order to check the InputHash.
 	params := gps.SolveParameters{
@@ -125,7 +126,7 @@ func runStatusAll(p *project, sm *gps.SourceMgr) error {
 
 	s, err := gps.Prepare(params, sm)
 	if err != nil {
-		return fmt.Errorf("could not set up solver for input hashing, err: %s", err)
+		return fmt.Errorf("could not set up solver for input hashing: %s", err)
 	}
 
 	cm := collectConstraints(ptree, p, sm)
@@ -206,7 +207,19 @@ func runStatusAll(p *project, sm *gps.SourceMgr) error {
 		// constraints.
 		//
 		// TODO
+
+		external := ptree.ExternalReach(true, false, nil).ListExternalImports()
+
+		// List imports?
+		for _, importPath := range external {
+			fmt.Fprintf(tw,
+				"%s\t\t\t\t\t\t\n",
+				importPath,
+			)
+
+		}
 	}
+	tw.Flush()
 
 	return nil
 }
