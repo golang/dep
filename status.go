@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"fmt"
 	"os"
+	"sort"
 	"text/tabwriter"
 
 	"github.com/sdboyer/gps"
@@ -136,15 +137,21 @@ func runStatusAll(p *project, sm *gps.SourceMgr) error {
 
 	cm := collectConstraints(ptree, p, sm)
 
-	if bytes.Equal(s.HashInputs(), p.l.Memo) {
-		tw := tabwriter.NewWriter(os.Stdout, 0, 4, 1, ' ', 0)
-		// Print header row
-		fmt.Fprintf(tw, "Project\tConstraint\tVersion\tRevision\tLatest\tPkgs Used\t\n")
+	// Get the project list and sort it so that the printed output users see is
+	// deterministically ordered. (This may be superfluous if the lock is always
+	// written in alpha order, but it doesn't hurt to double down.)
+	slp := p.l.Projects()
+	sort.Sort(sortedLockedProjects(slp))
 
+	if bytes.Equal(s.HashInputs(), p.l.Memo) {
 		// If these are equal, we're guaranteed that the lock is a transitively
 		// complete picture of all deps. That eliminates the need for at least
 		// some checks.
-		for _, proj := range p.l.Projects() {
+
+		tw := tabwriter.NewWriter(os.Stdout, 0, 4, 1, ' ', 0)
+		fmt.Fprintf(tw, "Project\tConstraint\tVersion\tRevision\tLatest\tPkgs Used\t\n")
+
+		for _, proj := range slp {
 			bs := BasicStatus{
 				ProjectRoot:  string(proj.Ident().ProjectRoot),
 				PackageCount: len(proj.Packages()),
@@ -233,7 +240,7 @@ func runStatusAll(p *project, sm *gps.SourceMgr) error {
 		for root, pkgs := range roots {
 			// TODO also handle the case where the project is present, but there
 			// are items missing from just the package list
-			for _, lp := range p.l.Projects() {
+			for _, lp := range slp {
 				if lp.Ident().ProjectRoot == root {
 					continue outer
 				}
@@ -249,6 +256,23 @@ func runStatusAll(p *project, sm *gps.SourceMgr) error {
 	}
 
 	return nil
+}
+
+type sortedLockedProjects []gps.LockedProject
+
+func (s sortedLockedProjects) Len() int      { return len(s) }
+func (s sortedLockedProjects) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
+func (s sortedLockedProjects) Less(i, j int) bool {
+	l, r := s[i].Ident(), s[j].Ident()
+
+	if l.ProjectRoot < r.ProjectRoot {
+		return true
+	}
+	if r.ProjectRoot < l.ProjectRoot {
+		return false
+	}
+
+	return l.NetworkName < r.NetworkName
 }
 
 func runStatusDetailed(p *project, sm *gps.SourceMgr, args []string) error {
