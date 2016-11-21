@@ -214,14 +214,17 @@ func runStatusAll(p *project, sm *gps.SourceMgr) error {
 				bs.PackageCount,
 			)
 		}
+
 		tw.Flush()
 	} else {
+		// Hash digest mismatch may indicate that some deps are no longer
+		// needed, some are missing, or that some constraints or source
+		// locations have changed.
+		//
+		// It's possible for digests to not match, but still have a correct
+		// lock.
 		tw := tabwriter.NewWriter(os.Stdout, 0, 4, 1, ' ', 0)
-		// Print header row
 		fmt.Fprintf(tw, "Project\tMissing Packages\t\n")
-		// Not equal - the lock may or may not be a complete picture, and even
-		// if it does have all the deps, it may not be a valid set of
-		// constraints.
 
 		external := ptree.ExternalReach(true, false, nil).ListExternalImports()
 		roots := make(map[gps.ProjectRoot][]string)
