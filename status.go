@@ -74,6 +74,11 @@ type BasicStatus struct {
 	PackageCount int
 }
 
+type MissingStatus struct {
+	ProjectRoot     string
+	MissingPackages string
+}
+
 func runStatus(args []string) error {
 	p, err := loadProject("")
 	if err != nil {
@@ -130,11 +135,12 @@ func runStatusAll(p *project, sm *gps.SourceMgr) error {
 	}
 
 	cm := collectConstraints(ptree, p, sm)
-	tw := tabwriter.NewWriter(os.Stdout, 0, 4, 1, ' ', 0)
-	// Print header row
-	fmt.Fprintf(tw, "Project\tConstraint\tVersion\tRevision\tLatest\tPkgs Used\t\n")
 
 	if bytes.Equal(s.HashInputs(), p.l.Memo) {
+		tw := tabwriter.NewWriter(os.Stdout, 0, 4, 1, ' ', 0)
+		// Print header row
+		fmt.Fprintf(tw, "Project\tConstraint\tVersion\tRevision\tLatest\tPkgs Used\t\n")
+
 		// If these are equal, we're guaranteed that the lock is a transitively
 		// complete picture of all deps. That eliminates the need for at least
 		// some checks.
@@ -201,25 +207,46 @@ func runStatusAll(p *project, sm *gps.SourceMgr) error {
 				bs.PackageCount,
 			)
 		}
+		tw.Flush()
 	} else {
+		tw := tabwriter.NewWriter(os.Stdout, 0, 4, 1, ' ', 0)
+		// Print header row
+		fmt.Fprintf(tw, "Project\tMissing Packages\t\n")
 		// Not equal - the lock may or may not be a complete picture, and even
 		// if it does have all the deps, it may not be a valid set of
 		// constraints.
-		//
-		// TODO
 
 		external := ptree.ExternalReach(true, false, nil).ListExternalImports()
+		roots := make(map[gps.ProjectRoot][]string)
+		var errs []string
+		for _, e := range external {
+			root, err := sm.DeduceProjectRoot(e)
+			if err != nil {
+				errs = append(errs, string(root))
+				continue
+			}
 
-		// List imports?
-		for _, importPath := range external {
-			fmt.Fprintf(tw,
-				"%s\t\t\t\t\t\t\n",
-				importPath,
-			)
-
+			roots[root] = append(roots[root], e)
 		}
+
+	outer:
+		for root, pkgs := range roots {
+			// TODO also handle the case where the project is present, but there
+			// are items missing from just the package list
+			for _, lp := range p.l.Projects() {
+				if lp.Ident().ProjectRoot == root {
+					continue outer
+				}
+			}
+
+			fmt.Fprintf(tw,
+				"%s\t%s\t\n",
+				root,
+				pkgs,
+			)
+		}
+		tw.Flush()
 	}
-	tw.Flush()
 
 	return nil
 }
