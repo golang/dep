@@ -25,10 +25,18 @@ type rawManifest struct {
 }
 
 type possibleProps struct {
-	Branch      string `json:"branch"`
-	Revision    string `json:"revision"`
-	Version     string `json:"version"`
-	NetworkName string `json:"network_name"`
+	Branch      string `json:"branch,omitempty"`
+	Revision    string `json:"revision,omitempty"`
+	Version     string `json:"version,omitempty"`
+	NetworkName string `json:"network_name,omitempty"`
+}
+
+func newRawManifest() rawManifest {
+	return rawManifest{
+		Dependencies: make(map[string]possibleProps),
+		Overrides:    make(map[string]possibleProps),
+		Ignores:      make([]string, 0),
+	}
 }
 
 func readManifest(r io.Reader) (*manifest, error) {
