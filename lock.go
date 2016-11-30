@@ -119,5 +119,6 @@ func (l *lock) MarshalJSON() ([]byte, error) {
 		raw.P[k] = ld
 	}
 
+	// TODO sort output - #15
 	return json.Marshal(raw)
 }
