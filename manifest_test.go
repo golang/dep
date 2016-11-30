@@ -19,7 +19,7 @@ func TestReadManifest(t *testing.T) {
             "branch": "master",
             "revision": "d05d5aca9f895d19e9265839bffeadd74a2d2ecb",
             "version": "^v0.12.0",
-            "network_name": "https://github.com/sdboyer/gps"
+            "source": "https://github.com/sdboyer/gps"
         }
     },
     "overrides": {
@@ -27,7 +27,7 @@ func TestReadManifest(t *testing.T) {
             "branch": "master",
             "revision": "d05d5aca9f895d19e9265839bffeadd74a2d2ecb",
             "version": "^v0.12.0",
-            "network_name": "https://github.com/sdboyer/gps"
+            "source": "https://github.com/sdboyer/gps"
         }
     },
     "ignores": [
@@ -47,7 +47,7 @@ func TestReadManifest(t *testing.T) {
     "overrides": {
         "github.com/sdboyer/gps": {
             "branch": "master",
-            "network_name": "https://github.com/sdboyer/gps"
+            "source": "https://github.com/sdboyer/gps"
         }
     },
     "ignores": [
@@ -55,20 +55,20 @@ func TestReadManifest(t *testing.T) {
     ]
 }`
 
-	_, err := ReadManifest(strings.NewReader(je))
+	_, err := readManifest(strings.NewReader(je))
 	if err == nil {
 		t.Error("Reading manifest with invalid props should have caused error, but did not")
 	} else if !strings.Contains(err.Error(), "multiple constraints") {
 		t.Errorf("Unexpected error %q; expected multiple constraint error", err)
 	}
 
-	m2, err := ReadManifest(strings.NewReader(jg))
+	m2, err := readManifest(strings.NewReader(jg))
 	if err != nil {
 		t.Fatalf("Should have read Manifest correctly, but got err %q", err)
 	}
 
 	c, _ := gps.NewSemverConstraint("^v0.12.0")
-	em := Manifest{
+	em := manifest{
 		Dependencies: map[gps.ProjectRoot]gps.ProjectProperties{
 			gps.ProjectRoot("github.com/sdboyer/gps"): {
 				Constraint: c,
