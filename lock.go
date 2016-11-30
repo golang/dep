@@ -86,25 +86,25 @@ func (l *lock) Projects() []gps.LockedProject {
 func (l *lock) MarshalJSON() ([]byte, error) {
 	raw := rawLock{
 		Memo: hex.EncodeToString(l.Memo),
-		P: make([]lockedDep, len(l.P))
+		P:    make([]lockedDep, len(l.P)),
 	}
 
 	for k, lp := range l.P {
 		id := lp.Ident()
 		ld := lockedDep{
-			Name:       string(id.ProjectRoot()),
+			Name:       string(id.ProjectRoot),
 			Repository: id.NetworkName,
 			Packages:   lp.Packages(),
 		}
 
 		switch tv := lp.Version().(type) {
 		case gps.UnpairedVersion:
-			ld.Version = tv
+			ld.Version = tv.String()
 		case gps.Revision:
-			ld.Revision = tv
+			ld.Revision = tv.String()
 		case gps.PairedVersion:
-			ld.Version = tv.Unpair()
-			ld.Revision = tv.Underlying()
+			ld.Version = tv.Unpair().String()
+			ld.Revision = tv.Underlying().String()
 		}
 
 		raw.P[k] = ld
