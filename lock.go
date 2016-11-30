@@ -97,14 +97,23 @@ func (l *lock) MarshalJSON() ([]byte, error) {
 			Packages:   lp.Packages(),
 		}
 
-		switch tv := lp.Version().(type) {
+		v := lp.Version()
+		// Figure out how to get the underlying revision
+		switch tv := v.(type) {
 		case gps.UnpairedVersion:
-			ld.Version = tv.String()
+			// TODO we could error here, if we want to be very defensive about not
+			// allowing a lock to be written if without an immmutable revision
 		case gps.Revision:
 			ld.Revision = tv.String()
 		case gps.PairedVersion:
-			ld.Version = tv.Unpair().String()
 			ld.Revision = tv.Underlying().String()
+		}
+
+		switch v.Type() {
+		case "branch":
+			ld.Branch = v.String()
+		case "semver", "version":
+			ld.Version = v.String()
 		}
 
 		raw.P[k] = ld
