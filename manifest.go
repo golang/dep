@@ -5,6 +5,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -117,7 +118,16 @@ func (m *manifest) MarshalJSON() ([]byte, error) {
 		raw.Overrides[string(n)] = toPossible(pp)
 	}
 
-	return json.Marshal(raw)
+	b, err := json.Marshal(raw)
+	if err != nil {
+		return nil, err
+	}
+
+	// Semver range ops, > and <, get turned into unicode code points. This is a
+	// nice example of why using JSON for files like this is not the best
+	b = bytes.Replace(b, []byte("\\u003c"), []byte("<"), -1)
+	b = bytes.Replace(b, []byte("\\u003e"), []byte(">"), -1)
+	return b, nil
 }
 
 func toPossible(pp gps.ProjectProperties) (p possibleProps) {
