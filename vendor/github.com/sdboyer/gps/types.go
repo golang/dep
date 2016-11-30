@@ -32,17 +32,18 @@ import (
 //  portions that correspond to a repository root:
 //	github.com/sdboyer/gps
 //
-// While not a panacea, having ProjectRoot allows gps to clearly indicate via
-// the type system when a path-ish string must have particular semantics.
+// While not a panacea, defining ProjectRoot at least allows us to clearly
+// identify when one of these path-ish strings is *supposed* to have certain
+// semantics.
 type ProjectRoot string
 
-// A ProjectIdentifier provides the name and source location of a dependency. It
-// is related to, but differs in two keys ways from, an plain import path.
+// A ProjectIdentifier is, more or less, the name of a dependency. It is related
+// to, but differs in two keys ways from, an import path.
 //
 // First, ProjectIdentifiers do not identify a single package. Rather, they
-// encompasses the whole tree of packages, including tree's root - the
-// ProjectRoot. In gps' current design, this ProjectRoot almost always
-// corresponds to the root of a repository.
+// encompasses the whole tree of packages rooted at and including their
+// ProjectRoot. In gps' current design, this ProjectRoot must correspond to the
+// root of a repository, though this may change in the future.
 //
 // Second, ProjectIdentifiers can optionally carry a NetworkName, which
 // identifies where the underlying source code can be located on the network.
@@ -62,15 +63,14 @@ type ProjectRoot string
 // Note that gps makes no guarantees about the actual import paths contained in
 // a repository aligning with ImportRoot. If tools, or their users, specify an
 // alternate NetworkName that contains a repository with incompatible internal
-// import paths, gps' solving operations will error. (gps does no import
-// rewriting.)
+// import paths, gps will fail. (gps does no import rewriting.)
 //
 // Also note that if different projects' manifests report a different
 // NetworkName for a given ImportRoot, it is a solve failure. Everyone has to
 // agree on where a given import path should be sourced from.
 //
 // If NetworkName is not explicitly set, gps will derive the network address from
-// the ImportRoot using a similar algorithm to that utilized by `go get`.
+// the ImportRoot using a similar algorithm to that of the official go tooling.
 type ProjectIdentifier struct {
 	ProjectRoot ProjectRoot
 	NetworkName string
@@ -166,11 +166,10 @@ type ProjectProperties struct {
 // Package represents a Go package. It contains a subset of the information
 // go/build.Package does.
 type Package struct {
-	Name        string   // Package name, as declared in the package statement
-	ImportPath  string   // Full import path, including the prefix provided to ListPackages()
-	CommentPath string   // Import path given in the comment on the package statement
-	Imports     []string // Imports from all go and cgo files
-	TestImports []string // Imports from all go test files (in go/build parlance: both TestImports and XTestImports)
+	ImportPath, CommentPath string
+	Name                    string
+	Imports                 []string
+	TestImports             []string
 }
 
 // bimodalIdentifiers are used to track work to be done in the unselected queue.
