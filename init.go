@@ -117,7 +117,7 @@ func runInit(args []string) error {
 
 func isStdLib(i string) bool {
 	switch i {
-	case "bytes", "encoding/hex", "encoding/json", "flag", "fmt", "io", "os", "path/filepath", "strings", "text/tabwriter":
+	case "bytes", "encoding/hex", "errors", "sort", "encoding/json", "flag", "fmt", "io", "os", "path/filepath", "strings", "text/tabwriter":
 		return true
 	}
 	return false

@@ -5,6 +5,7 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -56,6 +57,10 @@ var commands = []*command{
 	getCmd,
 	// help added here at init time.
 }
+
+var (
+	errProjectNotFound = errors.New("no project could be found")
+)
 
 func init() {
 	// Defeat circular declarations by appending
@@ -134,34 +139,27 @@ func findProjectRootFromWD() (string, error) {
 	return findProjectRoot(path)
 }
 
+// search upwards looking for a manifest file until we get to the root of the
+// filesystem
 func findProjectRoot(from string) (string, error) {
-	var f func(string) (string, error)
-	f = func(dir string) (string, error) {
+	for {
+		mp := filepath.Join(from, manifestName)
 
-		fullpath := filepath.Join(dir, manifestName)
-
-		if _, err := os.Stat(fullpath); err == nil {
-			return dir, nil
-		} else if !os.IsNotExist(err) {
+		_, err := os.Stat(mp)
+		if err == nil {
+			return from, nil
+		}
+		if !os.IsNotExist(err) {
 			// Some err other than non-existence - return that out
 			return "", err
 		}
 
-		base := filepath.Dir(dir)
-		if base == dir {
-			return "", fmt.Errorf("cannot resolve parent of %s", base)
+		parent := filepath.Dir(from)
+		if parent == from {
+			return "", errProjectNotFound
 		}
-
-		return f(base)
+		from = parent
 	}
-
-	path, err := f(from)
-	if err != nil {
-		return "", fmt.Errorf("error while searching for manifest: %s", err)
-	} else if path == "" {
-		return "", fmt.Errorf("could not find manifest in any parent of %s", from)
-	}
-	return path, nil
 }
 
 type project struct {
@@ -210,12 +208,15 @@ func loadProject(path string) (*project, error) {
 		return nil, fmt.Errorf("could not determine project root - not on GOPATH")
 	}
 
-	mp := filepath.Join(path, manifestName)
+	mp := filepath.Join(p.absroot, manifestName)
 	mf, err := os.Open(mp)
 	if err != nil {
-		// Should be impossible at this point for the manifest file not to
-		// exist, so this is some other kind of err
-		return nil, fmt.Errorf("could not open %s: %s", mp, err)
+		if os.IsNotExist(err) {
+			// TODO: list possible solutions? (dep init, cd $project)
+			return nil, fmt.Errorf("no %v found in project root %v", manifestName, p.absroot)
+		}
+		// Unable to read the manifest file
+		return nil, err
 	}
 	defer mf.Close()
 
