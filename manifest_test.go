@@ -131,7 +131,6 @@ func TestWriteManifest(t *testing.T) {
 	b = bytes.Replace(b, []byte("\\u003c"), []byte("<"), -1)
 	b = bytes.Replace(b, []byte("\\u003e"), []byte(">"), -1)
 
-	//s := out.String()
 	s := string(b)
 	if s != jg {
 		t.Errorf("Valid manifest did not marshal to JSON as expected:\n\t(GOT): %s\n\t(WNT): %s", s, jg)
