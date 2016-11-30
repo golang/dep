@@ -135,7 +135,7 @@ func toPossible(pp gps.ProjectProperties) (p possibleProps) {
 
 	if v, ok := pp.Constraint.(gps.Version); ok {
 		switch v.Type() {
-		case "revision":
+		case "rev": // will be changed to revision upstream soon
 			p.Revision = v.String()
 		case "branch":
 			p.Branch = v.String()

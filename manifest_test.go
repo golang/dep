@@ -5,6 +5,8 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
 	"reflect"
 	"strings"
 	"testing"
@@ -12,8 +14,7 @@ import (
 	"github.com/sdboyer/gps"
 )
 
-func TestReadManifest(t *testing.T) {
-	const je = `{
+const je = `{
     "dependencies": {
         "github.com/sdboyer/gps": {
             "branch": "master",
@@ -35,13 +36,13 @@ func TestReadManifest(t *testing.T) {
     ]
 }`
 
-	const jg = `{
+const jg = `{
     "dependencies": {
-        "github.com/sdboyer/gps": {
-            "version": "^v0.12.0"
-        },
         "github.com/babble/brook": {
             "revision": "d05d5aca9f895d19e9265839bffeadd74a2d2ecb"
+        },
+        "github.com/sdboyer/gps": {
+            "version": ">=0.12.0, <1.0.0"
         }
     },
     "overrides": {
@@ -55,6 +56,7 @@ func TestReadManifest(t *testing.T) {
     ]
 }`
 
+func TestReadManifest(t *testing.T) {
 	_, err := readManifest(strings.NewReader(je))
 	if err == nil {
 		t.Error("Reading manifest with invalid props should have caused error, but did not")
@@ -67,7 +69,7 @@ func TestReadManifest(t *testing.T) {
 		t.Fatalf("Should have read Manifest correctly, but got err %q", err)
 	}
 
-	c, _ := gps.NewSemverConstraint("^v0.12.0")
+	c, _ := gps.NewSemverConstraint(">=0.12.0, <1.0.0")
 	em := manifest{
 		Dependencies: map[gps.ProjectRoot]gps.ProjectProperties{
 			gps.ProjectRoot("github.com/sdboyer/gps"): {
@@ -94,5 +96,44 @@ func TestReadManifest(t *testing.T) {
 	}
 	if !reflect.DeepEqual(m2.Ignores, em.Ignores) {
 		t.Error("Valid manifest's ignores did not parse as expected")
+	}
+}
+
+func TestWriteManifest(t *testing.T) {
+	c, _ := gps.NewSemverConstraint("^v0.12.0")
+	m := &manifest{
+		Dependencies: map[gps.ProjectRoot]gps.ProjectProperties{
+			gps.ProjectRoot("github.com/sdboyer/gps"): {
+				Constraint: c,
+			},
+			gps.ProjectRoot("github.com/babble/brook"): {
+				Constraint: gps.Revision("d05d5aca9f895d19e9265839bffeadd74a2d2ecb"),
+			},
+		},
+		Ovr: map[gps.ProjectRoot]gps.ProjectProperties{
+			gps.ProjectRoot("github.com/sdboyer/gps"): {
+				NetworkName: "https://github.com/sdboyer/gps",
+				Constraint:  gps.NewBranch("master"),
+			},
+		},
+		Ignores: []string{"github.com/foo/bar"},
+	}
+
+	b, err := json.Marshal(m)
+	if err != nil {
+		t.Fatalf("Error while marshaling valid manifest to JSON: %q", err)
+	}
+
+	var out bytes.Buffer
+	json.Indent(&out, b, "", "    ")
+	b = out.Bytes()
+	// uuuuuughhhhh
+	b = bytes.Replace(b, []byte("\\u003c"), []byte("<"), -1)
+	b = bytes.Replace(b, []byte("\\u003e"), []byte(">"), -1)
+
+	//s := out.String()
+	s := string(b)
+	if s != jg {
+		t.Errorf("Valid manifest did not marshal to JSON as expected:\n\t(GOT): %s\n\t(WNT): %s", s, jg)
 	}
 }
