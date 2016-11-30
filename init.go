@@ -74,50 +74,45 @@ func runInit(args []string) error {
 
 	// TODO: Lstat ? Do we care?
 	_, err = os.Stat(mf)
-	if err != nil {
-		if os.IsNotExist(err) {
-			pr, err := determineProjectRoot(p)
-			if err != nil {
-				return errors.Wrap(err, "determineProjectRoot")
+	if err == nil {
+		return fmt.Errorf("Manifest file '%s' already exists", mf)
+	}
+	if os.IsNotExist(err) {
+		pr, err := determineProjectRoot(p)
+		if err != nil {
+			return errors.Wrap(err, "determineProjectRoot")
+		}
+		pkgT, err := gps.ListPackages(p, pr)
+		if err != nil {
+			return errors.Wrap(err, "gps.ListPackages")
+		}
+		sm, err := getSourceManager()
+		if err != nil {
+			return errors.Wrap(err, "getSourceManager")
+		}
+		defer sm.Release()
+		m := newRawManifest()
+		for _, v := range pkgT.Packages {
+			// TODO: Some errors maybe should not be skipped ;-)
+			if v.Err != nil {
+				continue
 			}
-			pkgT, err := gps.ListPackages(p, pr)
-			if err != nil {
-				return errors.Wrap(err, "gps.ListPackages")
-			}
-			sm, err := getSourceManager()
-			if err != nil {
-				return errors.Wrap(err, "getSourceManager")
-			}
-			defer sm.Release()
-			m := newRawManifest()
-			for _, v := range pkgT.Packages {
-				// TODO: Some errors maybe should not be skipped ;-)
-				if v.Err != nil {
+
+			for _, i := range v.P.Imports {
+				if isStdLib(i) { // TODO: Replace with non stubbed version
 					continue
 				}
-
-				for _, i := range v.P.Imports {
-					if isStdLib(i) { // TODO: Replace with non stubbed version
-						continue
-					}
-					pr, err := sm.DeduceProjectRoot(i)
-					if err != nil {
-						return errors.Wrap(err, "sm.DeduceProjectRoot") // TODO: Skip and report ?
-					}
-					// TODO: This is just wrong, need to figure out manifest file structure
-					m.Dependencies[string(pr)] = possibleProps{}
+				pr, err := sm.DeduceProjectRoot(i)
+				if err != nil {
+					return errors.Wrap(err, "sm.DeduceProjectRoot") // TODO: Skip and report ?
 				}
+				// TODO: This is just wrong, need to figure out manifest file structure
+				m.Dependencies[string(pr)] = possibleProps{}
 			}
-			err = writeManifest(mf, m)
-			if err != nil {
-				return errors.Wrap(err, "writeManifest")
-			}
-			return nil
 		}
-		return errors.Wrap(err, "Fall through")
+		return errors.Wrap(writeManifest(mf, m), "writeManifest")
 	}
-
-	return fmt.Errorf("Manifest file '%s' already exists", mf)
+	return errors.Wrap(err, "runInit fall through")
 }
 
 func isStdLib(i string) bool {
