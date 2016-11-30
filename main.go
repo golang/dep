@@ -5,6 +5,7 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -134,34 +135,33 @@ func findProjectRootFromWD() (string, error) {
 	return findProjectRoot(path)
 }
 
-func findProjectRoot(from string) (string, error) {
-	var f func(string) (string, error)
-	f = func(dir string) (string, error) {
+var (
+	errProjectNotFound = errors.New("no project could be found")
+	vcsDirs            = []string{".git"} // TODO: add others
+)
 
-		fullpath := filepath.Join(dir, manifestName)
-
-		if _, err := os.Stat(fullpath); err == nil {
-			return dir, nil
-		} else if !os.IsNotExist(err) {
-			// Some err other than non-existence - return that out
-			return "", err
+// findProjectRoot walks up the file system tree from the given directory to
+// the file system root looking for a known VCS metadata directory (.git, .hg,
+// etc). If none found, it returns errProjectNotFound.
+func findProjectRoot(dir string) (string, error) {
+	for {
+		for _, vcsDir := range vcsDirs {
+			vcsMeta := filepath.Join(dir, vcsDir)
+			if _, err := os.Stat(vcsMeta); err == nil {
+				return dir, nil
+			} else if !os.IsNotExist(err) {
+				// Something went wrong trying to read the directory,
+				// the user should be told of this.
+				return "", err
+			}
 		}
-
-		base := filepath.Dir(dir)
-		if base == dir {
-			return "", fmt.Errorf("cannot resolve parent of %s", base)
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			// We've hit the root without finding anything.
+			return "", errProjectNotFound
 		}
-
-		return f(base)
+		dir = parent
 	}
-
-	path, err := f(from)
-	if err != nil {
-		return "", fmt.Errorf("error while searching for manifest: %s", err)
-	} else if path == "" {
-		return "", fmt.Errorf("could not find manifest in any parent of %s", from)
-	}
-	return path, nil
 }
 
 type project struct {
@@ -210,12 +210,15 @@ func loadProject(path string) (*project, error) {
 		return nil, fmt.Errorf("could not determine project root - not on GOPATH")
 	}
 
-	mp := filepath.Join(path, manifestName)
+	mp := filepath.Join(p.absroot, manifestName)
 	mf, err := os.Open(mp)
 	if err != nil {
-		// Should be impossible at this point for the manifest file not to
-		// exist, so this is some other kind of err
-		return nil, fmt.Errorf("could not open %s: %s", mp, err)
+		if os.IsNotExist(err) {
+			// TODO: list possible solutions? (dep init, cd $project)
+			return nil, fmt.Errorf("no %v found in project root %v", manifestName, p.absroot)
+		}
+		// Unable to read the manifest file.
+		return nil, err
 	}
 	defer mf.Close()
 
