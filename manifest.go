@@ -31,6 +31,14 @@ type possibleProps struct {
 	NetworkName string `json:"source,omitempty"`
 }
 
+func newRawManifest() rawManifest {
+	return rawManifest{
+		Dependencies: make(map[string]possibleProps),
+		Overrides:    make(map[string]possibleProps),
+		Ignores:      make([]string, 0),
+	}
+}
+
 func readManifest(r io.Reader) (*manifest, error) {
 	rm := rawManifest{}
 	err := json.NewDecoder(r).Decode(&rm)
@@ -97,7 +105,7 @@ func toProps(n string, p possibleProps) (pp gps.ProjectProperties, err error) {
 func (m *manifest) MarshalJSON() ([]byte, error) {
 	raw := rawManifest{
 		Dependencies: make(map[string]possibleProps, len(m.Dependencies)),
-		Overrides:    make(map[string]possibleProps, len(m.Overrides)),
+		Overrides:    make(map[string]possibleProps, len(m.Ovr)),
 		Ignores:      m.Ignores,
 	}
 
@@ -105,7 +113,7 @@ func (m *manifest) MarshalJSON() ([]byte, error) {
 		raw.Dependencies[string(n)] = toPossible(pp)
 	}
 
-	for n, pp := range m.Overrides {
+	for n, pp := range m.Ovr {
 		raw.Overrides[string(n)] = toPossible(pp)
 	}
 
@@ -129,7 +137,8 @@ func toPossible(pp gps.ProjectProperties) (p possibleProps) {
 		// express a 'none' constraint, so we can ignore it here. We also ignore
 		// the 'any' case, because that's the other possibility, and it's what
 		// we interpret not having any constraint expressions at all to mean.
-		if !gps.IsAny(pp.Constraint) && !gps.IsNone(pp.Constraint) {
+		//if !gps.IsAny(pp.Constraint) && !gps.IsNone(pp.Constraint) {
+		if !gps.IsAny(pp.Constraint) {
 			// Has to be a semver range.
 			p.Version = pp.Constraint.String()
 		}
