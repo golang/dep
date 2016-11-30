@@ -31,6 +31,14 @@ type possibleProps struct {
 	NetworkName string `json:"network_name"`
 }
 
+func newRawManifest() rawManifest {
+	return rawManifest{
+		Dependencies: make(map[string]possibleProps),
+		Overrides:    make(map[string]possibleProps),
+		Ignores:      make([]string, 0),
+	}
+}
+
 func readManifest(r io.Reader) (*manifest, error) {
 	rm := rawManifest{}
 	err := json.NewDecoder(r).Decode(&rm)
