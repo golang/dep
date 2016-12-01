@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -91,7 +90,14 @@ func runInit(args []string) error {
 			return errors.Wrap(err, "getSourceManager")
 		}
 		defer sm.Release()
-		m := newRawManifest()
+
+		// TODO: This is just wrong, need to figure out manifest file structure
+		m := manifest{
+			Dependencies: make(gps.ProjectConstraints),
+		}
+
+		processed := make(map[gps.ProjectRoot]bool)
+		ondisk := make(map[gps.ProjectRoot]gps.Version)
 		for _, v := range pkgT.Packages {
 			// TODO: Some errors maybe should not be skipped ;-)
 			if v.Err != nil {
@@ -106,15 +112,38 @@ func runInit(args []string) error {
 				if err != nil {
 					return errors.Wrap(err, "sm.DeduceProjectRoot") // TODO: Skip and report ?
 				}
-				// TODO: This is just wrong, need to figure out manifest file structure
-				m.Dependencies[string(pr)] = possibleProps{}
+
+				if processed[pr] {
+					continue
+				}
+				processed[pr] = true
+
+				v, err := whatVersionIsOnDiskForThisThing(pr)
+				if err != nil {
+					fmt.Printf("Could not determine version for %q, omitting from generated manifest\n", pr)
+					continue
+				}
+
+				ondisk[pr] = v
+				pp := gps.ProjectProperties{}
+				switch v.Type() {
+				case "branch", "version", "rev":
+					pp.Constraint = v
+				case "semver":
+					c, _ := gps.NewSemverConstraint("^" + v.String())
+					pp.Constraint = c
+				}
+
+				m.Dependencies[pr] = pp
 			}
 		}
-		return errors.Wrap(writeManifest(mf, m), "writeManifest")
+
+		return errors.Wrap(writeManifest(mf, &m), "writeManifest")
 	}
 	return errors.Wrap(err, "runInit fall through")
 }
 
+// TODO this is a stub, make it not a stub when gps gets its act together
 func isStdLib(i string) bool {
 	switch i {
 	case "bytes", "encoding/hex", "errors", "sort", "encoding/json", "flag", "fmt", "io", "os", "path/filepath", "strings", "text/tabwriter":
@@ -123,16 +152,32 @@ func isStdLib(i string) bool {
 	return false
 }
 
-func writeManifest(path string, m rawManifest) error {
+// TODO rename this to something not dumb when it becomes not a stub
+func whatVersionIsOnDiskForThisThing(pr gps.ProjectRoot) (gps.Version, error) {
+	switch pr {
+	case "github.com/sdboyer/gps":
+		return gps.NewVersion("v0.12.0").Is("9ca61cb4e9851c80bb537e7d8e1be56e18e03cc9"), nil
+	case "github.com/Masterminds/semver":
+		return gps.NewBranch("2.x").Is("b3ef6b1808e9889dfb8767ce7068db923a3d07de"), nil
+	case "github.com/pkg/errors":
+		return gps.NewVersion("v0.8.0").Is("645ef00459ed84a119197bfb8d8205042c6df63d"), nil
+	}
+
+	return nil, fmt.Errorf("unknown project")
+}
+
+func writeManifest(path string, m *manifest) error {
 	f, err := os.Create(path)
 	if err != nil {
 		return err
 	}
 	defer f.Close()
-	e := json.NewEncoder(f)
-	return e.Encode(m)
-}
 
-func createManifest(path string) error {
-	return writeManifest(path, newRawManifest())
+	b, err := m.MarshalJSON()
+	if err != nil {
+		return err
+	}
+
+	_, err = f.Write(b)
+	return err
 }
