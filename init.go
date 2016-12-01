@@ -183,10 +183,7 @@ func runInit(args []string) error {
 			return err
 		}
 
-		l2 := lock{
-			Memo: soln.InputHash(),
-			P:    soln.Projects(),
-		}
+		l2 := lockFromInterface(soln)
 
 		if err := writeFile(mf, &m); err != nil {
 			return errors.Wrap(err, "writeFile for manifest")
