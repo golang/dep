@@ -5,8 +5,6 @@
 package main
 
 import (
-	"bytes"
-	"encoding/json"
 	"reflect"
 	"strings"
 	"testing"
@@ -34,7 +32,8 @@ const je = `{
     "ignores": [
         "github.com/foo/bar"
     ]
-}`
+}
+`
 
 const jg = `{
     "dependencies": {
@@ -54,7 +53,8 @@ const jg = `{
     "ignores": [
         "github.com/foo/bar"
     ]
-}`
+}
+`
 
 func TestReadManifest(t *testing.T) {
 	_, err := readManifest(strings.NewReader(je))
@@ -119,20 +119,12 @@ func TestWriteManifest(t *testing.T) {
 		Ignores: []string{"github.com/foo/bar"},
 	}
 
-	b, err := json.Marshal(m)
+	b, err := m.MarshalJSON()
 	if err != nil {
 		t.Fatalf("Error while marshaling valid manifest to JSON: %q", err)
 	}
 
-	var out bytes.Buffer
-	json.Indent(&out, b, "", "    ")
-	b = out.Bytes()
-	// uuuuuughhhhh
-	b = bytes.Replace(b, []byte("\\u003c"), []byte("<"), -1)
-	b = bytes.Replace(b, []byte("\\u003e"), []byte(">"), -1)
-
-	s := string(b)
-	if s != jg {
-		t.Errorf("Valid manifest did not marshal to JSON as expected:\n\t(GOT): %s\n\t(WNT): %s", s, jg)
+	if string(b) != jg {
+		t.Errorf("Valid manifest did not marshal to JSON as expected:\n\t(GOT): %s\n\t(WNT): %s", string(b), jg)
 	}
 }

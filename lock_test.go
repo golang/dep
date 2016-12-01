@@ -5,9 +5,7 @@
 package main
 
 import (
-	"bytes"
 	"encoding/hex"
-	"encoding/json"
 	"reflect"
 	"strings"
 	"testing"
@@ -16,33 +14,35 @@ import (
 )
 
 const le = `{
-	"memo": "2252a285ab27944a4d7adcba8dbd03980f59ba652f12db39fa93b927c345593e",
-	"projects": [
-		{
-			"name": "github.com/sdboyer/gps",
-			"branch": "master",
-			"version": "v0.12.0",
-			"revision": "d05d5aca9f895d19e9265839bffeadd74a2d2ecb",
-			"packages": [
-				"."
-			]
-		}
-	]
-}`
+    "memo": "2252a285ab27944a4d7adcba8dbd03980f59ba652f12db39fa93b927c345593e",
+    "projects": [
+        {
+            "name": "github.com/sdboyer/gps",
+            "branch": "master",
+            "version": "v0.12.0",
+            "revision": "d05d5aca9f895d19e9265839bffeadd74a2d2ecb",
+            "packages": [
+                "."
+            ]
+        }
+    ]
+}
+`
 
 const lg = `{
-	"memo": "2252a285ab27944a4d7adcba8dbd03980f59ba652f12db39fa93b927c345593e",
-	"projects": [
-		{
-			"name": "github.com/sdboyer/gps",
-			"branch": "master",
-			"revision": "d05d5aca9f895d19e9265839bffeadd74a2d2ecb",
-			"packages": [
-				"."
-			]
-		}
-	]
-}`
+    "memo": "2252a285ab27944a4d7adcba8dbd03980f59ba652f12db39fa93b927c345593e",
+    "projects": [
+        {
+            "name": "github.com/sdboyer/gps",
+            "branch": "master",
+            "revision": "d05d5aca9f895d19e9265839bffeadd74a2d2ecb",
+            "packages": [
+                "."
+            ]
+        }
+    ]
+}
+`
 
 func TestReadLock(t *testing.T) {
 	_, err := readLock(strings.NewReader(le))
@@ -87,16 +87,12 @@ func TestWriteLock(t *testing.T) {
 		},
 	}
 
-	b, err := json.Marshal(l)
+	b, err := l.MarshalJSON()
 	if err != nil {
 		t.Fatalf("Error while marshaling valid lock to JSON: %q", err)
 	}
 
-	var out bytes.Buffer
-	json.Indent(&out, b, "", "\t")
-
-	s := out.String()
-	if s != lg {
-		t.Errorf("Valid lock did not marshal to JSON as expected:\n\t(GOT): %s\n\t(WNT): %s", s, lg)
+	if string(b) != lg {
+		t.Errorf("Valid lock did not marshal to JSON as expected:\n\t(GOT): %s\n\t(WNT): %s", string(b), lg)
 	}
 }
