@@ -82,3 +82,43 @@ func (l *lock) InputHash() []byte {
 func (l *lock) Projects() []gps.LockedProject {
 	return l.P
 }
+
+func (l *lock) MarshalJSON() ([]byte, error) {
+	raw := rawLock{
+		Memo: hex.EncodeToString(l.Memo),
+		P:    make([]lockedDep, len(l.P)),
+	}
+
+	for k, lp := range l.P {
+		id := lp.Ident()
+		ld := lockedDep{
+			Name:       string(id.ProjectRoot),
+			Repository: id.NetworkName,
+			Packages:   lp.Packages(),
+		}
+
+		v := lp.Version()
+		// Figure out how to get the underlying revision
+		switch tv := v.(type) {
+		case gps.UnpairedVersion:
+			// TODO we could error here, if we want to be very defensive about not
+			// allowing a lock to be written if without an immmutable revision
+		case gps.Revision:
+			ld.Revision = tv.String()
+		case gps.PairedVersion:
+			ld.Revision = tv.Underlying().String()
+		}
+
+		switch v.Type() {
+		case "branch":
+			ld.Branch = v.String()
+		case "semver", "version":
+			ld.Version = v.String()
+		}
+
+		raw.P[k] = ld
+	}
+
+	// TODO sort output - #15
+	return json.Marshal(raw)
+}
