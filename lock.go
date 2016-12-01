@@ -121,3 +121,30 @@ func (l *lock) MarshalJSON() ([]byte, error) {
 
 	return json.Marshal(raw)
 }
+
+// lockFromInterface converts an arbitrary gps.Lock to dep's representation of a
+// lock. If the input is already dep's *lock, the input is returned directly.
+//
+// Data is defensively copied wherever necessary to ensure the resulting *lock
+// shares no memory with the original lock.
+//
+// As gps.Solution is a superset of gps.Lock, this can also be used to convert
+// solutions to dep's lock form.
+func lockFromInterface(in gps.Lock) *lock {
+	if in == nil {
+		return nil
+	} else if l, ok := in.(*lock); ok {
+		return l
+	}
+
+	h, p := in.InputHash(), in.Projects()
+
+	l := &lock{
+		Memo: make([]byte, len(h)),
+		P:    make([]gps.LockedProject, len(p)),
+	}
+
+	copy(l.Memo, h)
+	copy(l.P, p)
+	return l
+}
