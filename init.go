@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -53,7 +54,6 @@ func determineProjectRoot(path string) (string, error) {
 	return "", fmt.Errorf("%s not in any $GOPATH", path)
 }
 
-// TODO: Error when there is a lockfile, but no manifest?
 func runInit(args []string) error {
 	if len(args) > 1 {
 		return fmt.Errorf("Too many args: %d", len(args))
@@ -70,18 +70,24 @@ func runInit(args []string) error {
 	}
 
 	mf := filepath.Join(p, manifestName)
+	lf := filepath.Join(p, lockName)
 
 	// TODO: Lstat ? Do we care?
 	_, err = os.Stat(mf)
 	if err == nil {
 		return fmt.Errorf("Manifest file '%s' already exists", mf)
 	}
+	_, err = os.Stat(lf)
+	if err == nil {
+		return fmt.Errorf("Invalid state: manifest %q does not exist, but lock %q does.", mf, lf)
+	}
+
 	if os.IsNotExist(err) {
-		pr, err := determineProjectRoot(p)
+		cpr, err := determineProjectRoot(p)
 		if err != nil {
 			return errors.Wrap(err, "determineProjectRoot")
 		}
-		pkgT, err := gps.ListPackages(p, pr)
+		pkgT, err := gps.ListPackages(p, cpr)
 		if err != nil {
 			return errors.Wrap(err, "gps.ListPackages")
 		}
@@ -97,6 +103,7 @@ func runInit(args []string) error {
 		}
 
 		processed := make(map[gps.ProjectRoot]bool)
+		notondisk := make(map[gps.ProjectRoot]bool)
 		ondisk := make(map[gps.ProjectRoot]gps.Version)
 		for _, v := range pkgT.Packages {
 			// TODO: Some errors maybe should not be skipped ;-)
@@ -120,6 +127,7 @@ func runInit(args []string) error {
 
 				v, err := whatVersionIsOnDiskForThisThing(pr)
 				if err != nil {
+					notondisk[pr] = true
 					fmt.Printf("Could not determine version for %q, omitting from generated manifest\n", pr)
 					continue
 				}
@@ -138,7 +146,56 @@ func runInit(args []string) error {
 			}
 		}
 
-		return errors.Wrap(writeManifest(mf, &m), "writeManifest")
+		if len(notondisk) > 0 {
+			// TODO deal with the case where we import something not currently
+			// on disk - probing upstream?
+		}
+
+		l := lock{
+			P: make([]gps.LockedProject, 0, len(ondisk)),
+		}
+
+		for pr, v := range ondisk {
+			// We pass a nil slice for pkgs because we know that we're going to
+			// have to do a solve run with this lock (because it necessarily has
+			// only incorporated direct, not transitive deps), and gps' solver
+			// does not, and likely will never, care about the pkg list on the
+			// input lock.
+			l.P = append(l.P, gps.NewLockedProject(
+				gps.ProjectIdentifier{ProjectRoot: pr}, v, nil),
+			)
+		}
+
+		params := gps.SolveParameters{
+			RootDir:         p,
+			RootPackageTree: pkgT,
+			Manifest:        &m,
+			Lock:            &l,
+		}
+		s, err := gps.Prepare(params, sm)
+		if err != nil {
+			return errors.Wrap(err, "prepare solver")
+		}
+
+		soln, err := s.Solve()
+		if err != nil {
+			handleAllTheFailuresOfTheWorld(err)
+			return err
+		}
+
+		l2 := lock{
+			Memo: soln.InputHash(),
+			P:    soln.Projects(),
+		}
+
+		if err := writeFile(mf, &m); err != nil {
+			return errors.Wrap(err, "writeFile for manifest")
+		}
+		if err := writeFile(lf, &l2); err != nil {
+			return errors.Wrap(err, "writeFile for lock")
+		}
+
+		return nil
 	}
 	return errors.Wrap(err, "runInit fall through")
 }
@@ -166,14 +223,20 @@ func whatVersionIsOnDiskForThisThing(pr gps.ProjectRoot) (gps.Version, error) {
 	return nil, fmt.Errorf("unknown project")
 }
 
-func writeManifest(path string, m *manifest) error {
+// TODO solve failures can be really creative - we need to be similarly creative
+// in handling them and informing the user appropriately
+func handleAllTheFailuresOfTheWorld(err error) {
+	fmt.Println("ouchie, solve error: %s", err)
+}
+
+func writeFile(path string, in json.Marshaler) error {
 	f, err := os.Create(path)
 	if err != nil {
 		return err
 	}
 	defer f.Close()
 
-	b, err := m.MarshalJSON()
+	b, err := in.MarshalJSON()
 	if err != nil {
 		return err
 	}
