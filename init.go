@@ -77,16 +77,19 @@ func runInit(args []string) error {
 	lf := filepath.Join(p, lockName)
 
 	// TODO: Lstat ? Do we care?
-	_, err = os.Stat(mf)
-	if err == nil {
-		return fmt.Errorf("Manifest file '%s' already exists", mf)
+	_, merr := os.Stat(mf)
+	if merr == nil {
+		return fmt.Errorf("Manifest file %q already exists", mf)
 	}
-	_, err = os.Stat(lf)
-	if err == nil {
-		return fmt.Errorf("Invalid state: manifest %q does not exist, but lock %q does.", mf, lf)
-	}
+	_, lerr := os.Stat(lf)
 
-	if os.IsNotExist(err) {
+	if os.IsNotExist(merr) {
+		if lerr == nil {
+			return fmt.Errorf("Invalid state: manifest %q does not exist, but lock %q does.", mf, lf)
+		} else if !os.IsNotExist(lerr) {
+			return errors.Wrap(lerr, "stat lockfile")
+		}
+
 		cpr, err := determineProjectRoot(p)
 		if err != nil {
 			return errors.Wrap(err, "determineProjectRoot")
@@ -129,7 +132,7 @@ func runInit(args []string) error {
 				}
 				processed[pr] = true
 
-				v, err := whatVersionIsOnDiskForThisThing(pr)
+				v, err := versionInWorkspace(pr)
 				if err != nil {
 					notondisk[pr] = true
 					fmt.Printf("Could not determine version for %q, omitting from generated manifest\n", pr)
@@ -192,12 +195,13 @@ func runInit(args []string) error {
 		if err := writeFile(mf, &m); err != nil {
 			return errors.Wrap(err, "writeFile for manifest")
 		}
-		if err := writeFile(lf, &l2); err != nil {
+		if err := writeFile(lf, l2); err != nil {
 			return errors.Wrap(err, "writeFile for lock")
 		}
 
 		return nil
 	}
+
 	return errors.Wrap(err, "runInit fall through")
 }
 
@@ -210,8 +214,8 @@ func isStdLib(i string) bool {
 	return false
 }
 
-// TODO rename this to something not dumb when it becomes not a stub
-func whatVersionIsOnDiskForThisThing(pr gps.ProjectRoot) (gps.Version, error) {
+// TODO stub; considerable effort required for the real impl
+func versionInWorkspace(pr gps.ProjectRoot) (gps.Version, error) {
 	switch pr {
 	case "github.com/sdboyer/gps":
 		return gps.NewVersion("v0.12.0").Is("9ca61cb4e9851c80bb537e7d8e1be56e18e03cc9"), nil
