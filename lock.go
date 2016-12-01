@@ -5,6 +5,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -120,5 +121,12 @@ func (l *lock) MarshalJSON() ([]byte, error) {
 	}
 
 	// TODO sort output - #15
-	return json.Marshal(raw)
+
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	enc.SetIndent("", "    ")
+	enc.SetEscapeHTML(false)
+	err := enc.Encode(raw)
+
+	return buf.Bytes(), err
 }
