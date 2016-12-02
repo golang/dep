@@ -283,11 +283,20 @@ func runInit(args []string) error {
 		}
 
 		for pr, v := range ondisk {
+			// That we have to chop off these path prefixes is a symptom of
+			// a problem in gps itself
+			pkgs := make([]string, 0, len(processed[pr]))
+			prslash := string(pr) + "/"
+			for _, pkg := range processed[pr] {
+				if pkg == string(pr) {
+					pkgs = append(pkgs, ".")
+				} else {
+					pkgs = append(pkgs, strings.TrimPrefix(pkg, prslash))
+				}
+			}
+
 			l.P = append(l.P, gps.NewLockedProject(
-				// TODO processed holds "absolute" import paths, but the
-				// standard laid out elsewhere is to have them be expressed
-				// relative to their project root when written in a lock
-				gps.ProjectIdentifier{ProjectRoot: pr}, v, processed[pr]),
+				gps.ProjectIdentifier{ProjectRoot: pr}, v, pkgs),
 			)
 		}
 
