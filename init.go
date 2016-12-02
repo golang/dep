@@ -109,7 +109,7 @@ func runInit(args []string) error {
 			Dependencies: make(gps.ProjectConstraints),
 		}
 
-		processed := make(map[gps.ProjectRoot]bool)
+		processed := make(map[gps.ProjectRoot][]string)
 		notondisk := make(map[gps.ProjectRoot]bool)
 		ondisk := make(map[gps.ProjectRoot]gps.Version)
 		for _, v := range pkgT.Packages {
@@ -127,10 +127,14 @@ func runInit(args []string) error {
 					return errors.Wrap(err, "sm.DeduceProjectRoot") // TODO: Skip and report ?
 				}
 
-				if processed[pr] {
+				if _, ok := processed[pr]; ok {
+					if !contains(processed[pr], i) {
+						processed[pr] = append(processed[pr], i)
+					}
+
 					continue
 				}
-				processed[pr] = true
+				processed[pr] = []string{i}
 
 				v, err := versionInWorkspace(pr)
 				if err != nil {
@@ -150,6 +154,30 @@ func runInit(args []string) error {
 				}
 
 				m.Dependencies[pr] = pp
+			}
+		}
+
+	foo:
+		for root, pkgs := range processed {
+			r, err := determineProjectRoot(string(root))
+			if err != nil {
+				return errors.Wrap(err, "determineProjectRoot")
+			}
+
+			pt, err := gps.ListPackages(r, string(root))
+			if err != nil {
+				return errors.Wrap(err, "gps.ListPackages")
+			}
+
+			rm := pt.ExternalReach(false, false, nil)
+
+			for pkg := range pkgs {
+				p, ok := rm[pkg]
+				if !ok {
+					// not on disk...
+					notondisk[root] = true
+					continue foo
+				}
 			}
 		}
 
@@ -203,6 +231,16 @@ func runInit(args []string) error {
 	}
 
 	return errors.Wrap(err, "runInit fall through")
+}
+
+// contains checks if a array of strings contains a value
+func contains(a []string, b string) bool {
+	for v := range a {
+		if b == v {
+			return true
+		}
+	}
+	return false
 }
 
 // TODO this is a stub, make it not a stub when gps gets its act together
