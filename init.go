@@ -347,13 +347,18 @@ func contains(a []string, b string) bool {
 	return false
 }
 
-// TODO this is a stub, make it not a stub when gps gets its act together
-func isStdLib(i string) bool {
-	switch i {
-	case "bytes", "container/heap", "crypto/sha256", "encoding/hex", "encoding/xml", "errors", "sort", "encoding/json", "flag", "fmt", "go/build", "go/scanner", "io", "io/ioutil", "log", "math/rand", "net/http", "net/url", "os", "os/exec", "path", "path/filepath", "regexp", "runtime", "strconv", "strings", "sync", "sync/atomic", "text/scanner", "text/tabwriter", "time":
-		return true
+// isStdLib reports whether $GOROOT/src/path should be considered
+// part of the standard distribution. For historical reasons we allow people to add
+// their own code to $GOROOT instead of using $GOPATH, but we assume that
+// code will start with a domain name (dot in the first element).
+// This was loving taken from src/cmd/go/pkg.go in Go's code (isStandardImportPath).
+func isStdLib(path string) bool {
+	i := strings.Index(path, "/")
+	if i < 0 {
+		i = len(path)
 	}
-	return false
+	elem := path[:i]
+	return !strings.Contains(elem, ".")
 }
 
 // TODO stub; considerable effort required for the real impl
