@@ -110,6 +110,7 @@ func runInit(args []string) error {
 		}
 
 		processed := make(map[gps.ProjectRoot][]string)
+		packages := make(map[string]bool)
 		notondisk := make(map[gps.ProjectRoot]bool)
 		ondisk := make(map[gps.ProjectRoot]gps.Version)
 		for _, v := range pkgT.Packages {
@@ -127,6 +128,7 @@ func runInit(args []string) error {
 					return errors.Wrap(err, "sm.DeduceProjectRoot") // TODO: Skip and report ?
 				}
 
+				packages[i] = true
 				if _, ok := processed[pr]; ok {
 					if !contains(processed[pr], i) {
 						processed[pr] = append(processed[pr], i)
@@ -157,68 +159,158 @@ func runInit(args []string) error {
 			}
 		}
 
-	foo:
-		for root, pkgs := range processed {
-			r, err := determineProjectRoot(string(root))
-			if err != nil {
-				return errors.Wrap(err, "determineProjectRoot")
-			}
+		// Explore the packages we've found for transitive deps, either
+		// completing the lock or identifying (more) missing projects that we'll
+		// need to ask gps to solve for us.
+		colors := make(map[string]uint8)
+		const (
+			white uint8 = iota
+			grey
+			black
+		)
 
-			pt, err := gps.ListPackages(r, string(root))
-			if err != nil {
-				return errors.Wrap(err, "gps.ListPackages")
-			}
+		// cache of PackageTrees, so we don't parse projects more than once
+		ptrees := make(map[gps.ProjectRoot]gps.PackageTree)
 
-			rm := pt.ExternalReach(false, false, nil)
+		// depth-first traverser
+		var dft func(string) error
+		dft = func(pkg string) error {
+			switch colors[pkg] {
+			case white:
+				colors[pkg] = grey
 
-			for pkg := range pkgs {
-				p, ok := rm[pkg]
-				if !ok {
-					// not on disk...
-					notondisk[root] = true
-					continue foo
+				pr, err := sm.DeduceProjectRoot(pkg)
+				if err != nil {
+					return errors.Wrap(err, "could not deduce project root for "+pkg)
 				}
+
+				// We already visited this project root earlier via some other
+				// pkg within it, and made the decision that it's not on disk.
+				// Respect that decision, and pop the stack.
+				if notondisk[pr] {
+					colors[pkg] = black
+					return nil
+				}
+
+				r, err := determineProjectRoot(string(pr))
+				if err != nil {
+					return errors.Wrap(err, "determineProjectRoot")
+				}
+
+				ptree, has := ptrees[pr]
+				if !has {
+					// It's fine if the root does not exist - it indicates that this
+					// project is not present in the workspace, and so we need to
+					// solve to deal with this dep.
+					_, err := os.Lstat(r)
+					if os.IsNotExist(err) {
+						colors[pkg] = black
+						notondisk[pr] = true
+						return nil
+					}
+
+					ptree, err = gps.ListPackages(r, string(pr))
+					if err != nil {
+						// Any error here other than an a nonexistent dir (which
+						// can't happen because we covered that case above) is
+						// probably critical, so bail out.
+						return errors.Wrap(err, "gps.ListPackages")
+					}
+				}
+
+				rm := ptree.ExternalReach(false, false, nil)
+				reached, ok := rm[pkg]
+				if !ok {
+					colors[pkg] = black
+					// not on disk...
+					notondisk[pr] = true
+					return nil
+				}
+
+				if _, ok := processed[pr]; ok {
+					if !contains(processed[pr], pkg) {
+						processed[pr] = append(processed[pr], pkg)
+					}
+
+					// project must be on disk at this point; question is
+					// whether we're first seeing it here, in the transitive
+					// exploration, or if it arose in the direct dep parts
+					if _, in := ondisk[pr]; in {
+						v, err := versionInWorkspace(pr)
+						if err != nil {
+							colors[pkg] = black
+							notondisk[pr] = true
+							return nil
+						}
+						ondisk[pr] = v
+					}
+				} else {
+					processed[pr] = []string{pkg}
+				}
+
+				for _, rpkg := range reached {
+					err := dft(rpkg)
+					if err != nil {
+						return err
+					}
+				}
+
+				colors[pkg] = black
+			case grey:
+				return fmt.Errorf("Import cycle detected on %s", pkg)
+			case black:
+				return nil
+			}
+
+			panic("unreachable")
+		}
+
+		// run the depth-first traversal from the set of immediate external
+		// package imports we found in the current project
+		for pkg := range packages {
+			err := dft(pkg)
+			if err != nil {
+				return err // already errors.Wrap()'d internally
 			}
 		}
 
-		if len(notondisk) > 0 {
-			// TODO deal with the case where we import something not currently
-			// on disk - probing upstream?
-		}
-
+		// Make an initial lock from just what we know about the immediate deps
+		// of the current project
 		l := lock{
 			P: make([]gps.LockedProject, 0, len(ondisk)),
 		}
 
 		for pr, v := range ondisk {
-			// We pass a nil slice for pkgs because we know that we're going to
-			// have to do a solve run with this lock (because it necessarily has
-			// only incorporated direct, not transitive deps), and gps' solver
-			// does not, and likely will never, care about the pkg list on the
-			// input lock.
 			l.P = append(l.P, gps.NewLockedProject(
-				gps.ProjectIdentifier{ProjectRoot: pr}, v, nil),
+				// TODO processed holds "absolute" import paths, but the
+				// standard laid out elsewhere is to have them be expressed
+				// relative to their project root when written in a lock
+				gps.ProjectIdentifier{ProjectRoot: pr}, v, processed[pr]),
 			)
 		}
 
-		params := gps.SolveParameters{
-			RootDir:         p,
-			RootPackageTree: pkgT,
-			Manifest:        &m,
-			Lock:            &l,
-		}
-		s, err := gps.Prepare(params, sm)
-		if err != nil {
-			return errors.Wrap(err, "prepare solver")
-		}
+		var l2 *lock
+		if len(notondisk) > 0 {
+			params := gps.SolveParameters{
+				RootDir:         p,
+				RootPackageTree: pkgT,
+				Manifest:        &m,
+				Lock:            &l,
+			}
+			s, err := gps.Prepare(params, sm)
+			if err != nil {
+				return errors.Wrap(err, "prepare solver")
+			}
 
-		soln, err := s.Solve()
-		if err != nil {
-			handleAllTheFailuresOfTheWorld(err)
-			return err
+			soln, err := s.Solve()
+			if err != nil {
+				handleAllTheFailuresOfTheWorld(err)
+				return err
+			}
+			l2 = lockFromInterface(soln)
+		} else {
+			l2 = &l
 		}
-
-		l2 := lockFromInterface(soln)
 
 		if err := writeFile(mf, &m); err != nil {
 			return errors.Wrap(err, "writeFile for manifest")
@@ -235,7 +327,7 @@ func runInit(args []string) error {
 
 // contains checks if a array of strings contains a value
 func contains(a []string, b string) bool {
-	for v := range a {
+	for _, v := range a {
 		if b == v {
 			return true
 		}
