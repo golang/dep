@@ -249,6 +249,7 @@ func runInit(args []string) error {
 					ondisk[pr] = v
 				}
 
+				// recurse
 				for _, rpkg := range reached {
 					if isStdLib(rpkg) {
 						continue
@@ -276,8 +277,8 @@ func runInit(args []string) error {
 			}
 		}
 
-		// Make an initial lock from just what we know about the immediate deps
-		// of the current project
+		// Make an initial lock from what knowledge we've collected about the
+		// versions on disk
 		l := lock{
 			P: make([]gps.LockedProject, 0, len(ondisk)),
 		}
