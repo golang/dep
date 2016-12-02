@@ -1,0 +1,5 @@
+dep
+
+# for now ignore the lock and manifest
+manifest.json
+lock.json
