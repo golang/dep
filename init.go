@@ -45,17 +45,22 @@ var initCmd = &command{
 	`,
 }
 
-func determineProjectRoot(path string) (string, error) {
+// determineProjectRoot takes an absolute path and compares it against declared
+// GOPATH(s) to determine what portion of the input path should be treated as an
+// import path - as a project root.
+//
+// The second returned string indicates which GOPATH value was used.
+func determineProjectRoot(path string) (string, string, error) {
 	gopath := os.Getenv("GOPATH")
 	for _, gp := range filepath.SplitList(gopath) {
 		srcprefix := filepath.Join(gp, "src") + string(filepath.Separator)
 		if strings.HasPrefix(path, srcprefix) {
 			// filepath.ToSlash because we're dealing with an import path now,
 			// not an fs path
-			return filepath.ToSlash(strings.TrimPrefix(path, srcprefix)), nil
+			return filepath.ToSlash(strings.TrimPrefix(path, srcprefix)), gp, nil
 		}
 	}
-	return "", fmt.Errorf("%s not in any $GOPATH", path)
+	return "", "", fmt.Errorf("%s not in any $GOPATH", path)
 }
 
 func runInit(args []string) error {
@@ -90,7 +95,7 @@ func runInit(args []string) error {
 			return errors.Wrap(lerr, "stat lockfile")
 		}
 
-		cpr, err := determineProjectRoot(p)
+		cpr, gopath, err := determineProjectRoot(p)
 		if err != nil {
 			return errors.Wrap(err, "determineProjectRoot")
 		}
@@ -192,16 +197,12 @@ func runInit(args []string) error {
 					return nil
 				}
 
-				r, err := determineProjectRoot(string(pr))
-				if err != nil {
-					return errors.Wrap(err, "determineProjectRoot")
-				}
-
 				ptree, has := ptrees[pr]
 				if !has {
 					// It's fine if the root does not exist - it indicates that this
 					// project is not present in the workspace, and so we need to
 					// solve to deal with this dep.
+					r := filepath.Join(gopath, "src", string(pr))
 					_, err := os.Lstat(r)
 					if os.IsNotExist(err) {
 						colors[pkg] = black
@@ -231,24 +232,28 @@ func runInit(args []string) error {
 					if !contains(processed[pr], pkg) {
 						processed[pr] = append(processed[pr], pkg)
 					}
-
-					// project must be on disk at this point; question is
-					// whether we're first seeing it here, in the transitive
-					// exploration, or if it arose in the direct dep parts
-					if _, in := ondisk[pr]; in {
-						v, err := versionInWorkspace(pr)
-						if err != nil {
-							colors[pkg] = black
-							notondisk[pr] = true
-							return nil
-						}
-						ondisk[pr] = v
-					}
 				} else {
 					processed[pr] = []string{pkg}
 				}
 
+				// project must be on disk at this point; question is
+				// whether we're first seeing it here, in the transitive
+				// exploration, or if it arose in the direct dep parts
+				if _, in := ondisk[pr]; !in {
+					v, err := versionInWorkspace(pr)
+					if err != nil {
+						colors[pkg] = black
+						notondisk[pr] = true
+						return nil
+					}
+					ondisk[pr] = v
+				}
+
 				for _, rpkg := range reached {
+					if isStdLib(rpkg) {
+						continue
+					}
+
 					err := dft(rpkg)
 					if err != nil {
 						return err
@@ -258,11 +263,8 @@ func runInit(args []string) error {
 				colors[pkg] = black
 			case grey:
 				return fmt.Errorf("Import cycle detected on %s", pkg)
-			case black:
-				return nil
 			}
-
-			panic("unreachable")
+			return nil
 		}
 
 		// run the depth-first traversal from the set of immediate external
@@ -338,7 +340,7 @@ func contains(a []string, b string) bool {
 // TODO this is a stub, make it not a stub when gps gets its act together
 func isStdLib(i string) bool {
 	switch i {
-	case "bytes", "encoding/hex", "errors", "sort", "encoding/json", "flag", "fmt", "io", "os", "path/filepath", "strings", "text/tabwriter":
+	case "bytes", "container/heap", "crypto/sha256", "encoding/hex", "encoding/xml", "errors", "sort", "encoding/json", "flag", "fmt", "go/build", "go/scanner", "io", "io/ioutil", "log", "math/rand", "net/http", "net/url", "os", "os/exec", "path", "path/filepath", "regexp", "runtime", "strconv", "strings", "sync", "sync/atomic", "text/scanner", "text/tabwriter", "time":
 		return true
 	}
 	return false
@@ -351,8 +353,14 @@ func versionInWorkspace(pr gps.ProjectRoot) (gps.Version, error) {
 		return gps.NewVersion("v0.12.0").Is("9ca61cb4e9851c80bb537e7d8e1be56e18e03cc9"), nil
 	case "github.com/Masterminds/semver":
 		return gps.NewBranch("2.x").Is("b3ef6b1808e9889dfb8767ce7068db923a3d07de"), nil
+	case "github.com/Masterminds/vcs":
+		return gps.Revision("fbe9fb6ad5b5f35b3e82a7c21123cfc526cbf895"), nil
 	case "github.com/pkg/errors":
 		return gps.NewVersion("v0.8.0").Is("645ef00459ed84a119197bfb8d8205042c6df63d"), nil
+	case "github.com/armon/go-radix":
+		return gps.NewBranch("master").Is("4239b77079c7b5d1243b7b4736304ce8ddb6f0f2"), nil
+	case "github.com/termie/go-shutil":
+		return gps.NewBranch("master").Is("4239b77079c7b5d1243b7b4736304ce8ddb6f0f2"), nil
 	}
 
 	return nil, fmt.Errorf("unknown project")
