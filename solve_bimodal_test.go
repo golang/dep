@@ -149,6 +149,29 @@ var bimodalFixtures = map[string]bimodalFixture{
 			"b 1.1.0",
 		),
 	},
+	// Constraints apply only if the project that declares them has a
+	// reachable import - non-root
+	"constraints activated by import, transitive": {
+		ds: []depspec{
+			dsp(mkDepspec("root 0.0.0"),
+				pkg("root", "root/foo", "b"),
+				pkg("root/foo", "a"),
+			),
+			dsp(mkDepspec("a 1.0.0", "b 1.0.0"),
+				pkg("a"),
+			),
+			dsp(mkDepspec("b 1.0.0"),
+				pkg("b"),
+			),
+			dsp(mkDepspec("b 1.1.0"),
+				pkg("b"),
+			),
+		},
+		r: mksolution(
+			"a 1.0.0",
+			"b 1.1.0",
+		),
+	},
 	// Import jump is in a dep, and points to a transitive dep - but only in not
 	// the first version we try
 	"transitive bm-add on older version": {
