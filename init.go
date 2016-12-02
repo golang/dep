@@ -1,3 +1,7 @@
+// Copyright 2016 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
 package main
 
 import (
@@ -41,20 +45,24 @@ var initCmd = &command{
 	`,
 }
 
-func determineProjectRoot(path string) (string, error) {
+// determineProjectRoot takes an absolute path and compares it against declared
+// GOPATH(s) to determine what portion of the input path should be treated as an
+// import path - as a project root.
+//
+// The second returned string indicates which GOPATH value was used.
+func determineProjectRoot(path string) (string, string, error) {
 	gopath := os.Getenv("GOPATH")
 	for _, gp := range filepath.SplitList(gopath) {
 		srcprefix := filepath.Join(gp, "src") + string(filepath.Separator)
 		if strings.HasPrefix(path, srcprefix) {
 			// filepath.ToSlash because we're dealing with an import path now,
 			// not an fs path
-			return filepath.ToSlash(strings.TrimPrefix(path, srcprefix)), nil
+			return filepath.ToSlash(strings.TrimPrefix(path, srcprefix)), gp, nil
 		}
 	}
-	return "", fmt.Errorf("%s not in any $GOPATH", path)
+	return "", "", fmt.Errorf("%s not in any $GOPATH", path)
 }
 
-// TODO: Error when there is a lockfile, but no manifest?
 func runInit(args []string) error {
 	if len(args) > 1 {
 		return fmt.Errorf("Too many args: %d", len(args))
@@ -71,18 +79,27 @@ func runInit(args []string) error {
 	}
 
 	mf := filepath.Join(p, manifestName)
+	lf := filepath.Join(p, lockName)
 
 	// TODO: Lstat ? Do we care?
-	_, err = os.Stat(mf)
-	if err == nil {
-		return fmt.Errorf("Manifest file '%s' already exists", mf)
+	_, merr := os.Stat(mf)
+	if merr == nil {
+		return fmt.Errorf("Manifest file %q already exists", mf)
 	}
-	if os.IsNotExist(err) {
-		pr, err := determineProjectRoot(p)
+	_, lerr := os.Stat(lf)
+
+	if os.IsNotExist(merr) {
+		if lerr == nil {
+			return fmt.Errorf("Invalid state: manifest %q does not exist, but lock %q does.", mf, lf)
+		} else if !os.IsNotExist(lerr) {
+			return errors.Wrap(lerr, "stat lockfile")
+		}
+
+		cpr, gopath, err := determineProjectRoot(p)
 		if err != nil {
 			return errors.Wrap(err, "determineProjectRoot")
 		}
-		pkgT, err := gps.ListPackages(p, pr)
+		pkgT, err := gps.ListPackages(p, cpr)
 		if err != nil {
 			return errors.Wrap(err, "gps.ListPackages")
 		}
@@ -91,7 +108,16 @@ func runInit(args []string) error {
 			return errors.Wrap(err, "getSourceManager")
 		}
 		defer sm.Release()
-		m := newRawManifest()
+
+		// TODO: This is just wrong, need to figure out manifest file structure
+		m := manifest{
+			Dependencies: make(gps.ProjectConstraints),
+		}
+
+		processed := make(map[gps.ProjectRoot][]string)
+		packages := make(map[string]bool)
+		notondisk := make(map[gps.ProjectRoot]bool)
+		ondisk := make(map[gps.ProjectRoot]gps.Version)
 		for _, v := range pkgT.Packages {
 			// TODO: Some errors maybe should not be skipped ;-)
 			if v.Err != nil {
@@ -106,33 +132,268 @@ func runInit(args []string) error {
 				if err != nil {
 					return errors.Wrap(err, "sm.DeduceProjectRoot") // TODO: Skip and report ?
 				}
-				// TODO: This is just wrong, need to figure out manifest file structure
-				m.Dependencies[string(pr)] = possibleProps{}
+
+				packages[i] = true
+				if _, ok := processed[pr]; ok {
+					if !contains(processed[pr], i) {
+						processed[pr] = append(processed[pr], i)
+					}
+
+					continue
+				}
+				processed[pr] = []string{i}
+
+				v, err := versionInWorkspace(pr)
+				if err != nil {
+					notondisk[pr] = true
+					fmt.Printf("Could not determine version for %q, omitting from generated manifest\n", pr)
+					continue
+				}
+
+				ondisk[pr] = v
+				pp := gps.ProjectProperties{}
+				switch v.Type() {
+				case "branch", "version", "rev":
+					pp.Constraint = v
+				case "semver":
+					c, _ := gps.NewSemverConstraint("^" + v.String())
+					pp.Constraint = c
+				}
+
+				m.Dependencies[pr] = pp
 			}
 		}
-		return errors.Wrap(writeManifest(mf, m), "writeManifest")
+
+		// Explore the packages we've found for transitive deps, either
+		// completing the lock or identifying (more) missing projects that we'll
+		// need to ask gps to solve for us.
+		colors := make(map[string]uint8)
+		const (
+			white uint8 = iota
+			grey
+			black
+		)
+
+		// cache of PackageTrees, so we don't parse projects more than once
+		ptrees := make(map[gps.ProjectRoot]gps.PackageTree)
+
+		// depth-first traverser
+		var dft func(string) error
+		dft = func(pkg string) error {
+			switch colors[pkg] {
+			case white:
+				colors[pkg] = grey
+
+				pr, err := sm.DeduceProjectRoot(pkg)
+				if err != nil {
+					return errors.Wrap(err, "could not deduce project root for "+pkg)
+				}
+
+				// We already visited this project root earlier via some other
+				// pkg within it, and made the decision that it's not on disk.
+				// Respect that decision, and pop the stack.
+				if notondisk[pr] {
+					colors[pkg] = black
+					return nil
+				}
+
+				ptree, has := ptrees[pr]
+				if !has {
+					// It's fine if the root does not exist - it indicates that this
+					// project is not present in the workspace, and so we need to
+					// solve to deal with this dep.
+					r := filepath.Join(gopath, "src", string(pr))
+					_, err := os.Lstat(r)
+					if os.IsNotExist(err) {
+						colors[pkg] = black
+						notondisk[pr] = true
+						return nil
+					}
+
+					ptree, err = gps.ListPackages(r, string(pr))
+					if err != nil {
+						// Any error here other than an a nonexistent dir (which
+						// can't happen because we covered that case above) is
+						// probably critical, so bail out.
+						return errors.Wrap(err, "gps.ListPackages")
+					}
+				}
+
+				rm := ptree.ExternalReach(false, false, nil)
+				reached, ok := rm[pkg]
+				if !ok {
+					colors[pkg] = black
+					// not on disk...
+					notondisk[pr] = true
+					return nil
+				}
+
+				if _, ok := processed[pr]; ok {
+					if !contains(processed[pr], pkg) {
+						processed[pr] = append(processed[pr], pkg)
+					}
+				} else {
+					processed[pr] = []string{pkg}
+				}
+
+				// project must be on disk at this point; question is
+				// whether we're first seeing it here, in the transitive
+				// exploration, or if it arose in the direct dep parts
+				if _, in := ondisk[pr]; !in {
+					v, err := versionInWorkspace(pr)
+					if err != nil {
+						colors[pkg] = black
+						notondisk[pr] = true
+						return nil
+					}
+					ondisk[pr] = v
+				}
+
+				// recurse
+				for _, rpkg := range reached {
+					if isStdLib(rpkg) {
+						continue
+					}
+
+					err := dft(rpkg)
+					if err != nil {
+						return err
+					}
+				}
+
+				colors[pkg] = black
+			case grey:
+				return fmt.Errorf("Import cycle detected on %s", pkg)
+			}
+			return nil
+		}
+
+		// run the depth-first traversal from the set of immediate external
+		// package imports we found in the current project
+		for pkg := range packages {
+			err := dft(pkg)
+			if err != nil {
+				return err // already errors.Wrap()'d internally
+			}
+		}
+
+		// Make an initial lock from what knowledge we've collected about the
+		// versions on disk
+		l := lock{
+			P: make([]gps.LockedProject, 0, len(ondisk)),
+		}
+
+		for pr, v := range ondisk {
+			// That we have to chop off these path prefixes is a symptom of
+			// a problem in gps itself
+			pkgs := make([]string, 0, len(processed[pr]))
+			prslash := string(pr) + "/"
+			for _, pkg := range processed[pr] {
+				if pkg == string(pr) {
+					pkgs = append(pkgs, ".")
+				} else {
+					pkgs = append(pkgs, strings.TrimPrefix(pkg, prslash))
+				}
+			}
+
+			l.P = append(l.P, gps.NewLockedProject(
+				gps.ProjectIdentifier{ProjectRoot: pr}, v, pkgs),
+			)
+		}
+
+		var l2 *lock
+		if len(notondisk) > 0 {
+			params := gps.SolveParameters{
+				RootDir:         p,
+				RootPackageTree: pkgT,
+				Manifest:        &m,
+				Lock:            &l,
+			}
+			s, err := gps.Prepare(params, sm)
+			if err != nil {
+				return errors.Wrap(err, "prepare solver")
+			}
+
+			soln, err := s.Solve()
+			if err != nil {
+				handleAllTheFailuresOfTheWorld(err)
+				return err
+			}
+			l2 = lockFromInterface(soln)
+		} else {
+			l2 = &l
+		}
+
+		if err := writeFile(mf, &m); err != nil {
+			return errors.Wrap(err, "writeFile for manifest")
+		}
+		if err := writeFile(lf, l2); err != nil {
+			return errors.Wrap(err, "writeFile for lock")
+		}
+
+		return nil
 	}
+
 	return errors.Wrap(err, "runInit fall through")
 }
 
+// contains checks if a array of strings contains a value
+func contains(a []string, b string) bool {
+	for _, v := range a {
+		if b == v {
+			return true
+		}
+	}
+	return false
+}
+
+// TODO this is a stub, make it not a stub when gps gets its act together
 func isStdLib(i string) bool {
 	switch i {
-	case "bytes", "encoding/hex", "errors", "sort", "encoding/json", "flag", "fmt", "io", "os", "path/filepath", "strings", "text/tabwriter":
+	case "bytes", "container/heap", "crypto/sha256", "encoding/hex", "encoding/xml", "errors", "sort", "encoding/json", "flag", "fmt", "go/build", "go/scanner", "io", "io/ioutil", "log", "math/rand", "net/http", "net/url", "os", "os/exec", "path", "path/filepath", "regexp", "runtime", "strconv", "strings", "sync", "sync/atomic", "text/scanner", "text/tabwriter", "time":
 		return true
 	}
 	return false
 }
 
-func writeManifest(path string, m rawManifest) error {
+// TODO stub; considerable effort required for the real impl
+func versionInWorkspace(pr gps.ProjectRoot) (gps.Version, error) {
+	switch pr {
+	case "github.com/sdboyer/gps":
+		return gps.NewVersion("v0.12.0").Is("9ca61cb4e9851c80bb537e7d8e1be56e18e03cc9"), nil
+	case "github.com/Masterminds/semver":
+		return gps.NewBranch("2.x").Is("b3ef6b1808e9889dfb8767ce7068db923a3d07de"), nil
+	case "github.com/Masterminds/vcs":
+		return gps.Revision("fbe9fb6ad5b5f35b3e82a7c21123cfc526cbf895"), nil
+	case "github.com/pkg/errors":
+		return gps.NewVersion("v0.8.0").Is("645ef00459ed84a119197bfb8d8205042c6df63d"), nil
+	case "github.com/armon/go-radix":
+		return gps.NewBranch("master").Is("4239b77079c7b5d1243b7b4736304ce8ddb6f0f2"), nil
+	case "github.com/termie/go-shutil":
+		return gps.NewBranch("master").Is("4239b77079c7b5d1243b7b4736304ce8ddb6f0f2"), nil
+	}
+
+	return nil, fmt.Errorf("unknown project")
+}
+
+// TODO solve failures can be really creative - we need to be similarly creative
+// in handling them and informing the user appropriately
+func handleAllTheFailuresOfTheWorld(err error) {
+	fmt.Println("ouchie, solve error: %s", err)
+}
+
+func writeFile(path string, in json.Marshaler) error {
 	f, err := os.Create(path)
 	if err != nil {
 		return err
 	}
 	defer f.Close()
-	e := json.NewEncoder(f)
-	return e.Encode(m)
-}
 
-func createManifest(path string) error {
-	return writeManifest(path, newRawManifest())
+	b, err := in.MarshalJSON()
+	if err != nil {
+		return err
+	}
+
+	_, err = f.Write(b)
+	return err
 }
