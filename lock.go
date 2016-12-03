@@ -89,6 +89,8 @@ func (l *lock) MarshalJSON() ([]byte, error) {
 		P:    make([]lockedDep, len(l.P)),
 	}
 
+	sort.Sort(sortedLockedProjects(l.P))
+
 	for k, lp := range l.P {
 		id := lp.Ident()
 		ld := lockedDep{
@@ -147,4 +149,21 @@ func lockFromInterface(in gps.Lock) *lock {
 	copy(l.Memo, h)
 	copy(l.P, p)
 	return l
+}
+
+type sortedLockedProjects []gps.LockedProject
+
+func (s sortedLockedProjects) Len() int      { return len(s) }
+func (s sortedLockedProjects) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
+func (s sortedLockedProjects) Less(i, j int) bool {
+	l, r := s[i].Ident(), s[j].Ident()
+
+	if l.ProjectRoot < r.ProjectRoot {
+		return true
+	}
+	if r.ProjectRoot < l.ProjectRoot {
+		return false
+	}
+
+	return l.NetworkName < r.NetworkName
 }
