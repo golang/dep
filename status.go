@@ -205,7 +205,7 @@ func runStatusAll(p *project, sm *gps.SourceMgr) error {
 			}
 
 			fmt.Fprintf(tw,
-				"%s\t%s\t%s\t%s\t%s\t%s\t\n",
+				"%s\t%s\t%s\t%s\t%s\t%d\t\n",
 				bs.ProjectRoot,
 				bs.Constraint,
 				bs.Version,
