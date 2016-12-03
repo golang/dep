@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/Masterminds/vcs"
 	"github.com/pkg/errors"
 	"github.com/sdboyer/gps"
 )
@@ -61,6 +62,25 @@ func splitAbsoluteProjectRoot(path string) (string, string, error) {
 		}
 	}
 	return "", "", fmt.Errorf("%s not in any $GOPATH", path)
+}
+
+// absoluteProjectRoot determines the absolute path to the project root
+// including the $GOPATH. This will not work with stdlib packages and the
+// package directory needs to exist.
+func absoluteProjectRoot(path string) (string, error) {
+	gopath := os.Getenv("GOPATH")
+	for _, gp := range filepath.SplitList(gopath) {
+		posspath := filepath.Join(gp, "src", path)
+		f, err := os.Stat(posspath)
+		if err != nil {
+			continue
+		}
+
+		if f.IsDir() {
+			return posspath, nil
+		}
+	}
+	return "", fmt.Errorf("%s not in any $GOPATH", path)
 }
 
 func runInit(args []string) error {
@@ -361,24 +381,53 @@ func isStdLib(path string) bool {
 	return !strings.Contains(elem, ".")
 }
 
-// TODO stub; considerable effort required for the real impl
-func versionInWorkspace(pr gps.ProjectRoot) (gps.Version, error) {
-	switch pr {
-	case "github.com/sdboyer/gps":
-		return gps.NewVersion("v0.12.0").Is("9ca61cb4e9851c80bb537e7d8e1be56e18e03cc9"), nil
-	case "github.com/Masterminds/semver":
-		return gps.NewBranch("2.x").Is("b3ef6b1808e9889dfb8767ce7068db923a3d07de"), nil
-	case "github.com/Masterminds/vcs":
-		return gps.Revision("fbe9fb6ad5b5f35b3e82a7c21123cfc526cbf895"), nil
-	case "github.com/pkg/errors":
-		return gps.NewVersion("v0.8.0").Is("645ef00459ed84a119197bfb8d8205042c6df63d"), nil
-	case "github.com/armon/go-radix":
-		return gps.NewBranch("master").Is("4239b77079c7b5d1243b7b4736304ce8ddb6f0f2"), nil
-	case "github.com/termie/go-shutil":
-		return gps.NewBranch("master").Is("4239b77079c7b5d1243b7b4736304ce8ddb6f0f2"), nil
+func versionInWorkspace(root gps.ProjectRoot) (gps.Version, error) {
+	pr, err := absoluteProjectRoot(string(root))
+	if err != nil {
+		return nil, errors.Wrapf(err, "determine project root for %s", root)
 	}
 
-	return nil, fmt.Errorf("unknown project")
+	repo, err := vcs.NewRepo("", string(pr))
+	if err != nil {
+		return nil, errors.Wrapf(err, "creating new repo for root: %s", pr)
+	}
+
+	ver, err := repo.Current()
+	if err != nil {
+		return nil, errors.Wrapf(err, "finding current branch/version for root: %s", pr)
+	}
+
+	sha, err := repo.Version()
+	if err != nil {
+		return nil, errors.Wrapf(err, "getting repo version for root: %s", pr)
+	}
+
+	// first look through tags
+	tags, err := repo.Tags()
+	if err != nil {
+		return nil, errors.Wrapf(err, "getting repo tags for root: %s", pr)
+	}
+	// try to match the current version to a tag
+	if contains(tags, ver) {
+		// assume semver if it starts with a v
+		if strings.HasPrefix(ver, "v") {
+			return gps.NewVersion(ver).Is(gps.Revision(sha)), nil
+		}
+
+		return nil, fmt.Errorf("version for root %s does not start with a v: %q", pr, ver)
+	}
+
+	// look for the current branch
+	branches, err := repo.Branches()
+	if err != nil {
+		return nil, errors.Wrapf(err, "getting repo branch for root: %s")
+	}
+	// try to match the current version to a branch
+	if contains(branches, ver) {
+		return gps.NewBranch(ver).Is(gps.Revision(sha)), nil
+	}
+
+	return gps.Revision(sha), nil
 }
 
 // TODO solve failures can be really creative - we need to be similarly creative
