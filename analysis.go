@@ -599,7 +599,7 @@ func wmToReach(workmap map[string]wm, basedir string) map[string][]string {
 
 	var dfe func(string, []string) bool
 
-	// dfe is the depth-first-explorer that computes safe, error-free external
+	// dfe is the depth-first-explorer that computes a safe, error-free external
 	// reach map.
 	//
 	// pkg is the import path of the pkg currently being visited; path is the

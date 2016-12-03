@@ -28,7 +28,7 @@ way. It is a distillation of the ideas behind language package managers like
 [cargo](https://crates.io/) (and others) into a library, artisanally
 handcrafted with ❤️ for Go's specific requirements.
 
-`gps` is [on track](https://github.com/Masterminds/glide/pull/384) to become the engine behind [glide](https://glide.sh).
+`gps` is [on track](https://github.com/Masterminds/glide/issues/565) to become the engine behind [glide](https://glide.sh).
 
 The wiki has a [general introduction to the `gps`
 approach](https://github.com/sdboyer/gps/wiki/Introduction-to-gps), as well
