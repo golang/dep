@@ -107,9 +107,9 @@ func (r Revision) String() string {
 	return string(r)
 }
 
-// Type indicates the type of version - for revisions, "rev".
+// Type indicates the type of version - for revisions, "revision".
 func (r Revision) Type() string {
-	return "rev"
+	return "revision"
 }
 
 // Matches is the Revision acting as a constraint; it checks to see if the provided
