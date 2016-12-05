@@ -46,43 +46,6 @@ var initCmd = &command{
 	`,
 }
 
-// splitAbsoluteProjectRoot takes an absolute path and compares it against declared
-// GOPATH(s) to determine what portion of the input path should be treated as an
-// import path - as a project root.
-//
-// The second returned string indicates which GOPATH value was used.
-func splitAbsoluteProjectRoot(path string) (string, string, error) {
-	gopath := os.Getenv("GOPATH")
-	for _, gp := range filepath.SplitList(gopath) {
-		srcprefix := filepath.Join(gp, "src") + string(filepath.Separator)
-		if strings.HasPrefix(path, srcprefix) {
-			// filepath.ToSlash because we're dealing with an import path now,
-			// not an fs path
-			return filepath.ToSlash(strings.TrimPrefix(path, srcprefix)), gp, nil
-		}
-	}
-	return "", "", fmt.Errorf("%s not in any $GOPATH", path)
-}
-
-// absoluteProjectRoot determines the absolute path to the project root
-// including the $GOPATH. This will not work with stdlib packages and the
-// package directory needs to exist.
-func absoluteProjectRoot(path string) (string, error) {
-	gopath := os.Getenv("GOPATH")
-	for _, gp := range filepath.SplitList(gopath) {
-		posspath := filepath.Join(gp, "src", path)
-		f, err := os.Stat(posspath)
-		if err != nil {
-			continue
-		}
-
-		if f.IsDir() {
-			return posspath, nil
-		}
-	}
-	return "", fmt.Errorf("%s not in any $GOPATH", path)
-}
-
 func runInit(args []string) error {
 	if len(args) > 1 {
 		return fmt.Errorf("Too many args: %d", len(args))
@@ -118,7 +81,7 @@ func runInit(args []string) error {
 		return fmt.Errorf("Invalid state: manifest %q does not exist, but lock %q does.", mf, lf)
 	}
 
-	pr, gopath, err := splitAbsoluteProjectRoot(root)
+	pr, gopath, err := depContext.splitAbsoluteProjectRoot(root)
 	if err != nil {
 		return errors.Wrap(err, "determineProjectRoot")
 	}
@@ -126,7 +89,7 @@ func runInit(args []string) error {
 	if err != nil {
 		return errors.Wrap(err, "gps.ListPackages")
 	}
-	sm, err := getSourceManager()
+	sm, err := depContext.getSourceManager()
 	if err != nil {
 		return errors.Wrap(err, "getSourceManager")
 	}
@@ -357,6 +320,42 @@ func runInit(args []string) error {
 	return nil
 }
 
+// splitAbsoluteProjectRoot takes an absolute path and compares it against declared
+// GOPATH(s) to determine what portion of the input path should be treated as an
+// import path - as a project root.
+//
+// The second returned string indicates which GOPATH value was used.
+// TODO: rename this appropriately
+func (c *ctx) splitAbsoluteProjectRoot(path string) (string, string, error) {
+	for _, gp := range filepath.SplitList(c.GOPATH) {
+		srcprefix := filepath.Join(gp, "src") + string(filepath.Separator)
+		if strings.HasPrefix(path, srcprefix) {
+			// filepath.ToSlash because we're dealing with an import path now,
+			// not an fs path
+			return filepath.ToSlash(strings.TrimPrefix(path, srcprefix)), gp, nil
+		}
+	}
+	return "", "", fmt.Errorf("%s not in any $GOPATH", path)
+}
+
+// absoluteProjectRoot determines the absolute path to the project root
+// including the $GOPATH. This will not work with stdlib packages and the
+// package directory needs to exist.
+func (c *ctx) absoluteProjectRoot(path string) (string, error) {
+	for _, gp := range filepath.SplitList(c.GOPATH) {
+		posspath := filepath.Join(gp, "src", path)
+		f, err := os.Stat(posspath)
+		if err != nil {
+			continue
+		}
+
+		if f.IsDir() {
+			return posspath, nil
+		}
+	}
+	return "", fmt.Errorf("%s not in any $GOPATH", path)
+}
+
 // contains checks if a array of strings contains a value
 func contains(a []string, b string) bool {
 	for _, v := range a {
@@ -382,7 +381,7 @@ func isStdLib(path string) bool {
 }
 
 func versionInWorkspace(root gps.ProjectRoot) (gps.Version, error) {
-	pr, err := absoluteProjectRoot(string(root))
+	pr, err := depContext.absoluteProjectRoot(string(root))
 	if err != nil {
 		return nil, errors.Wrapf(err, "determine project root for %s", root)
 	}
