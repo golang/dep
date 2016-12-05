@@ -128,8 +128,7 @@ func runInit(args []string) error {
 				continue
 			}
 			processed[pr] = []string{i}
-
-			v, err := versionInWorkspace(pr)
+			v, err := depContext.versionInWorkspace(pr)
 			if err != nil {
 				notondisk[pr] = true
 				fmt.Printf("Could not determine version for %q, omitting from generated manifest\n", pr)
@@ -226,7 +225,7 @@ func runInit(args []string) error {
 			// whether we're first seeing it here, in the transitive
 			// exploration, or if it arose in the direct dep parts
 			if _, in := ondisk[pr]; !in {
-				v, err := versionInWorkspace(pr)
+				v, err := depContext.versionInWorkspace(pr)
 				if err != nil {
 					colors[pkg] = black
 					notondisk[pr] = true
@@ -380,8 +379,8 @@ func isStdLib(path string) bool {
 	return !strings.Contains(elem, ".")
 }
 
-func versionInWorkspace(root gps.ProjectRoot) (gps.Version, error) {
-	pr, err := depContext.absoluteProjectRoot(string(root))
+func (c *ctx) versionInWorkspace(root gps.ProjectRoot) (gps.Version, error) {
+	pr, err := c.absoluteProjectRoot(string(root))
 	if err != nil {
 		return nil, errors.Wrapf(err, "determine project root for %s", root)
 	}
