@@ -81,12 +81,12 @@ type MissingStatus struct {
 }
 
 func runStatus(args []string) error {
-	p, err := loadProject("")
+	p, err := depContext.loadProject("")
 	if err != nil {
 		return err
 	}
 
-	sm, err := getSourceManager()
+	sm, err := depContext.getSourceManager()
 	if err != nil {
 		return err
 	}
