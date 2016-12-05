@@ -4,6 +4,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"testing"
+
+	"github.com/sdboyer/gps"
 )
 
 func TestAbsoluteProjectRoot(t *testing.T) {
@@ -66,6 +68,39 @@ func TestIsStdLib(t *testing.T) {
 		b := isStdLib(p)
 		if b != e {
 			t.Fatalf("%s: expected %t got %t", p, e, b)
+		}
+	}
+}
+
+func TestVersionInWorkspace(t *testing.T) {
+	// test must also have external network
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("skipping because git binary not found")
+	}
+
+	tg := testgo(t)
+	defer tg.cleanup()
+
+	tg.tempDir("src")
+	tg.setenv("GOPATH", tg.path("."))
+	depCtx := &ctx{GOPATH: tg.path(".")}
+
+	importPaths := map[string]gps.Version{
+		"github.com/pkg/errors":      gps.NewVersion("v0.8.0").Is("645ef00459ed84a119197bfb8d8205042c6df63d"), // semver
+		"github.com/Sirupsen/logrus": gps.Revision("42b84f9ec624953ecbf81a94feccb3f5935c5edf"),                // random sha
+	}
+
+	// checkout the specified revisions
+	for ip, rev := range importPaths {
+		tg.runGo("get", ip)
+		repoDir := tg.path("src/" + ip)
+		tg.runGit(repoDir, "checkout", rev.String())
+
+		v, err := depCtx.versionInWorkspace(gps.ProjectRoot(ip))
+		tg.must(err)
+
+		if v != rev {
+			t.Fatalf("expected %s, got %s", v.String(), rev.String())
 		}
 	}
 }
