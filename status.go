@@ -261,23 +261,6 @@ func runStatusAll(p *project, sm *gps.SourceMgr) error {
 	return nil
 }
 
-type sortedLockedProjects []gps.LockedProject
-
-func (s sortedLockedProjects) Len() int      { return len(s) }
-func (s sortedLockedProjects) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
-func (s sortedLockedProjects) Less(i, j int) bool {
-	l, r := s[i].Ident(), s[j].Ident()
-
-	if l.ProjectRoot < r.ProjectRoot {
-		return true
-	}
-	if r.ProjectRoot < l.ProjectRoot {
-		return false
-	}
-
-	return l.NetworkName < r.NetworkName
-}
-
 func runStatusDetailed(p *project, sm *gps.SourceMgr, args []string) error {
 	// TODO
 	return fmt.Errorf("not implemented")
