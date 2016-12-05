@@ -6,19 +6,17 @@ package main
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 
 	"github.com/sdboyer/gps"
 )
 
-func getSourceManager() (*gps.SourceMgr, error) {
-	gopath := os.Getenv("GOPATH")
-	if gopath == "" {
+func (c *ctx) getSourceManager() (*gps.SourceMgr, error) {
+	if c.GOPATH == "" {
 		return nil, fmt.Errorf("GOPATH is not set")
 	}
 	// Use the first entry in GOPATH for the depcache
-	first := filepath.SplitList(gopath)[0]
+	first := filepath.SplitList(c.GOPATH)[0]
 
 	return gps.NewSourceManager(analyzer{}, filepath.Join(first, "depcache"))
 }
