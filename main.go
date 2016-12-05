@@ -15,11 +15,20 @@ import (
 	"github.com/sdboyer/gps"
 )
 
-const manifestName = "manifest.json"
-const lockName = "lock.json"
+const (
+	manifestName = "manifest.json"
+	lockName     = "lock.json"
+)
+
+var (
+	depContext *ctx
+)
 
 func main() {
 	flag.Parse()
+
+	// newContext() will set the GOPATH for us to use for various functions.
+	depContext = newContext()
 
 	do := flag.Arg(0)
 	var args []string
@@ -176,7 +185,7 @@ type project struct {
 //
 // If the provided path is empty, it will search from the path indicated by
 // os.Getwd().
-func loadProject(path string) (*project, error) {
+func (c *ctx) loadProject(path string) (*project, error) {
 	var err error
 	p := new(project)
 
@@ -191,12 +200,10 @@ func loadProject(path string) (*project, error) {
 		return p, err
 	}
 
-	gopath := os.Getenv("GOPATH")
 	var match bool
-	for _, gp := range filepath.SplitList(gopath) {
+	for _, gp := range filepath.SplitList(c.GOPATH) {
 		srcprefix := filepath.Join(gp, "src") + string(filepath.Separator)
 		if strings.HasPrefix(p.absroot, srcprefix) {
-			gopath = gp
 			match = true
 			// filepath.ToSlash because we're dealing with an import path now,
 			// not an fs path
