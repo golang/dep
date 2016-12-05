@@ -2,8 +2,45 @@ package main
 
 import (
 	"os/exec"
+	"path/filepath"
 	"testing"
 )
+
+func TestAbsoluteProjectRoot(t *testing.T) {
+	tg := testgo(t)
+	defer tg.cleanup()
+
+	tg.tempDir("src")
+	tg.setenv("GOPATH", tg.path("."))
+	depCtx := &ctx{GOPATH: tg.path(".")}
+
+	importPaths := map[string]bool{
+		"github.com/pkg/errors": true,
+		"my/silly/thing":        false,
+	}
+
+	for i, create := range importPaths {
+		if create {
+			tg.tempDir(filepath.Join("src", i))
+		}
+	}
+
+	for i, ok := range importPaths {
+		pr, err := depCtx.absoluteProjectRoot(i)
+		if ok {
+			tg.must(err)
+			expected := tg.path(filepath.Join("src", i))
+			if pr != expected {
+				t.Fatalf("expected %s, got %q", expected, pr)
+			}
+			continue
+		}
+
+		if err == nil {
+			t.Fatalf("expected %s to fail", i)
+		}
+	}
+}
 
 func TestContains(t *testing.T) {
 	a := []string{"a", "b", "abcd"}
