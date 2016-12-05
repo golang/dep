@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"go/format"
-	"io"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -28,6 +27,7 @@ func init() {
 
 // The TestMain function creates a dep command for testing purposes and
 // deletes it after the tests have been run.
+// Most of this is taken from https://github.com/golang/go/blob/master/src/cmd/go/go_test.go and reused here.
 func TestMain(m *testing.M) {
 	args := []string{"build", "-o", "testdep" + exeSuffix}
 	out, err := exec.Command("go", args...).CombinedOutput()
@@ -164,12 +164,12 @@ func (tg *testgoData) doRun(args []string) error {
 			}
 		}
 	}
-	tg.t.Logf("running testgo %v", args)
+	tg.t.Logf("running testdep %v", args)
 	var prog string
 	if tg.wd == "" {
-		prog = "./testgo" + exeSuffix
+		prog = "./testdep" + exeSuffix
 	} else {
-		prog = filepath.Join(tg.wd, "testgo"+exeSuffix)
+		prog = filepath.Join(tg.wd, "testdep"+exeSuffix)
 	}
 	cmd := exec.Command(prog, args...)
 	tg.stdout.Reset()
@@ -204,6 +204,30 @@ func (tg *testgoData) runFail(args ...string) {
 		tg.t.Fatal("testgo succeeded unexpectedly")
 	} else {
 		tg.t.Log("testgo failed as expected:", status)
+	}
+}
+
+// runGo runs a go command, and expects it to succeed.
+func (tg *testgoData) runGo(args ...string) {
+	cmd := exec.Command("go", args...)
+	tg.stdout.Reset()
+	tg.stderr.Reset()
+	cmd.Stdout = &tg.stdout
+	cmd.Stderr = &tg.stderr
+	cmd.Dir = tg.wd
+	cmd.Env = tg.env
+	status := cmd.Run()
+	if tg.stdout.Len() > 0 {
+		tg.t.Log("go standard output:")
+		tg.t.Log(tg.stdout.String())
+	}
+	if tg.stderr.Len() > 0 {
+		tg.t.Log("go standard error:")
+		tg.t.Log(tg.stderr.String())
+	}
+	if status != nil {
+		tg.t.Logf("go %v failed unexpectedly: %v", args, status)
+		tg.t.FailNow()
 	}
 }
 
@@ -429,73 +453,6 @@ func (tg *testgoData) mustNotExist(path string) {
 	}
 }
 
-// wantExecutable fails with msg if path is not executable.
-func (tg *testgoData) wantExecutable(path, msg string) {
-	if st, err := os.Stat(path); err != nil {
-		if !os.IsNotExist(err) {
-			tg.t.Log(err)
-		}
-		tg.t.Fatal(msg)
-	} else {
-		if runtime.GOOS != "windows" && st.Mode()&0111 == 0 {
-			tg.t.Fatalf("binary %s exists but is not executable", path)
-		}
-	}
-}
-
-// wantArchive fails if path is not an archive.
-func (tg *testgoData) wantArchive(path string) {
-	f, err := os.Open(path)
-	if err != nil {
-		tg.t.Fatal(err)
-	}
-	buf := make([]byte, 100)
-	io.ReadFull(f, buf)
-	f.Close()
-	if !bytes.HasPrefix(buf, []byte("!<arch>\n")) {
-		tg.t.Fatalf("file %s exists but is not an archive", path)
-	}
-}
-
-// isStale reports whether pkg is stale, and why
-func (tg *testgoData) isStale(pkg string) (bool, string) {
-	tg.run("list", "-f", "{{.Stale}}:{{.StaleReason}}", pkg)
-	v := strings.TrimSpace(tg.getStdout())
-	f := strings.SplitN(v, ":", 2)
-	if len(f) == 2 {
-		switch f[0] {
-		case "true":
-			return true, f[1]
-		case "false":
-			return false, f[1]
-		}
-	}
-	tg.t.Fatalf("unexpected output checking staleness of package %v: %v", pkg, v)
-	panic("unreachable")
-}
-
-// wantStale fails with msg if pkg is not stale.
-func (tg *testgoData) wantStale(pkg, reason, msg string) {
-	stale, why := tg.isStale(pkg)
-	if !stale {
-		tg.t.Fatal(msg)
-	}
-	if reason == "" && why != "" || !strings.Contains(why, reason) {
-		tg.t.Errorf("wrong reason for Stale=true: %q, want %q", why, reason)
-	}
-}
-
-// wantNotStale fails with msg if pkg is stale.
-func (tg *testgoData) wantNotStale(pkg, reason, msg string) {
-	stale, why := tg.isStale(pkg)
-	if stale {
-		tg.t.Fatal(msg)
-	}
-	if reason == "" && why != "" || !strings.Contains(why, reason) {
-		tg.t.Errorf("wrong reason for Stale=false: %q, want %q", why, reason)
-	}
-}
-
 // cleanup cleans up a test that runs testgo.
 func (tg *testgoData) cleanup() {
 	if tg.wd != "" {
@@ -513,13 +470,22 @@ func (tg *testgoData) cleanup() {
 	}
 }
 
-// failSSH puts an ssh executable in the PATH that always fails.
-// This is to stub out uses of ssh by go get.
-func (tg *testgoData) failSSH() {
-	wd, err := os.Getwd()
-	if err != nil {
-		tg.t.Fatal(err)
-	}
-	fail := filepath.Join(wd, "testdata/failssh")
-	tg.setenv("PATH", fmt.Sprintf("%v%c%v", fail, filepath.ListSeparator, os.Getenv("PATH")))
+// readManifest returns the manifest in the current directory.
+func (tg *testgoData) readManifest() string {
+	m := filepath.Join(tg.pwd(), "manifest.json")
+	tg.mustExist(m)
+
+	f, err := ioutil.ReadFile(m)
+	tg.must(err)
+	return string(f)
+}
+
+// readLock returns the lock in the current directory.
+func (tg *testgoData) readLock() string {
+	l := filepath.Join(tg.pwd(), "lock.json")
+	tg.mustExist(l)
+
+	f, err := ioutil.ReadFile(l)
+	tg.must(err)
+	return string(f)
 }
