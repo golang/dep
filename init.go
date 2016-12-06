@@ -81,260 +81,260 @@ func runInit(args []string) error {
 	mf := filepath.Join(p, manifestName)
 	lf := filepath.Join(p, lockName)
 
-	// TODO: Lstat ? Do we care?
-	_, merr := os.Stat(mf)
-	if merr == nil {
+	mok, err := isRegular(mf)
+	if err != nil {
+		return err
+	}
+	if mok {
 		return fmt.Errorf("Manifest file %q already exists", mf)
 	}
-	_, lerr := os.Stat(lf)
+	// Manifest file does not exist.
 
-	if os.IsNotExist(merr) {
-		if lerr == nil {
-			return fmt.Errorf("Invalid state: manifest %q does not exist, but lock %q does.", mf, lf)
-		} else if !os.IsNotExist(lerr) {
-			return errors.Wrap(lerr, "stat lockfile")
+	lok, err := isRegular(lf)
+	if err != nil {
+		return err
+	}
+	if lok {
+		return fmt.Errorf("Invalid state: manifest %q does not exist, but lock %q does.", mf, lf)
+	}
+
+	cpr, gopath, err := determineProjectRoot(p)
+	if err != nil {
+		return errors.Wrap(err, "determineProjectRoot")
+	}
+	pkgT, err := gps.ListPackages(p, cpr)
+	if err != nil {
+		return errors.Wrap(err, "gps.ListPackages")
+	}
+	sm, err := getSourceManager()
+	if err != nil {
+		return errors.Wrap(err, "getSourceManager")
+	}
+	defer sm.Release()
+
+	// TODO: This is just wrong, need to figure out manifest file structure
+	m := manifest{
+		Dependencies: make(gps.ProjectConstraints),
+	}
+
+	processed := make(map[gps.ProjectRoot][]string)
+	packages := make(map[string]bool)
+	notondisk := make(map[gps.ProjectRoot]bool)
+	ondisk := make(map[gps.ProjectRoot]gps.Version)
+	for _, v := range pkgT.Packages {
+		// TODO: Some errors maybe should not be skipped ;-)
+		if v.Err != nil {
+			continue
 		}
 
-		cpr, gopath, err := determineProjectRoot(p)
-		if err != nil {
-			return errors.Wrap(err, "determineProjectRoot")
-		}
-		pkgT, err := gps.ListPackages(p, cpr)
-		if err != nil {
-			return errors.Wrap(err, "gps.ListPackages")
-		}
-		sm, err := getSourceManager()
-		if err != nil {
-			return errors.Wrap(err, "getSourceManager")
-		}
-		defer sm.Release()
+		for _, i := range v.P.Imports {
+			if isStdLib(i) { // TODO: Replace with non stubbed version
+				continue
+			}
+			pr, err := sm.DeduceProjectRoot(i)
+			if err != nil {
+				return errors.Wrap(err, "sm.DeduceProjectRoot") // TODO: Skip and report ?
+			}
 
-		// TODO: This is just wrong, need to figure out manifest file structure
-		m := manifest{
-			Dependencies: make(gps.ProjectConstraints),
-		}
+			packages[i] = true
+			if _, ok := processed[pr]; ok {
+				if !contains(processed[pr], i) {
+					processed[pr] = append(processed[pr], i)
+				}
 
-		processed := make(map[gps.ProjectRoot][]string)
-		packages := make(map[string]bool)
-		notondisk := make(map[gps.ProjectRoot]bool)
-		ondisk := make(map[gps.ProjectRoot]gps.Version)
-		for _, v := range pkgT.Packages {
-			// TODO: Some errors maybe should not be skipped ;-)
-			if v.Err != nil {
+				continue
+			}
+			processed[pr] = []string{i}
+
+			v, err := versionInWorkspace(pr)
+			if err != nil {
+				notondisk[pr] = true
+				fmt.Printf("Could not determine version for %q, omitting from generated manifest\n", pr)
 				continue
 			}
 
-			for _, i := range v.P.Imports {
-				if isStdLib(i) { // TODO: Replace with non stubbed version
-					continue
+			ondisk[pr] = v
+			pp := gps.ProjectProperties{}
+			switch v.Type() {
+			case "branch", "version", "rev":
+				pp.Constraint = v
+			case "semver":
+				c, _ := gps.NewSemverConstraint("^" + v.String())
+				pp.Constraint = c
+			}
+
+			m.Dependencies[pr] = pp
+		}
+	}
+
+	// Explore the packages we've found for transitive deps, either
+	// completing the lock or identifying (more) missing projects that we'll
+	// need to ask gps to solve for us.
+	colors := make(map[string]uint8)
+	const (
+		white uint8 = iota
+		grey
+		black
+	)
+
+	// cache of PackageTrees, so we don't parse projects more than once
+	ptrees := make(map[gps.ProjectRoot]gps.PackageTree)
+
+	// depth-first traverser
+	var dft func(string) error
+	dft = func(pkg string) error {
+		switch colors[pkg] {
+		case white:
+			colors[pkg] = grey
+
+			pr, err := sm.DeduceProjectRoot(pkg)
+			if err != nil {
+				return errors.Wrap(err, "could not deduce project root for "+pkg)
+			}
+
+			// We already visited this project root earlier via some other
+			// pkg within it, and made the decision that it's not on disk.
+			// Respect that decision, and pop the stack.
+			if notondisk[pr] {
+				colors[pkg] = black
+				return nil
+			}
+
+			ptree, has := ptrees[pr]
+			if !has {
+				// It's fine if the root does not exist - it indicates that this
+				// project is not present in the workspace, and so we need to
+				// solve to deal with this dep.
+				r := filepath.Join(gopath, "src", string(pr))
+				_, err := os.Lstat(r)
+				if os.IsNotExist(err) {
+					colors[pkg] = black
+					notondisk[pr] = true
+					return nil
 				}
-				pr, err := sm.DeduceProjectRoot(i)
+
+				ptree, err = gps.ListPackages(r, string(pr))
 				if err != nil {
-					return errors.Wrap(err, "sm.DeduceProjectRoot") // TODO: Skip and report ?
+					// Any error here other than an a nonexistent dir (which
+					// can't happen because we covered that case above) is
+					// probably critical, so bail out.
+					return errors.Wrap(err, "gps.ListPackages")
 				}
+			}
 
-				packages[i] = true
-				if _, ok := processed[pr]; ok {
-					if !contains(processed[pr], i) {
-						processed[pr] = append(processed[pr], i)
-					}
+			rm := ptree.ExternalReach(false, false, nil)
+			reached, ok := rm[pkg]
+			if !ok {
+				colors[pkg] = black
+				// not on disk...
+				notondisk[pr] = true
+				return nil
+			}
 
-					continue
+			if _, ok := processed[pr]; ok {
+				if !contains(processed[pr], pkg) {
+					processed[pr] = append(processed[pr], pkg)
 				}
-				processed[pr] = []string{i}
+			} else {
+				processed[pr] = []string{pkg}
+			}
 
+			// project must be on disk at this point; question is
+			// whether we're first seeing it here, in the transitive
+			// exploration, or if it arose in the direct dep parts
+			if _, in := ondisk[pr]; !in {
 				v, err := versionInWorkspace(pr)
 				if err != nil {
+					colors[pkg] = black
 					notondisk[pr] = true
-					fmt.Printf("Could not determine version for %q, omitting from generated manifest\n", pr)
+					return nil
+				}
+				ondisk[pr] = v
+			}
+
+			// recurse
+			for _, rpkg := range reached {
+				if isStdLib(rpkg) {
 					continue
 				}
 
-				ondisk[pr] = v
-				pp := gps.ProjectProperties{}
-				switch v.Type() {
-				case "branch", "version", "rev":
-					pp.Constraint = v
-				case "semver":
-					c, _ := gps.NewSemverConstraint("^" + v.String())
-					pp.Constraint = c
-				}
-
-				m.Dependencies[pr] = pp
-			}
-		}
-
-		// Explore the packages we've found for transitive deps, either
-		// completing the lock or identifying (more) missing projects that we'll
-		// need to ask gps to solve for us.
-		colors := make(map[string]uint8)
-		const (
-			white uint8 = iota
-			grey
-			black
-		)
-
-		// cache of PackageTrees, so we don't parse projects more than once
-		ptrees := make(map[gps.ProjectRoot]gps.PackageTree)
-
-		// depth-first traverser
-		var dft func(string) error
-		dft = func(pkg string) error {
-			switch colors[pkg] {
-			case white:
-				colors[pkg] = grey
-
-				pr, err := sm.DeduceProjectRoot(pkg)
+				err := dft(rpkg)
 				if err != nil {
-					return errors.Wrap(err, "could not deduce project root for "+pkg)
-				}
-
-				// We already visited this project root earlier via some other
-				// pkg within it, and made the decision that it's not on disk.
-				// Respect that decision, and pop the stack.
-				if notondisk[pr] {
-					colors[pkg] = black
-					return nil
-				}
-
-				ptree, has := ptrees[pr]
-				if !has {
-					// It's fine if the root does not exist - it indicates that this
-					// project is not present in the workspace, and so we need to
-					// solve to deal with this dep.
-					r := filepath.Join(gopath, "src", string(pr))
-					_, err := os.Lstat(r)
-					if os.IsNotExist(err) {
-						colors[pkg] = black
-						notondisk[pr] = true
-						return nil
-					}
-
-					ptree, err = gps.ListPackages(r, string(pr))
-					if err != nil {
-						// Any error here other than an a nonexistent dir (which
-						// can't happen because we covered that case above) is
-						// probably critical, so bail out.
-						return errors.Wrap(err, "gps.ListPackages")
-					}
-				}
-
-				rm := ptree.ExternalReach(false, false, nil)
-				reached, ok := rm[pkg]
-				if !ok {
-					colors[pkg] = black
-					// not on disk...
-					notondisk[pr] = true
-					return nil
-				}
-
-				if _, ok := processed[pr]; ok {
-					if !contains(processed[pr], pkg) {
-						processed[pr] = append(processed[pr], pkg)
-					}
-				} else {
-					processed[pr] = []string{pkg}
-				}
-
-				// project must be on disk at this point; question is
-				// whether we're first seeing it here, in the transitive
-				// exploration, or if it arose in the direct dep parts
-				if _, in := ondisk[pr]; !in {
-					v, err := versionInWorkspace(pr)
-					if err != nil {
-						colors[pkg] = black
-						notondisk[pr] = true
-						return nil
-					}
-					ondisk[pr] = v
-				}
-
-				// recurse
-				for _, rpkg := range reached {
-					if isStdLib(rpkg) {
-						continue
-					}
-
-					err := dft(rpkg)
-					if err != nil {
-						return err
-					}
-				}
-
-				colors[pkg] = black
-			case grey:
-				return fmt.Errorf("Import cycle detected on %s", pkg)
-			}
-			return nil
-		}
-
-		// run the depth-first traversal from the set of immediate external
-		// package imports we found in the current project
-		for pkg := range packages {
-			err := dft(pkg)
-			if err != nil {
-				return err // already errors.Wrap()'d internally
-			}
-		}
-
-		// Make an initial lock from what knowledge we've collected about the
-		// versions on disk
-		l := lock{
-			P: make([]gps.LockedProject, 0, len(ondisk)),
-		}
-
-		for pr, v := range ondisk {
-			// That we have to chop off these path prefixes is a symptom of
-			// a problem in gps itself
-			pkgs := make([]string, 0, len(processed[pr]))
-			prslash := string(pr) + "/"
-			for _, pkg := range processed[pr] {
-				if pkg == string(pr) {
-					pkgs = append(pkgs, ".")
-				} else {
-					pkgs = append(pkgs, strings.TrimPrefix(pkg, prslash))
+					return err
 				}
 			}
 
-			l.P = append(l.P, gps.NewLockedProject(
-				gps.ProjectIdentifier{ProjectRoot: pr}, v, pkgs),
-			)
+			colors[pkg] = black
+		case grey:
+			return fmt.Errorf("Import cycle detected on %s", pkg)
 		}
-
-		var l2 *lock
-		if len(notondisk) > 0 {
-			params := gps.SolveParameters{
-				RootDir:         p,
-				RootPackageTree: pkgT,
-				Manifest:        &m,
-				Lock:            &l,
-			}
-			s, err := gps.Prepare(params, sm)
-			if err != nil {
-				return errors.Wrap(err, "prepare solver")
-			}
-
-			soln, err := s.Solve()
-			if err != nil {
-				handleAllTheFailuresOfTheWorld(err)
-				return err
-			}
-			l2 = lockFromInterface(soln)
-		} else {
-			l2 = &l
-		}
-
-		if err := writeFile(mf, &m); err != nil {
-			return errors.Wrap(err, "writeFile for manifest")
-		}
-		if err := writeFile(lf, l2); err != nil {
-			return errors.Wrap(err, "writeFile for lock")
-		}
-
 		return nil
 	}
 
-	return errors.Wrap(err, "runInit fall through")
+	// run the depth-first traversal from the set of immediate external
+	// package imports we found in the current project
+	for pkg := range packages {
+		err := dft(pkg)
+		if err != nil {
+			return err // already errors.Wrap()'d internally
+		}
+	}
+
+	// Make an initial lock from what knowledge we've collected about the
+	// versions on disk
+	l := lock{
+		P: make([]gps.LockedProject, 0, len(ondisk)),
+	}
+
+	for pr, v := range ondisk {
+		// That we have to chop off these path prefixes is a symptom of
+		// a problem in gps itself
+		pkgs := make([]string, 0, len(processed[pr]))
+		prslash := string(pr) + "/"
+		for _, pkg := range processed[pr] {
+			if pkg == string(pr) {
+				pkgs = append(pkgs, ".")
+			} else {
+				pkgs = append(pkgs, strings.TrimPrefix(pkg, prslash))
+			}
+		}
+
+		l.P = append(l.P, gps.NewLockedProject(
+			gps.ProjectIdentifier{ProjectRoot: pr}, v, pkgs),
+		)
+	}
+
+	var l2 *lock
+	if len(notondisk) > 0 {
+		params := gps.SolveParameters{
+			RootDir:         p,
+			RootPackageTree: pkgT,
+			Manifest:        &m,
+			Lock:            &l,
+		}
+		s, err := gps.Prepare(params, sm)
+		if err != nil {
+			return errors.Wrap(err, "prepare solver")
+		}
+
+		soln, err := s.Solve()
+		if err != nil {
+			handleAllTheFailuresOfTheWorld(err)
+			return err
+		}
+		l2 = lockFromInterface(soln)
+	} else {
+		l2 = &l
+	}
+
+	if err := writeFile(mf, &m); err != nil {
+		return errors.Wrap(err, "writeFile for manifest")
+	}
+	if err := writeFile(lf, l2); err != nil {
+		return errors.Wrap(err, "writeFile for lock")
+	}
+
+	return nil
 }
 
 // contains checks if a array of strings contains a value
@@ -401,4 +401,19 @@ func writeFile(path string, in json.Marshaler) error {
 
 	_, err = f.Write(b)
 	return err
+}
+
+func isRegular(name string) (bool, error) {
+	// TODO: lstat?
+	fi, err := os.Stat(name)
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	if fi.IsDir() {
+		return false, fmt.Errorf("%q is a directory, should be a file", name)
+	}
+	return true, nil
 }
