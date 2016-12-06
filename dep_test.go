@@ -231,6 +231,18 @@ func (tg *testgoData) runGo(args ...string) {
 	}
 }
 
+func needsExternalNetwork(t *testing.T) {
+	if testing.Short() {
+		t.Skipf("skipping test: no external network in -short mode")
+	}
+}
+
+func needsGit(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("skipping because git binary not found")
+	}
+}
+
 // runGit runs a git command, and expects it to succeed.
 func (tg *testgoData) runGit(dir string, args ...string) {
 	cmd := exec.Command("git", args...)
