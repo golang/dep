@@ -1,7 +1,6 @@
 package main
 
 import (
-	"os/exec"
 	"path/filepath"
 	"testing"
 
@@ -42,6 +41,13 @@ func TestAbsoluteProjectRoot(t *testing.T) {
 			t.Fatalf("expected %s to fail", i)
 		}
 	}
+
+	// test that a file fails
+	tg.tempFile("src/thing/thing.go", "hello world")
+	_, err := depCtx.absoluteProjectRoot("thing/thing.go")
+	if err == nil {
+		t.Fatal("error should not be nil for a file found")
+	}
 }
 
 func TestContains(t *testing.T) {
@@ -57,7 +63,7 @@ func TestContains(t *testing.T) {
 
 func TestIsStdLib(t *testing.T) {
 	tests := map[string]bool{
-		"github.com/sirupsen/logrus": false,
+		"github.com/Sirupsen/logrus": false,
 		"encoding/json":              true,
 		"golang.org/x/net/context":   false,
 		"net/context":                true,
@@ -73,10 +79,8 @@ func TestIsStdLib(t *testing.T) {
 }
 
 func TestVersionInWorkspace(t *testing.T) {
-	// test must also have external network
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("skipping because git binary not found")
-	}
+	needsExternalNetwork(t)
+	needsGit(t)
 
 	tg := testgo(t)
 	defer tg.cleanup()
@@ -106,10 +110,8 @@ func TestVersionInWorkspace(t *testing.T) {
 }
 
 func TestInit(t *testing.T) {
-	// test must also have external network
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("skipping because git binary not found")
-	}
+	needsExternalNetwork(t)
+	needsGit(t)
 
 	tg := testgo(t)
 	defer tg.cleanup()
