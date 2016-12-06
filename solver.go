@@ -215,7 +215,7 @@ func Prepare(params SolveParameters, sm SourceManager) (Solver, error) {
 
 	s := &solver{
 		params: params,
-		ig:     params.Manifest.IgnorePackages(),
+		ig:     params.Manifest.IgnoredPackages(),
 		ovr:    params.Manifest.Overrides(),
 		tl:     params.TraceLogger,
 		rpt:    params.RootPackageTree.dup(),

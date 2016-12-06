@@ -39,11 +39,11 @@ type RootManifest interface {
 	// them can harm the ecosystem as a whole.
 	Overrides() ProjectConstraints
 
-	// IngorePackages returns a set of import paths to ignore. These import
+	// IngoredPackages returns a set of import paths to ignore. These import
 	// paths can be within the root project, or part of other projects. Ignoring
 	// a package means that both it and its (unique) imports will be disregarded
 	// by all relevant solver operations.
-	IgnorePackages() map[string]bool
+	IgnoredPackages() map[string]bool
 }
 
 // SimpleManifest is a helper for tools to enumerate manifest data. It's
@@ -84,7 +84,7 @@ func (m simpleRootManifest) TestDependencyConstraints() ProjectConstraints {
 func (m simpleRootManifest) Overrides() ProjectConstraints {
 	return m.ovr
 }
-func (m simpleRootManifest) IgnorePackages() map[string]bool {
+func (m simpleRootManifest) IgnoredPackages() map[string]bool {
 	return m.ig
 }
 func (m simpleRootManifest) dup() simpleRootManifest {
