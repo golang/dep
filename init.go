@@ -45,12 +45,12 @@ var initCmd = &command{
 	`,
 }
 
-// determineProjectRoot takes an absolute path and compares it against declared
+// splitAbsoluteProjectRoot takes an absolute path and compares it against declared
 // GOPATH(s) to determine what portion of the input path should be treated as an
 // import path - as a project root.
 //
 // The second returned string indicates which GOPATH value was used.
-func determineProjectRoot(path string) (string, string, error) {
+func splitAbsoluteProjectRoot(path string) (string, string, error) {
 	gopath := os.Getenv("GOPATH")
 	for _, gp := range filepath.SplitList(gopath) {
 		srcprefix := filepath.Join(gp, "src") + string(filepath.Separator)
@@ -67,19 +67,19 @@ func runInit(args []string) error {
 	if len(args) > 1 {
 		return fmt.Errorf("Too many args: %d", len(args))
 	}
-	var p string
+	var root string
 	var err error
 	if len(args) == 0 {
-		p, err = os.Getwd()
+		root, err = os.Getwd()
 		if err != nil {
 			return errors.Wrap(err, "os.Getwd")
 		}
 	} else {
-		p = args[0]
+		root = args[0]
 	}
 
-	mf := filepath.Join(p, manifestName)
-	lf := filepath.Join(p, lockName)
+	mf := filepath.Join(root, manifestName)
+	lf := filepath.Join(root, lockName)
 
 	mok, err := isRegular(mf)
 	if err != nil {
@@ -98,11 +98,11 @@ func runInit(args []string) error {
 		return fmt.Errorf("Invalid state: manifest %q does not exist, but lock %q does.", mf, lf)
 	}
 
-	cpr, gopath, err := determineProjectRoot(p)
+	pr, gopath, err := splitAbsoluteProjectRoot(root)
 	if err != nil {
 		return errors.Wrap(err, "determineProjectRoot")
 	}
-	pkgT, err := gps.ListPackages(p, cpr)
+	pkgT, err := gps.ListPackages(root, pr)
 	if err != nil {
 		return errors.Wrap(err, "gps.ListPackages")
 	}
@@ -307,7 +307,7 @@ func runInit(args []string) error {
 	var l2 *lock
 	if len(notondisk) > 0 {
 		params := gps.SolveParameters{
-			RootDir:         p,
+			RootDir:         root,
 			RootPackageTree: pkgT,
 			Manifest:        &m,
 			Lock:            &l,
