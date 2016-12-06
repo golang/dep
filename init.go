@@ -128,7 +128,7 @@ func runInit(args []string) error {
 		}
 
 		for _, i := range v.P.Imports {
-			if isStdLib(i) { // TODO: Replace with non stubbed version
+			if isStdLib(i) {
 				continue
 			}
 			pr, err := sm.DeduceProjectRoot(i)
