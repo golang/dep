@@ -86,7 +86,7 @@ func runStatus(args []string) error {
 		return err
 	}
 
-	sm, err := depContext.getSourceManager()
+	sm, err := depContext.sourceManager()
 	if err != nil {
 		return err
 	}

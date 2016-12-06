@@ -11,7 +11,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/Masterminds/vcs"
 	"github.com/pkg/errors"
 	"github.com/sdboyer/gps"
 )
@@ -89,7 +88,7 @@ func runInit(args []string) error {
 	if err != nil {
 		return errors.Wrap(err, "gps.ListPackages")
 	}
-	sm, err := depContext.getSourceManager()
+	sm, err := depContext.sourceManager()
 	if err != nil {
 		return errors.Wrap(err, "getSourceManager")
 	}
@@ -319,42 +318,6 @@ func runInit(args []string) error {
 	return nil
 }
 
-// splitAbsoluteProjectRoot takes an absolute path and compares it against declared
-// GOPATH(s) to determine what portion of the input path should be treated as an
-// import path - as a project root.
-//
-// The second returned string indicates which GOPATH value was used.
-// TODO: rename this appropriately
-func (c *ctx) splitAbsoluteProjectRoot(path string) (string, string, error) {
-	for _, gp := range filepath.SplitList(c.GOPATH) {
-		srcprefix := filepath.Join(gp, "src") + string(filepath.Separator)
-		if strings.HasPrefix(path, srcprefix) {
-			// filepath.ToSlash because we're dealing with an import path now,
-			// not an fs path
-			return filepath.ToSlash(strings.TrimPrefix(path, srcprefix)), gp, nil
-		}
-	}
-	return "", "", fmt.Errorf("%s not in any $GOPATH", path)
-}
-
-// absoluteProjectRoot determines the absolute path to the project root
-// including the $GOPATH. This will not work with stdlib packages and the
-// package directory needs to exist.
-func (c *ctx) absoluteProjectRoot(path string) (string, error) {
-	for _, gp := range filepath.SplitList(c.GOPATH) {
-		posspath := filepath.Join(gp, "src", path)
-		f, err := os.Stat(posspath)
-		if err != nil {
-			continue
-		}
-
-		if f.IsDir() {
-			return posspath, nil
-		}
-	}
-	return "", fmt.Errorf("%s not in any $GOPATH", path)
-}
-
 // contains checks if a array of strings contains a value
 func contains(a []string, b string) bool {
 	for _, v := range a {
@@ -377,55 +340,6 @@ func isStdLib(path string) bool {
 	}
 	elem := path[:i]
 	return !strings.Contains(elem, ".")
-}
-
-func (c *ctx) versionInWorkspace(root gps.ProjectRoot) (gps.Version, error) {
-	pr, err := c.absoluteProjectRoot(string(root))
-	if err != nil {
-		return nil, errors.Wrapf(err, "determine project root for %s", root)
-	}
-
-	repo, err := vcs.NewRepo("", string(pr))
-	if err != nil {
-		return nil, errors.Wrapf(err, "creating new repo for root: %s", pr)
-	}
-
-	ver, err := repo.Current()
-	if err != nil {
-		return nil, errors.Wrapf(err, "finding current branch/version for root: %s", pr)
-	}
-
-	sha, err := repo.Version()
-	if err != nil {
-		return nil, errors.Wrapf(err, "getting repo version for root: %s", pr)
-	}
-
-	// first look through tags
-	tags, err := repo.Tags()
-	if err != nil {
-		return nil, errors.Wrapf(err, "getting repo tags for root: %s", pr)
-	}
-	// try to match the current version to a tag
-	if contains(tags, ver) {
-		// assume semver if it starts with a v
-		if strings.HasPrefix(ver, "v") {
-			return gps.NewVersion(ver).Is(gps.Revision(sha)), nil
-		}
-
-		return nil, fmt.Errorf("version for root %s does not start with a v: %q", pr, ver)
-	}
-
-	// look for the current branch
-	branches, err := repo.Branches()
-	if err != nil {
-		return nil, errors.Wrapf(err, "getting repo branch for root: %s")
-	}
-	// try to match the current version to a branch
-	if contains(branches, ver) {
-		return gps.NewBranch(ver).Is(gps.Revision(sha)), nil
-	}
-
-	return gps.Revision(sha), nil
 }
 
 // TODO solve failures can be really creative - we need to be similarly creative
@@ -461,6 +375,21 @@ func isRegular(name string) (bool, error) {
 	}
 	if fi.IsDir() {
 		return false, fmt.Errorf("%q is a directory, should be a file", name)
+	}
+	return true, nil
+}
+
+func isDir(name string) (bool, error) {
+	// TODO: lstat?
+	fi, err := os.Stat(name)
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	if !fi.IsDir() {
+		return false, fmt.Errorf("%q is not a directory", name)
 	}
 	return true, nil
 }
