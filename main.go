@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/sdboyer/gps"
 )
@@ -178,76 +177,4 @@ type project struct {
 	importroot gps.ProjectRoot
 	m          *manifest
 	l          *lock
-}
-
-// loadProject searches for a project root from the provided path, then loads
-// the manifest and lock (if any) it finds there.
-//
-// If the provided path is empty, it will search from the path indicated by
-// os.Getwd().
-func (c *ctx) loadProject(path string) (*project, error) {
-	var err error
-	p := new(project)
-
-	switch path {
-	case "":
-		p.absroot, err = findProjectRootFromWD()
-	default:
-		p.absroot, err = findProjectRoot(path)
-	}
-
-	if err != nil {
-		return p, err
-	}
-
-	var match bool
-	for _, gp := range filepath.SplitList(c.GOPATH) {
-		srcprefix := filepath.Join(gp, "src") + string(filepath.Separator)
-		if strings.HasPrefix(p.absroot, srcprefix) {
-			match = true
-			// filepath.ToSlash because we're dealing with an import path now,
-			// not an fs path
-			p.importroot = gps.ProjectRoot(filepath.ToSlash(strings.TrimPrefix(p.absroot, srcprefix)))
-			break
-		}
-	}
-	if !match {
-		return nil, fmt.Errorf("could not determine project root - not on GOPATH")
-	}
-
-	mp := filepath.Join(p.absroot, manifestName)
-	mf, err := os.Open(mp)
-	if err != nil {
-		if os.IsNotExist(err) {
-			// TODO: list possible solutions? (dep init, cd $project)
-			return nil, fmt.Errorf("no %v found in project root %v", manifestName, p.absroot)
-		}
-		// Unable to read the manifest file
-		return nil, err
-	}
-	defer mf.Close()
-
-	p.m, err = readManifest(mf)
-	if err != nil {
-		return nil, fmt.Errorf("error while parsing %s: %s", mp, err)
-	}
-
-	lp := filepath.Join(path, lockName)
-	lf, err := os.Open(lp)
-	if err != nil {
-		if os.IsNotExist(err) {
-			// It's fine for the lock not to exist
-			return p, nil
-		}
-		// But if a lock does exist and we can't open it, that's a problem
-		return nil, fmt.Errorf("could not open %s: %s", lp, err)
-	}
-
-	defer lf.Close()
-	p.l, err = readLock(lf)
-	if err != nil {
-		return nil, fmt.Errorf("error while parsing %s: %s", lp, err)
-	}
-
-	return p, nil
 }
