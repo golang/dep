@@ -67,7 +67,7 @@ type command struct {
 var commands = []*command{
 	initCmd,
 	statusCmd,
-	getCmd,
+	ensureCmd,
 	// help added here at init time.
 }
 
@@ -115,33 +115,6 @@ func help(args []string) error {
 func noop(args []string) error {
 	fmt.Println("noop called with flags:", args)
 	return nil
-}
-
-// The following command declarations should be moved to their own files as
-// they are implemented.
-
-var getCmd = &command{
-	fn:   noop,
-	name: "get",
-	short: `[flags] [package specs]
-	Fetch or update dependencies.
-	`,
-	long: `
-	Flags:
-		-a	update all packages
-		-x	dry run
-		-f	force the given package to be updated to the specified
-			version
-
-	Package specs:
-		<path>[@<version specifier>]
-
-	Ignores (? architectures / tags )
-		-t	(?) include tests
-
-	Destinations (?)
-		-vendor	(?) get to workspace or vendor directory
-	`,
 }
 
 func findProjectRootFromWD() (string, error) {
