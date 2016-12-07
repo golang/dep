@@ -80,7 +80,7 @@ func runInit(args []string) error {
 		return fmt.Errorf("Invalid state: manifest %q does not exist, but lock %q does.", mf, lf)
 	}
 
-	pr, gopath, err := depContext.splitAbsoluteProjectRoot(root)
+	pr, err := depContext.splitAbsoluteProjectRoot(root)
 	if err != nil {
 		return errors.Wrap(err, "determineProjectRoot")
 	}
@@ -186,7 +186,7 @@ func runInit(args []string) error {
 				// It's fine if the root does not exist - it indicates that this
 				// project is not present in the workspace, and so we need to
 				// solve to deal with this dep.
-				r := filepath.Join(gopath, "src", string(pr))
+				r := filepath.Join(depContext.GOPATH, "src", string(pr))
 				_, err := os.Lstat(r)
 				if os.IsNotExist(err) {
 					colors[pkg] = black
