@@ -27,7 +27,12 @@ func main() {
 	flag.Parse()
 
 	// newContext() will set the GOPATH for us to use for various functions.
-	depContext = newContext()
+	var err error
+	depContext, err = newContext()
+	if err != nil {
+		fmt.Fprint(os.Stderr, err.Error())
+		os.Exit(1)
+	}
 
 	do := flag.Arg(0)
 	var args []string
