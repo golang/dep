@@ -4,6 +4,17 @@
 
 package main
 
+import (
+	"encoding/hex"
+	"fmt"
+	"os"
+	"strconv"
+	"strings"
+
+	"github.com/pkg/errors"
+	"github.com/sdboyer/gps"
+)
+
 var ensureCmd = &command{
 	fn:   runEnsure,
 	name: "ensure",
@@ -68,5 +79,113 @@ For a description of the version specifier string, see this handy guide from cra
 }
 
 func runEnsure(args []string) error {
+	p, err := depContext.loadProject("")
+	if err != nil {
+		return err
+	}
+
+	sm, err := depContext.sourceManager()
+	if err != nil {
+		return err
+	}
+	defer sm.Release()
+
+	var errs []error
+	for _, arg := range args {
+		// default persist to manifest
+		constraint, err := getProjectConstraint(arg, sm)
+		if err != nil {
+			errs = append(errs, err)
+		}
+		p.m.Dependencies[constraint.Ident.ProjectRoot] = gps.ProjectProperties{
+			NetworkName: constraint.Ident.NetworkName,
+			Constraint:  constraint.Constraint,
+		}
+	}
+	if len(errs) > 0 {
+		for err := range errs {
+			fmt.Fprintln(os.Stderr, err)
+		}
+		os.Exit(1)
+	}
+
+	// TODO: do all the sync things and write the manifest
 	return nil
+}
+
+func getProjectConstraint(arg string, sm *gps.SourceMgr) (gps.ProjectConstraint, error) {
+	constraint := gps.ProjectConstraint{}
+
+	// try to split on '@'
+	atIndex := strings.Index(arg, "@")
+	if atIndex > 0 {
+		parts := strings.SplitN(arg, "@", 2)
+		constraint.Constraint = deduceConstraint(parts[1])
+		arg = parts[0]
+	}
+	// TODO: if we decide to keep equals.....
+
+	// split on colon if there is a network location
+	colonIndex := strings.Index(arg, ":")
+	if colonIndex > 0 {
+		parts := strings.SplitN(arg, ":", 2)
+		arg = parts[0]
+		constraint.Ident.NetworkName = parts[1]
+	}
+
+	pr, err := sm.DeduceProjectRoot(arg)
+	if err != nil {
+		return constraint, errors.Wrapf(err, "could not infer project root from dependency path: %s", arg) // this should go through to the user
+	}
+
+	if string(pr) != arg {
+		return constraint, errors.Wrapf(err, "dependency path %s is not a project root", arg)
+	}
+	constraint.Ident.ProjectRoot = gps.ProjectRoot(arg)
+
+	return constraint, nil
+}
+
+// deduceConstraint tries to puzzle out what kind of version is given in a string -
+// semver, a revision, or as a fallback, a plain tag
+func deduceConstraint(s string) gps.Constraint {
+	// always semver if we can
+	c, err := gps.NewSemverConstraint(s)
+	if err == nil {
+		return c
+	}
+
+	slen := len(s)
+	if slen == 40 {
+		if _, err = hex.DecodeString(s); err == nil {
+			// Whether or not it's intended to be a SHA1 digest, this is a
+			// valid byte sequence for that, so go with Revision. This
+			// covers git and hg
+			return gps.Revision(s)
+		}
+	}
+	// Next, try for bzr, which has a three-component GUID separated by
+	// dashes. There should be two, but the email part could contain
+	// internal dashes
+	if strings.Count(s, "-") >= 2 {
+		// Work from the back to avoid potential confusion from the email
+		i3 := strings.LastIndex(s, "-")
+		// Skip if - is last char, otherwise this would panic on bounds err
+		if slen == i3+1 {
+			return gps.NewVersion(s)
+		}
+
+		if _, err = hex.DecodeString(s[i3+1:]); err == nil {
+			i2 := strings.LastIndex(s[:i3], "-")
+			if _, err = strconv.ParseUint(s[i2+1:i3], 10, 64); err == nil {
+				// Getting this far means it'd pretty much be nuts if it's not a
+				// bzr rev, so don't bother parsing the email.
+				return gps.Revision(s)
+			}
+		}
+	}
+
+	// If not a plain SHA1 or bzr custom GUID, assume a plain version.
+	// TODO: if there is amgibuity here, then prompt the user?
+	return gps.NewVersion(s)
 }
