@@ -17,22 +17,24 @@ type ctx struct {
 	GOPATH string // Go path
 }
 
-func newContext() *ctx {
+func newContext() (*ctx, error) {
 	// this way we get the default GOPATH that was added in 1.8
 	buildContext := build.Default
-	return &ctx{
-		GOPATH: buildContext.GOPATH,
+	wd, err := os.Getwd()
+	if err != nil {
+		return nil, errors.Wrap(err, "getting work directory")
 	}
+	for _, gp := range filepath.SplitList(buildContext.GOPATH) {
+		if strings.HasPrefix(wd, gp) {
+			return &ctx{GOPATH: gp}, nil
+		}
+	}
+
+	return nil, errors.New("project not in a GOPATH")
 }
 
 func (c *ctx) sourceManager() (*gps.SourceMgr, error) {
-	if c.GOPATH == "" {
-		return nil, fmt.Errorf("GOPATH is not set")
-	}
-	// Use the first entry in GOPATH for the depcache
-	first := filepath.SplitList(c.GOPATH)[0]
-
-	return gps.NewSourceManager(analyzer{}, filepath.Join(first, "depcache"))
+	return gps.NewSourceManager(analyzer{}, filepath.Join(c.GOPATH, "depcache"))
 }
 
 // loadProject searches for a project root from the provided path, then loads
@@ -55,20 +57,11 @@ func (c *ctx) loadProject(path string) (*project, error) {
 		return p, err
 	}
 
-	var match bool
-	for _, gp := range filepath.SplitList(c.GOPATH) {
-		srcprefix := filepath.Join(gp, "src") + string(filepath.Separator)
-		if strings.HasPrefix(p.absroot, srcprefix) {
-			match = true
-			// filepath.ToSlash because we're dealing with an import path now,
-			// not an fs path
-			p.importroot = gps.ProjectRoot(filepath.ToSlash(strings.TrimPrefix(p.absroot, srcprefix)))
-			break
-		}
+	ip, err := c.splitAbsoluteProjectRoot(p.absroot)
+	if err != nil {
+		return nil, errors.Wrap(err, "split absolute project root")
 	}
-	if !match {
-		return nil, fmt.Errorf("could not determine project root - not on GOPATH")
-	}
+	p.importroot = gps.ProjectRoot(ip)
 
 	mp := filepath.Join(p.absroot, manifestName)
 	mf, err := os.Open(mp)
@@ -112,33 +105,32 @@ func (c *ctx) loadProject(path string) (*project, error) {
 // import path - as a project root.
 //
 // The second returned string indicates which GOPATH value was used.
-// TODO: rename this appropriately
-func (c *ctx) splitAbsoluteProjectRoot(path string) (string, string, error) {
-	for _, gp := range filepath.SplitList(c.GOPATH) {
-		srcprefix := filepath.Join(gp, "src") + string(filepath.Separator)
-		if strings.HasPrefix(path, srcprefix) {
-			// filepath.ToSlash because we're dealing with an import path now,
-			// not an fs path
-			return filepath.ToSlash(strings.TrimPrefix(path, srcprefix)), gp, nil
-		}
+func (c *ctx) splitAbsoluteProjectRoot(path string) (string, error) {
+	srcprefix := filepath.Join(c.GOPATH, "src") + string(filepath.Separator)
+	if strings.HasPrefix(path, srcprefix) {
+		// filepath.ToSlash because we're dealing with an import path now,
+		// not an fs path
+		return filepath.ToSlash(strings.TrimPrefix(path, srcprefix)), nil
 	}
-	return "", "", fmt.Errorf("%s not in any $GOPATH", path)
+
+	return "", fmt.Errorf("%s not in any $GOPATH", path)
 }
 
 // absoluteProjectRoot determines the absolute path to the project root
 // including the $GOPATH. This will not work with stdlib packages and the
 // package directory needs to exist.
 func (c *ctx) absoluteProjectRoot(path string) (string, error) {
-	for _, gp := range filepath.SplitList(c.GOPATH) {
-		posspath := filepath.Join(gp, "src", path)
-		dirOK, err := isDir(posspath)
-		if err != nil || !dirOK {
-			continue
-		}
-
-		return posspath, nil
+	posspath := filepath.Join(c.GOPATH, "src", path)
+	dirOK, err := isDir(posspath)
+	if err != nil {
+		return "", errors.Wrapf(err, "checking if %s is a directory", posspath)
 	}
-	return "", fmt.Errorf("%s not in any $GOPATH", path)
+
+	if !dirOK {
+		return "", fmt.Errorf("%s does not exist", posspath)
+	}
+
+	return posspath, nil
 }
 
 func (c *ctx) versionInWorkspace(root gps.ProjectRoot) (gps.Version, error) {
