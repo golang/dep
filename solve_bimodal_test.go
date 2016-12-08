@@ -800,7 +800,30 @@ var bimodalFixtures = map[string]bimodalFixture{
 		require: []string{"baz/qux"},
 		fail: &noVersionError{
 			pn: mkPI("baz"),
-			//fails: , // TODO new fail type for failed require
+			fails: []failedVersion{
+				{
+					v: NewVersion("2.0.0"),
+					f: &versionNotAllowedFailure{
+						goal:       mkAtom("baz 2.0.0"),
+						failparent: []dependency{mkDep("root", "baz 1.0.0", "baz/qux")},
+						c:          NewVersion("1.0.0"),
+					},
+				},
+				{
+					v: NewVersion("1.0.0"),
+					f: &checkeeHasProblemPackagesFailure{
+						goal: mkAtom("baz 1.0.0"),
+						failpkg: map[string]errDeppers{
+							"baz/qux": errDeppers{
+								err: nil, // nil indicates package is missing
+								deppers: []atom{
+									mkAtom("root"),
+								},
+							},
+						},
+					},
+				},
+			},
 		},
 	},
 	"require subpkg conflicts with other dep constraint": {
@@ -818,7 +841,30 @@ var bimodalFixtures = map[string]bimodalFixture{
 		require: []string{"baz/qux"},
 		fail: &noVersionError{
 			pn: mkPI("baz"),
-			//fails: , // TODO new fail type for failed require
+			fails: []failedVersion{
+				{
+					v: NewVersion("2.0.0"),
+					f: &versionNotAllowedFailure{
+						goal:       mkAtom("baz 2.0.0"),
+						failparent: []dependency{mkDep("foo 1.0.0", "baz 1.0.0", "baz")},
+						c:          NewVersion("1.0.0"),
+					},
+				},
+				{
+					v: NewVersion("1.0.0"),
+					f: &checkeeHasProblemPackagesFailure{
+						goal: mkAtom("baz 1.0.0"),
+						failpkg: map[string]errDeppers{
+							"baz/qux": errDeppers{
+								err: nil, // nil indicates package is missing
+								deppers: []atom{
+									mkAtom("root"),
+								},
+							},
+						},
+					},
+				},
+			},
 		},
 	},
 	"require independent subpkg conflicts with other dep constraint": {
@@ -836,7 +882,30 @@ var bimodalFixtures = map[string]bimodalFixture{
 		require: []string{"baz/qux"},
 		fail: &noVersionError{
 			pn: mkPI("baz"),
-			//fails: , // TODO new fail type for failed require
+			fails: []failedVersion{
+				{
+					v: NewVersion("2.0.0"),
+					f: &versionNotAllowedFailure{
+						goal:       mkAtom("baz 2.0.0"),
+						failparent: []dependency{mkDep("foo 1.0.0", "baz 1.0.0", "baz")},
+						c:          NewVersion("1.0.0"),
+					},
+				},
+				{
+					v: NewVersion("1.0.0"),
+					f: &checkeeHasProblemPackagesFailure{
+						goal: mkAtom("baz 1.0.0"),
+						failpkg: map[string]errDeppers{
+							"baz/qux": errDeppers{
+								err: nil, // nil indicates package is missing
+								deppers: []atom{
+									mkAtom("root"),
+								},
+							},
+						},
+					},
+				},
+			},
 		},
 	},
 }
