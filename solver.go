@@ -502,6 +502,31 @@ func (s *solver) selectRoot() error {
 	// analysis, rather than having the sm do it
 	mdeps := s.ovr.overrideAll(s.rm.DependencyConstraints().merge(s.rm.TestDependencyConstraints()))
 	reach := s.rpt.ExternalReach(true, true, s.ig).ListExternalImports()
+
+	// If there are any requires, slide them into the reach list, as well.
+	if len(s.req) > 0 {
+		reqs := make([]string, 0, len(s.req))
+
+		// Make a map of both imported and required pkgs to skip, to avoid
+		// duplication. Technically, a slice would probably be faster (given
+		// small size and bounds check elimination), but this is a one-time op,
+		// so it doesn't matter.
+		skip := make(map[string]bool, len(s.req))
+		for _, r := range reach {
+			if s.req[r] {
+				skip[r] = true
+			}
+		}
+
+		for r := range s.req {
+			if !skip[r] {
+				reqs = append(reqs, r)
+			}
+		}
+
+		reach = append(reach, reqs...)
+	}
+
 	deps, err := s.intersectConstraintsWithImports(mdeps, reach)
 	if err != nil {
 		// TODO(sdboyer) this could well happen; handle it with a more graceful error
