@@ -748,6 +748,97 @@ var bimodalFixtures = map[string]bimodalFixture{
 			"bar from baz 1.0.0",
 		),
 	},
+	"require package": {
+		ds: []depspec{
+			dsp(mkDepspec("root 0.0.0", "bar 1.0.0"),
+				pkg("root", "foo")),
+			dsp(mkDepspec("foo 1.0.0"),
+				pkg("foo", "bar")),
+			dsp(mkDepspec("bar 1.0.0"),
+				pkg("bar")),
+			dsp(mkDepspec("baz 1.0.0"),
+				pkg("baz")),
+		},
+		require: []string{"baz"},
+		r: mksolution(
+			"foo 1.0.0",
+			"bar 1.0.0",
+			"baz 1.0.0",
+		),
+	},
+	"require subpackage": {
+		ds: []depspec{
+			dsp(mkDepspec("root 0.0.0", "bar 1.0.0"),
+				pkg("root", "foo")),
+			dsp(mkDepspec("foo 1.0.0"),
+				pkg("foo", "bar")),
+			dsp(mkDepspec("bar 1.0.0"),
+				pkg("bar")),
+			dsp(mkDepspec("baz 1.0.0"),
+				pkg("baz", "baz/qux"),
+				pkg("baz/qux")),
+		},
+		require: []string{"baz/qux"},
+		r: mksolution(
+			"foo 1.0.0",
+			"bar 1.0.0",
+			mklp("baz 1.0.0", "baz/qux"),
+		),
+	},
+	"require impossible subpackage": {
+		ds: []depspec{
+			dsp(mkDepspec("root 0.0.0", "baz 1.0.0"),
+				pkg("root", "foo")),
+			dsp(mkDepspec("foo 1.0.0"),
+				pkg("foo")),
+			dsp(mkDepspec("baz 1.0.0"),
+				pkg("baz")),
+			dsp(mkDepspec("baz 2.0.0"),
+				pkg("baz", "baz/qux"),
+				pkg("baz/qux")),
+		},
+		require: []string{"baz/qux"},
+		fail: &noVersionError{
+			pn: mkPI("baz"),
+			//fails: , // TODO new fail type for failed require
+		},
+	},
+	"require subpkg conflicts with other dep constraint": {
+		ds: []depspec{
+			dsp(mkDepspec("root 0.0.0"),
+				pkg("root", "foo")),
+			dsp(mkDepspec("foo 1.0.0", "baz 1.0.0"),
+				pkg("foo", "baz")),
+			dsp(mkDepspec("baz 1.0.0"),
+				pkg("baz")),
+			dsp(mkDepspec("baz 2.0.0"),
+				pkg("baz", "baz/qux"),
+				pkg("baz/qux")),
+		},
+		require: []string{"baz/qux"},
+		fail: &noVersionError{
+			pn: mkPI("baz"),
+			//fails: , // TODO new fail type for failed require
+		},
+	},
+	"require independent subpkg conflicts with other dep constraint": {
+		ds: []depspec{
+			dsp(mkDepspec("root 0.0.0"),
+				pkg("root", "foo")),
+			dsp(mkDepspec("foo 1.0.0", "baz 1.0.0"),
+				pkg("foo", "baz")),
+			dsp(mkDepspec("baz 1.0.0"),
+				pkg("baz")),
+			dsp(mkDepspec("baz 2.0.0"),
+				pkg("baz"),
+				pkg("baz/qux")),
+		},
+		require: []string{"baz/qux"},
+		fail: &noVersionError{
+			pn: mkPI("baz"),
+			//fails: , // TODO new fail type for failed require
+		},
+	},
 }
 
 // tpkg is a representation of a single package. It has its own import path, as
@@ -783,6 +874,8 @@ type bimodalFixture struct {
 	changeall bool
 	// pkgs to ignore
 	ignore []string
+	// pkgs to require
+	require []string
 }
 
 func (f bimodalFixture) name() string {
