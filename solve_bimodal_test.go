@@ -782,7 +782,7 @@ var bimodalFixtures = map[string]bimodalFixture{
 		r: mksolution(
 			"foo 1.0.0",
 			"bar 1.0.0",
-			mklp("baz 1.0.0", "baz/qux"),
+			mklp("baz 1.0.0", "qux"),
 		),
 	},
 	"require impossible subpackage": {
@@ -900,9 +900,13 @@ func (f bimodalFixture) rootmanifest() RootManifest {
 		tc:  pcSliceToMap(f.ds[0].devdeps),
 		ovr: f.ovr,
 		ig:  make(map[string]bool),
+		req: make(map[string]bool),
 	}
 	for _, ig := range f.ignore {
 		m.ig[ig] = true
+	}
+	for _, req := range f.require {
+		m.req[req] = true
 	}
 
 	return m
