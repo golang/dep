@@ -237,7 +237,7 @@ func Prepare(params SolveParameters, sm SourceManager) (Solver, error) {
 		case 1:
 			return nil, badOptsFailure(fmt.Sprintf("%q was given as both a required and ignored package", both[0]))
 		default:
-			return nil, badOptsFailure(fmt.Sprintf("multiple packages given as both required and ignored: %q", strings.Join(both, "\", \"")))
+			return nil, badOptsFailure(fmt.Sprintf("multiple packages given as both required and ignored: %s", strings.Join(both, ", ")))
 		}
 	}
 
