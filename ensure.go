@@ -106,6 +106,12 @@ func runEnsure(args []string) error {
 			NetworkName: constraint.Ident.NetworkName,
 			Constraint:  constraint.Constraint,
 		}
+		for i, lp := range p.l.P {
+			if lp.Ident() == constraint.Ident {
+				p.l.P = append(p.l.P[:i], p.l.P[i+1:]...)
+				break
+			}
+		}
 	}
 	if len(errs) > 0 {
 		for err := range errs {
