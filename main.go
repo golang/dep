@@ -24,6 +24,9 @@ var (
 )
 
 func main() {
+	flag.Usage = func() {
+		help(nil)
+	}
 	flag.Parse()
 
 	// newContext() will set the GOPATH for us to use for various functions.
