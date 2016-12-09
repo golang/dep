@@ -1,0 +1,53 @@
+{
+    "memo": "",
+    "projects": [
+        {
+            "name": "github.com/Masterminds/semver",
+            "branch": "2.x",
+            "revision": "b3ef6b1808e9889dfb8767ce7068db923a3d07de",
+            "packages": [
+                "."
+            ]
+        },
+        {
+            "name": "github.com/Masterminds/vcs",
+            "version": "v1.8.0",
+            "revision": "fbe9fb6ad5b5f35b3e82a7c21123cfc526cbf895",
+            "packages": [
+                "."
+            ]
+        },
+        {
+            "name": "github.com/armon/go-radix",
+            "branch": "master",
+            "revision": "4239b77079c7b5d1243b7b4736304ce8ddb6f0f2",
+            "packages": [
+                "."
+            ]
+        },
+        {
+            "name": "github.com/pkg/errors",
+            "version": "v0.8.0",
+            "revision": "645ef00459ed84a119197bfb8d8205042c6df63d",
+            "packages": [
+                "."
+            ]
+        },
+        {
+            "name": "github.com/sdboyer/gps",
+            "version": "v0.12.0",
+            "revision": "9ca61cb4e9851c80bb537e7d8e1be56e18e03cc9",
+            "packages": [
+                "."
+            ]
+        },
+        {
+            "name": "github.com/termie/go-shutil",
+            "branch": "master",
+            "revision": "bcacb06fecaeec8dc42af03c87c6949f4a05c74c",
+            "packages": [
+                "."
+            ]
+        }
+    ]
+}
