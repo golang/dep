@@ -7,9 +7,14 @@ package main
 import (
 	"encoding/hex"
 	"fmt"
+	"io"
+	"log"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
+
+	"io/ioutil"
 
 	"github.com/pkg/errors"
 	"github.com/sdboyer/gps"
@@ -109,7 +114,89 @@ func runEnsure(args []string) error {
 		os.Exit(1)
 	}
 
-	// TODO: do all the sync things and write the manifest
+	fmt.Println(p.absroot)
+
+	params := gps.SolveParameters{
+		RootDir:     p.absroot,
+		Manifest:    p.m,
+		Lock:        p.l,
+		Trace:       true,
+		TraceLogger: log.New(os.Stdout, "", 0),
+	}
+
+	params.RootPackageTree, err = gps.ListPackages(p.absroot, string(p.importroot))
+	if err != nil {
+		return errors.Wrap(err, "ensure ListPackage for project")
+	}
+	solver, err := gps.Prepare(params, sm)
+	if err != nil {
+		return errors.Wrap(err, "ensure Prepare")
+	}
+	solution, err := solver.Solve()
+	if err != nil {
+		return errors.Wrap(err, "ensure Solve()")
+	}
+
+	ours := p.l.Projects()
+	for _, lp := range solution.Projects() {
+		i := lp.Ident()
+		var have bool
+		for _, op := range ours {
+			if op.Ident() == i {
+				have = true
+				break
+			}
+		}
+		if !have {
+			p.l.P = append(p.l.P, lp)
+		}
+	}
+
+	tv, err := ioutil.TempDir("", "vendor")
+	if err != nil {
+		return errors.Wrap(err, "ensure making temporary vendor")
+	}
+	defer os.RemoveAll(tv)
+
+	tm, err := ioutil.TempFile("", "manifest")
+	if err != nil {
+		return errors.Wrap(err, "ensure making temporary manifest")
+	}
+	tm.Close()
+	defer os.Remove(tm.Name())
+
+	tl, err := ioutil.TempFile("", "lock")
+	if err != nil {
+		return errors.Wrap(err, "ensure making temporary lock file")
+	}
+	tl.Close()
+	defer os.Remove(tl.Name())
+
+	if err := gps.WriteDepTree(tv, p.l, sm, true); err != nil {
+		return errors.Wrap(err, "ensure gps.WriteDepTree")
+	}
+
+	if err := writeFile(tm.Name(), p.m); err != nil {
+		return errors.Wrap(err, "ensure writeFile for manifest")
+	}
+
+	if err := writeFile(tl.Name(), p.l); err != nil {
+		return errors.Wrap(err, "ensure writeFile for lock")
+	}
+
+	if err := os.Rename(tm.Name(), filepath.Join(p.absroot, manifestName)); err != nil {
+		return errors.Wrap(err, "ensure moving temp manifest into place!")
+	}
+
+	if err := os.Rename(tl.Name(), filepath.Join(p.absroot, lockName)); err != nil {
+		return errors.Wrap(err, "ensure moving temp manifest into place!")
+	}
+
+	os.RemoveAll(filepath.Join(p.absroot, "vendor"))
+	if err := copyFolder(tv, filepath.Join(p.absroot, "vendor")); err != nil {
+		return errors.Wrap(err, "ensure moving temp vendor")
+	}
+
 	return nil
 }
 
@@ -123,6 +210,7 @@ func getProjectConstraint(arg string, sm *gps.SourceMgr) (gps.ProjectConstraint,
 		constraint.Constraint = deduceConstraint(parts[1])
 		arg = parts[0]
 	}
+	// TODO: What if there is no @, assume default branch (which may not be master) ?
 	// TODO: if we decide to keep equals.....
 
 	// split on colon if there is a network location
@@ -188,4 +276,72 @@ func deduceConstraint(s string) gps.Constraint {
 	// If not a plain SHA1 or bzr custom GUID, assume a plain version.
 	// TODO: if there is amgibuity here, then prompt the user?
 	return gps.NewVersion(s)
+}
+
+// stolen from k8s https://github.com/jessfraz/kubernetes/blob/2df475da2f7e5c0739afabe356012777b5634951/pkg/volume/volume.go#L249
+func copyFolder(source string, dest string) (err error) {
+	fi, err := os.Lstat(source)
+	if err != nil {
+		return err
+	}
+
+	err = os.MkdirAll(dest, fi.Mode())
+	if err != nil {
+		return err
+	}
+
+	directory, _ := os.Open(source)
+
+	defer directory.Close()
+
+	objects, err := directory.Readdir(-1)
+
+	for _, obj := range objects {
+		if obj.Mode()&os.ModeSymlink != 0 {
+			continue
+		}
+
+		sourcefilepointer := filepath.Join(source, obj.Name())
+		destinationfilepointer := filepath.Join(dest, obj.Name())
+
+		if obj.IsDir() {
+			err = copyFolder(sourcefilepointer, destinationfilepointer)
+			if err != nil {
+				return err
+			}
+		} else {
+			err = copyFile(sourcefilepointer, destinationfilepointer)
+			if err != nil {
+				return err
+			}
+		}
+
+	}
+	return
+}
+
+func copyFile(source string, dest string) (err error) {
+	sourcefile, err := os.Open(source)
+	if err != nil {
+		return err
+	}
+
+	defer sourcefile.Close()
+
+	destfile, err := os.Create(dest)
+	if err != nil {
+		return err
+	}
+
+	defer destfile.Close()
+
+	_, err = io.Copy(destfile, sourcefile)
+	if err == nil {
+		sourceinfo, err := os.Stat(source)
+		if err != nil {
+			err = os.Chmod(dest, sourceinfo.Mode())
+		}
+
+	}
+	return
 }
