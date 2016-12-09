@@ -15,7 +15,6 @@ func noErrors(at, depth int) error {
 	}
 	return noErrors(at+1, depth)
 }
-
 func yesErrors(at, depth int) error {
 	if at >= depth {
 		return New("ye error")
