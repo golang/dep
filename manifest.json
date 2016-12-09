@@ -1,0 +1,16 @@
+{
+    "dependencies": {
+        "github.com/Masterminds/semver": {
+            "branch": "2.x"
+        },
+        "github.com/Masterminds/vcs": {
+            "version": ">=1.8.0, <2.0.0"
+        },
+        "github.com/pkg/errors": {
+            "version": ">=0.8.0, <1.0.0"
+        },
+        "github.com/sdboyer/gps": {
+            "version": ">=0.12.0, <1.0.0"
+        }
+    }
+}
