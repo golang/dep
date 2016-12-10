@@ -140,23 +140,12 @@ func runEnsure(args []string) error {
 	}
 	solution, err := solver.Solve()
 	if err != nil {
+		handleAllTheFailuresOfTheWorld(err)
 		return errors.Wrap(err, "ensure Solve()")
 	}
 
-	ours := p.l.Projects()
-	for _, lp := range solution.Projects() {
-		i := lp.Ident()
-		var have bool
-		for _, op := range ours {
-			if op.Ident() == i {
-				have = true
-				break
-			}
-		}
-		if !have {
-			p.l.P = append(p.l.P, lp)
-		}
-	}
+	p.l.P = solution.Projects()
+	p.l.Memo = solution.InputHash()
 
 	tv, err := ioutil.TempDir("", "vendor")
 	if err != nil {
