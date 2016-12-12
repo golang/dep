@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"os"
+	"path/filepath"
 	"regexp"
 	"testing"
 )
@@ -35,6 +37,58 @@ func TestIsStdLib(t *testing.T) {
 			t.Fatalf("%s: expected %t got %t", p, e, b)
 		}
 	}
+}
+
+func TestIsRegular(t *testing.T) {
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tests := map[string]bool{
+		wd: false,
+		filepath.Join(wd, "_testdata"):                      false,
+		filepath.Join(wd, "main.go"):                        true,
+		filepath.Join(wd, "this_file_does_not_exist.thing"): false,
+	}
+
+	for f, expected := range tests {
+		dirOK, err := isRegular(f)
+		if err != nil && expected {
+			t.Fatal("expected no error, got %v", err)
+		}
+
+		if dirOK != expected {
+			t.Fatal("expected %t for %s, got %t", expected, f, dirOK)
+		}
+	}
+
+}
+
+func TestIsDir(t *testing.T) {
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tests := map[string]bool{
+		wd: true,
+		filepath.Join(wd, "_testdata"):                      true,
+		filepath.Join(wd, "main.go"):                        false,
+		filepath.Join(wd, "this_file_does_not_exist.thing"): false,
+	}
+
+	for f, expected := range tests {
+		dirOK, err := isDir(f)
+		if err != nil && expected {
+			t.Fatal("expected no error, got %v", err)
+		}
+
+		if dirOK != expected {
+			t.Fatal("expected %t for %s, got %t", expected, f, dirOK)
+		}
+	}
+
 }
 
 func TestInit(t *testing.T) {
