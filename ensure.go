@@ -314,9 +314,10 @@ func deduceConstraint(s string) gps.Constraint {
 	return gps.NewVersion(s)
 }
 
-// stolen from k8s https://github.com/jessfraz/kubernetes/blob/2df475da2f7e5c0739afabe356012777b5634951/pkg/volume/volume.go#L249
-func copyFolder(source string, dest string) (err error) {
-	fi, err := os.Lstat(source)
+// copyFolder takes in a directory and copies it's contents to the destination.
+// It preserves the file mode on files as well.
+func copyFolder(src string, dest string) error {
+	fi, err := os.Lstat(src)
 	if err != nil {
 		return err
 	}
@@ -326,58 +327,64 @@ func copyFolder(source string, dest string) (err error) {
 		return err
 	}
 
-	directory, _ := os.Open(source)
+	dir, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer dir.Close()
 
-	defer directory.Close()
-
-	objects, err := directory.Readdir(-1)
+	objects, err := dir.Readdir(-1)
+	if err != nil {
+		return err
+	}
 
 	for _, obj := range objects {
 		if obj.Mode()&os.ModeSymlink != 0 {
 			continue
 		}
 
-		sourcefilepointer := filepath.Join(source, obj.Name())
-		destinationfilepointer := filepath.Join(dest, obj.Name())
+		srcfile := filepath.Join(src, obj.Name())
+		destfile := filepath.Join(dest, obj.Name())
 
 		if obj.IsDir() {
-			err = copyFolder(sourcefilepointer, destinationfilepointer)
+			err = copyFolder(srcfile, destfile)
 			if err != nil {
 				return err
 			}
-		} else {
-			err = copyFile(sourcefilepointer, destinationfilepointer)
-			if err != nil {
-				return err
-			}
+			continue
 		}
 
+		if err := copyFile(srcfile, destfile); err != nil {
+			return err
+		}
 	}
-	return
+
+	return nil
 }
 
-func copyFile(source string, dest string) (err error) {
-	sourcefile, err := os.Open(source)
+// copyFile copies a file from one place to another with the permission bits
+// perserved as well.
+func copyFile(src string, dest string) error {
+	srcfile, err := os.Open(src)
 	if err != nil {
 		return err
 	}
-
-	defer sourcefile.Close()
+	defer srcfile.Close()
 
 	destfile, err := os.Create(dest)
 	if err != nil {
 		return err
 	}
-
 	defer destfile.Close()
 
-	_, err = io.Copy(destfile, sourcefile)
-	if err == nil {
-		sourceinfo, err := os.Stat(source)
-		if err != nil {
-			err = os.Chmod(dest, sourceinfo.Mode())
-		}
-
+	if _, err := io.Copy(destfile, srcfile); err != nil {
+		return err
 	}
-	return
+
+	srcinfo, err := os.Stat(src)
+	if err != nil {
+		return err
+	}
+
+	return os.Chmod(dest, srcinfo.Mode())
 }
