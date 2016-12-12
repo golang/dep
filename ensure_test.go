@@ -100,6 +100,7 @@ func TestDeduceConstraint(t *testing.T) {
 		"v1.2.3": sv,
 		"5b3352dc16517996fb951394bcbbe913a2a616e3":      gps.Revision("5b3352dc16517996fb951394bcbbe913a2a616e3"),
 		"g4@golang.org-20161116211307-wiuilyamo9ian0m7": gps.NewVersion("g4@golang.org-20161116211307-wiuilyamo9ian0m7"),
+		"20120425195858-psty8c35ve2oej8t":               gps.NewVersion("20120425195858-psty8c35ve2oej8t"),
 	}
 
 	for str, expected := range constraints {
@@ -133,6 +134,14 @@ func TestCopyFolder(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer os.RemoveAll(destdir)
+
+	dirOK, err := isDir(destdir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !dirOK {
+		t.Fatalf("expected %s to be a directory", destdir)
+	}
 
 	destf := filepath.Join(destdir, "myfile")
 	destcontents, err := ioutil.ReadFile(destf)
