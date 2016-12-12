@@ -1,6 +1,11 @@
 package main
 
-import "testing"
+import (
+	"io/ioutil"
+	"os"
+	"path/filepath"
+	"testing"
+)
 
 func TestEnsureOverrides(t *testing.T) {
 	needsExternalNetwork(t)
@@ -80,5 +85,98 @@ func main() {
 	lock := tg.readLock()
 	if lock != expectedLock {
 		t.Fatalf("expected %s, got %s", expectedLock, lock)
+	}
+}
+
+func TestCopyFolder(t *testing.T) {
+	dir, err := ioutil.TempDir("", "dep")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(dir)
+
+	srcf, err := os.Create(filepath.Join(dir, "myfile"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	contents := "hello world"
+	if _, err := srcf.Write([]byte(contents)); err != nil {
+		t.Fatal(err)
+	}
+	srcf.Close()
+
+	destdir := dir + "more-temp"
+	if err := copyFolder(dir, destdir); err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(destdir)
+
+	destf := filepath.Join(destdir, "myfile")
+	destcontents, err := ioutil.ReadFile(destf)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if contents != string(destcontents) {
+		t.Fatalf("expected: %s, got: %s", contents, string(destcontents))
+	}
+
+	srcinfo, err := os.Stat(srcf.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	destinfo, err := os.Stat(destf)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if srcinfo.Mode() != destinfo.Mode() {
+		t.Fatalf("expected %s: %#v\n to be the same mode as %s: %#v", srcf.Name(), srcinfo.Mode(), destf, destinfo.Mode())
+	}
+
+}
+
+func TestCopyFile(t *testing.T) {
+	srcf, err := ioutil.TempFile("", "dep")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(srcf.Name())
+
+	contents := "hello world"
+	if _, err := srcf.Write([]byte(contents)); err != nil {
+		t.Fatal(err)
+	}
+	srcf.Close()
+
+	destf := srcf.Name() + "more-temp"
+	if err := copyFile(srcf.Name(), destf); err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(destf)
+
+	destcontents, err := ioutil.ReadFile(destf)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if contents != string(destcontents) {
+		t.Fatalf("expected: %s, got: %s", contents, string(destcontents))
+	}
+
+	srcinfo, err := os.Stat(srcf.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	destinfo, err := os.Stat(destf)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if srcinfo.Mode() != destinfo.Mode() {
+		t.Fatalf("expected %s: %#v\n to be the same mode as %s: %#v", srcf.Name(), srcinfo.Mode(), destf, destinfo.Mode())
 	}
 }
