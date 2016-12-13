@@ -128,9 +128,11 @@ type solver struct {
 	// removal.
 	unsel *unselected
 
-	// Map of packages to ignore. Derived by converting SolveParameters.Ignore
-	// into a map during solver prep - which also, nicely, deduplicates it.
+	// Map of packages to ignore.
 	ig map[string]bool
+
+	// Map of packages to require.
+	req map[string]bool
 
 	// A stack of all the currently active versionQueues in the solver. The set
 	// of projects represented here corresponds closely to what's in s.sel,
@@ -216,9 +218,27 @@ func Prepare(params SolveParameters, sm SourceManager) (Solver, error) {
 	s := &solver{
 		params: params,
 		ig:     params.Manifest.IgnoredPackages(),
+		req:    params.Manifest.RequiredPackages(),
 		ovr:    params.Manifest.Overrides(),
 		tl:     params.TraceLogger,
 		rpt:    params.RootPackageTree.dup(),
+	}
+
+	if len(s.ig) != 0 {
+		var both []string
+		for pkg := range params.Manifest.RequiredPackages() {
+			if s.ig[pkg] {
+				both = append(both, pkg)
+			}
+		}
+		switch len(both) {
+		case 0:
+			break
+		case 1:
+			return nil, badOptsFailure(fmt.Sprintf("%q was given as both a required and ignored package", both[0]))
+		default:
+			return nil, badOptsFailure(fmt.Sprintf("multiple packages given as both required and ignored: %s", strings.Join(both, ", ")))
+		}
 	}
 
 	// Ensure the ignore and overrides maps are at least initialized
@@ -481,10 +501,31 @@ func (s *solver) selectRoot() error {
 	// If we're looking for root's deps, get it from opts and local root
 	// analysis, rather than having the sm do it
 	mdeps := s.ovr.overrideAll(s.rm.DependencyConstraints().merge(s.rm.TestDependencyConstraints()))
-
-	// Err is not possible at this point, as it could only come from
-	// listPackages(), which if we're here already succeeded for root
 	reach := s.rpt.ExternalReach(true, true, s.ig).ListExternalImports()
+
+	// If there are any requires, slide them into the reach list, as well.
+	if len(s.req) > 0 {
+		reqs := make([]string, 0, len(s.req))
+
+		// Make a map of both imported and required pkgs to skip, to avoid
+		// duplication. Technically, a slice would probably be faster (given
+		// small size and bounds check elimination), but this is a one-time op,
+		// so it doesn't matter.
+		skip := make(map[string]bool, len(s.req))
+		for _, r := range reach {
+			if s.req[r] {
+				skip[r] = true
+			}
+		}
+
+		for r := range s.req {
+			if !skip[r] {
+				reqs = append(reqs, r)
+			}
+		}
+
+		reach = append(reach, reqs...)
+	}
 
 	deps, err := s.intersectConstraintsWithImports(mdeps, reach)
 	if err != nil {
@@ -661,7 +702,7 @@ func (s *solver) createVersionQueue(bmi bimodalIdentifier) (*versionQueue, error
 			// Project exists only in vendor (and in some manifest somewhere)
 			// TODO(sdboyer) mark this for special handling, somehow?
 		} else {
-			return nil, fmt.Errorf("Project '%s' could not be located.", id)
+			return nil, fmt.Errorf("project '%s' could not be located", id)
 		}
 	}
 

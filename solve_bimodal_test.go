@@ -748,6 +748,166 @@ var bimodalFixtures = map[string]bimodalFixture{
 			"bar from baz 1.0.0",
 		),
 	},
+	"require package": {
+		ds: []depspec{
+			dsp(mkDepspec("root 0.0.0", "bar 1.0.0"),
+				pkg("root", "foo")),
+			dsp(mkDepspec("foo 1.0.0"),
+				pkg("foo", "bar")),
+			dsp(mkDepspec("bar 1.0.0"),
+				pkg("bar")),
+			dsp(mkDepspec("baz 1.0.0"),
+				pkg("baz")),
+		},
+		require: []string{"baz"},
+		r: mksolution(
+			"foo 1.0.0",
+			"bar 1.0.0",
+			"baz 1.0.0",
+		),
+	},
+	"require subpackage": {
+		ds: []depspec{
+			dsp(mkDepspec("root 0.0.0", "bar 1.0.0"),
+				pkg("root", "foo")),
+			dsp(mkDepspec("foo 1.0.0"),
+				pkg("foo", "bar")),
+			dsp(mkDepspec("bar 1.0.0"),
+				pkg("bar")),
+			dsp(mkDepspec("baz 1.0.0"),
+				pkg("baz", "baz/qux"),
+				pkg("baz/qux")),
+		},
+		require: []string{"baz/qux"},
+		r: mksolution(
+			"foo 1.0.0",
+			"bar 1.0.0",
+			mklp("baz 1.0.0", "qux"),
+		),
+	},
+	"require impossible subpackage": {
+		ds: []depspec{
+			dsp(mkDepspec("root 0.0.0", "baz 1.0.0"),
+				pkg("root", "foo")),
+			dsp(mkDepspec("foo 1.0.0"),
+				pkg("foo")),
+			dsp(mkDepspec("baz 1.0.0"),
+				pkg("baz")),
+			dsp(mkDepspec("baz 2.0.0"),
+				pkg("baz", "baz/qux"),
+				pkg("baz/qux")),
+		},
+		require: []string{"baz/qux"},
+		fail: &noVersionError{
+			pn: mkPI("baz"),
+			fails: []failedVersion{
+				{
+					v: NewVersion("2.0.0"),
+					f: &versionNotAllowedFailure{
+						goal:       mkAtom("baz 2.0.0"),
+						failparent: []dependency{mkDep("root", "baz 1.0.0", "baz/qux")},
+						c:          NewVersion("1.0.0"),
+					},
+				},
+				{
+					v: NewVersion("1.0.0"),
+					f: &checkeeHasProblemPackagesFailure{
+						goal: mkAtom("baz 1.0.0"),
+						failpkg: map[string]errDeppers{
+							"baz/qux": errDeppers{
+								err: nil, // nil indicates package is missing
+								deppers: []atom{
+									mkAtom("root"),
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	},
+	"require subpkg conflicts with other dep constraint": {
+		ds: []depspec{
+			dsp(mkDepspec("root 0.0.0"),
+				pkg("root", "foo")),
+			dsp(mkDepspec("foo 1.0.0", "baz 1.0.0"),
+				pkg("foo", "baz")),
+			dsp(mkDepspec("baz 1.0.0"),
+				pkg("baz")),
+			dsp(mkDepspec("baz 2.0.0"),
+				pkg("baz", "baz/qux"),
+				pkg("baz/qux")),
+		},
+		require: []string{"baz/qux"},
+		fail: &noVersionError{
+			pn: mkPI("baz"),
+			fails: []failedVersion{
+				{
+					v: NewVersion("2.0.0"),
+					f: &versionNotAllowedFailure{
+						goal:       mkAtom("baz 2.0.0"),
+						failparent: []dependency{mkDep("foo 1.0.0", "baz 1.0.0", "baz")},
+						c:          NewVersion("1.0.0"),
+					},
+				},
+				{
+					v: NewVersion("1.0.0"),
+					f: &checkeeHasProblemPackagesFailure{
+						goal: mkAtom("baz 1.0.0"),
+						failpkg: map[string]errDeppers{
+							"baz/qux": errDeppers{
+								err: nil, // nil indicates package is missing
+								deppers: []atom{
+									mkAtom("root"),
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	},
+	"require independent subpkg conflicts with other dep constraint": {
+		ds: []depspec{
+			dsp(mkDepspec("root 0.0.0"),
+				pkg("root", "foo")),
+			dsp(mkDepspec("foo 1.0.0", "baz 1.0.0"),
+				pkg("foo", "baz")),
+			dsp(mkDepspec("baz 1.0.0"),
+				pkg("baz")),
+			dsp(mkDepspec("baz 2.0.0"),
+				pkg("baz"),
+				pkg("baz/qux")),
+		},
+		require: []string{"baz/qux"},
+		fail: &noVersionError{
+			pn: mkPI("baz"),
+			fails: []failedVersion{
+				{
+					v: NewVersion("2.0.0"),
+					f: &versionNotAllowedFailure{
+						goal:       mkAtom("baz 2.0.0"),
+						failparent: []dependency{mkDep("foo 1.0.0", "baz 1.0.0", "baz")},
+						c:          NewVersion("1.0.0"),
+					},
+				},
+				{
+					v: NewVersion("1.0.0"),
+					f: &checkeeHasProblemPackagesFailure{
+						goal: mkAtom("baz 1.0.0"),
+						failpkg: map[string]errDeppers{
+							"baz/qux": errDeppers{
+								err: nil, // nil indicates package is missing
+								deppers: []atom{
+									mkAtom("root"),
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	},
 }
 
 // tpkg is a representation of a single package. It has its own import path, as
@@ -783,6 +943,8 @@ type bimodalFixture struct {
 	changeall bool
 	// pkgs to ignore
 	ignore []string
+	// pkgs to require
+	require []string
 }
 
 func (f bimodalFixture) name() string {
@@ -807,9 +969,13 @@ func (f bimodalFixture) rootmanifest() RootManifest {
 		tc:  pcSliceToMap(f.ds[0].devdeps),
 		ovr: f.ovr,
 		ig:  make(map[string]bool),
+		req: make(map[string]bool),
 	}
 	for _, ig := range f.ignore {
 		m.ig[ig] = true
+	}
+	for _, req := range f.require {
+		m.req[req] = true
 	}
 
 	return m

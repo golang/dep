@@ -294,7 +294,7 @@ func mkrevlock(pairs ...string) fixLock {
 	return l
 }
 
-// mksolution makes creates a map of project identifiers to their LockedProject
+// mksolution creates a map of project identifiers to their LockedProject
 // result, which is sufficient to act as a solution fixture for the purposes of
 // most tests.
 //
