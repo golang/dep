@@ -5,7 +5,9 @@
 package main
 
 import (
+	"bytes"
 	"encoding/hex"
+	"flag"
 	"fmt"
 	"io"
 	"log"
@@ -23,6 +25,7 @@ import (
 var ensureCmd = &command{
 	fn:   runEnsure,
 	name: "ensure",
+	flag: flag.NewFlagSet("", flag.ExitOnError),
 	short: `[flags] <path>[:alt location][@<version specifier>]
 	To ensure a dependency is in your project at a specific version (if specified).
 	`,
@@ -83,6 +86,12 @@ For a description of the version specifier string, see this handy guide from cra
 	`,
 }
 
+var ovr bool
+
+func init() {
+	ensureCmd.flag.BoolVar(&ovr, "override", false, "Interpret specified constraints as overrides rather than normal constraints")
+}
+
 func runEnsure(args []string) error {
 	p, err := depContext.loadProject("")
 	if err != nil {
@@ -113,11 +122,14 @@ func runEnsure(args []string) error {
 			}
 		}
 	}
+
 	if len(errs) > 0 {
+		var buf bytes.Buffer
 		for err := range errs {
-			fmt.Fprintln(os.Stderr, err)
+			fmt.Fprintln(&buf, err)
 		}
-		os.Exit(1)
+
+		return errors.New(buf.String())
 	}
 
 	params := gps.SolveParameters{
