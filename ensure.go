@@ -86,10 +86,22 @@ For a description of the version specifier string, see this handy guide from cra
 	`,
 }
 
-var ovr bool
+// stringSlice is a slice of strings
+type stringSlice []string
+
+// implement the flag interface for stringSlice
+func (s *stringSlice) String() string {
+	return fmt.Sprintf("%s", *s)
+}
+func (s *stringSlice) Set(value string) error {
+	*s = append(*s, value)
+	return nil
+}
+
+var overrides stringSlice
 
 func init() {
-	ensureCmd.flag.BoolVar(&ovr, "override", false, "Interpret specified constraints as overrides rather than normal constraints")
+	ensureCmd.flag.Var(&overrides, "override", "Interpret specified constraint(s) as override(s) rather than normal constraints")
 }
 
 func runEnsure(args []string) error {
@@ -111,15 +123,27 @@ func runEnsure(args []string) error {
 		if err != nil {
 			errs = append(errs, err)
 		}
-		pp := gps.ProjectProperties{
+		p.m.Dependencies[constraint.Ident.ProjectRoot] = gps.ProjectProperties{
 			NetworkName: constraint.Ident.NetworkName,
 			Constraint:  constraint.Constraint,
 		}
 
-		if ovr {
-			p.m.Ovr[constraint.Ident.ProjectRoot] = pp
-		} else {
-			p.m.Dependencies[constraint.Ident.ProjectRoot] = pp
+		for i, lp := range p.l.P {
+			if lp.Ident() == constraint.Ident {
+				p.l.P = append(p.l.P[:i], p.l.P[i+1:]...)
+				break
+			}
+		}
+	}
+
+	for _, ovr := range overrides {
+		constraint, err := getProjectConstraint(ovr, sm)
+		if err != nil {
+			errs = append(errs, err)
+		}
+		p.m.Ovr[constraint.Ident.ProjectRoot] = gps.ProjectProperties{
+			NetworkName: constraint.Ident.NetworkName,
+			Constraint:  constraint.Constraint,
 		}
 
 		for i, lp := range p.l.P {
