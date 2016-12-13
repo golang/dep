@@ -111,10 +111,17 @@ func runEnsure(args []string) error {
 		if err != nil {
 			errs = append(errs, err)
 		}
-		p.m.Dependencies[constraint.Ident.ProjectRoot] = gps.ProjectProperties{
+		pp := gps.ProjectProperties{
 			NetworkName: constraint.Ident.NetworkName,
 			Constraint:  constraint.Constraint,
 		}
+
+		if ovr {
+			p.m.Ovr[constraint.Ident.ProjectRoot] = pp
+		} else {
+			p.m.Dependencies[constraint.Ident.ProjectRoot] = pp
+		}
+
 		for i, lp := range p.l.P {
 			if lp.Ident() == constraint.Ident {
 				p.l.P = append(p.l.P[:i], p.l.P[i+1:]...)
