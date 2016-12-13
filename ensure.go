@@ -120,8 +120,6 @@ func runEnsure(args []string) error {
 		os.Exit(1)
 	}
 
-	fmt.Println(p.absroot)
-
 	params := gps.SolveParameters{
 		RootDir:     p.absroot,
 		Manifest:    p.m,
