@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/sdboyer/gps"
 )
@@ -42,12 +43,25 @@ func main() {
 	if do == "" {
 		do = "help"
 	} else {
-		args = flag.Args()[1:]
+		args = flag.Args()
 	}
 	for _, cmd := range commands {
 		if do != cmd.name {
 			continue
 		}
+
+		if cmd.flag != nil {
+			cmd.flag.Usage = func() { cmd.Usage() }
+			err = cmd.flag.Parse(args[1:])
+			if err != nil {
+				fmt.Fprint(os.Stderr, err.Error())
+				os.Exit(1)
+			}
+			args = cmd.flag.Args()
+		} else {
+			args = args[1:]
+		}
+
 		if err := cmd.fn(args); err != nil {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
 			os.Exit(1)
@@ -65,6 +79,13 @@ type command struct {
 	name  string
 	short string
 	long  string
+	flag  *flag.FlagSet
+}
+
+func (c *command) Usage() {
+	fmt.Fprintf(os.Stderr, "usage: %s\n\n", c.short)
+	fmt.Fprintf(os.Stderr, "%s\n", strings.TrimSpace(c.long))
+	os.Exit(2)
 }
 
 var commands = []*command{
