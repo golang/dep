@@ -314,7 +314,7 @@ func deduceConstraint(s string) gps.Constraint {
 	return gps.NewVersion(s)
 }
 
-// copyFolder takes in a directory and copies it's contents to the destination.
+// copyFolder takes in a directory and copies its contents to the destination.
 // It preserves the file mode on files as well.
 func copyFolder(src string, dest string) error {
 	fi, err := os.Lstat(src)
