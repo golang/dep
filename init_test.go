@@ -53,13 +53,18 @@ func TestIsRegular(t *testing.T) {
 	}
 
 	for f, expected := range tests {
-		dirOK, err := isRegular(f)
-		if err != nil && expected {
+		fileOK, err := isRegular(f)
+		if err != nil {
+			if !expected {
+				// this is the case where we expect an error so continue
+				// to the check below
+				continue
+			}
 			t.Fatal("expected no error, got %v", err)
 		}
 
-		if dirOK != expected {
-			t.Fatal("expected %t for %s, got %t", expected, f, dirOK)
+		if fileOK != expected {
+			t.Fatal("expected %t for %s, got %t", expected, f, fileOK)
 		}
 	}
 
@@ -80,7 +85,12 @@ func TestIsDir(t *testing.T) {
 
 	for f, expected := range tests {
 		dirOK, err := isDir(f)
-		if err != nil && expected {
+		if err != nil {
+			if !expected {
+				// this is the case where we expect an error so continue
+				// to the check below
+				continue
+			}
 			t.Fatal("expected no error, got %v", err)
 		}
 

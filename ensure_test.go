@@ -98,7 +98,8 @@ func TestDeduceConstraint(t *testing.T) {
 
 	constraints := map[string]gps.Constraint{
 		"v1.2.3": sv,
-		"5b3352dc16517996fb951394bcbbe913a2a616e3":      gps.Revision("5b3352dc16517996fb951394bcbbe913a2a616e3"),
+		"5b3352dc16517996fb951394bcbbe913a2a616e3": gps.Revision("5b3352dc16517996fb951394bcbbe913a2a616e3"),
+		// TODO: update the bzr ones tests to gps.Revision when @sdboyer says OK
 		"g4@golang.org-20161116211307-wiuilyamo9ian0m7": gps.NewVersion("g4@golang.org-20161116211307-wiuilyamo9ian0m7"),
 		"20120425195858-psty8c35ve2oej8t":               gps.NewVersion("20120425195858-psty8c35ve2oej8t"),
 	}
@@ -118,7 +119,12 @@ func TestCopyFolder(t *testing.T) {
 	}
 	defer os.RemoveAll(dir)
 
-	srcf, err := os.Create(filepath.Join(dir, "myfile"))
+	srcdir := filepath.Join(dir, "src")
+	if err := os.MkdirAll(srcdir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	srcf, err := os.Create(filepath.Join(srcdir, "myfile"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -129,11 +135,10 @@ func TestCopyFolder(t *testing.T) {
 	}
 	srcf.Close()
 
-	destdir := dir + "more-temp"
-	if err := copyFolder(dir, destdir); err != nil {
+	destdir := filepath.Join(dir, "dest")
+	if err := copyFolder(srcdir, destdir); err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(destdir)
 
 	dirOK, err := isDir(destdir)
 	if err != nil {
@@ -166,15 +171,19 @@ func TestCopyFolder(t *testing.T) {
 	if srcinfo.Mode() != destinfo.Mode() {
 		t.Fatalf("expected %s: %#v\n to be the same mode as %s: %#v", srcf.Name(), srcinfo.Mode(), destf, destinfo.Mode())
 	}
-
 }
 
 func TestCopyFile(t *testing.T) {
-	srcf, err := ioutil.TempFile("", "dep")
+	dir, err := ioutil.TempDir("", "dep")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(srcf.Name())
+	defer os.RemoveAll(dir)
+
+	srcf, err := os.Create(filepath.Join(dir, "srcfile"))
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	contents := "hello world"
 	if _, err := srcf.Write([]byte(contents)); err != nil {
@@ -182,11 +191,10 @@ func TestCopyFile(t *testing.T) {
 	}
 	srcf.Close()
 
-	destf := srcf.Name() + "more-temp"
+	destf := filepath.Join(dir, "destf")
 	if err := copyFile(srcf.Name(), destf); err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(destf)
 
 	destcontents, err := ioutil.ReadFile(destf)
 	if err != nil {
