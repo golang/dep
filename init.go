@@ -7,6 +7,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -80,14 +81,16 @@ func runInit(args []string) error {
 		return fmt.Errorf("Invalid state: manifest %q does not exist, but lock %q does.", mf, lf)
 	}
 
-	pr, err := depContext.splitAbsoluteProjectRoot(root)
+	cpr, err := depContext.splitAbsoluteProjectRoot(root)
 	if err != nil {
 		return errors.Wrap(err, "determineProjectRoot")
 	}
-	pkgT, err := gps.ListPackages(root, pr)
+	vlogf("Finding dependencies for %q...", cpr)
+	pkgT, err := gps.ListPackages(root, cpr)
 	if err != nil {
 		return errors.Wrap(err, "gps.ListPackages")
 	}
+	vlogf("Found %d dependencies.", len(pkgT.Packages))
 	sm, err := depContext.sourceManager()
 	if err != nil {
 		return errors.Wrap(err, "getSourceManager")
@@ -99,6 +102,7 @@ func runInit(args []string) error {
 		Dependencies: make(gps.ProjectConstraints),
 	}
 
+	vlogf("Building dependency graph...")
 	processed := make(map[gps.ProjectRoot][]string)
 	packages := make(map[string]bool)
 	notondisk := make(map[gps.ProjectRoot]bool)
@@ -106,31 +110,39 @@ func runInit(args []string) error {
 	for _, v := range pkgT.Packages {
 		// TODO: Some errors maybe should not be skipped ;-)
 		if v.Err != nil {
+			vlogf("%v", v.Err)
 			continue
 		}
+		vlogf("Package %q, analyzing...", v.P.ImportPath)
 
-		for _, i := range v.P.Imports {
-			if isStdLib(i) {
+		for _, ip := range v.P.Imports {
+			if isStdLib(ip) {
 				continue
 			}
-			pr, err := sm.DeduceProjectRoot(i)
+			if hasImportPathPrefix(ip, cpr) {
+				// Don't analyze imports from the current project.
+				continue
+			}
+			pr, err := sm.DeduceProjectRoot(ip)
 			if err != nil {
 				return errors.Wrap(err, "sm.DeduceProjectRoot") // TODO: Skip and report ?
 			}
 
-			packages[i] = true
+			packages[ip] = true
 			if _, ok := processed[pr]; ok {
-				if !contains(processed[pr], i) {
-					processed[pr] = append(processed[pr], i)
+				if !contains(processed[pr], ip) {
+					processed[pr] = append(processed[pr], ip)
 				}
 
 				continue
 			}
-			processed[pr] = []string{i}
+			vlogf("Package %q has import %q, analyzing...", v.P.ImportPath, ip)
+
+			processed[pr] = []string{ip}
 			v, err := depContext.versionInWorkspace(pr)
 			if err != nil {
 				notondisk[pr] = true
-				fmt.Printf("Could not determine version for %q, omitting from generated manifest\n", pr)
+				logf("Could not determine version for %q, omitting from generated manifest", pr)
 				continue
 			}
 
@@ -148,6 +160,7 @@ func runInit(args []string) error {
 		}
 	}
 
+	vlogf("Analyzing transitive dependencies...")
 	// Explore the packages we've found for transitive deps, either
 	// completing the lock or identifying (more) missing projects that we'll
 	// need to ask gps to solve for us.
@@ -166,6 +179,7 @@ func runInit(args []string) error {
 	dft = func(pkg string) error {
 		switch colors[pkg] {
 		case white:
+			vlogf("Analyzing %q...", pkg)
 			colors[pkg] = grey
 
 			pr, err := sm.DeduceProjectRoot(pkg)
@@ -201,6 +215,7 @@ func runInit(args []string) error {
 					// probably critical, so bail out.
 					return errors.Wrap(err, "gps.ListPackages")
 				}
+				ptrees[pr] = ptree
 			}
 
 			rm := ptree.ExternalReach(false, false, nil)
@@ -287,11 +302,17 @@ func runInit(args []string) error {
 
 	var l2 *lock
 	if len(notondisk) > 0 {
+		vlogf("Solving...")
 		params := gps.SolveParameters{
 			RootDir:         root,
 			RootPackageTree: pkgT,
 			Manifest:        &m,
 			Lock:            &l,
+		}
+
+		if *verbose {
+			params.Trace = true
+			params.TraceLogger = log.New(os.Stderr, "", 0)
 		}
 		s, err := gps.Prepare(params, sm)
 		if err != nil {
@@ -308,6 +329,7 @@ func runInit(args []string) error {
 		l2 = &l
 	}
 
+	vlogf("Writing manifest and lock files.")
 	if err := writeFile(mf, &m); err != nil {
 		return errors.Wrap(err, "writeFile for manifest")
 	}
@@ -392,4 +414,11 @@ func isDir(name string) (bool, error) {
 		return false, fmt.Errorf("%q is not a directory", name)
 	}
 	return true, nil
+}
+
+func hasImportPathPrefix(s, prefix string) bool {
+	if s == prefix {
+		return true
+	}
+	return strings.HasPrefix(s, prefix+"/")
 }
