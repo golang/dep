@@ -22,6 +22,7 @@ const (
 
 var (
 	depContext *ctx
+	verbose    = flag.Bool("v", false, "enable verbose logging")
 )
 
 func main() {
@@ -179,4 +180,16 @@ type project struct {
 	importroot gps.ProjectRoot
 	m          *manifest
 	l          *lock
+}
+
+func logf(format string, args ...interface{}) {
+	// TODO: something else?
+	fmt.Fprintf(os.Stderr, "dep: "+format+"\n", args...)
+}
+
+func vlogf(format string, args ...interface{}) {
+	if !*verbose {
+		return
+	}
+	logf(format, args...)
 }

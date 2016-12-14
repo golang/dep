@@ -2,6 +2,7 @@ package main
 
 import (
 	"path/filepath"
+	"regexp"
 	"testing"
 
 	"github.com/sdboyer/gps"
@@ -131,11 +132,15 @@ func TestInit(t *testing.T) {
 		tg.runGit(repoDir, "checkout", rev)
 	}
 
+	// Build a fake consumer of these packages.
+	const root = "github.com/golang/notexist"
 	m := `package main
 
 import (
 	"github.com/Sirupsen/logrus"
 	"github.com/pkg/errors"
+
+	"` + root + `/foo/bar"
 )
 
 func main() {
@@ -143,12 +148,18 @@ func main() {
 	if err != nil {
 		errors.Wrap(err, "thing")
 	}
-	logrus.Info("hello world")
+	logrus.Info(bar.Qux)
 }`
 
-	tg.tempFile("src/thing/thing.go", m)
-	tg.cd(tg.path("src/thing"))
+	tg.tempFile("src/"+root+"/foo/thing.go", m)
 
+	m = `package bar
+
+const Qux = "yo yo!"
+`
+	tg.tempFile("src/"+root+"/foo/bar/bar.go", m)
+
+	tg.cd(tg.path("src/" + root))
 	tg.run("init")
 
 	expectedManifest := `{
@@ -168,7 +179,6 @@ func main() {
 	}
 
 	expectedLock := `{
-    "memo": "0d682aa197bf6e94b9af8298acea5b7957b9a5674570cc16b3e8436846928a57",
     "projects": [
         {
             "name": "github.com/Sirupsen/logrus",
@@ -196,8 +206,14 @@ func main() {
     ]
 }
 `
-	lock := tg.readLock()
+	lock := wipeMemo(tg.readLock())
 	if lock != expectedLock {
 		t.Fatalf("expected %s, got %s", expectedLock, lock)
 	}
+}
+
+var memoRE = regexp.MustCompile(`\s+"memo": "[a-z0-9]+",`)
+
+func wipeMemo(s string) string {
+	return memoRE.ReplaceAllString(s, "")
 }
