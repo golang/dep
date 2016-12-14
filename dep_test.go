@@ -171,7 +171,7 @@ func (tg *testgoData) doRun(args []string) error {
 	} else {
 		prog = filepath.Join(tg.wd, "testdep"+exeSuffix)
 	}
-	cmd := exec.Command(prog, args...)
+	cmd := exec.Command(prog, append([]string{"-v"}, args...)...)
 	tg.stdout.Reset()
 	tg.stderr.Reset()
 	cmd.Stdout = &tg.stdout
@@ -254,11 +254,11 @@ func (tg *testgoData) runGit(dir string, args ...string) {
 	cmd.Env = tg.env
 	status := cmd.Run()
 	if tg.stdout.Len() > 0 {
-		tg.t.Log("git standard output:")
+		tg.t.Logf("git %v standard output:", args)
 		tg.t.Log(tg.stdout.String())
 	}
 	if tg.stderr.Len() > 0 {
-		tg.t.Log("git standard error:")
+		tg.t.Logf("git %v standard error:", args)
 		tg.t.Log(tg.stderr.String())
 	}
 	if status != nil {
