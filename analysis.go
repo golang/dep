@@ -28,10 +28,11 @@ func init() {
 	archList = strings.Split(archListString, " ")
 }
 
-// This was loving taken from src/cmd/go/pkg.go in Go's code (isStandardImportPath).
-//
 // Stored as a var so that tests can swap it out. Ugh globals, ugh.
-var isStdLib = func(path string) bool {
+var isStdLib = doIsStdLib
+
+// This was loving taken from src/cmd/go/pkg.go in Go's code (isStandardImportPath).
+func doIsStdLib(path string) bool {
 	i := strings.Index(path, "/")
 	if i < 0 {
 		i = len(path)
