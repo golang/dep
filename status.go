@@ -7,6 +7,7 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"log"
 	"os"
 	"sort"
 	"text/tabwriter"
@@ -129,6 +130,10 @@ func runStatusAll(p *project, sm *gps.SourceMgr) error {
 		Manifest:        p.m,
 		// Locks aren't a part of the input hash check, so we can omit it.
 	}
+	if *verbose {
+		params.Trace = true
+		params.TraceLogger = log.New(os.Stderr, "", 0)
+	}
 
 	s, err := gps.Prepare(params, sm)
 	if err != nil {
@@ -187,30 +192,48 @@ func runStatusAll(p *project, sm *gps.SourceMgr) error {
 				if !has {
 					c.Constraint = gps.Any()
 				}
+				// TODO: This constraint is only the constraint imposed by the
+				// current project, not by any transitive deps. As a result,
+				// transitive project deps will always show "any" here.
+				bs.Constraint = c.Constraint
 
 				vl, err := sm.ListVersions(proj.Ident())
-				if err != nil {
+				if err == nil {
 					gps.SortForUpgrade(vl)
 
 					for _, v := range vl {
-						// Because we've sorted the version list for upgrade, the
-						// first version we encounter that matches our constraint
-						// will be what we want
+						// Because we've sorted the version list for
+						// upgrade, the first version we encounter that
+						// matches our constraint will be what we want.
 						if c.Constraint.Matches(v) {
-							bs.Latest = v
+							// For branch constraints this should be the
+							// most recent revision on the selected
+							// branch.
+							if tv, ok := v.(gps.PairedVersion); ok && v.Type() == "branch" {
+								bs.Latest = tv.Underlying()
+							} else {
+								bs.Latest = v
+							}
 							break
 						}
 					}
 				}
 			}
 
+			var constraint string
+			if v, ok := bs.Constraint.(gps.Version); ok {
+				constraint = formatVersion(v)
+			} else {
+				constraint = bs.Constraint.String()
+			}
+
 			fmt.Fprintf(tw,
 				"%s\t%s\t%s\t%s\t%s\t%d\t\n",
 				bs.ProjectRoot,
-				bs.Constraint,
-				bs.Version,
-				string(bs.Revision)[:7],
-				bs.Latest,
+				constraint,
+				formatVersion(bs.Version),
+				formatVersion(bs.Revision),
+				formatVersion(bs.Latest),
 				bs.PackageCount,
 			)
 		}
@@ -259,6 +282,23 @@ func runStatusAll(p *project, sm *gps.SourceMgr) error {
 	}
 
 	return nil
+}
+
+func formatVersion(v gps.Version) string {
+	if v == nil {
+		return ""
+	}
+	switch v.Type() {
+	case "branch":
+		return "branch " + v.String()
+	case "rev":
+		r := v.String()
+		if len(r) > 7 {
+			r = r[:7]
+		}
+		return r
+	}
+	return v.String()
 }
 
 func runStatusDetailed(p *project, sm *gps.SourceMgr, args []string) error {
