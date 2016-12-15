@@ -135,7 +135,8 @@ func (m simpleRootManifest) dup() simpleRootManifest {
 
 // prepManifest ensures a manifest is prepared and safe for use by the solver.
 // This is mostly about ensuring that no outside routine can modify the manifest
-// while the solver is in-flight.
+// while the solver is in-flight, but it also filters out any empty
+// ProjectProperties.
 //
 // This is achieved by copying the manifest's data into a new SimpleManifest.
 func prepManifest(m Manifest) Manifest {
@@ -152,9 +153,28 @@ func prepManifest(m Manifest) Manifest {
 	}
 
 	for k, d := range deps {
+		// A zero-value ProjectProperties is equivalent to one with an
+		// anyConstraint{} in terms of how the solver will treat it. However, we
+		// normalize between these two by omitting such instances entirely, as
+		// it negates some possibility for false mismatches in input hashing.
+		if d.Constraint == nil {
+			if d.NetworkName == "" {
+				continue
+			}
+			d.Constraint = anyConstraint{}
+		}
+
 		rm.Deps[k] = d
 	}
+
 	for k, d := range ddeps {
+		if d.Constraint == nil {
+			if d.NetworkName == "" {
+				continue
+			}
+			d.Constraint = anyConstraint{}
+		}
+
 		rm.TestDeps[k] = d
 	}
 
