@@ -41,8 +41,14 @@ func (s *solver) HashInputs() []byte {
 	buf.WriteString(appenginePkgs)
 
 	// Write each of the packages, or the errors that were found for a
-	// particular subpath, into the hash.
+	// particular subpath, into the hash. We need to do this in a
+	// deterministic order, so expand and sort the map.
+	var pkgs []PackageOrErr
 	for _, perr := range s.rpt.Packages {
+		pkgs = append(pkgs, perr)
+	}
+	sort.Sort(sortPackageOrErr(pkgs))
+	for _, perr := range pkgs {
 		if perr.Err != nil {
 			buf.WriteString(perr.Err.Error())
 		} else {
@@ -90,4 +96,26 @@ func (s *solver) HashInputs() []byte {
 
 	hd := sha256.Sum256(buf.Bytes())
 	return hd[:]
+}
+
+type sortPackageOrErr []PackageOrErr
+
+func (s sortPackageOrErr) Len() int      { return len(s) }
+func (s sortPackageOrErr) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
+
+func (s sortPackageOrErr) Less(i, j int) bool {
+	a, b := s[i], s[j]
+	if a.Err != nil || b.Err != nil {
+		// Sort errors last.
+		if b.Err == nil {
+			return false
+		}
+		if a.Err == nil {
+			return true
+		}
+		// And then by string.
+		return a.Err.Error() < b.Err.Error()
+	}
+	// And finally, sort by import path.
+	return a.P.ImportPath < b.P.ImportPath
 }
