@@ -22,6 +22,7 @@ func init() {
 	flag.StringVar(&fixtorun, "gps.fix", "", "A single fixture to run in TestBasicSolves or TestBimodalSolves")
 	mkBridge(nil, nil)
 	overrideMkBridge()
+	overrideIsStdLib()
 }
 
 // sets the mkBridge global func to one that allows virtualized RootDirs
@@ -36,6 +37,14 @@ func overrideMkBridge() {
 				vlists: make(map[ProjectIdentifier][]Version),
 			},
 		}
+	}
+}
+
+// sets the isStdLib func to always return false, otherwise it would identify
+// pretty much all of our fixtures as being stdlib and skip everything
+func overrideIsStdLib() {
+	isStdLib = func(path string) bool {
+		return false
 	}
 }
 

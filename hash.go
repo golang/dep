@@ -34,12 +34,6 @@ func (s *solver) HashInputs() []byte {
 		buf.WriteString(pd.Constraint.String())
 	}
 
-	// The stdlib and old appengine packages play the same functional role in
-	// solving as ignores. Because they change, albeit quite infrequently, we
-	// have to include them in the hash.
-	buf.WriteString(stdlibPkgs)
-	buf.WriteString(appenginePkgs)
-
 	// Write each of the packages, or the errors that were found for a
 	// particular subpath, into the hash.
 	for _, perr := range s.rpt.Packages {
