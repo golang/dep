@@ -46,7 +46,7 @@ func TestHashInputs(t *testing.T) {
 	}
 }
 
-func TestHashInputsIgnores(t *testing.T) {
+func TestHashInputsReqsIgs(t *testing.T) {
 	fix := basicFixtures["shared dependency with overlapping constraints"]
 
 	rm := fix.rootmanifest().(simpleRootManifest).dup()
@@ -89,6 +89,86 @@ func TestHashInputsIgnores(t *testing.T) {
 		h.Write([]byte(v))
 	}
 	correct := h.Sum(nil)
+
+	if !bytes.Equal(dig, correct) {
+		t.Errorf("Hashes are not equal")
+	}
+
+	// Add requires
+	rm.req = map[string]bool{
+		"baz": true,
+		"qux": true,
+	}
+
+	params.Manifest = rm
+
+	s, err = Prepare(params, newdepspecSM(fix.ds, nil))
+	if err != nil {
+		t.Errorf("Unexpected error while prepping solver: %s", err)
+		t.FailNow()
+	}
+
+	dig = s.HashInputs()
+	h = sha256.New()
+
+	elems = []string{
+		"a",
+		"1.0.0",
+		"b",
+		"1.0.0",
+		"root",
+		"",
+		"root",
+		"a",
+		"b",
+		"baz",
+		"qux",
+		"bar",
+		"foo",
+		"depspec-sm-builtin",
+		"1.0.0",
+	}
+	for _, v := range elems {
+		h.Write([]byte(v))
+	}
+	correct = h.Sum(nil)
+
+	if !bytes.Equal(dig, correct) {
+		t.Errorf("Hashes are not equal")
+	}
+
+	// remove ignores, just test requires alone
+	rm.ig = nil
+	params.Manifest = rm
+
+	s, err = Prepare(params, newdepspecSM(fix.ds, nil))
+	if err != nil {
+		t.Errorf("Unexpected error while prepping solver: %s", err)
+		t.FailNow()
+	}
+
+	dig = s.HashInputs()
+	h = sha256.New()
+
+	elems = []string{
+		"a",
+		"1.0.0",
+		"b",
+		"1.0.0",
+		"root",
+		"",
+		"root",
+		"a",
+		"b",
+		"baz",
+		"qux",
+		"depspec-sm-builtin",
+		"1.0.0",
+	}
+	for _, v := range elems {
+		h.Write([]byte(v))
+	}
+	correct = h.Sum(nil)
 
 	if !bytes.Equal(dig, correct) {
 		t.Errorf("Hashes are not equal")

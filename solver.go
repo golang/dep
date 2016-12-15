@@ -613,7 +613,6 @@ func (s *solver) getImportsAndConstraintsOf(a atomWithPackages) ([]completeDep, 
 // are available, or Any() where they are not.
 func (s *solver) intersectConstraintsWithImports(deps []workingConstraint, reach []string) ([]completeDep, error) {
 	// Create a radix tree with all the projects we know from the manifest
-	// TODO(sdboyer) make this smarter once we allow non-root inputs as 'projects'
 	xt := radix.New()
 	for _, dep := range deps {
 		xt.Insert(string(dep.Ident.ProjectRoot), dep)
