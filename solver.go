@@ -623,10 +623,8 @@ func (s *solver) intersectConstraintsWithImports(deps []workingConstraint, reach
 	// the trie, assume (mostly) it's a correct correspondence.
 	dmap := make(map[ProjectRoot]completeDep)
 	for _, rp := range reach {
-		// If it's a stdlib package, skip it.
-		// TODO(sdboyer) this just hardcodes us to the packages in tip - should we
-		// have go version magic here, too?
-		if stdlib[rp] {
+		// If it's a stdlib-shaped package, skip it.
+		if isStdLib(rp) {
 			continue
 		}
 

@@ -250,11 +250,11 @@ func ListPackages(fileRoot, importRoot string) (PackageTree, error) {
 				lim = append(lim, imp)
 				// ignore stdlib done this way, b/c that's what the go tooling does
 			case strings.HasPrefix(imp, "./"):
-				if stdlib[imp[2:]] {
+				if isStdLib(imp[2:]) {
 					lim = append(lim, imp)
 				}
 			case strings.HasPrefix(imp, "../"):
-				if stdlib[imp[3:]] {
+				if isStdLib(imp[3:]) {
 					lim = append(lim, imp)
 				}
 			}
