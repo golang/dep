@@ -375,7 +375,7 @@ func TestBadSolveOpts(t *testing.T) {
 	_, err = Prepare(params, sm)
 	if err == nil {
 		t.Errorf("Should have errored on pkg both ignored and required")
-	} else if !strings.Contains(err.Error(), "multiple packages given as both required and ignored: foo, bar") {
+	} else if !strings.Contains(err.Error(), "multiple packages given as both required and ignored:") {
 		t.Error("Prepare should have given error with multiple ignore/require conflict error, but gave:", err)
 	}
 	params.Manifest = nil
