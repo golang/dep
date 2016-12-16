@@ -22,6 +22,7 @@ func init() {
 	flag.StringVar(&fixtorun, "gps.fix", "", "A single fixture to run in TestBasicSolves or TestBimodalSolves")
 	mkBridge(nil, nil)
 	overrideMkBridge()
+	overrideIsStdLib()
 }
 
 // sets the mkBridge global func to one that allows virtualized RootDirs
@@ -36,6 +37,14 @@ func overrideMkBridge() {
 				vlists: make(map[ProjectIdentifier][]Version),
 			},
 		}
+	}
+}
+
+// sets the isStdLib func to always return false, otherwise it would identify
+// pretty much all of our fixtures as being stdlib and skip everything
+func overrideIsStdLib() {
+	isStdLib = func(path string) bool {
+		return false
 	}
 }
 
@@ -283,6 +292,8 @@ func TestRootLockNoVersionPairMatching(t *testing.T) {
 	fixtureSolveSimpleChecks(fix, res, err, t)
 }
 
+// TestBadSolveOpts exercises the different possible inputs to a solver that can
+// be determined as invalid in Prepare(), without any further work
 func TestBadSolveOpts(t *testing.T) {
 	pn := strconv.FormatInt(rand.Int63(), 36)
 	fix := basicFixtures["no dependencies"]
@@ -353,6 +364,28 @@ func TestBadSolveOpts(t *testing.T) {
 		t.Errorf("Should have errored on override with empty ProjectProperties")
 	} else if !strings.Contains(err.Error(), "foo, but without any non-zero properties") {
 		t.Error("Prepare should have given error override with empty ProjectProperties, but gave:", err)
+	}
+
+	params.Manifest = simpleRootManifest{
+		ig:  map[string]bool{"foo": true},
+		req: map[string]bool{"foo": true},
+	}
+	_, err = Prepare(params, sm)
+	if err == nil {
+		t.Errorf("Should have errored on pkg both ignored and required")
+	} else if !strings.Contains(err.Error(), "was given as both a required and ignored package") {
+		t.Error("Prepare should have given error with single ignore/require conflict error, but gave:", err)
+	}
+
+	params.Manifest = simpleRootManifest{
+		ig:  map[string]bool{"foo": true, "bar": true},
+		req: map[string]bool{"foo": true, "bar": true},
+	}
+	_, err = Prepare(params, sm)
+	if err == nil {
+		t.Errorf("Should have errored on pkg both ignored and required")
+	} else if !strings.Contains(err.Error(), "multiple packages given as both required and ignored:") {
+		t.Error("Prepare should have given error with multiple ignore/require conflict error, but gave:", err)
 	}
 	params.Manifest = nil
 

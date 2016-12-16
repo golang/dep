@@ -187,7 +187,7 @@ func runStatusAll(p *project, sm *gps.SourceMgr) error {
 
 			// Only if we have a non-rev and non-plain version do/can we display
 			// anything wrt the version's updateability.
-			if bs.Version != nil && bs.Version.Type() != "version" {
+			if bs.Version != nil && bs.Version.Type() != gps.IsVersion {
 				c, has := p.m.Dependencies[proj.Ident().ProjectRoot]
 				if !has {
 					c.Constraint = gps.Any()
@@ -209,7 +209,7 @@ func runStatusAll(p *project, sm *gps.SourceMgr) error {
 							// For branch constraints this should be the
 							// most recent revision on the selected
 							// branch.
-							if tv, ok := v.(gps.PairedVersion); ok && v.Type() == "branch" {
+							if tv, ok := v.(gps.PairedVersion); ok && v.Type() == gps.IsBranch {
 								bs.Latest = tv.Underlying()
 							} else {
 								bs.Latest = v
@@ -289,9 +289,9 @@ func formatVersion(v gps.Version) string {
 		return ""
 	}
 	switch v.Type() {
-	case "branch":
+	case gps.IsBranch:
 		return "branch " + v.String()
-	case "rev":
+	case gps.IsRevision:
 		r := v.String()
 		if len(r) > 7 {
 			r = r[:7]

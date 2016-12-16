@@ -152,6 +152,9 @@ func NewSourceManager(an ProjectAnalyzer, cachedir string) (*SourceMgr, error) {
 	}, nil
 }
 
+// CouldNotCreateLockError describe failure modes in which creating a SourceMgr
+// did not succeed because there was an error while attempting to create the
+// on-disk lock file.
 type CouldNotCreateLockError struct {
 	Path string
 	Err  error
@@ -268,7 +271,7 @@ func (sm *SourceMgr) ExportProject(id ProjectIdentifier, v Version, to string) e
 	return src.exportVersionTo(v, to)
 }
 
-// DeduceRootProject takes an import path and deduces the corresponding
+// DeduceProjectRoot takes an import path and deduces the corresponding
 // project/source root.
 //
 // Note that some import paths may require network activity to correctly

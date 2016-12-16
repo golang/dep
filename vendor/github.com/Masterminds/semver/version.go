@@ -46,7 +46,7 @@ const SemVerRegex string = `v?([0-9]+)(\.[0-9]+)?(\.[0-9]+)?` +
 
 // Version represents a single semantic version.
 type Version struct {
-	major, minor, patch int64
+	major, minor, patch uint64
 	pre                 string
 	metadata            string
 	original            string
@@ -84,8 +84,8 @@ func NewVersion(v string) (*Version, error) {
 		original: v,
 	}
 
-	var temp int64
-	temp, err := strconv.ParseInt(m[1], 10, 32)
+	var temp uint64
+	temp, err := strconv.ParseUint(m[1], 10, 32)
 	if err != nil {
 		bvs := badVersionSegment{e: err}
 		if CacheVersions {
@@ -99,7 +99,7 @@ func NewVersion(v string) (*Version, error) {
 	sv.major = temp
 
 	if m[2] != "" {
-		temp, err = strconv.ParseInt(strings.TrimPrefix(m[2], "."), 10, 32)
+		temp, err = strconv.ParseUint(strings.TrimPrefix(m[2], "."), 10, 32)
 		if err != nil {
 			bvs := badVersionSegment{e: err}
 			if CacheVersions {
@@ -116,7 +116,7 @@ func NewVersion(v string) (*Version, error) {
 	}
 
 	if m[3] != "" {
-		temp, err = strconv.ParseInt(strings.TrimPrefix(m[3], "."), 10, 32)
+		temp, err = strconv.ParseUint(strings.TrimPrefix(m[3], "."), 10, 32)
 		if err != nil {
 			bvs := badVersionSegment{e: err}
 			if CacheVersions {
@@ -166,17 +166,17 @@ func (v *Version) Original() string {
 }
 
 // Major returns the major version.
-func (v *Version) Major() int64 {
+func (v *Version) Major() uint64 {
 	return v.major
 }
 
 // Minor returns the minor version.
-func (v *Version) Minor() int64 {
+func (v *Version) Minor() uint64 {
 	return v.minor
 }
 
 // Patch returns the patch version.
-func (v *Version) Patch() int64 {
+func (v *Version) Patch() uint64 {
 	return v.patch
 }
 
@@ -297,7 +297,7 @@ func (v *Version) Union(c Constraint) Constraint {
 func (Version) _private() {}
 func (Version) _real()    {}
 
-func compareSegment(v, o int64) int {
+func compareSegment(v, o uint64) int {
 	if v < o {
 		return -1
 	}

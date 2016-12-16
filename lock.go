@@ -114,9 +114,9 @@ func (l *lock) MarshalJSON() ([]byte, error) {
 		}
 
 		switch v.Type() {
-		case "branch":
+		case gps.IsBranch:
 			ld.Branch = v.String()
-		case "semver", "version":
+		case gps.IsSemver, gps.IsVersion:
 			ld.Version = v.String()
 		}
 
