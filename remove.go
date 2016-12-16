@@ -6,6 +6,9 @@ package main
 
 import (
 	"fmt"
+	"log"
+	"os"
+	"path/filepath"
 
 	"github.com/pkg/errors"
 	"github.com/sdboyer/gps"
@@ -55,16 +58,14 @@ func runRemove(args []string) error {
 	if err != nil {
 		return errors.Wrap(err, "determineProjectRoot")
 	}
-	fmt.Printf("cpr: %#v\n", cpr)
 
 	pkgT, err := gps.ListPackages(p.absroot, cpr)
 	if err != nil {
 		return errors.Wrap(err, "gps.ListPackages")
 	}
-	fmt.Printf("package tree: %#v\n", pkgT)
 
 	// get the list of packages
-	packages, _, _, _, err := getProjectDependencies(pkgT, cpr, sm)
+	pd, err := getProjectData(pkgT, cpr, sm)
 	if err != nil {
 		return err
 	}
@@ -78,11 +79,42 @@ func runRemove(args []string) error {
 		 *		- Actual solver behavior: ?
 		 */
 
-		// check if we are using the package
-		_, using := packages[gps.ProjectRoot(arg)]
-		fmt.Printf("using package %s: %t\n", arg, using)
+		if _, found := pd.dependencies[gps.ProjectRoot(arg)]; found {
+			//TODO: Tell the user where it is in use?
+			return fmt.Errorf("not removing '%s' because it is in use", arg)
+		}
+		delete(p.m.Dependencies, gps.ProjectRoot(arg))
 	}
-	fmt.Printf("packages: %#v", packages)
 
+	params := gps.SolveParameters{
+		RootDir:         p.absroot,
+		RootPackageTree: pkgT,
+		Manifest:        p.m,
+		Lock:            p.l,
+	}
+
+	if *verbose {
+		params.Trace = true
+		params.TraceLogger = log.New(os.Stderr, "", 0)
+	}
+	s, err := gps.Prepare(params, sm)
+	if err != nil {
+		return errors.Wrap(err, "prepare solver")
+	}
+
+	soln, err := s.Solve()
+	if err != nil {
+		handleAllTheFailuresOfTheWorld(err)
+		return err
+	}
+
+	p.l = lockFromInterface(soln)
+
+	if err := writeFile(filepath.Join(p.absroot, manifestName), p.m); err != nil {
+		return errors.Wrap(err, "writeFile for manifest")
+	}
+	if err := writeFile(filepath.Join(p.absroot, lockName), p.l); err != nil {
+		return errors.Wrap(err, "writeFile for lock")
+	}
 	return nil
 }
