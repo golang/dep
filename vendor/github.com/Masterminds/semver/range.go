@@ -20,7 +20,7 @@ func (rc rangeConstraint) Matches(v *Version) error {
 		rc: rc,
 	}
 
-	if rc.min != nil {
+	if !rc.minIsZero() {
 		// TODO ensure sane handling of prerelease versions (which are strictly
 		// less than the normal version, but should be admitted in a geq range)
 		cmp := rc.min.Compare(v)
@@ -37,7 +37,7 @@ func (rc rangeConstraint) Matches(v *Version) error {
 		}
 	}
 
-	if rc.max != nil {
+	if !rc.maxIsInf() {
 		// TODO ensure sane handling of prerelease versions (which are strictly
 		// less than the normal version, but should be admitted in a geq range)
 		cmp := rc.max.Compare(v)
@@ -83,6 +83,14 @@ func (rc rangeConstraint) dup() rangeConstraint {
 	}
 }
 
+func (rc rangeConstraint) minIsZero() bool {
+	return rc.min == nil
+}
+
+func (rc rangeConstraint) maxIsInf() bool {
+	return rc.max == nil
+}
+
 func (rc rangeConstraint) Intersect(c Constraint) Constraint {
 	switch oc := c.(type) {
 	case any:
@@ -105,8 +113,8 @@ func (rc rangeConstraint) Intersect(c Constraint) Constraint {
 			includeMax: rc.includeMax,
 		}
 
-		if oc.min != nil {
-			if nr.min == nil || nr.min.LessThan(oc.min) {
+		if !oc.minIsZero() {
+			if nr.minIsZero() || nr.min.LessThan(oc.min) {
 				nr.min = oc.min
 				nr.includeMin = oc.includeMin
 			} else if oc.min.Equal(nr.min) && !oc.includeMin {
@@ -115,8 +123,8 @@ func (rc rangeConstraint) Intersect(c Constraint) Constraint {
 			}
 		}
 
-		if oc.max != nil {
-			if nr.max == nil || nr.max.GreaterThan(oc.max) {
+		if !oc.maxIsInf() {
+			if nr.maxIsInf() || nr.max.GreaterThan(oc.max) {
 				nr.max = oc.max
 				nr.includeMax = oc.includeMax
 			} else if oc.max.Equal(nr.max) && !oc.includeMax {
@@ -132,7 +140,7 @@ func (rc rangeConstraint) Intersect(c Constraint) Constraint {
 			}
 		}
 
-		if nr.min == nil || nr.max == nil {
+		if nr.minIsZero() || nr.maxIsInf() {
 			return nr
 		}
 
@@ -209,7 +217,7 @@ func (rc rangeConstraint) Union(c Constraint) Constraint {
 		// Only possibility left is gt
 		return unionConstraint{rc.dup(), oc}
 	case rangeConstraint:
-		if (rc.min == nil && oc.max == nil) || (rc.max == nil && oc.min == nil) {
+		if (rc.minIsZero() && oc.maxIsInf()) || (rc.maxIsInf() && oc.minIsZero()) {
 			rcl, ocl := len(rc.excl), len(oc.excl)
 			// Quick check for open case
 			if rcl == 0 && ocl == 0 {
@@ -273,8 +281,8 @@ func (rc rangeConstraint) Union(c Constraint) Constraint {
 			)
 
 			// Pick the min
-			if rc.min != nil {
-				if oc.min == nil || rc.min.GreaterThan(oc.min) || (rc.min.Equal(oc.min) && !rc.includeMin && oc.includeMin) {
+			if !rc.minIsZero() {
+				if oc.minIsZero() || rc.min.GreaterThan(oc.min) || (rc.min.Equal(oc.min) && !rc.includeMin && oc.includeMin) {
 					info |= rminlt
 					nc.min = oc.min
 					nc.includeMin = oc.includeMin
@@ -283,15 +291,15 @@ func (rc rangeConstraint) Union(c Constraint) Constraint {
 					nc.min = rc.min
 					nc.includeMin = rc.includeMin
 				}
-			} else if oc.min != nil {
+			} else if !oc.minIsZero() {
 				info |= lminlt
 				nc.min = rc.min
 				nc.includeMin = rc.includeMin
 			}
 
 			// Pick the max
-			if rc.max != nil {
-				if oc.max == nil || rc.max.LessThan(oc.max) || (rc.max.Equal(oc.max) && !rc.includeMax && oc.includeMax) {
+			if !rc.maxIsInf() {
+				if oc.maxIsInf() || rc.max.LessThan(oc.max) || (rc.max.Equal(oc.max) && !rc.includeMax && oc.includeMax) {
 					info |= rmaxgt
 					nc.max = oc.max
 					nc.includeMax = oc.includeMax
@@ -300,7 +308,7 @@ func (rc rangeConstraint) Union(c Constraint) Constraint {
 					nc.max = rc.max
 					nc.includeMax = rc.includeMax
 				}
-			} else if oc.max != nil {
+			} else if oc.maxIsInf() {
 				info |= lmaxgt
 				nc.max = rc.max
 				nc.includeMax = rc.includeMax
@@ -346,14 +354,14 @@ func (rc rangeConstraint) Union(c Constraint) Constraint {
 // Note also that this does *not* compare excluded versions - it only compares
 // range endpoints.
 func (rc rangeConstraint) isSupersetOf(rc2 rangeConstraint) bool {
-	if rc.min != nil {
-		if rc2.min == nil || rc.min.GreaterThan(rc2.min) || (rc.min.Equal(rc2.min) && !rc.includeMin && rc2.includeMin) {
+	if !rc.minIsZero() {
+		if rc2.minIsZero() || rc.min.GreaterThan(rc2.min) || (rc.min.Equal(rc2.min) && !rc.includeMin && rc2.includeMin) {
 			return false
 		}
 	}
 
-	if rc.max != nil {
-		if rc2.max == nil || rc.max.LessThan(rc2.max) || (rc.max.Equal(rc2.max) && !rc.includeMax && rc2.includeMax) {
+	if !rc.maxIsInf() {
+		if rc2.maxIsInf() || rc.max.LessThan(rc2.max) || (rc.max.Equal(rc2.max) && !rc.includeMax && rc2.includeMax) {
 			return false
 		}
 	}
@@ -362,22 +370,66 @@ func (rc rangeConstraint) isSupersetOf(rc2 rangeConstraint) bool {
 }
 
 func (rc rangeConstraint) String() string {
-	// TODO express using caret or tilde, where applicable
 	var pieces []string
-	if rc.min != nil {
-		if rc.includeMin {
-			pieces = append(pieces, fmt.Sprintf(">=%s", rc.min))
-		} else {
-			pieces = append(pieces, fmt.Sprintf(">%s", rc.min))
+
+	// We need to trigger the standard verbose handling from various points, so
+	// wrap it in a function.
+	noshort := func() {
+		if !rc.minIsZero() {
+			if rc.includeMin {
+				pieces = append(pieces, fmt.Sprintf(">=%s", rc.min))
+			} else {
+				pieces = append(pieces, fmt.Sprintf(">%s", rc.min))
+			}
+		}
+
+		if !rc.maxIsInf() {
+			if rc.includeMax {
+				pieces = append(pieces, fmt.Sprintf("<=%s", rc.max))
+			} else {
+				pieces = append(pieces, fmt.Sprintf("<%s", rc.max))
+			}
 		}
 	}
 
-	if rc.max != nil {
-		if rc.includeMax {
-			pieces = append(pieces, fmt.Sprintf("<=%s", rc.max))
-		} else {
-			pieces = append(pieces, fmt.Sprintf("<%s", rc.max))
+	// Handle the possibility that we might be able to express the range
+	// with a carat or tilde, as we prefer those forms.
+	switch {
+	case rc.minIsZero() && rc.maxIsInf():
+		// This if is internal because it's useful to know for the other cases
+		// that we don't have special values at both bounds
+		if len(rc.excl) == 0 {
+			// Shouldn't be possible to reach from anything that can be done
+			// outside the package, but best to cover it and be safe
+			return "*"
 		}
+	case rc.minIsZero(), rc.includeMax, !rc.includeMin:
+		// tilde and carat could never apply here
+		noshort()
+	case !rc.maxIsInf() && rc.max.Minor() == 0 && rc.max.Patch() == 0: // basic carat
+		if rc.min.Major() == rc.max.Major()-1 && rc.min.Major() != 0 {
+			pieces = append(pieces, fmt.Sprintf("^%s", rc.min))
+		} else {
+			// range is too wide for carat, need standard operators
+			noshort()
+		}
+	case !rc.maxIsInf() && rc.max.Major() != 0 && rc.max.Patch() == 0: // basic tilde
+		if rc.min.Minor() == rc.max.Minor()-1 && rc.min.Major() == rc.max.Major() {
+			pieces = append(pieces, fmt.Sprintf("~%s", rc.min))
+		} else {
+			// range is too wide for tilde, need standard operators
+			noshort()
+		}
+	case !rc.maxIsInf() && rc.max.Major() == 0 && rc.max.Patch() == 0 && rc.max.Minor() != 0:
+		// below 1.0.0, tilde is meaningless but carat is shifted to the
+		// right (so it basically behaves the same as tilde does above 1.0.0)
+		if rc.min.Minor() == rc.max.Minor()-1 {
+			pieces = append(pieces, fmt.Sprintf("^%s", rc.min))
+		} else {
+			noshort()
+		}
+	default:
+		noshort()
 	}
 
 	for _, e := range rc.excl {

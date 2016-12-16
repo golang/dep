@@ -28,6 +28,9 @@ type solution struct {
 // WriteDepTree takes a basedir and a Lock, and exports all the projects
 // listed in the lock to the appropriate target location within the basedir.
 //
+// If the goal is to populate a vendor directory, basedir should be the absolute
+// path to that vendor directory, not its parent (a project root, typically).
+//
 // It requires a SourceManager to do the work, and takes a flag indicating
 // whether or not to strip vendor directories contained in the exported
 // dependencies.

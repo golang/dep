@@ -12,11 +12,33 @@ platform:
 install:
   - go version
   - go env
+  - go get -u gopkg.in/alecthomas/gometalinter.v1
+  - set PATH=%PATH%;%GOPATH%\bin
+  - gometalinter.v1.exe --install
 
 build_script:
   - go install -v ./...
 
 test_script:
+  - "gometalinter.v1 \
+    --disable-all \
+    --enable deadcode \
+    --severity deadcode:error \
+    --enable gofmt \
+    --enable gosimple \
+    --enable ineffassign \
+    --enable misspell \
+    --enable vet \
+    --tests \
+    --vendor \
+    --deadline 60s \
+    ./... || cmd /C EXIT 0"
+  - "gometalinter.v1 \
+    --disable-all \
+    --enable golint \
+    --vendor \
+    --deadline 60s \
+    ./... || cmd /C EXIT 0"
   - go test -v
 
 deploy: off

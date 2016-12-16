@@ -12,6 +12,8 @@ func TestVersionSorts(t *testing.T) {
 	v6 := NewVersion("2.0.5.2")
 	v7 := newDefaultBranch("unwrapped")
 	v8 := NewVersion("20.0.5.2")
+	v9 := NewVersion("v1.5.5-beta.4")
+	v10 := NewVersion("v3.0.1-alpha.1")
 
 	start := []Version{
 		v1,
@@ -22,6 +24,8 @@ func TestVersionSorts(t *testing.T) {
 		v6,
 		v7,
 		v8,
+		v9,
+		v10,
 		rev,
 	}
 
@@ -32,6 +36,7 @@ func TestVersionSorts(t *testing.T) {
 
 	edown := []Version{
 		v3, v4, v5, // semvers
+		v9, v10, // prerelease semver
 		v7, v1, v2, // floating/branches
 		v6, v8, // plain versions
 		rev, // revs
@@ -39,6 +44,7 @@ func TestVersionSorts(t *testing.T) {
 
 	eup := []Version{
 		v5, v4, v3, // semvers
+		v10, v9, // prerelease semver
 		v7, v1, v2, // floating/branches
 		v6, v8, // plain versions
 		rev, // revs

@@ -154,7 +154,7 @@ func (s *solver) traceInfo(args ...interface{}) {
 	case string:
 		msg = tracePrefix(fmt.Sprintf(data, args[1:]...), "| ", "| ")
 	case traceError:
-		preflen += 1
+		preflen++
 		// We got a special traceError, use its custom method
 		msg = tracePrefix(data.traceString(), "| ", failCharSp)
 	case error:

@@ -149,9 +149,9 @@ func runInit(args []string) error {
 			ondisk[pr] = v
 			pp := gps.ProjectProperties{}
 			switch v.Type() {
-			case "branch", "version", "rev":
+			case gps.IsBranch, gps.IsVersion, gps.IsRevision:
 				pp.Constraint = v
-			case "semver":
+			case gps.IsSemver:
 				c, _ := gps.NewSemverConstraint("^" + v.String())
 				pp.Constraint = c
 			}

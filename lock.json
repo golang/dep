@@ -1,10 +1,10 @@
 {
-    "memo": "5dae54d01074eeca29bbf86ad922fa1885bf8847a6893eb06072226267d54fc9",
+    "memo": "47c0ec3d677d1d5c01778bc81836801e009c641797708b8fcd773dce954c7714",
     "projects": [
         {
             "name": "github.com/Masterminds/semver",
             "branch": "2.x",
-            "revision": "b3ef6b1808e9889dfb8767ce7068db923a3d07de",
+            "revision": "94ad6eaf8457cf85a68c9b53fa42e9b1b8683783",
             "packages": [
                 "."
             ]
@@ -35,8 +35,8 @@
         },
         {
             "name": "github.com/sdboyer/gps",
-            "version": "v0.12.0",
-            "revision": "9ca61cb4e9851c80bb537e7d8e1be56e18e03cc9",
+            "version": "v0.13.0",
+            "revision": "41fd676e835d91ab7307597cb753e08d47065da1",
             "packages": [
                 "."
             ]
