@@ -6,6 +6,18 @@ import (
 	"github.com/Masterminds/semver"
 )
 
+// VersionType indicates a type for a Version that conveys some additional
+// semantics beyond that which is literally embedded on the Go type.
+type VersionType uint8
+
+// VersionTypes for the four major classes of version we deal with
+const (
+	IsRevision VersionType = iota
+	IsVersion
+	IsSemver
+	IsBranch
+)
+
 // Version represents one of the different types of versions used by gps.
 //
 // Version composes Constraint, because all versions can be used as a constraint
@@ -22,7 +34,7 @@ type Version interface {
 	Constraint
 
 	// Indicates the type of version - Revision, Branch, Version, or Semver
-	Type() string
+	Type() VersionType
 }
 
 // PairedVersion represents a normal Version, but paired with its corresponding,
@@ -107,8 +119,9 @@ func (r Revision) String() string {
 	return string(r)
 }
 
-func (r Revision) Type() string {
-	return "rev"
+// Type indicates the type of version - for revisions, "revision".
+func (r Revision) Type() VersionType {
+	return IsRevision
 }
 
 // Matches is the Revision acting as a constraint; it checks to see if the provided
@@ -145,6 +158,9 @@ func (r Revision) MatchesAny(c Constraint) bool {
 	return false
 }
 
+// Intersect computes the intersection of the Constraint with the provided
+// Constraint. For Revisions, this can only be another, exactly equal
+// Revision, or a PairedVersion whose underlying Revision is exactly equal.
 func (r Revision) Intersect(c Constraint) Constraint {
 	switch tc := c.(type) {
 	case anyConstraint:
@@ -175,8 +191,8 @@ func (v branchVersion) String() string {
 	return string(v.name)
 }
 
-func (v branchVersion) Type() string {
-	return "branch"
+func (v branchVersion) Type() VersionType {
+	return IsBranch
 }
 
 func (v branchVersion) Matches(v2 Version) bool {
@@ -248,8 +264,8 @@ func (v plainVersion) String() string {
 	return string(v)
 }
 
-func (r plainVersion) Type() string {
-	return "version"
+func (v plainVersion) Type() VersionType {
+	return IsVersion
 }
 
 func (v plainVersion) Matches(v2 Version) bool {
@@ -327,8 +343,8 @@ func (v semVersion) String() string {
 	return str
 }
 
-func (r semVersion) Type() string {
-	return "semver"
+func (v semVersion) Type() VersionType {
+	return IsSemver
 }
 
 func (v semVersion) Matches(v2 Version) bool {
@@ -407,7 +423,7 @@ func (v versionPair) String() string {
 	return v.v.String()
 }
 
-func (v versionPair) Type() string {
+func (v versionPair) Type() VersionType {
 	return v.v.Type()
 }
 
@@ -545,12 +561,15 @@ func compareVersionType(l, r Version) int {
 //  2.0 spec (as implemented by github.com/Masterminds/semver lib), with one
 //  exception:
 //  - Semver versions with a prerelease are after *all* non-prerelease semver.
-//  Against each other, they are sorted first by their numerical component, then
+//  Within this subset they are sorted first by their numerical component, then
 //  lexicographically by their prerelease version.
-//  - All branches are next, and sort lexicographically against each other.
-//  - All non-semver versions (tags) are next, and sort lexicographically
-//  against each other.
-//  - Revisions are last, and sort lexicographically against each other.
+//  - The default branch(es) is next; the exact semantics of that are specific
+//  to the underlying source.
+//  - All other branches come next, sorted lexicographically.
+//  - All non-semver versions (tags) are next, sorted lexicographically.
+//  - Revisions, if any, are last, sorted lexicographically. Revisions do not
+//  typically appear in version lists, so the only invariant we maintain is
+//  determinism - deeper semantics, like chronology or topology, do not matter.
 //
 // So, given a slice of the following versions:
 //
@@ -571,14 +590,13 @@ func SortForUpgrade(vl []Version) {
 //
 // This is *not* the same as reversing SortForUpgrade (or you could simply
 // sort.Reverse()). The type precedence is the same, including the semver vs.
-// semver-with-prerelease relation. Lexicographic comparisons within non-semver
-// tags, branches, and revisions remains the same as well; because we treat
-// these domains as having no ordering relations (chronology), there can be no
-// real concept of "upgrade" vs "downgrade", so there is no reason to reverse
-// them.
+// semver-with-prerelease relation. Lexicographical comparisons within
+// non-semver tags, branches, and revisions remains the same as well; because we
+// treat these domains as having no ordering relation, there can be no real
+// concept of "upgrade" vs "downgrade", so there is no reason to reverse them.
 //
 // Thus, the only binary relation that is reversed for downgrade is within-type
-// comparisons for semver (with and without prerelease).
+// comparisons for semver.
 //
 // So, given a slice of the following versions:
 //

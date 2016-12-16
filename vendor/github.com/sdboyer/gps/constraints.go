@@ -179,13 +179,19 @@ type ProjectConstraint struct {
 	Constraint Constraint
 }
 
+// ProjectConstraints is a map of projects, as identified by their import path
+// roots (ProjectRoots) to the corresponding ProjectProperties.
+//
+// They are the standard form in which Manifests declare their required
+// dependency properties - constraints and network locations - as well as the
+// form in which RootManifests declare their overrides.
+type ProjectConstraints map[ProjectRoot]ProjectProperties
+
 type workingConstraint struct {
 	Ident                     ProjectIdentifier
 	Constraint                Constraint
 	overrNet, overrConstraint bool
 }
-
-type ProjectConstraints map[ProjectRoot]ProjectProperties
 
 func pcSliceToMap(l []ProjectConstraint, r ...[]ProjectConstraint) ProjectConstraints {
 	final := make(ProjectConstraints)

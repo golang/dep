@@ -17,12 +17,14 @@ type manifest struct {
 	Dependencies gps.ProjectConstraints
 	Ovr          gps.ProjectConstraints
 	Ignores      []string
+	//Required     []string
 }
 
 type rawManifest struct {
 	Dependencies map[string]possibleProps `json:"dependencies,omitempty"`
 	Overrides    map[string]possibleProps `json:"overrides,omitempty"`
 	Ignores      []string                 `json:"ignores,omitempty"`
+	//Required     []string                 `json:"required,omitempty"`
 }
 
 type possibleProps struct {
@@ -108,6 +110,7 @@ func (m *manifest) MarshalJSON() ([]byte, error) {
 		Dependencies: make(map[string]possibleProps, len(m.Dependencies)),
 		Overrides:    make(map[string]possibleProps, len(m.Ovr)),
 		Ignores:      m.Ignores,
+		//Required:     m.Required,
 	}
 
 	for n, pp := range m.Dependencies {
@@ -132,11 +135,11 @@ func toPossible(pp gps.ProjectProperties) (p possibleProps) {
 
 	if v, ok := pp.Constraint.(gps.Version); ok {
 		switch v.Type() {
-		case "rev": // will be changed to revision upstream soon
+		case gps.IsRevision:
 			p.Revision = v.String()
-		case "branch":
+		case gps.IsBranch:
 			p.Branch = v.String()
-		case "semver", "version":
+		case gps.IsSemver, gps.IsVersion:
 			p.Version = v.String()
 		}
 	} else {
@@ -167,7 +170,7 @@ func (m *manifest) Overrides() gps.ProjectConstraints {
 	return m.Ovr
 }
 
-func (m *manifest) IgnorePackages() map[string]bool {
+func (m *manifest) IgnoredPackages() map[string]bool {
 	if len(m.Ignores) == 0 {
 		return nil
 	}
@@ -178,4 +181,18 @@ func (m *manifest) IgnorePackages() map[string]bool {
 	}
 
 	return mp
+}
+
+func (m *manifest) RequiredPackages() map[string]bool {
+	//if len(m.Required) == 0 {
+	//return nil
+	//}
+
+	//mp := make(map[string]bool, len(m.Required))
+	//for _, i := range m.Required {
+	//mp[i] = true
+	//}
+
+	//return mp
+	return nil
 }
