@@ -97,183 +97,12 @@ func runInit(args []string) error {
 	}
 	defer sm.Release()
 
-	// TODO: This is just wrong, need to figure out manifest file structure
+	packages, processed, notondisk, ondisk, err := getProjectDependencies(pkgT, cpr, sm)
+	if err != nil {
+		return err
+	}
 	m := manifest{
-		Dependencies: make(gps.ProjectConstraints),
-	}
-
-	vlogf("Building dependency graph...")
-	processed := make(map[gps.ProjectRoot][]string)
-	packages := make(map[string]bool)
-	notondisk := make(map[gps.ProjectRoot]bool)
-	ondisk := make(map[gps.ProjectRoot]gps.Version)
-	for _, v := range pkgT.Packages {
-		// TODO: Some errors maybe should not be skipped ;-)
-		if v.Err != nil {
-			vlogf("%v", v.Err)
-			continue
-		}
-		vlogf("Package %q, analyzing...", v.P.ImportPath)
-
-		for _, ip := range v.P.Imports {
-			if isStdLib(ip) {
-				continue
-			}
-			if hasImportPathPrefix(ip, cpr) {
-				// Don't analyze imports from the current project.
-				continue
-			}
-			pr, err := sm.DeduceProjectRoot(ip)
-			if err != nil {
-				return errors.Wrap(err, "sm.DeduceProjectRoot") // TODO: Skip and report ?
-			}
-
-			packages[ip] = true
-			if _, ok := processed[pr]; ok {
-				if !contains(processed[pr], ip) {
-					processed[pr] = append(processed[pr], ip)
-				}
-
-				continue
-			}
-			vlogf("Package %q has import %q, analyzing...", v.P.ImportPath, ip)
-
-			processed[pr] = []string{ip}
-			v, err := depContext.versionInWorkspace(pr)
-			if err != nil {
-				notondisk[pr] = true
-				logf("Could not determine version for %q, omitting from generated manifest", pr)
-				continue
-			}
-
-			ondisk[pr] = v
-			pp := gps.ProjectProperties{}
-			switch v.Type() {
-			case "branch", "version", "rev":
-				pp.Constraint = v
-			case "semver":
-				c, _ := gps.NewSemverConstraint("^" + v.String())
-				pp.Constraint = c
-			}
-
-			m.Dependencies[pr] = pp
-		}
-	}
-
-	vlogf("Analyzing transitive dependencies...")
-	// Explore the packages we've found for transitive deps, either
-	// completing the lock or identifying (more) missing projects that we'll
-	// need to ask gps to solve for us.
-	colors := make(map[string]uint8)
-	const (
-		white uint8 = iota
-		grey
-		black
-	)
-
-	// cache of PackageTrees, so we don't parse projects more than once
-	ptrees := make(map[gps.ProjectRoot]gps.PackageTree)
-
-	// depth-first traverser
-	var dft func(string) error
-	dft = func(pkg string) error {
-		switch colors[pkg] {
-		case white:
-			vlogf("Analyzing %q...", pkg)
-			colors[pkg] = grey
-
-			pr, err := sm.DeduceProjectRoot(pkg)
-			if err != nil {
-				return errors.Wrap(err, "could not deduce project root for "+pkg)
-			}
-
-			// We already visited this project root earlier via some other
-			// pkg within it, and made the decision that it's not on disk.
-			// Respect that decision, and pop the stack.
-			if notondisk[pr] {
-				colors[pkg] = black
-				return nil
-			}
-
-			ptree, has := ptrees[pr]
-			if !has {
-				// It's fine if the root does not exist - it indicates that this
-				// project is not present in the workspace, and so we need to
-				// solve to deal with this dep.
-				r := filepath.Join(depContext.GOPATH, "src", string(pr))
-				_, err := os.Lstat(r)
-				if os.IsNotExist(err) {
-					colors[pkg] = black
-					notondisk[pr] = true
-					return nil
-				}
-
-				ptree, err = gps.ListPackages(r, string(pr))
-				if err != nil {
-					// Any error here other than an a nonexistent dir (which
-					// can't happen because we covered that case above) is
-					// probably critical, so bail out.
-					return errors.Wrap(err, "gps.ListPackages")
-				}
-				ptrees[pr] = ptree
-			}
-
-			rm := ptree.ExternalReach(false, false, nil)
-			reached, ok := rm[pkg]
-			if !ok {
-				colors[pkg] = black
-				// not on disk...
-				notondisk[pr] = true
-				return nil
-			}
-
-			if _, ok := processed[pr]; ok {
-				if !contains(processed[pr], pkg) {
-					processed[pr] = append(processed[pr], pkg)
-				}
-			} else {
-				processed[pr] = []string{pkg}
-			}
-
-			// project must be on disk at this point; question is
-			// whether we're first seeing it here, in the transitive
-			// exploration, or if it arose in the direct dep parts
-			if _, in := ondisk[pr]; !in {
-				v, err := depContext.versionInWorkspace(pr)
-				if err != nil {
-					colors[pkg] = black
-					notondisk[pr] = true
-					return nil
-				}
-				ondisk[pr] = v
-			}
-
-			// recurse
-			for _, rpkg := range reached {
-				if isStdLib(rpkg) {
-					continue
-				}
-
-				err := dft(rpkg)
-				if err != nil {
-					return err
-				}
-			}
-
-			colors[pkg] = black
-		case grey:
-			return fmt.Errorf("Import cycle detected on %s", pkg)
-		}
-		return nil
-	}
-
-	// run the depth-first traversal from the set of immediate external
-	// package imports we found in the current project
-	for pkg := range packages {
-		err := dft(pkg)
-		if err != nil {
-			return err // already errors.Wrap()'d internally
-		}
+		Dependencies: packages,
 	}
 
 	// Make an initial lock from what knowledge we've collected about the
@@ -421,4 +250,184 @@ func hasImportPathPrefix(s, prefix string) bool {
 		return true
 	}
 	return strings.HasPrefix(s, prefix+"/")
+}
+
+func getProjectDependencies(pkgT gps.PackageTree, cpr string, sm *gps.SourceMgr) (dependencies gps.ProjectConstraints, processed map[gps.ProjectRoot][]string, notondisk map[gps.ProjectRoot]bool, ondisk map[gps.ProjectRoot]gps.Version, err error) {
+	vlogf("Building dependency graph...")
+
+	dependencies = make(gps.ProjectConstraints)
+	processed = make(map[gps.ProjectRoot][]string)
+	packages := make(map[string]bool)
+	notondisk = make(map[gps.ProjectRoot]bool)
+	ondisk = make(map[gps.ProjectRoot]gps.Version)
+	for _, v := range pkgT.Packages {
+		// TODO: Some errors maybe should not be skipped ;-)
+		if v.Err != nil {
+			vlogf("%v", v.Err)
+			continue
+		}
+		vlogf("Package %q, analyzing...", v.P.ImportPath)
+
+		for _, ip := range v.P.Imports {
+			if isStdLib(ip) {
+				continue
+			}
+			if hasImportPathPrefix(ip, cpr) {
+				// Don't analyze imports from the current project.
+				continue
+			}
+			pr, err := sm.DeduceProjectRoot(ip)
+			if err != nil {
+				return dependencies, processed, notondisk, ondisk, errors.Wrap(err, "sm.DeduceProjectRoot") // TODO: Skip and report ?
+			}
+
+			packages[ip] = true
+			if _, ok := processed[pr]; ok {
+				if !contains(processed[pr], ip) {
+					processed[pr] = append(processed[pr], ip)
+				}
+
+				continue
+			}
+			vlogf("Package %q has import %q, analyzing...", v.P.ImportPath, ip)
+
+			processed[pr] = []string{ip}
+			v, err := depContext.versionInWorkspace(pr)
+			if err != nil {
+				notondisk[pr] = true
+				vlogf("Could not determine version for %q, omitting from generated manifest", pr)
+				continue
+			}
+
+			ondisk[pr] = v
+			pp := gps.ProjectProperties{}
+			switch v.Type() {
+			case "branch", "version", "rev":
+				pp.Constraint = v
+			case "semver":
+				c, _ := gps.NewSemverConstraint("^" + v.String())
+				pp.Constraint = c
+			}
+
+			dependencies[pr] = pp
+		}
+	}
+
+	vlogf("Analyzing transitive dependencies...")
+	// Explore the packages we've found for transitive deps, either
+	// completing the lock or identifying (more) missing projects that we'll
+	// need to ask gps to solve for us.
+	colors := make(map[string]uint8)
+	const (
+		white uint8 = iota
+		grey
+		black
+	)
+
+	// cache of PackageTrees, so we don't parse projects more than once
+	ptrees := make(map[gps.ProjectRoot]gps.PackageTree)
+
+	// depth-first traverser
+	var dft func(string) error
+	dft = func(pkg string) error {
+		switch colors[pkg] {
+		case white:
+			vlogf("Analyzing %q...", pkg)
+			colors[pkg] = grey
+
+			pr, err := sm.DeduceProjectRoot(pkg)
+			if err != nil {
+				return errors.Wrap(err, "could not deduce project root for "+pkg)
+			}
+
+			// We already visited this project root earlier via some other
+			// pkg within it, and made the decision that it's not on disk.
+			// Respect that decision, and pop the stack.
+			if notondisk[pr] {
+				colors[pkg] = black
+				return nil
+			}
+
+			ptree, has := ptrees[pr]
+			if !has {
+				// It's fine if the root does not exist - it indicates that this
+				// project is not present in the workspace, and so we need to
+				// solve to deal with this dep.
+				r := filepath.Join(depContext.GOPATH, "src", string(pr))
+				_, err := os.Lstat(r)
+				if os.IsNotExist(err) {
+					colors[pkg] = black
+					notondisk[pr] = true
+					return nil
+				}
+
+				ptree, err = gps.ListPackages(r, string(pr))
+				if err != nil {
+					// Any error here other than an a nonexistent dir (which
+					// can't happen because we covered that case above) is
+					// probably critical, so bail out.
+					return errors.Wrap(err, "gps.ListPackages")
+				}
+				ptrees[pr] = ptree
+			}
+
+			rm := ptree.ExternalReach(false, false, nil)
+			reached, ok := rm[pkg]
+			if !ok {
+				colors[pkg] = black
+				// not on disk...
+				notondisk[pr] = true
+				return nil
+			}
+
+			if _, ok := processed[pr]; ok {
+				if !contains(processed[pr], pkg) {
+					processed[pr] = append(processed[pr], pkg)
+				}
+			} else {
+				processed[pr] = []string{pkg}
+			}
+
+			// project must be on disk at this point; question is
+			// whether we're first seeing it here, in the transitive
+			// exploration, or if it arose in the direct dep parts
+			if _, in := ondisk[pr]; !in {
+				v, err := depContext.versionInWorkspace(pr)
+				if err != nil {
+					colors[pkg] = black
+					notondisk[pr] = true
+					return nil
+				}
+				ondisk[pr] = v
+			}
+
+			// recurse
+			for _, rpkg := range reached {
+				if isStdLib(rpkg) {
+					continue
+				}
+
+				err := dft(rpkg)
+				if err != nil {
+					return err
+				}
+			}
+
+			colors[pkg] = black
+		case grey:
+			return fmt.Errorf("Import cycle detected on %s", pkg)
+		}
+		return nil
+	}
+
+	// run the depth-first traversal from the set of immediate external
+	// package imports we found in the current project
+	for pkg := range packages {
+		err := dft(pkg)
+		if err != nil {
+			return dependencies, processed, notondisk, ondisk, err // already errors.Wrap()'d internally
+		}
+	}
+
+	return dependencies, processed, notondisk, ondisk, nil
 }
