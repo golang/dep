@@ -99,9 +99,14 @@ func TestDeduceConstraint(t *testing.T) {
 	constraints := map[string]gps.Constraint{
 		"v1.2.3": sv,
 		"5b3352dc16517996fb951394bcbbe913a2a616e3": gps.Revision("5b3352dc16517996fb951394bcbbe913a2a616e3"),
-		// TODO: update the bzr ones tests to gps.Revision when @sdboyer says OK
-		"g4@golang.org-20161116211307-wiuilyamo9ian0m7": gps.NewVersion("g4@golang.org-20161116211307-wiuilyamo9ian0m7"),
-		"20120425195858-psty8c35ve2oej8t":               gps.NewVersion("20120425195858-psty8c35ve2oej8t"),
+
+		// valid bzr revs
+		"jess@linux.com-20161116211307-wiuilyamo9ian0m7": gps.Revision("jess@linux.com-20161116211307-wiuilyamo9ian0m7"),
+
+		// invalid bzr revs
+		"go4@golang.org-lskjdfnkjsdnf-ksjdfnskjdfn": gps.NewVersion("go4@golang.org-lskjdfnkjsdnf-ksjdfnskjdfn"),
+		"go4@golang.org-sadfasdf-":                  gps.NewVersion("go4@golang.org-sadfasdf-"),
+		"20120425195858-psty8c35ve2oej8t":           gps.NewVersion("20120425195858-psty8c35ve2oej8t"),
 	}
 
 	for str, expected := range constraints {
