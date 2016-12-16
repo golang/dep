@@ -97,26 +97,26 @@ func runInit(args []string) error {
 	}
 	defer sm.Release()
 
-	packages, processed, notondisk, ondisk, err := getProjectDependencies(pkgT, cpr, sm)
+	pd, err := getProjectData(pkgT, cpr, sm)
 	if err != nil {
 		return err
 	}
 	m := manifest{
-		Dependencies: packages,
+		Dependencies: pd.constraints,
 	}
 
 	// Make an initial lock from what knowledge we've collected about the
 	// versions on disk
 	l := lock{
-		P: make([]gps.LockedProject, 0, len(ondisk)),
+		P: make([]gps.LockedProject, 0, len(pd.ondisk)),
 	}
 
-	for pr, v := range ondisk {
+	for pr, v := range pd.ondisk {
 		// That we have to chop off these path prefixes is a symptom of
 		// a problem in gps itself
-		pkgs := make([]string, 0, len(processed[pr]))
+		pkgs := make([]string, 0, len(pd.dependencies[pr]))
 		prslash := string(pr) + "/"
-		for _, pkg := range processed[pr] {
+		for _, pkg := range pd.dependencies[pr] {
 			if pkg == string(pr) {
 				pkgs = append(pkgs, ".")
 			} else {
@@ -130,7 +130,7 @@ func runInit(args []string) error {
 	}
 
 	var l2 *lock
-	if len(notondisk) > 0 {
+	if len(pd.notondisk) > 0 {
 		vlogf("Solving...")
 		params := gps.SolveParameters{
 			RootDir:         root,
@@ -252,14 +252,21 @@ func hasImportPathPrefix(s, prefix string) bool {
 	return strings.HasPrefix(s, prefix+"/")
 }
 
-func getProjectDependencies(pkgT gps.PackageTree, cpr string, sm *gps.SourceMgr) (dependencies gps.ProjectConstraints, processed map[gps.ProjectRoot][]string, notondisk map[gps.ProjectRoot]bool, ondisk map[gps.ProjectRoot]gps.Version, err error) {
+type projectData struct {
+	constraints  gps.ProjectConstraints          // constraints that could be found
+	dependencies map[gps.ProjectRoot][]string    // all dependencies (imports) found by project root
+	notondisk    map[gps.ProjectRoot]bool        // projects that were not found on disk
+	ondisk       map[gps.ProjectRoot]gps.Version // projects that were found on disk
+}
+
+func getProjectData(pkgT gps.PackageTree, cpr string, sm *gps.SourceMgr) (projectData, error) {
 	vlogf("Building dependency graph...")
 
-	dependencies = make(gps.ProjectConstraints)
-	processed = make(map[gps.ProjectRoot][]string)
+	constraints := make(gps.ProjectConstraints)
+	dependencies := make(map[gps.ProjectRoot][]string)
 	packages := make(map[string]bool)
-	notondisk = make(map[gps.ProjectRoot]bool)
-	ondisk = make(map[gps.ProjectRoot]gps.Version)
+	notondisk := make(map[gps.ProjectRoot]bool)
+	ondisk := make(map[gps.ProjectRoot]gps.Version)
 	for _, v := range pkgT.Packages {
 		// TODO: Some errors maybe should not be skipped ;-)
 		if v.Err != nil {
@@ -278,20 +285,20 @@ func getProjectDependencies(pkgT gps.PackageTree, cpr string, sm *gps.SourceMgr)
 			}
 			pr, err := sm.DeduceProjectRoot(ip)
 			if err != nil {
-				return dependencies, processed, notondisk, ondisk, errors.Wrap(err, "sm.DeduceProjectRoot") // TODO: Skip and report ?
+				return projectData{}, errors.Wrap(err, "sm.DeduceProjectRoot") // TODO: Skip and report ?
 			}
 
 			packages[ip] = true
-			if _, ok := processed[pr]; ok {
-				if !contains(processed[pr], ip) {
-					processed[pr] = append(processed[pr], ip)
+			if _, ok := dependencies[pr]; ok {
+				if !contains(dependencies[pr], ip) {
+					dependencies[pr] = append(dependencies[pr], ip)
 				}
 
 				continue
 			}
 			vlogf("Package %q has import %q, analyzing...", v.P.ImportPath, ip)
 
-			processed[pr] = []string{ip}
+			dependencies[pr] = []string{ip}
 			v, err := depContext.versionInWorkspace(pr)
 			if err != nil {
 				notondisk[pr] = true
@@ -309,7 +316,7 @@ func getProjectDependencies(pkgT gps.PackageTree, cpr string, sm *gps.SourceMgr)
 				pp.Constraint = c
 			}
 
-			dependencies[pr] = pp
+			constraints[pr] = pp
 		}
 	}
 
@@ -380,12 +387,12 @@ func getProjectDependencies(pkgT gps.PackageTree, cpr string, sm *gps.SourceMgr)
 				return nil
 			}
 
-			if _, ok := processed[pr]; ok {
-				if !contains(processed[pr], pkg) {
-					processed[pr] = append(processed[pr], pkg)
+			if _, ok := dependencies[pr]; ok {
+				if !contains(dependencies[pr], pkg) {
+					dependencies[pr] = append(dependencies[pr], pkg)
 				}
 			} else {
-				processed[pr] = []string{pkg}
+				dependencies[pr] = []string{pkg}
 			}
 
 			// project must be on disk at this point; question is
@@ -425,9 +432,15 @@ func getProjectDependencies(pkgT gps.PackageTree, cpr string, sm *gps.SourceMgr)
 	for pkg := range packages {
 		err := dft(pkg)
 		if err != nil {
-			return dependencies, processed, notondisk, ondisk, err // already errors.Wrap()'d internally
+			return projectData{}, err // already errors.Wrap()'d internally
 		}
 	}
 
-	return dependencies, processed, notondisk, ondisk, nil
+	pd := projectData{
+		constraints:  constraints,
+		dependencies: dependencies,
+		notondisk:    notondisk,
+		ondisk:       ondisk,
+	}
+	return pd, nil
 }
