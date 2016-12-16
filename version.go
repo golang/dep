@@ -6,6 +6,18 @@ import (
 	"github.com/Masterminds/semver"
 )
 
+// VersionType indicates a type for a Version that conveys some additional
+// semantics beyond that which is literally embedded on the Go type.
+type VersionType uint8
+
+// VersionTypes for the four major classes of version we deal with
+const (
+	IsRevision VersionType = iota
+	IsVersion
+	IsSemver
+	IsBranch
+)
+
 // Version represents one of the different types of versions used by gps.
 //
 // Version composes Constraint, because all versions can be used as a constraint
@@ -22,7 +34,7 @@ type Version interface {
 	Constraint
 
 	// Indicates the type of version - Revision, Branch, Version, or Semver
-	Type() string
+	Type() VersionType
 }
 
 // PairedVersion represents a normal Version, but paired with its corresponding,
@@ -108,8 +120,8 @@ func (r Revision) String() string {
 }
 
 // Type indicates the type of version - for revisions, "revision".
-func (r Revision) Type() string {
-	return "revision"
+func (r Revision) Type() VersionType {
+	return IsRevision
 }
 
 // Matches is the Revision acting as a constraint; it checks to see if the provided
@@ -179,8 +191,8 @@ func (v branchVersion) String() string {
 	return string(v.name)
 }
 
-func (v branchVersion) Type() string {
-	return "branch"
+func (v branchVersion) Type() VersionType {
+	return IsBranch
 }
 
 func (v branchVersion) Matches(v2 Version) bool {
@@ -252,8 +264,8 @@ func (v plainVersion) String() string {
 	return string(v)
 }
 
-func (v plainVersion) Type() string {
-	return "version"
+func (v plainVersion) Type() VersionType {
+	return IsVersion
 }
 
 func (v plainVersion) Matches(v2 Version) bool {
@@ -331,8 +343,8 @@ func (v semVersion) String() string {
 	return str
 }
 
-func (v semVersion) Type() string {
-	return "semver"
+func (v semVersion) Type() VersionType {
+	return IsSemver
 }
 
 func (v semVersion) Matches(v2 Version) bool {
@@ -411,7 +423,7 @@ func (v versionPair) String() string {
 	return v.v.String()
 }
 
-func (v versionPair) Type() string {
+func (v versionPair) Type() VersionType {
 	return v.v.Type()
 }
 

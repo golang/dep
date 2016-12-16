@@ -377,7 +377,7 @@ func (vtu versionTypeUnion) String() string {
 // This should generally not be called, but is required for the interface. If it
 // is called, we have a bigger problem (the type has escaped the solver); thus,
 // panic.
-func (vtu versionTypeUnion) Type() string {
+func (vtu versionTypeUnion) Type() VersionType {
 	panic("versionTypeUnion should never need to answer a Type() call; it is solver internal-only")
 }
 
