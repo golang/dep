@@ -294,7 +294,7 @@ func mkrevlock(pairs ...string) fixLock {
 	return l
 }
 
-// mksolution makes creates a map of project identifiers to their LockedProject
+// mksolution creates a map of project identifiers to their LockedProject
 // result, which is sufficient to act as a solution fixture for the purposes of
 // most tests.
 //
@@ -1558,7 +1558,7 @@ func (b *depspecBridge) ListPackages(id ProjectIdentifier, v Version) (PackageTr
 	return b.sm.(fixSM).ListPackages(id, v)
 }
 
-func (sm *depspecBridge) vendorCodeExists(id ProjectIdentifier) (bool, error) {
+func (b *depspecBridge) vendorCodeExists(id ProjectIdentifier) (bool, error) {
 	return false, nil
 }
 

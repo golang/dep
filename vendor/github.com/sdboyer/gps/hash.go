@@ -34,15 +34,15 @@ func (s *solver) HashInputs() []byte {
 		buf.WriteString(pd.Constraint.String())
 	}
 
-	// The stdlib and old appengine packages play the same functional role in
-	// solving as ignores. Because they change, albeit quite infrequently, we
-	// have to include them in the hash.
-	buf.WriteString(stdlibPkgs)
-	buf.WriteString(appenginePkgs)
-
 	// Write each of the packages, or the errors that were found for a
-	// particular subpath, into the hash.
+	// particular subpath, into the hash. We need to do this in a
+	// deterministic order, so expand and sort the map.
+	var pkgs []PackageOrErr
 	for _, perr := range s.rpt.Packages {
+		pkgs = append(pkgs, perr)
+	}
+	sort.Sort(sortPackageOrErr(pkgs))
+	for _, perr := range pkgs {
 		if perr.Err != nil {
 			buf.WriteString(perr.Err.Error())
 		} else {
@@ -58,14 +58,26 @@ func (s *solver) HashInputs() []byte {
 		}
 	}
 
-	// Add the package ignores, if any.
+	// Write any require packages given in the root manifest.
+	if len(s.req) > 0 {
+		// Dump and sort the reqnores
+		req := make([]string, 0, len(s.req))
+		for pkg := range s.req {
+			req = append(req, pkg)
+		}
+		sort.Strings(req)
+
+		for _, reqp := range req {
+			buf.WriteString(reqp)
+		}
+	}
+
+	// Add the ignored packages, if any.
 	if len(s.ig) > 0 {
 		// Dump and sort the ignores
-		ig := make([]string, len(s.ig))
-		k := 0
+		ig := make([]string, 0, len(s.ig))
 		for pkg := range s.ig {
-			ig[k] = pkg
-			k++
+			ig = append(ig, pkg)
 		}
 		sort.Strings(ig)
 
@@ -90,4 +102,26 @@ func (s *solver) HashInputs() []byte {
 
 	hd := sha256.Sum256(buf.Bytes())
 	return hd[:]
+}
+
+type sortPackageOrErr []PackageOrErr
+
+func (s sortPackageOrErr) Len() int      { return len(s) }
+func (s sortPackageOrErr) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
+
+func (s sortPackageOrErr) Less(i, j int) bool {
+	a, b := s[i], s[j]
+	if a.Err != nil || b.Err != nil {
+		// Sort errors last.
+		if b.Err == nil {
+			return false
+		}
+		if a.Err == nil {
+			return true
+		}
+		// And then by string.
+		return a.Err.Error() < b.Err.Error()
+	}
+	// And finally, sort by import path.
+	return a.P.ImportPath < b.P.ImportPath
 }

@@ -39,11 +39,26 @@ type RootManifest interface {
 	// them can harm the ecosystem as a whole.
 	Overrides() ProjectConstraints
 
-	// IngorePackages returns a set of import paths to ignore. These import
+	// IngoredPackages returns a set of import paths to ignore. These import
 	// paths can be within the root project, or part of other projects. Ignoring
 	// a package means that both it and its (unique) imports will be disregarded
 	// by all relevant solver operations.
-	IgnorePackages() map[string]bool
+	//
+	// It is an error to include a package in both the ignored and required
+	// sets.
+	IgnoredPackages() map[string]bool
+
+	// RequiredPackages returns a set of import paths to require. These packages
+	// are required to be present in any solution. The list can include main
+	// packages.
+	//
+	// It is meaningless to specify packages that are within the
+	// PackageTree of the ProjectRoot (though not an error, because the
+	// RootManifest itself does not report a ProjectRoot).
+	//
+	// It is an error to include a package in both the ignored and required
+	// sets.
+	RequiredPackages() map[string]bool
 }
 
 // SimpleManifest is a helper for tools to enumerate manifest data. It's
@@ -72,7 +87,7 @@ func (m SimpleManifest) TestDependencyConstraints() ProjectConstraints {
 // Also, for tests.
 type simpleRootManifest struct {
 	c, tc, ovr ProjectConstraints
-	ig         map[string]bool
+	ig, req    map[string]bool
 }
 
 func (m simpleRootManifest) DependencyConstraints() ProjectConstraints {
@@ -84,8 +99,11 @@ func (m simpleRootManifest) TestDependencyConstraints() ProjectConstraints {
 func (m simpleRootManifest) Overrides() ProjectConstraints {
 	return m.ovr
 }
-func (m simpleRootManifest) IgnorePackages() map[string]bool {
+func (m simpleRootManifest) IgnoredPackages() map[string]bool {
 	return m.ig
+}
+func (m simpleRootManifest) RequiredPackages() map[string]bool {
+	return m.req
 }
 func (m simpleRootManifest) dup() simpleRootManifest {
 	m2 := simpleRootManifest{
@@ -93,6 +111,7 @@ func (m simpleRootManifest) dup() simpleRootManifest {
 		tc:  make(ProjectConstraints, len(m.tc)),
 		ovr: make(ProjectConstraints, len(m.ovr)),
 		ig:  make(map[string]bool, len(m.ig)),
+		req: make(map[string]bool, len(m.req)),
 	}
 
 	for k, v := range m.c {
@@ -107,13 +126,17 @@ func (m simpleRootManifest) dup() simpleRootManifest {
 	for k, v := range m.ig {
 		m2.ig[k] = v
 	}
+	for k, v := range m.req {
+		m2.req[k] = v
+	}
 
 	return m2
 }
 
 // prepManifest ensures a manifest is prepared and safe for use by the solver.
 // This is mostly about ensuring that no outside routine can modify the manifest
-// while the solver is in-flight.
+// while the solver is in-flight, but it also filters out any empty
+// ProjectProperties.
 //
 // This is achieved by copying the manifest's data into a new SimpleManifest.
 func prepManifest(m Manifest) Manifest {
@@ -130,9 +153,28 @@ func prepManifest(m Manifest) Manifest {
 	}
 
 	for k, d := range deps {
+		// A zero-value ProjectProperties is equivalent to one with an
+		// anyConstraint{} in terms of how the solver will treat it. However, we
+		// normalize between these two by omitting such instances entirely, as
+		// it negates some possibility for false mismatches in input hashing.
+		if d.Constraint == nil {
+			if d.NetworkName == "" {
+				continue
+			}
+			d.Constraint = anyConstraint{}
+		}
+
 		rm.Deps[k] = d
 	}
+
 	for k, d := range ddeps {
+		if d.Constraint == nil {
+			if d.NetworkName == "" {
+				continue
+			}
+			d.Constraint = anyConstraint{}
+		}
+
 		rm.TestDeps[k] = d
 	}
 
