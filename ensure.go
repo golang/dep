@@ -299,13 +299,11 @@ func deduceConstraint(s string) gps.Constraint {
 			return gps.NewVersion(s)
 		}
 
-		if _, err = hex.DecodeString(s[i3+1:]); err == nil {
-			i2 := strings.LastIndex(s[:i3], "-")
-			if _, err = strconv.ParseUint(s[i2+1:i3], 10, 64); err == nil {
-				// Getting this far means it'd pretty much be nuts if it's not a
-				// bzr rev, so don't bother parsing the email.
-				return gps.Revision(s)
-			}
+		i2 := strings.LastIndex(s[:i3], "-")
+		if _, err = strconv.ParseUint(s[i2+1:i3], 10, 64); err == nil {
+			// Getting this far means it'd pretty much be nuts if it's not a
+			// bzr rev, so don't bother parsing the email.
+			return gps.Revision(s)
 		}
 	}
 
