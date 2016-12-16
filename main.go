@@ -60,7 +60,9 @@ func main() {
 			}
 			args = cmd.flag.Args()
 		} else {
-			args = args[1:]
+			if len(args) > 0 {
+				args = args[1:]
+			}
 		}
 
 		if err := cmd.fn(args); err != nil {
