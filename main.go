@@ -95,6 +95,7 @@ var commands = []*command{
 	initCmd,
 	statusCmd,
 	ensureCmd,
+	removeCmd,
 	// help added here at init time.
 }
 

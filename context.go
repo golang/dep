@@ -17,6 +17,8 @@ type ctx struct {
 	GOPATH string // Go path
 }
 
+// newContext creates a struct with the project's GOPATH. It assumes
+// that of your "GOPATH"'s we want the one we are currently in.
 func newContext() (*ctx, error) {
 	// this way we get the default GOPATH that was added in 1.8
 	buildContext := build.Default
