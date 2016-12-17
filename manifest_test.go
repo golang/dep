@@ -8,13 +8,13 @@ func TestPrepManifest(t *testing.T) {
 		Deps: ProjectConstraints{
 			ProjectRoot("foo"): ProjectProperties{},
 			ProjectRoot("bar"): ProjectProperties{
-				NetworkName: "whatever",
+				Source: "whatever",
 			},
 		},
 		TestDeps: ProjectConstraints{
 			ProjectRoot("baz"): ProjectProperties{},
 			ProjectRoot("qux"): ProjectProperties{
-				NetworkName: "whatever",
+				Source: "whatever",
 			},
 		},
 	}

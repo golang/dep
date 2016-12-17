@@ -640,7 +640,7 @@ var bimodalFixtures = map[string]bimodalFixture{
 		),
 	},
 	// When a given project is initially brought in using the default (i.e.,
-	// empty) ProjectIdentifier.NetworkName, and a later, presumably
+	// empty) ProjectIdentifier.Source, and a later, presumably
 	// as-yet-undiscovered dependency specifies an alternate net addr for it, we
 	// have to fail - even though, if the deps were visited in the opposite
 	// order (deeper dep w/the alternate location first, default location
@@ -719,7 +719,7 @@ var bimodalFixtures = map[string]bimodalFixture{
 		},
 		ovr: ProjectConstraints{
 			ProjectRoot("bar"): ProjectProperties{
-				NetworkName: "baz",
+				Source: "baz",
 			},
 		},
 		r: mksolution(
@@ -740,7 +740,7 @@ var bimodalFixtures = map[string]bimodalFixture{
 		},
 		ovr: ProjectConstraints{
 			ProjectRoot("bar"): ProjectProperties{
-				NetworkName: "baz",
+				Source: "baz",
 			},
 		},
 		r: mksolution(

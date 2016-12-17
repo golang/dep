@@ -26,7 +26,7 @@ func (s *solver) HashInputs() []byte {
 	buf := new(bytes.Buffer)
 	for _, pd := range p {
 		buf.WriteString(string(pd.Ident.ProjectRoot))
-		buf.WriteString(pd.Ident.NetworkName)
+		buf.WriteString(pd.Ident.Source)
 		// FIXME Constraint.String() is a surjective-only transformation - tags
 		// and branches with the same name are written out as the same string.
 		// This could, albeit rarely, result in input collisions when a real
@@ -88,8 +88,8 @@ func (s *solver) HashInputs() []byte {
 
 	for _, pc := range s.ovr.asSortedSlice() {
 		buf.WriteString(string(pc.Ident.ProjectRoot))
-		if pc.Ident.NetworkName != "" {
-			buf.WriteString(pc.Ident.NetworkName)
+		if pc.Ident.Source != "" {
+			buf.WriteString(pc.Ident.Source)
 		}
 		if pc.Constraint != nil {
 			buf.WriteString(pc.Constraint.String())

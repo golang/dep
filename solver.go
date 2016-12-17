@@ -252,7 +252,7 @@ func Prepare(params SolveParameters, sm SourceManager) (Solver, error) {
 	// Validate no empties in the overrides map
 	var eovr []string
 	for pr, pp := range s.ovr {
-		if pp.Constraint == nil && pp.NetworkName == "" {
+		if pp.Constraint == nil && pp.Source == "" {
 			eovr = append(eovr, string(pr))
 		}
 	}
