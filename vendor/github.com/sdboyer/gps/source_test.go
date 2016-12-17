@@ -125,7 +125,7 @@ func TestGopkginSourceInteractions(t *testing.T) {
 		}
 	}
 
-	tfunc := func(opath, n string, major int64, evl []Version) {
+	tfunc := func(opath, n string, major uint64, evl []Version) {
 		un := "https://" + n
 		u, err := url.Parse(un)
 		if err != nil {
