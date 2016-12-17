@@ -8,7 +8,7 @@ imports:
 - name: github.com/hashicorp/golang-lru
   version: a0d98a5f288019575c6d1f4bb1573fef2d1fcdc4
 - name: github.com/Masterminds/semver
-  version: 0a2c9fc0eee2c4cbb9526877c4a54da047fdcadd
+  version: 94ad6eaf8457cf85a68c9b53fa42e9b1b8683783
   vcs: git
 - name: github.com/Masterminds/vcs
   version: fbe9fb6ad5b5f35b3e82a7c21123cfc526cbf895
