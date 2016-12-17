@@ -268,7 +268,7 @@ func (m gopkginDeducer) deduceSource(p string, u *url.URL) (maybeSource, error) 
 	} else {
 		u.Path = path.Join(v[2], v[3])
 	}
-	major, err := strconv.ParseInt(v[4][1:], 10, 64)
+	major, err := strconv.ParseUint(v[4][1:], 10, 64)
 	if err != nil {
 		// this should only be reachable if there's an error in the regex
 		return nil, fmt.Errorf("could not parse %q as a gopkg.in major version", v[4][1:])
