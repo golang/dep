@@ -7,6 +7,23 @@ import (
 	"github.com/sdboyer/gps"
 )
 
+func TestNewContextNoGOPATH(t *testing.T) {
+	tg := testgo(t)
+	defer tg.cleanup()
+
+	tg.tempDir("src")
+	tg.cd(tg.path("."))
+
+	c, err := newContext()
+	if err == nil {
+		t.Fatal("error should not have been nil")
+	}
+
+	if c != nil {
+		t.Fatalf("expected context to be nil, got: %#v", c)
+	}
+}
+
 func TestSplitAbsoluteProjectRoot(t *testing.T) {
 	tg := testgo(t)
 	defer tg.cleanup()
