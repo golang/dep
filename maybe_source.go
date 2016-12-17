@@ -100,7 +100,7 @@ type maybeGopkginSource struct {
 	// the actual upstream URL - always github
 	url *url.URL
 	// the major version to apply for filtering
-	major int64
+	major uint64
 }
 
 func (m maybeGopkginSource) try(cachedir string, an ProjectAnalyzer) (source, string, error) {

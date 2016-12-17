@@ -946,7 +946,7 @@ var basicFixtures = map[string]basicFixture{
 	},
 	"no version that matches requirement": {
 		ds: []depspec{
-			mkDepspec("root 0.0.0", "foo >=1.0.0, <2.0.0"),
+			mkDepspec("root 0.0.0", "foo ^1.0.0"),
 			mkDepspec("foo 2.0.0"),
 			mkDepspec("foo 2.1.3"),
 		},
