@@ -281,7 +281,7 @@ func (s *gitSource) doListVersions() (vlist []Version, err error) {
 // according to the input URL.
 type gopkginSource struct {
 	gitSource
-	major int64
+	major uint64
 }
 
 func (s *gopkginSource) listVersions() (vlist []Version, err error) {
