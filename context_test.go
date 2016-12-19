@@ -34,7 +34,7 @@ func TestSplitAbsoluteProjectRoot(t *testing.T) {
 	// test where it should return error
 	pr, err := depCtx.splitAbsoluteProjectRoot("tra/la/la/la")
 	if err == nil {
-		t.Fatal("should have gotten error but did not for tra/la/la/la: %s", pr)
+		t.Fatalf("should have gotten error but did not for tra/la/la/la: %s", pr)
 	}
 }
 
