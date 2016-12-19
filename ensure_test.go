@@ -55,7 +55,7 @@ func main() {
 	sysCommit, err := getRepoLatestCommit("golang/sys")
 	tg.must(err)
 	expectedLock := `{
-    "memo": "7a56f62368179fde8c13c3880e25f9e0aa55bceafc61abef6640ecb0c4d63d88",
+    "memo": "595716d270828e763c811ef79c9c41f85b1d1bfbdfe85280036405c03772206c",
     "projects": [
         {
             "name": "github.com/Sirupsen/logrus",
