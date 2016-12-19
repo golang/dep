@@ -60,11 +60,11 @@ func TestIsRegular(t *testing.T) {
 				// to the check below
 				continue
 			}
-			t.Fatal("expected no error, got %v", err)
+			t.Fatalf("expected no error, got %v", err)
 		}
 
 		if fileOK != expected {
-			t.Fatal("expected %t for %s, got %t", expected, f, fileOK)
+			t.Fatalf("expected %t for %s, got %t", expected, f, fileOK)
 		}
 	}
 
@@ -91,11 +91,11 @@ func TestIsDir(t *testing.T) {
 				// to the check below
 				continue
 			}
-			t.Fatal("expected no error, got %v", err)
+			t.Fatalf("expected no error, got %v", err)
 		}
 
 		if dirOK != expected {
-			t.Fatal("expected %t for %s, got %t", expected, f, dirOK)
+			t.Fatalf("expected %t for %s, got %t", expected, f, dirOK)
 		}
 	}
 
