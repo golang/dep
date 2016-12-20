@@ -150,7 +150,7 @@ func toPossible(pp gps.ProjectProperties) (p possibleProps) {
 		// the 'any' case, because that's the other possibility, and it's what
 		// we interpret not having any constraint expressions at all to mean.
 		//if !gps.IsAny(pp.Constraint) && !gps.IsNone(pp.Constraint) {
-		if !gps.IsAny(pp.Constraint) {
+		if !gps.IsAny(pp.Constraint) && pp.Constraint != nil {
 			// Has to be a semver range.
 			p.Version = pp.Constraint.String()
 		}
