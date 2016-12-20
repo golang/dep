@@ -138,7 +138,7 @@ func resetUsage(fs *flag.FlagSet, name, args, longHelp string) {
 }
 
 var (
-	errProjectNotFound = errors.New("no project could be found")
+	errProjectNotFound = errors.New("could not find project manifest.json")
 )
 
 func findProjectRootFromWD() (string, error) {
