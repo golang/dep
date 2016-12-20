@@ -111,6 +111,7 @@ func (cmd *ensureCommand) Run(args []string) error {
 		pc, err := getProjectConstraint(arg, sm)
 		if err != nil {
 			errs = append(errs, err)
+			continue
 		}
 
 		if gps.IsAny(pc.Constraint) && pc.Ident.Source == "" {
@@ -145,6 +146,7 @@ func (cmd *ensureCommand) Run(args []string) error {
 		pc, err := getProjectConstraint(ovr, sm)
 		if err != nil {
 			errs = append(errs, err)
+			continue
 		}
 
 		// Empty overrides are fine (in contrast to deps), because they actually
@@ -166,7 +168,7 @@ func (cmd *ensureCommand) Run(args []string) error {
 
 	if len(errs) > 0 {
 		var buf bytes.Buffer
-		for err := range errs {
+		for _, err := range errs {
 			fmt.Fprintln(&buf, err)
 		}
 
@@ -293,7 +295,7 @@ func getProjectConstraint(arg string, sm *gps.SourceMgr) (gps.ProjectConstraint,
 	}
 
 	if string(pr) != arg {
-		return constraint, errors.Wrapf(err, "dependency path %s is not a project root", arg)
+		return constraint, fmt.Errorf("dependency path %s is not a project root, try %s instead", arg, pr)
 	}
 	constraint.Ident.ProjectRoot = gps.ProjectRoot(arg)
 
