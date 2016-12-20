@@ -270,11 +270,13 @@ func getProjectConstraint(arg string, sm *gps.SourceMgr) (gps.ProjectConstraint,
 	}
 
 	// try to split on '@'
+	var versionStr string
 	atIndex := strings.Index(arg, "@")
 	if atIndex > 0 {
 		parts := strings.SplitN(arg, "@", 2)
-		constraint.Constraint = deduceConstraint(parts[1])
 		arg = parts[0]
+		versionStr = parts[1]
+		constraint.Constraint = deduceConstraint(parts[1])
 	}
 	// TODO: What if there is no @, assume default branch (which may not be master) ?
 	// TODO: if we decide to keep equals.....
@@ -295,7 +297,36 @@ func getProjectConstraint(arg string, sm *gps.SourceMgr) (gps.ProjectConstraint,
 	if string(pr) != arg {
 		return constraint, errors.Wrapf(err, "dependency path %s is not a project root", arg)
 	}
+
 	constraint.Ident.ProjectRoot = gps.ProjectRoot(arg)
+
+	// Below we are checking if the constraint we deduced was valid.
+	if v, ok := constraint.Constraint.(gps.Version); ok && versionStr != "" {
+		if v.Type() == gps.IsVersion {
+			// we hit the fall through case in deduce constraint, let's call out to network
+			// and get the package's versions
+			versions, err := sm.ListVersions(constraint.Ident)
+			if err != nil {
+				return constraint, errors.Wrapf(err, "list versions for %s", arg) // means repo does not exist
+			}
+
+			var found bool
+			for _, version := range versions {
+				if versionStr == version.String() {
+					if pv, ok := version.(gps.PairedVersion); ok {
+						version = pv.Unpair()
+					}
+					found = true
+					constraint.Constraint = version
+					break
+				}
+			}
+
+			if !found {
+				return constraint, fmt.Errorf("%s is not a valid version for the package %s", versionStr, arg)
+			}
+		}
+	}
 
 	return constraint, nil
 }
