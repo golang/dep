@@ -220,13 +220,15 @@ func runEnsure(args []string) error {
 		return errors.Wrap(err, "ensure writeFile for lock")
 	}
 
-	if err := os.Rename(tm.Name(), filepath.Join(p.absroot, manifestName)); err != nil {
+	if err := copyFile(tm.Name(), filepath.Join(p.absroot, manifestName)); err != nil {
 		return errors.Wrap(err, "ensure moving temp manifest into place!")
 	}
+	os.Remove(tm.Name())
 
-	if err := os.Rename(tl.Name(), filepath.Join(p.absroot, lockName)); err != nil {
+	if err := copyFile(tl.Name(), filepath.Join(p.absroot, lockName)); err != nil {
 		return errors.Wrap(err, "ensure moving temp manifest into place!")
 	}
+	os.Remove(tl.Name())
 
 	os.RemoveAll(filepath.Join(p.absroot, "vendor"))
 	if err := copyFolder(tv, filepath.Join(p.absroot, "vendor")); err != nil {
