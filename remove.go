@@ -42,6 +42,12 @@ Flags:
 	`,
 }
 
+var force bool
+
+func init() {
+	removeCmd.flag.Var(&force, "force", "Remove dependencies from manifest even if present in the current project's import")
+}
+
 func runRemove(args []string) error {
 	p, err := depContext.loadProject("")
 	if err != nil {
@@ -64,13 +70,35 @@ func runRemove(args []string) error {
 		return errors.Wrap(err, "gps.ListPackages")
 	}
 
-	// get the list of packages
-	pd, err := getProjectData(pkgT, cpr, sm)
-	if err != nil {
-		return err
+	// TODO this will end up ignoring internal pkgs with errs (and any other
+	// internal pkgs that import them), which is not what we want for this mode.
+	// A new callback, or a new param on this one, will be introduced to gps
+	// soon, and we'll want to use that when it arrives.
+	//reachlist := pkgT.ExternalReach(true, true).ListExternalImports()
+	reachmap := pkgT.ExternalReach(true, true)
+	//var imap := make(map[string]bool, len(reachlist))
+	//for _, im := range reachlist {
+	//imap[im] = true
+	//}
+
+	// warm the cache, in case any paths require go get metadata discovery
+	for _, arg := range args {
+		go sm.DeduceProjectRoot(arg)
 	}
 
 	for _, arg := range args {
+		pr, err := sm.DeduceProjectRoot(arg)
+		if err != nil {
+			// couldn't detect the project root for this string -
+			// a non-valid project root was provided
+			return errors.Wrap(err, "gps.DeduceProjectRoot")
+		}
+		if string(pr) != arg {
+			// don't be magical with subpaths, otherwise we muddy the waters
+			// between project roots and import paths
+			return fmt.Errorf("%q is not a project root, but %q is - is that what you want to remove?", arg, pr)
+		}
+
 		/*
 		 * - Remove package from manifest
 		 *	- if the package IS NOT being used, solving should do what we want
@@ -78,11 +106,28 @@ func runRemove(args []string) error {
 		 *		- Desired behavior: stop and tell the user, unless --force
 		 *		- Actual solver behavior: ?
 		 */
-
-		if _, found := pd.dependencies[gps.ProjectRoot(arg)]; found {
-			//TODO: Tell the user where it is in use?
-			return fmt.Errorf("not removing '%s' because it is in use", arg)
+		var pkgimport []string
+		for pkg, imports := range reachmap {
+			for _, im := range imports {
+				if hasImportPathPrefix(im, arg) {
+					pkgimport = append(pkgimport, pkg)
+					break
+				}
+			}
 		}
+
+		if _, indeps := p.m.Dependencies[gps.ProjectRoot(arg)]; !indeps {
+			return fmt.Errorf("%q is not present in the manifest, cannot remove it", arg)
+		}
+
+		if len(pkgimport) > 0 && !force {
+			if len(pkgimport) == 1 {
+				return fmt.Errorf("not removing %q because it is imported by %q (pass -force to override)", arg, pkgimport[0])
+			} else {
+				return fmt.Errorf("not removing %q because it is imported by:\n\t%s (pass -force to override)", arg, strings.Join(pkgimport, "\n\t"))
+			}
+		}
+
 		delete(p.m.Dependencies, gps.ProjectRoot(arg))
 	}
 
