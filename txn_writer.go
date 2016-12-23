@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/pkg/errors"
 	"github.com/sdboyer/gps"
 )
 
@@ -21,8 +22,8 @@ import (
 // guard against non-arcane failure conditions.
 type safeWriter struct {
 	root          string
-	conf          *manifest // the manifest to write
-	lock          *lock     // a struct representation of the current lock, if any
+	nm            *manifest // the new manifest to write
+	lock          *lock     // the old lock, if any
 	nl            gps.Lock  // the new lock to write, if desired
 	sm            gps.SourceManager
 	mpath, vendor string
@@ -49,80 +50,75 @@ type safeWriter struct {
 // will continue for whichever inputs are present.
 func (gw safeWriter) writeAllSafe() error {
 	// Decide which writes we need to do
-	var writeConf, writeLock, writeVendor bool
+	var writeM, writeL, writeV bool
 
-	if gw.conf != nil {
-		writeConf = true
+	if gw.nm != nil {
+		writeM = true
 	}
 
 	if gw.nl != nil {
 		if gw.lock == nil {
-			writeLock, writeVendor = true, true
+			writeL, writeV = true, true
 		} else {
 			rlf := lockFromInterface(gw.nl)
-			// This err really shouldn't occur, but could if we get an unpaired
-			// version back from gps somehow
-			if err != nil {
-				return err
-			}
 			if !locksAreEquivalent(rlf, gw.lock) {
-				writeLock, writeVendor = true, true
+				writeL, writeV = true, true
 			}
 		}
 	} else if gw.lock != nil {
-		writeLock = true
+		writeL = true
 	}
 
-	if !writeConf && !writeLock && !writeVendor {
+	if !writeM && !writeL && !writeV {
 		// nothing to do
 		return nil
 	}
 
-	if writeConf && gw.mpath == "" {
+	if writeM && gw.mpath == "" {
 		return fmt.Errorf("Must provide a path if writing out a config yaml.")
 	}
 
-	if (writeLock || writeVendor) && gw.vendor == "" {
+	if (writeL || writeV) && gw.vendor == "" {
 		return fmt.Errorf("Must provide a vendor dir if writing out a lock or vendor dir.")
 	}
 
-	if writeVendor && gw.sm == nil {
+	if writeV && gw.sm == nil {
 		return fmt.Errorf("Must provide a SourceManager if writing out a vendor dir.")
 	}
 
-	td, err := ioutil.TempDir(os.TempDir(), "glide")
+	td, err := ioutil.TempDir(os.TempDir(), "dep")
 	if err != nil {
-		return fmt.Errorf("Error while creating temp dir for vendor directory: %s", err)
+		return errors.Wrap(err, "error while creating temp dir for writing manifest/lock/vendor")
 	}
 	defer os.RemoveAll(td)
 
-	if writeConf {
-		if err := gw.conf.WriteFile(filepath.Join(td, "glide.yaml")); err != nil {
-			return fmt.Errorf("Failed to write glide YAML file: %s", err)
+	if writeM {
+		if err := writeFile(filepath.Join(td, manifestName), gw.nm); err != nil {
+			return errors.Wrap(err, "failed to write manifest file to temp dir")
 		}
 	}
 
-	if writeLock {
+	if writeL {
 		if gw.nl == nil {
-			// the result lock is nil but the flag is on, so we must be writing
+			// the new lock is nil but the flag is on, so we must be writing
 			// the other one
-			if err := gw.lock.WriteFile(filepath.Join(td, gpath.LockFile)); err != nil {
-				return fmt.Errorf("Failed to write glide lock file: %s", err)
+			if err := writeFile(filepath.Join(td, lockName), gw.lock); err != nil {
+				return errors.Wrap(err, "failed to write lock file to temp dir")
 			}
 		} else {
-			rlf, err := lockFromInterface(gw.nl)
+			rlf := lockFromInterface(gw.nl)
 			// As with above, this case really shouldn't get hit unless there's
 			// a bug in gps, or guarantees change
 			if err != nil {
 				return err
 			}
-			if err := rlf.WriteFile(filepath.Join(td, gpath.LockFile)); err != nil {
-				return fmt.Errorf("Failed to write glide lock file: %s", err)
+			if err := writeFile(filepath.Join(td, lockName), rlf); err != nil {
+				return errors.Wrap(err, "failed to write lock file to temp dir")
 			}
 		}
 	}
 
-	if writeVendor {
+	if writeV {
 		err = gps.WriteDepTree(filepath.Join(td, "vendor"), gw.nl, gw.sm, true)
 		if err != nil {
 			return fmt.Errorf("Error while generating vendor tree: %s", err)
@@ -138,10 +134,10 @@ func (gw safeWriter) writeAllSafe() error {
 	}
 	var restore []pathpair
 
-	if writeConf {
+	if writeM {
 		if _, err := os.Stat(gw.mpath); err == nil {
 			// move out the old one
-			tmploc := filepath.Join(td, "glide.yaml-old")
+			tmploc := filepath.Join(td, manifestName+".orig")
 			failerr = os.Rename(gw.mpath, tmploc)
 			if failerr != nil {
 				fail = true
@@ -157,11 +153,11 @@ func (gw safeWriter) writeAllSafe() error {
 		}
 	}
 
-	if !fail && writeLock {
-		tgt := filepath.Join(filepath.Dir(gw.vendor), gpath.LockFile)
+	if !fail && writeL {
+		tgt := filepath.Join(filepath.Dir(gw.vendor), lockName)
 		if _, err := os.Stat(tgt); err == nil {
 			// move out the old one
-			tmploc := filepath.Join(td, "glide.lock-old")
+			tmploc := filepath.Join(td, lockName+".orig")
 
 			failerr = os.Rename(tgt, tmploc)
 			if failerr != nil {
@@ -172,7 +168,7 @@ func (gw safeWriter) writeAllSafe() error {
 		}
 
 		// move in the new one
-		failerr = os.Rename(filepath.Join(td, gpath.LockFile), tgt)
+		failerr = renameElseCopy(filepath.Join(td, lockName), tgt)
 		if failerr != nil {
 			fail = true
 		}
@@ -180,16 +176,19 @@ func (gw safeWriter) writeAllSafe() error {
 
 	// have to declare out here so it's present later
 	var vendorbak string
-	if !fail && writeVendor {
+	if !fail && writeV {
 		if _, err := os.Stat(gw.vendor); err == nil {
-			// move out the old vendor dir. just do it into an adjacent dir, in
-			// order to mitigate the possibility of a pointless cross-filesystem move
-			vendorbak = gw.vendor + "-old"
+			// move out the old vendor dir. just do it into an adjacent dir, to
+			// try to mitigate the possibility of a pointless cross-filesystem
+			// move with a temp dir
+			vendorbak = gw.vendor + ".orig"
 			if _, err := os.Stat(vendorbak); err == nil {
-				// Just in case that happens to exist...
-				vendorbak = filepath.Join(td, "vendor-old")
+				// If that does already exist bite the bullet and use a proper
+				// tempdir
+				vendorbak = filepath.Join(td, "vendor.orig")
 			}
-			failerr = os.Rename(gw.vendor, vendorbak)
+
+			failerr = renameElseCopy(gw.vendor, vendorbak)
 			if failerr != nil {
 				fail = true
 			} else {
@@ -198,7 +197,7 @@ func (gw safeWriter) writeAllSafe() error {
 		}
 
 		// move in the new one
-		failerr = os.Rename(filepath.Join(td, "vendor"), gw.vendor)
+		failerr = renameElseCopy(filepath.Join(td, "vendor"), gw.vendor)
 		if failerr != nil {
 			fail = true
 		}
@@ -208,7 +207,7 @@ func (gw safeWriter) writeAllSafe() error {
 	if fail {
 		for _, pair := range restore {
 			// Nothing we can do on err here, we're already in recovery mode
-			os.Rename(pair.from, pair.to)
+			renameElseCopy(pair.from, pair.to)
 		}
 		return failerr
 	}
@@ -216,7 +215,7 @@ func (gw safeWriter) writeAllSafe() error {
 	// Renames all went smoothly. The deferred os.RemoveAll will get the temp
 	// dir, but if we wrote vendor, we have to clean that up directly
 
-	if writeVendor {
+	if writeV {
 		// Again, kinda nothing we can do about an error at this point
 		os.RemoveAll(vendorbak)
 	}
