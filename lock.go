@@ -177,3 +177,39 @@ func (s sortedLockedProjects) Less(i, j int) bool {
 
 	return l.Source < r.Source
 }
+
+// locksAreEquivalent compares two locks to see if they differ. If EITHER lock
+// is nil, or their memos do not match, or any projects differ, then false is
+// returned.
+func locksAreEquivalent(l, r *lock) bool {
+	if l == nil || r == nil {
+		return false
+	}
+
+	if !bytes.Equal(l.Memo, r.Memo) {
+		return false
+	}
+
+	if len(l.P) != len(r.P) {
+		return false
+	}
+
+	sort.Sort(sortedLockedProjects(l.P))
+	sort.Sort(sortedLockedProjects(r.P))
+
+	for k, lp := range l.P {
+		// TODO(sdboyer) gps will be adding a func to compare LockedProjects in the next
+		// version; we can swap that in here when it lands
+		rp := r.P[k]
+		if lp.Ident() != rp.Ident() {
+			return false
+		}
+
+		lpkg, rpkg := lp.Packages(), rp.Packages()
+		if !reflect.DeepEqual(lpkg, rpkg) {
+			return false
+		}
+	}
+
+	return true
+}
