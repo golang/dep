@@ -163,12 +163,11 @@ func runEnsure(args []string) error {
 		return errors.New(buf.String())
 	}
 
-	params := gps.SolveParameters{
-		RootDir:     p.absroot,
-		Manifest:    p.m,
-		Lock:        p.l,
-		Trace:       true,
-		TraceLogger: log.New(os.Stdout, "", 0),
+	params := p.makeParams()
+
+	if *verbose {
+		params.Trace = true
+		params.TraceLogger = log.New(os.Stderr, "", 0)
 	}
 
 	params.RootPackageTree, err = gps.ListPackages(p.absroot, string(p.importroot))

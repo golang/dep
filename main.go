@@ -185,6 +185,24 @@ type project struct {
 	l          *lock
 }
 
+// makeParams is a simple helper to create a gps.SolveParameters without setting
+// any nils incorrectly.
+func (p *project) makeParams() gps.SolveParameters {
+	params := gps.SolveParameters{
+		RootDir: p.absroot,
+	}
+
+	if p.m != nil {
+		params.Manifest = p.m
+	}
+
+	if p.l != nil {
+		params.Lock = p.l
+	}
+
+	return params
+}
+
 func logf(format string, args ...interface{}) {
 	// TODO: something else?
 	fmt.Fprintf(os.Stderr, "dep: "+format+"\n", args...)

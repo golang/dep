@@ -175,12 +175,8 @@ func runRemove(args []string) error {
 		}
 	}
 
-	params := gps.SolveParameters{
-		RootDir:         p.absroot,
-		RootPackageTree: pkgT,
-		Manifest:        p.m,
-		Lock:            p.l,
-	}
+	params := p.makeParams()
+	params.RootPackageTree = pkgT
 
 	if *verbose {
 		params.Trace = true
