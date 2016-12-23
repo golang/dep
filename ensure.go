@@ -14,8 +14,10 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
+	"syscall"
 
 	"github.com/pkg/errors"
 	"github.com/sdboyer/gps"
@@ -376,7 +378,7 @@ func deduceConstraint(s string) gps.Constraint {
 // renameElseCopy attempts to rename a file or directory, but falls back to
 // copying in the event of a cross-link device error.
 func renameElseCopy(src, dest string) error {
-	fi, err := os.Lstat(from)
+	fi, err := os.Lstat(src)
 	if err != nil {
 		return err
 	}
