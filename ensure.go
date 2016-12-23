@@ -373,6 +373,55 @@ func deduceConstraint(s string) gps.Constraint {
 	return gps.NewVersion(s)
 }
 
+// renameElseCopy attempts to rename a file or directory, but falls back to
+// copying in the event of a cross-link device error.
+func renameElseCopy(src, dest string) error {
+	fi, err := os.Lstat(from)
+	if err != nil {
+		return err
+	}
+
+	err = os.Rename(src, dest)
+	if err == nil {
+		return nil
+	}
+
+	terr, ok := err.(*os.LinkError)
+	if !ok {
+		return err
+	}
+
+	// Rename may fail if src and dest are on different devices; fall back to
+	// copy if we detect that case. syscall.EXDEV is the common name for the
+	// cross device link error which has varying output text across different
+	// operating systems.
+	if terr.Err == syscall.EXDEV {
+		vlogf("Cross link err (is temp dir on same partition as project?); falling back to manual copy: %s", terr)
+		if fi.IsDir() {
+			return copyFolder(src, dest)
+		} else {
+			return copyFile(src, dest)
+		}
+	} else if runtime.GOOS == "windows" {
+		// In windows it can drop down to an operating system call that
+		// returns an operating system error with a different number and
+		// message. Checking for that as a fall back.
+		noerr, ok := terr.Err.(syscall.Errno)
+		// 0x11 (ERROR_NOT_SAME_DEVICE) is the windows error.
+		// See https://msdn.microsoft.com/en-us/library/cc231199.aspx
+		if ok && noerr == 0x11 {
+			vlogf("Cross link err (is temp dir on same partition as project?); falling back to manual copy: %s", terr)
+			if fi.IsDir() {
+				return copyFolder(src, dest)
+			} else {
+				return copyFile(src, dest)
+			}
+		}
+	}
+
+	return terr
+}
+
 // copyFolder takes in a directory and copies its contents to the destination.
 // It preserves the file mode on files as well.
 func copyFolder(src string, dest string) error {
