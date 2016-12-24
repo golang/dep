@@ -107,11 +107,6 @@ func (gw safeWriter) writeAllSafe() error {
 			}
 		} else {
 			rlf := lockFromInterface(gw.nl)
-			// As with above, this case really shouldn't get hit unless there's
-			// a bug in gps, or guarantees change
-			if err != nil {
-				return err
-			}
 			if err := writeFile(filepath.Join(td, lockName), rlf); err != nil {
 				return errors.Wrap(err, "failed to write lock file to temp dir")
 			}
