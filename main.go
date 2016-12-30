@@ -5,7 +5,7 @@
 package main
 
 import (
-	"errors"
+	"bytes"
 	"flag"
 	"fmt"
 	"os"
@@ -13,6 +13,7 @@ import (
 	"strings"
 	"text/tabwriter"
 
+	"github.com/pkg/errors"
 	"github.com/sdboyer/gps"
 )
 
@@ -26,133 +27,119 @@ var (
 	verbose    = flag.Bool("v", false, "enable verbose logging")
 )
 
-func main() {
-	flag.Usage = func() {
-		help(nil)
-	}
-	flag.Parse()
+type command interface {
+	Name() string           // "foobar"
+	Args() string           // "<baz> [quux...]"
+	ShortHelp() string      // "Foo the first bar"
+	LongHelp() string       // "Foo the first bar meeting the following conditions..."
+	Register(*flag.FlagSet) // command-specific flags
+	Run([]string) error
+}
 
-	// newContext() will set the GOPATH for us to use for various functions.
-	var err error
-	depContext, err = newContext()
+func main() {
+	// Set up the dep context.
+	// TODO(pb): can this be deglobalized, pretty please?
+	dc, err := newContext()
 	if err != nil {
 		fmt.Fprint(os.Stderr, err.Error())
 		os.Exit(1)
 	}
+	depContext = dc
 
-	do := flag.Arg(0)
-	var args []string
-	if do == "" {
-		do = "help"
-	} else {
-		args = flag.Args()
+	// Build the list of available commands.
+	commands := []command{
+		&initCommand{},
+		&statusCommand{},
+		&ensureCommand{},
+		&removeCommand{},
 	}
-	for _, cmd := range commands {
-		if do != cmd.name {
-			continue
-		}
 
-		if cmd.flag != nil {
-			cmd.flag.Usage = func() { cmd.Usage() }
-			err = cmd.flag.Parse(args[1:])
-			if err != nil {
-				fmt.Fprint(os.Stderr, err.Error())
+	usage := func() {
+		fmt.Fprintln(os.Stderr, "Usage: dep <command>")
+		fmt.Fprintln(os.Stderr)
+		fmt.Fprintln(os.Stderr, "Commands:")
+		fmt.Fprintln(os.Stderr)
+		w := tabwriter.NewWriter(os.Stderr, 0, 4, 2, ' ', 0)
+		for _, command := range commands {
+			fmt.Fprintf(w, "\t%s\t%s\n", command.Name(), command.ShortHelp())
+		}
+		w.Flush()
+		fmt.Fprintln(os.Stderr)
+	}
+
+	if len(os.Args) <= 1 || len(os.Args) == 2 && strings.ToLower(os.Args[1]) == "help" {
+		usage()
+		os.Exit(1)
+	}
+
+	for _, command := range commands {
+		if name := command.Name(); os.Args[1] == name {
+			// Build flag set with global flags in there.
+			// TODO(pb): can we deglobalize verbose, pretty please?
+			fs := flag.NewFlagSet(name, flag.ExitOnError)
+			fs.BoolVar(verbose, "v", false, "enable verbose logging")
+
+			// Register the subcommand flags in there, too.
+			command.Register(fs)
+
+			// Override the usage text to something nicer.
+			resetUsage(fs, command.Name(), command.Args(), command.LongHelp())
+
+			// Parse the flags the user gave us.
+			if err := fs.Parse(os.Args[2:]); err != nil {
+				fs.Usage()
 				os.Exit(1)
 			}
-			args = cmd.flag.Args()
-		} else {
-			if len(args) > 0 {
-				args = args[1:]
-			}
-		}
 
-		if err := cmd.fn(args); err != nil {
-			fmt.Fprintf(os.Stderr, "error: %v\n", err)
-			os.Exit(1)
+			// Run the command with the post-flag-processing args.
+			if err := command.Run(fs.Args()); err != nil {
+				fmt.Fprintf(os.Stderr, "%v\n", err)
+				os.Exit(1)
+			}
+
+			// Easy peasy livin' breezy.
+			return
 		}
-		os.Exit(0)
 	}
 
-	fmt.Fprintf(os.Stderr, "unknown command: %q", flag.Arg(0))
-	help(nil)
-	os.Exit(2)
+	fmt.Fprintf(os.Stderr, "%s: no such command\n", os.Args[1])
+	usage()
+	os.Exit(1)
 }
 
-type command struct {
-	fn    func(args []string) error
-	name  string
-	short string
-	long  string
-	flag  *flag.FlagSet
-}
-
-func (c *command) Usage() {
-	fmt.Fprintf(os.Stderr, "usage: %s\n\n", c.short)
-	fmt.Fprintf(os.Stderr, "%s\n", strings.TrimSpace(c.long))
-	os.Exit(2)
-}
-
-var commands = []*command{
-	initCmd,
-	statusCmd,
-	ensureCmd,
-	removeCmd,
-	// help added here at init time.
+func resetUsage(fs *flag.FlagSet, name, args, longHelp string) {
+	var (
+		hasFlags   bool
+		flagBlock  bytes.Buffer
+		flagWriter = tabwriter.NewWriter(&flagBlock, 0, 4, 2, ' ', 0)
+	)
+	fs.VisitAll(func(f *flag.Flag) {
+		hasFlags = true
+		// Default-empty string vars should read "(default: <none>)"
+		// rather than the comparatively ugly "(default: )".
+		defValue := f.DefValue
+		if defValue == "" {
+			defValue = "<none>"
+		}
+		fmt.Fprintf(flagWriter, "\t-%s\t%s (default: %s)\n", f.Name, f.Usage, defValue)
+	})
+	flagWriter.Flush()
+	fs.Usage = func() {
+		fmt.Fprintf(os.Stderr, "Usage: dep %s %s\n", name, args)
+		fmt.Fprintln(os.Stderr)
+		fmt.Fprintln(os.Stderr, strings.TrimSpace(longHelp))
+		fmt.Fprintln(os.Stderr)
+		if hasFlags {
+			fmt.Fprintln(os.Stderr, "Flags:")
+			fmt.Fprintln(os.Stderr)
+			fmt.Fprintln(os.Stderr, flagBlock.String())
+		}
+	}
 }
 
 var (
 	errProjectNotFound = errors.New("no project could be found")
 )
-
-func init() {
-	// Defeat circular declarations by appending
-	// this to the list at init time.
-	commands = append(commands, &command{
-		fn:    help,
-		name:  "help",
-		short: `Show documentation for the dep tool or the specified command`,
-	})
-}
-
-func help(args []string) error {
-	if len(args) > 1 {
-		// If they're misusing help, show them how it's done.
-		args = []string{"help"}
-	}
-	if len(args) == 0 {
-		// Show short usage for all commands.
-		fmt.Println("usage: dep <command> [arguments]")
-		fmt.Println()
-		fmt.Println("Available commands:")
-		fmt.Println()
-		w := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)
-		for _, cmd := range commands {
-			fmt.Fprintf(w, "\t%s\t%s\n", cmd.name, cmd.short)
-		}
-		w.Flush()
-		fmt.Println()
-		return nil
-	}
-	// Show full help for a specific command.
-	for _, cmd := range commands {
-		if cmd.name != args[0] {
-			continue
-		}
-		fmt.Printf("usage: dep %s\n", cmd.name)
-		fmt.Println()
-		fmt.Printf("%s\n", cmd.short)
-		fmt.Println()
-		fmt.Println(cmd.long)
-		fmt.Println()
-		return nil
-	}
-	return fmt.Errorf("unknown command: %q", args[0])
-}
-
-func noop(args []string) error {
-	fmt.Println("noop called with flags:", args)
-	return nil
-}
 
 func findProjectRootFromWD() (string, error) {
 	path, err := os.Getwd()
