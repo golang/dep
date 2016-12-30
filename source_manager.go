@@ -250,7 +250,7 @@ func (sm *SourceMgr) HandleSignals(sigch chan os.Signal) {
 				return
 			case <-qch:
 				// quit channel triggered - deregister our sigch and return
-				signal.Stop(ch)
+				signal.Stop(sch)
 				return
 			}
 		}

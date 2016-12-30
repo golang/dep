@@ -708,31 +708,23 @@ func TestErrAfterRelease(t *testing.T) {
 }
 
 func TestSignalHandling(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping slow test in short mode")
+	}
+
 	sm, clean := mkNaiveSM(t)
 	//get self proc
 	proc, err := os.FindProcess(os.Getpid())
 	if err != nil {
-		t.Errorf("cannot find self proc")
-		t.FailNow()
+		t.Fatal("cannot find self proc")
 	}
 
-	// Set up a channel the test owns to ensure we don't terminate early
-	//c := make(chan os.Signal, 1)
-	//signal.Notify(c, os.Interrupt)
-	//defer signal.Stop(c)
+	sigch := make(chan os.Signal)
+	sm.HandleSignals(sigch)
 
-	//// Ask for everything we can get.
-	//c1 := make(chan os.Signal, 1)
-	//signal.Notify(c1)
+	sigch <- os.Interrupt
+	<-time.After(10 * time.Millisecond)
 
-	// Simulate a single signal first
-	//proc.Signal(os.Interrupt)
-	sm.sigch <- os.Interrupt
-	<-time.After(100 * time.Millisecond)
-
-	if sm.signaled != 1 {
-		t.Error("Signaled flag did not get set")
-	}
 	if sm.releasing != 1 {
 		t.Error("Releasing flag did not get set")
 	}
@@ -742,48 +734,26 @@ func TestSignalHandling(t *testing.T) {
 
 	lpath := filepath.Join(sm.cachedir, "sm.lock")
 	if _, err := os.Stat(lpath); err == nil {
-		t.Error("Expected error on statting what should be an absent lock file")
-		t.FailNow()
+		t.Fatal("Expected error on statting what should be an absent lock file")
 	}
 	clean()
 
 	sm, clean = mkNaiveSM(t)
-	// Send sig twice, to hit both goroutines
-	sm.sigch <- os.Interrupt
-	sm.sigch <- os.Interrupt
-	<-time.After(100 * time.Millisecond)
-
-	if sm.signaled != 1 {
-		t.Error("Signaled flag did not get set")
-	}
-	if sm.releasing != 1 {
-		t.Error("Releasing flag did not get set")
-	}
-	if sm.released != 1 {
-		t.Error("Released flag did not get set")
-	}
-
-	lpath = filepath.Join(sm.cachedir, "sm.lock")
-	if _, err := os.Stat(lpath); err == nil {
-		t.Error("Expected error on statting what should be an absent lock file")
-		t.FailNow()
-	}
-	clean()
-
-	sm, clean = mkNaiveSM(t)
-	id := mkPI("github.com/Masterminds/VCSTestRepo").normalize()
-	go sm.ListVersions(id)
+	SetUpSigHandling(sm)
+	go sm.DeduceProjectRoot("rsc.io/pdf")
 	runtime.Gosched()
-	// Send it twice and call release directly afterward.
-	//sm.sigch <- os.Interrupt
-	//sm.sigch <- os.Interrupt
-	proc.Signal(os.Interrupt)
-	proc.Signal(os.Interrupt)
-	//sm.Release()
-	<-time.After(5 * time.Second)
 
-	if sm.signaled != 1 {
-		t.Error("Signaled flag did not get set")
+	// signal the process and call release right afterward
+	now := time.Now()
+	proc.Signal(os.Interrupt)
+	sigdur := time.Since(now)
+	t.Logf("time to send signal: %v", sigdur)
+	sm.Release()
+	reldur := time.Since(now) - sigdur
+	t.Logf("time to return from Release(): %v", reldur)
+
+	if reldur < 10*time.Millisecond {
+		t.Errorf("finished too fast (%v); the necessary network request could not have completed yet", reldur)
 	}
 	if sm.releasing != 1 {
 		t.Error("Releasing flag did not get set")
