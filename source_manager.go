@@ -269,6 +269,7 @@ func (sm *SourceMgr) StopSignalHandling() {
 	sm.sigmut.Lock()
 	if sm.qch != nil {
 		close(sm.qch)
+		sm.qch = nil
 		runtime.Gosched()
 	}
 	sm.sigmut.Unlock()
