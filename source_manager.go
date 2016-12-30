@@ -167,20 +167,57 @@ func NewSourceManager(an ProjectAnalyzer, cachedir string) (*SourceMgr, error) {
 		dxt:      pathDeducerTrie(),
 		rootxt:   newProjectRootTrie(),
 		qch:      make(chan struct{}),
-		sigch:    make(chan os.Signal),
 	}
 
-	signal.Notify(sm.sigch, syscall.SIGINT, syscall.SIGHUP, syscall.SIGTERM, syscall.SIGQUIT, os.Interrupt)
-	sigfunc := func(ch chan os.Signal) {
+	return sm, nil
+}
+
+// SetUpSigHandling sets up typical signal handling for a SourceMgr. It will
+// register a signal handler to be notified on:
+//
+//  - syscall.SIGINT
+//  - syscall.SIGHUP
+//  - syscall.SIGTERM
+//  - syscall.SIGQUIT
+//  - os.Interrupt
+func SetUpSigHandling(sm *SourceMgr) {
+	sigch := make(chan os.Signal)
+	sm.HandleSignals(sigch)
+	signal.Notify(sigch, syscall.SIGINT, syscall.SIGHUP, syscall.SIGTERM, syscall.SIGQUIT, os.Interrupt)
+}
+
+// HandleSignals sets up logic to handle incoming signals with the goal of
+// shutting down the SourceMgr safely.
+//
+// Calling code must provide the signal channel, and is responsible for calling
+// signal.Notify() on that channel.
+//
+// Successive calls to HandleSignals() will deregister the previous handler and
+// set up a new one. It is not recommended that the same channel be passed
+// multiple times to this method.
+//
+// SetUpSigHandling() will set up a handler that is appropriate for most
+// use cases.
+func (sm *SourceMgr) HandleSignals(sigch chan os.Signal) {
+	sm.sigmut.Lock()
+	// always start by closing the qch, which will lead to any existing signal
+	// handler terminating, and deregistering its sigch.
+	if sm.qch != nil {
+		close(sm.qch)
+	}
+	sm.qch = make(chan struct{})
+
+	// Run a new goroutine with the input sigch and the fresh qch
+	go func(sch chan os.Signal, qch <-chan struct{}) {
 		for {
 			select {
-			case <-ch:
+			case <-sch:
 				// Set up a timer to uninstall the signal handler after three
 				// seconds, so that the user can easily force termination with a
 				// second ctrl-c
 				go func(c <-chan time.Time) {
 					<-c
-					signal.Stop(ch)
+					signal.Stop(sch)
 				}(time.After(3 * time.Second))
 
 				if !atomic.CompareAndSwapInt32(&sm.releasing, 0, 1) {
@@ -211,18 +248,30 @@ func NewSourceManager(an ProjectAnalyzer, cachedir string) (*SourceMgr, error) {
 				sm.doRelease()
 				sm.glock.Unlock()
 				return
-			case <-sm.qch:
+			case <-qch:
 				// quit channel triggered - deregister our sigch and return
 				signal.Stop(ch)
 				return
 			}
 		}
-	}
-
-	go sigfunc(sm.sigch)
+	}(sigch, sm.qch)
+	// Try to ensure handler is blocked in for-select before releasing the mutex
 	runtime.Gosched()
 
-	return sm, nil
+	sm.sigmut.Unlock()
+}
+
+// StopSignalHandling deregisters any signal handler running on this SourceMgr.
+//
+// It's normally not necessary to call this directly; it will be called as
+// needed by Release().
+func (sm *SourceMgr) StopSignalHandling() {
+	sm.sigmut.Lock()
+	if sm.qch != nil {
+		close(sm.qch)
+		runtime.Gosched()
+	}
+	sm.sigmut.Unlock()
 }
 
 // CouldNotCreateLockError describe failure modes in which creating a SourceMgr
@@ -267,9 +316,11 @@ func (sm *SourceMgr) doRelease() {
 		sm.lf.Close()
 		// Remove the lock file from disk
 		os.Remove(filepath.Join(sm.cachedir, "sm.lock"))
-		// Close the qch so the signal handlers run out. This will also
-		// deregister the sig channel, if any has been set up.
-		close(sm.qch)
+		// Close the qch, if non-nil, so the signal handlers run out. This will
+		// also deregister the sig channel, if any has been set up.
+		if sm.qch != nil {
+			close(sm.qch)
+		}
 	}
 }
 
