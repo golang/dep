@@ -119,17 +119,33 @@ func runEnsure(args []string) error {
 	var errs []error
 	for _, arg := range args {
 		// default persist to manifest
-		constraint, err := getProjectConstraint(arg, sm)
+		pc, err := getProjectConstraint(arg, sm)
 		if err != nil {
 			errs = append(errs, err)
 		}
-		p.m.Dependencies[constraint.Ident.ProjectRoot] = gps.ProjectProperties{
-			NetworkName: constraint.Ident.NetworkName,
-			Constraint:  constraint.Constraint,
+
+		if gps.IsAny(pc.Constraint) && pc.Ident.NetworkName == "" {
+			// If the input specified neither a network name nor a constraint,
+			// then the strict thing to do would be to remove the entry
+			// entirely. But that would probably be quite surprising for users,
+			// and it's what rm is for, so just ignore the input.
+			//
+			// TODO(sdboyer): for this case - or just in general - do we want to
+			// add project args to the requires list temporarily for this run?
+			if _, has := p.m.Dependencies[pc.Ident.ProjectRoot]; !has {
+				logf("No constraint or alternate source specified for %q, omitting from manifest", pc.Ident.ProjectRoot)
+			}
+			// If it's already in the manifest, no need to log
+			continue
+		}
+
+		p.m.Dependencies[pc.Ident.ProjectRoot] = gps.ProjectProperties{
+			NetworkName: pc.Ident.NetworkName,
+			Constraint:  pc.Constraint,
 		}
 
 		for i, lp := range p.l.P {
-			if lp.Ident() == constraint.Ident {
+			if lp.Ident() == pc.Ident {
 				p.l.P = append(p.l.P[:i], p.l.P[i+1:]...)
 				break
 			}
@@ -137,17 +153,22 @@ func runEnsure(args []string) error {
 	}
 
 	for _, ovr := range overrides {
-		constraint, err := getProjectConstraint(ovr, sm)
+		pc, err := getProjectConstraint(ovr, sm)
 		if err != nil {
 			errs = append(errs, err)
 		}
-		p.m.Ovr[constraint.Ident.ProjectRoot] = gps.ProjectProperties{
-			NetworkName: constraint.Ident.NetworkName,
-			Constraint:  constraint.Constraint,
+
+		// Empty overrides are fine (in contrast to deps), because they actually
+		// carry meaning - they force the constraints entirely open for a given
+		// project. Inadvisable, but meaningful.
+
+		p.m.Ovr[pc.Ident.ProjectRoot] = gps.ProjectProperties{
+			NetworkName: pc.Ident.NetworkName,
+			Constraint:  pc.Constraint,
 		}
 
 		for i, lp := range p.l.P {
-			if lp.Ident() == constraint.Ident {
+			if lp.Ident() == pc.Ident {
 				p.l.P = append(p.l.P[:i], p.l.P[i+1:]...)
 				break
 			}
@@ -241,7 +262,9 @@ func runEnsure(args []string) error {
 }
 
 func getProjectConstraint(arg string, sm *gps.SourceMgr) (gps.ProjectConstraint, error) {
-	constraint := gps.ProjectConstraint{}
+	constraint := gps.ProjectConstraint{
+		Constraint: gps.Any(), // default to any; avoids panics later
+	}
 
 	// try to split on '@'
 	atIndex := strings.Index(arg, "@")
