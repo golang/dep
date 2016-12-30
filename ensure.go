@@ -199,56 +199,17 @@ func (cmd *ensureCommand) Run(args []string) error {
 		return errors.Wrap(err, "ensure Solve()")
 	}
 
-	p.l.P = solution.Projects()
-	p.l.Memo = solution.InputHash()
-
-	tv, err := ioutil.TempDir("", "vendor")
-	if err != nil {
-		return errors.Wrap(err, "ensure making temporary vendor")
-	}
-	defer os.RemoveAll(tv)
-
-	tm, err := ioutil.TempFile("", "manifest")
-	if err != nil {
-		return errors.Wrap(err, "ensure making temporary manifest")
-	}
-	tm.Close()
-	defer os.Remove(tm.Name())
-
-	tl, err := ioutil.TempFile("", "lock")
-	if err != nil {
-		return errors.Wrap(err, "ensure making temporary lock file")
-	}
-	tl.Close()
-	defer os.Remove(tl.Name())
-
-	if err := gps.WriteDepTree(tv, p.l, sm, true); err != nil {
-		return errors.Wrap(err, "ensure gps.WriteDepTree")
+	sw := safeWriter{
+		root: p.absroot,
+		m:    p.m,
+		l:    p.l,
+		nl:   solution,
+		sm:   sm,
 	}
 
-	if err := writeFile(tm.Name(), p.m); err != nil {
-		return errors.Wrap(err, "ensure writeFile for manifest")
+	if err := sw.writeAllSafe(false); err != nil {
+		return errors.Wrap(err, "grouped write of manifest, lock and vendor")
 	}
-
-	if err := writeFile(tl.Name(), p.l); err != nil {
-		return errors.Wrap(err, "ensure writeFile for lock")
-	}
-
-	if err := copyFile(tm.Name(), filepath.Join(p.absroot, manifestName)); err != nil {
-		return errors.Wrap(err, "ensure moving temp manifest into place!")
-	}
-	os.Remove(tm.Name())
-
-	if err := copyFile(tl.Name(), filepath.Join(p.absroot, lockName)); err != nil {
-		return errors.Wrap(err, "ensure moving temp manifest into place!")
-	}
-	os.Remove(tl.Name())
-
-	os.RemoveAll(filepath.Join(p.absroot, "vendor"))
-	if err := copyFolder(tv, filepath.Join(p.absroot, "vendor")); err != nil {
-		return errors.Wrap(err, "ensure moving temp vendor")
-	}
-
 	return nil
 }
 

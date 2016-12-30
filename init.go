@@ -124,7 +124,12 @@ func (cmd *initCommand) Run(args []string) error {
 		)
 	}
 
-	var l2 *lock
+	sw := safeWriter{
+		root: root,
+		sm:   sm,
+		m:    &m,
+	}
+
 	if len(pd.notondisk) > 0 {
 		vlogf("Solving...")
 		params := gps.SolveParameters{
@@ -148,19 +153,16 @@ func (cmd *initCommand) Run(args []string) error {
 			handleAllTheFailuresOfTheWorld(err)
 			return err
 		}
-		l2 = lockFromInterface(soln)
+		sw.l = lockFromInterface(soln)
 	} else {
-		l2 = &l
+		sw.l = &l
 	}
 
 	vlogf("Writing manifest and lock files.")
-	if err := writeFile(mf, &m); err != nil {
-		return errors.Wrap(err, "writeFile for manifest")
-	}
-	if err := writeFile(lf, l2); err != nil {
-		return errors.Wrap(err, "writeFile for lock")
-	}
 
+	if err := sw.writeAllSafe(false); err != nil {
+		return errors.Wrap(err, "safe write of manifest and lock")
+	}
 	return nil
 }
 
