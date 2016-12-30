@@ -10,97 +10,108 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 
-	"io/ioutil"
-
 	"github.com/pkg/errors"
 	"github.com/sdboyer/gps"
 )
 
-var ensureCmd = &command{
-	fn:    runEnsure,
-	name:  "ensure",
-	flag:  flag.NewFlagSet("", flag.ExitOnError),
-	short: `Ensure a dependency is the vendor directory of the current project`,
-	long: `Run it when
-To ensure a new dependency is in your project.
-To ensure a dependency is updated.
-To the latest version that satisfies constraints.
-To a specific version or different constraint.
-(With no arguments) To ensure that you have all the dependencies specified by your Manifest + lockfile.
+const ensureShortHelp = `Ensure a dependency is vendored in the project`
+const ensureLongHelp = `
+Ensure is used to fetch project dependencies into the vendor folder, as well as
+to set version constraints for specific dependencies. It takes user input,
+solves the updated dependency graph of the project, writes any changes to the
+manifest and lock file, and downloads dependencies to the vendor folder.
 
+Package spec:
 
-What it does
-Download code, placing in the vendor/ directory of the project. Only the packages that are actually used by the current project and its dependencies are included.
-Any authentication, proxy settings, or other parameters regarding communicating with external repositories is the responsibility of the underlying VCS tools.
-Resolve version constraints
-If the set of constraints are not solvable, print an error
-Collapse any vendor folders in the downloaded code and its transient deps to the root.
-Includes dependencies required by the current project’s tests. There are arguments both for and against including the deps of tests for any transitive deps. Defer on deciding this for now.
-Copy the relevant versions of the code to the current project’s vendor directory.
-The source of that code is implementation dependant. Probably some kind of local cache of the VCS data (not a GOPATH/workspace).
-Write Manifest (if changed) and Lockfile
-Print what changed
-
-
-Flags:
-  -update            update all packages
-  -n                 dry run
-  -override <specs>  specify an override constraints for package(s)
-
-
-Package specs:
   <path>[:alt location][@<version specifier>]
 
 Examples:
-Fetch/update github.com/heroku/rollrus to latest version, including transitive dependencies (ensuring it matches the constraints of rollrus, or—if not contrained—their latest versions):
-  $ dep ensure github.com/heroku/rollrus
-Same dep, but choose any minor patch release in the 0.9.X series, setting the constraint. If another constraint exists that constraint is changed to ~0.9.0:
-  $ dep ensure github.com/heroku/rollrus@~0.9.0
-Same dep, but choose any release >= 0.9.1 and < 1.0.0, setting/changing constraints:
-  $ dep ensure github.com/heroku/rollrus@^0.9.1
-Same dep, but updating to 1.0.X:
-  $ dep ensure github.com/heroku/rollrus@~1.0.0
-Same dep, but fetching from a different location:
-  $ dep ensure github.com/heroku/rollrus:git.example.com/foo/bar
-Same dep, but check out a specific version or range without updating the Manifest and update the Lockfile. This will fail if the specified version does not satisfy any existing constraints:
-  $ dep ensure github.com/heroku/rollrus==1.2.3  # 1.2.3 specifically
-  $ dep ensure github.com/heroku/rollrus=^1.2.0  # >= 1.2.0  < 2.0.0
-Override any declared dependency range of 'github.com/foo/bar' to have the range of '^0.9.1'. This applies transitively:
-  $ dep ensure -override github.com/foo/bar@^0.9.1
 
+  dep ensure                                   Populate vendor from existing manifest and lock
+  dep ensure github.com/heroku/rollrus@^0.9.1  Update a specific dependency to a specific version
+  dep ensure -update                           Update all dependencies to latest permitted versions
 
-Transitive deps are ensured based on constraints in the local Manifest if they exist, then constraints in the dependency’s Manifest file. A lack of constraints defaults to the latest version, eg "^2".
+For more detailed usage examples, see dep ensure -examples.
+`
+const ensureExamples = `
+dep ensure
 
+    Solve the project's dependency graph, and download all dependencies to the
+    vendor folder. If a dependency is in the lock file, use the version
+    specified there. Otherwise, use the most recent version that can satisfy the
+    constraints in the manifest file.
 
-For a description of the version specifier string, see this handy guide from crates.io. We are going to defer on making a final decision about this syntax until we have more experience with it in practice.
-	`,
+dep ensure -update
+
+    Update all dependencies to the latest version allowed by the manifest, ignoring
+    any versions specified in the lock file. Update the lock file with any
+    changes.
+
+dep ensure github.com/heroku/rollrus
+
+    Update a specific dependency to the latest version allowed by the manifest,
+    including all of its transitive dependencies.
+
+dep ensure github.com/heroku/rollrus@~0.9.0
+
+    Same as above, but choose any release matching 0.9.x, preferring latest. If
+    a constraint was previously set in the manifest, this resets it.
+
+dep ensure github.com/heroku/rollrus@^0.9.1
+
+    Same as above, but choose any release >= 0.9.1, < 1.0.0. This form of
+    constraint strikes a good balance of safety and flexibility, and should be
+    preferred for libraries.
+
+dep ensure github.com/heroku/rollrus:git.internal.com/foo/bar
+
+    Fetch the dependency from a different location.
+
+dep ensure github.com/heroku/rollrus==1.2.3  # 1.2.3 exactly
+dep ensure github.com/heroku/rollrus=^1.2.0  # >= 1.2.0, < 2.0.0
+
+    Fetch the dependency at a specific version or range, and update the lock
+    file, but don't update the manifest file. Will fail if the specified version
+    doesn't satisfy the constraint in the manifest file.
+
+dep ensure -override github.com/heroku/rollrus@^0.9.1
+
+    Forcefully and transitively override any constraint for this dependency.
+    This can inadvertantly make your dependency graph unsolvable; use sparingly.
+`
+
+func (cmd *ensureCommand) Name() string      { return "ensure" }
+func (cmd *ensureCommand) Args() string      { return "[spec...]" }
+func (cmd *ensureCommand) ShortHelp() string { return ensureShortHelp }
+func (cmd *ensureCommand) LongHelp() string  { return ensureLongHelp }
+
+func (cmd *ensureCommand) Register(fs *flag.FlagSet) {
+	fs.BoolVar(&cmd.examples, "examples", false, "print detailed usage examples")
+	fs.BoolVar(&cmd.update, "update", false, "ensure all dependencies are at the latest version allowed by the manifest")
+	fs.BoolVar(&cmd.dryRun, "n", false, "dry run, don't actually ensure anything")
+	fs.Var(&cmd.overrides, "override", "specify an override constraint spec (repeatable)")
 }
 
-// stringSlice is a slice of strings
-type stringSlice []string
-
-// implement the flag interface for stringSlice
-func (s *stringSlice) String() string {
-	return fmt.Sprintf("%s", *s)
-}
-func (s *stringSlice) Set(value string) error {
-	*s = append(*s, value)
-	return nil
+type ensureCommand struct {
+	examples  bool
+	update    bool
+	dryRun    bool
+	overrides stringSlice
 }
 
-var overrides stringSlice
+func (cmd *ensureCommand) Run(args []string) error {
+	if cmd.examples {
+		fmt.Fprintln(os.Stderr, strings.TrimSpace(ensureExamples))
+		return nil
+	}
 
-func init() {
-	ensureCmd.flag.Var(&overrides, "override", "Interpret specified constraint(s) as override(s) rather than normal constraints")
-}
-
-func runEnsure(args []string) error {
 	p, err := depContext.loadProject("")
 	if err != nil {
 		return err
@@ -148,7 +159,7 @@ func runEnsure(args []string) error {
 		}
 	}
 
-	for _, ovr := range overrides {
+	for _, ovr := range cmd.overrides {
 		pc, err := getProjectConstraint(ovr, sm)
 		if err != nil {
 			errs = append(errs, err)
@@ -254,6 +265,20 @@ func runEnsure(args []string) error {
 		return errors.Wrap(err, "ensure moving temp vendor")
 	}
 
+	return nil
+}
+
+type stringSlice []string
+
+func (s *stringSlice) String() string {
+	if len(*s) == 0 {
+		return "<none>"
+	}
+	return strings.Join(*s, ", ")
+}
+
+func (s *stringSlice) Set(value string) error {
+	*s = append(*s, value)
 	return nil
 }
 

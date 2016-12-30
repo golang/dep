@@ -5,6 +5,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"log"
 	"os"
@@ -14,31 +15,33 @@ import (
 	"github.com/sdboyer/gps"
 )
 
-var removeCmd = &command{
-	fn:    runRemove,
-	name:  "rm",
-	short: `Remove one or more dependencies from the current project`,
-	long: `Run it when:
-To stop using dependencies
-To clean out unused dependencies
+const removeShortHelp = `Remove a dependency from the project`
+const removeLongHelp = `
+Remove a dependency from the project's manifest file, lock file, and vendor
+folder. If the project includes that dependency in its import graph, remove will
+fail unless -force is specified.
+`
 
-What it does
-Removes the given dependency from the Manifest, Lock, and vendor/.
-If the current project includes that dependency in its import graph, rm will fail unless -force is specified.
-If -unused is provided, specs matches all dependencies in the Manifest that are not reachable by the import graph.
-The -force and -unused flags cannot be combined (an error occurs).
-During removal, dependencies that were only present because of the dependencies being removed are also removed.
+func (cmd *removeCommand) Name() string      { return "remove" }
+func (cmd *removeCommand) Args() string      { return "[spec...]" }
+func (cmd *removeCommand) ShortHelp() string { return removeShortHelp }
+func (cmd *removeCommand) LongHelp() string  { return removeLongHelp }
 
-Note: this is a separate command to 'ensure' because we want the user to be explicit when making destructive changes.
-
-Flags:
--n            Dry run, don’t actually remove anything
--unused       Remove dependencies that are not used by this project
--force        Remove dependency even if it is used by the project
--keep-source  Do not remove source code`,
+func (cmd *removeCommand) Register(fs *flag.FlagSet) {
+	fs.BoolVar(&cmd.dryRun, "n", false, "dry run, don't actually remove anything")
+	fs.BoolVar(&cmd.unused, "unused", false, "remove all dependencies that aren't imported by the project")
+	fs.BoolVar(&cmd.force, "force", false, "remove the given dependencies even if they are imported by the project")
+	fs.BoolVar(&cmd.keepSource, "keep-source", false, "don't remove source code")
 }
 
-func runRemove(args []string) error {
+type removeCommand struct {
+	dryRun     bool
+	unused     bool
+	force      bool
+	keepSource bool
+}
+
+func (cmd *removeCommand) Run(args []string) error {
 	p, err := depContext.loadProject("")
 	if err != nil {
 		return err
