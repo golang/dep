@@ -341,17 +341,19 @@ func (sm *SourceMgr) GetManifestAndLock(id ProjectIdentifier, v Version) (Manife
 	if atomic.CompareAndSwapInt32(&sm.releasing, 1, 1) {
 		return nil, nil, smIsReleased{}
 	}
+	atomic.AddInt32(&sm.opcount, 1)
 	sm.glock.RLock()
+	defer func() {
+		sm.glock.RUnlock()
+		atomic.AddInt32(&sm.opcount, -1)
+	}()
 
 	src, err := sm.getSourceFor(id)
 	if err != nil {
-		sm.glock.RUnlock()
 		return nil, nil, err
 	}
 
-	m, l, err := src.getManifestAndLock(id.ProjectRoot, v)
-	sm.glock.RUnlock()
-	return m, l, err
+	return src.getManifestAndLock(id.ProjectRoot, v)
 }
 
 // ListPackages parses the tree of the Go packages at and below the ProjectRoot
@@ -360,17 +362,19 @@ func (sm *SourceMgr) ListPackages(id ProjectIdentifier, v Version) (PackageTree,
 	if atomic.CompareAndSwapInt32(&sm.releasing, 1, 1) {
 		return PackageTree{}, smIsReleased{}
 	}
+	atomic.AddInt32(&sm.opcount, 1)
 	sm.glock.RLock()
+	defer func() {
+		sm.glock.RUnlock()
+		atomic.AddInt32(&sm.opcount, -1)
+	}()
 
 	src, err := sm.getSourceFor(id)
 	if err != nil {
-		sm.glock.RUnlock()
 		return PackageTree{}, err
 	}
 
-	pt, err := src.listPackages(id.ProjectRoot, v)
-	sm.glock.RUnlock()
-	return pt, err
+	return src.listPackages(id.ProjectRoot, v)
 }
 
 // ListVersions retrieves a list of the available versions for a given
@@ -389,18 +393,20 @@ func (sm *SourceMgr) ListVersions(id ProjectIdentifier) ([]Version, error) {
 	if atomic.CompareAndSwapInt32(&sm.releasing, 1, 1) {
 		return nil, smIsReleased{}
 	}
+	atomic.AddInt32(&sm.opcount, 1)
 	sm.glock.RLock()
+	defer func() {
+		sm.glock.RUnlock()
+		atomic.AddInt32(&sm.opcount, -1)
+	}()
 
 	src, err := sm.getSourceFor(id)
 	if err != nil {
-		sm.glock.RUnlock()
 		// TODO(sdboyer) More-er proper-er errors
 		return nil, err
 	}
 
-	vl, err := src.listVersions()
-	sm.glock.RUnlock()
-	return vl, err
+	return src.listVersions()
 }
 
 // RevisionPresentIn indicates whether the provided Revision is present in the given
@@ -409,18 +415,20 @@ func (sm *SourceMgr) RevisionPresentIn(id ProjectIdentifier, r Revision) (bool, 
 	if atomic.CompareAndSwapInt32(&sm.releasing, 1, 1) {
 		return false, smIsReleased{}
 	}
+	atomic.AddInt32(&sm.opcount, 1)
 	sm.glock.RLock()
+	defer func() {
+		sm.glock.RUnlock()
+		atomic.AddInt32(&sm.opcount, -1)
+	}()
 
 	src, err := sm.getSourceFor(id)
 	if err != nil {
-		sm.glock.RUnlock()
 		// TODO(sdboyer) More-er proper-er errors
 		return false, err
 	}
 
-	is, err := src.revisionPresentIn(r)
-	sm.glock.RUnlock()
-	return is, err
+	return src.revisionPresentIn(r)
 }
 
 // SourceExists checks if a repository exists, either upstream or in the cache,
@@ -429,17 +437,19 @@ func (sm *SourceMgr) SourceExists(id ProjectIdentifier) (bool, error) {
 	if atomic.CompareAndSwapInt32(&sm.releasing, 1, 1) {
 		return false, smIsReleased{}
 	}
+	atomic.AddInt32(&sm.opcount, 1)
 	sm.glock.RLock()
+	defer func() {
+		sm.glock.RUnlock()
+		atomic.AddInt32(&sm.opcount, -1)
+	}()
 
 	src, err := sm.getSourceFor(id)
 	if err != nil {
-		sm.glock.RUnlock()
 		return false, err
 	}
 
-	exists := src.checkExistence(existsInCache) || src.checkExistence(existsUpstream)
-	sm.glock.RUnlock()
-	return exists, nil
+	return src.checkExistence(existsInCache) || src.checkExistence(existsUpstream), nil
 }
 
 // SyncSourceFor will ensure that all local caches and information about a
@@ -450,17 +460,19 @@ func (sm *SourceMgr) SyncSourceFor(id ProjectIdentifier) error {
 	if atomic.CompareAndSwapInt32(&sm.releasing, 1, 1) {
 		return smIsReleased{}
 	}
+	atomic.AddInt32(&sm.opcount, 1)
 	sm.glock.RLock()
+	defer func() {
+		sm.glock.RUnlock()
+		atomic.AddInt32(&sm.opcount, -1)
+	}()
 
 	src, err := sm.getSourceFor(id)
 	if err != nil {
-		sm.glock.RUnlock()
 		return err
 	}
 
-	err = src.syncLocal()
-	sm.glock.RUnlock()
-	return err
+	return src.syncLocal()
 }
 
 // ExportProject writes out the tree of the provided ProjectIdentifier's
@@ -469,17 +481,19 @@ func (sm *SourceMgr) ExportProject(id ProjectIdentifier, v Version, to string) e
 	if atomic.CompareAndSwapInt32(&sm.releasing, 1, 1) {
 		return smIsReleased{}
 	}
+	atomic.AddInt32(&sm.opcount, 1)
 	sm.glock.RLock()
+	defer func() {
+		sm.glock.RUnlock()
+		atomic.AddInt32(&sm.opcount, -1)
+	}()
 
 	src, err := sm.getSourceFor(id)
 	if err != nil {
-		sm.glock.RUnlock()
 		return err
 	}
 
-	err = src.exportVersionTo(v, to)
-	sm.glock.RUnlock()
-	return err
+	return src.exportVersionTo(v, to)
 }
 
 // DeduceProjectRoot takes an import path and deduces the corresponding
@@ -493,7 +507,12 @@ func (sm *SourceMgr) DeduceProjectRoot(ip string) (ProjectRoot, error) {
 	if atomic.CompareAndSwapInt32(&sm.releasing, 1, 1) {
 		return "", smIsReleased{}
 	}
+	atomic.AddInt32(&sm.opcount, 1)
 	sm.glock.RLock()
+	defer func() {
+		sm.glock.RUnlock()
+		atomic.AddInt32(&sm.opcount, -1)
+	}()
 
 	if prefix, root, has := sm.rootxt.LongestPrefix(ip); has {
 		// The non-matching tail of the import path could still be malformed.
@@ -508,18 +527,15 @@ func (sm *SourceMgr) DeduceProjectRoot(ip string) (ProjectRoot, error) {
 			// revalidate it later
 			sm.rootxt.Insert(ip, root)
 		}
-		sm.glock.RUnlock()
 		return root, nil
 	}
 
 	ft, err := sm.deducePathAndProcess(ip)
 	if err != nil {
-		sm.glock.RUnlock()
 		return "", err
 	}
 
 	r, err := ft.rootf()
-	sm.glock.RUnlock()
 	return ProjectRoot(r), err
 }
 
