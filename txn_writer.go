@@ -89,12 +89,12 @@ func (sw safeWriter) writeAllSafe(forceVendor bool) error {
 		return nil
 	}
 
-	if writeV && sw.l == nil && sw.nl == nil {
-		return errors.New("must provide a lock in order to write out vendor")
-	}
-
 	if writeV && sw.sm == nil {
 		return errors.New("must provide a SourceManager if writing out a vendor dir.")
+	}
+
+	if writeV && sw.l == nil && sw.nl == nil {
+		return errors.New("must provide a lock in order to write out vendor")
 	}
 
 	mpath := filepath.Join(sw.root, manifestName)
@@ -129,7 +129,13 @@ func (sw safeWriter) writeAllSafe(forceVendor bool) error {
 	}
 
 	if writeV {
-		err = gps.WriteDepTree(filepath.Join(td, "vendor"), sw.nl, sw.sm, true)
+		// prefer the nl, but take the l if only that's available, as could be the
+		// case if true was passed for forceVendor
+		l := sw.nl
+		if l == nil {
+			l = sw.l
+		}
+		err = gps.WriteDepTree(filepath.Join(td, "vendor"), l, sw.sm, true)
 		if err != nil {
 			return errors.Wrap(err, "error while writing out vendor tree")
 		}
