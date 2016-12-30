@@ -209,6 +209,7 @@ func (sm *SourceMgr) HandleSignals(sigch chan os.Signal) {
 
 	// Run a new goroutine with the input sigch and the fresh qch
 	go func(sch chan os.Signal, qch <-chan struct{}) {
+		defer signal.Stop(sch)
 		for {
 			select {
 			case <-sch:
@@ -223,7 +224,7 @@ func (sm *SourceMgr) HandleSignals(sigch chan os.Signal) {
 				if !atomic.CompareAndSwapInt32(&sm.releasing, 0, 1) {
 					// Something's already called Release() on this sm, so we
 					// don't have to do anything, as we'd just be redoing
-					// that work. Instead, just return.
+					// that work. Instead, deregister and return.
 					return
 				}
 
@@ -250,7 +251,6 @@ func (sm *SourceMgr) HandleSignals(sigch chan os.Signal) {
 				return
 			case <-qch:
 				// quit channel triggered - deregister our sigch and return
-				signal.Stop(sch)
 				return
 			}
 		}
