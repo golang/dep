@@ -86,21 +86,21 @@ type ProjectAnalyzer interface {
 // There's no (planned) reason why it would need to be reimplemented by other
 // tools; control via dependency injection is intended to be sufficient.
 type SourceMgr struct {
-	cachedir            string
-	lf                  *os.File
-	srcs                map[string]source
-	srcmut              sync.RWMutex
-	srcfuts             map[string]*unifiedFuture
-	srcfmut             sync.RWMutex
-	an                  ProjectAnalyzer
-	dxt                 deducerTrie
-	rootxt              prTrie
-	sigch               chan os.Signal
-	qch                 chan struct{}
-	glock               sync.RWMutex
-	opcount             int32
-	signaled            int32
-	releasing, released int32
+	cachedir  string                    // path to root of cache dir
+	lf        *os.File                  // handle for the sm lock file on disk
+	srcs      map[string]source         // map of path names to source obj
+	srcmut    sync.RWMutex              // mutex protecting srcs map
+	srcfuts   map[string]*unifiedFuture // map of paths to source-handling futures
+	srcfmut   sync.RWMutex              // mutex protecting futures map
+	an        ProjectAnalyzer           // analyzer injected by the caller
+	dxt       deducerTrie               // static trie with baseline source type deduction info
+	rootxt    prTrie                    // dynamic trie, updated as ProjectRoots are deduced
+	qch       chan struct{}             // quit chan for signal handler
+	sigmut    sync.Mutex                // mutex protecting signal handling setup/teardown
+	glock     sync.RWMutex              // global lock for all ops, sm validity
+	opcount   int32                     // number of ops in flight
+	releasing int32                     // flag indicating release of sm has begun
+	released  int32                     // flag indicating release of sm has finished
 }
 
 type smIsReleased struct{}
