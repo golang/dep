@@ -17,7 +17,7 @@ import (
 	"github.com/sdboyer/gps"
 )
 
-const initShortHelp = `Write manifest and lock files for the project`
+const initShortHelp = `Initialize a new project with manifest and lock files`
 const initLongHelp = `
 Initialize the project at filepath root by parsing its dependencies and writing
 manifest and lock files. If root isn't specified, use the current directory.
