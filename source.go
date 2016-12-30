@@ -97,23 +97,30 @@ func (bs *baseVCSSource) getManifestAndLock(r ProjectRoot, v Version) (Manifest,
 	}
 
 	// Cache didn't help; ensure our local is fully up to date.
-	err = bs.syncLocal()
-	if err != nil {
-		return nil, nil, err
+	do := func() (err error) {
+		bs.crepo.mut.Lock()
+		// Always prefer a rev, if it's available
+		if pv, ok := v.(PairedVersion); ok {
+			err = bs.crepo.r.UpdateVersion(pv.Underlying().String())
+		} else {
+			err = bs.crepo.r.UpdateVersion(v.String())
+		}
+
+		bs.crepo.mut.Unlock()
+		return
 	}
 
-	bs.crepo.mut.Lock()
-	// Always prefer a rev, if it's available
-	if pv, ok := v.(PairedVersion); ok {
-		err = bs.crepo.r.UpdateVersion(pv.Underlying().String())
-	} else {
-		err = bs.crepo.r.UpdateVersion(v.String())
-	}
-	bs.crepo.mut.Unlock()
+	if err = do(); err != nil {
+		// minimize network activity: only force local syncing if we had an err
+		err = bs.syncLocal()
+		if err != nil {
+			return nil, nil, err
+		}
 
-	if err != nil {
-		// TODO(sdboyer) More-er proper-er error
-		panic(fmt.Sprintf("canary - why is checkout/whatever failing: %s %s %s", bs.crepo.r.LocalPath(), v.String(), unwrapVcsErr(err)))
+		if err = do(); err != nil {
+			// TODO(sdboyer) More-er proper-er error
+			panic(fmt.Sprintf("canary - why is checkout/whatever failing: %s %s %s", bs.crepo.r.LocalPath(), v.String(), unwrapVcsErr(err)))
+		}
 	}
 
 	bs.crepo.mut.RLock()
