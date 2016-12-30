@@ -15,13 +15,10 @@ import (
 )
 
 var removeCmd = &command{
-	fn:   runRemove,
-	name: "rm",
-	short: `[flags] [packages]
-	Remove a package or a set of packages.
-	`,
-	long: `
-Run it when:
+	fn:    runRemove,
+	name:  "rm",
+	short: `Remove one or more dependencies from the current project`,
+	long: `Run it when:
 To stop using dependencies
 To clean out unused dependencies
 
@@ -35,11 +32,10 @@ During removal, dependencies that were only present because of the dependencies 
 Note: this is a separate command to 'ensure' because we want the user to be explicit when making destructive changes.
 
 Flags:
--n		Dry run, don’t actually remove anything
--unused	Remove dependencies that are not used by this project
--force		Remove dependency even if it is used by the project
--keep-source	Do not remove source code
-	`,
+-n            Dry run, don’t actually remove anything
+-unused       Remove dependencies that are not used by this project
+-force        Remove dependency even if it is used by the project
+-keep-source  Do not remove source code`,
 }
 
 func runRemove(args []string) error {

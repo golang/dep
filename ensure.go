@@ -23,14 +23,11 @@ import (
 )
 
 var ensureCmd = &command{
-	fn:   runEnsure,
-	name: "ensure",
-	flag: flag.NewFlagSet("", flag.ExitOnError),
-	short: `[flags] <path>[:alt location][@<version specifier>]
-	To ensure a dependency is in your project at a specific version (if specified).
-	`,
-	long: `
-	Run it when
+	fn:    runEnsure,
+	name:  "ensure",
+	flag:  flag.NewFlagSet("", flag.ExitOnError),
+	short: `Ensure a dependency is the vendor directory of the current project`,
+	long: `Run it when
 To ensure a new dependency is in your project.
 To ensure a dependency is updated.
 To the latest version that satisfies constraints.
@@ -52,31 +49,30 @@ Print what changed
 
 
 Flags:
-	-update		update all packages
-	-n			dry run
-	-override <specs>	specify an override constraints for package(s)
+  -update            update all packages
+  -n                 dry run
+  -override <specs>  specify an override constraints for package(s)
 
 
 Package specs:
-	<path>[:alt location][@<version specifier>]
-
+  <path>[:alt location][@<version specifier>]
 
 Examples:
 Fetch/update github.com/heroku/rollrus to latest version, including transitive dependencies (ensuring it matches the constraints of rollrus, or—if not contrained—their latest versions):
-	$ dep ensure github.com/heroku/rollrus
+  $ dep ensure github.com/heroku/rollrus
 Same dep, but choose any minor patch release in the 0.9.X series, setting the constraint. If another constraint exists that constraint is changed to ~0.9.0:
-	$ dep ensure github.com/heroku/rollrus@~0.9.0
+  $ dep ensure github.com/heroku/rollrus@~0.9.0
 Same dep, but choose any release >= 0.9.1 and < 1.0.0, setting/changing constraints:
-	$ dep ensure github.com/heroku/rollrus@^0.9.1
+  $ dep ensure github.com/heroku/rollrus@^0.9.1
 Same dep, but updating to 1.0.X:
-	$ dep ensure github.com/heroku/rollrus@~1.0.0
+  $ dep ensure github.com/heroku/rollrus@~1.0.0
 Same dep, but fetching from a different location:
-	$ dep ensure github.com/heroku/rollrus:git.example.com/foo/bar
+  $ dep ensure github.com/heroku/rollrus:git.example.com/foo/bar
 Same dep, but check out a specific version or range without updating the Manifest and update the Lockfile. This will fail if the specified version does not satisfy any existing constraints:
-	$ dep ensure github.com/heroku/rollrus==1.2.3	# 1.2.3 specifically
-	$ dep ensure github.com/heroku/rollrus=^1.2.0	# >= 1.2.0  < 2.0.0
+  $ dep ensure github.com/heroku/rollrus==1.2.3  # 1.2.3 specifically
+  $ dep ensure github.com/heroku/rollrus=^1.2.0  # >= 1.2.0  < 2.0.0
 Override any declared dependency range of 'github.com/foo/bar' to have the range of '^0.9.1'. This applies transitively:
-	$ dep ensure -override github.com/foo/bar@^0.9.1
+  $ dep ensure -override github.com/foo/bar@^0.9.1
 
 
 Transitive deps are ensured based on constraints in the local Manifest if they exist, then constraints in the dependency’s Manifest file. A lack of constraints defaults to the latest version, eg "^2".

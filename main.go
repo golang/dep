@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"text/tabwriter"
 
 	"github.com/sdboyer/gps"
 )
@@ -107,11 +108,9 @@ func init() {
 	// Defeat circular declarations by appending
 	// this to the list at init time.
 	commands = append(commands, &command{
-		fn:   help,
-		name: "help",
-		short: `[command]
-	Show documentation for the dep tool or the specified command.
-	`,
+		fn:    help,
+		name:  "help",
+		short: `Show documentation for the dep tool or the specified command`,
 	})
 }
 
@@ -122,11 +121,16 @@ func help(args []string) error {
 	}
 	if len(args) == 0 {
 		// Show short usage for all commands.
-		fmt.Printf("usage: dep <command> [arguments]\n\n")
-		fmt.Printf("Available commands:\n\n")
+		fmt.Println("usage: dep <command> [arguments]")
+		fmt.Println()
+		fmt.Println("Available commands:")
+		fmt.Println()
+		w := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)
 		for _, cmd := range commands {
-			fmt.Printf("%s %s\n", cmd.name, cmd.short)
+			fmt.Fprintf(w, "\t%s\t%s\n", cmd.name, cmd.short)
 		}
+		w.Flush()
+		fmt.Println()
 		return nil
 	}
 	// Show full help for a specific command.
@@ -134,7 +138,12 @@ func help(args []string) error {
 		if cmd.name != args[0] {
 			continue
 		}
-		fmt.Printf("usage: dep %s %s%s\n", cmd.name, cmd.short, cmd.long)
+		fmt.Printf("usage: dep %s\n", cmd.name)
+		fmt.Println()
+		fmt.Printf("%s\n", cmd.short)
+		fmt.Println()
+		fmt.Println(cmd.long)
+		fmt.Println()
 		return nil
 	}
 	return fmt.Errorf("unknown command: %q", args[0])
