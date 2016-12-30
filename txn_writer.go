@@ -37,8 +37,8 @@ type safeWriter struct {
 //
 // - If a sw.m is provided, it will be written to the standard manifest file
 //   name beneath sw.root
-// - If sw.l is provided without an sw.nl, it will be unconditionally written
-//   to the standard lock file name in the root dir
+// - If sw.l is provided without an sw.nl, it will be written to the standard
+//   lock file name in the root dir, but vendor will NOT be written
 // - If sw.l and sw.nl are both provided and are equivalent, then neither lock
 //   nor vendor will be written
 // - If sw.l and sw.nl are both provided and are not equivalent,
@@ -55,6 +55,7 @@ type safeWriter struct {
 func (sw safeWriter) writeAllSafe(forceVendor bool) error {
 	// Decide which writes we need to do
 	var writeM, writeL, writeV bool
+	writeV = forceVendor
 
 	if sw.m != nil {
 		writeM = true
@@ -83,22 +84,22 @@ func (sw safeWriter) writeAllSafe(forceVendor bool) error {
 		return fmt.Errorf("root path %q does not exist", sw.root)
 	}
 
-	mpath := filepath.Join(sw.root, manifestName)
-	lpath := filepath.Join(sw.root, lockName)
-	vpath := filepath.Join(sw.root, "vendor")
-
 	if !writeM && !writeL && !writeV {
 		// nothing to do
 		return nil
 	}
 
-	if (writeL || writeV) && vpath == "" {
-		return errors.New("must provide a vendor dir if writing out a lock or vendor dir.")
+	if writeV && sw.l == nil && sw.nl == nil {
+		return errors.New("must provide a lock in order to write out vendor")
 	}
 
 	if writeV && sw.sm == nil {
 		return errors.New("must provide a SourceManager if writing out a vendor dir.")
 	}
+
+	mpath := filepath.Join(sw.root, manifestName)
+	lpath := filepath.Join(sw.root, lockName)
+	vpath := filepath.Join(sw.root, "vendor")
 
 	td, err := ioutil.TempDir(os.TempDir(), "dep")
 	if err != nil {
@@ -136,12 +137,12 @@ func (sw safeWriter) writeAllSafe(forceVendor bool) error {
 
 	// Move the existing files and dirs to the temp dir while we put the new
 	// ones in, to provide insurance against errors for as long as possible
-	var fail bool
-	var failerr error
 	type pathpair struct {
 		from, to string
 	}
 	var restore []pathpair
+	var failerr error
+	var vendorbak string
 
 	if writeM {
 		if _, err := os.Stat(mpath); err == nil {
@@ -149,84 +150,78 @@ func (sw safeWriter) writeAllSafe(forceVendor bool) error {
 			tmploc := filepath.Join(td, manifestName+".orig")
 			failerr = renameElseCopy(mpath, tmploc)
 			if failerr != nil {
-				fail = true
-			} else {
-				restore = append(restore, pathpair{from: tmploc, to: mpath})
+				goto fail
 			}
+			restore = append(restore, pathpair{from: tmploc, to: mpath})
 		}
 
 		// move in the new one
 		failerr = renameElseCopy(filepath.Join(td, manifestName), mpath)
 		if failerr != nil {
-			fail = true
+			goto fail
 		}
 	}
 
-	if !fail && writeL {
+	if writeL {
 		if _, err := os.Stat(lpath); err == nil {
 			// move out the old one
 			tmploc := filepath.Join(td, lockName+".orig")
 
 			failerr = renameElseCopy(lpath, tmploc)
 			if failerr != nil {
-				fail = true
-			} else {
-				restore = append(restore, pathpair{from: tmploc, to: lpath})
+				goto fail
 			}
+			restore = append(restore, pathpair{from: tmploc, to: lpath})
 		}
 
 		// move in the new one
 		failerr = renameElseCopy(filepath.Join(td, lockName), lpath)
 		if failerr != nil {
-			fail = true
+			goto fail
 		}
 	}
 
-	// have to declare out here so it's present later
-	var vendorbak string
-	if !fail && writeV {
+	if writeV {
 		if _, err := os.Stat(vpath); err == nil {
 			// move out the old vendor dir. just do it into an adjacent dir, to
 			// try to mitigate the possibility of a pointless cross-filesystem
 			// move with a temp dir
 			vendorbak = vpath + ".orig"
 			if _, err := os.Stat(vendorbak); err == nil {
-				// If that does already exist bite the bullet and use a proper
-				// tempdir
+				// If the adjacent dir already exists, bite the bullet and move
+				// to a proper tempdir
 				vendorbak = filepath.Join(td, "vendor.orig")
 			}
 
 			failerr = renameElseCopy(vpath, vendorbak)
 			if failerr != nil {
-				fail = true
-			} else {
-				restore = append(restore, pathpair{from: vendorbak, to: vpath})
+				goto fail
 			}
+			restore = append(restore, pathpair{from: vendorbak, to: vpath})
 		}
 
 		// move in the new one
 		failerr = renameElseCopy(filepath.Join(td, "vendor"), vpath)
 		if failerr != nil {
-			fail = true
+			goto fail
 		}
-	}
-
-	// If we failed at any point, move all the things back into place, then bail
-	if fail {
-		for _, pair := range restore {
-			// Nothing we can do on err here, we're already in recovery mode
-			renameElseCopy(pair.from, pair.to)
-		}
-		return failerr
 	}
 
 	// Renames all went smoothly. The deferred os.RemoveAll will get the temp
 	// dir, but if we wrote vendor, we have to clean that up directly
 
 	if writeV {
-		// Again, kinda nothing we can do about an error at this point
+		// Nothing we can really do about an error at this point, so ignore it
 		os.RemoveAll(vendorbak)
 	}
 
 	return nil
+
+fail:
+	// If we failed at any point, move all the things back into place, then bail
+	for _, pair := range restore {
+		// Nothing we can do on err here, as we're already in recovery mode
+		renameElseCopy(pair.from, pair.to)
+	}
+	return failerr
 }
