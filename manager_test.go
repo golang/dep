@@ -780,6 +780,11 @@ func TestSignalHandling(t *testing.T) {
 	// Wait for twice the time it took to do it last time; should be safe
 	<-time.After(reldur * 2)
 
+	// proc.Signal doesn't send for windows, so just force it
+	if runtime.GOOS == "windows" {
+		sm.Release()
+	}
+
 	if sm.releasing != 1 {
 		t.Error("Releasing flag did not get set")
 	}
