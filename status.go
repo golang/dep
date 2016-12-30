@@ -16,53 +16,47 @@ import (
 )
 
 var statusCmd = &command{
-	fn:   runStatus,
-	name: "status",
-	short: `[flags] [packages]
-	Report the status of the current project's dependencies.
-	`,
-	long: `
-	If no packages are specified, for each dependency:
-	- root import path
-	- (if present in lock) the currently selected version
-	- (else) that it's missing from the lock
-	- whether it's present in the vendor directory (or if it's in
-	  workspace, if that's a thing?)
-	- the current aggregate constraints on that project (as specified by
-	  the Manifest)
-	- if -u is specified, whether there are newer versions of this
-	  dependency
+	fn:    runStatus,
+	name:  "status",
+	short: `Report the status of the current project's dependencies`,
+	long: `If no packages are specified, for each dependency:
+  - root import path
+  - (if present in lock) the currently selected version
+  - (else) that it's missing from the lock
+  - whether it's present in the vendor directory (or if it's in
+    workspace, if that's a thing?)
+  - the current aggregate constraints on that project (as specified by
+    the Manifest)
+  - if -u is specified, whether there are newer versions of this
+    dependency
 
-	If packages are specified, or if -a is specified,
-	for each of those dependencies:
-	- (if present in lock) the currently selected version
-	- (else) that it's missing from the lock
-	- whether it's present in the vendor directory
-	- The set of possible versions for that project
-	- The upstream source URL(s) from which the project may be retrieved
-	- The type of upstream source (git, hg, bzr, svn, registry)
-	- Other versions that might work, given the current constraints
-	- The list of all projects that import the project within the current
-	  depgraph
-	- The current constraint. If more than one project constrains it, both
-	  the aggregate and the individual components (and which project provides
-	  that constraint) are printed
-	- License information
-	- Package source location, if fetched from an alternate location
+  If packages are specified, or if -a is specified,
+  for each of those dependencies:
+  - (if present in lock) the currently selected version
+  - (else) that it's missing from the lock
+  - whether it's present in the vendor directory
+  - The set of possible versions for that project
+  - The upstream source URL(s) from which the project may be retrieved
+  - The type of upstream source (git, hg, bzr, svn, registry)
+  - Other versions that might work, given the current constraints
+  - The list of all projects that import the project within the current
+    depgraph
+  - The current constraint. If more than one project constrains it, both
+    the aggregate and the individual components (and which project provides
+    that constraint) are printed
+  - License information
+  - Package source location, if fetched from an alternate location
 
-	Flags:
-	-json		Output in json format
-	-f [template]	Output in text/template format
+  Flags:
+  -json          Output in JSON format
+  -f [template]  Output in text/template format
+  -old           Only show out of date packages and the current version
+  -missing       Only show missing packages
+  -unused        Only show unused packages
+  -modified      Only show modified packages
+  -dot           Export dependency graph in GraphViz format
 
-	-old		Only show out of date packages and the current version
-	-missing	Only show missing packages.
-	-unused		Only show unused packages.
-	-modified	Only show modified packages.
-
-	-dot		Export dependency graph in GraphViz format
-
-	The exit code of status is zero if all repositories are in a "good state".
-	`,
+  The exit code of status is zero if all repositories are in a "good state".`,
 }
 
 // BasicStatus contains all the information reported about a single dependency
