@@ -21,69 +21,83 @@ import (
 // It is not impervious to errors (writing to disk is hard), but it should
 // guard against non-arcane failure conditions.
 type safeWriter struct {
-	root          string
-	nm            *manifest // the new manifest to write
-	lock          *lock     // the old lock, if any
-	nl            gps.Lock  // the new lock to write, if desired
-	sm            gps.SourceManager
-	mpath, vendor string
+	root string    // absolute path of root dir in which to write
+	m    *manifest // the manifest to write, if any
+	l    *lock     // the old lock, if any
+	nl   gps.Lock  // the new lock, if any
+	sm   gps.SourceManager
 }
 
 // writeAllSafe writes out some combination of config yaml, lock, and a vendor
 // tree, to a temp dir, then moves them into place if and only if all the write
 // operations succeeded. It also does its best to roll back if any moves fail.
 //
-// This mostly guarantees that dep cannot terminate with a partial write,
-// resulting in an undefined disk state.
+// This mostly guarantees that dep cannot exit with a partial write that would
+// leave an undefined state on disk.
 //
-// - If a gw.conf is provided, it will be written to the standard manifest file
-// name beneath gw.pr
-// - If gw.lock is provided without a gw.nl, it will be written to
-//   `glide.lock` in the parent dir of gw.vendor
-// - If gw.lock and gw.nl are both provided and are not equivalent,
+// - If a sw.m is provided, it will be written to the standard manifest file
+//   name beneath sw.root
+// - If sw.l is provided without an sw.nl, it will be unconditionally written
+//   to the standard lock file name in the root dir
+// - If sw.l and sw.nl are both provided and are equivalent, then neither lock
+//   nor vendor will be written
+// - If sw.l and sw.nl are both provided and are not equivalent,
 //   the nl will be written to the same location as above, and a vendor
-//   tree will be written to gw.vendor
-// - If gw.nl is provided and gw.lock is not, it will write both a lock
+//   tree will be written to sw.root/vendor
+// - If sw.nl is provided and sw.lock is not, it will write both a lock
 //   and vendor dir in the same way
+// - If the forceVendor param is true, then vendor will be unconditionally
+//   written out based on sw.nl if present, else sw.l, else error.
 //
-// Any of the conf, lock, or result can be omitted; the grouped write operation
-// will continue for whichever inputs are present.
-func (gw safeWriter) writeAllSafe() error {
+// Any of m, l, or nl can be omitted; the grouped write operation will continue
+// for whichever inputs are present. A SourceManager is only required if vendor
+// is being written.
+func (sw safeWriter) writeAllSafe(forceVendor bool) error {
 	// Decide which writes we need to do
 	var writeM, writeL, writeV bool
 
-	if gw.nm != nil {
+	if sw.m != nil {
 		writeM = true
 	}
 
-	if gw.nl != nil {
-		if gw.lock == nil {
+	if sw.nl != nil {
+		if sw.l == nil {
 			writeL, writeV = true, true
 		} else {
-			rlf := lockFromInterface(gw.nl)
-			if !locksAreEquivalent(rlf, gw.lock) {
+			rlf := lockFromInterface(sw.nl)
+			if !locksAreEquivalent(rlf, sw.l) {
 				writeL, writeV = true, true
 			}
 		}
-	} else if gw.lock != nil {
+	} else if sw.l != nil {
 		writeL = true
 	}
+
+	if sw.root == "" {
+		return errors.New("root path must be non-empty")
+	}
+	if is, err := isDir(sw.root); !is {
+		if err != nil {
+			return err
+		}
+		return fmt.Errorf("root path %q does not exist", sw.root)
+	}
+
+	mpath := filepath.Join(sw.root, manifestName)
+	lpath := filepath.Join(sw.root, lockName)
+	vpath := filepath.Join(sw.root, "vendor")
 
 	if !writeM && !writeL && !writeV {
 		// nothing to do
 		return nil
 	}
 
-	if writeM && gw.mpath == "" {
-		return fmt.Errorf("Must provide a path if writing out a config yaml.")
+	if (writeL || writeV) && vpath == "" {
+		return errors.New("must provide a vendor dir if writing out a lock or vendor dir.")
 	}
 
-	if (writeL || writeV) && gw.vendor == "" {
-		return fmt.Errorf("Must provide a vendor dir if writing out a lock or vendor dir.")
-	}
-
-	if writeV && gw.sm == nil {
-		return fmt.Errorf("Must provide a SourceManager if writing out a vendor dir.")
+	if writeV && sw.sm == nil {
+		return errors.New("must provide a SourceManager if writing out a vendor dir.")
 	}
 
 	td, err := ioutil.TempDir(os.TempDir(), "dep")
@@ -93,20 +107,20 @@ func (gw safeWriter) writeAllSafe() error {
 	defer os.RemoveAll(td)
 
 	if writeM {
-		if err := writeFile(filepath.Join(td, manifestName), gw.nm); err != nil {
+		if err := writeFile(filepath.Join(td, manifestName), sw.m); err != nil {
 			return errors.Wrap(err, "failed to write manifest file to temp dir")
 		}
 	}
 
 	if writeL {
-		if gw.nl == nil {
+		if sw.nl == nil {
 			// the new lock is nil but the flag is on, so we must be writing
 			// the other one
-			if err := writeFile(filepath.Join(td, lockName), gw.lock); err != nil {
+			if err := writeFile(filepath.Join(td, lockName), sw.l); err != nil {
 				return errors.Wrap(err, "failed to write lock file to temp dir")
 			}
 		} else {
-			rlf := lockFromInterface(gw.nl)
+			rlf := lockFromInterface(sw.nl)
 			if err := writeFile(filepath.Join(td, lockName), rlf); err != nil {
 				return errors.Wrap(err, "failed to write lock file to temp dir")
 			}
@@ -114,9 +128,9 @@ func (gw safeWriter) writeAllSafe() error {
 	}
 
 	if writeV {
-		err = gps.WriteDepTree(filepath.Join(td, "vendor"), gw.nl, gw.sm, true)
+		err = gps.WriteDepTree(filepath.Join(td, "vendor"), sw.nl, sw.sm, true)
 		if err != nil {
-			return fmt.Errorf("Error while generating vendor tree: %s", err)
+			return errors.Wrap(err, "error while writing out vendor tree")
 		}
 	}
 
@@ -130,40 +144,39 @@ func (gw safeWriter) writeAllSafe() error {
 	var restore []pathpair
 
 	if writeM {
-		if _, err := os.Stat(gw.mpath); err == nil {
+		if _, err := os.Stat(mpath); err == nil {
 			// move out the old one
 			tmploc := filepath.Join(td, manifestName+".orig")
-			failerr = os.Rename(gw.mpath, tmploc)
+			failerr = os.Rename(mpath, tmploc)
 			if failerr != nil {
 				fail = true
 			} else {
-				restore = append(restore, pathpair{from: tmploc, to: gw.mpath})
+				restore = append(restore, pathpair{from: tmploc, to: mpath})
 			}
 		}
 
 		// move in the new one
-		failerr = os.Rename(filepath.Join(td, manifestName), gw.mpath)
+		failerr = os.Rename(filepath.Join(td, manifestName), mpath)
 		if failerr != nil {
 			fail = true
 		}
 	}
 
 	if !fail && writeL {
-		tgt := filepath.Join(filepath.Dir(gw.vendor), lockName)
-		if _, err := os.Stat(tgt); err == nil {
+		if _, err := os.Stat(lpath); err == nil {
 			// move out the old one
 			tmploc := filepath.Join(td, lockName+".orig")
 
-			failerr = os.Rename(tgt, tmploc)
+			failerr = os.Rename(lpath, tmploc)
 			if failerr != nil {
 				fail = true
 			} else {
-				restore = append(restore, pathpair{from: tmploc, to: tgt})
+				restore = append(restore, pathpair{from: tmploc, to: lpath})
 			}
 		}
 
 		// move in the new one
-		failerr = renameElseCopy(filepath.Join(td, lockName), tgt)
+		failerr = renameElseCopy(filepath.Join(td, lockName), lpath)
 		if failerr != nil {
 			fail = true
 		}
@@ -172,27 +185,27 @@ func (gw safeWriter) writeAllSafe() error {
 	// have to declare out here so it's present later
 	var vendorbak string
 	if !fail && writeV {
-		if _, err := os.Stat(gw.vendor); err == nil {
+		if _, err := os.Stat(vpath); err == nil {
 			// move out the old vendor dir. just do it into an adjacent dir, to
 			// try to mitigate the possibility of a pointless cross-filesystem
 			// move with a temp dir
-			vendorbak = gw.vendor + ".orig"
+			vendorbak = vpath + ".orig"
 			if _, err := os.Stat(vendorbak); err == nil {
 				// If that does already exist bite the bullet and use a proper
 				// tempdir
 				vendorbak = filepath.Join(td, "vendor.orig")
 			}
 
-			failerr = renameElseCopy(gw.vendor, vendorbak)
+			failerr = renameElseCopy(vpath, vendorbak)
 			if failerr != nil {
 				fail = true
 			} else {
-				restore = append(restore, pathpair{from: vendorbak, to: gw.vendor})
+				restore = append(restore, pathpair{from: vendorbak, to: vpath})
 			}
 		}
 
 		// move in the new one
-		failerr = renameElseCopy(filepath.Join(td, "vendor"), gw.vendor)
+		failerr = renameElseCopy(filepath.Join(td, "vendor"), vpath)
 		if failerr != nil {
 			fail = true
 		}
