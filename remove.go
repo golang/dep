@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"path/filepath"
 
 	"github.com/pkg/errors"
 	"github.com/sdboyer/gps"
@@ -107,13 +106,16 @@ func (cmd *removeCommand) Run(args []string) error {
 		return err
 	}
 
-	p.l = lockFromInterface(soln)
-
-	if err := writeFile(filepath.Join(p.absroot, manifestName), p.m); err != nil {
-		return errors.Wrap(err, "writeFile for manifest")
+	sw := safeWriter{
+		root: p.absroot,
+		m:    p.m,
+		l:    p.l,
+		nl:   soln,
+		sm:   sm,
 	}
-	if err := writeFile(filepath.Join(p.absroot, lockName), p.l); err != nil {
-		return errors.Wrap(err, "writeFile for lock")
+
+	if err := sw.writeAllSafe(false); err != nil {
+		return errors.Wrap(err, "grouped write of manifest, lock and vendor")
 	}
 	return nil
 }
