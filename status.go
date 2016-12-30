@@ -153,8 +153,8 @@ func runStatusAll(p *project, sm *gps.SourceMgr) error {
 		// complete picture of all deps. That eliminates the need for at least
 		// some checks.
 
-		tw := tabwriter.NewWriter(os.Stdout, 0, 4, 1, ' ', 0)
-		fmt.Fprintf(tw, "Project\tConstraint\tVersion\tRevision\tLatest\tPkgs Used\t\n")
+		tw := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)
+		fmt.Fprintf(tw, "PROJECT\tCONSTRAINT\tVERSION\tREVISION\tLATEST\tPKGS USED\n")
 
 		for _, proj := range slp {
 			bs := BasicStatus{
@@ -246,8 +246,8 @@ func runStatusAll(p *project, sm *gps.SourceMgr) error {
 		//
 		// It's possible for digests to not match, but still have a correct
 		// lock.
-		tw := tabwriter.NewWriter(os.Stdout, 0, 4, 1, ' ', 0)
-		fmt.Fprintf(tw, "Project\tMissing Packages\t\n")
+		tw := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)
+		fmt.Fprintf(tw, "PROJECT\tMISSING PACKAGES\n")
 
 		external := ptree.ExternalReach(true, false, nil).ListExternalImports()
 		roots := make(map[gps.ProjectRoot][]string)
