@@ -147,7 +147,7 @@ func (sw safeWriter) writeAllSafe(forceVendor bool) error {
 		if _, err := os.Stat(mpath); err == nil {
 			// move out the old one
 			tmploc := filepath.Join(td, manifestName+".orig")
-			failerr = os.Rename(mpath, tmploc)
+			failerr = renameElseCopy(mpath, tmploc)
 			if failerr != nil {
 				fail = true
 			} else {
@@ -156,7 +156,7 @@ func (sw safeWriter) writeAllSafe(forceVendor bool) error {
 		}
 
 		// move in the new one
-		failerr = os.Rename(filepath.Join(td, manifestName), mpath)
+		failerr = renameElseCopy(filepath.Join(td, manifestName), mpath)
 		if failerr != nil {
 			fail = true
 		}
@@ -167,7 +167,7 @@ func (sw safeWriter) writeAllSafe(forceVendor bool) error {
 			// move out the old one
 			tmploc := filepath.Join(td, lockName+".orig")
 
-			failerr = os.Rename(lpath, tmploc)
+			failerr = renameElseCopy(lpath, tmploc)
 			if failerr != nil {
 				fail = true
 			} else {
