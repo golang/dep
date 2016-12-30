@@ -1150,7 +1150,7 @@ func (s *solver) selectAtom(a atomWithPackages, pkgonly bool) {
 
 		s.sel.pushDep(dependency{depender: a.a, dep: dep})
 		// Go through all the packages introduced on this dep, selecting only
-		// the ones where the only depper on them is what the previous line just
+		// the ones where the only depper on them is what the preceding line just
 		// pushed in. Then, put those into the unselected queue.
 		rpm := s.sel.getRequiredPackagesIn(dep.Ident)
 		var newp []string

@@ -50,10 +50,14 @@ func (s *solver) HashInputs() []byte {
 			buf.WriteString(perr.P.CommentPath)
 			buf.WriteString(perr.P.ImportPath)
 			for _, imp := range perr.P.Imports {
-				buf.WriteString(imp)
+				if !isStdLib(imp) {
+					buf.WriteString(imp)
+				}
 			}
 			for _, imp := range perr.P.TestImports {
-				buf.WriteString(imp)
+				if !isStdLib(imp) {
+					buf.WriteString(imp)
+				}
 			}
 		}
 	}
