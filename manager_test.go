@@ -767,4 +767,29 @@ func TestSignalHandling(t *testing.T) {
 		t.Error("Expected error on statting what should be an absent lock file")
 	}
 	clean()
+
+	sm, clean = mkNaiveSM(t)
+	SetUpSigHandling(sm)
+	sm.StopSignalHandling()
+	SetUpSigHandling(sm)
+
+	go sm.DeduceProjectRoot("rsc.io/pdf")
+	//runtime.Gosched()
+	// Ensure that it all works after teardown and re-set up
+	proc.Signal(os.Interrupt)
+	// Wait for twice the time it took to do it last time; should be safe
+	<-time.After(reldur * 2)
+
+	if sm.releasing != 1 {
+		t.Error("Releasing flag did not get set")
+	}
+	if sm.released != 1 {
+		t.Error("Released flag did not get set")
+	}
+
+	lpath = filepath.Join(sm.cachedir, "sm.lock")
+	if _, err := os.Stat(lpath); err == nil {
+		t.Fatal("Expected error on statting what should be an absent lock file")
+	}
+	clean()
 }
