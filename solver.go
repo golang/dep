@@ -696,8 +696,8 @@ func (s *solver) createVersionQueue(bmi bimodalIdentifier) (*versionQueue, error
 			return nil, err
 		}
 		if exists {
-			// Project exists only in vendor (and in some manifest somewhere)
-			// TODO(sdboyer) mark this for special handling, somehow?
+			// Project exists only in vendor
+			// FIXME(sdboyer) this just totally doesn't work at all right now
 		} else {
 			return nil, fmt.Errorf("project '%s' could not be located", id)
 		}
