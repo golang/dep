@@ -10,6 +10,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"syscall"
+	"time"
 
 	"github.com/Masterminds/semver"
 )
@@ -166,76 +167,58 @@ func NewSourceManager(an ProjectAnalyzer, cachedir string) (*SourceMgr, error) {
 		dxt:      pathDeducerTrie(),
 		rootxt:   newProjectRootTrie(),
 		qch:      make(chan struct{}),
-		sigch:    make(chan os.Signal, 2), // buf to avoid unnecessary blocking
+		sigch:    make(chan os.Signal),
 	}
 
 	signal.Notify(sm.sigch, syscall.SIGINT, syscall.SIGHUP, syscall.SIGTERM, syscall.SIGQUIT, os.Interrupt)
-
-	sigfunc := func(ch <-chan os.Signal) {
+	sigfunc := func(ch chan os.Signal) {
 		for {
 			select {
 			case <-ch:
-				// First, CAS the signaled marker. This ensures that, even if
-				// two signals are sent in such rapid succession that they
-				// interleave (is this even realistically possible?), one of our
-				// threads follows the nice path, and the other follows the
-				// aggressive path.
-				if atomic.CompareAndSwapInt32(&sm.signaled, 0, 1) {
-					// Nice path - wait to remove the disk lock file until the
-					// global sm lock is clear.
-					if !atomic.CompareAndSwapInt32(&sm.releasing, 0, 1) {
-						// Something's already called Release() on this sm, so we
-						// don't have to do anything, as we'd just be redoing
-						// that work. Instead, just return.
-						return
-					}
+				// Set up a timer to uninstall the signal handler after three
+				// seconds, so that the user can easily force termination with a
+				// second ctrl-c
+				go func(c <-chan time.Time) {
+					<-c
+					signal.Stop(ch)
+				}(time.After(3 * time.Second))
 
-					// Things could interleave poorly here, but it would just
-					// make for confusing output, not incorrect behavior
-					var waited bool
-					if sm.opcount > 0 {
-						waited = true
-						fmt.Printf("Waiting for %v ops to complete...", sm.opcount)
-					}
-
-					// Mutex interaction in a signal handler is, as a general
-					// rule, unsafe. I'm not clear on whether the guarantees Go
-					// provides around signal handling, or having passed this
-					// through a channel in general, obviate those concerns, but
-					// to be safe, we avoid touching the mutex and immediately
-					// initiate disk cleanup.
-					sm.glock.Lock()
-					if waited && sm.released != 1 {
-						fmt.Println("done.\n")
-					}
-					sm.doRelease()
-					sm.glock.Unlock()
-				} else {
-					// As with above, a poor interleaving would only result in
-					// confusing output, not incorrect behavior
-					if sm.opcount > 0 {
-						fmt.Printf("Stopping without waiting for %v ops to complete\n", sm.opcount)
-					}
-
-					// Aggressive path - we don't care about the global lock,
-					// we're shutting down right away. We don't need to CAS
-					// releasing because it wouldn't change the behavior either
-					// way. It should already be set, of course, but just to be
-					// sure, we mark it to ensure that no other reading methods
-					// could possibly begin after this point.
-					atomic.StoreInt32(&sm.releasing, 1)
-					sm.doRelease()
+				if !atomic.CompareAndSwapInt32(&sm.releasing, 0, 1) {
+					// Something's already called Release() on this sm, so we
+					// don't have to do anything, as we'd just be redoing
+					// that work. Instead, just return.
+					return
 				}
 
+				// Keep track of whether we waited for output purposes
+				var waited bool
+				opc := sm.opcount
+				if opc > 0 {
+					waited = true
+					fmt.Printf("Waiting for %v ops to complete...", opc)
+				}
+
+				// Mutex interaction in a signal handler is, as a general rule,
+				// unsafe. I'm not clear on whether the guarantees Go provides
+				// around signal handling, or having passed this through a
+				// channel in general, obviate those concerns, but it's a lot
+				// easier to just hit the mutex right now, so do that until it
+				// proves problematic or someone provides a clear explanation.
+				sm.glock.Lock()
+				if waited && sm.released != 1 {
+					fmt.Print("done.\n")
+				}
+				sm.doRelease()
+				sm.glock.Unlock()
 				return
 			case <-sm.qch:
-				// quit channel triggered - all we have to do is return
+				// quit channel triggered - deregister our sigch and return
+				signal.Stop(ch)
 				return
 			}
 		}
 	}
 
-	go sigfunc(sm.sigch)
 	go sigfunc(sm.sigch)
 	runtime.Gosched()
 
@@ -258,7 +241,6 @@ func (e CouldNotCreateLockError) Error() string {
 // longer safe to call methods against it; all method calls will immediately
 // result in errors.
 func (sm *SourceMgr) Release() {
-	sm.lf.Close()
 	// This ensures a signal handling can't interleave with a Release call -
 	// exit early if we're already marked as having initiated a release process.
 	//
@@ -281,12 +263,12 @@ func (sm *SourceMgr) Release() {
 func (sm *SourceMgr) doRelease() {
 	// One last atomic marker ensures actual disk changes only happen once.
 	if atomic.CompareAndSwapInt32(&sm.released, 0, 1) {
+		// Close the file handle for the lock file
+		sm.lf.Close()
 		// Remove the lock file from disk
 		os.Remove(filepath.Join(sm.cachedir, "sm.lock"))
-		// deregister the signal channel. It's fine for this to happen more than
-		// once.
-		signal.Stop(sm.sigch)
-		// close the qch so the signal handlers run out
+		// Close the qch so the signal handlers run out. This will also
+		// deregister the sig channel, if any has been set up.
 		close(sm.qch)
 	}
 }
