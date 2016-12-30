@@ -17,33 +17,29 @@ import (
 )
 
 var initCmd = &command{
-	fn:   runInit,
-	name: "init",
-	short: `
-	Write Manifest file in the root of the project directory.
-	`,
-	long: `
-	Populates Manifest file with current deps of this project.
-	The specified version of each dependent repository is the version
-	available in the user's workspaces (as specified by GOPATH).
-	If the dependency is not present in any workspaces it is not be
-	included in the Manifest.
-	Writes Lock file(?)
-	Creates vendor/ directory(?)
+	fn:    runInit,
+	name:  "init",
+	short: `Write manifest and lock files for the current project`,
+	long: `Populates Manifest file with current deps of this project.
+  The specified version of each dependent repository is the version
+  available in the user's workspaces (as specified by GOPATH).
+  If the dependency is not present in any workspaces it is not be
+  included in the Manifest.
+  Writes Lock file(?)
+  Creates vendor/ directory(?)
 
-    Notes from DOC:
-    Reads existing dependency information written by other tools.
-    Noting any information that is lost (unsupported features, etc).
-    This functionality will be removed after a transition period (1 year?).
-    Write Manifest file in the root of the project directory.
-    * Populates Manifest file with current deps of this project.
-    The specified version of each dependent repository is the version available in the user's workspaces (including vendor/ directories, if present).
-    If the dependency is not present in any workspaces it will not be included in the Manifest. A warning will be issued for these dependencies.
-    Creates vendor/ directory (if it does not exist)
-    Copies the project’s dependencies from the workspace to the vendor/ directory (if they’re not already there).
-    Writes a Lockfile in the root of the project directory.
-    Invoke “dep status”.
-	`,
+  Notes from DOC:
+  Reads existing dependency information written by other tools.
+  Noting any information that is lost (unsupported features, etc).
+  This functionality will be removed after a transition period (1 year?).
+  Write Manifest file in the root of the project directory.
+  * Populates Manifest file with current deps of this project.
+  The specified version of each dependent repository is the version available in the user's workspaces (including vendor/ directories, if present).
+  If the dependency is not present in any workspaces it will not be included in the Manifest. A warning will be issued for these dependencies.
+  Creates vendor/ directory (if it does not exist)
+  Copies the project’s dependencies from the workspace to the vendor/ directory (if they’re not already there).
+  Writes a Lockfile in the root of the project directory.
+  Invoke “dep status”.`,
 }
 
 func runInit(args []string) error {
