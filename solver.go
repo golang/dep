@@ -537,7 +537,7 @@ func (s *solver) selectRoot() error {
 		// If we have no lock, or if this dep isn't in the lock, then prefetch
 		// it. See longer explanation in selectAtom() for how we benefit from
 		// parallelism here.
-		if _, has := s.rlm[dep.Ident.ProjectRoot]; !has {
+		if s.needVersionsFor(dep.Ident.ProjectRoot) {
 			go s.b.SyncSourceFor(dep.Ident)
 		}
 
@@ -922,6 +922,29 @@ func (s *solver) getLockVersionIfValid(id ProjectIdentifier) (Version, error) {
 	return v, nil
 }
 
+// needVersionListFor indicates whether we need a version list for a given
+// project root, based solely on general solver inputs (no constraint checking
+// required). This will be true if:
+//
+//  - ChangeAll is on
+//  - The project is not in the lock at all
+//  - The project is in the lock, but is also in the list of projects to change
+func (s *solver) needVersionsFor(pr ProjectRoot) bool {
+	if s.params.ChangeAll {
+		return true
+	}
+
+	if _, has := s.rlm[pr]; !has {
+		// not in the lock
+		return true
+	} else if _, has := s.chng[pr]; has {
+		// in the lock, but marked for change
+		return true
+	}
+	// in the lock, not marked for change
+	return false
+}
+
 // backtrack works backwards from the current failed solution to find the next
 // solution to try.
 func (s *solver) backtrack() bool {
@@ -1144,7 +1167,7 @@ func (s *solver) selectAtom(a atomWithPackages, pkgonly bool) {
 		// few microseconds before blocking later. Best case, the dep doesn't
 		// come up next, but some other dep comes up that wasn't prefetched, and
 		// both fetches proceed in parallel.
-		if _, has := s.rlm[dep.Ident.ProjectRoot]; !has {
+		if s.needVersionsFor(dep.Ident.ProjectRoot) {
 			go s.b.SyncSourceFor(dep.Ident)
 		}
 
