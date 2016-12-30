@@ -6,6 +6,7 @@ package main
 
 import (
 	"encoding/json"
+	"flag"
 	"fmt"
 	"log"
 	"os"
@@ -16,43 +17,41 @@ import (
 	"github.com/sdboyer/gps"
 )
 
-var initCmd = &command{
-	fn:    runInit,
-	name:  "init",
-	short: `Write manifest and lock files for the current project`,
-	long: `Populates Manifest file with current deps of this project.
-  The specified version of each dependent repository is the version
-  available in the user's workspaces (as specified by GOPATH).
-  If the dependency is not present in any workspaces it is not be
-  included in the Manifest.
-  Writes Lock file(?)
-  Creates vendor/ directory(?)
+const initShortHelp = `Write manifest and lock files for the project`
+const initLongHelp = `
+Initialize the project at filepath root by parsing its dependencies and writing
+manifest and lock files. If root isn't specified, use the current directory.
 
-  Notes from DOC:
-  Reads existing dependency information written by other tools.
-  Noting any information that is lost (unsupported features, etc).
-  This functionality will be removed after a transition period (1 year?).
-  Write Manifest file in the root of the project directory.
-  * Populates Manifest file with current deps of this project.
-  The specified version of each dependent repository is the version available in the user's workspaces (including vendor/ directories, if present).
-  If the dependency is not present in any workspaces it will not be included in the Manifest. A warning will be issued for these dependencies.
-  Creates vendor/ directory (if it does not exist)
-  Copies the project’s dependencies from the workspace to the vendor/ directory (if they’re not already there).
-  Writes a Lockfile in the root of the project directory.
-  Invoke “dep status”.`,
-}
+The version of each dependency will reflect the current state of the GOPATH. If
+a dependency doesn't exist in the GOPATH, it won't be written to the manifest,
+but it will be solved-for, and will appear in the lock.
 
-func runInit(args []string) error {
+Note: init may use the network to solve the dependency graph.
+
+Note: init does NOT vendor dependencies. See dep ensure.
+`
+
+func (cmd *initCommand) Name() string      { return "init" }
+func (cmd *initCommand) Args() string      { return "[root]" }
+func (cmd *initCommand) ShortHelp() string { return initShortHelp }
+func (cmd *initCommand) LongHelp() string  { return initLongHelp }
+
+func (cmd *initCommand) Register(fs *flag.FlagSet) {}
+
+type initCommand struct{}
+
+func (cmd *initCommand) Run(args []string) error {
 	if len(args) > 1 {
-		return fmt.Errorf("Too many args: %d", len(args))
+		return errors.Errorf("too many args (%d)", len(args))
 	}
+
 	var root string
-	var err error
-	if len(args) == 0 {
-		root, err = os.Getwd()
+	if len(args) <= 0 {
+		wd, err := os.Getwd()
 		if err != nil {
-			return errors.Wrap(err, "os.Getwd")
+			return err
 		}
+		root = wd
 	} else {
 		root = args[0]
 	}
@@ -65,7 +64,7 @@ func runInit(args []string) error {
 		return err
 	}
 	if mok {
-		return fmt.Errorf("Manifest file %q already exists", mf)
+		return fmt.Errorf("manifest file %q already exists", mf)
 	}
 	// Manifest file does not exist.
 
