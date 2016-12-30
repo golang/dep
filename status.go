@@ -6,6 +6,7 @@ package main
 
 import (
 	"bytes"
+	"flag"
 	"fmt"
 	"log"
 	"os"
@@ -15,48 +16,69 @@ import (
 	"github.com/sdboyer/gps"
 )
 
-var statusCmd = &command{
-	fn:    runStatus,
-	name:  "status",
-	short: `Report the status of the current project's dependencies`,
-	long: `If no packages are specified, for each dependency:
-  - root import path
-  - (if present in lock) the currently selected version
-  - (else) that it's missing from the lock
-  - whether it's present in the vendor directory (or if it's in
-    workspace, if that's a thing?)
-  - the current aggregate constraints on that project (as specified by
-    the Manifest)
-  - if -u is specified, whether there are newer versions of this
-    dependency
+const statusShortHelp = `Report the status of the project's dependencies`
+const statusLongHelp = `
+With no arguments, print the status of each dependency of the project.
 
-  If packages are specified, or if -a is specified,
-  for each of those dependencies:
-  - (if present in lock) the currently selected version
-  - (else) that it's missing from the lock
-  - whether it's present in the vendor directory
-  - The set of possible versions for that project
-  - The upstream source URL(s) from which the project may be retrieved
-  - The type of upstream source (git, hg, bzr, svn, registry)
-  - Other versions that might work, given the current constraints
-  - The list of all projects that import the project within the current
-    depgraph
-  - The current constraint. If more than one project constrains it, both
-    the aggregate and the individual components (and which project provides
-    that constraint) are printed
-  - License information
-  - Package source location, if fetched from an alternate location
+  PROJECT     The import path of the dependency
+  CONSTRAINT  The version constraint for the dependency, from the manifest
+  VERSION     The version chosen for the dependency, from the lock
+  REVISION    The VCS revision of the chosen version
+  LATEST      The latest VCS revision available for the dependency
+  PKGS USED   The number of packages (dependencies) used by this package
 
-  Flags:
-  -json          Output in JSON format
-  -f [template]  Output in text/template format
-  -old           Only show out of date packages and the current version
-  -missing       Only show missing packages
-  -unused        Only show unused packages
-  -modified      Only show modified packages
-  -dot           Export dependency graph in GraphViz format
+With one or more explicitly specified packages, or with the -detailed flag,
+print an extended status output for each dependency of the project.
 
-  The exit code of status is zero if all repositories are in a "good state".`,
+  TODO    Another column description.
+  FOOBAR  Another column description.
+
+Status returns exit code zero if all dependencies are in a "good state".
+`
+
+func (cmd *statusCommand) Name() string      { return "status" }
+func (cmd *statusCommand) Args() string      { return "[package...]" }
+func (cmd *statusCommand) ShortHelp() string { return statusShortHelp }
+func (cmd *statusCommand) LongHelp() string  { return statusLongHelp }
+
+func (cmd *statusCommand) Register(fs *flag.FlagSet) {
+	fs.BoolVar(&cmd.detailed, "detailed", false, "report more detailed status")
+	fs.BoolVar(&cmd.json, "json", false, "output in JSON format")
+	fs.StringVar(&cmd.template, "f", "", "output in text/template format")
+	fs.BoolVar(&cmd.dot, "dot", false, "output the dependency graph in GraphViz format")
+	fs.BoolVar(&cmd.old, "old", false, "only show out-of-date dependencies")
+	fs.BoolVar(&cmd.missing, "missing", false, "only show missing dependencies")
+	fs.BoolVar(&cmd.unused, "unused", false, "only show unused dependencies")
+	fs.BoolVar(&cmd.modified, "modified", false, "only show modified dependencies")
+}
+
+type statusCommand struct {
+	detailed bool
+	json     bool
+	template string
+	dot      bool
+	old      bool
+	missing  bool
+	unused   bool
+	modified bool
+}
+
+func (cmd *statusCommand) Run(args []string) error {
+	p, err := depContext.loadProject("")
+	if err != nil {
+		return err
+	}
+
+	sm, err := depContext.sourceManager()
+	if err != nil {
+		return err
+	}
+	defer sm.Release()
+
+	if cmd.detailed {
+		return runStatusDetailed(p, sm, args)
+	}
+	return runStatusAll(p, sm)
 }
 
 // BasicStatus contains all the information reported about a single dependency
@@ -73,24 +95,6 @@ type BasicStatus struct {
 type MissingStatus struct {
 	ProjectRoot     string
 	MissingPackages string
-}
-
-func runStatus(args []string) error {
-	p, err := depContext.loadProject("")
-	if err != nil {
-		return err
-	}
-
-	sm, err := depContext.sourceManager()
-	if err != nil {
-		return err
-	}
-	defer sm.Release()
-
-	if len(args) == 0 {
-		return runStatusAll(p, sm)
-	}
-	return runStatusDetailed(p, sm, args)
 }
 
 func runStatusAll(p *project, sm *gps.SourceMgr) error {
