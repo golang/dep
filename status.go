@@ -20,18 +20,18 @@ const statusShortHelp = `Report the status of the project's dependencies`
 const statusLongHelp = `
 With no arguments, print the status of each dependency of the project.
 
-  PROJECT     The import path of the dependency
-  CONSTRAINT  The version constraint for the dependency, from the manifest
-  VERSION     The version chosen for the dependency, from the lock
-  REVISION    The VCS revision of the chosen version
-  LATEST      The latest VCS revision available for the dependency
-  PKGS USED   The number of packages (dependencies) used by this package
+  PROJECT     Import path
+  CONSTRAINT  Version constraint, from the manifest
+  VERSION     Version chosen, from the lock
+  REVISION    VCS revision of the chosen version
+  LATEST      Latest VCS revision available
+  PKGS USED   Number of packages from this project that are actually used
 
 With one or more explicitly specified packages, or with the -detailed flag,
 print an extended status output for each dependency of the project.
 
-  TODO    Another column description.
-  FOOBAR  Another column description.
+  TODO    Another column description
+  FOOBAR  Another column description
 
 Status returns exit code zero if all dependencies are in a "good state".
 `
