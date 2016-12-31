@@ -36,7 +36,7 @@ func newContext() (*ctx, error) {
 }
 
 func (c *ctx) sourceManager() (*gps.SourceMgr, error) {
-	return gps.NewSourceManager(analyzer{}, filepath.Join(c.GOPATH, "depcache"))
+	return gps.NewSourceManager(analyzer{}, filepath.Join(c.GOPATH, "pkg", "depcache"))
 }
 
 // loadProject searches for a project root from the provided path, then loads
