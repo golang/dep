@@ -336,9 +336,10 @@ func deduceConstraint(s string) gps.Constraint {
 	return gps.NewVersion(s)
 }
 
-// renameElseCopy attempts to rename a file or directory, but falls back to
-// copying in the event of a cross-link device error.
-func renameElseCopy(src, dest string) error {
+// renameWithFallback attempts to rename a file or directory, but falls back to
+// copying in the event of a cross-link device error. If the fallback copy
+// succeeds, src is still removed, emulating normal rename behavior.
+func renameWithFallback(src, dest string) error {
 	fi, err := os.Lstat(src)
 	if err != nil {
 		return err
@@ -358,12 +359,13 @@ func renameElseCopy(src, dest string) error {
 	// copy if we detect that case. syscall.EXDEV is the common name for the
 	// cross device link error which has varying output text across different
 	// operating systems.
+	var cerr error
 	if terr.Err == syscall.EXDEV {
 		vlogf("Cross link err (is temp dir on same partition as project?); falling back to manual copy: %s", terr)
 		if fi.IsDir() {
-			return copyFolder(src, dest)
+			cerr = copyFolder(src, dest)
 		} else {
-			return copyFile(src, dest)
+			cerr = copyFile(src, dest)
 		}
 	} else if runtime.GOOS == "windows" {
 		// In windows it can drop down to an operating system call that
@@ -375,14 +377,20 @@ func renameElseCopy(src, dest string) error {
 		if ok && noerr == 0x11 {
 			vlogf("Cross link err (is temp dir on same partition as project?); falling back to manual copy: %s", terr)
 			if fi.IsDir() {
-				return copyFolder(src, dest)
+				cerr = copyFolder(src, dest)
 			} else {
-				return copyFile(src, dest)
+				cerr = copyFile(src, dest)
 			}
 		}
+	} else {
+		return terr
 	}
 
-	return terr
+	if cerr != nil {
+		return cerr
+	}
+
+	return os.RemoveAll(src)
 }
 
 // copyFolder takes in a directory and copies its contents to the destination.
