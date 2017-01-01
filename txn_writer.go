@@ -154,7 +154,7 @@ func (sw safeWriter) writeAllSafe(forceVendor bool) error {
 		if _, err := os.Stat(mpath); err == nil {
 			// move out the old one
 			tmploc := filepath.Join(td, manifestName+".orig")
-			failerr = renameElseCopy(mpath, tmploc)
+			failerr = renameWithFallback(mpath, tmploc)
 			if failerr != nil {
 				goto fail
 			}
@@ -162,7 +162,7 @@ func (sw safeWriter) writeAllSafe(forceVendor bool) error {
 		}
 
 		// move in the new one
-		failerr = renameElseCopy(filepath.Join(td, manifestName), mpath)
+		failerr = renameWithFallback(filepath.Join(td, manifestName), mpath)
 		if failerr != nil {
 			goto fail
 		}
@@ -173,7 +173,7 @@ func (sw safeWriter) writeAllSafe(forceVendor bool) error {
 			// move out the old one
 			tmploc := filepath.Join(td, lockName+".orig")
 
-			failerr = renameElseCopy(lpath, tmploc)
+			failerr = renameWithFallback(lpath, tmploc)
 			if failerr != nil {
 				goto fail
 			}
@@ -181,7 +181,7 @@ func (sw safeWriter) writeAllSafe(forceVendor bool) error {
 		}
 
 		// move in the new one
-		failerr = renameElseCopy(filepath.Join(td, lockName), lpath)
+		failerr = renameWithFallback(filepath.Join(td, lockName), lpath)
 		if failerr != nil {
 			goto fail
 		}
@@ -199,7 +199,7 @@ func (sw safeWriter) writeAllSafe(forceVendor bool) error {
 				vendorbak = filepath.Join(td, "vendor.orig")
 			}
 
-			failerr = renameElseCopy(vpath, vendorbak)
+			failerr = renameWithFallback(vpath, vendorbak)
 			if failerr != nil {
 				goto fail
 			}
@@ -207,7 +207,7 @@ func (sw safeWriter) writeAllSafe(forceVendor bool) error {
 		}
 
 		// move in the new one
-		failerr = renameElseCopy(filepath.Join(td, "vendor"), vpath)
+		failerr = renameWithFallback(filepath.Join(td, "vendor"), vpath)
 		if failerr != nil {
 			goto fail
 		}
@@ -227,7 +227,7 @@ fail:
 	// If we failed at any point, move all the things back into place, then bail
 	for _, pair := range restore {
 		// Nothing we can do on err here, as we're already in recovery mode
-		renameElseCopy(pair.from, pair.to)
+		renameWithFallback(pair.from, pair.to)
 	}
 	return failerr
 }
