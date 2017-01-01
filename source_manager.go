@@ -9,7 +9,6 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
-	"syscall"
 	"time"
 
 	"github.com/Masterminds/semver"
@@ -172,18 +171,12 @@ func NewSourceManager(an ProjectAnalyzer, cachedir string) (*SourceMgr, error) {
 	return sm, nil
 }
 
-// SetUpSigHandling sets up typical signal handling for a SourceMgr. It will
-// register a signal handler to be notified on:
-//
-//  - syscall.SIGINT
-//  - syscall.SIGHUP
-//  - syscall.SIGTERM
-//  - syscall.SIGQUIT
-//  - os.Interrupt
+// SetUpSigHandling sets up typical os.Interrupt signal handling for a
+// SourceMgr.
 func SetUpSigHandling(sm *SourceMgr) {
-	sigch := make(chan os.Signal)
+	sigch := make(chan os.Signal, 1)
+	signal.Notify(sigch, os.Interrupt)
 	sm.HandleSignals(sigch)
-	signal.Notify(sigch, syscall.SIGINT, syscall.SIGHUP, syscall.SIGTERM, syscall.SIGQUIT, os.Interrupt)
 }
 
 // HandleSignals sets up logic to handle incoming signals with the goal of
