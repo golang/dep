@@ -24,3 +24,46 @@ func TestLockedProjectSorting(t *testing.T) {
 		t.Errorf("SortLockedProject did not sort as expected:\n\t(GOT) %s\n\t(WNT) %s", lps2, lps)
 	}
 }
+
+func TestLockedProjectsEq(t *testing.T) {
+	lps := []LockedProject{
+		NewLockedProject(mkPI("github.com/sdboyer/gps"), NewVersion("v0.10.0"), []string{"gps"}),
+		NewLockedProject(mkPI("github.com/sdboyer/gps"), NewVersion("v0.10.0"), nil),
+		NewLockedProject(mkPI("github.com/sdboyer/gps"), NewVersion("v0.10.0"), []string{"gps", "flugle"}),
+		NewLockedProject(mkPI("foo"), NewVersion("nada"), []string{"foo"}),
+		NewLockedProject(mkPI("github.com/sdboyer/gps"), NewVersion("v0.10.0"), []string{"flugle", "gps"}),
+	}
+
+	if !lps[0].Eq(lps[0]) {
+		t.Error("lp does not eq self")
+	}
+
+	if lps[0].Eq(lps[1]) {
+		t.Error("lp should not eq when other pkg list is empty")
+	}
+	if lps[1].Eq(lps[0]) {
+		t.Fail()
+	}
+
+	if lps[0].Eq(lps[2]) {
+		t.Error("lp should not eq when other pkg list is longer")
+	}
+	if lps[2].Eq(lps[0]) {
+		t.Fail()
+	}
+
+	if lps[1].Eq(lps[2]) {
+		t.Fail()
+	}
+	if lps[2].Eq(lps[1]) {
+		t.Fail()
+	}
+
+	if lps[2].Eq(lps[4]) {
+		t.Error("should not eq if pkgs are out of order")
+	}
+
+	if lps[0].Eq(lps[3]) {
+		t.Error("lp should not eq totally different lp")
+	}
+}

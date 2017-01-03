@@ -107,6 +107,33 @@ func (lp LockedProject) Version() Version {
 	return lp.v.Is(lp.r)
 }
 
+// Eq checks if two LockedProject instances are equal.
+func (lp LockedProject) Eq(lp2 LockedProject) bool {
+	if lp.pi != lp2.pi {
+		return false
+	}
+
+	if lp.r != lp2.r {
+		return false
+	}
+
+	if len(lp.pkgs) != len(lp2.pkgs) {
+		return false
+	}
+
+	for k, v := range lp.pkgs {
+		if lp2.pkgs[k] != v {
+			return false
+		}
+	}
+
+	if !lp.v.Matches(lp2.v) {
+		return false
+	}
+
+	return true
+}
+
 // Packages returns the list of packages from within the LockedProject that are
 // actually used in the import graph. Some caveats:
 //
