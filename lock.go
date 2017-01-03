@@ -1,6 +1,9 @@
 package gps
 
-import "sort"
+import (
+	"bytes"
+	"sort"
+)
 
 // Lock represents data from a lock file (or however the implementing tool
 // chooses to store it) at a particular version that is relevant to the
@@ -18,6 +21,43 @@ type Lock interface {
 
 	// Projects returns the list of LockedProjects contained in the lock data.
 	Projects() []LockedProject
+}
+
+// LocksAreEq checks if two locks are equivalent. This checks that
+// all contained LockedProjects are equal, and optionally (if the third
+// parameter is true) whether the locks' input hashes are equal.
+func LocksAreEq(l1, l2 Lock, checkHash bool) bool {
+	// Cheapest ops first
+	if checkHash && !bytes.Equal(l1.InputHash(), l2.InputHash()) {
+		return false
+	}
+
+	p1, p2 := l1.Projects(), l2.Projects()
+	if len(p1) != len(p2) {
+		return false
+	}
+
+	// Check if the slices are sorted already. If they are, we can compare
+	// without copying. Otherwise, we have to copy to avoid altering the
+	// original input.
+	sp1, sp2 := lpsorter(p1), lpsorter(p2)
+	if len(p1) > 1 && !sort.IsSorted(sp1) {
+		p1 = make([]LockedProject, len(p1))
+		copy(p1, l1.Projects())
+		sort.Sort(lpsorter(p1))
+	}
+	if len(p2) > 1 && !sort.IsSorted(sp2) {
+		p2 = make([]LockedProject, len(p2))
+		copy(p2, l2.Projects())
+		sort.Sort(lpsorter(p2))
+	}
+
+	for k, lp := range p1 {
+		if !lp.Eq(p2[k]) {
+			return false
+		}
+	}
+	return true
 }
 
 // LockedProject is a single project entry from a lock file. It expresses the
@@ -105,6 +145,33 @@ func (lp LockedProject) Version() Version {
 	}
 
 	return lp.v.Is(lp.r)
+}
+
+// Eq checks if two LockedProject instances are equal.
+func (lp LockedProject) Eq(lp2 LockedProject) bool {
+	if lp.pi != lp2.pi {
+		return false
+	}
+
+	if lp.r != lp2.r {
+		return false
+	}
+
+	if len(lp.pkgs) != len(lp2.pkgs) {
+		return false
+	}
+
+	for k, v := range lp.pkgs {
+		if lp2.pkgs[k] != v {
+			return false
+		}
+	}
+
+	if !lp.v.Matches(lp2.v) {
+		return false
+	}
+
+	return true
 }
 
 // Packages returns the list of packages from within the LockedProject that are
