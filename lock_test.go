@@ -33,6 +33,7 @@ func TestLockedProjectsEq(t *testing.T) {
 		NewLockedProject(mkPI("foo"), NewVersion("nada"), []string{"foo"}),
 		NewLockedProject(mkPI("github.com/sdboyer/gps"), NewVersion("v0.10.0"), []string{"flugle", "gps"}),
 		NewLockedProject(mkPI("github.com/sdboyer/gps"), NewVersion("v0.10.0").Is("278a227dfc3d595a33a77ff3f841fd8ca1bc8cd0"), []string{"gps"}),
+		NewLockedProject(mkPI("github.com/sdboyer/gps"), NewVersion("v0.11.0"), []string{"gps"}),
 	}
 
 	fix := []struct {
@@ -42,10 +43,11 @@ func TestLockedProjectsEq(t *testing.T) {
 	}{
 		{0, 0, true, "lp does not eq self"},
 		{0, 5, false, "should not eq with different rev"},
+		{0, 6, false, "should not eq with different version"},
 		{5, 5, true, "should eq with same rev"},
 		{0, 1, false, "should not eq when other pkg list is empty"},
 		{0, 2, false, "should not eq when other pkg list is longer"},
-		{0, 4, false, "should not eq when pkg lists are out of order"},
+		{2, 4, false, "should not eq when pkg lists are out of order"},
 		{0, 3, false, "should not eq totally different lp"},
 	}
 
@@ -110,5 +112,10 @@ func TestLocksAreEq(t *testing.T) {
 	}
 	if !l2.p[0].Eq(svpl) {
 		t.Error("checking equality resorted l2")
+	}
+
+	l1.p[0] = NewLockedProject(mkPI("github.com/sdboyer/gps"), NewVersion("v0.11.0"), []string{"gps"})
+	if LocksAreEq(l1, l2, false) {
+		t.Error("should fail when individual lp were not eq")
 	}
 }
