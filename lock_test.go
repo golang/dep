@@ -42,6 +42,7 @@ func TestLockedProjectsEq(t *testing.T) {
 	}{
 		{0, 0, true, "lp does not eq self"},
 		{0, 5, false, "should not eq with different rev"},
+		{5, 5, true, "should eq with same rev"},
 		{0, 1, false, "should not eq when other pkg list is empty"},
 		{0, 2, false, "should not eq when other pkg list is longer"},
 		{0, 4, false, "should not eq when pkg lists are out of order"},
