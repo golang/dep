@@ -32,38 +32,38 @@ func TestLockedProjectsEq(t *testing.T) {
 		NewLockedProject(mkPI("github.com/sdboyer/gps"), NewVersion("v0.10.0"), []string{"gps", "flugle"}),
 		NewLockedProject(mkPI("foo"), NewVersion("nada"), []string{"foo"}),
 		NewLockedProject(mkPI("github.com/sdboyer/gps"), NewVersion("v0.10.0"), []string{"flugle", "gps"}),
+		NewLockedProject(mkPI("github.com/sdboyer/gps"), NewVersion("v0.10.0").Is("278a227dfc3d595a33a77ff3f841fd8ca1bc8cd0"), []string{"gps"}),
 	}
 
-	if !lps[0].Eq(lps[0]) {
-		t.Error("lp does not eq self")
+	fix := []struct {
+		l1, l2   int
+		shouldeq bool
+		err      string
+	}{
+		{0, 0, true, "lp does not eq self"},
+		{0, 5, false, "should not eq with different rev"},
+		{0, 1, false, "should not eq when other pkg list is empty"},
+		{0, 2, false, "should not eq when other pkg list is longer"},
+		{0, 4, false, "should not eq when pkg lists are out of order"},
+		{0, 3, false, "should not eq totally different lp"},
 	}
 
-	if lps[0].Eq(lps[1]) {
-		t.Error("lp should not eq when other pkg list is empty")
-	}
-	if lps[1].Eq(lps[0]) {
-		t.Fail()
-	}
+	for _, f := range fix {
+		if f.shouldeq {
+			if !lps[f.l1].Eq(lps[f.l2]) {
+				t.Error(f.err)
+			}
+			if !lps[f.l2].Eq(lps[f.l1]) {
+				t.Error(f.err + (" (reversed)"))
+			}
+		} else {
+			if lps[f.l1].Eq(lps[f.l2]) {
+				t.Error(f.err)
+			}
+			if lps[f.l2].Eq(lps[f.l1]) {
+				t.Error(f.err + (" (reversed)"))
+			}
 
-	if lps[0].Eq(lps[2]) {
-		t.Error("lp should not eq when other pkg list is longer")
-	}
-	if lps[2].Eq(lps[0]) {
-		t.Fail()
-	}
-
-	if lps[1].Eq(lps[2]) {
-		t.Fail()
-	}
-	if lps[2].Eq(lps[1]) {
-		t.Fail()
-	}
-
-	if lps[2].Eq(lps[4]) {
-		t.Error("should not eq if pkgs are out of order")
-	}
-
-	if lps[0].Eq(lps[3]) {
-		t.Error("lp should not eq totally different lp")
+		}
 	}
 }
