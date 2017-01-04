@@ -28,7 +28,7 @@ but it will be solved-for, and will appear in the lock.
 
 Note: init may use the network to solve the dependency graph.
 
-Note: init does NOT vendor dependencies. See dep ensure.
+Note: init does NOT vendor dependencies at the moment. See dep ensure.
 `
 
 func (cmd *initCommand) Name() string      { return "init" }

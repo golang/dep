@@ -21,12 +21,12 @@ import (
 	"github.com/sdboyer/gps"
 )
 
-const ensureShortHelp = `Ensure a dependency is vendored in the project`
+const ensureShortHelp = `Ensure a dependency is safely vendored in the project`
 const ensureLongHelp = `
 Ensure is used to fetch project dependencies into the vendor folder, as well as
 to set version constraints for specific dependencies. It takes user input,
 solves the updated dependency graph of the project, writes any changes to the
-manifest and lock file, and downloads dependencies to the vendor folder.
+manifest and lock file, and places dependencies in the vendor folder.
 
 Package spec:
 
@@ -36,33 +36,16 @@ Examples:
 
   dep ensure                                   Populate vendor from existing manifest and lock
   dep ensure github.com/heroku/rollrus@^0.9.1  Update a specific dependency to a specific version
-  dep ensure -update                           Update all dependencies to latest permitted versions
 
 For more detailed usage examples, see dep ensure -examples.
 `
 const ensureExamples = `
 dep ensure
 
-    Solve the project's dependency graph, and download all dependencies to the
+    Solve the project's dependency graph, and place all dependencies in the
     vendor folder. If a dependency is in the lock file, use the version
     specified there. Otherwise, use the most recent version that can satisfy the
     constraints in the manifest file.
-
-dep ensure -update
-
-    Update all dependencies to the latest version allowed by the manifest, ignoring
-    any versions specified in the lock file. Update the lock file with any
-    changes.
-
-dep ensure github.com/heroku/rollrus
-
-    Update a specific dependency to the latest version allowed by the manifest,
-    including all of its transitive dependencies.
-
-dep ensure github.com/heroku/rollrus@~0.9.0
-
-    Same as above, but choose any release matching 0.9.x, preferring latest. If
-    a constraint was previously set in the manifest, this resets it.
 
 dep ensure github.com/heroku/rollrus@^0.9.1
 
@@ -70,16 +53,14 @@ dep ensure github.com/heroku/rollrus@^0.9.1
     constraint strikes a good balance of safety and flexibility, and should be
     preferred for libraries.
 
+dep ensure github.com/heroku/rollrus@~0.9.0
+
+    Same as above, but choose any release matching 0.9.x, preferring latest. If
+    a constraint was previously set in the manifest, this resets it.
+
 dep ensure github.com/heroku/rollrus:git.internal.com/foo/bar
 
     Fetch the dependency from a different location.
-
-dep ensure github.com/heroku/rollrus==1.2.3  # 1.2.3 exactly
-dep ensure github.com/heroku/rollrus=^1.2.0  # >= 1.2.0, < 2.0.0
-
-    Fetch the dependency at a specific version or range, and update the lock
-    file, but don't update the manifest file. Will fail if the specified version
-    doesn't satisfy the constraint in the manifest file.
 
 dep ensure -override github.com/heroku/rollrus@^0.9.1
 
