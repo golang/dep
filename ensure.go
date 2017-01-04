@@ -65,9 +65,8 @@ dep ensure github.com/pkg/foo:git.internal.com/alt/foo
 dep ensure -override github.com/pkg/foo@^1.0.1
 
     Forcefully and transitively override any constraint for this dependency.
-    Overrides are powerful, but they are harmful over the long term. They should
-    be used as a last resort, especially if your project will be imported by
-    others.
+    Overrides are powerful, but harmful in the long term. They should be used
+    as a last resort, especially if your project may be imported by others.
 `
 
 func (cmd *ensureCommand) Name() string      { return "ensure" }
