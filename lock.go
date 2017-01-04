@@ -69,7 +69,7 @@ func readLock(r io.Reader) (*lock, error) {
 
 		id := gps.ProjectIdentifier{
 			ProjectRoot: gps.ProjectRoot(ld.Name),
-			NetworkName: ld.Repository,
+			Source: ld.Repository,
 		}
 		l.P[i] = gps.NewLockedProject(id, v, ld.Packages)
 	}
@@ -97,7 +97,7 @@ func (l *lock) MarshalJSON() ([]byte, error) {
 		id := lp.Ident()
 		ld := lockedDep{
 			Name:       string(id.ProjectRoot),
-			Repository: id.NetworkName,
+			Repository: id.Source,
 			Packages:   lp.Packages(),
 		}
 
@@ -175,5 +175,5 @@ func (s sortedLockedProjects) Less(i, j int) bool {
 		return false
 	}
 
-	return l.NetworkName < r.NetworkName
+	return l.Source < r.Source
 }

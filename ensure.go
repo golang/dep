@@ -124,7 +124,7 @@ func runEnsure(args []string) error {
 			errs = append(errs, err)
 		}
 
-		if gps.IsAny(pc.Constraint) && pc.Ident.NetworkName == "" {
+		if gps.IsAny(pc.Constraint) && pc.Ident.Source == "" {
 			// If the input specified neither a network name nor a constraint,
 			// then the strict thing to do would be to remove the entry
 			// entirely. But that would probably be quite surprising for users,
@@ -140,7 +140,7 @@ func runEnsure(args []string) error {
 		}
 
 		p.m.Dependencies[pc.Ident.ProjectRoot] = gps.ProjectProperties{
-			NetworkName: pc.Ident.NetworkName,
+			Source: pc.Ident.Source,
 			Constraint:  pc.Constraint,
 		}
 
@@ -163,7 +163,7 @@ func runEnsure(args []string) error {
 		// project. Inadvisable, but meaningful.
 
 		p.m.Ovr[pc.Ident.ProjectRoot] = gps.ProjectProperties{
-			NetworkName: pc.Ident.NetworkName,
+			Source: pc.Ident.Source,
 			Constraint:  pc.Constraint,
 		}
 
@@ -281,7 +281,7 @@ func getProjectConstraint(arg string, sm *gps.SourceMgr) (gps.ProjectConstraint,
 	if colonIndex > 0 {
 		parts := strings.SplitN(arg, ":", 2)
 		arg = parts[0]
-		constraint.Ident.NetworkName = parts[1]
+		constraint.Ident.Source = parts[1]
 	}
 
 	pr, err := sm.DeduceProjectRoot(arg)

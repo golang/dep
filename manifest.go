@@ -31,7 +31,7 @@ type possibleProps struct {
 	Branch      string `json:"branch,omitempty"`
 	Revision    string `json:"revision,omitempty"`
 	Version     string `json:"version,omitempty"`
-	NetworkName string `json:"source,omitempty"`
+	Source string `json:"source,omitempty"`
 }
 
 func newRawManifest() rawManifest {
@@ -103,7 +103,7 @@ func toProps(n string, p possibleProps) (pp gps.ProjectProperties, err error) {
 		pp.Constraint = gps.Any()
 	}
 
-	pp.NetworkName = p.NetworkName
+	pp.Source = p.Source
 	return pp, nil
 }
 
@@ -133,7 +133,7 @@ func (m *manifest) MarshalJSON() ([]byte, error) {
 }
 
 func toPossible(pp gps.ProjectProperties) (p possibleProps) {
-	p.NetworkName = pp.NetworkName
+	p.Source = pp.Source
 
 	if v, ok := pp.Constraint.(gps.Version); ok {
 		switch v.Type() {
