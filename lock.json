@@ -1,5 +1,5 @@
 {
-    "memo": "47c0ec3d677d1d5c01778bc81836801e009c641797708b8fcd773dce954c7714",
+    "memo": "56093ed07896d0d5c47ee3472d6ad16e9a7e6826598364caf01ac30dc9c277c5",
     "projects": [
         {
             "name": "github.com/Masterminds/semver",
@@ -35,16 +35,8 @@
         },
         {
             "name": "github.com/sdboyer/gps",
-            "version": "v0.13.1",
-            "revision": "e4435f58dfa1aee0c5324667f5b6cbad668db8fc",
-            "packages": [
-                "."
-            ]
-        },
-        {
-            "name": "github.com/termie/go-shutil",
             "branch": "master",
-            "revision": "bcacb06fecaeec8dc42af03c87c6949f4a05c74c",
+            "revision": "b27173f3bf78a69a70dba35122ce24eb1679a53a",
             "packages": [
                 "."
             ]

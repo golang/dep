@@ -167,11 +167,11 @@ func solveBimodalAndCheck(fix bimodalFixture, t *testing.T) (res Solution, err e
 
 func fixtureSolveSimpleChecks(fix specfix, soln Solution, err error, t *testing.T) (Solution, error) {
 	ppi := func(id ProjectIdentifier) string {
-		// need this so we can clearly tell if there's a NetworkName or not
-		if id.NetworkName == "" {
+		// need this so we can clearly tell if there's a Source or not
+		if id.Source == "" {
 			return string(id.ProjectRoot)
 		}
-		return fmt.Sprintf("%s (from %s)", id.ProjectRoot, id.NetworkName)
+		return fmt.Sprintf("%s (from %s)", id.ProjectRoot, id.Source)
 	}
 
 	pv := func(v Version) string {

@@ -182,7 +182,7 @@ func TestHashInputsOverrides(t *testing.T) {
 	// First case - override something not in the root, just with network name
 	rm.ovr = map[ProjectRoot]ProjectProperties{
 		"c": ProjectProperties{
-			NetworkName: "car",
+			Source: "car",
 		},
 	}
 	params := SolveParameters{
@@ -259,8 +259,8 @@ func TestHashInputsOverrides(t *testing.T) {
 
 	// Override not in root, both constraint and network name
 	rm.ovr["e"] = ProjectProperties{
-		NetworkName: "groucho",
-		Constraint:  NewBranch("plexiglass"),
+		Source:     "groucho",
+		Constraint: NewBranch("plexiglass"),
 	}
 	dig = s.HashInputs()
 	h = sha256.New()
@@ -334,7 +334,7 @@ func TestHashInputsOverrides(t *testing.T) {
 
 	// Override in root, only network name
 	rm.ovr["a"] = ProjectProperties{
-		NetworkName: "nota",
+		Source: "nota",
 	}
 	dig = s.HashInputs()
 	h = sha256.New()
@@ -373,8 +373,8 @@ func TestHashInputsOverrides(t *testing.T) {
 
 	// Override in root, network name and constraint
 	rm.ovr["a"] = ProjectProperties{
-		NetworkName: "nota",
-		Constraint:  NewVersion("fluglehorn"),
+		Source:     "nota",
+		Constraint: NewVersion("fluglehorn"),
 	}
 	dig = s.HashInputs()
 	h = sha256.New()

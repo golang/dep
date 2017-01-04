@@ -82,10 +82,11 @@ func (m maybeGitSource) try(cachedir string, an ProjectAnalyzer) (source, string
 	}
 
 	src.baseVCSSource.lvfunc = src.listVersions
-
-	_, err = src.listVersions()
-	if err != nil {
-		return nil, "", err
+	if !r.CheckLocal() {
+		_, err = src.listVersions()
+		if err != nil {
+			return nil, "", err
+		}
 	}
 
 	return src, ustr, nil
@@ -129,10 +130,11 @@ func (m maybeGopkginSource) try(cachedir string, an ProjectAnalyzer) (source, st
 	}
 
 	src.baseVCSSource.lvfunc = src.listVersions
-
-	_, err = src.listVersions()
-	if err != nil {
-		return nil, "", err
+	if !r.CheckLocal() {
+		_, err = src.listVersions()
+		if err != nil {
+			return nil, "", err
+		}
 	}
 
 	return src, ustr, nil

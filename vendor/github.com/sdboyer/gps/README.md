@@ -101,8 +101,8 @@ general library could know _a priori_.
 * What dependency version constraints are declared by [all dependencies](https://github.com/sdboyer/gps/wiki/gps-for-Implementors#the-projectanalyzer)
 * Given a [previous solution](https://github.com/sdboyer/gps/wiki/gps-for-Implementors#lock-data), [which versions to let change, and how](https://github.com/sdboyer/gps/wiki/gps-for-Implementors#tochange-changeall-and-downgrade)
   * In the absence of a previous solution, whether or not to use [preferred versions](https://github.com/sdboyer/gps/wiki/gps-for-Implementors#preferred-versions)
-* Allowing, or not, the user to [swap in different network names](https://github.com/sdboyer/gps/wiki/gps-for-Implementors#projectidentifier) for import paths (e.g. forks)
-* Specifying additional input/source packages not reachable from the root import graph ([not complete](https://github.com/sdboyer/gps/issues/42))
+* Allowing, or not, the user to [swap in different source locations](https://github.com/sdboyer/gps/wiki/gps-for-Implementors#projectidentifier) for import paths (e.g. forks)
+* Specifying additional input/source packages not reachable from the root import graph
 
 This list may not be exhaustive - see the
 [implementor's guide](https://github.com/sdboyer/gps/wiki/gps-for-Implementors)

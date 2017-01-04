@@ -361,10 +361,10 @@ func (b *bridge) SyncSourceFor(id ProjectIdentifier) error {
 // operations attempt each member, and will take the most open/optimistic
 // answer.
 //
-// This technically does allow tags to match branches - something we
-// otherwise try hard to avoid - but because the original input constraint never
-// actually changes (and is never written out in the Result), there's no harmful
-// case of a user suddenly riding a branch when they expected a fixed tag.
+// This technically does allow tags to match branches - something we otherwise
+// try hard to avoid - but because the original input constraint never actually
+// changes (and is never written out in the Solution), there's no harmful case
+// of a user suddenly riding a branch when they expected a fixed tag.
 type versionTypeUnion []Version
 
 // This should generally not be called, but is required for the interface. If it
