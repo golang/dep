@@ -34,8 +34,8 @@ Package spec:
 
 Examples:
 
-  dep ensure                                   Populate vendor from existing manifest and lock
-  dep ensure github.com/heroku/rollrus@^0.9.1  Update a specific dependency to a specific version
+  dep ensure                            Populate vendor from existing manifest and lock
+  dep ensure github.com/pkg/foo@^1.0.1  Update a specific dependency to a specific version
 
 For more detailed usage examples, see dep ensure -examples.
 `
@@ -47,22 +47,22 @@ dep ensure
     specified there. Otherwise, use the most recent version that can satisfy the
     constraints in the manifest file.
 
-dep ensure github.com/heroku/rollrus@^0.9.1
+dep ensure github.com/pkg/foo@^1.0.1
 
-    Same as above, but choose any release >= 0.9.1, < 1.0.0. This form of
-    constraint strikes a good balance of safety and flexibility, and should be
-    preferred for libraries.
+    Same as above, but choose any release >= 1.0.1, < 2.0.0. If a constraint was
+    previously set in the manifest, this resets it. This form of constraint
+    strikes a good balance of safety and flexibility, and should be preferred
+    for libraries.
 
-dep ensure github.com/heroku/rollrus@~0.9.0
+dep ensure github.com/pkg/foo@~1.0.1
 
-    Same as above, but choose any release matching 0.9.x, preferring latest. If
-    a constraint was previously set in the manifest, this resets it.
+    Same as above, but choose any release matching 1.0.x, preferring latest.
 
-dep ensure github.com/heroku/rollrus:git.internal.com/foo/bar
+dep ensure github.com/pkg/foo:git.internal.com/alt/foo
 
     Fetch the dependency from a different location.
 
-dep ensure -override github.com/heroku/rollrus@^0.9.1
+dep ensure -override github.com/pkg/foo@^1.0.1
 
     Forcefully and transitively override any constraint for this dependency.
     This can inadvertantly make your dependency graph unsolvable; use sparingly.
