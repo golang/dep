@@ -358,7 +358,7 @@ func TestGetSources(t *testing.T) {
 			}
 
 			// All of them _should_ select https, so this should work
-			lpi.NetworkName = "https://" + lpi.NetworkName
+			lpi.Source = "https://" + lpi.Source
 			src3, err := sm.getSourceFor(lpi)
 			if err != nil {
 				t.Errorf("(src %q) unexpected error getting explicit https source: %s", nn, err)
@@ -367,7 +367,7 @@ func TestGetSources(t *testing.T) {
 			}
 
 			// Now put in http, and they should differ
-			lpi.NetworkName = "http://" + string(lpi.ProjectRoot)
+			lpi.Source = "http://" + string(lpi.ProjectRoot)
 			src4, err := sm.getSourceFor(lpi)
 			if err != nil {
 				t.Errorf("(src %q) unexpected error getting explicit http source: %s", nn, err)
