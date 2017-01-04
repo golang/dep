@@ -171,7 +171,7 @@ func (tg *testgoData) doRun(args []string) error {
 	} else {
 		prog = filepath.Join(tg.wd, "testdep"+exeSuffix)
 	}
-	cmd := exec.Command(prog, append([]string{"-v"}, args...)...)
+	cmd := exec.Command(prog, append(args, "-v")...)
 	tg.stdout.Reset()
 	tg.stderr.Reset()
 	cmd.Stdout = &tg.stdout
