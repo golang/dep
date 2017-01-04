@@ -198,8 +198,8 @@ func pcSliceToMap(l []ProjectConstraint, r ...[]ProjectConstraint) ProjectConstr
 
 	for _, pc := range l {
 		final[pc.Ident.ProjectRoot] = ProjectProperties{
-			NetworkName: pc.Ident.NetworkName,
-			Constraint:  pc.Constraint,
+			Source:     pc.Ident.Source,
+			Constraint: pc.Constraint,
 		}
 	}
 
@@ -213,8 +213,8 @@ func pcSliceToMap(l []ProjectConstraint, r ...[]ProjectConstraint) ProjectConstr
 				final[pc.Ident.ProjectRoot] = pp
 			} else {
 				final[pc.Ident.ProjectRoot] = ProjectProperties{
-					NetworkName: pc.Ident.NetworkName,
-					Constraint:  pc.Constraint,
+					Source:     pc.Ident.Source,
+					Constraint: pc.Constraint,
 				}
 			}
 		}
@@ -231,7 +231,7 @@ func (m ProjectConstraints) asSortedSlice() []ProjectConstraint {
 		pcs[k] = ProjectConstraint{
 			Ident: ProjectIdentifier{
 				ProjectRoot: pr,
-				NetworkName: pp.NetworkName,
+				Source:      pp.Source,
 			},
 			Constraint: pp.Constraint,
 		}
@@ -262,8 +262,8 @@ func (m ProjectConstraints) merge(other ...ProjectConstraints) (out ProjectConst
 		for pr, pp := range pcm {
 			if rpp, exists := out[pr]; exists {
 				pp.Constraint = pp.Constraint.Intersect(rpp.Constraint)
-				if pp.NetworkName == "" {
-					pp.NetworkName = rpp.NetworkName
+				if pp.Source == "" {
+					pp.Source = rpp.Source
 				}
 			}
 			out[pr] = pp
@@ -297,7 +297,7 @@ func (m ProjectConstraints) override(pr ProjectRoot, pp ProjectProperties) worki
 	wc := workingConstraint{
 		Ident: ProjectIdentifier{
 			ProjectRoot: pr,
-			NetworkName: pp.NetworkName,
+			Source:      pp.Source,
 		},
 		Constraint: pp.Constraint,
 	}
@@ -319,8 +319,8 @@ func (m ProjectConstraints) override(pr ProjectRoot, pp ProjectProperties) worki
 		// from. Such disagreement is exactly what overrides preclude, so
 		// there's no need to preserve the meaning of "" here - thus, we can
 		// treat it as a zero value and ignore it, rather than applying it.
-		if opp.NetworkName != "" {
-			wc.Ident.NetworkName = opp.NetworkName
+		if opp.Source != "" {
+			wc.Ident.Source = opp.Source
 			wc.overrNet = true
 		}
 	}

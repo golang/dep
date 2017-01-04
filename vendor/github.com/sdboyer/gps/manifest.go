@@ -158,7 +158,7 @@ func prepManifest(m Manifest) Manifest {
 		// normalize between these two by omitting such instances entirely, as
 		// it negates some possibility for false mismatches in input hashing.
 		if d.Constraint == nil {
-			if d.NetworkName == "" {
+			if d.Source == "" {
 				continue
 			}
 			d.Constraint = anyConstraint{}
@@ -169,7 +169,7 @@ func prepManifest(m Manifest) Manifest {
 
 	for k, d := range ddeps {
 		if d.Constraint == nil {
-			if d.NetworkName == "" {
+			if d.Source == "" {
 				continue
 			}
 			d.Constraint = anyConstraint{}

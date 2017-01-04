@@ -305,7 +305,6 @@ func (sm *SourceMgr) DeduceProjectRoot(ip string) (ProjectRoot, error) {
 }
 
 func (sm *SourceMgr) getSourceFor(id ProjectIdentifier) (source, error) {
-	//pretty.Println(id.ProjectRoot)
 	nn := id.netName()
 
 	sm.srcmut.RLock()

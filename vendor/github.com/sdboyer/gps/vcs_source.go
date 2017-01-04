@@ -11,7 +11,6 @@ import (
 
 	"github.com/Masterminds/semver"
 	"github.com/Masterminds/vcs"
-	"github.com/termie/go-shutil"
 )
 
 // Kept here as a reference in case it does become important to implement a
@@ -47,13 +46,13 @@ func (s *gitSource) exportVersionTo(v Version, to string) error {
 
 		// Back up original index
 		idx, bak := filepath.Join(r.LocalPath(), ".git", "index"), filepath.Join(r.LocalPath(), ".git", "origindex")
-		err := os.Rename(idx, bak)
+		err := renameWithFallback(idx, bak)
 		if err != nil {
 			return err
 		}
 
 		// could have an err here...but it's hard to imagine how?
-		defer os.Rename(bak, idx)
+		defer renameWithFallback(bak, idx)
 
 		vstr := v.String()
 		if rv, ok := v.(PairedVersion); ok {
@@ -635,30 +634,10 @@ func (r *repo) exportVersionTo(v Version, to string) error {
 
 	r.r.UpdateVersion(v.String())
 
-	// TODO(sdboyer) This is a dumb, slow approach, but we're punting on making
-	// these fast for now because git is the OVERWHELMING case (it's handled in
-	// its own method)
-
-	cfg := &shutil.CopyTreeOptions{
-		Symlinks:     true,
-		CopyFunction: shutil.Copy,
-		Ignore: func(src string, contents []os.FileInfo) (ignore []string) {
-			for _, fi := range contents {
-				if !fi.IsDir() {
-					continue
-				}
-				n := fi.Name()
-				switch n {
-				case "vendor", ".bzr", ".svn", ".hg":
-					ignore = append(ignore, n)
-				}
-			}
-
-			return
-		},
-	}
-
-	return shutil.CopyTree(r.rpath, to, cfg)
+	// TODO(sdboyer) this is a simplistic approach and relying on the tools
+	// themselves might make it faster, but git's the overwhelming case (and has
+	// its own method) so fine for now
+	return copyDir(r.rpath, to)
 }
 
 // This func copied from Masterminds/vcs so we can exec our own commands

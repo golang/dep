@@ -195,8 +195,8 @@ func (s *solver) checkDepsDisallowsSelected(a atomWithPackages, cdep completeDep
 }
 
 // checkIdentMatches ensures that the LocalName of a dep introduced by an atom,
-// has the same NetworkName as what's already been selected (assuming anything's
-// been selected).
+// has the same Source as what's already been selected (assuming anything's been
+// selected).
 //
 // In other words, this ensures that the solver never simultaneously selects two
 // identifiers with the same local name, but that disagree about where their
