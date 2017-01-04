@@ -44,10 +44,10 @@ type ProjectRoot string
 // ProjectRoot. In gps' current design, this ProjectRoot almost always
 // corresponds to the root of a repository.
 //
-// Second, ProjectIdentifiers can optionally carry a NetworkName, which
+// Second, ProjectIdentifiers can optionally carry a Source, which
 // identifies where the underlying source code can be located on the network.
 // These can be either a full URL, including protocol, or plain import paths.
-// So, these are all valid data for NetworkName:
+// So, these are all valid data for Source:
 //
 //  github.com/sdboyer/gps
 //  github.com/fork/gps
@@ -61,19 +61,19 @@ type ProjectRoot string
 //
 // Note that gps makes no guarantees about the actual import paths contained in
 // a repository aligning with ImportRoot. If tools, or their users, specify an
-// alternate NetworkName that contains a repository with incompatible internal
+// alternate Source that contains a repository with incompatible internal
 // import paths, gps' solving operations will error. (gps does no import
 // rewriting.)
 //
 // Also note that if different projects' manifests report a different
-// NetworkName for a given ImportRoot, it is a solve failure. Everyone has to
+// Source for a given ImportRoot, it is a solve failure. Everyone has to
 // agree on where a given import path should be sourced from.
 //
-// If NetworkName is not explicitly set, gps will derive the network address from
+// If Source is not explicitly set, gps will derive the network address from
 // the ImportRoot using a similar algorithm to that utilized by `go get`.
 type ProjectIdentifier struct {
 	ProjectRoot ProjectRoot
-	NetworkName string
+	Source      string
 }
 
 func (i ProjectIdentifier) less(j ProjectIdentifier) bool {
@@ -91,12 +91,12 @@ func (i ProjectIdentifier) eq(j ProjectIdentifier) bool {
 	if i.ProjectRoot != j.ProjectRoot {
 		return false
 	}
-	if i.NetworkName == j.NetworkName {
+	if i.Source == j.Source {
 		return true
 	}
 
-	if (i.NetworkName == "" && j.NetworkName == string(j.ProjectRoot)) ||
-		(j.NetworkName == "" && i.NetworkName == string(i.ProjectRoot)) {
+	if (i.Source == "" && j.Source == string(j.ProjectRoot)) ||
+		(j.Source == "" && i.Source == string(i.ProjectRoot)) {
 		return true
 	}
 
@@ -108,22 +108,22 @@ func (i ProjectIdentifier) eq(j ProjectIdentifier) bool {
 //
 // Given that the ProjectRoots are equal (==), equivalency occurs if:
 //
-// 1. The NetworkNames are equal (==), OR
-// 2. The LEFT (the receiver) NetworkName is non-empty, and the right
-// NetworkName is empty.
+// 1. The Sources are equal (==), OR
+// 2. The LEFT (the receiver) Source is non-empty, and the right
+// Source is empty.
 //
 // *This is asymmetry in this binary relation is intentional.* It facilitates
-// the case where we allow for a ProjectIdentifier with an explicit NetworkName
+// the case where we allow for a ProjectIdentifier with an explicit Source
 // to match one without.
 func (i ProjectIdentifier) equiv(j ProjectIdentifier) bool {
 	if i.ProjectRoot != j.ProjectRoot {
 		return false
 	}
-	if i.NetworkName == j.NetworkName {
+	if i.Source == j.Source {
 		return true
 	}
 
-	if i.NetworkName != "" && j.NetworkName == "" {
+	if i.Source != "" && j.Source == "" {
 		return true
 	}
 
@@ -131,22 +131,22 @@ func (i ProjectIdentifier) equiv(j ProjectIdentifier) bool {
 }
 
 func (i ProjectIdentifier) netName() string {
-	if i.NetworkName == "" {
+	if i.Source == "" {
 		return string(i.ProjectRoot)
 	}
-	return i.NetworkName
+	return i.Source
 }
 
 func (i ProjectIdentifier) errString() string {
-	if i.NetworkName == "" || i.NetworkName == string(i.ProjectRoot) {
+	if i.Source == "" || i.Source == string(i.ProjectRoot) {
 		return string(i.ProjectRoot)
 	}
-	return fmt.Sprintf("%s (from %s)", i.ProjectRoot, i.NetworkName)
+	return fmt.Sprintf("%s (from %s)", i.ProjectRoot, i.Source)
 }
 
 func (i ProjectIdentifier) normalize() ProjectIdentifier {
-	if i.NetworkName == "" {
-		i.NetworkName = string(i.ProjectRoot)
+	if i.Source == "" {
+		i.Source = string(i.ProjectRoot)
 	}
 
 	return i
@@ -159,8 +159,8 @@ func (i ProjectIdentifier) normalize() ProjectIdentifier {
 // ProjectProperties; they make little sense without their corresponding
 // ProjectRoot.
 type ProjectProperties struct {
-	NetworkName string
-	Constraint  Constraint
+	Source     string
+	Constraint Constraint
 }
 
 // Package represents a Go package. It contains a subset of the information

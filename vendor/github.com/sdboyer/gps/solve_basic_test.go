@@ -19,7 +19,7 @@ func nvSplit(info string) (id ProjectIdentifier, version string) {
 	if strings.Contains(info, " from ") {
 		parts := regfrom.FindStringSubmatch(info)
 		info = parts[1] + " " + parts[3]
-		id.NetworkName = parts[2]
+		id.Source = parts[2]
 	}
 
 	s := strings.SplitN(info, " ", 2)
@@ -42,7 +42,7 @@ func nvrSplit(info string) (id ProjectIdentifier, version string, revision Revis
 	if strings.Contains(info, " from ") {
 		parts := regfrom.FindStringSubmatch(info)
 		info = fmt.Sprintf("%s %s", parts[1], parts[3])
-		id.NetworkName = parts[2]
+		id.Source = parts[2]
 	}
 
 	s := strings.SplitN(info, " ", 3)
@@ -205,7 +205,7 @@ type depspec struct {
 // treated as a test-only dependency.
 func mkDepspec(pi string, deps ...string) depspec {
 	pa := mkAtom(pi)
-	if string(pa.id.ProjectRoot) != pa.id.NetworkName && pa.id.NetworkName != "" {
+	if string(pa.id.ProjectRoot) != pa.id.Source && pa.id.Source != "" {
 		panic("alternate source on self makes no sense")
 	}
 
@@ -252,9 +252,9 @@ func mkADep(atom, pdep string, c Constraint, pl ...string) dependency {
 }
 
 // mkPI creates a ProjectIdentifier with the ProjectRoot as the provided
-// string, and the NetworkName unset.
+// string, and the Source unset.
 //
-// Call normalize() on the returned value if you need the NetworkName to be be
+// Call normalize() on the returned value if you need the Source to be be
 // equal to the ProjectRoot.
 func mkPI(root string) ProjectIdentifier {
 	return ProjectIdentifier{
@@ -1274,7 +1274,7 @@ var basicFixtures = map[string]basicFixture{
 		},
 		ovr: ProjectConstraints{
 			ProjectRoot("bar"): ProjectProperties{
-				NetworkName: "bar",
+				Source: "bar",
 			},
 		},
 		r: mksolution(
