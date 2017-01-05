@@ -75,7 +75,7 @@ func main() {
 	tg.tempFile("src/"+root+"/manifest.json", origm)
 
 	tg.cd(tg.path("src/" + root))
-	tg.run("rm", "-unused")
+	tg.run("remove", "-unused")
 
 	manifest := tg.readManifest()
 	if manifest != expectedManifest {
@@ -83,31 +83,31 @@ func main() {
 	}
 
 	tg.tempFile("src/"+root+"/manifest.json", origm)
-	tg.run("rm", "github.com/not/used")
+	tg.run("remove", "github.com/not/used")
 
 	manifest = tg.readManifest()
 	if manifest != expectedManifest {
 		t.Fatalf("expected %s, got %s", expectedManifest, manifest)
 	}
 
-	if err := tg.doRun([]string{"rm", "-unused", "github.com/not/used"}); err == nil {
+	if err := tg.doRun([]string{"remove", "-unused", "github.com/not/used"}); err == nil {
 		t.Fatal("rm with both -unused and arg should have failed")
 	}
 
-	if err := tg.doRun([]string{"rm", "github.com/not/present"}); err == nil {
+	if err := tg.doRun([]string{"remove", "github.com/not/present"}); err == nil {
 		t.Fatal("rm with arg not in manifest should have failed")
 	}
 
-	if err := tg.doRun([]string{"rm", "github.com/not/used", "github.com/not/present"}); err == nil {
+	if err := tg.doRun([]string{"remove", "github.com/not/used", "github.com/not/present"}); err == nil {
 		t.Fatal("rm with one arg not in manifest should have failed")
 	}
 
-	if err := tg.doRun([]string{"rm", "github.com/pkg/errors"}); err == nil {
+	if err := tg.doRun([]string{"remove", "github.com/pkg/errors"}); err == nil {
 		t.Fatal("rm of arg in manifest and imports should have failed without -force")
 	}
 
 	tg.tempFile("src/"+root+"/manifest.json", origm)
-	tg.run("rm", "-force", "github.com/pkg/errors", "github.com/not/used")
+	tg.run("remove", "-force", "github.com/pkg/errors", "github.com/not/used")
 
 	manifest = tg.readManifest()
 	if manifest != `{
