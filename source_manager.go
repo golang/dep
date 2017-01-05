@@ -3,9 +3,13 @@ package gps
 import (
 	"fmt"
 	"os"
+	"os/signal"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
+	"sync/atomic"
+	"time"
 
 	"github.com/Masterminds/semver"
 )
@@ -81,15 +85,27 @@ type ProjectAnalyzer interface {
 // There's no (planned) reason why it would need to be reimplemented by other
 // tools; control via dependency injection is intended to be sufficient.
 type SourceMgr struct {
-	cachedir string
-	lf       *os.File
-	srcs     map[string]source
-	srcmut   sync.RWMutex
-	srcfuts  map[string]*unifiedFuture
-	srcfmut  sync.RWMutex
-	an       ProjectAnalyzer
-	dxt      deducerTrie
-	rootxt   prTrie
+	cachedir  string                    // path to root of cache dir
+	lf        *os.File                  // handle for the sm lock file on disk
+	srcs      map[string]source         // map of path names to source obj
+	srcmut    sync.RWMutex              // mutex protecting srcs map
+	srcfuts   map[string]*unifiedFuture // map of paths to source-handling futures
+	srcfmut   sync.RWMutex              // mutex protecting futures map
+	an        ProjectAnalyzer           // analyzer injected by the caller
+	dxt       deducerTrie               // static trie with baseline source type deduction info
+	rootxt    prTrie                    // dynamic trie, updated as ProjectRoots are deduced
+	qch       chan struct{}             // quit chan for signal handler
+	sigmut    sync.Mutex                // mutex protecting signal handling setup/teardown
+	glock     sync.RWMutex              // global lock for all ops, sm validity
+	opcount   int32                     // number of ops in flight
+	releasing int32                     // flag indicating release of sm has begun
+	released  int32                     // flag indicating release of sm has finished
+}
+
+type smIsReleased struct{}
+
+func (smIsReleased) Error() string {
+	return "this SourceMgr has been released, its methods can no longer be called"
 }
 
 type unifiedFuture struct {
@@ -141,7 +157,7 @@ func NewSourceManager(an ProjectAnalyzer, cachedir string) (*SourceMgr, error) {
 		}
 	}
 
-	return &SourceMgr{
+	sm := &SourceMgr{
 		cachedir: cachedir,
 		lf:       fi,
 		srcs:     make(map[string]source),
@@ -149,7 +165,107 @@ func NewSourceManager(an ProjectAnalyzer, cachedir string) (*SourceMgr, error) {
 		an:       an,
 		dxt:      pathDeducerTrie(),
 		rootxt:   newProjectRootTrie(),
-	}, nil
+		qch:      make(chan struct{}),
+	}
+
+	return sm, nil
+}
+
+// SetUpSigHandling sets up typical os.Interrupt signal handling for a
+// SourceMgr.
+func SetUpSigHandling(sm *SourceMgr) {
+	sigch := make(chan os.Signal, 1)
+	signal.Notify(sigch, os.Interrupt)
+	sm.HandleSignals(sigch)
+}
+
+// HandleSignals sets up logic to handle incoming signals with the goal of
+// shutting down the SourceMgr safely.
+//
+// Calling code must provide the signal channel, and is responsible for calling
+// signal.Notify() on that channel.
+//
+// Successive calls to HandleSignals() will deregister the previous handler and
+// set up a new one. It is not recommended that the same channel be passed
+// multiple times to this method.
+//
+// SetUpSigHandling() will set up a handler that is appropriate for most
+// use cases.
+func (sm *SourceMgr) HandleSignals(sigch chan os.Signal) {
+	sm.sigmut.Lock()
+	// always start by closing the qch, which will lead to any existing signal
+	// handler terminating, and deregistering its sigch.
+	if sm.qch != nil {
+		close(sm.qch)
+	}
+	sm.qch = make(chan struct{})
+
+	// Run a new goroutine with the input sigch and the fresh qch
+	go func(sch chan os.Signal, qch <-chan struct{}) {
+		defer signal.Stop(sch)
+		for {
+			select {
+			case <-sch:
+				// Set up a timer to uninstall the signal handler after three
+				// seconds, so that the user can easily force termination with a
+				// second ctrl-c
+				go func(c <-chan time.Time) {
+					<-c
+					signal.Stop(sch)
+				}(time.After(3 * time.Second))
+
+				if !atomic.CompareAndSwapInt32(&sm.releasing, 0, 1) {
+					// Something's already called Release() on this sm, so we
+					// don't have to do anything, as we'd just be redoing
+					// that work. Instead, deregister and return.
+					return
+				}
+
+				// Keep track of whether we waited for output purposes
+				var waited bool
+				opc := sm.opcount
+				if opc > 0 {
+					waited = true
+					fmt.Printf("Waiting for %v ops to complete...", opc)
+				}
+
+				// Mutex interaction in a signal handler is, as a general rule,
+				// unsafe. I'm not clear on whether the guarantees Go provides
+				// around signal handling, or having passed this through a
+				// channel in general, obviate those concerns, but it's a lot
+				// easier to just hit the mutex right now, so do that until it
+				// proves problematic or someone provides a clear explanation.
+				sm.glock.Lock()
+				if waited && sm.released != 1 {
+					fmt.Print("done.\n")
+				}
+				sm.doRelease()
+				sm.glock.Unlock()
+				return
+			case <-qch:
+				// quit channel triggered - deregister our sigch and return
+				return
+			}
+		}
+	}(sigch, sm.qch)
+	// Try to ensure handler is blocked in for-select before releasing the mutex
+	runtime.Gosched()
+
+	sm.sigmut.Unlock()
+}
+
+// StopSignalHandling deregisters any signal handler running on this SourceMgr.
+//
+// It's normally not necessary to call this directly; it will be called as
+// needed by Release().
+func (sm *SourceMgr) StopSignalHandling() {
+	sm.sigmut.Lock()
+	if sm.qch != nil {
+		close(sm.qch)
+		sm.qch = nil
+		runtime.Gosched()
+	}
+	sm.sigmut.Unlock()
 }
 
 // CouldNotCreateLockError describe failure modes in which creating a SourceMgr
@@ -164,10 +280,42 @@ func (e CouldNotCreateLockError) Error() string {
 	return e.Err.Error()
 }
 
-// Release lets go of any locks held by the SourceManager.
+// Release lets go of any locks held by the SourceManager. Once called, it is no
+// longer safe to call methods against it; all method calls will immediately
+// result in errors.
 func (sm *SourceMgr) Release() {
-	sm.lf.Close()
-	os.Remove(filepath.Join(sm.cachedir, "sm.lock"))
+	// This ensures a signal handling can't interleave with a Release call -
+	// exit early if we're already marked as having initiated a release process.
+	//
+	// Setting it before we acquire the lock also guarantees that no _more_
+	// method calls will stack up.
+	if !atomic.CompareAndSwapInt32(&sm.releasing, 0, 1) {
+		return
+	}
+
+	// Grab the global sm lock so that we only release once we're sure all other
+	// calls have completed
+	//
+	// (This could deadlock, ofc)
+	sm.glock.Lock()
+	sm.doRelease()
+	sm.glock.Unlock()
+}
+
+// doRelease actually releases physical resources (files on disk, etc.).
+func (sm *SourceMgr) doRelease() {
+	// One last atomic marker ensures actual disk changes only happen once.
+	if atomic.CompareAndSwapInt32(&sm.released, 0, 1) {
+		// Close the file handle for the lock file
+		sm.lf.Close()
+		// Remove the lock file from disk
+		os.Remove(filepath.Join(sm.cachedir, "sm.lock"))
+		// Close the qch, if non-nil, so the signal handlers run out. This will
+		// also deregister the sig channel, if any has been set up.
+		if sm.qch != nil {
+			close(sm.qch)
+		}
+	}
 }
 
 // AnalyzerInfo reports the name and version of the injected ProjectAnalyzer.
@@ -183,6 +331,16 @@ func (sm *SourceMgr) AnalyzerInfo() (name string, version *semver.Version) {
 // The work of producing the manifest and lock is delegated to the injected
 // ProjectAnalyzer's DeriveManifestAndLock() method.
 func (sm *SourceMgr) GetManifestAndLock(id ProjectIdentifier, v Version) (Manifest, Lock, error) {
+	if atomic.CompareAndSwapInt32(&sm.releasing, 1, 1) {
+		return nil, nil, smIsReleased{}
+	}
+	atomic.AddInt32(&sm.opcount, 1)
+	sm.glock.RLock()
+	defer func() {
+		sm.glock.RUnlock()
+		atomic.AddInt32(&sm.opcount, -1)
+	}()
+
 	src, err := sm.getSourceFor(id)
 	if err != nil {
 		return nil, nil, err
@@ -194,6 +352,16 @@ func (sm *SourceMgr) GetManifestAndLock(id ProjectIdentifier, v Version) (Manife
 // ListPackages parses the tree of the Go packages at and below the ProjectRoot
 // of the given ProjectIdentifier, at the given version.
 func (sm *SourceMgr) ListPackages(id ProjectIdentifier, v Version) (PackageTree, error) {
+	if atomic.CompareAndSwapInt32(&sm.releasing, 1, 1) {
+		return PackageTree{}, smIsReleased{}
+	}
+	atomic.AddInt32(&sm.opcount, 1)
+	sm.glock.RLock()
+	defer func() {
+		sm.glock.RUnlock()
+		atomic.AddInt32(&sm.opcount, -1)
+	}()
+
 	src, err := sm.getSourceFor(id)
 	if err != nil {
 		return PackageTree{}, err
@@ -215,6 +383,16 @@ func (sm *SourceMgr) ListPackages(id ProjectIdentifier, v Version) (PackageTree,
 // is not accessible (network outage, access issues, or the resource actually
 // went away), an error will be returned.
 func (sm *SourceMgr) ListVersions(id ProjectIdentifier) ([]Version, error) {
+	if atomic.CompareAndSwapInt32(&sm.releasing, 1, 1) {
+		return nil, smIsReleased{}
+	}
+	atomic.AddInt32(&sm.opcount, 1)
+	sm.glock.RLock()
+	defer func() {
+		sm.glock.RUnlock()
+		atomic.AddInt32(&sm.opcount, -1)
+	}()
+
 	src, err := sm.getSourceFor(id)
 	if err != nil {
 		// TODO(sdboyer) More-er proper-er errors
@@ -227,6 +405,16 @@ func (sm *SourceMgr) ListVersions(id ProjectIdentifier) ([]Version, error) {
 // RevisionPresentIn indicates whether the provided Revision is present in the given
 // repository.
 func (sm *SourceMgr) RevisionPresentIn(id ProjectIdentifier, r Revision) (bool, error) {
+	if atomic.CompareAndSwapInt32(&sm.releasing, 1, 1) {
+		return false, smIsReleased{}
+	}
+	atomic.AddInt32(&sm.opcount, 1)
+	sm.glock.RLock()
+	defer func() {
+		sm.glock.RUnlock()
+		atomic.AddInt32(&sm.opcount, -1)
+	}()
+
 	src, err := sm.getSourceFor(id)
 	if err != nil {
 		// TODO(sdboyer) More-er proper-er errors
@@ -239,6 +427,16 @@ func (sm *SourceMgr) RevisionPresentIn(id ProjectIdentifier, r Revision) (bool, 
 // SourceExists checks if a repository exists, either upstream or in the cache,
 // for the provided ProjectIdentifier.
 func (sm *SourceMgr) SourceExists(id ProjectIdentifier) (bool, error) {
+	if atomic.CompareAndSwapInt32(&sm.releasing, 1, 1) {
+		return false, smIsReleased{}
+	}
+	atomic.AddInt32(&sm.opcount, 1)
+	sm.glock.RLock()
+	defer func() {
+		sm.glock.RUnlock()
+		atomic.AddInt32(&sm.opcount, -1)
+	}()
+
 	src, err := sm.getSourceFor(id)
 	if err != nil {
 		return false, err
@@ -252,6 +450,16 @@ func (sm *SourceMgr) SourceExists(id ProjectIdentifier) (bool, error) {
 //
 // The primary use case for this is prefetching.
 func (sm *SourceMgr) SyncSourceFor(id ProjectIdentifier) error {
+	if atomic.CompareAndSwapInt32(&sm.releasing, 1, 1) {
+		return smIsReleased{}
+	}
+	atomic.AddInt32(&sm.opcount, 1)
+	sm.glock.RLock()
+	defer func() {
+		sm.glock.RUnlock()
+		atomic.AddInt32(&sm.opcount, -1)
+	}()
+
 	src, err := sm.getSourceFor(id)
 	if err != nil {
 		return err
@@ -263,6 +471,16 @@ func (sm *SourceMgr) SyncSourceFor(id ProjectIdentifier) error {
 // ExportProject writes out the tree of the provided ProjectIdentifier's
 // ProjectRoot, at the provided version, to the provided directory.
 func (sm *SourceMgr) ExportProject(id ProjectIdentifier, v Version, to string) error {
+	if atomic.CompareAndSwapInt32(&sm.releasing, 1, 1) {
+		return smIsReleased{}
+	}
+	atomic.AddInt32(&sm.opcount, 1)
+	sm.glock.RLock()
+	defer func() {
+		sm.glock.RUnlock()
+		atomic.AddInt32(&sm.opcount, -1)
+	}()
+
 	src, err := sm.getSourceFor(id)
 	if err != nil {
 		return err
@@ -279,6 +497,16 @@ func (sm *SourceMgr) ExportProject(id ProjectIdentifier, v Version, to string) e
 // paths. (A special exception is written for gopkg.in to minimize network
 // activity, as its behavior is well-structured)
 func (sm *SourceMgr) DeduceProjectRoot(ip string) (ProjectRoot, error) {
+	if atomic.CompareAndSwapInt32(&sm.releasing, 1, 1) {
+		return "", smIsReleased{}
+	}
+	atomic.AddInt32(&sm.opcount, 1)
+	sm.glock.RLock()
+	defer func() {
+		sm.glock.RUnlock()
+		atomic.AddInt32(&sm.opcount, -1)
+	}()
+
 	if prefix, root, has := sm.rootxt.LongestPrefix(ip); has {
 		// The non-matching tail of the import path could still be malformed.
 		// Validate just that part, if it exists
