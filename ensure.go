@@ -176,11 +176,7 @@ func (cmd *ensureCommand) Run(args []string) error {
 		return errors.New(buf.String())
 	}
 
-	params := gps.SolveParameters{
-		RootDir:  p.absroot,
-		Manifest: p.m,
-		Lock:     p.l,
-	}
+	params := p.makeParams()
 	if *verbose {
 		params.Trace = true
 		params.TraceLogger = log.New(os.Stderr, "", 0)
