@@ -49,6 +49,12 @@ dep ensure
     specified there. Otherwise, use the most recent version that can satisfy the
     constraints in the manifest file.
 
+dep ensure -update
+
+    Update all dependencies to the latest versions allowed by the manifest, ignoring
+    any versions specified in the lock file. Update the lock file with any
+    changes.
+
 dep ensure github.com/pkg/foo@^1.0.1
 
     Same as above, but choose any release >= 1.0.1, < 2.0.0. If a constraint was
@@ -176,6 +182,9 @@ func (cmd *ensureCommand) Run(args []string) error {
 	}
 
 	params := p.makeParams()
+	// If -update was passed, we want the solver to allow all versions to change
+	params.ChangeAll = cmd.update
+
 	if *verbose {
 		params.Trace = true
 		params.TraceLogger = log.New(os.Stderr, "", 0)
