@@ -10,7 +10,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
@@ -132,8 +131,8 @@ func (cmd *ensureCommand) Run(args []string) error {
 		}
 
 		p.m.Dependencies[pc.Ident.ProjectRoot] = gps.ProjectProperties{
-			Source: pc.Ident.Source,
-			Constraint:  pc.Constraint,
+			Source:     pc.Ident.Source,
+			Constraint: pc.Constraint,
 		}
 
 		for i, lp := range p.l.P {
@@ -156,8 +155,8 @@ func (cmd *ensureCommand) Run(args []string) error {
 		// project. Inadvisable, but meaningful.
 
 		p.m.Ovr[pc.Ident.ProjectRoot] = gps.ProjectProperties{
-			Source: pc.Ident.Source,
-			Constraint:  pc.Constraint,
+			Source:     pc.Ident.Source,
+			Constraint: pc.Constraint,
 		}
 
 		for i, lp := range p.l.P {
