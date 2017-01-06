@@ -102,6 +102,10 @@ func (cmd *ensureCommand) Run(args []string) error {
 		return nil
 	}
 
+	if cmd.update && len(args) > 0 {
+		return errors.New("Cannot pass -update and itemized project list (for now)")
+	}
+
 	p, err := depContext.loadProject("")
 	if err != nil {
 		return err
