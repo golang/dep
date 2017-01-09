@@ -32,7 +32,7 @@ type safeWriter struct {
 // tree, to a temp dir, then moves them into place if and only if all the write
 // operations succeeded. It also does its best to roll back if any moves fail.
 //
-// This mostly guarantees that dep cannot exit with a partial write that would
+// This mostly guarantees that hoard cannot exit with a partial write that would
 // leave an undefined state on disk.
 //
 // - If a sw.m is provided, it will be written to the standard manifest file
@@ -101,7 +101,7 @@ func (sw safeWriter) writeAllSafe(forceVendor bool) error {
 	lpath := filepath.Join(sw.root, lockName)
 	vpath := filepath.Join(sw.root, "vendor")
 
-	td, err := ioutil.TempDir(os.TempDir(), "dep")
+	td, err := ioutil.TempDir(os.TempDir(), "hoard")
 	if err != nil {
 		return errors.Wrap(err, "error while creating temp dir for writing manifest/lock/vendor")
 	}

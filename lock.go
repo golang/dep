@@ -70,7 +70,7 @@ func readLock(r io.Reader) (*lock, error) {
 
 		id := gps.ProjectIdentifier{
 			ProjectRoot: gps.ProjectRoot(ld.Name),
-			Source: ld.Repository,
+			Source:      ld.Repository,
 		}
 		l.P[i] = gps.NewLockedProject(id, v, ld.Packages)
 	}
@@ -135,14 +135,14 @@ func (l *lock) MarshalJSON() ([]byte, error) {
 	return buf.Bytes(), err
 }
 
-// lockFromInterface converts an arbitrary gps.Lock to dep's representation of a
-// lock. If the input is already dep's *lock, the input is returned directly.
+// lockFromInterface converts an arbitrary gps.Lock to hoard's representation of a
+// lock. If the input is already hoard's *lock, the input is returned directly.
 //
 // Data is defensively copied wherever necessary to ensure the resulting *lock
 // shares no memory with the original lock.
 //
 // As gps.Solution is a superset of gps.Lock, this can also be used to convert
-// solutions to dep's lock form.
+// solutions to hoard's lock format.
 func lockFromInterface(in gps.Lock) *lock {
 	if in == nil {
 		return nil
