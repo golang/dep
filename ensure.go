@@ -35,41 +35,41 @@ Package spec:
 
 Examples:
 
-  dep ensure                            Populate vendor from existing manifest and lock
-  dep ensure github.com/pkg/foo@^1.0.1  Update a specific dependency to a specific version
+  hoard ensure                            Populate vendor from existing manifest and lock
+  hoard ensure github.com/pkg/foo@^1.0.1  Update a specific dependency to a specific version
 
-For more detailed usage examples, see dep ensure -examples.
+For more detailed usage examples, see hoard ensure -examples.
 `
 const ensureExamples = `
-dep ensure
+hoard ensure
 
     Solve the project's dependency graph, and place all dependencies in the
     vendor folder. If a dependency is in the lock file, use the version
     specified there. Otherwise, use the most recent version that can satisfy the
     constraints in the manifest file.
 
-dep ensure -update
+hoard ensure -update
 
     Update all dependencies to the latest versions allowed by the manifest, ignoring
     any versions specified in the lock file. Update the lock file with any
     changes.
 
-dep ensure github.com/pkg/foo@^1.0.1
+hoard ensure github.com/pkg/foo@^1.0.1
 
     Same as above, but choose any release >= 1.0.1, < 2.0.0. If a constraint was
     previously set in the manifest, this resets it. This form of constraint
     strikes a good balance of safety and flexibility, and should be preferred
     for libraries.
 
-dep ensure github.com/pkg/foo@~1.0.1
+hoard ensure github.com/pkg/foo@~1.0.1
 
     Same as above, but choose any release matching 1.0.x, preferring latest.
 
-dep ensure github.com/pkg/foo:git.internal.com/alt/foo
+hoard ensure github.com/pkg/foo:git.internal.com/alt/foo
 
     Fetch the dependency from a different location.
 
-dep ensure -override github.com/pkg/foo@^1.0.1
+hoard ensure -override github.com/pkg/foo@^1.0.1
 
     Forcefully and transitively override any constraint for this dependency.
     Overrides are powerful, but harmful in the long term. They should be used
@@ -105,12 +105,12 @@ func (cmd *ensureCommand) Run(args []string) error {
 		return errors.New("Cannot pass -update and itemized project list (for now)")
 	}
 
-	p, err := depContext.loadProject("")
+	p, err := hoardContext.loadProject("")
 	if err != nil {
 		return err
 	}
 
-	sm, err := depContext.sourceManager()
+	sm, err := hoardContext.sourceManager()
 	if err != nil {
 		return err
 	}

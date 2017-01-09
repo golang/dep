@@ -28,7 +28,7 @@ but it will be solved-for, and will appear in the lock.
 
 Note: init may use the network to solve the dependency graph.
 
-Note: init does NOT vendor dependencies at the moment. See dep ensure.
+Note: init does NOT vendor dependencies at the moment. See hoard ensure.
 `
 
 func (cmd *initCommand) Name() string      { return "init" }
@@ -76,7 +76,7 @@ func (cmd *initCommand) Run(args []string) error {
 		return fmt.Errorf("Invalid state: manifest %q does not exist, but lock %q does.", mf, lf)
 	}
 
-	cpr, err := depContext.splitAbsoluteProjectRoot(root)
+	cpr, err := hoardContext.splitAbsoluteProjectRoot(root)
 	if err != nil {
 		return errors.Wrap(err, "determineProjectRoot")
 	}
@@ -86,7 +86,7 @@ func (cmd *initCommand) Run(args []string) error {
 		return errors.Wrap(err, "gps.ListPackages")
 	}
 	vlogf("Found %d dependencies.", len(pkgT.Packages))
-	sm, err := depContext.sourceManager()
+	sm, err := hoardContext.sourceManager()
 	if err != nil {
 		return errors.Wrap(err, "getSourceManager")
 	}
@@ -296,7 +296,7 @@ func getProjectData(pkgT gps.PackageTree, cpr string, sm *gps.SourceMgr) (projec
 			vlogf("Package %q has import %q, analyzing...", v.P.ImportPath, ip)
 
 			dependencies[pr] = []string{ip}
-			v, err := depContext.versionInWorkspace(pr)
+			v, err := hoardContext.versionInWorkspace(pr)
 			if err != nil {
 				notondisk[pr] = true
 				vlogf("Could not determine version for %q, omitting from generated manifest", pr)
@@ -317,7 +317,7 @@ func getProjectData(pkgT gps.PackageTree, cpr string, sm *gps.SourceMgr) (projec
 		}
 	}
 
-	vlogf("Analyzing transitive dependencies...")
+	vlogf("Analyzing transitive imports...")
 	// Explore the packages we've found for transitive deps, either
 	// completing the lock or identifying (more) missing projects that we'll
 	// need to ask gps to solve for us.
@@ -357,7 +357,7 @@ func getProjectData(pkgT gps.PackageTree, cpr string, sm *gps.SourceMgr) (projec
 				// It's fine if the root does not exist - it indicates that this
 				// project is not present in the workspace, and so we need to
 				// solve to deal with this dep.
-				r := filepath.Join(depContext.GOPATH, "src", string(pr))
+				r := filepath.Join(hoardContext.GOPATH, "src", string(pr))
 				_, err := os.Lstat(r)
 				if os.IsNotExist(err) {
 					colors[pkg] = black
@@ -396,7 +396,7 @@ func getProjectData(pkgT gps.PackageTree, cpr string, sm *gps.SourceMgr) (projec
 			// whether we're first seeing it here, in the transitive
 			// exploration, or if it arose in the direct dep parts
 			if _, in := ondisk[pr]; !in {
-				v, err := depContext.versionInWorkspace(pr)
+				v, err := hoardContext.versionInWorkspace(pr)
 				if err != nil {
 					colors[pkg] = black
 					notondisk[pr] = true

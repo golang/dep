@@ -42,19 +42,19 @@ type removeCommand struct {
 }
 
 func (cmd *removeCommand) Run(args []string) error {
-	p, err := depContext.loadProject("")
+	p, err := hoardContext.loadProject("")
 	if err != nil {
 		return err
 	}
 
-	sm, err := depContext.sourceManager()
+	sm, err := hoardContext.sourceManager()
 	if err != nil {
 		return err
 	}
 	sm.UseDefaultSignalHandling()
 	defer sm.Release()
 
-	cpr, err := depContext.splitAbsoluteProjectRoot(p.absroot)
+	cpr, err := hoardContext.splitAbsoluteProjectRoot(p.absroot)
 	if err != nil {
 		return errors.Wrap(err, "determineProjectRoot")
 	}
