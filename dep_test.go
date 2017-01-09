@@ -25,14 +25,14 @@ func init() {
 	}
 }
 
-// The TestMain function creates a dep command for testing purposes and
+// The TestMain function creates a hoard command for testing purposes and
 // deletes it after the tests have been run.
 // Most of this is taken from https://github.com/golang/go/blob/master/src/cmd/go/go_test.go and reused here.
 func TestMain(m *testing.M) {
-	args := []string{"build", "-o", "testdep" + exeSuffix}
+	args := []string{"build", "-o", "testhoard" + exeSuffix}
 	out, err := exec.Command("go", args...).CombinedOutput()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "building testdep failed: %v\n%s", err, out)
+		fmt.Fprintf(os.Stderr, "building testhoard failed: %v\n%s", err, out)
 		os.Exit(2)
 	}
 
@@ -45,11 +45,11 @@ func TestMain(m *testing.M) {
 		// those systems.  Set CCACHE_DIR to cope.  Issue 17668.
 		os.Setenv("CCACHE_DIR", filepath.Join(home, ".ccache"))
 	}
-	os.Setenv("HOME", "/test-dep-home-does-not-exist")
+	os.Setenv("HOME", "/test-hoard-home-does-not-exist")
 
 	r := m.Run()
 
-	os.Remove("testdep" + exeSuffix)
+	os.Remove("testhoard" + exeSuffix)
 
 	os.Exit(r)
 }
@@ -164,12 +164,12 @@ func (tg *testgoData) doRun(args []string) error {
 			}
 		}
 	}
-	tg.t.Logf("running testdep %v", args)
+	tg.t.Logf("running testhoard %v", args)
 	var prog string
 	if tg.wd == "" {
-		prog = "./testdep" + exeSuffix
+		prog = "./testhoard" + exeSuffix
 	} else {
-		prog = filepath.Join(tg.wd, "testdep"+exeSuffix)
+		prog = filepath.Join(tg.wd, "testhoard"+exeSuffix)
 	}
 	args = append(args[:1], append([]string{"-v"}, args[1:]...)...)
 	cmd := exec.Command(prog, args...)
