@@ -64,12 +64,12 @@ type statusCommand struct {
 }
 
 func (cmd *statusCommand) Run(args []string) error {
-	p, err := depContext.loadProject("")
+	p, err := hoardContext.loadProject("")
 	if err != nil {
 		return err
 	}
 
-	sm, err := depContext.sourceManager()
+	sm, err := hoardContext.sourceManager()
 	if err != nil {
 		return err
 	}
