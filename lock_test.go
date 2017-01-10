@@ -34,6 +34,7 @@ func TestLockedProjectsEq(t *testing.T) {
 		NewLockedProject(mkPI("github.com/sdboyer/gps"), NewVersion("v0.10.0"), []string{"flugle", "gps"}),
 		NewLockedProject(mkPI("github.com/sdboyer/gps"), NewVersion("v0.10.0").Is("278a227dfc3d595a33a77ff3f841fd8ca1bc8cd0"), []string{"gps"}),
 		NewLockedProject(mkPI("github.com/sdboyer/gps"), NewVersion("v0.11.0"), []string{"gps"}),
+		NewLockedProject(mkPI("github.com/sdboyer/gps"), Revision("278a227dfc3d595a33a77ff3f841fd8ca1bc8cd0"), []string{"gps"}),
 	}
 
 	fix := []struct {
@@ -49,6 +50,8 @@ func TestLockedProjectsEq(t *testing.T) {
 		{0, 2, false, "should not eq when other pkg list is longer"},
 		{2, 4, false, "should not eq when pkg lists are out of order"},
 		{0, 3, false, "should not eq totally different lp"},
+		{7, 7, true, "should eq with only rev"},
+		{5, 7, false, "should not eq when only rev matches"},
 	}
 
 	for _, f := range fix {

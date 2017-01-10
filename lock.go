@@ -167,7 +167,14 @@ func (lp LockedProject) Eq(lp2 LockedProject) bool {
 		}
 	}
 
-	if !lp.v.Matches(lp2.v) {
+	v1n := lp.v == nil
+	v2n := lp2.v == nil
+
+	if v1n != v2n {
+		return false
+	}
+
+	if !v1n && !lp.v.Matches(lp2.v) {
 		return false
 	}
 
