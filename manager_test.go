@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -725,10 +726,10 @@ func TestSignalHandling(t *testing.T) {
 	sigch <- os.Interrupt
 	<-time.After(10 * time.Millisecond)
 
-	if sm.releasing != 1 {
+	if atomic.LoadInt32(&sm.releasing) != 1 {
 		t.Error("Releasing flag did not get set")
 	}
-	if sm.released != 1 {
+	if atomic.LoadInt32(&sm.released) != 1 {
 		t.Error("Released flag did not get set")
 	}
 
@@ -755,10 +756,10 @@ func TestSignalHandling(t *testing.T) {
 	if reldur < 10*time.Millisecond {
 		t.Errorf("finished too fast (%v); the necessary network request could not have completed yet", reldur)
 	}
-	if sm.releasing != 1 {
+	if atomic.LoadInt32(&sm.releasing) != 1 {
 		t.Error("Releasing flag did not get set")
 	}
-	if sm.released != 1 {
+	if atomic.LoadInt32(&sm.released) != 1 {
 		t.Error("Released flag did not get set")
 	}
 
@@ -785,10 +786,10 @@ func TestSignalHandling(t *testing.T) {
 		sm.Release()
 	}
 
-	if sm.releasing != 1 {
+	if atomic.LoadInt32(&sm.releasing) != 1 {
 		t.Error("Releasing flag did not get set")
 	}
-	if sm.released != 1 {
+	if atomic.LoadInt32(&sm.released) != 1 {
 		t.Error("Released flag did not get set")
 	}
 

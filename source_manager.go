@@ -223,7 +223,7 @@ func (sm *SourceMgr) HandleSignals(sigch chan os.Signal) {
 
 				// Keep track of whether we waited for output purposes
 				var waited bool
-				opc := sm.opcount
+				opc := atomic.LoadInt32(&sm.opcount)
 				if opc > 0 {
 					waited = true
 					fmt.Printf("Waiting for %v ops to complete...", opc)
