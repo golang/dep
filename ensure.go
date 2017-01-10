@@ -216,10 +216,7 @@ func (cmd *ensureCommand) Run(args []string) error {
 		sm:   sm,
 	}
 
-	if err := sw.writeAllSafe(false); err != nil {
-		return errors.Wrap(err, "grouped write of manifest, lock and vendor")
-	}
-	return nil
+	return errors.Wrap(sw.writeAllSafe(false), "grouped write of manifest, lock and vendor")
 }
 
 type stringSlice []string
