@@ -66,13 +66,8 @@ type baseVCSSource struct {
 	// their listVersions func into the baseSource, for use as needed.
 	lvfunc func() (vlist []Version, err error)
 
-	// lock to serialize access to syncLocal
-	synclock sync.Mutex
-
-	// Globalish flag indicating whether a "full" sync has been performed. Also
-	// used as a one-way gate to ensure that the full syncing routine is never
-	// run more than once on a given source instance.
-	allsync bool
+	// Once-er to control access to syncLocal
+	synconce sync.Once
 
 	// The error, if any, that occurred on syncLocal
 	syncerr error
@@ -283,42 +278,34 @@ func (bs *baseVCSSource) checkExistence(ex sourceExistence) bool {
 // with what's out there over the network.
 func (bs *baseVCSSource) syncLocal() error {
 	// Ensure we only have one goroutine doing this at a time
-	bs.synclock.Lock()
-	defer bs.synclock.Unlock()
-
-	// ...and that we only ever do it once
-	if bs.allsync {
-		// Return the stored err, if any
-		return bs.syncerr
-	}
-
-	bs.allsync = true
-	// First, ensure the local instance exists
-	bs.syncerr = bs.ensureCacheExistence()
-	if bs.syncerr != nil {
-		return bs.syncerr
-	}
-
-	_, bs.syncerr = bs.lvfunc()
-	if bs.syncerr != nil {
-		return bs.syncerr
-	}
-
-	// This case is really just for git repos, where the lvfunc doesn't
-	// guarantee that the local repo is synced
-	if !bs.crepo.synced {
-		bs.crepo.mut.Lock()
-		err := bs.crepo.r.Update()
-		if err != nil {
-			bs.syncerr = fmt.Errorf("failed fetching latest updates with err: %s", unwrapVcsErr(err))
-			bs.crepo.mut.Unlock()
-			return bs.syncerr
+	f := func() {
+		// First, ensure the local instance exists
+		bs.syncerr = bs.ensureCacheExistence()
+		if bs.syncerr != nil {
+			return
 		}
-		bs.crepo.synced = true
-		bs.crepo.mut.Unlock()
+
+		_, bs.syncerr = bs.lvfunc()
+		if bs.syncerr != nil {
+			return
+		}
+
+		// This case is really just for git repos, where the lvfunc doesn't
+		// guarantee that the local repo is synced
+		if !bs.crepo.synced {
+			bs.crepo.mut.Lock()
+			err := bs.crepo.r.Update()
+			if err != nil {
+				bs.syncerr = fmt.Errorf("failed fetching latest updates with err: %s", unwrapVcsErr(err))
+				bs.crepo.mut.Unlock()
+			}
+			bs.crepo.synced = true
+			bs.crepo.mut.Unlock()
+		}
 	}
 
-	return nil
+	bs.synconce.Do(f)
+	return bs.syncerr
 }
 
 func (bs *baseVCSSource) listPackages(pr ProjectRoot, v Version) (ptree PackageTree, err error) {
