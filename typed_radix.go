@@ -29,53 +29,48 @@ func newDeducerTrie() *deducerTrie {
 // Delete is used to delete a key, returning the previous value and if it was deleted
 func (t *deducerTrie) Delete(s string) (pathDeducer, bool) {
 	t.Lock()
+	defer t.Unlock()
 	if d, had := t.t.Delete(s); had {
-		t.Unlock()
 		return d.(pathDeducer), had
 	}
-	t.Unlock()
 	return nil, false
 }
 
 // Get is used to lookup a specific key, returning the value and if it was found
 func (t *deducerTrie) Get(s string) (pathDeducer, bool) {
 	t.RLock()
+	defer t.RUnlock()
 	if d, has := t.t.Get(s); has {
-		t.RUnlock()
 		return d.(pathDeducer), has
 	}
-	t.RUnlock()
 	return nil, false
 }
 
 // Insert is used to add a newentry or update an existing entry. Returns if updated.
 func (t *deducerTrie) Insert(s string, d pathDeducer) (pathDeducer, bool) {
 	t.Lock()
+	defer t.Unlock()
 	if d2, had := t.t.Insert(s, d); had {
-		t.Unlock()
 		return d2.(pathDeducer), had
 	}
-	t.Unlock()
 	return nil, false
 }
 
 // Len is used to return the number of elements in the tree
 func (t *deducerTrie) Len() int {
 	t.RLock()
-	l := t.t.Len()
-	t.RUnlock()
-	return l
+	defer t.RUnlock()
+	return t.t.Len()
 }
 
 // LongestPrefix is like Get, but instead of an exact match, it will return the
 // longest prefix match.
 func (t *deducerTrie) LongestPrefix(s string) (string, pathDeducer, bool) {
 	t.RLock()
+	defer t.RUnlock()
 	if p, d, has := t.t.LongestPrefix(s); has {
-		t.RUnlock()
 		return p, d.(pathDeducer), has
 	}
-	t.RUnlock()
 	return "", nil, false
 }
 
@@ -106,53 +101,48 @@ func newProjectRootTrie() *prTrie {
 // Delete is used to delete a key, returning the previous value and if it was deleted
 func (t *prTrie) Delete(s string) (ProjectRoot, bool) {
 	t.Lock()
+	defer t.Unlock()
 	if pr, had := t.t.Delete(s); had {
-		t.Unlock()
 		return pr.(ProjectRoot), had
 	}
-	t.Unlock()
 	return "", false
 }
 
 // Get is used to lookup a specific key, returning the value and if it was found
 func (t *prTrie) Get(s string) (ProjectRoot, bool) {
 	t.RLock()
+	defer t.RUnlock()
 	if pr, has := t.t.Get(s); has {
-		t.RUnlock()
 		return pr.(ProjectRoot), has
 	}
-	t.RUnlock()
 	return "", false
 }
 
 // Insert is used to add a newentry or update an existing entry. Returns if updated.
 func (t *prTrie) Insert(s string, pr ProjectRoot) (ProjectRoot, bool) {
 	t.Lock()
+	defer t.Unlock()
 	if pr2, had := t.t.Insert(s, pr); had {
-		t.Unlock()
 		return pr2.(ProjectRoot), had
 	}
-	t.Unlock()
 	return "", false
 }
 
 // Len is used to return the number of elements in the tree
 func (t *prTrie) Len() int {
 	t.RLock()
-	l := t.t.Len()
-	t.RUnlock()
-	return l
+	defer t.RUnlock()
+	return t.t.Len()
 }
 
 // LongestPrefix is like Get, but instead of an exact match, it will return the
 // longest prefix match.
 func (t *prTrie) LongestPrefix(s string) (string, ProjectRoot, bool) {
 	t.RLock()
+	defer t.RUnlock()
 	if p, pr, has := t.t.LongestPrefix(s); has && isPathPrefixOrEqual(p, s) {
-		t.RUnlock()
 		return p, pr.(ProjectRoot), has
 	}
-	t.RUnlock()
 	return "", "", false
 }
 
