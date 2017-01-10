@@ -69,7 +69,7 @@ func readLock(r io.Reader) (*lock, error) {
 
 		id := gps.ProjectIdentifier{
 			ProjectRoot: gps.ProjectRoot(ld.Name),
-			Source: ld.Repository,
+			Source:      ld.Repository,
 		}
 		l.P[i] = gps.NewLockedProject(id, v, ld.Packages)
 	}
