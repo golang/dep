@@ -9,7 +9,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"reflect"
 	"sort"
 
 	"github.com/sdboyer/gps"
@@ -193,12 +192,7 @@ func locksAreEquivalent(l, r *lock) bool {
 		// TODO(sdboyer) gps will be adding a func to compare LockedProjects in the next
 		// version; we can swap that in here when it lands
 		rp := r.P[k]
-		if lp.Ident() != rp.Ident() {
-			return false
-		}
-
-		lpkg, rpkg := lp.Packages(), rp.Packages()
-		if !reflect.DeepEqual(lpkg, rpkg) {
+		if !lp.Eq(rp) {
 			return false
 		}
 	}
