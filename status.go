@@ -104,17 +104,6 @@ func runStatusAll(p *project, sm *gps.SourceMgr) error {
 		return nil
 	}
 
-	// In the background, warm caches of version lists for all the projects in
-	// the lock. The SourceMgr coordinates access to this information - if the
-	// main goroutine asks for the version list while the background goroutine's
-	// request is in flight (or vice versa), both calls are folded together and
-	// are fulfilled from the same network response, and the same on-disk
-	// repository cache.
-	for _, proj := range p.l.Projects() {
-		id := proj.Ident()
-		go sm.ListVersions(id)
-	}
-
 	// While the network churns on ListVersions() requests, statically analyze
 	// code from the current project.
 	ptree, err := gps.ListPackages(p.absroot, string(p.importroot))
