@@ -92,8 +92,8 @@ type SourceMgr struct {
 	srcfuts   map[string]*unifiedFuture // map of paths to source-handling futures
 	srcfmut   sync.RWMutex              // mutex protecting futures map
 	an        ProjectAnalyzer           // analyzer injected by the caller
-	dxt       deducerTrie               // static trie with baseline source type deduction info
-	rootxt    prTrie                    // dynamic trie, updated as ProjectRoots are deduced
+	dxt       *deducerTrie              // static trie with baseline source type deduction info
+	rootxt    *prTrie                   // dynamic trie, updated as ProjectRoots are deduced
 	qch       chan struct{}             // quit chan for signal handler
 	sigmut    sync.Mutex                // mutex protecting signal handling setup/teardown
 	glock     sync.RWMutex              // global lock for all ops, sm validity

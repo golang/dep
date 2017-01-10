@@ -71,7 +71,7 @@ var (
 	pathvld     = regexp.MustCompile(`^([A-Za-z0-9-]+)(\.[A-Za-z0-9-]+)+(/[A-Za-z0-9-_.~]+)*$`)
 )
 
-func pathDeducerTrie() deducerTrie {
+func pathDeducerTrie() *deducerTrie {
 	dxt := newDeducerTrie()
 
 	dxt.Insert("github.com/", githubDeducer{regexp: ghRegex})
