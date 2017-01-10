@@ -147,12 +147,14 @@ func runStatusAll(p *project, sm *gps.SourceMgr) error {
 	slp := p.l.Projects()
 	sort.Sort(sortedLockedProjects(slp))
 
+	tw := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)
+	defer tw.Flush()
+
 	if bytes.Equal(s.HashInputs(), p.l.Memo) {
 		// If these are equal, we're guaranteed that the lock is a transitively
 		// complete picture of all deps. That eliminates the need for at least
 		// some checks.
 
-		tw := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)
 		fmt.Fprintf(tw, "PROJECT\tCONSTRAINT\tVERSION\tREVISION\tLATEST\tPKGS USED\n")
 
 		for _, proj := range slp {
@@ -237,47 +239,45 @@ func runStatusAll(p *project, sm *gps.SourceMgr) error {
 			)
 		}
 
-		tw.Flush()
-	} else {
-		// Hash digest mismatch may indicate that some deps are no longer
-		// needed, some are missing, or that some constraints or source
-		// locations have changed.
-		//
-		// It's possible for digests to not match, but still have a correct
-		// lock.
-		tw := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)
-		fmt.Fprintf(tw, "PROJECT\tMISSING PACKAGES\n")
+		return nil
+	}
 
-		external := ptree.ExternalReach(true, false, nil).ListExternalImports()
-		roots := make(map[gps.ProjectRoot][]string)
-		var errs []string
-		for _, e := range external {
-			root, err := sm.DeduceProjectRoot(e)
-			if err != nil {
-				errs = append(errs, string(root))
-				continue
-			}
+	// Hash digest mismatch may indicate that some deps are no longer
+	// needed, some are missing, or that some constraints or source
+	// locations have changed.
+	//
+	// It's possible for digests to not match, but still have a correct
+	// lock.
+	fmt.Fprintf(tw, "PROJECT\tMISSING PACKAGES\n")
 
-			roots[root] = append(roots[root], e)
+	external := ptree.ExternalReach(true, false, nil).ListExternalImports()
+	roots := make(map[gps.ProjectRoot][]string)
+	var errs []string
+	for _, e := range external {
+		root, err := sm.DeduceProjectRoot(e)
+		if err != nil {
+			errs = append(errs, string(root))
+			continue
 		}
 
-	outer:
-		for root, pkgs := range roots {
-			// TODO also handle the case where the project is present, but there
-			// are items missing from just the package list
-			for _, lp := range slp {
-				if lp.Ident().ProjectRoot == root {
-					continue outer
-				}
-			}
+		roots[root] = append(roots[root], e)
+	}
 
-			fmt.Fprintf(tw,
-				"%s\t%s\t\n",
-				root,
-				pkgs,
-			)
+outer:
+	for root, pkgs := range roots {
+		// TODO also handle the case where the project is present, but there
+		// are items missing from just the package list
+		for _, lp := range slp {
+			if lp.Ident().ProjectRoot == root {
+				continue outer
+			}
 		}
-		tw.Flush()
+
+		fmt.Fprintf(tw,
+			"%s\t%s\t\n",
+			root,
+			pkgs,
+		)
 	}
 
 	return nil
