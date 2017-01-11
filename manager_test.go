@@ -728,9 +728,6 @@ func TestSignalHandling(t *testing.T) {
 	if sm.releasing != 1 {
 		t.Error("Releasing flag did not get set")
 	}
-	if sm.released != 1 {
-		t.Error("Released flag did not get set")
-	}
 
 	lpath := filepath.Join(sm.cachedir, "sm.lock")
 	if _, err := os.Stat(lpath); err == nil {
@@ -758,9 +755,6 @@ func TestSignalHandling(t *testing.T) {
 	if sm.releasing != 1 {
 		t.Error("Releasing flag did not get set")
 	}
-	if sm.released != 1 {
-		t.Error("Released flag did not get set")
-	}
 
 	lpath = filepath.Join(sm.cachedir, "sm.lock")
 	if _, err := os.Stat(lpath); err == nil {
@@ -787,9 +781,6 @@ func TestSignalHandling(t *testing.T) {
 
 	if sm.releasing != 1 {
 		t.Error("Releasing flag did not get set")
-	}
-	if sm.released != 1 {
-		t.Error("Released flag did not get set")
 	}
 
 	lpath = filepath.Join(sm.cachedir, "sm.lock")
