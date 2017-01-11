@@ -729,9 +729,6 @@ func TestSignalHandling(t *testing.T) {
 	if atomic.LoadInt32(&sm.releasing) != 1 {
 		t.Error("Releasing flag did not get set")
 	}
-	if atomic.LoadInt32(&sm.released) != 1 {
-		t.Error("Released flag did not get set")
-	}
 
 	lpath := filepath.Join(sm.cachedir, "sm.lock")
 	if _, err := os.Stat(lpath); err == nil {
@@ -740,7 +737,7 @@ func TestSignalHandling(t *testing.T) {
 	clean()
 
 	sm, clean = mkNaiveSM(t)
-	SetUpSigHandling(sm)
+	sm.UseDefaultSignalHandling()
 	go sm.DeduceProjectRoot("rsc.io/pdf")
 	runtime.Gosched()
 
@@ -759,9 +756,6 @@ func TestSignalHandling(t *testing.T) {
 	if atomic.LoadInt32(&sm.releasing) != 1 {
 		t.Error("Releasing flag did not get set")
 	}
-	if atomic.LoadInt32(&sm.released) != 1 {
-		t.Error("Released flag did not get set")
-	}
 
 	lpath = filepath.Join(sm.cachedir, "sm.lock")
 	if _, err := os.Stat(lpath); err == nil {
@@ -770,9 +764,9 @@ func TestSignalHandling(t *testing.T) {
 	clean()
 
 	sm, clean = mkNaiveSM(t)
-	SetUpSigHandling(sm)
+	sm.UseDefaultSignalHandling()
 	sm.StopSignalHandling()
-	SetUpSigHandling(sm)
+	sm.UseDefaultSignalHandling()
 
 	go sm.DeduceProjectRoot("rsc.io/pdf")
 	//runtime.Gosched()
@@ -788,9 +782,6 @@ func TestSignalHandling(t *testing.T) {
 
 	if atomic.LoadInt32(&sm.releasing) != 1 {
 		t.Error("Releasing flag did not get set")
-	}
-	if atomic.LoadInt32(&sm.released) != 1 {
-		t.Error("Released flag did not get set")
 	}
 
 	lpath = filepath.Join(sm.cachedir, "sm.lock")

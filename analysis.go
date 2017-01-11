@@ -184,12 +184,16 @@ func ListPackages(fileRoot, importRoot string) (PackageTree, error) {
 				// combinations. That will be a more significant refactor.
 				//
 				// However, there is one case we want to allow here - one or
-				// more files with "+build ignore" with package `main`. (Ignore
-				// is just a convention, but for now it's good enough to just
-				// check that.) This is a fairly common way to give examples,
-				// and to make a more sophisticated build system than a Makefile
-				// allows, so we want to support that case. So, transparently
-				// lump the deps together.
+				// more files with package `main` having a "+build ignore" tag.
+				// (Ignore is just a convention, but for now it's good enough to
+				// just check that.) This is a fairly common way to give
+				// examples, and to make a more sophisticated build system than
+				// a Makefile allows, so we want to support that case. So,
+				// transparently lump the deps together.
+				//
+				// Caveat: this will only handle one file having an issue, as
+				// go/build stops scanning after it runs into the first problem.
+				// See https://github.com/sdboyer/gps/issues/138
 				mains := make(map[string]struct{})
 				for k, pkgname := range terr.Packages {
 					if pkgname == "main" {

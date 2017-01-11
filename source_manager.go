@@ -98,8 +98,8 @@ type SourceMgr struct {
 	sigmut    sync.Mutex                // mutex protecting signal handling setup/teardown
 	glock     sync.RWMutex              // global lock for all ops, sm validity
 	opcount   int32                     // number of ops in flight
+	relonce   sync.Once                 // once-er to ensure we only release once
 	releasing int32                     // flag indicating release of sm has begun
-	released  int32                     // flag indicating release of sm has finished
 }
 
 type smIsReleased struct{}
@@ -171,9 +171,9 @@ func NewSourceManager(an ProjectAnalyzer, cachedir string) (*SourceMgr, error) {
 	return sm, nil
 }
 
-// SetUpSigHandling sets up typical os.Interrupt signal handling for a
+// UseDefaultSignalHandling sets up typical os.Interrupt signal handling for a
 // SourceMgr.
-func SetUpSigHandling(sm *SourceMgr) {
+func (sm *SourceMgr) UseDefaultSignalHandling() {
 	sigch := make(chan os.Signal, 1)
 	signal.Notify(sigch, os.Interrupt)
 	sm.HandleSignals(sigch)
@@ -221,26 +221,19 @@ func (sm *SourceMgr) HandleSignals(sigch chan os.Signal) {
 					return
 				}
 
-				// Keep track of whether we waited for output purposes
-				var waited bool
 				opc := atomic.LoadInt32(&sm.opcount)
 				if opc > 0 {
-					waited = true
-					fmt.Printf("Waiting for %v ops to complete...", opc)
+					fmt.Printf("Signal received: waiting for %v ops to complete...\n", opc)
 				}
 
 				// Mutex interaction in a signal handler is, as a general rule,
 				// unsafe. I'm not clear on whether the guarantees Go provides
 				// around signal handling, or having passed this through a
 				// channel in general, obviate those concerns, but it's a lot
-				// easier to just hit the mutex right now, so do that until it
-				// proves problematic or someone provides a clear explanation.
-				sm.glock.Lock()
-				if waited && sm.released != 1 {
-					fmt.Print("done.\n")
-				}
-				sm.doRelease()
-				sm.glock.Unlock()
+				// easier to just rely on the mutex contained in the Once right
+				// now, so do that until it proves problematic or someone
+				// provides a clear explanation.
+				sm.relonce.Do(func() { sm.doRelease() })
 				return
 			case <-qch:
 				// quit channel triggered - deregister our sigch and return
@@ -284,38 +277,38 @@ func (e CouldNotCreateLockError) Error() string {
 // longer safe to call methods against it; all method calls will immediately
 // result in errors.
 func (sm *SourceMgr) Release() {
-	// This ensures a signal handling can't interleave with a Release call -
-	// exit early if we're already marked as having initiated a release process.
-	//
-	// Setting it before we acquire the lock also guarantees that no _more_
-	// method calls will stack up.
-	if !atomic.CompareAndSwapInt32(&sm.releasing, 0, 1) {
-		return
-	}
+	// Set sm.releasing before entering the Once func to guarantee that no
+	// _more_ method calls will stack up if/while waiting.
+	atomic.CompareAndSwapInt32(&sm.releasing, 0, 1)
 
+	// Whether 'releasing' is set or not, we don't want this function to return
+	// until after the doRelease process is done, as doing so could cause the
+	// process to terminate before a signal-driven doRelease() call has a chance
+	// to finish its cleanup.
+	sm.relonce.Do(func() { sm.doRelease() })
+}
+
+// doRelease actually releases physical resources (files on disk, etc.).
+//
+// This must be called only and exactly once. Calls to it should be wrapped in
+// the sm.relonce sync.Once instance.
+func (sm *SourceMgr) doRelease() {
 	// Grab the global sm lock so that we only release once we're sure all other
 	// calls have completed
 	//
 	// (This could deadlock, ofc)
 	sm.glock.Lock()
-	sm.doRelease()
-	sm.glock.Unlock()
-}
 
-// doRelease actually releases physical resources (files on disk, etc.).
-func (sm *SourceMgr) doRelease() {
-	// One last atomic marker ensures actual disk changes only happen once.
-	if atomic.CompareAndSwapInt32(&sm.released, 0, 1) {
-		// Close the file handle for the lock file
-		sm.lf.Close()
-		// Remove the lock file from disk
-		os.Remove(filepath.Join(sm.cachedir, "sm.lock"))
-		// Close the qch, if non-nil, so the signal handlers run out. This will
-		// also deregister the sig channel, if any has been set up.
-		if sm.qch != nil {
-			close(sm.qch)
-		}
+	// Close the file handle for the lock file
+	sm.lf.Close()
+	// Remove the lock file from disk
+	os.Remove(filepath.Join(sm.cachedir, "sm.lock"))
+	// Close the qch, if non-nil, so the signal handlers run out. This will
+	// also deregister the sig channel, if any has been set up.
+	if sm.qch != nil {
+		close(sm.qch)
 	}
+	sm.glock.Unlock()
 }
 
 // AnalyzerInfo reports the name and version of the injected ProjectAnalyzer.
