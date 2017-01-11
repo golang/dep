@@ -173,10 +173,10 @@ type solver struct {
 // a "lock file" - and/or use it to write out a directory tree of dependencies,
 // suitable to be a vendor directory, via CreateVendorTree.
 type Solver interface {
-	// HashInputs produces a hash digest representing the unique inputs to this
-	// solver. It is guaranteed that, if the hash digest is equal to the digest
-	// from a previous Solution.InputHash(), that that Solution is valid for
-	// this Solver's inputs.
+	// HashInputs hashes the unique inputs to this solver, returning the hash
+	// digest. It is guaranteed that, if the resulting digest is equal to the
+	// digest returned from a previous Solution.InputHash(), that that Solution
+	// is valid for this Solver's inputs.
 	//
 	// In such a case, it may not be necessary to run Solve() at all.
 	HashInputs() []byte

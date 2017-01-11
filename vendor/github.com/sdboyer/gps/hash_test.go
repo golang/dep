@@ -3,6 +3,7 @@ package gps
 import (
 	"bytes"
 	"crypto/sha256"
+	"strings"
 	"testing"
 )
 
@@ -42,7 +43,12 @@ func TestHashInputs(t *testing.T) {
 	correct := h.Sum(nil)
 
 	if !bytes.Equal(dig, correct) {
-		t.Errorf("Hashes are not equal")
+		t.Error("Hashes are not equal")
+	}
+
+	fixstr, hisstr := strings.Join(elems, ""), HashingInputsAsString(s)
+	if fixstr != hisstr {
+		t.Errorf("Hashing inputs not equal:\n\t(GOT) %s\n\t(WNT) %s", hisstr, fixstr)
 	}
 }
 
@@ -94,6 +100,11 @@ func TestHashInputsReqsIgs(t *testing.T) {
 		t.Errorf("Hashes are not equal")
 	}
 
+	fixstr, hisstr := strings.Join(elems, ""), HashingInputsAsString(s)
+	if fixstr != hisstr {
+		t.Errorf("Hashing inputs not equal:\n\t(GOT) %s\n\t(WNT) %s", hisstr, fixstr)
+	}
+
 	// Add requires
 	rm.req = map[string]bool{
 		"baz": true,
@@ -137,6 +148,11 @@ func TestHashInputsReqsIgs(t *testing.T) {
 		t.Errorf("Hashes are not equal")
 	}
 
+	fixstr, hisstr = strings.Join(elems, ""), HashingInputsAsString(s)
+	if fixstr != hisstr {
+		t.Errorf("Hashing inputs not equal:\n\t(GOT) %s\n\t(WNT) %s", hisstr, fixstr)
+	}
+
 	// remove ignores, just test requires alone
 	rm.ig = nil
 	params.Manifest = rm
@@ -172,6 +188,11 @@ func TestHashInputsReqsIgs(t *testing.T) {
 
 	if !bytes.Equal(dig, correct) {
 		t.Errorf("Hashes are not equal")
+	}
+
+	fixstr, hisstr = strings.Join(elems, ""), HashingInputsAsString(s)
+	if fixstr != hisstr {
+		t.Errorf("Hashing inputs not equal:\n\t(GOT) %s\n\t(WNT) %s", hisstr, fixstr)
 	}
 }
 
@@ -224,6 +245,11 @@ func TestHashInputsOverrides(t *testing.T) {
 		t.Errorf("Hashes are not equal")
 	}
 
+	fixstr, hisstr := strings.Join(elems, ""), HashingInputsAsString(s)
+	if fixstr != hisstr {
+		t.Errorf("Hashing inputs not equal:\n\t(GOT) %s\n\t(WNT) %s", hisstr, fixstr)
+	}
+
 	// Override not in root, just with constraint
 	rm.ovr["d"] = ProjectProperties{
 		Constraint: NewBranch("foobranch"),
@@ -255,6 +281,11 @@ func TestHashInputsOverrides(t *testing.T) {
 
 	if !bytes.Equal(dig, correct) {
 		t.Errorf("Hashes are not equal")
+	}
+
+	fixstr, hisstr = strings.Join(elems, ""), HashingInputsAsString(s)
+	if fixstr != hisstr {
+		t.Errorf("Hashing inputs not equal:\n\t(GOT) %s\n\t(WNT) %s", hisstr, fixstr)
 	}
 
 	// Override not in root, both constraint and network name
@@ -294,6 +325,11 @@ func TestHashInputsOverrides(t *testing.T) {
 		t.Errorf("Hashes are not equal")
 	}
 
+	fixstr, hisstr = strings.Join(elems, ""), HashingInputsAsString(s)
+	if fixstr != hisstr {
+		t.Errorf("Hashing inputs not equal:\n\t(GOT) %s\n\t(WNT) %s", hisstr, fixstr)
+	}
+
 	// Override in root, just constraint
 	rm.ovr["a"] = ProjectProperties{
 		Constraint: NewVersion("fluglehorn"),
@@ -330,6 +366,11 @@ func TestHashInputsOverrides(t *testing.T) {
 
 	if !bytes.Equal(dig, correct) {
 		t.Errorf("Hashes are not equal")
+	}
+
+	fixstr, hisstr = strings.Join(elems, ""), HashingInputsAsString(s)
+	if fixstr != hisstr {
+		t.Errorf("Hashing inputs not equal:\n\t(GOT) %s\n\t(WNT) %s", hisstr, fixstr)
 	}
 
 	// Override in root, only network name
@@ -371,6 +412,11 @@ func TestHashInputsOverrides(t *testing.T) {
 		t.Errorf("Hashes are not equal")
 	}
 
+	fixstr, hisstr = strings.Join(elems, ""), HashingInputsAsString(s)
+	if fixstr != hisstr {
+		t.Errorf("Hashing inputs not equal:\n\t(GOT) %s\n\t(WNT) %s", hisstr, fixstr)
+	}
+
 	// Override in root, network name and constraint
 	rm.ovr["a"] = ProjectProperties{
 		Source:     "nota",
@@ -410,5 +456,10 @@ func TestHashInputsOverrides(t *testing.T) {
 
 	if !bytes.Equal(dig, correct) {
 		t.Errorf("Hashes are not equal")
+	}
+
+	fixstr, hisstr = strings.Join(elems, ""), HashingInputsAsString(s)
+	if fixstr != hisstr {
+		t.Errorf("Hashing inputs not equal:\n\t(GOT) %s\n\t(WNT) %s", hisstr, fixstr)
 	}
 }
