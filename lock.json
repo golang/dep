@@ -36,7 +36,7 @@
         {
             "name": "github.com/sdboyer/gps",
             "branch": "master",
-            "revision": "88027dbe5e8fb2a2764036d1858f498a9aa6bf1c",
+            "revision": "669a62fc8b4b2c48757f6ff89aeba9eb8f287a9c",
             "packages": [
                 "."
             ]
