@@ -16,14 +16,21 @@ import (
 // unnecessary.
 //
 // (Basically, this is for memoization.)
-func (s *solver) HashInputs() []byte {
+func (s *solver) HashInputs() (digest []byte) {
+	buf := new(bytes.Buffer)
+	s.writeHashingInputs(buf)
+
+	hd := sha256.Sum256(buf.Bytes())
+	digest = hd[:]
+	return
+}
+
+func (s *solver) writeHashingInputs(buf *bytes.Buffer) {
 	// Apply overrides to the constraints from the root. Otherwise, the hash
 	// would be computed on the basis of a constraint from root that doesn't
 	// actually affect solving.
 	p := s.ovr.overrideAll(s.rm.DependencyConstraints().merge(s.rm.TestDependencyConstraints()))
 
-	// Build up a buffer of all the inputs.
-	buf := new(bytes.Buffer)
 	for _, pd := range p {
 		buf.WriteString(string(pd.Ident.ProjectRoot))
 		buf.WriteString(pd.Ident.Source)
@@ -103,9 +110,18 @@ func (s *solver) HashInputs() []byte {
 	an, av := s.b.AnalyzerInfo()
 	buf.WriteString(an)
 	buf.WriteString(av.String())
+}
 
-	hd := sha256.Sum256(buf.Bytes())
-	return hd[:]
+// HashingInputsAsString returns the raw input data used by Solver.HashInputs()
+// as a string.
+//
+// This is primarily intended for debugging purposes.
+func HashingInputsAsString(s Solver) string {
+	ts := s.(*solver)
+	buf := new(bytes.Buffer)
+	ts.writeHashingInputs(buf)
+
+	return buf.String()
 }
 
 type sortPackageOrErr []PackageOrErr
