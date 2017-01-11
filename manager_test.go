@@ -598,8 +598,8 @@ func TestMultiFetchThreadsafe(t *testing.T) {
 		//mkPI("bitbucket.org/sdboyer/nobm"),
 	}
 
-	// 40 gives us ten calls per op, per project, which is decently likely to
-	// reveal any underlying parallelism problems
+	// 40 gives us ten calls per op, per project, which should be(?) decently
+	// likely to reveal underlying parallelism problems
 	cnum := len(projects) * 40
 	wg := &sync.WaitGroup{}
 
