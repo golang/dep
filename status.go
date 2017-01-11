@@ -73,6 +73,7 @@ func (cmd *statusCommand) Run(args []string) error {
 	if err != nil {
 		return err
 	}
+	sm.UseDefaultSignalHandling()
 	defer sm.Release()
 
 	if cmd.detailed {

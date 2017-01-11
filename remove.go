@@ -51,6 +51,7 @@ func (cmd *removeCommand) Run(args []string) error {
 	if err != nil {
 		return err
 	}
+	sm.UseDefaultSignalHandling()
 	defer sm.Release()
 
 	cpr, err := depContext.splitAbsoluteProjectRoot(p.absroot)
