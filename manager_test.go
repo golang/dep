@@ -739,7 +739,7 @@ func TestSignalHandling(t *testing.T) {
 	clean()
 
 	sm, clean = mkNaiveSM(t)
-	SetUpSigHandling(sm)
+	sm.UseDefaultSignalHandling()
 	go sm.DeduceProjectRoot("rsc.io/pdf")
 	runtime.Gosched()
 
@@ -769,9 +769,9 @@ func TestSignalHandling(t *testing.T) {
 	clean()
 
 	sm, clean = mkNaiveSM(t)
-	SetUpSigHandling(sm)
+	sm.UseDefaultSignalHandling()
 	sm.StopSignalHandling()
-	SetUpSigHandling(sm)
+	sm.UseDefaultSignalHandling()
 
 	go sm.DeduceProjectRoot("rsc.io/pdf")
 	//runtime.Gosched()

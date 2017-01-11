@@ -171,9 +171,9 @@ func NewSourceManager(an ProjectAnalyzer, cachedir string) (*SourceMgr, error) {
 	return sm, nil
 }
 
-// SetUpSigHandling sets up typical os.Interrupt signal handling for a
+// UseDefaultSignalHandling sets up typical os.Interrupt signal handling for a
 // SourceMgr.
-func SetUpSigHandling(sm *SourceMgr) {
+func (sm *SourceMgr) UseDefaultSignalHandling() {
 	sigch := make(chan os.Signal, 1)
 	signal.Notify(sigch, os.Interrupt)
 	sm.HandleSignals(sigch)
