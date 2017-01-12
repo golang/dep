@@ -28,9 +28,14 @@ func (s *solver) HashInputs() (digest []byte) {
 
 func (s *solver) writeHashingInputs(w io.Writer) {
 	writeString := func(s string) {
-		// All users of writeHashingInputs cannot error on Write(), so just
-		// ignore it
-		w.Write([]byte(s))
+		// Skip zero-length string writes; it doesn't affect the real hash
+		// calculation, and keeps misleading newlines from showing up in the
+		// debug output.
+		if s != "" {
+			// All users of writeHashingInputs cannot error on Write(), so just
+			// ignore it
+			w.Write([]byte(s))
+		}
 	}
 
 	// Apply overrides to the constraints from the root. Otherwise, the hash
