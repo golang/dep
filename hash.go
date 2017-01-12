@@ -83,32 +83,26 @@ func (s *solver) writeHashingInputs(w io.Writer) {
 		}
 	}
 
-	// Write any require packages given in the root manifest.
-	if len(s.req) > 0 {
-		// Dump and sort the reqnores
-		req := make([]string, 0, len(s.req))
-		for pkg := range s.req {
-			req = append(req, pkg)
-		}
-		sort.Strings(req)
+	// Write any required packages given in the root manifest.
+	req := make([]string, 0, len(s.req))
+	for pkg := range s.req {
+		req = append(req, pkg)
+	}
+	sort.Strings(req)
 
-		for _, reqp := range req {
-			writeString(reqp)
-		}
+	for _, reqp := range req {
+		writeString(reqp)
 	}
 
 	// Add the ignored packages, if any.
-	if len(s.ig) > 0 {
-		// Dump and sort the ignores
-		ig := make([]string, 0, len(s.ig))
-		for pkg := range s.ig {
-			ig = append(ig, pkg)
-		}
-		sort.Strings(ig)
+	ig := make([]string, 0, len(s.ig))
+	for pkg := range s.ig {
+		ig = append(ig, pkg)
+	}
+	sort.Strings(ig)
 
-		for _, igp := range ig {
-			writeString(igp)
-		}
+	for _, igp := range ig {
+		writeString(igp)
 	}
 
 	for _, pc := range s.ovr.asSortedSlice() {
