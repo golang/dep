@@ -3,6 +3,7 @@ package gps
 import (
 	"bytes"
 	"crypto/sha256"
+	"io"
 	"sort"
 )
 
@@ -17,29 +18,37 @@ import (
 //
 // (Basically, this is for memoization.)
 func (s *solver) HashInputs() (digest []byte) {
-	buf := new(bytes.Buffer)
-	s.writeHashingInputs(buf)
+	h := sha256.New()
+	s.writeHashingInputs(h)
 
-	hd := sha256.Sum256(buf.Bytes())
+	hd := h.Sum(nil)
 	digest = hd[:]
 	return
 }
 
-func (s *solver) writeHashingInputs(buf *bytes.Buffer) {
+func (s *solver) writeHashingInputs(w io.Writer) {
+	writeString := func(s string) {
+		// All users of writeHashingInputs cannot error on Write(), so just
+		// ignore it
+		w.Write([]byte(s))
+	}
+
 	// Apply overrides to the constraints from the root. Otherwise, the hash
 	// would be computed on the basis of a constraint from root that doesn't
 	// actually affect solving.
-	p := s.ovr.overrideAll(s.rm.DependencyConstraints().merge(s.rm.TestDependencyConstraints()))
+	wc := s.ovr.overrideAll(s.rm.DependencyConstraints().merge(s.rm.TestDependencyConstraints()))
 
-	for _, pd := range p {
-		buf.WriteString(string(pd.Ident.ProjectRoot))
-		buf.WriteString(pd.Ident.Source)
+	for _, pd := range wc {
+		writeString(string(pd.Ident.ProjectRoot))
+		writeString(pd.Ident.Source)
 		// FIXME Constraint.String() is a surjective-only transformation - tags
 		// and branches with the same name are written out as the same string.
-		// This could, albeit rarely, result in input collisions when a real
-		// change has occurred.
-		buf.WriteString(pd.Constraint.String())
+		// This could, albeit rarely, result in erroneously identical inputs
+		// when a real change has occurred.
+		writeString(pd.Constraint.String())
 	}
+
+	// Get the external reach list
 
 	// Write each of the packages, or the errors that were found for a
 	// particular subpath, into the hash. We need to do this in a
@@ -51,19 +60,19 @@ func (s *solver) writeHashingInputs(buf *bytes.Buffer) {
 	sort.Sort(sortPackageOrErr(pkgs))
 	for _, perr := range pkgs {
 		if perr.Err != nil {
-			buf.WriteString(perr.Err.Error())
+			writeString(perr.Err.Error())
 		} else {
-			buf.WriteString(perr.P.Name)
-			buf.WriteString(perr.P.CommentPath)
-			buf.WriteString(perr.P.ImportPath)
+			writeString(perr.P.Name)
+			writeString(perr.P.CommentPath)
+			writeString(perr.P.ImportPath)
 			for _, imp := range perr.P.Imports {
 				if !isStdLib(imp) {
-					buf.WriteString(imp)
+					writeString(imp)
 				}
 			}
 			for _, imp := range perr.P.TestImports {
 				if !isStdLib(imp) {
-					buf.WriteString(imp)
+					writeString(imp)
 				}
 			}
 		}
@@ -79,7 +88,7 @@ func (s *solver) writeHashingInputs(buf *bytes.Buffer) {
 		sort.Strings(req)
 
 		for _, reqp := range req {
-			buf.WriteString(reqp)
+			writeString(reqp)
 		}
 	}
 
@@ -93,23 +102,32 @@ func (s *solver) writeHashingInputs(buf *bytes.Buffer) {
 		sort.Strings(ig)
 
 		for _, igp := range ig {
-			buf.WriteString(igp)
+			writeString(igp)
 		}
 	}
 
 	for _, pc := range s.ovr.asSortedSlice() {
-		buf.WriteString(string(pc.Ident.ProjectRoot))
+		writeString(string(pc.Ident.ProjectRoot))
 		if pc.Ident.Source != "" {
-			buf.WriteString(pc.Ident.Source)
+			writeString(pc.Ident.Source)
 		}
 		if pc.Constraint != nil {
-			buf.WriteString(pc.Constraint.String())
+			writeString(pc.Constraint.String())
 		}
 	}
 
 	an, av := s.b.AnalyzerInfo()
-	buf.WriteString(an)
-	buf.WriteString(av.String())
+	writeString(an)
+	writeString(av.String())
+}
+
+// bytes.Buffer wrapper that injects newlines after each call to Write().
+type nlbuf bytes.Buffer
+
+func (buf *nlbuf) Write(p []byte) (n int, err error) {
+	n, _ = (*bytes.Buffer)(buf).Write(p)
+	(*bytes.Buffer)(buf).WriteByte('\n')
+	return n + 1, nil
 }
 
 // HashingInputsAsString returns the raw input data used by Solver.HashInputs()
@@ -118,10 +136,10 @@ func (s *solver) writeHashingInputs(buf *bytes.Buffer) {
 // This is primarily intended for debugging purposes.
 func HashingInputsAsString(s Solver) string {
 	ts := s.(*solver)
-	buf := new(bytes.Buffer)
+	buf := new(nlbuf)
 	ts.writeHashingInputs(buf)
 
-	return buf.String()
+	return (*bytes.Buffer)(buf).String()
 }
 
 type sortPackageOrErr []PackageOrErr

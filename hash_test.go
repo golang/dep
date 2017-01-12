@@ -46,7 +46,7 @@ func TestHashInputs(t *testing.T) {
 		t.Error("Hashes are not equal")
 	}
 
-	fixstr, hisstr := strings.Join(elems, ""), HashingInputsAsString(s)
+	fixstr, hisstr := strings.Join(elems, "\n")+"\n", HashingInputsAsString(s)
 	if fixstr != hisstr {
 		t.Errorf("Hashing inputs not equal:\n\t(GOT) %s\n\t(WNT) %s", hisstr, fixstr)
 	}
@@ -100,7 +100,7 @@ func TestHashInputsReqsIgs(t *testing.T) {
 		t.Errorf("Hashes are not equal")
 	}
 
-	fixstr, hisstr := strings.Join(elems, ""), HashingInputsAsString(s)
+	fixstr, hisstr := strings.Join(elems, "\n")+"\n", HashingInputsAsString(s)
 	if fixstr != hisstr {
 		t.Errorf("Hashing inputs not equal:\n\t(GOT) %s\n\t(WNT) %s", hisstr, fixstr)
 	}
@@ -148,7 +148,7 @@ func TestHashInputsReqsIgs(t *testing.T) {
 		t.Errorf("Hashes are not equal")
 	}
 
-	fixstr, hisstr = strings.Join(elems, ""), HashingInputsAsString(s)
+	fixstr, hisstr = strings.Join(elems, "\n")+"\n", HashingInputsAsString(s)
 	if fixstr != hisstr {
 		t.Errorf("Hashing inputs not equal:\n\t(GOT) %s\n\t(WNT) %s", hisstr, fixstr)
 	}
@@ -190,7 +190,7 @@ func TestHashInputsReqsIgs(t *testing.T) {
 		t.Errorf("Hashes are not equal")
 	}
 
-	fixstr, hisstr = strings.Join(elems, ""), HashingInputsAsString(s)
+	fixstr, hisstr = strings.Join(elems, "\n")+"\n", HashingInputsAsString(s)
 	if fixstr != hisstr {
 		t.Errorf("Hashing inputs not equal:\n\t(GOT) %s\n\t(WNT) %s", hisstr, fixstr)
 	}
@@ -245,7 +245,7 @@ func TestHashInputsOverrides(t *testing.T) {
 		t.Errorf("Hashes are not equal")
 	}
 
-	fixstr, hisstr := strings.Join(elems, ""), HashingInputsAsString(s)
+	fixstr, hisstr := strings.Join(elems, "\n")+"\n", HashingInputsAsString(s)
 	if fixstr != hisstr {
 		t.Errorf("Hashing inputs not equal:\n\t(GOT) %s\n\t(WNT) %s", hisstr, fixstr)
 	}
@@ -283,7 +283,7 @@ func TestHashInputsOverrides(t *testing.T) {
 		t.Errorf("Hashes are not equal")
 	}
 
-	fixstr, hisstr = strings.Join(elems, ""), HashingInputsAsString(s)
+	fixstr, hisstr = strings.Join(elems, "\n")+"\n", HashingInputsAsString(s)
 	if fixstr != hisstr {
 		t.Errorf("Hashing inputs not equal:\n\t(GOT) %s\n\t(WNT) %s", hisstr, fixstr)
 	}
@@ -325,7 +325,7 @@ func TestHashInputsOverrides(t *testing.T) {
 		t.Errorf("Hashes are not equal")
 	}
 
-	fixstr, hisstr = strings.Join(elems, ""), HashingInputsAsString(s)
+	fixstr, hisstr = strings.Join(elems, "\n")+"\n", HashingInputsAsString(s)
 	if fixstr != hisstr {
 		t.Errorf("Hashing inputs not equal:\n\t(GOT) %s\n\t(WNT) %s", hisstr, fixstr)
 	}
@@ -368,7 +368,7 @@ func TestHashInputsOverrides(t *testing.T) {
 		t.Errorf("Hashes are not equal")
 	}
 
-	fixstr, hisstr = strings.Join(elems, ""), HashingInputsAsString(s)
+	fixstr, hisstr = strings.Join(elems, "\n")+"\n", HashingInputsAsString(s)
 	if fixstr != hisstr {
 		t.Errorf("Hashing inputs not equal:\n\t(GOT) %s\n\t(WNT) %s", hisstr, fixstr)
 	}
@@ -412,7 +412,7 @@ func TestHashInputsOverrides(t *testing.T) {
 		t.Errorf("Hashes are not equal")
 	}
 
-	fixstr, hisstr = strings.Join(elems, ""), HashingInputsAsString(s)
+	fixstr, hisstr = strings.Join(elems, "\n")+"\n", HashingInputsAsString(s)
 	if fixstr != hisstr {
 		t.Errorf("Hashing inputs not equal:\n\t(GOT) %s\n\t(WNT) %s", hisstr, fixstr)
 	}
@@ -458,7 +458,7 @@ func TestHashInputsOverrides(t *testing.T) {
 		t.Errorf("Hashes are not equal")
 	}
 
-	fixstr, hisstr = strings.Join(elems, ""), HashingInputsAsString(s)
+	fixstr, hisstr = strings.Join(elems, "\n")+"\n", HashingInputsAsString(s)
 	if fixstr != hisstr {
 		t.Errorf("Hashing inputs not equal:\n\t(GOT) %s\n\t(WNT) %s", hisstr, fixstr)
 	}
