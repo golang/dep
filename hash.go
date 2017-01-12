@@ -41,7 +41,7 @@ func (s *solver) writeHashingInputs(w io.Writer) {
 	// Apply overrides to the constraints from the root. Otherwise, the hash
 	// would be computed on the basis of a constraint from root that doesn't
 	// actually affect solving.
-	wc := s.ovr.overrideAll(s.rm.DependencyConstraints().merge(s.rm.TestDependencyConstraints()))
+	wc := s.rd.combineConstraints()
 
 	for _, pd := range wc {
 		writeString(string(pd.Ident.ProjectRoot))
@@ -59,7 +59,7 @@ func (s *solver) writeHashingInputs(w io.Writer) {
 	// particular subpath, into the hash. We need to do this in a
 	// deterministic order, so expand and sort the map.
 	var pkgs []PackageOrErr
-	for _, perr := range s.rpt.Packages {
+	for _, perr := range s.rd.rpt.Packages {
 		pkgs = append(pkgs, perr)
 	}
 	sort.Sort(sortPackageOrErr(pkgs))
@@ -84,8 +84,8 @@ func (s *solver) writeHashingInputs(w io.Writer) {
 	}
 
 	// Write any required packages given in the root manifest.
-	req := make([]string, 0, len(s.req))
-	for pkg := range s.req {
+	req := make([]string, 0, len(s.rd.req))
+	for pkg := range s.rd.req {
 		req = append(req, pkg)
 	}
 	sort.Strings(req)
@@ -95,8 +95,8 @@ func (s *solver) writeHashingInputs(w io.Writer) {
 	}
 
 	// Add the ignored packages, if any.
-	ig := make([]string, 0, len(s.ig))
-	for pkg := range s.ig {
+	ig := make([]string, 0, len(s.rd.ig))
+	for pkg := range s.rd.ig {
 		ig = append(ig, pkg)
 	}
 	sort.Strings(ig)
@@ -105,7 +105,7 @@ func (s *solver) writeHashingInputs(w io.Writer) {
 		writeString(igp)
 	}
 
-	for _, pc := range s.ovr.asSortedSlice() {
+	for _, pc := range s.rd.ovr.asSortedSlice() {
 		writeString(string(pc.Ident.ProjectRoot))
 		if pc.Ident.Source != "" {
 			writeString(pc.Ident.Source)
