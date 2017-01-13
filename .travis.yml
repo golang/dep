@@ -1,0 +1,17 @@
+---
+  language: go
+  sudo: false
+  notifications:
+    email: false
+  os:
+    - linux
+  go:
+    - 1.7
+    - tip
+  install:
+    - echo "This is an override of the default install deps step in travis."
+  script:
+    - go build -v
+    - go vet $(go list ./... | grep -v vendor)
+    - test -z "$(gofmt -s -l . |& grep -v vendor | tee /dev/stderr)"
+    - go test $(go list ./... | grep -v vendor)
