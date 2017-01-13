@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 )
 
@@ -35,8 +36,12 @@ func TestFindRoot(t *testing.T) {
 		t.Errorf("findProjectRoot on nonexistent subdir should still work and give %s, got %s", expect, got3)
 	}
 
-	got4, err := findProjectRoot(filepath.Join(expect, manifestName))
-	if err == nil {
-		t.Errorf("Should have err'd when trying subdir of file, but returned %s", got4)
+	// the following test does not work on windows because syscall.Stat does not
+	// return a "not a directory" error
+	if runtime.GOOS != "windows" {
+		got4, err := findProjectRoot(filepath.Join(expect, manifestName))
+		if err == nil {
+			t.Errorf("Should have err'd when trying subdir of file, but returned %s", got4)
+		}
 	}
 }
