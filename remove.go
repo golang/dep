@@ -101,7 +101,7 @@ func (cmd *removeCommand) Run(args []string) error {
 		}
 
 		var rm []gps.ProjectRoot
-		for pr, _ := range p.m.Dependencies {
+		for pr := range p.m.Dependencies {
 			if _, has := otherroots[pr]; !has {
 				delete(p.m.Dependencies, pr)
 				rm = append(rm, pr)
