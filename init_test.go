@@ -1,10 +1,6 @@
 package main
 
 import (
-	"encoding/json"
-	"errors"
-	"fmt"
-	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -169,8 +165,7 @@ const Qux = "yo yo!"
 		t.Fatalf("expected %s, got %s", expectedManifest, manifest)
 	}
 
-	sysCommit, err := getRepoLatestCommit("golang/sys")
-	tg.must(err)
+	sysCommit := tg.getCommit("go.googlesource.com/sys")
 	expectedLock := `{
     "projects": [
         {
@@ -209,25 +204,4 @@ var memoRE = regexp.MustCompile(`\s+"memo": "[a-z0-9]+",`)
 
 func wipeMemo(s string) string {
 	return memoRE.ReplaceAllString(s, "")
-}
-
-type commit struct {
-	Sha string `json:"sha"`
-}
-
-func getRepoLatestCommit(repo string) (string, error) {
-	resp, err := http.Get(fmt.Sprintf("https://api.github.com/repos/%s/commits?per_page=1", repo))
-	if err != nil {
-		return "", err
-	}
-
-	var commits []commit
-	if err := json.NewDecoder(resp.Body).Decode(&commits); err != nil {
-		return "", err
-	}
-
-	if len(commits) < 1 {
-		return "", errors.New("got no commits")
-	}
-	return commits[0].Sha, nil
 }
