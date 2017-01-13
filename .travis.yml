@@ -3,11 +3,14 @@
   sudo: false
   notifications:
     email: false
-  os:
-    - linux
-  go:
-    - 1.7
-    - tip
+  matrix:
+    include:
+      - os: linux
+        go: 1.7
+      - os: linux
+        go: tip
+      - os: osx
+        go: 1.7
   install:
     - echo "This is an override of the default install deps step in travis."
   script:
