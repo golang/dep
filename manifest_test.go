@@ -81,8 +81,8 @@ func TestReadManifest(t *testing.T) {
 		},
 		Ovr: map[gps.ProjectRoot]gps.ProjectProperties{
 			gps.ProjectRoot("github.com/sdboyer/gps"): {
-				Source: "https://github.com/sdboyer/gps",
-				Constraint:  gps.NewBranch("master"),
+				Source:     "https://github.com/sdboyer/gps",
+				Constraint: gps.NewBranch("master"),
 			},
 		},
 		Ignores: []string{"github.com/foo/bar"},
@@ -112,8 +112,8 @@ func TestWriteManifest(t *testing.T) {
 		},
 		Ovr: map[gps.ProjectRoot]gps.ProjectProperties{
 			gps.ProjectRoot("github.com/sdboyer/gps"): {
-				Source: "https://github.com/sdboyer/gps",
-				Constraint:  gps.NewBranch("master"),
+				Source:     "https://github.com/sdboyer/gps",
+				Constraint: gps.NewBranch("master"),
 			},
 		},
 		Ignores: []string{"github.com/foo/bar"},
