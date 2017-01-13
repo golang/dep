@@ -63,6 +63,7 @@ func TestTxnWriter(t *testing.T) {
 		GOPATH: tg.path("."),
 	}
 	sm, err := c.sourceManager()
+	defer sm.Release()
 	tg.must(err)
 
 	var sw safeWriter
