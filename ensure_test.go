@@ -52,8 +52,7 @@ func main() {
 		t.Fatalf("expected %s, got %s", expectedManifest, manifest)
 	}
 
-	sysCommit, err := getRepoLatestCommit("golang/sys")
-	tg.must(err)
+	sysCommit := tg.getCommit("go.googlesource.com/sys")
 	expectedLock := `{
     "memo": "595716d270828e763c811ef79c9c41f85b1d1bfbdfe85280036405c03772206c",
     "projects": [

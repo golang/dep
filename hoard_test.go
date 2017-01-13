@@ -502,3 +502,14 @@ func (tg *testgoData) readLock() string {
 	tg.must(err)
 	return string(f)
 }
+
+func (tg *testgoData) getCommit(repo string) string {
+	repoPath := tg.path("pkg/hoard/sources/https---" + strings.Replace(repo, "/", "-", -1))
+	cmd := exec.Command("git", "rev-parse", "HEAD")
+	cmd.Dir = repoPath
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		tg.t.Fatalf("git commit failed: out -> %s err -> %v", string(out), err)
+	}
+	return strings.TrimSpace(string(out))
+}
