@@ -28,10 +28,10 @@ type rawManifest struct {
 }
 
 type possibleProps struct {
-	Branch      string `json:"branch,omitempty"`
-	Revision    string `json:"revision,omitempty"`
-	Version     string `json:"version,omitempty"`
-	Source string `json:"source,omitempty"`
+	Branch   string `json:"branch,omitempty"`
+	Revision string `json:"revision,omitempty"`
+	Version  string `json:"version,omitempty"`
+	Source   string `json:"source,omitempty"`
 }
 
 func newRawManifest() rawManifest {
