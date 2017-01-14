@@ -3,8 +3,10 @@ package gps
 import (
 	"bytes"
 	"crypto/sha256"
+	"fmt"
 	"strings"
 	"testing"
+	"text/tabwriter"
 )
 
 func TestHashInputs(t *testing.T) {
@@ -43,12 +45,7 @@ func TestHashInputs(t *testing.T) {
 	correct := h.Sum(nil)
 
 	if !bytes.Equal(dig, correct) {
-		t.Error("Hashes are not equal")
-	}
-
-	fixstr, hisstr := strings.Join(elems, "\n")+"\n", HashingInputsAsString(s)
-	if fixstr != hisstr {
-		t.Errorf("Hashing inputs not equal:\n\t(GOT) %s\n\t(WNT) %s", hisstr, fixstr)
+		t.Errorf("Hashes are not equal. Inputs:\n%s", diffHashingInputs(s, elems))
 	}
 }
 
@@ -96,12 +93,7 @@ func TestHashInputsReqsIgs(t *testing.T) {
 	correct := h.Sum(nil)
 
 	if !bytes.Equal(dig, correct) {
-		t.Errorf("Hashes are not equal")
-	}
-
-	fixstr, hisstr := strings.Join(elems, "\n")+"\n", HashingInputsAsString(s)
-	if fixstr != hisstr {
-		t.Errorf("Hashing inputs not equal:\n\t(GOT) %s\n\t(WNT) %s", hisstr, fixstr)
+		t.Errorf("Hashes are not equal. Inputs:\n%s", diffHashingInputs(s, elems))
 	}
 
 	// Add requires
@@ -143,12 +135,7 @@ func TestHashInputsReqsIgs(t *testing.T) {
 	correct = h.Sum(nil)
 
 	if !bytes.Equal(dig, correct) {
-		t.Errorf("Hashes are not equal")
-	}
-
-	fixstr, hisstr = strings.Join(elems, "\n")+"\n", HashingInputsAsString(s)
-	if fixstr != hisstr {
-		t.Errorf("Hashing inputs not equal:\n\t(GOT) %s\n\t(WNT) %s", hisstr, fixstr)
+		t.Errorf("Hashes are not equal. Inputs:\n%s", diffHashingInputs(s, elems))
 	}
 
 	// remove ignores, just test requires alone
@@ -184,12 +171,7 @@ func TestHashInputsReqsIgs(t *testing.T) {
 	correct = h.Sum(nil)
 
 	if !bytes.Equal(dig, correct) {
-		t.Errorf("Hashes are not equal")
-	}
-
-	fixstr, hisstr = strings.Join(elems, "\n")+"\n", HashingInputsAsString(s)
-	if fixstr != hisstr {
-		t.Errorf("Hashing inputs not equal:\n\t(GOT) %s\n\t(WNT) %s", hisstr, fixstr)
+		t.Errorf("Hashes are not equal. Inputs:\n%s", diffHashingInputs(s, elems))
 	}
 }
 
@@ -238,12 +220,7 @@ func TestHashInputsOverrides(t *testing.T) {
 	correct := h.Sum(nil)
 
 	if !bytes.Equal(dig, correct) {
-		t.Errorf("Hashes are not equal")
-	}
-
-	fixstr, hisstr := strings.Join(elems, "\n")+"\n", HashingInputsAsString(s)
-	if fixstr != hisstr {
-		t.Errorf("Hashing inputs not equal:\n\t(GOT) %s\n\t(WNT) %s", hisstr, fixstr)
+		t.Errorf("Hashes are not equal. Inputs:\n%s", diffHashingInputs(s, elems))
 	}
 
 	// Override not in root, just with constraint
@@ -275,12 +252,7 @@ func TestHashInputsOverrides(t *testing.T) {
 	correct = h.Sum(nil)
 
 	if !bytes.Equal(dig, correct) {
-		t.Errorf("Hashes are not equal")
-	}
-
-	fixstr, hisstr = strings.Join(elems, "\n")+"\n", HashingInputsAsString(s)
-	if fixstr != hisstr {
-		t.Errorf("Hashing inputs not equal:\n\t(GOT) %s\n\t(WNT) %s", hisstr, fixstr)
+		t.Errorf("Hashes are not equal. Inputs:\n%s", diffHashingInputs(s, elems))
 	}
 
 	// Override not in root, both constraint and network name
@@ -316,12 +288,7 @@ func TestHashInputsOverrides(t *testing.T) {
 	correct = h.Sum(nil)
 
 	if !bytes.Equal(dig, correct) {
-		t.Errorf("Hashes are not equal")
-	}
-
-	fixstr, hisstr = strings.Join(elems, "\n")+"\n", HashingInputsAsString(s)
-	if fixstr != hisstr {
-		t.Errorf("Hashing inputs not equal:\n\t(GOT) %s\n\t(WNT) %s", hisstr, fixstr)
+		t.Errorf("Hashes are not equal. Inputs:\n%s", diffHashingInputs(s, elems))
 	}
 
 	// Override in root, just constraint
@@ -358,12 +325,7 @@ func TestHashInputsOverrides(t *testing.T) {
 	correct = h.Sum(nil)
 
 	if !bytes.Equal(dig, correct) {
-		t.Errorf("Hashes are not equal")
-	}
-
-	fixstr, hisstr = strings.Join(elems, "\n")+"\n", HashingInputsAsString(s)
-	if fixstr != hisstr {
-		t.Errorf("Hashing inputs not equal:\n\t(GOT) %s\n\t(WNT) %s", hisstr, fixstr)
+		t.Errorf("Hashes are not equal. Inputs:\n%s", diffHashingInputs(s, elems))
 	}
 
 	// Override in root, only network name
@@ -401,12 +363,7 @@ func TestHashInputsOverrides(t *testing.T) {
 	correct = h.Sum(nil)
 
 	if !bytes.Equal(dig, correct) {
-		t.Errorf("Hashes are not equal")
-	}
-
-	fixstr, hisstr = strings.Join(elems, "\n")+"\n", HashingInputsAsString(s)
-	if fixstr != hisstr {
-		t.Errorf("Hashing inputs not equal:\n\t(GOT) %s\n\t(WNT) %s", hisstr, fixstr)
+		t.Errorf("Hashes are not equal. Inputs:\n%s", diffHashingInputs(s, elems))
 	}
 
 	// Override in root, network name and constraint
@@ -446,11 +403,55 @@ func TestHashInputsOverrides(t *testing.T) {
 	correct = h.Sum(nil)
 
 	if !bytes.Equal(dig, correct) {
-		t.Errorf("Hashes are not equal")
+		t.Errorf("Hashes are not equal. Inputs:\n%s", diffHashingInputs(s, elems))
+	}
+}
+
+func diffHashingInputs(s Solver, wnt []string) string {
+	actual := HashingInputsAsString(s)
+	got := strings.Split(actual, "\n")
+
+	lg, lw := len(got), len(wnt)
+
+	var buf bytes.Buffer
+	tw := tabwriter.NewWriter(&buf, 4, 4, 2, ' ', 0)
+	fmt.Fprintln(tw, "  (GOT)  \t  (WANT)  \t")
+
+	if lg == lw {
+		// same length makes the loop pretty straightforward
+		for i := 0; i < lg; i++ {
+			fmt.Fprintf(tw, "%s\t%s\t\n", got[i], wnt[i])
+		}
+	} else if lg > lw {
+		offset := 0
+		for i := 0; i < lg; i++ {
+			if lw <= i-offset {
+				fmt.Fprintf(tw, "%s\t\t\n", got[i])
+			} else if got[i] != wnt[i-offset] && got[i] == wnt[i-offset-1] {
+				// if the next slot is a match, realign by skipping this one and
+				// bumping the offset
+				fmt.Fprintf(tw, "%s\t\t\n", got[i])
+				offset++
+			} else {
+				fmt.Fprintf(tw, "%s\t%s\t\n", got[i], wnt[i-offset])
+			}
+		}
+	} else {
+		offset := 0
+		for i := 0; i < lw; i++ {
+			if lg <= i-offset {
+				fmt.Fprintf(tw, "\t%s\t\n", wnt[i])
+			} else if got[i-offset] != wnt[i] && got[i-offset-1] == wnt[i] {
+				// if the next slot is a match, realign by skipping this one and
+				// bumping the offset
+				fmt.Fprintf(tw, "\t%s\t\n", wnt[i])
+				offset++
+			} else {
+				fmt.Fprintf(tw, "%s\t%s\t\n", got[i-offset], wnt[i])
+			}
+		}
 	}
 
-	fixstr, hisstr = strings.Join(elems, "\n")+"\n", HashingInputsAsString(s)
-	if fixstr != hisstr {
-		t.Errorf("Hashing inputs not equal:\n\t(GOT) %s\n\t(WNT) %s", hisstr, fixstr)
-	}
+	tw.Flush()
+	return buf.String()
 }
