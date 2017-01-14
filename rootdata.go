@@ -43,9 +43,15 @@ type rootdata struct {
 }
 
 // rootImportList returns a list of the unique imports from the root data.
-// Ignores and requires are taken into consideration.
+// Ignores and requires are taken into consideration, and stdlib is excluded.
 func (rd rootdata) externalImportList() []string {
-	reach := rd.rpt.ExternalReach(true, true, rd.ig).ListExternalImports()
+	all := rd.rpt.ExternalReach(true, true, rd.ig).ListExternalImports()
+	reach := make([]string, 0, len(all))
+	for _, r := range all {
+		if !isStdLib(r) {
+			reach = append(reach, r)
+		}
+	}
 
 	// If there are any requires, slide them into the reach list, as well.
 	if len(rd.req) > 0 {
@@ -75,13 +81,34 @@ func (rd rootdata) externalImportList() []string {
 }
 
 func (rd rootdata) getApplicableConstraints() []workingConstraint {
-	xt := radix.New()
-	combined := rd.combineConstraints()
+	// Merge the normal and test constraints together
+	pc := rd.rm.DependencyConstraints().merge(rd.rm.TestDependencyConstraints())
+
+	// Ensure that overrides which aren't in the combined pc map already make it
+	// in. Doing so provides a bit more compatibility spread for a generated
+	// hash.
+	for pr, pp := range rd.ovr {
+		if _, has := pc[pr]; !has {
+			cpp := ProjectProperties{
+				Constraint: pp.Constraint,
+				Source:     pp.Source,
+			}
+			if cpp.Constraint == nil {
+				cpp.Constraint = anyConstraint{}
+			}
+
+			pc[pr] = cpp
+		}
+	}
+
+	// Now override them all to produce a consolidated workingConstraint slice
+	combined := rd.ovr.overrideAll(pc)
 
 	type wccount struct {
 		count int
 		wc    workingConstraint
 	}
+	xt := radix.New()
 	for _, wc := range combined {
 		xt.Insert(string(wc.Ident.ProjectRoot), wccount{wc: wc})
 	}

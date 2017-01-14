@@ -17,8 +17,8 @@ var rootRev = Revision("")
 // Only RootDir and RootPackageTree are absolutely required. A nil Manifest is
 // allowed, though it usually makes little sense.
 //
-// Of these properties, only Manifest and Ignore are (directly) incorporated in
-// memoization hashing.
+// Of these properties, only the Manifest and RootPackageTree are (directly)
+// incorporated in memoization hashing.
 type SolveParameters struct {
 	// The path to the root of the project on which the solver should operate.
 	// This should point to the directory that should contain the vendor/

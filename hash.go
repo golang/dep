@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"io"
 	"sort"
+	"strings"
 )
 
 // HashInputs computes a hash digest of all data in SolveParams and the
@@ -38,12 +39,10 @@ func (s *solver) writeHashingInputs(w io.Writer) {
 		}
 	}
 
-	// Apply overrides to the constraints from the root. Otherwise, the hash
-	// would be computed on the basis of a constraint from root that doesn't
-	// actually affect solving.
-	wc := s.rd.combineConstraints()
-
-	for _, pd := range wc {
+	// getApplicableConstraints will apply overrides, incorporate requireds,
+	// apply local ignores, drop stdlib imports, and finally trim out
+	// ineffectual constraints.
+	for _, pd := range s.rd.getApplicableConstraints() {
 		writeString(string(pd.Ident.ProjectRoot))
 		writeString(pd.Ident.Source)
 		// FIXME Constraint.String() is a surjective-only transformation - tags
@@ -53,51 +52,21 @@ func (s *solver) writeHashingInputs(w io.Writer) {
 		writeString(pd.Constraint.String())
 	}
 
-	// Get the external reach list
-
-	// Write each of the packages, or the errors that were found for a
-	// particular subpath, into the hash. We need to do this in a
-	// deterministic order, so expand and sort the map.
-	var pkgs []PackageOrErr
-	for _, perr := range s.rd.rpt.Packages {
-		pkgs = append(pkgs, perr)
-	}
-	sort.Sort(sortPackageOrErr(pkgs))
-	for _, perr := range pkgs {
-		if perr.Err != nil {
-			writeString(perr.Err.Error())
-		} else {
-			writeString(perr.P.Name)
-			writeString(perr.P.CommentPath)
-			writeString(perr.P.ImportPath)
-			for _, imp := range perr.P.Imports {
-				if !isStdLib(imp) {
-					writeString(imp)
-				}
-			}
-			for _, imp := range perr.P.TestImports {
-				if !isStdLib(imp) {
-					writeString(imp)
-				}
-			}
-		}
+	// Write out each discrete import, including those derived from requires.
+	imports := s.rd.externalImportList()
+	sort.Strings(imports)
+	for _, im := range imports {
+		writeString(im)
 	}
 
-	// Write any required packages given in the root manifest.
-	req := make([]string, 0, len(s.rd.req))
-	for pkg := range s.rd.req {
-		req = append(req, pkg)
-	}
-	sort.Strings(req)
-
-	for _, reqp := range req {
-		writeString(reqp)
-	}
-
-	// Add the ignored packages, if any.
+	// Add ignores, skipping any that point under the current project root;
+	// those will have already been implicitly incorporated by the import
+	// lister.
 	ig := make([]string, 0, len(s.rd.ig))
 	for pkg := range s.rd.ig {
-		ig = append(ig, pkg)
+		if !strings.HasPrefix(pkg, s.rd.rpt.ImportRoot) || !isPathPrefixOrEqual(s.rd.rpt.ImportRoot, pkg) {
+			ig = append(ig, pkg)
+		}
 	}
 	sort.Strings(ig)
 
@@ -105,6 +74,9 @@ func (s *solver) writeHashingInputs(w io.Writer) {
 		writeString(igp)
 	}
 
+	// Overrides *also* need their own special entry distinct from basic
+	// constraints, to represent the unique effects they can have on the entire
+	// solving process beyond root's immediate scope.
 	for _, pc := range s.rd.ovr.asSortedSlice() {
 		writeString(string(pc.Ident.ProjectRoot))
 		if pc.Ident.Source != "" {
