@@ -23,11 +23,14 @@ The gophers there will answer or ask you to file an issue if you've tripped over
 Please read the [Contribution Guidelines](https://golang.org/doc/contribute.html)
 before sending patches.
 
-**We do not accept GitHub pull requests**
-(we use [Gerrit](https://code.google.com/p/gerrit/) instead for code review).
-
 Unless otherwise noted, the Go source files are distributed under
 the BSD-style license found in the LICENSE file.
+
+All submissions, including submissions by project members, require review. We
+use GitHub pull requests for this purpose. Consult [GitHub Help] for more
+information on using pull requests.
+
+[GitHub Help]: https://help.github.com/articles/about-pull-requests/<Paste>
 
 ## Contributor License Agreement
 
