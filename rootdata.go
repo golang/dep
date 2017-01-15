@@ -32,13 +32,13 @@ type rootdata struct {
 	// A map of the project names listed in the root's lock.
 	rlm map[ProjectRoot]LockedProject
 
-	// A defensively-copied instance of the root manifest.
-	rm Manifest
+	// A defensively copied instance of the root manifest.
+	rm SimpleManifest
 
-	// A defensively-copied instance of the root lock.
-	rl Lock
+	// A defensively copied instance of the root lock.
+	rl safeLock
 
-	// A defensively-copied instance of params.RootPackageTree
+	// A defensively copied instance of params.RootPackageTree
 	rpt PackageTree
 }
 
@@ -55,10 +55,8 @@ func (rd rootdata) externalImportList() []string {
 
 	// If there are any requires, slide them into the reach list, as well.
 	if len(rd.req) > 0 {
-		// Make a map of both imported and required pkgs to skip, to avoid
-		// duplication. Technically, a slice would probably be faster (given
-		// small size and bounds check elimination), but this is a one-time op,
-		// so it doesn't matter.
+		// Make a map of imports that are both in the import path list and the
+		// required list to avoid duplication.
 		skip := make(map[string]bool, len(rd.req))
 		for _, r := range reach {
 			if rd.req[r] {
@@ -143,10 +141,10 @@ func (rd rootdata) combineConstraints() []workingConstraint {
 
 // needVersionListFor indicates whether we need a version list for a given
 // project root, based solely on general solver inputs (no constraint checking
-// required). This will be true if:
+// required). This will be true if any of the following conditions hold:
 //
 //  - ChangeAll is on
-//  - The project is not in the lock at all
+//  - The project is not in the lock
 //  - The project is in the lock, but is also in the list of projects to change
 func (rd rootdata) needVersionsFor(pr ProjectRoot) bool {
 	if rd.chngall {
