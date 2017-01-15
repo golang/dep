@@ -267,13 +267,40 @@ func TestHashInputsOverrides(t *testing.T) {
 			},
 		},
 		{
-			name: "override source; imported, no deps pp",
+			name: "override source; required & imported, no deps pp",
 			mut: func() {
-				// Take c out of requires list and put it directly in root's imports
-				rm.req = nil
+				// Put c in the root's imports
 				poe := params.RootPackageTree.Packages["root"]
 				poe.P.Imports = []string{"a", "b", "c"}
 				params.RootPackageTree.Packages["root"] = poe
+			},
+			elems: []string{
+				hhConstraints,
+				"a",
+				"sv-1.0.0",
+				"b",
+				"sv-1.0.0",
+				"c",
+				"car",
+				"any-*", // Any isn't included under the override, but IS for the constraint b/c it's equivalent
+				hhImportsReqs,
+				"a",
+				"b",
+				"c",
+				hhIgnores,
+				hhOverrides,
+				"c",
+				"car",
+				hhAnalyzer,
+				"depspec-sm-builtin",
+				"1.0.0",
+			},
+		},
+		{
+			name: "override source; imported, no deps pp",
+			mut: func() {
+				// Take c out of requires list - now it's only imported
+				rm.req = nil
 			},
 			elems: []string{
 				hhConstraints,
