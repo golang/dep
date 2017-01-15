@@ -84,7 +84,7 @@ func (i ProjectIdentifier) less(j ProjectIdentifier) bool {
 		return false
 	}
 
-	return i.netName() < j.netName()
+	return i.normalizedSource() < j.normalizedSource()
 }
 
 func (i ProjectIdentifier) eq(j ProjectIdentifier) bool {
@@ -130,7 +130,7 @@ func (i ProjectIdentifier) equiv(j ProjectIdentifier) bool {
 	return false
 }
 
-func (i ProjectIdentifier) netName() string {
+func (i ProjectIdentifier) normalizedSource() string {
 	if i.Source == "" {
 		return string(i.ProjectRoot)
 	}

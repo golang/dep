@@ -1395,7 +1395,7 @@ func (sm *depspecSourceManager) GetManifestAndLock(id ProjectIdentifier, v Versi
 	}
 
 	for _, ds := range sm.specs {
-		if id.netName() == string(ds.n) && v.Matches(ds.v) {
+		if id.normalizedSource() == string(ds.n) && v.Matches(ds.v) {
 			return ds, dummyLock{}, nil
 		}
 	}
@@ -1409,7 +1409,7 @@ func (sm *depspecSourceManager) AnalyzerInfo() (string, *semver.Version) {
 }
 
 func (sm *depspecSourceManager) ExternalReach(id ProjectIdentifier, v Version) (map[string][]string, error) {
-	pid := pident{n: ProjectRoot(id.netName()), v: v}
+	pid := pident{n: ProjectRoot(id.normalizedSource()), v: v}
 	if m, exists := sm.rm[pid]; exists {
 		return m, nil
 	}
@@ -1418,7 +1418,7 @@ func (sm *depspecSourceManager) ExternalReach(id ProjectIdentifier, v Version) (
 
 func (sm *depspecSourceManager) ListExternal(id ProjectIdentifier, v Version) ([]string, error) {
 	// This should only be called for the root
-	pid := pident{n: ProjectRoot(id.netName()), v: v}
+	pid := pident{n: ProjectRoot(id.normalizedSource()), v: v}
 	if r, exists := sm.rm[pid]; exists {
 		return r[string(id.ProjectRoot)], nil
 	}
@@ -1426,7 +1426,7 @@ func (sm *depspecSourceManager) ListExternal(id ProjectIdentifier, v Version) ([
 }
 
 func (sm *depspecSourceManager) ListPackages(id ProjectIdentifier, v Version) (PackageTree, error) {
-	pid := pident{n: ProjectRoot(id.netName()), v: v}
+	pid := pident{n: ProjectRoot(id.normalizedSource()), v: v}
 
 	if r, exists := sm.rm[pid]; exists {
 		return PackageTree{
@@ -1472,7 +1472,7 @@ func (sm *depspecSourceManager) ListVersions(id ProjectIdentifier) (pi []Version
 	for _, ds := range sm.specs {
 		// To simulate the behavior of the real SourceManager, we do not return
 		// revisions from ListVersions().
-		if _, isrev := ds.v.(Revision); !isrev && id.netName() == string(ds.n) {
+		if _, isrev := ds.v.(Revision); !isrev && id.normalizedSource() == string(ds.n) {
 			pi = append(pi, ds.v)
 		}
 	}
@@ -1486,7 +1486,7 @@ func (sm *depspecSourceManager) ListVersions(id ProjectIdentifier) (pi []Version
 
 func (sm *depspecSourceManager) RevisionPresentIn(id ProjectIdentifier, r Revision) (bool, error) {
 	for _, ds := range sm.specs {
-		if id.netName() == string(ds.n) && r == ds.v {
+		if id.normalizedSource() == string(ds.n) && r == ds.v {
 			return true, nil
 		}
 	}
@@ -1496,7 +1496,7 @@ func (sm *depspecSourceManager) RevisionPresentIn(id ProjectIdentifier, r Revisi
 
 func (sm *depspecSourceManager) SourceExists(id ProjectIdentifier) (bool, error) {
 	for _, ds := range sm.specs {
-		if id.netName() == string(ds.n) {
+		if id.normalizedSource() == string(ds.n) {
 			return true, nil
 		}
 	}
