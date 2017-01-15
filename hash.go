@@ -3,7 +3,18 @@ package gps
 import (
 	"bytes"
 	"crypto/sha256"
+	"io"
 	"sort"
+	"strings"
+)
+
+// string headers used to demarcate sections in hash input creation
+const (
+	hhConstraints = "-CONSTRAINTS-"
+	hhImportsReqs = "-IMPORTS/REQS-"
+	hhIgnores     = "-IGNORES-"
+	hhOverrides   = "-OVERRIDES-"
+	hhAnalyzer    = "-ANALYZER-"
 )
 
 // HashInputs computes a hash digest of all data in SolveParams and the
@@ -17,99 +28,91 @@ import (
 //
 // (Basically, this is for memoization.)
 func (s *solver) HashInputs() (digest []byte) {
-	buf := new(bytes.Buffer)
-	s.writeHashingInputs(buf)
+	h := sha256.New()
+	s.writeHashingInputs(h)
 
-	hd := sha256.Sum256(buf.Bytes())
+	hd := h.Sum(nil)
 	digest = hd[:]
 	return
 }
 
-func (s *solver) writeHashingInputs(buf *bytes.Buffer) {
-	// Apply overrides to the constraints from the root. Otherwise, the hash
-	// would be computed on the basis of a constraint from root that doesn't
-	// actually affect solving.
-	p := s.ovr.overrideAll(s.rm.DependencyConstraints().merge(s.rm.TestDependencyConstraints()))
-
-	for _, pd := range p {
-		buf.WriteString(string(pd.Ident.ProjectRoot))
-		buf.WriteString(pd.Ident.Source)
-		// FIXME Constraint.String() is a surjective-only transformation - tags
-		// and branches with the same name are written out as the same string.
-		// This could, albeit rarely, result in input collisions when a real
-		// change has occurred.
-		buf.WriteString(pd.Constraint.String())
-	}
-
-	// Write each of the packages, or the errors that were found for a
-	// particular subpath, into the hash. We need to do this in a
-	// deterministic order, so expand and sort the map.
-	var pkgs []PackageOrErr
-	for _, perr := range s.rpt.Packages {
-		pkgs = append(pkgs, perr)
-	}
-	sort.Sort(sortPackageOrErr(pkgs))
-	for _, perr := range pkgs {
-		if perr.Err != nil {
-			buf.WriteString(perr.Err.Error())
-		} else {
-			buf.WriteString(perr.P.Name)
-			buf.WriteString(perr.P.CommentPath)
-			buf.WriteString(perr.P.ImportPath)
-			for _, imp := range perr.P.Imports {
-				if !isStdLib(imp) {
-					buf.WriteString(imp)
-				}
-			}
-			for _, imp := range perr.P.TestImports {
-				if !isStdLib(imp) {
-					buf.WriteString(imp)
-				}
-			}
+func (s *solver) writeHashingInputs(w io.Writer) {
+	writeString := func(s string) {
+		// Skip zero-length string writes; it doesn't affect the real hash
+		// calculation, and keeps misleading newlines from showing up in the
+		// debug output.
+		if s != "" {
+			// All users of writeHashingInputs cannot error on Write(), so just
+			// ignore it
+			w.Write([]byte(s))
 		}
 	}
 
-	// Write any require packages given in the root manifest.
-	if len(s.req) > 0 {
-		// Dump and sort the reqnores
-		req := make([]string, 0, len(s.req))
-		for pkg := range s.req {
-			req = append(req, pkg)
-		}
-		sort.Strings(req)
+	// We write "section headers" into the hash purely to ease scanning when
+	// debugging this input-constructing algorithm; as long as the headers are
+	// constant, then they're effectively a no-op.
+	writeString(hhConstraints)
 
-		for _, reqp := range req {
-			buf.WriteString(reqp)
-		}
+	// getApplicableConstraints will apply overrides, incorporate requireds,
+	// apply local ignores, drop stdlib imports, and finally trim out
+	// ineffectual constraints.
+	for _, pd := range s.rd.getApplicableConstraints() {
+		writeString(string(pd.Ident.ProjectRoot))
+		writeString(pd.Ident.Source)
+		writeString(typedConstraintString(pd.Constraint))
 	}
 
-	// Add the ignored packages, if any.
-	if len(s.ig) > 0 {
-		// Dump and sort the ignores
-		ig := make([]string, 0, len(s.ig))
-		for pkg := range s.ig {
+	// Write out each discrete import, including those derived from requires.
+	writeString(hhImportsReqs)
+	imports := s.rd.externalImportList()
+	sort.Strings(imports)
+	for _, im := range imports {
+		writeString(im)
+	}
+
+	// Add ignores, skipping any that point under the current project root;
+	// those will have already been implicitly incorporated by the import
+	// lister.
+	writeString(hhIgnores)
+	ig := make([]string, 0, len(s.rd.ig))
+	for pkg := range s.rd.ig {
+		if !strings.HasPrefix(pkg, s.rd.rpt.ImportRoot) || !isPathPrefixOrEqual(s.rd.rpt.ImportRoot, pkg) {
 			ig = append(ig, pkg)
 		}
-		sort.Strings(ig)
+	}
+	sort.Strings(ig)
 
-		for _, igp := range ig {
-			buf.WriteString(igp)
-		}
+	for _, igp := range ig {
+		writeString(igp)
 	}
 
-	for _, pc := range s.ovr.asSortedSlice() {
-		buf.WriteString(string(pc.Ident.ProjectRoot))
+	// Overrides *also* need their own special entry distinct from basic
+	// constraints, to represent the unique effects they can have on the entire
+	// solving process beyond root's immediate scope.
+	writeString(hhOverrides)
+	for _, pc := range s.rd.ovr.asSortedSlice() {
+		writeString(string(pc.Ident.ProjectRoot))
 		if pc.Ident.Source != "" {
-			buf.WriteString(pc.Ident.Source)
+			writeString(pc.Ident.Source)
 		}
 		if pc.Constraint != nil {
-			buf.WriteString(pc.Constraint.String())
+			writeString(typedConstraintString(pc.Constraint))
 		}
 	}
 
+	writeString(hhAnalyzer)
 	an, av := s.b.AnalyzerInfo()
-	buf.WriteString(an)
-	buf.WriteString(av.String())
+	writeString(an)
+	writeString(av.String())
+}
+
+// bytes.Buffer wrapper that injects newlines after each call to Write().
+type nlbuf bytes.Buffer
+
+func (buf *nlbuf) Write(p []byte) (n int, err error) {
+	n, _ = (*bytes.Buffer)(buf).Write(p)
+	(*bytes.Buffer)(buf).WriteByte('\n')
+	return n + 1, nil
 }
 
 // HashingInputsAsString returns the raw input data used by Solver.HashInputs()
@@ -118,10 +121,10 @@ func (s *solver) writeHashingInputs(buf *bytes.Buffer) {
 // This is primarily intended for debugging purposes.
 func HashingInputsAsString(s Solver) string {
 	ts := s.(*solver)
-	buf := new(bytes.Buffer)
+	buf := new(nlbuf)
 	ts.writeHashingInputs(buf)
 
-	return buf.String()
+	return (*bytes.Buffer)(buf).String()
 }
 
 type sortPackageOrErr []PackageOrErr
