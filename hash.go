@@ -8,6 +8,15 @@ import (
 	"strings"
 )
 
+// string headers used to demarcate sections in hash input creation
+const (
+	hhConstraints = "-CONSTRAINTS-"
+	hhImportsReqs = "-IMPORTS/REQS-"
+	hhIgnores     = "-IGNORES-"
+	hhOverrides   = "-OVERRIDES-"
+	hhAnalyzer    = "-ANALYZER-"
+)
+
 // HashInputs computes a hash digest of all data in SolveParams and the
 // RootManifest that act as function inputs to Solve().
 //
@@ -39,6 +48,11 @@ func (s *solver) writeHashingInputs(w io.Writer) {
 		}
 	}
 
+	// We write "section headers" into the hash purely to ease scanning when
+	// debugging this input-constructing algorithm; as long as the headers are
+	// constant, then they're effectively a no-op.
+	writeString(hhConstraints)
+
 	// getApplicableConstraints will apply overrides, incorporate requireds,
 	// apply local ignores, drop stdlib imports, and finally trim out
 	// ineffectual constraints.
@@ -53,6 +67,7 @@ func (s *solver) writeHashingInputs(w io.Writer) {
 	}
 
 	// Write out each discrete import, including those derived from requires.
+	writeString(hhImportsReqs)
 	imports := s.rd.externalImportList()
 	sort.Strings(imports)
 	for _, im := range imports {
@@ -62,6 +77,7 @@ func (s *solver) writeHashingInputs(w io.Writer) {
 	// Add ignores, skipping any that point under the current project root;
 	// those will have already been implicitly incorporated by the import
 	// lister.
+	writeString(hhIgnores)
 	ig := make([]string, 0, len(s.rd.ig))
 	for pkg := range s.rd.ig {
 		if !strings.HasPrefix(pkg, s.rd.rpt.ImportRoot) || !isPathPrefixOrEqual(s.rd.rpt.ImportRoot, pkg) {
@@ -77,6 +93,7 @@ func (s *solver) writeHashingInputs(w io.Writer) {
 	// Overrides *also* need their own special entry distinct from basic
 	// constraints, to represent the unique effects they can have on the entire
 	// solving process beyond root's immediate scope.
+	writeString(hhOverrides)
 	for _, pc := range s.rd.ovr.asSortedSlice() {
 		writeString(string(pc.Ident.ProjectRoot))
 		if pc.Ident.Source != "" {
@@ -87,6 +104,7 @@ func (s *solver) writeHashingInputs(w io.Writer) {
 		}
 	}
 
+	writeString(hhAnalyzer)
 	an, av := s.b.AnalyzerInfo()
 	writeString(an)
 	writeString(av.String())

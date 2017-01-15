@@ -55,8 +55,6 @@ func (rd rootdata) externalImportList() []string {
 
 	// If there are any requires, slide them into the reach list, as well.
 	if len(rd.req) > 0 {
-		reqs := make([]string, 0, len(rd.req))
-
 		// Make a map of both imported and required pkgs to skip, to avoid
 		// duplication. Technically, a slice would probably be faster (given
 		// small size and bounds check elimination), but this is a one-time op,
@@ -70,13 +68,12 @@ func (rd rootdata) externalImportList() []string {
 
 		for r := range rd.req {
 			if !skip[r] {
-				reqs = append(reqs, r)
+				reach = append(reach, r)
 			}
 		}
-
-		reach = append(reach, reqs...)
 	}
 
+	sort.Strings(reach)
 	return reach
 }
 
@@ -131,7 +128,7 @@ func (rd rootdata) getApplicableConstraints() []workingConstraint {
 
 	xt.Walk(func(s string, v interface{}) bool {
 		wcc := v.(wccount)
-		if wcc.count > 0 || wcc.wc.overrNet || wcc.wc.overrConstraint {
+		if wcc.count > 0 {
 			ret = append(ret, wcc.wc)
 		}
 		return false

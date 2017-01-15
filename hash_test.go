@@ -28,14 +28,17 @@ func TestHashInputs(t *testing.T) {
 	h := sha256.New()
 
 	elems := []string{
+		hhConstraints,
 		"a",
 		"1.0.0",
 		"b",
 		"1.0.0",
-		"root",
-		"root",
+		hhImportsReqs,
 		"a",
 		"b",
+		hhIgnores,
+		hhOverrides,
+		hhAnalyzer,
 		"depspec-sm-builtin",
 		"1.0.0",
 	}
@@ -74,16 +77,19 @@ func TestHashInputsReqsIgs(t *testing.T) {
 	h := sha256.New()
 
 	elems := []string{
+		hhConstraints,
 		"a",
 		"1.0.0",
 		"b",
 		"1.0.0",
-		"root",
-		"root",
+		hhImportsReqs,
 		"a",
 		"b",
+		hhIgnores,
 		"bar",
 		"foo",
+		hhOverrides,
+		hhAnalyzer,
 		"depspec-sm-builtin",
 		"1.0.0",
 	}
@@ -114,18 +120,21 @@ func TestHashInputsReqsIgs(t *testing.T) {
 	h = sha256.New()
 
 	elems = []string{
+		hhConstraints,
 		"a",
 		"1.0.0",
 		"b",
 		"1.0.0",
-		"root",
-		"root",
+		hhImportsReqs,
 		"a",
 		"b",
 		"baz",
 		"qux",
+		hhIgnores,
 		"bar",
 		"foo",
+		hhOverrides,
+		hhAnalyzer,
 		"depspec-sm-builtin",
 		"1.0.0",
 	}
@@ -152,16 +161,19 @@ func TestHashInputsReqsIgs(t *testing.T) {
 	h = sha256.New()
 
 	elems = []string{
+		hhConstraints,
 		"a",
 		"1.0.0",
 		"b",
 		"1.0.0",
-		"root",
-		"root",
+		hhImportsReqs,
 		"a",
 		"b",
 		"baz",
 		"qux",
+		hhIgnores,
+		hhOverrides,
+		hhAnalyzer,
 		"depspec-sm-builtin",
 		"1.0.0",
 	}
@@ -176,234 +188,320 @@ func TestHashInputsReqsIgs(t *testing.T) {
 }
 
 func TestHashInputsOverrides(t *testing.T) {
-	fix := basicFixtures["shared dependency with overlapping constraints"]
+	basefix := basicFixtures["shared dependency with overlapping constraints"]
 
-	rm := fix.rootmanifest().(simpleRootManifest).dup()
-	// First case - override something not in the root, just with network name
-	rm.ovr = map[ProjectRoot]ProjectProperties{
-		"c": ProjectProperties{
-			Source: "car",
-		},
-	}
+	// Set up base state that we'll mutate over the course of each test
+	rm := basefix.rootmanifest().(simpleRootManifest).dup()
 	params := SolveParameters{
-		RootDir:         string(fix.ds[0].n),
-		RootPackageTree: fix.rootTree(),
+		RootDir:         string(basefix.ds[0].n),
+		RootPackageTree: basefix.rootTree(),
 		Manifest:        rm,
 	}
 
-	s, err := Prepare(params, newdepspecSM(fix.ds, nil))
-	if err != nil {
-		t.Errorf("Unexpected error while prepping solver: %s", err)
-		t.FailNow()
+	table := []struct {
+		name  string
+		mut   func()
+		elems []string
+	}{
+		{
+			name: "override source; not imported, no deps pp",
+			mut: func() {
+				// First case - override just source, on something without
+				// corresponding project properties in the dependencies from
+				// root
+				rm.ovr = map[ProjectRoot]ProjectProperties{
+					"c": ProjectProperties{
+						Source: "car",
+					},
+				}
+			},
+			elems: []string{
+				hhConstraints,
+				"a",
+				"1.0.0",
+				"b",
+				"1.0.0",
+				hhImportsReqs,
+				"a",
+				"b",
+				hhIgnores,
+				hhOverrides,
+				"c",
+				"car",
+				hhAnalyzer,
+				"depspec-sm-builtin",
+				"1.0.0",
+			},
+		},
+		{
+			name: "override source; required, no deps pp",
+			mut: func() {
+				// Put c into the requires list, which should make it show up under
+				// constraints
+				rm.req = map[string]bool{
+					"c": true,
+				}
+			},
+			elems: []string{
+				hhConstraints,
+				"a",
+				"1.0.0",
+				"b",
+				"1.0.0",
+				"c",
+				"car",
+				"*", // Any isn't included under the override, but IS for the constraint b/c it's equivalent
+				hhImportsReqs,
+				"a",
+				"b",
+				"c",
+				hhIgnores,
+				hhOverrides,
+				"c",
+				"car",
+				hhAnalyzer,
+				"depspec-sm-builtin",
+				"1.0.0",
+			},
+		},
+		{
+			name: "override source; imported, no deps pp",
+			mut: func() {
+				// Take c out of requires list and put it directly in root's imports
+				rm.req = nil
+				poe := params.RootPackageTree.Packages["root"]
+				poe.P.Imports = []string{"a", "b", "c"}
+				params.RootPackageTree.Packages["root"] = poe
+			},
+			elems: []string{
+				hhConstraints,
+				"a",
+				"1.0.0",
+				"b",
+				"1.0.0",
+				"c",
+				"car",
+				"*",
+				hhImportsReqs,
+				"a",
+				"b",
+				"c",
+				hhIgnores,
+				hhOverrides,
+				"c",
+				"car",
+				hhAnalyzer,
+				"depspec-sm-builtin",
+				"1.0.0",
+			},
+		},
+		{
+			name: "other override constraint; not imported, no deps pp",
+			mut: func() {
+				// Override not in root, just with constraint
+				rm.ovr["d"] = ProjectProperties{
+					Constraint: NewBranch("foobranch"),
+				}
+			},
+			elems: []string{
+				hhConstraints,
+				"a",
+				"1.0.0",
+				"b",
+				"1.0.0",
+				"c",
+				"car",
+				"*",
+				hhImportsReqs,
+				"a",
+				"b",
+				"c",
+				hhIgnores,
+				hhOverrides,
+				"c",
+				"car",
+				"d",
+				"foobranch",
+				hhAnalyzer,
+				"depspec-sm-builtin",
+				"1.0.0",
+			},
+		},
+		{
+			name: "override constraint; not imported, no deps pp",
+			mut: func() {
+				// Remove the "c" pkg from imports for remainder of tests
+				poe := params.RootPackageTree.Packages["root"]
+				poe.P.Imports = []string{"a", "b"}
+				params.RootPackageTree.Packages["root"] = poe
+			},
+			elems: []string{
+				hhConstraints,
+				"a",
+				"1.0.0",
+				"b",
+				"1.0.0",
+				hhImportsReqs,
+				"a",
+				"b",
+				hhIgnores,
+				hhOverrides,
+				"c",
+				"car",
+				"d",
+				"foobranch",
+				hhAnalyzer,
+				"depspec-sm-builtin",
+				"1.0.0",
+			},
+		},
+		{
+			name: "override both; not imported, no deps pp",
+			mut: func() {
+				// Override not in root, both constraint and network name
+				rm.ovr["c"] = ProjectProperties{
+					Source:     "groucho",
+					Constraint: NewBranch("plexiglass"),
+				}
+			},
+			elems: []string{
+				hhConstraints,
+				"a",
+				"1.0.0",
+				"b",
+				"1.0.0",
+				hhImportsReqs,
+				"a",
+				"b",
+				hhIgnores,
+				hhOverrides,
+				"c",
+				"groucho",
+				"plexiglass",
+				"d",
+				"foobranch",
+				hhAnalyzer,
+				"depspec-sm-builtin",
+				"1.0.0",
+			},
+		},
+		{
+			name: "override constraint; imported, with constraint",
+			mut: func() {
+				// Override dep present in root, just constraint
+				rm.ovr["a"] = ProjectProperties{
+					Constraint: NewVersion("fluglehorn"),
+				}
+			},
+			elems: []string{
+				hhConstraints,
+				"a",
+				"fluglehorn",
+				"b",
+				"1.0.0",
+				hhImportsReqs,
+				"a",
+				"b",
+				hhIgnores,
+				hhOverrides,
+				"a",
+				"fluglehorn",
+				"c",
+				"groucho",
+				"plexiglass",
+				"d",
+				"foobranch",
+				hhAnalyzer,
+				"depspec-sm-builtin",
+				"1.0.0",
+			},
+		},
+		{
+			name: "override source; imported, with constraint",
+			mut: func() {
+				// Override in root, only network name
+				rm.ovr["a"] = ProjectProperties{
+					Source: "nota",
+				}
+			},
+			elems: []string{
+				hhConstraints,
+				"a",
+				"nota",
+				"1.0.0",
+				"b",
+				"1.0.0",
+				hhImportsReqs,
+				"a",
+				"b",
+				hhIgnores,
+				hhOverrides,
+				"a",
+				"nota",
+				"c",
+				"groucho",
+				"plexiglass",
+				"d",
+				"foobranch",
+				hhAnalyzer,
+				"depspec-sm-builtin",
+				"1.0.0",
+			},
+		},
+		{
+			name: "override both; imported, with constraint",
+			mut: func() {
+				// Override in root, network name and constraint
+				rm.ovr["a"] = ProjectProperties{
+					Source:     "nota",
+					Constraint: NewVersion("fluglehorn"),
+				}
+			},
+			elems: []string{
+				hhConstraints,
+				"a",
+				"nota",
+				"fluglehorn",
+				"b",
+				"1.0.0",
+				hhImportsReqs,
+				"a",
+				"b",
+				hhIgnores,
+				hhOverrides,
+				"a",
+				"nota",
+				"fluglehorn",
+				"c",
+				"groucho",
+				"plexiglass",
+				"d",
+				"foobranch",
+				hhAnalyzer,
+				"depspec-sm-builtin",
+				"1.0.0",
+			},
+		},
 	}
 
-	dig := s.HashInputs()
-	h := sha256.New()
+	for _, fix := range table {
+		fix.mut()
+		params.Manifest = rm
 
-	elems := []string{
-		"a",
-		"1.0.0",
-		"b",
-		"1.0.0",
-		"root",
-		"root",
-		"a",
-		"b",
-		"c",
-		"car",
-		"depspec-sm-builtin",
-		"1.0.0",
-	}
-	for _, v := range elems {
-		h.Write([]byte(v))
-	}
-	correct := h.Sum(nil)
+		s, err := Prepare(params, newdepspecSM(basefix.ds, nil))
+		if err != nil {
+			t.Errorf("(fix: %s) Unexpected error while prepping solver: %s", fix.name, err)
+			t.FailNow()
+		}
 
-	if !bytes.Equal(dig, correct) {
-		t.Errorf("Hashes are not equal. Inputs:\n%s", diffHashingInputs(s, elems))
-	}
+		h := sha256.New()
+		for _, v := range fix.elems {
+			h.Write([]byte(v))
+		}
 
-	// Override not in root, just with constraint
-	rm.ovr["d"] = ProjectProperties{
-		Constraint: NewBranch("foobranch"),
-	}
-	dig = s.HashInputs()
-	h = sha256.New()
-
-	elems = []string{
-		"a",
-		"1.0.0",
-		"b",
-		"1.0.0",
-		"root",
-		"root",
-		"a",
-		"b",
-		"c",
-		"car",
-		"d",
-		"foobranch",
-		"depspec-sm-builtin",
-		"1.0.0",
-	}
-	for _, v := range elems {
-		h.Write([]byte(v))
-	}
-	correct = h.Sum(nil)
-
-	if !bytes.Equal(dig, correct) {
-		t.Errorf("Hashes are not equal. Inputs:\n%s", diffHashingInputs(s, elems))
-	}
-
-	// Override not in root, both constraint and network name
-	rm.ovr["e"] = ProjectProperties{
-		Source:     "groucho",
-		Constraint: NewBranch("plexiglass"),
-	}
-	dig = s.HashInputs()
-	h = sha256.New()
-
-	elems = []string{
-		"a",
-		"1.0.0",
-		"b",
-		"1.0.0",
-		"root",
-		"root",
-		"a",
-		"b",
-		"c",
-		"car",
-		"d",
-		"foobranch",
-		"e",
-		"groucho",
-		"plexiglass",
-		"depspec-sm-builtin",
-		"1.0.0",
-	}
-	for _, v := range elems {
-		h.Write([]byte(v))
-	}
-	correct = h.Sum(nil)
-
-	if !bytes.Equal(dig, correct) {
-		t.Errorf("Hashes are not equal. Inputs:\n%s", diffHashingInputs(s, elems))
-	}
-
-	// Override in root, just constraint
-	rm.ovr["a"] = ProjectProperties{
-		Constraint: NewVersion("fluglehorn"),
-	}
-	dig = s.HashInputs()
-	h = sha256.New()
-
-	elems = []string{
-		"a",
-		"fluglehorn",
-		"b",
-		"1.0.0",
-		"root",
-		"root",
-		"a",
-		"b",
-		"a",
-		"fluglehorn",
-		"c",
-		"car",
-		"d",
-		"foobranch",
-		"e",
-		"groucho",
-		"plexiglass",
-		"depspec-sm-builtin",
-		"1.0.0",
-	}
-	for _, v := range elems {
-		h.Write([]byte(v))
-	}
-	correct = h.Sum(nil)
-
-	if !bytes.Equal(dig, correct) {
-		t.Errorf("Hashes are not equal. Inputs:\n%s", diffHashingInputs(s, elems))
-	}
-
-	// Override in root, only network name
-	rm.ovr["a"] = ProjectProperties{
-		Source: "nota",
-	}
-	dig = s.HashInputs()
-	h = sha256.New()
-
-	elems = []string{
-		"a",
-		"nota",
-		"1.0.0",
-		"b",
-		"1.0.0",
-		"root",
-		"root",
-		"a",
-		"b",
-		"a",
-		"nota",
-		"c",
-		"car",
-		"d",
-		"foobranch",
-		"e",
-		"groucho",
-		"plexiglass",
-		"depspec-sm-builtin",
-		"1.0.0",
-	}
-	for _, v := range elems {
-		h.Write([]byte(v))
-	}
-	correct = h.Sum(nil)
-
-	if !bytes.Equal(dig, correct) {
-		t.Errorf("Hashes are not equal. Inputs:\n%s", diffHashingInputs(s, elems))
-	}
-
-	// Override in root, network name and constraint
-	rm.ovr["a"] = ProjectProperties{
-		Source:     "nota",
-		Constraint: NewVersion("fluglehorn"),
-	}
-	dig = s.HashInputs()
-	h = sha256.New()
-
-	elems = []string{
-		"a",
-		"nota",
-		"fluglehorn",
-		"b",
-		"1.0.0",
-		"root",
-		"root",
-		"a",
-		"b",
-		"a",
-		"nota",
-		"fluglehorn",
-		"c",
-		"car",
-		"d",
-		"foobranch",
-		"e",
-		"groucho",
-		"plexiglass",
-		"depspec-sm-builtin",
-		"1.0.0",
-	}
-	for _, v := range elems {
-		h.Write([]byte(v))
-	}
-	correct = h.Sum(nil)
-
-	if !bytes.Equal(dig, correct) {
-		t.Errorf("Hashes are not equal. Inputs:\n%s", diffHashingInputs(s, elems))
+		if !bytes.Equal(s.HashInputs(), h.Sum(nil)) {
+			t.Errorf("(fix: %s) Hashes are not equal. Inputs:\n%s", fix.name, diffHashingInputs(s, fix.elems))
+		}
 	}
 }
 
@@ -427,7 +525,7 @@ func diffHashingInputs(s Solver, wnt []string) string {
 		for i := 0; i < lg; i++ {
 			if lw <= i-offset {
 				fmt.Fprintf(tw, "%s\t\t\n", got[i])
-			} else if got[i] != wnt[i-offset] && got[i] == wnt[i-offset-1] {
+			} else if got[i] != wnt[i-offset] && i+1 < lg && got[i+1] == wnt[i-offset] {
 				// if the next slot is a match, realign by skipping this one and
 				// bumping the offset
 				fmt.Fprintf(tw, "%s\t\t\n", got[i])
@@ -441,7 +539,7 @@ func diffHashingInputs(s Solver, wnt []string) string {
 		for i := 0; i < lw; i++ {
 			if lg <= i-offset {
 				fmt.Fprintf(tw, "\t%s\t\n", wnt[i])
-			} else if got[i-offset] != wnt[i] && got[i-offset-1] == wnt[i] {
+			} else if got[i-offset] != wnt[i] && i+1 < lw && got[i-offset] == wnt[i+1] {
 				// if the next slot is a match, realign by skipping this one and
 				// bumping the offset
 				fmt.Fprintf(tw, "\t%s\t\n", wnt[i])
