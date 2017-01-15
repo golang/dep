@@ -508,6 +508,8 @@ func TestHashInputsOverrides(t *testing.T) {
 func diffHashingInputs(s Solver, wnt []string) string {
 	actual := HashingInputsAsString(s)
 	got := strings.Split(actual, "\n")
+	// got has a trailing empty, add that to wnt
+	wnt = append(wnt, "")
 
 	lg, lw := len(got), len(wnt)
 
@@ -515,6 +517,7 @@ func diffHashingInputs(s Solver, wnt []string) string {
 	tw := tabwriter.NewWriter(&buf, 4, 4, 2, ' ', 0)
 	fmt.Fprintln(tw, "  (GOT)  \t  (WANT)  \t")
 
+	lmiss, rmiss := ">>>>>>>>>>", "<<<<<<<<<<"
 	if lg == lw {
 		// same length makes the loop pretty straightforward
 		for i := 0; i < lg; i++ {
@@ -524,11 +527,11 @@ func diffHashingInputs(s Solver, wnt []string) string {
 		offset := 0
 		for i := 0; i < lg; i++ {
 			if lw <= i-offset {
-				fmt.Fprintf(tw, "%s\t\t\n", got[i])
+				fmt.Fprintf(tw, "%s\t%s\t\n", got[i], rmiss)
 			} else if got[i] != wnt[i-offset] && i+1 < lg && got[i+1] == wnt[i-offset] {
 				// if the next slot is a match, realign by skipping this one and
 				// bumping the offset
-				fmt.Fprintf(tw, "%s\t\t\n", got[i])
+				fmt.Fprintf(tw, "%s\t%s\t\n", got[i], rmiss)
 				offset++
 			} else {
 				fmt.Fprintf(tw, "%s\t%s\t\n", got[i], wnt[i-offset])
@@ -538,11 +541,11 @@ func diffHashingInputs(s Solver, wnt []string) string {
 		offset := 0
 		for i := 0; i < lw; i++ {
 			if lg <= i-offset {
-				fmt.Fprintf(tw, "\t%s\t\n", wnt[i])
+				fmt.Fprintf(tw, "%s\t%s\t\n", lmiss, wnt[i])
 			} else if got[i-offset] != wnt[i] && i+1 < lw && got[i-offset] == wnt[i+1] {
 				// if the next slot is a match, realign by skipping this one and
 				// bumping the offset
-				fmt.Fprintf(tw, "\t%s\t\n", wnt[i])
+				fmt.Fprintf(tw, "%s\t%s\t\n", lmiss, wnt[i])
 				offset++
 			} else {
 				fmt.Fprintf(tw, "%s\t%s\t\n", got[i-offset], wnt[i])
