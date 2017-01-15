@@ -59,11 +59,7 @@ func (s *solver) writeHashingInputs(w io.Writer) {
 	for _, pd := range s.rd.getApplicableConstraints() {
 		writeString(string(pd.Ident.ProjectRoot))
 		writeString(pd.Ident.Source)
-		// FIXME Constraint.String() is a surjective-only transformation - tags
-		// and branches with the same name are written out as the same string.
-		// This could, albeit rarely, result in erroneously identical inputs
-		// when a real change has occurred.
-		writeString(pd.Constraint.String())
+		writeString(typedConstraintString(pd.Constraint))
 	}
 
 	// Write out each discrete import, including those derived from requires.
@@ -100,7 +96,7 @@ func (s *solver) writeHashingInputs(w io.Writer) {
 			writeString(pc.Ident.Source)
 		}
 		if pc.Constraint != nil {
-			writeString(pc.Constraint.String())
+			writeString(typedConstraintString(pc.Constraint))
 		}
 	}
 
