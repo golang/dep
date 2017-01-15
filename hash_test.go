@@ -49,6 +49,8 @@ func TestHashInputs(t *testing.T) {
 
 	if !bytes.Equal(dig, correct) {
 		t.Errorf("Hashes are not equal. Inputs:\n%s", diffHashingInputs(s, elems))
+	} else if strings.Join(elems, "\n")+"\n" != HashingInputsAsString(s) {
+		t.Errorf("Hashes are equal, but hashing input strings are not:\n%s", diffHashingInputs(s, elems))
 	}
 }
 
