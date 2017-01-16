@@ -343,7 +343,7 @@ func TestGetSources(t *testing.T) {
 	wg.Add(3)
 	for _, pi := range pil {
 		go func(lpi ProjectIdentifier) {
-			nn := lpi.netName()
+			nn := lpi.normalizedSource()
 			src, err := sm.getSourceFor(lpi)
 			if err != nil {
 				t.Errorf("(src %q) unexpected error setting up source: %s", nn, err)

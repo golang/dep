@@ -212,7 +212,7 @@ func (sl safeLock) Projects() []LockedProject {
 // while the solver is in-flight.
 //
 // This is achieved by copying the lock's data into a new safeLock.
-func prepLock(l Lock) Lock {
+func prepLock(l Lock) safeLock {
 	pl := l.Projects()
 
 	rl := safeLock{

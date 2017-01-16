@@ -848,3 +848,58 @@ func TestVersionUnionPanicOnString(t *testing.T) {
 	}()
 	_ = versionTypeUnion{}.String()
 }
+
+func TestTypedConstraintString(t *testing.T) {
+	// Also tests typedVersionString(), as this nests down into that
+	rev := Revision("flooboofoobooo")
+	v1 := NewBranch("master")
+	v2 := NewBranch("test").Is(rev)
+	v3 := NewVersion("1.0.1")
+	v4 := NewVersion("v2.0.5")
+	v5 := NewVersion("2.0.5.2")
+
+	table := []struct {
+		in  Constraint
+		out string
+	}{
+		{
+			in:  anyConstraint{},
+			out: "any-*",
+		},
+		{
+			in:  noneConstraint{},
+			out: "none-",
+		},
+		{
+			in:  mkSVC("^1.0.0"),
+			out: "svc-^1.0.0",
+		},
+		{
+			in:  v1,
+			out: "b-master",
+		},
+		{
+			in:  v2,
+			out: "b-test-r-" + string(rev),
+		},
+		{
+			in:  v3,
+			out: "sv-1.0.1",
+		},
+		{
+			in:  v4,
+			out: "sv-v2.0.5",
+		},
+		{
+			in:  v5,
+			out: "pv-2.0.5.2",
+		},
+	}
+
+	for _, fix := range table {
+		got := typedConstraintString(fix.in)
+		if got != fix.out {
+			t.Errorf("Typed string for %v (%T) was not expected %q; got %q", fix.in, fix.in, fix.out, got)
+		}
+	}
+}

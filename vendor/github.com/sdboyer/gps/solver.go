@@ -14,11 +14,11 @@ var rootRev = Revision("")
 
 // SolveParameters hold all arguments to a solver run.
 //
-// Only RootDir and ImportRoot are absolutely required. A nil Manifest is
+// Only RootDir and RootPackageTree are absolutely required. A nil Manifest is
 // allowed, though it usually makes little sense.
 //
-// Of these properties, only Manifest and Ignore are (directly) incorporated in
-// memoization hashing.
+// Of these properties, only the Manifest and RootPackageTree are (directly)
+// incorporated in memoization hashing.
 type SolveParameters struct {
 	// The path to the root of the project on which the solver should operate.
 	// This should point to the directory that should contain the vendor/
@@ -92,14 +92,6 @@ type solver struct {
 	// starts moving forward again.
 	attempts int
 
-	// SolveParameters are the inputs to the solver. They determine both what
-	// data the solver should operate on, and certain aspects of how solving
-	// proceeds.
-	//
-	// Prepare() validates these, so by the time we have a *solver instance, we
-	// know they're valid.
-	params SolveParameters
-
 	// Logger used exclusively for trace output, if the trace option is set.
 	tl *log.Logger
 
@@ -128,12 +120,6 @@ type solver struct {
 	// removal.
 	unsel *unselected
 
-	// Map of packages to ignore.
-	ig map[string]bool
-
-	// Map of packages to require.
-	req map[string]bool
-
 	// A stack of all the currently active versionQueues in the solver. The set
 	// of projects represented here corresponds closely to what's in s.sel,
 	// although s.sel will always contain the root project, and s.vqs never
@@ -142,27 +128,155 @@ type solver struct {
 	// added to an existing project.
 	vqs []*versionQueue
 
-	// A map of the ProjectRoot (local names) that should be allowed to change
-	chng map[ProjectRoot]struct{}
-
-	// A ProjectConstraints map containing the validated (guaranteed non-empty)
-	// overrides declared by the root manifest.
-	ovr ProjectConstraints
-
-	// A map of the project names listed in the root's lock.
-	rlm map[ProjectRoot]LockedProject
-
-	// A defensively-copied instance of the root manifest.
-	rm Manifest
-
-	// A defensively-copied instance of the root lock.
-	rl Lock
-
-	// A defensively-copied instance of params.RootPackageTree
-	rpt PackageTree
+	// Contains data and constraining information from the root project
+	rd rootdata
 
 	// metrics for the current solve run.
 	mtr *metrics
+}
+
+func (params SolveParameters) toRootdata() (rootdata, error) {
+	if params.RootDir == "" {
+		return rootdata{}, badOptsFailure("params must specify a non-empty root directory")
+	}
+	if params.RootPackageTree.ImportRoot == "" {
+		return rootdata{}, badOptsFailure("params must include a non-empty import root")
+	}
+	if len(params.RootPackageTree.Packages) == 0 {
+		return rootdata{}, badOptsFailure("at least one package must be present in the PackageTree")
+	}
+	if params.Lock == nil && len(params.ToChange) != 0 {
+		return rootdata{}, badOptsFailure(fmt.Sprintf("update specifically requested for %s, but no lock was provided to upgrade from", params.ToChange))
+	}
+
+	if params.Manifest == nil {
+		params.Manifest = simpleRootManifest{}
+	}
+
+	rd := rootdata{
+		ig:      params.Manifest.IgnoredPackages(),
+		req:     params.Manifest.RequiredPackages(),
+		ovr:     params.Manifest.Overrides(),
+		rpt:     params.RootPackageTree.dup(),
+		chng:    make(map[ProjectRoot]struct{}),
+		rlm:     make(map[ProjectRoot]LockedProject),
+		chngall: params.ChangeAll,
+		dir:     params.RootDir,
+	}
+
+	// Ensure the required, ignore and overrides maps are at least initialized
+	if rd.ig == nil {
+		rd.ig = make(map[string]bool)
+	}
+	if rd.req == nil {
+		rd.req = make(map[string]bool)
+	}
+	if rd.ovr == nil {
+		rd.ovr = make(ProjectConstraints)
+	}
+
+	if len(rd.ig) != 0 {
+		var both []string
+		for pkg := range params.Manifest.RequiredPackages() {
+			if rd.ig[pkg] {
+				both = append(both, pkg)
+			}
+		}
+		switch len(both) {
+		case 0:
+			break
+		case 1:
+			return rootdata{}, badOptsFailure(fmt.Sprintf("%q was given as both a required and ignored package", both[0]))
+		default:
+			return rootdata{}, badOptsFailure(fmt.Sprintf("multiple packages given as both required and ignored: %s", strings.Join(both, ", ")))
+		}
+	}
+
+	// Validate no empties in the overrides map
+	var eovr []string
+	for pr, pp := range rd.ovr {
+		if pp.Constraint == nil && pp.Source == "" {
+			eovr = append(eovr, string(pr))
+		}
+	}
+
+	if eovr != nil {
+		// Maybe it's a little nitpicky to do this (we COULD proceed; empty
+		// overrides have no effect), but this errs on the side of letting the
+		// tool/user know there's bad input. Purely as a principle, that seems
+		// preferable to silently allowing progress with icky input.
+		if len(eovr) > 1 {
+			return rootdata{}, badOptsFailure(fmt.Sprintf("Overrides lacked any non-zero properties for multiple project roots: %s", strings.Join(eovr, " ")))
+		}
+		return rootdata{}, badOptsFailure(fmt.Sprintf("An override was declared for %s, but without any non-zero properties", eovr[0]))
+	}
+
+	// Prep safe, normalized versions of root manifest and lock data
+	rd.rm = prepManifest(params.Manifest)
+
+	if params.Lock != nil {
+		for _, lp := range params.Lock.Projects() {
+			rd.rlm[lp.Ident().ProjectRoot] = lp
+		}
+
+		// Also keep a prepped one, mostly for the bridge. This is probably
+		// wasteful, but only minimally so, and yay symmetry
+		rd.rl = prepLock(params.Lock)
+	}
+
+	for _, p := range params.ToChange {
+		if _, exists := rd.rlm[p]; !exists {
+			return rootdata{}, badOptsFailure(fmt.Sprintf("cannot update %s as it is not in the lock", p))
+		}
+		rd.chng[p] = struct{}{}
+	}
+
+	return rd, nil
+}
+
+// Prepare readies a Solver for use.
+//
+// This function reads and validates the provided SolveParameters. If a problem
+// with the inputs is detected, an error is returned. Otherwise, a Solver is
+// returned, ready to hash and check inputs or perform a solving run.
+func Prepare(params SolveParameters, sm SourceManager) (Solver, error) {
+	if sm == nil {
+		return nil, badOptsFailure("must provide non-nil SourceManager")
+	}
+	if params.Trace && params.TraceLogger == nil {
+		return nil, badOptsFailure("trace requested, but no logger provided")
+	}
+
+	rd, err := params.toRootdata()
+	if err != nil {
+		return nil, err
+	}
+
+	s := &solver{
+		tl: params.TraceLogger,
+		rd: rd,
+	}
+
+	// Set up the bridge and ensure the root dir is in good, working order
+	// before doing anything else. (This call is stubbed out in tests, via
+	// overriding mkBridge(), so we can run with virtual RootDir.)
+	s.b = mkBridge(s, sm, params.Downgrade)
+	err = s.b.verifyRootDir(params.RootDir)
+	if err != nil {
+		return nil, err
+	}
+
+	// Initialize stacks and queues
+	s.sel = &selection{
+		deps: make(map[ProjectRoot][]dependency),
+		sm:   s.b,
+	}
+	s.unsel = &unselected{
+		sl:  make([]bimodalIdentifier, 0),
+		cmp: s.unselectedComparator,
+	}
+
+	return s, nil
 }
 
 // A Solver is the main workhorse of gps: given a set of project inputs, it
@@ -184,133 +298,6 @@ type Solver interface {
 	// Solve initiates a solving run. It will either complete successfully with
 	// a Solution, or fail with an informative error.
 	Solve() (Solution, error)
-}
-
-// Prepare readies a Solver for use.
-//
-// This function reads and validates the provided SolveParameters. If a problem
-// with the inputs is detected, an error is returned. Otherwise, a Solver is
-// returned, ready to hash and check inputs or perform a solving run.
-func Prepare(params SolveParameters, sm SourceManager) (Solver, error) {
-	if sm == nil {
-		return nil, badOptsFailure("must provide non-nil SourceManager")
-	}
-	if params.RootDir == "" {
-		return nil, badOptsFailure("params must specify a non-empty root directory")
-	}
-	if params.RootPackageTree.ImportRoot == "" {
-		return nil, badOptsFailure("params must include a non-empty import root")
-	}
-	if len(params.RootPackageTree.Packages) == 0 {
-		return nil, badOptsFailure("at least one package must be present in the PackageTree")
-	}
-	if params.Trace && params.TraceLogger == nil {
-		return nil, badOptsFailure("trace requested, but no logger provided")
-	}
-	if params.Lock == nil && len(params.ToChange) != 0 {
-		return nil, badOptsFailure(fmt.Sprintf("update specifically requested for %s, but no lock was provided to upgrade from", params.ToChange))
-	}
-
-	if params.Manifest == nil {
-		params.Manifest = simpleRootManifest{}
-	}
-
-	s := &solver{
-		params: params,
-		ig:     params.Manifest.IgnoredPackages(),
-		req:    params.Manifest.RequiredPackages(),
-		ovr:    params.Manifest.Overrides(),
-		tl:     params.TraceLogger,
-		rpt:    params.RootPackageTree.dup(),
-	}
-
-	if len(s.ig) != 0 {
-		var both []string
-		for pkg := range params.Manifest.RequiredPackages() {
-			if s.ig[pkg] {
-				both = append(both, pkg)
-			}
-		}
-		switch len(both) {
-		case 0:
-			break
-		case 1:
-			return nil, badOptsFailure(fmt.Sprintf("%q was given as both a required and ignored package", both[0]))
-		default:
-			return nil, badOptsFailure(fmt.Sprintf("multiple packages given as both required and ignored: %s", strings.Join(both, ", ")))
-		}
-	}
-
-	// Ensure the ignore and overrides maps are at least initialized
-	if s.ig == nil {
-		s.ig = make(map[string]bool)
-	}
-	if s.ovr == nil {
-		s.ovr = make(ProjectConstraints)
-	}
-
-	// Validate no empties in the overrides map
-	var eovr []string
-	for pr, pp := range s.ovr {
-		if pp.Constraint == nil && pp.Source == "" {
-			eovr = append(eovr, string(pr))
-		}
-	}
-
-	if eovr != nil {
-		// Maybe it's a little nitpicky to do this (we COULD proceed; empty
-		// overrides have no effect), but this errs on the side of letting the
-		// tool/user know there's bad input. Purely as a principle, that seems
-		// preferable to silently allowing progress with icky input.
-		if len(eovr) > 1 {
-			return nil, badOptsFailure(fmt.Sprintf("Overrides lacked any non-zero properties for multiple project roots: %s", strings.Join(eovr, " ")))
-		}
-		return nil, badOptsFailure(fmt.Sprintf("An override was declared for %s, but without any non-zero properties", eovr[0]))
-	}
-
-	// Set up the bridge and ensure the root dir is in good, working order
-	// before doing anything else. (This call is stubbed out in tests, via
-	// overriding mkBridge(), so we can run with virtual RootDir.)
-	s.b = mkBridge(s, sm)
-	err := s.b.verifyRootDir(s.params.RootDir)
-	if err != nil {
-		return nil, err
-	}
-
-	// Initialize maps
-	s.chng = make(map[ProjectRoot]struct{})
-	s.rlm = make(map[ProjectRoot]LockedProject)
-
-	// Initialize stacks and queues
-	s.sel = &selection{
-		deps: make(map[ProjectRoot][]dependency),
-		sm:   s.b,
-	}
-	s.unsel = &unselected{
-		sl:  make([]bimodalIdentifier, 0),
-		cmp: s.unselectedComparator,
-	}
-
-	// Prep safe, normalized versions of root manifest and lock data
-	s.rm = prepManifest(s.params.Manifest)
-	if s.params.Lock != nil {
-		for _, lp := range s.params.Lock.Projects() {
-			s.rlm[lp.Ident().ProjectRoot] = lp
-		}
-
-		// Also keep a prepped one, mostly for the bridge. This is probably
-		// wasteful, but only minimally so, and yay symmetry
-		s.rl = prepLock(s.params.Lock)
-	}
-
-	for _, p := range s.params.ToChange {
-		if _, exists := s.rlm[p]; !exists {
-			return nil, badOptsFailure(fmt.Sprintf("cannot update %s as it is not in the lock", p))
-		}
-		s.chng[p] = struct{}{}
-	}
-
-	return s, nil
 }
 
 // Solve attempts to find a dependency solution for the given project, as
@@ -348,8 +335,8 @@ func (s *solver) Solve() (Solution, error) {
 	}
 
 	s.traceFinish(soln, err)
-	if s.params.Trace {
-		s.mtr.dump(s.params.TraceLogger)
+	if s.tl != nil {
+		s.mtr.dump(s.tl)
 	}
 	return soln, err
 }
@@ -467,67 +454,14 @@ func (s *solver) solve() (map[atom]map[string]struct{}, error) {
 // populate the queues at the beginning of a solve run.
 func (s *solver) selectRoot() error {
 	s.mtr.push("select-root")
-	pa := atom{
-		id: ProjectIdentifier{
-			ProjectRoot: ProjectRoot(s.rpt.ImportRoot),
-		},
-		// This is a hack so that the root project doesn't have a nil version.
-		// It's sort of OK because the root never makes it out into the results.
-		// We may need a more elegant solution if we discover other side
-		// effects, though.
-		v: rootRev,
-	}
-
-	list := make([]string, len(s.rpt.Packages))
-	k := 0
-	for path, pkg := range s.rpt.Packages {
-		if pkg.Err != nil {
-			list[k] = path
-			k++
-		}
-	}
-	list = list[:k]
-	sort.Strings(list)
-
-	a := atomWithPackages{
-		a:  pa,
-		pl: list,
-	}
-
 	// Push the root project onto the queue.
 	// TODO(sdboyer) maybe it'd just be better to skip this?
-	s.sel.pushSelection(a, true)
+	awp := s.rd.rootAtom()
+	s.sel.pushSelection(awp, true)
 
 	// If we're looking for root's deps, get it from opts and local root
 	// analysis, rather than having the sm do it
-	mdeps := s.ovr.overrideAll(s.rm.DependencyConstraints().merge(s.rm.TestDependencyConstraints()))
-	reach := s.rpt.ExternalReach(true, true, s.ig).ListExternalImports()
-
-	// If there are any requires, slide them into the reach list, as well.
-	if len(s.req) > 0 {
-		reqs := make([]string, 0, len(s.req))
-
-		// Make a map of both imported and required pkgs to skip, to avoid
-		// duplication. Technically, a slice would probably be faster (given
-		// small size and bounds check elimination), but this is a one-time op,
-		// so it doesn't matter.
-		skip := make(map[string]bool, len(s.req))
-		for _, r := range reach {
-			if s.req[r] {
-				skip[r] = true
-			}
-		}
-
-		for r := range s.req {
-			if !skip[r] {
-				reqs = append(reqs, r)
-			}
-		}
-
-		reach = append(reach, reqs...)
-	}
-
-	deps, err := s.intersectConstraintsWithImports(mdeps, reach)
+	deps, err := s.intersectConstraintsWithImports(s.rd.combineConstraints(), s.rd.externalImportList())
 	if err != nil {
 		// TODO(sdboyer) this could well happen; handle it with a more graceful error
 		panic(fmt.Sprintf("shouldn't be possible %s", err))
@@ -537,16 +471,16 @@ func (s *solver) selectRoot() error {
 		// If we have no lock, or if this dep isn't in the lock, then prefetch
 		// it. See longer explanation in selectAtom() for how we benefit from
 		// parallelism here.
-		if s.needVersionsFor(dep.Ident.ProjectRoot) {
+		if s.rd.needVersionsFor(dep.Ident.ProjectRoot) {
 			go s.b.SyncSourceFor(dep.Ident)
 		}
 
-		s.sel.pushDep(dependency{depender: pa, dep: dep})
+		s.sel.pushDep(dependency{depender: awp.a, dep: dep})
 		// Add all to unselected queue
 		heap.Push(s.unsel, bimodalIdentifier{id: dep.Ident, pl: dep.pl, fromRoot: true})
 	}
 
-	s.traceSelectRoot(s.rpt, deps)
+	s.traceSelectRoot(s.rd.rpt, deps)
 	s.mtr.pop()
 	return nil
 }
@@ -554,7 +488,7 @@ func (s *solver) selectRoot() error {
 func (s *solver) getImportsAndConstraintsOf(a atomWithPackages) ([]completeDep, error) {
 	var err error
 
-	if ProjectRoot(s.rpt.ImportRoot) == a.a.id.ProjectRoot {
+	if s.rd.isRoot(a.a.id.ProjectRoot) {
 		panic("Should never need to recheck imports/constraints from root during solve")
 	}
 
@@ -570,7 +504,7 @@ func (s *solver) getImportsAndConstraintsOf(a atomWithPackages) ([]completeDep, 
 		return nil, err
 	}
 
-	allex := ptree.ExternalReach(false, false, s.ig)
+	allex := ptree.ExternalReach(false, false, s.rd.ig)
 	// Use a map to dedupe the unique external packages
 	exmap := make(map[string]struct{})
 	// Add to the list those packages that are reached by the packages
@@ -603,7 +537,7 @@ func (s *solver) getImportsAndConstraintsOf(a atomWithPackages) ([]completeDep, 
 	}
 	sort.Strings(reach)
 
-	deps := s.ovr.overrideAll(m.DependencyConstraints())
+	deps := s.rd.ovr.overrideAll(m.DependencyConstraints())
 	return s.intersectConstraintsWithImports(deps, reach)
 }
 
@@ -629,23 +563,21 @@ func (s *solver) intersectConstraintsWithImports(deps []workingConstraint, reach
 
 		// Look for a prefix match; it'll be the root project/repo containing
 		// the reached package
-		if pre, idep, match := xt.LongestPrefix(rp); match {
-			if isPathPrefixOrEqual(pre, rp) {
-				// Match is valid; put it in the dmap, either creating a new
-				// completeDep or appending it to the existing one for this base
-				// project/prefix.
-				dep := idep.(workingConstraint)
-				if cdep, exists := dmap[dep.Ident.ProjectRoot]; exists {
-					cdep.pl = append(cdep.pl, rp)
-					dmap[dep.Ident.ProjectRoot] = cdep
-				} else {
-					dmap[dep.Ident.ProjectRoot] = completeDep{
-						workingConstraint: dep,
-						pl:                []string{rp},
-					}
+		if pre, idep, match := xt.LongestPrefix(rp); match && isPathPrefixOrEqual(pre, rp) {
+			// Match is valid; put it in the dmap, either creating a new
+			// completeDep or appending it to the existing one for this base
+			// project/prefix.
+			dep := idep.(workingConstraint)
+			if cdep, exists := dmap[dep.Ident.ProjectRoot]; exists {
+				cdep.pl = append(cdep.pl, rp)
+				dmap[dep.Ident.ProjectRoot] = cdep
+			} else {
+				dmap[dep.Ident.ProjectRoot] = completeDep{
+					workingConstraint: dep,
+					pl:                []string{rp},
 				}
-				continue
 			}
+			continue
 		}
 
 		// No match. Let the SourceManager try to figure out the root
@@ -656,7 +588,7 @@ func (s *solver) intersectConstraintsWithImports(deps []workingConstraint, reach
 		}
 
 		// Make a new completeDep with an open constraint, respecting overrides
-		pd := s.ovr.override(root, ProjectProperties{Constraint: Any()})
+		pd := s.rd.ovr.override(root, ProjectProperties{Constraint: Any()})
 
 		// Insert the pd into the trie so that further deps from this
 		// project get caught by the prefix search
@@ -682,7 +614,7 @@ func (s *solver) intersectConstraintsWithImports(deps []workingConstraint, reach
 func (s *solver) createVersionQueue(bmi bimodalIdentifier) (*versionQueue, error) {
 	id := bmi.id
 	// If on the root package, there's no queue to make
-	if ProjectRoot(s.rpt.ImportRoot) == id.ProjectRoot {
+	if s.rd.isRoot(id.ProjectRoot) {
 		return newVersionQueue(id, nil, nil, s.b)
 	}
 
@@ -704,7 +636,7 @@ func (s *solver) createVersionQueue(bmi bimodalIdentifier) (*versionQueue, error
 	}
 
 	var lockv Version
-	if len(s.rlm) > 0 {
+	if len(s.rd.rlm) > 0 {
 		lockv, err = s.getLockVersionIfValid(id)
 		if err != nil {
 			// Can only get an error here if an upgrade was expressly requested on
@@ -722,7 +654,7 @@ func (s *solver) createVersionQueue(bmi bimodalIdentifier) (*versionQueue, error
 		// TODO(sdboyer) nested loop; prime candidate for a cache somewhere
 		for _, dep := range s.sel.getDependenciesOn(bmi.id) {
 			// Skip the root, of course
-			if ProjectRoot(s.rpt.ImportRoot) == dep.depender.id.ProjectRoot {
+			if s.rd.isRoot(dep.depender.id.ProjectRoot) {
 				continue
 			}
 
@@ -857,7 +789,7 @@ func (s *solver) findValidVersion(q *versionQueue, pl []string) error {
 func (s *solver) getLockVersionIfValid(id ProjectIdentifier) (Version, error) {
 	// If the project is specifically marked for changes, then don't look for a
 	// locked version.
-	if _, explicit := s.chng[id.ProjectRoot]; explicit || s.params.ChangeAll {
+	if _, explicit := s.rd.chng[id.ProjectRoot]; explicit || s.rd.chngall {
 		// For projects with an upstream or cache repository, it's safe to
 		// ignore what's in the lock, because there's presumably more versions
 		// to be found and attempted in the repository. If it's only in vendor,
@@ -880,7 +812,7 @@ func (s *solver) getLockVersionIfValid(id ProjectIdentifier) (Version, error) {
 		}
 	}
 
-	lp, exists := s.rlm[id.ProjectRoot]
+	lp, exists := s.rd.rlm[id.ProjectRoot]
 	if !exists {
 		return nil, nil
 	}
@@ -920,29 +852,6 @@ func (s *solver) getLockVersionIfValid(id ProjectIdentifier) (Version, error) {
 	}
 
 	return v, nil
-}
-
-// needVersionListFor indicates whether we need a version list for a given
-// project root, based solely on general solver inputs (no constraint checking
-// required). This will be true if:
-//
-//  - ChangeAll is on
-//  - The project is not in the lock at all
-//  - The project is in the lock, but is also in the list of projects to change
-func (s *solver) needVersionsFor(pr ProjectRoot) bool {
-	if s.params.ChangeAll {
-		return true
-	}
-
-	if _, has := s.rlm[pr]; !has {
-		// not in the lock
-		return true
-	} else if _, has := s.chng[pr]; has {
-		// in the lock, but marked for change
-		return true
-	}
-	// in the lock, not marked for change
-	return false
 }
 
 // backtrack works backwards from the current failed solution to find the next
@@ -1059,8 +968,8 @@ func (s *solver) unselectedComparator(i, j int) bool {
 		return false
 	}
 
-	_, ilock := s.rlm[iname.ProjectRoot]
-	_, jlock := s.rlm[jname.ProjectRoot]
+	_, ilock := s.rd.rlm[iname.ProjectRoot]
+	_, jlock := s.rd.rlm[jname.ProjectRoot]
 
 	switch {
 	case ilock && !jlock:
@@ -1105,7 +1014,7 @@ func (s *solver) fail(id ProjectIdentifier) {
 	// selection?
 
 	// skip if the root project
-	if ProjectRoot(s.rpt.ImportRoot) != id.ProjectRoot {
+	if !s.rd.isRoot(id.ProjectRoot) {
 		// just look for the first (oldest) one; the backtracker will necessarily
 		// traverse through and pop off any earlier ones
 		for _, vq := range s.vqs {
@@ -1167,7 +1076,7 @@ func (s *solver) selectAtom(a atomWithPackages, pkgonly bool) {
 		// few microseconds before blocking later. Best case, the dep doesn't
 		// come up next, but some other dep comes up that wasn't prefetched, and
 		// both fetches proceed in parallel.
-		if s.needVersionsFor(dep.Ident.ProjectRoot) {
+		if s.rd.needVersionsFor(dep.Ident.ProjectRoot) {
 			go s.b.SyncSourceFor(dep.Ident)
 		}
 
