@@ -20,12 +20,12 @@ func (cmd *hashinCommand) Register(fs *flag.FlagSet) {
 type hashinCommand struct{}
 
 func (_ hashinCommand) Run(args []string) error {
-	p, err := hoardContext.loadProject("")
+	p, err := nestContext.loadProject("")
 	if err != nil {
 		return err
 	}
 
-	sm, err := hoardContext.sourceManager()
+	sm, err := nestContext.sourceManager()
 	if err != nil {
 		return err
 	}
@@ -33,7 +33,7 @@ func (_ hashinCommand) Run(args []string) error {
 	defer sm.Release()
 
 	params := p.makeParams()
-	cpr, err := hoardContext.splitAbsoluteProjectRoot(p.absroot)
+	cpr, err := nestContext.splitAbsoluteProjectRoot(p.absroot)
 	if err != nil {
 		return errors.Wrap(err, "determineProjectRoot")
 	}
