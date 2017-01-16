@@ -1,6 +1,7 @@
 package gps
 
 import (
+	"fmt"
 	"sort"
 
 	"github.com/Masterminds/semver"
@@ -552,6 +553,30 @@ func compareVersionType(l, r Version) int {
 		}
 	}
 	panic("unknown version type")
+}
+
+// typedVersionString emits the normal stringified representation of the
+// provided version, prefixed with a string that uniquely identifies the type of
+// the version.
+func typedVersionString(v Version) string {
+	var prefix string
+	switch tv := v.(type) {
+	case branchVersion:
+		prefix = "b"
+	case plainVersion:
+		prefix = "pv"
+	case semVersion:
+		prefix = "sv"
+	case Revision:
+		prefix = "r"
+	case versionPair:
+		// NOTE: The behavior suits what we want for input hashing purposes, but
+		// pulling out both the unpaired and underlying makes the behavior
+		// inconsistent with how a normal String() op works on a pairedVersion.
+		return fmt.Sprintf("%s-%s", typedVersionString(tv.Unpair()), typedVersionString(tv.Underlying()))
+	}
+
+	return fmt.Sprintf("%s-%s", prefix, v.String())
 }
 
 // SortForUpgrade sorts a slice of []Version in roughly descending order, so

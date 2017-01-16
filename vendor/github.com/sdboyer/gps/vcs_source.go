@@ -135,8 +135,8 @@ func (s *gitSource) doListVersions() (vlist []Version, err error) {
 	r := s.crepo.r
 	var out []byte
 	c := exec.Command("git", "ls-remote", r.Remote())
-	// Ensure no terminal prompting for PWs
-	c.Env = mergeEnvLists([]string{"GIT_TERMINAL_PROMPT=0"}, os.Environ())
+	// Ensure no prompting for PWs
+	c.Env = mergeEnvLists([]string{"GIT_ASKPASS=", "GIT_TERMINAL_PROMPT=0"}, os.Environ())
 	out, err = c.CombinedOutput()
 
 	all := bytes.Split(bytes.TrimSpace(out), []byte("\n"))
