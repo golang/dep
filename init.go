@@ -35,6 +35,7 @@ func (cmd *initCommand) Name() string      { return "init" }
 func (cmd *initCommand) Args() string      { return "[root]" }
 func (cmd *initCommand) ShortHelp() string { return initShortHelp }
 func (cmd *initCommand) LongHelp() string  { return initLongHelp }
+func (cmd *initCommand) Hidden() bool      { return false }
 
 func (cmd *initCommand) Register(fs *flag.FlagSet) {}
 

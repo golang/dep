@@ -33,6 +33,7 @@ type command interface {
 	ShortHelp() string      // "Foo the first bar"
 	LongHelp() string       // "Foo the first bar meeting the following conditions..."
 	Register(*flag.FlagSet) // command-specific flags
+	Hidden() bool           // indicates whether the command should be hidden from help output
 	Run([]string) error
 }
 
@@ -52,6 +53,7 @@ func main() {
 		&statusCommand{},
 		&ensureCommand{},
 		&removeCommand{},
+		&hashinCommand{},
 	}
 
 	usage := func() {
@@ -61,7 +63,9 @@ func main() {
 		fmt.Fprintln(os.Stderr)
 		w := tabwriter.NewWriter(os.Stderr, 0, 4, 2, ' ', 0)
 		for _, command := range commands {
-			fmt.Fprintf(w, "\t%s\t%s\n", command.Name(), command.ShortHelp())
+			if !command.Hidden() {
+				fmt.Fprintf(w, "\t%s\t%s\n", command.Name(), command.ShortHelp())
+			}
 		}
 		w.Flush()
 		fmt.Fprintln(os.Stderr)
