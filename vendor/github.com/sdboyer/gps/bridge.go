@@ -40,6 +40,9 @@ type bridge struct {
 	// held by the solver that it ends up being easier and saner to do this.
 	s *solver
 
+	// Whether to sort version lists for downgrade.
+	down bool
+
 	// Simple, local cache of the root's PackageTree
 	crp *struct {
 		ptree PackageTree
@@ -58,17 +61,18 @@ type bridge struct {
 
 // Global factory func to create a bridge. This exists solely to allow tests to
 // override it with a custom bridge and sm.
-var mkBridge = func(s *solver, sm SourceManager) sourceBridge {
+var mkBridge = func(s *solver, sm SourceManager, down bool) sourceBridge {
 	return &bridge{
 		sm:     sm,
 		s:      s,
+		down:   down,
 		vlists: make(map[ProjectIdentifier][]Version),
 	}
 }
 
 func (b *bridge) GetManifestAndLock(id ProjectIdentifier, v Version) (Manifest, Lock, error) {
-	if id.ProjectRoot == ProjectRoot(b.s.rpt.ImportRoot) {
-		return b.s.rm, b.s.rl, nil
+	if b.s.rd.isRoot(id.ProjectRoot) {
+		return b.s.rd.rm, b.s.rd.rl, nil
 	}
 
 	b.s.mtr.push("b-gmal")
@@ -94,7 +98,7 @@ func (b *bridge) ListVersions(id ProjectIdentifier) ([]Version, error) {
 		return nil, err
 	}
 
-	if b.s.params.Downgrade {
+	if b.down {
 		SortForDowngrade(vl)
 	} else {
 		SortForUpgrade(vl)
@@ -120,7 +124,7 @@ func (b *bridge) SourceExists(id ProjectIdentifier) (bool, error) {
 }
 
 func (b *bridge) vendorCodeExists(id ProjectIdentifier) (bool, error) {
-	fi, err := os.Stat(filepath.Join(b.s.params.RootDir, "vendor", string(id.ProjectRoot)))
+	fi, err := os.Stat(filepath.Join(b.s.rd.dir, "vendor", string(id.ProjectRoot)))
 	if err != nil {
 		return false, err
 	} else if fi.IsDir() {
@@ -279,7 +283,7 @@ func (b *bridge) vtu(id ProjectIdentifier, v Version) versionTypeUnion {
 // The root project is handled separately, as the source manager isn't
 // responsible for that code.
 func (b *bridge) ListPackages(id ProjectIdentifier, v Version) (PackageTree, error) {
-	if id.ProjectRoot == ProjectRoot(b.s.rpt.ImportRoot) {
+	if b.s.rd.isRoot(id.ProjectRoot) {
 		panic("should never call ListPackages on root project")
 	}
 
@@ -327,7 +331,7 @@ func (b *bridge) breakLock() {
 		return
 	}
 
-	for _, lp := range b.s.rl.Projects() {
+	for _, lp := range b.s.rd.rl.Projects() {
 		if _, is := b.s.sel.selected(lp.pi); !is {
 			// TODO(sdboyer) use this as an opportunity to detect
 			// inconsistencies between upstream and the lock (e.g., moved tags)?

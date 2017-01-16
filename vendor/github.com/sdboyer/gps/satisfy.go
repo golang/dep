@@ -214,8 +214,8 @@ func (s *solver) checkIdentMatches(a atomWithPackages, cdep completeDep) error {
 		return &sourceMismatchFailure{
 			shared:   dep.Ident.ProjectRoot,
 			sel:      deps,
-			current:  curid.netName(),
-			mismatch: dep.Ident.netName(),
+			current:  curid.normalizedSource(),
+			mismatch: dep.Ident.normalizedSource(),
 			prob:     a.a,
 		}
 	}

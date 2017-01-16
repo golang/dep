@@ -1030,9 +1030,9 @@ func newbmSM(bmf bimodalFixture) *bmSourceManager {
 func (sm *bmSourceManager) ListPackages(id ProjectIdentifier, v Version) (PackageTree, error) {
 	for k, ds := range sm.specs {
 		// Cheat for root, otherwise we blow up b/c version is empty
-		if id.netName() == string(ds.n) && (k == 0 || ds.v.Matches(v)) {
+		if id.normalizedSource() == string(ds.n) && (k == 0 || ds.v.Matches(v)) {
 			ptree := PackageTree{
-				ImportRoot: id.netName(),
+				ImportRoot: id.normalizedSource(),
 				Packages:   make(map[string]PackageOrErr),
 			}
 			for _, pkg := range ds.pkgs {
@@ -1054,8 +1054,8 @@ func (sm *bmSourceManager) ListPackages(id ProjectIdentifier, v Version) (Packag
 
 func (sm *bmSourceManager) GetManifestAndLock(id ProjectIdentifier, v Version) (Manifest, Lock, error) {
 	for _, ds := range sm.specs {
-		if id.netName() == string(ds.n) && v.Matches(ds.v) {
-			if l, exists := sm.lm[id.netName()+" "+v.String()]; exists {
+		if id.normalizedSource() == string(ds.n) && v.Matches(ds.v) {
+			if l, exists := sm.lm[id.normalizedSource()+" "+v.String()]; exists {
 				return ds, l, nil
 			}
 			return ds, dummyLock{}, nil

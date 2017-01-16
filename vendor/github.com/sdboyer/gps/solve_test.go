@@ -20,7 +20,7 @@ var fixtorun string
 // TODO(sdboyer) regression test ensuring that locks with only revs for projects don't cause errors
 func init() {
 	flag.StringVar(&fixtorun, "gps.fix", "", "A single fixture to run in TestBasicSolves or TestBimodalSolves")
-	mkBridge(nil, nil)
+	mkBridge(nil, nil, false)
 	overrideMkBridge()
 	overrideIsStdLib()
 }
@@ -29,11 +29,12 @@ func init() {
 func overrideMkBridge() {
 	// For all tests, override the base bridge with the depspecBridge that skips
 	// verifyRootDir calls
-	mkBridge = func(s *solver, sm SourceManager) sourceBridge {
+	mkBridge = func(s *solver, sm SourceManager, down bool) sourceBridge {
 		return &depspecBridge{
 			&bridge{
 				sm:     sm,
 				s:      s,
+				down:   down,
 				vlists: make(map[ProjectIdentifier][]Version),
 			},
 		}
@@ -417,10 +418,11 @@ func TestBadSolveOpts(t *testing.T) {
 
 	// swap out the test mkBridge override temporarily, just to make sure we get
 	// the right error
-	mkBridge = func(s *solver, sm SourceManager) sourceBridge {
+	mkBridge = func(s *solver, sm SourceManager, down bool) sourceBridge {
 		return &bridge{
 			sm:     sm,
 			s:      s,
+			down:   down,
 			vlists: make(map[ProjectIdentifier][]Version),
 		}
 	}
