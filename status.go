@@ -40,6 +40,7 @@ func (cmd *statusCommand) Name() string      { return "status" }
 func (cmd *statusCommand) Args() string      { return "[package...]" }
 func (cmd *statusCommand) ShortHelp() string { return statusShortHelp }
 func (cmd *statusCommand) LongHelp() string  { return statusLongHelp }
+func (cmd *statusCommand) Hidden() bool      { return false }
 
 func (cmd *statusCommand) Register(fs *flag.FlagSet) {
 	fs.BoolVar(&cmd.detailed, "detailed", false, "report more detailed status")
