@@ -7,7 +7,6 @@ package main
 import (
 	"os"
 	"path/filepath"
-	"regexp"
 	"runtime"
 	"testing"
 )
@@ -176,6 +175,7 @@ const Qux = "yo yo!"
 
 	sysCommit := tg.getCommit("go.googlesource.com/sys")
 	expectedLock := `{
+    "memo": "e5aa3024d5de3a019bf6541029effdcd434538399eb079f432635c8524d31238",
     "projects": [
         {
             "name": "github.com/Sirupsen/logrus",
@@ -203,14 +203,8 @@ const Qux = "yo yo!"
     ]
 }
 `
-	lock := wipeMemo(tg.readLock())
+	lock := tg.readLock()
 	if lock != expectedLock {
 		t.Fatalf("expected %s, got %s", expectedLock, lock)
 	}
-}
-
-var memoRE = regexp.MustCompile(`\s+"memo": "[a-z0-9]+",`)
-
-func wipeMemo(s string) string {
-	return memoRE.ReplaceAllString(s, "")
 }
