@@ -80,6 +80,7 @@ func (cmd *ensureCommand) Name() string      { return "ensure" }
 func (cmd *ensureCommand) Args() string      { return "[spec...]" }
 func (cmd *ensureCommand) ShortHelp() string { return ensureShortHelp }
 func (cmd *ensureCommand) LongHelp() string  { return ensureLongHelp }
+func (cmd *ensureCommand) Hidden() bool      { return false }
 
 func (cmd *ensureCommand) Register(fs *flag.FlagSet) {
 	fs.BoolVar(&cmd.examples, "examples", false, "print detailed usage examples")
