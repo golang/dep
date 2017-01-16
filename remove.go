@@ -26,6 +26,7 @@ func (cmd *removeCommand) Name() string      { return "remove" }
 func (cmd *removeCommand) Args() string      { return "[spec...]" }
 func (cmd *removeCommand) ShortHelp() string { return removeShortHelp }
 func (cmd *removeCommand) LongHelp() string  { return removeLongHelp }
+func (cmd *removeCommand) Hidden() bool      { return false }
 
 func (cmd *removeCommand) Register(fs *flag.FlagSet) {
 	fs.BoolVar(&cmd.dryRun, "n", false, "dry run, don't actually remove anything")
