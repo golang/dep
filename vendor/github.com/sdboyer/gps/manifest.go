@@ -139,7 +139,7 @@ func (m simpleRootManifest) dup() simpleRootManifest {
 // ProjectProperties.
 //
 // This is achieved by copying the manifest's data into a new SimpleManifest.
-func prepManifest(m Manifest) Manifest {
+func prepManifest(m Manifest) SimpleManifest {
 	if m == nil {
 		return SimpleManifest{}
 	}

@@ -32,6 +32,26 @@ type Constraint interface {
 	_private()
 }
 
+// typedConstraintString emits the normal stringified representation of the
+// provided constraint, prefixed with a string that uniquely identifies the type
+// of the constraint.
+func typedConstraintString(c Constraint) string {
+	var prefix string
+
+	switch tc := c.(type) {
+	case Version:
+		return typedVersionString(tc)
+	case semverConstraint:
+		prefix = "svc"
+	case anyConstraint:
+		prefix = "any"
+	case noneConstraint:
+		prefix = "none"
+	}
+
+	return fmt.Sprintf("%s-%s", prefix, c.String())
+}
+
 func (semverConstraint) _private() {}
 func (anyConstraint) _private()    {}
 func (noneConstraint) _private()   {}

@@ -15,7 +15,7 @@ const (
 )
 
 func (s *solver) traceCheckPkgs(bmi bimodalIdentifier) {
-	if !s.params.Trace {
+	if s.tl == nil {
 		return
 	}
 
@@ -24,7 +24,7 @@ func (s *solver) traceCheckPkgs(bmi bimodalIdentifier) {
 }
 
 func (s *solver) traceCheckQueue(q *versionQueue, bmi bimodalIdentifier, cont bool, offset int) {
-	if !s.params.Trace {
+	if s.tl == nil {
 		return
 	}
 
@@ -49,7 +49,7 @@ func (s *solver) traceCheckQueue(q *versionQueue, bmi bimodalIdentifier, cont bo
 // traceStartBacktrack is called with the bmi that first failed, thus initiating
 // backtracking
 func (s *solver) traceStartBacktrack(bmi bimodalIdentifier, err error, pkgonly bool) {
-	if !s.params.Trace {
+	if s.tl == nil {
 		return
 	}
 
@@ -67,7 +67,7 @@ func (s *solver) traceStartBacktrack(bmi bimodalIdentifier, err error, pkgonly b
 // traceBacktrack is called when a package or project is poppped off during
 // backtracking
 func (s *solver) traceBacktrack(bmi bimodalIdentifier, pkgonly bool) {
-	if !s.params.Trace {
+	if s.tl == nil {
 		return
 	}
 
@@ -84,7 +84,7 @@ func (s *solver) traceBacktrack(bmi bimodalIdentifier, pkgonly bool) {
 
 // Called just once after solving has finished, whether success or not
 func (s *solver) traceFinish(sol solution, err error) {
-	if !s.params.Trace {
+	if s.tl == nil {
 		return
 	}
 
@@ -101,15 +101,15 @@ func (s *solver) traceFinish(sol solution, err error) {
 
 // traceSelectRoot is called just once, when the root project is selected
 func (s *solver) traceSelectRoot(ptree PackageTree, cdeps []completeDep) {
-	if !s.params.Trace {
+	if s.tl == nil {
 		return
 	}
 
 	// This duplicates work a bit, but we're in trace mode and it's only once,
 	// so who cares
-	rm := ptree.ExternalReach(true, true, s.ig)
+	rm := ptree.ExternalReach(true, true, s.rd.ig)
 
-	s.tl.Printf("Root project is %q", s.rpt.ImportRoot)
+	s.tl.Printf("Root project is %q", s.rd.rpt.ImportRoot)
 
 	var expkgs int
 	for _, cdep := range cdeps {
@@ -124,7 +124,7 @@ func (s *solver) traceSelectRoot(ptree PackageTree, cdeps []completeDep) {
 
 // traceSelect is called when an atom is successfully selected
 func (s *solver) traceSelect(awp atomWithPackages, pkgonly bool) {
-	if !s.params.Trace {
+	if s.tl == nil {
 		return
 	}
 
@@ -140,7 +140,7 @@ func (s *solver) traceSelect(awp atomWithPackages, pkgonly bool) {
 }
 
 func (s *solver) traceInfo(args ...interface{}) {
-	if !s.params.Trace {
+	if s.tl == nil {
 		return
 	}
 
