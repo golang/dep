@@ -123,6 +123,7 @@ func main() {
 
 	sysCommit := tg.getCommit("go.googlesource.com/sys")
 	expectedLock := `{
+    "memo": "c2d1935d281595034e4afeb49d13981f4210badea72ac78c3eb2ba01f36c3ceb",
     "projects": [
         {
             "name": "github.com/Sirupsen/logrus",
@@ -150,7 +151,7 @@ func main() {
     ]
 }
 `
-	lock := wipeMemo(tg.readLock())
+	lock := tg.readLock()
 	if lock != expectedLock {
 		t.Fatalf("expected %s, got %s", expectedLock, lock)
 	}
