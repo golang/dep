@@ -61,4 +61,6 @@ If not, please file an issue, describing what you did or wanted to do, what you 
 Contributions are greatly appreciated.
 The maintainers actively manage the issues list, and try to highlight issues suitable for newcomers.
 The project follows the typical GitHub pull request model.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for more details.
 Before starting any work, please either comment on an existing issue, or file a new one.
+
