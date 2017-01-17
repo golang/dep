@@ -218,7 +218,15 @@ func (cmd *ensureCommand) Run(args []string) error {
 		sm:   sm,
 	}
 
-	return errors.Wrap(sw.writeAllSafe(false), "grouped write of manifest, lock and vendor")
+	// check if vendor exists, because if the locks are the same but
+	// vendor does not exist we should write vendor
+	var writeV bool
+	vendorExists, _ := isDir(filepath.Join(sw.root, "vendor"))
+	if !vendorExists && solution != nil {
+		writeV = true
+	}
+
+	return errors.Wrap(sw.writeAllSafe(writeV), "grouped write of manifest, lock and vendor")
 }
 
 type stringSlice []string
