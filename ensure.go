@@ -56,10 +56,10 @@ hoard ensure -update
 
 hoard ensure github.com/pkg/foo@^1.0.1
 
-    Same as above, but choose any release >= 1.0.1, < 2.0.0. If a constraint was
-    previously set in the manifest, this resets it. This form of constraint
-    strikes a good balance of safety and flexibility, and should be preferred
-    for libraries.
+    Constrain pkg/foo to the latest release matching >= 1.0.1, < 2.0.0, and
+    place that release in the vendor folder. If a constraint was previously set
+    in the manifest, this resets it. This form of constraint strikes a good
+    balance of safety and flexibility, and should be preferred for libraries.
 
 hoard ensure github.com/pkg/foo@~1.0.1
 
