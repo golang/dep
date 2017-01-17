@@ -7,7 +7,6 @@ package main
 import (
 	"os"
 	"path/filepath"
-	"runtime"
 	"testing"
 )
 
@@ -104,10 +103,6 @@ func TestIsDir(t *testing.T) {
 func TestInit(t *testing.T) {
 	needsExternalNetwork(t)
 	needsGit(t)
-	// TODO: fix and remove this skip on windows
-	if runtime.GOOS == "windows" {
-		t.Skip("skipping on windows momentarily")
-	}
 
 	tg := testgo(t)
 	defer tg.cleanup()
