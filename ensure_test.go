@@ -93,6 +93,73 @@ func main() {
 	}
 }
 
+func TestEnsureEmptyRepoNoArgs(t *testing.T) {
+	needsExternalNetwork(t)
+	needsGit(t)
+
+	tg := testgo(t)
+	defer tg.cleanup()
+
+	tg.tempDir("src")
+	tg.setenv("GOPATH", tg.path("."))
+
+	m := `package main
+
+import (
+	"github.com/Sirupsen/logrus"
+)
+
+func main() {
+	logrus.Info("hello world")
+}`
+
+	tg.tempFile("src/thing/thing.go", m)
+	tg.cd(tg.path("src/thing"))
+
+	tg.run("init")
+	tg.run("ensure")
+
+	// make sure vendor exists
+	tg.mustExist(tg.path("src/thing/vendor/github.com/Sirupsen/logrus"))
+
+	expectedManifest := `{}
+`
+
+	manifest := tg.readManifest()
+	if manifest != expectedManifest {
+		t.Fatalf("expected %s, got %s", expectedManifest, manifest)
+	}
+
+	sysCommit := tg.getCommit("go.googlesource.com/sys")
+	logrusCommit := tg.getCommit("github.com/Sirupsen/logrus")
+	expectedLock := `{
+    "projects": [
+        {
+            "name": "github.com/Sirupsen/logrus",
+            "version": "v0.11.0",
+            "revision": "` + logrusCommit + `",
+            "packages": [
+                "."
+            ]
+        },
+        {
+            "name": "golang.org/x/sys",
+            "branch": "master",
+            "revision": "` + sysCommit + `",
+            "packages": [
+                "unix"
+            ]
+        }
+    ]
+}
+`
+
+	lock := wipeMemo(tg.readLock())
+	if lock != expectedLock {
+		t.Fatalf("expected %s, got %s", expectedLock, lock)
+	}
+}
+
 func TestDeduceConstraint(t *testing.T) {
 	sv, err := gps.NewSemverConstraint("v1.2.3")
 	if err != nil {
