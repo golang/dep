@@ -20,3 +20,4 @@
     - go test $(go list ./... | grep -v vendor)
     - go build ./hack/licenseok
     - find . -path ./vendor -prune -o -type f -name "*.go" -printf '%P\n' | xargs ./licenseok
+    - ./hack/validate-vendor.bash
