@@ -134,14 +134,14 @@ func (l *lock) MarshalJSON() ([]byte, error) {
 	return buf.Bytes(), err
 }
 
-// lockFromInterface converts an arbitrary gps.Lock to hoard's representation of a
-// lock. If the input is already hoard's *lock, the input is returned directly.
+// lockFromInterface converts an arbitrary gps.Lock to nest's representation of a
+// lock. If the input is already nest's *lock, the input is returned directly.
 //
 // Data is defensively copied wherever necessary to ensure the resulting *lock
 // shares no memory with the original lock.
 //
 // As gps.Solution is a superset of gps.Lock, this can also be used to convert
-// solutions to hoard's lock format.
+// solutions to nest's lock format.
 func lockFromInterface(in gps.Lock) *lock {
 	if in == nil {
 		return nil
