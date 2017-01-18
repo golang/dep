@@ -67,7 +67,7 @@ func main() {
 		fmt.Fprintln(os.Stderr)
 	}
 
-	if len(os.Args) <= 1 || len(os.Args) == 2 && strings.ToLower(os.Args[1]) == "help" {
+	if len(os.Args) <= 1 || len(os.Args) == 2 && (strings.Contains(strings.ToLower(os.Args[1]), "help") || strings.ToLower(os.Args[1]) == "-h") {
 		usage()
 		os.Exit(1)
 	}
