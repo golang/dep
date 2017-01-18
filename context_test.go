@@ -30,7 +30,7 @@ func TestSplitAbsoluteProjectRoot(t *testing.T) {
 
 	tg.tempDir("src")
 	tg.setenv("GOPATH", tg.path("."))
-	hoardCtx := &ctx{GOPATH: tg.path(".")}
+	nestCtx := &ctx{GOPATH: tg.path(".")}
 
 	importPaths := []string{
 		"github.com/pkg/errors",
@@ -38,8 +38,8 @@ func TestSplitAbsoluteProjectRoot(t *testing.T) {
 	}
 
 	for _, ip := range importPaths {
-		fullpath := filepath.Join(hoardCtx.GOPATH, "src", ip)
-		pr, err := hoardCtx.splitAbsoluteProjectRoot(fullpath)
+		fullpath := filepath.Join(nestCtx.GOPATH, "src", ip)
+		pr, err := nestCtx.splitAbsoluteProjectRoot(fullpath)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -49,7 +49,7 @@ func TestSplitAbsoluteProjectRoot(t *testing.T) {
 	}
 
 	// test where it should return error
-	pr, err := hoardCtx.splitAbsoluteProjectRoot("tra/la/la/la")
+	pr, err := nestCtx.splitAbsoluteProjectRoot("tra/la/la/la")
 	if err == nil {
 		t.Fatalf("should have gotten error but did not for tra/la/la/la: %s", pr)
 	}
@@ -61,7 +61,7 @@ func TestAbsoluteProjectRoot(t *testing.T) {
 
 	tg.tempDir("src")
 	tg.setenv("GOPATH", tg.path("."))
-	hoardCtx := &ctx{GOPATH: tg.path(".")}
+	nestCtx := &ctx{GOPATH: tg.path(".")}
 
 	importPaths := map[string]bool{
 		"github.com/pkg/errors": true,
@@ -75,7 +75,7 @@ func TestAbsoluteProjectRoot(t *testing.T) {
 	}
 
 	for i, ok := range importPaths {
-		pr, err := hoardCtx.absoluteProjectRoot(i)
+		pr, err := nestCtx.absoluteProjectRoot(i)
 		if ok {
 			tg.must(err)
 			expected := tg.path(filepath.Join("src", i))
@@ -92,7 +92,7 @@ func TestAbsoluteProjectRoot(t *testing.T) {
 
 	// test that a file fails
 	tg.tempFile("src/thing/thing.go", "hello world")
-	_, err := hoardCtx.absoluteProjectRoot("thing/thing.go")
+	_, err := nestCtx.absoluteProjectRoot("thing/thing.go")
 	if err == nil {
 		t.Fatal("error should not be nil for a file found")
 	}
@@ -107,7 +107,7 @@ func TestVersionInWorkspace(t *testing.T) {
 
 	tg.tempDir("src")
 	tg.setenv("GOPATH", tg.path("."))
-	hoardCtx := &ctx{GOPATH: tg.path(".")}
+	nestCtx := &ctx{GOPATH: tg.path(".")}
 
 	importPaths := map[string]struct {
 		rev      gps.Version
@@ -134,7 +134,7 @@ func TestVersionInWorkspace(t *testing.T) {
 			tg.runGit(repoDir, "checkout", info.rev.String())
 		}
 
-		v, err := hoardCtx.versionInWorkspace(gps.ProjectRoot(ip))
+		v, err := nestCtx.versionInWorkspace(gps.ProjectRoot(ip))
 		tg.must(err)
 
 		if v != info.rev {
