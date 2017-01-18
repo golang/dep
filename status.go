@@ -64,12 +64,12 @@ type statusCommand struct {
 }
 
 func (cmd *statusCommand) Run(args []string) error {
-	p, err := hoardContext.loadProject("")
+	p, err := nestContext.loadProject("")
 	if err != nil {
 		return err
 	}
 
-	sm, err := hoardContext.sourceManager()
+	sm, err := nestContext.sourceManager()
 	if err != nil {
 		return err
 	}

@@ -28,7 +28,7 @@ but it will be solved-for, and will appear in the lock.
 
 Note: init may use the network to solve the dependency graph.
 
-Note: init does NOT vendor dependencies at the moment. See hoard ensure.
+Note: init does NOT vendor dependencies at the moment. See nest ensure.
 `
 
 func (cmd *initCommand) Name() string      { return "init" }
@@ -76,7 +76,7 @@ func (cmd *initCommand) Run(args []string) error {
 		return fmt.Errorf("Invalid state: manifest %q does not exist, but lock %q does.", mf, lf)
 	}
 
-	cpr, err := hoardContext.splitAbsoluteProjectRoot(root)
+	cpr, err := nestContext.splitAbsoluteProjectRoot(root)
 	if err != nil {
 		return errors.Wrap(err, "determineProjectRoot")
 	}
@@ -86,7 +86,7 @@ func (cmd *initCommand) Run(args []string) error {
 		return errors.Wrap(err, "gps.ListPackages")
 	}
 	vlogf("Found %d dependencies.", len(pkgT.Packages))
-	sm, err := hoardContext.sourceManager()
+	sm, err := nestContext.sourceManager()
 	if err != nil {
 		return errors.Wrap(err, "getSourceManager")
 	}
@@ -296,7 +296,7 @@ func getProjectData(pkgT gps.PackageTree, cpr string, sm *gps.SourceMgr) (projec
 			vlogf("Package %q has import %q, analyzing...", v.P.ImportPath, ip)
 
 			dependencies[pr] = []string{ip}
-			v, err := hoardContext.versionInWorkspace(pr)
+			v, err := nestContext.versionInWorkspace(pr)
 			if err != nil {
 				notondisk[pr] = true
 				vlogf("Could not determine version for %q, omitting from generated manifest", pr)
@@ -357,7 +357,7 @@ func getProjectData(pkgT gps.PackageTree, cpr string, sm *gps.SourceMgr) (projec
 				// It's fine if the root does not exist - it indicates that this
 				// project is not present in the workspace, and so we need to
 				// solve to deal with this dep.
-				r := filepath.Join(hoardContext.GOPATH, "src", string(pr))
+				r := filepath.Join(nestContext.GOPATH, "src", string(pr))
 				_, err := os.Lstat(r)
 				if os.IsNotExist(err) {
 					colors[pkg] = black
@@ -396,7 +396,7 @@ func getProjectData(pkgT gps.PackageTree, cpr string, sm *gps.SourceMgr) (projec
 			// whether we're first seeing it here, in the transitive
 			// exploration, or if it arose in the direct dep parts
 			if _, in := ondisk[pr]; !in {
-				v, err := hoardContext.versionInWorkspace(pr)
+				v, err := nestContext.versionInWorkspace(pr)
 				if err != nil {
 					colors[pkg] = black
 					notondisk[pr] = true

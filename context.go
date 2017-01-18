@@ -36,7 +36,7 @@ func newContext() (*ctx, error) {
 }
 
 func (c *ctx) sourceManager() (*gps.SourceMgr, error) {
-	return gps.NewSourceManager(analyzer{}, filepath.Join(c.GOPATH, "pkg", "hoard"))
+	return gps.NewSourceManager(analyzer{}, filepath.Join(c.GOPATH, "pkg", "nest"))
 }
 
 // loadProject searches for a project root from the provided path, then loads
@@ -69,7 +69,7 @@ func (c *ctx) loadProject(path string) (*project, error) {
 	mf, err := os.Open(mp)
 	if err != nil {
 		if os.IsNotExist(err) {
-			// TODO: list possible solutions? (hoard init, cd $project)
+			// TODO: list possible solutions? (nest init, cd $project)
 			return nil, fmt.Errorf("no %v found in project root %v", manifestName, p.absroot)
 		}
 		// Unable to read the manifest file
