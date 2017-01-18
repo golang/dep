@@ -119,6 +119,7 @@ func (cmd *ensureCommand) Run(args []string) error {
 	defer sm.Release()
 
 	var errs []error
+	var requestedPackages []string
 	for _, arg := range args {
 		// default persist to manifest
 		pc, err := getProjectConstraint(arg, sm)
@@ -126,6 +127,7 @@ func (cmd *ensureCommand) Run(args []string) error {
 			errs = append(errs, err)
 			continue
 		}
+		requestedPackages = append(requestedPackages, string(pc.Ident.ProjectRoot))
 
 		if gps.IsAny(pc.Constraint) && pc.Ident.Source == "" {
 			// If the input specified neither a network name nor a constraint,
@@ -209,6 +211,22 @@ func (cmd *ensureCommand) Run(args []string) error {
 	if err != nil {
 		handleAllTheFailuresOfTheWorld(err)
 		return errors.Wrap(err, "ensure Solve()")
+	}
+
+	// generate warning if the package specifically requested was not added to
+	// the generated lock, this would mean it is not imported in their code
+	for _, pkg := range requestedPackages {
+		var found bool
+		for _, lp := range solution.Projects() {
+			if string(lp.Ident().ProjectRoot) == pkg {
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			fmt.Fprintf(os.Stdout, "WARNING: %s was requested but is not imported in your code.\n", pkg)
+		}
 	}
 
 	sw := safeWriter{

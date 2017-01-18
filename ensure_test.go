@@ -13,6 +13,62 @@ import (
 	"github.com/sdboyer/gps"
 )
 
+func TestEnsureUnusedDep(t *testing.T) {
+	needsExternalNetwork(t)
+	needsGit(t)
+
+	tg := testgo(t)
+	defer tg.cleanup()
+
+	tg.tempDir("src")
+	tg.setenv("GOPATH", tg.path("."))
+
+	m := `package main
+
+import (
+	"fmt"
+)
+
+func main() {
+	fmt.Println("hello world")
+}`
+
+	tg.tempFile("src/thing/thing.go", m)
+	tg.cd(tg.path("src/thing"))
+
+	tg.run("init")
+	tg.run("ensure", "github.com/Sirupsen/logrus@0.11.0")
+	tg.grepStdout("WARNING: github.com/Sirupsen/logrus was requested but is not imported in your code", "")
+
+	// manifest should not show the dependency as required
+	expectedManifest := `{
+    "dependencies": {
+        "github.com/Sirupsen/logrus": {
+            "version": "0.11.0"
+        }
+    }
+}
+`
+
+	manifest := tg.readManifest()
+	if manifest != expectedManifest {
+		t.Fatalf("expected %s, got %s", expectedManifest, manifest)
+	}
+
+	// we should not have a vendor folder with logrus
+	tg.mustNotExist(tg.path("src/thing/vendor/github.com/Sirupsen/logrus"))
+
+	expectedLock := `{
+    "memo": "fe519839881b58f20ae6efe7a78004b320bc9ba14c88a4ea6a061e8030b7a493",
+    "projects": []
+}
+`
+	lock := tg.readLock()
+	if lock != expectedLock {
+		t.Fatalf("expected %s, got %s", expectedLock, lock)
+	}
+}
+
 func TestEnsureOverrides(t *testing.T) {
 	needsExternalNetwork(t)
 	needsGit(t)
