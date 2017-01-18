@@ -1,8 +1,8 @@
-# Hoard
+# Nest
 
-Linux & OSX: [![Build Status](https://travis-ci.com/golang/hoard.svg?token=PbNwH1E9VppQaM7yAzpw&branch=master)](https://travis-ci.com/golang/hoard) | Windows: [![Build Status](https://ci.appveyor.com/api/projects/status/jbfsybf98lfrxccy?svg=true)](https://ci.appveyor.com/project/jessfraz/hoard)
+Linux & OSX: [![Build Status](https://travis-ci.com/golang/nest.svg?token=PbNwH1E9VppQaM7yAzpw&branch=master)](https://travis-ci.com/golang/hoard) | Windows: [![Build Status](https://ci.appveyor.com/api/projects/status/jbfsybf98lfrxccy?svg=true)](https://ci.appveyor.com/project/jessfraz/hoard)
 
-Hoard is a prototype dependency management tool.
+Nest is a prototype dependency management tool.
 
 ## Current status
 
@@ -25,20 +25,20 @@ Please see below for feedback and contribution guidelines.
 Get the tool via
 
 ```sh
-$ go get github.com/golang/hoard
+$ go get github.com/golang/nest
 ```
 
 Typical usage on a new repo might be
 
 ```sh
-$ hoard init
-$ hoard ensure -update
+$ nest init
+$ nest ensure -update
 ```
 
 To update a dependency to a new version, you might run
 
 ```sh
-$ hoard ensure github.com/pkg/errors@^0.8.0
+$ nest ensure github.com/pkg/errors@^0.8.0
 ```
 
 See the help text for much more detailed usage instructions.
