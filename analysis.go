@@ -34,7 +34,8 @@ func init() {
 // Stored as a var so that tests can swap it out. Ugh globals, ugh.
 var isStdLib = doIsStdLib
 
-// This was loving taken from src/cmd/go/pkg.go in Go's code (isStandardImportPath).
+// This was lovingly lifted from src/cmd/go/pkg.go in Go's code
+// (isStandardImportPath).
 func doIsStdLib(path string) bool {
 	i := strings.Index(path, "/")
 	if i < 0 {
@@ -122,9 +123,9 @@ func ListPackages(fileRoot, importRoot string) (PackageTree, error) {
 			return err
 		}
 
-		// Compute the import path. Run the result through ToSlash(), so that windows
-		// paths are normalized to Unix separators, as import paths are expected
-		// to be.
+		// Compute the import path. Run the result through ToSlash(), so that
+		// windows file paths are normalized to slashes, as is expected of
+		// import paths.
 		ip := filepath.ToSlash(filepath.Join(importRoot, strings.TrimPrefix(wp, fileRoot)))
 
 		// Find all the imports, across all os/arch combos
@@ -166,22 +167,18 @@ func ListPackages(fileRoot, importRoot string) (PackageTree, error) {
 			// Do allow the single-dot, at least for now
 			case imp == "..":
 				lim = append(lim, imp)
-				// ignore stdlib done this way, b/c that's what the go tooling does
 			case strings.HasPrefix(imp, "./"):
-				if isStdLib(imp[2:]) {
-					lim = append(lim, imp)
-				}
+				lim = append(lim, imp)
 			case strings.HasPrefix(imp, "../"):
-				if isStdLib(imp[3:]) {
-					lim = append(lim, imp)
-				}
+				lim = append(lim, imp)
 			}
 		}
 
 		if len(lim) > 0 {
 			ptree.Packages[ip] = PackageOrErr{
 				Err: &LocalImportsError{
-					Dir:          ip,
+					Dir:          path,
+					ImportPath:   ip,
 					LocalImports: lim,
 				},
 			}
@@ -293,6 +290,7 @@ func fillPackage(p *build.Package) error {
 //
 // TODO(sdboyer) add a Files property once we're doing our own per-file parsing
 type LocalImportsError struct {
+	ImportPath   string
 	Dir          string
 	LocalImports []string
 }

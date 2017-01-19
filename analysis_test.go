@@ -849,6 +849,63 @@ func TestListPackages(t *testing.T) {
 				},
 			},
 		},
+		"relative imports": {
+			fileRoot:   j("relimport"),
+			importRoot: "relimport",
+			out: PackageTree{
+				ImportRoot: "relimport",
+				Packages: map[string]PackageOrErr{
+					"relimport": {
+						P: Package{
+							ImportPath:  "relimport",
+							CommentPath: "",
+							Name:        "relimport",
+							Imports: []string{
+								"sort",
+							},
+						},
+					},
+					"relimport/dot": {
+						P: Package{
+							ImportPath:  "relimport/dot",
+							CommentPath: "",
+							Name:        "dot",
+							Imports: []string{
+								".",
+								"sort",
+							},
+						},
+					},
+					"relimport/dotdot": {
+						Err: &LocalImportsError{
+							Dir:        j("relimport/dotdot"),
+							ImportPath: "relimport/dotdot",
+							LocalImports: []string{
+								"..",
+							},
+						},
+					},
+					"relimport/dotslash": {
+						Err: &LocalImportsError{
+							Dir:        j("relimport/dotslash"),
+							ImportPath: "relimport/dotslash",
+							LocalImports: []string{
+								"./simple",
+							},
+						},
+					},
+					"relimport/dotdotslash": {
+						Err: &LocalImportsError{
+							Dir:        j("relimport/dotdotslash"),
+							ImportPath: "relimport/dotdotslash",
+							LocalImports: []string{
+								"../github.com/sdboyer/gps",
+							},
+						},
+					},
+				},
+			},
+		},
 		// This case mostly exists for the PackageTree methods, but it does
 		// cover a bit of range
 		"varied": {
