@@ -1050,7 +1050,7 @@ func TestListPackagesNoPerms(t *testing.T) {
 
 func TestListExternalImports(t *testing.T) {
 	// There's enough in the 'varied' test case to test most of what matters
-	vptree, err := ListPackages(filepath.Join(getwd(t), "_testdata", "src", "varied"), "varied")
+	vptree, err := ListPackages(filepath.Join(getwd(t), "_testdata", "src", "github.com", "example", "varied"), "github.com/example/varied")
 	if err != nil {
 		t.Fatalf("listPackages failed on varied test case: %s", err)
 	}
@@ -1136,7 +1136,7 @@ func TestListExternalImports(t *testing.T) {
 	// should have the same effect as ignoring main
 	name = "ignore the root"
 	ignore = map[string]bool{
-		"varied": true,
+		"github.com/example/varied": true,
 	}
 	except("net/http")
 	validate()
@@ -1144,7 +1144,7 @@ func TestListExternalImports(t *testing.T) {
 	// now drop a more interesting one
 	name = "ignore simple"
 	ignore = map[string]bool{
-		"varied/simple": true,
+		"github.com/example/varied/simple": true,
 	}
 	// we get github.com/sdboyer/gps from m1p, too, so it should still be there
 	except("go/parser")
@@ -1153,8 +1153,8 @@ func TestListExternalImports(t *testing.T) {
 	// now drop two
 	name = "ignore simple and namemismatch"
 	ignore = map[string]bool{
-		"varied/simple":       true,
-		"varied/namemismatch": true,
+		"github.com/example/varied/simple":       true,
+		"github.com/example/varied/namemismatch": true,
 	}
 	except("go/parser", "github.com/Masterminds/semver")
 	validate()
@@ -1178,8 +1178,8 @@ func TestListExternalImports(t *testing.T) {
 	// ignore two that should knock out gps
 	name = "ignore both importers"
 	ignore = map[string]bool{
-		"varied/simple": true,
-		"varied/m1p":    true,
+		"github.com/example/varied/simple": true,
+		"github.com/example/varied/m1p":    true,
 	}
 	except("sort", "github.com/sdboyer/gps", "go/parser")
 	validate()
@@ -1209,7 +1209,7 @@ func TestListExternalImports(t *testing.T) {
 
 func TestExternalReach(t *testing.T) {
 	// There's enough in the 'varied' test case to test most of what matters
-	vptree, err := ListPackages(filepath.Join(getwd(t), "_testdata", "src", "varied"), "varied")
+	vptree, err := ListPackages(filepath.Join(getwd(t), "_testdata", "src", "github.com", "example", "varied"), "github.com/example/varied")
 	if err != nil {
 		t.Fatalf("listPackages failed on varied test case: %s", err)
 	}
@@ -1245,12 +1245,12 @@ func TestExternalReach(t *testing.T) {
 	}
 
 	all := map[string][]string{
-		"varied":                {"encoding/binary", "github.com/Masterminds/semver", "github.com/sdboyer/gps", "go/parser", "hash", "net/http", "os", "sort"},
-		"varied/m1p":            {"github.com/sdboyer/gps", "os", "sort"},
-		"varied/namemismatch":   {"github.com/Masterminds/semver", "os"},
-		"varied/otherpath":      {"github.com/sdboyer/gps", "os", "sort"},
-		"varied/simple":         {"encoding/binary", "github.com/sdboyer/gps", "go/parser", "hash", "os", "sort"},
-		"varied/simple/another": {"encoding/binary", "github.com/sdboyer/gps", "hash", "os", "sort"},
+		"github.com/example/varied":                {"encoding/binary", "github.com/Masterminds/semver", "github.com/sdboyer/gps", "go/parser", "hash", "net/http", "os", "sort"},
+		"github.com/example/varied/m1p":            {"github.com/sdboyer/gps", "os", "sort"},
+		"github.com/example/varied/namemismatch":   {"github.com/Masterminds/semver", "os"},
+		"github.com/example/varied/otherpath":      {"github.com/sdboyer/gps", "os", "sort"},
+		"github.com/example/varied/simple":         {"encoding/binary", "github.com/sdboyer/gps", "go/parser", "hash", "os", "sort"},
+		"github.com/example/varied/simple/another": {"encoding/binary", "github.com/sdboyer/gps", "hash", "os", "sort"},
 	}
 	// build a map to validate the exception inputs. do this because shit is
 	// hard enough to keep track of that it's preferable not to have silent
@@ -1327,13 +1327,13 @@ func TestExternalReach(t *testing.T) {
 	// turn off main pkgs, which necessarily doesn't affect anything else
 	name = "no main"
 	main = false
-	except("varied")
+	except("github.com/example/varied")
 	validate()
 
 	// ignoring the "varied" pkg has same effect as disabling main pkgs
 	name = "ignore root"
 	ignore = map[string]bool{
-		"varied": true,
+		"github.com/example/varied": true,
 	}
 	main = true
 	validate()
@@ -1345,20 +1345,20 @@ func TestExternalReach(t *testing.T) {
 	tests = false
 	ignore = nil
 	except(
-		"varied encoding/binary",
-		"varied/simple encoding/binary",
-		"varied/simple/another encoding/binary",
-		"varied/otherpath github.com/sdboyer/gps os sort",
+		"github.com/example/varied encoding/binary",
+		"github.com/example/varied/simple encoding/binary",
+		"github.com/example/varied/simple/another encoding/binary",
+		"github.com/example/varied/otherpath github.com/sdboyer/gps os sort",
 	)
 
 	// almost the same as previous, but varied just goes away completely
 	name = "no main or tests"
 	main = false
 	except(
-		"varied",
-		"varied/simple encoding/binary",
-		"varied/simple/another encoding/binary",
-		"varied/otherpath github.com/sdboyer/gps os sort",
+		"github.com/example/varied",
+		"github.com/example/varied/simple encoding/binary",
+		"github.com/example/varied/simple/another encoding/binary",
+		"github.com/example/varied/otherpath github.com/sdboyer/gps os sort",
 	)
 	validate()
 
@@ -1369,38 +1369,38 @@ func TestExternalReach(t *testing.T) {
 	// varied/simple
 	name = "ignore varied/simple"
 	ignore = map[string]bool{
-		"varied/simple": true,
+		"github.com/example/varied/simple": true,
 	}
 	except(
 		// root pkg loses on everything in varied/simple/another
-		"varied hash encoding/binary go/parser",
-		"varied/simple",
+		"github.com/example/varied hash encoding/binary go/parser",
+		"github.com/example/varied/simple",
 	)
 	validate()
 
 	// widen the hole by excluding otherpath
 	name = "ignore varied/{otherpath,simple}"
 	ignore = map[string]bool{
-		"varied/otherpath": true,
-		"varied/simple":    true,
+		"github.com/example/varied/otherpath": true,
+		"github.com/example/varied/simple":    true,
 	}
 	except(
 		// root pkg loses on everything in varied/simple/another and varied/m1p
-		"varied hash encoding/binary go/parser github.com/sdboyer/gps sort",
-		"varied/otherpath",
-		"varied/simple",
+		"github.com/example/varied hash encoding/binary go/parser github.com/sdboyer/gps sort",
+		"github.com/example/varied/otherpath",
+		"github.com/example/varied/simple",
 	)
 	validate()
 
 	// remove namemismatch, though we're mostly beating a dead horse now
 	name = "ignore varied/{otherpath,simple,namemismatch}"
-	ignore["varied/namemismatch"] = true
+	ignore["github.com/example/varied/namemismatch"] = true
 	except(
 		// root pkg loses on everything in varied/simple/another and varied/m1p
-		"varied hash encoding/binary go/parser github.com/sdboyer/gps sort os github.com/Masterminds/semver",
-		"varied/otherpath",
-		"varied/simple",
-		"varied/namemismatch",
+		"github.com/example/varied hash encoding/binary go/parser github.com/sdboyer/gps sort os github.com/Masterminds/semver",
+		"github.com/example/varied/otherpath",
+		"github.com/example/varied/simple",
+		"github.com/example/varied/namemismatch",
 	)
 	validate()
 }
