@@ -23,8 +23,8 @@ const (
 )
 
 var (
-	nestContext *ctx
-	verbose     = flag.Bool("v", false, "enable verbose logging")
+	depContext *ctx
+	verbose    = flag.Bool("v", false, "enable verbose logging")
 )
 
 type command interface {
@@ -37,14 +37,14 @@ type command interface {
 }
 
 func main() {
-	// Set up the nest context.
+	// Set up the dep context.
 	// TODO(pb): can this be deglobalized, pretty please?
 	hc, err := newContext()
 	if err != nil {
 		fmt.Fprint(os.Stderr, err.Error())
 		os.Exit(1)
 	}
-	nestContext = hc
+	depContext = hc
 
 	// Build the list of available commands.
 	commands := []command{
@@ -55,7 +55,7 @@ func main() {
 	}
 
 	usage := func() {
-		fmt.Fprintln(os.Stderr, "Usage: nest <command>")
+		fmt.Fprintln(os.Stderr, "Usage: dep <command>")
 		fmt.Fprintln(os.Stderr)
 		fmt.Fprintln(os.Stderr, "Commands:")
 		fmt.Fprintln(os.Stderr)
@@ -125,7 +125,7 @@ func resetUsage(fs *flag.FlagSet, name, args, longHelp string) {
 	})
 	flagWriter.Flush()
 	fs.Usage = func() {
-		fmt.Fprintf(os.Stderr, "Usage: nest %s %s\n", name, args)
+		fmt.Fprintf(os.Stderr, "Usage: dep %s %s\n", name, args)
 		fmt.Fprintln(os.Stderr)
 		fmt.Fprintln(os.Stderr, strings.TrimSpace(longHelp))
 		fmt.Fprintln(os.Stderr)
@@ -201,7 +201,7 @@ func (p *project) makeParams() gps.SolveParameters {
 
 func logf(format string, args ...interface{}) {
 	// TODO: something else?
-	fmt.Fprintf(os.Stderr, "nest: "+format+"\n", args...)
+	fmt.Fprintf(os.Stderr, "dep: "+format+"\n", args...)
 }
 
 func vlogf(format string, args ...interface{}) {

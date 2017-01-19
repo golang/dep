@@ -29,14 +29,14 @@ func init() {
 	}
 }
 
-// The TestMain function creates a nest command for testing purposes and
+// The TestMain function creates a dep command for testing purposes and
 // deletes it after the tests have been run.
 // Most of this is taken from https://github.com/golang/go/blob/master/src/cmd/go/go_test.go and reused here.
 func TestMain(m *testing.M) {
-	args := []string{"build", "-o", "testnest" + exeSuffix}
+	args := []string{"build", "-o", "testdep" + exeSuffix}
 	out, err := exec.Command("go", args...).CombinedOutput()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "building testnest failed: %v\n%s", err, out)
+		fmt.Fprintf(os.Stderr, "building testdep failed: %v\n%s", err, out)
 		os.Exit(2)
 	}
 
@@ -49,11 +49,11 @@ func TestMain(m *testing.M) {
 		// those systems.  Set CCACHE_DIR to cope.  Issue 17668.
 		os.Setenv("CCACHE_DIR", filepath.Join(home, ".ccache"))
 	}
-	os.Setenv("HOME", "/test-nest-home-does-not-exist")
+	os.Setenv("HOME", "/test-dep-home-does-not-exist")
 
 	r := m.Run()
 
-	os.Remove("testnest" + exeSuffix)
+	os.Remove("testdep" + exeSuffix)
 
 	os.Exit(r)
 }
@@ -168,12 +168,12 @@ func (tg *testgoData) doRun(args []string) error {
 			}
 		}
 	}
-	tg.t.Logf("running testnest %v", args)
+	tg.t.Logf("running testdep %v", args)
 	var prog string
 	if tg.wd == "" {
-		prog = "./testnest" + exeSuffix
+		prog = "./testdep" + exeSuffix
 	} else {
-		prog = filepath.Join(tg.wd, "testnest"+exeSuffix)
+		prog = filepath.Join(tg.wd, "testdep"+exeSuffix)
 	}
 	args = append(args[:1], append([]string{"-v"}, args[1:]...)...)
 	cmd := exec.Command(prog, args...)
@@ -508,7 +508,7 @@ func (tg *testgoData) readLock() string {
 }
 
 func (tg *testgoData) getCommit(repo string) string {
-	repoPath := tg.path("pkg/nest/sources/https---" + strings.Replace(repo, "/", "-", -1))
+	repoPath := tg.path("pkg/dep/sources/https---" + strings.Replace(repo, "/", "-", -1))
 	cmd := exec.Command("git", "rev-parse", "HEAD")
 	cmd.Dir = repoPath
 	out, err := cmd.CombinedOutput()
