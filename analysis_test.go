@@ -27,7 +27,6 @@ func TestWorkmapToReach(t *testing.T) {
 
 	table := map[string]struct {
 		workmap map[string]wm
-		basedir string
 		out     map[string][]string
 	}{
 		"single": {
@@ -220,7 +219,7 @@ func TestWorkmapToReach(t *testing.T) {
 	}
 
 	for name, fix := range table {
-		out := wmToReach(fix.workmap, fix.basedir)
+		out := wmToReach(fix.workmap)
 		if !reflect.DeepEqual(out, fix.out) {
 			t.Errorf("wmToReach(%q): Did not get expected reach map:\n\t(GOT): %s\n\t(WNT): %s", name, out, fix.out)
 		}
@@ -1403,15 +1402,6 @@ func TestExternalReach(t *testing.T) {
 		"github.com/example/varied/namemismatch",
 	)
 	validate()
-}
-
-var _ = map[string][]string{
-	"varied":                {"encoding/binary", "github.com/Masterminds/semver", "github.com/sdboyer/gps", "go/parser", "hash", "net/http", "os", "sort"},
-	"varied/m1p":            {"github.com/sdboyer/gps", "os", "sort"},
-	"varied/namemismatch":   {"github.com/Masterminds/semver", "os"},
-	"varied/otherpath":      {"github.com/sdboyer/gps", "os", "sort"},
-	"varied/simple":         {"encoding/binary", "github.com/sdboyer/gps", "go/parser", "hash", "os", "sort"},
-	"varied/simple/another": {"encoding/binary", "github.com/sdboyer/gps", "hash", "os", "sort"},
 }
 
 func getwd(t *testing.T) string {
