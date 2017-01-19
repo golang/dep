@@ -442,7 +442,7 @@ func (t PackageTree) ExternalReach(main, tests bool, ignore map[string]bool) Rea
 				continue
 			}
 
-			if !checkPrefixSlash(filepath.Clean(imp), t.ImportRoot) {
+			if !eqOrSlashedPrefix(imp, t.ImportRoot) {
 				w.ex[imp] = true
 			} else {
 				if w2, seen := workmap[imp]; seen {
@@ -774,17 +774,15 @@ func (rm ReachMap) ListExternalImports() []string {
 	return ex
 }
 
-// checkPrefixSlash checks to see if the prefix is a prefix of the string as-is,
-// and that it is either equal OR the prefix + / is still a prefix.
-func checkPrefixSlash(s, prefix string) bool {
+// eqOrSlashedPrefix checks to see if the prefix is either equal to the string,
+// or that it is a prefix and the next char in the string is "/".
+func eqOrSlashedPrefix(s, prefix string) bool {
 	if !strings.HasPrefix(s, prefix) {
 		return false
 	}
-	return s == prefix || strings.HasPrefix(s, ensureTrailingSlash(prefix))
-}
 
-func ensureTrailingSlash(s string) string {
-	return strings.TrimSuffix(s, string(os.PathSeparator)) + string(os.PathSeparator)
+	prflen, pathlen := len(prefix), len(s)
+	return prflen == pathlen || strings.Index(s[prflen:], "/") == 0
 }
 
 // helper func to merge, dedupe, and sort strings
