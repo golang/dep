@@ -1,8 +1,8 @@
-# Nest
+# Dep
 
-Linux & OSX: [![Build Status](https://travis-ci.com/golang/nest.svg?token=PbNwH1E9VppQaM7yAzpw&branch=master)](https://travis-ci.com/golang/nest) | Windows: [![Build Status](https://ci.appveyor.com/api/projects/status/jbfsybf98lfrxccy?svg=true)](https://ci.appveyor.com/project/jessfraz/hoard)
+Linux & OSX: [![Build Status](https://travis-ci.com/golang/dep.svg?token=PbNwH1E9VppQaM7yAzpw&branch=master)](https://travis-ci.com/golang/dep) | Windows: [![Build Status](https://ci.appveyor.com/api/projects/status/jbfsybf98lfrxccy?svg=true)](https://ci.appveyor.com/project/jessfraz/hoard)
 
-Nest is a prototype dependency management tool.
+Dep is a prototype dependency management tool.
 
 ## Current status
 
@@ -25,20 +25,20 @@ Please see below for feedback and contribution guidelines.
 Get the tool via
 
 ```sh
-$ go get github.com/golang/nest
+$ go get github.com/golang/dep
 ```
 
 Typical usage on a new repo might be
 
 ```sh
-$ nest init
-$ nest ensure -update
+$ dep init
+$ dep ensure -update
 ```
 
 To update a dependency to a new version, you might run
 
 ```sh
-$ nest ensure github.com/pkg/errors@^0.8.0
+$ dep ensure github.com/pkg/errors@^0.8.0
 ```
 
 See the help text for much more detailed usage instructions.

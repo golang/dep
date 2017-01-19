@@ -12,7 +12,7 @@ import (
 )
 
 func TestDeriveManifestAndLock(t *testing.T) {
-	dir, err := ioutil.TempDir("", "nest")
+	dir, err := ioutil.TempDir("", "dep")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -56,7 +56,7 @@ func TestDeriveManifestAndLock(t *testing.T) {
 }
 
 func TestDeriveManifestAndLockDoesNotExist(t *testing.T) {
-	dir, err := ioutil.TempDir("", "nest")
+	dir, err := ioutil.TempDir("", "dep")
 	if err != nil {
 		t.Fatal(err)
 	}
