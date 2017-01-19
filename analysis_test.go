@@ -226,6 +226,16 @@ func TestWorkmapToReach(t *testing.T) {
 	}
 }
 
+func TestListPackagesNoDir(t *testing.T) {
+	out, err := ListPackages(filepath.Join(getwd(t), "_testdata", "notexist"), "notexist")
+	if err == nil {
+		t.Error("ListPackages should have errored on pointing to a nonexistent dir")
+	}
+	if !reflect.DeepEqual(PackageTree{}, out) {
+		t.Error("should've gotten back an empty PackageTree")
+	}
+}
+
 func TestListPackages(t *testing.T) {
 	srcdir := filepath.Join(getwd(t), "_testdata", "src")
 	j := func(s ...string) string {
@@ -251,7 +261,6 @@ func TestListPackages(t *testing.T) {
 					},
 				},
 			},
-			err: nil,
 		},
 		"code only": {
 			fileRoot:   j("simple"),
@@ -1210,7 +1219,7 @@ func TestExternalReach(t *testing.T) {
 	// There's enough in the 'varied' test case to test most of what matters
 	vptree, err := ListPackages(filepath.Join(getwd(t), "_testdata", "src", "github.com", "example", "varied"), "github.com/example/varied")
 	if err != nil {
-		t.Fatalf("listPackages failed on varied test case: %s", err)
+		t.Fatalf("ListPackages failed on varied test case: %s", err)
 	}
 
 	// Set up vars for validate closure
