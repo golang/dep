@@ -758,6 +758,51 @@ func TestListPackages(t *testing.T) {
 				},
 			},
 		},
+		// import cycle of three packages. ListPackages doesn't do anything
+		// special with cycles - that's the reach calculator's job - so this is
+		// error-free
+		"import cycle, len 3": {
+			fileRoot:   j("cycle"),
+			importRoot: "cycle",
+			out: PackageTree{
+				ImportRoot: "cycle",
+				Packages: map[string]PackageOrErr{
+					"cycle": {
+						P: Package{
+							ImportPath:  "cycle",
+							CommentPath: "",
+							Name:        "cycle",
+							Imports: []string{
+								"cycle/one",
+								"github.com/sdboyer/gps",
+							},
+						},
+					},
+					"cycle/one": {
+						P: Package{
+							ImportPath:  "cycle/one",
+							CommentPath: "",
+							Name:        "one",
+							Imports: []string{
+								"cycle/two",
+								"github.com/sdboyer/gps",
+							},
+						},
+					},
+					"cycle/two": {
+						P: Package{
+							ImportPath:  "cycle/two",
+							CommentPath: "",
+							Name:        "two",
+							Imports: []string{
+								"cycle",
+								"github.com/sdboyer/gps",
+							},
+						},
+					},
+				},
+			},
+		},
 		// has disallowed dir names
 		"disallowed dirs": {
 			fileRoot:   j("disallow"),
@@ -1411,6 +1456,19 @@ func TestExternalReach(t *testing.T) {
 		"github.com/example/varied/namemismatch",
 	)
 	validate()
+}
+
+// Verify that we handle import cycles correctly - drop em all
+func TestExternalReachCycle(t *testing.T) {
+	ptree, err := ListPackages(filepath.Join(getwd(t), "_testdata", "src", "cycle"), "cycle")
+	if err != nil {
+		t.Fatalf("ListPackages failed on cycle test case: %s", err)
+	}
+
+	rm := ptree.ExternalReach(true, true, nil)
+	if len(rm) > 0 {
+		t.Errorf("should be empty reachmap when all packages are in a cycle, got %v", rm)
+	}
 }
 
 func getwd(t *testing.T) string {
