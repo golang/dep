@@ -1,7 +1,7 @@
 version: "{build}"
 
 # Source Config
-clone_folder: c:\gopath\src\github.com\golang\nest
+clone_folder: c:\gopath\src\github.com\golang\dep
 
 # Build host
 

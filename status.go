@@ -64,12 +64,12 @@ type statusCommand struct {
 }
 
 func (cmd *statusCommand) Run(args []string) error {
-	p, err := nestContext.loadProject("")
+	p, err := depContext.loadProject("")
 	if err != nil {
 		return err
 	}
 
-	sm, err := nestContext.sourceManager()
+	sm, err := depContext.sourceManager()
 	if err != nil {
 		return err
 	}
