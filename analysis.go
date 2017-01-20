@@ -67,6 +67,7 @@ func doIsStdLib(path string) bool {
 // to PackageOrErr - each path under the root that exists will have either a
 // Package, or an error describing why the directory is not a valid package.
 func ListPackages(fileRoot, importRoot string) (PackageTree, error) {
+	//fmt.Printf("ListPackages(%q,%q)\n", fileRoot, importRoot)
 	// Set up a build.ctx for parsing
 	ctx := build.Default
 	ctx.GOROOT = ""
@@ -155,9 +156,18 @@ func ListPackages(fileRoot, importRoot string) (PackageTree, error) {
 		ip := filepath.ToSlash(filepath.Join(importRoot, strings.TrimPrefix(path, fileRoot)))
 
 		// Find all the imports, across all os/arch combos
-		p, err := ctx.ImportDir(path, analysisImportMode())
+		ap, err := filepath.Abs(path)
+		if err != nil {
+			return err
+		}
+		p, err := fullPackageInDir(ap)
+		//fmt.Printf("fullPackage(%q) == err=%q == %#v\n", ap, err, p)
+		//p, err := ctx.ImportDir(path, analysisImportMode())
 		var pkg Package
 		if err == nil {
+			if p.Name == "" {
+				p.Name = importRoot
+			}
 			pkg = happy(ip, p)
 		} else {
 			switch terr := err.(type) {
@@ -173,6 +183,7 @@ func ListPackages(fileRoot, importRoot string) (PackageTree, error) {
 				}
 				return nil
 			case *build.MultiplePackageError:
+				fmt.Println("HOW DID WE GET HERE?")
 				// Set this up preemptively, so we can easily just return out if
 				// something goes wrong. Otherwise, it'll get transparently
 				// overwritten later.
