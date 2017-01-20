@@ -91,6 +91,7 @@ func (cmd *initCommand) Run(args []string) error {
 	if err != nil {
 		return errors.Wrap(err, "getSourceManager")
 	}
+	sm.UseDefaultSignalHandling()
 	defer sm.Release()
 
 	pd, err := getProjectData(pkgT, cpr, sm)
