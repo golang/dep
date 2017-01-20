@@ -15,24 +15,15 @@ import (
 var (
 	gorootSrc  = filepath.Join(build.Default.GOROOT, "src")
 	ignoreTags = []string{} //[]string{"appengine", "ignore"} //TODO: appengine is a special case for now: https://github.com/tools/godep/issues/353
-
-	pkgCache = make(map[string]*build.Package) // dir => *build.Package
 )
 
 // returns the package in dir either from a cache or by importing it and then caching it
-func fullPackageInDir(dir string) (*build.Package, error) {
-	var err error
-	pkg, ok := pkgCache[dir]
-	if !ok {
-		pkg, err = build.ImportDir(dir, build.FindOnly)
-		if pkg.Goroot {
-			pkg, err = build.ImportDir(pkg.Dir, 0)
-		} else {
-			err = fillPackage(pkg)
-		}
-		if err == nil {
-			pkgCache[dir] = pkg
-		}
+func fullPackageInDir(dir string) (pkg *build.Package, err error) {
+	pkg, err = build.ImportDir(dir, build.FindOnly)
+	if pkg.Goroot {
+		pkg, err = build.ImportDir(pkg.Dir, 0)
+	} else {
+		err = fillPackage(pkg)
 	}
 	return pkg, err
 }
