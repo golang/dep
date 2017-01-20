@@ -90,18 +90,6 @@ NextFile:
 							continue NextFile
 						}
 					}
-
-					//TODO: Needed in GPS?
-					/*					if versionMatch.MatchString(t) && !isSameOrNewer(t, majorGoVersion) {
-											debugln("Adding", fname, "to ignored list because of version tag", t)
-											p.IgnoredGoFiles = append(p.IgnoredGoFiles, fname)
-											continue NextFile
-										}
-										if versionNegativeMatch.MatchString(t) && isSameOrNewer(t[1:], majorGoVersion) {
-											debugln("Adding", fname, "to ignored list because of version tag", t)
-											p.IgnoredGoFiles = append(p.IgnoredGoFiles, fname)
-											continue NextFile
-										} */
 				}
 			}
 		}
