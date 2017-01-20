@@ -8,6 +8,7 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"path"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -127,7 +128,7 @@ func ListPackages(fileRoot, importRoot string) (PackageTree, error) {
 		return pkg
 	}
 
-	err := filepath.Walk(fileRoot, func(path string, fi os.FileInfo, err error) error {
+	err := filepath.Walk(fileRoot, func(wp string, fi os.FileInfo, err error) error {
 		if err != nil && err != filepath.SkipDir {
 			return err
 		}
@@ -153,10 +154,10 @@ func ListPackages(fileRoot, importRoot string) (PackageTree, error) {
 		// Compute the import path. Run the result through ToSlash(), so that windows
 		// paths are normalized to Unix separators, as import paths are expected
 		// to be.
-		ip := filepath.ToSlash(filepath.Join(importRoot, strings.TrimPrefix(path, fileRoot)))
+		ip := filepath.ToSlash(filepath.Join(importRoot, strings.TrimPrefix(wp, fileRoot)))
 
 		// Find all the imports, across all os/arch combos
-		ap, err := filepath.Abs(path)
+		ap, err := filepath.Abs(wp)
 		if err != nil {
 			return err
 		}
@@ -166,7 +167,7 @@ func ListPackages(fileRoot, importRoot string) (PackageTree, error) {
 		var pkg Package
 		if err == nil {
 			if p.Name == "" {
-				p.Name = importRoot
+				p.Name = path.Base(importRoot)
 			}
 			pkg = happy(ip, p)
 		} else {
@@ -208,7 +209,7 @@ func ListPackages(fileRoot, importRoot string) (PackageTree, error) {
 				mains := make(map[string]struct{})
 				for k, pkgname := range terr.Packages {
 					if pkgname == "main" {
-						tags, err2 := readFileBuildTags(filepath.Join(path, terr.Files[k]))
+						tags, err2 := readFileBuildTags(filepath.Join(wp, terr.Files[k]))
 						if err2 != nil {
 							return nil
 						}
@@ -234,12 +235,12 @@ func ListPackages(fileRoot, importRoot string) (PackageTree, error) {
 				// outf first; if there's another err there, we bail out with a
 				// return
 				ctx.ReadDir = outf
-				po, err2 := ctx.ImportDir(path, analysisImportMode())
+				po, err2 := ctx.ImportDir(wp, analysisImportMode())
 				if err2 != nil {
 					return nil
 				}
 				ctx.ReadDir = inf
-				pi, err2 := ctx.ImportDir(path, analysisImportMode())
+				pi, err2 := ctx.ImportDir(wp, analysisImportMode())
 				if err2 != nil {
 					return nil
 				}
