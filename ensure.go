@@ -50,9 +50,9 @@ dep ensure
 
 dep ensure -update
 
-    Update all dependencies to the latest versions allowed by the manifest, ignoring
-    any versions specified in the lock file. Update the lock file with any
-    changes.
+    Update all dependencies to the latest versions allowed by the manifest,
+    ignoring any versions specified in the lock file. Update the lock file with
+    any changes.
 
 dep ensure github.com/pkg/foo@^1.0.1
 
@@ -72,8 +72,8 @@ dep ensure github.com/pkg/foo:git.internal.com/alt/foo
 dep ensure -override github.com/pkg/foo@^1.0.1
 
     Forcefully and transitively override any constraint for this dependency.
-    Overrides are powerful, but harmful in the long term. They should be used
-    as a last resort, especially if your project may be imported by others.
+    Overrides are powerful, but harmful in the long term. They should be used as
+    a last resort, especially if your project may be imported by others.
 `
 
 func (cmd *ensureCommand) Name() string      { return "ensure" }
