@@ -78,6 +78,9 @@ NextFile:
 		testFile := strings.HasSuffix(file, "_test.go")
 		fname := filepath.Base(file)
 		for _, c := range pf.Comments {
+			if c.Pos() > pf.Package { // +build must come before package
+				continue
+			}
 			ct := c.Text()
 			if i := strings.Index(ct, buildMatch); i != -1 {
 				for _, t := range strings.FieldsFunc(ct[i+len(buildMatch):], buildFieldSplit) {
