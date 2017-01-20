@@ -115,6 +115,7 @@ func (cmd *ensureCommand) Run(args []string) error {
 	if err != nil {
 		return err
 	}
+	sm.UseDefaultSignalHandling()
 	defer sm.Release()
 
 	var errs []error
