@@ -690,14 +690,17 @@ func wmToReach(workmap map[string]wm, basedir string) map[string][]string {
 			return true
 
 		case grey:
+			// Import cycles can arise in healthy situations through xtests, so
+			// allow them for now.
+			//
+			// FIXME(sdboyer) we need an improved model that allows us to
+			// accurately reject real import cycles.
+			return true
 			// grey means an import cycle; guaranteed badness right here. You'd
 			// hope we never encounter it in a dependency (really? you published
 			// that code?), but we have to defend against it.
-			//
-			// FIXME handle import cycles by dropping everything involved. (i
-			// think we need to compute SCC, then drop *all* of them?)
-			colors[pkg] = black
-			poison(append(path, pkg)) // poison self and parents
+			//colors[pkg] = black
+			//poison(append(path, pkg)) // poison self and parents
 
 		case black:
 			// black means we're done with the package. If it has an entry in
@@ -724,9 +727,6 @@ func wmToReach(workmap map[string]wm, basedir string) map[string][]string {
 		default:
 			panic(fmt.Sprintf("invalid color marker %v for %s", colors[pkg], pkg))
 		}
-
-		// shouldn't ever hit this
-		return false
 	}
 
 	// Run the depth-first exploration.
