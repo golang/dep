@@ -74,13 +74,6 @@ func doIsStdLib(path string) bool {
 // to PackageOrErr - each path under the root that exists will have either a
 // Package, or an error describing why the directory is not a valid package.
 func ListPackages(fileRoot, importRoot string) (PackageTree, error) {
-	//fmt.Printf("ListPackages(%q,%q)\n", fileRoot, importRoot)
-	// Set up a build.ctx for parsing
-	ctx := build.Default
-	ctx.GOROOT = ""
-	ctx.GOPATH = ""
-	ctx.UseAllFiles = true
-
 	ptree := PackageTree{
 		ImportRoot: importRoot,
 		Packages:   make(map[string]PackageOrErr),
