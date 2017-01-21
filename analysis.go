@@ -2,20 +2,27 @@ package gps
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"go/build"
+	"go/parser"
 	gscan "go/scanner"
+	"go/token"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"text/scanner"
+	"unicode"
 )
 
-var osList []string
-var archList []string
+var (
+	osList     []string
+	archList   []string
+	ignoreTags = []string{} //[]string{"appengine", "ignore"} //TODO: appengine is a special case for now: https://github.com/tools/godep/issues/353
+)
 
 func init() {
 	// The supported systems are listed in
@@ -67,49 +74,9 @@ func doIsStdLib(path string) bool {
 // to PackageOrErr - each path under the root that exists will have either a
 // Package, or an error describing why the directory is not a valid package.
 func ListPackages(fileRoot, importRoot string) (PackageTree, error) {
-	// Set up a build.ctx for parsing
-	ctx := build.Default
-	ctx.GOROOT = ""
-	ctx.GOPATH = ""
-	ctx.UseAllFiles = true
-
 	ptree := PackageTree{
 		ImportRoot: importRoot,
 		Packages:   make(map[string]PackageOrErr),
-	}
-
-	// mkfilter returns two funcs that can be injected into a build.Context,
-	// letting us filter the results into an "in" and "out" set.
-	mkfilter := func(files map[string]struct{}) (in, out func(dir string) (fi []os.FileInfo, err error)) {
-		in = func(dir string) (fi []os.FileInfo, err error) {
-			all, err := ioutil.ReadDir(dir)
-			if err != nil {
-				return nil, err
-			}
-
-			for _, f := range all {
-				if _, exists := files[f.Name()]; exists {
-					fi = append(fi, f)
-				}
-			}
-			return fi, nil
-		}
-
-		out = func(dir string) (fi []os.FileInfo, err error) {
-			all, err := ioutil.ReadDir(dir)
-			if err != nil {
-				return nil, err
-			}
-
-			for _, f := range all {
-				if _, exists := files[f.Name()]; !exists {
-					fi = append(fi, f)
-				}
-			}
-			return fi, nil
-		}
-
-		return
 	}
 
 	// helper func to create a Package from a *build.Package
@@ -126,7 +93,12 @@ func ListPackages(fileRoot, importRoot string) (PackageTree, error) {
 		return pkg
 	}
 
-	err := filepath.Walk(fileRoot, func(path string, fi os.FileInfo, err error) error {
+	var err error
+	fileRoot, err = filepath.Abs(fileRoot)
+	if err != nil {
+		return PackageTree{}, err
+	}
+	err = filepath.Walk(fileRoot, func(wp string, fi os.FileInfo, err error) error {
 		if err != nil && err != filepath.SkipDir {
 			return err
 		}
@@ -152,93 +124,27 @@ func ListPackages(fileRoot, importRoot string) (PackageTree, error) {
 		// Compute the import path. Run the result through ToSlash(), so that windows
 		// paths are normalized to Unix separators, as import paths are expected
 		// to be.
-		ip := filepath.ToSlash(filepath.Join(importRoot, strings.TrimPrefix(path, fileRoot)))
+		ip := filepath.ToSlash(filepath.Join(importRoot, strings.TrimPrefix(wp, fileRoot)))
 
 		// Find all the imports, across all os/arch combos
-		p, err := ctx.ImportDir(path, analysisImportMode())
+		//p, err := fullPackageInDir(wp)
+		p := &build.Package{
+			Dir: wp,
+		}
+		err = fillPackage(p)
+
 		var pkg Package
 		if err == nil {
 			pkg = happy(ip, p)
 		} else {
-			switch terr := err.(type) {
-			case gscan.ErrorList, *gscan.Error:
-				// This happens if we encounter malformed Go source code
+			switch err.(type) {
+			case gscan.ErrorList, *gscan.Error, *build.NoGoError:
+				// This happens if we encounter malformed or nonexistent Go
+				// source code
 				ptree.Packages[ip] = PackageOrErr{
 					Err: err,
 				}
 				return nil
-			case *build.NoGoError:
-				ptree.Packages[ip] = PackageOrErr{
-					Err: err,
-				}
-				return nil
-			case *build.MultiplePackageError:
-				// Set this up preemptively, so we can easily just return out if
-				// something goes wrong. Otherwise, it'll get transparently
-				// overwritten later.
-				ptree.Packages[ip] = PackageOrErr{
-					Err: err,
-				}
-
-				// For now, we're punting entirely on dealing with os/arch
-				// combinations. That will be a more significant refactor.
-				//
-				// However, there is one case we want to allow here - one or
-				// more files with package `main` having a "+build ignore" tag.
-				// (Ignore is just a convention, but for now it's good enough to
-				// just check that.) This is a fairly common way to give
-				// examples, and to make a more sophisticated build system than
-				// a Makefile allows, so we want to support that case. So,
-				// transparently lump the deps together.
-				//
-				// Caveat: this will only handle one file having an issue, as
-				// go/build stops scanning after it runs into the first problem.
-				// See https://github.com/sdboyer/gps/issues/138
-				mains := make(map[string]struct{})
-				for k, pkgname := range terr.Packages {
-					if pkgname == "main" {
-						tags, err2 := readFileBuildTags(filepath.Join(path, terr.Files[k]))
-						if err2 != nil {
-							return nil
-						}
-
-						var hasignore bool
-						for _, t := range tags {
-							if t == "ignore" {
-								hasignore = true
-								break
-							}
-						}
-						if !hasignore {
-							// No ignore tag found - bail out
-							return nil
-						}
-						mains[terr.Files[k]] = struct{}{}
-					}
-				}
-				// Make filtering funcs that will let us look only at the main
-				// files, and exclude the main files; inf and outf, respectively
-				inf, outf := mkfilter(mains)
-
-				// outf first; if there's another err there, we bail out with a
-				// return
-				ctx.ReadDir = outf
-				po, err2 := ctx.ImportDir(path, analysisImportMode())
-				if err2 != nil {
-					return nil
-				}
-				ctx.ReadDir = inf
-				pi, err2 := ctx.ImportDir(path, analysisImportMode())
-				if err2 != nil {
-					return nil
-				}
-				ctx.ReadDir = nil
-
-				// Use the other files as baseline, they're the main stuff
-				pkg = happy(ip, po)
-				mpkg := happy(ip, pi)
-				pkg.Imports = dedupeStrings(pkg.Imports, mpkg.Imports)
-				pkg.TestImports = dedupeStrings(pkg.TestImports, mpkg.TestImports)
 			default:
 				return err
 			}
@@ -286,6 +192,97 @@ func ListPackages(fileRoot, importRoot string) (PackageTree, error) {
 	}
 
 	return ptree, nil
+}
+
+// fillPackage full of info. Assumes p.Dir is set at a minimum
+func fillPackage(p *build.Package) error {
+	if p.SrcRoot == "" {
+		for _, base := range build.Default.SrcDirs() {
+			if strings.HasPrefix(p.Dir, base) {
+				p.SrcRoot = base
+			}
+		}
+	}
+
+	if p.SrcRoot == "" {
+		return errors.New("Unable to find SrcRoot for package " + p.ImportPath)
+	}
+
+	if p.Root == "" {
+		p.Root = filepath.Dir(p.SrcRoot)
+	}
+
+	var buildMatch = "+build "
+	var buildFieldSplit = func(r rune) bool {
+		return unicode.IsSpace(r) || r == ','
+	}
+
+	gofiles, err := filepath.Glob(filepath.Join(p.Dir, "*.go"))
+	if err != nil {
+		return err
+	}
+
+	if len(gofiles) == 0 {
+		return &build.NoGoError{Dir: p.Dir}
+	}
+
+	var testImports []string
+	var imports []string
+NextFile:
+	for _, file := range gofiles {
+		pf, err := parser.ParseFile(token.NewFileSet(), file, nil, parser.ImportsOnly|parser.ParseComments)
+		if err != nil {
+			return err
+		}
+		testFile := strings.HasSuffix(file, "_test.go")
+		fname := filepath.Base(file)
+		for _, c := range pf.Comments {
+			if c.Pos() > pf.Package { // +build must come before package
+				continue
+			}
+			ct := c.Text()
+			if i := strings.Index(ct, buildMatch); i != -1 {
+				for _, t := range strings.FieldsFunc(ct[i+len(buildMatch):], buildFieldSplit) {
+					for _, tag := range ignoreTags {
+						if t == tag {
+							p.IgnoredGoFiles = append(p.IgnoredGoFiles, fname)
+							continue NextFile
+						}
+					}
+				}
+			}
+		}
+
+		if testFile {
+			p.TestGoFiles = append(p.TestGoFiles, fname)
+			if p.Name == "" {
+				p.Name = strings.TrimSuffix(pf.Name.Name, "_test")
+			}
+		} else {
+			if p.Name == "" {
+				p.Name = pf.Name.Name
+			}
+			p.GoFiles = append(p.GoFiles, fname)
+		}
+
+		for _, is := range pf.Imports {
+			name, err := strconv.Unquote(is.Path.Value)
+			if err != nil {
+				return err // can't happen?
+			}
+			if testFile {
+				testImports = append(testImports, name)
+			} else {
+				imports = append(imports, name)
+			}
+		}
+	}
+
+	imports = uniq(imports)
+	testImports = uniq(testImports)
+	p.Imports = imports
+	p.TestImports = testImports
+	return nil
 }
 
 // LocalImportsError indicates that a package contains at least one relative
@@ -910,4 +907,23 @@ func dedupeStrings(s1, s2 []string) (r []string) {
 	}
 
 	return
+}
+
+func uniq(a []string) []string {
+	if a == nil {
+		return make([]string, 0)
+	}
+	var s string
+	var i int
+	if !sort.StringsAreSorted(a) {
+		sort.Strings(a)
+	}
+	for _, t := range a {
+		if t != s {
+			a[i] = t
+			i++
+			s = t
+		}
+	}
+	return a[:i]
 }
