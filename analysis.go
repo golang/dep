@@ -1,20 +1,17 @@
 package gps
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"go/build"
 	"go/parser"
 	gscan "go/scanner"
 	"go/token"
-	"io"
 	"os"
 	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
-	"text/scanner"
 	"unicode"
 )
 
@@ -296,98 +293,6 @@ type LocalImportsError struct {
 
 func (e *LocalImportsError) Error() string {
 	return fmt.Sprintf("import path %s had problematic local imports", e.Dir)
-}
-
-func readFileBuildTags(fp string) ([]string, error) {
-	co, err := readGoContents(fp)
-	if err != nil {
-		return []string{}, err
-	}
-
-	var tags []string
-	// Only look at places where we had a code comment.
-	if len(co) > 0 {
-		t := findTags(co)
-		for _, tg := range t {
-			found := false
-			for _, tt := range tags {
-				if tt == tg {
-					found = true
-				}
-			}
-			if !found {
-				tags = append(tags, tg)
-			}
-		}
-	}
-
-	return tags, nil
-}
-
-// Read contents of a Go file up to the package declaration. This can be used
-// to find the the build tags.
-func readGoContents(fp string) ([]byte, error) {
-	f, err := os.Open(fp)
-	defer f.Close()
-	if err != nil {
-		return []byte{}, err
-	}
-
-	var s scanner.Scanner
-	s.Init(f)
-	var tok rune
-	var pos scanner.Position
-	for tok != scanner.EOF {
-		tok = s.Scan()
-
-		// Getting the token text will skip comments by default.
-		tt := s.TokenText()
-		// build tags will not be after the package declaration.
-		if tt == "package" {
-			pos = s.Position
-			break
-		}
-	}
-
-	var buf bytes.Buffer
-	f.Seek(0, 0)
-	_, err = io.CopyN(&buf, f, int64(pos.Offset))
-	if err != nil {
-		return []byte{}, err
-	}
-
-	return buf.Bytes(), nil
-}
-
-// From a byte slice of a Go file find the tags.
-func findTags(co []byte) []string {
-	p := co
-	var tgs []string
-	for len(p) > 0 {
-		line := p
-		if i := bytes.IndexByte(line, '\n'); i >= 0 {
-			line, p = line[:i], p[i+1:]
-		} else {
-			p = p[len(p):]
-		}
-		line = bytes.TrimSpace(line)
-		// Only look at comment lines that are well formed in the Go style
-		if bytes.HasPrefix(line, []byte("//")) {
-			line = bytes.TrimSpace(line[len([]byte("//")):])
-			if len(line) > 0 && line[0] == '+' {
-				f := strings.Fields(string(line))
-
-				// We've found a +build tag line.
-				if f[0] == "+build" {
-					for _, tg := range f[1:] {
-						tgs = append(tgs, tg)
-					}
-				}
-			}
-		}
-	}
-
-	return tgs
 }
 
 // A PackageTree represents the results of recursively parsing a tree of
