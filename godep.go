@@ -13,27 +13,11 @@ import (
 )
 
 var (
-	gorootSrc  = filepath.Join(build.Default.GOROOT, "src")
 	ignoreTags = []string{} //[]string{"appengine", "ignore"} //TODO: appengine is a special case for now: https://github.com/tools/godep/issues/353
 )
 
-// returns the package in dir either from a cache or by importing it and then caching it
-func fullPackageInDir(dir string) (pkg *build.Package, err error) {
-	pkg, err = build.ImportDir(dir, build.FindOnly)
-	if pkg.Goroot {
-		pkg, err = build.ImportDir(pkg.Dir, 0)
-	} else {
-		err = fillPackage(pkg)
-	}
-	return pkg, err
-}
-
 // fillPackage full of info. Assumes p.Dir is set at a minimum
 func fillPackage(p *build.Package) error {
-	if p.Goroot {
-		return nil
-	}
-
 	if p.SrcRoot == "" {
 		for _, base := range build.Default.SrcDirs() {
 			if strings.HasPrefix(p.Dir, base) {
@@ -55,10 +39,8 @@ func fillPackage(p *build.Package) error {
 		return unicode.IsSpace(r) || r == ','
 	}
 
-	//debugln("Filling package:", p.ImportPath, "from", p.Dir)
 	gofiles, err := filepath.Glob(filepath.Join(p.Dir, "*.go"))
 	if err != nil {
-		//debugln("Error globbing", err)
 		return err
 	}
 
@@ -70,7 +52,6 @@ func fillPackage(p *build.Package) error {
 	var imports []string
 NextFile:
 	for _, file := range gofiles {
-		//debugln(file)
 		pf, err := parser.ParseFile(token.NewFileSet(), file, nil, parser.ImportsOnly|parser.ParseComments)
 		if err != nil {
 			return err
@@ -93,10 +74,11 @@ NextFile:
 				}
 			}
 		}
+
 		if testFile {
 			p.TestGoFiles = append(p.TestGoFiles, fname)
 			if p.Name == "" {
-				p.Name = strings.Split(pf.Name.Name, "_")[0]
+				p.Name = strings.TrimSuffix(pf.Name.Name, "_test")
 			}
 		} else {
 			if p.Name == "" {
@@ -104,6 +86,7 @@ NextFile:
 			}
 			p.GoFiles = append(p.GoFiles, fname)
 		}
+
 		for _, is := range pf.Imports {
 			name, err := strconv.Unquote(is.Path.Value)
 			if err != nil {
@@ -116,6 +99,7 @@ NextFile:
 			}
 		}
 	}
+
 	imports = uniq(imports)
 	testImports = uniq(testImports)
 	p.Imports = imports

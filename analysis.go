@@ -6,9 +6,7 @@ import (
 	"go/build"
 	gscan "go/scanner"
 	"io"
-	"io/ioutil"
 	"os"
-	"path"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -80,40 +78,6 @@ func ListPackages(fileRoot, importRoot string) (PackageTree, error) {
 		Packages:   make(map[string]PackageOrErr),
 	}
 
-	// mkfilter returns two funcs that can be injected into a build.Context,
-	// letting us filter the results into an "in" and "out" set.
-	mkfilter := func(files map[string]struct{}) (in, out func(dir string) (fi []os.FileInfo, err error)) {
-		in = func(dir string) (fi []os.FileInfo, err error) {
-			all, err := ioutil.ReadDir(dir)
-			if err != nil {
-				return nil, err
-			}
-
-			for _, f := range all {
-				if _, exists := files[f.Name()]; exists {
-					fi = append(fi, f)
-				}
-			}
-			return fi, nil
-		}
-
-		out = func(dir string) (fi []os.FileInfo, err error) {
-			all, err := ioutil.ReadDir(dir)
-			if err != nil {
-				return nil, err
-			}
-
-			for _, f := range all {
-				if _, exists := files[f.Name()]; !exists {
-					fi = append(fi, f)
-				}
-			}
-			return fi, nil
-		}
-
-		return
-	}
-
 	// helper func to create a Package from a *build.Package
 	happy := func(importPath string, p *build.Package) Package {
 		// Happy path - simple parsing worked
@@ -128,7 +92,12 @@ func ListPackages(fileRoot, importRoot string) (PackageTree, error) {
 		return pkg
 	}
 
-	err := filepath.Walk(fileRoot, func(wp string, fi os.FileInfo, err error) error {
+	var err error
+	fileRoot, err = filepath.Abs(fileRoot)
+	if err != nil {
+		return PackageTree{}, err
+	}
+	err = filepath.Walk(fileRoot, func(wp string, fi os.FileInfo, err error) error {
 		if err != nil && err != filepath.SkipDir {
 			return err
 		}
@@ -157,100 +126,24 @@ func ListPackages(fileRoot, importRoot string) (PackageTree, error) {
 		ip := filepath.ToSlash(filepath.Join(importRoot, strings.TrimPrefix(wp, fileRoot)))
 
 		// Find all the imports, across all os/arch combos
-		ap, err := filepath.Abs(wp)
-		if err != nil {
-			return err
+		//p, err := fullPackageInDir(wp)
+		p := &build.Package{
+			Dir: wp,
 		}
-		p, err := fullPackageInDir(ap)
-		//fmt.Printf("fullPackage(%q) == err=%q == %#v\n", ap, err, p)
-		//p, err := ctx.ImportDir(path, analysisImportMode())
+		err = fillPackage(p)
+
 		var pkg Package
 		if err == nil {
-			if p.Name == "" {
-				p.Name = path.Base(importRoot)
-			}
 			pkg = happy(ip, p)
 		} else {
-			switch terr := err.(type) {
-			case gscan.ErrorList, *gscan.Error:
-				// This happens if we encounter malformed Go source code
+			switch err.(type) {
+			case gscan.ErrorList, *gscan.Error, *build.NoGoError:
+				// This happens if we encounter malformed or nonexistent Go
+				// source code
 				ptree.Packages[ip] = PackageOrErr{
 					Err: err,
 				}
 				return nil
-			case *build.NoGoError:
-				ptree.Packages[ip] = PackageOrErr{
-					Err: err,
-				}
-				return nil
-			case *build.MultiplePackageError:
-				fmt.Println("HOW DID WE GET HERE?")
-				// Set this up preemptively, so we can easily just return out if
-				// something goes wrong. Otherwise, it'll get transparently
-				// overwritten later.
-				ptree.Packages[ip] = PackageOrErr{
-					Err: err,
-				}
-
-				// For now, we're punting entirely on dealing with os/arch
-				// combinations. That will be a more significant refactor.
-				//
-				// However, there is one case we want to allow here - one or
-				// more files with package `main` having a "+build ignore" tag.
-				// (Ignore is just a convention, but for now it's good enough to
-				// just check that.) This is a fairly common way to give
-				// examples, and to make a more sophisticated build system than
-				// a Makefile allows, so we want to support that case. So,
-				// transparently lump the deps together.
-				//
-				// Caveat: this will only handle one file having an issue, as
-				// go/build stops scanning after it runs into the first problem.
-				// See https://github.com/sdboyer/gps/issues/138
-				mains := make(map[string]struct{})
-				for k, pkgname := range terr.Packages {
-					if pkgname == "main" {
-						tags, err2 := readFileBuildTags(filepath.Join(wp, terr.Files[k]))
-						if err2 != nil {
-							return nil
-						}
-
-						var hasignore bool
-						for _, t := range tags {
-							if t == "ignore" {
-								hasignore = true
-								break
-							}
-						}
-						if !hasignore {
-							// No ignore tag found - bail out
-							return nil
-						}
-						mains[terr.Files[k]] = struct{}{}
-					}
-				}
-				// Make filtering funcs that will let us look only at the main
-				// files, and exclude the main files; inf and outf, respectively
-				inf, outf := mkfilter(mains)
-
-				// outf first; if there's another err there, we bail out with a
-				// return
-				ctx.ReadDir = outf
-				po, err2 := ctx.ImportDir(wp, analysisImportMode())
-				if err2 != nil {
-					return nil
-				}
-				ctx.ReadDir = inf
-				pi, err2 := ctx.ImportDir(wp, analysisImportMode())
-				if err2 != nil {
-					return nil
-				}
-				ctx.ReadDir = nil
-
-				// Use the other files as baseline, they're the main stuff
-				pkg = happy(ip, po)
-				mpkg := happy(ip, pi)
-				pkg.Imports = dedupeStrings(pkg.Imports, mpkg.Imports)
-				pkg.TestImports = dedupeStrings(pkg.TestImports, mpkg.TestImports)
 			default:
 				return err
 			}
