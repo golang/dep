@@ -225,7 +225,6 @@ func fillPackage(p *build.Package) error {
 
 	var testImports []string
 	var imports []string
-NextFile:
 	for _, file := range gofiles {
 		pf, err := parser.ParseFile(token.NewFileSet(), file, nil, parser.ImportsOnly|parser.ParseComments)
 		if err != nil {
@@ -233,6 +232,8 @@ NextFile:
 		}
 		testFile := strings.HasSuffix(file, "_test.go")
 		fname := filepath.Base(file)
+
+		var ignored bool
 		for _, c := range pf.Comments {
 			if c.Pos() > pf.Package { // +build must come before package
 				continue
@@ -240,11 +241,9 @@ NextFile:
 			ct := c.Text()
 			if i := strings.Index(ct, buildMatch); i != -1 {
 				for _, t := range strings.FieldsFunc(ct[i+len(buildMatch):], buildFieldSplit) {
-					for _, tag := range ignoreTags {
-						if t == tag {
-							p.IgnoredGoFiles = append(p.IgnoredGoFiles, fname)
-							continue NextFile
-						}
+					// hardcoded (for now) handling for the "ignore" build tag
+					if t == "ignore" {
+						ignored = true
 					}
 				}
 			}
@@ -252,11 +251,11 @@ NextFile:
 
 		if testFile {
 			p.TestGoFiles = append(p.TestGoFiles, fname)
-			if p.Name == "" {
+			if p.Name == "" && !ignored {
 				p.Name = strings.TrimSuffix(pf.Name.Name, "_test")
 			}
 		} else {
-			if p.Name == "" {
+			if p.Name == "" && !ignored {
 				p.Name = pf.Name.Name
 			}
 			p.GoFiles = append(p.GoFiles, fname)

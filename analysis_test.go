@@ -626,6 +626,27 @@ func TestListPackages(t *testing.T) {
 				},
 			},
 		},
+		"code and ignored main, order check": {
+			fileRoot:   j("igmainfirst"),
+			importRoot: "simple",
+			out: PackageTree{
+				ImportRoot: "simple",
+				Packages: map[string]PackageOrErr{
+					"simple": {
+						P: Package{
+							ImportPath:  "simple",
+							CommentPath: "",
+							Name:        "simple",
+							Imports: []string{
+								"github.com/sdboyer/gps",
+								"sort",
+								"unicode",
+							},
+						},
+					},
+				},
+			},
+		},
 		"code and ignored main with comment leader": {
 			fileRoot:   j("igmainlong"),
 			importRoot: "simple",
