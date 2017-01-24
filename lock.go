@@ -53,7 +53,7 @@ func readLock(r io.Reader) (*lock, error) {
 	for i, ld := range rl.P {
 		r := gps.Revision(ld.Revision)
 
-		var v gps.Version
+		var v gps.Version = r
 		if ld.Version != "" {
 			if ld.Branch != "" {
 				return nil, fmt.Errorf("lock file specified both a branch (%s) and version (%s) for %s", ld.Branch, ld.Version, ld.Name)
@@ -63,8 +63,6 @@ func readLock(r io.Reader) (*lock, error) {
 			v = gps.NewBranch(ld.Branch).Is(r)
 		} else if r == "" {
 			return nil, fmt.Errorf("lock file has entry for %s, but specifies no version", ld.Name)
-		} else {
-			v = r
 		}
 
 		id := gps.ProjectIdentifier{
