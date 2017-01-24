@@ -1,7 +1,6 @@
 package gps
 
 import (
-	"errors"
 	"fmt"
 	"go/build"
 	"go/parser"
@@ -76,20 +75,6 @@ func ListPackages(fileRoot, importRoot string) (PackageTree, error) {
 		Packages:   make(map[string]PackageOrErr),
 	}
 
-	// helper func to create a Package from a *build.Package
-	happy := func(importPath string, p *build.Package) Package {
-		// Happy path - simple parsing worked
-		pkg := Package{
-			ImportPath:  importPath,
-			CommentPath: p.ImportComment,
-			Name:        p.Name,
-			Imports:     p.Imports,
-			TestImports: dedupeStrings(p.TestImports, p.XTestImports),
-		}
-
-		return pkg
-	}
-
 	var err error
 	fileRoot, err = filepath.Abs(fileRoot)
 	if err != nil {
@@ -132,7 +117,13 @@ func ListPackages(fileRoot, importRoot string) (PackageTree, error) {
 
 		var pkg Package
 		if err == nil {
-			pkg = happy(ip, p)
+			pkg = Package{
+				ImportPath:  ip,
+				CommentPath: p.ImportComment,
+				Name:        p.Name,
+				Imports:     p.Imports,
+				TestImports: dedupeStrings(p.TestImports, p.XTestImports),
+			}
 		} else {
 			switch err.(type) {
 			case gscan.ErrorList, *gscan.Error, *build.NoGoError:
@@ -193,22 +184,6 @@ func ListPackages(fileRoot, importRoot string) (PackageTree, error) {
 
 // fillPackage full of info. Assumes p.Dir is set at a minimum
 func fillPackage(p *build.Package) error {
-	if p.SrcRoot == "" {
-		for _, base := range build.Default.SrcDirs() {
-			if strings.HasPrefix(p.Dir, base) {
-				p.SrcRoot = base
-			}
-		}
-	}
-
-	if p.SrcRoot == "" {
-		return errors.New("Unable to find SrcRoot for package " + p.ImportPath)
-	}
-
-	if p.Root == "" {
-		p.Root = filepath.Dir(p.SrcRoot)
-	}
-
 	var buildMatch = "+build "
 	var buildFieldSplit = func(r rune) bool {
 		return unicode.IsSpace(r) || r == ','
