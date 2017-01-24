@@ -1,6 +1,6 @@
 # Dep
 
-Linux & OSX: [![Build Status](https://travis-ci.com/golang/dep.svg?token=PbNwH1E9VppQaM7yAzpw&branch=master)](https://travis-ci.com/golang/dep) | Windows: [![Build status](https://ci.appveyor.com/api/projects/status/bpop030h3mypkr9h?svg=true)](https://ci.appveyor.com/project/jessfraz/dep)
+Linux & OSX: [![Build Status](https://travis-ci.org/golang/dep.svg?branch=master)](https://travis-ci.org/golang/dep) | Windows: [![Build status](https://ci.appveyor.com/api/projects/status/bpop030h3mypkr9h?svg=true)](https://ci.appveyor.com/project/jessfraz/dep)
 
 Dep is a prototype dependency management tool.
 
