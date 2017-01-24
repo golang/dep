@@ -82,12 +82,7 @@ func (s *selection) getRequiredPackagesIn(id ProjectIdentifier) map[string]int {
 	uniq := make(map[string]int)
 	for _, dep := range s.deps[id.ProjectRoot] {
 		for _, pkg := range dep.dep.pl {
-			if count, has := uniq[pkg]; has {
-				count++
-				uniq[pkg] = count
-			} else {
-				uniq[pkg] = 1
-			}
+			uniq[pkg] = uniq[pkg] + 1
 		}
 	}
 
@@ -105,12 +100,7 @@ func (s *selection) getSelectedPackagesIn(id ProjectIdentifier) map[string]int {
 	for _, p := range s.projects {
 		if p.a.a.id.eq(id) {
 			for _, pkg := range p.a.pl {
-				if count, has := uniq[pkg]; has {
-					count++
-					uniq[pkg] = count
-				} else {
-					uniq[pkg] = 1
-				}
+				uniq[pkg] = uniq[pkg] + 1
 			}
 		}
 	}
