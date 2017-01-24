@@ -271,6 +271,38 @@ var bimodalFixtures = map[string]bimodalFixture{
 			"b 1.0.0",
 		),
 	},
+	"project cycle involving root": {
+		ds: []depspec{
+			dsp(mkDepspec("root 0.0.0", "a ~1.0.0"),
+				pkg("root", "a"),
+				pkg("root/foo"),
+			),
+			dsp(mkDepspec("a 1.0.0"),
+				pkg("a", "root/foo"),
+			),
+		},
+		r: mksolution(
+			"a 1.0.0",
+		),
+	},
+	"project cycle not involving root": {
+		ds: []depspec{
+			dsp(mkDepspec("root 0.0.0", "a ~1.0.0"),
+				pkg("root", "a"),
+			),
+			dsp(mkDepspec("a 1.0.0"),
+				pkg("a", "b"),
+				pkg("a/foo"),
+			),
+			dsp(mkDepspec("b 1.0.0"),
+				pkg("b", "a/foo"),
+			),
+		},
+		r: mksolution(
+			mklp("a 1.0.0", ".", "foo"),
+			"b 1.0.0",
+		),
+	},
 	// Ensure that if a constraint is expressed, but no actual import exists,
 	// then the constraint is disregarded - the project named in the constraint
 	// is not part of the solution.
