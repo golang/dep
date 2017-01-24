@@ -156,9 +156,8 @@ func (cmd *removeCommand) Run(args []string) error {
 			if len(pkgimport) > 0 && !cmd.force {
 				if len(pkgimport) == 1 {
 					return fmt.Errorf("not removing %q because it is imported by %q (pass -force to override)", arg, pkgimport[0])
-				} else {
-					return fmt.Errorf("not removing %q because it is imported by:\n\t%s (pass -force to override)", arg, strings.Join(pkgimport, "\n\t"))
 				}
+				return fmt.Errorf("not removing %q because it is imported by:\n\t%s (pass -force to override)", arg, strings.Join(pkgimport, "\n\t"))
 			}
 
 			delete(p.m.Dependencies, gps.ProjectRoot(arg))

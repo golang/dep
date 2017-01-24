@@ -90,7 +90,7 @@ func (sw safeWriter) writeAllSafe(forceVendor bool) error {
 	}
 
 	if writeV && sw.sm == nil {
-		return errors.New("must provide a SourceManager if writing out a vendor dir.")
+		return errors.New("must provide a SourceManager if writing out a vendor dir")
 	}
 
 	if writeV && sw.l == nil && sw.nl == nil {

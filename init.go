@@ -74,7 +74,7 @@ func (cmd *initCommand) Run(args []string) error {
 		return err
 	}
 	if lok {
-		return fmt.Errorf("Invalid state: manifest %q does not exist, but lock %q does.", mf, lf)
+		return fmt.Errorf("invalid state: manifest %q does not exist, but lock %q does", mf, lf)
 	}
 
 	cpr, err := depContext.splitAbsoluteProjectRoot(root)
