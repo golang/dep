@@ -284,7 +284,7 @@ func (b *bridge) vtu(id ProjectIdentifier, v Version) versionTypeUnion {
 // responsible for that code.
 func (b *bridge) ListPackages(id ProjectIdentifier, v Version) (PackageTree, error) {
 	if b.s.rd.isRoot(id.ProjectRoot) {
-		panic("should never call ListPackages on root project")
+		return b.s.rd.rpt, nil
 	}
 
 	b.s.mtr.push("b-list-pkgs")
