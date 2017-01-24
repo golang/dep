@@ -141,12 +141,17 @@ func (rd rootdata) combineConstraints() []workingConstraint {
 
 // needVersionListFor indicates whether we need a version list for a given
 // project root, based solely on general solver inputs (no constraint checking
-// required). This will be true if any of the following conditions hold:
+// required). Assuming the argument is not the root project itself, this will be
+// true if any of the following conditions hold:
 //
 //  - ChangeAll is on
 //  - The project is not in the lock
 //  - The project is in the lock, but is also in the list of projects to change
 func (rd rootdata) needVersionsFor(pr ProjectRoot) bool {
+	if rd.isRoot(pr) {
+		return false
+	}
+
 	if rd.chngall {
 		return true
 	}
@@ -154,7 +159,9 @@ func (rd rootdata) needVersionsFor(pr ProjectRoot) bool {
 	if _, has := rd.rlm[pr]; !has {
 		// not in the lock
 		return true
-	} else if _, has := rd.chng[pr]; has {
+	}
+
+	if _, has := rd.chng[pr]; has {
 		// in the lock, but marked for change
 		return true
 	}
