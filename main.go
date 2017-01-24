@@ -38,14 +38,7 @@ type command interface {
 }
 
 func main() {
-	// Set up the dep context.
-	// TODO(pb): can this be deglobalized, pretty please?
-	hc, err := newContext()
-	if err != nil {
-		fmt.Fprint(os.Stderr, err.Error())
-		os.Exit(1)
-	}
-	depContext = hc
+
 
 	// Build the list of available commands.
 	commands := []command{
@@ -75,6 +68,15 @@ func main() {
 		usage()
 		os.Exit(1)
 	}
+
+	// Set up the dep context.
+	// TODO(pb): can this be deglobalized, pretty please?
+	hc, err := newContext()
+	if err != nil {
+		fmt.Fprint(os.Stderr, err.Error())
+		os.Exit(1)
+	}
+	depContext = hc
 
 	for _, command := range commands {
 		if name := command.Name(); os.Args[1] == name {

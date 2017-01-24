@@ -36,7 +36,7 @@ func newContext() (*ctx, error) {
 		}
 	}
 
-	return nil, errors.New("project not in a GOPATH")
+	return nil, errors.New("project not in a GOPATH\n")
 }
 
 func (c *ctx) sourceManager() (*gps.SourceMgr, error) {
