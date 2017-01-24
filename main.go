@@ -144,7 +144,7 @@ func resetUsage(fs *flag.FlagSet, name, args, longHelp string) {
 }
 
 var (
-	errProjectNotFound = errors.New("could not find project manifest.json")
+	errProjectNotFound = errors.New("could not find project manifest.json, use dep init to initiate a manifest")
 )
 
 func findProjectRootFromWD() (string, error) {
