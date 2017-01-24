@@ -145,7 +145,7 @@ func (c *ctx) versionInWorkspace(root gps.ProjectRoot) (gps.Version, error) {
 		return nil, errors.Wrapf(err, "determine project root for %s", root)
 	}
 
-	repo, err := vcs.NewRepo("", string(pr))
+	repo, err := vcs.NewRepo("", pr)
 	if err != nil {
 		return nil, errors.Wrapf(err, "creating new repo for root: %s", pr)
 	}
