@@ -26,6 +26,8 @@ func (a analyzer) DeriveManifestAndLock(path string, n gps.ProjectRoot) (gps.Man
 	if err != nil {
 		return nil, nil, nil
 	}
+	defer f.Close()
+
 	m, err := readManifest(f)
 	if err != nil {
 		return nil, nil, err
