@@ -455,7 +455,6 @@ func (s *solver) solve() (map[atom]map[string]struct{}, error) {
 func (s *solver) selectRoot() error {
 	s.mtr.push("select-root")
 	// Push the root project onto the queue.
-	// TODO(sdboyer) maybe it'd just be better to skip this?
 	awp := s.rd.rootAtom()
 	s.sel.pushSelection(awp, true)
 
@@ -1063,6 +1062,12 @@ func (s *solver) selectAtom(a atomWithPackages, pkgonly bool) {
 	}
 
 	for _, dep := range deps {
+		// Root can come back up here if there's a project-level cycle.
+		// Satisfiability checks have already ensured invariants are maintained,
+		// so we know we can just skip it here.
+		if s.rd.isRoot(dep.Ident.ProjectRoot) {
+			continue
+		}
 		// If this is dep isn't in the lock, do some prefetching. (If it is, we
 		// might be able to get away with zero network activity for it, so don't
 		// prefetch). This provides an opportunity for some parallelism wins, on
