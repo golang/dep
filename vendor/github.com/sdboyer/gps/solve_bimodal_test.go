@@ -1093,7 +1093,7 @@ func computeBimodalExternalMap(ds []depspec) map[pident]map[string][]string {
 			}
 
 			for _, imp := range pkg.imports {
-				if !checkPrefixSlash(filepath.Clean(imp), string(d.n)) {
+				if !eqOrSlashedPrefix(imp, string(d.n)) {
 					// Easy case - if the import is not a child of the base
 					// project path, put it in the external map
 					w.ex[imp] = true
