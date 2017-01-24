@@ -1,13 +1,13 @@
-# Contributing to Go
+# Contributing to Dep
 
-Go is an open source project.
+Dep is an open source project.
 
 It is the work of hundreds of contributors. We appreciate your help!
 
 
 ## Filing issues
 
-When [filing an issue](https://golang.org/issue/new), make sure to answer these five questions:
+When [filing an issue](https://github.com/golang/dep/issues/new), make sure to answer these five questions:
 
 1. What version of Go are you using (`go version`)?
 2. What operating system and processor architecture are you using?
@@ -23,14 +23,14 @@ The gophers there will answer or ask you to file an issue if you've tripped over
 Please read the [Contribution Guidelines](https://golang.org/doc/contribute.html)
 before sending patches.
 
-Unless otherwise noted, the Go source files are distributed under
+Unless otherwise noted, the Dep source files are distributed under
 the BSD-style license found in the LICENSE file.
 
 All submissions, including submissions by project members, require review. We
 use GitHub pull requests for this purpose. Consult [GitHub Help] for more
 information on using pull requests.
 
-[GitHub Help]: https://help.github.com/articles/about-pull-requests/<Paste>
+[GitHub Help]: https://help.github.com/articles/about-pull-requests/
 
 ## Contributor License Agreement
 
