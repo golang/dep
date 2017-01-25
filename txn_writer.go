@@ -129,8 +129,8 @@ func (sw safeWriter) writeAllSafe(forceVendor bool) error {
 	}
 
 	if writeV {
-		// prefer the nl, but take the l if only that's available, as could be the
-		// case if true was passed for forceVendor
+		// Prefer the nl, but take the l if only that's available, as could be the
+		// case if true was passed for forceVendor.
 		l := sw.nl
 		if l == nil {
 			l = sw.l
@@ -142,7 +142,7 @@ func (sw safeWriter) writeAllSafe(forceVendor bool) error {
 	}
 
 	// Move the existing files and dirs to the temp dir while we put the new
-	// ones in, to provide insurance against errors for as long as possible
+	// ones in, to provide insurance against errors for as long as possible.
 	type pathpair struct {
 		from, to string
 	}
@@ -152,7 +152,7 @@ func (sw safeWriter) writeAllSafe(forceVendor bool) error {
 
 	if writeM {
 		if _, err := os.Stat(mpath); err == nil {
-			// move out the old one
+			// Move out the old one.
 			tmploc := filepath.Join(td, manifestName+".orig")
 			failerr = renameWithFallback(mpath, tmploc)
 			if failerr != nil {
@@ -161,7 +161,7 @@ func (sw safeWriter) writeAllSafe(forceVendor bool) error {
 			restore = append(restore, pathpair{from: tmploc, to: mpath})
 		}
 
-		// move in the new one
+		// Move in the new one.
 		failerr = renameWithFallback(filepath.Join(td, manifestName), mpath)
 		if failerr != nil {
 			goto fail
@@ -170,7 +170,7 @@ func (sw safeWriter) writeAllSafe(forceVendor bool) error {
 
 	if writeL {
 		if _, err := os.Stat(lpath); err == nil {
-			// move out the old one
+			// Move out the old one.
 			tmploc := filepath.Join(td, lockName+".orig")
 
 			failerr = renameWithFallback(lpath, tmploc)
@@ -180,7 +180,7 @@ func (sw safeWriter) writeAllSafe(forceVendor bool) error {
 			restore = append(restore, pathpair{from: tmploc, to: lpath})
 		}
 
-		// move in the new one
+		// Move in the new one.
 		failerr = renameWithFallback(filepath.Join(td, lockName), lpath)
 		if failerr != nil {
 			goto fail
@@ -189,13 +189,13 @@ func (sw safeWriter) writeAllSafe(forceVendor bool) error {
 
 	if writeV {
 		if _, err := os.Stat(vpath); err == nil {
-			// move out the old vendor dir. just do it into an adjacent dir, to
+			// Move out the old vendor dir. just do it into an adjacent dir, to
 			// try to mitigate the possibility of a pointless cross-filesystem
-			// move with a temp dir
+			// move with a temp directory.
 			vendorbak = vpath + ".orig"
 			if _, err := os.Stat(vendorbak); err == nil {
 				// If the adjacent dir already exists, bite the bullet and move
-				// to a proper tempdir
+				// to a proper tempdir.
 				vendorbak = filepath.Join(td, "vendor.orig")
 			}
 
@@ -206,7 +206,7 @@ func (sw safeWriter) writeAllSafe(forceVendor bool) error {
 			restore = append(restore, pathpair{from: vendorbak, to: vpath})
 		}
 
-		// move in the new one
+		// Move in the new one.
 		failerr = renameWithFallback(filepath.Join(td, "vendor"), vpath)
 		if failerr != nil {
 			goto fail
@@ -215,7 +215,6 @@ func (sw safeWriter) writeAllSafe(forceVendor bool) error {
 
 	// Renames all went smoothly. The deferred os.RemoveAll will get the temp
 	// dir, but if we wrote vendor, we have to clean that up directly
-
 	if writeV {
 		// Nothing we can really do about an error at this point, so ignore it
 		os.RemoveAll(vendorbak)
@@ -224,9 +223,9 @@ func (sw safeWriter) writeAllSafe(forceVendor bool) error {
 	return nil
 
 fail:
-	// If we failed at any point, move all the things back into place, then bail
+	// If we failed at any point, move all the things back into place, then bail.
 	for _, pair := range restore {
-		// Nothing we can do on err here, as we're already in recovery mode
+		// Nothing we can do on err here, as we're already in recovery mode.
 		renameWithFallback(pair.from, pair.to)
 	}
 	return failerr

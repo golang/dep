@@ -39,7 +39,6 @@ type command interface {
 }
 
 func main() {
-
 	// Build the list of available commands.
 	commands := []command{
 		&initCommand{},
@@ -143,9 +142,7 @@ func resetUsage(fs *flag.FlagSet, name, args, longHelp string) {
 	}
 }
 
-var (
-	errProjectNotFound = errors.New("could not find project manifest.json, use dep init to initiate a manifest")
-)
+var errProjectNotFound = errors.New("could not find project manifest.json, use dep init to initiate a manifest")
 
 func findProjectRootFromWD() (string, error) {
 	path, err := os.Getwd()
@@ -155,8 +152,7 @@ func findProjectRootFromWD() (string, error) {
 	return findProjectRoot(path)
 }
 
-// search upwards looking for a manifest file until we get to the root of the
-// filesystem
+// search upwards looking for a manifest file until we get to the root of the filesystem.
 func findProjectRoot(from string) (string, error) {
 	for {
 		mp := filepath.Join(from, manifestName)

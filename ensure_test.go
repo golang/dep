@@ -188,7 +188,7 @@ func TestDeduceConstraint(t *testing.T) {
 	}
 }
 
-func TestCopyFolder(t *testing.T) {
+func TestCopyDir(t *testing.T) {
 	dir, err := ioutil.TempDir("", "dep")
 	if err != nil {
 		t.Fatal(err)
@@ -212,7 +212,7 @@ func TestCopyFolder(t *testing.T) {
 	srcf.Close()
 
 	destdir := filepath.Join(dir, "dest")
-	if err := copyFolder(srcdir, destdir); err != nil {
+	if err := copyDir(srcdir, destdir); err != nil {
 		t.Fatal(err)
 	}
 
