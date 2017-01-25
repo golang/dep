@@ -646,6 +646,37 @@ func TestMultiFetchThreadsafe(t *testing.T) {
 	wg.Wait()
 }
 
+// Ensure that we don't see concurrent map writes when calling ListVersions.
+// Regression test for https://github.com/sdboyer/gps/issues/156.
+//
+// Ideally this would be caught by TestMultiFetchThreadsafe, but perhaps the
+// high degree of parallelism pretty much eliminates that as a realistic
+// possibility?
+func TestListVersionsRacey(t *testing.T) {
+	// This test is quite slow, skip it on -short
+	if testing.Short() {
+		t.Skip("Skipping slow test in short mode")
+	}
+
+	sm, clean := mkNaiveSM(t)
+	defer clean()
+
+	wg := &sync.WaitGroup{}
+	id := mkPI("github.com/sdboyer/gps")
+	for i := 0; i < 20; i++ {
+		wg.Add(1)
+		go func() {
+			_, err := sm.ListVersions(id)
+			if err != nil {
+				t.Errorf("listing versions failed with err %s", err.Error())
+			}
+			wg.Done()
+		}()
+	}
+
+	wg.Wait()
+}
+
 func TestErrAfterRelease(t *testing.T) {
 	sm, clean := mkNaiveSM(t)
 	clean()
