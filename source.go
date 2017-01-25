@@ -66,6 +66,13 @@ type baseVCSSource struct {
 	// their listVersions func into the baseSource, for use as needed.
 	lvfunc func() (vlist []Version, err error)
 
+	// Mutex to ensure only one listVersions runs at a time
+	//
+	// TODO(sdboyer) this is a horrible one-off hack, and must be removed once
+	// source managers are refactored to properly serialize and fold-in calls to
+	// these methods.
+	lvmut sync.Mutex
+
 	// Once-er to control access to syncLocal
 	synconce sync.Once
 
