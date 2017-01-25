@@ -304,9 +304,9 @@ func (bs *baseVCSSource) syncLocal() error {
 			err := bs.crepo.r.Update()
 			if err != nil {
 				bs.syncerr = fmt.Errorf("failed fetching latest updates with err: %s", unwrapVcsErr(err))
-				bs.crepo.mut.Unlock()
+			} else {
+				bs.crepo.synced = true
 			}
-			bs.crepo.synced = true
 			bs.crepo.mut.Unlock()
 		}
 	}
