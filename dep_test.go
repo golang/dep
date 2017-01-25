@@ -15,11 +15,13 @@ import (
 	"regexp"
 	"runtime"
 	"strings"
+	"sync"
 	"testing"
 )
 
 var (
 	exeSuffix string // ".exe" on Windows
+	mu        sync.Mutex
 )
 
 func init() {
@@ -197,6 +199,10 @@ func (tg *testgoData) doRun(args []string) error {
 
 // run runs the test go command, and expects it to succeed.
 func (tg *testgoData) run(args ...string) {
+	if runtime.GOOS == "windows" {
+		mu.Lock()
+		defer mu.Unlock()
+	}
 	if status := tg.doRun(args); status != nil {
 		tg.t.Logf("go %v failed unexpectedly: %v", args, status)
 		tg.t.FailNow()
@@ -478,6 +484,13 @@ func (tg *testgoData) cleanup() {
 			fmt.Fprintln(os.Stderr, "could not restore working directory, crashing:", err)
 			os.Exit(2)
 		}
+	}
+	// NOTE(mattn): It seems that sometimes git.exe is not dead
+	// when cleanup() is called. But we do not know any way to wait for it.
+	if runtime.GOOS == "windows" {
+		mu.Lock()
+		exec.Command(`taskkill`, `/F`, `/IM`, `git.exe`).Run()
+		mu.Unlock()
 	}
 	for _, path := range tg.temps {
 		tg.check(os.RemoveAll(path))
