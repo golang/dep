@@ -5,10 +5,13 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
 	"testing"
+
+	"github.com/sdboyer/gps"
 )
 
 func TestFindRoot(t *testing.T) {
@@ -40,6 +43,20 @@ func TestFindRoot(t *testing.T) {
 		t.Errorf("findProjectRoot on nonexistent subdir should still work and give %s, got %s", expect, got3)
 	}
 
+	root := "/"
+	returnedPath, projectRootErr := findProjectRoot(root)
+	if returnedPath != "" {
+		t.Errorf("findProjectRoot with path %s returned non empty string: %s", root, returnedPath)
+	}
+	if projectRootErr == nil {
+		t.Errorf("findProjectRoot with path %s should return error", root)
+	}
+	errStr := fmt.Sprintf("%v", projectRootErr.Error())
+	expectedStr := "could not find project manifest.json, use dep init to initiate a manifest"
+	if errStr != expectedStr {
+		t.Errorf("Incorrect errProjectNotFound error. Found: %s. Expected: %s", errStr, expectedStr)
+	}
+
 	// the following test does not work on windows because syscall.Stat does not
 	// return a "not a directory" error
 	if runtime.GOOS != "windows" {
@@ -47,5 +64,24 @@ func TestFindRoot(t *testing.T) {
 		if err == nil {
 			t.Errorf("Should have err'd when trying subdir of file, but returned %s", got4)
 		}
+	}
+}
+
+func TestProjectMakeParams(t *testing.T) {
+	p := project{
+		absroot:    "someroot",
+		importroot: gps.ProjectRoot("Some project root"),
+		m:          &manifest{Ignores: []string{"ignoring this"}},
+		l:          &lock{},
+	}
+
+	solveParam := p.makeParams()
+
+	if solveParam.Manifest != p.m {
+		t.Error("makeParams() returned gps.SolveParameters with incorrect Manifest")
+	}
+
+	if solveParam.Lock != p.l {
+		t.Error("makeParams() returned gps.SolveParameters with incorrect Lock")
 	}
 }
