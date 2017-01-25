@@ -49,7 +49,6 @@ func readManifest(r io.Reader) (*manifest, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	m := &manifest{
 		Dependencies: make(gps.ProjectConstraints, len(rm.Dependencies)),
 		Ovr:          make(gps.ProjectConstraints, len(rm.Overrides)),
