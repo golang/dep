@@ -147,10 +147,12 @@ func (cmd *ensureCommand) Run(args []string) error {
 			Constraint:  pc.Constraint,
 		}
 
-		for i, lp := range p.l.P {
-			if lp.Ident() == pc.Ident {
-				p.l.P = append(p.l.P[:i], p.l.P[i+1:]...)
-				break
+		if p.l != nil {
+			for i, lp := range p.l.P {
+				if lp.Ident() == pc.Ident {
+					p.l.P = append(p.l.P[:i], p.l.P[i+1:]...)
+					break
+				}
 			}
 		}
 	}
@@ -170,10 +172,12 @@ func (cmd *ensureCommand) Run(args []string) error {
 			Constraint:  pc.Constraint,
 		}
 
-		for i, lp := range p.l.P {
-			if lp.Ident() == pc.Ident {
-				p.l.P = append(p.l.P[:i], p.l.P[i+1:]...)
-				break
+		if p.l != nil {
+			for i, lp := range p.l.P {
+				if lp.Ident() == pc.Ident {
+					p.l.P = append(p.l.P[:i], p.l.P[i+1:]...)
+					break
+				}
 			}
 		}
 	}
