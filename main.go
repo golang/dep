@@ -54,9 +54,9 @@ func main() {
 		fmt.Fprintln(os.Stderr, "Commands:")
 		fmt.Fprintln(os.Stderr)
 		w := tabwriter.NewWriter(os.Stderr, 0, 4, 2, ' ', 0)
-		for _, command := range commands {
-			if !command.Hidden() {
-				fmt.Fprintf(w, "\t%s\t%s\n", command.Name(), command.ShortHelp())
+		for _, cmd := range commands {
+			if !cmd.Hidden() {
+				fmt.Fprintf(w, "\t%s\t%s\n", cmd.Name(), cmd.ShortHelp())
 			}
 		}
 		w.Flush()
@@ -77,18 +77,18 @@ func main() {
 	}
 	depContext = hc
 
-	for _, command := range commands {
-		if name := command.Name(); os.Args[1] == name {
+	for _, cmd := range commands {
+		if name := cmd.Name(); os.Args[1] == name {
 			// Build flag set with global flags in there.
 			// TODO(pb): can we deglobalize verbose, pretty please?
 			fs := flag.NewFlagSet(name, flag.ExitOnError)
 			fs.BoolVar(verbose, "v", false, "enable verbose logging")
 
 			// Register the subcommand flags in there, too.
-			command.Register(fs)
+			cmd.Register(fs)
 
 			// Override the usage text to something nicer.
-			resetUsage(fs, command.Name(), command.Args(), command.LongHelp())
+			resetUsage(fs, cmd.Name(), cmd.Args(), cmd.LongHelp())
 
 			// Parse the flags the user gave us.
 			if err := fs.Parse(os.Args[2:]); err != nil {
@@ -97,7 +97,7 @@ func main() {
 			}
 
 			// Run the command with the post-flag-processing args.
-			if err := command.Run(fs.Args()); err != nil {
+			if err := cmd.Run(fs.Args()); err != nil {
 				fmt.Fprintf(os.Stderr, "%v\n", err)
 				os.Exit(1)
 			}
