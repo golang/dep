@@ -30,7 +30,9 @@ func newContext() (*ctx, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "getting work directory")
 	}
+	wd = filepath.FromSlash(wd)
 	for _, gp := range filepath.SplitList(buildContext.GOPATH) {
+		gp = filepath.FromSlash(gp)
 		if strings.HasPrefix(wd, gp) {
 			return &ctx{GOPATH: gp}, nil
 		}
