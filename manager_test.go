@@ -61,6 +61,25 @@ func mkNaiveSM(t *testing.T) (*SourceMgr, func()) {
 	}
 }
 
+func remakeNaiveSM(osm *SourceMgr, t *testing.T) (*SourceMgr, func()) {
+	cpath := osm.cachedir
+	osm.Release()
+
+	sm, err := NewSourceManager(naiveAnalyzer{}, cpath)
+	if err != nil {
+		t.Errorf("unexpected error on SourceManager recreation: %s", err)
+		t.FailNow()
+	}
+
+	return sm, func() {
+		sm.Release()
+		err := removeAll(cpath)
+		if err != nil {
+			t.Errorf("removeAll failed: %s", err)
+		}
+	}
+}
+
 func init() {
 	_, filename, _, _ := runtime.Caller(1)
 	bd = path.Dir(filename)
@@ -578,9 +597,6 @@ func TestMultiFetchThreadsafe(t *testing.T) {
 		t.Skip("Skipping slow test in short mode")
 	}
 
-	sm, clean := mkNaiveSM(t)
-	defer clean()
-
 	projects := []ProjectIdentifier{
 		mkPI("github.com/sdboyer/gps"),
 		mkPI("github.com/sdboyer/gpkt"),
@@ -600,50 +616,61 @@ func TestMultiFetchThreadsafe(t *testing.T) {
 
 	// 40 gives us ten calls per op, per project, which should be(?) decently
 	// likely to reveal underlying parallelism problems
-	cnum := len(projects) * 40
-	wg := &sync.WaitGroup{}
 
-	for i := 0; i < cnum; i++ {
-		wg.Add(1)
+	do := func(sm *SourceMgr) {
+		wg := &sync.WaitGroup{}
+		cnum := len(projects) * 40
 
-		go func(id ProjectIdentifier, pass int) {
-			switch pass {
-			case 0:
-				t.Logf("Deducing root for %s", id.errString())
-				_, err := sm.DeduceProjectRoot(string(id.ProjectRoot))
-				if err != nil {
-					t.Errorf("err on deducing project root for %s: %s", id.errString(), err.Error())
-				}
-			case 1:
-				t.Logf("syncing %s", id)
-				err := sm.SyncSourceFor(id)
-				if err != nil {
-					t.Errorf("syncing failed for %s with err %s", id.errString(), err.Error())
-				}
-			case 2:
-				t.Logf("listing versions for %s", id)
-				_, err := sm.ListVersions(id)
-				if err != nil {
-					t.Errorf("listing versions failed for %s with err %s", id.errString(), err.Error())
-				}
-			case 3:
-				t.Logf("Checking source existence for %s", id)
-				y, err := sm.SourceExists(id)
-				if err != nil {
-					t.Errorf("err on checking source existence for %s: %s", id.errString(), err.Error())
-				}
-				if !y {
-					t.Errorf("claims %s source does not exist", id.errString())
-				}
-			default:
-				panic(fmt.Sprintf("wtf, %s %v", id, pass))
-			}
-			wg.Done()
-		}(projects[i%len(projects)], (i/len(projects))%4)
+		for i := 0; i < cnum; i++ {
+			wg.Add(1)
 
-		runtime.Gosched()
+			go func(id ProjectIdentifier, pass int) {
+				switch pass {
+				case 0:
+					t.Logf("Deducing root for %s", id.errString())
+					_, err := sm.DeduceProjectRoot(string(id.ProjectRoot))
+					if err != nil {
+						t.Errorf("err on deducing project root for %s: %s", id.errString(), err.Error())
+					}
+				case 1:
+					t.Logf("syncing %s", id)
+					err := sm.SyncSourceFor(id)
+					if err != nil {
+						t.Errorf("syncing failed for %s with err %s", id.errString(), err.Error())
+					}
+				case 2:
+					t.Logf("listing versions for %s", id)
+					_, err := sm.ListVersions(id)
+					if err != nil {
+						t.Errorf("listing versions failed for %s with err %s", id.errString(), err.Error())
+					}
+				case 3:
+					t.Logf("Checking source existence for %s", id)
+					y, err := sm.SourceExists(id)
+					if err != nil {
+						t.Errorf("err on checking source existence for %s: %s", id.errString(), err.Error())
+					}
+					if !y {
+						t.Errorf("claims %s source does not exist", id.errString())
+					}
+				default:
+					panic(fmt.Sprintf("wtf, %s %v", id, pass))
+				}
+				wg.Done()
+			}(projects[i%len(projects)], (i/len(projects))%4)
+
+			runtime.Gosched()
+		}
+		wg.Wait()
 	}
-	wg.Wait()
+
+	sm, _ := mkNaiveSM(t)
+	do(sm)
+	// Run the thing twice with a remade sm so that we cover both the cases of
+	// pre-existing and new clones
+	sm2, clean := remakeNaiveSM(sm, t)
+	do(sm2)
+	clean()
 }
 
 // Ensure that we don't see concurrent map writes when calling ListVersions.
