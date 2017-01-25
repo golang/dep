@@ -72,7 +72,7 @@ func main() {
 	// TODO(pb): can this be deglobalized, pretty please?
 	hc, err := newContext()
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err.Error())
+		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 	depContext = hc
