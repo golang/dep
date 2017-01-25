@@ -85,3 +85,21 @@ func TestProjectMakeParams(t *testing.T) {
 		t.Error("makeParams() returned gps.SolveParameters with incorrect Lock")
 	}
 }
+
+func TestSlashedGOPATH(t *testing.T) {
+	tg := testgo(t)
+	defer tg.cleanup()
+	tg.tempDir("src")
+
+	tg.setenv("GOPATH", filepath.ToSlash(tg.path(".")))
+	_, err := newContext()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tg.setenv("GOPATH", filepath.FromSlash(tg.path(".")))
+	_, err = newContext()
+	if err != nil {
+		t.Fatal(err)
+	}
+}
