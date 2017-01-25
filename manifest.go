@@ -132,8 +132,10 @@ func (m *manifest) MarshalJSON() ([]byte, error) {
 	return buf.Bytes(), err
 }
 
-func toPossible(pp gps.ProjectProperties) (p possibleProps) {
-	p.Source = pp.Source
+func toPossible(pp gps.ProjectProperties) possibleProps {
+	p := possibleProps{
+		Source: pp.Source,
+	}
 
 	if v, ok := pp.Constraint.(gps.Version); ok {
 		switch v.Type() {
