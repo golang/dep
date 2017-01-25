@@ -463,7 +463,7 @@ func copyFolder(src string, dest string) error {
 }
 
 // copyFile copies a file from one place to another with the permission bits
-// perserved as well.
+// preserved as well.
 func copyFile(src string, dest string) error {
 	srcfile, err := os.Open(src)
 	if err != nil {
