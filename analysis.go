@@ -84,6 +84,19 @@ func ListPackages(fileRoot, importRoot string) (PackageTree, error) {
 		if err != nil && err != filepath.SkipDir {
 			return err
 		}
+
+		// Rewrite FileInfo if file is symlink
+		if fi.Mode()&os.ModeSymlink != 0 {
+			dst, err := os.Readlink(filepath.Join(fileRoot, fi.Name()))
+			if err != nil {
+				return err
+			}
+			fi, err = os.Stat(filepath.Join(fileRoot, dst))
+			if err != nil {
+				return err
+			}
+		}
+
 		if !fi.IsDir() {
 			return nil
 		}
