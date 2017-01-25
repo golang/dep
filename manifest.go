@@ -144,19 +144,19 @@ func toPossible(pp gps.ProjectProperties) (p possibleProps) {
 		case gps.IsSemver, gps.IsVersion:
 			p.Version = v.String()
 		}
-	} else {
-		// We simply don't allow for a case where the user could directly
-		// express a 'none' constraint, so we can ignore it here. We also ignore
-		// the 'any' case, because that's the other possibility, and it's what
-		// we interpret not having any constraint expressions at all to mean.
-		//if !gps.IsAny(pp.Constraint) && !gps.IsNone(pp.Constraint) {
-		if !gps.IsAny(pp.Constraint) && pp.Constraint != nil {
-			// Has to be a semver range.
-			p.Version = pp.Constraint.String()
-		}
+		return p
 	}
 
-	return
+	// We simply don't allow for a case where the user could directly
+	// express a 'none' constraint, so we can ignore it here. We also ignore
+	// the 'any' case, because that's the other possibility, and it's what
+	// we interpret not having any constraint expressions at all to mean.
+	// if !gps.IsAny(pp.Constraint) && !gps.IsNone(pp.Constraint) {
+	if !gps.IsAny(pp.Constraint) && pp.Constraint != nil {
+		// Has to be a semver range.
+		p.Version = pp.Constraint.String()
+	}
+	return p
 }
 
 func (m *manifest) DependencyConstraints() gps.ProjectConstraints {
