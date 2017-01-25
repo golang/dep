@@ -364,7 +364,7 @@ func renameWithFallback(src, dest string) error {
 
 	// Windows cannot use syscall.Rename to rename a directory
 	if runtime.GOOS == "windows" && fi.IsDir() {
-		if err := copyFolder(src, dest); err != nil {
+		if err := copyDir(src, dest); err != nil {
 			return err
 		}
 		return os.RemoveAll(src)
@@ -388,7 +388,7 @@ func renameWithFallback(src, dest string) error {
 	if terr.Err == syscall.EXDEV {
 		vlogf("Cross link err (is temp dir on same partition as project?); falling back to manual copy: %s", terr)
 		if fi.IsDir() {
-			cerr = copyFolder(src, dest)
+			cerr = copyDir(src, dest)
 		} else {
 			cerr = copyFile(src, dest)
 		}
@@ -414,9 +414,9 @@ func renameWithFallback(src, dest string) error {
 	return os.RemoveAll(src)
 }
 
-// copyFolder takes in a directory and copies its contents to the destination.
+// copyDir takes in a directory and copies its contents to the destination.
 // It preserves the file mode on files as well.
-func copyFolder(src string, dest string) error {
+func copyDir(src string, dest string) error {
 	fi, err := os.Lstat(src)
 	if err != nil {
 		return err
@@ -447,7 +447,7 @@ func copyFolder(src string, dest string) error {
 		destfile := filepath.Join(dest, obj.Name())
 
 		if obj.IsDir() {
-			err = copyFolder(srcfile, destfile)
+			err = copyDir(srcfile, destfile)
 			if err != nil {
 				return err
 			}

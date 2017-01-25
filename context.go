@@ -131,11 +131,9 @@ func (c *ctx) absoluteProjectRoot(path string) (string, error) {
 	if err != nil {
 		return "", errors.Wrapf(err, "checking if %s is a directory", posspath)
 	}
-
 	if !dirOK {
 		return "", fmt.Errorf("%s does not exist", posspath)
 	}
-
 	return posspath, nil
 }
 
@@ -160,14 +158,14 @@ func (c *ctx) versionInWorkspace(root gps.ProjectRoot) (gps.Version, error) {
 		return nil, errors.Wrapf(err, "getting repo version for root: %s", pr)
 	}
 
-	// first look through tags
+	// First look through tags.
 	tags, err := repo.Tags()
 	if err != nil {
 		return nil, errors.Wrapf(err, "getting repo tags for root: %s", pr)
 	}
-	// try to match the current version to a tag
+	// Try to match the current version to a tag.
 	if contains(tags, ver) {
-		// assume semver if it starts with a v
+		// Assume semver if it starts with a v.
 		if strings.HasPrefix(ver, "v") {
 			return gps.NewVersion(ver).Is(gps.Revision(rev)), nil
 		}
@@ -175,12 +173,12 @@ func (c *ctx) versionInWorkspace(root gps.ProjectRoot) (gps.Version, error) {
 		return nil, fmt.Errorf("version for root %s does not start with a v: %q", pr, ver)
 	}
 
-	// look for the current branch
+	// Look for the current branch.
 	branches, err := repo.Branches()
 	if err != nil {
 		return nil, errors.Wrapf(err, "getting repo branch for root: %s")
 	}
-	// try to match the current version to a branch
+	// Try to match the current version to a branch.
 	if contains(branches, ver) {
 		return gps.NewBranch(ver).Is(gps.Revision(rev)), nil
 	}
