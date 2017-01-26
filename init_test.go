@@ -170,7 +170,7 @@ const Qux = "yo yo!"
 
 	sysCommit := tg.getCommit("go.googlesource.com/sys")
 	expectedLock := `{
-    "memo": "e5aa3024d5de3a019bf6541029effdcd434538399eb079f432635c8524d31238",
+    "memo": "668fe45796bc4e85a5a6c0a0f1eb6fab9e23588d1eb33f3a12b2ad5599a3575e",
     "projects": [
         {
             "name": "github.com/Sirupsen/logrus",
