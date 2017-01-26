@@ -49,7 +49,8 @@ func WriteDepTree(basedir string, l Lock, sm SourceManager, sv bool) error {
 
 		// Only make the parent dir, as some source implementations will balk on
 		// trying to write to an empty but existing dir.
-		err := os.MkdirAll(filepath.Dir(to), 0777)
+		//err := os.MkdirAll(filepath.Dir(to), 0777)
+		err := os.MkdirAll(to, 0777)
 		if err != nil {
 			return err
 		}
