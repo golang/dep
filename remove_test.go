@@ -123,7 +123,7 @@ func main() {
 
 	sysCommit := tg.getCommit("go.googlesource.com/sys")
 	expectedLock := `{
-    "memo": "c2d1935d281595034e4afeb49d13981f4210badea72ac78c3eb2ba01f36c3ceb",
+    "memo": "7769242a737ed497aa39831eecfdc4a1bf59517df898907accc6bdc0f789a69b",
     "projects": [
         {
             "name": "github.com/Sirupsen/logrus",
