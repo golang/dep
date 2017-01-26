@@ -878,6 +878,25 @@ func TestListPackages(t *testing.T) {
 				},
 			},
 		},
+		"invalid buildtag like comments should be ignored": {
+			fileRoot:   j("buildtag"),
+			importRoot: "buildtag",
+			out: PackageTree{
+				ImportRoot: "buildtag",
+				Packages: map[string]PackageOrErr{
+					"buildtag": {
+						P: Package{
+							ImportPath:  "buildtag",
+							CommentPath: "",
+							Name:        "buildtag",
+							Imports: []string{
+								"sort",
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 
 	for name, fix := range table {

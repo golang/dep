@@ -184,7 +184,7 @@ func ListPackages(fileRoot, importRoot string) (PackageTree, error) {
 
 // fillPackage full of info. Assumes p.Dir is set at a minimum
 func fillPackage(p *build.Package) error {
-	var buildMatch = "+build "
+	var buildPrefix = "// +build "
 	var buildFieldSplit = func(r rune) bool {
 		return unicode.IsSpace(r) || r == ','
 	}
@@ -210,16 +210,27 @@ func fillPackage(p *build.Package) error {
 
 		var ignored bool
 		for _, c := range pf.Comments {
-			if c.Pos() > pf.Package { // +build must come before package
+			if c.Pos() > pf.Package { // +build comment must come before package
 				continue
 			}
-			ct := c.Text()
-			if i := strings.Index(ct, buildMatch); i != -1 {
-				for _, t := range strings.FieldsFunc(ct[i+len(buildMatch):], buildFieldSplit) {
-					// hardcoded (for now) handling for the "ignore" build tag
-					if t == "ignore" {
-						ignored = true
-					}
+
+			var ct string
+			for _, cl := range c.List {
+				if strings.HasPrefix(cl.Text, buildPrefix) {
+					ct = cl.Text
+					break
+				}
+			}
+			fmt.Println(ct)
+			if ct == "" {
+				continue
+			}
+
+			for _, t := range strings.FieldsFunc(ct[len(buildPrefix):], buildFieldSplit) {
+				// hardcoded (for now) handling for the "ignore" build tag
+				// We "soft" ignore the files tagged with ignore so that we pull in their imports.
+				if t == "ignore" {
+					ignored = true
 				}
 			}
 		}
