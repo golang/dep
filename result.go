@@ -47,14 +47,6 @@ func WriteDepTree(basedir string, l Lock, sm SourceManager, sv bool) error {
 	for _, p := range l.Projects() {
 		to := filepath.FromSlash(filepath.Join(basedir, string(p.Ident().ProjectRoot)))
 
-		// Only make the parent dir, as some source implementations will balk on
-		// trying to write to an empty but existing dir.
-		//err := os.MkdirAll(filepath.Dir(to), 0777)
-		err := os.MkdirAll(to, 0777)
-		if err != nil {
-			return err
-		}
-
 		err = sm.ExportProject(p.Ident(), p.Version(), to)
 		if err != nil {
 			removeAll(basedir)

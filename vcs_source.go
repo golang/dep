@@ -40,6 +40,10 @@ func (s *gitSource) exportVersionTo(v Version, to string) error {
 		return err
 	}
 
+	if err := os.MkdirAll(to, 0777); err != nil {
+		return err
+	}
+
 	do := func() error {
 		s.crepo.mut.Lock()
 		defer s.crepo.mut.Unlock()

@@ -2,6 +2,8 @@ package gps
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"sync"
 )
 
@@ -435,5 +437,12 @@ func (bs *baseVCSSource) exportVersionTo(v Version, to string) error {
 	if err := bs.ensureCacheExistence(); err != nil {
 		return err
 	}
+
+	// Only make the parent dir, as the general implementation will balk on
+	// trying to write to an empty but existing dir.
+	if err := os.MkdirAll(filepath.Dir(to), 0777); err != nil {
+		return err
+	}
+
 	return bs.crepo.exportVersionTo(v, to)
 }
