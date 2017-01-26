@@ -432,5 +432,8 @@ func (bs *baseVCSSource) toRevOrErr(v Version) (r Revision, err error) {
 }
 
 func (bs *baseVCSSource) exportVersionTo(v Version, to string) error {
+	if err := bs.ensureCacheExistence(); err != nil {
+		return err
+	}
 	return bs.crepo.exportVersionTo(v, to)
 }

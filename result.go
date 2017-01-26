@@ -3,7 +3,6 @@ package gps
 import (
 	"fmt"
 	"os"
-	"path"
 	"path/filepath"
 )
 
@@ -46,9 +45,11 @@ func WriteDepTree(basedir string, l Lock, sm SourceManager, sv bool) error {
 
 	// TODO(sdboyer) parallelize
 	for _, p := range l.Projects() {
-		to := path.Join(basedir, string(p.Ident().ProjectRoot))
+		to := filepath.FromSlash(filepath.Join(basedir, string(p.Ident().ProjectRoot)))
 
-		err := os.MkdirAll(to, 0777)
+		// Only make the parent dir, as some source implementations will balk on
+		// trying to write to an empty but existing dir.
+		err := os.MkdirAll(filepath.Dir(to), 0777)
 		if err != nil {
 			return err
 		}
