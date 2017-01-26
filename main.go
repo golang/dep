@@ -152,7 +152,8 @@ func findProjectRootFromWD() (string, error) {
 	return findProjectRoot(path)
 }
 
-// search upwards looking for a manifest file until we get to the root of the filesystem.
+// findProjectRoot searches from the starting directory upwards looking for a
+// manifest file until we get to the root of the filesystem.
 func findProjectRoot(from string) (string, error) {
 	for {
 		mp := filepath.Join(from, manifestName)
