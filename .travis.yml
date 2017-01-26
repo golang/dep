@@ -9,8 +9,9 @@
         go: 1.7.x
       - os: linux
         go: tip
-      - os: osx
-        go: 1.7.x
+# OSX wait times are unbearable right now. Re-enable when we can.
+      #- os: osx
+        #go: 1.7.x
   install:
     - echo "This is an override of the default install deps step in travis."
   script:
