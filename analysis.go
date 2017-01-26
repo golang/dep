@@ -221,7 +221,6 @@ func fillPackage(p *build.Package) error {
 					break
 				}
 			}
-			fmt.Println(ct)
 			if ct == "" {
 				continue
 			}
