@@ -39,5 +39,5 @@ func (a analyzer) DeriveManifestAndLock(path string, n gps.ProjectRoot) (gps.Man
 
 func (a analyzer) Info() (name string, version *semver.Version) {
 	v, _ := semver.NewVersion("v0.0.1")
-	return "deb", v
+	return "dep", v
 }
