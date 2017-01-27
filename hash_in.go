@@ -22,13 +22,13 @@ func (cmd *hashinCommand) Register(fs *flag.FlagSet) {}
 
 type hashinCommand struct{}
 
-func (hashinCommand) Run(args []string) error {
-	p, err := depContext.loadProject("")
+func (hashinCommand) Run(ctx *ctx, args []string) error {
+	p, err := ctx.loadProject("")
 	if err != nil {
 		return err
 	}
 
-	sm, err := depContext.sourceManager()
+	sm, err := ctx.sourceManager()
 	if err != nil {
 		return err
 	}
@@ -36,7 +36,7 @@ func (hashinCommand) Run(args []string) error {
 	defer sm.Release()
 
 	params := p.makeParams()
-	cpr, err := depContext.splitAbsoluteProjectRoot(p.absroot)
+	cpr, err := ctx.splitAbsoluteProjectRoot(p.absroot)
 	if err != nil {
 		return errors.Wrap(err, "determineProjectRoot")
 	}

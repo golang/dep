@@ -42,20 +42,20 @@ type removeCommand struct {
 	keepSource bool
 }
 
-func (cmd *removeCommand) Run(args []string) error {
-	p, err := depContext.loadProject("")
+func (cmd *removeCommand) Run(ctx *ctx, args []string) error {
+	p, err := ctx.loadProject("")
 	if err != nil {
 		return err
 	}
 
-	sm, err := depContext.sourceManager()
+	sm, err := ctx.sourceManager()
 	if err != nil {
 		return err
 	}
 	sm.UseDefaultSignalHandling()
 	defer sm.Release()
 
-	cpr, err := depContext.splitAbsoluteProjectRoot(p.absroot)
+	cpr, err := ctx.splitAbsoluteProjectRoot(p.absroot)
 	if err != nil {
 		return errors.Wrap(err, "determineProjectRoot")
 	}

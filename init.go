@@ -41,7 +41,7 @@ func (cmd *initCommand) Register(fs *flag.FlagSet) {}
 
 type initCommand struct{}
 
-func (cmd *initCommand) Run(args []string) error {
+func (cmd *initCommand) Run(ctx *ctx, args []string) error {
 	if len(args) > 1 {
 		return errors.Errorf("too many args (%d)", len(args))
 	}
@@ -77,7 +77,7 @@ func (cmd *initCommand) Run(args []string) error {
 		return fmt.Errorf("invalid state: manifest %q does not exist, but lock %q does", mf, lf)
 	}
 
-	cpr, err := depContext.splitAbsoluteProjectRoot(root)
+	cpr, err := ctx.splitAbsoluteProjectRoot(root)
 	if err != nil {
 		return errors.Wrap(err, "determineProjectRoot")
 	}
@@ -87,14 +87,14 @@ func (cmd *initCommand) Run(args []string) error {
 		return errors.Wrap(err, "gps.ListPackages")
 	}
 	vlogf("Found %d dependencies.", len(pkgT.Packages))
-	sm, err := depContext.sourceManager()
+	sm, err := ctx.sourceManager()
 	if err != nil {
 		return errors.Wrap(err, "getSourceManager")
 	}
 	sm.UseDefaultSignalHandling()
 	defer sm.Release()
 
-	pd, err := getProjectData(pkgT, cpr, sm)
+	pd, err := getProjectData(ctx, pkgT, cpr, sm)
 	if err != nil {
 		return err
 	}
@@ -258,7 +258,7 @@ type projectData struct {
 	ondisk       map[gps.ProjectRoot]gps.Version // projects that were found on disk
 }
 
-func getProjectData(pkgT gps.PackageTree, cpr string, sm *gps.SourceMgr) (projectData, error) {
+func getProjectData(ctx *ctx, pkgT gps.PackageTree, cpr string, sm *gps.SourceMgr) (projectData, error) {
 	vlogf("Building dependency graph...")
 
 	constraints := make(gps.ProjectConstraints)
@@ -298,7 +298,7 @@ func getProjectData(pkgT gps.PackageTree, cpr string, sm *gps.SourceMgr) (projec
 			vlogf("Package %q has import %q, analyzing...", v.P.ImportPath, ip)
 
 			dependencies[pr] = []string{ip}
-			v, err := depContext.versionInWorkspace(pr)
+			v, err := ctx.versionInWorkspace(pr)
 			if err != nil {
 				notondisk[pr] = true
 				vlogf("Could not determine version for %q, omitting from generated manifest", pr)
@@ -359,7 +359,7 @@ func getProjectData(pkgT gps.PackageTree, cpr string, sm *gps.SourceMgr) (projec
 				// It's fine if the root does not exist - it indicates that this
 				// project is not present in the workspace, and so we need to
 				// solve to deal with this dep.
-				r := filepath.Join(depContext.GOPATH, "src", string(pr))
+				r := filepath.Join(ctx.GOPATH, "src", string(pr))
 				_, err := os.Lstat(r)
 				if os.IsNotExist(err) {
 					colors[pkg] = black
@@ -398,7 +398,7 @@ func getProjectData(pkgT gps.PackageTree, cpr string, sm *gps.SourceMgr) (projec
 			// whether we're first seeing it here, in the transitive
 			// exploration, or if it arose in the direct dep parts
 			if _, in := ondisk[pr]; !in {
-				v, err := depContext.versionInWorkspace(pr)
+				v, err := ctx.versionInWorkspace(pr)
 				if err != nil {
 					colors[pkg] = black
 					notondisk[pr] = true
