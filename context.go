@@ -62,7 +62,7 @@ func (c *ctx) loadProject(path string) (*project, error) {
 	}
 
 	if err != nil {
-		return p, err
+		return nil, err
 	}
 
 	ip, err := c.splitAbsoluteProjectRoot(p.absroot)
