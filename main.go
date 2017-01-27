@@ -21,6 +21,7 @@ import (
 const (
 	manifestName = "manifest.json"
 	lockName     = "lock.json"
+	vendorName   = "vendor"
 )
 
 var (
