@@ -96,8 +96,8 @@ func (c *ctx) loadProject(path string) (*project, error) {
 		// But if a lock does exist and we can't open it, that's a problem
 		return nil, fmt.Errorf("could not open %s: %s", lp, err)
 	}
-
 	defer lf.Close()
+
 	p.l, err = readLock(lf)
 	if err != nil {
 		return nil, fmt.Errorf("error while parsing %s: %s", lp, err)
