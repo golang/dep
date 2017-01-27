@@ -24,8 +24,7 @@ const (
 )
 
 var (
-	depContext *ctx
-	verbose    = flag.Bool("v", false, "enable verbose logging")
+	verbose = flag.Bool("v", false, "enable verbose logging")
 )
 
 type command interface {
@@ -35,7 +34,7 @@ type command interface {
 	LongHelp() string       // "Foo the first bar meeting the following conditions..."
 	Register(*flag.FlagSet) // command-specific flags
 	Hidden() bool           // indicates whether the command should be hidden from help output
-	Run([]string) error
+	Run(*ctx, []string) error
 }
 
 func main() {
@@ -68,15 +67,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Set up the dep context.
-	// TODO(pb): can this be deglobalized, pretty please?
-	hc, err := newContext()
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
-	}
-	depContext = hc
-
 	for _, cmd := range commands {
 		if name := cmd.Name(); os.Args[1] == name {
 			// Build flag set with global flags in there.
@@ -96,8 +86,15 @@ func main() {
 				os.Exit(1)
 			}
 
+			// Set up the dep context.
+			ctx, err := newContext()
+			if err != nil {
+				fmt.Fprintln(os.Stderr, err)
+				os.Exit(1)
+			}
+
 			// Run the command with the post-flag-processing args.
-			if err := cmd.Run(fs.Args()); err != nil {
+			if err := cmd.Run(ctx, fs.Args()); err != nil {
 				fmt.Fprintf(os.Stderr, "%v\n", err)
 				os.Exit(1)
 			}

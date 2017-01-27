@@ -64,13 +64,13 @@ type statusCommand struct {
 	modified bool
 }
 
-func (cmd *statusCommand) Run(args []string) error {
-	p, err := depContext.loadProject("")
+func (cmd *statusCommand) Run(ctx *ctx, args []string) error {
+	p, err := ctx.loadProject("")
 	if err != nil {
 		return err
 	}
 
-	sm, err := depContext.sourceManager()
+	sm, err := ctx.sourceManager()
 	if err != nil {
 		return err
 	}
