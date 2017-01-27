@@ -44,6 +44,7 @@ func main() {
 		&statusCommand{},
 		&ensureCommand{},
 		&removeCommand{},
+		&requireCommand{},
 		&hashinCommand{},
 	}
 
