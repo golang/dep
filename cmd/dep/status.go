@@ -13,6 +13,7 @@ import (
 	"sort"
 	"text/tabwriter"
 
+	"github.com/golang/dep"
 	"github.com/sdboyer/gps"
 )
 
@@ -64,13 +65,13 @@ type statusCommand struct {
 	modified bool
 }
 
-func (cmd *statusCommand) Run(ctx *ctx, args []string) error {
-	p, err := ctx.loadProject("")
+func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
+	p, err := ctx.LoadProject("")
 	if err != nil {
 		return err
 	}
 
-	sm, err := ctx.sourceManager()
+	sm, err := ctx.SourceManager()
 	if err != nil {
 		return err
 	}
@@ -99,24 +100,24 @@ type MissingStatus struct {
 	MissingPackages string
 }
 
-func runStatusAll(p *project, sm *gps.SourceMgr) error {
-	if p.l == nil {
+func runStatusAll(p *dep.Project, sm *gps.SourceMgr) error {
+	if p.Lock == nil {
 		// TODO if we have no lock file, do...other stuff
 		return nil
 	}
 
 	// While the network churns on ListVersions() requests, statically analyze
 	// code from the current project.
-	ptree, err := gps.ListPackages(p.absroot, string(p.importroot))
+	ptree, err := gps.ListPackages(p.AbsRoot, string(p.ImportRoot))
 	if err != nil {
 		return fmt.Errorf("analysis of local packages failed: %v", err)
 	}
 
 	// Set up a solver in order to check the InputHash.
 	params := gps.SolveParameters{
-		RootDir:         p.absroot,
+		RootDir:         p.AbsRoot,
 		RootPackageTree: ptree,
-		Manifest:        p.m,
+		Manifest:        p.Manifest,
 		// Locks aren't a part of the input hash check, so we can omit it.
 	}
 	if *verbose {
@@ -134,13 +135,13 @@ func runStatusAll(p *project, sm *gps.SourceMgr) error {
 	// Get the project list and sort it so that the printed output users see is
 	// deterministically ordered. (This may be superfluous if the lock is always
 	// written in alpha order, but it doesn't hurt to double down.)
-	slp := p.l.Projects()
-	sort.Sort(sortedLockedProjects(slp))
+	slp := p.Lock.Projects()
+	sort.Sort(dep.SortedLockedProjects(slp))
 
 	tw := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)
 	defer tw.Flush()
 
-	if bytes.Equal(s.HashInputs(), p.l.Memo) {
+	if bytes.Equal(s.HashInputs(), p.Lock.Memo) {
 		// If these are equal, we're guaranteed that the lock is a transitively
 		// complete picture of all deps. That eliminates the need for at least
 		// some checks.
@@ -166,7 +167,7 @@ func runStatusAll(p *project, sm *gps.SourceMgr) error {
 
 			// Check if the manifest has an override for this project. If so,
 			// set that as the constraint.
-			if pp, has := p.m.Ovr[proj.Ident().ProjectRoot]; has && pp.Constraint != nil {
+			if pp, has := p.Manifest.Ovr[proj.Ident().ProjectRoot]; has && pp.Constraint != nil {
 				// TODO note somehow that it's overridden
 				bs.Constraint = pp.Constraint
 			} else {
@@ -179,7 +180,7 @@ func runStatusAll(p *project, sm *gps.SourceMgr) error {
 			// Only if we have a non-rev and non-plain version do/can we display
 			// anything wrt the version's updateability.
 			if bs.Version != nil && bs.Version.Type() != gps.IsVersion {
-				c, has := p.m.Dependencies[proj.Ident().ProjectRoot]
+				c, has := p.Manifest.Dependencies[proj.Ident().ProjectRoot]
 				if !has {
 					c.Constraint = gps.Any()
 				}
@@ -290,12 +291,12 @@ func formatVersion(v gps.Version) string {
 	return v.String()
 }
 
-func runStatusDetailed(p *project, sm *gps.SourceMgr, args []string) error {
+func runStatusDetailed(p *dep.Project, sm *gps.SourceMgr, args []string) error {
 	// TODO
 	return fmt.Errorf("not implemented")
 }
 
-func collectConstraints(ptree gps.PackageTree, p *project, sm *gps.SourceMgr) map[string][]gps.Constraint {
+func collectConstraints(ptree gps.PackageTree, p *dep.Project, sm *gps.SourceMgr) map[string][]gps.Constraint {
 	// TODO
 	return map[string][]gps.Constraint{}
 }

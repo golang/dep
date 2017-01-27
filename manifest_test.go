@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package main
+package dep
 
 import (
 	"reflect"
@@ -70,7 +70,7 @@ func TestReadManifest(t *testing.T) {
 	}
 
 	c, _ := gps.NewSemverConstraint(">=0.12.0, <1.0.0")
-	em := manifest{
+	em := Manifest{
 		Dependencies: map[gps.ProjectRoot]gps.ProjectProperties{
 			gps.ProjectRoot("github.com/sdboyer/gps"): {
 				Constraint: c,
@@ -101,7 +101,7 @@ func TestReadManifest(t *testing.T) {
 
 func TestWriteManifest(t *testing.T) {
 	c, _ := gps.NewSemverConstraint("^v0.12.0")
-	m := &manifest{
+	m := &Manifest{
 		Dependencies: map[gps.ProjectRoot]gps.ProjectProperties{
 			gps.ProjectRoot("github.com/sdboyer/gps"): {
 				Constraint: c,

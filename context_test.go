@@ -2,23 +2,24 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package main
+package dep
 
 import (
 	"path/filepath"
 	"testing"
 
+	"github.com/golang/dep/test"
 	"github.com/sdboyer/gps"
 )
 
 func TestNewContextNoGOPATH(t *testing.T) {
-	tg := testgo(t)
-	defer tg.cleanup()
+	tg := test.Testgo(t)
+	defer tg.Cleanup()
 
-	tg.tempDir("src")
-	tg.cd(tg.path("."))
+	tg.TempDir("src")
+	tg.Cd(tg.Path("."))
 
-	c, err := newContext()
+	c, err := NewContext()
 	if err == nil {
 		t.Fatal("error should not have been nil")
 	}
@@ -29,12 +30,12 @@ func TestNewContextNoGOPATH(t *testing.T) {
 }
 
 func TestSplitAbsoluteProjectRoot(t *testing.T) {
-	tg := testgo(t)
-	defer tg.cleanup()
+	tg := test.Testgo(t)
+	defer tg.Cleanup()
 
-	tg.tempDir("src")
-	tg.setenv("GOPATH", tg.path("."))
-	depCtx := &ctx{GOPATH: tg.path(".")}
+	tg.TempDir("src")
+	tg.Setenv("GOPATH", tg.Path("."))
+	depCtx := &Ctx{GOPATH: tg.Path(".")}
 
 	importPaths := []string{
 		"github.com/pkg/errors",
@@ -43,7 +44,7 @@ func TestSplitAbsoluteProjectRoot(t *testing.T) {
 
 	for _, ip := range importPaths {
 		fullpath := filepath.Join(depCtx.GOPATH, "src", ip)
-		pr, err := depCtx.splitAbsoluteProjectRoot(fullpath)
+		pr, err := depCtx.SplitAbsoluteProjectRoot(fullpath)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -53,19 +54,19 @@ func TestSplitAbsoluteProjectRoot(t *testing.T) {
 	}
 
 	// test where it should return error
-	pr, err := depCtx.splitAbsoluteProjectRoot("tra/la/la/la")
+	pr, err := depCtx.SplitAbsoluteProjectRoot("tra/la/la/la")
 	if err == nil {
 		t.Fatalf("should have gotten error but did not for tra/la/la/la: %s", pr)
 	}
 }
 
 func TestAbsoluteProjectRoot(t *testing.T) {
-	tg := testgo(t)
-	defer tg.cleanup()
+	tg := test.Testgo(t)
+	defer tg.Cleanup()
 
-	tg.tempDir("src")
-	tg.setenv("GOPATH", tg.path("."))
-	depCtx := &ctx{GOPATH: tg.path(".")}
+	tg.TempDir("src")
+	tg.Setenv("GOPATH", tg.Path("."))
+	depCtx := &Ctx{GOPATH: tg.Path(".")}
 
 	importPaths := map[string]bool{
 		"github.com/pkg/errors": true,
@@ -74,15 +75,15 @@ func TestAbsoluteProjectRoot(t *testing.T) {
 
 	for i, create := range importPaths {
 		if create {
-			tg.tempDir(filepath.Join("src", i))
+			tg.TempDir(filepath.Join("src", i))
 		}
 	}
 
 	for i, ok := range importPaths {
 		pr, err := depCtx.absoluteProjectRoot(i)
 		if ok {
-			tg.must(err)
-			expected := tg.path(filepath.Join("src", i))
+			tg.Must(err)
+			expected := tg.Path(filepath.Join("src", i))
 			if pr != expected {
 				t.Fatalf("expected %s, got %q", expected, pr)
 			}
@@ -95,7 +96,7 @@ func TestAbsoluteProjectRoot(t *testing.T) {
 	}
 
 	// test that a file fails
-	tg.tempFile("src/thing/thing.go", "hello world")
+	tg.TempFile("src/thing/thing.go", "hello world")
 	_, err := depCtx.absoluteProjectRoot("thing/thing.go")
 	if err == nil {
 		t.Fatal("error should not be nil for a file found")
@@ -103,15 +104,15 @@ func TestAbsoluteProjectRoot(t *testing.T) {
 }
 
 func TestVersionInWorkspace(t *testing.T) {
-	needsExternalNetwork(t)
-	needsGit(t)
+	test.NeedsExternalNetwork(t)
+	test.NeedsGit(t)
 
-	tg := testgo(t)
-	defer tg.cleanup()
+	tg := test.Testgo(t)
+	defer tg.Cleanup()
 
-	tg.tempDir("src")
-	tg.setenv("GOPATH", tg.path("."))
-	depCtx := &ctx{GOPATH: tg.path(".")}
+	tg.TempDir("src")
+	tg.Setenv("GOPATH", tg.Path("."))
+	depCtx := &Ctx{GOPATH: tg.Path(".")}
 
 	importPaths := map[string]struct {
 		rev      gps.Version
@@ -132,14 +133,14 @@ func TestVersionInWorkspace(t *testing.T) {
 
 	// checkout the specified revisions
 	for ip, info := range importPaths {
-		tg.runGo("get", ip)
-		repoDir := tg.path("src/" + ip)
+		tg.RunGo("get", ip)
+		repoDir := tg.Path("src/" + ip)
 		if info.checkout {
-			tg.runGit(repoDir, "checkout", info.rev.String())
+			tg.RunGit(repoDir, "checkout", info.rev.String())
 		}
 
-		v, err := depCtx.versionInWorkspace(gps.ProjectRoot(ip))
-		tg.must(err)
+		v, err := depCtx.VersionInWorkspace(gps.ProjectRoot(ip))
+		tg.Must(err)
 
 		if v != info.rev {
 			t.Fatalf("expected %q, got %q", v.String(), info.rev.String())

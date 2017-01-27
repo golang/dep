@@ -10,17 +10,10 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 	"text/tabwriter"
 
-	"github.com/pkg/errors"
-	"github.com/sdboyer/gps"
-)
-
-const (
-	manifestName = "manifest.json"
-	lockName     = "lock.json"
+	"github.com/golang/dep"
 )
 
 var (
@@ -34,7 +27,7 @@ type command interface {
 	LongHelp() string       // "Foo the first bar meeting the following conditions..."
 	Register(*flag.FlagSet) // command-specific flags
 	Hidden() bool           // indicates whether the command should be hidden from help output
-	Run(*ctx, []string) error
+	Run(*dep.Ctx, []string) error
 }
 
 func main() {
@@ -87,7 +80,7 @@ func main() {
 			}
 
 			// Set up the dep context.
-			ctx, err := newContext()
+			ctx, err := dep.NewContext()
 			if err != nil {
 				fmt.Fprintln(os.Stderr, err)
 				os.Exit(1)
@@ -137,66 +130,6 @@ func resetUsage(fs *flag.FlagSet, name, args, longHelp string) {
 			fmt.Fprintln(os.Stderr, flagBlock.String())
 		}
 	}
-}
-
-var errProjectNotFound = errors.New("could not find project manifest.json, use dep init to initiate a manifest")
-
-func findProjectRootFromWD() (string, error) {
-	path, err := os.Getwd()
-	if err != nil {
-		return "", fmt.Errorf("could not get working directory: %s", err)
-	}
-	return findProjectRoot(path)
-}
-
-// findProjectRoot searches from the starting directory upwards looking for a
-// manifest file until we get to the root of the filesystem.
-func findProjectRoot(from string) (string, error) {
-	for {
-		mp := filepath.Join(from, manifestName)
-
-		_, err := os.Stat(mp)
-		if err == nil {
-			return from, nil
-		}
-		if !os.IsNotExist(err) {
-			// Some err other than non-existence - return that out
-			return "", err
-		}
-
-		parent := filepath.Dir(from)
-		if parent == from {
-			return "", errProjectNotFound
-		}
-		from = parent
-	}
-}
-
-type project struct {
-	// absroot is the absolute path to the root directory of the project.
-	absroot string
-	// importroot is the import path of the project's root directory.
-	importroot gps.ProjectRoot
-	m          *manifest
-	l          *lock
-}
-
-// makeParams is a simple helper to create a gps.SolveParameters without setting
-// any nils incorrectly.
-func (p *project) makeParams() gps.SolveParameters {
-	params := gps.SolveParameters{
-		RootDir: p.absroot,
-	}
-
-	if p.m != nil {
-		params.Manifest = p.m
-	}
-
-	if p.l != nil {
-		params.Lock = p.l
-	}
-
-	return params
 }
 
 func logf(format string, args ...interface{}) {

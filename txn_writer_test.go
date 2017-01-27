@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package main
+package dep
 
 import (
 	"os"
@@ -10,82 +10,83 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/golang/dep/test"
 )
 
 func TestTxnWriterBadInputs(t *testing.T) {
-	tg := testgo(t)
-	defer tg.cleanup()
+	tg := test.Testgo(t)
+	defer tg.Cleanup()
 
-	tg.tempDir("txnwriter")
-	td := tg.path(".")
+	tg.TempDir("txnwriter")
+	td := tg.Path(".")
 
-	sw := safeWriter{}
+	var sw SafeWriter
 
 	// no root
-	if err := sw.writeAllSafe(false); err == nil {
+	if err := sw.WriteAllSafe(false); err == nil {
 		t.Errorf("should have errored without a root path, but did not")
 	}
-	sw.root = td
+	sw.Root = td
 
-	if err := sw.writeAllSafe(false); err != nil {
+	if err := sw.WriteAllSafe(false); err != nil {
 		t.Errorf("write with only root should be fine, just a no-op, but got err %q", err)
 	}
-	if err := sw.writeAllSafe(true); err == nil {
+	if err := sw.WriteAllSafe(true); err == nil {
 		t.Errorf("should fail because no source manager was provided for writing vendor")
 	}
 
-	if err := sw.writeAllSafe(true); err == nil {
+	if err := sw.WriteAllSafe(true); err == nil {
 		t.Errorf("should fail because no lock was provided from which to write vendor")
 	}
 	// now check dir validation
-	sw.root = filepath.Join(td, "nonexistent")
-	if err := sw.writeAllSafe(false); err == nil {
+	sw.Root = filepath.Join(td, "nonexistent")
+	if err := sw.WriteAllSafe(false); err == nil {
 		t.Errorf("should have errored with nonexistent dir for root path, but did not")
 	}
 
-	sw.root = filepath.Join(td, "myfile")
-	srcf, err := os.Create(sw.root)
+	sw.Root = filepath.Join(td, "myfile")
+	srcf, err := os.Create(sw.Root)
 	if err != nil {
 		t.Fatal(err)
 	}
 	srcf.Close()
-	if err := sw.writeAllSafe(false); err == nil {
+	if err := sw.WriteAllSafe(false); err == nil {
 		t.Errorf("should have errored when root path is a file, but did not")
 	}
 }
 
 func TestTxnWriter(t *testing.T) {
-	needsExternalNetwork(t)
-	needsGit(t)
+	test.NeedsExternalNetwork(t)
+	test.NeedsGit(t)
 
-	tg := testgo(t)
-	tg.tempDir("")
-	defer tg.cleanup()
+	tg := test.Testgo(t)
+	tg.TempDir("")
+	defer tg.Cleanup()
 
-	var c *ctx
-	c = &ctx{
-		GOPATH: tg.path("."),
+	c := &Ctx{
+		GOPATH: tg.Path("."),
 	}
-	sm, err := c.sourceManager()
+	sm, err := c.SourceManager()
 	defer sm.Release()
-	tg.must(err)
+	tg.Must(err)
 
-	var sw safeWriter
+	var sw SafeWriter
 	var mpath, lpath, vpath string
 	var count int
 	reset := func() {
 		pr := filepath.Join("src", "txnwriter"+strconv.Itoa(count))
-		tg.tempDir(pr)
+		tg.TempDir(pr)
 
-		sw = safeWriter{
-			root: tg.path(pr),
-			sm:   sm,
+		sw = SafeWriter{
+			Root:          tg.Path(pr),
+			SourceManager: sm,
 		}
-		tg.cd(sw.root)
+		tg.Cd(sw.Root)
 
-		mpath = filepath.Join(sw.root, manifestName)
-		lpath = filepath.Join(sw.root, lockName)
-		vpath = filepath.Join(sw.root, "vendor")
+		mpath = filepath.Join(sw.Root, ManifestName)
+		lpath = filepath.Join(sw.Root, LockName)
+		vpath = filepath.Join(sw.Root, "vendor")
 
 		count++
 	}
@@ -116,91 +117,91 @@ func TestTxnWriter(t *testing.T) {
 `
 
 	m, err := readManifest(strings.NewReader(expectedManifest))
-	tg.must(err)
+	tg.Must(err)
 	l, err := readLock(strings.NewReader(expectedLock))
-	tg.must(err)
+	tg.Must(err)
 
 	// Just write manifest
-	sw.m = m
-	tg.must(sw.writeAllSafe(false))
-	tg.mustExist(mpath)
-	tg.mustNotExist(lpath)
-	tg.mustNotExist(vpath)
+	sw.Manifest = m
+	tg.Must(sw.WriteAllSafe(false))
+	tg.MustExist(mpath)
+	tg.MustNotExist(lpath)
+	tg.MustNotExist(vpath)
 
-	diskm := tg.readManifest()
+	diskm := tg.ReadManifest()
 	if diskm != expectedManifest {
 		t.Fatalf("expected %s, got %s", expectedManifest, diskm)
 	}
 
 	// Manifest and lock, but no vendor
-	sw.l = l
-	tg.must(sw.writeAllSafe(false))
-	tg.mustExist(mpath)
-	tg.mustExist(lpath)
-	tg.mustNotExist(vpath)
+	sw.Lock = l
+	tg.Must(sw.WriteAllSafe(false))
+	tg.MustExist(mpath)
+	tg.MustExist(lpath)
+	tg.MustNotExist(vpath)
 
-	diskm = tg.readManifest()
+	diskm = tg.ReadManifest()
 	if diskm != expectedManifest {
 		t.Fatalf("expected %s, got %s", expectedManifest, diskm)
 	}
 
-	diskl := tg.readLock()
+	diskl := tg.ReadLock()
 	if diskl != expectedLock {
 		t.Fatalf("expected %s, got %s", expectedLock, diskl)
 	}
 
-	tg.must(sw.writeAllSafe(true))
-	tg.mustExist(mpath)
-	tg.mustExist(lpath)
-	tg.mustExist(vpath)
-	tg.mustExist(filepath.Join(vpath, "github.com", "sdboyer", "dep-test"))
+	tg.Must(sw.WriteAllSafe(true))
+	tg.MustExist(mpath)
+	tg.MustExist(lpath)
+	tg.MustExist(vpath)
+	tg.MustExist(filepath.Join(vpath, "github.com", "sdboyer", "dep-test"))
 
-	diskm = tg.readManifest()
+	diskm = tg.ReadManifest()
 	if diskm != expectedManifest {
 		t.Fatalf("expected %s, got %s", expectedManifest, diskm)
 	}
 
-	diskl = tg.readLock()
+	diskl = tg.ReadLock()
 	if diskl != expectedLock {
 		t.Fatalf("expected %s, got %s", expectedLock, diskl)
 	}
 
 	// start fresh, ignoring the manifest now
 	reset()
-	sw.l = l
-	sw.nl = l
+	sw.Lock = l
+	sw.NewLock = l
 
-	tg.must(sw.writeAllSafe(false))
+	tg.Must(sw.WriteAllSafe(false))
 	// locks are equivalent, so nothing gets written
-	tg.mustNotExist(mpath)
-	tg.mustNotExist(lpath)
-	tg.mustNotExist(vpath)
+	tg.MustNotExist(mpath)
+	tg.MustNotExist(lpath)
+	tg.MustNotExist(vpath)
 
-	l2 := &lock{}
+	l2 := new(Lock)
 	*l2 = *l
 	// zero out the input hash to ensure non-equivalency
 	l2.Memo = []byte{}
-	sw.l = l2
-	tg.must(sw.writeAllSafe(true))
-	tg.mustNotExist(mpath)
-	tg.mustExist(lpath)
-	tg.mustExist(vpath)
-	tg.mustExist(filepath.Join(vpath, "github.com", "sdboyer", "dep-test"))
+	sw.Lock = l2
+	tg.Must(sw.WriteAllSafe(true))
+	tg.MustNotExist(mpath)
+	tg.MustExist(lpath)
+	tg.MustExist(vpath)
+	tg.MustExist(filepath.Join(vpath, "github.com", "sdboyer", "dep-test"))
 
-	diskl = tg.readLock()
+	diskl = tg.ReadLock()
 	if diskl != expectedLock {
 		t.Fatalf("expected %s, got %s", expectedLock, diskl)
 	}
 
 	// repeat op to ensure good behavior when vendor dir already exists
-	sw.l = nil
-	tg.must(sw.writeAllSafe(true))
-	tg.mustNotExist(mpath)
-	tg.mustExist(lpath)
-	tg.mustExist(vpath)
-	tg.mustExist(filepath.Join(vpath, "github.com", "sdboyer", "dep-test"))
+	sw.Lock = nil
+	tg.Must(sw.WriteAllSafe(true))
+	tg.MustNotExist(mpath)
+	tg.MustExist(lpath)
+	tg.MustExist(vpath)
+	tg.MustExist(filepath.Join(vpath, "github.com", "sdboyer", "dep-test"))
 
-	diskl = tg.readLock()
+	diskl = tg.ReadLock()
 	if diskl != expectedLock {
 		t.Fatalf("expected %s, got %s", expectedLock, diskl)
 	}

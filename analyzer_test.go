@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package main
+package dep
 
 import (
 	"io/ioutil"
@@ -30,7 +30,7 @@ func TestDeriveManifestAndLock(t *testing.T) {
 }
 `
 
-	if err := ioutil.WriteFile(filepath.Join(dir, manifestName), []byte(contents), 0644); err != nil {
+	if err := ioutil.WriteFile(filepath.Join(dir, ManifestName), []byte(contents), 0644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -41,7 +41,7 @@ func TestDeriveManifestAndLock(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	b, err := m.(*manifest).MarshalJSON()
+	b, err := m.(*Manifest).MarshalJSON()
 	if err != nil {
 		t.Fatal(err)
 	}

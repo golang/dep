@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package main
+package dep
 
 import (
 	"bytes"
@@ -13,7 +13,9 @@ import (
 	"github.com/sdboyer/gps"
 )
 
-type manifest struct {
+const ManifestName = "manifest.json"
+
+type Manifest struct {
 	Dependencies gps.ProjectConstraints
 	Ovr          gps.ProjectConstraints
 	Ignores      []string
@@ -43,13 +45,13 @@ func newRawManifest() rawManifest {
 	}
 }
 
-func readManifest(r io.Reader) (*manifest, error) {
+func readManifest(r io.Reader) (*Manifest, error) {
 	rm := rawManifest{}
 	err := json.NewDecoder(r).Decode(&rm)
 	if err != nil {
 		return nil, err
 	}
-	m := &manifest{
+	m := &Manifest{
 		Dependencies: make(gps.ProjectConstraints, len(rm.Dependencies)),
 		Ovr:          make(gps.ProjectConstraints, len(rm.Overrides)),
 		Ignores:      rm.Ignores,
@@ -106,7 +108,7 @@ func toProps(n string, p possibleProps) (pp gps.ProjectProperties, err error) {
 	return pp, nil
 }
 
-func (m *manifest) MarshalJSON() ([]byte, error) {
+func (m *Manifest) MarshalJSON() ([]byte, error) {
 	raw := rawManifest{
 		Dependencies: make(map[string]possibleProps, len(m.Dependencies)),
 		Overrides:    make(map[string]possibleProps, len(m.Ovr)),
@@ -160,20 +162,20 @@ func toPossible(pp gps.ProjectProperties) possibleProps {
 	return p
 }
 
-func (m *manifest) DependencyConstraints() gps.ProjectConstraints {
+func (m *Manifest) DependencyConstraints() gps.ProjectConstraints {
 	return m.Dependencies
 }
 
-func (m *manifest) TestDependencyConstraints() gps.ProjectConstraints {
+func (m *Manifest) TestDependencyConstraints() gps.ProjectConstraints {
 	// TODO decide whether we're going to incorporate this or not
 	return nil
 }
 
-func (m *manifest) Overrides() gps.ProjectConstraints {
+func (m *Manifest) Overrides() gps.ProjectConstraints {
 	return m.Ovr
 }
 
-func (m *manifest) IgnoredPackages() map[string]bool {
+func (m *Manifest) IgnoredPackages() map[string]bool {
 	if len(m.Ignores) == 0 {
 		return nil
 	}
@@ -186,7 +188,7 @@ func (m *manifest) IgnoredPackages() map[string]bool {
 	return mp
 }
 
-func (m *manifest) RequiredPackages() map[string]bool {
+func (m *Manifest) RequiredPackages() map[string]bool {
 	if len(m.Required) == 0 {
 		return nil
 	}

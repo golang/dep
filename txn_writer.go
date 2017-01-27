@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package main
+package dep
 
 import (
 	"fmt"
@@ -14,74 +14,74 @@ import (
 	"github.com/sdboyer/gps"
 )
 
-// safeWriter transactionalizes writes of manifest, lock, and vendor dir, both
+// SafeWriter transactionalizes writes of manifest, lock, and vendor dir, both
 // individually and in any combination, into a pseudo-atomic action with
 // transactional rollback.
 //
 // It is not impervious to errors (writing to disk is hard), but it should
 // guard against non-arcane failure conditions.
-type safeWriter struct {
-	root string    // absolute path of root dir in which to write
-	m    *manifest // the manifest to write, if any
-	l    *lock     // the old lock, if any
-	nl   gps.Lock  // the new lock, if any
-	sm   gps.SourceManager
+type SafeWriter struct {
+	Root          string    // absolute path of root dir in which to write
+	Manifest      *Manifest // the manifest to write, if any
+	Lock          *Lock     // the old lock, if any
+	NewLock       gps.Lock  // the new lock, if any
+	SourceManager gps.SourceManager
 }
 
-// writeAllSafe writes out some combination of config yaml, lock, and a vendor
+// WriteAllSafe writes out some combination of config yaml, lock, and a vendor
 // tree, to a temp dir, then moves them into place if and only if all the write
 // operations succeeded. It also does its best to roll back if any moves fail.
 //
 // This mostly guarantees that dep cannot exit with a partial write that would
 // leave an undefined state on disk.
 //
-// - If a sw.m is provided, it will be written to the standard manifest file
-//   name beneath sw.root
-// - If sw.l is provided without an sw.nl, it will be written to the standard
+// - If a sw.Manifest is provided, it will be written to the standard manifest file
+//   name beneath sw.Root
+// - If sw.Lock is provided without an sw.NewLock, it will be written to the standard
 //   lock file name in the root dir, but vendor will NOT be written
-// - If sw.l and sw.nl are both provided and are equivalent, then neither lock
+// - If sw.Lock and sw.NewLock are both provided and are equivalent, then neither lock
 //   nor vendor will be written
-// - If sw.l and sw.nl are both provided and are not equivalent,
+// - If sw.Lock and sw.NewLock are both provided and are not equivalent,
 //   the nl will be written to the same location as above, and a vendor
-//   tree will be written to sw.root/vendor
-// - If sw.nl is provided and sw.lock is not, it will write both a lock
+//   tree will be written to sw.Root/vendor
+// - If sw.NewLock is provided and sw.Lockock is not, it will write both a lock
 //   and vendor dir in the same way
 // - If the forceVendor param is true, then vendor will be unconditionally
-//   written out based on sw.nl if present, else sw.l, else error.
+//   written out based on sw.NewLock if present, else sw.Lock, else error.
 //
 // Any of m, l, or nl can be omitted; the grouped write operation will continue
 // for whichever inputs are present. A SourceManager is only required if vendor
 // is being written.
-func (sw safeWriter) writeAllSafe(forceVendor bool) error {
+func (sw SafeWriter) WriteAllSafe(forceVendor bool) error {
 	// Decide which writes we need to do
 	var writeM, writeL, writeV bool
 	writeV = forceVendor
 
-	if sw.m != nil {
+	if sw.Manifest != nil {
 		writeM = true
 	}
 
-	if sw.nl != nil {
-		if sw.l == nil {
+	if sw.NewLock != nil {
+		if sw.Lock == nil {
 			writeL, writeV = true, true
 		} else {
-			rlf := lockFromInterface(sw.nl)
-			if !locksAreEquivalent(rlf, sw.l) {
+			rlf := LockFromInterface(sw.NewLock)
+			if !locksAreEquivalent(rlf, sw.Lock) {
 				writeL, writeV = true, true
 			}
 		}
-	} else if sw.l != nil {
+	} else if sw.Lock != nil {
 		writeL = true
 	}
 
-	if sw.root == "" {
+	if sw.Root == "" {
 		return errors.New("root path must be non-empty")
 	}
-	if is, err := isDir(sw.root); !is {
+	if is, err := IsDir(sw.Root); !is {
 		if err != nil {
 			return err
 		}
-		return fmt.Errorf("root path %q does not exist", sw.root)
+		return fmt.Errorf("root path %q does not exist", sw.Root)
 	}
 
 	if !writeM && !writeL && !writeV {
@@ -89,17 +89,17 @@ func (sw safeWriter) writeAllSafe(forceVendor bool) error {
 		return nil
 	}
 
-	if writeV && sw.sm == nil {
+	if writeV && sw.SourceManager == nil {
 		return errors.New("must provide a SourceManager if writing out a vendor dir")
 	}
 
-	if writeV && sw.l == nil && sw.nl == nil {
+	if writeV && sw.Lock == nil && sw.NewLock == nil {
 		return errors.New("must provide a lock in order to write out vendor")
 	}
 
-	mpath := filepath.Join(sw.root, manifestName)
-	lpath := filepath.Join(sw.root, lockName)
-	vpath := filepath.Join(sw.root, "vendor")
+	mpath := filepath.Join(sw.Root, ManifestName)
+	lpath := filepath.Join(sw.Root, LockName)
+	vpath := filepath.Join(sw.Root, "vendor")
 
 	td, err := ioutil.TempDir(os.TempDir(), "dep")
 	if err != nil {
@@ -108,21 +108,21 @@ func (sw safeWriter) writeAllSafe(forceVendor bool) error {
 	defer os.RemoveAll(td)
 
 	if writeM {
-		if err := writeFile(filepath.Join(td, manifestName), sw.m); err != nil {
+		if err := writeFile(filepath.Join(td, ManifestName), sw.Manifest); err != nil {
 			return errors.Wrap(err, "failed to write manifest file to temp dir")
 		}
 	}
 
 	if writeL {
-		if sw.nl == nil {
+		if sw.NewLock == nil {
 			// the new lock is nil but the flag is on, so we must be writing
 			// the other one
-			if err := writeFile(filepath.Join(td, lockName), sw.l); err != nil {
+			if err := writeFile(filepath.Join(td, LockName), sw.Lock); err != nil {
 				return errors.Wrap(err, "failed to write lock file to temp dir")
 			}
 		} else {
-			rlf := lockFromInterface(sw.nl)
-			if err := writeFile(filepath.Join(td, lockName), rlf); err != nil {
+			rlf := LockFromInterface(sw.NewLock)
+			if err := writeFile(filepath.Join(td, LockName), rlf); err != nil {
 				return errors.Wrap(err, "failed to write lock file to temp dir")
 			}
 		}
@@ -131,11 +131,11 @@ func (sw safeWriter) writeAllSafe(forceVendor bool) error {
 	if writeV {
 		// Prefer the nl, but take the l if only that's available, as could be the
 		// case if true was passed for forceVendor.
-		l := sw.nl
+		l := sw.NewLock
 		if l == nil {
-			l = sw.l
+			l = sw.Lock
 		}
-		err = gps.WriteDepTree(filepath.Join(td, "vendor"), l, sw.sm, true)
+		err = gps.WriteDepTree(filepath.Join(td, "vendor"), l, sw.SourceManager, true)
 		if err != nil {
 			return errors.Wrap(err, "error while writing out vendor tree")
 		}
@@ -153,7 +153,7 @@ func (sw safeWriter) writeAllSafe(forceVendor bool) error {
 	if writeM {
 		if _, err := os.Stat(mpath); err == nil {
 			// Move out the old one.
-			tmploc := filepath.Join(td, manifestName+".orig")
+			tmploc := filepath.Join(td, ManifestName+".orig")
 			failerr = renameWithFallback(mpath, tmploc)
 			if failerr != nil {
 				goto fail
@@ -162,7 +162,7 @@ func (sw safeWriter) writeAllSafe(forceVendor bool) error {
 		}
 
 		// Move in the new one.
-		failerr = renameWithFallback(filepath.Join(td, manifestName), mpath)
+		failerr = renameWithFallback(filepath.Join(td, ManifestName), mpath)
 		if failerr != nil {
 			goto fail
 		}
@@ -171,7 +171,7 @@ func (sw safeWriter) writeAllSafe(forceVendor bool) error {
 	if writeL {
 		if _, err := os.Stat(lpath); err == nil {
 			// Move out the old one.
-			tmploc := filepath.Join(td, lockName+".orig")
+			tmploc := filepath.Join(td, LockName+".orig")
 
 			failerr = renameWithFallback(lpath, tmploc)
 			if failerr != nil {
@@ -181,7 +181,7 @@ func (sw safeWriter) writeAllSafe(forceVendor bool) error {
 		}
 
 		// Move in the new one.
-		failerr = renameWithFallback(filepath.Join(td, lockName), lpath)
+		failerr = renameWithFallback(filepath.Join(td, LockName), lpath)
 		if failerr != nil {
 			goto fail
 		}

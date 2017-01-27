@@ -25,7 +25,7 @@ Please see below for feedback and contribution guidelines.
 Get the tool via
 
 ```sh
-$ go get github.com/golang/dep
+$ go get github.com/golang/dep/...
 ```
 
 Typical usage on a new repo might be
