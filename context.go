@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package main
+package dep
 
 import (
 	"fmt"
@@ -16,14 +16,14 @@ import (
 	"github.com/sdboyer/gps"
 )
 
-// ctx defines the supporting context of the tool.
-type ctx struct {
+// Ctx defines the supporting context of the tool.
+type Ctx struct {
 	GOPATH string // Go path
 }
 
-// newContext creates a struct with the project's GOPATH. It assumes
+// NewContext creates a struct with the project's GOPATH. It assumes
 // that of your "GOPATH"'s we want the one we are currently in.
-func newContext() (*ctx, error) {
+func NewContext() (*Ctx, error) {
 	// this way we get the default GOPATH that was added in 1.8
 	buildContext := build.Default
 	wd, err := os.Getwd()
@@ -34,61 +34,61 @@ func newContext() (*ctx, error) {
 	for _, gp := range filepath.SplitList(buildContext.GOPATH) {
 		gp = filepath.FromSlash(gp)
 		if strings.HasPrefix(wd, gp) {
-			return &ctx{GOPATH: gp}, nil
+			return &Ctx{GOPATH: gp}, nil
 		}
 	}
 
 	return nil, errors.New("project not in a GOPATH")
 }
 
-func (c *ctx) sourceManager() (*gps.SourceMgr, error) {
+func (c *Ctx) SourceManager() (*gps.SourceMgr, error) {
 	return gps.NewSourceManager(analyzer{}, filepath.Join(c.GOPATH, "pkg", "dep"))
 }
 
-// loadProject searches for a project root from the provided path, then loads
+// LoadProject searches for a project root from the provided path, then loads
 // the manifest and lock (if any) it finds there.
 //
 // If the provided path is empty, it will search from the path indicated by
 // os.Getwd().
-func (c *ctx) loadProject(path string) (*project, error) {
+func (c *Ctx) LoadProject(path string) (*Project, error) {
 	var err error
-	p := new(project)
+	p := new(Project)
 
 	switch path {
 	case "":
-		p.absroot, err = findProjectRootFromWD()
+		p.AbsRoot, err = findProjectRootFromWD()
 	default:
-		p.absroot, err = findProjectRoot(path)
+		p.AbsRoot, err = findProjectRoot(path)
 	}
 
 	if err != nil {
 		return p, err
 	}
 
-	ip, err := c.splitAbsoluteProjectRoot(p.absroot)
+	ip, err := c.SplitAbsoluteProjectRoot(p.AbsRoot)
 	if err != nil {
 		return nil, errors.Wrap(err, "split absolute project root")
 	}
-	p.importroot = gps.ProjectRoot(ip)
+	p.ImportRoot = gps.ProjectRoot(ip)
 
-	mp := filepath.Join(p.absroot, manifestName)
+	mp := filepath.Join(p.AbsRoot, ManifestName)
 	mf, err := os.Open(mp)
 	if err != nil {
 		if os.IsNotExist(err) {
 			// TODO: list possible solutions? (dep init, cd $project)
-			return nil, fmt.Errorf("no %v found in project root %v", manifestName, p.absroot)
+			return nil, fmt.Errorf("no %v found in project root %v", ManifestName, p.AbsRoot)
 		}
 		// Unable to read the manifest file
 		return nil, err
 	}
 	defer mf.Close()
 
-	p.m, err = readManifest(mf)
+	p.Manifest, err = readManifest(mf)
 	if err != nil {
 		return nil, fmt.Errorf("error while parsing %s: %s", mp, err)
 	}
 
-	lp := filepath.Join(path, lockName)
+	lp := filepath.Join(path, LockName)
 	lf, err := os.Open(lp)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -100,7 +100,7 @@ func (c *ctx) loadProject(path string) (*project, error) {
 	}
 	defer lf.Close()
 
-	p.l, err = readLock(lf)
+	p.Lock, err = readLock(lf)
 	if err != nil {
 		return nil, fmt.Errorf("error while parsing %s: %s", lp, err)
 	}
@@ -108,12 +108,12 @@ func (c *ctx) loadProject(path string) (*project, error) {
 	return p, nil
 }
 
-// splitAbsoluteProjectRoot takes an absolute path and compares it against declared
+// SplitAbsoluteProjectRoot takes an absolute path and compares it against declared
 // GOPATH(s) to determine what portion of the input path should be treated as an
 // import path - as a project root.
 //
 // The second returned string indicates which GOPATH value was used.
-func (c *ctx) splitAbsoluteProjectRoot(path string) (string, error) {
+func (c *Ctx) SplitAbsoluteProjectRoot(path string) (string, error) {
 	srcprefix := filepath.Join(c.GOPATH, "src") + string(filepath.Separator)
 	if strings.HasPrefix(path, srcprefix) {
 		// filepath.ToSlash because we're dealing with an import path now,
@@ -127,9 +127,9 @@ func (c *ctx) splitAbsoluteProjectRoot(path string) (string, error) {
 // absoluteProjectRoot determines the absolute path to the project root
 // including the $GOPATH. This will not work with stdlib packages and the
 // package directory needs to exist.
-func (c *ctx) absoluteProjectRoot(path string) (string, error) {
+func (c *Ctx) absoluteProjectRoot(path string) (string, error) {
 	posspath := filepath.Join(c.GOPATH, "src", path)
-	dirOK, err := isDir(posspath)
+	dirOK, err := IsDir(posspath)
 	if err != nil {
 		return "", errors.Wrapf(err, "checking if %s is a directory", posspath)
 	}
@@ -139,7 +139,7 @@ func (c *ctx) absoluteProjectRoot(path string) (string, error) {
 	return posspath, nil
 }
 
-func (c *ctx) versionInWorkspace(root gps.ProjectRoot) (gps.Version, error) {
+func (c *Ctx) VersionInWorkspace(root gps.ProjectRoot) (gps.Version, error) {
 	pr, err := c.absoluteProjectRoot(string(root))
 	if err != nil {
 		return nil, errors.Wrapf(err, "determine project root for %s", root)
@@ -186,4 +186,14 @@ func (c *ctx) versionInWorkspace(root gps.ProjectRoot) (gps.Version, error) {
 	}
 
 	return gps.Revision(rev), nil
+}
+
+// contains checks if a array of strings contains a value
+func contains(a []string, b string) bool {
+	for _, v := range a {
+		if b == v {
+			return true
+		}
+	}
+	return false
 }

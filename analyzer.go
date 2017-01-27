@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package main
+package dep
 
 import (
 	"os"
@@ -17,8 +17,8 @@ type analyzer struct{}
 func (a analyzer) DeriveManifestAndLock(path string, n gps.ProjectRoot) (gps.Manifest, gps.Lock, error) {
 	// TODO: If we decide to support other tools manifest, this is where we would need
 	// to add that support.
-	mf := filepath.Join(path, manifestName)
-	if fileOK, err := isRegular(mf); err != nil || !fileOK {
+	mf := filepath.Join(path, ManifestName)
+	if fileOK, err := IsRegular(mf); err != nil || !fileOK {
 		// Do not return an error, when does not exist.
 		return nil, nil, nil
 	}

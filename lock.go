@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package main
+package dep
 
 import (
 	"bytes"
@@ -15,7 +15,9 @@ import (
 	"github.com/sdboyer/gps"
 )
 
-type lock struct {
+const LockName = "lock.json"
+
+type Lock struct {
 	Memo []byte
 	P    []gps.LockedProject
 }
@@ -34,7 +36,7 @@ type lockedDep struct {
 	Packages   []string `json:"packages"`
 }
 
-func readLock(r io.Reader) (*lock, error) {
+func readLock(r io.Reader) (*Lock, error) {
 	rl := rawLock{}
 	err := json.NewDecoder(r).Decode(&rl)
 	if err != nil {
@@ -45,7 +47,7 @@ func readLock(r io.Reader) (*lock, error) {
 	if err != nil {
 		return nil, fmt.Errorf("invalid hash digest in lock's memo field")
 	}
-	l := &lock{
+	l := &Lock{
 		Memo: b,
 		P:    make([]gps.LockedProject, len(rl.P)),
 	}
@@ -75,21 +77,21 @@ func readLock(r io.Reader) (*lock, error) {
 	return l, nil
 }
 
-func (l *lock) InputHash() []byte {
+func (l *Lock) InputHash() []byte {
 	return l.Memo
 }
 
-func (l *lock) Projects() []gps.LockedProject {
+func (l *Lock) Projects() []gps.LockedProject {
 	return l.P
 }
 
-func (l *lock) MarshalJSON() ([]byte, error) {
+func (l *Lock) MarshalJSON() ([]byte, error) {
 	raw := rawLock{
 		Memo: hex.EncodeToString(l.Memo),
 		P:    make([]lockedDep, len(l.P)),
 	}
 
-	sort.Sort(sortedLockedProjects(l.P))
+	sort.Sort(SortedLockedProjects(l.P))
 
 	for k, lp := range l.P {
 		id := lp.Ident()
@@ -132,7 +134,7 @@ func (l *lock) MarshalJSON() ([]byte, error) {
 	return buf.Bytes(), err
 }
 
-// lockFromInterface converts an arbitrary gps.Lock to dep's representation of a
+// LockFromInterface converts an arbitrary gps.Lock to dep's representation of a
 // lock. If the input is already dep's *lock, the input is returned directly.
 //
 // Data is defensively copied wherever necessary to ensure the resulting *lock
@@ -140,16 +142,16 @@ func (l *lock) MarshalJSON() ([]byte, error) {
 //
 // As gps.Solution is a superset of gps.Lock, this can also be used to convert
 // solutions to dep's lock format.
-func lockFromInterface(in gps.Lock) *lock {
+func LockFromInterface(in gps.Lock) *Lock {
 	if in == nil {
 		return nil
-	} else if l, ok := in.(*lock); ok {
+	} else if l, ok := in.(*Lock); ok {
 		return l
 	}
 
 	h, p := in.InputHash(), in.Projects()
 
-	l := &lock{
+	l := &Lock{
 		Memo: make([]byte, len(h)),
 		P:    make([]gps.LockedProject, len(p)),
 	}
@@ -159,11 +161,11 @@ func lockFromInterface(in gps.Lock) *lock {
 	return l
 }
 
-type sortedLockedProjects []gps.LockedProject
+type SortedLockedProjects []gps.LockedProject
 
-func (s sortedLockedProjects) Len() int      { return len(s) }
-func (s sortedLockedProjects) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
-func (s sortedLockedProjects) Less(i, j int) bool {
+func (s SortedLockedProjects) Len() int      { return len(s) }
+func (s SortedLockedProjects) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
+func (s SortedLockedProjects) Less(i, j int) bool {
 	l, r := s[i].Ident(), s[j].Ident()
 
 	if l.ProjectRoot < r.ProjectRoot {
@@ -179,7 +181,7 @@ func (s sortedLockedProjects) Less(i, j int) bool {
 // locksAreEquivalent compares two locks to see if they differ. If EITHER lock
 // is nil, or their memos do not match, or any projects differ, then false is
 // returned.
-func locksAreEquivalent(l, r *lock) bool {
+func locksAreEquivalent(l, r *Lock) bool {
 	if l == nil || r == nil {
 		return false
 	}
@@ -192,8 +194,8 @@ func locksAreEquivalent(l, r *lock) bool {
 		return false
 	}
 
-	sort.Sort(sortedLockedProjects(l.P))
-	sort.Sort(sortedLockedProjects(r.P))
+	sort.Sort(SortedLockedProjects(l.P))
+	sort.Sort(SortedLockedProjects(r.P))
 
 	for k, lp := range l.P {
 		// TODO(sdboyer) gps will be adding a func to compare LockedProjects in the next

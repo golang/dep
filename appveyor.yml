@@ -28,4 +28,5 @@ deploy: false
 
 test_script:
   - go build
-  - go test
+  - go test .
+  - go test ./cmd/dep

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package main
+package dep
 
 import (
 	"os"
@@ -10,6 +10,7 @@ import (
 	"runtime"
 	"testing"
 
+	"github.com/golang/dep/test"
 	"github.com/sdboyer/gps"
 )
 
@@ -18,6 +19,7 @@ func TestFindRoot(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	want := filepath.Join(wd, "_testdata", "rootfind")
 	got1, err := findProjectRoot(want)
 	if err != nil {
@@ -52,7 +54,7 @@ func TestFindRoot(t *testing.T) {
 	// The following test does not work on windows because syscall.Stat does not
 	// return a "not a directory" error.
 	if runtime.GOOS != "windows" {
-		got4, err := findProjectRoot(filepath.Join(want, manifestName))
+		got4, err := findProjectRoot(filepath.Join(want, ManifestName))
 		if err == nil {
 			t.Errorf("Should have err'd when trying subdir of file, but returned %s", got4)
 		}
@@ -60,37 +62,37 @@ func TestFindRoot(t *testing.T) {
 }
 
 func TestProjectMakeParams(t *testing.T) {
-	p := project{
-		absroot:    "someroot",
-		importroot: gps.ProjectRoot("Some project root"),
-		m:          &manifest{Ignores: []string{"ignoring this"}},
-		l:          &lock{},
+	p := Project{
+		AbsRoot:    "someroot",
+		ImportRoot: gps.ProjectRoot("Some project root"),
+		Manifest:   &Manifest{Ignores: []string{"ignoring this"}},
+		Lock:       &Lock{},
 	}
 
-	solveParam := p.makeParams()
+	solveParam := p.MakeParams()
 
-	if solveParam.Manifest != p.m {
+	if solveParam.Manifest != p.Manifest {
 		t.Error("makeParams() returned gps.SolveParameters with incorrect Manifest")
 	}
 
-	if solveParam.Lock != p.l {
+	if solveParam.Lock != p.Lock {
 		t.Error("makeParams() returned gps.SolveParameters with incorrect Lock")
 	}
 }
 
 func TestSlashedGOPATH(t *testing.T) {
-	tg := testgo(t)
-	defer tg.cleanup()
-	tg.tempDir("src")
+	tg := test.Testgo(t)
+	defer tg.Cleanup()
+	tg.TempDir("src")
 
-	tg.setenv("GOPATH", filepath.ToSlash(tg.path(".")))
-	_, err := newContext()
+	tg.Setenv("GOPATH", filepath.ToSlash(tg.Path(".")))
+	_, err := NewContext()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	tg.setenv("GOPATH", filepath.FromSlash(tg.path(".")))
-	_, err = newContext()
+	tg.Setenv("GOPATH", filepath.FromSlash(tg.Path(".")))
+	_, err = NewContext()
 	if err != nil {
 		t.Fatal(err)
 	}
