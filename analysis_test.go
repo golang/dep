@@ -994,17 +994,6 @@ func TestListPackagesNoPerms(t *testing.T) {
 					},
 				},
 			},
-			"ren/simple": {
-				P: Package{
-					ImportPath:  "ren/simple",
-					CommentPath: "",
-					Name:        "simple",
-					Imports: []string{
-						"github.com/sdboyer/gps",
-						"sort",
-					},
-				},
-			},
 		},
 	}
 
