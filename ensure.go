@@ -96,7 +96,7 @@ type ensureCommand struct {
 	overrides stringSlice
 }
 
-func (cmd *ensureCommand) Run(args []string) error {
+func (cmd *ensureCommand) Run(ctx *ctx, args []string) error {
 	if cmd.examples {
 		fmt.Fprintln(os.Stderr, strings.TrimSpace(ensureExamples))
 		return nil
@@ -106,12 +106,12 @@ func (cmd *ensureCommand) Run(args []string) error {
 		return errors.New("Cannot pass -update and itemized project list (for now)")
 	}
 
-	p, err := depContext.loadProject("")
+	p, err := ctx.loadProject("")
 	if err != nil {
 		return err
 	}
 
-	sm, err := depContext.sourceManager()
+	sm, err := ctx.sourceManager()
 	if err != nil {
 		return err
 	}
