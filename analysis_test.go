@@ -5,6 +5,7 @@ import (
 	"go/build"
 	"go/scanner"
 	"go/token"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -952,6 +953,88 @@ func TestListPackages(t *testing.T) {
 					}
 				}
 			}
+		}
+	}
+}
+
+// Test that ListPackages skips directories for which it lacks permissions to
+// enter and files it lacks permissions to read.
+func TestListPackagesNoPerms(t *testing.T) {
+	tmp, err := ioutil.TempDir("", "listpkgsnp")
+	if err != nil {
+		t.Errorf("Failed to create temp dir: %s", err)
+		t.FailNow()
+	}
+	defer os.RemoveAll(tmp)
+
+	srcdir := filepath.Join(getwd(t), "_testdata", "src", "ren")
+	workdir := filepath.Join(tmp, "ren")
+	copyDir(srcdir, workdir)
+
+	// chmod the simple dir and m1p/b.go file so they can't be read
+	os.Chmod(filepath.Join(workdir, "simple"), 0)
+	os.Chmod(filepath.Join(workdir, "m1p", "b.go"), 0)
+
+	want := PackageTree{
+		ImportRoot: "ren",
+		Packages: map[string]PackageOrErr{
+			"ren": {
+				Err: &build.NoGoError{
+					Dir: workdir,
+				},
+			},
+			"ren/m1p": {
+				P: Package{
+					ImportPath:  "ren/m1p",
+					CommentPath: "",
+					Name:        "m1p",
+					Imports: []string{
+						"github.com/sdboyer/gps",
+						"sort",
+					},
+				},
+			},
+			"ren/simple": {
+				P: Package{
+					ImportPath:  "ren/simple",
+					CommentPath: "",
+					Name:        "simple",
+					Imports: []string{
+						"github.com/sdboyer/gps",
+						"sort",
+					},
+				},
+			},
+		},
+	}
+
+	got, err := ListPackages(workdir, "ren")
+
+	if err != nil {
+		t.Errorf("Unexpected err from ListPackages: %s", err)
+		t.FailNow()
+	}
+	if want.ImportRoot != got.ImportRoot {
+		t.Errorf("Expected ImportRoot %s, got %s", want.ImportRoot, got.ImportRoot)
+		t.FailNow()
+	}
+
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("Did not get expected PackageOrErrs:\n\t(GOT): %#v\n\t(WNT): %#v", got, want)
+		if len(got.Packages) != 2 {
+			if len(got.Packages) == 3 {
+				t.Error("Wrong number of PackageOrErrs - did 'simple' subpackage make it into results somehow?")
+			} else {
+				t.Error("Wrong number of PackageOrErrs")
+			}
+		}
+
+		if got.Packages["ren"].Err == nil {
+			t.Error("Should have gotten error on empty root directory")
+		}
+
+		if !reflect.DeepEqual(got.Packages["ren/m1p"].P.Imports, want.Packages["ren/m1p"].P.Imports) {
+			t.Error("Mismatch between ")
 		}
 	}
 }
