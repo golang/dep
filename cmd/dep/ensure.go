@@ -9,15 +9,13 @@ import (
 	"encoding/hex"
 	"flag"
 	"fmt"
-	"io"
 	"log"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strconv"
 	"strings"
-	"syscall"
 
+	"github.com/golang/dep"
 	"github.com/pkg/errors"
 	"github.com/sdboyer/gps"
 )
@@ -96,7 +94,7 @@ type ensureCommand struct {
 	overrides stringSlice
 }
 
-func (cmd *ensureCommand) Run(ctx *ctx, args []string) error {
+func (cmd *ensureCommand) Run(ctx *dep.Ctx, args []string) error {
 	if cmd.examples {
 		fmt.Fprintln(os.Stderr, strings.TrimSpace(ensureExamples))
 		return nil
@@ -106,12 +104,12 @@ func (cmd *ensureCommand) Run(ctx *ctx, args []string) error {
 		return errors.New("Cannot pass -update and itemized project list (for now)")
 	}
 
-	p, err := ctx.loadProject("")
+	p, err := ctx.LoadProject("")
 	if err != nil {
 		return err
 	}
 
-	sm, err := ctx.sourceManager()
+	sm, err := ctx.SourceManager()
 	if err != nil {
 		return err
 	}
@@ -135,22 +133,22 @@ func (cmd *ensureCommand) Run(ctx *ctx, args []string) error {
 			//
 			// TODO(sdboyer): for this case - or just in general - do we want to
 			// add project args to the requires list temporarily for this run?
-			if _, has := p.m.Dependencies[pc.Ident.ProjectRoot]; !has {
+			if _, has := p.Manifest.Dependencies[pc.Ident.ProjectRoot]; !has {
 				logf("No constraint or alternate source specified for %q, omitting from manifest", pc.Ident.ProjectRoot)
 			}
 			// If it's already in the manifest, no need to log
 			continue
 		}
 
-		p.m.Dependencies[pc.Ident.ProjectRoot] = gps.ProjectProperties{
+		p.Manifest.Dependencies[pc.Ident.ProjectRoot] = gps.ProjectProperties{
 			Source:     pc.Ident.Source,
 			Constraint: pc.Constraint,
 		}
 
-		if p.l != nil {
-			for i, lp := range p.l.P {
+		if p.Lock != nil {
+			for i, lp := range p.Lock.P {
 				if lp.Ident() == pc.Ident {
-					p.l.P = append(p.l.P[:i], p.l.P[i+1:]...)
+					p.Lock.P = append(p.Lock.P[:i], p.Lock.P[i+1:]...)
 					break
 				}
 			}
@@ -168,15 +166,15 @@ func (cmd *ensureCommand) Run(ctx *ctx, args []string) error {
 		// carry meaning - they force the constraints entirely open for a given
 		// project. Inadvisable, but meaningful.
 
-		p.m.Ovr[pc.Ident.ProjectRoot] = gps.ProjectProperties{
+		p.Manifest.Ovr[pc.Ident.ProjectRoot] = gps.ProjectProperties{
 			Source:     pc.Ident.Source,
 			Constraint: pc.Constraint,
 		}
 
-		if p.l != nil {
-			for i, lp := range p.l.P {
+		if p.Lock != nil {
+			for i, lp := range p.Lock.P {
 				if lp.Ident() == pc.Ident {
-					p.l.P = append(p.l.P[:i], p.l.P[i+1:]...)
+					p.Lock.P = append(p.Lock.P[:i], p.Lock.P[i+1:]...)
 					break
 				}
 			}
@@ -192,7 +190,7 @@ func (cmd *ensureCommand) Run(ctx *ctx, args []string) error {
 		return errors.New(buf.String())
 	}
 
-	params := p.makeParams()
+	params := p.MakeParams()
 	// If -update was passed, we want the solver to allow all versions to change
 	params.ChangeAll = cmd.update
 
@@ -201,7 +199,7 @@ func (cmd *ensureCommand) Run(ctx *ctx, args []string) error {
 		params.TraceLogger = log.New(os.Stderr, "", 0)
 	}
 
-	params.RootPackageTree, err = gps.ListPackages(p.absroot, string(p.importroot))
+	params.RootPackageTree, err = gps.ListPackages(p.AbsRoot, string(p.ImportRoot))
 	if err != nil {
 		return errors.Wrap(err, "ensure ListPackage for project")
 	}
@@ -215,23 +213,23 @@ func (cmd *ensureCommand) Run(ctx *ctx, args []string) error {
 		return errors.Wrap(err, "ensure Solve()")
 	}
 
-	sw := safeWriter{
-		root: p.absroot,
-		m:    p.m,
-		l:    p.l,
-		nl:   solution,
-		sm:   sm,
+	sw := dep.SafeWriter{
+		Root:          p.AbsRoot,
+		Manifest:      p.Manifest,
+		Lock:          p.Lock,
+		NewLock:       solution,
+		SourceManager: sm,
 	}
 
 	// check if vendor exists, because if the locks are the same but
 	// vendor does not exist we should write vendor
 	var writeV bool
-	vendorExists, _ := isDir(filepath.Join(sw.root, "vendor"))
+	vendorExists, _ := dep.IsDir(filepath.Join(sw.Root, "vendor"))
 	if !vendorExists && solution != nil {
 		writeV = true
 	}
 
-	return errors.Wrap(sw.writeAllSafe(writeV), "grouped write of manifest, lock and vendor")
+	return errors.Wrap(sw.WriteAllSafe(writeV), "grouped write of manifest, lock and vendor")
 }
 
 type stringSlice []string
@@ -355,140 +353,4 @@ func deduceConstraint(s string) gps.Constraint {
 	// If not a plain SHA1 or bzr custom GUID, assume a plain version.
 	// TODO: if there is amgibuity here, then prompt the user?
 	return gps.NewVersion(s)
-}
-
-// renameWithFallback attempts to rename a file or directory, but falls back to
-// copying in the event of a cross-link device error. If the fallback copy
-// succeeds, src is still removed, emulating normal rename behavior.
-func renameWithFallback(src, dest string) error {
-	fi, err := os.Lstat(src)
-	if err != nil {
-		return err
-	}
-
-	// Windows cannot use syscall.Rename to rename a directory
-	if runtime.GOOS == "windows" && fi.IsDir() {
-		if err := copyDir(src, dest); err != nil {
-			return err
-		}
-		return os.RemoveAll(src)
-	}
-
-	err = os.Rename(src, dest)
-	if err == nil {
-		return nil
-	}
-
-	terr, ok := err.(*os.LinkError)
-	if !ok {
-		return err
-	}
-
-	// Rename may fail if src and dest are on different devices; fall back to
-	// copy if we detect that case. syscall.EXDEV is the common name for the
-	// cross device link error which has varying output text across different
-	// operating systems.
-	var cerr error
-	if terr.Err == syscall.EXDEV {
-		vlogf("Cross link err (is temp dir on same partition as project?); falling back to manual copy: %s", terr)
-		if fi.IsDir() {
-			cerr = copyDir(src, dest)
-		} else {
-			cerr = copyFile(src, dest)
-		}
-	} else if runtime.GOOS == "windows" {
-		// In windows it can drop down to an operating system call that
-		// returns an operating system error with a different number and
-		// message. Checking for that as a fall back.
-		noerr, ok := terr.Err.(syscall.Errno)
-		// 0x11 (ERROR_NOT_SAME_DEVICE) is the windows error.
-		// See https://msdn.microsoft.com/en-us/library/cc231199.aspx
-		if ok && noerr == 0x11 {
-			vlogf("Cross link err (is temp dir on same partition as project?); falling back to manual copy: %s", terr)
-			cerr = copyFile(src, dest)
-		}
-	} else {
-		return terr
-	}
-
-	if cerr != nil {
-		return cerr
-	}
-
-	return os.RemoveAll(src)
-}
-
-// copyDir takes in a directory and copies its contents to the destination.
-// It preserves the file mode on files as well.
-func copyDir(src string, dest string) error {
-	fi, err := os.Lstat(src)
-	if err != nil {
-		return err
-	}
-
-	err = os.MkdirAll(dest, fi.Mode())
-	if err != nil {
-		return err
-	}
-
-	dir, err := os.Open(src)
-	if err != nil {
-		return err
-	}
-	defer dir.Close()
-
-	objects, err := dir.Readdir(-1)
-	if err != nil {
-		return err
-	}
-
-	for _, obj := range objects {
-		if obj.Mode()&os.ModeSymlink != 0 {
-			continue
-		}
-
-		srcfile := filepath.Join(src, obj.Name())
-		destfile := filepath.Join(dest, obj.Name())
-
-		if obj.IsDir() {
-			err = copyDir(srcfile, destfile)
-			if err != nil {
-				return err
-			}
-			continue
-		}
-
-		if err := copyFile(srcfile, destfile); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-// copyFile copies a file from one place to another with the permission bits
-// preserved as well.
-func copyFile(src string, dest string) error {
-	srcfile, err := os.Open(src)
-	if err != nil {
-		return err
-	}
-	defer srcfile.Close()
-
-	destfile, err := os.Create(dest)
-	if err != nil {
-		return err
-	}
-	defer destfile.Close()
-
-	if _, err := io.Copy(destfile, srcfile); err != nil {
-		return err
-	}
-
-	srcinfo, err := os.Stat(src)
-	if err != nil {
-		return err
-	}
-
-	return os.Chmod(dest, srcinfo.Mode())
 }

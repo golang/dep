@@ -4,17 +4,21 @@
 
 package main
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/golang/dep/test"
+)
 
 func TestRemove(t *testing.T) {
-	needsExternalNetwork(t)
-	needsGit(t)
+	test.NeedsExternalNetwork(t)
+	test.NeedsGit(t)
 
-	tg := testgo(t)
-	defer tg.cleanup()
+	tg := test.Testgo(t)
+	defer tg.Cleanup()
 
-	tg.tempDir("src")
-	tg.setenv("GOPATH", tg.path("."))
+	tg.TempDir("src")
+	tg.Setenv("GOPATH", tg.Path("."))
 
 	importPaths := map[string]string{
 		"github.com/pkg/errors":      "v0.8.0",                                   // semver
@@ -23,9 +27,9 @@ func TestRemove(t *testing.T) {
 
 	// checkout the specified revisions
 	for ip, rev := range importPaths {
-		tg.runGo("get", ip)
-		repoDir := tg.path("src/" + ip)
-		tg.runGit(repoDir, "checkout", rev)
+		tg.RunGo("get", ip)
+		repoDir := tg.Path("src/" + ip)
+		tg.RunGit(repoDir, "checkout", rev)
 	}
 
 	// Build a fake consumer of these packages.
@@ -45,7 +49,7 @@ func main() {
 	logrus.Info("whatev")
 }`
 
-	tg.tempFile("src/"+root+"/thing.go", m)
+	tg.TempFile("src/"+root+"/thing.go", m)
 	origm := `{
     "dependencies": {
         "github.com/not/used": {
@@ -72,44 +76,44 @@ func main() {
 }
 `
 
-	tg.tempFile("src/"+root+"/manifest.json", origm)
+	tg.TempFile("src/"+root+"/manifest.json", origm)
 
-	tg.cd(tg.path("src/" + root))
-	tg.run("remove", "-unused")
+	tg.Cd(tg.Path("src/" + root))
+	tg.Run("remove", "-unused")
 
-	manifest := tg.readManifest()
+	manifest := tg.ReadManifest()
 	if manifest != expectedManifest {
 		t.Fatalf("expected %s, got %s", expectedManifest, manifest)
 	}
 
-	tg.tempFile("src/"+root+"/manifest.json", origm)
-	tg.run("remove", "github.com/not/used")
+	tg.TempFile("src/"+root+"/manifest.json", origm)
+	tg.Run("remove", "github.com/not/used")
 
-	manifest = tg.readManifest()
+	manifest = tg.ReadManifest()
 	if manifest != expectedManifest {
 		t.Fatalf("expected %s, got %s", expectedManifest, manifest)
 	}
 
-	if err := tg.doRun([]string{"remove", "-unused", "github.com/not/used"}); err == nil {
+	if err := tg.DoRun([]string{"remove", "-unused", "github.com/not/used"}); err == nil {
 		t.Fatal("rm with both -unused and arg should have failed")
 	}
 
-	if err := tg.doRun([]string{"remove", "github.com/not/present"}); err == nil {
+	if err := tg.DoRun([]string{"remove", "github.com/not/present"}); err == nil {
 		t.Fatal("rm with arg not in manifest should have failed")
 	}
 
-	if err := tg.doRun([]string{"remove", "github.com/not/used", "github.com/not/present"}); err == nil {
+	if err := tg.DoRun([]string{"remove", "github.com/not/used", "github.com/not/present"}); err == nil {
 		t.Fatal("rm with one arg not in manifest should have failed")
 	}
 
-	if err := tg.doRun([]string{"remove", "github.com/pkg/errors"}); err == nil {
+	if err := tg.DoRun([]string{"remove", "github.com/pkg/errors"}); err == nil {
 		t.Fatal("rm of arg in manifest and imports should have failed without -force")
 	}
 
-	tg.tempFile("src/"+root+"/manifest.json", origm)
-	tg.run("remove", "-force", "github.com/pkg/errors", "github.com/not/used")
+	tg.TempFile("src/"+root+"/manifest.json", origm)
+	tg.Run("remove", "-force", "github.com/pkg/errors", "github.com/not/used")
 
-	manifest = tg.readManifest()
+	manifest = tg.ReadManifest()
 	if manifest != `{
     "dependencies": {
         "github.com/Sirupsen/logrus": {
@@ -121,7 +125,7 @@ func main() {
 		t.Fatalf("expected %s, got %s", expectedManifest, manifest)
 	}
 
-	sysCommit := tg.getCommit("go.googlesource.com/sys")
+	sysCommit := tg.GetCommit("go.googlesource.com/sys")
 	expectedLock := `{
     "memo": "7769242a737ed497aa39831eecfdc4a1bf59517df898907accc6bdc0f789a69b",
     "projects": [
@@ -151,7 +155,7 @@ func main() {
     ]
 }
 `
-	lock := tg.readLock()
+	lock := tg.ReadLock()
 	if lock != expectedLock {
 		t.Fatalf("expected %s, got %s", expectedLock, lock)
 	}

@@ -5,9 +5,9 @@
 package main
 
 import (
-	"os"
-	"path/filepath"
 	"testing"
+
+	"github.com/golang/dep/test"
 )
 
 func TestContains(t *testing.T) {
@@ -38,77 +38,15 @@ func TestIsStdLib(t *testing.T) {
 	}
 }
 
-func TestIsRegular(t *testing.T) {
-	wd, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	tests := map[string]bool{
-		wd: false,
-		filepath.Join(wd, "_testdata"):                      false,
-		filepath.Join(wd, "main.go"):                        true,
-		filepath.Join(wd, "this_file_does_not_exist.thing"): false,
-	}
-
-	for f, expected := range tests {
-		fileOK, err := isRegular(f)
-		if err != nil {
-			if !expected {
-				// this is the case where we expect an error so continue
-				// to the check below
-				continue
-			}
-			t.Fatalf("expected no error, got %v", err)
-		}
-
-		if fileOK != expected {
-			t.Fatalf("expected %t for %s, got %t", expected, f, fileOK)
-		}
-	}
-
-}
-
-func TestIsDir(t *testing.T) {
-	wd, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	tests := map[string]bool{
-		wd: true,
-		filepath.Join(wd, "_testdata"):                      true,
-		filepath.Join(wd, "main.go"):                        false,
-		filepath.Join(wd, "this_file_does_not_exist.thing"): false,
-	}
-
-	for f, expected := range tests {
-		dirOK, err := isDir(f)
-		if err != nil {
-			if !expected {
-				// this is the case where we expect an error so continue
-				// to the check below
-				continue
-			}
-			t.Fatalf("expected no error, got %v", err)
-		}
-
-		if dirOK != expected {
-			t.Fatalf("expected %t for %s, got %t", expected, f, dirOK)
-		}
-	}
-
-}
-
 func TestInit(t *testing.T) {
-	needsExternalNetwork(t)
-	needsGit(t)
+	test.NeedsExternalNetwork(t)
+	test.NeedsGit(t)
 
-	tg := testgo(t)
-	defer tg.cleanup()
+	tg := test.Testgo(t)
+	defer tg.Cleanup()
 
-	tg.tempDir("src")
-	tg.setenv("GOPATH", tg.path("."))
+	tg.TempDir("src")
+	tg.Setenv("GOPATH", tg.Path("."))
 
 	importPaths := map[string]string{
 		"github.com/pkg/errors":      "v0.8.0",                                   // semver
@@ -117,9 +55,9 @@ func TestInit(t *testing.T) {
 
 	// checkout the specified revisions
 	for ip, rev := range importPaths {
-		tg.runGo("get", ip)
-		repoDir := tg.path("src/" + ip)
-		tg.runGit(repoDir, "checkout", rev)
+		tg.RunGo("get", ip)
+		repoDir := tg.Path("src/" + ip)
+		tg.RunGit(repoDir, "checkout", rev)
 	}
 
 	// Build a fake consumer of these packages.
@@ -141,16 +79,16 @@ func main() {
 	logrus.Info(bar.Qux)
 }`
 
-	tg.tempFile("src/"+root+"/foo/thing.go", m)
+	tg.TempFile("src/"+root+"/foo/thing.go", m)
 
 	m = `package bar
 
 const Qux = "yo yo!"
 `
-	tg.tempFile("src/"+root+"/foo/bar/bar.go", m)
+	tg.TempFile("src/"+root+"/foo/bar/bar.go", m)
 
-	tg.cd(tg.path("src/" + root))
-	tg.run("init")
+	tg.Cd(tg.Path("src/" + root))
+	tg.Run("init")
 
 	expectedManifest := `{
     "dependencies": {
@@ -163,12 +101,12 @@ const Qux = "yo yo!"
     }
 }
 `
-	manifest := tg.readManifest()
+	manifest := tg.ReadManifest()
 	if manifest != expectedManifest {
 		t.Fatalf("expected %s, got %s", expectedManifest, manifest)
 	}
 
-	sysCommit := tg.getCommit("go.googlesource.com/sys")
+	sysCommit := tg.GetCommit("go.googlesource.com/sys")
 	expectedLock := `{
     "memo": "668fe45796bc4e85a5a6c0a0f1eb6fab9e23588d1eb33f3a12b2ad5599a3575e",
     "projects": [
@@ -198,7 +136,7 @@ const Qux = "yo yo!"
     ]
 }
 `
-	lock := tg.readLock()
+	lock := tg.ReadLock()
 	if lock != expectedLock {
 		t.Fatalf("expected %s, got %s", expectedLock, lock)
 	}

@@ -8,6 +8,7 @@ import (
 	"flag"
 	"fmt"
 
+	"github.com/golang/dep"
 	"github.com/pkg/errors"
 	"github.com/sdboyer/gps"
 )
@@ -22,26 +23,26 @@ func (cmd *hashinCommand) Register(fs *flag.FlagSet) {}
 
 type hashinCommand struct{}
 
-func (hashinCommand) Run(ctx *ctx, args []string) error {
-	p, err := ctx.loadProject("")
+func (hashinCommand) Run(ctx *dep.Ctx, args []string) error {
+	p, err := ctx.LoadProject("")
 	if err != nil {
 		return err
 	}
 
-	sm, err := ctx.sourceManager()
+	sm, err := ctx.SourceManager()
 	if err != nil {
 		return err
 	}
 	sm.UseDefaultSignalHandling()
 	defer sm.Release()
 
-	params := p.makeParams()
-	cpr, err := ctx.splitAbsoluteProjectRoot(p.absroot)
+	params := p.MakeParams()
+	cpr, err := ctx.SplitAbsoluteProjectRoot(p.AbsRoot)
 	if err != nil {
 		return errors.Wrap(err, "determineProjectRoot")
 	}
 
-	params.RootPackageTree, err = gps.ListPackages(p.absroot, cpr)
+	params.RootPackageTree, err = gps.ListPackages(p.AbsRoot, cpr)
 	if err != nil {
 		return errors.Wrap(err, "gps.ListPackages")
 	}

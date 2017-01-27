@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/golang/dep"
 	"github.com/pkg/errors"
 	"github.com/sdboyer/gps"
 )
@@ -41,7 +42,7 @@ func (cmd *initCommand) Register(fs *flag.FlagSet) {}
 
 type initCommand struct{}
 
-func (cmd *initCommand) Run(ctx *ctx, args []string) error {
+func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 	if len(args) > 1 {
 		return errors.Errorf("too many args (%d)", len(args))
 	}
@@ -57,10 +58,10 @@ func (cmd *initCommand) Run(ctx *ctx, args []string) error {
 		root = args[0]
 	}
 
-	mf := filepath.Join(root, manifestName)
-	lf := filepath.Join(root, lockName)
+	mf := filepath.Join(root, dep.ManifestName)
+	lf := filepath.Join(root, dep.LockName)
 
-	mok, err := isRegular(mf)
+	mok, err := dep.IsRegular(mf)
 	if err != nil {
 		return err
 	}
@@ -69,7 +70,7 @@ func (cmd *initCommand) Run(ctx *ctx, args []string) error {
 	}
 	// Manifest file does not exist.
 
-	lok, err := isRegular(lf)
+	lok, err := dep.IsRegular(lf)
 	if err != nil {
 		return err
 	}
@@ -77,7 +78,7 @@ func (cmd *initCommand) Run(ctx *ctx, args []string) error {
 		return fmt.Errorf("invalid state: manifest %q does not exist, but lock %q does", mf, lf)
 	}
 
-	cpr, err := ctx.splitAbsoluteProjectRoot(root)
+	cpr, err := ctx.SplitAbsoluteProjectRoot(root)
 	if err != nil {
 		return errors.Wrap(err, "determineProjectRoot")
 	}
@@ -87,7 +88,7 @@ func (cmd *initCommand) Run(ctx *ctx, args []string) error {
 		return errors.Wrap(err, "gps.ListPackages")
 	}
 	vlogf("Found %d dependencies.", len(pkgT.Packages))
-	sm, err := ctx.sourceManager()
+	sm, err := ctx.SourceManager()
 	if err != nil {
 		return errors.Wrap(err, "getSourceManager")
 	}
@@ -98,13 +99,13 @@ func (cmd *initCommand) Run(ctx *ctx, args []string) error {
 	if err != nil {
 		return err
 	}
-	m := manifest{
+	m := dep.Manifest{
 		Dependencies: pd.constraints,
 	}
 
 	// Make an initial lock from what knowledge we've collected about the
 	// versions on disk
-	l := lock{
+	l := dep.Lock{
 		P: make([]gps.LockedProject, 0, len(pd.ondisk)),
 	}
 
@@ -126,10 +127,10 @@ func (cmd *initCommand) Run(ctx *ctx, args []string) error {
 		)
 	}
 
-	sw := safeWriter{
-		root: root,
-		sm:   sm,
-		m:    &m,
+	sw := dep.SafeWriter{
+		Root:          root,
+		SourceManager: sm,
+		Manifest:      &m,
 	}
 
 	if len(pd.notondisk) > 0 {
@@ -155,14 +156,14 @@ func (cmd *initCommand) Run(ctx *ctx, args []string) error {
 			handleAllTheFailuresOfTheWorld(err)
 			return err
 		}
-		sw.l = lockFromInterface(soln)
+		sw.Lock = dep.LockFromInterface(soln)
 	} else {
-		sw.l = &l
+		sw.Lock = &l
 	}
 
 	vlogf("Writing manifest and lock files.")
 
-	if err := sw.writeAllSafe(false); err != nil {
+	if err := sw.WriteAllSafe(false); err != nil {
 		return errors.Wrap(err, "safe write of manifest and lock")
 	}
 	return nil
@@ -214,36 +215,6 @@ func writeFile(path string, in json.Marshaler) error {
 	return err
 }
 
-func isRegular(name string) (bool, error) {
-	// TODO: lstat?
-	fi, err := os.Stat(name)
-	if os.IsNotExist(err) {
-		return false, nil
-	}
-	if err != nil {
-		return false, err
-	}
-	if fi.IsDir() {
-		return false, fmt.Errorf("%q is a directory, should be a file", name)
-	}
-	return true, nil
-}
-
-func isDir(name string) (bool, error) {
-	// TODO: lstat?
-	fi, err := os.Stat(name)
-	if os.IsNotExist(err) {
-		return false, nil
-	}
-	if err != nil {
-		return false, err
-	}
-	if !fi.IsDir() {
-		return false, fmt.Errorf("%q is not a directory", name)
-	}
-	return true, nil
-}
-
 func hasImportPathPrefix(s, prefix string) bool {
 	if s == prefix {
 		return true
@@ -258,7 +229,7 @@ type projectData struct {
 	ondisk       map[gps.ProjectRoot]gps.Version // projects that were found on disk
 }
 
-func getProjectData(ctx *ctx, pkgT gps.PackageTree, cpr string, sm *gps.SourceMgr) (projectData, error) {
+func getProjectData(ctx *dep.Ctx, pkgT gps.PackageTree, cpr string, sm *gps.SourceMgr) (projectData, error) {
 	vlogf("Building dependency graph...")
 
 	constraints := make(gps.ProjectConstraints)
@@ -298,7 +269,7 @@ func getProjectData(ctx *ctx, pkgT gps.PackageTree, cpr string, sm *gps.SourceMg
 			vlogf("Package %q has import %q, analyzing...", v.P.ImportPath, ip)
 
 			dependencies[pr] = []string{ip}
-			v, err := ctx.versionInWorkspace(pr)
+			v, err := ctx.VersionInWorkspace(pr)
 			if err != nil {
 				notondisk[pr] = true
 				vlogf("Could not determine version for %q, omitting from generated manifest", pr)
@@ -398,7 +369,7 @@ func getProjectData(ctx *ctx, pkgT gps.PackageTree, cpr string, sm *gps.SourceMg
 			// whether we're first seeing it here, in the transitive
 			// exploration, or if it arose in the direct dep parts
 			if _, in := ondisk[pr]; !in {
-				v, err := ctx.versionInWorkspace(pr)
+				v, err := ctx.VersionInWorkspace(pr)
 				if err != nil {
 					colors[pkg] = black
 					notondisk[pr] = true

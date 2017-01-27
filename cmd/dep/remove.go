@@ -11,6 +11,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/golang/dep"
 	"github.com/pkg/errors"
 	"github.com/sdboyer/gps"
 )
@@ -42,25 +43,25 @@ type removeCommand struct {
 	keepSource bool
 }
 
-func (cmd *removeCommand) Run(ctx *ctx, args []string) error {
-	p, err := ctx.loadProject("")
+func (cmd *removeCommand) Run(ctx *dep.Ctx, args []string) error {
+	p, err := ctx.LoadProject("")
 	if err != nil {
 		return err
 	}
 
-	sm, err := ctx.sourceManager()
+	sm, err := ctx.SourceManager()
 	if err != nil {
 		return err
 	}
 	sm.UseDefaultSignalHandling()
 	defer sm.Release()
 
-	cpr, err := ctx.splitAbsoluteProjectRoot(p.absroot)
+	cpr, err := ctx.SplitAbsoluteProjectRoot(p.AbsRoot)
 	if err != nil {
 		return errors.Wrap(err, "determineProjectRoot")
 	}
 
-	pkgT, err := gps.ListPackages(p.absroot, cpr)
+	pkgT, err := gps.ListPackages(p.AbsRoot, cpr)
 	if err != nil {
 		return errors.Wrap(err, "gps.ListPackages")
 	}
@@ -102,9 +103,9 @@ func (cmd *removeCommand) Run(ctx *ctx, args []string) error {
 		}
 
 		var rm []gps.ProjectRoot
-		for pr := range p.m.Dependencies {
+		for pr := range p.Manifest.Dependencies {
 			if _, has := otherroots[pr]; !has {
-				delete(p.m.Dependencies, pr)
+				delete(p.Manifest.Dependencies, pr)
 				rm = append(rm, pr)
 			}
 		}
@@ -150,7 +151,7 @@ func (cmd *removeCommand) Run(ctx *ctx, args []string) error {
 				}
 			}
 
-			if _, indeps := p.m.Dependencies[gps.ProjectRoot(arg)]; !indeps {
+			if _, indeps := p.Manifest.Dependencies[gps.ProjectRoot(arg)]; !indeps {
 				return fmt.Errorf("%q is not present in the manifest, cannot remove it", arg)
 			}
 
@@ -161,11 +162,11 @@ func (cmd *removeCommand) Run(ctx *ctx, args []string) error {
 				return fmt.Errorf("not removing %q because it is imported by:\n\t%s (pass -force to override)", arg, strings.Join(pkgimport, "\n\t"))
 			}
 
-			delete(p.m.Dependencies, gps.ProjectRoot(arg))
+			delete(p.Manifest.Dependencies, gps.ProjectRoot(arg))
 		}
 	}
 
-	params := p.makeParams()
+	params := p.MakeParams()
 	params.RootPackageTree = pkgT
 
 	if *verbose {
@@ -183,15 +184,15 @@ func (cmd *removeCommand) Run(ctx *ctx, args []string) error {
 		return err
 	}
 
-	sw := safeWriter{
-		root: p.absroot,
-		m:    p.m,
-		l:    p.l,
-		nl:   soln,
-		sm:   sm,
+	sw := dep.SafeWriter{
+		Root:          p.AbsRoot,
+		Manifest:      p.Manifest,
+		Lock:          p.Lock,
+		NewLock:       soln,
+		SourceManager: sm,
 	}
 
-	if err := sw.writeAllSafe(false); err != nil {
+	if err := sw.WriteAllSafe(false); err != nil {
 		return errors.Wrap(err, "grouped write of manifest, lock and vendor")
 	}
 	return nil
