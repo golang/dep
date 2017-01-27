@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package main
+package dep
 
 import (
 	"encoding/hex"
@@ -58,7 +58,7 @@ func TestReadLock(t *testing.T) {
 	}
 
 	b, _ := hex.DecodeString("2252a285ab27944a4d7adcba8dbd03980f59ba652f12db39fa93b927c345593e")
-	l2 := &lock{
+	l2 := &Lock{
 		Memo: b,
 		P: []gps.LockedProject{
 			gps.NewLockedProject(
@@ -76,7 +76,7 @@ func TestReadLock(t *testing.T) {
 
 func TestWriteLock(t *testing.T) {
 	memo, _ := hex.DecodeString("2252a285ab27944a4d7adcba8dbd03980f59ba652f12db39fa93b927c345593e")
-	l := &lock{
+	l := &Lock{
 		Memo: memo,
 		P: []gps.LockedProject{
 			gps.NewLockedProject(
