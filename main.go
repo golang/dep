@@ -68,15 +68,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Set up the dep context.
-	// TODO(pb): can this be deglobalized, pretty please?
-	hc, err := newContext()
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
-	}
-	depContext = hc
-
 	for _, cmd := range commands {
 		if name := cmd.Name(); os.Args[1] == name {
 			// Build flag set with global flags in there.
@@ -95,6 +86,15 @@ func main() {
 				fs.Usage()
 				os.Exit(1)
 			}
+
+			// Set up the dep context.
+			// TODO(pb): can this be deglobalized, pretty please?
+			hc, err := newContext()
+			if err != nil {
+				fmt.Fprintln(os.Stderr, err)
+				os.Exit(1)
+			}
+			depContext = hc
 
 			// Run the command with the post-flag-processing args.
 			if err := cmd.Run(fs.Args()); err != nil {
