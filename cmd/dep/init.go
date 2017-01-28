@@ -166,6 +166,7 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 	if err := sw.WriteAllSafe(false); err != nil {
 		return errors.Wrap(err, "safe write of manifest and lock")
 	}
+
 	return nil
 }
 
@@ -237,6 +238,15 @@ func getProjectData(ctx *dep.Ctx, pkgT gps.PackageTree, cpr string, sm *gps.Sour
 	packages := make(map[string]bool)
 	notondisk := make(map[gps.ProjectRoot]bool)
 	ondisk := make(map[gps.ProjectRoot]gps.Version)
+
+	syncDep := func(pr gps.ProjectRoot, sm *gps.SourceMgr) {
+		message := "Cached"
+		if err := sm.SyncSourceFor(gps.ProjectIdentifier{ProjectRoot: pr}); err != nil {
+			message = "Unable to cache"
+		}
+		fmt.Fprintf(os.Stderr, "%s %s\n", message, pr)
+	}
+
 	for _, v := range pkgT.Packages {
 		// TODO: Some errors maybe should not be skipped ;-)
 		if v.Err != nil {
@@ -266,6 +276,8 @@ func getProjectData(ctx *dep.Ctx, pkgT gps.PackageTree, cpr string, sm *gps.Sour
 
 				continue
 			}
+			go syncDep(pr, sm)
+
 			vlogf("Package %q has import %q, analyzing...", v.P.ImportPath, ip)
 
 			dependencies[pr] = []string{ip}
@@ -363,6 +375,7 @@ func getProjectData(ctx *dep.Ctx, pkgT gps.PackageTree, cpr string, sm *gps.Sour
 				}
 			} else {
 				dependencies[pr] = []string{pkg}
+				go syncDep(pr, sm)
 			}
 
 			// project must be on disk at this point; question is
