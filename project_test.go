@@ -81,17 +81,17 @@ func TestProjectMakeParams(t *testing.T) {
 }
 
 func TestSlashedGOPATH(t *testing.T) {
-	tg := test.Testgo(t)
-	defer tg.Cleanup()
-	tg.TempDir("src")
+	h := test.NewHelper(t)
+	defer h.Cleanup()
+	h.TempDir("src")
 
-	tg.Setenv("GOPATH", filepath.ToSlash(tg.Path(".")))
+	h.Setenv("GOPATH", filepath.ToSlash(h.Path(".")))
 	_, err := NewContext()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	tg.Setenv("GOPATH", filepath.FromSlash(tg.Path(".")))
+	h.Setenv("GOPATH", filepath.FromSlash(h.Path(".")))
 	_, err = NewContext()
 	if err != nil {
 		t.Fatal(err)
