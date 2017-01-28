@@ -114,11 +114,16 @@ func (c *Ctx) LoadProject(path string) (*Project, error) {
 //
 // The second returned string indicates which GOPATH value was used.
 func (c *Ctx) SplitAbsoluteProjectRoot(path string) (string, error) {
-	srcprefix := filepath.Join(c.GOPATH, "src") + string(filepath.Separator)
+	srcprefix := filepath.Join(c.GOPATH, "src")
 	if strings.HasPrefix(path, srcprefix) {
 		// filepath.ToSlash because we're dealing with an import path now,
 		// not an fs path
-		return filepath.ToSlash(strings.TrimPrefix(path, srcprefix)), nil
+		rel, err := filepath.Rel(srcprefix, path)
+		if err != nil {
+			return "", err
+		}
+
+		return filepath.ToSlash(rel), nil
 	}
 
 	return "", fmt.Errorf("%s not in any $GOPATH", path)
