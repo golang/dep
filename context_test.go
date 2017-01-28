@@ -13,11 +13,11 @@ import (
 )
 
 func TestNewContextNoGOPATH(t *testing.T) {
-	tg := test.Testgo(t)
-	defer tg.Cleanup()
+	h := test.NewHelper(t)
+	defer h.Cleanup()
 
-	tg.TempDir("src")
-	tg.Cd(tg.Path("."))
+	h.TempDir("src")
+	h.Cd(h.Path("."))
 
 	c, err := NewContext()
 	if err == nil {
@@ -30,12 +30,12 @@ func TestNewContextNoGOPATH(t *testing.T) {
 }
 
 func TestSplitAbsoluteProjectRoot(t *testing.T) {
-	tg := test.Testgo(t)
-	defer tg.Cleanup()
+	h := test.NewHelper(t)
+	defer h.Cleanup()
 
-	tg.TempDir("src")
-	tg.Setenv("GOPATH", tg.Path("."))
-	depCtx := &Ctx{GOPATH: tg.Path(".")}
+	h.TempDir("src")
+	h.Setenv("GOPATH", h.Path("."))
+	depCtx := &Ctx{GOPATH: h.Path(".")}
 
 	importPaths := []string{
 		"github.com/pkg/errors",
@@ -61,12 +61,12 @@ func TestSplitAbsoluteProjectRoot(t *testing.T) {
 }
 
 func TestAbsoluteProjectRoot(t *testing.T) {
-	tg := test.Testgo(t)
-	defer tg.Cleanup()
+	h := test.NewHelper(t)
+	defer h.Cleanup()
 
-	tg.TempDir("src")
-	tg.Setenv("GOPATH", tg.Path("."))
-	depCtx := &Ctx{GOPATH: tg.Path(".")}
+	h.TempDir("src")
+	h.Setenv("GOPATH", h.Path("."))
+	depCtx := &Ctx{GOPATH: h.Path(".")}
 
 	importPaths := map[string]bool{
 		"github.com/pkg/errors": true,
@@ -75,15 +75,15 @@ func TestAbsoluteProjectRoot(t *testing.T) {
 
 	for i, create := range importPaths {
 		if create {
-			tg.TempDir(filepath.Join("src", i))
+			h.TempDir(filepath.Join("src", i))
 		}
 	}
 
 	for i, ok := range importPaths {
 		pr, err := depCtx.absoluteProjectRoot(i)
 		if ok {
-			tg.Must(err)
-			expected := tg.Path(filepath.Join("src", i))
+			h.Must(err)
+			expected := h.Path(filepath.Join("src", i))
 			if pr != expected {
 				t.Fatalf("expected %s, got %q", expected, pr)
 			}
@@ -96,7 +96,7 @@ func TestAbsoluteProjectRoot(t *testing.T) {
 	}
 
 	// test that a file fails
-	tg.TempFile("src/thing/thing.go", "hello world")
+	h.TempFile("src/thing/thing.go", "hello world")
 	_, err := depCtx.absoluteProjectRoot("thing/thing.go")
 	if err == nil {
 		t.Fatal("error should not be nil for a file found")
@@ -107,12 +107,12 @@ func TestVersionInWorkspace(t *testing.T) {
 	test.NeedsExternalNetwork(t)
 	test.NeedsGit(t)
 
-	tg := test.Testgo(t)
-	defer tg.Cleanup()
+	h := test.NewHelper(t)
+	defer h.Cleanup()
 
-	tg.TempDir("src")
-	tg.Setenv("GOPATH", tg.Path("."))
-	depCtx := &Ctx{GOPATH: tg.Path(".")}
+	h.TempDir("src")
+	h.Setenv("GOPATH", h.Path("."))
+	depCtx := &Ctx{GOPATH: h.Path(".")}
 
 	importPaths := map[string]struct {
 		rev      gps.Version
@@ -133,14 +133,14 @@ func TestVersionInWorkspace(t *testing.T) {
 
 	// checkout the specified revisions
 	for ip, info := range importPaths {
-		tg.RunGo("get", ip)
-		repoDir := tg.Path("src/" + ip)
+		h.RunGo("get", ip)
+		repoDir := h.Path("src/" + ip)
 		if info.checkout {
-			tg.RunGit(repoDir, "checkout", info.rev.String())
+			h.RunGit(repoDir, "checkout", info.rev.String())
 		}
 
 		v, err := depCtx.VersionInWorkspace(gps.ProjectRoot(ip))
-		tg.Must(err)
+		h.Must(err)
 
 		if v != info.rev {
 			t.Fatalf("expected %q, got %q", v.String(), info.rev.String())
