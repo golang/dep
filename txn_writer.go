@@ -99,7 +99,7 @@ func (sw safeWriter) writeAllSafe(forceVendor bool) error {
 
 	mpath := filepath.Join(sw.root, manifestName)
 	lpath := filepath.Join(sw.root, lockName)
-	vpath := filepath.Join(sw.root, "vendor")
+	vpath := filepath.Join(sw.root, vendorName)
 
 	td, err := ioutil.TempDir(os.TempDir(), "dep")
 	if err != nil {
@@ -135,7 +135,7 @@ func (sw safeWriter) writeAllSafe(forceVendor bool) error {
 		if l == nil {
 			l = sw.l
 		}
-		err = gps.WriteDepTree(filepath.Join(td, "vendor"), l, sw.sm, true)
+		err = gps.WriteDepTree(filepath.Join(td, vendorName), l, sw.sm, true)
 		if err != nil {
 			return errors.Wrap(err, "error while writing out vendor tree")
 		}
@@ -207,7 +207,7 @@ func (sw safeWriter) writeAllSafe(forceVendor bool) error {
 		}
 
 		// Move in the new one.
-		failerr = renameWithFallback(filepath.Join(td, "vendor"), vpath)
+		failerr = renameWithFallback(filepath.Join(td, vendorName), vpath)
 		if failerr != nil {
 			goto fail
 		}

@@ -85,7 +85,7 @@ func TestTxnWriter(t *testing.T) {
 
 		mpath = filepath.Join(sw.root, manifestName)
 		lpath = filepath.Join(sw.root, lockName)
-		vpath = filepath.Join(sw.root, "vendor")
+		vpath = filepath.Join(sw.root, vendorName)
 
 		count++
 	}

@@ -226,7 +226,7 @@ func (cmd *ensureCommand) Run(ctx *ctx, args []string) error {
 	// check if vendor exists, because if the locks are the same but
 	// vendor does not exist we should write vendor
 	var writeV bool
-	vendorExists, _ := isDir(filepath.Join(sw.root, "vendor"))
+	vendorExists, _ := isDir(filepath.Join(sw.root, vendorName))
 	if !vendorExists && solution != nil {
 		writeV = true
 	}
