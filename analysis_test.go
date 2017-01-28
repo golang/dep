@@ -972,8 +972,16 @@ func TestListPackagesNoPerms(t *testing.T) {
 	copyDir(srcdir, workdir)
 
 	// chmod the simple dir and m1p/b.go file so they can't be read
-	os.Chmod(filepath.Join(workdir, "simple"), 0)
+	err = os.Chmod(filepath.Join(workdir, "simple"), 0)
+	if err != nil {
+		t.Error("Error while chmodding simple dir", err)
+		t.FailNow()
+	}
 	os.Chmod(filepath.Join(workdir, "m1p", "b.go"), 0)
+	if err != nil {
+		t.Error("Error while chmodding b.go file", err)
+		t.FailNow()
+	}
 
 	want := PackageTree{
 		ImportRoot: "ren",
@@ -1023,7 +1031,7 @@ func TestListPackagesNoPerms(t *testing.T) {
 		}
 
 		if !reflect.DeepEqual(got.Packages["ren/m1p"].P.Imports, want.Packages["ren/m1p"].P.Imports) {
-			t.Error("Mismatch between ")
+			t.Error("Mismatch between imports in m1p")
 		}
 	}
 }

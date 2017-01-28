@@ -11,7 +11,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"syscall"
 	"unicode"
 )
 
@@ -117,7 +116,7 @@ func ListPackages(fileRoot, importRoot string) (PackageTree, error) {
 		// and encountered an error.
 		_, err = os.Open(wp)
 		if err != nil {
-			if terr, ok := err.(*os.PathError); ok && terr.Err == syscall.Errno(syscall.EACCES) {
+			if os.IsPermission(err) {
 				return filepath.SkipDir
 			}
 			return err
@@ -223,7 +222,7 @@ func fillPackage(p *build.Package) error {
 	for _, file := range gofiles {
 		pf, err := parser.ParseFile(token.NewFileSet(), file, nil, parser.ImportsOnly|parser.ParseComments)
 		if err != nil {
-			if terr, ok := err.(*os.PathError); ok && terr.Err == syscall.Errno(syscall.EACCES) {
+			if os.IsPermission(err) {
 				continue
 			}
 			return err
