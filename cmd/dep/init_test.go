@@ -42,11 +42,11 @@ func TestInit(t *testing.T) {
 	test.NeedsExternalNetwork(t)
 	test.NeedsGit(t)
 
-	tg := test.Testgo(t)
-	defer tg.Cleanup()
+	h := test.NewHelper(t)
+	defer h.Cleanup()
 
-	tg.TempDir("src")
-	tg.Setenv("GOPATH", tg.Path("."))
+	h.TempDir("src")
+	h.Setenv("GOPATH", h.Path("."))
 
 	importPaths := map[string]string{
 		"github.com/pkg/errors":      "v0.8.0",                                   // semver
@@ -55,9 +55,9 @@ func TestInit(t *testing.T) {
 
 	// checkout the specified revisions
 	for ip, rev := range importPaths {
-		tg.RunGo("get", ip)
-		repoDir := tg.Path("src/" + ip)
-		tg.RunGit(repoDir, "checkout", rev)
+		h.RunGo("get", ip)
+		repoDir := h.Path("src/" + ip)
+		h.RunGit(repoDir, "checkout", rev)
 	}
 
 	// Build a fake consumer of these packages.
@@ -79,16 +79,16 @@ func main() {
 	logrus.Info(bar.Qux)
 }`
 
-	tg.TempFile("src/"+root+"/foo/thing.go", m)
+	h.TempFile("src/"+root+"/foo/thing.go", m)
 
 	m = `package bar
 
 const Qux = "yo yo!"
 `
-	tg.TempFile("src/"+root+"/foo/bar/bar.go", m)
+	h.TempFile("src/"+root+"/foo/bar/bar.go", m)
 
-	tg.Cd(tg.Path("src/" + root))
-	tg.Run("init")
+	h.Cd(h.Path("src/" + root))
+	h.Run("init")
 
 	expectedManifest := `{
     "dependencies": {
@@ -101,12 +101,12 @@ const Qux = "yo yo!"
     }
 }
 `
-	manifest := tg.ReadManifest()
+	manifest := h.ReadManifest()
 	if manifest != expectedManifest {
 		t.Fatalf("expected %s, got %s", expectedManifest, manifest)
 	}
 
-	sysCommit := tg.GetCommit("go.googlesource.com/sys")
+	sysCommit := h.GetCommit("go.googlesource.com/sys")
 	expectedLock := `{
     "memo": "668fe45796bc4e85a5a6c0a0f1eb6fab9e23588d1eb33f3a12b2ad5599a3575e",
     "projects": [
@@ -136,7 +136,7 @@ const Qux = "yo yo!"
     ]
 }
 `
-	lock := tg.ReadLock()
+	lock := h.ReadLock()
 	if lock != expectedLock {
 		t.Fatalf("expected %s, got %s", expectedLock, lock)
 	}
