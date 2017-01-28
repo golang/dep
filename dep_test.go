@@ -244,7 +244,7 @@ func (tg *testgoData) runGo(args ...string) {
 
 func needsExternalNetwork(t *testing.T) {
 	if testing.Short() {
-		t.Skipf("skipping test: no external network in -short mode")
+		t.Skip("skipping test: no external network in -short mode")
 	}
 }
 
