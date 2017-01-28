@@ -15,11 +15,11 @@ func TestEnsureOverrides(t *testing.T) {
 	test.NeedsExternalNetwork(t)
 	test.NeedsGit(t)
 
-	tg := test.Testgo(t)
-	defer tg.Cleanup()
+	h := test.NewHelper(t)
+	defer h.Cleanup()
 
-	tg.TempDir("src")
-	tg.Setenv("GOPATH", tg.Path("."))
+	h.TempDir("src")
+	h.Setenv("GOPATH", h.Path("."))
 
 	m := `package main
 
@@ -34,11 +34,11 @@ func main() {
 	logrus.Info("hello world")
 }`
 
-	tg.TempFile("src/thing/thing.go", m)
-	tg.Cd(tg.Path("src/thing"))
+	h.TempFile("src/thing/thing.go", m)
+	h.Cd(h.Path("src/thing"))
 
-	tg.Run("init")
-	tg.Run("ensure", "-override", "github.com/Sirupsen/logrus@0.11.0")
+	h.Run("init")
+	h.Run("ensure", "-override", "github.com/Sirupsen/logrus@0.11.0")
 
 	expectedManifest := `{
     "overrides": {
@@ -49,12 +49,12 @@ func main() {
 }
 `
 
-	manifest := tg.ReadManifest()
+	manifest := h.ReadManifest()
 	if manifest != expectedManifest {
 		t.Fatalf("expected %s, got %s", expectedManifest, manifest)
 	}
 
-	sysCommit := tg.GetCommit("go.googlesource.com/sys")
+	sysCommit := h.GetCommit("go.googlesource.com/sys")
 	expectedLock := `{
     "memo": "57d20ba0289c2df60025bf6127220a5403483251bd5e523a7f9ea17752bd5482",
     "projects": [
@@ -85,7 +85,7 @@ func main() {
     ]
 }
 `
-	lock := tg.ReadLock()
+	lock := h.ReadLock()
 	if lock != expectedLock {
 		t.Fatalf("expected %s, got %s", expectedLock, lock)
 	}
@@ -95,11 +95,11 @@ func TestEnsureEmptyRepoNoArgs(t *testing.T) {
 	test.NeedsExternalNetwork(t)
 	test.NeedsGit(t)
 
-	tg := test.Testgo(t)
-	defer tg.Cleanup()
+	h := test.NewHelper(t)
+	defer h.Cleanup()
 
-	tg.TempDir("src")
-	tg.Setenv("GOPATH", tg.Path("."))
+	h.TempDir("src")
+	h.Setenv("GOPATH", h.Path("."))
 
 	m := `package main
 
@@ -111,25 +111,25 @@ func main() {
 	logrus.Info("hello world")
 }`
 
-	tg.TempFile("src/thing/thing.go", m)
-	tg.Cd(tg.Path("src/thing"))
+	h.TempFile("src/thing/thing.go", m)
+	h.Cd(h.Path("src/thing"))
 
-	tg.Run("init")
-	tg.Run("ensure")
+	h.Run("init")
+	h.Run("ensure")
 
 	// make sure vendor exists
-	tg.MustExist(tg.Path("src/thing/vendor/github.com/Sirupsen/logrus"))
+	h.MustExist(h.Path("src/thing/vendor/github.com/Sirupsen/logrus"))
 
 	expectedManifest := `{}
 `
 
-	manifest := tg.ReadManifest()
+	manifest := h.ReadManifest()
 	if manifest != expectedManifest {
 		t.Fatalf("expected %s, got %s", expectedManifest, manifest)
 	}
 
-	sysCommit := tg.GetCommit("go.googlesource.com/sys")
-	logrusCommit := tg.GetCommit("github.com/Sirupsen/logrus")
+	sysCommit := h.GetCommit("go.googlesource.com/sys")
+	logrusCommit := h.GetCommit("github.com/Sirupsen/logrus")
 	expectedLock := `{
     "memo": "d4a7b45d366ece090464407f4038cdb62a031c29ef3254f197b8a3d5e6993cca",
     "projects": [
@@ -153,7 +153,7 @@ func main() {
 }
 `
 
-	lock := tg.ReadLock()
+	lock := h.ReadLock()
 	if lock != expectedLock {
 		t.Fatalf("expected %s, got %s", expectedLock, lock)
 	}

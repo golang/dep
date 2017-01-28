@@ -15,11 +15,11 @@ import (
 )
 
 func TestTxnWriterBadInputs(t *testing.T) {
-	tg := test.Testgo(t)
-	defer tg.Cleanup()
+	h := test.NewHelper(t)
+	defer h.Cleanup()
 
-	tg.TempDir("txnwriter")
-	td := tg.Path(".")
+	h.TempDir("txnwriter")
+	td := h.Path(".")
 
 	var sw SafeWriter
 
@@ -60,29 +60,29 @@ func TestTxnWriter(t *testing.T) {
 	test.NeedsExternalNetwork(t)
 	test.NeedsGit(t)
 
-	tg := test.Testgo(t)
-	tg.TempDir("")
-	defer tg.Cleanup()
+	h := test.NewHelper(t)
+	h.TempDir("")
+	defer h.Cleanup()
 
 	c := &Ctx{
-		GOPATH: tg.Path("."),
+		GOPATH: h.Path("."),
 	}
 	sm, err := c.SourceManager()
 	defer sm.Release()
-	tg.Must(err)
+	h.Must(err)
 
 	var sw SafeWriter
 	var mpath, lpath, vpath string
 	var count int
 	reset := func() {
 		pr := filepath.Join("src", "txnwriter"+strconv.Itoa(count))
-		tg.TempDir(pr)
+		h.TempDir(pr)
 
 		sw = SafeWriter{
-			Root:          tg.Path(pr),
+			Root:          h.Path(pr),
 			SourceManager: sm,
 		}
-		tg.Cd(sw.Root)
+		h.Cd(sw.Root)
 
 		mpath = filepath.Join(sw.Root, ManifestName)
 		lpath = filepath.Join(sw.Root, LockName)
@@ -117,51 +117,51 @@ func TestTxnWriter(t *testing.T) {
 `
 
 	m, err := readManifest(strings.NewReader(expectedManifest))
-	tg.Must(err)
+	h.Must(err)
 	l, err := readLock(strings.NewReader(expectedLock))
-	tg.Must(err)
+	h.Must(err)
 
 	// Just write manifest
 	sw.Manifest = m
-	tg.Must(sw.WriteAllSafe(false))
-	tg.MustExist(mpath)
-	tg.MustNotExist(lpath)
-	tg.MustNotExist(vpath)
+	h.Must(sw.WriteAllSafe(false))
+	h.MustExist(mpath)
+	h.MustNotExist(lpath)
+	h.MustNotExist(vpath)
 
-	diskm := tg.ReadManifest()
+	diskm := h.ReadManifest()
 	if diskm != expectedManifest {
 		t.Fatalf("expected %s, got %s", expectedManifest, diskm)
 	}
 
 	// Manifest and lock, but no vendor
 	sw.Lock = l
-	tg.Must(sw.WriteAllSafe(false))
-	tg.MustExist(mpath)
-	tg.MustExist(lpath)
-	tg.MustNotExist(vpath)
+	h.Must(sw.WriteAllSafe(false))
+	h.MustExist(mpath)
+	h.MustExist(lpath)
+	h.MustNotExist(vpath)
 
-	diskm = tg.ReadManifest()
+	diskm = h.ReadManifest()
 	if diskm != expectedManifest {
 		t.Fatalf("expected %s, got %s", expectedManifest, diskm)
 	}
 
-	diskl := tg.ReadLock()
+	diskl := h.ReadLock()
 	if diskl != expectedLock {
 		t.Fatalf("expected %s, got %s", expectedLock, diskl)
 	}
 
-	tg.Must(sw.WriteAllSafe(true))
-	tg.MustExist(mpath)
-	tg.MustExist(lpath)
-	tg.MustExist(vpath)
-	tg.MustExist(filepath.Join(vpath, "github.com", "sdboyer", "dep-test"))
+	h.Must(sw.WriteAllSafe(true))
+	h.MustExist(mpath)
+	h.MustExist(lpath)
+	h.MustExist(vpath)
+	h.MustExist(filepath.Join(vpath, "github.com", "sdboyer", "dep-test"))
 
-	diskm = tg.ReadManifest()
+	diskm = h.ReadManifest()
 	if diskm != expectedManifest {
 		t.Fatalf("expected %s, got %s", expectedManifest, diskm)
 	}
 
-	diskl = tg.ReadLock()
+	diskl = h.ReadLock()
 	if diskl != expectedLock {
 		t.Fatalf("expected %s, got %s", expectedLock, diskl)
 	}
@@ -171,37 +171,37 @@ func TestTxnWriter(t *testing.T) {
 	sw.Lock = l
 	sw.NewLock = l
 
-	tg.Must(sw.WriteAllSafe(false))
+	h.Must(sw.WriteAllSafe(false))
 	// locks are equivalent, so nothing gets written
-	tg.MustNotExist(mpath)
-	tg.MustNotExist(lpath)
-	tg.MustNotExist(vpath)
+	h.MustNotExist(mpath)
+	h.MustNotExist(lpath)
+	h.MustNotExist(vpath)
 
 	l2 := new(Lock)
 	*l2 = *l
 	// zero out the input hash to ensure non-equivalency
 	l2.Memo = []byte{}
 	sw.Lock = l2
-	tg.Must(sw.WriteAllSafe(true))
-	tg.MustNotExist(mpath)
-	tg.MustExist(lpath)
-	tg.MustExist(vpath)
-	tg.MustExist(filepath.Join(vpath, "github.com", "sdboyer", "dep-test"))
+	h.Must(sw.WriteAllSafe(true))
+	h.MustNotExist(mpath)
+	h.MustExist(lpath)
+	h.MustExist(vpath)
+	h.MustExist(filepath.Join(vpath, "github.com", "sdboyer", "dep-test"))
 
-	diskl = tg.ReadLock()
+	diskl = h.ReadLock()
 	if diskl != expectedLock {
 		t.Fatalf("expected %s, got %s", expectedLock, diskl)
 	}
 
 	// repeat op to ensure good behavior when vendor dir already exists
 	sw.Lock = nil
-	tg.Must(sw.WriteAllSafe(true))
-	tg.MustNotExist(mpath)
-	tg.MustExist(lpath)
-	tg.MustExist(vpath)
-	tg.MustExist(filepath.Join(vpath, "github.com", "sdboyer", "dep-test"))
+	h.Must(sw.WriteAllSafe(true))
+	h.MustNotExist(mpath)
+	h.MustExist(lpath)
+	h.MustExist(vpath)
+	h.MustExist(filepath.Join(vpath, "github.com", "sdboyer", "dep-test"))
 
-	diskl = tg.ReadLock()
+	diskl = h.ReadLock()
 	if diskl != expectedLock {
 		t.Fatalf("expected %s, got %s", expectedLock, diskl)
 	}
