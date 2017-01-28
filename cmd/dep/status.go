@@ -239,7 +239,7 @@ func runStatusAll(p *dep.Project, sm *gps.SourceMgr) error {
 	//
 	// It's possible for digests to not match, but still have a correct
 	// lock.
-	fmt.Fprintf(tw, "PROJECT\tMISSING PACKAGES\n")
+	fmt.Fprintln(tw, "PROJECT\tMISSING PACKAGES")
 
 	external := ptree.ExternalReach(true, false, nil).ListExternalImports()
 	roots := make(map[gps.ProjectRoot][]string)
