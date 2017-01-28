@@ -1,6 +1,6 @@
 # Dep
 
-Linux & OSX: [![Build Status](https://travis-ci.org/golang/dep.svg?branch=master)](https://travis-ci.org/golang/dep) | Windows: [![Build status](https://ci.appveyor.com/api/projects/status/4pu2xnnrikol2gsf/branch/master?svg=true)](https://ci.appveyor.com/project/golang/dep/branch/master)
+Linux: [![Build Status](https://travis-ci.org/golang/dep.svg?branch=master)](https://travis-ci.org/golang/dep) | Windows: [![Build status](https://ci.appveyor.com/api/projects/status/4pu2xnnrikol2gsf/branch/master?svg=true)](https://ci.appveyor.com/project/golang/dep/branch/master)
 
 Dep is a prototype dependency management tool.
 
@@ -25,7 +25,7 @@ Please see below for feedback and contribution guidelines.
 Get the tool via
 
 ```sh
-$ go get github.com/golang/dep/...
+$ go get -u github.com/golang/dep/...
 ```
 
 Typical usage on a new repo might be
