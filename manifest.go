@@ -5,7 +5,6 @@
 package dep
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -108,7 +107,7 @@ func toProps(n string, p possibleProps) (pp gps.ProjectProperties, err error) {
 	return pp, nil
 }
 
-func (m *Manifest) MarshalJSON() ([]byte, error) {
+func (m *Manifest) WriteTo(w io.Writer) (int64, error) {
 	raw := rawManifest{
 		Dependencies: make(map[string]possibleProps, len(m.Dependencies)),
 		Overrides:    make(map[string]possibleProps, len(m.Ovr)),
@@ -124,13 +123,13 @@ func (m *Manifest) MarshalJSON() ([]byte, error) {
 		raw.Overrides[string(n)] = toPossible(pp)
 	}
 
-	var buf bytes.Buffer
-	enc := json.NewEncoder(&buf)
+	enc := json.NewEncoder(w)
 	enc.SetIndent("", "    ")
 	enc.SetEscapeHTML(false)
-	err := enc.Encode(raw)
 
-	return buf.Bytes(), err
+	// Always return 0 as the number of bytes written
+	// because json.Encoder.Encode() does not return it.
+	return 0, enc.Encode(raw)
 }
 
 func toPossible(pp gps.ProjectProperties) possibleProps {

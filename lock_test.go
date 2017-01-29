@@ -5,6 +5,7 @@
 package dep
 
 import (
+	"bytes"
 	"encoding/hex"
 	"reflect"
 	"strings"
@@ -87,12 +88,13 @@ func TestWriteLock(t *testing.T) {
 		},
 	}
 
-	b, err := l.MarshalJSON()
-	if err != nil {
+	b := new(bytes.Buffer)
+
+	if _, err := l.WriteTo(b); err != nil {
 		t.Fatalf("Error while marshaling valid lock to JSON: %q", err)
 	}
 
-	if string(b) != lg {
-		t.Errorf("Valid lock did not marshal to JSON as expected:\n\t(GOT): %s\n\t(WNT): %s", string(b), lg)
+	if b.String() != lg {
+		t.Errorf("Valid lock did not marshal to JSON as expected:\n\t(GOT): %s\n\t(WNT): %s", b.String(), lg)
 	}
 }

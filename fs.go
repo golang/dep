@@ -5,7 +5,6 @@
 package dep
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -44,20 +43,18 @@ func IsDir(name string) (bool, error) {
 	return true, nil
 }
 
-func writeFile(path string, in json.Marshaler) error {
+func writeFile(path string, wt io.WriterTo) error {
 	f, err := os.Create(path)
 	if err != nil {
 		return err
 	}
 	defer f.Close()
 
-	b, err := in.MarshalJSON()
-	if err != nil {
+	if _, err := wt.WriteTo(f); err != nil {
 		return err
 	}
 
-	_, err = f.Write(b)
-	return err
+	return nil
 }
 
 // renameWithFallback attempts to rename a file or directory, but falls back to

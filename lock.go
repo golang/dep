@@ -85,7 +85,7 @@ func (l *Lock) Projects() []gps.LockedProject {
 	return l.P
 }
 
-func (l *Lock) MarshalJSON() ([]byte, error) {
+func (l *Lock) WriteTo(w io.Writer) (int64, error) {
 	raw := rawLock{
 		Memo: hex.EncodeToString(l.Memo),
 		P:    make([]lockedDep, len(l.P)),
@@ -125,13 +125,13 @@ func (l *Lock) MarshalJSON() ([]byte, error) {
 
 	// TODO sort output - #15
 
-	var buf bytes.Buffer
-	enc := json.NewEncoder(&buf)
+	enc := json.NewEncoder(w)
 	enc.SetIndent("", "    ")
 	enc.SetEscapeHTML(false)
-	err := enc.Encode(raw)
 
-	return buf.Bytes(), err
+	// Always return 0 as the number of bytes written
+	// because json.Encoder.Encode() does not return it.
+	return 0, enc.Encode(raw)
 }
 
 // LockFromInterface converts an arbitrary gps.Lock to dep's representation of a
