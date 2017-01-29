@@ -3,7 +3,6 @@ package gps
 import (
 	"fmt"
 	"os"
-	"path"
 	"path/filepath"
 )
 
@@ -46,12 +45,7 @@ func WriteDepTree(basedir string, l Lock, sm SourceManager, sv bool) error {
 
 	// TODO(sdboyer) parallelize
 	for _, p := range l.Projects() {
-		to := path.Join(basedir, string(p.Ident().ProjectRoot))
-
-		err := os.MkdirAll(to, 0777)
-		if err != nil {
-			return err
-		}
+		to := filepath.FromSlash(filepath.Join(basedir, string(p.Ident().ProjectRoot)))
 
 		err = sm.ExportProject(p.Ident(), p.Version(), to)
 		if err != nil {
