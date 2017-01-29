@@ -878,6 +878,51 @@ func TestListPackages(t *testing.T) {
 				},
 			},
 		},
+		// has symbolic link
+		"follow symlink": {
+			fileRoot:   j("gosimple"),
+			importRoot: "gosimple",
+			out: PackageTree{
+				ImportRoot: "gosimple",
+				Packages:   map[string]PackageOrErr{},
+			},
+		},
+		"follow symlinks inside of package": {
+			fileRoot:   j("symlinks"),
+			importRoot: "symlinks",
+			out: PackageTree{
+				ImportRoot: "symlinks",
+				Packages: map[string]PackageOrErr{
+					"symlinks/gopkg": {
+						P: Package{
+							ImportPath:  "symlinks/gopkg",
+							CommentPath: "",
+							Name:        "gopkg",
+							Imports:     []string{},
+						},
+					},
+					"symlinks/pkg": {
+						P: Package{
+							ImportPath:  "symlinks/pkg",
+							CommentPath: "",
+							Name:        "gopkg",
+							Imports:     []string{},
+						},
+					},
+					"symlinks": {
+						P: Package{
+							ImportPath:  "symlinks",
+							CommentPath: "",
+							Name:        "symlinks",
+							Imports: []string{
+								"github.com/sdboyer/gps",
+								"symlinks/gopkg",
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 
 	for name, fix := range table {

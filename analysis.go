@@ -85,16 +85,37 @@ func ListPackages(fileRoot, importRoot string) (PackageTree, error) {
 			return err
 		}
 
-		// Rewrite FileInfo if file is symlink
-		if fi.Mode()&os.ModeSymlink != 0 {
-			dst, err := os.Readlink(filepath.Join(fileRoot, fi.Name()))
+		// Read the destination of named symbolic link
+		// rules:
+		// 	1. All absolute symlinks are disqualified; if one is encountered, it should be skipped.
+		// 	2. Relative symlinks pointing to somewhere outside of the root (via ..) should also be skipped.
+		if !fi.IsDir() && fi.Mode()&os.ModeSymlink != 0 {
+			n := fi.Name()
+			if strings.HasPrefix(n, string(filepath.Separator)) {
+				return nil
+			}
+			dst, err := os.Readlink(wp)
 			if err != nil {
 				return err
 			}
-			fi, err = os.Stat(filepath.Join(fileRoot, dst))
+			// 1.
+			if strings.HasPrefix(dst, string(filepath.Separator)) {
+				return nil
+			}
+			d, _ := filepath.Split(wp)
+			rp, err := filepath.Abs(filepath.Join(d, dst))
 			if err != nil {
 				return err
 			}
+			// 2.
+			if !strings.HasPrefix(rp, fileRoot) {
+				return nil
+			}
+			rfi, err := os.Lstat(rp)
+			if err != nil {
+				return nil
+			}
+			fi = rfi
 		}
 
 		if !fi.IsDir() {
@@ -120,6 +141,9 @@ func ListPackages(fileRoot, importRoot string) (PackageTree, error) {
 		// paths are normalized to Unix separators, as import paths are expected
 		// to be.
 		ip := filepath.ToSlash(filepath.Join(importRoot, strings.TrimPrefix(wp, fileRoot)))
+		if ip == "" {
+			return filepath.SkipDir
+		}
 
 		// Find all the imports, across all os/arch combos
 		//p, err := fullPackageInDir(wp)
