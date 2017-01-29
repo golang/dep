@@ -1,6 +1,11 @@
 package symlinks
 
 import (
-	_ "github.com/sdboyer/gps"
-	_ "symlinks/gopkg"
+	"github.com/sdboyer/gps"
+	"symlinks/gopkg"
+)
+
+var (
+	_ = gps.Solve
+	_ = gopkg.Foo
 )
