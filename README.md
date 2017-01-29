@@ -4,6 +4,12 @@ Linux & OSX: [![Build Status](https://travis-ci.com/golang/hoard.svg?token=PbNwH
 
 Hoard is a prototype dependency management tool.
 
+### Dep is NOT an official tool. It is not (yet) blessed by the Go team.
+
+It IS, however, the consensus effort of most of the Go community, and being integrated into the `go` toolchain is the goal.
+
+We're working on a roadmap with more details.
+
 ## Current status
 
 **Pre-alpha**.
