@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -878,16 +879,42 @@ func TestListPackages(t *testing.T) {
 				},
 			},
 		},
-		// has symbolic link
-		"follow symlink": {
+		"invalid buildtag like comments should be ignored": {
+			fileRoot:   j("buildtag"),
+			importRoot: "buildtag",
+			out: PackageTree{
+				ImportRoot: "buildtag",
+				Packages: map[string]PackageOrErr{
+					"buildtag": {
+						P: Package{
+							ImportPath:  "buildtag",
+							CommentPath: "",
+							Name:        "buildtag",
+							Imports: []string{
+								"sort",
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	if runtime.GOOS != "windows" {
+		type t struct {
+			fileRoot   string
+			importRoot string
+			out        PackageTree
+			err        error
+		}
+		table["follow_symlink"] = t{
 			fileRoot:   j("gosimple"),
 			importRoot: "gosimple",
 			out: PackageTree{
 				ImportRoot: "gosimple",
 				Packages:   map[string]PackageOrErr{},
 			},
-		},
-		"follow symlinks inside of package": {
+		}
+		table["follow symlinks inside of package"] = t{
 			fileRoot:   j("symlinks"),
 			importRoot: "symlinks",
 			out: PackageTree{
@@ -922,26 +949,7 @@ func TestListPackages(t *testing.T) {
 					},
 				},
 			},
-		},
-		"invalid buildtag like comments should be ignored": {
-			fileRoot:   j("buildtag"),
-			importRoot: "buildtag",
-			out: PackageTree{
-				ImportRoot: "buildtag",
-				Packages: map[string]PackageOrErr{
-					"buildtag": {
-						P: Package{
-							ImportPath:  "buildtag",
-							CommentPath: "",
-							Name:        "buildtag",
-							Imports: []string{
-								"sort",
-							},
-						},
-					},
-				},
-			},
-		},
+		}
 	}
 
 	for name, fix := range table {
