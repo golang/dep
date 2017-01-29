@@ -917,6 +917,12 @@ func TestListPackages(t *testing.T) {
 							Imports: []string{
 								"github.com/sdboyer/gps",
 								"symlinks/gopkg",
+							},
+						},
+					},
+				},
+			},
+		},
 		"invalid buildtag like comments should be ignored": {
 			fileRoot:   j("buildtag"),
 			importRoot: "buildtag",
