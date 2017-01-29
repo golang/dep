@@ -92,26 +92,16 @@ func ListPackages(fileRoot, importRoot string) (PackageTree, error) {
 		if !fi.IsDir() && fi.Mode()&os.ModeSymlink != 0 {
 			n := fi.Name()
 			if strings.HasPrefix(n, string(filepath.Separator)) {
-				return nil
+				return err
 			}
-			dst, err := os.Readlink(wp)
+			dst, err := filepath.EvalSymlinks(wp)
 			if err != nil {
 				return err
 			}
-			// 1.
-			if strings.HasPrefix(dst, string(filepath.Separator)) {
+			if !strings.HasPrefix(dst, fileRoot) {
 				return nil
 			}
-			d, _ := filepath.Split(wp)
-			rp, err := filepath.Abs(filepath.Join(d, dst))
-			if err != nil {
-				return err
-			}
-			// 2.
-			if !strings.HasPrefix(rp, fileRoot) {
-				return nil
-			}
-			rfi, err := os.Lstat(rp)
+			rfi, err := os.Lstat(dst)
 			if err != nil {
 				return nil
 			}
