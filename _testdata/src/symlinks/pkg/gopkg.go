@@ -1,5 +1,5 @@
 package gopkg
 
 const (
-	Foo = "foo"
+	foo = "foo"
 )
