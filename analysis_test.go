@@ -5,9 +5,11 @@ import (
 	"go/build"
 	"go/scanner"
 	"go/token"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -952,6 +954,96 @@ func TestListPackages(t *testing.T) {
 					}
 				}
 			}
+		}
+	}
+}
+
+// Test that ListPackages skips directories for which it lacks permissions to
+// enter and files it lacks permissions to read.
+func TestListPackagesNoPerms(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		// TODO This test doesn't work on windows because I wasn't able to easily
+		// figure out how to chmod a dir in a way that made it untraversable.
+		//
+		// It's not a big deal, though, because the os.IsPermission() call we
+		// use in the real code is effectively what's being tested here, and
+		// that's designed to be cross-platform. So, if the unix tests pass, we
+		// have every reason to believe windows tests would to, if the situation
+		// arises.
+		t.Skip()
+	}
+	tmp, err := ioutil.TempDir("", "listpkgsnp")
+	if err != nil {
+		t.Errorf("Failed to create temp dir: %s", err)
+		t.FailNow()
+	}
+	defer os.RemoveAll(tmp)
+
+	srcdir := filepath.Join(getwd(t), "_testdata", "src", "ren")
+	workdir := filepath.Join(tmp, "ren")
+	copyDir(srcdir, workdir)
+
+	// chmod the simple dir and m1p/b.go file so they can't be read
+	err = os.Chmod(filepath.Join(workdir, "simple"), 0)
+	if err != nil {
+		t.Error("Error while chmodding simple dir", err)
+		t.FailNow()
+	}
+	os.Chmod(filepath.Join(workdir, "m1p", "b.go"), 0)
+	if err != nil {
+		t.Error("Error while chmodding b.go file", err)
+		t.FailNow()
+	}
+
+	want := PackageTree{
+		ImportRoot: "ren",
+		Packages: map[string]PackageOrErr{
+			"ren": {
+				Err: &build.NoGoError{
+					Dir: workdir,
+				},
+			},
+			"ren/m1p": {
+				P: Package{
+					ImportPath:  "ren/m1p",
+					CommentPath: "",
+					Name:        "m1p",
+					Imports: []string{
+						"github.com/sdboyer/gps",
+						"sort",
+					},
+				},
+			},
+		},
+	}
+
+	got, err := ListPackages(workdir, "ren")
+
+	if err != nil {
+		t.Errorf("Unexpected err from ListPackages: %s", err)
+		t.FailNow()
+	}
+	if want.ImportRoot != got.ImportRoot {
+		t.Errorf("Expected ImportRoot %s, got %s", want.ImportRoot, got.ImportRoot)
+		t.FailNow()
+	}
+
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("Did not get expected PackageOrErrs:\n\t(GOT): %#v\n\t(WNT): %#v", got, want)
+		if len(got.Packages) != 2 {
+			if len(got.Packages) == 3 {
+				t.Error("Wrong number of PackageOrErrs - did 'simple' subpackage make it into results somehow?")
+			} else {
+				t.Error("Wrong number of PackageOrErrs")
+			}
+		}
+
+		if got.Packages["ren"].Err == nil {
+			t.Error("Should have gotten error on empty root directory")
+		}
+
+		if !reflect.DeepEqual(got.Packages["ren/m1p"].P.Imports, want.Packages["ren/m1p"].P.Imports) {
+			t.Error("Mismatch between imports in m1p")
 		}
 	}
 }

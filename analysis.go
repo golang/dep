@@ -80,6 +80,7 @@ func ListPackages(fileRoot, importRoot string) (PackageTree, error) {
 	if err != nil {
 		return PackageTree{}, err
 	}
+
 	err = filepath.Walk(fileRoot, func(wp string, fi os.FileInfo, err error) error {
 		if err != nil && err != filepath.SkipDir {
 			return err
@@ -101,6 +102,24 @@ func ListPackages(fileRoot, importRoot string) (PackageTree, error) {
 		// really weird if we don't.
 		if strings.HasPrefix(fi.Name(), ".") {
 			return filepath.SkipDir
+		}
+
+		// The entry error is nil when visiting a directory that itself is
+		// untraversable, as it's still governed by the parent directory's
+		// perms. We have to check readability of the dir here, because
+		// otherwise we'll have an empty package entry when we fail to read any
+		// of the dir's contents.
+		//
+		// If we didn't check here, then the next time this closure is called it
+		// would have an err with the same path as is called this time, as only
+		// then will filepath.Walk have attempted to descend into the directory
+		// and encountered an error.
+		_, err = os.Open(wp)
+		if err != nil {
+			if os.IsPermission(err) {
+				return filepath.SkipDir
+			}
+			return err
 		}
 
 		// Compute the import path. Run the result through ToSlash(), so that windows
@@ -203,6 +222,9 @@ func fillPackage(p *build.Package) error {
 	for _, file := range gofiles {
 		pf, err := parser.ParseFile(token.NewFileSet(), file, nil, parser.ImportsOnly|parser.ParseComments)
 		if err != nil {
+			if os.IsPermission(err) {
+				continue
+			}
 			return err
 		}
 		testFile := strings.HasSuffix(file, "_test.go")
