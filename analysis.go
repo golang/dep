@@ -131,9 +131,6 @@ func ListPackages(fileRoot, importRoot string) (PackageTree, error) {
 		// paths are normalized to Unix separators, as import paths are expected
 		// to be.
 		ip := filepath.ToSlash(filepath.Join(importRoot, strings.TrimPrefix(wp, fileRoot)))
-		if ip == "" {
-			return filepath.SkipDir
-		}
 
 		// Find all the imports, across all os/arch combos
 		//p, err := fullPackageInDir(wp)
