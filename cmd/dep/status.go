@@ -126,7 +126,9 @@ type jsonOutput struct {
 	missing []*MissingStatus
 }
 
-func (out *jsonOutput) BasicHeader() {}
+func (out *jsonOutput) BasicHeader() {
+	out.basic = []*BasicStatus{}
+}
 
 func (out *jsonOutput) BasicFooter() {
 	json.NewEncoder(out.w).Encode(out.basic)
@@ -137,6 +139,7 @@ func (out *jsonOutput) BasicLine(bs *BasicStatus) {
 }
 
 func (out *jsonOutput) MissingHeader() {
+	out.missing = []*MissingStatus{}
 }
 
 func (out *jsonOutput) MissingLine(ms *MissingStatus) {
