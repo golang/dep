@@ -362,7 +362,7 @@ type PackageOrErr struct {
 // See PackageTree.ExternalReach() for more information.
 type ReachMap map[string][]string
 
-// ExternalReach looks through a PackageTree and computes the list of external
+// ToReachMaps looks through a PackageTree and computes the list of external
 // import statements (that is, import statements pointing to packages that are
 // not logical children of PackageTree.ImportRoot) that are transitively
 // imported by the internal packages in the tree.
@@ -434,7 +434,7 @@ type ReachMap map[string][]string
 //
 // When backprop is false, errors in internal packages are functionally
 // identical to ignoring that package.
-func (t PackageTree) ExternalReach(main, tests bool, ignore map[string]bool) (ex ReachMap, in ReachMap) {
+func (t PackageTree) ToReachMaps(main, tests bool, ignore map[string]bool) (ex ReachMap, in ReachMap) {
 	if ignore == nil {
 		ignore = make(map[string]bool)
 	}

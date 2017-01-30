@@ -14,9 +14,9 @@ import (
 	"testing"
 )
 
-// PackageTree.ExternalReach() uses an easily separable algorithm, wmToReach(),
-// to turn a discovered set of packages and their imports into a proper external
-// reach map.
+// PackageTree.ToReachMaps() uses an easily separable algorithm, wmToReach(),
+// to turn a discovered set of packages and their imports into a proper pair of
+// internal and external reach maps.
 //
 // That algorithm is purely symbolic (no filesystem interaction), and thus is
 // easy to test. This is that test.
@@ -1171,7 +1171,7 @@ func TestListExternalImports(t *testing.T) {
 	var main, tests bool
 
 	validate := func() {
-		exmap, _ := vptree.ExternalReach(main, tests, ignore)
+		exmap, _ := vptree.ToReachMaps(main, tests, ignore)
 		result := exmap.ListExternalImports()
 		if !reflect.DeepEqual(expect, result) {
 			t.Errorf("Wrong imports in %q case:\n\t(GOT): %s\n\t(WNT): %s", name, result, expect)
@@ -1311,7 +1311,7 @@ func TestListExternalImports(t *testing.T) {
 		t.Fatalf("listPackages failed on disallow test case: %s", err)
 	}
 
-	exmap, _ := ptree.ExternalReach(false, false, nil)
+	exmap, _ := ptree.ToReachMaps(false, false, nil)
 	result := exmap.ListExternalImports()
 	expect = []string{"github.com/sdboyer/gps", "hash", "sort"}
 	if !reflect.DeepEqual(expect, result) {
@@ -1319,7 +1319,7 @@ func TestListExternalImports(t *testing.T) {
 	}
 }
 
-func TestExternalReach(t *testing.T) {
+func TestToReachMaps(t *testing.T) {
 	// There's enough in the 'varied' test case to test most of what matters
 	vptree, err := ListPackages(filepath.Join(getwd(t), "_testdata", "src", "github.com", "example", "varied"), "github.com/example/varied")
 	if err != nil {
@@ -1333,7 +1333,7 @@ func TestExternalReach(t *testing.T) {
 	var ignore map[string]bool
 
 	validate := func() {
-		result, _ := vptree.ExternalReach(main, tests, ignore)
+		result, _ := vptree.ToReachMaps(main, tests, ignore)
 		if !reflect.DeepEqual(expect, result) {
 			seen := make(map[string]bool)
 			for ip, epkgs := range expect {
@@ -1518,13 +1518,13 @@ func TestExternalReach(t *testing.T) {
 }
 
 // Verify that we handle import cycles correctly - drop em all
-func TestExternalReachCycle(t *testing.T) {
+func TestToReachMapsCycle(t *testing.T) {
 	ptree, err := ListPackages(filepath.Join(getwd(t), "_testdata", "src", "cycle"), "cycle")
 	if err != nil {
 		t.Fatalf("ListPackages failed on cycle test case: %s", err)
 	}
 
-	rm, _ := ptree.ExternalReach(true, true, nil)
+	rm, _ := ptree.ToReachMaps(true, true, nil)
 
 	// FIXME TEMPORARILY COMMENTED UNTIL WE CREATE A BETTER LISTPACKAGES MODEL -
 	//if len(rm) > 0 {

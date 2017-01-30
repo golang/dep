@@ -503,7 +503,7 @@ func (s *solver) getImportsAndConstraintsOf(a atomWithPackages) ([]string, []com
 		return nil, nil, err
 	}
 
-	allex, allin := ptree.ExternalReach(false, false, s.rd.ig)
+	allex, allin := ptree.ToReachMaps(false, false, s.rd.ig)
 	// Use maps to dedupe the unique internal and external packages.
 	exmap, inmap := make(map[string]struct{}), make(map[string]struct{})
 
