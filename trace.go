@@ -111,7 +111,7 @@ func (s *solver) traceSelectRoot(ptree PackageTree, cdeps []completeDep) {
 
 	// This duplicates work a bit, but we're in trace mode and it's only once,
 	// so who cares
-	rm := ptree.ExternalReach(true, true, s.rd.ig)
+	rm, _ := ptree.ExternalReach(true, true, s.rd.ig)
 
 	s.tl.Printf("Root project is %q", s.rd.rpt.ImportRoot)
 

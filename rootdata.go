@@ -45,7 +45,8 @@ type rootdata struct {
 // rootImportList returns a list of the unique imports from the root data.
 // Ignores and requires are taken into consideration, and stdlib is excluded.
 func (rd rootdata) externalImportList() []string {
-	all := rd.rpt.ExternalReach(true, true, rd.ig).ListExternalImports()
+	ex, _ := rd.rpt.ExternalReach(true, true, rd.ig)
+	all := ex.ListExternalImports()
 	reach := make([]string, 0, len(all))
 	for _, r := range all {
 		if !isStdLib(r) {

@@ -242,7 +242,7 @@ var bimodalFixtures = map[string]bimodalFixture{
 			),
 		},
 		r: mksolution(
-			"a 1.0.0",
+			mklp("a 1.0.0", ".", "bar"),
 			"b 1.0.0",
 		),
 	},
@@ -267,7 +267,7 @@ var bimodalFixtures = map[string]bimodalFixture{
 			),
 		},
 		r: mksolution(
-			"a 1.0.0",
+			mklp("a 1.0.0", ".", "bar"),
 			"b 1.0.0",
 		),
 	},
@@ -301,6 +301,25 @@ var bimodalFixtures = map[string]bimodalFixture{
 		r: mksolution(
 			mklp("a 1.0.0", ".", "foo"),
 			"b 1.0.0",
+		),
+	},
+	"project cycle not involving root with internal paths": {
+		ds: []depspec{
+			dsp(mkDepspec("root 0.0.0", "a ~1.0.0"),
+				pkg("root", "a"),
+			),
+			dsp(mkDepspec("a 1.0.0"),
+				pkg("a", "b/baz"),
+				pkg("a/foo"),
+			),
+			dsp(mkDepspec("b 1.0.0"),
+				pkg("b", "a/foo"),
+				pkg("b/baz", "b"),
+			),
+		},
+		r: mksolution(
+			mklp("a 1.0.0", ".", "foo"),
+			mklp("b 1.0.0", ".", "baz"),
 		),
 	},
 	// Ensure that if a constraint is expressed, but no actual import exists,
