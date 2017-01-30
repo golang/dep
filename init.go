@@ -195,7 +195,7 @@ func isStdLib(path string) bool {
 // TODO solve failures can be really creative - we need to be similarly creative
 // in handling them and informing the user appropriately
 func handleAllTheFailuresOfTheWorld(err error) {
-	fmt.Printf("ouchie, solve error: %s", err)
+	fmt.Printf("solve error: %s", err)
 }
 
 func writeFile(path string, in json.Marshaler) error {
