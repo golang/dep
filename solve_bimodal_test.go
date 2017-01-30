@@ -1149,7 +1149,7 @@ func computeBimodalExternalMap(ds []depspec) map[pident]map[string][]string {
 			workmap[pkg.path] = w
 		}
 
-		drm := wmToReach(workmap)
+		drm, _ := wmToReach(workmap)
 		rm[pident{n: d.n, v: d.v}] = drm
 	}
 
