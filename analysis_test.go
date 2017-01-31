@@ -243,6 +243,109 @@ func TestWorkmapToReach(t *testing.T) {
 				"A/quux": nil,
 			},
 		},
+		// The following tests are mostly about regressions and weeding out
+		// weird assumptions
+		"internal diamond": {
+			workmap: map[string]wm{
+				"A": {
+					ex: map[string]bool{
+						"B/foo": true,
+					},
+					in: map[string]bool{
+						"A/foo": true,
+						"A/bar": true,
+					},
+				},
+				"A/foo": {
+					ex: map[string]bool{
+						"C": true,
+					},
+					in: map[string]bool{
+						"A/quux": true,
+					},
+				},
+				"A/bar": {
+					ex: map[string]bool{
+						"D": true,
+					},
+					in: map[string]bool{
+						"A/quux": true,
+					},
+				},
+				"A/quux": {
+					ex: map[string]bool{
+						"B/baz": true,
+					},
+					in: empty(),
+				},
+			},
+			exrm: ReachMap{
+				"A": {
+					"B/baz",
+					"B/foo",
+					"C",
+					"D",
+				},
+				"A/foo": {
+					"B/baz",
+					"C",
+				},
+				"A/bar": {
+					"B/baz",
+					"D",
+				},
+				"A/quux": {
+					"B/baz",
+				},
+			},
+			inrm: ReachMap{
+				"A": {
+					"A/bar",
+					"A/foo",
+					"A/quux",
+				},
+				"A/foo": {
+					"A/quux",
+				},
+				"A/bar": {
+					"A/quux",
+				},
+				"A/quux": nil,
+			},
+		},
+		"rootmost gets imported": {
+			workmap: map[string]wm{
+				"A": {
+					ex: map[string]bool{
+						"B": true,
+					},
+					in: empty(),
+				},
+				"A/foo": {
+					ex: map[string]bool{
+						"C": true,
+					},
+					in: map[string]bool{
+						"A": true,
+					},
+				},
+			},
+			exrm: ReachMap{
+				"A": {
+					"B",
+				},
+				"A/foo": {
+					"B",
+					"C",
+				},
+			},
+			inrm: ReachMap{
+				"A": nil,
+				"A/foo": {
+					"A",
+				},
+			},
+		},
 	}
 
 	for name, fix := range table {
