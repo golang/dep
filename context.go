@@ -52,7 +52,8 @@ func (c *Ctx) SourceManager() (*gps.SourceMgr, error) {
 // name ManifestName (manifest.json, by default) is located.
 //
 // The Project contains the parsed manifest as well as a parsed lock file, if
-// present.  The import path is calculated as everything past Ctx.GOPATH/src.
+// present.  The import path is calculated as the remaining path segment
+// below Ctx.GOPATH/src.
 func (c *Ctx) LoadProject(path string) (*Project, error) {
 	var err error
 	p := new(Project)
