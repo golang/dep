@@ -45,11 +45,12 @@ func (c *Ctx) SourceManager() (*gps.SourceMgr, error) {
 	return gps.NewSourceManager(analyzer{}, filepath.Join(c.GOPATH, "pkg", "dep"))
 }
 
-// LoadProject searches for a project root from the provided path, then loads
-// the manifest and lock (if any) it finds there.
-//
-// If the provided path is empty, it will search from the path indicated by
-// os.Getwd().
+// LoadProject takes a path and searches up the directory tree for
+// a project root.  If an absolute path is given, the search begins in that
+// directory.  If an empty string is given, the search begins in the current
+// working directory.  The search stops when a file with the name ManifestName
+// is located, at which point the manifest and lock file, if present, are
+// parsed at returned as a Project.
 func (c *Ctx) LoadProject(path string) (*Project, error) {
 	var err error
 	p := new(Project)
@@ -88,7 +89,7 @@ func (c *Ctx) LoadProject(path string) (*Project, error) {
 		return nil, fmt.Errorf("error while parsing %s: %s", mp, err)
 	}
 
-	lp := filepath.Join(path, LockName)
+	lp := filepath.Join(p.AbsRoot, LockName)
 	lf, err := os.Open(lp)
 	if err != nil {
 		if os.IsNotExist(err) {

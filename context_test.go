@@ -5,6 +5,7 @@
 package dep
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -145,5 +146,179 @@ func TestVersionInWorkspace(t *testing.T) {
 		if v != info.rev {
 			t.Fatalf("expected %q, got %q", v.String(), info.rev.String())
 		}
+	}
+}
+
+func TestLoadProject(t *testing.T) {
+	tg := test.Testgo(t)
+	defer tg.Cleanup()
+
+	tg.TempDir("src")
+	tg.TempDir("src/test1")
+	tg.TempDir("src/test1/sub")
+	tg.TempFile("src/test1/manifest.json", `{"dependencies":{}}`)
+	tg.TempFile("src/test1/lock.json", `{"memo":"cdafe8641b28cd16fe025df278b0a49b9416859345d8b6ba0ace0272b74925ee","projects":[]}`)
+	tg.TempDir("src/test2")
+	tg.TempDir("src/test2/sub")
+	tg.TempFile("src/test2/manifest.json", `{"dependencies":{}}`)
+	tg.Setenv("GOPATH", tg.Path("."))
+
+	const ( //Path Types
+		full = iota
+		relative
+		empty
+	)
+
+	var cases = []struct {
+		lock     bool
+		pathType int
+		dirs     []string
+	}{
+		{true, full, []string{"src", "test1"}},
+		{true, full, []string{"src", "test1", "sub"}},
+		{false, full, []string{"src", "test2"}},
+		{false, full, []string{"src", "test2", "sub"}},
+		// {true, relative, []string{"src", "test1"}},
+		// {true, relative, []string{"src", "test1", "sub"}},
+		// {false, relative, []string{"src", "test2"}},
+		// {false, relative, []string{"src", "test2", "sub"}},
+		{true, empty, []string{"src", "test1"}},
+		{true, empty, []string{"src", "test1", "sub"}},
+		{false, empty, []string{"src", "test2"}},
+		{false, empty, []string{"src", "test2", "sub"}},
+	}
+
+	for _, _case := range cases {
+		ctx := &Ctx{GOPATH: tg.Path(".")}
+
+		var proj *Project
+		var err error
+		var start, path string
+
+		switch _case.pathType {
+		case full:
+			start = "."
+			path = filepath.Join(ctx.GOPATH, filepath.Join(_case.dirs...))
+		case relative:
+			start = "src"
+			path = filepath.Join(_case.dirs[1:]...)
+		case empty:
+			start = filepath.Join(_case.dirs...)
+			path = ""
+		}
+		tg.Cd(tg.Path(start))
+		proj, err = ctx.LoadProject(path)
+
+		if err != nil {
+			t.Fatalf("error in LoadProject: %q -> %s, from: %s", err.Error(), path, start)
+		}
+		if proj.Manifest == nil {
+			t.Fatalf("Manifest file didn't load: %s, from: %s", path, start)
+		}
+		if _case.lock && proj.Lock == nil {
+			t.Fatalf("Lock file didn't load -> %s, from: %s", path, start)
+		} else if !_case.lock && proj.Lock != nil {
+			t.Fatalf("Non-existent Lock file loaded -> %s, from: %s", path, start)
+		}
+	}
+}
+
+func TestLoadProjectNotFoundErrors(t *testing.T) {
+	tg := test.Testgo(t)
+	defer tg.Cleanup()
+
+	tg.TempDir("src")
+	tg.TempDir("src/test1")
+	tg.TempDir("src/test1/sub")
+	tg.Setenv("GOPATH", tg.Path("."))
+
+	var cases = []struct {
+		fromPath bool
+		dirs     []string
+	}{
+		{true, []string{"src", "test1"}},
+		{true, []string{"src", "test1", "sub"}},
+		{false, []string{"src", "test1"}},
+		{false, []string{"src", "test1", "sub"}},
+	}
+
+	for _, _case := range cases {
+		ctx := &Ctx{GOPATH: tg.Path(".")}
+		local := filepath.Join(_case.dirs...)
+		path := filepath.Join(ctx.GOPATH, local)
+
+		var err error
+		if _case.fromPath {
+			tg.Cd(tg.Path("."))
+			_, err = ctx.LoadProject(path)
+		} else {
+			tg.Cd(tg.Path(local))
+			_, err = ctx.LoadProject("")
+		}
+		if err == nil {
+			t.Fatalf("should have thrown 'No Manifest Found' error -> %s", local)
+		}
+	}
+}
+
+func TestLoadProjectManifestParseError(t *testing.T) {
+	tg := test.Testgo(t)
+	defer tg.Cleanup()
+
+	tg.TempDir("src")
+	tg.TempDir("src/test1")
+	tg.TempFile("src/test1/manifest.json", ` "dependencies":{} `)
+	tg.TempFile("src/test1/lock.json", `{"memo":"cdafe8641b28cd16fe025df278b0a49b9416859345d8b6ba0ace0272b74925ee","projects":[]}`)
+	tg.Setenv("GOPATH", tg.Path("."))
+
+	ctx := &Ctx{GOPATH: tg.Path(".")}
+	path := filepath.Join("src", "test1")
+	tg.Cd(tg.Path(path))
+
+	_, err := ctx.LoadProject("")
+	if err == nil {
+		t.Fatalf("should have thrown 'Manifest Syntax' error")
+	}
+}
+
+func TestLoadProjectLockParseError(t *testing.T) {
+	tg := test.Testgo(t)
+	defer tg.Cleanup()
+
+	tg.TempDir("src")
+	tg.TempDir("src/test1")
+	tg.TempFile("src/test1/manifest.json", `{"dependencies":{}}`)
+	tg.TempFile("src/test1/lock.json", ` "memo":"cdafe8641b28cd16fe025df278b0a49b9416859345d8b6ba0ace0272b74925ee","projects":[] `)
+	tg.Setenv("GOPATH", tg.Path("."))
+
+	ctx := &Ctx{GOPATH: tg.Path(".")}
+	path := filepath.Join("src", "test1")
+	tg.Cd(tg.Path(path))
+
+	_, err := ctx.LoadProject("")
+	if err == nil {
+		t.Fatalf("should have thrown 'Lock Syntax' error")
+	}
+}
+
+func TestLoadProjectNoSrcDir(t *testing.T) {
+	tg := test.Testgo(t)
+	defer tg.Cleanup()
+
+	tg.TempDir("test1")
+	tg.TempFile("test1/manifest.json", `{"dependencies":{}}`)
+	tg.TempFile("test1/lock.json", `{"memo":"cdafe8641b28cd16fe025df278b0a49b9416859345d8b6ba0ace0272b74925ee","projects":[]}`)
+	tg.Setenv("GOPATH", tg.Path("."))
+
+	ctx := &Ctx{GOPATH: tg.Path(".")}
+	path := filepath.Join("test1")
+	tg.Cd(tg.Path(path))
+
+	f, _ := os.OpenFile(filepath.Join(ctx.GOPATH, "src", "test1", "lock.json"), os.O_WRONLY, os.ModePerm)
+	defer f.Close()
+
+	_, err := ctx.LoadProject("")
+	if err == nil {
+		t.Fatalf("should have thrown 'Split Absolute Root' error (no 'src' dir present)")
 	}
 }
