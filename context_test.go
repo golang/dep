@@ -147,3 +147,94 @@ func TestVersionInWorkspace(t *testing.T) {
 		}
 	}
 }
+
+func TestLoadProjectWD(t *testing.T) {
+	tg := test.Testgo(t)
+	defer tg.Cleanup()
+
+	tg.TempFile("src/prj/manifest.json", "{}")
+	tg.Cd(tg.Path("src/prj"))
+	depCtx := &Ctx{GOPATH: tg.Path(".")}
+	tg.Setenv("GOPATH", depCtx.GOPATH)
+
+	p1, err := depCtx.LoadProject("")
+	if err != nil {
+		t.Fatal("error should have been nil. Got:", err)
+	}
+
+	if p1 == nil {
+		t.Fatal("project should not have been nil")
+	}
+
+	tg.TempFile("src/prj/lock.json", "{}")
+
+	p2, err := depCtx.LoadProject("")
+	if err != nil {
+		t.Fatal("error should have been nil. Got:", err)
+	}
+
+	if p2 == nil {
+		t.Fatal("project should not have been nil")
+	}
+
+}
+
+func TestLoadProjectPath(t *testing.T) {
+	tg := test.Testgo(t)
+	defer tg.Cleanup()
+
+	tg.TempFile("src/prj/manifest.json", "{}")
+	depCtx := &Ctx{GOPATH: tg.Path(".")}
+	tg.Setenv("GOPATH", depCtx.GOPATH)
+
+	p1, err := depCtx.LoadProject(tg.Path("src/prj"))
+	if err != nil {
+		t.Fatal("error should have been nil. Got:", err)
+	}
+
+	if p1 == nil {
+		t.Fatal("project should not have been nil")
+	}
+
+	tg.TempFile("src/prj/lock.json", "{}")
+
+	p2, err := depCtx.LoadProject(tg.Path("src/prj"))
+	if err != nil {
+		t.Fatal("error should have been nil. Got:", err)
+	}
+
+	if p2 == nil {
+		t.Fatal("project should not have been nil")
+	}
+}
+
+func TestLoadProjectInvalidFiles(t *testing.T) {
+	tg := test.Testgo(t)
+	defer tg.Cleanup()
+
+	tg.TempFile("src/prj/manifest.json", "--- # Invalid manifest")
+	depCtx := &Ctx{GOPATH: tg.Path(".")}
+	tg.Setenv("GOPATH", depCtx.GOPATH)
+
+	p1, err := depCtx.LoadProject(tg.Path("src/prj"))
+	if err == nil {
+		t.Fatal("error should not have been nil. Got:", err)
+	}
+
+	if p1 != nil {
+		t.Fatal("project should have been nil")
+	}
+
+	tg.TempFile("src/prj/manifest.json", "{}")
+	tg.TempFile("src/prj/lock.json", "--- # Invalid lock")
+
+	p2, err := depCtx.LoadProject(tg.Path("src/prj"))
+	if err == nil {
+		t.Fatal("error should not have been nil. Got:", err)
+	}
+
+	if p2 != nil {
+		t.Fatal("project should have been nil")
+	}
+
+}
