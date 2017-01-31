@@ -11,7 +11,6 @@ import (
 )
 
 func TestStatusFormatVersion(t *testing.T) {
-
 	tests := map[gps.Version]string{
 		nil: "",
 		gps.NewBranch("master"):        "branch master",
