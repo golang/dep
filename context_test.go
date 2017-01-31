@@ -150,7 +150,7 @@ func TestVersionInWorkspace(t *testing.T) {
 }
 
 func TestLoadProject(t *testing.T) {
-	tg := test.Testgo(t)
+	tg := test.NewHelper(t)
 	defer tg.Cleanup()
 
 	tg.TempDir("src")
@@ -206,7 +206,7 @@ func TestLoadProject(t *testing.T) {
 }
 
 func TestLoadProjectNotFoundErrors(t *testing.T) {
-	tg := test.Testgo(t)
+	tg := test.NewHelper(t)
 	defer tg.Cleanup()
 
 	tg.TempDir("src")
@@ -243,7 +243,7 @@ func TestLoadProjectNotFoundErrors(t *testing.T) {
 }
 
 func TestLoadProjectManifestParseError(t *testing.T) {
-	tg := test.Testgo(t)
+	tg := test.NewHelper(t)
 	defer tg.Cleanup()
 
 	tg.TempDir("src")
@@ -263,7 +263,7 @@ func TestLoadProjectManifestParseError(t *testing.T) {
 }
 
 func TestLoadProjectLockParseError(t *testing.T) {
-	tg := test.Testgo(t)
+	tg := test.NewHelper(t)
 	defer tg.Cleanup()
 
 	tg.TempDir("src")
@@ -283,7 +283,7 @@ func TestLoadProjectLockParseError(t *testing.T) {
 }
 
 func TestLoadProjectNoSrcDir(t *testing.T) {
-	tg := test.Testgo(t)
+	tg := test.NewHelper(t)
 	defer tg.Cleanup()
 
 	tg.TempDir("test1")
