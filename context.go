@@ -47,14 +47,22 @@ func (c *Ctx) SourceManager() (*gps.SourceMgr, error) {
 
 // LoadProject takes a path and searches up the directory tree for
 // a project root.  If an absolute path is given, the search begins in that
-// directory.  If an empty string is given, the search begins in the current
-// working directory.  The search stops when a file with the name ManifestName
-// is located, at which point the manifest and lock file, if present, are
-// parsed at returned as a Project.
+// directory.  If a relative or empty path is given, the search start is computed
+// from the current working directory.  The search stops when a file with the
+// name ManifestName (manifest.json, by default) is located.
+//
+// The Project contains the parsed manifest as well as a parsed lock file, if
+// present.  The import path is calculated as everything past Ctx.GOPATH/src.
 func (c *Ctx) LoadProject(path string) (*Project, error) {
 	var err error
 	p := new(Project)
 
+	if path != "" {
+		path, err = filepath.Abs(path)
+		if err != nil {
+			return nil, err
+		}
+	}
 	switch path {
 	case "":
 		p.AbsRoot, err = findProjectRootFromWD()
