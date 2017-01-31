@@ -193,10 +193,7 @@ func TestLoadProject(t *testing.T) {
 		path := testcase.path
 		tg.Cd(tg.Path(start))
 		proj, err := ctx.LoadProject(path)
-
-		if err != nil {
-			t.Fatalf("error in LoadProject: %q -> from: %q, path: %q", err.Error(), start, path)
-		}
+		tg.Must(err)
 		if proj.Manifest == nil {
 			t.Fatalf("Manifest file didn't load -> from: %q, path: %q", start, path)
 		}
@@ -240,7 +237,7 @@ func TestLoadProjectNotFoundErrors(t *testing.T) {
 		tg.Cd(tg.Path(start))
 		_, err := ctx.LoadProject(path)
 		if err == nil {
-			t.Fatalf("should have thrown 'No Manifest Found' error -> from: %q, path: %q", start, path)
+			t.Fatalf("should have returned 'No Manifest Found' error -> from: %q, path: %q", start, path)
 		}
 	}
 }
@@ -261,7 +258,7 @@ func TestLoadProjectManifestParseError(t *testing.T) {
 
 	_, err := ctx.LoadProject("")
 	if err == nil {
-		t.Fatalf("should have thrown 'Manifest Syntax' error")
+		t.Fatalf("should have returned 'Manifest Syntax' error")
 	}
 }
 
@@ -281,7 +278,7 @@ func TestLoadProjectLockParseError(t *testing.T) {
 
 	_, err := ctx.LoadProject("")
 	if err == nil {
-		t.Fatalf("should have thrown 'Lock Syntax' error")
+		t.Fatalf("should have returned 'Lock Syntax' error")
 	}
 }
 
@@ -303,6 +300,6 @@ func TestLoadProjectNoSrcDir(t *testing.T) {
 
 	_, err := ctx.LoadProject("")
 	if err == nil {
-		t.Fatalf("should have thrown 'Split Absolute Root' error (no 'src' dir present)")
+		t.Fatalf("should have returned 'Split Absolute Root' error (no 'src' dir present)")
 	}
 }
