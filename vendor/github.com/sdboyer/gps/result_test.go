@@ -1,8 +1,10 @@
 package gps
 
 import (
+	"io/ioutil"
 	"os"
 	"path"
+	"path/filepath"
 	"testing"
 )
 
@@ -43,26 +45,54 @@ func TestWriteDepTree(t *testing.T) {
 		t.Skip("Skipping dep tree writing test in short mode")
 	}
 
-	r := basicResult
+	tmp, err := ioutil.TempDir("", "writetree")
+	if err != nil {
+		t.Errorf("Failed to create temp dir: %s", err)
+		t.FailNow()
+	}
+	defer os.RemoveAll(tmp)
 
-	tmp := path.Join(os.TempDir(), "vsolvtest")
-	os.RemoveAll(tmp)
+	r := solution{
+		att: 1,
+		p: []LockedProject{
+			pa2lp(atom{
+				id: pi("github.com/sdboyer/testrepo"),
+				v:  NewBranch("master").Is(Revision("4d59fb584b15a94d7401e356d2875c472d76ef45")),
+			}, nil),
+			pa2lp(atom{
+				id: pi("launchpad.net/govcstestbzrrepo"),
+				v:  NewVersion("1.0.0").Is(Revision("matt@mattfarina.com-20150731135137-pbphasfppmygpl68")),
+			}, nil),
+			pa2lp(atom{
+				id: pi("bitbucket.org/sdboyer/withbm"),
+				v:  NewVersion("v1.0.0").Is(Revision("aa110802a0c64195d0a6c375c9f66668827c90b4")),
+			}, nil),
+		},
+	}
 
 	sm, clean := mkNaiveSM(t)
 	defer clean()
 
 	// nil lock/result should err immediately
-	err := WriteDepTree(path.Join(tmp, "export"), nil, sm, true)
+	err = WriteDepTree(tmp, nil, sm, true)
 	if err == nil {
 		t.Errorf("Should error if nil lock is passed to WriteDepTree")
 	}
 
-	err = WriteDepTree(path.Join(tmp, "export"), r, sm, true)
+	err = WriteDepTree(tmp, r, sm, true)
 	if err != nil {
 		t.Errorf("Unexpected error while creating vendor tree: %s", err)
 	}
 
-	// TODO(sdboyer) add more checks
+	if _, err = os.Stat(filepath.Join(tmp, "github.com", "sdboyer", "testrepo")); err != nil {
+		t.Errorf("Directory for github.com/sdboyer/testrepo does not exist")
+	}
+	if _, err = os.Stat(filepath.Join(tmp, "launchpad.net", "govcstestbzrrepo")); err != nil {
+		t.Errorf("Directory for launchpad.net/govcstestbzrrepo does not exist")
+	}
+	if _, err = os.Stat(filepath.Join(tmp, "bitbucket.org", "sdboyer", "withbm")); err != nil {
+		t.Errorf("Directory for bitbucket.org/sdboyer/withbm does not exist")
+	}
 }
 
 func BenchmarkCreateVendorTree(b *testing.B) {
