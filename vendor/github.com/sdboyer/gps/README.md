@@ -29,16 +29,13 @@ way. It is a distillation of the ideas behind language package managers like
 handcrafted with ❤️ for Go's specific requirements.
 
 `gps` is [on track](https://github.com/Masterminds/glide/issues/565) to become
-the engine behind [glide](https://glide.sh). It also powers the new, (hopefully)
-official Go tooling, which we plan to make public at the beginning of 2017.
+the engine behind [glide](https://glide.sh). It also powers the [experimental, eventually-official Go tooling](https://github.com/golang/dep).
 
 The wiki has a [general introduction to the `gps`
 approach](https://github.com/sdboyer/gps/wiki/Introduction-to-gps), as well
 as guides for folks [implementing
 tools](https://github.com/sdboyer/gps/wiki/gps-for-Implementors) or [looking
 to contribute](https://github.com/sdboyer/gps/wiki/gps-for-Contributors).
-
-**`gps` is progressing rapidly, but still in beta, with a concomitantly liberal sprinkling of panics.**
 
 ## Wait...a package management _library_?!
 
@@ -72,7 +69,7 @@ productive.
 * What the available versions are for a given project/repository (all branches, tags, or revs are eligible)
   * In general, semver tags are preferred to branches, are preferred to plain tags
 * The actual packages that must be present (determined through import graph static analysis)
-  * How the import graph is statically analyzed (Similar to `go/build`, but with a combinatorial view of build tags)
+  * How the import graph is statically analyzed - similar to `go/build`, but with a combinatorial view of build tags ([not yet implemented](https://github.com/sdboyer/gps/issues/99))
 * All packages from the same source (repository) must be the same version
 * Package import cycles are not allowed ([not yet implemented](https://github.com/sdboyer/gps/issues/66))
 
