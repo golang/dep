@@ -5,6 +5,7 @@
 package dep
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -145,5 +146,36 @@ func TestVersionInWorkspace(t *testing.T) {
 		if v != info.rev {
 			t.Fatalf("expected %q, got %q", v.String(), info.rev.String())
 		}
+	}
+}
+
+func TestLoadProject(t *testing.T) {
+	tg := testgo(t)
+	defer tg.cleanup()
+
+	wd, err := os.Getwd()
+	tg.must(err)
+
+	ctx, err := newContext()
+	tg.must(err)
+
+	project, err := ctx.loadProject(wd)
+	tg.must(err)
+
+	if project.absroot != wd {
+		t.Fatalf("project absroot should be %s, is %s", wd, project.absroot)
+	}
+
+	depImportRoot := "github.com/golang/dep"
+	if string(project.importroot) != depImportRoot {
+		t.Fatalf("project importroot should be %s, is %s", depImportRoot, project.importroot)
+	}
+
+	if project.m == nil {
+		t.Fatal("project manifest should have been loaded")
+	}
+
+	if project.l == nil {
+		t.Fatal("project lock should have been loaded")
 	}
 }
