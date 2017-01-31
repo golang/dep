@@ -2,6 +2,7 @@ package gps
 
 import (
 	"fmt"
+	"os"
 	"os/exec"
 	"testing"
 	"time"
@@ -9,31 +10,42 @@ import (
 
 func mkTestCmd(iterations int) *monitoredCmd {
 	return newMonitoredCmd(
-		exec.Command("go", "run", "./_testdata/src/cmd/echosleep.go", "-n", fmt.Sprint(iterations)),
+		exec.Command("./echosleep", "-n", fmt.Sprint(iterations)),
 		200*time.Millisecond,
 	)
 }
 
 func TestMonitoredCmd(t *testing.T) {
-	cmd := mkTestCmd(2)
-	err := cmd.run()
+	err := exec.Command("go", "build", "./_testdata/cmd/echosleep.go").Run()
 	if err != nil {
-		t.Errorf("expected command not to fail:", err)
+		t.Errorf("Unable to build echosleep binary: %s", err)
+	}
+	defer os.Remove("./echosleep")
+
+	cmd := mkTestCmd(2)
+	err = cmd.run()
+	if err != nil {
+		t.Errorf("Expected command not to fail: %s", err)
 	}
 
 	expectedOutput := "foo\nfoo\n"
-	if cmd.buf.buf.String() != expectedOutput {
-		t.Errorf("expected output %s to be %s", cmd.buf.buf.String(), expectedOutput)
+	if cmd.stdout.buf.String() != expectedOutput {
+		t.Errorf("Unexpected output:\n\t(GOT): %s\n\t(WNT): %s", cmd.stdout.buf.String(), expectedOutput)
 	}
 
 	cmd = mkTestCmd(10)
 	err = cmd.run()
 	if err == nil {
-		t.Errorf("expected command to fail")
+		t.Error("Expected command to fail")
 	}
 
-	expectedOutput = "foo\nfoo\nfoo\nfoo\nfoo\n"
-	if cmd.buf.buf.String() != expectedOutput {
-		t.Errorf("expected output %s to be %s", cmd.buf.buf.String(), expectedOutput)
+	_, ok := err.(*timeoutError)
+	if !ok {
+		t.Errorf("Expected a timeout error, but got: %s", err)
+	}
+
+	expectedOutput = "foo\nfoo\nfoo\nfoo\n"
+	if cmd.stdout.buf.String() != expectedOutput {
+		t.Errorf("Unexpected output:\n\t(GOT): %s\n\t(WNT): %s", cmd.stdout.buf.String(), expectedOutput)
 	}
 }

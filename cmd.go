@@ -13,14 +13,16 @@ import (
 type monitoredCmd struct {
 	cmd     *exec.Cmd
 	timeout time.Duration
-	buf     *activityBuffer
+	stdout  *activityBuffer
+	stderr  *activityBuffer
 }
 
 func newMonitoredCmd(cmd *exec.Cmd, timeout time.Duration) *monitoredCmd {
-	buf := newActivityBuffer()
-	cmd.Stderr = buf
-	cmd.Stdout = buf
-	return &monitoredCmd{cmd, timeout, buf}
+	stdout := newActivityBuffer()
+	stderr := newActivityBuffer()
+	cmd.Stderr = stderr
+	cmd.Stdout = stdout
+	return &monitoredCmd{cmd, timeout, stdout, stderr}
 }
 
 // run will wait for the command to finish and return the error, if any. If the
@@ -37,10 +39,10 @@ func (c *monitoredCmd) run() error {
 		case <-ticker.C:
 			if c.hasTimedOut() {
 				if err := c.cmd.Process.Kill(); err != nil {
-					return fmt.Errorf("error killing process after command timed out: %s", err)
+					return &killCmdError{err}
 				}
 
-				return fmt.Errorf("command timed out after %s of no activity", c.timeout)
+				return &timeoutError{c.timeout}
 			}
 		case err := <-done:
 			return err
@@ -49,15 +51,17 @@ func (c *monitoredCmd) run() error {
 }
 
 func (c *monitoredCmd) hasTimedOut() bool {
-	return c.buf.lastActivity.Before(time.Now().Add(-c.timeout))
+	t := time.Now().Add(-c.timeout)
+	return c.stderr.lastActivity.Before(t) &&
+		c.stdout.lastActivity.Before(t)
 }
 
 func (c *monitoredCmd) combinedOutput() ([]byte, error) {
 	if err := c.run(); err != nil {
-		return nil, err
+		return c.stderr.buf.Bytes(), err
 	}
 
-	return c.buf.buf.Bytes(), nil
+	return c.stdout.buf.Bytes(), nil
 }
 
 // activityBuffer is a buffer that keeps track of the last time a Write
@@ -76,4 +80,20 @@ func newActivityBuffer() *activityBuffer {
 func (b *activityBuffer) Write(p []byte) (int, error) {
 	b.lastActivity = time.Now()
 	return b.buf.Write(p)
+}
+
+type timeoutError struct {
+	timeout time.Duration
+}
+
+func (e timeoutError) Error() string {
+	return fmt.Sprintf("command killed after %s of no activity", e.timeout)
+}
+
+type killCmdError struct {
+	err error
+}
+
+func (e killCmdError) Error() string {
+	return fmt.Sprintf("error killing command after timeout: %s", e.err)
 }
