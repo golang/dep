@@ -1057,16 +1057,16 @@ func (s *solver) selectAtom(a atomWithPackages, pkgonly bool) {
 		pl: a.pl,
 	})
 
-	s.sel.pushSelection(a, pkgonly)
-
 	pl, deps, err := s.getImportsAndConstraintsOf(a)
 	if err != nil {
 		// This shouldn't be possible; other checks should have ensured all
 		// packages and deps are present for any argument passed to this method.
 		panic(fmt.Sprintf("canary - shouldn't be possible %s", err))
 	}
-	// Assign the new internal package list into the atom
+	// Assign the new internal package list into the atom, then push it onto the
+	// selection stack
 	a.pl = pl
+	s.sel.pushSelection(a, pkgonly)
 
 	// If this atom has a lock, pull it out so that we can potentially inject
 	// preferred versions into any bmis we enqueue
