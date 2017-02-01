@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
-	"strings"
 	"testing"
 
 	"github.com/golang/dep/test"
@@ -93,32 +92,12 @@ func TestTxnWriter(t *testing.T) {
 	reset()
 
 	// super basic manifest and lock
-	expectedManifest := `{
-    "dependencies": {
-        "github.com/sdboyer/dep-test": {
-            "version": "1.0.0"
-        }
-    }
-}
-`
-	expectedLock := `{
-    "memo": "595716d270828e763c811ef79c9c41f85b1d1bfbdfe85280036405c03772206c",
-    "projects": [
-        {
-            "name": "github.com/sdboyer/dep-test",
-            "version": "1.0.0",
-            "revision": "2a3a211e171803acb82d1d5d42ceb53228f51751",
-            "packages": [
-                "."
-            ]
-        }
-    ]
-}
-`
+	expectedManifest := h.GetTestFileString("txn_writer/expected_manifest.json")
+	expectedLock := h.GetTestFileString("txn_writer/expected_lock.json")
 
-	m, err := readManifest(strings.NewReader(expectedManifest))
+	m, err := readManifest(h.GetTestFileReader("txn_writer/expected_manifest.json"))
 	h.Must(err)
-	l, err := readLock(strings.NewReader(expectedLock))
+	l, err := readLock(h.GetTestFileReader("txn_writer/expected_lock.json"))
 	h.Must(err)
 
 	// Just write manifest
@@ -129,7 +108,8 @@ func TestTxnWriter(t *testing.T) {
 	h.MustNotExist(vpath)
 
 	diskm := h.ReadManifest()
-	if diskm != expectedManifest {
+	if exp, err := test.AreEqualJSON(expectedManifest, diskm); !exp {
+		h.Must(err)
 		t.Fatalf("expected %s, got %s", expectedManifest, diskm)
 	}
 
@@ -141,12 +121,14 @@ func TestTxnWriter(t *testing.T) {
 	h.MustNotExist(vpath)
 
 	diskm = h.ReadManifest()
-	if diskm != expectedManifest {
+	if exp, err := test.AreEqualJSON(expectedManifest, diskm); !exp {
+		h.Must(err)
 		t.Fatalf("expected %s, got %s", expectedManifest, diskm)
 	}
 
 	diskl := h.ReadLock()
-	if diskl != expectedLock {
+	if exp, err := test.AreEqualJSON(expectedLock, diskl); !exp {
+		h.Must(err)
 		t.Fatalf("expected %s, got %s", expectedLock, diskl)
 	}
 
@@ -157,12 +139,14 @@ func TestTxnWriter(t *testing.T) {
 	h.MustExist(filepath.Join(vpath, "github.com", "sdboyer", "dep-test"))
 
 	diskm = h.ReadManifest()
-	if diskm != expectedManifest {
+	if exp, err := test.AreEqualJSON(expectedManifest, diskm); !exp {
+		h.Must(err)
 		t.Fatalf("expected %s, got %s", expectedManifest, diskm)
 	}
 
 	diskl = h.ReadLock()
-	if diskl != expectedLock {
+	if exp, err := test.AreEqualJSON(expectedLock, diskl); !exp {
+		h.Must(err)
 		t.Fatalf("expected %s, got %s", expectedLock, diskl)
 	}
 
@@ -189,7 +173,8 @@ func TestTxnWriter(t *testing.T) {
 	h.MustExist(filepath.Join(vpath, "github.com", "sdboyer", "dep-test"))
 
 	diskl = h.ReadLock()
-	if diskl != expectedLock {
+	if exp, err := test.AreEqualJSON(expectedLock, diskl); !exp {
+		h.Must(err)
 		t.Fatalf("expected %s, got %s", expectedLock, diskl)
 	}
 
@@ -202,7 +187,8 @@ func TestTxnWriter(t *testing.T) {
 	h.MustExist(filepath.Join(vpath, "github.com", "sdboyer", "dep-test"))
 
 	diskl = h.ReadLock()
-	if diskl != expectedLock {
+	if exp, err := test.AreEqualJSON(expectedLock, diskl); !exp {
+		h.Must(err)
 		t.Fatalf("expected %s, got %s", expectedLock, diskl)
 	}
 
