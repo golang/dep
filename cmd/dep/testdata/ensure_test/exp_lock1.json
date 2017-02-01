@@ -1,0 +1,29 @@
+{
+  "memo": "57d20ba0289c2df60025bf6127220a5403483251bd5e523a7f9ea17752bd5482",
+  "projects": [
+      {
+          "name": "github.com/Sirupsen/logrus",
+          "version": "v0.11.0",
+          "revision": "d26492970760ca5d33129d2d799e34be5c4782eb",
+          "packages": [
+              "."
+          ]
+      },
+      {
+          "name": "github.com/sdboyer/dep-test",
+          "version": "1.0.0",
+          "revision": "2a3a211e171803acb82d1d5d42ceb53228f51751",
+          "packages": [
+              "."
+          ]
+      },
+      {
+          "name": "golang.org/x/sys",
+          "branch": "master",
+          "revision": "{{sysCommit}}",
+          "packages": [
+              "unix"
+          ]
+      }
+  ]
+}

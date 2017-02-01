@@ -5,6 +5,7 @@
 package main
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/golang/dep/test"
@@ -21,72 +22,25 @@ func TestEnsureOverrides(t *testing.T) {
 	h.TempDir("src")
 	h.Setenv("GOPATH", h.Path("."))
 
-	m := `package main
-
-import (
-	"github.com/Sirupsen/logrus"
-	sthing "github.com/sdboyer/dep-test"
-)
-
-type Baz sthing.Foo
-
-func main() {
-	logrus.Info("hello world")
-}`
-
-	h.TempFile("src/thing/thing.go", m)
+	h.TempCopy("src/thing/thing.go", "ensure_test/source1.go")
 	h.Cd(h.Path("src/thing"))
 
 	h.Run("init")
 	h.Run("ensure", "-override", "github.com/Sirupsen/logrus@0.11.0")
 
-	expectedManifest := `{
-    "overrides": {
-        "github.com/Sirupsen/logrus": {
-            "version": "0.11.0"
-        }
-    }
-}
-`
-
+	expectedManifest := h.GetTestfile("ensure_test/exp_manifest1.json")
 	manifest := h.ReadManifest()
-	if manifest != expectedManifest {
+	if exp, err := test.AreEqualJSON(expectedManifest, manifest); !exp {
+		h.Must(err)
 		t.Fatalf("expected %s, got %s", expectedManifest, manifest)
 	}
 
 	sysCommit := h.GetCommit("go.googlesource.com/sys")
-	expectedLock := `{
-    "memo": "57d20ba0289c2df60025bf6127220a5403483251bd5e523a7f9ea17752bd5482",
-    "projects": [
-        {
-            "name": "github.com/Sirupsen/logrus",
-            "version": "v0.11.0",
-            "revision": "d26492970760ca5d33129d2d799e34be5c4782eb",
-            "packages": [
-                "."
-            ]
-        },
-        {
-            "name": "github.com/sdboyer/dep-test",
-            "version": "1.0.0",
-            "revision": "2a3a211e171803acb82d1d5d42ceb53228f51751",
-            "packages": [
-                "."
-            ]
-        },
-        {
-            "name": "golang.org/x/sys",
-            "branch": "master",
-            "revision": "` + sysCommit + `",
-            "packages": [
-                "unix"
-            ]
-        }
-    ]
-}
-`
+	expectedLock := h.GetTestfile("ensure_test/exp_lock1.json")
+	expectedLock = strings.Replace(expectedLock, "{{sysCommit}}", sysCommit, -1)
 	lock := h.ReadLock()
-	if lock != expectedLock {
+	if exp, err := test.AreEqualJSON(expectedLock, lock); !exp {
+		h.Must(err)
 		t.Fatalf("expected %s, got %s", expectedLock, lock)
 	}
 }
