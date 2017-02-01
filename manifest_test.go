@@ -9,62 +9,41 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/golang/dep/test"
 	"github.com/sdboyer/gps"
 )
 
-const je = `{
-    "dependencies": {
-        "github.com/sdboyer/gps": {
-            "branch": "master",
-            "revision": "d05d5aca9f895d19e9265839bffeadd74a2d2ecb",
-            "version": "^v0.12.0",
-            "source": "https://github.com/sdboyer/gps"
-        }
-    },
-    "overrides": {
-        "github.com/sdboyer/gps": {
-            "branch": "master",
-            "revision": "d05d5aca9f895d19e9265839bffeadd74a2d2ecb",
-            "version": "^v0.12.0",
-            "source": "https://github.com/sdboyer/gps"
-        }
-    },
-    "ignores": [
-        "github.com/foo/bar"
-    ]
-}
-`
-
-const jg = `{
-    "dependencies": {
-        "github.com/babble/brook": {
-            "revision": "d05d5aca9f895d19e9265839bffeadd74a2d2ecb"
-        },
-        "github.com/sdboyer/gps": {
-            "version": ">=0.12.0, <1.0.0"
-        }
-    },
-    "overrides": {
-        "github.com/sdboyer/gps": {
-            "branch": "master",
-            "source": "https://github.com/sdboyer/gps"
-        }
-    },
-    "ignores": [
-        "github.com/foo/bar"
-    ]
-}
-`
+// const jg = `{
+//     "dependencies": {
+//         "github.com/babble/brook": {
+//             "revision": "d05d5aca9f895d19e9265839bffeadd74a2d2ecb"
+//         },
+//         "github.com/sdboyer/gps": {
+//             "version": ">=0.12.0, <1.0.0"
+//         }
+//     },
+//     "overrides": {
+//         "github.com/sdboyer/gps": {
+//             "branch": "master",
+//             "source": "https://github.com/sdboyer/gps"
+//         }
+//     },
+//     "ignores": [
+//         "github.com/foo/bar"
+//     ]
+// }
+// `
 
 func TestReadManifest(t *testing.T) {
-	_, err := readManifest(strings.NewReader(je))
+	h := test.NewHelper(t)
+	_, err := readManifest(h.GetTestFileReader("manifest/error.json"))
 	if err == nil {
 		t.Error("Reading manifest with invalid props should have caused error, but did not")
 	} else if !strings.Contains(err.Error(), "multiple constraints") {
 		t.Errorf("Unexpected error %q; expected multiple constraint error", err)
 	}
 
-	m2, err := readManifest(strings.NewReader(jg))
+	m2, err := readManifest(h.GetTestFileReader("manifest/golden.json"))
 	if err != nil {
 		t.Fatalf("Should have read Manifest correctly, but got err %q", err)
 	}
@@ -100,6 +79,8 @@ func TestReadManifest(t *testing.T) {
 }
 
 func TestWriteManifest(t *testing.T) {
+	h := test.NewHelper(t)
+	jg := h.GetTestFileString("manifest/golden.json")
 	c, _ := gps.NewSemverConstraint("^v0.12.0")
 	m := &Manifest{
 		Dependencies: map[gps.ProjectRoot]gps.ProjectProperties{
@@ -124,7 +105,8 @@ func TestWriteManifest(t *testing.T) {
 		t.Fatalf("Error while marshaling valid manifest to JSON: %q", err)
 	}
 
-	if string(b) != jg {
+	if exp, err := test.AreEqualJSON(string(b), jg); !exp {
+		h.Must(err)
 		t.Errorf("Valid manifest did not marshal to JSON as expected:\n\t(GOT): %s\n\t(WNT): %s", string(b), jg)
 	}
 }

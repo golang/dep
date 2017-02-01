@@ -1,0 +1,21 @@
+{
+    "dependencies": {
+        "github.com/sdboyer/gps": {
+            "branch": "master",
+            "revision": "d05d5aca9f895d19e9265839bffeadd74a2d2ecb",
+            "version": "^v0.12.0",
+            "source": "https://github.com/sdboyer/gps"
+        }
+    },
+    "overrides": {
+        "github.com/sdboyer/gps": {
+            "branch": "master",
+            "revision": "d05d5aca9f895d19e9265839bffeadd74a2d2ecb",
+            "version": "^v0.12.0",
+            "source": "https://github.com/sdboyer/gps"
+        }
+    },
+    "ignores": [
+        "github.com/foo/bar"
+    ]
+}
