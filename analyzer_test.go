@@ -9,34 +9,21 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/golang/dep/test"
 )
 
 func TestDeriveManifestAndLock(t *testing.T) {
-	dir, err := ioutil.TempDir("", "dep")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(dir)
+	h := test.NewHelper(t)
+	defer h.Cleanup()
 
-	contents := `{
-    "dependencies": {
-        "github.com/pkg/errors": {
-            "version": ">=0.8.0, <1.0.0"
-        },
-        "github.com/sdboyer/gps": {
-            "version": ">=0.12.0, <1.0.0"
-        }
-    }
-}
-`
-
-	if err := ioutil.WriteFile(filepath.Join(dir, ManifestName), []byte(contents), 0644); err != nil {
-		t.Fatal(err)
-	}
+	h.TempDir("dep")
+	contents := h.GetTestFileString("analyzer/manifest.json")
+	h.TempCopy(filepath.Join("dep", ManifestName), "analyzer/manifest.json")
 
 	a := analyzer{}
 
-	m, l, err := a.DeriveManifestAndLock(dir, "my/fake/project")
+	m, l, err := a.DeriveManifestAndLock(h.Path("dep"), "my/fake/project")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -46,7 +33,8 @@ func TestDeriveManifestAndLock(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if (string(b)) != contents {
+	if exp, err := test.AreEqualJSON(contents, string(b)); !exp {
+		h.Must(err)
 		t.Fatalf("expected %s\n got %s", contents, string(b))
 	}
 
