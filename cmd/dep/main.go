@@ -55,36 +55,6 @@ func main() {
 		fmt.Fprintln(os.Stderr)
 	}
 
-	// parseArgs determines the name of the dep command and wether the user asked for
-	// help to be printed.
-	parseArgs := func(args []string) (cmdName string, printCmdUsage bool, exit bool) {
-		isHelpArg := func() bool {
-			if strings.Contains(strings.ToLower(args[1]), "help") ||
-				strings.ToLower(args[1]) == "-h" {
-				return true
-			}
-			return false
-		}
-
-		switch len(args) {
-		case 0, 1:
-			exit = true
-		case 2:
-			if isHelpArg() {
-				exit = true
-			}
-			cmdName = args[1]
-		default:
-			if isHelpArg() {
-				cmdName = args[2]
-				printCmdUsage = true
-			} else {
-				cmdName = args[1]
-			}
-		}
-		return cmdName, printCmdUsage, exit
-	}
-
 	cmdName, printCommandHelp, exit := parseArgs(os.Args)
 	if exit {
 		usage()
@@ -92,17 +62,17 @@ func main() {
 	}
 
 	for _, cmd := range commands {
-		if name := cmd.Name(); cmdName == name {
+		if cmd.Name() == cmdName {
 			// Build flag set with global flags in there.
 			// TODO(pb): can we deglobalize verbose, pretty please?
-			fs := flag.NewFlagSet(name, flag.ExitOnError)
+			fs := flag.NewFlagSet(cmdName, flag.ExitOnError)
 			fs.BoolVar(verbose, "v", false, "enable verbose logging")
 
 			// Register the subcommand flags in there, too.
 			cmd.Register(fs)
 
 			// Override the usage text to something nicer.
-			resetUsage(fs, cmd.Name(), cmd.Args(), cmd.LongHelp())
+			resetUsage(fs, cmdName, cmd.Args(), cmd.LongHelp())
 
 			if printCommandHelp {
 				fs.Usage()
@@ -133,7 +103,7 @@ func main() {
 		}
 	}
 
-	fmt.Fprintf(os.Stderr, "%s: no such command\n", os.Args[1])
+	fmt.Fprintf(os.Stderr, "%s: no such command\n", cmdName)
 	usage()
 	os.Exit(1)
 }
@@ -166,6 +136,32 @@ func resetUsage(fs *flag.FlagSet, name, args, longHelp string) {
 			fmt.Fprintln(os.Stderr, flagBlock.String())
 		}
 	}
+}
+
+// parseArgs determines the name of the dep command and wether the user asked for
+// help to be printed.
+func parseArgs(args []string) (cmdName string, printCmdUsage bool, exit bool) {
+	isHelpArg := func() bool {
+		return strings.Contains(strings.ToLower(args[1]), "help") || strings.ToLower(args[1]) == "-h"
+	}
+
+	switch len(args) {
+	case 0, 1:
+		exit = true
+	case 2:
+		if isHelpArg() {
+			exit = true
+		}
+		cmdName = args[1]
+	default:
+		if isHelpArg() {
+			cmdName = args[2]
+			printCmdUsage = true
+		} else {
+			cmdName = args[1]
+		}
+	}
+	return cmdName, printCmdUsage, exit
 }
 
 func logf(format string, args ...interface{}) {
