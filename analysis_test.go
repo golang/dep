@@ -1459,19 +1459,33 @@ func TestToReachMaps(t *testing.T) {
 		t.Fatalf("ListPackages failed on varied test case: %s", err)
 	}
 
+	// Helper to add github.com/varied/example prefix
+	b := func(s string) string {
+		if s == "" {
+			return "github.com/example/varied"
+		}
+		return "github.com/example/varied/" + s
+	}
+	bl := func(parts ...string) string {
+		for k, s := range parts {
+			parts[k] = b(s)
+		}
+		return strings.Join(parts, " ")
+	}
+
 	// Set up vars for validate closure
-	var expect map[string][]string
+	var wantex, wantin map[string][]string
 	var name string
 	var main, tests bool
 	var ignore map[string]bool
 
 	validate := func() {
-		result, _ := vptree.ToReachMaps(main, tests, ignore)
-		if !reflect.DeepEqual(expect, result) {
+		gotex, gotin := vptree.ToReachMaps(main, tests, ignore)
+		if !reflect.DeepEqual(wantex, gotex) {
 			seen := make(map[string]bool)
-			for ip, epkgs := range expect {
+			for ip, epkgs := range wantex {
 				seen[ip] = true
-				if pkgs, exists := result[ip]; !exists {
+				if pkgs, exists := gotex[ip]; !exists {
 					t.Errorf("ver(%q): expected import path %s was not present in result", name, ip)
 				} else {
 					if !reflect.DeepEqual(pkgs, epkgs) {
@@ -1480,46 +1494,87 @@ func TestToReachMaps(t *testing.T) {
 				}
 			}
 
-			for ip, pkgs := range result {
+			for ip, pkgs := range gotex {
 				if seen[ip] {
 					continue
 				}
 				t.Errorf("ver(%q): Got packages for import path %s, but none were expected:\n\t%s", name, ip, pkgs)
 			}
 		}
+
+		if !reflect.DeepEqual(wantin, gotin) {
+			seen := make(map[string]bool)
+			for ip, epkgs := range wantin {
+				seen[ip] = true
+				if pkgs, exists := gotin[ip]; !exists {
+					t.Errorf("ver(%q): expected internal import path %s was not present in result", name, ip)
+				} else {
+					if !reflect.DeepEqual(pkgs, epkgs) {
+						t.Errorf("ver(%q): did not get expected internal package set for import path %s:\n\t(GOT): %s\n\t(WNT): %s", name, ip, pkgs, epkgs)
+					}
+				}
+			}
+
+			for ip, pkgs := range gotin {
+				if seen[ip] {
+					continue
+				}
+				t.Errorf("ver(%q): Got internal packages for import path %s, but none were expected:\n\t%s", name, ip, pkgs)
+			}
+		}
 	}
 
-	all := map[string][]string{
-		"github.com/example/varied":                {"encoding/binary", "github.com/Masterminds/semver", "github.com/sdboyer/gps", "go/parser", "hash", "net/http", "os", "sort"},
-		"github.com/example/varied/m1p":            {"github.com/sdboyer/gps", "os", "sort"},
-		"github.com/example/varied/namemismatch":   {"github.com/Masterminds/semver", "os"},
-		"github.com/example/varied/otherpath":      {"github.com/sdboyer/gps", "os", "sort"},
-		"github.com/example/varied/simple":         {"encoding/binary", "github.com/sdboyer/gps", "go/parser", "hash", "os", "sort"},
-		"github.com/example/varied/simple/another": {"encoding/binary", "github.com/sdboyer/gps", "hash", "os", "sort"},
+	// maps of each internal package, and their expected external and internal
+	// imports in the maximal case.
+	allex := map[string][]string{
+		b(""):               {"encoding/binary", "github.com/Masterminds/semver", "github.com/sdboyer/gps", "go/parser", "hash", "net/http", "os", "sort"},
+		b("m1p"):            {"github.com/sdboyer/gps", "os", "sort"},
+		b("namemismatch"):   {"github.com/Masterminds/semver", "os"},
+		b("otherpath"):      {"github.com/sdboyer/gps", "os", "sort"},
+		b("simple"):         {"encoding/binary", "github.com/sdboyer/gps", "go/parser", "hash", "os", "sort"},
+		b("simple/another"): {"encoding/binary", "github.com/sdboyer/gps", "hash", "os", "sort"},
 	}
+
+	allin := map[string][]string{
+		b(""):               {b("m1p"), b("namemismatch"), b("otherpath"), b("simple"), b("simple/another")},
+		b("m1p"):            {},
+		b("namemismatch"):   {},
+		b("otherpath"):      {b("m1p")},
+		b("simple"):         {b("m1p"), b("simple/another")},
+		b("simple/another"): {b("m1p")},
+	}
+
 	// build a map to validate the exception inputs. do this because shit is
 	// hard enough to keep track of that it's preferable not to have silent
 	// success if a typo creeps in and we're trying to except an import that
 	// isn't in a pkg in the first place
 	valid := make(map[string]map[string]bool)
-	for ip, expkgs := range all {
+	for ip, expkgs := range allex {
 		m := make(map[string]bool)
 		for _, pkg := range expkgs {
 			m[pkg] = true
 		}
 		valid[ip] = m
 	}
+	validin := make(map[string]map[string]bool)
+	for ip, inpkgs := range allin {
+		m := make(map[string]bool)
+		for _, pkg := range inpkgs {
+			m[pkg] = true
+		}
+		validin[ip] = m
+	}
 
-	// helper to compose expect, excepting specific packages
+	// helper to compose wantex, excepting specific packages
 	//
 	// this makes it easier to see what we're taking out on each test
 	except := func(pkgig ...string) {
 		// reinit expect with everything from all
-		expect = make(map[string][]string)
-		for ip, expkgs := range all {
+		wantex = make(map[string][]string)
+		for ip, expkgs := range allex {
 			sl := make([]string, len(expkgs))
 			copy(sl, expkgs)
-			expect[ip] = sl
+			wantex[ip] = sl
 		}
 
 		// now build the dropmap
@@ -1536,7 +1591,7 @@ func TestToReachMaps(t *testing.T) {
 
 			// if only a single elem was passed, though, drop the whole thing
 			if len(not) == 0 {
-				delete(expect, ip)
+				delete(wantex, ip)
 				continue
 			}
 
@@ -1551,7 +1606,7 @@ func TestToReachMaps(t *testing.T) {
 			drop[ip] = m
 		}
 
-		for ip, pkgs := range expect {
+		for ip, pkgs := range wantex {
 			var npkgs []string
 			for _, imp := range pkgs {
 				if !drop[ip][imp] {
@@ -1559,26 +1614,81 @@ func TestToReachMaps(t *testing.T) {
 				}
 			}
 
-			expect[ip] = npkgs
+			wantex[ip] = npkgs
 		}
 	}
+
+	// same as above, but for internal reachmap
+	exceptin := func(pkgig ...string) {
+		// reinit expect with everything from all
+		wantin = make(map[string][]string)
+		for ip, inpkgs := range allin {
+			sl := make([]string, len(inpkgs))
+			copy(sl, inpkgs)
+			wantin[ip] = sl
+		}
+
+		// now build the dropmap
+		drop := make(map[string]map[string]bool)
+		for _, igstr := range pkgig {
+			// split on space; first elem is import path to pkg, the rest are
+			// the imports to drop.
+			not := strings.Split(igstr, " ")
+			var ip string
+			ip, not = not[0], not[1:]
+			if _, exists := validin[ip]; !exists {
+				t.Fatalf("%s is not a package name we're working with, doofus", ip)
+			}
+
+			// if only a single elem was passed, though, drop the whole thing
+			if len(not) == 0 {
+				delete(wantin, ip)
+				continue
+			}
+
+			m := make(map[string]bool)
+			for _, imp := range not {
+				if !validin[ip][imp] {
+					t.Fatalf("%s is not a reachable import of %s, even in the all case", imp, ip)
+				}
+				m[imp] = true
+			}
+
+			drop[ip] = m
+		}
+
+		for ip, pkgs := range wantin {
+			var npkgs []string
+			for _, imp := range pkgs {
+				if !drop[ip][imp] {
+					npkgs = append(npkgs, imp)
+				}
+			}
+
+			wantin[ip] = npkgs
+		}
+	}
+
+	/* PREP IS DONE, BEGIN ACTUAL TESTING */
 
 	// first, validate all
 	name = "all"
 	main, tests = true, true
 	except()
+	exceptin()
 	validate()
 
 	// turn off main pkgs, which necessarily doesn't affect anything else
 	name = "no main"
 	main = false
-	except("github.com/example/varied")
+	except(b(""))
+	exceptin(b(""))
 	validate()
 
 	// ignoring the "varied" pkg has same effect as disabling main pkgs
 	name = "ignore root"
 	ignore = map[string]bool{
-		"github.com/example/varied": true,
+		b(""): true,
 	}
 	main = true
 	validate()
@@ -1590,20 +1700,24 @@ func TestToReachMaps(t *testing.T) {
 	tests = false
 	ignore = nil
 	except(
-		"github.com/example/varied encoding/binary",
-		"github.com/example/varied/simple encoding/binary",
-		"github.com/example/varied/simple/another encoding/binary",
-		"github.com/example/varied/otherpath github.com/sdboyer/gps os sort",
+		b("")+" encoding/binary",
+		b("simple")+" encoding/binary",
+		b("simple/another")+" encoding/binary",
+		b("otherpath")+" github.com/sdboyer/gps os sort",
 	)
 
 	// almost the same as previous, but varied just goes away completely
 	name = "no main or tests"
 	main = false
 	except(
-		"github.com/example/varied",
-		"github.com/example/varied/simple encoding/binary",
-		"github.com/example/varied/simple/another encoding/binary",
-		"github.com/example/varied/otherpath github.com/sdboyer/gps os sort",
+		b(""),
+		b("simple")+" encoding/binary",
+		b("simple/another")+" encoding/binary",
+		b("otherpath")+" github.com/sdboyer/gps os sort",
+	)
+	exceptin(
+		b(""),
+		bl("otherpath", "m1p"),
 	)
 	validate()
 
@@ -1614,38 +1728,56 @@ func TestToReachMaps(t *testing.T) {
 	// varied/simple
 	name = "ignore varied/simple"
 	ignore = map[string]bool{
-		"github.com/example/varied/simple": true,
+		b("simple"): true,
 	}
 	except(
 		// root pkg loses on everything in varied/simple/another
-		"github.com/example/varied hash encoding/binary go/parser",
-		"github.com/example/varied/simple",
+		b("")+" hash encoding/binary go/parser",
+		b("simple"),
+	)
+	exceptin(
+		// FIXME this is a bit odd, but should probably exclude m1p as well,
+		// because it actually shouldn't be valid to import a package that only
+		// has tests. This whole model misses that nuance right now, though.
+		bl("", "simple", "simple/another"),
+		b("simple"),
 	)
 	validate()
 
 	// widen the hole by excluding otherpath
 	name = "ignore varied/{otherpath,simple}"
 	ignore = map[string]bool{
-		"github.com/example/varied/otherpath": true,
-		"github.com/example/varied/simple":    true,
+		b("otherpath"): true,
+		b("simple"):    true,
 	}
 	except(
 		// root pkg loses on everything in varied/simple/another and varied/m1p
-		"github.com/example/varied hash encoding/binary go/parser github.com/sdboyer/gps sort",
-		"github.com/example/varied/otherpath",
-		"github.com/example/varied/simple",
+		b("")+" hash encoding/binary go/parser github.com/sdboyer/gps sort",
+		b("otherpath"),
+		b("simple"),
+	)
+	exceptin(
+		bl("", "simple", "simple/another", "m1p", "otherpath"),
+		b("otherpath"),
+		b("simple"),
 	)
 	validate()
 
 	// remove namemismatch, though we're mostly beating a dead horse now
 	name = "ignore varied/{otherpath,simple,namemismatch}"
-	ignore["github.com/example/varied/namemismatch"] = true
+	ignore[b("namemismatch")] = true
 	except(
 		// root pkg loses on everything in varied/simple/another and varied/m1p
-		"github.com/example/varied hash encoding/binary go/parser github.com/sdboyer/gps sort os github.com/Masterminds/semver",
-		"github.com/example/varied/otherpath",
-		"github.com/example/varied/simple",
-		"github.com/example/varied/namemismatch",
+		b("")+" hash encoding/binary go/parser github.com/sdboyer/gps sort os github.com/Masterminds/semver",
+		b("otherpath"),
+		b("simple"),
+		b("namemismatch"),
+	)
+	exceptin(
+		bl("", "simple", "simple/another", "m1p", "otherpath", "namemismatch"),
+		b("otherpath"),
+		b("simple"),
+		b("namemismatch"),
 	)
 	validate()
 }
