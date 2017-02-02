@@ -38,6 +38,7 @@ func main() {
 		&ensureCommand{},
 		&removeCommand{},
 		&hashinCommand{},
+		&versionCommand{},
 	}
 
 	usage := func() {
