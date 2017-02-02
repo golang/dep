@@ -60,6 +60,8 @@ func TestTxnWriter(t *testing.T) {
 	test.NeedsGit(t)
 
 	h := test.NewHelper(t)
+	defer h.Cleanup()
+
 	h.TempDir("")
 	defer h.Cleanup()
 
