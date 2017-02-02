@@ -67,7 +67,7 @@ type statusCommand struct {
 	modified bool
 }
 
-type Outputter interface {
+type outputter interface {
 	BasicHeader()
 	BasicLine(*BasicStatus)
 	BasicFooter()
@@ -147,7 +147,7 @@ func (out *jsonOutput) MissingLine(ms *MissingStatus) {
 }
 
 func (out *jsonOutput) MissingFooter() {
-	json.NewEncoder(os.Stdout).Encode(out.missing)
+	json.NewEncoder(out.w).Encode(out.missing)
 }
 
 func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
@@ -163,15 +163,15 @@ func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
 	sm.UseDefaultSignalHandling()
 	defer sm.Release()
 
-	var out Outputter
-	if cmd.detailed {
+	var out outputter
+	switch {
+	case cmd.detailed:
 		return fmt.Errorf("not implemented")
-	}
-	if cmd.json {
+	case cmd.json:
 		out = &jsonOutput{
 			w: os.Stdout,
 		}
-	} else {
+	default:
 		out = &tableOutput{
 			w: tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0),
 		}
@@ -195,7 +195,7 @@ type MissingStatus struct {
 	MissingPackages []string
 }
 
-func runStatusAll(out Outputter, p *dep.Project, sm *gps.SourceMgr) error {
+func runStatusAll(out outputter, p *dep.Project, sm *gps.SourceMgr) error {
 	if p.Lock == nil {
 		// TODO if we have no lock file, do...other stuff
 		return nil
