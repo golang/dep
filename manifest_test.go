@@ -15,6 +15,8 @@ import (
 
 func TestReadManifest(t *testing.T) {
 	h := test.NewHelper(t)
+	defer h.Cleanup()
+
 	_, err := readManifest(h.GetTestFileReader("manifest/error.json"))
 	if err == nil {
 		t.Error("Reading manifest with invalid props should have caused error, but did not")
@@ -59,6 +61,8 @@ func TestReadManifest(t *testing.T) {
 
 func TestWriteManifest(t *testing.T) {
 	h := test.NewHelper(t)
+	defer h.Cleanup()
+
 	jg := h.GetTestFileString("manifest/golden.json")
 	c, _ := gps.NewSemverConstraint("^v0.12.0")
 	m := &Manifest{

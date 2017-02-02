@@ -16,6 +16,8 @@ import (
 
 func TestReadLock(t *testing.T) {
 	h := test.NewHelper(t)
+	defer h.Cleanup()
+
 	_, err := readLock(h.GetTestFileReader("lock/error.json"))
 	if err == nil {
 		t.Error("Reading lock with invalid props should have caused error, but did not")
@@ -47,6 +49,8 @@ func TestReadLock(t *testing.T) {
 
 func TestWriteLock(t *testing.T) {
 	h := test.NewHelper(t)
+	defer h.Cleanup()
+
 	lg := h.GetTestFileString("lock/golden.json")
 	memo, _ := hex.DecodeString("2252a285ab27944a4d7adcba8dbd03980f59ba652f12db39fa93b927c345593e")
 	l := &Lock{
