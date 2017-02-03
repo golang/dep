@@ -166,7 +166,7 @@ func (s *solver) traceInfo(args ...interface{}) {
 		msg = tracePrefix(innerIndent + data.Error(), "  ", failCharSp)
 	default:
 		// panic here because this can *only* mean a stupid internal bug
-		panic(fmt.Sprintf("%scanary - unknown type passed as first param to traceInfo %T", innerIndent, data))
+		panic(fmt.Sprintf("%canary - unknown type passed as first param to traceInfo %T", data))
 	}
 
 	prefix := getprei(preflen)
