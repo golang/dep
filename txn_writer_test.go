@@ -97,9 +97,9 @@ func TestTxnWriter(t *testing.T) {
 	expectedManifest := h.GetTestFileString("txn_writer/expected_manifest.json")
 	expectedLock := h.GetTestFileString("txn_writer/expected_lock.json")
 
-	m, err := readManifest(h.GetTestFileReader("txn_writer/expected_manifest.json"))
+	m, err := readManifest(h.GetTestFile("txn_writer/expected_manifest.json"))
 	h.Must(err)
-	l, err := readLock(h.GetTestFileReader("txn_writer/expected_lock.json"))
+	l, err := readLock(h.GetTestFile("txn_writer/expected_lock.json"))
 	h.Must(err)
 
 	// Just write manifest

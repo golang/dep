@@ -17,14 +17,14 @@ func TestReadManifest(t *testing.T) {
 	h := test.NewHelper(t)
 	defer h.Cleanup()
 
-	_, err := readManifest(h.GetTestFileReader("manifest/error.json"))
+	_, err := readManifest(h.GetTestFile("manifest/error.json"))
 	if err == nil {
 		t.Error("Reading manifest with invalid props should have caused error, but did not")
 	} else if !strings.Contains(err.Error(), "multiple constraints") {
 		t.Errorf("Unexpected error %q; expected multiple constraint error", err)
 	}
 
-	m2, err := readManifest(h.GetTestFileReader("manifest/golden.json"))
+	m2, err := readManifest(h.GetTestFile("manifest/golden.json"))
 	if err != nil {
 		t.Fatalf("Should have read Manifest correctly, but got err %q", err)
 	}
