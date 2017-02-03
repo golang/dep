@@ -18,14 +18,14 @@ func TestReadLock(t *testing.T) {
 	h := test.NewHelper(t)
 	defer h.Cleanup()
 
-	_, err := readLock(h.GetTestFileReader("lock/error.json"))
+	_, err := readLock(h.GetTestFile("lock/error.json"))
 	if err == nil {
 		t.Error("Reading lock with invalid props should have caused error, but did not")
 	} else if !strings.Contains(err.Error(), "both a branch") {
 		t.Errorf("Unexpected error %q; expected multiple version error", err)
 	}
 
-	l, err := readLock(h.GetTestFileReader("lock/golden.json"))
+	l, err := readLock(h.GetTestFile("lock/golden.json"))
 	if err != nil {
 		t.Fatalf("Should have read Lock correctly, but got err %q", err)
 	}
