@@ -19,7 +19,7 @@ func (s *solver) traceCheckPkgs(bmi bimodalIdentifier) {
 		return
 	}
 
-	prefix := strings.Repeat("| ", len(s.vqs)+1)
+	prefix := getprei(len(s.vqs)+1)
 	s.tl.Printf("%s\n", tracePrefix(fmt.Sprintf("? revisit %s to add %v pkgs", bmi.id.errString(), len(bmi.pl)), prefix, prefix))
 }
 
@@ -28,7 +28,7 @@ func (s *solver) traceCheckQueue(q *versionQueue, bmi bimodalIdentifier, cont bo
 		return
 	}
 
-	prefix := strings.Repeat("| ", len(s.vqs)+offset)
+	prefix := getprei(len(s.vqs)+offset)
 	vlen := strconv.Itoa(len(q.pi))
 	if !q.allLoaded {
 		vlen = "at least " + vlen
@@ -60,7 +60,7 @@ func (s *solver) traceStartBacktrack(bmi bimodalIdentifier, err error, pkgonly b
 		msg = fmt.Sprintf("%s no more versions of %s to try; begin backtrack", backChar, bmi.id.errString())
 	}
 
-	prefix := strings.Repeat("| ", len(s.sel.projects))
+	prefix := getprei(len(s.sel.projects))
 	s.tl.Printf("%s\n", tracePrefix(msg, prefix, prefix))
 }
 
@@ -78,7 +78,7 @@ func (s *solver) traceBacktrack(bmi bimodalIdentifier, pkgonly bool) {
 		msg = fmt.Sprintf("%s backtrack: no more versions of %s to try", backChar, bmi.id.errString())
 	}
 
-	prefix := strings.Repeat("| ", len(s.sel.projects))
+	prefix := getprei(len(s.sel.projects))
 	s.tl.Printf("%s\n", tracePrefix(msg, prefix, prefix))
 }
 
@@ -119,7 +119,7 @@ func (s *solver) traceSelectRoot(ptree PackageTree, cdeps []completeDep) {
 	// TODO(sdboyer) include info on ignored pkgs/imports, etc.
 	s.tl.Printf(" %v transitively valid internal packages", len(rm))
 	s.tl.Printf(" %v external packages imported from %v projects", expkgs, len(cdeps))
-	s.tl.Printf(successCharSp + "select (root)")
+	s.tl.Printf("(0)   " + successCharSp + "select (root)")
 }
 
 // traceSelect is called when an atom is successfully selected
@@ -135,7 +135,7 @@ func (s *solver) traceSelect(awp atomWithPackages, pkgonly bool) {
 		msg = fmt.Sprintf("%s select %s w/%v pkgs", successChar, a2vs(awp.a), len(awp.pl))
 	}
 
-	prefix := strings.Repeat("| ", len(s.sel.projects)-1)
+	prefix := getprei(len(s.sel.projects)-1)
 	s.tl.Printf("%s\n", tracePrefix(msg, prefix, prefix))
 }
 
@@ -165,8 +165,20 @@ func (s *solver) traceInfo(args ...interface{}) {
 		panic(fmt.Sprintf("canary - unknown type passed as first param to traceInfo %T", data))
 	}
 
-	prefix := strings.Repeat("| ", preflen)
+	prefix := getprei(preflen)
 	s.tl.Printf("%s\n", tracePrefix(msg, prefix, prefix))
+}
+
+func getprei(i int) string {
+	var s string
+	if i < 10 {
+		s = fmt.Sprintf("(%d)   ", i)
+	}else if i < 100 {
+		s = fmt.Sprintf("(%d)  ", i)
+	}else {
+		s = fmt.Sprintf("(%d) ", i)
+	}
+	return s
 }
 
 func tracePrefix(msg, sep, fsep string) string {
