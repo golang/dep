@@ -19,7 +19,7 @@ func (s *solver) traceCheckPkgs(bmi bimodalIdentifier) {
 		return
 	}
 
-	prefix := getprei(len(s.vqs)+1)
+	prefix := getprei(len(s.vqs) + 1)
 	s.tl.Printf("%s\n", tracePrefix(fmt.Sprintf("? revisit %s to add %v pkgs", bmi.id.errString(), len(bmi.pl)), prefix, prefix))
 }
 
@@ -28,7 +28,7 @@ func (s *solver) traceCheckQueue(q *versionQueue, bmi bimodalIdentifier, cont bo
 		return
 	}
 
-	prefix := getprei(len(s.vqs)+offset)
+	prefix := getprei(len(s.vqs) + offset)
 	vlen := strconv.Itoa(len(q.pi))
 	if !q.allLoaded {
 		vlen = "at least " + vlen
@@ -135,7 +135,7 @@ func (s *solver) traceSelect(awp atomWithPackages, pkgonly bool) {
 		msg = fmt.Sprintf("%s select %s w/%v pkgs", successChar, a2vs(awp.a), len(awp.pl))
 	}
 
-	prefix := getprei(len(s.sel.projects)-1)
+	prefix := getprei(len(s.sel.projects) - 1)
 	s.tl.Printf("%s\n", tracePrefix(msg, prefix, prefix))
 }
 
@@ -173,9 +173,9 @@ func getprei(i int) string {
 	var s string
 	if i < 10 {
 		s = fmt.Sprintf("(%d)   ", i)
-	}else if i < 100 {
+	} else if i < 100 {
 		s = fmt.Sprintf("(%d)  ", i)
-	}else {
+	} else {
 		s = fmt.Sprintf("(%d) ", i)
 	}
 	return s
