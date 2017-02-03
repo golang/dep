@@ -47,7 +47,10 @@ type Helper struct {
 
 // NewHelper initializes a new helper for testing.
 func NewHelper(t *testing.T) *Helper {
-	wd, _ := os.Getwd()
+	wd, err := os.Getwd()
+	if err != nil {
+		panic(err)
+	}
 	return &Helper{t: t, origWd: wd}
 }
 
@@ -417,45 +420,39 @@ func (h *Helper) TempFile(path, contents string) {
 	h.Must(ioutil.WriteFile(filepath.Join(h.tempdir, path), bytes, 0644))
 }
 
-// GetTestFileBytes reads a file form the testdata directory into memory.  src is
-// relative to ./testdata.  Assumes tests take place starting in the cmd/dep
-// directory.
-func (h *Helper) GetTestFileBytes(src string) []byte {
-	content, err := ioutil.ReadFile(filepath.Join(h.origWd, "_testdata", src))
+// GetTestFile reads a file from the testdata directory into memory.  src is
+// relative to ./_testdata.
+func (h *Helper) GetTestFile(src string) io.ReadCloser {
+	content, err := os.Open(filepath.Join(h.origWd, "_testdata", src))
 	if err != nil {
 		panic(err)
-	}
-	if strings.HasSuffix(src, ".go") {
-		formatted, err := format.Source(content)
-		if err == nil {
-			content = formatted
-		}
 	}
 	return content
 }
 
-// GetTestFileString reads a file form the testdata directory into memory.  src is
-// relative to ./testdata.  Assumes tests take place starting in the cmd/dep
-// directory.
+// GetTestFileString reads a file from the testdata directory into memory.  src is
+// relative to ./_testdata.
 func (h *Helper) GetTestFileString(src string) string {
-	return string(h.GetTestFileBytes(src))
-}
-
-// GetTestFileReader reads a file form the testdata directory into memory.  src is
-// relative to ./testdata.  Assumes tests take place starting in the cmd/dep
-// directory.
-func (h *Helper) GetTestFileReader(src string) io.Reader {
-	return strings.NewReader(h.GetTestFileString(src))
+	content, err := ioutil.ReadAll(h.GetTestFile(src))
+	if err != nil {
+		panic(err)
+	}
+	return string(content)
 }
 
 // TempCopy copies a temporary file from testdata into the temporary directory.
 // dest is relative to the temp directory location, and src is relative to
-// ./testdata.  Assumes tests take place starting in the cmd/dep directory.
+// ./_testdata.
 func (h *Helper) TempCopy(dest, src string) {
-	content := h.GetTestFileBytes(src)
-	h.makeTempdir()
-	h.Must(os.MkdirAll(filepath.Join(h.tempdir, filepath.Dir(dest)), 0755))
-	h.Must(ioutil.WriteFile(filepath.Join(h.tempdir, dest), content, 0644))
+	in := h.GetTestFile(src)
+	defer in.Close()
+	h.TempDir(filepath.Dir(dest))
+	out, err := os.Create(filepath.Join(h.tempdir, dest))
+	if err != nil {
+		panic(err)
+	}
+	defer out.Close()
+	io.Copy(out, in)
 }
 
 // TempDir adds a temporary directory for a run of testgo.
