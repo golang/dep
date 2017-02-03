@@ -12,6 +12,7 @@ const (
 	failChar      = "✗"
 	failCharSp    = failChar + " "
 	backChar      = "←"
+	innerIndent   = "  "
 )
 
 func (s *solver) traceCheckPkgs(bmi bimodalIdentifier) {
@@ -36,14 +37,17 @@ func (s *solver) traceCheckQueue(q *versionQueue, bmi bimodalIdentifier, cont bo
 
 	// TODO(sdboyer) how...to list the packages in the limited space we have?
 	var verb string
+	indent := ""
 	if cont {
+		// Continue is an "inner" message.. indenting
 		verb = "continue"
 		vlen = vlen + " more"
+		indent = innerIndent
 	} else {
 		verb = "attempt"
 	}
 
-	s.tl.Printf("%s\n", tracePrefix(fmt.Sprintf("? %s %s with %v pkgs; %s versions to try", verb, bmi.id.errString(), len(bmi.pl), vlen), prefix, prefix))
+	s.tl.Printf("%s\n", tracePrefix(fmt.Sprintf("%s? %s %s with %v pkgs; %s versions to try",indent, verb, bmi.id.errString(), len(bmi.pl), vlen), prefix, prefix))
 }
 
 // traceStartBacktrack is called with the bmi that first failed, thus initiating
@@ -55,9 +59,9 @@ func (s *solver) traceStartBacktrack(bmi bimodalIdentifier, err error, pkgonly b
 
 	var msg string
 	if pkgonly {
-		msg = fmt.Sprintf("%s could not add %v pkgs to %s; begin backtrack", backChar, len(bmi.pl), bmi.id.errString())
+		msg = fmt.Sprintf("%s%s could not add %v pkgs to %s; begin backtrack",innerIndent, backChar, len(bmi.pl), bmi.id.errString())
 	} else {
-		msg = fmt.Sprintf("%s no more versions of %s to try; begin backtrack", backChar, bmi.id.errString())
+		msg = fmt.Sprintf("%s%s no more versions of %s to try; begin backtrack",innerIndent, backChar, bmi.id.errString())
 	}
 
 	prefix := getprei(len(s.sel.projects))
@@ -93,9 +97,9 @@ func (s *solver) traceFinish(sol solution, err error) {
 		for _, lp := range sol.Projects() {
 			pkgcount += len(lp.pkgs)
 		}
-		s.tl.Printf("%s found solution with %v packages from %v projects", successChar, pkgcount, len(sol.Projects()))
+		s.tl.Printf("%s%s found solution with %v packages from %v projects",innerIndent, successChar, pkgcount, len(sol.Projects()))
 	} else {
-		s.tl.Printf("%s solving failed", failChar)
+		s.tl.Printf("%s%s solving failed",innerIndent, failChar)
 	}
 }
 
@@ -130,7 +134,7 @@ func (s *solver) traceSelect(awp atomWithPackages, pkgonly bool) {
 
 	var msg string
 	if pkgonly {
-		msg = fmt.Sprintf("%s include %v more pkgs from %s", successChar, len(awp.pl), a2vs(awp.a))
+		msg = fmt.Sprintf("%s%s include %v more pkgs from %s",innerIndent, successChar, len(awp.pl), a2vs(awp.a))
 	} else {
 		msg = fmt.Sprintf("%s select %s w/%v pkgs", successChar, a2vs(awp.a), len(awp.pl))
 	}
@@ -152,17 +156,17 @@ func (s *solver) traceInfo(args ...interface{}) {
 	var msg string
 	switch data := args[0].(type) {
 	case string:
-		msg = tracePrefix(fmt.Sprintf(data, args[1:]...), "| ", "| ")
+		msg = tracePrefix(innerIndent + fmt.Sprintf(data, args[1:]...), "  ", "  ")
 	case traceError:
 		preflen++
 		// We got a special traceError, use its custom method
-		msg = tracePrefix(data.traceString(), "| ", failCharSp)
+		msg = tracePrefix(innerIndent + data.traceString(), "  ", failCharSp)
 	case error:
 		// Regular error; still use the x leader but default Error() string
-		msg = tracePrefix(data.Error(), "| ", failCharSp)
+		msg = tracePrefix(innerIndent + data.Error(), "  ", failCharSp)
 	default:
 		// panic here because this can *only* mean a stupid internal bug
-		panic(fmt.Sprintf("canary - unknown type passed as first param to traceInfo %T", data))
+		panic(fmt.Sprintf("%scanary - unknown type passed as first param to traceInfo %T", innerIndent, data))
 	}
 
 	prefix := getprei(preflen)
@@ -172,7 +176,7 @@ func (s *solver) traceInfo(args ...interface{}) {
 func getprei(i int) string {
 	var s string
 	if i < 10 {
-		s = fmt.Sprintf("(%d)   ", i)
+		s = fmt.Sprintf("(%d)	", i)
 	} else if i < 100 {
 		s = fmt.Sprintf("(%d)  ", i)
 	} else {
