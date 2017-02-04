@@ -88,8 +88,7 @@ func TestWriteManifest(t *testing.T) {
 		t.Fatalf("Error while marshaling valid manifest to JSON: %q", err)
 	}
 
-	if exp, err := test.AreEqualJSON(string(b), jg); !exp {
-		h.Must(err)
+	if string(b) != jg {
 		t.Errorf("Valid manifest did not marshal to JSON as expected:\n\t(GOT): %s\n\t(WNT): %s", string(b), jg)
 	}
 }
