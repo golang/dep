@@ -33,8 +33,7 @@ func TestDeriveManifestAndLock(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if exp, err := test.AreEqualJSON(contents, string(b)); !exp {
-		h.Must(err)
+	if contents != string(b) {
 		t.Fatalf("expected %s\n got %s", contents, string(b))
 	}
 
