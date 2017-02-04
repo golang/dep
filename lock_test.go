@@ -69,8 +69,7 @@ func TestWriteLock(t *testing.T) {
 		t.Fatalf("Error while marshaling valid lock to JSON: %q", err)
 	}
 
-	if exp, err := test.AreEqualJSON(string(b), lg); !exp {
-		h.Must(err)
+	if string(b) != lg {
 		t.Errorf("Valid lock did not marshal to JSON as expected:\n\t(GOT): %s\n\t(WNT): %s", string(b), lg)
 	}
 }
