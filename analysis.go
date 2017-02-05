@@ -91,7 +91,7 @@ func ListPackages(fileRoot, importRoot string) (PackageTree, error) {
 		// 	2. Relative symlinks pointing to somewhere outside of the root (via ..) should also be skipped.
 		if !fi.IsDir() && fi.Mode()&os.ModeSymlink != 0 {
 			n := fi.Name()
-			if strings.HasPrefix(n, string(filepath.Separator)) {
+			if filepath.IsAbs(n) {
 				return err
 			}
 			dst, err := filepath.EvalSymlinks(wp)
