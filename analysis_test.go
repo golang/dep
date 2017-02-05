@@ -232,12 +232,13 @@ func TestListPackages(t *testing.T) {
 		return filepath.Join(srcdir, filepath.Join(s...))
 	}
 
-	table := map[string]struct {
+	type tc struct {
 		fileRoot   string
 		importRoot string
 		out        PackageTree
 		err        error
-	}{
+	}
+	table := map[string]tc{
 		"empty": {
 			fileRoot:   j("empty"),
 			importRoot: "empty",
@@ -900,13 +901,7 @@ func TestListPackages(t *testing.T) {
 		},
 	}
 	if runtime.GOOS != "windows" {
-		type t struct {
-			fileRoot   string
-			importRoot string
-			out        PackageTree
-			err        error
-		}
-		table["follow_symlink"] = t{
+		table["follow_symlink"] = tc{
 			fileRoot:   j("gosimple"),
 			importRoot: "gosimple",
 			out: PackageTree{
@@ -914,7 +909,7 @@ func TestListPackages(t *testing.T) {
 				Packages:   map[string]PackageOrErr{},
 			},
 		}
-		table["follow symlinks inside of package"] = t{
+		table["follow symlinks inside of package"] = tc{
 			fileRoot:   j("symlinks"),
 			importRoot: "symlinks",
 			out: PackageTree{
