@@ -90,11 +90,14 @@ func ListPackages(fileRoot, importRoot string) (PackageTree, error) {
 		// 	1. All absolute symlinks are disqualified; if one is encountered, it should be skipped.
 		// 	2. Relative symlinks pointing to somewhere outside of the root (via ..) should also be skipped.
 		if !fi.IsDir() && fi.Mode()&os.ModeSymlink != 0 {
-			n := fi.Name()
-			if filepath.IsAbs(n) {
+			dst, err := os.Readlink(wp)
+			if err != nil {
 				return err
 			}
-			dst, err := filepath.EvalSymlinks(wp)
+			if filepath.IsAbs(dst) {
+				return err
+			}
+			dst, err = filepath.EvalSymlinks(wp)
 			if err != nil {
 				return err
 			}
