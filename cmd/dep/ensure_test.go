@@ -130,12 +130,14 @@ func main() {
 
 	sysCommit := h.GetCommit("go.googlesource.com/sys")
 	logrusCommit := h.GetCommit("github.com/Sirupsen/logrus")
+	logrusVersion := h.GetLatestTag("github.com/Sirupsen/logrus")
+
 	expectedLock := `{
     "memo": "d4a7b45d366ece090464407f4038cdb62a031c29ef3254f197b8a3d5e6993cca",
     "projects": [
         {
             "name": "github.com/Sirupsen/logrus",
-            "version": "v0.11.0",
+            "version": "` + logrusVersion + `",
             "revision": "` + logrusCommit + `",
             "packages": [
                 "."
