@@ -104,11 +104,11 @@ func TestEnsureEmptyRepoNoArgs(t *testing.T) {
 	m := `package main
 
 import (
-	"github.com/Sirupsen/logrus"
+	_ "github.com/jimmysmith95/fixed-version"
+	_ "golang.org/x/sys/unix"
 )
 
 func main() {
-	logrus.Info("hello world")
 }`
 
 	h.TempFile("src/thing/thing.go", m)
@@ -118,7 +118,7 @@ func main() {
 	h.Run("ensure")
 
 	// make sure vendor exists
-	h.MustExist(h.Path("src/thing/vendor/github.com/Sirupsen/logrus"))
+	h.MustExist(h.Path("src/thing/vendor/github.com/jimmysmith95/fixed-version"))
 
 	expectedManifest := `{}
 `
@@ -129,16 +129,15 @@ func main() {
 	}
 
 	sysCommit := h.GetCommit("go.googlesource.com/sys")
-	logrusCommit := h.GetCommit("github.com/Sirupsen/logrus")
-	logrusVersion := h.GetLatestTag("github.com/Sirupsen/logrus")
+	fixedVersionCommit := h.GetCommit("github.com/jimmysmith95/fixed-version")
 
 	expectedLock := `{
-    "memo": "d4a7b45d366ece090464407f4038cdb62a031c29ef3254f197b8a3d5e6993cca",
+    "memo": "8a7660015b2473d6d2f4bfdfd0508e6aa8178746559d0a9a90cecfbe6aa47a06",
     "projects": [
         {
-            "name": "github.com/Sirupsen/logrus",
-            "version": "` + logrusVersion + `",
-            "revision": "` + logrusCommit + `",
+            "name": "github.com/jimmysmith95/fixed-version",
+            "version": "v1.0.0",
+            "revision": "` + fixedVersionCommit + `",
             "packages": [
                 "."
             ]
