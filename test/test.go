@@ -505,3 +505,15 @@ func (h *Helper) GetCommit(repo string) string {
 	}
 	return strings.TrimSpace(string(out))
 }
+
+func (h *Helper) GetLatestTag(repo string) string {
+	repoPath := h.Path("pkg/dep/sources/https---" + strings.Replace(repo, "/", "-", -1))
+	cmd := exec.Command("git", "describe", "--tags")
+	cmd.Dir = repoPath
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		h.t.Fatalf("git describe failed: out -> %s err -> %v", string(out), err)
+	}
+	return strings.TrimSpace(string(out))
+}
+
