@@ -140,4 +140,7 @@ const Qux = "yo yo!"
 	if lock != expectedLock {
 		t.Fatalf("expected %s, got %s", expectedLock, lock)
 	}
+
+	// vendor should have been created & populated
+	h.MustExist(h.Path("src/" + root + "/vendor/github.com/Sirupsen/logrus"))
 }
