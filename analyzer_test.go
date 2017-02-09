@@ -18,8 +18,9 @@ func TestDeriveManifestAndLock(t *testing.T) {
 	defer h.Cleanup()
 
 	h.TempDir("dep")
-	contents := h.GetTestFileString("analyzer/manifest.json")
-	h.TempCopy(filepath.Join("dep", ManifestName), "analyzer/manifest.json")
+	golden := "analyzer/manifest.json"
+	contents := h.GetTestFileString(golden)
+	h.TempCopy(filepath.Join("dep", ManifestName), golden)
 
 	a := analyzer{}
 
@@ -34,7 +35,13 @@ func TestDeriveManifestAndLock(t *testing.T) {
 	}
 
 	if contents != string(b) {
-		t.Fatalf("expected %s\n got %s", contents, string(b))
+		if *test.UpdateGolden {
+			if err := h.WriteTestFile(golden, string(b)); err != nil {
+				t.Fatal(err)
+			}
+		} else {
+			t.Fatalf("expected %s\n got %s", contents, string(b))
+		}
 	}
 
 	if l != nil {

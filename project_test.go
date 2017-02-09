@@ -20,7 +20,7 @@ func TestFindRoot(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	want := filepath.Join(wd, "_testdata", "rootfind")
+	want := filepath.Join(wd, "testdata", "rootfind")
 	got1, err := findProjectRoot(want)
 	if err != nil {
 		t.Errorf("Unexpected error while finding root: %s", err)

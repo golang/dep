@@ -129,7 +129,7 @@ func TestIsRegular(t *testing.T) {
 
 	tests := map[string]bool{
 		wd: false,
-		filepath.Join(wd, "_testdata"):                      false,
+		filepath.Join(wd, "testdata"):                       false,
 		filepath.Join(wd, "cmd", "dep", "main.go"):          true,
 		filepath.Join(wd, "this_file_does_not_exist.thing"): false,
 	}
@@ -160,7 +160,7 @@ func TestIsDir(t *testing.T) {
 
 	tests := map[string]bool{
 		wd: true,
-		filepath.Join(wd, "_testdata"):                      true,
+		filepath.Join(wd, "testdata"):                       true,
 		filepath.Join(wd, "main.go"):                        false,
 		filepath.Join(wd, "this_file_does_not_exist.thing"): false,
 	}
