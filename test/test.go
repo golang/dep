@@ -6,6 +6,7 @@ package test
 
 import (
 	"bytes"
+	"flag"
 	"fmt"
 	"go/format"
 	"io"
@@ -21,8 +22,9 @@ import (
 )
 
 var (
-	ExeSuffix string // ".exe" on Windows
-	mu        sync.Mutex
+	ExeSuffix    string // ".exe" on Windows
+	mu           sync.Mutex
+	UpdateGolden = flag.Bool("update", false, "update .golden files")
 )
 
 func init() {
@@ -420,10 +422,17 @@ func (h *Helper) TempFile(path, contents string) {
 	h.Must(ioutil.WriteFile(filepath.Join(h.tempdir, path), bytes, 0644))
 }
 
+// WriteTestFile writes a file to the testdata directory from memory.  src is
+// relative to ./testdata.
+func (h *Helper) WriteTestFile(src string, content string) error {
+	err := ioutil.WriteFile(filepath.Join(h.origWd, "testdata", src), []byte(content), 0666)
+	return err
+}
+
 // GetTestFile reads a file from the testdata directory into memory.  src is
-// relative to ./_testdata.
+// relative to ./testdata.
 func (h *Helper) GetTestFile(src string) io.ReadCloser {
-	content, err := os.Open(filepath.Join(h.origWd, "_testdata", src))
+	content, err := os.Open(filepath.Join(h.origWd, "testdata", src))
 	if err != nil {
 		panic(err)
 	}
@@ -431,7 +440,7 @@ func (h *Helper) GetTestFile(src string) io.ReadCloser {
 }
 
 // GetTestFileString reads a file from the testdata directory into memory.  src is
-// relative to ./_testdata.
+// relative to ./testdata.
 func (h *Helper) GetTestFileString(src string) string {
 	content, err := ioutil.ReadAll(h.GetTestFile(src))
 	if err != nil {
@@ -442,7 +451,7 @@ func (h *Helper) GetTestFileString(src string) string {
 
 // TempCopy copies a temporary file from testdata into the temporary directory.
 // dest is relative to the temp directory location, and src is relative to
-// ./_testdata.
+// ./testdata.
 func (h *Helper) TempCopy(dest, src string) {
 	in := h.GetTestFile(src)
 	defer in.Close()

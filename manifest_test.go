@@ -63,7 +63,8 @@ func TestWriteManifest(t *testing.T) {
 	h := test.NewHelper(t)
 	defer h.Cleanup()
 
-	jg := h.GetTestFileString("manifest/golden.json")
+	golden := "manifest/golden.json"
+	jg := h.GetTestFileString(golden)
 	c, _ := gps.NewSemverConstraint("^v0.12.0")
 	m := &Manifest{
 		Dependencies: map[gps.ProjectRoot]gps.ProjectProperties{
@@ -89,6 +90,12 @@ func TestWriteManifest(t *testing.T) {
 	}
 
 	if string(b) != jg {
-		t.Errorf("Valid manifest did not marshal to JSON as expected:\n\t(GOT): %s\n\t(WNT): %s", string(b), jg)
+		if *test.UpdateGolden {
+			if err = h.WriteTestFile(golden, string(b)); err != nil {
+				t.Fatal(err)
+			}
+		} else {
+			t.Errorf("Valid manifest did not marshal to JSON as expected:\n\t(GOT): %s\n\t(WNT): %s", jg, string(b))
+		}
 	}
 }

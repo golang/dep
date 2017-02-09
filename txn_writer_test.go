@@ -94,12 +94,14 @@ func TestTxnWriter(t *testing.T) {
 	reset()
 
 	// super basic manifest and lock
-	expectedManifest := h.GetTestFileString("txn_writer/expected_manifest.json")
-	expectedLock := h.GetTestFileString("txn_writer/expected_lock.json")
+	goldenMan := "txn_writer/expected_manifest.json"
+	goldenLock := "txn_writer/expected_lock.json"
+	expectedManifest := h.GetTestFileString(goldenMan)
+	expectedLock := h.GetTestFileString(goldenLock)
 
-	m, err := readManifest(h.GetTestFile("txn_writer/expected_manifest.json"))
+	m, err := readManifest(h.GetTestFile(goldenMan))
 	h.Must(err)
-	l, err := readLock(h.GetTestFile("txn_writer/expected_lock.json"))
+	l, err := readLock(h.GetTestFile(goldenLock))
 	h.Must(err)
 
 	// Just write manifest
@@ -111,7 +113,14 @@ func TestTxnWriter(t *testing.T) {
 
 	diskm := h.ReadManifest()
 	if expectedManifest != diskm {
-		t.Fatalf("expected %s, got %s", expectedManifest, diskm)
+		if *test.UpdateGolden {
+			expectedManifest = diskm
+			if err = h.WriteTestFile(goldenMan, diskm); err != nil {
+				t.Fatal(err)
+			}
+		} else {
+			t.Fatalf("expected %s, got %s", expectedManifest, diskm)
+		}
 	}
 
 	// Manifest and lock, but no vendor
@@ -128,7 +137,14 @@ func TestTxnWriter(t *testing.T) {
 
 	diskl := h.ReadLock()
 	if expectedLock != diskl {
-		t.Fatalf("expected %s, got %s", expectedLock, diskl)
+		if *test.UpdateGolden {
+			expectedLock = diskl
+			if err = h.WriteTestFile(goldenLock, diskl); err != nil {
+				t.Fatal(err)
+			}
+		} else {
+			t.Fatalf("expected %s, got %s", expectedLock, diskl)
+		}
 	}
 
 	h.Must(sw.WriteAllSafe(true))
