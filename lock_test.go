@@ -25,7 +25,8 @@ func TestReadLock(t *testing.T) {
 		t.Errorf("Unexpected error %q; expected multiple version error", err)
 	}
 
-	l, err := readLock(h.GetTestFile("lock/golden.json"))
+	golden := "lock/golden.json"
+	l, err := readLock(h.GetTestFile(golden))
 	if err != nil {
 		t.Fatalf("Should have read Lock correctly, but got err %q", err)
 	}
@@ -44,6 +45,7 @@ func TestReadLock(t *testing.T) {
 
 	if !reflect.DeepEqual(l, l2) {
 		t.Error("Valid lock did not parse as expected")
+
 	}
 }
 
@@ -51,7 +53,8 @@ func TestWriteLock(t *testing.T) {
 	h := test.NewHelper(t)
 	defer h.Cleanup()
 
-	lg := h.GetTestFileString("lock/golden.json")
+	golden := "lock/golden.json"
+	lg := h.GetTestFileString(golden)
 	memo, _ := hex.DecodeString("2252a285ab27944a4d7adcba8dbd03980f59ba652f12db39fa93b927c345593e")
 	l := &Lock{
 		Memo: memo,
@@ -70,6 +73,12 @@ func TestWriteLock(t *testing.T) {
 	}
 
 	if string(b) != lg {
-		t.Errorf("Valid lock did not marshal to JSON as expected:\n\t(GOT): %s\n\t(WNT): %s", string(b), lg)
+		if *test.UpdateGolden {
+			if err = h.WriteTestFile(golden, string(b)); err != nil {
+				t.Fatal(err)
+			}
+		} else {
+			t.Errorf("Valid lock did not marshal to JSON as expected:\n\t(GOT): %s\n\t(WNT): %s", lg, string(b))
+		}
 	}
 }
