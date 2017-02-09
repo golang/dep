@@ -80,6 +80,7 @@ func ListPackages(fileRoot, importRoot string) (PackageTree, error) {
 	if err != nil {
 		return PackageTree{}, err
 	}
+
 	err = filepath.Walk(fileRoot, func(wp string, fi os.FileInfo, err error) error {
 		if err != nil && err != filepath.SkipDir {
 			return err
@@ -101,6 +102,24 @@ func ListPackages(fileRoot, importRoot string) (PackageTree, error) {
 		// really weird if we don't.
 		if strings.HasPrefix(fi.Name(), ".") {
 			return filepath.SkipDir
+		}
+
+		// The entry error is nil when visiting a directory that itself is
+		// untraversable, as it's still governed by the parent directory's
+		// perms. We have to check readability of the dir here, because
+		// otherwise we'll have an empty package entry when we fail to read any
+		// of the dir's contents.
+		//
+		// If we didn't check here, then the next time this closure is called it
+		// would have an err with the same path as is called this time, as only
+		// then will filepath.Walk have attempted to descend into the directory
+		// and encountered an error.
+		_, err = os.Open(wp)
+		if err != nil {
+			if os.IsPermission(err) {
+				return filepath.SkipDir
+			}
+			return err
 		}
 
 		// Compute the import path. Run the result through ToSlash(), so that windows
@@ -184,7 +203,7 @@ func ListPackages(fileRoot, importRoot string) (PackageTree, error) {
 
 // fillPackage full of info. Assumes p.Dir is set at a minimum
 func fillPackage(p *build.Package) error {
-	var buildMatch = "+build "
+	var buildPrefix = "// +build "
 	var buildFieldSplit = func(r rune) bool {
 		return unicode.IsSpace(r) || r == ','
 	}
@@ -203,6 +222,9 @@ func fillPackage(p *build.Package) error {
 	for _, file := range gofiles {
 		pf, err := parser.ParseFile(token.NewFileSet(), file, nil, parser.ImportsOnly|parser.ParseComments)
 		if err != nil {
+			if os.IsPermission(err) {
+				continue
+			}
 			return err
 		}
 		testFile := strings.HasSuffix(file, "_test.go")
@@ -210,16 +232,26 @@ func fillPackage(p *build.Package) error {
 
 		var ignored bool
 		for _, c := range pf.Comments {
-			if c.Pos() > pf.Package { // +build must come before package
+			if c.Pos() > pf.Package { // +build comment must come before package
 				continue
 			}
-			ct := c.Text()
-			if i := strings.Index(ct, buildMatch); i != -1 {
-				for _, t := range strings.FieldsFunc(ct[i+len(buildMatch):], buildFieldSplit) {
-					// hardcoded (for now) handling for the "ignore" build tag
-					if t == "ignore" {
-						ignored = true
-					}
+
+			var ct string
+			for _, cl := range c.List {
+				if strings.HasPrefix(cl.Text, buildPrefix) {
+					ct = cl.Text
+					break
+				}
+			}
+			if ct == "" {
+				continue
+			}
+
+			for _, t := range strings.FieldsFunc(ct[len(buildPrefix):], buildFieldSplit) {
+				// hardcoded (for now) handling for the "ignore" build tag
+				// We "soft" ignore the files tagged with ignore so that we pull in their imports.
+				if t == "ignore" {
+					ignored = true
 				}
 			}
 		}

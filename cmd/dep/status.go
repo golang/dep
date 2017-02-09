@@ -6,8 +6,10 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"sort"
@@ -65,6 +67,89 @@ type statusCommand struct {
 	modified bool
 }
 
+type outputter interface {
+	BasicHeader()
+	BasicLine(*BasicStatus)
+	BasicFooter()
+	MissingHeader()
+	MissingLine(*MissingStatus)
+	MissingFooter()
+}
+
+type tableOutput struct{ w *tabwriter.Writer }
+
+func (out *tableOutput) BasicHeader() {
+	fmt.Fprintf(out.w, "PROJECT\tCONSTRAINT\tVERSION\tREVISION\tLATEST\tPKGS USED\n")
+}
+
+func (out *tableOutput) BasicFooter() {
+	out.w.Flush()
+}
+
+func (out *tableOutput) BasicLine(bs *BasicStatus) {
+	var constraint string
+	if v, ok := bs.Constraint.(gps.Version); ok {
+		constraint = formatVersion(v)
+	} else {
+		constraint = bs.Constraint.String()
+	}
+	fmt.Fprintf(out.w,
+		"%s\t%s\t%s\t%s\t%s\t%d\t\n",
+		bs.ProjectRoot,
+		constraint,
+		formatVersion(bs.Version),
+		formatVersion(bs.Revision),
+		formatVersion(bs.Latest),
+		bs.PackageCount,
+	)
+}
+
+func (out *tableOutput) MissingHeader() {
+	fmt.Fprintln(out.w, "PROJECT\tMISSING PACKAGES")
+}
+
+func (out *tableOutput) MissingLine(ms *MissingStatus) {
+	fmt.Fprintf(out.w,
+		"%s\t%s\t\n",
+		ms.ProjectRoot,
+		ms.MissingPackages,
+	)
+}
+
+func (out *tableOutput) MissingFooter() {
+	out.w.Flush()
+}
+
+type jsonOutput struct {
+	w       io.Writer
+	basic   []*BasicStatus
+	missing []*MissingStatus
+}
+
+func (out *jsonOutput) BasicHeader() {
+	out.basic = []*BasicStatus{}
+}
+
+func (out *jsonOutput) BasicFooter() {
+	json.NewEncoder(out.w).Encode(out.basic)
+}
+
+func (out *jsonOutput) BasicLine(bs *BasicStatus) {
+	out.basic = append(out.basic, bs)
+}
+
+func (out *jsonOutput) MissingHeader() {
+	out.missing = []*MissingStatus{}
+}
+
+func (out *jsonOutput) MissingLine(ms *MissingStatus) {
+	out.missing = append(out.missing, ms)
+}
+
+func (out *jsonOutput) MissingFooter() {
+	json.NewEncoder(out.w).Encode(out.missing)
+}
+
 func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
 	p, err := ctx.LoadProject("")
 	if err != nil {
@@ -78,10 +163,20 @@ func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
 	sm.UseDefaultSignalHandling()
 	defer sm.Release()
 
-	if cmd.detailed {
-		return runStatusDetailed(p, sm, args)
+	var out outputter
+	switch {
+	case cmd.detailed:
+		return fmt.Errorf("not implemented")
+	case cmd.json:
+		out = &jsonOutput{
+			w: os.Stdout,
+		}
+	default:
+		out = &tableOutput{
+			w: tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0),
+		}
 	}
-	return runStatusAll(p, sm)
+	return runStatusAll(out, p, sm)
 }
 
 // BasicStatus contains all the information reported about a single dependency
@@ -97,10 +192,10 @@ type BasicStatus struct {
 
 type MissingStatus struct {
 	ProjectRoot     string
-	MissingPackages string
+	MissingPackages []string
 }
 
-func runStatusAll(p *dep.Project, sm *gps.SourceMgr) error {
+func runStatusAll(out outputter, p *dep.Project, sm *gps.SourceMgr) error {
 	if p.Lock == nil {
 		// TODO if we have no lock file, do...other stuff
 		return nil
@@ -138,15 +233,12 @@ func runStatusAll(p *dep.Project, sm *gps.SourceMgr) error {
 	slp := p.Lock.Projects()
 	sort.Sort(dep.SortedLockedProjects(slp))
 
-	tw := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)
-	defer tw.Flush()
-
 	if bytes.Equal(s.HashInputs(), p.Lock.Memo) {
 		// If these are equal, we're guaranteed that the lock is a transitively
 		// complete picture of all deps. That eliminates the need for at least
 		// some checks.
 
-		fmt.Fprintf(tw, "PROJECT\tCONSTRAINT\tVERSION\tREVISION\tLATEST\tPKGS USED\n")
+		out.BasicHeader()
 
 		for _, proj := range slp {
 			bs := BasicStatus{
@@ -212,23 +304,9 @@ func runStatusAll(p *dep.Project, sm *gps.SourceMgr) error {
 				}
 			}
 
-			var constraint string
-			if v, ok := bs.Constraint.(gps.Version); ok {
-				constraint = formatVersion(v)
-			} else {
-				constraint = bs.Constraint.String()
-			}
-
-			fmt.Fprintf(tw,
-				"%s\t%s\t%s\t%s\t%s\t%d\t\n",
-				bs.ProjectRoot,
-				constraint,
-				formatVersion(bs.Version),
-				formatVersion(bs.Revision),
-				formatVersion(bs.Latest),
-				bs.PackageCount,
-			)
+			out.BasicLine(&bs)
 		}
+		out.BasicFooter()
 
 		return nil
 	}
@@ -239,7 +317,7 @@ func runStatusAll(p *dep.Project, sm *gps.SourceMgr) error {
 	//
 	// It's possible for digests to not match, but still have a correct
 	// lock.
-	fmt.Fprintln(tw, "PROJECT\tMISSING PACKAGES")
+	out.MissingHeader()
 
 	external := ptree.ExternalReach(true, false, nil).ListExternalImports()
 	roots := make(map[gps.ProjectRoot][]string)
@@ -264,12 +342,9 @@ outer:
 			}
 		}
 
-		fmt.Fprintf(tw,
-			"%s\t%s\t\n",
-			root,
-			pkgs,
-		)
+		out.MissingLine(&MissingStatus{ProjectRoot: string(root), MissingPackages: pkgs})
 	}
+	out.MissingFooter()
 
 	return nil
 }
@@ -289,11 +364,6 @@ func formatVersion(v gps.Version) string {
 		return r
 	}
 	return v.String()
-}
-
-func runStatusDetailed(p *dep.Project, sm *gps.SourceMgr, args []string) error {
-	// TODO
-	return fmt.Errorf("not implemented")
 }
 
 func collectConstraints(ptree gps.PackageTree, p *dep.Project, sm *gps.SourceMgr) map[string][]gps.Constraint {

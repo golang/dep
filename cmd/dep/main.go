@@ -55,23 +55,29 @@ func main() {
 		fmt.Fprintln(os.Stderr)
 	}
 
-	if len(os.Args) <= 1 || len(os.Args) == 2 && (strings.Contains(strings.ToLower(os.Args[1]), "help") || strings.ToLower(os.Args[1]) == "-h") {
+	cmdName, printCommandHelp, exit := parseArgs(os.Args)
+	if exit {
 		usage()
 		os.Exit(1)
 	}
 
 	for _, cmd := range commands {
-		if name := cmd.Name(); os.Args[1] == name {
+		if cmd.Name() == cmdName {
 			// Build flag set with global flags in there.
 			// TODO(pb): can we deglobalize verbose, pretty please?
-			fs := flag.NewFlagSet(name, flag.ExitOnError)
+			fs := flag.NewFlagSet(cmdName, flag.ExitOnError)
 			fs.BoolVar(verbose, "v", false, "enable verbose logging")
 
 			// Register the subcommand flags in there, too.
 			cmd.Register(fs)
 
 			// Override the usage text to something nicer.
-			resetUsage(fs, cmd.Name(), cmd.Args(), cmd.LongHelp())
+			resetUsage(fs, cmdName, cmd.Args(), cmd.LongHelp())
+
+			if printCommandHelp {
+				fs.Usage()
+				os.Exit(1)
+			}
 
 			// Parse the flags the user gave us.
 			if err := fs.Parse(os.Args[2:]); err != nil {
@@ -97,7 +103,7 @@ func main() {
 		}
 	}
 
-	fmt.Fprintf(os.Stderr, "%s: no such command\n", os.Args[1])
+	fmt.Fprintf(os.Stderr, "%s: no such command\n", cmdName)
 	usage()
 	os.Exit(1)
 }
@@ -130,6 +136,32 @@ func resetUsage(fs *flag.FlagSet, name, args, longHelp string) {
 			fmt.Fprintln(os.Stderr, flagBlock.String())
 		}
 	}
+}
+
+// parseArgs determines the name of the dep command and wether the user asked for
+// help to be printed.
+func parseArgs(args []string) (cmdName string, printCmdUsage bool, exit bool) {
+	isHelpArg := func() bool {
+		return strings.Contains(strings.ToLower(args[1]), "help") || strings.ToLower(args[1]) == "-h"
+	}
+
+	switch len(args) {
+	case 0, 1:
+		exit = true
+	case 2:
+		if isHelpArg() {
+			exit = true
+		}
+		cmdName = args[1]
+	default:
+		if isHelpArg() {
+			cmdName = args[2]
+			printCmdUsage = true
+		} else {
+			cmdName = args[1]
+		}
+	}
+	return cmdName, printCmdUsage, exit
 }
 
 func logf(format string, args ...interface{}) {

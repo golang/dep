@@ -2,6 +2,7 @@ package gps
 
 import (
 	"strings"
+	"sync"
 
 	"github.com/armon/go-radix"
 )
@@ -15,17 +16,20 @@ import (
 // Oh generics, where art thou...
 
 type deducerTrie struct {
+	sync.RWMutex
 	t *radix.Tree
 }
 
-func newDeducerTrie() deducerTrie {
-	return deducerTrie{
+func newDeducerTrie() *deducerTrie {
+	return &deducerTrie{
 		t: radix.New(),
 	}
 }
 
 // Delete is used to delete a key, returning the previous value and if it was deleted
-func (t deducerTrie) Delete(s string) (pathDeducer, bool) {
+func (t *deducerTrie) Delete(s string) (pathDeducer, bool) {
+	t.Lock()
+	defer t.Unlock()
 	if d, had := t.t.Delete(s); had {
 		return d.(pathDeducer), had
 	}
@@ -33,7 +37,9 @@ func (t deducerTrie) Delete(s string) (pathDeducer, bool) {
 }
 
 // Get is used to lookup a specific key, returning the value and if it was found
-func (t deducerTrie) Get(s string) (pathDeducer, bool) {
+func (t *deducerTrie) Get(s string) (pathDeducer, bool) {
+	t.RLock()
+	defer t.RUnlock()
 	if d, has := t.t.Get(s); has {
 		return d.(pathDeducer), has
 	}
@@ -41,7 +47,9 @@ func (t deducerTrie) Get(s string) (pathDeducer, bool) {
 }
 
 // Insert is used to add a newentry or update an existing entry. Returns if updated.
-func (t deducerTrie) Insert(s string, d pathDeducer) (pathDeducer, bool) {
+func (t *deducerTrie) Insert(s string, d pathDeducer) (pathDeducer, bool) {
+	t.Lock()
+	defer t.Unlock()
 	if d2, had := t.t.Insert(s, d); had {
 		return d2.(pathDeducer), had
 	}
@@ -49,13 +57,17 @@ func (t deducerTrie) Insert(s string, d pathDeducer) (pathDeducer, bool) {
 }
 
 // Len is used to return the number of elements in the tree
-func (t deducerTrie) Len() int {
+func (t *deducerTrie) Len() int {
+	t.RLock()
+	defer t.RUnlock()
 	return t.t.Len()
 }
 
 // LongestPrefix is like Get, but instead of an exact match, it will return the
 // longest prefix match.
-func (t deducerTrie) LongestPrefix(s string) (string, pathDeducer, bool) {
+func (t *deducerTrie) LongestPrefix(s string) (string, pathDeducer, bool) {
+	t.RLock()
+	defer t.RUnlock()
 	if p, d, has := t.t.LongestPrefix(s); has {
 		return p, d.(pathDeducer), has
 	}
@@ -63,28 +75,33 @@ func (t deducerTrie) LongestPrefix(s string) (string, pathDeducer, bool) {
 }
 
 // ToMap is used to walk the tree and convert it to a map.
-func (t deducerTrie) ToMap() map[string]pathDeducer {
+func (t *deducerTrie) ToMap() map[string]pathDeducer {
 	m := make(map[string]pathDeducer)
+	t.RLock()
 	t.t.Walk(func(s string, d interface{}) bool {
 		m[s] = d.(pathDeducer)
 		return false
 	})
 
+	t.RUnlock()
 	return m
 }
 
 type prTrie struct {
+	sync.RWMutex
 	t *radix.Tree
 }
 
-func newProjectRootTrie() prTrie {
-	return prTrie{
+func newProjectRootTrie() *prTrie {
+	return &prTrie{
 		t: radix.New(),
 	}
 }
 
 // Delete is used to delete a key, returning the previous value and if it was deleted
-func (t prTrie) Delete(s string) (ProjectRoot, bool) {
+func (t *prTrie) Delete(s string) (ProjectRoot, bool) {
+	t.Lock()
+	defer t.Unlock()
 	if pr, had := t.t.Delete(s); had {
 		return pr.(ProjectRoot), had
 	}
@@ -92,7 +109,9 @@ func (t prTrie) Delete(s string) (ProjectRoot, bool) {
 }
 
 // Get is used to lookup a specific key, returning the value and if it was found
-func (t prTrie) Get(s string) (ProjectRoot, bool) {
+func (t *prTrie) Get(s string) (ProjectRoot, bool) {
+	t.RLock()
+	defer t.RUnlock()
 	if pr, has := t.t.Get(s); has {
 		return pr.(ProjectRoot), has
 	}
@@ -100,7 +119,9 @@ func (t prTrie) Get(s string) (ProjectRoot, bool) {
 }
 
 // Insert is used to add a newentry or update an existing entry. Returns if updated.
-func (t prTrie) Insert(s string, pr ProjectRoot) (ProjectRoot, bool) {
+func (t *prTrie) Insert(s string, pr ProjectRoot) (ProjectRoot, bool) {
+	t.Lock()
+	defer t.Unlock()
 	if pr2, had := t.t.Insert(s, pr); had {
 		return pr2.(ProjectRoot), had
 	}
@@ -108,13 +129,17 @@ func (t prTrie) Insert(s string, pr ProjectRoot) (ProjectRoot, bool) {
 }
 
 // Len is used to return the number of elements in the tree
-func (t prTrie) Len() int {
+func (t *prTrie) Len() int {
+	t.RLock()
+	defer t.RUnlock()
 	return t.t.Len()
 }
 
 // LongestPrefix is like Get, but instead of an exact match, it will return the
 // longest prefix match.
-func (t prTrie) LongestPrefix(s string) (string, ProjectRoot, bool) {
+func (t *prTrie) LongestPrefix(s string) (string, ProjectRoot, bool) {
+	t.RLock()
+	defer t.RUnlock()
 	if p, pr, has := t.t.LongestPrefix(s); has && isPathPrefixOrEqual(p, s) {
 		return p, pr.(ProjectRoot), has
 	}
@@ -122,13 +147,15 @@ func (t prTrie) LongestPrefix(s string) (string, ProjectRoot, bool) {
 }
 
 // ToMap is used to walk the tree and convert it to a map.
-func (t prTrie) ToMap() map[string]ProjectRoot {
+func (t *prTrie) ToMap() map[string]ProjectRoot {
+	t.RLock()
 	m := make(map[string]ProjectRoot)
 	t.t.Walk(func(s string, pr interface{}) bool {
 		m[s] = pr.(ProjectRoot)
 		return false
 	})
 
+	t.RUnlock()
 	return m
 }
 

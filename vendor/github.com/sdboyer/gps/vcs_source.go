@@ -40,6 +40,10 @@ func (s *gitSource) exportVersionTo(v Version, to string) error {
 		return err
 	}
 
+	if err := os.MkdirAll(to, 0777); err != nil {
+		return err
+	}
+
 	do := func() error {
 		s.crepo.mut.Lock()
 		defer s.crepo.mut.Unlock()
@@ -98,6 +102,9 @@ func (s *gitSource) exportVersionTo(v Version, to string) error {
 }
 
 func (s *gitSource) listVersions() (vlist []Version, err error) {
+	s.baseVCSSource.lvmut.Lock()
+	defer s.baseVCSSource.lvmut.Unlock()
+
 	if s.cvsync {
 		vlist = make([]Version, len(s.dc.vMap))
 		k := 0
@@ -284,6 +291,9 @@ type gopkginSource struct {
 }
 
 func (s *gopkginSource) listVersions() (vlist []Version, err error) {
+	s.baseVCSSource.lvmut.Lock()
+	defer s.baseVCSSource.lvmut.Unlock()
+
 	if s.cvsync {
 		vlist = make([]Version, len(s.dc.vMap))
 		k := 0
@@ -376,6 +386,9 @@ type bzrSource struct {
 }
 
 func (s *bzrSource) listVersions() (vlist []Version, err error) {
+	s.baseVCSSource.lvmut.Lock()
+	defer s.baseVCSSource.lvmut.Unlock()
+
 	if s.cvsync {
 		vlist = make([]Version, len(s.dc.vMap))
 		k := 0
@@ -461,6 +474,9 @@ type hgSource struct {
 }
 
 func (s *hgSource) listVersions() (vlist []Version, err error) {
+	s.baseVCSSource.lvmut.Lock()
+	defer s.baseVCSSource.lvmut.Unlock()
+
 	if s.cvsync {
 		vlist = make([]Version, len(s.dc.vMap))
 		k := 0
