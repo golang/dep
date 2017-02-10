@@ -17,20 +17,13 @@ func TestReadManifest(t *testing.T) {
 	h := test.NewHelper(t)
 	defer h.Cleanup()
 
-	_, err := readManifest(h.GetTestFile("manifest/error.json"))
-	if err == nil {
-		t.Error("Reading manifest with invalid props should have caused error, but did not")
-	} else if !strings.Contains(err.Error(), "multiple constraints") {
-		t.Errorf("Unexpected error %q; expected multiple constraint error", err)
-	}
-
-	m2, err := readManifest(h.GetTestFile("manifest/golden.json"))
+	got, err := readManifest(h.GetTestFile("manifest/golden.json"))
 	if err != nil {
 		t.Fatalf("Should have read Manifest correctly, but got err %q", err)
 	}
 
 	c, _ := gps.NewSemverConstraint(">=0.12.0, <1.0.0")
-	em := Manifest{
+	want := Manifest{
 		Dependencies: map[gps.ProjectRoot]gps.ProjectProperties{
 			gps.ProjectRoot("github.com/sdboyer/gps"): {
 				Constraint: c,
@@ -48,13 +41,13 @@ func TestReadManifest(t *testing.T) {
 		Ignores: []string{"github.com/foo/bar"},
 	}
 
-	if !reflect.DeepEqual(m2.Dependencies, em.Dependencies) {
+	if !reflect.DeepEqual(got.Dependencies, want.Dependencies) {
 		t.Error("Valid manifest's dependencies did not parse as expected")
 	}
-	if !reflect.DeepEqual(m2.Ovr, em.Ovr) {
+	if !reflect.DeepEqual(got.Ovr, want.Ovr) {
 		t.Error("Valid manifest's overrides did not parse as expected")
 	}
-	if !reflect.DeepEqual(m2.Ignores, em.Ignores) {
+	if !reflect.DeepEqual(got.Ignores, want.Ignores) {
 		t.Error("Valid manifest's ignores did not parse as expected")
 	}
 }
@@ -64,7 +57,7 @@ func TestWriteManifest(t *testing.T) {
 	defer h.Cleanup()
 
 	golden := "manifest/golden.json"
-	jg := h.GetTestFileString(golden)
+	want := h.GetTestFileString(golden)
 	c, _ := gps.NewSemverConstraint("^v0.12.0")
 	m := &Manifest{
 		Dependencies: map[gps.ProjectRoot]gps.ProjectProperties{
@@ -84,18 +77,40 @@ func TestWriteManifest(t *testing.T) {
 		Ignores: []string{"github.com/foo/bar"},
 	}
 
-	b, err := m.MarshalJSON()
+	got, err := m.MarshalJSON()
 	if err != nil {
 		t.Fatalf("Error while marshaling valid manifest to JSON: %q", err)
 	}
 
-	if string(b) != jg {
+	if string(got) != want {
 		if *test.UpdateGolden {
-			if err = h.WriteTestFile(golden, string(b)); err != nil {
+			if err = h.WriteTestFile(golden, string(got)); err != nil {
 				t.Fatal(err)
 			}
 		} else {
-			t.Errorf("Valid manifest did not marshal to JSON as expected:\n\t(GOT): %s\n\t(WNT): %s", jg, string(b))
+			t.Errorf("Valid manifest did not marshal to JSON as expected:\n\t(GOT): %s\n\t(WNT): %s", string(got), want)
+		}
+	}
+}
+
+func TestReadManifestErrors(t *testing.T) {
+	h := test.NewHelper(t)
+	defer h.Cleanup()
+	var err error
+
+	tests := []struct {
+		name string
+		file string
+	}{
+		{"multiple constraints", "manifest/error.json"},
+	}
+
+	for _, tst := range tests {
+		_, err = readManifest(h.GetTestFile(tst.file))
+		if err == nil {
+			t.Errorf("Reading manifest with %s should have caused error, but did not", tst.name)
+		} else if !strings.Contains(err.Error(), tst.name) {
+			t.Errorf("Unexpected error %q; expected %s error", err, tst.name)
 		}
 	}
 }
