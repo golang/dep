@@ -225,7 +225,10 @@ func (cmd *ensureCommand) Run(ctx *dep.Ctx, args []string) error {
 	// vendor does not exist we should write vendor
 	var writeV bool
 	path := filepath.Join(sw.Root, "vendor")
-	vendorIsDir, _ := dep.IsDir(path)
+	vendorIsDir, err := dep.IsDir(path)
+	if err != nil {
+		return errors.Wrap(err, "ensure vendor is a directory")
+	}
 	vendorEmpty, _ := dep.IsEmptyDir(path)
 	vendorExists := vendorIsDir && !vendorEmpty
 	if !vendorExists && solution != nil {

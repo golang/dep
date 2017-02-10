@@ -192,32 +192,32 @@ func TestIsEmpty(t *testing.T) {
 	h := test.NewHelper(t)
 	h.TempDir("empty")
 	tests := map[string]string{
-		wd: "false",
-		filepath.Join(wd, "_testdata"):                      "false",
+		wd:                                                  "false",
+		"_testdata":                                         "false",
 		filepath.Join(wd, "main.go"):                        "err",
 		filepath.Join(wd, "this_file_does_not_exist.thing"): "err",
 		h.Path("empty"):                                     "true",
 	}
 
-	for f, expected := range tests {
+	for f, want := range tests {
 		empty, err := IsEmptyDir(f)
-		if expected == "err" {
+		if want == "err" {
 			if err == nil {
-				t.Fatalf("Expected an error for %v, but it was nil", f)
+				t.Fatalf("Wanted an error for %v, but it was nil", f)
 			}
 			if empty {
-				t.Fatalf("Expected false with error for %v, but got true", f)
+				t.Fatalf("Wanted false with error for %v, but got true", f)
 			}
 		} else if err != nil {
-			t.Fatalf("expected no error for %v, got %v", f, err)
+			t.Fatalf("Wanted no error for %v, got %v", f, err)
 		}
 
-		if expected == "true" && !empty {
-			t.Fatalf("Expected true for %v, but got false", f)
+		if want == "true" && !empty {
+			t.Fatalf("Wanted true for %v, but got false", f)
 		}
 
-		if expected == "false" && empty {
-			t.Fatalf("Expected false for %v, but got true", f)
+		if want == "false" && empty {
+			t.Fatalf("Wanted false for %v, but got true", f)
 		}
 	}
 }
