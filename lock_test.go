@@ -19,13 +19,13 @@ func TestReadLock(t *testing.T) {
 	defer h.Cleanup()
 
 	golden := "lock/golden0.json"
-	l, err := readLock(h.GetTestFile(golden))
+	got, err := readLock(h.GetTestFile(golden))
 	if err != nil {
 		t.Fatalf("Should have read Lock correctly, but got err %q", err)
 	}
 
 	b, _ := hex.DecodeString("2252a285ab27944a4d7adcba8dbd03980f59ba652f12db39fa93b927c345593e")
-	l2 := &Lock{
+	want := &Lock{
 		Memo: b,
 		P: []gps.LockedProject{
 			gps.NewLockedProject(
@@ -36,18 +36,18 @@ func TestReadLock(t *testing.T) {
 		},
 	}
 
-	if !reflect.DeepEqual(l, l2) {
+	if !reflect.DeepEqual(got, want) {
 		t.Error("Valid lock did not parse as expected")
 	}
 
 	golden = "lock/golden1.json"
-	l, err = readLock(h.GetTestFile(golden))
+	got, err = readLock(h.GetTestFile(golden))
 	if err != nil {
 		t.Fatalf("Should have read Lock correctly, but got err %q", err)
 	}
 
 	b, _ = hex.DecodeString("2252a285ab27944a4d7adcba8dbd03980f59ba652f12db39fa93b927c345593e")
-	l2 = &Lock{
+	want = &Lock{
 		Memo: b,
 		P: []gps.LockedProject{
 			gps.NewLockedProject(
@@ -58,7 +58,7 @@ func TestReadLock(t *testing.T) {
 		},
 	}
 
-	if !reflect.DeepEqual(l, l2) {
+	if !reflect.DeepEqual(got, want) {
 		t.Error("Valid lock did not parse as expected")
 	}
 }
@@ -68,7 +68,7 @@ func TestWriteLock(t *testing.T) {
 	defer h.Cleanup()
 
 	golden := "lock/golden0.json"
-	lg := h.GetTestFileString(golden)
+	want := h.GetTestFileString(golden)
 	memo, _ := hex.DecodeString("2252a285ab27944a4d7adcba8dbd03980f59ba652f12db39fa93b927c345593e")
 	l := &Lock{
 		Memo: memo,
@@ -81,23 +81,23 @@ func TestWriteLock(t *testing.T) {
 		},
 	}
 
-	b, err := l.MarshalJSON()
+	got, err := l.MarshalJSON()
 	if err != nil {
 		t.Fatalf("Error while marshaling valid lock to JSON: %q", err)
 	}
 
-	if string(b) != lg {
+	if string(got) != want {
 		if *test.UpdateGolden {
-			if err = h.WriteTestFile(golden, string(b)); err != nil {
+			if err = h.WriteTestFile(golden, string(got)); err != nil {
 				t.Fatal(err)
 			}
 		} else {
-			t.Errorf("Valid lock did not marshal to JSON as expected:\n\t(GOT): %s\n\t(WNT): %s", lg, string(b))
+			t.Errorf("Valid lock did not marshal to JSON as expected:\n\t(GOT): %s\n\t(WNT): %s", string(got), want)
 		}
 	}
 
 	golden = "lock/golden1.json"
-	lg = h.GetTestFileString(golden)
+	want = h.GetTestFileString(golden)
 	memo, _ = hex.DecodeString("2252a285ab27944a4d7adcba8dbd03980f59ba652f12db39fa93b927c345593e")
 	l = &Lock{
 		Memo: memo,
@@ -110,18 +110,18 @@ func TestWriteLock(t *testing.T) {
 		},
 	}
 
-	b, err = l.MarshalJSON()
+	got, err = l.MarshalJSON()
 	if err != nil {
 		t.Fatalf("Error while marshaling valid lock to JSON: %q", err)
 	}
 
-	if string(b) != lg {
+	if string(got) != want {
 		if *test.UpdateGolden {
-			if err = h.WriteTestFile(golden, string(b)); err != nil {
+			if err = h.WriteTestFile(golden, string(got)); err != nil {
 				t.Fatal(err)
 			}
 		} else {
-			t.Errorf("Valid lock did not marshal to JSON as expected:\n\t(GOT): %s\n\t(WNT): %s", lg, string(b))
+			t.Errorf("Valid lock did not marshal to JSON as expected:\n\t(GOT): %s\n\t(WNT): %s", string(got), want)
 		}
 	}
 }
@@ -148,26 +148,4 @@ func TestReadLockErrors(t *testing.T) {
 			t.Errorf("Unexpected error %q; expected %s error", err, tst.name)
 		}
 	}
-
-	// _, err = readLock(h.GetTestFile("lock/error0.json"))
-	// if err == nil {
-	// 	t.Error("Reading lock with invalid props should have caused error, but did not")
-	// } else if !strings.Contains(err.Error(), "both a branch") {
-	// 	t.Errorf("Unexpected error %q; expected multiple version error", err)
-	// }
-	//
-	// _, err = readLock(h.GetTestFile("lock/error1.json"))
-	// if err == nil {
-	// 	t.Error("Reading lock with invalid hash should have caused error, but did not")
-	// } else if !strings.Contains(err.Error(), "invalid hash") {
-	// 	t.Errorf("Unexpected error %q; expected invalid hash error", err)
-	// }
-	//
-	// _, err = readLock(h.GetTestFile("lock/error2.json"))
-	// if err == nil {
-	// 	t.Error("Reading lock with invalid props should have caused error, but did not")
-	// } else if !strings.Contains(err.Error(), "no version") {
-	// 	t.Errorf("Unexpected error %q; expected no version error", err)
-	// }
-
 }
