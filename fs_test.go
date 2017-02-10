@@ -192,15 +192,15 @@ func TestIsEmpty(t *testing.T) {
 	h := test.NewHelper(t)
 	h.TempDir("empty")
 	tests := map[string]string{
-		wd:                                                  "false",
-		"_testdata":                                         "false",
-		filepath.Join(wd, "main.go"):                        "err",
-		filepath.Join(wd, "this_file_does_not_exist.thing"): "err",
-		h.Path("empty"):                                     "true",
+		wd:                                                  "true",
+		"_testdata":                                         "true",
+		filepath.Join(wd, "fs.go"):                          "err",
+		filepath.Join(wd, "this_file_does_not_exist.thing"): "false",
+		h.Path("empty"):                                     "false",
 	}
 
 	for f, want := range tests {
-		empty, err := IsEmptyDir(f)
+		empty, err := IsNonEmptyDir(f)
 		if want == "err" {
 			if err == nil {
 				t.Fatalf("Wanted an error for %v, but it was nil", f)

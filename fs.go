@@ -45,12 +45,17 @@ func IsDir(name string) (bool, error) {
 	return true, nil
 }
 
-func IsEmptyDir(name string) (bool, error) {
+func IsNonEmptyDir(name string) (bool, error) {
+	isDir, err := IsDir(name)
+	if !isDir || err != nil {
+		return isDir, err
+	}
+
 	files, err := ioutil.ReadDir(name)
 	if err != nil {
 		return false, err
 	}
-	return len(files) == 0, nil
+	return len(files) != 0, nil
 }
 
 func writeFile(path string, in json.Marshaler) error {
