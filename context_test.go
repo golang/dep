@@ -43,21 +43,21 @@ func TestSplitAbsoluteProjectRoot(t *testing.T) {
 		"my/silly/thing",
 	}
 
-	for _, ip := range importPaths {
-		fullpath := filepath.Join(depCtx.GOPATH, "src", ip)
-		pr, err := depCtx.SplitAbsoluteProjectRoot(fullpath)
+	for _, want := range importPaths {
+		fullpath := filepath.Join(depCtx.GOPATH, "src", want)
+		got, err := depCtx.SplitAbsoluteProjectRoot(fullpath)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if pr != ip {
-			t.Fatalf("expected %s, got %s", ip, pr)
+		if got != want {
+			t.Fatalf("expected %s, got %s", want, got)
 		}
 	}
 
 	// test where it should return error
-	pr, err := depCtx.SplitAbsoluteProjectRoot("tra/la/la/la")
+	got, err := depCtx.SplitAbsoluteProjectRoot("tra/la/la/la")
 	if err == nil {
-		t.Fatalf("should have gotten error but did not for tra/la/la/la: %s", pr)
+		t.Fatalf("should have gotten error but did not for tra/la/la/la: %s", got)
 	}
 }
 
@@ -81,12 +81,12 @@ func TestAbsoluteProjectRoot(t *testing.T) {
 	}
 
 	for i, ok := range importPaths {
-		pr, err := depCtx.absoluteProjectRoot(i)
+		got, err := depCtx.absoluteProjectRoot(i)
 		if ok {
 			h.Must(err)
-			expected := h.Path(filepath.Join("src", i))
-			if pr != expected {
-				t.Fatalf("expected %s, got %q", expected, pr)
+			want := h.Path(filepath.Join("src", i))
+			if got != want {
+				t.Fatalf("expected %s, got %q", want, got)
 			}
 			continue
 		}
@@ -140,11 +140,11 @@ func TestVersionInWorkspace(t *testing.T) {
 			h.RunGit(repoDir, "checkout", info.rev.String())
 		}
 
-		v, err := depCtx.VersionInWorkspace(gps.ProjectRoot(ip))
+		got, err := depCtx.VersionInWorkspace(gps.ProjectRoot(ip))
 		h.Must(err)
 
-		if v != info.rev {
-			t.Fatalf("expected %q, got %q", v.String(), info.rev.String())
+		if got != info.rev {
+			t.Fatalf("expected %q, got %q", got.String(), info.rev.String())
 		}
 	}
 }

@@ -16,27 +16,16 @@ import (
 
 func TestAnalyzerInfo(t *testing.T) {
 	a := analyzer{}
-	n, v := a.Info()
-	if n != "dep" {
-		t.Errorf("analyzer.Info() returned an incorrect name: '%s' (expected 'dep')", n)
+	gotn, gotv := a.Info()
+	if gotn != "dep" {
+		t.Errorf("analyzer.Info() returned an incorrect name: '%s' (expected 'dep')", gotn)
 	}
-	expV, err := semver.NewVersion("v0.0.1")
+	wantv, err := semver.NewVersion("v0.0.1")
 	if err != nil {
 		t.Fatal(err)
-	} else if v != expV {
-		t.Fatalf("analyzer.Info() returned an incorrect version: %v (expected %v)", v, expV)
 	}
-}
-
-func TestAnalyzerErrors(t *testing.T) {
-	h := test.NewHelper(t)
-	defer h.Cleanup()
-	h.TempDir("dep")
-
-	a := analyzer{}
-	_, _, err := a.DeriveManifestAndLock(h.Path("dep"), "my/fake/project")
-	if err == nil {
-		t.Fatal("analyzer.DeriveManifestAndLock with manifest not present should have produced an error")
+	if gotv != wantv {
+		t.Fatalf("analyzer.Info() returned an incorrect version: %v (expected %v)", gotv, wantv)
 	}
 }
 
@@ -46,7 +35,7 @@ func TestDeriveManifestAndLock(t *testing.T) {
 
 	h.TempDir("dep")
 	golden := "analyzer/manifest.json"
-	contents := h.GetTestFileString(golden)
+	want := h.GetTestFileString(golden)
 	h.TempCopy(filepath.Join("dep", ManifestName), golden)
 
 	a := analyzer{}
@@ -56,18 +45,18 @@ func TestDeriveManifestAndLock(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	b, err := m.(*Manifest).MarshalJSON()
+	got, err := m.(*Manifest).MarshalJSON()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if contents != string(b) {
+	if want != string(got) {
 		if *test.UpdateGolden {
-			if err := h.WriteTestFile(golden, string(b)); err != nil {
+			if err := h.WriteTestFile(golden, string(got)); err != nil {
 				t.Fatal(err)
 			}
 		} else {
-			t.Fatalf("expected %s\n got %s", contents, string(b))
+			t.Fatalf("expected %s\n got %s", want, string(got))
 		}
 	}
 
