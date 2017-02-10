@@ -21,7 +21,7 @@ func TestCopyDir(t *testing.T) {
 	defer os.RemoveAll(dir)
 
 	srcdir := filepath.Join(dir, "src")
-	if err := os.MkdirAll(srcdir, 0755); err != nil {
+	if err = os.MkdirAll(srcdir, 0755); err != nil {
 		t.Fatal(err)
 	}
 
@@ -30,14 +30,14 @@ func TestCopyDir(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	contents := "hello world"
-	if _, err := srcf.Write([]byte(contents)); err != nil {
+	want := "hello world"
+	if _, err = srcf.Write([]byte(want)); err != nil {
 		t.Fatal(err)
 	}
 	srcf.Close()
 
 	destdir := filepath.Join(dir, "dest")
-	if err := CopyDir(srcdir, destdir); err != nil {
+	if err = CopyDir(srcdir, destdir); err != nil {
 		t.Fatal(err)
 	}
 
@@ -50,27 +50,27 @@ func TestCopyDir(t *testing.T) {
 	}
 
 	destf := filepath.Join(destdir, "myfile")
-	destcontents, err := ioutil.ReadFile(destf)
+	got, err := ioutil.ReadFile(destf)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if contents != string(destcontents) {
-		t.Fatalf("expected: %s, got: %s", contents, string(destcontents))
+	if want != string(got) {
+		t.Fatalf("expected: %s, got: %s", want, string(got))
 	}
 
-	srcinfo, err := os.Stat(srcf.Name())
+	wantinfo, err := os.Stat(srcf.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	destinfo, err := os.Stat(destf)
+	gotinfo, err := os.Stat(destf)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if srcinfo.Mode() != destinfo.Mode() {
-		t.Fatalf("expected %s: %#v\n to be the same mode as %s: %#v", srcf.Name(), srcinfo.Mode(), destf, destinfo.Mode())
+	if wantinfo.Mode() != gotinfo.Mode() {
+		t.Fatalf("expected %s: %#v\n to be the same mode as %s: %#v", srcf.Name(), wantinfo.Mode(), destf, gotinfo.Mode())
 	}
 }
 
@@ -86,8 +86,8 @@ func TestCopyFile(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	contents := "hello world"
-	if _, err := srcf.Write([]byte(contents)); err != nil {
+	want := "hello world"
+	if _, err := srcf.Write([]byte(want)); err != nil {
 		t.Fatal(err)
 	}
 	srcf.Close()
@@ -97,27 +97,27 @@ func TestCopyFile(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	destcontents, err := ioutil.ReadFile(destf)
+	got, err := ioutil.ReadFile(destf)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if contents != string(destcontents) {
-		t.Fatalf("expected: %s, got: %s", contents, string(destcontents))
+	if want != string(got) {
+		t.Fatalf("expected: %s, got: %s", want, string(got))
 	}
 
-	srcinfo, err := os.Stat(srcf.Name())
+	wantinfo, err := os.Stat(srcf.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	destinfo, err := os.Stat(destf)
+	gotinfo, err := os.Stat(destf)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if srcinfo.Mode() != destinfo.Mode() {
-		t.Fatalf("expected %s: %#v\n to be the same mode as %s: %#v", srcf.Name(), srcinfo.Mode(), destf, destinfo.Mode())
+	if wantinfo.Mode() != gotinfo.Mode() {
+		t.Fatalf("expected %s: %#v\n to be the same mode as %s: %#v", srcf.Name(), wantinfo.Mode(), destf, gotinfo.Mode())
 	}
 }
 
@@ -134,10 +134,10 @@ func TestIsRegular(t *testing.T) {
 		filepath.Join(wd, "this_file_does_not_exist.thing"): false,
 	}
 
-	for f, expected := range tests {
-		fileOK, err := IsRegular(f)
+	for f, want := range tests {
+		got, err := IsRegular(f)
 		if err != nil {
-			if !expected {
+			if !want {
 				// this is the case where we expect an error so continue
 				// to the check below
 				continue
@@ -145,8 +145,8 @@ func TestIsRegular(t *testing.T) {
 			t.Fatalf("expected no error, got %v", err)
 		}
 
-		if fileOK != expected {
-			t.Fatalf("expected %t for %s, got %t", expected, f, fileOK)
+		if got != want {
+			t.Fatalf("expected %t for %s, got %t", want, f, got)
 		}
 	}
 
@@ -165,10 +165,10 @@ func TestIsDir(t *testing.T) {
 		filepath.Join(wd, "this_file_does_not_exist.thing"): false,
 	}
 
-	for f, expected := range tests {
-		dirOK, err := IsDir(f)
+	for f, want := range tests {
+		got, err := IsDir(f)
 		if err != nil {
-			if !expected {
+			if !want {
 				// this is the case where we expect an error so continue
 				// to the check below
 				continue
@@ -176,8 +176,8 @@ func TestIsDir(t *testing.T) {
 			t.Fatalf("expected no error, got %v", err)
 		}
 
-		if dirOK != expected {
-			t.Fatalf("expected %t for %s, got %t", expected, f, dirOK)
+		if got != want {
+			t.Fatalf("expected %t for %s, got %t", want, f, got)
 		}
 	}
 

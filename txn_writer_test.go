@@ -94,14 +94,14 @@ func TestTxnWriter(t *testing.T) {
 	reset()
 
 	// super basic manifest and lock
-	goldenMan := "txn_writer/expected_manifest.json"
-	goldenLock := "txn_writer/expected_lock.json"
-	expectedManifest := h.GetTestFileString(goldenMan)
-	expectedLock := h.GetTestFileString(goldenLock)
+	goldenm := "txn_writer/expected_manifest.json"
+	goldenl := "txn_writer/expected_lock.json"
+	wantm := h.GetTestFileString(goldenm)
+	wantl := h.GetTestFileString(goldenl)
 
-	m, err := readManifest(h.GetTestFile(goldenMan))
+	m, err := readManifest(h.GetTestFile(goldenm))
 	h.Must(err)
-	l, err := readLock(h.GetTestFile(goldenLock))
+	l, err := readLock(h.GetTestFile(goldenl))
 	h.Must(err)
 
 	// Just write manifest
@@ -111,15 +111,15 @@ func TestTxnWriter(t *testing.T) {
 	h.MustNotExist(lpath)
 	h.MustNotExist(vpath)
 
-	diskm := h.ReadManifest()
-	if expectedManifest != diskm {
+	gotm := h.ReadManifest()
+	if wantm != gotm {
 		if *test.UpdateGolden {
-			expectedManifest = diskm
-			if err = h.WriteTestFile(goldenMan, diskm); err != nil {
+			wantm = gotm
+			if err = h.WriteTestFile(goldenm, gotm); err != nil {
 				t.Fatal(err)
 			}
 		} else {
-			t.Fatalf("expected %s, got %s", expectedManifest, diskm)
+			t.Fatalf("expected %s, got %s", wantm, gotm)
 		}
 	}
 
@@ -130,20 +130,20 @@ func TestTxnWriter(t *testing.T) {
 	h.MustExist(lpath)
 	h.MustNotExist(vpath)
 
-	diskm = h.ReadManifest()
-	if expectedManifest != diskm {
-		t.Fatalf("expected %s, got %s", expectedManifest, diskm)
+	gotm = h.ReadManifest()
+	if wantm != gotm {
+		t.Fatalf("expected %s, got %s", wantm, gotm)
 	}
 
-	diskl := h.ReadLock()
-	if expectedLock != diskl {
+	gotl := h.ReadLock()
+	if wantl != gotl {
 		if *test.UpdateGolden {
-			expectedLock = diskl
-			if err = h.WriteTestFile(goldenLock, diskl); err != nil {
+			wantl = gotl
+			if err = h.WriteTestFile(goldenl, gotl); err != nil {
 				t.Fatal(err)
 			}
 		} else {
-			t.Fatalf("expected %s, got %s", expectedLock, diskl)
+			t.Fatalf("expected %s, got %s", wantl, gotl)
 		}
 	}
 
@@ -153,14 +153,14 @@ func TestTxnWriter(t *testing.T) {
 	h.MustExist(vpath)
 	h.MustExist(filepath.Join(vpath, "github.com", "sdboyer", "dep-test"))
 
-	diskm = h.ReadManifest()
-	if expectedManifest != diskm {
-		t.Fatalf("expected %s, got %s", expectedManifest, diskm)
+	gotm = h.ReadManifest()
+	if wantm != gotm {
+		t.Fatalf("expected %s, got %s", wantm, gotm)
 	}
 
-	diskl = h.ReadLock()
-	if expectedLock != diskl {
-		t.Fatalf("expected %s, got %s", expectedLock, diskl)
+	gotl = h.ReadLock()
+	if wantl != gotl {
+		t.Fatalf("expected %s, got %s", wantl, gotl)
 	}
 
 	// start fresh, ignoring the manifest now
@@ -185,9 +185,9 @@ func TestTxnWriter(t *testing.T) {
 	h.MustExist(vpath)
 	h.MustExist(filepath.Join(vpath, "github.com", "sdboyer", "dep-test"))
 
-	diskl = h.ReadLock()
-	if expectedLock != diskl {
-		t.Fatalf("expected %s, got %s", expectedLock, diskl)
+	gotl = h.ReadLock()
+	if wantl != gotl {
+		t.Fatalf("expected %s, got %s", wantl, gotl)
 	}
 
 	// repeat op to ensure good behavior when vendor dir already exists
@@ -198,9 +198,9 @@ func TestTxnWriter(t *testing.T) {
 	h.MustExist(vpath)
 	h.MustExist(filepath.Join(vpath, "github.com", "sdboyer", "dep-test"))
 
-	diskl = h.ReadLock()
-	if expectedLock != diskl {
-		t.Fatalf("expected %s, got %s", expectedLock, diskl)
+	gotl = h.ReadLock()
+	if wantl != gotl {
+		t.Fatalf("expected %s, got %s", wantl, gotl)
 	}
 
 	// TODO test txn rollback cases. maybe we can force errors with chmodding?
