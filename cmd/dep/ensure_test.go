@@ -186,3 +186,110 @@ func TestDeduceConstraint(t *testing.T) {
 		}
 	}
 }
+
+func TestEnsureUpdate(t *testing.T) {
+	test.NeedsExternalNetwork(t)
+	test.NeedsGit(t)
+
+	h := test.NewHelper(t)
+	defer h.Cleanup()
+
+	h.TempDir("src")
+	h.Setenv("GOPATH", h.Path("."))
+
+	m := `package main
+
+import (
+	"fmt"
+	"github.com/pkg/errors"
+	stuff "github.com/carolynvs/go-dep-test"
+)
+
+func main() {
+	fmt.Println(stuff.Thing)
+	TryToDoSomething()
+}
+
+func TryToDoSomething() error {
+	return errors.New("I tried, Billy. I tried...")
+}
+`
+
+	h.TempFile("src/thing/thing.go", m)
+
+	origManifest := `{
+    "dependencies": {
+        "github.com/carolynvs/go-dep-test": {
+            "version": "~0.1.0"
+        }
+    }
+}`
+	h.TempFile("src/thing/manifest.json", origManifest)
+
+	origLock := `{
+    "memo": "9a5243dd3fa20feeaa20398e7283d6c566532e2af1aae279a010df34793761c5",
+    "projects": [
+        {
+            "name": "github.com/carolynvs/go-dep-test",
+            "version": "0.1.0",
+            "revision": "b9c5511fa463628e6251554db29a4be161d02aed",
+            "packages": [
+                "."
+            ]
+        },
+        {
+            "name": "github.com/pkg/errors",
+            "branch": "v0.7.0",
+            "revision": "01fa4104b9c248c8945d14d9f128454d5b28d595",
+            "packages": [
+                "."
+            ]
+        }
+    ]
+}
+`
+	h.TempFile("src/thing/lock.json", origLock)
+	h.Cd(h.Path("src/thing"))
+
+	h.Run("ensure", "-update", "github.com/carolynvs/go-dep-test")
+	
+	expectedManifest := `{
+    "dependencies": {
+        "github.com/carolynvs/go-dep-test": {
+            "version": "^0.1.0"
+        }
+    }
+}
+`
+	manifest := h.ReadManifest()
+	if manifest != expectedManifest {
+		t.Fatalf("expected '%s', got '%s'", expectedManifest, manifest)
+	}
+
+	expectedLock := `{
+    "memo": "9a5243dd3fa20feeaa20398e7283d6c566532e2af1aae279a010df34793761c5",
+    "projects": [
+        {
+            "name": "github.com/carolynvs/go-dep-test",
+            "version": "0.1.1",
+            "revision": "40691983e4002d3a3f5879cc0f1fe99bedda148c",
+            "packages": [
+                "."
+            ]
+        },
+        {
+            "name": "github.com/pkg/errors",
+            "branch": "v0.7.0",
+            "revision": "01fa4104b9c248c8945d14d9f128454d5b28d595",
+            "packages": [
+                "."
+            ]
+        }
+    ]
+}
+`
+	lock := h.ReadLock()
+	if lock != expectedLock {
+		t.Fatalf("expected %s, got %s", expectedLock, lock)
+	}
+}
