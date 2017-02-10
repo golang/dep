@@ -180,3 +180,40 @@ func TestIsDir(t *testing.T) {
 	}
 
 }
+
+func TestIsEmpty(t *testing.T) {
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tests := map[string]string{
+		wd: "false",
+		filepath.Join(wd, "_testdata"): "false",
+		filepath.Join(wd, "main.go"): "err",
+		filepath.Join(wd, "this_file_does_not_exist.thing"): "err",
+		filepath.Join(wd, "_testdata/empty"): "true",
+	}
+
+	for f, expected := range tests {
+		empty, err := IsEmpty(f)
+		if expected == "err" {
+			if err == nil {
+				t.Fatalf("Expected an error for %v, but it was nil", f)
+			}
+			if empty {
+				t.Fatalf("Expected false with error for %v, but got true", f)
+			}
+		} else if err != nil {
+			t.Fatalf("expected no error for %v, got %v", f, err)
+		}
+
+		if expected == "true" && !empty {
+			t.Fatalf("Expected true for %v, but got false", f)
+		}
+
+		if expected == "false" && empty {
+			t.Fatalf("Expected false for %v, but got true", f)
+		}
+	}
+}
