@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"github.com/golang/dep/test"
 )
 
 func TestCopyDir(t *testing.T) {
@@ -187,12 +188,14 @@ func TestIsEmpty(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	h := test.NewHelper(t)
+	h.TempDir("empty")
 	tests := map[string]string{
 		wd: "false",
 		filepath.Join(wd, "_testdata"): "false",
 		filepath.Join(wd, "main.go"): "err",
 		filepath.Join(wd, "this_file_does_not_exist.thing"): "err",
-		filepath.Join(wd, "_testdata/empty"): "true",
+		h.Path("empty"): "true",
 	}
 
 	for f, expected := range tests {
