@@ -64,7 +64,7 @@ func readLock(r io.Reader) (*Lock, error) {
 		} else if ld.Branch != "" {
 			v = gps.NewBranch(ld.Branch).Is(r)
 		} else if r == "" {
-			return nil, fmt.Errorf("lock file has entry for %s, but specifies no version", ld.Name)
+			return nil, fmt.Errorf("lock file has entry for %s, but specifies no branch or version", ld.Name)
 		}
 
 		id := gps.ProjectIdentifier{
