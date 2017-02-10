@@ -118,41 +118,42 @@ func (cmd *ensureCommand) Run(ctx *dep.Ctx, args []string) error {
 	sm.UseDefaultSignalHandling()
 	defer sm.Release()
 
+	params := p.MakeParams()
+	if cmd.update && len(args) == 0 {
+		// If -update was specified without args, we want the solver to allow all versions to change
+		params.ChangeAll = cmd.update
+	}
+
 	var errs []error
 	for _, arg := range args {
-		// default persist to manifest
 		pc, err := getProjectConstraint(arg, sm)
 		if err != nil {
 			errs = append(errs, err)
 			continue
 		}
 
-		if gps.IsAny(pc.Constraint) && pc.Ident.Source == "" {
-			// If the input specified neither a network name nor a constraint,
-			// then the strict thing to do would be to remove the entry
-			// entirely. But that would probably be quite surprising for users,
-			// and it's what rm is for, so just ignore the input.
-			//
-			// TODO(sdboyer): for this case - or just in general - do we want to
-			// add project args to the requires list temporarily for this run?
-			if _, has := p.Manifest.Dependencies[pc.Ident.ProjectRoot]; !has {
-				logf("No constraint or alternate source specified for %q, omitting from manifest", pc.Ident.ProjectRoot)
-			}
-			// If it's already in the manifest, no need to log
-			continue
-		}
+		// Ignore the lockfile for this dependency and allow its version to change
+		params.ToChange = append(params.ToChange, pc.Ident.ProjectRoot)
 
-		p.Manifest.Dependencies[pc.Ident.ProjectRoot] = gps.ProjectProperties{
-			Source:     pc.Ident.Source,
-			Constraint: pc.Constraint,
-		}
-
-		if p.Lock != nil {
-			for i, lp := range p.Lock.P {
-				if lp.Ident() == pc.Ident {
-					p.Lock.P = append(p.Lock.P[:i], p.Lock.P[i+1:]...)
-					break
+		if !cmd.update {
+			if gps.IsAny(pc.Constraint) && pc.Ident.Source == "" {
+				// If the input specified neither a network name nor a constraint,
+				// then the strict thing to do would be to remove the entry
+				// entirely. But that would probably be quite surprising for users,
+				// and it's what rm is for, so just ignore the input.
+				//
+				// TODO(sdboyer): for this case - or just in general - do we want to
+				// add project args to the requires list temporarily for this run?
+				if _, has := p.Manifest.Dependencies[pc.Ident.ProjectRoot]; !has {
+					logf("No constraint or alternate source specified for %q, omitting from manifest", pc.Ident.ProjectRoot)
 				}
+				// If it's already in the manifest, no need to log
+				continue
+			}
+
+			p.Manifest.Dependencies[pc.Ident.ProjectRoot] = gps.ProjectProperties{
+				Source:     pc.Ident.Source,
+				Constraint: pc.Constraint,
 			}
 		}
 	}
@@ -173,14 +174,8 @@ func (cmd *ensureCommand) Run(ctx *dep.Ctx, args []string) error {
 			Constraint: pc.Constraint,
 		}
 
-		if p.Lock != nil {
-			for i, lp := range p.Lock.P {
-				if lp.Ident() == pc.Ident {
-					p.Lock.P = append(p.Lock.P[:i], p.Lock.P[i+1:]...)
-					break
-				}
-			}
-		}
+		// Ignore the lockfile for this dependency and allow its version to change
+		params.ToChange = append(params.ToChange, pc.Ident.ProjectRoot)
 	}
 
 	if len(errs) > 0 {
@@ -191,10 +186,6 @@ func (cmd *ensureCommand) Run(ctx *dep.Ctx, args []string) error {
 
 		return errors.New(buf.String())
 	}
-
-	params := p.MakeParams()
-	// If -update was passed, we want the solver to allow all versions to change
-	params.ChangeAll = cmd.update
 
 	if *verbose {
 		params.Trace = true
