@@ -45,7 +45,7 @@ func IsDir(name string) (bool, error) {
 	return true, nil
 }
 
-func IsEmpty(name string) (bool, error) {
+func IsEmptyDir(name string) (bool, error) {
 	files, err := ioutil.ReadDir(name)
 	if err != nil {
 		return false, err
