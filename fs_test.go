@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
 	"github.com/golang/dep/test"
 )
 
@@ -192,10 +193,10 @@ func TestIsEmpty(t *testing.T) {
 	h.TempDir("empty")
 	tests := map[string]string{
 		wd: "false",
-		filepath.Join(wd, "_testdata"): "false",
-		filepath.Join(wd, "main.go"): "err",
+		filepath.Join(wd, "_testdata"):                      "false",
+		filepath.Join(wd, "main.go"):                        "err",
 		filepath.Join(wd, "this_file_does_not_exist.thing"): "err",
-		h.Path("empty"): "true",
+		h.Path("empty"):                                     "true",
 	}
 
 	for f, expected := range tests {
