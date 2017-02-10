@@ -196,7 +196,7 @@ func TestIsEmpty(t *testing.T) {
 	}
 
 	for f, expected := range tests {
-		empty, err := IsEmpty(f)
+		empty, err := IsEmptyDir(f)
 		if expected == "err" {
 			if err == nil {
 				t.Fatalf("Expected an error for %v, but it was nil", f)

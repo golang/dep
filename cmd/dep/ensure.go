@@ -226,7 +226,7 @@ func (cmd *ensureCommand) Run(ctx *dep.Ctx, args []string) error {
 	var writeV bool
 	path := filepath.Join(sw.Root, "vendor")
 	vendorIsDir, _ := dep.IsDir(path)
-	vendorEmpty, _ := dep.IsEmpty(path)
+	vendorEmpty, _ := dep.IsEmptyDir(path)
 	vendorExists := vendorIsDir && !vendorEmpty
 	if !vendorExists && solution != nil {
 		writeV = true
