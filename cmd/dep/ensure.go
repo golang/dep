@@ -52,6 +52,12 @@ dep ensure -update
     ignoring any versions specified in the lock file. Update the lock file with
     any changes.
 
+dep ensure -update github.com/pkg/foo github.com/pkg/bar
+
+    Update a list of dependencies to the latest versions allowed by the manifest,
+    ignoring any versions specified in the lock file. Update the lock file with
+    any changes.
+
 dep ensure github.com/pkg/foo@^1.0.1
 
     Constrain pkg/foo to the latest release matching >= 1.0.1, < 2.0.0, and
@@ -82,7 +88,7 @@ func (cmd *ensureCommand) Hidden() bool      { return false }
 
 func (cmd *ensureCommand) Register(fs *flag.FlagSet) {
 	fs.BoolVar(&cmd.examples, "examples", false, "print detailed usage examples")
-	fs.BoolVar(&cmd.update, "update", false, "ensure all dependencies are at the latest version allowed by the manifest")
+	fs.BoolVar(&cmd.update, "update", false, "ensure dependencies are at the latest version allowed by the manifest")
 	fs.BoolVar(&cmd.dryRun, "n", false, "dry run, don't actually ensure anything")
 	fs.Var(&cmd.overrides, "override", "specify an override constraint spec (repeatable)")
 }
@@ -98,10 +104,6 @@ func (cmd *ensureCommand) Run(ctx *dep.Ctx, args []string) error {
 	if cmd.examples {
 		fmt.Fprintln(os.Stderr, strings.TrimSpace(ensureExamples))
 		return nil
-	}
-
-	if cmd.update && len(args) > 0 {
-		return errors.New("Cannot pass -update and itemized project list (for now)")
 	}
 
 	p, err := ctx.LoadProject("")
