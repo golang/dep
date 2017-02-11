@@ -9,6 +9,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/golang/dep/test"
 )
 
 func TestCopyDir(t *testing.T) {
@@ -179,4 +181,43 @@ func TestIsDir(t *testing.T) {
 		}
 	}
 
+}
+
+func TestIsEmpty(t *testing.T) {
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	h := test.NewHelper(t)
+	h.TempDir("empty")
+	tests := map[string]string{
+		wd:                                                  "true",
+		"_testdata":                                         "true",
+		filepath.Join(wd, "fs.go"):                          "err",
+		filepath.Join(wd, "this_file_does_not_exist.thing"): "false",
+		h.Path("empty"):                                     "false",
+	}
+
+	for f, want := range tests {
+		empty, err := IsNonEmptyDir(f)
+		if want == "err" {
+			if err == nil {
+				t.Fatalf("Wanted an error for %v, but it was nil", f)
+			}
+			if empty {
+				t.Fatalf("Wanted false with error for %v, but got true", f)
+			}
+		} else if err != nil {
+			t.Fatalf("Wanted no error for %v, got %v", f, err)
+		}
+
+		if want == "true" && !empty {
+			t.Fatalf("Wanted true for %v, but got false", f)
+		}
+
+		if want == "false" && empty {
+			t.Fatalf("Wanted false for %v, but got true", f)
+		}
+	}
 }

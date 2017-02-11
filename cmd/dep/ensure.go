@@ -223,11 +223,11 @@ func (cmd *ensureCommand) Run(ctx *dep.Ctx, args []string) error {
 
 	// check if vendor exists, because if the locks are the same but
 	// vendor does not exist we should write vendor
-	var writeV bool
-	vendorExists, _ := dep.IsDir(filepath.Join(sw.Root, "vendor"))
-	if !vendorExists && solution != nil {
-		writeV = true
+	vendorExists, err := dep.IsNonEmptyDir(filepath.Join(sw.Root, "vendor"))
+	if err != nil {
+		return errors.Wrap(err, "ensure vendor is a directory")
 	}
+	writeV := !vendorExists && solution != nil
 
 	return errors.Wrap(sw.WriteAllSafe(writeV), "grouped write of manifest, lock and vendor")
 }

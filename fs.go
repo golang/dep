@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -42,6 +43,19 @@ func IsDir(name string) (bool, error) {
 		return false, fmt.Errorf("%q is not a directory", name)
 	}
 	return true, nil
+}
+
+func IsNonEmptyDir(name string) (bool, error) {
+	isDir, err := IsDir(name)
+	if !isDir || err != nil {
+		return isDir, err
+	}
+
+	files, err := ioutil.ReadDir(name)
+	if err != nil {
+		return false, err
+	}
+	return len(files) != 0, nil
 }
 
 func writeFile(path string, in json.Marshaler) error {
