@@ -193,7 +193,7 @@ func TestIsEmpty(t *testing.T) {
 	h.TempDir("empty")
 	tests := map[string]string{
 		wd:                                                  "true",
-		"_testdata":                                         "true",
+		"testdata":                                          "true",
 		filepath.Join(wd, "fs.go"):                          "err",
 		filepath.Join(wd, "this_file_does_not_exist.thing"): "false",
 		h.Path("empty"):                                     "false",
