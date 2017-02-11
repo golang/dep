@@ -119,11 +119,67 @@ func (cmd *ensureCommand) Run(ctx *dep.Ctx, args []string) error {
 	defer sm.Release()
 
 	params := p.MakeParams()
-	if cmd.update && len(args) == 0 {
-		// If -update was specified without args, we want the solver to allow all versions to change
-		params.ChangeAll = cmd.update
+	if *verbose {
+		params.Trace = true
+		params.TraceLogger = log.New(os.Stderr, "", 0)
+	}
+	params.RootPackageTree, err = gps.ListPackages(p.AbsRoot, string(p.ImportRoot))
+	if err != nil {
+		return errors.Wrap(err, "ensure ListPackage for project")
 	}
 
+	if cmd.update {
+		applyUpdateArgs(args, &params)
+	} else {
+		err := applyEnsureArgs(args, cmd.overrides, p, sm, &params)
+		if err != nil {
+			return err
+		}
+	}
+
+	solver, err := gps.Prepare(params, sm)
+	if err != nil {
+		return errors.Wrap(err, "ensure Prepare")
+	}
+	solution, err := solver.Solve()
+	if err != nil {
+		handleAllTheFailuresOfTheWorld(err)
+		return errors.Wrap(err, "ensure Solve()")
+	}
+
+	sw := dep.SafeWriter{
+		Root:          p.AbsRoot,
+		Manifest:      p.Manifest,
+		Lock:          p.Lock,
+		NewLock:       solution,
+		SourceManager: sm,
+	}
+
+	// check if vendor exists, because if the locks are the same but
+	// vendor does not exist we should write vendor
+	vendorExists, err := dep.IsNonEmptyDir(filepath.Join(sw.Root, "vendor"))
+	if err != nil {
+		return errors.Wrap(err, "ensure vendor is a directory")
+	}
+	writeV := !vendorExists && solution != nil
+
+	return errors.Wrap(sw.WriteAllSafe(writeV), "grouped write of manifest, lock and vendor")
+}
+
+func applyUpdateArgs(args []string, params *gps.SolveParameters) {
+	// When -update is specified without args, allow every project to change versions, regardless of the lock file
+	if len(args) == 0 {
+		params.ChangeAll = true
+		return
+	}
+
+	// Allow any of specified project versions to change, regardless of the lock file
+	for _, arg := range args {
+		params.ToChange = append(params.ToChange, gps.ProjectRoot(arg))
+	}
+}
+
+func applyEnsureArgs(args []string, overrides stringSlice, p *dep.Project, sm *gps.SourceMgr, params *gps.SolveParameters) error {
 	var errs []error
 	for _, arg := range args {
 		pc, err := getProjectConstraint(arg, sm)
@@ -132,33 +188,31 @@ func (cmd *ensureCommand) Run(ctx *dep.Ctx, args []string) error {
 			continue
 		}
 
+		if gps.IsAny(pc.Constraint) && pc.Ident.Source == "" {
+			// If the input specified neither a network name nor a constraint,
+			// then the strict thing to do would be to remove the entry
+			// entirely. But that would probably be quite surprising for users,
+			// and it's what rm is for, so just ignore the input.
+			//
+			// TODO(sdboyer): for this case - or just in general - do we want to
+			// add project args to the requires list temporarily for this run?
+			if _, has := p.Manifest.Dependencies[pc.Ident.ProjectRoot]; !has {
+				logf("No constraint or alternate source specified for %q, omitting from manifest", pc.Ident.ProjectRoot)
+			}
+			// If it's already in the manifest, no need to log
+			continue
+		}
+
+		p.Manifest.Dependencies[pc.Ident.ProjectRoot] = gps.ProjectProperties{
+			Source:     pc.Ident.Source,
+			Constraint: pc.Constraint,
+		}
+
 		// Ignore the lockfile for this dependency and allow its version to change
 		params.ToChange = append(params.ToChange, pc.Ident.ProjectRoot)
-
-		if !cmd.update {
-			if gps.IsAny(pc.Constraint) && pc.Ident.Source == "" {
-				// If the input specified neither a network name nor a constraint,
-				// then the strict thing to do would be to remove the entry
-				// entirely. But that would probably be quite surprising for users,
-				// and it's what rm is for, so just ignore the input.
-				//
-				// TODO(sdboyer): for this case - or just in general - do we want to
-				// add project args to the requires list temporarily for this run?
-				if _, has := p.Manifest.Dependencies[pc.Ident.ProjectRoot]; !has {
-					logf("No constraint or alternate source specified for %q, omitting from manifest", pc.Ident.ProjectRoot)
-				}
-				// If it's already in the manifest, no need to log
-				continue
-			}
-
-			p.Manifest.Dependencies[pc.Ident.ProjectRoot] = gps.ProjectProperties{
-				Source:     pc.Ident.Source,
-				Constraint: pc.Constraint,
-			}
-		}
 	}
 
-	for _, ovr := range cmd.overrides {
+	for _, ovr := range overrides {
 		pc, err := getProjectConstraint(ovr, sm)
 		if err != nil {
 			errs = append(errs, err)
@@ -187,42 +241,7 @@ func (cmd *ensureCommand) Run(ctx *dep.Ctx, args []string) error {
 		return errors.New(buf.String())
 	}
 
-	if *verbose {
-		params.Trace = true
-		params.TraceLogger = log.New(os.Stderr, "", 0)
-	}
-
-	params.RootPackageTree, err = gps.ListPackages(p.AbsRoot, string(p.ImportRoot))
-	if err != nil {
-		return errors.Wrap(err, "ensure ListPackage for project")
-	}
-	solver, err := gps.Prepare(params, sm)
-	if err != nil {
-		return errors.Wrap(err, "ensure Prepare")
-	}
-	solution, err := solver.Solve()
-	if err != nil {
-		handleAllTheFailuresOfTheWorld(err)
-		return errors.Wrap(err, "ensure Solve()")
-	}
-
-	sw := dep.SafeWriter{
-		Root:          p.AbsRoot,
-		Manifest:      p.Manifest,
-		Lock:          p.Lock,
-		NewLock:       solution,
-		SourceManager: sm,
-	}
-
-	// check if vendor exists, because if the locks are the same but
-	// vendor does not exist we should write vendor
-	vendorExists, err := dep.IsNonEmptyDir(filepath.Join(sw.Root, "vendor"))
-	if err != nil {
-		return errors.Wrap(err, "ensure vendor is a directory")
-	}
-	writeV := !vendorExists && solution != nil
-
-	return errors.Wrap(sw.WriteAllSafe(writeV), "grouped write of manifest, lock and vendor")
+	return nil
 }
 
 type stringSlice []string
