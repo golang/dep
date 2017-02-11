@@ -5,6 +5,7 @@
 package dep
 
 import (
+	"bytes"
 	"reflect"
 	"strings"
 	"testing"
@@ -119,12 +120,13 @@ func TestWriteManifest(t *testing.T) {
 		Ignores: []string{"github.com/foo/bar"},
 	}
 
-	b, err := m.MarshalJSON()
-	if err != nil {
+	b := new(bytes.Buffer)
+
+	if _, err := m.WriteTo(b); err != nil {
 		t.Fatalf("Error while marshaling valid manifest to JSON: %q", err)
 	}
 
-	if string(b) != jg {
-		t.Errorf("Valid manifest did not marshal to JSON as expected:\n\t(GOT): %s\n\t(WNT): %s", string(b), jg)
+	if b.String() != jg {
+		t.Errorf("Valid manifest did not marshal to JSON as expected:\n\t(GOT): %s\n\t(WNT): %s", b.String(), jg)
 	}
 }

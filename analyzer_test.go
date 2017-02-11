@@ -5,6 +5,7 @@
 package dep
 
 import (
+	"bytes"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -41,13 +42,15 @@ func TestDeriveManifestAndLock(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	b, err := m.(*Manifest).MarshalJSON()
+	b := new(bytes.Buffer)
+
+	_, err = m.(*Manifest).WriteTo(b)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if (string(b)) != contents {
-		t.Fatalf("expected %s\n got %s", contents, string(b))
+	if (b.String()) != contents {
+		t.Fatalf("expected %s\n got %s", contents, b.String())
 	}
 
 	if l != nil {

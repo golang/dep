@@ -9,6 +9,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/sdboyer/gps"
 )
 
 func TestCopyDir(t *testing.T) {
@@ -179,4 +181,43 @@ func TestIsDir(t *testing.T) {
 		}
 	}
 
+}
+
+func Benchmark_writeFile(b *testing.B) {
+	// Create test data.
+	c, _ := gps.NewSemverConstraint("^v0.12.0")
+	m := &Manifest{
+		Dependencies: map[gps.ProjectRoot]gps.ProjectProperties{
+			gps.ProjectRoot("github.com/sdboyer/gps"): {
+				Constraint: c,
+			},
+			gps.ProjectRoot("github.com/babble/brook"): {
+				Constraint: gps.Revision("d05d5aca9f895d19e9265839bffeadd74a2d2ecb"),
+			},
+		},
+		Ovr: map[gps.ProjectRoot]gps.ProjectProperties{
+			gps.ProjectRoot("github.com/sdboyer/gps"): {
+				Source:     "https://github.com/sdboyer/gps",
+				Constraint: gps.NewBranch("master"),
+			},
+		},
+		Ignores: []string{"github.com/foo/bar"},
+	}
+
+	// Create a tmp file.
+	dir, err := ioutil.TempDir("", "dep")
+	if err != nil {
+		b.Fatal(err)
+	}
+	path := filepath.Join(dir, "Benchmark_writeFile.json")
+
+	// Clean up the tmp file.
+	defer os.Remove(path)
+
+	// Execute a benchmark test.
+	for i := 0; i < b.N; i++ {
+		if err := writeFile(path, m); err != nil {
+			b.Fatal(err)
+		}
+	}
 }
