@@ -10,24 +10,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/Masterminds/semver"
 	"github.com/golang/dep/test"
 )
-
-func TestAnalyzerInfo(t *testing.T) {
-	a := analyzer{}
-	gotn, gotv := a.Info()
-	if gotn != "dep" {
-		t.Errorf("analyzer.Info() returned an incorrect name: '%s' (expected 'dep')", gotn)
-	}
-	wantv, err := semver.NewVersion("v0.0.1")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if gotv != wantv {
-		t.Fatalf("analyzer.Info() returned an incorrect version: %v (expected %v)", gotv, wantv)
-	}
-}
 
 func TestDeriveManifestAndLock(t *testing.T) {
 	h := test.NewHelper(t)
