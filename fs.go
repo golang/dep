@@ -15,6 +15,7 @@ import (
 	"syscall"
 )
 
+// IsRegular is true if name is a regular file
 func IsRegular(name string) (bool, error) {
 	// TODO: lstat?
 	fi, err := os.Stat(name)
@@ -30,6 +31,7 @@ func IsRegular(name string) (bool, error) {
 	return true, nil
 }
 
+// IsDir is true if name is a directory
 func IsDir(name string) (bool, error) {
 	// TODO: lstat?
 	fi, err := os.Stat(name)
@@ -45,17 +47,18 @@ func IsDir(name string) (bool, error) {
 	return true, nil
 }
 
-func IsNonEmptyDir(name string) (bool, error) {
-	isDir, err := IsDir(name)
-	if !isDir || err != nil {
-		return isDir, err
-	}
-
+// IsEmptyDirOrNotExist is true if name is a directory and is not empty or
+// doesn't exist.
+// Returns an error when name is a file or on other fs/io errors.
+func IsEmptyDirOrNotExist(name string) (bool, error) {
 	files, err := ioutil.ReadDir(name)
 	if err != nil {
+		if os.IsNotExist(err) {
+			return true, nil
+		}
 		return false, err
 	}
-	return len(files) != 0, nil
+	return len(files) == 0, nil
 }
 
 func writeFile(path string, in json.Marshaler) error {

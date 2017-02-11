@@ -157,13 +157,13 @@ func (cmd *ensureCommand) Run(ctx *dep.Ctx, args []string) error {
 		sw.Manifest = p.Manifest
 	}
 
-	// check if vendor exists, because if the locks are the same but
-	// vendor does not exist we should write vendor
-	vendorExists, err := dep.IsNonEmptyDir(filepath.Join(sw.Root, "vendor"))
+	// If the locks are the same and vendor doesn't exist (or is empty) we
+	// should write vendor
+	ok, err := dep.IsEmptyDirOrNotExist(filepath.Join(sw.Root, "vendor"))
 	if err != nil {
 		return errors.Wrap(err, "ensure vendor is a directory")
 	}
-	writeV := !vendorExists && solution != nil
+	writeV := ok && solution != nil
 
 	return errors.Wrap(sw.WriteAllSafe(writeV), "grouped write of manifest, lock and vendor")
 }
