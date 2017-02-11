@@ -252,18 +252,10 @@ func TryToDoSomething() error {
 	h.Cd(h.Path("src/thing"))
 
 	h.Run("ensure", "-update", "github.com/carolynvs/go-dep-test")
-	
-	expectedManifest := `{
-    "dependencies": {
-        "github.com/carolynvs/go-dep-test": {
-            "version": "^0.1.0"
-        }
-    }
-}
-`
+
 	manifest := h.ReadManifest()
-	if manifest != expectedManifest {
-		t.Fatalf("expected '%s', got '%s'", expectedManifest, manifest)
+	if manifest != origManifest {
+		t.Fatalf("The manifest should not be modified during an update. Expected %s, got %s", origManifest, manifest)
 	}
 
 	expectedLock := `{

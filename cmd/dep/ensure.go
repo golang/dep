@@ -149,10 +149,12 @@ func (cmd *ensureCommand) Run(ctx *dep.Ctx, args []string) error {
 
 	sw := dep.SafeWriter{
 		Root:          p.AbsRoot,
-		Manifest:      p.Manifest,
 		Lock:          p.Lock,
 		NewLock:       solution,
 		SourceManager: sm,
+	}
+	if !cmd.update {
+		sw.Manifest = p.Manifest
 	}
 
 	// check if vendor exists, because if the locks are the same but
