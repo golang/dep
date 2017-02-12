@@ -942,6 +942,16 @@ func TestListPackages(t *testing.T) {
 							},
 						},
 					},
+					"symlinks/foo": {
+						P: Package{
+							ImportPath:  "symlinks/foo",
+							CommentPath: "",
+							Name:        "foo",
+							Imports: []string{
+								"github.com/sdboyer/gps",
+							},
+						},
+					},
 				},
 			},
 		}
