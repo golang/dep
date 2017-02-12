@@ -131,8 +131,8 @@ func TestIsRegular(t *testing.T) {
 		name       string
 		want, werr bool
 	}{
-		{name: wd, want: false, werr: false},
-		{name: filepath.Join(wd, "testdata"), want: false, werr: false},
+		{name: wd, want: false, werr: true},
+		{name: filepath.Join(wd, "testdata"), want: false, werr: true},
 		{name: filepath.Join(wd, "cmd", "dep", "main.go"), want: true, werr: false},
 		{name: filepath.Join(wd, "this_file_does_not_exist.thing"), want: false, werr: false},
 	}
