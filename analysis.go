@@ -99,7 +99,7 @@ func ListPackages(fileRoot, importRoot string) (PackageTree, error) {
 			}
 			dst, err = filepath.EvalSymlinks(wp)
 			if err != nil {
-				return err
+				return nil
 			}
 			if !strings.HasPrefix(dst, fileRoot) {
 				return nil
