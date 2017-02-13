@@ -42,6 +42,13 @@ func (cmd *initCommand) Register(fs *flag.FlagSet) {}
 
 type initCommand struct{}
 
+func trimPathPrefix(p1, p2 string) string {
+	if filepath.HasPrefix(p1, p2) {
+		return p1[len(p2):]
+	}
+	return p1
+}
+
 func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 	if len(args) > 1 {
 		return errors.Errorf("too many args (%d)", len(args))
@@ -118,7 +125,7 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 			if pkg == string(pr) {
 				pkgs = append(pkgs, ".")
 			} else {
-				pkgs = append(pkgs, strings.TrimPrefix(pkg, prslash))
+				pkgs = append(pkgs, trimPathPrefix(pkg, prslash))
 			}
 		}
 
