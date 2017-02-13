@@ -209,9 +209,6 @@ func applyEnsureArgs(args []string, overrides stringSlice, p *dep.Project, sm *g
 			Source:     pc.Ident.Source,
 			Constraint: pc.Constraint,
 		}
-
-		// Ignore the lockfile for this dependency and allow its version to change
-		params.ToChange = append(params.ToChange, pc.Ident.ProjectRoot)
 	}
 
 	for _, ovr := range overrides {
@@ -229,9 +226,6 @@ func applyEnsureArgs(args []string, overrides stringSlice, p *dep.Project, sm *g
 			Source:     pc.Ident.Source,
 			Constraint: pc.Constraint,
 		}
-
-		// Ignore the lockfile for this dependency and allow its version to change
-		params.ToChange = append(params.ToChange, pc.Ident.ProjectRoot)
 	}
 
 	if len(errs) > 0 {
