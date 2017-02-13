@@ -61,7 +61,7 @@ func TestInit(t *testing.T) {
 	}
 
 	// Build a fake consumer of these packages.
-	const root = "github.com/golang/notexist"
+	const root = "notexist.com/something.git"
 	m := `package main
 
 import (
