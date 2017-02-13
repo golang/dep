@@ -6,6 +6,7 @@ package main
 
 import (
 	"testing"
+	"time"
 
 	"github.com/golang/dep/test"
 )
@@ -159,4 +160,7 @@ func main() {
 	if lock != expectedLock {
 		t.Fatalf("expected %s, got %s", expectedLock, lock)
 	}
+
+	// Sledgehammer approach to letting the gps goroutines finish.
+	time.Sleep(2 * time.Second)
 }
