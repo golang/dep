@@ -478,10 +478,20 @@ func (h *Helper) Path(name string) string {
 	if h.tempdir == "" {
 		h.t.Fatalf("internal testsuite error: path(%q) with no tempdir", name)
 	}
+
+	var joined string
 	if name == "." {
-		return h.tempdir
+		joined = h.tempdir
+	} else {
+		joined = filepath.Join(h.tempdir, name)
 	}
-	return filepath.Join(h.tempdir, name)
+
+	// Ensure it's the absolute, symlink-less path we're returning
+	abs, err := filepath.EvalSymlinks(joined)
+	if err != nil {
+		h.t.Fatalf("internal testsuite error: could not get absolute path for dir(%q), err %q", joined, err)
+	}
+	return abs
 }
 
 // MustExist fails if path does not exist.
