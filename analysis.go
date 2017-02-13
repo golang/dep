@@ -737,103 +737,58 @@ func wmToReach(workmap map[string]wm) ReachMap {
 	return rm
 }
 
-// ListExternalImports computes a sorted, deduplicated list of all the external
-// packages that are reachable through imports from all valid packages in a
-// ReachMap, as computed by PackageTree.ExternalReach().
+// FlattenAll flattens a reachmap into a sorted, deduplicated list of all the
+// external imports named by its contained packages.
 //
-// If an internal path is ignored, all of the external packages that it uniquely
-// imports are omitted. Note, however, that no internal transitivity checks are
-// made here - every non-ignored package in the tree is considered independently
-// (with one set of exceptions, noted below). That means, given a PackageTree
-// with root A and packages at A, A/foo, and A/bar, and the following import
-// chain:
+// If stdlib is true, then stdlib imports are excluded from the result.
+func (rm ReachMap) FlattenAll(stdlib bool) []string {
+	return rm.flatten(func(pkg string) bool { return true }, stdlib)
+}
+
+// Flatten flattens a reachmap into a sorted, deduplicated list of all the
+// external imports named by its contained packages, but excludes imports coming
+// from packages with disallowed patterns in their names: any path element with
+// a leading dot, a leading underscore, with the name "testdata".
 //
-//  A -> A/foo -> A/bar -> B/baz
-//
-// If you ignore A or A/foo, A/bar will still be visited, and B/baz will be
-// returned, because this method visits ALL packages in the tree, not only those
-// reachable from the root (or any other) packages. If your use case requires
-// interrogating external imports with respect to only specific package entry
-// points, you need ExternalReach() instead.
-//
-// It is safe to pass a nil map if there are no packages to ignore.
-//
-// If an internal package has an error (that is, PackageOrErr is Err), it is excluded from
-// consideration. Internal packages that transitively import the error package
-// are also excluded. So, if:
-//
-//    -> B/foo
-//   /
-//  A
-//   \
-//    -> A/bar -> B/baz
-//
-// And A/bar has some error in it, then both A and A/bar will be eliminated from
-// consideration; neither B/foo nor B/baz will be in the results. If A/bar, with
-// its errors, is ignored, however, then A will remain, and B/foo will be in the
-// results.
-//
-// Finally, note that if a directory is named "testdata", or has a leading dot
-// or underscore, it will not be directly analyzed as a source. This is in
-// keeping with Go tooling conventions that such directories should be ignored.
-// So, if:
-//
-//  A -> B/foo
-//  A/.bar -> B/baz
-//  A/_qux -> B/baz
-//  A/testdata -> B/baz
-//
-// Then B/foo will be returned, but B/baz will not, because all three of the
-// packages that import it are in directories with disallowed names.
-//
-// HOWEVER, in keeping with the Go compiler, if one of those packages in a
-// disallowed directory is imported by a package in an allowed directory, then
-// it *will* be used. That is, while tools like go list will ignore a directory
-// named .foo, you can still import from .foo. Thus, it must be included. So,
-// if:
-//
-//    -> B/foo
-//   /
-//  A
-//   \
-//    -> A/.bar -> B/baz
-//
-// A is legal, and it imports A/.bar, so the results will include B/baz.
-func (rm ReachMap) ListExternalImports() []string {
-	exm := make(map[string]struct{})
-	for pkg, reach := range rm {
+// If stdlib is true, then stdlib imports are excluded from the result.
+func (rm ReachMap) Flatten(stdlib bool) []string {
+	f := func(pkg string) bool {
 		// Eliminate import paths with any elements having leading dots, leading
 		// underscores, or testdata. If these are internally reachable (which is
 		// a no-no, but possible), any external imports will have already been
 		// pulled up through ExternalReach. The key here is that we don't want
 		// to treat such packages as themselves being sources.
-		//
-		// TODO(sdboyer) strings.Split will always heap alloc, which isn't great to do
-		// in a loop like this. We could also just parse it ourselves...
-		var skip bool
 		for _, elem := range strings.Split(pkg, "/") {
 			if strings.HasPrefix(elem, ".") || strings.HasPrefix(elem, "_") || elem == "testdata" {
-				skip = true
-				break
+				return false
 			}
 		}
+		return true
+	}
 
-		if !skip {
-			for _, ex := range reach {
+	return rm.flatten(f, stdlib)
+}
+
+func (rm ReachMap) flatten(filter func(string) bool, stdlib bool) []string {
+	exm := make(map[string]struct{})
+	for pkg, ie := range rm {
+		if filter(pkg) {
+			for _, ex := range ie.External {
+				if !stdlib && isStdLib(ex) {
+					continue
+				}
 				exm[ex] = struct{}{}
 			}
 		}
 	}
 
 	if len(exm) == 0 {
-		return nil
+		return []string{}
 	}
 
-	ex := make([]string, len(exm))
-	k := 0
+	ex := make([]string, 0, len(exm))
 	for p := range exm {
-		ex[k] = p
-		k++
+		ex = append(ex, p)
 	}
 
 	sort.Strings(ex)

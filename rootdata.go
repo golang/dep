@@ -46,7 +46,7 @@ type rootdata struct {
 // Ignores and requires are taken into consideration, and stdlib is excluded.
 func (rd rootdata) externalImportList() []string {
 	rm := rd.rpt.ToReachMap(true, true, rd.ig)
-	all := rm.ListExternalImports()
+	all := rm.Flatten(false)
 	reach := make([]string, 0, len(all))
 	for _, r := range all {
 		if !isStdLib(r) {

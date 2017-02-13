@@ -1269,7 +1269,7 @@ func TestListPackagesNoPerms(t *testing.T) {
 	}
 }
 
-func TestListExternalImports(t *testing.T) {
+func TestFlattenReachMap(t *testing.T) {
 	// There's enough in the 'varied' test case to test most of what matters
 	vptree, err := ListPackages(filepath.Join(getwd(t), "_testdata", "src", "github.com", "example", "varied"), "github.com/example/varied")
 	if err != nil {
@@ -1279,11 +1279,11 @@ func TestListExternalImports(t *testing.T) {
 	var expect []string
 	var name string
 	var ignore map[string]bool
-	var main, tests bool
+	var stdlib, main, tests bool
 
 	validate := func() {
 		rm := vptree.ToReachMap(main, tests, ignore)
-		result := rm.ListExternalImports()
+		result := rm.Flatten(stdlib)
 		if !reflect.DeepEqual(expect, result) {
 			t.Errorf("Wrong imports in %q case:\n\t(GOT): %s\n\t(WNT): %s", name, result, expect)
 		}
@@ -1323,12 +1323,22 @@ func TestListExternalImports(t *testing.T) {
 	// everything on
 	name = "simple"
 	except()
-	main, tests = true, true
+	stdlib, main, tests = true, true, true
 	validate()
 
-	// Now without tests, which should just cut one
+	// turning off stdlib should cut most things, but we need to override the
+	// function
+	isStdLib = doIsStdLib
+	name = "no stdlib"
+	stdlib = false
+	except("encoding/binary", "go/parser", "hash", "net/http", "os", "sort")
+	validate()
+	// Restore stdlib func override
+	overrideIsStdLib()
+
+	// stdlib back in; now exclude tests, which should just cut one
 	name = "no tests"
-	tests = false
+	stdlib, tests = true, false
 	except("encoding/binary")
 	validate()
 
@@ -1423,7 +1433,7 @@ func TestListExternalImports(t *testing.T) {
 	}
 
 	rm := ptree.ToReachMap(false, false, nil)
-	result := rm.Flatten()
+	result := rm.Flatten(true)
 	expect = []string{"github.com/sdboyer/gps", "hash", "sort"}
 	if !reflect.DeepEqual(expect, result) {
 		t.Errorf("Wrong imports in %q case:\n\t(GOT): %s\n\t(WNT): %s", name, result, expect)

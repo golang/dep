@@ -1121,7 +1121,7 @@ func (sm *bmSourceManager) GetManifestAndLock(id ProjectIdentifier, v Version) (
 
 // computeBimodalExternalMap takes a set of depspecs and computes an
 // internally-versioned external reach map that is useful for quickly answering
-// ListExternal()-type calls.
+// ReachMap.Flatten()-type calls.
 //
 // Note that it does not do things like stripping out stdlib packages - these
 // maps are intended for use in SM fixtures, and that's a higher-level
