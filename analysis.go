@@ -356,13 +356,16 @@ type PackageOrErr struct {
 	Err error
 }
 
-// ReachMap maps a set of import paths (keys) to the set of external packages
-// transitively reachable from the packages at those import paths.
+// ReachMap maps a set of import paths (keys) to the sets of transitively
+// reachable tree-internal packages, and all the tree-external reachable through
+// those internal packages.
 //
-// See PackageTree.ExternalReach() for more information.
-type ReachMap map[string][]string
+// See PackageTree.ToReachMap() for more information.
+type ReachMap map[string]struct {
+	Internal, External []string
+}
 
-// ToReachMaps looks through a PackageTree and computes the list of external
+// ToReachMap looks through a PackageTree and computes the list of external
 // import statements (that is, import statements pointing to packages that are
 // not logical children of PackageTree.ImportRoot) that are transitively
 // imported by the internal packages in the tree.
@@ -434,7 +437,7 @@ type ReachMap map[string][]string
 //
 // When backprop is false, errors in internal packages are functionally
 // identical to ignoring that package.
-func (t PackageTree) ToReachMaps(main, tests bool, ignore map[string]bool) (ex ReachMap, in ReachMap) {
+func (t PackageTree) ToReachMap(main, tests bool, ignore map[string]bool) ReachMap {
 	if ignore == nil {
 		ignore = make(map[string]bool)
 	}
@@ -508,7 +511,7 @@ func (t PackageTree) ToReachMaps(main, tests bool, ignore map[string]bool) (ex R
 //
 // The basedir string, with a trailing slash ensured, will be stripped from the
 // keys of the returned map.
-func wmToReach(workmap map[string]wm) (ex ReachMap, in ReachMap) {
+func wmToReach(workmap map[string]wm) ReachMap {
 	// Uses depth-first exploration to compute reachability into external
 	// packages, dropping any internal packages on "poisoned paths" - a path
 	// containing a package with an error, or with a dep on an internal package
@@ -541,10 +544,6 @@ func wmToReach(workmap map[string]wm) (ex ReachMap, in ReachMap) {
 	// stack of parent packages we've visited to get to pkg. The return value
 	// indicates whether the level completed successfully (true) or if it was
 	// poisoned (false).
-	//
-	// TODO(sdboyer) some deft improvements could probably be made by passing the list of
-	// parent reachsets, rather than a list of parent package string names.
-	// might be able to eliminate the use of exrsets map-of-maps entirely.
 	dfe = func(pkg string, path []string) bool {
 		// white is the zero value of uint8, which is what we want if the pkg
 		// isn't in the colors map, so this works fine
@@ -691,12 +690,16 @@ func wmToReach(workmap map[string]wm) (ex ReachMap, in ReachMap) {
 		dfe(pkg, path)
 	}
 
-	// Flatten exrsets into the final external reachmap
-	rm := make(map[string][]string)
+	type ie struct {
+		Internal, External []string
+	}
+
+	// Flatten exrsets into reachmap
+	rm := make(ReachMap)
 	for pkg, rs := range exrsets {
 		rlen := len(rs)
 		if rlen == 0 {
-			rm[pkg] = nil
+			rm[pkg] = ie{}
 			continue
 		}
 
@@ -706,15 +709,16 @@ func wmToReach(workmap map[string]wm) (ex ReachMap, in ReachMap) {
 		}
 
 		sort.Strings(edeps)
-		rm[pkg] = edeps
+
+		sets := rm[pkg]
+		sets.External = edeps
+		rm[pkg] = sets
 	}
 
-	// Flatten inrsets into the final internal reachmap
-	irm := make(map[string][]string)
+	// Flatten inrsets into reachmap
 	for pkg, rs := range inrsets {
 		rlen := len(rs)
 		if rlen == 0 {
-			irm[pkg] = nil
 			continue
 		}
 
@@ -724,10 +728,13 @@ func wmToReach(workmap map[string]wm) (ex ReachMap, in ReachMap) {
 		}
 
 		sort.Strings(ideps)
-		irm[pkg] = ideps
+
+		sets := rm[pkg]
+		sets.Internal = ideps
+		rm[pkg] = sets
 	}
 
-	return rm, irm
+	return rm
 }
 
 // ListExternalImports computes a sorted, deduplicated list of all the external

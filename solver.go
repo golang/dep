@@ -503,13 +503,13 @@ func (s *solver) getImportsAndConstraintsOf(a atomWithPackages) ([]string, []com
 		return nil, nil, err
 	}
 
-	allex, allin := ptree.ToReachMaps(false, false, s.rd.ig)
+	rm := ptree.ToReachMap(false, false, s.rd.ig)
 	// Use maps to dedupe the unique internal and external packages.
 	exmap, inmap := make(map[string]struct{}), make(map[string]struct{})
 
 	for _, pkg := range a.pl {
 		inmap[pkg] = struct{}{}
-		for _, ipkg := range allin[pkg] {
+		for _, ipkg := range rm[pkg].Internal {
 			inmap[ipkg] = struct{}{}
 		}
 	}
@@ -530,7 +530,7 @@ func (s *solver) getImportsAndConstraintsOf(a atomWithPackages) ([]string, []com
 	// Add to the list those packages that are reached by the packages
 	// explicitly listed in the atom
 	for _, pkg := range a.pl {
-		expkgs, exists := allex[pkg]
+		ie, exists := rm[pkg]
 		if !exists {
 			// missing package here *should* only happen if the target pkg was
 			// poisoned somehow - check the original ptree.
@@ -544,7 +544,7 @@ func (s *solver) getImportsAndConstraintsOf(a atomWithPackages) ([]string, []com
 			return nil, nil, fmt.Errorf("package %s does not exist within project %s", pkg, a.a.id.errString())
 		}
 
-		for _, ex := range expkgs {
+		for _, ex := range ie.External {
 			exmap[ex] = struct{}{}
 		}
 	}

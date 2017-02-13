@@ -1170,7 +1170,11 @@ func computeBimodalExternalMap(ds []depspec) map[pident]map[string][]string {
 			workmap[pkg.path] = w
 		}
 
-		drm, _ := wmToReach(workmap)
+		reachmap := wmToReach(workmap)
+		drm := make(map[string][]string)
+		for ip, ie := range reachmap {
+			drm[ip] = ie.External
+		}
 		rm[pident{n: d.n, v: d.v}] = drm
 	}
 
