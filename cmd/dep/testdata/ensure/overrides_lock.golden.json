@@ -1,0 +1,13 @@
+{
+    "memo": "80807a008f7d8d26de122a8c6ad1f4c7286950b32e0488660afc57ccbbc037a1",
+    "projects": [
+        {
+            "name": "github.com/carolynvs/go-dep-test",
+            "version": "0.1.1",
+            "revision": "d15fa4b9d1330a469387f2873399d28ea1c463eb",
+            "packages": [
+                "."
+            ]
+        }
+    ]
+}
