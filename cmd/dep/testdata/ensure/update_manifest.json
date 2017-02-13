@@ -1,0 +1,7 @@
+{
+    "dependencies": {
+        "github.com/carolynvs/go-dep-test": {
+            "version": "~0.1.0"
+        }
+    }
+}
