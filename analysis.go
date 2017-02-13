@@ -365,6 +365,34 @@ type ReachMap map[string]struct {
 	Internal, External []string
 }
 
+// ProblemImportError describes the reason that a particular import path is
+// not safely importable.
+type ProblemImportError struct {
+	// The import path of the package with some problem rendering it
+	// unimportable.
+	ImportPath string
+	// The path to the internal package the problem package imports that is the
+	// original cause of this issue. If empty, the package itself is the
+	// problem.
+	Cause []string
+	// The actual error from ListPackages that is undermining importability for
+	// this package.
+	Err error
+}
+
+// Error formats the ProblemImportError as a string, reflecting whether the
+// error represents a direct or transitive problem.
+func (e *ProblemImportError) Error() string {
+	switch len(e.Cause) {
+	case 0:
+		return fmt.Sprintf("%q contains malformed code: %s", e.ImportPath, e.Err.Error())
+	case 1:
+		return fmt.Sprintf("%q imports %q, which contains malformed code: %s", e.ImportPath, e.Cause[0], e.Err.Error())
+	default:
+		return fmt.Sprintf("%q transitively (through %v packages) imports %q, which contains malformed code: %s", e.ImportPath, len(e.Cause)-1, e.Cause[len(e.Cause)-1], e.Err.Error())
+	}
+}
+
 // ToReachMap looks through a PackageTree and computes the list of external
 // import statements (that is, import statements pointing to packages that are
 // not logical children of PackageTree.ImportRoot) that are transitively
@@ -437,7 +465,7 @@ type ReachMap map[string]struct {
 //
 // When backprop is false, errors in internal packages are functionally
 // identical to ignoring that package.
-func (t PackageTree) ToReachMap(main, tests bool, ignore map[string]bool) ReachMap {
+func (t PackageTree) ToReachMap(main, tests bool, ignore map[string]bool) (ReachMap, map[string]*ProblemImportError) {
 	if ignore == nil {
 		ignore = make(map[string]bool)
 	}
@@ -499,6 +527,11 @@ func (t PackageTree) ToReachMap(main, tests bool, ignore map[string]bool) ReachM
 	//return wmToReachNoPoison(wm)
 }
 
+// Helper func to create an error when a package is missing.
+func missingPkgErr(pkg string) error {
+	return fmt.Errorf("no package exists at %q", pkg)
+}
+
 // wmToReach takes an internal "workmap" constructed by
 // PackageTree.ExternalReach(), transitively walks (via depth-first traversal)
 // all internal imports until they reach an external path or terminate, then
@@ -511,7 +544,7 @@ func (t PackageTree) ToReachMap(main, tests bool, ignore map[string]bool) ReachM
 //
 // The basedir string, with a trailing slash ensured, will be stripped from the
 // keys of the returned map.
-func wmToReach(workmap map[string]wm) ReachMap {
+func wmToReach(workmap map[string]wm) (ReachMap, map[string]*ProblemImportError) {
 	// Uses depth-first exploration to compute reachability into external
 	// packages, dropping any internal packages on "poisoned paths" - a path
 	// containing a package with an error, or with a dep on an internal package
@@ -526,13 +559,87 @@ func wmToReach(workmap map[string]wm) ReachMap {
 	colors := make(map[string]uint8)
 	exrsets := make(map[string]map[string]struct{})
 	inrsets := make(map[string]map[string]struct{})
+	errmap := make(map[string]*ProblemImportError)
 
-	// poison is a helper func to eliminate specific reachsets from exrsets
-	poison := func(path []string) {
-		for _, ppkg := range path {
+	// poison is a helper func to eliminate specific reachsets from exrsets and
+	// inrsets, and populate error information along the way.
+	poison := func(path []string, err *ProblemImportError) {
+		for k, ppkg := range path {
 			delete(exrsets, ppkg)
 			delete(inrsets, ppkg)
+
+			// Duplicate the err for this package
+			kerr := &ProblemImportError{
+				ImportPath: ppkg,
+				Err:        err.Err,
+			}
+
+			// Shift the slice bounds on the incoming err.Cause.
+			//
+			// This check will only not be true on the final path element when
+			// entering via poisonWhite, where the last pkg is the underlying
+			// cause of the problem, and is thus expected to have an empty Cause
+			// slice.
+			if k+1 < len(err.Cause) {
+				// reuse the slice
+				kerr.Cause = err.Cause[k+1:]
+			}
+
+			// Both black and white cases can have the final element be a
+			// package that doesn't exist. If that's the case, don't write it
+			// directly to the errmap, as presence in the errmap indicates the
+			// package was present in the input PackageTree.
+			if k == len(path)-1 {
+				if _, exists := workmap[path[len(path)-1]]; !exists {
+					continue
+				}
+			}
+
+			// Direct writing to the errmap means that if multiple errors affect
+			// a given package, only the last error visited will be reported.
+			// But that should be sufficient; presumably, the user can
+			// iteratively resolve the errors.
+			errmap[ppkg] = kerr
 		}
+	}
+
+	// poisonWhite wraps poison for error recording in the white-poisoning case,
+	// where we're constructing a new poison path.
+	poisonWhite := func(path []string) {
+		err := &ProblemImportError{
+			Cause: make([]string, len(path)),
+		}
+		copy(err.Cause, path)
+
+		// find the tail err
+		tail := path[len(path)-1]
+		if w, exists := workmap[tail]; exists {
+			// If we make it to here, the dfe guarantees that the workmap
+			// will contain an error for this pkg.
+			err.Err = w.err
+		} else {
+			err.Err = missingPkgErr(tail)
+		}
+
+		poison(path, err)
+	}
+	// poisonBlack wraps poison for error recording in the black-poisoning case,
+	// where we're connecting to an existing poison path.
+	poisonBlack := func(path []string, from string) {
+		// Because the outer dfe loop ensures we never directly re-visit a pkg
+		// that was already completed (black), we don't have to defend against
+		// an empty path here.
+
+		fromErr := errmap[from]
+		err := &ProblemImportError{
+			Err:   fromErr.Err,
+			Cause: make([]string, 0, len(path)+len(fromErr.Cause)+1),
+		}
+		err.Cause = append(err.Cause, path...)
+		err.Cause = append(err.Cause, from)
+		err.Cause = append(err.Cause, fromErr.Cause...)
+
+		poison(path, err)
 	}
 
 	var dfe func(string, []string) bool
@@ -554,9 +661,15 @@ func wmToReach(workmap map[string]wm) ReachMap {
 
 			// make sure it's present and w/out errs
 			w, exists := workmap[pkg]
+
+			// Push current visitee onto onto the path slice. Passing this as a
+			// value has the effect of auto-popping the slice, while also giving
+			// us safe memory reuse.
+			path = append(path, pkg)
+
 			if !exists || w.err != nil {
 				// Does not exist or has an err; poison self and all parents
-				poison(path)
+				poisonWhite(path)
 
 				// we know we're done here, so mark it black
 				colors[pkg] = black
@@ -565,11 +678,6 @@ func wmToReach(workmap map[string]wm) ReachMap {
 			// pkg exists with no errs; start internal and external reachsets for it.
 			rs := make(map[string]struct{})
 			irs := make(map[string]struct{})
-
-			// Push self onto the path slice. Passing this as a value has the
-			// effect of auto-popping the slice, while also giving us safe
-			// memory reuse.
-			path = append(path, pkg)
 
 			// Dump this package's external pkgs into its own reachset. Separate
 			// loop from the parent dump to avoid nested map loop lookups.
@@ -647,13 +755,14 @@ func wmToReach(workmap map[string]wm) ReachMap {
 			//poison(append(path, pkg)) // poison self and parents
 
 		case black:
-			// black means we're done with the package. If it has an entry in
-			// exrsets, it completed successfully. If not, it was poisoned,
-			// and we need to bubble the poison back up.
+			// black means we're revisiting a package that was already
+			// completely explored. If it has an entry in exrsets, it completed
+			// successfully. If not, it was poisoned, and we need to bubble the
+			// poison back up.
 			rs, exists := exrsets[pkg]
 			if !exists {
 				// just poison parents; self was necessarily already poisoned
-				poison(path)
+				poisonBlack(path, pkg)
 				return false
 			}
 			// If external reachset existed, internal must (even if empty)
@@ -687,7 +796,12 @@ func wmToReach(workmap map[string]wm) ReachMap {
 	// comparably well, and fits nicely with an escape hatch in the dfe.
 	var path []string
 	for pkg := range workmap {
-		dfe(pkg, path)
+		// However, at least check that the package isn't already fully visited;
+		// this saves a bit of time and implementation complexity inside the
+		// closures.
+		if colors[pkg] != black {
+			dfe(pkg, path)
+		}
 	}
 
 	type ie struct {
@@ -734,7 +848,7 @@ func wmToReach(workmap map[string]wm) ReachMap {
 		rm[pkg] = sets
 	}
 
-	return rm
+	return rm, errmap
 }
 
 // FlattenAll flattens a reachmap into a sorted, deduplicated list of all the

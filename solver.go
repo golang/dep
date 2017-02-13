@@ -503,7 +503,7 @@ func (s *solver) getImportsAndConstraintsOf(a atomWithPackages) ([]string, []com
 		return nil, nil, err
 	}
 
-	rm := ptree.ToReachMap(false, false, s.rd.ig)
+	rm, em := ptree.ToReachMap(false, false, s.rd.ig)
 	// Use maps to dedupe the unique internal and external packages.
 	exmap, inmap := make(map[string]struct{}), make(map[string]struct{})
 
@@ -530,17 +530,20 @@ func (s *solver) getImportsAndConstraintsOf(a atomWithPackages) ([]string, []com
 	// Add to the list those packages that are reached by the packages
 	// explicitly listed in the atom
 	for _, pkg := range a.pl {
+		// Skip ignored packages
+		if s.rd.ig[pkg] {
+			continue
+		}
+
 		ie, exists := rm[pkg]
 		if !exists {
-			// missing package here *should* only happen if the target pkg was
-			// poisoned somehow - check the original ptree.
-			if perr, exists := ptree.Packages[pkg]; exists {
-				if perr.Err != nil {
-					return nil, nil, fmt.Errorf("package %s has errors: %s", pkg, perr.Err)
-				}
-				return nil, nil, fmt.Errorf("package %s depends on some other package within %s with errors", pkg, a.a.id.errString())
+			// Missing package here *should* only happen if the target pkg was
+			// poisoned. Check the errors map
+			if importErr, eexists := em[pkg]; eexists {
+				return nil, nil, importErr
 			}
-			// Nope, it's actually not there. This shouldn't happen.
+
+			// Nope, it's actually full-on not there.
 			return nil, nil, fmt.Errorf("package %s does not exist within project %s", pkg, a.a.id.errString())
 		}
 

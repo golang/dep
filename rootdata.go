@@ -45,7 +45,7 @@ type rootdata struct {
 // rootImportList returns a list of the unique imports from the root data.
 // Ignores and requires are taken into consideration, and stdlib is excluded.
 func (rd rootdata) externalImportList() []string {
-	rm := rd.rpt.ToReachMap(true, true, rd.ig)
+	rm, _ := rd.rpt.ToReachMap(true, true, rd.ig)
 	all := rm.Flatten(false)
 	reach := make([]string, 0, len(all))
 	for _, r := range all {
@@ -81,8 +81,7 @@ func (rd rootdata) getApplicableConstraints() []workingConstraint {
 	pc := rd.rm.DependencyConstraints().merge(rd.rm.TestDependencyConstraints())
 
 	// Ensure that overrides which aren't in the combined pc map already make it
-	// in. Doing so provides a bit more compatibility spread for a generated
-	// hash.
+	// in. Doing so makes input hashes equal in more useful cases.
 	for pr, pp := range rd.ovr {
 		if _, has := pc[pr]; !has {
 			cpp := ProjectProperties{

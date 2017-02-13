@@ -29,8 +29,9 @@ func TestWorkmapToReach(t *testing.T) {
 		Internal, External []string
 	}{}
 	table := map[string]struct {
-		workmap    map[string]wm
-		exrm, inrm ReachMap
+		workmap map[string]wm
+		rm      ReachMap
+		em      map[string]*ProblemImportError
 	}{
 		"single": {
 			workmap: map[string]wm{
@@ -39,7 +40,7 @@ func TestWorkmapToReach(t *testing.T) {
 					in: empty(),
 				},
 			},
-			exrm: ReachMap{
+			rm: ReachMap{
 				"foo": e,
 			},
 		},
@@ -54,7 +55,7 @@ func TestWorkmapToReach(t *testing.T) {
 					in: empty(),
 				},
 			},
-			exrm: ReachMap{
+			rm: ReachMap{
 				"foo":     e,
 				"foo/bar": e,
 			},
@@ -72,7 +73,7 @@ func TestWorkmapToReach(t *testing.T) {
 					in: empty(),
 				},
 			},
-			exrm: ReachMap{
+			rm: ReachMap{
 				"foo": {
 					Internal: []string{"foo/bar"},
 				},
@@ -94,7 +95,7 @@ func TestWorkmapToReach(t *testing.T) {
 					in: empty(),
 				},
 			},
-			exrm: ReachMap{
+			rm: ReachMap{
 				"foo": {
 					External: []string{"baz"},
 					Internal: []string{"foo/bar"},
@@ -122,9 +123,16 @@ func TestWorkmapToReach(t *testing.T) {
 					in: empty(),
 				},
 			},
-			exrm: ReachMap{
+			rm: ReachMap{
 				"A/bar": {
 					External: []string{"B/baz"},
+				},
+			},
+			em: map[string]*ProblemImportError{
+				"A": &ProblemImportError{
+					ImportPath: "A",
+					Cause:      []string{"A/foo"},
+					Err:        missingPkgErr("A/foo"),
 				},
 			},
 		},
@@ -154,9 +162,21 @@ func TestWorkmapToReach(t *testing.T) {
 					in: empty(),
 				},
 			},
-			exrm: ReachMap{
+			rm: ReachMap{
 				"A/quux": {
 					External: []string{"B/baz"},
+				},
+			},
+			em: map[string]*ProblemImportError{
+				"A": &ProblemImportError{
+					ImportPath: "A",
+					Cause:      []string{"A/foo", "A/bar"},
+					Err:        missingPkgErr("A/bar"),
+				},
+				"A/foo": &ProblemImportError{
+					ImportPath: "A/foo",
+					Cause:      []string{"A/bar"},
+					Err:        missingPkgErr("A/bar"),
 				},
 			},
 		},
@@ -181,9 +201,20 @@ func TestWorkmapToReach(t *testing.T) {
 					in: empty(),
 				},
 			},
-			exrm: ReachMap{
+			rm: ReachMap{
 				"A/bar": {
 					External: []string{"B/baz"},
+				},
+			},
+			em: map[string]*ProblemImportError{
+				"A": &ProblemImportError{
+					ImportPath: "A",
+					Cause:      []string{"A/foo"},
+					Err:        fmt.Errorf("err pkg"),
+				},
+				"A/foo": &ProblemImportError{
+					ImportPath: "A/foo",
+					Err:        fmt.Errorf("err pkg"),
 				},
 			},
 		},
@@ -216,9 +247,25 @@ func TestWorkmapToReach(t *testing.T) {
 					in: empty(),
 				},
 			},
-			exrm: ReachMap{
+			rm: ReachMap{
 				"A/quux": {
 					External: []string{"B/baz"},
+				},
+			},
+			em: map[string]*ProblemImportError{
+				"A": &ProblemImportError{
+					ImportPath: "A",
+					Cause:      []string{"A/foo", "A/bar"},
+					Err:        fmt.Errorf("err pkg"),
+				},
+				"A/foo": &ProblemImportError{
+					ImportPath: "A/foo",
+					Cause:      []string{"A/bar"},
+					Err:        fmt.Errorf("err pkg"),
+				},
+				"A/bar": &ProblemImportError{
+					ImportPath: "A/bar",
+					Err:        fmt.Errorf("err pkg"),
 				},
 			},
 		},
@@ -258,7 +305,7 @@ func TestWorkmapToReach(t *testing.T) {
 					in: empty(),
 				},
 			},
-			exrm: ReachMap{
+			rm: ReachMap{
 				"A": {
 					External: []string{
 						"B/baz",
@@ -312,7 +359,7 @@ func TestWorkmapToReach(t *testing.T) {
 					},
 				},
 			},
-			exrm: ReachMap{
+			rm: ReachMap{
 				"A": {
 					External: []string{"B"},
 				},
@@ -330,9 +377,20 @@ func TestWorkmapToReach(t *testing.T) {
 	}
 
 	for name, fix := range table {
-		rm := wmToReach(fix.workmap)
-		if !reflect.DeepEqual(rm, fix.exrm) {
-			t.Errorf("wmToReach(%q): Did not get expected reach map:\n\t(GOT): %s\n\t(WNT): %s", name, rm, fix.exrm)
+		// Avoid erroneous errors by initializing the fixture's error map if
+		// needed
+		if fix.em == nil {
+			fix.em = make(map[string]*ProblemImportError)
+		}
+
+		rm, em := wmToReach(fix.workmap)
+		if !reflect.DeepEqual(rm, fix.rm) {
+			//t.Error(pretty.Sprintf("wmToReach(%q): Did not get expected reach map:\n\t(GOT): %s\n\t(WNT): %s", name, rm, fix.rm))
+			t.Errorf("wmToReach(%q): Did not get expected reach map:\n\t(GOT): %s\n\t(WNT): %s", name, rm, fix.rm)
+		}
+		if !reflect.DeepEqual(em, fix.em) {
+			//t.Error(pretty.Sprintf("wmToReach(%q): Did not get expected error map:\n\t(GOT): %# v\n\t(WNT): %# v", name, em, fix.em))
+			t.Errorf("wmToReach(%q): Did not get expected error map:\n\t(GOT): %v\n\t(WNT): %v", name, em, fix.em)
 		}
 	}
 }
@@ -1282,7 +1340,10 @@ func TestFlattenReachMap(t *testing.T) {
 	var stdlib, main, tests bool
 
 	validate := func() {
-		rm := vptree.ToReachMap(main, tests, ignore)
+		rm, em := vptree.ToReachMap(main, tests, ignore)
+		if len(em) != 0 {
+			t.Errorf("Should not have any error pkgs from ToReachMap, got %s", em)
+		}
 		result := rm.Flatten(stdlib)
 		if !reflect.DeepEqual(expect, result) {
 			t.Errorf("Wrong imports in %q case:\n\t(GOT): %s\n\t(WNT): %s", name, result, expect)
@@ -1429,10 +1490,13 @@ func TestFlattenReachMap(t *testing.T) {
 	// The only thing varied *doesn't* cover is disallowed path patterns
 	ptree, err := ListPackages(filepath.Join(getwd(t), "_testdata", "src", "disallow"), "disallow")
 	if err != nil {
-		t.Fatalf("listPackages failed on disallow test case: %s", err)
+		t.Fatalf("ListPackages failed on disallow test case: %s", err)
 	}
 
-	rm := ptree.ToReachMap(false, false, nil)
+	rm, em := ptree.ToReachMap(false, false, nil)
+	if len(em) != 0 {
+		t.Errorf("Should not have any error packages from ToReachMap, got %s", em)
+	}
 	result := rm.Flatten(true)
 	expect = []string{"github.com/sdboyer/gps", "hash", "sort"}
 	if !reflect.DeepEqual(expect, result) {
@@ -1468,7 +1532,10 @@ func TestToReachMap(t *testing.T) {
 	var ignore map[string]bool
 
 	validate := func() {
-		got := vptree.ToReachMap(main, tests, ignore)
+		got, em := vptree.ToReachMap(main, tests, ignore)
+		if len(em) != 0 {
+			t.Errorf("Should not have any error packages from ToReachMap, got %s", em)
+		}
 		if !reflect.DeepEqual(want, got) {
 			seen := make(map[string]bool)
 			for ip, wantie := range want {
@@ -1708,7 +1775,10 @@ func TestToReachMapCycle(t *testing.T) {
 		t.Fatalf("ListPackages failed on cycle test case: %s", err)
 	}
 
-	rm := ptree.ToReachMap(true, true, nil)
+	rm, em := ptree.ToReachMap(true, true, nil)
+	if len(em) != 0 {
+		t.Errorf("Should not have any error packages from ToReachMap, got %s", em)
+	}
 
 	// FIXME TEMPORARILY COMMENTED UNTIL WE CREATE A BETTER LISTPACKAGES MODEL -
 	//if len(rm) > 0 {
