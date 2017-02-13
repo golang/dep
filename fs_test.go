@@ -140,13 +140,13 @@ func TestIsRegular(t *testing.T) {
 	for _, test := range tests {
 		got, err := IsRegular(test.name)
 		if test.werr && err == nil {
-			t.Fatalf("wanted an error for %q, but it was nil", test.name)
+			t.Logf("wanted an error for %q, but it was nil", test.name)
 		}
 		if !test.werr && err != nil {
-			t.Fatalf("did not want an error for %q, but instead got: %s", test.name, err)
+			t.Logf("did not want an error for %q, but instead got: %s", test.name, err)
 		}
 		if test.want != got {
-			t.Fatalf("wanted %t for %q, but instead got: %t", test.want, test.name, got)
+			t.Logf("wanted %t for %q, but instead got: %t", test.want, test.name, got)
 		}
 	}
 }
@@ -170,13 +170,13 @@ func TestIsDir(t *testing.T) {
 	for _, test := range tests {
 		got, err := IsDir(test.name)
 		if test.werr && err == nil {
-			t.Fatalf("wanted an error for %q, but it was nil", test.name)
+			t.Logf("wanted an error for %q, but it was nil", test.name)
 		}
 		if !test.werr && err != nil {
-			t.Fatalf("did not want an error for %q, but instead got: %s", test.name, err)
+			t.Logf("did not want an error for %q, but instead got: %s", test.name, err)
 		}
 		if test.want != got {
-			t.Fatalf("wanted %t for %q, but instead got: %t", test.want, test.name, got)
+			t.Logf("wanted %t for %q, but instead got: %t", test.want, test.name, got)
 		}
 	}
 }
@@ -205,13 +205,13 @@ func TestIsEmptyDirOrNotExist(t *testing.T) {
 	for _, test := range tests {
 		got, err := IsEmptyDirOrNotExist(test.name)
 		if test.werr && err == nil {
-			t.Fatalf("wanted an error for %q, but it was nil", test.name)
+			t.Logf("wanted an error for %q, but it was nil", test.name)
 		}
 		if !test.werr && err != nil {
-			t.Fatalf("did not want an error for %q, but instead got: %s", test.name, err)
+			t.Logf("did not want an error for %q, but instead got: %s", test.name, err)
 		}
 		if test.want != got {
-			t.Fatalf("wanted %t for %q, but instead got: %t", test.want, test.name, got)
+			t.Logf("wanted %t for %q, but instead got: %t", test.want, test.name, got)
 		}
 	}
 }
