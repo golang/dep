@@ -49,6 +49,7 @@ func IsDir(name string) (bool, error) {
 
 // IsEmptyDirOrNotExist is true if name is a directory and is not empty or
 // doesn't exist.
+//
 // Returns an error when name is a file or on other fs/io errors.
 func IsEmptyDirOrNotExist(name string) (bool, error) {
 	files, err := ioutil.ReadDir(name)
