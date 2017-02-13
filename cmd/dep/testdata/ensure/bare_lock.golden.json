@@ -1,0 +1,13 @@
+{
+    "memo": "671164a61abeac1133d1da7f6bb22ed18e6921dfc5f9247b378833833b5a3aca",
+    "projects": [
+        {
+            "name": "github.com/jimmysmith95/fixed-version",
+            "version": "v1.0.0",
+            "revision": "a2d649e0636403a4693cd928f60c56ba7d9cd299",
+            "packages": [
+                "."
+            ]
+        }
+    ]
+}
