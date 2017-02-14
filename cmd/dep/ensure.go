@@ -52,6 +52,12 @@ dep ensure -update
     ignoring any versions specified in the lock file. Update the lock file with
     any changes.
 
+dep ensure -update github.com/pkg/foo github.com/pkg/bar
+
+    Update a list of dependencies to the latest versions allowed by the manifest,
+    ignoring any versions specified in the lock file. Update the lock file with
+    any changes.
+
 dep ensure github.com/pkg/foo@^1.0.1
 
     Constrain pkg/foo to the latest release matching >= 1.0.1, < 2.0.0, and
@@ -82,7 +88,7 @@ func (cmd *ensureCommand) Hidden() bool      { return false }
 
 func (cmd *ensureCommand) Register(fs *flag.FlagSet) {
 	fs.BoolVar(&cmd.examples, "examples", false, "print detailed usage examples")
-	fs.BoolVar(&cmd.update, "update", false, "ensure all dependencies are at the latest version allowed by the manifest")
+	fs.BoolVar(&cmd.update, "update", false, "ensure dependencies are at the latest version allowed by the manifest")
 	fs.BoolVar(&cmd.dryRun, "n", false, "dry run, don't actually ensure anything")
 	fs.Var(&cmd.overrides, "override", "specify an override constraint spec (repeatable)")
 }
@@ -100,10 +106,6 @@ func (cmd *ensureCommand) Run(ctx *dep.Ctx, args []string) error {
 		return nil
 	}
 
-	if cmd.update && len(args) > 0 {
-		return errors.New("Cannot pass -update and itemized project list (for now)")
-	}
-
 	p, err := ctx.LoadProject("")
 	if err != nil {
 		return err
@@ -116,9 +118,72 @@ func (cmd *ensureCommand) Run(ctx *dep.Ctx, args []string) error {
 	sm.UseDefaultSignalHandling()
 	defer sm.Release()
 
+	params := p.MakeParams()
+	if *verbose {
+		params.Trace = true
+		params.TraceLogger = log.New(os.Stderr, "", 0)
+	}
+	params.RootPackageTree, err = gps.ListPackages(p.AbsRoot, string(p.ImportRoot))
+	if err != nil {
+		return errors.Wrap(err, "ensure ListPackage for project")
+	}
+
+	if cmd.update {
+		applyUpdateArgs(args, &params)
+	} else {
+		err := applyEnsureArgs(args, cmd.overrides, p, sm, &params)
+		if err != nil {
+			return err
+		}
+	}
+
+	solver, err := gps.Prepare(params, sm)
+	if err != nil {
+		return errors.Wrap(err, "ensure Prepare")
+	}
+	solution, err := solver.Solve()
+	if err != nil {
+		handleAllTheFailuresOfTheWorld(err)
+		return errors.Wrap(err, "ensure Solve()")
+	}
+
+	sw := dep.SafeWriter{
+		Root:          p.AbsRoot,
+		Lock:          p.Lock,
+		NewLock:       solution,
+		SourceManager: sm,
+	}
+	if !cmd.update {
+		sw.Manifest = p.Manifest
+	}
+
+	// check if vendor exists, because if the locks are the same but
+	// vendor does not exist we should write vendor
+	vendorExists, err := dep.IsNonEmptyDir(filepath.Join(sw.Root, "vendor"))
+	if err != nil {
+		return errors.Wrap(err, "ensure vendor is a directory")
+	}
+	writeV := !vendorExists && solution != nil
+
+	return errors.Wrap(sw.WriteAllSafe(writeV), "grouped write of manifest, lock and vendor")
+}
+
+func applyUpdateArgs(args []string, params *gps.SolveParameters) {
+	// When -update is specified without args, allow every project to change versions, regardless of the lock file
+	if len(args) == 0 {
+		params.ChangeAll = true
+		return
+	}
+
+	// Allow any of specified project versions to change, regardless of the lock file
+	for _, arg := range args {
+		params.ToChange = append(params.ToChange, gps.ProjectRoot(arg))
+	}
+}
+
+func applyEnsureArgs(args []string, overrides stringSlice, p *dep.Project, sm *gps.SourceMgr, params *gps.SolveParameters) error {
 	var errs []error
 	for _, arg := range args {
-		// default persist to manifest
 		pc, err := getProjectConstraint(arg, sm)
 		if err != nil {
 			errs = append(errs, err)
@@ -144,18 +209,9 @@ func (cmd *ensureCommand) Run(ctx *dep.Ctx, args []string) error {
 			Source:     pc.Ident.Source,
 			Constraint: pc.Constraint,
 		}
-
-		if p.Lock != nil {
-			for i, lp := range p.Lock.P {
-				if lp.Ident() == pc.Ident {
-					p.Lock.P = append(p.Lock.P[:i], p.Lock.P[i+1:]...)
-					break
-				}
-			}
-		}
 	}
 
-	for _, ovr := range cmd.overrides {
+	for _, ovr := range overrides {
 		pc, err := getProjectConstraint(ovr, sm)
 		if err != nil {
 			errs = append(errs, err)
@@ -170,15 +226,6 @@ func (cmd *ensureCommand) Run(ctx *dep.Ctx, args []string) error {
 			Source:     pc.Ident.Source,
 			Constraint: pc.Constraint,
 		}
-
-		if p.Lock != nil {
-			for i, lp := range p.Lock.P {
-				if lp.Ident() == pc.Ident {
-					p.Lock.P = append(p.Lock.P[:i], p.Lock.P[i+1:]...)
-					break
-				}
-			}
-		}
 	}
 
 	if len(errs) > 0 {
@@ -190,46 +237,7 @@ func (cmd *ensureCommand) Run(ctx *dep.Ctx, args []string) error {
 		return errors.New(buf.String())
 	}
 
-	params := p.MakeParams()
-	// If -update was passed, we want the solver to allow all versions to change
-	params.ChangeAll = cmd.update
-
-	if *verbose {
-		params.Trace = true
-		params.TraceLogger = log.New(os.Stderr, "", 0)
-	}
-
-	params.RootPackageTree, err = gps.ListPackages(p.AbsRoot, string(p.ImportRoot))
-	if err != nil {
-		return errors.Wrap(err, "ensure ListPackage for project")
-	}
-	solver, err := gps.Prepare(params, sm)
-	if err != nil {
-		return errors.Wrap(err, "ensure Prepare")
-	}
-	solution, err := solver.Solve()
-	if err != nil {
-		handleAllTheFailuresOfTheWorld(err)
-		return errors.Wrap(err, "ensure Solve()")
-	}
-
-	sw := dep.SafeWriter{
-		Root:          p.AbsRoot,
-		Manifest:      p.Manifest,
-		Lock:          p.Lock,
-		NewLock:       solution,
-		SourceManager: sm,
-	}
-
-	// check if vendor exists, because if the locks are the same but
-	// vendor does not exist we should write vendor
-	vendorExists, err := dep.IsNonEmptyDir(filepath.Join(sw.Root, "vendor"))
-	if err != nil {
-		return errors.Wrap(err, "ensure vendor is a directory")
-	}
-	writeV := !vendorExists && solution != nil
-
-	return errors.Wrap(sw.WriteAllSafe(writeV), "grouped write of manifest, lock and vendor")
+	return nil
 }
 
 type stringSlice []string

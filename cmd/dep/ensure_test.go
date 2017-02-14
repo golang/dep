@@ -21,73 +21,36 @@ func TestEnsureOverrides(t *testing.T) {
 	h.TempDir("src")
 	h.Setenv("GOPATH", h.Path("."))
 
-	m := `package main
-
-import (
-	"github.com/Sirupsen/logrus"
-	sthing "github.com/sdboyer/dep-test"
-)
-
-type Baz sthing.Foo
-
-func main() {
-	logrus.Info("hello world")
-}`
-
-	h.TempFile("src/thing/thing.go", m)
+	h.TempCopy("src/thing/thing.go", "ensure/overrides_main.go")
 	h.Cd(h.Path("src/thing"))
 
 	h.Run("init")
-	h.Run("ensure", "-override", "github.com/Sirupsen/logrus@0.11.0")
+	h.Run("ensure", "-override", "github.com/carolynvs/go-dep-test@0.1.1")
 
-	expectedManifest := `{
-    "overrides": {
-        "github.com/Sirupsen/logrus": {
-            "version": "0.11.0"
-        }
-    }
-}
-`
-
-	manifest := h.ReadManifest()
-	if manifest != expectedManifest {
-		t.Fatalf("expected %s, got %s", expectedManifest, manifest)
+	goldenManifest := "ensure/overrides_manifest.golden.json"
+	wantManifest := h.GetTestFileString(goldenManifest)
+	gotManifest := h.ReadManifest()
+	if gotManifest != wantManifest {
+		if *test.UpdateGolden {
+			if err := h.WriteTestFile(goldenManifest, string(gotManifest)); err != nil {
+				t.Fatal(err)
+			}
+		} else {
+			t.Fatalf("expected %s, got %s", wantManifest, gotManifest)
+		}
 	}
 
-	sysCommit := h.GetCommit("go.googlesource.com/sys")
-	expectedLock := `{
-    "memo": "57d20ba0289c2df60025bf6127220a5403483251bd5e523a7f9ea17752bd5482",
-    "projects": [
-        {
-            "name": "github.com/Sirupsen/logrus",
-            "version": "v0.11.0",
-            "revision": "d26492970760ca5d33129d2d799e34be5c4782eb",
-            "packages": [
-                "."
-            ]
-        },
-        {
-            "name": "github.com/sdboyer/dep-test",
-            "version": "1.0.0",
-            "revision": "2a3a211e171803acb82d1d5d42ceb53228f51751",
-            "packages": [
-                "."
-            ]
-        },
-        {
-            "name": "golang.org/x/sys",
-            "branch": "master",
-            "revision": "` + sysCommit + `",
-            "packages": [
-                "unix"
-            ]
-        }
-    ]
-}
-`
-	lock := h.ReadLock()
-	if lock != expectedLock {
-		t.Fatalf("expected %s, got %s", expectedLock, lock)
+	goldenLock := "ensure/overrides_lock.golden.json"
+	wantLock := h.GetTestFileString(goldenLock)
+	gotLock := h.ReadLock()
+	if gotLock != wantLock {
+		if *test.UpdateGolden {
+			if err := h.WriteTestFile(goldenLock, string(gotLock)); err != nil {
+				t.Fatal(err)
+			}
+		} else {
+			t.Fatalf("expected %s, got %s", wantLock, gotLock)
+		}
 	}
 }
 
@@ -100,18 +63,7 @@ func TestEnsureEmptyRepoNoArgs(t *testing.T) {
 
 	h.TempDir("src")
 	h.Setenv("GOPATH", h.Path("."))
-
-	m := `package main
-
-import (
-	_ "github.com/jimmysmith95/fixed-version"
-	_ "golang.org/x/sys/unix"
-)
-
-func main() {
-}`
-
-	h.TempFile("src/thing/thing.go", m)
+	h.TempCopy("src/thing/thing.go", "ensure/bare_main.go")
 	h.Cd(h.Path("src/thing"))
 
 	h.Run("init")
@@ -120,43 +72,30 @@ func main() {
 	// make sure vendor exists
 	h.MustExist(h.Path("src/thing/vendor/github.com/jimmysmith95/fixed-version"))
 
-	expectedManifest := `{}
-`
-
-	manifest := h.ReadManifest()
-	if manifest != expectedManifest {
-		t.Fatalf("expected %s, got %s", expectedManifest, manifest)
+	goldenManifest := "ensure/bare_manifest.golden.json"
+	wantManifest := h.GetTestFileString(goldenManifest)
+	gotManifest := h.ReadManifest()
+	if gotManifest != wantManifest {
+		if *test.UpdateGolden {
+			if err := h.WriteTestFile(goldenManifest, string(gotManifest)); err != nil {
+				t.Fatal(err)
+			}
+		} else {
+			t.Fatalf("expected %s, got %s", wantManifest, gotManifest)
+		}
 	}
 
-	sysCommit := h.GetCommit("go.googlesource.com/sys")
-	fixedVersionCommit := h.GetCommit("github.com/jimmysmith95/fixed-version")
-
-	expectedLock := `{
-    "memo": "8a7660015b2473d6d2f4bfdfd0508e6aa8178746559d0a9a90cecfbe6aa47a06",
-    "projects": [
-        {
-            "name": "github.com/jimmysmith95/fixed-version",
-            "version": "v1.0.0",
-            "revision": "` + fixedVersionCommit + `",
-            "packages": [
-                "."
-            ]
-        },
-        {
-            "name": "golang.org/x/sys",
-            "branch": "master",
-            "revision": "` + sysCommit + `",
-            "packages": [
-                "unix"
-            ]
-        }
-    ]
-}
-`
-
-	lock := h.ReadLock()
-	if lock != expectedLock {
-		t.Fatalf("expected %s, got %s", expectedLock, lock)
+	goldenLock := "ensure/bare_lock.golden.json"
+	wantLock := h.GetTestFileString(goldenLock)
+	gotLock := h.ReadLock()
+	if gotLock != wantLock {
+		if *test.UpdateGolden {
+			if err := h.WriteTestFile(goldenLock, string(gotLock)); err != nil {
+				t.Fatal(err)
+			}
+		} else {
+			t.Fatalf("expected %s, got %s", wantLock, gotLock)
+		}
 	}
 }
 
@@ -183,6 +122,47 @@ func TestDeduceConstraint(t *testing.T) {
 		c := deduceConstraint(str)
 		if c != expected {
 			t.Fatalf("expected: %#v, got %#v for %s", expected, c, str)
+		}
+	}
+}
+
+func TestEnsureUpdate(t *testing.T) {
+	test.NeedsExternalNetwork(t)
+	test.NeedsGit(t)
+
+	h := test.NewHelper(t)
+	defer h.Cleanup()
+
+	// Setup up a test project
+	h.TempDir("src")
+	h.Setenv("GOPATH", h.Path("."))
+	h.TempCopy("src/thing/main.go", "ensure/update_main.go")
+	origManifest := "ensure/update_manifest.json"
+	h.TempCopy("src/thing/manifest.json", origManifest)
+	origLock := "ensure/update_lock.json"
+	h.TempCopy("src/thing/lock.json", origLock)
+	h.Cd(h.Path("src/thing"))
+
+	h.Run("ensure", "-update", "github.com/carolynvs/go-dep-test")
+
+	// Verify that the manifest wasn't modified by -update
+	wantManifest := h.GetTestFileString(origManifest)
+	gotManifest := h.ReadManifest()
+	if gotManifest != wantManifest {
+		t.Fatalf("The manifest should not be modified during an update. Expected %s, got %s", origManifest, gotManifest)
+	}
+
+	// Verify the lock matches the expected golden file
+	goldenLock := "ensure/update_lock.golden.json"
+	wantLock := h.GetTestFileString(goldenLock)
+	gotLock := h.ReadLock()
+	if gotLock != wantLock {
+		if *test.UpdateGolden {
+			if err := h.WriteTestFile(goldenLock, string(gotLock)); err != nil {
+				t.Fatal(err)
+			}
+		} else {
+			t.Fatalf("expected %s, got %s", wantLock, gotLock)
 		}
 	}
 }
