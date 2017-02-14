@@ -6,6 +6,7 @@ package main
 
 import (
 	"testing"
+	"time"
 
 	"github.com/golang/dep/test"
 )
@@ -33,7 +34,7 @@ func TestRemove(t *testing.T) {
 	}
 
 	// Build a fake consumer of these packages.
-	const root = "github.com/golang/notexist"
+	const root = "notexist.com/something.git"
 	m := `package main
 
 import (
@@ -52,7 +53,7 @@ func main() {
 	h.TempFile("src/"+root+"/thing.go", m)
 	origm := `{
     "dependencies": {
-        "github.com/not/used": {
+        "notexist.com/other.git": {
             "version": "2.0.0"
         },
         "github.com/Sirupsen/logrus": {
@@ -87,22 +88,22 @@ func main() {
 	}
 
 	h.TempFile("src/"+root+"/manifest.json", origm)
-	h.Run("remove", "github.com/not/used")
+	h.Run("remove", "notexist.com/other.git")
 
 	manifest = h.ReadManifest()
 	if manifest != expectedManifest {
 		t.Fatalf("expected %s, got %s", expectedManifest, manifest)
 	}
 
-	if err := h.DoRun([]string{"remove", "-unused", "github.com/not/used"}); err == nil {
+	if err := h.DoRun([]string{"remove", "-unused", "notexist.com/other.git"}); err == nil {
 		t.Fatal("rm with both -unused and arg should have failed")
 	}
 
-	if err := h.DoRun([]string{"remove", "github.com/not/present"}); err == nil {
+	if err := h.DoRun([]string{"remove", "notexist.com/third.git"}); err == nil {
 		t.Fatal("rm with arg not in manifest should have failed")
 	}
 
-	if err := h.DoRun([]string{"remove", "github.com/not/used", "github.com/not/present"}); err == nil {
+	if err := h.DoRun([]string{"remove", "notexist.com/other.git", "notexist.com/third.git"}); err == nil {
 		t.Fatal("rm with one arg not in manifest should have failed")
 	}
 
@@ -111,7 +112,7 @@ func main() {
 	}
 
 	h.TempFile("src/"+root+"/manifest.json", origm)
-	h.Run("remove", "-force", "github.com/pkg/errors", "github.com/not/used")
+	h.Run("remove", "-force", "github.com/pkg/errors", "notexist.com/other.git")
 
 	manifest = h.ReadManifest()
 	if manifest != `{
@@ -159,4 +160,7 @@ func main() {
 	if lock != expectedLock {
 		t.Fatalf("expected %s, got %s", expectedLock, lock)
 	}
+
+	// Sledgehammer approach to letting the gps goroutines finish.
+	time.Sleep(2 * time.Second)
 }
