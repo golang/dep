@@ -61,50 +61,13 @@ func TestInit(t *testing.T) {
 		h.RunGit(repoDir, "checkout", rev)
 	}
 
-	// Build a fake consumer of these packages.
-	// const root = "github.com/golang/notexist"
-	// 	m := `package main
-	//
-	// import (
-	// 	"github.com/Sirupsen/logrus"
-	// 	"github.com/pkg/errors"
-	//
-	// 	"` + root + `/foo/bar"
-	// )
-	//
-	// func main() {
-	// 	err := nil
-	// 	if err != nil {
-	// 		errors.Wrap(err, "thing")
-	// 	}
-	// 	logrus.Info(bar.Qux)
-	// }`
-	//
-	// 	h.TempFile("src/"+root+"/foo/thing.go", m)
 	root := "src/github.com/golang/notexist"
 	h.TempCopy(root+"/foo/thing.go", "init/thing.input.go")
-
-	// 	m := `package bar
-	//
-	// const Qux = "yo yo!"
-	// `
-	// h.TempFile("src/"+root+"/foo/bar/bar.go", m)
 	h.TempCopy(root+"/foo/bar/bar.go", "init/bar.input.go")
 
 	h.Cd(h.Path(root))
 	h.Run("init")
 
-	// 	expectedManifest := `{
-	//     "dependencies": {
-	//         "github.com/Sirupsen/logrus": {
-	//             "revision": "42b84f9ec624953ecbf81a94feccb3f5935c5edf"
-	//         },
-	//         "github.com/pkg/errors": {
-	//             "version": ">=0.8.0, <1.0.0"
-	//         }
-	//     }
-	// }
-	// `
 	goldenManifest := "init/manifest.golden.json"
 	wantManifest := h.GetTestFileString(goldenManifest)
 	gotManifest := h.ReadManifest()
@@ -118,35 +81,6 @@ func TestInit(t *testing.T) {
 		}
 	}
 
-	// 	expectedLock := `{
-	//     "memo": "668fe45796bc4e85a5a6c0a0f1eb6fab9e23588d1eb33f3a12b2ad5599a3575e",
-	//     "projects": [
-	//         {
-	//             "name": "github.com/Sirupsen/logrus",
-	//             "revision": "42b84f9ec624953ecbf81a94feccb3f5935c5edf",
-	//             "packages": [
-	//                 "."
-	//             ]
-	//         },
-	//         {
-	//             "name": "github.com/pkg/errors",
-	//             "version": "v0.8.0",
-	//             "revision": "645ef00459ed84a119197bfb8d8205042c6df63d",
-	//             "packages": [
-	//                 "."
-	//             ]
-	//         },
-	//         {
-	//             "name": "golang.org/x/sys",
-	//             "branch": "master",
-	//             "revision": "` + sysCommit + `",
-	//             "packages": [
-	//                 "unix"
-	//             ]
-	//         }
-	//     ]
-	// }
-	// `
 	sysCommit := h.GetCommit("go.googlesource.com/sys")
 	goldenLock := "init/lock.golden.json"
 	wantLock := strings.Replace(h.GetTestFileString(goldenLock), "` + sysCommit + `", sysCommit, 1)
