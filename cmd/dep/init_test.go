@@ -61,6 +61,7 @@ func TestInit(t *testing.T) {
 		h.RunGit(repoDir, "checkout", rev)
 	}
 
+	// Build a fake consumer of these packages.
 	root := "src/github.com/golang/notexist"
 	h.TempCopy(root+"/foo/thing.go", "init/thing.input.go")
 	h.TempCopy(root+"/foo/bar/bar.go", "init/bar.input.go")
