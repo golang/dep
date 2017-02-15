@@ -1,0 +1,7 @@
+{
+    "dependencies": {
+        "github.com/Sirupsen/logrus": {
+            "revision": "42b84f9ec624953ecbf81a94feccb3f5935c5edf"
+        }
+    }
+}
