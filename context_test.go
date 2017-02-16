@@ -5,6 +5,7 @@
 package dep
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -35,6 +36,7 @@ func TestSplitAbsoluteProjectRoot(t *testing.T) {
 	defer h.Cleanup()
 
 	h.TempDir("src")
+
 	h.Setenv("GOPATH", h.Path("."))
 	depCtx := &Ctx{GOPATH: h.Path(".")}
 
@@ -44,6 +46,9 @@ func TestSplitAbsoluteProjectRoot(t *testing.T) {
 	}
 
 	for _, want := range importPaths {
+		// actually create the directory so lstat won't fail
+		h.TempDir(fmt.Sprintf("src/%s", want))
+
 		fullpath := filepath.Join(depCtx.GOPATH, "src", want)
 		got, err := depCtx.SplitAbsoluteProjectRoot(fullpath)
 		if err != nil {
@@ -58,6 +63,24 @@ func TestSplitAbsoluteProjectRoot(t *testing.T) {
 	got, err := depCtx.SplitAbsoluteProjectRoot("tra/la/la/la")
 	if err == nil {
 		t.Fatalf("should have gotten error but did not for tra/la/la/la: %s", got)
+	}
+
+	// test resolving project root is symlinked
+	want := "real/full/path"
+	symlinkedPath := filepath.Join(depCtx.GOPATH, "src", "sympath")
+
+	h.TempDir(filepath.Join("src", want))
+
+	os.Symlink(
+		filepath.Join(depCtx.GOPATH, "src", want),
+		symlinkedPath)
+
+	got, err = depCtx.SplitAbsoluteProjectRoot(symlinkedPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != want {
+		t.Fatalf("expected %s, got %s", want, got)
 	}
 }
 
