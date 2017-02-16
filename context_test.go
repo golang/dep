@@ -5,7 +5,6 @@
 package dep
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -46,8 +45,8 @@ func TestSplitAbsoluteProjectRoot(t *testing.T) {
 	}
 
 	for _, want := range importPaths {
-		// actually create the directory so lstat won't fail
-		h.TempDir(fmt.Sprintf("src/%s", want))
+		// create the target directory so lstat doesn't fail
+		h.TempDir(filepath.Join("src", want))
 
 		fullpath := filepath.Join(depCtx.GOPATH, "src", want)
 		got, err := depCtx.SplitAbsoluteProjectRoot(fullpath)
