@@ -1,0 +1,10 @@
+{
+    "dependencies": {
+        "github.com/Sirupsen/logrus": {
+            "revision": "42b84f9ec624953ecbf81a94feccb3f5935c5edf"
+        },
+        "github.com/pkg/errors": {
+            "version": ">=0.8.0, <1.0.0"
+        }
+    }
+}

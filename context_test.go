@@ -7,8 +7,10 @@ package dep
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
+	"unicode"
 
 	"github.com/golang/dep/test"
 	"github.com/sdboyer/gps"
@@ -329,5 +331,45 @@ func TestLoadProjectNoSrcDir(t *testing.T) {
 	_, err := ctx.LoadProject("")
 	if err == nil {
 		t.Fatalf("should have returned 'Split Absolute Root' error (no 'src' dir present)")
+	}
+}
+
+// TestCaseInsentitive is test for Windows. This should work even though set
+// difference letter cases in GOPATH.
+func TestCaseInsentitiveGOPATH(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("skip this test on non-Windows")
+	}
+
+	h := test.NewHelper(t)
+	defer h.Cleanup()
+
+	h.TempDir("src")
+	h.TempDir("src/test1")
+	h.TempFile("src/test1/manifest.json", ` "dependencies":{} `)
+
+	// Shuffle letter case
+	rs := []rune(strings.ToLower(h.Path(".")))
+	for i, r := range rs {
+		if unicode.IsLower(r) {
+			rs[i] = unicode.ToUpper(r)
+		} else {
+			rs[i] = unicode.ToLower(r)
+		}
+	}
+	gopath := string(rs)
+	h.Setenv("GOPATH", gopath)
+	depCtx := &Ctx{GOPATH: gopath}
+
+	depCtx.LoadProject("")
+
+	ip := "github.com/pkg/errors"
+	fullpath := filepath.Join(depCtx.GOPATH, "src", ip)
+	pr, err := depCtx.SplitAbsoluteProjectRoot(fullpath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pr != ip {
+		t.Fatalf("expected %s, got %s", ip, pr)
 	}
 }
