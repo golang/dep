@@ -320,7 +320,6 @@ func TestCaseInsentitiveGOPATH(t *testing.T) {
 	h.TempDir("src")
 	h.TempDir("src/test1")
 	h.TempFile("src/test1/manifest.json", ` "dependencies":{} `)
-	h.TempFile("src/test1/lock.json", `{"memo":"cdafe8641b28cd16fe025df278b0a49b9416859345d8b6ba0ace0272b74925ee","projects":[]}`)
 
 	// Shuffle letter case
 	rs := []rune(strings.ToLower(h.Path(".")))
