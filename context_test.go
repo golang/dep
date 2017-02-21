@@ -228,7 +228,7 @@ func TestLoadProjectWithSymlinkedDir(t *testing.T) {
 		t.Fatalf("Error loading project: %s", err)
 	}
 
-	if !strings.HasSuffix(p.AbsRoot, "/real/path") {
+	if !strings.HasSuffix(p.AbsRoot, filepath.Join("real", "path")) {
 		t.Fatalf("Expected AbsRoot to end with '/real/path', AbsRoot is %s", p.AbsRoot)
 	}
 }
