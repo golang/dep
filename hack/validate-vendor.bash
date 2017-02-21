@@ -11,7 +11,7 @@ set -e -o pipefail
 # TRAVIS_BRANCH is the name of the branch targeted by the pull request.
 # but we won't have that set if running locally
 if [ -z "$TRAVIS_BRANCH" ]; then
-	VALIDATE_REPO='git@github.com:golang/nest.git'
+	VALIDATE_REPO='git@github.com:golang/dep.git'
 	VALIDATE_BRANCH='master'
 
 	git fetch -q "$VALIDATE_REPO" "refs/heads/$VALIDATE_BRANCH"
@@ -36,7 +36,7 @@ if [ ${#files[@]} -gt 0 ]; then
 			echo
 			echo "$diffs"
 			echo
-			echo 'Please vendor your package with github.com/golang/nest.'
+			echo 'Please vendor your package with github.com/golang/dep.'
 			echo
 		} >&2
 		false
