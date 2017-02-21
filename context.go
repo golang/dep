@@ -27,6 +27,7 @@ func NewContext() (*Ctx, error) {
 	// this way we get the default GOPATH that was added in 1.8
 	buildContext := build.Default
 	wd, err := os.Getwd()
+
 	if err != nil {
 		return nil, errors.Wrap(err, "getting work directory")
 	}
@@ -73,6 +74,13 @@ func (c *Ctx) LoadProject(path string) (*Project, error) {
 
 	if err != nil {
 		return nil, err
+	}
+
+	// the path may lie within a symlinked directory, resolve that
+	// before moving forward
+	p.AbsRoot, err = filepath.EvalSymlinks(p.AbsRoot)
+	if err != nil {
+		return nil, errors.Wrapf(err, "eval symlinks")
 	}
 
 	ip, err := c.SplitAbsoluteProjectRoot(p.AbsRoot)
@@ -124,13 +132,6 @@ func (c *Ctx) LoadProject(path string) (*Project, error) {
 //
 // The second returned string indicates which GOPATH value was used.
 func (c *Ctx) SplitAbsoluteProjectRoot(path string) (string, error) {
-	// the path may lie within a symlinked directory, resolve those first
-	path, err := filepath.EvalSymlinks(path)
-
-	if err != nil {
-		return "", fmt.Errorf("failed attempt to resolve symlinks: %s", err)
-	}
-
 	srcprefix := filepath.Join(c.GOPATH, "src") + string(filepath.Separator)
 	if strings.HasPrefix(path, srcprefix) {
 		// filepath.ToSlash because we're dealing with an import path now,

@@ -7,6 +7,7 @@ package dep
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/golang/dep/test"
@@ -45,9 +46,6 @@ func TestSplitAbsoluteProjectRoot(t *testing.T) {
 	}
 
 	for _, want := range importPaths {
-		// create the target directory so lstat doesn't fail
-		h.TempDir(filepath.Join("src", want))
-
 		fullpath := filepath.Join(depCtx.GOPATH, "src", want)
 		got, err := depCtx.SplitAbsoluteProjectRoot(fullpath)
 		if err != nil {
@@ -62,24 +60,6 @@ func TestSplitAbsoluteProjectRoot(t *testing.T) {
 	got, err := depCtx.SplitAbsoluteProjectRoot("tra/la/la/la")
 	if err == nil {
 		t.Fatalf("should have gotten error but did not for tra/la/la/la: %s", got)
-	}
-
-	// test resolving project root is symlinked
-	want := "real/full/path"
-	symlinkedPath := filepath.Join(depCtx.GOPATH, "src", "sympath")
-
-	h.TempDir(filepath.Join("src", want))
-
-	os.Symlink(
-		filepath.Join(depCtx.GOPATH, "src", want),
-		symlinkedPath)
-
-	got, err = depCtx.SplitAbsoluteProjectRoot(symlinkedPath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got != want {
-		t.Fatalf("expected %s, got %s", want, got)
 	}
 }
 
@@ -224,6 +204,32 @@ func TestLoadProject(t *testing.T) {
 		} else if !testcase.lock && proj.Lock != nil {
 			t.Fatalf("Non-existent Lock file loaded -> from: %q, path: %q", start, path)
 		}
+	}
+}
+
+func TestLoadProjectWithSymlinkedDir(t *testing.T) {
+	tg := test.NewHelper(t)
+	defer tg.Cleanup()
+
+	tg.TempDir("src")
+	tg.TempDir("src/real")
+	tg.TempDir("src/real/path")
+	tg.TempFile("src/real/path/manifest.json", `{"dependencies":{}}`)
+	tg.TempFile("src/real/path/lock.json", `{"memo":"cdafe8641b28cd16fe025df278b0a49b9416859345d8b6ba0ace0272b74925ee","projects":[]}`)
+	tg.Setenv("GOPATH", tg.Path("."))
+	ctx := &Ctx{GOPATH: tg.Path(".")}
+
+	symlinkedPath := filepath.Join(ctx.GOPATH, "src", "sympath")
+	os.Symlink(filepath.Join(ctx.GOPATH, "src/real/path"), symlinkedPath)
+
+	p, err := ctx.LoadProject(symlinkedPath)
+
+	if err != nil {
+		t.Fatalf("Error loading project: %s", err)
+	}
+
+	if !strings.HasSuffix(p.AbsRoot, "/real/path") {
+		t.Fatalf("Expected AbsRoot to end with '/real/path', AbsRoot is %s", p.AbsRoot)
 	}
 }
 
