@@ -19,7 +19,7 @@
         {
             "name": "golang.org/x/sys",
             "branch": "master",
-            "revision": "e24f485414aeafb646f6fca458b0bf869c0880a1",
+            "revision": "` + sysCommit + `",
             "packages": [
                 "unix"
             ]
