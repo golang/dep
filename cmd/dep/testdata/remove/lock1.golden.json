@@ -1,0 +1,28 @@
+{
+    "memo": "7769242a737ed497aa39831eecfdc4a1bf59517df898907accc6bdc0f789a69b",
+    "projects": [
+        {
+            "name": "github.com/Sirupsen/logrus",
+            "revision": "42b84f9ec624953ecbf81a94feccb3f5935c5edf",
+            "packages": [
+                "."
+            ]
+        },
+        {
+            "name": "github.com/pkg/errors",
+            "version": "v0.8.0",
+            "revision": "645ef00459ed84a119197bfb8d8205042c6df63d",
+            "packages": [
+                "."
+            ]
+        },
+        {
+            "name": "golang.org/x/sys",
+            "branch": "master",
+            "revision": "` + sysCommit + `",
+            "packages": [
+                "unix"
+            ]
+        }
+    ]
+}

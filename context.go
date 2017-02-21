@@ -34,7 +34,7 @@ func NewContext() (*Ctx, error) {
 	wd = filepath.FromSlash(wd)
 	for _, gp := range filepath.SplitList(buildContext.GOPATH) {
 		gp = filepath.FromSlash(gp)
-		if strings.HasPrefix(wd, gp) {
+		if filepath.HasPrefix(wd, gp) {
 			return &Ctx{GOPATH: gp}, nil
 		}
 	}
@@ -133,10 +133,10 @@ func (c *Ctx) LoadProject(path string) (*Project, error) {
 // The second returned string indicates which GOPATH value was used.
 func (c *Ctx) SplitAbsoluteProjectRoot(path string) (string, error) {
 	srcprefix := filepath.Join(c.GOPATH, "src") + string(filepath.Separator)
-	if strings.HasPrefix(path, srcprefix) {
+	if filepath.HasPrefix(path, srcprefix) {
 		// filepath.ToSlash because we're dealing with an import path now,
 		// not an fs path
-		return filepath.ToSlash(strings.TrimPrefix(path, srcprefix)), nil
+		return filepath.ToSlash(path[len(srcprefix):]), nil
 	}
 
 	return "", fmt.Errorf("%s not in any $GOPATH", path)
