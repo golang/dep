@@ -406,6 +406,10 @@ func (e *ProblemImportError) Error() string {
 // tests indicates whether (true) or not (false) to include imports from test
 // files in packages when computing the reach map.
 //
+// backprop indicates whether errors (an actual PackageOrErr.Err, or an import
+// to a nonexistent internal package) should be backpropagated, transitively
+// "poisoning" all corresponding importers to all importers.
+//
 // ignore is a map of import paths that, if encountered, should be excluded from
 // analysis. This exclusion applies to both internal and external packages. If
 // an external import path is ignored, it is simply omitted from the results.
@@ -462,9 +466,6 @@ func (e *ProblemImportError) Error() string {
 // 	"A": []string{},
 // 	"A/bar": []string{"B/baz"},
 //  }
-//
-// When backprop is false, errors in internal packages are functionally
-// identical to ignoring that package.
 func (t PackageTree) ToReachMap(main, tests, backprop bool, ignore map[string]bool) (ReachMap, map[string]*ProblemImportError) {
 	if ignore == nil {
 		ignore = make(map[string]bool)
