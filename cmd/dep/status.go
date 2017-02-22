@@ -17,6 +17,7 @@ import (
 
 	"github.com/golang/dep"
 	"github.com/sdboyer/gps"
+	"path/filepath"
 )
 
 const statusShortHelp = `Report the status of the project's dependencies`
@@ -164,6 +165,10 @@ func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
 	defer sm.Release()
 
 	var out outputter
+
+	// Require of children should be useful for tree/graph operations.
+	// By default is set to false in order to avoid slower status process
+	var rch bool = false
 	switch {
 	case cmd.detailed:
 		return fmt.Errorf("not implemented")
@@ -176,13 +181,14 @@ func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
 			w: tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0),
 		}
 	}
-	return runStatusAll(out, p, sm)
+	return runStatusAll(out, p, sm, rch)
 }
 
 // BasicStatus contains all the information reported about a single dependency
 // in the summary/list status output mode.
 type BasicStatus struct {
 	ProjectRoot  string
+	children     []string
 	Constraint   gps.Constraint
 	Version      gps.UnpairedVersion
 	Revision     gps.Revision
@@ -195,7 +201,7 @@ type MissingStatus struct {
 	MissingPackages []string
 }
 
-func runStatusAll(out outputter, p *dep.Project, sm *gps.SourceMgr) error {
+func runStatusAll(out outputter, p *dep.Project, sm *gps.SourceMgr, rch bool) error {
 	if p.Lock == nil {
 		// TODO if we have no lock file, do...other stuff
 		return nil
@@ -244,6 +250,19 @@ func runStatusAll(out outputter, p *dep.Project, sm *gps.SourceMgr) error {
 			bs := BasicStatus{
 				ProjectRoot:  string(proj.Ident().ProjectRoot),
 				PackageCount: len(proj.Packages()),
+			}
+
+			// List project child packages if required
+			if rch == true {
+				r := filepath.Join(p.AbsRoot, "vendor", string(proj.Ident().ProjectRoot))
+				ptr, err := gps.ListPackages(r, string(proj.Ident().ProjectRoot))
+
+				if err != nil {
+					return fmt.Errorf("analysis of %s package failed: %v", proj.Ident().ProjectRoot, err)
+				}
+
+				prm, _ := ptr.ToReachMap(false, false, false, nil)
+				bs.children = prm.Flatten(false)
 			}
 
 			// Split apart the version from the lock into its constituent parts
