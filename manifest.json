@@ -10,7 +10,7 @@
             "version": ">=0.8.0, <1.0.0"
         },
         "github.com/sdboyer/gps": {
-            "branch": "master"
+            "version": ">=0.14.0, <1.0.0"
         }
     }
 }

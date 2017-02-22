@@ -4,6 +4,7 @@ package main
 
 import (
 	"go/build"
+	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
@@ -38,7 +39,8 @@ func main() {
 	params.RootPackageTree, _ = gps.ListPackages(root, importroot)
 
 	// Set up a SourceManager. This manages interaction with sources (repositories).
-	sourcemgr, _ := gps.NewSourceManager(NaiveAnalyzer{}, ".repocache")
+	tempdir, _ := ioutil.TempDir("", "gps-repocache")
+	sourcemgr, _ := gps.NewSourceManager(NaiveAnalyzer{}, filepath.Join(tempdir))
 	defer sourcemgr.Release()
 
 	// Prep and run the solver

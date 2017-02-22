@@ -14,9 +14,9 @@ import (
 	"testing"
 )
 
-// PackageTree.ExternalReach() uses an easily separable algorithm, wmToReach(),
-// to turn a discovered set of packages and their imports into a proper external
-// reach map.
+// PackageTree.ToReachMap() uses an easily separable algorithm, wmToReach(),
+// to turn a discovered set of packages and their imports into a proper pair of
+// internal and external reach maps.
 //
 // That algorithm is purely symbolic (no filesystem interaction), and thus is
 // easy to test. This is that test.
@@ -25,10 +25,14 @@ func TestWorkmapToReach(t *testing.T) {
 		return make(map[string]bool)
 	}
 
+	e := struct {
+		Internal, External []string
+	}{}
 	table := map[string]struct {
-		workmap map[string]wm
-		basedir string
-		out     map[string][]string
+		workmap  map[string]wm
+		rm       ReachMap
+		em       map[string]*ProblemImportError
+		backprop bool
 	}{
 		"single": {
 			workmap: map[string]wm{
@@ -37,8 +41,8 @@ func TestWorkmapToReach(t *testing.T) {
 					in: empty(),
 				},
 			},
-			out: map[string][]string{
-				"foo": nil,
+			rm: ReachMap{
+				"foo": e,
 			},
 		},
 		"no external": {
@@ -52,9 +56,9 @@ func TestWorkmapToReach(t *testing.T) {
 					in: empty(),
 				},
 			},
-			out: map[string][]string{
-				"foo":     nil,
-				"foo/bar": nil,
+			rm: ReachMap{
+				"foo":     e,
+				"foo/bar": e,
 			},
 		},
 		"no external with subpkg": {
@@ -70,9 +74,11 @@ func TestWorkmapToReach(t *testing.T) {
 					in: empty(),
 				},
 			},
-			out: map[string][]string{
-				"foo":     nil,
-				"foo/bar": nil,
+			rm: ReachMap{
+				"foo": {
+					Internal: []string{"foo/bar"},
+				},
+				"foo/bar": e,
 			},
 		},
 		"simple base transitive": {
@@ -90,12 +96,13 @@ func TestWorkmapToReach(t *testing.T) {
 					in: empty(),
 				},
 			},
-			out: map[string][]string{
+			rm: ReachMap{
 				"foo": {
-					"baz",
+					External: []string{"baz"},
+					Internal: []string{"foo/bar"},
 				},
 				"foo/bar": {
-					"baz",
+					External: []string{"baz"},
 				},
 			},
 		},
@@ -117,11 +124,19 @@ func TestWorkmapToReach(t *testing.T) {
 					in: empty(),
 				},
 			},
-			out: map[string][]string{
+			rm: ReachMap{
 				"A/bar": {
-					"B/baz",
+					External: []string{"B/baz"},
 				},
 			},
+			em: map[string]*ProblemImportError{
+				"A": &ProblemImportError{
+					ImportPath: "A",
+					Cause:      []string{"A/foo"},
+					Err:        missingPkgErr("A/foo"),
+				},
+			},
+			backprop: true,
 		},
 		"transitive missing package is poison": {
 			workmap: map[string]wm{
@@ -149,11 +164,24 @@ func TestWorkmapToReach(t *testing.T) {
 					in: empty(),
 				},
 			},
-			out: map[string][]string{
+			rm: ReachMap{
 				"A/quux": {
-					"B/baz",
+					External: []string{"B/baz"},
 				},
 			},
+			em: map[string]*ProblemImportError{
+				"A": &ProblemImportError{
+					ImportPath: "A",
+					Cause:      []string{"A/foo", "A/bar"},
+					Err:        missingPkgErr("A/bar"),
+				},
+				"A/foo": &ProblemImportError{
+					ImportPath: "A/foo",
+					Cause:      []string{"A/bar"},
+					Err:        missingPkgErr("A/bar"),
+				},
+			},
+			backprop: true,
 		},
 		"err'd package is poison": {
 			workmap: map[string]wm{
@@ -176,11 +204,23 @@ func TestWorkmapToReach(t *testing.T) {
 					in: empty(),
 				},
 			},
-			out: map[string][]string{
+			rm: ReachMap{
 				"A/bar": {
-					"B/baz",
+					External: []string{"B/baz"},
 				},
 			},
+			em: map[string]*ProblemImportError{
+				"A": &ProblemImportError{
+					ImportPath: "A",
+					Cause:      []string{"A/foo"},
+					Err:        fmt.Errorf("err pkg"),
+				},
+				"A/foo": &ProblemImportError{
+					ImportPath: "A/foo",
+					Err:        fmt.Errorf("err pkg"),
+				},
+			},
+			backprop: true,
 		},
 		"transitive err'd package is poison": {
 			workmap: map[string]wm{
@@ -211,19 +251,212 @@ func TestWorkmapToReach(t *testing.T) {
 					in: empty(),
 				},
 			},
-			out: map[string][]string{
+			rm: ReachMap{
 				"A/quux": {
-					"B/baz",
+					External: []string{"B/baz"},
+				},
+			},
+			em: map[string]*ProblemImportError{
+				"A": &ProblemImportError{
+					ImportPath: "A",
+					Cause:      []string{"A/foo", "A/bar"},
+					Err:        fmt.Errorf("err pkg"),
+				},
+				"A/foo": &ProblemImportError{
+					ImportPath: "A/foo",
+					Cause:      []string{"A/bar"},
+					Err:        fmt.Errorf("err pkg"),
+				},
+				"A/bar": &ProblemImportError{
+					ImportPath: "A/bar",
+					Err:        fmt.Errorf("err pkg"),
+				},
+			},
+			backprop: true,
+		},
+		"transitive err'd package no backprop": {
+			workmap: map[string]wm{
+				"A": {
+					ex: map[string]bool{
+						"B/foo": true,
+					},
+					in: map[string]bool{
+						"A/foo":  true, // transitively err'd
+						"A/quux": true,
+					},
+				},
+				"A/foo": {
+					ex: map[string]bool{
+						"C/flugle": true,
+					},
+					in: map[string]bool{
+						"A/bar": true, // err'd
+					},
+				},
+				"A/bar": {
+					err: fmt.Errorf("err pkg"),
+				},
+				"A/quux": {
+					ex: map[string]bool{
+						"B/baz": true,
+					},
+					in: empty(),
+				},
+			},
+			rm: ReachMap{
+				"A": {
+					Internal: []string{"A/bar", "A/foo", "A/quux"},
+					//Internal: []string{"A/foo", "A/quux"},
+					External: []string{"B/baz", "B/foo", "C/flugle"},
+				},
+				"A/foo": {
+					Internal: []string{"A/bar"},
+					External: []string{"C/flugle"},
+				},
+				"A/quux": {
+					External: []string{"B/baz"},
+				},
+			},
+			em: map[string]*ProblemImportError{
+				"A/bar": &ProblemImportError{
+					ImportPath: "A/bar",
+					Err:        fmt.Errorf("err pkg"),
+				},
+			},
+		},
+		// The following tests are mostly about regressions and weeding out
+		// weird assumptions
+		"internal diamond": {
+			workmap: map[string]wm{
+				"A": {
+					ex: map[string]bool{
+						"B/foo": true,
+					},
+					in: map[string]bool{
+						"A/foo": true,
+						"A/bar": true,
+					},
+				},
+				"A/foo": {
+					ex: map[string]bool{
+						"C": true,
+					},
+					in: map[string]bool{
+						"A/quux": true,
+					},
+				},
+				"A/bar": {
+					ex: map[string]bool{
+						"D": true,
+					},
+					in: map[string]bool{
+						"A/quux": true,
+					},
+				},
+				"A/quux": {
+					ex: map[string]bool{
+						"B/baz": true,
+					},
+					in: empty(),
+				},
+			},
+			rm: ReachMap{
+				"A": {
+					External: []string{
+						"B/baz",
+						"B/foo",
+						"C",
+						"D",
+					},
+					Internal: []string{
+						"A/bar",
+						"A/foo",
+						"A/quux",
+					},
+				},
+				"A/foo": {
+					External: []string{
+						"B/baz",
+						"C",
+					},
+					Internal: []string{
+						"A/quux",
+					},
+				},
+				"A/bar": {
+					External: []string{
+						"B/baz",
+						"D",
+					},
+					Internal: []string{
+						"A/quux",
+					},
+				},
+				"A/quux": {
+					External: []string{"B/baz"},
+				},
+			},
+		},
+		"rootmost gets imported": {
+			workmap: map[string]wm{
+				"A": {
+					ex: map[string]bool{
+						"B": true,
+					},
+					in: empty(),
+				},
+				"A/foo": {
+					ex: map[string]bool{
+						"C": true,
+					},
+					in: map[string]bool{
+						"A": true,
+					},
+				},
+			},
+			rm: ReachMap{
+				"A": {
+					External: []string{"B"},
+				},
+				"A/foo": {
+					External: []string{
+						"B",
+						"C",
+					},
+					Internal: []string{
+						"A",
+					},
 				},
 			},
 		},
 	}
 
 	for name, fix := range table {
-		out := wmToReach(fix.workmap, fix.basedir)
-		if !reflect.DeepEqual(out, fix.out) {
-			t.Errorf("wmToReach(%q): Did not get expected reach map:\n\t(GOT): %s\n\t(WNT): %s", name, out, fix.out)
+		// Avoid erroneous errors by initializing the fixture's error map if
+		// needed
+		if fix.em == nil {
+			fix.em = make(map[string]*ProblemImportError)
 		}
+
+		rm, em := wmToReach(fix.workmap, fix.backprop)
+		if !reflect.DeepEqual(rm, fix.rm) {
+			//t.Error(pretty.Sprintf("wmToReach(%q): Did not get expected reach map:\n\t(GOT): %s\n\t(WNT): %s", name, rm, fix.rm))
+			t.Errorf("wmToReach(%q): Did not get expected reach map:\n\t(GOT): %s\n\t(WNT): %s", name, rm, fix.rm)
+		}
+		if !reflect.DeepEqual(em, fix.em) {
+			//t.Error(pretty.Sprintf("wmToReach(%q): Did not get expected error map:\n\t(GOT): %# v\n\t(WNT): %# v", name, em, fix.em))
+			t.Errorf("wmToReach(%q): Did not get expected error map:\n\t(GOT): %v\n\t(WNT): %v", name, em, fix.em)
+		}
+	}
+}
+
+func TestListPackagesNoDir(t *testing.T) {
+	out, err := ListPackages(filepath.Join(getwd(t), "_testdata", "notexist"), "notexist")
+	if err == nil {
+		t.Error("ListPackages should have errored on pointing to a nonexistent dir")
+	}
+	if !reflect.DeepEqual(PackageTree{}, out) {
+		t.Error("should've gotten back an empty PackageTree")
 	}
 }
 
@@ -252,7 +485,6 @@ func TestListPackages(t *testing.T) {
 					},
 				},
 			},
-			err: nil,
 		},
 		"code only": {
 			fileRoot:   j("simple"),
@@ -750,6 +982,51 @@ func TestListPackages(t *testing.T) {
 				},
 			},
 		},
+		// import cycle of three packages. ListPackages doesn't do anything
+		// special with cycles - that's the reach calculator's job - so this is
+		// error-free
+		"import cycle, len 3": {
+			fileRoot:   j("cycle"),
+			importRoot: "cycle",
+			out: PackageTree{
+				ImportRoot: "cycle",
+				Packages: map[string]PackageOrErr{
+					"cycle": {
+						P: Package{
+							ImportPath:  "cycle",
+							CommentPath: "",
+							Name:        "cycle",
+							Imports: []string{
+								"cycle/one",
+								"github.com/sdboyer/gps",
+							},
+						},
+					},
+					"cycle/one": {
+						P: Package{
+							ImportPath:  "cycle/one",
+							CommentPath: "",
+							Name:        "one",
+							Imports: []string{
+								"cycle/two",
+								"github.com/sdboyer/gps",
+							},
+						},
+					},
+					"cycle/two": {
+						P: Package{
+							ImportPath:  "cycle/two",
+							CommentPath: "",
+							Name:        "two",
+							Imports: []string{
+								"cycle",
+								"github.com/sdboyer/gps",
+							},
+						},
+					},
+				},
+			},
+		},
 		// has disallowed dir names
 		"disallowed dirs": {
 			fileRoot:   j("disallow"),
@@ -790,6 +1067,63 @@ func TestListPackages(t *testing.T) {
 							Name:        "testdata",
 							Imports: []string{
 								"hash",
+							},
+						},
+					},
+				},
+			},
+		},
+		"relative imports": {
+			fileRoot:   j("relimport"),
+			importRoot: "relimport",
+			out: PackageTree{
+				ImportRoot: "relimport",
+				Packages: map[string]PackageOrErr{
+					"relimport": {
+						P: Package{
+							ImportPath:  "relimport",
+							CommentPath: "",
+							Name:        "relimport",
+							Imports: []string{
+								"sort",
+							},
+						},
+					},
+					"relimport/dot": {
+						P: Package{
+							ImportPath:  "relimport/dot",
+							CommentPath: "",
+							Name:        "dot",
+							Imports: []string{
+								".",
+								"sort",
+							},
+						},
+					},
+					"relimport/dotdot": {
+						Err: &LocalImportsError{
+							Dir:        j("relimport/dotdot"),
+							ImportPath: "relimport/dotdot",
+							LocalImports: []string{
+								"..",
+							},
+						},
+					},
+					"relimport/dotslash": {
+						Err: &LocalImportsError{
+							Dir:        j("relimport/dotslash"),
+							ImportPath: "relimport/dotslash",
+							LocalImports: []string{
+								"./simple",
+							},
+						},
+					},
+					"relimport/dotdotslash": {
+						Err: &LocalImportsError{
+							Dir:        j("relimport/dotdotslash"),
+							ImportPath: "relimport/dotdotslash",
+							LocalImports: []string{
+								"../github.com/sdboyer/gps",
 							},
 						},
 					},
@@ -1048,9 +1382,9 @@ func TestListPackagesNoPerms(t *testing.T) {
 	}
 }
 
-func TestListExternalImports(t *testing.T) {
+func TestFlattenReachMap(t *testing.T) {
 	// There's enough in the 'varied' test case to test most of what matters
-	vptree, err := ListPackages(filepath.Join(getwd(t), "_testdata", "src", "varied"), "varied")
+	vptree, err := ListPackages(filepath.Join(getwd(t), "_testdata", "src", "github.com", "example", "varied"), "github.com/example/varied")
 	if err != nil {
 		t.Fatalf("listPackages failed on varied test case: %s", err)
 	}
@@ -1058,10 +1392,14 @@ func TestListExternalImports(t *testing.T) {
 	var expect []string
 	var name string
 	var ignore map[string]bool
-	var main, tests bool
+	var stdlib, main, tests bool
 
 	validate := func() {
-		result := vptree.ExternalReach(main, tests, ignore).ListExternalImports()
+		rm, em := vptree.ToReachMap(main, tests, true, ignore)
+		if len(em) != 0 {
+			t.Errorf("Should not have any error pkgs from ToReachMap, got %s", em)
+		}
+		result := rm.Flatten(stdlib)
 		if !reflect.DeepEqual(expect, result) {
 			t.Errorf("Wrong imports in %q case:\n\t(GOT): %s\n\t(WNT): %s", name, result, expect)
 		}
@@ -1101,12 +1439,22 @@ func TestListExternalImports(t *testing.T) {
 	// everything on
 	name = "simple"
 	except()
-	main, tests = true, true
+	stdlib, main, tests = true, true, true
 	validate()
 
-	// Now without tests, which should just cut one
+	// turning off stdlib should cut most things, but we need to override the
+	// function
+	isStdLib = doIsStdLib
+	name = "no stdlib"
+	stdlib = false
+	except("encoding/binary", "go/parser", "hash", "net/http", "os", "sort")
+	validate()
+	// Restore stdlib func override
+	overrideIsStdLib()
+
+	// stdlib back in; now exclude tests, which should just cut one
 	name = "no tests"
-	tests = false
+	stdlib, tests = true, false
 	except("encoding/binary")
 	validate()
 
@@ -1136,7 +1484,7 @@ func TestListExternalImports(t *testing.T) {
 	// should have the same effect as ignoring main
 	name = "ignore the root"
 	ignore = map[string]bool{
-		"varied": true,
+		"github.com/example/varied": true,
 	}
 	except("net/http")
 	validate()
@@ -1144,7 +1492,7 @@ func TestListExternalImports(t *testing.T) {
 	// now drop a more interesting one
 	name = "ignore simple"
 	ignore = map[string]bool{
-		"varied/simple": true,
+		"github.com/example/varied/simple": true,
 	}
 	// we get github.com/sdboyer/gps from m1p, too, so it should still be there
 	except("go/parser")
@@ -1153,8 +1501,8 @@ func TestListExternalImports(t *testing.T) {
 	// now drop two
 	name = "ignore simple and namemismatch"
 	ignore = map[string]bool{
-		"varied/simple":       true,
-		"varied/namemismatch": true,
+		"github.com/example/varied/simple":       true,
+		"github.com/example/varied/namemismatch": true,
 	}
 	except("go/parser", "github.com/Masterminds/semver")
 	validate()
@@ -1178,8 +1526,8 @@ func TestListExternalImports(t *testing.T) {
 	// ignore two that should knock out gps
 	name = "ignore both importers"
 	ignore = map[string]bool{
-		"varied/simple": true,
-		"varied/m1p":    true,
+		"github.com/example/varied/simple": true,
+		"github.com/example/varied/m1p":    true,
 	}
 	except("sort", "github.com/sdboyer/gps", "go/parser")
 	validate()
@@ -1197,84 +1545,137 @@ func TestListExternalImports(t *testing.T) {
 	// The only thing varied *doesn't* cover is disallowed path patterns
 	ptree, err := ListPackages(filepath.Join(getwd(t), "_testdata", "src", "disallow"), "disallow")
 	if err != nil {
-		t.Fatalf("listPackages failed on disallow test case: %s", err)
+		t.Fatalf("ListPackages failed on disallow test case: %s", err)
 	}
 
-	result := ptree.ExternalReach(false, false, nil).ListExternalImports()
+	rm, em := ptree.ToReachMap(false, false, true, nil)
+	if len(em) != 0 {
+		t.Errorf("Should not have any error packages from ToReachMap, got %s", em)
+	}
+	result := rm.Flatten(true)
 	expect = []string{"github.com/sdboyer/gps", "hash", "sort"}
 	if !reflect.DeepEqual(expect, result) {
 		t.Errorf("Wrong imports in %q case:\n\t(GOT): %s\n\t(WNT): %s", name, result, expect)
 	}
 }
 
-func TestExternalReach(t *testing.T) {
+func TestToReachMap(t *testing.T) {
 	// There's enough in the 'varied' test case to test most of what matters
-	vptree, err := ListPackages(filepath.Join(getwd(t), "_testdata", "src", "varied"), "varied")
+	vptree, err := ListPackages(filepath.Join(getwd(t), "_testdata", "src", "github.com", "example", "varied"), "github.com/example/varied")
 	if err != nil {
-		t.Fatalf("listPackages failed on varied test case: %s", err)
+		t.Fatalf("ListPackages failed on varied test case: %s", err)
+	}
+
+	// Helper to add github.com/varied/example prefix
+	b := func(s string) string {
+		if s == "" {
+			return "github.com/example/varied"
+		}
+		return "github.com/example/varied/" + s
+	}
+	bl := func(parts ...string) string {
+		for k, s := range parts {
+			parts[k] = b(s)
+		}
+		return strings.Join(parts, " ")
 	}
 
 	// Set up vars for validate closure
-	var expect map[string][]string
+	var want ReachMap
 	var name string
 	var main, tests bool
 	var ignore map[string]bool
 
 	validate := func() {
-		result := vptree.ExternalReach(main, tests, ignore)
-		if !reflect.DeepEqual(expect, result) {
+		got, em := vptree.ToReachMap(main, tests, true, ignore)
+		if len(em) != 0 {
+			t.Errorf("Should not have any error packages from ToReachMap, got %s", em)
+		}
+		if !reflect.DeepEqual(want, got) {
 			seen := make(map[string]bool)
-			for ip, epkgs := range expect {
+			for ip, wantie := range want {
 				seen[ip] = true
-				if pkgs, exists := result[ip]; !exists {
+				if gotie, exists := got[ip]; !exists {
 					t.Errorf("ver(%q): expected import path %s was not present in result", name, ip)
 				} else {
-					if !reflect.DeepEqual(pkgs, epkgs) {
-						t.Errorf("ver(%q): did not get expected package set for import path %s:\n\t(GOT): %s\n\t(WNT): %s", name, ip, pkgs, epkgs)
+					if !reflect.DeepEqual(wantie, gotie) {
+						t.Errorf("ver(%q): did not get expected import set for pkg %s:\n\t(GOT): %#v\n\t(WNT): %#v", name, ip, gotie, wantie)
 					}
 				}
 			}
 
-			for ip, pkgs := range result {
+			for ip, ie := range got {
 				if seen[ip] {
 					continue
 				}
-				t.Errorf("ver(%q): Got packages for import path %s, but none were expected:\n\t%s", name, ip, pkgs)
+				t.Errorf("ver(%q): Got packages for import path %s, but none were expected:\n\t%s", name, ip, ie)
 			}
 		}
 	}
 
-	all := map[string][]string{
-		"varied":                {"encoding/binary", "github.com/Masterminds/semver", "github.com/sdboyer/gps", "go/parser", "hash", "net/http", "os", "sort"},
-		"varied/m1p":            {"github.com/sdboyer/gps", "os", "sort"},
-		"varied/namemismatch":   {"github.com/Masterminds/semver", "os"},
-		"varied/otherpath":      {"github.com/sdboyer/gps", "os", "sort"},
-		"varied/simple":         {"encoding/binary", "github.com/sdboyer/gps", "go/parser", "hash", "os", "sort"},
-		"varied/simple/another": {"encoding/binary", "github.com/sdboyer/gps", "hash", "os", "sort"},
+	// maps of each internal package, and their expected external and internal
+	// imports in the maximal case.
+	allex := map[string][]string{
+		b(""):               {"encoding/binary", "github.com/Masterminds/semver", "github.com/sdboyer/gps", "go/parser", "hash", "net/http", "os", "sort"},
+		b("m1p"):            {"github.com/sdboyer/gps", "os", "sort"},
+		b("namemismatch"):   {"github.com/Masterminds/semver", "os"},
+		b("otherpath"):      {"github.com/sdboyer/gps", "os", "sort"},
+		b("simple"):         {"encoding/binary", "github.com/sdboyer/gps", "go/parser", "hash", "os", "sort"},
+		b("simple/another"): {"encoding/binary", "github.com/sdboyer/gps", "hash", "os", "sort"},
 	}
+
+	allin := map[string][]string{
+		b(""):               {b("m1p"), b("namemismatch"), b("otherpath"), b("simple"), b("simple/another")},
+		b("m1p"):            {},
+		b("namemismatch"):   {},
+		b("otherpath"):      {b("m1p")},
+		b("simple"):         {b("m1p"), b("simple/another")},
+		b("simple/another"): {b("m1p")},
+	}
+
 	// build a map to validate the exception inputs. do this because shit is
 	// hard enough to keep track of that it's preferable not to have silent
 	// success if a typo creeps in and we're trying to except an import that
 	// isn't in a pkg in the first place
 	valid := make(map[string]map[string]bool)
-	for ip, expkgs := range all {
+	for ip, expkgs := range allex {
 		m := make(map[string]bool)
 		for _, pkg := range expkgs {
 			m[pkg] = true
 		}
 		valid[ip] = m
 	}
+	validin := make(map[string]map[string]bool)
+	for ip, inpkgs := range allin {
+		m := make(map[string]bool)
+		for _, pkg := range inpkgs {
+			m[pkg] = true
+		}
+		validin[ip] = m
+	}
 
-	// helper to compose expect, excepting specific packages
+	// helper to compose want, excepting specific packages
 	//
 	// this makes it easier to see what we're taking out on each test
 	except := func(pkgig ...string) {
 		// reinit expect with everything from all
-		expect = make(map[string][]string)
-		for ip, expkgs := range all {
-			sl := make([]string, len(expkgs))
-			copy(sl, expkgs)
-			expect[ip] = sl
+		want = make(ReachMap)
+		for ip, expkgs := range allex {
+			var ie struct{ Internal, External []string }
+
+			inpkgs := allin[ip]
+			lenex, lenin := len(expkgs), len(inpkgs)
+			if lenex > 0 {
+				ie.External = make([]string, len(expkgs))
+				copy(ie.External, expkgs)
+			}
+
+			if lenin > 0 {
+				ie.Internal = make([]string, len(inpkgs))
+				copy(ie.Internal, inpkgs)
+			}
+
+			want[ip] = ie
 		}
 
 		// now build the dropmap
@@ -1291,14 +1692,20 @@ func TestExternalReach(t *testing.T) {
 
 			// if only a single elem was passed, though, drop the whole thing
 			if len(not) == 0 {
-				delete(expect, ip)
+				delete(want, ip)
 				continue
 			}
 
 			m := make(map[string]bool)
 			for _, imp := range not {
-				if !valid[ip][imp] {
-					t.Fatalf("%s is not a reachable import of %s, even in the all case", imp, ip)
+				if strings.HasPrefix(imp, "github.com/example/varied") {
+					if !validin[ip][imp] {
+						t.Fatalf("%s is not a reachable import of %s, even in the all case", imp, ip)
+					}
+				} else {
+					if !valid[ip][imp] {
+						t.Fatalf("%s is not a reachable import of %s, even in the all case", imp, ip)
+					}
 				}
 				m[imp] = true
 			}
@@ -1306,17 +1713,25 @@ func TestExternalReach(t *testing.T) {
 			drop[ip] = m
 		}
 
-		for ip, pkgs := range expect {
-			var npkgs []string
-			for _, imp := range pkgs {
+		for ip, ie := range want {
+			var nie struct{ Internal, External []string }
+			for _, imp := range ie.Internal {
 				if !drop[ip][imp] {
-					npkgs = append(npkgs, imp)
+					nie.Internal = append(nie.Internal, imp)
 				}
 			}
 
-			expect[ip] = npkgs
+			for _, imp := range ie.External {
+				if !drop[ip][imp] {
+					nie.External = append(nie.External, imp)
+				}
+			}
+
+			want[ip] = nie
 		}
 	}
+
+	/* PREP IS DONE, BEGIN ACTUAL TESTING */
 
 	// first, validate all
 	name = "all"
@@ -1327,13 +1742,13 @@ func TestExternalReach(t *testing.T) {
 	// turn off main pkgs, which necessarily doesn't affect anything else
 	name = "no main"
 	main = false
-	except("varied")
+	except(b(""))
 	validate()
 
 	// ignoring the "varied" pkg has same effect as disabling main pkgs
 	name = "ignore root"
 	ignore = map[string]bool{
-		"varied": true,
+		b(""): true,
 	}
 	main = true
 	validate()
@@ -1345,20 +1760,20 @@ func TestExternalReach(t *testing.T) {
 	tests = false
 	ignore = nil
 	except(
-		"varied encoding/binary",
-		"varied/simple encoding/binary",
-		"varied/simple/another encoding/binary",
-		"varied/otherpath github.com/sdboyer/gps os sort",
+		b("")+" encoding/binary",
+		b("simple")+" encoding/binary",
+		b("simple/another")+" encoding/binary",
+		b("otherpath")+" github.com/sdboyer/gps os sort",
 	)
 
 	// almost the same as previous, but varied just goes away completely
 	name = "no main or tests"
 	main = false
 	except(
-		"varied",
-		"varied/simple encoding/binary",
-		"varied/simple/another encoding/binary",
-		"varied/otherpath github.com/sdboyer/gps os sort",
+		b(""),
+		b("simple")+" encoding/binary",
+		b("simple/another")+" encoding/binary",
+		bl("otherpath", "m1p")+" github.com/sdboyer/gps os sort",
 	)
 	validate()
 
@@ -1369,49 +1784,65 @@ func TestExternalReach(t *testing.T) {
 	// varied/simple
 	name = "ignore varied/simple"
 	ignore = map[string]bool{
-		"varied/simple": true,
+		b("simple"): true,
 	}
 	except(
 		// root pkg loses on everything in varied/simple/another
-		"varied hash encoding/binary go/parser",
-		"varied/simple",
+		// FIXME this is a bit odd, but should probably exclude m1p as well,
+		// because it actually shouldn't be valid to import a package that only
+		// has tests. This whole model misses that nuance right now, though.
+		bl("", "simple", "simple/another")+" hash encoding/binary go/parser",
+		b("simple"),
 	)
 	validate()
 
 	// widen the hole by excluding otherpath
 	name = "ignore varied/{otherpath,simple}"
 	ignore = map[string]bool{
-		"varied/otherpath": true,
-		"varied/simple":    true,
+		b("otherpath"): true,
+		b("simple"):    true,
 	}
 	except(
 		// root pkg loses on everything in varied/simple/another and varied/m1p
-		"varied hash encoding/binary go/parser github.com/sdboyer/gps sort",
-		"varied/otherpath",
-		"varied/simple",
+		bl("", "simple", "simple/another", "m1p", "otherpath")+" hash encoding/binary go/parser github.com/sdboyer/gps sort",
+		b("otherpath"),
+		b("simple"),
 	)
 	validate()
 
 	// remove namemismatch, though we're mostly beating a dead horse now
 	name = "ignore varied/{otherpath,simple,namemismatch}"
-	ignore["varied/namemismatch"] = true
+	ignore[b("namemismatch")] = true
 	except(
 		// root pkg loses on everything in varied/simple/another and varied/m1p
-		"varied hash encoding/binary go/parser github.com/sdboyer/gps sort os github.com/Masterminds/semver",
-		"varied/otherpath",
-		"varied/simple",
-		"varied/namemismatch",
+		bl("", "simple", "simple/another", "m1p", "otherpath", "namemismatch")+" hash encoding/binary go/parser github.com/sdboyer/gps sort os github.com/Masterminds/semver",
+		b("otherpath"),
+		b("simple"),
+		b("namemismatch"),
 	)
 	validate()
 }
 
-var _ = map[string][]string{
-	"varied":                {"encoding/binary", "github.com/Masterminds/semver", "github.com/sdboyer/gps", "go/parser", "hash", "net/http", "os", "sort"},
-	"varied/m1p":            {"github.com/sdboyer/gps", "os", "sort"},
-	"varied/namemismatch":   {"github.com/Masterminds/semver", "os"},
-	"varied/otherpath":      {"github.com/sdboyer/gps", "os", "sort"},
-	"varied/simple":         {"encoding/binary", "github.com/sdboyer/gps", "go/parser", "hash", "os", "sort"},
-	"varied/simple/another": {"encoding/binary", "github.com/sdboyer/gps", "hash", "os", "sort"},
+// Verify that we handle import cycles correctly - drop em all
+func TestToReachMapCycle(t *testing.T) {
+	ptree, err := ListPackages(filepath.Join(getwd(t), "_testdata", "src", "cycle"), "cycle")
+	if err != nil {
+		t.Fatalf("ListPackages failed on cycle test case: %s", err)
+	}
+
+	rm, em := ptree.ToReachMap(true, true, false, nil)
+	if len(em) != 0 {
+		t.Errorf("Should not have any error packages from ToReachMap, got %s", em)
+	}
+
+	// FIXME TEMPORARILY COMMENTED UNTIL WE CREATE A BETTER LISTPACKAGES MODEL -
+	//if len(rm) > 0 {
+	//t.Errorf("should be empty reachmap when all packages are in a cycle, got %v", rm)
+	//}
+
+	if len(rm) == 0 {
+		t.Error("TEMPORARY: should ignore import cycles, but cycle was eliminated")
+	}
 }
 
 func getwd(t *testing.T) string {
