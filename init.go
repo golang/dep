@@ -389,12 +389,21 @@ func getProjectData(pkgT gps.PackageTree, cpr string, sm *gps.SourceMgr) (projec
 				ptrees[pr] = ptree
 			}
 
-			rm := ptree.ExternalReach(false, false, nil)
+			// Get a reachmap that includes main pkgs (even though importing
+			// them is an error, what we're checking right now is simply whether
+			// there's a package with go code present on disk), and does not
+			// backpropagate errors (again, because our only concern right now
+			// is package existence).
+			rm, errmap := ptree.ToReachMap(true, false, false, nil)
 			reached, ok := rm[pkg]
 			if !ok {
 				colors[pkg] = black
 				// not on disk...
 				notondisk[pr] = true
+				return nil
+			} else if _, ok := errmap[pkg]; ok {
+				// The package is on disk, but it itself contains some errors.
+				colors[pkg] = black
 				return nil
 			}
 
@@ -421,7 +430,7 @@ func getProjectData(pkgT gps.PackageTree, cpr string, sm *gps.SourceMgr) (projec
 			}
 
 			// recurse
-			for _, rpkg := range reached {
+			for _, rpkg := range reached.External {
 				if isStdLib(rpkg) {
 					continue
 				}

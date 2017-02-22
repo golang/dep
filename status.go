@@ -239,7 +239,9 @@ func runStatusAll(p *project, sm *gps.SourceMgr) error {
 	// lock.
 	fmt.Fprintln(tw, "PROJECT\tMISSING PACKAGES")
 
-	external := ptree.ExternalReach(true, false, nil).ListExternalImports()
+	rm, _ := ptree.ToReachMap(true, true, false, nil)
+
+	external := rm.Flatten(false)
 	roots := make(map[gps.ProjectRoot][]string)
 	var errs []string
 	for _, e := range external {

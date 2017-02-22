@@ -64,19 +64,14 @@ func (cmd *removeCommand) Run(args []string) error {
 		return errors.Wrap(err, "gps.ListPackages")
 	}
 
-	// TODO this will end up ignoring internal pkgs with errs (and any other
-	// internal pkgs that import them), which is not what we want for this mode.
-	// A new callback, or a new param on this one, will be introduced to gps
-	// soon, and we'll want to use that when it arrives.
-	//reachlist := pkgT.ExternalReach(true, true).ListExternalImports()
-	reachmap := pkgT.ExternalReach(true, true, nil)
+	reachmap, _ := pkgT.ToReachMap(true, true, false, nil)
 
 	if cmd.unused {
 		if len(args) > 0 {
 			return fmt.Errorf("remove takes no arguments when running with -unused")
 		}
 
-		reachlist := reachmap.ListExternalImports()
+		reachlist := reachmap.Flatten(false)
 
 		// warm the cache in parallel, in case any paths require go get metadata
 		// discovery
@@ -140,8 +135,8 @@ func (cmd *removeCommand) Run(args []string) error {
 			*		- Actual solver behavior: ?
 			 */
 			var pkgimport []string
-			for pkg, imports := range reachmap {
-				for _, im := range imports {
+			for pkg, ie := range reachmap {
+				for _, im := range ie.External {
 					if hasImportPathPrefix(im, arg) {
 						pkgimport = append(pkgimport, pkg)
 						break
