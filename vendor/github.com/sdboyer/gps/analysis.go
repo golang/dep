@@ -34,7 +34,8 @@ func init() {
 // Stored as a var so that tests can swap it out. Ugh globals, ugh.
 var isStdLib = doIsStdLib
 
-// This was loving taken from src/cmd/go/pkg.go in Go's code (isStandardImportPath).
+// This was lovingly lifted from src/cmd/go/pkg.go in Go's code
+// (isStandardImportPath).
 func doIsStdLib(path string) bool {
 	i := strings.Index(path, "/")
 	if i < 0 {
@@ -46,9 +47,6 @@ func doIsStdLib(path string) bool {
 
 // ListPackages reports Go package information about all directories in the tree
 // at or below the provided fileRoot.
-//
-// Directories without any valid Go files are excluded. Directories with
-// multiple packages are excluded.
 //
 // The importRoot parameter is prepended to the relative path when determining
 // the import path for each package. The obvious case is for something typical,
@@ -122,9 +120,9 @@ func ListPackages(fileRoot, importRoot string) (PackageTree, error) {
 			return err
 		}
 
-		// Compute the import path. Run the result through ToSlash(), so that windows
-		// paths are normalized to Unix separators, as import paths are expected
-		// to be.
+		// Compute the import path. Run the result through ToSlash(), so that
+		// windows file paths are normalized to slashes, as is expected of
+		// import paths.
 		ip := filepath.ToSlash(filepath.Join(importRoot, strings.TrimPrefix(wp, fileRoot)))
 
 		// Find all the imports, across all os/arch combos
@@ -166,22 +164,18 @@ func ListPackages(fileRoot, importRoot string) (PackageTree, error) {
 			// Do allow the single-dot, at least for now
 			case imp == "..":
 				lim = append(lim, imp)
-				// ignore stdlib done this way, b/c that's what the go tooling does
 			case strings.HasPrefix(imp, "./"):
-				if isStdLib(imp[2:]) {
-					lim = append(lim, imp)
-				}
+				lim = append(lim, imp)
 			case strings.HasPrefix(imp, "../"):
-				if isStdLib(imp[3:]) {
-					lim = append(lim, imp)
-				}
+				lim = append(lim, imp)
 			}
 		}
 
 		if len(lim) > 0 {
 			ptree.Packages[ip] = PackageOrErr{
 				Err: &LocalImportsError{
-					Dir:          ip,
+					Dir:          wp,
+					ImportPath:   ip,
 					LocalImports: lim,
 				},
 			}
@@ -293,12 +287,21 @@ func fillPackage(p *build.Package) error {
 //
 // TODO(sdboyer) add a Files property once we're doing our own per-file parsing
 type LocalImportsError struct {
+	ImportPath   string
 	Dir          string
 	LocalImports []string
 }
 
 func (e *LocalImportsError) Error() string {
-	return fmt.Sprintf("import path %s had problematic local imports", e.Dir)
+	switch len(e.LocalImports) {
+	case 0:
+		// shouldn't be possible, but just cover the case
+		return fmt.Sprintf("import path %s had bad local imports", e.ImportPath)
+	case 1:
+		return fmt.Sprintf("import path %s had a local import: %q", e.ImportPath, e.LocalImports[0])
+	default:
+		return fmt.Sprintf("import path %s had local imports: %q", e.ImportPath, strings.Join(e.LocalImports, "\", \""))
+	}
 }
 
 // A PackageTree represents the results of recursively parsing a tree of
@@ -353,13 +356,44 @@ type PackageOrErr struct {
 	Err error
 }
 
-// ReachMap maps a set of import paths (keys) to the set of external packages
-// transitively reachable from the packages at those import paths.
+// ReachMap maps a set of import paths (keys) to the sets of transitively
+// reachable tree-internal packages, and all the tree-external packages
+// reachable through those internal packages.
 //
-// See PackageTree.ExternalReach() for more information.
-type ReachMap map[string][]string
+// See PackageTree.ToReachMap() for more information.
+type ReachMap map[string]struct {
+	Internal, External []string
+}
 
-// ExternalReach looks through a PackageTree and computes the list of external
+// ProblemImportError describes the reason that a particular import path is
+// not safely importable.
+type ProblemImportError struct {
+	// The import path of the package with some problem rendering it
+	// unimportable.
+	ImportPath string
+	// The path to the internal package the problem package imports that is the
+	// original cause of this issue. If empty, the package itself is the
+	// problem.
+	Cause []string
+	// The actual error from ListPackages that is undermining importability for
+	// this package.
+	Err error
+}
+
+// Error formats the ProblemImportError as a string, reflecting whether the
+// error represents a direct or transitive problem.
+func (e *ProblemImportError) Error() string {
+	switch len(e.Cause) {
+	case 0:
+		return fmt.Sprintf("%q contains malformed code: %s", e.ImportPath, e.Err.Error())
+	case 1:
+		return fmt.Sprintf("%q imports %q, which contains malformed code: %s", e.ImportPath, e.Cause[0], e.Err.Error())
+	default:
+		return fmt.Sprintf("%q transitively (through %v packages) imports %q, which contains malformed code: %s", e.ImportPath, len(e.Cause)-1, e.Cause[len(e.Cause)-1], e.Err.Error())
+	}
+}
+
+// ToReachMap looks through a PackageTree and computes the list of external
 // import statements (that is, import statements pointing to packages that are
 // not logical children of PackageTree.ImportRoot) that are transitively
 // imported by the internal packages in the tree.
@@ -372,11 +406,15 @@ type ReachMap map[string][]string
 // tests indicates whether (true) or not (false) to include imports from test
 // files in packages when computing the reach map.
 //
+// backprop indicates whether errors (an actual PackageOrErr.Err, or an import
+// to a nonexistent internal package) should be backpropagated, transitively
+// "poisoning" all corresponding importers to all importers.
+//
 // ignore is a map of import paths that, if encountered, should be excluded from
 // analysis. This exclusion applies to both internal and external packages. If
 // an external import path is ignored, it is simply omitted from the results.
 //
-// If an internal path is ignored, then not only does it not appear in the final
+// If an internal path is ignored, then it not only does not appear in the final
 // map, but it is also excluded from the transitive calculations of other
 // internal packages.  That is, if you ignore A/foo, then the external package
 // list for all internal packages that import A/foo will not include external
@@ -405,7 +443,30 @@ type ReachMap map[string][]string
 //  }
 //
 // If there are no packages to ignore, it is safe to pass a nil map.
-func (t PackageTree) ExternalReach(main, tests bool, ignore map[string]bool) ReachMap {
+//
+// Finally, if an internal PackageOrErr contains an error, it is always omitted
+// from the result set. If backprop is true, then the error from that internal
+// package will be transitively propagated back to any other internal
+// PackageOrErrs that import it, causing them to also be omitted. So, with the
+// same import chain:
+//
+//  A -> A/foo -> A/bar -> B/baz
+//
+// If A/foo has an error, then it would backpropagate to A, causing both to be
+// omitted, and the returned map to contain only A/bar:
+//
+//  map[string][]string{
+// 	"A/bar": []string{"B/baz"},
+//  }
+//
+// If backprop is false, then errors will not backpropagate to internal
+// importers. So, with an error in A/foo, this would be the result map:
+//
+//  map[string][]string{
+// 	"A": []string{},
+// 	"A/bar": []string{"B/baz"},
+//  }
+func (t PackageTree) ToReachMap(main, tests, backprop bool, ignore map[string]bool) (ReachMap, map[string]*ProblemImportError) {
 	if ignore == nil {
 		ignore = make(map[string]bool)
 	}
@@ -433,9 +494,10 @@ func (t PackageTree) ExternalReach(main, tests bool, ignore map[string]bool) Rea
 		}
 
 		imps = imps[:0]
-		imps = p.Imports
 		if tests {
-			imps = dedupeStrings(imps, p.TestImports)
+			imps = dedupeStrings(p.Imports, p.TestImports)
+		} else {
+			imps = p.Imports
 		}
 
 		w := wm{
@@ -443,8 +505,9 @@ func (t PackageTree) ExternalReach(main, tests bool, ignore map[string]bool) Rea
 			in: make(map[string]bool),
 		}
 
+		// For each import, decide whether it should be ignored, or if it
+		// belongs in the external or internal imports list.
 		for _, imp := range imps {
-			// Skip ignored imports
 			if ignore[imp] {
 				continue
 			}
@@ -452,24 +515,19 @@ func (t PackageTree) ExternalReach(main, tests bool, ignore map[string]bool) Rea
 			if !eqOrSlashedPrefix(imp, t.ImportRoot) {
 				w.ex[imp] = true
 			} else {
-				if w2, seen := workmap[imp]; seen {
-					for i := range w2.ex {
-						w.ex[i] = true
-					}
-					for i := range w2.in {
-						w.in[i] = true
-					}
-				} else {
-					w.in[imp] = true
-				}
+				w.in[imp] = true
 			}
 		}
 
 		workmap[ip] = w
 	}
 
-	//return wmToReach(workmap, t.ImportRoot)
-	return wmToReach(workmap, "") // TODO(sdboyer) this passes tests, but doesn't seem right
+	return wmToReach(workmap, backprop)
+}
+
+// Helper func to create an error when a package is missing.
+func missingPkgErr(pkg string) error {
+	return fmt.Errorf("no package exists at %q", pkg)
 }
 
 // wmToReach takes an internal "workmap" constructed by
@@ -478,11 +536,10 @@ func (t PackageTree) ExternalReach(main, tests bool, ignore map[string]bool) Rea
 // translates the results into a slice of external imports for each internal
 // pkg.
 //
-// The basedir string, with a trailing slash ensured, will be stripped from the
-// keys of the returned map.
-//
-// This is mostly separated out for testing purposes.
-func wmToReach(workmap map[string]wm, basedir string) map[string][]string {
+// It drops any packages with errors, and - if backprop is true - backpropagates
+// those errors, causing internal packages that (transitively) import other
+// internal packages having errors to also be dropped.
+func wmToReach(workmap map[string]wm, backprop bool) (ReachMap, map[string]*ProblemImportError) {
 	// Uses depth-first exploration to compute reachability into external
 	// packages, dropping any internal packages on "poisoned paths" - a path
 	// containing a package with an error, or with a dep on an internal package
@@ -495,13 +552,89 @@ func wmToReach(workmap map[string]wm, basedir string) map[string][]string {
 	)
 
 	colors := make(map[string]uint8)
-	allreachsets := make(map[string]map[string]struct{})
+	exrsets := make(map[string]map[string]struct{})
+	inrsets := make(map[string]map[string]struct{})
+	errmap := make(map[string]*ProblemImportError)
 
-	// poison is a helper func to eliminate specific reachsets from allreachsets
-	poison := func(path []string) {
-		for _, ppkg := range path {
-			delete(allreachsets, ppkg)
+	// poison is a helper func to eliminate specific reachsets from exrsets and
+	// inrsets, and populate error information along the way.
+	poison := func(path []string, err *ProblemImportError) {
+		for k, ppkg := range path {
+			delete(exrsets, ppkg)
+			delete(inrsets, ppkg)
+
+			// Duplicate the err for this package
+			kerr := &ProblemImportError{
+				ImportPath: ppkg,
+				Err:        err.Err,
+			}
+
+			// Shift the slice bounds on the incoming err.Cause.
+			//
+			// This check will only be false on the final path element when
+			// entering via poisonWhite, where the last pkg is the underlying
+			// cause of the problem, and is thus expected to have an empty Cause
+			// slice.
+			if k+1 < len(err.Cause) {
+				// reuse the slice
+				kerr.Cause = err.Cause[k+1:]
+			}
+
+			// Both black and white cases can have the final element be a
+			// package that doesn't exist. If that's the case, don't write it
+			// directly to the errmap, as presence in the errmap indicates the
+			// package was present in the input PackageTree.
+			if k == len(path)-1 {
+				if _, exists := workmap[path[len(path)-1]]; !exists {
+					continue
+				}
+			}
+
+			// Direct writing to the errmap means that if multiple errors affect
+			// a given package, only the last error visited will be reported.
+			// But that should be sufficient; presumably, the user can
+			// iteratively resolve the errors.
+			errmap[ppkg] = kerr
 		}
+	}
+
+	// poisonWhite wraps poison for error recording in the white-poisoning case,
+	// where we're constructing a new poison path.
+	poisonWhite := func(path []string) {
+		err := &ProblemImportError{
+			Cause: make([]string, len(path)),
+		}
+		copy(err.Cause, path)
+
+		// find the tail err
+		tail := path[len(path)-1]
+		if w, exists := workmap[tail]; exists {
+			// If we make it to here, the dfe guarantees that the workmap
+			// will contain an error for this pkg.
+			err.Err = w.err
+		} else {
+			err.Err = missingPkgErr(tail)
+		}
+
+		poison(path, err)
+	}
+	// poisonBlack wraps poison for error recording in the black-poisoning case,
+	// where we're connecting to an existing poison path.
+	poisonBlack := func(path []string, from string) {
+		// Because the outer dfe loop ensures we never directly re-visit a pkg
+		// that was already completed (black), we don't have to defend against
+		// an empty path here.
+
+		fromErr := errmap[from]
+		err := &ProblemImportError{
+			Err:   fromErr.Err,
+			Cause: make([]string, 0, len(path)+len(fromErr.Cause)+1),
+		}
+		err.Cause = append(err.Cause, path...)
+		err.Cause = append(err.Cause, from)
+		err.Cause = append(err.Cause, fromErr.Cause...)
+
+		poison(path, err)
 	}
 
 	var dfe func(string, []string) bool
@@ -513,10 +646,6 @@ func wmToReach(workmap map[string]wm, basedir string) map[string][]string {
 	// stack of parent packages we've visited to get to pkg. The return value
 	// indicates whether the level completed successfully (true) or if it was
 	// poisoned (false).
-	//
-	// TODO(sdboyer) some deft improvements could probably be made by passing the list of
-	// parent reachsets, rather than a list of parent package string names.
-	// might be able to eliminate the use of allreachsets map-of-maps entirely.
 	dfe = func(pkg string, path []string) bool {
 		// white is the zero value of uint8, which is what we want if the pkg
 		// isn't in the colors map, so this works fine
@@ -527,63 +656,82 @@ func wmToReach(workmap map[string]wm, basedir string) map[string][]string {
 
 			// make sure it's present and w/out errs
 			w, exists := workmap[pkg]
+
+			// Push current visitee onto the path slice. Passing path through
+			// recursion levels as a value has the effect of auto-popping the
+			// slice, while also giving us safe memory reuse.
+			path = append(path, pkg)
+
 			if !exists || w.err != nil {
-				// Does not exist or has an err; poison self and all parents
-				poison(path)
+				if backprop {
+					// Does not exist or has an err; poison self and all parents
+					poisonWhite(path)
+				} else if exists {
+					// Only record something in the errmap if there's actually a
+					// package there, per the semantics of the errmap
+					errmap[pkg] = &ProblemImportError{
+						ImportPath: pkg,
+						Err:        w.err,
+					}
+				}
 
 				// we know we're done here, so mark it black
 				colors[pkg] = black
 				return false
 			}
-			// pkg exists with no errs. mark it as in-process (grey), and start
-			// a reachmap for it
-			//
-			// TODO(sdboyer) use sync.Pool here? can be lots of explicit map alloc/dealloc
+			// pkg exists with no errs; start internal and external reachsets for it.
 			rs := make(map[string]struct{})
-
-			// Push self onto the path slice. Passing this as a value has the
-			// effect of auto-popping the slice, while also giving us safe
-			// memory reuse.
-			path = append(path, pkg)
+			irs := make(map[string]struct{})
 
 			// Dump this package's external pkgs into its own reachset. Separate
 			// loop from the parent dump to avoid nested map loop lookups.
 			for ex := range w.ex {
 				rs[ex] = struct{}{}
 			}
-			allreachsets[pkg] = rs
+			exrsets[pkg] = rs
+			// Same deal for internal imports
+			for in := range w.in {
+				irs[in] = struct{}{}
+			}
+			inrsets[pkg] = irs
 
-			// Push this pkg's external imports into all parent reachsets. Not
-			// all parents will necessarily have a reachset; none, some, or all
+			// Push this pkg's imports into all parent reachsets. Not all
+			// parents will necessarily have a reachset; none, some, or all
 			// could have been poisoned by a different path than what we're on
-			// right now. (Or we could be at depth 0)
+			// right now.
 			for _, ppkg := range path {
-				if prs, exists := allreachsets[ppkg]; exists {
+				if prs, exists := exrsets[ppkg]; exists {
 					for ex := range w.ex {
 						prs[ex] = struct{}{}
+					}
+				}
+
+				if prs, exists := inrsets[ppkg]; exists {
+					for in := range w.in {
+						prs[in] = struct{}{}
 					}
 				}
 			}
 
 			// Now, recurse until done, or a false bubbles up, indicating the
 			// path is poisoned.
-			var clean bool
 			for in := range w.in {
 				// It's possible, albeit weird, for a package to import itself.
 				// If we try to visit self, though, then it erroneously poisons
-				// the path, as it would be interpreted as grey. In reality,
-				// this becomes a no-op, so just skip it.
+				// the path, as it would be interpreted as grey. In practice,
+				// self-imports are a no-op, so we can just skip it.
 				if in == pkg {
 					continue
 				}
 
-				clean = dfe(in, path)
-				if !clean {
-					// Path is poisoned. Our reachmap was already deleted by the
-					// path we're returning from; mark ourselves black, then
-					// bubble up the poison. This is OK to do early, before
-					// exploring all internal imports, because the outer loop
-					// visits all internal packages anyway.
+				clean := dfe(in, path)
+				if !clean && backprop {
+					// Path is poisoned. If we're backpropagating errors, then
+					// the  reachmap for the visitee was already deleted by the
+					// path we're returning from; mark the visitee black, then
+					// return false to bubble up the poison. This is OK to do
+					// early, before exploring all internal imports, because the
+					// outer loop visits all internal packages anyway.
 					//
 					// In fact, stopping early is preferable - white subpackages
 					// won't have to iterate pointlessly through a parent path
@@ -611,22 +759,33 @@ func wmToReach(workmap map[string]wm, basedir string) map[string][]string {
 			//poison(append(path, pkg)) // poison self and parents
 
 		case black:
-			// black means we're done with the package. If it has an entry in
-			// allreachsets, it completed successfully. If not, it was poisoned,
-			// and we need to bubble the poison back up.
-			rs, exists := allreachsets[pkg]
+			// black means we're revisiting a package that was already
+			// completely explored. If it has an entry in exrsets, it completed
+			// successfully. If not, it was poisoned, and we need to bubble the
+			// poison back up.
+			rs, exists := exrsets[pkg]
 			if !exists {
-				// just poison parents; self was necessarily already poisoned
-				poison(path)
+				if backprop {
+					// just poison parents; self was necessarily already poisoned
+					poisonBlack(path, pkg)
+				}
 				return false
 			}
+			// If external reachset existed, internal must (even if empty)
+			irs := inrsets[pkg]
 
-			// It's good; pull over of the external imports from its reachset
-			// into all non-poisoned parent reachsets
+			// It's good; pull over the imports from its reachset into all
+			// non-poisoned parent reachsets
 			for _, ppkg := range path {
-				if prs, exists := allreachsets[ppkg]; exists {
+				if prs, exists := exrsets[ppkg]; exists {
 					for ex := range rs {
 						prs[ex] = struct{}{}
+					}
+				}
+
+				if prs, exists := inrsets[ppkg]; exists {
+					for in := range irs {
+						prs[in] = struct{}{}
 					}
 				}
 			}
@@ -643,138 +802,113 @@ func wmToReach(workmap map[string]wm, basedir string) map[string][]string {
 	// comparably well, and fits nicely with an escape hatch in the dfe.
 	var path []string
 	for pkg := range workmap {
-		dfe(pkg, path)
+		// However, at least check that the package isn't already fully visited;
+		// this saves a bit of time and implementation complexity inside the
+		// closures.
+		if colors[pkg] != black {
+			dfe(pkg, path)
+		}
 	}
 
-	if len(allreachsets) == 0 {
-		return nil
+	type ie struct {
+		Internal, External []string
 	}
 
-	// Flatten allreachsets into the final reachlist
-	rt := strings.TrimSuffix(basedir, string(os.PathSeparator)) + string(os.PathSeparator)
-	rm := make(map[string][]string)
-	for pkg, rs := range allreachsets {
+	// Flatten exrsets into reachmap
+	rm := make(ReachMap)
+	for pkg, rs := range exrsets {
 		rlen := len(rs)
 		if rlen == 0 {
-			rm[strings.TrimPrefix(pkg, rt)] = nil
+			rm[pkg] = ie{}
 			continue
 		}
 
-		edeps := make([]string, rlen)
-		k := 0
+		edeps := make([]string, 0, rlen)
 		for opkg := range rs {
-			edeps[k] = opkg
-			k++
+			edeps = append(edeps, opkg)
 		}
 
 		sort.Strings(edeps)
-		rm[strings.TrimPrefix(pkg, rt)] = edeps
+
+		sets := rm[pkg]
+		sets.External = edeps
+		rm[pkg] = sets
 	}
 
-	return rm
+	// Flatten inrsets into reachmap
+	for pkg, rs := range inrsets {
+		rlen := len(rs)
+		if rlen == 0 {
+			continue
+		}
+
+		ideps := make([]string, 0, rlen)
+		for opkg := range rs {
+			ideps = append(ideps, opkg)
+		}
+
+		sort.Strings(ideps)
+
+		sets := rm[pkg]
+		sets.Internal = ideps
+		rm[pkg] = sets
+	}
+
+	return rm, errmap
 }
 
-// ListExternalImports computes a sorted, deduplicated list of all the external
-// packages that are reachable through imports from all valid packages in a
-// ReachMap, as computed by PackageTree.ExternalReach().
+// FlattenAll flattens a reachmap into a sorted, deduplicated list of all the
+// external imports named by its contained packages.
 //
-// main and tests determine whether main packages and test imports should be
-// included in the calculation. "External" is defined as anything not prefixed,
-// after path cleaning, by the PackageTree.ImportRoot. This includes stdlib.
+// If stdlib is true, then stdlib imports are excluded from the result.
+func (rm ReachMap) FlattenAll(stdlib bool) []string {
+	return rm.flatten(func(pkg string) bool { return true }, stdlib)
+}
+
+// Flatten flattens a reachmap into a sorted, deduplicated list of all the
+// external imports named by its contained packages, but excludes imports coming
+// from packages with disallowed patterns in their names: any path element with
+// a leading dot, a leading underscore, with the name "testdata".
 //
-// If an internal path is ignored, all of the external packages that it uniquely
-// imports are omitted. Note, however, that no internal transitivity checks are
-// made here - every non-ignored package in the tree is considered independently
-// (with one set of exceptions, noted below). That means, given a PackageTree
-// with root A and packages at A, A/foo, and A/bar, and the following import
-// chain:
-//
-//  A -> A/foo -> A/bar -> B/baz
-//
-// If you ignore A or A/foo, A/bar will still be visited, and B/baz will be
-// returned, because this method visits ALL packages in the tree, not only those reachable
-// from the root (or any other) packages. If your use case requires interrogating
-// external imports with respect to only specific package entry points, you need
-// ExternalReach() instead.
-//
-// It is safe to pass a nil map if there are no packages to ignore.
-//
-// If an internal package has an error (that is, PackageOrErr is Err), it is excluded from
-// consideration. Internal packages that transitively import the error package
-// are also excluded. So, if:
-//
-//    -> B/foo
-//   /
-//  A
-//   \
-//    -> A/bar -> B/baz
-//
-// And A/bar has some error in it, then both A and A/bar will be eliminated from
-// consideration; neither B/foo nor B/baz will be in the results. If A/bar, with
-// its errors, is ignored, however, then A will remain, and B/foo will be in the
-// results.
-//
-// Finally, note that if a directory is named "testdata", or has a leading dot
-// or underscore, it will not be directly analyzed as a source. This is in
-// keeping with Go tooling conventions that such directories should be ignored.
-// So, if:
-//
-//  A -> B/foo
-//  A/.bar -> B/baz
-//  A/_qux -> B/baz
-//  A/testdata -> B/baz
-//
-// Then B/foo will be returned, but B/baz will not, because all three of the
-// packages that import it are in directories with disallowed names.
-//
-// HOWEVER, in keeping with the Go compiler, if one of those packages in a
-// disallowed directory is imported by a package in an allowed directory, then
-// it *will* be used. That is, while tools like go list will ignore a directory
-// named .foo, you can still import from .foo. Thus, it must be included. So,
-// if:
-//
-//    -> B/foo
-//   /
-//  A
-//   \
-//    -> A/.bar -> B/baz
-//
-// A is legal, and it imports A/.bar, so the results will include B/baz.
-func (rm ReachMap) ListExternalImports() []string {
-	exm := make(map[string]struct{})
-	for pkg, reach := range rm {
+// If stdlib is true, then stdlib imports are excluded from the result.
+func (rm ReachMap) Flatten(stdlib bool) []string {
+	f := func(pkg string) bool {
 		// Eliminate import paths with any elements having leading dots, leading
 		// underscores, or testdata. If these are internally reachable (which is
 		// a no-no, but possible), any external imports will have already been
 		// pulled up through ExternalReach. The key here is that we don't want
 		// to treat such packages as themselves being sources.
-		//
-		// TODO(sdboyer) strings.Split will always heap alloc, which isn't great to do
-		// in a loop like this. We could also just parse it ourselves...
-		var skip bool
 		for _, elem := range strings.Split(pkg, "/") {
 			if strings.HasPrefix(elem, ".") || strings.HasPrefix(elem, "_") || elem == "testdata" {
-				skip = true
-				break
+				return false
 			}
 		}
+		return true
+	}
 
-		if !skip {
-			for _, ex := range reach {
+	return rm.flatten(f, stdlib)
+}
+
+func (rm ReachMap) flatten(filter func(string) bool, stdlib bool) []string {
+	exm := make(map[string]struct{})
+	for pkg, ie := range rm {
+		if filter(pkg) {
+			for _, ex := range ie.External {
+				if !stdlib && isStdLib(ex) {
+					continue
+				}
 				exm[ex] = struct{}{}
 			}
 		}
 	}
 
 	if len(exm) == 0 {
-		return nil
+		return []string{}
 	}
 
-	ex := make([]string, len(exm))
-	k := 0
+	ex := make([]string, 0, len(exm))
 	for p := range exm {
-		ex[k] = p
-		k++
+		ex = append(ex, p)
 	}
 
 	sort.Strings(ex)
