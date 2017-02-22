@@ -401,8 +401,9 @@ func getProjectData(pkgT gps.PackageTree, cpr string, sm *gps.SourceMgr) (projec
 				// not on disk...
 				notondisk[pr] = true
 				return nil
-			} else if _, ok := errmap[pkg]; ok {
-				// The package is on disk, but it itself contains some errors.
+			}
+			if _, ok := errmap[pkg]; ok {
+				// The package is on disk, but contains some errors.
 				colors[pkg] = black
 				return nil
 			}
