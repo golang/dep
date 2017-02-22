@@ -484,7 +484,7 @@ func (s *solver) selectRoot() error {
 	return nil
 }
 
-func (s *solver) getImportsAndConstraintsOf(a atomWithPackages) ([]completeDep, error) {
+func (s *solver) getImportsAndConstraintsOf(a atomWithPackages) ([]string, []completeDep, error) {
 	var err error
 
 	if s.rd.isRoot(a.a.id.ProjectRoot) {
@@ -495,49 +495,72 @@ func (s *solver) getImportsAndConstraintsOf(a atomWithPackages) ([]completeDep, 
 	// information.
 	m, _, err := s.b.GetManifestAndLock(a.a.id, a.a.v)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	ptree, err := s.b.ListPackages(a.a.id, a.a.v)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	allex := ptree.ExternalReach(false, false, s.rd.ig)
-	// Use a map to dedupe the unique external packages
-	exmap := make(map[string]struct{})
+	rm, em := ptree.ToReachMap(false, false, true, s.rd.ig)
+	// Use maps to dedupe the unique internal and external packages.
+	exmap, inmap := make(map[string]struct{}), make(map[string]struct{})
+
+	for _, pkg := range a.pl {
+		inmap[pkg] = struct{}{}
+		for _, ipkg := range rm[pkg].Internal {
+			inmap[ipkg] = struct{}{}
+		}
+	}
+
+	var pl []string
+	// If lens are the same, then the map must have the same contents as the
+	// slice; no need to build a new one.
+	if len(inmap) == len(a.pl) {
+		pl = a.pl
+	} else {
+		pl = make([]string, 0, len(inmap))
+		for pkg := range inmap {
+			pl = append(pl, pkg)
+		}
+		sort.Strings(pl)
+	}
+
 	// Add to the list those packages that are reached by the packages
 	// explicitly listed in the atom
 	for _, pkg := range a.pl {
-		expkgs, exists := allex[pkg]
-		if !exists {
-			// missing package here *should* only happen if the target pkg was
-			// poisoned somehow - check the original ptree.
-			if perr, exists := ptree.Packages[pkg]; exists {
-				if perr.Err != nil {
-					return nil, fmt.Errorf("package %s has errors: %s", pkg, perr.Err)
-				}
-				return nil, fmt.Errorf("package %s depends on some other package within %s with errors", pkg, a.a.id.errString())
-			}
-			// Nope, it's actually not there. This shouldn't happen.
-			return nil, fmt.Errorf("package %s does not exist within project %s", pkg, a.a.id.errString())
+		// Skip ignored packages
+		if s.rd.ig[pkg] {
+			continue
 		}
 
-		for _, ex := range expkgs {
+		ie, exists := rm[pkg]
+		if !exists {
+			// Missing package here *should* only happen if the target pkg was
+			// poisoned. Check the errors map
+			if importErr, eexists := em[pkg]; eexists {
+				return nil, nil, importErr
+			}
+
+			// Nope, it's actually full-on not there.
+			return nil, nil, fmt.Errorf("package %s does not exist within project %s", pkg, a.a.id.errString())
+		}
+
+		for _, ex := range ie.External {
 			exmap[ex] = struct{}{}
 		}
 	}
 
-	reach := make([]string, len(exmap))
-	k := 0
+	reach := make([]string, 0, len(exmap))
 	for pkg := range exmap {
-		reach[k] = pkg
-		k++
+		reach = append(reach, pkg)
 	}
 	sort.Strings(reach)
 
 	deps := s.rd.ovr.overrideAll(m.DependencyConstraints())
-	return s.intersectConstraintsWithImports(deps, reach)
+	cd, err := s.intersectConstraintsWithImports(deps, reach)
+	return pl, cd, err
 }
 
 // intersectConstraintsWithImports takes a list of constraints and a list of
@@ -1037,14 +1060,16 @@ func (s *solver) selectAtom(a atomWithPackages, pkgonly bool) {
 		pl: a.pl,
 	})
 
-	s.sel.pushSelection(a, pkgonly)
-
-	deps, err := s.getImportsAndConstraintsOf(a)
+	pl, deps, err := s.getImportsAndConstraintsOf(a)
 	if err != nil {
 		// This shouldn't be possible; other checks should have ensured all
 		// packages and deps are present for any argument passed to this method.
 		panic(fmt.Sprintf("canary - shouldn't be possible %s", err))
 	}
+	// Assign the new internal package list into the atom, then push it onto the
+	// selection stack
+	a.pl = pl
+	s.sel.pushSelection(a, pkgonly)
 
 	// If this atom has a lock, pull it out so that we can potentially inject
 	// preferred versions into any bmis we enqueue
@@ -1119,7 +1144,7 @@ func (s *solver) unselectLast() (atomWithPackages, bool) {
 	awp, first := s.sel.popSelection()
 	heap.Push(s.unsel, bimodalIdentifier{id: awp.a.id, pl: awp.pl})
 
-	deps, err := s.getImportsAndConstraintsOf(awp)
+	_, deps, err := s.getImportsAndConstraintsOf(awp)
 	if err != nil {
 		// This shouldn't be possible; other checks should have ensured all
 		// packages and deps are present for any argument passed to this method.

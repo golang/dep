@@ -242,7 +242,7 @@ var bimodalFixtures = map[string]bimodalFixture{
 			),
 		},
 		r: mksolution(
-			"a 1.0.0",
+			mklp("a 1.0.0", ".", "bar"),
 			"b 1.0.0",
 		),
 	},
@@ -267,7 +267,7 @@ var bimodalFixtures = map[string]bimodalFixture{
 			),
 		},
 		r: mksolution(
-			"a 1.0.0",
+			mklp("a 1.0.0", ".", "bar"),
 			"b 1.0.0",
 		),
 	},
@@ -301,6 +301,27 @@ var bimodalFixtures = map[string]bimodalFixture{
 		r: mksolution(
 			mklp("a 1.0.0", ".", "foo"),
 			"b 1.0.0",
+		),
+	},
+	"project cycle not involving root with internal paths": {
+		ds: []depspec{
+			dsp(mkDepspec("root 0.0.0", "a ~1.0.0"),
+				pkg("root", "a"),
+			),
+			dsp(mkDepspec("a 1.0.0"),
+				pkg("a", "b/baz"),
+				pkg("a/foo", "a/quux", "a/quark"),
+				pkg("a/quux"),
+				pkg("a/quark"),
+			),
+			dsp(mkDepspec("b 1.0.0"),
+				pkg("b", "a/foo"),
+				pkg("b/baz", "b"),
+			),
+		},
+		r: mksolution(
+			mklp("a 1.0.0", ".", "foo", "quark", "quux"),
+			mklp("b 1.0.0", ".", "baz"),
 		),
 	},
 	// Ensure that if a constraint is expressed, but no actual import exists,
@@ -1099,8 +1120,8 @@ func (sm *bmSourceManager) GetManifestAndLock(id ProjectIdentifier, v Version) (
 }
 
 // computeBimodalExternalMap takes a set of depspecs and computes an
-// internally-versioned external reach map that is useful for quickly answering
-// ListExternal()-type calls.
+// internally-versioned ReachMap that is useful for quickly answering
+// ReachMap.Flatten()-type calls.
 //
 // Note that it does not do things like stripping out stdlib packages - these
 // maps are intended for use in SM fixtures, and that's a higher-level
@@ -1126,30 +1147,23 @@ func computeBimodalExternalMap(ds []depspec) map[pident]map[string][]string {
 
 			for _, imp := range pkg.imports {
 				if !eqOrSlashedPrefix(imp, string(d.n)) {
-					// Easy case - if the import is not a child of the base
-					// project path, put it in the external map
 					w.ex[imp] = true
 				} else {
-					if w2, seen := workmap[imp]; seen {
-						// If it is, and we've seen that path, dereference it
-						// immediately
-						for i := range w2.ex {
-							w.ex[i] = true
-						}
-						for i := range w2.in {
-							w.in[i] = true
-						}
-					} else {
-						// Otherwise, put it in the 'in' map for later
-						// reprocessing
-						w.in[imp] = true
-					}
+					w.in[imp] = true
 				}
 			}
 			workmap[pkg.path] = w
 		}
 
-		drm := wmToReach(workmap, "")
+		reachmap, em := wmToReach(workmap, true)
+		if len(em) > 0 {
+			panic(fmt.Sprintf("pkgs with errors in reachmap processing: %s", em))
+		}
+
+		drm := make(map[string][]string)
+		for ip, ie := range reachmap {
+			drm[ip] = ie.External
+		}
 		rm[pident{n: d.n, v: d.v}] = drm
 	}
 
