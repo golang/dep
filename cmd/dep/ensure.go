@@ -127,6 +127,9 @@ func (cmd *ensureCommand) Run(ctx *dep.Ctx, args []string) error {
 	if err != nil {
 		return errors.Wrap(err, "ensure ListPackage for project")
 	}
+	if containsOnlyErrorsOrIsEmpty(params.RootPackageTree.Packages) {
+		return errors.New("Root package doesn't contain any valid go package")
+	}
 
 	if cmd.update {
 		applyUpdateArgs(args, &params)
@@ -166,6 +169,15 @@ func (cmd *ensureCommand) Run(ctx *dep.Ctx, args []string) error {
 	writeV := !vendorExists && solution != nil
 
 	return errors.Wrap(sw.WriteAllSafe(writeV), "grouped write of manifest, lock and vendor")
+}
+
+func containsOnlyErrorsOrIsEmpty(m map[string]gps.PackageOrErr) bool {
+	for _, pckOrMap := range m {
+		if &pckOrMap.P != nil && pckOrMap.Err == nil {
+			return false
+		}
+	}
+	return true
 }
 
 func applyUpdateArgs(args []string, params *gps.SolveParameters) {
