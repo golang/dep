@@ -102,11 +102,11 @@ func TestRemove(t *testing.T) {
 
 	sysCommit := h.GetCommit("go.googlesource.com/sys")
 	goldenLock := "remove/lock1.golden.json"
-	wantLock := strings.Replace(h.GetTestFileString(goldenLock), "` + sysCommit + `", sysCommit, 1)
+	wantLock := strings.Replace(h.GetTestFileString(goldenLock), "{{sysCommit}}", sysCommit, 1)
 	gotLock := h.ReadLock()
 	if wantLock != gotLock {
 		if *test.UpdateGolden {
-			if err := h.WriteTestFile(goldenLock, gotLock); err != nil {
+			if err := h.WriteTestFile(goldenLock, strings.Replace(gotLock, sysCommit, "{{sysCommit}}", 1)); err != nil {
 				t.Fatal(err)
 			}
 		} else {
