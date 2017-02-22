@@ -319,7 +319,9 @@ func runStatusAll(out outputter, p *dep.Project, sm *gps.SourceMgr) error {
 	// lock.
 	out.MissingHeader()
 
-	external := ptree.ExternalReach(true, false, nil).ListExternalImports()
+	rm, _ := ptree.ToReachMap(true, true, false, nil)
+
+	external := rm.Flatten(false)
 	roots := make(map[gps.ProjectRoot][]string)
 	var errs []string
 	for _, e := range external {
