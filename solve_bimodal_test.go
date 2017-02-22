@@ -1155,7 +1155,7 @@ func computeBimodalExternalMap(ds []depspec) map[pident]map[string][]string {
 			workmap[pkg.path] = w
 		}
 
-		reachmap, em := wmToReach(workmap)
+		reachmap, em := wmToReach(workmap, true)
 		if len(em) > 0 {
 			panic(fmt.Sprintf("pkgs with errors in reachmap processing: %s", em))
 		}

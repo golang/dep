@@ -43,9 +43,10 @@ type rootdata struct {
 }
 
 // rootImportList returns a list of the unique imports from the root data.
-// Ignores and requires are taken into consideration, and stdlib is excluded.
+// Ignores and requires are taken into consideration, stdlib is excluded, and
+// errors within the local set of package are not backpropagated.
 func (rd rootdata) externalImportList() []string {
-	rm, _ := rd.rpt.ToReachMap(true, true, rd.ig)
+	rm, _ := rd.rpt.ToReachMap(true, true, false, rd.ig)
 	all := rm.Flatten(false)
 	reach := make([]string, 0, len(all))
 	for _, r := range all {

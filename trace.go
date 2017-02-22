@@ -47,7 +47,7 @@ func (s *solver) traceCheckQueue(q *versionQueue, bmi bimodalIdentifier, cont bo
 		verb = "attempt"
 	}
 
-	s.tl.Printf("%s\n", tracePrefix(fmt.Sprintf("%s? %s %s with %v pkgs; %s versions to try",indent, verb, bmi.id.errString(), len(bmi.pl), vlen), prefix, prefix))
+	s.tl.Printf("%s\n", tracePrefix(fmt.Sprintf("%s? %s %s with %v pkgs; %s versions to try", indent, verb, bmi.id.errString(), len(bmi.pl), vlen), prefix, prefix))
 }
 
 // traceStartBacktrack is called with the bmi that first failed, thus initiating
@@ -59,9 +59,9 @@ func (s *solver) traceStartBacktrack(bmi bimodalIdentifier, err error, pkgonly b
 
 	var msg string
 	if pkgonly {
-		msg = fmt.Sprintf("%s%s could not add %v pkgs to %s; begin backtrack",innerIndent, backChar, len(bmi.pl), bmi.id.errString())
+		msg = fmt.Sprintf("%s%s could not add %v pkgs to %s; begin backtrack", innerIndent, backChar, len(bmi.pl), bmi.id.errString())
 	} else {
-		msg = fmt.Sprintf("%s%s no more versions of %s to try; begin backtrack",innerIndent, backChar, bmi.id.errString())
+		msg = fmt.Sprintf("%s%s no more versions of %s to try; begin backtrack", innerIndent, backChar, bmi.id.errString())
 	}
 
 	prefix := getprei(len(s.sel.projects))
@@ -97,9 +97,9 @@ func (s *solver) traceFinish(sol solution, err error) {
 		for _, lp := range sol.Projects() {
 			pkgcount += len(lp.pkgs)
 		}
-		s.tl.Printf("%s%s found solution with %v packages from %v projects",innerIndent, successChar, pkgcount, len(sol.Projects()))
+		s.tl.Printf("%s%s found solution with %v packages from %v projects", innerIndent, successChar, pkgcount, len(sol.Projects()))
 	} else {
-		s.tl.Printf("%s%s solving failed",innerIndent, failChar)
+		s.tl.Printf("%s%s solving failed", innerIndent, failChar)
 	}
 }
 
@@ -111,7 +111,7 @@ func (s *solver) traceSelectRoot(ptree PackageTree, cdeps []completeDep) {
 
 	// This duplicates work a bit, but we're in trace mode and it's only once,
 	// so who cares
-	rm, _ := ptree.ToReachMap(true, true, s.rd.ig)
+	rm, _ := ptree.ToReachMap(true, true, false, s.rd.ig)
 
 	s.tl.Printf("Root project is %q", s.rd.rpt.ImportRoot)
 
@@ -134,7 +134,7 @@ func (s *solver) traceSelect(awp atomWithPackages, pkgonly bool) {
 
 	var msg string
 	if pkgonly {
-		msg = fmt.Sprintf("%s%s include %v more pkgs from %s",innerIndent, successChar, len(awp.pl), a2vs(awp.a))
+		msg = fmt.Sprintf("%s%s include %v more pkgs from %s", innerIndent, successChar, len(awp.pl), a2vs(awp.a))
 	} else {
 		msg = fmt.Sprintf("%s select %s w/%v pkgs", successChar, a2vs(awp.a), len(awp.pl))
 	}
@@ -156,14 +156,14 @@ func (s *solver) traceInfo(args ...interface{}) {
 	var msg string
 	switch data := args[0].(type) {
 	case string:
-		msg = tracePrefix(innerIndent + fmt.Sprintf(data, args[1:]...), "  ", "  ")
+		msg = tracePrefix(innerIndent+fmt.Sprintf(data, args[1:]...), "  ", "  ")
 	case traceError:
 		preflen++
 		// We got a special traceError, use its custom method
-		msg = tracePrefix(innerIndent + data.traceString(), "  ", failCharSp)
+		msg = tracePrefix(innerIndent+data.traceString(), "  ", failCharSp)
 	case error:
 		// Regular error; still use the x leader but default Error() string
-		msg = tracePrefix(innerIndent + data.Error(), "  ", failCharSp)
+		msg = tracePrefix(innerIndent+data.Error(), "  ", failCharSp)
 	default:
 		// panic here because this can *only* mean a stupid internal bug
 		panic(fmt.Sprintf("canary - unknown type passed as first param to traceInfo %T", data))

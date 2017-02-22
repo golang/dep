@@ -357,8 +357,8 @@ type PackageOrErr struct {
 }
 
 // ReachMap maps a set of import paths (keys) to the sets of transitively
-// reachable tree-internal packages, and all the tree-external reachable through
-// those internal packages.
+// reachable tree-internal packages, and all the tree-external packages
+// reachable through those internal packages.
 //
 // See PackageTree.ToReachMap() for more information.
 type ReachMap map[string]struct {
@@ -465,7 +465,7 @@ func (e *ProblemImportError) Error() string {
 //
 // When backprop is false, errors in internal packages are functionally
 // identical to ignoring that package.
-func (t PackageTree) ToReachMap(main, tests bool, ignore map[string]bool) (ReachMap, map[string]*ProblemImportError) {
+func (t PackageTree) ToReachMap(main, tests, backprop bool, ignore map[string]bool) (ReachMap, map[string]*ProblemImportError) {
 	if ignore == nil {
 		ignore = make(map[string]bool)
 	}
@@ -521,10 +521,7 @@ func (t PackageTree) ToReachMap(main, tests bool, ignore map[string]bool) (Reach
 		workmap[ip] = w
 	}
 
-	//if backprop {
-	return wmToReach(workmap)
-	//}
-	//return wmToReachNoPoison(wm)
+	return wmToReach(workmap, backprop)
 }
 
 // Helper func to create an error when a package is missing.
@@ -538,13 +535,10 @@ func missingPkgErr(pkg string) error {
 // translates the results into a slice of external imports for each internal
 // pkg.
 //
-// It drops any packages with errors, and backpropagates those errors, causing
-// internal packages that (transitively) import other internal packages having
-// errors to also be dropped.
-//
-// The basedir string, with a trailing slash ensured, will be stripped from the
-// keys of the returned map.
-func wmToReach(workmap map[string]wm) (ReachMap, map[string]*ProblemImportError) {
+// It drops any packages with errors, and - if backprop is true - backpropagates
+// those errors, causing internal packages that (transitively) import other
+// internal packages having errors to also be dropped.
+func wmToReach(workmap map[string]wm, backprop bool) (ReachMap, map[string]*ProblemImportError) {
 	// Uses depth-first exploration to compute reachability into external
 	// packages, dropping any internal packages on "poisoned paths" - a path
 	// containing a package with an error, or with a dep on an internal package
@@ -576,7 +570,7 @@ func wmToReach(workmap map[string]wm) (ReachMap, map[string]*ProblemImportError)
 
 			// Shift the slice bounds on the incoming err.Cause.
 			//
-			// This check will only not be true on the final path element when
+			// This check will only be false on the final path element when
 			// entering via poisonWhite, where the last pkg is the underlying
 			// cause of the problem, and is thus expected to have an empty Cause
 			// slice.
@@ -662,14 +656,23 @@ func wmToReach(workmap map[string]wm) (ReachMap, map[string]*ProblemImportError)
 			// make sure it's present and w/out errs
 			w, exists := workmap[pkg]
 
-			// Push current visitee onto onto the path slice. Passing this as a
-			// value has the effect of auto-popping the slice, while also giving
-			// us safe memory reuse.
+			// Push current visitee onto the path slice. Passing path through
+			// recursion levels as a value has the effect of auto-popping the
+			// slice, while also giving us safe memory reuse.
 			path = append(path, pkg)
 
 			if !exists || w.err != nil {
-				// Does not exist or has an err; poison self and all parents
-				poisonWhite(path)
+				if backprop {
+					// Does not exist or has an err; poison self and all parents
+					poisonWhite(path)
+				} else if exists {
+					// Only record something in the errmap if there's actually a
+					// package there, per the semantics of the errmap
+					errmap[pkg] = &ProblemImportError{
+						ImportPath: pkg,
+						Err:        w.err,
+					}
+				}
 
 				// we know we're done here, so mark it black
 				colors[pkg] = black
@@ -711,23 +714,23 @@ func wmToReach(workmap map[string]wm) (ReachMap, map[string]*ProblemImportError)
 
 			// Now, recurse until done, or a false bubbles up, indicating the
 			// path is poisoned.
-			var clean bool
 			for in := range w.in {
 				// It's possible, albeit weird, for a package to import itself.
 				// If we try to visit self, though, then it erroneously poisons
-				// the path, as it would be interpreted as grey. In reality,
-				// this becomes a no-op, so just skip it.
+				// the path, as it would be interpreted as grey. In practice,
+				// self-imports are a no-op, so we can just skip it.
 				if in == pkg {
 					continue
 				}
 
-				clean = dfe(in, path)
-				if !clean {
-					// Path is poisoned. Our reachmap was already deleted by the
-					// path we're returning from; mark ourselves black, then
-					// bubble up the poison. This is OK to do early, before
-					// exploring all internal imports, because the outer loop
-					// visits all internal packages anyway.
+				clean := dfe(in, path)
+				if !clean && backprop {
+					// Path is poisoned. If we're backpropagating errors, then
+					// the  reachmap for the visitee was already deleted by the
+					// path we're returning from; mark the visitee black, then
+					// return false to bubble up the poison. This is OK to do
+					// early, before exploring all internal imports, because the
+					// outer loop visits all internal packages anyway.
 					//
 					// In fact, stopping early is preferable - white subpackages
 					// won't have to iterate pointlessly through a parent path
@@ -761,8 +764,10 @@ func wmToReach(workmap map[string]wm) (ReachMap, map[string]*ProblemImportError)
 			// poison back up.
 			rs, exists := exrsets[pkg]
 			if !exists {
-				// just poison parents; self was necessarily already poisoned
-				poisonBlack(path, pkg)
+				if backprop {
+					// just poison parents; self was necessarily already poisoned
+					poisonBlack(path, pkg)
+				}
 				return false
 			}
 			// If external reachset existed, internal must (even if empty)

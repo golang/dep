@@ -29,9 +29,10 @@ func TestWorkmapToReach(t *testing.T) {
 		Internal, External []string
 	}{}
 	table := map[string]struct {
-		workmap map[string]wm
-		rm      ReachMap
-		em      map[string]*ProblemImportError
+		workmap  map[string]wm
+		rm       ReachMap
+		em       map[string]*ProblemImportError
+		backprop bool
 	}{
 		"single": {
 			workmap: map[string]wm{
@@ -135,6 +136,7 @@ func TestWorkmapToReach(t *testing.T) {
 					Err:        missingPkgErr("A/foo"),
 				},
 			},
+			backprop: true,
 		},
 		"transitive missing package is poison": {
 			workmap: map[string]wm{
@@ -179,6 +181,7 @@ func TestWorkmapToReach(t *testing.T) {
 					Err:        missingPkgErr("A/bar"),
 				},
 			},
+			backprop: true,
 		},
 		"err'd package is poison": {
 			workmap: map[string]wm{
@@ -217,6 +220,7 @@ func TestWorkmapToReach(t *testing.T) {
 					Err:        fmt.Errorf("err pkg"),
 				},
 			},
+			backprop: true,
 		},
 		"transitive err'd package is poison": {
 			workmap: map[string]wm{
@@ -263,6 +267,57 @@ func TestWorkmapToReach(t *testing.T) {
 					Cause:      []string{"A/bar"},
 					Err:        fmt.Errorf("err pkg"),
 				},
+				"A/bar": &ProblemImportError{
+					ImportPath: "A/bar",
+					Err:        fmt.Errorf("err pkg"),
+				},
+			},
+			backprop: true,
+		},
+		"transitive err'd package no backprop": {
+			workmap: map[string]wm{
+				"A": {
+					ex: map[string]bool{
+						"B/foo": true,
+					},
+					in: map[string]bool{
+						"A/foo":  true, // transitively err'd
+						"A/quux": true,
+					},
+				},
+				"A/foo": {
+					ex: map[string]bool{
+						"C/flugle": true,
+					},
+					in: map[string]bool{
+						"A/bar": true, // err'd
+					},
+				},
+				"A/bar": {
+					err: fmt.Errorf("err pkg"),
+				},
+				"A/quux": {
+					ex: map[string]bool{
+						"B/baz": true,
+					},
+					in: empty(),
+				},
+			},
+			rm: ReachMap{
+				"A": {
+					Internal: []string{"A/bar", "A/foo", "A/quux"},
+					//Internal: []string{"A/foo", "A/quux"},
+					External: []string{"B/baz", "B/foo", "C/flugle"},
+				},
+				"A/foo": {
+					Internal: []string{"A/bar"},
+					External: []string{"C/flugle"},
+				},
+				"A/quux": {
+					External: []string{"B/baz"},
+				},
+			},
+			em: map[string]*ProblemImportError{
 				"A/bar": &ProblemImportError{
 					ImportPath: "A/bar",
 					Err:        fmt.Errorf("err pkg"),
@@ -383,7 +438,7 @@ func TestWorkmapToReach(t *testing.T) {
 			fix.em = make(map[string]*ProblemImportError)
 		}
 
-		rm, em := wmToReach(fix.workmap)
+		rm, em := wmToReach(fix.workmap, fix.backprop)
 		if !reflect.DeepEqual(rm, fix.rm) {
 			//t.Error(pretty.Sprintf("wmToReach(%q): Did not get expected reach map:\n\t(GOT): %s\n\t(WNT): %s", name, rm, fix.rm))
 			t.Errorf("wmToReach(%q): Did not get expected reach map:\n\t(GOT): %s\n\t(WNT): %s", name, rm, fix.rm)
@@ -1340,7 +1395,7 @@ func TestFlattenReachMap(t *testing.T) {
 	var stdlib, main, tests bool
 
 	validate := func() {
-		rm, em := vptree.ToReachMap(main, tests, ignore)
+		rm, em := vptree.ToReachMap(main, tests, true, ignore)
 		if len(em) != 0 {
 			t.Errorf("Should not have any error pkgs from ToReachMap, got %s", em)
 		}
@@ -1493,7 +1548,7 @@ func TestFlattenReachMap(t *testing.T) {
 		t.Fatalf("ListPackages failed on disallow test case: %s", err)
 	}
 
-	rm, em := ptree.ToReachMap(false, false, nil)
+	rm, em := ptree.ToReachMap(false, false, true, nil)
 	if len(em) != 0 {
 		t.Errorf("Should not have any error packages from ToReachMap, got %s", em)
 	}
@@ -1532,7 +1587,7 @@ func TestToReachMap(t *testing.T) {
 	var ignore map[string]bool
 
 	validate := func() {
-		got, em := vptree.ToReachMap(main, tests, ignore)
+		got, em := vptree.ToReachMap(main, tests, true, ignore)
 		if len(em) != 0 {
 			t.Errorf("Should not have any error packages from ToReachMap, got %s", em)
 		}
@@ -1775,7 +1830,7 @@ func TestToReachMapCycle(t *testing.T) {
 		t.Fatalf("ListPackages failed on cycle test case: %s", err)
 	}
 
-	rm, em := ptree.ToReachMap(true, true, nil)
+	rm, em := ptree.ToReachMap(true, true, false, nil)
 	if len(em) != 0 {
 		t.Errorf("Should not have any error packages from ToReachMap, got %s", em)
 	}
