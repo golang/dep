@@ -186,25 +186,5 @@ func locksAreEquivalent(l, r *Lock) bool {
 		return false
 	}
 
-	if !bytes.Equal(l.Memo, r.Memo) {
-		return false
-	}
-
-	if len(l.P) != len(r.P) {
-		return false
-	}
-
-	sort.Sort(SortedLockedProjects(l.P))
-	sort.Sort(SortedLockedProjects(r.P))
-
-	for k, lp := range l.P {
-		// TODO(sdboyer) gps will be adding a func to compare LockedProjects in the next
-		// version; we can swap that in here when it lands
-		rp := r.P[k]
-		if !lp.Eq(rp) {
-			return false
-		}
-	}
-
-	return true
+	return gps.LocksAreEq(l, r, true)
 }
