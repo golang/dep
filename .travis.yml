@@ -8,6 +8,8 @@
       - os: linux
         go: 1.7.x
       - os: linux
+        go: 1.8
+      - os: linux
         go: tip
 # OSX wait times are unbearable right now. Re-enable when we can.
       #- os: osx
