@@ -4,4 +4,6 @@
 
 package bar
 
-const Qux = "yo yo!"
+import "github.com/sdboyer/deptest"
+
+const Qux = deptest.Map["yo yo!"]
