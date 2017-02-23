@@ -5,16 +5,13 @@
 package main
 
 import (
-	"github.com/Sirupsen/logrus"
-	"github.com/pkg/errors"
-
 	"github.com/golang/notexist/foo/bar"
+	"github.com/sdboyer/deptestdos"
 )
 
 func main() {
 	err := nil
 	if err != nil {
-		errors.Wrap(err, "thing")
+		deptestdos.diMeLo(bar.Qux)
 	}
-	logrus.Info(bar.Qux)
 }

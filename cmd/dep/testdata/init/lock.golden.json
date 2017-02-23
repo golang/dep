@@ -1,27 +1,19 @@
 {
-    "memo": "668fe45796bc4e85a5a6c0a0f1eb6fab9e23588d1eb33f3a12b2ad5599a3575e",
+    "memo": "",
     "projects": [
         {
-            "name": "github.com/Sirupsen/logrus",
-            "revision": "42b84f9ec624953ecbf81a94feccb3f5935c5edf",
-            "packages": [
-                "."
-            ]
-        },
-        {
-            "name": "github.com/pkg/errors",
+            "name": "github.com/sdboyer/deptest",
             "version": "v0.8.0",
-            "revision": "645ef00459ed84a119197bfb8d8205042c6df63d",
+            "revision": "ff2948a2ac8f538c4ecd55962e919d1e13e74baf",
             "packages": [
                 "."
             ]
         },
         {
-            "name": "golang.org/x/sys",
-            "branch": "master",
-            "revision": "{{sysCommit}}",
+            "name": "github.com/sdboyer/deptestdos",
+            "revision": "a0196baa11ea047dd65037287451d36b861b00ea",
             "packages": [
-                "unix"
+                "."
             ]
         }
     ]
