@@ -1416,15 +1416,6 @@ func (sm *depspecSourceManager) ExternalReach(id ProjectIdentifier, v Version) (
 	return nil, fmt.Errorf("No reach data for %s at version %s", id.errString(), v)
 }
 
-func (sm *depspecSourceManager) ListExternal(id ProjectIdentifier, v Version) ([]string, error) {
-	// This should only be called for the root
-	pid := pident{n: ProjectRoot(id.normalizedSource()), v: v}
-	if r, exists := sm.rm[pid]; exists {
-		return r[string(id.ProjectRoot)], nil
-	}
-	return nil, fmt.Errorf("No reach data for %s at version %s", id.errString(), v)
-}
-
 func (sm *depspecSourceManager) ListPackages(id ProjectIdentifier, v Version) (PackageTree, error) {
 	pid := pident{n: ProjectRoot(id.normalizedSource()), v: v}
 
