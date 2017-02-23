@@ -18,6 +18,7 @@ import (
 	"github.com/golang/dep"
 	"github.com/pkg/errors"
 	"github.com/sdboyer/gps"
+	"go/build"
 )
 
 const ensureShortHelp = `Ensure a dependency is safely vendored in the project`
@@ -127,10 +128,18 @@ func (cmd *ensureCommand) Run(ctx *dep.Ctx, args []string) error {
 	if err != nil {
 		return errors.Wrap(err, "ensure ListPackage for project")
 	}
-	if containsOnlyErrorsOrIsEmpty(params.RootPackageTree.Packages) {
-		return errors.New("Root package doesn't contain any valid go package")
+	if len(params.RootPackageTree.Packages) == 0 {
+		return errors.New("Current directory doesn't contain any go code")
 	}
-
+	for impPth, pckOrMap := range params.RootPackageTree.Packages {
+		if err := pckOrMap.Err; err != nil {
+			if noGoErr, ok := err.(*build.NoGoError); ok {
+				return errors.Wrap(noGoErr, "Current directory doesn't contain any go code")
+			} else {
+				return errors.Wrap(err, "There are errors in the import path: "+impPth)
+			}
+		}
+	}
 	if cmd.update {
 		applyUpdateArgs(args, &params)
 	} else {
@@ -169,15 +178,6 @@ func (cmd *ensureCommand) Run(ctx *dep.Ctx, args []string) error {
 	writeV := !vendorExists && solution != nil
 
 	return errors.Wrap(sw.WriteAllSafe(writeV), "grouped write of manifest, lock and vendor")
-}
-
-func containsOnlyErrorsOrIsEmpty(m map[string]gps.PackageOrErr) bool {
-	for _, pckOrMap := range m {
-		if &pckOrMap.P != nil && pckOrMap.Err == nil {
-			return false
-		}
-	}
-	return true
 }
 
 func applyUpdateArgs(args []string, params *gps.SolveParameters) {
