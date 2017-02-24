@@ -68,7 +68,7 @@ func (h *Helper) Must(err error) {
 // check gives a test non-fatal error if err is not nil.
 func (h *Helper) check(err error) {
 	if err != nil {
-		h.t.Error(err)
+		h.t.Errorf("%+v", err)
 	}
 }
 
@@ -112,10 +112,12 @@ func (h *Helper) Cd(dir string) {
 		h.wd = h.pwd()
 	}
 	abs, err := filepath.Abs(dir)
-	h.Must(os.Chdir(dir))
 	if err == nil {
 		h.Setenv("PWD", abs)
 	}
+
+	err = os.Chdir(dir)
+	h.Must(errors.Wrapf(err, "Unable to cd to %s", dir))
 }
 
 // Setenv sets an environment variable to use when running the test go
@@ -452,7 +454,7 @@ func (h *Helper) GetTestFile(src string) io.ReadCloser {
 func (h *Helper) GetTestFileString(src string) string {
 	content, err := ioutil.ReadAll(h.GetTestFile(src))
 	if err != nil {
-		panic(err)
+		h.t.Fatalf("%+v", err)
 	}
 	return string(content)
 }
@@ -498,7 +500,7 @@ func (h *Helper) Path(name string) string {
 	// Ensure it's the absolute, symlink-less path we're returning
 	abs, err := filepath.EvalSymlinks(joined)
 	if err != nil {
-		h.t.Fatalf("internal testsuite error: could not get absolute path for dir(%q), err %q", joined, err)
+		h.t.Fatalf("%+v", errors.Wrapf(err, "internal testsuite error: could not get absolute path for dir(%q)", joined))
 	}
 	return abs
 }
