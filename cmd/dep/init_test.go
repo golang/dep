@@ -39,6 +39,7 @@ func TestIsStdLib(t *testing.T) {
 }
 
 type initTestCase struct {
+	dataRoot       string
 	importPaths    map[string]string
 	sourceFiles    map[string]string
 	goldenManifest string
@@ -48,17 +49,48 @@ type initTestCase struct {
 
 func TestInit(t *testing.T) {
 	tests := []initTestCase{
+
+		// Both dependencies previously retrieved.  Both will show up in manifest and lock
 		{
+			dataRoot: "init/case1",
 			importPaths: map[string]string{
 				"github.com/sdboyer/deptest":    "v0.8.0",                                   // semver
 				"github.com/sdboyer/deptestdos": "a0196baa11ea047dd65037287451d36b861b00ea", // random sha
 			},
 			sourceFiles: map[string]string{
-				"init/thing.input.go": "foo/thing.go",
-				"init/bar.input.go":   "foo/bar/bar.go",
+				"thing.input.go": "foo/thing.go",
+				"bar.input.go":   "foo/bar/bar.go",
 			},
-			goldenManifest: "init/manifest.golden.json",
-			goldenLock:     "init/lock.golden.json",
+			goldenManifest: "manifest.golden.json",
+			goldenLock:     "lock.golden.json",
+		},
+
+		// One dependency previously retrieved by version.  Both will show up in lock, but only retrieved one in manifest.
+		{
+			dataRoot: "init/case2",
+			importPaths: map[string]string{
+				"github.com/sdboyer/deptest": "v0.8.0", // semver
+			},
+			sourceFiles: map[string]string{
+				"thing.input.go": "foo/thing.go",
+				"bar.input.go":   "foo/bar/bar.go",
+			},
+			goldenManifest: "manifest.golden.json",
+			goldenLock:     "lock.golden.json",
+		},
+
+		// One dependency previously retrieved by sha.  Both will show up in lock and manifest?
+		{
+			dataRoot: "init/case3",
+			importPaths: map[string]string{
+				"github.com/sdboyer/deptestdos": "a0196baa11ea047dd65037287451d36b861b00ea",
+			},
+			sourceFiles: map[string]string{
+				"thing.input.go": "foo/thing.go",
+				"bar.input.go":   "foo/bar/bar.go",
+			},
+			goldenManifest: "manifest.golden.json",
+			goldenLock:     "lock.golden.json",
 		},
 	}
 
@@ -82,17 +114,17 @@ func TestInit(t *testing.T) {
 		// Build a fake consumer of these packages.
 		root := "src/github.com/golang/notexist"
 		for src, dest := range testCase.sourceFiles {
-			h.TempCopy(root+"/"+dest, src)
+			h.TempCopy(root+"/"+dest, testCase.dataRoot+"/"+src)
 		}
 
 		h.Cd(h.Path(root))
 		h.Run("init")
 
-		wantManifest := h.GetTestFileString(testCase.goldenManifest)
+		wantManifest := h.GetTestFileString(testCase.dataRoot + "/" + testCase.goldenManifest)
 		gotManifest := h.ReadManifest()
 		if wantManifest != gotManifest {
 			if *test.UpdateGolden {
-				if err := h.WriteTestFile(testCase.goldenManifest, gotManifest); err != nil {
+				if err := h.WriteTestFile(testCase.dataRoot+"/"+testCase.goldenManifest, gotManifest); err != nil {
 					t.Fatal(err)
 				}
 			} else {
@@ -100,11 +132,11 @@ func TestInit(t *testing.T) {
 			}
 		}
 
-		wantLock := h.GetTestFileString(testCase.goldenLock)
+		wantLock := h.GetTestFileString(testCase.dataRoot + "/" + testCase.goldenLock)
 		gotLock := h.ReadLock()
 		if wantLock != gotLock {
 			if *test.UpdateGolden {
-				if err := h.WriteTestFile(testCase.goldenLock, gotLock); err != nil {
+				if err := h.WriteTestFile(testCase.dataRoot+"/"+testCase.goldenLock, gotLock); err != nil {
 					t.Fatal(err)
 				}
 			} else {
