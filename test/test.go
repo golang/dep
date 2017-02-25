@@ -439,14 +439,20 @@ func (h *Helper) WriteTestFile(src string, content string) error {
 	return err
 }
 
+// GetTestFile reads a file into memory
+func (h *Helper) GetFile(path string) io.ReadCloser {
+	content, err := os.Open(path)
+	if err != nil {
+		h.t.Fatalf("%+v", errors.Wrapf(err, "Unable to open file: %s", path))
+	}
+	return content
+}
+
 // GetTestFile reads a file from the testdata directory into memory.  src is
 // relative to ./testdata.
 func (h *Helper) GetTestFile(src string) io.ReadCloser {
-	content, err := os.Open(filepath.Join(h.origWd, "testdata", src))
-	if err != nil {
-		panic(err)
-	}
-	return content
+	fullPath := filepath.Join(h.origWd, "testdata", src)
+	return h.GetFile(fullPath)
 }
 
 // GetTestFileString reads a file from the testdata directory into memory.  src is
