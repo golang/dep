@@ -17,12 +17,12 @@ import (
 
 	"github.com/golang/dep"
 	"github.com/sdboyer/gps"
-	"path/filepath"
 	"hash/fnv"
 	"io/ioutil"
-	"syscall"
 	"os/exec"
+	"path/filepath"
 	"strings"
+	"syscall"
 )
 
 const statusShortHelp = `Report the status of the project's dependencies`
@@ -289,7 +289,6 @@ func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
 	defer sm.Release()
 
 	var out outputter
-
 	switch {
 	case cmd.detailed:
 		return fmt.Errorf("not implemented")
