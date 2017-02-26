@@ -18,6 +18,11 @@ import (
 	"github.com/golang/dep"
 	"github.com/sdboyer/gps"
 	"path/filepath"
+	"hash/fnv"
+	"io/ioutil"
+	"syscall"
+	"os/exec"
+	"strings"
 )
 
 const statusShortHelp = `Report the status of the project's dependencies`
@@ -50,6 +55,7 @@ func (cmd *statusCommand) Register(fs *flag.FlagSet) {
 	fs.BoolVar(&cmd.detailed, "detailed", false, "report more detailed status")
 	fs.BoolVar(&cmd.json, "json", false, "output in JSON format")
 	fs.StringVar(&cmd.template, "f", "", "output in text/template format")
+	fs.StringVar(&cmd.output, "o", "output.svg", "output file")
 	fs.BoolVar(&cmd.dot, "dot", false, "output the dependency graph in GraphViz format")
 	fs.BoolVar(&cmd.old, "old", false, "only show out-of-date dependencies")
 	fs.BoolVar(&cmd.missing, "missing", false, "only show missing dependencies")
@@ -61,6 +67,7 @@ type statusCommand struct {
 	detailed bool
 	json     bool
 	template string
+	output   string
 	dot      bool
 	old      bool
 	missing  bool
@@ -151,6 +158,123 @@ func (out *jsonOutput) MissingFooter() {
 	json.NewEncoder(out.w).Encode(out.missing)
 }
 
+type dotProject struct {
+	project  string
+	version  string
+	children []string
+}
+
+func (dp *dotProject) hash() uint32 {
+	h := fnv.New32a()
+	h.Write([]byte(dp.project))
+	return h.Sum32()
+}
+
+func (dp *dotProject) label() string {
+	label := []string{dp.project}
+
+	if dp.version != "" {
+		label = append(label, dp.version)
+	}
+
+	return strings.Join(label, "\n")
+}
+
+type dotOutput struct {
+	w   io.Writer
+	o   string
+	p   *dep.Project
+	dps []*dotProject
+	b   bytes.Buffer
+	bsh map[string]uint32
+}
+
+func (out *dotOutput) BasicHeader() {
+
+	// TODO Check for dot package before doing something
+	// cmd := exec.Command("dot", "-V")
+
+	out.dps = []*dotProject{}
+	out.bsh = make(map[string]uint32)
+	out.b.WriteString("digraph { node [shape=box]; ")
+
+	ptree, _ := gps.ListPackages(out.p.AbsRoot, string(out.p.ImportRoot))
+	prm, _ := ptree.ToReachMap(true, false, false, nil)
+
+	rdp := &dotProject{
+		project:  string(out.p.ImportRoot),
+		version:  "",
+		children: prm.Flatten(false),
+	}
+
+	out.dps = append(out.dps, rdp)
+}
+
+func (out *dotOutput) BasicFooter() {
+
+	for _, dp := range out.dps {
+		out.bsh[dp.project] = dp.hash()
+
+		// Create name boxes, and name them using hashes
+		// to avoid encoding name conflicts
+		out.b.WriteString(fmt.Sprintf("%d [label=\"%s\"];", dp.hash(), dp.label()))
+	}
+
+	// Store relations to avoid duplication
+	rels := make(map[string]bool)
+
+	// Create relations
+	for _, dp := range out.dps {
+		for _, bsc := range dp.children {
+			for pr, hsh := range out.bsh {
+				if strings.HasPrefix(bsc, pr) {
+					r := fmt.Sprintf("%d -> %d", out.bsh[dp.project], hsh)
+
+					if _, ex := rels[r]; !ex {
+						out.b.WriteString(r + "; ")
+						rels[r] = true
+					}
+
+				}
+			}
+		}
+	}
+
+	out.b.WriteString("}")
+
+	// TODO: Pipe created string to dot
+	// Storing Graphviz output inside temp file to generate dot output
+	tf, err := ioutil.TempFile(os.TempDir(), "")
+
+	if err != nil {
+		fmt.Printf("%v", err)
+	}
+
+	defer syscall.Unlink(tf.Name())
+	ioutil.WriteFile(tf.Name(), out.b.Bytes(), 0644)
+
+	if err := exec.Command("dot", tf.Name(), "-Tsvg", "-o", out.o).Run(); err != nil {
+		fmt.Errorf("Something went wrong generating dot output: %s", err)
+	}
+
+	fmt.Fprintf(out.w, "Output generated and stored %s", out.o)
+}
+
+func (out *dotOutput) BasicLine(bs *BasicStatus) {
+
+	dp := &dotProject{
+		project:  bs.ProjectRoot,
+		version:  bs.Version.String(),
+		children: bs.Children,
+	}
+
+	out.dps = append(out.dps, dp)
+}
+
+func (out *dotOutput) MissingHeader()                {}
+func (out *dotOutput) MissingLine(ms *MissingStatus) {}
+func (out *dotOutput) MissingFooter()                {}
+
 func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
 	p, err := ctx.LoadProject("")
 	if err != nil {
@@ -166,9 +290,6 @@ func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
 
 	var out outputter
 
-	// Require of children should be useful for tree/graph operations.
-	// By default is set to false in order to avoid slower status process
-	var rch bool = false
 	switch {
 	case cmd.detailed:
 		return fmt.Errorf("not implemented")
@@ -176,19 +297,25 @@ func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
 		out = &jsonOutput{
 			w: os.Stdout,
 		}
+	case cmd.dot:
+		out = &dotOutput{
+			p: p,
+			o: cmd.output,
+			w: os.Stdout,
+		}
 	default:
 		out = &tableOutput{
 			w: tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0),
 		}
 	}
-	return runStatusAll(out, p, sm, rch)
+	return runStatusAll(out, p, sm)
 }
 
 // BasicStatus contains all the information reported about a single dependency
 // in the summary/list status output mode.
 type BasicStatus struct {
 	ProjectRoot  string
-	children     []string
+	Children     []string
 	Constraint   gps.Constraint
 	Version      gps.UnpairedVersion
 	Revision     gps.Revision
@@ -201,7 +328,7 @@ type MissingStatus struct {
 	MissingPackages []string
 }
 
-func runStatusAll(out outputter, p *dep.Project, sm *gps.SourceMgr, rch bool) error {
+func runStatusAll(out outputter, p *dep.Project, sm *gps.SourceMgr) error {
 	if p.Lock == nil {
 		// TODO if we have no lock file, do...other stuff
 		return nil
@@ -252,8 +379,10 @@ func runStatusAll(out outputter, p *dep.Project, sm *gps.SourceMgr, rch bool) er
 				PackageCount: len(proj.Packages()),
 			}
 
-			// List project child packages if required
-			if rch == true {
+			// Get children only for specific outputers
+			// in order to avoid slower status process
+			switch out.(type) {
+			case *dotOutput:
 				r := filepath.Join(p.AbsRoot, "vendor", string(proj.Ident().ProjectRoot))
 				ptr, err := gps.ListPackages(r, string(proj.Ident().ProjectRoot))
 
@@ -261,8 +390,8 @@ func runStatusAll(out outputter, p *dep.Project, sm *gps.SourceMgr, rch bool) er
 					return fmt.Errorf("analysis of %s package failed: %v", proj.Ident().ProjectRoot, err)
 				}
 
-				prm, _ := ptr.ToReachMap(false, false, false, nil)
-				bs.children = prm.Flatten(false)
+				prm, _ := ptr.ToReachMap(true, false, false, nil)
+				bs.Children = prm.Flatten(false)
 			}
 
 			// Split apart the version from the lock into its constituent parts
