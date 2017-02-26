@@ -23,7 +23,6 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
-	"golang.org/x/tools/go/gcimporter15/testdata"
 )
 
 const statusShortHelp = `Report the status of the project's dependencies`
