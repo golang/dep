@@ -23,6 +23,7 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
+	"golang.org/x/tools/go/gcimporter15/testdata"
 )
 
 const statusShortHelp = `Report the status of the project's dependencies`
@@ -254,10 +255,10 @@ func (out *dotOutput) BasicFooter() {
 	ioutil.WriteFile(tf.Name(), out.b.Bytes(), 0644)
 
 	if err := exec.Command("dot", tf.Name(), "-Tsvg", "-o", out.o).Run(); err != nil {
-		fmt.Errorf("Something went wrong generating dot output: %s", err)
+		fmt.Fprintf(out.w, "Something went wrong generating dot output: %s", err)
+	} else {
+		fmt.Fprintf(out.w, "Output generated and stored %s", out.o)
 	}
-
-	fmt.Fprintf(out.w, "Output generated and stored %s", out.o)
 }
 
 func (out *dotOutput) BasicLine(bs *BasicStatus) {
