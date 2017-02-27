@@ -458,7 +458,9 @@ func (h *Helper) GetTestFile(src string) io.ReadCloser {
 // GetTestFileString reads a file from the testdata directory into memory.  src is
 // relative to ./testdata.
 func (h *Helper) GetTestFileString(src string) string {
-	content, err := ioutil.ReadAll(h.GetTestFile(src))
+	srcf := h.GetTestFile(src)
+	defer srcf.Close()
+	content, err := ioutil.ReadAll(srcf)
 	if err != nil {
 		h.t.Fatalf("%+v", err)
 	}
