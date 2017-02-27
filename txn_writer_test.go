@@ -5,79 +5,109 @@
 package dep
 
 import (
-	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/golang/dep/test"
 	"github.com/pkg/errors"
 )
 
-func TestTxnWriterBadInputs(t *testing.T) {
-	h := test.NewHelper(t)
-	defer h.Cleanup()
-
-	h.TempDir("txnwriter")
-	root := h.Path(".")
-
-	var sw SafeWriter
-	pc, err := NewContext()
-	if err != nil {
-		t.Fatal(err)
-	}
-	sm, err := pc.SourceManager()
-	defer sm.Release()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	sw.Prepare(nil, nil, nil, false)
-
-	// no root
-	if err := sw.Write("", nil); err == nil {
-		t.Fatalf("should have errored without a root path, but did not")
-	}
-
-	// noop
-	if err := sw.Write(root, nil); err != nil {
-		t.Fatalf("write with only root should be fine, just a no-op, but got err %q", err)
-	}
-
-	// force vendor with missing source manager
-	sw.Prepare(nil, nil, nil, true)
-	if !sw.Payload.HasVendor() {
-		t.Fatalf("writeV not propogated")
-	}
-	if err := sw.Write(root, nil); err == nil {
-		t.Fatalf("should fail because no source manager was provided for writing vendor")
-	}
-
-	// force vendor with missing lock
-	if err := sw.Write(root, sm); err == nil {
-		t.Fatalf("should fail because no lock was provided from which to write vendor")
-	}
-
-	// now check dir validation
-	sw.Prepare(nil, nil, nil, false)
-	missingroot := filepath.Join(root, "nonexistent")
-	if err := sw.Write(missingroot, sm); err == nil {
-		t.Fatalf("should have errored with nonexistent dir for root path, but did not")
-	}
-
-	fileroot := filepath.Join(root, "myfile")
-	srcf, err := os.Create(fileroot)
-	if err != nil {
-		t.Fatal(err)
-	}
-	srcf.Close()
-	if err := sw.Write(fileroot, sm); err == nil {
-		t.Fatalf("should have errored when root path is a file, but did not")
-	}
-}
-
 const safeWriterProject = "safewritertest"
 const safeWriterGoldenManifest = "txn_writer/expected_manifest.json"
 const safeWriterGoldenLock = "txn_writer/expected_lock.json"
+
+func TestSafeWriter_BadInput_MissingRoot(t *testing.T) {
+	h := test.NewHelper(t)
+	defer h.Cleanup()
+	pc := NewTestProjectContext(h, safeWriterProject)
+	defer pc.Release()
+
+	var sw SafeWriter
+	sw.Prepare(nil, nil, nil, false)
+
+	err := sw.Write("", pc.SourceManager)
+
+	if err == nil {
+		t.Fatal("should have errored without a root path, but did not")
+	} else if !strings.Contains(err.Error(), "root path") {
+		t.Fatalf("expected root path error, got %s", err.Error())
+	}
+}
+
+func TestSafeWriter_BadInput_MissingSourceManager(t *testing.T) {
+	h := test.NewHelper(t)
+	defer h.Cleanup()
+	pc := NewTestProjectContext(h, safeWriterProject)
+	defer pc.Release()
+
+	var sw SafeWriter
+	sw.Prepare(nil, nil, nil, true)
+
+	err := sw.Write(pc.Project.AbsRoot, nil)
+
+	if err == nil {
+		t.Fatal("should have errored without a source manager when forceVendor is true, but did not")
+	} else if !strings.Contains(err.Error(), "SourceManager") {
+		t.Fatalf("expected SourceManager error, got %s", err.Error())
+	}
+}
+
+func TestSafeWriter_BadInput_MissingLock(t *testing.T) {
+	h := test.NewHelper(t)
+	defer h.Cleanup()
+	pc := NewTestProjectContext(h, safeWriterProject)
+	defer pc.Release()
+
+	var sw SafeWriter
+	sw.Prepare(nil, nil, nil, true)
+
+	err := sw.Write(pc.Project.AbsRoot, pc.SourceManager)
+
+	if err == nil {
+		t.Fatal("should have errored without a lock when forceVendor is true, but did not")
+	} else if !strings.Contains(err.Error(), "lock") {
+		t.Fatalf("expected lock error, got %s", err.Error())
+	}
+}
+
+func TestSafeWriter_BadInput_NonexistentRoot(t *testing.T) {
+	h := test.NewHelper(t)
+	defer h.Cleanup()
+	pc := NewTestProjectContext(h, safeWriterProject)
+	defer pc.Release()
+
+	var sw SafeWriter
+	sw.Prepare(nil, nil, nil, true)
+
+	missingroot := filepath.Join(pc.Project.AbsRoot, "nonexistent")
+	err := sw.Write(missingroot, pc.SourceManager)
+
+	if err == nil {
+		t.Fatal("should have errored with nonexistent dir for root path, but did not")
+	} else if !strings.Contains(err.Error(), "does not exist") {
+		t.Fatalf("expected does not exist error, got %s", err.Error())
+	}
+}
+
+func TestSafeWriter_BadInput_RootIsFile(t *testing.T) {
+	h := test.NewHelper(t)
+	defer h.Cleanup()
+	pc := NewTestProjectContext(h, safeWriterProject)
+	defer pc.Release()
+
+	var sw SafeWriter
+	sw.Prepare(nil, nil, nil, true)
+
+	fileroot := pc.CopyFile("fileroot", "txn_writer/badinput_fileroot")
+	err := sw.Write(fileroot, pc.SourceManager)
+
+	if err == nil {
+		t.Fatal("should have errored when root path is a file, but did not")
+	} else if !strings.Contains(err.Error(), "does not exist") {
+		t.Fatalf("expected does not exist error, got %s", err.Error())
+	}
+}
 
 func TestSafeWriter_ManifestOnly(t *testing.T) {
 	test.NeedsExternalNetwork(t)
