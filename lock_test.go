@@ -19,7 +19,9 @@ func TestReadLock(t *testing.T) {
 	defer h.Cleanup()
 
 	golden := "lock/golden0.json"
-	got, err := readLock(h.GetTestFile(golden))
+	g0f := h.GetTestFile(golden)
+	defer g0f.Close()
+	got, err := readLock(g0f)
 	if err != nil {
 		t.Fatalf("Should have read Lock correctly, but got err %q", err)
 	}
@@ -41,7 +43,9 @@ func TestReadLock(t *testing.T) {
 	}
 
 	golden = "lock/golden1.json"
-	got, err = readLock(h.GetTestFile(golden))
+	g1f := h.GetTestFile(golden)
+	defer g1f.Close()
+	got, err = readLock(g1f)
 	if err != nil {
 		t.Fatalf("Should have read Lock correctly, but got err %q", err)
 	}
@@ -141,7 +145,9 @@ func TestReadLockErrors(t *testing.T) {
 	}
 
 	for _, tst := range tests {
-		_, err = readLock(h.GetTestFile(tst.file))
+		lf := h.GetTestFile(tst.file)
+		defer lf.Close()
+		_, err = readLock(lf)
 		if err == nil {
 			t.Errorf("Reading lock with %s should have caused error, but did not", tst.name)
 		} else if !strings.Contains(err.Error(), tst.name) {

@@ -59,13 +59,17 @@ func (pc *TestProjectContext) Load() {
 	var m *Manifest
 	mp := pc.getManifestPath()
 	if pc.h.Exist(mp) {
-		m, err = readManifest(pc.h.GetFile(mp))
+		mf := pc.h.GetFile(mp)
+		defer mf.Close()
+		m, err = readManifest(mf)
 		pc.h.Must(err)
 	}
 	var l *Lock
 	lp := pc.getLockPath()
 	if pc.h.Exist(lp) {
-		l, err = readLock(pc.h.GetFile(lp))
+		lf := pc.h.GetFile(lp)
+		defer lf.Close()
+		l, err = readLock(lf)
 		pc.h.Must(err)
 	}
 	pc.Project.Manifest = m
