@@ -6,13 +6,14 @@ package dep
 
 import (
 	"encoding/json"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"runtime"
 	"syscall"
+
+	"github.com/pkg/errors"
 )
 
 func IsRegular(name string) (bool, error) {
@@ -25,7 +26,7 @@ func IsRegular(name string) (bool, error) {
 		return false, err
 	}
 	if fi.IsDir() {
-		return false, fmt.Errorf("%q is a directory, should be a file", name)
+		return false, errors.Errorf("%q is a directory, should be a file", name)
 	}
 	return true, nil
 }
@@ -40,7 +41,7 @@ func IsDir(name string) (bool, error) {
 		return false, err
 	}
 	if !fi.IsDir() {
-		return false, fmt.Errorf("%q is not a directory", name)
+		return false, errors.Errorf("%q is not a directory", name)
 	}
 	return true, nil
 }
@@ -80,7 +81,7 @@ func writeFile(path string, in json.Marshaler) error {
 func renameWithFallback(src, dest string) error {
 	fi, err := os.Lstat(src)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "cannot stat %s", src)
 	}
 
 	// Windows cannot use syscall.Rename to rename a directory
@@ -88,7 +89,7 @@ func renameWithFallback(src, dest string) error {
 		if err := CopyDir(src, dest); err != nil {
 			return err
 		}
-		return os.RemoveAll(src)
+		return errors.Wrapf(os.RemoveAll(src), "cannot delete %s", src)
 	}
 
 	err = os.Rename(src, dest)
@@ -98,7 +99,7 @@ func renameWithFallback(src, dest string) error {
 
 	terr, ok := err.(*os.LinkError)
 	if !ok {
-		return err
+		return errors.Wrapf(err, "cannot rename %s to %s", src, dest)
 	}
 
 	// Rename may fail if src and dest are on different devices; fall back to
@@ -123,14 +124,14 @@ func renameWithFallback(src, dest string) error {
 			cerr = CopyFile(src, dest)
 		}
 	} else {
-		return terr
+		return errors.Wrapf(terr, "link error: cannot rename %s to %s", src, dest)
 	}
 
 	if cerr != nil {
-		return cerr
+		return errors.Wrapf(cerr, "second attemp failed: cannot rename %s to %s", src, dest)
 	}
 
-	return os.RemoveAll(src)
+	return errors.Wrapf(os.RemoveAll(src), "cannot delete %s", src)
 }
 
 // CopyDir takes in a directory and copies its contents to the destination.
@@ -138,23 +139,23 @@ func renameWithFallback(src, dest string) error {
 func CopyDir(src string, dest string) error {
 	fi, err := os.Lstat(src)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "cannot stat %s", src)
 	}
 
 	err = os.MkdirAll(dest, fi.Mode())
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "cannot mkdir %s", dest)
 	}
 
 	dir, err := os.Open(src)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "cannot open %s", src)
 	}
 	defer dir.Close()
 
 	objects, err := dir.Readdir(-1)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "cannot read directory %s", dir.Name())
 	}
 
 	for _, obj := range objects {
