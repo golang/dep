@@ -161,7 +161,8 @@ func (cmd *ensureCommand) Run(ctx *dep.Ctx, args []string) error {
 		manifest = p.Manifest
 	}
 
-	sw.Prepare(manifest, p.Lock, solution, writeV)
+	newLock := dep.LockFromInterface(solution)
+	sw.Prepare(manifest, p.Lock, newLock, writeV)
 	if cmd.dryRun {
 		return sw.PrintPreparedActions()
 	}
