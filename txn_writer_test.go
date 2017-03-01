@@ -257,7 +257,7 @@ func TestSafeWriter_UnmodifiedLock(t *testing.T) {
 		t.Fatal("Did not expect the payload to contain the manifest")
 	}
 	if sw.Payload.HasLock() {
-		t.Fatal("Did not expect the payload to contain the lock")
+		t.Fatal("Did not expect the payload to contain the lock.")
 	}
 	if sw.Payload.HasVendor() {
 		t.Fatal("Did not expect the payload to contain the vendor directory")
@@ -369,6 +369,70 @@ func TestSafeWriter_ForceVendorWhenVendorAlreadyExists(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := pc.VendorFileShouldExist("github.com/sdboyer/dep-test"); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestSafeWriter_DiffLocks(t *testing.T) {
+	test.NeedsExternalNetwork(t)
+	test.NeedsGit(t)
+
+	h := test.NewHelper(t)
+	defer h.Cleanup()
+
+	pc := NewTestProjectContext(h, safeWriterProject)
+	defer pc.Release()
+	pc.CopyFile(LockName, "txn_writer/original_lock.json")
+	pc.Load()
+
+	ulf := h.GetTestFile("txn_writer/updated_lock.json")
+	defer ulf.Close()
+	updatedLock, err := readLock(ulf)
+	h.Must(err)
+
+	var sw SafeWriter
+	sw.Prepare(nil, pc.Project.Lock, updatedLock, true)
+
+	// Verify lock diff
+	diff := sw.Payload.LockDiff
+	if diff == nil {
+		t.Fatal("Expected the payload to contain a diff of the lock files")
+	}
+	if diff.HashDiff == nil {
+		t.Fatalf("Expected the lock diff to contain the updated hash: expected %s, got %s", pc.Project.Lock.Memo, updatedLock.Memo)
+	}
+
+	if len(diff.Add) != 1 {
+		t.Fatalf("Expected the lock diff to contain 1 added project, got %d", len(diff.Add))
+	} else {
+		add := diff.Add[0]
+		if add.Name != "github.com/stuff/realthing" {
+			t.Errorf("expected new project github.com/stuff/realthing, got %s", add.Name)
+		}
+	}
+
+	if len(diff.Remove) != 1 {
+		t.Fatalf("Expected the lock diff to contain 1 removed project, got %d", len(diff.Remove))
+	} else {
+		remove := diff.Remove[0]
+		if remove != "github.com/stuff/placeholder" {
+			t.Fatalf("expected new project github.com/stuff/placeholder, got %s", remove)
+		}
+	}
+
+	if len(diff.Modify) != 1 {
+		t.Fatalf("Expected the lock diff to contain 1 modified project, got %d", len(diff.Modify))
+	} else {
+		modify := diff.Modify[0]
+		if modify.Name != "github.com/foo/bar" {
+			t.Fatalf("expected new project github.com/foo/bar, got %s", modify.Name)
+		}
+	}
+
+	output, err := diff.Format()
+	h.Must(err)
+	goldenOutput := "txn_writer/expected_diff_output.txt"
+	if err = pc.ShouldMatchGolden(goldenOutput, output); err != nil {
 		t.Fatal(err)
 	}
 }

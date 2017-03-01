@@ -96,8 +96,7 @@ func (pc *TestProjectContext) getVendorPath() string {
 // Updates the golden file when -UpdateGolden flag is present.
 func (pc *TestProjectContext) LockShouldMatchGolden(goldenLockPath string) error {
 	got := pc.h.ReadLock()
-	want := pc.h.GetTestFileString(goldenLockPath)
-	return pc.shouldMatchGolden(goldenLockPath, want, got)
+	return pc.ShouldMatchGolden(goldenLockPath, got)
 }
 
 // LockShouldNotExist returns an error when the lock exists.
@@ -110,8 +109,7 @@ func (pc *TestProjectContext) LockShouldNotExist() error {
 // Updates the golden file when -UpdateGolden flag is present
 func (pc *TestProjectContext) ManifestShouldMatchGolden(goldenManifestPath string) error {
 	got := pc.h.ReadManifest()
-	want := pc.h.GetTestFileString(goldenManifestPath)
-	return pc.shouldMatchGolden(goldenManifestPath, want, got)
+	return pc.ShouldMatchGolden(goldenManifestPath, got)
 }
 
 // ManifestShouldNotExist returns an error when the lock exists.
@@ -122,7 +120,8 @@ func (pc *TestProjectContext) ManifestShouldNotExist() error {
 // ShouldMatchGolden returns an error when a file does not match the golden file.
 // goldenFile is the path to the golden file, relative to the testdata directory
 // Updates the golden file when -UpdateGolden flag is present
-func (pc *TestProjectContext) shouldMatchGolden(goldenFile string, want string, got string) error {
+func (pc *TestProjectContext) ShouldMatchGolden(goldenFile string, got string) error {
+	want := pc.h.GetTestFileString(goldenFile)
 	if want != got {
 		if *test.UpdateGolden {
 			if err := pc.h.WriteTestFile(goldenFile, got); err != nil {

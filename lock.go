@@ -184,14 +184,3 @@ func (s SortedLockedProjects) Less(i, j int) bool {
 
 	return l.Source < r.Source
 }
-
-// locksAreEquivalent compares two locks to see if they differ. If EITHER lock
-// is nil, or their memos do not match, or any projects differ, then false is
-// returned.
-func locksAreEquivalent(l, r *Lock) bool {
-	if l == nil || r == nil {
-		return false
-	}
-
-	return gps.LocksAreEq(l, r, true)
-}
