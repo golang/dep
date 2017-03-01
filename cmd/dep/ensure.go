@@ -131,14 +131,8 @@ func (cmd *ensureCommand) Run(ctx *dep.Ctx, args []string) error {
 	if len(params.RootPackageTree.Packages) == 0 {
 		return errors.New("Current directory doesn't contain any go code")
 	}
-	for impPth, pckOrMap := range params.RootPackageTree.Packages {
-		if err := pckOrMap.Err; err != nil {
-			if noGoErr, ok := err.(*build.NoGoError); ok {
-				return errors.Wrap(noGoErr, "Current directory doesn't contain any go code")
-			} else {
-				return errors.Wrap(err, "There are errors in the import path: "+impPth)
-			}
-		}
+	if err := containsOnlyErrors(params.RootPackageTree.Packages); err != nil {
+		return err
 	}
 	if cmd.update {
 		applyUpdateArgs(args, &params)
@@ -180,6 +174,21 @@ func (cmd *ensureCommand) Run(ctx *dep.Ctx, args []string) error {
 	return errors.Wrap(sw.WriteAllSafe(writeV), "grouped write of manifest, lock and vendor")
 }
 
+func containsOnlyErrors(m map[string]gps.PackageOrErr) error {
+	var err error
+	for impPth, poe := range m {
+		if err = poe.Err; err != nil {
+			if noGoErr, ok := err.(*build.NoGoError); ok && err != nil {
+				err = errors.Wrap(noGoErr, "Current directory doesn't contain any go code")
+			} else if err == nil {
+				err = errors.Wrap(err, "There are errors in the import path: "+impPth)
+			}
+		} else {
+			return nil
+		}
+	}
+	return err
+}
 func applyUpdateArgs(args []string, params *gps.SolveParameters) {
 	// When -update is specified without args, allow every project to change versions, regardless of the lock file
 	if len(args) == 0 {
