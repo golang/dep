@@ -102,14 +102,7 @@ func (l *Lock) MarshalJSON() ([]byte, error) {
 		}
 
 		v := lp.Version()
-		ld.Revision = GetRevisionFromVersion(v)
-
-		switch v.Type() {
-		case gps.IsBranch:
-			ld.Branch = v.String()
-		case gps.IsSemver, gps.IsVersion:
-			ld.Version = v.String()
-		}
+		ld.Revision, ld.Branch, ld.Version = getVersionInfo(v)
 
 		raw.P[k] = ld
 	}
@@ -125,18 +118,27 @@ func (l *Lock) MarshalJSON() ([]byte, error) {
 	return buf.Bytes(), err
 }
 
-func GetRevisionFromVersion(v gps.Version) string {
+// TODO(carolynvs) this should be moved to gps
+func getVersionInfo(v gps.Version) (revision string, branch string, version string) {
 	// Figure out how to get the underlying revision
 	switch tv := v.(type) {
 	case gps.UnpairedVersion:
 	// TODO we could error here, if we want to be very defensive about not
 	// allowing a lock to be written if without an immmutable revision
 	case gps.Revision:
-		return tv.String()
+		revision = tv.String()
 	case gps.PairedVersion:
-		return tv.Underlying().String()
+		revision = tv.Underlying().String()
 	}
-	return ""
+
+	switch v.Type() {
+	case gps.IsBranch:
+		branch = v.String()
+	case gps.IsSemver, gps.IsVersion:
+		version = v.String()
+	}
+
+	return
 }
 
 // LockFromInterface converts an arbitrary gps.Lock to dep's representation of a
