@@ -5,7 +5,7 @@
 package main
 
 import (
-	_ "github.com/jimmysmith95/fixed-version"
+	_ "github.com/sdboyer/deptest"
 )
 
 func main() {

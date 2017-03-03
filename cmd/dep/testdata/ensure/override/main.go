@@ -5,8 +5,8 @@
 package main
 
 import (
-	"fmt"
-	stuff "github.com/carolynvs/go-dep-test"
+  "fmt"
+  stuff "github.com/sdboyer/deptest"
 )
 
 func main() {
