@@ -1,7 +1,7 @@
 {
     "overrides": {
-        "github.com/carolynvs/go-dep-test": {
-            "version": "0.1.1"
+        "github.com/sdboyer/deptest": {
+            "version": "1.0.0"
         }
     }
 }

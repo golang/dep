@@ -11,94 +11,6 @@ import (
 	"github.com/sdboyer/gps"
 )
 
-func TestEnsureOverrides(t *testing.T) {
-	test.NeedsExternalNetwork(t)
-	test.NeedsGit(t)
-
-	h := test.NewHelper(t)
-	defer h.Cleanup()
-
-	h.TempDir("src")
-	h.Setenv("GOPATH", h.Path("."))
-
-	h.TempCopy("src/thing/thing.go", "ensure/overrides_main.go")
-	h.Cd(h.Path("src/thing"))
-
-	h.Run("init")
-	h.Run("ensure", "-override", "github.com/carolynvs/go-dep-test@0.1.1")
-
-	goldenManifest := "ensure/overrides_manifest.golden.json"
-	wantManifest := h.GetTestFileString(goldenManifest)
-	gotManifest := h.ReadManifest()
-	if gotManifest != wantManifest {
-		if *test.UpdateGolden {
-			if err := h.WriteTestFile(goldenManifest, string(gotManifest)); err != nil {
-				t.Fatal(err)
-			}
-		} else {
-			t.Fatalf("expected %s, got %s", wantManifest, gotManifest)
-		}
-	}
-
-	goldenLock := "ensure/overrides_lock.golden.json"
-	wantLock := h.GetTestFileString(goldenLock)
-	gotLock := h.ReadLock()
-	if gotLock != wantLock {
-		if *test.UpdateGolden {
-			if err := h.WriteTestFile(goldenLock, string(gotLock)); err != nil {
-				t.Fatal(err)
-			}
-		} else {
-			t.Fatalf("expected %s, got %s", wantLock, gotLock)
-		}
-	}
-}
-
-func TestEnsureEmptyRepoNoArgs(t *testing.T) {
-	test.NeedsExternalNetwork(t)
-	test.NeedsGit(t)
-
-	h := test.NewHelper(t)
-	defer h.Cleanup()
-
-	h.TempDir("src")
-	h.Setenv("GOPATH", h.Path("."))
-	h.TempCopy("src/thing/thing.go", "ensure/bare_main.go")
-	h.Cd(h.Path("src/thing"))
-
-	h.Run("init")
-	h.Run("ensure")
-
-	// make sure vendor exists
-	h.MustExist(h.Path("src/thing/vendor/github.com/jimmysmith95/fixed-version"))
-
-	goldenManifest := "ensure/bare_manifest.golden.json"
-	wantManifest := h.GetTestFileString(goldenManifest)
-	gotManifest := h.ReadManifest()
-	if gotManifest != wantManifest {
-		if *test.UpdateGolden {
-			if err := h.WriteTestFile(goldenManifest, string(gotManifest)); err != nil {
-				t.Fatal(err)
-			}
-		} else {
-			t.Fatalf("expected %s, got %s", wantManifest, gotManifest)
-		}
-	}
-
-	goldenLock := "ensure/bare_lock.golden.json"
-	wantLock := h.GetTestFileString(goldenLock)
-	gotLock := h.ReadLock()
-	if gotLock != wantLock {
-		if *test.UpdateGolden {
-			if err := h.WriteTestFile(goldenLock, string(gotLock)); err != nil {
-				t.Fatal(err)
-			}
-		} else {
-			t.Fatalf("expected %s, got %s", wantLock, gotLock)
-		}
-	}
-}
-
 func TestDeduceConstraint(t *testing.T) {
 	sv, err := gps.NewSemverConstraint("v1.2.3")
 	if err != nil {
@@ -126,43 +38,109 @@ func TestDeduceConstraint(t *testing.T) {
 	}
 }
 
-func TestEnsureUpdate(t *testing.T) {
-	test.NeedsExternalNetwork(t)
-	test.NeedsGit(t)
+type ensureTestCase struct {
+	dataRoot       string
+	commands       [][]string
+	sourceFiles    map[string]string
+	goldenManifest string
+	goldenLock     string
+}
 
-	h := test.NewHelper(t)
-	defer h.Cleanup()
+func TestEnsureCases(t *testing.T) {
+	tests := []ensureTestCase{
 
-	// Setup up a test project
-	h.TempDir("src")
-	h.Setenv("GOPATH", h.Path("."))
-	h.TempCopy("src/thing/main.go", "ensure/update_main.go")
-	origManifest := "ensure/update_manifest.json"
-	h.TempCopy("src/thing/manifest.json", origManifest)
-	origLock := "ensure/update_lock.json"
-	h.TempCopy("src/thing/lock.json", origLock)
-	h.Cd(h.Path("src/thing"))
+		// Override test case
+		{
+			dataRoot: "ensure/override",
+			commands: [][]string{
+				{"init"},
+				{"ensure", "-override", "github.com/sdboyer/deptest@1.0.0"},
+			},
+			sourceFiles: map[string]string{
+				"main.go": "thing.go",
+			},
+			goldenManifest: "manifest.golden.json",
+			goldenLock:     "lock.golden.json",
+		},
 
-	h.Run("ensure", "-update", "github.com/carolynvs/go-dep-test")
+		// Empty repo test case
+		{
+			dataRoot: "ensure/empty",
+			commands: [][]string{
+				{"init"},
+				{"ensure"},
+			},
+			sourceFiles: map[string]string{
+				"main.go": "thing.go",
+			},
+			goldenManifest: "manifest.golden.json",
+			goldenLock:     "lock.golden.json",
+		},
 
-	// Verify that the manifest wasn't modified by -update
-	wantManifest := h.GetTestFileString(origManifest)
-	gotManifest := h.ReadManifest()
-	if gotManifest != wantManifest {
-		t.Fatalf("The manifest should not be modified during an update. Expected %s, got %s", origManifest, gotManifest)
+		// Update test case
+		{
+			dataRoot: "ensure/update",
+			commands: [][]string{
+				{"ensure", "-update", "github.com/carolynvs/go-dep-test"},
+			},
+			sourceFiles: map[string]string{
+				"main.go":       "thing.go",
+				"manifest.json": "manifest.json",
+				"lock.json":     "lock.json",
+			},
+			goldenManifest: "manifest.json",
+			goldenLock:     "lock.golden.json",
+		},
 	}
 
-	// Verify the lock matches the expected golden file
-	goldenLock := "ensure/update_lock.golden.json"
-	wantLock := h.GetTestFileString(goldenLock)
-	gotLock := h.ReadLock()
-	if gotLock != wantLock {
-		if *test.UpdateGolden {
-			if err := h.WriteTestFile(goldenLock, string(gotLock)); err != nil {
-				t.Fatal(err)
-			}
-		} else {
-			t.Fatalf("expected %s, got %s", wantLock, gotLock)
+	runTest := func(t *testing.T, testCase ensureTestCase) {
+		test.NeedsExternalNetwork(t)
+		test.NeedsGit(t)
+
+		h := test.NewHelper(t)
+		defer h.Cleanup()
+
+		h.TempDir("src")
+		h.Setenv("GOPATH", h.Path("."))
+
+		// Build a fake consumer of these packages.
+		root := "src/thing"
+		for src, dest := range testCase.sourceFiles {
+			h.TempCopy(root+"/"+dest, testCase.dataRoot+"/"+src)
 		}
+		h.Cd(h.Path(root))
+
+		for _, cmd := range testCase.commands {
+			h.Run(cmd...)
+		}
+
+		wantManifest := h.GetTestFileString(testCase.dataRoot + "/" + testCase.goldenManifest)
+		gotManifest := h.ReadManifest()
+		if wantManifest != gotManifest {
+			if *test.UpdateGolden {
+				if err := h.WriteTestFile(testCase.dataRoot+"/"+testCase.goldenManifest, gotManifest); err != nil {
+					t.Fatal(err)
+				}
+			} else {
+				t.Errorf("expected %s, got %s", wantManifest, gotManifest)
+			}
+		}
+
+		wantLock := h.GetTestFileString(testCase.dataRoot + "/" + testCase.goldenLock)
+		gotLock := h.ReadLock()
+		if wantLock != gotLock {
+			if *test.UpdateGolden {
+				if err := h.WriteTestFile(testCase.dataRoot+"/"+testCase.goldenLock, gotLock); err != nil {
+					t.Fatal(err)
+				}
+			} else {
+				t.Errorf("expected %s, got %s", wantLock, gotLock)
+			}
+		}
+
+	}
+
+	for _, testCase := range tests {
+		runTest(t, testCase)
 	}
 }
