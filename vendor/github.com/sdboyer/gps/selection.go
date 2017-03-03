@@ -173,30 +173,33 @@ func (u *unselected) Pop() (v interface{}) {
 	return v
 }
 
-// remove takes a ProjectIdentifier out of the priority queue, if present.
+// remove takes a bimodalIdentifier out of the priority queue, if present. Only
+// the first matching bmi will be removed.
 //
-// There are, generally, two ways this gets called: to remove the unselected
-// item from the front of the queue while that item is being unselected, and
-// during backtracking, when an item becomes unnecessary because the item that
-// induced it was popped off.
+// There are two events that cause this to be called: bmi selection, when the
+// bmi at the front of the queue is removed, and backtracking, when a bmi
+// becomes unnecessary because the dependency that induced it was backtracked
+// and popped off.
 //
 // The worst case for both of these is O(n), but in practice the first case is
-// be O(1), as we iterate the queue from front to back.
+// O(1), as we iterate the queue from front to back.
 func (u *unselected) remove(bmi bimodalIdentifier) {
-	for k, pi := range u.sl {
-		if pi.id.eq(bmi.id) {
+	plen := len(bmi.pl)
+outer:
+	for i, pi := range u.sl {
+		if pi.id.eq(bmi.id) && len(pi.pl) == plen {
 			// Simple slice comparison - assume they're both sorted the same
-			for k, pkg := range pi.pl {
-				if bmi.pl[k] != pkg {
-					break
+			for i2, pkg := range pi.pl {
+				if bmi.pl[i2] != pkg {
+					continue outer
 				}
 			}
 
-			if k == len(u.sl)-1 {
+			if i == len(u.sl)-1 {
 				// if we're on the last element, just pop, no splice
 				u.sl = u.sl[:len(u.sl)-1]
 			} else {
-				u.sl = append(u.sl[:k], u.sl[k+1:]...)
+				u.sl = append(u.sl[:i], u.sl[i+1:]...)
 			}
 			break
 		}
