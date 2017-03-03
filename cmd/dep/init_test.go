@@ -145,7 +145,7 @@ func TestInit(t *testing.T) {
 		}
 
 		// vendor should have been created & populated
-		for ip, _ := range testCase.importPaths {
+		for ip := range testCase.importPaths {
 			h.MustExist(h.Path(root + "/vendor/" + ip))
 		}
 	}
