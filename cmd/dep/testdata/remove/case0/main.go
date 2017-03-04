@@ -5,14 +5,14 @@
 package main
 
 import (
-	"github.com/Sirupsen/logrus"
-	"github.com/pkg/errors"
+	"github.com/sdboyer/deptest"
+	"github.com/sdboyer/deptestdos"
 )
 
 func main() {
 	err := nil
 	if err != nil {
-		errors.Wrap(err, "thing")
+		deptest.Map["yo yo!"]
 	}
-	logrus.Info("whatev")
+	deptestdos.diMeLo("whatev")
 }
