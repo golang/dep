@@ -82,7 +82,7 @@ func TestEnsureCases(t *testing.T) {
 		{
 			dataRoot: "ensure/update",
 			commands: [][]string{
-				{"ensure", "-update", "github.com/carolynvs/go-dep-test"},
+				{"ensure", "-update", "github.com/sdboyer/deptest"},
 			},
 			sourceFiles: map[string]string{
 				"main.go":       "thing.go",
