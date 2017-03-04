@@ -5,16 +5,14 @@
 package main
 
 import (
-	"fmt"
-	stuff "github.com/carolynvs/go-dep-test"
-	"github.com/pkg/errors"
+	"github.com/sdboyer/deptest"
+	"github.com/sdboyer/deptestdos"
 )
 
 func main() {
-	fmt.Println(stuff.Thing)
-	TryToDoSomething()
-}
-
-func TryToDoSomething() error {
-	return errors.New("I tried, Billy. I tried...")
+	err := nil
+	if err != nil {
+		deptest.Map["yo yo!"]
+	}
+	deptestdos.diMeLo("whatev")
 }
