@@ -2,17 +2,17 @@
     "memo": "9a5243dd3fa20feeaa20398e7283d6c566532e2af1aae279a010df34793761c5",
     "projects": [
         {
-            "name": "github.com/carolynvs/go-dep-test",
-            "version": "0.1.0",
-            "revision": "b9c5511fa463628e6251554db29a4be161d02aed",
+            "name": "github.com/sdboyer/deptest",
+            "version": "v0.8.0",
+            "revision": "ff2948a2ac8f538c4ecd55962e919d1e13e74baf",
             "packages": [
                 "."
             ]
         },
         {
-            "name": "github.com/pkg/errors",
-            "branch": "v0.7.0",
-            "revision": "01fa4104b9c248c8945d14d9f128454d5b28d595",
+            "name": "github.com/sdboyer/deptestdos",
+            "version": "v2.0.0",
+            "revision": "5c607206be5decd28e6263ffffdcee067266015e",
             "packages": [
                 "."
             ]
