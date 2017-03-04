@@ -5,6 +5,7 @@
 package main
 
 import (
+	"path/filepath"
 	"testing"
 
 	"github.com/golang/dep/test"
@@ -93,54 +94,53 @@ func TestEnsureCases(t *testing.T) {
 		},
 	}
 
-	runTest := func(t *testing.T, testCase ensureTestCase) {
-		test.NeedsExternalNetwork(t)
-		test.NeedsGit(t)
-
-		h := test.NewHelper(t)
-		defer h.Cleanup()
-
-		h.TempDir("src")
-		h.Setenv("GOPATH", h.Path("."))
-
-		// Build a fake consumer of these packages.
-		root := "src/thing"
-		for src, dest := range testCase.sourceFiles {
-			h.TempCopy(root+"/"+dest, testCase.dataRoot+"/"+src)
-		}
-		h.Cd(h.Path(root))
-
-		for _, cmd := range testCase.commands {
-			h.Run(cmd...)
-		}
-
-		wantManifest := h.GetTestFileString(testCase.dataRoot + "/" + testCase.goldenManifest)
-		gotManifest := h.ReadManifest()
-		if wantManifest != gotManifest {
-			if *test.UpdateGolden {
-				if err := h.WriteTestFile(testCase.dataRoot+"/"+testCase.goldenManifest, gotManifest); err != nil {
-					t.Fatal(err)
-				}
-			} else {
-				t.Errorf("expected %s, got %s", wantManifest, gotManifest)
-			}
-		}
-
-		wantLock := h.GetTestFileString(testCase.dataRoot + "/" + testCase.goldenLock)
-		gotLock := h.ReadLock()
-		if wantLock != gotLock {
-			if *test.UpdateGolden {
-				if err := h.WriteTestFile(testCase.dataRoot+"/"+testCase.goldenLock, gotLock); err != nil {
-					t.Fatal(err)
-				}
-			} else {
-				t.Errorf("expected %s, got %s", wantLock, gotLock)
-			}
-		}
-
-	}
+	test.NeedsExternalNetwork(t)
+	test.NeedsGit(t)
 
 	for _, testCase := range tests {
-		runTest(t, testCase)
+		t.Run(testCase.dataRoot, func(t *testing.T) {
+			h := test.NewHelper(t)
+			defer h.Cleanup()
+
+			h.TempDir("src")
+			h.Setenv("GOPATH", h.Path("."))
+
+			// Build a fake consumer of these packages.
+			root := "src/thing"
+			for src, dest := range testCase.sourceFiles {
+				h.TempCopy(filepath.Join(root, dest), filepath.Join(testCase.dataRoot, src))
+			}
+			h.Cd(h.Path(root))
+
+			for _, cmd := range testCase.commands {
+				h.Run(cmd...)
+			}
+
+			wantPath := filepath.Join(testCase.dataRoot, testCase.goldenManifest)
+			wantManifest := h.GetTestFileString(wantPath)
+			gotManifest := h.ReadManifest()
+			if wantManifest != gotManifest {
+				if *test.UpdateGolden {
+					if err := h.WriteTestFile(wantPath, gotManifest); err != nil {
+						t.Fatal(err)
+					}
+				} else {
+					t.Errorf("expected %s, got %s", wantManifest, gotManifest)
+				}
+			}
+
+			wantPath = filepath.Join(testCase.dataRoot, testCase.goldenLock)
+			wantLock := h.GetTestFileString(wantPath)
+			gotLock := h.ReadLock()
+			if wantLock != gotLock {
+				if *test.UpdateGolden {
+					if err := h.WriteTestFile(wantPath, gotLock); err != nil {
+						t.Fatal(err)
+					}
+				} else {
+					t.Errorf("expected %s, got %s", wantLock, gotLock)
+				}
+			}
+		})
 	}
 }

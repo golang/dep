@@ -5,6 +5,7 @@
 package main
 
 import (
+	"path/filepath"
 	"testing"
 
 	"github.com/golang/dep/test"
@@ -65,7 +66,7 @@ func TestInit(t *testing.T) {
 			goldenLock:     "lock.golden.json",
 		},
 
-		// One dependency previously retrieved by version.  Both will show up in lock, but only retrieved one in manifest.
+		// One dependency previously retrieved by version.  Both will show up in lock, but only retrieved one in manifest?
 		{
 			dataRoot: "init/case2",
 			importPaths: map[string]string{
@@ -79,7 +80,7 @@ func TestInit(t *testing.T) {
 			goldenLock:     "lock.golden.json",
 		},
 
-		// One dependency previously retrieved by sha.  Both will show up in lock and manifest?
+		// One dependency previously retrieved by sha.  Both will show up in lock and manifest
 		{
 			dataRoot: "init/case3",
 			importPaths: map[string]string{
@@ -94,63 +95,63 @@ func TestInit(t *testing.T) {
 		},
 	}
 
-	runTest := func(t *testing.T, testCase initTestCase) {
-		test.NeedsExternalNetwork(t)
-		test.NeedsGit(t)
-
-		h := test.NewHelper(t)
-		defer h.Cleanup()
-
-		h.TempDir("src")
-		h.Setenv("GOPATH", h.Path("."))
-
-		// checkout the specified revisions
-		for ip, rev := range testCase.importPaths {
-			h.RunGo("get", ip)
-			repoDir := h.Path("src/" + ip)
-			h.RunGit(repoDir, "checkout", rev)
-		}
-
-		// Build a fake consumer of these packages.
-		root := "src/github.com/golang/notexist"
-		for src, dest := range testCase.sourceFiles {
-			h.TempCopy(root+"/"+dest, testCase.dataRoot+"/"+src)
-		}
-
-		h.Cd(h.Path(root))
-		h.Run("init")
-
-		wantManifest := h.GetTestFileString(testCase.dataRoot + "/" + testCase.goldenManifest)
-		gotManifest := h.ReadManifest()
-		if wantManifest != gotManifest {
-			if *test.UpdateGolden {
-				if err := h.WriteTestFile(testCase.dataRoot+"/"+testCase.goldenManifest, gotManifest); err != nil {
-					t.Fatal(err)
-				}
-			} else {
-				t.Errorf("expected %s, got %s", wantManifest, gotManifest)
-			}
-		}
-
-		wantLock := h.GetTestFileString(testCase.dataRoot + "/" + testCase.goldenLock)
-		gotLock := h.ReadLock()
-		if wantLock != gotLock {
-			if *test.UpdateGolden {
-				if err := h.WriteTestFile(testCase.dataRoot+"/"+testCase.goldenLock, gotLock); err != nil {
-					t.Fatal(err)
-				}
-			} else {
-				t.Errorf("expected %s, got %s", wantLock, gotLock)
-			}
-		}
-
-		// vendor should have been created & populated
-		for ip := range testCase.importPaths {
-			h.MustExist(h.Path(root + "/vendor/" + ip))
-		}
-	}
+	test.NeedsExternalNetwork(t)
+	test.NeedsGit(t)
 
 	for _, testCase := range tests {
-		runTest(t, testCase)
+		t.Run(testCase.dataRoot, func(t *testing.T) {
+			h := test.NewHelper(t)
+			defer h.Cleanup()
+
+			h.TempDir("src")
+			h.Setenv("GOPATH", h.Path("."))
+
+			// checkout the specified revisions
+			for ip, rev := range testCase.importPaths {
+				h.RunGo("get", ip)
+				repoDir := h.Path(filepath.Join("src", ip))
+				h.RunGit(repoDir, "checkout", rev)
+			}
+
+			// Build a fake consumer of these packages.
+			root := "src/github.com/golang/notexist"
+			for src, dest := range testCase.sourceFiles {
+				h.TempCopy(filepath.Join(root, dest), filepath.Join(testCase.dataRoot, src))
+			}
+
+			h.Cd(h.Path(root))
+			h.Run("init")
+
+			wantPath := filepath.Join(testCase.dataRoot, testCase.goldenManifest)
+			wantManifest := h.GetTestFileString(wantPath)
+			gotManifest := h.ReadManifest()
+			if wantManifest != gotManifest {
+				if *test.UpdateGolden {
+					if err := h.WriteTestFile(wantPath, gotManifest); err != nil {
+						t.Fatal(err)
+					}
+				} else {
+					t.Errorf("expected %s, got %s", wantManifest, gotManifest)
+				}
+			}
+
+			wantPath = filepath.Join(testCase.dataRoot, testCase.goldenLock)
+			wantLock := h.GetTestFileString(wantPath)
+			gotLock := h.ReadLock()
+			if wantLock != gotLock {
+				if *test.UpdateGolden {
+					if err := h.WriteTestFile(wantPath, gotLock); err != nil {
+						t.Fatal(err)
+					}
+				} else {
+					t.Errorf("expected %s, got %s", wantLock, gotLock)
+				}
+			}
+
+			// vendor should have been created & populated
+			for ip := range testCase.importPaths {
+				h.MustExist(h.Path(filepath.Join(root, "vendor", ip)))
+			}
+		})
 	}
 }
