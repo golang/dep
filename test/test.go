@@ -503,10 +503,6 @@ func (h *Helper) Path(name string) string {
 	return abs
 }
 
-func (h *Helper) TestDataPath(name string) string {
-	return filepath.Join(h.origWd, "testdata", name)
-}
-
 // MustExist fails if path does not exist.
 func (h *Helper) MustExist(path string) {
 	if !h.Exist(path) {
