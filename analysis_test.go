@@ -434,19 +434,21 @@ func TestWorkmapToReach(t *testing.T) {
 	for name, fix := range table {
 		// Avoid erroneous errors by initializing the fixture's error map if
 		// needed
-		if fix.em == nil {
-			fix.em = make(map[string]*ProblemImportError)
-		}
+		t.Run(fmt.Sprintf("wmToReach(%q)", name), func(t *testing.T) {
+			if fix.em == nil {
+				fix.em = make(map[string]*ProblemImportError)
+			}
 
-		rm, em := wmToReach(fix.workmap, fix.backprop)
-		if !reflect.DeepEqual(rm, fix.rm) {
-			//t.Error(pretty.Sprintf("wmToReach(%q): Did not get expected reach map:\n\t(GOT): %s\n\t(WNT): %s", name, rm, fix.rm))
-			t.Errorf("wmToReach(%q): Did not get expected reach map:\n\t(GOT): %s\n\t(WNT): %s", name, rm, fix.rm)
-		}
-		if !reflect.DeepEqual(em, fix.em) {
-			//t.Error(pretty.Sprintf("wmToReach(%q): Did not get expected error map:\n\t(GOT): %# v\n\t(WNT): %# v", name, em, fix.em))
-			t.Errorf("wmToReach(%q): Did not get expected error map:\n\t(GOT): %v\n\t(WNT): %v", name, em, fix.em)
-		}
+			rm, em := wmToReach(fix.workmap, fix.backprop)
+			if !reflect.DeepEqual(rm, fix.rm) {
+				//t.Error(pretty.Sprintf("wmToReach(%q): Did not get expected reach map:\n\t(GOT): %s\n\t(WNT): %s", name, rm, fix.rm))
+				t.Errorf("Did not get expected reach map:\n\t(GOT): %s\n\t(WNT): %s", rm, fix.rm)
+			}
+			if !reflect.DeepEqual(em, fix.em) {
+				//t.Error(pretty.Sprintf("wmToReach(%q): Did not get expected error map:\n\t(GOT): %# v\n\t(WNT): %# v", name, em, fix.em))
+				t.Errorf("Did not get expected error map:\n\t(GOT): %v\n\t(WNT): %v", em, fix.em)
+			}
+		})
 	}
 }
 
