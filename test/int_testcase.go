@@ -29,6 +29,9 @@ type IntegrationTestCase struct {
 	RootPath    string
 	InitialPath string
 	FinalPath   string
+	CommandPath string
+	ImportPath  string
+	VendorPath  string
 }
 
 func NewTestCase(t *testing.T, name string) *IntegrationTestCase {
@@ -47,11 +50,14 @@ func NewTestCase(t *testing.T, name string) *IntegrationTestCase {
 		RootPath:    rootPath,
 		InitialPath: filepath.Join(rootPath, "initial"),
 		FinalPath:   filepath.Join(rootPath, "final"),
+		CommandPath: filepath.Join(rootPath, "commands.txt"),
+		ImportPath:  filepath.Join(rootPath, "initial", "imports.txt"),
+		VendorPath:  filepath.Join(rootPath, "final", "vendors.txt"),
 	}
 }
 
 func (tc *IntegrationTestCase) GetImports() map[string]string {
-	fpath := filepath.Join(tc.InitialPath, "imports.txt")
+	fpath := tc.ImportPath
 	file, err := os.Open(fpath)
 	if err != nil {
 		panic(fmt.Sprintf("Opening %s produced error: %s", fpath, err))
@@ -81,7 +87,7 @@ func (tc *IntegrationTestCase) GetImports() map[string]string {
 }
 
 func (tc *IntegrationTestCase) GetCommands() [][]string {
-	fpath := filepath.Join(tc.RootPath, "commands.txt")
+	fpath := tc.CommandPath
 	file, err := os.Open(fpath)
 	if err != nil {
 		panic(fmt.Sprintf("Opening %s produced error: %s", fpath, err))
@@ -111,7 +117,7 @@ func (tc *IntegrationTestCase) GetCommands() [][]string {
 }
 
 func (tc *IntegrationTestCase) GetVendors() []string {
-	fpath := filepath.Join(tc.FinalPath, "vendors.txt")
+	fpath := tc.VendorPath
 	file, err := os.Open(fpath)
 	if err != nil {
 		panic(fmt.Sprintf("Opening %s produced error: %s", fpath, err))
@@ -134,7 +140,7 @@ func (tc *IntegrationTestCase) GetVendors() []string {
 	return result
 }
 
-func (tc *IntegrationTestCase) CompareFile(t *testing.T, goldenPath, working string) {
+func (tc *IntegrationTestCase) CompareFile(goldenPath, working string) {
 	golden := filepath.Join(tc.FinalPath, goldenPath)
 
 	gotExists, got, err := getFile(working)
@@ -150,28 +156,47 @@ func (tc *IntegrationTestCase) CompareFile(t *testing.T, goldenPath, working str
 		if want != got {
 			if *UpdateGolden {
 				if err := tc.WriteFile(golden, got); err != nil {
-					t.Fatal(err)
+					tc.t.Fatal(err)
 				}
 			} else {
-				t.Errorf("expected %s, got %s", want, got)
+				tc.t.Errorf("expected %s, got %s", want, got)
 			}
 		}
 	} else if !wantExists && gotExists {
 		if *UpdateGolden {
 			if err := tc.WriteFile(golden, got); err != nil {
-				t.Fatal(err)
+				tc.t.Fatal(err)
 			}
 		} else {
-			t.Errorf("%s created where none was expected", goldenPath)
+			tc.t.Errorf("%s created where none was expected", goldenPath)
 		}
 	} else if wantExists && !gotExists {
 		if *UpdateGolden {
 			err := os.Remove(golden)
 			if err != nil {
-				t.Fatal(err)
+				tc.t.Fatal(err)
 			}
 		} else {
-			t.Errorf("%s not created where one was expected", goldenPath)
+			tc.t.Errorf("%s not created where one was expected", goldenPath)
+		}
+	}
+}
+
+func (tc *IntegrationTestCase) CompareVendorPaths(gotVendorPaths []string) {
+	if *UpdateGolden {
+		content := strings.Join(gotVendorPaths, "\n") + "\n"
+		if err := tc.WriteFile(tc.VendorPath, content); err != nil {
+			tc.t.Fatal(err)
+		}
+	} else {
+		wantVendorPaths := tc.GetVendors()
+		if len(gotVendorPaths) != len(wantVendorPaths) {
+			tc.t.Fatalf("Wrong number of vendor paths created: want %d got %d", len(gotVendorPaths), len(wantVendorPaths))
+		}
+		for ind := range gotVendorPaths {
+			if gotVendorPaths[ind] != wantVendorPaths[ind] {
+				tc.t.Errorf("Mismatch in vendor paths created: want %s got %s", gotVendorPaths, wantVendorPaths)
+			}
 		}
 	}
 }
