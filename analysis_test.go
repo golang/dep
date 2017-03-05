@@ -1295,59 +1295,60 @@ func TestListPackages(t *testing.T) {
 	}
 
 	for name, fix := range table {
-		if _, err := os.Stat(fix.fileRoot); err != nil {
-			t.Errorf("listPackages(%q): error on fileRoot %s: %s", name, fix.fileRoot, err)
-			continue
-		}
-
-		out, err := ListPackages(fix.fileRoot, fix.importRoot)
-
-		if err != nil && fix.err == nil {
-			t.Errorf("listPackages(%q): Received error but none expected: %s", name, err)
-		} else if fix.err != nil && err == nil {
-			t.Errorf("listPackages(%q): Error expected but none received", name)
-		} else if fix.err != nil && err != nil {
-			if !reflect.DeepEqual(fix.err, err) {
-				t.Errorf("listPackages(%q): Did not receive expected error:\n\t(GOT): %s\n\t(WNT): %s", name, err, fix.err)
+		t.Run(fmt.Sprintf("listPackages(%q)", name), func(t *testing.T) {
+			if _, err := os.Stat(fix.fileRoot); err != nil {
+				t.Errorf("error on fileRoot %s: %s", fix.fileRoot, err)
 			}
-		}
 
-		if fix.out.ImportRoot != "" && fix.out.Packages != nil {
-			if !reflect.DeepEqual(out, fix.out) {
-				if fix.out.ImportRoot != out.ImportRoot {
-					t.Errorf("listPackages(%q): Expected ImportRoot %s, got %s", name, fix.out.ImportRoot, out.ImportRoot)
+			out, err := ListPackages(fix.fileRoot, fix.importRoot)
+
+			if err != nil && fix.err == nil {
+				t.Errorf("Received error but none expected: %s", err)
+			} else if fix.err != nil && err == nil {
+				t.Errorf("Error expected but none received")
+			} else if fix.err != nil && err != nil {
+				if !reflect.DeepEqual(fix.err, err) {
+					t.Errorf("Did not receive expected error:\n\t(GOT): %s\n\t(WNT): %s", err, fix.err)
 				}
+			}
 
-				// overwrite the out one to see if we still have a real problem
-				out.ImportRoot = fix.out.ImportRoot
-
+			if fix.out.ImportRoot != "" && fix.out.Packages != nil {
 				if !reflect.DeepEqual(out, fix.out) {
-					if len(fix.out.Packages) < 2 {
-						t.Errorf("listPackages(%q): Did not get expected PackageOrErrs:\n\t(GOT): %#v\n\t(WNT): %#v", name, out, fix.out)
-					} else {
-						seen := make(map[string]bool)
-						for path, perr := range fix.out.Packages {
-							seen[path] = true
-							if operr, exists := out.Packages[path]; !exists {
-								t.Errorf("listPackages(%q): Expected PackageOrErr for path %s was missing from output:\n\t%s", name, path, perr)
-							} else {
-								if !reflect.DeepEqual(perr, operr) {
-									t.Errorf("listPackages(%q): PkgOrErr for path %s was not as expected:\n\t(GOT): %#v\n\t(WNT): %#v", name, path, operr, perr)
+					if fix.out.ImportRoot != out.ImportRoot {
+						t.Errorf("Expected ImportRoot %s, got %s", fix.out.ImportRoot, out.ImportRoot)
+					}
+
+					// overwrite the out one to see if we still have a real problem
+					out.ImportRoot = fix.out.ImportRoot
+
+					if !reflect.DeepEqual(out, fix.out) {
+						if len(fix.out.Packages) < 2 {
+							t.Errorf("Did not get expected PackageOrErrs:\n\t(GOT): %#v\n\t(WNT): %#v", out, fix.out)
+						} else {
+							seen := make(map[string]bool)
+							for path, perr := range fix.out.Packages {
+								seen[path] = true
+								if operr, exists := out.Packages[path]; !exists {
+									t.Errorf("Expected PackageOrErr for path %s was missing from output:\n\t%s", path, perr)
+								} else {
+									if !reflect.DeepEqual(perr, operr) {
+										t.Errorf("PkgOrErr for path %s was not as expected:\n\t(GOT): %#v\n\t(WNT): %#v", path, operr, perr)
+									}
 								}
 							}
-						}
 
-						for path, operr := range out.Packages {
-							if seen[path] {
-								continue
+							for path, operr := range out.Packages {
+								if seen[path] {
+									continue
+								}
+
+								t.Errorf("Got PackageOrErr for path %s, but none was expected:\n\t%s", path, operr)
 							}
-
-							t.Errorf("listPackages(%q): Got PackageOrErr for path %s, but none was expected:\n\t%s", name, path, operr)
 						}
 					}
 				}
 			}
-		}
+		})
 	}
 }
 
