@@ -17,7 +17,7 @@ var (
 	ProjectRoot string = "src/github.com/golang/notexist"
 )
 
-// To manage a test case directory structure and content
+// To manage a test project directory structure and content
 type IntegrationTestProject struct {
 	t *testing.T
 	h *Helper
@@ -74,7 +74,6 @@ func (p *IntegrationTestProject) CopyTree(src string) {
 					p.TempDir(ProjectRoot, localpath)
 				} else {
 					destpath := filepath.Join(p.ProjPath(), localpath)
-					//fmt.Printf("Copying %s -> %s\n", localpath, destpath)
 					copyFile(destpath, path)
 				}
 			}
