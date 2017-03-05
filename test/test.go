@@ -6,7 +6,6 @@ package test
 
 import (
 	"bytes"
-	"flag"
 	"fmt"
 	"go/format"
 	"io"
@@ -24,9 +23,10 @@ import (
 )
 
 var (
-	ExeSuffix    string // ".exe" on Windows
-	mu           sync.Mutex
-	UpdateGolden = flag.Bool("update", false, "update .golden files")
+	ExeSuffix string // ".exe" on Windows
+	mu        sync.Mutex
+
+//	UpdateGolden = flag.Bool("update", false, "update golden files")
 )
 
 func init() {
@@ -466,6 +466,20 @@ func (h *Helper) TempCopy(dest, src string) {
 	io.Copy(out, in)
 }
 
+func (h *Helper) TempCopyTree(dest, src string) {
+	filepath.Walk(
+		src,
+		func(path string, info os.FileInfo, err error) error {
+			if !info.IsDir() {
+				srcpath := path[strings.Index(path, "testdata")+9:]
+				destpath := filepath.Join(dest, path[len(src):])
+				fmt.Printf("%s -> %s\n", srcpath, destpath)
+				h.TempCopy(destpath, srcpath)
+			}
+			return nil
+		})
+}
+
 // TempDir adds a temporary directory for a run of testgo.
 func (h *Helper) TempDir(path string) {
 	h.makeTempdir()
@@ -495,6 +509,10 @@ func (h *Helper) Path(name string) string {
 		h.t.Fatalf("internal testsuite error: could not get absolute path for dir(%q), err %q", joined, err)
 	}
 	return abs
+}
+
+func (h *Helper) TestDataPath(name string) string {
+	return filepath.Join(h.origWd, "testdata", name)
 }
 
 // MustExist fails if path does not exist.
