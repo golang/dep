@@ -5,6 +5,7 @@
 package test
 
 import (
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
@@ -27,9 +28,10 @@ func NewTestProject(t *testing.T, initPath string) *IntegrationTestProject {
 		t: t,
 		h: NewHelper(t),
 	}
-	new.h.TempDir("src")
+	new.TempDir(ProjectRoot)
+	new.TempDir(ProjectRoot, "vendor")
+	new.CopyTree(initPath)
 	new.h.Setenv("GOPATH", new.h.Path("."))
-	new.h.TempCopyTree(ProjectRoot, initPath)
 	new.h.Cd(new.Path(ProjectRoot))
 	return new
 }
@@ -40,6 +42,10 @@ func (p *IntegrationTestProject) Cleanup() {
 
 func (p *IntegrationTestProject) Path(args ...string) string {
 	return p.h.Path(filepath.Join(args...))
+}
+
+func (p *IntegrationTestProject) TempDir(args ...string) {
+	p.h.TempDir(filepath.Join(args...))
 }
 
 func (p *IntegrationTestProject) ProjPath(args ...string) string {
@@ -57,6 +63,39 @@ func (p *IntegrationTestProject) RunGit(dir string, args ...string) {
 
 func (p *IntegrationTestProject) DoRun(args []string) error {
 	return p.h.DoRun(args)
+}
+
+func (p *IntegrationTestProject) CopyTree(src string) {
+	filepath.Walk(src,
+		func(path string, info os.FileInfo, err error) error {
+			if path != src {
+				localpath := path[len(src)+1:]
+				if info.IsDir() {
+					p.TempDir(ProjectRoot, localpath)
+				} else {
+					destpath := filepath.Join(p.ProjPath(), localpath)
+					//fmt.Printf("Copying %s -> %s\n", localpath, destpath)
+					copyFile(destpath, path)
+				}
+			}
+			return nil
+		})
+}
+
+func copyFile(dest, src string) {
+	in, err := os.Open(src)
+	if err != nil {
+		panic(err)
+	}
+	defer in.Close()
+
+	out, err := os.Create(dest)
+	if err != nil {
+		panic(err)
+	}
+	defer out.Close()
+
+	io.Copy(out, in)
 }
 
 // Collect final vendor paths at a depth of three levels

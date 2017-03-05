@@ -5,7 +5,6 @@
 package main
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -39,25 +38,15 @@ func TestIntegration(t *testing.T) {
 				// Run commands
 				commands := testCase.GetCommands()
 				for _, args := range commands {
-					err := testProj.DoRun(args)
-					fmt.Println(args, err)
+					testProj.DoRun(args)
 				}
 
 				// Check final manifest and lock
-				testCase.CompareFile(t, "manifest.json", testProj.ProjPath("manifest.json"))
-				testCase.CompareFile(t, "lock.json", testProj.ProjPath("lock.json"))
+				testCase.CompareFile("manifest.json", testProj.ProjPath("manifest.json"))
+				testCase.CompareFile("lock.json", testProj.ProjPath("lock.json"))
 
 				// Check vendor paths
-				wantVendorPaths := testCase.GetVendors()
-				gotVendorPaths := testProj.GetVendorPaths()
-				if len(gotVendorPaths) != len(wantVendorPaths) {
-					t.Errorf("Wrong number of vendor paths created: want %d got %d", len(gotVendorPaths), len(wantVendorPaths))
-				}
-				for ind := range gotVendorPaths {
-					if gotVendorPaths[ind] != wantVendorPaths[ind] {
-						t.Errorf("Mismatch in vendor paths created: want %s got %s", gotVendorPaths, wantVendorPaths)
-					}
-				}
+				testCase.CompareVendorPaths(testProj.GetVendorPaths())
 			})
 		}
 		return nil

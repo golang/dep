@@ -1,0 +1,20 @@
+{
+    "memo": "",
+    "projects": [
+        {
+            "name": "github.com/sdboyer/deptest",
+            "branch": "master",
+            "revision": "3f4c3bea144e112a69bbe5d8d01c1b09a544253f",
+            "packages": [
+                "."
+            ]
+        },
+        {
+            "name": "github.com/sdboyer/deptestdos",
+            "revision": "a0196baa11ea047dd65037287451d36b861b00ea",
+            "packages": [
+                "."
+            ]
+        }
+    ]
+}
