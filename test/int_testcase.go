@@ -191,7 +191,7 @@ func (tc *IntegrationTestCase) CompareVendorPaths(gotVendorPaths []string) {
 	} else {
 		wantVendorPaths := tc.GetVendors()
 		if len(gotVendorPaths) != len(wantVendorPaths) {
-			tc.t.Fatalf("Wrong number of vendor paths created: want %d got %d", len(gotVendorPaths), len(wantVendorPaths))
+			tc.t.Fatalf("Wrong number of vendor paths created: want %d got %d", len(wantVendorPaths), len(gotVendorPaths))
 		}
 		for ind := range gotVendorPaths {
 			if gotVendorPaths[ind] != wantVendorPaths[ind] {
@@ -209,11 +209,7 @@ func (tc *IntegrationTestCase) WriteFile(src string, content string) error {
 func getFile(path string) (bool, string, error) {
 	_, err := os.Stat(path)
 	if err != nil {
-		if err == io.EOF {
-			return false, "", nil
-		} else {
-			return false, "", err
-		}
+		return false, "", nil
 	}
 	f, err := ioutil.ReadFile(path)
 	if err != nil {
