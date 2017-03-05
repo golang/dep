@@ -521,7 +521,7 @@ func TestDeduceFromPath(t *testing.T) {
 					u, in, uerr := normalizeURI(fix.in)
 					if uerr != nil {
 						if fix.rerr == nil {
-							t.Errorf("bad input URI %s", fix.in, uerr)
+							t.Errorf("bad input URI %s", uerr)
 						}
 						t.SkipNow()
 					}
