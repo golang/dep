@@ -467,7 +467,7 @@ var pathDeductionFixtures = map[string][]pathDeductionFixture{
 
 func TestDeduceFromPath(t *testing.T) {
 	for typ, fixtures := range pathDeductionFixtures {
-		t.Run(fmt.Sprintf("%s", typ), func(t *testing.T) {
+		t.Run(typ, func(t *testing.T) {
 			var deducer pathDeducer
 			switch typ {
 			case "github":
@@ -517,7 +517,7 @@ func TestDeduceFromPath(t *testing.T) {
 			}
 
 			for _, fix := range fixtures {
-				t.Run(fmt.Sprintf("(in: %s)", fix.in), func(t *testing.T) {
+				t.Run(fix.in, func(t *testing.T) {
 					u, in, uerr := normalizeURI(fix.in)
 					if uerr != nil {
 						if fix.rerr == nil {
@@ -581,30 +581,32 @@ func TestVanityDeduction(t *testing.T) {
 	for _, fix := range vanities {
 		go func(fix pathDeductionFixture) {
 			defer wg.Done()
-			pr, err := sm.DeduceProjectRoot(fix.in)
-			if err != nil {
-				t.Errorf("(in: %s) Unexpected err on deducing project root: %s", fix.in, err)
-				return
-			} else if string(pr) != fix.root {
-				t.Errorf("(in: %s) Deducer did not return expected root:\n\t(GOT) %s\n\t(WNT) %s", fix.in, pr, fix.root)
-			}
+			t.Run(fmt.Sprintf("%s", fix.in), func(t *testing.T) {
+				pr, err := sm.DeduceProjectRoot(fix.in)
+				if err != nil {
+					t.Errorf("Unexpected err on deducing project root: %s", err)
+					return
+				} else if string(pr) != fix.root {
+					t.Errorf("Deducer did not return expected root:\n\t(GOT) %s\n\t(WNT) %s", pr, fix.root)
+				}
 
-			ft, err := sm.deducePathAndProcess(fix.in)
-			if err != nil {
-				t.Errorf("(in: %s) Unexpected err on deducing source: %s", fix.in, err)
-				return
-			}
+				ft, err := sm.deducePathAndProcess(fix.in)
+				if err != nil {
+					t.Errorf("Unexpected err on deducing source: %s", err)
+					return
+				}
 
-			_, ident, err := ft.srcf()
-			if err != nil {
-				t.Errorf("(in: %s) Unexpected err on executing source future: %s", fix.in, err)
-				return
-			}
+				_, ident, err := ft.srcf()
+				if err != nil {
+					t.Errorf("Unexpected err on executing source future: %s", err)
+					return
+				}
 
-			ustr := fix.mb.(maybeGitSource).url.String()
-			if ident != ustr {
-				t.Errorf("(in: %s) Deduced repo ident does not match fixture:\n\t(GOT) %s\n\t(WNT) %s", fix.in, ident, ustr)
-			}
+				ustr := fix.mb.(maybeGitSource).url.String()
+				if ident != ustr {
+					t.Errorf("Deduced repo ident does not match fixture:\n\t(GOT) %s\n\t(WNT) %s", ident, ustr)
+				}
+			})
 		}(fix)
 	}
 

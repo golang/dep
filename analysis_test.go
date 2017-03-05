@@ -434,7 +434,7 @@ func TestWorkmapToReach(t *testing.T) {
 	for name, fix := range table {
 		// Avoid erroneous errors by initializing the fixture's error map if
 		// needed
-		t.Run(fmt.Sprintf("wmToReach(%q)", name), func(t *testing.T) {
+		t.Run(name, func(t *testing.T) {
 			if fix.em == nil {
 				fix.em = make(map[string]*ProblemImportError)
 			}
@@ -1295,7 +1295,7 @@ func TestListPackages(t *testing.T) {
 	}
 
 	for name, fix := range table {
-		t.Run(fmt.Sprintf("listPackages(%q)", name), func(t *testing.T) {
+		t.Run(name, func(t *testing.T) {
 			if _, err := os.Stat(fix.fileRoot); err != nil {
 				t.Errorf("error on fileRoot %s: %s", fix.fileRoot, err)
 			}
