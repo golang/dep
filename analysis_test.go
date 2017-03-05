@@ -466,12 +466,13 @@ func TestListPackages(t *testing.T) {
 		return filepath.Join(srcdir, filepath.Join(s...))
 	}
 
-	table := map[string]struct {
+	type tc struct {
 		fileRoot   string
 		importRoot string
 		out        PackageTree
 		err        error
-	}{
+	}
+	table := map[string]tc{
 		"empty": {
 			fileRoot:   j("empty"),
 			importRoot: "empty",
@@ -1233,6 +1234,62 @@ func TestListPackages(t *testing.T) {
 				},
 			},
 		},
+	}
+	if runtime.GOOS != "windows" {
+		table["follow_symlink"] = tc{
+			fileRoot:   j("gosimple"),
+			importRoot: "gosimple",
+			out: PackageTree{
+				ImportRoot: "gosimple",
+				Packages:   map[string]PackageOrErr{},
+			},
+		}
+		table["follow symlinks inside of package"] = tc{
+			fileRoot:   j("symlinks"),
+			importRoot: "symlinks",
+			out: PackageTree{
+				ImportRoot: "symlinks",
+				Packages: map[string]PackageOrErr{
+					"symlinks/gopkg": {
+						P: Package{
+							ImportPath:  "symlinks/gopkg",
+							CommentPath: "",
+							Name:        "gopkg",
+							Imports:     []string{},
+						},
+					},
+					"symlinks/pkg": {
+						P: Package{
+							ImportPath:  "symlinks/pkg",
+							CommentPath: "",
+							Name:        "gopkg",
+							Imports:     []string{},
+						},
+					},
+					"symlinks": {
+						P: Package{
+							ImportPath:  "symlinks",
+							CommentPath: "",
+							Name:        "symlinks",
+							Imports: []string{
+								"github.com/sdboyer/gps",
+								"symlinks/gopkg",
+							},
+						},
+					},
+					"symlinks/foo": {
+						P: Package{
+							ImportPath:  "symlinks/foo",
+							CommentPath: "",
+							Name:        "foo",
+							Imports: []string{
+								"github.com/sdboyer/gps",
+							},
+						},
+					},
+				},
+			},
+		}
 	}
 
 	for name, fix := range table {
