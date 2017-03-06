@@ -9,7 +9,14 @@ Add: [
     }
 ]
 Remove: [
-    "github.com/stuff/placeholder"
+    {
+        "name": "github.com/stuff/placeholder",
+        "version": "2.0.0",
+        "revision": "6694017eeb4e20fd277b049bf29dba4895c97234",
+        "packages": [
+            "."
+        ]
+    }
 ]
 Modify: [
     {

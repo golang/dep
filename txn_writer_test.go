@@ -415,8 +415,8 @@ func TestSafeWriter_DiffLocks(t *testing.T) {
 		t.Fatalf("Expected the lock diff to contain 1 removed project, got %d", len(diff.Remove))
 	} else {
 		remove := diff.Remove[0]
-		if remove != "github.com/stuff/placeholder" {
-			t.Fatalf("expected new project github.com/stuff/placeholder, got %s", remove)
+		if remove.Name != "github.com/stuff/placeholder" {
+			t.Fatalf("expected new project github.com/stuff/placeholder, got %s", remove.Name)
 		}
 	}
 
