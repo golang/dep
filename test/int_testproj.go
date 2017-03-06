@@ -19,8 +19,9 @@ var (
 
 // To manage a test project directory structure and content
 type IntegrationTestProject struct {
-	t *testing.T
-	h *Helper
+	t          *testing.T
+	h          *Helper
+	preImports []string
 }
 
 func NewTestProject(t *testing.T, initPath string) *IntegrationTestProject {
@@ -48,8 +49,19 @@ func (p *IntegrationTestProject) TempDir(args ...string) {
 	p.h.TempDir(filepath.Join(args...))
 }
 
+func (p *IntegrationTestProject) TempProjDir(args ...string) {
+	localPath := append([]string{ProjectRoot}, args...)
+	p.h.TempDir(filepath.Join(localPath...))
+}
+
 func (p *IntegrationTestProject) ProjPath(args ...string) string {
 	localPath := append([]string{ProjectRoot}, args...)
+	return p.Path(localPath...)
+}
+
+func (p *IntegrationTestProject) VendorPath(args ...string) string {
+	localPath := append([]string{ProjectRoot, "vendor"}, args...)
+	p.TempDir(localPath...)
 	return p.Path(localPath...)
 }
 
@@ -59,6 +71,13 @@ func (p *IntegrationTestProject) RunGo(args ...string) {
 
 func (p *IntegrationTestProject) RunGit(dir string, args ...string) {
 	p.h.RunGit(dir, args...)
+}
+
+func (p *IntegrationTestProject) GetVendorGit(ip string) {
+	parse := strings.Split(ip, "/")
+	gitDir := strings.Join(parse[:len(parse)-1], string(filepath.Separator))
+	p.TempProjDir("vendor", gitDir)
+	p.RunGit(p.ProjPath("vendor", gitDir), "clone", "http://"+ip)
 }
 
 func (p *IntegrationTestProject) DoRun(args []string) error {
@@ -116,4 +135,43 @@ func (p *IntegrationTestProject) GetVendorPaths() []string {
 	)
 	sort.Strings(result)
 	return result
+}
+
+// Collect final vendor paths at a depth of three levels
+func (p *IntegrationTestProject) GetImportPaths() []string {
+	importPath := p.Path("src")
+	result := make([]string, 0)
+	filepath.Walk(
+		importPath,
+		func(path string, info os.FileInfo, err error) error {
+			if len(path) > len(importPath) && info.IsDir() {
+				parse := strings.Split(path[len(importPath)+1:], string(filepath.Separator))
+				if len(parse) == 3 {
+					result = append(result, strings.Join(parse, "/"))
+					return filepath.SkipDir
+				}
+			}
+			return nil
+		},
+	)
+	sort.Strings(result)
+	return result
+}
+
+func (p *IntegrationTestProject) RecordImportPaths() {
+	p.preImports = p.GetImportPaths()
+}
+
+// Compare import paths before and after commands
+func (p *IntegrationTestProject) CompareImportPaths() {
+	wantImportPaths := p.preImports
+	gotImportPaths := p.GetImportPaths()
+	if len(gotImportPaths) != len(wantImportPaths) {
+		p.t.Fatalf("Import path count changed during command: pre %d post %d", len(wantImportPaths), len(gotImportPaths))
+	}
+	for ind := range gotImportPaths {
+		if gotImportPaths[ind] != wantImportPaths[ind] {
+			p.t.Errorf("Change in import paths during: pre %s post %s", gotImportPaths, wantImportPaths)
+		}
+	}
 }
