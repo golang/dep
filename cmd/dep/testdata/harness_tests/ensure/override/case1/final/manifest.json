@@ -1,7 +1,0 @@
-{
-    "overrides": {
-        "github.com/sdboyer/deptest": {
-            "version": "1.0.0"
-        }
-    }
-}
