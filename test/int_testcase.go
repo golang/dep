@@ -24,14 +24,15 @@ var (
 
 // To manage a test case directory structure and content
 type IntegrationTestCase struct {
-	t           *testing.T
-	Name        string
-	RootPath    string
-	InitialPath string
-	FinalPath   string
-	CommandPath string
-	ImportPath  string
-	VendorPath  string
+	t               *testing.T
+	Name            string
+	RootPath        string
+	InitialPath     string
+	FinalPath       string
+	CommandPath     string
+	ImportPath      string
+	InitVendorPath  string
+	FinalVendorPath string
 }
 
 func NewTestCase(t *testing.T, name string) *IntegrationTestCase {
@@ -45,14 +46,15 @@ func NewTestCase(t *testing.T, name string) *IntegrationTestCase {
 		strings.Replace(name, "/", string(filepath.Separator), -1),
 	)
 	return &IntegrationTestCase{
-		t:           t,
-		Name:        name,
-		RootPath:    rootPath,
-		InitialPath: filepath.Join(rootPath, "initial"),
-		FinalPath:   filepath.Join(rootPath, "final"),
-		CommandPath: filepath.Join(rootPath, "commands.txt"),
-		ImportPath:  filepath.Join(rootPath, "initial", "imports.txt"),
-		VendorPath:  filepath.Join(rootPath, "final", "vendors.txt"),
+		t:               t,
+		Name:            name,
+		RootPath:        rootPath,
+		InitialPath:     filepath.Join(rootPath, "initial"),
+		FinalPath:       filepath.Join(rootPath, "final"),
+		CommandPath:     filepath.Join(rootPath, "commands.txt"),
+		ImportPath:      filepath.Join(rootPath, "initial", "imports.txt"),
+		InitVendorPath:  filepath.Join(rootPath, "initial", "vendors.txt"),
+		FinalVendorPath: filepath.Join(rootPath, "final", "vendors.txt"),
 	}
 }
 
@@ -116,8 +118,38 @@ func (tc *IntegrationTestCase) GetCommands() [][]string {
 	return result
 }
 
-func (tc *IntegrationTestCase) GetVendors() []string {
-	fpath := tc.VendorPath
+func (tc *IntegrationTestCase) GetInitVendors() map[string]string {
+	fpath := tc.InitVendorPath
+	file, err := os.Open(fpath)
+	if err != nil {
+		panic(fmt.Sprintf("Opening %s produced error: %s", fpath, err))
+	}
+
+	result := make(map[string]string)
+	content := bufio.NewReader(file)
+	re := regexp.MustCompile(" +")
+	lineNum := 1
+	for err == nil {
+		var line string
+		line, err = content.ReadString('\n')
+		line = strings.TrimSpace(line)
+		if len(line) != 0 {
+			parse := re.Split(line, -1)
+			if len(parse) != 2 {
+				panic(fmt.Sprintf("Malformed %s on line %d", fpath, lineNum))
+			}
+			result[parse[0]] = parse[1]
+		}
+		lineNum += 1
+	}
+	if err != io.EOF {
+		panic(fmt.Sprintf("Reading %s produced error: %s", fpath, err))
+	}
+	return result
+}
+
+func (tc *IntegrationTestCase) GetFinalVendors() []string {
+	fpath := tc.FinalVendorPath
 	file, err := os.Open(fpath)
 	if err != nil {
 		panic(fmt.Sprintf("Opening %s produced error: %s", fpath, err))
@@ -185,11 +217,11 @@ func (tc *IntegrationTestCase) CompareFile(goldenPath, working string) {
 func (tc *IntegrationTestCase) CompareVendorPaths(gotVendorPaths []string) {
 	if *UpdateGolden {
 		content := strings.Join(gotVendorPaths, "\n") + "\n"
-		if err := tc.WriteFile(tc.VendorPath, content); err != nil {
+		if err := tc.WriteFile(tc.FinalVendorPath, content); err != nil {
 			tc.t.Fatal(err)
 		}
 	} else {
-		wantVendorPaths := tc.GetVendors()
+		wantVendorPaths := tc.GetFinalVendors()
 		if len(gotVendorPaths) != len(wantVendorPaths) {
 			tc.t.Fatalf("Wrong number of vendor paths created: want %d got %d", len(wantVendorPaths), len(gotVendorPaths))
 		}

@@ -1,0 +1,13 @@
+{
+    "memo": "1a99b419931283cb086167ddfb2e8322df12e2648e139eb27a42904360e962ad",
+    "projects": [
+        {
+            "name": "github.com/sdboyer/deptest",
+            "version": "v1.0.0",
+            "revision": "ff2948a2ac8f538c4ecd55962e919d1e13e74baf",
+            "packages": [
+                "."
+            ]
+        }
+    ]
+}

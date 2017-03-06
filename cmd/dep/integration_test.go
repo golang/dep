@@ -28,7 +28,14 @@ func TestIntegration(t *testing.T) {
 				testProj := test.NewTestProject(t, testCase.InitialPath)
 				defer testProj.Cleanup()
 
-				// Checkout the specified revisions
+				// Create and checkout the vendor revisions
+				vendorPaths := testCase.GetInitVendors()
+				for ip, rev := range vendorPaths {
+					testProj.GetVendorGit(ip)
+					testProj.RunGit(testProj.VendorPath(ip), "checkout", rev)
+				}
+
+				// Create and checkout the import revisions
 				importPaths := testCase.GetImports()
 				for ip, rev := range importPaths {
 					testProj.RunGo("get", ip)
@@ -36,6 +43,7 @@ func TestIntegration(t *testing.T) {
 				}
 
 				// Run commands
+				testProj.RecordImportPaths()
 				commands := testCase.GetCommands()
 				for _, args := range commands {
 					testProj.DoRun(args)
@@ -46,6 +54,7 @@ func TestIntegration(t *testing.T) {
 				testCase.CompareFile("lock.json", testProj.ProjPath("lock.json"))
 
 				// Check vendor paths
+				testProj.CompareImportPaths()
 				testCase.CompareVendorPaths(testProj.GetVendorPaths())
 			})
 		}
