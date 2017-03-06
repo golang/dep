@@ -57,7 +57,7 @@ func (payload *SafeWriterPayload) HasVendor() bool {
 type LockDiff struct {
 	HashDiff *StringDiff
 	Add      []LockedProjectDiff
-	Remove   []gps.ProjectRoot
+	Remove   []LockedProjectDiff
 	Modify   []LockedProjectDiff
 }
 
@@ -111,12 +111,12 @@ func (diff *LockDiff) Format() (string, error) {
 // Fields are only populated when there is a difference, otherwise they are empty.
 // TODO(carolynvs) this should be moved to gps
 type LockedProjectDiff struct {
-	Name       gps.ProjectRoot `json:"name"`
+	Name     gps.ProjectRoot `json:"name"`
 	Source   *StringDiff     `json:"repo,omitempty"`
-	Version    *StringDiff     `json:"version,omitempty"`
-	Branch     *StringDiff     `json:"branch,omitempty"`
-	Revision   *StringDiff     `json:"revision,omitempty"`
-	Packages   []StringDiff    `json:"packages,omitempty"`
+	Version  *StringDiff     `json:"version,omitempty"`
+	Branch   *StringDiff     `json:"branch,omitempty"`
+	Revision *StringDiff     `json:"revision,omitempty"`
+	Packages []StringDiff    `json:"packages,omitempty"`
 }
 
 type StringDiff struct {
@@ -438,7 +438,7 @@ func diffLocks(l1 gps.Lock, l2 gps.Lock) *LockDiff {
 				}
 				i2next = i2 + 1 // Don't evaluate to this again
 			case -1: // Found a new project
-				add := buildAddProject(lp2)
+				add := buildLockedProjectDiff(lp2)
 				diff.Add = append(diff.Add, add)
 				i2next = i2 + 1 // Don't evaluate to this again
 				continue        // Keep looking for a matching project
@@ -450,14 +450,15 @@ func diffLocks(l1 gps.Lock, l2 gps.Lock) *LockDiff {
 		}
 
 		if !matched {
-			diff.Remove = append(diff.Remove, pr1)
+			remove := buildLockedProjectDiff(lp1)
+			diff.Remove = append(diff.Remove, remove)
 		}
 	}
 
 	// Anything that still hasn't been evaluated are adds
 	for i2 := i2next; i2 < len(p2); i2++ {
 		lp2 := p2[i2]
-		add := buildAddProject(lp2)
+		add := buildLockedProjectDiff(lp2)
 		diff.Add = append(diff.Add, add)
 	}
 
@@ -467,7 +468,7 @@ func diffLocks(l1 gps.Lock, l2 gps.Lock) *LockDiff {
 	return &diff
 }
 
-func buildAddProject(lp gps.LockedProject) LockedProjectDiff {
+func buildLockedProjectDiff(lp gps.LockedProject) LockedProjectDiff {
 	r2, b2, v2 := getVersionInfo(lp.Version())
 	var rev, version, branch *StringDiff
 	if r2 != "" {
