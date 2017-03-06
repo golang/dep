@@ -83,11 +83,7 @@ func ListPackages(fileRoot, importRoot string) (PackageTree, error) {
 		if err != nil && err != filepath.SkipDir {
 			return err
 		}
-
-		// Read the destination of named symbolic link
-		if fi, err := readSymlink(wp, fileRoot, fi); err != nil {
-			return nil
-		} else if !fi.IsDir() {
+		if !fi.IsDir() {
 			return nil
 		}
 
@@ -197,32 +193,6 @@ func ListPackages(fileRoot, importRoot string) (PackageTree, error) {
 	}
 
 	return ptree, nil
-}
-
-func readSymlink(wp, fileRoot string, fi os.FileInfo) (os.FileInfo, error) {
-	// read only symlink dir
-	if fi.IsDir() || fi.Mode()&os.ModeSymlink == 0 {
-		return fi, nil
-	}
-
-	dst, err := os.Readlink(wp)
-	if err != nil {
-		return fi, err
-	}
-
-	// All absolute symlinks are disqualified; if one is encountered, it should be skipped.
-	if filepath.IsAbs(dst) {
-		return fi, nil
-	}
-
-	// Relative symlinks pointing to somewhere outside of the root (via ..) should also be skipped.
-	dst, err = filepath.EvalSymlinks(wp)
-	if err != nil {
-		return fi, nil
-	} else if !strings.HasPrefix(dst, fileRoot) {
-		return fi, nil
-	}
-	return os.Lstat(dst)
 }
 
 // fillPackage full of info. Assumes p.Dir is set at a minimum
