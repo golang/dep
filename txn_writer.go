@@ -112,7 +112,7 @@ func (diff *LockDiff) Format() (string, error) {
 // TODO(carolynvs) this should be moved to gps
 type LockedProjectDiff struct {
 	Name       gps.ProjectRoot `json:"name"`
-	Repository *StringDiff     `json:"repo,omitempty"`
+	Source   *StringDiff     `json:"repo,omitempty"`
 	Version    *StringDiff     `json:"version,omitempty"`
 	Branch     *StringDiff     `json:"branch,omitempty"`
 	Revision   *StringDiff     `json:"revision,omitempty"`
@@ -501,7 +501,7 @@ func diffProjects(lp1 gps.LockedProject, lp2 gps.LockedProject) *LockedProjectDi
 	s1 := lp1.Ident().Source
 	s2 := lp2.Ident().Source
 	if s1 != s2 {
-		diff.Repository = &StringDiff{Previous: s1, Current: s2}
+		diff.Source = &StringDiff{Previous: s1, Current: s2}
 	}
 
 	r1, b1, v1 := getVersionInfo(lp1.Version())
@@ -564,7 +564,7 @@ func diffProjects(lp1 gps.LockedProject, lp2 gps.LockedProject) *LockedProjectDi
 		diff.Packages = append(diff.Packages, add)
 	}
 
-	if diff.Repository == nil && diff.Version == nil && diff.Revision == nil && len(diff.Packages) == 0 {
+	if diff.Source == nil && diff.Version == nil && diff.Revision == nil && len(diff.Packages) == 0 {
 		return nil // The projects are equivalent
 	}
 	return &diff
