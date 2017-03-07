@@ -35,7 +35,7 @@ func NewTestProjectContext(h *test.Helper, projectName string) *TestProjectConte
 	h.Cd(pc.Project.AbsRoot)
 	h.Setenv("GOPATH", pc.tempDir)
 
-	// Setup a Source Manager
+	// Set up a Source Manager
 	var err error
 	pc.Context = &Ctx{GOPATH: pc.tempDir}
 	pc.SourceManager, err = pc.Context.SourceManager()

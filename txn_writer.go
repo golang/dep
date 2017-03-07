@@ -112,7 +112,7 @@ func (diff *LockDiff) Format() (string, error) {
 // TODO(carolynvs) this should be moved to gps
 type LockedProjectDiff struct {
 	Name     gps.ProjectRoot `json:"name"`
-	Source   *StringDiff     `json:"repo,omitempty"`
+	Source   *StringDiff     `json:"source,omitempty"`
 	Version  *StringDiff     `json:"version,omitempty"`
 	Branch   *StringDiff     `json:"branch,omitempty"`
 	Revision *StringDiff     `json:"revision,omitempty"`
