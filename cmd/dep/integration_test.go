@@ -7,6 +7,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -18,6 +19,13 @@ func TestIntegration(t *testing.T) {
 	test.NeedsGit(t)
 
 	filepath.Walk("testdata", func(path string, info os.FileInfo, err error) error {
+
+		if runtime.GOOS == "windows" && strings.Contains(path, "remove") {
+			// TODO skipping the remove tests on windows until some fixes happen in gps -
+			// see https://github.com/golang/dep/issues/301
+			return filepath.SkipDir
+		}
+
 		if strings.HasSuffix(path, "testcase.yaml") {
 			parse := strings.Split(path, string(filepath.Separator))
 			testName := strings.Join(parse[1:len(parse)-1], "/")
