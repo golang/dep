@@ -1,0 +1,11 @@
+ # Remove/unused, case 2 (basic)
+
+commands:
+  - remove github.com/not/used
+
+initialVendors:
+    github.com/sdboyer/deptest:      v0.8.0
+    github.com/sdboyer/deptestdos:   a0196baa11ea047dd65037287451d36b861b00ea
+
+finalVendors:
+  - github.com/sdboyer/deptest

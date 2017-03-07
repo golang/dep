@@ -21,15 +21,13 @@ func TestRemoveErrors(t *testing.T) {
 	defer testProj.Cleanup()
 
 	// Create and checkout the vendor revisions
-	vendorPaths := testCase.GetInitVendors()
-	for ip, rev := range vendorPaths {
+	for ip, rev := range testCase.InitialVendors {
 		testProj.GetVendorGit(ip)
 		testProj.RunGit(testProj.VendorPath(ip), "checkout", rev)
 	}
 
 	// Create and checkout the import revisions
-	importPaths := testCase.GetImports()
-	for ip, rev := range importPaths {
+	for ip, rev := range testCase.Imports {
 		testProj.RunGo("get", ip)
 		testProj.RunGit(testProj.Path("src", ip), "checkout", rev)
 	}

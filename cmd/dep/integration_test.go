@@ -18,7 +18,7 @@ func TestIntegration(t *testing.T) {
 	test.NeedsGit(t)
 
 	filepath.Walk("testdata", func(path string, info os.FileInfo, err error) error {
-		if strings.HasSuffix(path, "commands.txt") {
+		if strings.HasSuffix(path, "testcase.yaml") {
 			parse := strings.Split(path, string(filepath.Separator))
 			testName := strings.Join(parse[1:len(parse)-1], "/")
 
@@ -29,23 +29,20 @@ func TestIntegration(t *testing.T) {
 				defer testProj.Cleanup()
 
 				// Create and checkout the vendor revisions
-				vendorPaths := testCase.GetInitVendors()
-				for ip, rev := range vendorPaths {
+				for ip, rev := range testCase.InitialVendors {
 					testProj.GetVendorGit(ip)
 					testProj.RunGit(testProj.VendorPath(ip), "checkout", rev)
 				}
 
 				// Create and checkout the import revisions
-				importPaths := testCase.GetImports()
-				for ip, rev := range importPaths {
+				for ip, rev := range testCase.Imports {
 					testProj.RunGo("get", ip)
 					testProj.RunGit(testProj.Path("src", ip), "checkout", rev)
 				}
 
 				// Run commands
 				testProj.RecordImportPaths()
-				commands := testCase.GetCommands()
-				for _, args := range commands {
+				for _, args := range testCase.Commands {
 					testProj.DoRun(args)
 				}
 
