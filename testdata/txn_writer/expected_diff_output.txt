@@ -21,7 +21,7 @@ Remove: [
 Modify: [
     {
         "name": "github.com/foo/bar",
-        "repo": "+ http://github.example.com/foo/bar",
+        "source": "+ http://github.example.com/foo/bar",
         "version": "+ 1.2.0",
         "branch": "- master",
         "revision": "f24338400f072ef18125ae0fbe6b06fe6d1783e7 -> 2a3a211e171803acb82d1d5d42ceb53228f51751",
