@@ -6,6 +6,7 @@ package main
 
 import (
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/golang/dep/test"
@@ -22,6 +23,12 @@ type removeTestCase struct {
 }
 
 func TestRemove(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		// TODO skipping this test on windows until some fixes happen in gps -
+		// see https://github.com/golang/dep/issues/301
+		t.Skip()
+	}
+
 	tests := []removeTestCase{
 		{
 			dataRoot: "remove/case0",
