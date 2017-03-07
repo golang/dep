@@ -5,15 +5,11 @@
 package test
 
 import (
-	"bufio"
 	"flag"
-	"fmt"
-	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
-	"sort"
 	"strings"
 	"testing"
 )
@@ -24,15 +20,15 @@ var (
 
 // To manage a test case directory structure and content
 type IntegrationTestCase struct {
-	t               *testing.T
-	Name            string
-	RootPath        string
-	InitialPath     string
-	FinalPath       string
-	CommandPath     string
-	ImportPath      string
-	InitVendorPath  string
-	FinalVendorPath string
+	t              *testing.T
+	Name           string
+	RootPath       string
+	InitialPath    string
+	FinalPath      string
+	Commands       [][]string
+	Imports        map[string]string
+	InitialVendors map[string]string
+	FinalVendors   []string
 }
 
 func NewTestCase(t *testing.T, name string) *IntegrationTestCase {
@@ -45,132 +41,161 @@ func NewTestCase(t *testing.T, name string) *IntegrationTestCase {
 		"testdata",
 		strings.Replace(name, "/", string(filepath.Separator), -1),
 	)
-	return &IntegrationTestCase{
-		t:               t,
-		Name:            name,
-		RootPath:        rootPath,
-		InitialPath:     filepath.Join(rootPath, "initial"),
-		FinalPath:       filepath.Join(rootPath, "final"),
-		CommandPath:     filepath.Join(rootPath, "commands.txt"),
-		ImportPath:      filepath.Join(rootPath, "initial", "imports.txt"),
-		InitVendorPath:  filepath.Join(rootPath, "initial", "vendors.txt"),
-		FinalVendorPath: filepath.Join(rootPath, "final", "vendors.txt"),
+	n := &IntegrationTestCase{
+		t:           t,
+		Name:        name,
+		RootPath:    rootPath,
+		InitialPath: filepath.Join(rootPath, "initial"),
+		FinalPath:   filepath.Join(rootPath, "final"),
 	}
-}
-
-func (tc *IntegrationTestCase) GetImports() map[string]string {
-	fpath := tc.ImportPath
-	file, err := os.Open(fpath)
+	rdr, err := os.Open(filepath.Join(rootPath, "testcase.yaml"))
 	if err != nil {
-		panic(fmt.Sprintf("Opening %s produced error: %s", fpath, err))
+		panic(err)
 	}
-
-	result := make(map[string]string)
-	content := bufio.NewReader(file)
-	re := regexp.MustCompile(" +")
-	lineNum := 1
-	for err == nil {
-		var line string
-		line, err = content.ReadString('\n')
-		line = strings.TrimSpace(line)
-		if len(line) != 0 {
-			parse := re.Split(line, -1)
-			if len(parse) != 2 {
-				panic(fmt.Sprintf("Malformed %s on line %d", fpath, lineNum))
-			}
-			result[parse[0]] = parse[1]
-		}
-		lineNum += 1
-	}
-	if err != io.EOF {
-		panic(fmt.Sprintf("Reading %s produced error: %s", fpath, err))
-	}
-	return result
-}
-
-func (tc *IntegrationTestCase) GetCommands() [][]string {
-	fpath := tc.CommandPath
-	file, err := os.Open(fpath)
+	yaml, err := ParseYaml(rdr)
 	if err != nil {
-		panic(fmt.Sprintf("Opening %s produced error: %s", fpath, err))
+		panic(err)
 	}
-
-	result := make([][]string, 0)
-	content := bufio.NewReader(file)
-	re := regexp.MustCompile(" +")
-	lineNum := 1
-	for err == nil {
-		var line string
-		line, err = content.ReadString('\n')
-		line = strings.TrimSpace(line)
-		if len(line) != 0 {
-			parse := re.Split(line, -1)
-			if len(parse) < 1 {
-				panic(fmt.Sprintf("Malformed %s on line %d", fpath, lineNum))
-			}
-			result = append(result, parse)
-		}
-		lineNum += 1
-	}
-	if err != io.EOF {
-		panic(fmt.Sprintf("Reading %s produced error: %s", fpath, err))
-	}
-	return result
-}
-
-func (tc *IntegrationTestCase) GetInitVendors() map[string]string {
-	fpath := tc.InitVendorPath
-	file, err := os.Open(fpath)
-	if err != nil {
-		panic(fmt.Sprintf("Opening %s produced error: %s", fpath, err))
-	}
-
-	result := make(map[string]string)
-	content := bufio.NewReader(file)
-	re := regexp.MustCompile(" +")
-	lineNum := 1
-	for err == nil {
-		var line string
-		line, err = content.ReadString('\n')
-		line = strings.TrimSpace(line)
-		if len(line) != 0 {
-			parse := re.Split(line, -1)
-			if len(parse) != 2 {
-				panic(fmt.Sprintf("Malformed %s on line %d", fpath, lineNum))
-			}
-			result[parse[0]] = parse[1]
-		}
-		lineNum += 1
-	}
-	if err != io.EOF {
-		panic(fmt.Sprintf("Reading %s produced error: %s", fpath, err))
-	}
-	return result
-}
-
-func (tc *IntegrationTestCase) GetFinalVendors() []string {
-	fpath := tc.FinalVendorPath
-	file, err := os.Open(fpath)
-	if err != nil {
-		panic(fmt.Sprintf("Opening %s produced error: %s", fpath, err))
-	}
-
-	result := make([]string, 0)
-	content := bufio.NewReader(file)
-	for err == nil {
-		var line string
-		line, err = content.ReadString('\n')
-		line = strings.TrimSpace(line)
-		if len(line) != 0 {
-			result = append(result, line)
+	if _, ok := yaml["imports"]; ok {
+		n.Imports = make(map[string]string)
+		for k, v := range yaml["imports"].(YamlDoc) {
+			n.Imports[k] = v.(string)
 		}
 	}
-	if err != io.EOF {
-		panic(fmt.Sprintf("Reading %s produced error: %s", fpath, err))
+	if _, ok := yaml["initialVendors"]; ok {
+		n.InitialVendors = make(map[string]string)
+		for k, v := range yaml["initialVendors"].(YamlDoc) {
+			n.InitialVendors[k] = v.(string)
+		}
 	}
-	sort.Strings(result)
-	return result
+	if _, ok := yaml["finalVendors"]; ok {
+		n.FinalVendors = []string(yaml["finalVendors"].(YamlList))
+	}
+	if _, ok := yaml["commands"]; ok {
+		n.Commands = make([][]string, 0)
+		sep := regexp.MustCompile(" +")
+		for _, val := range yaml["commands"].(YamlList) {
+			n.Commands = append(n.Commands, sep.Split(val, -1))
+		}
+	}
+
+	return n
 }
+
+//
+// func (tc *IntegrationTestCase) GetImports() map[string]string {
+// 	fpath := tc.ImportPath
+// 	file, err := os.Open(fpath)
+// 	if err != nil {
+// 		panic(fmt.Sprintf("Opening %s produced error: %s", fpath, err))
+// 	}
+//
+// 	result := make(map[string]string)
+// 	content := bufio.NewReader(file)
+// 	re := regexp.MustCompile(" +")
+// 	lineNum := 1
+// 	for err == nil {
+// 		var line string
+// 		line, err = content.ReadString('\n')
+// 		line = strings.TrimSpace(line)
+// 		if len(line) != 0 {
+// 			parse := re.Split(line, -1)
+// 			if len(parse) != 2 {
+// 				panic(fmt.Sprintf("Malformed %s on line %d", fpath, lineNum))
+// 			}
+// 			result[parse[0]] = parse[1]
+// 		}
+// 		lineNum += 1
+// 	}
+// 	if err != io.EOF {
+// 		panic(fmt.Sprintf("Reading %s produced error: %s", fpath, err))
+// 	}
+// 	return result
+// }
+//
+// func (tc *IntegrationTestCase) GetCommands() [][]string {
+// 	fpath := tc.CommandPath
+// 	file, err := os.Open(fpath)
+// 	if err != nil {
+// 		panic(fmt.Sprintf("Opening %s produced error: %s", fpath, err))
+// 	}
+//
+// 	result := make([][]string, 0)
+// 	content := bufio.NewReader(file)
+// 	re := regexp.MustCompile(" +")
+// 	lineNum := 1
+// 	for err == nil {
+// 		var line string
+// 		line, err = content.ReadString('\n')
+// 		line = strings.TrimSpace(line)
+// 		if len(line) != 0 {
+// 			parse := re.Split(line, -1)
+// 			if len(parse) < 1 {
+// 				panic(fmt.Sprintf("Malformed %s on line %d", fpath, lineNum))
+// 			}
+// 			result = append(result, parse)
+// 		}
+// 		lineNum += 1
+// 	}
+// 	if err != io.EOF {
+// 		panic(fmt.Sprintf("Reading %s produced error: %s", fpath, err))
+// 	}
+// 	return result
+// }
+//
+// func (tc *IntegrationTestCase) GetInitVendors() map[string]string {
+// 	fpath := tc.InitVendorPath
+// 	file, err := os.Open(fpath)
+// 	if err != nil {
+// 		panic(fmt.Sprintf("Opening %s produced error: %s", fpath, err))
+// 	}
+//
+// 	result := make(map[string]string)
+// 	content := bufio.NewReader(file)
+// 	re := regexp.MustCompile(" +")
+// 	lineNum := 1
+// 	for err == nil {
+// 		var line string
+// 		line, err = content.ReadString('\n')
+// 		line = strings.TrimSpace(line)
+// 		if len(line) != 0 {
+// 			parse := re.Split(line, -1)
+// 			if len(parse) != 2 {
+// 				panic(fmt.Sprintf("Malformed %s on line %d", fpath, lineNum))
+// 			}
+// 			result[parse[0]] = parse[1]
+// 		}
+// 		lineNum += 1
+// 	}
+// 	if err != io.EOF {
+// 		panic(fmt.Sprintf("Reading %s produced error: %s", fpath, err))
+// 	}
+// 	return result
+// }
+//
+// func (tc *IntegrationTestCase) GetFinalVendors() []string {
+// 	fpath := tc.FinalVendorPath
+// 	file, err := os.Open(fpath)
+// 	if err != nil {
+// 		panic(fmt.Sprintf("Opening %s produced error: %s", fpath, err))
+// 	}
+//
+// 	result := make([]string, 0)
+// 	content := bufio.NewReader(file)
+// 	for err == nil {
+// 		var line string
+// 		line, err = content.ReadString('\n')
+// 		line = strings.TrimSpace(line)
+// 		if len(line) != 0 {
+// 			result = append(result, line)
+// 		}
+// 	}
+// 	if err != io.EOF {
+// 		panic(fmt.Sprintf("Reading %s produced error: %s", fpath, err))
+// 	}
+// 	sort.Strings(result)
+// 	return result
+// }
 
 func (tc *IntegrationTestCase) CompareFile(goldenPath, working string) {
 	golden := filepath.Join(tc.FinalPath, goldenPath)
@@ -215,20 +240,13 @@ func (tc *IntegrationTestCase) CompareFile(goldenPath, working string) {
 }
 
 func (tc *IntegrationTestCase) CompareVendorPaths(gotVendorPaths []string) {
-	if *UpdateGolden {
-		content := strings.Join(gotVendorPaths, "\n") + "\n"
-		if err := tc.WriteFile(tc.FinalVendorPath, content); err != nil {
-			tc.t.Fatal(err)
-		}
-	} else {
-		wantVendorPaths := tc.GetFinalVendors()
-		if len(gotVendorPaths) != len(wantVendorPaths) {
-			tc.t.Fatalf("Wrong number of vendor paths created: want %d got %d", len(wantVendorPaths), len(gotVendorPaths))
-		}
-		for ind := range gotVendorPaths {
-			if gotVendorPaths[ind] != wantVendorPaths[ind] {
-				tc.t.Errorf("Mismatch in vendor paths created: want %s got %s", gotVendorPaths, wantVendorPaths)
-			}
+	wantVendorPaths := tc.FinalVendors
+	if len(gotVendorPaths) != len(wantVendorPaths) {
+		tc.t.Fatalf("Wrong number of vendor paths created: want %d got %d", len(wantVendorPaths), len(gotVendorPaths))
+	}
+	for ind := range gotVendorPaths {
+		if gotVendorPaths[ind] != wantVendorPaths[ind] {
+			tc.t.Errorf("Mismatch in vendor paths created: want %s got %s", gotVendorPaths, wantVendorPaths)
 		}
 	}
 }
