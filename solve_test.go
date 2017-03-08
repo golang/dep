@@ -82,19 +82,14 @@ func TestBasicSolves(t *testing.T) {
 
 		sort.Strings(names)
 		for _, n := range names {
-			solveBasicsAndCheck(basicFixtures[n], t)
-			if testing.Verbose() {
-				// insert a line break between tests
-				stderrlog.Println("")
-			}
+			t.Run(n, func(t *testing.T) {
+				solveBasicsAndCheck(basicFixtures[n], t)
+			})
 		}
 	}
 }
 
 func solveBasicsAndCheck(fix basicFixture, t *testing.T) (res Solution, err error) {
-	if testing.Verbose() {
-		stderrlog.Printf("[[fixture %q]]", fix.n)
-	}
 	sm := newdepspecSM(fix.ds, nil)
 
 	params := SolveParameters{
@@ -133,11 +128,9 @@ func TestBimodalSolves(t *testing.T) {
 
 		sort.Strings(names)
 		for _, n := range names {
-			solveBimodalAndCheck(bimodalFixtures[n], t)
-			if testing.Verbose() {
-				// insert a line break between tests
-				stderrlog.Println("")
-			}
+			t.Run(n, func(t *testing.T) {
+				solveBimodalAndCheck(bimodalFixtures[n], t)
+			})
 		}
 	}
 }

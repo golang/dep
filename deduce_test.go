@@ -467,98 +467,102 @@ var pathDeductionFixtures = map[string][]pathDeductionFixture{
 
 func TestDeduceFromPath(t *testing.T) {
 	for typ, fixtures := range pathDeductionFixtures {
-		var deducer pathDeducer
-		switch typ {
-		case "github":
-			deducer = githubDeducer{regexp: ghRegex}
-		case "gopkg.in":
-			deducer = gopkginDeducer{regexp: gpinNewRegex}
-		case "jazz":
-			deducer = jazzDeducer{regexp: jazzRegex}
-		case "bitbucket":
-			deducer = bitbucketDeducer{regexp: bbRegex}
-		case "launchpad":
-			deducer = launchpadDeducer{regexp: lpRegex}
-		case "git.launchpad":
-			deducer = launchpadGitDeducer{regexp: glpRegex}
-		case "apache":
-			deducer = apacheDeducer{regexp: apacheRegex}
-		case "vcsext":
-			deducer = vcsExtensionDeducer{regexp: vcsExtensionRegex}
-		default:
-			// Should just be the vanity imports, which we do elsewhere
-			continue
-		}
-
-		var printmb func(mb maybeSource) string
-		printmb = func(mb maybeSource) string {
-			switch tmb := mb.(type) {
-			case maybeSources:
-				var buf bytes.Buffer
-				fmt.Fprintf(&buf, "%v maybeSources:", len(tmb))
-				for _, elem := range tmb {
-					fmt.Fprintf(&buf, "\n\t\t%s", printmb(elem))
-				}
-				return buf.String()
-			case maybeGitSource:
-				return fmt.Sprintf("%T: %s", tmb, ufmt(tmb.url))
-			case maybeBzrSource:
-				return fmt.Sprintf("%T: %s", tmb, ufmt(tmb.url))
-			case maybeHgSource:
-				return fmt.Sprintf("%T: %s", tmb, ufmt(tmb.url))
-			case maybeGopkginSource:
-				return fmt.Sprintf("%T: %s (v%v) %s ", tmb, tmb.opath, tmb.major, ufmt(tmb.url))
+		t.Run(typ, func(t *testing.T) {
+			var deducer pathDeducer
+			switch typ {
+			case "github":
+				deducer = githubDeducer{regexp: ghRegex}
+			case "gopkg.in":
+				deducer = gopkginDeducer{regexp: gpinNewRegex}
+			case "jazz":
+				deducer = jazzDeducer{regexp: jazzRegex}
+			case "bitbucket":
+				deducer = bitbucketDeducer{regexp: bbRegex}
+			case "launchpad":
+				deducer = launchpadDeducer{regexp: lpRegex}
+			case "git.launchpad":
+				deducer = launchpadGitDeducer{regexp: glpRegex}
+			case "apache":
+				deducer = apacheDeducer{regexp: apacheRegex}
+			case "vcsext":
+				deducer = vcsExtensionDeducer{regexp: vcsExtensionRegex}
 			default:
-				t.Errorf("Unknown maybeSource type: %T", mb)
-				t.FailNow()
-			}
-			return ""
-		}
-
-		for _, fix := range fixtures {
-			u, in, uerr := normalizeURI(fix.in)
-			if uerr != nil {
-				if fix.rerr == nil {
-					t.Errorf("(in: %s) bad input URI %s", fix.in, uerr)
-				}
-				continue
+				// Should just be the vanity imports, which we do elsewhere
+				t.Log("skipping")
+				t.SkipNow()
 			}
 
-			root, rerr := deducer.deduceRoot(in)
-			if fix.rerr != nil {
-				if rerr == nil {
-					t.Errorf("(in: %s, %T) Expected error on deducing root, got none:\n\t(WNT) %s", in, deducer, fix.rerr)
-				} else if fix.rerr.Error() != rerr.Error() {
-					t.Errorf("(in: %s, %T) Got unexpected error on deducing root:\n\t(GOT) %s\n\t(WNT) %s", in, deducer, rerr, fix.rerr)
+			var printmb func(mb maybeSource, t *testing.T) string
+			printmb = func(mb maybeSource, t *testing.T) string {
+				switch tmb := mb.(type) {
+				case maybeSources:
+					var buf bytes.Buffer
+					fmt.Fprintf(&buf, "%v maybeSources:", len(tmb))
+					for _, elem := range tmb {
+						fmt.Fprintf(&buf, "\n\t\t%s", printmb(elem, t))
+					}
+					return buf.String()
+				case maybeGitSource:
+					return fmt.Sprintf("%T: %s", tmb, ufmt(tmb.url))
+				case maybeBzrSource:
+					return fmt.Sprintf("%T: %s", tmb, ufmt(tmb.url))
+				case maybeHgSource:
+					return fmt.Sprintf("%T: %s", tmb, ufmt(tmb.url))
+				case maybeGopkginSource:
+					return fmt.Sprintf("%T: %s (v%v) %s ", tmb, tmb.opath, tmb.major, ufmt(tmb.url))
+				default:
+					t.Errorf("Unknown maybeSource type: %T", mb)
 				}
-			} else if rerr != nil {
-				t.Errorf("(in: %s, %T) Got unexpected error on deducing root:\n\t(GOT) %s", in, deducer, rerr)
-			} else if root != fix.root {
-				t.Errorf("(in: %s, %T) Deducer did not return expected root:\n\t(GOT) %s\n\t(WNT) %s", in, deducer, root, fix.root)
+				return ""
 			}
 
-			mb, mberr := deducer.deduceSource(in, u)
-			if fix.srcerr != nil {
-				if mberr == nil {
-					t.Errorf("(in: %s, %T) Expected error on deducing source, got none:\n\t(WNT) %s", in, deducer, fix.srcerr)
-				} else if fix.srcerr.Error() != mberr.Error() {
-					t.Errorf("(in: %s, %T) Got unexpected error on deducing source:\n\t(GOT) %s\n\t(WNT) %s", in, deducer, mberr, fix.srcerr)
-				}
-			} else if mberr != nil {
-				// don't complain the fix already expected an rerr
-				if fix.rerr == nil {
-					t.Errorf("(in: %s, %T) Got unexpected error on deducing source:\n\t(GOT) %s", in, deducer, mberr)
-				}
-			} else if !reflect.DeepEqual(mb, fix.mb) {
-				if mb == nil {
-					t.Errorf("(in: %s, %T) Deducer returned source maybes, but none expected:\n\t(GOT) (none)\n\t(WNT) %s", in, deducer, printmb(fix.mb))
-				} else if fix.mb == nil {
-					t.Errorf("(in: %s, %T) Deducer returned source maybes, but none expected:\n\t(GOT) %s\n\t(WNT) (none)", in, deducer, printmb(mb))
-				} else {
-					t.Errorf("(in: %s, %T) Deducer did not return expected source:\n\t(GOT) %s\n\t(WNT) %s", in, deducer, printmb(mb), printmb(fix.mb))
-				}
+			for _, fix := range fixtures {
+				t.Run(fix.in, func(t *testing.T) {
+					u, in, uerr := normalizeURI(fix.in)
+					if uerr != nil {
+						if fix.rerr == nil {
+							t.Errorf("bad input URI %s", uerr)
+						}
+						t.SkipNow()
+					}
+
+					root, rerr := deducer.deduceRoot(in)
+					if fix.rerr != nil {
+						if rerr == nil {
+							t.Errorf("Expected error on deducing root, got none:\n\t(WNT) %s", fix.rerr)
+						} else if fix.rerr.Error() != rerr.Error() {
+							t.Errorf("Got unexpected error on deducing root:\n\t(GOT) %s\n\t(WNT) %s", rerr, fix.rerr)
+						}
+					} else if rerr != nil {
+						t.Errorf("Got unexpected error on deducing root:\n\t(GOT) %s", rerr)
+					} else if root != fix.root {
+						t.Errorf("Deducer did not return expected root:\n\t(GOT) %s\n\t(WNT) %s", root, fix.root)
+					}
+
+					mb, mberr := deducer.deduceSource(in, u)
+					if fix.srcerr != nil {
+						if mberr == nil {
+							t.Errorf("Expected error on deducing source, got none:\n\t(WNT) %s", fix.srcerr)
+						} else if fix.srcerr.Error() != mberr.Error() {
+							t.Errorf("Got unexpected error on deducing source:\n\t(GOT) %s\n\t(WNT) %s", mberr, fix.srcerr)
+						}
+					} else if mberr != nil {
+						// don't complain the fix already expected an rerr
+						if fix.rerr == nil {
+							t.Errorf("Got unexpected error on deducing source:\n\t(GOT) %s", mberr)
+						}
+					} else if !reflect.DeepEqual(mb, fix.mb) {
+						if mb == nil {
+							t.Errorf("Deducer returned source maybes, but none expected:\n\t(GOT) (none)\n\t(WNT) %s", printmb(fix.mb, t))
+						} else if fix.mb == nil {
+							t.Errorf("Deducer returned source maybes, but none expected:\n\t(GOT) %s\n\t(WNT) (none)", printmb(mb, t))
+						} else {
+							t.Errorf("Deducer did not return expected source:\n\t(GOT) %s\n\t(WNT) %s", printmb(mb, t), printmb(fix.mb, t))
+						}
+					}
+				})
 			}
-		}
+		})
 	}
 }
 
@@ -577,30 +581,32 @@ func TestVanityDeduction(t *testing.T) {
 	for _, fix := range vanities {
 		go func(fix pathDeductionFixture) {
 			defer wg.Done()
-			pr, err := sm.DeduceProjectRoot(fix.in)
-			if err != nil {
-				t.Errorf("(in: %s) Unexpected err on deducing project root: %s", fix.in, err)
-				return
-			} else if string(pr) != fix.root {
-				t.Errorf("(in: %s) Deducer did not return expected root:\n\t(GOT) %s\n\t(WNT) %s", fix.in, pr, fix.root)
-			}
+			t.Run(fmt.Sprintf("%s", fix.in), func(t *testing.T) {
+				pr, err := sm.DeduceProjectRoot(fix.in)
+				if err != nil {
+					t.Errorf("Unexpected err on deducing project root: %s", err)
+					return
+				} else if string(pr) != fix.root {
+					t.Errorf("Deducer did not return expected root:\n\t(GOT) %s\n\t(WNT) %s", pr, fix.root)
+				}
 
-			ft, err := sm.deducePathAndProcess(fix.in)
-			if err != nil {
-				t.Errorf("(in: %s) Unexpected err on deducing source: %s", fix.in, err)
-				return
-			}
+				ft, err := sm.deducePathAndProcess(fix.in)
+				if err != nil {
+					t.Errorf("Unexpected err on deducing source: %s", err)
+					return
+				}
 
-			_, ident, err := ft.srcf()
-			if err != nil {
-				t.Errorf("(in: %s) Unexpected err on executing source future: %s", fix.in, err)
-				return
-			}
+				_, ident, err := ft.srcf()
+				if err != nil {
+					t.Errorf("Unexpected err on executing source future: %s", err)
+					return
+				}
 
-			ustr := fix.mb.(maybeGitSource).url.String()
-			if ident != ustr {
-				t.Errorf("(in: %s) Deduced repo ident does not match fixture:\n\t(GOT) %s\n\t(WNT) %s", fix.in, ident, ustr)
-			}
+				ustr := fix.mb.(maybeGitSource).url.String()
+				if ident != ustr {
+					t.Errorf("Deduced repo ident does not match fixture:\n\t(GOT) %s\n\t(WNT) %s", ident, ustr)
+				}
+			})
 		}(fix)
 	}
 

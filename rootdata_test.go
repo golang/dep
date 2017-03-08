@@ -204,11 +204,13 @@ func TestGetApplicableConstraints(t *testing.T) {
 	}
 
 	for _, fix := range table {
-		fix.mut()
+		t.Run(fix.name, func(t *testing.T) {
+			fix.mut()
 
-		got := rd.getApplicableConstraints()
-		if !reflect.DeepEqual(fix.result, got) {
-			t.Errorf("(fix: %q) unexpected applicable constraint set:\n\t(GOT): %+v\n\t(WNT): %+v", fix.name, got, fix.result)
-		}
+			got := rd.getApplicableConstraints()
+			if !reflect.DeepEqual(fix.result, got) {
+				t.Errorf("unexpected applicable constraint set:\n\t(GOT): %+v\n\t(WNT): %+v", got, fix.result)
+			}
+		})
 	}
 }
