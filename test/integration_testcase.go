@@ -10,7 +10,6 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"regexp"
 	"testing"
 )
 
@@ -25,10 +24,10 @@ type IntegrationTestCase struct {
 	RootPath       string
 	InitialPath    string
 	FinalPath      string
-	Commands       [][]string
-	Imports        map[string]string
-	InitialVendors map[string]string
-	FinalVendors   []string
+	Commands       [][]string        `json:"commands"`
+	Imports        map[string]string `json:"imports"`
+	InitialVendors map[string]string `json:"initialVendors"`
+	FinalVendors   []string          `json:"finalVendors"`
 }
 
 func NewTestCase(t *testing.T, name string) *IntegrationTestCase {
@@ -48,35 +47,9 @@ func NewTestCase(t *testing.T, name string) *IntegrationTestCase {
 	if err != nil {
 		panic(err)
 	}
-	d := make(map[string]interface{})
-	err = json.Unmarshal(j, &d)
+	err = json.Unmarshal(j, n)
 	if err != nil {
 		panic(err)
-	}
-	n.Imports = make(map[string]string)
-	if _, ok := d["imports"]; ok {
-		for key, val := range d["imports"].(map[string]interface{}) {
-			n.Imports[key] = val.(string)
-		}
-	}
-	n.InitialVendors = make(map[string]string)
-	if _, ok := d["initialVendors"]; ok {
-		for key, val := range d["initialVendors"].(map[string]interface{}) {
-			n.InitialVendors[key] = val.(string)
-		}
-	}
-	n.FinalVendors = make([]string, 0)
-	if _, ok := d["finalVendors"]; ok {
-		for _, val := range d["finalVendors"].([]interface{}) {
-			n.FinalVendors = append(n.FinalVendors, val.(string))
-		}
-	}
-	n.Commands = make([][]string, 0)
-	if _, ok := d["commands"]; ok {
-		sep := regexp.MustCompile(" +")
-		for _, val := range d["commands"].([]interface{}) {
-			n.Commands = append(n.Commands, sep.Split(val.(string), -1))
-		}
 	}
 	return n
 }

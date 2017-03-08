@@ -1,6 +1,6 @@
 {
   "commands": [
-    "remove -unused"
+    ["remove", "-unused"]
   ],
   "finalVendors": [
     "github.com/sdboyer/deptest",
