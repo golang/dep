@@ -1,0 +1,10 @@
+{
+  "commands": [
+    "init",
+    "ensure -update github.com/sdboyer/deptest"
+  ],
+  "finalVendors": [
+    "github.com/sdboyer/deptest",
+    "github.com/sdboyer/deptestdos"
+  ]
+}

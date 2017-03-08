@@ -1,8 +1,0 @@
- # Remove/force, case 1 (basic)
-
-commands:
-  - remove -force github.com/sdboyer/deptestdos github.com/not/used
-
-finalVendors:
-  - github.com/sdboyer/deptest
-  - github.com/sdboyer/deptestdos

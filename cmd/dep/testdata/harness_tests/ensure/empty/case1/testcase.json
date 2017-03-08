@@ -1,0 +1,9 @@
+{
+  "commands": [
+    "init",
+    "ensure -update"
+  ],
+  "finalVendors": [
+    "github.com/sdboyer/deptest"
+  ]
+}
