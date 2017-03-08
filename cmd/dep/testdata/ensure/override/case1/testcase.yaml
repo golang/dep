@@ -1,9 +1,0 @@
- # Ensure/override, case 1 (basic)
-
-commands:
-  - init
-  - ensure -override github.com/sdboyer/deptest@1.0.0
-
-
-finalVendors:
-  - github.com/sdboyer/deptest

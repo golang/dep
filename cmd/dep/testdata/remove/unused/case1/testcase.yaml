@@ -1,8 +1,0 @@
- # Remove/unused, case 1 (basic)
-
-commands:
-  - remove -unused
-
-finalVendors:
-  - github.com/sdboyer/deptest
-  - github.com/sdboyer/deptestdos

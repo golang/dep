@@ -1,8 +1,0 @@
- # Remove/specific, case 1 (basic)
-
-commands:
-  - remove github.com/not/used
-
-finalVendors:
-  - github.com/sdboyer/deptest
-  - github.com/sdboyer/deptestdos

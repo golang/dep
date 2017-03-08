@@ -1,7 +1,0 @@
- # Ensure/empty, case 2 (basic)
-
-commands:
-  - ensure
-
-finalVendors:
-  - github.com/sdboyer/deptest
