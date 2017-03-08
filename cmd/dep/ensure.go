@@ -9,6 +9,7 @@ import (
 	"encoding/hex"
 	"flag"
 	"fmt"
+	"go/build"
 	"log"
 	"os"
 	"path/filepath"
@@ -126,6 +127,10 @@ func (cmd *ensureCommand) Run(ctx *dep.Ctx, args []string) error {
 	params.RootPackageTree, err = gps.ListPackages(p.AbsRoot, string(p.ImportRoot))
 	if err != nil {
 		return errors.Wrap(err, "ensure ListPackage for project")
+	}
+
+	if err := checkErrors(params.RootPackageTree.Packages); err != nil {
+		return err
 	}
 
 	if cmd.update {
@@ -361,4 +366,31 @@ func deduceConstraint(s string) gps.Constraint {
 	// If not a plain SHA1 or bzr custom GUID, assume a plain version.
 	// TODO: if there is amgibuity here, then prompt the user?
 	return gps.NewVersion(s)
+}
+
+func checkErrors(m map[string]gps.PackageOrErr) error {
+	noGoErrors, pkgErrors := 0, 0
+	for _, poe := range m {
+		if poe.Err != nil {
+			switch poe.Err.(type) {
+			case *build.NoGoError:
+				noGoErrors++
+			default:
+				pkgErrors++
+			}
+		}
+	}
+	if len(m) == 0 || len(m) == noGoErrors {
+		return errors.New("all dirs lacked any go code")
+	}
+
+	if len(m) == pkgErrors {
+		return fmt.Errorf("all dirs had go code with errors")
+	}
+
+	if pkgErrors > 0 && noGoErrors > 0 {
+		return fmt.Errorf("%d dirs had errors and %d had no go code", pkgErrors, noGoErrors)
+	}
+
+	return nil
 }
