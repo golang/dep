@@ -28,7 +28,7 @@ The `testcase.json` file has the following format:
     {
       "commands": [
         ["init"],
-        ["ensure" "github.com/sdboyer/deptesttres"]
+        ["ensure", "github.com/sdboyer/deptesttres"]
       ],
       "imports": {
         "github.com/sdboyer/deptest": "v0.8.0",
