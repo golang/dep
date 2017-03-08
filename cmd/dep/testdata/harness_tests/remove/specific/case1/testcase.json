@@ -1,6 +1,6 @@
 {
   "commands": [
-    "remove github.com/not/used"
+    ["remove", "github.com/not/used"]
   ],
   "finalVendors": [
     "github.com/sdboyer/deptest",

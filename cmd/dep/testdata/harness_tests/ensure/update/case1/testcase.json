@@ -1,7 +1,7 @@
 {
   "commands": [
-    "init",
-    "ensure -update github.com/sdboyer/deptest"
+    ["init"],
+    ["ensure", "-update", "github.com/sdboyer/deptest"]
   ],
   "finalVendors": [
     "github.com/sdboyer/deptest",

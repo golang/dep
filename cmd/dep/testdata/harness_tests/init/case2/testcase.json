@@ -1,6 +1,6 @@
 {
   "commands": [
-    "init"
+    ["init"]
   ],
   "imports": {
     "github.com/sdboyer/deptest": "v0.8.0"
