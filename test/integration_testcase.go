@@ -17,7 +17,7 @@ var (
 	UpdateGolden *bool = flag.Bool("update", false, "update golden files")
 )
 
-// To manage a test case directory structure and content
+// IntegrationTestCase manages a test case directory structure and content
 type IntegrationTestCase struct {
 	t              *testing.T
 	Name           string
@@ -59,11 +59,11 @@ func (tc *IntegrationTestCase) CompareFile(goldenPath, working string) {
 
 	gotExists, got, err := getFile(working)
 	if err != nil {
-		panic(err)
+		tc.t.Fatalf("Error reading project file %s: %s", goldenPath, err)
 	}
 	wantExists, want, err := getFile(golden)
 	if err != nil {
-		panic(err)
+		tc.t.Fatalf("Error reading testcase file %s: %s", goldenPath, err)
 	}
 
 	if wantExists && gotExists {
