@@ -1,0 +1,9 @@
+{
+  "commands": [
+    ["remove", "-unused"]
+  ],
+  "finalVendors": [
+    "github.com/sdboyer/deptest",
+    "github.com/sdboyer/deptestdos"
+  ]
+}
