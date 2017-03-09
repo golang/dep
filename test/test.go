@@ -513,9 +513,18 @@ func (h *Helper) Path(name string) string {
 
 // MustExist fails if path does not exist.
 func (h *Helper) MustExist(path string) {
-	if !h.Exist(path) {
-		h.t.Fatalf("%+v", errors.Errorf("%s does not exist but should", path))
+	if err := h.ShouldExist(path); err != nil {
+		h.t.Fatalf("%+v", err)
 	}
+}
+
+// ShouldExist returns an error if path does not exist.
+func (h *Helper) ShouldExist(path string) error {
+	if !h.Exist(path) {
+		return errors.Errorf("%s does not exist but should", path)
+	}
+
+	return nil
 }
 
 // Exist returns whether or not a path exists
@@ -532,9 +541,18 @@ func (h *Helper) Exist(path string) bool {
 
 // MustNotExist fails if path exists.
 func (h *Helper) MustNotExist(path string) {
-	if h.Exist(path) {
-		h.t.Fatalf("%+v", errors.Errorf("%s exists but should not", path))
+	if err := h.ShouldNotExist(path); err != nil {
+		h.t.Fatalf("%+v", err)
 	}
+}
+
+// ShouldNotExist returns an error if path exists.
+func (h *Helper) ShouldNotExist(path string) error {
+	if h.Exist(path) {
+		return errors.Errorf("%s exists but should not", path)
+	}
+
+	return nil
 }
 
 // Cleanup cleans up a test that runs testgo.
