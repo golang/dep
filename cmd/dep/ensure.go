@@ -388,7 +388,7 @@ func checkErrors(m map[string]gps.PackageOrErr) error {
 		return fmt.Errorf("all dirs had go code with errors")
 	}
 
-	if pkgErrors > 0 && noGoErrors > 0 {
+	if len(m) == pkgErrors+noGoErrors {
 		return fmt.Errorf("%d dirs had errors and %d had no go code", pkgErrors, noGoErrors)
 	}
 
