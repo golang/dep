@@ -13,11 +13,12 @@ import (
 	"testing"
 )
 
-var (
+const (
 	ProjectRoot string = "src/github.com/golang/notexist"
 )
 
-// To manage a test project directory structure and content
+// IntegrationTestProject manages the "virtual" test project directory structure
+// and content
 type IntegrationTestProject struct {
 	t          *testing.T
 	h          *Helper
