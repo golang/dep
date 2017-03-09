@@ -860,7 +860,7 @@ func wmToReach(workmap map[string]wm, backprop bool) (ReachMap, map[string]*Prob
 // FlattenAll flattens a reachmap into a sorted, deduplicated list of all the
 // external imports named by its contained packages.
 //
-// If stdlib is true, then stdlib imports are excluded from the result.
+// If stdlib is false, then stdlib imports are excluded from the result.
 func (rm ReachMap) FlattenAll(stdlib bool) []string {
 	return rm.flatten(func(pkg string) bool { return true }, stdlib)
 }
@@ -870,7 +870,7 @@ func (rm ReachMap) FlattenAll(stdlib bool) []string {
 // from packages with disallowed patterns in their names: any path element with
 // a leading dot, a leading underscore, with the name "testdata".
 //
-// If stdlib is true, then stdlib imports are excluded from the result.
+// If stdlib is false, then stdlib imports are excluded from the result.
 func (rm ReachMap) Flatten(stdlib bool) []string {
 	f := func(pkg string) bool {
 		// Eliminate import paths with any elements having leading dots, leading
