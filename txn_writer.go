@@ -21,85 +21,132 @@ import (
 // It is not impervious to errors (writing to disk is hard), but it should
 // guard against non-arcane failure conditions.
 type SafeWriter struct {
-	Root          string    // absolute path of root dir in which to write
-	Manifest      *Manifest // the manifest to write, if any
-	Lock          *Lock     // the old lock, if any
-	NewLock       gps.Lock  // the new lock, if any
-	SourceManager gps.SourceManager
+	Payload *SafeWriterPayload
 }
 
-// WriteAllSafe writes out some combination of config yaml, lock, and a vendor
-// tree, to a temp dir, then moves them into place if and only if all the write
-// operations succeeded. It also does its best to roll back if any moves fail.
-//
-// This mostly guarantees that dep cannot exit with a partial write that would
-// leave an undefined state on disk.
-//
-// - If a sw.Manifest is provided, it will be written to the standard manifest file
-//   name beneath sw.Root
-// - If sw.Lock is provided without an sw.NewLock, it will be written to the standard
-//   lock file name in the root dir, but vendor will NOT be written
-// - If sw.Lock and sw.NewLock are both provided and are equivalent, then neither lock
-//   nor vendor will be written
-// - If sw.Lock and sw.NewLock are both provided and are not equivalent,
-//   the nl will be written to the same location as above, and a vendor
-//   tree will be written to sw.Root/vendor
-// - If sw.NewLock is provided and sw.Lockock is not, it will write both a lock
-//   and vendor dir in the same way
-// - If the forceVendor param is true, then vendor will be unconditionally
-//   written out based on sw.NewLock if present, else sw.Lock, else error.
-//
-// Any of m, l, or nl can be omitted; the grouped write operation will continue
-// for whichever inputs are present. A SourceManager is only required if vendor
-// is being written.
-func (sw SafeWriter) WriteAllSafe(forceVendor bool) error {
-	// Decide which writes we need to do
-	var writeM, writeL, writeV bool
-	writeV = forceVendor
+// SafeWriterPayload represents the actions SafeWriter will execute when SafeWriter.Write is called.
+type SafeWriterPayload struct {
+	Manifest         *Manifest
+	Lock             *Lock
+	LockDiff         *LockDiff
+	ForceWriteVendor bool
+}
 
-	if sw.Manifest != nil {
-		writeM = true
+func (payload *SafeWriterPayload) HasLock() bool {
+	return payload.Lock != nil
+}
+
+func (payload *SafeWriterPayload) HasManifest() bool {
+	return payload.Manifest != nil
+}
+
+func (payload *SafeWriterPayload) HasVendor() bool {
+	// TODO(carolynvs) this can be calculated based on if we are writing the lock
+	// init -> switch to newlock
+	// ensure checks existence, why not move that into the prep?
+	return payload.ForceWriteVendor
+}
+
+// LockDiff is the set of differences between an existing lock file and an updated lock file.
+// TODO(carolynvs) this should be moved to gps
+type LockDiff struct {
+	Add    []gps.LockedProject
+	Remove []gps.LockedProject
+	Modify []LockedProjectDiff
+}
+
+// LockedProjectDiff contains the before and after snapshot of a project reference.
+// TODO(carolynvs) this should be moved to gps
+type LockedProjectDiff struct {
+	Current gps.LockedProject // Current represents the project reference as defined in the existing lock file.
+	Updated gps.LockedProject // Updated represents the desired project reference.
+}
+
+// Prepare to write a set of config yaml, lock and vendor tree.
+//
+// - If manifest is provided, it will be written to the standard manifest file
+//   name beneath root.
+// - If lock is provided it will be written to the standard
+//   lock file name in the root dir, but vendor will NOT be written
+// - If lock and newLock are both provided and are equivalent, then neither lock
+//   nor vendor will be written
+// - If lock and newLock are both provided and are not equivalent,
+//   the newLock will be written to the same location as above, and a vendor
+//   tree will be written to the vendor directory
+// - If newLock is provided and lock is not, it will write both a lock
+//   and the vendor directory in the same way
+// - If the forceVendor param is true, then vendor/ will be unconditionally
+//   written out based on newLock if present, else lock, else error.
+func (sw *SafeWriter) Prepare(manifest *Manifest, lock *Lock, newLock gps.Lock, forceVendor bool) {
+	sw.Payload = &SafeWriterPayload{
+		Manifest:         manifest,
+		ForceWriteVendor: forceVendor,
 	}
 
-	if sw.NewLock != nil {
-		if sw.Lock == nil {
-			writeL, writeV = true, true
+	if newLock != nil {
+		rlf := LockFromInterface(newLock)
+		if lock == nil {
+			sw.Payload.Lock = rlf
+			sw.Payload.ForceWriteVendor = true
 		} else {
-			rlf := LockFromInterface(sw.NewLock)
-			if !locksAreEquivalent(rlf, sw.Lock) {
-				writeL, writeV = true, true
+			if !locksAreEquivalent(rlf, lock) {
+				sw.Payload.Lock = rlf
+				sw.Payload.ForceWriteVendor = true
 			}
 		}
-	} else if sw.Lock != nil {
-		writeL = true
+	} else if lock != nil {
+		sw.Payload.Lock = lock
 	}
+}
 
-	if sw.Root == "" {
+func (payload SafeWriterPayload) validate(root string, sm gps.SourceManager) error {
+	if root == "" {
 		return errors.New("root path must be non-empty")
 	}
-	if is, err := IsDir(sw.Root); !is {
+	if is, err := IsDir(root); !is {
 		if err != nil {
 			return err
 		}
-		return fmt.Errorf("root path %q does not exist", sw.Root)
+		return fmt.Errorf("root path %q does not exist", root)
 	}
 
-	if !writeM && !writeL && !writeV {
+	if payload.HasVendor() && sm == nil {
+		return errors.New("must provide a SourceManager if writing out a vendor dir")
+	}
+
+	if payload.HasVendor() && payload.Lock == nil {
+		return errors.New("must provide a lock in order to write out vendor")
+	}
+
+	return nil
+}
+
+// Write saves some combination of config yaml, lock, and a vendor tree.
+// root is the absolute path of root dir in which to write.
+// sm is only required if vendor is being written.
+//
+// It first writes to a temp dir, then moves them in place if and only if all the write
+// operations succeeded. It also does its best to roll back if any moves fail.
+// This mostly guarantees that dep cannot exit with a partial write that would
+// leave an undefined state on disk.
+func (sw *SafeWriter) Write(root string, sm gps.SourceManager) error {
+	if sw.Payload == nil {
+		return errors.New("Cannot call SafeWriter.Write before SafeWriter.Prepare")
+	}
+
+	err := sw.Payload.validate(root, sm)
+	if err != nil {
+		return err
+	}
+
+	if !sw.Payload.HasManifest() && !sw.Payload.HasLock() && !sw.Payload.HasVendor() {
 		// nothing to do
 		return nil
 	}
 
-	if writeV && sw.SourceManager == nil {
-		return errors.New("must provide a SourceManager if writing out a vendor dir")
-	}
-
-	if writeV && sw.Lock == nil && sw.NewLock == nil {
-		return errors.New("must provide a lock in order to write out vendor")
-	}
-
-	mpath := filepath.Join(sw.Root, ManifestName)
-	lpath := filepath.Join(sw.Root, LockName)
-	vpath := filepath.Join(sw.Root, "vendor")
+	mpath := filepath.Join(root, ManifestName)
+	lpath := filepath.Join(root, LockName)
+	vpath := filepath.Join(root, "vendor")
 
 	td, err := ioutil.TempDir(os.TempDir(), "dep")
 	if err != nil {
@@ -107,35 +154,20 @@ func (sw SafeWriter) WriteAllSafe(forceVendor bool) error {
 	}
 	defer os.RemoveAll(td)
 
-	if writeM {
-		if err := writeFile(filepath.Join(td, ManifestName), sw.Manifest); err != nil {
+	if sw.Payload.HasManifest() {
+		if err := writeFile(filepath.Join(td, ManifestName), sw.Payload.Manifest); err != nil {
 			return errors.Wrap(err, "failed to write manifest file to temp dir")
 		}
 	}
 
-	if writeL {
-		if sw.NewLock == nil {
-			// the new lock is nil but the flag is on, so we must be writing
-			// the other one
-			if err := writeFile(filepath.Join(td, LockName), sw.Lock); err != nil {
-				return errors.Wrap(err, "failed to write lock file to temp dir")
-			}
-		} else {
-			rlf := LockFromInterface(sw.NewLock)
-			if err := writeFile(filepath.Join(td, LockName), rlf); err != nil {
-				return errors.Wrap(err, "failed to write lock file to temp dir")
-			}
+	if sw.Payload.HasLock() {
+		if err := writeFile(filepath.Join(td, LockName), sw.Payload.Lock); err != nil {
+			return errors.Wrap(err, "failed to write lock file to temp dir")
 		}
 	}
 
-	if writeV {
-		// Prefer the nl, but take the l if only that's available, as could be the
-		// case if true was passed for forceVendor.
-		l := sw.NewLock
-		if l == nil {
-			l = sw.Lock
-		}
-		err = gps.WriteDepTree(filepath.Join(td, "vendor"), l, sw.SourceManager, true)
+	if sw.Payload.HasVendor() {
+		err = gps.WriteDepTree(filepath.Join(td, "vendor"), sw.Payload.Lock, sm, true)
 		if err != nil {
 			return errors.Wrap(err, "error while writing out vendor tree")
 		}
@@ -150,7 +182,7 @@ func (sw SafeWriter) WriteAllSafe(forceVendor bool) error {
 	var failerr error
 	var vendorbak string
 
-	if writeM {
+	if sw.Payload.HasManifest() {
 		if _, err := os.Stat(mpath); err == nil {
 			// Move out the old one.
 			tmploc := filepath.Join(td, ManifestName+".orig")
@@ -168,7 +200,7 @@ func (sw SafeWriter) WriteAllSafe(forceVendor bool) error {
 		}
 	}
 
-	if writeL {
+	if sw.Payload.HasLock() {
 		if _, err := os.Stat(lpath); err == nil {
 			// Move out the old one.
 			tmploc := filepath.Join(td, LockName+".orig")
@@ -187,7 +219,7 @@ func (sw SafeWriter) WriteAllSafe(forceVendor bool) error {
 		}
 	}
 
-	if writeV {
+	if sw.Payload.HasVendor() {
 		if _, err := os.Stat(vpath); err == nil {
 			// Move out the old vendor dir. just do it into an adjacent dir, to
 			// try to mitigate the possibility of a pointless cross-filesystem
@@ -215,7 +247,7 @@ func (sw SafeWriter) WriteAllSafe(forceVendor bool) error {
 
 	// Renames all went smoothly. The deferred os.RemoveAll will get the temp
 	// dir, but if we wrote vendor, we have to clean that up directly
-	if writeV {
+	if sw.Payload.HasVendor() {
 		// Nothing we can really do about an error at this point, so ignore it
 		os.RemoveAll(vendorbak)
 	}
@@ -229,4 +261,39 @@ fail:
 		renameWithFallback(pair.from, pair.to)
 	}
 	return failerr
+}
+
+func (sw *SafeWriter) PrintPreparedActions() error {
+	if sw.Payload.HasManifest() {
+		fmt.Println("Would have written the following manifest.json:")
+		m, err := sw.Payload.Manifest.MarshalJSON()
+		if err != nil {
+			return errors.Wrap(err, "ensure DryRun cannot read manifest")
+		}
+		fmt.Println(string(m))
+	}
+
+	if sw.Payload.HasLock() {
+		fmt.Println("Would have written the following lock.json:")
+		m, err := sw.Payload.Lock.MarshalJSON()
+		if err != nil {
+			return errors.Wrap(err, "ensure DryRun cannot read lock")
+		}
+		fmt.Println(string(m))
+	}
+
+	if sw.Payload.HasVendor() {
+		fmt.Println("Would have written the following projects to the vendor directory:")
+		for _, project := range sw.Payload.Lock.Projects() {
+			prj := project.Ident()
+			rev := GetRevisionFromVersion(project.Version())
+			if prj.Source == "" {
+				fmt.Printf("%s@%s\n", prj.ProjectRoot, rev)
+			} else {
+				fmt.Printf("%s -> %s@%s\n", prj.ProjectRoot, prj.Source, rev)
+			}
+		}
+	}
+
+	return nil
 }
