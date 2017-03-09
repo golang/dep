@@ -1,0 +1,12 @@
+{
+  "commands": [
+    ["init"]
+  ],
+  "imports": {
+    "github.com/sdboyer/deptest": "v0.8.0"
+  },
+  "finalVendors": [
+    "github.com/sdboyer/deptest",
+    "github.com/sdboyer/deptestdos"
+  ]
+}

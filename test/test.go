@@ -24,9 +24,9 @@ import (
 )
 
 var (
-	ExeSuffix    string // ".exe" on Windows
-	mu           sync.Mutex
-	UpdateGolden = flag.Bool("update", false, "update .golden files")
+	ExeSuffix string // ".exe" on Windows
+	mu        sync.Mutex
+	PrintLogs *bool = flag.Bool("logs", false, "log stdin/stdout of test commands")
 )
 
 func init() {
@@ -151,7 +151,9 @@ func (h *Helper) DoRun(args []string) error {
 			}
 		}
 	}
-	h.t.Logf("running testdep %v", args)
+	if *PrintLogs {
+		h.t.Logf("running testdep %v", args)
+	}
 	var prog string
 	if h.wd == "" {
 		prog = "./testdep" + ExeSuffix
@@ -166,13 +168,15 @@ func (h *Helper) DoRun(args []string) error {
 	cmd.Stderr = &h.stderr
 	cmd.Env = h.env
 	status := cmd.Run()
-	if h.stdout.Len() > 0 {
-		h.t.Log("standard output:")
-		h.t.Log(h.stdout.String())
-	}
-	if h.stderr.Len() > 0 {
-		h.t.Log("standard error:")
-		h.t.Log(h.stderr.String())
+	if *PrintLogs {
+		if h.stdout.Len() > 0 {
+			h.t.Log("standard output:")
+			h.t.Log(h.stdout.String())
+		}
+		if h.stderr.Len() > 0 {
+			h.t.Log("standard error:")
+			h.t.Log(h.stderr.String())
+		}
 	}
 	h.ran = true
 	return status
@@ -249,13 +253,15 @@ func (h *Helper) RunGit(dir string, args ...string) {
 	cmd.Dir = dir
 	cmd.Env = h.env
 	status := cmd.Run()
-	if h.stdout.Len() > 0 {
-		h.t.Logf("git %v standard output:", args)
-		h.t.Log(h.stdout.String())
-	}
-	if h.stderr.Len() > 0 {
-		h.t.Logf("git %v standard error:", args)
-		h.t.Log(h.stderr.String())
+	if *PrintLogs {
+		if h.stdout.Len() > 0 {
+			h.t.Logf("git %v standard output:", args)
+			h.t.Log(h.stdout.String())
+		}
+		if h.stderr.Len() > 0 {
+			h.t.Logf("git %v standard error:", args)
+			h.t.Log(h.stderr.String())
+		}
 	}
 	if status != nil {
 		h.t.Logf("git %v failed unexpectedly: %v", args, status)
