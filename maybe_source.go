@@ -75,7 +75,7 @@ func (m maybeGitSource) try(cachedir string, an ProjectAnalyzer) (source, string
 			an: an,
 			dc: newMetaCache(),
 			crepo: &repo{
-				r:     r,
+				r:     &gitRepo{r},
 				rpath: path,
 			},
 		},
@@ -121,7 +121,7 @@ func (m maybeGopkginSource) try(cachedir string, an ProjectAnalyzer) (source, st
 				an: an,
 				dc: newMetaCache(),
 				crepo: &repo{
-					r:     r,
+					r:     &gitRepo{r},
 					rpath: path,
 				},
 			},
@@ -164,7 +164,7 @@ func (m maybeBzrSource) try(cachedir string, an ProjectAnalyzer) (source, string
 				f: existsUpstream,
 			},
 			crepo: &repo{
-				r:     r,
+				r:     &bzrRepo{r},
 				rpath: path,
 			},
 		},
@@ -198,7 +198,7 @@ func (m maybeHgSource) try(cachedir string, an ProjectAnalyzer) (source, string,
 				f: existsUpstream,
 			},
 			crepo: &repo{
-				r:     r,
+				r:     &hgRepo{r},
 				rpath: path,
 			},
 		},
