@@ -363,6 +363,8 @@ func TestGetSources(t *testing.T) {
 	wg.Add(3)
 	for _, pi := range pil {
 		go func(lpi ProjectIdentifier) {
+			defer wg.Done()
+
 			nn := lpi.normalizedSource()
 			src, err := sm.getSourceFor(lpi)
 			if err != nil {
@@ -395,8 +397,6 @@ func TestGetSources(t *testing.T) {
 			} else if src == src4 {
 				t.Errorf("(src %q) explicit http source should create a new src", nn)
 			}
-
-			wg.Done()
 		}(pi)
 	}
 
