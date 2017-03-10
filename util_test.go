@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 )
@@ -127,5 +128,15 @@ func TestCopyFile(t *testing.T) {
 
 	if srcinfo.Mode() != destinfo.Mode() {
 		t.Fatalf("expected %s: %#v\n to be the same mode as %s: %#v", srcf.Name(), srcinfo.Mode(), destf, destinfo.Mode())
+	}
+}
+
+// Fail a test if the specified binaries aren't installed.
+func requiresBins(t *testing.T, bins ...string) {
+	for _, b := range bins {
+		_, err := exec.LookPath(b)
+		if err != nil {
+			t.Fatalf("%s is not installed", b)
+		}
 	}
 }
