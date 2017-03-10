@@ -2,7 +2,7 @@
   "commands": [
     ["init"]
   ],
-  "finalVendors": [
+  "vendor-final": [
     "github.com/sdboyer/deptest"
   ]
 }

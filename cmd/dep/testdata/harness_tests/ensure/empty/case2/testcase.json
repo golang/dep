@@ -2,7 +2,7 @@
   "commands": [
     ["ensure"]
   ],
-  "finalVendors": [
+  "vendor-final": [
     "github.com/sdboyer/deptest"
   ]
 }
