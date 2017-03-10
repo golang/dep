@@ -655,7 +655,7 @@ func (sm *SourceMgr) deduceFromPath(path string) (deductionFuture, error) {
 			defer close(c)
 			// make sure the metadata future is finished (without errors), thus
 			// guaranteeing that ru and vcs will be populated
-			_, err := root()
+			_, err = root()
 			if err != nil {
 				return
 			}
@@ -683,7 +683,6 @@ func (sm *SourceMgr) deduceFromPath(path string) (deductionFuture, error) {
 			return src, ident, err
 		}
 	}
-
 	return deductionFuture{
 		rslow: true,
 		root:  root,
