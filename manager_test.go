@@ -350,6 +350,7 @@ func TestGetSources(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping source setup test in short mode")
 	}
+	requiresBins(t, "git", "hg", "bzr")
 
 	sm, clean := mkNaiveSM(t)
 
