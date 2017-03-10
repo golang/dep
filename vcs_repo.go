@@ -28,18 +28,17 @@ func (r *gitRepo) Get() error {
 		if _, err := os.Stat(basePath); os.IsNotExist(err) {
 			err = os.MkdirAll(basePath, 0755)
 			if err != nil {
-				return vcs.NewLocalError("Unable to create directory", err, "")
+				return vcs.NewLocalError("unable to create directory", err, "")
 			}
 
 			out, err = runFromCwd("git", "clone", r.Remote(), r.LocalPath())
 			if err != nil {
-				return vcs.NewRemoteError("Unable to get repository", err, string(out))
+				return vcs.NewRemoteError("unable to get repository", err, string(out))
 			}
 			return err
 		}
-
 	} else if err != nil {
-		return vcs.NewRemoteError("Unable to get repository", err, string(out))
+		return vcs.NewRemoteError("unable to get repository", err, string(out))
 	}
 
 	return nil
@@ -49,14 +48,14 @@ func (r *gitRepo) Update() error {
 	// Perform a fetch to make sure everything is up to date.
 	out, err := runFromRepoDir(r, "git", "fetch", "--tags", r.RemoteLocation)
 	if err != nil {
-		return vcs.NewRemoteError("Unable to update repository", err, string(out))
+		return vcs.NewRemoteError("unable to update repository", err, string(out))
 	}
 
 	// When in a detached head state, such as when an individual commit is checked
 	// out do not attempt a pull. It will cause an error.
 	detached, err := r.isDetachedHead()
 	if err != nil {
-		return vcs.NewLocalError("Unable to update repository", err, "")
+		return vcs.NewLocalError("unable to update repository", err, "")
 	}
 
 	if detached {
@@ -65,7 +64,7 @@ func (r *gitRepo) Update() error {
 
 	out, err = runFromRepoDir(r, "git", "pull")
 	if err != nil {
-		return vcs.NewRemoteError("Unable to update repository", err, string(out))
+		return vcs.NewRemoteError("unable to update repository", err, string(out))
 	}
 
 	return r.defendAgainstSubmodules()
@@ -77,18 +76,20 @@ func (r *gitRepo) defendAgainstSubmodules() error {
 	// First, update them to whatever they should be, if there should happen to be any.
 	out, err := runFromRepoDir(r, "git", "submodule", "update", "--init", "--recursive")
 	if err != nil {
-		return vcs.NewLocalError("Unexpected error while defensively updating submodules", err, string(out))
+		return vcs.NewLocalError("unexpected error while defensively updating submodules", err, string(out))
 	}
+
 	// Now, do a special extra-aggressive clean in case changing versions caused
 	// one or more submodules to go away.
 	out, err = runFromRepoDir(r, "git", "clean", "-x", "-d", "-f", "-f")
 	if err != nil {
-		return vcs.NewLocalError("Unexpected error while defensively cleaning up after possible derelict submodule directories", err, string(out))
+		return vcs.NewLocalError("unexpected error while defensively cleaning up after possible derelict submodule directories", err, string(out))
 	}
+
 	// Then, repeat just in case there are any nested submodules that went away.
 	out, err = runFromRepoDir(r, "git", "submodule", "foreach", "--recursive", "git", "clean", "-x", "-d", "-f", "-f")
 	if err != nil {
-		return vcs.NewLocalError("Unexpected error while defensively cleaning up after possible derelict nested submodule directories", err, string(out))
+		return vcs.NewLocalError("unexpected error while defensively cleaning up after possible derelict nested submodule directories", err, string(out))
 	}
 
 	return nil
@@ -137,13 +138,13 @@ func (r *bzrRepo) Get() error {
 	if _, err := os.Stat(basePath); os.IsNotExist(err) {
 		err = os.MkdirAll(basePath, 0755)
 		if err != nil {
-			return vcs.NewLocalError("Unable to create directory", err, "")
+			return vcs.NewLocalError("unable to create directory", err, "")
 		}
 	}
 
 	out, err := runFromCwd("bzr", "branch", r.Remote(), r.LocalPath())
 	if err != nil {
-		return vcs.NewRemoteError("Unable to get repository", err, string(out))
+		return vcs.NewRemoteError("unable to get repository", err, string(out))
 	}
 
 	return nil
@@ -152,12 +153,14 @@ func (r *bzrRepo) Get() error {
 func (r *bzrRepo) Update() error {
 	out, err := runFromRepoDir(r, "bzr", "pull")
 	if err != nil {
-		return vcs.NewRemoteError("Unable to update repository", err, string(out))
+		return vcs.NewRemoteError("unable to update repository", err, string(out))
 	}
+
 	out, err = runFromRepoDir(r, "bzr", "update")
 	if err != nil {
-		return vcs.NewRemoteError("Unable to update repository", err, string(out))
+		return vcs.NewRemoteError("unable to update repository", err, string(out))
 	}
+
 	return nil
 }
 
@@ -168,7 +171,7 @@ type hgRepo struct {
 func (r *hgRepo) Get() error {
 	out, err := runFromCwd("hg", "clone", r.Remote(), r.LocalPath())
 	if err != nil {
-		return vcs.NewRemoteError("Unable to get repository", err, string(out))
+		return vcs.NewRemoteError("unable to get repository", err, string(out))
 	}
 
 	return nil
@@ -181,7 +184,7 @@ func (r *hgRepo) Update() error {
 func (r *hgRepo) UpdateVersion(version string) error {
 	out, err := runFromRepoDir(r, "hg", "pull")
 	if err != nil {
-		return vcs.NewRemoteError("Unable to update checked out version", err, string(out))
+		return vcs.NewRemoteError("unable to update checked out version", err, string(out))
 	}
 
 	if len(strings.TrimSpace(version)) > 0 {
@@ -191,7 +194,7 @@ func (r *hgRepo) UpdateVersion(version string) error {
 	}
 
 	if err != nil {
-		return vcs.NewRemoteError("Unable to update checked out version", err, string(out))
+		return vcs.NewRemoteError("unable to update checked out version", err, string(out))
 	}
 
 	return nil
@@ -208,26 +211,30 @@ func (r *svnRepo) Get() error {
 	} else if runtime.GOOS == "windows" && filepath.VolumeName(remote) != "" {
 		remote = "file:///" + remote
 	}
+
 	out, err := runFromCwd("svn", "checkout", remote, r.LocalPath())
 	if err != nil {
-		return vcs.NewRemoteError("Unable to get repository", err, string(out))
+		return vcs.NewRemoteError("unable to get repository", err, string(out))
 	}
+
 	return nil
 }
 
 func (r *svnRepo) Update() error {
 	out, err := runFromRepoDir(r, "svn", "update")
 	if err != nil {
-		return vcs.NewRemoteError("Unable to update repository", err, string(out))
+		return vcs.NewRemoteError("unable to update repository", err, string(out))
 	}
+
 	return err
 }
 
 func (r *svnRepo) UpdateVersion(version string) error {
 	out, err := runFromRepoDir(r, "svn", "update", "-r", version)
 	if err != nil {
-		return vcs.NewRemoteError("Unable to update checked out version", err, string(out))
+		return vcs.NewRemoteError("unable to update checked out version", err, string(out))
 	}
+
 	return nil
 }
 
@@ -236,21 +243,23 @@ func (r *svnRepo) CommitInfo(id string) (*vcs.CommitInfo, error) {
 	// svn info does provide details for these but does not have elements like
 	// the commit message.
 	if id == "HEAD" || id == "BASE" {
-		type Commit struct {
+		type commit struct {
 			Revision string `xml:"revision,attr"`
 		}
-		type Info struct {
-			Commit Commit `xml:"entry>commit"`
+
+		type info struct {
+			Commit commit `xml:"entry>commit"`
 		}
 
 		out, err := runFromRepoDir(r, "svn", "info", "-r", id, "--xml")
 		if err != nil {
-			return nil, vcs.NewLocalError("Unable to retrieve commit information", err, string(out))
+			return nil, vcs.NewLocalError("unable to retrieve commit information", err, string(out))
 		}
-		infos := &Info{}
+
+		infos := new(info)
 		err = xml.Unmarshal(out, &infos)
 		if err != nil {
-			return nil, vcs.NewLocalError("Unable to retrieve commit information", err, string(out))
+			return nil, vcs.NewLocalError("unable to retrieve commit information", err, string(out))
 		}
 
 		id = infos.Commit.Revision
@@ -261,24 +270,26 @@ func (r *svnRepo) CommitInfo(id string) (*vcs.CommitInfo, error) {
 
 	out, err := runFromRepoDir(r, "svn", "log", "-r", id, "--xml")
 	if err != nil {
-		return nil, vcs.NewRemoteError("Unable to retrieve commit information", err, string(out))
+		return nil, vcs.NewRemoteError("unable to retrieve commit information", err, string(out))
 	}
 
-	type Logentry struct {
+	type logentry struct {
 		Author string `xml:"author"`
 		Date   string `xml:"date"`
 		Msg    string `xml:"msg"`
 	}
-	type Log struct {
+
+	type log struct {
 		XMLName xml.Name   `xml:"log"`
-		Logs    []Logentry `xml:"logentry"`
+		Logs    []logentry `xml:"logentry"`
 	}
 
-	logs := &Log{}
+	logs := new(log)
 	err = xml.Unmarshal(out, &logs)
 	if err != nil {
-		return nil, vcs.NewLocalError("Unable to retrieve commit information", err, string(out))
+		return nil, vcs.NewLocalError("unable to retrieve commit information", err, string(out))
 	}
+
 	if len(logs.Logs) == 0 {
 		return nil, vcs.ErrRevisionUnavailable
 	}
@@ -292,7 +303,7 @@ func (r *svnRepo) CommitInfo(id string) (*vcs.CommitInfo, error) {
 	if len(logs.Logs[0].Date) > 0 {
 		ci.Date, err = time.Parse(time.RFC3339Nano, logs.Logs[0].Date)
 		if err != nil {
-			return nil, vcs.NewLocalError("Unable to retrieve commit information", err, string(out))
+			return nil, vcs.NewLocalError("unable to retrieve commit information", err, string(out))
 		}
 	}
 
