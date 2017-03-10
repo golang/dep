@@ -238,8 +238,6 @@ type projectData struct {
 }
 
 func getProjectData(ctx *dep.Ctx, pkgT gps.PackageTree, cpr string, sm *gps.SourceMgr) (projectData, error) {
-	vlogf("Building dependency graph...")
-
 	constraints := make(gps.ProjectConstraints)
 	dependencies := make(map[gps.ProjectRoot][]string)
 	packages := make(map[string]bool)
@@ -254,59 +252,48 @@ func getProjectData(ctx *dep.Ctx, pkgT gps.PackageTree, cpr string, sm *gps.Sour
 		fmt.Fprintf(os.Stderr, "%s %s\n", message, pr)
 	}
 
-	for _, v := range pkgT.Packages {
-		// TODO: Some errors maybe should not be skipped ;-)
-		if v.Err != nil {
-			vlogf("%v", v.Err)
+	rm, _ := pkgT.ToReachMap(true, true, false, nil)
+	if len(rm) == 0 {
+		return projectData{}, nil
+	}
+
+	vlogf("Building dependency graph...")
+	// Exclude stdlib imports from the list returned from Flatten().
+	const omitStdlib = false
+	for _, ip := range rm.Flatten(omitStdlib) {
+		pr, err := sm.DeduceProjectRoot(ip)
+		if err != nil {
+			return projectData{}, errors.Wrap(err, "sm.DeduceProjectRoot") // TODO: Skip and report ?
+		}
+
+		packages[ip] = true
+		if _, has := dependencies[pr]; has {
+			dependencies[pr] = append(dependencies[pr], ip)
 			continue
 		}
-		vlogf("Package %q, analyzing...", v.P.ImportPath)
+		go syncDep(pr, sm)
 
-		for _, ip := range v.P.Imports {
-			if isStdLib(ip) {
-				continue
-			}
-			if hasImportPathPrefix(ip, cpr) {
-				// Don't analyze imports from the current project.
-				continue
-			}
-			pr, err := sm.DeduceProjectRoot(ip)
-			if err != nil {
-				return projectData{}, errors.Wrap(err, "sm.DeduceProjectRoot") // TODO: Skip and report ?
-			}
+		vlogf("Found import of %q, analyzing...", ip)
 
-			packages[ip] = true
-			if _, ok := dependencies[pr]; ok {
-				if !contains(dependencies[pr], ip) {
-					dependencies[pr] = append(dependencies[pr], ip)
-				}
-
-				continue
-			}
-			go syncDep(pr, sm)
-
-			vlogf("Package %q has import %q, analyzing...", v.P.ImportPath, ip)
-
-			dependencies[pr] = []string{ip}
-			v, err := ctx.VersionInWorkspace(pr)
-			if err != nil {
-				notondisk[pr] = true
-				vlogf("Could not determine version for %q, omitting from generated manifest", pr)
-				continue
-			}
-
-			ondisk[pr] = v
-			pp := gps.ProjectProperties{}
-			switch v.Type() {
-			case gps.IsBranch, gps.IsVersion, gps.IsRevision:
-				pp.Constraint = v
-			case gps.IsSemver:
-				c, _ := gps.NewSemverConstraint("^" + v.String())
-				pp.Constraint = c
-			}
-
-			constraints[pr] = pp
+		dependencies[pr] = []string{ip}
+		v, err := ctx.VersionInWorkspace(pr)
+		if err != nil {
+			notondisk[pr] = true
+			vlogf("Could not determine version for %q, omitting from generated manifest", pr)
+			continue
 		}
+
+		ondisk[pr] = v
+		pp := gps.ProjectProperties{}
+		switch v.Type() {
+		case gps.IsBranch, gps.IsVersion, gps.IsRevision:
+			pp.Constraint = v
+		case gps.IsSemver:
+			c, _ := gps.NewSemverConstraint("^" + v.String())
+			pp.Constraint = c
+		}
+
+		constraints[pr] = pp
 	}
 
 	vlogf("Analyzing transitive imports...")
@@ -350,11 +337,29 @@ func getProjectData(ctx *dep.Ctx, pkgT gps.PackageTree, cpr string, sm *gps.Sour
 				// project is not present in the workspace, and so we need to
 				// solve to deal with this dep.
 				r := filepath.Join(ctx.GOPATH, "src", string(pr))
-				_, err := os.Lstat(r)
-				if os.IsNotExist(err) {
+				fi, err := os.Stat(r)
+				if os.IsNotExist(err) || !fi.IsDir() {
 					colors[pkg] = black
 					notondisk[pr] = true
 					return nil
+				}
+
+				// We know the project is on disk; the question is whether we're
+				// first seeing it here, in the transitive exploration, or if it
+				// was found in the initial pass on direct imports. We know it's
+				// the former if there's no entry for it in the ondisk map.
+				if _, in := ondisk[pr]; !in {
+					v, err := ctx.VersionInWorkspace(pr)
+					if err != nil {
+						// Even if we know it's on disk, errors are still
+						// possible when trying to deduce version. If we
+						// encounter such an error, just treat the project as
+						// not being on disk; the solver will work it out.
+						colors[pkg] = black
+						notondisk[pr] = true
+						return nil
+					}
+					ondisk[pr] = v
 				}
 
 				ptree, err = gps.ListPackages(r, string(pr))
@@ -386,26 +391,13 @@ func getProjectData(ctx *dep.Ctx, pkgT gps.PackageTree, cpr string, sm *gps.Sour
 				return nil
 			}
 
-			if _, ok := dependencies[pr]; ok {
-				if !contains(dependencies[pr], pkg) {
-					dependencies[pr] = append(dependencies[pr], pkg)
+			if deps, has := dependencies[pr]; has {
+				if !contains(deps, pkg) {
+					dependencies[pr] = append(deps, pkg)
 				}
 			} else {
 				dependencies[pr] = []string{pkg}
 				go syncDep(pr, sm)
-			}
-
-			// project must be on disk at this point; question is
-			// whether we're first seeing it here, in the transitive
-			// exploration, or if it arose in the direct dep parts
-			if _, in := ondisk[pr]; !in {
-				v, err := ctx.VersionInWorkspace(pr)
-				if err != nil {
-					colors[pkg] = black
-					notondisk[pr] = true
-					return nil
-				}
-				ondisk[pr] = v
 			}
 
 			// recurse
@@ -416,13 +408,14 @@ func getProjectData(ctx *dep.Ctx, pkgT gps.PackageTree, cpr string, sm *gps.Sour
 
 				err := dft(rpkg)
 				if err != nil {
+					// Bubble up any errors we encounter
 					return err
 				}
 			}
 
 			colors[pkg] = black
 		case grey:
-			return fmt.Errorf("Import cycle detected on %s", pkg)
+			return errors.Errorf("Import cycle detected on %s", pkg)
 		}
 		return nil
 	}
