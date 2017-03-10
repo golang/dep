@@ -19,15 +19,15 @@ var (
 
 // IntegrationTestCase manages a test case directory structure and content
 type IntegrationTestCase struct {
-	t              *testing.T
-	Name           string
-	RootPath       string
-	InitialPath    string
-	FinalPath      string
-	Commands       [][]string        `json:"commands"`
-	Imports        map[string]string `json:"imports"`
-	InitialVendors map[string]string `json:"initialVendors"`
-	FinalVendors   []string          `json:"finalVendors"`
+	t             *testing.T
+	Name          string
+	RootPath      string
+	InitialPath   string
+	FinalPath     string
+	Commands      [][]string        `json:"commands"`
+	GopathInitial map[string]string `json:"gopath-initial"`
+	VendorInitial map[string]string `json:"vendor-initial"`
+	VendorFinal   []string          `json:"vendor-final"`
 }
 
 func NewTestCase(t *testing.T, name string) *IntegrationTestCase {
@@ -97,7 +97,7 @@ func (tc *IntegrationTestCase) CompareFile(goldenPath, working string) {
 }
 
 func (tc *IntegrationTestCase) CompareVendorPaths(gotVendorPaths []string) {
-	wantVendorPaths := tc.FinalVendors
+	wantVendorPaths := tc.VendorFinal
 	if len(gotVendorPaths) != len(wantVendorPaths) {
 		tc.t.Fatalf("Wrong number of vendor paths created: want %d got %d", len(wantVendorPaths), len(gotVendorPaths))
 	}

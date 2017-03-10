@@ -3,7 +3,7 @@
     ["init"],
     ["ensure", "-update"]
   ],
-  "finalVendors": [
+  "vendor-final": [
     "github.com/sdboyer/deptest"
   ]
 }
