@@ -258,7 +258,9 @@ func getProjectData(ctx *dep.Ctx, pkgT gps.PackageTree, cpr string, sm *gps.Sour
 	}
 
 	vlogf("Building dependency graph...")
-	for _, ip := range rm.Flatten(false) {
+	// Exclude stdlib imports from the list returned from Flatten().
+	const omitStdlib = false
+	for _, ip := range rm.Flatten(omitStdlib) {
 		pr, err := sm.DeduceProjectRoot(ip)
 		if err != nil {
 			return projectData{}, errors.Wrap(err, "sm.DeduceProjectRoot") // TODO: Skip and report ?
