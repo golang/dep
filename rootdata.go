@@ -4,6 +4,7 @@ import (
 	"sort"
 
 	"github.com/armon/go-radix"
+	"github.com/sdboyer/gps/pkgtree"
 )
 
 // rootdata holds static data and constraining rules from the root project for
@@ -39,10 +40,10 @@ type rootdata struct {
 	rl safeLock
 
 	// A defensively copied instance of params.RootPackageTree
-	rpt PackageTree
+	rpt pkgtree.PackageTree
 }
 
-// rootImportList returns a list of the unique imports from the root data.
+// externalImportList returns a list of the unique imports from the root data.
 // Ignores and requires are taken into consideration, stdlib is excluded, and
 // errors within the local set of package are not backpropagated.
 func (rd rootdata) externalImportList() []string {

@@ -1,10 +1,9 @@
-package gps
+package fs
 
 import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"testing"
 )
@@ -47,7 +46,7 @@ func TestCopyDir(t *testing.T) {
 	srcf.Close()
 
 	destdir := filepath.Join(dir, "dest")
-	if err := copyDir(srcdir, destdir); err != nil {
+	if err := CopyDir(srcdir, destdir); err != nil {
 		t.Fatal(err)
 	}
 
@@ -103,7 +102,7 @@ func TestCopyFile(t *testing.T) {
 	srcf.Close()
 
 	destf := filepath.Join(dir, "destf")
-	if err := copyFile(srcf.Name(), destf); err != nil {
+	if err := CopyFile(srcf.Name(), destf); err != nil {
 		t.Fatal(err)
 	}
 
@@ -128,15 +127,5 @@ func TestCopyFile(t *testing.T) {
 
 	if srcinfo.Mode() != destinfo.Mode() {
 		t.Fatalf("expected %s: %#v\n to be the same mode as %s: %#v", srcf.Name(), srcinfo.Mode(), destf, destinfo.Mode())
-	}
-}
-
-// Fail a test if the specified binaries aren't installed.
-func requiresBins(t *testing.T, bins ...string) {
-	for _, b := range bins {
-		_, err := exec.LookPath(b)
-		if err != nil {
-			t.Fatalf("%s is not installed", b)
-		}
 	}
 }

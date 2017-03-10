@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/armon/go-radix"
+	"github.com/sdboyer/gps/pkgtree"
 )
 
 var rootRev = Revision("")
@@ -38,7 +39,7 @@ type SolveParameters struct {
 	//
 	// The ImportRoot property must be a non-empty string, and at least one
 	// element must be present in the Packages map.
-	RootPackageTree PackageTree
+	RootPackageTree pkgtree.PackageTree
 
 	// The root manifest. This contains all the dependency constraints
 	// associated with normal Manifests, as well as the particular controls
@@ -157,7 +158,7 @@ func (params SolveParameters) toRootdata() (rootdata, error) {
 		ig:      params.Manifest.IgnoredPackages(),
 		req:     params.Manifest.RequiredPackages(),
 		ovr:     params.Manifest.Overrides(),
-		rpt:     params.RootPackageTree.dup(),
+		rpt:     params.RootPackageTree.Copy(),
 		chng:    make(map[ProjectRoot]struct{}),
 		rlm:     make(map[ProjectRoot]LockedProject),
 		chngall: params.ChangeAll,

@@ -3,6 +3,7 @@ package gps
 import (
 	"io/ioutil"
 	"net/url"
+	"os/exec"
 	"reflect"
 	"sync"
 	"testing"
@@ -484,4 +485,14 @@ func TestHgSourceInteractions(t *testing.T) {
 
 	<-donech
 	rf()
+}
+
+// Fail a test if the specified binaries aren't installed.
+func requiresBins(t *testing.T, bins ...string) {
+	for _, b := range bins {
+		_, err := exec.LookPath(b)
+		if err != nil {
+			t.Fatalf("%s is not installed", b)
+		}
+	}
 }

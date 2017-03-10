@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/Masterminds/semver"
+	"github.com/sdboyer/gps/pkgtree"
 )
 
 var regfrom = regexp.MustCompile(`^(\w*) from (\w*) ([0-9\.\*]*)`)
@@ -371,7 +372,7 @@ type pident struct {
 type specfix interface {
 	name() string
 	rootmanifest() RootManifest
-	rootTree() PackageTree
+	rootTree() pkgtree.PackageTree
 	specs() []depspec
 	maxTries() int
 	solution() map[ProjectIdentifier]LockedProject
@@ -439,7 +440,7 @@ func (f basicFixture) rootmanifest() RootManifest {
 	}
 }
 
-func (f basicFixture) rootTree() PackageTree {
+func (f basicFixture) rootTree() pkgtree.PackageTree {
 	var imp, timp []string
 	for _, dep := range f.ds[0].deps {
 		imp = append(imp, string(dep.Ident.ProjectRoot))
@@ -449,11 +450,11 @@ func (f basicFixture) rootTree() PackageTree {
 	}
 
 	n := string(f.ds[0].n)
-	pt := PackageTree{
+	pt := pkgtree.PackageTree{
 		ImportRoot: n,
-		Packages: map[string]PackageOrErr{
+		Packages: map[string]pkgtree.PackageOrErr{
 			string(n): {
-				P: Package{
+				P: pkgtree.Package{
 					ImportPath:  n,
 					Name:        n,
 					Imports:     imp,
@@ -1350,7 +1351,7 @@ func init() {
 }
 
 // reachMaps contain externalReach()-type data for a given depspec fixture's
-// universe of proejcts, packages, and versions.
+// universe of projects, packages, and versions.
 type reachMap map[pident]map[string][]string
 
 type depspecSourceManager struct {
@@ -1416,15 +1417,15 @@ func (sm *depspecSourceManager) ExternalReach(id ProjectIdentifier, v Version) (
 	return nil, fmt.Errorf("No reach data for %s at version %s", id.errString(), v)
 }
 
-func (sm *depspecSourceManager) ListPackages(id ProjectIdentifier, v Version) (PackageTree, error) {
+func (sm *depspecSourceManager) ListPackages(id ProjectIdentifier, v Version) (pkgtree.PackageTree, error) {
 	pid := pident{n: ProjectRoot(id.normalizedSource()), v: v}
 
 	if r, exists := sm.rm[pid]; exists {
-		return PackageTree{
+		return pkgtree.PackageTree{
 			ImportRoot: string(pid.n),
-			Packages: map[string]PackageOrErr{
+			Packages: map[string]pkgtree.PackageOrErr{
 				string(pid.n): {
-					P: Package{
+					P: pkgtree.Package{
 						ImportPath: string(pid.n),
 						Name:       string(pid.n),
 						Imports:    r[string(pid.n)],
@@ -1440,11 +1441,11 @@ func (sm *depspecSourceManager) ListPackages(id ProjectIdentifier, v Version) (P
 		uv := pv.Unpair()
 		for pid, r := range sm.rm {
 			if uv.Matches(pid.v) {
-				return PackageTree{
+				return pkgtree.PackageTree{
 					ImportRoot: string(pid.n),
-					Packages: map[string]PackageOrErr{
+					Packages: map[string]pkgtree.PackageOrErr{
 						string(pid.n): {
-							P: Package{
+							P: pkgtree.Package{
 								ImportPath: string(pid.n),
 								Name:       string(pid.n),
 								Imports:    r[string(pid.n)],
@@ -1456,7 +1457,7 @@ func (sm *depspecSourceManager) ListPackages(id ProjectIdentifier, v Version) (P
 		}
 	}
 
-	return PackageTree{}, fmt.Errorf("Project %s at version %s could not be found", pid.n, v)
+	return pkgtree.PackageTree{}, fmt.Errorf("Project %s at version %s could not be found", pid.n, v)
 }
 
 func (sm *depspecSourceManager) ListVersions(id ProjectIdentifier) (pi []Version, err error) {
@@ -1545,7 +1546,7 @@ func (b *depspecBridge) verifyRootDir(path string) error {
 	return nil
 }
 
-func (b *depspecBridge) ListPackages(id ProjectIdentifier, v Version) (PackageTree, error) {
+func (b *depspecBridge) ListPackages(id ProjectIdentifier, v Version) (pkgtree.PackageTree, error) {
 	return b.sm.(fixSM).ListPackages(id, v)
 }
 

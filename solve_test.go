@@ -13,6 +13,8 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/sdboyer/gps/pkgtree"
 )
 
 var fixtorun string
@@ -47,6 +49,8 @@ func overrideIsStdLib() {
 	isStdLib = func(path string) bool {
 		return false
 	}
+	// NOTE(narqo): this is an ugly hack! One have to think about better way to do cross-package mocking.
+	pkgtree.MockIsStdLib()
 }
 
 var stderrlog = log.New(os.Stderr, "", 0)
@@ -318,7 +322,7 @@ func TestBadSolveOpts(t *testing.T) {
 		t.Error("Prepare should have given error on empty import root, but gave:", err)
 	}
 
-	params.RootPackageTree = PackageTree{
+	params.RootPackageTree = pkgtree.PackageTree{
 		ImportRoot: pn,
 	}
 	_, err = Prepare(params, sm)
@@ -328,11 +332,11 @@ func TestBadSolveOpts(t *testing.T) {
 		t.Error("Prepare should have given error on empty import root, but gave:", err)
 	}
 
-	params.RootPackageTree = PackageTree{
+	params.RootPackageTree = pkgtree.PackageTree{
 		ImportRoot: pn,
-		Packages: map[string]PackageOrErr{
+		Packages: map[string]pkgtree.PackageOrErr{
 			pn: {
-				P: Package{
+				P: pkgtree.Package{
 					ImportPath: pn,
 					Name:       pn,
 				},
