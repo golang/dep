@@ -17,12 +17,6 @@ import (
 
 	"github.com/golang/dep"
 	"github.com/sdboyer/gps"
-	"hash/fnv"
-	"io/ioutil"
-	"os/exec"
-	"path/filepath"
-	"strings"
-	"syscall"
 )
 
 const statusShortHelp = `Report the status of the project's dependencies`
@@ -55,7 +49,6 @@ func (cmd *statusCommand) Register(fs *flag.FlagSet) {
 	fs.BoolVar(&cmd.detailed, "detailed", false, "report more detailed status")
 	fs.BoolVar(&cmd.json, "json", false, "output in JSON format")
 	fs.StringVar(&cmd.template, "f", "", "output in text/template format")
-	fs.StringVar(&cmd.output, "o", "output.svg", "output file")
 	fs.BoolVar(&cmd.dot, "dot", false, "output the dependency graph in GraphViz format")
 	fs.BoolVar(&cmd.old, "old", false, "only show out-of-date dependencies")
 	fs.BoolVar(&cmd.missing, "missing", false, "only show missing dependencies")
@@ -158,117 +151,29 @@ func (out *jsonOutput) MissingFooter() {
 	json.NewEncoder(out.w).Encode(out.missing)
 }
 
-type dotProject struct {
-	project  string
-	version  string
-	children []string
-}
-
-func (dp *dotProject) hash() uint32 {
-	h := fnv.New32a()
-	h.Write([]byte(dp.project))
-	return h.Sum32()
-}
-
-func (dp *dotProject) label() string {
-	label := []string{dp.project}
-
-	if dp.version != "" {
-		label = append(label, dp.version)
-	}
-
-	return strings.Join(label, "\n")
-}
-
 type dotOutput struct {
-	w   io.Writer
-	o   string
-	p   *dep.Project
-	dps []*dotProject
-	b   bytes.Buffer
-	bsh map[string]uint32
+	w io.Writer
+	o string
+	g *graphviz
+	p *dep.Project
 }
 
 func (out *dotOutput) BasicHeader() {
-
-	// TODO Check for dot package before doing something
-	// cmd := exec.Command("dot", "-V")
-
-	out.dps = []*dotProject{}
-	out.bsh = make(map[string]uint32)
-	out.b.WriteString("digraph { node [shape=box]; ")
+	out.g = new(graphviz).New()
 
 	ptree, _ := gps.ListPackages(out.p.AbsRoot, string(out.p.ImportRoot))
 	prm, _ := ptree.ToReachMap(true, false, false, nil)
 
-	rdp := &dotProject{
-		project:  string(out.p.ImportRoot),
-		version:  "",
-		children: prm.Flatten(false),
-	}
-
-	out.dps = append(out.dps, rdp)
+	out.g.createNode(string(out.p.ImportRoot), "", prm.Flatten(false))
 }
 
 func (out *dotOutput) BasicFooter() {
-
-	for _, dp := range out.dps {
-		out.bsh[dp.project] = dp.hash()
-
-		// Create name boxes, and name them using hashes
-		// to avoid encoding name conflicts
-		out.b.WriteString(fmt.Sprintf("%d [label=\"%s\"];", dp.hash(), dp.label()))
-	}
-
-	// Store relations to avoid duplication
-	rels := make(map[string]bool)
-
-	// Create relations
-	for _, dp := range out.dps {
-		for _, bsc := range dp.children {
-			for pr, hsh := range out.bsh {
-				if strings.HasPrefix(bsc, pr) {
-					r := fmt.Sprintf("%d -> %d", out.bsh[dp.project], hsh)
-
-					if _, ex := rels[r]; !ex {
-						out.b.WriteString(r + "; ")
-						rels[r] = true
-					}
-
-				}
-			}
-		}
-	}
-
-	out.b.WriteString("}")
-
-	// TODO: Pipe created string to dot
-	// Storing Graphviz output inside temp file to generate dot output
-	tf, err := ioutil.TempFile(os.TempDir(), "")
-
-	if err != nil {
-		fmt.Printf("%v", err)
-	}
-
-	defer syscall.Unlink(tf.Name())
-	ioutil.WriteFile(tf.Name(), out.b.Bytes(), 0644)
-
-	if err := exec.Command("dot", tf.Name(), "-Tsvg", "-o", out.o).Run(); err != nil {
-		fmt.Fprintf(out.w, "Something went wrong generating dot output: %s", err)
-	} else {
-		fmt.Fprintf(out.w, "Output generated and stored %s", out.o)
-	}
+	gvo := out.g.output()
+	fmt.Fprintf(out.w, gvo.String())
 }
 
 func (out *dotOutput) BasicLine(bs *BasicStatus) {
-
-	dp := &dotProject{
-		project:  bs.ProjectRoot,
-		version:  bs.Version.String(),
-		children: bs.Children,
-	}
-
-	out.dps = append(out.dps, dp)
+	out.g.createNode(bs.ProjectRoot, bs.Version.String(), bs.Children)
 }
 
 func (out *dotOutput) MissingHeader()                {}
@@ -382,8 +287,7 @@ func runStatusAll(out outputter, p *dep.Project, sm *gps.SourceMgr) error {
 			// in order to avoid slower status process
 			switch out.(type) {
 			case *dotOutput:
-				r := filepath.Join(p.AbsRoot, "vendor", string(proj.Ident().ProjectRoot))
-				ptr, err := gps.ListPackages(r, string(proj.Ident().ProjectRoot))
+				ptr, err := sm.ListPackages(proj.Ident(), proj.Version())
 
 				if err != nil {
 					return fmt.Errorf("analysis of %s package failed: %v", proj.Ident().ProjectRoot, err)
