@@ -27,7 +27,7 @@ desired.  The test name will consist of the directory path from `testdata` to
 the test case directory itself.  In the above example, the test name would be
 `category1/subcategory1/case1`, and could be singled out with the `-run` option
 of `go test` (i.e.
-`go test github.com/golang/dep/cmp/dep -run Integration/category1/subcategory1/case1`).  
+`go test github.com/golang/dep/cmp/dep -run Integration/category1/subcategory1/case1`).
 New tests can be added simply by adding a new directory with the json file to
 the `testdata` tree.  There is no need for code modification - the new test
 will be included automatically.
@@ -44,15 +44,15 @@ The `testcase.json` file has the following format:
         ["init"],
         ["ensure", "github.com/sdboyer/deptesttres"]
       ],
-      "imports": {
+      "gopath-initial": {
         "github.com/sdboyer/deptest": "v0.8.0",
         "github.com/sdboyer/deptestdos": "a0196baa11ea047dd65037287451d36b861b00ea"
       },
-      "initialVendors": {
+      "vendor-initial": {
         "github.com/sdboyer/deptesttres": "v2.1.0",
         "github.com/sdboyer/deptestquatro": "cf596baa11ea047ddf8797287451d36b861bab45"
       },
-      "finalVendors": [
+      "vendor-final": [
         "github.com/sdboyer/deptest",
         "github.com/sdboyer/deptestdos",
         "github.com/sdboyer/deptesttres",
@@ -65,15 +65,15 @@ for example, it can be completely left out.
 
 The test procedure is as follows:
 
-1. Create a temporary directory for the test project environment
-2. Create `src/github.com/golang/notexist` as the project
-3. Copy the contents of `initial` to the project
-4. Fetch the repos and versions in `imports` to the `src` directory
-5. Fetch the repos and versions in `initialVendors` to the `vendor` directory
-6. Run the commands in `commands` in order on the project
-7. Check the resulting files against those in `final`
-8. Check the `vendor` directory for the repos listed under `finalVendors`
+1. Create a unique temporary directory (TMPDIR) as the test run's GOPATH
+2. Create `$TMPDIR/src/github.com/golang/notexist` as the current project
+3. Copy the contents of `initial` input directory to the project
+4. Fetch the repos and versions in `gopath-initial` into `$TMPDIR/src` directory
+5. Fetch the repos and versions in `vendor-initial` to the project's `vendor` directory
+6. Run `commands` on the project, in declaration order
+7. Check the resulting files against those in the `final` input directory
+8. Check the `vendor` directory for the projects listed under `vendor-final`
 9. Check that there were no changes to `src` listings
-10.  Clean up
+10. Clean up
 
 Note that for the remote fetches, only git repos are currently supported.

@@ -3,7 +3,7 @@
     ["init"],
     ["ensure", "-override", "github.com/sdboyer/deptest@1.0.0"]
   ],
-  "finalVendors": [
+  "vendor-final": [
     "github.com/sdboyer/deptest"
   ]
 }

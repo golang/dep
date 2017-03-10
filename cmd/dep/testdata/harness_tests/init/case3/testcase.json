@@ -2,10 +2,10 @@
   "commands": [
     ["init"]
   ],
-  "imports": {
+  "gopath-initial": {
     "github.com/sdboyer/deptestdos": "a0196baa11ea047dd65037287451d36b861b00ea"
   },
-  "finalVendors": [
+  "vendor-final": [
     "github.com/sdboyer/deptest",
     "github.com/sdboyer/deptestdos"
   ]
