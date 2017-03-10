@@ -124,6 +124,11 @@ func (c *Ctx) LoadProject(path string) (*Project, error) {
 //
 // The second returned string indicates which GOPATH value was used.
 func (c *Ctx) SplitAbsoluteProjectRoot(path string) (string, error) {
+	// allow vendor directory to be directly under GOPATH/src
+	if filepath.Join(c.GOPATH, "src") == path {
+		return ".", nil
+	}
+
 	srcprefix := filepath.Join(c.GOPATH, "src") + string(filepath.Separator)
 	if filepath.HasPrefix(path, srcprefix) {
 		// filepath.ToSlash because we're dealing with an import path now,
