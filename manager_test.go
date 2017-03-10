@@ -850,3 +850,17 @@ func TestSignalHandling(t *testing.T) {
 	}
 	clean()
 }
+
+func TestUnreachableSource(t *testing.T) {
+	// If a git remote is unreachable (maybe the server is only accessible behind a VPN, or
+	// something), we should return a clear error, not a panic.
+
+	sm, clean := mkNaiveSM(t)
+	defer clean()
+
+	id := mkPI("golang.org/notareal/repo").normalize()
+	_, err := sm.ListVersions(id)
+	if err == nil {
+		t.Error("expected err when listing versions of a bogus source, but got nil")
+	}
+}
