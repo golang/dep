@@ -13,6 +13,9 @@ import (
 	"github.com/Masterminds/vcs"
 )
 
+// original implementation of these methods come from
+// https://github.com/Masterminds/vcs
+
 type gitRepo struct {
 	*vcs.GitRepo
 }
