@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"os/exec"
+	"sync"
 	"time"
 )
 
@@ -52,8 +53,8 @@ func (c *monitoredCmd) run() error {
 
 func (c *monitoredCmd) hasTimedOut() bool {
 	t := time.Now().Add(-c.timeout)
-	return c.stderr.lastActivity.Before(t) &&
-		c.stdout.lastActivity.Before(t)
+	return c.stderr.lastActivity().Before(t) &&
+		c.stdout.lastActivity().Before(t)
 }
 
 func (c *monitoredCmd) combinedOutput() ([]byte, error) {
@@ -67,8 +68,9 @@ func (c *monitoredCmd) combinedOutput() ([]byte, error) {
 // activityBuffer is a buffer that keeps track of the last time a Write
 // operation was performed on it.
 type activityBuffer struct {
-	buf          *bytes.Buffer
-	lastActivity time.Time
+	sync.Mutex
+	buf               *bytes.Buffer
+	lastActivityStamp time.Time
 }
 
 func newActivityBuffer() *activityBuffer {
@@ -78,8 +80,16 @@ func newActivityBuffer() *activityBuffer {
 }
 
 func (b *activityBuffer) Write(p []byte) (int, error) {
-	b.lastActivity = time.Now()
+	b.Lock()
+	b.lastActivityStamp = time.Now()
+	defer b.Unlock()
 	return b.buf.Write(p)
+}
+
+func (b *activityBuffer) lastActivity() time.Time {
+	b.Lock()
+	defer b.Unlock()
+	return b.lastActivityStamp
 }
 
 type timeoutError struct {
