@@ -346,7 +346,6 @@ func TestMgrMethodsFailWithBadPath(t *testing.T) {
 }
 
 func TestGetSources(t *testing.T) {
-	t.Skip("skipping TestGetSources")
 	// This test is a tad slow, skip it on -short
 	if testing.Short() {
 		t.Skip("Skipping source setup test in short mode")
@@ -356,7 +355,7 @@ func TestGetSources(t *testing.T) {
 
 	pil := []ProjectIdentifier{
 		mkPI("github.com/Masterminds/VCSTestRepo").normalize(),
-		//		mkPI("bitbucket.org/mattfarina/testhgrepo").normalize(),
+		mkPI("bitbucket.org/mattfarina/testhgrepo").normalize(),
 		mkPI("launchpad.net/govcstestbzrrepo").normalize(),
 	}
 
