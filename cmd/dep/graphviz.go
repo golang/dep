@@ -37,8 +37,7 @@ func (g graphviz) output() bytes.Buffer {
 	for _, gvp := range g.ps {
 		g.h[gvp.project] = gvp.hash()
 
-		// Create name boxes, and name them using hashes
-		// to avoid encoding name conflicts
+		// Create node string
 		g.b.WriteString(fmt.Sprintf("%d [label=\"%s\"];", gvp.hash(), gvp.label()))
 	}
 
