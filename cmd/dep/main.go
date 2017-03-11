@@ -53,6 +53,7 @@ func main() {
 		}
 		w.Flush()
 		fmt.Fprintln(os.Stderr)
+		fmt.Fprintln(os.Stderr, "Use \"dep help [command]\" for more information about a command.")
 	}
 
 	cmdName, printCommandHelp, exit := parseArgs(os.Args)
