@@ -1,0 +1,9 @@
+{
+  "commands": [
+    ["init"]
+  ],
+  "vendor-final": [
+    "github.com/sdboyer/deptest",
+    "github.com/sdboyer/deptestdos"
+  ]
+}
