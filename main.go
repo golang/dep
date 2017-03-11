@@ -70,6 +70,7 @@ func main() {
 		}
 		w.Flush()
 		fmt.Fprintln(os.Stderr)
+		fmt.Fprintln(os.Stderr, "Use \"dep help [command]\" for more information about a command.")
 	}
 
 	if len(os.Args) <= 1 || len(os.Args) == 2 && (strings.Contains(strings.ToLower(os.Args[1]), "help") || strings.ToLower(os.Args[1]) == "-h") {
