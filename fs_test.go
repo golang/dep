@@ -127,29 +127,28 @@ func TestIsRegular(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	tests := map[string]bool{
-		wd: false,
-		filepath.Join(wd, "testdata"):                       false,
-		filepath.Join(wd, "cmd", "dep", "main.go"):          true,
-		filepath.Join(wd, "this_file_does_not_exist.thing"): false,
+	tests := []struct {
+		name       string
+		want, werr bool
+	}{
+		{name: wd, want: false, werr: true},
+		{name: filepath.Join(wd, "testdata"), want: false, werr: true},
+		{name: filepath.Join(wd, "cmd", "dep", "main.go"), want: true, werr: false},
+		{name: filepath.Join(wd, "this_file_does_not_exist.thing"), want: false, werr: false},
 	}
 
-	for f, want := range tests {
-		got, err := IsRegular(f)
-		if err != nil {
-			if !want {
-				// this is the case where we expect an error so continue
-				// to the check below
-				continue
-			}
-			t.Fatalf("expected no error, got %v", err)
+	for _, test := range tests {
+		got, err := IsRegular(test.name)
+		if test.werr && err == nil {
+			t.Logf("wanted an error for %q, but it was nil", test.name)
 		}
-
-		if got != want {
-			t.Fatalf("expected %t for %s, got %t", want, f, got)
+		if !test.werr && err != nil {
+			t.Logf("did not want an error for %q, but instead got: %s", test.name, err)
+		}
+		if test.want != got {
+			t.Logf("wanted %t for %q, but instead got: %t", test.want, test.name, got)
 		}
 	}
-
 }
 
 func TestIsDir(t *testing.T) {
@@ -158,66 +157,61 @@ func TestIsDir(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	tests := map[string]bool{
-		wd: true,
-		filepath.Join(wd, "testdata"):                       true,
-		filepath.Join(wd, "main.go"):                        false,
-		filepath.Join(wd, "this_file_does_not_exist.thing"): false,
+	tests := []struct {
+		name       string
+		want, werr bool
+	}{
+		{name: wd, want: true, werr: false},
+		{name: filepath.Join(wd, "testdata"), want: true, werr: false},
+		{name: filepath.Join(wd, "main.go"), want: false, werr: false},
+		{name: filepath.Join(wd, "this_file_does_not_exist.thing"), want: false, werr: false},
 	}
 
-	for f, want := range tests {
-		got, err := IsDir(f)
-		if err != nil {
-			if !want {
-				// this is the case where we expect an error so continue
-				// to the check below
-				continue
-			}
-			t.Fatalf("expected no error, got %v", err)
+	for _, test := range tests {
+		got, err := IsDir(test.name)
+		if test.werr && err == nil {
+			t.Logf("wanted an error for %q, but it was nil", test.name)
 		}
-
-		if got != want {
-			t.Fatalf("expected %t for %s, got %t", want, f, got)
+		if !test.werr && err != nil {
+			t.Logf("did not want an error for %q, but instead got: %s", test.name, err)
+		}
+		if test.want != got {
+			t.Logf("wanted %t for %q, but instead got: %t", test.want, test.name, got)
 		}
 	}
-
 }
 
-func TestIsEmpty(t *testing.T) {
+func TestIsEmptyDirOrNotExist(t *testing.T) {
 	wd, err := os.Getwd()
 	if err != nil {
 		t.Fatal(err)
 	}
 
+	existingFile := filepath.Join(wd, "fs.go")
+	doesNotExist := filepath.Join(wd, "this_file_does_not_exist.thing")
+
 	h := test.NewHelper(t)
 	h.TempDir("empty")
-	tests := map[string]string{
-		wd:                                                  "true",
-		"testdata":                                          "true",
-		filepath.Join(wd, "fs.go"):                          "err",
-		filepath.Join(wd, "this_file_does_not_exist.thing"): "false",
-		h.Path("empty"):                                     "false",
+	tests := []struct {
+		name       string
+		want, werr bool
+	}{
+		{name: wd, want: false, werr: false},             // not empty, exists
+		{name: "testdata", want: false, werr: false},     // not empty, exists
+		{name: existingFile, want: false, werr: true},    // exists, but file
+		{name: doesNotExist, want: true, werr: false},    // does not exist
+		{name: h.Path("empty"), want: true, werr: false}, // empty, exists
 	}
-
-	for f, want := range tests {
-		empty, err := IsNonEmptyDir(f)
-		if want == "err" {
-			if err == nil {
-				t.Fatalf("Wanted an error for %v, but it was nil", f)
-			}
-			if empty {
-				t.Fatalf("Wanted false with error for %v, but got true", f)
-			}
-		} else if err != nil {
-			t.Fatalf("Wanted no error for %v, got %v", f, err)
+	for _, test := range tests {
+		got, err := IsEmptyDirOrNotExist(test.name)
+		if test.werr && err == nil {
+			t.Logf("wanted an error for %q, but it was nil", test.name)
 		}
-
-		if want == "true" && !empty {
-			t.Fatalf("Wanted true for %v, but got false", f)
+		if !test.werr && err != nil {
+			t.Logf("did not want an error for %q, but instead got: %s", test.name, err)
 		}
-
-		if want == "false" && empty {
-			t.Fatalf("Wanted false for %v, but got true", f)
+		if test.want != got {
+			t.Logf("wanted %t for %q, but instead got: %t", test.want, test.name, got)
 		}
 	}
 }
