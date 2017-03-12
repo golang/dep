@@ -58,7 +58,7 @@ The `testcase.json` file has the following format:
         "github.com/sdboyer/deptesttres",
         "github.com/sdboyer/deptestquatro"
       ],
-      "error-expected":"something went wrong"
+      "error-expected": "something went wrong"
     }
 
 All of the categories are optional - if the `imports` list for a test is empty,
