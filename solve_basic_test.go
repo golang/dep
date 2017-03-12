@@ -1404,8 +1404,8 @@ func (sm *depspecSourceManager) GetManifestAndLock(id ProjectIdentifier, v Versi
 	return nil, nil, fmt.Errorf("Project %s at version %s could not be found", id.errString(), v)
 }
 
-func (sm *depspecSourceManager) AnalyzerInfo() (string, *semver.Version) {
-	return "depspec-sm-builtin", sv("v1.0.0")
+func (sm *depspecSourceManager) AnalyzerInfo() (string, int) {
+	return "depspec-sm-builtin", 1
 }
 
 func (sm *depspecSourceManager) ExternalReach(id ProjectIdentifier, v Version) (map[string][]string, error) {

@@ -5,8 +5,6 @@ import (
 	"os"
 	"path/filepath"
 	"sync/atomic"
-
-	"github.com/Masterminds/semver"
 )
 
 // sourceBridges provide an adapter to SourceManagers that tailor operations
@@ -81,7 +79,7 @@ func (b *bridge) GetManifestAndLock(id ProjectIdentifier, v Version) (Manifest, 
 	return m, l, e
 }
 
-func (b *bridge) AnalyzerInfo() (string, *semver.Version) {
+func (b *bridge) AnalyzerInfo() (string, int) {
 	return b.sm.AnalyzerInfo()
 }
 
