@@ -112,13 +112,15 @@ func ListPackages(fileRoot, importRoot string) (PackageTree, error) {
 		// would have an err with the same path as is called this time, as only
 		// then will filepath.Walk have attempted to descend into the directory
 		// and encountered an error.
-		_, err = os.Open(wp)
+		var f *os.File
+		f, err = os.Open(wp)
 		if err != nil {
 			if os.IsPermission(err) {
 				return filepath.SkipDir
 			}
 			return err
 		}
+		f.Close()
 
 		// Compute the import path. Run the result through ToSlash(), so that
 		// windows file paths are normalized to slashes, as is expected of
