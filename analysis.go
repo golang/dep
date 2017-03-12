@@ -120,7 +120,7 @@ func ListPackages(fileRoot, importRoot string) (PackageTree, error) {
 			}
 			return err
 		}
-		defer f.Close()
+		f.Close()
 
 		// Compute the import path. Run the result through ToSlash(), so that
 		// windows file paths are normalized to slashes, as is expected of
