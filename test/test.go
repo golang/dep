@@ -505,6 +505,10 @@ func (h *Helper) Path(name string) string {
 		joined = filepath.Join(h.tempdir, name)
 	}
 
+	if _, err := os.Stat(joined); os.IsNotExist(err) {
+		return ""
+	}
+
 	// Ensure it's the absolute, symlink-less path we're returning
 	abs, err := filepath.EvalSymlinks(joined)
 	if err != nil {
