@@ -24,6 +24,7 @@ type IntegrationTestCase struct {
 	RootPath      string
 	InitialPath   string
 	FinalPath     string
+	ErrorExpected string            `json:"error-expected"`
 	Commands      [][]string        `json:"commands"`
 	GopathInitial map[string]string `json:"gopath-initial"`
 	VendorInitial map[string]string `json:"vendor-initial"`
@@ -52,6 +53,25 @@ func NewTestCase(t *testing.T, name string) *IntegrationTestCase {
 		panic(err)
 	}
 	return n
+}
+
+// CompareError compares expected error to error recived.
+func (tc *IntegrationTestCase) CompareError(err error) {
+	wantExists, want := len(tc.ErrorExpected) > 0, tc.ErrorExpected
+	gotExists, got := err != nil, ""
+	if gotExists {
+		got = err.Error()
+	}
+
+	if wantExists && gotExists {
+		if want != got {
+			tc.t.Errorf("expected error %s, got error %s", want, got)
+		}
+	} else if !wantExists && gotExists {
+		tc.t.Fatalf("%s error raised where none was expected", got)
+	} else if wantExists && !gotExists {
+		tc.t.Errorf("%s error was not logged where one was expected", want)
+	}
 }
 
 func (tc *IntegrationTestCase) CompareFile(goldenPath, working string) {
