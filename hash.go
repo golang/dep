@@ -6,6 +6,7 @@ import (
 	"io"
 	"sort"
 	"strings"
+	"strconv"
 )
 
 // string headers used to demarcate sections in hash input creation
@@ -103,7 +104,7 @@ func (s *solver) writeHashingInputs(w io.Writer) {
 	writeString(hhAnalyzer)
 	an, av := s.b.AnalyzerInfo()
 	writeString(an)
-	writeString(av.String())
+	writeString(strconv.Itoa(av))
 }
 
 // bytes.Buffer wrapper that injects newlines after each call to Write().

@@ -26,8 +26,8 @@ func (naiveAnalyzer) DeriveManifestAndLock(string, ProjectRoot) (Manifest, Lock,
 	return nil, nil, nil
 }
 
-func (a naiveAnalyzer) Info() (name string, version *semver.Version) {
-	return "naive-analyzer", sv("v0.0.1")
+func (a naiveAnalyzer) Info() (name string, version int) {
+	return "naive-analyzer", 1
 }
 
 func sv(s string) *semver.Version {

@@ -10,8 +10,6 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
-
-	"github.com/Masterminds/semver"
 )
 
 // Used to compute a friendly filepath from a URL-shaped input
@@ -61,7 +59,7 @@ type SourceManager interface {
 
 	// AnalyzerInfo reports the name and version of the logic used to service
 	// GetManifestAndLock().
-	AnalyzerInfo() (name string, version *semver.Version)
+	AnalyzerInfo() (name string, version int)
 
 	// DeduceRootProject takes an import path and deduces the corresponding
 	// project/source root.
@@ -77,7 +75,7 @@ type ProjectAnalyzer interface {
 	DeriveManifestAndLock(path string, importRoot ProjectRoot) (Manifest, Lock, error)
 
 	// Report the name and version of this ProjectAnalyzer.
-	Info() (name string, version *semver.Version)
+	Info() (name string, version int)
 }
 
 // SourceMgr is the default SourceManager for gps.
@@ -312,7 +310,7 @@ func (sm *SourceMgr) doRelease() {
 }
 
 // AnalyzerInfo reports the name and version of the injected ProjectAnalyzer.
-func (sm *SourceMgr) AnalyzerInfo() (name string, version *semver.Version) {
+func (sm *SourceMgr) AnalyzerInfo() (name string, version int) {
 	return sm.an.Info()
 }
 
