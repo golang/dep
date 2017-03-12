@@ -72,7 +72,7 @@ The test procedure is as follows:
 4. Fetch the repos and versions in `gopath-initial` into `$TMPDIR/src` directory
 5. Fetch the repos and versions in `vendor-initial` to the project's `vendor` directory
 6. Run `commands` on the project, in declaration order
-7. Check that only expected errors were raised 
+7. Check that only an expected error was raised from the final command
 8. Check the resulting files against those in the `final` input directory
 9. Check the `vendor` directory for the projects listed under `vendor-final`
 10. Check that there were no changes to `src` listings

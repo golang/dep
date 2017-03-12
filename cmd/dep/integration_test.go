@@ -52,12 +52,16 @@ func TestIntegration(t *testing.T) {
 				testProj.RecordImportPaths()
 
 				var err error
-				for _, args := range testCase.Commands {
-					if err = testProj.DoRun(args); err != nil {
-						break
+				for i, args := range testCase.Commands {
+					err = testProj.DoRun(args)
+					if err != nil {
+						if i != len(testCase.Commands)+1 {
+							t.Fatalf("%s error raised on none final command", err.Error())
+						}
 					}
 				}
 
+				// Check errors from final command
 				testCase.CompareError(err)
 
 				// Check final manifest and lock
