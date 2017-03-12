@@ -67,7 +67,7 @@ func (m maybeGitSource) try(cachedir string, an ProjectAnalyzer) (source, string
 	path := filepath.Join(cachedir, "sources", sanitizer.Replace(ustr))
 	r, err := vcs.NewGitRepo(ustr, path)
 	if err != nil {
-		return nil, "", err
+		return nil, ustr, err
 	}
 
 	src := &gitSource{
@@ -85,7 +85,7 @@ func (m maybeGitSource) try(cachedir string, an ProjectAnalyzer) (source, string
 	if !r.CheckLocal() {
 		_, err = src.listVersions()
 		if err != nil {
-			return nil, "", err
+			return nil, ustr, err
 		}
 	}
 
@@ -112,7 +112,7 @@ func (m maybeGopkginSource) try(cachedir string, an ProjectAnalyzer) (source, st
 	ustr := m.url.String()
 	r, err := vcs.NewGitRepo(ustr, path)
 	if err != nil {
-		return nil, "", err
+		return nil, ustr, err
 	}
 
 	src := &gopkginSource{
@@ -133,7 +133,7 @@ func (m maybeGopkginSource) try(cachedir string, an ProjectAnalyzer) (source, st
 	if !r.CheckLocal() {
 		_, err = src.listVersions()
 		if err != nil {
-			return nil, "", err
+			return nil, ustr, err
 		}
 	}
 
@@ -149,10 +149,10 @@ func (m maybeBzrSource) try(cachedir string, an ProjectAnalyzer) (source, string
 	path := filepath.Join(cachedir, "sources", sanitizer.Replace(ustr))
 	r, err := vcs.NewBzrRepo(ustr, path)
 	if err != nil {
-		return nil, "", err
+		return nil, ustr, err
 	}
 	if !r.Ping() {
-		return nil, "", fmt.Errorf("Remote repository at %s does not exist, or is inaccessible", ustr)
+		return nil, ustr, fmt.Errorf("Remote repository at %s does not exist, or is inaccessible", ustr)
 	}
 
 	src := &bzrSource{
@@ -183,10 +183,10 @@ func (m maybeHgSource) try(cachedir string, an ProjectAnalyzer) (source, string,
 	path := filepath.Join(cachedir, "sources", sanitizer.Replace(ustr))
 	r, err := vcs.NewHgRepo(ustr, path)
 	if err != nil {
-		return nil, "", err
+		return nil, ustr, err
 	}
 	if !r.Ping() {
-		return nil, "", fmt.Errorf("Remote repository at %s does not exist, or is inaccessible", ustr)
+		return nil, ustr, fmt.Errorf("Remote repository at %s does not exist, or is inaccessible", ustr)
 	}
 
 	src := &hgSource{
