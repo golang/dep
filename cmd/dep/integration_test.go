@@ -50,9 +50,15 @@ func TestIntegration(t *testing.T) {
 
 				// Run commands
 				testProj.RecordImportPaths()
+
+				var err error
 				for _, args := range testCase.Commands {
-					testProj.DoRun(args)
+					if err = testProj.DoRun(args); err != nil {
+						break
+					}
 				}
+
+				testCase.CompareError(err)
 
 				// Check final manifest and lock
 				testCase.CompareFile("manifest.json", testProj.ProjPath("manifest.json"))
