@@ -106,13 +106,13 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 	if err != nil {
 		return err
 	}
-	m := dep.Manifest{
+	m := &dep.Manifest{
 		Dependencies: pd.constraints,
 	}
 
 	// Make an initial lock from what knowledge we've collected about the
 	// versions on disk
-	l := dep.Lock{
+	l := &dep.Lock{
 		P: make([]gps.LockedProject, 0, len(pd.ondisk)),
 	}
 
@@ -134,19 +134,13 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 		)
 	}
 
-	sw := dep.SafeWriter{
-		Root:          root,
-		SourceManager: sm,
-		Manifest:      &m,
-	}
-
 	if len(pd.notondisk) > 0 {
 		vlogf("Solving...")
 		params := gps.SolveParameters{
 			RootDir:         root,
 			RootPackageTree: pkgT,
-			Manifest:        &m,
-			Lock:            &l,
+			Manifest:        m,
+			Lock:            l,
 		}
 
 		if *verbose {
@@ -163,14 +157,14 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 			handleAllTheFailuresOfTheWorld(err)
 			return err
 		}
-		sw.Lock = dep.LockFromInterface(soln)
-	} else {
-		sw.Lock = &l
+		l = dep.LockFromInterface(soln)
 	}
 
 	vlogf("Writing manifest and lock files.")
 
-	if err := sw.WriteAllSafe(true); err != nil {
+	var sw dep.SafeWriter
+	sw.Prepare(m, l, nil, true)
+	if err := sw.Write(root, sm); err != nil {
 		return errors.Wrap(err, "safe write of manifest and lock")
 	}
 

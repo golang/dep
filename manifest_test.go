@@ -17,7 +17,9 @@ func TestReadManifest(t *testing.T) {
 	h := test.NewHelper(t)
 	defer h.Cleanup()
 
-	got, err := readManifest(h.GetTestFile("manifest/golden.json"))
+	mf := h.GetTestFile("manifest/golden.json")
+	defer mf.Close()
+	got, err := readManifest(mf)
 	if err != nil {
 		t.Fatalf("Should have read Manifest correctly, but got err %q", err)
 	}
@@ -106,7 +108,9 @@ func TestReadManifestErrors(t *testing.T) {
 	}
 
 	for _, tst := range tests {
-		_, err = readManifest(h.GetTestFile(tst.file))
+		mf := h.GetTestFile(tst.file)
+		defer mf.Close()
+		_, err = readManifest(mf)
 		if err == nil {
 			t.Errorf("Reading manifest with %s should have caused error, but did not", tst.name)
 		} else if !strings.Contains(err.Error(), tst.name) {

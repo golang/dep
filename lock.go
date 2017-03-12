@@ -102,23 +102,7 @@ func (l *Lock) MarshalJSON() ([]byte, error) {
 		}
 
 		v := lp.Version()
-		// Figure out how to get the underlying revision
-		switch tv := v.(type) {
-		case gps.UnpairedVersion:
-			// TODO we could error here, if we want to be very defensive about not
-			// allowing a lock to be written if without an immmutable revision
-		case gps.Revision:
-			ld.Revision = tv.String()
-		case gps.PairedVersion:
-			ld.Revision = tv.Underlying().String()
-		}
-
-		switch v.Type() {
-		case gps.IsBranch:
-			ld.Branch = v.String()
-		case gps.IsSemver, gps.IsVersion:
-			ld.Version = v.String()
-		}
+		ld.Revision, ld.Branch, ld.Version = getVersionInfo(v)
 
 		raw.P[k] = ld
 	}
@@ -132,6 +116,29 @@ func (l *Lock) MarshalJSON() ([]byte, error) {
 	err := enc.Encode(raw)
 
 	return buf.Bytes(), err
+}
+
+// TODO(carolynvs) this should be moved to gps
+func getVersionInfo(v gps.Version) (revision string, branch string, version string) {
+	// Figure out how to get the underlying revision
+	switch tv := v.(type) {
+	case gps.UnpairedVersion:
+	// TODO we could error here, if we want to be very defensive about not
+	// allowing a lock to be written if without an immmutable revision
+	case gps.Revision:
+		revision = tv.String()
+	case gps.PairedVersion:
+		revision = tv.Underlying().String()
+	}
+
+	switch v.Type() {
+	case gps.IsBranch:
+		branch = v.String()
+	case gps.IsSemver, gps.IsVersion:
+		version = v.String()
+	}
+
+	return
 }
 
 // LockFromInterface converts an arbitrary gps.Lock to dep's representation of a
@@ -176,15 +183,4 @@ func (s SortedLockedProjects) Less(i, j int) bool {
 	}
 
 	return l.Source < r.Source
-}
-
-// locksAreEquivalent compares two locks to see if they differ. If EITHER lock
-// is nil, or their memos do not match, or any projects differ, then false is
-// returned.
-func locksAreEquivalent(l, r *Lock) bool {
-	if l == nil || r == nil {
-		return false
-	}
-
-	return gps.LocksAreEq(l, r, true)
 }
