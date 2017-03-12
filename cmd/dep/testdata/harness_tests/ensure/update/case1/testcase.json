@@ -1,6 +1,5 @@
 {
   "commands": [
-    ["init"],
     ["ensure", "-update", "github.com/sdboyer/deptest"]
   ],
   "vendor-final": [
