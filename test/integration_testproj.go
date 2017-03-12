@@ -74,6 +74,10 @@ func (p *IntegrationTestProject) RunGit(dir string, args ...string) {
 	p.h.RunGit(dir, args...)
 }
 
+func (p *IntegrationTestProject) GetStderr() string {
+	return p.h.getStderr()
+}
+
 func (p *IntegrationTestProject) GetVendorGit(ip string) {
 	parse := strings.Split(ip, "/")
 	gitDir := strings.Join(parse[:len(parse)-1], string(filepath.Separator))

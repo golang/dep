@@ -55,14 +55,14 @@ func TestIntegration(t *testing.T) {
 				for i, args := range testCase.Commands {
 					err = testProj.DoRun(args)
 					if err != nil {
-						if i != len(testCase.Commands)+1 {
+						if i+1 != len(testCase.Commands) {
 							t.Fatalf("%s error raised on none final command", err.Error())
 						}
 					}
 				}
 
 				// Check errors from final command
-				testCase.CompareError(err)
+				testCase.CompareError(err, testProj.GetStderr())
 
 				// Check final manifest and lock
 				testCase.CompareFile("manifest.json", testProj.ProjPath("manifest.json"))

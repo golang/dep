@@ -10,6 +10,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -56,21 +57,22 @@ func NewTestCase(t *testing.T, name string) *IntegrationTestCase {
 }
 
 // CompareError compares expected error to error recived.
-func (tc *IntegrationTestCase) CompareError(err error) {
-	wantExists, want := len(tc.ErrorExpected) > 0, tc.ErrorExpected
-	gotExists, got := err != nil, ""
-	if gotExists {
-		got = err.Error()
+func (tc *IntegrationTestCase) CompareError(err error, stderr string) {
+	if err == nil {
+		return
 	}
 
+	wantExists, want := len(tc.ErrorExpected) > 0, tc.ErrorExpected
+	gotExists, got := len(stderr) > 0, stderr
+
 	if wantExists && gotExists {
-		if want != got {
+		if !strings.Contains(got, want) {
 			tc.t.Errorf("expected error %s, got error %s", want, got)
 		}
 	} else if !wantExists && gotExists {
-		tc.t.Fatalf("%s error raised where none was expected", got)
+		tc.t.Fatal("error raised where none was expected")
 	} else if wantExists && !gotExists {
-		tc.t.Errorf("%s error was not logged where one was expected", want)
+		tc.t.Error("error was not raised where one was expected")
 	}
 }
 
