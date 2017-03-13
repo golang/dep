@@ -54,10 +54,8 @@ func TestIntegration(t *testing.T) {
 				var err error
 				for i, args := range testCase.Commands {
 					err = testProj.DoRun(args)
-					if err != nil {
-						if i+1 != len(testCase.Commands) {
-							t.Fatalf("%s error raised on none final command", err.Error())
-						}
+					if err != nil &&  i < len(testCase.Commands)-1 {
+							t.Fatalf("unexpected error raised: %s", err.Error())
 					}
 				}
 

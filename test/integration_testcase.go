@@ -140,7 +140,14 @@ func getFile(path string) (bool, string, error) {
 	if err != nil {
 		return false, "", nil
 	}
-	f, err := ioutil.ReadFile(path)
+
+	// Ensure it's the absolute, symlink-less path we're returning
+	abs, err := filepath.EvalSymlinks(path)
+	if err != nil {
+		return false, "", nil
+	}
+
+	f, err := ioutil.ReadFile(abs)
 	if err != nil {
 		return true, "", err
 	}
