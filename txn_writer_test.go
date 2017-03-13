@@ -165,14 +165,14 @@ func TestSafeWriter_ManifestAndUnmodifiedLock(t *testing.T) {
 	pc.Load()
 
 	var sw SafeWriter
-	sw.Prepare(pc.Project.Manifest, pc.Project.Lock, nil, false)
+	sw.Prepare(pc.Project.Manifest, pc.Project.Lock, pc.Project.Lock, false)
 
 	// Verify prepared actions
 	if !sw.Payload.HasManifest() {
 		t.Fatal("Expected the payload to contain the manifest")
 	}
-	if !sw.Payload.HasLock() {
-		t.Fatal("Expected the payload to contain the lock")
+	if sw.Payload.HasLock() {
+		t.Fatal("Did not expect the payload to contain the lock")
 	}
 	if sw.Payload.HasVendor() {
 		t.Fatal("Did not expect the payload to contain the vendor directory")
@@ -208,7 +208,7 @@ func TestSafeWriter_ManifestAndUnmodifiedLockWithForceVendor(t *testing.T) {
 	pc.Load()
 
 	var sw SafeWriter
-	sw.Prepare(pc.Project.Manifest, pc.Project.Lock, nil, true)
+	sw.Prepare(pc.Project.Manifest, pc.Project.Lock, pc.Project.Lock, true)
 
 	// Verify prepared actions
 	if !sw.Payload.HasManifest() {
@@ -339,7 +339,7 @@ func TestSafeWriter_ForceVendorWhenVendorAlreadyExists(t *testing.T) {
 
 	var sw SafeWriter
 	// Populate vendor
-	sw.Prepare(nil, pc.Project.Lock, nil, true)
+	sw.Prepare(nil, pc.Project.Lock, pc.Project.Lock, true)
 	err := sw.Write(pc.Project.AbsRoot, pc.SourceManager)
 	h.Must(errors.Wrap(err, "SafeWriter.Write failed"))
 

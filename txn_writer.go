@@ -30,10 +30,10 @@ type SafeWriter struct {
 
 // SafeWriterPayload represents the actions SafeWriter will execute when SafeWriter.Write is called.
 type SafeWriterPayload struct {
-	Manifest         *Manifest
-	Lock             *Lock
-	LockDiff         *LockDiff
-	ForceWriteVendor bool
+	Manifest    *Manifest
+	Lock        *Lock
+	LockDiff    *LockDiff
+	WriteVendor bool
 }
 
 func (payload *SafeWriterPayload) HasLock() bool {
@@ -45,10 +45,7 @@ func (payload *SafeWriterPayload) HasManifest() bool {
 }
 
 func (payload *SafeWriterPayload) HasVendor() bool {
-	// TODO(carolynvs) this can be calculated based on if we are writing the lock
-	// init -> switch to newlock
-	// ensure checks existence, why not move that into the prep?
-	return payload.ForceWriteVendor
+	return payload.WriteVendor
 }
 
 // LockDiff is the set of differences between an existing lock file and an updated lock file.
@@ -162,20 +159,23 @@ func (diff StringDiff) MarshalJSON() ([]byte, error) {
 //   written out based on newLock if present, else lock, else error.
 func (sw *SafeWriter) Prepare(manifest *Manifest, lock *Lock, newLock *Lock, forceVendor bool) {
 	sw.Payload = &SafeWriterPayload{
-		Manifest:         manifest,
-		ForceWriteVendor: forceVendor,
+		Manifest:    manifest,
+		WriteVendor: forceVendor,
 	}
 
 	if newLock != nil {
 		if lock == nil {
 			sw.Payload.Lock = newLock
-			sw.Payload.ForceWriteVendor = true
+			sw.Payload.WriteVendor = true
 		} else {
 			diff := diffLocks(lock, newLock)
 			if diff != nil {
 				sw.Payload.Lock = newLock
 				sw.Payload.LockDiff = diff
-				sw.Payload.ForceWriteVendor = true
+				sw.Payload.WriteVendor = true
+			} else if forceVendor {
+				sw.Payload.Lock = newLock
+				sw.Payload.WriteVendor = true
 			}
 		}
 	} else if lock != nil {
