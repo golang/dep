@@ -6,6 +6,8 @@ import (
 	"os/exec"
 	"sync"
 	"time"
+
+	"github.com/Masterminds/vcs"
 )
 
 // monitoredCmd wraps a cmd and will keep monitoring the process until it
@@ -106,4 +108,18 @@ type killCmdError struct {
 
 func (e killCmdError) Error() string {
 	return fmt.Sprintf("error killing command after timeout: %s", e.err)
+}
+
+func runFromCwd(cmd string, args ...string) ([]byte, error) {
+	c := newMonitoredCmd(exec.Command(cmd, args...), 2*time.Minute)
+	out, err := c.combinedOutput()
+	if err != nil {
+		err = fmt.Errorf("%s: %s", string(out), err)
+	}
+	return out, nil
+}
+
+func runFromRepoDir(repo vcs.Repo, cmd string, args ...string) ([]byte, error) {
+	c := newMonitoredCmd(repo.CmdFromDir(cmd, args...), 2*time.Minute)
+	return c.combinedOutput()
 }

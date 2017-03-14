@@ -7,7 +7,7 @@ dependencies:
   pre:
     - wget https://github.com/Masterminds/glide/releases/download/0.10.1/glide-0.10.1-linux-amd64.tar.gz
     - tar -vxz -C $HOME/bin --strip=1 -f glide-0.10.1-linux-amd64.tar.gz
-    - sudo apt-get install bzr
+    - sudo apt-get install bzr subversion
   override:
     - mkdir -p $HOME/.go_workspace/src
     - glide --home $HOME/.glide -y glide.yaml install --cache
