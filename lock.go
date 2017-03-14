@@ -28,12 +28,12 @@ type rawLock struct {
 }
 
 type lockedDep struct {
-	Name       string   `json:"name"`
-	Version    string   `json:"version,omitempty"`
-	Branch     string   `json:"branch,omitempty"`
-	Revision   string   `json:"revision"`
-	Repository string   `json:"repo,omitempty"`
-	Packages   []string `json:"packages"`
+	Name     string   `json:"name"`
+	Version  string   `json:"version,omitempty"`
+	Branch   string   `json:"branch,omitempty"`
+	Revision string   `json:"revision"`
+	Source   string   `json:"source,omitempty"`
+	Packages []string `json:"packages"`
 }
 
 func readLock(r io.Reader) (*Lock, error) {
@@ -69,7 +69,7 @@ func readLock(r io.Reader) (*Lock, error) {
 
 		id := gps.ProjectIdentifier{
 			ProjectRoot: gps.ProjectRoot(ld.Name),
-			Source:      ld.Repository,
+			Source:      ld.Source,
 		}
 		l.P[i] = gps.NewLockedProject(id, v, ld.Packages)
 	}
@@ -96,9 +96,9 @@ func (l *Lock) MarshalJSON() ([]byte, error) {
 	for k, lp := range l.P {
 		id := lp.Ident()
 		ld := lockedDep{
-			Name:       string(id.ProjectRoot),
-			Repository: id.Source,
-			Packages:   lp.Packages(),
+			Name:     string(id.ProjectRoot),
+			Source:   id.Source,
+			Packages: lp.Packages(),
 		}
 
 		v := lp.Version()

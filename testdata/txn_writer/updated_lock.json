@@ -3,7 +3,7 @@
   "projects": [
     {
       "name": "github.com/foo/bar",
-      "repo": "http://github.example.com/foo/bar",
+      "source": "http://github.example.com/foo/bar",
       "version": "1.2.0",
       "revision": "2a3a211e171803acb82d1d5d42ceb53228f51751",
       "packages": [
