@@ -135,20 +135,26 @@ func (c *Ctx) LoadProject(path string) (*Project, error) {
 //
 // If the passed path isn't a symlink at all, we just pass through.
 func (c *Ctx) resolveProjectRoot(path string) (string, error) {
-	// Determine if this is a symlink
+	// Determine if this path is a Symlink
+	l, err := os.Lstat(path)
+	if err != nil {
+		return "", errors.Wrap(err, "resolveProjectRoot")
+	}
+
+	// Pass through if not
+	if l.Mode()&os.ModeSymlink == 0 {
+		return path, nil
+	}
+
+	// Resolve path
 	resolved, err := filepath.EvalSymlinks(path)
 	if err != nil {
 		return "", errors.Wrap(err, "resolveProjectRoot")
 	}
 
-	// Not a symlink, move on
-	if resolved == path {
-		return path, nil
-	}
-
 	// Determine if the symlink is within the GOPATH, in which case we're not
 	// sure how to resolve it.
-	if strings.HasPrefix(path, c.GOPATH) {
+	if filepath.HasPrefix(path, c.GOPATH) {
 		return "", fmt.Errorf("''%s' is linked to another path within GOPATH", path)
 	}
 

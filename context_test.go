@@ -375,7 +375,7 @@ func TestResolveProjectRoot(t *testing.T) {
 		t.Fatalf("Error resolving project root: %s", err)
 	}
 	if p != realPath {
-		t.Fatalf("Expected path to be %s, got %s", realPath, p)
+		t.Fatalf("Want path to be %s, got %s", realPath, p)
 	}
 
 	// Real path should be returned, symlink is outside GOPATH
@@ -384,10 +384,10 @@ func TestResolveProjectRoot(t *testing.T) {
 		t.Fatalf("Error resolving project root: %s", err)
 	}
 	if p != realPath {
-		t.Fatalf("Expected path to be %s, got %s", realPath, p)
+		t.Fatalf("Want path to be %s, got %s", realPath, p)
 	}
 
-	// Sylinked path is inside GOPATH, should return error
+	// Symlinked path is inside GOPATH, should return error
 	_, err = ctx.resolveProjectRoot(symlinkedInGoPath)
 	if err == nil {
 		t.Fatalf("Expected an error")
