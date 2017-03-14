@@ -5,7 +5,6 @@
 package main
 
 import (
-	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
@@ -199,22 +198,6 @@ func isStdLib(path string) bool {
 // in handling them and informing the user appropriately
 func handleAllTheFailuresOfTheWorld(err error) {
 	fmt.Printf("solve error: %s\n", err)
-}
-
-func writeFile(path string, in json.Marshaler) error {
-	f, err := os.Create(path)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-
-	b, err := in.MarshalJSON()
-	if err != nil {
-		return err
-	}
-
-	_, err = f.Write(b)
-	return err
 }
 
 func hasImportPathPrefix(s, prefix string) bool {
