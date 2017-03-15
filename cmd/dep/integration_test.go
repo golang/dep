@@ -33,7 +33,8 @@ func TestIntegration(t *testing.T) {
 			t.Run(testName, func(t *testing.T) {
 				// Set up environment
 				testCase := test.NewTestCase(t, testName)
-				testProj := test.NewTestProject(t, testCase.InitialPath)
+				defer testCase.Cleanup()
+				testProj := test.NewTestProject(t, testCase.InitialPath())
 				defer testProj.Cleanup()
 
 				// Create and checkout the vendor revisions

@@ -17,7 +17,7 @@ func TestRemoveErrors(t *testing.T) {
 	testName := "remove/unused/case1"
 
 	testCase := test.NewTestCase(t, testName)
-	testProj := test.NewTestProject(t, testCase.InitialPath)
+	testProj := test.NewTestProject(t, testCase.InitialPath())
 	defer testProj.Cleanup()
 
 	// Create and checkout the vendor revisions
