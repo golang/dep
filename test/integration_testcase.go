@@ -11,8 +11,8 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"strings"
 	"regexp"
+	"strings"
 	"testing"
 )
 
@@ -29,7 +29,7 @@ type IntegrationTestCase struct {
 	finalPath     string
 	Commands      [][]string        `json:"commands"`
 	ErrorExpected string            `json:"error-expected"`
-  GopathInitial map[string]string `json:"gopath-initial"`
+	GopathInitial map[string]string `json:"gopath-initial"`
 	VendorInitial map[string]string `json:"vendor-initial"`
 	VendorFinal   []string          `json:"vendor-final"`
 }
@@ -64,8 +64,8 @@ func (tc *IntegrationTestCase) CompareError(err error, stderr string) {
 		return
 	}
 
-	wantExists, want := len(tc.ErrorExpected) > 0, tc.ErrorExpected
-	gotExists, got := len(stderr) > 0, stderr
+	wantExists, want := tc.ErrorExpected != "", tc.ErrorExpected
+	gotExists, got := stderr != "", stderr
 
 	if wantExists && gotExists {
 		if !strings.Contains(got, want) {
@@ -170,19 +170,13 @@ func (tc *IntegrationTestCase) WriteFile(src string, content string) error {
 	return err
 }
 
-func getFile(path string) (bool, string, error) {
-	_, err := os.Stat(path)
+func getFile(path string) (exists bool, contents string, err error) {
+	_, err = os.Stat(path)
 	if err != nil {
 		return false, "", nil
 	}
 
-	// Ensure it's the absolute, symlink-less path we're returning
-	abs, err := filepath.EvalSymlinks(path)
-	if err != nil {
-		return false, "", nil
-	}
-
-	f, err := ioutil.ReadFile(abs)
+	f, err := ioutil.ReadFile(path)
 	if err != nil {
 		return true, "", err
 	}
