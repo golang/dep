@@ -358,12 +358,21 @@ func (sw *SafeWriter) PrintPreparedActions() error {
 	}
 
 	if sw.Payload.HasLock() {
-		fmt.Println("Would have written the following changes to lock.json:")
-		diff, err := sw.Payload.LockDiff.Format()
-		if err != nil {
-			return errors.Wrap(err, "ensure DryRun cannot serialize the lock diff")
+		if sw.Payload.LockDiff == nil {
+			fmt.Println("Would have written the following lock.json:")
+			l, err := sw.Payload.Lock.MarshalJSON()
+			if err != nil {
+				return errors.Wrap(err, "ensure DryRun cannot serialize lock")
+			}
+			fmt.Println(string(l))
+		} else {
+			fmt.Println("Would have written the following changes to lock.json:")
+			diff, err := sw.Payload.LockDiff.Format()
+			if err != nil {
+				return errors.Wrap(err, "ensure DryRun cannot serialize the lock diff")
+			}
+			fmt.Println(diff)
 		}
-		fmt.Println(diff)
 	}
 
 	if sw.Payload.HasVendor() {
