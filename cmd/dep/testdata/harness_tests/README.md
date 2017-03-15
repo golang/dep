@@ -7,19 +7,20 @@ expected final state to see if the test passes.
 The directory structure is as follows:
 
     testdata/
-        category1/
-            subcategory1/
-                case1/
-                    testcase.json
-                    initial/
-                        file1.go
-                        manifest.json
-                        ...
-                    final/
-                        manifest.json
-                        lock.json
-                case2/
-                ...
+        harness_tests/
+            category1/
+                subcategory1/
+                    case1/
+                        testcase.json
+                        initial/
+                            file1.go
+                            manifest.json
+                            ...
+                        final/
+                            manifest.json
+                            lock.json
+                    case2/
+                    ...
 
 The test code itself simply walks down the directory tree, looking for
 `testcase.json` files.  These files can be as many levels down the tree as

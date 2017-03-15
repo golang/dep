@@ -5,12 +5,14 @@
 package test
 
 import (
+	"bytes"
 	"encoding/json"
 	"flag"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
+	"regexp"
 	"testing"
 )
 
@@ -21,13 +23,13 @@ var (
 // IntegrationTestCase manages a test case directory structure and content
 type IntegrationTestCase struct {
 	t             *testing.T
-	Name          string
-	RootPath      string
-	InitialPath   string
-	FinalPath     string
-	ErrorExpected string            `json:"error-expected"`
+	name          string
+	rootPath      string
+	initialPath   string
+	finalPath     string
 	Commands      [][]string        `json:"commands"`
-	GopathInitial map[string]string `json:"gopath-initial"`
+	ErrorExpected string            `json:"error-expected"`
+  GopathInitial map[string]string `json:"gopath-initial"`
 	VendorInitial map[string]string `json:"vendor-initial"`
 	VendorFinal   []string          `json:"vendor-final"`
 }
@@ -40,10 +42,10 @@ func NewTestCase(t *testing.T, name string) *IntegrationTestCase {
 	rootPath := filepath.FromSlash(filepath.Join(wd, "testdata", "harness_tests", name))
 	n := &IntegrationTestCase{
 		t:           t,
-		Name:        name,
-		RootPath:    rootPath,
-		InitialPath: filepath.Join(rootPath, "initial"),
-		FinalPath:   filepath.Join(rootPath, "final"),
+		name:        name,
+		rootPath:    rootPath,
+		initialPath: filepath.Join(rootPath, "initial"),
+		finalPath:   filepath.Join(rootPath, "final"),
 	}
 	j, err := ioutil.ReadFile(filepath.Join(rootPath, "testcase.json"))
 	if err != nil {
@@ -76,8 +78,37 @@ func (tc *IntegrationTestCase) CompareError(err error, stderr string) {
 	}
 }
 
+var jsonNils *regexp.Regexp = regexp.MustCompile(`.*: null,.*\r?\n`)
+var jsonCmds *regexp.Regexp = regexp.MustCompile(`(?s)  "commands": \[(.*)  ],`)
+var jsonInds *regexp.Regexp = regexp.MustCompile(`(?s)\s*\n\s*`)
+
+// Cleanup writes the resulting TestCase back to the directory, if the -update
+// flag is set.  During the test, comparisons made to the TestCase should
+// write the result back to the TestCase when -update is enabled
+func (tc *IntegrationTestCase) Cleanup() {
+	if *UpdateGolden {
+		j, err := json.MarshalIndent(tc, "", "  ")
+		if err != nil {
+			panic(err)
+		}
+		j = jsonNils.ReplaceAll(j, []byte(""))
+		cmds := jsonCmds.FindAllSubmatch(j, -1)[0][1]
+		n := jsonInds.ReplaceAll(cmds, []byte(""))
+		n = bytes.Replace(n, []byte("["), []byte("\n    ["), -1)
+		n = bytes.Replace(n, []byte(`","`), []byte(`", "`), -1)
+		n = append(n, '\n')
+		j = bytes.Replace(j, cmds, n, -1)
+		j = append(j, '\n')
+		err = ioutil.WriteFile(filepath.Join(tc.rootPath, "testcase.json"), j, 0666)
+	}
+}
+
+func (tc *IntegrationTestCase) InitialPath() string {
+	return tc.initialPath
+}
+
 func (tc *IntegrationTestCase) CompareFile(goldenPath, working string) {
-	golden := filepath.Join(tc.FinalPath, goldenPath)
+	golden := filepath.Join(tc.finalPath, goldenPath)
 
 	gotExists, got, err := getFile(working)
 	if err != nil {
@@ -119,13 +150,17 @@ func (tc *IntegrationTestCase) CompareFile(goldenPath, working string) {
 }
 
 func (tc *IntegrationTestCase) CompareVendorPaths(gotVendorPaths []string) {
-	wantVendorPaths := tc.VendorFinal
-	if len(gotVendorPaths) != len(wantVendorPaths) {
-		tc.t.Fatalf("Wrong number of vendor paths created: want %d got %d", len(wantVendorPaths), len(gotVendorPaths))
-	}
-	for ind := range gotVendorPaths {
-		if gotVendorPaths[ind] != wantVendorPaths[ind] {
-			tc.t.Errorf("Mismatch in vendor paths created: want %s got %s", gotVendorPaths, wantVendorPaths)
+	if *UpdateGolden {
+		tc.VendorFinal = gotVendorPaths
+	} else {
+		wantVendorPaths := tc.VendorFinal
+		if len(gotVendorPaths) != len(wantVendorPaths) {
+			tc.t.Fatalf("Wrong number of vendor paths created: want %d got %d", len(wantVendorPaths), len(gotVendorPaths))
+		}
+		for ind := range gotVendorPaths {
+			if gotVendorPaths[ind] != wantVendorPaths[ind] {
+				tc.t.Errorf("Mismatch in vendor paths created: want %s got %s", gotVendorPaths, wantVendorPaths)
+			}
 		}
 	}
 }
