@@ -157,29 +157,23 @@ func (diff StringDiff) MarshalJSON() ([]byte, error) {
 //   and the vendor directory in the same way
 // - If the forceVendor param is true, then vendor/ will be unconditionally
 //   written out based on newLock if present, else lock, else error.
-func (sw *SafeWriter) Prepare(manifest *Manifest, lock *Lock, newLock *Lock, forceVendor bool) {
+func (sw *SafeWriter) Prepare(manifest *Manifest, oldLock *Lock, newLock *Lock, forceVendor bool) {
 	sw.Payload = &SafeWriterPayload{
-		Manifest:    manifest,
-		WriteVendor: forceVendor,
+		Manifest: manifest,
 	}
 
-	if newLock != nil {
-		if lock == nil {
-			sw.Payload.Lock = newLock
-			sw.Payload.WriteVendor = true
-		} else {
-			diff := diffLocks(lock, newLock)
-			if diff != nil {
-				sw.Payload.Lock = newLock
-				sw.Payload.LockDiff = diff
-				sw.Payload.WriteVendor = true
-			} else if forceVendor {
-				sw.Payload.Lock = newLock
-				sw.Payload.WriteVendor = true
-			}
-		}
-	} else if lock != nil {
-		sw.Payload.Lock = lock
+	if oldLock != nil && newLock != nil {
+		sw.Payload.LockDiff = diffLocks(oldLock, newLock)
+	}
+
+	if forceVendor || sw.Payload.LockDiff != nil {
+		sw.Payload.Lock = newLock
+		sw.Payload.WriteVendor = true
+	}
+
+	if oldLock == nil && newLock != nil {
+		sw.Payload.Lock = newLock
+		sw.Payload.WriteVendor = true
 	}
 }
 

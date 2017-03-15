@@ -373,6 +373,54 @@ func TestSafeWriter_ForceVendorWhenVendorAlreadyExists(t *testing.T) {
 	}
 }
 
+func TestSafeWriter_NewLock(t *testing.T) {
+	test.NeedsExternalNetwork(t)
+	test.NeedsGit(t)
+
+	h := test.NewHelper(t)
+	defer h.Cleanup()
+
+	pc := NewTestProjectContext(h, safeWriterProject)
+	defer pc.Release()
+	pc.Load()
+
+	var sw SafeWriter
+	lf := h.GetTestFile(safeWriterGoldenLock)
+	defer lf.Close()
+	newLock, err := readLock(lf)
+	h.Must(err)
+	sw.Prepare(nil, nil, newLock, false)
+
+	// Verify prepared actions
+	if sw.Payload.HasManifest() {
+		t.Fatal("Did not expect the payload to contain the manifest")
+	}
+	if !sw.Payload.HasLock() {
+		t.Fatal("Expected the payload to contain the lock")
+	}
+	if !sw.Payload.HasVendor() {
+		t.Fatal("Expected the payload to the vendor directory")
+	}
+
+	// Write changes
+	err = sw.Write(pc.Project.AbsRoot, pc.SourceManager)
+	h.Must(errors.Wrap(err, "SafeWriter.Write failed"))
+
+	// Verify file system changes
+	if err := pc.ManifestShouldNotExist(); err != nil {
+		t.Fatal(err)
+	}
+	if err := pc.LockShouldMatchGolden(safeWriterGoldenLock); err != nil {
+		t.Fatal(err)
+	}
+	if err := pc.VendorShouldExist(); err != nil {
+		t.Fatal(err)
+	}
+	if err := pc.VendorFileShouldExist("github.com/sdboyer/dep-test"); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestSafeWriter_DiffLocks(t *testing.T) {
 	test.NeedsExternalNetwork(t)
 	test.NeedsGit(t)
