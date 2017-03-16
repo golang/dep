@@ -1,6 +1,7 @@
 package gps
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -622,7 +623,7 @@ func (sm *SourceMgr) deduceFromPath(path string) (deductionFuture, error) {
 	go func() {
 		defer close(c)
 		var reporoot string
-		importroot, vcs, reporoot, futerr = parseMetadata(path)
+		importroot, vcs, reporoot, futerr = parseMetadata(context.Background(), path)
 		if futerr != nil {
 			futerr = fmt.Errorf("unable to deduce repository and source type for: %q", opath)
 			return
@@ -725,7 +726,7 @@ func normalizeURI(p string) (u *url.URL, newpath string, err error) {
 }
 
 // fetchMetadata fetches the remote metadata for path.
-func fetchMetadata(path string) (rc io.ReadCloser, err error) {
+func fetchMetadata(ctx context.Context, path string) (rc io.ReadCloser, err error) {
 	defer func() {
 		if err != nil {
 			err = fmt.Errorf("unable to determine remote metadata protocol: %s", err)
@@ -733,23 +734,29 @@ func fetchMetadata(path string) (rc io.ReadCloser, err error) {
 	}()
 
 	// try https first
-	rc, err = doFetchMetadata("https", path)
+	rc, err = doFetchMetadata(ctx, "https", path)
 	if err == nil {
 		return
 	}
 
-	rc, err = doFetchMetadata("http", path)
+	rc, err = doFetchMetadata(ctx, "http", path)
 	return
 }
 
-func doFetchMetadata(scheme, path string) (io.ReadCloser, error) {
+func doFetchMetadata(ctx context.Context, scheme, path string) (io.ReadCloser, error) {
 	url := fmt.Sprintf("%s://%s?go-get=1", scheme, path)
 	switch scheme {
 	case "https", "http":
-		resp, err := http.Get(url)
+		req, err := http.NewRequest("GET", url, nil)
 		if err != nil {
 			return nil, fmt.Errorf("failed to access url %q", url)
 		}
+
+		resp, err := http.DefaultClient.Do(req.WithContext(ctx))
+		if err != nil {
+			return nil, fmt.Errorf("failed to access url %q", url)
+		}
+
 		return resp.Body, nil
 	default:
 		return nil, fmt.Errorf("unknown remote protocol scheme: %q", scheme)
@@ -757,8 +764,8 @@ func doFetchMetadata(scheme, path string) (io.ReadCloser, error) {
 }
 
 // parseMetadata fetches and decodes remote metadata for path.
-func parseMetadata(path string) (string, string, string, error) {
-	rc, err := fetchMetadata(path)
+func parseMetadata(ctx context.Context, path string) (string, string, string, error) {
+	rc, err := fetchMetadata(ctx, path)
 	if err != nil {
 		return "", "", "", err
 	}
