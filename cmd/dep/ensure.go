@@ -33,7 +33,7 @@ Package spec:
 
 Examples:
 
-  dep ensure                            Populate vendor from existing manifest and then lock
+  dep ensure                            Compute required deps, lock them, and populate vendor
   dep ensure github.com/pkg/foo@^1.0.1  Update a specific dependency to a specific version
 
 For more detailed usage examples, see dep ensure -examples.
