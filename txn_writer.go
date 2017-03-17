@@ -6,6 +6,7 @@ package dep
 
 import (
 	"bytes"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -65,6 +66,10 @@ func (diff *LockDiff) Format() (string, error) {
 
 	var buf bytes.Buffer
 
+	if diff.HashDiff != nil {
+		buf.WriteString(fmt.Sprintf("Memo: %s\n", diff.HashDiff))
+	}
+
 	if len(diff.Add) > 0 {
 		buf.WriteString("Add: ")
 
@@ -121,23 +126,27 @@ type StringDiff struct {
 	Current  string
 }
 
-func (diff StringDiff) MarshalJSON() ([]byte, error) {
-	var value string
-
+func (diff StringDiff) String() string {
 	if diff.Previous == "" && diff.Current != "" {
-		value = fmt.Sprintf("+ %s", diff.Current)
-	} else if diff.Previous != "" && diff.Current == "" {
-		value = fmt.Sprintf("- %s", diff.Previous)
-	} else if diff.Previous != diff.Current {
-		value = fmt.Sprintf("%s -> %s", diff.Previous, diff.Current)
-	} else {
-		value = diff.Current
+		return fmt.Sprintf("+ %s", diff.Current)
 	}
 
+	if diff.Previous != "" && diff.Current == "" {
+		return fmt.Sprintf("- %s", diff.Previous)
+	}
+
+	if diff.Previous != diff.Current {
+		return fmt.Sprintf("%s -> %s", diff.Previous, diff.Current)
+	}
+
+	return diff.Current
+}
+
+func (diff StringDiff) MarshalJSON() ([]byte, error) {
 	var buf bytes.Buffer
 	enc := json.NewEncoder(&buf)
 	enc.SetEscapeHTML(false)
-	err := enc.Encode(value)
+	err := enc.Encode(diff.String())
 
 	return buf.Bytes(), err
 }
@@ -416,10 +425,10 @@ func diffLocks(l1 gps.Lock, l2 gps.Lock) *LockDiff {
 
 	diff := LockDiff{}
 
-	h1 := l1.InputHash()
-	h2 := l2.InputHash()
-	if !bytes.Equal(h1, h2) {
-		diff.HashDiff = &StringDiff{Previous: string(h1), Current: string(h2)}
+	h1 := hex.EncodeToString(l1.InputHash())
+	h2 := hex.EncodeToString(l2.InputHash())
+	if h1 != h2 {
+		diff.HashDiff = &StringDiff{Previous: h1, Current: h2}
 	}
 
 	var i2next int
