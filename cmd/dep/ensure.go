@@ -153,7 +153,10 @@ func (cmd *ensureCommand) Run(ctx *dep.Ctx, args []string) error {
 	if err != nil {
 		return errors.Wrap(err, "ensure vendor is a directory")
 	}
-	writeV := !vendorExists && solution != nil
+	writeV := dep.VendorOnChanged
+	if !vendorExists && solution != nil {
+		writeV = dep.VendorAlways
+	}
 
 	var sw dep.SafeWriter
 	var manifest *dep.Manifest

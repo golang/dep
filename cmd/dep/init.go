@@ -163,7 +163,7 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 	vlogf("Writing manifest and lock files.")
 
 	var sw dep.SafeWriter
-	sw.Prepare(m, nil, l, true)
+	sw.Prepare(m, nil, l, dep.VendorAlways)
 	if err := sw.Write(root, sm); err != nil {
 		return errors.Wrap(err, "safe write of manifest and lock")
 	}
