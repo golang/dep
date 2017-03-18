@@ -151,39 +151,55 @@ func (diff StringDiff) MarshalJSON() ([]byte, error) {
 	return buf.Bytes(), err
 }
 
+// VendorBehavior defines when the vendor directory should be written.
+type VendorBehavior int
+
+const (
+	// VendorOnChanged indicates that the vendor directory should be written when the lock is new or changed.
+	VendorOnChanged VendorBehavior = iota
+	// VendorAlways forces the vendor directory to always be written.
+	VendorAlways
+	// VendorNever indicates the vendor directory should never be written.
+	VendorNever
+)
+
 // Prepare to write a set of config yaml, lock and vendor tree.
 //
 // - If manifest is provided, it will be written to the standard manifest file
 //   name beneath root.
-// - If lock is provided it will be written to the standard
-//   lock file name in the root dir, but vendor will NOT be written
-// - If lock and newLock are both provided and are equivalent, then neither lock
-//   nor vendor will be written
-// - If lock and newLock are both provided and are not equivalent,
-//   the newLock will be written to the same location as above, and a vendor
-//   tree will be written to the vendor directory
-// - If newLock is provided and lock is not, it will write both a lock
-//   and the vendor directory in the same way
-// - If the forceVendor param is true, then vendor/ will be unconditionally
-//   written out based on newLock if present, else lock, else error.
-func (sw *SafeWriter) Prepare(manifest *Manifest, oldLock *Lock, newLock *Lock, forceVendor bool) {
+// - If newLock is provided, it will be written to the standard lock file
+//   name beneath root.
+// - If vendor is VendorAlways, or is VendorOnChanged and the locks are different,
+//   the vendor directory will be written beneath root based on newLock.
+// - If oldLock is provided without newLock, error.
+// - If vendor is VendorAlways without a newLock, error.
+func (sw *SafeWriter) Prepare(manifest *Manifest, oldLock, newLock *Lock, vendor VendorBehavior) error {
 	sw.Payload = &SafeWriterPayload{
 		Manifest: manifest,
+		Lock:     newLock,
 	}
 
-	if oldLock != nil && newLock != nil {
+	if oldLock != nil {
+		if newLock == nil {
+			return errors.New("must provide newLock when oldLock is specified")
+		}
 		sw.Payload.LockDiff = diffLocks(oldLock, newLock)
 	}
 
-	if forceVendor || sw.Payload.LockDiff != nil {
-		sw.Payload.Lock = newLock
+	switch vendor {
+	case VendorAlways:
 		sw.Payload.WriteVendor = true
+	case VendorOnChanged:
+		if sw.Payload.LockDiff != nil || (newLock != nil && oldLock == nil) {
+			sw.Payload.WriteVendor = true
+		}
 	}
 
-	if oldLock == nil && newLock != nil {
-		sw.Payload.Lock = newLock
-		sw.Payload.WriteVendor = true
+	if sw.Payload.WriteVendor && newLock == nil {
+		return errors.New("must provide newLock in order to write out vendor")
 	}
+
+	return nil
 }
 
 func (payload SafeWriterPayload) validate(root string, sm gps.SourceManager) error {
@@ -199,10 +215,6 @@ func (payload SafeWriterPayload) validate(root string, sm gps.SourceManager) err
 
 	if payload.HasVendor() && sm == nil {
 		return errors.New("must provide a SourceManager if writing out a vendor dir")
-	}
-
-	if payload.HasVendor() && payload.Lock == nil {
-		return errors.New("must provide a lock in order to write out vendor")
 	}
 
 	return nil
