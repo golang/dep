@@ -5,10 +5,10 @@
 package main
 
 import (
-	"hash/fnv"
-	"strings"
 	"bytes"
 	"fmt"
+	"hash/fnv"
+	"strings"
 )
 
 type graphviz struct {
@@ -48,7 +48,7 @@ func (g graphviz) output() bytes.Buffer {
 	for _, dp := range g.ps {
 		for _, bsc := range dp.children {
 			for pr, hsh := range g.h {
-				if strings.HasPrefix(bsc, pr) {
+				if strings.HasPrefix(bsc, pr) && isPathPrefixOrEqual(pr, bsc) {
 					r := fmt.Sprintf("%d -> %d", g.h[dp.project], hsh)
 
 					if _, ex := rels[r]; !ex {
@@ -90,4 +90,25 @@ func (dp gvnode) label() string {
 	}
 
 	return strings.Join(label, "\n")
+}
+
+// Ensure that the literal string prefix is a path tree match and
+// guard against possibilities like this:
+//
+// github.com/sdboyer/foo
+// github.com/sdboyer/foobar/baz
+//
+// Verify that either the input is the same length as the match (in which
+// case we know they're equal), or that the next character is a "/". (Import
+// paths are defined to always use "/", not the OS-specific path separator.)
+func isPathPrefixOrEqual(pre, path string) bool {
+	prflen, pathlen := len(pre), len(path)
+	if pathlen == prflen+1 {
+		// this can never be the case
+		return false
+	}
+
+	// we assume something else (a trie) has done equality check up to the point
+	// of the prefix, so we just check len
+	return prflen == pathlen || strings.Index(path[prflen:], "/") == 0
 }
