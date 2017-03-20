@@ -10,7 +10,7 @@
 <a href="https://godoc.org/github.com/sdboyer/gps"><img src="https://godoc.org/github.com/sdboyer/gps?status.svg" alt="GoDoc"></a>
 </p>
 
---
+---
 
 `gps` is the Go Packaging Solver. It is an engine for tackling dependency
 management problems in Go. It is trivial - [about 35 lines of
