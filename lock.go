@@ -11,6 +11,7 @@ import (
 	"io"
 	"sort"
 
+	"github.com/pelletier/go-toml"
 	"github.com/pkg/errors"
 	"github.com/sdboyer/gps"
 )
@@ -85,7 +86,8 @@ func (l *Lock) Projects() []gps.LockedProject {
 	return l.P
 }
 
-func (l *Lock) MarshalJSON() ([]byte, error) {
+// toRaw converts the manifest into a representation suitable to write to the lock file
+func (l *Lock) toRaw() rawLock {
 	raw := rawLock{
 		Memo: hex.EncodeToString(l.Memo),
 		P:    make([]lockedDep, len(l.P)),
@@ -109,6 +111,12 @@ func (l *Lock) MarshalJSON() ([]byte, error) {
 
 	// TODO sort output - #15
 
+	return raw
+}
+
+func (l *Lock) MarshalJSON() ([]byte, error) {
+	raw := l.toRaw()
+
 	var buf bytes.Buffer
 	enc := json.NewEncoder(&buf)
 	enc.SetIndent("", "    ")
@@ -116,6 +124,47 @@ func (l *Lock) MarshalJSON() ([]byte, error) {
 	err := enc.Encode(raw)
 
 	return buf.Bytes(), err
+}
+
+func (l *Lock) MarshalTOML() (string, error) {
+	raw := l.toRaw()
+
+	// TODO(carolynvs) Consider adding reflection-based marshal functionality to go-toml
+	m := make(map[string]interface{})
+	m["memo"] = raw.Memo
+	p := make([]map[string]interface{}, len(raw.P))
+	for i := 0; i < len(p); i++ {
+		prj := make(map[string]interface{})
+		prj["name"] = raw.P[i].Name
+		prj["revision"] = raw.P[i].Revision
+
+		if raw.P[i].Source != "" {
+			prj["source"] = raw.P[i].Source
+		}
+		if raw.P[i].Branch != "" {
+			prj["branch"] = raw.P[i].Branch
+		}
+		if raw.P[i].Version != "" {
+			prj["version"] = raw.P[i].Version
+		}
+
+		pkgs := make([]interface{}, len(raw.P[i].Packages))
+		for j := range raw.P[i].Packages {
+			pkgs[j] = raw.P[i].Packages[j]
+		}
+		prj["packages"] = pkgs
+
+		p[i] = prj
+	}
+	m["projects"] = p
+
+	t, err := toml.TreeFromMap(m)
+	if err != nil {
+		return "", errors.Wrap(err, "Unable to marshal lock to TOML tree")
+	}
+
+	result, err := t.ToTomlString()
+	return result, errors.Wrap(err, "Unable to marshal lock to TOML string")
 }
 
 // TODO(carolynvs) this should be moved to gps

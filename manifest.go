@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"io"
 
+	"github.com/pelletier/go-toml"
 	"github.com/pkg/errors"
 	"github.com/sdboyer/gps"
 )
@@ -108,21 +109,25 @@ func toProps(n string, p possibleProps) (pp gps.ProjectProperties, err error) {
 	return pp, nil
 }
 
-func (m *Manifest) MarshalJSON() ([]byte, error) {
+// toRaw converts the manifest into a representation suitable to write to the manifest file
+func (m *Manifest) toRaw() rawManifest {
 	raw := rawManifest{
 		Dependencies: make(map[string]possibleProps, len(m.Dependencies)),
 		Overrides:    make(map[string]possibleProps, len(m.Ovr)),
 		Ignores:      m.Ignores,
 		Required:     m.Required,
 	}
-
 	for n, pp := range m.Dependencies {
 		raw.Dependencies[string(n)] = toPossible(pp)
 	}
-
 	for n, pp := range m.Ovr {
 		raw.Overrides[string(n)] = toPossible(pp)
 	}
+	return raw
+}
+
+func (m *Manifest) MarshalJSON() ([]byte, error) {
+	raw := m.toRaw()
 
 	var buf bytes.Buffer
 	enc := json.NewEncoder(&buf)
@@ -131,6 +136,62 @@ func (m *Manifest) MarshalJSON() ([]byte, error) {
 	err := enc.Encode(raw)
 
 	return buf.Bytes(), err
+}
+
+func (m *Manifest) MarshalTOML() (string, error) {
+	raw := m.toRaw()
+
+	// TODO(carolynvs) Consider adding reflection-based marshal functionality to go-toml
+	copyProject := func(src map[string]possibleProps) map[string]interface{} {
+		dest := make(map[string]interface{}, len(src))
+		for k, v := range src {
+			prj := make(map[string]interface{})
+			if v.Source != "" {
+				prj["source"] = v.Source
+			}
+			if v.Branch != "" {
+				prj["branch"] = v.Branch
+			}
+			if v.Version != "" {
+				prj["version"] = v.Version
+			}
+			if v.Revision != "" {
+				prj["revision"] = v.Revision
+			}
+			dest[k] = prj
+
+		}
+		return dest
+	}
+
+	copyProjectRef := func(src []string) []interface{} {
+		dest := make([]interface{}, len(src))
+		for i := range src {
+			dest[i] = src[i]
+		}
+		return dest
+	}
+
+	data := make(map[string]interface{})
+	if len(raw.Dependencies) > 0 {
+		data["dependencies"] = copyProject(raw.Dependencies)
+	}
+	if len(raw.Overrides) > 0 {
+		data["overrides"] = copyProject(raw.Overrides)
+	}
+	if len(raw.Ignores) > 0 {
+		data["ignores"] = copyProjectRef(raw.Ignores)
+	}
+	if len(raw.Required) > 0 {
+		data["required"] = copyProjectRef(raw.Required)
+	}
+
+	tree, err := toml.TreeFromMap(data)
+	if err != nil {
+		return "", errors.Wrap(err, "Unable to marshal the lock to a TOML tree")
+	}
+	result, err := tree.ToTomlString()
+	return result, errors.Wrap(err, "Unable to marshal the lock to a TOML string")
 }
 
 func toPossible(pp gps.ProjectProperties) possibleProps {

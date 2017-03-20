@@ -58,7 +58,7 @@ func TestWriteManifest(t *testing.T) {
 	h := test.NewHelper(t)
 	defer h.Cleanup()
 
-	golden := "manifest/golden.json"
+	golden := "manifest/golden.toml"
 	want := h.GetTestFileString(golden)
 	c, _ := gps.NewSemverConstraint("^v0.12.0")
 	m := &Manifest{
@@ -81,7 +81,7 @@ func TestWriteManifest(t *testing.T) {
 
 	got, err := m.MarshalJSON()
 	if err != nil {
-		t.Fatalf("Error while marshaling valid manifest to JSON: %q", err)
+		t.Fatalf("Error while marshaling valid manifest to TOML: %q", err)
 	}
 
 	if string(got) != want {
@@ -90,7 +90,7 @@ func TestWriteManifest(t *testing.T) {
 				t.Fatal(err)
 			}
 		} else {
-			t.Errorf("Valid manifest did not marshal to JSON as expected:\n\t(GOT): %s\n\t(WNT): %s", string(got), want)
+			t.Errorf("Valid manifest did not marshal to TOML as expected:\n\t(GOT): %s\n\t(WNT): %s", string(got), want)
 		}
 	}
 }
