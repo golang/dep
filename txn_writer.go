@@ -6,6 +6,7 @@ package dep
 
 import (
 	"bytes"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -30,10 +31,10 @@ type SafeWriter struct {
 
 // SafeWriterPayload represents the actions SafeWriter will execute when SafeWriter.Write is called.
 type SafeWriterPayload struct {
-	Manifest         *Manifest
-	Lock             *Lock
-	LockDiff         *LockDiff
-	ForceWriteVendor bool
+	Manifest    *Manifest
+	Lock        *Lock
+	LockDiff    *LockDiff
+	WriteVendor bool
 }
 
 func (payload *SafeWriterPayload) HasLock() bool {
@@ -45,10 +46,7 @@ func (payload *SafeWriterPayload) HasManifest() bool {
 }
 
 func (payload *SafeWriterPayload) HasVendor() bool {
-	// TODO(carolynvs) this can be calculated based on if we are writing the lock
-	// init -> switch to newlock
-	// ensure checks existence, why not move that into the prep?
-	return payload.ForceWriteVendor
+	return payload.WriteVendor
 }
 
 // LockDiff is the set of differences between an existing lock file and an updated lock file.
@@ -67,6 +65,10 @@ func (diff *LockDiff) Format() (string, error) {
 	}
 
 	var buf bytes.Buffer
+
+	if diff.HashDiff != nil {
+		buf.WriteString(fmt.Sprintf("Memo: %s\n", diff.HashDiff))
+	}
 
 	if len(diff.Add) > 0 {
 		buf.WriteString("Add: ")
@@ -124,63 +126,80 @@ type StringDiff struct {
 	Current  string
 }
 
-func (diff StringDiff) MarshalJSON() ([]byte, error) {
-	var value string
-
+func (diff StringDiff) String() string {
 	if diff.Previous == "" && diff.Current != "" {
-		value = fmt.Sprintf("+ %s", diff.Current)
-	} else if diff.Previous != "" && diff.Current == "" {
-		value = fmt.Sprintf("- %s", diff.Previous)
-	} else if diff.Previous != diff.Current {
-		value = fmt.Sprintf("%s -> %s", diff.Previous, diff.Current)
-	} else {
-		value = diff.Current
+		return fmt.Sprintf("+ %s", diff.Current)
 	}
 
+	if diff.Previous != "" && diff.Current == "" {
+		return fmt.Sprintf("- %s", diff.Previous)
+	}
+
+	if diff.Previous != diff.Current {
+		return fmt.Sprintf("%s -> %s", diff.Previous, diff.Current)
+	}
+
+	return diff.Current
+}
+
+func (diff StringDiff) MarshalJSON() ([]byte, error) {
 	var buf bytes.Buffer
 	enc := json.NewEncoder(&buf)
 	enc.SetEscapeHTML(false)
-	err := enc.Encode(value)
+	err := enc.Encode(diff.String())
 
 	return buf.Bytes(), err
 }
+
+// VendorBehavior defines when the vendor directory should be written.
+type VendorBehavior int
+
+const (
+	// VendorOnChanged indicates that the vendor directory should be written when the lock is new or changed.
+	VendorOnChanged VendorBehavior = iota
+	// VendorAlways forces the vendor directory to always be written.
+	VendorAlways
+	// VendorNever indicates the vendor directory should never be written.
+	VendorNever
+)
 
 // Prepare to write a set of config yaml, lock and vendor tree.
 //
 // - If manifest is provided, it will be written to the standard manifest file
 //   name beneath root.
-// - If lock is provided it will be written to the standard
-//   lock file name in the root dir, but vendor will NOT be written
-// - If lock and newLock are both provided and are equivalent, then neither lock
-//   nor vendor will be written
-// - If lock and newLock are both provided and are not equivalent,
-//   the newLock will be written to the same location as above, and a vendor
-//   tree will be written to the vendor directory
-// - If newLock is provided and lock is not, it will write both a lock
-//   and the vendor directory in the same way
-// - If the forceVendor param is true, then vendor/ will be unconditionally
-//   written out based on newLock if present, else lock, else error.
-func (sw *SafeWriter) Prepare(manifest *Manifest, lock *Lock, newLock *Lock, forceVendor bool) {
+// - If newLock is provided, it will be written to the standard lock file
+//   name beneath root.
+// - If vendor is VendorAlways, or is VendorOnChanged and the locks are different,
+//   the vendor directory will be written beneath root based on newLock.
+// - If oldLock is provided without newLock, error.
+// - If vendor is VendorAlways without a newLock, error.
+func (sw *SafeWriter) Prepare(manifest *Manifest, oldLock, newLock *Lock, vendor VendorBehavior) error {
 	sw.Payload = &SafeWriterPayload{
-		Manifest:         manifest,
-		ForceWriteVendor: forceVendor,
+		Manifest: manifest,
+		Lock:     newLock,
 	}
 
-	if newLock != nil {
-		if lock == nil {
-			sw.Payload.Lock = newLock
-			sw.Payload.ForceWriteVendor = true
-		} else {
-			diff := diffLocks(lock, newLock)
-			if diff != nil {
-				sw.Payload.Lock = newLock
-				sw.Payload.LockDiff = diff
-				sw.Payload.ForceWriteVendor = true
-			}
+	if oldLock != nil {
+		if newLock == nil {
+			return errors.New("must provide newLock when oldLock is specified")
 		}
-	} else if lock != nil {
-		sw.Payload.Lock = lock
+		sw.Payload.LockDiff = diffLocks(oldLock, newLock)
 	}
+
+	switch vendor {
+	case VendorAlways:
+		sw.Payload.WriteVendor = true
+	case VendorOnChanged:
+		if sw.Payload.LockDiff != nil || (newLock != nil && oldLock == nil) {
+			sw.Payload.WriteVendor = true
+		}
+	}
+
+	if sw.Payload.WriteVendor && newLock == nil {
+		return errors.New("must provide newLock in order to write out vendor")
+	}
+
+	return nil
 }
 
 func (payload SafeWriterPayload) validate(root string, sm gps.SourceManager) error {
@@ -196,10 +215,6 @@ func (payload SafeWriterPayload) validate(root string, sm gps.SourceManager) err
 
 	if payload.HasVendor() && sm == nil {
 		return errors.New("must provide a SourceManager if writing out a vendor dir")
-	}
-
-	if payload.HasVendor() && payload.Lock == nil {
-		return errors.New("must provide a lock in order to write out vendor")
 	}
 
 	return nil
@@ -358,12 +373,21 @@ func (sw *SafeWriter) PrintPreparedActions() error {
 	}
 
 	if sw.Payload.HasLock() {
-		fmt.Println("Would have written the following changes to lock.json:")
-		diff, err := sw.Payload.LockDiff.Format()
-		if err != nil {
-			return errors.Wrap(err, "ensure DryRun cannot serialize the lock diff")
+		if sw.Payload.LockDiff == nil {
+			fmt.Println("Would have written the following lock.json:")
+			l, err := sw.Payload.Lock.MarshalJSON()
+			if err != nil {
+				return errors.Wrap(err, "ensure DryRun cannot serialize lock")
+			}
+			fmt.Println(string(l))
+		} else {
+			fmt.Println("Would have written the following changes to lock.json:")
+			diff, err := sw.Payload.LockDiff.Format()
+			if err != nil {
+				return errors.Wrap(err, "ensure DryRun cannot serialize the lock diff")
+			}
+			fmt.Println(diff)
 		}
-		fmt.Println(diff)
 	}
 
 	if sw.Payload.HasVendor() {
@@ -413,10 +437,10 @@ func diffLocks(l1 gps.Lock, l2 gps.Lock) *LockDiff {
 
 	diff := LockDiff{}
 
-	h1 := l1.InputHash()
-	h2 := l2.InputHash()
-	if !bytes.Equal(h1, h2) {
-		diff.HashDiff = &StringDiff{Previous: string(h1), Current: string(h2)}
+	h1 := hex.EncodeToString(l1.InputHash())
+	h2 := hex.EncodeToString(l2.InputHash())
+	if h1 != h2 {
+		diff.HashDiff = &StringDiff{Previous: h1, Current: h2}
 	}
 
 	var i2next int
