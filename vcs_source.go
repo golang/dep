@@ -706,12 +706,60 @@ NextVar:
 
 func stripVendor(path string, info os.FileInfo, err error) error {
 	if info.Name() == "vendor" {
+
 		if _, err := os.Lstat(path); err == nil {
 			if info.IsDir() {
 				return removeAll(path)
+			}
+
+			if (info.Mode() & os.ModeSymlink) != 0 {
+				// This is a symlink named 'vendor'. It might point at a directory; if
+				// so, then that's the actual vendor path we need to strip.
+				realPath, err := filepath.EvalSymlinks(path)
+				if err != nil {
+					return err
+				}
+
+				// If the symlink takes us into a higher directory, something very
+				// fishy is going on. To avoid allowing poisonous symlinks (like one
+				// pointing at '/', say), only actually remove files in the same
+				// directory as the symlink or in a deeper directory.
+				//
+				// First, though, resolve any symlinks in path's dir.
+				dir, err := filepath.EvalSymlinks(filepath.Dir(path))
+				if err != nil {
+					return err
+				}
+
+				if !inDirectory(realPath, dir) {
+					return nil
+				}
+
+				// We now trust that the symlink points at a deletable location. But
+				// is that location a directory?
+				realInfo, err := os.Lstat(realPath)
+				if err != nil {
+					return err
+				}
+				if realInfo.IsDir() {
+					return removeAll(realPath)
+				}
 			}
 		}
 	}
 
 	return nil
+}
+
+func inDirectory(path, dir string) bool {
+	pd := filepath.Dir(path)
+	for {
+		if pd == dir {
+			return true
+		}
+		if pd == filepath.Dir(pd) {
+			return false
+		}
+		pd = filepath.Dir(pd)
+	}
 }
