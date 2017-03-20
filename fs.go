@@ -5,7 +5,6 @@
 package dep
 
 import (
-	"encoding/json"
 	"io"
 	"io/ioutil"
 	"os"
@@ -15,6 +14,13 @@ import (
 
 	"github.com/pkg/errors"
 )
+
+// Marshaler is the interface implemented by types that
+// can marshal themselves into valid TOML.
+// TODO(carolynvs) Consider adding this to go-toml?
+type Marshaler interface {
+	MarshalTOML() (string, error)
+}
 
 func IsRegular(name string) (bool, error) {
 	// TODO: lstat?
@@ -59,19 +65,19 @@ func IsNonEmptyDir(name string) (bool, error) {
 	return len(files) != 0, nil
 }
 
-func writeFile(path string, in json.Marshaler) error {
+func writeFile(path string, in Marshaler) error {
 	f, err := os.Create(path)
 	if err != nil {
 		return err
 	}
 	defer f.Close()
 
-	b, err := in.MarshalJSON()
+	s, err := in.MarshalTOML()
 	if err != nil {
 		return err
 	}
 
-	_, err = f.Write(b)
+	_, err = f.WriteString(s)
 	return err
 }
 
