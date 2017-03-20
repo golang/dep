@@ -71,7 +71,7 @@ func TestWriteLock(t *testing.T) {
 	h := test.NewHelper(t)
 	defer h.Cleanup()
 
-	golden := "lock/golden0.json"
+	golden := "lock/golden0.toml"
 	want := h.GetTestFileString(golden)
 	memo, _ := hex.DecodeString("2252a285ab27944a4d7adcba8dbd03980f59ba652f12db39fa93b927c345593e")
 	l := &Lock{
@@ -85,9 +85,9 @@ func TestWriteLock(t *testing.T) {
 		},
 	}
 
-	got, err := l.MarshalJSON()
+	got, err := l.MarshalTOML()
 	if err != nil {
-		t.Fatalf("Error while marshaling valid lock to JSON: %q", err)
+		t.Fatalf("Error while marshaling valid lock to TOML: %q", err)
 	}
 
 	if string(got) != want {
@@ -96,11 +96,11 @@ func TestWriteLock(t *testing.T) {
 				t.Fatal(err)
 			}
 		} else {
-			t.Errorf("Valid lock did not marshal to JSON as expected:\n\t(GOT): %s\n\t(WNT): %s", string(got), want)
+			t.Errorf("Valid lock did not marshal to TOML as expected:\n\t(GOT): %s\n\t(WNT): %s", string(got), want)
 		}
 	}
 
-	golden = "lock/golden1.json"
+	golden = "lock/golden1.toml"
 	want = h.GetTestFileString(golden)
 	memo, _ = hex.DecodeString("2252a285ab27944a4d7adcba8dbd03980f59ba652f12db39fa93b927c345593e")
 	l = &Lock{
@@ -114,9 +114,9 @@ func TestWriteLock(t *testing.T) {
 		},
 	}
 
-	got, err = l.MarshalJSON()
+	got, err = l.MarshalTOML()
 	if err != nil {
-		t.Fatalf("Error while marshaling valid lock to JSON: %q", err)
+		t.Fatalf("Error while marshaling valid lock to TOML: %q", err)
 	}
 
 	if string(got) != want {
@@ -125,7 +125,7 @@ func TestWriteLock(t *testing.T) {
 				t.Fatal(err)
 			}
 		} else {
-			t.Errorf("Valid lock did not marshal to JSON as expected:\n\t(GOT): %s\n\t(WNT): %s", string(got), want)
+			t.Errorf("Valid lock did not marshal to TOML as expected:\n\t(GOT): %s\n\t(WNT): %s", string(got), want)
 		}
 	}
 }
