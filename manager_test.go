@@ -1,6 +1,7 @@
 package gps
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -600,6 +601,8 @@ func TestMultiFetchThreadsafe(t *testing.T) {
 
 	t.Skip("UGH: this is demonstrating real concurrency problems; skipping until we've fixed them")
 
+	// FIXME test case of base path vs. e.g. https path - folding those together
+	// is crucial
 	projects := []ProjectIdentifier{
 		mkPI("github.com/sdboyer/gps"),
 		mkPI("github.com/sdboyer/gpkt"),
@@ -863,5 +866,75 @@ func TestUnreachableSource(t *testing.T) {
 	_, err := sm.ListVersions(id)
 	if err == nil {
 		t.Error("expected err when listing versions of a bogus source, but got nil")
+	}
+}
+
+func TestCallManager(t *testing.T) {
+	bgc := context.Background()
+	ctx, cancelFunc := context.WithCancel(bgc)
+	cm := newCallManager(ctx)
+
+	ci := callInfo{
+		name: "foo",
+		typ:  0,
+	}
+
+	_, err := cm.run(ci)
+	if err != nil {
+		t.Fatal("unexpected err on setUpCall:", err)
+	}
+
+	tc, exists := cm.running[ci]
+	if !exists {
+		t.Fatal("running call not recorded in map")
+	}
+
+	if tc.count != 1 {
+		t.Fatalf("wrong count of running ci: wanted 1 got %v", tc.count)
+	}
+
+	// run another, but via setUpCall
+	_, doneFunc, err := cm.setUpCall(bgc, "foo", 0)
+	if err != nil {
+		t.Fatal("unexpected err on setUpCall:", err)
+	}
+
+	tc, exists = cm.running[ci]
+	if !exists {
+		t.Fatal("running call not recorded in map")
+	}
+
+	if tc.count != 2 {
+		t.Fatalf("wrong count of running ci: wanted 2 got %v", tc.count)
+	}
+
+	doneFunc()
+	if len(cm.ran) != 0 {
+		t.Fatal("should not record metrics until last one drops")
+	}
+
+	tc, exists = cm.running[ci]
+	if !exists {
+		t.Fatal("running call not recorded in map")
+	}
+
+	if tc.count != 1 {
+		t.Fatalf("wrong count of running ci: wanted 1 got %v", tc.count)
+	}
+
+	cm.done(ci)
+	ran, exists := cm.ran[0]
+	if !exists {
+		t.Fatal("should have metrics after closing last of a ci, but did not")
+	}
+
+	if ran.count != 1 {
+		t.Fatalf("wrong count of serial runs of a call: wanted 1 got %v", ran.count)
+	}
+
+	cancelFunc()
+	_, err = cm.run(ci)
+	if err == nil {
+		t.Fatal("should have errored on cm.run() after canceling cm's input context")
 	}
 }

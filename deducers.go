@@ -6,14 +6,116 @@ import (
 	"fmt"
 	"net/url"
 	"sync"
+	"time"
 
 	radix "github.com/armon/go-radix"
+	"github.com/sdboyer/constext"
 )
 
-type srcCommand interface {
+type timeCount struct {
+	count int
+	start time.Time
+}
+
+type durCount struct {
+	count int
+	dur   time.Duration
 }
 
 type callManager struct {
+	ctx     context.Context
+	mu      sync.Mutex // Guards all maps.
+	running map[callInfo]timeCount
+	//running map[callInfo]time.Time
+	ran map[callType]durCount
+	//ran map[callType]time.Duration
+}
+
+func newCallManager(ctx context.Context) *callManager {
+	return &callManager{
+		ctx:     ctx,
+		running: make(map[callInfo]timeCount),
+		ran:     make(map[callType]durCount),
+	}
+}
+
+// Helper function to register a call with a callManager, combine contexts, and
+// create a to-be-deferred func to clean it all up.
+func (cm *callManager) setUpCall(inctx context.Context, name string, typ callType) (cctx context.Context, doneFunc func(), err error) {
+	ci := callInfo{
+		name: name,
+		typ:  typ,
+	}
+
+	octx, err := cm.run(ci)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	cctx, cancelFunc := constext.Cons(inctx, octx)
+	return cctx, func() {
+		cm.done(ci)
+		cancelFunc() // ensure constext cancel goroutine is cleaned up
+	}, nil
+}
+
+func (cm *callManager) run(ci callInfo) (context.Context, error) {
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
+	if cm.ctx.Err() != nil {
+		// We've already been canceled; error out.
+		return nil, cm.ctx.Err()
+	}
+
+	if existingInfo, has := cm.running[ci]; has {
+		existingInfo.count++
+		cm.running[ci] = existingInfo
+	} else {
+		cm.running[ci] = timeCount{
+			count: 1,
+			start: time.Now(),
+		}
+	}
+
+	return cm.ctx, nil
+}
+
+func (cm *callManager) done(ci callInfo) {
+	cm.mu.Lock()
+
+	existingInfo, has := cm.running[ci]
+	if !has {
+		panic(fmt.Sprintf("sourceMgr: tried to complete a call that had not registered via run()"))
+	}
+
+	if existingInfo.count > 1 {
+		// If more than one is pending, don't stop the clock yet.
+		existingInfo.count--
+		cm.running[ci] = existingInfo
+	} else {
+		// Last one for this particular key; update metrics with info.
+		durCnt := cm.ran[ci.typ]
+		durCnt.count++
+		durCnt.dur += time.Now().Sub(existingInfo.start)
+		cm.ran[ci.typ] = durCnt
+		delete(cm.running, ci)
+	}
+
+	cm.mu.Unlock()
+}
+
+type callType uint
+
+const (
+	ctHTTPMetadata callType = iota
+	ctListVersions
+	ctGetManifestAndLock
+)
+
+// callInfo provides metadata about an ongoing call.
+type callInfo struct {
+	name string
+	typ  callType
 }
 
 type srcReturnChans struct {
@@ -31,19 +133,17 @@ func (retchans srcReturnChans) awaitReturn() (*sourceActor, error) {
 }
 
 type sourcesCompany struct {
-	//actionChan chan func()
-	ctx       context.Context
-	callMgr   callManager
-	srcmut    sync.RWMutex
+	callMgr   *callManager
+	srcmut    sync.RWMutex // guards srcs and nameToURL maps
 	srcs      map[string]*sourceActor
 	nameToURL map[string]string
-	psrcmut   sync.Mutex
+	psrcmut   sync.Mutex // guards protoSrcs map
 	protoSrcs map[string][]srcReturnChans
 	deducer   *deductionCoordinator
 	cachedir  string
 }
 
-func (sc *sourcesCompany) getSourceActorFor(id ProjectIdentifier) (*sourceActor, error) {
+func (sc *sourcesCompany) getSourceActorFor(ctx context.Context, id ProjectIdentifier) (*sourceActor, error) {
 	normalizedName := id.normalizedSource()
 
 	sc.srcmut.RLock()
@@ -133,7 +233,7 @@ func (sc *sourcesCompany) getSourceActorFor(id ProjectIdentifier) (*sourceActor,
 		// sourceURL it's operating on, and ensure it's *also* registered at
 		// that path in the map. This will cause it to actually initiate the
 		// maybeSource.try() behavior in order to settle on a URL.
-		url, err := srcActor.sourceURL()
+		url, err := srcActor.sourceURL(ctx)
 		if err != nil {
 			doReturn(nil, err)
 			return
@@ -163,33 +263,27 @@ func (sc *sourcesCompany) getSourceActorFor(id ProjectIdentifier) (*sourceActor,
 type sourceActor struct {
 	maybe    maybeSource
 	cachedir string
+	mu       sync.Mutex // global lock, serializes all behaviors
 	action   chan (func())
-	callMgr  callManager
-	ctx      context.Context
+	callMgr  *callManager
 }
 
-func (sa *sourceActor) sourceURL() (string, error) {
-	retchan, errchan := make(chan string), make(chan error)
-	sa.action <- func() {
-	}
+func (sa *sourceActor) sourceURL(ctx context.Context) (string, error) {
+	sa.mu.Lock()
+	defer sa.mu.Unlock()
 
-	select {
-	case url := <-retchan:
-		return url, nil
-	case err := <-errchan:
-		return "", err
-	}
+	return "", nil
 }
 
 type deductionCoordinator struct {
 	ctx        context.Context
-	callMgr    callManager
+	callMgr    *callManager
 	rootxt     *radix.Tree
 	deducext   *deducerTrie
 	actionChan chan func()
 }
 
-func newDeductionCoordinator(ctx context.Context, cm callManager) *deductionCoordinator {
+func newDeductionCoordinator(ctx context.Context, cm *callManager) *deductionCoordinator {
 	dc := &deductionCoordinator{
 		ctx:      ctx,
 		callMgr:  cm,
@@ -202,7 +296,6 @@ func newDeductionCoordinator(ctx context.Context, cm callManager) *deductionCoor
 		for {
 			select {
 			case <-ctx.Done():
-				// TODO should this iterate over the rootxt and kill open hmd?
 				close(dc.actionChan)
 			case action := <-dc.actionChan:
 				action()
@@ -214,10 +307,14 @@ func newDeductionCoordinator(ctx context.Context, cm callManager) *deductionCoor
 }
 
 func (dc *deductionCoordinator) deduceRootPath(path string) (pathDeduction, error) {
+	if dc.ctx.Err() != nil {
+		return pathDeduction{}, errors.New("deductionCoordinator has been terminated")
+	}
+
 	retchan, errchan := make(chan pathDeduction), make(chan error)
 	dc.actionChan <- func() {
 		hmdDeduce := func(hmd *httpMetadataDeducer) {
-			pd, err := hmd.deduce(path)
+			pd, err := hmd.deduce(context.TODO(), path)
 			if err != nil {
 				errchan <- err
 			} else {
@@ -252,8 +349,8 @@ func (dc *deductionCoordinator) deduceRootPath(path string) (pathDeduction, erro
 		if err == nil {
 			// Deduction worked; store it in the rootxt, send on retchan and
 			// terminate.
-			// FIXME deal with changing path vs. root. Probably needs to be
-			// predeclared and reused in the hmd returnFunc
+			// FIXME(sdboyer) deal with changing path vs. root. Probably needs
+			// to be predeclared and reused in the hmd returnFunc
 			dc.rootxt.Insert(pd.root, pd.mb)
 			retchan <- pd
 			return
@@ -269,7 +366,6 @@ func (dc *deductionCoordinator) deduceRootPath(path string) (pathDeduction, erro
 		hmd := &httpMetadataDeducer{
 			basePath: path,
 			callMgr:  dc.callMgr,
-			ctx:      dc.ctx,
 			// The vanity deducer will call this func with a completed
 			// pathDeduction if it succeeds in finding one. We process it
 			// back through the action channel to ensure serialized
@@ -277,9 +373,10 @@ func (dc *deductionCoordinator) deduceRootPath(path string) (pathDeduction, erro
 			returnFunc: func(pd pathDeduction) {
 				dc.actionChan <- func() {
 					if pd.root != path {
-						// Clean out the vanity deducer, we don't need it
-						// anymore.
-						dc.rootxt.Delete(path)
+						// Replace the vanity deducer with a real result set, so
+						// that subsequent deductions don't hit the network
+						// again.
+						dc.rootxt.Insert(path, pd.mb)
 					}
 					dc.rootxt.Insert(pd.root, pd.mb)
 				}
@@ -358,14 +455,18 @@ type httpMetadataDeducer struct {
 	deduceErr  error
 	basePath   string
 	returnFunc func(pathDeduction)
-	callMgr    callManager
-	ctx        context.Context
+	callMgr    *callManager
 }
 
-func (hmd *httpMetadataDeducer) deduce(path string) (pathDeduction, error) {
+func (hmd *httpMetadataDeducer) deduce(ctx context.Context, path string) (pathDeduction, error) {
 	hmd.once.Do(func() {
-		// FIXME interact with callmgr
-		//hmd.callMgr.Attach()
+		ctx, doneFunc, err := hmd.callMgr.setUpCall(ctx, path, ctHTTPMetadata)
+		if err != nil {
+			hmd.deduceErr = err
+			return
+		}
+		defer doneFunc()
+
 		opath := path
 		// FIXME should we need this first return val?
 		_, path, err := normalizeURI(path)
@@ -377,7 +478,7 @@ func (hmd *httpMetadataDeducer) deduce(path string) (pathDeduction, error) {
 		pd := pathDeduction{}
 
 		// Make the HTTP call to attempt to retrieve go-get metadata
-		root, vcs, reporoot, err := parseMetadata(hmd.ctx, path)
+		root, vcs, reporoot, err := parseMetadata(ctx, path)
 		if err != nil {
 			hmd.deduceErr = fmt.Errorf("unable to deduce repository and source type for: %q", opath)
 			return
