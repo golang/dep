@@ -13,6 +13,10 @@ import (
 // https://github.com/Masterminds/vcs test files
 
 func TestSvnRepo(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping slow test in short mode")
+	}
+
 	tempDir, err := ioutil.TempDir("", "go-vcs-svn-tests")
 	if err != nil {
 		t.Error(err)
@@ -99,6 +103,10 @@ func TestSvnRepo(t *testing.T) {
 }
 
 func TestHgRepo(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping slow test in short mode")
+	}
+
 	tempDir, err := ioutil.TempDir("", "go-vcs-hg-tests")
 	if err != nil {
 		t.Error(err)
@@ -160,6 +168,10 @@ func TestHgRepo(t *testing.T) {
 }
 
 func TestGitRepo(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping slow test in short mode")
+	}
+
 	tempDir, err := ioutil.TempDir("", "go-vcs-git-tests")
 	if err != nil {
 		t.Error(err)
@@ -230,6 +242,10 @@ func TestGitRepo(t *testing.T) {
 }
 
 func TestBzrRepo(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping slow test in short mode")
+	}
+
 	tempDir, err := ioutil.TempDir("", "go-vcs-bzr-tests")
 	if err != nil {
 		t.Error(err)
