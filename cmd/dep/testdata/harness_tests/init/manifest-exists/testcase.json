@@ -1,0 +1,6 @@
+{
+  "commands": [
+    ["init"]
+  ],
+  "error-expected" : "manifest file already exists"
+}

@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"testing"
 )
 
@@ -27,6 +28,7 @@ type IntegrationTestCase struct {
 	initialPath   string
 	finalPath     string
 	Commands      [][]string        `json:"commands"`
+	ErrorExpected string            `json:"error-expected"`
 	GopathInitial map[string]string `json:"gopath-initial"`
 	VendorInitial map[string]string `json:"vendor-initial"`
 	VendorFinal   []string          `json:"vendor-final"`
@@ -54,6 +56,26 @@ func NewTestCase(t *testing.T, name string) *IntegrationTestCase {
 		panic(err)
 	}
 	return n
+}
+
+// CompareError compares expected error to error recived.
+func (tc *IntegrationTestCase) CompareError(err error, stderr string) {
+	if err == nil {
+		return
+	}
+
+	wantExists, want := tc.ErrorExpected != "", tc.ErrorExpected
+	gotExists, got := stderr != "", stderr
+
+	if wantExists && gotExists {
+		if !strings.Contains(got, want) {
+			tc.t.Errorf("expected error %s, got error %s", want, got)
+		}
+	} else if !wantExists && gotExists {
+		tc.t.Fatal("error raised where none was expected")
+	} else if wantExists && !gotExists {
+		tc.t.Error("error was not raised where one was expected")
+	}
 }
 
 var jsonNils *regexp.Regexp = regexp.MustCompile(`.*: null,.*\r?\n`)
@@ -148,11 +170,12 @@ func (tc *IntegrationTestCase) WriteFile(src string, content string) error {
 	return err
 }
 
-func getFile(path string) (bool, string, error) {
-	_, err := os.Stat(path)
+func getFile(path string) (exists bool, contents string, err error) {
+	_, err = os.Stat(path)
 	if err != nil {
 		return false, "", nil
 	}
+
 	f, err := ioutil.ReadFile(path)
 	if err != nil {
 		return true, "", err

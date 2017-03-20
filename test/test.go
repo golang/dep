@@ -506,12 +506,7 @@ func (h *Helper) Path(name string) string {
 		joined = filepath.Join(h.tempdir, name)
 	}
 
-	// Ensure it's the absolute, symlink-less path we're returning
-	abs, err := filepath.EvalSymlinks(joined)
-	if err != nil {
-		h.t.Fatalf("%+v", errors.Wrapf(err, "internal testsuite error: could not get absolute path for dir(%q)", joined))
-	}
-	return abs
+	return joined
 }
 
 // MustExist fails if path does not exist.
