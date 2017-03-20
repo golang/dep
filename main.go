@@ -57,6 +57,25 @@ func main() {
 		&hashinCommand{},
 	}
 
+	examples := [][2]string{
+		[2]string{
+			"dep init",
+			"set up a new project",
+		},
+		[2]string{
+			"dep ensure",
+			"install the project's dependencies",
+		},
+		[2]string{
+			"dep ensure -update",
+			"update the saved versions of all dependencies",
+		},
+		[2]string{
+			"dep ensure github.com/pkg/errors",
+			"add a dependency to the project",
+		},
+	}
+
 	usage := func() {
 		fmt.Fprintln(os.Stderr, "Usage: dep <command>")
 		fmt.Fprintln(os.Stderr)
@@ -67,6 +86,12 @@ func main() {
 			if !command.Hidden() {
 				fmt.Fprintf(w, "\t%s\t%s\n", command.Name(), command.ShortHelp())
 			}
+		}
+		w.Flush()
+		fmt.Fprintln(os.Stderr)
+		fmt.Fprintln(os.Stderr, "Examples:")
+		for _, example := range examples {
+			fmt.Fprintf(w, "\t%s\t%s\n", example[0], example[1])
 		}
 		w.Flush()
 		fmt.Fprintln(os.Stderr)
