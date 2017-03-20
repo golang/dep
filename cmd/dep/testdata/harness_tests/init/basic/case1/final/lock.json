@@ -1,0 +1,21 @@
+{
+    "memo": "d92aca2decb5c206446e27908e6ff60a361d6db604136f906091cb9183ea7b1f",
+    "projects": [
+        {
+            "name": "github.com/sdboyer/deptest",
+            "version": "v1.0.0",
+            "revision": "ff2948a2ac8f538c4ecd55962e919d1e13e74baf",
+            "packages": [
+                "."
+            ]
+        },
+        {
+            "name": "github.com/sdboyer/deptestdos",
+            "version": "v2.0.0",
+            "revision": "5c607206be5decd28e6263ffffdcee067266015e",
+            "packages": [
+                "."
+            ]
+        }
+    ]
+}
