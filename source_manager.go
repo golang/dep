@@ -1,6 +1,7 @@
 package gps
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/signal"
@@ -14,10 +15,8 @@ import (
 	"github.com/sdboyer/gps/pkgtree"
 )
 
-// Used to compute a friendly filepath from a URL-shaped input
-//
-// TODO(sdboyer) this is awful. Right?
-var sanitizer = strings.NewReplacer(":", "-", "/", "-", "+", "-")
+// Used to compute a friendly filepath from a URL-shaped input.
+var sanitizer = strings.NewReplacer("-", "--", ":", "-", "/", "-", "+", "-")
 
 // A SourceManager is responsible for retrieving, managing, and interrogating
 // source repositories. Its primary purpose is to serve the needs of a Solver,
@@ -85,21 +84,24 @@ type ProjectAnalyzer interface {
 // There's no (planned) reason why it would need to be reimplemented by other
 // tools; control via dependency injection is intended to be sufficient.
 type SourceMgr struct {
-	cachedir  string                    // path to root of cache dir
-	lf        *os.File                  // handle for the sm lock file on disk
-	srcs      map[string]source         // map of path names to source obj
-	srcmut    sync.RWMutex              // mutex protecting srcs map
-	srcfuts   map[string]*unifiedFuture // map of paths to source-handling futures
-	srcfmut   sync.RWMutex              // mutex protecting futures map
-	an        ProjectAnalyzer           // analyzer injected by the caller
-	dxt       *deducerTrie              // static trie with baseline source type deduction info
-	rootxt    *prTrie                   // dynamic trie, updated as ProjectRoots are deduced
-	qch       chan struct{}             // quit chan for signal handler
-	sigmut    sync.Mutex                // mutex protecting signal handling setup/teardown
-	glock     sync.RWMutex              // global lock for all ops, sm validity
-	opcount   int32                     // number of ops in flight
-	relonce   sync.Once                 // once-er to ensure we only release once
-	releasing int32                     // flag indicating release of sm has begun
+	cachedir    string                    // path to root of cache dir
+	lf          *os.File                  // handle for the sm lock file on disk
+	callMgr     *callManager              // subsystem that coordinates running calls/io
+	deduceCoord *deductionCoordinator     // subsystem that manages import path deduction
+	srcCoord    *sourceCoordinator        // subsystem that manages sources
+	srcs        map[string]source         // map of path names to source obj
+	srcmut      sync.RWMutex              // mutex protecting srcs map
+	srcfuts     map[string]*unifiedFuture // map of paths to source-handling futures
+	srcfmut     sync.RWMutex              // mutex protecting futures map
+	an          ProjectAnalyzer           // analyzer injected by the caller
+	dxt         *deducerTrie              // static trie with baseline source type deduction info
+	rootxt      *prTrie                   // dynamic trie, updated as ProjectRoots are deduced
+	qch         chan struct{}             // quit chan for signal handler
+	sigmut      sync.Mutex                // mutex protecting signal handling setup/teardown
+	glock       sync.RWMutex              // global lock for all ops, sm validity
+	opcount     int32                     // number of ops in flight
+	relonce     sync.Once                 // once-er to ensure we only release once
+	releasing   int32                     // flag indicating release of sm has begun
 }
 
 type smIsReleased struct{}
@@ -157,15 +159,21 @@ func NewSourceManager(an ProjectAnalyzer, cachedir string) (*SourceMgr, error) {
 		}
 	}
 
+	cm := newCallManager(context.TODO())
+	deducer := newDeductionCoordinator(cm)
+
 	sm := &SourceMgr{
-		cachedir: cachedir,
-		lf:       fi,
-		srcs:     make(map[string]source),
-		srcfuts:  make(map[string]*unifiedFuture),
-		an:       an,
-		dxt:      pathDeducerTrie(),
-		rootxt:   newProjectRootTrie(),
-		qch:      make(chan struct{}),
+		cachedir:    cachedir,
+		lf:          fi,
+		callMgr:     cm,
+		deduceCoord: deducer,
+		srcCoord:    newSourceCoordinator(cm, deducer, cachedir),
+		srcs:        make(map[string]source),
+		srcfuts:     make(map[string]*unifiedFuture),
+		an:          an,
+		dxt:         pathDeducerTrie(),
+		rootxt:      newProjectRootTrie(),
+		qch:         make(chan struct{}),
 	}
 
 	return sm, nil

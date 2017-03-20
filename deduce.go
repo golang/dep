@@ -2,6 +2,7 @@ package gps
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -10,6 +11,9 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
+
+	radix "github.com/armon/go-radix"
 )
 
 var (
@@ -564,7 +568,7 @@ func (sm *SourceMgr) deduceFromPath(path string) (deductionFuture, error) {
 			c := make(chan struct{}, 1)
 			go func() {
 				defer close(c)
-				src, ident, err = mb.try(cachedir, an)
+				src, ident, err = mb.try(context.TODO(), cachedir, an)
 			}()
 
 			return func() (source, string, error) {
@@ -672,7 +676,7 @@ func (sm *SourceMgr) deduceFromPath(path string) (deductionFuture, error) {
 			}
 
 			if m != nil {
-				src, ident, err = m.try(cachedir, an)
+				src, ident, err = m.try(context.TODO(), cachedir, an)
 			} else {
 				err = fmt.Errorf("unsupported vcs type %s", vcs)
 			}
@@ -690,6 +694,253 @@ func (sm *SourceMgr) deduceFromPath(path string) (deductionFuture, error) {
 	}, nil
 }
 
+type deductionCoordinator struct {
+	ctx      context.Context
+	callMgr  *callManager
+	rootxt   *radix.Tree
+	deducext *deducerTrie
+	action   chan func()
+}
+
+func newDeductionCoordinator(cm *callManager) *deductionCoordinator {
+	dc := &deductionCoordinator{
+		callMgr:  cm,
+		ctx:      cm.getLifetimeContext(),
+		rootxt:   radix.New(),
+		deducext: pathDeducerTrie(),
+	}
+
+	// Start listener loop
+	go func() {
+		for {
+			select {
+			case <-dc.ctx.Done():
+				close(dc.action)
+			case action := <-dc.action:
+				action()
+			}
+		}
+	}()
+
+	return dc
+}
+
+func (dc *deductionCoordinator) deduceRootPath(path string) (pathDeduction, error) {
+	if dc.ctx.Err() != nil {
+		return pathDeduction{}, errors.New("deductionCoordinator has been terminated")
+	}
+
+	retchan, errchan := make(chan pathDeduction), make(chan error)
+	dc.action <- func() {
+		hmdDeduce := func(hmd *httpMetadataDeducer) {
+			pd, err := hmd.deduce(context.TODO(), path)
+			if err != nil {
+				errchan <- err
+			} else {
+				retchan <- pd
+			}
+		}
+
+		// First, check the rootxt to see if there's a prefix match - if so, we
+		// can return that and move on.
+		if prefix, data, has := dc.rootxt.LongestPrefix(path); has && isPathPrefixOrEqual(prefix, path) {
+			switch d := data.(type) {
+			case maybeSource:
+				retchan <- pathDeduction{root: prefix, mb: d}
+			case *httpMetadataDeducer:
+				// Multiple calls have come in for a similar path shape during
+				// the window in which the HTTP request to retrieve go get
+				// metadata is in flight. Fold this request in with the existing
+				// one(s) by giving it its own goroutine that awaits a response
+				// from the running httpMetadataDeducer.
+				go hmdDeduce(d)
+			default:
+				panic(fmt.Sprintf("unexpected %T in deductionCoordinator.rootxt: %v", d, d))
+			}
+
+			// Finding either a finished maybeSource or an in-flight vanity
+			// deduction means there's nothing more to do on this action.
+			return
+		}
+
+		// No match. Try known path deduction first.
+		pd, err := dc.deduceKnownPaths(path)
+		if err == nil {
+			// Deduction worked; store it in the rootxt, send on retchan and
+			// terminate.
+			// FIXME(sdboyer) deal with changing path vs. root. Probably needs
+			// to be predeclared and reused in the hmd returnFunc
+			dc.rootxt.Insert(pd.root, pd.mb)
+			retchan <- pd
+			return
+		}
+
+		if err != errNoKnownPathMatch {
+			errchan <- err
+			return
+		}
+
+		// The err indicates no known path matched. It's still possible that
+		// retrieving go get metadata might do the trick.
+		hmd := &httpMetadataDeducer{
+			basePath: path,
+			callMgr:  dc.callMgr,
+			// The vanity deducer will call this func with a completed
+			// pathDeduction if it succeeds in finding one. We process it
+			// back through the action channel to ensure serialized
+			// access to the rootxt map.
+			returnFunc: func(pd pathDeduction) {
+				dc.action <- func() {
+					if pd.root != path {
+						// Replace the vanity deducer with a real result set, so
+						// that subsequent deductions don't hit the network
+						// again.
+						dc.rootxt.Insert(path, pd.mb)
+					}
+					dc.rootxt.Insert(pd.root, pd.mb)
+				}
+			},
+		}
+
+		// Save the hmd in the rootxt so that calls checking on similar
+		// paths made while the request is in flight can be folded together.
+		dc.rootxt.Insert(path, hmd)
+		// Spawn a new goroutine for the HTTP-backed deduction process.
+		go hmdDeduce(hmd)
+
+	}
+
+	select {
+	case pd := <-retchan:
+		return pd, nil
+	case err := <-errchan:
+		return pathDeduction{}, err
+	}
+}
+
+// pathDeduction represents the results of a successful import path deduction -
+// a root path, plus a maybeSource that can be used to attempt to connect to
+// the source.
+type pathDeduction struct {
+	root string
+	mb   maybeSource
+}
+
+var errNoKnownPathMatch = errors.New("no known path match")
+
+func (dc *deductionCoordinator) deduceKnownPaths(path string) (pathDeduction, error) {
+	u, path, err := normalizeURI(path)
+	if err != nil {
+		return pathDeduction{}, err
+	}
+
+	// First, try the root path-based matches
+	if _, mtch, has := dc.deducext.LongestPrefix(path); has {
+		root, err := mtch.deduceRoot(path)
+		if err != nil {
+			return pathDeduction{}, err
+		}
+		mb, err := mtch.deduceSource(path, u)
+		if err != nil {
+			return pathDeduction{}, err
+		}
+
+		return pathDeduction{
+			root: root,
+			mb:   mb,
+		}, nil
+	}
+
+	// Next, try the vcs extension-based (infix) matcher
+	exm := vcsExtensionDeducer{regexp: vcsExtensionRegex}
+	if root, err := exm.deduceRoot(path); err == nil {
+		mb, err := exm.deduceSource(path, u)
+		if err != nil {
+			return pathDeduction{}, err
+		}
+
+		return pathDeduction{
+			root: root,
+			mb:   mb,
+		}, nil
+	}
+
+	return pathDeduction{}, errNoKnownPathMatch
+}
+
+type httpMetadataDeducer struct {
+	once       sync.Once
+	deduced    pathDeduction
+	deduceErr  error
+	basePath   string
+	returnFunc func(pathDeduction)
+	callMgr    *callManager
+}
+
+func (hmd *httpMetadataDeducer) deduce(ctx context.Context, path string) (pathDeduction, error) {
+	// TODO(sdboyer) can this be replaced by the code in golang.org/x?
+	hmd.once.Do(func() {
+		ctx, doneFunc, err := hmd.callMgr.setUpCall(ctx, path, ctHTTPMetadata)
+		if err != nil {
+			hmd.deduceErr = err
+			return
+		}
+		defer doneFunc()
+
+		opath := path
+		// FIXME should we need this first return val?
+		_, path, err := normalizeURI(path)
+		if err != nil {
+			hmd.deduceErr = err
+			return
+		}
+
+		pd := pathDeduction{}
+
+		// Make the HTTP call to attempt to retrieve go-get metadata
+		root, vcs, reporoot, err := parseMetadata(ctx, path)
+		if err != nil {
+			hmd.deduceErr = fmt.Errorf("unable to deduce repository and source type for: %q", opath)
+			return
+		}
+		pd.root = root
+
+		// If we got something back at all, then it supercedes the actual input for
+		// the real URL to hit
+		repoURL, err := url.Parse(reporoot)
+		if err != nil {
+			hmd.deduceErr = fmt.Errorf("server returned bad URL when searching for vanity import: %q", reporoot)
+			return
+		}
+
+		switch vcs {
+		case "git":
+			pd.mb = maybeGitSource{url: repoURL}
+		case "bzr":
+			pd.mb = maybeBzrSource{url: repoURL}
+		case "hg":
+			pd.mb = maybeHgSource{url: repoURL}
+		default:
+			hmd.deduceErr = fmt.Errorf("unsupported vcs type %s in go-get metadata from %s", vcs, path)
+			return
+		}
+
+		hmd.deduced = pd
+		// All data is assigned for other goroutines that may be waiting. Now,
+		// send the pathDeduction back to the deductionCoordinator by calling
+		// the returnFunc. This will also remove the reference to this hmd in
+		// the coordinator's trie.
+		//
+		// When this call finishes, it is guaranteed the coordinator will have
+		// at least begun running the action to insert the path deduction, which
+		// means no other deduction request will be able to interleave and
+		// request the same path before the pathDeduction can be processed, but
+		// after this hmd has been dereferenced from the trie.
+		hmd.returnFunc(pd)
+	})
+
+	return hmd.deduced, hmd.deduceErr
+}
 func normalizeURI(p string) (u *url.URL, newpath string, err error) {
 	if m := scpSyntaxRe.FindStringSubmatch(p); m != nil {
 		// Match SCP-like syntax and convert it to a URL.
