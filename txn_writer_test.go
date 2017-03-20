@@ -15,7 +15,7 @@ import (
 
 const safeWriterProject = "safewritertest"
 const safeWriterGoldenManifest = "txn_writer/expected_manifest.json"
-const safeWriterGoldenLock = "txn_writer/expected_lock.json"
+const safeWriterGoldenLock = "txn_writer/expected_lock.toml"
 
 func TestSafeWriter_BadInput_MissingRoot(t *testing.T) {
 	h := test.NewHelper(t)

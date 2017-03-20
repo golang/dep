@@ -79,7 +79,7 @@ func TestWriteManifest(t *testing.T) {
 		Ignores: []string{"github.com/foo/bar"},
 	}
 
-	got, err := m.MarshalJSON()
+	got, err := m.MarshalTOML()
 	if err != nil {
 		t.Fatalf("Error while marshaling valid manifest to TOML: %q", err)
 	}

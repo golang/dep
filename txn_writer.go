@@ -365,7 +365,7 @@ fail:
 func (sw *SafeWriter) PrintPreparedActions() error {
 	if sw.Payload.HasManifest() {
 		fmt.Println("Would have written the following manifest.json:")
-		m, err := sw.Payload.Manifest.MarshalJSON()
+		m, err := sw.Payload.Manifest.MarshalTOML()
 		if err != nil {
 			return errors.Wrap(err, "ensure DryRun cannot serialize manifest")
 		}
@@ -375,7 +375,7 @@ func (sw *SafeWriter) PrintPreparedActions() error {
 	if sw.Payload.HasLock() {
 		if sw.Payload.LockDiff == nil {
 			fmt.Println("Would have written the following lock.json:")
-			l, err := sw.Payload.Lock.MarshalJSON()
+			l, err := sw.Payload.Lock.MarshalTOML()
 			if err != nil {
 				return errors.Wrap(err, "ensure DryRun cannot serialize lock")
 			}

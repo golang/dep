@@ -29,7 +29,7 @@ func TestDeriveManifestAndLock(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	got, err := m.(*Manifest).MarshalJSON()
+	got, err := m.(*Manifest).MarshalTOML()
 	if err != nil {
 		t.Fatal(err)
 	}
