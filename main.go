@@ -77,6 +77,8 @@ func main() {
 	}
 
 	usage := func() {
+		fmt.Fprintln(os.Stderr, "dep is a tool for managing dependencies for Go projects")
+		fmt.Fprintln(os.Stderr)
 		fmt.Fprintln(os.Stderr, "Usage: dep <command>")
 		fmt.Fprintln(os.Stderr)
 		fmt.Fprintln(os.Stderr, "Commands:")
