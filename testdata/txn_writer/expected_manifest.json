@@ -1,7 +1,0 @@
-{
-    "dependencies": {
-        "github.com/sdboyer/dep-test": {
-            "version": "1.0.0"
-        }
-    }
-}

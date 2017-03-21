@@ -1,0 +1,14 @@
+memo = "2252a285ab27944a4d7adcba8dbd03980f59ba652f12db39fa93b927c345593e"
+
+[[projects]]
+  name = "github.com/foo/bar"
+  source = "http://github.example.com/foo/bar"
+  version = "1.2.0"
+  revision = "2a3a211e171803acb82d1d5d42ceb53228f51751"
+  packages = ["thing","util"]
+
+[[packages]]
+  name = "github.com/stuff/realthing"
+  version = "2.0.0"
+  revision = "1f02e52d6bac308da54ab84a234c58a98ca82347"
+  packages = ["."]
