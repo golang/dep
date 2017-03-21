@@ -41,19 +41,19 @@ func main() {
 	}
 
 	examples := [][2]string{
-		[2]string{
+		{
 			"dep init",
 			"set up a new project",
 		},
-		[2]string{
+		{
 			"dep ensure",
 			"install the project's dependencies",
 		},
-		[2]string{
+		{
 			"dep ensure -update",
 			"update the saved versions of all dependencies",
 		},
-		[2]string{
+		{
 			"dep ensure github.com/pkg/errors",
 			"add a dependency to the project",
 		},
