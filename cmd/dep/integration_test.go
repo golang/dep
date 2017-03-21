@@ -11,6 +11,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/golang/dep"
 	"github.com/golang/dep/test"
 )
 
@@ -56,8 +57,8 @@ func TestIntegration(t *testing.T) {
 				}
 
 				// Check final manifest and lock
-				testCase.CompareFile("manifest.json", testProj.ProjPath("manifest.json"))
-				testCase.CompareFile("lock.json", testProj.ProjPath("lock.json"))
+				testCase.CompareFile(dep.ManifestName, testProj.ProjPath(dep.ManifestName))
+				testCase.CompareFile(dep.LockName, testProj.ProjPath(dep.LockName))
 
 				// Check vendor paths
 				testProj.CompareImportPaths()
