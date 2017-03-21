@@ -5,7 +5,6 @@
 package dep
 
 import (
-	"bytes"
 	"encoding/json"
 	"io"
 
@@ -24,17 +23,10 @@ type Manifest struct {
 }
 
 type rawManifest struct {
-	Dependencies map[string]possibleProps `json:"dependencies,omitempty"`
-	Overrides    map[string]possibleProps `json:"overrides,omitempty"`
-	Ignores      []string                 `json:"ignores,omitempty"`
-	Required     []string                 `json:"required,omitempty"`
-}
-
-type possibleProps struct {
-	Branch   string `json:"branch,omitempty"`
-	Revision string `json:"revision,omitempty"`
-	Version  string `json:"version,omitempty"`
-	Source   string `json:"source,omitempty"`
+	Dependencies map[string]possibleProps
+	Overrides    map[string]possibleProps
+	Ignores      []string
+	Required     []string
 }
 
 func newRawManifest() rawManifest {
@@ -44,6 +36,13 @@ func newRawManifest() rawManifest {
 		Ignores:      make([]string, 0),
 		Required:     make([]string, 0),
 	}
+}
+
+type possibleProps struct {
+	Branch   string
+	Revision string
+	Version  string
+	Source   string
 }
 
 func readManifest(r io.Reader) (*Manifest, error) {
@@ -124,18 +123,6 @@ func (m *Manifest) toRaw() rawManifest {
 		raw.Overrides[string(n)] = toPossible(pp)
 	}
 	return raw
-}
-
-func (m *Manifest) MarshalJSON() ([]byte, error) {
-	raw := m.toRaw()
-
-	var buf bytes.Buffer
-	enc := json.NewEncoder(&buf)
-	enc.SetIndent("", "    ")
-	enc.SetEscapeHTML(false)
-	err := enc.Encode(raw)
-
-	return buf.Bytes(), err
 }
 
 func (m *Manifest) MarshalTOML() (string, error) {
