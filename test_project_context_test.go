@@ -62,7 +62,7 @@ func (pc *TestProjectContext) Load() {
 		mf := pc.h.GetFile(mp)
 		defer mf.Close()
 		m, err = readManifest(mf)
-		pc.h.Must(err)
+		pc.h.Must(errors.Wrapf(err, "Unable to read manifest at %s", mp))
 	}
 	var l *Lock
 	lp := pc.getLockPath()
@@ -70,7 +70,7 @@ func (pc *TestProjectContext) Load() {
 		lf := pc.h.GetFile(lp)
 		defer lf.Close()
 		l, err = readLock(lf)
-		pc.h.Must(err)
+		pc.h.Must(errors.Wrapf(err, "Unable to read lock at %s", lp))
 	}
 	pc.Project.Manifest = m
 	pc.Project.Lock = l
