@@ -17,13 +17,3 @@ func doIsStdLib(path string) bool {
 
 	return !strings.Contains(path[:i], ".")
 }
-
-// MockIsStdLib sets the IsStdLib func to always return false, otherwise it would identify
-// pretty much all of our fixtures as being stdlib and skip everything.
-//
-// The function is not designed to be used from anywhere else except gps's fixtures initialization.
-func MockIsStdLib() {
-	IsStdLib = func(path string) bool {
-		return false
-	}
-}
