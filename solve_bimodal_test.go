@@ -1177,7 +1177,6 @@ func computeBimodalExternalMap(specs []depspec) map[pident]map[string][]string {
 		if len(em) > 0 {
 			panic(fmt.Sprintf("pkgs with errors in reachmap processing: %s", em))
 		}
-		fmt.Printf("reachmap: %+v\n", reachmap)
 
 		drm := make(map[string][]string)
 		for ip, ie := range reachmap {
@@ -1187,15 +1186,4 @@ func computeBimodalExternalMap(specs []depspec) map[pident]map[string][]string {
 	}
 
 	return rm
-}
-
-// eqOrSlashedPrefix checks to see if the prefix is either equal to the string,
-// or that it is a prefix and the next char in the string is "/".
-func eqOrSlashedPrefix(s, prefix string) bool {
-	if !strings.HasPrefix(s, prefix) {
-		return false
-	}
-
-	prflen, pathlen := len(prefix), len(s)
-	return prflen == pathlen || strings.Index(s[prflen:], "/") == 0
 }
