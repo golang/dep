@@ -140,3 +140,211 @@ func BenchmarkCreateVendorTree(b *testing.B) {
 	sm.Release()
 	os.RemoveAll(tmp) // comment this to leave temp dir behind for inspection
 }
+
+func TestStripVendor(t *testing.T) {
+
+	type testcase struct {
+		before, after filesystemState
+	}
+
+	test := func(tc testcase) func(*testing.T) {
+		return func(t *testing.T) {
+			tempDir, err := ioutil.TempDir("", "TestStripVendor")
+			if err != nil {
+				t.Fatalf("ioutil.TempDir err=%q", err)
+			}
+			defer func() {
+				if err := os.RemoveAll(tempDir); err != nil {
+					t.Errorf("os.RemoveAll(%q) err=%q", tempDir, err)
+				}
+			}()
+			tc.before.root = tempDir
+			tc.after.root = tempDir
+
+			tc.before.setup(t)
+
+			if err := filepath.Walk(tempDir, stripVendor); err != nil {
+				t.Errorf("filepath.Walk err=%q", err)
+			}
+
+			tc.after.assert(t)
+		}
+	}
+
+	t.Run("vendor directory", test(testcase{
+		before: filesystemState{
+			dirs: []fsPath{
+				fsPath{"package"},
+				fsPath{"package", "vendor"},
+			},
+		},
+		after: filesystemState{
+			dirs: []fsPath{
+				fsPath{"package"},
+			},
+		},
+	}))
+
+	t.Run("vendor file", test(testcase{
+		before: filesystemState{
+			dirs: []fsPath{
+				fsPath{"package"},
+			},
+			files: []fsPath{
+				fsPath{"package", "vendor"},
+			},
+		},
+		after: filesystemState{
+			dirs: []fsPath{
+				fsPath{"package"},
+			},
+			files: []fsPath{
+				fsPath{"package", "vendor"},
+			},
+		},
+	}))
+
+	t.Run("vendor symlink", test(testcase{
+		before: filesystemState{
+			dirs: []fsPath{
+				fsPath{"package"},
+				fsPath{"package", "_vendor"},
+			},
+			links: []fsLink{
+				fsLink{
+					path: fsPath{"package", "vendor"},
+					to:   "./_vendor",
+				},
+			},
+		},
+		after: filesystemState{
+			dirs: []fsPath{
+				fsPath{"package"},
+				fsPath{"package", "_vendor"},
+			},
+		},
+	}))
+
+	t.Run("nonvendor symlink", test(testcase{
+		before: filesystemState{
+			dirs: []fsPath{
+				fsPath{"package"},
+				fsPath{"package", "_vendor"},
+			},
+			links: []fsLink{
+				fsLink{
+					path: fsPath{"package", "link"},
+					to:   "./_vendor",
+				},
+			},
+		},
+		after: filesystemState{
+			dirs: []fsPath{
+				fsPath{"package"},
+				fsPath{"package", "_vendor"},
+			},
+			links: []fsLink{
+				fsLink{
+					path: fsPath{"package", "link"},
+					to:   "./_vendor",
+				},
+			},
+		},
+	}))
+
+	t.Run("vendor symlink to file", test(testcase{
+		before: filesystemState{
+			dirs: []fsPath{
+				fsPath{"package"},
+			},
+			files: []fsPath{
+				fsPath{"package", "file"},
+			},
+			links: []fsLink{
+				fsLink{
+					path: fsPath{"package", "vendor"},
+					to:   "./file",
+				},
+			},
+		},
+		after: filesystemState{
+			dirs: []fsPath{
+				fsPath{"package"},
+			},
+			files: []fsPath{
+				fsPath{"package", "file"},
+			},
+			links: []fsLink{
+				fsLink{
+					path: fsPath{"package", "vendor"},
+					to:   "./file",
+				},
+			},
+		},
+	}))
+
+	t.Run("chained symlinks", test(testcase{
+		before: filesystemState{
+			dirs: []fsPath{
+				fsPath{"package"},
+				fsPath{"package", "_vendor"},
+			},
+			links: []fsLink{
+				fsLink{
+					path: fsPath{"package", "vendor"},
+					to:   "./vendor2",
+				},
+				fsLink{
+					path: fsPath{"package", "vendor2"},
+					to:   "./_vendor",
+				},
+			},
+		},
+		after: filesystemState{
+			dirs: []fsPath{
+				fsPath{"package"},
+				fsPath{"package", "_vendor"},
+			},
+			links: []fsLink{
+				fsLink{
+					path: fsPath{"package", "vendor2"},
+					to:   "./_vendor",
+				},
+			},
+		},
+	}))
+
+	t.Run("circular symlinks", test(testcase{
+		before: filesystemState{
+			dirs: []fsPath{
+				fsPath{"package"},
+			},
+			links: []fsLink{
+				fsLink{
+					path: fsPath{"package", "link1"},
+					to:   "./link2",
+				},
+				fsLink{
+					path: fsPath{"package", "link2"},
+					to:   "./link1",
+				},
+			},
+		},
+		after: filesystemState{
+			dirs: []fsPath{
+				fsPath{"package"},
+			},
+			links: []fsLink{
+				fsLink{
+					path: fsPath{"package", "link1"},
+					to:   "./link2",
+				},
+				fsLink{
+					path: fsPath{"package", "link2"},
+					to:   "./link1",
+				},
+			},
+		},
+	}))
+
+}

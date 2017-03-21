@@ -72,3 +72,25 @@ func (r solution) Attempts() int {
 func (r solution) InputHash() []byte {
 	return r.hd
 }
+
+func stripVendor(path string, info os.FileInfo, err error) error {
+	if info.Name() == "vendor" {
+		if _, err := os.Lstat(path); err == nil {
+			if info.IsDir() {
+				return removeAll(path)
+			}
+
+			if (info.Mode() & os.ModeSymlink) != 0 {
+				realInfo, err := os.Stat(path)
+				if err != nil {
+					return err
+				}
+				if realInfo.IsDir() {
+					return os.Remove(path)
+				}
+			}
+		}
+	}
+
+	return nil
+}
