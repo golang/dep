@@ -1,4 +1,4 @@
-// Copyright 2016 The Go Authors. All rights reserved.
+// Copyright 2016-2017 The Go Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
@@ -40,7 +40,8 @@ func TestReadManifest(t *testing.T) {
 				Constraint: gps.NewBranch("master"),
 			},
 		},
-		Ignores: []string{"github.com/foo/bar"},
+		Ignores:  []string{"github.com/foo/bar"},
+		Required: []string{"github.com/babble/brook"},
 	}
 
 	if !reflect.DeepEqual(got.Dependencies, want.Dependencies) {
@@ -51,6 +52,61 @@ func TestReadManifest(t *testing.T) {
 	}
 	if !reflect.DeepEqual(got.Ignores, want.Ignores) {
 		t.Error("Valid manifest's ignores did not parse as expected")
+	}
+	if !reflect.DeepEqual(got.Required, want.Required) {
+		t.Error("Valid manifest's requires did not parse as expected")
+	}
+
+	if !reflect.DeepEqual(got.Overrides(), want.Ovr) {
+		t.Error("Manifest.Overrides() does not return expected overrides")
+	}
+
+	if gotLen, wantLen := len(got.IgnoredPackages()), len(want.Ignores); gotLen != wantLen {
+		t.Errorf("Manifest.IgnoredPackages() returns %d elements, should be %d",
+			gotLen, wantLen)
+	}
+
+	for k, v := range got.IgnoredPackages() {
+		if v != true {
+			t.Errorf("Manifest.IgnoredPackages() returns %v for %q, should be %v",
+				v, k, true)
+		}
+
+		found := false
+		for _, p := range want.Ignores {
+			if k == p {
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			t.Errorf("Manifest.IgnoredPackages() returns an unexpected element: %q", k)
+		}
+	}
+
+	if gotLen, wantLen := len(got.RequiredPackages()), len(want.Required); gotLen != wantLen {
+		t.Errorf("Manifest.RequiredPackages() returns %d elements, should be %d",
+			gotLen, wantLen)
+	}
+
+	for k, v := range got.RequiredPackages() {
+		if v != true {
+			t.Errorf("Manifest.RequiredPackages() returns %v for %q, should be %v",
+				v, k, true)
+		}
+
+		found := false
+		for _, p := range want.Required {
+			if k == p {
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			t.Errorf("Manifest.RequiredPackages() returns an unexpected element: %q", k)
+		}
 	}
 }
 
@@ -76,7 +132,8 @@ func TestWriteManifest(t *testing.T) {
 				Constraint: gps.NewBranch("master"),
 			},
 		},
-		Ignores: []string{"github.com/foo/bar"},
+		Ignores:  []string{"github.com/foo/bar"},
+		Required: []string{"github.com/babble/brook"},
 	}
 
 	got, err := m.MarshalJSON()
@@ -116,5 +173,39 @@ func TestReadManifestErrors(t *testing.T) {
 		} else if !strings.Contains(err.Error(), tst.name) {
 			t.Errorf("Unexpected error %q; expected %s error", err, tst.name)
 		}
+	}
+}
+
+func TestManifestInterface(t *testing.T) {
+	c, _ := gps.NewSemverConstraint(">=0.12.0, <1.0.0")
+	m := Manifest{
+		Dependencies: map[gps.ProjectRoot]gps.ProjectProperties{
+			gps.ProjectRoot("github.com/sdboyer/gps"): {
+				Constraint: c,
+			},
+			gps.ProjectRoot("github.com/babble/brook"): {
+				Constraint: gps.Revision("d05d5aca9f895d19e9265839bffeadd74a2d2ecb"),
+			},
+		},
+		Ovr: map[gps.ProjectRoot]gps.ProjectProperties{
+			gps.ProjectRoot("github.com/sdboyer/gps"): {
+				Source:     "https://github.com/sdboyer/gps",
+				Constraint: gps.NewBranch("master"),
+			},
+		},
+		Ignores: []string{"github.com/foo/bar"},
+	}
+
+	var i gps.Manifest = &m
+
+	if c := i.DependencyConstraints(); !reflect.DeepEqual(c, m.Dependencies) {
+		t.Errorf("Manifest.DependencyConstraints() does not return expected constraints: %v vs %v",
+			c, m.Dependencies)
+	}
+
+	// TODO decide whether we're going to incorporate this or not
+	if c := i.TestDependencyConstraints(); c != nil {
+		t.Errorf("Manifest.TestDependencyConstraints() does not return expected constraints: %v vs %v",
+			c, nil)
 	}
 }
