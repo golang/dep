@@ -11,7 +11,7 @@ import (
 func mkTestCmd(iterations int) *monitoredCmd {
 	return newMonitoredCmd(
 		exec.Command("./echosleep", "-n", fmt.Sprint(iterations)),
-		(time.Duration(iterations+1))*100*time.Millisecond,
+		200*time.Millisecond,
 	)
 }
 
