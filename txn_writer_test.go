@@ -14,7 +14,7 @@ import (
 )
 
 const safeWriterProject = "safewritertest"
-const safeWriterGoldenManifest = "txn_writer/expected_manifest.json"
+const safeWriterGoldenManifest = "txn_writer/expected_manifest.toml"
 const safeWriterGoldenLock = "txn_writer/expected_lock.toml"
 
 func TestSafeWriter_BadInput_MissingRoot(t *testing.T) {
@@ -498,10 +498,10 @@ func TestSafeWriter_DiffLocks(t *testing.T) {
 
 	pc := NewTestProjectContext(h, safeWriterProject)
 	defer pc.Release()
-	pc.CopyFile(LockName, "txn_writer/original_lock.json")
+	pc.CopyFile(LockName, "txn_writer/original_lock.toml")
 	pc.Load()
 
-	ulf := h.GetTestFile("txn_writer/updated_lock.json")
+	ulf := h.GetTestFile("txn_writer/updated_lock.toml")
 	defer ulf.Close()
 	updatedLock, err := readLock(ulf)
 	h.Must(err)

@@ -17,7 +17,7 @@ func TestReadManifest(t *testing.T) {
 	h := test.NewHelper(t)
 	defer h.Cleanup()
 
-	mf := h.GetTestFile("manifest/golden.json")
+	mf := h.GetTestFile("manifest/golden.toml")
 	defer mf.Close()
 	got, err := readManifest(mf)
 	if err != nil {
@@ -104,7 +104,7 @@ func TestReadManifestErrors(t *testing.T) {
 		name string
 		file string
 	}{
-		{"multiple constraints", "manifest/error.json"},
+		{"multiple constraints", "manifest/error.toml"},
 	}
 
 	for _, tst := range tests {

@@ -18,7 +18,7 @@ func TestReadLock(t *testing.T) {
 	h := test.NewHelper(t)
 	defer h.Cleanup()
 
-	golden := "lock/golden0.json"
+	golden := "lock/golden0.toml"
 	g0f := h.GetTestFile(golden)
 	defer g0f.Close()
 	got, err := readLock(g0f)
@@ -42,7 +42,7 @@ func TestReadLock(t *testing.T) {
 		t.Error("Valid lock did not parse as expected")
 	}
 
-	golden = "lock/golden1.json"
+	golden = "lock/golden1.toml"
 	g1f := h.GetTestFile(golden)
 	defer g1f.Close()
 	got, err = readLock(g1f)
@@ -139,9 +139,9 @@ func TestReadLockErrors(t *testing.T) {
 		name string
 		file string
 	}{
-		{"specified both", "lock/error0.json"},
-		{"invalid hash", "lock/error1.json"},
-		{"no branch or version", "lock/error2.json"},
+		{"specified both", "lock/error0.toml"},
+		{"invalid hash", "lock/error1.toml"},
+		{"no branch or version", "lock/error2.toml"},
 	}
 
 	for _, tst := range tests {
