@@ -20,6 +20,10 @@ test:
   pre:
     - go vet
   override:
-    - cd $RD && go test -v -coverprofile=coverage.txt -covermode=atomic
+    - |
+      cd $RD && \
+        echo 'mode: atomic' > coverage.txt && \
+        go list ./... | grep -v "/vendor/" | xargs -n1 -I_ go test -covermode=atomic -coverprofile=coverage.out -v _ && \
+        tail -n +2 coverage.out >> coverage.txt'
     - cd $RD && go build example.go
     - cd $RD && bash <(curl -s https://codecov.io/bash)
