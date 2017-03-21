@@ -6,7 +6,6 @@ package dep
 
 import (
 	"encoding/hex"
-	"encoding/json"
 	"io"
 	"sort"
 
@@ -23,36 +22,50 @@ type Lock struct {
 }
 
 type rawLock struct {
-	Memo string
-	P    []lockedDep
+	Memo     string
+	Projects []rawLockedProject
 }
 
-type lockedDep struct {
+type rawLockedProject struct {
 	Name     string
-	Version  string
 	Branch   string
 	Revision string
+	Version  string
 	Source   string
 	Packages []string
 }
 
 func readLock(r io.Reader) (*Lock, error) {
-	rl := rawLock{}
-	err := json.NewDecoder(r).Decode(&rl)
+	tree, err := toml.LoadReader(r)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "Unable to parse the lock as TOML")
 	}
 
-	b, err := hex.DecodeString(rl.Memo)
+	mapper := &tomlMapper{Tree: tree}
+
+	raw := rawLock{
+		Memo:     readKeyAsString(mapper, "memo"),
+		Projects: readTableAsLockedProjects(mapper, "projects"),
+	}
+
+	if mapper.Error != nil {
+		return nil, errors.Wrap(mapper.Error, "Invalid lock structure")
+	}
+	return fromRawLock(raw)
+}
+
+func fromRawLock(raw rawLock) (*Lock, error) {
+	var err error
+	l := &Lock{
+		P: make([]gps.LockedProject, len(raw.Projects)),
+	}
+
+	l.Memo, err = hex.DecodeString(raw.Memo)
 	if err != nil {
 		return nil, errors.Errorf("invalid hash digest in lock's memo field")
 	}
-	l := &Lock{
-		Memo: b,
-		P:    make([]gps.LockedProject, len(rl.P)),
-	}
 
-	for i, ld := range rl.P {
+	for i, ld := range raw.Projects {
 		r := gps.Revision(ld.Revision)
 
 		var v gps.Version = r
@@ -73,7 +86,6 @@ func readLock(r io.Reader) (*Lock, error) {
 		}
 		l.P[i] = gps.NewLockedProject(id, v, ld.Packages)
 	}
-
 	return l, nil
 }
 
@@ -88,15 +100,15 @@ func (l *Lock) Projects() []gps.LockedProject {
 // toRaw converts the manifest into a representation suitable to write to the lock file
 func (l *Lock) toRaw() rawLock {
 	raw := rawLock{
-		Memo: hex.EncodeToString(l.Memo),
-		P:    make([]lockedDep, len(l.P)),
+		Memo:     hex.EncodeToString(l.Memo),
+		Projects: make([]rawLockedProject, len(l.P)),
 	}
 
 	sort.Sort(SortedLockedProjects(l.P))
 
 	for k, lp := range l.P {
 		id := lp.Ident()
-		ld := lockedDep{
+		ld := rawLockedProject{
 			Name:     string(id.ProjectRoot),
 			Source:   id.Source,
 			Packages: lp.Packages(),
@@ -105,7 +117,7 @@ func (l *Lock) toRaw() rawLock {
 		v := lp.Version()
 		ld.Revision, ld.Branch, ld.Version = getVersionInfo(v)
 
-		raw.P[k] = ld
+		raw.Projects[k] = ld
 	}
 
 	// TODO sort output - #15
@@ -116,12 +128,11 @@ func (l *Lock) toRaw() rawLock {
 func (l *Lock) MarshalTOML() (string, error) {
 	raw := l.toRaw()
 
-	// TODO(carolynvs) Consider adding reflection-based marshal functionality to go-toml
 	m := make(map[string]interface{})
 	m["memo"] = raw.Memo
-	p := make([]map[string]interface{}, len(raw.P))
+	p := make([]map[string]interface{}, len(raw.Projects))
 	for i := 0; i < len(p); i++ {
-		srcPrj := raw.P[i]
+		srcPrj := raw.Projects[i]
 		prj := make(map[string]interface{})
 		prj["name"] = srcPrj.Name
 		prj["revision"] = srcPrj.Revision
