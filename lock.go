@@ -5,7 +5,6 @@
 package dep
 
 import (
-	"bytes"
 	"encoding/hex"
 	"encoding/json"
 	"io"
@@ -24,17 +23,17 @@ type Lock struct {
 }
 
 type rawLock struct {
-	Memo string      `json:"memo"`
-	P    []lockedDep `json:"projects"`
+	Memo string
+	P    []lockedDep
 }
 
 type lockedDep struct {
-	Name     string   `json:"name"`
-	Version  string   `json:"version,omitempty"`
-	Branch   string   `json:"branch,omitempty"`
-	Revision string   `json:"revision"`
-	Source   string   `json:"source,omitempty"`
-	Packages []string `json:"packages"`
+	Name     string
+	Version  string
+	Branch   string
+	Revision string
+	Source   string
+	Packages []string
 }
 
 func readLock(r io.Reader) (*Lock, error) {
@@ -112,18 +111,6 @@ func (l *Lock) toRaw() rawLock {
 	// TODO sort output - #15
 
 	return raw
-}
-
-func (l *Lock) MarshalJSON() ([]byte, error) {
-	raw := l.toRaw()
-
-	var buf bytes.Buffer
-	enc := json.NewEncoder(&buf)
-	enc.SetIndent("", "    ")
-	enc.SetEscapeHTML(false)
-	err := enc.Encode(raw)
-
-	return buf.Bytes(), err
 }
 
 func (l *Lock) MarshalTOML() (string, error) {
