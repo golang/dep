@@ -253,29 +253,23 @@ func TestStripVendor(t *testing.T) {
 
 	t.Run("vendor symlink to file", test(testcase{
 		before: filesystemState{
-			dirs: []fsPath{
-				fsPath{"package"},
-			},
 			files: []fsPath{
-				fsPath{"package", "file"},
+				fsPath{"file"},
 			},
 			links: []fsLink{
 				fsLink{
-					path: fsPath{"package", "vendor"},
+					path: fsPath{"vendor"},
 					to:   "file",
 				},
 			},
 		},
 		after: filesystemState{
-			dirs: []fsPath{
-				fsPath{"package"},
-			},
 			files: []fsPath{
-				fsPath{"package", "file"},
+				fsPath{"file"},
 			},
 			links: []fsLink{
 				fsLink{
-					path: fsPath{"package", "vendor"},
+					path: fsPath{"vendor"},
 					to:   "file",
 				},
 			},
@@ -285,28 +279,26 @@ func TestStripVendor(t *testing.T) {
 	t.Run("chained symlinks", test(testcase{
 		before: filesystemState{
 			dirs: []fsPath{
-				fsPath{"package"},
-				fsPath{"package", "_vendor"},
+				fsPath{"_vendor"},
 			},
 			links: []fsLink{
 				fsLink{
-					path: fsPath{"package", "vendor"},
+					path: fsPath{"vendor"},
 					to:   "vendor2",
 				},
 				fsLink{
-					path: fsPath{"package", "vendor2"},
+					path: fsPath{"vendor2"},
 					to:   "_vendor",
 				},
 			},
 		},
 		after: filesystemState{
 			dirs: []fsPath{
-				fsPath{"package"},
-				fsPath{"package", "_vendor"},
+				fsPath{"_vendor"},
 			},
 			links: []fsLink{
 				fsLink{
-					path: fsPath{"package", "vendor2"},
+					path: fsPath{"vendor2"},
 					to:   "_vendor",
 				},
 			},
