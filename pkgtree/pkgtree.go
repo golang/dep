@@ -14,30 +14,6 @@ import (
 	"unicode"
 )
 
-// Stored as a var so that tests can swap it out. Ugh globals, ugh.
-var isStdLib = doIsStdLib
-
-// This was lovingly lifted from src/cmd/go/pkg.go in Go's code
-// (isStandardImportPath).
-func doIsStdLib(path string) bool {
-	i := strings.Index(path, "/")
-	if i < 0 {
-		i = len(path)
-	}
-
-	return !strings.Contains(path[:i], ".")
-}
-
-// MockIsStdLib sets the isStdLib func to always return false, otherwise it would identify
-// pretty much all of our fixtures as being stdlib and skip everything.
-//
-// The function is not designed to be used from anywhere else except gps's fixtures initialization.
-func MockIsStdLib() {
-	isStdLib = func(path string) bool {
-		return false
-	}
-}
-
 // Package represents a Go package. It contains a subset of the information
 // go/build.Package does.
 type Package struct {

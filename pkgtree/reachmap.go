@@ -3,6 +3,8 @@ package pkgtree
 import (
 	"sort"
 	"strings"
+
+	"github.com/sdboyer/gps/internal"
 )
 
 // ReachMap maps a set of import paths (keys) to the sets of transitively
@@ -51,7 +53,7 @@ func (rm ReachMap) flatten(filter func(string) bool, stdlib bool) []string {
 	for pkg, ie := range rm {
 		if filter(pkg) {
 			for _, ex := range ie.External {
-				if !stdlib && isStdLib(ex) {
+				if !stdlib && internal.IsStdLib(ex) {
 					continue
 				}
 				exm[ex] = struct{}{}

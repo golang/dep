@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/armon/go-radix"
+	"github.com/sdboyer/gps/internal"
 	"github.com/sdboyer/gps/pkgtree"
 )
 
@@ -26,20 +27,6 @@ func init() {
 
 	archListString := "386 amd64 amd64p32 arm armbe arm64 arm64be ppc64 ppc64le mips mipsle mips64 mips64le mips64p32 mips64p32le ppc s390 s390x sparc sparc64"
 	archList = strings.Split(archListString, " ")
-}
-
-// Stored as a var so that tests can swap it out. Ugh globals, ugh.
-var isStdLib = doIsStdLib
-
-// This was lovingly lifted from src/cmd/go/pkg.go in Go's code
-// (isStandardImportPath).
-func doIsStdLib(path string) bool {
-	i := strings.Index(path, "/")
-	if i < 0 {
-		i = len(path)
-	}
-
-	return !strings.Contains(path[:i], ".")
 }
 
 var rootRev = Revision("")
@@ -611,7 +598,7 @@ func (s *solver) intersectConstraintsWithImports(deps []workingConstraint, reach
 	dmap := make(map[ProjectRoot]completeDep)
 	for _, rp := range reach {
 		// If it's a stdlib-shaped package, skip it.
-		if isStdLib(rp) {
+		if internal.IsStdLib(rp) {
 			continue
 		}
 

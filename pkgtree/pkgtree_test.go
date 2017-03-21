@@ -13,34 +13,22 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/sdboyer/gps/internal"
 	"github.com/sdboyer/gps/internal/fs"
 )
 
+// Stores a reference to original IsStdLib, so we could restore overridden version.
+var doIsStdLib = internal.IsStdLib
+
 func init() {
-	MockIsStdLib()
+	overrideIsStdLib()
 }
 
-func TestIsStdLib(t *testing.T) {
-	fix := []struct {
-		ip string
-		is bool
-	}{
-		{"appengine", true},
-		{"net/http", true},
-		{"github.com/anything", false},
-		{"foo", true},
-	}
-
-	for _, f := range fix {
-		r := doIsStdLib(f.ip)
-		if r != f.is {
-			if r {
-				t.Errorf("%s was marked stdlib but should not have been", f.ip)
-			} else {
-				t.Errorf("%s was not marked stdlib but should have been", f.ip)
-
-			}
-		}
+// sets the IsStdLib func to always return false, otherwise it would identify
+// pretty much all of our fixtures as being stdlib and skip everything.
+func overrideIsStdLib() {
+	internal.IsStdLib = func(path string) bool {
+		return false
 	}
 }
 
@@ -1741,13 +1729,13 @@ func TestFlattenReachMap(t *testing.T) {
 
 	// turning off stdlib should cut most things, but we need to override the
 	// function
-	isStdLib = doIsStdLib
+	internal.IsStdLib = doIsStdLib
 	name = "no stdlib"
 	stdlib = false
 	except("encoding/binary", "go/parser", "hash", "net/http", "os", "sort")
 	validate()
 	// restore stdlib func override
-	MockIsStdLib()
+	overrideIsStdLib()
 
 	// stdlib back in; now exclude tests, which should just cut one
 	name = "no tests"

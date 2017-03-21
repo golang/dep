@@ -4,6 +4,7 @@ import (
 	"sort"
 
 	"github.com/armon/go-radix"
+	"github.com/sdboyer/gps/internal"
 	"github.com/sdboyer/gps/pkgtree"
 )
 
@@ -51,7 +52,7 @@ func (rd rootdata) externalImportList() []string {
 	all := rm.Flatten(false)
 	reach := make([]string, 0, len(all))
 	for _, r := range all {
-		if !isStdLib(r) {
+		if !internal.IsStdLib(r) {
 			reach = append(reach, r)
 		}
 	}
@@ -113,7 +114,7 @@ func (rd rootdata) getApplicableConstraints() []workingConstraint {
 	// Walk all dep import paths we have to consider and mark the corresponding
 	// wc entry in the trie, if any
 	for _, im := range rd.externalImportList() {
-		if isStdLib(im) {
+		if internal.IsStdLib(im) {
 			continue
 		}
 

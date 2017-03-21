@@ -14,6 +14,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/sdboyer/gps/internal"
 	"github.com/sdboyer/gps/pkgtree"
 )
 
@@ -46,11 +47,9 @@ func overrideMkBridge() {
 // sets the isStdLib func to always return false, otherwise it would identify
 // pretty much all of our fixtures as being stdlib and skip everything
 func overrideIsStdLib() {
-	isStdLib = func(path string) bool {
+	internal.IsStdLib = func(path string) bool {
 		return false
 	}
-	// NOTE(narqo): this is an ugly hack! One have to think about better way to do cross-package mocking.
-	pkgtree.MockIsStdLib()
 }
 
 var stderrlog = log.New(os.Stderr, "", 0)
