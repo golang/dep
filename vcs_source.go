@@ -11,7 +11,7 @@ import (
 
 	"github.com/Masterminds/semver"
 	"github.com/Masterminds/vcs"
-	"github.com/sdboyer/gps/fs"
+	"github.com/sdboyer/gps/internal/fs"
 )
 
 // Kept here as a reference in case it does become important to implement a

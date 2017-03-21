@@ -13,7 +13,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/sdboyer/gps/fs"
+	"github.com/sdboyer/gps/internal/fs"
 )
 
 func init() {
