@@ -142,29 +142,30 @@ func (m *Manifest) MarshalTOML() (string, error) {
 	raw := m.toRaw()
 
 	// TODO(carolynvs) Consider adding reflection-based marshal functionality to go-toml
-	copyProject := func(src map[string]possibleProps) map[string]interface{} {
-		dest := make(map[string]interface{}, len(src))
-		for k, v := range src {
+	copyProjects := func(src map[string]possibleProps) []map[string]interface{} {
+		dest := make([]map[string]interface{}, 0, len(src))
+		for prjName, srcPrj := range src {
 			prj := make(map[string]interface{})
-			if v.Source != "" {
-				prj["source"] = v.Source
+			prj["name"] = prjName
+			if srcPrj.Source != "" {
+				prj["source"] = srcPrj.Source
 			}
-			if v.Branch != "" {
-				prj["branch"] = v.Branch
+			if srcPrj.Branch != "" {
+				prj["branch"] = srcPrj.Branch
 			}
-			if v.Version != "" {
-				prj["version"] = v.Version
+			if srcPrj.Version != "" {
+				prj["version"] = srcPrj.Version
 			}
-			if v.Revision != "" {
-				prj["revision"] = v.Revision
+			if srcPrj.Revision != "" {
+				prj["revision"] = srcPrj.Revision
 			}
-			dest[k] = prj
+			dest = append(dest, prj)
 
 		}
 		return dest
 	}
 
-	copyProjectRef := func(src []string) []interface{} {
+	copyProjectRefs := func(src []string) []interface{} {
 		dest := make([]interface{}, len(src))
 		for i := range src {
 			dest[i] = src[i]
@@ -174,16 +175,16 @@ func (m *Manifest) MarshalTOML() (string, error) {
 
 	data := make(map[string]interface{})
 	if len(raw.Dependencies) > 0 {
-		data["dependencies"] = copyProject(raw.Dependencies)
+		data["dependencies"] = copyProjects(raw.Dependencies)
 	}
 	if len(raw.Overrides) > 0 {
-		data["overrides"] = copyProject(raw.Overrides)
+		data["overrides"] = copyProjects(raw.Overrides)
 	}
 	if len(raw.Ignores) > 0 {
-		data["ignores"] = copyProjectRef(raw.Ignores)
+		data["ignores"] = copyProjectRefs(raw.Ignores)
 	}
 	if len(raw.Required) > 0 {
-		data["required"] = copyProjectRef(raw.Required)
+		data["required"] = copyProjectRefs(raw.Required)
 	}
 
 	tree, err := toml.TreeFromMap(data)
