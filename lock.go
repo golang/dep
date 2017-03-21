@@ -134,23 +134,24 @@ func (l *Lock) MarshalTOML() (string, error) {
 	m["memo"] = raw.Memo
 	p := make([]map[string]interface{}, len(raw.P))
 	for i := 0; i < len(p); i++ {
+		srcPrj := raw.P[i]
 		prj := make(map[string]interface{})
-		prj["name"] = raw.P[i].Name
-		prj["revision"] = raw.P[i].Revision
+		prj["name"] = srcPrj.Name
+		prj["revision"] = srcPrj.Revision
 
-		if raw.P[i].Source != "" {
-			prj["source"] = raw.P[i].Source
+		if srcPrj.Source != "" {
+			prj["source"] = srcPrj.Source
 		}
-		if raw.P[i].Branch != "" {
-			prj["branch"] = raw.P[i].Branch
+		if srcPrj.Branch != "" {
+			prj["branch"] = srcPrj.Branch
 		}
-		if raw.P[i].Version != "" {
-			prj["version"] = raw.P[i].Version
+		if srcPrj.Version != "" {
+			prj["version"] = srcPrj.Version
 		}
 
-		pkgs := make([]interface{}, len(raw.P[i].Packages))
-		for j := range raw.P[i].Packages {
-			pkgs[j] = raw.P[i].Packages[j]
+		pkgs := make([]interface{}, len(srcPrj.Packages))
+		for j := range srcPrj.Packages {
+			pkgs[j] = srcPrj.Packages[j]
 		}
 		prj["packages"] = pkgs
 

@@ -1,15 +1,14 @@
 ignores = ["github.com/foo/bar"]
 
-[dependencies]
+[[dependencies]]
+  name = "github.com/sdboyer/gps"
+  version = ">=0.12.0, <1.0.0"
 
-  [dependencies.github.com/babble/brook]
-    revision = "d05d5aca9f895d19e9265839bffeadd74a2d2ecb"
+[[dependencies]]
+  name = "github.com/babble/brook"
+  revision = "d05d5aca9f895d19e9265839bffeadd74a2d2ecb"
 
-  [dependencies.github.com/sdboyer/gps]
-    version = ">=0.12.0, <1.0.0"
-
-[overrides]
-
-  [overrides.github.com/sdboyer/gps]
-    branch = "master"
-    source = "https://github.com/sdboyer/gps"
+[[overrides]]
+  branch = "master"
+  name = "github.com/sdboyer/gps"
+  source = "https://github.com/sdboyer/gps"
