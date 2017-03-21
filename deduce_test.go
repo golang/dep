@@ -77,14 +77,30 @@ var pathDeductionFixtures = map[string][]pathDeductionFixture{
 			root: "github.com/sdboyer/gps",
 			mb:   maybeGitSource{url: mkurl("https://github.com/sdboyer/gps")},
 		},
+		{
+			in:   "github.com/sdboyer-/gps/foo",
+			root: "github.com/sdboyer-/gps",
+			mb: maybeSources{
+				maybeGitSource{url: mkurl("https://github.com/sdboyer-/gps")},
+				maybeGitSource{url: mkurl("ssh://git@github.com/sdboyer-/gps")},
+				maybeGitSource{url: mkurl("git://github.com/sdboyer-/gps")},
+				maybeGitSource{url: mkurl("http://github.com/sdboyer-/gps")},
+			},
+		},
+		{
+			in:   "github.com/a/gps/foo",
+			root: "github.com/a/gps",
+			mb: maybeSources{
+				maybeGitSource{url: mkurl("https://github.com/a/gps")},
+				maybeGitSource{url: mkurl("ssh://git@github.com/a/gps")},
+				maybeGitSource{url: mkurl("git://github.com/a/gps")},
+				maybeGitSource{url: mkurl("http://github.com/a/gps")},
+			},
+		},
 		// some invalid github username patterns
 		{
 			in:   "github.com/-sdboyer/gps/foo",
 			rerr: errors.New("github.com/-sdboyer/gps/foo is not a valid path for a source on github.com"),
-		},
-		{
-			in:   "github.com/sdboyer-/gps/foo",
-			rerr: errors.New("github.com/sdboyer-/gps/foo is not a valid path for a source on github.com"),
 		},
 		{
 			in:   "github.com/sdbo.yer/gps/foo",
