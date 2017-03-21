@@ -81,22 +81,24 @@ func (fs filesystemState) assert(t *testing.T) {
 			return nil
 		}
 
-		if info.IsDir() {
-			_, ok := dirMap[path]
-			if !ok {
-				t.Errorf("unexpected directory exists %q", path)
-			} else {
-				delete(dirMap, path)
-			}
-			return nil
-		}
-
+		// Careful! Have to check whether the path is a symlink first because, on
+		// windows, a symlink to a directory will return 'true' for info.IsDir().
 		if (info.Mode() & os.ModeSymlink) != 0 {
 			_, ok := linkMap[path]
 			if !ok {
 				t.Errorf("unexpected symlink exists %q", path)
 			} else {
 				delete(linkMap, path)
+			}
+			return nil
+		}
+
+		if info.IsDir() {
+			_, ok := dirMap[path]
+			if !ok {
+				t.Errorf("unexpected directory exists %q", path)
+			} else {
+				delete(dirMap, path)
 			}
 			return nil
 		}

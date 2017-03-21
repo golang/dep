@@ -142,7 +142,6 @@ func BenchmarkCreateVendorTree(b *testing.B) {
 }
 
 func TestStripVendor(t *testing.T) {
-
 	type testcase struct {
 		before, after filesystemState
 	}
