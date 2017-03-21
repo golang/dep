@@ -213,7 +213,7 @@ func TestStripVendor(t *testing.T) {
 			links: []fsLink{
 				fsLink{
 					path: fsPath{"package", "vendor"},
-					to:   "./_vendor",
+					to:   "_vendor",
 				},
 			},
 		},
@@ -234,7 +234,7 @@ func TestStripVendor(t *testing.T) {
 			links: []fsLink{
 				fsLink{
 					path: fsPath{"package", "link"},
-					to:   "./_vendor",
+					to:   "_vendor",
 				},
 			},
 		},
@@ -246,7 +246,7 @@ func TestStripVendor(t *testing.T) {
 			links: []fsLink{
 				fsLink{
 					path: fsPath{"package", "link"},
-					to:   "./_vendor",
+					to:   "_vendor",
 				},
 			},
 		},
@@ -263,7 +263,7 @@ func TestStripVendor(t *testing.T) {
 			links: []fsLink{
 				fsLink{
 					path: fsPath{"package", "vendor"},
-					to:   "./file",
+					to:   "file",
 				},
 			},
 		},
@@ -277,7 +277,7 @@ func TestStripVendor(t *testing.T) {
 			links: []fsLink{
 				fsLink{
 					path: fsPath{"package", "vendor"},
-					to:   "./file",
+					to:   "file",
 				},
 			},
 		},
@@ -292,11 +292,11 @@ func TestStripVendor(t *testing.T) {
 			links: []fsLink{
 				fsLink{
 					path: fsPath{"package", "vendor"},
-					to:   "./vendor2",
+					to:   "vendor2",
 				},
 				fsLink{
 					path: fsPath{"package", "vendor2"},
-					to:   "./_vendor",
+					to:   "_vendor",
 				},
 			},
 		},
@@ -308,7 +308,7 @@ func TestStripVendor(t *testing.T) {
 			links: []fsLink{
 				fsLink{
 					path: fsPath{"package", "vendor2"},
-					to:   "./_vendor",
+					to:   "_vendor",
 				},
 			},
 		},
@@ -322,11 +322,11 @@ func TestStripVendor(t *testing.T) {
 			links: []fsLink{
 				fsLink{
 					path: fsPath{"package", "link1"},
-					to:   "./link2",
+					to:   "link2",
 				},
 				fsLink{
 					path: fsPath{"package", "link2"},
-					to:   "./link1",
+					to:   "link1",
 				},
 			},
 		},
@@ -337,11 +337,11 @@ func TestStripVendor(t *testing.T) {
 			links: []fsLink{
 				fsLink{
 					path: fsPath{"package", "link1"},
-					to:   "./link2",
+					to:   "link2",
 				},
 				fsLink{
 					path: fsPath{"package", "link2"},
-					to:   "./link1",
+					to:   "link1",
 				},
 			},
 		},
