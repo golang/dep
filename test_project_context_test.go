@@ -54,7 +54,7 @@ func (pc *TestProjectContext) CopyFile(projectPath string, testdataPath string) 
 }
 
 func (pc *TestProjectContext) Load() {
-	// TODO(carolynvs): Can't use Ctx.LoadProject until dep doesn't require a manifest.json at the project root or it also looks for lock.json
+	// TODO(carolynvs): Can't use Ctx.LoadProject until dep doesn't require a manifest at the project root or it also looks for lock
 	var err error
 	var m *Manifest
 	mp := pc.getManifestPath()

@@ -14,7 +14,7 @@ import (
 	"github.com/sdboyer/gps"
 )
 
-const ManifestName = "manifest.json"
+const ManifestName = "manifest.toml"
 
 type Manifest struct {
 	Dependencies gps.ProjectConstraints
