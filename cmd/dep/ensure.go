@@ -290,7 +290,7 @@ func getProjectConstraint(arg string, sm *gps.SourceMgr) (gps.ProjectConstraint,
 	}
 
 	if string(pr) != arg {
-		return constraint, fmt.Errorf("dependency path %s is not a project root, try %s instead", arg, pr)
+		return constraint, errors.Errorf("dependency path %s is not a project root, try %s instead", arg, pr)
 	}
 
 	constraint.Ident.ProjectRoot = gps.ProjectRoot(arg)
@@ -318,7 +318,7 @@ func getProjectConstraint(arg string, sm *gps.SourceMgr) (gps.ProjectConstraint,
 			}
 
 			if !found {
-				return constraint, fmt.Errorf("%s is not a valid version for the package %s", versionStr, arg)
+				return constraint, errors.Errorf("%s is not a valid version for the package %s", versionStr, arg)
 			}
 		}
 	}

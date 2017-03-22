@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/pkg/errors"
 	"github.com/sdboyer/gps"
 )
 
@@ -17,7 +18,7 @@ var errProjectNotFound = fmt.Errorf("could not find project %s, use dep init to 
 func findProjectRootFromWD() (string, error) {
 	path, err := os.Getwd()
 	if err != nil {
-		return "", fmt.Errorf("could not get working directory: %s", err)
+		return "", errors.Errorf("could not get working directory: %s", err)
 	}
 	return findProjectRoot(path)
 }

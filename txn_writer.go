@@ -210,7 +210,7 @@ func (payload SafeWriterPayload) validate(root string, sm gps.SourceManager) err
 		if err != nil {
 			return err
 		}
-		return fmt.Errorf("root path %q does not exist", root)
+		return errors.Errorf("root path %q does not exist", root)
 	}
 
 	if payload.HasVendor() && sm == nil {
