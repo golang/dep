@@ -127,13 +127,12 @@ type srcReturnChans struct {
 	err chan error
 }
 
-func (retchans srcReturnChans) awaitReturn() (*sourceGateway, error) {
+func (rc srcReturnChans) awaitReturn() (sg *sourceGateway, err error) {
 	select {
-	case sa := <-retchans.ret:
-		return sa, nil
-	case err := <-retchans.err:
-		return nil, err
+	case sg = <-rc.ret:
+	case err = <-rc.err:
 	}
+	return
 }
 
 type sourceCoordinator struct {
@@ -218,18 +217,21 @@ func (sc *sourceCoordinator) getSourceGatewayFor(ctx context.Context, id Project
 			return
 		}
 
-		// It'd be quite the feat - but not impossible - for an actor
+		// It'd be quite the feat - but not impossible - for a gateway
 		// corresponding to this normalizedName to have slid into the main
 		// sources map after the initial unlock, but before this goroutine got
 		// scheduled. Guard against that by checking the main sources map again
 		// and bailing out if we find an entry.
+		var srcGate *sourceGateway
 		sc.srcmut.RLock()
-		srcGate, has := sc.srcs[normalizedName]
-		sc.srcmut.RUnlock()
-		if has {
-			doReturn(srcGate, nil)
-			return
+		if url, has := sc.nameToURL[normalizedName]; has {
+			if srcGate, has := sc.srcs[url]; has {
+				sc.srcmut.RUnlock()
+				doReturn(srcGate, nil)
+				return
+			}
 		}
+		sc.srcmut.RUnlock()
 
 		srcGate = &sourceGateway{
 			maybe:    pd.mb,
@@ -254,7 +256,7 @@ func (sc *sourceCoordinator) getSourceGatewayFor(ctx context.Context, id Project
 			return
 		}
 
-		// We know we have a working srcActor at this point, and need to
+		// We know we have a working srcGateway at this point, and need to
 		// integrate it back into the main map.
 		sc.srcmut.Lock()
 		defer sc.srcmut.Unlock()
