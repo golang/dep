@@ -55,15 +55,6 @@ type source interface {
 	revisionPresentIn(Revision) (bool, error)
 }
 
-type sourceMetaCache struct {
-	//Version  string                   // TODO(sdboyer) use this
-	infos  map[Revision]projectInfo
-	ptrees map[Revision]pkgtree.PackageTree
-	vMap   map[UnpairedVersion]Revision
-	rMap   map[Revision][]UnpairedVersion
-	// TODO(sdboyer) mutexes. actually probably just one, b/c complexity
-}
-
 // projectInfo holds manifest and lock
 type projectInfo struct {
 	Manifest
@@ -76,15 +67,6 @@ type existence struct {
 
 	// The existence levels verified to be present through searching
 	f sourceExistence
-}
-
-func newMetaCache() *sourceMetaCache {
-	return &sourceMetaCache{
-		infos:  make(map[Revision]projectInfo),
-		ptrees: make(map[Revision]pkgtree.PackageTree),
-		vMap:   make(map[UnpairedVersion]Revision),
-		rMap:   make(map[Revision][]UnpairedVersion),
-	}
 }
 
 type baseVCSSource struct {
