@@ -7,9 +7,9 @@ package dep
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"io"
 
+	"github.com/pkg/errors"
 	"github.com/sdboyer/gps"
 )
 
@@ -82,12 +82,12 @@ func readManifest(r io.Reader) (*Manifest, error) {
 func toProps(n string, p possibleProps) (pp gps.ProjectProperties, err error) {
 	if p.Branch != "" {
 		if p.Version != "" || p.Revision != "" {
-			return pp, fmt.Errorf("multiple constraints specified for %s, can only specify one", n)
+			return pp, errors.Errorf("multiple constraints specified for %s, can only specify one", n)
 		}
 		pp.Constraint = gps.NewBranch(p.Branch)
 	} else if p.Version != "" {
 		if p.Revision != "" {
-			return pp, fmt.Errorf("multiple constraints specified for %s, can only specify one", n)
+			return pp, errors.Errorf("multiple constraints specified for %s, can only specify one", n)
 		}
 
 		// always semver if we can
