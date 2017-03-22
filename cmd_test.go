@@ -1,6 +1,7 @@
 package gps
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -9,7 +10,7 @@ import (
 )
 
 func mkTestCmd(iterations int) *monitoredCmd {
-	return newMonitoredCmd(
+	return newMonitoredCmd(context.Background(),
 		exec.Command("./echosleep", "-n", fmt.Sprint(iterations)),
 		200*time.Millisecond,
 	)

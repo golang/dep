@@ -2,6 +2,7 @@ package gps
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"os/exec"
 	"sync"
@@ -11,21 +12,26 @@ import (
 )
 
 // monitoredCmd wraps a cmd and will keep monitoring the process until it
-// finishes or a certain amount of time has passed and the command showed
-// no signs of activity.
+// finishes, the provided context is canceled, or a certain amount of time has
+// passed and the command showed no signs of activity.
 type monitoredCmd struct {
 	cmd     *exec.Cmd
 	timeout time.Duration
+	ctx     context.Context
 	stdout  *activityBuffer
 	stderr  *activityBuffer
 }
 
-func newMonitoredCmd(cmd *exec.Cmd, timeout time.Duration) *monitoredCmd {
-	stdout := newActivityBuffer()
-	stderr := newActivityBuffer()
-	cmd.Stderr = stderr
-	cmd.Stdout = stdout
-	return &monitoredCmd{cmd, timeout, stdout, stderr}
+func newMonitoredCmd(ctx context.Context, cmd *exec.Cmd, timeout time.Duration) *monitoredCmd {
+	stdout, stderr := newActivityBuffer(), newActivityBuffer()
+	cmd.Stdout, cmd.Stderr = stdout, stderr
+	return &monitoredCmd{
+		cmd:     cmd,
+		timeout: timeout,
+		ctx:     ctx,
+		stdout:  stdout,
+		stderr:  stderr,
+	}
 }
 
 // run will wait for the command to finish and return the error, if any. If the
@@ -47,6 +53,11 @@ func (c *monitoredCmd) run() error {
 
 				return &timeoutError{c.timeout}
 			}
+		case <-c.ctx.Done():
+			if err := c.cmd.Process.Kill(); err != nil {
+				return &killCmdError{err}
+			}
+			return c.ctx.Err()
 		case err := <-done:
 			return err
 		}
@@ -107,11 +118,11 @@ type killCmdError struct {
 }
 
 func (e killCmdError) Error() string {
-	return fmt.Sprintf("error killing command after timeout: %s", e.err)
+	return fmt.Sprintf("error killing command: %s", e.err)
 }
 
 func runFromCwd(cmd string, args ...string) ([]byte, error) {
-	c := newMonitoredCmd(exec.Command(cmd, args...), 2*time.Minute)
+	c := newMonitoredCmd(context.TODO(), exec.Command(cmd, args...), 2*time.Minute)
 	out, err := c.combinedOutput()
 	if err != nil {
 		err = fmt.Errorf("%s: %s", string(out), err)
@@ -120,6 +131,6 @@ func runFromCwd(cmd string, args ...string) ([]byte, error) {
 }
 
 func runFromRepoDir(repo vcs.Repo, cmd string, args ...string) ([]byte, error) {
-	c := newMonitoredCmd(repo.CmdFromDir(cmd, args...), 2*time.Minute)
+	c := newMonitoredCmd(context.TODO(), repo.CmdFromDir(cmd, args...), 2*time.Minute)
 	return c.combinedOutput()
 }
