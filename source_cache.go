@@ -1,9 +1,14 @@
 package gps
 
 import (
+<<<<<<< 7262376693ac4f5a1bcaa2d40a4a929da62ee872
 	"sync"
 
 	"github.com/sdboyer/gps/pkgtree"
+=======
+	"fmt"
+	"sync"
+>>>>>>> Convert source, maybeSource to new cache system
 )
 
 // singleSourceCache provides a method set for storing and retrieving data about
@@ -12,13 +17,17 @@ type singleSourceCache interface {
 	// Store the manifest and lock information for a given revision, as defined by
 	// a particular ProjectAnalyzer.
 	setProjectInfo(Revision, ProjectAnalyzer, projectInfo)
+
 	// Get the manifest and lock information for a given revision, as defined by
 	// a particular ProjectAnalyzer.
 	getProjectInfo(Revision, ProjectAnalyzer) (projectInfo, bool)
+
 	// Store a PackageTree for a given revision.
 	setPackageTree(Revision, pkgtree.PackageTree)
+
 	// Get the PackageTree for a given revision.
 	getPackageTree(Revision) (pkgtree.PackageTree, bool)
+
 	// Store the mappings between a set of PairedVersions' surface versions
 	// their corresponding revisions.
 	//
@@ -27,28 +36,27 @@ type singleSourceCache interface {
 	// revision existing will be kept, on the assumption that revisions are
 	// immutable and permanent.
 	storeVersionMap(versionList []PairedVersion, flush bool)
+
 	// Get the list of unpaired versions corresponding to the given revision.
 	getVersionsFor(Revision) ([]UnpairedVersion, bool)
+
+	// Gets all the version pairs currently known to the cache.
+	getAllVersions() []Version
+	//getAllVersions() []PairedVersion
+
 	// Get the revision corresponding to the given unpaired version.
 	getRevisionFor(UnpairedVersion) (Revision, bool)
-}
 
-type sourceMetaCache struct {
-	//Version  string                   // TODO(sdboyer) use this
-	infos  map[Revision]projectInfo
-	ptrees map[Revision]pkgtree.PackageTree
-	vMap   map[UnpairedVersion]Revision
-	rMap   map[Revision][]UnpairedVersion
-	// TODO(sdboyer) mutexes. actually probably just one, b/c complexity
-}
+	// Attempt to convert the given Version to a Revision, given information
+	// currently present in the cache, and in the Version itself.
+	toRevision(v Version) (Revision, bool)
 
-func newMetaCache() *sourceMetaCache {
-	return &sourceMetaCache{
-		infos:  make(map[Revision]projectInfo),
-		ptrees: make(map[Revision]pkgtree.PackageTree),
-		vMap:   make(map[UnpairedVersion]Revision),
-		rMap:   make(map[Revision][]UnpairedVersion),
-	}
+	// Attempt to convert the given Version to an UnpairedVersion, given
+	// information currently present in the cache, or in the Version itself.
+	//
+	// If the input is a revision and multiple UnpairedVersions are associated
+	// with it, whatever happens to be the first is returned.
+	toUnpaired(v Version) (UnpairedVersion, bool)
 }
 
 type singleSourceCacheMemory struct {
@@ -76,6 +84,12 @@ func (c *singleSourceCacheMemory) setProjectInfo(r Revision, an ProjectAnalyzer,
 		c.infos[an] = inner
 	}
 	inner[r] = pi
+
+	// Ensure there's at least an entry in the rMap so that the rMap always has
+	// a complete picture of the revisions we know to exist
+	if _, has = c.rMap[r]; !has {
+		c.rMap[r] = nil
+	}
 	c.mut.Unlock()
 }
 
@@ -94,6 +108,12 @@ func (c *singleSourceCacheMemory) getProjectInfo(r Revision, an ProjectAnalyzer)
 func (c *singleSourceCacheMemory) setPackageTree(r Revision, ptree pkgtree.PackageTree) {
 	c.mut.Lock()
 	c.ptrees[r] = ptree
+
+	// Ensure there's at least an entry in the rMap so that the rMap always has
+	// a complete picture of the revisions we know to exist
+	if _, has := c.rMap[r]; !has {
+		c.rMap[r] = nil
+	}
 	c.mut.Unlock()
 }
 
@@ -107,6 +127,8 @@ func (c *singleSourceCacheMemory) getPackageTree(r Revision) (pkgtree.PackageTre
 func (c *singleSourceCacheMemory) storeVersionMap(versionList []PairedVersion, flush bool) {
 	c.mut.Lock()
 	if flush {
+		// TODO(sdboyer) how do we handle cache consistency here - revs that may
+		// be out of date vis-a-vis the ptrees or infos maps?
 		for r := range c.rMap {
 			c.rMap[r] = nil
 		}
@@ -130,9 +152,49 @@ func (c *singleSourceCacheMemory) getVersionsFor(r Revision) ([]UnpairedVersion,
 	return versionList, has
 }
 
+//func (c *singleSourceCacheMemory) getAllVersions() []PairedVersion {
+func (c *singleSourceCacheMemory) getAllVersions() []Version {
+	//vlist := make([]PairedVersion, 0, len(c.vMap))
+	vlist := make([]Version, 0, len(c.vMap))
+	for v, r := range c.vMap {
+		vlist = append(vlist, v.Is(r))
+	}
+	return vlist
+}
+
 func (c *singleSourceCacheMemory) getRevisionFor(uv UnpairedVersion) (Revision, bool) {
 	c.mut.Lock()
 	r, has := c.vMap[uv]
 	c.mut.Unlock()
 	return r, has
+}
+
+func (c *singleSourceCacheMemory) toRevision(v Version) (Revision, bool) {
+	switch t := v.(type) {
+	case Revision:
+		return t, true
+	case PairedVersion:
+		return t.Underlying(), true
+	case UnpairedVersion:
+		r, has := c.vMap[t]
+		return r, has
+	default:
+		panic(fmt.Sprintf("Unknown version type %T", v))
+	}
+}
+
+func (c *singleSourceCacheMemory) toUnpaired(v Version) (UnpairedVersion, bool) {
+	switch t := v.(type) {
+	case UnpairedVersion:
+		return t, true
+	case PairedVersion:
+		return t.Unpair(), true
+	case Revision:
+		if upv, has := c.rMap[t]; has && len(upv) > 0 {
+			return upv[0], true
+		}
+		return nil, false
+	default:
+		panic(fmt.Sprintf("unknown version type %T", v))
+	}
 }

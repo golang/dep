@@ -230,6 +230,8 @@ func (sc *sourceCoordinator) getSourceGatewayFor(ctx context.Context, id Project
 				doReturn(srcGate, nil)
 				return
 			}
+			// This should panic, right?
+			panic("")
 		}
 		sc.srcmut.RUnlock()
 

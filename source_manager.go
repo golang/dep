@@ -347,7 +347,7 @@ func (sm *SourceMgr) GetManifestAndLock(id ProjectIdentifier, v Version) (Manife
 		return nil, nil, err
 	}
 
-	return src.getManifestAndLock(id.ProjectRoot, v)
+	return src.getManifestAndLock(id.ProjectRoot, v, sm.an)
 }
 
 // ListPackages parses the tree of the Go packages at and below the ProjectRoot

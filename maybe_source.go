@@ -2,6 +2,7 @@ package gps
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"net/url"
 	"path/filepath"
@@ -12,20 +13,22 @@ import (
 // A maybeSource represents a set of information that, given some
 // typically-expensive network effort, could be transformed into a proper source.
 //
-// Wrapping these up as their own type kills two birds with one stone:
+// Wrapping these up as their own type achieves two goals:
 //
 // * Allows control over when deduction logic triggers network activity
 // * Makes it easy to attempt multiple URLs for a given import path
 type maybeSource interface {
-	try(cachedir string, an ProjectAnalyzer) (source, string, error)
+	// TODO(sdboyer) remove ProjectAnalyzer from here after refactor to bring it in on
+	// GetManifestAndLock() calls as a param
+	try(ctx context.Context, cachedir string, c singleSourceCache) (source, string, error)
 }
 
 type maybeSources []maybeSource
 
-func (mbs maybeSources) try(cachedir string, an ProjectAnalyzer) (source, string, error) {
+func (mbs maybeSources) try(ctx context.Context, cachedir string, c singleSourceCache) (source, string, error) {
 	var e sourceFailures
 	for _, mb := range mbs {
-		src, ident, err := mb.try(cachedir, an)
+		src, ident, err := mb.try(ctx, cachedir, c)
 		if err == nil {
 			return src, ident, nil
 		}
@@ -62,7 +65,7 @@ type maybeGitSource struct {
 	url *url.URL
 }
 
-func (m maybeGitSource) try(cachedir string, an ProjectAnalyzer) (source, string, error) {
+func (m maybeGitSource) try(ctx context.Context, cachedir string, c singleSourceCache) (source, string, error) {
 	ustr := m.url.String()
 	path := filepath.Join(cachedir, "sources", sanitizer.Replace(ustr))
 	r, err := vcs.NewGitRepo(ustr, path)
@@ -72,8 +75,7 @@ func (m maybeGitSource) try(cachedir string, an ProjectAnalyzer) (source, string
 
 	src := &gitSource{
 		baseVCSSource: baseVCSSource{
-			an: an,
-			dc: newMetaCache(),
+			dc: c,
 			crepo: &repo{
 				r:     &gitRepo{r},
 				rpath: path,
@@ -104,7 +106,7 @@ type maybeGopkginSource struct {
 	major uint64
 }
 
-func (m maybeGopkginSource) try(cachedir string, an ProjectAnalyzer) (source, string, error) {
+func (m maybeGopkginSource) try(ctx context.Context, cachedir string, c singleSourceCache) (source, string, error) {
 	// We don't actually need a fully consistent transform into the on-disk path
 	// - just something that's unique to the particular gopkg.in domain context.
 	// So, it's OK to just dumb-join the scheme with the path.
@@ -118,8 +120,7 @@ func (m maybeGopkginSource) try(cachedir string, an ProjectAnalyzer) (source, st
 	src := &gopkginSource{
 		gitSource: gitSource{
 			baseVCSSource: baseVCSSource{
-				an: an,
-				dc: newMetaCache(),
+				dc: c,
 				crepo: &repo{
 					r:     &gitRepo{r},
 					rpath: path,
@@ -144,7 +145,7 @@ type maybeBzrSource struct {
 	url *url.URL
 }
 
-func (m maybeBzrSource) try(cachedir string, an ProjectAnalyzer) (source, string, error) {
+func (m maybeBzrSource) try(ctx context.Context, cachedir string, c singleSourceCache) (source, string, error) {
 	ustr := m.url.String()
 	path := filepath.Join(cachedir, "sources", sanitizer.Replace(ustr))
 	r, err := vcs.NewBzrRepo(ustr, path)
@@ -157,8 +158,7 @@ func (m maybeBzrSource) try(cachedir string, an ProjectAnalyzer) (source, string
 
 	src := &bzrSource{
 		baseVCSSource: baseVCSSource{
-			an: an,
-			dc: newMetaCache(),
+			dc: c,
 			ex: existence{
 				s: existsUpstream,
 				f: existsUpstream,
@@ -178,7 +178,7 @@ type maybeHgSource struct {
 	url *url.URL
 }
 
-func (m maybeHgSource) try(cachedir string, an ProjectAnalyzer) (source, string, error) {
+func (m maybeHgSource) try(ctx context.Context, cachedir string, c singleSourceCache) (source, string, error) {
 	ustr := m.url.String()
 	path := filepath.Join(cachedir, "sources", sanitizer.Replace(ustr))
 	r, err := vcs.NewHgRepo(ustr, path)
@@ -191,8 +191,7 @@ func (m maybeHgSource) try(cachedir string, an ProjectAnalyzer) (source, string,
 
 	src := &hgSource{
 		baseVCSSource: baseVCSSource{
-			an: an,
-			dc: newMetaCache(),
+			dc: c,
 			ex: existence{
 				s: existsUpstream,
 				f: existsUpstream,

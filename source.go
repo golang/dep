@@ -49,7 +49,7 @@ type source interface {
 	syncLocal() error
 	checkExistence(sourceExistence) bool
 	exportVersionTo(Version, string) error
-	getManifestAndLock(ProjectRoot, Version) (Manifest, Lock, error)
+	getManifestAndLock(ProjectRoot, Version, ProjectAnalyzer) (Manifest, Lock, error)
 	listPackages(ProjectRoot, Version) (pkgtree.PackageTree, error)
 	listVersions() ([]Version, error)
 	revisionPresentIn(Revision) (bool, error)
@@ -77,12 +77,9 @@ type baseVCSSource struct {
 	// existence of the project/repo.
 	ex existence
 
-	// ProjectAnalyzer used to fulfill getManifestAndLock
-	an ProjectAnalyzer
-
 	// The project metadata cache. This is (or is intended to be) persisted to
 	// disk, for reuse across solver runs.
-	dc *sourceMetaCache
+	dc singleSourceCache
 
 	// lvfunc allows the other vcs source types that embed this type to inject
 	// their listVersions func into the baseSource, for use as needed.
@@ -105,7 +102,7 @@ type baseVCSSource struct {
 	cvsync bool
 }
 
-func (bs *baseVCSSource) getManifestAndLock(r ProjectRoot, v Version) (Manifest, Lock, error) {
+func (bs *baseVCSSource) getManifestAndLock(r ProjectRoot, v Version, an ProjectAnalyzer) (Manifest, Lock, error) {
 	if err := bs.ensureCacheExistence(); err != nil {
 		return nil, nil, err
 	}
@@ -116,7 +113,7 @@ func (bs *baseVCSSource) getManifestAndLock(r ProjectRoot, v Version) (Manifest,
 	}
 
 	// Return the info from the cache, if we already have it
-	if pi, exists := bs.dc.infos[rev]; exists {
+	if pi, exists := bs.dc.getProjectInfo(rev, an); exists {
 		return pi.Manifest, pi.Lock, nil
 	}
 
@@ -148,8 +145,7 @@ func (bs *baseVCSSource) getManifestAndLock(r ProjectRoot, v Version) (Manifest,
 	}
 
 	bs.crepo.mut.RLock()
-	m, l, err := bs.an.DeriveManifestAndLock(bs.crepo.r.LocalPath(), r)
-	// TODO(sdboyer) cache results
+	m, l, err := an.DeriveManifestAndLock(bs.crepo.r.LocalPath(), r)
 	bs.crepo.mut.RUnlock()
 
 	if err == nil {
@@ -163,7 +159,7 @@ func (bs *baseVCSSource) getManifestAndLock(r ProjectRoot, v Version) (Manifest,
 			Lock:     l,
 		}
 
-		bs.dc.infos[rev] = pi
+		bs.dc.setProjectInfo(rev, an, pi)
 
 		return pi.Manifest, pi.Lock, nil
 	}
@@ -171,54 +167,12 @@ func (bs *baseVCSSource) getManifestAndLock(r ProjectRoot, v Version) (Manifest,
 	return nil, nil, unwrapVcsErr(err)
 }
 
-// toRevision turns a Version into a Revision, if doing so is possible based on
-// the information contained in the version itself, or in the cache maps.
-func (dc *sourceMetaCache) toRevision(v Version) Revision {
-	switch t := v.(type) {
-	case Revision:
-		return t
-	case PairedVersion:
-		return t.Underlying()
-	case UnpairedVersion:
-		// This will return the empty rev (empty string) if we don't have a
-		// record of it. It's up to the caller to decide, for example, if
-		// it's appropriate to update the cache.
-		return dc.vMap[t]
-	default:
-		panic(fmt.Sprintf("Unknown version type %T", v))
-	}
-}
-
-// toUnpaired turns a Version into an UnpairedVersion, if doing so is possible
-// based on the information contained in the version itself, or in the cache
-// maps.
-//
-// If the input is a revision and multiple UnpairedVersions are associated with
-// it, whatever happens to be the first is returned.
-func (dc *sourceMetaCache) toUnpaired(v Version) UnpairedVersion {
-	switch t := v.(type) {
-	case UnpairedVersion:
-		return t
-	case PairedVersion:
-		return t.Unpair()
-	case Revision:
-		if upv, has := dc.rMap[t]; has && len(upv) > 0 {
-			return upv[0]
-		}
-		return nil
-	default:
-		panic(fmt.Sprintf("unknown version type %T", v))
-	}
-}
-
 func (bs *baseVCSSource) revisionPresentIn(r Revision) (bool, error) {
 	// First and fastest path is to check the data cache to see if the rev is
 	// present. This could give us false positives, but the cases where that can
 	// occur would require a type of cache staleness that seems *exceedingly*
 	// unlikely to occur.
-	if _, has := bs.dc.infos[r]; has {
-		return true, nil
-	} else if _, has := bs.dc.rMap[r]; has {
+	if _, has := bs.dc.getVersionsFor(r); has {
 		return true, nil
 	}
 
@@ -349,7 +303,7 @@ func (bs *baseVCSSource) listPackages(pr ProjectRoot, v Version) (ptree pkgtree.
 
 	// Return the ptree from the cache, if we already have it
 	var exists bool
-	if ptree, exists = bs.dc.ptrees[r]; exists {
+	if ptree, exists = bs.dc.getPackageTree(r); exists {
 		return
 	}
 
@@ -377,7 +331,7 @@ func (bs *baseVCSSource) listPackages(pr ProjectRoot, v Version) (ptree pkgtree.
 		ptree, err = pkgtree.ListPackages(bs.crepo.r.LocalPath(), string(pr))
 		// TODO(sdboyer) cache errs?
 		if err == nil {
-			bs.dc.ptrees[r] = ptree
+			bs.dc.setPackageTree(r, ptree)
 		}
 	} else {
 		err = unwrapVcsErr(err)
@@ -388,12 +342,13 @@ func (bs *baseVCSSource) listPackages(pr ProjectRoot, v Version) (ptree pkgtree.
 }
 
 // toRevOrErr makes all efforts to convert a Version into a rev, including
-// updating the cache repo (if needed). It does not guarantee that the returned
+// updating the source repo (if needed). It does not guarantee that the returned
 // Revision actually exists in the repository (as one of the cheaper methods may
 // have had bad data).
-func (bs *baseVCSSource) toRevOrErr(v Version) (r Revision, err error) {
-	r = bs.dc.toRevision(v)
-	if r == "" {
+func (bs *baseVCSSource) toRevOrErr(v Version) (Revision, error) {
+	r, has := bs.dc.toRevision(v)
+	var err error
+	if !has {
 		// Rev can be empty if:
 		//  - The cache is unsynced
 		//  - A version was passed that used to exist, but no longer does
@@ -403,18 +358,18 @@ func (bs *baseVCSSource) toRevOrErr(v Version) (r Revision, err error) {
 			// call the lvfunc to sync the meta cache
 			_, err = bs.lvfunc()
 			if err != nil {
-				return
+				return "", err
 			}
 		}
 
-		r = bs.dc.toRevision(v)
+		r, has = bs.dc.toRevision(v)
 		// If we still don't have a rev, then the version's no good
-		if r == "" {
+		if !has {
 			err = fmt.Errorf("version %s does not exist in source %s", v, bs.crepo.r.Remote())
 		}
 	}
 
-	return
+	return r, err
 }
 
 func (bs *baseVCSSource) exportVersionTo(v Version, to string) error {

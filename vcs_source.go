@@ -102,44 +102,25 @@ func (s *gitSource) exportVersionTo(v Version, to string) error {
 	return err
 }
 
-func (s *gitSource) listVersions() (vlist []Version, err error) {
+func (s *gitSource) listVersions() ([]Version, error) {
 	s.baseVCSSource.lvmut.Lock()
 	defer s.baseVCSSource.lvmut.Unlock()
 
 	if s.cvsync {
-		vlist = make([]Version, len(s.dc.vMap))
-		k := 0
-		for v, r := range s.dc.vMap {
-			vlist[k] = v.Is(r)
-			k++
-		}
-
-		return
+		return s.dc.getAllVersions(), nil
 	}
 
-	vlist, err = s.doListVersions()
+	vlist, err := s.doListVersions()
 	if err != nil {
 		return nil, err
 	}
-
-	// Process the version data into the cache
-	//
-	// reset the rmap and vmap, as they'll be fully repopulated by this
-	s.dc.vMap = make(map[UnpairedVersion]Revision)
-	s.dc.rMap = make(map[Revision][]UnpairedVersion)
-
-	for _, v := range vlist {
-		pv := v.(PairedVersion)
-		u, r := pv.Unpair(), pv.Underlying()
-		s.dc.vMap[u] = r
-		s.dc.rMap[r] = append(s.dc.rMap[r], u)
-	}
-	// Mark the cache as being in sync with upstream's version list
+	// Process version data into the cache and mark cache as in sync
+	s.dc.storeVersionMap(vlist, true)
 	s.cvsync = true
-	return
+	return s.dc.getAllVersions(), nil
 }
 
-func (s *gitSource) doListVersions() (vlist []Version, err error) {
+func (s *gitSource) doListVersions() (vlist []PairedVersion, err error) {
 	r := s.crepo.r
 	var out []byte
 	c := exec.Command("git", "ls-remote", r.Remote())
@@ -219,7 +200,7 @@ func (s *gitSource) doListVersions() (vlist []Version, err error) {
 
 	smap := make(map[string]bool)
 	uniq := 0
-	vlist = make([]Version, len(all)-1) // less 1, because always ignore HEAD
+	vlist = make([]PairedVersion, len(all)-1) // less 1, because always ignore HEAD
 	for _, pair := range all {
 		var v PairedVersion
 		if string(pair[46:51]) == "heads" {
@@ -291,19 +272,12 @@ type gopkginSource struct {
 	major uint64
 }
 
-func (s *gopkginSource) listVersions() (vlist []Version, err error) {
+func (s *gopkginSource) listVersions() ([]Version, error) {
 	s.baseVCSSource.lvmut.Lock()
 	defer s.baseVCSSource.lvmut.Unlock()
 
 	if s.cvsync {
-		vlist = make([]Version, len(s.dc.vMap))
-		k := 0
-		for v, r := range s.dc.vMap {
-			vlist[k] = v.Is(r)
-			k++
-		}
-
-		return
+		return s.dc.getAllVersions(), nil
 	}
 
 	ovlist, err := s.doListVersions()
@@ -312,7 +286,7 @@ func (s *gopkginSource) listVersions() (vlist []Version, err error) {
 	}
 
 	// Apply gopkg.in's filtering rules
-	vlist = make([]Version, len(ovlist))
+	vlist := make([]PairedVersion, len(ovlist))
 	k := 0
 	var dbranch int // index of branch to be marked default
 	var bsv *semver.Version
@@ -363,21 +337,10 @@ func (s *gopkginSource) listVersions() (vlist []Version, err error) {
 		}.Is(dbv.r)
 	}
 
-	// Process the filtered version data into the cache
-	//
-	// reset the rmap and vmap, as they'll be fully repopulated by this
-	s.dc.vMap = make(map[UnpairedVersion]Revision)
-	s.dc.rMap = make(map[Revision][]UnpairedVersion)
-
-	for _, v := range vlist {
-		pv := v.(PairedVersion)
-		u, r := pv.Unpair(), pv.Underlying()
-		s.dc.vMap[u] = r
-		s.dc.rMap[r] = append(s.dc.rMap[r], u)
-	}
-	// Mark the cache as being in sync with upstream's version list
+	// Process filtered version data into the cache and mark cache as in sync
+	s.dc.storeVersionMap(vlist, true)
 	s.cvsync = true
-	return
+	return s.dc.getAllVersions(), nil
 }
 
 // bzrSource is a generic bzr repository implementation that should work with
@@ -402,25 +365,18 @@ func (s *bzrSource) update() error {
 	return nil
 }
 
-func (s *bzrSource) listVersions() (vlist []Version, err error) {
+func (s *bzrSource) listVersions() ([]Version, error) {
 	s.baseVCSSource.lvmut.Lock()
 	defer s.baseVCSSource.lvmut.Unlock()
 
 	if s.cvsync {
-		vlist = make([]Version, len(s.dc.vMap))
-		k := 0
-		for v, r := range s.dc.vMap {
-			vlist[k] = v.Is(r)
-			k++
-		}
-
-		return
+		return s.dc.getAllVersions(), nil
 	}
 
 	// Must first ensure cache checkout's existence
-	err = s.ensureCacheExistence()
+	err := s.ensureCacheExistence()
 	if err != nil {
-		return
+		return nil, err
 	}
 	r := s.crepo.r
 
@@ -431,7 +387,7 @@ func (s *bzrSource) listVersions() (vlist []Version, err error) {
 		err = s.update()
 		s.crepo.mut.Unlock()
 		if err != nil {
-			return
+			return nil, err
 		}
 
 		s.crepo.synced = true
@@ -453,35 +409,25 @@ func (s *bzrSource) listVersions() (vlist []Version, err error) {
 		return nil, fmt.Errorf("%s: %s", err, br)
 	}
 
-	// Both commands completed successfully, so there's no further possibility
-	// of errors. That means it's now safe to reset the rmap and vmap, as
-	// they're about to be fully repopulated.
-	s.dc.vMap = make(map[UnpairedVersion]Revision)
-	s.dc.rMap = make(map[Revision][]UnpairedVersion)
-	vlist = make([]Version, len(all)+1)
+	vlist := make([]PairedVersion, 0, len(all)+1)
 
 	// Now, all the tags.
-	for k, line := range all {
+	for _, line := range all {
 		idx := bytes.IndexByte(line, 32) // space
 		v := NewVersion(string(line[:idx]))
 		r := Revision(bytes.TrimSpace(line[idx:]))
-
-		s.dc.vMap[v] = r
-		s.dc.rMap[r] = append(s.dc.rMap[r], v)
-		vlist[k] = v.Is(r)
+		vlist = append(vlist, v.Is(r))
 	}
 
 	// Last, add the default branch, hardcoding the visual representation of it
 	// that bzr uses when operating in the workflow mode we're using.
 	v := newDefaultBranch("(default)")
-	rev := Revision(string(branchrev))
-	s.dc.vMap[v] = rev
-	s.dc.rMap[rev] = append(s.dc.rMap[rev], v)
-	vlist[len(vlist)-1] = v.Is(rev)
+	vlist = append(vlist, v.Is(Revision(string(branchrev))))
 
-	// Cache is now in sync with upstream's version list
+	// Process version data into the cache and mark cache as in sync
+	s.dc.storeVersionMap(vlist, true)
 	s.cvsync = true
-	return
+	return s.dc.getAllVersions(), nil
 }
 
 // hgSource is a generic hg repository implementation that should work with
@@ -506,25 +452,18 @@ func (s *hgSource) update() error {
 	return nil
 }
 
-func (s *hgSource) listVersions() (vlist []Version, err error) {
+func (s *hgSource) listVersions() ([]Version, error) {
 	s.baseVCSSource.lvmut.Lock()
 	defer s.baseVCSSource.lvmut.Unlock()
 
 	if s.cvsync {
-		vlist = make([]Version, len(s.dc.vMap))
-		k := 0
-		for v, r := range s.dc.vMap {
-			vlist[k] = v.Is(r)
-			k++
-		}
-
-		return
+		return s.dc.getAllVersions(), nil
 	}
 
 	// Must first ensure cache checkout's existence
-	err = s.ensureCacheExistence()
+	err := s.ensureCacheExistence()
 	if err != nil {
-		return
+		return nil, err
 	}
 	r := s.crepo.r
 
@@ -535,13 +474,14 @@ func (s *hgSource) listVersions() (vlist []Version, err error) {
 		err = unwrapVcsErr(s.update())
 		s.crepo.mut.Unlock()
 		if err != nil {
-			return
+			return nil, err
 		}
 
 		s.crepo.synced = true
 	}
 
 	var out []byte
+	var vlist []PairedVersion
 
 	// Now, list all the tags
 	out, err = runFromRepoDir(r, "hg", "tags", "--debug", "--verbose")
@@ -600,7 +540,7 @@ func (s *hgSource) listVersions() (vlist []Version, err error) {
 			idx := bytes.IndexByte(pair[0], 32) // space
 			// if it's the magic @ marker, make that the default branch
 			str := string(pair[0][:idx])
-			var v Version
+			var v PairedVersion
 			if str == "@" {
 				magicAt = true
 				v = newDefaultBranch(str).Is(Revision(pair[1])).(PairedVersion)
@@ -630,7 +570,7 @@ func (s *hgSource) listVersions() (vlist []Version, err error) {
 		str := string(pair[0][:idx])
 		// if there was no magic @ bookmark, and this is mercurial's magic
 		// "default" branch, then mark it as default branch
-		var v Version
+		var v PairedVersion
 		if !magicAt && str == "default" {
 			v = newDefaultBranch(str).Is(Revision(pair[1])).(PairedVersion)
 		} else {
@@ -639,20 +579,10 @@ func (s *hgSource) listVersions() (vlist []Version, err error) {
 		vlist = append(vlist, v)
 	}
 
-	// reset the rmap and vmap, as they'll be fully repopulated by this
-	s.dc.vMap = make(map[UnpairedVersion]Revision)
-	s.dc.rMap = make(map[Revision][]UnpairedVersion)
-
-	for _, v := range vlist {
-		pv := v.(PairedVersion)
-		u, r := pv.Unpair(), pv.Underlying()
-		s.dc.vMap[u] = r
-		s.dc.rMap[r] = append(s.dc.rMap[r], u)
-	}
-
-	// Cache is now in sync with upstream's version list
+	// Process version data into the cache and mark cache as in sync
+	s.dc.storeVersionMap(vlist, true)
 	s.cvsync = true
-	return
+	return s.dc.getAllVersions(), nil
 }
 
 type repo struct {
