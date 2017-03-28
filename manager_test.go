@@ -366,10 +366,9 @@ func TestGetSources(t *testing.T) {
 	wg.Add(len(pil))
 	for _, pi := range pil {
 		lpi := pi
-		t.Run(string(pi.ProjectRoot), func(t *testing.T) {
+		t.Run(lpi.normalizedSource(), func(t *testing.T) {
 			defer wg.Done()
 
-			nn := lpi.normalizedSource()
 			srcg, err := sm.srcCoord.getSourceGatewayFor(ctx, lpi)
 			if err != nil {
 				t.Errorf("unexpected error setting up source: %s", err)
