@@ -562,7 +562,7 @@ func newDeductionCoordinator(cm *callManager) *deductionCoordinator {
 // If no errors are encountered, the returned pathDeduction will contain both
 // the root path and a list of maybeSources, which can be subsequently used to
 // create a handler that will manage the particular source.
-func (dc *deductionCoordinator) deduceRootPath(path string) (pathDeduction, error) {
+func (dc *deductionCoordinator) deduceRootPath(ctx context.Context, path string) (pathDeduction, error) {
 	if dc.callMgr.getLifetimeContext().Err() != nil {
 		return pathDeduction{}, errors.New("deductionCoordinator has been terminated")
 	}
@@ -570,7 +570,7 @@ func (dc *deductionCoordinator) deduceRootPath(path string) (pathDeduction, erro
 	retchan, errchan := make(chan pathDeduction), make(chan error)
 	dc.action <- func() {
 		hmdDeduce := func(hmd *httpMetadataDeducer) {
-			pd, err := hmd.deduce(context.TODO(), path)
+			pd, err := hmd.deduce(ctx, path)
 			if err != nil {
 				errchan <- err
 			} else {
@@ -724,8 +724,7 @@ func (hmd *httpMetadataDeducer) deduce(ctx context.Context, path string) (pathDe
 		defer doneFunc()
 
 		opath := path
-		// FIXME should we need this first return val?
-		_, path, err := normalizeURI(path)
+		u, path, err := normalizeURI(path)
 		if err != nil {
 			hmd.deduceErr = err
 			return
@@ -734,7 +733,7 @@ func (hmd *httpMetadataDeducer) deduce(ctx context.Context, path string) (pathDe
 		pd := pathDeduction{}
 
 		// Make the HTTP call to attempt to retrieve go-get metadata
-		root, vcs, reporoot, err := parseMetadata(ctx, path)
+		root, vcs, reporoot, err := parseMetadata(ctx, path, u.Scheme)
 		if err != nil {
 			hmd.deduceErr = fmt.Errorf("unable to deduce repository and source type for: %q", opath)
 			return
@@ -745,8 +744,22 @@ func (hmd *httpMetadataDeducer) deduce(ctx context.Context, path string) (pathDe
 		// the real URL to hit
 		repoURL, err := url.Parse(reporoot)
 		if err != nil {
-			hmd.deduceErr = fmt.Errorf("server returned bad URL when searching for vanity import: %q", reporoot)
+			hmd.deduceErr = fmt.Errorf("server returned bad URL in go-get metadata: %q", reporoot)
 			return
+		}
+
+		// If the input path specified a scheme, then try to honor it.
+		if u.Scheme != "" && repoURL.Scheme != u.Scheme {
+			// If the input scheme was http, but the go-get metadata
+			// nevertheless indicated https should be used for the repo, then
+			// trust the metadata and use https.
+			//
+			// To err on the secure side, do NOT allow the same in the other
+			// direction (https -> http).
+			if u.Scheme != "http" || repoURL.Scheme != "https" {
+				hmd.deduceErr = fmt.Errorf("scheme mismatch for %q: input asked for %q, but go-get metadata specified %q", path, u.Scheme, repoURL.Scheme)
+				return
+			}
 		}
 
 		switch vcs {
@@ -814,14 +827,18 @@ func normalizeURI(p string) (u *url.URL, newpath string, err error) {
 }
 
 // fetchMetadata fetches the remote metadata for path.
-func fetchMetadata(ctx context.Context, path string) (rc io.ReadCloser, err error) {
+func fetchMetadata(ctx context.Context, path, scheme string) (rc io.ReadCloser, err error) {
 	defer func() {
 		if err != nil {
 			err = fmt.Errorf("unable to determine remote metadata protocol: %s", err)
 		}
 	}()
 
-	// try https first
+	if scheme == "http" {
+		rc, err = doFetchMetadata(ctx, "http", path)
+		return
+	}
+
 	rc, err = doFetchMetadata(ctx, "https", path)
 	if err == nil {
 		return
@@ -852,8 +869,12 @@ func doFetchMetadata(ctx context.Context, scheme, path string) (io.ReadCloser, e
 }
 
 // parseMetadata fetches and decodes remote metadata for path.
-func parseMetadata(ctx context.Context, path string) (string, string, string, error) {
-	rc, err := fetchMetadata(ctx, path)
+//
+// scheme is optional. If it's http, only http will be attempted for fetching.
+// Any other scheme (including none) will first try https, then fall back to
+// http.
+func parseMetadata(ctx context.Context, path, scheme string) (string, string, string, error) {
+	rc, err := fetchMetadata(ctx, path, scheme)
 	if err != nil {
 		return "", "", "", err
 	}

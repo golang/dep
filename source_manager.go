@@ -493,7 +493,7 @@ func (sm *SourceMgr) DeduceProjectRoot(ip string) (ProjectRoot, error) {
 		atomic.AddInt32(&sm.opcount, -1)
 	}()
 
-	pd, err := sm.deduceCoord.deduceRootPath(ip)
+	pd, err := sm.deduceCoord.deduceRootPath(context.TODO(), ip)
 	return ProjectRoot(pd.root), err
 }
 

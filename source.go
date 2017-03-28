@@ -2,6 +2,7 @@ package gps
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -92,6 +93,10 @@ func newSourceCoordinator(cm *callManager, deducer *deductionCoordinator, cached
 }
 
 func (sc *sourceCoordinator) getSourceGatewayFor(ctx context.Context, id ProjectIdentifier) (*sourceGateway, error) {
+	if sc.callMgr.getLifetimeContext().Err() != nil {
+		return nil, errors.New("sourceCoordinator has been terminated")
+	}
+
 	normalizedName := id.normalizedSource()
 
 	sc.srcmut.RLock()
@@ -143,7 +148,7 @@ func (sc *sourceCoordinator) getSourceGatewayFor(ctx context.Context, id Project
 			sc.psrcmut.Unlock()
 		}
 
-		pd, err := sc.deducer.deduceRootPath(normalizedName)
+		pd, err := sc.deducer.deduceRootPath(ctx, normalizedName)
 		if err != nil {
 			// As in the deducer, don't cache errors so that externally-driven retry
 			// strategies can be constructed.
