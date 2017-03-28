@@ -74,8 +74,8 @@ func newMemoryCache() singleSourceCache {
 		vMap:   make(map[UnpairedVersion]Revision),
 		rMap:   make(map[Revision][]UnpairedVersion),
 	}
-
 }
+
 func (c *singleSourceCacheMemory) setProjectInfo(r Revision, an ProjectAnalyzer, pi projectInfo) {
 	c.mut.Lock()
 	inner, has := c.infos[an]
@@ -101,6 +101,7 @@ func (c *singleSourceCacheMemory) getProjectInfo(r Revision, an ProjectAnalyzer)
 	if !has {
 		return projectInfo{}, false
 	}
+
 	pi, has := inner[r]
 	return pi, has
 }
@@ -176,7 +177,9 @@ func (c *singleSourceCacheMemory) toRevision(v Version) (Revision, bool) {
 	case PairedVersion:
 		return t.Underlying(), true
 	case UnpairedVersion:
+		c.mut.Lock()
 		r, has := c.vMap[t]
+		c.mut.Unlock()
 		return r, has
 	default:
 		panic(fmt.Sprintf("Unknown version type %T", v))
@@ -190,7 +193,11 @@ func (c *singleSourceCacheMemory) toUnpaired(v Version) (UnpairedVersion, bool) 
 	case PairedVersion:
 		return t.Unpair(), true
 	case Revision:
-		if upv, has := c.rMap[t]; has && len(upv) > 0 {
+		c.mut.Lock()
+		upv, has := c.rMap[t]
+		c.mut.Unlock()
+
+		if has && len(upv) > 0 {
 			return upv[0], true
 		}
 		return nil, false

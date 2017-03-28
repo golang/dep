@@ -14,19 +14,6 @@ import (
 	"github.com/sdboyer/gps/internal/fs"
 )
 
-// Kept here as a reference in case it does become important to implement a
-// vcsSource interface. Remove if/when it becomes clear we're never going to do
-// this.
-//type vcsSource interface {
-//syncLocal() error
-//ensureLocal() error
-//listLocalVersionPairs() ([]PairedVersion, sourceExistence, error)
-//listUpstreamVersionPairs() ([]PairedVersion, sourceExistence, error)
-//hasRevision(Revision) (bool, error)
-//checkout(Version) error
-//exportVersionTo(Version, string) error
-//}
-
 // gitSource is a generic git repository implementation that should work with
 // all standard git remotes.
 type gitSource struct {
