@@ -363,52 +363,53 @@ func TestGetSources(t *testing.T) {
 
 	ctx := context.Background()
 	wg := &sync.WaitGroup{}
-	wg.Add(3)
+	wg.Add(len(pil))
 	for _, pi := range pil {
-		go func(lpi ProjectIdentifier) {
+		lpi := pi
+		t.Run(string(pi.ProjectRoot), func(t *testing.T) {
 			defer wg.Done()
 
 			nn := lpi.normalizedSource()
 			srcg, err := sm.srcCoord.getSourceGatewayFor(ctx, lpi)
 			if err != nil {
-				t.Errorf("(src %q) unexpected error setting up source: %s", nn, err)
+				t.Errorf("unexpected error setting up source: %s", err)
 				return
 			}
 
 			// Re-get the same, make sure they are the same
 			srcg2, err := sm.srcCoord.getSourceGatewayFor(ctx, lpi)
 			if err != nil {
-				t.Errorf("(src %q) unexpected error re-getting source: %s", nn, err)
+				t.Errorf("unexpected error re-getting source: %s", err)
 			} else if srcg != srcg2 {
-				t.Errorf("(src %q) first and second sources are not eq", nn)
+				t.Error("first and second sources are not eq")
 			}
 
 			// All of them _should_ select https, so this should work
 			lpi.Source = "https://" + lpi.Source
 			srcg3, err := sm.srcCoord.getSourceGatewayFor(ctx, lpi)
 			if err != nil {
-				t.Errorf("(src %q) unexpected error getting explicit https source: %s", nn, err)
+				t.Errorf("unexpected error getting explicit https source: %s", err)
 			} else if srcg != srcg3 {
-				t.Errorf("(src %q) explicit https source should reuse autodetected https source", nn)
+				t.Error("explicit https source should reuse autodetected https source")
 			}
 
 			// Now put in http, and they should differ
 			lpi.Source = "http://" + string(lpi.ProjectRoot)
 			srcg4, err := sm.srcCoord.getSourceGatewayFor(ctx, lpi)
 			if err != nil {
-				t.Errorf("(src %q) unexpected error getting explicit http source: %s", nn, err)
+				t.Errorf("unexpected error getting explicit http source: %s", err)
 			} else if srcg == srcg4 {
-				t.Errorf("(src %q) explicit http source should create a new src", nn)
+				t.Error("explicit http source should create a new src")
 			}
-		}(pi)
+		})
 	}
 
 	wg.Wait()
 
 	// nine entries (of which three are dupes): for each vcs, raw import path,
 	// the https url, and the http url
-	if len(sm.srcCoord.srcs) != 9 {
-		t.Errorf("Should have nine discrete entries in the srcs map, got %v", len(sm.srcCoord.srcs))
+	if len(sm.srcCoord.nameToURL) != 9 {
+		t.Errorf("Should have nine discrete entries in the nameToURL map, got %v", len(sm.srcCoord.nameToURL))
 	}
 	clean()
 }
@@ -476,8 +477,8 @@ func TestDeduceProjectRoot(t *testing.T) {
 	} else if string(pr) != in {
 		t.Errorf("Wrong project root was deduced;\n\t(GOT) %s\n\t(WNT) %s", pr, in)
 	}
-	if sm.deduceCoord.rootxt.Len() != 2 {
-		t.Errorf("Root path trie should have two elements, one for root and one for subpath; has %v", sm.deduceCoord.rootxt.Len())
+	if sm.deduceCoord.rootxt.Len() != 1 {
+		t.Errorf("Root path trie should still have one element, as still only one unique root has gone in; has %v", sm.deduceCoord.rootxt.Len())
 	}
 
 	// Now do a fully different root, but still on github
@@ -489,8 +490,8 @@ func TestDeduceProjectRoot(t *testing.T) {
 	} else if string(pr) != in2 {
 		t.Errorf("Wrong project root was deduced;\n\t(GOT) %s\n\t(WNT) %s", pr, in)
 	}
-	if sm.deduceCoord.rootxt.Len() != 4 {
-		t.Errorf("Root path trie should have four elements, one for each unique root and subpath; has %v", sm.deduceCoord.rootxt.Len())
+	if sm.deduceCoord.rootxt.Len() != 2 {
+		t.Errorf("Root path trie should have two elements, one for each unique root; has %v", sm.deduceCoord.rootxt.Len())
 	}
 
 	// Ensure that our prefixes are bounded by path separators
@@ -501,8 +502,8 @@ func TestDeduceProjectRoot(t *testing.T) {
 	} else if string(pr) != in4 {
 		t.Errorf("Wrong project root was deduced;\n\t(GOT) %s\n\t(WNT) %s", pr, in)
 	}
-	if sm.deduceCoord.rootxt.Len() != 5 {
-		t.Errorf("Root path trie should have five elements, one for each unique root and subpath; has %v", sm.deduceCoord.rootxt.Len())
+	if sm.deduceCoord.rootxt.Len() != 3 {
+		t.Errorf("Root path trie should have three elements, one for each unique; has %v", sm.deduceCoord.rootxt.Len())
 	}
 
 	// Ensure that vcs extension-based matching comes through
@@ -513,8 +514,8 @@ func TestDeduceProjectRoot(t *testing.T) {
 	} else if string(pr) != in5 {
 		t.Errorf("Wrong project root was deduced;\n\t(GOT) %s\n\t(WNT) %s", pr, in)
 	}
-	if sm.deduceCoord.rootxt.Len() != 6 {
-		t.Errorf("Root path trie should have six elements, one for each unique root and subpath; has %v", sm.deduceCoord.rootxt.Len())
+	if sm.deduceCoord.rootxt.Len() != 4 {
+		t.Errorf("Root path trie should have four elements, one for each unique root; has %v", sm.deduceCoord.rootxt.Len())
 	}
 }
 
