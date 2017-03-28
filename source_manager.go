@@ -342,12 +342,12 @@ func (sm *SourceMgr) GetManifestAndLock(id ProjectIdentifier, v Version) (Manife
 		atomic.AddInt32(&sm.opcount, -1)
 	}()
 
-	src, err := sm.getSourceFor(id)
+	srcg, err := sm.srcCoord.getSourceGatewayFor(context.TODO(), id)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	return src.getManifestAndLock(id.ProjectRoot, v, sm.an)
+	return srcg.getManifestAndLock(context.TODO(), id.ProjectRoot, v, sm.an)
 }
 
 // ListPackages parses the tree of the Go packages at and below the ProjectRoot
@@ -363,12 +363,12 @@ func (sm *SourceMgr) ListPackages(id ProjectIdentifier, v Version) (pkgtree.Pack
 		atomic.AddInt32(&sm.opcount, -1)
 	}()
 
-	src, err := sm.getSourceFor(id)
+	srcg, err := sm.srcCoord.getSourceGatewayFor(context.TODO(), id)
 	if err != nil {
 		return pkgtree.PackageTree{}, err
 	}
 
-	return src.listPackages(id.ProjectRoot, v)
+	return srcg.listPackages(context.TODO(), id.ProjectRoot, v)
 }
 
 // ListVersions retrieves a list of the available versions for a given
@@ -394,13 +394,13 @@ func (sm *SourceMgr) ListVersions(id ProjectIdentifier) ([]Version, error) {
 		atomic.AddInt32(&sm.opcount, -1)
 	}()
 
-	src, err := sm.getSourceFor(id)
+	srcg, err := sm.srcCoord.getSourceGatewayFor(context.TODO(), id)
 	if err != nil {
 		// TODO(sdboyer) More-er proper-er errors
 		return nil, err
 	}
 
-	return src.listVersions()
+	return srcg.listVersions(context.TODO())
 }
 
 // RevisionPresentIn indicates whether the provided Revision is present in the given
@@ -416,13 +416,13 @@ func (sm *SourceMgr) RevisionPresentIn(id ProjectIdentifier, r Revision) (bool, 
 		atomic.AddInt32(&sm.opcount, -1)
 	}()
 
-	src, err := sm.getSourceFor(id)
+	srcg, err := sm.srcCoord.getSourceGatewayFor(context.TODO(), id)
 	if err != nil {
 		// TODO(sdboyer) More-er proper-er errors
 		return false, err
 	}
 
-	return src.revisionPresentIn(r)
+	return srcg.revisionPresentIn(context.TODO(), r)
 }
 
 // SourceExists checks if a repository exists, either upstream or in the cache,
@@ -438,12 +438,12 @@ func (sm *SourceMgr) SourceExists(id ProjectIdentifier) (bool, error) {
 		atomic.AddInt32(&sm.opcount, -1)
 	}()
 
-	src, err := sm.getSourceFor(id)
+	srcg, err := sm.srcCoord.getSourceGatewayFor(context.TODO(), id)
 	if err != nil {
 		return false, err
 	}
 
-	return src.checkExistence(existsInCache) || src.checkExistence(existsUpstream), nil
+	return srcg.checkExistence(context.TODO(), existsInCache) || srcg.checkExistence(context.TODO(), existsUpstream), nil
 }
 
 // SyncSourceFor will ensure that all local caches and information about a
@@ -461,12 +461,12 @@ func (sm *SourceMgr) SyncSourceFor(id ProjectIdentifier) error {
 		atomic.AddInt32(&sm.opcount, -1)
 	}()
 
-	src, err := sm.getSourceFor(id)
+	srcg, err := sm.srcCoord.getSourceGatewayFor(context.TODO(), id)
 	if err != nil {
 		return err
 	}
 
-	return src.syncLocal()
+	return srcg.syncLocal(context.TODO())
 }
 
 // ExportProject writes out the tree of the provided ProjectIdentifier's
@@ -482,12 +482,12 @@ func (sm *SourceMgr) ExportProject(id ProjectIdentifier, v Version, to string) e
 		atomic.AddInt32(&sm.opcount, -1)
 	}()
 
-	src, err := sm.getSourceFor(id)
+	srcg, err := sm.srcCoord.getSourceGatewayFor(context.TODO(), id)
 	if err != nil {
 		return err
 	}
 
-	return src.exportVersionTo(v, to)
+	return srcg.exportVersionTo(context.TODO(), v, to)
 }
 
 // DeduceProjectRoot takes an import path and deduces the corresponding
@@ -508,29 +508,8 @@ func (sm *SourceMgr) DeduceProjectRoot(ip string) (ProjectRoot, error) {
 		atomic.AddInt32(&sm.opcount, -1)
 	}()
 
-	if prefix, root, has := sm.rootxt.LongestPrefix(ip); has {
-		// The non-matching tail of the import path could still be malformed.
-		// Validate just that part, if it exists
-		if prefix != ip {
-			// TODO(sdboyer) commented until i find a proper description of how
-			// to validate an import path
-			//if !pathvld.MatchString(strings.TrimPrefix(ip, prefix+"/")) {
-			//return "", fmt.Errorf("%q is not a valid import path", ip)
-			//}
-			// There was one, and it validated fine - add it so we don't have to
-			// revalidate it later
-			sm.rootxt.Insert(ip, root)
-		}
-		return root, nil
-	}
-
-	ft, err := sm.deducePathAndProcess(ip)
-	if err != nil {
-		return "", err
-	}
-
-	r, err := ft.rootf()
-	return ProjectRoot(r), err
+	pd, err := sm.deduceCoord.deduceRootPath(ip)
+	return ProjectRoot(pd.root), err
 }
 
 func (sm *SourceMgr) getSourceFor(id ProjectIdentifier) (source, error) {

@@ -301,23 +301,24 @@ func (sg *sourceGateway) syncLocal(ctx context.Context) error {
 	sg.mu.Lock()
 	defer sg.mu.Unlock()
 
-	_, err := sg.require(context.TODO(), sourceIsSetUp|sourceHasLatestLocally)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	_, err := sg.require(ctx, sourceIsSetUp|sourceHasLatestLocally)
+	return err
 }
 
 func (sg *sourceGateway) checkExistence(ctx context.Context, ex sourceExistence) bool {
 	sg.mu.Lock()
 	defer sg.mu.Unlock()
 
-	// TODO(sdboyer) these constants really aren't conceptual siblings in the
-	// way they should be
-	_, err := sg.require(context.TODO(), sourceIsSetUp|sourceExistsUpstream)
-	if err != nil {
-		_, err := sg.require(context.TODO(), sourceIsSetUp|sourceExistsLocally)
+	if ex&existsUpstream != 0 {
+		// TODO(sdboyer) these constants really aren't conceptual siblings in the
+		// way they should be
+		_, err := sg.require(ctx, sourceIsSetUp|sourceExistsUpstream)
+		if err != nil {
+			return false
+		}
+	}
+	if ex&existsInCache != 0 {
+		_, err := sg.require(ctx, sourceIsSetUp|sourceExistsLocally)
 		if err != nil {
 			return false
 		}
@@ -326,16 +327,16 @@ func (sg *sourceGateway) checkExistence(ctx context.Context, ex sourceExistence)
 	return true
 }
 
-func (sg *sourceGateway) exportVersionTo(v Version, to string) error {
+func (sg *sourceGateway) exportVersionTo(ctx context.Context, v Version, to string) error {
 	sg.mu.Lock()
 	defer sg.mu.Unlock()
 
-	_, err := sg.require(context.TODO(), sourceIsSetUp|sourceExistsLocally)
+	_, err := sg.require(ctx, sourceIsSetUp|sourceExistsLocally)
 	if err != nil {
 		return err
 	}
 
-	r, err := sg.convertToRevision(v)
+	r, err := sg.convertToRevision(ctx, v)
 	if err != nil {
 		return err
 	}
@@ -343,11 +344,11 @@ func (sg *sourceGateway) exportVersionTo(v Version, to string) error {
 	return sg.src.exportVersionTo(r, to)
 }
 
-func (sg *sourceGateway) getManifestAndLock(pr ProjectRoot, v Version, an ProjectAnalyzer) (Manifest, Lock, error) {
+func (sg *sourceGateway) getManifestAndLock(ctx context.Context, pr ProjectRoot, v Version, an ProjectAnalyzer) (Manifest, Lock, error) {
 	sg.mu.Lock()
 	defer sg.mu.Unlock()
 
-	r, err := sg.convertToRevision(v)
+	r, err := sg.convertToRevision(ctx, v)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -355,6 +356,11 @@ func (sg *sourceGateway) getManifestAndLock(pr ProjectRoot, v Version, an Projec
 	pi, has := sg.cache.getProjectInfo(r, an)
 	if has {
 		return pi.Manifest, pi.Lock, nil
+	}
+
+	_, err = sg.require(ctx, sourceIsSetUp|sourceExistsLocally)
+	if err != nil {
+		return nil, nil, err
 	}
 
 	m, l, err := sg.src.getManifestAndLock(pr, r, an)
@@ -368,11 +374,11 @@ func (sg *sourceGateway) getManifestAndLock(pr ProjectRoot, v Version, an Projec
 
 // FIXME ProjectRoot input either needs to parameterize the cache, or be
 // incorporated on the fly on egress...?
-func (sg *sourceGateway) listPackages(pr ProjectRoot, v Version) (PackageTree, error) {
+func (sg *sourceGateway) listPackages(ctx context.Context, pr ProjectRoot, v Version) (PackageTree, error) {
 	sg.mu.Lock()
 	defer sg.mu.Unlock()
 
-	r, err := sg.convertToRevision(v)
+	r, err := sg.convertToRevision(ctx, v)
 	if err != nil {
 		return PackageTree{}, err
 	}
@@ -380,6 +386,11 @@ func (sg *sourceGateway) listPackages(pr ProjectRoot, v Version) (PackageTree, e
 	ptree, has := sg.cache.getPackageTree(r)
 	if has {
 		return ptree, nil
+	}
+
+	_, err = sg.require(ctx, sourceIsSetUp|sourceExistsLocally)
+	if err != nil {
+		return PackageTree{}, err
 	}
 
 	ptree, err = sg.src.listPackages(pr, r)
@@ -391,7 +402,7 @@ func (sg *sourceGateway) listPackages(pr ProjectRoot, v Version) (PackageTree, e
 	return ptree, nil
 }
 
-func (sg *sourceGateway) convertToRevision(v Version) (Revision, error) {
+func (sg *sourceGateway) convertToRevision(ctx context.Context, v Version) (Revision, error) {
 	// When looking up by Version, there are four states that may have
 	// differing opinions about version->revision mappings:
 	//
@@ -418,7 +429,7 @@ func (sg *sourceGateway) convertToRevision(v Version) (Revision, error) {
 
 	// The version list is out of date; it's possible this version might
 	// show up after loading it.
-	_, err := sg.require(context.TODO(), sourceIsSetUp|sourceHasLatestVersionList)
+	_, err := sg.require(ctx, sourceIsSetUp|sourceHasLatestVersionList)
 	if err != nil {
 		return "", err
 	}
@@ -431,14 +442,14 @@ func (sg *sourceGateway) convertToRevision(v Version) (Revision, error) {
 	return r, nil
 }
 
-func (sg *sourceGateway) listVersions() ([]Version, error) {
+func (sg *sourceGateway) listVersions(ctx context.Context) ([]Version, error) {
 	sg.mu.Lock()
 	defer sg.mu.Unlock()
 
 	// TODO(sdboyer) The problem here is that sourceExistsUpstream may not be
 	// sufficient (e.g. bzr, hg), but we don't want to force local b/c git
 	// doesn't need it
-	_, err := sg.require(context.TODO(), sourceIsSetUp|sourceExistsUpstream|sourceHasLatestVersionList)
+	_, err := sg.require(ctx, sourceIsSetUp|sourceExistsUpstream|sourceHasLatestVersionList)
 	if err != nil {
 		return nil, err
 	}
@@ -446,11 +457,11 @@ func (sg *sourceGateway) listVersions() ([]Version, error) {
 	return sg.cache.getAllVersions(), nil
 }
 
-func (sg *sourceGateway) revisionPresentIn(r Revision) (bool, error) {
+func (sg *sourceGateway) revisionPresentIn(ctx context.Context, r Revision) (bool, error) {
 	sg.mu.Lock()
 	defer sg.mu.Unlock()
 
-	_, err := sg.require(context.TODO(), sourceIsSetUp|sourceExistsLocally)
+	_, err := sg.require(ctx, sourceIsSetUp|sourceExistsLocally)
 	if err != nil {
 		return false, err
 	}
@@ -466,7 +477,7 @@ func (sg *sourceGateway) sourceURL(ctx context.Context) (string, error) {
 	sg.mu.Lock()
 	defer sg.mu.Unlock()
 
-	_, err := sg.require(context.TODO(), sourceIsSetUp|sourceExistsLocally)
+	_, err := sg.require(ctx, sourceIsSetUp)
 	if err != nil {
 		return "", err
 	}
