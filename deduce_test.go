@@ -595,38 +595,27 @@ func TestVanityDeduction(t *testing.T) {
 	wg.Add(len(vanities))
 
 	for _, fix := range vanities {
-		go func(fix pathDeductionFixture) {
-			defer wg.Done()
-			t.Run(fmt.Sprintf("%s", fix.in), func(t *testing.T) {
-				pr, err := sm.DeduceProjectRoot(fix.in)
-				if err != nil {
-					t.Errorf("Unexpected err on deducing project root: %s", err)
-					return
-				} else if string(pr) != fix.root {
-					t.Errorf("Deducer did not return expected root:\n\t(GOT) %s\n\t(WNT) %s", pr, fix.root)
-				}
+		t.Run(fmt.Sprintf("%s", fix.in), func(t *testing.T) {
+			pr, err := sm.DeduceProjectRoot(fix.in)
+			if err != nil {
+				t.Errorf("Unexpected err on deducing project root: %s", err)
+				return
+			} else if string(pr) != fix.root {
+				t.Errorf("Deducer did not return expected root:\n\t(GOT) %s\n\t(WNT) %s", pr, fix.root)
+			}
 
-				ft, err := sm.deducePathAndProcess(fix.in)
-				if err != nil {
-					t.Errorf("Unexpected err on deducing source: %s", err)
-					return
-				}
+			pd, err := sm.deduceCoord.deduceRootPath(fix.in)
+			if err != nil {
+				t.Errorf("Unexpected err on deducing source: %s", err)
+				return
+			}
 
-				_, ident, err := ft.srcf()
-				if err != nil {
-					t.Errorf("Unexpected err on executing source future: %s", err)
-					return
-				}
-
-				ustr := fix.mb.(maybeGitSource).url.String()
-				if ident != ustr {
-					t.Errorf("Deduced repo ident does not match fixture:\n\t(GOT) %s\n\t(WNT) %s", ident, ustr)
-				}
-			})
-		}(fix)
+			ustr := fix.mb.(maybeGitSource).url.String()
+			if pd.root != ustr {
+				t.Errorf("Deduced repo ident does not match fixture:\n\t(GOT) %s\n\t(WNT) %s", pd.root, ustr)
+			}
+		})
 	}
-
-	wg.Wait()
 }
 
 // borrow from stdlib

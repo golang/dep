@@ -361,6 +361,7 @@ func TestGetSources(t *testing.T) {
 		mkPI("launchpad.net/govcstestbzrrepo").normalize(),
 	}
 
+	ctx := context.Background()
 	wg := &sync.WaitGroup{}
 	wg.Add(3)
 	for _, pi := range pil {
@@ -368,35 +369,35 @@ func TestGetSources(t *testing.T) {
 			defer wg.Done()
 
 			nn := lpi.normalizedSource()
-			src, err := sm.getSourceFor(lpi)
+			srcg, err := sm.srcCoord.getSourceGatewayFor(ctx, lpi)
 			if err != nil {
 				t.Errorf("(src %q) unexpected error setting up source: %s", nn, err)
 				return
 			}
 
 			// Re-get the same, make sure they are the same
-			src2, err := sm.getSourceFor(lpi)
+			srcg2, err := sm.srcCoord.getSourceGatewayFor(ctx, lpi)
 			if err != nil {
 				t.Errorf("(src %q) unexpected error re-getting source: %s", nn, err)
-			} else if src != src2 {
+			} else if srcg != srcg2 {
 				t.Errorf("(src %q) first and second sources are not eq", nn)
 			}
 
 			// All of them _should_ select https, so this should work
 			lpi.Source = "https://" + lpi.Source
-			src3, err := sm.getSourceFor(lpi)
+			srcg3, err := sm.srcCoord.getSourceGatewayFor(ctx, lpi)
 			if err != nil {
 				t.Errorf("(src %q) unexpected error getting explicit https source: %s", nn, err)
-			} else if src != src3 {
+			} else if srcg != srcg3 {
 				t.Errorf("(src %q) explicit https source should reuse autodetected https source", nn)
 			}
 
 			// Now put in http, and they should differ
 			lpi.Source = "http://" + string(lpi.ProjectRoot)
-			src4, err := sm.getSourceFor(lpi)
+			srcg4, err := sm.srcCoord.getSourceGatewayFor(ctx, lpi)
 			if err != nil {
 				t.Errorf("(src %q) unexpected error getting explicit http source: %s", nn, err)
-			} else if src == src4 {
+			} else if srcg == srcg4 {
 				t.Errorf("(src %q) explicit http source should create a new src", nn)
 			}
 		}(pi)
@@ -406,8 +407,8 @@ func TestGetSources(t *testing.T) {
 
 	// nine entries (of which three are dupes): for each vcs, raw import path,
 	// the https url, and the http url
-	if len(sm.srcs) != 9 {
-		t.Errorf("Should have nine discrete entries in the srcs map, got %v", len(sm.srcs))
+	if len(sm.srcCoord.srcs) != 9 {
+		t.Errorf("Should have nine discrete entries in the srcs map, got %v", len(sm.srcCoord.srcs))
 	}
 	clean()
 }
@@ -453,8 +454,8 @@ func TestDeduceProjectRoot(t *testing.T) {
 	if string(pr) != in {
 		t.Errorf("Wrong project root was deduced;\n\t(GOT) %s\n\t(WNT) %s", pr, in)
 	}
-	if sm.rootxt.Len() != 1 {
-		t.Errorf("Root path trie should have one element after one deduction, has %v", sm.rootxt.Len())
+	if sm.deduceCoord.rootxt.Len() != 1 {
+		t.Errorf("Root path trie should have one element after one deduction, has %v", sm.deduceCoord.rootxt.Len())
 	}
 
 	pr, err = sm.DeduceProjectRoot(in)
@@ -463,8 +464,8 @@ func TestDeduceProjectRoot(t *testing.T) {
 	} else if string(pr) != in {
 		t.Errorf("Wrong project root was deduced;\n\t(GOT) %s\n\t(WNT) %s", pr, in)
 	}
-	if sm.rootxt.Len() != 1 {
-		t.Errorf("Root path trie should still have one element after performing the same deduction twice; has %v", sm.rootxt.Len())
+	if sm.deduceCoord.rootxt.Len() != 1 {
+		t.Errorf("Root path trie should still have one element after performing the same deduction twice; has %v", sm.deduceCoord.rootxt.Len())
 	}
 
 	// Now do a subpath
@@ -475,8 +476,8 @@ func TestDeduceProjectRoot(t *testing.T) {
 	} else if string(pr) != in {
 		t.Errorf("Wrong project root was deduced;\n\t(GOT) %s\n\t(WNT) %s", pr, in)
 	}
-	if sm.rootxt.Len() != 2 {
-		t.Errorf("Root path trie should have two elements, one for root and one for subpath; has %v", sm.rootxt.Len())
+	if sm.deduceCoord.rootxt.Len() != 2 {
+		t.Errorf("Root path trie should have two elements, one for root and one for subpath; has %v", sm.deduceCoord.rootxt.Len())
 	}
 
 	// Now do a fully different root, but still on github
@@ -488,8 +489,8 @@ func TestDeduceProjectRoot(t *testing.T) {
 	} else if string(pr) != in2 {
 		t.Errorf("Wrong project root was deduced;\n\t(GOT) %s\n\t(WNT) %s", pr, in)
 	}
-	if sm.rootxt.Len() != 4 {
-		t.Errorf("Root path trie should have four elements, one for each unique root and subpath; has %v", sm.rootxt.Len())
+	if sm.deduceCoord.rootxt.Len() != 4 {
+		t.Errorf("Root path trie should have four elements, one for each unique root and subpath; has %v", sm.deduceCoord.rootxt.Len())
 	}
 
 	// Ensure that our prefixes are bounded by path separators
@@ -500,8 +501,8 @@ func TestDeduceProjectRoot(t *testing.T) {
 	} else if string(pr) != in4 {
 		t.Errorf("Wrong project root was deduced;\n\t(GOT) %s\n\t(WNT) %s", pr, in)
 	}
-	if sm.rootxt.Len() != 5 {
-		t.Errorf("Root path trie should have five elements, one for each unique root and subpath; has %v", sm.rootxt.Len())
+	if sm.deduceCoord.rootxt.Len() != 5 {
+		t.Errorf("Root path trie should have five elements, one for each unique root and subpath; has %v", sm.deduceCoord.rootxt.Len())
 	}
 
 	// Ensure that vcs extension-based matching comes through
@@ -512,84 +513,8 @@ func TestDeduceProjectRoot(t *testing.T) {
 	} else if string(pr) != in5 {
 		t.Errorf("Wrong project root was deduced;\n\t(GOT) %s\n\t(WNT) %s", pr, in)
 	}
-	if sm.rootxt.Len() != 6 {
-		t.Errorf("Root path trie should have six elements, one for each unique root and subpath; has %v", sm.rootxt.Len())
-	}
-}
-
-// Test that the deduction performed in SourceMgr.deducePathAndProcess() is safe
-// for parallel execution - in particular, that parallel calls to the same
-// resource fold in together as expected.
-//
-// Obviously, this is just a heuristic; while failure means something's
-// definitely broken, success does not guarantee correctness.
-func TestMultiDeduceThreadsafe(t *testing.T) {
-	sm, clean := mkNaiveSM(t)
-	defer clean()
-
-	in := "github.com/sdboyer/gps"
-	ft, err := sm.deducePathAndProcess(in)
-	if err != nil {
-		t.Errorf("Known-good path %q had unexpected basic deduction error: %s", in, err)
-		t.FailNow()
-	}
-
-	cnum := 50
-	wg := &sync.WaitGroup{}
-
-	// Set up channel for everything else to block on
-	c := make(chan struct{}, 1)
-	f := func(rnum int) {
-		defer func() {
-			wg.Done()
-			if e := recover(); e != nil {
-				t.Errorf("goroutine number %v panicked with err: %s", rnum, e)
-			}
-		}()
-		<-c
-		_, err := ft.rootf()
-		if err != nil {
-			t.Errorf("err was non-nil on root detection in goroutine number %v: %s", rnum, err)
-		}
-	}
-
-	for k := range make([]struct{}, cnum) {
-		wg.Add(1)
-		go f(k)
-		runtime.Gosched()
-	}
-	close(c)
-	wg.Wait()
-	if sm.rootxt.Len() != 1 {
-		t.Errorf("Root path trie should have just one element; has %v", sm.rootxt.Len())
-	}
-
-	// repeat for srcf
-	wg2 := &sync.WaitGroup{}
-	c = make(chan struct{}, 1)
-	f = func(rnum int) {
-		defer func() {
-			wg2.Done()
-			if e := recover(); e != nil {
-				t.Errorf("goroutine number %v panicked with err: %s", rnum, e)
-			}
-		}()
-		<-c
-		_, _, err := ft.srcf()
-		if err != nil {
-			t.Errorf("err was non-nil on root detection in goroutine number %v: %s", rnum, err)
-		}
-	}
-
-	for k := range make([]struct{}, cnum) {
-		wg2.Add(1)
-		go f(k)
-		runtime.Gosched()
-	}
-	close(c)
-	wg2.Wait()
-	if len(sm.srcs) != 2 {
-		t.Errorf("Sources map should have just two elements, but has %v", len(sm.srcs))
+	if sm.deduceCoord.rootxt.Len() != 6 {
+		t.Errorf("Root path trie should have six elements, one for each unique root and subpath; has %v", sm.deduceCoord.rootxt.Len())
 	}
 }
 

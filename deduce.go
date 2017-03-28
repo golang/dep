@@ -524,176 +524,6 @@ func (m vcsExtensionDeducer) deduceSource(path string, u *url.URL) (maybeSource,
 	}
 }
 
-type stringFuture func() (string, error)
-type sourceFuture func() (source, string, error)
-type partialSourceFuture func(string, ProjectAnalyzer) sourceFuture
-
-type deductionFuture struct {
-	// rslow indicates that the root future may be a slow call (that it has to
-	// hit the network for some reason)
-	rslow bool
-	root  stringFuture
-	psf   partialSourceFuture
-}
-
-// deduceFromPath takes an import path and attempts to deduce various
-// metadata about it - what type of source should handle it, and where its
-// "root" is (for vcs repositories, the repository root).
-//
-// The results are wrapped in futures, as most of these operations require at
-// least some network activity to complete. For the first return value, network
-// activity will be triggered when the future is called. For the second,
-// network activity is triggered only when calling the sourceFuture returned
-// from the partialSourceFuture.
-func (sm *SourceMgr) deduceFromPath(path string) (deductionFuture, error) {
-	opath := path
-	u, path, err := normalizeURI(path)
-	if err != nil {
-		return deductionFuture{}, err
-	}
-
-	// Helpers to futurize the results from deducers
-	strfut := func(s string) stringFuture {
-		return func() (string, error) {
-			return s, nil
-		}
-	}
-
-	srcfut := func(mb maybeSource) partialSourceFuture {
-		return func(cachedir string, an ProjectAnalyzer) sourceFuture {
-			var src source
-			var ident string
-			var err error
-
-			c := make(chan struct{}, 1)
-			go func() {
-				defer close(c)
-				src, ident, err = mb.try(context.TODO(), cachedir, newMemoryCache())
-			}()
-
-			return func() (source, string, error) {
-				<-c
-				return src, ident, err
-			}
-		}
-	}
-
-	// First, try the root path-based matches
-	if _, mtchi, has := sm.dxt.LongestPrefix(path); has {
-		mtch := mtchi.(pathDeducer)
-		root, err := mtch.deduceRoot(path)
-		if err != nil {
-			return deductionFuture{}, err
-		}
-		mb, err := mtch.deduceSource(path, u)
-		if err != nil {
-			return deductionFuture{}, err
-		}
-
-		return deductionFuture{
-			rslow: false,
-			root:  strfut(root),
-			psf:   srcfut(mb),
-		}, nil
-	}
-
-	// Next, try the vcs extension-based (infix) matcher
-	exm := vcsExtensionDeducer{regexp: vcsExtensionRegex}
-	if root, err := exm.deduceRoot(path); err == nil {
-		mb, err := exm.deduceSource(path, u)
-		if err != nil {
-			return deductionFuture{}, err
-		}
-
-		return deductionFuture{
-			rslow: false,
-			root:  strfut(root),
-			psf:   srcfut(mb),
-		}, nil
-	}
-
-	// No luck so far. maybe it's one of them vanity imports?
-	// We have to get a little fancier for the metadata lookup by chaining the
-	// source future onto the metadata future
-
-	// Declare these out here so they're available for the source future
-	var vcs string
-	var ru *url.URL
-
-	// Kick off the vanity metadata fetch
-	var importroot string
-	var futerr error
-	c := make(chan struct{}, 1)
-	go func() {
-		defer close(c)
-		var reporoot string
-		importroot, vcs, reporoot, futerr = parseMetadata(context.Background(), path)
-		if futerr != nil {
-			futerr = fmt.Errorf("unable to deduce repository and source type for: %q", opath)
-			return
-		}
-
-		// If we got something back at all, then it supercedes the actual input for
-		// the real URL to hit
-		ru, futerr = url.Parse(reporoot)
-		if futerr != nil {
-			futerr = fmt.Errorf("server returned bad URL when searching for vanity import: %q", reporoot)
-			importroot = ""
-			return
-		}
-	}()
-
-	// Set up the root func to catch the result
-	root := func() (string, error) {
-		<-c
-		return importroot, futerr
-	}
-
-	src := func(cachedir string, an ProjectAnalyzer) sourceFuture {
-		var src source
-		var ident string
-		var err error
-
-		c := make(chan struct{}, 1)
-		go func() {
-			defer close(c)
-			// make sure the metadata future is finished (without errors), thus
-			// guaranteeing that ru and vcs will be populated
-			_, err = root()
-			if err != nil {
-				return
-			}
-			ident = ru.String()
-
-			var m maybeSource
-			switch vcs {
-			case "git":
-				m = maybeGitSource{url: ru}
-			case "bzr":
-				m = maybeBzrSource{url: ru}
-			case "hg":
-				m = maybeHgSource{url: ru}
-			}
-
-			if m != nil {
-				src, ident, err = m.try(context.TODO(), cachedir, newMemoryCache())
-			} else {
-				err = fmt.Errorf("unsupported vcs type %s", vcs)
-			}
-		}()
-
-		return func() (source, string, error) {
-			<-c
-			return src, ident, err
-		}
-	}
-	return deductionFuture{
-		rslow: true,
-		root:  root,
-		psf:   src,
-	}, nil
-}
-
 type deductionCoordinator struct {
 	callMgr  *callManager
 	rootxt   *radix.Tree
@@ -725,6 +555,13 @@ func newDeductionCoordinator(cm *callManager) *deductionCoordinator {
 	return dc
 }
 
+// deduceRootPath takes an import path and attempts to deduce various
+// metadata about it - what type of source should handle it, and where its
+// "root" is (for vcs repositories, the repository root).
+//
+// If no errors are encountered, the returned pathDeduction will contain both
+// the root path and a list of maybeSources, which can be subsequently used to
+// create a handler that will manage the particular source.
 func (dc *deductionCoordinator) deduceRootPath(path string) (pathDeduction, error) {
 	if dc.callMgr.getLifetimeContext().Err() != nil {
 		return pathDeduction{}, errors.New("deductionCoordinator has been terminated")
@@ -807,7 +644,6 @@ func (dc *deductionCoordinator) deduceRootPath(path string) (pathDeduction, erro
 		dc.rootxt.Insert(path, hmd)
 		// Spawn a new goroutine for the HTTP-backed deduction process.
 		go hmdDeduce(hmd)
-
 	}
 
 	select {
@@ -941,6 +777,7 @@ func (hmd *httpMetadataDeducer) deduce(ctx context.Context, path string) (pathDe
 
 	return hmd.deduced, hmd.deduceErr
 }
+
 func normalizeURI(p string) (u *url.URL, newpath string, err error) {
 	if m := scpSyntaxRe.FindStringSubmatch(p); m != nil {
 		// Match SCP-like syntax and convert it to a URL.

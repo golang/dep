@@ -84,36 +84,24 @@ type ProjectAnalyzer interface {
 // There's no (planned) reason why it would need to be reimplemented by other
 // tools; control via dependency injection is intended to be sufficient.
 type SourceMgr struct {
-	cachedir    string                    // path to root of cache dir
-	lf          *os.File                  // handle for the sm lock file on disk
-	callMgr     *callManager              // subsystem that coordinates running calls/io
-	deduceCoord *deductionCoordinator     // subsystem that manages import path deduction
-	srcCoord    *sourceCoordinator        // subsystem that manages sources
-	srcs        map[string]source         // map of path names to source obj
-	srcmut      sync.RWMutex              // mutex protecting srcs map
-	srcfuts     map[string]*unifiedFuture // map of paths to source-handling futures
-	srcfmut     sync.RWMutex              // mutex protecting futures map
-	an          ProjectAnalyzer           // analyzer injected by the caller
-	dxt         *deducerTrie              // static trie with baseline source type deduction info
-	rootxt      *prTrie                   // dynamic trie, updated as ProjectRoots are deduced
-	qch         chan struct{}             // quit chan for signal handler
-	sigmut      sync.Mutex                // mutex protecting signal handling setup/teardown
-	glock       sync.RWMutex              // global lock for all ops, sm validity
-	opcount     int32                     // number of ops in flight
-	relonce     sync.Once                 // once-er to ensure we only release once
-	releasing   int32                     // flag indicating release of sm has begun
+	cachedir    string                // path to root of cache dir
+	lf          *os.File              // handle for the sm lock file on disk
+	callMgr     *callManager          // subsystem that coordinates running calls/io
+	deduceCoord *deductionCoordinator // subsystem that manages import path deduction
+	srcCoord    *sourceCoordinator    // subsystem that manages sources
+	an          ProjectAnalyzer       // analyzer injected by the caller
+	qch         chan struct{}         // quit chan for signal handler
+	sigmut      sync.Mutex            // mutex protecting signal handling setup/teardown
+	glock       sync.RWMutex          // global lock for all ops, sm validity
+	opcount     int32                 // number of ops in flight
+	relonce     sync.Once             // once-er to ensure we only release once
+	releasing   int32                 // flag indicating release of sm has begun
 }
 
 type smIsReleased struct{}
 
 func (smIsReleased) Error() string {
 	return "this SourceMgr has been released, its methods can no longer be called"
-}
-
-type unifiedFuture struct {
-	rc, sc chan struct{}
-	rootf  stringFuture
-	srcf   sourceFuture
 }
 
 var _ SourceManager = &SourceMgr{}
@@ -168,11 +156,7 @@ func NewSourceManager(an ProjectAnalyzer, cachedir string) (*SourceMgr, error) {
 		callMgr:     cm,
 		deduceCoord: deducer,
 		srcCoord:    newSourceCoordinator(cm, deducer, cachedir),
-		srcs:        make(map[string]source),
-		srcfuts:     make(map[string]*unifiedFuture),
 		an:          an,
-		dxt:         pathDeducerTrie(),
-		rootxt:      newProjectRootTrie(),
 		qch:         make(chan struct{}),
 	}
 
@@ -510,176 +494,4 @@ func (sm *SourceMgr) DeduceProjectRoot(ip string) (ProjectRoot, error) {
 
 	pd, err := sm.deduceCoord.deduceRootPath(ip)
 	return ProjectRoot(pd.root), err
-}
-
-func (sm *SourceMgr) getSourceFor(id ProjectIdentifier) (source, error) {
-	nn := id.normalizedSource()
-
-	sm.srcmut.RLock()
-	src, has := sm.srcs[nn]
-	sm.srcmut.RUnlock()
-	if has {
-		return src, nil
-	}
-
-	ft, err := sm.deducePathAndProcess(nn)
-	if err != nil {
-		return nil, err
-	}
-
-	// we don't care about the ident here, and the future produced by
-	// deducePathAndProcess will dedupe with what's in the sm.srcs map
-	src, _, err = ft.srcf()
-	return src, err
-}
-
-func (sm *SourceMgr) deducePathAndProcess(path string) (*unifiedFuture, error) {
-	// Check for an already-existing future in the map first
-	sm.srcfmut.RLock()
-	ft, exists := sm.srcfuts[path]
-	sm.srcfmut.RUnlock()
-
-	if exists {
-		return ft, nil
-	}
-
-	// Don't have one - set one up.
-	df, err := sm.deduceFromPath(path)
-	if err != nil {
-		return nil, err
-	}
-
-	sm.srcfmut.Lock()
-	defer sm.srcfmut.Unlock()
-	// A bad interleaving could allow two goroutines to make it here for the
-	// same path, so we have to re-check existence.
-	if ft, exists = sm.srcfuts[path]; exists {
-		return ft, nil
-	}
-
-	ft = &unifiedFuture{
-		rc: make(chan struct{}, 1),
-		sc: make(chan struct{}, 1),
-	}
-
-	// Rewrap the rootfinding func in another future
-	var pr string
-	var rooterr error
-
-	// Kick off the func to get root and register it into the rootxt.
-	rootf := func() {
-		defer close(ft.rc)
-		pr, rooterr = df.root()
-		if rooterr != nil {
-			// Don't cache errs. This doesn't really hurt the solver, and is
-			// beneficial for other use cases because it means we don't have to
-			// expose any kind of controls for clearing caches.
-			return
-		}
-
-		tpr := ProjectRoot(pr)
-		sm.rootxt.Insert(pr, tpr)
-		// It's not harmful if the netname was a URL rather than an
-		// import path
-		if pr != path {
-			// Insert the result into the rootxt twice - once at the
-			// root itself, so as to catch siblings/relatives, and again
-			// at the exact provided import path (assuming they were
-			// different), so that on subsequent calls, exact matches
-			// can skip the regex above.
-			sm.rootxt.Insert(path, tpr)
-		}
-	}
-
-	// If deduction tells us this is slow, do it async in its own goroutine;
-	// otherwise, we can do it here and give the scheduler a bit of a break.
-	if df.rslow {
-		go rootf()
-	} else {
-		rootf()
-	}
-
-	// Store a closure bound to the future result on the futTracker.
-	ft.rootf = func() (string, error) {
-		<-ft.rc
-		return pr, rooterr
-	}
-
-	// Root future is handled, now build up the source future.
-	//
-	// First, complete the partialSourceFuture with information the sm has about
-	// our cachedir and analyzer
-	fut := df.psf(sm.cachedir, sm.an)
-
-	// The maybeSource-trying process is always slow, so keep it async here.
-	var src source
-	var ident string
-	var srcerr error
-	go func() {
-		defer close(ft.sc)
-		src, ident, srcerr = fut()
-		if srcerr != nil {
-			// Don't cache errs. This doesn't really hurt the solver, and is
-			// beneficial for other use cases because it means we don't have
-			// to expose any kind of controls for clearing caches.
-			return
-		}
-
-		sm.srcmut.Lock()
-		defer sm.srcmut.Unlock()
-
-		// Check to make sure a source hasn't shown up in the meantime, or that
-		// there wasn't already one at the ident.
-		var hasi, hasp bool
-		var srci, srcp source
-		if ident != "" {
-			srci, hasi = sm.srcs[ident]
-		}
-		srcp, hasp = sm.srcs[path]
-
-		// if neither the ident nor the input path have an entry for this src,
-		// we're in the simple case - write them both in and we're done
-		if !hasi && !hasp {
-			sm.srcs[path] = src
-			if ident != path && ident != "" {
-				sm.srcs[ident] = src
-			}
-			return
-		}
-
-		// Now, the xors.
-		//
-		// If already present for ident but not for path, copy ident's src
-		// to path. This covers cases like a gopkg.in path referring back
-		// onto a github repository, where something else already explicitly
-		// looked up that same gh repo.
-		if hasi && !hasp {
-			sm.srcs[path] = srci
-			src = srci
-		}
-		// If already present for path but not for ident, do NOT copy path's
-		// src to ident, but use the returned one instead. Really, this case
-		// shouldn't occur at all...? But the crucial thing is that the
-		// path-based one has already discovered what actual ident of source
-		// they want to use, and changing that arbitrarily would have
-		// undefined effects.
-		if hasp && !hasi && ident != "" {
-			sm.srcs[ident] = src
-		}
-
-		// If both are present, then assume we're good, and use the path one
-		if hasp && hasi {
-			// TODO(sdboyer) compare these (somehow? reflect? pointer?) and if they're not the
-			// same object, panic
-			src = srcp
-		}
-	}()
-
-	ft.srcf = func() (source, string, error) {
-		<-ft.sc
-		return src, ident, srcerr
-	}
-
-	sm.srcfuts[path] = ft
-	return ft, nil
 }
