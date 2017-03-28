@@ -49,7 +49,7 @@ func TestWorkmapToReach(t *testing.T) {
 	table := map[string]struct {
 		workmap  map[string]wm
 		rm       ReachMap
-		em       map[string]*ErrProblemImport
+		em       map[string]*ProblemImportError
 		backprop bool
 	}{
 		"single": {
@@ -147,8 +147,8 @@ func TestWorkmapToReach(t *testing.T) {
 					External: []string{"B/baz"},
 				},
 			},
-			em: map[string]*ErrProblemImport{
-				"A": &ErrProblemImport{
+			em: map[string]*ProblemImportError{
+				"A": &ProblemImportError{
 					ImportPath: "A",
 					Cause:      []string{"A/foo"},
 					Err:        missingPkgErr("A/foo"),
@@ -187,13 +187,13 @@ func TestWorkmapToReach(t *testing.T) {
 					External: []string{"B/baz"},
 				},
 			},
-			em: map[string]*ErrProblemImport{
-				"A": &ErrProblemImport{
+			em: map[string]*ProblemImportError{
+				"A": &ProblemImportError{
 					ImportPath: "A",
 					Cause:      []string{"A/foo", "A/bar"},
 					Err:        missingPkgErr("A/bar"),
 				},
-				"A/foo": &ErrProblemImport{
+				"A/foo": &ProblemImportError{
 					ImportPath: "A/foo",
 					Cause:      []string{"A/bar"},
 					Err:        missingPkgErr("A/bar"),
@@ -227,13 +227,13 @@ func TestWorkmapToReach(t *testing.T) {
 					External: []string{"B/baz"},
 				},
 			},
-			em: map[string]*ErrProblemImport{
-				"A": &ErrProblemImport{
+			em: map[string]*ProblemImportError{
+				"A": &ProblemImportError{
 					ImportPath: "A",
 					Cause:      []string{"A/foo"},
 					Err:        fmt.Errorf("err pkg"),
 				},
-				"A/foo": &ErrProblemImport{
+				"A/foo": &ProblemImportError{
 					ImportPath: "A/foo",
 					Err:        fmt.Errorf("err pkg"),
 				},
@@ -274,18 +274,18 @@ func TestWorkmapToReach(t *testing.T) {
 					External: []string{"B/baz"},
 				},
 			},
-			em: map[string]*ErrProblemImport{
-				"A": &ErrProblemImport{
+			em: map[string]*ProblemImportError{
+				"A": &ProblemImportError{
 					ImportPath: "A",
 					Cause:      []string{"A/foo", "A/bar"},
 					Err:        fmt.Errorf("err pkg"),
 				},
-				"A/foo": &ErrProblemImport{
+				"A/foo": &ProblemImportError{
 					ImportPath: "A/foo",
 					Cause:      []string{"A/bar"},
 					Err:        fmt.Errorf("err pkg"),
 				},
-				"A/bar": &ErrProblemImport{
+				"A/bar": &ProblemImportError{
 					ImportPath: "A/bar",
 					Err:        fmt.Errorf("err pkg"),
 				},
@@ -335,8 +335,8 @@ func TestWorkmapToReach(t *testing.T) {
 					External: []string{"B/baz"},
 				},
 			},
-			em: map[string]*ErrProblemImport{
-				"A/bar": &ErrProblemImport{
+			em: map[string]*ProblemImportError{
+				"A/bar": &ProblemImportError{
 					ImportPath: "A/bar",
 					Err:        fmt.Errorf("err pkg"),
 				},
@@ -454,7 +454,7 @@ func TestWorkmapToReach(t *testing.T) {
 		// needed
 		t.Run(name, func(t *testing.T) {
 			if fix.em == nil {
-				fix.em = make(map[string]*ErrProblemImport)
+				fix.em = make(map[string]*ProblemImportError)
 			}
 
 			rm, em := wmToReach(fix.workmap, fix.backprop)
@@ -1121,7 +1121,7 @@ func TestListPackages(t *testing.T) {
 						},
 					},
 					"relimport/dotdot": {
-						Err: &ErrLocalImports{
+						Err: &LocalImportsError{
 							Dir:        j("relimport/dotdot"),
 							ImportPath: "relimport/dotdot",
 							LocalImports: []string{
@@ -1130,7 +1130,7 @@ func TestListPackages(t *testing.T) {
 						},
 					},
 					"relimport/dotslash": {
-						Err: &ErrLocalImports{
+						Err: &LocalImportsError{
 							Dir:        j("relimport/dotslash"),
 							ImportPath: "relimport/dotslash",
 							LocalImports: []string{
@@ -1139,7 +1139,7 @@ func TestListPackages(t *testing.T) {
 						},
 					},
 					"relimport/dotdotslash": {
-						Err: &ErrLocalImports{
+						Err: &LocalImportsError{
 							Dir:        j("relimport/dotdotslash"),
 							ImportPath: "relimport/dotdotslash",
 							LocalImports: []string{

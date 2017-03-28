@@ -154,7 +154,7 @@ func ListPackages(fileRoot, importRoot string) (PackageTree, error) {
 
 		if len(lim) > 0 {
 			ptree.Packages[ip] = PackageOrErr{
-				Err: &ErrLocalImports{
+				Err: &LocalImportsError{
 					Dir:          wp,
 					ImportPath:   ip,
 					LocalImports: lim,
@@ -263,17 +263,17 @@ func fillPackage(p *build.Package) error {
 	return nil
 }
 
-// ErrLocalImports indicates that a package contains at least one relative
+// LocalImportsError indicates that a package contains at least one relative
 // import that will prevent it from compiling.
 //
 // TODO(sdboyer) add a Files property once we're doing our own per-file parsing
-type ErrLocalImports struct {
+type LocalImportsError struct {
 	ImportPath   string
 	Dir          string
 	LocalImports []string
 }
 
-func (e *ErrLocalImports) Error() string {
+func (e *LocalImportsError) Error() string {
 	switch len(e.LocalImports) {
 	case 0:
 		// shouldn't be possible, but just cover the case
@@ -298,9 +298,9 @@ type PackageOrErr struct {
 	Err error
 }
 
-// ErrProblemImport describes the reason that a particular import path is
+// ProblemImportError describes the reason that a particular import path is
 // not safely importable.
-type ErrProblemImport struct {
+type ProblemImportError struct {
 	// The import path of the package with some problem rendering it
 	// unimportable.
 	ImportPath string
@@ -313,9 +313,9 @@ type ErrProblemImport struct {
 	Err error
 }
 
-// Error formats the ErrProblemImport as a string, reflecting whether the
+// Error formats the ProblemImportError as a string, reflecting whether the
 // error represents a direct or transitive problem.
-func (e *ErrProblemImport) Error() string {
+func (e *ProblemImportError) Error() string {
 	switch len(e.Cause) {
 	case 0:
 		return fmt.Sprintf("%q contains malformed code: %s", e.ImportPath, e.Err.Error())
@@ -413,7 +413,7 @@ type PackageTree struct {
 // 	"A": []string{},
 // 	"A/bar": []string{"B/baz"},
 //  }
-func (t PackageTree) ToReachMap(main, tests, backprop bool, ignore map[string]bool) (ReachMap, map[string]*ErrProblemImport) {
+func (t PackageTree) ToReachMap(main, tests, backprop bool, ignore map[string]bool) (ReachMap, map[string]*ProblemImportError) {
 	if ignore == nil {
 		ignore = make(map[string]bool)
 	}
@@ -511,7 +511,7 @@ func (t PackageTree) Copy() PackageTree {
 // It drops any packages with errors, and - if backprop is true - backpropagates
 // those errors, causing internal packages that (transitively) import other
 // internal packages having errors to also be dropped.
-func wmToReach(workmap map[string]wm, backprop bool) (ReachMap, map[string]*ErrProblemImport) {
+func wmToReach(workmap map[string]wm, backprop bool) (ReachMap, map[string]*ProblemImportError) {
 	// Uses depth-first exploration to compute reachability into external
 	// packages, dropping any internal packages on "poisoned paths" - a path
 	// containing a package with an error, or with a dep on an internal package
@@ -526,17 +526,17 @@ func wmToReach(workmap map[string]wm, backprop bool) (ReachMap, map[string]*ErrP
 	colors := make(map[string]uint8)
 	exrsets := make(map[string]map[string]struct{})
 	inrsets := make(map[string]map[string]struct{})
-	errmap := make(map[string]*ErrProblemImport)
+	errmap := make(map[string]*ProblemImportError)
 
 	// poison is a helper func to eliminate specific reachsets from exrsets and
 	// inrsets, and populate error information along the way.
-	poison := func(path []string, err *ErrProblemImport) {
+	poison := func(path []string, err *ProblemImportError) {
 		for k, ppkg := range path {
 			delete(exrsets, ppkg)
 			delete(inrsets, ppkg)
 
 			// Duplicate the err for this package
-			kerr := &ErrProblemImport{
+			kerr := &ProblemImportError{
 				ImportPath: ppkg,
 				Err:        err.Err,
 			}
@@ -573,7 +573,7 @@ func wmToReach(workmap map[string]wm, backprop bool) (ReachMap, map[string]*ErrP
 	// poisonWhite wraps poison for error recording in the white-poisoning case,
 	// where we're constructing a new poison path.
 	poisonWhite := func(path []string) {
-		err := &ErrProblemImport{
+		err := &ProblemImportError{
 			Cause: make([]string, len(path)),
 		}
 		copy(err.Cause, path)
@@ -598,7 +598,7 @@ func wmToReach(workmap map[string]wm, backprop bool) (ReachMap, map[string]*ErrP
 		// an empty path here.
 
 		fromErr := errmap[from]
-		err := &ErrProblemImport{
+		err := &ProblemImportError{
 			Err:   fromErr.Err,
 			Cause: make([]string, 0, len(path)+len(fromErr.Cause)+1),
 		}
@@ -641,7 +641,7 @@ func wmToReach(workmap map[string]wm, backprop bool) (ReachMap, map[string]*ErrP
 				} else if exists {
 					// Only record something in the errmap if there's actually a
 					// package there, per the semantics of the errmap
-					errmap[pkg] = &ErrProblemImport{
+					errmap[pkg] = &ProblemImportError{
 						ImportPath: pkg,
 						Err:        w.err,
 					}
