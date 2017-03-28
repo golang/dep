@@ -1,14 +1,10 @@
 package gps
 
 import (
-<<<<<<< 7262376693ac4f5a1bcaa2d40a4a929da62ee872
+	"fmt"
 	"sync"
 
 	"github.com/sdboyer/gps/pkgtree"
-=======
-	"fmt"
-	"sync"
->>>>>>> Convert source, maybeSource to new cache system
 )
 
 // singleSourceCache provides a method set for storing and retrieving data about

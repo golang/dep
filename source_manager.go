@@ -12,6 +12,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/sdboyer/constext"
 	"github.com/sdboyer/gps/pkgtree"
 )
 
@@ -494,4 +495,117 @@ func (sm *SourceMgr) DeduceProjectRoot(ip string) (ProjectRoot, error) {
 
 	pd, err := sm.deduceCoord.deduceRootPath(ip)
 	return ProjectRoot(pd.root), err
+}
+
+type timeCount struct {
+	count int
+	start time.Time
+}
+
+type durCount struct {
+	count int
+	dur   time.Duration
+}
+
+type callManager struct {
+	ctx        context.Context
+	cancelFunc context.CancelFunc
+	mu         sync.Mutex // Guards all maps.
+	running    map[callInfo]timeCount
+	//running map[callInfo]time.Time
+	ran map[callType]durCount
+	//ran map[callType]time.Duration
+}
+
+func newCallManager(ctx context.Context) *callManager {
+	ctx, cf := context.WithCancel(ctx)
+	return &callManager{
+		ctx:        ctx,
+		cancelFunc: cf,
+		running:    make(map[callInfo]timeCount),
+		ran:        make(map[callType]durCount),
+	}
+}
+
+// Helper function to register a call with a callManager, combine contexts, and
+// create a to-be-deferred func to clean it all up.
+func (cm *callManager) setUpCall(inctx context.Context, name string, typ callType) (cctx context.Context, doneFunc func(), err error) {
+	ci := callInfo{
+		name: name,
+		typ:  typ,
+	}
+
+	octx, err := cm.run(ci)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	cctx, cancelFunc := constext.Cons(inctx, octx)
+	return cctx, func() {
+		cm.done(ci)
+		cancelFunc() // ensure constext cancel goroutine is cleaned up
+	}, nil
+}
+
+func (cm *callManager) getLifetimeContext() context.Context {
+	return cm.ctx
+}
+
+func (cm *callManager) run(ci callInfo) (context.Context, error) {
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
+	if cm.ctx.Err() != nil {
+		// We've already been canceled; error out.
+		return nil, cm.ctx.Err()
+	}
+
+	if existingInfo, has := cm.running[ci]; has {
+		existingInfo.count++
+		cm.running[ci] = existingInfo
+	} else {
+		cm.running[ci] = timeCount{
+			count: 1,
+			start: time.Now(),
+		}
+	}
+
+	return cm.ctx, nil
+}
+
+func (cm *callManager) done(ci callInfo) {
+	cm.mu.Lock()
+
+	existingInfo, has := cm.running[ci]
+	if !has {
+		panic(fmt.Sprintf("sourceMgr: tried to complete a call that had not registered via run()"))
+	}
+
+	if existingInfo.count > 1 {
+		// If more than one is pending, don't stop the clock yet.
+		existingInfo.count--
+		cm.running[ci] = existingInfo
+	} else {
+		// Last one for this particular key; update metrics with info.
+		durCnt := cm.ran[ci.typ]
+		durCnt.count++
+		durCnt.dur += time.Now().Sub(existingInfo.start)
+		cm.ran[ci.typ] = durCnt
+		delete(cm.running, ci)
+	}
+
+	cm.mu.Unlock()
+}
+
+type callType uint
+
+const (
+	ctHTTPMetadata callType = iota
+	ctListVersions
+	ctGetManifestAndLock
+)
+
+// callInfo provides metadata about an ongoing call.
+type callInfo struct {
+	name string
+	typ  callType
 }
