@@ -47,7 +47,7 @@ const (
 	existsUpstream
 )
 
-type sourceState uint32
+type sourceState int32
 
 const (
 	sourceIsSetUp sourceState = 1 << iota
@@ -101,10 +101,12 @@ func (sc *sourceCoordinator) getSourceGatewayFor(ctx context.Context, id Project
 
 	sc.srcmut.RLock()
 	if url, has := sc.nameToURL[normalizedName]; has {
-		if srcGate, has := sc.srcs[url]; has {
-			sc.srcmut.RUnlock()
+		srcGate, has := sc.srcs[url]
+		sc.srcmut.RUnlock()
+		if has {
 			return srcGate, nil
 		}
+		panic(fmt.Sprintf("%q was URL for %q in nameToURL, but no corresponding srcGate in srcs map", url, normalizedName))
 	}
 	sc.srcmut.RUnlock()
 
@@ -130,18 +132,18 @@ func (sc *sourceCoordinator) getSourceGatewayFor(ctx context.Context, id Project
 		sc.protoSrcs[normalizedName] = []srcReturnChans{rc}
 		sc.psrcmut.Unlock()
 
-		doReturn := func(sa *sourceGateway, err error) {
+		doReturn := func(sg *sourceGateway, err error) {
 			sc.psrcmut.Lock()
-			if sa != nil {
+			if sg != nil {
 				for _, rc := range sc.protoSrcs[normalizedName] {
-					rc.ret <- sa
+					rc.ret <- sg
 				}
 			} else if err != nil {
 				for _, rc := range sc.protoSrcs[normalizedName] {
 					rc.err <- err
 				}
 			} else {
-				panic("sa and err both nil")
+				panic("sg and err both nil")
 			}
 
 			delete(sc.protoSrcs, normalizedName)
@@ -169,8 +171,7 @@ func (sc *sourceCoordinator) getSourceGatewayFor(ctx context.Context, id Project
 				doReturn(srcGate, nil)
 				return
 			}
-			// This should panic, right?
-			panic("")
+			panic(fmt.Sprintf("%q was URL for %q in nameToURL, but no corresponding srcGate in srcs map", url, normalizedName))
 		}
 		sc.srcmut.RUnlock()
 
@@ -220,7 +221,6 @@ type sourceGateway struct {
 	srcState sourceState
 	src      source
 	cache    singleSourceCache
-	url      string     // TODO no nono nononononononooo get it from a call
 	mu       sync.Mutex // global lock, serializes all behaviors
 	callMgr  *callManager
 }
@@ -421,7 +421,7 @@ func (sg *sourceGateway) sourceURL(ctx context.Context) (string, error) {
 		return "", err
 	}
 
-	return sg.url, nil
+	return sg.src.upstreamURL(), nil
 }
 
 // createSingleSourceCache creates a singleSourceCache instance for use by
@@ -439,22 +439,29 @@ func (sg *sourceGateway) require(ctx context.Context, wanted sourceState) (errSt
 		flag = 1 << i
 
 		if todo&flag != 0 {
-			// Assign the currently visited bit to the errState so that we
-			// can return easily later.
+			// Assign the currently visited bit to errState so that we can
+			// return easily later.
+			//
+			// Also set up addlState so that individual ops can easily attach
+			// more states that were incidentally satisfied by the op.
 			errState = flag
+			var addlState sourceState
 
 			switch flag {
 			case sourceIsSetUp:
-				sg.src, sg.url, err = sg.maybe.try(ctx, sg.cachedir, sg.cache)
+				sg.src, addlState, err = sg.maybe.try(ctx, sg.cachedir, sg.cache)
 			case sourceExistsUpstream:
-				// TODO(sdboyer) doing it this way kinda muddles responsibility
-				if !sg.src.checkExistence(existsUpstream) {
-					err = fmt.Errorf("%s does not exist upstream", sg.url)
+				if !sg.src.existsUpstream(ctx) {
+					err = fmt.Errorf("%s does not exist upstream", sg.src.upstreamURL())
 				}
 			case sourceExistsLocally:
-				// TODO(sdboyer) doing it this way kinda muddles responsibility
-				if !sg.src.checkExistence(existsInCache) {
-					err = fmt.Errorf("%s does not exist in the local cache", sg.url)
+				if !sg.src.existsLocally(ctx) {
+					err = sg.src.syncLocal()
+					if err == nil {
+						addlState |= sourceHasLatestLocally
+					} else {
+						err = fmt.Errorf("%s does not exist in the local cache and fetching failed: %s", sg.src.upstreamURL(), err)
+					}
 				}
 			case sourceHasLatestVersionList:
 				_, err = sg.src.listVersions()
@@ -466,8 +473,9 @@ func (sg *sourceGateway) require(ctx context.Context, wanted sourceState) (errSt
 				return
 			}
 
-			sg.srcState |= flag
-			todo -= flag
+			checked := flag | addlState
+			sg.srcState |= checked
+			todo &= ^checked
 		}
 	}
 
@@ -475,6 +483,9 @@ func (sg *sourceGateway) require(ctx context.Context, wanted sourceState) (errSt
 }
 
 type source interface {
+	existsLocally(context.Context) bool
+	existsUpstream(context.Context) bool
+	upstreamURL() string
 	syncLocal() error
 	checkExistence(sourceExistence) bool
 	exportVersionTo(Version, string) error
@@ -483,6 +494,16 @@ type source interface {
 	listVersions() ([]Version, error)
 	revisionPresentIn(Revision) (bool, error)
 }
+
+//type source interface {
+//syncLocal(context.Context) error
+//checkExistence(sourceExistence) bool
+//exportRevisionTo(Revision, string) error
+//getManifestAndLock(ProjectRoot, Revision, ProjectAnalyzer) (Manifest, Lock, error)
+//listPackages(ProjectRoot, Revision) (PackageTree, error)
+//listVersions(context.Context) ([]Version, error)
+//revisionPresentIn(Revision) (bool, error)
+//}
 
 // projectInfo holds manifest and lock
 type projectInfo struct {
@@ -529,6 +550,18 @@ type baseVCSSource struct {
 
 	// Whether the cache has the latest info on versions
 	cvsync bool
+}
+
+func (bs *baseVCSSource) existsLocally(ctx context.Context) bool {
+	return bs.crepo.r.CheckLocal()
+}
+
+func (bs *baseVCSSource) existsUpstream(ctx context.Context) bool {
+	return bs.crepo.r.Ping()
+}
+
+func (bs *baseVCSSource) upstreamURL() string {
+	return bs.crepo.r.Remote()
 }
 
 func (bs *baseVCSSource) getManifestAndLock(r ProjectRoot, v Version, an ProjectAnalyzer) (Manifest, Lock, error) {

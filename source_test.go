@@ -40,7 +40,7 @@ func TestGitSourceInteractions(t *testing.T) {
 		url: u,
 	}
 
-	isrc, ident, err := mb.try(context.Background(), cpath, newMemoryCache())
+	isrc, state, err := mb.try(context.Background(), cpath, newMemoryCache())
 	if err != nil {
 		t.Errorf("Unexpected error while setting up gitSource for test repo: %s", err)
 		rf()
@@ -52,8 +52,13 @@ func TestGitSourceInteractions(t *testing.T) {
 		rf()
 		t.FailNow()
 	}
-	if ident != un {
-		t.Errorf("Expected %s as source ident, got %s", un, ident)
+
+	wantstate := sourceIsSetUp | sourceExistsUpstream
+	if state != wantstate {
+		t.Errorf("Expected return state to be %v, got %v", wantstate, state)
+	}
+	if un != src.upstreamURL() {
+		t.Errorf("Expected %s as source URL, got %s", un, src.upstreamURL())
 	}
 
 	vlist, err := src.listVersions()
@@ -142,7 +147,7 @@ func TestGopkginSourceInteractions(t *testing.T) {
 			major: major,
 		}
 
-		isrc, ident, err := mb.try(context.Background(), cpath, newMemoryCache())
+		isrc, state, err := mb.try(context.Background(), cpath, newMemoryCache())
 		if err != nil {
 			t.Errorf("Unexpected error while setting up gopkginSource for test repo: %s", err)
 			return
@@ -152,8 +157,13 @@ func TestGopkginSourceInteractions(t *testing.T) {
 			t.Errorf("Expected a gopkginSource, got a %T", isrc)
 			return
 		}
-		if ident != un {
-			t.Errorf("Expected %s as source ident, got %s", un, ident)
+
+		wantstate := sourceIsSetUp | sourceExistsUpstream
+		if state != wantstate {
+			t.Errorf("Expected return state to be %v, got %v", wantstate, state)
+		}
+		if un != src.upstreamURL() {
+			t.Errorf("Expected %s as source URL, got %s", un, src.upstreamURL())
 		}
 		if src.major != major {
 			t.Errorf("Expected %v as major version filter on gopkginSource, got %v", major, src.major)
@@ -281,7 +291,7 @@ func TestBzrSourceInteractions(t *testing.T) {
 		url: u,
 	}
 
-	isrc, ident, err := mb.try(context.Background(), cpath, newMemoryCache())
+	isrc, state, err := mb.try(context.Background(), cpath, newMemoryCache())
 	if err != nil {
 		t.Errorf("Unexpected error while setting up bzrSource for test repo: %s", err)
 		rf()
@@ -293,8 +303,13 @@ func TestBzrSourceInteractions(t *testing.T) {
 		rf()
 		t.FailNow()
 	}
-	if ident != un {
-		t.Errorf("Expected %s as source ident, got %s", un, ident)
+
+	wantstate := sourceIsSetUp | sourceExistsUpstream
+	if state != wantstate {
+		t.Errorf("Expected return state to be %v, got %v", wantstate, state)
+	}
+	if un != src.upstreamURL() {
+		t.Errorf("Expected %s as source URL, got %s", un, src.upstreamURL())
 	}
 	evl := []Version{
 		NewVersion("1.0.0").Is(Revision("matt@mattfarina.com-20150731135137-pbphasfppmygpl68")),
@@ -390,7 +405,7 @@ func TestHgSourceInteractions(t *testing.T) {
 			url: u,
 		}
 
-		isrc, ident, err := mb.try(context.Background(), cpath, newMemoryCache())
+		isrc, state, err := mb.try(context.Background(), cpath, newMemoryCache())
 		if err != nil {
 			t.Errorf("Unexpected error while setting up hgSource for test repo: %s", err)
 			return
@@ -400,8 +415,13 @@ func TestHgSourceInteractions(t *testing.T) {
 			t.Errorf("Expected a hgSource, got a %T", isrc)
 			return
 		}
-		if ident != un {
-			t.Errorf("Expected %s as source ident, got %s", un, ident)
+
+		wantstate := sourceIsSetUp | sourceExistsUpstream
+		if state != wantstate {
+			t.Errorf("Expected return state to be %v, got %v", wantstate, state)
+		}
+		if un != src.upstreamURL() {
+			t.Errorf("Expected %s as source URL, got %s", un, src.upstreamURL())
 		}
 
 		// check that an expected rev is present
