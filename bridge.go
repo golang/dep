@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"sync/atomic"
+
+	"github.com/sdboyer/gps/pkgtree"
 )
 
 // sourceBridges provide an adapter to SourceManagers that tailor operations
@@ -43,7 +45,7 @@ type bridge struct {
 
 	// Simple, local cache of the root's PackageTree
 	crp *struct {
-		ptree PackageTree
+		ptree pkgtree.PackageTree
 		err   error
 	}
 
@@ -280,7 +282,7 @@ func (b *bridge) vtu(id ProjectIdentifier, v Version) versionTypeUnion {
 //
 // The root project is handled separately, as the source manager isn't
 // responsible for that code.
-func (b *bridge) ListPackages(id ProjectIdentifier, v Version) (PackageTree, error) {
+func (b *bridge) ListPackages(id ProjectIdentifier, v Version) (pkgtree.PackageTree, error) {
 	if b.s.rd.isRoot(id.ProjectRoot) {
 		return b.s.rd.rpt, nil
 	}

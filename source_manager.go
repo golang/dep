@@ -10,6 +10,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/sdboyer/gps/pkgtree"
 )
 
 // Used to compute a friendly filepath from a URL-shaped input
@@ -43,7 +45,7 @@ type SourceManager interface {
 
 	// ListPackages parses the tree of the Go packages at or below root of the
 	// provided ProjectIdentifier, at the provided version.
-	ListPackages(ProjectIdentifier, Version) (PackageTree, error)
+	ListPackages(ProjectIdentifier, Version) (pkgtree.PackageTree, error)
 
 	// GetManifestAndLock returns manifest and lock information for the provided
 	// root import path.
@@ -342,9 +344,9 @@ func (sm *SourceMgr) GetManifestAndLock(id ProjectIdentifier, v Version) (Manife
 
 // ListPackages parses the tree of the Go packages at and below the ProjectRoot
 // of the given ProjectIdentifier, at the given version.
-func (sm *SourceMgr) ListPackages(id ProjectIdentifier, v Version) (PackageTree, error) {
+func (sm *SourceMgr) ListPackages(id ProjectIdentifier, v Version) (pkgtree.PackageTree, error) {
 	if atomic.CompareAndSwapInt32(&sm.releasing, 1, 1) {
-		return PackageTree{}, smIsReleased{}
+		return pkgtree.PackageTree{}, smIsReleased{}
 	}
 	atomic.AddInt32(&sm.opcount, 1)
 	sm.glock.RLock()
@@ -355,7 +357,7 @@ func (sm *SourceMgr) ListPackages(id ProjectIdentifier, v Version) (PackageTree,
 
 	src, err := sm.getSourceFor(id)
 	if err != nil {
-		return PackageTree{}, err
+		return pkgtree.PackageTree{}, err
 	}
 
 	return src.listPackages(id.ProjectRoot, v)

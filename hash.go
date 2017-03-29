@@ -5,8 +5,10 @@ import (
 	"crypto/sha256"
 	"io"
 	"sort"
-	"strings"
 	"strconv"
+	"strings"
+
+	"github.com/sdboyer/gps/pkgtree"
 )
 
 // string headers used to demarcate sections in hash input creation
@@ -128,7 +130,7 @@ func HashingInputsAsString(s Solver) string {
 	return (*bytes.Buffer)(buf).String()
 }
 
-type sortPackageOrErr []PackageOrErr
+type sortPackageOrErr []pkgtree.PackageOrErr
 
 func (s sortPackageOrErr) Len() int      { return len(s) }
 func (s sortPackageOrErr) Swap(i, j int) { s[i], s[j] = s[j], s[i] }

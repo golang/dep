@@ -1,4 +1,4 @@
-package gps
+package pkgtree
 
 import (
 	"fmt"
@@ -14,35 +14,14 @@ import (
 	"unicode"
 )
 
-var (
-	osList     []string
-	archList   []string
-	ignoreTags = []string{} //[]string{"appengine", "ignore"} //TODO: appengine is a special case for now: https://github.com/tools/godep/issues/353
-)
-
-func init() {
-	// The supported systems are listed in
-	// https://github.com/golang/go/blob/master/src/go/build/syslist.go
-	// The lists are not exported, so we need to duplicate them here.
-	osListString := "android darwin dragonfly freebsd linux nacl netbsd openbsd plan9 solaris windows"
-	osList = strings.Split(osListString, " ")
-
-	archListString := "386 amd64 amd64p32 arm armbe arm64 arm64be ppc64 ppc64le mips mipsle mips64 mips64le mips64p32 mips64p32le ppc s390 s390x sparc sparc64"
-	archList = strings.Split(archListString, " ")
-}
-
-// Stored as a var so that tests can swap it out. Ugh globals, ugh.
-var isStdLib = doIsStdLib
-
-// This was lovingly lifted from src/cmd/go/pkg.go in Go's code
-// (isStandardImportPath).
-func doIsStdLib(path string) bool {
-	i := strings.Index(path, "/")
-	if i < 0 {
-		i = len(path)
-	}
-
-	return !strings.Contains(path[:i], ".")
+// Package represents a Go package. It contains a subset of the information
+// go/build.Package does.
+type Package struct {
+	Name        string   // Package name, as declared in the package statement
+	ImportPath  string   // Full import path, including the prefix provided to ListPackages()
+	CommentPath string   // Import path given in the comment on the package statement
+	Imports     []string // Imports from all go and cgo files
+	TestImports []string // Imports from all go test files (in go/build parlance: both TestImports and XTestImports)
 }
 
 // ListPackages reports Go package information about all directories in the tree
@@ -306,45 +285,6 @@ func (e *LocalImportsError) Error() string {
 	}
 }
 
-// A PackageTree represents the results of recursively parsing a tree of
-// packages, starting at the ImportRoot. The results of parsing the files in the
-// directory identified by each import path - a Package or an error - are stored
-// in the Packages map, keyed by that import path.
-type PackageTree struct {
-	ImportRoot string
-	Packages   map[string]PackageOrErr
-}
-
-// dup copies the PackageTree.
-//
-// This is really only useful as a defensive measure to prevent external state
-// mutations.
-func (t PackageTree) dup() PackageTree {
-	t2 := PackageTree{
-		ImportRoot: t.ImportRoot,
-		Packages:   map[string]PackageOrErr{},
-	}
-
-	for path, poe := range t.Packages {
-		poe2 := PackageOrErr{
-			Err: poe.Err,
-			P:   poe.P,
-		}
-		if len(poe.P.Imports) > 0 {
-			poe2.P.Imports = make([]string, len(poe.P.Imports))
-			copy(poe2.P.Imports, poe.P.Imports)
-		}
-		if len(poe.P.TestImports) > 0 {
-			poe2.P.TestImports = make([]string, len(poe.P.TestImports))
-			copy(poe2.P.TestImports, poe.P.TestImports)
-		}
-
-		t2.Packages[path] = poe2
-	}
-
-	return t2
-}
-
 type wm struct {
 	err error
 	ex  map[string]bool
@@ -356,15 +296,6 @@ type wm struct {
 type PackageOrErr struct {
 	P   Package
 	Err error
-}
-
-// ReachMap maps a set of import paths (keys) to the sets of transitively
-// reachable tree-internal packages, and all the tree-external packages
-// reachable through those internal packages.
-//
-// See PackageTree.ToReachMap() for more information.
-type ReachMap map[string]struct {
-	Internal, External []string
 }
 
 // ProblemImportError describes the reason that a particular import path is
@@ -393,6 +324,20 @@ func (e *ProblemImportError) Error() string {
 	default:
 		return fmt.Sprintf("%q transitively (through %v packages) imports %q, which contains malformed code: %s", e.ImportPath, len(e.Cause)-1, e.Cause[len(e.Cause)-1], e.Err.Error())
 	}
+}
+
+// Helper func to create an error when a package is missing.
+func missingPkgErr(pkg string) error {
+	return fmt.Errorf("no package exists at %q", pkg)
+}
+
+// A PackageTree represents the results of recursively parsing a tree of
+// packages, starting at the ImportRoot. The results of parsing the files in the
+// directory identified by each import path - a Package or an error - are stored
+// in the Packages map, keyed by that import path.
+type PackageTree struct {
+	ImportRoot string
+	Packages   map[string]PackageOrErr
 }
 
 // ToReachMap looks through a PackageTree and computes the list of external
@@ -527,9 +472,34 @@ func (t PackageTree) ToReachMap(main, tests, backprop bool, ignore map[string]bo
 	return wmToReach(workmap, backprop)
 }
 
-// Helper func to create an error when a package is missing.
-func missingPkgErr(pkg string) error {
-	return fmt.Errorf("no package exists at %q", pkg)
+// Copy copies the PackageTree.
+//
+// This is really only useful as a defensive measure to prevent external state
+// mutations.
+func (t PackageTree) Copy() PackageTree {
+	t2 := PackageTree{
+		ImportRoot: t.ImportRoot,
+		Packages:   map[string]PackageOrErr{},
+	}
+
+	for path, poe := range t.Packages {
+		poe2 := PackageOrErr{
+			Err: poe.Err,
+			P:   poe.P,
+		}
+		if len(poe.P.Imports) > 0 {
+			poe2.P.Imports = make([]string, len(poe.P.Imports))
+			copy(poe2.P.Imports, poe.P.Imports)
+		}
+		if len(poe.P.TestImports) > 0 {
+			poe2.P.TestImports = make([]string, len(poe.P.TestImports))
+			copy(poe2.P.TestImports, poe.P.TestImports)
+		}
+
+		t2.Packages[path] = poe2
+	}
+
+	return t2
 }
 
 // wmToReach takes an internal "workmap" constructed by
@@ -857,64 +827,6 @@ func wmToReach(workmap map[string]wm, backprop bool) (ReachMap, map[string]*Prob
 	}
 
 	return rm, errmap
-}
-
-// FlattenAll flattens a reachmap into a sorted, deduplicated list of all the
-// external imports named by its contained packages.
-//
-// If stdlib is false, then stdlib imports are excluded from the result.
-func (rm ReachMap) FlattenAll(stdlib bool) []string {
-	return rm.flatten(func(pkg string) bool { return true }, stdlib)
-}
-
-// Flatten flattens a reachmap into a sorted, deduplicated list of all the
-// external imports named by its contained packages, but excludes imports coming
-// from packages with disallowed patterns in their names: any path element with
-// a leading dot, a leading underscore, with the name "testdata".
-//
-// If stdlib is false, then stdlib imports are excluded from the result.
-func (rm ReachMap) Flatten(stdlib bool) []string {
-	f := func(pkg string) bool {
-		// Eliminate import paths with any elements having leading dots, leading
-		// underscores, or testdata. If these are internally reachable (which is
-		// a no-no, but possible), any external imports will have already been
-		// pulled up through ExternalReach. The key here is that we don't want
-		// to treat such packages as themselves being sources.
-		for _, elem := range strings.Split(pkg, "/") {
-			if strings.HasPrefix(elem, ".") || strings.HasPrefix(elem, "_") || elem == "testdata" {
-				return false
-			}
-		}
-		return true
-	}
-
-	return rm.flatten(f, stdlib)
-}
-
-func (rm ReachMap) flatten(filter func(string) bool, stdlib bool) []string {
-	exm := make(map[string]struct{})
-	for pkg, ie := range rm {
-		if filter(pkg) {
-			for _, ex := range ie.External {
-				if !stdlib && isStdLib(ex) {
-					continue
-				}
-				exm[ex] = struct{}{}
-			}
-		}
-	}
-
-	if len(exm) == 0 {
-		return []string{}
-	}
-
-	ex := make([]string, 0, len(exm))
-	for p := range exm {
-		ex = append(ex, p)
-	}
-
-	sort.Strings(ex)
-	return ex
 }
 
 // eqOrSlashedPrefix checks to see if the prefix is either equal to the string,

@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"path/filepath"
 	"strings"
+
+	"github.com/sdboyer/gps/pkgtree"
 )
 
 // dsp - "depspec with packages"
@@ -1002,7 +1004,7 @@ type tpkg struct {
 type bimodalFixture struct {
 	// name of this fixture datum
 	n string
-	// bimodal project. first is always treated as root project
+	// bimodal project; first is always treated as root project
 	ds []depspec
 	// results; map of name/version pairs
 	r map[ProjectIdentifier]LockedProject
@@ -1061,16 +1063,16 @@ func (f bimodalFixture) rootmanifest() RootManifest {
 	return m
 }
 
-func (f bimodalFixture) rootTree() PackageTree {
-	pt := PackageTree{
+func (f bimodalFixture) rootTree() pkgtree.PackageTree {
+	pt := pkgtree.PackageTree{
 		ImportRoot: string(f.ds[0].n),
-		Packages:   map[string]PackageOrErr{},
+		Packages:   map[string]pkgtree.PackageOrErr{},
 	}
 
 	for _, pkg := range f.ds[0].pkgs {
 		elems := strings.Split(pkg.path, "/")
-		pt.Packages[pkg.path] = PackageOrErr{
-			P: Package{
+		pt.Packages[pkg.path] = pkgtree.PackageOrErr{
+			P: pkgtree.Package{
 				ImportPath: pkg.path,
 				Name:       elems[len(elems)-1],
 				// TODO(sdboyer) ugh, tpkg type has no space for supporting test
@@ -1107,17 +1109,17 @@ func newbmSM(bmf bimodalFixture) *bmSourceManager {
 	return sm
 }
 
-func (sm *bmSourceManager) ListPackages(id ProjectIdentifier, v Version) (PackageTree, error) {
+func (sm *bmSourceManager) ListPackages(id ProjectIdentifier, v Version) (pkgtree.PackageTree, error) {
 	for k, ds := range sm.specs {
 		// Cheat for root, otherwise we blow up b/c version is empty
 		if id.normalizedSource() == string(ds.n) && (k == 0 || ds.v.Matches(v)) {
-			ptree := PackageTree{
+			ptree := pkgtree.PackageTree{
 				ImportRoot: id.normalizedSource(),
-				Packages:   make(map[string]PackageOrErr),
+				Packages:   make(map[string]pkgtree.PackageOrErr),
 			}
 			for _, pkg := range ds.pkgs {
-				ptree.Packages[pkg.path] = PackageOrErr{
-					P: Package{
+				ptree.Packages[pkg.path] = pkgtree.PackageOrErr{
+					P: pkgtree.Package{
 						ImportPath: pkg.path,
 						Name:       filepath.Base(pkg.path),
 						Imports:    pkg.imports,
@@ -1129,7 +1131,7 @@ func (sm *bmSourceManager) ListPackages(id ProjectIdentifier, v Version) (Packag
 		}
 	}
 
-	return PackageTree{}, fmt.Errorf("Project %s at version %s could not be found", id.errString(), v)
+	return pkgtree.PackageTree{}, fmt.Errorf("Project %s at version %s could not be found", id.errString(), v)
 }
 
 func (sm *bmSourceManager) GetManifestAndLock(id ProjectIdentifier, v Version) (Manifest, Lock, error) {
@@ -1153,36 +1155,25 @@ func (sm *bmSourceManager) GetManifestAndLock(id ProjectIdentifier, v Version) (
 // Note that it does not do things like stripping out stdlib packages - these
 // maps are intended for use in SM fixtures, and that's a higher-level
 // responsibility within the system.
-func computeBimodalExternalMap(ds []depspec) map[pident]map[string][]string {
+func computeBimodalExternalMap(specs []depspec) map[pident]map[string][]string {
 	// map of project name+version -> map of subpkg name -> external pkg list
 	rm := make(map[pident]map[string][]string)
 
-	// algorithm adapted from externalReach()
-	for _, d := range ds {
-		// Keeps a list of all internal and external reaches for packages within
-		// a given root. We create one on each pass through, rather than doing
-		// them all at once, because the depspec set may (read: is expected to)
-		// have multiple versions of the same base project, and each of those
-		// must be calculated independently.
-		workmap := make(map[string]wm)
-
-		for _, pkg := range d.pkgs {
-			w := wm{
-				ex: make(map[string]bool),
-				in: make(map[string]bool),
-			}
-
-			for _, imp := range pkg.imports {
-				if !eqOrSlashedPrefix(imp, string(d.n)) {
-					w.ex[imp] = true
-				} else {
-					w.in[imp] = true
-				}
-			}
-			workmap[pkg.path] = w
+	for _, ds := range specs {
+		ptree := pkgtree.PackageTree{
+			ImportRoot: string(ds.n),
+			Packages:   make(map[string]pkgtree.PackageOrErr),
 		}
-
-		reachmap, em := wmToReach(workmap, true)
+		for _, pkg := range ds.pkgs {
+			ptree.Packages[pkg.path] = pkgtree.PackageOrErr{
+				P: pkgtree.Package{
+					ImportPath: pkg.path,
+					Name:       filepath.Base(pkg.path),
+					Imports:    pkg.imports,
+				},
+			}
+		}
+		reachmap, em := ptree.ToReachMap(false, true, true, nil)
 		if len(em) > 0 {
 			panic(fmt.Sprintf("pkgs with errors in reachmap processing: %s", em))
 		}
@@ -1191,7 +1182,7 @@ func computeBimodalExternalMap(ds []depspec) map[pident]map[string][]string {
 		for ip, ie := range reachmap {
 			drm[ip] = ie.External
 		}
-		rm[pident{n: d.n, v: d.v}] = drm
+		rm[pident{n: ds.n, v: ds.v}] = drm
 	}
 
 	return rm

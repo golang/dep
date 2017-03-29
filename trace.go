@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+
+	"github.com/sdboyer/gps/pkgtree"
 )
 
 const (
@@ -104,7 +106,7 @@ func (s *solver) traceFinish(sol solution, err error) {
 }
 
 // traceSelectRoot is called just once, when the root project is selected
-func (s *solver) traceSelectRoot(ptree PackageTree, cdeps []completeDep) {
+func (s *solver) traceSelectRoot(ptree pkgtree.PackageTree, cdeps []completeDep) {
 	if s.tl == nil {
 		return
 	}

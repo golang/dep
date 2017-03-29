@@ -11,6 +11,7 @@ import (
 
 	"github.com/Masterminds/semver"
 	"github.com/Masterminds/vcs"
+	"github.com/sdboyer/gps/internal/fs"
 )
 
 // Kept here as a reference in case it does become important to implement a
@@ -50,13 +51,13 @@ func (s *gitSource) exportVersionTo(v Version, to string) error {
 
 		// Back up original index
 		idx, bak := filepath.Join(r.LocalPath(), ".git", "index"), filepath.Join(r.LocalPath(), ".git", "origindex")
-		err := renameWithFallback(idx, bak)
+		err := fs.RenameWithFallback(idx, bak)
 		if err != nil {
 			return err
 		}
 
 		// could have an err here...but it's hard to imagine how?
-		defer renameWithFallback(bak, idx)
+		defer fs.RenameWithFallback(bak, idx)
 
 		vstr := v.String()
 		if rv, ok := v.(PairedVersion); ok {
@@ -685,7 +686,7 @@ func (r *repo) exportVersionTo(v Version, to string) error {
 	// TODO(sdboyer) this is a simplistic approach and relying on the tools
 	// themselves might make it faster, but git's the overwhelming case (and has
 	// its own method) so fine for now
-	return copyDir(r.rpath, to)
+	return fs.CopyDir(r.rpath, to)
 }
 
 // This func copied from Masterminds/vcs so we can exec our own commands

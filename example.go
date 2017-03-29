@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/sdboyer/gps"
+	"github.com/sdboyer/gps/pkgtree"
 )
 
 // This is probably the simplest possible implementation of gps. It does the
@@ -35,7 +36,7 @@ func main() {
 		TraceLogger: log.New(os.Stdout, "", 0),
 	}
 	// Perform static analysis on the current project to find all of its imports.
-	params.RootPackageTree, _ = gps.ListPackages(root, importroot)
+	params.RootPackageTree, _ = pkgtree.ListPackages(root, importroot)
 
 	// Set up a SourceManager. This manages interaction with sources (repositories).
 	tempdir, _ := ioutil.TempDir("", "gps-repocache")

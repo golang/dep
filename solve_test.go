@@ -13,6 +13,9 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/sdboyer/gps/internal"
+	"github.com/sdboyer/gps/pkgtree"
 )
 
 var fixtorun string
@@ -44,7 +47,7 @@ func overrideMkBridge() {
 // sets the isStdLib func to always return false, otherwise it would identify
 // pretty much all of our fixtures as being stdlib and skip everything
 func overrideIsStdLib() {
-	isStdLib = func(path string) bool {
+	internal.IsStdLib = func(path string) bool {
 		return false
 	}
 }
@@ -318,7 +321,7 @@ func TestBadSolveOpts(t *testing.T) {
 		t.Error("Prepare should have given error on empty import root, but gave:", err)
 	}
 
-	params.RootPackageTree = PackageTree{
+	params.RootPackageTree = pkgtree.PackageTree{
 		ImportRoot: pn,
 	}
 	_, err = Prepare(params, sm)
@@ -328,11 +331,11 @@ func TestBadSolveOpts(t *testing.T) {
 		t.Error("Prepare should have given error on empty import root, but gave:", err)
 	}
 
-	params.RootPackageTree = PackageTree{
+	params.RootPackageTree = pkgtree.PackageTree{
 		ImportRoot: pn,
-		Packages: map[string]PackageOrErr{
+		Packages: map[string]pkgtree.PackageOrErr{
 			pn: {
-				P: Package{
+				P: pkgtree.Package{
 					ImportPath: pn,
 					Name:       pn,
 				},
