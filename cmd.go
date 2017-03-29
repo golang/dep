@@ -41,8 +41,13 @@ func (c *monitoredCmd) run() error {
 		select {
 		case <-ticker.C:
 			if c.hasTimedOut() {
-				if err := c.cmd.Process.Kill(); err != nil {
-					return &killCmdError{err}
+				// On windows it is apparently (?) possible for the process
+				// pointer to become nil without Run() having returned (and
+				// thus, passing through the done channel). Guard against this.
+				if c.cmd.Process != nil {
+					if err := c.cmd.Process.Kill(); err != nil {
+						return &killCmdError{err}
+					}
 				}
 
 				return &timeoutError{c.timeout}
