@@ -119,98 +119,100 @@ func (sc *sourceCoordinator) getSourceGatewayFor(ctx context.Context, id Project
 
 	// The rest of the work needs its own goroutine, the results of which will
 	// be re-joined to this call via the return chans.
-	go func() {
-		sc.psrcmut.Lock()
-		if chans, has := sc.protoSrcs[normalizedName]; has {
-			// Another goroutine is already working on this normalizedName. Fold
-			// in with that work by attaching our return channels to the list.
-			sc.protoSrcs[normalizedName] = append(chans, rc)
-			sc.psrcmut.Unlock()
-			return
-		}
-
-		sc.protoSrcs[normalizedName] = []srcReturnChans{rc}
-		sc.psrcmut.Unlock()
-
-		doReturn := func(sg *sourceGateway, err error) {
-			sc.psrcmut.Lock()
-			if sg != nil {
-				for _, rc := range sc.protoSrcs[normalizedName] {
-					rc.ret <- sg
-				}
-			} else if err != nil {
-				for _, rc := range sc.protoSrcs[normalizedName] {
-					rc.err <- err
-				}
-			} else {
-				panic("sg and err both nil")
-			}
-
-			delete(sc.protoSrcs, normalizedName)
-			sc.psrcmut.Unlock()
-		}
-
-		pd, err := sc.deducer.deduceRootPath(ctx, normalizedName)
-		if err != nil {
-			// As in the deducer, don't cache errors so that externally-driven retry
-			// strategies can be constructed.
-			doReturn(nil, err)
-			return
-		}
-
-		// It'd be quite the feat - but not impossible - for a gateway
-		// corresponding to this normalizedName to have slid into the main
-		// sources map after the initial unlock, but before this goroutine got
-		// scheduled. Guard against that by checking the main sources map again
-		// and bailing out if we find an entry.
-		var srcGate *sourceGateway
-		sc.srcmut.RLock()
-		if url, has := sc.nameToURL[normalizedName]; has {
-			if srcGate, has := sc.srcs[url]; has {
-				sc.srcmut.RUnlock()
-				doReturn(srcGate, nil)
-				return
-			}
-			panic(fmt.Sprintf("%q was URL for %q in nameToURL, but no corresponding srcGate in srcs map", url, normalizedName))
-		}
-		sc.srcmut.RUnlock()
-
-		srcGate = newSourceGateway(pd.mb, sc.callMgr, sc.cachedir)
-
-		// The normalized name is usually different from the source URL- e.g.
-		// github.com/sdboyer/gps vs. https://github.com/sdboyer/gps. But it's
-		// possible to arrive here with a full URL as the normalized name - and
-		// both paths *must* lead to the same sourceGateway instance in order to
-		// ensure disk access is correctly managed.
-		//
-		// Therefore, we now must query the sourceGateway to get the actual
-		// sourceURL it's operating on, and ensure it's *also* registered at
-		// that path in the map. This will cause it to actually initiate the
-		// maybeSource.try() behavior in order to settle on a URL.
-		url, err := srcGate.sourceURL(ctx)
-		if err != nil {
-			doReturn(nil, err)
-			return
-		}
-
-		// We know we have a working srcGateway at this point, and need to
-		// integrate it back into the main map.
-		sc.srcmut.Lock()
-		defer sc.srcmut.Unlock()
-		// Record the name -> URL mapping, even if it's a self-mapping.
-		sc.nameToURL[normalizedName] = url
-
-		if sa, has := sc.srcs[url]; has {
-			// URL already had an entry in the main map; use that as the result.
-			doReturn(sa, nil)
-			return
-		}
-
-		sc.srcs[url] = srcGate
-		doReturn(srcGate, nil)
-	}()
-
+	go sc.setUpSourceGateway(ctx, normalizedName, rc)
 	return rc.awaitReturn()
+}
+
+// Not intended to be called externally - call getSourceGatewayFor instead.
+func (sc *sourceCoordinator) setUpSourceGateway(ctx context.Context, normalizedName string, rc srcReturnChans) {
+	sc.psrcmut.Lock()
+	if chans, has := sc.protoSrcs[normalizedName]; has {
+		// Another goroutine is already working on this normalizedName. Fold
+		// in with that work by attaching our return channels to the list.
+		sc.protoSrcs[normalizedName] = append(chans, rc)
+		sc.psrcmut.Unlock()
+		return
+	}
+
+	sc.protoSrcs[normalizedName] = []srcReturnChans{rc}
+	sc.psrcmut.Unlock()
+
+	doReturn := func(sg *sourceGateway, err error) {
+		sc.psrcmut.Lock()
+		if sg != nil {
+			for _, rc := range sc.protoSrcs[normalizedName] {
+				rc.ret <- sg
+			}
+		} else if err != nil {
+			for _, rc := range sc.protoSrcs[normalizedName] {
+				rc.err <- err
+			}
+		} else {
+			panic("sg and err both nil")
+		}
+
+		delete(sc.protoSrcs, normalizedName)
+		sc.psrcmut.Unlock()
+	}
+
+	pd, err := sc.deducer.deduceRootPath(ctx, normalizedName)
+	if err != nil {
+		// As in the deducer, don't cache errors so that externally-driven retry
+		// strategies can be constructed.
+		doReturn(nil, err)
+		return
+	}
+
+	// It'd be quite the feat - but not impossible - for a gateway
+	// corresponding to this normalizedName to have slid into the main
+	// sources map after the initial unlock, but before this goroutine got
+	// scheduled. Guard against that by checking the main sources map again
+	// and bailing out if we find an entry.
+	var srcGate *sourceGateway
+	sc.srcmut.RLock()
+	if url, has := sc.nameToURL[normalizedName]; has {
+		if srcGate, has := sc.srcs[url]; has {
+			sc.srcmut.RUnlock()
+			doReturn(srcGate, nil)
+			return
+		}
+		panic(fmt.Sprintf("%q was URL for %q in nameToURL, but no corresponding srcGate in srcs map", url, normalizedName))
+	}
+	sc.srcmut.RUnlock()
+
+	srcGate = newSourceGateway(pd.mb, sc.callMgr, sc.cachedir)
+
+	// The normalized name is usually different from the source URL- e.g.
+	// github.com/sdboyer/gps vs. https://github.com/sdboyer/gps. But it's
+	// possible to arrive here with a full URL as the normalized name - and
+	// both paths *must* lead to the same sourceGateway instance in order to
+	// ensure disk access is correctly managed.
+	//
+	// Therefore, we now must query the sourceGateway to get the actual
+	// sourceURL it's operating on, and ensure it's *also* registered at
+	// that path in the map. This will cause it to actually initiate the
+	// maybeSource.try() behavior in order to settle on a URL.
+	url, err := srcGate.sourceURL(ctx)
+	if err != nil {
+		doReturn(nil, err)
+		return
+	}
+
+	// We know we have a working srcGateway at this point, and need to
+	// integrate it back into the main map.
+	sc.srcmut.Lock()
+	defer sc.srcmut.Unlock()
+	// Record the name -> URL mapping, even if it's a self-mapping.
+	sc.nameToURL[normalizedName] = url
+
+	if sa, has := sc.srcs[url]; has {
+		// URL already had an entry in the main map; use that as the result.
+		doReturn(sa, nil)
+		return
+	}
+
+	sc.srcs[url] = srcGate
+	doReturn(srcGate, nil)
 }
 
 // sourceGateways manage all incoming calls for data from sources, serializing
