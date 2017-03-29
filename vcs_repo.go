@@ -49,6 +49,7 @@ func (r *gitRepo) Get() error {
 
 func (r *gitRepo) Update() error {
 	// Perform a fetch to make sure everything is up to date.
+	//out, err := runFromRepoDir(r, "git", "fetch", "--tags", "--prune", r.RemoteLocation)
 	out, err := runFromRepoDir(r, "git", "fetch", "--tags", r.RemoteLocation)
 	if err != nil {
 		return vcs.NewRemoteError("unable to update repository", err, string(out))

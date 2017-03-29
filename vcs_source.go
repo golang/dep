@@ -79,7 +79,7 @@ func (s *gitSource) exportVersionTo(v Version, to string) error {
 		// If there was an err, and the repo cache is stale, it might've been
 		// beacuse we were missing the rev/ref. Try syncing, then run the export
 		// op again.
-		err = s.syncLocal()
+		err = s.updateLocal()
 		if err != nil {
 			return err
 		}
@@ -89,22 +89,14 @@ func (s *gitSource) exportVersionTo(v Version, to string) error {
 	return err
 }
 
-func (s *gitSource) listVersions() ([]Version, error) {
-	s.baseVCSSource.lvmut.Lock()
-	defer s.baseVCSSource.lvmut.Unlock()
-
-	if s.cvsync {
-		return s.dc.getAllVersions(), nil
-	}
-
+func (s *gitSource) listVersions() ([]PairedVersion, error) {
 	vlist, err := s.doListVersions()
 	if err != nil {
 		return nil, err
 	}
-	// Process version data into the cache and mark cache as in sync
+	// Process version data into the cache and
 	s.dc.storeVersionMap(vlist, true)
-	s.cvsync = true
-	return s.dc.getAllVersions(), nil
+	return vlist, nil
 }
 
 func (s *gitSource) doListVersions() (vlist []PairedVersion, err error) {
@@ -259,14 +251,7 @@ type gopkginSource struct {
 	major uint64
 }
 
-func (s *gopkginSource) listVersions() ([]Version, error) {
-	s.baseVCSSource.lvmut.Lock()
-	defer s.baseVCSSource.lvmut.Unlock()
-
-	if s.cvsync {
-		return s.dc.getAllVersions(), nil
-	}
-
+func (s *gopkginSource) listVersions() ([]PairedVersion, error) {
 	ovlist, err := s.doListVersions()
 	if err != nil {
 		return nil, err
@@ -324,10 +309,9 @@ func (s *gopkginSource) listVersions() ([]Version, error) {
 		}.Is(dbv.r)
 	}
 
-	// Process filtered version data into the cache and mark cache as in sync
+	// Process filtered version data into the cache
 	s.dc.storeVersionMap(vlist, true)
-	s.cvsync = true
-	return s.dc.getAllVersions(), nil
+	return vlist, nil
 }
 
 // bzrSource is a generic bzr repository implementation that should work with
@@ -352,37 +336,11 @@ func (s *bzrSource) update() error {
 	return nil
 }
 
-func (s *bzrSource) listVersions() ([]Version, error) {
-	s.baseVCSSource.lvmut.Lock()
-	defer s.baseVCSSource.lvmut.Unlock()
-
-	if s.cvsync {
-		return s.dc.getAllVersions(), nil
-	}
-
-	// Must first ensure cache checkout's existence
-	err := s.ensureCacheExistence()
-	if err != nil {
-		return nil, err
-	}
+func (s *bzrSource) listVersions() ([]PairedVersion, error) {
 	r := s.crepo.r
 
-	// Local repo won't have all the latest refs if ensureCacheExistence()
-	// didn't create it
-	if !s.crepo.synced {
-		s.crepo.mut.Lock()
-		err = s.update()
-		s.crepo.mut.Unlock()
-		if err != nil {
-			return nil, err
-		}
-
-		s.crepo.synced = true
-	}
-
-	var out []byte
 	// Now, list all the tags
-	out, err = runFromRepoDir(r, "bzr", "tags", "--show-ids", "-v")
+	out, err := runFromRepoDir(r, "bzr", "tags", "--show-ids", "-v")
 	if err != nil {
 		return nil, fmt.Errorf("%s: %s", err, string(out))
 	}
@@ -411,10 +369,9 @@ func (s *bzrSource) listVersions() ([]Version, error) {
 	v := newDefaultBranch("(default)")
 	vlist = append(vlist, v.Is(Revision(string(branchrev))))
 
-	// Process version data into the cache and mark cache as in sync
+	// Process version data into the cache
 	s.dc.storeVersionMap(vlist, true)
-	s.cvsync = true
-	return s.dc.getAllVersions(), nil
+	return vlist, nil
 }
 
 // hgSource is a generic hg repository implementation that should work with
@@ -439,39 +396,12 @@ func (s *hgSource) update() error {
 	return nil
 }
 
-func (s *hgSource) listVersions() ([]Version, error) {
-	s.baseVCSSource.lvmut.Lock()
-	defer s.baseVCSSource.lvmut.Unlock()
-
-	if s.cvsync {
-		return s.dc.getAllVersions(), nil
-	}
-
-	// Must first ensure cache checkout's existence
-	err := s.ensureCacheExistence()
-	if err != nil {
-		return nil, err
-	}
-	r := s.crepo.r
-
-	// Local repo won't have all the latest refs if ensureCacheExistence()
-	// didn't create it
-	if !s.crepo.synced {
-		s.crepo.mut.Lock()
-		err = unwrapVcsErr(s.update())
-		s.crepo.mut.Unlock()
-		if err != nil {
-			return nil, err
-		}
-
-		s.crepo.synced = true
-	}
-
-	var out []byte
+func (s *hgSource) listVersions() ([]PairedVersion, error) {
 	var vlist []PairedVersion
 
+	r := s.crepo.r
 	// Now, list all the tags
-	out, err = runFromRepoDir(r, "hg", "tags", "--debug", "--verbose")
+	out, err := runFromRepoDir(r, "hg", "tags", "--debug", "--verbose")
 	if err != nil {
 		return nil, fmt.Errorf("%s: %s", err, string(out))
 	}
@@ -566,10 +496,9 @@ func (s *hgSource) listVersions() ([]Version, error) {
 		vlist = append(vlist, v)
 	}
 
-	// Process version data into the cache and mark cache as in sync
+	// Process version data into the cache
 	s.dc.storeVersionMap(vlist, true)
-	s.cvsync = true
-	return s.dc.getAllVersions(), nil
+	return vlist, nil
 }
 
 type repo struct {

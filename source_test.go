@@ -46,6 +46,19 @@ func TestGitSourceInteractions(t *testing.T) {
 		rf()
 		t.FailNow()
 	}
+
+	wantstate := sourceIsSetUp | sourceExistsUpstream | sourceHasLatestVersionList
+	if state != wantstate {
+		t.Errorf("Expected return state to be %v, got %v", wantstate, state)
+	}
+
+	err = isrc.initLocal()
+	if err != nil {
+		t.Errorf("Error on cloning git repo: %s", err)
+		rf()
+		t.FailNow()
+	}
+
 	src, ok := isrc.(*gitSource)
 	if !ok {
 		t.Errorf("Expected a gitSource, got a %T", isrc)
@@ -53,21 +66,18 @@ func TestGitSourceInteractions(t *testing.T) {
 		t.FailNow()
 	}
 
-	wantstate := sourceIsSetUp | sourceExistsUpstream
-	if state != wantstate {
-		t.Errorf("Expected return state to be %v, got %v", wantstate, state)
-	}
 	if un != src.upstreamURL() {
 		t.Errorf("Expected %s as source URL, got %s", un, src.upstreamURL())
 	}
 
-	vlist, err := src.listVersions()
+	pvlist, err := src.listVersions()
 	if err != nil {
 		t.Errorf("Unexpected error getting version pairs from git repo: %s", err)
 		rf()
 		t.FailNow()
 	}
 
+	vlist := hidePair(pvlist)
 	if src.ex.s&existsUpstream != existsUpstream {
 		t.Errorf("gitSource.listVersions() should have set the upstream existence bit for search")
 	}
@@ -152,16 +162,25 @@ func TestGopkginSourceInteractions(t *testing.T) {
 			t.Errorf("Unexpected error while setting up gopkginSource for test repo: %s", err)
 			return
 		}
+
+		wantstate := sourceIsSetUp | sourceExistsUpstream | sourceHasLatestVersionList
+		if state != wantstate {
+			t.Errorf("Expected return state to be %v, got %v", wantstate, state)
+		}
+
+		err = isrc.initLocal()
+		if err != nil {
+			t.Errorf("Error on cloning git repo: %s", err)
+			rf()
+			t.FailNow()
+		}
+
 		src, ok := isrc.(*gopkginSource)
 		if !ok {
 			t.Errorf("Expected a gopkginSource, got a %T", isrc)
 			return
 		}
 
-		wantstate := sourceIsSetUp | sourceExistsUpstream
-		if state != wantstate {
-			t.Errorf("Expected return state to be %v, got %v", wantstate, state)
-		}
 		if un != src.upstreamURL() {
 			t.Errorf("Expected %s as source URL, got %s", un, src.upstreamURL())
 		}
@@ -178,11 +197,12 @@ func TestGopkginSourceInteractions(t *testing.T) {
 			t.Errorf("Revision %s that should exist was not present", rev)
 		}
 
-		vlist, err := src.listVersions()
+		pvlist, err := src.listVersions()
 		if err != nil {
 			t.Errorf("Unexpected error getting version pairs from hg repo: %s", err)
 		}
 
+		vlist := hidePair(pvlist)
 		if src.ex.s&existsUpstream|existsInCache != existsUpstream|existsInCache {
 			t.Errorf("gopkginSource.listVersions() should have set the upstream and cache existence bits for search")
 		}
@@ -200,11 +220,12 @@ func TestGopkginSourceInteractions(t *testing.T) {
 		}
 
 		// Run again, this time to ensure cache outputs correctly
-		vlist, err = src.listVersions()
+		pvlist, err = src.listVersions()
 		if err != nil {
 			t.Errorf("Unexpected error getting version pairs from hg repo: %s", err)
 		}
 
+		vlist = hidePair(pvlist)
 		if src.ex.s&existsUpstream|existsInCache != existsUpstream|existsInCache {
 			t.Errorf("gopkginSource.listVersions() should have set the upstream and cache existence bits for search")
 		}
@@ -297,6 +318,19 @@ func TestBzrSourceInteractions(t *testing.T) {
 		rf()
 		t.FailNow()
 	}
+
+	wantstate := sourceIsSetUp | sourceExistsUpstream
+	if state != wantstate {
+		t.Errorf("Expected return state to be %v, got %v", wantstate, state)
+	}
+
+	err = isrc.initLocal()
+	if err != nil {
+		t.Errorf("Error on cloning git repo: %s", err)
+		rf()
+		t.FailNow()
+	}
+
 	src, ok := isrc.(*bzrSource)
 	if !ok {
 		t.Errorf("Expected a bzrSource, got a %T", isrc)
@@ -304,7 +338,6 @@ func TestBzrSourceInteractions(t *testing.T) {
 		t.FailNow()
 	}
 
-	wantstate := sourceIsSetUp | sourceExistsUpstream
 	if state != wantstate {
 		t.Errorf("Expected return state to be %v, got %v", wantstate, state)
 	}
@@ -324,11 +357,12 @@ func TestBzrSourceInteractions(t *testing.T) {
 		t.Errorf("Revision that should exist was not present")
 	}
 
-	vlist, err := src.listVersions()
+	pvlist, err := src.listVersions()
 	if err != nil {
 		t.Errorf("Unexpected error getting version pairs from bzr repo: %s", err)
 	}
 
+	vlist := hidePair(pvlist)
 	if src.ex.s&existsUpstream|existsInCache != existsUpstream|existsInCache {
 		t.Errorf("bzrSource.listVersions() should have set the upstream and cache existence bits for search")
 	}
@@ -346,11 +380,12 @@ func TestBzrSourceInteractions(t *testing.T) {
 	}
 
 	// Run again, this time to ensure cache outputs correctly
-	vlist, err = src.listVersions()
+	pvlist, err = src.listVersions()
 	if err != nil {
 		t.Errorf("Unexpected error getting version pairs from bzr repo: %s", err)
 	}
 
+	vlist = hidePair(pvlist)
 	if src.ex.s&existsUpstream|existsInCache != existsUpstream|existsInCache {
 		t.Errorf("bzrSource.listVersions() should have set the upstream and cache existence bits for search")
 	}
@@ -410,13 +445,25 @@ func TestHgSourceInteractions(t *testing.T) {
 			t.Errorf("Unexpected error while setting up hgSource for test repo: %s", err)
 			return
 		}
+
+		wantstate := sourceIsSetUp | sourceExistsUpstream
+		if state != wantstate {
+			t.Errorf("Expected return state to be %v, got %v", wantstate, state)
+		}
+
+		err = isrc.initLocal()
+		if err != nil {
+			t.Errorf("Error on cloning git repo: %s", err)
+			rf()
+			t.FailNow()
+		}
+
 		src, ok := isrc.(*hgSource)
 		if !ok {
 			t.Errorf("Expected a hgSource, got a %T", isrc)
 			return
 		}
 
-		wantstate := sourceIsSetUp | sourceExistsUpstream
 		if state != wantstate {
 			t.Errorf("Expected return state to be %v, got %v", wantstate, state)
 		}
@@ -432,11 +479,12 @@ func TestHgSourceInteractions(t *testing.T) {
 			t.Errorf("Revision that should exist was not present")
 		}
 
-		vlist, err := src.listVersions()
+		pvlist, err := src.listVersions()
 		if err != nil {
 			t.Errorf("Unexpected error getting version pairs from hg repo: %s", err)
 		}
 
+		vlist := hidePair(pvlist)
 		if src.ex.s&existsUpstream|existsInCache != existsUpstream|existsInCache {
 			t.Errorf("hgSource.listVersions() should have set the upstream and cache existence bits for search")
 		}
@@ -454,11 +502,12 @@ func TestHgSourceInteractions(t *testing.T) {
 		}
 
 		// Run again, this time to ensure cache outputs correctly
-		vlist, err = src.listVersions()
+		pvlist, err = src.listVersions()
 		if err != nil {
 			t.Errorf("Unexpected error getting version pairs from hg repo: %s", err)
 		}
 
+		vlist = hidePair(pvlist)
 		if src.ex.s&existsUpstream|existsInCache != existsUpstream|existsInCache {
 			t.Errorf("hgSource.listVersions() should have set the upstream and cache existence bits for search")
 		}

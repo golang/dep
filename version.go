@@ -749,3 +749,11 @@ func (vs downgradeVersionSorter) Less(i, j int) bool {
 	}
 	return lsv.LessThan(rsv)
 }
+
+func hidePair(pvl []PairedVersion) []Version {
+	vl := make([]Version, 0, len(pvl))
+	for _, v := range pvl {
+		vl = append(vl, v)
+	}
+	return vl
+}

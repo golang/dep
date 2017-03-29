@@ -37,6 +37,7 @@ type SourceManager interface {
 
 	// ListVersions retrieves a list of the available versions for a given
 	// repository name.
+	// TODO convert to []PairedVersion
 	ListVersions(ProjectIdentifier) ([]Version, error)
 
 	// RevisionPresentIn indicates whether the provided Version is present in
@@ -385,7 +386,12 @@ func (sm *SourceMgr) ListVersions(id ProjectIdentifier) ([]Version, error) {
 		return nil, err
 	}
 
-	return srcg.listVersions(context.TODO())
+	pvl, err := srcg.listVersions(context.TODO())
+	if err != nil {
+		return nil, err
+	}
+	// FIXME return a []PairedVersion
+	return hidePair(pvl), nil
 }
 
 // RevisionPresentIn indicates whether the provided Revision is present in the given

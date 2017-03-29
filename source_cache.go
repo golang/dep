@@ -24,6 +24,9 @@ type singleSourceCache interface {
 	// Get the PackageTree for a given revision.
 	getPackageTree(Revision) (pkgtree.PackageTree, bool)
 
+	// Indicate to the cache that an individual revision is known to exist.
+	markRevisionExists(r Revision)
+
 	// Store the mappings between a set of PairedVersions' surface versions
 	// their corresponding revisions.
 	//
@@ -37,8 +40,7 @@ type singleSourceCache interface {
 	getVersionsFor(Revision) ([]UnpairedVersion, bool)
 
 	// Gets all the version pairs currently known to the cache.
-	getAllVersions() []Version
-	//getAllVersions() []PairedVersion
+	getAllVersions() []PairedVersion
 
 	// Get the revision corresponding to the given unpaired version.
 	getRevisionFor(UnpairedVersion) (Revision, bool)
@@ -142,6 +144,14 @@ func (c *singleSourceCacheMemory) storeVersionMap(versionList []PairedVersion, f
 	c.mut.Unlock()
 }
 
+func (c *singleSourceCacheMemory) markRevisionExists(r Revision) {
+	c.mut.Lock()
+	if _, has := c.rMap[r]; !has {
+		c.rMap[r] = nil
+	}
+	c.mut.Unlock()
+}
+
 func (c *singleSourceCacheMemory) getVersionsFor(r Revision) ([]UnpairedVersion, bool) {
 	c.mut.Lock()
 	versionList, has := c.rMap[r]
@@ -149,10 +159,8 @@ func (c *singleSourceCacheMemory) getVersionsFor(r Revision) ([]UnpairedVersion,
 	return versionList, has
 }
 
-//func (c *singleSourceCacheMemory) getAllVersions() []PairedVersion {
-func (c *singleSourceCacheMemory) getAllVersions() []Version {
-	//vlist := make([]PairedVersion, 0, len(c.vMap))
-	vlist := make([]Version, 0, len(c.vMap))
+func (c *singleSourceCacheMemory) getAllVersions() []PairedVersion {
+	vlist := make([]PairedVersion, 0, len(c.vMap))
 	for v, r := range c.vMap {
 		vlist = append(vlist, v.Is(r))
 	}

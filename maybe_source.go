@@ -19,8 +19,6 @@ import (
 // * Allows control over when deduction logic triggers network activity
 // * Makes it easy to attempt multiple URLs for a given import path
 type maybeSource interface {
-	// TODO(sdboyer) remove ProjectAnalyzer from here after refactor to bring it in on
-	// GetManifestAndLock() calls as a param
 	//try(ctx context.Context, cachedir string, c singleSourceCache) (source, string, error)
 	try(ctx context.Context, cachedir string, c singleSourceCache) (source, sourceState, error)
 	getURL() string
@@ -97,18 +95,16 @@ func (m maybeGitSource) try(ctx context.Context, cachedir string, c singleSource
 			},
 		},
 	}
-	src.baseVCSSource.lvfunc = src.listVersions
 
 	// Pinging invokes the same action as calling listVersions, so just do that.
-	_, err = src.listVersions()
+	vl, err := src.listVersions()
 	if err != nil {
 		return nil, 0, fmt.Errorf("remote repository at %s does not exist, or is inaccessible", ustr)
 	}
 
-	//c.storeVersionMap(vl, true)
-	//state := sourceIsSetUp | sourceExistsUpstream | sourceHasLatestVersionList
+	c.storeVersionMap(vl, true)
+	state := sourceIsSetUp | sourceExistsUpstream | sourceHasLatestVersionList
 
-	state := sourceIsSetUp | sourceExistsUpstream
 	if r.CheckLocal() {
 		state |= sourceExistsLocally
 	}
@@ -156,18 +152,16 @@ func (m maybeGopkginSource) try(ctx context.Context, cachedir string, c singleSo
 		},
 		major: m.major,
 	}
-	src.baseVCSSource.lvfunc = src.listVersions
 
 	// Pinging invokes the same action as calling listVersions, so just do that.
-	_, err = src.listVersions()
+	vl, err := src.listVersions()
 	if err != nil {
 		return nil, 0, fmt.Errorf("remote repository at %s does not exist, or is inaccessible", ustr)
 	}
 
-	//c.storeVersionMap(vl, true)
-	//state := sourceIsSetUp | sourceExistsUpstream | sourceHasLatestVersionList
+	c.storeVersionMap(vl, true)
+	state := sourceIsSetUp | sourceExistsUpstream | sourceHasLatestVersionList
 
-	state := sourceIsSetUp | sourceExistsUpstream
 	if r.CheckLocal() {
 		state |= sourceExistsLocally
 	}
@@ -210,7 +204,6 @@ func (m maybeBzrSource) try(ctx context.Context, cachedir string, c singleSource
 			},
 		},
 	}
-	src.baseVCSSource.lvfunc = src.listVersions
 
 	return src, state, nil
 }
@@ -250,7 +243,6 @@ func (m maybeHgSource) try(ctx context.Context, cachedir string, c singleSourceC
 			},
 		},
 	}
-	src.baseVCSSource.lvfunc = src.listVersions
 
 	return src, state, nil
 }

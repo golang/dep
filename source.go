@@ -383,7 +383,7 @@ func (sg *sourceGateway) convertToRevision(ctx context.Context, v Version) (Revi
 	return r, nil
 }
 
-func (sg *sourceGateway) listVersions(ctx context.Context) ([]Version, error) {
+func (sg *sourceGateway) listVersions(ctx context.Context) ([]PairedVersion, error) {
 	sg.mu.Lock()
 	defer sg.mu.Unlock()
 
@@ -411,7 +411,11 @@ func (sg *sourceGateway) revisionPresentIn(ctx context.Context, r Revision) (boo
 		return true, nil
 	}
 
-	return sg.src.revisionPresentIn(r)
+	present, err := sg.src.revisionPresentIn(r)
+	if err == nil && present {
+		sg.cache.markRevisionExists(r)
+	}
+	return present, err
 }
 
 func (sg *sourceGateway) sourceURL(ctx context.Context) (string, error) {
@@ -436,10 +440,9 @@ func (sg *sourceGateway) createSingleSourceCache() singleSourceCache {
 
 func (sg *sourceGateway) require(ctx context.Context, wanted sourceState) (errState sourceState, err error) {
 	todo := (^sg.srcState) & wanted
-	var flag sourceState
-	for i := uint(0); todo != 0; i++ {
-		flag = 1 << i
+	var flag sourceState = 1
 
+	for todo != 0 {
 		if todo&flag != 0 {
 			// Assign the currently visited bit to errState so that we can
 			// return easily later.
@@ -458,7 +461,7 @@ func (sg *sourceGateway) require(ctx context.Context, wanted sourceState) (errSt
 				}
 			case sourceExistsLocally:
 				if !sg.src.existsLocally(ctx) {
-					err = sg.src.syncLocal()
+					err = sg.src.initLocal()
 					if err == nil {
 						addlState |= sourceHasLatestLocally
 					} else {
@@ -466,9 +469,13 @@ func (sg *sourceGateway) require(ctx context.Context, wanted sourceState) (errSt
 					}
 				}
 			case sourceHasLatestVersionList:
-				_, err = sg.src.listVersions()
+				var pvl []PairedVersion
+				pvl, err = sg.src.listVersions()
+				if err != nil {
+					sg.cache.storeVersionMap(pvl, true)
+				}
 			case sourceHasLatestLocally:
-				err = sg.src.syncLocal()
+				err = sg.src.updateLocal()
 			}
 
 			if err != nil {
@@ -479,6 +486,8 @@ func (sg *sourceGateway) require(ctx context.Context, wanted sourceState) (errSt
 			sg.srcState |= checked
 			todo &= ^checked
 		}
+
+		flag <<= 1
 	}
 
 	return 0, nil
@@ -488,17 +497,17 @@ type source interface {
 	existsLocally(context.Context) bool
 	existsUpstream(context.Context) bool
 	upstreamURL() string
-	syncLocal() error
+	initLocal() error
+	updateLocal() error
 	checkExistence(sourceExistence) bool
 	exportVersionTo(Version, string) error
 	getManifestAndLock(ProjectRoot, Version, ProjectAnalyzer) (Manifest, Lock, error)
 	listPackages(ProjectRoot, Version) (pkgtree.PackageTree, error)
-	listVersions() ([]Version, error)
+	listVersions() ([]PairedVersion, error)
 	revisionPresentIn(Revision) (bool, error)
 }
 
 //type source interface {
-//syncLocal(context.Context) error
 //checkExistence(sourceExistence) bool
 //exportRevisionTo(Revision, string) error
 //getManifestAndLock(ProjectRoot, Revision, ProjectAnalyzer) (Manifest, Lock, error)
@@ -533,17 +542,6 @@ type baseVCSSource struct {
 	// disk, for reuse across solver runs.
 	dc singleSourceCache
 
-	// lvfunc allows the other vcs source types that embed this type to inject
-	// their listVersions func into the baseSource, for use as needed.
-	lvfunc func() (vlist []Version, err error)
-
-	// Mutex to ensure only one listVersions runs at a time
-	//
-	// TODO(sdboyer) this is a horrible one-off hack, and must be removed once
-	// source managers are refactored to properly serialize and fold-in calls to
-	// these methods.
-	lvmut sync.Mutex
-
 	// Once-er to control access to syncLocal
 	synconce sync.Once
 
@@ -567,20 +565,6 @@ func (bs *baseVCSSource) upstreamURL() string {
 }
 
 func (bs *baseVCSSource) getManifestAndLock(r ProjectRoot, v Version, an ProjectAnalyzer) (Manifest, Lock, error) {
-	if err := bs.ensureCacheExistence(); err != nil {
-		return nil, nil, err
-	}
-
-	rev, err := bs.toRevOrErr(v)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	// Return the info from the cache, if we already have it
-	if pi, exists := bs.dc.getProjectInfo(rev, an); exists {
-		return pi.Manifest, pi.Lock, nil
-	}
-
 	// Cache didn't help; ensure our local is fully up to date.
 	do := func() (err error) {
 		bs.crepo.mut.Lock()
@@ -595,9 +579,9 @@ func (bs *baseVCSSource) getManifestAndLock(r ProjectRoot, v Version, an Project
 		return
 	}
 
-	if err = do(); err != nil {
+	if err := do(); err != nil {
 		// minimize network activity: only force local syncing if we had an err
-		err = bs.syncLocal()
+		err = bs.updateLocal()
 		if err != nil {
 			return nil, nil, err
 		}
@@ -613,38 +597,17 @@ func (bs *baseVCSSource) getManifestAndLock(r ProjectRoot, v Version, an Project
 	bs.crepo.mut.RUnlock()
 
 	if err == nil {
-		if l != nil {
+		if l != nil && l != Lock(nil) {
 			l = prepLock(l)
 		}
 
-		// If m is nil, prepManifest will provide an empty one.
-		pi := projectInfo{
-			Manifest: prepManifest(m),
-			Lock:     l,
-		}
-
-		bs.dc.setProjectInfo(rev, an, pi)
-
-		return pi.Manifest, pi.Lock, nil
+		return prepManifest(m), l, nil
 	}
 
 	return nil, nil, unwrapVcsErr(err)
 }
 
 func (bs *baseVCSSource) revisionPresentIn(r Revision) (bool, error) {
-	// First and fastest path is to check the data cache to see if the rev is
-	// present. This could give us false positives, but the cases where that can
-	// occur would require a type of cache staleness that seems *exceedingly*
-	// unlikely to occur.
-	if _, has := bs.dc.getVersionsFor(r); has {
-		return true, nil
-	}
-
-	err := bs.ensureCacheExistence()
-	if err != nil {
-		return false, err
-	}
-
 	bs.crepo.mut.RLock()
 	defer bs.crepo.mut.RUnlock()
 	return bs.crepo.r.IsReference(string(r)), nil
@@ -721,119 +684,49 @@ func (bs *baseVCSSource) checkExistence(ex sourceExistence) bool {
 	return ex&bs.ex.f == ex
 }
 
-// syncLocal ensures the local data we have about the source is fully up to date
-// with what's out there over the network.
-func (bs *baseVCSSource) syncLocal() error {
-	// Ensure we only have one goroutine doing this at a time
-	f := func() {
-		// First, ensure the local instance exists
-		bs.syncerr = bs.ensureCacheExistence()
-		if bs.syncerr != nil {
-			return
-		}
-
-		_, bs.syncerr = bs.lvfunc()
-		if bs.syncerr != nil {
-			return
-		}
-
-		// This case is really just for git repos, where the lvfunc doesn't
-		// guarantee that the local repo is synced
-		if !bs.crepo.synced {
-			bs.crepo.mut.Lock()
-			err := bs.crepo.r.Update()
-			if err != nil {
-				bs.syncerr = fmt.Errorf("failed fetching latest updates with err: %s", unwrapVcsErr(err))
-			} else {
-				bs.crepo.synced = true
-			}
-			bs.crepo.mut.Unlock()
-		}
+// initLocal clones/checks out the upstream repository to disk for the first
+// time.
+func (bs *baseVCSSource) initLocal() error {
+	bs.crepo.mut.Lock()
+	err := bs.crepo.r.Get()
+	bs.crepo.mut.Unlock()
+	if err != nil {
+		return unwrapVcsErr(err)
 	}
+	return nil
+}
 
-	bs.synconce.Do(f)
-	return bs.syncerr
+// updateLocal ensures the local data we have about the source is fully up to date
+// with what's out there over the network.
+func (bs *baseVCSSource) updateLocal() error {
+	bs.crepo.mut.Lock()
+	err := bs.crepo.r.Update()
+	bs.crepo.mut.Unlock()
+	if err != nil {
+		return unwrapVcsErr(err)
+	}
+	return nil
 }
 
 func (bs *baseVCSSource) listPackages(pr ProjectRoot, v Version) (ptree pkgtree.PackageTree, err error) {
-	if err = bs.ensureCacheExistence(); err != nil {
+	// TODO make param a rev
+	r, has := bs.dc.toRevision(v)
+	if !has {
 		return
 	}
 
-	var r Revision
-	if r, err = bs.toRevOrErr(v); err != nil {
-		return
-	}
-
-	// Return the ptree from the cache, if we already have it
-	var exists bool
-	if ptree, exists = bs.dc.getPackageTree(r); exists {
-		return
-	}
-
-	// Not in the cache; check out the version and do the analysis
 	bs.crepo.mut.Lock()
 	// Check out the desired version for analysis
-	if r != "" {
-		// Always prefer a rev, if it's available
-		err = bs.crepo.r.UpdateVersion(string(r))
-	} else {
-		// If we don't have a rev, ensure the repo is up to date, otherwise we
-		// could have a desync issue
-		if !bs.crepo.synced {
-			err = bs.crepo.r.Update()
-			if err != nil {
-				err = fmt.Errorf("could not fetch latest updates into repository: %s", unwrapVcsErr(err))
-				return
-			}
-			bs.crepo.synced = true
-		}
-		err = bs.crepo.r.UpdateVersion(v.String())
-	}
+	err = bs.crepo.r.UpdateVersion(string(r))
 
-	if err == nil {
-		ptree, err = pkgtree.ListPackages(bs.crepo.r.LocalPath(), string(pr))
-		// TODO(sdboyer) cache errs?
-		if err == nil {
-			bs.dc.setPackageTree(r, ptree)
-		}
-	} else {
+	if err != nil {
 		err = unwrapVcsErr(err)
+	} else {
+		ptree, err = pkgtree.ListPackages(bs.crepo.r.LocalPath(), string(pr))
 	}
 	bs.crepo.mut.Unlock()
 
 	return
-}
-
-// toRevOrErr makes all efforts to convert a Version into a rev, including
-// updating the source repo (if needed). It does not guarantee that the returned
-// Revision actually exists in the repository (as one of the cheaper methods may
-// have had bad data).
-func (bs *baseVCSSource) toRevOrErr(v Version) (Revision, error) {
-	r, has := bs.dc.toRevision(v)
-	var err error
-	if !has {
-		// Rev can be empty if:
-		//  - The cache is unsynced
-		//  - A version was passed that used to exist, but no longer does
-		//  - A garbage version was passed. (Functionally indistinguishable from
-		//  the previous)
-		if !bs.cvsync {
-			// call the lvfunc to sync the meta cache
-			_, err = bs.lvfunc()
-			if err != nil {
-				return "", err
-			}
-		}
-
-		r, has = bs.dc.toRevision(v)
-		// If we still don't have a rev, then the version's no good
-		if !has {
-			err = fmt.Errorf("version %s does not exist in source %s", v, bs.crepo.r.Remote())
-		}
-	}
-
-	return r, err
 }
 
 func (bs *baseVCSSource) exportVersionTo(v Version, to string) error {
