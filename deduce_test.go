@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"net/url"
 	"reflect"
-	"sync"
 	"testing"
 )
 
@@ -484,7 +483,10 @@ var pathDeductionFixtures = map[string][]pathDeductionFixture{
 
 func TestDeduceFromPath(t *testing.T) {
 	for typ, fixtures := range pathDeductionFixtures {
+		typ, fixtures := typ, fixtures
 		t.Run(typ, func(t *testing.T) {
+			t.Parallel()
+
 			var deducer pathDeducer
 			switch typ {
 			case "github":
@@ -534,7 +536,9 @@ func TestDeduceFromPath(t *testing.T) {
 			}
 
 			for _, fix := range fixtures {
+				fix := fix
 				t.Run(fix.in, func(t *testing.T) {
+					t.Parallel()
 					u, in, uerr := normalizeURI(fix.in)
 					if uerr != nil {
 						if fix.rerr == nil {
@@ -592,32 +596,35 @@ func TestVanityDeduction(t *testing.T) {
 	defer clean()
 
 	vanities := pathDeductionFixtures["vanity"]
-	wg := &sync.WaitGroup{}
-	wg.Add(len(vanities))
-
+	// group to avoid sourcemanager cleanup
 	ctx := context.Background()
-	for _, fix := range vanities {
-		t.Run(fmt.Sprintf("%s", fix.in), func(t *testing.T) {
-			pr, err := sm.DeduceProjectRoot(fix.in)
-			if err != nil {
-				t.Errorf("Unexpected err on deducing project root: %s", err)
-				return
-			} else if string(pr) != fix.root {
-				t.Errorf("Deducer did not return expected root:\n\t(GOT) %s\n\t(WNT) %s", pr, fix.root)
-			}
+	t.Run("vanity", func(t *testing.T) {
+		for _, fix := range vanities {
+			fix := fix
+			t.Run(fmt.Sprintf("%s", fix.in), func(t *testing.T) {
+				t.Parallel()
 
-			pd, err := sm.deduceCoord.deduceRootPath(ctx, fix.in)
-			if err != nil {
-				t.Errorf("Unexpected err on deducing source: %s", err)
-				return
-			}
+				pr, err := sm.DeduceProjectRoot(fix.in)
+				if err != nil {
+					t.Errorf("Unexpected err on deducing project root: %s", err)
+					return
+				} else if string(pr) != fix.root {
+					t.Errorf("Deducer did not return expected root:\n\t(GOT) %s\n\t(WNT) %s", pr, fix.root)
+				}
 
-			goturl, wanturl := pd.mb.(maybeGitSource).url.String(), fix.mb.(maybeGitSource).url.String()
-			if goturl != wanturl {
-				t.Errorf("Deduced repo ident does not match fixture:\n\t(GOT) %s\n\t(WNT) %s", goturl, wanturl)
-			}
-		})
-	}
+				pd, err := sm.deduceCoord.deduceRootPath(ctx, fix.in)
+				if err != nil {
+					t.Errorf("Unexpected err on deducing source: %s", err)
+					return
+				}
+
+				goturl, wanturl := pd.mb.(maybeGitSource).url.String(), fix.mb.(maybeGitSource).url.String()
+				if goturl != wanturl {
+					t.Errorf("Deduced repo ident does not match fixture:\n\t(GOT) %s\n\t(WNT) %s", goturl, wanturl)
+				}
+			})
+		}
+	})
 }
 
 func TestVanityDeductionSchemeMismatch(t *testing.T) {

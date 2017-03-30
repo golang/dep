@@ -10,7 +10,22 @@ import (
 	"testing"
 )
 
-func TestGitSourceInteractions(t *testing.T) {
+// Parent test that executes all the slow vcs interaction tests in parallel.
+func TestSlowVcs(t *testing.T) {
+	t.Run("write-deptree", testWriteDepTree)
+	t.Run("bzr-repo", testBzrRepo)
+	t.Run("bzr-source", testBzrSourceInteractions)
+	t.Run("svn-repo", testSvnRepo)
+	t.Run("hg-repo", testHgRepo)
+	t.Run("hg-source", testHgSourceInteractions)
+	t.Run("git-repo", testGitRepo)
+	t.Run("git-source", testGitSourceInteractions)
+	t.Run("gopkgin-source", testGopkginSourceInteractions)
+}
+
+func testGitSourceInteractions(t *testing.T) {
+	t.Parallel()
+
 	// This test is slowish, skip it on -short
 	if testing.Short() {
 		t.Skip("Skipping git source version fetching test in short mode")
@@ -113,7 +128,9 @@ func TestGitSourceInteractions(t *testing.T) {
 	}
 }
 
-func TestGopkginSourceInteractions(t *testing.T) {
+func testGopkginSourceInteractions(t *testing.T) {
+	t.Parallel()
+
 	// This test is slowish, skip it on -short
 	if testing.Short() {
 		t.Skip("Skipping gopkg.in source version fetching test in short mode")
@@ -255,7 +272,9 @@ func TestGopkginSourceInteractions(t *testing.T) {
 	rf()
 }
 
-func TestBzrSourceInteractions(t *testing.T) {
+func testBzrSourceInteractions(t *testing.T) {
+	t.Parallel()
+
 	// This test is quite slow (ugh bzr), so skip it on -short
 	if testing.Short() {
 		t.Skip("Skipping bzr source version fetching test in short mode")
@@ -370,7 +389,9 @@ func TestBzrSourceInteractions(t *testing.T) {
 	}
 }
 
-func TestHgSourceInteractions(t *testing.T) {
+func testHgSourceInteractions(t *testing.T) {
+	t.Parallel()
+
 	// This test is slow, so skip it on -short
 	if testing.Short() {
 		t.Skip("Skipping hg source version fetching test in short mode")

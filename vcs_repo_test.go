@@ -12,7 +12,9 @@ import (
 // original implementation of these test files come from
 // https://github.com/Masterminds/vcs test files
 
-func TestSvnRepo(t *testing.T) {
+func testSvnRepo(t *testing.T) {
+	t.Parallel()
+
 	if testing.Short() {
 		t.Skip("Skipping slow test in short mode")
 	}
@@ -102,7 +104,9 @@ func TestSvnRepo(t *testing.T) {
 	}
 }
 
-func TestHgRepo(t *testing.T) {
+func testHgRepo(t *testing.T) {
+	t.Parallel()
+
 	if testing.Short() {
 		t.Skip("Skipping slow test in short mode")
 	}
@@ -167,7 +171,9 @@ func TestHgRepo(t *testing.T) {
 	}
 }
 
-func TestGitRepo(t *testing.T) {
+func testGitRepo(t *testing.T) {
+	t.Parallel()
+
 	if testing.Short() {
 		t.Skip("Skipping slow test in short mode")
 	}
@@ -241,7 +247,9 @@ func TestGitRepo(t *testing.T) {
 	}
 }
 
-func TestBzrRepo(t *testing.T) {
+func testBzrRepo(t *testing.T) {
+	t.Parallel()
+
 	if testing.Short() {
 		t.Skip("Skipping slow test in short mode")
 	}

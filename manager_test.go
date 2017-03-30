@@ -362,48 +362,47 @@ func TestGetSources(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	wg := &sync.WaitGroup{}
-	wg.Add(len(pil))
-	for _, pi := range pil {
-		lpi := pi
-		t.Run(lpi.normalizedSource(), func(t *testing.T) {
-			defer wg.Done()
+	// protects against premature release of sm
+	t.Run("inner", func(t *testing.T) {
+		for _, pi := range pil {
+			lpi := pi
+			t.Run(lpi.normalizedSource(), func(t *testing.T) {
+				t.Parallel()
 
-			srcg, err := sm.srcCoord.getSourceGatewayFor(ctx, lpi)
-			if err != nil {
-				t.Errorf("unexpected error setting up source: %s", err)
-				return
-			}
+				srcg, err := sm.srcCoord.getSourceGatewayFor(ctx, lpi)
+				if err != nil {
+					t.Errorf("unexpected error setting up source: %s", err)
+					return
+				}
 
-			// Re-get the same, make sure they are the same
-			srcg2, err := sm.srcCoord.getSourceGatewayFor(ctx, lpi)
-			if err != nil {
-				t.Errorf("unexpected error re-getting source: %s", err)
-			} else if srcg != srcg2 {
-				t.Error("first and second sources are not eq")
-			}
+				// Re-get the same, make sure they are the same
+				srcg2, err := sm.srcCoord.getSourceGatewayFor(ctx, lpi)
+				if err != nil {
+					t.Errorf("unexpected error re-getting source: %s", err)
+				} else if srcg != srcg2 {
+					t.Error("first and second sources are not eq")
+				}
 
-			// All of them _should_ select https, so this should work
-			lpi.Source = "https://" + lpi.Source
-			srcg3, err := sm.srcCoord.getSourceGatewayFor(ctx, lpi)
-			if err != nil {
-				t.Errorf("unexpected error getting explicit https source: %s", err)
-			} else if srcg != srcg3 {
-				t.Error("explicit https source should reuse autodetected https source")
-			}
+				// All of them _should_ select https, so this should work
+				lpi.Source = "https://" + lpi.Source
+				srcg3, err := sm.srcCoord.getSourceGatewayFor(ctx, lpi)
+				if err != nil {
+					t.Errorf("unexpected error getting explicit https source: %s", err)
+				} else if srcg != srcg3 {
+					t.Error("explicit https source should reuse autodetected https source")
+				}
 
-			// Now put in http, and they should differ
-			lpi.Source = "http://" + string(lpi.ProjectRoot)
-			srcg4, err := sm.srcCoord.getSourceGatewayFor(ctx, lpi)
-			if err != nil {
-				t.Errorf("unexpected error getting explicit http source: %s", err)
-			} else if srcg == srcg4 {
-				t.Error("explicit http source should create a new src")
-			}
-		})
-	}
-
-	wg.Wait()
+				// Now put in http, and they should differ
+				lpi.Source = "http://" + string(lpi.ProjectRoot)
+				srcg4, err := sm.srcCoord.getSourceGatewayFor(ctx, lpi)
+				if err != nil {
+					t.Errorf("unexpected error getting explicit http source: %s", err)
+				} else if srcg == srcg4 {
+					t.Error("explicit http source should create a new src")
+				}
+			})
+		}
+	})
 
 	// nine entries (of which three are dupes): for each vcs, raw import path,
 	// the https url, and the http url
