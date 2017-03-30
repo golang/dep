@@ -25,8 +25,9 @@ memo = "31a7162c06758e4619ed89b91e1f48bf94ad14f394bbee79299ed0bb5150e409"
   version = "v0.2.0"
 
 [[projects]]
+  branch = "master"
   name = "github.com/pelletier/go-toml"
-  revision = "fee7787d3f811af92276f5ff10107092e95b7a1d"
+  revision = "e32a2e04744250647a72bf17da1b09befc03b6b1"
   packages = ["."]
 
 [[projects]]

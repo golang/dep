@@ -8,8 +8,8 @@
   version = "^1.8.0"
 
 [[dependencies]]
+  branch = "master"
   name = "github.com/pelletier/go-toml"
-  revision = "fee7787d3f811af92276f5ff10107092e95b7a1d"
 
 [[dependencies]]
   name = "github.com/pkg/errors"
