@@ -117,11 +117,7 @@ func (e killCmdError) Error() string {
 
 func runFromCwd(cmd string, args ...string) ([]byte, error) {
 	c := newMonitoredCmd(exec.Command(cmd, args...), 2*time.Minute)
-	out, err := c.combinedOutput()
-	if err != nil {
-		err = fmt.Errorf("%s: %s", string(out), err)
-	}
-	return out, nil
+	return c.combinedOutput()
 }
 
 func runFromRepoDir(repo vcs.Repo, cmd string, args ...string) ([]byte, error) {
