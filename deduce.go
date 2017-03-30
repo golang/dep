@@ -526,9 +526,9 @@ func (m vcsExtensionDeducer) deduceSource(path string, u *url.URL) (maybeSource,
 
 type deductionCoordinator struct {
 	callMgr  *callManager
+	mut      sync.RWMutex
 	rootxt   *radix.Tree
 	deducext *deducerTrie
-	action   chan func()
 }
 
 func newDeductionCoordinator(cm *callManager) *deductionCoordinator {
@@ -536,21 +536,7 @@ func newDeductionCoordinator(cm *callManager) *deductionCoordinator {
 		callMgr:  cm,
 		rootxt:   radix.New(),
 		deducext: pathDeducerTrie(),
-		action:   make(chan func()),
 	}
-
-	// Start listener loop
-	go func() {
-		for {
-			select {
-			case <-dc.callMgr.getLifetimeContext().Done():
-				close(dc.action)
-				return
-			case action := <-dc.action:
-				action()
-			}
-		}
-	}()
 
 	return dc
 }
@@ -567,91 +553,75 @@ func (dc *deductionCoordinator) deduceRootPath(ctx context.Context, path string)
 		return pathDeduction{}, errors.New("deductionCoordinator has been terminated")
 	}
 
-	retchan, errchan := make(chan pathDeduction), make(chan error)
-	dc.action <- func() {
-		hmdDeduce := func(hmd *httpMetadataDeducer) {
-			pd, err := hmd.deduce(ctx, path)
-			if err != nil {
-				errchan <- err
-			} else {
-				retchan <- pd
-			}
+	// First, check the rootxt to see if there's a prefix match - if so, we
+	// can return that and move on.
+	dc.mut.RLock()
+	prefix, data, has := dc.rootxt.LongestPrefix(path)
+	dc.mut.RUnlock()
+	if has && isPathPrefixOrEqual(prefix, path) {
+		switch d := data.(type) {
+		case maybeSource:
+			return pathDeduction{root: prefix, mb: d}, nil
+		case *httpMetadataDeducer:
+			// Multiple calls have come in for a similar path shape during
+			// the window in which the HTTP request to retrieve go get
+			// metadata is in flight. Fold this request in with the existing
+			// one(s) by calling the deduction method, which will avoid
+			// duplication of work through a sync.Once.
+			return d.deduce(ctx, path)
 		}
 
-		// First, check the rootxt to see if there's a prefix match - if so, we
-		// can return that and move on.
-		if prefix, data, has := dc.rootxt.LongestPrefix(path); has && isPathPrefixOrEqual(prefix, path) {
-			switch d := data.(type) {
-			case maybeSource:
-				retchan <- pathDeduction{root: prefix, mb: d}
-			case *httpMetadataDeducer:
-				// Multiple calls have come in for a similar path shape during
-				// the window in which the HTTP request to retrieve go get
-				// metadata is in flight. Fold this request in with the existing
-				// one(s) by giving it its own goroutine that awaits a response
-				// from the running httpMetadataDeducer.
-				go hmdDeduce(d)
-			default:
-				panic(fmt.Sprintf("unexpected %T in deductionCoordinator.rootxt: %v", d, d))
-			}
-
-			// Finding either a finished maybeSource or an in-flight vanity
-			// deduction means there's nothing more to do on this action.
-			return
-		}
-
-		// No match. Try known path deduction first.
-		pd, err := dc.deduceKnownPaths(path)
-		if err == nil {
-			// Deduction worked; store it in the rootxt, send on retchan and
-			// terminate.
-			// FIXME(sdboyer) deal with changing path vs. root. Probably needs
-			// to be predeclared and reused in the hmd returnFunc
-			dc.rootxt.Insert(pd.root, pd.mb)
-			retchan <- pd
-			return
-		}
-
-		if err != errNoKnownPathMatch {
-			errchan <- err
-			return
-		}
-
-		// The err indicates no known path matched. It's still possible that
-		// retrieving go get metadata might do the trick.
-		hmd := &httpMetadataDeducer{
-			basePath: path,
-			callMgr:  dc.callMgr,
-			// The vanity deducer will call this func with a completed
-			// pathDeduction if it succeeds in finding one. We process it
-			// back through the action channel to ensure serialized
-			// access to the rootxt map.
-			returnFunc: func(pd pathDeduction) {
-				dc.action <- func() {
-					if pd.root != path {
-						// Replace the vanity deducer with a real result set, so
-						// that subsequent deductions don't hit the network
-						// again.
-						dc.rootxt.Insert(path, pd.mb)
-					}
-					dc.rootxt.Insert(pd.root, pd.mb)
-				}
-			},
-		}
-
-		// Save the hmd in the rootxt so that calls checking on similar
-		// paths made while the request is in flight can be folded together.
-		dc.rootxt.Insert(path, hmd)
-		// Spawn a new goroutine for the HTTP-backed deduction process.
-		go hmdDeduce(hmd)
+		panic(fmt.Sprintf("unexpected %T in deductionCoordinator.rootxt: %v", data, data))
 	}
 
-	select {
-	case pd := <-retchan:
+	// No match. Try known path deduction first.
+	pd, err := dc.deduceKnownPaths(path)
+	if err == nil {
+		// Deduction worked; store it in the rootxt, send on retchan and
+		// terminate.
+		// FIXME(sdboyer) deal with changing path vs. root. Probably needs
+		// to be predeclared and reused in the hmd returnFunc
+		dc.mut.Lock()
+		dc.rootxt.Insert(pd.root, pd.mb)
+		dc.mut.Unlock()
 		return pd, nil
-	case err := <-errchan:
+	}
+
+	if err != errNoKnownPathMatch {
 		return pathDeduction{}, err
 	}
+
+	// The err indicates no known path matched. It's still possible that
+	// retrieving go get metadata might do the trick.
+	hmd := &httpMetadataDeducer{
+		basePath: path,
+		callMgr:  dc.callMgr,
+		// The vanity deducer will call this func with a completed
+		// pathDeduction if it succeeds in finding one. We process it
+		// back through the action channel to ensure serialized
+		// access to the rootxt map.
+		returnFunc: func(pd pathDeduction) {
+			dc.mut.Lock()
+			dc.rootxt.Insert(pd.root, pd.mb)
+
+			if pd.root != path {
+				// Replace the vanity deducer with a real result set, so
+				// that subsequent deductions don't hit the network
+				// again.
+				dc.rootxt.Insert(path, pd.mb)
+			}
+			dc.mut.Unlock()
+		},
+	}
+
+	// Save the hmd in the rootxt so that calls checking on similar
+	// paths made while the request is in flight can be folded together.
+	dc.mut.Lock()
+	dc.rootxt.Insert(path, hmd)
+	dc.mut.Unlock()
+
+	// Trigger the HTTP-backed deduction process for this requestor.
+	return hmd.deduce(ctx, path)
 }
 
 // pathDeduction represents the results of a successful import path deduction -
@@ -714,7 +684,6 @@ type httpMetadataDeducer struct {
 }
 
 func (hmd *httpMetadataDeducer) deduce(ctx context.Context, path string) (pathDeduction, error) {
-	// TODO(sdboyer) can this be replaced by the code in golang.org/x?
 	hmd.once.Do(func() {
 		ctx, doneFunc, err := hmd.callMgr.setUpCall(ctx, path, ctHTTPMetadata)
 		if err != nil {
