@@ -500,7 +500,8 @@ func TestFloatsWithoutLeadingZeros(t *testing.T) {
 
 func TestMissingFile(t *testing.T) {
 	_, err := LoadFile("foo.toml")
-	if err.Error() != "open foo.toml: no such file or directory" {
+	if err.Error() != "open foo.toml: no such file or directory" &&
+		err.Error() != "open foo.toml: The system cannot find the file specified." {
 		t.Error("Bad error message:", err.Error())
 	}
 }
