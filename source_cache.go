@@ -12,11 +12,11 @@ import (
 type singleSourceCache interface {
 	// Store the manifest and lock information for a given revision, as defined by
 	// a particular ProjectAnalyzer.
-	setProjectInfo(Revision, ProjectAnalyzer, projectInfo)
+	setManifestAndLock(Revision, ProjectAnalyzer, Manifest, Lock)
 
 	// Get the manifest and lock information for a given revision, as defined by
 	// a particular ProjectAnalyzer.
-	getProjectInfo(Revision, ProjectAnalyzer) (projectInfo, bool)
+	getManifestAndLock(Revision, ProjectAnalyzer) (Manifest, Lock, bool)
 
 	// Store a PackageTree for a given revision.
 	setPackageTree(Revision, pkgtree.PackageTree)
@@ -74,14 +74,19 @@ func newMemoryCache() singleSourceCache {
 	}
 }
 
-func (c *singleSourceCacheMemory) setProjectInfo(r Revision, an ProjectAnalyzer, pi projectInfo) {
+type projectInfo struct {
+	Manifest
+	Lock
+}
+
+func (c *singleSourceCacheMemory) setManifestAndLock(r Revision, an ProjectAnalyzer, m Manifest, l Lock) {
 	c.mut.Lock()
 	inner, has := c.infos[an]
 	if !has {
 		inner = make(map[Revision]projectInfo)
 		c.infos[an] = inner
 	}
-	inner[r] = pi
+	inner[r] = projectInfo{Manifest: m, Lock: l}
 
 	// Ensure there's at least an entry in the rMap so that the rMap always has
 	// a complete picture of the revisions we know to exist
@@ -91,17 +96,20 @@ func (c *singleSourceCacheMemory) setProjectInfo(r Revision, an ProjectAnalyzer,
 	c.mut.Unlock()
 }
 
-func (c *singleSourceCacheMemory) getProjectInfo(r Revision, an ProjectAnalyzer) (projectInfo, bool) {
+func (c *singleSourceCacheMemory) getManifestAndLock(r Revision, an ProjectAnalyzer) (Manifest, Lock, bool) {
 	c.mut.Lock()
 	defer c.mut.Unlock()
 
 	inner, has := c.infos[an]
 	if !has {
-		return projectInfo{}, false
+		return nil, nil, false
 	}
 
 	pi, has := inner[r]
-	return pi, has
+	if has {
+		return pi.Manifest, pi.Lock, true
+	}
+	return nil, nil, false
 }
 
 func (c *singleSourceCacheMemory) setPackageTree(r Revision, ptree pkgtree.PackageTree) {

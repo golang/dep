@@ -296,9 +296,9 @@ func (sg *sourceGateway) getManifestAndLock(ctx context.Context, pr ProjectRoot,
 		return nil, nil, err
 	}
 
-	pi, has := sg.cache.getProjectInfo(r, an)
+	m, l, has := sg.cache.getManifestAndLock(r, an)
 	if has {
-		return pi.Manifest, pi.Lock, nil
+		return m, l, nil
 	}
 
 	_, err = sg.require(ctx, sourceIsSetUp|sourceExistsLocally)
@@ -306,12 +306,12 @@ func (sg *sourceGateway) getManifestAndLock(ctx context.Context, pr ProjectRoot,
 		return nil, nil, err
 	}
 
-	m, l, err := sg.src.getManifestAndLock(pr, r, an)
+	m, l, err = sg.src.getManifestAndLock(pr, r, an)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	sg.cache.setProjectInfo(r, an, projectInfo{Manifest: m, Lock: l})
+	sg.cache.setManifestAndLock(r, an, m, l)
 	return m, l, nil
 }
 
@@ -509,12 +509,6 @@ type source interface {
 	listPackages(ProjectRoot, Revision) (pkgtree.PackageTree, error)
 	revisionPresentIn(Revision) (bool, error)
 	exportRevisionTo(Revision, string) error
-}
-
-// projectInfo holds manifest and lock
-type projectInfo struct {
-	Manifest
-	Lock
 }
 
 type baseVCSSource struct {
