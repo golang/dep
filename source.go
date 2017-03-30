@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"sync"
 
+	"github.com/sdboyer/gps/internal/fs"
 	"github.com/sdboyer/gps/pkgtree"
 )
 
@@ -600,11 +601,18 @@ func (bs *baseVCSSource) listPackages(pr ProjectRoot, r Revision) (ptree pkgtree
 }
 
 func (bs *baseVCSSource) exportRevisionTo(r Revision, to string) error {
-	// Only make the parent dir, as the general implementation will balk on
-	// trying to write to an empty but existing dir.
+	// Only make the parent dir, as CopyDir will balk on trying to write to an
+	// empty but existing dir.
 	if err := os.MkdirAll(filepath.Dir(to), 0777); err != nil {
 		return err
 	}
 
-	return bs.crepo.exportVersionTo(r, to)
+	if err := bs.crepo.r.UpdateVersion(r.String()); err != nil {
+		return unwrapVcsErr(err)
+	}
+
+	// TODO(sdboyer) this is a simplistic approach and relying on the tools
+	// themselves might make it faster, but git's the overwhelming case (and has
+	// its own method) so fine for now
+	return fs.CopyDir(bs.crepo.rpath, to)
 }

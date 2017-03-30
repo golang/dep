@@ -64,18 +64,7 @@ func (s *gitSource) exportRevisionTo(rev Revision, to string) error {
 	return nil
 }
 
-func (s *gitSource) listVersions() ([]PairedVersion, error) {
-	vlist, err := s.doListVersions()
-	if err != nil {
-		return nil, err
-	}
-	// Process version data into the cache
-	// TODO remove this call
-	s.dc.storeVersionMap(vlist, true)
-	return vlist, nil
-}
-
-func (s *gitSource) doListVersions() (vlist []PairedVersion, err error) {
+func (s *gitSource) listVersions() (vlist []PairedVersion, err error) {
 	r := s.crepo.r
 	var out []byte
 	c := exec.Command("git", "ls-remote", r.Remote())
@@ -83,37 +72,13 @@ func (s *gitSource) doListVersions() (vlist []PairedVersion, err error) {
 	c.Env = mergeEnvLists([]string{"GIT_ASKPASS=", "GIT_TERMINAL_PROMPT=0"}, os.Environ())
 	out, err = c.CombinedOutput()
 
+	if err != nil {
+		return nil, err
+	}
+
 	all := bytes.Split(bytes.TrimSpace(out), []byte("\n"))
-	if err != nil || len(all) == 0 {
-		// TODO(sdboyer) remove this path? it really just complicates things, for
-		// probably not much benefit
-
-		// ls-remote failed, probably due to bad communication or a faulty
-		// upstream implementation. So fetch updates, then build the list
-		// locally
-		s.crepo.mut.Lock()
-		err = r.Update()
-		s.crepo.mut.Unlock()
-		if err != nil {
-			// Definitely have a problem, now - bail out
-			return
-		}
-
-		// Also, local is definitely now synced
-		s.crepo.synced = true
-
-		s.crepo.mut.RLock()
-		out, err = runFromRepoDir(r, "git", "show-ref", "--dereference")
-		s.crepo.mut.RUnlock()
-		if err != nil {
-			// TODO(sdboyer) More-er proper-er error
-			return
-		}
-
-		all = bytes.Split(bytes.TrimSpace(out), []byte("\n"))
-		if len(all) == 0 {
-			return nil, fmt.Errorf("no versions available for %s (this is weird)", r.Remote())
-		}
+	if len(all) == 0 {
+		return nil, fmt.Errorf("no data returned from ls-remote")
 	}
 
 	// Pull out the HEAD rev (it's always first) so we know what branches to
@@ -220,7 +185,7 @@ type gopkginSource struct {
 }
 
 func (s *gopkginSource) listVersions() ([]PairedVersion, error) {
-	ovlist, err := s.doListVersions()
+	ovlist, err := s.gitSource.listVersions()
 	if err != nil {
 		return nil, err
 	}
@@ -277,8 +242,6 @@ func (s *gopkginSource) listVersions() ([]PairedVersion, error) {
 		}.Is(dbv.r)
 	}
 
-	// Process filtered version data into the cache
-	s.dc.storeVersionMap(vlist, true)
 	return vlist, nil
 }
 
@@ -337,8 +300,6 @@ func (s *bzrSource) listVersions() ([]PairedVersion, error) {
 	v := newDefaultBranch("(default)")
 	vlist = append(vlist, v.Is(Revision(string(branchrev))))
 
-	// Process version data into the cache
-	s.dc.storeVersionMap(vlist, true)
 	return vlist, nil
 }
 
@@ -465,8 +426,6 @@ func (s *hgSource) listVersions() ([]PairedVersion, error) {
 		vlist = append(vlist, v)
 	}
 
-	// Process version data into the cache
-	s.dc.storeVersionMap(vlist, true)
 	return vlist, nil
 }
 
@@ -484,19 +443,8 @@ type repo struct {
 	synced bool
 }
 
-func (r *repo) exportVersionTo(v Version, to string) error {
-	r.mut.Lock()
-	defer r.mut.Unlock()
-
-	// TODO(sdboyer) sloppy - this update may not be necessary
-	if !r.synced {
-		err := r.r.Update()
-		if err != nil {
-			return fmt.Errorf("err on attempting to update repo: %s", unwrapVcsErr(err))
-		}
-	}
-
-	r.r.UpdateVersion(v.String())
+func (r *repo) exportRevisionTo(rev Revision, to string) error {
+	r.r.UpdateVersion(rev.String())
 
 	// TODO(sdboyer) this is a simplistic approach and relying on the tools
 	// themselves might make it faster, but git's the overwhelming case (and has
