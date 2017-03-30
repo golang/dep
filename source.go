@@ -463,7 +463,7 @@ func (sg *sourceGateway) require(ctx context.Context, wanted sourceState) (errSt
 				}
 			case sourceExistsLocally:
 				if !sg.src.existsLocally(ctx) {
-					err = sg.src.initLocal()
+					err = sg.src.initLocal(ctx)
 					if err == nil {
 						addlState |= sourceHasLatestLocally
 					} else {
@@ -472,12 +472,12 @@ func (sg *sourceGateway) require(ctx context.Context, wanted sourceState) (errSt
 				}
 			case sourceHasLatestVersionList:
 				var pvl []PairedVersion
-				pvl, err = sg.src.listVersions()
+				pvl, err = sg.src.listVersions(ctx)
 				if err != nil {
 					sg.cache.storeVersionMap(pvl, true)
 				}
 			case sourceHasLatestLocally:
-				err = sg.src.updateLocal()
+				err = sg.src.updateLocal(ctx)
 			}
 
 			if err != nil {
@@ -502,9 +502,9 @@ type source interface {
 	existsLocally(context.Context) bool
 	existsUpstream(context.Context) bool
 	upstreamURL() string
-	initLocal() error
-	updateLocal() error
-	listVersions() ([]PairedVersion, error)
+	initLocal(context.Context) error
+	updateLocal(context.Context) error
+	listVersions(context.Context) ([]PairedVersion, error)
 	getManifestAndLock(ProjectRoot, Revision, ProjectAnalyzer) (Manifest, Lock, error)
 	listPackages(ProjectRoot, Revision) (pkgtree.PackageTree, error)
 	revisionPresentIn(Revision) (bool, error)
@@ -524,6 +524,7 @@ func (bs *baseVCSSource) existsLocally(ctx context.Context) bool {
 	return bs.crepo.r.CheckLocal()
 }
 
+// TODO reimpl for git
 func (bs *baseVCSSource) existsUpstream(ctx context.Context) bool {
 	return bs.crepo.r.Ping()
 }
@@ -557,9 +558,9 @@ func (bs *baseVCSSource) revisionPresentIn(r Revision) (bool, error) {
 
 // initLocal clones/checks out the upstream repository to disk for the first
 // time.
-func (bs *baseVCSSource) initLocal() error {
+func (bs *baseVCSSource) initLocal(ctx context.Context) error {
 	bs.crepo.mut.Lock()
-	err := bs.crepo.r.Get()
+	err := bs.crepo.r.get(ctx)
 	bs.crepo.mut.Unlock()
 	if err != nil {
 		return unwrapVcsErr(err)
@@ -569,9 +570,9 @@ func (bs *baseVCSSource) initLocal() error {
 
 // updateLocal ensures the local data we have about the source is fully up to date
 // with what's out there over the network.
-func (bs *baseVCSSource) updateLocal() error {
+func (bs *baseVCSSource) updateLocal(ctx context.Context) error {
 	bs.crepo.mut.Lock()
-	err := bs.crepo.r.Update()
+	err := bs.crepo.r.update(ctx)
 	bs.crepo.mut.Unlock()
 	if err != nil {
 		return unwrapVcsErr(err)

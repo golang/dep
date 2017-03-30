@@ -55,7 +55,8 @@ func testGitSourceInteractions(t *testing.T) {
 		url: u,
 	}
 
-	isrc, state, err := mb.try(context.Background(), cpath, newMemoryCache())
+	ctx := context.Background()
+	isrc, state, err := mb.try(ctx, cpath, newMemoryCache())
 	if err != nil {
 		t.Errorf("Unexpected error while setting up gitSource for test repo: %s", err)
 		rf()
@@ -67,7 +68,7 @@ func testGitSourceInteractions(t *testing.T) {
 		t.Errorf("Expected return state to be %v, got %v", wantstate, state)
 	}
 
-	err = isrc.initLocal()
+	err = isrc.initLocal(ctx)
 	if err != nil {
 		t.Errorf("Error on cloning git repo: %s", err)
 		rf()
@@ -85,7 +86,7 @@ func testGitSourceInteractions(t *testing.T) {
 		t.Errorf("Expected %s as source URL, got %s", un, src.upstreamURL())
 	}
 
-	pvlist, err := src.listVersions()
+	pvlist, err := src.listVersions(ctx)
 	if err != nil {
 		t.Errorf("Unexpected error getting version pairs from git repo: %s", err)
 		rf()
@@ -161,7 +162,8 @@ func testGopkginSourceInteractions(t *testing.T) {
 			major: major,
 		}
 
-		isrc, state, err := mb.try(context.Background(), cpath, newMemoryCache())
+		ctx := context.Background()
+		isrc, state, err := mb.try(ctx, cpath, newMemoryCache())
 		if err != nil {
 			t.Errorf("Unexpected error while setting up gopkginSource for test repo: %s", err)
 			return
@@ -172,7 +174,7 @@ func testGopkginSourceInteractions(t *testing.T) {
 			t.Errorf("Expected return state to be %v, got %v", wantstate, state)
 		}
 
-		err = isrc.initLocal()
+		err = isrc.initLocal(ctx)
 		if err != nil {
 			t.Errorf("Error on cloning git repo: %s", err)
 			rf()
@@ -201,7 +203,7 @@ func testGopkginSourceInteractions(t *testing.T) {
 			t.Errorf("Revision %s that should exist was not present", rev)
 		}
 
-		pvlist, err := src.listVersions()
+		pvlist, err := src.listVersions(ctx)
 		if err != nil {
 			t.Errorf("Unexpected error getting version pairs from hg repo: %s", err)
 		}
@@ -217,7 +219,7 @@ func testGopkginSourceInteractions(t *testing.T) {
 		}
 
 		// Run again, this time to ensure cache outputs correctly
-		pvlist, err = src.listVersions()
+		pvlist, err = src.listVersions(ctx)
 		if err != nil {
 			t.Errorf("Unexpected error getting version pairs from hg repo: %s", err)
 		}
@@ -304,7 +306,8 @@ func testBzrSourceInteractions(t *testing.T) {
 		url: u,
 	}
 
-	isrc, state, err := mb.try(context.Background(), cpath, newMemoryCache())
+	ctx := context.Background()
+	isrc, state, err := mb.try(ctx, cpath, newMemoryCache())
 	if err != nil {
 		t.Errorf("Unexpected error while setting up bzrSource for test repo: %s", err)
 		rf()
@@ -316,7 +319,7 @@ func testBzrSourceInteractions(t *testing.T) {
 		t.Errorf("Expected return state to be %v, got %v", wantstate, state)
 	}
 
-	err = isrc.initLocal()
+	err = isrc.initLocal(ctx)
 	if err != nil {
 		t.Errorf("Error on cloning git repo: %s", err)
 		rf()
@@ -349,7 +352,7 @@ func testBzrSourceInteractions(t *testing.T) {
 		t.Errorf("Revision that should exist was not present")
 	}
 
-	pvlist, err := src.listVersions()
+	pvlist, err := src.listVersions(ctx)
 	if err != nil {
 		t.Errorf("Unexpected error getting version pairs from bzr repo: %s", err)
 	}
@@ -365,7 +368,7 @@ func testBzrSourceInteractions(t *testing.T) {
 	}
 
 	// Run again, this time to ensure cache outputs correctly
-	pvlist, err = src.listVersions()
+	pvlist, err = src.listVersions(ctx)
 	if err != nil {
 		t.Errorf("Unexpected error getting version pairs from bzr repo: %s", err)
 	}
@@ -420,7 +423,8 @@ func testHgSourceInteractions(t *testing.T) {
 			url: u,
 		}
 
-		isrc, state, err := mb.try(context.Background(), cpath, newMemoryCache())
+		ctx := context.Background()
+		isrc, state, err := mb.try(ctx, cpath, newMemoryCache())
 		if err != nil {
 			t.Errorf("Unexpected error while setting up hgSource for test repo: %s", err)
 			return
@@ -431,7 +435,7 @@ func testHgSourceInteractions(t *testing.T) {
 			t.Errorf("Expected return state to be %v, got %v", wantstate, state)
 		}
 
-		err = isrc.initLocal()
+		err = isrc.initLocal(ctx)
 		if err != nil {
 			t.Errorf("Error on cloning git repo: %s", err)
 			rf()
@@ -459,7 +463,7 @@ func testHgSourceInteractions(t *testing.T) {
 			t.Errorf("Revision that should exist was not present")
 		}
 
-		pvlist, err := src.listVersions()
+		pvlist, err := src.listVersions(ctx)
 		if err != nil {
 			t.Errorf("Unexpected error getting version pairs from hg repo: %s", err)
 		}
@@ -475,7 +479,7 @@ func testHgSourceInteractions(t *testing.T) {
 		}
 
 		// Run again, this time to ensure cache outputs correctly
-		pvlist, err = src.listVersions()
+		pvlist, err = src.listVersions(ctx)
 		if err != nil {
 			t.Errorf("Unexpected error getting version pairs from hg repo: %s", err)
 		}

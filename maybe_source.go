@@ -97,7 +97,7 @@ func (m maybeGitSource) try(ctx context.Context, cachedir string, c singleSource
 	}
 
 	// Pinging invokes the same action as calling listVersions, so just do that.
-	vl, err := src.listVersions()
+	vl, err := src.listVersions(ctx)
 	if err != nil {
 		return nil, 0, fmt.Errorf("remote repository at %s does not exist, or is inaccessible", ustr)
 	}
@@ -154,7 +154,7 @@ func (m maybeGopkginSource) try(ctx context.Context, cachedir string, c singleSo
 	}
 
 	// Pinging invokes the same action as calling listVersions, so just do that.
-	vl, err := src.listVersions()
+	vl, err := src.listVersions(ctx)
 	if err != nil {
 		return nil, 0, fmt.Errorf("remote repository at %s does not exist, or is inaccessible", ustr)
 	}

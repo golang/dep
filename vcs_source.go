@@ -2,6 +2,7 @@ package gps
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -10,7 +11,6 @@ import (
 	"sync"
 
 	"github.com/Masterminds/semver"
-	"github.com/Masterminds/vcs"
 	"github.com/sdboyer/gps/internal/fs"
 )
 
@@ -21,6 +21,7 @@ type gitSource struct {
 }
 
 func (s *gitSource) exportRevisionTo(rev Revision, to string) error {
+	ctx := context.TODO()
 	r := s.crepo.r
 
 	if err := os.MkdirAll(to, 0777); err != nil {
@@ -40,7 +41,7 @@ func (s *gitSource) exportRevisionTo(rev Revision, to string) error {
 	// could have an err here...but it's hard to imagine how?
 	defer fs.RenameWithFallback(bak, idx)
 
-	out, err := runFromRepoDir(r, "git", "read-tree", rev.String())
+	out, err := runFromRepoDir(ctx, r, "git", "read-tree", rev.String())
 	if err != nil {
 		return fmt.Errorf("%s: %s", out, err)
 	}
@@ -56,7 +57,7 @@ func (s *gitSource) exportRevisionTo(rev Revision, to string) error {
 	// though we have a bunch of housekeeping to do to set up, then tear
 	// down, the sparse checkout controls, as well as restore the original
 	// index and HEAD.
-	out, err = runFromRepoDir(r, "git", "checkout-index", "-a", "--prefix="+to)
+	out, err = runFromRepoDir(ctx, r, "git", "checkout-index", "-a", "--prefix="+to)
 	if err != nil {
 		return fmt.Errorf("%s: %s", out, err)
 	}
@@ -64,7 +65,7 @@ func (s *gitSource) exportRevisionTo(rev Revision, to string) error {
 	return nil
 }
 
-func (s *gitSource) listVersions() (vlist []PairedVersion, err error) {
+func (s *gitSource) listVersions(ctx context.Context) (vlist []PairedVersion, err error) {
 	r := s.crepo.r
 	var out []byte
 	c := exec.Command("git", "ls-remote", r.Remote())
@@ -184,8 +185,8 @@ type gopkginSource struct {
 	major uint64
 }
 
-func (s *gopkginSource) listVersions() ([]PairedVersion, error) {
-	ovlist, err := s.gitSource.listVersions()
+func (s *gopkginSource) listVersions(ctx context.Context) ([]PairedVersion, error) {
+	ovlist, err := s.gitSource.listVersions(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -251,27 +252,11 @@ type bzrSource struct {
 	baseVCSSource
 }
 
-func (s *bzrSource) update() error {
-	r := s.crepo.r
-
-	out, err := runFromRepoDir(r, "bzr", "pull")
-	if err != nil {
-		return vcs.NewRemoteError("Unable to update repository", err, string(out))
-	}
-
-	out, err = runFromRepoDir(r, "bzr", "update")
-	if err != nil {
-		return vcs.NewRemoteError("Unable to update repository", err, string(out))
-	}
-
-	return nil
-}
-
-func (s *bzrSource) listVersions() ([]PairedVersion, error) {
+func (s *bzrSource) listVersions(ctx context.Context) ([]PairedVersion, error) {
 	r := s.crepo.r
 
 	// Now, list all the tags
-	out, err := runFromRepoDir(r, "bzr", "tags", "--show-ids", "-v")
+	out, err := runFromRepoDir(ctx, r, "bzr", "tags", "--show-ids", "-v")
 	if err != nil {
 		return nil, fmt.Errorf("%s: %s", err, string(out))
 	}
@@ -279,7 +264,7 @@ func (s *bzrSource) listVersions() ([]PairedVersion, error) {
 	all := bytes.Split(bytes.TrimSpace(out), []byte("\n"))
 
 	var branchrev []byte
-	branchrev, err = runFromRepoDir(r, "bzr", "version-info", "--custom", "--template={revision_id}", "--revision=branch:.")
+	branchrev, err = runFromRepoDir(ctx, r, "bzr", "version-info", "--custom", "--template={revision_id}", "--revision=branch:.")
 	br := string(branchrev)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %s", err, br)
@@ -309,29 +294,12 @@ type hgSource struct {
 	baseVCSSource
 }
 
-// TODO dead code?
-func (s *hgSource) update() error {
-	r := s.crepo.r
-
-	out, err := runFromRepoDir(r, "hg", "pull")
-	if err != nil {
-		return vcs.NewLocalError("Unable to update checked out version", err, string(out))
-	}
-
-	out, err = runFromRepoDir(r, "hg", "update")
-	if err != nil {
-		return vcs.NewLocalError("Unable to update checked out version", err, string(out))
-	}
-
-	return nil
-}
-
-func (s *hgSource) listVersions() ([]PairedVersion, error) {
+func (s *hgSource) listVersions(ctx context.Context) ([]PairedVersion, error) {
 	var vlist []PairedVersion
 
 	r := s.crepo.r
 	// Now, list all the tags
-	out, err := runFromRepoDir(r, "hg", "tags", "--debug", "--verbose")
+	out, err := runFromRepoDir(ctx, r, "hg", "tags", "--debug", "--verbose")
 	if err != nil {
 		return nil, fmt.Errorf("%s: %s", err, string(out))
 	}
@@ -365,7 +333,7 @@ func (s *hgSource) listVersions() ([]PairedVersion, error) {
 	// bookmarks next, because the presence of the magic @ bookmark has to
 	// determine how we handle the branches
 	var magicAt bool
-	out, err = runFromRepoDir(r, "hg", "bookmarks", "--debug")
+	out, err = runFromRepoDir(ctx, r, "hg", "bookmarks", "--debug")
 	if err != nil {
 		// better nothing than partial and misleading
 		return nil, fmt.Errorf("%s: %s", err, string(out))
@@ -398,7 +366,7 @@ func (s *hgSource) listVersions() ([]PairedVersion, error) {
 		}
 	}
 
-	out, err = runFromRepoDir(r, "hg", "branches", "-c", "--debug")
+	out, err = runFromRepoDir(ctx, r, "hg", "branches", "-c", "--debug")
 	if err != nil {
 		// better nothing than partial and misleading
 		return nil, fmt.Errorf("%s: %s", err, string(out))
@@ -437,7 +405,7 @@ type repo struct {
 	mut sync.RWMutex
 
 	// Object for direct repo interaction
-	r vcs.Repo
+	r ctxRepo
 
 	// Whether or not the cache repo is in sync (think dvcs) with upstream
 	synced bool
