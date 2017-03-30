@@ -9,6 +9,7 @@ import (
 	"io"
 	"sort"
 
+	"bytes"
 	"github.com/pelletier/go-toml"
 	"github.com/pkg/errors"
 	"github.com/sdboyer/gps"
@@ -22,35 +23,32 @@ type Lock struct {
 }
 
 type rawLock struct {
-	Memo     string
-	Projects []rawLockedProject
+	Memo     string             `toml:"memo"`
+	Projects []rawLockedProject `toml:"projects"`
 }
 
 type rawLockedProject struct {
-	Name     string
-	Branch   string
-	Revision string
-	Version  string
-	Source   string
-	Packages []string
+	Name     string   `toml:"name"`
+	Branch   string   `toml:"branch,omitempty"`
+	Revision string   `toml:"revision"`
+	Version  string   `toml:"version,omitempty"`
+	Source   string   `toml:"source,omitempty"`
+	Packages []string `toml:"packages"`
 }
 
 func readLock(r io.Reader) (*Lock, error) {
-	tree, err := toml.LoadReader(r)
+	buf := &bytes.Buffer{}
+	_, err := buf.ReadFrom(r)
+	if err != nil {
+		return nil, errors.Wrap(err, "Unable to read byte stream")
+	}
+
+	raw := rawLock{}
+	err = toml.Unmarshal(buf.Bytes(), &raw)
 	if err != nil {
 		return nil, errors.Wrap(err, "Unable to parse the lock as TOML")
 	}
 
-	mapper := &tomlMapper{Tree: tree}
-
-	raw := rawLock{
-		Memo:     readKeyAsString(mapper, "memo"),
-		Projects: readTableAsLockedProjects(mapper, "projects"),
-	}
-
-	if mapper.Error != nil {
-		return nil, errors.Wrap(mapper.Error, "Invalid lock structure")
-	}
 	return fromRawLock(raw)
 }
 
@@ -127,43 +125,8 @@ func (l *Lock) toRaw() rawLock {
 
 func (l *Lock) MarshalTOML() (string, error) {
 	raw := l.toRaw()
-
-	m := make(map[string]interface{})
-	m["memo"] = raw.Memo
-	p := make([]map[string]interface{}, len(raw.Projects))
-	for i := 0; i < len(p); i++ {
-		srcPrj := raw.Projects[i]
-		prj := make(map[string]interface{})
-		prj["name"] = srcPrj.Name
-		prj["revision"] = srcPrj.Revision
-
-		if srcPrj.Source != "" {
-			prj["source"] = srcPrj.Source
-		}
-		if srcPrj.Branch != "" {
-			prj["branch"] = srcPrj.Branch
-		}
-		if srcPrj.Version != "" {
-			prj["version"] = srcPrj.Version
-		}
-
-		pkgs := make([]interface{}, len(srcPrj.Packages))
-		for j := range srcPrj.Packages {
-			pkgs[j] = srcPrj.Packages[j]
-		}
-		prj["packages"] = pkgs
-
-		p[i] = prj
-	}
-	m["projects"] = p
-
-	t, err := toml.TreeFromMap(m)
-	if err != nil {
-		return "", errors.Wrap(err, "Unable to marshal lock to TOML tree")
-	}
-
-	result, err := t.ToTomlString()
-	return result, errors.Wrap(err, "Unable to marshal lock to TOML string")
+	result, err := toml.Marshal(raw)
+	return string(result), errors.Wrap(err, "Unable to marshal lock to TOML string")
 }
 
 // TODO(carolynvs) this should be moved to gps

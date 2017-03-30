@@ -8,6 +8,7 @@ import (
 	"io"
 	"sort"
 
+	"bytes"
 	"github.com/pelletier/go-toml"
 	"github.com/pkg/errors"
 	"github.com/sdboyer/gps"
@@ -23,37 +24,33 @@ type Manifest struct {
 }
 
 type rawManifest struct {
-	Dependencies []rawProject
-	Overrides    []rawProject
-	Ignores      []string
-	Required     []string
+	Dependencies []rawProject `toml:"dependencies,omitempty"`
+	Overrides    []rawProject `toml:"overrides,omitempty"`
+	Ignores      []string     `toml:"ignores,omitempty"`
+	Required     []string     `toml:"required,omitempty"`
 }
 
 type rawProject struct {
-	Name     string
-	Branch   string
-	Revision string
-	Version  string
-	Source   string
+	Name     string `toml:"name"`
+	Branch   string `toml:"branch,omitempty"`
+	Revision string `toml:"revision,omitempty"`
+	Version  string `toml:"version,omitempty"`
+	Source   string `toml:"source,omitempty"`
 }
 
 func readManifest(r io.Reader) (*Manifest, error) {
-	tree, err := toml.LoadReader(r)
+	buf := &bytes.Buffer{}
+	_, err := buf.ReadFrom(r)
+	if err != nil {
+		return nil, errors.Wrap(err, "Unable to read byte stream")
+	}
+
+	raw := rawManifest{}
+	err = toml.Unmarshal(buf.Bytes(), &raw)
 	if err != nil {
 		return nil, errors.Wrap(err, "Unable to parse the manifest as TOML")
 	}
 
-	mapper := &tomlMapper{Tree: tree}
-	raw := rawManifest{
-		Dependencies: readTableAsProjects(mapper, "dependencies"),
-		Overrides:    readTableAsProjects(mapper, "overrides"),
-		Required:     readKeyAsStringList(mapper, "required"),
-		Ignores:      readKeyAsStringList(mapper, "ignores"),
-	}
-
-	if mapper.Error != nil {
-		return nil, errors.Wrap(mapper.Error, "Invalid manifest structure")
-	}
 	return fromRawManifest(raw)
 }
 
@@ -159,61 +156,8 @@ func (s sortedRawProjects) Less(i, j int) bool {
 
 func (m *Manifest) MarshalTOML() (string, error) {
 	raw := m.toRaw()
-
-	mapRawProject := func(raw rawProject) map[string]interface{} {
-		prj := make(map[string]interface{})
-		prj["name"] = raw.Name
-		if raw.Source != "" {
-			prj["source"] = raw.Source
-		}
-		if raw.Branch != "" {
-			prj["branch"] = raw.Branch
-		}
-		if raw.Version != "" {
-			prj["version"] = raw.Version
-		}
-		if raw.Revision != "" {
-			prj["revision"] = raw.Revision
-		}
-		return prj
-	}
-
-	mapRawProjects := func(src []rawProject) []map[string]interface{} {
-		dest := make([]map[string]interface{}, len(src))
-		for i := 0; i < len(src); i++ {
-			dest[i] = mapRawProject(src[i])
-		}
-		return dest
-	}
-
-	copyProjectRefs := func(src []string) []interface{} {
-		dest := make([]interface{}, len(src))
-		for i := range src {
-			dest[i] = src[i]
-		}
-		return dest
-	}
-
-	data := make(map[string]interface{})
-	if len(raw.Dependencies) > 0 {
-		data["dependencies"] = mapRawProjects(raw.Dependencies)
-	}
-	if len(raw.Overrides) > 0 {
-		data["overrides"] = mapRawProjects(raw.Overrides)
-	}
-	if len(raw.Ignores) > 0 {
-		data["ignores"] = copyProjectRefs(raw.Ignores)
-	}
-	if len(raw.Required) > 0 {
-		data["required"] = copyProjectRefs(raw.Required)
-	}
-
-	tree, err := toml.TreeFromMap(data)
-	if err != nil {
-		return "", errors.Wrap(err, "Unable to marshal the lock to a TOML tree")
-	}
-	result, err := tree.ToTomlString()
-	return result, errors.Wrap(err, "Unable to marshal the lock to a TOML string")
+	result, err := toml.Marshal(raw)
+	return string(result), errors.Wrap(err, "Unable to marshal the lock to a TOML string")
 }
 
 func toRawProject(name gps.ProjectRoot, project gps.ProjectProperties) rawProject {
