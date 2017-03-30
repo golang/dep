@@ -21,12 +21,7 @@ type gitSource struct {
 }
 
 func (s *gitSource) exportVersionTo(v Version, to string) error {
-	// Get away without syncing local, if we can
 	r := s.crepo.r
-	// ...but local repo does have to at least exist
-	if err := s.ensureCacheExistence(); err != nil {
-		return err
-	}
 
 	if err := os.MkdirAll(to, 0777); err != nil {
 		return err
@@ -123,10 +118,6 @@ func (s *gitSource) doListVersions() (vlist []PairedVersion, err error) {
 			return
 		}
 
-		// Upstream and cache must exist for this to have worked, so add that to
-		// searched and found
-		s.ex.s |= existsUpstream | existsInCache
-		s.ex.f |= existsUpstream | existsInCache
 		// Also, local is definitely now synced
 		s.crepo.synced = true
 
@@ -143,10 +134,6 @@ func (s *gitSource) doListVersions() (vlist []PairedVersion, err error) {
 			return nil, fmt.Errorf("no versions available for %s (this is weird)", r.Remote())
 		}
 	}
-
-	// Local cache may not actually exist here, but upstream definitely does
-	s.ex.s |= existsUpstream
-	s.ex.f |= existsUpstream
 
 	// Pull out the HEAD rev (it's always first) so we know what branches to
 	// mark as default. This is, perhaps, not the best way to glean this, but it

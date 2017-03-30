@@ -499,7 +499,6 @@ type source interface {
 	upstreamURL() string
 	initLocal() error
 	updateLocal() error
-	checkExistence(sourceExistence) bool
 	exportVersionTo(Version, string) error
 	getManifestAndLock(ProjectRoot, Version, ProjectAnalyzer) (Manifest, Lock, error)
 	listPackages(ProjectRoot, Version) (pkgtree.PackageTree, error)
@@ -507,49 +506,19 @@ type source interface {
 	revisionPresentIn(Revision) (bool, error)
 }
 
-//type source interface {
-//checkExistence(sourceExistence) bool
-//exportRevisionTo(Revision, string) error
-//getManifestAndLock(ProjectRoot, Revision, ProjectAnalyzer) (Manifest, Lock, error)
-//listPackages(ProjectRoot, Revision) (PackageTree, error)
-//listVersions(context.Context) ([]Version, error)
-//revisionPresentIn(Revision) (bool, error)
-//}
-
 // projectInfo holds manifest and lock
 type projectInfo struct {
 	Manifest
 	Lock
 }
 
-type existence struct {
-	// The existence levels for which a search/check has been performed
-	s sourceExistence
-
-	// The existence levels verified to be present through searching
-	f sourceExistence
-}
-
 type baseVCSSource struct {
 	// Object for the cache repository
 	crepo *repo
 
-	// Indicates the extent to which we have searched for, and verified, the
-	// existence of the project/repo.
-	ex existence
-
 	// The project metadata cache. This is (or is intended to be) persisted to
 	// disk, for reuse across solver runs.
 	dc singleSourceCache
-
-	// Once-er to control access to syncLocal
-	synconce sync.Once
-
-	// The error, if any, that occurred on syncLocal
-	syncerr error
-
-	// Whether the cache has the latest info on versions
-	cvsync bool
 }
 
 func (bs *baseVCSSource) existsLocally(ctx context.Context) bool {
@@ -613,77 +582,6 @@ func (bs *baseVCSSource) revisionPresentIn(r Revision) (bool, error) {
 	return bs.crepo.r.IsReference(string(r)), nil
 }
 
-func (bs *baseVCSSource) ensureCacheExistence() error {
-	// Technically, methods could could attempt to return straight from the
-	// metadata cache even if the repo cache doesn't exist on disk. But that
-	// would allow weird state inconsistencies (cache exists, but no repo...how
-	// does that even happen?) that it'd be better to just not allow so that we
-	// don't have to think about it elsewhere
-	if !bs.checkExistence(existsInCache) {
-		if bs.checkExistence(existsUpstream) {
-			bs.crepo.mut.Lock()
-			if bs.crepo.synced {
-				// A second ensure call coming in while the first is completing
-				// isn't terribly unlikely, especially for a large repo. In that
-				// event, the synced flag will have flipped on by the time we
-				// acquire the lock. If it has, there's no need to do this work
-				// twice.
-				bs.crepo.mut.Unlock()
-				return nil
-			}
-
-			err := bs.crepo.r.Get()
-
-			if err != nil {
-				bs.crepo.mut.Unlock()
-				return fmt.Errorf("failed to create repository cache for %s with err:\n%s", bs.crepo.r.Remote(), unwrapVcsErr(err))
-			}
-
-			bs.crepo.synced = true
-			bs.ex.s |= existsInCache
-			bs.ex.f |= existsInCache
-			bs.crepo.mut.Unlock()
-		} else {
-			return fmt.Errorf("project %s does not exist upstream", bs.crepo.r.Remote())
-		}
-	}
-
-	return nil
-}
-
-// checkExistence provides a direct method for querying existence levels of the
-// source. It will only perform actual searching (local fs or over the network)
-// if no previous attempt at that search has been made.
-//
-// Note that this may perform read-ish operations on the cache repo, and it
-// takes a lock accordingly. This makes it unsafe to call from a segment where
-// the cache repo mutex is already write-locked, as deadlock will occur.
-func (bs *baseVCSSource) checkExistence(ex sourceExistence) bool {
-	if bs.ex.s&ex != ex {
-		if ex&existsInVendorRoot != 0 && bs.ex.s&existsInVendorRoot == 0 {
-			panic("should now be implemented in bridge")
-		}
-		if ex&existsInCache != 0 && bs.ex.s&existsInCache == 0 {
-			bs.crepo.mut.RLock()
-			bs.ex.s |= existsInCache
-			if bs.crepo.r.CheckLocal() {
-				bs.ex.f |= existsInCache
-			}
-			bs.crepo.mut.RUnlock()
-		}
-		if ex&existsUpstream != 0 && bs.ex.s&existsUpstream == 0 {
-			bs.crepo.mut.RLock()
-			bs.ex.s |= existsUpstream
-			if bs.crepo.r.Ping() {
-				bs.ex.f |= existsUpstream
-			}
-			bs.crepo.mut.RUnlock()
-		}
-	}
-
-	return ex&bs.ex.f == ex
-}
-
 // initLocal clones/checks out the upstream repository to disk for the first
 // time.
 func (bs *baseVCSSource) initLocal() error {
@@ -730,10 +628,6 @@ func (bs *baseVCSSource) listPackages(pr ProjectRoot, v Version) (ptree pkgtree.
 }
 
 func (bs *baseVCSSource) exportVersionTo(v Version, to string) error {
-	if err := bs.ensureCacheExistence(); err != nil {
-		return err
-	}
-
 	// Only make the parent dir, as the general implementation will balk on
 	// trying to write to an empty but existing dir.
 	if err := os.MkdirAll(filepath.Dir(to), 0777); err != nil {

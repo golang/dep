@@ -78,19 +78,6 @@ func TestGitSourceInteractions(t *testing.T) {
 	}
 
 	vlist := hidePair(pvlist)
-	if src.ex.s&existsUpstream != existsUpstream {
-		t.Errorf("gitSource.listVersions() should have set the upstream existence bit for search")
-	}
-	if src.ex.f&existsUpstream != existsUpstream {
-		t.Errorf("gitSource.listVersions() should have set the upstream existence bit for found")
-	}
-	if src.ex.s&existsInCache != 0 {
-		t.Errorf("gitSource.listVersions() should not have set the cache existence bit for search")
-	}
-	if src.ex.f&existsInCache != 0 {
-		t.Errorf("gitSource.listVersions() should not have set the cache existence bit for found")
-	}
-
 	// check that an expected rev is present
 	is, err := src.revisionPresentIn(Revision("4a54adf81c75375d26d376459c00d5ff9b703e5e"))
 	if err != nil {
@@ -203,13 +190,6 @@ func TestGopkginSourceInteractions(t *testing.T) {
 		}
 
 		vlist := hidePair(pvlist)
-		if src.ex.s&existsUpstream|existsInCache != existsUpstream|existsInCache {
-			t.Errorf("gopkginSource.listVersions() should have set the upstream and cache existence bits for search")
-		}
-		if src.ex.f&existsUpstream|existsInCache != existsUpstream|existsInCache {
-			t.Errorf("gopkginSource.listVersions() should have set the upstream and cache existence bits for found")
-		}
-
 		if len(vlist) != len(evl) {
 			t.Errorf("gopkgin test repo should've produced %v versions, got %v", len(evl), len(vlist))
 		} else {
@@ -226,13 +206,6 @@ func TestGopkginSourceInteractions(t *testing.T) {
 		}
 
 		vlist = hidePair(pvlist)
-		if src.ex.s&existsUpstream|existsInCache != existsUpstream|existsInCache {
-			t.Errorf("gopkginSource.listVersions() should have set the upstream and cache existence bits for search")
-		}
-		if src.ex.f&existsUpstream|existsInCache != existsUpstream|existsInCache {
-			t.Errorf("gopkginSource.listVersions() should have set the upstream and cache existence bits for found")
-		}
-
 		if len(vlist) != len(evl) {
 			t.Errorf("gopkgin test repo should've produced %v versions, got %v", len(evl), len(vlist))
 		} else {
@@ -363,13 +336,6 @@ func TestBzrSourceInteractions(t *testing.T) {
 	}
 
 	vlist := hidePair(pvlist)
-	if src.ex.s&existsUpstream|existsInCache != existsUpstream|existsInCache {
-		t.Errorf("bzrSource.listVersions() should have set the upstream and cache existence bits for search")
-	}
-	if src.ex.f&existsUpstream|existsInCache != existsUpstream|existsInCache {
-		t.Errorf("bzrSource.listVersions() should have set the upstream and cache existence bits for found")
-	}
-
 	if len(vlist) != 2 {
 		t.Errorf("bzr test repo should've produced two versions, got %v", len(vlist))
 	} else {
@@ -386,13 +352,6 @@ func TestBzrSourceInteractions(t *testing.T) {
 	}
 
 	vlist = hidePair(pvlist)
-	if src.ex.s&existsUpstream|existsInCache != existsUpstream|existsInCache {
-		t.Errorf("bzrSource.listVersions() should have set the upstream and cache existence bits for search")
-	}
-	if src.ex.f&existsUpstream|existsInCache != existsUpstream|existsInCache {
-		t.Errorf("bzrSource.listVersions() should have set the upstream and cache existence bits for found")
-	}
-
 	if len(vlist) != 2 {
 		t.Errorf("bzr test repo should've produced two versions, got %v", len(vlist))
 	} else {
@@ -485,13 +444,6 @@ func TestHgSourceInteractions(t *testing.T) {
 		}
 
 		vlist := hidePair(pvlist)
-		if src.ex.s&existsUpstream|existsInCache != existsUpstream|existsInCache {
-			t.Errorf("hgSource.listVersions() should have set the upstream and cache existence bits for search")
-		}
-		if src.ex.f&existsUpstream|existsInCache != existsUpstream|existsInCache {
-			t.Errorf("hgSource.listVersions() should have set the upstream and cache existence bits for found")
-		}
-
 		if len(vlist) != len(evl) {
 			t.Errorf("hg test repo should've produced %v versions, got %v", len(evl), len(vlist))
 		} else {
@@ -508,13 +460,6 @@ func TestHgSourceInteractions(t *testing.T) {
 		}
 
 		vlist = hidePair(pvlist)
-		if src.ex.s&existsUpstream|existsInCache != existsUpstream|existsInCache {
-			t.Errorf("hgSource.listVersions() should have set the upstream and cache existence bits for search")
-		}
-		if src.ex.f&existsUpstream|existsInCache != existsUpstream|existsInCache {
-			t.Errorf("hgSource.listVersions() should have set the upstream and cache existence bits for found")
-		}
-
 		if len(vlist) != len(evl) {
 			t.Errorf("hg test repo should've produced %v versions, got %v", len(evl), len(vlist))
 		} else {
