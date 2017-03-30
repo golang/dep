@@ -20,68 +20,48 @@ type gitSource struct {
 	baseVCSSource
 }
 
-func (s *gitSource) exportVersionTo(v Version, to string) error {
+func (s *gitSource) exportRevisionTo(rev Revision, to string) error {
 	r := s.crepo.r
 
 	if err := os.MkdirAll(to, 0777); err != nil {
 		return err
 	}
 
-	do := func() error {
-		s.crepo.mut.Lock()
-		defer s.crepo.mut.Unlock()
+	s.crepo.mut.Lock()
+	defer s.crepo.mut.Unlock()
 
-		// Back up original index
-		idx, bak := filepath.Join(r.LocalPath(), ".git", "index"), filepath.Join(r.LocalPath(), ".git", "origindex")
-		err := fs.RenameWithFallback(idx, bak)
-		if err != nil {
-			return err
-		}
-
-		// could have an err here...but it's hard to imagine how?
-		defer fs.RenameWithFallback(bak, idx)
-
-		vstr := v.String()
-		if rv, ok := v.(PairedVersion); ok {
-			vstr = rv.Underlying().String()
-		}
-
-		out, err := runFromRepoDir(r, "git", "read-tree", vstr)
-		if err != nil {
-			return fmt.Errorf("%s: %s", out, err)
-		}
-
-		// Ensure we have exactly one trailing slash
-		to = strings.TrimSuffix(to, string(os.PathSeparator)) + string(os.PathSeparator)
-		// Checkout from our temporary index to the desired target location on
-		// disk; now it's git's job to make it fast.
-		//
-		// Sadly, this approach *does* also write out vendor dirs. There doesn't
-		// appear to be a way to make checkout-index respect sparse checkout
-		// rules (-a supercedes it). The alternative is using plain checkout,
-		// though we have a bunch of housekeeping to do to set up, then tear
-		// down, the sparse checkout controls, as well as restore the original
-		// index and HEAD.
-		out, err = runFromRepoDir(r, "git", "checkout-index", "-a", "--prefix="+to)
-		if err != nil {
-			return fmt.Errorf("%s: %s", out, err)
-		}
-		return nil
+	// Back up original index
+	idx, bak := filepath.Join(r.LocalPath(), ".git", "index"), filepath.Join(r.LocalPath(), ".git", "origindex")
+	err := fs.RenameWithFallback(idx, bak)
+	if err != nil {
+		return err
 	}
 
-	err := do()
-	if err != nil && !s.crepo.synced {
-		// If there was an err, and the repo cache is stale, it might've been
-		// beacuse we were missing the rev/ref. Try syncing, then run the export
-		// op again.
-		err = s.updateLocal()
-		if err != nil {
-			return err
-		}
-		err = do()
+	// could have an err here...but it's hard to imagine how?
+	defer fs.RenameWithFallback(bak, idx)
+
+	out, err := runFromRepoDir(r, "git", "read-tree", rev.String())
+	if err != nil {
+		return fmt.Errorf("%s: %s", out, err)
 	}
 
-	return err
+	// Ensure we have exactly one trailing slash
+	to = strings.TrimSuffix(to, string(os.PathSeparator)) + string(os.PathSeparator)
+	// Checkout from our temporary index to the desired target location on
+	// disk; now it's git's job to make it fast.
+	//
+	// Sadly, this approach *does* also write out vendor dirs. There doesn't
+	// appear to be a way to make checkout-index respect sparse checkout
+	// rules (-a supercedes it). The alternative is using plain checkout,
+	// though we have a bunch of housekeeping to do to set up, then tear
+	// down, the sparse checkout controls, as well as restore the original
+	// index and HEAD.
+	out, err = runFromRepoDir(r, "git", "checkout-index", "-a", "--prefix="+to)
+	if err != nil {
+		return fmt.Errorf("%s: %s", out, err)
+	}
+
+	return nil
 }
 
 func (s *gitSource) listVersions() ([]PairedVersion, error) {
@@ -89,7 +69,8 @@ func (s *gitSource) listVersions() ([]PairedVersion, error) {
 	if err != nil {
 		return nil, err
 	}
-	// Process version data into the cache and
+	// Process version data into the cache
+	// TODO remove this call
 	s.dc.storeVersionMap(vlist, true)
 	return vlist, nil
 }
@@ -367,6 +348,7 @@ type hgSource struct {
 	baseVCSSource
 }
 
+// TODO dead code?
 func (s *hgSource) update() error {
 	r := s.crepo.r
 

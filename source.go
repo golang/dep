@@ -12,6 +12,7 @@ import (
 )
 
 // sourceExistence values represent the extent to which a project "exists."
+// TODO remove
 type sourceExistence uint8
 
 const (
@@ -282,7 +283,7 @@ func (sg *sourceGateway) exportVersionTo(ctx context.Context, v Version, to stri
 		return err
 	}
 
-	return sg.src.exportVersionTo(r, to)
+	return sg.src.exportRevisionTo(r, to)
 }
 
 func (sg *sourceGateway) getManifestAndLock(ctx context.Context, pr ProjectRoot, v Version, an ProjectAnalyzer) (Manifest, Lock, error) {
@@ -493,17 +494,20 @@ func (sg *sourceGateway) require(ctx context.Context, wanted sourceState) (errSt
 	return 0, nil
 }
 
+// source is an abstraction around the different underlying types (git, bzr, hg,
+// svn, maybe raw on-disk code, and maybe eventually a registry) that can
+// provide versioned project source trees.
 type source interface {
 	existsLocally(context.Context) bool
 	existsUpstream(context.Context) bool
 	upstreamURL() string
 	initLocal() error
 	updateLocal() error
-	exportVersionTo(Version, string) error
-	getManifestAndLock(ProjectRoot, Version, ProjectAnalyzer) (Manifest, Lock, error)
-	listPackages(ProjectRoot, Version) (pkgtree.PackageTree, error)
 	listVersions() ([]PairedVersion, error)
+	getManifestAndLock(ProjectRoot, Revision, ProjectAnalyzer) (Manifest, Lock, error)
+	listPackages(ProjectRoot, Revision) (pkgtree.PackageTree, error)
 	revisionPresentIn(Revision) (bool, error)
+	exportRevisionTo(Revision, string) error
 }
 
 // projectInfo holds manifest and lock
@@ -533,47 +537,21 @@ func (bs *baseVCSSource) upstreamURL() string {
 	return bs.crepo.r.Remote()
 }
 
-func (bs *baseVCSSource) getManifestAndLock(r ProjectRoot, v Version, an ProjectAnalyzer) (Manifest, Lock, error) {
-	// Cache didn't help; ensure our local is fully up to date.
-	do := func() (err error) {
-		bs.crepo.mut.Lock()
-		// Always prefer a rev, if it's available
-		if pv, ok := v.(PairedVersion); ok {
-			err = bs.crepo.r.UpdateVersion(pv.Underlying().String())
-		} else {
-			err = bs.crepo.r.UpdateVersion(v.String())
-		}
+func (bs *baseVCSSource) getManifestAndLock(pr ProjectRoot, r Revision, an ProjectAnalyzer) (Manifest, Lock, error) {
+	bs.crepo.mut.Lock()
+	err := bs.crepo.r.UpdateVersion(r.String())
+	m, l, err := an.DeriveManifestAndLock(bs.crepo.r.LocalPath(), pr)
+	bs.crepo.mut.Unlock()
 
-		bs.crepo.mut.Unlock()
-		return
+	if err != nil {
+		return nil, nil, unwrapVcsErr(err)
 	}
 
-	if err := do(); err != nil {
-		// minimize network activity: only force local syncing if we had an err
-		err = bs.updateLocal()
-		if err != nil {
-			return nil, nil, err
-		}
-
-		if err = do(); err != nil {
-			// TODO(sdboyer) More-er proper-er error
-			panic(fmt.Sprintf("canary - why is checkout/whatever failing: %s %s %s", bs.crepo.r.LocalPath(), v.String(), unwrapVcsErr(err)))
-		}
+	if l != nil && l != Lock(nil) {
+		l = prepLock(l)
 	}
 
-	bs.crepo.mut.RLock()
-	m, l, err := an.DeriveManifestAndLock(bs.crepo.r.LocalPath(), r)
-	bs.crepo.mut.RUnlock()
-
-	if err == nil {
-		if l != nil && l != Lock(nil) {
-			l = prepLock(l)
-		}
-
-		return prepManifest(m), l, nil
-	}
-
-	return nil, nil, unwrapVcsErr(err)
+	return prepManifest(m), l, nil
 }
 
 func (bs *baseVCSSource) revisionPresentIn(r Revision) (bool, error) {
@@ -606,13 +584,7 @@ func (bs *baseVCSSource) updateLocal() error {
 	return nil
 }
 
-func (bs *baseVCSSource) listPackages(pr ProjectRoot, v Version) (ptree pkgtree.PackageTree, err error) {
-	// TODO make param a rev
-	r, has := bs.dc.toRevision(v)
-	if !has {
-		return
-	}
-
+func (bs *baseVCSSource) listPackages(pr ProjectRoot, r Revision) (ptree pkgtree.PackageTree, err error) {
 	bs.crepo.mut.Lock()
 	// Check out the desired version for analysis
 	err = bs.crepo.r.UpdateVersion(string(r))
@@ -627,12 +599,12 @@ func (bs *baseVCSSource) listPackages(pr ProjectRoot, v Version) (ptree pkgtree.
 	return
 }
 
-func (bs *baseVCSSource) exportVersionTo(v Version, to string) error {
+func (bs *baseVCSSource) exportRevisionTo(r Revision, to string) error {
 	// Only make the parent dir, as the general implementation will balk on
 	// trying to write to an empty but existing dir.
 	if err := os.MkdirAll(filepath.Dir(to), 0777); err != nil {
 		return err
 	}
 
-	return bs.crepo.exportVersionTo(v, to)
+	return bs.crepo.exportVersionTo(r, to)
 }
