@@ -16,8 +16,7 @@ type ctxRepo interface {
 	vcs.Repo
 	get(context.Context) error
 	update(context.Context) error
-	// TODO(sdboyer) implement these, pronto
-	//updateVersion(context.Context) error
+	updateVersion(context.Context, string) error
 	//ping(context.Context) (bool, error)
 }
 
@@ -71,8 +70,7 @@ func (r *gitRepo) get(ctx context.Context) error {
 
 func (r *gitRepo) update(ctx context.Context) error {
 	// Perform a fetch to make sure everything is up to date.
-	//out, err := runFromRepoDir(ctx, r, "git", "fetch", "--tags", "--prune", r.RemoteLocation)
-	out, err := runFromRepoDir(ctx, r, "git", "fetch", "--tags", r.RemoteLocation)
+	out, err := runFromRepoDir(ctx, r, "git", "fetch", "--tags", "--prune", r.RemoteLocation)
 	if err != nil {
 		return newVcsRemoteErrorOr("unable to update repository", err, string(out))
 	}
@@ -166,6 +164,14 @@ func (r *bzrRepo) update(ctx context.Context) error {
 	return nil
 }
 
+func (r *bzrRepo) updateVersion(ctx context.Context, version string) error {
+	out, err := runFromRepoDir(ctx, r, "bzr", "update", "-r", version)
+	if err != nil {
+		return newVcsLocalErrorOr("unable to update checked out version", err, string(out))
+	}
+	return nil
+}
+
 type hgRepo struct {
 	*vcs.HgRepo
 }
@@ -180,21 +186,15 @@ func (r *hgRepo) get(ctx context.Context) error {
 }
 
 func (r *hgRepo) update(ctx context.Context) error {
-	return r.updateVersion(ctx, "")
+	out, err := runFromRepoDir(ctx, r, "hg", "pull")
+	if err != nil {
+		return newVcsRemoteErrorOr("unable to fetch latest changes", err, string(out))
+	}
+	return nil
 }
 
 func (r *hgRepo) updateVersion(ctx context.Context, version string) error {
-	out, err := runFromRepoDir(ctx, r, "hg", "pull")
-	if err != nil {
-		return newVcsRemoteErrorOr("unable to update checked out version", err, string(out))
-	}
-
-	if len(strings.TrimSpace(version)) > 0 {
-		out, err = runFromRepoDir(ctx, r, "hg", "update", version)
-	} else {
-		out, err = runFromRepoDir(ctx, r, "hg", "update")
-	}
-
+	out, err := runFromRepoDir(ctx, r, "hg", "update", version)
 	if err != nil {
 		return newVcsRemoteErrorOr("unable to update checked out version", err, string(out))
 	}

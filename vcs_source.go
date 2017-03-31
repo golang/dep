@@ -21,8 +21,7 @@ type gitSource struct {
 	baseVCSSource
 }
 
-func (s *gitSource) exportRevisionTo(rev Revision, to string) error {
-	ctx := context.TODO()
+func (s *gitSource) exportRevisionTo(ctx context.Context, rev Revision, to string) error {
 	r := s.crepo.r
 
 	if err := os.MkdirAll(to, 0777); err != nil {

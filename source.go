@@ -285,7 +285,7 @@ func (sg *sourceGateway) exportVersionTo(ctx context.Context, v Version, to stri
 	}
 
 	return sg.suprvsr.do(ctx, sg.src.upstreamURL(), ctExportTree, func(ctx context.Context) error {
-		return sg.src.exportRevisionTo(r, to)
+		return sg.src.exportRevisionTo(ctx, r, to)
 	})
 }
 
@@ -345,7 +345,7 @@ func (sg *sourceGateway) listPackages(ctx context.Context, pr ProjectRoot, v Ver
 
 	label := fmt.Sprintf("%s:%s", pr, sg.src.upstreamURL())
 	err = sg.suprvsr.do(ctx, label, ctListPackages, func(ctx context.Context) error {
-		ptree, err = sg.src.listPackages(pr, r)
+		ptree, err = sg.src.listPackages(ctx, pr, r)
 		return err
 	})
 	if err != nil {
@@ -529,9 +529,9 @@ type source interface {
 	updateLocal(context.Context) error
 	listVersions(context.Context) ([]PairedVersion, error)
 	getManifestAndLock(context.Context, ProjectRoot, Revision, ProjectAnalyzer) (Manifest, Lock, error)
-	listPackages(ProjectRoot, Revision) (pkgtree.PackageTree, error)
+	listPackages(context.Context, ProjectRoot, Revision) (pkgtree.PackageTree, error)
 	revisionPresentIn(Revision) (bool, error)
-	exportRevisionTo(Revision, string) error
+	exportRevisionTo(context.Context, Revision, string) error
 	sourceType() string
 }
 
@@ -561,7 +561,7 @@ func (bs *baseVCSSource) getManifestAndLock(ctx context.Context, pr ProjectRoot,
 	bs.crepo.mut.Lock()
 	defer bs.crepo.mut.Unlock()
 
-	err := bs.crepo.r.UpdateVersion(r.String())
+	err := bs.crepo.r.updateVersion(ctx, r.String())
 	if err != nil {
 		return nil, nil, unwrapVcsErr(err)
 	}
@@ -610,9 +610,9 @@ func (bs *baseVCSSource) updateLocal(ctx context.Context) error {
 	return nil
 }
 
-func (bs *baseVCSSource) listPackages(pr ProjectRoot, r Revision) (ptree pkgtree.PackageTree, err error) {
+func (bs *baseVCSSource) listPackages(ctx context.Context, pr ProjectRoot, r Revision) (ptree pkgtree.PackageTree, err error) {
 	bs.crepo.mut.Lock()
-	err = bs.crepo.r.UpdateVersion(r.String())
+	err = bs.crepo.r.updateVersion(ctx, r.String())
 	bs.crepo.mut.Unlock()
 
 	if err != nil {
@@ -624,14 +624,14 @@ func (bs *baseVCSSource) listPackages(pr ProjectRoot, r Revision) (ptree pkgtree
 	return
 }
 
-func (bs *baseVCSSource) exportRevisionTo(r Revision, to string) error {
+func (bs *baseVCSSource) exportRevisionTo(ctx context.Context, r Revision, to string) error {
 	// Only make the parent dir, as CopyDir will balk on trying to write to an
 	// empty but existing dir.
 	if err := os.MkdirAll(filepath.Dir(to), 0777); err != nil {
 		return err
 	}
 
-	if err := bs.crepo.r.UpdateVersion(r.String()); err != nil {
+	if err := bs.crepo.r.updateVersion(ctx, r.String()); err != nil {
 		return unwrapVcsErr(err)
 	}
 
