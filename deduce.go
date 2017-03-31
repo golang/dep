@@ -702,9 +702,6 @@ func (hmd *httpMetadataDeducer) deduce(ctx context.Context, path string) (pathDe
 		})
 		if err != nil {
 			hmd.deduceErr = fmt.Errorf("unable to deduce repository and source type for: %q", opath)
-			if err == context.Canceled || err == context.DeadlineExceeded {
-				hmd.deduceErr = err
-			}
 			return
 		}
 		pd.root = root

@@ -89,13 +89,12 @@ type SourceMgr struct {
 	cachedir    string                // path to root of cache dir
 	lf          *os.File              // handle for the sm lock file on disk
 	suprvsr     *supervisor           // subsystem that supervises running calls/io
+	cancelAll   context.CancelFunc    // cancel func to kill all running work
 	deduceCoord *deductionCoordinator // subsystem that manages import path deduction
 	srcCoord    *sourceCoordinator    // subsystem that manages sources
-	an          ProjectAnalyzer       // analyzer injected by the caller
-	qch         chan struct{}         // quit chan for signal handler
+	an          ProjectAnalyzer       // analyzer injected by the caller TODO remove
 	sigmut      sync.Mutex            // mutex protecting signal handling setup/teardown
-	glock       sync.RWMutex          // global lock for all ops, sm validity
-	opcount     int32                 // number of ops in flight
+	qch         chan struct{}         // quit chan for signal handler
 	relonce     sync.Once             // once-er to ensure we only release once
 	releasing   int32                 // flag indicating release of sm has begun
 }
@@ -149,13 +148,15 @@ func NewSourceManager(an ProjectAnalyzer, cachedir string) (*SourceMgr, error) {
 		}
 	}
 
-	superv := newSupervisor(context.TODO())
+	ctx, cf := context.WithCancel(context.TODO())
+	superv := newSupervisor(ctx)
 	deducer := newDeductionCoordinator(superv)
 
 	sm := &SourceMgr{
 		cachedir:    cachedir,
 		lf:          fi,
 		suprvsr:     superv,
+		cancelAll:   cf,
 		deduceCoord: deducer,
 		srcCoord:    newSourceCoordinator(superv, deducer, cachedir),
 		an:          an,
@@ -215,7 +216,7 @@ func (sm *SourceMgr) HandleSignals(sigch chan os.Signal) {
 					return
 				}
 
-				opc := atomic.LoadInt32(&sm.opcount)
+				opc := sm.suprvsr.count()
 				if opc > 0 {
 					fmt.Printf("Signal received: waiting for %v ops to complete...\n", opc)
 				}
@@ -287,22 +288,19 @@ func (sm *SourceMgr) Release() {
 // This must be called only and exactly once. Calls to it should be wrapped in
 // the sm.relonce sync.Once instance.
 func (sm *SourceMgr) doRelease() {
-	// Grab the global sm lock so that we only release once we're sure all other
-	// calls have completed
-	//
-	// (This could deadlock, ofc)
-	sm.glock.Lock()
+	// Send the signal to the supervisor to cancel all running calls
+	sm.cancelAll()
+	sm.suprvsr.wait()
 
-	// Close the file handle for the lock file
+	// Close the file handle for the lock file and remove it from disk
 	sm.lf.Close()
-	// Remove the lock file from disk
 	os.Remove(filepath.Join(sm.cachedir, "sm.lock"))
+
 	// Close the qch, if non-nil, so the signal handlers run out. This will
 	// also deregister the sig channel, if any has been set up.
 	if sm.qch != nil {
 		close(sm.qch)
 	}
-	sm.glock.Unlock()
 }
 
 // AnalyzerInfo reports the name and version of the injected ProjectAnalyzer.
@@ -321,12 +319,6 @@ func (sm *SourceMgr) GetManifestAndLock(id ProjectIdentifier, v Version) (Manife
 	if atomic.CompareAndSwapInt32(&sm.releasing, 1, 1) {
 		return nil, nil, smIsReleased{}
 	}
-	atomic.AddInt32(&sm.opcount, 1)
-	sm.glock.RLock()
-	defer func() {
-		sm.glock.RUnlock()
-		atomic.AddInt32(&sm.opcount, -1)
-	}()
 
 	srcg, err := sm.srcCoord.getSourceGatewayFor(context.TODO(), id)
 	if err != nil {
@@ -342,12 +334,6 @@ func (sm *SourceMgr) ListPackages(id ProjectIdentifier, v Version) (pkgtree.Pack
 	if atomic.CompareAndSwapInt32(&sm.releasing, 1, 1) {
 		return pkgtree.PackageTree{}, smIsReleased{}
 	}
-	atomic.AddInt32(&sm.opcount, 1)
-	sm.glock.RLock()
-	defer func() {
-		sm.glock.RUnlock()
-		atomic.AddInt32(&sm.opcount, -1)
-	}()
 
 	srcg, err := sm.srcCoord.getSourceGatewayFor(context.TODO(), id)
 	if err != nil {
@@ -373,12 +359,6 @@ func (sm *SourceMgr) ListVersions(id ProjectIdentifier) ([]Version, error) {
 	if atomic.CompareAndSwapInt32(&sm.releasing, 1, 1) {
 		return nil, smIsReleased{}
 	}
-	atomic.AddInt32(&sm.opcount, 1)
-	sm.glock.RLock()
-	defer func() {
-		sm.glock.RUnlock()
-		atomic.AddInt32(&sm.opcount, -1)
-	}()
 
 	srcg, err := sm.srcCoord.getSourceGatewayFor(context.TODO(), id)
 	if err != nil {
@@ -400,12 +380,6 @@ func (sm *SourceMgr) RevisionPresentIn(id ProjectIdentifier, r Revision) (bool, 
 	if atomic.CompareAndSwapInt32(&sm.releasing, 1, 1) {
 		return false, smIsReleased{}
 	}
-	atomic.AddInt32(&sm.opcount, 1)
-	sm.glock.RLock()
-	defer func() {
-		sm.glock.RUnlock()
-		atomic.AddInt32(&sm.opcount, -1)
-	}()
 
 	srcg, err := sm.srcCoord.getSourceGatewayFor(context.TODO(), id)
 	if err != nil {
@@ -422,12 +396,6 @@ func (sm *SourceMgr) SourceExists(id ProjectIdentifier) (bool, error) {
 	if atomic.CompareAndSwapInt32(&sm.releasing, 1, 1) {
 		return false, smIsReleased{}
 	}
-	atomic.AddInt32(&sm.opcount, 1)
-	sm.glock.RLock()
-	defer func() {
-		sm.glock.RUnlock()
-		atomic.AddInt32(&sm.opcount, -1)
-	}()
 
 	srcg, err := sm.srcCoord.getSourceGatewayFor(context.TODO(), id)
 	if err != nil {
@@ -445,12 +413,6 @@ func (sm *SourceMgr) SyncSourceFor(id ProjectIdentifier) error {
 	if atomic.CompareAndSwapInt32(&sm.releasing, 1, 1) {
 		return smIsReleased{}
 	}
-	atomic.AddInt32(&sm.opcount, 1)
-	sm.glock.RLock()
-	defer func() {
-		sm.glock.RUnlock()
-		atomic.AddInt32(&sm.opcount, -1)
-	}()
 
 	srcg, err := sm.srcCoord.getSourceGatewayFor(context.TODO(), id)
 	if err != nil {
@@ -466,12 +428,6 @@ func (sm *SourceMgr) ExportProject(id ProjectIdentifier, v Version, to string) e
 	if atomic.CompareAndSwapInt32(&sm.releasing, 1, 1) {
 		return smIsReleased{}
 	}
-	atomic.AddInt32(&sm.opcount, 1)
-	sm.glock.RLock()
-	defer func() {
-		sm.glock.RUnlock()
-		atomic.AddInt32(&sm.opcount, -1)
-	}()
 
 	srcg, err := sm.srcCoord.getSourceGatewayFor(context.TODO(), id)
 	if err != nil {
@@ -492,12 +448,6 @@ func (sm *SourceMgr) DeduceProjectRoot(ip string) (ProjectRoot, error) {
 	if atomic.CompareAndSwapInt32(&sm.releasing, 1, 1) {
 		return "", smIsReleased{}
 	}
-	atomic.AddInt32(&sm.opcount, 1)
-	sm.glock.RLock()
-	defer func() {
-		sm.glock.RUnlock()
-		atomic.AddInt32(&sm.opcount, -1)
-	}()
 
 	pd, err := sm.deduceCoord.deduceRootPath(context.TODO(), ip)
 	return ProjectRoot(pd.root), err
@@ -517,6 +467,7 @@ type supervisor struct {
 	ctx        context.Context
 	cancelFunc context.CancelFunc
 	mu         sync.Mutex // Guards all maps.
+	cond       sync.Cond  // Allows waiting until all calls clear.
 	running    map[callInfo]timeCount
 	ran        map[callType]durCount
 }
@@ -528,59 +479,66 @@ func newSupervisor(ctx context.Context) *supervisor {
 		cancelFunc: cf,
 		running:    make(map[callInfo]timeCount),
 		ran:        make(map[callType]durCount),
+		cond:       sync.Cond{L: &sync.Mutex{}},
 	}
 }
 
 // do executes the incoming closure using a conjoined context, and keeps
 // counters to ensure the sourceMgr can't finish Release()ing until after all
 // calls have returned.
-func (cm *supervisor) do(inctx context.Context, name string, typ callType, f func(context.Context) error) error {
+func (sup *supervisor) do(inctx context.Context, name string, typ callType, f func(context.Context) error) error {
 	ci := callInfo{
 		name: name,
 		typ:  typ,
 	}
 
-	octx, err := cm.start(ci)
+	octx, err := sup.start(ci)
 	if err != nil {
 		return err
 	}
 
 	cctx, cancelFunc := constext.Cons(inctx, octx)
 	err = f(cctx)
-	cm.done(ci)
+	sup.done(ci)
 	cancelFunc()
 	return err
 }
 
-func (cm *supervisor) getLifetimeContext() context.Context {
-	return cm.ctx
+func (sup *supervisor) getLifetimeContext() context.Context {
+	return sup.ctx
 }
 
-func (cm *supervisor) start(ci callInfo) (context.Context, error) {
-	cm.mu.Lock()
-	defer cm.mu.Unlock()
-	if cm.ctx.Err() != nil {
+func (sup *supervisor) start(ci callInfo) (context.Context, error) {
+	sup.mu.Lock()
+	defer sup.mu.Unlock()
+	if sup.ctx.Err() != nil {
 		// We've already been canceled; error out.
-		return nil, cm.ctx.Err()
+		return nil, sup.ctx.Err()
 	}
 
-	if existingInfo, has := cm.running[ci]; has {
+	if existingInfo, has := sup.running[ci]; has {
 		existingInfo.count++
-		cm.running[ci] = existingInfo
+		sup.running[ci] = existingInfo
 	} else {
-		cm.running[ci] = timeCount{
+		sup.running[ci] = timeCount{
 			count: 1,
 			start: time.Now(),
 		}
 	}
 
-	return cm.ctx, nil
+	return sup.ctx, nil
 }
 
-func (cm *supervisor) done(ci callInfo) {
-	cm.mu.Lock()
+func (sup *supervisor) count() int {
+	sup.mu.Lock()
+	defer sup.mu.Unlock()
+	return len(sup.running)
+}
 
-	existingInfo, has := cm.running[ci]
+func (sup *supervisor) done(ci callInfo) {
+	sup.mu.Lock()
+
+	existingInfo, has := sup.running[ci]
 	if !has {
 		panic(fmt.Sprintf("sourceMgr: tried to complete a call that had not registered via run()"))
 	}
@@ -588,17 +546,33 @@ func (cm *supervisor) done(ci callInfo) {
 	if existingInfo.count > 1 {
 		// If more than one is pending, don't stop the clock yet.
 		existingInfo.count--
-		cm.running[ci] = existingInfo
+		sup.running[ci] = existingInfo
 	} else {
 		// Last one for this particular key; update metrics with info.
-		durCnt := cm.ran[ci.typ]
+		durCnt := sup.ran[ci.typ]
 		durCnt.count++
 		durCnt.dur += time.Now().Sub(existingInfo.start)
-		cm.ran[ci.typ] = durCnt
-		delete(cm.running, ci)
-	}
+		sup.ran[ci.typ] = durCnt
+		delete(sup.running, ci)
 
-	cm.mu.Unlock()
+		if len(sup.running) == 0 {
+			// This is the only place where we signal the cond, as it's the only
+			// time that the number of running calls could become zero.
+			sup.cond.Signal()
+		}
+	}
+	sup.mu.Unlock()
+}
+
+// wait until all active calls have terminated.
+//
+// Assumes something else has already canceled the supervisor via its context.
+func (sup *supervisor) wait() {
+	sup.cond.L.Lock()
+	for len(sup.running) > 0 {
+		sup.cond.Wait()
+	}
+	sup.cond.L.Unlock()
 }
 
 type callType uint

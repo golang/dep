@@ -726,8 +726,11 @@ func TestSignalHandling(t *testing.T) {
 
 	sm, clean = mkNaiveSM(t)
 	sm.UseDefaultSignalHandling()
-	go sm.DeduceProjectRoot("rsc.io/pdf")
-	runtime.Gosched()
+	var callerr error
+	go func() {
+		_, callerr = sm.DeduceProjectRoot("rsc.io/pdf")
+	}()
+	<-time.After(10 * time.Millisecond)
 
 	// signal the process and call release right afterward
 	now := time.Now()
@@ -738,8 +741,8 @@ func TestSignalHandling(t *testing.T) {
 	reldur := time.Since(now) - sigdur
 	t.Logf("time to return from Release(): %v", reldur)
 
-	if reldur < 10*time.Millisecond {
-		t.Errorf("finished too fast (%v); the necessary network request could not have completed yet", reldur)
+	if callerr == nil {
+		t.Error("network call could not have completed before cancellation, should have gotten an error")
 	}
 	if atomic.LoadInt32(&sm.releasing) != 1 {
 		t.Error("Releasing flag did not get set")
@@ -751,31 +754,39 @@ func TestSignalHandling(t *testing.T) {
 	}
 	clean()
 
+	// proc.Signal(os.Interrupt) does nothing on windows, so skip this part
+	if runtime.GOOS == "windows" {
+		return
+	}
+
 	sm, clean = mkNaiveSM(t)
 	sm.UseDefaultSignalHandling()
 	sm.StopSignalHandling()
 	sm.UseDefaultSignalHandling()
 
 	go sm.DeduceProjectRoot("rsc.io/pdf")
-	//runtime.Gosched()
+	runtime.Gosched()
+
 	// Ensure that it all works after teardown and re-set up
 	proc.Signal(os.Interrupt)
-	// Wait for twice the time it took to do it last time; should be safe
-	<-time.After(reldur * 2)
 
-	// proc.Signal doesn't send for windows, so just force it
-	if runtime.GOOS == "windows" {
-		sm.Release()
+	after := time.After(3 * time.Second)
+	tick := time.NewTicker(25 * time.Microsecond)
+loop:
+	for {
+		select {
+		case <-tick.C:
+			if atomic.LoadInt32(&sm.releasing) == 1 {
+				tick.Stop()
+				break loop
+			}
+		case <-after:
+			tick.Stop()
+			t.Fatalf("did not receive signal in reasonable time")
+		}
 	}
 
-	if atomic.LoadInt32(&sm.releasing) != 1 {
-		t.Error("Releasing flag did not get set")
-	}
-
-	lpath = filepath.Join(sm.cachedir, "sm.lock")
-	if _, err := os.Stat(lpath); err == nil {
-		t.Fatal("Expected error on statting what should be an absent lock file")
-	}
+	<-sm.qch
 	clean()
 }
 
