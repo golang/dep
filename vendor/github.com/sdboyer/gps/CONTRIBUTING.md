@@ -56,3 +56,12 @@ The changes themselves should generally conform to the following guidelines:
 * New or changed logic should be accompanied by tests.
 * Maintainable, table-based tests are strongly preferred, even if it means
   writing a new testing harness to execute them.
+
+## Setting up your development environment
+
+In order to run `gps`'s tests, you'll need to inflate `gps`'s dependencies using
+`glide`. Install `[glide](https://github.com/Masterminds/glide)`, and then download
+and install `gps`'s dependencies by running `glide install` from the repo base.
+
+Also, you'll need to have working copies of `git`, `hg`, and `bzr` to run all of
+`gps`'s tests.

@@ -1,7 +1,7 @@
-package gps
+package fs
 
 import (
-	"fmt"
+	"errors"
 	"io"
 	"io/ioutil"
 	"os"
@@ -10,10 +10,10 @@ import (
 	"syscall"
 )
 
-// renameWithFallback attempts to rename a file or directory, but falls back to
+// RenameWithFallback attempts to rename a file or directory, but falls back to
 // copying in the event of a cross-link device error. If the fallback copy
 // succeeds, src is still removed, emulating normal rename behavior.
-func renameWithFallback(src, dest string) error {
+func RenameWithFallback(src, dest string) error {
 	fi, err := os.Stat(src)
 	if err != nil {
 		return err
@@ -36,9 +36,9 @@ func renameWithFallback(src, dest string) error {
 	var cerr error
 	if terr.Err == syscall.EXDEV {
 		if fi.IsDir() {
-			cerr = copyDir(src, dest)
+			cerr = CopyDir(src, dest)
 		} else {
-			cerr = copyFile(src, dest)
+			cerr = CopyFile(src, dest)
 		}
 	} else if runtime.GOOS == "windows" {
 		// In windows it can drop down to an operating system call that
@@ -49,9 +49,9 @@ func renameWithFallback(src, dest string) error {
 		// See https://msdn.microsoft.com/en-us/library/cc231199.aspx
 		if ok && noerr == 0x11 {
 			if fi.IsDir() {
-				cerr = copyDir(src, dest)
+				cerr = CopyDir(src, dest)
 			} else {
-				cerr = copyFile(src, dest)
+				cerr = CopyFile(src, dest)
 			}
 		}
 	} else {
@@ -65,10 +65,15 @@ func renameWithFallback(src, dest string) error {
 	return os.RemoveAll(src)
 }
 
-// copyDir recursively copies a directory tree, attempting to preserve permissions.
+var (
+	errSrcNotDir = errors.New("source is not a directory")
+	errDestExist = errors.New("destination already exists")
+)
+
+// CopyDir recursively copies a directory tree, attempting to preserve permissions.
 // Source directory must exist, destination directory must *not* exist.
 // Symlinks are ignored and skipped.
-func copyDir(src string, dst string) (err error) {
+func CopyDir(src string, dst string) (err error) {
 	src = filepath.Clean(src)
 	dst = filepath.Clean(dst)
 
@@ -77,7 +82,7 @@ func copyDir(src string, dst string) (err error) {
 		return err
 	}
 	if !si.IsDir() {
-		return fmt.Errorf("source is not a directory")
+		return errSrcNotDir
 	}
 
 	_, err = os.Stat(dst)
@@ -85,7 +90,7 @@ func copyDir(src string, dst string) (err error) {
 		return
 	}
 	if err == nil {
-		return fmt.Errorf("destination already exists")
+		return errDestExist
 	}
 
 	err = os.MkdirAll(dst, si.Mode())
@@ -103,14 +108,14 @@ func copyDir(src string, dst string) (err error) {
 		dstPath := filepath.Join(dst, entry.Name())
 
 		if entry.IsDir() {
-			err = copyDir(srcPath, dstPath)
+			err = CopyDir(srcPath, dstPath)
 			if err != nil {
 				return
 			}
 		} else {
 			// This will include symlinks, which is what we want in all cases
 			// where gps is copying things.
-			err = copyFile(srcPath, dstPath)
+			err = CopyFile(srcPath, dstPath)
 			if err != nil {
 				return
 			}
@@ -120,12 +125,12 @@ func copyDir(src string, dst string) (err error) {
 	return
 }
 
-// copyFile copies the contents of the file named src to the file named
+// CopyFile copies the contents of the file named src to the file named
 // by dst. The file will be created if it does not already exist. If the
 // destination file exists, all it's contents will be replaced by the contents
 // of the source file. The file mode will be copied from the source and
 // the copied data is synced/flushed to stable storage.
-func copyFile(src, dst string) (err error) {
+func CopyFile(src, dst string) (err error) {
 	in, err := os.Open(src)
 	if err != nil {
 		return
@@ -163,3 +168,4 @@ func copyFile(src, dst string) (err error) {
 
 	return
 }
+

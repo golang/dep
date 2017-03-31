@@ -11,7 +11,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/Masterminds/semver"
+	"github.com/sdboyer/gps/pkgtree"
 )
 
 // Used to compute a friendly filepath from a URL-shaped input
@@ -45,7 +45,7 @@ type SourceManager interface {
 
 	// ListPackages parses the tree of the Go packages at or below root of the
 	// provided ProjectIdentifier, at the provided version.
-	ListPackages(ProjectIdentifier, Version) (PackageTree, error)
+	ListPackages(ProjectIdentifier, Version) (pkgtree.PackageTree, error)
 
 	// GetManifestAndLock returns manifest and lock information for the provided
 	// root import path.
@@ -61,7 +61,7 @@ type SourceManager interface {
 
 	// AnalyzerInfo reports the name and version of the logic used to service
 	// GetManifestAndLock().
-	AnalyzerInfo() (name string, version *semver.Version)
+	AnalyzerInfo() (name string, version int)
 
 	// DeduceRootProject takes an import path and deduces the corresponding
 	// project/source root.
@@ -77,7 +77,7 @@ type ProjectAnalyzer interface {
 	DeriveManifestAndLock(path string, importRoot ProjectRoot) (Manifest, Lock, error)
 
 	// Report the name and version of this ProjectAnalyzer.
-	Info() (name string, version *semver.Version)
+	Info() (name string, version int)
 }
 
 // SourceMgr is the default SourceManager for gps.
@@ -312,7 +312,7 @@ func (sm *SourceMgr) doRelease() {
 }
 
 // AnalyzerInfo reports the name and version of the injected ProjectAnalyzer.
-func (sm *SourceMgr) AnalyzerInfo() (name string, version *semver.Version) {
+func (sm *SourceMgr) AnalyzerInfo() (name string, version int) {
 	return sm.an.Info()
 }
 
@@ -344,9 +344,9 @@ func (sm *SourceMgr) GetManifestAndLock(id ProjectIdentifier, v Version) (Manife
 
 // ListPackages parses the tree of the Go packages at and below the ProjectRoot
 // of the given ProjectIdentifier, at the given version.
-func (sm *SourceMgr) ListPackages(id ProjectIdentifier, v Version) (PackageTree, error) {
+func (sm *SourceMgr) ListPackages(id ProjectIdentifier, v Version) (pkgtree.PackageTree, error) {
 	if atomic.CompareAndSwapInt32(&sm.releasing, 1, 1) {
-		return PackageTree{}, smIsReleased{}
+		return pkgtree.PackageTree{}, smIsReleased{}
 	}
 	atomic.AddInt32(&sm.opcount, 1)
 	sm.glock.RLock()
@@ -357,7 +357,7 @@ func (sm *SourceMgr) ListPackages(id ProjectIdentifier, v Version) (PackageTree,
 
 	src, err := sm.getSourceFor(id)
 	if err != nil {
-		return PackageTree{}, err
+		return pkgtree.PackageTree{}, err
 	}
 
 	return src.listPackages(id.ProjectRoot, v)

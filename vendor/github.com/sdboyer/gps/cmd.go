@@ -4,7 +4,10 @@ import (
 	"bytes"
 	"fmt"
 	"os/exec"
+	"sync"
 	"time"
+
+	"github.com/Masterminds/vcs"
 )
 
 // monitoredCmd wraps a cmd and will keep monitoring the process until it
@@ -38,8 +41,13 @@ func (c *monitoredCmd) run() error {
 		select {
 		case <-ticker.C:
 			if c.hasTimedOut() {
-				if err := c.cmd.Process.Kill(); err != nil {
-					return &killCmdError{err}
+				// On windows it is apparently (?) possible for the process
+				// pointer to become nil without Run() having returned (and
+				// thus, passing through the done channel). Guard against this.
+				if c.cmd.Process != nil {
+					if err := c.cmd.Process.Kill(); err != nil {
+						return &killCmdError{err}
+					}
 				}
 
 				return &timeoutError{c.timeout}
@@ -52,8 +60,8 @@ func (c *monitoredCmd) run() error {
 
 func (c *monitoredCmd) hasTimedOut() bool {
 	t := time.Now().Add(-c.timeout)
-	return c.stderr.lastActivity.Before(t) &&
-		c.stdout.lastActivity.Before(t)
+	return c.stderr.lastActivity().Before(t) &&
+		c.stdout.lastActivity().Before(t)
 }
 
 func (c *monitoredCmd) combinedOutput() ([]byte, error) {
@@ -67,8 +75,9 @@ func (c *monitoredCmd) combinedOutput() ([]byte, error) {
 // activityBuffer is a buffer that keeps track of the last time a Write
 // operation was performed on it.
 type activityBuffer struct {
-	buf          *bytes.Buffer
-	lastActivity time.Time
+	sync.Mutex
+	buf               *bytes.Buffer
+	lastActivityStamp time.Time
 }
 
 func newActivityBuffer() *activityBuffer {
@@ -78,8 +87,16 @@ func newActivityBuffer() *activityBuffer {
 }
 
 func (b *activityBuffer) Write(p []byte) (int, error) {
-	b.lastActivity = time.Now()
+	b.Lock()
+	b.lastActivityStamp = time.Now()
+	defer b.Unlock()
 	return b.buf.Write(p)
+}
+
+func (b *activityBuffer) lastActivity() time.Time {
+	b.Lock()
+	defer b.Unlock()
+	return b.lastActivityStamp
 }
 
 type timeoutError struct {
@@ -96,4 +113,14 @@ type killCmdError struct {
 
 func (e killCmdError) Error() string {
 	return fmt.Sprintf("error killing command after timeout: %s", e.err)
+}
+
+func runFromCwd(cmd string, args ...string) ([]byte, error) {
+	c := newMonitoredCmd(exec.Command(cmd, args...), 2*time.Minute)
+	return c.combinedOutput()
+}
+
+func runFromRepoDir(repo vcs.Repo, cmd string, args ...string) ([]byte, error) {
+	c := newMonitoredCmd(repo.CmdFromDir(cmd, args...), 2*time.Minute)
+	return c.combinedOutput()
 }

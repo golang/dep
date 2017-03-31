@@ -3,6 +3,7 @@ package gps
 import (
 	"io/ioutil"
 	"net/url"
+	"os/exec"
 	"reflect"
 	"sync"
 	"testing"
@@ -13,6 +14,7 @@ func TestGitSourceInteractions(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping git source version fetching test in short mode")
 	}
+	requiresBins(t, "git")
 
 	cpath, err := ioutil.TempDir("", "smcache")
 	if err != nil {
@@ -113,6 +115,7 @@ func TestGopkginSourceInteractions(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping gopkg.in source version fetching test in short mode")
 	}
+	requiresBins(t, "git")
 
 	cpath, err := ioutil.TempDir("", "smcache")
 	if err != nil {
@@ -252,6 +255,7 @@ func TestBzrSourceInteractions(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping bzr source version fetching test in short mode")
 	}
+	requiresBins(t, "bzr")
 
 	cpath, err := ioutil.TempDir("", "smcache")
 	if err != nil {
@@ -361,6 +365,7 @@ func TestHgSourceInteractions(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping hg source version fetching test in short mode")
 	}
+	requiresBins(t, "hg")
 
 	cpath, err := ioutil.TempDir("", "smcache")
 	if err != nil {
@@ -480,4 +485,14 @@ func TestHgSourceInteractions(t *testing.T) {
 
 	<-donech
 	rf()
+}
+
+// Fail a test if the specified binaries aren't installed.
+func requiresBins(t *testing.T, bins ...string) {
+	for _, b := range bins {
+		_, err := exec.LookPath(b)
+		if err != nil {
+			t.Fatalf("%s is not installed", b)
+		}
+	}
 }

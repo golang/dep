@@ -7,7 +7,9 @@ dependencies:
   pre:
     - wget https://github.com/Masterminds/glide/releases/download/0.10.1/glide-0.10.1-linux-amd64.tar.gz
     - tar -vxz -C $HOME/bin --strip=1 -f glide-0.10.1-linux-amd64.tar.gz
+    - sudo apt-get install bzr subversion
   override:
+    - mkdir -p $HOME/.go_workspace/src
     - glide --home $HOME/.glide -y glide.yaml install --cache
     - mkdir -p $RD
     - rsync -azC --delete ./ $RD
@@ -18,6 +20,11 @@ test:
   pre:
     - go vet
   override:
-    - cd $RD && go test -v -coverprofile=coverage.txt -covermode=atomic
+    - |
+      cd $RD && \
+        echo 'mode: atomic' > coverage.txt && \
+        go list ./... | grep -v "/vendor/" | \
+          xargs -n1 -I% sh -c 'set -e; go test -covermode=atomic -coverprofile=coverage.out % ; tail -n +2 coverage.out >> coverage.txt' && \
+        rm coverage.out
     - cd $RD && go build example.go
     - cd $RD && bash <(curl -s https://codecov.io/bash)
