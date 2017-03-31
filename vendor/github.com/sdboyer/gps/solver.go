@@ -1152,6 +1152,12 @@ func (s *solver) unselectLast() (atomWithPackages, bool) {
 	}
 
 	for _, dep := range deps {
+		// Skip popping if the dep is the root project, which can occur if
+		// there's a project-level import cycle. (This occurs frequently with
+		// e.g. kubernetes and docker)
+		if s.rd.isRoot(dep.Ident.ProjectRoot) {
+			continue
+		}
 		s.sel.popDep(dep.Ident)
 
 		// if no parents/importers, remove from unselected queue

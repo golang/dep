@@ -285,6 +285,33 @@ var bimodalFixtures = map[string]bimodalFixture{
 			"a 1.0.0",
 		),
 	},
+	"project cycle involving root with backtracking": {
+		ds: []depspec{
+			dsp(mkDepspec("root 0.0.0", "a ~1.0.0"),
+				pkg("root", "a", "b"),
+				pkg("root/foo"),
+			),
+			dsp(mkDepspec("a 1.0.0"),
+				pkg("a", "root/foo"),
+			),
+			dsp(mkDepspec("a 1.0.1"),
+				pkg("a", "root/foo"),
+			),
+			dsp(mkDepspec("b 1.0.0", "a 1.0.0"),
+				pkg("b", "a"),
+			),
+			dsp(mkDepspec("b 1.0.1", "a 1.0.0"),
+				pkg("b", "a"),
+			),
+			dsp(mkDepspec("b 1.0.2", "a 1.0.0"),
+				pkg("b", "a"),
+			),
+		},
+		r: mksolution(
+			"a 1.0.0",
+			"b 1.0.2",
+		),
+	},
 	"project cycle not involving root": {
 		ds: []depspec{
 			dsp(mkDepspec("root 0.0.0", "a ~1.0.0"),

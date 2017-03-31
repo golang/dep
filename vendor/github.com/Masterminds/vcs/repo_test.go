@@ -46,7 +46,7 @@ func TestTypeSwitch(t *testing.T) {
 		}
 	}()
 
-	repo, err := NewSvnRepo("https://github.com/Masterminds/VCSTestRepo/trunk", tempDir+"/VCSTestRepo")
+	repo, err := NewSvnRepo("https://github.com/Masterminds/VCSTestRepo/trunk", tempDir+string(os.PathSeparator)+"VCSTestRepo")
 	if err != nil {
 		t.Error(err)
 	}
@@ -55,7 +55,7 @@ func TestTypeSwitch(t *testing.T) {
 		t.Errorf("Unable to checkout SVN repo for repo switching tests. Err was %s", err)
 	}
 
-	_, err = NewRepo("https://github.com/Masterminds/VCSTestRepo", tempDir+"/VCSTestRepo")
+	_, err = NewRepo("https://github.com/Masterminds/VCSTestRepo", tempDir+string(os.PathSeparator)+"VCSTestRepo")
 	if err != ErrWrongVCS {
 		t.Errorf("Not detecting repo switch from SVN to Git")
 	}
@@ -63,12 +63,12 @@ func TestTypeSwitch(t *testing.T) {
 
 func TestDepInstalled(t *testing.T) {
 	i := depInstalled("git")
-	if i != true {
+	if !i {
 		t.Error("depInstalled not finding installed dep.")
 	}
 
 	i = depInstalled("thisreallyisntinstalled")
-	if i != false {
+	if i {
 		t.Error("depInstalled finding not installed dep.")
 	}
 }
