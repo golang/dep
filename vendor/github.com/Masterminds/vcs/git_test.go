@@ -1,6 +1,7 @@
 package vcs
 
 import (
+	"fmt"
 	"io/ioutil"
 	"path/filepath"
 	"time"
@@ -53,7 +54,7 @@ func TestGit(t *testing.T) {
 	}
 
 	// Verify Git repo is a Git repo
-	if repo.CheckLocal() == false {
+	if !repo.CheckLocal() {
 		t.Error("Problem checking out repo or Git CheckLocal is not working")
 	}
 
@@ -73,7 +74,7 @@ func TestGit(t *testing.T) {
 		t.Error(nrerr)
 	}
 	// Verify the right oject is returned. It will check the local repo type.
-	if nrepo.CheckLocal() == false {
+	if !nrepo.CheckLocal() {
 		t.Error("Wrong version returned from NewRepo")
 	}
 
@@ -153,8 +154,23 @@ func TestGit(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	if tags[0] != "1.0.0" {
-		t.Error("Git tags is not reporting the correct version")
+
+	var hasRelTag bool
+	var hasOffMasterTag bool
+
+	for _, tv := range tags {
+		if tv == "1.0.0" {
+			hasRelTag = true
+		} else if tv == "off-master-tag" {
+			hasOffMasterTag = true
+		}
+	}
+
+	if !hasRelTag {
+		t.Error("Git tags unable to find release tag on master")
+	}
+	if !hasOffMasterTag {
+		t.Error("Git tags did not fetch tags not on master")
 	}
 
 	tags, err = repo.TagsFromCommit("74dd547545b7df4aa285bcec1b54e2b76f726395")
@@ -177,20 +193,20 @@ func TestGit(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	// The branches should be HEAD, master, and test.
-	if branches[2] != "test" {
+	// The branches should be HEAD, master, other, and test.
+	if branches[3] != "test" {
 		t.Error("Git is incorrectly returning branches")
 	}
 
-	if repo.IsReference("1.0.0") != true {
+	if !repo.IsReference("1.0.0") {
 		t.Error("Git is reporting a reference is not one")
 	}
 
-	if repo.IsReference("foo") == true {
-		t.Error("Git is reporting a non-existant reference is one")
+	if repo.IsReference("foo") {
+		t.Error("Git is reporting a non-existent reference is one")
 	}
 
-	if repo.IsDirty() == true {
+	if repo.IsDirty() {
 		t.Error("Git incorrectly reporting dirty")
 	}
 
@@ -245,7 +261,7 @@ func TestGit(t *testing.T) {
 
 	_, err = os.Stat(filepath.Join(exportDir, string(repo.Vcs())))
 	if err != nil {
-		if found := os.IsNotExist(err); found == false {
+		if found := os.IsNotExist(err); !found {
 			t.Errorf("Error checking exported metadata in Git: %s", err)
 		}
 	} else {
@@ -268,7 +284,7 @@ func TestGitCheckLocal(t *testing.T) {
 	}()
 
 	repo, _ := NewGitRepo("", tempDir)
-	if repo.CheckLocal() == true {
+	if repo.CheckLocal() {
 		t.Error("Git CheckLocal does not identify non-Git location")
 	}
 
@@ -340,4 +356,129 @@ func TestGitInit(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
+}
+
+func TestGitSubmoduleHandling(t *testing.T) {
+	tempDir, err := ioutil.TempDir("", "go-vcs-git-submodule-tests")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err = os.RemoveAll(tempDir)
+		if err != nil {
+			t.Error(err)
+		}
+	}()
+
+	dumplocal := func(err error) string {
+		if terr, ok := err.(*LocalError); ok {
+			return fmt.Sprintf("msg: %s\norig: %s\nout: %s", terr.Error(), terr.Original(), terr.Out())
+		}
+		return err.Error()
+	}
+
+	subdirExists := func(dir ...string) bool {
+		_, err := os.Stat(filepath.Join(append([]string{tempDir}, dir...)...))
+		return err == nil
+	}
+
+	// Initial clone should get version with two submodules, each of which have
+	// their own submodule
+	repo, err := NewGitRepo("https://github.com/sdboyer/subm", tempDir)
+	if err != nil {
+		t.Fatal(dumplocal(err))
+	}
+	err = repo.Get()
+	if err != nil {
+		t.Fatalf("unable to clone Git repo. Err was %s", dumplocal(err))
+	}
+
+	// Verify we are on the right version.
+	v, err := repo.Version()
+	if v != "18e3a5f6fc7f6d577e732e7a5ab2caf990efbf8f" {
+		t.Fatalf("did not start from expected rev, tests could fail - bailing out (got %s)", v)
+	}
+	if err != nil {
+		t.Fatal(dumplocal(err))
+	}
+
+	if !subdirExists("subm1", ".git") {
+		t.Fatal("subm1 submodule does not exist on initial clone/checkout")
+	}
+	if !subdirExists("subm1", "dep-test", ".git") {
+		t.Fatal("dep-test submodule nested under subm1 does not exist on initial clone/checkout")
+	}
+
+	if !subdirExists("subm-again", ".git") {
+		t.Fatal("subm-again submodule does not exist on initial clone/checkout")
+	}
+	if !subdirExists("subm-again", "dep-test", ".git") {
+		t.Fatal("dep-test submodule nested under subm-again does not exist on initial clone/checkout")
+	}
+
+	// Now switch to version with no submodules, make sure they all go away
+	err = repo.UpdateVersion("e677f82015f72ac1c8fafa66b5463163b3597af2")
+	if err != nil {
+		t.Fatalf("checking out needed version failed with err: %s", dumplocal(err))
+	}
+
+	if subdirExists("subm1") {
+		t.Fatal("checking out version without submodule did not clean up immediate submodules")
+	}
+	if subdirExists("subm1", "dep-test") {
+		t.Fatal("checking out version without submodule did not clean up nested submodules")
+	}
+	if subdirExists("subm-again") {
+		t.Fatal("checking out version without submodule did not clean up immediate submodules")
+	}
+	if subdirExists("subm-again", "dep-test") {
+		t.Fatal("checking out version without submodule did not clean up nested submodules")
+	}
+
+	err = repo.UpdateVersion("aaf7aa1bc4c3c682cc530eca8f80417088ee8540")
+	if err != nil {
+		t.Fatalf("checking out needed version failed with err: %s", dumplocal(err))
+	}
+
+	if !subdirExists("subm1", ".git") {
+		t.Fatal("checking out version with immediate submodule did not set up git subrepo")
+	}
+
+	err = repo.UpdateVersion("6cc4669af468f3b4f16e7e96275ad01ade5b522f")
+	if err != nil {
+		t.Fatalf("checking out needed version failed with err: %s", dumplocal(err))
+	}
+
+	if !subdirExists("subm1", "dep-test", ".git") {
+		t.Fatal("checking out version with nested submodule did not set up nested git subrepo")
+	}
+
+	err = repo.UpdateVersion("aaf7aa1bc4c3c682cc530eca8f80417088ee8540")
+	if err != nil {
+		t.Fatalf("checking out needed version failed with err: %s", dumplocal(err))
+	}
+
+	if subdirExists("subm1", "dep-test") {
+		t.Fatal("rolling back to version without nested submodule did not clean up the nested submodule")
+	}
+
+	err = repo.UpdateVersion("18e3a5f6fc7f6d577e732e7a5ab2caf990efbf8f")
+	if err != nil {
+		t.Fatalf("checking out needed version failed with err: %s", dumplocal(err))
+	}
+
+	if !subdirExists("subm1", ".git") {
+		t.Fatal("subm1 submodule does not exist after switch from other commit")
+	}
+	if !subdirExists("subm1", "dep-test", ".git") {
+		t.Fatal("dep-test submodule nested under subm1 does not exist after switch from other commit")
+	}
+
+	if !subdirExists("subm-again", ".git") {
+		t.Fatal("subm-again submodule does not exist after switch from other commit")
+	}
+	if !subdirExists("subm-again", "dep-test", ".git") {
+		t.Fatal("dep-test submodule nested under subm-again does not exist after switch from other commit")
+	}
+
 }

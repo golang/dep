@@ -11,8 +11,8 @@
         },
         {
             "name": "github.com/Masterminds/vcs",
-            "version": "v1.8.0",
-            "revision": "fbe9fb6ad5b5f35b3e82a7c21123cfc526cbf895",
+            "version": "v1.11.0",
+            "revision": "795e20f901c3d561de52811fb3488a2cb2c8588b",
             "packages": [
                 "."
             ]
@@ -35,8 +35,8 @@
         },
         {
             "name": "github.com/sdboyer/gps",
-            "version": "v0.14.1",
-            "revision": "287edec9f4ca516577cc3ac9744068a34c4c7b08",
+            "version": "v0.14.2",
+            "revision": "b87665c64039289aa606a5c6c0a512d7661db717",
             "packages": [
                 "."
             ]

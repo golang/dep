@@ -1,10 +1,9 @@
 language: go
 
 go:
-  - 1.3
-  - 1.4
-  - 1.5
   - 1.6
+  - 1.7
+  - 1.8
   - tip
 
 before_script:
@@ -16,6 +15,10 @@ before_script:
 # - http://docs.travis-ci.com/user/workers/container-based-infrastructure/
 # - http://docs.travis-ci.com/user/workers/standard-infrastructure/
 sudo: false
+
+script:
+  - make setup
+  - make test
 
 notifications:
   webhooks:
