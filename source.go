@@ -244,7 +244,7 @@ func (sg *sourceGateway) syncLocal(ctx context.Context) error {
 	sg.mu.Lock()
 	defer sg.mu.Unlock()
 
-	_, err := sg.require(ctx, sourceIsSetUp|sourceHasLatestLocally)
+	_, err := sg.require(ctx, sourceIsSetUp|sourceExistsLocally|sourceHasLatestLocally)
 	return err
 }
 

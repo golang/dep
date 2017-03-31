@@ -523,13 +523,13 @@ func TestMultiFetchThreadsafe(t *testing.T) {
 		t.Skip("Skipping slow test in short mode")
 	}
 
-	t.Skip("UGH: this is demonstrating real concurrency problems; skipping until we've fixed them")
-
-	// FIXME test case of base path vs. e.g. https path - folding those together
-	// is crucial
 	projects := []ProjectIdentifier{
 		mkPI("github.com/sdboyer/gps"),
 		mkPI("github.com/sdboyer/gpkt"),
+		ProjectIdentifier{
+			ProjectRoot: ProjectRoot("github.com/sdboyer/gpkt"),
+			Source:      "https://github.com/sdboyer/gpkt",
+		},
 		mkPI("github.com/sdboyer/gogl"),
 		mkPI("github.com/sdboyer/gliph"),
 		mkPI("github.com/sdboyer/frozone"),
@@ -544,62 +544,77 @@ func TestMultiFetchThreadsafe(t *testing.T) {
 		//mkPI("bitbucket.org/sdboyer/nobm"),
 	}
 
-	// 40 gives us ten calls per op, per project, which should be(?) decently
-	// likely to reveal underlying parallelism problems
+	do := func(name string, sm *SourceMgr) {
+		t.Run(name, func(t *testing.T) {
+			// This gives us ten calls per op, per project, which should be(?)
+			// decently likely to reveal underlying concurrency problems
+			ops := 4
+			cnum := len(projects) * ops * 10
 
-	do := func(sm *SourceMgr) {
-		wg := &sync.WaitGroup{}
-		cnum := len(projects) * 40
+			for i := 0; i < cnum; i++ {
+				// Trigger all four ops on each project, then move on to the next
+				// project.
+				id, op := projects[(i/ops)%len(projects)], i%ops
+				// The count of times this op has been been invoked on this project
+				// (after the upcoming invocation)
+				opcount := i/(ops*len(projects)) + 1
 
-		for i := 0; i < cnum; i++ {
-			wg.Add(1)
-
-			go func(id ProjectIdentifier, pass int) {
-				switch pass {
+				switch op {
 				case 0:
-					t.Logf("Deducing root for %s", id.errString())
-					_, err := sm.DeduceProjectRoot(string(id.ProjectRoot))
-					if err != nil {
-						t.Errorf("err on deducing project root for %s: %s", id.errString(), err.Error())
-					}
+					t.Run(fmt.Sprintf("deduce:%v:%s", opcount, id.errString()), func(t *testing.T) {
+						t.Parallel()
+						if _, err := sm.DeduceProjectRoot(string(id.ProjectRoot)); err != nil {
+							t.Error(err)
+						}
+					})
 				case 1:
-					t.Logf("syncing %s", id)
-					err := sm.SyncSourceFor(id)
-					if err != nil {
-						t.Errorf("syncing failed for %s with err %s", id.errString(), err.Error())
-					}
+					t.Run(fmt.Sprintf("sync:%v:%s", opcount, id.errString()), func(t *testing.T) {
+						t.Parallel()
+						err := sm.SyncSourceFor(id)
+						if err != nil {
+							t.Error(err)
+						}
+					})
 				case 2:
-					t.Logf("listing versions for %s", id)
-					_, err := sm.ListVersions(id)
-					if err != nil {
-						t.Errorf("listing versions failed for %s with err %s", id.errString(), err.Error())
-					}
+					t.Run(fmt.Sprintf("listVersions:%v:%s", opcount, id.errString()), func(t *testing.T) {
+						t.Parallel()
+						vl, err := sm.ListVersions(id)
+						if err != nil {
+							t.Fatal(err)
+						}
+						if len(vl) == 0 {
+							t.Error("no versions returned")
+						}
+					})
 				case 3:
-					t.Logf("Checking source existence for %s", id)
-					y, err := sm.SourceExists(id)
-					if err != nil {
-						t.Errorf("err on checking source existence for %s: %s", id.errString(), err.Error())
-					}
-					if !y {
-						t.Errorf("claims %s source does not exist", id.errString())
-					}
+					t.Run(fmt.Sprintf("exists:%v:%s", opcount, id.errString()), func(t *testing.T) {
+						t.Parallel()
+						y, err := sm.SourceExists(id)
+						if err != nil {
+							t.Fatal(err)
+						}
+						if !y {
+							t.Error("said source does not exist")
+						}
+					})
 				default:
-					panic(fmt.Sprintf("wtf, %s %v", id, pass))
+					panic(fmt.Sprintf("wtf, %s %v", id, op))
 				}
-				wg.Done()
-			}(projects[i%len(projects)], (i/len(projects))%4)
-
-			runtime.Gosched()
-		}
-		wg.Wait()
+			}
+		})
 	}
 
 	sm, _ := mkNaiveSM(t)
-	do(sm)
+	do("first", sm)
+
 	// Run the thing twice with a remade sm so that we cover both the cases of
-	// pre-existing and new clones
+	// pre-existing and new clones.
+	//
+	// This triggers a release of the first sm, which is much of what we're
+	// testing here - that the release is complete and clean, and can be
+	// immediately followed by a new sm coming in.
 	sm2, clean := remakeNaiveSM(sm, t)
-	do(sm2)
+	do("second", sm2)
 	clean()
 }
 
