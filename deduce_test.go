@@ -633,7 +633,7 @@ func TestVanityDeductionSchemeMismatch(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	cm := newCallManager(ctx)
+	cm := newSupervisor(ctx)
 	dc := newDeductionCoordinator(cm)
 	_, err := dc.deduceRootPath(ctx, "ssh://golang.org/exp")
 	if err == nil {

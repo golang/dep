@@ -793,22 +793,22 @@ func TestUnreachableSource(t *testing.T) {
 	}
 }
 
-func TestCallManager(t *testing.T) {
+func TestSupervisor(t *testing.T) {
 	bgc := context.Background()
 	ctx, cancelFunc := context.WithCancel(bgc)
-	cm := newCallManager(ctx)
+	superv := newSupervisor(ctx)
 
 	ci := callInfo{
 		name: "foo",
 		typ:  0,
 	}
 
-	_, err := cm.start(ci)
+	_, err := superv.start(ci)
 	if err != nil {
 		t.Fatal("unexpected err on setUpCall:", err)
 	}
 
-	tc, exists := cm.running[ci]
+	tc, exists := superv.running[ci]
 	if !exists {
 		t.Fatal("running call not recorded in map")
 	}
@@ -821,7 +821,7 @@ func TestCallManager(t *testing.T) {
 	block, wait := make(chan struct{}), make(chan struct{})
 	go func() {
 		wait <- struct{}{}
-		err := cm.do(bgc, "foo", 0, func(ctx context.Context) error {
+		err := superv.do(bgc, "foo", 0, func(ctx context.Context) error {
 			<-block
 			return nil
 		})
@@ -832,7 +832,8 @@ func TestCallManager(t *testing.T) {
 	}()
 	<-wait
 
-	tc, exists = cm.running[ci]
+	superv.mu.Lock()
+	tc, exists = superv.running[ci]
 	if !exists {
 		t.Fatal("running call not recorded in map")
 	}
@@ -840,14 +841,16 @@ func TestCallManager(t *testing.T) {
 	if tc.count != 2 {
 		t.Fatalf("wrong count of running ci: wanted 2 got %v", tc.count)
 	}
+	superv.mu.Unlock()
 
 	close(block)
 	<-wait
-	if len(cm.ran) != 0 {
+	superv.mu.Lock()
+	if len(superv.ran) != 0 {
 		t.Fatal("should not record metrics until last one drops")
 	}
 
-	tc, exists = cm.running[ci]
+	tc, exists = superv.running[ci]
 	if !exists {
 		t.Fatal("running call not recorded in map")
 	}
@@ -855,9 +858,11 @@ func TestCallManager(t *testing.T) {
 	if tc.count != 1 {
 		t.Fatalf("wrong count of running ci: wanted 1 got %v", tc.count)
 	}
+	superv.mu.Unlock()
 
-	cm.done(ci)
-	ran, exists := cm.ran[0]
+	superv.done(ci)
+	superv.mu.Lock()
+	ran, exists := superv.ran[0]
 	if !exists {
 		t.Fatal("should have metrics after closing last of a ci, but did not")
 	}
@@ -865,14 +870,15 @@ func TestCallManager(t *testing.T) {
 	if ran.count != 1 {
 		t.Fatalf("wrong count of serial runs of a call: wanted 1 got %v", ran.count)
 	}
+	superv.mu.Unlock()
 
 	cancelFunc()
-	_, err = cm.start(ci)
+	_, err = superv.start(ci)
 	if err == nil {
 		t.Fatal("should have errored on cm.run() after canceling cm's input context")
 	}
 
-	cm.do(bgc, "foo", 0, func(ctx context.Context) error {
+	superv.do(bgc, "foo", 0, func(ctx context.Context) error {
 		t.Fatal("calls should not be initiated by do() after main context is cancelled")
 		return nil
 	})

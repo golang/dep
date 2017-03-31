@@ -88,7 +88,7 @@ type ProjectAnalyzer interface {
 type SourceMgr struct {
 	cachedir    string                // path to root of cache dir
 	lf          *os.File              // handle for the sm lock file on disk
-	callMgr     *callManager          // subsystem that coordinates running calls/io
+	suprvsr     *supervisor           // subsystem that supervises running calls/io
 	deduceCoord *deductionCoordinator // subsystem that manages import path deduction
 	srcCoord    *sourceCoordinator    // subsystem that manages sources
 	an          ProjectAnalyzer       // analyzer injected by the caller
@@ -149,15 +149,15 @@ func NewSourceManager(an ProjectAnalyzer, cachedir string) (*SourceMgr, error) {
 		}
 	}
 
-	cm := newCallManager(context.TODO())
-	deducer := newDeductionCoordinator(cm)
+	superv := newSupervisor(context.TODO())
+	deducer := newDeductionCoordinator(superv)
 
 	sm := &SourceMgr{
 		cachedir:    cachedir,
 		lf:          fi,
-		callMgr:     cm,
+		suprvsr:     superv,
 		deduceCoord: deducer,
-		srcCoord:    newSourceCoordinator(cm, deducer, cachedir),
+		srcCoord:    newSourceCoordinator(superv, deducer, cachedir),
 		an:          an,
 		qch:         make(chan struct{}),
 	}
@@ -513,19 +513,17 @@ type durCount struct {
 	dur   time.Duration
 }
 
-type callManager struct {
+type supervisor struct {
 	ctx        context.Context
 	cancelFunc context.CancelFunc
 	mu         sync.Mutex // Guards all maps.
 	running    map[callInfo]timeCount
-	//running map[callInfo]time.Time
-	ran map[callType]durCount
-	//ran map[callType]time.Duration
+	ran        map[callType]durCount
 }
 
-func newCallManager(ctx context.Context) *callManager {
+func newSupervisor(ctx context.Context) *supervisor {
 	ctx, cf := context.WithCancel(ctx)
-	return &callManager{
+	return &supervisor{
 		ctx:        ctx,
 		cancelFunc: cf,
 		running:    make(map[callInfo]timeCount),
@@ -536,7 +534,7 @@ func newCallManager(ctx context.Context) *callManager {
 // do executes the incoming closure using a conjoined context, and keeps
 // counters to ensure the sourceMgr can't finish Release()ing until after all
 // calls have returned.
-func (cm *callManager) do(inctx context.Context, name string, typ callType, f func(context.Context) error) error {
+func (cm *supervisor) do(inctx context.Context, name string, typ callType, f func(context.Context) error) error {
 	ci := callInfo{
 		name: name,
 		typ:  typ,
@@ -554,11 +552,11 @@ func (cm *callManager) do(inctx context.Context, name string, typ callType, f fu
 	return err
 }
 
-func (cm *callManager) getLifetimeContext() context.Context {
+func (cm *supervisor) getLifetimeContext() context.Context {
 	return cm.ctx
 }
 
-func (cm *callManager) start(ci callInfo) (context.Context, error) {
+func (cm *supervisor) start(ci callInfo) (context.Context, error) {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
 	if cm.ctx.Err() != nil {
@@ -579,7 +577,7 @@ func (cm *callManager) start(ci callInfo) (context.Context, error) {
 	return cm.ctx, nil
 }
 
-func (cm *callManager) done(ci callInfo) {
+func (cm *supervisor) done(ci callInfo) {
 	cm.mu.Lock()
 
 	existingInfo, has := cm.running[ci]

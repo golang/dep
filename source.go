@@ -73,29 +73,29 @@ func (rc srcReturnChans) awaitReturn() (sg *sourceGateway, err error) {
 }
 
 type sourceCoordinator struct {
-	callMgr   *callManager
-	srcmut    sync.RWMutex // guards srcs and nameToURL maps
-	srcs      map[string]*sourceGateway
-	nameToURL map[string]string
-	psrcmut   sync.Mutex // guards protoSrcs map
-	protoSrcs map[string][]srcReturnChans
-	deducer   *deductionCoordinator
-	cachedir  string
+	supervisor *supervisor
+	srcmut     sync.RWMutex // guards srcs and nameToURL maps
+	srcs       map[string]*sourceGateway
+	nameToURL  map[string]string
+	psrcmut    sync.Mutex // guards protoSrcs map
+	protoSrcs  map[string][]srcReturnChans
+	deducer    *deductionCoordinator
+	cachedir   string
 }
 
-func newSourceCoordinator(cm *callManager, deducer *deductionCoordinator, cachedir string) *sourceCoordinator {
+func newSourceCoordinator(superv *supervisor, deducer *deductionCoordinator, cachedir string) *sourceCoordinator {
 	return &sourceCoordinator{
-		callMgr:   cm,
-		deducer:   deducer,
-		cachedir:  cachedir,
-		srcs:      make(map[string]*sourceGateway),
-		nameToURL: make(map[string]string),
-		protoSrcs: make(map[string][]srcReturnChans),
+		supervisor: superv,
+		deducer:    deducer,
+		cachedir:   cachedir,
+		srcs:       make(map[string]*sourceGateway),
+		nameToURL:  make(map[string]string),
+		protoSrcs:  make(map[string][]srcReturnChans),
 	}
 }
 
 func (sc *sourceCoordinator) getSourceGatewayFor(ctx context.Context, id ProjectIdentifier) (*sourceGateway, error) {
-	if sc.callMgr.getLifetimeContext().Err() != nil {
+	if sc.supervisor.getLifetimeContext().Err() != nil {
 		return nil, errors.New("sourceCoordinator has been terminated")
 	}
 
@@ -182,7 +182,7 @@ func (sc *sourceCoordinator) setUpSourceGateway(ctx context.Context, normalizedN
 	}
 	sc.srcmut.RUnlock()
 
-	srcGate = newSourceGateway(pd.mb, sc.callMgr, sc.cachedir)
+	srcGate = newSourceGateway(pd.mb, sc.supervisor, sc.cachedir)
 
 	// The normalized name is usually different from the source URL- e.g.
 	// github.com/sdboyer/gps vs. https://github.com/sdboyer/gps. But it's
@@ -226,14 +226,14 @@ type sourceGateway struct {
 	src      source
 	cache    singleSourceCache
 	mu       sync.Mutex // global lock, serializes all behaviors
-	callMgr  *callManager
+	suprvsr  *supervisor
 }
 
-func newSourceGateway(maybe maybeSource, callMgr *callManager, cachedir string) *sourceGateway {
+func newSourceGateway(maybe maybeSource, superv *supervisor, cachedir string) *sourceGateway {
 	sg := &sourceGateway{
 		maybe:    maybe,
 		cachedir: cachedir,
-		callMgr:  callMgr,
+		suprvsr:  superv,
 	}
 	sg.cache = sg.createSingleSourceCache()
 
@@ -284,7 +284,7 @@ func (sg *sourceGateway) exportVersionTo(ctx context.Context, v Version, to stri
 		return err
 	}
 
-	return sg.callMgr.do(ctx, sg.src.upstreamURL(), ctExportTree, func(ctx context.Context) error {
+	return sg.suprvsr.do(ctx, sg.src.upstreamURL(), ctExportTree, func(ctx context.Context) error {
 		return sg.src.exportRevisionTo(r, to)
 	})
 }
@@ -310,7 +310,7 @@ func (sg *sourceGateway) getManifestAndLock(ctx context.Context, pr ProjectRoot,
 
 	name, vers := an.Info()
 	label := fmt.Sprintf("%s:%s.%v", sg.src.upstreamURL(), name, vers)
-	err = sg.callMgr.do(ctx, label, ctGetManifestAndLock, func(ctx context.Context) error {
+	err = sg.suprvsr.do(ctx, label, ctGetManifestAndLock, func(ctx context.Context) error {
 		m, l, err = sg.src.getManifestAndLock(ctx, pr, r, an)
 		return err
 	})
@@ -344,7 +344,7 @@ func (sg *sourceGateway) listPackages(ctx context.Context, pr ProjectRoot, v Ver
 	}
 
 	label := fmt.Sprintf("%s:%s", pr, sg.src.upstreamURL())
-	err = sg.callMgr.do(ctx, label, ctListPackages, func(ctx context.Context) error {
+	err = sg.suprvsr.do(ctx, label, ctListPackages, func(ctx context.Context) error {
 		ptree, err = sg.src.listPackages(pr, r)
 		return err
 	})
@@ -467,9 +467,9 @@ func (sg *sourceGateway) require(ctx context.Context, wanted sourceState) (errSt
 
 			switch flag {
 			case sourceIsSetUp:
-				sg.src, addlState, err = sg.maybe.try(ctx, sg.cachedir, sg.cache, sg.callMgr)
+				sg.src, addlState, err = sg.maybe.try(ctx, sg.cachedir, sg.cache, sg.suprvsr)
 			case sourceExistsUpstream:
-				err = sg.callMgr.do(ctx, sg.src.sourceType(), ctSourcePing, func(ctx context.Context) error {
+				err = sg.suprvsr.do(ctx, sg.src.sourceType(), ctSourcePing, func(ctx context.Context) error {
 					if !sg.src.existsUpstream(ctx) {
 						return fmt.Errorf("%s does not exist upstream", sg.src.upstreamURL())
 					}
@@ -477,7 +477,7 @@ func (sg *sourceGateway) require(ctx context.Context, wanted sourceState) (errSt
 				})
 			case sourceExistsLocally:
 				if !sg.src.existsLocally(ctx) {
-					err = sg.callMgr.do(ctx, sg.src.sourceType(), ctSourceInit, func(ctx context.Context) error {
+					err = sg.suprvsr.do(ctx, sg.src.sourceType(), ctSourceInit, func(ctx context.Context) error {
 						return sg.src.initLocal(ctx)
 					})
 
@@ -489,7 +489,7 @@ func (sg *sourceGateway) require(ctx context.Context, wanted sourceState) (errSt
 				}
 			case sourceHasLatestVersionList:
 				var pvl []PairedVersion
-				err = sg.callMgr.do(ctx, sg.src.sourceType(), ctListVersions, func(ctx context.Context) error {
+				err = sg.suprvsr.do(ctx, sg.src.sourceType(), ctListVersions, func(ctx context.Context) error {
 					pvl, err = sg.src.listVersions(ctx)
 					return err
 				})
@@ -498,7 +498,7 @@ func (sg *sourceGateway) require(ctx context.Context, wanted sourceState) (errSt
 					sg.cache.storeVersionMap(pvl, true)
 				}
 			case sourceHasLatestLocally:
-				err = sg.callMgr.do(ctx, sg.src.sourceType(), ctSourceFetch, func(ctx context.Context) error {
+				err = sg.suprvsr.do(ctx, sg.src.sourceType(), ctSourceFetch, func(ctx context.Context) error {
 					return sg.src.updateLocal(ctx)
 				})
 			}

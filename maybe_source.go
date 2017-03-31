@@ -19,16 +19,16 @@ import (
 // * Allows control over when deduction logic triggers network activity
 // * Makes it easy to attempt multiple URLs for a given import path
 type maybeSource interface {
-	try(ctx context.Context, cachedir string, c singleSourceCache, cm *callManager) (source, sourceState, error)
+	try(ctx context.Context, cachedir string, c singleSourceCache, superv *supervisor) (source, sourceState, error)
 	getURL() string
 }
 
 type maybeSources []maybeSource
 
-func (mbs maybeSources) try(ctx context.Context, cachedir string, c singleSourceCache, cm *callManager) (source, sourceState, error) {
+func (mbs maybeSources) try(ctx context.Context, cachedir string, c singleSourceCache, superv *supervisor) (source, sourceState, error) {
 	var e sourceFailures
 	for _, mb := range mbs {
-		src, state, err := mb.try(ctx, cachedir, c, cm)
+		src, state, err := mb.try(ctx, cachedir, c, superv)
 		if err == nil {
 			return src, state, nil
 		}
@@ -76,7 +76,7 @@ type maybeGitSource struct {
 	url *url.URL
 }
 
-func (m maybeGitSource) try(ctx context.Context, cachedir string, c singleSourceCache, cm *callManager) (source, sourceState, error) {
+func (m maybeGitSource) try(ctx context.Context, cachedir string, c singleSourceCache, superv *supervisor) (source, sourceState, error) {
 	ustr := m.url.String()
 	path := filepath.Join(cachedir, "sources", sanitizer.Replace(ustr))
 
@@ -96,7 +96,7 @@ func (m maybeGitSource) try(ctx context.Context, cachedir string, c singleSource
 
 	// Pinging invokes the same action as calling listVersions, so just do that.
 	var vl []PairedVersion
-	err = cm.do(ctx, "git:lv:maybe", ctListVersions, func(ctx context.Context) (err error) {
+	err = superv.do(ctx, "git:lv:maybe", ctListVersions, func(ctx context.Context) (err error) {
 		if vl, err = src.listVersions(ctx); err != nil {
 			return fmt.Errorf("remote repository at %s does not exist, or is inaccessible", ustr)
 		}
@@ -132,7 +132,7 @@ type maybeGopkginSource struct {
 	major uint64
 }
 
-func (m maybeGopkginSource) try(ctx context.Context, cachedir string, c singleSourceCache, cm *callManager) (source, sourceState, error) {
+func (m maybeGopkginSource) try(ctx context.Context, cachedir string, c singleSourceCache, superv *supervisor) (source, sourceState, error) {
 	// We don't actually need a fully consistent transform into the on-disk path
 	// - just something that's unique to the particular gopkg.in domain context.
 	// So, it's OK to just dumb-join the scheme with the path.
@@ -157,7 +157,7 @@ func (m maybeGopkginSource) try(ctx context.Context, cachedir string, c singleSo
 	}
 
 	var vl []PairedVersion
-	err = cm.do(ctx, "git:lv:maybe", ctListVersions, func(ctx context.Context) (err error) {
+	err = superv.do(ctx, "git:lv:maybe", ctListVersions, func(ctx context.Context) (err error) {
 		if vl, err = src.listVersions(ctx); err != nil {
 			return fmt.Errorf("remote repository at %s does not exist, or is inaccessible", ustr)
 		}
@@ -185,7 +185,7 @@ type maybeBzrSource struct {
 	url *url.URL
 }
 
-func (m maybeBzrSource) try(ctx context.Context, cachedir string, c singleSourceCache, cm *callManager) (source, sourceState, error) {
+func (m maybeBzrSource) try(ctx context.Context, cachedir string, c singleSourceCache, superv *supervisor) (source, sourceState, error) {
 	ustr := m.url.String()
 	path := filepath.Join(cachedir, "sources", sanitizer.Replace(ustr))
 
@@ -194,7 +194,7 @@ func (m maybeBzrSource) try(ctx context.Context, cachedir string, c singleSource
 		return nil, 0, unwrapVcsErr(err)
 	}
 
-	err = cm.do(ctx, "bzr:ping", ctSourcePing, func(ctx context.Context) error {
+	err = superv.do(ctx, "bzr:ping", ctSourcePing, func(ctx context.Context) error {
 		if !r.Ping() {
 			return fmt.Errorf("remote repository at %s does not exist, or is inaccessible", ustr)
 		}
@@ -229,7 +229,7 @@ type maybeHgSource struct {
 	url *url.URL
 }
 
-func (m maybeHgSource) try(ctx context.Context, cachedir string, c singleSourceCache, cm *callManager) (source, sourceState, error) {
+func (m maybeHgSource) try(ctx context.Context, cachedir string, c singleSourceCache, superv *supervisor) (source, sourceState, error) {
 	ustr := m.url.String()
 	path := filepath.Join(cachedir, "sources", sanitizer.Replace(ustr))
 
@@ -238,7 +238,7 @@ func (m maybeHgSource) try(ctx context.Context, cachedir string, c singleSourceC
 		return nil, 0, unwrapVcsErr(err)
 	}
 
-	err = cm.do(ctx, "hg:ping", ctSourcePing, func(ctx context.Context) error {
+	err = superv.do(ctx, "hg:ping", ctSourcePing, func(ctx context.Context) error {
 		if !r.Ping() {
 			return fmt.Errorf("remote repository at %s does not exist, or is inaccessible", ustr)
 		}

@@ -525,15 +525,15 @@ func (m vcsExtensionDeducer) deduceSource(path string, u *url.URL) (maybeSource,
 }
 
 type deductionCoordinator struct {
-	callMgr  *callManager
+	suprvsr  *supervisor
 	mut      sync.RWMutex
 	rootxt   *radix.Tree
 	deducext *deducerTrie
 }
 
-func newDeductionCoordinator(cm *callManager) *deductionCoordinator {
+func newDeductionCoordinator(superv *supervisor) *deductionCoordinator {
 	dc := &deductionCoordinator{
-		callMgr:  cm,
+		suprvsr:  superv,
 		rootxt:   radix.New(),
 		deducext: pathDeducerTrie(),
 	}
@@ -549,7 +549,7 @@ func newDeductionCoordinator(cm *callManager) *deductionCoordinator {
 // the root path and a list of maybeSources, which can be subsequently used to
 // create a handler that will manage the particular source.
 func (dc *deductionCoordinator) deduceRootPath(ctx context.Context, path string) (pathDeduction, error) {
-	if dc.callMgr.getLifetimeContext().Err() != nil {
+	if dc.suprvsr.getLifetimeContext().Err() != nil {
 		return pathDeduction{}, errors.New("deductionCoordinator has been terminated")
 	}
 
@@ -595,7 +595,7 @@ func (dc *deductionCoordinator) deduceRootPath(ctx context.Context, path string)
 	// retrieving go get metadata might do the trick.
 	hmd := &httpMetadataDeducer{
 		basePath: path,
-		callMgr:  dc.callMgr,
+		suprvsr:  dc.suprvsr,
 		// The vanity deducer will call this func with a completed
 		// pathDeduction if it succeeds in finding one. We process it
 		// back through the action channel to ensure serialized
@@ -680,7 +680,7 @@ type httpMetadataDeducer struct {
 	deduceErr  error
 	basePath   string
 	returnFunc func(pathDeduction)
-	callMgr    *callManager
+	suprvsr    *supervisor
 }
 
 func (hmd *httpMetadataDeducer) deduce(ctx context.Context, path string) (pathDeduction, error) {
@@ -696,7 +696,7 @@ func (hmd *httpMetadataDeducer) deduce(ctx context.Context, path string) (pathDe
 
 		// Make the HTTP call to attempt to retrieve go-get metadata
 		var root, vcs, reporoot string
-		err = hmd.callMgr.do(ctx, path, ctHTTPMetadata, func(ctx context.Context) error {
+		err = hmd.suprvsr.do(ctx, path, ctHTTPMetadata, func(ctx context.Context) error {
 			root, vcs, reporoot, err = parseMetadata(ctx, path, u.Scheme)
 			return err
 		})
