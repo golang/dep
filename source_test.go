@@ -56,7 +56,8 @@ func testGitSourceInteractions(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	isrc, state, err := mb.try(ctx, cpath, newMemoryCache())
+	callMgr := newCallManager(ctx)
+	isrc, state, err := mb.try(ctx, cpath, newMemoryCache(), callMgr)
 	if err != nil {
 		t.Errorf("Unexpected error while setting up gitSource for test repo: %s", err)
 		rf()
@@ -163,7 +164,8 @@ func testGopkginSourceInteractions(t *testing.T) {
 		}
 
 		ctx := context.Background()
-		isrc, state, err := mb.try(ctx, cpath, newMemoryCache())
+		callMgr := newCallManager(ctx)
+		isrc, state, err := mb.try(ctx, cpath, newMemoryCache(), callMgr)
 		if err != nil {
 			t.Errorf("Unexpected error while setting up gopkginSource for test repo: %s", err)
 			return
@@ -307,7 +309,8 @@ func testBzrSourceInteractions(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	isrc, state, err := mb.try(ctx, cpath, newMemoryCache())
+	callMgr := newCallManager(ctx)
+	isrc, state, err := mb.try(ctx, cpath, newMemoryCache(), callMgr)
 	if err != nil {
 		t.Errorf("Unexpected error while setting up bzrSource for test repo: %s", err)
 		rf()
@@ -424,7 +427,8 @@ func testHgSourceInteractions(t *testing.T) {
 		}
 
 		ctx := context.Background()
-		isrc, state, err := mb.try(ctx, cpath, newMemoryCache())
+		callMgr := newCallManager(ctx)
+		isrc, state, err := mb.try(ctx, cpath, newMemoryCache(), callMgr)
 		if err != nil {
 			t.Errorf("Unexpected error while setting up hgSource for test repo: %s", err)
 			return

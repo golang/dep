@@ -284,7 +284,9 @@ func (sg *sourceGateway) exportVersionTo(ctx context.Context, v Version, to stri
 		return err
 	}
 
-	return sg.src.exportRevisionTo(r, to)
+	return sg.callMgr.do(ctx, sg.src.upstreamURL(), ctExportTree, func(ctx context.Context) error {
+		return sg.src.exportRevisionTo(r, to)
+	})
 }
 
 func (sg *sourceGateway) getManifestAndLock(ctx context.Context, pr ProjectRoot, v Version, an ProjectAnalyzer) (Manifest, Lock, error) {
@@ -306,7 +308,12 @@ func (sg *sourceGateway) getManifestAndLock(ctx context.Context, pr ProjectRoot,
 		return nil, nil, err
 	}
 
-	m, l, err = sg.src.getManifestAndLock(pr, r, an)
+	name, vers := an.Info()
+	label := fmt.Sprintf("%s:%s.%v", sg.src.upstreamURL(), name, vers)
+	err = sg.callMgr.do(ctx, label, ctGetManifestAndLock, func(ctx context.Context) error {
+		m, l, err = sg.src.getManifestAndLock(ctx, pr, r, an)
+		return err
+	})
 	if err != nil {
 		return nil, nil, err
 	}
@@ -336,7 +343,11 @@ func (sg *sourceGateway) listPackages(ctx context.Context, pr ProjectRoot, v Ver
 		return pkgtree.PackageTree{}, err
 	}
 
-	ptree, err = sg.src.listPackages(pr, r)
+	label := fmt.Sprintf("%s:%s", pr, sg.src.upstreamURL())
+	err = sg.callMgr.do(ctx, label, ctListPackages, func(ctx context.Context) error {
+		ptree, err = sg.src.listPackages(pr, r)
+		return err
+	})
 	if err != nil {
 		return pkgtree.PackageTree{}, err
 	}
@@ -456,14 +467,20 @@ func (sg *sourceGateway) require(ctx context.Context, wanted sourceState) (errSt
 
 			switch flag {
 			case sourceIsSetUp:
-				sg.src, addlState, err = sg.maybe.try(ctx, sg.cachedir, sg.cache)
+				sg.src, addlState, err = sg.maybe.try(ctx, sg.cachedir, sg.cache, sg.callMgr)
 			case sourceExistsUpstream:
-				if !sg.src.existsUpstream(ctx) {
-					err = fmt.Errorf("%s does not exist upstream", sg.src.upstreamURL())
-				}
+				err = sg.callMgr.do(ctx, sg.src.sourceType(), ctSourcePing, func(ctx context.Context) error {
+					if !sg.src.existsUpstream(ctx) {
+						return fmt.Errorf("%s does not exist upstream", sg.src.upstreamURL())
+					}
+					return nil
+				})
 			case sourceExistsLocally:
 				if !sg.src.existsLocally(ctx) {
-					err = sg.src.initLocal(ctx)
+					err = sg.callMgr.do(ctx, sg.src.sourceType(), ctSourceInit, func(ctx context.Context) error {
+						return sg.src.initLocal(ctx)
+					})
+
 					if err == nil {
 						addlState |= sourceHasLatestLocally
 					} else {
@@ -472,12 +489,18 @@ func (sg *sourceGateway) require(ctx context.Context, wanted sourceState) (errSt
 				}
 			case sourceHasLatestVersionList:
 				var pvl []PairedVersion
-				pvl, err = sg.src.listVersions(ctx)
+				err = sg.callMgr.do(ctx, sg.src.sourceType(), ctListVersions, func(ctx context.Context) error {
+					pvl, err = sg.src.listVersions(ctx)
+					return err
+				})
+
 				if err != nil {
 					sg.cache.storeVersionMap(pvl, true)
 				}
 			case sourceHasLatestLocally:
-				err = sg.src.updateLocal(ctx)
+				err = sg.callMgr.do(ctx, sg.src.sourceType(), ctSourceFetch, func(ctx context.Context) error {
+					return sg.src.updateLocal(ctx)
+				})
 			}
 
 			if err != nil {
@@ -505,19 +528,20 @@ type source interface {
 	initLocal(context.Context) error
 	updateLocal(context.Context) error
 	listVersions(context.Context) ([]PairedVersion, error)
-	getManifestAndLock(ProjectRoot, Revision, ProjectAnalyzer) (Manifest, Lock, error)
+	getManifestAndLock(context.Context, ProjectRoot, Revision, ProjectAnalyzer) (Manifest, Lock, error)
 	listPackages(ProjectRoot, Revision) (pkgtree.PackageTree, error)
 	revisionPresentIn(Revision) (bool, error)
 	exportRevisionTo(Revision, string) error
+	sourceType() string
 }
 
 type baseVCSSource struct {
 	// Object for the cache repository
 	crepo *repo
+}
 
-	// The project metadata cache. This is (or is intended to be) persisted to
-	// disk, for reuse across solver runs.
-	dc singleSourceCache
+func (bs *baseVCSSource) sourceType() string {
+	return string(bs.crepo.r.Vcs())
 }
 
 func (bs *baseVCSSource) existsLocally(ctx context.Context) bool {
@@ -526,21 +550,25 @@ func (bs *baseVCSSource) existsLocally(ctx context.Context) bool {
 
 // TODO reimpl for git
 func (bs *baseVCSSource) existsUpstream(ctx context.Context) bool {
-	return bs.crepo.r.Ping()
+	return !bs.crepo.r.Ping()
 }
 
 func (bs *baseVCSSource) upstreamURL() string {
 	return bs.crepo.r.Remote()
 }
 
-func (bs *baseVCSSource) getManifestAndLock(pr ProjectRoot, r Revision, an ProjectAnalyzer) (Manifest, Lock, error) {
+func (bs *baseVCSSource) getManifestAndLock(ctx context.Context, pr ProjectRoot, r Revision, an ProjectAnalyzer) (Manifest, Lock, error) {
 	bs.crepo.mut.Lock()
-	err := bs.crepo.r.UpdateVersion(r.String())
-	m, l, err := an.DeriveManifestAndLock(bs.crepo.r.LocalPath(), pr)
-	bs.crepo.mut.Unlock()
+	defer bs.crepo.mut.Unlock()
 
+	err := bs.crepo.r.UpdateVersion(r.String())
 	if err != nil {
 		return nil, nil, unwrapVcsErr(err)
+	}
+
+	m, l, err := an.DeriveManifestAndLock(bs.crepo.r.LocalPath(), pr)
+	if err != nil {
+		return nil, nil, err
 	}
 
 	if l != nil && l != Lock(nil) {
@@ -562,18 +590,20 @@ func (bs *baseVCSSource) initLocal(ctx context.Context) error {
 	bs.crepo.mut.Lock()
 	err := bs.crepo.r.get(ctx)
 	bs.crepo.mut.Unlock()
+
 	if err != nil {
 		return unwrapVcsErr(err)
 	}
 	return nil
 }
 
-// updateLocal ensures the local data we have about the source is fully up to date
-// with what's out there over the network.
+// updateLocal ensures the local data (versions and code) we have about the
+// source is fully up to date with that of the canonical upstream source.
 func (bs *baseVCSSource) updateLocal(ctx context.Context) error {
 	bs.crepo.mut.Lock()
 	err := bs.crepo.r.update(ctx)
 	bs.crepo.mut.Unlock()
+
 	if err != nil {
 		return unwrapVcsErr(err)
 	}
@@ -582,15 +612,14 @@ func (bs *baseVCSSource) updateLocal(ctx context.Context) error {
 
 func (bs *baseVCSSource) listPackages(pr ProjectRoot, r Revision) (ptree pkgtree.PackageTree, err error) {
 	bs.crepo.mut.Lock()
-	// Check out the desired version for analysis
-	err = bs.crepo.r.UpdateVersion(string(r))
+	err = bs.crepo.r.UpdateVersion(r.String())
+	bs.crepo.mut.Unlock()
 
 	if err != nil {
 		err = unwrapVcsErr(err)
 	} else {
 		ptree, err = pkgtree.ListPackages(bs.crepo.r.LocalPath(), string(pr))
 	}
-	bs.crepo.mut.Unlock()
 
 	return
 }
@@ -609,5 +638,5 @@ func (bs *baseVCSSource) exportRevisionTo(r Revision, to string) error {
 	// TODO(sdboyer) this is a simplistic approach and relying on the tools
 	// themselves might make it faster, but git's the overwhelming case (and has
 	// its own method) so fine for now
-	return fs.CopyDir(bs.crepo.rpath, to)
+	return fs.CopyDir(bs.crepo.r.LocalPath(), to)
 }

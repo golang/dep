@@ -501,7 +501,7 @@ func TestDeduceProjectRoot(t *testing.T) {
 		t.Errorf("Wrong project root was deduced;\n\t(GOT) %s\n\t(WNT) %s", pr, in)
 	}
 	if sm.deduceCoord.rootxt.Len() != 3 {
-		t.Errorf("Root path trie should have three elements, one for each unique; has %v", sm.deduceCoord.rootxt.Len())
+		t.Errorf("Root path trie should have three elements, one for each unique root; has %v", sm.deduceCoord.rootxt.Len())
 	}
 
 	// Ensure that vcs extension-based matching comes through
@@ -803,7 +803,7 @@ func TestCallManager(t *testing.T) {
 		typ:  0,
 	}
 
-	_, err := cm.run(ci)
+	_, err := cm.start(ci)
 	if err != nil {
 		t.Fatal("unexpected err on setUpCall:", err)
 	}
@@ -817,11 +817,20 @@ func TestCallManager(t *testing.T) {
 		t.Fatalf("wrong count of running ci: wanted 1 got %v", tc.count)
 	}
 
-	// run another, but via setUpCall
-	_, doneFunc, err := cm.setUpCall(bgc, "foo", 0)
-	if err != nil {
-		t.Fatal("unexpected err on setUpCall:", err)
-	}
+	// run another, but via do
+	block, wait := make(chan struct{}), make(chan struct{})
+	go func() {
+		wait <- struct{}{}
+		err := cm.do(bgc, "foo", 0, func(ctx context.Context) error {
+			<-block
+			return nil
+		})
+		if err != nil {
+			t.Fatal("unexpected err on do() completion:", err)
+		}
+		close(wait)
+	}()
+	<-wait
 
 	tc, exists = cm.running[ci]
 	if !exists {
@@ -832,7 +841,8 @@ func TestCallManager(t *testing.T) {
 		t.Fatalf("wrong count of running ci: wanted 2 got %v", tc.count)
 	}
 
-	doneFunc()
+	close(block)
+	<-wait
 	if len(cm.ran) != 0 {
 		t.Fatal("should not record metrics until last one drops")
 	}
@@ -857,8 +867,13 @@ func TestCallManager(t *testing.T) {
 	}
 
 	cancelFunc()
-	_, err = cm.run(ci)
+	_, err = cm.start(ci)
 	if err == nil {
 		t.Fatal("should have errored on cm.run() after canceling cm's input context")
 	}
+
+	cm.do(bgc, "foo", 0, func(ctx context.Context) error {
+		t.Fatal("calls should not be initiated by do() after main context is cancelled")
+		return nil
+	})
 }

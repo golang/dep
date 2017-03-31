@@ -533,31 +533,32 @@ func newCallManager(ctx context.Context) *callManager {
 	}
 }
 
-// Helper function to register a call with a callManager, combine contexts, and
-// create a to-be-deferred func to clean it all up.
-func (cm *callManager) setUpCall(inctx context.Context, name string, typ callType) (cctx context.Context, doneFunc func(), err error) {
+// do executes the incoming closure using a conjoined context, and keeps
+// counters to ensure the sourceMgr can't finish Release()ing until after all
+// calls have returned.
+func (cm *callManager) do(inctx context.Context, name string, typ callType, f func(context.Context) error) error {
 	ci := callInfo{
 		name: name,
 		typ:  typ,
 	}
 
-	octx, err := cm.run(ci)
+	octx, err := cm.start(ci)
 	if err != nil {
-		return nil, nil, err
+		return err
 	}
 
 	cctx, cancelFunc := constext.Cons(inctx, octx)
-	return cctx, func() {
-		cm.done(ci)
-		cancelFunc() // ensure constext cancel goroutine is cleaned up
-	}, nil
+	err = f(cctx)
+	cm.done(ci)
+	cancelFunc()
+	return err
 }
 
 func (cm *callManager) getLifetimeContext() context.Context {
 	return cm.ctx
 }
 
-func (cm *callManager) run(ci callInfo) (context.Context, error) {
+func (cm *callManager) start(ci callInfo) (context.Context, error) {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
 	if cm.ctx.Err() != nil {
@@ -608,6 +609,12 @@ const (
 	ctHTTPMetadata callType = iota
 	ctListVersions
 	ctGetManifestAndLock
+	ctListPackages
+	ctSourcePing
+	ctSourceInit
+	ctSourceFetch
+	ctCheckoutVersion
+	ctExportTree
 )
 
 // callInfo provides metadata about an ongoing call.

@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/Masterminds/semver"
 	"github.com/sdboyer/gps/internal/fs"
@@ -67,11 +68,12 @@ func (s *gitSource) exportRevisionTo(rev Revision, to string) error {
 
 func (s *gitSource) listVersions(ctx context.Context) (vlist []PairedVersion, err error) {
 	r := s.crepo.r
+
 	var out []byte
-	c := exec.Command("git", "ls-remote", r.Remote())
+	c := newMonitoredCmd(exec.Command("git", "ls-remote", r.Remote()), 30*time.Second)
 	// Ensure no prompting for PWs
-	c.Env = mergeEnvLists([]string{"GIT_ASKPASS=", "GIT_TERMINAL_PROMPT=0"}, os.Environ())
-	out, err = c.CombinedOutput()
+	c.cmd.Env = mergeEnvLists([]string{"GIT_ASKPASS=", "GIT_TERMINAL_PROMPT=0"}, os.Environ())
+	out, err = c.combinedOutput(ctx)
 
 	if err != nil {
 		return nil, err

@@ -685,13 +685,6 @@ type httpMetadataDeducer struct {
 
 func (hmd *httpMetadataDeducer) deduce(ctx context.Context, path string) (pathDeduction, error) {
 	hmd.once.Do(func() {
-		ctx, doneFunc, err := hmd.callMgr.setUpCall(ctx, path, ctHTTPMetadata)
-		if err != nil {
-			hmd.deduceErr = err
-			return
-		}
-		defer doneFunc()
-
 		opath := path
 		u, path, err := normalizeURI(path)
 		if err != nil {
@@ -702,9 +695,16 @@ func (hmd *httpMetadataDeducer) deduce(ctx context.Context, path string) (pathDe
 		pd := pathDeduction{}
 
 		// Make the HTTP call to attempt to retrieve go-get metadata
-		root, vcs, reporoot, err := parseMetadata(ctx, path, u.Scheme)
+		var root, vcs, reporoot string
+		err = hmd.callMgr.do(ctx, path, ctHTTPMetadata, func(ctx context.Context) error {
+			root, vcs, reporoot, err = parseMetadata(ctx, path, u.Scheme)
+			return err
+		})
 		if err != nil {
 			hmd.deduceErr = fmt.Errorf("unable to deduce repository and source type for: %q", opath)
+			if err == context.Canceled || err == context.DeadlineExceeded {
+				hmd.deduceErr = err
+			}
 			return
 		}
 		pd.root = root

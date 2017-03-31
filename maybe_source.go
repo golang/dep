@@ -19,17 +19,16 @@ import (
 // * Allows control over when deduction logic triggers network activity
 // * Makes it easy to attempt multiple URLs for a given import path
 type maybeSource interface {
-	//try(ctx context.Context, cachedir string, c singleSourceCache) (source, string, error)
-	try(ctx context.Context, cachedir string, c singleSourceCache) (source, sourceState, error)
+	try(ctx context.Context, cachedir string, c singleSourceCache, cm *callManager) (source, sourceState, error)
 	getURL() string
 }
 
 type maybeSources []maybeSource
 
-func (mbs maybeSources) try(ctx context.Context, cachedir string, c singleSourceCache) (source, sourceState, error) {
+func (mbs maybeSources) try(ctx context.Context, cachedir string, c singleSourceCache, cm *callManager) (source, sourceState, error) {
 	var e sourceFailures
 	for _, mb := range mbs {
-		src, state, err := mb.try(ctx, cachedir, c)
+		src, state, err := mb.try(ctx, cachedir, c, cm)
 		if err == nil {
 			return src, state, nil
 		}
@@ -77,7 +76,7 @@ type maybeGitSource struct {
 	url *url.URL
 }
 
-func (m maybeGitSource) try(ctx context.Context, cachedir string, c singleSourceCache) (source, sourceState, error) {
+func (m maybeGitSource) try(ctx context.Context, cachedir string, c singleSourceCache, cm *callManager) (source, sourceState, error) {
 	ustr := m.url.String()
 	path := filepath.Join(cachedir, "sources", sanitizer.Replace(ustr))
 
@@ -88,7 +87,6 @@ func (m maybeGitSource) try(ctx context.Context, cachedir string, c singleSource
 
 	src := &gitSource{
 		baseVCSSource: baseVCSSource{
-			dc: c,
 			crepo: &repo{
 				r:     &gitRepo{r},
 				rpath: path,
@@ -97,9 +95,15 @@ func (m maybeGitSource) try(ctx context.Context, cachedir string, c singleSource
 	}
 
 	// Pinging invokes the same action as calling listVersions, so just do that.
-	vl, err := src.listVersions(ctx)
+	var vl []PairedVersion
+	err = cm.do(ctx, "git:lv:maybe", ctListVersions, func(ctx context.Context) (err error) {
+		if vl, err = src.listVersions(ctx); err != nil {
+			return fmt.Errorf("remote repository at %s does not exist, or is inaccessible", ustr)
+		}
+		return nil
+	})
 	if err != nil {
-		return nil, 0, fmt.Errorf("remote repository at %s does not exist, or is inaccessible", ustr)
+		return nil, 0, err
 	}
 
 	c.storeVersionMap(vl, true)
@@ -128,7 +132,7 @@ type maybeGopkginSource struct {
 	major uint64
 }
 
-func (m maybeGopkginSource) try(ctx context.Context, cachedir string, c singleSourceCache) (source, sourceState, error) {
+func (m maybeGopkginSource) try(ctx context.Context, cachedir string, c singleSourceCache, cm *callManager) (source, sourceState, error) {
 	// We don't actually need a fully consistent transform into the on-disk path
 	// - just something that's unique to the particular gopkg.in domain context.
 	// So, it's OK to just dumb-join the scheme with the path.
@@ -143,7 +147,6 @@ func (m maybeGopkginSource) try(ctx context.Context, cachedir string, c singleSo
 	src := &gopkginSource{
 		gitSource: gitSource{
 			baseVCSSource: baseVCSSource{
-				dc: c,
 				crepo: &repo{
 					r:     &gitRepo{r},
 					rpath: path,
@@ -153,10 +156,15 @@ func (m maybeGopkginSource) try(ctx context.Context, cachedir string, c singleSo
 		major: m.major,
 	}
 
-	// Pinging invokes the same action as calling listVersions, so just do that.
-	vl, err := src.listVersions(ctx)
+	var vl []PairedVersion
+	err = cm.do(ctx, "git:lv:maybe", ctListVersions, func(ctx context.Context) (err error) {
+		if vl, err = src.listVersions(ctx); err != nil {
+			return fmt.Errorf("remote repository at %s does not exist, or is inaccessible", ustr)
+		}
+		return nil
+	})
 	if err != nil {
-		return nil, 0, fmt.Errorf("remote repository at %s does not exist, or is inaccessible", ustr)
+		return nil, 0, err
 	}
 
 	c.storeVersionMap(vl, true)
@@ -177,7 +185,7 @@ type maybeBzrSource struct {
 	url *url.URL
 }
 
-func (m maybeBzrSource) try(ctx context.Context, cachedir string, c singleSourceCache) (source, sourceState, error) {
+func (m maybeBzrSource) try(ctx context.Context, cachedir string, c singleSourceCache, cm *callManager) (source, sourceState, error) {
 	ustr := m.url.String()
 	path := filepath.Join(cachedir, "sources", sanitizer.Replace(ustr))
 
@@ -186,8 +194,14 @@ func (m maybeBzrSource) try(ctx context.Context, cachedir string, c singleSource
 		return nil, 0, unwrapVcsErr(err)
 	}
 
-	if !r.Ping() {
-		return nil, 0, fmt.Errorf("remote repository at %s does not exist, or is inaccessible", ustr)
+	err = cm.do(ctx, "bzr:ping", ctSourcePing, func(ctx context.Context) error {
+		if !r.Ping() {
+			return fmt.Errorf("remote repository at %s does not exist, or is inaccessible", ustr)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, 0, err
 	}
 
 	state := sourceIsSetUp | sourceExistsUpstream
@@ -197,7 +211,6 @@ func (m maybeBzrSource) try(ctx context.Context, cachedir string, c singleSource
 
 	src := &bzrSource{
 		baseVCSSource: baseVCSSource{
-			dc: c,
 			crepo: &repo{
 				r:     &bzrRepo{r},
 				rpath: path,
@@ -216,7 +229,7 @@ type maybeHgSource struct {
 	url *url.URL
 }
 
-func (m maybeHgSource) try(ctx context.Context, cachedir string, c singleSourceCache) (source, sourceState, error) {
+func (m maybeHgSource) try(ctx context.Context, cachedir string, c singleSourceCache, cm *callManager) (source, sourceState, error) {
 	ustr := m.url.String()
 	path := filepath.Join(cachedir, "sources", sanitizer.Replace(ustr))
 
@@ -225,8 +238,14 @@ func (m maybeHgSource) try(ctx context.Context, cachedir string, c singleSourceC
 		return nil, 0, unwrapVcsErr(err)
 	}
 
-	if !r.Ping() {
-		return nil, 0, fmt.Errorf("remote repository at %s does not exist, or is inaccessible", ustr)
+	err = cm.do(ctx, "hg:ping", ctSourcePing, func(ctx context.Context) error {
+		if !r.Ping() {
+			return fmt.Errorf("remote repository at %s does not exist, or is inaccessible", ustr)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, 0, err
 	}
 
 	state := sourceIsSetUp | sourceExistsUpstream
@@ -236,7 +255,6 @@ func (m maybeHgSource) try(ctx context.Context, cachedir string, c singleSourceC
 
 	src := &hgSource{
 		baseVCSSource: baseVCSSource{
-			dc: c,
 			crepo: &repo{
 				r:     &hgRepo{r},
 				rpath: path,

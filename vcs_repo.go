@@ -16,6 +16,7 @@ type ctxRepo interface {
 	vcs.Repo
 	get(context.Context) error
 	update(context.Context) error
+	// TODO(sdboyer) implement these, pronto
 	//updateVersion(context.Context) error
 	//ping(context.Context) (bool, error)
 }
