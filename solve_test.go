@@ -7,12 +7,12 @@ import (
 	"io/ioutil"
 	"log"
 	"math/rand"
-	"os"
 	"reflect"
 	"sort"
 	"strconv"
 	"strings"
 	"testing"
+	"unicode"
 
 	"github.com/sdboyer/gps/internal"
 	"github.com/sdboyer/gps/pkgtree"
@@ -52,13 +52,31 @@ func overrideIsStdLib() {
 	}
 }
 
-var stderrlog = log.New(os.Stderr, "", 0)
+type testlogger struct {
+	*testing.T
+}
 
-func fixSolve(params SolveParameters, sm SourceManager) (Solution, error) {
-	if testing.Verbose() {
-		params.Trace = true
-		params.TraceLogger = stderrlog
+func (t testlogger) Write(b []byte) (n int, err error) {
+	str := string(b)
+	if len(str) == 0 {
+		return 0, nil
 	}
+
+	for _, part := range strings.Split(str, "\n") {
+		str := strings.TrimRightFunc(part, unicode.IsSpace)
+		if len(str) != 0 {
+			t.T.Log(str)
+		}
+	}
+	return len(b), err
+}
+
+func fixSolve(params SolveParameters, sm SourceManager, t *testing.T) (Solution, error) {
+	// Trace unconditionally; by passing the trace through t.Log(), the testing
+	// system will decide whether or not to actually show the output (based on
+	// -v, or selectively on test failure).
+	params.Trace = true
+	params.TraceLogger = log.New(testlogger{T: t}, "", 0)
 
 	s, err := Prepare(params, sm)
 	if err != nil {
@@ -109,7 +127,7 @@ func solveBasicsAndCheck(fix basicFixture, t *testing.T) (res Solution, err erro
 		params.Lock = fix.l
 	}
 
-	res, err = fixSolve(params, sm)
+	res, err = fixSolve(params, sm, t)
 
 	return fixtureSolveSimpleChecks(fix, res, err, t)
 }
@@ -139,9 +157,6 @@ func TestBimodalSolves(t *testing.T) {
 }
 
 func solveBimodalAndCheck(fix bimodalFixture, t *testing.T) (res Solution, err error) {
-	if testing.Verbose() {
-		stderrlog.Printf("[[fixture %q]]", fix.n)
-	}
 	sm := newbmSM(fix)
 
 	params := SolveParameters{
@@ -157,7 +172,7 @@ func solveBimodalAndCheck(fix bimodalFixture, t *testing.T) (res Solution, err e
 		params.Lock = fix.l
 	}
 
-	res, err = fixSolve(params, sm)
+	res, err = fixSolve(params, sm, t)
 
 	return fixtureSolveSimpleChecks(fix, res, err, t)
 }
@@ -284,7 +299,7 @@ func TestRootLockNoVersionPairMatching(t *testing.T) {
 		Lock:            l2,
 	}
 
-	res, err := fixSolve(params, sm)
+	res, err := fixSolve(params, sm, t)
 
 	fixtureSolveSimpleChecks(fix, res, err, t)
 }
