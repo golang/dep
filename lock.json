@@ -1,5 +1,5 @@
 {
-    "memo": "fc012dfb266db9deec4121dd38069e2556ba66a5514939662da94fac1251996e",
+    "memo": "7d6a3f3c62a19d81b64d89f782c828672626860651a0f85f55d7bad7c340f2e8",
     "projects": [
         {
             "name": "github.com/Masterminds/semver",
@@ -35,10 +35,13 @@
         },
         {
             "name": "github.com/sdboyer/gps",
-            "version": "v0.14.2",
-            "revision": "b87665c64039289aa606a5c6c0a512d7661db717",
+            "version": "v0.15.0",
+            "revision": "b0f646b744e74543c094023d05339ffb82458e35",
             "packages": [
-                "."
+                ".",
+                "internal",
+                "internal/fs",
+                "pkgtree"
             ]
         }
     ]

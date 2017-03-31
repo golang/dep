@@ -26,8 +26,8 @@ func (naiveAnalyzer) DeriveManifestAndLock(string, ProjectRoot) (Manifest, Lock,
 	return nil, nil, nil
 }
 
-func (a naiveAnalyzer) Info() (name string, version *semver.Version) {
-	return "naive-analyzer", sv("v0.0.1")
+func (a naiveAnalyzer) Info() (name string, version int) {
+	return "naive-analyzer", 1
 }
 
 func sv(s string) *semver.Version {
@@ -350,6 +350,7 @@ func TestGetSources(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping source setup test in short mode")
 	}
+	requiresBins(t, "git", "hg", "bzr")
 
 	sm, clean := mkNaiveSM(t)
 
@@ -363,6 +364,8 @@ func TestGetSources(t *testing.T) {
 	wg.Add(3)
 	for _, pi := range pil {
 		go func(lpi ProjectIdentifier) {
+			defer wg.Done()
+
 			nn := lpi.normalizedSource()
 			src, err := sm.getSourceFor(lpi)
 			if err != nil {
@@ -395,8 +398,6 @@ func TestGetSources(t *testing.T) {
 			} else if src == src4 {
 				t.Errorf("(src %q) explicit http source should create a new src", nn)
 			}
-
-			wg.Done()
 		}(pi)
 	}
 
@@ -849,4 +850,18 @@ func TestSignalHandling(t *testing.T) {
 		t.Fatal("Expected error on statting what should be an absent lock file")
 	}
 	clean()
+}
+
+func TestUnreachableSource(t *testing.T) {
+	// If a git remote is unreachable (maybe the server is only accessible behind a VPN, or
+	// something), we should return a clear error, not a panic.
+
+	sm, clean := mkNaiveSM(t)
+	defer clean()
+
+	id := mkPI("golang.org/notareal/repo").normalize()
+	_, err := sm.ListVersions(id)
+	if err == nil {
+		t.Error("expected err when listing versions of a bogus source, but got nil")
+	}
 }

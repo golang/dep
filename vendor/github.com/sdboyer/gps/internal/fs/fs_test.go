@@ -1,4 +1,4 @@
-package gps
+package fs
 
 import (
 	"fmt"
@@ -46,7 +46,7 @@ func TestCopyDir(t *testing.T) {
 	srcf.Close()
 
 	destdir := filepath.Join(dir, "dest")
-	if err := copyDir(srcdir, destdir); err != nil {
+	if err := CopyDir(srcdir, destdir); err != nil {
 		t.Fatal(err)
 	}
 
@@ -102,7 +102,7 @@ func TestCopyFile(t *testing.T) {
 	srcf.Close()
 
 	destf := filepath.Join(dir, "destf")
-	if err := copyFile(srcf.Name(), destf); err != nil {
+	if err := CopyFile(srcf.Name(), destf); err != nil {
 		t.Fatal(err)
 	}
 

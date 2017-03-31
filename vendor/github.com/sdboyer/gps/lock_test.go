@@ -37,40 +37,42 @@ func TestLockedProjectsEq(t *testing.T) {
 		NewLockedProject(mkPI("github.com/sdboyer/gps"), Revision("278a227dfc3d595a33a77ff3f841fd8ca1bc8cd0"), []string{"gps"}),
 	}
 
-	fix := []struct {
+	fix := map[string]struct {
 		l1, l2   int
 		shouldeq bool
 		err      string
 	}{
-		{0, 0, true, "lp does not eq self"},
-		{0, 5, false, "should not eq with different rev"},
-		{0, 6, false, "should not eq with different version"},
-		{5, 5, true, "should eq with same rev"},
-		{0, 1, false, "should not eq when other pkg list is empty"},
-		{0, 2, false, "should not eq when other pkg list is longer"},
-		{2, 4, false, "should not eq when pkg lists are out of order"},
-		{0, 3, false, "should not eq totally different lp"},
-		{7, 7, true, "should eq with only rev"},
-		{5, 7, false, "should not eq when only rev matches"},
+		"with self":               {0, 0, true, "lp does not eq self"},
+		"with different revision": {0, 5, false, "should not eq with different rev"},
+		"with different versions": {0, 6, false, "should not eq with different version"},
+		"with same revsion":       {5, 5, true, "should eq with same rev"},
+		"with empty pkg":          {0, 1, false, "should not eq when other pkg list is empty"},
+		"with long pkg list":      {0, 2, false, "should not eq when other pkg list is longer"},
+		"with different orders":   {2, 4, false, "should not eq when pkg lists are out of order"},
+		"with different lp":       {0, 3, false, "should not eq totally different lp"},
+		"with only rev":           {7, 7, true, "should eq with only rev"},
+		"when only rev matches":   {5, 7, false, "should not eq when only rev matches"},
 	}
 
-	for _, f := range fix {
-		if f.shouldeq {
-			if !lps[f.l1].Eq(lps[f.l2]) {
-				t.Error(f.err)
-			}
-			if !lps[f.l2].Eq(lps[f.l1]) {
-				t.Error(f.err + (" (reversed)"))
-			}
-		} else {
-			if lps[f.l1].Eq(lps[f.l2]) {
-				t.Error(f.err)
-			}
-			if lps[f.l2].Eq(lps[f.l1]) {
-				t.Error(f.err + (" (reversed)"))
-			}
+	for k, f := range fix {
+		t.Run(k, func(t *testing.T) {
+			if f.shouldeq {
+				if !lps[f.l1].Eq(lps[f.l2]) {
+					t.Error(f.err)
+				}
+				if !lps[f.l2].Eq(lps[f.l1]) {
+					t.Error(f.err + (" (reversed)"))
+				}
+			} else {
+				if lps[f.l1].Eq(lps[f.l2]) {
+					t.Error(f.err)
+				}
+				if lps[f.l2].Eq(lps[f.l1]) {
+					t.Error(f.err + (" (reversed)"))
+				}
 
-		}
+			}
+		})
 	}
 }
 

@@ -4,6 +4,8 @@ import (
 	"sort"
 
 	"github.com/armon/go-radix"
+	"github.com/sdboyer/gps/internal"
+	"github.com/sdboyer/gps/pkgtree"
 )
 
 // rootdata holds static data and constraining rules from the root project for
@@ -39,10 +41,10 @@ type rootdata struct {
 	rl safeLock
 
 	// A defensively copied instance of params.RootPackageTree
-	rpt PackageTree
+	rpt pkgtree.PackageTree
 }
 
-// rootImportList returns a list of the unique imports from the root data.
+// externalImportList returns a list of the unique imports from the root data.
 // Ignores and requires are taken into consideration, stdlib is excluded, and
 // errors within the local set of package are not backpropagated.
 func (rd rootdata) externalImportList() []string {
@@ -50,7 +52,7 @@ func (rd rootdata) externalImportList() []string {
 	all := rm.Flatten(false)
 	reach := make([]string, 0, len(all))
 	for _, r := range all {
-		if !isStdLib(r) {
+		if !internal.IsStdLib(r) {
 			reach = append(reach, r)
 		}
 	}
@@ -112,7 +114,7 @@ func (rd rootdata) getApplicableConstraints() []workingConstraint {
 	// Walk all dep import paths we have to consider and mark the corresponding
 	// wc entry in the trie, if any
 	for _, im := range rd.externalImportList() {
-		if isStdLib(im) {
+		if internal.IsStdLib(im) {
 			continue
 		}
 
