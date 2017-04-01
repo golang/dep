@@ -87,10 +87,7 @@ func (m maybeGitSource) try(ctx context.Context, cachedir string, c singleSource
 
 	src := &gitSource{
 		baseVCSSource: baseVCSSource{
-			crepo: &repo{
-				r:     &gitRepo{r},
-				rpath: path,
-			},
+			repo: &gitRepo{r},
 		},
 	}
 
@@ -147,10 +144,7 @@ func (m maybeGopkginSource) try(ctx context.Context, cachedir string, c singleSo
 	src := &gopkginSource{
 		gitSource: gitSource{
 			baseVCSSource: baseVCSSource{
-				crepo: &repo{
-					r:     &gitRepo{r},
-					rpath: path,
-				},
+				repo: &gitRepo{r},
 			},
 		},
 		major: m.major,
@@ -211,10 +205,7 @@ func (m maybeBzrSource) try(ctx context.Context, cachedir string, c singleSource
 
 	src := &bzrSource{
 		baseVCSSource: baseVCSSource{
-			crepo: &repo{
-				r:     &bzrRepo{r},
-				rpath: path,
-			},
+			repo: &bzrRepo{r},
 		},
 	}
 
@@ -255,10 +246,7 @@ func (m maybeHgSource) try(ctx context.Context, cachedir string, c singleSourceC
 
 	src := &hgSource{
 		baseVCSSource: baseVCSSource{
-			crepo: &repo{
-				r:     &hgRepo{r},
-				rpath: path,
-			},
+			repo: &hgRepo{r},
 		},
 	}
 

@@ -8,7 +8,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/Masterminds/semver"
@@ -22,14 +21,11 @@ type gitSource struct {
 }
 
 func (s *gitSource) exportRevisionTo(ctx context.Context, rev Revision, to string) error {
-	r := s.crepo.r
+	r := s.repo
 
 	if err := os.MkdirAll(to, 0777); err != nil {
 		return err
 	}
-
-	s.crepo.mut.Lock()
-	defer s.crepo.mut.Unlock()
 
 	// Back up original index
 	idx, bak := filepath.Join(r.LocalPath(), ".git", "index"), filepath.Join(r.LocalPath(), ".git", "origindex")
@@ -66,7 +62,7 @@ func (s *gitSource) exportRevisionTo(ctx context.Context, rev Revision, to strin
 }
 
 func (s *gitSource) listVersions(ctx context.Context) (vlist []PairedVersion, err error) {
-	r := s.crepo.r
+	r := s.repo
 
 	var out []byte
 	c := newMonitoredCmd(exec.Command("git", "ls-remote", r.Remote()), 30*time.Second)
@@ -254,7 +250,7 @@ type bzrSource struct {
 }
 
 func (s *bzrSource) listVersions(ctx context.Context) ([]PairedVersion, error) {
-	r := s.crepo.r
+	r := s.repo
 
 	// Now, list all the tags
 	out, err := runFromRepoDir(ctx, r, "bzr", "tags", "--show-ids", "-v")
@@ -298,7 +294,7 @@ type hgSource struct {
 func (s *hgSource) listVersions(ctx context.Context) ([]PairedVersion, error) {
 	var vlist []PairedVersion
 
-	r := s.crepo.r
+	r := s.repo
 	// Now, list all the tags
 	out, err := runFromRepoDir(ctx, r, "hg", "tags", "--debug", "--verbose")
 	if err != nil {
@@ -399,26 +395,8 @@ func (s *hgSource) listVersions(ctx context.Context) ([]PairedVersion, error) {
 }
 
 type repo struct {
-	// Path to the root of the default working copy (NOT the repo itself)
-	rpath string
-
-	// Mutex controlling general access to the repo
-	mut sync.RWMutex
-
 	// Object for direct repo interaction
 	r ctxRepo
-
-	// Whether or not the cache repo is in sync (think dvcs) with upstream
-	synced bool
-}
-
-func (r *repo) exportRevisionTo(rev Revision, to string) error {
-	r.r.UpdateVersion(rev.String())
-
-	// TODO(sdboyer) this is a simplistic approach and relying on the tools
-	// themselves might make it faster, but git's the overwhelming case (and has
-	// its own method) so fine for now
-	return fs.CopyDir(r.rpath, to)
 }
 
 // This func copied from Masterminds/vcs so we can exec our own commands

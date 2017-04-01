@@ -466,21 +466,23 @@ type durCount struct {
 type supervisor struct {
 	ctx        context.Context
 	cancelFunc context.CancelFunc
-	mu         sync.Mutex // Guards all maps.
-	cond       sync.Cond  // Allows waiting until all calls clear.
+	mu         sync.Mutex // Guards all maps
+	cond       sync.Cond  // Wraps mu so callers can wait until all calls end
 	running    map[callInfo]timeCount
 	ran        map[callType]durCount
 }
 
 func newSupervisor(ctx context.Context) *supervisor {
 	ctx, cf := context.WithCancel(ctx)
-	return &supervisor{
+	supv := &supervisor{
 		ctx:        ctx,
 		cancelFunc: cf,
 		running:    make(map[callInfo]timeCount),
 		ran:        make(map[callType]durCount),
-		cond:       sync.Cond{L: &sync.Mutex{}},
 	}
+
+	supv.cond = sync.Cond{L: &supv.mu}
+	return supv
 }
 
 // do executes the incoming closure using a conjoined context, and keeps

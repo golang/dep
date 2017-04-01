@@ -741,11 +741,12 @@ func TestSignalHandling(t *testing.T) {
 
 	sm, clean = mkNaiveSM(t)
 	sm.UseDefaultSignalHandling()
-	var callerr error
+	errchan := make(chan error)
 	go func() {
-		_, callerr = sm.DeduceProjectRoot("rsc.io/pdf")
+		_, callerr := sm.DeduceProjectRoot("rsc.io/pdf")
+		errchan <- callerr
 	}()
-	<-time.After(10 * time.Millisecond)
+	runtime.Gosched()
 
 	// signal the process and call release right afterward
 	now := time.Now()
@@ -756,6 +757,7 @@ func TestSignalHandling(t *testing.T) {
 	reldur := time.Since(now) - sigdur
 	t.Logf("time to return from Release(): %v", reldur)
 
+	callerr := <-errchan
 	if callerr == nil {
 		t.Error("network call could not have completed before cancellation, should have gotten an error")
 	}
@@ -780,6 +782,7 @@ func TestSignalHandling(t *testing.T) {
 	sm.UseDefaultSignalHandling()
 
 	go sm.DeduceProjectRoot("rsc.io/pdf")
+	go sm.DeduceProjectRoot("k8s.io/kubernetes")
 	runtime.Gosched()
 
 	// Ensure that it all works after teardown and re-set up

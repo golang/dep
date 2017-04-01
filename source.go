@@ -536,37 +536,33 @@ type source interface {
 }
 
 type baseVCSSource struct {
-	// Object for the cache repository
-	crepo *repo
+	repo ctxRepo
 }
 
 func (bs *baseVCSSource) sourceType() string {
-	return string(bs.crepo.r.Vcs())
+	return string(bs.repo.Vcs())
 }
 
 func (bs *baseVCSSource) existsLocally(ctx context.Context) bool {
-	return bs.crepo.r.CheckLocal()
+	return bs.repo.CheckLocal()
 }
 
 // TODO reimpl for git
 func (bs *baseVCSSource) existsUpstream(ctx context.Context) bool {
-	return !bs.crepo.r.Ping()
+	return !bs.repo.Ping()
 }
 
 func (bs *baseVCSSource) upstreamURL() string {
-	return bs.crepo.r.Remote()
+	return bs.repo.Remote()
 }
 
 func (bs *baseVCSSource) getManifestAndLock(ctx context.Context, pr ProjectRoot, r Revision, an ProjectAnalyzer) (Manifest, Lock, error) {
-	bs.crepo.mut.Lock()
-	defer bs.crepo.mut.Unlock()
-
-	err := bs.crepo.r.updateVersion(ctx, r.String())
+	err := bs.repo.updateVersion(ctx, r.String())
 	if err != nil {
 		return nil, nil, unwrapVcsErr(err)
 	}
 
-	m, l, err := an.DeriveManifestAndLock(bs.crepo.r.LocalPath(), pr)
+	m, l, err := an.DeriveManifestAndLock(bs.repo.LocalPath(), pr)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -579,17 +575,13 @@ func (bs *baseVCSSource) getManifestAndLock(ctx context.Context, pr ProjectRoot,
 }
 
 func (bs *baseVCSSource) revisionPresentIn(r Revision) (bool, error) {
-	bs.crepo.mut.RLock()
-	defer bs.crepo.mut.RUnlock()
-	return bs.crepo.r.IsReference(string(r)), nil
+	return bs.repo.IsReference(string(r)), nil
 }
 
 // initLocal clones/checks out the upstream repository to disk for the first
 // time.
 func (bs *baseVCSSource) initLocal(ctx context.Context) error {
-	bs.crepo.mut.Lock()
-	err := bs.crepo.r.get(ctx)
-	bs.crepo.mut.Unlock()
+	err := bs.repo.get(ctx)
 
 	if err != nil {
 		return unwrapVcsErr(err)
@@ -600,9 +592,7 @@ func (bs *baseVCSSource) initLocal(ctx context.Context) error {
 // updateLocal ensures the local data (versions and code) we have about the
 // source is fully up to date with that of the canonical upstream source.
 func (bs *baseVCSSource) updateLocal(ctx context.Context) error {
-	bs.crepo.mut.Lock()
-	err := bs.crepo.r.update(ctx)
-	bs.crepo.mut.Unlock()
+	err := bs.repo.update(ctx)
 
 	if err != nil {
 		return unwrapVcsErr(err)
@@ -611,14 +601,12 @@ func (bs *baseVCSSource) updateLocal(ctx context.Context) error {
 }
 
 func (bs *baseVCSSource) listPackages(ctx context.Context, pr ProjectRoot, r Revision) (ptree pkgtree.PackageTree, err error) {
-	bs.crepo.mut.Lock()
-	err = bs.crepo.r.updateVersion(ctx, r.String())
-	bs.crepo.mut.Unlock()
+	err = bs.repo.updateVersion(ctx, r.String())
 
 	if err != nil {
 		err = unwrapVcsErr(err)
 	} else {
-		ptree, err = pkgtree.ListPackages(bs.crepo.r.LocalPath(), string(pr))
+		ptree, err = pkgtree.ListPackages(bs.repo.LocalPath(), string(pr))
 	}
 
 	return
@@ -631,12 +619,12 @@ func (bs *baseVCSSource) exportRevisionTo(ctx context.Context, r Revision, to st
 		return err
 	}
 
-	if err := bs.crepo.r.updateVersion(ctx, r.String()); err != nil {
+	if err := bs.repo.updateVersion(ctx, r.String()); err != nil {
 		return unwrapVcsErr(err)
 	}
 
 	// TODO(sdboyer) this is a simplistic approach and relying on the tools
 	// themselves might make it faster, but git's the overwhelming case (and has
 	// its own method) so fine for now
-	return fs.CopyDir(bs.crepo.r.LocalPath(), to)
+	return fs.CopyDir(bs.repo.LocalPath(), to)
 }
