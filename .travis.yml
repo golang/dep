@@ -8,12 +8,11 @@
       - os: linux
         go: 1.7.x
       - os: linux
-        go: 1.8
+        go: 1.8.x
       - os: linux
         go: tip
-# OSX wait times are unbearable right now. Re-enable when we can.
-      #- os: osx
-        #go: 1.7.x
+      - os: osx
+        go: 1.8.x
   install:
     - echo "This is an override of the default install deps step in travis."
   script:
