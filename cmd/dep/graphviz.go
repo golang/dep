@@ -32,13 +32,11 @@ func (g graphviz) New() *graphviz {
 }
 
 func (g graphviz) output() bytes.Buffer {
-	g.b.WriteString("digraph { node [shape=box]; ")
+	g.b.WriteString("digraph {\n\tnode [shape=box];")
 
 	for _, gvp := range g.ps {
-		g.h[gvp.project] = gvp.hash()
-
 		// Create node string
-		g.b.WriteString(fmt.Sprintf("%d [label=\"%s\"];", gvp.hash(), gvp.label()))
+		g.b.WriteString(fmt.Sprintf("\n\t%d [label=\"%s\"];", gvp.hash(), gvp.label()))
 	}
 
 	// Store relations to avoid duplication
@@ -48,11 +46,11 @@ func (g graphviz) output() bytes.Buffer {
 	for _, dp := range g.ps {
 		for _, bsc := range dp.children {
 			for pr, hsh := range g.h {
-				if strings.HasPrefix(bsc, pr) && isPathPrefixOrEqual(pr, bsc) {
-					r := fmt.Sprintf("%d -> %d", g.h[dp.project], hsh)
+				if isPathPrefix(bsc, pr) {
+					r := fmt.Sprintf("\n\t%d -> %d", g.h[dp.project], hsh)
 
 					if _, ex := rels[r]; !ex {
-						g.b.WriteString(r + "; ")
+						g.b.WriteString(r + ";")
 						rels[r] = true
 					}
 
@@ -61,18 +59,18 @@ func (g graphviz) output() bytes.Buffer {
 		}
 	}
 
-	g.b.WriteString("}")
-
+	g.b.WriteString("\n}")
 	return g.b
 }
 
-func (g *graphviz) createNode(p, v string, c []string) {
+func (g *graphviz) createNode(project, version string, children []string) {
 	pr := &gvnode{
-		project:  p,
-		version:  v,
-		children: c,
+		project:  project,
+		version:  version,
+		children: children,
 	}
 
+	g.h[pr.project] = pr.hash()
 	g.ps = append(g.ps, pr)
 }
 
@@ -89,26 +87,24 @@ func (dp gvnode) label() string {
 		label = append(label, dp.version)
 	}
 
-	return strings.Join(label, "\n")
+	return strings.Join(label, "\\n")
 }
 
-// Ensure that the literal string prefix is a path tree match and
-// guard against possibilities like this:
+// isPathPrefix ensures that the literal string prefix is a path tree match and
+// guards against possibilities like this:
 //
 // github.com/sdboyer/foo
 // github.com/sdboyer/foobar/baz
 //
-// Verify that either the input is the same length as the match (in which
-// case we know they're equal), or that the next character is a "/". (Import
-// paths are defined to always use "/", not the OS-specific path separator.)
-func isPathPrefixOrEqual(pre, path string) bool {
-	prflen, pathlen := len(pre), len(path)
-	if pathlen == prflen+1 {
-		// this can never be the case
+// Verify that prefix is path match and either the input is the same length as
+// the match (in which case we know they're equal), or that the next character
+// is a "/". (Import paths are defined to always use "/", not the OS-specific
+// path separator.)
+func isPathPrefix(path, pre string) bool {
+	pathlen, prflen := len(path), len(pre)
+	if pathlen < prflen || path[0:prflen] != pre || pathlen == prflen+1 {
 		return false
 	}
 
-	// we assume something else (a trie) has done equality check up to the point
-	// of the prefix, so we just check len
 	return prflen == pathlen || strings.Index(path[prflen:], "/") == 0
 }
