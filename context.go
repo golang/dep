@@ -5,7 +5,6 @@
 package dep
 
 import (
-	"fmt"
 	"go/build"
 	"os"
 	"path/filepath"
@@ -86,7 +85,7 @@ func (c *Ctx) LoadProject(path string) (*Project, error) {
 	if err != nil {
 		if os.IsNotExist(err) {
 			// TODO: list possible solutions? (dep init, cd $project)
-			return nil, fmt.Errorf("no %v found in project root %v", ManifestName, p.AbsRoot)
+			return nil, errors.Errorf("no %v found in project root %v", ManifestName, p.AbsRoot)
 		}
 		// Unable to read the manifest file
 		return nil, err
@@ -95,7 +94,7 @@ func (c *Ctx) LoadProject(path string) (*Project, error) {
 
 	p.Manifest, err = readManifest(mf)
 	if err != nil {
-		return nil, fmt.Errorf("error while parsing %s: %s", mp, err)
+		return nil, errors.Errorf("error while parsing %s: %s", mp, err)
 	}
 
 	lp := filepath.Join(p.AbsRoot, LockName)
@@ -106,13 +105,13 @@ func (c *Ctx) LoadProject(path string) (*Project, error) {
 			return p, nil
 		}
 		// But if a lock does exist and we can't open it, that's a problem
-		return nil, fmt.Errorf("could not open %s: %s", lp, err)
+		return nil, errors.Errorf("could not open %s: %s", lp, err)
 	}
 	defer lf.Close()
 
 	p.Lock, err = readLock(lf)
 	if err != nil {
-		return nil, fmt.Errorf("error while parsing %s: %s", lp, err)
+		return nil, errors.Errorf("error while parsing %s: %s", lp, err)
 	}
 
 	return p, nil
@@ -131,7 +130,7 @@ func (c *Ctx) SplitAbsoluteProjectRoot(path string) (string, error) {
 		return filepath.ToSlash(path[len(srcprefix):]), nil
 	}
 
-	return "", fmt.Errorf("%s not in any $GOPATH", path)
+	return "", errors.Errorf("%s not in any $GOPATH", path)
 }
 
 // absoluteProjectRoot determines the absolute path to the project root
@@ -144,7 +143,7 @@ func (c *Ctx) absoluteProjectRoot(path string) (string, error) {
 		return "", errors.Wrapf(err, "checking if %s is a directory", posspath)
 	}
 	if !dirOK {
-		return "", fmt.Errorf("%s does not exist", posspath)
+		return "", errors.Errorf("%s does not exist", posspath)
 	}
 	return posspath, nil
 }
@@ -182,7 +181,7 @@ func (c *Ctx) VersionInWorkspace(root gps.ProjectRoot) (gps.Version, error) {
 			return gps.NewVersion(ver).Is(gps.Revision(rev)), nil
 		}
 
-		return nil, fmt.Errorf("version for root %s does not start with a v: %q", pr, ver)
+		return nil, errors.Errorf("version for root %s does not start with a v: %q", pr, ver)
 	}
 
 	// Look for the current branch.
