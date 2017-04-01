@@ -13,7 +13,7 @@ func (fs filesystemState) setup(t *testing.T) {
 	for _, dir := range fs.dirs {
 		p := dir.prepend(fs.root)
 		if err := os.MkdirAll(p.String(), 0777); err != nil {
-			t.Fatalf("os.MkdirAll(%q, 0777) err=%q", p, 0777)
+			t.Fatalf("os.MkdirAll(%q, 0777) err=%q", p, err)
 		}
 	}
 	for _, file := range fs.files {
