@@ -4,51 +4,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
-	"path/filepath"
 	"sync"
 
-	"github.com/sdboyer/gps/internal/fs"
 	"github.com/sdboyer/gps/pkgtree"
 )
 
-// sourceExistence values represent the extent to which a project "exists."
-// TODO remove
-type sourceExistence uint8
-
-const (
-	// ExistsInVendorRoot indicates that a project exists in a vendor directory
-	// at the predictable location based on import path. It does NOT imply, much
-	// less guarantee, any of the following:
-	//   - That the code at the expected location under vendor is at the version
-	//   given in a lock file
-	//   - That the code at the expected location under vendor is from the
-	//   expected upstream project at all
-	//   - That, if this flag is not present, the project does not exist at some
-	//   unexpected/nested location under vendor
-	//   - That the full repository history is available. In fact, the
-	//   assumption should be that if only this flag is on, the full repository
-	//   history is likely not available (locally)
-	//
-	// In short, the information encoded in this flag should not be construed as
-	// exhaustive.
-	existsInVendorRoot sourceExistence = 1 << iota
-
-	// ExistsInCache indicates that a project exists on-disk in the local cache.
-	// It does not guarantee that an upstream exists, thus it cannot imply
-	// that the cache is at all correct - up-to-date, or even of the expected
-	// upstream project repository.
-	//
-	// Additionally, this refers only to the existence of the local repository
-	// itself; it says nothing about the existence or completeness of the
-	// separate metadata cache.
-	existsInCache
-
-	// ExistsUpstream indicates that a project repository was locatable at the
-	// path provided by a project's URI (a base import path).
-	existsUpstream
-)
-
+// sourceState represent the states that a source can be in, depending on how
+// much search and discovery work ahs been done by a source's managing gateway.
+//
+// These are basically used to achieve a cheap approximation of a FSM.
 type sourceState int32
 
 const (
@@ -248,26 +212,28 @@ func (sg *sourceGateway) syncLocal(ctx context.Context) error {
 	return err
 }
 
-func (sg *sourceGateway) checkExistence(ctx context.Context, ex sourceExistence) bool {
+func (sg *sourceGateway) existsInCache(ctx context.Context) bool {
 	sg.mu.Lock()
 	defer sg.mu.Unlock()
 
-	if ex&existsUpstream != 0 {
-		// TODO(sdboyer) these constants really aren't conceptual siblings in the
-		// way they should be
-		_, err := sg.require(ctx, sourceIsSetUp|sourceExistsUpstream)
-		if err != nil {
-			return false
-		}
-	}
-	if ex&existsInCache != 0 {
-		_, err := sg.require(ctx, sourceIsSetUp|sourceExistsLocally)
-		if err != nil {
-			return false
-		}
+	_, err := sg.require(ctx, sourceIsSetUp|sourceExistsLocally)
+	if err != nil {
+		return false
 	}
 
-	return true
+	return sg.srcState&sourceExistsLocally != 0
+}
+
+func (sg *sourceGateway) existsUpstream(ctx context.Context) bool {
+	sg.mu.Lock()
+	defer sg.mu.Unlock()
+
+	_, err := sg.require(ctx, sourceIsSetUp|sourceExistsUpstream)
+	if err != nil {
+		return false
+	}
+
+	return sg.srcState&sourceExistsUpstream != 0
 }
 
 func (sg *sourceGateway) exportVersionTo(ctx context.Context, v Version, to string) error {
@@ -533,98 +499,4 @@ type source interface {
 	revisionPresentIn(Revision) (bool, error)
 	exportRevisionTo(context.Context, Revision, string) error
 	sourceType() string
-}
-
-type baseVCSSource struct {
-	repo ctxRepo
-}
-
-func (bs *baseVCSSource) sourceType() string {
-	return string(bs.repo.Vcs())
-}
-
-func (bs *baseVCSSource) existsLocally(ctx context.Context) bool {
-	return bs.repo.CheckLocal()
-}
-
-// TODO reimpl for git
-func (bs *baseVCSSource) existsUpstream(ctx context.Context) bool {
-	return !bs.repo.Ping()
-}
-
-func (bs *baseVCSSource) upstreamURL() string {
-	return bs.repo.Remote()
-}
-
-func (bs *baseVCSSource) getManifestAndLock(ctx context.Context, pr ProjectRoot, r Revision, an ProjectAnalyzer) (Manifest, Lock, error) {
-	err := bs.repo.updateVersion(ctx, r.String())
-	if err != nil {
-		return nil, nil, unwrapVcsErr(err)
-	}
-
-	m, l, err := an.DeriveManifestAndLock(bs.repo.LocalPath(), pr)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	if l != nil && l != Lock(nil) {
-		l = prepLock(l)
-	}
-
-	return prepManifest(m), l, nil
-}
-
-func (bs *baseVCSSource) revisionPresentIn(r Revision) (bool, error) {
-	return bs.repo.IsReference(string(r)), nil
-}
-
-// initLocal clones/checks out the upstream repository to disk for the first
-// time.
-func (bs *baseVCSSource) initLocal(ctx context.Context) error {
-	err := bs.repo.get(ctx)
-
-	if err != nil {
-		return unwrapVcsErr(err)
-	}
-	return nil
-}
-
-// updateLocal ensures the local data (versions and code) we have about the
-// source is fully up to date with that of the canonical upstream source.
-func (bs *baseVCSSource) updateLocal(ctx context.Context) error {
-	err := bs.repo.update(ctx)
-
-	if err != nil {
-		return unwrapVcsErr(err)
-	}
-	return nil
-}
-
-func (bs *baseVCSSource) listPackages(ctx context.Context, pr ProjectRoot, r Revision) (ptree pkgtree.PackageTree, err error) {
-	err = bs.repo.updateVersion(ctx, r.String())
-
-	if err != nil {
-		err = unwrapVcsErr(err)
-	} else {
-		ptree, err = pkgtree.ListPackages(bs.repo.LocalPath(), string(pr))
-	}
-
-	return
-}
-
-func (bs *baseVCSSource) exportRevisionTo(ctx context.Context, r Revision, to string) error {
-	// Only make the parent dir, as CopyDir will balk on trying to write to an
-	// empty but existing dir.
-	if err := os.MkdirAll(filepath.Dir(to), 0777); err != nil {
-		return err
-	}
-
-	if err := bs.repo.updateVersion(ctx, r.String()); err != nil {
-		return unwrapVcsErr(err)
-	}
-
-	// TODO(sdboyer) this is a simplistic approach and relying on the tools
-	// themselves might make it faster, but git's the overwhelming case (and has
-	// its own method) so fine for now
-	return fs.CopyDir(bs.repo.LocalPath(), to)
 }

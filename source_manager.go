@@ -383,7 +383,8 @@ func (sm *SourceMgr) SourceExists(id ProjectIdentifier) (bool, error) {
 		return false, err
 	}
 
-	return srcg.checkExistence(context.TODO(), existsInCache) || srcg.checkExistence(context.TODO(), existsUpstream), nil
+	ctx := context.TODO()
+	return srcg.existsInCache(ctx) || srcg.existsUpstream(ctx), nil
 }
 
 // SyncSourceFor will ensure that all local caches and information about a

@@ -12,7 +12,102 @@ import (
 
 	"github.com/Masterminds/semver"
 	"github.com/sdboyer/gps/internal/fs"
+	"github.com/sdboyer/gps/pkgtree"
 )
+
+type baseVCSSource struct {
+	repo ctxRepo
+}
+
+func (bs *baseVCSSource) sourceType() string {
+	return string(bs.repo.Vcs())
+}
+
+func (bs *baseVCSSource) existsLocally(ctx context.Context) bool {
+	return bs.repo.CheckLocal()
+}
+
+// TODO reimpl for git
+func (bs *baseVCSSource) existsUpstream(ctx context.Context) bool {
+	return !bs.repo.Ping()
+}
+
+func (bs *baseVCSSource) upstreamURL() string {
+	return bs.repo.Remote()
+}
+
+func (bs *baseVCSSource) getManifestAndLock(ctx context.Context, pr ProjectRoot, r Revision, an ProjectAnalyzer) (Manifest, Lock, error) {
+	err := bs.repo.updateVersion(ctx, r.String())
+	if err != nil {
+		return nil, nil, unwrapVcsErr(err)
+	}
+
+	m, l, err := an.DeriveManifestAndLock(bs.repo.LocalPath(), pr)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if l != nil && l != Lock(nil) {
+		l = prepLock(l)
+	}
+
+	return prepManifest(m), l, nil
+}
+
+func (bs *baseVCSSource) revisionPresentIn(r Revision) (bool, error) {
+	return bs.repo.IsReference(string(r)), nil
+}
+
+// initLocal clones/checks out the upstream repository to disk for the first
+// time.
+func (bs *baseVCSSource) initLocal(ctx context.Context) error {
+	err := bs.repo.get(ctx)
+
+	if err != nil {
+		return unwrapVcsErr(err)
+	}
+	return nil
+}
+
+// updateLocal ensures the local data (versions and code) we have about the
+// source is fully up to date with that of the canonical upstream source.
+func (bs *baseVCSSource) updateLocal(ctx context.Context) error {
+	err := bs.repo.update(ctx)
+
+	if err != nil {
+		return unwrapVcsErr(err)
+	}
+	return nil
+}
+
+func (bs *baseVCSSource) listPackages(ctx context.Context, pr ProjectRoot, r Revision) (ptree pkgtree.PackageTree, err error) {
+	err = bs.repo.updateVersion(ctx, r.String())
+
+	if err != nil {
+		err = unwrapVcsErr(err)
+	} else {
+		ptree, err = pkgtree.ListPackages(bs.repo.LocalPath(), string(pr))
+	}
+
+	return
+}
+
+func (bs *baseVCSSource) exportRevisionTo(ctx context.Context, r Revision, to string) error {
+	// Only make the parent dir, as CopyDir will balk on trying to write to an
+	// empty but existing dir.
+	if err := os.MkdirAll(filepath.Dir(to), 0777); err != nil {
+		return err
+	}
+
+	if err := bs.repo.updateVersion(ctx, r.String()); err != nil {
+		return unwrapVcsErr(err)
+	}
+
+	// TODO(sdboyer) this is a simplistic approach and relying on the tools
+	// themselves might make it faster, but git's the overwhelming case (and has
+	// its own method) so fine for now
+	return fs.CopyDir(bs.repo.LocalPath(), to)
+}
 
 // gitSource is a generic git repository implementation that should work with
 // all standard git remotes.
