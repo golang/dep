@@ -47,7 +47,7 @@ func mkNaiveSM(t *testing.T) (*SourceMgr, func()) {
 		t.FailNow()
 	}
 
-	sm, err := NewSourceManager(naiveAnalyzer{}, cpath)
+	sm, err := NewSourceManager(cpath)
 	if err != nil {
 		t.Errorf("Unexpected error on SourceManager creation: %s", err)
 		t.FailNow()
@@ -66,7 +66,7 @@ func remakeNaiveSM(osm *SourceMgr, t *testing.T) (*SourceMgr, func()) {
 	cpath := osm.cachedir
 	osm.Release()
 
-	sm, err := NewSourceManager(naiveAnalyzer{}, cpath)
+	sm, err := NewSourceManager(cpath)
 	if err != nil {
 		t.Errorf("unexpected error on SourceManager recreation: %s", err)
 		t.FailNow()
@@ -91,13 +91,13 @@ func TestSourceManagerInit(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to create temp dir: %s", err)
 	}
-	sm, err := NewSourceManager(naiveAnalyzer{}, cpath)
+	sm, err := NewSourceManager(cpath)
 
 	if err != nil {
 		t.Errorf("Unexpected error on SourceManager creation: %s", err)
 	}
 
-	_, err = NewSourceManager(naiveAnalyzer{}, cpath)
+	_, err = NewSourceManager(cpath)
 	if err == nil {
 		t.Errorf("Creating second SourceManager should have failed due to file lock contention")
 	} else if te, ok := err.(CouldNotCreateLockError); !ok {
@@ -120,7 +120,7 @@ func TestSourceManagerInit(t *testing.T) {
 	}
 
 	// Set another one up at the same spot now, just to be sure
-	sm, err = NewSourceManager(naiveAnalyzer{}, cpath)
+	sm, err = NewSourceManager(cpath)
 	if err != nil {
 		t.Errorf("Creating a second SourceManager should have succeeded when the first was released, but failed with err %s", err)
 	}
@@ -144,7 +144,7 @@ func TestSourceInit(t *testing.T) {
 		t.FailNow()
 	}
 
-	sm, err := NewSourceManager(naiveAnalyzer{}, cpath)
+	sm, err := NewSourceManager(cpath)
 	if err != nil {
 		t.Errorf("Unexpected error on SourceManager creation: %s", err)
 		t.FailNow()
@@ -338,7 +338,7 @@ func TestMgrMethodsFailWithBadPath(t *testing.T) {
 	if _, err = sm.ListPackages(bad, nil); err == nil {
 		t.Error("ListPackages() did not error on bad input")
 	}
-	if _, _, err = sm.GetManifestAndLock(bad, nil); err == nil {
+	if _, _, err = sm.GetManifestAndLock(bad, nil, naiveAnalyzer{}); err == nil {
 		t.Error("GetManifestAndLock() did not error on bad input")
 	}
 	if err = sm.ExportProject(bad, nil, ""); err == nil {
@@ -426,7 +426,7 @@ func TestGetInfoListVersionsOrdering(t *testing.T) {
 
 	id := mkPI("github.com/sdboyer/gpkt").normalize()
 
-	_, _, err := sm.GetManifestAndLock(id, NewVersion("v1.0.0"))
+	_, _, err := sm.GetManifestAndLock(id, NewVersion("v1.0.0"), naiveAnalyzer{})
 	if err != nil {
 		t.Errorf("Unexpected error from GetInfoAt %s", err)
 	}
@@ -689,7 +689,7 @@ func TestErrAfterRelease(t *testing.T) {
 		t.Errorf("ListPackages errored after Release(), but with unexpected error: %T %s", terr, terr.Error())
 	}
 
-	_, _, err = sm.GetManifestAndLock(id, nil)
+	_, _, err = sm.GetManifestAndLock(id, nil, naiveAnalyzer{})
 	if err == nil {
 		t.Errorf("GetManifestAndLock did not error after calling Release()")
 	} else if terr, ok := err.(smIsReleased); !ok {

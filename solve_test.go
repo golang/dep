@@ -104,6 +104,7 @@ func solveBasicsAndCheck(fix basicFixture, t *testing.T) (res Solution, err erro
 		Downgrade:       fix.downgrade,
 		ChangeAll:       fix.changeall,
 		ToChange:        fix.changelist,
+		ProjectAnalyzer: naiveAnalyzer{},
 	}
 
 	if fix.l != nil {
@@ -153,6 +154,7 @@ func solveBimodalAndCheck(fix bimodalFixture, t *testing.T) (res Solution, err e
 		Lock:            dummyLock{},
 		Downgrade:       fix.downgrade,
 		ChangeAll:       fix.changeall,
+		ProjectAnalyzer: naiveAnalyzer{},
 	}
 
 	if fix.l != nil {
@@ -284,6 +286,7 @@ func TestRootLockNoVersionPairMatching(t *testing.T) {
 		RootPackageTree: fix.rootTree(),
 		Manifest:        fix.rootmanifest(),
 		Lock:            l2,
+		ProjectAnalyzer: naiveAnalyzer{},
 	}
 
 	res, err := fixSolve(params, sm)
@@ -308,6 +311,14 @@ func TestBadSolveOpts(t *testing.T) {
 		t.Error("Prepare should have given error on nil SourceManager, but gave:", err)
 	}
 
+	_, err = Prepare(params, sm)
+	if err == nil {
+		t.Errorf("Prepare should have errored without ProjectAnalyzer")
+	} else if !strings.Contains(err.Error(), "must provide a ProjectAnalyzer") {
+		t.Error("Prepare should have given error without ProjectAnalyzer, but gave:", err)
+	}
+
+	params.ProjectAnalyzer = naiveAnalyzer{}
 	_, err = Prepare(params, sm)
 	if err == nil {
 		t.Errorf("Prepare should have errored on empty root")

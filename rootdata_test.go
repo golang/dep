@@ -12,6 +12,7 @@ func TestRootdataExternalImports(t *testing.T) {
 		RootDir:         string(fix.ds[0].n),
 		RootPackageTree: fix.rootTree(),
 		Manifest:        fix.rootmanifest(),
+		ProjectAnalyzer: naiveAnalyzer{},
 	}
 
 	is, err := Prepare(params, newdepspecSM(fix.ds, nil))
@@ -65,6 +66,7 @@ func TestGetApplicableConstraints(t *testing.T) {
 		RootDir:         string(fix.ds[0].n),
 		RootPackageTree: fix.rootTree(),
 		Manifest:        fix.rootmanifest(),
+		ProjectAnalyzer: naiveAnalyzer{},
 	}
 
 	is, err := Prepare(params, newdepspecSM(fix.ds, nil))

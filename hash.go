@@ -104,7 +104,7 @@ func (s *solver) writeHashingInputs(w io.Writer) {
 	}
 
 	writeString(hhAnalyzer)
-	an, av := s.b.AnalyzerInfo()
+	an, av := s.rd.an.Info()
 	writeString(an)
 	writeString(strconv.Itoa(av))
 }

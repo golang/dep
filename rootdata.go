@@ -42,6 +42,9 @@ type rootdata struct {
 
 	// A defensively copied instance of params.RootPackageTree
 	rpt pkgtree.PackageTree
+
+	// The ProjectAnalyzer to use for all GetManifestAndLock calls.
+	an ProjectAnalyzer
 }
 
 // externalImportList returns a list of the unique imports from the root data.

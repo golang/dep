@@ -1384,7 +1384,7 @@ func newdepspecSM(ds []depspec, ignore []string) *depspecSourceManager {
 	}
 }
 
-func (sm *depspecSourceManager) GetManifestAndLock(id ProjectIdentifier, v Version) (Manifest, Lock, error) {
+func (sm *depspecSourceManager) GetManifestAndLock(id ProjectIdentifier, v Version, an ProjectAnalyzer) (Manifest, Lock, error) {
 	// If the input version is a PairedVersion, look only at its top version,
 	// not the underlying. This is generally consistent with the idea that, for
 	// this class of lookup, the rev probably DOES exist, but upstream changed

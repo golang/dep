@@ -54,15 +54,11 @@ type SourceManager interface {
 	// gps currently requires that projects be rooted at their repository root,
 	// necessitating that the ProjectIdentifier's ProjectRoot must also be a
 	// repository root.
-	GetManifestAndLock(ProjectIdentifier, Version) (Manifest, Lock, error)
+	GetManifestAndLock(ProjectIdentifier, Version, ProjectAnalyzer) (Manifest, Lock, error)
 
 	// ExportProject writes out the tree of the provided import path, at the
 	// provided version, to the provided directory.
 	ExportProject(ProjectIdentifier, Version, string) error
-
-	// AnalyzerInfo reports the name and version of the logic used to service
-	// GetManifestAndLock().
-	AnalyzerInfo() (name string, version int)
 
 	// DeduceRootProject takes an import path and deduces the corresponding
 	// project/source root.
@@ -92,7 +88,6 @@ type SourceMgr struct {
 	cancelAll   context.CancelFunc    // cancel func to kill all running work
 	deduceCoord *deductionCoordinator // subsystem that manages import path deduction
 	srcCoord    *sourceCoordinator    // subsystem that manages sources
-	an          ProjectAnalyzer       // analyzer injected by the caller TODO remove
 	sigmut      sync.Mutex            // mutex protecting signal handling setup/teardown
 	qch         chan struct{}         // quit chan for signal handler
 	relonce     sync.Once             // once-er to ensure we only release once
@@ -108,9 +103,8 @@ func (smIsReleased) Error() string {
 var _ SourceManager = &SourceMgr{}
 
 // NewSourceManager produces an instance of gps's built-in SourceManager. It
-// takes a cache directory (where local instances of upstream repositories are
-// stored), and a ProjectAnalyzer that is used to extract manifest and lock
-// information from source trees.
+// takes a cache directory, where local instances of upstream sources are
+// stored.
 //
 // The returned SourceManager aggressively caches information wherever possible.
 // If tools need to do preliminary work involving upstream repository analysis
@@ -121,11 +115,7 @@ var _ SourceManager = &SourceMgr{}
 // gps's SourceManager is intended to be threadsafe (if it's not, please file a
 // bug!). It should be safe to reuse across concurrent solving runs, even on
 // unrelated projects.
-func NewSourceManager(an ProjectAnalyzer, cachedir string) (*SourceMgr, error) {
-	if an == nil {
-		return nil, fmt.Errorf("a ProjectAnalyzer must be provided to the SourceManager")
-	}
-
+func NewSourceManager(cachedir string) (*SourceMgr, error) {
 	err := os.MkdirAll(filepath.Join(cachedir, "sources"), 0777)
 	if err != nil {
 		return nil, err
@@ -159,7 +149,6 @@ func NewSourceManager(an ProjectAnalyzer, cachedir string) (*SourceMgr, error) {
 		cancelAll:   cf,
 		deduceCoord: deducer,
 		srcCoord:    newSourceCoordinator(superv, deducer, cachedir),
-		an:          an,
 		qch:         make(chan struct{}),
 	}
 
@@ -303,19 +292,11 @@ func (sm *SourceMgr) doRelease() {
 	}
 }
 
-// AnalyzerInfo reports the name and version of the injected ProjectAnalyzer.
-func (sm *SourceMgr) AnalyzerInfo() (name string, version int) {
-	return sm.an.Info()
-}
-
 // GetManifestAndLock returns manifest and lock information for the provided
-// import path. gps currently requires that projects be rooted at their
-// repository root, necessitating that the ProjectIdentifier's ProjectRoot must
-// also be a repository root.
-//
-// The work of producing the manifest and lock is delegated to the injected
-// ProjectAnalyzer's DeriveManifestAndLock() method.
-func (sm *SourceMgr) GetManifestAndLock(id ProjectIdentifier, v Version) (Manifest, Lock, error) {
+// ProjectIdentifier, at the provided Version. The work of producing the
+// manifest and lock is delegated to the provided ProjectAnalyzer's
+// DeriveManifestAndLock() method.
+func (sm *SourceMgr) GetManifestAndLock(id ProjectIdentifier, v Version, an ProjectAnalyzer) (Manifest, Lock, error) {
 	if atomic.CompareAndSwapInt32(&sm.releasing, 1, 1) {
 		return nil, nil, smIsReleased{}
 	}
@@ -325,7 +306,7 @@ func (sm *SourceMgr) GetManifestAndLock(id ProjectIdentifier, v Version) (Manife
 		return nil, nil, err
 	}
 
-	return srcg.getManifestAndLock(context.TODO(), id.ProjectRoot, v, sm.an)
+	return srcg.getManifestAndLock(context.TODO(), id.ProjectRoot, v, an)
 }
 
 // ListPackages parses the tree of the Go packages at and below the ProjectRoot
