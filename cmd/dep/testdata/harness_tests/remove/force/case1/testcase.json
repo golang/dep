@@ -1,0 +1,9 @@
+{
+  "commands": [
+    ["remove", "-force", "github.com/sdboyer/deptestdos", "github.com/not/used"]
+  ],
+  "vendor-final": [
+    "github.com/sdboyer/deptest",
+    "github.com/sdboyer/deptestdos"
+  ]
+}

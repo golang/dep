@@ -8,10 +8,10 @@ import (
 	"bytes"
 	"encoding/hex"
 	"encoding/json"
-	"fmt"
 	"io"
 	"sort"
 
+	"github.com/pkg/errors"
 	"github.com/sdboyer/gps"
 )
 
@@ -28,12 +28,12 @@ type rawLock struct {
 }
 
 type lockedDep struct {
-	Name       string   `json:"name"`
-	Version    string   `json:"version,omitempty"`
-	Branch     string   `json:"branch,omitempty"`
-	Revision   string   `json:"revision"`
-	Repository string   `json:"repo,omitempty"`
-	Packages   []string `json:"packages"`
+	Name     string   `json:"name"`
+	Version  string   `json:"version,omitempty"`
+	Branch   string   `json:"branch,omitempty"`
+	Revision string   `json:"revision"`
+	Source   string   `json:"source,omitempty"`
+	Packages []string `json:"packages"`
 }
 
 func readLock(r io.Reader) (*Lock, error) {
@@ -45,7 +45,7 @@ func readLock(r io.Reader) (*Lock, error) {
 
 	b, err := hex.DecodeString(rl.Memo)
 	if err != nil {
-		return nil, fmt.Errorf("invalid hash digest in lock's memo field")
+		return nil, errors.Errorf("invalid hash digest in lock's memo field")
 	}
 	l := &Lock{
 		Memo: b,
@@ -58,18 +58,18 @@ func readLock(r io.Reader) (*Lock, error) {
 		var v gps.Version = r
 		if ld.Version != "" {
 			if ld.Branch != "" {
-				return nil, fmt.Errorf("lock file specified both a branch (%s) and version (%s) for %s", ld.Branch, ld.Version, ld.Name)
+				return nil, errors.Errorf("lock file specified both a branch (%s) and version (%s) for %s", ld.Branch, ld.Version, ld.Name)
 			}
 			v = gps.NewVersion(ld.Version).Is(r)
 		} else if ld.Branch != "" {
 			v = gps.NewBranch(ld.Branch).Is(r)
 		} else if r == "" {
-			return nil, fmt.Errorf("lock file has entry for %s, but specifies no branch or version", ld.Name)
+			return nil, errors.Errorf("lock file has entry for %s, but specifies no branch or version", ld.Name)
 		}
 
 		id := gps.ProjectIdentifier{
 			ProjectRoot: gps.ProjectRoot(ld.Name),
-			Source:      ld.Repository,
+			Source:      ld.Source,
 		}
 		l.P[i] = gps.NewLockedProject(id, v, ld.Packages)
 	}
@@ -96,29 +96,13 @@ func (l *Lock) MarshalJSON() ([]byte, error) {
 	for k, lp := range l.P {
 		id := lp.Ident()
 		ld := lockedDep{
-			Name:       string(id.ProjectRoot),
-			Repository: id.Source,
-			Packages:   lp.Packages(),
+			Name:     string(id.ProjectRoot),
+			Source:   id.Source,
+			Packages: lp.Packages(),
 		}
 
 		v := lp.Version()
-		// Figure out how to get the underlying revision
-		switch tv := v.(type) {
-		case gps.UnpairedVersion:
-			// TODO we could error here, if we want to be very defensive about not
-			// allowing a lock to be written if without an immmutable revision
-		case gps.Revision:
-			ld.Revision = tv.String()
-		case gps.PairedVersion:
-			ld.Revision = tv.Underlying().String()
-		}
-
-		switch v.Type() {
-		case gps.IsBranch:
-			ld.Branch = v.String()
-		case gps.IsSemver, gps.IsVersion:
-			ld.Version = v.String()
-		}
+		ld.Revision, ld.Branch, ld.Version = getVersionInfo(v)
 
 		raw.P[k] = ld
 	}
@@ -132,6 +116,29 @@ func (l *Lock) MarshalJSON() ([]byte, error) {
 	err := enc.Encode(raw)
 
 	return buf.Bytes(), err
+}
+
+// TODO(carolynvs) this should be moved to gps
+func getVersionInfo(v gps.Version) (revision string, branch string, version string) {
+	// Figure out how to get the underlying revision
+	switch tv := v.(type) {
+	case gps.UnpairedVersion:
+	// TODO we could error here, if we want to be very defensive about not
+	// allowing a lock to be written if without an immmutable revision
+	case gps.Revision:
+		revision = tv.String()
+	case gps.PairedVersion:
+		revision = tv.Underlying().String()
+	}
+
+	switch v.Type() {
+	case gps.IsBranch:
+		branch = v.String()
+	case gps.IsSemver, gps.IsVersion:
+		version = v.String()
+	}
+
+	return
 }
 
 // LockFromInterface converts an arbitrary gps.Lock to dep's representation of a
@@ -176,15 +183,4 @@ func (s SortedLockedProjects) Less(i, j int) bool {
 	}
 
 	return l.Source < r.Source
-}
-
-// locksAreEquivalent compares two locks to see if they differ. If EITHER lock
-// is nil, or their memos do not match, or any projects differ, then false is
-// returned.
-func locksAreEquivalent(l, r *Lock) bool {
-	if l == nil || r == nil {
-		return false
-	}
-
-	return gps.LocksAreEq(l, r, true)
 }

@@ -5,7 +5,6 @@
 package main
 
 import (
-	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
@@ -73,7 +72,7 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 		return err
 	}
 	if mok {
-		return fmt.Errorf("manifest file %q already exists", mf)
+		return errors.Errorf("manifest file %q already exists", mf)
 	}
 	// Manifest file does not exist.
 
@@ -82,7 +81,7 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 		return err
 	}
 	if lok {
-		return fmt.Errorf("invalid state: manifest %q does not exist, but lock %q does", mf, lf)
+		return errors.Errorf("invalid state: manifest %q does not exist, but lock %q does", mf, lf)
 	}
 
 	cpr, err := ctx.SplitAbsoluteProjectRoot(root)
@@ -106,13 +105,13 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 	if err != nil {
 		return err
 	}
-	m := dep.Manifest{
+	m := &dep.Manifest{
 		Dependencies: pd.constraints,
 	}
 
 	// Make an initial lock from what knowledge we've collected about the
 	// versions on disk
-	l := dep.Lock{
+	l := &dep.Lock{
 		P: make([]gps.LockedProject, 0, len(pd.ondisk)),
 	}
 
@@ -134,19 +133,13 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 		)
 	}
 
-	sw := dep.SafeWriter{
-		Root:          root,
-		SourceManager: sm,
-		Manifest:      &m,
-	}
-
 	if len(pd.notondisk) > 0 {
 		vlogf("Solving...")
 		params := gps.SolveParameters{
 			RootDir:         root,
 			RootPackageTree: pkgT,
-			Manifest:        &m,
-			Lock:            &l,
+			Manifest:        m,
+			Lock:            l,
 		}
 
 		if *verbose {
@@ -163,14 +156,14 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 			handleAllTheFailuresOfTheWorld(err)
 			return err
 		}
-		sw.Lock = dep.LockFromInterface(soln)
-	} else {
-		sw.Lock = &l
+		l = dep.LockFromInterface(soln)
 	}
 
 	vlogf("Writing manifest and lock files.")
 
-	if err := sw.WriteAllSafe(true); err != nil {
+	var sw dep.SafeWriter
+	sw.Prepare(m, nil, l, dep.VendorAlways)
+	if err := sw.Write(root, sm); err != nil {
 		return errors.Wrap(err, "safe write of manifest and lock")
 	}
 
@@ -204,23 +197,7 @@ func isStdLib(path string) bool {
 // TODO solve failures can be really creative - we need to be similarly creative
 // in handling them and informing the user appropriately
 func handleAllTheFailuresOfTheWorld(err error) {
-	fmt.Printf("solve error: %s", err)
-}
-
-func writeFile(path string, in json.Marshaler) error {
-	f, err := os.Create(path)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-
-	b, err := in.MarshalJSON()
-	if err != nil {
-		return err
-	}
-
-	_, err = f.Write(b)
-	return err
+	fmt.Printf("solve error: %s\n", err)
 }
 
 func hasImportPathPrefix(s, prefix string) bool {
@@ -238,8 +215,6 @@ type projectData struct {
 }
 
 func getProjectData(ctx *dep.Ctx, pkgT gps.PackageTree, cpr string, sm *gps.SourceMgr) (projectData, error) {
-	vlogf("Building dependency graph...")
-
 	constraints := make(gps.ProjectConstraints)
 	dependencies := make(map[gps.ProjectRoot][]string)
 	packages := make(map[string]bool)
@@ -254,59 +229,48 @@ func getProjectData(ctx *dep.Ctx, pkgT gps.PackageTree, cpr string, sm *gps.Sour
 		fmt.Fprintf(os.Stderr, "%s %s\n", message, pr)
 	}
 
-	for _, v := range pkgT.Packages {
-		// TODO: Some errors maybe should not be skipped ;-)
-		if v.Err != nil {
-			vlogf("%v", v.Err)
+	rm, _ := pkgT.ToReachMap(true, true, false, nil)
+	if len(rm) == 0 {
+		return projectData{}, nil
+	}
+
+	vlogf("Building dependency graph...")
+	// Exclude stdlib imports from the list returned from Flatten().
+	const omitStdlib = false
+	for _, ip := range rm.Flatten(omitStdlib) {
+		pr, err := sm.DeduceProjectRoot(ip)
+		if err != nil {
+			return projectData{}, errors.Wrap(err, "sm.DeduceProjectRoot") // TODO: Skip and report ?
+		}
+
+		packages[ip] = true
+		if _, has := dependencies[pr]; has {
+			dependencies[pr] = append(dependencies[pr], ip)
 			continue
 		}
-		vlogf("Package %q, analyzing...", v.P.ImportPath)
+		go syncDep(pr, sm)
 
-		for _, ip := range v.P.Imports {
-			if isStdLib(ip) {
-				continue
-			}
-			if hasImportPathPrefix(ip, cpr) {
-				// Don't analyze imports from the current project.
-				continue
-			}
-			pr, err := sm.DeduceProjectRoot(ip)
-			if err != nil {
-				return projectData{}, errors.Wrap(err, "sm.DeduceProjectRoot") // TODO: Skip and report ?
-			}
+		vlogf("Found import of %q, analyzing...", ip)
 
-			packages[ip] = true
-			if _, ok := dependencies[pr]; ok {
-				if !contains(dependencies[pr], ip) {
-					dependencies[pr] = append(dependencies[pr], ip)
-				}
-
-				continue
-			}
-			go syncDep(pr, sm)
-
-			vlogf("Package %q has import %q, analyzing...", v.P.ImportPath, ip)
-
-			dependencies[pr] = []string{ip}
-			v, err := ctx.VersionInWorkspace(pr)
-			if err != nil {
-				notondisk[pr] = true
-				vlogf("Could not determine version for %q, omitting from generated manifest", pr)
-				continue
-			}
-
-			ondisk[pr] = v
-			pp := gps.ProjectProperties{}
-			switch v.Type() {
-			case gps.IsBranch, gps.IsVersion, gps.IsRevision:
-				pp.Constraint = v
-			case gps.IsSemver:
-				c, _ := gps.NewSemverConstraint("^" + v.String())
-				pp.Constraint = c
-			}
-
-			constraints[pr] = pp
+		dependencies[pr] = []string{ip}
+		v, err := ctx.VersionInWorkspace(pr)
+		if err != nil {
+			notondisk[pr] = true
+			vlogf("Could not determine version for %q, omitting from generated manifest", pr)
+			continue
 		}
+
+		ondisk[pr] = v
+		pp := gps.ProjectProperties{}
+		switch v.Type() {
+		case gps.IsBranch, gps.IsVersion, gps.IsRevision:
+			pp.Constraint = v
+		case gps.IsSemver:
+			c, _ := gps.NewSemverConstraint("^" + v.String())
+			pp.Constraint = c
+		}
+
+		constraints[pr] = pp
 	}
 
 	vlogf("Analyzing transitive imports...")
@@ -350,11 +314,29 @@ func getProjectData(ctx *dep.Ctx, pkgT gps.PackageTree, cpr string, sm *gps.Sour
 				// project is not present in the workspace, and so we need to
 				// solve to deal with this dep.
 				r := filepath.Join(ctx.GOPATH, "src", string(pr))
-				_, err := os.Lstat(r)
-				if os.IsNotExist(err) {
+				fi, err := os.Stat(r)
+				if os.IsNotExist(err) || !fi.IsDir() {
 					colors[pkg] = black
 					notondisk[pr] = true
 					return nil
+				}
+
+				// We know the project is on disk; the question is whether we're
+				// first seeing it here, in the transitive exploration, or if it
+				// was found in the initial pass on direct imports. We know it's
+				// the former if there's no entry for it in the ondisk map.
+				if _, in := ondisk[pr]; !in {
+					v, err := ctx.VersionInWorkspace(pr)
+					if err != nil {
+						// Even if we know it's on disk, errors are still
+						// possible when trying to deduce version. If we
+						// encounter such an error, just treat the project as
+						// not being on disk; the solver will work it out.
+						colors[pkg] = black
+						notondisk[pr] = true
+						return nil
+					}
+					ondisk[pr] = v
 				}
 
 				ptree, err = gps.ListPackages(r, string(pr))
@@ -386,26 +368,13 @@ func getProjectData(ctx *dep.Ctx, pkgT gps.PackageTree, cpr string, sm *gps.Sour
 				return nil
 			}
 
-			if _, ok := dependencies[pr]; ok {
-				if !contains(dependencies[pr], pkg) {
-					dependencies[pr] = append(dependencies[pr], pkg)
+			if deps, has := dependencies[pr]; has {
+				if !contains(deps, pkg) {
+					dependencies[pr] = append(deps, pkg)
 				}
 			} else {
 				dependencies[pr] = []string{pkg}
 				go syncDep(pr, sm)
-			}
-
-			// project must be on disk at this point; question is
-			// whether we're first seeing it here, in the transitive
-			// exploration, or if it arose in the direct dep parts
-			if _, in := ondisk[pr]; !in {
-				v, err := ctx.VersionInWorkspace(pr)
-				if err != nil {
-					colors[pkg] = black
-					notondisk[pr] = true
-					return nil
-				}
-				ondisk[pr] = v
 			}
 
 			// recurse
@@ -416,13 +385,14 @@ func getProjectData(ctx *dep.Ctx, pkgT gps.PackageTree, cpr string, sm *gps.Sour
 
 				err := dft(rpkg)
 				if err != nil {
+					// Bubble up any errors we encounter
 					return err
 				}
 			}
 
 			colors[pkg] = black
 		case grey:
-			return fmt.Errorf("Import cycle detected on %s", pkg)
+			return errors.Errorf("Import cycle detected on %s", pkg)
 		}
 		return nil
 	}
