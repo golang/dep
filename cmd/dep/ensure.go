@@ -147,25 +147,30 @@ func (cmd *ensureCommand) Run(ctx *dep.Ctx, args []string) error {
 		return errors.Wrap(err, "ensure Solve()")
 	}
 
-	sw := dep.SafeWriter{
-		Root:          p.AbsRoot,
-		Lock:          p.Lock,
-		NewLock:       solution,
-		SourceManager: sm,
-	}
-	if !cmd.update {
-		sw.Manifest = p.Manifest
-	}
-
 	// check if vendor exists, because if the locks are the same but
 	// vendor does not exist we should write vendor
-	vendorExists, err := dep.IsNonEmptyDir(filepath.Join(sw.Root, "vendor"))
+	vendorExists, err := dep.IsNonEmptyDir(filepath.Join(p.AbsRoot, "vendor"))
 	if err != nil {
 		return errors.Wrap(err, "ensure vendor is a directory")
 	}
-	writeV := !vendorExists && solution != nil
+	writeV := dep.VendorOnChanged
+	if !vendorExists && solution != nil {
+		writeV = dep.VendorAlways
+	}
 
-	return errors.Wrap(sw.WriteAllSafe(writeV), "grouped write of manifest, lock and vendor")
+	var sw dep.SafeWriter
+	var manifest *dep.Manifest
+	if !cmd.update {
+		manifest = p.Manifest
+	}
+
+	newLock := dep.LockFromInterface(solution)
+	sw.Prepare(manifest, p.Lock, newLock, writeV)
+	if cmd.dryRun {
+		return sw.PrintPreparedActions()
+	}
+
+	return errors.Wrap(sw.Write(p.AbsRoot, sm), "grouped write of manifest, lock and vendor")
 }
 
 func applyUpdateArgs(args []string, params *gps.SolveParameters) {
@@ -285,7 +290,7 @@ func getProjectConstraint(arg string, sm *gps.SourceMgr) (gps.ProjectConstraint,
 	}
 
 	if string(pr) != arg {
-		return constraint, fmt.Errorf("dependency path %s is not a project root, try %s instead", arg, pr)
+		return constraint, errors.Errorf("dependency path %s is not a project root, try %s instead", arg, pr)
 	}
 
 	constraint.Ident.ProjectRoot = gps.ProjectRoot(arg)
@@ -313,7 +318,7 @@ func getProjectConstraint(arg string, sm *gps.SourceMgr) (gps.ProjectConstraint,
 			}
 
 			if !found {
-				return constraint, fmt.Errorf("%s is not a valid version for the package %s", versionStr, arg)
+				return constraint, errors.Errorf("%s is not a valid version for the package %s", versionStr, arg)
 			}
 		}
 	}

@@ -1,0 +1,12 @@
+{
+  "commands": [
+    ["init"]
+  ],
+  "gopath-initial": {
+    "github.com/sdboyer/deptest": "v0.8.0"
+  },
+  "vendor-final": [
+    "github.com/sdboyer/deptest",
+    "github.com/sdboyer/deptestdos"
+  ]
+}

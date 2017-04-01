@@ -1,0 +1,34 @@
+Memo: 595716d270828e763c811ef79c9c41f85b1d1bfbdfe85280036405c03772206c -> 2252a285ab27944a4d7adcba8dbd03980f59ba652f12db39fa93b927c345593e
+Add: [
+    {
+        "name": "github.com/stuff/realthing",
+        "version": "2.0.0",
+        "revision": "1f02e52d6bac308da54ab84a234c58a98ca82347",
+        "packages": [
+            "."
+        ]
+    }
+]
+Remove: [
+    {
+        "name": "github.com/stuff/placeholder",
+        "version": "2.0.0",
+        "revision": "6694017eeb4e20fd277b049bf29dba4895c97234",
+        "packages": [
+            "."
+        ]
+    }
+]
+Modify: [
+    {
+        "name": "github.com/foo/bar",
+        "source": "+ http://github.example.com/foo/bar",
+        "version": "+ 1.2.0",
+        "branch": "- master",
+        "revision": "f24338400f072ef18125ae0fbe6b06fe6d1783e7 -> 2a3a211e171803acb82d1d5d42ceb53228f51751",
+        "packages": [
+            "- placeholder",
+            "+ thing"
+        ]
+    }
+]

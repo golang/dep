@@ -6,7 +6,6 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"log"
 	"os"
 	"strings"
@@ -70,7 +69,7 @@ func (cmd *removeCommand) Run(ctx *dep.Ctx, args []string) error {
 
 	if cmd.unused {
 		if len(args) > 0 {
-			return fmt.Errorf("remove takes no arguments when running with -unused")
+			return errors.Errorf("remove takes no arguments when running with -unused")
 		}
 
 		reachlist := reachmap.Flatten(false)
@@ -126,7 +125,7 @@ func (cmd *removeCommand) Run(ctx *dep.Ctx, args []string) error {
 			if string(pr) != arg {
 				// don't be magical with subpaths, otherwise we muddy the waters
 				// between project roots and import paths
-				return fmt.Errorf("%q is not a project root, but %q is - is that what you want to remove?", arg, pr)
+				return errors.Errorf("%q is not a project root, but %q is - is that what you want to remove?", arg, pr)
 			}
 
 			/*
@@ -147,14 +146,14 @@ func (cmd *removeCommand) Run(ctx *dep.Ctx, args []string) error {
 			}
 
 			if _, indeps := p.Manifest.Dependencies[gps.ProjectRoot(arg)]; !indeps {
-				return fmt.Errorf("%q is not present in the manifest, cannot remove it", arg)
+				return errors.Errorf("%q is not present in the manifest, cannot remove it", arg)
 			}
 
 			if len(pkgimport) > 0 && !cmd.force {
 				if len(pkgimport) == 1 {
-					return fmt.Errorf("not removing %q because it is imported by %q (pass -force to override)", arg, pkgimport[0])
+					return errors.Errorf("not removing %q because it is imported by %q (pass -force to override)", arg, pkgimport[0])
 				}
-				return fmt.Errorf("not removing %q because it is imported by:\n\t%s (pass -force to override)", arg, strings.Join(pkgimport, "\n\t"))
+				return errors.Errorf("not removing %q because it is imported by:\n\t%s (pass -force to override)", arg, strings.Join(pkgimport, "\n\t"))
 			}
 
 			delete(p.Manifest.Dependencies, gps.ProjectRoot(arg))
@@ -179,15 +178,10 @@ func (cmd *removeCommand) Run(ctx *dep.Ctx, args []string) error {
 		return err
 	}
 
-	sw := dep.SafeWriter{
-		Root:          p.AbsRoot,
-		Manifest:      p.Manifest,
-		Lock:          p.Lock,
-		NewLock:       soln,
-		SourceManager: sm,
-	}
-
-	if err := sw.WriteAllSafe(false); err != nil {
+	var sw dep.SafeWriter
+	newLock := dep.LockFromInterface(soln)
+	sw.Prepare(p.Manifest, p.Lock, newLock, dep.VendorOnChanged)
+	if err := sw.Write(p.AbsRoot, sm); err != nil {
 		return errors.Wrap(err, "grouped write of manifest, lock and vendor")
 	}
 	return nil

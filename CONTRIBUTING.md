@@ -4,6 +4,7 @@ Dep is an open source project.
 
 It is the work of hundreds of contributors. We appreciate your help!
 
+Keep an eye on the [Roadmap](https://github.com/golang/dep/wiki/Roadmap) for a summary of where the project is, and where we're headed.
 
 ## Filing issues
 

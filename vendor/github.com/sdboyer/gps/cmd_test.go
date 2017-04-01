@@ -33,8 +33,8 @@ func TestMonitoredCmd(t *testing.T) {
 		t.Errorf("Unexpected output:\n\t(GOT): %s\n\t(WNT): %s", cmd.stdout.buf.String(), expectedOutput)
 	}
 
-	cmd = mkTestCmd(10)
-	err = cmd.run()
+	cmd2 := mkTestCmd(10)
+	err = cmd2.run()
 	if err == nil {
 		t.Error("Expected command to fail")
 	}
@@ -45,7 +45,7 @@ func TestMonitoredCmd(t *testing.T) {
 	}
 
 	expectedOutput = "foo\nfoo\nfoo\nfoo\n"
-	if cmd.stdout.buf.String() != expectedOutput {
-		t.Errorf("Unexpected output:\n\t(GOT): %s\n\t(WNT): %s", cmd.stdout.buf.String(), expectedOutput)
+	if cmd2.stdout.buf.String() != expectedOutput {
+		t.Errorf("Unexpected output:\n\t(GOT): %s\n\t(WNT): %s", cmd2.stdout.buf.String(), expectedOutput)
 	}
 }

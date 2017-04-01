@@ -24,9 +24,9 @@ import (
 )
 
 var (
-	ExeSuffix    string // ".exe" on Windows
-	mu           sync.Mutex
-	UpdateGolden = flag.Bool("update", false, "update .golden files")
+	ExeSuffix string // ".exe" on Windows
+	mu        sync.Mutex
+	PrintLogs *bool = flag.Bool("logs", false, "log stdin/stdout of test commands")
 )
 
 func init() {
@@ -68,7 +68,7 @@ func (h *Helper) Must(err error) {
 // check gives a test non-fatal error if err is not nil.
 func (h *Helper) check(err error) {
 	if err != nil {
-		h.t.Error(err)
+		h.t.Errorf("%+v", err)
 	}
 }
 
@@ -112,10 +112,12 @@ func (h *Helper) Cd(dir string) {
 		h.wd = h.pwd()
 	}
 	abs, err := filepath.Abs(dir)
-	h.Must(os.Chdir(dir))
 	if err == nil {
 		h.Setenv("PWD", abs)
 	}
+
+	err = os.Chdir(dir)
+	h.Must(errors.Wrapf(err, "Unable to cd to %s", dir))
 }
 
 // Setenv sets an environment variable to use when running the test go
@@ -151,28 +153,33 @@ func (h *Helper) DoRun(args []string) error {
 			}
 		}
 	}
-	h.t.Logf("running testdep %v", args)
+	if *PrintLogs {
+		h.t.Logf("running testdep %v", args)
+	}
 	var prog string
 	if h.wd == "" {
 		prog = "./testdep" + ExeSuffix
 	} else {
 		prog = filepath.Join(h.wd, "testdep"+ExeSuffix)
 	}
-	args = append(args[:1], append([]string{"-v"}, args[1:]...)...)
-	cmd := exec.Command(prog, args...)
+	newargs := []string{args[0], "-v"}
+	newargs = append(newargs, args[1:]...)
+	cmd := exec.Command(prog, newargs...)
 	h.stdout.Reset()
 	h.stderr.Reset()
 	cmd.Stdout = &h.stdout
 	cmd.Stderr = &h.stderr
 	cmd.Env = h.env
 	status := cmd.Run()
-	if h.stdout.Len() > 0 {
-		h.t.Log("standard output:")
-		h.t.Log(h.stdout.String())
-	}
-	if h.stderr.Len() > 0 {
-		h.t.Log("standard error:")
-		h.t.Log(h.stderr.String())
+	if *PrintLogs {
+		if h.stdout.Len() > 0 {
+			h.t.Log("standard output:")
+			h.t.Log(h.stdout.String())
+		}
+		if h.stderr.Len() > 0 {
+			h.t.Log("standard error:")
+			h.t.Log(h.stderr.String())
+		}
 	}
 	h.ran = true
 	return status
@@ -249,13 +256,15 @@ func (h *Helper) RunGit(dir string, args ...string) {
 	cmd.Dir = dir
 	cmd.Env = h.env
 	status := cmd.Run()
-	if h.stdout.Len() > 0 {
-		h.t.Logf("git %v standard output:", args)
-		h.t.Log(h.stdout.String())
-	}
-	if h.stderr.Len() > 0 {
-		h.t.Logf("git %v standard error:", args)
-		h.t.Log(h.stderr.String())
+	if *PrintLogs {
+		if h.stdout.Len() > 0 {
+			h.t.Logf("git %v standard output:", args)
+			h.t.Log(h.stdout.String())
+		}
+		if h.stderr.Len() > 0 {
+			h.t.Logf("git %v standard error:", args)
+			h.t.Log(h.stderr.String())
+		}
 	}
 	if status != nil {
 		h.t.Logf("git %v failed unexpectedly: %v", args, status)
@@ -431,22 +440,30 @@ func (h *Helper) WriteTestFile(src string, content string) error {
 	return err
 }
 
+// GetTestFile reads a file into memory
+func (h *Helper) GetFile(path string) io.ReadCloser {
+	content, err := os.Open(path)
+	if err != nil {
+		h.t.Fatalf("%+v", errors.Wrapf(err, "Unable to open file: %s", path))
+	}
+	return content
+}
+
 // GetTestFile reads a file from the testdata directory into memory.  src is
 // relative to ./testdata.
 func (h *Helper) GetTestFile(src string) io.ReadCloser {
-	content, err := os.Open(filepath.Join(h.origWd, "testdata", src))
-	if err != nil {
-		panic(err)
-	}
-	return content
+	fullPath := filepath.Join(h.origWd, "testdata", src)
+	return h.GetFile(fullPath)
 }
 
 // GetTestFileString reads a file from the testdata directory into memory.  src is
 // relative to ./testdata.
 func (h *Helper) GetTestFileString(src string) string {
-	content, err := ioutil.ReadAll(h.GetTestFile(src))
+	srcf := h.GetTestFile(src)
+	defer srcf.Close()
+	content, err := ioutil.ReadAll(srcf)
 	if err != nil {
-		panic(err)
+		h.t.Fatalf("%+v", err)
 	}
 	return string(content)
 }
@@ -492,16 +509,25 @@ func (h *Helper) Path(name string) string {
 	// Ensure it's the absolute, symlink-less path we're returning
 	abs, err := filepath.EvalSymlinks(joined)
 	if err != nil {
-		h.t.Fatalf("internal testsuite error: could not get absolute path for dir(%q), err %q", joined, err)
+		h.t.Fatalf("%+v", errors.Wrapf(err, "internal testsuite error: could not get absolute path for dir(%q)", joined))
 	}
 	return abs
 }
 
 // MustExist fails if path does not exist.
 func (h *Helper) MustExist(path string) {
-	if !h.Exist(path) {
-		h.t.Fatalf("%+v", errors.Errorf("%s does not exist but should", path))
+	if err := h.ShouldExist(path); err != nil {
+		h.t.Fatalf("%+v", err)
 	}
+}
+
+// ShouldExist returns an error if path does not exist.
+func (h *Helper) ShouldExist(path string) error {
+	if !h.Exist(path) {
+		return errors.Errorf("%s does not exist but should", path)
+	}
+
+	return nil
 }
 
 // Exist returns whether or not a path exists
@@ -518,9 +544,18 @@ func (h *Helper) Exist(path string) bool {
 
 // MustNotExist fails if path exists.
 func (h *Helper) MustNotExist(path string) {
-	if h.Exist(path) {
-		h.t.Fatalf("%+v", errors.Errorf("%s exists but should not", path))
+	if err := h.ShouldNotExist(path); err != nil {
+		h.t.Fatalf("%+v", err)
 	}
+}
+
+// ShouldNotExist returns an error if path exists.
+func (h *Helper) ShouldNotExist(path string) error {
+	if h.Exist(path) {
+		return errors.Errorf("%s exists but should not", path)
+	}
+
+	return nil
 }
 
 // Cleanup cleans up a test that runs testgo.

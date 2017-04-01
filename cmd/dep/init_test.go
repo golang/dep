@@ -4,12 +4,7 @@
 
 package main
 
-import (
-	"strings"
-	"testing"
-
-	"github.com/golang/dep/test"
-)
+import "testing"
 
 func TestContains(t *testing.T) {
 	a := []string{"a", "b", "abcd"}
@@ -37,65 +32,4 @@ func TestIsStdLib(t *testing.T) {
 			t.Fatalf("%s: expected %t got %t", p, e, b)
 		}
 	}
-}
-
-func TestInit(t *testing.T) {
-	test.NeedsExternalNetwork(t)
-	test.NeedsGit(t)
-
-	h := test.NewHelper(t)
-	defer h.Cleanup()
-
-	h.TempDir("src")
-	h.Setenv("GOPATH", h.Path("."))
-
-	importPaths := map[string]string{
-		"github.com/pkg/errors":      "v0.8.0",                                   // semver
-		"github.com/Sirupsen/logrus": "42b84f9ec624953ecbf81a94feccb3f5935c5edf", // random sha
-	}
-
-	// checkout the specified revisions
-	for ip, rev := range importPaths {
-		h.RunGo("get", ip)
-		repoDir := h.Path("src/" + ip)
-		h.RunGit(repoDir, "checkout", rev)
-	}
-
-	// Build a fake consumer of these packages.
-	root := "src/github.com/golang/notexist"
-	h.TempCopy(root+"/foo/thing.go", "init/thing.input.go")
-	h.TempCopy(root+"/foo/bar/bar.go", "init/bar.input.go")
-
-	h.Cd(h.Path(root))
-	h.Run("init")
-
-	goldenManifest := "init/manifest.golden.json"
-	wantManifest := h.GetTestFileString(goldenManifest)
-	gotManifest := h.ReadManifest()
-	if wantManifest != gotManifest {
-		if *test.UpdateGolden {
-			if err := h.WriteTestFile(goldenManifest, gotManifest); err != nil {
-				t.Fatal(err)
-			}
-		} else {
-			t.Errorf("expected %s, got %s", wantManifest, gotManifest)
-		}
-	}
-
-	sysCommit := h.GetCommit("go.googlesource.com/sys")
-	goldenLock := "init/lock.golden.json"
-	wantLock := strings.Replace(h.GetTestFileString(goldenLock), "{{sysCommit}}", sysCommit, 1)
-	gotLock := h.ReadLock()
-	if wantLock != gotLock {
-		if *test.UpdateGolden {
-			if err := h.WriteTestFile(goldenLock, strings.Replace(gotLock, sysCommit, "{{sysCommit}}", 1)); err != nil {
-				t.Fatal(err)
-			}
-		} else {
-			t.Errorf("expected %s, got %s", wantLock, gotLock)
-		}
-	}
-
-	// vendor should have been created & populated
-	h.MustExist(h.Path(root + "/vendor/github.com/Sirupsen/logrus"))
 }
