@@ -72,7 +72,7 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 		return err
 	}
 	if mok {
-		return fmt.Errorf("manifest file %q already exists", mf)
+		return errors.Errorf("manifest file %q already exists", mf)
 	}
 	// Manifest file does not exist.
 
@@ -81,7 +81,7 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 		return err
 	}
 	if lok {
-		return fmt.Errorf("invalid state: manifest %q does not exist, but lock %q does", mf, lf)
+		return errors.Errorf("invalid state: manifest %q does not exist, but lock %q does", mf, lf)
 	}
 
 	cpr, err := ctx.SplitAbsoluteProjectRoot(root)

@@ -8,10 +8,10 @@ import (
 	"bytes"
 	"encoding/hex"
 	"encoding/json"
-	"fmt"
 	"io"
 	"sort"
 
+	"github.com/pkg/errors"
 	"github.com/sdboyer/gps"
 )
 
@@ -45,7 +45,7 @@ func readLock(r io.Reader) (*Lock, error) {
 
 	b, err := hex.DecodeString(rl.Memo)
 	if err != nil {
-		return nil, fmt.Errorf("invalid hash digest in lock's memo field")
+		return nil, errors.Errorf("invalid hash digest in lock's memo field")
 	}
 	l := &Lock{
 		Memo: b,
@@ -58,13 +58,13 @@ func readLock(r io.Reader) (*Lock, error) {
 		var v gps.Version = r
 		if ld.Version != "" {
 			if ld.Branch != "" {
-				return nil, fmt.Errorf("lock file specified both a branch (%s) and version (%s) for %s", ld.Branch, ld.Version, ld.Name)
+				return nil, errors.Errorf("lock file specified both a branch (%s) and version (%s) for %s", ld.Branch, ld.Version, ld.Name)
 			}
 			v = gps.NewVersion(ld.Version).Is(r)
 		} else if ld.Branch != "" {
 			v = gps.NewBranch(ld.Branch).Is(r)
 		} else if r == "" {
-			return nil, fmt.Errorf("lock file has entry for %s, but specifies no branch or version", ld.Name)
+			return nil, errors.Errorf("lock file has entry for %s, but specifies no branch or version", ld.Name)
 		}
 
 		id := gps.ProjectIdentifier{

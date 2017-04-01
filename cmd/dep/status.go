@@ -16,6 +16,7 @@ import (
 	"text/tabwriter"
 
 	"github.com/golang/dep"
+	"github.com/pkg/errors"
 	"github.com/sdboyer/gps"
 )
 
@@ -166,7 +167,7 @@ func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
 	var out outputter
 	switch {
 	case cmd.detailed:
-		return fmt.Errorf("not implemented")
+		return errors.Errorf("not implemented")
 	case cmd.json:
 		out = &jsonOutput{
 			w: os.Stdout,
@@ -205,7 +206,7 @@ func runStatusAll(out outputter, p *dep.Project, sm *gps.SourceMgr) error {
 	// code from the current project.
 	ptree, err := gps.ListPackages(p.AbsRoot, string(p.ImportRoot))
 	if err != nil {
-		return fmt.Errorf("analysis of local packages failed: %v", err)
+		return errors.Errorf("analysis of local packages failed: %v", err)
 	}
 
 	// Set up a solver in order to check the InputHash.
@@ -222,7 +223,7 @@ func runStatusAll(out outputter, p *dep.Project, sm *gps.SourceMgr) error {
 
 	s, err := gps.Prepare(params, sm)
 	if err != nil {
-		return fmt.Errorf("could not set up solver for input hashing: %s", err)
+		return errors.Errorf("could not set up solver for input hashing: %s", err)
 	}
 
 	cm := collectConstraints(ptree, p, sm)
