@@ -17,12 +17,15 @@ func (fs filesystemState) setupUsingJunctions(t *testing.T) {
 
 func (fs filesystemState) setupJunctions(t *testing.T) {
 	for _, link := range fs.links {
-		p := link.path.prepend(fs.root)
+		from := link.path.prepend(fs.root)
+		to := fsPath{link.to}.prepend(fs.root)
 		// There is no way to make junctions in the standard library, so we'll just
 		// do what the stdlib's os tests do: run mklink.
-		output, err := exec.Command("cmd", "/c", "mklink", "/J", p.String(), link.to).CombinedOutput()
+		//
+		// Also, all junctions must point to absolute paths.
+		output, err := exec.Command("cmd", "/c", "mklink", "/J", from.String(), to.String()).CombinedOutput()
 		if err != nil {
-			t.Fatalf("failed to run mklink %v %v: %v %q", p.String(), link.to, err, output)
+			t.Fatalf("failed to run mklink %v %v: %v %q", from.String(), to.String(), err, output)
 		}
 	}
 }
