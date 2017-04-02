@@ -142,35 +142,7 @@ func BenchmarkCreateVendorTree(b *testing.B) {
 }
 
 func TestStripVendor(t *testing.T) {
-	type testcase struct {
-		before, after filesystemState
-	}
-
-	test := func(tc testcase) func(*testing.T) {
-		return func(t *testing.T) {
-			tempDir, err := ioutil.TempDir("", "TestStripVendor")
-			if err != nil {
-				t.Fatalf("ioutil.TempDir err=%q", err)
-			}
-			defer func() {
-				if err := os.RemoveAll(tempDir); err != nil {
-					t.Errorf("os.RemoveAll(%q) err=%q", tempDir, err)
-				}
-			}()
-			tc.before.root = tempDir
-			tc.after.root = tempDir
-
-			tc.before.setup(t)
-
-			if err := filepath.Walk(tempDir, stripVendor); err != nil {
-				t.Errorf("filepath.Walk err=%q", err)
-			}
-
-			tc.after.assert(t)
-		}
-	}
-
-	t.Run("vendor directory", test(testcase{
+	t.Run("vendor directory", stripVendorTestCase(fsTestCase{
 		before: filesystemState{
 			dirs: []fsPath{
 				fsPath{"package"},
@@ -184,7 +156,7 @@ func TestStripVendor(t *testing.T) {
 		},
 	}))
 
-	t.Run("vendor file", test(testcase{
+	t.Run("vendor file", stripVendorTestCase(fsTestCase{
 		before: filesystemState{
 			dirs: []fsPath{
 				fsPath{"package"},
@@ -203,7 +175,7 @@ func TestStripVendor(t *testing.T) {
 		},
 	}))
 
-	t.Run("vendor symlink", test(testcase{
+	t.Run("vendor symlink", stripVendorTestCase(fsTestCase{
 		before: filesystemState{
 			dirs: []fsPath{
 				fsPath{"package"},
@@ -224,7 +196,7 @@ func TestStripVendor(t *testing.T) {
 		},
 	}))
 
-	t.Run("nonvendor symlink", test(testcase{
+	t.Run("nonvendor symlink", stripVendorTestCase(fsTestCase{
 		before: filesystemState{
 			dirs: []fsPath{
 				fsPath{"package"},
@@ -251,7 +223,7 @@ func TestStripVendor(t *testing.T) {
 		},
 	}))
 
-	t.Run("vendor symlink to file", test(testcase{
+	t.Run("vendor symlink to file", stripVendorTestCase(fsTestCase{
 		before: filesystemState{
 			files: []fsPath{
 				fsPath{"file"},
@@ -276,7 +248,7 @@ func TestStripVendor(t *testing.T) {
 		},
 	}))
 
-	t.Run("chained symlinks", test(testcase{
+	t.Run("chained symlinks", stripVendorTestCase(fsTestCase{
 		before: filesystemState{
 			dirs: []fsPath{
 				fsPath{"_vendor"},
@@ -305,7 +277,7 @@ func TestStripVendor(t *testing.T) {
 		},
 	}))
 
-	t.Run("circular symlinks", test(testcase{
+	t.Run("circular symlinks", stripVendorTestCase(fsTestCase{
 		before: filesystemState{
 			dirs: []fsPath{
 				fsPath{"package"},

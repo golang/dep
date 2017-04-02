@@ -3,40 +3,26 @@
 package gps
 
 import (
-	"os"
-	"path/filepath"
+	"os/exec"
 	"testing"
 )
 
-// setup inflates fs onto the actual host file system
-func (fs filesystemState) setup(t *testing.T) {
-	for _, dir := range fs.dirs {
-		p := dir.prepend(fs.root)
-		if err := os.MkdirAll(p.String(), 0777); err != nil {
-			t.Fatalf("os.MkdirAll(%q, 0777) err=%q", p, err)
-		}
-	}
-	for _, file := range fs.files {
-		p := file.prepend(fs.root)
-		f, err := os.Create(p.String())
-		if err != nil {
-			t.Fatalf("os.Create(%q) err=%q", p, err)
-		}
-		if err := f.Close(); err != nil {
-			t.Fatalf("file %q Close() err=%q", p, err)
-		}
-	}
+// setupUisngJunctions inflats fs onto the host file system, but uses Windows
+// directory junctions for links
+func (fs filesystemState) setupUsingJunctions(t *testing.T) {
+	fs.setupDirs(t)
+	fs.setupFiles(t)
+	fs.setupJunctions(t)
+}
+
+func (fs filesystemState) setupJunctions(t *testing.T) {
 	for _, link := range fs.links {
 		p := link.path.prepend(fs.root)
-
-		// On Windows, relative symlinks confuse filepath.Walk. This is golang/go
-		// issue 17540. So, we'll just sigh and do absolute links, assuming they are
-		// relative to the directory of link.path.
-		dir := filepath.Dir(p.String())
-		to := filepath.Join(dir, link.to)
-
-		if err := os.Symlink(to, p.String()); err != nil {
-			t.Fatalf("os.Symlink(%q, %q) err=%q", to, p, err)
+		// There is no way to make junctions in the standard library, so we'll just
+		// do what the stdlib's os tests do: run mklink.
+		output, err := exec.Command("cmd", "/c", "mklink", "/J", p.String(), link.to).CombinedOutput()
+		if err != nil {
+			t.Fatalf("failed to run mklink %v %v: %v %q", p.String(), link.to, err, output)
 		}
 	}
 }
