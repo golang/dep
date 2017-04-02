@@ -7,8 +7,8 @@ import (
 	"testing"
 )
 
-// setupUisngJunctions inflats fs onto the host file system, but uses Windows
-// directory junctions for links
+// setupUsingJunctions inflates fs onto the host file system, but uses Windows
+// directory junctions for links.
 func (fs filesystemState) setupUsingJunctions(t *testing.T) {
 	fs.setupDirs(t)
 	fs.setupFiles(t)
