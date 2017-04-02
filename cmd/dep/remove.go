@@ -13,6 +13,7 @@ import (
 	"github.com/golang/dep"
 	"github.com/pkg/errors"
 	"github.com/sdboyer/gps"
+	"github.com/sdboyer/gps/pkgtree"
 )
 
 const removeShortHelp = `Remove a dependency from the project`
@@ -60,7 +61,7 @@ func (cmd *removeCommand) Run(ctx *dep.Ctx, args []string) error {
 		return errors.Wrap(err, "determineProjectRoot")
 	}
 
-	pkgT, err := gps.ListPackages(p.AbsRoot, cpr)
+	pkgT, err := pkgtree.ListPackages(p.AbsRoot, cpr)
 	if err != nil {
 		return errors.Wrap(err, "gps.ListPackages")
 	}

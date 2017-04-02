@@ -163,16 +163,6 @@ type ProjectProperties struct {
 	Constraint Constraint
 }
 
-// Package represents a Go package. It contains a subset of the information
-// go/build.Package does.
-type Package struct {
-	Name        string   // Package name, as declared in the package statement
-	ImportPath  string   // Full import path, including the prefix provided to ListPackages()
-	CommentPath string   // Import path given in the comment on the package statement
-	Imports     []string // Imports from all go and cgo files
-	TestImports []string // Imports from all go test files (in go/build parlance: both TestImports and XTestImports)
-}
-
 // bimodalIdentifiers are used to track work to be done in the unselected queue.
 type bimodalIdentifier struct {
 	id ProjectIdentifier

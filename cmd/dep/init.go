@@ -15,6 +15,7 @@ import (
 	"github.com/golang/dep"
 	"github.com/pkg/errors"
 	"github.com/sdboyer/gps"
+	"github.com/sdboyer/gps/pkgtree"
 )
 
 const initShortHelp = `Initialize a new project with manifest and lock files`
@@ -89,7 +90,7 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 		return errors.Wrap(err, "determineProjectRoot")
 	}
 	vlogf("Finding dependencies for %q...", cpr)
-	pkgT, err := gps.ListPackages(root, cpr)
+	pkgT, err := pkgtree.ListPackages(root, cpr)
 	if err != nil {
 		return errors.Wrap(err, "gps.ListPackages")
 	}
@@ -214,7 +215,7 @@ type projectData struct {
 	ondisk       map[gps.ProjectRoot]gps.Version // projects that were found on disk
 }
 
-func getProjectData(ctx *dep.Ctx, pkgT gps.PackageTree, cpr string, sm *gps.SourceMgr) (projectData, error) {
+func getProjectData(ctx *dep.Ctx, pkgT pkgtree.PackageTree, cpr string, sm *gps.SourceMgr) (projectData, error) {
 	constraints := make(gps.ProjectConstraints)
 	dependencies := make(map[gps.ProjectRoot][]string)
 	packages := make(map[string]bool)
@@ -285,7 +286,7 @@ func getProjectData(ctx *dep.Ctx, pkgT gps.PackageTree, cpr string, sm *gps.Sour
 	)
 
 	// cache of PackageTrees, so we don't parse projects more than once
-	ptrees := make(map[gps.ProjectRoot]gps.PackageTree)
+	ptrees := make(map[gps.ProjectRoot]pkgtree.PackageTree)
 
 	// depth-first traverser
 	var dft func(string) error
@@ -339,7 +340,7 @@ func getProjectData(ctx *dep.Ctx, pkgT gps.PackageTree, cpr string, sm *gps.Sour
 					ondisk[pr] = v
 				}
 
-				ptree, err = gps.ListPackages(r, string(pr))
+				ptree, err = pkgtree.ListPackages(r, string(pr))
 				if err != nil {
 					// Any error here other than an a nonexistent dir (which
 					// can't happen because we covered that case above) is

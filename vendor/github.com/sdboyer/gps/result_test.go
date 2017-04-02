@@ -44,6 +44,7 @@ func TestWriteDepTree(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping dep tree writing test in short mode")
 	}
+	requiresBins(t, "git", "hg", "bzr")
 
 	tmp, err := ioutil.TempDir("", "writetree")
 	if err != nil {

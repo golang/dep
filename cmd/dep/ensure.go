@@ -18,6 +18,7 @@ import (
 	"github.com/golang/dep"
 	"github.com/pkg/errors"
 	"github.com/sdboyer/gps"
+	"github.com/sdboyer/gps/pkgtree"
 )
 
 const ensureShortHelp = `Ensure a dependency is safely vendored in the project`
@@ -123,7 +124,7 @@ func (cmd *ensureCommand) Run(ctx *dep.Ctx, args []string) error {
 		params.Trace = true
 		params.TraceLogger = log.New(os.Stderr, "", 0)
 	}
-	params.RootPackageTree, err = gps.ListPackages(p.AbsRoot, string(p.ImportRoot))
+	params.RootPackageTree, err = pkgtree.ListPackages(p.AbsRoot, string(p.ImportRoot))
 	if err != nil {
 		return errors.Wrap(err, "ensure ListPackage for project")
 	}

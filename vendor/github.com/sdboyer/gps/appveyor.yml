@@ -19,7 +19,7 @@ build_script:
   - C:\gopath\bin\glide install
 
 test_script:
-  - go test
+  - go test . ./internal/... ./pkgtree/...
   - go build example.go
 
 deploy: off

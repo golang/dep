@@ -55,7 +55,7 @@ func TestHg(t *testing.T) {
 	}
 
 	// Verify Hg repo is a Hg repo
-	if repo.CheckLocal() == false {
+	if !repo.CheckLocal() {
 		t.Error("Problem checking out repo or Hg CheckLocal is not working")
 	}
 
@@ -75,7 +75,7 @@ func TestHg(t *testing.T) {
 		t.Error(nrerr)
 	}
 	// Verify the right oject is returned. It will check the local repo type.
-	if nrepo.CheckLocal() == false {
+	if !nrepo.CheckLocal() {
 		t.Error("Wrong version returned from NewRepo")
 	}
 
@@ -166,19 +166,19 @@ func TestHg(t *testing.T) {
 		t.Error("Hg is incorrectly returning branches")
 	}
 
-	if repo.IsReference("1.0.0") != true {
+	if !repo.IsReference("1.0.0") {
 		t.Error("Hg is reporting a reference is not one")
 	}
 
-	if repo.IsReference("test") != true {
+	if !repo.IsReference("test") {
 		t.Error("Hg is reporting a reference is not one")
 	}
 
-	if repo.IsReference("foo") == true {
-		t.Error("Hg is reporting a non-existant reference is one")
+	if repo.IsReference("foo") {
+		t.Error("Hg is reporting a non-existent reference is one")
 	}
 
-	if repo.IsDirty() == true {
+	if repo.IsDirty() {
 		t.Error("Hg incorrectly reporting dirty")
 	}
 
@@ -231,7 +231,7 @@ func TestHg(t *testing.T) {
 
 	_, err = os.Stat(filepath.Join(exportDir, string(repo.Vcs())))
 	if err != nil {
-		if found := os.IsNotExist(err); found == false {
+		if found := os.IsNotExist(err); !found {
 			t.Errorf("Error checking exported metadata in Hg: %s", err)
 		}
 	} else {
@@ -254,7 +254,7 @@ func TestHgCheckLocal(t *testing.T) {
 	}()
 
 	repo, _ := NewHgRepo("", tempDir)
-	if repo.CheckLocal() == true {
+	if repo.CheckLocal() {
 		t.Error("Hg CheckLocal does not identify non-Hg location")
 	}
 

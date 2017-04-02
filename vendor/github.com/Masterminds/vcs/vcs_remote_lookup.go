@@ -55,16 +55,10 @@ var vcsList = []*vcsInfo{
 		vcs:     Git,
 		pattern: `^(go\.googlesource\.com/[A-Za-z0-9_.\-]+/?)$`,
 	},
-	// TODO: Once Google Code becomes fully deprecated this can be removed.
 	{
-		host:     "code.google.com",
-		addCheck: checkGoogle,
-		pattern:  `^(code\.google\.com/[pr]/(?P<project>[a-z0-9\-]+)(\.(?P<repo>[a-z0-9\-]+))?)(/[A-Za-z0-9_.\-]+)*$`,
-	},
-	// Alternative Google setup. This is the previous structure but it still works... until Google Code goes away.
-	{
-		addCheck: checkURL,
-		pattern:  `^([a-z0-9_\-.]+)\.googlecode\.com/(?P<type>git|hg|svn)(/.*)?$`,
+		host:    "git.openstack.org",
+		vcs:     Git,
+		pattern: `^(git\.openstack\.org/[A-Za-z0-9_.\-]+/[A-Za-z0-9_.\-]+)$`,
 	},
 	// If none of the previous detect the type they will fall to this looking for the type in a generic sense
 	// by the extension to the path.
@@ -156,6 +150,11 @@ func detectVcsFromURL(vcsURL string) (Type, error) {
 		if err != nil {
 			return "", err
 		}
+	}
+
+	// Detect file schemes
+	if u.Scheme == "file" {
+		return DetectVcsFromFS(u.Path)
 	}
 
 	if u.Host == "" {
@@ -265,37 +264,6 @@ func checkBitbucket(i map[string]string, ul *url.URL) (Type, error) {
 
 	return response.SCM, nil
 
-}
-
-// Google supports Git, Hg, and Svn. The SVN style is only
-// supported through their legacy setup at <project>.googlecode.com.
-// I wonder if anyone is actually using SVN support.
-func checkGoogle(i map[string]string, u *url.URL) (Type, error) {
-
-	// To figure out which of the VCS types is used in Google Code you need
-	// to parse a web page and find it. Ugh. I mean... ugh.
-	var hack = regexp.MustCompile(`id="checkoutcmd">(hg|git|svn)`)
-
-	d, err := get(expand(i, "https://code.google.com/p/{project}/source/checkout?repo={repo}"))
-	if err != nil {
-		return "", err
-	}
-
-	if m := hack.FindSubmatch(d); m != nil {
-		if vcs := string(m[1]); vcs != "" {
-			if vcs == "svn" {
-				// While Google supports SVN it can only be used with the legacy
-				// urls of <project>.googlecode.com. I considered creating a new
-				// error for this problem but Google Code is going away and there
-				// is support for the legacy structure.
-				return "", ErrCannotDetectVCS
-			}
-
-			return Type(vcs), nil
-		}
-	}
-
-	return "", ErrCannotDetectVCS
 }
 
 // Expect a type key on i with the exact type detected from the regex.

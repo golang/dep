@@ -1,5 +1,5 @@
 {
-    "memo": "fc012dfb266db9deec4121dd38069e2556ba66a5514939662da94fac1251996e",
+    "memo": "31a7162c06758e4619ed89b91e1f48bf94ad14f394bbee79299ed0bb5150e409",
     "projects": [
         {
             "name": "github.com/Masterminds/semver",
@@ -11,8 +11,8 @@
         },
         {
             "name": "github.com/Masterminds/vcs",
-            "version": "v1.8.0",
-            "revision": "fbe9fb6ad5b5f35b3e82a7c21123cfc526cbf895",
+            "version": "v1.11.0",
+            "revision": "795e20f901c3d561de52811fb3488a2cb2c8588b",
             "packages": [
                 "."
             ]
@@ -35,10 +35,13 @@
         },
         {
             "name": "github.com/sdboyer/gps",
-            "version": "v0.14.1",
-            "revision": "287edec9f4ca516577cc3ac9744068a34c4c7b08",
+            "version": "v0.15.0",
+            "revision": "b0f646b744e74543c094023d05339ffb82458e35",
             "packages": [
-                "."
+                ".",
+                "internal",
+                "internal/fs",
+                "pkgtree"
             ]
         }
     ]

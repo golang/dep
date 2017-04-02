@@ -5,7 +5,10 @@ import (
 	"crypto/sha256"
 	"io"
 	"sort"
+	"strconv"
 	"strings"
+
+	"github.com/sdboyer/gps/pkgtree"
 )
 
 // string headers used to demarcate sections in hash input creation
@@ -103,7 +106,7 @@ func (s *solver) writeHashingInputs(w io.Writer) {
 	writeString(hhAnalyzer)
 	an, av := s.b.AnalyzerInfo()
 	writeString(an)
-	writeString(av.String())
+	writeString(strconv.Itoa(av))
 }
 
 // bytes.Buffer wrapper that injects newlines after each call to Write().
@@ -127,7 +130,7 @@ func HashingInputsAsString(s Solver) string {
 	return (*bytes.Buffer)(buf).String()
 }
 
-type sortPackageOrErr []PackageOrErr
+type sortPackageOrErr []pkgtree.PackageOrErr
 
 func (s sortPackageOrErr) Len() int      { return len(s) }
 func (s sortPackageOrErr) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
