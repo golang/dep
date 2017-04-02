@@ -130,6 +130,10 @@ type Repo interface {
 	// RunFromDir executes a command from repo's directory.
 	RunFromDir(cmd string, args ...string) ([]byte, error)
 
+	// CmdFromDir creates a new command that will be executed from repo's
+	// directory.
+	CmdFromDir(cmd string, args ...string) *exec.Cmd
+
 	// ExportDir exports the current revision to the passed in directory.
 	ExportDir(string) error
 }
@@ -220,10 +224,15 @@ func (b base) run(cmd string, args ...string) ([]byte, error) {
 	return out, err
 }
 
-func (b *base) RunFromDir(cmd string, args ...string) ([]byte, error) {
+func (b *base) CmdFromDir(cmd string, args ...string) *exec.Cmd {
 	c := exec.Command(cmd, args...)
 	c.Dir = b.local
 	c.Env = envForDir(c.Dir)
+	return c
+}
+
+func (b *base) RunFromDir(cmd string, args ...string) ([]byte, error) {
+	c := b.CmdFromDir(cmd, args...)
 	out, err := c.CombinedOutput()
 	return out, err
 }

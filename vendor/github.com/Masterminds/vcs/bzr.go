@@ -39,7 +39,7 @@ func NewBzrRepo(remote, local string) (*BzrRepo, error) {
 	// http://bazaar.launchpad.net/~mattfarina/govcstestbzrrepo/trunk/. Notice
 	// the change from https to http and the path chance.
 	// Here we set the remote to be the local one if none is passed in.
-	if err == nil && r.CheckLocal() == true && remote == "" {
+	if err == nil && r.CheckLocal() && remote == "" {
 		c := exec.Command("bzr", "info")
 		c.Dir = local
 		c.Env = envForDir(c.Dir)
@@ -226,11 +226,7 @@ func (s *BzrRepo) Tags() ([]string, error) {
 // commit id or tag.
 func (s *BzrRepo) IsReference(r string) bool {
 	_, err := s.RunFromDir("bzr", "revno", "-r", r)
-	if err == nil {
-		return true
-	}
-
-	return false
+	return err == nil
 }
 
 // IsDirty returns if the checkout has been modified from the checked
@@ -308,21 +304,14 @@ func (s *BzrRepo) Ping() bool {
 			// an error is returned. Launchpad returns a 404 for a codebase that
 			// does not exist. Otherwise it returns a JSON object describing it.
 			_, er := get("https://api.launchpad.net/1.0/" + try)
-			if er == nil {
-				return true
-			}
-			return false
+			return er == nil
 		}
 	}
 
 	// This is the same command that Go itself uses but it's not fast (or fast
 	// enough by my standards). A faster method would be useful.
 	_, err = s.run("bzr", "info", s.Remote())
-	if err != nil {
-		return false
-	}
-
-	return true
+	return err == nil
 }
 
 // ExportDir exports the current revision to the passed in directory.
@@ -340,6 +329,7 @@ func (s *BzrRepo) ExportDir(dir string) error {
 // https://bazaar.launchpad.net/~bzr-pqm/bzr/bzr.dev/files/head:/po/
 func (s *BzrRepo) isUnableToCreateDir(err error) bool {
 	msg := err.Error()
+
 	if strings.HasPrefix(msg, fmt.Sprintf("Parent directory of %s does not exist.", s.LocalPath())) ||
 		strings.HasPrefix(msg, fmt.Sprintf("Nadřazený adresář %s neexistuje.", s.LocalPath())) ||
 		strings.HasPrefix(msg, fmt.Sprintf("El directorio padre de %s no existe.", s.LocalPath())) ||

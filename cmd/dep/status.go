@@ -18,6 +18,7 @@ import (
 	"github.com/golang/dep"
 	"github.com/pkg/errors"
 	"github.com/sdboyer/gps"
+	"github.com/sdboyer/gps/pkgtree"
 )
 
 const statusShortHelp = `Report the status of the project's dependencies`
@@ -204,7 +205,7 @@ func runStatusAll(out outputter, p *dep.Project, sm *gps.SourceMgr) error {
 
 	// While the network churns on ListVersions() requests, statically analyze
 	// code from the current project.
-	ptree, err := gps.ListPackages(p.AbsRoot, string(p.ImportRoot))
+	ptree, err := pkgtree.ListPackages(p.AbsRoot, string(p.ImportRoot))
 	if err != nil {
 		return errors.Errorf("analysis of local packages failed: %v", err)
 	}
@@ -369,7 +370,7 @@ func formatVersion(v gps.Version) string {
 	return v.String()
 }
 
-func collectConstraints(ptree gps.PackageTree, p *dep.Project, sm *gps.SourceMgr) map[string][]gps.Constraint {
+func collectConstraints(ptree pkgtree.PackageTree, p *dep.Project, sm *gps.SourceMgr) map[string][]gps.Constraint {
 	// TODO
 	return map[string][]gps.Constraint{}
 }

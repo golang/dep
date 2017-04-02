@@ -1,4 +1,4 @@
-package gps
+package pkgtree
 
 import (
 	"fmt"
@@ -12,7 +12,25 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/sdboyer/gps/internal"
+	"github.com/sdboyer/gps/internal/fs"
 )
+
+// Stores a reference to original IsStdLib, so we could restore overridden version.
+var doIsStdLib = internal.IsStdLib
+
+func init() {
+	overrideIsStdLib()
+}
+
+// sets the IsStdLib func to always return false, otherwise it would identify
+// pretty much all of our fixtures as being stdlib and skip everything.
+func overrideIsStdLib() {
+	internal.IsStdLib = func(path string) bool {
+		return false
+	}
+}
 
 // PackageTree.ToReachMap() uses an easily separable algorithm, wmToReach(),
 // to turn a discovered set of packages and their imports into a proper pair of
@@ -434,24 +452,26 @@ func TestWorkmapToReach(t *testing.T) {
 	for name, fix := range table {
 		// Avoid erroneous errors by initializing the fixture's error map if
 		// needed
-		if fix.em == nil {
-			fix.em = make(map[string]*ProblemImportError)
-		}
+		t.Run(name, func(t *testing.T) {
+			if fix.em == nil {
+				fix.em = make(map[string]*ProblemImportError)
+			}
 
-		rm, em := wmToReach(fix.workmap, fix.backprop)
-		if !reflect.DeepEqual(rm, fix.rm) {
-			//t.Error(pretty.Sprintf("wmToReach(%q): Did not get expected reach map:\n\t(GOT): %s\n\t(WNT): %s", name, rm, fix.rm))
-			t.Errorf("wmToReach(%q): Did not get expected reach map:\n\t(GOT): %s\n\t(WNT): %s", name, rm, fix.rm)
-		}
-		if !reflect.DeepEqual(em, fix.em) {
-			//t.Error(pretty.Sprintf("wmToReach(%q): Did not get expected error map:\n\t(GOT): %# v\n\t(WNT): %# v", name, em, fix.em))
-			t.Errorf("wmToReach(%q): Did not get expected error map:\n\t(GOT): %v\n\t(WNT): %v", name, em, fix.em)
-		}
+			rm, em := wmToReach(fix.workmap, fix.backprop)
+			if !reflect.DeepEqual(rm, fix.rm) {
+				//t.Error(pretty.Sprintf("wmToReach(%q): Did not get expected reach map:\n\t(GOT): %s\n\t(WNT): %s", name, rm, fix.rm))
+				t.Errorf("Did not get expected reach map:\n\t(GOT): %s\n\t(WNT): %s", rm, fix.rm)
+			}
+			if !reflect.DeepEqual(em, fix.em) {
+				//t.Error(pretty.Sprintf("wmToReach(%q): Did not get expected error map:\n\t(GOT): %# v\n\t(WNT): %# v", name, em, fix.em))
+				t.Errorf("Did not get expected error map:\n\t(GOT): %v\n\t(WNT): %v", em, fix.em)
+			}
+		})
 	}
 }
 
 func TestListPackagesNoDir(t *testing.T) {
-	out, err := ListPackages(filepath.Join(getwd(t), "_testdata", "notexist"), "notexist")
+	out, err := ListPackages(filepath.Join(getTestdataRootDir(t), "notexist"), "notexist")
 	if err == nil {
 		t.Error("ListPackages should have errored on pointing to a nonexistent dir")
 	}
@@ -461,7 +481,7 @@ func TestListPackagesNoDir(t *testing.T) {
 }
 
 func TestListPackages(t *testing.T) {
-	srcdir := filepath.Join(getwd(t), "_testdata", "src")
+	srcdir := filepath.Join(getTestdataRootDir(t), "src")
 	j := func(s ...string) string {
 		return filepath.Join(srcdir, filepath.Join(s...))
 	}
@@ -1236,59 +1256,60 @@ func TestListPackages(t *testing.T) {
 	}
 
 	for name, fix := range table {
-		if _, err := os.Stat(fix.fileRoot); err != nil {
-			t.Errorf("listPackages(%q): error on fileRoot %s: %s", name, fix.fileRoot, err)
-			continue
-		}
-
-		out, err := ListPackages(fix.fileRoot, fix.importRoot)
-
-		if err != nil && fix.err == nil {
-			t.Errorf("listPackages(%q): Received error but none expected: %s", name, err)
-		} else if fix.err != nil && err == nil {
-			t.Errorf("listPackages(%q): Error expected but none received", name)
-		} else if fix.err != nil && err != nil {
-			if !reflect.DeepEqual(fix.err, err) {
-				t.Errorf("listPackages(%q): Did not receive expected error:\n\t(GOT): %s\n\t(WNT): %s", name, err, fix.err)
+		t.Run(name, func(t *testing.T) {
+			if _, err := os.Stat(fix.fileRoot); err != nil {
+				t.Errorf("error on fileRoot %s: %s", fix.fileRoot, err)
 			}
-		}
 
-		if fix.out.ImportRoot != "" && fix.out.Packages != nil {
-			if !reflect.DeepEqual(out, fix.out) {
-				if fix.out.ImportRoot != out.ImportRoot {
-					t.Errorf("listPackages(%q): Expected ImportRoot %s, got %s", name, fix.out.ImportRoot, out.ImportRoot)
+			out, err := ListPackages(fix.fileRoot, fix.importRoot)
+
+			if err != nil && fix.err == nil {
+				t.Errorf("Received error but none expected: %s", err)
+			} else if fix.err != nil && err == nil {
+				t.Errorf("Error expected but none received")
+			} else if fix.err != nil && err != nil {
+				if !reflect.DeepEqual(fix.err, err) {
+					t.Errorf("Did not receive expected error:\n\t(GOT): %s\n\t(WNT): %s", err, fix.err)
 				}
+			}
 
-				// overwrite the out one to see if we still have a real problem
-				out.ImportRoot = fix.out.ImportRoot
-
+			if fix.out.ImportRoot != "" && fix.out.Packages != nil {
 				if !reflect.DeepEqual(out, fix.out) {
-					if len(fix.out.Packages) < 2 {
-						t.Errorf("listPackages(%q): Did not get expected PackageOrErrs:\n\t(GOT): %#v\n\t(WNT): %#v", name, out, fix.out)
-					} else {
-						seen := make(map[string]bool)
-						for path, perr := range fix.out.Packages {
-							seen[path] = true
-							if operr, exists := out.Packages[path]; !exists {
-								t.Errorf("listPackages(%q): Expected PackageOrErr for path %s was missing from output:\n\t%s", name, path, perr)
-							} else {
-								if !reflect.DeepEqual(perr, operr) {
-									t.Errorf("listPackages(%q): PkgOrErr for path %s was not as expected:\n\t(GOT): %#v\n\t(WNT): %#v", name, path, operr, perr)
+					if fix.out.ImportRoot != out.ImportRoot {
+						t.Errorf("Expected ImportRoot %s, got %s", fix.out.ImportRoot, out.ImportRoot)
+					}
+
+					// overwrite the out one to see if we still have a real problem
+					out.ImportRoot = fix.out.ImportRoot
+
+					if !reflect.DeepEqual(out, fix.out) {
+						if len(fix.out.Packages) < 2 {
+							t.Errorf("Did not get expected PackageOrErrs:\n\t(GOT): %#v\n\t(WNT): %#v", out, fix.out)
+						} else {
+							seen := make(map[string]bool)
+							for path, perr := range fix.out.Packages {
+								seen[path] = true
+								if operr, exists := out.Packages[path]; !exists {
+									t.Errorf("Expected PackageOrErr for path %s was missing from output:\n\t%s", path, perr)
+								} else {
+									if !reflect.DeepEqual(perr, operr) {
+										t.Errorf("PkgOrErr for path %s was not as expected:\n\t(GOT): %#v\n\t(WNT): %#v", path, operr, perr)
+									}
 								}
 							}
-						}
 
-						for path, operr := range out.Packages {
-							if seen[path] {
-								continue
+							for path, operr := range out.Packages {
+								if seen[path] {
+									continue
+								}
+
+								t.Errorf("Got PackageOrErr for path %s, but none was expected:\n\t%s", path, operr)
 							}
-
-							t.Errorf("listPackages(%q): Got PackageOrErr for path %s, but none was expected:\n\t%s", name, path, operr)
 						}
 					}
 				}
 			}
-		}
+		})
 	}
 }
 
@@ -1313,9 +1334,9 @@ func TestListPackagesNoPerms(t *testing.T) {
 	}
 	defer os.RemoveAll(tmp)
 
-	srcdir := filepath.Join(getwd(t), "_testdata", "src", "ren")
+	srcdir := filepath.Join(getTestdataRootDir(t), "src", "ren")
 	workdir := filepath.Join(tmp, "ren")
-	copyDir(srcdir, workdir)
+	fs.CopyDir(srcdir, workdir)
 
 	// chmod the simple dir and m1p/b.go file so they can't be read
 	err = os.Chmod(filepath.Join(workdir, "simple"), 0)
@@ -1382,186 +1403,9 @@ func TestListPackagesNoPerms(t *testing.T) {
 	}
 }
 
-func TestFlattenReachMap(t *testing.T) {
-	// There's enough in the 'varied' test case to test most of what matters
-	vptree, err := ListPackages(filepath.Join(getwd(t), "_testdata", "src", "github.com", "example", "varied"), "github.com/example/varied")
-	if err != nil {
-		t.Fatalf("listPackages failed on varied test case: %s", err)
-	}
-
-	var expect []string
-	var name string
-	var ignore map[string]bool
-	var stdlib, main, tests bool
-
-	validate := func() {
-		rm, em := vptree.ToReachMap(main, tests, true, ignore)
-		if len(em) != 0 {
-			t.Errorf("Should not have any error pkgs from ToReachMap, got %s", em)
-		}
-		result := rm.Flatten(stdlib)
-		if !reflect.DeepEqual(expect, result) {
-			t.Errorf("Wrong imports in %q case:\n\t(GOT): %s\n\t(WNT): %s", name, result, expect)
-		}
-	}
-
-	all := []string{
-		"encoding/binary",
-		"github.com/Masterminds/semver",
-		"github.com/sdboyer/gps",
-		"go/parser",
-		"hash",
-		"net/http",
-		"os",
-		"sort",
-	}
-
-	// helper to rewrite expect, except for a couple packages
-	//
-	// this makes it easier to see what we're taking out on each test
-	except := func(not ...string) {
-		expect = make([]string, len(all)-len(not))
-
-		drop := make(map[string]bool)
-		for _, npath := range not {
-			drop[npath] = true
-		}
-
-		k := 0
-		for _, path := range all {
-			if !drop[path] {
-				expect[k] = path
-				k++
-			}
-		}
-	}
-
-	// everything on
-	name = "simple"
-	except()
-	stdlib, main, tests = true, true, true
-	validate()
-
-	// turning off stdlib should cut most things, but we need to override the
-	// function
-	isStdLib = doIsStdLib
-	name = "no stdlib"
-	stdlib = false
-	except("encoding/binary", "go/parser", "hash", "net/http", "os", "sort")
-	validate()
-	// Restore stdlib func override
-	overrideIsStdLib()
-
-	// stdlib back in; now exclude tests, which should just cut one
-	name = "no tests"
-	stdlib, tests = true, false
-	except("encoding/binary")
-	validate()
-
-	// Now skip main, which still just cuts out one
-	name = "no main"
-	main, tests = false, true
-	except("net/http")
-	validate()
-
-	// No test and no main, which should be additive
-	name = "no test, no main"
-	main, tests = false, false
-	except("net/http", "encoding/binary")
-	validate()
-
-	// now, the ignore tests. turn main and tests back on
-	main, tests = true, true
-
-	// start with non-matching
-	name = "non-matching ignore"
-	ignore = map[string]bool{
-		"nomatch": true,
-	}
-	except()
-	validate()
-
-	// should have the same effect as ignoring main
-	name = "ignore the root"
-	ignore = map[string]bool{
-		"github.com/example/varied": true,
-	}
-	except("net/http")
-	validate()
-
-	// now drop a more interesting one
-	name = "ignore simple"
-	ignore = map[string]bool{
-		"github.com/example/varied/simple": true,
-	}
-	// we get github.com/sdboyer/gps from m1p, too, so it should still be there
-	except("go/parser")
-	validate()
-
-	// now drop two
-	name = "ignore simple and namemismatch"
-	ignore = map[string]bool{
-		"github.com/example/varied/simple":       true,
-		"github.com/example/varied/namemismatch": true,
-	}
-	except("go/parser", "github.com/Masterminds/semver")
-	validate()
-
-	// make sure tests and main play nice with ignore
-	name = "ignore simple and namemismatch, and no tests"
-	tests = false
-	except("go/parser", "github.com/Masterminds/semver", "encoding/binary")
-	validate()
-	name = "ignore simple and namemismatch, and no main"
-	main, tests = false, true
-	except("go/parser", "github.com/Masterminds/semver", "net/http")
-	validate()
-	name = "ignore simple and namemismatch, and no main or tests"
-	main, tests = false, false
-	except("go/parser", "github.com/Masterminds/semver", "net/http", "encoding/binary")
-	validate()
-
-	main, tests = true, true
-
-	// ignore two that should knock out gps
-	name = "ignore both importers"
-	ignore = map[string]bool{
-		"github.com/example/varied/simple": true,
-		"github.com/example/varied/m1p":    true,
-	}
-	except("sort", "github.com/sdboyer/gps", "go/parser")
-	validate()
-
-	// finally, directly ignore some external packages
-	name = "ignore external"
-	ignore = map[string]bool{
-		"github.com/sdboyer/gps": true,
-		"go/parser":              true,
-		"sort":                   true,
-	}
-	except("sort", "github.com/sdboyer/gps", "go/parser")
-	validate()
-
-	// The only thing varied *doesn't* cover is disallowed path patterns
-	ptree, err := ListPackages(filepath.Join(getwd(t), "_testdata", "src", "disallow"), "disallow")
-	if err != nil {
-		t.Fatalf("ListPackages failed on disallow test case: %s", err)
-	}
-
-	rm, em := ptree.ToReachMap(false, false, true, nil)
-	if len(em) != 0 {
-		t.Errorf("Should not have any error packages from ToReachMap, got %s", em)
-	}
-	result := rm.Flatten(true)
-	expect = []string{"github.com/sdboyer/gps", "hash", "sort"}
-	if !reflect.DeepEqual(expect, result) {
-		t.Errorf("Wrong imports in %q case:\n\t(GOT): %s\n\t(WNT): %s", name, result, expect)
-	}
-}
-
 func TestToReachMap(t *testing.T) {
 	// There's enough in the 'varied' test case to test most of what matters
-	vptree, err := ListPackages(filepath.Join(getwd(t), "_testdata", "src", "github.com", "example", "varied"), "github.com/example/varied")
+	vptree, err := ListPackages(filepath.Join(getTestdataRootDir(t), "src", "github.com", "example", "varied"), "github.com/example/varied")
 	if err != nil {
 		t.Fatalf("ListPackages failed on varied test case: %s", err)
 	}
@@ -1823,9 +1667,186 @@ func TestToReachMap(t *testing.T) {
 	validate()
 }
 
+func TestFlattenReachMap(t *testing.T) {
+	// There's enough in the 'varied' test case to test most of what matters
+	vptree, err := ListPackages(filepath.Join(getTestdataRootDir(t), "src", "github.com", "example", "varied"), "github.com/example/varied")
+	if err != nil {
+		t.Fatalf("listPackages failed on varied test case: %s", err)
+	}
+
+	var expect []string
+	var name string
+	var ignore map[string]bool
+	var stdlib, main, tests bool
+
+	validate := func() {
+		rm, em := vptree.ToReachMap(main, tests, true, ignore)
+		if len(em) != 0 {
+			t.Errorf("Should not have any error pkgs from ToReachMap, got %s", em)
+		}
+		result := rm.Flatten(stdlib)
+		if !reflect.DeepEqual(expect, result) {
+			t.Errorf("Wrong imports in %q case:\n\t(GOT): %s\n\t(WNT): %s", name, result, expect)
+		}
+	}
+
+	all := []string{
+		"encoding/binary",
+		"github.com/Masterminds/semver",
+		"github.com/sdboyer/gps",
+		"go/parser",
+		"hash",
+		"net/http",
+		"os",
+		"sort",
+	}
+
+	// helper to rewrite expect, except for a couple packages
+	//
+	// this makes it easier to see what we're taking out on each test
+	except := func(not ...string) {
+		expect = make([]string, len(all)-len(not))
+
+		drop := make(map[string]bool)
+		for _, npath := range not {
+			drop[npath] = true
+		}
+
+		k := 0
+		for _, path := range all {
+			if !drop[path] {
+				expect[k] = path
+				k++
+			}
+		}
+	}
+
+	// everything on
+	name = "simple"
+	except()
+	stdlib, main, tests = true, true, true
+	validate()
+
+	// turning off stdlib should cut most things, but we need to override the
+	// function
+	internal.IsStdLib = doIsStdLib
+	name = "no stdlib"
+	stdlib = false
+	except("encoding/binary", "go/parser", "hash", "net/http", "os", "sort")
+	validate()
+	// restore stdlib func override
+	overrideIsStdLib()
+
+	// stdlib back in; now exclude tests, which should just cut one
+	name = "no tests"
+	stdlib, tests = true, false
+	except("encoding/binary")
+	validate()
+
+	// Now skip main, which still just cuts out one
+	name = "no main"
+	main, tests = false, true
+	except("net/http")
+	validate()
+
+	// No test and no main, which should be additive
+	name = "no test, no main"
+	main, tests = false, false
+	except("net/http", "encoding/binary")
+	validate()
+
+	// now, the ignore tests. turn main and tests back on
+	main, tests = true, true
+
+	// start with non-matching
+	name = "non-matching ignore"
+	ignore = map[string]bool{
+		"nomatch": true,
+	}
+	except()
+	validate()
+
+	// should have the same effect as ignoring main
+	name = "ignore the root"
+	ignore = map[string]bool{
+		"github.com/example/varied": true,
+	}
+	except("net/http")
+	validate()
+
+	// now drop a more interesting one
+	name = "ignore simple"
+	ignore = map[string]bool{
+		"github.com/example/varied/simple": true,
+	}
+	// we get github.com/sdboyer/gps from m1p, too, so it should still be there
+	except("go/parser")
+	validate()
+
+	// now drop two
+	name = "ignore simple and namemismatch"
+	ignore = map[string]bool{
+		"github.com/example/varied/simple":       true,
+		"github.com/example/varied/namemismatch": true,
+	}
+	except("go/parser", "github.com/Masterminds/semver")
+	validate()
+
+	// make sure tests and main play nice with ignore
+	name = "ignore simple and namemismatch, and no tests"
+	tests = false
+	except("go/parser", "github.com/Masterminds/semver", "encoding/binary")
+	validate()
+	name = "ignore simple and namemismatch, and no main"
+	main, tests = false, true
+	except("go/parser", "github.com/Masterminds/semver", "net/http")
+	validate()
+	name = "ignore simple and namemismatch, and no main or tests"
+	main, tests = false, false
+	except("go/parser", "github.com/Masterminds/semver", "net/http", "encoding/binary")
+	validate()
+
+	main, tests = true, true
+
+	// ignore two that should knock out gps
+	name = "ignore both importers"
+	ignore = map[string]bool{
+		"github.com/example/varied/simple": true,
+		"github.com/example/varied/m1p":    true,
+	}
+	except("sort", "github.com/sdboyer/gps", "go/parser")
+	validate()
+
+	// finally, directly ignore some external packages
+	name = "ignore external"
+	ignore = map[string]bool{
+		"github.com/sdboyer/gps": true,
+		"go/parser":              true,
+		"sort":                   true,
+	}
+	except("sort", "github.com/sdboyer/gps", "go/parser")
+	validate()
+
+	// The only thing varied *doesn't* cover is disallowed path patterns
+	ptree, err := ListPackages(filepath.Join(getTestdataRootDir(t), "src", "disallow"), "disallow")
+	if err != nil {
+		t.Fatalf("ListPackages failed on disallow test case: %s", err)
+	}
+
+	rm, em := ptree.ToReachMap(false, false, true, nil)
+	if len(em) != 0 {
+		t.Errorf("Should not have any error packages from ToReachMap, got %s", em)
+	}
+	result := rm.Flatten(true)
+	expect = []string{"github.com/sdboyer/gps", "hash", "sort"}
+	if !reflect.DeepEqual(expect, result) {
+		t.Errorf("Wrong imports in %q case:\n\t(GOT): %s\n\t(WNT): %s", name, result, expect)
+	}
+}
+
 // Verify that we handle import cycles correctly - drop em all
 func TestToReachMapCycle(t *testing.T) {
-	ptree, err := ListPackages(filepath.Join(getwd(t), "_testdata", "src", "cycle"), "cycle")
+	ptree, err := ListPackages(filepath.Join(getTestdataRootDir(t), "src", "cycle"), "cycle")
 	if err != nil {
 		t.Fatalf("ListPackages failed on cycle test case: %s", err)
 	}
@@ -1845,10 +1866,10 @@ func TestToReachMapCycle(t *testing.T) {
 	}
 }
 
-func getwd(t *testing.T) string {
+func getTestdataRootDir(t *testing.T) string {
 	cwd, err := os.Getwd()
 	if err != nil {
 		t.Fatal(err)
 	}
-	return cwd
+	return filepath.Join(cwd, "..", "_testdata")
 }
