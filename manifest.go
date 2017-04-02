@@ -139,7 +139,6 @@ func (m *Manifest) toRaw() rawManifest {
 	return raw
 }
 
-// TODO(carolynvs) when gps is moved, we can use the unexported gps.sortedConstraints
 type sortedRawProjects []rawProject
 
 func (s sortedRawProjects) Len() int      { return len(s) }
