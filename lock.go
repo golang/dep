@@ -123,10 +123,10 @@ func (l *Lock) toRaw() rawLock {
 	return raw
 }
 
-func (l *Lock) MarshalTOML() (string, error) {
+func (l *Lock) MarshalTOML() ([]byte, error) {
 	raw := l.toRaw()
 	result, err := toml.Marshal(raw)
-	return string(result), errors.Wrap(err, "Unable to marshal lock to TOML string")
+	return result, errors.Wrap(err, "Unable to marshal lock to TOML string")
 }
 
 // TODO(carolynvs) this should be moved to gps
