@@ -72,11 +72,11 @@ func (diff *LockDiff) Format() (string, error) {
 
 	writeDiffs := func(diffs []LockedProjectDiff) error {
 		for i := 0; i < len(diffs); i++ {
-			chunk, err := diffs[i].MarshalTOML()
+			chunk, err := toml.Marshal(diffs[i])
 			if err != nil {
 				return err
 			}
-			buf.WriteString(chunk)
+			buf.Write(chunk)
 		}
 		buf.WriteString("\n")
 		return nil
@@ -113,52 +113,12 @@ func (diff *LockDiff) Format() (string, error) {
 // Fields are only populated when there is a difference, otherwise they are empty.
 // TODO(carolynvs) this should be moved to gps
 type LockedProjectDiff struct {
-	Name     gps.ProjectRoot
-	Source   *StringDiff
-	Version  *StringDiff
-	Branch   *StringDiff
-	Revision *StringDiff
-	Packages []StringDiff
-}
-
-func (diff *LockedProjectDiff) MarshalTOML() (string, error) {
-	prj := make(map[string]interface{})
-	prj["name"] = string(diff.Name)
-
-	if diff.Source != nil {
-		prj["source"] = diff.Source.String()
-	}
-
-	if diff.Version != nil {
-		prj["version"] = diff.Version.String()
-	}
-
-	if diff.Branch != nil {
-		prj["branch"] = diff.Branch.String()
-	}
-
-	if diff.Revision != nil {
-		prj["revision"] = diff.Revision.String()
-	}
-
-	if len(diff.Packages) > 0 {
-		p := make([]interface{}, len(diff.Packages))
-		for i := 0; i < len(diff.Packages); i++ {
-			p[i] = diff.Packages[i].String()
-		}
-		prj["packages"] = p
-	}
-
-	m := make(map[string]interface{})
-	m["projects"] = []map[string]interface{}{prj}
-
-	t, err := toml.TreeFromMap(m)
-	if err != nil {
-		return "", errors.Wrap(err, "Unable to marshal lock diff to TOML tree")
-	}
-
-	result, err := t.ToTomlString()
-	return result, errors.Wrap(err, "Unable to marshal lock diff to TOML string")
+	Name     gps.ProjectRoot `toml:"name"`
+	Source   *StringDiff     `toml:"source"`
+	Version  *StringDiff     `toml:"version"`
+	Branch   *StringDiff     `toml:"branch"`
+	Revision *StringDiff     `toml:"revision"`
+	Packages []StringDiff    `toml:"packages"`
 }
 
 type StringDiff struct {
