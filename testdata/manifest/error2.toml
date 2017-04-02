@@ -1,0 +1,9 @@
+ignores = ["github.com/foo/bar"]
+
+[[dependencies]]
+  name = "github.com/sdboyer/gps"
+  branch = "master"
+
+[[dependencies]]
+  name = "github.com/sdboyer/gps"
+  branch = "master"

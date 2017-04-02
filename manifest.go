@@ -67,6 +67,9 @@ func fromRawManifest(raw rawManifest) (*Manifest, error) {
 		if err != nil {
 			return nil, err
 		}
+		if _, exists := m.Dependencies[name]; exists {
+			return nil, errors.Errorf("multiple dependencies specified for %s, can only specify one", name)
+		}
 		m.Dependencies[name] = prj
 	}
 
