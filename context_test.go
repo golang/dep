@@ -159,11 +159,11 @@ func TestLoadProject(t *testing.T) {
 	tg.TempDir("src")
 	tg.TempDir("src/test1")
 	tg.TempDir("src/test1/sub")
-	tg.TempFile("src/test1/manifest.toml", "")
-	tg.TempFile("src/test1/lock.toml", `memo = "cdafe8641b28cd16fe025df278b0a49b9416859345d8b6ba0ace0272b74925ee"`)
+	tg.TempFile(filepath.Join("src/test1", ManifestName), "")
+	tg.TempFile(filepath.Join("src/test1", LockName), `memo = "cdafe8641b28cd16fe025df278b0a49b9416859345d8b6ba0ace0272b74925ee"`)
 	tg.TempDir("src/test2")
 	tg.TempDir("src/test2/sub")
-	tg.TempFile("src/test2/manifest.toml", "")
+	tg.TempFile(filepath.Join("src/test2", ManifestName), "")
 	tg.Setenv("GOPATH", tg.Path("."))
 
 	var testcases = []struct {
@@ -251,8 +251,8 @@ func TestLoadProjectManifestParseError(t *testing.T) {
 
 	tg.TempDir("src")
 	tg.TempDir("src/test1")
-	tg.TempFile("src/test1/manifest.toml", `[[dependencies]]`)
-	tg.TempFile("src/test1/lock.toml", `memo = "cdafe8641b28cd16fe025df278b0a49b9416859345d8b6ba0ace0272b74925ee"\n\n[[projects]]`)
+	tg.TempFile(filepath.Join("src/test1", ManifestName), `[[dependencies]]`)
+	tg.TempFile(filepath.Join("src/test1", LockName), `memo = "cdafe8641b28cd16fe025df278b0a49b9416859345d8b6ba0ace0272b74925ee"\n\n[[projects]]`)
 	tg.Setenv("GOPATH", tg.Path("."))
 
 	ctx := &Ctx{GOPATH: tg.Path(".")}
@@ -271,8 +271,8 @@ func TestLoadProjectLockParseError(t *testing.T) {
 
 	tg.TempDir("src")
 	tg.TempDir("src/test1")
-	tg.TempFile("src/test1/manifest.toml", `[[dependencies]]`)
-	tg.TempFile("src/test1/lock.toml", `memo = "cdafe8641b28cd16fe025df278b0a49b9416859345d8b6ba0ace0272b74925ee"\n\n[[projects]]`)
+	tg.TempFile(filepath.Join("src/test1", ManifestName), `[[dependencies]]`)
+	tg.TempFile(filepath.Join("src/test1", LockName), `memo = "cdafe8641b28cd16fe025df278b0a49b9416859345d8b6ba0ace0272b74925ee"\n\n[[projects]]`)
 	tg.Setenv("GOPATH", tg.Path("."))
 
 	ctx := &Ctx{GOPATH: tg.Path(".")}
@@ -290,15 +290,15 @@ func TestLoadProjectNoSrcDir(t *testing.T) {
 	defer tg.Cleanup()
 
 	tg.TempDir("test1")
-	tg.TempFile("test1/manifest.toml", `[[dependencies]]`)
-	tg.TempFile("test1/lock.toml", `memo = "cdafe8641b28cd16fe025df278b0a49b9416859345d8b6ba0ace0272b74925ee"\n\n[[projects]]`)
+	tg.TempFile(filepath.Join("test1", ManifestName), `[[dependencies]]`)
+	tg.TempFile(filepath.Join("test1", LockName), `memo = "cdafe8641b28cd16fe025df278b0a49b9416859345d8b6ba0ace0272b74925ee"\n\n[[projects]]`)
 	tg.Setenv("GOPATH", tg.Path("."))
 
 	ctx := &Ctx{GOPATH: tg.Path(".")}
 	path := filepath.Join("test1")
 	tg.Cd(tg.Path(path))
 
-	f, _ := os.OpenFile(filepath.Join(ctx.GOPATH, "src", "test1", "lock.toml"), os.O_WRONLY, os.ModePerm)
+	f, _ := os.OpenFile(filepath.Join(ctx.GOPATH, "src", "test1", LockName), os.O_WRONLY, os.ModePerm)
 	defer f.Close()
 
 	_, err := ctx.LoadProject("")
@@ -319,7 +319,7 @@ func TestCaseInsentitiveGOPATH(t *testing.T) {
 
 	h.TempDir("src")
 	h.TempDir("src/test1")
-	h.TempFile("src/test1/manifest.toml", `[[dependencies]]`)
+	h.TempFile(filepath.Join("src/test1", ManifestName), `[[dependencies]]`)
 
 	// Shuffle letter case
 	rs := []rune(strings.ToLower(h.Path(".")))

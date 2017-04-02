@@ -395,7 +395,7 @@ fail:
 
 func (sw *SafeWriter) PrintPreparedActions() error {
 	if sw.Payload.HasManifest() {
-		fmt.Println("Would have written the following manifest.toml:")
+		fmt.Printf("Would have written the following %s:\n", ManifestName)
 		m, err := sw.Payload.Manifest.MarshalTOML()
 		if err != nil {
 			return errors.Wrap(err, "ensure DryRun cannot serialize manifest")
@@ -405,14 +405,14 @@ func (sw *SafeWriter) PrintPreparedActions() error {
 
 	if sw.Payload.HasLock() {
 		if sw.Payload.LockDiff == nil {
-			fmt.Println("Would have written the following lock.toml:")
+			fmt.Printf("Would have written the following %s:\n", LockName)
 			l, err := sw.Payload.Lock.MarshalTOML()
 			if err != nil {
 				return errors.Wrap(err, "ensure DryRun cannot serialize lock")
 			}
 			fmt.Println(string(l))
 		} else {
-			fmt.Println("Would have written the following changes to lock.toml:")
+			fmt.Printf("Would have written the following changes to %s:\n", LockName)
 			diff, err := sw.Payload.LockDiff.Format()
 			if err != nil {
 				return errors.Wrap(err, "ensure DryRun cannot serialize the lock diff")

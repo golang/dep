@@ -18,7 +18,7 @@ func TestDeriveManifestAndLock(t *testing.T) {
 	defer h.Cleanup()
 
 	h.TempDir("dep")
-	golden := "analyzer/manifest.toml"
+	golden := filepath.Join("analyzer", ManifestName)
 	want := h.GetTestFileString(golden)
 	h.TempCopy(filepath.Join("dep", ManifestName), golden)
 
