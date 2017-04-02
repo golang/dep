@@ -154,10 +154,10 @@ func (s sortedRawProjects) Less(i, j int) bool {
 	return l.Source < r.Source
 }
 
-func (m *Manifest) MarshalTOML() (string, error) {
+func (m *Manifest) MarshalTOML() ([]byte, error) {
 	raw := m.toRaw()
 	result, err := toml.Marshal(raw)
-	return string(result), errors.Wrap(err, "Unable to marshal the lock to a TOML string")
+	return result, errors.Wrap(err, "Unable to marshal the lock to a TOML string")
 }
 
 func toRawProject(name gps.ProjectRoot, project gps.ProjectProperties) rawProject {
