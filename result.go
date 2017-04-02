@@ -76,7 +76,17 @@ func (r solution) InputHash() []byte {
 func stripVendor(path string, info os.FileInfo, err error) error {
 	if info.Name() == "vendor" {
 		if _, err := os.Lstat(path); err == nil {
-			if (info.Mode() & os.ModeSymlink) != 0 {
+			symlink := (info.Mode() & os.ModeSymlink) != 0
+			dir := info.IsDir()
+
+			switch {
+			case symlink && dir:
+				// This must be a windows junction directory. Support for these in the
+				// standard library is spotty, and we could easily delete an important
+				// folder if we called os.Remove. Just skip these.
+				return filepath.SkipDir
+
+			case symlink:
 				realInfo, err := os.Stat(path)
 				if err != nil {
 					return err
@@ -84,9 +94,8 @@ func stripVendor(path string, info os.FileInfo, err error) error {
 				if realInfo.IsDir() {
 					return os.Remove(path)
 				}
-			}
 
-			if info.IsDir() {
+			case dir:
 				return removeAll(path)
 			}
 		}
