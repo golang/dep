@@ -717,11 +717,6 @@ func TestSignalHandling(t *testing.T) {
 	}
 
 	sm, clean := mkNaiveSM(t)
-	//get self proc
-	proc, err := os.FindProcess(os.Getpid())
-	if err != nil {
-		t.Fatal("cannot find self proc")
-	}
 
 	sigch := make(chan os.Signal)
 	sm.HandleSignals(sigch)
@@ -739,23 +734,17 @@ func TestSignalHandling(t *testing.T) {
 	}
 	clean()
 
+	// Test again, this time with a running call
 	sm, clean = mkNaiveSM(t)
-	sm.UseDefaultSignalHandling()
+	sm.HandleSignals(sigch)
+
 	errchan := make(chan error)
 	go func() {
-		_, callerr := sm.DeduceProjectRoot("rsc.io/pdf")
+		_, callerr := sm.DeduceProjectRoot("k8s.io/kubernetes")
 		errchan <- callerr
 	}()
+	go func() { sigch <- os.Interrupt }()
 	runtime.Gosched()
-
-	// signal the process and call release right afterward
-	now := time.Now()
-	proc.Signal(os.Interrupt)
-	sigdur := time.Since(now)
-	t.Logf("time to send signal: %v", sigdur)
-	sm.Release()
-	reldur := time.Since(now) - sigdur
-	t.Logf("time to return from Release(): %v", reldur)
 
 	callerr := <-errchan
 	if callerr == nil {
@@ -764,47 +753,32 @@ func TestSignalHandling(t *testing.T) {
 	if atomic.LoadInt32(&sm.releasing) != 1 {
 		t.Error("Releasing flag did not get set")
 	}
-
-	lpath = filepath.Join(sm.cachedir, "sm.lock")
-	if _, err := os.Stat(lpath); err == nil {
-		t.Error("Expected error on statting what should be an absent lock file")
-	}
 	clean()
 
-	// proc.Signal(os.Interrupt) does nothing on windows, so skip this part
-	if runtime.GOOS == "windows" {
-		return
-	}
-
 	sm, clean = mkNaiveSM(t)
+	// Ensure that handling also works after stopping and restarting itself,
+	// and that Release happens only once.
 	sm.UseDefaultSignalHandling()
 	sm.StopSignalHandling()
-	sm.UseDefaultSignalHandling()
+	sm.HandleSignals(sigch)
 
-	go sm.DeduceProjectRoot("rsc.io/pdf")
-	go sm.DeduceProjectRoot("k8s.io/kubernetes")
+	go func() {
+		_, callerr := sm.DeduceProjectRoot("k8s.io/kubernetes")
+		errchan <- callerr
+	}()
+	go func() {
+		sigch <- os.Interrupt
+		sm.Release()
+	}()
 	runtime.Gosched()
 
-	// Ensure that it all works after teardown and re-set up
-	proc.Signal(os.Interrupt)
-
-	after := time.After(3 * time.Second)
-	tick := time.NewTicker(25 * time.Microsecond)
-loop:
-	for {
-		select {
-		case <-tick.C:
-			if atomic.LoadInt32(&sm.releasing) == 1 {
-				tick.Stop()
-				break loop
-			}
-		case <-after:
-			tick.Stop()
-			t.Fatalf("did not receive signal in reasonable time")
-		}
+	after := time.After(2 * time.Second)
+	select {
+	case <-sm.qch:
+	case <-after:
+		t.Error("did not shut down in reasonable time")
 	}
 
-	<-sm.qch
 	clean()
 }
 
