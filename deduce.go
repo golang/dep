@@ -524,6 +524,17 @@ func (m vcsExtensionDeducer) deduceSource(path string, u *url.URL) (maybeSource,
 	}
 }
 
+// A deducer takes an import path and inspects it to determine where the
+// corresponding project root should be. It applies a number of matching
+// techniques, eventually falling back to an HTTP request for go-get metadata if
+// none of the explicit rules succeed.
+//
+// The only real implementation is deductionCoordinator. The interface is
+// primarily intended for testing purposes.
+type deducer interface {
+	deduceRootPath(ctx context.Context, path string) (pathDeduction, error)
+}
+
 type deductionCoordinator struct {
 	suprvsr  *supervisor
 	mut      sync.RWMutex

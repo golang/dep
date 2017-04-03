@@ -43,11 +43,11 @@ type sourceCoordinator struct {
 	nameToURL  map[string]string
 	psrcmut    sync.Mutex // guards protoSrcs map
 	protoSrcs  map[string][]srcReturnChans
-	deducer    *deductionCoordinator
+	deducer    deducer
 	cachedir   string
 }
 
-func newSourceCoordinator(superv *supervisor, deducer *deductionCoordinator, cachedir string) *sourceCoordinator {
+func newSourceCoordinator(superv *supervisor, deducer deducer, cachedir string) *sourceCoordinator {
 	return &sourceCoordinator{
 		supervisor: superv,
 		deducer:    deducer,

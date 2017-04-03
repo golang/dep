@@ -13,9 +13,11 @@ import (
 // Parent test that executes all the slow vcs interaction tests in parallel.
 func TestSlowVcs(t *testing.T) {
 	t.Run("write-deptree", testWriteDepTree)
+	t.Run("source-gateway", testSourceGateway)
 	t.Run("bzr-repo", testBzrRepo)
 	t.Run("bzr-source", testBzrSourceInteractions)
 	t.Run("svn-repo", testSvnRepo)
+	// TODO(sdboyer) svn-source
 	t.Run("hg-repo", testHgRepo)
 	t.Run("hg-source", testHgSourceInteractions)
 	t.Run("git-repo", testGitRepo)
