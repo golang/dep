@@ -62,11 +62,10 @@ func (m *metrics) dump(l *log.Logger) {
 		fmt.Fprintf(w, "\t%s:\t%v\t\n", nd.n, nd.d)
 	}
 	fmt.Fprintf(w, "\n\tTOTAL:\t%v\t\n", tot)
+	w.Flush()
 
 	l.Println("\nSolver wall times by segment:")
-	w.Flush()
-	fmt.Println((&buf).String())
-
+	l.Println((&buf).String())
 }
 
 type ndpair struct {

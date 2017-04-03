@@ -24,7 +24,7 @@ test:
       cd $RD && \
         echo 'mode: atomic' > coverage.txt && \
         go list ./... | grep -v "/vendor/" | \
-          xargs -n1 -I% sh -c 'set -e; go test -covermode=atomic -coverprofile=coverage.out -v % ; tail -n +2 coverage.out >> coverage.txt' && \
+          xargs -n1 -I% sh -c 'set -e; go test -covermode=atomic -coverprofile=coverage.out % ; tail -n +2 coverage.out >> coverage.txt' && \
         rm coverage.out
     - cd $RD && go build example.go
     - cd $RD && bash <(curl -s https://codecov.io/bash)
