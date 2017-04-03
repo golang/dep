@@ -1,6 +1,8 @@
 package gps
 
 import (
+	"context"
+	"errors"
 	"io/ioutil"
 	"os"
 	"testing"
@@ -12,6 +14,34 @@ import (
 // original implementation of these test files come from
 // https://github.com/Masterminds/vcs test files
 
+func TestErrs(t *testing.T) {
+	err := newVcsLocalErrorOr("", context.Canceled, "")
+	if err != context.Canceled {
+		t.Errorf("context errors should always pass through, got %s", err)
+	}
+	err = newVcsRemoteErrorOr("", context.Canceled, "")
+	if err != context.Canceled {
+		t.Errorf("context errors should always pass through, got %s", err)
+	}
+	err = newVcsLocalErrorOr("", context.DeadlineExceeded, "")
+	if err != context.DeadlineExceeded {
+		t.Errorf("context errors should always pass through, got %s", err)
+	}
+	err = newVcsRemoteErrorOr("", context.DeadlineExceeded, "")
+	if err != context.DeadlineExceeded {
+		t.Errorf("context errors should always pass through, got %s", err)
+	}
+
+	err = newVcsLocalErrorOr("foo", errors.New("bar"), "baz")
+	if _, is := err.(*vcs.LocalError); !is {
+		t.Errorf("should have gotten local error, got %T %v", err, err)
+	}
+	err = newVcsRemoteErrorOr("foo", errors.New("bar"), "baz")
+	if _, is := err.(*vcs.RemoteError); !is {
+		t.Errorf("should have gotten remote error, got %T %v", err, err)
+	}
+}
+
 func testSvnRepo(t *testing.T) {
 	t.Parallel()
 
@@ -19,6 +49,7 @@ func testSvnRepo(t *testing.T) {
 		t.Skip("Skipping slow test in short mode")
 	}
 
+	ctx := context.Background()
 	tempDir, err := ioutil.TempDir("", "go-vcs-svn-tests")
 	if err != nil {
 		t.Error(err)
@@ -37,7 +68,7 @@ func testSvnRepo(t *testing.T) {
 	repo := &svnRepo{rep}
 
 	// Do an initial checkout.
-	err = repo.Get()
+	err = repo.get(ctx)
 	if err != nil {
 		t.Errorf("Unable to checkout SVN repo. Err was %s", err)
 	}
@@ -48,7 +79,7 @@ func testSvnRepo(t *testing.T) {
 	}
 
 	// Update the version to a previous version.
-	err = repo.UpdateVersion("r2")
+	err = repo.updateVersion(ctx, "r2")
 	if err != nil {
 		t.Errorf("Unable to update SVN repo version. Err was %s", err)
 	}
@@ -63,7 +94,7 @@ func testSvnRepo(t *testing.T) {
 	}
 
 	// Perform an update which should take up back to the latest version.
-	err = repo.Update()
+	err = repo.update(ctx)
 	if err != nil {
 		t.Error(err)
 	}
@@ -111,6 +142,7 @@ func testHgRepo(t *testing.T) {
 		t.Skip("Skipping slow test in short mode")
 	}
 
+	ctx := context.Background()
 	tempDir, err := ioutil.TempDir("", "go-vcs-hg-tests")
 	if err != nil {
 		t.Error(err)
@@ -131,7 +163,7 @@ func testHgRepo(t *testing.T) {
 	repo := &hgRepo{rep}
 
 	// Do an initial clone.
-	err = repo.Get()
+	err = repo.get(ctx)
 	if err != nil {
 		t.Errorf("Unable to clone Hg repo. Err was %s", err)
 	}
@@ -142,7 +174,7 @@ func testHgRepo(t *testing.T) {
 	}
 
 	// Set the version using the short hash.
-	err = repo.UpdateVersion("a5494ba2177f")
+	err = repo.updateVersion(ctx, "a5494ba2177f")
 	if err != nil {
 		t.Errorf("Unable to update Hg repo version. Err was %s", err)
 	}
@@ -157,15 +189,7 @@ func testHgRepo(t *testing.T) {
 	}
 
 	// Perform an update.
-	err = repo.Update()
-	if err != nil {
-		t.Error(err)
-	}
-
-	v, err = repo.Version()
-	if v != "9c6ccbca73e8a1351c834f33f57f1f7a0329ad35" {
-		t.Errorf("Error checking checked out Hg version: %s", v)
-	}
+	err = repo.update(ctx)
 	if err != nil {
 		t.Error(err)
 	}
@@ -178,6 +202,7 @@ func testGitRepo(t *testing.T) {
 		t.Skip("Skipping slow test in short mode")
 	}
 
+	ctx := context.Background()
 	tempDir, err := ioutil.TempDir("", "go-vcs-git-tests")
 	if err != nil {
 		t.Error(err)
@@ -198,7 +223,7 @@ func testGitRepo(t *testing.T) {
 	repo := &gitRepo{rep}
 
 	// Do an initial clone.
-	err = repo.Get()
+	err = repo.get(ctx)
 	if err != nil {
 		t.Errorf("Unable to clone Git repo. Err was %s", err)
 	}
@@ -209,7 +234,7 @@ func testGitRepo(t *testing.T) {
 	}
 
 	// Perform an update.
-	err = repo.Update()
+	err = repo.update(ctx)
 	if err != nil {
 		t.Error(err)
 	}
@@ -223,7 +248,7 @@ func testGitRepo(t *testing.T) {
 	}
 
 	// Set the version using the short hash.
-	err = repo.UpdateVersion("806b07b")
+	err = repo.updateVersion(ctx, "806b07b")
 	if err != nil {
 		t.Errorf("Unable to update Git repo version. Err was %s", err)
 	}
@@ -232,7 +257,7 @@ func testGitRepo(t *testing.T) {
 	// Trying to pull in an update in this state will cause an error. Update
 	// should cleanly handle this. Pulling on a branch (tested elsewhere) and
 	// skipping that here.
-	err = repo.Update()
+	err = repo.update(ctx)
 	if err != nil {
 		t.Error(err)
 	}
@@ -254,6 +279,7 @@ func testBzrRepo(t *testing.T) {
 		t.Skip("Skipping slow test in short mode")
 	}
 
+	ctx := context.Background()
 	tempDir, err := ioutil.TempDir("", "go-vcs-bzr-tests")
 	if err != nil {
 		t.Error(err)
@@ -274,7 +300,7 @@ func testBzrRepo(t *testing.T) {
 	repo := &bzrRepo{rep}
 
 	// Do an initial clone.
-	err = repo.Get()
+	err = repo.get(ctx)
 	if err != nil {
 		t.Errorf("Unable to clone Bzr repo. Err was %s", err)
 	}
@@ -292,7 +318,7 @@ func testBzrRepo(t *testing.T) {
 		t.Errorf("Current failed to detect Bzr on tip of branch. Got version: %s", v)
 	}
 
-	err = repo.UpdateVersion("2")
+	err = repo.updateVersion(ctx, "2")
 	if err != nil {
 		t.Errorf("Unable to update Bzr repo version. Err was %s", err)
 	}

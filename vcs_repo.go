@@ -43,25 +43,7 @@ func newVcsLocalErrorOr(msg string, err error, out string) error {
 
 func (r *gitRepo) get(ctx context.Context) error {
 	out, err := runFromCwd(ctx, "git", "clone", "--recursive", r.Remote(), r.LocalPath())
-
-	// There are some windows cases where Git cannot create the parent
-	// directory, of the location where it's trying to create the repo. Catch
-	// that error and try to handle it.
-	if err != nil && r.isUnableToCreateDir(err) {
-		basePath := filepath.Dir(filepath.FromSlash(r.LocalPath()))
-		if _, err := os.Stat(basePath); os.IsNotExist(err) {
-			err = os.MkdirAll(basePath, 0755)
-			if err != nil {
-				return newVcsLocalErrorOr("unable to create directory", err, "")
-			}
-
-			out, err = runFromCwd(ctx, "git", "clone", r.Remote(), r.LocalPath())
-			if err != nil {
-				return newVcsRemoteErrorOr("unable to get repository", err, string(out))
-			}
-			return err
-		}
-	} else if err != nil {
+	if err != nil {
 		return newVcsRemoteErrorOr("unable to get repository", err, string(out))
 	}
 
@@ -111,24 +93,6 @@ func (r *gitRepo) defendAgainstSubmodules(ctx context.Context) error {
 	return nil
 }
 
-// isUnableToCreateDir checks for an error in the command to see if an error
-// where the parent directory of the VCS local path doesn't exist. This is
-// done in a multi-lingual manner.
-func (r *gitRepo) isUnableToCreateDir(err error) bool {
-	msg := err.Error()
-	if strings.HasPrefix(msg, "could not create work tree dir") ||
-		strings.HasPrefix(msg, "不能创建工作区目录") ||
-		strings.HasPrefix(msg, "no s'ha pogut crear el directori d'arbre de treball") ||
-		strings.HasPrefix(msg, "impossible de créer le répertoire de la copie de travail") ||
-		strings.HasPrefix(msg, "kunde inte skapa arbetskatalogen") ||
-		(strings.HasPrefix(msg, "Konnte Arbeitsverzeichnis") && strings.Contains(msg, "nicht erstellen")) ||
-		(strings.HasPrefix(msg, "작업 디렉터리를") && strings.Contains(msg, "만들 수 없습니다")) {
-		return true
-	}
-
-	return false
-}
-
 type bzrRepo struct {
 	*vcs.BzrRepo
 }
@@ -155,12 +119,6 @@ func (r *bzrRepo) update(ctx context.Context) error {
 	if err != nil {
 		return newVcsRemoteErrorOr("unable to update repository", err, string(out))
 	}
-
-	out, err = runFromRepoDir(ctx, r, "bzr", "update")
-	if err != nil {
-		return newVcsRemoteErrorOr("unable to update repository", err, string(out))
-	}
-
 	return nil
 }
 

@@ -2,6 +2,7 @@ package gps
 
 import (
 	"context"
+	"fmt"
 	"io/ioutil"
 	"reflect"
 	"testing"
@@ -106,9 +107,30 @@ func testSourceGateway(t *testing.T) {
 				t.Fatal("bare rev should be in cache after specific request for it")
 			}
 
-			_, err = sg.listPackages(ctx, ProjectRoot("github.com/sdboyer/deptest"), NewVersion("notexist"))
+			// Ensure that a bad rev doesn't work on any method that takes
+			// versions
+			badver := NewVersion("notexist")
+			wanterr := fmt.Errorf("version %q does not exist in source", badver)
+
+			_, _, err = sg.getManifestAndLock(ctx, ProjectRoot("github.com/sdboyer/deptest"), badver, naiveAnalyzer{})
 			if err == nil {
-				t.Fatal("should have errored on nonexistent version")
+				t.Fatal("wanted err on nonexistent version")
+			} else if err.Error() != wanterr.Error() {
+				t.Fatalf("wanted nonexistent err when passing bad version, got: %s", err)
+			}
+
+			_, err = sg.listPackages(ctx, ProjectRoot("github.com/sdboyer/deptest"), badver)
+			if err == nil {
+				t.Fatal("wanted err on nonexistent version")
+			} else if err.Error() != wanterr.Error() {
+				t.Fatalf("wanted nonexistent err when passing bad version, got: %s", err)
+			}
+
+			err = sg.exportVersionTo(ctx, badver, cachedir)
+			if err == nil {
+				t.Fatal("wanted err on nonexistent version")
+			} else if err.Error() != wanterr.Error() {
+				t.Fatalf("wanted nonexistent err when passing bad version, got: %s", err)
 			}
 
 			wantptree := pkgtree.PackageTree{
