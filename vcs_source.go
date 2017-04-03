@@ -72,7 +72,7 @@ func (bs *baseVCSSource) initLocal(ctx context.Context) error {
 // updateLocal ensures the local data (versions and code) we have about the
 // source is fully up to date with that of the canonical upstream source.
 func (bs *baseVCSSource) updateLocal(ctx context.Context) error {
-	err := bs.repo.update(ctx)
+	err := bs.repo.fetch(ctx)
 
 	if err != nil {
 		return unwrapVcsErr(err)

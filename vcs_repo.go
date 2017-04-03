@@ -15,7 +15,7 @@ import (
 type ctxRepo interface {
 	vcs.Repo
 	get(context.Context) error
-	update(context.Context) error
+	fetch(context.Context) error
 	updateVersion(context.Context, string) error
 	//ping(context.Context) (bool, error)
 }
@@ -50,7 +50,7 @@ func (r *gitRepo) get(ctx context.Context) error {
 	return nil
 }
 
-func (r *gitRepo) update(ctx context.Context) error {
+func (r *gitRepo) fetch(ctx context.Context) error {
 	// Perform a fetch to make sure everything is up to date.
 	out, err := runFromRepoDir(ctx, r, "git", "fetch", "--tags", "--prune", r.RemoteLocation)
 	if err != nil {
@@ -114,7 +114,7 @@ func (r *bzrRepo) get(ctx context.Context) error {
 	return nil
 }
 
-func (r *bzrRepo) update(ctx context.Context) error {
+func (r *bzrRepo) fetch(ctx context.Context) error {
 	out, err := runFromRepoDir(ctx, r, "bzr", "pull")
 	if err != nil {
 		return newVcsRemoteErrorOr("unable to update repository", err, string(out))
@@ -143,7 +143,7 @@ func (r *hgRepo) get(ctx context.Context) error {
 	return nil
 }
 
-func (r *hgRepo) update(ctx context.Context) error {
+func (r *hgRepo) fetch(ctx context.Context) error {
 	out, err := runFromRepoDir(ctx, r, "hg", "pull")
 	if err != nil {
 		return newVcsRemoteErrorOr("unable to fetch latest changes", err, string(out))

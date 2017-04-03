@@ -189,7 +189,7 @@ func testHgRepo(t *testing.T) {
 	}
 
 	// Perform an update.
-	err = repo.update(ctx)
+	err = repo.fetch(ctx)
 	if err != nil {
 		t.Error(err)
 	}
@@ -234,7 +234,7 @@ func testGitRepo(t *testing.T) {
 	}
 
 	// Perform an update.
-	err = repo.update(ctx)
+	err = repo.fetch(ctx)
 	if err != nil {
 		t.Error(err)
 	}
@@ -257,7 +257,7 @@ func testGitRepo(t *testing.T) {
 	// Trying to pull in an update in this state will cause an error. Update
 	// should cleanly handle this. Pulling on a branch (tested elsewhere) and
 	// skipping that here.
-	err = repo.update(ctx)
+	err = repo.fetch(ctx)
 	if err != nil {
 		t.Error(err)
 	}
