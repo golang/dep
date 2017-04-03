@@ -612,52 +612,7 @@ func SortForUpgrade(vl []Version) {
 
 // temporary shim until this can replace SortForUpgrade, after #202
 func sortForUpgrade(vl []PairedVersion) {
-	sort.Slice(vl, func(i, j int) bool {
-		var l, r Version = vl[i], vl[j]
-
-		if tl, ispair := l.(versionPair); ispair {
-			l = tl.v
-		}
-		if tr, ispair := r.(versionPair); ispair {
-			r = tr.v
-		}
-
-		switch compareVersionType(l, r) {
-		case -1:
-			return true
-		case 1:
-			return false
-		case 0:
-			break
-		default:
-			panic("unreachable")
-		}
-
-		switch tl := l.(type) {
-		case branchVersion:
-			tr := r.(branchVersion)
-			if tl.isDefault != tr.isDefault {
-				// If they're not both defaults, then return the left val: if left
-				// is the default, then it is "less" (true) b/c we want it earlier.
-				// Else the right is the default, and so the left should be later
-				// (false).
-				return tl.isDefault
-			}
-			return l.String() < r.String()
-		case Revision, plainVersion:
-			// All that we can do now is alpha sort
-			return l.String() < r.String()
-		}
-
-		// This ensures that pre-release versions are always sorted after ALL
-		// full-release versions
-		lsv, rsv := l.(semVersion).sv, r.(semVersion).sv
-		lpre, rpre := lsv.Prerelease() == "", rsv.Prerelease() == ""
-		if (lpre && !rpre) || (!lpre && rpre) {
-			return lpre
-		}
-		return lsv.GreaterThan(rsv)
-	})
+	sort.Sort(pvupgradeVersionSorter(vl))
 }
 
 // SortForDowngrade sorts a slice of []Version in roughly ascending order, so
@@ -688,6 +643,7 @@ func SortForDowngrade(vl []Version) {
 }
 
 type upgradeVersionSorter []Version
+type pvupgradeVersionSorter []PairedVersion
 type downgradeVersionSorter []Version
 
 func (vs upgradeVersionSorter) Len() int {
@@ -739,6 +695,53 @@ func (vs upgradeVersionSorter) Less(i, j int) bool {
 		}
 		return l.String() < r.String()
 	case Revision, plainVersion:
+		// All that we can do now is alpha sort
+		return l.String() < r.String()
+	}
+
+	// This ensures that pre-release versions are always sorted after ALL
+	// full-release versions
+	lsv, rsv := l.(semVersion).sv, r.(semVersion).sv
+	lpre, rpre := lsv.Prerelease() == "", rsv.Prerelease() == ""
+	if (lpre && !rpre) || (!lpre && rpre) {
+		return lpre
+	}
+	return lsv.GreaterThan(rsv)
+}
+
+func (vs pvupgradeVersionSorter) Len() int {
+	return len(vs)
+}
+
+func (vs pvupgradeVersionSorter) Swap(i, j int) {
+	vs[i], vs[j] = vs[j], vs[i]
+}
+func (vs pvupgradeVersionSorter) Less(i, j int) bool {
+	l, r := vs[i].Unpair(), vs[j].Unpair()
+
+	switch compareVersionType(l, r) {
+	case -1:
+		return true
+	case 1:
+		return false
+	case 0:
+		break
+	default:
+		panic("unreachable")
+	}
+
+	switch tl := l.(type) {
+	case branchVersion:
+		tr := r.(branchVersion)
+		if tl.isDefault != tr.isDefault {
+			// If they're not both defaults, then return the left val: if left
+			// is the default, then it is "less" (true) b/c we want it earlier.
+			// Else the right is the default, and so the left should be later
+			// (false).
+			return tl.isDefault
+		}
+		return l.String() < r.String()
+	case plainVersion:
 		// All that we can do now is alpha sort
 		return l.String() < r.String()
 	}
