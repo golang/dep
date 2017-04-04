@@ -1384,7 +1384,7 @@ func newdepspecSM(ds []depspec, ignore []string) *depspecSourceManager {
 	}
 }
 
-func (sm *depspecSourceManager) GetManifestAndLock(id ProjectIdentifier, v Version) (Manifest, Lock, error) {
+func (sm *depspecSourceManager) GetManifestAndLock(id ProjectIdentifier, v Version, an ProjectAnalyzer) (Manifest, Lock, error) {
 	// If the input version is a PairedVersion, look only at its top version,
 	// not the underlying. This is generally consistent with the idea that, for
 	// this class of lookup, the rev probably DOES exist, but upstream changed
@@ -1403,10 +1403,6 @@ func (sm *depspecSourceManager) GetManifestAndLock(id ProjectIdentifier, v Versi
 
 	// TODO(sdboyer) proper solver-type errors
 	return nil, nil, fmt.Errorf("Project %s at version %s could not be found", id.errString(), v)
-}
-
-func (sm *depspecSourceManager) AnalyzerInfo() (string, int) {
-	return "depspec-sm-builtin", 1
 }
 
 func (sm *depspecSourceManager) ExternalReach(id ProjectIdentifier, v Version) (map[string][]string, error) {

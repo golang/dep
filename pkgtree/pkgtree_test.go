@@ -450,9 +450,12 @@ func TestWorkmapToReach(t *testing.T) {
 	}
 
 	for name, fix := range table {
-		// Avoid erroneous errors by initializing the fixture's error map if
-		// needed
+		name, fix := name, fix
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			// Avoid erroneous errors by initializing the fixture's error map if
+			// needed
 			if fix.em == nil {
 				fix.em = make(map[string]*ProblemImportError)
 			}

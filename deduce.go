@@ -1,6 +1,8 @@
 package gps
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -9,6 +11,9 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
+
+	radix "github.com/armon/go-radix"
 )
 
 var (
@@ -519,76 +524,147 @@ func (m vcsExtensionDeducer) deduceSource(path string, u *url.URL) (maybeSource,
 	}
 }
 
-type stringFuture func() (string, error)
-type sourceFuture func() (source, string, error)
-type partialSourceFuture func(string, ProjectAnalyzer) sourceFuture
-
-type deductionFuture struct {
-	// rslow indicates that the root future may be a slow call (that it has to
-	// hit the network for some reason)
-	rslow bool
-	root  stringFuture
-	psf   partialSourceFuture
+// A deducer takes an import path and inspects it to determine where the
+// corresponding project root should be. It applies a number of matching
+// techniques, eventually falling back to an HTTP request for go-get metadata if
+// none of the explicit rules succeed.
+//
+// The only real implementation is deductionCoordinator. The interface is
+// primarily intended for testing purposes.
+type deducer interface {
+	deduceRootPath(ctx context.Context, path string) (pathDeduction, error)
 }
 
-// deduceFromPath takes an import path and attempts to deduce various
+type deductionCoordinator struct {
+	suprvsr  *supervisor
+	mut      sync.RWMutex
+	rootxt   *radix.Tree
+	deducext *deducerTrie
+}
+
+func newDeductionCoordinator(superv *supervisor) *deductionCoordinator {
+	dc := &deductionCoordinator{
+		suprvsr:  superv,
+		rootxt:   radix.New(),
+		deducext: pathDeducerTrie(),
+	}
+
+	return dc
+}
+
+// deduceRootPath takes an import path and attempts to deduce various
 // metadata about it - what type of source should handle it, and where its
 // "root" is (for vcs repositories, the repository root).
 //
-// The results are wrapped in futures, as most of these operations require at
-// least some network activity to complete. For the first return value, network
-// activity will be triggered when the future is called. For the second,
-// network activity is triggered only when calling the sourceFuture returned
-// from the partialSourceFuture.
-func (sm *SourceMgr) deduceFromPath(path string) (deductionFuture, error) {
-	opath := path
+// If no errors are encountered, the returned pathDeduction will contain both
+// the root path and a list of maybeSources, which can be subsequently used to
+// create a handler that will manage the particular source.
+func (dc *deductionCoordinator) deduceRootPath(ctx context.Context, path string) (pathDeduction, error) {
+	if dc.suprvsr.getLifetimeContext().Err() != nil {
+		return pathDeduction{}, errors.New("deductionCoordinator has been terminated")
+	}
+
+	// First, check the rootxt to see if there's a prefix match - if so, we
+	// can return that and move on.
+	dc.mut.RLock()
+	prefix, data, has := dc.rootxt.LongestPrefix(path)
+	dc.mut.RUnlock()
+	if has && isPathPrefixOrEqual(prefix, path) {
+		switch d := data.(type) {
+		case maybeSource:
+			return pathDeduction{root: prefix, mb: d}, nil
+		case *httpMetadataDeducer:
+			// Multiple calls have come in for a similar path shape during
+			// the window in which the HTTP request to retrieve go get
+			// metadata is in flight. Fold this request in with the existing
+			// one(s) by calling the deduction method, which will avoid
+			// duplication of work through a sync.Once.
+			return d.deduce(ctx, path)
+		}
+
+		panic(fmt.Sprintf("unexpected %T in deductionCoordinator.rootxt: %v", data, data))
+	}
+
+	// No match. Try known path deduction first.
+	pd, err := dc.deduceKnownPaths(path)
+	if err == nil {
+		// Deduction worked; store it in the rootxt, send on retchan and
+		// terminate.
+		// FIXME(sdboyer) deal with changing path vs. root. Probably needs
+		// to be predeclared and reused in the hmd returnFunc
+		dc.mut.Lock()
+		dc.rootxt.Insert(pd.root, pd.mb)
+		dc.mut.Unlock()
+		return pd, nil
+	}
+
+	if err != errNoKnownPathMatch {
+		return pathDeduction{}, err
+	}
+
+	// The err indicates no known path matched. It's still possible that
+	// retrieving go get metadata might do the trick.
+	hmd := &httpMetadataDeducer{
+		basePath: path,
+		suprvsr:  dc.suprvsr,
+		// The vanity deducer will call this func with a completed
+		// pathDeduction if it succeeds in finding one. We process it
+		// back through the action channel to ensure serialized
+		// access to the rootxt map.
+		returnFunc: func(pd pathDeduction) {
+			dc.mut.Lock()
+			dc.rootxt.Insert(pd.root, pd.mb)
+
+			if pd.root != path {
+				// Replace the vanity deducer with a real result set, so
+				// that subsequent deductions don't hit the network
+				// again.
+				dc.rootxt.Insert(path, pd.mb)
+			}
+			dc.mut.Unlock()
+		},
+	}
+
+	// Save the hmd in the rootxt so that calls checking on similar
+	// paths made while the request is in flight can be folded together.
+	dc.mut.Lock()
+	dc.rootxt.Insert(path, hmd)
+	dc.mut.Unlock()
+
+	// Trigger the HTTP-backed deduction process for this requestor.
+	return hmd.deduce(ctx, path)
+}
+
+// pathDeduction represents the results of a successful import path deduction -
+// a root path, plus a maybeSource that can be used to attempt to connect to
+// the source.
+type pathDeduction struct {
+	root string
+	mb   maybeSource
+}
+
+var errNoKnownPathMatch = errors.New("no known path match")
+
+func (dc *deductionCoordinator) deduceKnownPaths(path string) (pathDeduction, error) {
 	u, path, err := normalizeURI(path)
 	if err != nil {
-		return deductionFuture{}, err
-	}
-
-	// Helpers to futurize the results from deducers
-	strfut := func(s string) stringFuture {
-		return func() (string, error) {
-			return s, nil
-		}
-	}
-
-	srcfut := func(mb maybeSource) partialSourceFuture {
-		return func(cachedir string, an ProjectAnalyzer) sourceFuture {
-			var src source
-			var ident string
-			var err error
-
-			c := make(chan struct{}, 1)
-			go func() {
-				defer close(c)
-				src, ident, err = mb.try(cachedir, an)
-			}()
-
-			return func() (source, string, error) {
-				<-c
-				return src, ident, err
-			}
-		}
+		return pathDeduction{}, err
 	}
 
 	// First, try the root path-based matches
-	if _, mtchi, has := sm.dxt.LongestPrefix(path); has {
-		mtch := mtchi.(pathDeducer)
+	if _, mtch, has := dc.deducext.LongestPrefix(path); has {
 		root, err := mtch.deduceRoot(path)
 		if err != nil {
-			return deductionFuture{}, err
+			return pathDeduction{}, err
 		}
 		mb, err := mtch.deduceSource(path, u)
 		if err != nil {
-			return deductionFuture{}, err
+			return pathDeduction{}, err
 		}
 
-		return deductionFuture{
-			rslow: false,
-			root:  strfut(root),
-			psf:   srcfut(mb),
+		return pathDeduction{
+			root: root,
+			mb:   mb,
 		}, nil
 	}
 
@@ -597,96 +673,99 @@ func (sm *SourceMgr) deduceFromPath(path string) (deductionFuture, error) {
 	if root, err := exm.deduceRoot(path); err == nil {
 		mb, err := exm.deduceSource(path, u)
 		if err != nil {
-			return deductionFuture{}, err
+			return pathDeduction{}, err
 		}
 
-		return deductionFuture{
-			rslow: false,
-			root:  strfut(root),
-			psf:   srcfut(mb),
+		return pathDeduction{
+			root: root,
+			mb:   mb,
 		}, nil
 	}
 
-	// No luck so far. maybe it's one of them vanity imports?
-	// We have to get a little fancier for the metadata lookup by chaining the
-	// source future onto the metadata future
+	return pathDeduction{}, errNoKnownPathMatch
+}
 
-	// Declare these out here so they're available for the source future
-	var vcs string
-	var ru *url.URL
+type httpMetadataDeducer struct {
+	once       sync.Once
+	deduced    pathDeduction
+	deduceErr  error
+	basePath   string
+	returnFunc func(pathDeduction)
+	suprvsr    *supervisor
+}
 
-	// Kick off the vanity metadata fetch
-	var importroot string
-	var futerr error
-	c := make(chan struct{}, 1)
-	go func() {
-		defer close(c)
-		var reporoot string
-		importroot, vcs, reporoot, futerr = parseMetadata(path)
-		if futerr != nil {
-			futerr = fmt.Errorf("unable to deduce repository and source type for: %q", opath)
+func (hmd *httpMetadataDeducer) deduce(ctx context.Context, path string) (pathDeduction, error) {
+	hmd.once.Do(func() {
+		opath := path
+		u, path, err := normalizeURI(path)
+		if err != nil {
+			hmd.deduceErr = err
 			return
 		}
+
+		pd := pathDeduction{}
+
+		// Make the HTTP call to attempt to retrieve go-get metadata
+		var root, vcs, reporoot string
+		err = hmd.suprvsr.do(ctx, path, ctHTTPMetadata, func(ctx context.Context) error {
+			root, vcs, reporoot, err = parseMetadata(ctx, path, u.Scheme)
+			return err
+		})
+		if err != nil {
+			hmd.deduceErr = fmt.Errorf("unable to deduce repository and source type for: %q", opath)
+			return
+		}
+		pd.root = root
 
 		// If we got something back at all, then it supercedes the actual input for
 		// the real URL to hit
-		ru, futerr = url.Parse(reporoot)
-		if futerr != nil {
-			futerr = fmt.Errorf("server returned bad URL when searching for vanity import: %q", reporoot)
-			importroot = ""
+		repoURL, err := url.Parse(reporoot)
+		if err != nil {
+			hmd.deduceErr = fmt.Errorf("server returned bad URL in go-get metadata: %q", reporoot)
 			return
 		}
-	}()
 
-	// Set up the root func to catch the result
-	root := func() (string, error) {
-		<-c
-		return importroot, futerr
-	}
-
-	src := func(cachedir string, an ProjectAnalyzer) sourceFuture {
-		var src source
-		var ident string
-		var err error
-
-		c := make(chan struct{}, 1)
-		go func() {
-			defer close(c)
-			// make sure the metadata future is finished (without errors), thus
-			// guaranteeing that ru and vcs will be populated
-			_, err = root()
-			if err != nil {
+		// If the input path specified a scheme, then try to honor it.
+		if u.Scheme != "" && repoURL.Scheme != u.Scheme {
+			// If the input scheme was http, but the go-get metadata
+			// nevertheless indicated https should be used for the repo, then
+			// trust the metadata and use https.
+			//
+			// To err on the secure side, do NOT allow the same in the other
+			// direction (https -> http).
+			if u.Scheme != "http" || repoURL.Scheme != "https" {
+				hmd.deduceErr = fmt.Errorf("scheme mismatch for %q: input asked for %q, but go-get metadata specified %q", path, u.Scheme, repoURL.Scheme)
 				return
 			}
-			ident = ru.String()
-
-			var m maybeSource
-			switch vcs {
-			case "git":
-				m = maybeGitSource{url: ru}
-			case "bzr":
-				m = maybeBzrSource{url: ru}
-			case "hg":
-				m = maybeHgSource{url: ru}
-			}
-
-			if m != nil {
-				src, ident, err = m.try(cachedir, an)
-			} else {
-				err = fmt.Errorf("unsupported vcs type %s", vcs)
-			}
-		}()
-
-		return func() (source, string, error) {
-			<-c
-			return src, ident, err
 		}
-	}
-	return deductionFuture{
-		rslow: true,
-		root:  root,
-		psf:   src,
-	}, nil
+
+		switch vcs {
+		case "git":
+			pd.mb = maybeGitSource{url: repoURL}
+		case "bzr":
+			pd.mb = maybeBzrSource{url: repoURL}
+		case "hg":
+			pd.mb = maybeHgSource{url: repoURL}
+		default:
+			hmd.deduceErr = fmt.Errorf("unsupported vcs type %s in go-get metadata from %s", vcs, path)
+			return
+		}
+
+		hmd.deduced = pd
+		// All data is assigned for other goroutines that may be waiting. Now,
+		// send the pathDeduction back to the deductionCoordinator by calling
+		// the returnFunc. This will also remove the reference to this hmd in
+		// the coordinator's trie.
+		//
+		// When this call finishes, it is guaranteed the coordinator will have
+		// at least begun running the action to insert the path deduction, which
+		// means no other deduction request will be able to interleave and
+		// request the same path before the pathDeduction can be processed, but
+		// after this hmd has been dereferenced from the trie.
+		hmd.returnFunc(pd)
+	})
+
+	return hmd.deduced, hmd.deduceErr
 }
 
 func normalizeURI(p string) (u *url.URL, newpath string, err error) {
@@ -725,31 +804,41 @@ func normalizeURI(p string) (u *url.URL, newpath string, err error) {
 }
 
 // fetchMetadata fetches the remote metadata for path.
-func fetchMetadata(path string) (rc io.ReadCloser, err error) {
+func fetchMetadata(ctx context.Context, path, scheme string) (rc io.ReadCloser, err error) {
 	defer func() {
 		if err != nil {
 			err = fmt.Errorf("unable to determine remote metadata protocol: %s", err)
 		}
 	}()
 
-	// try https first
-	rc, err = doFetchMetadata("https", path)
+	if scheme == "http" {
+		rc, err = doFetchMetadata(ctx, "http", path)
+		return
+	}
+
+	rc, err = doFetchMetadata(ctx, "https", path)
 	if err == nil {
 		return
 	}
 
-	rc, err = doFetchMetadata("http", path)
+	rc, err = doFetchMetadata(ctx, "http", path)
 	return
 }
 
-func doFetchMetadata(scheme, path string) (io.ReadCloser, error) {
+func doFetchMetadata(ctx context.Context, scheme, path string) (io.ReadCloser, error) {
 	url := fmt.Sprintf("%s://%s?go-get=1", scheme, path)
 	switch scheme {
 	case "https", "http":
-		resp, err := http.Get(url)
+		req, err := http.NewRequest("GET", url, nil)
 		if err != nil {
 			return nil, fmt.Errorf("failed to access url %q", url)
 		}
+
+		resp, err := http.DefaultClient.Do(req.WithContext(ctx))
+		if err != nil {
+			return nil, fmt.Errorf("failed to access url %q", url)
+		}
+
 		return resp.Body, nil
 	default:
 		return nil, fmt.Errorf("unknown remote protocol scheme: %q", scheme)
@@ -757,8 +846,12 @@ func doFetchMetadata(scheme, path string) (io.ReadCloser, error) {
 }
 
 // parseMetadata fetches and decodes remote metadata for path.
-func parseMetadata(path string) (string, string, string, error) {
-	rc, err := fetchMetadata(path)
+//
+// scheme is optional. If it's http, only http will be attempted for fetching.
+// Any other scheme (including none) will first try https, then fall back to
+// http.
+func parseMetadata(ctx context.Context, path, scheme string) (string, string, string, error) {
+	rc, err := fetchMetadata(ctx, path, scheme)
 	if err != nil {
 		return "", "", "", err
 	}

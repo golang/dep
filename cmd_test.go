@@ -1,6 +1,7 @@
 package gps
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -16,6 +17,11 @@ func mkTestCmd(iterations int) *monitoredCmd {
 }
 
 func TestMonitoredCmd(t *testing.T) {
+	// Sleeps make this a bit slow
+	if testing.Short() {
+		t.Skip("skipping test with sleeps on short")
+	}
+
 	err := exec.Command("go", "build", "./_testdata/cmd/echosleep.go").Run()
 	if err != nil {
 		t.Errorf("Unable to build echosleep binary: %s", err)
@@ -23,7 +29,7 @@ func TestMonitoredCmd(t *testing.T) {
 	defer os.Remove("./echosleep")
 
 	cmd := mkTestCmd(2)
-	err = cmd.run()
+	err = cmd.run(context.Background())
 	if err != nil {
 		t.Errorf("Expected command not to fail: %s", err)
 	}
@@ -34,7 +40,7 @@ func TestMonitoredCmd(t *testing.T) {
 	}
 
 	cmd2 := mkTestCmd(10)
-	err = cmd2.run()
+	err = cmd2.run(context.Background())
 	if err == nil {
 		t.Error("Expected command to fail")
 	}
