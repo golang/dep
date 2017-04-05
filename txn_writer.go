@@ -59,6 +59,10 @@ type LockDiff struct {
 	Modify   []LockedProjectDiff
 }
 
+type rawLockedProjectDiffs struct {
+	Projects []LockedProjectDiff `toml:"projects"`
+}
+
 func (diff *LockDiff) Format() (string, error) {
 	if diff == nil {
 		return "", nil
@@ -71,13 +75,12 @@ func (diff *LockDiff) Format() (string, error) {
 	}
 
 	writeDiffs := func(diffs []LockedProjectDiff) error {
-		for i := 0; i < len(diffs); i++ {
-			chunk, err := toml.Marshal(diffs[i])
-			if err != nil {
-				return err
-			}
-			buf.Write(chunk)
+		raw := rawLockedProjectDiffs{diffs}
+		chunk, err := toml.Marshal(raw)
+		if err != nil {
+			return err
 		}
+		buf.Write(chunk)
 		buf.WriteString("\n")
 		return nil
 	}
@@ -114,11 +117,11 @@ func (diff *LockDiff) Format() (string, error) {
 // TODO(carolynvs) this should be moved to gps
 type LockedProjectDiff struct {
 	Name     gps.ProjectRoot `toml:"name"`
-	Source   *StringDiff     `toml:"source"`
-	Version  *StringDiff     `toml:"version"`
-	Branch   *StringDiff     `toml:"branch"`
-	Revision *StringDiff     `toml:"revision"`
-	Packages []StringDiff    `toml:"packages"`
+	Source   *StringDiff     `toml:"source,omitempty"`
+	Version  *StringDiff     `toml:"version,omitempty"`
+	Branch   *StringDiff     `toml:"branch,omitempty"`
+	Revision *StringDiff     `toml:"revision,omitempty"`
+	Packages []StringDiff    `toml:"packages,omitempty"`
 }
 
 type StringDiff struct {
@@ -140,6 +143,10 @@ func (diff StringDiff) String() string {
 	}
 
 	return diff.Current
+}
+
+func (diff StringDiff) MarshalTOML() ([]byte, error) {
+	return []byte(diff.String()), nil
 }
 
 // VendorBehavior defines when the vendor directory should be written.

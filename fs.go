@@ -12,15 +12,9 @@ import (
 	"runtime"
 	"syscall"
 
+	"github.com/pelletier/go-toml"
 	"github.com/pkg/errors"
 )
-
-// tomlMarshaler is the interface implemented by types that
-// can marshal themselves into valid TOML.
-// TODO(carolynvs) Add this (and an unmarshaler) to go-toml, implemented using the same patterns in encoding/json
-type tomlMarshaler interface {
-	MarshalTOML() ([]byte, error)
-}
 
 func IsRegular(name string) (bool, error) {
 	// TODO: lstat?
@@ -65,7 +59,7 @@ func IsNonEmptyDir(name string) (bool, error) {
 	return len(files) != 0, nil
 }
 
-func writeFile(path string, in tomlMarshaler) error {
+func writeFile(path string, in toml.Marshaler) error {
 	f, err := os.Create(path)
 	if err != nil {
 		return err

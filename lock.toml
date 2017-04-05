@@ -1,4 +1,4 @@
-memo = "31a7162c06758e4619ed89b91e1f48bf94ad14f394bbee79299ed0bb5150e409"
+memo = "2f117dcf1ebe1cff7acbddb851d29b87554d2249f1033f2a4cca3b33dc3fecc2"
 
 [[projects]]
   branch = "2.x"
@@ -9,7 +9,7 @@ memo = "31a7162c06758e4619ed89b91e1f48bf94ad14f394bbee79299ed0bb5150e409"
 [[projects]]
   name = "github.com/Masterminds/vcs"
   packages = ["."]
-  revision = "fbe9fb6ad5b5f35b3e82a7c21123cfc526cbf895"
+  revision = "795e20f901c3d561de52811fb3488a2cb2c8588b"
   version = "v1.11.0"
 
 [[projects]]
@@ -27,8 +27,8 @@ memo = "31a7162c06758e4619ed89b91e1f48bf94ad14f394bbee79299ed0bb5150e409"
 [[projects]]
   branch = "master"
   name = "github.com/pelletier/go-toml"
-  revision = "e32a2e04744250647a72bf17da1b09befc03b6b1"
   packages = ["."]
+  revision = "fe206efb84b2bc8e8cfafe6b4c1826622be969e3"
 
 [[projects]]
   name = "github.com/pkg/errors"
