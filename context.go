@@ -18,7 +18,8 @@ import (
 
 // Ctx defines the supporting context of the tool.
 type Ctx struct {
-	GOPATH string // Go path
+	GOPATH  string   // Selected Go path
+	GOPATHS []string // Other Go paths
 }
 
 // NewContext creates a struct with the project's GOPATH. It assumes
@@ -32,14 +33,23 @@ func NewContext() (*Ctx, error) {
 		return nil, errors.Wrap(err, "getting work directory")
 	}
 	wd = filepath.FromSlash(wd)
+	ctx := &Ctx{}
+
 	for _, gp := range filepath.SplitList(buildContext.GOPATH) {
 		gp = filepath.FromSlash(gp)
+
 		if filepath.HasPrefix(wd, gp) {
-			return &Ctx{GOPATH: gp}, nil
+			ctx.GOPATH = gp
 		}
+
+		ctx.GOPATHS = append(ctx.GOPATHS, gp)
 	}
 
-	return nil, errors.New("project not in a GOPATH")
+	if ctx.GOPATH == "" {
+		return nil, errors.New("project not in a GOPATH")
+	}
+
+	return ctx, nil
 }
 
 func (c *Ctx) SourceManager() (*gps.SourceMgr, error) {
@@ -76,7 +86,7 @@ func (c *Ctx) LoadProject(path string) (*Project, error) {
 		return nil, err
 	}
 
-	// the path may lie within a symlinked directory, resolve that
+	// The path may lie within a symlinked directory, resolve the path
 	// before moving forward
 	p.AbsRoot, err = c.resolveProjectRoot(p.AbsRoot)
 	if err != nil {
@@ -152,13 +162,14 @@ func (c *Ctx) resolveProjectRoot(path string) (string, error) {
 		return "", errors.Wrap(err, "resolveProjectRoot")
 	}
 
-	// Determine if the symlink is within the GOPATH, in which case we're not
+	// Determine if the symlink is within and of the GOPATHs, in which case we're not
 	// sure how to resolve it.
-	if filepath.HasPrefix(path, c.GOPATH) {
-		return "", fmt.Errorf("''%s' is linked to another path within GOPATH", path)
+	for _, gp := range c.GOPATHS {
+		if filepath.HasPrefix(path, gp) {
+			return "", fmt.Errorf("''%s' is linked to another path within GOPATH", path)
+		}
 	}
 
-	// Return the resolved path
 	return resolved, nil
 }
 
