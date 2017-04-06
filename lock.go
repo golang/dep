@@ -15,7 +15,7 @@ import (
 	"github.com/sdboyer/gps"
 )
 
-const LockName = "lock.toml"
+const LockName = "Gopkg.lock"
 
 type Lock struct {
 	Memo []byte
