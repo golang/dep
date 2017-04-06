@@ -361,7 +361,12 @@ func TestResolveProjectRoot(t *testing.T) {
 
 	tg.Setenv("GOPATH", tg.Path(filepath.Join(".", "go")))
 
-	ctx := &Ctx{GOPATH: tg.Path(filepath.Join(".", "go"))}
+	ctx := &Ctx{
+		GOPATH: tg.Path(filepath.Join(".", "go")),
+		GOPATHS: []string{
+			tg.Path(filepath.Join(".", "go")),
+		},
+	}
 
 	realPath := filepath.Join(ctx.GOPATH, "src/real/path")
 	symlinkedPath := filepath.Join(tg.Path("."), "sym", "symlink")
@@ -390,6 +395,6 @@ func TestResolveProjectRoot(t *testing.T) {
 	// Symlinked path is inside GOPATH, should return error
 	_, err = ctx.resolveProjectRoot(symlinkedInGoPath)
 	if err == nil {
-		t.Fatalf("Expected an error")
+		t.Fatalf("Wanted an error")
 	}
 }
