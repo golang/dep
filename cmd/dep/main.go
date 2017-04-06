@@ -51,7 +51,7 @@ func main() {
 		},
 		{
 			"dep ensure -update",
-			"update the saved versions of all dependencies",
+			"update the locked versions of all dependencies",
 		},
 		{
 			"dep ensure github.com/pkg/errors",
