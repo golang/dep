@@ -11,6 +11,7 @@ import (
 
 	"github.com/Masterminds/semver"
 	"github.com/Masterminds/vcs"
+	"github.com/sdboyer/gps/internal/fs"
 )
 
 // Kept here as a reference in case it does become important to implement a
@@ -50,20 +51,20 @@ func (s *gitSource) exportVersionTo(v Version, to string) error {
 
 		// Back up original index
 		idx, bak := filepath.Join(r.LocalPath(), ".git", "index"), filepath.Join(r.LocalPath(), ".git", "origindex")
-		err := renameWithFallback(idx, bak)
+		err := fs.RenameWithFallback(idx, bak)
 		if err != nil {
 			return err
 		}
 
 		// could have an err here...but it's hard to imagine how?
-		defer renameWithFallback(bak, idx)
+		defer fs.RenameWithFallback(bak, idx)
 
 		vstr := v.String()
 		if rv, ok := v.(PairedVersion); ok {
 			vstr = rv.Underlying().String()
 		}
 
-		out, err := r.RunFromDir("git", "read-tree", vstr)
+		out, err := runFromRepoDir(r, "git", "read-tree", vstr)
 		if err != nil {
 			return fmt.Errorf("%s: %s", out, err)
 		}
@@ -79,7 +80,7 @@ func (s *gitSource) exportVersionTo(v Version, to string) error {
 		// though we have a bunch of housekeeping to do to set up, then tear
 		// down, the sparse checkout controls, as well as restore the original
 		// index and HEAD.
-		out, err = r.RunFromDir("git", "checkout-index", "-a", "--prefix="+to)
+		out, err = runFromRepoDir(r, "git", "checkout-index", "-a", "--prefix="+to)
 		if err != nil {
 			return fmt.Errorf("%s: %s", out, err)
 		}
@@ -170,7 +171,7 @@ func (s *gitSource) doListVersions() (vlist []Version, err error) {
 		s.crepo.synced = true
 
 		s.crepo.mut.RLock()
-		out, err = r.RunFromDir("git", "show-ref", "--dereference")
+		out, err = runFromRepoDir(r, "git", "show-ref", "--dereference")
 		s.crepo.mut.RUnlock()
 		if err != nil {
 			// TODO(sdboyer) More-er proper-er error
@@ -385,6 +386,22 @@ type bzrSource struct {
 	baseVCSSource
 }
 
+func (s *bzrSource) update() error {
+	r := s.crepo.r
+
+	out, err := runFromRepoDir(r, "bzr", "pull")
+	if err != nil {
+		return vcs.NewRemoteError("Unable to update repository", err, string(out))
+	}
+
+	out, err = runFromRepoDir(r, "bzr", "update")
+	if err != nil {
+		return vcs.NewRemoteError("Unable to update repository", err, string(out))
+	}
+
+	return nil
+}
+
 func (s *bzrSource) listVersions() (vlist []Version, err error) {
 	s.baseVCSSource.lvmut.Lock()
 	defer s.baseVCSSource.lvmut.Unlock()
@@ -411,7 +428,7 @@ func (s *bzrSource) listVersions() (vlist []Version, err error) {
 	// didn't create it
 	if !s.crepo.synced {
 		s.crepo.mut.Lock()
-		err = r.Update()
+		err = s.update()
 		s.crepo.mut.Unlock()
 		if err != nil {
 			return
@@ -422,7 +439,7 @@ func (s *bzrSource) listVersions() (vlist []Version, err error) {
 
 	var out []byte
 	// Now, list all the tags
-	out, err = r.RunFromDir("bzr", "tags", "--show-ids", "-v")
+	out, err = runFromRepoDir(r, "bzr", "tags", "--show-ids", "-v")
 	if err != nil {
 		return nil, fmt.Errorf("%s: %s", err, string(out))
 	}
@@ -430,7 +447,7 @@ func (s *bzrSource) listVersions() (vlist []Version, err error) {
 	all := bytes.Split(bytes.TrimSpace(out), []byte("\n"))
 
 	var branchrev []byte
-	branchrev, err = r.RunFromDir("bzr", "version-info", "--custom", "--template={revision_id}", "--revision=branch:.")
+	branchrev, err = runFromRepoDir(r, "bzr", "version-info", "--custom", "--template={revision_id}", "--revision=branch:.")
 	br := string(branchrev)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %s", err, br)
@@ -473,6 +490,22 @@ type hgSource struct {
 	baseVCSSource
 }
 
+func (s *hgSource) update() error {
+	r := s.crepo.r
+
+	out, err := runFromRepoDir(r, "hg", "pull")
+	if err != nil {
+		return vcs.NewLocalError("Unable to update checked out version", err, string(out))
+	}
+
+	out, err = runFromRepoDir(r, "hg", "update")
+	if err != nil {
+		return vcs.NewLocalError("Unable to update checked out version", err, string(out))
+	}
+
+	return nil
+}
+
 func (s *hgSource) listVersions() (vlist []Version, err error) {
 	s.baseVCSSource.lvmut.Lock()
 	defer s.baseVCSSource.lvmut.Unlock()
@@ -499,7 +532,7 @@ func (s *hgSource) listVersions() (vlist []Version, err error) {
 	// didn't create it
 	if !s.crepo.synced {
 		s.crepo.mut.Lock()
-		err = unwrapVcsErr(r.Update())
+		err = unwrapVcsErr(s.update())
 		s.crepo.mut.Unlock()
 		if err != nil {
 			return
@@ -511,7 +544,7 @@ func (s *hgSource) listVersions() (vlist []Version, err error) {
 	var out []byte
 
 	// Now, list all the tags
-	out, err = r.RunFromDir("hg", "tags", "--debug", "--verbose")
+	out, err = runFromRepoDir(r, "hg", "tags", "--debug", "--verbose")
 	if err != nil {
 		return nil, fmt.Errorf("%s: %s", err, string(out))
 	}
@@ -545,7 +578,7 @@ func (s *hgSource) listVersions() (vlist []Version, err error) {
 	// bookmarks next, because the presence of the magic @ bookmark has to
 	// determine how we handle the branches
 	var magicAt bool
-	out, err = r.RunFromDir("hg", "bookmarks", "--debug")
+	out, err = runFromRepoDir(r, "hg", "bookmarks", "--debug")
 	if err != nil {
 		// better nothing than partial and misleading
 		return nil, fmt.Errorf("%s: %s", err, string(out))
@@ -578,7 +611,7 @@ func (s *hgSource) listVersions() (vlist []Version, err error) {
 		}
 	}
 
-	out, err = r.RunFromDir("hg", "branches", "-c", "--debug")
+	out, err = runFromRepoDir(r, "hg", "branches", "-c", "--debug")
 	if err != nil {
 		// better nothing than partial and misleading
 		return nil, fmt.Errorf("%s: %s", err, string(out))
@@ -653,7 +686,7 @@ func (r *repo) exportVersionTo(v Version, to string) error {
 	// TODO(sdboyer) this is a simplistic approach and relying on the tools
 	// themselves might make it faster, but git's the overwhelming case (and has
 	// its own method) so fine for now
-	return copyDir(r.rpath, to)
+	return fs.CopyDir(r.rpath, to)
 }
 
 // This func copied from Masterminds/vcs so we can exec our own commands

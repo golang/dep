@@ -8,7 +8,26 @@ import (
 	"strings"
 
 	"github.com/armon/go-radix"
+	"github.com/sdboyer/gps/internal"
+	"github.com/sdboyer/gps/pkgtree"
 )
+
+var (
+	osList     []string
+	archList   []string
+	ignoreTags = []string{} //[]string{"appengine", "ignore"} //TODO: appengine is a special case for now: https://github.com/tools/godep/issues/353
+)
+
+func init() {
+	// The supported systems are listed in
+	// https://github.com/golang/go/blob/master/src/go/build/syslist.go
+	// The lists are not exported, so we need to duplicate them here.
+	osListString := "android darwin dragonfly freebsd linux nacl netbsd openbsd plan9 solaris windows"
+	osList = strings.Split(osListString, " ")
+
+	archListString := "386 amd64 amd64p32 arm armbe arm64 arm64be ppc64 ppc64le mips mipsle mips64 mips64le mips64p32 mips64p32le ppc s390 s390x sparc sparc64"
+	archList = strings.Split(archListString, " ")
+}
 
 var rootRev = Revision("")
 
@@ -38,7 +57,7 @@ type SolveParameters struct {
 	//
 	// The ImportRoot property must be a non-empty string, and at least one
 	// element must be present in the Packages map.
-	RootPackageTree PackageTree
+	RootPackageTree pkgtree.PackageTree
 
 	// The root manifest. This contains all the dependency constraints
 	// associated with normal Manifests, as well as the particular controls
@@ -157,7 +176,7 @@ func (params SolveParameters) toRootdata() (rootdata, error) {
 		ig:      params.Manifest.IgnoredPackages(),
 		req:     params.Manifest.RequiredPackages(),
 		ovr:     params.Manifest.Overrides(),
-		rpt:     params.RootPackageTree.dup(),
+		rpt:     params.RootPackageTree.Copy(),
 		chng:    make(map[ProjectRoot]struct{}),
 		rlm:     make(map[ProjectRoot]LockedProject),
 		chngall: params.ChangeAll,
@@ -484,7 +503,7 @@ func (s *solver) selectRoot() error {
 	return nil
 }
 
-func (s *solver) getImportsAndConstraintsOf(a atomWithPackages) ([]completeDep, error) {
+func (s *solver) getImportsAndConstraintsOf(a atomWithPackages) ([]string, []completeDep, error) {
 	var err error
 
 	if s.rd.isRoot(a.a.id.ProjectRoot) {
@@ -495,49 +514,72 @@ func (s *solver) getImportsAndConstraintsOf(a atomWithPackages) ([]completeDep, 
 	// information.
 	m, _, err := s.b.GetManifestAndLock(a.a.id, a.a.v)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	ptree, err := s.b.ListPackages(a.a.id, a.a.v)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	allex := ptree.ExternalReach(false, false, s.rd.ig)
-	// Use a map to dedupe the unique external packages
-	exmap := make(map[string]struct{})
+	rm, em := ptree.ToReachMap(false, false, true, s.rd.ig)
+	// Use maps to dedupe the unique internal and external packages.
+	exmap, inmap := make(map[string]struct{}), make(map[string]struct{})
+
+	for _, pkg := range a.pl {
+		inmap[pkg] = struct{}{}
+		for _, ipkg := range rm[pkg].Internal {
+			inmap[ipkg] = struct{}{}
+		}
+	}
+
+	var pl []string
+	// If lens are the same, then the map must have the same contents as the
+	// slice; no need to build a new one.
+	if len(inmap) == len(a.pl) {
+		pl = a.pl
+	} else {
+		pl = make([]string, 0, len(inmap))
+		for pkg := range inmap {
+			pl = append(pl, pkg)
+		}
+		sort.Strings(pl)
+	}
+
 	// Add to the list those packages that are reached by the packages
 	// explicitly listed in the atom
 	for _, pkg := range a.pl {
-		expkgs, exists := allex[pkg]
-		if !exists {
-			// missing package here *should* only happen if the target pkg was
-			// poisoned somehow - check the original ptree.
-			if perr, exists := ptree.Packages[pkg]; exists {
-				if perr.Err != nil {
-					return nil, fmt.Errorf("package %s has errors: %s", pkg, perr.Err)
-				}
-				return nil, fmt.Errorf("package %s depends on some other package within %s with errors", pkg, a.a.id.errString())
-			}
-			// Nope, it's actually not there. This shouldn't happen.
-			return nil, fmt.Errorf("package %s does not exist within project %s", pkg, a.a.id.errString())
+		// Skip ignored packages
+		if s.rd.ig[pkg] {
+			continue
 		}
 
-		for _, ex := range expkgs {
+		ie, exists := rm[pkg]
+		if !exists {
+			// Missing package here *should* only happen if the target pkg was
+			// poisoned. Check the errors map
+			if importErr, eexists := em[pkg]; eexists {
+				return nil, nil, importErr
+			}
+
+			// Nope, it's actually full-on not there.
+			return nil, nil, fmt.Errorf("package %s does not exist within project %s", pkg, a.a.id.errString())
+		}
+
+		for _, ex := range ie.External {
 			exmap[ex] = struct{}{}
 		}
 	}
 
-	reach := make([]string, len(exmap))
-	k := 0
+	reach := make([]string, 0, len(exmap))
 	for pkg := range exmap {
-		reach[k] = pkg
-		k++
+		reach = append(reach, pkg)
 	}
 	sort.Strings(reach)
 
 	deps := s.rd.ovr.overrideAll(m.DependencyConstraints())
-	return s.intersectConstraintsWithImports(deps, reach)
+	cd, err := s.intersectConstraintsWithImports(deps, reach)
+	return pl, cd, err
 }
 
 // intersectConstraintsWithImports takes a list of constraints and a list of
@@ -556,7 +598,7 @@ func (s *solver) intersectConstraintsWithImports(deps []workingConstraint, reach
 	dmap := make(map[ProjectRoot]completeDep)
 	for _, rp := range reach {
 		// If it's a stdlib-shaped package, skip it.
-		if isStdLib(rp) {
+		if internal.IsStdLib(rp) {
 			continue
 		}
 
@@ -1037,14 +1079,16 @@ func (s *solver) selectAtom(a atomWithPackages, pkgonly bool) {
 		pl: a.pl,
 	})
 
-	s.sel.pushSelection(a, pkgonly)
-
-	deps, err := s.getImportsAndConstraintsOf(a)
+	pl, deps, err := s.getImportsAndConstraintsOf(a)
 	if err != nil {
 		// This shouldn't be possible; other checks should have ensured all
 		// packages and deps are present for any argument passed to this method.
 		panic(fmt.Sprintf("canary - shouldn't be possible %s", err))
 	}
+	// Assign the new internal package list into the atom, then push it onto the
+	// selection stack
+	a.pl = pl
+	s.sel.pushSelection(a, pkgonly)
 
 	// If this atom has a lock, pull it out so that we can potentially inject
 	// preferred versions into any bmis we enqueue
@@ -1119,7 +1163,7 @@ func (s *solver) unselectLast() (atomWithPackages, bool) {
 	awp, first := s.sel.popSelection()
 	heap.Push(s.unsel, bimodalIdentifier{id: awp.a.id, pl: awp.pl})
 
-	deps, err := s.getImportsAndConstraintsOf(awp)
+	_, deps, err := s.getImportsAndConstraintsOf(awp)
 	if err != nil {
 		// This shouldn't be possible; other checks should have ensured all
 		// packages and deps are present for any argument passed to this method.
@@ -1127,6 +1171,12 @@ func (s *solver) unselectLast() (atomWithPackages, bool) {
 	}
 
 	for _, dep := range deps {
+		// Skip popping if the dep is the root project, which can occur if
+		// there's a project-level import cycle. (This occurs frequently with
+		// e.g. kubernetes and docker)
+		if s.rd.isRoot(dep.Ident.ProjectRoot) {
+			continue
+		}
 		s.sel.popDep(dep.Ident)
 
 		// if no parents/importers, remove from unselected queue

@@ -32,7 +32,7 @@ func NewHgRepo(remote, local string) (*HgRepo, error) {
 
 	// Make sure the local Hg repo is configured the same as the remote when
 	// A remote value was passed in.
-	if err == nil && r.CheckLocal() == true {
+	if err == nil && r.CheckLocal() {
 		// An Hg repo was found so test that the URL there matches
 		// the repo passed in here.
 		c := exec.Command("hg", "paths")
@@ -207,11 +207,7 @@ func (s *HgRepo) Tags() ([]string, error) {
 // commit id, branch, or tag.
 func (s *HgRepo) IsReference(r string) bool {
 	_, err := s.RunFromDir("hg", "log", "-r", r)
-	if err == nil {
-		return true
-	}
-
-	return false
+	return err == nil
 }
 
 // IsDirty returns if the checkout has been modified from the checked
@@ -305,11 +301,7 @@ func (s *HgRepo) TagsFromCommit(id string) ([]string, error) {
 // Ping returns if remote location is accessible.
 func (s *HgRepo) Ping() bool {
 	_, err := s.run("hg", "identify", s.Remote())
-	if err != nil {
-		return false
-	}
-
-	return true
+	return err == nil
 }
 
 // ExportDir exports the current revision to the passed in directory.

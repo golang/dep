@@ -4,6 +4,8 @@ import (
 	"sort"
 
 	"github.com/armon/go-radix"
+	"github.com/sdboyer/gps/internal"
+	"github.com/sdboyer/gps/pkgtree"
 )
 
 // rootdata holds static data and constraining rules from the root project for
@@ -39,16 +41,18 @@ type rootdata struct {
 	rl safeLock
 
 	// A defensively copied instance of params.RootPackageTree
-	rpt PackageTree
+	rpt pkgtree.PackageTree
 }
 
-// rootImportList returns a list of the unique imports from the root data.
-// Ignores and requires are taken into consideration, and stdlib is excluded.
+// externalImportList returns a list of the unique imports from the root data.
+// Ignores and requires are taken into consideration, stdlib is excluded, and
+// errors within the local set of package are not backpropagated.
 func (rd rootdata) externalImportList() []string {
-	all := rd.rpt.ExternalReach(true, true, rd.ig).ListExternalImports()
+	rm, _ := rd.rpt.ToReachMap(true, true, false, rd.ig)
+	all := rm.Flatten(false)
 	reach := make([]string, 0, len(all))
 	for _, r := range all {
-		if !isStdLib(r) {
+		if !internal.IsStdLib(r) {
 			reach = append(reach, r)
 		}
 	}
@@ -80,8 +84,7 @@ func (rd rootdata) getApplicableConstraints() []workingConstraint {
 	pc := rd.rm.DependencyConstraints().merge(rd.rm.TestDependencyConstraints())
 
 	// Ensure that overrides which aren't in the combined pc map already make it
-	// in. Doing so provides a bit more compatibility spread for a generated
-	// hash.
+	// in. Doing so makes input hashes equal in more useful cases.
 	for pr, pp := range rd.ovr {
 		if _, has := pc[pr]; !has {
 			cpp := ProjectProperties{
@@ -111,7 +114,7 @@ func (rd rootdata) getApplicableConstraints() []workingConstraint {
 	// Walk all dep import paths we have to consider and mark the corresponding
 	// wc entry in the trie, if any
 	for _, im := range rd.externalImportList() {
-		if isStdLib(im) {
+		if internal.IsStdLib(im) {
 			continue
 		}
 

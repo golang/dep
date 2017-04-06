@@ -16,7 +16,9 @@ import (
 	"text/tabwriter"
 
 	"github.com/golang/dep"
+	"github.com/pkg/errors"
 	"github.com/sdboyer/gps"
+	"github.com/sdboyer/gps/pkgtree"
 )
 
 const statusShortHelp = `Report the status of the project's dependencies`
@@ -166,7 +168,7 @@ func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
 	var out outputter
 	switch {
 	case cmd.detailed:
-		return fmt.Errorf("not implemented")
+		return errors.Errorf("not implemented")
 	case cmd.json:
 		out = &jsonOutput{
 			w: os.Stdout,
@@ -203,9 +205,9 @@ func runStatusAll(out outputter, p *dep.Project, sm *gps.SourceMgr) error {
 
 	// While the network churns on ListVersions() requests, statically analyze
 	// code from the current project.
-	ptree, err := gps.ListPackages(p.AbsRoot, string(p.ImportRoot))
+	ptree, err := pkgtree.ListPackages(p.AbsRoot, string(p.ImportRoot))
 	if err != nil {
-		return fmt.Errorf("analysis of local packages failed: %v", err)
+		return errors.Errorf("analysis of local packages failed: %v", err)
 	}
 
 	// Set up a solver in order to check the InputHash.
@@ -222,7 +224,7 @@ func runStatusAll(out outputter, p *dep.Project, sm *gps.SourceMgr) error {
 
 	s, err := gps.Prepare(params, sm)
 	if err != nil {
-		return fmt.Errorf("could not set up solver for input hashing: %s", err)
+		return errors.Errorf("could not set up solver for input hashing: %s", err)
 	}
 
 	cm := collectConstraints(ptree, p, sm)
@@ -319,7 +321,9 @@ func runStatusAll(out outputter, p *dep.Project, sm *gps.SourceMgr) error {
 	// lock.
 	out.MissingHeader()
 
-	external := ptree.ExternalReach(true, false, nil).ListExternalImports()
+	rm, _ := ptree.ToReachMap(true, true, false, nil)
+
+	external := rm.Flatten(false)
 	roots := make(map[gps.ProjectRoot][]string)
 	var errs []string
 	for _, e := range external {
@@ -366,7 +370,7 @@ func formatVersion(v gps.Version) string {
 	return v.String()
 }
 
-func collectConstraints(ptree gps.PackageTree, p *dep.Project, sm *gps.SourceMgr) map[string][]gps.Constraint {
+func collectConstraints(ptree pkgtree.PackageTree, p *dep.Project, sm *gps.SourceMgr) map[string][]gps.Constraint {
 	// TODO
 	return map[string][]gps.Constraint{}
 }

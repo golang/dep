@@ -1,3 +1,43 @@
+# 1.11.0 (2017-03-23)
+
+## Added
+- #65: Exposed CmdFromDir function (thanks @erizocosmico)
+
+## Changed
+- #69: Updated testing for Go 1.8
+
+## Fixed
+- #64: Testing fatal error if bzr not installed (thanks @kevinburke)
+
+# 1.10.2 (2017-01-24)
+
+## Fixed
+- #63: Remove extra quotes in submodule export (thanks @dt)
+
+# 1.10.1 (2017-01-18)
+
+## Fixed
+- #62: Added windows testing via appveyor and fixed issues under windows.
+
+# 1.10.0 (2017-01-09)
+
+## Added
+- #60: Handle Git submodules (thanks @sdboyer)
+- #61: Add gometalinter to testing
+
+# 1.9.0 (2016-11-18)
+
+## Added
+- #50: Auto-detect remotes with file:// prefix.
+- #59: Testing against Go 1.7
+
+## Changed
+- Removed auto-detection for Google Code as the service is deprecated
+- Added auto-detection of git.openstack.org
+
+## Fixed
+- #53: Git not fetching tags off branch
+
 # 1.8.0 (2016-06-29)
 
 ## Added

@@ -6,7 +6,6 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"log"
 	"os"
 	"strings"
@@ -14,6 +13,7 @@ import (
 	"github.com/golang/dep"
 	"github.com/pkg/errors"
 	"github.com/sdboyer/gps"
+	"github.com/sdboyer/gps/pkgtree"
 )
 
 const removeShortHelp = `Remove a dependency from the project`
@@ -61,24 +61,19 @@ func (cmd *removeCommand) Run(ctx *dep.Ctx, args []string) error {
 		return errors.Wrap(err, "determineProjectRoot")
 	}
 
-	pkgT, err := gps.ListPackages(p.AbsRoot, cpr)
+	pkgT, err := pkgtree.ListPackages(p.AbsRoot, cpr)
 	if err != nil {
 		return errors.Wrap(err, "gps.ListPackages")
 	}
 
-	// TODO this will end up ignoring internal pkgs with errs (and any other
-	// internal pkgs that import them), which is not what we want for this mode.
-	// A new callback, or a new param on this one, will be introduced to gps
-	// soon, and we'll want to use that when it arrives.
-	//reachlist := pkgT.ExternalReach(true, true).ListExternalImports()
-	reachmap := pkgT.ExternalReach(true, true, nil)
+	reachmap, _ := pkgT.ToReachMap(true, true, false, nil)
 
 	if cmd.unused {
 		if len(args) > 0 {
-			return fmt.Errorf("remove takes no arguments when running with -unused")
+			return errors.Errorf("remove takes no arguments when running with -unused")
 		}
 
-		reachlist := reachmap.ListExternalImports()
+		reachlist := reachmap.Flatten(false)
 
 		// warm the cache in parallel, in case any paths require go get metadata
 		// discovery
@@ -131,7 +126,7 @@ func (cmd *removeCommand) Run(ctx *dep.Ctx, args []string) error {
 			if string(pr) != arg {
 				// don't be magical with subpaths, otherwise we muddy the waters
 				// between project roots and import paths
-				return fmt.Errorf("%q is not a project root, but %q is - is that what you want to remove?", arg, pr)
+				return errors.Errorf("%q is not a project root, but %q is - is that what you want to remove?", arg, pr)
 			}
 
 			/*
@@ -142,8 +137,8 @@ func (cmd *removeCommand) Run(ctx *dep.Ctx, args []string) error {
 			*		- Actual solver behavior: ?
 			 */
 			var pkgimport []string
-			for pkg, imports := range reachmap {
-				for _, im := range imports {
+			for pkg, ie := range reachmap {
+				for _, im := range ie.External {
 					if hasImportPathPrefix(im, arg) {
 						pkgimport = append(pkgimport, pkg)
 						break
@@ -152,14 +147,14 @@ func (cmd *removeCommand) Run(ctx *dep.Ctx, args []string) error {
 			}
 
 			if _, indeps := p.Manifest.Dependencies[gps.ProjectRoot(arg)]; !indeps {
-				return fmt.Errorf("%q is not present in the manifest, cannot remove it", arg)
+				return errors.Errorf("%q is not present in the manifest, cannot remove it", arg)
 			}
 
 			if len(pkgimport) > 0 && !cmd.force {
 				if len(pkgimport) == 1 {
-					return fmt.Errorf("not removing %q because it is imported by %q (pass -force to override)", arg, pkgimport[0])
+					return errors.Errorf("not removing %q because it is imported by %q (pass -force to override)", arg, pkgimport[0])
 				}
-				return fmt.Errorf("not removing %q because it is imported by:\n\t%s (pass -force to override)", arg, strings.Join(pkgimport, "\n\t"))
+				return errors.Errorf("not removing %q because it is imported by:\n\t%s (pass -force to override)", arg, strings.Join(pkgimport, "\n\t"))
 			}
 
 			delete(p.Manifest.Dependencies, gps.ProjectRoot(arg))
@@ -184,15 +179,10 @@ func (cmd *removeCommand) Run(ctx *dep.Ctx, args []string) error {
 		return err
 	}
 
-	sw := dep.SafeWriter{
-		Root:          p.AbsRoot,
-		Manifest:      p.Manifest,
-		Lock:          p.Lock,
-		NewLock:       soln,
-		SourceManager: sm,
-	}
-
-	if err := sw.WriteAllSafe(false); err != nil {
+	var sw dep.SafeWriter
+	newLock := dep.LockFromInterface(soln)
+	sw.Prepare(p.Manifest, p.Lock, newLock, dep.VendorOnChanged)
+	if err := sw.Write(p.AbsRoot, sm); err != nil {
 		return errors.Wrap(err, "grouped write of manifest, lock and vendor")
 	}
 	return nil

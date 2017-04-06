@@ -40,7 +40,28 @@ func main() {
 		&hashinCommand{},
 	}
 
+	examples := [][2]string{
+		{
+			"dep init",
+			"set up a new project",
+		},
+		{
+			"dep ensure",
+			"install the project's dependencies",
+		},
+		{
+			"dep ensure -update",
+			"update the locked versions of all dependencies",
+		},
+		{
+			"dep ensure github.com/pkg/errors",
+			"add a dependency to the project",
+		},
+	}
+
 	usage := func() {
+		fmt.Fprintln(os.Stderr, "dep is a tool for managing dependencies for Go projects")
+		fmt.Fprintln(os.Stderr)
 		fmt.Fprintln(os.Stderr, "Usage: dep <command>")
 		fmt.Fprintln(os.Stderr)
 		fmt.Fprintln(os.Stderr, "Commands:")
@@ -53,6 +74,13 @@ func main() {
 		}
 		w.Flush()
 		fmt.Fprintln(os.Stderr)
+		fmt.Fprintln(os.Stderr, "Examples:")
+		for _, example := range examples {
+			fmt.Fprintf(w, "\t%s\t%s\n", example[0], example[1])
+		}
+		w.Flush()
+		fmt.Fprintln(os.Stderr)
+		fmt.Fprintln(os.Stderr, "Use \"dep help [command]\" for more information about a command.")
 	}
 
 	cmdName, printCommandHelp, exit := parseArgs(os.Args)

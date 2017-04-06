@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 )
@@ -33,7 +34,7 @@ func NewSvnRepo(remote, local string) (*SvnRepo, error) {
 
 	// Make sure the local SVN repo is configured the same as the remote when
 	// A remote value was passed in.
-	if err == nil && r.CheckLocal() == true {
+	if err == nil && r.CheckLocal() {
 		// An SVN repo was found so test that the URL there matches
 		// the repo passed in here.
 		out, err := exec.Command("svn", "info", local).CombinedOutput()
@@ -76,6 +77,8 @@ func (s *SvnRepo) Get() error {
 	remote := s.Remote()
 	if strings.HasPrefix(remote, "/") {
 		remote = "file://" + remote
+	} else if runtime.GOOS == "windows" && filepath.VolumeName(remote) != "" {
+		remote = "file:///" + remote
 	}
 	out, err := s.run("svn", "checkout", remote, s.LocalPath())
 	if err != nil {
@@ -139,6 +142,9 @@ func (s *SvnRepo) Version() (string, error) {
 	}
 
 	out, err := s.RunFromDir("svn", "info", "--xml")
+	if err != nil {
+		return "", NewLocalError("Unable to retrieve checked out version", err, string(out))
+	}
 	s.log(out)
 	infos := &Info{}
 	err = xml.Unmarshal(out, &infos)
@@ -180,8 +186,8 @@ func (s *SvnRepo) Date() (time.Time, error) {
 	if err != nil {
 		return time.Time{}, NewLocalError("Unable to retrieve revision date", err, string(out))
 	}
-	const longForm = "2006-01-02T15:04:05.000000Z\n"
-	t, err := time.Parse(longForm, string(out))
+	const longForm = "2006-01-02T15:04:05.000000Z"
+	t, err := time.Parse(longForm, strings.TrimSpace(string(out)))
 	if err != nil {
 		return time.Time{}, NewLocalError("Unable to retrieve revision date", err, string(out))
 	}
@@ -190,14 +196,24 @@ func (s *SvnRepo) Date() (time.Time, error) {
 
 // CheckLocal verifies the local location is an SVN repo.
 func (s *SvnRepo) CheckLocal() bool {
-	sep := fmt.Sprintf("%c", os.PathSeparator)
-	psplit := strings.Split(s.LocalPath(), sep)
-	for i := 0; i < len(psplit); i++ {
-		path := fmt.Sprintf("%s%s", sep, filepath.Join(psplit[0:(len(psplit)-(i))]...))
-		if _, err := os.Stat(filepath.Join(path, ".svn")); err == nil {
+	pth, err := filepath.Abs(s.LocalPath())
+	if err != nil {
+		s.log(err.Error())
+		return false
+	}
+
+	if _, err := os.Stat(filepath.Join(pth, ".svn")); err == nil {
+		return true
+	}
+
+	oldpth := pth
+	for oldpth != pth {
+		pth = filepath.Dir(pth)
+		if _, err := os.Stat(filepath.Join(pth, ".svn")); err == nil {
 			return true
 		}
 	}
+
 	return false
 }
 
@@ -261,6 +277,9 @@ func (s *SvnRepo) CommitInfo(id string) (*CommitInfo, error) {
 		}
 
 		out, err := s.RunFromDir("svn", "info", "-r", id, "--xml")
+		if err != nil {
+			return nil, NewLocalError("Unable to retrieve commit information", err, string(out))
+		}
 		infos := &Info{}
 		err = xml.Unmarshal(out, &infos)
 		if err != nil {
@@ -323,11 +342,7 @@ func (s *SvnRepo) TagsFromCommit(id string) ([]string, error) {
 // Ping returns if remote location is accessible.
 func (s *SvnRepo) Ping() bool {
 	_, err := s.run("svn", "--non-interactive", "info", s.Remote())
-	if err != nil {
-		return false
-	}
-
-	return true
+	return err == nil
 }
 
 // ExportDir exports the current revision to the passed in directory.
@@ -346,11 +361,7 @@ func (s *SvnRepo) ExportDir(dir string) error {
 // where the parent directory of the VCS local path doesn't exist.
 func (s *SvnRepo) isUnableToCreateDir(err error) bool {
 	msg := err.Error()
-	if strings.HasPrefix(msg, "E000002") {
-		return true
-	}
-
-	return false
+	return strings.HasPrefix(msg, "E000002")
 }
 
 // detectRemoteFromInfoCommand finds the remote url from the `svn info`

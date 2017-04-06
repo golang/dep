@@ -11,6 +11,7 @@ import (
 	"github.com/golang/dep"
 	"github.com/pkg/errors"
 	"github.com/sdboyer/gps"
+	"github.com/sdboyer/gps/pkgtree"
 )
 
 func (cmd *hashinCommand) Name() string      { return "hash-inputs" }
@@ -42,7 +43,7 @@ func (hashinCommand) Run(ctx *dep.Ctx, args []string) error {
 		return errors.Wrap(err, "determineProjectRoot")
 	}
 
-	params.RootPackageTree, err = gps.ListPackages(p.AbsRoot, cpr)
+	params.RootPackageTree, err = pkgtree.ListPackages(p.AbsRoot, cpr)
 	if err != nil {
 		return errors.Wrap(err, "gps.ListPackages")
 	}

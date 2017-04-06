@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+
+	"github.com/sdboyer/gps/pkgtree"
 )
 
 // sourceExistence values represent the extent to which a project "exists."
@@ -48,7 +50,7 @@ type source interface {
 	checkExistence(sourceExistence) bool
 	exportVersionTo(Version, string) error
 	getManifestAndLock(ProjectRoot, Version) (Manifest, Lock, error)
-	listPackages(ProjectRoot, Version) (PackageTree, error)
+	listPackages(ProjectRoot, Version) (pkgtree.PackageTree, error)
 	listVersions() ([]Version, error)
 	revisionPresentIn(Revision) (bool, error)
 }
@@ -56,7 +58,7 @@ type source interface {
 type sourceMetaCache struct {
 	//Version  string                   // TODO(sdboyer) use this
 	infos  map[Revision]projectInfo
-	ptrees map[Revision]PackageTree
+	ptrees map[Revision]pkgtree.PackageTree
 	vMap   map[UnpairedVersion]Revision
 	rMap   map[Revision][]UnpairedVersion
 	// TODO(sdboyer) mutexes. actually probably just one, b/c complexity
@@ -79,7 +81,7 @@ type existence struct {
 func newMetaCache() *sourceMetaCache {
 	return &sourceMetaCache{
 		infos:  make(map[Revision]projectInfo),
-		ptrees: make(map[Revision]PackageTree),
+		ptrees: make(map[Revision]pkgtree.PackageTree),
 		vMap:   make(map[UnpairedVersion]Revision),
 		rMap:   make(map[Revision][]UnpairedVersion),
 	}
@@ -353,7 +355,7 @@ func (bs *baseVCSSource) syncLocal() error {
 	return bs.syncerr
 }
 
-func (bs *baseVCSSource) listPackages(pr ProjectRoot, v Version) (ptree PackageTree, err error) {
+func (bs *baseVCSSource) listPackages(pr ProjectRoot, v Version) (ptree pkgtree.PackageTree, err error) {
 	if err = bs.ensureCacheExistence(); err != nil {
 		return
 	}
@@ -390,7 +392,7 @@ func (bs *baseVCSSource) listPackages(pr ProjectRoot, v Version) (ptree PackageT
 	}
 
 	if err == nil {
-		ptree, err = ListPackages(bs.crepo.r.LocalPath(), string(pr))
+		ptree, err = pkgtree.ListPackages(bs.crepo.r.LocalPath(), string(pr))
 		// TODO(sdboyer) cache errs?
 		if err == nil {
 			bs.dc.ptrees[r] = ptree

@@ -5,112 +5,46 @@
 package main
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/golang/dep/test"
 )
 
-func TestRemove(t *testing.T) {
+func TestRemoveErrors(t *testing.T) {
 	test.NeedsExternalNetwork(t)
 	test.NeedsGit(t)
 
-	h := test.NewHelper(t)
-	defer h.Cleanup()
+	testName := "remove/unused/case1"
 
-	h.TempDir("src")
-	h.Setenv("GOPATH", h.Path("."))
+	testCase := test.NewTestCase(t, testName)
+	testProj := test.NewTestProject(t, testCase.InitialPath())
+	defer testProj.Cleanup()
 
-	importPaths := map[string]string{
-		"github.com/pkg/errors":      "v0.8.0",                                   // semver
-		"github.com/Sirupsen/logrus": "42b84f9ec624953ecbf81a94feccb3f5935c5edf", // random sha
+	// Create and checkout the vendor revisions
+	for ip, rev := range testCase.VendorInitial {
+		testProj.GetVendorGit(ip)
+		testProj.RunGit(testProj.VendorPath(ip), "checkout", rev)
 	}
 
-	// checkout the specified revisions
-	for ip, rev := range importPaths {
-		h.RunGo("get", ip)
-		repoDir := h.Path("src/" + ip)
-		h.RunGit(repoDir, "checkout", rev)
+	// Create and checkout the import revisions
+	for ip, rev := range testCase.GopathInitial {
+		testProj.RunGo("get", ip)
+		testProj.RunGit(testProj.Path("src", ip), "checkout", rev)
 	}
 
-	// Build a fake consumer of these packages.
-	const root = "src/github.com/golang/notexist"
-	h.TempCopy(root+"/thing.go", "remove/main.input.go")
-	h.TempCopy(root+"/manifest.json", "remove/manifest.input.json")
-
-	h.Cd(h.Path(root))
-	h.Run("remove", "-unused")
-
-	goldenManifest := "remove/manifest0.golden.json"
-	wantManifest := h.GetTestFileString(goldenManifest)
-	gotManifest := h.ReadManifest()
-	if wantManifest != gotManifest {
-		if *test.UpdateGolden {
-			if err := h.WriteTestFile(goldenManifest, gotManifest); err != nil {
-				t.Fatal(err)
-			}
-		} else {
-			t.Errorf("expected %s, got %s", wantManifest, gotManifest)
-		}
-	}
-
-	h.TempCopy(root+"/manifest.json", "remove/manifest.input.json")
-	h.Run("remove", "github.com/not/used")
-
-	gotManifest = h.ReadManifest()
-	if wantManifest != gotManifest {
-		if *test.UpdateGolden {
-			if err := h.WriteTestFile(goldenManifest, gotManifest); err != nil {
-				t.Fatal(err)
-			}
-		} else {
-			t.Errorf("expected %s, got %s", wantManifest, gotManifest)
-		}
-	}
-
-	if err := h.DoRun([]string{"remove", "-unused", "github.com/not/used"}); err == nil {
+	if err := testProj.DoRun([]string{"remove", "-unused", "github.com/not/used"}); err == nil {
 		t.Fatal("rm with both -unused and arg should have failed")
 	}
 
-	if err := h.DoRun([]string{"remove", "github.com/not/present"}); err == nil {
+	if err := testProj.DoRun([]string{"remove", "github.com/not/present"}); err == nil {
 		t.Fatal("rm with arg not in manifest should have failed")
 	}
 
-	if err := h.DoRun([]string{"remove", "github.com/not/used", "github.com/not/present"}); err == nil {
+	if err := testProj.DoRun([]string{"remove", "github.com/not/used", "github.com/not/present"}); err == nil {
 		t.Fatal("rm with one arg not in manifest should have failed")
 	}
 
-	if err := h.DoRun([]string{"remove", "github.com/pkg/errors"}); err == nil {
+	if err := testProj.DoRun([]string{"remove", "github.com/sdboyer/deptest"}); err == nil {
 		t.Fatal("rm of arg in manifest and imports should have failed without -force")
-	}
-
-	h.TempCopy(root+"/manifest.json", "remove/manifest.input.json")
-	h.Run("remove", "-force", "github.com/pkg/errors", "github.com/not/used")
-
-	goldenManifest = "remove/manifest1.golden.json"
-	wantManifest = h.GetTestFileString(goldenManifest)
-	gotManifest = h.ReadManifest()
-	if wantManifest != gotManifest {
-		if *test.UpdateGolden {
-			if err := h.WriteTestFile(goldenManifest, gotManifest); err != nil {
-				t.Fatal(err)
-			}
-		} else {
-			t.Errorf("expected %s, got %s", wantManifest, gotManifest)
-		}
-	}
-
-	sysCommit := h.GetCommit("go.googlesource.com/sys")
-	goldenLock := "remove/lock1.golden.json"
-	wantLock := strings.Replace(h.GetTestFileString(goldenLock), "` + sysCommit + `", sysCommit, 1)
-	gotLock := h.ReadLock()
-	if wantLock != gotLock {
-		if *test.UpdateGolden {
-			if err := h.WriteTestFile(goldenLock, gotLock); err != nil {
-				t.Fatal(err)
-			}
-		} else {
-			t.Errorf("expected %s, got %s", wantLock, gotLock)
-		}
 	}
 }

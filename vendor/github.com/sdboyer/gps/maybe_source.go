@@ -50,9 +50,9 @@ type sourceFailures []sourceSetupFailure
 
 func (sf sourceFailures) Error() string {
 	var buf bytes.Buffer
-	fmt.Fprintf(&buf, "No valid source could be created:\n")
+	fmt.Fprintf(&buf, "no valid source could be created:")
 	for _, e := range sf {
-		fmt.Fprintf(&buf, "\t%s", e.Error())
+		fmt.Fprintf(&buf, "\n\t%s", e.Error())
 	}
 
 	return buf.String()
@@ -67,7 +67,7 @@ func (m maybeGitSource) try(cachedir string, an ProjectAnalyzer) (source, string
 	path := filepath.Join(cachedir, "sources", sanitizer.Replace(ustr))
 	r, err := vcs.NewGitRepo(ustr, path)
 	if err != nil {
-		return nil, "", err
+		return nil, ustr, unwrapVcsErr(err)
 	}
 
 	src := &gitSource{
@@ -75,7 +75,7 @@ func (m maybeGitSource) try(cachedir string, an ProjectAnalyzer) (source, string
 			an: an,
 			dc: newMetaCache(),
 			crepo: &repo{
-				r:     r,
+				r:     &gitRepo{r},
 				rpath: path,
 			},
 		},
@@ -85,7 +85,7 @@ func (m maybeGitSource) try(cachedir string, an ProjectAnalyzer) (source, string
 	if !r.CheckLocal() {
 		_, err = src.listVersions()
 		if err != nil {
-			return nil, "", err
+			return nil, ustr, unwrapVcsErr(err)
 		}
 	}
 
@@ -112,7 +112,7 @@ func (m maybeGopkginSource) try(cachedir string, an ProjectAnalyzer) (source, st
 	ustr := m.url.String()
 	r, err := vcs.NewGitRepo(ustr, path)
 	if err != nil {
-		return nil, "", err
+		return nil, ustr, unwrapVcsErr(err)
 	}
 
 	src := &gopkginSource{
@@ -121,7 +121,7 @@ func (m maybeGopkginSource) try(cachedir string, an ProjectAnalyzer) (source, st
 				an: an,
 				dc: newMetaCache(),
 				crepo: &repo{
-					r:     r,
+					r:     &gitRepo{r},
 					rpath: path,
 				},
 			},
@@ -133,7 +133,7 @@ func (m maybeGopkginSource) try(cachedir string, an ProjectAnalyzer) (source, st
 	if !r.CheckLocal() {
 		_, err = src.listVersions()
 		if err != nil {
-			return nil, "", err
+			return nil, ustr, unwrapVcsErr(err)
 		}
 	}
 
@@ -149,10 +149,10 @@ func (m maybeBzrSource) try(cachedir string, an ProjectAnalyzer) (source, string
 	path := filepath.Join(cachedir, "sources", sanitizer.Replace(ustr))
 	r, err := vcs.NewBzrRepo(ustr, path)
 	if err != nil {
-		return nil, "", err
+		return nil, ustr, unwrapVcsErr(err)
 	}
 	if !r.Ping() {
-		return nil, "", fmt.Errorf("Remote repository at %s does not exist, or is inaccessible", ustr)
+		return nil, ustr, fmt.Errorf("remote repository at %s does not exist, or is inaccessible", ustr)
 	}
 
 	src := &bzrSource{
@@ -164,7 +164,7 @@ func (m maybeBzrSource) try(cachedir string, an ProjectAnalyzer) (source, string
 				f: existsUpstream,
 			},
 			crepo: &repo{
-				r:     r,
+				r:     &bzrRepo{r},
 				rpath: path,
 			},
 		},
@@ -183,10 +183,10 @@ func (m maybeHgSource) try(cachedir string, an ProjectAnalyzer) (source, string,
 	path := filepath.Join(cachedir, "sources", sanitizer.Replace(ustr))
 	r, err := vcs.NewHgRepo(ustr, path)
 	if err != nil {
-		return nil, "", err
+		return nil, ustr, unwrapVcsErr(err)
 	}
 	if !r.Ping() {
-		return nil, "", fmt.Errorf("Remote repository at %s does not exist, or is inaccessible", ustr)
+		return nil, ustr, fmt.Errorf("remote repository at %s does not exist, or is inaccessible", ustr)
 	}
 
 	src := &hgSource{
@@ -198,7 +198,7 @@ func (m maybeHgSource) try(cachedir string, an ProjectAnalyzer) (source, string,
 				f: existsUpstream,
 			},
 			crepo: &repo{
-				r:     r,
+				r:     &hgRepo{r},
 				rpath: path,
 			},
 		},

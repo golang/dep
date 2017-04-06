@@ -4,13 +4,14 @@ package main
 
 import (
 	"go/build"
+	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
 	"strings"
 
-	"github.com/Masterminds/semver"
 	"github.com/sdboyer/gps"
+	"github.com/sdboyer/gps/pkgtree"
 )
 
 // This is probably the simplest possible implementation of gps. It does the
@@ -35,10 +36,11 @@ func main() {
 		TraceLogger: log.New(os.Stdout, "", 0),
 	}
 	// Perform static analysis on the current project to find all of its imports.
-	params.RootPackageTree, _ = gps.ListPackages(root, importroot)
+	params.RootPackageTree, _ = pkgtree.ListPackages(root, importroot)
 
 	// Set up a SourceManager. This manages interaction with sources (repositories).
-	sourcemgr, _ := gps.NewSourceManager(NaiveAnalyzer{}, ".repocache")
+	tempdir, _ := ioutil.TempDir("", "gps-repocache")
+	sourcemgr, _ := gps.NewSourceManager(NaiveAnalyzer{}, filepath.Join(tempdir))
 	defer sourcemgr.Release()
 
 	// Prep and run the solver
@@ -64,7 +66,6 @@ func (a NaiveAnalyzer) DeriveManifestAndLock(path string, n gps.ProjectRoot) (gp
 
 // Reports the name and version of the analyzer. This is used internally as part
 // of gps' hashing memoization scheme.
-func (a NaiveAnalyzer) Info() (name string, version *semver.Version) {
-	v, _ := semver.NewVersion("v0.0.1")
-	return "example-analyzer", v
+func (a NaiveAnalyzer) Info() (name string, version int) {
+	return "example-analyzer", 1
 }
