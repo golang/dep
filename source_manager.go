@@ -38,7 +38,7 @@ type SourceManager interface {
 	// ListVersions retrieves a list of the available versions for a given
 	// repository name.
 	// TODO convert to []PairedVersion
-	ListVersions(ProjectIdentifier) ([]Version, error)
+	ListVersions(ProjectIdentifier) ([]PairedVersion, error)
 
 	// RevisionPresentIn indicates whether the provided Version is present in
 	// the given repository.
@@ -341,7 +341,7 @@ func (sm *SourceMgr) ListPackages(id ProjectIdentifier, v Version) (pkgtree.Pack
 // calls will return a cached version of the first call's results. if upstream
 // is not accessible (network outage, access issues, or the resource actually
 // went away), an error will be returned.
-func (sm *SourceMgr) ListVersions(id ProjectIdentifier) ([]Version, error) {
+func (sm *SourceMgr) ListVersions(id ProjectIdentifier) ([]PairedVersion, error) {
 	if atomic.CompareAndSwapInt32(&sm.releasing, 1, 1) {
 		return nil, smIsReleased{}
 	}
@@ -352,12 +352,7 @@ func (sm *SourceMgr) ListVersions(id ProjectIdentifier) ([]Version, error) {
 		return nil, err
 	}
 
-	pvl, err := srcg.listVersions(context.TODO())
-	if err != nil {
-		return nil, err
-	}
-	// FIXME return a []PairedVersion
-	return hidePair(pvl), nil
+	return srcg.listVersions(context.TODO())
 }
 
 // RevisionPresentIn indicates whether the provided Revision is present in the given

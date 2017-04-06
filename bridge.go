@@ -9,8 +9,8 @@ import (
 	"github.com/sdboyer/gps/pkgtree"
 )
 
-// sourceBridges provide an adapter to SourceManagers that tailor operations
-// for a single solve run.
+// sourceBridge is an adapter to SourceManagers that tailor operations for a
+// single solve run.
 type sourceBridge interface {
 	// sourceBridge includes all the methods in the SourceManager interface except
 	// for Release().
@@ -23,13 +23,16 @@ type sourceBridge interface {
 	ExportProject(ProjectIdentifier, Version, string) error
 	DeduceProjectRoot(ip string) (ProjectRoot, error)
 
+	//sourceExists(ProjectIdentifier) (bool, error)
+	//syncSourceFor(ProjectIdentifier) error
+	listVersions(ProjectIdentifier) ([]Version, error)
+	//revisionPresentIn(ProjectIdentifier, Revision) (bool, error)
+	//listPackages(ProjectIdentifier, Version) (pkgtree.PackageTree, error)
+	//getManifestAndLock(ProjectIdentifier, Version, ProjectAnalyzer) (Manifest, Lock, error)
+	//exportProject(ProjectIdentifier, Version, string) error
+	//deduceProjectRoot(ip string) (ProjectRoot, error)
 	verifyRootDir(path string) error
-	pairRevision(id ProjectIdentifier, r Revision) []Version
-	pairVersion(id ProjectIdentifier, v UnpairedVersion) PairedVersion
-	vendorCodeExists(id ProjectIdentifier) (bool, error)
-	matches(id ProjectIdentifier, c Constraint, v Version) bool
-	matchesAny(id ProjectIdentifier, c1, c2 Constraint) bool
-	intersect(id ProjectIdentifier, c1, c2 Constraint) Constraint
+	vendorCodeExists(ProjectIdentifier) (bool, error)
 	breakLock()
 }
 
@@ -50,9 +53,6 @@ type bridge struct {
 	// held by the solver that it ends up being easier and saner to do this.
 	s *solver
 
-	// Whether to sort version lists for downgrade.
-	down bool
-
 	// Simple, local cache of the root's PackageTree
 	crp *struct {
 		ptree pkgtree.PackageTree
@@ -62,11 +62,14 @@ type bridge struct {
 	// Map of project root name to their available version list. This cache is
 	// layered on top of the proper SourceManager's cache; the only difference
 	// is that this keeps the versions sorted in the direction required by the
-	// current solve run
+	// current solve run.
 	vlists map[ProjectIdentifier][]Version
 
 	// Indicates whether lock breaking has already been run
 	lockbroken int32
+
+	// Whether to sort version lists for downgrade.
+	down bool
 }
 
 // Global factory func to create a bridge. This exists solely to allow tests to
@@ -91,19 +94,23 @@ func (b *bridge) GetManifestAndLock(id ProjectIdentifier, v Version, an ProjectA
 	return m, l, e
 }
 
-func (b *bridge) ListVersions(id ProjectIdentifier) ([]Version, error) {
+func (b *bridge) ListVersions(id ProjectIdentifier) ([]PairedVersion, error) {
+	return b.sm.ListVersions(id)
+}
+
+func (b *bridge) listVersions(id ProjectIdentifier) ([]Version, error) {
 	if vl, exists := b.vlists[id]; exists {
 		return vl, nil
 	}
 
 	b.s.mtr.push("b-list-versions")
-	vl, err := b.sm.ListVersions(id)
-	// TODO(sdboyer) cache errors, too?
+	pvl, err := b.sm.ListVersions(id)
 	if err != nil {
 		b.s.mtr.pop()
 		return nil, err
 	}
 
+	vl := hidePair(pvl)
 	if b.down {
 		SortForDowngrade(vl)
 	} else {
@@ -141,7 +148,7 @@ func (b *bridge) vendorCodeExists(id ProjectIdentifier) (bool, error) {
 }
 
 func (b *bridge) pairVersion(id ProjectIdentifier, v UnpairedVersion) PairedVersion {
-	vl, err := b.ListVersions(id)
+	vl, err := b.listVersions(id)
 	if err != nil {
 		return nil
 	}
@@ -162,7 +169,7 @@ func (b *bridge) pairVersion(id ProjectIdentifier, v UnpairedVersion) PairedVers
 }
 
 func (b *bridge) pairRevision(id ProjectIdentifier, r Revision) []Version {
-	vl, err := b.ListVersions(id)
+	vl, err := b.listVersions(id)
 	if err != nil {
 		return nil
 	}

@@ -153,15 +153,15 @@ func TestSourceInit(t *testing.T) {
 	}()
 
 	id := mkPI("github.com/sdboyer/gpkt").normalize()
-	v, err := sm.ListVersions(id)
+	pvl, err := sm.ListVersions(id)
 	if err != nil {
 		t.Errorf("Unexpected error during initial project setup/fetching %s", err)
 	}
 
-	if len(v) != 7 {
-		t.Errorf("Expected seven version results from the test repo, got %v", len(v))
+	if len(pvl) != 7 {
+		t.Errorf("Expected seven version results from the test repo, got %v", len(pvl))
 	} else {
-		expected := []Version{
+		expected := []PairedVersion{
 			NewVersion("v2.0.0").Is(Revision("4a54adf81c75375d26d376459c00d5ff9b703e5e")),
 			NewVersion("v1.1.0").Is(Revision("b2cb48dda625f6640b34d9ffb664533359ac8b91")),
 			NewVersion("v1.0.0").Is(Revision("bf85021c0405edbc4f3648b0603818d641674f72")),
@@ -173,11 +173,11 @@ func TestSourceInit(t *testing.T) {
 
 		// SourceManager itself doesn't guarantee ordering; sort them here so we
 		// can dependably check output
-		SortForUpgrade(v)
+		SortPairedForUpgrade(pvl)
 
 		for k, e := range expected {
-			if !v[k].Matches(e) {
-				t.Errorf("Expected version %s in position %v but got %s", e, k, v[k])
+			if !pvl[k].Matches(e) {
+				t.Errorf("Expected version %s in position %v but got %s", e, k, pvl[k])
 			}
 		}
 	}
@@ -191,13 +191,13 @@ func TestSourceInit(t *testing.T) {
 		s:      &solver{mtr: newMetrics()},
 	}
 
-	v, err = smc.ListVersions(id)
+	vl, err := smc.listVersions(id)
 	if err != nil {
 		t.Errorf("Unexpected error during initial project setup/fetching %s", err)
 	}
 
-	if len(v) != 7 {
-		t.Errorf("Expected seven version results from the test repo, got %v", len(v))
+	if len(vl) != 7 {
+		t.Errorf("Expected seven version results from the test repo, got %v", len(vl))
 	} else {
 		expected := []Version{
 			NewVersion("v2.0.0").Is(Revision("4a54adf81c75375d26d376459c00d5ff9b703e5e")),
@@ -210,21 +210,21 @@ func TestSourceInit(t *testing.T) {
 		}
 
 		for k, e := range expected {
-			if !v[k].Matches(e) {
-				t.Errorf("Expected version %s in position %v but got %s", e, k, v[k])
+			if !vl[k].Matches(e) {
+				t.Errorf("Expected version %s in position %v but got %s", e, k, vl[k])
 			}
 		}
 
-		if !v[3].(versionPair).v.(branchVersion).isDefault {
+		if !vl[3].(versionPair).v.(branchVersion).isDefault {
 			t.Error("Expected master branch version to have isDefault flag, but it did not")
 		}
-		if v[4].(versionPair).v.(branchVersion).isDefault {
+		if vl[4].(versionPair).v.(branchVersion).isDefault {
 			t.Error("Expected v1 branch version not to have isDefault flag, but it did")
 		}
-		if v[5].(versionPair).v.(branchVersion).isDefault {
+		if vl[5].(versionPair).v.(branchVersion).isDefault {
 			t.Error("Expected v1.1 branch version not to have isDefault flag, but it did")
 		}
-		if v[6].(versionPair).v.(branchVersion).isDefault {
+		if vl[6].(versionPair).v.(branchVersion).isDefault {
 			t.Error("Expected v3 branch version not to have isDefault flag, but it did")
 		}
 	}
@@ -284,13 +284,13 @@ func TestDefaultBranchAssignment(t *testing.T) {
 	} else {
 		brev := Revision("fda020843ac81352004b9dca3fcccdd517600149")
 		mrev := Revision("9f9c3a591773d9b28128309ac7a9a72abcab267d")
-		expected := []Version{
+		expected := []PairedVersion{
 			NewBranch("branchone").Is(brev),
 			NewBranch("otherbranch").Is(brev),
 			NewBranch("master").Is(mrev),
 		}
 
-		SortForUpgrade(v)
+		SortPairedForUpgrade(v)
 
 		for k, e := range expected {
 			if !v[k].Matches(e) {

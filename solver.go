@@ -1038,11 +1038,11 @@ func (s *solver) unselectedComparator(i, j int) bool {
 	// way avoid that call when making a version queue, we know we're gonna have
 	// to pay that cost anyway.
 
-	// We can safely ignore an err from ListVersions here because, if there is
+	// We can safely ignore an err from listVersions here because, if there is
 	// an actual problem, it'll be noted and handled somewhere else saner in the
 	// solving algorithm.
-	ivl, _ := s.b.ListVersions(iname)
-	jvl, _ := s.b.ListVersions(jname)
+	ivl, _ := s.b.listVersions(iname)
+	jvl, _ := s.b.listVersions(jname)
 	iv, jv := len(ivl), len(jvl)
 
 	// Packages with fewer versions to pick from are less likely to benefit from
