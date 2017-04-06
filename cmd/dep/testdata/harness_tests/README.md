@@ -14,11 +14,11 @@ The directory structure is as follows:
                         testcase.json
                         initial/
                             file1.go
-                            manifest.toml
+                            Gopkg.toml
                             ...
                         final/
-                            manifest.toml
-                            lock.toml
+                            Gopkg.toml
+                            Gopkg.lock
                     case2/
                     ...
 

@@ -48,7 +48,7 @@ func (c *Ctx) SourceManager() (*gps.SourceMgr, error) {
 // a project root.  If an absolute path is given, the search begins in that
 // directory.  If a relative or empty path is given, the search start is computed
 // from the current working directory.  The search stops when a file with the
-// name ManifestName (manifest.toml, by default) is located.
+// name ManifestName (Gopkg.toml, by default) is located.
 //
 // The Project contains the parsed manifest as well as a parsed lock file, if
 // present.  The import path is calculated as the remaining path segment
