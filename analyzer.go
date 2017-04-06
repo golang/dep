@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/Masterminds/semver"
 	"github.com/sdboyer/gps"
 )
 
@@ -37,7 +36,6 @@ func (a analyzer) DeriveManifestAndLock(path string, n gps.ProjectRoot) (gps.Man
 	return m, nil, nil
 }
 
-func (a analyzer) Info() (string, *semver.Version) {
-	v, _ := semver.NewVersion("v0.0.1")
-	return "dep", v
+func (a analyzer) Info() (string, int) {
+	return "dep", 1
 }

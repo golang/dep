@@ -40,7 +40,7 @@ func TestHashInputs(t *testing.T) {
 		hhOverrides,
 		hhAnalyzer,
 		"depspec-sm-builtin",
-		"1.0.0",
+		"1",
 	}
 	for _, v := range elems {
 		h.Write([]byte(v))
@@ -93,7 +93,7 @@ func TestHashInputsReqsIgs(t *testing.T) {
 		hhOverrides,
 		hhAnalyzer,
 		"depspec-sm-builtin",
-		"1.0.0",
+		"1",
 	}
 	for _, v := range elems {
 		h.Write([]byte(v))
@@ -138,7 +138,7 @@ func TestHashInputsReqsIgs(t *testing.T) {
 		hhOverrides,
 		hhAnalyzer,
 		"depspec-sm-builtin",
-		"1.0.0",
+		"1",
 	}
 	for _, v := range elems {
 		h.Write([]byte(v))
@@ -177,7 +177,7 @@ func TestHashInputsReqsIgs(t *testing.T) {
 		hhOverrides,
 		hhAnalyzer,
 		"depspec-sm-builtin",
-		"1.0.0",
+		"1",
 	}
 	for _, v := range elems {
 		h.Write([]byte(v))
@@ -232,7 +232,7 @@ func TestHashInputsOverrides(t *testing.T) {
 				"car",
 				hhAnalyzer,
 				"depspec-sm-builtin",
-				"1.0.0",
+				"1",
 			},
 		},
 		{
@@ -263,7 +263,7 @@ func TestHashInputsOverrides(t *testing.T) {
 				"car",
 				hhAnalyzer,
 				"depspec-sm-builtin",
-				"1.0.0",
+				"1",
 			},
 		},
 		{
@@ -293,7 +293,7 @@ func TestHashInputsOverrides(t *testing.T) {
 				"car",
 				hhAnalyzer,
 				"depspec-sm-builtin",
-				"1.0.0",
+				"1",
 			},
 		},
 		{
@@ -321,7 +321,7 @@ func TestHashInputsOverrides(t *testing.T) {
 				"car",
 				hhAnalyzer,
 				"depspec-sm-builtin",
-				"1.0.0",
+				"1",
 			},
 		},
 		{
@@ -353,7 +353,7 @@ func TestHashInputsOverrides(t *testing.T) {
 				"b-foobranch",
 				hhAnalyzer,
 				"depspec-sm-builtin",
-				"1.0.0",
+				"1",
 			},
 		},
 		{
@@ -381,7 +381,7 @@ func TestHashInputsOverrides(t *testing.T) {
 				"b-foobranch",
 				hhAnalyzer,
 				"depspec-sm-builtin",
-				"1.0.0",
+				"1",
 			},
 		},
 		{
@@ -411,7 +411,7 @@ func TestHashInputsOverrides(t *testing.T) {
 				"b-foobranch",
 				hhAnalyzer,
 				"depspec-sm-builtin",
-				"1.0.0",
+				"1",
 			},
 		},
 		{
@@ -442,7 +442,7 @@ func TestHashInputsOverrides(t *testing.T) {
 				"b-foobranch",
 				hhAnalyzer,
 				"depspec-sm-builtin",
-				"1.0.0",
+				"1",
 			},
 		},
 		{
@@ -474,7 +474,7 @@ func TestHashInputsOverrides(t *testing.T) {
 				"b-foobranch",
 				hhAnalyzer,
 				"depspec-sm-builtin",
-				"1.0.0",
+				"1",
 			},
 		},
 		{
@@ -508,7 +508,7 @@ func TestHashInputsOverrides(t *testing.T) {
 				"b-foobranch",
 				hhAnalyzer,
 				"depspec-sm-builtin",
-				"1.0.0",
+				"1",
 			},
 		},
 	}

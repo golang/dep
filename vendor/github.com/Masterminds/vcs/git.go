@@ -33,7 +33,7 @@ func NewGitRepo(remote, local string) (*GitRepo, error) {
 
 	// Make sure the local Git repo is configured the same as the remote when
 	// A remote value was passed in.
-	if err == nil && r.CheckLocal() == true {
+	if err == nil && r.CheckLocal() {
 		c := exec.Command("git", "config", "--get", "remote.origin.url")
 		c.Dir = local
 		c.Env = envForDir(c.Dir)
@@ -70,7 +70,7 @@ func (s GitRepo) Vcs() Type {
 
 // Get is used to perform an initial clone of a repository.
 func (s *GitRepo) Get() error {
-	out, err := s.run("git", "clone", s.Remote(), s.LocalPath())
+	out, err := s.run("git", "clone", "--recursive", s.Remote(), s.LocalPath())
 
 	// There are some windows cases where Git cannot create the parent directory,
 	// if it does not already exist, to the location it's trying to create the
@@ -131,7 +131,7 @@ func (s *GitRepo) Init() error {
 // Update performs an Git fetch and pull to an existing checkout.
 func (s *GitRepo) Update() error {
 	// Perform a fetch to make sure everything is up to date.
-	out, err := s.RunFromDir("git", "fetch", s.RemoteLocation)
+	out, err := s.RunFromDir("git", "fetch", "--tags", s.RemoteLocation)
 	if err != nil {
 		return NewRemoteError("Unable to update repository", err, string(out))
 	}
@@ -143,7 +143,7 @@ func (s *GitRepo) Update() error {
 		return NewLocalError("Unable to update repository", err, "")
 	}
 
-	if detached == true {
+	if detached {
 		return nil
 	}
 
@@ -151,7 +151,8 @@ func (s *GitRepo) Update() error {
 	if err != nil {
 		return NewRemoteError("Unable to update repository", err, string(out))
 	}
-	return nil
+
+	return s.defendAgainstSubmodules()
 }
 
 // UpdateVersion sets the version of a package currently checked out via Git.
@@ -160,6 +161,30 @@ func (s *GitRepo) UpdateVersion(version string) error {
 	if err != nil {
 		return NewLocalError("Unable to update checked out version", err, string(out))
 	}
+
+	return s.defendAgainstSubmodules()
+}
+
+// defendAgainstSubmodules tries to keep repo state sane in the event of
+// submodules. Or nested submodules. What a great idea, submodules.
+func (s *GitRepo) defendAgainstSubmodules() error {
+	// First, update them to whatever they should be, if there should happen to be any.
+	out, err := s.RunFromDir("git", "submodule", "update", "--init", "--recursive")
+	if err != nil {
+		return NewLocalError("Unexpected error while defensively updating submodules", err, string(out))
+	}
+	// Now, do a special extra-aggressive clean in case changing versions caused
+	// one or more submodules to go away.
+	out, err = s.RunFromDir("git", "clean", "-x", "-d", "-f", "-f")
+	if err != nil {
+		return NewLocalError("Unexpected error while defensively cleaning up after possible derelict submodule directories", err, string(out))
+	}
+	// Then, repeat just in case there are any nested submodules that went away.
+	out, err = s.RunFromDir("git", "submodule", "foreach", "--recursive", "git", "clean", "-x", "-d", "-f", "-f")
+	if err != nil {
+		return NewLocalError("Unexpected error while defensively cleaning up after possible derelict nested submodule directories", err, string(out))
+	}
+
 	return nil
 }
 
@@ -255,11 +280,7 @@ func (s *GitRepo) IsReference(r string) bool {
 	// not been checked out yet. This next step should pickup the other
 	// possible references.
 	_, err = s.RunFromDir("git", "show-ref", r)
-	if err == nil {
-		return true
-	}
-
-	return false
+	return err == nil
 }
 
 // IsDirty returns if the checkout has been modified from the checked
@@ -339,11 +360,7 @@ func (s *GitRepo) Ping() bool {
 	// remote needs to be different.
 	c.Env = mergeEnvLists([]string{"GIT_TERMINAL_PROMPT=0"}, os.Environ())
 	_, err := c.CombinedOutput()
-	if err != nil {
-		return false
-	}
-
-	return true
+	return err == nil
 }
 
 // ExportDir exports the current revision to the passed in directory.
@@ -354,10 +371,24 @@ func (s *GitRepo) ExportDir(dir string) error {
 		dir = dir + string(os.PathSeparator)
 	}
 
+	// checkout-index on some systems, such as some Windows cases, does not
+	// create the parent directory to export into if it does not exist. Explicitly
+	// creating it.
+	err := os.MkdirAll(dir, 0755)
+	if err != nil {
+		return NewLocalError("Unable to create directory", err, "")
+	}
+
 	out, err := s.RunFromDir("git", "checkout-index", "-f", "-a", "--prefix="+dir)
 	s.log(out)
 	if err != nil {
 		return NewLocalError("Unable to export source", err, string(out))
+	}
+	// and now, the horror of submodules
+	out, err = s.RunFromDir("git", "submodule", "foreach", "--recursive", "git checkout-index -f -a --prefix=\""+filepath.Join(dir, "$path")+string(filepath.Separator)+"\"")
+	s.log(out)
+	if err != nil {
+		return NewLocalError("Error while exporting submodule sources", err, string(out))
 	}
 
 	return nil

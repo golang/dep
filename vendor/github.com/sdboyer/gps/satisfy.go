@@ -31,7 +31,7 @@ func (s *solver) check(a atomWithPackages, pkgonly bool) error {
 		return err
 	}
 
-	deps, err := s.getImportsAndConstraintsOf(a)
+	_, deps, err := s.getImportsAndConstraintsOf(a)
 	if err != nil {
 		// An err here would be from the package fetcher; pass it straight back
 		// TODO(sdboyer) can we traceInfo this?

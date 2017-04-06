@@ -1,6 +1,10 @@
 package vcs
 
 import (
+	"io/ioutil"
+	"os"
+	"os/exec"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -24,8 +28,6 @@ func TestVCSLookup(t *testing.T) {
 		"https://hub.jazz.net/git/user1/pkgname":                           {work: true, t: Git},
 		"https://hub.jazz.net/git/user1/pkgname/subpkg/subpkg/subpkg":      {work: true, t: Git},
 		"https://hubs.jazz.net/git/user1/pkgname":                          {work: false, t: Git},
-		"http://farbtastic.googlecode.com/svn/":                            {work: true, t: Svn},
-		"http://farbtastic.googlecode.com/svn/trunk":                       {work: true, t: Svn},
 		"https://example.com/foo/bar.git":                                  {work: true, t: Git},
 		"https://example.com/foo/bar.svn":                                  {work: true, t: Svn},
 		"https://example.com/foo/bar/baz.bzr":                              {work: true, t: Bzr},
@@ -33,6 +35,7 @@ func TestVCSLookup(t *testing.T) {
 		"https://gopkg.in/tomb.v1":                                         {work: true, t: Git},
 		"https://golang.org/x/net":                                         {work: true, t: Git},
 		"https://speter.net/go/exp/math/dec/inf":                           {work: true, t: Git},
+		"https://git.openstack.org/foo/bar":                                {work: true, t: Git},
 		"git@github.com:Masterminds/vcs.git":                               {work: true, t: Git},
 		"git@example.com:foo.git":                                          {work: true, t: Git},
 		"ssh://hg@bitbucket.org/mattfarina/testhgrepo":                     {work: true, t: Hg},
@@ -47,15 +50,15 @@ func TestVCSLookup(t *testing.T) {
 
 	for u, c := range urlList {
 		ty, _, err := detectVcsFromRemote(u)
-		if err == nil && c.work == false {
+		if err == nil && !c.work {
 			t.Errorf("Error detecting VCS from URL(%s)", u)
 		}
 
-		if err == ErrCannotDetectVCS && c.work == true {
+		if err == ErrCannotDetectVCS && c.work {
 			t.Errorf("Error detecting VCS from URL(%s)", u)
 		}
 
-		if err != nil && c.work == true {
+		if err != nil && c.work {
 			t.Errorf("Error detecting VCS from URL(%s): %s", u, err)
 		}
 
@@ -63,13 +66,49 @@ func TestVCSLookup(t *testing.T) {
 			err != ErrCannotDetectVCS &&
 			!strings.HasSuffix(err.Error(), "Not Found") &&
 			!strings.HasSuffix(err.Error(), "Access Denied") &&
-			c.work == false {
+			!c.work {
 			t.Errorf("Unexpected error returned (%s): %s", u, err)
 		}
 
-		if c.work == true && ty != c.t {
+		if c.work && ty != c.t {
 			t.Errorf("Incorrect VCS type returned(%s)", u)
 		}
+	}
+}
+
+func TestVCSFileLookup(t *testing.T) {
+	tempDir, err := ioutil.TempDir("", "go-vcs-file-lookup-tests")
+	if err != nil {
+		t.Error(err)
+	}
+	defer func() {
+		err = os.RemoveAll(tempDir)
+		if err != nil {
+			t.Error(err)
+		}
+	}()
+
+	_, err = exec.Command("git", "init", tempDir).CombinedOutput()
+	if err != nil {
+		t.Error(err)
+	}
+
+	// On Windows it should be file:// followed by /C:\for\bar. That / before
+	// the drive needs to be included in testing.
+	var pth string
+	if runtime.GOOS == "windows" {
+		pth = "file:///" + tempDir
+	} else {
+		pth = "file://" + tempDir
+	}
+	ty, _, err := detectVcsFromRemote(pth)
+
+	if err != nil {
+		t.Errorf("Unable to detect file:// path: %s", err)
+	}
+
+	if ty != Git {
+		t.Errorf("Detected wrong type from file:// path. Found type %v", ty)
 	}
 }
 

@@ -4,6 +4,8 @@ Manage repos in varying version control systems with ease through a common
 interface.
 
 [![Build Status](https://travis-ci.org/Masterminds/vcs.svg)](https://travis-ci.org/Masterminds/vcs) [![GoDoc](https://godoc.org/github.com/Masterminds/vcs?status.png)](https://godoc.org/github.com/Masterminds/vcs) [![Go Report Card](https://goreportcard.com/badge/github.com/Masterminds/vcs)](https://goreportcard.com/report/github.com/Masterminds/vcs)
+[![Build status](https://ci.appveyor.com/api/projects/status/vg3cjc561q2trobm?svg=true&passingText=windows%20build%20passing&failingText=windows%20build%20failing)](https://ci.appveyor.com/project/mattfarina/vcs)
+
 
 ## Quick Usage
 

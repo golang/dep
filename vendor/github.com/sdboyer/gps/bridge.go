@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"sync/atomic"
 
-	"github.com/Masterminds/semver"
+	"github.com/sdboyer/gps/pkgtree"
 )
 
 // sourceBridges provide an adapter to SourceManagers that tailor operations
@@ -45,7 +45,7 @@ type bridge struct {
 
 	// Simple, local cache of the root's PackageTree
 	crp *struct {
-		ptree PackageTree
+		ptree pkgtree.PackageTree
 		err   error
 	}
 
@@ -81,7 +81,7 @@ func (b *bridge) GetManifestAndLock(id ProjectIdentifier, v Version) (Manifest, 
 	return m, l, e
 }
 
-func (b *bridge) AnalyzerInfo() (string, *semver.Version) {
+func (b *bridge) AnalyzerInfo() (string, int) {
 	return b.sm.AnalyzerInfo()
 }
 
@@ -282,7 +282,7 @@ func (b *bridge) vtu(id ProjectIdentifier, v Version) versionTypeUnion {
 //
 // The root project is handled separately, as the source manager isn't
 // responsible for that code.
-func (b *bridge) ListPackages(id ProjectIdentifier, v Version) (PackageTree, error) {
+func (b *bridge) ListPackages(id ProjectIdentifier, v Version) (pkgtree.PackageTree, error) {
 	if b.s.rd.isRoot(id.ProjectRoot) {
 		return b.s.rd.rpt, nil
 	}

@@ -31,7 +31,7 @@ func TestBzr(t *testing.T) {
 
 	repo, err := NewBzrRepo("https://launchpad.net/govcstestbzrrepo", tempDir+"/govcstestbzrrepo")
 	if err != nil {
-		t.Error(err)
+		t.Fatal(err)
 	}
 
 	if repo.Vcs() != Bzr {
@@ -55,7 +55,7 @@ func TestBzr(t *testing.T) {
 	}
 
 	// Verify Bzr repo is a Bzr repo
-	if repo.CheckLocal() == false {
+	if !repo.CheckLocal() {
 		t.Error("Problem checking out repo or Bzr CheckLocal is not working")
 	}
 
@@ -75,7 +75,7 @@ func TestBzr(t *testing.T) {
 		t.Error(nrerr)
 	}
 	// Verify the right oject is returned. It will check the local repo type.
-	if nrepo.CheckLocal() == false {
+	if !nrepo.CheckLocal() {
 		t.Error("Wrong version returned from NewRepo")
 	}
 
@@ -164,15 +164,15 @@ func TestBzr(t *testing.T) {
 		t.Error("Bzr is incorrectly returning branches")
 	}
 
-	if repo.IsReference("1.0.0") != true {
+	if !repo.IsReference("1.0.0") {
 		t.Error("Bzr is reporting a reference is not one")
 	}
 
-	if repo.IsReference("foo") == true {
-		t.Error("Bzr is reporting a non-existant reference is one")
+	if repo.IsReference("foo") {
+		t.Error("Bzr is reporting a non-existent reference is one")
 	}
 
-	if repo.IsDirty() == true {
+	if repo.IsDirty() {
 		t.Error("Bzr incorrectly reporting dirty")
 	}
 
@@ -227,7 +227,7 @@ func TestBzr(t *testing.T) {
 
 	_, err = os.Stat(filepath.Join(exportDir, string(repo.Vcs())))
 	if err != nil {
-		if found := os.IsNotExist(err); found == false {
+		if found := os.IsNotExist(err); !found {
 			t.Errorf("Error checking exported metadata in Bzr: %s", err)
 		}
 	} else {
@@ -250,7 +250,7 @@ func TestBzrCheckLocal(t *testing.T) {
 	}()
 
 	repo, _ := NewBzrRepo("", tempDir)
-	if repo.CheckLocal() == true {
+	if repo.CheckLocal() {
 		t.Error("Bzr CheckLocal does not identify non-Bzr location")
 	}
 

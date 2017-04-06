@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/Masterminds/semver"
+	"github.com/sdboyer/gps/pkgtree"
 )
 
 var regfrom = regexp.MustCompile(`^(\w*) from (\w*) ([0-9\.\*]*)`)
@@ -371,7 +372,7 @@ type pident struct {
 type specfix interface {
 	name() string
 	rootmanifest() RootManifest
-	rootTree() PackageTree
+	rootTree() pkgtree.PackageTree
 	specs() []depspec
 	maxTries() int
 	solution() map[ProjectIdentifier]LockedProject
@@ -439,7 +440,7 @@ func (f basicFixture) rootmanifest() RootManifest {
 	}
 }
 
-func (f basicFixture) rootTree() PackageTree {
+func (f basicFixture) rootTree() pkgtree.PackageTree {
 	var imp, timp []string
 	for _, dep := range f.ds[0].deps {
 		imp = append(imp, string(dep.Ident.ProjectRoot))
@@ -449,11 +450,11 @@ func (f basicFixture) rootTree() PackageTree {
 	}
 
 	n := string(f.ds[0].n)
-	pt := PackageTree{
+	pt := pkgtree.PackageTree{
 		ImportRoot: n,
-		Packages: map[string]PackageOrErr{
+		Packages: map[string]pkgtree.PackageOrErr{
 			string(n): {
-				P: Package{
+				P: pkgtree.Package{
 					ImportPath:  n,
 					Name:        n,
 					Imports:     imp,
@@ -1350,7 +1351,7 @@ func init() {
 }
 
 // reachMaps contain externalReach()-type data for a given depspec fixture's
-// universe of proejcts, packages, and versions.
+// universe of projects, packages, and versions.
 type reachMap map[pident]map[string][]string
 
 type depspecSourceManager struct {
@@ -1404,8 +1405,8 @@ func (sm *depspecSourceManager) GetManifestAndLock(id ProjectIdentifier, v Versi
 	return nil, nil, fmt.Errorf("Project %s at version %s could not be found", id.errString(), v)
 }
 
-func (sm *depspecSourceManager) AnalyzerInfo() (string, *semver.Version) {
-	return "depspec-sm-builtin", sv("v1.0.0")
+func (sm *depspecSourceManager) AnalyzerInfo() (string, int) {
+	return "depspec-sm-builtin", 1
 }
 
 func (sm *depspecSourceManager) ExternalReach(id ProjectIdentifier, v Version) (map[string][]string, error) {
@@ -1416,24 +1417,15 @@ func (sm *depspecSourceManager) ExternalReach(id ProjectIdentifier, v Version) (
 	return nil, fmt.Errorf("No reach data for %s at version %s", id.errString(), v)
 }
 
-func (sm *depspecSourceManager) ListExternal(id ProjectIdentifier, v Version) ([]string, error) {
-	// This should only be called for the root
-	pid := pident{n: ProjectRoot(id.normalizedSource()), v: v}
-	if r, exists := sm.rm[pid]; exists {
-		return r[string(id.ProjectRoot)], nil
-	}
-	return nil, fmt.Errorf("No reach data for %s at version %s", id.errString(), v)
-}
-
-func (sm *depspecSourceManager) ListPackages(id ProjectIdentifier, v Version) (PackageTree, error) {
+func (sm *depspecSourceManager) ListPackages(id ProjectIdentifier, v Version) (pkgtree.PackageTree, error) {
 	pid := pident{n: ProjectRoot(id.normalizedSource()), v: v}
 
 	if r, exists := sm.rm[pid]; exists {
-		return PackageTree{
+		return pkgtree.PackageTree{
 			ImportRoot: string(pid.n),
-			Packages: map[string]PackageOrErr{
+			Packages: map[string]pkgtree.PackageOrErr{
 				string(pid.n): {
-					P: Package{
+					P: pkgtree.Package{
 						ImportPath: string(pid.n),
 						Name:       string(pid.n),
 						Imports:    r[string(pid.n)],
@@ -1449,11 +1441,11 @@ func (sm *depspecSourceManager) ListPackages(id ProjectIdentifier, v Version) (P
 		uv := pv.Unpair()
 		for pid, r := range sm.rm {
 			if uv.Matches(pid.v) {
-				return PackageTree{
+				return pkgtree.PackageTree{
 					ImportRoot: string(pid.n),
-					Packages: map[string]PackageOrErr{
+					Packages: map[string]pkgtree.PackageOrErr{
 						string(pid.n): {
-							P: Package{
+							P: pkgtree.Package{
 								ImportPath: string(pid.n),
 								Name:       string(pid.n),
 								Imports:    r[string(pid.n)],
@@ -1465,7 +1457,7 @@ func (sm *depspecSourceManager) ListPackages(id ProjectIdentifier, v Version) (P
 		}
 	}
 
-	return PackageTree{}, fmt.Errorf("Project %s at version %s could not be found", pid.n, v)
+	return pkgtree.PackageTree{}, fmt.Errorf("Project %s at version %s could not be found", pid.n, v)
 }
 
 func (sm *depspecSourceManager) ListVersions(id ProjectIdentifier) (pi []Version, err error) {
@@ -1554,7 +1546,7 @@ func (b *depspecBridge) verifyRootDir(path string) error {
 	return nil
 }
 
-func (b *depspecBridge) ListPackages(id ProjectIdentifier, v Version) (PackageTree, error) {
+func (b *depspecBridge) ListPackages(id ProjectIdentifier, v Version) (pkgtree.PackageTree, error) {
 	return b.sm.(fixSM).ListPackages(id, v)
 }
 
@@ -1609,195 +1601,3 @@ func (dummyLock) InputHash() []byte {
 func (dummyLock) Projects() []LockedProject {
 	return nil
 }
-
-// We've borrowed this bestiary from pub's tests:
-// https://github.com/dart-lang/pub/blob/master/test/version_solver_test.dart
-
-// TODO(sdboyer) finish converting all of these
-
-/*
-func basicGraph() {
-  testResolve("circular dependency", {
-    "myapp 1.0.0": {
-      "foo": "1.0.0"
-    },
-    "foo 1.0.0": {
-      "bar": "1.0.0"
-    },
-    "bar 1.0.0": {
-      "foo": "1.0.0"
-    }
-  }, result: {
-    "myapp from root": "1.0.0",
-    "foo": "1.0.0",
-    "bar": "1.0.0"
-  });
-
-}
-
-func withLockFile() {
-
-}
-
-func rootDependency() {
-  testResolve("with root source", {
-    "myapp 1.0.0": {
-      "foo": "1.0.0"
-    },
-    "foo 1.0.0": {
-      "myapp from root": ">=1.0.0"
-    }
-  }, result: {
-    "myapp from root": "1.0.0",
-    "foo": "1.0.0"
-  });
-
-  testResolve("with different source", {
-    "myapp 1.0.0": {
-      "foo": "1.0.0"
-    },
-    "foo 1.0.0": {
-      "myapp": ">=1.0.0"
-    }
-  }, result: {
-    "myapp from root": "1.0.0",
-    "foo": "1.0.0"
-  });
-
-  testResolve("with wrong version", {
-    "myapp 1.0.0": {
-      "foo": "1.0.0"
-    },
-    "foo 1.0.0": {
-      "myapp": "<1.0.0"
-    }
-  }, error: couldNotSolve);
-}
-
-func unsolvable() {
-
-  testResolve("mismatched descriptions", {
-    "myapp 0.0.0": {
-      "foo": "1.0.0",
-      "bar": "1.0.0"
-    },
-    "foo 1.0.0": {
-      "shared-x": "1.0.0"
-    },
-    "bar 1.0.0": {
-      "shared-y": "1.0.0"
-    },
-    "shared-x 1.0.0": {},
-    "shared-y 1.0.0": {}
-  }, error: descriptionMismatch("shared", "foo", "bar"));
-
-  testResolve("mismatched sources", {
-    "myapp 0.0.0": {
-      "foo": "1.0.0",
-      "bar": "1.0.0"
-    },
-    "foo 1.0.0": {
-      "shared": "1.0.0"
-    },
-    "bar 1.0.0": {
-      "shared from mock2": "1.0.0"
-    },
-    "shared 1.0.0": {},
-    "shared 1.0.0 from mock2": {}
-  }, error: sourceMismatch("shared", "foo", "bar"));
-
-
-
-  // This is a regression test for #18300.
-  testResolve("...", {
-    "myapp 0.0.0": {
-      "angular": "any",
-      "collection": "any"
-    },
-    "analyzer 0.12.2": {},
-    "angular 0.10.0": {
-      "di": ">=0.0.32 <0.1.0",
-      "collection": ">=0.9.1 <1.0.0"
-    },
-    "angular 0.9.11": {
-      "di": ">=0.0.32 <0.1.0",
-      "collection": ">=0.9.1 <1.0.0"
-    },
-    "angular 0.9.10": {
-      "di": ">=0.0.32 <0.1.0",
-      "collection": ">=0.9.1 <1.0.0"
-    },
-    "collection 0.9.0": {},
-    "collection 0.9.1": {},
-    "di 0.0.37": {"analyzer": ">=0.13.0 <0.14.0"},
-    "di 0.0.36": {"analyzer": ">=0.13.0 <0.14.0"}
-  }, error: noVersion(["analyzer", "di"]), maxTries: 2);
-}
-
-func badSource() {
-  testResolve("fail if the root package has a bad source in dep", {
-    "myapp 0.0.0": {
-      "foo from bad": "any"
-    },
-  }, error: unknownSource("myapp", "foo", "bad"));
-
-  testResolve("fail if the root package has a bad source in dev dep", {
-    "myapp 0.0.0": {
-      "(dev) foo from bad": "any"
-    },
-  }, error: unknownSource("myapp", "foo", "bad"));
-
-  testResolve("fail if all versions have bad source in dep", {
-    "myapp 0.0.0": {
-      "foo": "any"
-    },
-    "foo 1.0.0": {
-      "bar from bad": "any"
-    },
-    "foo 1.0.1": {
-      "baz from bad": "any"
-    },
-    "foo 1.0.3": {
-      "bang from bad": "any"
-    },
-  }, error: unknownSource("foo", "bar", "bad"), maxTries: 3);
-
-  testResolve("ignore versions with bad source in dep", {
-    "myapp 1.0.0": {
-      "foo": "any"
-    },
-    "foo 1.0.0": {
-      "bar": "any"
-    },
-    "foo 1.0.1": {
-      "bar from bad": "any"
-    },
-    "foo 1.0.3": {
-      "bar from bad": "any"
-    },
-    "bar 1.0.0": {}
-  }, result: {
-    "myapp from root": "1.0.0",
-    "foo": "1.0.0",
-    "bar": "1.0.0"
-  }, maxTries: 3);
-}
-
-func backtracking() {
-  testResolve("circular dependency on older version", {
-    "myapp 0.0.0": {
-      "a": ">=1.0.0"
-    },
-    "a 1.0.0": {},
-    "a 2.0.0": {
-      "b": "1.0.0"
-    },
-    "b 1.0.0": {
-      "a": "1.0.0"
-    }
-  }, result: {
-    "myapp from root": "0.0.0",
-    "a": "1.0.0"
-  }, maxTries: 2);
-}
-*/

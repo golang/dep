@@ -19,12 +19,14 @@ import (
 	"strings"
 	"sync"
 	"testing"
+
+	"github.com/pkg/errors"
 )
 
 var (
-	ExeSuffix    string // ".exe" on Windows
-	mu           sync.Mutex
-	UpdateGolden = flag.Bool("update", false, "update .golden files")
+	ExeSuffix string // ".exe" on Windows
+	mu        sync.Mutex
+	PrintLogs *bool = flag.Bool("logs", false, "log stdin/stdout of test commands")
 )
 
 func init() {
@@ -59,30 +61,30 @@ func NewHelper(t *testing.T) *Helper {
 // Must gives a fatal error if err is not nil.
 func (h *Helper) Must(err error) {
 	if err != nil {
-		h.t.Fatal(err)
+		h.t.Fatalf("%+v", err)
 	}
 }
 
 // check gives a test non-fatal error if err is not nil.
 func (h *Helper) check(err error) {
 	if err != nil {
-		h.t.Error(err)
+		h.t.Errorf("%+v", err)
 	}
 }
 
 // parallel runs the test in parallel by calling t.Parallel.
 func (h *Helper) parallel() {
 	if h.ran {
-		h.t.Fatal("internal testsuite error: call to parallel after run")
+		h.t.Fatalf("%+v", errors.New("internal testsuite error: call to parallel after run"))
 	}
 	if h.wd != "" {
-		h.t.Fatal("internal testsuite error: call to parallel after cd")
+		h.t.Fatalf("%+v", errors.New("internal testsuite error: call to parallel after cd"))
 	}
 	for _, e := range h.env {
 		if strings.HasPrefix(e, "GOROOT=") || strings.HasPrefix(e, "GOPATH=") || strings.HasPrefix(e, "GOBIN=") {
 			val := e[strings.Index(e, "=")+1:]
 			if strings.HasPrefix(val, "testdata") || strings.HasPrefix(val, "./testdata") {
-				h.t.Fatalf("internal testsuite error: call to parallel with testdata in environment (%s)", e)
+				h.t.Fatalf("%+v", errors.Errorf("internal testsuite error: call to parallel with testdata in environment (%s)", e))
 			}
 		}
 	}
@@ -94,7 +96,7 @@ func (h *Helper) parallel() {
 func (h *Helper) pwd() string {
 	wd, err := os.Getwd()
 	if err != nil {
-		h.t.Fatalf("could not get working directory: %v", err)
+		h.t.Fatalf("%+v", errors.Wrap(err, "could not get working directory"))
 	}
 	return wd
 }
@@ -104,23 +106,25 @@ func (h *Helper) pwd() string {
 // other tests.
 func (h *Helper) Cd(dir string) {
 	if h.inParallel {
-		h.t.Fatal("internal testsuite error: changing directory when running in parallel")
+		h.t.Fatalf("%+v", errors.New("internal testsuite error: changing directory when running in parallel"))
 	}
 	if h.wd == "" {
 		h.wd = h.pwd()
 	}
 	abs, err := filepath.Abs(dir)
-	h.Must(os.Chdir(dir))
 	if err == nil {
 		h.Setenv("PWD", abs)
 	}
+
+	err = os.Chdir(dir)
+	h.Must(errors.Wrapf(err, "Unable to cd to %s", dir))
 }
 
 // Setenv sets an environment variable to use when running the test go
 // command.
 func (h *Helper) Setenv(name, val string) {
 	if h.inParallel && (name == "GOROOT" || name == "GOPATH" || name == "GOBIN") && (strings.HasPrefix(val, "testdata") || strings.HasPrefix(val, "./testdata")) {
-		h.t.Fatalf("internal testsuite error: call to setenv with testdata (%s=%s) after parallel", name, val)
+		h.t.Fatalf("%+v", errors.Errorf("internal testsuite error: call to setenv with testdata (%s=%s) after parallel", name, val))
 	}
 	h.unsetenv(name)
 	h.env = append(h.env, name+"="+val)
@@ -145,32 +149,37 @@ func (h *Helper) DoRun(args []string) error {
 	if h.inParallel {
 		for _, arg := range args {
 			if strings.HasPrefix(arg, "testdata") || strings.HasPrefix(arg, "./testdata") {
-				h.t.Fatal("internal testsuite error: parallel run using testdata")
+				h.t.Fatalf("%+v", errors.New("internal testsuite error: parallel run using testdata"))
 			}
 		}
 	}
-	h.t.Logf("running testdep %v", args)
+	if *PrintLogs {
+		h.t.Logf("running testdep %v", args)
+	}
 	var prog string
 	if h.wd == "" {
 		prog = "./testdep" + ExeSuffix
 	} else {
 		prog = filepath.Join(h.wd, "testdep"+ExeSuffix)
 	}
-	args = append(args[:1], append([]string{"-v"}, args[1:]...)...)
-	cmd := exec.Command(prog, args...)
+	newargs := []string{args[0], "-v"}
+	newargs = append(newargs, args[1:]...)
+	cmd := exec.Command(prog, newargs...)
 	h.stdout.Reset()
 	h.stderr.Reset()
 	cmd.Stdout = &h.stdout
 	cmd.Stderr = &h.stderr
 	cmd.Env = h.env
 	status := cmd.Run()
-	if h.stdout.Len() > 0 {
-		h.t.Log("standard output:")
-		h.t.Log(h.stdout.String())
-	}
-	if h.stderr.Len() > 0 {
-		h.t.Log("standard error:")
-		h.t.Log(h.stderr.String())
+	if *PrintLogs {
+		if h.stdout.Len() > 0 {
+			h.t.Log("standard output:")
+			h.t.Log(h.stdout.String())
+		}
+		if h.stderr.Len() > 0 {
+			h.t.Log("standard error:")
+			h.t.Log(h.stderr.String())
+		}
 	}
 	h.ran = true
 	return status
@@ -191,7 +200,7 @@ func (h *Helper) Run(args ...string) {
 // runFail runs the test go command, and expects it to fail.
 func (h *Helper) runFail(args ...string) {
 	if status := h.DoRun(args); status == nil {
-		h.t.Fatal("testgo succeeded unexpectedly")
+		h.t.Fatalf("%+v", errors.New("testgo succeeded unexpectedly"))
 	} else {
 		h.t.Log("testgo failed as expected:", status)
 	}
@@ -247,13 +256,15 @@ func (h *Helper) RunGit(dir string, args ...string) {
 	cmd.Dir = dir
 	cmd.Env = h.env
 	status := cmd.Run()
-	if h.stdout.Len() > 0 {
-		h.t.Logf("git %v standard output:", args)
-		h.t.Log(h.stdout.String())
-	}
-	if h.stderr.Len() > 0 {
-		h.t.Logf("git %v standard error:", args)
-		h.t.Log(h.stderr.String())
+	if *PrintLogs {
+		if h.stdout.Len() > 0 {
+			h.t.Logf("git %v standard output:", args)
+			h.t.Log(h.stdout.String())
+		}
+		if h.stderr.Len() > 0 {
+			h.t.Logf("git %v standard error:", args)
+			h.t.Log(h.stderr.String())
+		}
 	}
 	if status != nil {
 		h.t.Logf("git %v failed unexpectedly: %v", args, status)
@@ -264,7 +275,7 @@ func (h *Helper) RunGit(dir string, args ...string) {
 // getStdout returns standard output of the testgo run as a string.
 func (h *Helper) getStdout() string {
 	if !h.ran {
-		h.t.Fatal("internal testsuite error: stdout called before run")
+		h.t.Fatalf("%+v", errors.New("internal testsuite error: stdout called before run"))
 	}
 	return h.stdout.String()
 }
@@ -272,7 +283,7 @@ func (h *Helper) getStdout() string {
 // getStderr returns standard error of the testgo run as a string.
 func (h *Helper) getStderr() string {
 	if !h.ran {
-		h.t.Fatal("internal testsuite error: stdout called before run")
+		h.t.Fatalf("%+v", errors.New("internal testsuite error: stdout called before run"))
 	}
 	return h.stderr.String()
 }
@@ -282,7 +293,7 @@ func (h *Helper) getStderr() string {
 // each line separately, as with the grep command.
 func (h *Helper) doGrepMatch(match string, b *bytes.Buffer) bool {
 	if !h.ran {
-		h.t.Fatal("internal testsuite error: grep called before run")
+		h.t.Fatalf("%+v", errors.New("internal testsuite error: grep called before run"))
 	}
 	re := regexp.MustCompile(match)
 	for _, ln := range bytes.Split(b.Bytes(), []byte{'\n'}) {
@@ -355,14 +366,14 @@ func (h *Helper) grepStderrNot(match, msg string) {
 func (h *Helper) grepBothNot(match, msg string) {
 	if h.doGrepMatch(match, &h.stdout) || h.doGrepMatch(match, &h.stderr) {
 		h.t.Log(msg)
-		h.t.Fatalf("pattern %v found unexpectedly in standard output or standard error", match)
+		h.t.Fatalf("%+v", errors.Errorf("pattern %v found unexpectedly in standard output or standard error", match))
 	}
 }
 
 // doGrepCount counts the number of times a regexp is seen in a buffer.
 func (h *Helper) doGrepCount(match string, b *bytes.Buffer) int {
 	if !h.ran {
-		h.t.Fatal("internal testsuite error: doGrepCount called before run")
+		h.t.Fatalf("%+v", errors.New("internal testsuite error: doGrepCount called before run"))
 	}
 	re := regexp.MustCompile(match)
 	c := 0
@@ -386,7 +397,7 @@ func (h *Helper) grepCountBoth(match string) int {
 // removed if it exists.
 func (h *Helper) creatingTemp(path string) {
 	if filepath.IsAbs(path) && !strings.HasPrefix(path, h.tempdir) {
-		h.t.Fatalf("internal testsuite error: creatingTemp(%q) with absolute path not in temporary directory", path)
+		h.t.Fatalf("%+v", errors.Errorf("internal testsuite error: creatingTemp(%q) with absolute path not in temporary directory", path))
 	}
 	// If we have changed the working directory, make sure we have
 	// an absolute path, because we are going to change directory
@@ -429,22 +440,30 @@ func (h *Helper) WriteTestFile(src string, content string) error {
 	return err
 }
 
+// GetTestFile reads a file into memory
+func (h *Helper) GetFile(path string) io.ReadCloser {
+	content, err := os.Open(path)
+	if err != nil {
+		h.t.Fatalf("%+v", errors.Wrapf(err, "Unable to open file: %s", path))
+	}
+	return content
+}
+
 // GetTestFile reads a file from the testdata directory into memory.  src is
 // relative to ./testdata.
 func (h *Helper) GetTestFile(src string) io.ReadCloser {
-	content, err := os.Open(filepath.Join(h.origWd, "testdata", src))
-	if err != nil {
-		panic(err)
-	}
-	return content
+	fullPath := filepath.Join(h.origWd, "testdata", src)
+	return h.GetFile(fullPath)
 }
 
 // GetTestFileString reads a file from the testdata directory into memory.  src is
 // relative to ./testdata.
 func (h *Helper) GetTestFileString(src string) string {
-	content, err := ioutil.ReadAll(h.GetTestFile(src))
+	srcf := h.GetTestFile(src)
+	defer srcf.Close()
+	content, err := ioutil.ReadAll(srcf)
 	if err != nil {
-		panic(err)
+		h.t.Fatalf("%+v", err)
 	}
 	return string(content)
 }
@@ -467,8 +486,9 @@ func (h *Helper) TempCopy(dest, src string) {
 // TempDir adds a temporary directory for a run of testgo.
 func (h *Helper) TempDir(path string) {
 	h.makeTempdir()
-	if err := os.MkdirAll(filepath.Join(h.tempdir, path), 0755); err != nil && !os.IsExist(err) {
-		h.t.Fatal(err)
+	fullPath := filepath.Join(h.tempdir, path)
+	if err := os.MkdirAll(fullPath, 0755); err != nil && !os.IsExist(err) {
+		h.t.Fatalf("%+v", errors.Errorf("Unable to create temp directory: %s", fullPath))
 	}
 }
 
@@ -476,7 +496,7 @@ func (h *Helper) TempDir(path string) {
 // directory.
 func (h *Helper) Path(name string) string {
 	if h.tempdir == "" {
-		h.t.Fatalf("internal testsuite error: path(%q) with no tempdir", name)
+		h.t.Fatalf("%+v", errors.Errorf("internal testsuite error: path(%q) with no tempdir", name))
 	}
 
 	var joined string
@@ -489,26 +509,53 @@ func (h *Helper) Path(name string) string {
 	// Ensure it's the absolute, symlink-less path we're returning
 	abs, err := filepath.EvalSymlinks(joined)
 	if err != nil {
-		h.t.Fatalf("internal testsuite error: could not get absolute path for dir(%q), err %q", joined, err)
+		h.t.Fatalf("%+v", errors.Wrapf(err, "internal testsuite error: could not get absolute path for dir(%q)", joined))
 	}
 	return abs
 }
 
 // MustExist fails if path does not exist.
 func (h *Helper) MustExist(path string) {
+	if err := h.ShouldExist(path); err != nil {
+		h.t.Fatalf("%+v", err)
+	}
+}
+
+// ShouldExist returns an error if path does not exist.
+func (h *Helper) ShouldExist(path string) error {
+	if !h.Exist(path) {
+		return errors.Errorf("%s does not exist but should", path)
+	}
+
+	return nil
+}
+
+// Exist returns whether or not a path exists
+func (h *Helper) Exist(path string) bool {
 	if _, err := os.Stat(path); err != nil {
 		if os.IsNotExist(err) {
-			h.t.Fatalf("%s does not exist but should", path)
+			return false
 		}
-		h.t.Fatalf("%s stat failed: %v", path, err)
+		h.t.Fatalf("%+v", errors.Wrapf(err, "Error checking if path exists: %s", path))
 	}
+
+	return true
 }
 
 // MustNotExist fails if path exists.
 func (h *Helper) MustNotExist(path string) {
-	if _, err := os.Stat(path); err == nil || !os.IsNotExist(err) {
-		h.t.Fatalf("%s exists but should not (%v)", path, err)
+	if err := h.ShouldNotExist(path); err != nil {
+		h.t.Fatalf("%+v", err)
 	}
+}
+
+// ShouldNotExist returns an error if path exists.
+func (h *Helper) ShouldNotExist(path string) error {
+	if h.Exist(path) {
+		return errors.Errorf("%s exists but should not", path)
+	}
+
+	return nil
 }
 
 // Cleanup cleans up a test that runs testgo.
@@ -561,7 +608,7 @@ func (h *Helper) GetCommit(repo string) string {
 	cmd.Dir = repoPath
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		h.t.Fatalf("git commit failed: out -> %s err -> %v", string(out), err)
+		h.t.Fatalf("%+v", errors.Wrapf(err, "git commit failed: out -> %s", string(out)))
 	}
 	return strings.TrimSpace(string(out))
 }
