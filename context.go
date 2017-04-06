@@ -165,7 +165,7 @@ func (c *Ctx) resolveProjectRoot(path string) (string, error) {
 	// sure how to resolve it.
 	for _, gp := range c.GOPATHS {
 		if filepath.HasPrefix(path, gp) {
-			return "", fmt.Errorf("'%s' is linked to another path within a GOPATH (%s)", path, gp)
+			return "", errors.Errorf("'%s' is linked to another path within a GOPATH (%s)", path, gp)
 		}
 	}
 
