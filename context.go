@@ -162,11 +162,11 @@ func (c *Ctx) resolveProjectRoot(path string) (string, error) {
 		return "", errors.Wrap(err, "resolveProjectRoot")
 	}
 
-	// Determine if the symlink is within and of the GOPATHs, in which case we're not
+	// Determine if the symlink is within any of the GOPATHs, in which case we're not
 	// sure how to resolve it.
 	for _, gp := range c.GOPATHS {
 		if filepath.HasPrefix(path, gp) {
-			return "", fmt.Errorf("''%s' is linked to another path within GOPATH", path)
+			return "", fmt.Errorf("''%s' is linked to another path within a GOPATH (%s)", path, gp)
 		}
 	}
 
