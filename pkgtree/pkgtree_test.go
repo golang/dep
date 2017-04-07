@@ -1153,6 +1153,26 @@ func TestListPackages(t *testing.T) {
 				},
 			},
 		},
+		"skip underscore": {
+			fileRoot:   j("skip_"),
+			importRoot: "skip_",
+			out: PackageTree{
+				ImportRoot: "skip_",
+				Packages: map[string]PackageOrErr{
+					"skip_": {
+						P: Package{
+							ImportPath:  "skip_",
+							CommentPath: "",
+							Name:        "skip",
+							Imports: []string{
+								"github.com/sdboyer/gps",
+								"sort",
+							},
+						},
+					},
+				},
+			},
+		},
 		// This case mostly exists for the PackageTree methods, but it does
 		// cover a bit of range
 		"varied": {

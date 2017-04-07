@@ -195,6 +195,10 @@ func fillPackage(p *build.Package) error {
 	var testImports []string
 	var imports []string
 	for _, file := range gofiles {
+		// Skip underscore-led files, in keeping with the rest of the toolchain.
+		if filepath.Base(file)[0] == '_' {
+			continue
+		}
 		pf, err := parser.ParseFile(token.NewFileSet(), file, nil, parser.ImportsOnly|parser.ParseComments)
 		if err != nil {
 			if os.IsPermission(err) {
