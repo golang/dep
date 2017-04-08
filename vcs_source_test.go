@@ -38,19 +38,17 @@ func testGitSourceInteractions(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to create temp dir: %s", err)
 	}
-	rf := func() {
-		err := removeAll(cpath)
-		if err != nil {
+	defer func() {
+		if err := removeAll(cpath); err != nil {
 			t.Errorf("removeAll failed: %s", err)
 		}
-	}
+	}()
 
 	n := "github.com/sdboyer/gpkt"
 	un := "https://" + n
 	u, err := url.Parse(un)
 	if err != nil {
 		t.Errorf("URL was bad, lolwut? errtext: %s", err)
-		rf()
 		t.FailNow()
 	}
 	mb := maybeGitSource{
@@ -62,7 +60,6 @@ func testGitSourceInteractions(t *testing.T) {
 	isrc, state, err := mb.try(ctx, cpath, newMemoryCache(), superv)
 	if err != nil {
 		t.Errorf("Unexpected error while setting up gitSource for test repo: %s", err)
-		rf()
 		t.FailNow()
 	}
 
@@ -74,14 +71,12 @@ func testGitSourceInteractions(t *testing.T) {
 	err = isrc.initLocal(ctx)
 	if err != nil {
 		t.Errorf("Error on cloning git repo: %s", err)
-		rf()
 		t.FailNow()
 	}
 
 	src, ok := isrc.(*gitSource)
 	if !ok {
 		t.Errorf("Expected a gitSource, got a %T", isrc)
-		rf()
 		t.FailNow()
 	}
 
@@ -92,7 +87,6 @@ func testGitSourceInteractions(t *testing.T) {
 	pvlist, err := src.listVersions(ctx)
 	if err != nil {
 		t.Errorf("Unexpected error getting version pairs from git repo: %s", err)
-		rf()
 		t.FailNow()
 	}
 
@@ -145,12 +139,11 @@ func testGopkginSourceInteractions(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to create temp dir: %s", err)
 	}
-	rf := func() {
-		err := removeAll(cpath)
-		if err != nil {
+	defer func() {
+		if err := removeAll(cpath); err != nil {
 			t.Errorf("removeAll failed: %s", err)
 		}
-	}
+	}()
 
 	tfunc := func(opath, n string, major uint64, evl []Version) {
 		un := "https://" + n
@@ -181,7 +174,6 @@ func testGopkginSourceInteractions(t *testing.T) {
 		err = isrc.initLocal(ctx)
 		if err != nil {
 			t.Errorf("Error on cloning git repo: %s", err)
-			rf()
 			t.FailNow()
 		}
 
@@ -275,7 +267,6 @@ func testGopkginSourceInteractions(t *testing.T) {
 	}()
 
 	wg.Wait()
-	rf()
 }
 
 func testBzrSourceInteractions(t *testing.T) {
@@ -291,19 +282,17 @@ func testBzrSourceInteractions(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to create temp dir: %s", err)
 	}
-	rf := func() {
-		err := removeAll(cpath)
-		if err != nil {
+	defer func() {
+		if err := removeAll(cpath); err != nil {
 			t.Errorf("removeAll failed: %s", err)
 		}
-	}
+	}()
 
 	n := "launchpad.net/govcstestbzrrepo"
 	un := "https://" + n
 	u, err := url.Parse(un)
 	if err != nil {
 		t.Errorf("URL was bad, lolwut? errtext: %s", err)
-		rf()
 		t.FailNow()
 	}
 	mb := maybeBzrSource{
@@ -315,7 +304,6 @@ func testBzrSourceInteractions(t *testing.T) {
 	isrc, state, err := mb.try(ctx, cpath, newMemoryCache(), superv)
 	if err != nil {
 		t.Errorf("Unexpected error while setting up bzrSource for test repo: %s", err)
-		rf()
 		t.FailNow()
 	}
 
@@ -327,14 +315,12 @@ func testBzrSourceInteractions(t *testing.T) {
 	err = isrc.initLocal(ctx)
 	if err != nil {
 		t.Errorf("Error on cloning git repo: %s", err)
-		rf()
 		t.FailNow()
 	}
 
 	src, ok := isrc.(*bzrSource)
 	if !ok {
 		t.Errorf("Expected a bzrSource, got a %T", isrc)
-		rf()
 		t.FailNow()
 	}
 
@@ -410,12 +396,11 @@ func testHgSourceInteractions(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to create temp dir: %s", err)
 	}
-	rf := func() {
-		err := removeAll(cpath)
-		if err != nil {
+	defer func() {
+		if err := removeAll(cpath); err != nil {
 			t.Errorf("removeAll failed: %s", err)
 		}
-	}
+	}()
 
 	tfunc := func(n string, evl []Version) {
 		un := "https://" + n
@@ -444,7 +429,6 @@ func testHgSourceInteractions(t *testing.T) {
 		err = isrc.initLocal(ctx)
 		if err != nil {
 			t.Errorf("Error on cloning git repo: %s", err)
-			rf()
 			t.FailNow()
 		}
 
@@ -530,7 +514,6 @@ func testHgSourceInteractions(t *testing.T) {
 	})
 
 	<-donech
-	rf()
 }
 
 // Fail a test if the specified binaries aren't installed.
