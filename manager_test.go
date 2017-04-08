@@ -43,14 +43,12 @@ func sv(s string) *semver.Version {
 func mkNaiveSM(t *testing.T) (*SourceMgr, func()) {
 	cpath, err := ioutil.TempDir("", "smcache")
 	if err != nil {
-		t.Errorf("Failed to create temp dir: %s", err)
-		t.FailNow()
+		t.Fatalf("Failed to create temp dir: %s", err)
 	}
 
 	sm, err := NewSourceManager(cpath)
 	if err != nil {
-		t.Errorf("Unexpected error on SourceManager creation: %s", err)
-		t.FailNow()
+		t.Fatalf("Unexpected error on SourceManager creation: %s", err)
 	}
 
 	return sm, func() {
@@ -68,8 +66,7 @@ func remakeNaiveSM(osm *SourceMgr, t *testing.T) (*SourceMgr, func()) {
 
 	sm, err := NewSourceManager(cpath)
 	if err != nil {
-		t.Errorf("unexpected error on SourceManager recreation: %s", err)
-		t.FailNow()
+		t.Fatalf("unexpected error on SourceManager recreation: %s", err)
 	}
 
 	return sm, func() {
@@ -115,8 +112,7 @@ func TestSourceManagerInit(t *testing.T) {
 	}
 
 	if _, err = os.Stat(path.Join(cpath, "sm.lock")); !os.IsNotExist(err) {
-		t.Errorf("Global cache lock file not cleared correctly on Release()")
-		t.FailNow()
+		t.Fatalf("Global cache lock file not cleared correctly on Release()")
 	}
 
 	// Set another one up at the same spot now, just to be sure
@@ -140,14 +136,12 @@ func TestSourceInit(t *testing.T) {
 
 	cpath, err := ioutil.TempDir("", "smcache")
 	if err != nil {
-		t.Errorf("Failed to create temp dir: %s", err)
-		t.FailNow()
+		t.Fatalf("Failed to create temp dir: %s", err)
 	}
 
 	sm, err := NewSourceManager(cpath)
 	if err != nil {
-		t.Errorf("Unexpected error on SourceManager creation: %s", err)
-		t.FailNow()
+		t.Fatalf("Unexpected error on SourceManager creation: %s", err)
 	}
 
 	defer func() {

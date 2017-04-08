@@ -17,8 +17,7 @@ func TestRootdataExternalImports(t *testing.T) {
 
 	is, err := Prepare(params, newdepspecSM(fix.ds, nil))
 	if err != nil {
-		t.Errorf("Unexpected error while prepping solver: %s", err)
-		t.FailNow()
+		t.Fatalf("Unexpected error while prepping solver: %s", err)
 	}
 	rd := is.(*solver).rd
 
@@ -71,8 +70,7 @@ func TestGetApplicableConstraints(t *testing.T) {
 
 	is, err := Prepare(params, newdepspecSM(fix.ds, nil))
 	if err != nil {
-		t.Errorf("Unexpected error while prepping solver: %s", err)
-		t.FailNow()
+		t.Fatalf("Unexpected error while prepping solver: %s", err)
 	}
 	rd := is.(*solver).rd
 

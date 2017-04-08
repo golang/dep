@@ -48,8 +48,7 @@ func testGitSourceInteractions(t *testing.T) {
 	un := "https://" + n
 	u, err := url.Parse(un)
 	if err != nil {
-		t.Errorf("URL was bad, lolwut? errtext: %s", err)
-		t.FailNow()
+		t.Fatalf("Error parsing URL %s: %s", un, err)
 	}
 	mb := maybeGitSource{
 		url: u,
@@ -59,8 +58,7 @@ func testGitSourceInteractions(t *testing.T) {
 	superv := newSupervisor(ctx)
 	isrc, state, err := mb.try(ctx, cpath, newMemoryCache(), superv)
 	if err != nil {
-		t.Errorf("Unexpected error while setting up gitSource for test repo: %s", err)
-		t.FailNow()
+		t.Fatalf("Unexpected error while setting up gitSource for test repo: %s", err)
 	}
 
 	wantstate := sourceIsSetUp | sourceExistsUpstream | sourceHasLatestVersionList
@@ -70,14 +68,12 @@ func testGitSourceInteractions(t *testing.T) {
 
 	err = isrc.initLocal(ctx)
 	if err != nil {
-		t.Errorf("Error on cloning git repo: %s", err)
-		t.FailNow()
+		t.Fatalf("Error on cloning git repo: %s", err)
 	}
 
 	src, ok := isrc.(*gitSource)
 	if !ok {
-		t.Errorf("Expected a gitSource, got a %T", isrc)
-		t.FailNow()
+		t.Fatalf("Expected a gitSource, got a %T", isrc)
 	}
 
 	if un != src.upstreamURL() {
@@ -86,8 +82,7 @@ func testGitSourceInteractions(t *testing.T) {
 
 	pvlist, err := src.listVersions(ctx)
 	if err != nil {
-		t.Errorf("Unexpected error getting version pairs from git repo: %s", err)
-		t.FailNow()
+		t.Fatalf("Unexpected error getting version pairs from git repo: %s", err)
 	}
 
 	vlist := hidePair(pvlist)
@@ -173,8 +168,7 @@ func testGopkginSourceInteractions(t *testing.T) {
 
 		err = isrc.initLocal(ctx)
 		if err != nil {
-			t.Errorf("Error on cloning git repo: %s", err)
-			t.FailNow()
+			t.Fatalf("Error on cloning git repo: %s", err)
 		}
 
 		src, ok := isrc.(*gopkginSource)
@@ -292,8 +286,7 @@ func testBzrSourceInteractions(t *testing.T) {
 	un := "https://" + n
 	u, err := url.Parse(un)
 	if err != nil {
-		t.Errorf("URL was bad, lolwut? errtext: %s", err)
-		t.FailNow()
+		t.Fatalf("Error parsing URL %s: %s", un, err)
 	}
 	mb := maybeBzrSource{
 		url: u,
@@ -303,8 +296,7 @@ func testBzrSourceInteractions(t *testing.T) {
 	superv := newSupervisor(ctx)
 	isrc, state, err := mb.try(ctx, cpath, newMemoryCache(), superv)
 	if err != nil {
-		t.Errorf("Unexpected error while setting up bzrSource for test repo: %s", err)
-		t.FailNow()
+		t.Fatalf("Unexpected error while setting up bzrSource for test repo: %s", err)
 	}
 
 	wantstate := sourceIsSetUp | sourceExistsUpstream
@@ -314,14 +306,12 @@ func testBzrSourceInteractions(t *testing.T) {
 
 	err = isrc.initLocal(ctx)
 	if err != nil {
-		t.Errorf("Error on cloning git repo: %s", err)
-		t.FailNow()
+		t.Fatalf("Error on cloning git repo: %s", err)
 	}
 
 	src, ok := isrc.(*bzrSource)
 	if !ok {
-		t.Errorf("Expected a bzrSource, got a %T", isrc)
-		t.FailNow()
+		t.Fatalf("Expected a bzrSource, got a %T", isrc)
 	}
 
 	if state != wantstate {
@@ -428,8 +418,7 @@ func testHgSourceInteractions(t *testing.T) {
 
 		err = isrc.initLocal(ctx)
 		if err != nil {
-			t.Errorf("Error on cloning git repo: %s", err)
-			t.FailNow()
+			t.Fatalf("Error on cloning git repo: %s", err)
 		}
 
 		src, ok := isrc.(*hgSource)
