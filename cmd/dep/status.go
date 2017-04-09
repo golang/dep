@@ -162,7 +162,7 @@ type dotOutput struct {
 func (out *dotOutput) BasicHeader() {
 	out.g = new(graphviz).New()
 
-	ptree, _ := gps.ListPackages(out.p.AbsRoot, string(out.p.ImportRoot))
+	ptree, _ := pkgtree.ListPackages(out.p.AbsRoot, string(out.p.ImportRoot))
 	prm, _ := ptree.ToReachMap(true, false, false, nil)
 
 	out.g.createNode(string(out.p.ImportRoot), "", prm.Flatten(false))
