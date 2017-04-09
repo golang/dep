@@ -102,7 +102,7 @@ func (dp gvnode) label() string {
 // path separator.)
 func isPathPrefix(path, pre string) bool {
 	pathlen, prflen := len(path), len(pre)
-	if pathlen < prflen || path[0:prflen] != pre || pathlen == prflen+1 {
+	if pathlen < prflen || path[0:prflen] != pre {
 		return false
 	}
 

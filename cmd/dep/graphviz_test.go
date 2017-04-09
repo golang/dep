@@ -16,10 +16,10 @@ func TestEmptyProject(t *testing.T) {
 	defer h.Cleanup()
 
 	b := g.output()
-	expected := h.GetTestFileString("graphviz/empty.dot")
+	want := h.GetTestFileString("graphviz/empty.dot")
 
-	if b.String() != expected {
-		t.Fatalf("expected '%v', got '%v'", expected, b.String())
+	if b.String() != want {
+		t.Fatalf("expected '%v', got '%v'", want, b.String())
 	}
 }
 
@@ -33,9 +33,9 @@ func TestSimpleProject(t *testing.T) {
 	g.createNode("bar", "dev", []string{})
 
 	b := g.output()
-	expected := h.GetTestFileString("graphviz/case1.dot")
-	if b.String() != expected {
-		t.Fatalf("expected '%v', got '%v'", expected, b.String())
+	want := h.GetTestFileString("graphviz/case1.dot")
+	if b.String() != want {
+		t.Fatalf("expected '%v', got '%v'", want, b.String())
 	}
 }
 
@@ -47,17 +47,17 @@ func TestNoLinks(t *testing.T) {
 	g.createNode("project", "", []string{})
 
 	b := g.output()
-	expected := h.GetTestFileString("graphviz/case2.dot")
-	if b.String() != expected {
-		t.Fatalf("expected '%v', got '%v'", expected, b.String())
+	want := h.GetTestFileString("graphviz/case2.dot")
+	if b.String() != want {
+		t.Fatalf("expected '%v', got '%v'", want, b.String())
 	}
 }
 
 func TestIsPathPrefix(t *testing.T) {
 	tcs := []struct {
-		path     string
-		pre      string
-		expected bool
+		path string
+		pre  string
+		want bool
 	}{
 		{"github.com/sdboyer/foo/bar", "github.com/sdboyer/foo", true},
 		{"github.com/sdboyer/foobar", "github.com/sdboyer/foo", false},
@@ -68,8 +68,8 @@ func TestIsPathPrefix(t *testing.T) {
 
 	for _, tc := range tcs {
 		r := isPathPrefix(tc.path, tc.pre)
-		if tc.expected != r {
-			t.Fatalf("expected '%v', got '%v'", tc.expected, r)
+		if tc.want != r {
+			t.Fatalf("expected '%v', got '%v'", tc.want, r)
 		}
 	}
 }
