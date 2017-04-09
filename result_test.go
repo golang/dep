@@ -50,8 +50,7 @@ func testWriteDepTree(t *testing.T) {
 
 	tmp, err := ioutil.TempDir("", "writetree")
 	if err != nil {
-		t.Errorf("Failed to create temp dir: %s", err)
-		t.FailNow()
+		t.Fatalf("Failed to create temp dir: %s", err)
 	}
 	defer os.RemoveAll(tmp)
 

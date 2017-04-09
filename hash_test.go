@@ -21,8 +21,7 @@ func TestHashInputs(t *testing.T) {
 
 	s, err := Prepare(params, newdepspecSM(fix.ds, nil))
 	if err != nil {
-		t.Errorf("Unexpected error while prepping solver: %s", err)
-		t.FailNow()
+		t.Fatalf("Unexpected error while prepping solver: %s", err)
 	}
 
 	dig := s.HashInputs()
@@ -73,8 +72,7 @@ func TestHashInputsReqsIgs(t *testing.T) {
 
 	s, err := Prepare(params, newdepspecSM(fix.ds, nil))
 	if err != nil {
-		t.Errorf("Unexpected error while prepping solver: %s", err)
-		t.FailNow()
+		t.Fatalf("Unexpected error while prepping solver: %s", err)
 	}
 
 	dig := s.HashInputs()
@@ -116,8 +114,7 @@ func TestHashInputsReqsIgs(t *testing.T) {
 
 	s, err = Prepare(params, newdepspecSM(fix.ds, nil))
 	if err != nil {
-		t.Errorf("Unexpected error while prepping solver: %s", err)
-		t.FailNow()
+		t.Fatalf("Unexpected error while prepping solver: %s", err)
 	}
 
 	dig = s.HashInputs()
@@ -157,8 +154,7 @@ func TestHashInputsReqsIgs(t *testing.T) {
 
 	s, err = Prepare(params, newdepspecSM(fix.ds, nil))
 	if err != nil {
-		t.Errorf("Unexpected error while prepping solver: %s", err)
-		t.FailNow()
+		t.Fatalf("Unexpected error while prepping solver: %s", err)
 	}
 
 	dig = s.HashInputs()
@@ -522,8 +518,7 @@ func TestHashInputsOverrides(t *testing.T) {
 
 		s, err := Prepare(params, newdepspecSM(basefix.ds, nil))
 		if err != nil {
-			t.Errorf("(fix: %q) Unexpected error while prepping solver: %s", fix.name, err)
-			t.FailNow()
+			t.Fatalf("(fix: %q) Unexpected error while prepping solver: %s", fix.name, err)
 		}
 
 		h := sha256.New()
