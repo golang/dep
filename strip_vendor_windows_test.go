@@ -33,7 +33,7 @@ func (fs filesystemState) setupJunctions(t *testing.T) {
 	}
 }
 
-func TestStripVendorJunctions(t *testing.T) {
+func TestStripVendorJunction(t *testing.T) {
 	tempDir, err := ioutil.TempDir("", "TestStripVendor")
 	if err != nil {
 		t.Fatalf("ioutil.TempDir err=%q", err)
