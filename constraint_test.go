@@ -590,8 +590,7 @@ func TestSemverConstraintOps(t *testing.T) {
 	// still an incomparable type
 	c1, err := NewSemverConstraint("=1.0.0")
 	if err != nil {
-		t.Errorf("Failed to create constraint: %s", err)
-		t.FailNow()
+		t.Fatalf("Failed to create constraint: %s", err)
 	}
 
 	if !c1.MatchesAny(any) {
@@ -610,8 +609,7 @@ func TestSemverConstraintOps(t *testing.T) {
 
 	c1, err = NewSemverConstraint(">= 1.0.0")
 	if err != nil {
-		t.Errorf("Failed to create constraint: %s", err)
-		t.FailNow()
+		t.Fatalf("Failed to create constraint: %s", err)
 	}
 
 	if c1.Matches(v1) {

@@ -1,6 +1,7 @@
 package gps
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -42,14 +43,12 @@ func sv(s string) *semver.Version {
 func mkNaiveSM(t *testing.T) (*SourceMgr, func()) {
 	cpath, err := ioutil.TempDir("", "smcache")
 	if err != nil {
-		t.Errorf("Failed to create temp dir: %s", err)
-		t.FailNow()
+		t.Fatalf("Failed to create temp dir: %s", err)
 	}
 
-	sm, err := NewSourceManager(naiveAnalyzer{}, cpath)
+	sm, err := NewSourceManager(cpath)
 	if err != nil {
-		t.Errorf("Unexpected error on SourceManager creation: %s", err)
-		t.FailNow()
+		t.Fatalf("Unexpected error on SourceManager creation: %s", err)
 	}
 
 	return sm, func() {
@@ -65,10 +64,9 @@ func remakeNaiveSM(osm *SourceMgr, t *testing.T) (*SourceMgr, func()) {
 	cpath := osm.cachedir
 	osm.Release()
 
-	sm, err := NewSourceManager(naiveAnalyzer{}, cpath)
+	sm, err := NewSourceManager(cpath)
 	if err != nil {
-		t.Errorf("unexpected error on SourceManager recreation: %s", err)
-		t.FailNow()
+		t.Fatalf("unexpected error on SourceManager recreation: %s", err)
 	}
 
 	return sm, func() {
@@ -90,13 +88,13 @@ func TestSourceManagerInit(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to create temp dir: %s", err)
 	}
-	sm, err := NewSourceManager(naiveAnalyzer{}, cpath)
+	sm, err := NewSourceManager(cpath)
 
 	if err != nil {
 		t.Errorf("Unexpected error on SourceManager creation: %s", err)
 	}
 
-	_, err = NewSourceManager(naiveAnalyzer{}, cpath)
+	_, err = NewSourceManager(cpath)
 	if err == nil {
 		t.Errorf("Creating second SourceManager should have failed due to file lock contention")
 	} else if te, ok := err.(CouldNotCreateLockError); !ok {
@@ -114,12 +112,11 @@ func TestSourceManagerInit(t *testing.T) {
 	}
 
 	if _, err = os.Stat(path.Join(cpath, "sm.lock")); !os.IsNotExist(err) {
-		t.Errorf("Global cache lock file not cleared correctly on Release()")
-		t.FailNow()
+		t.Fatalf("Global cache lock file not cleared correctly on Release()")
 	}
 
 	// Set another one up at the same spot now, just to be sure
-	sm, err = NewSourceManager(naiveAnalyzer{}, cpath)
+	sm, err = NewSourceManager(cpath)
 	if err != nil {
 		t.Errorf("Creating a second SourceManager should have succeeded when the first was released, but failed with err %s", err)
 	}
@@ -139,14 +136,12 @@ func TestSourceInit(t *testing.T) {
 
 	cpath, err := ioutil.TempDir("", "smcache")
 	if err != nil {
-		t.Errorf("Failed to create temp dir: %s", err)
-		t.FailNow()
+		t.Fatalf("Failed to create temp dir: %s", err)
 	}
 
-	sm, err := NewSourceManager(naiveAnalyzer{}, cpath)
+	sm, err := NewSourceManager(cpath)
 	if err != nil {
-		t.Errorf("Unexpected error on SourceManager creation: %s", err)
-		t.FailNow()
+		t.Fatalf("Unexpected error on SourceManager creation: %s", err)
 	}
 
 	defer func() {
@@ -337,7 +332,7 @@ func TestMgrMethodsFailWithBadPath(t *testing.T) {
 	if _, err = sm.ListPackages(bad, nil); err == nil {
 		t.Error("ListPackages() did not error on bad input")
 	}
-	if _, _, err = sm.GetManifestAndLock(bad, nil); err == nil {
+	if _, _, err = sm.GetManifestAndLock(bad, nil, naiveAnalyzer{}); err == nil {
 		t.Error("GetManifestAndLock() did not error on bad input")
 	}
 	if err = sm.ExportProject(bad, nil, ""); err == nil {
@@ -360,53 +355,53 @@ func TestGetSources(t *testing.T) {
 		mkPI("launchpad.net/govcstestbzrrepo").normalize(),
 	}
 
-	wg := &sync.WaitGroup{}
-	wg.Add(3)
-	for _, pi := range pil {
-		go func(lpi ProjectIdentifier) {
-			defer wg.Done()
+	ctx := context.Background()
+	// protects against premature release of sm
+	t.Run("inner", func(t *testing.T) {
+		for _, pi := range pil {
+			lpi := pi
+			t.Run(lpi.normalizedSource(), func(t *testing.T) {
+				t.Parallel()
 
-			nn := lpi.normalizedSource()
-			src, err := sm.getSourceFor(lpi)
-			if err != nil {
-				t.Errorf("(src %q) unexpected error setting up source: %s", nn, err)
-				return
-			}
+				srcg, err := sm.srcCoord.getSourceGatewayFor(ctx, lpi)
+				if err != nil {
+					t.Errorf("unexpected error setting up source: %s", err)
+					return
+				}
 
-			// Re-get the same, make sure they are the same
-			src2, err := sm.getSourceFor(lpi)
-			if err != nil {
-				t.Errorf("(src %q) unexpected error re-getting source: %s", nn, err)
-			} else if src != src2 {
-				t.Errorf("(src %q) first and second sources are not eq", nn)
-			}
+				// Re-get the same, make sure they are the same
+				srcg2, err := sm.srcCoord.getSourceGatewayFor(ctx, lpi)
+				if err != nil {
+					t.Errorf("unexpected error re-getting source: %s", err)
+				} else if srcg != srcg2 {
+					t.Error("first and second sources are not eq")
+				}
 
-			// All of them _should_ select https, so this should work
-			lpi.Source = "https://" + lpi.Source
-			src3, err := sm.getSourceFor(lpi)
-			if err != nil {
-				t.Errorf("(src %q) unexpected error getting explicit https source: %s", nn, err)
-			} else if src != src3 {
-				t.Errorf("(src %q) explicit https source should reuse autodetected https source", nn)
-			}
+				// All of them _should_ select https, so this should work
+				lpi.Source = "https://" + lpi.Source
+				srcg3, err := sm.srcCoord.getSourceGatewayFor(ctx, lpi)
+				if err != nil {
+					t.Errorf("unexpected error getting explicit https source: %s", err)
+				} else if srcg != srcg3 {
+					t.Error("explicit https source should reuse autodetected https source")
+				}
 
-			// Now put in http, and they should differ
-			lpi.Source = "http://" + string(lpi.ProjectRoot)
-			src4, err := sm.getSourceFor(lpi)
-			if err != nil {
-				t.Errorf("(src %q) unexpected error getting explicit http source: %s", nn, err)
-			} else if src == src4 {
-				t.Errorf("(src %q) explicit http source should create a new src", nn)
-			}
-		}(pi)
-	}
-
-	wg.Wait()
+				// Now put in http, and they should differ
+				lpi.Source = "http://" + string(lpi.ProjectRoot)
+				srcg4, err := sm.srcCoord.getSourceGatewayFor(ctx, lpi)
+				if err != nil {
+					t.Errorf("unexpected error getting explicit http source: %s", err)
+				} else if srcg == srcg4 {
+					t.Error("explicit http source should create a new src")
+				}
+			})
+		}
+	})
 
 	// nine entries (of which three are dupes): for each vcs, raw import path,
 	// the https url, and the http url
-	if len(sm.srcs) != 9 {
-		t.Errorf("Should have nine discrete entries in the srcs map, got %v", len(sm.srcs))
+	if len(sm.srcCoord.nameToURL) != 9 {
+		t.Errorf("Should have nine discrete entries in the nameToURL map, got %v", len(sm.srcCoord.nameToURL))
 	}
 	clean()
 }
@@ -425,7 +420,7 @@ func TestGetInfoListVersionsOrdering(t *testing.T) {
 
 	id := mkPI("github.com/sdboyer/gpkt").normalize()
 
-	_, _, err := sm.GetManifestAndLock(id, NewVersion("v1.0.0"))
+	_, _, err := sm.GetManifestAndLock(id, NewVersion("v1.0.0"), naiveAnalyzer{})
 	if err != nil {
 		t.Errorf("Unexpected error from GetInfoAt %s", err)
 	}
@@ -452,8 +447,8 @@ func TestDeduceProjectRoot(t *testing.T) {
 	if string(pr) != in {
 		t.Errorf("Wrong project root was deduced;\n\t(GOT) %s\n\t(WNT) %s", pr, in)
 	}
-	if sm.rootxt.Len() != 1 {
-		t.Errorf("Root path trie should have one element after one deduction, has %v", sm.rootxt.Len())
+	if sm.deduceCoord.rootxt.Len() != 1 {
+		t.Errorf("Root path trie should have one element after one deduction, has %v", sm.deduceCoord.rootxt.Len())
 	}
 
 	pr, err = sm.DeduceProjectRoot(in)
@@ -462,8 +457,8 @@ func TestDeduceProjectRoot(t *testing.T) {
 	} else if string(pr) != in {
 		t.Errorf("Wrong project root was deduced;\n\t(GOT) %s\n\t(WNT) %s", pr, in)
 	}
-	if sm.rootxt.Len() != 1 {
-		t.Errorf("Root path trie should still have one element after performing the same deduction twice; has %v", sm.rootxt.Len())
+	if sm.deduceCoord.rootxt.Len() != 1 {
+		t.Errorf("Root path trie should still have one element after performing the same deduction twice; has %v", sm.deduceCoord.rootxt.Len())
 	}
 
 	// Now do a subpath
@@ -474,8 +469,8 @@ func TestDeduceProjectRoot(t *testing.T) {
 	} else if string(pr) != in {
 		t.Errorf("Wrong project root was deduced;\n\t(GOT) %s\n\t(WNT) %s", pr, in)
 	}
-	if sm.rootxt.Len() != 2 {
-		t.Errorf("Root path trie should have two elements, one for root and one for subpath; has %v", sm.rootxt.Len())
+	if sm.deduceCoord.rootxt.Len() != 1 {
+		t.Errorf("Root path trie should still have one element, as still only one unique root has gone in; has %v", sm.deduceCoord.rootxt.Len())
 	}
 
 	// Now do a fully different root, but still on github
@@ -487,8 +482,8 @@ func TestDeduceProjectRoot(t *testing.T) {
 	} else if string(pr) != in2 {
 		t.Errorf("Wrong project root was deduced;\n\t(GOT) %s\n\t(WNT) %s", pr, in)
 	}
-	if sm.rootxt.Len() != 4 {
-		t.Errorf("Root path trie should have four elements, one for each unique root and subpath; has %v", sm.rootxt.Len())
+	if sm.deduceCoord.rootxt.Len() != 2 {
+		t.Errorf("Root path trie should have two elements, one for each unique root; has %v", sm.deduceCoord.rootxt.Len())
 	}
 
 	// Ensure that our prefixes are bounded by path separators
@@ -499,8 +494,8 @@ func TestDeduceProjectRoot(t *testing.T) {
 	} else if string(pr) != in4 {
 		t.Errorf("Wrong project root was deduced;\n\t(GOT) %s\n\t(WNT) %s", pr, in)
 	}
-	if sm.rootxt.Len() != 5 {
-		t.Errorf("Root path trie should have five elements, one for each unique root and subpath; has %v", sm.rootxt.Len())
+	if sm.deduceCoord.rootxt.Len() != 3 {
+		t.Errorf("Root path trie should have three elements, one for each unique root; has %v", sm.deduceCoord.rootxt.Len())
 	}
 
 	// Ensure that vcs extension-based matching comes through
@@ -511,84 +506,8 @@ func TestDeduceProjectRoot(t *testing.T) {
 	} else if string(pr) != in5 {
 		t.Errorf("Wrong project root was deduced;\n\t(GOT) %s\n\t(WNT) %s", pr, in)
 	}
-	if sm.rootxt.Len() != 6 {
-		t.Errorf("Root path trie should have six elements, one for each unique root and subpath; has %v", sm.rootxt.Len())
-	}
-}
-
-// Test that the deduction performed in SourceMgr.deducePathAndProcess() is safe
-// for parallel execution - in particular, that parallel calls to the same
-// resource fold in together as expected.
-//
-// Obviously, this is just a heuristic; while failure means something's
-// definitely broken, success does not guarantee correctness.
-func TestMultiDeduceThreadsafe(t *testing.T) {
-	sm, clean := mkNaiveSM(t)
-	defer clean()
-
-	in := "github.com/sdboyer/gps"
-	ft, err := sm.deducePathAndProcess(in)
-	if err != nil {
-		t.Errorf("Known-good path %q had unexpected basic deduction error: %s", in, err)
-		t.FailNow()
-	}
-
-	cnum := 50
-	wg := &sync.WaitGroup{}
-
-	// Set up channel for everything else to block on
-	c := make(chan struct{}, 1)
-	f := func(rnum int) {
-		defer func() {
-			wg.Done()
-			if e := recover(); e != nil {
-				t.Errorf("goroutine number %v panicked with err: %s", rnum, e)
-			}
-		}()
-		<-c
-		_, err := ft.rootf()
-		if err != nil {
-			t.Errorf("err was non-nil on root detection in goroutine number %v: %s", rnum, err)
-		}
-	}
-
-	for k := range make([]struct{}, cnum) {
-		wg.Add(1)
-		go f(k)
-		runtime.Gosched()
-	}
-	close(c)
-	wg.Wait()
-	if sm.rootxt.Len() != 1 {
-		t.Errorf("Root path trie should have just one element; has %v", sm.rootxt.Len())
-	}
-
-	// repeat for srcf
-	wg2 := &sync.WaitGroup{}
-	c = make(chan struct{}, 1)
-	f = func(rnum int) {
-		defer func() {
-			wg2.Done()
-			if e := recover(); e != nil {
-				t.Errorf("goroutine number %v panicked with err: %s", rnum, e)
-			}
-		}()
-		<-c
-		_, _, err := ft.srcf()
-		if err != nil {
-			t.Errorf("err was non-nil on root detection in goroutine number %v: %s", rnum, err)
-		}
-	}
-
-	for k := range make([]struct{}, cnum) {
-		wg2.Add(1)
-		go f(k)
-		runtime.Gosched()
-	}
-	close(c)
-	wg2.Wait()
-	if len(sm.srcs) != 2 {
-		t.Errorf("Sources map should have just two elements, but has %v", len(sm.srcs))
+	if sm.deduceCoord.rootxt.Len() != 4 {
+		t.Errorf("Root path trie should have four elements, one for each unique root; has %v", sm.deduceCoord.rootxt.Len())
 	}
 }
 
@@ -598,11 +517,13 @@ func TestMultiFetchThreadsafe(t *testing.T) {
 		t.Skip("Skipping slow test in short mode")
 	}
 
-	t.Skip("UGH: this is demonstrating real concurrency problems; skipping until we've fixed them")
-
 	projects := []ProjectIdentifier{
 		mkPI("github.com/sdboyer/gps"),
 		mkPI("github.com/sdboyer/gpkt"),
+		ProjectIdentifier{
+			ProjectRoot: ProjectRoot("github.com/sdboyer/gpkt"),
+			Source:      "https://github.com/sdboyer/gpkt",
+		},
 		mkPI("github.com/sdboyer/gogl"),
 		mkPI("github.com/sdboyer/gliph"),
 		mkPI("github.com/sdboyer/frozone"),
@@ -617,62 +538,77 @@ func TestMultiFetchThreadsafe(t *testing.T) {
 		//mkPI("bitbucket.org/sdboyer/nobm"),
 	}
 
-	// 40 gives us ten calls per op, per project, which should be(?) decently
-	// likely to reveal underlying parallelism problems
+	do := func(name string, sm *SourceMgr) {
+		t.Run(name, func(t *testing.T) {
+			// This gives us ten calls per op, per project, which should be(?)
+			// decently likely to reveal underlying concurrency problems
+			ops := 4
+			cnum := len(projects) * ops * 10
 
-	do := func(sm *SourceMgr) {
-		wg := &sync.WaitGroup{}
-		cnum := len(projects) * 40
+			for i := 0; i < cnum; i++ {
+				// Trigger all four ops on each project, then move on to the next
+				// project.
+				id, op := projects[(i/ops)%len(projects)], i%ops
+				// The count of times this op has been been invoked on this project
+				// (after the upcoming invocation)
+				opcount := i/(ops*len(projects)) + 1
 
-		for i := 0; i < cnum; i++ {
-			wg.Add(1)
-
-			go func(id ProjectIdentifier, pass int) {
-				switch pass {
+				switch op {
 				case 0:
-					t.Logf("Deducing root for %s", id.errString())
-					_, err := sm.DeduceProjectRoot(string(id.ProjectRoot))
-					if err != nil {
-						t.Errorf("err on deducing project root for %s: %s", id.errString(), err.Error())
-					}
+					t.Run(fmt.Sprintf("deduce:%v:%s", opcount, id.errString()), func(t *testing.T) {
+						t.Parallel()
+						if _, err := sm.DeduceProjectRoot(string(id.ProjectRoot)); err != nil {
+							t.Error(err)
+						}
+					})
 				case 1:
-					t.Logf("syncing %s", id)
-					err := sm.SyncSourceFor(id)
-					if err != nil {
-						t.Errorf("syncing failed for %s with err %s", id.errString(), err.Error())
-					}
+					t.Run(fmt.Sprintf("sync:%v:%s", opcount, id.errString()), func(t *testing.T) {
+						t.Parallel()
+						err := sm.SyncSourceFor(id)
+						if err != nil {
+							t.Error(err)
+						}
+					})
 				case 2:
-					t.Logf("listing versions for %s", id)
-					_, err := sm.ListVersions(id)
-					if err != nil {
-						t.Errorf("listing versions failed for %s with err %s", id.errString(), err.Error())
-					}
+					t.Run(fmt.Sprintf("listVersions:%v:%s", opcount, id.errString()), func(t *testing.T) {
+						t.Parallel()
+						vl, err := sm.ListVersions(id)
+						if err != nil {
+							t.Fatal(err)
+						}
+						if len(vl) == 0 {
+							t.Error("no versions returned")
+						}
+					})
 				case 3:
-					t.Logf("Checking source existence for %s", id)
-					y, err := sm.SourceExists(id)
-					if err != nil {
-						t.Errorf("err on checking source existence for %s: %s", id.errString(), err.Error())
-					}
-					if !y {
-						t.Errorf("claims %s source does not exist", id.errString())
-					}
+					t.Run(fmt.Sprintf("exists:%v:%s", opcount, id.errString()), func(t *testing.T) {
+						t.Parallel()
+						y, err := sm.SourceExists(id)
+						if err != nil {
+							t.Fatal(err)
+						}
+						if !y {
+							t.Error("said source does not exist")
+						}
+					})
 				default:
-					panic(fmt.Sprintf("wtf, %s %v", id, pass))
+					panic(fmt.Sprintf("wtf, %s %v", id, op))
 				}
-				wg.Done()
-			}(projects[i%len(projects)], (i/len(projects))%4)
-
-			runtime.Gosched()
-		}
-		wg.Wait()
+			}
+		})
 	}
 
 	sm, _ := mkNaiveSM(t)
-	do(sm)
+	do("first", sm)
+
 	// Run the thing twice with a remade sm so that we cover both the cases of
-	// pre-existing and new clones
+	// pre-existing and new clones.
+	//
+	// This triggers a release of the first sm, which is much of what we're
+	// testing here - that the release is complete and clean, and can be
+	// immediately followed by a new sm coming in.
 	sm2, clean := remakeNaiveSM(sm, t)
-	do(sm2)
+	do("second", sm2)
 	clean()
 }
 
@@ -747,7 +683,7 @@ func TestErrAfterRelease(t *testing.T) {
 		t.Errorf("ListPackages errored after Release(), but with unexpected error: %T %s", terr, terr.Error())
 	}
 
-	_, _, err = sm.GetManifestAndLock(id, nil)
+	_, _, err = sm.GetManifestAndLock(id, nil, naiveAnalyzer{})
 	if err == nil {
 		t.Errorf("GetManifestAndLock did not error after calling Release()")
 	} else if terr, ok := err.(smIsReleased); !ok {
@@ -775,11 +711,6 @@ func TestSignalHandling(t *testing.T) {
 	}
 
 	sm, clean := mkNaiveSM(t)
-	//get self proc
-	proc, err := os.FindProcess(os.Getpid())
-	if err != nil {
-		t.Fatal("cannot find self proc")
-	}
 
 	sigch := make(chan os.Signal)
 	sm.HandleSignals(sigch)
@@ -797,71 +728,158 @@ func TestSignalHandling(t *testing.T) {
 	}
 	clean()
 
+	// Test again, this time with a running call
 	sm, clean = mkNaiveSM(t)
-	sm.UseDefaultSignalHandling()
-	go sm.DeduceProjectRoot("rsc.io/pdf")
+	sm.HandleSignals(sigch)
+
+	errchan := make(chan error)
+	go func() {
+		_, callerr := sm.DeduceProjectRoot("k8s.io/kubernetes")
+		errchan <- callerr
+	}()
+	go func() { sigch <- os.Interrupt }()
 	runtime.Gosched()
 
-	// signal the process and call release right afterward
-	now := time.Now()
-	proc.Signal(os.Interrupt)
-	sigdur := time.Since(now)
-	t.Logf("time to send signal: %v", sigdur)
-	sm.Release()
-	reldur := time.Since(now) - sigdur
-	t.Logf("time to return from Release(): %v", reldur)
-
-	if reldur < 10*time.Millisecond {
-		t.Errorf("finished too fast (%v); the necessary network request could not have completed yet", reldur)
+	callerr := <-errchan
+	if callerr == nil {
+		t.Error("network call could not have completed before cancellation, should have gotten an error")
 	}
 	if atomic.LoadInt32(&sm.releasing) != 1 {
 		t.Error("Releasing flag did not get set")
-	}
-
-	lpath = filepath.Join(sm.cachedir, "sm.lock")
-	if _, err := os.Stat(lpath); err == nil {
-		t.Error("Expected error on statting what should be an absent lock file")
 	}
 	clean()
 
 	sm, clean = mkNaiveSM(t)
+	// Ensure that handling also works after stopping and restarting itself,
+	// and that Release happens only once.
 	sm.UseDefaultSignalHandling()
 	sm.StopSignalHandling()
-	sm.UseDefaultSignalHandling()
+	sm.HandleSignals(sigch)
 
-	go sm.DeduceProjectRoot("rsc.io/pdf")
-	//runtime.Gosched()
-	// Ensure that it all works after teardown and re-set up
-	proc.Signal(os.Interrupt)
-	// Wait for twice the time it took to do it last time; should be safe
-	<-time.After(reldur * 2)
-
-	// proc.Signal doesn't send for windows, so just force it
-	if runtime.GOOS == "windows" {
+	go func() {
+		_, callerr := sm.DeduceProjectRoot("k8s.io/kubernetes")
+		errchan <- callerr
+	}()
+	go func() {
+		sigch <- os.Interrupt
 		sm.Release()
+	}()
+	runtime.Gosched()
+
+	after := time.After(2 * time.Second)
+	select {
+	case <-sm.qch:
+	case <-after:
+		t.Error("did not shut down in reasonable time")
 	}
 
-	if atomic.LoadInt32(&sm.releasing) != 1 {
-		t.Error("Releasing flag did not get set")
-	}
-
-	lpath = filepath.Join(sm.cachedir, "sm.lock")
-	if _, err := os.Stat(lpath); err == nil {
-		t.Fatal("Expected error on statting what should be an absent lock file")
-	}
 	clean()
 }
 
 func TestUnreachableSource(t *testing.T) {
 	// If a git remote is unreachable (maybe the server is only accessible behind a VPN, or
 	// something), we should return a clear error, not a panic.
+	if testing.Short() {
+		t.Skip("Skipping slow test in short mode")
+	}
 
 	sm, clean := mkNaiveSM(t)
 	defer clean()
 
-	id := mkPI("golang.org/notareal/repo").normalize()
-	_, err := sm.ListVersions(id)
+	id := mkPI("github.com/golang/notexist").normalize()
+	err := sm.SyncSourceFor(id)
 	if err == nil {
 		t.Error("expected err when listing versions of a bogus source, but got nil")
 	}
+}
+
+func TestSupervisor(t *testing.T) {
+	bgc := context.Background()
+	ctx, cancelFunc := context.WithCancel(bgc)
+	superv := newSupervisor(ctx)
+
+	ci := callInfo{
+		name: "foo",
+		typ:  0,
+	}
+
+	_, err := superv.start(ci)
+	if err != nil {
+		t.Fatal("unexpected err on setUpCall:", err)
+	}
+
+	tc, exists := superv.running[ci]
+	if !exists {
+		t.Fatal("running call not recorded in map")
+	}
+
+	if tc.count != 1 {
+		t.Fatalf("wrong count of running ci: wanted 1 got %v", tc.count)
+	}
+
+	// run another, but via do
+	block, wait := make(chan struct{}), make(chan struct{})
+	go func() {
+		wait <- struct{}{}
+		err := superv.do(bgc, "foo", 0, func(ctx context.Context) error {
+			<-block
+			return nil
+		})
+		if err != nil {
+			t.Fatal("unexpected err on do() completion:", err)
+		}
+		close(wait)
+	}()
+	<-wait
+
+	superv.mu.Lock()
+	tc, exists = superv.running[ci]
+	if !exists {
+		t.Fatal("running call not recorded in map")
+	}
+
+	if tc.count != 2 {
+		t.Fatalf("wrong count of running ci: wanted 2 got %v", tc.count)
+	}
+	superv.mu.Unlock()
+
+	close(block)
+	<-wait
+	superv.mu.Lock()
+	if len(superv.ran) != 0 {
+		t.Fatal("should not record metrics until last one drops")
+	}
+
+	tc, exists = superv.running[ci]
+	if !exists {
+		t.Fatal("running call not recorded in map")
+	}
+
+	if tc.count != 1 {
+		t.Fatalf("wrong count of running ci: wanted 1 got %v", tc.count)
+	}
+	superv.mu.Unlock()
+
+	superv.done(ci)
+	superv.mu.Lock()
+	ran, exists := superv.ran[0]
+	if !exists {
+		t.Fatal("should have metrics after closing last of a ci, but did not")
+	}
+
+	if ran.count != 1 {
+		t.Fatalf("wrong count of serial runs of a call: wanted 1 got %v", ran.count)
+	}
+	superv.mu.Unlock()
+
+	cancelFunc()
+	_, err = superv.start(ci)
+	if err == nil {
+		t.Fatal("should have errored on cm.run() after canceling cm's input context")
+	}
+
+	superv.do(bgc, "foo", 0, func(ctx context.Context) error {
+		t.Fatal("calls should not be initiated by do() after main context is cancelled")
+		return nil
+	})
 }

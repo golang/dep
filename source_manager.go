@@ -1,6 +1,7 @@
 package gps
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/signal"
@@ -11,13 +12,12 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/sdboyer/constext"
 	"github.com/sdboyer/gps/pkgtree"
 )
 
-// Used to compute a friendly filepath from a URL-shaped input
-//
-// TODO(sdboyer) this is awful. Right?
-var sanitizer = strings.NewReplacer(":", "-", "/", "-", "+", "-")
+// Used to compute a friendly filepath from a URL-shaped input.
+var sanitizer = strings.NewReplacer("-", "--", ":", "-", "/", "-", "+", "-")
 
 // A SourceManager is responsible for retrieving, managing, and interrogating
 // source repositories. Its primary purpose is to serve the needs of a Solver,
@@ -37,6 +37,7 @@ type SourceManager interface {
 
 	// ListVersions retrieves a list of the available versions for a given
 	// repository name.
+	// TODO convert to []PairedVersion
 	ListVersions(ProjectIdentifier) ([]Version, error)
 
 	// RevisionPresentIn indicates whether the provided Version is present in
@@ -53,15 +54,11 @@ type SourceManager interface {
 	// gps currently requires that projects be rooted at their repository root,
 	// necessitating that the ProjectIdentifier's ProjectRoot must also be a
 	// repository root.
-	GetManifestAndLock(ProjectIdentifier, Version) (Manifest, Lock, error)
+	GetManifestAndLock(ProjectIdentifier, Version, ProjectAnalyzer) (Manifest, Lock, error)
 
 	// ExportProject writes out the tree of the provided import path, at the
 	// provided version, to the provided directory.
 	ExportProject(ProjectIdentifier, Version, string) error
-
-	// AnalyzerInfo reports the name and version of the logic used to service
-	// GetManifestAndLock().
-	AnalyzerInfo() (name string, version int)
 
 	// DeduceRootProject takes an import path and deduces the corresponding
 	// project/source root.
@@ -90,21 +87,16 @@ type ProjectAnalyzer interface {
 // There's no (planned) reason why it would need to be reimplemented by other
 // tools; control via dependency injection is intended to be sufficient.
 type SourceMgr struct {
-	cachedir  string                    // path to root of cache dir
-	lf        *os.File                  // handle for the sm lock file on disk
-	srcs      map[string]source         // map of path names to source obj
-	srcmut    sync.RWMutex              // mutex protecting srcs map
-	srcfuts   map[string]*unifiedFuture // map of paths to source-handling futures
-	srcfmut   sync.RWMutex              // mutex protecting futures map
-	an        ProjectAnalyzer           // analyzer injected by the caller
-	dxt       *deducerTrie              // static trie with baseline source type deduction info
-	rootxt    *prTrie                   // dynamic trie, updated as ProjectRoots are deduced
-	qch       chan struct{}             // quit chan for signal handler
-	sigmut    sync.Mutex                // mutex protecting signal handling setup/teardown
-	glock     sync.RWMutex              // global lock for all ops, sm validity
-	opcount   int32                     // number of ops in flight
-	relonce   sync.Once                 // once-er to ensure we only release once
-	releasing int32                     // flag indicating release of sm has begun
+	cachedir    string                // path to root of cache dir
+	lf          *os.File              // handle for the sm lock file on disk
+	suprvsr     *supervisor           // subsystem that supervises running calls/io
+	cancelAll   context.CancelFunc    // cancel func to kill all running work
+	deduceCoord *deductionCoordinator // subsystem that manages import path deduction
+	srcCoord    *sourceCoordinator    // subsystem that manages sources
+	sigmut      sync.Mutex            // mutex protecting signal handling setup/teardown
+	qch         chan struct{}         // quit chan for signal handler
+	relonce     sync.Once             // once-er to ensure we only release once
+	releasing   int32                 // flag indicating release of sm has begun
 }
 
 type smIsReleased struct{}
@@ -113,18 +105,11 @@ func (smIsReleased) Error() string {
 	return "this SourceMgr has been released, its methods can no longer be called"
 }
 
-type unifiedFuture struct {
-	rc, sc chan struct{}
-	rootf  stringFuture
-	srcf   sourceFuture
-}
-
 var _ SourceManager = &SourceMgr{}
 
 // NewSourceManager produces an instance of gps's built-in SourceManager. It
-// takes a cache directory (where local instances of upstream repositories are
-// stored), and a ProjectAnalyzer that is used to extract manifest and lock
-// information from source trees.
+// takes a cache directory, where local instances of upstream sources are
+// stored.
 //
 // The returned SourceManager aggressively caches information wherever possible.
 // If tools need to do preliminary work involving upstream repository analysis
@@ -135,11 +120,7 @@ var _ SourceManager = &SourceMgr{}
 // gps's SourceManager is intended to be threadsafe (if it's not, please file a
 // bug!). It should be safe to reuse across concurrent solving runs, even on
 // unrelated projects.
-func NewSourceManager(an ProjectAnalyzer, cachedir string) (*SourceMgr, error) {
-	if an == nil {
-		return nil, fmt.Errorf("a ProjectAnalyzer must be provided to the SourceManager")
-	}
-
+func NewSourceManager(cachedir string) (*SourceMgr, error) {
 	err := os.MkdirAll(filepath.Join(cachedir, "sources"), 0777)
 	if err != nil {
 		return nil, err
@@ -162,15 +143,18 @@ func NewSourceManager(an ProjectAnalyzer, cachedir string) (*SourceMgr, error) {
 		}
 	}
 
+	ctx, cf := context.WithCancel(context.TODO())
+	superv := newSupervisor(ctx)
+	deducer := newDeductionCoordinator(superv)
+
 	sm := &SourceMgr{
-		cachedir: cachedir,
-		lf:       fi,
-		srcs:     make(map[string]source),
-		srcfuts:  make(map[string]*unifiedFuture),
-		an:       an,
-		dxt:      pathDeducerTrie(),
-		rootxt:   newProjectRootTrie(),
-		qch:      make(chan struct{}),
+		cachedir:    cachedir,
+		lf:          fi,
+		suprvsr:     superv,
+		cancelAll:   cf,
+		deduceCoord: deducer,
+		srcCoord:    newSourceCoordinator(superv, deducer, cachedir),
+		qch:         make(chan struct{}),
 	}
 
 	return sm, nil
@@ -226,7 +210,7 @@ func (sm *SourceMgr) HandleSignals(sigch chan os.Signal) {
 					return
 				}
 
-				opc := atomic.LoadInt32(&sm.opcount)
+				opc := sm.suprvsr.count()
 				if opc > 0 {
 					fmt.Printf("Signal received: waiting for %v ops to complete...\n", opc)
 				}
@@ -298,53 +282,36 @@ func (sm *SourceMgr) Release() {
 // This must be called only and exactly once. Calls to it should be wrapped in
 // the sm.relonce sync.Once instance.
 func (sm *SourceMgr) doRelease() {
-	// Grab the global sm lock so that we only release once we're sure all other
-	// calls have completed
-	//
-	// (This could deadlock, ofc)
-	sm.glock.Lock()
+	// Send the signal to the supervisor to cancel all running calls
+	sm.cancelAll()
+	sm.suprvsr.wait()
 
-	// Close the file handle for the lock file
+	// Close the file handle for the lock file and remove it from disk
 	sm.lf.Close()
-	// Remove the lock file from disk
 	os.Remove(filepath.Join(sm.cachedir, "sm.lock"))
+
 	// Close the qch, if non-nil, so the signal handlers run out. This will
 	// also deregister the sig channel, if any has been set up.
 	if sm.qch != nil {
 		close(sm.qch)
 	}
-	sm.glock.Unlock()
-}
-
-// AnalyzerInfo reports the name and version of the injected ProjectAnalyzer.
-func (sm *SourceMgr) AnalyzerInfo() (name string, version int) {
-	return sm.an.Info()
 }
 
 // GetManifestAndLock returns manifest and lock information for the provided
-// import path. gps currently requires that projects be rooted at their
-// repository root, necessitating that the ProjectIdentifier's ProjectRoot must
-// also be a repository root.
-//
-// The work of producing the manifest and lock is delegated to the injected
-// ProjectAnalyzer's DeriveManifestAndLock() method.
-func (sm *SourceMgr) GetManifestAndLock(id ProjectIdentifier, v Version) (Manifest, Lock, error) {
+// ProjectIdentifier, at the provided Version. The work of producing the
+// manifest and lock is delegated to the provided ProjectAnalyzer's
+// DeriveManifestAndLock() method.
+func (sm *SourceMgr) GetManifestAndLock(id ProjectIdentifier, v Version, an ProjectAnalyzer) (Manifest, Lock, error) {
 	if atomic.CompareAndSwapInt32(&sm.releasing, 1, 1) {
 		return nil, nil, smIsReleased{}
 	}
-	atomic.AddInt32(&sm.opcount, 1)
-	sm.glock.RLock()
-	defer func() {
-		sm.glock.RUnlock()
-		atomic.AddInt32(&sm.opcount, -1)
-	}()
 
-	src, err := sm.getSourceFor(id)
+	srcg, err := sm.srcCoord.getSourceGatewayFor(context.TODO(), id)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	return src.getManifestAndLock(id.ProjectRoot, v)
+	return srcg.getManifestAndLock(context.TODO(), id.ProjectRoot, v, an)
 }
 
 // ListPackages parses the tree of the Go packages at and below the ProjectRoot
@@ -353,19 +320,13 @@ func (sm *SourceMgr) ListPackages(id ProjectIdentifier, v Version) (pkgtree.Pack
 	if atomic.CompareAndSwapInt32(&sm.releasing, 1, 1) {
 		return pkgtree.PackageTree{}, smIsReleased{}
 	}
-	atomic.AddInt32(&sm.opcount, 1)
-	sm.glock.RLock()
-	defer func() {
-		sm.glock.RUnlock()
-		atomic.AddInt32(&sm.opcount, -1)
-	}()
 
-	src, err := sm.getSourceFor(id)
+	srcg, err := sm.srcCoord.getSourceGatewayFor(context.TODO(), id)
 	if err != nil {
 		return pkgtree.PackageTree{}, err
 	}
 
-	return src.listPackages(id.ProjectRoot, v)
+	return srcg.listPackages(context.TODO(), id.ProjectRoot, v)
 }
 
 // ListVersions retrieves a list of the available versions for a given
@@ -384,20 +345,19 @@ func (sm *SourceMgr) ListVersions(id ProjectIdentifier) ([]Version, error) {
 	if atomic.CompareAndSwapInt32(&sm.releasing, 1, 1) {
 		return nil, smIsReleased{}
 	}
-	atomic.AddInt32(&sm.opcount, 1)
-	sm.glock.RLock()
-	defer func() {
-		sm.glock.RUnlock()
-		atomic.AddInt32(&sm.opcount, -1)
-	}()
 
-	src, err := sm.getSourceFor(id)
+	srcg, err := sm.srcCoord.getSourceGatewayFor(context.TODO(), id)
 	if err != nil {
 		// TODO(sdboyer) More-er proper-er errors
 		return nil, err
 	}
 
-	return src.listVersions()
+	pvl, err := srcg.listVersions(context.TODO())
+	if err != nil {
+		return nil, err
+	}
+	// FIXME return a []PairedVersion
+	return hidePair(pvl), nil
 }
 
 // RevisionPresentIn indicates whether the provided Revision is present in the given
@@ -406,20 +366,14 @@ func (sm *SourceMgr) RevisionPresentIn(id ProjectIdentifier, r Revision) (bool, 
 	if atomic.CompareAndSwapInt32(&sm.releasing, 1, 1) {
 		return false, smIsReleased{}
 	}
-	atomic.AddInt32(&sm.opcount, 1)
-	sm.glock.RLock()
-	defer func() {
-		sm.glock.RUnlock()
-		atomic.AddInt32(&sm.opcount, -1)
-	}()
 
-	src, err := sm.getSourceFor(id)
+	srcg, err := sm.srcCoord.getSourceGatewayFor(context.TODO(), id)
 	if err != nil {
 		// TODO(sdboyer) More-er proper-er errors
 		return false, err
 	}
 
-	return src.revisionPresentIn(r)
+	return srcg.revisionPresentIn(context.TODO(), r)
 }
 
 // SourceExists checks if a repository exists, either upstream or in the cache,
@@ -428,19 +382,14 @@ func (sm *SourceMgr) SourceExists(id ProjectIdentifier) (bool, error) {
 	if atomic.CompareAndSwapInt32(&sm.releasing, 1, 1) {
 		return false, smIsReleased{}
 	}
-	atomic.AddInt32(&sm.opcount, 1)
-	sm.glock.RLock()
-	defer func() {
-		sm.glock.RUnlock()
-		atomic.AddInt32(&sm.opcount, -1)
-	}()
 
-	src, err := sm.getSourceFor(id)
+	srcg, err := sm.srcCoord.getSourceGatewayFor(context.TODO(), id)
 	if err != nil {
 		return false, err
 	}
 
-	return src.checkExistence(existsInCache) || src.checkExistence(existsUpstream), nil
+	ctx := context.TODO()
+	return srcg.existsInCache(ctx) || srcg.existsUpstream(ctx), nil
 }
 
 // SyncSourceFor will ensure that all local caches and information about a
@@ -451,19 +400,13 @@ func (sm *SourceMgr) SyncSourceFor(id ProjectIdentifier) error {
 	if atomic.CompareAndSwapInt32(&sm.releasing, 1, 1) {
 		return smIsReleased{}
 	}
-	atomic.AddInt32(&sm.opcount, 1)
-	sm.glock.RLock()
-	defer func() {
-		sm.glock.RUnlock()
-		atomic.AddInt32(&sm.opcount, -1)
-	}()
 
-	src, err := sm.getSourceFor(id)
+	srcg, err := sm.srcCoord.getSourceGatewayFor(context.TODO(), id)
 	if err != nil {
 		return err
 	}
 
-	return src.syncLocal()
+	return srcg.syncLocal(context.TODO())
 }
 
 // ExportProject writes out the tree of the provided ProjectIdentifier's
@@ -472,19 +415,13 @@ func (sm *SourceMgr) ExportProject(id ProjectIdentifier, v Version, to string) e
 	if atomic.CompareAndSwapInt32(&sm.releasing, 1, 1) {
 		return smIsReleased{}
 	}
-	atomic.AddInt32(&sm.opcount, 1)
-	sm.glock.RLock()
-	defer func() {
-		sm.glock.RUnlock()
-		atomic.AddInt32(&sm.opcount, -1)
-	}()
 
-	src, err := sm.getSourceFor(id)
+	srcg, err := sm.srcCoord.getSourceGatewayFor(context.TODO(), id)
 	if err != nil {
 		return err
 	}
 
-	return src.exportVersionTo(v, to)
+	return srcg.exportVersionTo(context.TODO(), v, to)
 }
 
 // DeduceProjectRoot takes an import path and deduces the corresponding
@@ -498,206 +435,151 @@ func (sm *SourceMgr) DeduceProjectRoot(ip string) (ProjectRoot, error) {
 	if atomic.CompareAndSwapInt32(&sm.releasing, 1, 1) {
 		return "", smIsReleased{}
 	}
-	atomic.AddInt32(&sm.opcount, 1)
-	sm.glock.RLock()
-	defer func() {
-		sm.glock.RUnlock()
-		atomic.AddInt32(&sm.opcount, -1)
-	}()
 
-	if prefix, root, has := sm.rootxt.LongestPrefix(ip); has {
-		// The non-matching tail of the import path could still be malformed.
-		// Validate just that part, if it exists
-		if prefix != ip {
-			// TODO(sdboyer) commented until i find a proper description of how
-			// to validate an import path
-			//if !pathvld.MatchString(strings.TrimPrefix(ip, prefix+"/")) {
-			//return "", fmt.Errorf("%q is not a valid import path", ip)
-			//}
-			// There was one, and it validated fine - add it so we don't have to
-			// revalidate it later
-			sm.rootxt.Insert(ip, root)
-		}
-		return root, nil
-	}
-
-	ft, err := sm.deducePathAndProcess(ip)
-	if err != nil {
-		return "", err
-	}
-
-	r, err := ft.rootf()
-	return ProjectRoot(r), err
+	pd, err := sm.deduceCoord.deduceRootPath(context.TODO(), ip)
+	return ProjectRoot(pd.root), err
 }
 
-func (sm *SourceMgr) getSourceFor(id ProjectIdentifier) (source, error) {
-	nn := id.normalizedSource()
-
-	sm.srcmut.RLock()
-	src, has := sm.srcs[nn]
-	sm.srcmut.RUnlock()
-	if has {
-		return src, nil
-	}
-
-	ft, err := sm.deducePathAndProcess(nn)
-	if err != nil {
-		return nil, err
-	}
-
-	// we don't care about the ident here, and the future produced by
-	// deducePathAndProcess will dedupe with what's in the sm.srcs map
-	src, _, err = ft.srcf()
-	return src, err
+type timeCount struct {
+	count int
+	start time.Time
 }
 
-func (sm *SourceMgr) deducePathAndProcess(path string) (*unifiedFuture, error) {
-	// Check for an already-existing future in the map first
-	sm.srcfmut.RLock()
-	ft, exists := sm.srcfuts[path]
-	sm.srcfmut.RUnlock()
+type durCount struct {
+	count int
+	dur   time.Duration
+}
 
-	if exists {
-		return ft, nil
+type supervisor struct {
+	ctx        context.Context
+	cancelFunc context.CancelFunc
+	mu         sync.Mutex // Guards all maps
+	cond       sync.Cond  // Wraps mu so callers can wait until all calls end
+	running    map[callInfo]timeCount
+	ran        map[callType]durCount
+}
+
+func newSupervisor(ctx context.Context) *supervisor {
+	ctx, cf := context.WithCancel(ctx)
+	supv := &supervisor{
+		ctx:        ctx,
+		cancelFunc: cf,
+		running:    make(map[callInfo]timeCount),
+		ran:        make(map[callType]durCount),
 	}
 
-	// Don't have one - set one up.
-	df, err := sm.deduceFromPath(path)
+	supv.cond = sync.Cond{L: &supv.mu}
+	return supv
+}
+
+// do executes the incoming closure using a conjoined context, and keeps
+// counters to ensure the sourceMgr can't finish Release()ing until after all
+// calls have returned.
+func (sup *supervisor) do(inctx context.Context, name string, typ callType, f func(context.Context) error) error {
+	ci := callInfo{
+		name: name,
+		typ:  typ,
+	}
+
+	octx, err := sup.start(ci)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	sm.srcfmut.Lock()
-	defer sm.srcfmut.Unlock()
-	// A bad interleaving could allow two goroutines to make it here for the
-	// same path, so we have to re-check existence.
-	if ft, exists = sm.srcfuts[path]; exists {
-		return ft, nil
+	cctx, cancelFunc := constext.Cons(inctx, octx)
+	err = f(cctx)
+	sup.done(ci)
+	cancelFunc()
+	return err
+}
+
+func (sup *supervisor) getLifetimeContext() context.Context {
+	return sup.ctx
+}
+
+func (sup *supervisor) start(ci callInfo) (context.Context, error) {
+	sup.mu.Lock()
+	defer sup.mu.Unlock()
+	if sup.ctx.Err() != nil {
+		// We've already been canceled; error out.
+		return nil, sup.ctx.Err()
 	}
 
-	ft = &unifiedFuture{
-		rc: make(chan struct{}, 1),
-		sc: make(chan struct{}, 1),
-	}
-
-	// Rewrap the rootfinding func in another future
-	var pr string
-	var rooterr error
-
-	// Kick off the func to get root and register it into the rootxt.
-	rootf := func() {
-		defer close(ft.rc)
-		pr, rooterr = df.root()
-		if rooterr != nil {
-			// Don't cache errs. This doesn't really hurt the solver, and is
-			// beneficial for other use cases because it means we don't have to
-			// expose any kind of controls for clearing caches.
-			return
-		}
-
-		tpr := ProjectRoot(pr)
-		sm.rootxt.Insert(pr, tpr)
-		// It's not harmful if the netname was a URL rather than an
-		// import path
-		if pr != path {
-			// Insert the result into the rootxt twice - once at the
-			// root itself, so as to catch siblings/relatives, and again
-			// at the exact provided import path (assuming they were
-			// different), so that on subsequent calls, exact matches
-			// can skip the regex above.
-			sm.rootxt.Insert(path, tpr)
-		}
-	}
-
-	// If deduction tells us this is slow, do it async in its own goroutine;
-	// otherwise, we can do it here and give the scheduler a bit of a break.
-	if df.rslow {
-		go rootf()
+	if existingInfo, has := sup.running[ci]; has {
+		existingInfo.count++
+		sup.running[ci] = existingInfo
 	} else {
-		rootf()
+		sup.running[ci] = timeCount{
+			count: 1,
+			start: time.Now(),
+		}
 	}
 
-	// Store a closure bound to the future result on the futTracker.
-	ft.rootf = func() (string, error) {
-		<-ft.rc
-		return pr, rooterr
+	return sup.ctx, nil
+}
+
+func (sup *supervisor) count() int {
+	sup.mu.Lock()
+	defer sup.mu.Unlock()
+	return len(sup.running)
+}
+
+func (sup *supervisor) done(ci callInfo) {
+	sup.mu.Lock()
+
+	existingInfo, has := sup.running[ci]
+	if !has {
+		panic(fmt.Sprintf("sourceMgr: tried to complete a call that had not registered via run()"))
 	}
 
-	// Root future is handled, now build up the source future.
-	//
-	// First, complete the partialSourceFuture with information the sm has about
-	// our cachedir and analyzer
-	fut := df.psf(sm.cachedir, sm.an)
+	if existingInfo.count > 1 {
+		// If more than one is pending, don't stop the clock yet.
+		existingInfo.count--
+		sup.running[ci] = existingInfo
+	} else {
+		// Last one for this particular key; update metrics with info.
+		durCnt := sup.ran[ci.typ]
+		durCnt.count++
+		durCnt.dur += time.Now().Sub(existingInfo.start)
+		sup.ran[ci.typ] = durCnt
+		delete(sup.running, ci)
 
-	// The maybeSource-trying process is always slow, so keep it async here.
-	var src source
-	var ident string
-	var srcerr error
-	go func() {
-		defer close(ft.sc)
-		src, ident, srcerr = fut()
-		if srcerr != nil {
-			// Don't cache errs. This doesn't really hurt the solver, and is
-			// beneficial for other use cases because it means we don't have
-			// to expose any kind of controls for clearing caches.
-			return
+		if len(sup.running) == 0 {
+			// This is the only place where we signal the cond, as it's the only
+			// time that the number of running calls could become zero.
+			sup.cond.Signal()
 		}
-
-		sm.srcmut.Lock()
-		defer sm.srcmut.Unlock()
-
-		// Check to make sure a source hasn't shown up in the meantime, or that
-		// there wasn't already one at the ident.
-		var hasi, hasp bool
-		var srci, srcp source
-		if ident != "" {
-			srci, hasi = sm.srcs[ident]
-		}
-		srcp, hasp = sm.srcs[path]
-
-		// if neither the ident nor the input path have an entry for this src,
-		// we're in the simple case - write them both in and we're done
-		if !hasi && !hasp {
-			sm.srcs[path] = src
-			if ident != path && ident != "" {
-				sm.srcs[ident] = src
-			}
-			return
-		}
-
-		// Now, the xors.
-		//
-		// If already present for ident but not for path, copy ident's src
-		// to path. This covers cases like a gopkg.in path referring back
-		// onto a github repository, where something else already explicitly
-		// looked up that same gh repo.
-		if hasi && !hasp {
-			sm.srcs[path] = srci
-			src = srci
-		}
-		// If already present for path but not for ident, do NOT copy path's
-		// src to ident, but use the returned one instead. Really, this case
-		// shouldn't occur at all...? But the crucial thing is that the
-		// path-based one has already discovered what actual ident of source
-		// they want to use, and changing that arbitrarily would have
-		// undefined effects.
-		if hasp && !hasi && ident != "" {
-			sm.srcs[ident] = src
-		}
-
-		// If both are present, then assume we're good, and use the path one
-		if hasp && hasi {
-			// TODO(sdboyer) compare these (somehow? reflect? pointer?) and if they're not the
-			// same object, panic
-			src = srcp
-		}
-	}()
-
-	ft.srcf = func() (source, string, error) {
-		<-ft.sc
-		return src, ident, srcerr
 	}
+	sup.mu.Unlock()
+}
 
-	sm.srcfuts[path] = ft
-	return ft, nil
+// wait until all active calls have terminated.
+//
+// Assumes something else has already canceled the supervisor via its context.
+func (sup *supervisor) wait() {
+	sup.cond.L.Lock()
+	for len(sup.running) > 0 {
+		sup.cond.Wait()
+	}
+	sup.cond.L.Unlock()
+}
+
+type callType uint
+
+const (
+	ctHTTPMetadata callType = iota
+	ctListVersions
+	ctGetManifestAndLock
+	ctListPackages
+	ctSourcePing
+	ctSourceInit
+	ctSourceFetch
+	ctCheckoutVersion
+	ctExportTree
+)
+
+// callInfo provides metadata about an ongoing call.
+type callInfo struct {
+	name string
+	typ  callType
 }

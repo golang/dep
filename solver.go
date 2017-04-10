@@ -49,6 +49,13 @@ type SolveParameters struct {
 	// A real path to a readable directory is required.
 	RootDir string
 
+	// The ProjectAnalyzer is responsible for extracting Manifest and
+	// (optionally) Lock information from dependencies. The solver passes it
+	// along to its SourceManager's GetManifestAndLock() method as needed.
+	//
+	// An analyzer is required.
+	ProjectAnalyzer ProjectAnalyzer
+
 	// The tree of packages that comprise the root project, as well as the
 	// import path that should identify the root of that tree.
 	//
@@ -155,6 +162,9 @@ type solver struct {
 }
 
 func (params SolveParameters) toRootdata() (rootdata, error) {
+	if params.ProjectAnalyzer == nil {
+		return rootdata{}, badOptsFailure("must provide a ProjectAnalyzer")
+	}
 	if params.RootDir == "" {
 		return rootdata{}, badOptsFailure("params must specify a non-empty root directory")
 	}
@@ -181,6 +191,7 @@ func (params SolveParameters) toRootdata() (rootdata, error) {
 		rlm:     make(map[ProjectRoot]LockedProject),
 		chngall: params.ChangeAll,
 		dir:     params.RootDir,
+		an:      params.ProjectAnalyzer,
 	}
 
 	// Ensure the required, ignore and overrides maps are at least initialized
@@ -512,7 +523,7 @@ func (s *solver) getImportsAndConstraintsOf(a atomWithPackages) ([]string, []com
 
 	// Work through the source manager to get project info and static analysis
 	// information.
-	m, _, err := s.b.GetManifestAndLock(a.a.id, a.a.v)
+	m, _, err := s.b.GetManifestAndLock(a.a.id, a.a.v, s.rd.an)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -699,7 +710,7 @@ func (s *solver) createVersionQueue(bmi bimodalIdentifier) (*versionQueue, error
 				continue
 			}
 
-			_, l, err := s.b.GetManifestAndLock(dep.depender.id, dep.depender.v)
+			_, l, err := s.b.GetManifestAndLock(dep.depender.id, dep.depender.v, s.rd.an)
 			if err != nil || l == nil {
 				// err being non-nil really shouldn't be possible, but the lock
 				// being nil is quite likely
@@ -1096,7 +1107,7 @@ func (s *solver) selectAtom(a atomWithPackages, pkgonly bool) {
 	// TODO(sdboyer) making this call here could be the first thing to trigger
 	// network activity...maybe? if so, can we mitigate by deferring the work to
 	// queue consumption time?
-	_, l, _ := s.b.GetManifestAndLock(a.a.id, a.a.v)
+	_, l, _ := s.b.GetManifestAndLock(a.a.id, a.a.v, s.rd.an)
 	var lmap map[ProjectIdentifier]Version
 	if l != nil {
 		lmap = make(map[ProjectIdentifier]Version)

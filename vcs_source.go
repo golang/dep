@@ -2,30 +2,112 @@ package gps
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"sync"
+	"time"
 
 	"github.com/Masterminds/semver"
-	"github.com/Masterminds/vcs"
 	"github.com/sdboyer/gps/internal/fs"
+	"github.com/sdboyer/gps/pkgtree"
 )
 
-// Kept here as a reference in case it does become important to implement a
-// vcsSource interface. Remove if/when it becomes clear we're never going to do
-// this.
-//type vcsSource interface {
-//syncLocal() error
-//ensureLocal() error
-//listLocalVersionPairs() ([]PairedVersion, sourceExistence, error)
-//listUpstreamVersionPairs() ([]PairedVersion, sourceExistence, error)
-//hasRevision(Revision) (bool, error)
-//checkout(Version) error
-//exportVersionTo(Version, string) error
-//}
+type baseVCSSource struct {
+	repo ctxRepo
+}
+
+func (bs *baseVCSSource) sourceType() string {
+	return string(bs.repo.Vcs())
+}
+
+func (bs *baseVCSSource) existsLocally(ctx context.Context) bool {
+	return bs.repo.CheckLocal()
+}
+
+// TODO reimpl for git
+func (bs *baseVCSSource) existsUpstream(ctx context.Context) bool {
+	return !bs.repo.Ping()
+}
+
+func (bs *baseVCSSource) upstreamURL() string {
+	return bs.repo.Remote()
+}
+
+func (bs *baseVCSSource) getManifestAndLock(ctx context.Context, pr ProjectRoot, r Revision, an ProjectAnalyzer) (Manifest, Lock, error) {
+	err := bs.repo.updateVersion(ctx, r.String())
+	if err != nil {
+		return nil, nil, unwrapVcsErr(err)
+	}
+
+	m, l, err := an.DeriveManifestAndLock(bs.repo.LocalPath(), pr)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if l != nil && l != Lock(nil) {
+		l = prepLock(l)
+	}
+
+	return prepManifest(m), l, nil
+}
+
+func (bs *baseVCSSource) revisionPresentIn(r Revision) (bool, error) {
+	return bs.repo.IsReference(string(r)), nil
+}
+
+// initLocal clones/checks out the upstream repository to disk for the first
+// time.
+func (bs *baseVCSSource) initLocal(ctx context.Context) error {
+	err := bs.repo.get(ctx)
+
+	if err != nil {
+		return unwrapVcsErr(err)
+	}
+	return nil
+}
+
+// updateLocal ensures the local data (versions and code) we have about the
+// source is fully up to date with that of the canonical upstream source.
+func (bs *baseVCSSource) updateLocal(ctx context.Context) error {
+	err := bs.repo.fetch(ctx)
+
+	if err != nil {
+		return unwrapVcsErr(err)
+	}
+	return nil
+}
+
+func (bs *baseVCSSource) listPackages(ctx context.Context, pr ProjectRoot, r Revision) (ptree pkgtree.PackageTree, err error) {
+	err = bs.repo.updateVersion(ctx, r.String())
+
+	if err != nil {
+		err = unwrapVcsErr(err)
+	} else {
+		ptree, err = pkgtree.ListPackages(bs.repo.LocalPath(), string(pr))
+	}
+
+	return
+}
+
+func (bs *baseVCSSource) exportRevisionTo(ctx context.Context, r Revision, to string) error {
+	// Only make the parent dir, as CopyDir will balk on trying to write to an
+	// empty but existing dir.
+	if err := os.MkdirAll(filepath.Dir(to), 0777); err != nil {
+		return err
+	}
+
+	if err := bs.repo.updateVersion(ctx, r.String()); err != nil {
+		return unwrapVcsErr(err)
+	}
+
+	// TODO(sdboyer) this is a simplistic approach and relying on the tools
+	// themselves might make it faster, but git's the overwhelming case (and has
+	// its own method) so fine for now
+	return fs.CopyDir(bs.repo.LocalPath(), to)
+}
 
 // gitSource is a generic git repository implementation that should work with
 // all standard git remotes.
@@ -33,160 +115,64 @@ type gitSource struct {
 	baseVCSSource
 }
 
-func (s *gitSource) exportVersionTo(v Version, to string) error {
-	// Get away without syncing local, if we can
-	r := s.crepo.r
-	// ...but local repo does have to at least exist
-	if err := s.ensureCacheExistence(); err != nil {
-		return err
-	}
+func (s *gitSource) exportRevisionTo(ctx context.Context, rev Revision, to string) error {
+	r := s.repo
 
 	if err := os.MkdirAll(to, 0777); err != nil {
 		return err
 	}
 
-	do := func() error {
-		s.crepo.mut.Lock()
-		defer s.crepo.mut.Unlock()
-
-		// Back up original index
-		idx, bak := filepath.Join(r.LocalPath(), ".git", "index"), filepath.Join(r.LocalPath(), ".git", "origindex")
-		err := fs.RenameWithFallback(idx, bak)
-		if err != nil {
-			return err
-		}
-
-		// could have an err here...but it's hard to imagine how?
-		defer fs.RenameWithFallback(bak, idx)
-
-		vstr := v.String()
-		if rv, ok := v.(PairedVersion); ok {
-			vstr = rv.Underlying().String()
-		}
-
-		out, err := runFromRepoDir(r, "git", "read-tree", vstr)
-		if err != nil {
-			return fmt.Errorf("%s: %s", out, err)
-		}
-
-		// Ensure we have exactly one trailing slash
-		to = strings.TrimSuffix(to, string(os.PathSeparator)) + string(os.PathSeparator)
-		// Checkout from our temporary index to the desired target location on
-		// disk; now it's git's job to make it fast.
-		//
-		// Sadly, this approach *does* also write out vendor dirs. There doesn't
-		// appear to be a way to make checkout-index respect sparse checkout
-		// rules (-a supercedes it). The alternative is using plain checkout,
-		// though we have a bunch of housekeeping to do to set up, then tear
-		// down, the sparse checkout controls, as well as restore the original
-		// index and HEAD.
-		out, err = runFromRepoDir(r, "git", "checkout-index", "-a", "--prefix="+to)
-		if err != nil {
-			return fmt.Errorf("%s: %s", out, err)
-		}
-		return nil
+	// Back up original index
+	idx, bak := filepath.Join(r.LocalPath(), ".git", "index"), filepath.Join(r.LocalPath(), ".git", "origindex")
+	err := fs.RenameWithFallback(idx, bak)
+	if err != nil {
+		return err
 	}
 
-	err := do()
-	if err != nil && !s.crepo.synced {
-		// If there was an err, and the repo cache is stale, it might've been
-		// beacuse we were missing the rev/ref. Try syncing, then run the export
-		// op again.
-		err = s.syncLocal()
-		if err != nil {
-			return err
-		}
-		err = do()
+	// could have an err here...but it's hard to imagine how?
+	defer fs.RenameWithFallback(bak, idx)
+
+	out, err := runFromRepoDir(ctx, r, "git", "read-tree", rev.String())
+	if err != nil {
+		return fmt.Errorf("%s: %s", out, err)
 	}
 
-	return err
+	// Ensure we have exactly one trailing slash
+	to = strings.TrimSuffix(to, string(os.PathSeparator)) + string(os.PathSeparator)
+	// Checkout from our temporary index to the desired target location on
+	// disk; now it's git's job to make it fast.
+	//
+	// Sadly, this approach *does* also write out vendor dirs. There doesn't
+	// appear to be a way to make checkout-index respect sparse checkout
+	// rules (-a supercedes it). The alternative is using plain checkout,
+	// though we have a bunch of housekeeping to do to set up, then tear
+	// down, the sparse checkout controls, as well as restore the original
+	// index and HEAD.
+	out, err = runFromRepoDir(ctx, r, "git", "checkout-index", "-a", "--prefix="+to)
+	if err != nil {
+		return fmt.Errorf("%s: %s", out, err)
+	}
+
+	return nil
 }
 
-func (s *gitSource) listVersions() (vlist []Version, err error) {
-	s.baseVCSSource.lvmut.Lock()
-	defer s.baseVCSSource.lvmut.Unlock()
+func (s *gitSource) listVersions(ctx context.Context) (vlist []PairedVersion, err error) {
+	r := s.repo
 
-	if s.cvsync {
-		vlist = make([]Version, len(s.dc.vMap))
-		k := 0
-		for v, r := range s.dc.vMap {
-			vlist[k] = v.Is(r)
-			k++
-		}
+	var out []byte
+	c := newMonitoredCmd(exec.Command("git", "ls-remote", r.Remote()), 30*time.Second)
+	// Ensure no prompting for PWs
+	c.cmd.Env = mergeEnvLists([]string{"GIT_ASKPASS=", "GIT_TERMINAL_PROMPT=0"}, os.Environ())
+	out, err = c.combinedOutput(ctx)
 
-		return
-	}
-
-	vlist, err = s.doListVersions()
 	if err != nil {
 		return nil, err
 	}
 
-	// Process the version data into the cache
-	//
-	// reset the rmap and vmap, as they'll be fully repopulated by this
-	s.dc.vMap = make(map[UnpairedVersion]Revision)
-	s.dc.rMap = make(map[Revision][]UnpairedVersion)
-
-	for _, v := range vlist {
-		pv := v.(PairedVersion)
-		u, r := pv.Unpair(), pv.Underlying()
-		s.dc.vMap[u] = r
-		s.dc.rMap[r] = append(s.dc.rMap[r], u)
-	}
-	// Mark the cache as being in sync with upstream's version list
-	s.cvsync = true
-	return
-}
-
-func (s *gitSource) doListVersions() (vlist []Version, err error) {
-	r := s.crepo.r
-	var out []byte
-	c := exec.Command("git", "ls-remote", r.Remote())
-	// Ensure no prompting for PWs
-	c.Env = mergeEnvLists([]string{"GIT_ASKPASS=", "GIT_TERMINAL_PROMPT=0"}, os.Environ())
-	out, err = c.CombinedOutput()
-
 	all := bytes.Split(bytes.TrimSpace(out), []byte("\n"))
-	if err != nil || len(all) == 0 {
-		// TODO(sdboyer) remove this path? it really just complicates things, for
-		// probably not much benefit
-
-		// ls-remote failed, probably due to bad communication or a faulty
-		// upstream implementation. So fetch updates, then build the list
-		// locally
-		s.crepo.mut.Lock()
-		err = r.Update()
-		s.crepo.mut.Unlock()
-		if err != nil {
-			// Definitely have a problem, now - bail out
-			return
-		}
-
-		// Upstream and cache must exist for this to have worked, so add that to
-		// searched and found
-		s.ex.s |= existsUpstream | existsInCache
-		s.ex.f |= existsUpstream | existsInCache
-		// Also, local is definitely now synced
-		s.crepo.synced = true
-
-		s.crepo.mut.RLock()
-		out, err = runFromRepoDir(r, "git", "show-ref", "--dereference")
-		s.crepo.mut.RUnlock()
-		if err != nil {
-			// TODO(sdboyer) More-er proper-er error
-			return
-		}
-
-		all = bytes.Split(bytes.TrimSpace(out), []byte("\n"))
-		if len(all) == 0 {
-			return nil, fmt.Errorf("no versions available for %s (this is weird)", r.Remote())
-		}
+	if len(all) == 0 {
+		return nil, fmt.Errorf("no data returned from ls-remote")
 	}
-
-	// Local cache may not actually exist here, but upstream definitely does
-	s.ex.s |= existsUpstream
-	s.ex.f |= existsUpstream
 
 	// Pull out the HEAD rev (it's always first) so we know what branches to
 	// mark as default. This is, perhaps, not the best way to glean this, but it
@@ -219,7 +205,7 @@ func (s *gitSource) doListVersions() (vlist []Version, err error) {
 
 	smap := make(map[string]bool)
 	uniq := 0
-	vlist = make([]Version, len(all)-1) // less 1, because always ignore HEAD
+	vlist = make([]PairedVersion, len(all)-1) // less 1, because always ignore HEAD
 	for _, pair := range all {
 		var v PairedVersion
 		if string(pair[46:51]) == "heads" {
@@ -291,28 +277,14 @@ type gopkginSource struct {
 	major uint64
 }
 
-func (s *gopkginSource) listVersions() (vlist []Version, err error) {
-	s.baseVCSSource.lvmut.Lock()
-	defer s.baseVCSSource.lvmut.Unlock()
-
-	if s.cvsync {
-		vlist = make([]Version, len(s.dc.vMap))
-		k := 0
-		for v, r := range s.dc.vMap {
-			vlist[k] = v.Is(r)
-			k++
-		}
-
-		return
-	}
-
-	ovlist, err := s.doListVersions()
+func (s *gopkginSource) listVersions(ctx context.Context) ([]PairedVersion, error) {
+	ovlist, err := s.gitSource.listVersions(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	// Apply gopkg.in's filtering rules
-	vlist = make([]Version, len(ovlist))
+	vlist := make([]PairedVersion, len(ovlist))
 	k := 0
 	var dbranch int // index of branch to be marked default
 	var bsv *semver.Version
@@ -363,21 +335,7 @@ func (s *gopkginSource) listVersions() (vlist []Version, err error) {
 		}.Is(dbv.r)
 	}
 
-	// Process the filtered version data into the cache
-	//
-	// reset the rmap and vmap, as they'll be fully repopulated by this
-	s.dc.vMap = make(map[UnpairedVersion]Revision)
-	s.dc.rMap = make(map[Revision][]UnpairedVersion)
-
-	for _, v := range vlist {
-		pv := v.(PairedVersion)
-		u, r := pv.Unpair(), pv.Underlying()
-		s.dc.vMap[u] = r
-		s.dc.rMap[r] = append(s.dc.rMap[r], u)
-	}
-	// Mark the cache as being in sync with upstream's version list
-	s.cvsync = true
-	return
+	return vlist, nil
 }
 
 // bzrSource is a generic bzr repository implementation that should work with
@@ -386,60 +344,11 @@ type bzrSource struct {
 	baseVCSSource
 }
 
-func (s *bzrSource) update() error {
-	r := s.crepo.r
+func (s *bzrSource) listVersions(ctx context.Context) ([]PairedVersion, error) {
+	r := s.repo
 
-	out, err := runFromRepoDir(r, "bzr", "pull")
-	if err != nil {
-		return vcs.NewRemoteError("Unable to update repository", err, string(out))
-	}
-
-	out, err = runFromRepoDir(r, "bzr", "update")
-	if err != nil {
-		return vcs.NewRemoteError("Unable to update repository", err, string(out))
-	}
-
-	return nil
-}
-
-func (s *bzrSource) listVersions() (vlist []Version, err error) {
-	s.baseVCSSource.lvmut.Lock()
-	defer s.baseVCSSource.lvmut.Unlock()
-
-	if s.cvsync {
-		vlist = make([]Version, len(s.dc.vMap))
-		k := 0
-		for v, r := range s.dc.vMap {
-			vlist[k] = v.Is(r)
-			k++
-		}
-
-		return
-	}
-
-	// Must first ensure cache checkout's existence
-	err = s.ensureCacheExistence()
-	if err != nil {
-		return
-	}
-	r := s.crepo.r
-
-	// Local repo won't have all the latest refs if ensureCacheExistence()
-	// didn't create it
-	if !s.crepo.synced {
-		s.crepo.mut.Lock()
-		err = s.update()
-		s.crepo.mut.Unlock()
-		if err != nil {
-			return
-		}
-
-		s.crepo.synced = true
-	}
-
-	var out []byte
 	// Now, list all the tags
-	out, err = runFromRepoDir(r, "bzr", "tags", "--show-ids", "-v")
+	out, err := runFromRepoDir(ctx, r, "bzr", "tags", "--show-ids", "-v")
 	if err != nil {
 		return nil, fmt.Errorf("%s: %s", err, string(out))
 	}
@@ -447,41 +356,28 @@ func (s *bzrSource) listVersions() (vlist []Version, err error) {
 	all := bytes.Split(bytes.TrimSpace(out), []byte("\n"))
 
 	var branchrev []byte
-	branchrev, err = runFromRepoDir(r, "bzr", "version-info", "--custom", "--template={revision_id}", "--revision=branch:.")
+	branchrev, err = runFromRepoDir(ctx, r, "bzr", "version-info", "--custom", "--template={revision_id}", "--revision=branch:.")
 	br := string(branchrev)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %s", err, br)
 	}
 
-	// Both commands completed successfully, so there's no further possibility
-	// of errors. That means it's now safe to reset the rmap and vmap, as
-	// they're about to be fully repopulated.
-	s.dc.vMap = make(map[UnpairedVersion]Revision)
-	s.dc.rMap = make(map[Revision][]UnpairedVersion)
-	vlist = make([]Version, len(all)+1)
+	vlist := make([]PairedVersion, 0, len(all)+1)
 
 	// Now, all the tags.
-	for k, line := range all {
+	for _, line := range all {
 		idx := bytes.IndexByte(line, 32) // space
 		v := NewVersion(string(line[:idx]))
 		r := Revision(bytes.TrimSpace(line[idx:]))
-
-		s.dc.vMap[v] = r
-		s.dc.rMap[r] = append(s.dc.rMap[r], v)
-		vlist[k] = v.Is(r)
+		vlist = append(vlist, v.Is(r))
 	}
 
 	// Last, add the default branch, hardcoding the visual representation of it
 	// that bzr uses when operating in the workflow mode we're using.
 	v := newDefaultBranch("(default)")
-	rev := Revision(string(branchrev))
-	s.dc.vMap[v] = rev
-	s.dc.rMap[rev] = append(s.dc.rMap[rev], v)
-	vlist[len(vlist)-1] = v.Is(rev)
+	vlist = append(vlist, v.Is(Revision(string(branchrev))))
 
-	// Cache is now in sync with upstream's version list
-	s.cvsync = true
-	return
+	return vlist, nil
 }
 
 // hgSource is a generic hg repository implementation that should work with
@@ -490,61 +386,12 @@ type hgSource struct {
 	baseVCSSource
 }
 
-func (s *hgSource) update() error {
-	r := s.crepo.r
+func (s *hgSource) listVersions(ctx context.Context) ([]PairedVersion, error) {
+	var vlist []PairedVersion
 
-	out, err := runFromRepoDir(r, "hg", "pull")
-	if err != nil {
-		return vcs.NewLocalError("Unable to update checked out version", err, string(out))
-	}
-
-	out, err = runFromRepoDir(r, "hg", "update")
-	if err != nil {
-		return vcs.NewLocalError("Unable to update checked out version", err, string(out))
-	}
-
-	return nil
-}
-
-func (s *hgSource) listVersions() (vlist []Version, err error) {
-	s.baseVCSSource.lvmut.Lock()
-	defer s.baseVCSSource.lvmut.Unlock()
-
-	if s.cvsync {
-		vlist = make([]Version, len(s.dc.vMap))
-		k := 0
-		for v, r := range s.dc.vMap {
-			vlist[k] = v.Is(r)
-			k++
-		}
-
-		return
-	}
-
-	// Must first ensure cache checkout's existence
-	err = s.ensureCacheExistence()
-	if err != nil {
-		return
-	}
-	r := s.crepo.r
-
-	// Local repo won't have all the latest refs if ensureCacheExistence()
-	// didn't create it
-	if !s.crepo.synced {
-		s.crepo.mut.Lock()
-		err = unwrapVcsErr(s.update())
-		s.crepo.mut.Unlock()
-		if err != nil {
-			return
-		}
-
-		s.crepo.synced = true
-	}
-
-	var out []byte
-
+	r := s.repo
 	// Now, list all the tags
-	out, err = runFromRepoDir(r, "hg", "tags", "--debug", "--verbose")
+	out, err := runFromRepoDir(ctx, r, "hg", "tags", "--debug", "--verbose")
 	if err != nil {
 		return nil, fmt.Errorf("%s: %s", err, string(out))
 	}
@@ -578,7 +425,7 @@ func (s *hgSource) listVersions() (vlist []Version, err error) {
 	// bookmarks next, because the presence of the magic @ bookmark has to
 	// determine how we handle the branches
 	var magicAt bool
-	out, err = runFromRepoDir(r, "hg", "bookmarks", "--debug")
+	out, err = runFromRepoDir(ctx, r, "hg", "bookmarks", "--debug")
 	if err != nil {
 		// better nothing than partial and misleading
 		return nil, fmt.Errorf("%s: %s", err, string(out))
@@ -600,7 +447,7 @@ func (s *hgSource) listVersions() (vlist []Version, err error) {
 			idx := bytes.IndexByte(pair[0], 32) // space
 			// if it's the magic @ marker, make that the default branch
 			str := string(pair[0][:idx])
-			var v Version
+			var v PairedVersion
 			if str == "@" {
 				magicAt = true
 				v = newDefaultBranch(str).Is(Revision(pair[1])).(PairedVersion)
@@ -611,7 +458,7 @@ func (s *hgSource) listVersions() (vlist []Version, err error) {
 		}
 	}
 
-	out, err = runFromRepoDir(r, "hg", "branches", "-c", "--debug")
+	out, err = runFromRepoDir(ctx, r, "hg", "branches", "-c", "--debug")
 	if err != nil {
 		// better nothing than partial and misleading
 		return nil, fmt.Errorf("%s: %s", err, string(out))
@@ -630,7 +477,7 @@ func (s *hgSource) listVersions() (vlist []Version, err error) {
 		str := string(pair[0][:idx])
 		// if there was no magic @ bookmark, and this is mercurial's magic
 		// "default" branch, then mark it as default branch
-		var v Version
+		var v PairedVersion
 		if !magicAt && str == "default" {
 			v = newDefaultBranch(str).Is(Revision(pair[1])).(PairedVersion)
 		} else {
@@ -639,54 +486,12 @@ func (s *hgSource) listVersions() (vlist []Version, err error) {
 		vlist = append(vlist, v)
 	}
 
-	// reset the rmap and vmap, as they'll be fully repopulated by this
-	s.dc.vMap = make(map[UnpairedVersion]Revision)
-	s.dc.rMap = make(map[Revision][]UnpairedVersion)
-
-	for _, v := range vlist {
-		pv := v.(PairedVersion)
-		u, r := pv.Unpair(), pv.Underlying()
-		s.dc.vMap[u] = r
-		s.dc.rMap[r] = append(s.dc.rMap[r], u)
-	}
-
-	// Cache is now in sync with upstream's version list
-	s.cvsync = true
-	return
+	return vlist, nil
 }
 
 type repo struct {
-	// Path to the root of the default working copy (NOT the repo itself)
-	rpath string
-
-	// Mutex controlling general access to the repo
-	mut sync.RWMutex
-
 	// Object for direct repo interaction
-	r vcs.Repo
-
-	// Whether or not the cache repo is in sync (think dvcs) with upstream
-	synced bool
-}
-
-func (r *repo) exportVersionTo(v Version, to string) error {
-	r.mut.Lock()
-	defer r.mut.Unlock()
-
-	// TODO(sdboyer) sloppy - this update may not be necessary
-	if !r.synced {
-		err := r.r.Update()
-		if err != nil {
-			return fmt.Errorf("err on attempting to update repo: %s", unwrapVcsErr(err))
-		}
-	}
-
-	r.r.UpdateVersion(v.String())
-
-	// TODO(sdboyer) this is a simplistic approach and relying on the tools
-	// themselves might make it faster, but git's the overwhelming case (and has
-	// its own method) so fine for now
-	return fs.CopyDir(r.rpath, to)
+	r ctxRepo
 }
 
 // This func copied from Masterminds/vcs so we can exec our own commands

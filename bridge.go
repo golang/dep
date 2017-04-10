@@ -81,19 +81,15 @@ var mkBridge = func(s *solver, sm SourceManager, down bool) sourceBridge {
 	}
 }
 
-func (b *bridge) GetManifestAndLock(id ProjectIdentifier, v Version) (Manifest, Lock, error) {
+func (b *bridge) GetManifestAndLock(id ProjectIdentifier, v Version, an ProjectAnalyzer) (Manifest, Lock, error) {
 	if b.s.rd.isRoot(id.ProjectRoot) {
 		return b.s.rd.rm, b.s.rd.rl, nil
 	}
 
 	b.s.mtr.push("b-gmal")
-	m, l, e := b.sm.GetManifestAndLock(id, v)
+	m, l, e := b.sm.GetManifestAndLock(id, v, an)
 	b.s.mtr.pop()
 	return m, l, e
-}
-
-func (b *bridge) AnalyzerInfo() (string, int) {
-	return b.sm.AnalyzerInfo()
 }
 
 func (b *bridge) ListVersions(id ProjectIdentifier) ([]Version, error) {

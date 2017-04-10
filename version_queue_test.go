@@ -136,8 +136,7 @@ func TestVersionQueueAdvance(t *testing.T) {
 	// First with no prefv or lockv
 	vq, err := newVersionQueue(id, nil, nil, fb)
 	if err != nil {
-		t.Errorf("Unexpected err on vq create: %s", err)
-		t.FailNow()
+		t.Fatalf("Unexpected err on vq create: %s", err)
 	}
 
 	for k, v := range fakevl[1:] {
