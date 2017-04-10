@@ -16,6 +16,10 @@ func stripVendor(path string, info os.FileInfo, err error) error {
 				// This could be a windows junction directory. Support for these in the
 				// standard library is spotty, and we could easily delete an important
 				// folder if we called os.Remove or os.RemoveAll. Just skip these.
+				//
+				// TODO: If we could distinguish between junctions and Windows symlinks,
+				// we might be able to safely delete symlinks, even though junctions are
+				// dangerous.
 				return filepath.SkipDir
 
 			case symlink:
