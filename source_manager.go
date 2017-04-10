@@ -63,6 +63,11 @@ type SourceManager interface {
 	// DeduceRootProject takes an import path and deduces the corresponding
 	// project/source root.
 	DeduceProjectRoot(ip string) (ProjectRoot, error)
+
+	// Release lets go of any locks held by the SourceManager. Once called, it is
+	// no longer safe to call methods against it; all method calls will
+	// immediately result in errors.
+	Release()
 }
 
 // A ProjectAnalyzer is responsible for analyzing a given path for Manifest and

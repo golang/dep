@@ -12,7 +12,17 @@ import (
 // sourceBridges provide an adapter to SourceManagers that tailor operations
 // for a single solve run.
 type sourceBridge interface {
-	SourceManager // composes SourceManager
+	// sourceBridge includes all the methods in the SourceManager interface except
+	// for Release().
+	SourceExists(ProjectIdentifier) (bool, error)
+	SyncSourceFor(ProjectIdentifier) error
+	ListVersions(ProjectIdentifier) ([]Version, error)
+	RevisionPresentIn(ProjectIdentifier, Revision) (bool, error)
+	ListPackages(ProjectIdentifier, Version) (pkgtree.PackageTree, error)
+	GetManifestAndLock(ProjectIdentifier, Version, ProjectAnalyzer) (Manifest, Lock, error)
+	ExportProject(ProjectIdentifier, Version, string) error
+	DeduceProjectRoot(ip string) (ProjectRoot, error)
+
 	verifyRootDir(path string) error
 	pairRevision(id ProjectIdentifier, r Revision) []Version
 	pairVersion(id ProjectIdentifier, v UnpairedVersion) PairedVersion
