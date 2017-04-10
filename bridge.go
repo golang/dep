@@ -12,7 +12,7 @@ import (
 // sourceBridges provide an adapter to SourceManagers that tailor operations
 // for a single solve run.
 type sourceBridge interface {
-	SourceManager // composes SourceManager
+	sourceDeducer
 	verifyRootDir(path string) error
 	pairRevision(id ProjectIdentifier, r Revision) []Version
 	pairVersion(id ProjectIdentifier, v UnpairedVersion) PairedVersion
@@ -352,8 +352,6 @@ func (b *bridge) SyncSourceFor(id ProjectIdentifier) error {
 	// by the solver, and the metrics design is for wall time on a single thread
 	return b.sm.SyncSourceFor(id)
 }
-
-func (b *bridge) Release() { b.sm.Release() }
 
 // versionTypeUnion represents a set of versions that are, within the scope of
 // this solver run, equivalent.

@@ -27,6 +27,18 @@ var sanitizer = strings.NewReplacer(":", "-", "/", "-", "+", "-")
 // sufficient for any purpose. It provides some additional semantics around the
 // methods defined here.
 type SourceManager interface {
+	// SourceManager adds a Release method to the sourceDeducer method set. The
+	// sourceDeducer method set is defined in a separate interface because it's
+	// used by the sourceBridge interface as well, but sourceBridges don't get a
+	// Release method.
+	sourceDeducer
+	// Release lets go of any locks held by the SourceManager. Once called, it is
+	// no longer safe to call methods against it; all method calls will
+	// immediately result in errors.
+	Release()
+}
+
+type sourceDeducer interface {
 	// SourceExists checks if a repository exists, either upstream or in the
 	// SourceManager's central repository cache.
 	SourceExists(ProjectIdentifier) (bool, error)
@@ -66,11 +78,6 @@ type SourceManager interface {
 	// DeduceRootProject takes an import path and deduces the corresponding
 	// project/source root.
 	DeduceProjectRoot(ip string) (ProjectRoot, error)
-
-	// Release lets go of any locks held by the SourceManager. Once called, it is
-	// no longer safe to call methods against it; all method calls will
-	// immediately result in errors.
-	Release()
 }
 
 // A ProjectAnalyzer is responsible for analyzing a given path for Manifest and
