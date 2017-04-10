@@ -32,9 +32,9 @@ func (fs filesystemState) setupJunctions(t *testing.T) {
 		}
 		// Junctions, when created, forbid listing of their contents. We need to
 		// manually permit that so we can call filepath.Walk.
-		output, err = exec.Command("cmd", "icacls", from.String(), "/grant", ":r", "Everyone:F").CombinedOutput()
+		output, err = exec.Command("cmd", "icacls", from.String(), "/grant", ":r", "Everyone:F", "/T", "/L").CombinedOutput()
 		if err != nil {
-			t.Fatalf("failed to run icacls %v /e /p Everyone:F: %v %q", from.String(), err, output)
+			t.Fatalf("failed to run icacls %v /grant :r Everyone:F /T /L: %v %q", from.String(), err, output)
 		}
 	}
 }
