@@ -19,9 +19,8 @@ type sourceBridge interface {
 	ListVersions(ProjectIdentifier) ([]Version, error)
 	RevisionPresentIn(ProjectIdentifier, Revision) (bool, error)
 	ListPackages(ProjectIdentifier, Version) (pkgtree.PackageTree, error)
-	GetManifestAndLock(ProjectIdentifier, Version) (Manifest, Lock, error)
+	GetManifestAndLock(ProjectIdentifier, Version, ProjectAnalyzer) (Manifest, Lock, error)
 	ExportProject(ProjectIdentifier, Version, string) error
-	AnalyzerInfo() (name string, version int)
 	DeduceProjectRoot(ip string) (ProjectRoot, error)
 
 	verifyRootDir(path string) error
