@@ -354,10 +354,17 @@ func TestResolveProjectRoot(t *testing.T) {
 
 	tg.TempDir("go")
 	tg.TempDir("go/src")
-	tg.TempDir("sym")
 	tg.TempDir("go/src/real")
 	tg.TempDir("go/src/real/path")
 	tg.TempDir("go/src/sym")
+
+	tg.TempDir("gotwo") // Another directory used as a GOPATH
+	tg.TempDir("gotwo/src")
+	tg.TempDir("gotwo/src/real")
+	tg.TempDir("gotwo/src/real/path")
+	tg.TempDir("gotwo/src/sym")
+
+	tg.TempDir("sym") // Directory for symlinks
 
 	tg.Setenv("GOPATH", tg.Path(filepath.Join(".", "go")))
 
@@ -365,14 +372,18 @@ func TestResolveProjectRoot(t *testing.T) {
 		GOPATH: tg.Path(filepath.Join(".", "go")),
 		GOPATHS: []string{
 			tg.Path(filepath.Join(".", "go")),
+			tg.Path(filepath.Join(".", "gotwo")),
 		},
 	}
 
-	realPath := filepath.Join(ctx.GOPATH, "src/real/path")
+	realPath := filepath.Join(ctx.GOPATH, "src", "real", "path")
+	realPathTwo := filepath.Join(ctx.GOPATHS[1], "src", "real", "path")
 	symlinkedPath := filepath.Join(tg.Path("."), "sym", "symlink")
 	symlinkedInGoPath := filepath.Join(ctx.GOPATH, "src/sym/path")
+	symlinkedInOtherGoPath := filepath.Join(tg.Path("."), "sym", "symtwo")
 	os.Symlink(realPath, symlinkedPath)
 	os.Symlink(realPath, symlinkedInGoPath)
+	os.Symlink(realPathTwo, symlinkedInOtherGoPath)
 
 	// Real path should be returned, no symlinks to deal with
 	p, err := ctx.resolveProjectRoot(realPath)
@@ -390,6 +401,15 @@ func TestResolveProjectRoot(t *testing.T) {
 	}
 	if p != realPath {
 		t.Fatalf("Want path to be %s, got %s", realPath, p)
+	}
+
+	// Real path should be returned, symlink is in another GOPATH
+	p, err = ctx.resolveProjectRoot(symlinkedInOtherGoPath)
+	if err != nil {
+		t.Fatalf("Error resolving project root: %s", err)
+	}
+	if p != realPathTwo {
+		t.Fatalf("Want path to be %s, got %s", realPathTwo, p)
 	}
 
 	// Symlinked path is inside GOPATH, should return error
