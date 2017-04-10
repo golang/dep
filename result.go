@@ -83,7 +83,7 @@ func stripVendor(path string, info os.FileInfo, err error) error {
 			case symlink && dir:
 				// This must be a windows junction directory. Support for these in the
 				// standard library is spotty, and we could easily delete an important
-				// folder if we called os.Remove. Just skip these.
+				// folder if we called os.Remove or os.RemoveAll. Just skip these.
 				return filepath.SkipDir
 
 			case symlink:

@@ -14,7 +14,7 @@ type fsPath []string
 func (f fsPath) String() string { return filepath.Join(f...) }
 
 func (f fsPath) prepend(prefix string) fsPath {
-	p := fsPath{prefix}
+	p := fsPath{filepath.FromSlash(prefix)}
 	return append(p, f...)
 }
 
@@ -35,18 +35,18 @@ type filesystemState struct {
 // assert makes sure that the fs state matches the state of the actual host
 // file system
 func (fs filesystemState) assert(t *testing.T) {
-	dirMap := make(map[string]struct{})
-	fileMap := make(map[string]struct{})
-	linkMap := make(map[string]struct{})
+	dirMap := make(map[string]bool)
+	fileMap := make(map[string]bool)
+	linkMap := make(map[string]bool)
 
 	for _, d := range fs.dirs {
-		dirMap[d.prepend(fs.root).String()] = struct{}{}
+		dirMap[d.prepend(fs.root).String()] = true
 	}
 	for _, f := range fs.files {
-		fileMap[f.prepend(fs.root).String()] = struct{}{}
+		fileMap[f.prepend(fs.root).String()] = true
 	}
 	for _, l := range fs.links {
-		linkMap[l.path.prepend(fs.root).String()] = struct{}{}
+		linkMap[l.path.prepend(fs.root).String()] = true
 	}
 
 	err := filepath.Walk(fs.root, func(path string, info os.FileInfo, err error) error {
@@ -62,30 +62,27 @@ func (fs filesystemState) assert(t *testing.T) {
 		// Careful! Have to check whether the path is a symlink first because, on
 		// windows, a symlink to a directory will return 'true' for info.IsDir().
 		if (info.Mode() & os.ModeSymlink) != 0 {
-			_, ok := linkMap[path]
-			if !ok {
-				t.Errorf("unexpected symlink exists %q", path)
-			} else {
+			if linkMap[path] {
 				delete(linkMap, path)
+			} else {
+				t.Errorf("unexpected symlink exists %q", path)
 			}
 			return nil
 		}
 
 		if info.IsDir() {
-			_, ok := dirMap[path]
-			if !ok {
-				t.Errorf("unexpected directory exists %q", path)
-			} else {
+			if dirMap[path] {
 				delete(dirMap, path)
+			} else {
+				t.Errorf("unexpected directory exists %q", path)
 			}
 			return nil
 		}
 
-		_, ok := fileMap[path]
-		if !ok {
-			t.Errorf("unexpected file exists %q", path)
-		} else {
+		if fileMap[path] {
 			delete(fileMap, path)
+		} else {
+			t.Errorf("unexpected file exists %q", path)
 		}
 		return nil
 	})
