@@ -30,6 +30,12 @@ func (fs filesystemState) setupJunctions(t *testing.T) {
 		if err != nil {
 			t.Fatalf("failed to run mklink %v %v: %v %q", from.String(), to.String(), err, output)
 		}
+		// Junctions, when created, forbid listing of their contents. We need to
+		// manually permit that so we can call filepath.Walk.
+		output, err = exec.Command("cmd", "icacls", from.String(), "/grant", ":r", "Everyone:F").CombinedOutput()
+		if err != nil {
+			t.Fatalf("failed to run icacls %v /e /p Everyone:F: %v %q", from.String(), err, output)
+		}
 	}
 }
 
@@ -151,6 +157,10 @@ func TestStripVendorSymlinks(t *testing.T) {
 	}))
 
 	t.Run("chained symlinks", stripVendorTestCase(fsTestCase{
+		// Curiously, if a symlink on windows points to *another* symlink which
+		// eventually points at a directory, we'll correctly remove that first
+		// symlink, because the first symlink doesn't appear to Go to be a
+		// directory.
 		before: filesystemState{
 			dirs: []fsPath{
 				fsPath{"_vendor"},
@@ -171,10 +181,6 @@ func TestStripVendorSymlinks(t *testing.T) {
 				fsPath{"_vendor"},
 			},
 			links: []fsLink{
-				fsLink{
-					path: fsPath{"vendor"},
-					to:   "vendor2",
-				},
 				fsLink{
 					path: fsPath{"vendor2"},
 					to:   "_vendor",
