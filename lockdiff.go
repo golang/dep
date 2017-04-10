@@ -11,13 +11,17 @@ import (
 // * Added: Previous = nil, Current != nil
 // * Deleted: Previous != nil, Current = nil
 // * Modified: Previous != nil, Current != nil
-//
+// * No Change: Previous = Current, or a nil pointer
 type StringDiff struct {
 	Previous string
 	Current  string
 }
 
-func (diff StringDiff) String() string {
+func (diff *StringDiff) String() string {
+	if diff == nil {
+		return ""
+	}
+
 	if diff.Previous == "" && diff.Current != "" {
 		return fmt.Sprintf("+ %s", diff.Current)
 	}
@@ -107,12 +111,12 @@ func DiffLocks(l1 Lock, l2 Lock) *LockDiff {
 					diff.Modify = append(diff.Modify, *pdiff)
 				}
 				i2next = i2 + 1 // Don't evaluate to this again
-			case -1: // Found a new project
+			case +1: // Found a new project
 				add := buildLockedProjectDiff(lp2)
 				diff.Add = append(diff.Add, add)
 				i2next = i2 + 1 // Don't evaluate to this again
 				continue        // Keep looking for a matching project
-			case +1: // Project has been removed, handled below
+			case -1: // Project has been removed, handled below
 				break
 			}
 
