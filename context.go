@@ -17,7 +17,8 @@ import (
 
 // Ctx defines the supporting context of the tool.
 type Ctx struct {
-	GOPATH string // Go path
+	GOPATH  string   // Selected Go path
+	GOPATHS []string // Other Go paths
 }
 
 // NewContext creates a struct with the project's GOPATH. It assumes
@@ -26,18 +27,28 @@ func NewContext() (*Ctx, error) {
 	// this way we get the default GOPATH that was added in 1.8
 	buildContext := build.Default
 	wd, err := os.Getwd()
+
 	if err != nil {
 		return nil, errors.Wrap(err, "getting work directory")
 	}
 	wd = filepath.FromSlash(wd)
+	ctx := &Ctx{}
+
 	for _, gp := range filepath.SplitList(buildContext.GOPATH) {
 		gp = filepath.FromSlash(gp)
+
 		if filepath.HasPrefix(wd, gp) {
-			return &Ctx{GOPATH: gp}, nil
+			ctx.GOPATH = gp
 		}
+
+		ctx.GOPATHS = append(ctx.GOPATHS, gp)
 	}
 
-	return nil, errors.New("project not in a GOPATH")
+	if ctx.GOPATH == "" {
+		return nil, errors.New("project not in a GOPATH")
+	}
+
+	return ctx, nil
 }
 
 func (c *Ctx) SourceManager() (*gps.SourceMgr, error) {
@@ -72,6 +83,13 @@ func (c *Ctx) LoadProject(path string) (*Project, error) {
 
 	if err != nil {
 		return nil, err
+	}
+
+	// The path may lie within a symlinked directory, resolve the path
+	// before moving forward
+	p.AbsRoot, err = c.resolveProjectRoot(p.AbsRoot)
+	if err != nil {
+		return nil, errors.Wrapf(err, "resolve project root")
 	}
 
 	ip, err := c.SplitAbsoluteProjectRoot(p.AbsRoot)
@@ -115,6 +133,43 @@ func (c *Ctx) LoadProject(path string) (*Project, error) {
 	}
 
 	return p, nil
+}
+
+// resolveProjectRoot evaluates the root directory and does the following:
+//
+// If the passed path is a symlink outside GOPATH to a directory within a
+// GOPATH, the resolved full real path is returned.
+//
+// If the passed path is a symlink within a GOPATH, we return an error.
+//
+// If the passed path isn't a symlink at all, we just pass through.
+func (c *Ctx) resolveProjectRoot(path string) (string, error) {
+	// Determine if this path is a Symlink
+	l, err := os.Lstat(path)
+	if err != nil {
+		return "", errors.Wrap(err, "resolveProjectRoot")
+	}
+
+	// Pass through if not
+	if l.Mode()&os.ModeSymlink == 0 {
+		return path, nil
+	}
+
+	// Resolve path
+	resolved, err := filepath.EvalSymlinks(path)
+	if err != nil {
+		return "", errors.Wrap(err, "resolveProjectRoot")
+	}
+
+	// Determine if the symlink is within any of the GOPATHs, in which case we're not
+	// sure how to resolve it.
+	for _, gp := range c.GOPATHS {
+		if filepath.HasPrefix(path, gp) {
+			return "", errors.Errorf("'%s' is linked to another path within a GOPATH (%s)", path, gp)
+		}
+	}
+
+	return resolved, nil
 }
 
 // SplitAbsoluteProjectRoot takes an absolute path and compares it against declared
