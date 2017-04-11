@@ -811,7 +811,7 @@ func hidePair(pvl []PairedVersion) []Version {
 	return vl
 }
 
-// Decompose a Version into the underlying number, branch and revision
+// GetVersionInfo decomposes a Version into the underlying number, branch and revision
 func GetVersionInfo(v Version) (revision string, branch string, version string) {
 	switch tv := v.(type) {
 	case UnpairedVersion:
