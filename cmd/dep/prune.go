@@ -21,6 +21,9 @@ import (
 const pruneShortHelp = `Prune the vendor tree of unused packages`
 const pruneLongHelp = `
 Prune is used to remove unused packages from your vendor tree.
+
+STABILITY NOTICE: this command creates problems for vendor/ verification. As
+such, it may be removed and/or moved out into a separate project later on.
 `
 
 type pruneCommand struct {
