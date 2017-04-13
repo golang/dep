@@ -21,7 +21,7 @@ fi
 VALIDATE_HEAD="$(git rev-parse --verify HEAD)"
 
 IFS=$'\n'
-files=( $(git diff "$TRAVIS_BRANCH...$VALIDATE_HEAD" --diff-filter=ACMR --name-only -- 'manifest.json' 'lock.json' 'vendor/' || true) )
+files=( $(git diff "$TRAVIS_BRANCH...$VALIDATE_HEAD" --diff-filter=ACMR --name-only -- 'Gopkg.toml' 'Gopkg.lock' 'vendor/' || true) )
 unset IFS
 
 if [ ${#files[@]} -gt 0 ]; then
@@ -29,7 +29,7 @@ if [ ${#files[@]} -gt 0 ]; then
 	go build
 	./dep ensure
 	# Let see if the working directory is clean
-	diffs="$(git status --porcelain -- vendor manifest.json lock.json 2>/dev/null)"
+	diffs="$(git status --porcelain -- vendor Gopkg.toml Gopkg.lock 2>/dev/null)"
 	if [ "$diffs" ]; then
 		{
 			echo 'The result of ensure differs'

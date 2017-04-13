@@ -14,8 +14,8 @@ import (
 )
 
 const safeWriterProject = "safewritertest"
-const safeWriterGoldenManifest = "txn_writer/expected_manifest.json"
-const safeWriterGoldenLock = "txn_writer/expected_lock.json"
+const safeWriterGoldenManifest = "txn_writer/expected_manifest.toml"
+const safeWriterGoldenLock = "txn_writer/expected_lock.toml"
 
 func TestSafeWriter_BadInput_MissingRoot(t *testing.T) {
 	h := test.NewHelper(t)
@@ -498,10 +498,10 @@ func TestSafeWriter_DiffLocks(t *testing.T) {
 
 	pc := NewTestProjectContext(h, safeWriterProject)
 	defer pc.Release()
-	pc.CopyFile(LockName, "txn_writer/original_lock.json")
+	pc.CopyFile(LockName, "txn_writer/original_lock.toml")
 	pc.Load()
 
-	ulf := h.GetTestFile("txn_writer/updated_lock.json")
+	ulf := h.GetTestFile("txn_writer/updated_lock.toml")
 	defer ulf.Close()
 	updatedLock, err := readLock(ulf)
 	h.Must(err)
@@ -518,12 +518,16 @@ func TestSafeWriter_DiffLocks(t *testing.T) {
 		t.Fatalf("Expected the lock diff to contain the updated hash: expected %s, got %s", pc.Project.Lock.Memo, updatedLock.Memo)
 	}
 
-	if len(diff.Add) != 1 {
-		t.Fatalf("Expected the lock diff to contain 1 added project, got %d", len(diff.Add))
+	if len(diff.Add) != 2 {
+		t.Fatalf("Expected the lock diff to contain 2 added projects, got %d", len(diff.Add))
 	} else {
-		add := diff.Add[0]
-		if add.Name != "github.com/stuff/realthing" {
-			t.Errorf("expected new project github.com/stuff/realthing, got %s", add.Name)
+		add1 := diff.Add[0]
+		if add1.Name != "github.com/sdboyer/deptest" {
+			t.Errorf("expected new project[0] github.com/sdboyer/deptest, got %s", add1.Name)
+		}
+		add2 := diff.Add[1]
+		if add2.Name != "github.com/stuff/realthing" {
+			t.Errorf("expected new project[1] github.com/stuff/realthing, got %s", add2.Name)
 		}
 	}
 

@@ -17,7 +17,7 @@ func TestReadManifest(t *testing.T) {
 	h := test.NewHelper(t)
 	defer h.Cleanup()
 
-	mf := h.GetTestFile("manifest/golden.json")
+	mf := h.GetTestFile("manifest/golden.toml")
 	defer mf.Close()
 	got, err := readManifest(mf)
 	if err != nil {
@@ -58,7 +58,7 @@ func TestWriteManifest(t *testing.T) {
 	h := test.NewHelper(t)
 	defer h.Cleanup()
 
-	golden := "manifest/golden.json"
+	golden := "manifest/golden.toml"
 	want := h.GetTestFileString(golden)
 	c, _ := gps.NewSemverConstraint("^v0.12.0")
 	m := &Manifest{
@@ -79,9 +79,9 @@ func TestWriteManifest(t *testing.T) {
 		Ignores: []string{"github.com/foo/bar"},
 	}
 
-	got, err := m.MarshalJSON()
+	got, err := m.MarshalTOML()
 	if err != nil {
-		t.Fatalf("Error while marshaling valid manifest to JSON: %q", err)
+		t.Fatalf("Error while marshaling valid manifest to TOML: %q", err)
 	}
 
 	if string(got) != want {
@@ -90,7 +90,7 @@ func TestWriteManifest(t *testing.T) {
 				t.Fatal(err)
 			}
 		} else {
-			t.Errorf("Valid manifest did not marshal to JSON as expected:\n\t(GOT): %s\n\t(WNT): %s", string(got), want)
+			t.Errorf("Valid manifest did not marshal to TOML as expected:\n\t(GOT): %s\n\t(WNT): %s", string(got), want)
 		}
 	}
 }
@@ -104,7 +104,8 @@ func TestReadManifestErrors(t *testing.T) {
 		name string
 		file string
 	}{
-		{"multiple constraints", "manifest/error.json"},
+		{"multiple constraints", "manifest/error1.toml"},
+		{"multiple dependencies", "manifest/error2.toml"},
 	}
 
 	for _, tst := range tests {
