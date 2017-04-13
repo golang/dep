@@ -62,6 +62,7 @@ type statusCommand struct {
 	detailed bool
 	json     bool
 	template string
+	output   string
 	dot      bool
 	old      bool
 	missing  bool
@@ -152,6 +153,35 @@ func (out *jsonOutput) MissingFooter() {
 	json.NewEncoder(out.w).Encode(out.missing)
 }
 
+type dotOutput struct {
+	w io.Writer
+	o string
+	g *graphviz
+	p *dep.Project
+}
+
+func (out *dotOutput) BasicHeader() {
+	out.g = new(graphviz).New()
+
+	ptree, _ := pkgtree.ListPackages(out.p.AbsRoot, string(out.p.ImportRoot))
+	prm, _ := ptree.ToReachMap(true, false, false, nil)
+
+	out.g.createNode(string(out.p.ImportRoot), "", prm.Flatten(false))
+}
+
+func (out *dotOutput) BasicFooter() {
+	gvo := out.g.output()
+	fmt.Fprintf(out.w, gvo.String())
+}
+
+func (out *dotOutput) BasicLine(bs *BasicStatus) {
+	out.g.createNode(bs.ProjectRoot, bs.Version.String(), bs.Children)
+}
+
+func (out *dotOutput) MissingHeader()                {}
+func (out *dotOutput) MissingLine(ms *MissingStatus) {}
+func (out *dotOutput) MissingFooter()                {}
+
 func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
 	p, err := ctx.LoadProject("")
 	if err != nil {
@@ -173,6 +203,12 @@ func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
 		out = &jsonOutput{
 			w: os.Stdout,
 		}
+	case cmd.dot:
+		out = &dotOutput{
+			p: p,
+			o: cmd.output,
+			w: os.Stdout,
+		}
 	default:
 		out = &tableOutput{
 			w: tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0),
@@ -185,6 +221,7 @@ func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
 // in the summary/list status output mode.
 type BasicStatus struct {
 	ProjectRoot  string
+	Children     []string
 	Constraint   gps.Constraint
 	Version      gps.UnpairedVersion
 	Revision     gps.Revision
@@ -246,6 +283,20 @@ func runStatusAll(out outputter, p *dep.Project, sm *gps.SourceMgr) error {
 			bs := BasicStatus{
 				ProjectRoot:  string(proj.Ident().ProjectRoot),
 				PackageCount: len(proj.Packages()),
+			}
+
+			// Get children only for specific outputers
+			// in order to avoid slower status process
+			switch out.(type) {
+			case *dotOutput:
+				ptr, err := sm.ListPackages(proj.Ident(), proj.Version())
+
+				if err != nil {
+					return fmt.Errorf("analysis of %s package failed: %v", proj.Ident().ProjectRoot, err)
+				}
+
+				prm, _ := ptr.ToReachMap(true, false, false, nil)
+				bs.Children = prm.Flatten(false)
 			}
 
 			// Split apart the version from the lock into its constituent parts
