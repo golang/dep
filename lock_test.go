@@ -18,7 +18,7 @@ func TestReadLock(t *testing.T) {
 	h := test.NewHelper(t)
 	defer h.Cleanup()
 
-	golden := "lock/golden0.json"
+	golden := "lock/golden0.toml"
 	g0f := h.GetTestFile(golden)
 	defer g0f.Close()
 	got, err := readLock(g0f)
@@ -42,7 +42,7 @@ func TestReadLock(t *testing.T) {
 		t.Error("Valid lock did not parse as expected")
 	}
 
-	golden = "lock/golden1.json"
+	golden = "lock/golden1.toml"
 	g1f := h.GetTestFile(golden)
 	defer g1f.Close()
 	got, err = readLock(g1f)
@@ -71,7 +71,7 @@ func TestWriteLock(t *testing.T) {
 	h := test.NewHelper(t)
 	defer h.Cleanup()
 
-	golden := "lock/golden0.json"
+	golden := "lock/golden0.toml"
 	want := h.GetTestFileString(golden)
 	memo, _ := hex.DecodeString("2252a285ab27944a4d7adcba8dbd03980f59ba652f12db39fa93b927c345593e")
 	l := &Lock{
@@ -85,9 +85,9 @@ func TestWriteLock(t *testing.T) {
 		},
 	}
 
-	got, err := l.MarshalJSON()
+	got, err := l.MarshalTOML()
 	if err != nil {
-		t.Fatalf("Error while marshaling valid lock to JSON: %q", err)
+		t.Fatalf("Error while marshaling valid lock to TOML: %q", err)
 	}
 
 	if string(got) != want {
@@ -96,11 +96,11 @@ func TestWriteLock(t *testing.T) {
 				t.Fatal(err)
 			}
 		} else {
-			t.Errorf("Valid lock did not marshal to JSON as expected:\n\t(GOT): %s\n\t(WNT): %s", string(got), want)
+			t.Errorf("Valid lock did not marshal to TOML as expected:\n\t(GOT): %s\n\t(WNT): %s", string(got), want)
 		}
 	}
 
-	golden = "lock/golden1.json"
+	golden = "lock/golden1.toml"
 	want = h.GetTestFileString(golden)
 	memo, _ = hex.DecodeString("2252a285ab27944a4d7adcba8dbd03980f59ba652f12db39fa93b927c345593e")
 	l = &Lock{
@@ -114,9 +114,9 @@ func TestWriteLock(t *testing.T) {
 		},
 	}
 
-	got, err = l.MarshalJSON()
+	got, err = l.MarshalTOML()
 	if err != nil {
-		t.Fatalf("Error while marshaling valid lock to JSON: %q", err)
+		t.Fatalf("Error while marshaling valid lock to TOML: %q", err)
 	}
 
 	if string(got) != want {
@@ -125,7 +125,7 @@ func TestWriteLock(t *testing.T) {
 				t.Fatal(err)
 			}
 		} else {
-			t.Errorf("Valid lock did not marshal to JSON as expected:\n\t(GOT): %s\n\t(WNT): %s", string(got), want)
+			t.Errorf("Valid lock did not marshal to TOML as expected:\n\t(GOT): %s\n\t(WNT): %s", string(got), want)
 		}
 	}
 }
@@ -139,9 +139,9 @@ func TestReadLockErrors(t *testing.T) {
 		name string
 		file string
 	}{
-		{"specified both", "lock/error0.json"},
-		{"invalid hash", "lock/error1.json"},
-		{"no branch or version", "lock/error2.json"},
+		{"specified both", "lock/error0.toml"},
+		{"invalid hash", "lock/error1.toml"},
+		{"no branch or version", "lock/error2.toml"},
 	}
 
 	for _, tst := range tests {

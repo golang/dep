@@ -29,6 +29,11 @@ var (
 	PrintLogs *bool = flag.Bool("logs", false, "log stdin/stdout of test commands")
 )
 
+const (
+	manifestName string = "Gopkg.toml"
+	lockName     string = "Gopkg.lock"
+)
+
 func init() {
 	switch runtime.GOOS {
 	case "windows":
@@ -584,7 +589,7 @@ func (h *Helper) Cleanup() {
 
 // ReadManifest returns the manifest in the current directory.
 func (h *Helper) ReadManifest() string {
-	m := filepath.Join(h.pwd(), "manifest.json")
+	m := filepath.Join(h.pwd(), manifestName)
 	h.MustExist(m)
 
 	f, err := ioutil.ReadFile(m)
@@ -594,7 +599,7 @@ func (h *Helper) ReadManifest() string {
 
 // ReadLock returns the lock in the current directory.
 func (h *Helper) ReadLock() string {
-	l := filepath.Join(h.pwd(), "lock.json")
+	l := filepath.Join(h.pwd(), lockName)
 	h.MustExist(l)
 
 	f, err := ioutil.ReadFile(l)
