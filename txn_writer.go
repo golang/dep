@@ -27,6 +27,8 @@ const exampleToml = `
 # [[dependencies]]
 # branch = "master"
 # name = "github.com/vendor/package"
+# revision = "abc123"
+# version = "1.0.0"
 `
 
 // SafeWriter transactionalizes writes of manifest, lock, and vendor dir, both
@@ -264,6 +266,10 @@ func (sw *SafeWriter) Write(root string, sm gps.SourceManager) error {
 	defer os.RemoveAll(td)
 
 	if sw.Payload.HasManifest() {
+		if sw.Payload.Manifest.IsEmpty() {
+			err := modifyWithString(mpath, exampleToml)
+			return errors.Wrap(err, "failed to generate example text")
+		}
 		if err := writeFile(filepath.Join(td, ManifestName), sw.Payload.Manifest); err != nil {
 			return errors.Wrap(err, "failed to write manifest file to temp dir")
 		}
@@ -359,13 +365,6 @@ func (sw *SafeWriter) Write(root string, sm gps.SourceManager) error {
 	if sw.Payload.HasVendor() {
 		// Nothing we can really do about an error at this point, so ignore it
 		os.RemoveAll(vendorbak)
-	}
-
-	if len(sw.Payload.Manifest.Dependencies) == 0 {
-		err := modifyWithString(mpath, exampleToml)
-		if err != nil {
-			goto fail
-		}
 	}
 
 	return nil

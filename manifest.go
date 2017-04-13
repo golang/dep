@@ -140,6 +140,14 @@ func (m *Manifest) toRaw() rawManifest {
 	return raw
 }
 
+// IsEmpty - Checks if payload is empty
+func (m *Manifest) IsEmpty() bool {
+	if m.Ovr == nil && len(m.Ignores) == 0 && len(m.Dependencies) == 0 {
+		return true
+	}
+	return false
+}
+
 type sortedRawProjects []rawProject
 
 func (s sortedRawProjects) Len() int      { return len(s) }
