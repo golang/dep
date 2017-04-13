@@ -170,7 +170,7 @@ func (s *gitSource) listVersions(ctx context.Context) (vlist []PairedVersion, er
 	}
 
 	all := bytes.Split(bytes.TrimSpace(out), []byte("\n"))
-	if len(all) == 0 {
+	if len(all) == 1 && len(all[0]) == 0 {
 		return nil, fmt.Errorf("no data returned from ls-remote")
 	}
 
