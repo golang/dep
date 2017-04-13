@@ -9,6 +9,7 @@ import (
 	"sort"
 
 	"bytes"
+
 	"github.com/pelletier/go-toml"
 	"github.com/pkg/errors"
 	"github.com/sdboyer/gps"
