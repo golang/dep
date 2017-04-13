@@ -1,0 +1,7 @@
+
+# Example:
+# [[dependencies]]
+# branch = "master"
+# name = "github.com/vendor/package"
+# revision = "abc123"
+# version = "1.0.0"
