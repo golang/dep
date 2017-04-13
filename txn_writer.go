@@ -594,3 +594,107 @@ func diffProjects(lp1 gps.LockedProject, lp2 gps.LockedProject) *LockedProjectDi
 	}
 	return &diff
 }
+
+func PruneProject(p *Project, sm gps.SourceManager) error {
+	td, err := ioutil.TempDir(os.TempDir(), "dep")
+	if err != nil {
+		return errors.Wrap(err, "error while creating temp dir for writing manifest/lock/vendor")
+	}
+	defer os.RemoveAll(td)
+
+	if err := gps.WriteDepTree(td, p.Lock, sm, true); err != nil {
+		return err
+	}
+
+	var toKeep []string
+	for _, project := range p.Lock.Projects() {
+		projectRoot := string(project.Ident().ProjectRoot)
+		for _, pkg := range project.Packages() {
+			toKeep = append(toKeep, filepath.Join(projectRoot, pkg))
+		}
+	}
+
+	toDelete, err := calculatePrune(td, toKeep)
+	if err != nil {
+		return err
+	}
+
+	if err := deleteDirs(toDelete); err != nil {
+		return err
+	}
+
+	vpath := filepath.Join(p.AbsRoot, "vendor")
+	vendorbak := vpath + ".orig"
+	var failerr error
+	if _, err := os.Stat(vpath); err == nil {
+		// Move out the old vendor dir. just do it into an adjacent dir, to
+		// try to mitigate the possibility of a pointless cross-filesystem
+		// move with a temp directory.
+		if _, err := os.Stat(vendorbak); err == nil {
+			// If the adjacent dir already exists, bite the bullet and move
+			// to a proper tempdir.
+			vendorbak = filepath.Join(td, "vendor.orig")
+		}
+		failerr = renameWithFallback(vpath, vendorbak)
+		if failerr != nil {
+			goto fail
+		}
+	}
+
+	// Move in the new one.
+	failerr = renameWithFallback(td, vpath)
+	if failerr != nil {
+		goto fail
+	}
+
+	os.RemoveAll(vendorbak)
+
+	return nil
+
+fail:
+	renameWithFallback(vendorbak, vpath)
+	return failerr
+}
+
+func calculatePrune(vendorDir string, keep []string) ([]string, error) {
+	sort.Strings(keep)
+	toDelete := []string{}
+	err := filepath.Walk(vendorDir, func(path string, info os.FileInfo, err error) error {
+		if _, err := os.Lstat(path); err != nil {
+			return nil
+		}
+		if !info.IsDir() {
+			return nil
+		}
+		if path == vendorDir {
+			return nil
+		}
+
+		name := strings.TrimPrefix(path, vendorDir+"/")
+		i := sort.Search(len(keep), func(i int) bool {
+			return name <= keep[i]
+		})
+		if i >= len(keep) || !strings.HasPrefix(keep[i], name) {
+			toDelete = append(toDelete, path)
+		}
+		return nil
+	})
+	return toDelete, err
+}
+
+func deleteDirs(toDelete []string) error {
+	// sort by length so we delete sub dirs first
+	sort.Sort(byLen(toDelete))
+	for _, path := range toDelete {
+		if err := os.RemoveAll(path); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+type byLen []string
+
+func (a byLen) Len() int           { return len(a) }
+func (a byLen) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a byLen) Less(i, j int) bool { return len(a[i]) > len(a[j]) }
