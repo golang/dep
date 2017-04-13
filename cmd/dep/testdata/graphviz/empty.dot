@@ -1,0 +1,3 @@
+digraph {
+	node [shape=box];
+}
