@@ -75,6 +75,14 @@ func writeFile(path string, in toml.Marshaler) error {
 	return err
 }
 
+// modifyWithString - Modifies a given file with a new string input.
+// This is used to write arbitrary string data to a file, such as
+// updating the `Gopkg.toml` file with example data if no deps found
+// on init.
+func modifyWithString(path, data string) error {
+	return ioutil.WriteFile(path, []byte(data), 0644)
+}
+
 // renameWithFallback attempts to rename a file or directory, but falls back to
 // copying in the event of a cross-link device error. If the fallback copy
 // succeeds, src is still removed, emulating normal rename behavior.

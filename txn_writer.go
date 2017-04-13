@@ -19,6 +19,16 @@ import (
 	"github.com/sdboyer/gps"
 )
 
+// Example string to be written to the manifest file
+// if no dependencies are found in the project
+// during `dep init`
+const exampleToml = `
+# Example:
+# [[dependencies]]
+# branch = "master"
+# name = "github.com/vendor/package"
+`
+
 // SafeWriter transactionalizes writes of manifest, lock, and vendor dir, both
 // individually and in any combination, into a pseudo-atomic action with
 // transactional rollback.
@@ -172,6 +182,7 @@ const (
 // - If oldLock is provided without newLock, error.
 // - If vendor is VendorAlways without a newLock, error.
 func (sw *SafeWriter) Prepare(manifest *Manifest, oldLock, newLock *Lock, vendor VendorBehavior) error {
+
 	sw.Payload = &SafeWriterPayload{
 		Manifest: manifest,
 		Lock:     newLock,
@@ -227,6 +238,7 @@ func (payload SafeWriterPayload) validate(root string, sm gps.SourceManager) err
 // This mostly guarantees that dep cannot exit with a partial write that would
 // leave an undefined state on disk.
 func (sw *SafeWriter) Write(root string, sm gps.SourceManager) error {
+
 	if sw.Payload == nil {
 		return errors.New("Cannot call SafeWriter.Write before SafeWriter.Prepare")
 	}
@@ -347,6 +359,13 @@ func (sw *SafeWriter) Write(root string, sm gps.SourceManager) error {
 	if sw.Payload.HasVendor() {
 		// Nothing we can really do about an error at this point, so ignore it
 		os.RemoveAll(vendorbak)
+	}
+
+	if len(sw.Payload.Manifest.Dependencies) == 0 {
+		err := modifyWithString(mpath, exampleToml)
+		if err != nil {
+			goto fail
+		}
 	}
 
 	return nil
