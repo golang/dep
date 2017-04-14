@@ -144,7 +144,7 @@ func DiffLocks(l1 Lock, l2 Lock) *LockDiff {
 
 func buildLockedProjectDiff(lp LockedProject) LockedProjectDiff {
 	s2 := lp.pi.Source
-	r2, b2, v2 := GetVersionInfo(lp.Version())
+	r2, b2, v2 := VersionComponentStrings(lp.Version())
 
 	var rev, version, branch, source *StringDiff
 	if s2 != "" {
@@ -185,8 +185,8 @@ func DiffProjects(lp1 LockedProject, lp2 LockedProject) *LockedProjectDiff {
 		diff.Source = &StringDiff{Previous: s1, Current: s2}
 	}
 
-	r1, b1, v1 := GetVersionInfo(lp1.Version())
-	r2, b2, v2 := GetVersionInfo(lp2.Version())
+	r1, b1, v1 := VersionComponentStrings(lp1.Version())
+	r2, b2, v2 := VersionComponentStrings(lp2.Version())
 	if r1 != r2 {
 		diff.Revision = &StringDiff{Previous: r1, Current: r2}
 	}
