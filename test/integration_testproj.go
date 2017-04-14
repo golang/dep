@@ -5,6 +5,7 @@
 package test
 
 import (
+	"bytes"
 	"io"
 	"io/ioutil"
 	"os"
@@ -30,12 +31,13 @@ type IntegrationTestProject struct {
 	tempdir    string
 	env        []string
 	origWd     string
+	stdout     bytes.Buffer
+	stderr     bytes.Buffer
 }
 
 func NewTestProject(t *testing.T, initPath, wd string) *IntegrationTestProject {
 	new := &IntegrationTestProject{
 		t:      t,
-		h:      NewHelper(t),
 		origWd: wd,
 		env:    os.Environ(),
 	}
@@ -47,7 +49,6 @@ func NewTestProject(t *testing.T, initPath, wd string) *IntegrationTestProject {
 }
 
 func (p *IntegrationTestProject) Cleanup() {
-	p.h.Cleanup()
 	os.RemoveAll(p.tempdir)
 }
 
@@ -68,7 +69,8 @@ func (p *IntegrationTestProject) TempDir(args ...string) {
 }
 
 func (p *IntegrationTestProject) TempProjDir(args ...string) {
-	p.TempDir(p.ProjPath(args...))
+	localPath := append([]string{ProjectRoot}, args...)
+	p.TempDir(localPath...)
 }
 
 func (p *IntegrationTestProject) VendorPath(args ...string) string {
@@ -79,44 +81,44 @@ func (p *IntegrationTestProject) VendorPath(args ...string) string {
 
 func (p *IntegrationTestProject) RunGo(args ...string) {
 	cmd := exec.Command("go", args...)
-	p.h.stdout.Reset()
-	p.h.stderr.Reset()
-	cmd.Stdout = &p.h.stdout
-	cmd.Stderr = &p.h.stderr
+	p.stdout.Reset()
+	p.stderr.Reset()
+	cmd.Stdout = &p.stdout
+	cmd.Stderr = &p.stderr
 	cmd.Dir = p.tempdir
 	cmd.Env = p.env
 	status := cmd.Run()
-	if p.h.stdout.Len() > 0 {
-		p.h.t.Log("go standard output:")
-		p.h.t.Log(p.h.stdout.String())
+	if p.stdout.Len() > 0 {
+		p.t.Log("go standard output:")
+		p.t.Log(p.stdout.String())
 	}
-	if p.h.stderr.Len() > 0 {
-		p.h.t.Log("go standard error:")
-		p.h.t.Log(p.h.stderr.String())
+	if p.stderr.Len() > 0 {
+		p.t.Log("go standard error:")
+		p.t.Log(p.stderr.String())
 	}
 	if status != nil {
-		p.h.t.Logf("go %v failed unexpectedly: %v", args, status)
-		p.h.t.FailNow()
+		p.t.Logf("go %v failed unexpectedly: %v", args, status)
+		p.t.FailNow()
 	}
 }
 
 func (p *IntegrationTestProject) RunGit(dir string, args ...string) {
 	cmd := exec.Command("git", args...)
-	p.h.stdout.Reset()
-	p.h.stderr.Reset()
-	cmd.Stdout = &p.h.stdout
-	cmd.Stderr = &p.h.stderr
+	p.stdout.Reset()
+	p.stderr.Reset()
+	cmd.Stdout = &p.stdout
+	cmd.Stderr = &p.stderr
 	cmd.Dir = dir
 	cmd.Env = p.env
 	status := cmd.Run()
 	if *PrintLogs {
-		if p.h.stdout.Len() > 0 {
+		if p.stdout.Len() > 0 {
 			p.t.Logf("git %v standard output:", args)
-			p.t.Log(p.h.stdout.String())
+			p.t.Log(p.stdout.String())
 		}
-		if p.h.stderr.Len() > 0 {
+		if p.stderr.Len() > 0 {
 			p.t.Logf("git %v standard error:", args)
-			p.t.Log(p.h.stderr.String())
+			p.t.Log(p.stderr.String())
 		}
 	}
 	if status != nil {
@@ -134,31 +136,30 @@ func (p *IntegrationTestProject) GetVendorGit(ip string) {
 
 func (p *IntegrationTestProject) DoRun(args []string) error {
 	if *PrintLogs {
-		p.h.t.Logf("running testdep %v", args)
+		p.t.Logf("running testdep %v", args)
 	}
 	var prog string
 	prog = filepath.Join(p.origWd, "testdep"+ExeSuffix)
 	newargs := []string{args[0], "-v"}
 	newargs = append(newargs, args[1:]...)
 	cmd := exec.Command(prog, newargs...)
-	p.h.stdout.Reset()
-	p.h.stderr.Reset()
-	cmd.Stdout = &p.h.stdout
-	cmd.Stderr = &p.h.stderr
+	p.stdout.Reset()
+	p.stderr.Reset()
+	cmd.Stdout = &p.stdout
+	cmd.Stderr = &p.stderr
 	cmd.Env = p.env
 	cmd.Dir = p.ProjPath("")
 	status := cmd.Run()
 	if *PrintLogs {
-		if p.h.stdout.Len() > 0 {
-			p.h.t.Log("standard output:")
-			p.h.t.Log(p.h.stdout.String())
+		if p.stdout.Len() > 0 {
+			p.t.Log("standard output:")
+			p.t.Log(p.stdout.String())
 		}
-		if p.h.stderr.Len() > 0 {
-			p.h.t.Log("standard error:")
-			p.h.t.Log(p.h.stderr.String())
+		if p.stderr.Len() > 0 {
+			p.t.Log("standard error:")
+			p.t.Log(p.stderr.String())
 		}
 	}
-	p.h.ran = true
 	return status
 }
 
@@ -261,7 +262,7 @@ func (p *IntegrationTestProject) makeRootTempDir() {
 	if p.tempdir == "" {
 		var err error
 		p.tempdir, err = ioutil.TempDir("", "gotest")
-		p.h.Must(err)
+		p.Must(err)
 	}
 }
 
@@ -269,4 +270,11 @@ func (p *IntegrationTestProject) makeRootTempDir() {
 // command.
 func (p *IntegrationTestProject) Setenv(name, val string) {
 	p.env = append(p.env, name+"="+val)
+}
+
+// Must gives a fatal error if err is not nil.
+func (p *IntegrationTestProject) Must(err error) {
+	if err != nil {
+		p.t.Fatalf("%+v", err)
+	}
 }
