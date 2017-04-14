@@ -444,3 +444,54 @@ func TestDiffLocks_ModifyHash(t *testing.T) {
 		t.Fatalf("Expected diff.HashDiff to be '%s', got '%s'", want, got)
 	}
 }
+
+func TestDiffLocks_EmptyInitialLock(t *testing.T) {
+	h2, _ := hex.DecodeString("abc123")
+	l2 := safeLock{
+		h: h2,
+		p: []LockedProject{
+			{pi: ProjectIdentifier{ProjectRoot: "github.com/foo/bar"}, v: NewVersion("v1.0.0")},
+		},
+	}
+
+	diff := DiffLocks(nil, l2)
+
+	wantHash := "+ abc123"
+	gotHash := diff.HashDiff.String()
+	if gotHash != wantHash {
+		t.Fatalf("Expected diff.HashDiff to be '%s', got '%s'", wantHash, gotHash)
+	}
+
+	if len(diff.Add) != 1 {
+		t.Fatalf("Expected diff.Add to contain 1 project, got %d", len(diff.Add))
+	}
+}
+
+func TestDiffLocks_EmptyFinalLock(t *testing.T) {
+	h1, _ := hex.DecodeString("abc123")
+	l1 := safeLock{
+		h: h1,
+		p: []LockedProject{
+			{pi: ProjectIdentifier{ProjectRoot: "github.com/foo/bar"}, v: NewVersion("v1.0.0")},
+		},
+	}
+
+	diff := DiffLocks(l1, nil)
+
+	wantHash := "- abc123"
+	gotHash := diff.HashDiff.String()
+	if gotHash != wantHash {
+		t.Fatalf("Expected diff.HashDiff to be '%s', got '%s'", wantHash, gotHash)
+	}
+
+	if len(diff.Remove) != 1 {
+		t.Fatalf("Expected diff.Remove to contain 1 project, got %d", len(diff.Remove))
+	}
+}
+
+func TestDiffLocks_EmptyLocks(t *testing.T) {
+	diff := DiffLocks(nil, nil)
+	if diff != nil {
+		t.Fatal("Expected the diff to be empty")
+	}
+}
