@@ -5,15 +5,16 @@
 package dep
 
 import (
-	"bytes"
-	"encoding/json"
 	"io"
+	"sort"
 
+	"bytes"
+	"github.com/pelletier/go-toml"
 	"github.com/pkg/errors"
 	"github.com/sdboyer/gps"
 )
 
-const ManifestName = "manifest.json"
+const ManifestName = "Gopkg.toml"
 
 type Manifest struct {
 	Dependencies gps.ProjectConstraints
@@ -23,131 +24,160 @@ type Manifest struct {
 }
 
 type rawManifest struct {
-	Dependencies map[string]possibleProps `json:"dependencies,omitempty"`
-	Overrides    map[string]possibleProps `json:"overrides,omitempty"`
-	Ignores      []string                 `json:"ignores,omitempty"`
-	Required     []string                 `json:"required,omitempty"`
+	Dependencies []rawProject `toml:"dependencies,omitempty"`
+	Overrides    []rawProject `toml:"overrides,omitempty"`
+	Ignores      []string     `toml:"ignores,omitempty"`
+	Required     []string     `toml:"required,omitempty"`
 }
 
-type possibleProps struct {
-	Branch   string `json:"branch,omitempty"`
-	Revision string `json:"revision,omitempty"`
-	Version  string `json:"version,omitempty"`
-	Source   string `json:"source,omitempty"`
-}
-
-func newRawManifest() rawManifest {
-	return rawManifest{
-		Dependencies: make(map[string]possibleProps),
-		Overrides:    make(map[string]possibleProps),
-		Ignores:      make([]string, 0),
-		Required:     make([]string, 0),
-	}
+type rawProject struct {
+	Name     string `toml:"name"`
+	Branch   string `toml:"branch,omitempty"`
+	Revision string `toml:"revision,omitempty"`
+	Version  string `toml:"version,omitempty"`
+	Source   string `toml:"source,omitempty"`
 }
 
 func readManifest(r io.Reader) (*Manifest, error) {
-	rm := rawManifest{}
-	err := json.NewDecoder(r).Decode(&rm)
+	buf := &bytes.Buffer{}
+	_, err := buf.ReadFrom(r)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "Unable to read byte stream")
 	}
+
+	raw := rawManifest{}
+	err = toml.Unmarshal(buf.Bytes(), &raw)
+	if err != nil {
+		return nil, errors.Wrap(err, "Unable to parse the manifest as TOML")
+	}
+
+	return fromRawManifest(raw)
+}
+
+func fromRawManifest(raw rawManifest) (*Manifest, error) {
 	m := &Manifest{
-		Dependencies: make(gps.ProjectConstraints, len(rm.Dependencies)),
-		Ovr:          make(gps.ProjectConstraints, len(rm.Overrides)),
-		Ignores:      rm.Ignores,
-		Required:     rm.Required,
+		Dependencies: make(gps.ProjectConstraints, len(raw.Dependencies)),
+		Ovr:          make(gps.ProjectConstraints, len(raw.Overrides)),
+		Ignores:      raw.Ignores,
+		Required:     raw.Required,
 	}
 
-	for n, pp := range rm.Dependencies {
-		m.Dependencies[gps.ProjectRoot(n)], err = toProps(n, pp)
+	for i := 0; i < len(raw.Dependencies); i++ {
+		name, prj, err := toProject(raw.Dependencies[i])
 		if err != nil {
 			return nil, err
 		}
+		if _, exists := m.Dependencies[name]; exists {
+			return nil, errors.Errorf("multiple dependencies specified for %s, can only specify one", name)
+		}
+		m.Dependencies[name] = prj
 	}
 
-	for n, pp := range rm.Overrides {
-		m.Ovr[gps.ProjectRoot(n)], err = toProps(n, pp)
+	for i := 0; i < len(raw.Overrides); i++ {
+		name, prj, err := toProject(raw.Overrides[i])
 		if err != nil {
 			return nil, err
 		}
+		m.Ovr[name] = prj
 	}
 
 	return m, nil
 }
 
-// toProps interprets the string representations of project information held in
-// a possibleProps, converting them into a proper gps.ProjectProperties. An
-// error is returned if the possibleProps contains some invalid combination -
+// toProject interprets the string representations of project information held in
+// a rawProject, converting them into a proper gps.ProjectProperties. An
+// error is returned if the rawProject contains some invalid combination -
 // for example, if both a branch and version constraint are specified.
-func toProps(n string, p possibleProps) (pp gps.ProjectProperties, err error) {
-	if p.Branch != "" {
-		if p.Version != "" || p.Revision != "" {
-			return pp, errors.Errorf("multiple constraints specified for %s, can only specify one", n)
+func toProject(raw rawProject) (n gps.ProjectRoot, pp gps.ProjectProperties, err error) {
+	n = gps.ProjectRoot(raw.Name)
+	if raw.Branch != "" {
+		if raw.Version != "" || raw.Revision != "" {
+			return n, pp, errors.Errorf("multiple constraints specified for %s, can only specify one", n)
 		}
-		pp.Constraint = gps.NewBranch(p.Branch)
-	} else if p.Version != "" {
-		if p.Revision != "" {
-			return pp, errors.Errorf("multiple constraints specified for %s, can only specify one", n)
+		pp.Constraint = gps.NewBranch(raw.Branch)
+	} else if raw.Version != "" {
+		if raw.Revision != "" {
+			return n, pp, errors.Errorf("multiple constraints specified for %s, can only specify one", n)
 		}
 
 		// always semver if we can
-		pp.Constraint, err = gps.NewSemverConstraint(p.Version)
+		pp.Constraint, err = gps.NewSemverConstraint(raw.Version)
 		if err != nil {
 			// but if not, fall back on plain versions
-			pp.Constraint = gps.NewVersion(p.Version)
+			pp.Constraint = gps.NewVersion(raw.Version)
 		}
-	} else if p.Revision != "" {
-		pp.Constraint = gps.Revision(p.Revision)
+	} else if raw.Revision != "" {
+		pp.Constraint = gps.Revision(raw.Revision)
 	} else {
 		// If the user specifies nothing, it means an open constraint (accept
 		// anything).
 		pp.Constraint = gps.Any()
 	}
 
-	pp.Source = p.Source
-	return pp, nil
+	pp.Source = raw.Source
+	return n, pp, nil
 }
 
-func (m *Manifest) MarshalJSON() ([]byte, error) {
+// toRaw converts the manifest into a representation suitable to write to the manifest file
+func (m *Manifest) toRaw() rawManifest {
 	raw := rawManifest{
-		Dependencies: make(map[string]possibleProps, len(m.Dependencies)),
-		Overrides:    make(map[string]possibleProps, len(m.Ovr)),
+		Dependencies: make([]rawProject, 0, len(m.Dependencies)),
+		Overrides:    make([]rawProject, 0, len(m.Ovr)),
 		Ignores:      m.Ignores,
 		Required:     m.Required,
 	}
-
-	for n, pp := range m.Dependencies {
-		raw.Dependencies[string(n)] = toPossible(pp)
+	for n, prj := range m.Dependencies {
+		raw.Dependencies = append(raw.Dependencies, toRawProject(n, prj))
 	}
+	sort.Sort(sortedRawProjects(raw.Dependencies))
 
-	for n, pp := range m.Ovr {
-		raw.Overrides[string(n)] = toPossible(pp)
+	for n, prj := range m.Ovr {
+		raw.Overrides = append(raw.Overrides, toRawProject(n, prj))
 	}
+	sort.Sort(sortedRawProjects(raw.Overrides))
 
-	var buf bytes.Buffer
-	enc := json.NewEncoder(&buf)
-	enc.SetIndent("", "    ")
-	enc.SetEscapeHTML(false)
-	err := enc.Encode(raw)
-
-	return buf.Bytes(), err
+	return raw
 }
 
-func toPossible(pp gps.ProjectProperties) possibleProps {
-	p := possibleProps{
-		Source: pp.Source,
+type sortedRawProjects []rawProject
+
+func (s sortedRawProjects) Len() int      { return len(s) }
+func (s sortedRawProjects) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
+func (s sortedRawProjects) Less(i, j int) bool {
+	l, r := s[i], s[j]
+
+	if l.Name < r.Name {
+		return true
+	}
+	if r.Name < l.Name {
+		return false
 	}
 
-	if v, ok := pp.Constraint.(gps.Version); ok {
+	return l.Source < r.Source
+}
+
+func (m *Manifest) MarshalTOML() ([]byte, error) {
+	raw := m.toRaw()
+	result, err := toml.Marshal(raw)
+	return result, errors.Wrap(err, "Unable to marshal the lock to a TOML string")
+}
+
+func toRawProject(name gps.ProjectRoot, project gps.ProjectProperties) rawProject {
+	raw := rawProject{
+		Name:   string(name),
+		Source: project.Source,
+	}
+
+	if v, ok := project.Constraint.(gps.Version); ok {
 		switch v.Type() {
 		case gps.IsRevision:
-			p.Revision = v.String()
+			raw.Revision = v.String()
 		case gps.IsBranch:
-			p.Branch = v.String()
+			raw.Branch = v.String()
 		case gps.IsSemver, gps.IsVersion:
-			p.Version = v.String()
+			raw.Version = v.String()
 		}
-		return p
+		return raw
 	}
 
 	// We simply don't allow for a case where the user could directly
@@ -155,11 +185,11 @@ func toPossible(pp gps.ProjectProperties) possibleProps {
 	// the 'any' case, because that's the other possibility, and it's what
 	// we interpret not having any constraint expressions at all to mean.
 	// if !gps.IsAny(pp.Constraint) && !gps.IsNone(pp.Constraint) {
-	if !gps.IsAny(pp.Constraint) && pp.Constraint != nil {
+	if !gps.IsAny(project.Constraint) && project.Constraint != nil {
 		// Has to be a semver range.
-		p.Version = pp.Constraint.String()
+		raw.Version = project.Constraint.String()
 	}
-	return p
+	return raw
 }
 
 func (m *Manifest) DependencyConstraints() gps.ProjectConstraints {
