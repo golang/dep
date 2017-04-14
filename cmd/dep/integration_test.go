@@ -19,6 +19,10 @@ func TestIntegration(t *testing.T) {
 	test.NeedsGit(t)
 
 	filepath.Walk(filepath.Join("testdata", "harness_tests"), func(path string, info os.FileInfo, err error) error {
+		wd, err := os.Getwd()
+		if err != nil {
+			panic(err)
+		}
 
 		if runtime.GOOS == "windows" && strings.Contains(path, "remove") {
 			// TODO skipping the remove tests on windows until some fixes happen in gps -
@@ -31,10 +35,13 @@ func TestIntegration(t *testing.T) {
 			testName := strings.Join(parse[2:len(parse)-1], "/")
 
 			t.Run(testName, func(t *testing.T) {
+				// Uncomment once the gps improvements are in place
+				// t.Parallel()
+
 				// Set up environment
-				testCase := test.NewTestCase(t, testName)
+				testCase := test.NewTestCase(t, testName, wd)
 				defer testCase.Cleanup()
-				testProj := test.NewTestProject(t, testCase.InitialPath())
+				testProj := test.NewTestProject(t, testCase.InitialPath(), wd)
 				defer testProj.Cleanup()
 
 				// Create and checkout the vendor revisions

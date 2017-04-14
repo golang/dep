@@ -6,11 +6,15 @@ package test
 
 import (
 	"io"
+	"io/ioutil"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
 	"testing"
+
+	"github.com/pkg/errors"
 )
 
 const (
@@ -23,41 +27,48 @@ type IntegrationTestProject struct {
 	t          *testing.T
 	h          *Helper
 	preImports []string
+	tempdir    string
+	env        []string
+	origWd     string
 }
 
-func NewTestProject(t *testing.T, initPath string) *IntegrationTestProject {
+func NewTestProject(t *testing.T, initPath, wd string) *IntegrationTestProject {
 	new := &IntegrationTestProject{
-		t: t,
-		h: NewHelper(t),
+		t:      t,
+		h:      NewHelper(t),
+		origWd: wd,
+		env:    os.Environ(),
 	}
-	new.TempDir(ProjectRoot)
+	new.makeRootTempDir()
 	new.TempDir(ProjectRoot, "vendor")
 	new.CopyTree(initPath)
-	new.h.Setenv("GOPATH", new.h.Path("."))
-	new.h.Cd(new.Path(ProjectRoot))
+	new.Setenv("GOPATH", new.tempdir)
 	return new
 }
 
 func (p *IntegrationTestProject) Cleanup() {
 	p.h.Cleanup()
+	os.RemoveAll(p.tempdir)
 }
 
 func (p *IntegrationTestProject) Path(args ...string) string {
-	return p.h.Path(filepath.Join(args...))
-}
-
-func (p *IntegrationTestProject) TempDir(args ...string) {
-	p.h.TempDir(filepath.Join(args...))
-}
-
-func (p *IntegrationTestProject) TempProjDir(args ...string) {
-	localPath := append([]string{ProjectRoot}, args...)
-	p.h.TempDir(filepath.Join(localPath...))
+	return filepath.Join(p.tempdir, filepath.Join(args...))
 }
 
 func (p *IntegrationTestProject) ProjPath(args ...string) string {
 	localPath := append([]string{ProjectRoot}, args...)
 	return p.Path(localPath...)
+}
+
+func (p *IntegrationTestProject) TempDir(args ...string) {
+	fullPath := p.Path(args...)
+	if err := os.MkdirAll(fullPath, 0755); err != nil && !os.IsExist(err) {
+		p.t.Fatalf("%+v", errors.Errorf("Unable to create temp directory: %s", fullPath))
+	}
+}
+
+func (p *IntegrationTestProject) TempProjDir(args ...string) {
+	p.TempDir(p.ProjPath(args...))
 }
 
 func (p *IntegrationTestProject) VendorPath(args ...string) string {
@@ -67,11 +78,51 @@ func (p *IntegrationTestProject) VendorPath(args ...string) string {
 }
 
 func (p *IntegrationTestProject) RunGo(args ...string) {
-	p.h.RunGo(args...)
+	cmd := exec.Command("go", args...)
+	p.h.stdout.Reset()
+	p.h.stderr.Reset()
+	cmd.Stdout = &p.h.stdout
+	cmd.Stderr = &p.h.stderr
+	cmd.Dir = p.tempdir
+	cmd.Env = p.env
+	status := cmd.Run()
+	if p.h.stdout.Len() > 0 {
+		p.h.t.Log("go standard output:")
+		p.h.t.Log(p.h.stdout.String())
+	}
+	if p.h.stderr.Len() > 0 {
+		p.h.t.Log("go standard error:")
+		p.h.t.Log(p.h.stderr.String())
+	}
+	if status != nil {
+		p.h.t.Logf("go %v failed unexpectedly: %v", args, status)
+		p.h.t.FailNow()
+	}
 }
 
 func (p *IntegrationTestProject) RunGit(dir string, args ...string) {
-	p.h.RunGit(dir, args...)
+	cmd := exec.Command("git", args...)
+	p.h.stdout.Reset()
+	p.h.stderr.Reset()
+	cmd.Stdout = &p.h.stdout
+	cmd.Stderr = &p.h.stderr
+	cmd.Dir = dir
+	cmd.Env = p.env
+	status := cmd.Run()
+	if *PrintLogs {
+		if p.h.stdout.Len() > 0 {
+			p.t.Logf("git %v standard output:", args)
+			p.t.Log(p.h.stdout.String())
+		}
+		if p.h.stderr.Len() > 0 {
+			p.t.Logf("git %v standard error:", args)
+			p.t.Log(p.h.stderr.String())
+		}
+	}
+	if status != nil {
+		p.t.Logf("git %v failed unexpectedly: %v", args, status)
+		p.t.FailNow()
+	}
 }
 
 func (p *IntegrationTestProject) GetVendorGit(ip string) {
@@ -82,7 +133,33 @@ func (p *IntegrationTestProject) GetVendorGit(ip string) {
 }
 
 func (p *IntegrationTestProject) DoRun(args []string) error {
-	return p.h.DoRun(args)
+	if *PrintLogs {
+		p.h.t.Logf("running testdep %v", args)
+	}
+	var prog string
+	prog = filepath.Join(p.origWd, "testdep"+ExeSuffix)
+	newargs := []string{args[0], "-v"}
+	newargs = append(newargs, args[1:]...)
+	cmd := exec.Command(prog, newargs...)
+	p.h.stdout.Reset()
+	p.h.stderr.Reset()
+	cmd.Stdout = &p.h.stdout
+	cmd.Stderr = &p.h.stderr
+	cmd.Env = p.env
+	cmd.Dir = p.ProjPath("")
+	status := cmd.Run()
+	if *PrintLogs {
+		if p.h.stdout.Len() > 0 {
+			p.h.t.Log("standard output:")
+			p.h.t.Log(p.h.stdout.String())
+		}
+		if p.h.stderr.Len() > 0 {
+			p.h.t.Log("standard error:")
+			p.h.t.Log(p.h.stderr.String())
+		}
+	}
+	p.h.ran = true
+	return status
 }
 
 func (p *IntegrationTestProject) CopyTree(src string) {
@@ -159,6 +236,7 @@ func (p *IntegrationTestProject) GetImportPaths() []string {
 	return result
 }
 
+// Take a snapshot of the import paths before test is run
 func (p *IntegrationTestProject) RecordImportPaths() {
 	p.preImports = p.GetImportPaths()
 }
@@ -175,4 +253,20 @@ func (p *IntegrationTestProject) CompareImportPaths() {
 			p.t.Errorf("Change in import paths during: pre %s post %s", gotImportPaths, wantImportPaths)
 		}
 	}
+}
+
+// makeRootTempdir makes a temporary directory for a run of testgo. If
+// the temporary directory was already created, this does nothing.
+func (p *IntegrationTestProject) makeRootTempDir() {
+	if p.tempdir == "" {
+		var err error
+		p.tempdir, err = ioutil.TempDir("", "gotest")
+		p.h.Must(err)
+	}
+}
+
+// Setenv sets an environment variable to use when running the test go
+// command.
+func (p *IntegrationTestProject) Setenv(name, val string) {
+	p.env = append(p.env, name+"="+val)
 }

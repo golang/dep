@@ -32,11 +32,7 @@ type IntegrationTestCase struct {
 	VendorFinal   []string          `json:"vendor-final"`
 }
 
-func NewTestCase(t *testing.T, name string) *IntegrationTestCase {
-	wd, err := os.Getwd()
-	if err != nil {
-		panic(err)
-	}
+func NewTestCase(t *testing.T, name, wd string) *IntegrationTestCase {
 	rootPath := filepath.FromSlash(filepath.Join(wd, "testdata", "harness_tests", name))
 	n := &IntegrationTestCase{
 		t:           t,
