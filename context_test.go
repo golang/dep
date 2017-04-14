@@ -5,11 +5,13 @@
 package dep
 
 import (
+	"go/build"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
+	"fmt"
 	"unicode"
 
 	"github.com/golang/dep/test"
@@ -30,6 +32,26 @@ func TestNewContextNoGOPATH(t *testing.T) {
 
 	if c != nil {
 		t.Fatalf("expected context to be nil, got: %#v", c)
+	}
+}
+
+func TestMultipleGopaths(t *testing.T) {
+	h := test.NewHelper(t)
+	defer h.Cleanup()
+
+	gp1 := "go/foo_new"
+	gp2 := "go/foo"
+
+	project := filepath.Join(gp1, "src/bar")
+	h.TempDir(project)
+	h.TempDir(gp2)
+	h.Cd(h.Path(project))
+
+	build.Default.GOPATH = fmt.Sprintf("%s:%s", h.Path(gp1), h.Path(gp2))
+	c, err := NewContext()
+	h.Must(err)
+	if c.GOPATH != h.Path(gp1) {
+		t.Fatalf("Incorrect GOPATH detected. Expected '%s', got '%s'", h.Path(gp1), c.GOPATH)
 	}
 }
 
