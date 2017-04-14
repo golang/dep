@@ -38,6 +38,7 @@ func main() {
 		&ensureCommand{},
 		&removeCommand{},
 		&hashinCommand{},
+		&pruneCommand{},
 	}
 
 	examples := [][2]string{

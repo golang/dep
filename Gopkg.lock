@@ -1,0 +1,43 @@
+memo = "2f117dcf1ebe1cff7acbddb851d29b87554d2249f1033f2a4cca3b33dc3fecc2"
+
+[[projects]]
+  branch = "2.x"
+  name = "github.com/Masterminds/semver"
+  packages = ["."]
+  revision = "94ad6eaf8457cf85a68c9b53fa42e9b1b8683783"
+
+[[projects]]
+  name = "github.com/Masterminds/vcs"
+  packages = ["."]
+  revision = "795e20f901c3d561de52811fb3488a2cb2c8588b"
+  version = "v1.11.0"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/armon/go-radix"
+  packages = ["."]
+  revision = "4239b77079c7b5d1243b7b4736304ce8ddb6f0f2"
+
+[[projects]]
+  name = "github.com/pelletier/go-buffruneio"
+  packages = ["."]
+  revision = "c37440a7cf42ac63b919c752ca73a85067e05992"
+  version = "v0.2.0"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/pelletier/go-toml"
+  packages = ["."]
+  revision = "fe206efb84b2bc8e8cfafe6b4c1826622be969e3"
+
+[[projects]]
+  name = "github.com/pkg/errors"
+  packages = ["."]
+  revision = "645ef00459ed84a119197bfb8d8205042c6df63d"
+  version = "v0.8.0"
+
+[[projects]]
+  name = "github.com/sdboyer/gps"
+  packages = [".","internal","internal/fs","pkgtree"]
+  revision = "b0f646b744e74543c094023d05339ffb82458e35"
+  version = "v0.15.0"

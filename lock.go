@@ -5,17 +5,17 @@
 package dep
 
 import (
-	"bytes"
 	"encoding/hex"
-	"encoding/json"
 	"io"
 	"sort"
 
+	"bytes"
+	"github.com/pelletier/go-toml"
 	"github.com/pkg/errors"
 	"github.com/sdboyer/gps"
 )
 
-const LockName = "lock.json"
+const LockName = "Gopkg.lock"
 
 type Lock struct {
 	Memo []byte
@@ -23,36 +23,47 @@ type Lock struct {
 }
 
 type rawLock struct {
-	Memo string      `json:"memo"`
-	P    []lockedDep `json:"projects"`
+	Memo     string             `toml:"memo"`
+	Projects []rawLockedProject `toml:"projects"`
 }
 
-type lockedDep struct {
-	Name     string   `json:"name"`
-	Version  string   `json:"version,omitempty"`
-	Branch   string   `json:"branch,omitempty"`
-	Revision string   `json:"revision"`
-	Source   string   `json:"source,omitempty"`
-	Packages []string `json:"packages"`
+type rawLockedProject struct {
+	Name     string   `toml:"name"`
+	Branch   string   `toml:"branch,omitempty"`
+	Revision string   `toml:"revision"`
+	Version  string   `toml:"version,omitempty"`
+	Source   string   `toml:"source,omitempty"`
+	Packages []string `toml:"packages"`
 }
 
 func readLock(r io.Reader) (*Lock, error) {
-	rl := rawLock{}
-	err := json.NewDecoder(r).Decode(&rl)
+	buf := &bytes.Buffer{}
+	_, err := buf.ReadFrom(r)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "Unable to read byte stream")
 	}
 
-	b, err := hex.DecodeString(rl.Memo)
+	raw := rawLock{}
+	err = toml.Unmarshal(buf.Bytes(), &raw)
+	if err != nil {
+		return nil, errors.Wrap(err, "Unable to parse the lock as TOML")
+	}
+
+	return fromRawLock(raw)
+}
+
+func fromRawLock(raw rawLock) (*Lock, error) {
+	var err error
+	l := &Lock{
+		P: make([]gps.LockedProject, len(raw.Projects)),
+	}
+
+	l.Memo, err = hex.DecodeString(raw.Memo)
 	if err != nil {
 		return nil, errors.Errorf("invalid hash digest in lock's memo field")
 	}
-	l := &Lock{
-		Memo: b,
-		P:    make([]gps.LockedProject, len(rl.P)),
-	}
 
-	for i, ld := range rl.P {
+	for i, ld := range raw.Projects {
 		r := gps.Revision(ld.Revision)
 
 		var v gps.Version = r
@@ -73,7 +84,6 @@ func readLock(r io.Reader) (*Lock, error) {
 		}
 		l.P[i] = gps.NewLockedProject(id, v, ld.Packages)
 	}
-
 	return l, nil
 }
 
@@ -85,17 +95,18 @@ func (l *Lock) Projects() []gps.LockedProject {
 	return l.P
 }
 
-func (l *Lock) MarshalJSON() ([]byte, error) {
+// toRaw converts the manifest into a representation suitable to write to the lock file
+func (l *Lock) toRaw() rawLock {
 	raw := rawLock{
-		Memo: hex.EncodeToString(l.Memo),
-		P:    make([]lockedDep, len(l.P)),
+		Memo:     hex.EncodeToString(l.Memo),
+		Projects: make([]rawLockedProject, len(l.P)),
 	}
 
 	sort.Sort(SortedLockedProjects(l.P))
 
 	for k, lp := range l.P {
 		id := lp.Ident()
-		ld := lockedDep{
+		ld := rawLockedProject{
 			Name:     string(id.ProjectRoot),
 			Source:   id.Source,
 			Packages: lp.Packages(),
@@ -104,18 +115,18 @@ func (l *Lock) MarshalJSON() ([]byte, error) {
 		v := lp.Version()
 		ld.Revision, ld.Branch, ld.Version = getVersionInfo(v)
 
-		raw.P[k] = ld
+		raw.Projects[k] = ld
 	}
 
 	// TODO sort output - #15
 
-	var buf bytes.Buffer
-	enc := json.NewEncoder(&buf)
-	enc.SetIndent("", "    ")
-	enc.SetEscapeHTML(false)
-	err := enc.Encode(raw)
+	return raw
+}
 
-	return buf.Bytes(), err
+func (l *Lock) MarshalTOML() ([]byte, error) {
+	raw := l.toRaw()
+	result, err := toml.Marshal(raw)
+	return result, errors.Wrap(err, "Unable to marshal lock to TOML string")
 }
 
 // TODO(carolynvs) this should be moved to gps

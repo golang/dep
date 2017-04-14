@@ -7,7 +7,6 @@ package dep
 import (
 	"bytes"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -15,6 +14,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/pelletier/go-toml"
 	"github.com/pkg/errors"
 	"github.com/sdboyer/gps"
 )
@@ -59,6 +59,10 @@ type LockDiff struct {
 	Modify   []LockedProjectDiff
 }
 
+type rawLockedProjectDiffs struct {
+	Projects []LockedProjectDiff `toml:"projects"`
+}
+
 func (diff *LockDiff) Format() (string, error) {
 	if diff == nil {
 		return "", nil
@@ -67,40 +71,39 @@ func (diff *LockDiff) Format() (string, error) {
 	var buf bytes.Buffer
 
 	if diff.HashDiff != nil {
-		buf.WriteString(fmt.Sprintf("Memo: %s\n", diff.HashDiff))
+		buf.WriteString(fmt.Sprintf("Memo: %s\n\n", diff.HashDiff))
+	}
+
+	writeDiffs := func(diffs []LockedProjectDiff) error {
+		raw := rawLockedProjectDiffs{diffs}
+		chunk, err := toml.Marshal(raw)
+		if err != nil {
+			return err
+		}
+		buf.Write(chunk)
+		buf.WriteString("\n")
+		return nil
 	}
 
 	if len(diff.Add) > 0 {
-		buf.WriteString("Add: ")
-
-		enc := json.NewEncoder(&buf)
-		enc.SetIndent("", "    ")
-		enc.SetEscapeHTML(false)
-		err := enc.Encode(diff.Add)
+		buf.WriteString("Add:")
+		err := writeDiffs(diff.Add)
 		if err != nil {
 			return "", errors.Wrap(err, "Unable to format LockDiff.Add")
 		}
 	}
 
 	if len(diff.Remove) > 0 {
-		buf.WriteString("Remove: ")
-
-		enc := json.NewEncoder(&buf)
-		enc.SetIndent("", "    ")
-		enc.SetEscapeHTML(false)
-		err := enc.Encode(diff.Remove)
+		buf.WriteString("Remove:")
+		err := writeDiffs(diff.Remove)
 		if err != nil {
 			return "", errors.Wrap(err, "Unable to format LockDiff.Remove")
 		}
 	}
 
 	if len(diff.Modify) > 0 {
-		buf.WriteString("Modify: ")
-
-		enc := json.NewEncoder(&buf)
-		enc.SetIndent("", "    ")
-		enc.SetEscapeHTML(false)
-		err := enc.Encode(diff.Modify)
+		buf.WriteString("Modify:")
+		err := writeDiffs(diff.Modify)
 		if err != nil {
 			return "", errors.Wrap(err, "Unable to format LockDiff.Modify")
 		}
@@ -113,12 +116,12 @@ func (diff *LockDiff) Format() (string, error) {
 // Fields are only populated when there is a difference, otherwise they are empty.
 // TODO(carolynvs) this should be moved to gps
 type LockedProjectDiff struct {
-	Name     gps.ProjectRoot `json:"name"`
-	Source   *StringDiff     `json:"source,omitempty"`
-	Version  *StringDiff     `json:"version,omitempty"`
-	Branch   *StringDiff     `json:"branch,omitempty"`
-	Revision *StringDiff     `json:"revision,omitempty"`
-	Packages []StringDiff    `json:"packages,omitempty"`
+	Name     gps.ProjectRoot `toml:"name"`
+	Source   *StringDiff     `toml:"source,omitempty"`
+	Version  *StringDiff     `toml:"version,omitempty"`
+	Branch   *StringDiff     `toml:"branch,omitempty"`
+	Revision *StringDiff     `toml:"revision,omitempty"`
+	Packages []StringDiff    `toml:"packages,omitempty"`
 }
 
 type StringDiff struct {
@@ -142,13 +145,8 @@ func (diff StringDiff) String() string {
 	return diff.Current
 }
 
-func (diff StringDiff) MarshalJSON() ([]byte, error) {
-	var buf bytes.Buffer
-	enc := json.NewEncoder(&buf)
-	enc.SetEscapeHTML(false)
-	err := enc.Encode(diff.String())
-
-	return buf.Bytes(), err
+func (diff StringDiff) MarshalTOML() ([]byte, error) {
+	return []byte(diff.String()), nil
 }
 
 // VendorBehavior defines when the vendor directory should be written.
@@ -364,8 +362,8 @@ fail:
 
 func (sw *SafeWriter) PrintPreparedActions() error {
 	if sw.Payload.HasManifest() {
-		fmt.Println("Would have written the following manifest.json:")
-		m, err := sw.Payload.Manifest.MarshalJSON()
+		fmt.Printf("Would have written the following %s:\n", ManifestName)
+		m, err := sw.Payload.Manifest.MarshalTOML()
 		if err != nil {
 			return errors.Wrap(err, "ensure DryRun cannot serialize manifest")
 		}
@@ -374,14 +372,14 @@ func (sw *SafeWriter) PrintPreparedActions() error {
 
 	if sw.Payload.HasLock() {
 		if sw.Payload.LockDiff == nil {
-			fmt.Println("Would have written the following lock.json:")
-			l, err := sw.Payload.Lock.MarshalJSON()
+			fmt.Printf("Would have written the following %s:\n", LockName)
+			l, err := sw.Payload.Lock.MarshalTOML()
 			if err != nil {
 				return errors.Wrap(err, "ensure DryRun cannot serialize lock")
 			}
 			fmt.Println(string(l))
 		} else {
-			fmt.Println("Would have written the following changes to lock.json:")
+			fmt.Printf("Would have written the following changes to %s:\n", LockName)
 			diff, err := sw.Payload.LockDiff.Format()
 			if err != nil {
 				return errors.Wrap(err, "ensure DryRun cannot serialize the lock diff")
@@ -594,3 +592,107 @@ func diffProjects(lp1 gps.LockedProject, lp2 gps.LockedProject) *LockedProjectDi
 	}
 	return &diff
 }
+
+func PruneProject(p *Project, sm gps.SourceManager) error {
+	td, err := ioutil.TempDir(os.TempDir(), "dep")
+	if err != nil {
+		return errors.Wrap(err, "error while creating temp dir for writing manifest/lock/vendor")
+	}
+	defer os.RemoveAll(td)
+
+	if err := gps.WriteDepTree(td, p.Lock, sm, true); err != nil {
+		return err
+	}
+
+	var toKeep []string
+	for _, project := range p.Lock.Projects() {
+		projectRoot := string(project.Ident().ProjectRoot)
+		for _, pkg := range project.Packages() {
+			toKeep = append(toKeep, filepath.Join(projectRoot, pkg))
+		}
+	}
+
+	toDelete, err := calculatePrune(td, toKeep)
+	if err != nil {
+		return err
+	}
+
+	if err := deleteDirs(toDelete); err != nil {
+		return err
+	}
+
+	vpath := filepath.Join(p.AbsRoot, "vendor")
+	vendorbak := vpath + ".orig"
+	var failerr error
+	if _, err := os.Stat(vpath); err == nil {
+		// Move out the old vendor dir. just do it into an adjacent dir, to
+		// try to mitigate the possibility of a pointless cross-filesystem
+		// move with a temp directory.
+		if _, err := os.Stat(vendorbak); err == nil {
+			// If the adjacent dir already exists, bite the bullet and move
+			// to a proper tempdir.
+			vendorbak = filepath.Join(td, "vendor.orig")
+		}
+		failerr = renameWithFallback(vpath, vendorbak)
+		if failerr != nil {
+			goto fail
+		}
+	}
+
+	// Move in the new one.
+	failerr = renameWithFallback(td, vpath)
+	if failerr != nil {
+		goto fail
+	}
+
+	os.RemoveAll(vendorbak)
+
+	return nil
+
+fail:
+	renameWithFallback(vendorbak, vpath)
+	return failerr
+}
+
+func calculatePrune(vendorDir string, keep []string) ([]string, error) {
+	sort.Strings(keep)
+	toDelete := []string{}
+	err := filepath.Walk(vendorDir, func(path string, info os.FileInfo, err error) error {
+		if _, err := os.Lstat(path); err != nil {
+			return nil
+		}
+		if !info.IsDir() {
+			return nil
+		}
+		if path == vendorDir {
+			return nil
+		}
+
+		name := strings.TrimPrefix(path, vendorDir+"/")
+		i := sort.Search(len(keep), func(i int) bool {
+			return name <= keep[i]
+		})
+		if i >= len(keep) || !strings.HasPrefix(keep[i], name) {
+			toDelete = append(toDelete, path)
+		}
+		return nil
+	})
+	return toDelete, err
+}
+
+func deleteDirs(toDelete []string) error {
+	// sort by length so we delete sub dirs first
+	sort.Sort(byLen(toDelete))
+	for _, path := range toDelete {
+		if err := os.RemoveAll(path); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+type byLen []string
+
+func (a byLen) Len() int           { return len(a) }
+func (a byLen) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a byLen) Less(i, j int) bool { return len(a[i]) > len(a[j]) }

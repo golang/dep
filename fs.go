@@ -5,7 +5,6 @@
 package dep
 
 import (
-	"encoding/json"
 	"io"
 	"io/ioutil"
 	"os"
@@ -13,6 +12,7 @@ import (
 	"runtime"
 	"syscall"
 
+	"github.com/pelletier/go-toml"
 	"github.com/pkg/errors"
 )
 
@@ -59,19 +59,19 @@ func IsNonEmptyDir(name string) (bool, error) {
 	return len(files) != 0, nil
 }
 
-func writeFile(path string, in json.Marshaler) error {
+func writeFile(path string, in toml.Marshaler) error {
 	f, err := os.Create(path)
 	if err != nil {
 		return err
 	}
 	defer f.Close()
 
-	b, err := in.MarshalJSON()
+	s, err := in.MarshalTOML()
 	if err != nil {
 		return err
 	}
 
-	_, err = f.Write(b)
+	_, err = f.Write(s)
 	return err
 }
 
