@@ -646,7 +646,7 @@ func SortForDowngrade(vl []Version) {
 // SortPairedForDowngrade has the same behavior as SortForDowngrade, but
 // operates on []PairedVersion types.
 func SortPairedForDowngrade(vl []PairedVersion) {
-	sort.Sort(pvupgradeVersionSorter(vl))
+	sort.Sort(pvdowngradeVersionSorter(vl))
 }
 
 type upgradeVersionSorter []Version

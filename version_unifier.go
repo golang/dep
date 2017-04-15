@@ -66,11 +66,11 @@ func (vu versionUnifier) matches(id ProjectIdentifier, c Constraint, v Version) 
 	vu.mtr.push("b-matches")
 	// This approach is slightly wasteful, but just SO much less verbose, and
 	// more easily understood.
-	vtu := vu.vtu(id, v)
+	vtu := vu.createTypeUnion(id, v)
 
 	var uc Constraint
 	if cv, ok := c.(Version); ok {
-		uc = vu.vtu(id, cv)
+		uc = vu.createTypeUnion(id, cv)
 	} else {
 		uc = c
 	}
@@ -90,13 +90,13 @@ func (vu versionUnifier) matchesAny(id ProjectIdentifier, c1, c2 Constraint) boo
 	// more easily understood.
 	var uc1, uc2 Constraint
 	if v1, ok := c1.(Version); ok {
-		uc1 = vu.vtu(id, v1)
+		uc1 = vu.createTypeUnion(id, v1)
 	} else {
 		uc1 = c1
 	}
 
 	if v2, ok := c2.(Version); ok {
-		uc2 = vu.vtu(id, v2)
+		uc2 = vu.createTypeUnion(id, v2)
 	} else {
 		uc2 = c2
 	}
@@ -117,13 +117,13 @@ func (vu versionUnifier) intersect(id ProjectIdentifier, c1, c2 Constraint) Cons
 	// more easily understood.
 	var uc1, uc2 Constraint
 	if v1, ok := c1.(Version); ok {
-		uc1 = vu.vtu(id, v1)
+		uc1 = vu.createTypeUnion(id, v1)
 	} else {
 		uc1 = c1
 	}
 
 	if v2, ok := c2.(Version); ok {
-		uc2 = vu.vtu(id, v2)
+		uc2 = vu.createTypeUnion(id, v2)
 	} else {
 		uc2 = c2
 	}
@@ -132,12 +132,12 @@ func (vu versionUnifier) intersect(id ProjectIdentifier, c1, c2 Constraint) Cons
 	return uc1.Intersect(uc2)
 }
 
-// vtu creates a versionTypeUnion for the provided version.
+// createTypeUnion creates a versionTypeUnion for the provided version.
 //
 // This union may (and typically will) end up being nothing more than the single
 // input version, but creating a versionTypeUnion guarantees that 'local'
 // constraint checks (direct method calls) are authoritative.
-func (vu versionUnifier) vtu(id ProjectIdentifier, v Version) versionTypeUnion {
+func (vu versionUnifier) createTypeUnion(id ProjectIdentifier, v Version) versionTypeUnion {
 	switch tv := v.(type) {
 	case Revision:
 		return versionTypeUnion(vu.pairRevision(id, tv))
