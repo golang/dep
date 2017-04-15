@@ -60,7 +60,7 @@ type Project struct {
 func (p *Project) MakeParams() gps.SolveParameters {
 	params := gps.SolveParameters{
 		RootDir:         p.AbsRoot,
-		ProjectAnalyzer: analyzer{},
+		ProjectAnalyzer: Analyzer{},
 	}
 
 	if p.Manifest != nil {
