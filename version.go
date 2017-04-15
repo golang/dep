@@ -610,8 +610,9 @@ func SortForUpgrade(vl []Version) {
 	sort.Sort(upgradeVersionSorter(vl))
 }
 
-// temporary shim until this can replace SortForUpgrade, after #202
-func sortForUpgrade(vl []PairedVersion) {
+// SortPairedForUpgrade has the same behavior as SortForUpgrade, but operates on
+// []PairedVersion types.
+func SortPairedForUpgrade(vl []PairedVersion) {
 	sort.Sort(pvupgradeVersionSorter(vl))
 }
 
@@ -642,9 +643,13 @@ func SortForDowngrade(vl []Version) {
 	sort.Sort(downgradeVersionSorter(vl))
 }
 
+// SortPairedForDowngrade has the same behavior as SortForDowngrade, but
+// operates on []PairedVersion types.
+func SortPairedForDowngrade(vl []PairedVersion) {
+	sort.Sort(pvdowngradeVersionSorter(vl))
+}
+
 type upgradeVersionSorter []Version
-type pvupgradeVersionSorter []PairedVersion
-type downgradeVersionSorter []Version
 
 func (vs upgradeVersionSorter) Len() int {
 	return len(vs)
@@ -654,60 +659,12 @@ func (vs upgradeVersionSorter) Swap(i, j int) {
 	vs[i], vs[j] = vs[j], vs[i]
 }
 
-func (vs downgradeVersionSorter) Len() int {
-	return len(vs)
-}
-
-func (vs downgradeVersionSorter) Swap(i, j int) {
-	vs[i], vs[j] = vs[j], vs[i]
-}
-
 func (vs upgradeVersionSorter) Less(i, j int) bool {
 	l, r := vs[i], vs[j]
-
-	if tl, ispair := l.(versionPair); ispair {
-		l = tl.v
-	}
-	if tr, ispair := r.(versionPair); ispair {
-		r = tr.v
-	}
-
-	switch compareVersionType(l, r) {
-	case -1:
-		return true
-	case 1:
-		return false
-	case 0:
-		break
-	default:
-		panic("unreachable")
-	}
-
-	switch tl := l.(type) {
-	case branchVersion:
-		tr := r.(branchVersion)
-		if tl.isDefault != tr.isDefault {
-			// If they're not both defaults, then return the left val: if left
-			// is the default, then it is "less" (true) b/c we want it earlier.
-			// Else the right is the default, and so the left should be later
-			// (false).
-			return tl.isDefault
-		}
-		return l.String() < r.String()
-	case Revision, plainVersion:
-		// All that we can do now is alpha sort
-		return l.String() < r.String()
-	}
-
-	// This ensures that pre-release versions are always sorted after ALL
-	// full-release versions
-	lsv, rsv := l.(semVersion).sv, r.(semVersion).sv
-	lpre, rpre := lsv.Prerelease() == "", rsv.Prerelease() == ""
-	if (lpre && !rpre) || (!lpre && rpre) {
-		return lpre
-	}
-	return lsv.GreaterThan(rsv)
+	return vLess(l, r, false)
 }
+
+type pvupgradeVersionSorter []PairedVersion
 
 func (vs pvupgradeVersionSorter) Len() int {
 	return len(vs)
@@ -717,48 +674,40 @@ func (vs pvupgradeVersionSorter) Swap(i, j int) {
 	vs[i], vs[j] = vs[j], vs[i]
 }
 func (vs pvupgradeVersionSorter) Less(i, j int) bool {
-	l, r := vs[i].Unpair(), vs[j].Unpair()
+	l, r := vs[i], vs[j]
+	return vLess(l, r, false)
+}
 
-	switch compareVersionType(l, r) {
-	case -1:
-		return true
-	case 1:
-		return false
-	case 0:
-		break
-	default:
-		panic("unreachable")
-	}
+type downgradeVersionSorter []Version
 
-	switch tl := l.(type) {
-	case branchVersion:
-		tr := r.(branchVersion)
-		if tl.isDefault != tr.isDefault {
-			// If they're not both defaults, then return the left val: if left
-			// is the default, then it is "less" (true) b/c we want it earlier.
-			// Else the right is the default, and so the left should be later
-			// (false).
-			return tl.isDefault
-		}
-		return l.String() < r.String()
-	case plainVersion:
-		// All that we can do now is alpha sort
-		return l.String() < r.String()
-	}
+func (vs downgradeVersionSorter) Len() int {
+	return len(vs)
+}
 
-	// This ensures that pre-release versions are always sorted after ALL
-	// full-release versions
-	lsv, rsv := l.(semVersion).sv, r.(semVersion).sv
-	lpre, rpre := lsv.Prerelease() == "", rsv.Prerelease() == ""
-	if (lpre && !rpre) || (!lpre && rpre) {
-		return lpre
-	}
-	return lsv.GreaterThan(rsv)
+func (vs downgradeVersionSorter) Swap(i, j int) {
+	vs[i], vs[j] = vs[j], vs[i]
 }
 
 func (vs downgradeVersionSorter) Less(i, j int) bool {
 	l, r := vs[i], vs[j]
+	return vLess(l, r, true)
+}
 
+type pvdowngradeVersionSorter []PairedVersion
+
+func (vs pvdowngradeVersionSorter) Len() int {
+	return len(vs)
+}
+
+func (vs pvdowngradeVersionSorter) Swap(i, j int) {
+	vs[i], vs[j] = vs[j], vs[i]
+}
+func (vs pvdowngradeVersionSorter) Less(i, j int) bool {
+	l, r := vs[i], vs[j]
+	return vLess(l, r, true)
+}
+
+func vLess(l, r Version, down bool) bool {
 	if tl, ispair := l.(versionPair); ispair {
 		l = tl.v
 	}
@@ -800,7 +749,11 @@ func (vs downgradeVersionSorter) Less(i, j int) bool {
 	if (lpre && !rpre) || (!lpre && rpre) {
 		return lpre
 	}
-	return lsv.LessThan(rsv)
+
+	if down {
+		return lsv.LessThan(rsv)
+	}
+	return lsv.GreaterThan(rsv)
 }
 
 func hidePair(pvl []PairedVersion) []Version {

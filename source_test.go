@@ -75,7 +75,7 @@ func testSourceGateway(t *testing.T) {
 			if len(vlist) != 4 {
 				t.Fatalf("git test repo should've produced four versions, got %v: vlist was %s", len(vlist), vlist)
 			} else {
-				sortForUpgrade(vlist)
+				SortPairedForUpgrade(vlist)
 				evl := []PairedVersion{
 					NewVersion("v1.0.0").Is(Revision("ff2948a2ac8f538c4ecd55962e919d1e13e74baf")),
 					NewVersion("v0.8.1").Is(Revision("3f4c3bea144e112a69bbe5d8d01c1b09a544253f")),

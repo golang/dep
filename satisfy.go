@@ -82,7 +82,7 @@ func (s *solver) check(a atomWithPackages, pkgonly bool) error {
 // the constraints established by the current solution.
 func (s *solver) checkAtomAllowable(pa atom) error {
 	constraint := s.sel.getConstraint(pa.id)
-	if s.b.matches(pa.id, constraint, pa.v) {
+	if s.vUnify.matches(pa.id, constraint, pa.v) {
 		return nil
 	}
 	// TODO(sdboyer) collect constraint failure reason (wait...aren't we, below?)
@@ -90,7 +90,7 @@ func (s *solver) checkAtomAllowable(pa atom) error {
 	deps := s.sel.getDependenciesOn(pa.id)
 	var failparent []dependency
 	for _, dep := range deps {
-		if !s.b.matches(pa.id, dep.dep.Constraint, pa.v) {
+		if !s.vUnify.matches(pa.id, dep.dep.Constraint, pa.v) {
 			s.fail(dep.depender.id)
 			failparent = append(failparent, dep)
 		}
@@ -152,7 +152,7 @@ func (s *solver) checkDepsConstraintsAllowable(a atomWithPackages, cdep complete
 	constraint := s.sel.getConstraint(dep.Ident)
 	// Ensure the constraint expressed by the dep has at least some possible
 	// intersection with the intersection of existing constraints.
-	if s.b.matchesAny(dep.Ident, constraint, dep.Constraint) {
+	if s.vUnify.matchesAny(dep.Ident, constraint, dep.Constraint) {
 		return nil
 	}
 
@@ -161,7 +161,7 @@ func (s *solver) checkDepsConstraintsAllowable(a atomWithPackages, cdep complete
 	var failsib []dependency
 	var nofailsib []dependency
 	for _, sibling := range siblings {
-		if !s.b.matchesAny(dep.Ident, sibling.dep.Constraint, dep.Constraint) {
+		if !s.vUnify.matchesAny(dep.Ident, sibling.dep.Constraint, dep.Constraint) {
 			s.fail(sibling.depender.id)
 			failsib = append(failsib, sibling)
 		} else {
@@ -183,7 +183,7 @@ func (s *solver) checkDepsConstraintsAllowable(a atomWithPackages, cdep complete
 func (s *solver) checkDepsDisallowsSelected(a atomWithPackages, cdep completeDep) error {
 	dep := cdep.workingConstraint
 	selected, exists := s.sel.selected(dep.Ident)
-	if exists && !s.b.matches(dep.Ident, dep.Constraint, selected.a.v) {
+	if exists && !s.vUnify.matches(dep.Ident, dep.Constraint, selected.a.v) {
 		s.fail(dep.Ident)
 
 		return &constraintNotAllowedFailure{

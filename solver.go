@@ -127,6 +127,10 @@ type solver struct {
 	// names a SourceManager operates on.
 	b sourceBridge
 
+	// A versionUnifier, to facilitate cross-type version comparison and set
+	// operations.
+	vUnify versionUnifier
+
 	// A stack containing projects and packages that are currently "selected" -
 	// that is, they have passed all satisfiability checks, and are part of the
 	// current solution.
@@ -295,11 +299,14 @@ func Prepare(params SolveParameters, sm SourceManager) (Solver, error) {
 	if err != nil {
 		return nil, err
 	}
+	s.vUnify = versionUnifier{
+		b: s.b,
+	}
 
 	// Initialize stacks and queues
 	s.sel = &selection{
 		deps: make(map[ProjectRoot][]dependency),
-		sm:   s.b,
+		vu:   s.vUnify,
 	}
 	s.unsel = &unselected{
 		sl:  make([]bimodalIdentifier, 0),
@@ -337,6 +344,7 @@ type Solver interface {
 func (s *solver) Solve() (Solution, error) {
 	// Set up a metrics object
 	s.mtr = newMetrics()
+	s.vUnify.mtr = s.mtr
 
 	// Prime the queues with the root project
 	err := s.selectRoot()
@@ -876,7 +884,7 @@ func (s *solver) getLockVersionIfValid(id ProjectIdentifier) (Version, error) {
 		if tv, ok := v.(Revision); ok {
 			// If we only have a revision from the root's lock, allow matching
 			// against other versions that have that revision
-			for _, pv := range s.b.pairRevision(id, tv) {
+			for _, pv := range s.vUnify.pairRevision(id, tv) {
 				if constraint.Matches(pv) {
 					v = pv
 					found = true
@@ -1038,11 +1046,11 @@ func (s *solver) unselectedComparator(i, j int) bool {
 	// way avoid that call when making a version queue, we know we're gonna have
 	// to pay that cost anyway.
 
-	// We can safely ignore an err from ListVersions here because, if there is
+	// We can safely ignore an err from listVersions here because, if there is
 	// an actual problem, it'll be noted and handled somewhere else saner in the
 	// solving algorithm.
-	ivl, _ := s.b.ListVersions(iname)
-	jvl, _ := s.b.ListVersions(jname)
+	ivl, _ := s.b.listVersions(iname)
+	jvl, _ := s.b.listVersions(jname)
 	iv, jv := len(ivl), len(jvl)
 
 	// Packages with fewer versions to pick from are less likely to benefit from
