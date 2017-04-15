@@ -52,7 +52,7 @@ func NewContext() (*Ctx, error) {
 }
 
 func (c *Ctx) SourceManager() (*gps.SourceMgr, error) {
-	return gps.NewSourceManager(analyzer{}, filepath.Join(c.GOPATH, "pkg", "dep"))
+	return gps.NewSourceManager(filepath.Join(c.GOPATH, "pkg", "dep"))
 }
 
 // LoadProject takes a path and searches up the directory tree for

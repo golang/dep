@@ -22,7 +22,7 @@ func TestDeriveManifestAndLock(t *testing.T) {
 	want := h.GetTestFileString(golden)
 	h.TempCopy(filepath.Join("dep", ManifestName), golden)
 
-	a := analyzer{}
+	a := Analyzer{}
 
 	m, l, err := a.DeriveManifestAndLock(h.Path("dep"), "my/fake/project")
 	if err != nil {
@@ -56,7 +56,7 @@ func TestDeriveManifestAndLockDoesNotExist(t *testing.T) {
 	}
 	defer os.RemoveAll(dir)
 
-	a := analyzer{}
+	a := Analyzer{}
 
 	m, l, err := a.DeriveManifestAndLock(dir, "my/fake/project")
 	if m != nil || l != nil || err != nil {

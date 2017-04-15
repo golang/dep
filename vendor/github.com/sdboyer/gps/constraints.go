@@ -20,41 +20,27 @@ var (
 // magic to operate.
 type Constraint interface {
 	fmt.Stringer
+
 	// Matches indicates if the provided Version is allowed by the Constraint.
 	Matches(Version) bool
+
 	// MatchesAny indicates if the intersection of the Constraint with the
 	// provided Constraint would yield a Constraint that could allow *any*
 	// Version.
 	MatchesAny(Constraint) bool
+
 	// Intersect computes the intersection of the Constraint with the provided
 	// Constraint.
 	Intersect(Constraint) Constraint
-	_private()
+
+	// typedString emits the normal stringified representation of the provided
+	// constraint, prefixed with a string that uniquely identifies the type of
+	// the constraint.
+	//
+	// It also forces Constraint to be a private/sealed interface, which is a
+	// design goal of the system.
+	typedString() string
 }
-
-// typedConstraintString emits the normal stringified representation of the
-// provided constraint, prefixed with a string that uniquely identifies the type
-// of the constraint.
-func typedConstraintString(c Constraint) string {
-	var prefix string
-
-	switch tc := c.(type) {
-	case Version:
-		return typedVersionString(tc)
-	case semverConstraint:
-		prefix = "svc"
-	case anyConstraint:
-		prefix = "any"
-	case noneConstraint:
-		prefix = "none"
-	}
-
-	return fmt.Sprintf("%s-%s", prefix, c.String())
-}
-
-func (semverConstraint) _private() {}
-func (anyConstraint) _private()    {}
-func (noneConstraint) _private()   {}
 
 // NewSemverConstraint attempts to construct a semver Constraint object from the
 // input string.
@@ -80,6 +66,10 @@ type semverConstraint struct {
 
 func (c semverConstraint) String() string {
 	return c.c.String()
+}
+
+func (c semverConstraint) typedString() string {
+	return fmt.Sprintf("svc-%s", c.c.String())
 }
 
 func (c semverConstraint) Matches(v Version) bool {
@@ -159,6 +149,10 @@ func (anyConstraint) String() string {
 	return "*"
 }
 
+func (anyConstraint) typedString() string {
+	return "any-*"
+}
+
 func (anyConstraint) Matches(Version) bool {
 	return true
 }
@@ -177,6 +171,10 @@ type noneConstraint struct{}
 
 func (noneConstraint) String() string {
 	return ""
+}
+
+func (noneConstraint) typedString() string {
+	return "none-"
 }
 
 func (noneConstraint) Matches(Version) bool {

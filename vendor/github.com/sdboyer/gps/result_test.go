@@ -39,7 +39,9 @@ func init() {
 	}
 }
 
-func TestWriteDepTree(t *testing.T) {
+func testWriteDepTree(t *testing.T) {
+	t.Parallel()
+
 	// This test is a bit slow, skip it on -short
 	if testing.Short() {
 		t.Skip("Skipping dep tree writing test in short mode")
@@ -48,8 +50,7 @@ func TestWriteDepTree(t *testing.T) {
 
 	tmp, err := ioutil.TempDir("", "writetree")
 	if err != nil {
-		t.Errorf("Failed to create temp dir: %s", err)
-		t.FailNow()
+		t.Fatalf("Failed to create temp dir: %s", err)
 	}
 	defer os.RemoveAll(tmp)
 
@@ -73,6 +74,11 @@ func TestWriteDepTree(t *testing.T) {
 
 	sm, clean := mkNaiveSM(t)
 	defer clean()
+
+	// Trigger simultaneous fetch of all three to speed up test execution time
+	for _, p := range r.p {
+		go sm.SyncSourceFor(p.pi)
+	}
 
 	// nil lock/result should err immediately
 	err = WriteDepTree(tmp, nil, sm, true)
@@ -104,7 +110,7 @@ func BenchmarkCreateVendorTree(b *testing.B) {
 	tmp := path.Join(os.TempDir(), "vsolvtest")
 
 	clean := true
-	sm, err := NewSourceManager(naiveAnalyzer{}, path.Join(tmp, "cache"))
+	sm, err := NewSourceManager(path.Join(tmp, "cache"))
 	if err != nil {
 		b.Errorf("NewSourceManager errored unexpectedly: %q", err)
 		clean = false

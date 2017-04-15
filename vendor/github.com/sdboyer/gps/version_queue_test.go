@@ -23,7 +23,11 @@ func init() {
 	SortForUpgrade(fakevl)
 }
 
-func (fb *fakeBridge) ListVersions(id ProjectIdentifier) ([]Version, error) {
+func (fb *fakeBridge) ListVersions(id ProjectIdentifier) ([]PairedVersion, error) {
+	return nil, nil
+}
+
+func (fb *fakeBridge) listVersions(id ProjectIdentifier) ([]Version, error) {
 	// it's a fixture, we only ever do the one, regardless of id
 	return fb.vl, nil
 }
@@ -34,7 +38,11 @@ type fakeFailBridge struct {
 
 var errVQ = fmt.Errorf("vqerr")
 
-func (fb *fakeFailBridge) ListVersions(id ProjectIdentifier) ([]Version, error) {
+func (fb *fakeFailBridge) ListVersions(id ProjectIdentifier) ([]PairedVersion, error) {
+	return nil, nil
+}
+
+func (fb *fakeFailBridge) listVersions(id ProjectIdentifier) ([]Version, error) {
 	return nil, errVQ
 }
 
@@ -55,7 +63,7 @@ func TestVersionQueueSetup(t *testing.T) {
 		t.Errorf("Unexpected err on vq create: %s", err)
 	} else {
 		if len(vq.pi) != 5 {
-			t.Errorf("Should have five versions from ListVersions() when providing no prefv or lockv; got %v:\n\t%s", len(vq.pi), vq.String())
+			t.Errorf("Should have five versions from listVersions() when providing no prefv or lockv; got %v:\n\t%s", len(vq.pi), vq.String())
 		}
 		if !vq.allLoaded {
 			t.Errorf("allLoaded flag should be set, but wasn't")
@@ -136,8 +144,7 @@ func TestVersionQueueAdvance(t *testing.T) {
 	// First with no prefv or lockv
 	vq, err := newVersionQueue(id, nil, nil, fb)
 	if err != nil {
-		t.Errorf("Unexpected err on vq create: %s", err)
-		t.FailNow()
+		t.Fatalf("Unexpected err on vq create: %s", err)
 	}
 
 	for k, v := range fakevl[1:] {
