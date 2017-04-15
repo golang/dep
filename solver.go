@@ -127,6 +127,10 @@ type solver struct {
 	// names a SourceManager operates on.
 	b sourceBridge
 
+	// A versionUnifier, to facilitate cross-type version comparison and set
+	// operations.
+	vUnify versionUnifier
+
 	// A stack containing projects and packages that are currently "selected" -
 	// that is, they have passed all satisfiability checks, and are part of the
 	// current solution.
@@ -295,11 +299,14 @@ func Prepare(params SolveParameters, sm SourceManager) (Solver, error) {
 	if err != nil {
 		return nil, err
 	}
+	s.vUnify = versionUnifier{
+		b: s.b,
+	}
 
 	// Initialize stacks and queues
 	s.sel = &selection{
 		deps: make(map[ProjectRoot][]dependency),
-		sm:   s.b,
+		vu:   s.vUnify,
 	}
 	s.unsel = &unselected{
 		sl:  make([]bimodalIdentifier, 0),
@@ -337,6 +344,7 @@ type Solver interface {
 func (s *solver) Solve() (Solution, error) {
 	// Set up a metrics object
 	s.mtr = newMetrics()
+	s.vUnify.mtr = s.mtr
 
 	// Prime the queues with the root project
 	err := s.selectRoot()
@@ -876,7 +884,7 @@ func (s *solver) getLockVersionIfValid(id ProjectIdentifier) (Version, error) {
 		if tv, ok := v.(Revision); ok {
 			// If we only have a revision from the root's lock, allow matching
 			// against other versions that have that revision
-			for _, pv := range s.b.pairRevision(id, tv) {
+			for _, pv := range s.vUnify.pairRevision(id, tv) {
 				if constraint.Matches(pv) {
 					v = pv
 					found = true
