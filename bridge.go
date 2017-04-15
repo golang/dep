@@ -16,7 +16,6 @@ type sourceBridge interface {
 	// for Release().
 	SourceExists(ProjectIdentifier) (bool, error)
 	SyncSourceFor(ProjectIdentifier) error
-	ListVersions(ProjectIdentifier) ([]Version, error)
 	RevisionPresentIn(ProjectIdentifier, Revision) (bool, error)
 	ListPackages(ProjectIdentifier, Version) (pkgtree.PackageTree, error)
 	GetManifestAndLock(ProjectIdentifier, Version, ProjectAnalyzer) (Manifest, Lock, error)
@@ -92,10 +91,6 @@ func (b *bridge) GetManifestAndLock(id ProjectIdentifier, v Version, an ProjectA
 	m, l, e := b.sm.GetManifestAndLock(id, v, an)
 	b.s.mtr.pop()
 	return m, l, e
-}
-
-func (b *bridge) ListVersions(id ProjectIdentifier) ([]PairedVersion, error) {
-	return b.sm.ListVersions(id)
 }
 
 func (b *bridge) listVersions(id ProjectIdentifier) ([]Version, error) {
