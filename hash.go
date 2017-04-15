@@ -62,7 +62,7 @@ func (s *solver) writeHashingInputs(w io.Writer) {
 	for _, pd := range s.rd.getApplicableConstraints() {
 		writeString(string(pd.Ident.ProjectRoot))
 		writeString(pd.Ident.Source)
-		writeString(typedConstraintString(pd.Constraint))
+		writeString(pd.Constraint.typedString())
 	}
 
 	// Write out each discrete import, including those derived from requires.
@@ -99,7 +99,7 @@ func (s *solver) writeHashingInputs(w io.Writer) {
 			writeString(pc.Ident.Source)
 		}
 		if pc.Constraint != nil {
-			writeString(typedConstraintString(pc.Constraint))
+			writeString(pc.Constraint.typedString())
 		}
 	}
 

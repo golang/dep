@@ -69,15 +69,10 @@ type UnpairedVersion interface {
 }
 
 // types are weird
-func (branchVersion) _private()  {}
 func (branchVersion) _pair(bool) {}
-func (plainVersion) _private()   {}
 func (plainVersion) _pair(bool)  {}
-func (semVersion) _private()     {}
 func (semVersion) _pair(bool)    {}
-func (versionPair) _private()    {}
 func (versionPair) _pair(int)    {}
-func (Revision) _private()       {}
 
 // NewBranch creates a new Version to represent a floating version (in
 // general, a branch).
@@ -118,6 +113,10 @@ type Revision string
 // String converts the Revision back into a string.
 func (r Revision) String() string {
 	return string(r)
+}
+
+func (r Revision) typedString() string {
+	return "r-" + string(r)
 }
 
 // Type indicates the type of version - for revisions, "revision".
@@ -192,6 +191,10 @@ func (v branchVersion) String() string {
 	return string(v.name)
 }
 
+func (v branchVersion) typedString() string {
+	return fmt.Sprintf("b-%s", v.String())
+}
+
 func (v branchVersion) Type() VersionType {
 	return IsBranch
 }
@@ -263,6 +266,10 @@ type plainVersion string
 
 func (v plainVersion) String() string {
 	return string(v)
+}
+
+func (v plainVersion) typedString() string {
+	return fmt.Sprintf("pv-%s", v.String())
 }
 
 func (v plainVersion) Type() VersionType {
@@ -344,6 +351,10 @@ func (v semVersion) String() string {
 	return str
 }
 
+func (v semVersion) typedString() string {
+	return fmt.Sprintf("sv-%s", v.String())
+}
+
 func (v semVersion) Type() VersionType {
 	return IsSemver
 }
@@ -422,6 +433,10 @@ type versionPair struct {
 
 func (v versionPair) String() string {
 	return v.v.String()
+}
+
+func (v versionPair) typedString() string {
+	return fmt.Sprintf("%s-%s", v.Unpair().typedString(), v.Underlying().typedString())
 }
 
 func (v versionPair) Type() VersionType {
@@ -553,30 +568,6 @@ func compareVersionType(l, r Version) int {
 		}
 	}
 	panic("unknown version type")
-}
-
-// typedVersionString emits the normal stringified representation of the
-// provided version, prefixed with a string that uniquely identifies the type of
-// the version.
-func typedVersionString(v Version) string {
-	var prefix string
-	switch tv := v.(type) {
-	case branchVersion:
-		prefix = "b"
-	case plainVersion:
-		prefix = "pv"
-	case semVersion:
-		prefix = "sv"
-	case Revision:
-		prefix = "r"
-	case versionPair:
-		// NOTE: The behavior suits what we want for input hashing purposes, but
-		// pulling out both the unpaired and underlying makes the behavior
-		// inconsistent with how a normal String() op works on a pairedVersion.
-		return fmt.Sprintf("%s-%s", typedVersionString(tv.Unpair()), typedVersionString(tv.Underlying()))
-	}
-
-	return fmt.Sprintf("%s-%s", prefix, v.String())
 }
 
 // SortForUpgrade sorts a slice of []Version in roughly descending order, so

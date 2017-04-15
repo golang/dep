@@ -895,7 +895,7 @@ func TestTypedConstraintString(t *testing.T) {
 	}
 
 	for _, fix := range table {
-		got := typedConstraintString(fix.in)
+		got := fix.in.typedString()
 		if got != fix.out {
 			t.Errorf("Typed string for %v (%T) was not expected %q; got %q", fix.in, fix.in, fix.out, got)
 		}

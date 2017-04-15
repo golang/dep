@@ -180,6 +180,10 @@ func (vtu versionTypeUnion) String() string {
 	panic("versionTypeUnion should never be turned into a string; it is solver internal-only")
 }
 
+func (vtu versionTypeUnion) typedString() string {
+	panic("versionTypeUnion should never be turned into a string; it is solver internal-only")
+}
+
 // This should generally not be called, but is required for the interface. If it
 // is called, we have a bigger problem (the type has escaped the solver); thus,
 // panic.
@@ -254,5 +258,3 @@ func (vtu versionTypeUnion) Intersect(c Constraint) Constraint {
 
 	return none
 }
-
-func (vtu versionTypeUnion) _private() {}

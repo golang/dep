@@ -93,7 +93,7 @@ func TestTypeUnionIntersect(t *testing.T) {
 
 	gotc = vu.intersect(id, c, rev3)
 	if gotc != NewVersion("v2.0.5").Is(rev3) {
-		t.Fatalf("wanted v2.0.5, got %s from intersect", typedConstraintString(gotc))
+		t.Fatalf("wanted v2.0.5, got %s from intersect", gotc.typedString())
 	}
 }
 
