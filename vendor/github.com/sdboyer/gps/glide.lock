@@ -7,4 +7,6 @@ imports:
   version: 94ad6eaf8457cf85a68c9b53fa42e9b1b8683783
 - name: github.com/Masterminds/vcs
   version: abd1ea7037d3652ef9833a164b627f49225e1131
+- name: github.com/sdboyer/constext
+  version: 836a144573533ea4da4e6929c235fd348aed1c80
 testImports: []

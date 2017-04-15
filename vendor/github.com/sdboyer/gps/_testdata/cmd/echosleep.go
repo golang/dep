@@ -12,6 +12,6 @@ func main() {
 
 	for i := 0; i < *n; i++ {
 		fmt.Println("foo")
-		time.Sleep(time.Duration(i) * 100 * time.Millisecond)
+		time.Sleep(time.Duration(i) * 250 * time.Millisecond)
 	}
 }

@@ -41,7 +41,7 @@ func newVersionQueue(id ProjectIdentifier, lockv, prefv Version, b sourceBridge)
 
 	if len(vq.pi) == 0 {
 		var err error
-		vq.pi, err = vq.b.ListVersions(vq.id)
+		vq.pi, err = vq.b.listVersions(vq.id)
 		if err != nil {
 			// TODO(sdboyer) pushing this error this early entails that we
 			// unconditionally deep scan (e.g. vendor), as well as hitting the
@@ -87,11 +87,11 @@ func (vq *versionQueue) advance(fail error) error {
 		vq.allLoaded = true
 
 		var vltmp []Version
-		vltmp, vq.adverr = vq.b.ListVersions(vq.id)
+		vltmp, vq.adverr = vq.b.listVersions(vq.id)
 		if vq.adverr != nil {
 			return vq.adverr
 		}
-		// defensive copy - calling ListVersions here means slice contents may
+		// defensive copy - calling listVersions here means slice contents may
 		// be modified when removing prefv/lockv.
 		vq.pi = make([]Version, len(vltmp))
 		copy(vq.pi, vltmp)
