@@ -1,4 +1,4 @@
-memo = "2f117dcf1ebe1cff7acbddb851d29b87554d2249f1033f2a4cca3b33dc3fecc2"
+memo = "940bdaea844d101260e58623a5bae0392cce009ab34d274e89058b780e880309"
 
 [[projects]]
   branch = "2.x"
@@ -37,7 +37,13 @@ memo = "2f117dcf1ebe1cff7acbddb851d29b87554d2249f1033f2a4cca3b33dc3fecc2"
   version = "v0.8.0"
 
 [[projects]]
+  branch = "master"
+  name = "github.com/sdboyer/constext"
+  packages = ["."]
+  revision = "836a144573533ea4da4e6929c235fd348aed1c80"
+
+[[projects]]
   name = "github.com/sdboyer/gps"
   packages = [".","internal","internal/fs","pkgtree"]
-  revision = "b0f646b744e74543c094023d05339ffb82458e35"
-  version = "v0.15.0"
+  revision = "f118745d0aaff02a6a627467fc773716d1df518c"
+  version = "v0.16.0"
