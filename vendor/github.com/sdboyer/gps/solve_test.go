@@ -104,6 +104,7 @@ func TestBasicSolves(t *testing.T) {
 		sort.Strings(names)
 		for _, n := range names {
 			t.Run(n, func(t *testing.T) {
+				//t.Parallel() // until trace output is fixed in parallel
 				solveBasicsAndCheck(basicFixtures[n], t)
 			})
 		}
@@ -121,6 +122,7 @@ func solveBasicsAndCheck(fix basicFixture, t *testing.T) (res Solution, err erro
 		Downgrade:       fix.downgrade,
 		ChangeAll:       fix.changeall,
 		ToChange:        fix.changelist,
+		ProjectAnalyzer: naiveAnalyzer{},
 	}
 
 	if fix.l != nil {
@@ -150,6 +152,7 @@ func TestBimodalSolves(t *testing.T) {
 		sort.Strings(names)
 		for _, n := range names {
 			t.Run(n, func(t *testing.T) {
+				//t.Parallel() // until trace output is fixed in parallel
 				solveBimodalAndCheck(bimodalFixtures[n], t)
 			})
 		}
@@ -166,6 +169,7 @@ func solveBimodalAndCheck(fix bimodalFixture, t *testing.T) (res Solution, err e
 		Lock:            dummyLock{},
 		Downgrade:       fix.downgrade,
 		ChangeAll:       fix.changeall,
+		ProjectAnalyzer: naiveAnalyzer{},
 	}
 
 	if fix.l != nil {
@@ -196,15 +200,15 @@ func fixtureSolveSimpleChecks(fix specfix, soln Solution, err error, t *testing.
 	fixfail := fix.failure()
 	if err != nil {
 		if fixfail == nil {
-			t.Errorf("(fixture: %q) Solve failed unexpectedly:\n%s", fix.name(), err)
+			t.Errorf("Solve failed unexpectedly:\n%s", err)
 		} else if !reflect.DeepEqual(fixfail, err) {
 			// TODO(sdboyer) reflect.DeepEqual works for now, but once we start
 			// modeling more complex cases, this should probably become more robust
-			t.Errorf("(fixture: %q) Failure mismatch:\n\t(GOT): %s\n\t(WNT): %s", fix.name(), err, fixfail)
+			t.Errorf("Failure mismatch:\n\t(GOT): %s\n\t(WNT): %s", err, fixfail)
 		}
 	} else if fixfail != nil {
 		var buf bytes.Buffer
-		fmt.Fprintf(&buf, "(fixture: %q) Solver succeeded, but expecting failure:\n%s\nProjects in solution:", fix.name(), fixfail)
+		fmt.Fprintf(&buf, "Solver succeeded, but expecting failure:\n%s\nProjects in solution:", fixfail)
 		for _, p := range soln.Projects() {
 			fmt.Fprintf(&buf, "\n\t- %s at %s", ppi(p.Ident()), p.Version())
 		}
@@ -212,7 +216,7 @@ func fixtureSolveSimpleChecks(fix specfix, soln Solution, err error, t *testing.
 	} else {
 		r := soln.(solution)
 		if fix.maxTries() > 0 && r.Attempts() > fix.maxTries() {
-			t.Errorf("(fixture: %q) Solver completed in %v attempts, but expected %v or fewer", fix.name(), r.att, fix.maxTries())
+			t.Errorf("Solver completed in %v attempts, but expected %v or fewer", r.att, fix.maxTries())
 		}
 
 		// Dump result projects into a map for easier interrogation
@@ -224,23 +228,23 @@ func fixtureSolveSimpleChecks(fix specfix, soln Solution, err error, t *testing.
 		fixlen, rlen := len(fix.solution()), len(rp)
 		if fixlen != rlen {
 			// Different length, so they definitely disagree
-			t.Errorf("(fixture: %q) Solver reported %v package results, result expected %v", fix.name(), rlen, fixlen)
+			t.Errorf("Solver reported %v package results, result expected %v", rlen, fixlen)
 		}
 
 		// Whether or not len is same, still have to verify that results agree
 		// Walk through fixture/expected results first
 		for id, flp := range fix.solution() {
 			if lp, exists := rp[id]; !exists {
-				t.Errorf("(fixture: %q) Project %q expected but missing from results", fix.name(), ppi(id))
+				t.Errorf("Project %q expected but missing from results", ppi(id))
 			} else {
 				// delete result from map so we skip it on the reverse pass
 				delete(rp, id)
 				if flp.Version() != lp.Version() {
-					t.Errorf("(fixture: %q) Expected version %q of project %q, but actual version was %q", fix.name(), pv(flp.Version()), ppi(id), pv(lp.Version()))
+					t.Errorf("Expected version %q of project %q, but actual version was %q", pv(flp.Version()), ppi(id), pv(lp.Version()))
 				}
 
 				if !reflect.DeepEqual(lp.pkgs, flp.pkgs) {
-					t.Errorf("(fixture: %q) Package list was not not as expected for project %s@%s:\n\t(GOT) %s\n\t(WNT) %s", fix.name(), ppi(id), pv(lp.Version()), lp.pkgs, flp.pkgs)
+					t.Errorf("Package list was not not as expected for project %s@%s:\n\t(GOT) %s\n\t(WNT) %s", ppi(id), pv(lp.Version()), lp.pkgs, flp.pkgs)
 				}
 			}
 		}
@@ -248,7 +252,7 @@ func fixtureSolveSimpleChecks(fix specfix, soln Solution, err error, t *testing.
 		// Now walk through remaining actual results
 		for id, lp := range rp {
 			if _, exists := fix.solution()[id]; !exists {
-				t.Errorf("(fixture: %q) Unexpected project %s@%s present in results, with pkgs:\n\t%s", fix.name(), ppi(id), pv(lp.Version()), lp.pkgs)
+				t.Errorf("Unexpected project %s@%s present in results, with pkgs:\n\t%s", ppi(id), pv(lp.Version()), lp.pkgs)
 			}
 		}
 	}
@@ -297,6 +301,7 @@ func TestRootLockNoVersionPairMatching(t *testing.T) {
 		RootPackageTree: fix.rootTree(),
 		Manifest:        fix.rootmanifest(),
 		Lock:            l2,
+		ProjectAnalyzer: naiveAnalyzer{},
 	}
 
 	res, err := fixSolve(params, sm, t)
@@ -321,6 +326,14 @@ func TestBadSolveOpts(t *testing.T) {
 		t.Error("Prepare should have given error on nil SourceManager, but gave:", err)
 	}
 
+	_, err = Prepare(params, sm)
+	if err == nil {
+		t.Errorf("Prepare should have errored without ProjectAnalyzer")
+	} else if !strings.Contains(err.Error(), "must provide a ProjectAnalyzer") {
+		t.Error("Prepare should have given error without ProjectAnalyzer, but gave:", err)
+	}
+
+	params.ProjectAnalyzer = naiveAnalyzer{}
 	_, err = Prepare(params, sm)
 	if err == nil {
 		t.Errorf("Prepare should have errored on empty root")

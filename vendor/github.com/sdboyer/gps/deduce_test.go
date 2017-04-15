@@ -2,11 +2,11 @@ package gps
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"net/url"
 	"reflect"
-	"sync"
 	"testing"
 )
 
@@ -483,7 +483,10 @@ var pathDeductionFixtures = map[string][]pathDeductionFixture{
 
 func TestDeduceFromPath(t *testing.T) {
 	for typ, fixtures := range pathDeductionFixtures {
+		typ, fixtures := typ, fixtures
 		t.Run(typ, func(t *testing.T) {
+			t.Parallel()
+
 			var deducer pathDeducer
 			switch typ {
 			case "github":
@@ -533,7 +536,9 @@ func TestDeduceFromPath(t *testing.T) {
 			}
 
 			for _, fix := range fixtures {
+				fix := fix
 				t.Run(fix.in, func(t *testing.T) {
+					t.Parallel()
 					u, in, uerr := normalizeURI(fix.in)
 					if uerr != nil {
 						if fix.rerr == nil {
@@ -591,13 +596,14 @@ func TestVanityDeduction(t *testing.T) {
 	defer clean()
 
 	vanities := pathDeductionFixtures["vanity"]
-	wg := &sync.WaitGroup{}
-	wg.Add(len(vanities))
-
-	for _, fix := range vanities {
-		go func(fix pathDeductionFixture) {
-			defer wg.Done()
+	// group to avoid sourcemanager cleanup
+	ctx := context.Background()
+	t.Run("vanity", func(t *testing.T) {
+		for _, fix := range vanities {
+			fix := fix
 			t.Run(fmt.Sprintf("%s", fix.in), func(t *testing.T) {
+				t.Parallel()
+
 				pr, err := sm.DeduceProjectRoot(fix.in)
 				if err != nil {
 					t.Errorf("Unexpected err on deducing project root: %s", err)
@@ -606,27 +612,33 @@ func TestVanityDeduction(t *testing.T) {
 					t.Errorf("Deducer did not return expected root:\n\t(GOT) %s\n\t(WNT) %s", pr, fix.root)
 				}
 
-				ft, err := sm.deducePathAndProcess(fix.in)
+				pd, err := sm.deduceCoord.deduceRootPath(ctx, fix.in)
 				if err != nil {
 					t.Errorf("Unexpected err on deducing source: %s", err)
 					return
 				}
 
-				_, ident, err := ft.srcf()
-				if err != nil {
-					t.Errorf("Unexpected err on executing source future: %s", err)
-					return
-				}
-
-				ustr := fix.mb.(maybeGitSource).url.String()
-				if ident != ustr {
-					t.Errorf("Deduced repo ident does not match fixture:\n\t(GOT) %s\n\t(WNT) %s", ident, ustr)
+				goturl, wanturl := pd.mb.(maybeGitSource).url.String(), fix.mb.(maybeGitSource).url.String()
+				if goturl != wanturl {
+					t.Errorf("Deduced repo ident does not match fixture:\n\t(GOT) %s\n\t(WNT) %s", goturl, wanturl)
 				}
 			})
-		}(fix)
+		}
+	})
+}
+
+func TestVanityDeductionSchemeMismatch(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping slow test in short mode")
 	}
 
-	wg.Wait()
+	ctx := context.Background()
+	cm := newSupervisor(ctx)
+	dc := newDeductionCoordinator(cm)
+	_, err := dc.deduceRootPath(ctx, "ssh://golang.org/exp")
+	if err == nil {
+		t.Error("should have errored on scheme mismatch between input and go-get metadata")
+	}
 }
 
 // borrow from stdlib

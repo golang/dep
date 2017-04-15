@@ -141,6 +141,7 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 			RootPackageTree: pkgT,
 			Manifest:        m,
 			Lock:            l,
+			ProjectAnalyzer: dep.Analyzer{},
 		}
 
 		if *verbose {
