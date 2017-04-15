@@ -1463,7 +1463,7 @@ func (sm *depspecSourceManager) ListPackages(id ProjectIdentifier, v Version) (p
 }
 
 func (sm *depspecSourceManager) ListVersions(id ProjectIdentifier) ([]PairedVersion, error) {
-	pvl := make([]PairedVersion, 0)
+	var pvl []PairedVersion
 	for _, ds := range sm.specs {
 		if id.normalizedSource() != string(ds.n) {
 			continue
