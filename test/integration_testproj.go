@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"testing"
@@ -44,7 +45,11 @@ func NewTestProject(t *testing.T, initPath, wd string) *IntegrationTestProject {
 	new.makeRootTempDir()
 	new.TempDir(ProjectRoot, "vendor")
 	new.CopyTree(initPath)
-	new.Setenv("GOPATH", new.tempdir)
+	if runtime.GOOS == "darwin" {
+		new.Setenv("GOPATH", filepath.Join("/private", new.tempdir))
+	} else {
+		new.Setenv("GOPATH", new.tempdir)
+	}
 	return new
 }
 
