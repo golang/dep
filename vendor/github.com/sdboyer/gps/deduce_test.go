@@ -472,18 +472,16 @@ var pathDeductionFixtures = map[string][]pathDeductionFixture{
 			root: "golang.org/x/exp",
 			mb:   maybeGitSource{url: mkurl("https://go.googlesource.com/exp")},
 		},
-		// rsc.io appears to have broken
-		//{
-		//in:   "rsc.io/pdf",
-		//root: "rsc.io/pdf",
-		//mb:   maybeGitSource{url: mkurl("https://github.com/rsc/pdf")},
-		//},
+		{
+			in:   "golang.org/x/net/html",
+			root: "golang.org/x/net",
+			mb:   maybeGitSource{url: mkurl("https://go.googlesource.com/net")},
+		},
 	},
 }
 
 func TestDeduceFromPath(t *testing.T) {
-	for typ, fixtures := range pathDeductionFixtures {
-		typ, fixtures := typ, fixtures
+	do := func(typ string, fixtures []pathDeductionFixture, t *testing.T) {
 		t.Run(typ, func(t *testing.T) {
 			t.Parallel()
 
@@ -585,6 +583,21 @@ func TestDeduceFromPath(t *testing.T) {
 			}
 		})
 	}
+	for typ, fixtures := range pathDeductionFixtures {
+		typ, fixtures := typ, fixtures
+		t.Run("first", func(t *testing.T) {
+			do(typ, fixtures, t)
+		})
+	}
+
+	// Run the test set twice to ensure results are correct for both cached
+	// and uncached deductions.
+	for typ, fixtures := range pathDeductionFixtures {
+		typ, fixtures := typ, fixtures
+		t.Run("second", func(t *testing.T) {
+			do(typ, fixtures, t)
+		})
+	}
 }
 
 func TestVanityDeduction(t *testing.T) {
@@ -598,7 +611,7 @@ func TestVanityDeduction(t *testing.T) {
 	vanities := pathDeductionFixtures["vanity"]
 	// group to avoid sourcemanager cleanup
 	ctx := context.Background()
-	t.Run("vanity", func(t *testing.T) {
+	do := func(t *testing.T) {
 		for _, fix := range vanities {
 			fix := fix
 			t.Run(fmt.Sprintf("%s", fix.in), func(t *testing.T) {
@@ -624,7 +637,11 @@ func TestVanityDeduction(t *testing.T) {
 				}
 			})
 		}
-	})
+	}
+
+	// Run twice, to ensure correctness of cache
+	t.Run("first", do)
+	t.Run("second", do)
 }
 
 func TestVanityDeductionSchemeMismatch(t *testing.T) {

@@ -614,13 +614,6 @@ func (dc *deductionCoordinator) deduceRootPath(ctx context.Context, path string)
 		returnFunc: func(pd pathDeduction) {
 			dc.mut.Lock()
 			dc.rootxt.Insert(pd.root, pd.mb)
-
-			if pd.root != path {
-				// Replace the vanity deducer with a real result set, so
-				// that subsequent deductions don't hit the network
-				// again.
-				dc.rootxt.Insert(path, pd.mb)
-			}
 			dc.mut.Unlock()
 		},
 	}
