@@ -541,7 +541,7 @@ func (s *solver) getImportsAndConstraintsOf(a atomWithPackages) ([]string, []com
 		return nil, nil, err
 	}
 
-	rm, em := ptree.ToReachMap(false, false, true, s.rd.ig)
+	rm, em := ptree.ToReachMap(true, false, true, s.rd.ig)
 	// Use maps to dedupe the unique internal and external packages.
 	exmap, inmap := make(map[string]struct{}), make(map[string]struct{})
 
