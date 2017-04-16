@@ -16,12 +16,12 @@ func TestHashInputs(t *testing.T) {
 		RootDir:         string(fix.ds[0].n),
 		RootPackageTree: fix.rootTree(),
 		Manifest:        fix.rootmanifest(),
+		ProjectAnalyzer: naiveAnalyzer{},
 	}
 
 	s, err := Prepare(params, newdepspecSM(fix.ds, nil))
 	if err != nil {
-		t.Errorf("Unexpected error while prepping solver: %s", err)
-		t.FailNow()
+		t.Fatalf("Unexpected error while prepping solver: %s", err)
 	}
 
 	dig := s.HashInputs()
@@ -39,7 +39,7 @@ func TestHashInputs(t *testing.T) {
 		hhIgnores,
 		hhOverrides,
 		hhAnalyzer,
-		"depspec-sm-builtin",
+		"naive-analyzer",
 		"1",
 	}
 	for _, v := range elems {
@@ -67,12 +67,12 @@ func TestHashInputsReqsIgs(t *testing.T) {
 		RootDir:         string(fix.ds[0].n),
 		RootPackageTree: fix.rootTree(),
 		Manifest:        rm,
+		ProjectAnalyzer: naiveAnalyzer{},
 	}
 
 	s, err := Prepare(params, newdepspecSM(fix.ds, nil))
 	if err != nil {
-		t.Errorf("Unexpected error while prepping solver: %s", err)
-		t.FailNow()
+		t.Fatalf("Unexpected error while prepping solver: %s", err)
 	}
 
 	dig := s.HashInputs()
@@ -92,7 +92,7 @@ func TestHashInputsReqsIgs(t *testing.T) {
 		"foo",
 		hhOverrides,
 		hhAnalyzer,
-		"depspec-sm-builtin",
+		"naive-analyzer",
 		"1",
 	}
 	for _, v := range elems {
@@ -114,8 +114,7 @@ func TestHashInputsReqsIgs(t *testing.T) {
 
 	s, err = Prepare(params, newdepspecSM(fix.ds, nil))
 	if err != nil {
-		t.Errorf("Unexpected error while prepping solver: %s", err)
-		t.FailNow()
+		t.Fatalf("Unexpected error while prepping solver: %s", err)
 	}
 
 	dig = s.HashInputs()
@@ -137,7 +136,7 @@ func TestHashInputsReqsIgs(t *testing.T) {
 		"foo",
 		hhOverrides,
 		hhAnalyzer,
-		"depspec-sm-builtin",
+		"naive-analyzer",
 		"1",
 	}
 	for _, v := range elems {
@@ -155,8 +154,7 @@ func TestHashInputsReqsIgs(t *testing.T) {
 
 	s, err = Prepare(params, newdepspecSM(fix.ds, nil))
 	if err != nil {
-		t.Errorf("Unexpected error while prepping solver: %s", err)
-		t.FailNow()
+		t.Fatalf("Unexpected error while prepping solver: %s", err)
 	}
 
 	dig = s.HashInputs()
@@ -176,7 +174,7 @@ func TestHashInputsReqsIgs(t *testing.T) {
 		hhIgnores,
 		hhOverrides,
 		hhAnalyzer,
-		"depspec-sm-builtin",
+		"naive-analyzer",
 		"1",
 	}
 	for _, v := range elems {
@@ -198,6 +196,7 @@ func TestHashInputsOverrides(t *testing.T) {
 		RootDir:         string(basefix.ds[0].n),
 		RootPackageTree: basefix.rootTree(),
 		Manifest:        rm,
+		ProjectAnalyzer: naiveAnalyzer{},
 	}
 
 	table := []struct {
@@ -231,7 +230,7 @@ func TestHashInputsOverrides(t *testing.T) {
 				"c",
 				"car",
 				hhAnalyzer,
-				"depspec-sm-builtin",
+				"naive-analyzer",
 				"1",
 			},
 		},
@@ -262,7 +261,7 @@ func TestHashInputsOverrides(t *testing.T) {
 				"c",
 				"car",
 				hhAnalyzer,
-				"depspec-sm-builtin",
+				"naive-analyzer",
 				"1",
 			},
 		},
@@ -292,7 +291,7 @@ func TestHashInputsOverrides(t *testing.T) {
 				"c",
 				"car",
 				hhAnalyzer,
-				"depspec-sm-builtin",
+				"naive-analyzer",
 				"1",
 			},
 		},
@@ -320,7 +319,7 @@ func TestHashInputsOverrides(t *testing.T) {
 				"c",
 				"car",
 				hhAnalyzer,
-				"depspec-sm-builtin",
+				"naive-analyzer",
 				"1",
 			},
 		},
@@ -352,7 +351,7 @@ func TestHashInputsOverrides(t *testing.T) {
 				"d",
 				"b-foobranch",
 				hhAnalyzer,
-				"depspec-sm-builtin",
+				"naive-analyzer",
 				"1",
 			},
 		},
@@ -380,7 +379,7 @@ func TestHashInputsOverrides(t *testing.T) {
 				"d",
 				"b-foobranch",
 				hhAnalyzer,
-				"depspec-sm-builtin",
+				"naive-analyzer",
 				"1",
 			},
 		},
@@ -410,7 +409,7 @@ func TestHashInputsOverrides(t *testing.T) {
 				"d",
 				"b-foobranch",
 				hhAnalyzer,
-				"depspec-sm-builtin",
+				"naive-analyzer",
 				"1",
 			},
 		},
@@ -441,7 +440,7 @@ func TestHashInputsOverrides(t *testing.T) {
 				"d",
 				"b-foobranch",
 				hhAnalyzer,
-				"depspec-sm-builtin",
+				"naive-analyzer",
 				"1",
 			},
 		},
@@ -473,7 +472,7 @@ func TestHashInputsOverrides(t *testing.T) {
 				"d",
 				"b-foobranch",
 				hhAnalyzer,
-				"depspec-sm-builtin",
+				"naive-analyzer",
 				"1",
 			},
 		},
@@ -507,7 +506,7 @@ func TestHashInputsOverrides(t *testing.T) {
 				"d",
 				"b-foobranch",
 				hhAnalyzer,
-				"depspec-sm-builtin",
+				"naive-analyzer",
 				"1",
 			},
 		},
@@ -519,8 +518,7 @@ func TestHashInputsOverrides(t *testing.T) {
 
 		s, err := Prepare(params, newdepspecSM(basefix.ds, nil))
 		if err != nil {
-			t.Errorf("(fix: %q) Unexpected error while prepping solver: %s", fix.name, err)
-			t.FailNow()
+			t.Fatalf("(fix: %q) Unexpected error while prepping solver: %s", fix.name, err)
 		}
 
 		h := sha256.New()

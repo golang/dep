@@ -69,15 +69,10 @@ type UnpairedVersion interface {
 }
 
 // types are weird
-func (branchVersion) _private()  {}
 func (branchVersion) _pair(bool) {}
-func (plainVersion) _private()   {}
 func (plainVersion) _pair(bool)  {}
-func (semVersion) _private()     {}
 func (semVersion) _pair(bool)    {}
-func (versionPair) _private()    {}
 func (versionPair) _pair(int)    {}
-func (Revision) _private()       {}
 
 // NewBranch creates a new Version to represent a floating version (in
 // general, a branch).
@@ -118,6 +113,10 @@ type Revision string
 // String converts the Revision back into a string.
 func (r Revision) String() string {
 	return string(r)
+}
+
+func (r Revision) typedString() string {
+	return "r-" + string(r)
 }
 
 // Type indicates the type of version - for revisions, "revision".
@@ -192,6 +191,10 @@ func (v branchVersion) String() string {
 	return string(v.name)
 }
 
+func (v branchVersion) typedString() string {
+	return fmt.Sprintf("b-%s", v.String())
+}
+
 func (v branchVersion) Type() VersionType {
 	return IsBranch
 }
@@ -263,6 +266,10 @@ type plainVersion string
 
 func (v plainVersion) String() string {
 	return string(v)
+}
+
+func (v plainVersion) typedString() string {
+	return fmt.Sprintf("pv-%s", v.String())
 }
 
 func (v plainVersion) Type() VersionType {
@@ -344,6 +351,10 @@ func (v semVersion) String() string {
 	return str
 }
 
+func (v semVersion) typedString() string {
+	return fmt.Sprintf("sv-%s", v.String())
+}
+
 func (v semVersion) Type() VersionType {
 	return IsSemver
 }
@@ -422,6 +433,10 @@ type versionPair struct {
 
 func (v versionPair) String() string {
 	return v.v.String()
+}
+
+func (v versionPair) typedString() string {
+	return fmt.Sprintf("%s-%s", v.Unpair().typedString(), v.Underlying().typedString())
 }
 
 func (v versionPair) Type() VersionType {
@@ -555,30 +570,6 @@ func compareVersionType(l, r Version) int {
 	panic("unknown version type")
 }
 
-// typedVersionString emits the normal stringified representation of the
-// provided version, prefixed with a string that uniquely identifies the type of
-// the version.
-func typedVersionString(v Version) string {
-	var prefix string
-	switch tv := v.(type) {
-	case branchVersion:
-		prefix = "b"
-	case plainVersion:
-		prefix = "pv"
-	case semVersion:
-		prefix = "sv"
-	case Revision:
-		prefix = "r"
-	case versionPair:
-		// NOTE: The behavior suits what we want for input hashing purposes, but
-		// pulling out both the unpaired and underlying makes the behavior
-		// inconsistent with how a normal String() op works on a pairedVersion.
-		return fmt.Sprintf("%s-%s", typedVersionString(tv.Unpair()), typedVersionString(tv.Underlying()))
-	}
-
-	return fmt.Sprintf("%s-%s", prefix, v.String())
-}
-
 // SortForUpgrade sorts a slice of []Version in roughly descending order, so
 // that presumably newer versions are visited first. The rules are:
 //
@@ -610,6 +601,12 @@ func SortForUpgrade(vl []Version) {
 	sort.Sort(upgradeVersionSorter(vl))
 }
 
+// SortPairedForUpgrade has the same behavior as SortForUpgrade, but operates on
+// []PairedVersion types.
+func SortPairedForUpgrade(vl []PairedVersion) {
+	sort.Sort(pvupgradeVersionSorter(vl))
+}
+
 // SortForDowngrade sorts a slice of []Version in roughly ascending order, so
 // that presumably older versions are visited first.
 //
@@ -637,8 +634,13 @@ func SortForDowngrade(vl []Version) {
 	sort.Sort(downgradeVersionSorter(vl))
 }
 
+// SortPairedForDowngrade has the same behavior as SortForDowngrade, but
+// operates on []PairedVersion types.
+func SortPairedForDowngrade(vl []PairedVersion) {
+	sort.Sort(pvdowngradeVersionSorter(vl))
+}
+
 type upgradeVersionSorter []Version
-type downgradeVersionSorter []Version
 
 func (vs upgradeVersionSorter) Len() int {
 	return len(vs)
@@ -648,6 +650,27 @@ func (vs upgradeVersionSorter) Swap(i, j int) {
 	vs[i], vs[j] = vs[j], vs[i]
 }
 
+func (vs upgradeVersionSorter) Less(i, j int) bool {
+	l, r := vs[i], vs[j]
+	return vLess(l, r, false)
+}
+
+type pvupgradeVersionSorter []PairedVersion
+
+func (vs pvupgradeVersionSorter) Len() int {
+	return len(vs)
+}
+
+func (vs pvupgradeVersionSorter) Swap(i, j int) {
+	vs[i], vs[j] = vs[j], vs[i]
+}
+func (vs pvupgradeVersionSorter) Less(i, j int) bool {
+	l, r := vs[i], vs[j]
+	return vLess(l, r, false)
+}
+
+type downgradeVersionSorter []Version
+
 func (vs downgradeVersionSorter) Len() int {
 	return len(vs)
 }
@@ -656,9 +679,26 @@ func (vs downgradeVersionSorter) Swap(i, j int) {
 	vs[i], vs[j] = vs[j], vs[i]
 }
 
-func (vs upgradeVersionSorter) Less(i, j int) bool {
+func (vs downgradeVersionSorter) Less(i, j int) bool {
 	l, r := vs[i], vs[j]
+	return vLess(l, r, true)
+}
 
+type pvdowngradeVersionSorter []PairedVersion
+
+func (vs pvdowngradeVersionSorter) Len() int {
+	return len(vs)
+}
+
+func (vs pvdowngradeVersionSorter) Swap(i, j int) {
+	vs[i], vs[j] = vs[j], vs[i]
+}
+func (vs pvdowngradeVersionSorter) Less(i, j int) bool {
+	l, r := vs[i], vs[j]
+	return vLess(l, r, true)
+}
+
+func vLess(l, r Version, down bool) bool {
 	if tl, ispair := l.(versionPair); ispair {
 		l = tl.v
 	}
@@ -699,53 +739,38 @@ func (vs upgradeVersionSorter) Less(i, j int) bool {
 	lpre, rpre := lsv.Prerelease() == "", rsv.Prerelease() == ""
 	if (lpre && !rpre) || (!lpre && rpre) {
 		return lpre
+	}
+
+	if down {
+		return lsv.LessThan(rsv)
 	}
 	return lsv.GreaterThan(rsv)
 }
 
-func (vs downgradeVersionSorter) Less(i, j int) bool {
-	l, r := vs[i], vs[j]
-
-	if tl, ispair := l.(versionPair); ispair {
-		l = tl.v
+func hidePair(pvl []PairedVersion) []Version {
+	vl := make([]Version, 0, len(pvl))
+	for _, v := range pvl {
+		vl = append(vl, v)
 	}
-	if tr, ispair := r.(versionPair); ispair {
-		r = tr.v
-	}
+	return vl
+}
 
-	switch compareVersionType(l, r) {
-	case -1:
-		return true
-	case 1:
-		return false
-	case 0:
-		break
-	default:
-		panic("unreachable")
+// VersionComponentStrings decomposes a Version into the underlying number, branch and revision
+func VersionComponentStrings(v Version) (revision string, branch string, version string) {
+	switch tv := v.(type) {
+	case UnpairedVersion:
+	case Revision:
+		revision = tv.String()
+	case PairedVersion:
+		revision = tv.Underlying().String()
 	}
 
-	switch tl := l.(type) {
-	case branchVersion:
-		tr := r.(branchVersion)
-		if tl.isDefault != tr.isDefault {
-			// If they're not both defaults, then return the left val: if left
-			// is the default, then it is "less" (true) b/c we want it earlier.
-			// Else the right is the default, and so the left should be later
-			// (false).
-			return tl.isDefault
-		}
-		return l.String() < r.String()
-	case Revision, plainVersion:
-		// All that we can do now is alpha sort
-		return l.String() < r.String()
+	switch v.Type() {
+	case IsBranch:
+		branch = v.String()
+	case IsSemver, IsVersion:
+		version = v.String()
 	}
 
-	// This ensures that pre-release versions are always sorted after ALL
-	// full-release versions
-	lsv, rsv := l.(semVersion).sv, r.(semVersion).sv
-	lpre, rpre := lsv.Prerelease() == "", rsv.Prerelease() == ""
-	if (lpre && !rpre) || (!lpre && rpre) {
-		return lpre
-	}
-	return lsv.LessThan(rsv)
+	return
 }

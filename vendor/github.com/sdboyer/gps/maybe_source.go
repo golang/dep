@@ -2,9 +2,11 @@ package gps
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"net/url"
 	"path/filepath"
+	"strings"
 
 	"github.com/Masterminds/vcs"
 )
@@ -12,29 +14,41 @@ import (
 // A maybeSource represents a set of information that, given some
 // typically-expensive network effort, could be transformed into a proper source.
 //
-// Wrapping these up as their own type kills two birds with one stone:
+// Wrapping these up as their own type achieves two goals:
 //
 // * Allows control over when deduction logic triggers network activity
 // * Makes it easy to attempt multiple URLs for a given import path
 type maybeSource interface {
-	try(cachedir string, an ProjectAnalyzer) (source, string, error)
+	try(ctx context.Context, cachedir string, c singleSourceCache, superv *supervisor) (source, sourceState, error)
+	getURL() string
 }
 
 type maybeSources []maybeSource
 
-func (mbs maybeSources) try(cachedir string, an ProjectAnalyzer) (source, string, error) {
+func (mbs maybeSources) try(ctx context.Context, cachedir string, c singleSourceCache, superv *supervisor) (source, sourceState, error) {
 	var e sourceFailures
 	for _, mb := range mbs {
-		src, ident, err := mb.try(cachedir, an)
+		src, state, err := mb.try(ctx, cachedir, c, superv)
 		if err == nil {
-			return src, ident, nil
+			return src, state, nil
 		}
 		e = append(e, sourceSetupFailure{
-			ident: ident,
+			ident: mb.getURL(),
 			err:   err,
 		})
 	}
-	return nil, "", e
+	return nil, 0, e
+}
+
+// This really isn't generally intended to be used - the interface is for
+// maybeSources to be able to interrogate its members, not other things to
+// interrogate a maybeSources.
+func (mbs maybeSources) getURL() string {
+	strslice := make([]string, 0, len(mbs))
+	for _, mb := range mbs {
+		strslice = append(strslice, mb.getURL())
+	}
+	return strings.Join(strslice, "\n")
 }
 
 type sourceSetupFailure struct {
@@ -62,34 +76,45 @@ type maybeGitSource struct {
 	url *url.URL
 }
 
-func (m maybeGitSource) try(cachedir string, an ProjectAnalyzer) (source, string, error) {
+func (m maybeGitSource) try(ctx context.Context, cachedir string, c singleSourceCache, superv *supervisor) (source, sourceState, error) {
 	ustr := m.url.String()
 	path := filepath.Join(cachedir, "sources", sanitizer.Replace(ustr))
+
 	r, err := vcs.NewGitRepo(ustr, path)
 	if err != nil {
-		return nil, ustr, unwrapVcsErr(err)
+		return nil, 0, unwrapVcsErr(err)
 	}
 
 	src := &gitSource{
 		baseVCSSource: baseVCSSource{
-			an: an,
-			dc: newMetaCache(),
-			crepo: &repo{
-				r:     &gitRepo{r},
-				rpath: path,
-			},
+			repo: &gitRepo{r},
 		},
 	}
 
-	src.baseVCSSource.lvfunc = src.listVersions
-	if !r.CheckLocal() {
-		_, err = src.listVersions()
-		if err != nil {
-			return nil, ustr, unwrapVcsErr(err)
+	// Pinging invokes the same action as calling listVersions, so just do that.
+	var vl []PairedVersion
+	err = superv.do(ctx, "git:lv:maybe", ctListVersions, func(ctx context.Context) (err error) {
+		if vl, err = src.listVersions(ctx); err != nil {
+			return fmt.Errorf("remote repository at %s does not exist, or is inaccessible", ustr)
 		}
+		return nil
+	})
+	if err != nil {
+		return nil, 0, err
 	}
 
-	return src, ustr, nil
+	c.storeVersionMap(vl, true)
+	state := sourceIsSetUp | sourceExistsUpstream | sourceHasLatestVersionList
+
+	if r.CheckLocal() {
+		state |= sourceExistsLocally
+	}
+
+	return src, state, nil
+}
+
+func (m maybeGitSource) getURL() string {
+	return m.url.String()
 }
 
 type maybeGopkginSource struct {
@@ -104,106 +129,130 @@ type maybeGopkginSource struct {
 	major uint64
 }
 
-func (m maybeGopkginSource) try(cachedir string, an ProjectAnalyzer) (source, string, error) {
+func (m maybeGopkginSource) try(ctx context.Context, cachedir string, c singleSourceCache, superv *supervisor) (source, sourceState, error) {
 	// We don't actually need a fully consistent transform into the on-disk path
 	// - just something that's unique to the particular gopkg.in domain context.
 	// So, it's OK to just dumb-join the scheme with the path.
 	path := filepath.Join(cachedir, "sources", sanitizer.Replace(m.url.Scheme+"/"+m.opath))
 	ustr := m.url.String()
+
 	r, err := vcs.NewGitRepo(ustr, path)
 	if err != nil {
-		return nil, ustr, unwrapVcsErr(err)
+		return nil, 0, unwrapVcsErr(err)
 	}
 
 	src := &gopkginSource{
 		gitSource: gitSource{
 			baseVCSSource: baseVCSSource{
-				an: an,
-				dc: newMetaCache(),
-				crepo: &repo{
-					r:     &gitRepo{r},
-					rpath: path,
-				},
+				repo: &gitRepo{r},
 			},
 		},
 		major: m.major,
 	}
 
-	src.baseVCSSource.lvfunc = src.listVersions
-	if !r.CheckLocal() {
-		_, err = src.listVersions()
-		if err != nil {
-			return nil, ustr, unwrapVcsErr(err)
+	var vl []PairedVersion
+	err = superv.do(ctx, "git:lv:maybe", ctListVersions, func(ctx context.Context) (err error) {
+		if vl, err = src.listVersions(ctx); err != nil {
+			return fmt.Errorf("remote repository at %s does not exist, or is inaccessible", ustr)
 		}
+		return nil
+	})
+	if err != nil {
+		return nil, 0, err
 	}
 
-	return src, ustr, nil
+	c.storeVersionMap(vl, true)
+	state := sourceIsSetUp | sourceExistsUpstream | sourceHasLatestVersionList
+
+	if r.CheckLocal() {
+		state |= sourceExistsLocally
+	}
+
+	return src, state, nil
+}
+
+func (m maybeGopkginSource) getURL() string {
+	return m.opath
 }
 
 type maybeBzrSource struct {
 	url *url.URL
 }
 
-func (m maybeBzrSource) try(cachedir string, an ProjectAnalyzer) (source, string, error) {
+func (m maybeBzrSource) try(ctx context.Context, cachedir string, c singleSourceCache, superv *supervisor) (source, sourceState, error) {
 	ustr := m.url.String()
 	path := filepath.Join(cachedir, "sources", sanitizer.Replace(ustr))
+
 	r, err := vcs.NewBzrRepo(ustr, path)
 	if err != nil {
-		return nil, ustr, unwrapVcsErr(err)
+		return nil, 0, unwrapVcsErr(err)
 	}
-	if !r.Ping() {
-		return nil, ustr, fmt.Errorf("remote repository at %s does not exist, or is inaccessible", ustr)
+
+	err = superv.do(ctx, "bzr:ping", ctSourcePing, func(ctx context.Context) error {
+		if !r.Ping() {
+			return fmt.Errorf("remote repository at %s does not exist, or is inaccessible", ustr)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, 0, err
+	}
+
+	state := sourceIsSetUp | sourceExistsUpstream
+	if r.CheckLocal() {
+		state |= sourceExistsLocally
 	}
 
 	src := &bzrSource{
 		baseVCSSource: baseVCSSource{
-			an: an,
-			dc: newMetaCache(),
-			ex: existence{
-				s: existsUpstream,
-				f: existsUpstream,
-			},
-			crepo: &repo{
-				r:     &bzrRepo{r},
-				rpath: path,
-			},
+			repo: &bzrRepo{r},
 		},
 	}
-	src.baseVCSSource.lvfunc = src.listVersions
 
-	return src, ustr, nil
+	return src, state, nil
+}
+
+func (m maybeBzrSource) getURL() string {
+	return m.url.String()
 }
 
 type maybeHgSource struct {
 	url *url.URL
 }
 
-func (m maybeHgSource) try(cachedir string, an ProjectAnalyzer) (source, string, error) {
+func (m maybeHgSource) try(ctx context.Context, cachedir string, c singleSourceCache, superv *supervisor) (source, sourceState, error) {
 	ustr := m.url.String()
 	path := filepath.Join(cachedir, "sources", sanitizer.Replace(ustr))
+
 	r, err := vcs.NewHgRepo(ustr, path)
 	if err != nil {
-		return nil, ustr, unwrapVcsErr(err)
+		return nil, 0, unwrapVcsErr(err)
 	}
-	if !r.Ping() {
-		return nil, ustr, fmt.Errorf("remote repository at %s does not exist, or is inaccessible", ustr)
+
+	err = superv.do(ctx, "hg:ping", ctSourcePing, func(ctx context.Context) error {
+		if !r.Ping() {
+			return fmt.Errorf("remote repository at %s does not exist, or is inaccessible", ustr)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, 0, err
+	}
+
+	state := sourceIsSetUp | sourceExistsUpstream
+	if r.CheckLocal() {
+		state |= sourceExistsLocally
 	}
 
 	src := &hgSource{
 		baseVCSSource: baseVCSSource{
-			an: an,
-			dc: newMetaCache(),
-			ex: existence{
-				s: existsUpstream,
-				f: existsUpstream,
-			},
-			crepo: &repo{
-				r:     &hgRepo{r},
-				rpath: path,
-			},
+			repo: &hgRepo{r},
 		},
 	}
-	src.baseVCSSource.lvfunc = src.listVersions
 
-	return src, ustr, nil
+	return src, state, nil
+}
+
+func (m maybeHgSource) getURL() string {
+	return m.url.String()
 }

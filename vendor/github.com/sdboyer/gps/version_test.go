@@ -7,13 +7,13 @@ func TestVersionSorts(t *testing.T) {
 	v1 := NewBranch("master").Is(rev)
 	v2 := NewBranch("test").Is(rev)
 	v3 := NewVersion("1.0.0").Is(rev)
-	v4 := NewVersion("1.0.1")
-	v5 := NewVersion("v2.0.5")
-	v6 := NewVersion("2.0.5.2")
-	v7 := newDefaultBranch("unwrapped")
-	v8 := NewVersion("20.0.5.2")
-	v9 := NewVersion("v1.5.5-beta.4")
-	v10 := NewVersion("v3.0.1-alpha.1")
+	v4 := NewVersion("1.0.1").Is(rev)
+	v5 := NewVersion("v2.0.5").Is(rev)
+	v6 := NewVersion("2.0.5.2").Is(rev)
+	v7 := newDefaultBranch("unwrapped").Is(rev)
+	v8 := NewVersion("20.0.5.2").Is(rev)
+	v9 := NewVersion("v1.5.5-beta.4").Is(rev)
+	v10 := NewVersion("v3.0.1-alpha.1").Is(rev)
 
 	start := []Version{
 		v1,
@@ -97,6 +97,85 @@ func TestVersionSorts(t *testing.T) {
 		if edown[k] != v {
 			wrong = append(wrong, k)
 			t.Errorf("Expected version %s in position %v on up-then-downgrade sort, but got %s", edown[k], k, v)
+		}
+	}
+	if len(wrong) > 0 {
+		// Just helps with readability a bit
+		t.Fatalf("Up-then-downgrade sort positions with wrong versions: %v", wrong)
+	}
+
+	///////////
+	// Repeat for PairedVersion slices & sorts
+
+	pdown, pup := make([]PairedVersion, 0, len(start)), make([]PairedVersion, 0, len(start))
+	for _, v := range start {
+		if _, ok := v.(Revision); ok {
+			continue
+		}
+		pdown = append(pdown, v.(PairedVersion))
+		pup = append(pup, v.(PairedVersion))
+	}
+
+	pedown, peup := make([]PairedVersion, 0, len(edown)), make([]PairedVersion, 0, len(eup))
+	for _, v := range edown {
+		if _, ok := v.(Revision); ok {
+			continue
+		}
+		pedown = append(pedown, v.(PairedVersion))
+	}
+	for _, v := range eup {
+		if _, ok := v.(Revision); ok {
+			continue
+		}
+		peup = append(peup, v.(PairedVersion))
+	}
+
+	SortPairedForUpgrade(pup)
+	for k, v := range pup {
+		if peup[k] != v {
+			wrong = append(wrong, k)
+			t.Errorf("Expected version %s in position %v on upgrade sort, but got %s", peup[k], k, v)
+		}
+	}
+	if len(wrong) > 0 {
+		// Just helps with readability a bit
+		t.Errorf("Upgrade sort positions with wrong versions: %v", wrong)
+	}
+
+	SortPairedForDowngrade(pdown)
+	wrong = wrong[:0]
+	for k, v := range pdown {
+		if pedown[k] != v {
+			wrong = append(wrong, k)
+			t.Errorf("Expected version %s in position %v on downgrade sort, but got %s", pedown[k], k, v)
+		}
+	}
+	if len(wrong) > 0 {
+		// Just helps with readability a bit
+		t.Errorf("Downgrade sort positions with wrong versions: %v", wrong)
+	}
+
+	// Now make sure we sort back the other way correctly...just because
+	SortPairedForUpgrade(pdown)
+	wrong = wrong[:0]
+	for k, v := range pdown {
+		if peup[k] != v {
+			wrong = append(wrong, k)
+			t.Errorf("Expected version %s in position %v on down-then-upgrade sort, but got %s", peup[k], k, v)
+		}
+	}
+	if len(wrong) > 0 {
+		// Just helps with readability a bit
+		t.Errorf("Down-then-upgrade sort positions with wrong versions: %v", wrong)
+	}
+
+	// Now make sure we sort back the other way correctly...just because
+	SortPairedForDowngrade(pup)
+	wrong = wrong[:0]
+	for k, v := range pup {
+		if pedown[k] != v {
+			wrong = append(wrong, k)
+			t.Errorf("Expected version %s in position %v on up-then-downgrade sort, but got %s", pedown[k], k, v)
 		}
 	}
 	if len(wrong) > 0 {
