@@ -6,6 +6,7 @@ package test
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
@@ -149,6 +150,10 @@ func (p *IntegrationTestProject) DoRun(args []string) error {
 	cmd.Stderr = &p.stderr
 	cmd.Env = p.env
 	cmd.Dir = p.ProjPath("")
+
+	fmt.Printf(cmd.Dir)
+	fmt.Printf(p.tempdir)
+
 	status := cmd.Run()
 	if *PrintLogs {
 		if p.stdout.Len() > 0 {
