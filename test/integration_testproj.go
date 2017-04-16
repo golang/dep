@@ -6,6 +6,7 @@ package test
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
@@ -150,14 +151,22 @@ func (p *IntegrationTestProject) DoRun(args []string) error {
 	cmd.Env = p.env
 	cmd.Dir = p.ProjPath("")
 
-	status := cmd.Run()
-	if p.stdout.Len() > 0 {
-		p.t.Log("standard output:")
-		p.t.Log(p.stdout.String())
+	fmt.Println(p.tempdir)
+	fmt.Println(cmd.Dir)
+	for i := 0; i < len(cmd.Env); i++ {
+		fmt.Println(cmd.Env[i])
 	}
-	if p.stderr.Len() > 0 {
-		p.t.Log("standard error:")
-		p.t.Log(p.stderr.String())
+
+	status := cmd.Run()
+	if *PrintLogs {
+		if p.stdout.Len() > 0 {
+			p.t.Log("standard output:")
+			p.t.Log(p.stdout.String())
+		}
+		if p.stderr.Len() > 0 {
+			p.t.Log("standard error:")
+			p.t.Log(p.stderr.String())
+		}
 	}
 	return status
 }
