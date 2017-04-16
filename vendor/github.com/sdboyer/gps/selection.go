@@ -3,7 +3,7 @@ package gps
 type selection struct {
 	projects []selected
 	deps     map[ProjectRoot][]dependency
-	sm       sourceBridge
+	vu       versionUnifier
 }
 
 type selected struct {
@@ -124,7 +124,7 @@ func (s *selection) getConstraint(id ProjectIdentifier) Constraint {
 	// Start with the open set
 	var ret Constraint = any
 	for _, dep := range deps {
-		ret = s.sm.intersect(id, ret, dep.dep.Constraint)
+		ret = s.vu.intersect(id, ret, dep.dep.Constraint)
 	}
 
 	return ret
