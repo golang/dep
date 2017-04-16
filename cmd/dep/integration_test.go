@@ -46,7 +46,10 @@ func TestIntegration(t *testing.T) {
 				// Run commands
 				testProj.RecordImportPaths()
 				for _, args := range testCase.Commands {
-					testProj.DoRun(args)
+					err = testProj.DoRun(args)
+					if err != nil {
+						t.Fatalf("%v", err)
+					}
 				}
 
 				// Check final manifest and lock
