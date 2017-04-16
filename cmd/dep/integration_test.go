@@ -7,7 +7,6 @@ package main
 import (
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 
@@ -23,12 +22,6 @@ func TestIntegration(t *testing.T) {
 		wd, err := os.Getwd()
 		if err != nil {
 			panic(err)
-		}
-
-		if runtime.GOOS == "windows" && strings.Contains(path, "remove") {
-			// TODO skipping the remove tests on windows until some fixes happen in gps -
-			// see https://github.com/golang/dep/issues/301
-			return filepath.SkipDir
 		}
 
 		if filepath.Base(path) == "testcase.json" {
