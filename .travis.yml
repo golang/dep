@@ -19,7 +19,7 @@
     - go build -v ./cmd/dep
     - go vet $(go list ./... | grep -v vendor)
     - test -z "$(gofmt -s -l . 2>&1 | grep -v vendor | tee /dev/stderr)"
-    - go test -race $(go list ./... | grep -v vendor)
+    - go test -race -run Integration/init/case3 -v $(go list ./... | grep -v vendor)
     - go build ./hack/licenseok
     - find . -path ./vendor -prune -o -type f -name "*.go" -printf '%P\n' | xargs ./licenseok
     - ./hack/validate-vendor.bash
