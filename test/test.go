@@ -187,7 +187,7 @@ func (h *Helper) DoRun(args []string) error {
 		}
 	}
 	h.ran = true
-	return status
+	return errors.Wrapf(status, "Error running %s\n%s", strings.Join(newargs, " "), h.stderr.String())
 }
 
 // run runs the test go command, and expects it to succeed.
