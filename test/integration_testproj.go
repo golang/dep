@@ -47,7 +47,7 @@ func NewTestProject(t *testing.T, initPath, wd string) *IntegrationTestProject {
 	new.TempDir(ProjectRoot, "vendor")
 	new.CopyTree(initPath)
 	fmt.Println(runtime.GOOS)
-	new.Setenv("GOPATH", filepath.Join("private", new.tempdir))
+	new.Setenv("GOPATH", filepath.Join("/private", new.tempdir))
 	return new
 }
 
