@@ -45,5 +45,5 @@ memo = "940bdaea844d101260e58623a5bae0392cce009ab34d274e89058b780e880309"
 [[projects]]
   name = "github.com/sdboyer/gps"
   packages = [".","internal","internal/fs","pkgtree"]
-  revision = "f118745d0aaff02a6a627467fc773716d1df518c"
-  version = "v0.16.0"
+  revision = "154c091e40c985ca523b0b350bc351024a97844c"
+  version = "v0.16.1"

@@ -59,12 +59,10 @@ func (s *solver) check(a atomWithPackages, pkgonly bool) error {
 			s.mtr.pop()
 			return err
 		}
-		// TODO(sdboyer) decide how to refactor in order to re-enable this. Checking for
-		// revision existence is important...but kinda obnoxious.
-		//if err := s.checkRevisionExists(a, dep); err != nil {
-		//s.traceInfo(err)
-		//return err
-		//}
+		if err := s.checkRevisionExists(a, dep); err != nil {
+			s.traceInfo(err)
+			return err
+		}
 		if err := s.checkPackageImportsFromDepExist(a, dep); err != nil {
 			s.traceInfo(err)
 			s.mtr.pop()
