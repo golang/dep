@@ -5,6 +5,7 @@
 package main
 
 import (
+	"os"
 	"testing"
 
 	"github.com/golang/dep/test"
@@ -15,9 +16,13 @@ func TestRemoveErrors(t *testing.T) {
 	test.NeedsGit(t)
 
 	testName := "remove/unused/case1"
+	wd, err := os.Getwd()
+	if err != nil {
+		panic(err)
+	}
 
-	testCase := test.NewTestCase(t, testName)
-	testProj := test.NewTestProject(t, testCase.InitialPath())
+	testCase := test.NewTestCase(t, testName, wd)
+	testProj := test.NewTestProject(t, testCase.InitialPath(), wd)
 	defer testProj.Cleanup()
 
 	// Create and checkout the vendor revisions
