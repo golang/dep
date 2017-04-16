@@ -29,7 +29,7 @@ func TestIntegration(t *testing.T) {
 			testName := strings.Join(parse[2:len(parse)-1], "/")
 
 			t.Run(testName, func(t *testing.T) {
-				t.Parallel()
+				//t.Parallel()
 
 				// Set up environment
 				testCase := test.NewTestCase(t, testName, wd)
