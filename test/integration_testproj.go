@@ -45,11 +45,18 @@ func NewTestProject(t *testing.T, initPath, wd string) *IntegrationTestProject {
 	new.makeRootTempDir()
 	new.TempDir(ProjectRoot, "vendor")
 	new.CopyTree(initPath)
-	if runtime.GOOS == "darwin" {
+
+	// Note that the Travis darwin platform, directories with certain roots such
+	// as /var are actually links to a dirtree under /private.  Without the patch
+	// below the wd, and therefore the GOPATH, is recorded as "/var/..." but the
+	// actual process runs in "/private/var/..." and dies due to not being in the
+	// GOPATH because the roots don't line up.
+	if runtime.GOOS == "darwin" && needsPrivateLeader(new.tempdir) {
 		new.Setenv("GOPATH", filepath.Join("/private", new.tempdir))
 	} else {
 		new.Setenv("GOPATH", new.tempdir)
 	}
+
 	return new
 }
 
@@ -282,4 +289,16 @@ func (p *IntegrationTestProject) Must(err error) {
 	if err != nil {
 		p.t.Fatalf("%+v", err)
 	}
+}
+
+// Checks for filepath beginnings that result in the "/private" leader
+// on Mac platforms
+func needsPrivateLeader(path string) bool {
+	var roots = []string{"/var", "/tmp", "/etc"}
+	for _, root := range roots {
+		if strings.HasPrefix(path, root) {
+			return true
+		}
+	}
+	return false
 }
