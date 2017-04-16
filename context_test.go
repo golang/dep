@@ -5,7 +5,6 @@
 package dep
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -382,15 +381,9 @@ func TestResolveProjectRoot(t *testing.T) {
 	symlinkedPath := filepath.Join(tg.Path("."), "sym", "symlink")
 	symlinkedInGoPath := filepath.Join(ctx.GOPATH, "src/sym/path")
 	symlinkedInOtherGoPath := filepath.Join(tg.Path("."), "sym", "symtwo")
-	os.Symlink(realPath, symlinkedPath+".lnk")
+	os.Symlink(realPath, symlinkedPath)
 	os.Symlink(realPath, symlinkedInGoPath)
 	os.Symlink(realPathTwo, symlinkedInOtherGoPath)
-
-	fmt.Println(realPath)
-	fmt.Println(realPathTwo)
-	fmt.Println(symlinkedPath)
-	fmt.Println(symlinkedInGoPath)
-	fmt.Println(symlinkedInOtherGoPath)
 
 	// Real path should be returned, no symlinks to deal with
 	p, err := ctx.resolveProjectRoot(realPath)
