@@ -115,6 +115,8 @@ func main() {
 			}
 
 			// Set up the dep context.
+			fmt.Print("Context wd: ")
+			fmt.Println(os.Getwd())
 			ctx, err := dep.NewContext()
 			if err != nil {
 				fmt.Fprintln(os.Stderr, err)

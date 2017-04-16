@@ -20,17 +20,17 @@ init:
 
 install:
   # Install the specific Go version.
-  - rmdir c:\go /s /q
-  - appveyor DownloadFile https://storage.googleapis.com/golang/go%GOVERSION%.windows-amd64.msi
-  - msiexec /i go%GOVERSION%.windows-amd64.msi /q
-  - set Path=c:\go\bin;c:\gopath\bin;%Path%
-  - go version
-  - go env
+  # - rmdir c:\go /s /q
+  # - appveyor DownloadFile https://storage.googleapis.com/golang/go%GOVERSION%.windows-amd64.msi
+  # - msiexec /i go%GOVERSION%.windows-amd64.msi /q
+  # - set Path=c:\go\bin;c:\gopath\bin;%Path%
+  # - go version
+  # - go env
 
 build: false
 deploy: false
 
 test_script:
-  - go build
-  - go test .
-  - go test ./cmd/dep
+  # - go build
+  # - go test .
+  # - go test ./cmd/dep
