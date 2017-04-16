@@ -63,8 +63,10 @@ func (c *monitoredCmd) run(ctx context.Context) error {
 				return &timeoutError{c.timeout}
 			}
 		case <-ctx.Done():
-			if err := c.cmd.Process.Kill(); err != nil {
-				return &killCmdError{err}
+			if c.cmd.Process != nil {
+				if err := c.cmd.Process.Kill(); err != nil {
+					return &killCmdError{err}
+				}
 			}
 			return c.ctx.Err()
 		case err := <-done:
