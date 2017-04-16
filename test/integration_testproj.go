@@ -158,15 +158,13 @@ func (p *IntegrationTestProject) DoRun(args []string) error {
 	}
 
 	status := cmd.Run()
-	if *PrintLogs {
-		if p.stdout.Len() > 0 {
-			p.t.Log("standard output:")
-			p.t.Log(p.stdout.String())
-		}
-		if p.stderr.Len() > 0 {
-			p.t.Log("standard error:")
-			p.t.Log(p.stderr.String())
-		}
+	if p.stdout.Len() > 0 {
+		p.t.Log("standard output:")
+		p.t.Log(p.stdout.String())
+	}
+	if p.stderr.Len() > 0 {
+		p.t.Log("standard error:")
+		p.t.Log(p.stderr.String())
 	}
 	return status
 }
