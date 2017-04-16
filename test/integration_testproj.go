@@ -151,8 +151,8 @@ func (p *IntegrationTestProject) DoRun(args []string) error {
 	cmd.Env = p.env
 	cmd.Dir = p.ProjPath("")
 
-	fmt.Printf(cmd.Dir)
-	fmt.Printf(p.tempdir)
+	fmt.Println(p.tempdir)
+	fmt.Println(cmd.Dir)
 
 	status := cmd.Run()
 	if *PrintLogs {
