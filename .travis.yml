@@ -5,12 +5,12 @@
     email: false
   matrix:
     include:
-      - os: linux
-        go: 1.7.x
-      - os: linux
-        go: 1.8.x
-      - os: linux
-        go: tip
+      # - os: linux
+      #   go: 1.7.x
+      # - os: linux
+      #   go: 1.8.x
+      # - os: linux
+      #   go: tip
       - os: osx
         go: 1.8.x
   install:
