@@ -29,8 +29,7 @@ func TestIntegration(t *testing.T) {
 			testName := strings.Join(parse[2:len(parse)-1], "/")
 
 			t.Run(testName, func(t *testing.T) {
-				// Uncomment once the gps improvements are in place
-				// t.Parallel()
+				t.Parallel()
 
 				// Set up environment
 				testCase := test.NewTestCase(t, testName, wd)
