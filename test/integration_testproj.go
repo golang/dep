@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"testing"
@@ -45,7 +46,8 @@ func NewTestProject(t *testing.T, initPath, wd string) *IntegrationTestProject {
 	new.makeRootTempDir()
 	new.TempDir(ProjectRoot, "vendor")
 	new.CopyTree(initPath)
-	new.Setenv("GOPATH", new.tempdir)
+	fmt.Println(runtime.GOOS)
+	new.Setenv("GOPATH", filepath.Join("private", new.tempdir))
 	return new
 }
 
