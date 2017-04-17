@@ -74,6 +74,9 @@ func (tc *IntegrationTestCase) Cleanup() {
 		j = bytes.Replace(j, cmds, n, -1)
 		j = append(j, '\n')
 		err = ioutil.WriteFile(filepath.Join(tc.rootPath, "testcase.json"), j, 0666)
+		if err != nil {
+			tc.t.Errorf("Failed to update testcase %s: %s", tc.name, err)
+		}
 	}
 }
 
