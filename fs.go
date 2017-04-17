@@ -12,6 +12,7 @@ import (
 	"runtime"
 	"syscall"
 
+	"github.com/golang/dep/internal"
 	"github.com/pelletier/go-toml"
 	"github.com/pkg/errors"
 )
@@ -32,18 +33,7 @@ func IsRegular(name string) (bool, error) {
 }
 
 func IsDir(name string) (bool, error) {
-	// TODO: lstat?
-	fi, err := os.Stat(name)
-	if os.IsNotExist(err) {
-		return false, nil
-	}
-	if err != nil {
-		return false, err
-	}
-	if !fi.IsDir() {
-		return false, errors.Errorf("%q is not a directory", name)
-	}
-	return true, nil
+	return internal.IsDir(name)
 }
 
 func IsNonEmptyDir(name string) (bool, error) {
