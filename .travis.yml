@@ -1,25 +1,31 @@
 ---
-  language: go
-  sudo: false
-  notifications:
-    email: false
-  matrix:
-    include:
-      - os: linux
-        go: 1.7.x
-      - os: linux
-        go: 1.8.x
-      - os: linux
-        go: tip
-      - os: osx
-        go: 1.8.x
-  install:
-    - echo "This is an override of the default install deps step in travis."
-  script:
-    - go build -v ./cmd/dep
-    - go vet $(go list ./... | grep -v vendor)
-    - test -z "$(gofmt -s -l . 2>&1 | grep -v vendor | tee /dev/stderr)"
-    - go test -race $(go list ./... | grep -v vendor)
-    - go build ./hack/licenseok
-    - find . -path ./vendor -prune -o -type f -name "*.go" -printf '%P\n' | xargs ./licenseok
-    - ./hack/validate-vendor.bash
+language: go
+sudo: false
+notifications:
+  email: false
+matrix:
+  include:
+    - os: linux
+      go: 1.7.x
+    - os: linux
+      go: 1.8.x
+    - os: linux
+      go: tip
+    - os: osx
+      go: 1.8.x
+install:
+  - echo "This is an override of the default install deps step in travis."
+before_script:
+  - PKGS=$(go list ./... | grep -v /vendor/)
+  - go get -v honnef.co/go/tools/cmd/staticcheck
+script:
+  - go build -v ./cmd/dep
+  - go vet $PKGS
+  # Ignore the deprecation warning about filepath.HasPrefix (SA1019). This flag
+  # can be removed when issue #296 is resolved.
+  - staticcheck -ignore='github.com/golang/dep/context.go:SA1019 github.com/golang/dep/cmd/dep/init.go:SA1019' $PKGS
+  - test -z "$(gofmt -s -l . 2>&1 | grep -v vendor/ | tee /dev/stderr)"
+  - go test -race $PKGS
+  - go build ./hack/licenseok
+  - find . -path ./vendor -prune -o -type f -name "*.go" -printf '%P\n' | xargs ./licenseok
+  - ./hack/validate-vendor.bash
