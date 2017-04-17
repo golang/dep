@@ -17,7 +17,6 @@ import (
 type monitoredCmd struct {
 	cmd     *exec.Cmd
 	timeout time.Duration
-	ctx     context.Context
 	stdout  *activityBuffer
 	stderr  *activityBuffer
 }
@@ -68,7 +67,7 @@ func (c *monitoredCmd) run(ctx context.Context) error {
 					return &killCmdError{err}
 				}
 			}
-			return c.ctx.Err()
+			return ctx.Err()
 		case err := <-done:
 			return err
 		}

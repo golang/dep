@@ -17,7 +17,7 @@ func mkTestCmd(iterations int) *monitoredCmd {
 }
 
 func TestMonitoredCmd(t *testing.T) {
-	// Sleeps make this a bit slow
+	// Sleeps and compile make this a bit slow
 	if testing.Short() {
 		t.Skip("skipping test with sleeps on short")
 	}
@@ -53,5 +53,24 @@ func TestMonitoredCmd(t *testing.T) {
 	expectedOutput = "foo\nfoo\nfoo\nfoo\n"
 	if cmd2.stdout.buf.String() != expectedOutput {
 		t.Errorf("Unexpected output:\n\t(GOT): %s\n\t(WNT): %s", cmd2.stdout.buf.String(), expectedOutput)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	sync1, errchan := make(chan struct{}), make(chan error)
+	cmd3 := mkTestCmd(2)
+	go func() {
+		close(sync1)
+		errchan <- cmd3.run(ctx)
+	}()
+
+	// Make sure goroutine is at least started before we cancel the context.
+	<-sync1
+	// Give it a bit to get the process started.
+	<-time.After(5 * time.Millisecond)
+	cancel()
+
+	err = <-errchan
+	if err != context.Canceled {
+		t.Errorf("should have gotten canceled error, got %s", err)
 	}
 }
