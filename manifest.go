@@ -142,7 +142,7 @@ func (m *Manifest) toRaw() rawManifest {
 
 // IsEmpty - Checks if payload is empty
 func (m *Manifest) IsEmpty() bool {
-	if m.Ovr == nil && len(m.Ignores) == 0 && len(m.Dependencies) == 0 {
+	if m.Ovr == nil && len(m.Ignores) == 0 && len(m.Dependencies) == 0 && len(m.Required) == 0 {
 		return true
 	}
 	return false

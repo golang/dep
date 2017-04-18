@@ -75,7 +75,7 @@ func writeFile(path string, in toml.Marshaler) error {
 	return err
 }
 
-// modifyWithString - Modifies a given file with a new string input.
+// modifyWithString modifies a given file with a new string input.
 // This is used to write arbitrary string data to a file, such as
 // updating the `Gopkg.toml` file with example data if no deps found
 // on init.

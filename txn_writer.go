@@ -25,8 +25,10 @@ import (
 const exampleToml = `
 # Example:
 # [[dependencies]]
+# source = "https://github.com/myfork/package.git"
 # branch = "master"
 # name = "github.com/vendor/package"
+# Note: revision will depend on your repository type, i.e git, svc, bzr etc...
 # revision = "abc123"
 # version = "1.0.0"
 `
@@ -267,10 +269,11 @@ func (sw *SafeWriter) Write(root string, sm gps.SourceManager) error {
 
 	if sw.Payload.HasManifest() {
 		if sw.Payload.Manifest.IsEmpty() {
-			err := modifyWithString(mpath, exampleToml)
-			return errors.Wrap(err, "failed to generate example text")
-		}
-		if err := writeFile(filepath.Join(td, ManifestName), sw.Payload.Manifest); err != nil {
+			err := modifyWithString(filepath.Join(td, ManifestName), exampleToml)
+			if err != nil {
+				return errors.Wrap(err, "failed to generate example text")
+			}
+		} else if err := writeFile(filepath.Join(td, ManifestName), sw.Payload.Manifest); err != nil {
 			return errors.Wrap(err, "failed to write manifest file to temp dir")
 		}
 	}
