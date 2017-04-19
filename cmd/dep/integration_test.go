@@ -51,12 +51,17 @@ func TestIntegration(t *testing.T) {
 
 				// Run commands
 				testProj.RecordImportPaths()
-				for _, args := range testCase.Commands {
+
+				var err error
+				for i, args := range testCase.Commands {
 					err = testProj.DoRun(args)
-					if err != nil {
-						t.Fatalf("%v", err)
+					if err != nil && i < len(testCase.Commands)-1 {
+						t.Fatalf("cmd %s raised an unexpected error: %s", args[0], err.Error())
 					}
 				}
+
+				// Check error raised in final command
+				testCase.CompareError(err, testProj.GetStderr())
 
 				// Check final manifest and lock
 				testCase.CompareFile(dep.ManifestName, testProj.ProjPath(dep.ManifestName))
