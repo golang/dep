@@ -1,0 +1,7 @@
+memo = "e5c16e09ed6f0a1a2b3cf472c34b7fd50861dd070e81d5e623f72e8173f0c065"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/sdboyer/deptest"
+  packages = ["."]
+  revision = "3f4c3bea144e112a69bbe5d8d01c1b09a544253f"
