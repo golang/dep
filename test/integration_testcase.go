@@ -130,12 +130,8 @@ func (tc *IntegrationTestCase) CompareFile(goldenPath, working string) {
 
 // CompareError compares exected and actual error
 func (tc *IntegrationTestCase) CompareError(err error, stderr string) {
-	if err == nil {
-		return
-	}
-
 	wantExists, want := tc.ErrorExpected != "", tc.ErrorExpected
-	gotExists, got := stderr != "", stderr
+	gotExists, got := stderr != "" && err != nil, stderr
 
 	if wantExists && gotExists {
 		if !strings.Contains(got, want) {
