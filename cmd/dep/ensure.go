@@ -26,7 +26,7 @@ const ensureLongHelp = `
 Ensure is used to fetch project dependencies into the vendor folder, as well as
 to set version constraints for specific dependencies. It takes user input,
 solves the updated dependency graph of the project, writes any changes to the
-manifest and lock file, and places dependencies in the vendor folder.
+lock file, and places dependencies in the vendor folder.
 
 Package spec:
 
