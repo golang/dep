@@ -309,11 +309,8 @@ func getProjectConstraint(arg string, sm *gps.SourceMgr) (gps.ProjectConstraint,
 			var found bool
 			for _, version := range versions {
 				if versionStr == version.String() {
-					if pv, ok := version.(gps.PairedVersion); ok {
-						version = pv.Unpair()
-					}
 					found = true
-					constraint.Constraint = version
+					constraint.Constraint = version.Unpair()
 					break
 				}
 			}

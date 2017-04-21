@@ -32,11 +32,7 @@ type IntegrationTestCase struct {
 	VendorFinal   []string          `json:"vendor-final"`
 }
 
-func NewTestCase(t *testing.T, name string) *IntegrationTestCase {
-	wd, err := os.Getwd()
-	if err != nil {
-		panic(err)
-	}
+func NewTestCase(t *testing.T, name, wd string) *IntegrationTestCase {
 	rootPath := filepath.FromSlash(filepath.Join(wd, "testdata", "harness_tests", name))
 	n := &IntegrationTestCase{
 		t:           t,
@@ -78,6 +74,9 @@ func (tc *IntegrationTestCase) Cleanup() {
 		j = bytes.Replace(j, cmds, n, -1)
 		j = append(j, '\n')
 		err = ioutil.WriteFile(filepath.Join(tc.rootPath, "testcase.json"), j, 0666)
+		if err != nil {
+			tc.t.Errorf("Failed to update testcase %s: %s", tc.name, err)
+		}
 	}
 }
 

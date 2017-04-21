@@ -31,16 +31,17 @@ func main() {
 
 	// Set up params, including tracing
 	params := gps.SolveParameters{
-		RootDir:     root,
-		Trace:       true,
-		TraceLogger: log.New(os.Stdout, "", 0),
+		RootDir:         root,
+		Trace:           true,
+		TraceLogger:     log.New(os.Stdout, "", 0),
+		ProjectAnalyzer: NaiveAnalyzer{},
 	}
 	// Perform static analysis on the current project to find all of its imports.
 	params.RootPackageTree, _ = pkgtree.ListPackages(root, importroot)
 
 	// Set up a SourceManager. This manages interaction with sources (repositories).
 	tempdir, _ := ioutil.TempDir("", "gps-repocache")
-	sourcemgr, _ := gps.NewSourceManager(NaiveAnalyzer{}, filepath.Join(tempdir))
+	sourcemgr, _ := gps.NewSourceManager(filepath.Join(tempdir))
 	defer sourcemgr.Release()
 
 	// Prep and run the solver

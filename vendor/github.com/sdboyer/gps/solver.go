@@ -49,6 +49,13 @@ type SolveParameters struct {
 	// A real path to a readable directory is required.
 	RootDir string
 
+	// The ProjectAnalyzer is responsible for extracting Manifest and
+	// (optionally) Lock information from dependencies. The solver passes it
+	// along to its SourceManager's GetManifestAndLock() method as needed.
+	//
+	// An analyzer is required.
+	ProjectAnalyzer ProjectAnalyzer
+
 	// The tree of packages that comprise the root project, as well as the
 	// import path that should identify the root of that tree.
 	//
@@ -120,6 +127,10 @@ type solver struct {
 	// names a SourceManager operates on.
 	b sourceBridge
 
+	// A versionUnifier, to facilitate cross-type version comparison and set
+	// operations.
+	vUnify versionUnifier
+
 	// A stack containing projects and packages that are currently "selected" -
 	// that is, they have passed all satisfiability checks, and are part of the
 	// current solution.
@@ -155,6 +166,9 @@ type solver struct {
 }
 
 func (params SolveParameters) toRootdata() (rootdata, error) {
+	if params.ProjectAnalyzer == nil {
+		return rootdata{}, badOptsFailure("must provide a ProjectAnalyzer")
+	}
 	if params.RootDir == "" {
 		return rootdata{}, badOptsFailure("params must specify a non-empty root directory")
 	}
@@ -181,6 +195,7 @@ func (params SolveParameters) toRootdata() (rootdata, error) {
 		rlm:     make(map[ProjectRoot]LockedProject),
 		chngall: params.ChangeAll,
 		dir:     params.RootDir,
+		an:      params.ProjectAnalyzer,
 	}
 
 	// Ensure the required, ignore and overrides maps are at least initialized
@@ -284,11 +299,14 @@ func Prepare(params SolveParameters, sm SourceManager) (Solver, error) {
 	if err != nil {
 		return nil, err
 	}
+	s.vUnify = versionUnifier{
+		b: s.b,
+	}
 
 	// Initialize stacks and queues
 	s.sel = &selection{
 		deps: make(map[ProjectRoot][]dependency),
-		sm:   s.b,
+		vu:   s.vUnify,
 	}
 	s.unsel = &unselected{
 		sl:  make([]bimodalIdentifier, 0),
@@ -326,6 +344,7 @@ type Solver interface {
 func (s *solver) Solve() (Solution, error) {
 	// Set up a metrics object
 	s.mtr = newMetrics()
+	s.vUnify.mtr = s.mtr
 
 	// Prime the queues with the root project
 	err := s.selectRoot()
@@ -512,7 +531,7 @@ func (s *solver) getImportsAndConstraintsOf(a atomWithPackages) ([]string, []com
 
 	// Work through the source manager to get project info and static analysis
 	// information.
-	m, _, err := s.b.GetManifestAndLock(a.a.id, a.a.v)
+	m, _, err := s.b.GetManifestAndLock(a.a.id, a.a.v, s.rd.an)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -522,7 +541,7 @@ func (s *solver) getImportsAndConstraintsOf(a atomWithPackages) ([]string, []com
 		return nil, nil, err
 	}
 
-	rm, em := ptree.ToReachMap(false, false, true, s.rd.ig)
+	rm, em := ptree.ToReachMap(true, false, true, s.rd.ig)
 	// Use maps to dedupe the unique internal and external packages.
 	exmap, inmap := make(map[string]struct{}), make(map[string]struct{})
 
@@ -699,7 +718,7 @@ func (s *solver) createVersionQueue(bmi bimodalIdentifier) (*versionQueue, error
 				continue
 			}
 
-			_, l, err := s.b.GetManifestAndLock(dep.depender.id, dep.depender.v)
+			_, l, err := s.b.GetManifestAndLock(dep.depender.id, dep.depender.v, s.rd.an)
 			if err != nil || l == nil {
 				// err being non-nil really shouldn't be possible, but the lock
 				// being nil is quite likely
@@ -865,7 +884,7 @@ func (s *solver) getLockVersionIfValid(id ProjectIdentifier) (Version, error) {
 		if tv, ok := v.(Revision); ok {
 			// If we only have a revision from the root's lock, allow matching
 			// against other versions that have that revision
-			for _, pv := range s.b.pairRevision(id, tv) {
+			for _, pv := range s.vUnify.pairRevision(id, tv) {
 				if constraint.Matches(pv) {
 					v = pv
 					found = true
@@ -1027,11 +1046,11 @@ func (s *solver) unselectedComparator(i, j int) bool {
 	// way avoid that call when making a version queue, we know we're gonna have
 	// to pay that cost anyway.
 
-	// We can safely ignore an err from ListVersions here because, if there is
+	// We can safely ignore an err from listVersions here because, if there is
 	// an actual problem, it'll be noted and handled somewhere else saner in the
 	// solving algorithm.
-	ivl, _ := s.b.ListVersions(iname)
-	jvl, _ := s.b.ListVersions(jname)
+	ivl, _ := s.b.listVersions(iname)
+	jvl, _ := s.b.listVersions(jname)
 	iv, jv := len(ivl), len(jvl)
 
 	// Packages with fewer versions to pick from are less likely to benefit from
@@ -1096,7 +1115,7 @@ func (s *solver) selectAtom(a atomWithPackages, pkgonly bool) {
 	// TODO(sdboyer) making this call here could be the first thing to trigger
 	// network activity...maybe? if so, can we mitigate by deferring the work to
 	// queue consumption time?
-	_, l, _ := s.b.GetManifestAndLock(a.a.id, a.a.v)
+	_, l, _ := s.b.GetManifestAndLock(a.a.id, a.a.v, s.rd.an)
 	var lmap map[ProjectIdentifier]Version
 	if l != nil {
 		lmap = make(map[ProjectIdentifier]Version)

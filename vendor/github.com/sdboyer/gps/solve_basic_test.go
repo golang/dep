@@ -1384,7 +1384,7 @@ func newdepspecSM(ds []depspec, ignore []string) *depspecSourceManager {
 	}
 }
 
-func (sm *depspecSourceManager) GetManifestAndLock(id ProjectIdentifier, v Version) (Manifest, Lock, error) {
+func (sm *depspecSourceManager) GetManifestAndLock(id ProjectIdentifier, v Version, an ProjectAnalyzer) (Manifest, Lock, error) {
 	// If the input version is a PairedVersion, look only at its top version,
 	// not the underlying. This is generally consistent with the idea that, for
 	// this class of lookup, the rev probably DOES exist, but upstream changed
@@ -1405,10 +1405,6 @@ func (sm *depspecSourceManager) GetManifestAndLock(id ProjectIdentifier, v Versi
 	return nil, nil, fmt.Errorf("Project %s at version %s could not be found", id.errString(), v)
 }
 
-func (sm *depspecSourceManager) AnalyzerInfo() (string, int) {
-	return "depspec-sm-builtin", 1
-}
-
 func (sm *depspecSourceManager) ExternalReach(id ProjectIdentifier, v Version) (map[string][]string, error) {
 	pid := pident{n: ProjectRoot(id.normalizedSource()), v: v}
 	if m, exists := sm.rm[pid]; exists {
@@ -1419,6 +1415,12 @@ func (sm *depspecSourceManager) ExternalReach(id ProjectIdentifier, v Version) (
 
 func (sm *depspecSourceManager) ListPackages(id ProjectIdentifier, v Version) (pkgtree.PackageTree, error) {
 	pid := pident{n: ProjectRoot(id.normalizedSource()), v: v}
+	if pv, ok := v.(PairedVersion); ok && pv.Underlying() == "FAKEREV" {
+		// An empty rev may come in here because that's what we produce in
+		// ListVersions(). If that's what we see, then just pretend like we have
+		// an unpaired.
+		pid.v = pv.Unpair()
+	}
 
 	if r, exists := sm.rm[pid]; exists {
 		return pkgtree.PackageTree{
@@ -1460,20 +1462,32 @@ func (sm *depspecSourceManager) ListPackages(id ProjectIdentifier, v Version) (p
 	return pkgtree.PackageTree{}, fmt.Errorf("Project %s at version %s could not be found", pid.n, v)
 }
 
-func (sm *depspecSourceManager) ListVersions(id ProjectIdentifier) (pi []Version, err error) {
+func (sm *depspecSourceManager) ListVersions(id ProjectIdentifier) ([]PairedVersion, error) {
+	var pvl []PairedVersion
 	for _, ds := range sm.specs {
-		// To simulate the behavior of the real SourceManager, we do not return
-		// revisions from ListVersions().
-		if _, isrev := ds.v.(Revision); !isrev && id.normalizedSource() == string(ds.n) {
-			pi = append(pi, ds.v)
+		if id.normalizedSource() != string(ds.n) {
+			continue
+		}
+
+		switch tv := ds.v.(type) {
+		case Revision:
+			// To simulate the behavior of the real SourceManager, we do not return
+			// raw revisions from listVersions().
+		case PairedVersion:
+			pvl = append(pvl, tv)
+		case UnpairedVersion:
+			// Dummy revision; if the fixture doesn't provide it, we know
+			// the test doesn't need revision info, anyway.
+			pvl = append(pvl, tv.Is(Revision("FAKEREV")))
+		default:
+			panic(fmt.Sprintf("unreachable: type of version was %#v for spec %s", ds.v, id.errString()))
 		}
 	}
 
-	if len(pi) == 0 {
-		err = fmt.Errorf("Project %s could not be found", id.errString())
+	if len(pvl) == 0 {
+		return nil, fmt.Errorf("Project %s could not be found", id.errString())
 	}
-
-	return
+	return pvl, nil
 }
 
 func (sm *depspecSourceManager) RevisionPresentIn(id ProjectIdentifier, r Revision) (bool, error) {
@@ -1534,6 +1548,37 @@ func (sm *depspecSourceManager) ignore() map[string]bool {
 
 type depspecBridge struct {
 	*bridge
+}
+
+func (b *depspecBridge) listVersions(id ProjectIdentifier) ([]Version, error) {
+	if vl, exists := b.vlists[id]; exists {
+		return vl, nil
+	}
+
+	pvl, err := b.sm.ListVersions(id)
+	if err != nil {
+		return nil, err
+	}
+
+	// Construct a []Version slice. If any paired versions use the fake rev,
+	// remove the underlying component.
+	vl := make([]Version, 0, len(pvl))
+	for _, v := range pvl {
+		if v.Underlying() == "FAKEREV" {
+			vl = append(vl, v.Unpair())
+		} else {
+			vl = append(vl, v)
+		}
+	}
+
+	if b.down {
+		SortForDowngrade(vl)
+	} else {
+		SortForUpgrade(vl)
+	}
+
+	b.vlists[id] = vl
+	return vl, nil
 }
 
 // override verifyRoot() on bridge to prevent any filesystem interaction

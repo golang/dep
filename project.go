@@ -59,7 +59,8 @@ type Project struct {
 // any nils incorrectly.
 func (p *Project) MakeParams() gps.SolveParameters {
 	params := gps.SolveParameters{
-		RootDir: p.AbsRoot,
+		RootDir:         p.AbsRoot,
+		ProjectAnalyzer: Analyzer{},
 	}
 
 	if p.Manifest != nil {

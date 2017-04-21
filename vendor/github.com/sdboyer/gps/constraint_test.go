@@ -590,8 +590,7 @@ func TestSemverConstraintOps(t *testing.T) {
 	// still an incomparable type
 	c1, err := NewSemverConstraint("=1.0.0")
 	if err != nil {
-		t.Errorf("Failed to create constraint: %s", err)
-		t.FailNow()
+		t.Fatalf("Failed to create constraint: %s", err)
 	}
 
 	if !c1.MatchesAny(any) {
@@ -610,8 +609,7 @@ func TestSemverConstraintOps(t *testing.T) {
 
 	c1, err = NewSemverConstraint(">= 1.0.0")
 	if err != nil {
-		t.Errorf("Failed to create constraint: %s", err)
-		t.FailNow()
+		t.Fatalf("Failed to create constraint: %s", err)
 	}
 
 	if c1.Matches(v1) {
@@ -897,7 +895,7 @@ func TestTypedConstraintString(t *testing.T) {
 	}
 
 	for _, fix := range table {
-		got := typedConstraintString(fix.in)
+		got := fix.in.typedString()
 		if got != fix.out {
 			t.Errorf("Typed string for %v (%T) was not expected %q; got %q", fix.in, fix.in, fix.out, got)
 		}

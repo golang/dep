@@ -1,4 +1,4 @@
-ignores = ["github.com/foo/bar"]
+ignored = ["github.com/foo/bar"]
 
 [[dependencies]]
   name = "github.com/babble/brook"

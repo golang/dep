@@ -11,9 +11,9 @@ import (
 	"github.com/sdboyer/gps"
 )
 
-type analyzer struct{}
+type Analyzer struct{}
 
-func (a analyzer) DeriveManifestAndLock(path string, n gps.ProjectRoot) (gps.Manifest, gps.Lock, error) {
+func (a Analyzer) DeriveManifestAndLock(path string, n gps.ProjectRoot) (gps.Manifest, gps.Lock, error) {
 	// TODO: If we decide to support other tools manifest, this is where we would need
 	// to add that support.
 	mf := filepath.Join(path, ManifestName)
@@ -36,6 +36,6 @@ func (a analyzer) DeriveManifestAndLock(path string, n gps.ProjectRoot) (gps.Man
 	return m, nil, nil
 }
 
-func (a analyzer) Info() (string, int) {
+func (a Analyzer) Info() (string, int) {
 	return "dep", 1
 }
