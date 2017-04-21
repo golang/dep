@@ -25,14 +25,36 @@ import (
 
 const ensureShortHelp = `Ensure a dependency is safely vendored in the project`
 const ensureLongHelp = `
-Ensure is used to fetch project dependencies into the vendor folder, as well as
-to set version constraints for specific dependencies. It takes user input,
-solves the updated dependency graph of the project, writes any changes to the
-lock file, and places dependencies in the vendor folder.
+usage: dep ensure [-update | -add] [-no-vendor | -vendor-only] [<specs>...]
 
-Package spec:
+Project spec:
 
-  <path>[:alt location][@<version specifier>]
+  <path>[:alt source][@<version specifier>]
+
+Flags:
+
+  -update: update all, or only the named, dependencies in Gopkg.lock
+  -add: add new dependencies
+  -no-vendor: update Gopkg.lock if needed, but do not update vendor/
+  -vendor-only: populate vendor/ without updating Gopkg.lock
+
+
+Ensure gets a project into a complete, compilable, and reproducible state:
+
+  * All non-stdlib imports are fulfilled
+  * All constraints and overrides in Gopkg.toml are respected
+  * Gopkg.lock records precise versions for all dependencies
+  * vendor/ is populated according to Gopkg.lock
+
+Ensure has fast techniques to determine that some of these steps may be
+unnecessary. If that determination is made, ensure may skip some steps. Flags
+may be passed to bypass these checks; -vendor-only will allow an out-of-date
+Gopkg.lock to populate vendor/, and -no-vendor will update Gopkg.lock (if
+needed), but never touch vendor/.
+
+The effect of passing project spec arguments varies slightly depending on the
+combination of flags that are passed.
+
 
 Examples:
 
@@ -91,16 +113,19 @@ func (cmd *ensureCommand) Hidden() bool      { return false }
 
 func (cmd *ensureCommand) Register(fs *flag.FlagSet) {
 	fs.BoolVar(&cmd.examples, "examples", false, "print detailed usage examples")
-	fs.BoolVar(&cmd.update, "update", false, "ensure dependencies are at the latest version allowed by the manifest")
-	fs.BoolVar(&cmd.dryRun, "n", false, "dry run, don't actually ensure anything")
-	fs.Var(&cmd.overrides, "override", "specify an override constraint spec (repeatable)")
+	fs.BoolVar(&cmd.update, "update", false, "update the named dependencies (or all, if none are named) in Gopkg.lock to the latest allowed by Gopkg.toml")
+	fs.BoolVar(&cmd.add, "add", false, "add new dependencies, or populate Gopkg.toml with constraints for existing dependencies")
+	fs.BoolVar(&cmd.vendorOnly, "vendor-only", false, "populate vendor/ from Gopkg.lock without updating it first")
+	fs.BoolVar(&cmd.noVendor, "no-vendor", false, "update Gopkg.lock (if needed), but do not update vendor/")
 }
 
 type ensureCommand struct {
-	examples  bool
-	update    bool
-	dryRun    bool
-	overrides stringSlice
+	examples   bool
+	update     bool
+	add        bool
+	noVendor   bool
+	vendorOnly bool
+	overrides  stringSlice
 }
 
 func (cmd *ensureCommand) Run(ctx *dep.Ctx, args []string) error {
