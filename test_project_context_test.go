@@ -9,7 +9,7 @@ import (
 
 	"github.com/golang/dep/test"
 	"github.com/pkg/errors"
-	"github.com/sdboyer/gps"
+	"github.com/golang/dep/gps"
 )
 
 // TestProjectContext groups together test project files and helps test them

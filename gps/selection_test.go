@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-// Regression test for https://github.com/sdboyer/gps/issues/174
+// Regression test for https://github.com/golang/dep/gps/issues/174
 func TestUnselectedRemoval(t *testing.T) {
 	// We don't need a comparison function for this test
 	bmi1 := bimodalIdentifier{

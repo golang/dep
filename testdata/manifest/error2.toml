@@ -1,9 +1,9 @@
 ignored = ["github.com/foo/bar"]
 
 [[dependencies]]
-  name = "github.com/sdboyer/gps"
+  name = "github.com/golang/dep/gps"
   branch = "master"
 
 [[dependencies]]
-  name = "github.com/sdboyer/gps"
+  name = "github.com/golang/dep/gps"
   branch = "master"

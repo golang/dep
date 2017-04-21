@@ -439,7 +439,7 @@ func TestDeduceProjectRoot(t *testing.T) {
 	sm, clean := mkNaiveSM(t)
 	defer clean()
 
-	in := "github.com/sdboyer/gps"
+	in := "github.com/golang/dep/gps"
 	pr, err := sm.DeduceProjectRoot(in)
 	if err != nil {
 		t.Errorf("Problem while detecting root of %q %s", in, err)
@@ -518,7 +518,7 @@ func TestMultiFetchThreadsafe(t *testing.T) {
 	}
 
 	projects := []ProjectIdentifier{
-		mkPI("github.com/sdboyer/gps"),
+		mkPI("github.com/golang/dep/gps"),
 		mkPI("github.com/sdboyer/gpkt"),
 		ProjectIdentifier{
 			ProjectRoot: ProjectRoot("github.com/sdboyer/gpkt"),
@@ -613,7 +613,7 @@ func TestMultiFetchThreadsafe(t *testing.T) {
 }
 
 // Ensure that we don't see concurrent map writes when calling ListVersions.
-// Regression test for https://github.com/sdboyer/gps/issues/156.
+// Regression test for https://github.com/golang/dep/gps/issues/156.
 //
 // Ideally this would be caught by TestMultiFetchThreadsafe, but perhaps the
 // high degree of parallelism pretty much eliminates that as a realistic
@@ -628,7 +628,7 @@ func TestListVersionsRacey(t *testing.T) {
 	defer clean()
 
 	wg := &sync.WaitGroup{}
-	id := mkPI("github.com/sdboyer/gps")
+	id := mkPI("github.com/golang/dep/gps")
 	for i := 0; i < 20; i++ {
 		wg.Add(1)
 		go func() {

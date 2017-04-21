@@ -17,8 +17,8 @@ import (
 
 	"github.com/golang/dep"
 	"github.com/pkg/errors"
-	"github.com/sdboyer/gps"
-	"github.com/sdboyer/gps/pkgtree"
+	"github.com/golang/dep/gps"
+	"github.com/golang/dep/gps/pkgtree"
 )
 
 const ensureShortHelp = `Ensure a dependency is safely vendored in the project`

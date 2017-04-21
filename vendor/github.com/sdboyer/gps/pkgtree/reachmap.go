@@ -4,7 +4,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/sdboyer/gps/internal"
+	"github.com/golang/dep/gps/internal"
 )
 
 // ReachMap maps a set of import paths (keys) to the sets of transitively

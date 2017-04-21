@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/sdboyer/constext"
-	"github.com/sdboyer/gps/pkgtree"
+	"github.com/golang/dep/gps/pkgtree"
 )
 
 // Used to compute a friendly filepath from a URL-shaped input.

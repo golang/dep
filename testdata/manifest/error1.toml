@@ -1,15 +1,15 @@
 ignored = ["github.com/foo/bar"]
 
 [[dependencies]]
-  name = "github.com/sdboyer/gps"
+  name = "github.com/golang/dep/gps"
   branch = "master"
   revision = "d05d5aca9f895d19e9265839bffeadd74a2d2ecb"
   version = "^v0.12.0"
-  source = "https://github.com/sdboyer/gps"
+  source = "https://github.com/golang/dep/gps"
 
 [[overrides]]
-  name = "github.com/sdboyer/gps"
+  name = "github.com/golang/dep/gps"
   branch = "master"
   revision = "d05d5aca9f895d19e9265839bffeadd74a2d2ecb"
   version = "^v0.12.0"
-  source = "https://github.com/sdboyer/gps"
+  source = "https://github.com/golang/dep/gps"

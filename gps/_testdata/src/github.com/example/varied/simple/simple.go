@@ -3,7 +3,7 @@ package simple
 import (
 	"go/parser"
 
-	"github.com/sdboyer/gps"
+	"github.com/golang/dep/gps"
 )
 
 var (

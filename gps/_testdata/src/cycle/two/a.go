@@ -2,7 +2,7 @@ package two
 
 import (
 	"cycle"
-	"github.com/sdboyer/gps"
+	"github.com/golang/dep/gps"
 )
 
 var (

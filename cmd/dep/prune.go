@@ -12,8 +12,8 @@ import (
 	"os"
 
 	"github.com/golang/dep"
-	"github.com/sdboyer/gps"
-	"github.com/sdboyer/gps/pkgtree"
+	"github.com/golang/dep/gps"
+	"github.com/golang/dep/gps/pkgtree"
 
 	"github.com/pkg/errors"
 )

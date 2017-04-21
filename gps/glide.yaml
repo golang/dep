@@ -1,4 +1,4 @@
-package: github.com/sdboyer/gps
+package: github.com/golang/dep/gps
 owners:
 - name: Sam Boyer
   email: tech@samboyer.org

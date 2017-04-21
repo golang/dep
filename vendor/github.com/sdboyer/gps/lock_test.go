@@ -8,7 +8,7 @@ import (
 func TestLockedProjectSorting(t *testing.T) {
 	// version doesn't matter here
 	lps := []LockedProject{
-		NewLockedProject(mkPI("github.com/sdboyer/gps"), NewVersion("v0.10.0"), nil),
+		NewLockedProject(mkPI("github.com/golang/dep/gps"), NewVersion("v0.10.0"), nil),
 		NewLockedProject(mkPI("foo"), NewVersion("nada"), nil),
 		NewLockedProject(mkPI("bar"), NewVersion("zip"), nil),
 		NewLockedProject(mkPI("qux"), NewVersion("zilch"), nil),
@@ -27,14 +27,14 @@ func TestLockedProjectSorting(t *testing.T) {
 
 func TestLockedProjectsEq(t *testing.T) {
 	lps := []LockedProject{
-		NewLockedProject(mkPI("github.com/sdboyer/gps"), NewVersion("v0.10.0"), []string{"gps"}),
-		NewLockedProject(mkPI("github.com/sdboyer/gps"), NewVersion("v0.10.0"), nil),
-		NewLockedProject(mkPI("github.com/sdboyer/gps"), NewVersion("v0.10.0"), []string{"gps", "flugle"}),
+		NewLockedProject(mkPI("github.com/golang/dep/gps"), NewVersion("v0.10.0"), []string{"gps"}),
+		NewLockedProject(mkPI("github.com/golang/dep/gps"), NewVersion("v0.10.0"), nil),
+		NewLockedProject(mkPI("github.com/golang/dep/gps"), NewVersion("v0.10.0"), []string{"gps", "flugle"}),
 		NewLockedProject(mkPI("foo"), NewVersion("nada"), []string{"foo"}),
-		NewLockedProject(mkPI("github.com/sdboyer/gps"), NewVersion("v0.10.0"), []string{"flugle", "gps"}),
-		NewLockedProject(mkPI("github.com/sdboyer/gps"), NewVersion("v0.10.0").Is("278a227dfc3d595a33a77ff3f841fd8ca1bc8cd0"), []string{"gps"}),
-		NewLockedProject(mkPI("github.com/sdboyer/gps"), NewVersion("v0.11.0"), []string{"gps"}),
-		NewLockedProject(mkPI("github.com/sdboyer/gps"), Revision("278a227dfc3d595a33a77ff3f841fd8ca1bc8cd0"), []string{"gps"}),
+		NewLockedProject(mkPI("github.com/golang/dep/gps"), NewVersion("v0.10.0"), []string{"flugle", "gps"}),
+		NewLockedProject(mkPI("github.com/golang/dep/gps"), NewVersion("v0.10.0").Is("278a227dfc3d595a33a77ff3f841fd8ca1bc8cd0"), []string{"gps"}),
+		NewLockedProject(mkPI("github.com/golang/dep/gps"), NewVersion("v0.11.0"), []string{"gps"}),
+		NewLockedProject(mkPI("github.com/golang/dep/gps"), Revision("278a227dfc3d595a33a77ff3f841fd8ca1bc8cd0"), []string{"gps"}),
 	}
 
 	fix := map[string]struct {
@@ -77,7 +77,7 @@ func TestLockedProjectsEq(t *testing.T) {
 }
 
 func TestLocksAreEq(t *testing.T) {
-	gpl := NewLockedProject(mkPI("github.com/sdboyer/gps"), NewVersion("v0.10.0").Is("278a227dfc3d595a33a77ff3f841fd8ca1bc8cd0"), []string{"gps"})
+	gpl := NewLockedProject(mkPI("github.com/golang/dep/gps"), NewVersion("v0.10.0").Is("278a227dfc3d595a33a77ff3f841fd8ca1bc8cd0"), []string{"gps"})
 	svpl := NewLockedProject(mkPI("github.com/Masterminds/semver"), NewVersion("v2.0.0"), []string{"semver"})
 	bbbt := NewLockedProject(mkPI("github.com/beeblebrox/browntown"), NewBranch("master").Is("63fc17eb7966a6f4cc0b742bf42731c52c4ac740"), []string{"browntown", "smoochies"})
 
@@ -119,7 +119,7 @@ func TestLocksAreEq(t *testing.T) {
 		t.Error("checking equality resorted l2")
 	}
 
-	l1.p[0] = NewLockedProject(mkPI("github.com/sdboyer/gps"), NewVersion("v0.11.0"), []string{"gps"})
+	l1.p[0] = NewLockedProject(mkPI("github.com/golang/dep/gps"), NewVersion("v0.11.0"), []string{"gps"})
 	if LocksAreEq(l1, l2, false) {
 		t.Error("should fail when individual lp were not eq")
 	}

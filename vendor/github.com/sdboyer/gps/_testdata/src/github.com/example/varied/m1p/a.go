@@ -3,7 +3,7 @@ package m1p
 import (
 	"sort"
 
-	"github.com/sdboyer/gps"
+	"github.com/golang/dep/gps"
 )
 
 var (

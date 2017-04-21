@@ -11,7 +11,7 @@ import (
 	"testing"
 
 	"github.com/golang/dep/test"
-	"github.com/sdboyer/gps"
+	"github.com/golang/dep/gps"
 )
 
 func TestReadLock(t *testing.T) {
@@ -31,7 +31,7 @@ func TestReadLock(t *testing.T) {
 		Memo: b,
 		P: []gps.LockedProject{
 			gps.NewLockedProject(
-				gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot("github.com/sdboyer/gps")},
+				gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot("github.com/golang/dep/gps")},
 				gps.NewBranch("master").Is(gps.Revision("d05d5aca9f895d19e9265839bffeadd74a2d2ecb")),
 				[]string{"."},
 			),
@@ -55,7 +55,7 @@ func TestReadLock(t *testing.T) {
 		Memo: b,
 		P: []gps.LockedProject{
 			gps.NewLockedProject(
-				gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot("github.com/sdboyer/gps")},
+				gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot("github.com/golang/dep/gps")},
 				gps.NewVersion("0.12.2").Is(gps.Revision("d05d5aca9f895d19e9265839bffeadd74a2d2ecb")),
 				[]string{"."},
 			),
@@ -78,7 +78,7 @@ func TestWriteLock(t *testing.T) {
 		Memo: memo,
 		P: []gps.LockedProject{
 			gps.NewLockedProject(
-				gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot("github.com/sdboyer/gps")},
+				gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot("github.com/golang/dep/gps")},
 				gps.NewBranch("master").Is(gps.Revision("d05d5aca9f895d19e9265839bffeadd74a2d2ecb")),
 				[]string{"."},
 			),
@@ -107,7 +107,7 @@ func TestWriteLock(t *testing.T) {
 		Memo: memo,
 		P: []gps.LockedProject{
 			gps.NewLockedProject(
-				gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot("github.com/sdboyer/gps")},
+				gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot("github.com/golang/dep/gps")},
 				gps.NewVersion("0.12.2").Is(gps.Revision("d05d5aca9f895d19e9265839bffeadd74a2d2ecb")),
 				[]string{"."},
 			),

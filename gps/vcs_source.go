@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"github.com/Masterminds/semver"
-	"github.com/sdboyer/gps/internal/fs"
-	"github.com/sdboyer/gps/pkgtree"
+	"github.com/golang/dep/gps/internal/fs"
+	"github.com/golang/dep/gps/pkgtree"
 )
 
 type baseVCSSource struct {
