@@ -14,7 +14,7 @@ Summarize the question and quote the reply, linking back to the original comment
 * [Why is `dep` ignoring the version specified in the manifest?](#why-is-dep-ignoring-the-version-specified-in-the-manifest)
 * [`dep` deleted my files in the vendor directory!](#dep-deleted-my-files-in-the-vendor-directory)
 * [Can I put the manifest and lock in the vendor directory?](#can-i-put-the-manifest-and-lock-in-the-vendor-directory)
-* [Unable to update checked out version: fatal: reference is not a tree](#unable-to-update-checked-out-version-fatal-reference-is-not-a-tree)
+* [Why did dep use a different revision for package X instead of the revision in the lock file?](#why-did-dep-use-a-different-revision-for-package-x-instead-of-the-revision-in-the-lock-file)
 
 ## What is a direct or transitive dependency?
 * Direct dependencies are dependencies that are imported by your project.
@@ -105,18 +105,22 @@ No.
 > We prefer to treat the use of vendor/ as an implementation detail.
 -[@sdboyer on go package management list](https://groups.google.com/d/msg/go-package-management/et1qFUjrkP4/LQFCHP4WBQAJ)
 
-## Unable to update checked out version: fatal: reference is not a tree
+## Why did dep use a different revision for package X instead of the revision in the lock file?
+Sometimes the revision specified in the lock file is no longer valid. There are a few
+ways this can occur:
+
+* When you generated the lock file, you had an unpushed commit in your local copy of package X's repository in your GOPATH.
+* After generating the lock file, new commits were force pushed to package X's repository, causing the commit revision in your lock file to no longer exist.
+
+To troubleshoot, you can revert dep's changes to your lock, and then run `dep ensure -v -n`.
+This retries the command in dry-run mode with verbose logs enabled. Check the output
+for a warning like the one below, indicating that a commit in the lock is no longer valid.
 
 ```
-solve error: No versions of github.com/groob/plist met constraints:
-    empty_data: Unable to update checked out version: fatal: reference is not a tree: 94c3023a0ab2ab1ae7ca10cf1b1416d00c0b77a0
-
-    master: Could not introduce github.com/groob/plist@master, as it is not allowed by constraint empty_data from project github.com/groob/autopkgd.No versions of github.com/groob/plist met constraints:
-    empty_data: Unable to update checked out version: fatal: reference is not a tree: 94c3023a0ab2ab1ae7ca10cf1b1416d00c0b77a0
-
-    master: Could not introduce github.com/groob/plist@master, as it is not allowed by constraint empty_data from project github.com/groob/autopkgd.
+Unable to update checked out version: fatal: reference is not a tree: 4dfc6a8a7e15229398c0a018b6d7a078cccae9c8
 ```
--[@groob in #216](https://github.com/golang/dep/issues/216#issue-204717822)
 
-This can occur when a package in your GOPATH has unpushed commits. Either push the commit(s),
-or checkout a commit that is present on the remote.
+> The lock file represents a set of precise, typically immutable versions for the entire transitive closure of dependencies for a project. But "the project" can be, and is, decomposed into just a bunch of arguments to an algorithm. When those inputs change, the lock may need to change as well.
+>
+> Under most circumstances, if those arguments don't change, then the lock remains fine and correct. You've hit one one of the few cases where that guarantee doesn't apply. The fact that you ran dep ensure and it DID a solve is a product of some arguments changing; that solving failed because this particular commit had become stale is a separate problem.
+-[@sdboyer in #405](https://github.com/golang/dep/issues/405#issuecomment-295998489)
