@@ -1,0 +1,25 @@
+version: build-{build}.{branch}
+
+clone_folder: C:\gopath\src\github.com\sdboyer\gps
+shallow_clone: true
+
+environment:
+  GOPATH: C:\gopath
+
+platform:
+  - x64
+
+install:
+  - go version
+  - go env
+  - choco install bzr
+  - set PATH=C:\Program Files (x86)\Bazaar\;C:\Program Files\Mercurial\;%PATH%
+build_script:
+  - go get github.com/Masterminds/glide
+  - C:\gopath\bin\glide install
+
+test_script:
+  - go test . ./internal/... ./pkgtree/...
+  - go build example.go
+
+deploy: off
