@@ -1,4 +1,4 @@
-memo = "940bdaea844d101260e58623a5bae0392cce009ab34d274e89058b780e880309"
+memo = "099c73630ad2c4f0894ed8646e2e4b5a9f635c85661a77fbf3b9f9dd78c77e87"
 
 [[projects]]
   branch = "2.x"
@@ -9,8 +9,8 @@ memo = "940bdaea844d101260e58623a5bae0392cce009ab34d274e89058b780e880309"
 [[projects]]
   name = "github.com/Masterminds/vcs"
   packages = ["."]
-  revision = "795e20f901c3d561de52811fb3488a2cb2c8588b"
-  version = "v1.11.0"
+  revision = "2b467644127097f69ed9c9829a0c5f757a804cee"
+  version = "v1.10.2"
 
 [[projects]]
   branch = "master"

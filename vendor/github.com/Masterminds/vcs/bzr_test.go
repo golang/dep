@@ -31,7 +31,7 @@ func TestBzr(t *testing.T) {
 
 	repo, err := NewBzrRepo("https://launchpad.net/govcstestbzrrepo", tempDir+"/govcstestbzrrepo")
 	if err != nil {
-		t.Fatal(err)
+		t.Error(err)
 	}
 
 	if repo.Vcs() != Bzr {

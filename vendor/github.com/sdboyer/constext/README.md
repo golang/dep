@@ -41,7 +41,7 @@ little more.
 
 For example: in [dep](https://github.com/golang/dep), the subsystem that
 manages interaction with source repositories is called a
-[`SourceManager`](https://godoc.org/github.com/golang/dep/gps#SourceManager). It
+[`SourceManager`](https://godoc.org/github.com/sdboyer/gps#SourceManager). It
 is a long-lived object; generally, only one is created over the course of any
 single `dep` invocation. The `SourceManager` has a number of methods on it that
 may initiate network and/or disk interaction. As such, these methods need to

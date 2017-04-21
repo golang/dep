@@ -1,14 +1,3 @@
-# 1.11.0 (2017-03-23)
-
-## Added
-- #65: Exposed CmdFromDir function (thanks @erizocosmico)
-
-## Changed
-- #69: Updated testing for Go 1.8
-
-## Fixed
-- #64: Testing fatal error if bzr not installed (thanks @kevinburke)
-
 # 1.10.2 (2017-01-24)
 
 ## Fixed
