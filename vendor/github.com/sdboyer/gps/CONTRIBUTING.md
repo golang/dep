@@ -8,15 +8,15 @@ a strong, motivating design behind `gps`, but we are always open to discussion
 on ways we can improve the library, particularly if it allows `gps` to cover
 more of the Go package management possibility space.
 
-`gps` has no CLA, but we do have a [Code of Conduct](https://github.com/sdboyer/gps/blob/master/CODE_OF_CONDUCT.md). By
+`gps` has no CLA, but we do have a [Code of Conduct](https://github.com/golang/dep/gps/blob/master/CODE_OF_CONDUCT.md). By
 participating, you are expected to uphold this code.
 
 ## How can I contribute?
 
 It may be best to start by getting a handle on what `gps` actually is. Our
-wiki has a [general introduction](https://github.com/sdboyer/gps/wiki/Introduction-to-gps), a
-[guide for tool implementors](https://github.com/sdboyer/gps/wiki/gps-for-Implementors), and
-a [guide for contributors](https://github.com/sdboyer/gps/wiki/gps-for-contributors).
+wiki has a [general introduction](https://github.com/golang/dep/gps/wiki/Introduction-to-gps), a
+[guide for tool implementors](https://github.com/golang/dep/gps/wiki/gps-for-Implementors), and
+a [guide for contributors](https://github.com/golang/dep/gps/wiki/gps-for-contributors).
 There's also a [discursive essay](https://medium.com/@sdboyer/so-you-want-to-write-a-package-manager-4ae9c17d9527)
 that lays out the big-picture goals and considerations driving the `gps` design.
 
@@ -29,12 +29,12 @@ appreciated:
 * **Identifying missed use cases:** the loose `gps` rule of thumb is, "if you can do
   it in Go, we support it in `gps`." Posting issues about cases we've missed
   helps us reach that goal.
-* **Writing tests:** in the same vein, `gps` has a [large suite](https://github.com/sdboyer/gps/blob/master/CODE_OF_CONDUCT.md) of solving tests, but
+* **Writing tests:** in the same vein, `gps` has a [large suite](https://github.com/golang/dep/gps/blob/master/CODE_OF_CONDUCT.md) of solving tests, but
   they still only scratch the surface. Writing tests is not only helpful, but is
   also a great way to get a feel for how `gps` works.
 * **Suggesting enhancements:** `gps` has plenty of missing chunks. Help fill them in!
 * **Reporting bugs**: `gps` being a library means this isn't always the easiest.
-  However, you could always compile the [example](https://github.com/sdboyer/gps/blob/master/example.go), run that against some of
+  However, you could always compile the [example](https://github.com/golang/dep/gps/blob/master/example.go), run that against some of
   your projects, and report problems you encounter.
 * **Building experimental tools with `gps`:** probably the best and fastest ways to
   kick the tires!

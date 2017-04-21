@@ -12,7 +12,7 @@ import (
 
 	"github.com/Masterminds/vcs"
 	"github.com/pkg/errors"
-	"github.com/sdboyer/gps"
+	"github.com/golang/dep/gps"
 )
 
 // Ctx defines the supporting context of the tool.

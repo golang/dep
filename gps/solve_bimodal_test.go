@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/sdboyer/gps/pkgtree"
+	"github.com/golang/dep/gps/pkgtree"
 )
 
 // dsp - "depspec with packages"

@@ -12,7 +12,7 @@ import (
 	"bytes"
 	"github.com/pelletier/go-toml"
 	"github.com/pkg/errors"
-	"github.com/sdboyer/gps"
+	"github.com/golang/dep/gps"
 )
 
 const LockName = "Gopkg.lock"

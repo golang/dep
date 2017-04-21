@@ -4,7 +4,7 @@ import (
 	"sort"
 
 	"missing/missing"
-	"github.com/sdboyer/gps"
+	"github.com/golang/dep/gps"
 )
 
 var (

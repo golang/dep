@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	"github.com/golang/dep/test"
-	"github.com/sdboyer/gps"
+	"github.com/golang/dep/gps"
 )
 
 func TestReadManifest(t *testing.T) {
@@ -27,7 +27,7 @@ func TestReadManifest(t *testing.T) {
 	c, _ := gps.NewSemverConstraint(">=0.12.0, <1.0.0")
 	want := Manifest{
 		Dependencies: map[gps.ProjectRoot]gps.ProjectProperties{
-			gps.ProjectRoot("github.com/sdboyer/gps"): {
+			gps.ProjectRoot("github.com/golang/dep/gps"): {
 				Constraint: c,
 			},
 			gps.ProjectRoot("github.com/babble/brook"): {
@@ -35,8 +35,8 @@ func TestReadManifest(t *testing.T) {
 			},
 		},
 		Ovr: map[gps.ProjectRoot]gps.ProjectProperties{
-			gps.ProjectRoot("github.com/sdboyer/gps"): {
-				Source:     "https://github.com/sdboyer/gps",
+			gps.ProjectRoot("github.com/golang/dep/gps"): {
+				Source:     "https://github.com/golang/dep/gps",
 				Constraint: gps.NewBranch("master"),
 			},
 		},
@@ -63,7 +63,7 @@ func TestWriteManifest(t *testing.T) {
 	c, _ := gps.NewSemverConstraint("^v0.12.0")
 	m := &Manifest{
 		Dependencies: map[gps.ProjectRoot]gps.ProjectProperties{
-			gps.ProjectRoot("github.com/sdboyer/gps"): {
+			gps.ProjectRoot("github.com/golang/dep/gps"): {
 				Constraint: c,
 			},
 			gps.ProjectRoot("github.com/babble/brook"): {
@@ -71,8 +71,8 @@ func TestWriteManifest(t *testing.T) {
 			},
 		},
 		Ovr: map[gps.ProjectRoot]gps.ProjectProperties{
-			gps.ProjectRoot("github.com/sdboyer/gps"): {
-				Source:     "https://github.com/sdboyer/gps",
+			gps.ProjectRoot("github.com/golang/dep/gps"): {
+				Source:     "https://github.com/golang/dep/gps",
 				Constraint: gps.NewBranch("master"),
 			},
 		},

@@ -14,8 +14,8 @@ import (
 
 	"github.com/golang/dep"
 	"github.com/pkg/errors"
-	"github.com/sdboyer/gps"
-	"github.com/sdboyer/gps/pkgtree"
+	"github.com/golang/dep/gps"
+	"github.com/golang/dep/gps/pkgtree"
 )
 
 const initShortHelp = `Initialize a new project with manifest and lock files`

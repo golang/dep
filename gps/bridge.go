@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"sync/atomic"
 
-	"github.com/sdboyer/gps/pkgtree"
+	"github.com/golang/dep/gps/pkgtree"
 )
 
 // sourceBridge is an adapter to SourceManagers that tailor operations for a

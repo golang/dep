@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/sdboyer/gps/pkgtree"
+	"github.com/golang/dep/gps/pkgtree"
 )
 
 // string headers used to demarcate sections in hash input creation

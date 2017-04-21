@@ -1,7 +1,7 @@
 package dotslash
 
 import (
-	"../github.com/sdboyer/gps"
+	"../github.com/golang/dep/gps"
 )
 
 var (

@@ -42,8 +42,8 @@ func TestStringDiff_Modify(t *testing.T) {
 }
 
 func TestDiffProjects_NoChange(t *testing.T) {
-	p1 := NewLockedProject(mkPI("github.com/sdboyer/gps"), NewVersion("v0.10.0"), []string{"gps"})
-	p2 := NewLockedProject(mkPI("github.com/sdboyer/gps"), NewVersion("v0.10.0"), []string{"gps"})
+	p1 := NewLockedProject(mkPI("github.com/golang/dep/gps"), NewVersion("v0.10.0"), []string{"gps"})
+	p2 := NewLockedProject(mkPI("github.com/golang/dep/gps"), NewVersion("v0.10.0"), []string{"gps"})
 
 	diff := DiffProjects(p1, p2)
 	if diff != nil {
