@@ -439,7 +439,7 @@ func TestDeduceProjectRoot(t *testing.T) {
 	sm, clean := mkNaiveSM(t)
 	defer clean()
 
-	in := "github.com/golang/dep/gps"
+	in := "github.com/sdboyer/gps"
 	pr, err := sm.DeduceProjectRoot(in)
 	if err != nil {
 		t.Errorf("Problem while detecting root of %q %s", in, err)
