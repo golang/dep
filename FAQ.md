@@ -39,7 +39,11 @@ Committing the vendor directory is totally up to you. There is no general advice
 -[@sdboyer in #371](https://github.com/golang/dep/issues/371#issuecomment-293246832)
 
 ## Does `dep` replace `go get`?
+No, `dep` is an experiment and is still in its infancy. Depending on how this
+experiment goes, it may be considered for inclusion in the go project in some form
+or another in the future but that is not guaranteed.
 
+Here are some suggestions for when you could use `dep` or `go get`:
 > I would say that dep doesn't replace go get, but they both can do similar things. Here's how I use them:
 >
 > `go get`: I want to download the source code for a go project so that I can work on it myself, or to install a tool. This clones the repo under GOPATH for all to use.
