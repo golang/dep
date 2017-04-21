@@ -32,7 +32,7 @@ func (a Analyzer) DeriveManifestAndLock(path string, n gps.ProjectRoot) (gps.Man
 		return nil, nil, err
 	}
 	// TODO: No need to return lock til we decide about preferred versions, see
-	// https://github.com/golang/dep/gps/wiki/gps-for-Implementors#preferred-versions.
+	// https://github.com/sdboyer/gps/wiki/gps-for-Implementors#preferred-versions.
 	return m, nil, nil
 }
 

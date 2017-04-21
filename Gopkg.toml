@@ -14,7 +14,3 @@
 [[dependencies]]
   name = "github.com/pkg/errors"
   version = ">=0.8.0, <1.0.0"
-
-[[dependencies]]
-  name = "github.com/golang/dep/gps"
-  version = ">=0.16.0, <1.0.0"
