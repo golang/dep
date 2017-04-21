@@ -10,8 +10,8 @@ Summarize the question and quote the reply, linking back to the original comment
 * [Should I commit my vendor directory?](#should-i-commit-my-vendor-directory)
 * [Why is it `dep ensure` instead of `dep install`?](#why-is-it-dep-ensure-instead-of-dep-install)
 * [Does `dep` replace `go get`?](#does-dep-replace-go-get)
-* [Why did `dep ensure -update` not update package X?](#why-did-dep-ensure--update-not-update-package-x)
 * [Why is `dep` ignoring the version specified in the manifest?](#why-is-dep-ignoring-the-version-specified-in-the-manifest)
+* [Why did `dep ensure -update` not update package X?](#why-did-dep-ensure--update-not-update-package-x)
 * [`dep` deleted my files in the vendor directory!](#dep-deleted-my-files-in-the-vendor-directory)
 * [Can I put the manifest and lock in the vendor directory?](#can-i-put-the-manifest-and-lock-in-the-vendor-directory)
 * [Why did dep use a different revision for package X instead of the revision in the lock file?](#why-did-dep-use-a-different-revision-for-package-x-instead-of-the-revision-in-the-lock-file)
@@ -55,40 +55,40 @@ Here are some suggestions for when you could use `dep` or `go get`:
 > is for people consuming Go code, and dep-family commands are for people developing it.
 -[@sdboyer in #376](https://github.com/golang/dep/issues/376#issuecomment-294045873)
 
-## Why did `dep ensure -update` not update package X?
-Is package X a direct dependency? [#385](https://github.com/golang/dep/issues/385)
-
-Constraints given in a project's manifest are only applied if the
-dependent project is actually imported. Transitive dependencies (dependencies
-of your imports) are only updated when the revision in the lockfile no
-longer meets the constraints of your direct dependencies.
-
-> If you absolutely need to specify the constraint of a transitive dep from your own project, you have two options:
->
-> Specify the constraint on github.com/gorilla/context via an override. Overrides apply globally, but are a power only given to the root project, so if anything else imports your project, the override won't be used.
-> Mark github.com/gorilla/context as a required package in the manifest. This will cause it to be treated as a direct dependency, and your constraint will come into effect.
->
-> However, before taking either of those steps, I'd say it's worth asking if you actually need to use master of github.com/gorilla/context. I imagine it's imported by github.com/gorilla/mux - and if that package is OK with using the tagged release instead of master (which is the preferred mode of operation anyway), then maybe that should be good enough for you? If you really needed something out of github.com/gorilla/context, then you'd probably be importing it directly and doing something with it
--[@sdboyer in #385](https://github.com/golang/dep/issues/385#issuecomment-294361087)
-
 ## Why is `dep` ignoring the version specified in the manifest?
 Only direct dependencies can be managed with a `dependencies` entry
 in the manifest. Use an `overrides` entry for transitive dependencies.
 
->  Constraints:
+>  Dependencies:
 >
 >  1. Can be declared by any project's manifest, yours or a dependency
 >  2. Apply only to direct dependencies of the project declaring the constraint
->  3. Must not conflict with the constraints declared in any other project's manifest
+>  3. Must not conflict with the `dependencies` declared in any other project's manifest
 >
 >  Overrides:
 >
 >  1. Are only utilized from the current/your project's manifest
 >  2. Apply globally, to direct and transitive dependencies
->  3. Supercede constraints declared in all manifests, yours or a dependency's
+>  3. Supersede constraints declared in all manifests, yours or a dependency's
 >
 >  Overrides are also discussed with some visuals in [the gps docs](https://github.com/sdboyer/gps/wiki/gps-for-Implementors#overrides).
 -[@sdboyer in #328](https://github.com/golang/dep/issues/328#issuecomment-286631961)
+
+
+## Why did `dep ensure -update` not update package X?
+This is a symptom of the same problem in [Why is `dep` ignoring the version specified in the manifest?](#why-is-dep-ignoring-the-version-specified-in-the-manifest) and can occur after you had previously added a `dependencies` entry to your manifest for a [transitive dependency](#what-is-a-direct-or-transitive-dependency) and run `dep ensure`. Later when you attempt to update, project X is not updated as expected.
+
+If you accidentally use a `dependencies` entry for a transitive dependency, **it is silently ignored**. We have [#302](https://github.com/golang/dep/issues/302) open to detect and print a warning when this occurs.
+
+Only direct dependencies can be constrained with a `dependencies` entry, anything else should use a `required` or `overrides` entry.
+
+> If you absolutely need to specify the constraint of a transitive dep from your own project, you have two options:
+>
+> 1. Specify the constraint on `github.com/gorilla/context` via an override. Overrides apply globally, but are a power only given to the root project, so if anything else imports your project, the override won't be used.
+> 2. Mark `github.com/gorilla/context` as a required package in the manifest. This will cause it to be treated as a direct dependency, and your constraint will come into effect.
+>
+> However, before taking either of those steps, I'd say it's worth asking if you actually need to use `master` of `github.com/gorilla/context`. I imagine it's imported by `github.com/gorilla/mux` - and if that package is OK with using the tagged release instead of `master` (which is the preferred mode of operation anyway), then maybe that should be good enough for you? If you really needed something out of `github.com/gorilla/context`, then you'd probably be importing it directly and doing something with it
+-[@sdboyer in #385](https://github.com/golang/dep/issues/385#issuecomment-294361087)
 
 ## `dep` deleted my files in the vendor directory!
 First, sorry! 😞 We hope you were able to recover your files...
