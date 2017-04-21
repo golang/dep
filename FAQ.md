@@ -7,6 +7,7 @@ Please contribute to the FAQ! Found an explanation in an issue or pull request h
 Summarize the question and quote the reply, linking back to the original comment.
 
 * [What is a direct or transitive dependency?](#what-is-a-direct-or-transitive-dependency)
+* [Should I commit my vendor directory?](#should-i-commit-my-vendor-directory)
 * [Why is it `dep ensure` instead of `dep install`?](#why-is-it-dep-ensure-instead-of-dep-install)
 * [Does `dep` replace `go get`?](#does-dep-replace-go-get)
 * [Why did `dep ensure -update` not update package X?](#why-did-dep-ensure--update-not-update-package-x)
@@ -17,15 +18,24 @@ Summarize the question and quote the reply, linking back to the original comment
 
 ## What is a direct or transitive dependency?
 * Direct dependencies are dependencies that are imported by your project.
-* Transitive dependencies are the dependencies of your dependencies. Necessary to compile but are not directly used by your code.
+* Transitive dependencies are the dependencies of your dependencies. Necessary
+  to compile but are not directly used by your code.
+
+## Should I commit my vendor directory?
+
+Committing the vendor directory is totally up to you. There is no general advice that applies in all cases.
+
+**Pros**: it's the only way to get truly reproducible builds, as it guards against upstream renames and deletes; and you don't need an extra `dep ensure` step on fresh clones to build your repo.
+
+**Cons**: your repo will be bigger, potentially a lot bigger; and PR diffs are more annoying.
 
 ## Why is it `dep ensure` instead of `dep install`?
 
 > Yeah, we went round and round on names. [A lot](https://gist.github.com/jessfraz/315db91b272441f510e81e449f675a8b).
 >
->  The idea of "ensure" is roughly, "ensure that all my local states - code tree, manifest, lock, and vendor - are in sync with each other." When arguments are passed, it becomes "ensure this argument is satisfied, along with synchronization between all my local states."
+> The idea of "ensure" is roughly, "ensure that all my local states - code tree, manifest, lock, and vendor - are in sync with each other." When arguments are passed, it becomes "ensure this argument is satisfied, along with synchronization between all my local states."
 >
->  We opted for this approach because we came to the conclusion that allowing the tool to perform partial work/exit in intermediate states ended up creating a tool that had more commands, had far more possible valid exit and input states, and was generally full of footguns. In this approach, the user has most of the same ultimate control, but exercises it differently (by modifying the code/manifest and re-running dep ensure).
+> We opted for this approach because we came to the conclusion that allowing the tool to perform partial work/exit in intermediate states ended up creating a tool that had more commands, had far more possible valid exit and input states, and was generally full of footguns. In this approach, the user has most of the same ultimate control, but exercises it differently (by modifying the code/manifest and re-running dep ensure).
 -[@sdboyer in #371](https://github.com/golang/dep/issues/371#issuecomment-293246832)
 
 ## Does `dep` replace `go get`?
