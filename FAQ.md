@@ -52,26 +52,20 @@ Committing the vendor directory is totally up to you. There is no general advice
 -[@sdboyer in #376](https://github.com/golang/dep/issues/376#issuecomment-294045873)
 
 ## Why did `dep ensure -update` not update package X?
+Is package X a direct dependency? [#385](https://github.com/golang/dep/issues/385)
 
+Constraints given in a project's manifest are only applied if the
+dependent project is actually imported. Transitive dependencies (dependencies
+of your imports) are only updated when the revision in the lockfile no
+longer meets the constraints of your direct dependencies.
 
-* Is package X a direct dependency? [#385](https://github.com/golang/dep/issues/385)
-
-    Constraints given in a project's manifest are only applied if the
-    dependent project is actually imported. Transitive dependencies (dependencies
-    of your imports) are only updated when the revision in the lockfile no
-    longer meets the constraints of your direct dependencies.
-
-    > If you absolutely need to specify the constraint of a transitive dep from your own project, you have two options:
-    >
-    > Specify the constraint on github.com/gorilla/context via an override. Overrides apply globally, but are a power only given to the root project, so if anything else imports your project, the override won't be used.
-    > Mark github.com/gorilla/context as a required package in the manifest. This will cause it to be treated as a direct dependency, and your constraint will come into effect.
-    >
-    > However, before taking either of those steps, I'd say it's worth asking if you actually need to use master of github.com/gorilla/context. I imagine it's imported by github.com/gorilla/mux - and if that package is OK with using the tagged release instead of master (which is the preferred mode of operation anyway), then maybe that should be good enough for you? If you really needed something out of github.com/gorilla/context, then you'd probably be importing it directly and doing something with it
-    -[@sdboyer in #385](https://github.com/golang/dep/issues/385#issuecomment-294361087)
-
-* Is package X included in the `ignored` list in your manifest?
-
-    Remove it from `ignored` and try again.
+> If you absolutely need to specify the constraint of a transitive dep from your own project, you have two options:
+>
+> Specify the constraint on github.com/gorilla/context via an override. Overrides apply globally, but are a power only given to the root project, so if anything else imports your project, the override won't be used.
+> Mark github.com/gorilla/context as a required package in the manifest. This will cause it to be treated as a direct dependency, and your constraint will come into effect.
+>
+> However, before taking either of those steps, I'd say it's worth asking if you actually need to use master of github.com/gorilla/context. I imagine it's imported by github.com/gorilla/mux - and if that package is OK with using the tagged release instead of master (which is the preferred mode of operation anyway), then maybe that should be good enough for you? If you really needed something out of github.com/gorilla/context, then you'd probably be importing it directly and doing something with it
+-[@sdboyer in #385](https://github.com/golang/dep/issues/385#issuecomment-294361087)
 
 ## Why is `dep` ignoring the version specified in the manifest?
 Only direct dependencies can be managed with a `dependencies` entry
