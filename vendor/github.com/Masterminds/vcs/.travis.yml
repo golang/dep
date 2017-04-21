@@ -3,7 +3,6 @@ language: go
 go:
   - 1.6
   - 1.7
-  - 1.8
   - tip
 
 before_script:
@@ -17,8 +16,8 @@ before_script:
 sudo: false
 
 script:
-  - make setup
-  - make test
+  - GO15VENDOREXPERIMENT=1 make setup
+  - GO15VENDOREXPERIMENT=1 make test
 
 notifications:
   webhooks:
