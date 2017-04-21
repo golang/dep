@@ -58,6 +58,11 @@ Do any of the commands have surprising effects, output, or results?
 Please check the existing issues to see if your feedback has already been reported.
 If not, please file an issue, describing what you did or wanted to do, what you expected to happen, and what actually happened.
 
+## FAQ
+
+As questions arise about dep we'll add them to the [FAQ](FAQ.md).
+This will serve as a source of data of what to include in the [full documentation](https://github.com/golang/dep/issues/331) once we reach that stage.
+
 ## Contributing
 
 Contributions are greatly appreciated.
