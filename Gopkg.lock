@@ -41,9 +41,3 @@ memo = "940bdaea844d101260e58623a5bae0392cce009ab34d274e89058b780e880309"
   name = "github.com/sdboyer/constext"
   packages = ["."]
   revision = "836a144573533ea4da4e6929c235fd348aed1c80"
-
-[[projects]]
-  name = "github.com/golang/dep/gps"
-  packages = [".","internal","internal/fs","pkgtree"]
-  revision = "da7569e414959d639654919aaf67259c3add73f4"
-  version = "v0.16.3"

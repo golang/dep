@@ -20,17 +20,17 @@ import (
 // management domain has lots of different path-ish strings floating around:
 //
 //  actual directories:
-//	/home/sdboyer/go/src/github.com/golang/dep/gps/example
+//	/home/sdboyer/go/src/github.com/sdboyer/gps/example
 //  URLs:
-//	https://github.com/golang/dep/gps
+//	https://github.com/sdboyer/gps
 //  import paths:
-//	github.com/golang/dep/gps/example
+//	github.com/sdboyer/gps/example
 //  portions of import paths that refer to a package:
 //	example
 //  portions that could not possibly refer to anything sane:
 //	github.com/sdboyer
 //  portions that correspond to a repository root:
-//	github.com/golang/dep/gps
+//	github.com/sdboyer/gps
 //
 // While not a panacea, having ProjectRoot allows gps to clearly indicate via
 // the type system when a path-ish string must have particular semantics.
@@ -49,10 +49,10 @@ type ProjectRoot string
 // These can be either a full URL, including protocol, or plain import paths.
 // So, these are all valid data for Source:
 //
-//  github.com/golang/dep/gps
+//  github.com/sdboyer/gps
 //  github.com/fork/gps
 //  git@github.com:sdboyer/gps
-//  https://github.com/golang/dep/gps
+//  https://github.com/sdboyer/gps
 //
 // With plain import paths, network addresses are derived purely through an
 // algorithm. By having an explicit network name, it becomes possible to, for
