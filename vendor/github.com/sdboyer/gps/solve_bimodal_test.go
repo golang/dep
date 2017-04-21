@@ -1134,7 +1134,7 @@ func (sm *bmSourceManager) ListPackages(id ProjectIdentifier, v Version) (pkgtre
 	return pkgtree.PackageTree{}, fmt.Errorf("Project %s at version %s could not be found", id.errString(), v)
 }
 
-func (sm *bmSourceManager) GetManifestAndLock(id ProjectIdentifier, v Version) (Manifest, Lock, error) {
+func (sm *bmSourceManager) GetManifestAndLock(id ProjectIdentifier, v Version, an ProjectAnalyzer) (Manifest, Lock, error) {
 	for _, ds := range sm.specs {
 		if id.normalizedSource() == string(ds.n) && v.Matches(ds.v) {
 			if l, exists := sm.lm[id.normalizedSource()+" "+v.String()]; exists {

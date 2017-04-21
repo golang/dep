@@ -485,8 +485,8 @@ func diffLocks(l1 gps.Lock, l2 gps.Lock) *LockDiff {
 				diff.Add = append(diff.Add, add)
 				i2next = i2 + 1 // Don't evaluate to this again
 				continue        // Keep looking for a matching project
-			case +1: // Project has been removed, handled below
-				break
+			case +1:
+				// Project has been removed, handled below
 			}
 
 			break // Done evaluating this project, move onto the next

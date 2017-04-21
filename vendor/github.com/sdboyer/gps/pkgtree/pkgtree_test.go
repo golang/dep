@@ -450,9 +450,12 @@ func TestWorkmapToReach(t *testing.T) {
 	}
 
 	for name, fix := range table {
-		// Avoid erroneous errors by initializing the fixture's error map if
-		// needed
+		name, fix := name, fix
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			// Avoid erroneous errors by initializing the fixture's error map if
+			// needed
 			if fix.em == nil {
 				fix.em = make(map[string]*ProblemImportError)
 			}
@@ -1150,6 +1153,26 @@ func TestListPackages(t *testing.T) {
 				},
 			},
 		},
+		"skip underscore": {
+			fileRoot:   j("skip_"),
+			importRoot: "skip_",
+			out: PackageTree{
+				ImportRoot: "skip_",
+				Packages: map[string]PackageOrErr{
+					"skip_": {
+						P: Package{
+							ImportPath:  "skip_",
+							CommentPath: "",
+							Name:        "skip",
+							Imports: []string{
+								"github.com/sdboyer/gps",
+								"sort",
+							},
+						},
+					},
+				},
+			},
+		},
 		// This case mostly exists for the PackageTree methods, but it does
 		// cover a bit of range
 		"varied": {
@@ -1329,8 +1352,7 @@ func TestListPackagesNoPerms(t *testing.T) {
 	}
 	tmp, err := ioutil.TempDir("", "listpkgsnp")
 	if err != nil {
-		t.Errorf("Failed to create temp dir: %s", err)
-		t.FailNow()
+		t.Fatalf("Failed to create temp dir: %s", err)
 	}
 	defer os.RemoveAll(tmp)
 
@@ -1341,13 +1363,11 @@ func TestListPackagesNoPerms(t *testing.T) {
 	// chmod the simple dir and m1p/b.go file so they can't be read
 	err = os.Chmod(filepath.Join(workdir, "simple"), 0)
 	if err != nil {
-		t.Error("Error while chmodding simple dir", err)
-		t.FailNow()
+		t.Fatalf("Error while chmodding simple dir: %s", err)
 	}
 	os.Chmod(filepath.Join(workdir, "m1p", "b.go"), 0)
 	if err != nil {
-		t.Error("Error while chmodding b.go file", err)
-		t.FailNow()
+		t.Fatalf("Error while chmodding b.go file: %s", err)
 	}
 
 	want := PackageTree{
@@ -1375,12 +1395,10 @@ func TestListPackagesNoPerms(t *testing.T) {
 	got, err := ListPackages(workdir, "ren")
 
 	if err != nil {
-		t.Errorf("Unexpected err from ListPackages: %s", err)
-		t.FailNow()
+		t.Fatalf("Unexpected err from ListPackages: %s", err)
 	}
 	if want.ImportRoot != got.ImportRoot {
-		t.Errorf("Expected ImportRoot %s, got %s", want.ImportRoot, got.ImportRoot)
-		t.FailNow()
+		t.Fatalf("Expected ImportRoot %s, got %s", want.ImportRoot, got.ImportRoot)
 	}
 
 	if !reflect.DeepEqual(got, want) {

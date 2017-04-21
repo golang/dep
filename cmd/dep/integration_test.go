@@ -7,7 +7,6 @@ package main
 import (
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 
@@ -20,11 +19,9 @@ func TestIntegration(t *testing.T) {
 	test.NeedsGit(t)
 
 	filepath.Walk(filepath.Join("testdata", "harness_tests"), func(path string, info os.FileInfo, err error) error {
-
-		if runtime.GOOS == "windows" && strings.Contains(path, "remove") {
-			// TODO skipping the remove tests on windows until some fixes happen in gps -
-			// see https://github.com/golang/dep/issues/301
-			return filepath.SkipDir
+		wd, err := os.Getwd()
+		if err != nil {
+			panic(err)
 		}
 
 		if filepath.Base(path) == "testcase.json" {
@@ -32,10 +29,12 @@ func TestIntegration(t *testing.T) {
 			testName := strings.Join(parse[2:len(parse)-1], "/")
 
 			t.Run(testName, func(t *testing.T) {
+				t.Parallel()
+
 				// Set up environment
-				testCase := test.NewTestCase(t, testName)
+				testCase := test.NewTestCase(t, testName, wd)
 				defer testCase.Cleanup()
-				testProj := test.NewTestProject(t, testCase.InitialPath())
+				testProj := test.NewTestProject(t, testCase.InitialPath(), wd)
 				defer testProj.Cleanup()
 
 				// Create and checkout the vendor revisions
@@ -53,7 +52,10 @@ func TestIntegration(t *testing.T) {
 				// Run commands
 				testProj.RecordImportPaths()
 				for _, args := range testCase.Commands {
-					testProj.DoRun(args)
+					err = testProj.DoRun(args)
+					if err != nil {
+						t.Fatalf("%v", err)
+					}
 				}
 
 				// Check final manifest and lock

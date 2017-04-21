@@ -55,6 +55,7 @@ func TestLockedProjectsEq(t *testing.T) {
 	}
 
 	for k, f := range fix {
+		k, f := k, f
 		t.Run(k, func(t *testing.T) {
 			if f.shouldeq {
 				if !lps[f.l1].Eq(lps[f.l2]) {
@@ -70,7 +71,6 @@ func TestLockedProjectsEq(t *testing.T) {
 				if lps[f.l2].Eq(lps[f.l1]) {
 					t.Error(f.err + (" (reversed)"))
 				}
-
 			}
 		})
 	}

@@ -20,14 +20,14 @@ const ManifestName = "Gopkg.toml"
 type Manifest struct {
 	Dependencies gps.ProjectConstraints
 	Ovr          gps.ProjectConstraints
-	Ignores      []string
+	Ignored      []string
 	Required     []string
 }
 
 type rawManifest struct {
 	Dependencies []rawProject `toml:"dependencies,omitempty"`
 	Overrides    []rawProject `toml:"overrides,omitempty"`
-	Ignores      []string     `toml:"ignores,omitempty"`
+	Ignored      []string     `toml:"ignored,omitempty"`
 	Required     []string     `toml:"required,omitempty"`
 }
 
@@ -59,7 +59,7 @@ func fromRawManifest(raw rawManifest) (*Manifest, error) {
 	m := &Manifest{
 		Dependencies: make(gps.ProjectConstraints, len(raw.Dependencies)),
 		Ovr:          make(gps.ProjectConstraints, len(raw.Overrides)),
-		Ignores:      raw.Ignores,
+		Ignored:      raw.Ignored,
 		Required:     raw.Required,
 	}
 
@@ -124,7 +124,7 @@ func (m *Manifest) toRaw() rawManifest {
 	raw := rawManifest{
 		Dependencies: make([]rawProject, 0, len(m.Dependencies)),
 		Overrides:    make([]rawProject, 0, len(m.Ovr)),
-		Ignores:      m.Ignores,
+		Ignored:      m.Ignored,
 		Required:     m.Required,
 	}
 	for n, prj := range m.Dependencies {
@@ -215,12 +215,12 @@ func (m *Manifest) Overrides() gps.ProjectConstraints {
 }
 
 func (m *Manifest) IgnoredPackages() map[string]bool {
-	if len(m.Ignores) == 0 {
+	if len(m.Ignored) == 0 {
 		return nil
 	}
 
-	mp := make(map[string]bool, len(m.Ignores))
-	for _, i := range m.Ignores {
+	mp := make(map[string]bool, len(m.Ignored))
+	for _, i := range m.Ignored {
 		mp[i] = true
 	}
 

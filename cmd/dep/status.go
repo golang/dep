@@ -249,6 +249,7 @@ func runStatusAll(out outputter, p *dep.Project, sm *gps.SourceMgr) error {
 
 	// Set up a solver in order to check the InputHash.
 	params := gps.SolveParameters{
+		ProjectAnalyzer: dep.Analyzer{},
 		RootDir:         p.AbsRoot,
 		RootPackageTree: ptree,
 		Manifest:        p.Manifest,
@@ -336,21 +337,14 @@ func runStatusAll(out outputter, p *dep.Project, sm *gps.SourceMgr) error {
 
 				vl, err := sm.ListVersions(proj.Ident())
 				if err == nil {
-					gps.SortForUpgrade(vl)
+					gps.SortPairedForUpgrade(vl)
 
 					for _, v := range vl {
 						// Because we've sorted the version list for
 						// upgrade, the first version we encounter that
 						// matches our constraint will be what we want.
 						if c.Constraint.Matches(v) {
-							// For branch constraints this should be the
-							// most recent revision on the selected
-							// branch.
-							if tv, ok := v.(gps.PairedVersion); ok && v.Type() == gps.IsBranch {
-								bs.Latest = tv.Underlying()
-							} else {
-								bs.Latest = v
-							}
+							bs.Latest = v.Underlying()
 							break
 						}
 					}
