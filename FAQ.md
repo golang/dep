@@ -74,7 +74,7 @@ Committing the vendor directory is totally up to you. There is no general advice
     Remove it from `ignored` and try again.
 
 ## Why is `dep` ignoring the version specified in the manifest?
-Only direct dependencies can be managed with a `depenencies` entry
+Only direct dependencies can be managed with a `dependencies` entry
 in the manifest. Use an `overrides` entry for transitive dependencies.
 
 >  Constraints:
