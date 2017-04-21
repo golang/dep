@@ -19,6 +19,10 @@ func TestIntegration(t *testing.T) {
 	test.NeedsGit(t)
 
 	filepath.Walk(filepath.Join("testdata", "harness_tests"), func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			t.Fatal("error walking filepath")
+		}
+
 		wd, err := os.Getwd()
 		if err != nil {
 			panic(err)
