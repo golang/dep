@@ -59,12 +59,9 @@ func (cmd *pruneCommand) Run(ctx *dep.Ctx, args []string) error {
 	}
 
 	// Set up a solver in order to check the InputHash.
-	params := gps.SolveParameters{
-		RootDir:         p.AbsRoot,
-		RootPackageTree: ptree,
-		Manifest:        p.Manifest,
-		// Locks aren't a part of the input hash check, so we can omit it.
-	}
+	params := p.MakeParams()
+	params.RootPackageTree = ptree
+
 	if *verbose {
 		params.Trace = true
 		params.TraceLogger = log.New(os.Stderr, "", 0)
