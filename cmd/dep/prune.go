@@ -60,6 +60,7 @@ func (cmd *pruneCommand) Run(ctx *dep.Ctx, args []string) error {
 
 	// Set up a solver in order to check the InputHash.
 	params := gps.SolveParameters{
+		ProjectAnalyzer: dep.Analyzer{},
 		RootDir:         p.AbsRoot,
 		RootPackageTree: ptree,
 		Manifest:        p.Manifest,
