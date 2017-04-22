@@ -17,13 +17,14 @@ install:
   - echo "This is an override of the default install deps step in travis."
 before_script:
   - PKGS=$(go list ./... | grep -v /vendor/)
-  - go get -v honnef.co/go/tools/cmd/staticcheck
+  - go get -v honnef.co/go/tools/cmd/{gosimple,staticcheck}
 script:
   - go build -v ./cmd/dep
   - go vet $PKGS
   # Ignore the deprecation warning about filepath.HasPrefix (SA1019). This flag
   # can be removed when issue #296 is resolved.
   - staticcheck -ignore='github.com/golang/dep/context.go:SA1019 github.com/golang/dep/cmd/dep/init.go:SA1019' $PKGS
+  - gosimple $PKGS
   - test -z "$(gofmt -s -l . 2>&1 | grep -v vendor/ | tee /dev/stderr)"
   - go test -race $PKGS
   - go build ./hack/licenseok
