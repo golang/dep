@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/golang/dep"
+	"github.com/golang/dep/internal"
 	"github.com/pkg/errors"
 	"github.com/sdboyer/gps"
 	"github.com/sdboyer/gps/pkgtree"
@@ -89,12 +90,12 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 	if err != nil {
 		return errors.Wrap(err, "determineProjectRoot")
 	}
-	vlogf("Finding dependencies for %q...", cpr)
+	internal.Vlogf("Finding dependencies for %q...", cpr)
 	pkgT, err := pkgtree.ListPackages(root, cpr)
 	if err != nil {
 		return errors.Wrap(err, "gps.ListPackages")
 	}
-	vlogf("Found %d dependencies.", len(pkgT.Packages))
+	internal.Vlogf("Found %d dependencies.", len(pkgT.Packages))
 	sm, err := ctx.SourceManager()
 	if err != nil {
 		return errors.Wrap(err, "getSourceManager")
@@ -135,7 +136,7 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 	}
 
 	if len(pd.notondisk) > 0 {
-		vlogf("Solving...")
+		internal.Vlogf("Solving...")
 		params := gps.SolveParameters{
 			RootDir:         root,
 			RootPackageTree: pkgT,
@@ -161,7 +162,7 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 		l = dep.LockFromInterface(soln)
 	}
 
-	vlogf("Writing manifest and lock files.")
+	internal.Vlogf("Writing manifest and lock files.")
 
 	var sw dep.SafeWriter
 	sw.Prepare(m, nil, l, dep.VendorAlways)
@@ -236,7 +237,7 @@ func getProjectData(ctx *dep.Ctx, pkgT pkgtree.PackageTree, cpr string, sm *gps.
 		return projectData{}, nil
 	}
 
-	vlogf("Building dependency graph...")
+	internal.Vlogf("Building dependency graph...")
 	// Exclude stdlib imports from the list returned from Flatten().
 	const omitStdlib = false
 	for _, ip := range rm.Flatten(omitStdlib) {
@@ -252,13 +253,13 @@ func getProjectData(ctx *dep.Ctx, pkgT pkgtree.PackageTree, cpr string, sm *gps.
 		}
 		go syncDep(pr, sm)
 
-		vlogf("Found import of %q, analyzing...", ip)
+		internal.Vlogf("Found import of %q, analyzing...", ip)
 
 		dependencies[pr] = []string{ip}
 		v, err := ctx.VersionInWorkspace(pr)
 		if err != nil {
 			notondisk[pr] = true
-			vlogf("Could not determine version for %q, omitting from generated manifest", pr)
+			internal.Vlogf("Could not determine version for %q, omitting from generated manifest", pr)
 			continue
 		}
 
@@ -275,7 +276,7 @@ func getProjectData(ctx *dep.Ctx, pkgT pkgtree.PackageTree, cpr string, sm *gps.
 		constraints[pr] = pp
 	}
 
-	vlogf("Analyzing transitive imports...")
+	internal.Vlogf("Analyzing transitive imports...")
 	// Explore the packages we've found for transitive deps, either
 	// completing the lock or identifying (more) missing projects that we'll
 	// need to ask gps to solve for us.
@@ -294,7 +295,7 @@ func getProjectData(ctx *dep.Ctx, pkgT pkgtree.PackageTree, cpr string, sm *gps.
 	dft = func(pkg string) error {
 		switch colors[pkg] {
 		case white:
-			vlogf("Analyzing %q...", pkg)
+			internal.Vlogf("Analyzing %q...", pkg)
 			colors[pkg] = grey
 
 			pr, err := sm.DeduceProjectRoot(pkg)
