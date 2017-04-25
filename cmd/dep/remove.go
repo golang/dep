@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/golang/dep"
+	"github.com/golang/dep/internal"
 	"github.com/pkg/errors"
 	"github.com/golang/dep/gps"
 	"github.com/golang/dep/gps/pkgtree"
@@ -91,7 +92,7 @@ func (cmd *removeCommand) Run(ctx *dep.Ctx, args []string) error {
 				// not being able to detect the root for an import path that's
 				// actually in the import list is a deeper problem. However,
 				// it's not our direct concern here, so we just warn.
-				logf("could not infer root for %q", pr)
+				internal.Logf("could not infer root for %q", pr)
 				continue
 			}
 			otherroots[pr] = true
@@ -106,7 +107,7 @@ func (cmd *removeCommand) Run(ctx *dep.Ctx, args []string) error {
 		}
 
 		if len(rm) == 0 {
-			logf("nothing to do")
+			internal.Logf("nothing to do")
 			return nil
 		}
 	} else {

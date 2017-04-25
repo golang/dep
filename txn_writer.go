@@ -6,7 +6,6 @@ package dep
 
 import (
 	"bytes"
-	"encoding/hex"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -33,7 +32,7 @@ type SafeWriter struct {
 type SafeWriterPayload struct {
 	Manifest    *Manifest
 	Lock        *Lock
-	LockDiff    *LockDiff
+	LockDiff    *gps.LockDiff
 	WriteVendor bool
 }
 
@@ -49,33 +48,74 @@ func (payload *SafeWriterPayload) HasVendor() bool {
 	return payload.WriteVendor
 }
 
-// LockDiff is the set of differences between an existing lock file and an updated lock file.
-// Fields are only populated when there is a difference, otherwise they are empty.
-// TODO(carolynvs) this should be moved to gps
-type LockDiff struct {
-	HashDiff *StringDiff
-	Add      []LockedProjectDiff
-	Remove   []LockedProjectDiff
-	Modify   []LockedProjectDiff
+type rawStringDiff struct {
+	*gps.StringDiff
+}
+
+func (diff rawStringDiff) MarshalTOML() ([]byte, error) {
+	return []byte(diff.String()), nil
+}
+
+type rawLockDiff struct {
+	*gps.LockDiff
+}
+
+type rawLockedProjectDiff struct {
+	Name     gps.ProjectRoot `toml:"name"`
+	Source   *rawStringDiff  `toml:"source,omitempty"`
+	Version  *rawStringDiff  `toml:"version,omitempty"`
+	Branch   *rawStringDiff  `toml:"branch,omitempty"`
+	Revision *rawStringDiff  `toml:"revision,omitempty"`
+	Packages []rawStringDiff `toml:"packages,omitempty"`
+}
+
+func toRawLockedProjectDiff(diff gps.LockedProjectDiff) rawLockedProjectDiff {
+	// this is a shallow copy since we aren't modifying the raw diff
+	raw := rawLockedProjectDiff{Name: diff.Name}
+	if diff.Source != nil {
+		raw.Source = &rawStringDiff{diff.Source}
+	}
+	if diff.Version != nil {
+		raw.Version = &rawStringDiff{diff.Version}
+	}
+	if diff.Branch != nil {
+		raw.Branch = &rawStringDiff{diff.Branch}
+	}
+	if diff.Revision != nil {
+		raw.Revision = &rawStringDiff{diff.Revision}
+	}
+	raw.Packages = make([]rawStringDiff, len(diff.Packages))
+	for i := 0; i < len(diff.Packages); i++ {
+		raw.Packages[i] = rawStringDiff{&diff.Packages[i]}
+	}
+	return raw
 }
 
 type rawLockedProjectDiffs struct {
-	Projects []LockedProjectDiff `toml:"projects"`
+	Projects []rawLockedProjectDiff `toml:"projects"`
 }
 
-func (diff *LockDiff) Format() (string, error) {
-	if diff == nil {
-		return "", nil
+func toRawLockedProjectDiffs(diffs []gps.LockedProjectDiff) rawLockedProjectDiffs {
+	raw := rawLockedProjectDiffs{
+		Projects: make([]rawLockedProjectDiff, len(diffs)),
 	}
 
+	for i := 0; i < len(diffs); i++ {
+		raw.Projects[i] = toRawLockedProjectDiff(diffs[i])
+	}
+
+	return raw
+}
+
+func formatLockDiff(diff gps.LockDiff) (string, error) {
 	var buf bytes.Buffer
 
 	if diff.HashDiff != nil {
 		buf.WriteString(fmt.Sprintf("Memo: %s\n\n", diff.HashDiff))
 	}
 
-	writeDiffs := func(diffs []LockedProjectDiff) error {
-		raw := rawLockedProjectDiffs{diffs}
+	writeDiffs := func(diffs []gps.LockedProjectDiff) error {
+		raw := toRawLockedProjectDiffs(diffs)
 		chunk, err := toml.Marshal(raw)
 		if err != nil {
 			return err
@@ -112,43 +152,6 @@ func (diff *LockDiff) Format() (string, error) {
 	return buf.String(), nil
 }
 
-// LockedProjectDiff contains the before and after snapshot of a project reference.
-// Fields are only populated when there is a difference, otherwise they are empty.
-// TODO(carolynvs) this should be moved to gps
-type LockedProjectDiff struct {
-	Name     gps.ProjectRoot `toml:"name"`
-	Source   *StringDiff     `toml:"source,omitempty"`
-	Version  *StringDiff     `toml:"version,omitempty"`
-	Branch   *StringDiff     `toml:"branch,omitempty"`
-	Revision *StringDiff     `toml:"revision,omitempty"`
-	Packages []StringDiff    `toml:"packages,omitempty"`
-}
-
-type StringDiff struct {
-	Previous string
-	Current  string
-}
-
-func (diff StringDiff) String() string {
-	if diff.Previous == "" && diff.Current != "" {
-		return fmt.Sprintf("+ %s", diff.Current)
-	}
-
-	if diff.Previous != "" && diff.Current == "" {
-		return fmt.Sprintf("- %s", diff.Previous)
-	}
-
-	if diff.Previous != diff.Current {
-		return fmt.Sprintf("%s -> %s", diff.Previous, diff.Current)
-	}
-
-	return diff.Current
-}
-
-func (diff StringDiff) MarshalTOML() ([]byte, error) {
-	return []byte(diff.String()), nil
-}
-
 // VendorBehavior defines when the vendor directory should be written.
 type VendorBehavior int
 
@@ -181,7 +184,7 @@ func (sw *SafeWriter) Prepare(manifest *Manifest, oldLock, newLock *Lock, vendor
 		if newLock == nil {
 			return errors.New("must provide newLock when oldLock is specified")
 		}
-		sw.Payload.LockDiff = diffLocks(oldLock, newLock)
+		sw.Payload.LockDiff = gps.DiffLocks(oldLock, newLock)
 	}
 
 	switch vendor {
@@ -380,7 +383,7 @@ func (sw *SafeWriter) PrintPreparedActions() error {
 			fmt.Println(string(l))
 		} else {
 			fmt.Printf("Would have written the following changes to %s:\n", LockName)
-			diff, err := sw.Payload.LockDiff.Format()
+			diff, err := formatLockDiff(*sw.Payload.LockDiff)
 			if err != nil {
 				return errors.Wrap(err, "ensure DryRun cannot serialize the lock diff")
 			}
@@ -392,7 +395,7 @@ func (sw *SafeWriter) PrintPreparedActions() error {
 		fmt.Println("Would have written the following projects to the vendor directory:")
 		for _, project := range sw.Payload.Lock.Projects() {
 			prj := project.Ident()
-			rev, _, _ := getVersionInfo(project.Version())
+			rev, _, _ := gps.VersionComponentStrings(project.Version())
 			if prj.Source == "" {
 				fmt.Printf("%s@%s\n", prj.ProjectRoot, rev)
 			} else {
@@ -402,195 +405,6 @@ func (sw *SafeWriter) PrintPreparedActions() error {
 	}
 
 	return nil
-}
-
-// diffLocks compares two locks and identifies the differences between them.
-// Returns nil if there are no differences.
-// TODO(carolynvs) this should be moved to gps
-func diffLocks(l1 gps.Lock, l2 gps.Lock) *LockDiff {
-	// Default nil locks to empty locks, so that we can still generate a diff
-	if l1 == nil {
-		l1 = &gps.SimpleLock{}
-	}
-	if l2 == nil {
-		l2 = &gps.SimpleLock{}
-	}
-
-	p1, p2 := l1.Projects(), l2.Projects()
-
-	// Check if the slices are sorted already. If they are, we can compare
-	// without copying. Otherwise, we have to copy to avoid altering the
-	// original input.
-	sp1, sp2 := SortedLockedProjects(p1), SortedLockedProjects(p2)
-	if len(p1) > 1 && !sort.IsSorted(sp1) {
-		p1 = make([]gps.LockedProject, len(p1))
-		copy(p1, l1.Projects())
-		sort.Sort(SortedLockedProjects(p1))
-	}
-	if len(p2) > 1 && !sort.IsSorted(sp2) {
-		p2 = make([]gps.LockedProject, len(p2))
-		copy(p2, l2.Projects())
-		sort.Sort(SortedLockedProjects(p2))
-	}
-
-	diff := LockDiff{}
-
-	h1 := hex.EncodeToString(l1.InputHash())
-	h2 := hex.EncodeToString(l2.InputHash())
-	if h1 != h2 {
-		diff.HashDiff = &StringDiff{Previous: h1, Current: h2}
-	}
-
-	var i2next int
-	for i1 := 0; i1 < len(p1); i1++ {
-		lp1 := p1[i1]
-		pr1 := lp1.Ident().ProjectRoot
-
-		var matched bool
-		for i2 := i2next; i2 < len(p2); i2++ {
-			lp2 := p2[i2]
-			pr2 := lp2.Ident().ProjectRoot
-
-			switch strings.Compare(string(pr1), string(pr2)) {
-			case 0: // Found a matching project
-				matched = true
-				pdiff := diffProjects(lp1, lp2)
-				if pdiff != nil {
-					diff.Modify = append(diff.Modify, *pdiff)
-				}
-				i2next = i2 + 1 // Don't evaluate to this again
-			case -1: // Found a new project
-				add := buildLockedProjectDiff(lp2)
-				diff.Add = append(diff.Add, add)
-				i2next = i2 + 1 // Don't evaluate to this again
-				continue        // Keep looking for a matching project
-			case +1:
-				// Project has been removed, handled below
-			}
-
-			break // Done evaluating this project, move onto the next
-		}
-
-		if !matched {
-			remove := buildLockedProjectDiff(lp1)
-			diff.Remove = append(diff.Remove, remove)
-		}
-	}
-
-	// Anything that still hasn't been evaluated are adds
-	for i2 := i2next; i2 < len(p2); i2++ {
-		lp2 := p2[i2]
-		add := buildLockedProjectDiff(lp2)
-		diff.Add = append(diff.Add, add)
-	}
-
-	if diff.HashDiff == nil && len(diff.Add) == 0 && len(diff.Remove) == 0 && len(diff.Modify) == 0 {
-		return nil // The locks are the equivalent
-	}
-	return &diff
-}
-
-func buildLockedProjectDiff(lp gps.LockedProject) LockedProjectDiff {
-	r2, b2, v2 := getVersionInfo(lp.Version())
-	var rev, version, branch *StringDiff
-	if r2 != "" {
-		rev = &StringDiff{Previous: r2, Current: r2}
-	}
-	if b2 != "" {
-		branch = &StringDiff{Previous: b2, Current: b2}
-	}
-	if v2 != "" {
-		version = &StringDiff{Previous: v2, Current: v2}
-	}
-	add := LockedProjectDiff{
-		Name:     lp.Ident().ProjectRoot,
-		Revision: rev,
-		Version:  version,
-		Branch:   branch,
-		Packages: make([]StringDiff, len(lp.Packages())),
-	}
-	for i, pkg := range lp.Packages() {
-		add.Packages[i] = StringDiff{Previous: pkg, Current: pkg}
-	}
-	return add
-}
-
-// diffProjects compares two projects and identifies the differences between them.
-// Returns nil if there are no differences
-// TODO(carolynvs) this should be moved to gps and updated once the gps unexported fields are available to use.
-func diffProjects(lp1 gps.LockedProject, lp2 gps.LockedProject) *LockedProjectDiff {
-	diff := LockedProjectDiff{Name: lp1.Ident().ProjectRoot}
-
-	s1 := lp1.Ident().Source
-	s2 := lp2.Ident().Source
-	if s1 != s2 {
-		diff.Source = &StringDiff{Previous: s1, Current: s2}
-	}
-
-	r1, b1, v1 := getVersionInfo(lp1.Version())
-	r2, b2, v2 := getVersionInfo(lp2.Version())
-	if r1 != r2 {
-		diff.Revision = &StringDiff{Previous: r1, Current: r2}
-	}
-	if b1 != b2 {
-		diff.Branch = &StringDiff{Previous: b1, Current: b2}
-	}
-	if v1 != v2 {
-		diff.Version = &StringDiff{Previous: v1, Current: v2}
-	}
-
-	p1 := lp1.Packages()
-	p2 := lp2.Packages()
-	if !sort.StringsAreSorted(p1) {
-		p1 = make([]string, len(p1))
-		copy(p1, lp1.Packages())
-		sort.Strings(p1)
-	}
-	if !sort.StringsAreSorted(p2) {
-		p2 = make([]string, len(p2))
-		copy(p2, lp2.Packages())
-		sort.Strings(p2)
-	}
-
-	var i2next int
-	for i1 := 0; i1 < len(p1); i1++ {
-		pkg1 := p1[i1]
-
-		var matched bool
-		for i2 := i2next; i2 < len(p2); i2++ {
-			pkg2 := p2[i2]
-
-			switch strings.Compare(pkg1, pkg2) {
-			case 0: // Found matching package
-				matched = true
-				i2next = i2 + 1 // Don't evaluate to this again
-			case +1: // Found a new package
-				add := StringDiff{Current: pkg2}
-				diff.Packages = append(diff.Packages, add)
-				i2next = i2 + 1 // Don't evaluate to this again
-				continue        // Keep looking for a match
-			case -1: // Package has been removed (handled below)
-			}
-
-			break // Done evaluating this package, move onto the next
-		}
-
-		if !matched {
-			diff.Packages = append(diff.Packages, StringDiff{Previous: pkg1})
-		}
-	}
-
-	// Anything that still hasn't been evaluated are adds
-	for i2 := i2next; i2 < len(p2); i2++ {
-		pkg2 := p2[i2]
-		add := StringDiff{Current: pkg2}
-		diff.Packages = append(diff.Packages, add)
-	}
-
-	if diff.Source == nil && diff.Version == nil && diff.Revision == nil && len(diff.Packages) == 0 {
-		return nil // The projects are equivalent
-	}
-	return &diff
 }
 
 func PruneProject(p *Project, sm gps.SourceManager) error {
