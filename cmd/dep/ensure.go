@@ -16,6 +16,7 @@ import (
 	"strings"
 
 	"github.com/golang/dep"
+	"github.com/golang/dep/internal"
 	"github.com/pkg/errors"
 	"github.com/golang/dep/gps"
 	"github.com/golang/dep/gps/pkgtree"
@@ -205,7 +206,7 @@ func applyEnsureArgs(args []string, overrides stringSlice, p *dep.Project, sm *g
 			// TODO(sdboyer): for this case - or just in general - do we want to
 			// add project args to the requires list temporarily for this run?
 			if _, has := p.Manifest.Dependencies[pc.Ident.ProjectRoot]; !has {
-				logf("No constraint or alternate source specified for %q, omitting from manifest", pc.Ident.ProjectRoot)
+				internal.Logf("No constraint or alternate source specified for %q, omitting from manifest", pc.Ident.ProjectRoot)
 			}
 			// If it's already in the manifest, no need to log
 			continue

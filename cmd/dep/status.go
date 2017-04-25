@@ -364,22 +364,42 @@ func runStatusAll(out outputter, p *dep.Project, sm *gps.SourceMgr) error {
 	//
 	// It's possible for digests to not match, but still have a correct
 	// lock.
-	out.MissingHeader()
-
 	rm, _ := ptree.ToReachMap(true, true, false, nil)
 
 	external := rm.Flatten(false)
-	roots := make(map[gps.ProjectRoot][]string)
-	var errs []string
+	roots := make(map[gps.ProjectRoot][]string, len(external))
+
+	type fail struct {
+		ex  string
+		err error
+	}
+	var errs []fail
 	for _, e := range external {
 		root, err := sm.DeduceProjectRoot(e)
 		if err != nil {
-			errs = append(errs, string(root))
+			errs = append(errs, fail{
+				ex:  e,
+				err: err,
+			})
 			continue
 		}
 
 		roots[root] = append(roots[root], e)
 	}
+
+	if len(errs) != 0 {
+		// TODO this is just a fix quick so staticcheck doesn't complain.
+		// Visually reconciling failure to deduce project roots with the rest of
+		// the mismatch output is a larger problem.
+		fmt.Fprintf(os.Stderr, "Failed to deduce project roots for import paths:\n")
+		for _, fail := range errs {
+			fmt.Fprintf(os.Stderr, "\t%s: %s\n", fail.ex, fail.err.Error())
+		}
+
+		return errors.New("address issues with undeducable import paths to get more status information.")
+	}
+
+	out.MissingHeader()
 
 outer:
 	for root, pkgs := range roots {

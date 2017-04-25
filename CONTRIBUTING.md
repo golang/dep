@@ -8,6 +8,8 @@ Keep an eye on the [Roadmap](https://github.com/golang/dep/wiki/Roadmap) for a s
 
 ## Filing issues
 
+Please check the existing issues and [FAQ](FAQ.md) to see if your feedback has already been reported.
+
 When [filing an issue](https://github.com/golang/dep/issues/new), make sure to answer these five questions:
 
 1. What version of Go are you using (`go version`)?

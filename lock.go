@@ -113,7 +113,7 @@ func (l *Lock) toRaw() rawLock {
 		}
 
 		v := lp.Version()
-		ld.Revision, ld.Branch, ld.Version = getVersionInfo(v)
+		ld.Revision, ld.Branch, ld.Version = gps.VersionComponentStrings(v)
 
 		raw.Projects[k] = ld
 	}
@@ -127,29 +127,6 @@ func (l *Lock) MarshalTOML() ([]byte, error) {
 	raw := l.toRaw()
 	result, err := toml.Marshal(raw)
 	return result, errors.Wrap(err, "Unable to marshal lock to TOML string")
-}
-
-// TODO(carolynvs) this should be moved to gps
-func getVersionInfo(v gps.Version) (revision string, branch string, version string) {
-	// Figure out how to get the underlying revision
-	switch tv := v.(type) {
-	case gps.UnpairedVersion:
-	// TODO we could error here, if we want to be very defensive about not
-	// allowing a lock to be written if without an immmutable revision
-	case gps.Revision:
-		revision = tv.String()
-	case gps.PairedVersion:
-		revision = tv.Underlying().String()
-	}
-
-	switch v.Type() {
-	case gps.IsBranch:
-		branch = v.String()
-	case gps.IsSemver, gps.IsVersion:
-		version = v.String()
-	}
-
-	return
 }
 
 // LockFromInterface converts an arbitrary gps.Lock to dep's representation of a
