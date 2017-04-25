@@ -150,8 +150,7 @@ func (p *IntegrationTestProject) DoRun(args []string) error {
 	if *PrintLogs {
 		p.t.Logf("running testdep %v", args)
 	}
-	var prog string
-	prog = filepath.Join(p.origWd, "testdep"+ExeSuffix)
+	prog := filepath.Join(p.origWd, "testdep"+ExeSuffix)
 	newargs := []string{args[0], "-v"}
 	newargs = append(newargs, args[1:]...)
 	cmd := exec.Command(prog, newargs...)
