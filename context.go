@@ -34,11 +34,13 @@ func NewContext() (*Ctx, error) {
 	wd = filepath.FromSlash(wd)
 	ctx := &Ctx{}
 
+	gopathFound := false
 	for _, gp := range filepath.SplitList(buildContext.GOPATH) {
 		gp = filepath.FromSlash(gp)
 
-		if filepath.HasPrefix(wd, gp) {
+		if !gopathFound && filepath.HasPrefix(wd, gp) {
 			ctx.GOPATH = gp
+			gopathFound = true
 		}
 
 		ctx.GOPATHS = append(ctx.GOPATHS, gp)
