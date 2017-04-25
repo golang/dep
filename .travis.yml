@@ -23,9 +23,10 @@ script:
   - go vet $PKGS
   # Ignore the deprecation warning about filepath.HasPrefix (SA1019). This flag
   # can be removed when issue #296 is resolved.
-  - staticcheck -ignore='github.com/golang/dep/context.go:SA1019 github.com/golang/dep/cmd/dep/init.go:SA1019' $PKGS
+  - staticcheck -ignore='github.com/golang/dep/context.go:SA1019 github.com/golang/dep/cmd/dep/init.go:SA1019 github.com/golang/dep/cmd/dep/status.go:SA4010' $PKGS
   #- test -z "$(gofmt -s -l . 2>&1 | grep -v vendor/ | tee /dev/stderr)"
   - find * -maxdepth 1 ! -path "testdata" ! -path "vendor" ! -path "gps/_testdata" -type d -print0 | xargs -0 gofmt -s -l
+  - gosimple $PKGS
   - go test -race $PKGS
   - go build ./hack/licenseok
   - find . -path ./vendor -prune -o -type f -name "*.go" -printf '%P\n' | xargs ./licenseok
