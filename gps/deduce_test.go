@@ -614,7 +614,7 @@ func TestVanityDeduction(t *testing.T) {
 	do := func(t *testing.T) {
 		for _, fix := range vanities {
 			fix := fix
-			t.Run(fmt.Sprintf("%s", fix.in), func(t *testing.T) {
+			t.Run(fix.in, func(t *testing.T) {
 				t.Parallel()
 
 				pr, err := sm.DeduceProjectRoot(fix.in)

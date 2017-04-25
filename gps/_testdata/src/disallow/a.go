@@ -1,8 +1,8 @@
 package disallow
 
 import (
-	"sort"
 	"disallow/testdata"
+	"sort"
 
 	"github.com/golang/dep/gps"
 )

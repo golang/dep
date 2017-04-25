@@ -3,8 +3,8 @@ package simple
 import (
 	"sort"
 
-	"missing/missing"
 	"github.com/golang/dep/gps"
+	"missing/missing"
 )
 
 var (

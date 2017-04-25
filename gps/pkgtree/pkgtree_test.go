@@ -1839,8 +1839,8 @@ func TestFlattenReachMap(t *testing.T) {
 	name = "ignore external"
 	ignore = map[string]bool{
 		"github.com/golang/dep/gps": true,
-		"go/parser":              true,
-		"sort":                   true,
+		"go/parser":                 true,
+		"sort":                      true,
 	}
 	except("sort", "github.com/golang/dep/gps", "go/parser")
 	validate()

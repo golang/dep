@@ -1,9 +1,9 @@
 package toml
 
 import (
+	"strconv"
 	"testing"
 	"time"
-	"strconv"
 )
 
 type customString string

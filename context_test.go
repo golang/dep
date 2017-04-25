@@ -12,8 +12,8 @@ import (
 	"testing"
 	"unicode"
 
-	"github.com/golang/dep/test"
 	"github.com/golang/dep/gps"
+	"github.com/golang/dep/test"
 )
 
 func TestNewContextNoGOPATH(t *testing.T) {

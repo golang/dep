@@ -13,9 +13,9 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/golang/dep/gps"
 	"github.com/pelletier/go-toml"
 	"github.com/pkg/errors"
-	"github.com/golang/dep/gps"
 )
 
 // SafeWriter transactionalizes writes of manifest, lock, and vendor dir, both

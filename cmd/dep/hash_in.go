@@ -9,9 +9,9 @@ import (
 	"fmt"
 
 	"github.com/golang/dep"
-	"github.com/pkg/errors"
 	"github.com/golang/dep/gps"
 	"github.com/golang/dep/gps/pkgtree"
+	"github.com/pkg/errors"
 )
 
 func (cmd *hashinCommand) Name() string      { return "hash-inputs" }

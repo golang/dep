@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/golang/dep/test"
 	"github.com/golang/dep/gps"
+	"github.com/golang/dep/test"
 )
 
 func TestReadLock(t *testing.T) {

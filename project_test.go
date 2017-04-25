@@ -10,8 +10,8 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/golang/dep/test"
 	"github.com/golang/dep/gps"
+	"github.com/golang/dep/test"
 )
 
 func TestFindRoot(t *testing.T) {
