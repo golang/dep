@@ -177,6 +177,9 @@ func TestVersionQueueAdvance(t *testing.T) {
 	lockv := fakevl[2]
 	prefv := fakevl[0]
 	vq, err = newVersionQueue(id, lockv, prefv, fb)
+	if err != nil {
+		t.Errorf("error creating version queue: %v", err)
+	}
 	if vq.String() != "[v1.1.0, v2.0.0]" {
 		t.Error("stringifying vq did not have expected outcome, got", vq.String())
 	}
@@ -228,6 +231,9 @@ func TestVersionQueueAdvance(t *testing.T) {
 	// Make sure we handle things correctly when listVersions adds nothing new
 	fb = &fakeBridge{vl: []Version{lockv, prefv}}
 	vq, err = newVersionQueue(id, lockv, prefv, fb)
+	if err != nil {
+		t.Errorf("error creating version queue: %v", err)
+	}
 	vq.advance(nil)
 	vq.advance(nil)
 	if vq.current() != nil || !vq.isExhausted() {

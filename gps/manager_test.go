@@ -248,11 +248,15 @@ func TestSourceInit(t *testing.T) {
 		t.Error("Cache repo does not exist in expected location")
 	}
 
-	_, err = os.Stat(filepath.Join(cpath, "metadata", "github.com", "sdboyer", "gpkt", "cache.json"))
-	if err != nil {
-		// TODO(sdboyer) disabled until we get caching working
-		//t.Error("Metadata cache json file does not exist in expected location")
-	}
+	// TODO (kris-nova) disabled entire if block and NOT TRACKING ERR to get `staticcheck` working.
+	// Whenever we fix Sam's todo we can fix this one as well.
+	// _, err = os.Stat(filepath.Join(cpath, "metadata", "github.com", "sdboyer", "gpkt", "cache.json"))
+	os.Stat(filepath.Join(cpath, "metadata", "github.com", "sdboyer", "gpkt", "cache.json"))
+
+	// if err != nil {
+	// TODO(sdboyer) disabled until we get caching working
+	//t.Error("Metadata cache json file does not exist in expected location")
+	//}
 
 	// Ensure source existence values are what we expect
 	var exists bool
@@ -819,6 +823,7 @@ func TestSupervisor(t *testing.T) {
 
 	// run another, but via do
 	block, wait := make(chan struct{}), make(chan struct{})
+	errchan := make(chan error)
 	go func() {
 		wait <- struct{}{}
 		err := superv.do(bgc, "foo", 0, func(ctx context.Context) error {
@@ -826,11 +831,18 @@ func TestSupervisor(t *testing.T) {
 			return nil
 		})
 		if err != nil {
-			t.Fatal("unexpected err on do() completion:", err)
+			errchan <- err
 		}
 		close(wait)
+		errchan <- nil
+
 	}()
+
 	<-wait
+	err = <- errchan
+	if err != nil {
+		t.Fatal("unexpected err on do() completion:", err)
+	}
 
 	superv.mu.Lock()
 	tc, exists = superv.running[ci]
