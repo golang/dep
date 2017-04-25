@@ -367,7 +367,7 @@ func runStatusAll(out outputter, p *dep.Project, sm *gps.SourceMgr) error {
 	rm, _ := ptree.ToReachMap(true, true, false, nil)
 
 	external := rm.Flatten(false)
-	roots := make(map[gps.ProjectRoot][]string)
+	roots := make(map[gps.ProjectRoot][]string, len(external))
 
 	type fail struct {
 		ex  string
@@ -389,7 +389,7 @@ func runStatusAll(out outputter, p *dep.Project, sm *gps.SourceMgr) error {
 
 	if len(errs) != 0 {
 		// TODO this is just a fix quick so staticcheck doesn't complain.
-		// Visually ceconciling failure to deduce project roots with the rest of
+		// Visually reconciling failure to deduce project roots with the rest of
 		// the mismatch output is a larger problem.
 		fmt.Fprintf(os.Stderr, "Failed to deduce project roots for import paths:\n")
 		for _, fail := range errs {
