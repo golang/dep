@@ -16,10 +16,10 @@ import (
 	"strings"
 
 	"github.com/golang/dep"
-	"github.com/golang/dep/internal"
-	"github.com/pkg/errors"
 	"github.com/golang/dep/gps"
 	"github.com/golang/dep/gps/pkgtree"
+	"github.com/golang/dep/internal"
+	"github.com/pkg/errors"
 )
 
 const ensureShortHelp = `Ensure a dependency is safely vendored in the project`

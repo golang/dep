@@ -259,7 +259,7 @@ func (s *gitSource) listVersions(ctx context.Context) (vlist []PairedVersion, er
 		for k, v := range vlist {
 			pv := v.(PairedVersion)
 			if bv, ok := pv.Unpair().(branchVersion); ok {
-				if bv.name != "master" && bv.isDefault == true {
+				if bv.name != "master" && bv.isDefault {
 					bv.isDefault = false
 					vlist[k] = bv.Is(pv.Underlying())
 				}

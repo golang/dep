@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/golang/dep/test"
 	"github.com/golang/dep/gps"
+	"github.com/golang/dep/test"
 )
 
 func TestReadManifest(t *testing.T) {

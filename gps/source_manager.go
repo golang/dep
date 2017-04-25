@@ -12,8 +12,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/sdboyer/constext"
 	"github.com/golang/dep/gps/pkgtree"
+	"github.com/sdboyer/constext"
 )
 
 // Used to compute a friendly filepath from a URL-shaped input.
@@ -535,7 +535,7 @@ func (sup *supervisor) done(ci callInfo) {
 		// Last one for this particular key; update metrics with info.
 		durCnt := sup.ran[ci.typ]
 		durCnt.count++
-		durCnt.dur += time.Now().Sub(existingInfo.start)
+		durCnt.dur += time.Since(existingInfo.start)
 		sup.ran[ci.typ] = durCnt
 		delete(sup.running, ci)
 
