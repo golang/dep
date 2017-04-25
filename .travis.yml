@@ -29,5 +29,3 @@ script:
   - gosimple $PKGS
   - go test -race $PKGS
   - go build ./hack/licenseok
-  - find . -path ./vendor -prune -o -type f -name "*.go" -printf '%P\n' | xargs ./licenseok
-
