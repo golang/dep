@@ -14,6 +14,7 @@ import (
 	"text/tabwriter"
 
 	"github.com/golang/dep"
+	"github.com/golang/dep/internal"
 )
 
 var (
@@ -114,6 +115,8 @@ func main() {
 				os.Exit(1)
 			}
 
+			internal.Verbose = *verbose
+
 			// Set up the dep context.
 			ctx, err := dep.NewContext()
 			if err != nil {
@@ -167,7 +170,7 @@ func resetUsage(fs *flag.FlagSet, name, args, longHelp string) {
 	}
 }
 
-// parseArgs determines the name of the dep command and wether the user asked for
+// parseArgs determines the name of the dep command and whether the user asked for
 // help to be printed.
 func parseArgs(args []string) (cmdName string, printCmdUsage bool, exit bool) {
 	isHelpArg := func() bool {
@@ -191,16 +194,4 @@ func parseArgs(args []string) (cmdName string, printCmdUsage bool, exit bool) {
 		}
 	}
 	return cmdName, printCmdUsage, exit
-}
-
-func logf(format string, args ...interface{}) {
-	// TODO: something else?
-	fmt.Fprintf(os.Stderr, "dep: "+format+"\n", args...)
-}
-
-func vlogf(format string, args ...interface{}) {
-	if !*verbose {
-		return
-	}
-	logf(format, args...)
 }
