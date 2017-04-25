@@ -11,7 +11,7 @@ Summarize the question and quote the reply, linking back to the original comment
 * [Why is it `dep ensure` instead of `dep install`?](#why-is-it-dep-ensure-instead-of-dep-install)
 * [Does `dep` replace `go get`?](#does-dep-replace-go-get)
 * [Why is `dep` ignoring a version constraint in the manifest?](#why-is-dep-ignoring-a-version-constraint-in-the-manifest)
-* [How do I constrain a transitive dependency's version?](#how-do-I-constrain-a-transitive-dependencys-version)
+* [How do I constrain a transitive dependency's version?](#how-do-i-constrain-a-transitive-dependencys-version)
 * [`dep` deleted my files in the vendor directory!](#dep-deleted-my-files-in-the-vendor-directory)
 * [Can I put the manifest and lock in the vendor directory?](#can-i-put-the-manifest-and-lock-in-the-vendor-directory)
 * [Why did dep use a different revision for package X instead of the revision in the lock file?](#why-did-dep-use-a-different-revision-for-package-x-instead-of-the-revision-in-the-lock-file)
@@ -62,7 +62,6 @@ in the manifest. Transitive dependencies are unaffected.
 Use an `overrides` entry for transitive dependencies.
 
 ## How do I constrain a transitive dependency's version?
-
 First, if you're wondering about this because you're trying to keep the version
 of the transitive dependency from changing, then you're working against `dep`'s
 design. The lock file, `Gopkg.lock`, will keep the selected version of the
@@ -80,13 +79,10 @@ dependencies and overrides are declared in the same way in `Gopkg.toml`, they
 behave differently:
 
 * Dependencies:
-
    1. Can be declared by any project's manifest, yours or a dependency
    2. Apply only to direct dependencies of the project declaring the constraint
    3. Must not conflict with the `dependencies` declared in any other project's manifest
-
-Overrides:
-
+* Overrides:
    1. Are only utilized from the current/your project's manifest
    2. Apply globally, to direct and transitive dependencies
    3. Supersede constraints declared in all manifests, yours or a dependency's
