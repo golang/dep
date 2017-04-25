@@ -117,7 +117,7 @@ func DiffLocks(l1 Lock, l2 Lock) *LockDiff {
 				i2next = i2 + 1 // Don't evaluate to this again
 				continue        // Keep looking for a matching project
 			case -1: // Project has been removed, handled below
-				break
+				continue
 			}
 
 			break // Done evaluating this project, move onto the next
@@ -228,7 +228,7 @@ func DiffProjects(lp1 LockedProject, lp2 LockedProject) *LockedProjectDiff {
 				i2next = i2 + 1 // Don't evaluate to this again
 				continue        // Keep looking for a match
 			case -1: // Package has been removed (handled below)
-				break
+				continue
 			}
 
 			break // Done evaluating this package, move onto the next

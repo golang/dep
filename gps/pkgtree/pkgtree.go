@@ -444,7 +444,9 @@ func (t PackageTree) ToReachMap(main, tests, backprop bool, ignore map[string]bo
 			continue
 		}
 
-		imps = imps[:0]
+		// TODO (kris-nova) Disable to get staticcheck passing
+		//imps = imps[:0]
+
 		if tests {
 			imps = dedupeStrings(p.Imports, p.TestImports)
 		} else {
