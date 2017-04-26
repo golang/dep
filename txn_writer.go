@@ -296,7 +296,7 @@ func (sw *SafeWriter) Write(root string, sm gps.SourceManager) error {
 
 	// Ensure vendor/.git is preserved if present
 	if hasDotGit(vpath) {
-		err = os.Rename(filepath.Join(vpath, ".git"), filepath.Join(td, "vendor/.git"))
+		err = renameWithFallback(filepath.Join(vpath, ".git"), filepath.Join(td, "vendor/.git"))
 		if _, ok := err.(*os.LinkError); ok {
 			return errors.Wrap(err, "failed to preserve vendor/.git")
 		}
@@ -538,10 +538,7 @@ func deleteDirs(toDelete []string) error {
 func hasDotGit(path string) bool {
 	gitfilepath := filepath.Join(path, ".git")
 	_, err := os.Stat(gitfilepath)
-	if err != nil {
-		return false
-	}
-	return true
+	return err == nil
 }
 
 type byLen []string
