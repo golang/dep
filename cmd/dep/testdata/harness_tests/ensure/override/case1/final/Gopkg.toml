@@ -2,3 +2,47 @@
 [[overrides]]
   name = "github.com/sdboyer/deptest"
   version = "1.0.0"
+
+## Dependencies define constraints on how dependent projects should be
+## incorporated into Gopkg.lock. They are respected by dep whether
+## this project is the current project, or if it's a dependency.
+# [[dependencies]]
+## Required: the root import path of the project being constrained
+# name = "github.com/user/project"
+## Optional: an alternate location (URL or import path) for the project's source
+# source = "https://github.com/myfork/package.git"
+## Optional, but recommended: the version constraint to enforce for the project.
+## Only one of "branch", "version" or "revision" can be specified.
+# version = "1.0.0"
+# branch = "master"
+## Note: revision will depend on your repository type; git and hg have SHA1s,
+## bzr a 3-part id, svn a revision number.
+# revision = "abc123"
+
+## Overrides have the same structure as [[dependencies]], but supercede all
+## [[dependencies]] declarations from all projects. However, only the current
+## project's overrides will apply.
+##
+## Overrides are a sledgehammer, and should be used only as a last resort.
+# [[overrides]]
+## Required: the root import path of the project being constrained
+# name = "github.com/user/project"
+## Optional: an alternate location (URL or import path) for the project's source
+# source = "https://github.com/myfork/package.git"
+## Optional, but recommended: the version constraint to enforce for the project.
+## Only one of "branch", "version" or "revision" can be specified.
+# version = "1.0.0"
+# branch = "master"
+## Note: revision will depend on your repository type; git and hg have SHA1s,
+## bzr a 3-part id, svn a revision number.
+# revision = "abc123"
+
+## "required" lists a set of packages (not projects) that must be included in
+## Gopkg.lock. This has the same effect as directly importing a package, but
+## can be used to require "main" packages.
+# required = ["github.com/user/thing/cmd/thing"]
+
+## "ignored" lists a set of packages (not projects) that are ignored when
+## dep statically analyzes source code. Ignored packages can be in this project,
+## or in a dependency.
+# ignored = ["github.com/user/project/badpkg"]
