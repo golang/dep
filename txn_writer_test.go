@@ -5,6 +5,8 @@
 package dep
 
 import (
+	"io/ioutil"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -520,5 +522,19 @@ func TestSafeWriter_DiffLocks(t *testing.T) {
 	goldenOutput := "txn_writer/expected_diff_output.txt"
 	if err = pc.ShouldMatchGolden(goldenOutput, output); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestHasDotGit(t *testing.T) {
+	// Create a tempdir with .git file
+	td, err := ioutil.TempDir(os.TempDir(), "dotGitFile")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(td)
+
+	os.OpenFile(td+string(filepath.Separator)+".git", os.O_CREATE, 0777)
+	if !hasDotGit(td) {
+		t.Fatal("Expected hasDotGit to find .git")
 	}
 }
