@@ -21,15 +21,50 @@ import (
 // Example string to be written to the manifest file
 // if no dependencies are found in the project
 // during `dep init`
-const exampleToml = `
-# Example:
+const exampleTOML = `
+## Dependencies define constraints on how dependent projects should be
+## incorporated into Gopkg.lock. They are respected by dep whether
+## this project is the current project, or if it's a dependency.
 # [[dependencies]]
+## Required: the root import path of the project being constrained
+# name = "github.com/user/project"
+## Optional: an alternate location (URL or import path) for the project's source
 # source = "https://github.com/myfork/package.git"
-# branch = "master"
-# name = "github.com/vendor/package"
-# Note: revision will depend on your repository type, i.e git, svc, bzr etc...
-# revision = "abc123"
+## Optional, but recommended: the version constraint to enforce for the project.
+## Only one of "branch", "version" or "revision" can be specified.
 # version = "1.0.0"
+# branch = "master"
+## Note: revision will depend on your repository type; git and hg have SHA1s,
+## bzr a 3-part id, svn a revision number.
+# revision = "abc123"
+
+## Overrides have the same structure as [[dependencies]], but supercede all
+## [[dependencies]] declarations from all projects. However, only the current
+## project's overrides will apply.
+##
+## Overrides are a sledgehammer, and should be used only as a last resort.
+# [[overrides]]
+## Required: the root import path of the project being constrained
+# name = "github.com/user/project"
+## Optional: an alternate location (URL or import path) for the project's source
+# source = "https://github.com/myfork/package.git"
+## Optional, but recommended: the version constraint to enforce for the project.
+## Only one of "branch", "version" or "revision" can be specified.
+# version = "1.0.0"
+# branch = "master"
+## Note: revision will depend on your repository type; git and hg have SHA1s,
+## bzr a 3-part id, svn a revision number.
+# revision = "abc123"
+
+## "required" lists a set of packages (not projects) that must be included in
+## Gopkg.lock. This has the same effect as directly importing a package, but
+## can be used to require "main" packages.
+# required = ["github.com/user/thing/cmd/thing"]
+
+## "ignored" lists a set of packages (not projects) that are ignored when
+## dep statically analyzes source code. Ignored packages can be in this project,
+## or in a dependency.
+# ignored = ["github.com/user/project/badpkg"]
 `
 
 // SafeWriter transactionalizes writes of manifest, lock, and vendor dir, both
@@ -271,12 +306,16 @@ func (sw *SafeWriter) Write(root string, sm gps.SourceManager) error {
 	defer os.RemoveAll(td)
 
 	if sw.Payload.HasManifest() {
-		if sw.Payload.Manifest.IsEmpty() {
-			err := modifyWithString(filepath.Join(td, ManifestName), exampleToml)
-			if err != nil {
-				return errors.Wrap(err, "failed to generate example text")
-			}
-		} else if err := writeFile(filepath.Join(td, ManifestName), sw.Payload.Manifest); err != nil {
+		// Always write the example text to the bottom of the TOML file.
+		examples := []byte(exampleTOML)
+		tb, err := sw.Payload.Manifest.MarshalTOML()
+		if err != nil {
+			return errors.Wrap(err, "failed to marshal manifest to TOML")
+		}
+
+		// 0666 is before umask; mirrors behavior of os.Create (used by
+		// writeFile())
+		if err = ioutil.WriteFile(filepath.Join(td, ManifestName), append(tb, examples...), 0666); err != nil {
 			return errors.Wrap(err, "failed to write manifest file to temp dir")
 		}
 	}
