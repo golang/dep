@@ -12,6 +12,7 @@ import (
 
 	"github.com/Masterminds/vcs"
 	"github.com/golang/dep/gps"
+	"github.com/golang/dep/internal"
 	"github.com/pkg/errors"
 )
 
@@ -37,7 +38,7 @@ func NewContext() (*Ctx, error) {
 	for _, gp := range filepath.SplitList(buildContext.GOPATH) {
 		gp = filepath.FromSlash(gp)
 
-		if filepath.HasPrefix(wd, gp) {
+		if internal.HasFilepathPrefix(wd, gp) {
 			ctx.GOPATH = gp
 		}
 
@@ -164,7 +165,7 @@ func (c *Ctx) resolveProjectRoot(path string) (string, error) {
 	// Determine if the symlink is within any of the GOPATHs, in which case we're not
 	// sure how to resolve it.
 	for _, gp := range c.GOPATHS {
-		if filepath.HasPrefix(path, gp) {
+		if internal.HasFilepathPrefix(path, gp) {
 			return "", errors.Errorf("'%s' is linked to another path within a GOPATH (%s)", path, gp)
 		}
 	}
@@ -179,7 +180,7 @@ func (c *Ctx) resolveProjectRoot(path string) (string, error) {
 // The second returned string indicates which GOPATH value was used.
 func (c *Ctx) SplitAbsoluteProjectRoot(path string) (string, error) {
 	srcprefix := filepath.Join(c.GOPATH, "src") + string(filepath.Separator)
-	if filepath.HasPrefix(path, srcprefix) {
+	if internal.HasFilepathPrefix(path, srcprefix) {
 		// filepath.ToSlash because we're dealing with an import path now,
 		// not an fs path
 		return filepath.ToSlash(path[len(srcprefix):]), nil
