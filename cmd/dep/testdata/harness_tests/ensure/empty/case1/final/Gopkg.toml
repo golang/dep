@@ -1,0 +1,9 @@
+
+# Example:
+# [[dependencies]]
+# source = "https://github.com/myfork/package.git"
+# branch = "master"
+# name = "github.com/vendor/package"
+# Note: revision will depend on your repository type, i.e git, svc, bzr etc...
+# revision = "abc123"
+# version = "1.0.0"
