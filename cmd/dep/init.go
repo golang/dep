@@ -44,7 +44,7 @@ func (cmd *initCommand) Register(fs *flag.FlagSet) {}
 type initCommand struct{}
 
 func trimPathPrefix(p1, p2 string) string {
-	if filepath.HasPrefix(p1, p2) {
+	if internal.HasFilepathPrefix(p1, p2) {
 		return p1[len(p2):]
 	}
 	return p1
