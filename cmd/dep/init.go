@@ -139,32 +139,30 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 		)
 	}
 
-	if len(pd.notondisk) > 0 {
-		internal.Vlogf("Solving...")
-		params := gps.SolveParameters{
-			RootDir:         root,
-			RootPackageTree: pkgT,
-			Manifest:        m,
-			Lock:            l,
-			ProjectAnalyzer: dep.Analyzer{},
-		}
-
-		if *verbose {
-			params.Trace = true
-			params.TraceLogger = log.New(os.Stderr, "", 0)
-		}
-		s, err := gps.Prepare(params, sm)
-		if err != nil {
-			return errors.Wrap(err, "prepare solver")
-		}
-
-		soln, err := s.Solve()
-		if err != nil {
-			handleAllTheFailuresOfTheWorld(err)
-			return err
-		}
-		l = dep.LockFromInterface(soln)
+	internal.Vlogf("Solving...")
+	params := gps.SolveParameters{
+		RootDir:         root,
+		RootPackageTree: pkgT,
+		Manifest:        m,
+		Lock:            l,
+		ProjectAnalyzer: dep.Analyzer{},
 	}
+
+	if *verbose {
+		params.Trace = true
+		params.TraceLogger = log.New(os.Stderr, "", 0)
+	}
+	s, err := gps.Prepare(params, sm)
+	if err != nil {
+		return errors.Wrap(err, "prepare solver")
+	}
+
+	soln, err := s.Solve()
+	if err != nil {
+		handleAllTheFailuresOfTheWorld(err)
+		return err
+	}
+	l = dep.LockFromInterface(soln)
 
 	internal.Vlogf("Writing manifest and lock files.")
 
@@ -262,8 +260,8 @@ func getProjectData(ctx *dep.Ctx, pkgT pkgtree.PackageTree, cpr string, sm *gps.
 		v, err := ctx.VersionInWorkspace(pr)
 		if err != nil {
 			notondisk[pr] = true
-			internal.Vlogf("Could not determine version for %q, omitting from generated manifest", pr)
-			continue
+			internal.Vlogf("Could not determine version for %q, assuming version to be master", pr)
+			v = gps.Revision("master")
 		}
 
 		ondisk[pr] = v
