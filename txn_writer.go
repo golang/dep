@@ -294,6 +294,14 @@ func (sw *SafeWriter) Write(root string, sm gps.SourceManager) error {
 		}
 	}
 
+	// Ensure vendor/.git is preserved if present
+	if hasDotGit(vpath) {
+		err = renameWithFallback(filepath.Join(vpath, ".git"), filepath.Join(td, "vendor/.git"))
+		if _, ok := err.(*os.LinkError); ok {
+			return errors.Wrap(err, "failed to preserve vendor/.git")
+		}
+	}
+
 	// Move the existing files and dirs to the temp dir while we put the new
 	// ones in, to provide insurance against errors for as long as possible.
 	type pathpair struct {
@@ -524,6 +532,13 @@ func deleteDirs(toDelete []string) error {
 		}
 	}
 	return nil
+}
+
+// hasDotGit checks if a given path has .git file or directory in it.
+func hasDotGit(path string) bool {
+	gitfilepath := filepath.Join(path, ".git")
+	_, err := os.Stat(gitfilepath)
+	return err == nil
 }
 
 type byLen []string

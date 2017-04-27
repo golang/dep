@@ -5,6 +5,8 @@
 package dep
 
 import (
+	"io/ioutil"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -519,6 +521,70 @@ func TestSafeWriter_DiffLocks(t *testing.T) {
 	h.Must(err)
 	goldenOutput := "txn_writer/expected_diff_output.txt"
 	if err = pc.ShouldMatchGolden(goldenOutput, output); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestHasDotGit(t *testing.T) {
+	// Create a tempdir with .git file
+	td, err := ioutil.TempDir(os.TempDir(), "dotGitFile")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(td)
+
+	os.OpenFile(td+string(filepath.Separator)+".git", os.O_CREATE, 0777)
+	if !hasDotGit(td) {
+		t.Fatal("Expected hasDotGit to find .git")
+	}
+}
+
+func TestSafeWriter_VendorDotGitPreservedWithForceVendor(t *testing.T) {
+	h := test.NewHelper(t)
+	defer h.Cleanup()
+
+	pc := NewTestProjectContext(h, safeWriterProject)
+	defer pc.Release()
+
+	gitDirPath := filepath.Join(pc.Project.AbsRoot, "vendor", ".git")
+	os.MkdirAll(gitDirPath, 0777)
+	dummyFile := filepath.Join("vendor", ".git", "badinput_fileroot")
+	pc.CopyFile(dummyFile, "txn_writer/badinput_fileroot")
+	pc.CopyFile(ManifestName, safeWriterGoldenManifest)
+	pc.CopyFile(LockName, safeWriterGoldenLock)
+	pc.Load()
+
+	var sw SafeWriter
+	sw.Prepare(pc.Project.Manifest, pc.Project.Lock, pc.Project.Lock, VendorAlways)
+
+	// Verify prepared actions
+	if !sw.Payload.HasManifest() {
+		t.Fatal("Expected the payload to contain the manifest")
+	}
+	if !sw.Payload.HasLock() {
+		t.Fatal("Expected the payload to contain the lock")
+	}
+	if !sw.Payload.HasVendor() {
+		t.Fatal("Expected the payload to contain the vendor directory")
+	}
+
+	err := sw.Write(pc.Project.AbsRoot, pc.SourceManager)
+	h.Must(errors.Wrap(err, "SafeWriter.Write failed"))
+
+	// Verify file system changes
+	if err := pc.ManifestShouldMatchGolden(safeWriterGoldenManifest); err != nil {
+		t.Fatal(err)
+	}
+	if err := pc.LockShouldMatchGolden(safeWriterGoldenLock); err != nil {
+		t.Fatal(err)
+	}
+	if err := pc.VendorShouldExist(); err != nil {
+		t.Fatal(err)
+	}
+	if err := pc.VendorFileShouldExist("github.com/sdboyer/dep-test"); err != nil {
+		t.Fatal(err)
+	}
+	if err := pc.VendorFileShouldExist(".git/badinput_fileroot"); err != nil {
 		t.Fatal(err)
 	}
 }
