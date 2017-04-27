@@ -17,7 +17,7 @@ Summarize the question and quote the reply, linking back to the original comment
 * [Why did dep use a different revision for package X instead of the revision in the lock file?](#why-did-dep-use-a-different-revision-for-package-x-instead-of-the-revision-in-the-lock-file)
 
 ## What is a direct or transitive dependency?
-* Direct dependencies appear in at least one import statement from your project - are dependencies that are imported by your project.
+* Direct dependencies are dependencies that are imported directly by your project: they appear in at least one import statement from your project.
 * Transitive dependencies are the dependencies of your dependencies. Necessary to compile but are not directly used by your code.
 
 ## Should I commit my vendor directory?
