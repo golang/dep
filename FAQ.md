@@ -22,11 +22,17 @@ Summarize the question and quote the reply, linking back to the original comment
 
 ## Should I commit my vendor directory?
 
-Committing the vendor directory is totally up to you. There is no general advice that applies in all cases.
+It's up to you:
 
-**Pros**: it's the only way to get truly reproducible builds, as it guards against upstream renames and deletes; and you don't need an extra `dep ensure` step on fresh clones to build your repo.
+**Pros**
 
-**Cons**: your repo will be bigger, potentially a lot bigger; and PR diffs are more annoying.
+- it's the only way to get truly reproducible builds, as it guards against upstream renames and deletes
+- you don't need an extra `dep ensure` step (to fetch dependencies) on fresh clones to build your repo
+
+**Cons**
+
+- your repo will be bigger, potentially a lot bigger
+- PR diffs are more annoying
 
 ## Why is it `dep ensure` instead of `dep install`?
 
