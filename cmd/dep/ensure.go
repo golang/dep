@@ -27,7 +27,7 @@ const ensureLongHelp = `
 Ensure is used to fetch project dependencies into the vendor folder, as well as
 to set version constraints for specific dependencies. It takes user input,
 solves the updated dependency graph of the project, writes any changes to the
-manifest and lock file, and places dependencies in the vendor folder.
+lock file, and places dependencies in the vendor folder.
 
 Package spec:
 
@@ -163,13 +163,8 @@ func (cmd *ensureCommand) Run(ctx *dep.Ctx, args []string) error {
 	}
 
 	var sw dep.SafeWriter
-	var manifest *dep.Manifest
-	if !cmd.update {
-		manifest = p.Manifest
-	}
-
 	newLock := dep.LockFromInterface(solution)
-	sw.Prepare(manifest, p.Lock, newLock, writeV)
+	sw.Prepare(nil, p.Lock, newLock, writeV)
 	if cmd.dryRun {
 		return sw.PrintPreparedActions()
 	}
