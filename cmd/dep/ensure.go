@@ -93,13 +93,15 @@ func (cmd *ensureCommand) Register(fs *flag.FlagSet) {
 	fs.BoolVar(&cmd.update, "update", false, "ensure dependencies are at the latest version allowed by the manifest")
 	fs.BoolVar(&cmd.dryRun, "n", false, "dry run, don't actually ensure anything")
 	fs.Var(&cmd.overrides, "override", "specify an override constraint spec (repeatable)")
+	fs.BoolVar(&cmd.noExamples, "no-examples", false, "don't include example in Gopkg.toml")
 }
 
 type ensureCommand struct {
-	examples  bool
-	update    bool
-	dryRun    bool
-	overrides stringSlice
+	examples   bool
+	update     bool
+	dryRun     bool
+	overrides  stringSlice
+	noExamples bool
 }
 
 func (cmd *ensureCommand) Run(ctx *dep.Ctx, args []string) error {
@@ -172,7 +174,7 @@ func (cmd *ensureCommand) Run(ctx *dep.Ctx, args []string) error {
 		return sw.PrintPreparedActions()
 	}
 
-	return errors.Wrap(sw.Write(p.AbsRoot, sm), "grouped write of manifest, lock and vendor")
+	return errors.Wrap(sw.Write(p.AbsRoot, sm, cmd.noExamples), "grouped write of manifest, lock and vendor")
 }
 
 func applyUpdateArgs(args []string, params *gps.SolveParameters) {
