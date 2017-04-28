@@ -320,12 +320,17 @@ func (sw *SafeWriter) Write(root string, sm gps.SourceManager, noExamples bool) 
 			return errors.Wrap(err, "failed to marshal manifest to TOML")
 		}
 
+		initOutput := ""
+
+		// If examples are NOT disabled, use the example text
 		if !noExamples {
-			// 0666 is before umask; mirrors behavior of os.Create (used by
-			// writeFile())
-			if err = ioutil.WriteFile(filepath.Join(td, ManifestName), append([]byte(exampleTOML), tb...), 0666); err != nil {
-				return errors.Wrap(err, "failed to write manifest file to temp dir")
-			}
+			initOutput = exampleTOML
+		}
+
+		// 0666 is before umask; mirrors behavior of os.Create (used by
+		// writeFile())
+		if err = ioutil.WriteFile(filepath.Join(td, ManifestName), append([]byte(initOutput), tb...), 0666); err != nil {
+			return errors.Wrap(err, "failed to write manifest file to temp dir")
 		}
 	}
 

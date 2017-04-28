@@ -35,7 +35,6 @@ func (cmd *removeCommand) Register(fs *flag.FlagSet) {
 	fs.BoolVar(&cmd.unused, "unused", false, "remove all dependencies that aren't imported by the project")
 	fs.BoolVar(&cmd.force, "force", false, "remove the given dependencies even if they are imported by the project")
 	fs.BoolVar(&cmd.keepSource, "keep-source", false, "don't remove source code")
-	fs.BoolVar(&cmd.noExamples, "no-examples", false, "don't include example in Gopkg.toml")
 }
 
 type removeCommand struct {
@@ -43,7 +42,6 @@ type removeCommand struct {
 	unused     bool
 	force      bool
 	keepSource bool
-	noExamples bool
 }
 
 func (cmd *removeCommand) Run(ctx *dep.Ctx, args []string) error {
@@ -184,13 +182,9 @@ func (cmd *removeCommand) Run(ctx *dep.Ctx, args []string) error {
 
 	var sw dep.SafeWriter
 	newLock := dep.LockFromInterface(soln)
-<<<<<<< HEAD
-	sw.Prepare(p.Manifest, p.Lock, newLock, dep.VendorOnChanged)
-	if err := sw.Write(p.AbsRoot, sm, cmd.noExamples); err != nil {
-=======
+
 	sw.Prepare(nil, p.Lock, newLock, dep.VendorOnChanged)
-	if err := sw.Write(p.AbsRoot, sm); err != nil {
->>>>>>> 84595e3ac9faae88b7ef37d66cc06e6c09758e30
+	if err := sw.Write(p.AbsRoot, sm, true); err != nil {
 		return errors.Wrap(err, "grouped write of manifest, lock and vendor")
 	}
 	return nil
