@@ -1,0 +1,7 @@
+coverage:
+  ignore:
+  - gps/remove_go16.go
+  - gps/remove_go17.go
+  - gps/solve_failures.go
+  - gps/typed_radix.go
+  - gps/discovery.go # copied from stdlib, don't need to test
