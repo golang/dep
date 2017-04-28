@@ -1,0 +1,30 @@
+---
+language: go
+sudo: false
+notifications:
+  email: false
+matrix:
+  include:
+    - os: linux
+      go: 1.7.x
+    - os: linux
+      go: 1.8.x
+    - os: linux
+      go: tip
+    - os: osx
+      go: 1.8.x
+install:
+  - echo "This is an override of the default install deps step in travis."
+before_script:
+  - PKGS=$(go list ./... | grep -v /vendor/)
+  - go get -v honnef.co/go/tools/cmd/{gosimple,staticcheck}
+script:
+  - go build -v ./cmd/dep
+  - go vet $PKGS
+  - staticcheck $PKGS
+  - gosimple $PKGS
+  - test -z "$(gofmt -s -l . 2>&1 | grep -v vendor/ | tee /dev/stderr)"
+  - go test -race $PKGS
+  - go build ./hack/licenseok
+  - find . -path ./vendor -prune -o -type f -name "*.go" -printf '%P\n' | xargs ./licenseok
+  - ./hack/validate-vendor.bash

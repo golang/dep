@@ -1,0 +1,5 @@
+ignored = ["github.com/sdboyer/deptestdos"]
+
+[[dependencies]]
+  branch = "master"
+  name = "github.com/sdboyer/deptest"
