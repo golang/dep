@@ -23,7 +23,7 @@ func (a Analyzer) DeriveManifestAndLock(path string, n gps.ProjectRoot) (gps.Man
 	}
 	f, err := os.Open(mf)
 	if err != nil {
-		return nil, nil, nil
+		return nil, nil, err
 	}
 	defer f.Close()
 
