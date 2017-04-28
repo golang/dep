@@ -22,29 +22,26 @@ import (
 // if no dependencies are found in the project
 // during `dep init`
 const exampleTOML = `
-## EXAMPLE (these lines may be deleted)
-#
+## Gopkg.toml example (these lines may be deleted)
+
 ## "required" lists a set of packages (not projects) that must be included in
 ## Gopkg.lock. This list is merged with the set of packages imported by the current
 ## project. Use it when your project needs a package it doesn't explicitly import -
 ## including "main" packages.
 # required = ["github.com/user/thing/cmd/thing"]
-#
-#
+
 ## "ignored" lists a set of packages (not projects) that are ignored when
 ## dep statically analyzes source code. Ignored packages can be in this project,
 ## or in a dependency.
 # ignored = ["github.com/user/project/badpkg"]
-#
-#
-# [[dependencies]]
+
 ## Dependencies define constraints on dependent projects. They are respected by
 ## dep whether coming from the Gopkg.toml of the current project or a dependency.
-#
+# [[dependencies]]
 ## Required: the root import path of the project being constrained.
 # name = "github.com/user/project"
 #
-## Optional, but recommended: the version constraint to enforce for the project.
+## Recommended: the version constraint to enforce for the project.
 ## Only one of "branch", "version" or "revision" can be specified.
 # version = "1.0.0"
 # branch = "master"
@@ -52,15 +49,13 @@ const exampleTOML = `
 #
 ## Optional: an alternate location (URL or import path) for the project's source.
 # source = "https://github.com/myfork/package.git"
-#
-#
-# [[overrides]]
+
 ## Overrides have the same structure as [[dependencies]], but supercede all
 ## [[dependencies]] declarations from all projects. Only the current project's
 ## [[overrides]] are applied.
 ##
 ## Overrides are a sledgehammer. Use them only as a last resort.
-#
+# [[overrides]]
 ## Required: the root import path of the project being constrained.
 # name = "github.com/user/project"
 #
