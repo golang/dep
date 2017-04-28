@@ -139,25 +139,28 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 		)
 	}
 
+	// Run solver with project versions found on disk
 	internal.Vlogf("Solving...")
-	params := gps.SolveParameters{
-		RootDir:         root,
-		RootPackageTree: pkgT,
-		Manifest:        m,
-		Lock:            l,
-		ProjectAnalyzer: dep.Analyzer{},
-	}
-
-	if *verbose {
-		params.Trace = true
-		params.TraceLogger = log.New(os.Stderr, "", 0)
-	}
-	s, err := gps.Prepare(params, sm)
+	soln, err := getSolverSolution(root, pkgT, m, l, sm)
 	if err != nil {
-		return errors.Wrap(err, "prepare solver")
+		handleAllTheFailuresOfTheWorld(err)
+		return err
+	}
+	l = dep.LockFromInterface(soln)
+
+	// Pick notondisk project constraints from solution and add to manifest
+	for k, _ := range pd.notondisk {
+		for _, x := range l.Projects() {
+			if k == x.Ident().ProjectRoot {
+				m.Dependencies[k] = getProjectPropertiesFromVersion(x.Version())
+				break
+			}
+		}
 	}
 
-	soln, err := s.Solve()
+	// Run solver again with appropriate constraint solutions from previous run
+	// to generate the final lock.
+	soln, err = getSolverSolution(root, pkgT, m, l, sm)
 	if err != nil {
 		handleAllTheFailuresOfTheWorld(err)
 		return err
@@ -211,6 +214,43 @@ func hasImportPathPrefix(s, prefix string) bool {
 	return strings.HasPrefix(s, prefix+"/")
 }
 
+// getProjectPropertiesFromVersion takes a gps.Version and returns a proper
+// gps.ProjectProperties with Constraint value based on the version type.
+func getProjectPropertiesFromVersion(v gps.Version) gps.ProjectProperties {
+	pp := gps.ProjectProperties{}
+	switch v.Type() {
+	case gps.IsBranch, gps.IsVersion, gps.IsRevision:
+		pp.Constraint = v
+	case gps.IsSemver:
+		c, _ := gps.NewSemverConstraint("^" + v.String())
+		pp.Constraint = c
+	}
+
+	return pp
+}
+
+// getSolverSolution runs gps solver and returns a solution.
+func getSolverSolution(root string, pkgT pkgtree.PackageTree, m *dep.Manifest, l *dep.Lock, sm *gps.SourceMgr) (gps.Solution, error) {
+	params := gps.SolveParameters{
+		RootDir:         root,
+		RootPackageTree: pkgT,
+		Manifest:        m,
+		Lock:            l,
+		ProjectAnalyzer: dep.Analyzer{},
+	}
+
+	if *verbose {
+		params.Trace = true
+		params.TraceLogger = log.New(os.Stderr, "", 0)
+	}
+	s, err := gps.Prepare(params, sm)
+	if err != nil {
+		return nil, errors.Wrap(err, "prepare solver")
+	}
+
+	return s.Solve()
+}
+
 type projectData struct {
 	constraints  gps.ProjectConstraints          // constraints that could be found
 	dependencies map[gps.ProjectRoot][]string    // all dependencies (imports) found by project root
@@ -260,21 +300,12 @@ func getProjectData(ctx *dep.Ctx, pkgT pkgtree.PackageTree, cpr string, sm *gps.
 		v, err := ctx.VersionInWorkspace(pr)
 		if err != nil {
 			notondisk[pr] = true
-			internal.Vlogf("Could not determine version for %q, assuming version to be master", pr)
-			v = gps.Revision("master")
+			internal.Vlogf("Could not determine version for %q, omitting from generated manifest", pr)
+			continue
 		}
 
 		ondisk[pr] = v
-		pp := gps.ProjectProperties{}
-		switch v.Type() {
-		case gps.IsBranch, gps.IsVersion, gps.IsRevision:
-			pp.Constraint = v
-		case gps.IsSemver:
-			c, _ := gps.NewSemverConstraint("^" + v.String())
-			pp.Constraint = c
-		}
-
-		constraints[pr] = pp
+		constraints[pr] = getProjectPropertiesFromVersion(v)
 	}
 
 	internal.Vlogf("Analyzing transitive imports...")
