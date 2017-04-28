@@ -50,7 +50,3 @@
 # source = "https://github.com/myfork/package.git"
 
 
-
-[[overrides]]
-  name = "github.com/sdboyer/deptest"
-  version = "1.0.0"

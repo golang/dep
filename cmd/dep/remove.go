@@ -19,7 +19,7 @@ import (
 
 const removeShortHelp = `Remove a dependency from the project`
 const removeLongHelp = `
-Remove a dependency from the project's manifest file, lock file, and vendor
+Remove a dependency from the project's lock file, and vendor
 folder. If the project includes that dependency in its import graph, remove will
 fail unless -force is specified.
 `
@@ -184,8 +184,13 @@ func (cmd *removeCommand) Run(ctx *dep.Ctx, args []string) error {
 
 	var sw dep.SafeWriter
 	newLock := dep.LockFromInterface(soln)
+<<<<<<< HEAD
 	sw.Prepare(p.Manifest, p.Lock, newLock, dep.VendorOnChanged)
 	if err := sw.Write(p.AbsRoot, sm, cmd.noExamples); err != nil {
+=======
+	sw.Prepare(nil, p.Lock, newLock, dep.VendorOnChanged)
+	if err := sw.Write(p.AbsRoot, sm); err != nil {
+>>>>>>> 84595e3ac9faae88b7ef37d66cc06e6c09758e30
 		return errors.Wrap(err, "grouped write of manifest, lock and vendor")
 	}
 	return nil
