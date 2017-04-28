@@ -28,7 +28,7 @@ func TestSafeWriter_BadInput_MissingRoot(t *testing.T) {
 	var sw SafeWriter
 	sw.Prepare(nil, nil, nil, VendorOnChanged)
 
-	err := sw.Write("", pc.SourceManager)
+	err := sw.Write("", pc.SourceManager, false)
 
 	if err == nil {
 		t.Fatal("should have errored without a root path, but did not")
@@ -48,7 +48,7 @@ func TestSafeWriter_BadInput_MissingSourceManager(t *testing.T) {
 	var sw SafeWriter
 	sw.Prepare(nil, nil, pc.Project.Lock, VendorAlways)
 
-	err := sw.Write(pc.Project.AbsRoot, nil)
+	err := sw.Write(pc.Project.AbsRoot, nil, false)
 
 	if err == nil {
 		t.Fatal("should have errored without a source manager when forceVendor is true, but did not")
@@ -101,7 +101,7 @@ func TestSafeWriter_BadInput_NonexistentRoot(t *testing.T) {
 	sw.Prepare(nil, nil, nil, VendorOnChanged)
 
 	missingroot := filepath.Join(pc.Project.AbsRoot, "nonexistent")
-	err := sw.Write(missingroot, pc.SourceManager)
+	err := sw.Write(missingroot, pc.SourceManager, false)
 
 	if err == nil {
 		t.Fatal("should have errored with nonexistent dir for root path, but did not")
@@ -120,7 +120,7 @@ func TestSafeWriter_BadInput_RootIsFile(t *testing.T) {
 	sw.Prepare(nil, nil, nil, VendorOnChanged)
 
 	fileroot := pc.CopyFile("fileroot", "txn_writer/badinput_fileroot")
-	err := sw.Write(fileroot, pc.SourceManager)
+	err := sw.Write(fileroot, pc.SourceManager, false)
 
 	if err == nil {
 		t.Fatal("should have errored when root path is a file, but did not")
@@ -156,7 +156,7 @@ func TestSafeWriter_Manifest(t *testing.T) {
 	}
 
 	// Write changes
-	err := sw.Write(pc.Project.AbsRoot, pc.SourceManager)
+	err := sw.Write(pc.Project.AbsRoot, pc.SourceManager, false)
 	h.Must(errors.Wrap(err, "SafeWriter.Write failed"))
 
 	// Verify file system changes
@@ -199,7 +199,7 @@ func TestSafeWriter_ManifestAndUnmodifiedLock(t *testing.T) {
 	}
 
 	// Write changes
-	err := sw.Write(pc.Project.AbsRoot, pc.SourceManager)
+	err := sw.Write(pc.Project.AbsRoot, pc.SourceManager, false)
 	h.Must(errors.Wrap(err, "SafeWriter.Write failed"))
 
 	// Verify file system changes
@@ -242,7 +242,7 @@ func TestSafeWriter_ManifestAndUnmodifiedLockWithForceVendor(t *testing.T) {
 	}
 
 	// Write changes
-	err := sw.Write(pc.Project.AbsRoot, pc.SourceManager)
+	err := sw.Write(pc.Project.AbsRoot, pc.SourceManager, false)
 	h.Must(errors.Wrap(err, "SafeWriter.Write failed"))
 
 	// Verify file system changes
@@ -290,7 +290,7 @@ func TestSafeWriter_ModifiedLock(t *testing.T) {
 	}
 
 	// Write changes
-	err := sw.Write(pc.Project.AbsRoot, pc.SourceManager)
+	err := sw.Write(pc.Project.AbsRoot, pc.SourceManager, false)
 	h.Must(errors.Wrap(err, "SafeWriter.Write failed"))
 
 	// Verify file system changes
@@ -338,7 +338,7 @@ func TestSafeWriter_ModifiedLockSkipVendor(t *testing.T) {
 	}
 
 	// Write changes
-	err := sw.Write(pc.Project.AbsRoot, pc.SourceManager)
+	err := sw.Write(pc.Project.AbsRoot, pc.SourceManager, false)
 	h.Must(errors.Wrap(err, "SafeWriter.Write failed"))
 
 	// Verify file system changes
@@ -368,7 +368,7 @@ func TestSafeWriter_ForceVendorWhenVendorAlreadyExists(t *testing.T) {
 	var sw SafeWriter
 	// Populate vendor
 	sw.Prepare(nil, pc.Project.Lock, pc.Project.Lock, VendorAlways)
-	err := sw.Write(pc.Project.AbsRoot, pc.SourceManager)
+	err := sw.Write(pc.Project.AbsRoot, pc.SourceManager, false)
 	h.Must(errors.Wrap(err, "SafeWriter.Write failed"))
 
 	// Verify prepared actions
@@ -383,7 +383,7 @@ func TestSafeWriter_ForceVendorWhenVendorAlreadyExists(t *testing.T) {
 		t.Fatal("Expected the payload to contain the vendor directory ")
 	}
 
-	err = sw.Write(pc.Project.AbsRoot, pc.SourceManager)
+	err = sw.Write(pc.Project.AbsRoot, pc.SourceManager, false)
 	h.Must(errors.Wrap(err, "SafeWriter.Write failed"))
 
 	// Verify file system changes
@@ -431,7 +431,7 @@ func TestSafeWriter_NewLock(t *testing.T) {
 	}
 
 	// Write changes
-	err = sw.Write(pc.Project.AbsRoot, pc.SourceManager)
+	err = sw.Write(pc.Project.AbsRoot, pc.SourceManager, false)
 	h.Must(errors.Wrap(err, "SafeWriter.Write failed"))
 
 	// Verify file system changes
@@ -476,7 +476,7 @@ func TestSafeWriter_NewLockSkipVendor(t *testing.T) {
 	}
 
 	// Write changes
-	err = sw.Write(pc.Project.AbsRoot, pc.SourceManager)
+	err = sw.Write(pc.Project.AbsRoot, pc.SourceManager, false)
 	h.Must(errors.Wrap(err, "SafeWriter.Write failed"))
 
 	// Verify file system changes
@@ -568,7 +568,7 @@ func TestSafeWriter_VendorDotGitPreservedWithForceVendor(t *testing.T) {
 		t.Fatal("Expected the payload to contain the vendor directory")
 	}
 
-	err := sw.Write(pc.Project.AbsRoot, pc.SourceManager)
+	err := sw.Write(pc.Project.AbsRoot, pc.SourceManager, false)
 	h.Must(errors.Wrap(err, "SafeWriter.Write failed"))
 
 	// Verify file system changes
