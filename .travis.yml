@@ -24,7 +24,9 @@ script:
   - staticcheck $PKGS
   - gosimple $PKGS
   - test -z "$(gofmt -s -l . 2>&1 | grep -v vendor/ | tee /dev/stderr)"
-  - go test -race $PKGS
+  - for pkg in $PKGS; do go test -race -coverprofile=profile.out -covermode=atomic $pkg; if [ -f profile.out ]; then cat profile.out >> coverage.txt; rm profile.out; fi; done
   - go build ./hack/licenseok
   - find . -path ./vendor -prune -o -type f -name "*.go" -printf '%P\n' | xargs ./licenseok
   - ./hack/validate-vendor.bash
+after_success:
+  - bash <(curl -s https://codecov.io/bash)

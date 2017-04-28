@@ -1,6 +1,6 @@
 # Dep
 
-Linux: [![Build Status](https://travis-ci.org/golang/dep.svg?branch=master)](https://travis-ci.org/golang/dep) | Windows: [![Build status](https://ci.appveyor.com/api/projects/status/4pu2xnnrikol2gsf/branch/master?svg=true)](https://ci.appveyor.com/project/golang/dep/branch/master)
+Linux: [![Build Status](https://travis-ci.org/golang/dep.svg?branch=master)](https://travis-ci.org/golang/dep) | Windows: [![Build status](https://ci.appveyor.com/api/projects/status/4pu2xnnrikol2gsf/branch/master?svg=true)](https://ci.appveyor.com/project/golang/dep/branch/master) | Codecov: [![codecov](https://codecov.io/gh/golang/dep/branch/master/graph/badge.svg)](https://codecov.io/gh/golang/dep)
 
 Dep is a prototype dependency management tool. It requires Go 1.7 or newer to compile.
 
