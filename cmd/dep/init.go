@@ -40,7 +40,7 @@ func (cmd *initCommand) LongHelp() string  { return initLongHelp }
 func (cmd *initCommand) Hidden() bool      { return false }
 
 func (cmd *initCommand) Register(fs *flag.FlagSet) {
-	fs.BoolVar(&cmd.noExamples, "no-examples", false, "don't show examples")
+	fs.BoolVar(&cmd.noExamples, "no-examples", false, "don't include example in Gopkg.toml")
 }
 
 type initCommand struct {
