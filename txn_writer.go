@@ -22,9 +22,8 @@ import (
 // if no dependencies are found in the project
 // during `dep init`
 const exampleTOML = `
-
 ## EXAMPLES & DOCS - safe to delete!
-
+#
 ## Dependencies define constraints on how dependent projects should be
 ## incorporated into Gopkg.lock. They are respected by dep whether
 ## this project is the current project, or if it's a dependency.
@@ -40,23 +39,25 @@ const exampleTOML = `
 ## Note: revision will depend on your repository type; git and hg have SHA1s,
 ## bzr a 3-part id, svn a revision number.
 # revision = "abc123"
-
+#
 ## [[overrides]] follow the exact same structure as [[dependencies]], but supercede
 ## all [[dependencies]] declarations from all projects. Only the current project's
 ## [[overrides]] are applied.
 ##
 ## Overrides are a sledgehammer, and should be used only as a last resort.
-
+#
 ## "required" lists a set of packages (not projects) that must be included in
 ## Gopkg.lock. This list is merged with the set of packages imported by the current
 ## project. Use it when your project needs a package it doesn't explicitly import -
 ## including "main" packages.
 # required = ["github.com/user/thing/cmd/thing"]
-
+#
 ## "ignored" lists a set of packages (not projects) that are ignored when
 ## dep statically analyzes source code. Ignored packages can be in this project,
 ## or in a dependency.
 # ignored = ["github.com/user/project/badpkg"]
+
+
 `
 
 // SafeWriter transactionalizes writes of manifest, lock, and vendor dir, both
@@ -299,7 +300,6 @@ func (sw *SafeWriter) Write(root string, sm gps.SourceManager) error {
 
 	if sw.Payload.HasManifest() {
 		// Always write the example text to the bottom of the TOML file.
-		examples := []byte(exampleTOML)
 		tb, err := sw.Payload.Manifest.MarshalTOML()
 		if err != nil {
 			return errors.Wrap(err, "failed to marshal manifest to TOML")
@@ -307,7 +307,7 @@ func (sw *SafeWriter) Write(root string, sm gps.SourceManager) error {
 
 		// 0666 is before umask; mirrors behavior of os.Create (used by
 		// writeFile())
-		if err = ioutil.WriteFile(filepath.Join(td, ManifestName), append(tb, examples...), 0666); err != nil {
+		if err = ioutil.WriteFile(filepath.Join(td, ManifestName), append([]byte(exampleTOML), tb...), 0666); err != nil {
 			return errors.Wrap(err, "failed to write manifest file to temp dir")
 		}
 	}
