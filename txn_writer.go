@@ -244,7 +244,7 @@ func (payload SafeWriterPayload) validate(root string, sm gps.SourceManager) err
 // operations succeeded. It also does its best to roll back if any moves fail.
 // This mostly guarantees that dep cannot exit with a partial write that would
 // leave an undefined state on disk.
-func (sw *SafeWriter) Write(root string, sm gps.SourceManager) error {
+func (sw *SafeWriter) Write(root string, sm gps.SourceManager, noExamples bool) error {
 
 	if sw.Payload == nil {
 		return errors.New("Cannot call SafeWriter.Write before SafeWriter.Prepare")
@@ -272,9 +272,11 @@ func (sw *SafeWriter) Write(root string, sm gps.SourceManager) error {
 
 	if sw.Payload.HasManifest() {
 		if sw.Payload.Manifest.IsEmpty() {
-			err := modifyWithString(filepath.Join(td, ManifestName), exampleToml)
-			if err != nil {
-				return errors.Wrap(err, "failed to generate example text")
+			if !noExamples {
+				err := modifyWithString(filepath.Join(td, ManifestName), exampleToml)
+				if err != nil {
+					return errors.Wrap(err, "failed to generate example text")
+				}
 			}
 		} else if err := writeFile(filepath.Join(td, ManifestName), sw.Payload.Manifest); err != nil {
 			return errors.Wrap(err, "failed to write manifest file to temp dir")
