@@ -73,7 +73,7 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 		return err
 	}
 	if mok {
-		return errors.New("manifest file already exists")
+		return errors.Errorf("manifest already exists: %s", mf)
 	}
 	// Manifest file does not exist.
 

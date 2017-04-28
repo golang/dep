@@ -135,7 +135,7 @@ func (tc *IntegrationTestCase) CompareError(err error, stderr string) {
 
 	if wantExists && gotExists {
 		if !strings.Contains(got, want) {
-			tc.t.Errorf("expected error %s, got error %s", want, got)
+			tc.t.Errorf("expected error containing %s, got error %s", want, got)
 		}
 	} else if !wantExists && gotExists {
 		tc.t.Fatal("error raised where none was expected")
