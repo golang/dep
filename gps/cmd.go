@@ -44,24 +44,30 @@ func (c *monitoredCmd) run(ctx context.Context) error {
 	ticker := time.NewTicker(c.timeout)
 	done := make(chan error, 1)
 	defer ticker.Stop()
-	go func() { done <- c.cmd.Run() }()
+
+	err := c.cmd.Start()
+	if err != nil {
+		return err
+	}
+
+	go func() {
+		done <- c.cmd.Wait()
+	}()
 
 	for {
 		select {
 		case <-ticker.C:
 			if c.hasTimedOut() {
-				// On windows it is apparently (?) possible for the process
-				// pointer to become nil without Run() having returned (and
-				// thus, passing through the done channel). Guard against this.
-				if c.cmd.Process != nil {
-					if err := c.cmd.Process.Kill(); err != nil {
-						return &killCmdError{err}
-					}
+				if err := c.cmd.Process.Kill(); err != nil {
+					return &killCmdError{err}
 				}
 
 				return &timeoutError{c.timeout}
 			}
 		case <-ctx.Done():
+			if err := c.cmd.Process.Kill(); err != nil {
+				return &killCmdError{err}
+			}
 			return ctx.Err()
 		case err := <-done:
 			return err
