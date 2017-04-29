@@ -320,7 +320,7 @@ func (sw *SafeWriter) Write(root string, sm gps.SourceManager, noExamples bool) 
 			return errors.Wrap(err, "failed to marshal manifest to TOML")
 		}
 
-		initOutput := ""
+		var initOutput string
 
 		// If examples are NOT disabled, use the example text
 		if !noExamples {
