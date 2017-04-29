@@ -1,6 +1,6 @@
 {
   "commands": [
-    ["init"]
+    ["init", "-no-examples"]
   ],
   "gopath-initial": {
     "github.com/sdboyer/deptest": "v0.8.0"
