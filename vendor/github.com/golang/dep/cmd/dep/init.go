@@ -39,13 +39,9 @@ func (cmd *initCommand) ShortHelp() string { return initShortHelp }
 func (cmd *initCommand) LongHelp() string  { return initLongHelp }
 func (cmd *initCommand) Hidden() bool      { return false }
 
-func (cmd *initCommand) Register(fs *flag.FlagSet) {
-	fs.BoolVar(&cmd.noExamples, "no-examples", false, "don't show examples")
-}
+func (cmd *initCommand) Register(fs *flag.FlagSet) {}
 
-type initCommand struct {
-	noExamples bool
-}
+type initCommand struct{}
 
 func trimPathPrefix(p1, p2 string) string {
 	if internal.HasFilepathPrefix(p1, p2) {
@@ -78,7 +74,7 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 		return err
 	}
 	if mok {
-		return errors.Errorf("manifest already exists: %s", mf)
+		return errors.Errorf("manifest file %q already exists", mf)
 	}
 	// Manifest file does not exist.
 
@@ -170,7 +166,7 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 
 	var sw dep.SafeWriter
 	sw.Prepare(m, nil, l, dep.VendorAlways)
-	if err := sw.Write(root, sm, cmd.noExamples); err != nil {
+	if err := sw.Write(root, sm); err != nil {
 		return errors.Wrap(err, "safe write of manifest and lock")
 	}
 
@@ -204,6 +200,7 @@ func isStdLib(path string) bool {
 // TODO solve failures can be really creative - we need to be similarly creative
 // in handling them and informing the user appropriately
 func handleAllTheFailuresOfTheWorld(err error) {
+	fmt.Printf("solve error: %s\n", err)
 }
 
 func hasImportPathPrefix(s, prefix string) bool {

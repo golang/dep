@@ -1,0 +1,31 @@
+Memo: 595716d270828e763c811ef79c9c41f85b1d1bfbdfe85280036405c03772206c -> 2252a285ab27944a4d7adcba8dbd03980f59ba652f12db39fa93b927c345593e
+
+Add:
+[[projects]]
+  name = "github.com/sdboyer/deptest"
+  packages = ["."]
+  revision = "ff2948a2ac8f538c4ecd55962e919d1e13e74baf"
+  version = "v1.0.0"
+
+[[projects]]
+  name = "github.com/stuff/realthing"
+  packages = ["."]
+  revision = "1f02e52d6bac308da54ab84a234c58a98ca82347"
+  version = "2.0.0"
+
+Remove:
+[[projects]]
+  name = "github.com/stuff/placeholder"
+  packages = ["."]
+  revision = "6694017eeb4e20fd277b049bf29dba4895c97234"
+  version = "2.0.0"
+
+Modify:
+[[projects]]
+  branch = "- master"
+  name = "github.com/foo/bar"
+  packages = ["- placeholder","+ thing"]
+  revision = "f24338400f072ef18125ae0fbe6b06fe6d1783e7 -> 2a3a211e171803acb82d1d5d42ceb53228f51751"
+  source = "+ http://github.example.com/foo/bar"
+  version = "+ 1.2.0"
+

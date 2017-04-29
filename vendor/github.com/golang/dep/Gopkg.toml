@@ -1,0 +1,20 @@
+
+[[dependencies]]
+  branch = "2.x"
+  name = "github.com/Masterminds/semver"
+
+[[dependencies]]
+  name = "github.com/Masterminds/vcs"
+  version = "^1.8.0"
+
+[[dependencies]]
+  branch = "master"
+  name = "github.com/pelletier/go-toml"
+
+[[dependencies]]
+  name = "github.com/pkg/errors"
+  version = ">=0.8.0, <1.0.0"
+
+[[dependencies]]
+  name = "github.com/sdboyer/gps"
+  version = ">=0.16.0, <1.0.0"
