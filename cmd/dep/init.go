@@ -200,7 +200,6 @@ func isStdLib(path string) bool {
 // TODO solve failures can be really creative - we need to be similarly creative
 // in handling them and informing the user appropriately
 func handleAllTheFailuresOfTheWorld(err error) {
-	fmt.Printf("solve error: %s\n", err)
 }
 
 func hasImportPathPrefix(s, prefix string) bool {
