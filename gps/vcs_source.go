@@ -405,11 +405,6 @@ func (s *hgSource) listVersions(ctx context.Context) ([]PairedVersion, error) {
 			continue
 		}
 
-		// tip is magic, don't include it
-		if bytes.HasPrefix(line, []byte("tip")) {
-			continue
-		}
-
 		// Split on colon; this gets us the rev and the tag plus local revno
 		pair := bytes.Split(line, []byte(":"))
 		if bytes.Equal(nulrev, pair[1]) {
@@ -417,8 +412,15 @@ func (s *hgSource) listVersions(ctx context.Context) ([]PairedVersion, error) {
 			continue
 		}
 
-		idx := bytes.IndexByte(pair[0], 32) // space
-		v := NewVersion(string(pair[0][:idx])).Is(Revision(pair[1])).(PairedVersion)
+		// tip moves like a branch, so treat it that way
+		var v PairedVersion
+		if bytes.HasPrefix(line, []byte("tip")) {
+			v = NewBranch("tip").Is(Revision(pair[1])).(PairedVersion)
+		} else {
+			idx := bytes.IndexByte(pair[0], 32) // space
+			v = NewVersion(string(pair[0][:idx])).Is(Revision(pair[1])).(PairedVersion)
+		}
+
 		vlist = append(vlist, v)
 	}
 
