@@ -184,15 +184,6 @@ func (cmd *ensureCommand) Run(ctx *dep.Ctx, args []string) error {
 	}
 	return cmd.runDefault(ctx, args, p, sm, params)
 
-	if cmd.update {
-		applyUpdateArgs(args, &params)
-	} else {
-		err := applyEnsureArgs(args, cmd.overrides, p, sm, &params)
-		if err != nil {
-			return err
-		}
-	}
-
 	solver, err := gps.Prepare(params, sm)
 	if err != nil {
 		return errors.Wrap(err, "ensure Prepare")
@@ -301,13 +292,11 @@ func (cmd *ensureCommand) runDefault(ctx *dep.Ctx, args []string, p *dep.Project
 	return nil
 }
 
-func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm gps.SourceManager, params gps.SolveParameters) error {
-}
-
 func (cmd *ensureCommand) runUpdate(ctx *dep.Ctx, args []string, p *dep.Project, sm gps.SourceManager, params gps.SolveParameters) error {
-}
+	if p.Lock == nil {
+		return errors.New("%s does not exist. nothing to do, as -update works by updating the values in %s.", dep.LockName, dep.LockName)
+	}
 
-func applyUpdateArgs(args []string, params *gps.SolveParameters) {
 	// When -update is specified without args, allow every project to change versions, regardless of the lock file
 	if len(args) == 0 {
 		params.ChangeAll = true
@@ -316,8 +305,27 @@ func applyUpdateArgs(args []string, params *gps.SolveParameters) {
 
 	// Allow any of specified project versions to change, regardless of the lock file
 	for _, arg := range args {
+		// Ensure the provided path has a deducible project root
+		// TODO(sdboyer) do these concurrently
+		pc, err := getProjectConstraint(arg, sm)
+		if err != nil {
+			// TODO(sdboyer) return all errors, not just the first one we encounter
+			// TODO(sdboyer) ensure these errors are contextualized in a
+			// sensible way for -update
+			return err
+		}
+
+		if !gps.IsAny(pc.Constraint) {
+			// TODO(sdboyer) constraints should be allowed to allow solves that
+			// target particular versions while remaining within declared constraints
+			return errors.Errorf("-update operates according to constraints declared in %s, not CLI arguments.\nYou passed in %s for %s", dep.ManifestName, pc.Constraint, pc.Ident.ProjectRoot)
+		}
+
 		params.ToChange = append(params.ToChange, gps.ProjectRoot(arg))
 	}
+}
+
+func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm gps.SourceManager, params gps.SolveParameters) error {
 }
 
 func applyEnsureArgs(args []string, overrides stringSlice, p *dep.Project, sm gps.SourceManager, params *gps.SolveParameters) error {
