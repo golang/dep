@@ -180,10 +180,12 @@ func (cmd *removeCommand) Run(ctx *dep.Ctx, args []string) error {
 		return err
 	}
 
-	var sw dep.SafeWriter
 	newLock := dep.LockFromInterface(soln)
 
-	sw.Prepare(nil, p.Lock, newLock, dep.VendorOnChanged)
+	sw, err := dep.NewSafeWriter(nil, p.Lock, newLock, dep.VendorOnChanged)
+	if err != nil {
+		return err
+	}
 	if err := sw.Write(p.AbsRoot, sm, true); err != nil {
 		return errors.Wrap(err, "grouped write of manifest, lock and vendor")
 	}

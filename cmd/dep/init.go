@@ -168,8 +168,11 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 
 	internal.Vlogf("Writing manifest and lock files.")
 
-	var sw dep.SafeWriter
-	sw.Prepare(m, nil, l, dep.VendorAlways)
+	sw, err := dep.NewSafeWriter(m, nil, l, dep.VendorAlways)
+	if err != nil {
+		return err
+	}
+
 	if err := sw.Write(root, sm, cmd.noExamples); err != nil {
 		return errors.Wrap(err, "safe write of manifest and lock")
 	}
