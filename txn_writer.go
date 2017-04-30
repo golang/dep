@@ -85,6 +85,46 @@ type SafeWriter struct {
 	Payload *SafeWriterPayload
 }
 
+// NewSafeWriter sets up a SafeWriter to write a set of config yaml, lock and vendor tree.
+//
+// - If manifest is provided, it will be written to the standard manifest file
+//   name beneath root.
+// - If newLock is provided, it will be written to the standard lock file
+//   name beneath root.
+// - If vendor is VendorAlways, or is VendorOnChanged and the locks are different,
+//   the vendor directory will be written beneath root based on newLock.
+// - If oldLock is provided without newLock, error.
+// - If vendor is VendorAlways without a newLock, error.
+func NewSafeWriter(manifest *Manifest, oldLock, newLock *Lock, vendor VendorBehavior) (*SafeWriter, error) {
+	p := &SafeWriterPayload{
+		Manifest: manifest,
+		Lock:     newLock,
+	}
+	sw := &SafeWriter{p}
+
+	if oldLock != nil {
+		if newLock == nil {
+			return nil, errors.New("must provide newLock when oldLock is specified")
+		}
+		sw.Payload.LockDiff = gps.DiffLocks(oldLock, newLock)
+	}
+
+	switch vendor {
+	case VendorAlways:
+		sw.Payload.WriteVendor = true
+	case VendorOnChanged:
+		if sw.Payload.LockDiff != nil || (newLock != nil && oldLock == nil) {
+			sw.Payload.WriteVendor = true
+		}
+	}
+
+	if sw.Payload.WriteVendor && newLock == nil {
+		return nil, errors.New("must provide newLock in order to write out vendor")
+	}
+
+	return sw, nil
+}
+
 // SafeWriterPayload represents the actions SafeWriter will execute when SafeWriter.Write is called.
 type SafeWriterPayload struct {
 	Manifest    *Manifest
@@ -220,46 +260,6 @@ const (
 	// VendorNever indicates the vendor directory should never be written.
 	VendorNever
 )
-
-// Prepare to write a set of config yaml, lock and vendor tree.
-//
-// - If manifest is provided, it will be written to the standard manifest file
-//   name beneath root.
-// - If newLock is provided, it will be written to the standard lock file
-//   name beneath root.
-// - If vendor is VendorAlways, or is VendorOnChanged and the locks are different,
-//   the vendor directory will be written beneath root based on newLock.
-// - If oldLock is provided without newLock, error.
-// - If vendor is VendorAlways without a newLock, error.
-func (sw *SafeWriter) Prepare(manifest *Manifest, oldLock, newLock *Lock, vendor VendorBehavior) error {
-
-	sw.Payload = &SafeWriterPayload{
-		Manifest: manifest,
-		Lock:     newLock,
-	}
-
-	if oldLock != nil {
-		if newLock == nil {
-			return errors.New("must provide newLock when oldLock is specified")
-		}
-		sw.Payload.LockDiff = gps.DiffLocks(oldLock, newLock)
-	}
-
-	switch vendor {
-	case VendorAlways:
-		sw.Payload.WriteVendor = true
-	case VendorOnChanged:
-		if sw.Payload.LockDiff != nil || (newLock != nil && oldLock == nil) {
-			sw.Payload.WriteVendor = true
-		}
-	}
-
-	if sw.Payload.WriteVendor && newLock == nil {
-		return errors.New("must provide newLock in order to write out vendor")
-	}
-
-	return nil
-}
 
 func (payload SafeWriterPayload) validate(root string, sm gps.SourceManager) error {
 	if root == "" {
