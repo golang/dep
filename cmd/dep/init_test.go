@@ -4,7 +4,11 @@
 
 package main
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/sdboyer/gps"
+)
 
 func TestContains(t *testing.T) {
 	a := []string{"a", "b", "abcd"}
@@ -31,5 +35,46 @@ func TestIsStdLib(t *testing.T) {
 		if b != e {
 			t.Fatalf("%s: expected %t got %t", p, e, b)
 		}
+	}
+}
+
+func TestGetProjectPropertiesFromVersion(t *testing.T) {
+	cases := []struct {
+		version  gps.Version
+		expected gps.Version
+	}{
+		{
+			version:  gps.NewBranch("foo-branch").Is("some-revision"),
+			expected: gps.NewBranch("foo-branch"),
+		},
+		{
+			version:  gps.NewVersion("foo-version").Is("some-revision"),
+			expected: gps.NewVersion("foo-version"),
+		},
+		{
+			version:  gps.Revision("alsjd934"),
+			expected: nil,
+		},
+		// This fails. Hence, testing separately below.
+		// {
+		// 	version: gps.NewVersion("v1.0.0"),
+		// 	expected: gps.NewVersion("^1.0.0"),
+		// },
+	}
+
+	for _, c := range cases {
+		actualProp := getProjectPropertiesFromVersion(c.version)
+		if c.expected != actualProp.Constraint {
+			t.Fatalf("Expected %q to be equal to %q", actualProp.Constraint, c.expected)
+		}
+	}
+
+	outsemver := getProjectPropertiesFromVersion(gps.NewVersion("v1.0.0"))
+	expectedSemver, _ := gps.NewSemverConstraint("^1.0.0")
+	// Comparing outsemver.Constraint and expectedSemver fails with error
+	// "comparing uncomparable type semver.rangeConstraint", although they have
+	// same value and same type "gps.semverConstraint" as per "reflect".
+	if outsemver.Constraint.String() != expectedSemver.String() {
+		t.Fatalf("Expected %q to be equal to %q", outsemver, expectedSemver)
 	}
 }
