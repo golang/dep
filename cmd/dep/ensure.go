@@ -388,7 +388,7 @@ func checkErrors(m map[string]pkgtree.PackageOrErr) error {
 	}
 
 	if len(m) == pkgErrors+noGoErrors {
-		return fmt.Errorf("%d dirs had errors and %d had no go code", pkgErrors, noGoErrors)
+		return errors.Errorf("%d dirs had errors and %d had no go code", pkgErrors, noGoErrors)
 	}
 
 	return nil
