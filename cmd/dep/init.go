@@ -231,40 +231,29 @@ func hasImportPathPrefix(s, prefix string) bool {
 	return strings.HasPrefix(s, prefix+"/")
 }
 
-// getVersionConstituents extracts version constituents
-func getVersionConstituents(v gps.Version) (version, revision string) {
-	switch tv := v.(type) {
-	case gps.UnpairedVersion:
-		version = tv.String()
-	case gps.Revision:
-		revision = tv.String()
-	case gps.PairedVersion:
-		version = tv.Unpair().String()
-		revision = tv.Underlying().String()
-	}
-
-	return version, revision
-}
-
 // getProjectPropertiesFromVersion takes a gps.Version and returns a proper
 // gps.ProjectProperties with Constraint value based on the provided version.
 func getProjectPropertiesFromVersion(v gps.Version) gps.ProjectProperties {
 	pp := gps.ProjectProperties{}
 
-	// constituent version and revision. Ignoring revison for manifest.
-	cv, _ := getVersionConstituents(v)
+	// extract version and ignore if it's revision only
+	switch tv := v.(type) {
+	case gps.PairedVersion:
+		v = tv.Unpair()
+	case gps.Revision:
+		return pp
+	}
 
 	switch v.Type() {
-	case gps.IsBranch:
-		pp.Constraint = gps.NewBranch(cv)
-	case gps.IsVersion:
-		pp.Constraint = gps.NewVersion(cv)
+	case gps.IsBranch, gps.IsVersion:
+		pp.Constraint = v
 	case gps.IsSemver:
 		// TODO: remove "^" when https://github.com/golang/dep/issues/225 is ready.
-		c, _ := gps.NewSemverConstraint("^" + cv)
+		c, err := gps.NewSemverConstraint("^" + v.String())
+		if err != nil {
+			panic(err)
+		}
 		pp.Constraint = c
-	case gps.IsRevision:
-		pp.Constraint = nil
 	}
 
 	return pp
