@@ -287,7 +287,7 @@ func (payload SafeWriterPayload) validate(root string, sm gps.SourceManager) err
 // operations succeeded. It also does its best to roll back if any moves fail.
 // This mostly guarantees that dep cannot exit with a partial write that would
 // leave an undefined state on disk.
-func (sw *SafeWriter) Write(root string, sm gps.SourceManager) error {
+func (sw *SafeWriter) Write(root string, sm gps.SourceManager, noExamples bool) error {
 
 	if sw.Payload == nil {
 		return errors.New("Cannot call SafeWriter.Write before SafeWriter.Prepare")
@@ -320,9 +320,16 @@ func (sw *SafeWriter) Write(root string, sm gps.SourceManager) error {
 			return errors.Wrap(err, "failed to marshal manifest to TOML")
 		}
 
+		var initOutput string
+
+		// If examples are NOT disabled, use the example text
+		if !noExamples {
+			initOutput = exampleTOML
+		}
+
 		// 0666 is before umask; mirrors behavior of os.Create (used by
 		// writeFile())
-		if err = ioutil.WriteFile(filepath.Join(td, ManifestName), append([]byte(exampleTOML), tb...), 0666); err != nil {
+		if err = ioutil.WriteFile(filepath.Join(td, ManifestName), append([]byte(initOutput), tb...), 0666); err != nil {
 			return errors.Wrap(err, "failed to write manifest file to temp dir")
 		}
 	}

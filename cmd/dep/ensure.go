@@ -167,7 +167,7 @@ func (cmd *ensureCommand) Run(ctx *dep.Ctx, args []string) error {
 		return sw.PrintPreparedActions()
 	}
 
-	return errors.Wrap(sw.Write(p.AbsRoot, sm), "grouped write of manifest, lock and vendor")
+	return errors.Wrap(sw.Write(p.AbsRoot, sm, true), "grouped write of manifest, lock and vendor")
 }
 
 func applyUpdateArgs(args []string, params *gps.SolveParameters) {
