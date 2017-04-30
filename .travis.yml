@@ -16,7 +16,10 @@ matrix:
 install:
   - echo "This is an override of the default install deps step in travis."
 before_script:
-  - if [[ "$(go env GOHOSTOS)" == "darwin" ]]; then rvm get head; fi
+  # OSX as of El Capitan sets an exit trap that interacts poorly with our
+  # set -e below. So, unset the trap.
+  # Related: https://superuser.com/questions/1044130/why-am-i-having-how-can-i-fix-this-error-shell-session-update-command-not-f
+  - if [[ "$(go env GOHOSTOS)" == "darwin" ]]; then trap EXIT; fi
   - PKGS=$(go list ./... | grep -v /vendor/)
   - go get -v honnef.co/go/tools/cmd/{gosimple,staticcheck}
   - npm install -g codeclimate-test-reporter
