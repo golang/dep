@@ -39,9 +39,13 @@ func (cmd *initCommand) ShortHelp() string { return initShortHelp }
 func (cmd *initCommand) LongHelp() string  { return initLongHelp }
 func (cmd *initCommand) Hidden() bool      { return false }
 
-func (cmd *initCommand) Register(fs *flag.FlagSet) {}
+func (cmd *initCommand) Register(fs *flag.FlagSet) {
+	fs.BoolVar(&cmd.noExamples, "no-examples", false, "don't include example in Gopkg.toml")
+}
 
-type initCommand struct{}
+type initCommand struct {
+	noExamples bool
+}
 
 func trimPathPrefix(p1, p2 string) string {
 	if internal.HasFilepathPrefix(p1, p2) {
@@ -166,7 +170,7 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 
 	var sw dep.SafeWriter
 	sw.Prepare(m, nil, l, dep.VendorAlways)
-	if err := sw.Write(root, sm); err != nil {
+	if err := sw.Write(root, sm, cmd.noExamples); err != nil {
 		return errors.Wrap(err, "safe write of manifest and lock")
 	}
 
