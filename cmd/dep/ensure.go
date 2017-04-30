@@ -134,6 +134,23 @@ func (cmd *ensureCommand) Run(ctx *dep.Ctx, args []string) error {
 		return nil
 	}
 
+	if cmd.add && cmd.update {
+		return errors.New("cannot pass both -add and -update")
+	}
+
+	if cmd.update && cmd.vendorOnly {
+		return errors.New("-vendor-only makes -update a no-op; cannot pass them together")
+	}
+
+	if cmd.add && cmd.vendorOnly {
+		return errors.New("-vendor-only makes -add a no-op; cannot pass them together")
+	}
+
+	if cmd.vendorOnly && cmd.noVendor {
+		// TODO(sdboyer) can't think of anything not snarky right now
+		return errors.New("really?")
+	}
+
 	p, err := ctx.LoadProject("")
 	if err != nil {
 		return err
@@ -158,6 +175,14 @@ func (cmd *ensureCommand) Run(ctx *dep.Ctx, args []string) error {
 	if err := checkErrors(params.RootPackageTree.Packages); err != nil {
 		return err
 	}
+
+	var fail error
+	if cmd.add {
+		return cmd.runAdd(ctx, args, p, sm, params)
+	} else if cmd.update {
+		return cmd.runUpdate(ctx, args, p, sm, params)
+	}
+	return cmd.runDefault(ctx, args, p, sm, params)
 
 	if cmd.update {
 		applyUpdateArgs(args, &params)
@@ -199,6 +224,87 @@ func (cmd *ensureCommand) Run(ctx *dep.Ctx, args []string) error {
 	}
 
 	return errors.Wrap(sw.Write(p.AbsRoot, sm, true), "grouped write of manifest, lock and vendor")
+}
+
+func (cmd *ensureCommand) runDefault(ctx *dep.Ctx, args []string, p *dep.Project, sm gps.SourceManager, params gps.SolveParameters) error {
+	// Bare ensure doesn't take any args.
+	if len(args) != 0 {
+		if cmd.vendorOnly {
+			return errors.Errorf("dep ensure -vendor-only only populates vendor/ from %s; it takes no spec arguments.", dep.LockName)
+		}
+		return errors.New("dep ensure only takes spec arguments with -add or -update - did you want one of those?")
+	}
+
+	sw := &dep.SafeWriter{}
+	if cmd.vendorOnly {
+		if p.Lock == nil {
+			return errors.Errorf("no %s exists from which to populate vendor/ directory", dep.LockName)
+		}
+		// Pass the same lock as old and new so that the writer will observe no
+		// difference and choose not to write it out.
+		err := sw.Prepare(nil, p.Lock, p.Lock, dep.VendorAlways)
+		if err != nil {
+			return err
+		}
+
+		if cmd.dryRun {
+			fmt.Printf("Would have populated vendor/ directory from %s", dep.LockName)
+			return nil
+		}
+
+		return errors.WithMessage(sw.Write(p.AbsRoot, sm, true), "grouped write of manifest, lock and vendor")
+	}
+
+	solver, err := gps.Prepare(params, sm)
+	if err != nil {
+		return errors.Wrap(err, "ensure Prepare")
+	}
+
+	if p.Lock != nil && bytes.Equal(p.Lock.InputHash(), solver.HashInputs()) {
+		// Memo matches, so there's probably nothing to do.
+		if cmd.noVendor {
+			// The user said not to touch vendor/, so definitely nothing to do.
+			return nil
+		}
+
+		// TODO(sdboyer) The desired behavior at this point is to determine
+		// whether it's necessary to write out vendor, or if it's already
+		// consistent with the lock. However, we haven't yet determined what
+		// that "verification" is supposed to look like (#121); in the meantime,
+		// we unconditionally write out vendor/ so that `dep ensure`'s behavior
+		// is maximally compatible with what it will eventually become.
+		// vendor doesn't exist at all; be helpful and write it.
+		err := sw.Prepare(nil, p.Lock, p.Lock, dep.VendorAlways)
+		if err != nil {
+			return err
+		}
+
+		if cmd.dryRun {
+			fmt.Printf("Would have populated vendor/ directory from %s", dep.LockName)
+			return nil
+		}
+
+		return errors.WithMessage(sw.Write(p.AbsRoot, sm, true), "grouped write of manifest, lock and vendor")
+	}
+
+	solution, err := solver.Solve()
+	if err != nil {
+		handleAllTheFailuresOfTheWorld(err)
+		return errors.Wrap(err, "ensure Solve()")
+	}
+
+	sw.Prepare(nil, p.Lock, dep.LockFromInterface(solution), dep.VendorOnChanged)
+	if cmd.dryRun {
+		return sw.PrintPreparedActions()
+	}
+
+	return nil
+}
+
+func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm gps.SourceManager, params gps.SolveParameters) error {
+}
+
+func (cmd *ensureCommand) runUpdate(ctx *dep.Ctx, args []string, p *dep.Project, sm gps.SourceManager, params gps.SolveParameters) error {
 }
 
 func applyUpdateArgs(args []string, params *gps.SolveParameters) {
