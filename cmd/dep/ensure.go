@@ -248,7 +248,7 @@ func (cmd *ensureCommand) runDefault(ctx *dep.Ctx, args []string, p *dep.Project
 
 	solver, err := gps.Prepare(params, sm)
 	if err != nil {
-		return errors.Wrap(err, "ensure Prepare")
+		return errors.Wrap(err, "prepare solver")
 	}
 
 	if p.Lock != nil && bytes.Equal(p.Lock.InputHash(), solver.HashInputs()) {
@@ -297,13 +297,32 @@ func (cmd *ensureCommand) runUpdate(ctx *dep.Ctx, args []string, p *dep.Project,
 		return errors.New("%s does not exist. nothing to do, as -update works by updating the values in %s.", dep.LockName, dep.LockName)
 	}
 
-	// When -update is specified without args, allow every project to change versions, regardless of the lock file
+	// We'll need to discard this prepared solver as later work changes params,
+	// but solver preparation is cheap and worth doing up front in order to
+	// perform the fastpath check of hash comparison.
+	solver, err := gps.Prepare(params, sm)
+	if err != nil {
+		return errors.Wrap(err, "fastpath solver prepare")
+	}
+
+	// Compare the hashes. If they're not equal, bail out and ask the user to
+	// run a straight `dep ensure` before updating. This is handholding the
+	// user a bit, but the extra effort required is minimal, and it ensures the
+	// user is isolating variables in the event of solve problems (was it the
+	// existing changes, or the -update that caused the problem?).
+	if bytes.Equal(p.Lock.InputHash(), solver.HashInputs()) {
+		return errors.Errorf("%s and %s are out of sync. run a plain `dep ensure` to resync them before attempting an -update.", dep.ManifestName, dep.LockName)
+	}
+
+	// When -update is specified without args, allow every dependency to change
+	// versions, regardless of the lock file.
 	if len(args) == 0 {
 		params.ChangeAll = true
 		return
 	}
 
-	// Allow any of specified project versions to change, regardless of the lock file
+	// Allow any of specified project versions to change, regardless of the lock
+	// file.
 	for _, arg := range args {
 		// Ensure the provided path has a deducible project root
 		// TODO(sdboyer) do these concurrently
@@ -315,6 +334,10 @@ func (cmd *ensureCommand) runUpdate(ctx *dep.Ctx, args []string, p *dep.Project,
 			return err
 		}
 
+		if !p.Lock.HasProjectWithRoot(pc.Ident.ProjectRoot) {
+			return errors.Errorf("%s is not present in %s, cannot -update it", pc.Ident.ProjectRoot, dep.LockName)
+		}
+
 		if !gps.IsAny(pc.Constraint) {
 			// TODO(sdboyer) constraints should be allowed to allow solves that
 			// target particular versions while remaining within declared constraints
@@ -323,6 +346,28 @@ func (cmd *ensureCommand) runUpdate(ctx *dep.Ctx, args []string, p *dep.Project,
 
 		params.ToChange = append(params.ToChange, gps.ProjectRoot(arg))
 	}
+
+	// Re-prepare a solver now that our params are complete.
+	solver, err = gps.Prepare(params, sm)
+	if err != nil {
+		return errors.Wrap(err, "fastpath solver prepare")
+	}
+	solution, err := solver.Solve()
+	if err != nil {
+		handleAllTheFailuresOfTheWorld(err)
+		return errors.Wrap(err, "ensure Solve()")
+	}
+
+	var sw dep.SafeWriter
+	sw.Prepare(nil, p.Lock, dep.LockFromInterface(solution), dep.VendorOnChanged)
+	// TODO(sdboyer) special handling for warning cases as described in spec -
+	// e.g., named projects did not upgrade even though newer versions were
+	// available.
+	if cmd.dryRun {
+		return sw.PrintPreparedActions()
+	}
+
+	return errors.Wrap(sw.Write(p.AbsRoot, sm, true), "grouped write of manifest, lock and vendor")
 }
 
 func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm gps.SourceManager, params gps.SolveParameters) error {
@@ -402,6 +447,8 @@ func (s *stringSlice) Set(value string) error {
 }
 
 func getProjectConstraint(arg string, sm gps.SourceManager) (gps.ProjectConstraint, error) {
+	// TODO(sdboyer) this func needs to be broken out, now that we admit
+	// different info in specs
 	constraint := gps.ProjectConstraint{
 		Constraint: gps.Any(), // default to any; avoids panics later
 	}
