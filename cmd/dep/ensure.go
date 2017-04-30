@@ -25,11 +25,11 @@ import (
 
 const ensureShortHelp = `Ensure a dependency is safely vendored in the project`
 const ensureLongHelp = `
-usage: dep ensure [-update | -add] [-no-vendor | -vendor-only] [<specs>...]
+usage: dep ensure [-update | -add] [-no-vendor | -vendor-only] [<spec>...]
 
 Project spec:
 
-  <path>[:alt source][@<version specifier>]
+  <path>[:alt source][@<constraint>]
 
 Flags:
 
