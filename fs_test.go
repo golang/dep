@@ -190,6 +190,8 @@ func TestIsEmpty(t *testing.T) {
 	}
 
 	h := test.NewHelper(t)
+	defer h.Cleanup()
+
 	h.TempDir("empty")
 	tests := map[string]string{
 		wd:                                                  "true",
