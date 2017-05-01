@@ -369,45 +369,65 @@ func TestResolveProjectRoot(t *testing.T) {
 		},
 	}
 
-	realPath := filepath.Join(ctx.GOPATH, "src", "real", "path")
-	realPathTwo := filepath.Join(ctx.GOPATHS[1], "src", "real", "path")
-	symlinkedPath := filepath.Join(tg.Path("."), "sym", "symlink")
-	symlinkedInGoPath := filepath.Join(ctx.GOPATH, "src/sym/path")
-	symlinkedInOtherGoPath := filepath.Join(tg.Path("."), "sym", "symtwo")
-	os.Symlink(realPath, symlinkedPath)
-	os.Symlink(realPath, symlinkedInGoPath)
-	os.Symlink(realPathTwo, symlinkedInOtherGoPath)
-
-	// Real path should be returned, no symlinks to deal with
-	p, err := ctx.resolveProjectRoot(realPath)
-	if err != nil {
-		t.Fatalf("Error resolving project root: %s", err)
-	}
-	if p != realPath {
-		t.Fatalf("Want path to be %s, got %s", realPath, p)
-	}
-
-	// Real path should be returned, symlink is outside GOPATH
-	p, err = ctx.resolveProjectRoot(symlinkedPath)
-	if err != nil {
-		t.Fatalf("Error resolving project root: %s", err)
-	}
-	if p != realPath {
-		t.Fatalf("Want path to be %s, got %s", realPath, p)
-	}
-
-	// Real path should be returned, symlink is in another GOPATH
-	p, err = ctx.resolveProjectRoot(symlinkedInOtherGoPath)
-	if err != nil {
-		t.Fatalf("Error resolving project root: %s", err)
-	}
-	if p != realPathTwo {
-		t.Fatalf("Want path to be %s, got %s", realPathTwo, p)
+	testcases := []struct {
+		name         string
+		path         string
+		resolvedPath string
+		symlink      bool
+		expectErr    bool
+	}{
+		{
+			name:         "no-symlinks",
+			path:         filepath.Join(ctx.GOPATH, "src/real/path"),
+			resolvedPath: filepath.Join(ctx.GOPATH, "src/real/path"),
+		},
+		{
+			name:         "symlink-outside-gopath",
+			path:         filepath.Join(tg.Path("."), "sym/symlink"),
+			resolvedPath: filepath.Join(ctx.GOPATH, "src/real/path"),
+			symlink:      true,
+		},
+		{
+			name:         "symlink-in-another-gopath",
+			path:         filepath.Join(tg.Path("."), "sym/symtwo"),
+			resolvedPath: filepath.Join(ctx.GOPATHS[1], "src/real/path"),
+			symlink:      true,
+		},
+		{
+			name:         "symlink-in-gopath",
+			path:         filepath.Join(ctx.GOPATH, "src/sym/path"),
+			resolvedPath: filepath.Join(ctx.GOPATH, "src/real/path"),
+			symlink:      true,
+			expectErr:    true,
+		},
 	}
 
-	// Symlinked path is inside GOPATH, should return error
-	_, err = ctx.resolveProjectRoot(symlinkedInGoPath)
-	if err == nil {
-		t.Fatalf("Wanted an error")
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.symlink {
+				if err := os.Symlink(tc.resolvedPath, tc.path); err != nil {
+					if runtime.GOOS == "windows" {
+						t.Skipf("Not testing Windows symlinks because: %s", err)
+					} else {
+						t.Fatal(err)
+					}
+				}
+			}
+
+			p, err := ctx.resolveProjectRoot(tc.path)
+			if err != nil {
+				if !tc.expectErr {
+					t.Fatalf("Error resolving project root: %s", err)
+				}
+				return
+			}
+			if err == nil && tc.expectErr {
+				t.Fatal("Wanted an error")
+			}
+
+			if p != tc.resolvedPath {
+				t.Errorf("Want path to be %s, got %s", tc.resolvedPath, p)
+			}
+		})
 	}
 }
