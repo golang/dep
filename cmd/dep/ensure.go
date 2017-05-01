@@ -165,9 +165,11 @@ func (cmd *ensureCommand) Run(ctx *dep.Ctx, args []string) error {
 		writeV = dep.VendorAlways
 	}
 
-	var sw dep.SafeWriter
 	newLock := dep.LockFromInterface(solution)
-	sw.Prepare(nil, p.Lock, newLock, writeV)
+	sw, err := dep.NewSafeWriter(nil, p.Lock, newLock, writeV)
+	if err != nil {
+		return err
+	}
 	if cmd.dryRun {
 		return sw.PrintPreparedActions()
 	}
