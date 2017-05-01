@@ -134,13 +134,13 @@ func TestSafeWriter_Manifest(t *testing.T) {
 	sw, _ := NewSafeWriter(pc.Project.Manifest, nil, nil, VendorOnChanged)
 
 	// Verify prepared actions
-	if !sw.Payload.HasManifest() {
+	if !sw.HasManifest() {
 		t.Fatal("Expected the payload to contain the manifest")
 	}
-	if sw.Payload.HasLock() {
+	if sw.HasLock() {
 		t.Fatal("Did not expect the payload to contain the lock")
 	}
-	if sw.Payload.HasVendor() {
+	if sw.HasVendor() {
 		t.Fatal("Did not expect the payload to contain the vendor directory")
 	}
 
@@ -176,13 +176,13 @@ func TestSafeWriter_ManifestAndUnmodifiedLock(t *testing.T) {
 	sw, _ := NewSafeWriter(pc.Project.Manifest, pc.Project.Lock, pc.Project.Lock, VendorOnChanged)
 
 	// Verify prepared actions
-	if !sw.Payload.HasManifest() {
+	if !sw.HasManifest() {
 		t.Fatal("Expected the payload to contain the manifest")
 	}
-	if !sw.Payload.HasLock() {
+	if !sw.HasLock() {
 		t.Fatal("Expected the payload to contain the lock.")
 	}
-	if sw.Payload.HasVendor() {
+	if sw.HasVendor() {
 		t.Fatal("Did not expect the payload to contain the vendor directory")
 	}
 
@@ -218,13 +218,13 @@ func TestSafeWriter_ManifestAndUnmodifiedLockWithForceVendor(t *testing.T) {
 	sw, _ := NewSafeWriter(pc.Project.Manifest, pc.Project.Lock, pc.Project.Lock, VendorAlways)
 
 	// Verify prepared actions
-	if !sw.Payload.HasManifest() {
+	if !sw.HasManifest() {
 		t.Fatal("Expected the payload to contain the manifest")
 	}
-	if !sw.Payload.HasLock() {
+	if !sw.HasLock() {
 		t.Fatal("Expected the payload to contain the lock")
 	}
-	if !sw.Payload.HasVendor() {
+	if !sw.HasVendor() {
 		t.Fatal("Expected the payload to contain the vendor directory")
 	}
 
@@ -265,13 +265,13 @@ func TestSafeWriter_ModifiedLock(t *testing.T) {
 	sw, _ := NewSafeWriter(nil, originalLock, pc.Project.Lock, VendorOnChanged)
 
 	// Verify prepared actions
-	if sw.Payload.HasManifest() {
+	if sw.HasManifest() {
 		t.Fatal("Did not expect the payload to contain the manifest")
 	}
-	if !sw.Payload.HasLock() {
+	if !sw.HasLock() {
 		t.Fatal("Expected the payload to contain the lock")
 	}
-	if !sw.Payload.HasVendor() {
+	if !sw.HasVendor() {
 		t.Fatal("Expected the payload to contain the vendor directory")
 	}
 
@@ -312,13 +312,13 @@ func TestSafeWriter_ModifiedLockSkipVendor(t *testing.T) {
 	sw, _ := NewSafeWriter(nil, originalLock, pc.Project.Lock, VendorNever)
 
 	// Verify prepared actions
-	if sw.Payload.HasManifest() {
+	if sw.HasManifest() {
 		t.Fatal("Did not expect the payload to contain the manifest")
 	}
-	if !sw.Payload.HasLock() {
+	if !sw.HasLock() {
 		t.Fatal("Expected the payload to contain the lock")
 	}
-	if sw.Payload.HasVendor() {
+	if sw.HasVendor() {
 		t.Fatal("Did not expect the payload to contain the vendor directory")
 	}
 
@@ -356,13 +356,13 @@ func TestSafeWriter_ForceVendorWhenVendorAlreadyExists(t *testing.T) {
 
 	// Verify prepared actions
 	sw, _ = NewSafeWriter(nil, nil, pc.Project.Lock, VendorAlways)
-	if sw.Payload.HasManifest() {
+	if sw.HasManifest() {
 		t.Fatal("Did not expect the payload to contain the manifest")
 	}
-	if !sw.Payload.HasLock() {
+	if !sw.HasLock() {
 		t.Fatal("Expected the payload to contain the lock")
 	}
-	if !sw.Payload.HasVendor() {
+	if !sw.HasVendor() {
 		t.Fatal("Expected the payload to contain the vendor directory ")
 	}
 
@@ -402,13 +402,13 @@ func TestSafeWriter_NewLock(t *testing.T) {
 	sw, _ := NewSafeWriter(nil, nil, newLock, VendorOnChanged)
 
 	// Verify prepared actions
-	if sw.Payload.HasManifest() {
+	if sw.HasManifest() {
 		t.Fatal("Did not expect the payload to contain the manifest")
 	}
-	if !sw.Payload.HasLock() {
+	if !sw.HasLock() {
 		t.Fatal("Expected the payload to contain the lock")
 	}
-	if !sw.Payload.HasVendor() {
+	if !sw.HasVendor() {
 		t.Fatal("Expected the payload to contain the vendor directory")
 	}
 
@@ -446,13 +446,13 @@ func TestSafeWriter_NewLockSkipVendor(t *testing.T) {
 	sw, _ := NewSafeWriter(nil, nil, newLock, VendorNever)
 
 	// Verify prepared actions
-	if sw.Payload.HasManifest() {
+	if sw.HasManifest() {
 		t.Fatal("Did not expect the payload to contain the manifest")
 	}
-	if !sw.Payload.HasLock() {
+	if !sw.HasLock() {
 		t.Fatal("Expected the payload to contain the lock")
 	}
-	if sw.Payload.HasVendor() {
+	if sw.HasVendor() {
 		t.Fatal("Did not expect the payload to contain the vendor directory")
 	}
 
@@ -492,7 +492,7 @@ func TestSafeWriter_DiffLocks(t *testing.T) {
 	sw, _ := NewSafeWriter(nil, pc.Project.Lock, updatedLock, VendorOnChanged)
 
 	// Verify lock diff
-	diff := sw.Payload.LockDiff
+	diff := sw.LockDiff
 	if diff == nil {
 		t.Fatal("Expected the payload to contain a diff of the lock files")
 	}
@@ -537,13 +537,13 @@ func TestSafeWriter_VendorDotGitPreservedWithForceVendor(t *testing.T) {
 	sw, _ := NewSafeWriter(pc.Project.Manifest, pc.Project.Lock, pc.Project.Lock, VendorAlways)
 
 	// Verify prepared actions
-	if !sw.Payload.HasManifest() {
+	if !sw.HasManifest() {
 		t.Fatal("Expected the payload to contain the manifest")
 	}
-	if !sw.Payload.HasLock() {
+	if !sw.HasLock() {
 		t.Fatal("Expected the payload to contain the lock")
 	}
-	if !sw.Payload.HasVendor() {
+	if !sw.HasVendor() {
 		t.Fatal("Expected the payload to contain the vendor directory")
 	}
 
