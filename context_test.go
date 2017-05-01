@@ -352,21 +352,14 @@ func TestResolveProjectRoot(t *testing.T) {
 	tg := test.NewHelper(t)
 	defer tg.Cleanup()
 
-	tg.TempDir("go")
-	tg.TempDir("go/src")
-	tg.TempDir("go/src/real")
 	tg.TempDir("go/src/real/path")
 	tg.TempDir("go/src/sym")
 
-	tg.TempDir("gotwo") // Another directory used as a GOPATH
-	tg.TempDir("gotwo/src")
-	tg.TempDir("gotwo/src/real")
+	// Another directory used as a GOPATH
 	tg.TempDir("gotwo/src/real/path")
 	tg.TempDir("gotwo/src/sym")
 
 	tg.TempDir("sym") // Directory for symlinks
-
-	tg.Setenv("GOPATH", tg.Path(filepath.Join(".", "go")))
 
 	ctx := &Ctx{
 		GOPATH: tg.Path(filepath.Join(".", "go")),
