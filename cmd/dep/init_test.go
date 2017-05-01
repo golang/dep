@@ -4,7 +4,11 @@
 
 package main
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/sdboyer/gps"
+)
 
 func TestContains(t *testing.T) {
 	a := []string{"a", "b", "abcd"}
@@ -31,5 +35,48 @@ func TestIsStdLib(t *testing.T) {
 		if b != e {
 			t.Fatalf("%s: expected %t got %t", p, e, b)
 		}
+	}
+}
+
+func TestGetProjectPropertiesFromVersion(t *testing.T) {
+	cases := []struct {
+		version gps.Version
+		want    gps.Version
+	}{
+		{
+			version: gps.NewBranch("foo-branch"),
+			want:    gps.NewBranch("foo-branch"),
+		},
+		{
+			version: gps.NewVersion("foo-version"),
+			want:    gps.NewVersion("foo-version"),
+		},
+		{
+			version: gps.NewBranch("foo-branch").Is("some-revision"),
+			want:    gps.NewBranch("foo-branch"),
+		},
+		{
+			version: gps.NewVersion("foo-version").Is("some-revision"),
+			want:    gps.NewVersion("foo-version"),
+		},
+		{
+			version: gps.Revision("some-revision"),
+			want:    nil,
+		},
+	}
+
+	for _, c := range cases {
+		actualProp := getProjectPropertiesFromVersion(c.version)
+		if c.want != actualProp.Constraint {
+			t.Fatalf("Expected project property to be %v, got %v", actualProp.Constraint, c.want)
+		}
+	}
+
+	// Test to have caret in semver version
+	outsemver := getProjectPropertiesFromVersion(gps.NewVersion("v1.0.0"))
+	wantSemver, _ := gps.NewSemverConstraint("^1.0.0")
+
+	if outsemver.Constraint.String() != wantSemver.String() {
+		t.Fatalf("Expected semver to be %v, got %v", outsemver.Constraint, wantSemver)
 	}
 }

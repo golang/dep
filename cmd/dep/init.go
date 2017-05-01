@@ -21,16 +21,14 @@ import (
 
 const initShortHelp = `Initialize a new project with manifest and lock files`
 const initLongHelp = `
-Initialize the project at filepath root by parsing its dependencies and writing
-manifest and lock files. If root isn't specified, use the current directory.
+Initialize the project at filepath root by parsing its dependencies, writing
+manifest and lock files, and vendoring the dependencies. If root isn't
+specified, use the current directory.
 
 The version of each dependency will reflect the current state of the GOPATH. If
-a dependency doesn't exist in the GOPATH, it won't be written to the manifest,
-but it will be solved-for, and will appear in the lock.
-
-Note: init may use the network to solve the dependency graph.
-
-Note: init does NOT vendor dependencies at the moment. See dep ensure.
+a dependency doesn't exist in the GOPATH, the network would be used to
+solve-for, and the solution will appear in manifest and lock. Solved
+dependencies will be vendored in vendor/ dir relative to project root.
 `
 
 func (cmd *initCommand) Name() string      { return "init" }
@@ -139,32 +137,50 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 		)
 	}
 
-	if len(pd.notondisk) > 0 {
-		internal.Vlogf("Solving...")
-		params := gps.SolveParameters{
-			RootDir:         root,
-			RootPackageTree: pkgT,
-			Manifest:        m,
-			Lock:            l,
-			ProjectAnalyzer: dep.Analyzer{},
-		}
-
-		if *verbose {
-			params.Trace = true
-			params.TraceLogger = log.New(os.Stderr, "", 0)
-		}
-		s, err := gps.Prepare(params, sm)
-		if err != nil {
-			return errors.Wrap(err, "prepare solver")
-		}
-
-		soln, err := s.Solve()
-		if err != nil {
-			handleAllTheFailuresOfTheWorld(err)
-			return err
-		}
-		l = dep.LockFromInterface(soln)
+	// Run solver with project versions found on disk
+	internal.Vlogf("Solving...")
+	params := gps.SolveParameters{
+		RootDir:         root,
+		RootPackageTree: pkgT,
+		Manifest:        m,
+		Lock:            l,
+		ProjectAnalyzer: dep.Analyzer{},
 	}
+
+	if *verbose {
+		params.Trace = true
+		params.TraceLogger = log.New(os.Stderr, "", 0)
+	}
+	s, err := gps.Prepare(params, sm)
+	if err != nil {
+		return errors.Wrap(err, "prepare solver")
+	}
+
+	soln, err := s.Solve()
+	if err != nil {
+		handleAllTheFailuresOfTheWorld(err)
+		return err
+	}
+	l = dep.LockFromInterface(soln)
+
+	// Pick notondisk project constraints from solution and add to manifest
+	for k, _ := range pd.notondisk {
+		for _, x := range l.Projects() {
+			if k == x.Ident().ProjectRoot {
+				m.Dependencies[k] = getProjectPropertiesFromVersion(x.Version())
+				break
+			}
+		}
+	}
+
+	// Run gps.Prepare with appropriate constraint solutions from solve run
+	// to generate the final lock memo.
+	s, err = gps.Prepare(params, sm)
+	if err != nil {
+		return errors.Wrap(err, "prepare solver")
+	}
+
+	l.Memo = s.HashInputs()
 
 	internal.Vlogf("Writing manifest and lock files.")
 
@@ -211,6 +227,34 @@ func hasImportPathPrefix(s, prefix string) bool {
 		return true
 	}
 	return strings.HasPrefix(s, prefix+"/")
+}
+
+// getProjectPropertiesFromVersion takes a gps.Version and returns a proper
+// gps.ProjectProperties with Constraint value based on the provided version.
+func getProjectPropertiesFromVersion(v gps.Version) gps.ProjectProperties {
+	pp := gps.ProjectProperties{}
+
+	// extract version and ignore if it's revision only
+	switch tv := v.(type) {
+	case gps.PairedVersion:
+		v = tv.Unpair()
+	case gps.Revision:
+		return pp
+	}
+
+	switch v.Type() {
+	case gps.IsBranch, gps.IsVersion:
+		pp.Constraint = v
+	case gps.IsSemver:
+		// TODO: remove "^" when https://github.com/golang/dep/issues/225 is ready.
+		c, err := gps.NewSemverConstraint("^" + v.String())
+		if err != nil {
+			panic(err)
+		}
+		pp.Constraint = c
+	}
+
+	return pp
 }
 
 type projectData struct {
@@ -267,16 +311,7 @@ func getProjectData(ctx *dep.Ctx, pkgT pkgtree.PackageTree, cpr string, sm *gps.
 		}
 
 		ondisk[pr] = v
-		pp := gps.ProjectProperties{}
-		switch v.Type() {
-		case gps.IsBranch, gps.IsVersion, gps.IsRevision:
-			pp.Constraint = v
-		case gps.IsSemver:
-			c, _ := gps.NewSemverConstraint("^" + v.String())
-			pp.Constraint = c
-		}
-
-		constraints[pr] = pp
+		constraints[pr] = getProjectPropertiesFromVersion(v)
 	}
 
 	internal.Vlogf("Analyzing transitive imports...")
