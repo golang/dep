@@ -50,3 +50,7 @@
 # source = "https://github.com/myfork/package.git"
 
 
+
+[[dependencies]]
+  name = "github.com/sdboyer/deptest"
+  version = "^1.0.0"
