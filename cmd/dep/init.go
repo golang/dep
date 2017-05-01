@@ -21,16 +21,14 @@ import (
 
 const initShortHelp = `Initialize a new project with manifest and lock files`
 const initLongHelp = `
-Initialize the project at filepath root by parsing its dependencies and writing
-manifest and lock files. If root isn't specified, use the current directory.
+Initialize the project at filepath root by parsing its dependencies, writing
+manifest and lock files, and vendoring the dependencies. If root isn't
+specified, use the current directory.
 
 The version of each dependency will reflect the current state of the GOPATH. If
-a dependency doesn't exist in the GOPATH, it won't be written to the manifest,
-but it will be solved-for, and will appear in the lock.
-
-Note: init may use the network to solve the dependency graph.
-
-Note: init does NOT vendor dependencies at the moment. See dep ensure.
+a dependency doesn't exist in the GOPATH, the network would be used to
+solve-for, and the solution will appear in manifest and lock. Solved
+dependencies will be vendored in vendor/ dir relative to project root.
 `
 
 func (cmd *initCommand) Name() string      { return "init" }
