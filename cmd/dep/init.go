@@ -26,9 +26,16 @@ manifest and lock files, and vendoring the dependencies. If root isn't
 specified, use the current directory.
 
 The version of each dependency will reflect the current state of the GOPATH. If
-a dependency doesn't exist in the GOPATH, the network would be used to
-solve-for, and the solution will appear in manifest and lock. Solved
-dependencies will be vendored in vendor/ dir relative to project root.
+a dependency doesn't exist in the GOPATH, a version will be selected from the
+versions available from the upstream source per the following algorithm:
+
+ - Tags conforming to semver (sorted by semver rules)
+ - Default branch(es) (sorted lexicographically)
+ - Non-semver tags (sorted lexicographically)
+
+A Gopkg.toml file will be written with inferred version constraints for all
+direct dependencies. Gopkg.lock will be written with precise versions, and
+vendor/ will be populated with the precise versions written to Gopkg.lock.
 `
 
 func (cmd *initCommand) Name() string      { return "init" }
