@@ -40,41 +40,43 @@ func TestIsStdLib(t *testing.T) {
 
 func TestGetProjectPropertiesFromVersion(t *testing.T) {
 	cases := []struct {
-		version  gps.Version
-		expected gps.Version
+		version gps.Version
+		want    gps.Version
 	}{
 		{
-			version:  gps.NewBranch("foo-branch").Is("some-revision"),
-			expected: gps.NewBranch("foo-branch"),
+			version: gps.NewBranch("foo-branch"),
+			want:    gps.NewBranch("foo-branch"),
 		},
 		{
-			version:  gps.NewVersion("foo-version").Is("some-revision"),
-			expected: gps.NewVersion("foo-version"),
+			version: gps.NewVersion("foo-version"),
+			want:    gps.NewVersion("foo-version"),
 		},
 		{
-			version:  gps.Revision("alsjd934"),
-			expected: nil,
+			version: gps.NewBranch("foo-branch").Is("some-revision"),
+			want:    gps.NewBranch("foo-branch"),
 		},
-		// This fails. Hence, testing separately below.
-		// {
-		// 	version: gps.NewVersion("v1.0.0"),
-		// 	expected: gps.NewVersion("^1.0.0"),
-		// },
+		{
+			version: gps.NewVersion("foo-version").Is("some-revision"),
+			want:    gps.NewVersion("foo-version"),
+		},
+		{
+			version: gps.Revision("some-revision"),
+			want:    nil,
+		},
 	}
 
 	for _, c := range cases {
 		actualProp := getProjectPropertiesFromVersion(c.version)
-		if c.expected != actualProp.Constraint {
-			t.Fatalf("Expected %q to be equal to %q", actualProp.Constraint, c.expected)
+		if c.want != actualProp.Constraint {
+			t.Fatalf("Expected project property to be %v, got %v", actualProp.Constraint, c.want)
 		}
 	}
 
+	// Test to have caret in semver version
 	outsemver := getProjectPropertiesFromVersion(gps.NewVersion("v1.0.0"))
-	expectedSemver, _ := gps.NewSemverConstraint("^1.0.0")
-	// Comparing outsemver.Constraint and expectedSemver fails with error
-	// "comparing uncomparable type semver.rangeConstraint", although they have
-	// same value and same type "gps.semverConstraint" as per "reflect".
-	if outsemver.Constraint.String() != expectedSemver.String() {
-		t.Fatalf("Expected %q to be equal to %q", outsemver, expectedSemver)
+	wantSemver, _ := gps.NewSemverConstraint("^1.0.0")
+
+	if outsemver.Constraint.String() != wantSemver.String() {
+		t.Fatalf("Expected semver to be %v, got %v", outsemver.Constraint, wantSemver)
 	}
 }
