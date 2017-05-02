@@ -8,7 +8,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/sdboyer/gps"
+	"github.com/golang/dep/gps"
 )
 
 func TestContains(t *testing.T) {
