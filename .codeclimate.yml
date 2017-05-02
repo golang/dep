@@ -8,3 +8,4 @@ ratings:
     - "**.go"
 exclude_paths:
   - vendor/
+  - gps/_testdata
