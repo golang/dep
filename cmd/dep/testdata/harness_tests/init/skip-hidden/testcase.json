@@ -1,6 +1,6 @@
 {
   "commands": [
-    ["init"]
+    ["init", "-no-examples"]
   ],
   "vendor-final": [
     "github.com/sdboyer/deptest"

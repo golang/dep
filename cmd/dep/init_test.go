@@ -4,7 +4,12 @@
 
 package main
 
-import "testing"
+import (
+	"reflect"
+	"testing"
+
+	"github.com/sdboyer/gps"
+)
 
 func TestContains(t *testing.T) {
 	a := []string{"a", "b", "abcd"}
@@ -30,6 +35,49 @@ func TestIsStdLib(t *testing.T) {
 		b := isStdLib(p)
 		if b != e {
 			t.Fatalf("%s: expected %t got %t", p, e, b)
+		}
+	}
+}
+
+func TestGetProjectPropertiesFromVersion(t *testing.T) {
+	wantSemver, _ := gps.NewSemverConstraint("^v1.0.0")
+	cases := []struct {
+		version, want gps.Constraint
+	}{
+		{
+			version: gps.NewBranch("foo-branch"),
+			want:    gps.NewBranch("foo-branch"),
+		},
+		{
+			version: gps.NewVersion("foo-version"),
+			want:    gps.NewVersion("foo-version"),
+		},
+		{
+			version: gps.NewVersion("v1.0.0"),
+			want:    wantSemver,
+		},
+		{
+			version: gps.NewBranch("foo-branch").Is("some-revision"),
+			want:    gps.NewBranch("foo-branch"),
+		},
+		{
+			version: gps.NewVersion("foo-version").Is("some-revision"),
+			want:    gps.NewVersion("foo-version"),
+		},
+		{
+			version: gps.Revision("some-revision"),
+			want:    nil,
+		},
+		{
+			version: gps.NewVersion("v1.0.0").Is("some-revision"),
+			want:    wantSemver,
+		},
+	}
+
+	for _, c := range cases {
+		actualProp := getProjectPropertiesFromVersion(c.version.(gps.Version))
+		if !reflect.DeepEqual(c.want, actualProp.Constraint) {
+			t.Fatalf("Constraints are not as expected: \n\t(GOT) %v\n\t(WNT) %v", actualProp.Constraint, c.want)
 		}
 	}
 }

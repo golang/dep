@@ -17,16 +17,22 @@ Summarize the question and quote the reply, linking back to the original comment
 * [Why did dep use a different revision for package X instead of the revision in the lock file?](#why-did-dep-use-a-different-revision-for-package-x-instead-of-the-revision-in-the-lock-file)
 
 ## What is a direct or transitive dependency?
-* Direct dependencies appear in at least one import statement from your project - are dependencies that are imported by your project.
+* Direct dependencies are dependencies that are imported directly by your project: they appear in at least one import statement from your project.
 * Transitive dependencies are the dependencies of your dependencies. Necessary to compile but are not directly used by your code.
 
 ## Should I commit my vendor directory?
 
-Committing the vendor directory is totally up to you. There is no general advice that applies in all cases.
+It's up to you:
 
-**Pros**: it's the only way to get truly reproducible builds, as it guards against upstream renames and deletes; and you don't need an extra `dep ensure` step on fresh clones to build your repo.
+**Pros**
 
-**Cons**: your repo will be bigger, potentially a lot bigger; and PR diffs are more annoying.
+- it's the only way to get truly reproducible builds, as it guards against upstream renames and deletes
+- you don't need an extra `dep ensure` step (to fetch dependencies) on fresh clones to build your repo
+
+**Cons**
+
+- your repo will be bigger, potentially a lot bigger
+- PR diffs are more annoying
 
 ## Why is it `dep ensure` instead of `dep install`?
 

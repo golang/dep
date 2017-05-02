@@ -1,0 +1,7 @@
+{
+   "commands": [
+     ["init", "-no-examples"],
+     ["ensure", "-update"]
+   ],
+   "error-expected" : "all dirs lacked any go code"
+ } 

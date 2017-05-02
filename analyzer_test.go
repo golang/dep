@@ -5,15 +5,15 @@
 package dep
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/golang/dep/test"
 )
 
-func TestDeriveManifestAndLock(t *testing.T) {
+func TestAnalyzerDeriveManifestAndLock(t *testing.T) {
 	h := test.NewHelper(t)
 	defer h.Cleanup()
 
@@ -49,17 +49,75 @@ func TestDeriveManifestAndLock(t *testing.T) {
 	}
 }
 
-func TestDeriveManifestAndLockDoesNotExist(t *testing.T) {
-	dir, err := ioutil.TempDir("", "dep")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(dir)
+func TestAnalyzerDeriveManifestAndLockDoesNotExist(t *testing.T) {
+	h := test.NewHelper(t)
+	defer h.Cleanup()
+
+	h.TempDir("dep")
 
 	a := Analyzer{}
 
-	m, l, err := a.DeriveManifestAndLock(dir, "my/fake/project")
+	m, l, err := a.DeriveManifestAndLock(h.Path("dep"), "my/fake/project")
 	if m != nil || l != nil || err != nil {
 		t.Fatalf("expected manifest & lock & err to be nil: m -> %#v l -> %#v err-> %#v", m, l, err)
+	}
+}
+
+func TestAnalyzerDeriveManifestAndLockCannotOpen(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		// TODO: find an implementation that works on Microsoft
+		// Windows. Setting permissions works differently there.
+		// os.Chmod(..., 0222) below is not enough for the file
+		// to be write-only (unreadable), and os.Chmod(...,
+		// 0000) returns an invalid argument error.
+		t.Skip("skipping on windows")
+	}
+
+	h := test.NewHelper(t)
+	defer h.Cleanup()
+
+	h.TempDir("dep")
+
+	// Create an empty manifest file
+	h.TempFile(filepath.Join("dep", ManifestName), "")
+
+	// Change its mode so that it cannot be read
+	err := os.Chmod(filepath.Join(h.Path("dep"), ManifestName), 0222)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	a := Analyzer{}
+
+	m, l, err := a.DeriveManifestAndLock(h.Path("dep"), "my/fake/project")
+	if m != nil || l != nil || err == nil {
+		t.Fatalf("expected manifest & lock to be nil, err to be not nil: m -> %#v l -> %#v err -> %#v", m, l, err)
+	}
+}
+
+func TestAnalyzerDeriveManifestAndLockInvalidManifest(t *testing.T) {
+	h := test.NewHelper(t)
+	defer h.Cleanup()
+
+	h.TempDir("dep")
+
+	// Create a manifest with invalid contents
+	h.TempFile(filepath.Join("dep", ManifestName), "invalid manifest")
+
+	a := Analyzer{}
+
+	m, l, err := a.DeriveManifestAndLock(h.Path("dep"), "my/fake/project")
+	if m != nil || l != nil || err == nil {
+		t.Fatalf("expected manifest & lock & err to be nil: m -> %#v l -> %#v err-> %#v", m, l, err)
+	}
+}
+
+func TestAnalyzerInfo(t *testing.T) {
+	a := Analyzer{}
+
+	name, vers := a.Info()
+
+	if name != "dep" || vers != 1 {
+		t.Fatalf("expected name to be 'dep' and version to be 1: name -> %q vers -> %d", name, vers)
 	}
 }

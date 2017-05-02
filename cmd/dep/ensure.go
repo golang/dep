@@ -9,6 +9,7 @@ import (
 	"encoding/hex"
 	"flag"
 	"fmt"
+	"go/build"
 	"log"
 	"os"
 	"path/filepath"
@@ -27,7 +28,7 @@ const ensureLongHelp = `
 Ensure is used to fetch project dependencies into the vendor folder, as well as
 to set version constraints for specific dependencies. It takes user input,
 solves the updated dependency graph of the project, writes any changes to the
-manifest and lock file, and places dependencies in the vendor folder.
+lock file, and places dependencies in the vendor folder.
 
 Package spec:
 
@@ -130,6 +131,10 @@ func (cmd *ensureCommand) Run(ctx *dep.Ctx, args []string) error {
 		return errors.Wrap(err, "ensure ListPackage for project")
 	}
 
+	if err := checkErrors(params.RootPackageTree.Packages); err != nil {
+		return err
+	}
+
 	if cmd.update {
 		applyUpdateArgs(args, &params)
 	} else {
@@ -160,19 +165,16 @@ func (cmd *ensureCommand) Run(ctx *dep.Ctx, args []string) error {
 		writeV = dep.VendorAlways
 	}
 
-	var sw dep.SafeWriter
-	var manifest *dep.Manifest
-	if !cmd.update {
-		manifest = p.Manifest
-	}
-
 	newLock := dep.LockFromInterface(solution)
-	sw.Prepare(manifest, p.Lock, newLock, writeV)
+	sw, err := dep.NewSafeWriter(nil, p.Lock, newLock, writeV)
+	if err != nil {
+		return err
+	}
 	if cmd.dryRun {
 		return sw.PrintPreparedActions()
 	}
 
-	return errors.Wrap(sw.Write(p.AbsRoot, sm), "grouped write of manifest, lock and vendor")
+	return errors.Wrap(sw.Write(p.AbsRoot, sm, true), "grouped write of manifest, lock and vendor")
 }
 
 func applyUpdateArgs(args []string, params *gps.SolveParameters) {
@@ -365,4 +367,31 @@ func deduceConstraint(s string) gps.Constraint {
 	// If not a plain SHA1 or bzr custom GUID, assume a plain version.
 	// TODO: if there is amgibuity here, then prompt the user?
 	return gps.NewVersion(s)
+}
+
+func checkErrors(m map[string]pkgtree.PackageOrErr) error {
+	noGoErrors, pkgErrors := 0, 0
+	for _, poe := range m {
+		if poe.Err != nil {
+			switch poe.Err.(type) {
+			case *build.NoGoError:
+				noGoErrors++
+			default:
+				pkgErrors++
+			}
+		}
+	}
+	if len(m) == 0 || len(m) == noGoErrors {
+		return errors.New("all dirs lacked any go code")
+	}
+
+	if len(m) == pkgErrors {
+		return errors.New("all dirs had go code with errors")
+	}
+
+	if len(m) == pkgErrors+noGoErrors {
+		return errors.Errorf("%d dirs had errors and %d had no go code", pkgErrors, noGoErrors)
+	}
+
+	return nil
 }
