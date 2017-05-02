@@ -138,17 +138,17 @@ func (cmd *ensureCommand) Run(ctx *dep.Ctx, args []string) error {
 		return errors.New("cannot pass both -add and -update")
 	}
 
-	if cmd.update && cmd.vendorOnly {
-		return errors.New("-vendor-only makes -update a no-op; cannot pass them together")
-	}
-
-	if cmd.add && cmd.vendorOnly {
-		return errors.New("-vendor-only makes -add a no-op; cannot pass them together")
-	}
-
-	if cmd.vendorOnly && cmd.noVendor {
-		// TODO(sdboyer) can't think of anything not snarky right now
-		return errors.New("really?")
+	if cmd.vendorOnly {
+		if cmd.update {
+			return errors.New("-vendor-only makes -update a no-op; cannot pass them together")
+		}
+		if cmd.add {
+			return errors.New("-vendor-only makes -add a no-op; cannot pass them together")
+		}
+		if cmd.noVendor {
+			// TODO(sdboyer) can't think of anything not snarky right now
+			return errors.New("really?")
+		}
 	}
 
 	p, err := ctx.LoadProject("")
@@ -264,7 +264,6 @@ func (cmd *ensureCommand) runDefault(ctx *dep.Ctx, args []string, p *dep.Project
 		// that "verification" is supposed to look like (#121); in the meantime,
 		// we unconditionally write out vendor/ so that `dep ensure`'s behavior
 		// is maximally compatible with what it will eventually become.
-		// vendor doesn't exist at all; be helpful and write it.
 		err := sw.Prepare(nil, p.Lock, p.Lock, dep.VendorAlways)
 		if err != nil {
 			return err
@@ -309,7 +308,8 @@ func (cmd *ensureCommand) runUpdate(ctx *dep.Ctx, args []string, p *dep.Project,
 	// run a straight `dep ensure` before updating. This is handholding the
 	// user a bit, but the extra effort required is minimal, and it ensures the
 	// user is isolating variables in the event of solve problems (was it the
-	// existing changes, or the -update that caused the problem?).
+	// "pending" changes, or the -update that caused the problem?).
+	// TODO(sdboyer) reduce this to a warning?
 	if bytes.Equal(p.Lock.InputHash(), solver.HashInputs()) {
 		return errors.Errorf("%s and %s are out of sync. run a plain `dep ensure` to resync them before attempting an -update.", dep.ManifestName, dep.LockName)
 	}
@@ -329,13 +329,16 @@ func (cmd *ensureCommand) runUpdate(ctx *dep.Ctx, args []string, p *dep.Project,
 		pc, err := getProjectConstraint(arg, sm)
 		if err != nil {
 			// TODO(sdboyer) return all errors, not just the first one we encounter
-			// TODO(sdboyer) ensure these errors are contextualized in a
-			// sensible way for -update
+			// TODO(sdboyer) ensure these errors are contextualized in a sensible way for -update
 			return err
 		}
 
 		if !p.Lock.HasProjectWithRoot(pc.Ident.ProjectRoot) {
 			return errors.Errorf("%s is not present in %s, cannot -update it", pc.Ident.ProjectRoot, dep.LockName)
+		}
+
+		if p.Ident.Source != "" {
+			return errors.Errorf("cannot specify alternate sources on -update (%s)")
 		}
 
 		if !gps.IsAny(pc.Constraint) {
@@ -371,6 +374,61 @@ func (cmd *ensureCommand) runUpdate(ctx *dep.Ctx, args []string, p *dep.Project,
 }
 
 func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm gps.SourceManager, params gps.SolveParameters) error {
+	if len(args) == 0 {
+		return errors.New("must specify at least one project or package to add")
+	}
+
+	// Compare the hashes. If they're not equal, bail out and ask the user to
+	// run a straight `dep ensure` before updating. This is handholding the
+	// user a bit, but the extra effort required is minimal, and it ensures the
+	// user is isolating variables in the event of solve problems (was it the
+	// "pending" changes, or the -add that caused the problem?).
+	// TODO(sdboyer) reduce this to a warning?
+	if bytes.Equal(p.Lock.InputHash(), solver.HashInputs()) {
+		return errors.Errorf("%s and %s are out of sync. run a plain `dep ensure` to resync them before attempting an -add.", dep.ManifestName, dep.LockName)
+	}
+
+	rm, errmap := params.RootPackageTree.ToReachMap(true, true, false, p.Manifest.IgnoredPackages())
+	// Having some problematic internal packages isn't cause for termination,
+	// but the user needs to be warned.
+	for fail := range errmap {
+		internal.Logf("Warning: %s", fail)
+	}
+
+	exmap := make(map[string]bool)
+	exrmap := make(map[gps.ProjectRoot]bool)
+	for _, ex := range append(rm.Flatten(false), p.Manifest.RequiredPackages()...) {
+		exmap[ex] = true
+		root, err := sm.DeduceProjectRoot(ex)
+		if err != nil {
+			// This should be essentially impossible to hit, as it entails that
+			// we couldn't deduce the root for an import, but that some previous
+			// solve run WAS able to deduce the root.
+			return errors.Wrap(err, "could not deduce project root")
+		}
+		exrmap[root] = true
+	}
+
+	for _, arg := range args {
+		// TODO(sdboyer) return all errors, not just the first one we encounter
+		// TODO(sdboyer) do these concurrently
+		pc, err := getProjectConstraint(arg, sm)
+		if err != nil {
+			// TODO(sdboyer) ensure these errors are contextualized in a sensible way for -add
+			return err
+		}
+
+		inManifest := p.Manifest.HasConstraintsOn(pc.Ident.ProjectRoot)
+		inImports := exrmap[pc.Ident.ProjectRoot]
+		if inManifest && inImports {
+			return errors.Errorf("%s is already in %s and the project's direct imports, nothing to add", pc.Ident.ProjectRoot, dep.ManifestName)
+		}
+
+		err = sm.SyncSourceFor(pc.Ident)
+		if err != nil {
+			return errors.Wrap(err, "failed to fetch source for %s", pc.Ident.ProjectRoot)
+		}
+	}
 }
 
 func applyEnsureArgs(args []string, overrides stringSlice, p *dep.Project, sm gps.SourceManager, params *gps.SolveParameters) error {
