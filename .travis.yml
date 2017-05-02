@@ -24,6 +24,7 @@ before_script:
   - go get -v honnef.co/go/tools/cmd/{gosimple,staticcheck}
   - npm install -g codeclimate-test-reporter
 script:
+  - export DEPTESTBYPASS501=1
   - go build -v ./cmd/dep
   - go vet $PKGS
   # TODO (kris-nova) remove the ignore flag once we can refactor the code causing problems
