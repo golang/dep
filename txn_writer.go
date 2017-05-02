@@ -21,15 +21,58 @@ import (
 // Example string to be written to the manifest file
 // if no dependencies are found in the project
 // during `dep init`
-const exampleToml = `
-# Example:
+const exampleTOML = `
+## Gopkg.toml example (these lines may be deleted)
+
+## "required" lists a set of packages (not projects) that must be included in
+## Gopkg.lock. This list is merged with the set of packages imported by the current
+## project. Use it when your project needs a package it doesn't explicitly import -
+## including "main" packages.
+# required = ["github.com/user/thing/cmd/thing"]
+
+## "ignored" lists a set of packages (not projects) that are ignored when
+## dep statically analyzes source code. Ignored packages can be in this project,
+## or in a dependency.
+# ignored = ["github.com/user/project/badpkg"]
+
+## Dependencies define constraints on dependent projects. They are respected by
+## dep whether coming from the Gopkg.toml of the current project or a dependency.
 # [[dependencies]]
-# source = "https://github.com/myfork/package.git"
-# branch = "master"
-# name = "github.com/vendor/package"
-# Note: revision will depend on your repository type, i.e git, svc, bzr etc...
-# revision = "abc123"
+## Required: the root import path of the project being constrained.
+# name = "github.com/user/project"
+#
+## Recommended: the version constraint to enforce for the project.
+## Only one of "branch", "version" or "revision" can be specified.
 # version = "1.0.0"
+# branch = "master"
+# revision = "abc123"
+#
+## Optional: an alternate location (URL or import path) for the project's source.
+# source = "https://github.com/myfork/package.git"
+
+## Overrides have the same structure as [[dependencies]], but supercede all
+## [[dependencies]] declarations from all projects. Only the current project's
+## [[overrides]] are applied.
+##
+## Overrides are a sledgehammer. Use them only as a last resort.
+# [[overrides]]
+## Required: the root import path of the project being constrained.
+# name = "github.com/user/project"
+#
+## Optional: specifying a version constraint override will cause all other
+## constraints on this project to be ignored; only the overriden constraint
+## need be satisfied.
+## Again, only one of "branch", "version" or "revision" can be specified.
+# version = "1.0.0"
+# branch = "master"
+# revision = "abc123"
+#
+## Optional: specifying an alternate source location as an override will
+## enforce that the alternate location is used for that project, regardless of
+## what source location any dependent projects specify.
+# source = "https://github.com/myfork/package.git"
+
+
 `
 
 // SafeWriter transactionalizes writes of manifest, lock, and vendor dir, both
@@ -39,27 +82,63 @@ const exampleToml = `
 // It is not impervious to errors (writing to disk is hard), but it should
 // guard against non-arcane failure conditions.
 type SafeWriter struct {
-	Payload *SafeWriterPayload
-}
-
-// SafeWriterPayload represents the actions SafeWriter will execute when SafeWriter.Write is called.
-type SafeWriterPayload struct {
 	Manifest    *Manifest
 	Lock        *Lock
 	LockDiff    *gps.LockDiff
 	WriteVendor bool
 }
 
-func (payload *SafeWriterPayload) HasLock() bool {
-	return payload.Lock != nil
+// NewSafeWriter sets up a SafeWriter to write a set of config yaml, lock and vendor tree.
+//
+// - If manifest is provided, it will be written to the standard manifest file
+//   name beneath root.
+// - If newLock is provided, it will be written to the standard lock file
+//   name beneath root.
+// - If vendor is VendorAlways, or is VendorOnChanged and the locks are different,
+//   the vendor directory will be written beneath root based on newLock.
+// - If oldLock is provided without newLock, error.
+// - If vendor is VendorAlways without a newLock, error.
+func NewSafeWriter(manifest *Manifest, oldLock, newLock *Lock, vendor VendorBehavior) (*SafeWriter, error) {
+	sw := &SafeWriter{
+		Manifest: manifest,
+		Lock:     newLock,
+	}
+	if oldLock != nil {
+		if newLock == nil {
+			return nil, errors.New("must provide newLock when oldLock is specified")
+		}
+		sw.LockDiff = gps.DiffLocks(oldLock, newLock)
+	}
+
+	switch vendor {
+	case VendorAlways:
+		sw.WriteVendor = true
+	case VendorOnChanged:
+		if sw.LockDiff != nil || (newLock != nil && oldLock == nil) {
+			sw.WriteVendor = true
+		}
+	}
+
+	if sw.WriteVendor && newLock == nil {
+		return nil, errors.New("must provide newLock in order to write out vendor")
+	}
+
+	return sw, nil
 }
 
-func (payload *SafeWriterPayload) HasManifest() bool {
-	return payload.Manifest != nil
+// HasLock checks if a Lock is present in the SafeWriter
+func (sw *SafeWriter) HasLock() bool {
+	return sw.Lock != nil
 }
 
-func (payload *SafeWriterPayload) HasVendor() bool {
-	return payload.WriteVendor
+// HasManifest checks if a Manifest is present in the SafeWriter
+func (sw *SafeWriter) HasManifest() bool {
+	return sw.Manifest != nil
+}
+
+// HasVendor returns the if SafeWriter should write to vendor
+func (sw *SafeWriter) HasVendor() bool {
+	return sw.WriteVendor
 }
 
 type rawStringDiff struct {
@@ -178,47 +257,7 @@ const (
 	VendorNever
 )
 
-// Prepare to write a set of config yaml, lock and vendor tree.
-//
-// - If manifest is provided, it will be written to the standard manifest file
-//   name beneath root.
-// - If newLock is provided, it will be written to the standard lock file
-//   name beneath root.
-// - If vendor is VendorAlways, or is VendorOnChanged and the locks are different,
-//   the vendor directory will be written beneath root based on newLock.
-// - If oldLock is provided without newLock, error.
-// - If vendor is VendorAlways without a newLock, error.
-func (sw *SafeWriter) Prepare(manifest *Manifest, oldLock, newLock *Lock, vendor VendorBehavior) error {
-
-	sw.Payload = &SafeWriterPayload{
-		Manifest: manifest,
-		Lock:     newLock,
-	}
-
-	if oldLock != nil {
-		if newLock == nil {
-			return errors.New("must provide newLock when oldLock is specified")
-		}
-		sw.Payload.LockDiff = gps.DiffLocks(oldLock, newLock)
-	}
-
-	switch vendor {
-	case VendorAlways:
-		sw.Payload.WriteVendor = true
-	case VendorOnChanged:
-		if sw.Payload.LockDiff != nil || (newLock != nil && oldLock == nil) {
-			sw.Payload.WriteVendor = true
-		}
-	}
-
-	if sw.Payload.WriteVendor && newLock == nil {
-		return errors.New("must provide newLock in order to write out vendor")
-	}
-
-	return nil
-}
-
-func (payload SafeWriterPayload) validate(root string, sm gps.SourceManager) error {
+func (sw SafeWriter) validate(root string, sm gps.SourceManager) error {
 	if root == "" {
 		return errors.New("root path must be non-empty")
 	}
@@ -229,7 +268,7 @@ func (payload SafeWriterPayload) validate(root string, sm gps.SourceManager) err
 		return errors.Errorf("root path %q does not exist", root)
 	}
 
-	if payload.HasVendor() && sm == nil {
+	if sw.HasVendor() && sm == nil {
 		return errors.New("must provide a SourceManager if writing out a vendor dir")
 	}
 
@@ -244,18 +283,13 @@ func (payload SafeWriterPayload) validate(root string, sm gps.SourceManager) err
 // operations succeeded. It also does its best to roll back if any moves fail.
 // This mostly guarantees that dep cannot exit with a partial write that would
 // leave an undefined state on disk.
-func (sw *SafeWriter) Write(root string, sm gps.SourceManager) error {
-
-	if sw.Payload == nil {
-		return errors.New("Cannot call SafeWriter.Write before SafeWriter.Prepare")
-	}
-
-	err := sw.Payload.validate(root, sm)
+func (sw *SafeWriter) Write(root string, sm gps.SourceManager, noExamples bool) error {
+	err := sw.validate(root, sm)
 	if err != nil {
 		return err
 	}
 
-	if !sw.Payload.HasManifest() && !sw.Payload.HasLock() && !sw.Payload.HasVendor() {
+	if !sw.HasManifest() && !sw.HasLock() && !sw.HasVendor() {
 		// nothing to do
 		return nil
 	}
@@ -270,27 +304,45 @@ func (sw *SafeWriter) Write(root string, sm gps.SourceManager) error {
 	}
 	defer os.RemoveAll(td)
 
-	if sw.Payload.HasManifest() {
-		if sw.Payload.Manifest.IsEmpty() {
-			err := modifyWithString(filepath.Join(td, ManifestName), exampleToml)
-			if err != nil {
-				return errors.Wrap(err, "failed to generate example text")
-			}
-		} else if err := writeFile(filepath.Join(td, ManifestName), sw.Payload.Manifest); err != nil {
+	if sw.HasManifest() {
+		// Always write the example text to the bottom of the TOML file.
+		tb, err := sw.Manifest.MarshalTOML()
+		if err != nil {
+			return errors.Wrap(err, "failed to marshal manifest to TOML")
+		}
+
+		var initOutput string
+
+		// If examples are NOT disabled, use the example text
+		if !noExamples {
+			initOutput = exampleTOML
+		}
+
+		// 0666 is before umask; mirrors behavior of os.Create (used by
+		// writeFile())
+		if err = ioutil.WriteFile(filepath.Join(td, ManifestName), append([]byte(initOutput), tb...), 0666); err != nil {
 			return errors.Wrap(err, "failed to write manifest file to temp dir")
 		}
 	}
 
-	if sw.Payload.HasLock() {
-		if err := writeFile(filepath.Join(td, LockName), sw.Payload.Lock); err != nil {
+	if sw.HasLock() {
+		if err := writeFile(filepath.Join(td, LockName), sw.Lock); err != nil {
 			return errors.Wrap(err, "failed to write lock file to temp dir")
 		}
 	}
 
-	if sw.Payload.HasVendor() {
-		err = gps.WriteDepTree(filepath.Join(td, "vendor"), sw.Payload.Lock, sm, true)
+	if sw.HasVendor() {
+		err = gps.WriteDepTree(filepath.Join(td, "vendor"), sw.Lock, sm, true)
 		if err != nil {
 			return errors.Wrap(err, "error while writing out vendor tree")
+		}
+	}
+
+	// Ensure vendor/.git is preserved if present
+	if hasDotGit(vpath) {
+		err = renameWithFallback(filepath.Join(vpath, ".git"), filepath.Join(td, "vendor/.git"))
+		if _, ok := err.(*os.LinkError); ok {
+			return errors.Wrap(err, "failed to preserve vendor/.git")
 		}
 	}
 
@@ -303,7 +355,7 @@ func (sw *SafeWriter) Write(root string, sm gps.SourceManager) error {
 	var failerr error
 	var vendorbak string
 
-	if sw.Payload.HasManifest() {
+	if sw.HasManifest() {
 		if _, err := os.Stat(mpath); err == nil {
 			// Move out the old one.
 			tmploc := filepath.Join(td, ManifestName+".orig")
@@ -321,7 +373,7 @@ func (sw *SafeWriter) Write(root string, sm gps.SourceManager) error {
 		}
 	}
 
-	if sw.Payload.HasLock() {
+	if sw.HasLock() {
 		if _, err := os.Stat(lpath); err == nil {
 			// Move out the old one.
 			tmploc := filepath.Join(td, LockName+".orig")
@@ -340,7 +392,7 @@ func (sw *SafeWriter) Write(root string, sm gps.SourceManager) error {
 		}
 	}
 
-	if sw.Payload.HasVendor() {
+	if sw.HasVendor() {
 		if _, err := os.Stat(vpath); err == nil {
 			// Move out the old vendor dir. just do it into an adjacent dir, to
 			// try to mitigate the possibility of a pointless cross-filesystem
@@ -368,7 +420,7 @@ func (sw *SafeWriter) Write(root string, sm gps.SourceManager) error {
 
 	// Renames all went smoothly. The deferred os.RemoveAll will get the temp
 	// dir, but if we wrote vendor, we have to clean that up directly
-	if sw.Payload.HasVendor() {
+	if sw.HasVendor() {
 		// Nothing we can really do about an error at this point, so ignore it
 		os.RemoveAll(vendorbak)
 	}
@@ -385,26 +437,26 @@ fail:
 }
 
 func (sw *SafeWriter) PrintPreparedActions() error {
-	if sw.Payload.HasManifest() {
+	if sw.HasManifest() {
 		fmt.Printf("Would have written the following %s:\n", ManifestName)
-		m, err := sw.Payload.Manifest.MarshalTOML()
+		m, err := sw.Manifest.MarshalTOML()
 		if err != nil {
 			return errors.Wrap(err, "ensure DryRun cannot serialize manifest")
 		}
 		fmt.Println(string(m))
 	}
 
-	if sw.Payload.HasLock() {
-		if sw.Payload.LockDiff == nil {
+	if sw.HasLock() {
+		if sw.LockDiff == nil {
 			fmt.Printf("Would have written the following %s:\n", LockName)
-			l, err := sw.Payload.Lock.MarshalTOML()
+			l, err := sw.Lock.MarshalTOML()
 			if err != nil {
 				return errors.Wrap(err, "ensure DryRun cannot serialize lock")
 			}
 			fmt.Println(string(l))
 		} else {
 			fmt.Printf("Would have written the following changes to %s:\n", LockName)
-			diff, err := formatLockDiff(*sw.Payload.LockDiff)
+			diff, err := formatLockDiff(*sw.LockDiff)
 			if err != nil {
 				return errors.Wrap(err, "ensure DryRun cannot serialize the lock diff")
 			}
@@ -412,9 +464,9 @@ func (sw *SafeWriter) PrintPreparedActions() error {
 		}
 	}
 
-	if sw.Payload.HasVendor() {
+	if sw.HasVendor() {
 		fmt.Println("Would have written the following projects to the vendor directory:")
-		for _, project := range sw.Payload.Lock.Projects() {
+		for _, project := range sw.Lock.Projects() {
 			prj := project.Ident()
 			rev, _, _ := gps.VersionComponentStrings(project.Version())
 			if prj.Source == "" {
@@ -524,6 +576,13 @@ func deleteDirs(toDelete []string) error {
 		}
 	}
 	return nil
+}
+
+// hasDotGit checks if a given path has .git file or directory in it.
+func hasDotGit(path string) bool {
+	gitfilepath := filepath.Join(path, ".git")
+	_, err := os.Stat(gitfilepath)
+	return err == nil
 }
 
 type byLen []string

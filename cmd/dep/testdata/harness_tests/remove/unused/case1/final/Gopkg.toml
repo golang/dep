@@ -1,3 +1,6 @@
+[[dependencies]]
+  name = "github.com/not/used"
+  version = "2.0.0"
 
 [[dependencies]]
   name = "github.com/sdboyer/deptest"

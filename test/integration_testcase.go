@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"testing"
 )
 
@@ -27,6 +28,7 @@ type IntegrationTestCase struct {
 	initialPath   string
 	finalPath     string
 	Commands      [][]string        `json:"commands"`
+	ErrorExpected string            `json:"error-expected"`
 	GopathInitial map[string]string `json:"gopath-initial"`
 	VendorInitial map[string]string `json:"vendor-initial"`
 	VendorFinal   []string          `json:"vendor-final"`
@@ -123,6 +125,22 @@ func (tc *IntegrationTestCase) CompareFile(goldenPath, working string) {
 		} else {
 			tc.t.Errorf("%s not created where one was expected", goldenPath)
 		}
+	}
+}
+
+// CompareError compares exected and actual error
+func (tc *IntegrationTestCase) CompareError(err error, stderr string) {
+	wantExists, want := tc.ErrorExpected != "", tc.ErrorExpected
+	gotExists, got := stderr != "" && err != nil, stderr
+
+	if wantExists && gotExists {
+		if !strings.Contains(got, want) {
+			tc.t.Errorf("expected error containing %s, got error %s", want, got)
+		}
+	} else if !wantExists && gotExists {
+		tc.t.Fatal("error raised where none was expected")
+	} else if wantExists && !gotExists {
+		tc.t.Error("error not raised where one was expected")
 	}
 }
 

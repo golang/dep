@@ -1,3 +1,5 @@
+# Temporarily, until gps moves in and this becomes a direct dep again
+required = ["github.com/Masterminds/semver"]
 
 [[dependencies]]
   branch = "2.x"

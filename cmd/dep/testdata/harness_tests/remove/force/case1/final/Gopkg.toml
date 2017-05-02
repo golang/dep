@@ -1,4 +1,11 @@
+[[dependencies]]
+  name = "github.com/not/used"
+  version = "2.0.0"
 
 [[dependencies]]
   name = "github.com/sdboyer/deptest"
   version = ">=0.8.0, <1.0.0"
+
+[[dependencies]]
+  name = "github.com/sdboyer/deptestdos"
+  revision = "a0196baa11ea047dd65037287451d36b861b00ea"
