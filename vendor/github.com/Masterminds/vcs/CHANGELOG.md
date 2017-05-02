@@ -1,3 +1,19 @@
+# 1.11.1 (2017-04-28)
+
+## Fixed
+- #76: Fix submodule handling for Windows (thanks @m0j0hn)
+
+# 1.11.0 (2017-03-23)
+
+## Added
+- #65: Exposed CmdFromDir function (thanks @erizocosmico)
+
+## Changed
+- #69: Updated testing for Go 1.8
+
+## Fixed
+- #64: Testing fatal error if bzr not installed (thanks @kevinburke)
+
 # 1.10.2 (2017-01-24)
 
 ## Fixed
