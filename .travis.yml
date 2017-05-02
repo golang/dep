@@ -20,6 +20,8 @@ before_script:
   # set -e below. So, unset the trap.
   # Related: https://superuser.com/questions/1044130/why-am-i-having-how-can-i-fix-this-error-shell-session-update-command-not-f
   - if [[ "$(go env GOHOSTOS)" == "darwin" ]]; then trap EXIT; fi
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew update; fi
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew install bzr; fi
   - PKGS=$(go list ./... | grep -v /vendor/ | grep -v _testdata/ )
   - go get -v honnef.co/go/tools/cmd/{gosimple,staticcheck}
   - npm install -g codeclimate-test-reporter
