@@ -845,7 +845,9 @@ func TestSupervisor(t *testing.T) {
 	// TODO (kris-nova) We need to disable this bypass here, and in the .travis.yml
 	// as soon as dep#501 is fixed
 	bypass := os.Getenv("DEPTESTBYPASS501")
-	if tc.count != 2 &&  bypass == "" {
+	if bypass != "" {
+		t.Log("bypassing tc.count check for running ci")
+	} else if tc.count != 2 {
 		t.Fatalf("wrong count of running ci: wanted 2 got %v", tc.count)
 	}
 	superv.mu.Unlock()
