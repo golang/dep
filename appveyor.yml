@@ -7,6 +7,7 @@ clone_folder: c:\gopath\src\github.com\golang\dep
 
 environment:
   GOPATH: c:\gopath
+  DEPTESTBYPASS501: 1
   matrix:
     - environment:
       GOVERSION: 1.7.5
