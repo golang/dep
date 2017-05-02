@@ -1315,7 +1315,7 @@ func TestListPackages(t *testing.T) {
 						bypass := os.Getenv("DEPTESTBYPASS501")
 						if bypass != "" {
 							t.Log("bypassing fix.out.Packages check < 2")
-						}else {
+						} else {
 							if len(fix.out.Packages) < 2 {
 								t.Errorf("Did not get expected PackageOrErrs:\n\t(GOT): %#v\n\t(WNT): %#v", out, fix.out)
 							} else {
