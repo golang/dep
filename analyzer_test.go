@@ -5,9 +5,7 @@
 package dep
 
 import (
-	"os"
 	"path/filepath"
-	"runtime"
 	"testing"
 
 	"github.com/golang/dep/test"
@@ -64,31 +62,23 @@ func TestAnalyzerDeriveManifestAndLockDoesNotExist(t *testing.T) {
 }
 
 func TestAnalyzerDeriveManifestAndLockCannotOpen(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		// TODO: find an implementation that works on Microsoft
-		// Windows. Setting permissions works differently there.
-		// os.Chmod(..., 0222) below is not enough for the file
-		// to be write-only (unreadable), and os.Chmod(...,
-		// 0000) returns an invalid argument error.
-		t.Skip("skipping on windows")
-	}
-
 	h := test.NewHelper(t)
 	defer h.Cleanup()
 
 	h.TempDir("dep")
 
-	// Create an empty manifest file
+	// Simulate an inaccessible manifest file.
 	h.TempFile(filepath.Join("dep", ManifestName), "")
-
-	// Change its mode so that it cannot be read
-	err := os.Chmod(filepath.Join(h.Path("dep"), ManifestName), 0222)
+	closer, err := makeUnreadable(filepath.Join(h.Path("dep"), ManifestName))
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer closer.Close()
 
 	a := Analyzer{}
 
+	// Verify that the solver rejects the manifest, rather than treating it as
+	// offering no constraints.
 	m, l, err := a.DeriveManifestAndLock(h.Path("dep"), "my/fake/project")
 	if m != nil || l != nil || err == nil {
 		t.Fatalf("expected manifest & lock to be nil, err to be not nil: m -> %#v l -> %#v err -> %#v", m, l, err)
