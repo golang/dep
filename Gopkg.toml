@@ -6,7 +6,7 @@ required = ["github.com/Masterminds/semver"]
 
 [[dependencies]]
   name = "github.com/Masterminds/vcs"
-  version = "^1.8.0"
+  version = "^1.11.0"
 
 [[dependencies]]
   branch = "master"
