@@ -248,11 +248,13 @@ func TestSourceInit(t *testing.T) {
 		t.Error("Cache repo does not exist in expected location")
 	}
 
-	_, err = os.Stat(filepath.Join(cpath, "metadata", "github.com", "sdboyer", "gpkt", "cache.json"))
-	if err != nil {
-		// TODO(sdboyer) disabled until we get caching working
+	os.Stat(filepath.Join(cpath, "metadata", "github.com", "sdboyer", "gpkt", "cache.json"))
+
+	// TODO(sdboyer) disabled until we get caching working
+	//_, err = os.Stat(filepath.Join(cpath, "metadata", "github.com", "sdboyer", "gpkt", "cache.json"))
+	//if err != nil {
 		//t.Error("Metadata cache json file does not exist in expected location")
-	}
+	//}
 
 	// Ensure source existence values are what we expect
 	var exists bool
@@ -819,15 +821,17 @@ func TestSupervisor(t *testing.T) {
 
 	// run another, but via do
 	block, wait := make(chan struct{}), make(chan struct{})
+	errchan := make(chan error)
 	go func() {
 		wait <- struct{}{}
 		err := superv.do(bgc, "foo", 0, func(ctx context.Context) error {
 			<-block
 			return nil
 		})
-		if err != nil {
-			t.Fatal("unexpected err on do() completion:", err)
-		}
+		errchan <- err
+		//if err != nil {
+		//	t.Fatal("unexpected err on do() completion:", err)
+		//}
 		close(wait)
 	}()
 	<-wait
@@ -844,6 +848,12 @@ func TestSupervisor(t *testing.T) {
 	superv.mu.Unlock()
 
 	close(block)
+
+	possibleConcurrentError := <-errchan
+	if possibleConcurrentError != nil {
+		t.Fatal("unexpected err on do() completion:", err)
+	}
+
 	<-wait
 	superv.mu.Lock()
 	if len(superv.ran) != 0 {
