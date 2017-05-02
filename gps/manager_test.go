@@ -842,6 +842,8 @@ func TestSupervisor(t *testing.T) {
 		t.Fatal("running call not recorded in map")
 	}
 
+	// TODO (kris-nova) We need to disable this bypass here, and in the .travis.yml
+	// as soon as dep#501 is fixed
 	bypass := os.Getenv("DEPTESTBYPASS501")
 	if tc.count != 2 &&  bypass == "" {
 		t.Fatalf("wrong count of running ci: wanted 2 got %v", tc.count)
