@@ -951,10 +951,13 @@ func (s *solver) backtrack() bool {
 		// Grab the last versionQueue off the list of queues
 		q := s.vqs[len(s.vqs)-1]
 
-		// Walk back to the next project
-		awp, proj := s.unselectLast()
-		if !proj {
-			panic("canary - *should* be impossible to have a pkg-only selection here")
+		// Walk back to the next project. This may entail walking through some
+		// package-only selections.
+		var proj bool
+		var awp atomWithPackages
+		for !proj {
+			awp, proj = s.unselectLast()
+			s.traceBacktrack(awp.bmi(), !proj)
 		}
 
 		if !q.id.eq(awp.a.id) {
