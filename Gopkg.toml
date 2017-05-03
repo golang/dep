@@ -1,4 +1,3 @@
-# Temporarily, until gps moves in and this becomes a direct dep again
 required = ["github.com/Masterminds/semver"]
 
 [[dependencies]]
@@ -7,7 +6,7 @@ required = ["github.com/Masterminds/semver"]
 
 [[dependencies]]
   name = "github.com/Masterminds/vcs"
-  version = "^1.8.0"
+  version = "^1.11.0"
 
 [[dependencies]]
   branch = "master"
@@ -16,7 +15,3 @@ required = ["github.com/Masterminds/semver"]
 [[dependencies]]
   name = "github.com/pkg/errors"
   version = ">=0.8.0, <1.0.0"
-
-[[dependencies]]
-  name = "github.com/sdboyer/gps"
-  version = ">=0.16.0, <1.0.0"

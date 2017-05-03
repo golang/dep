@@ -8,7 +8,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/sdboyer/gps"
+	"github.com/golang/dep/gps"
 )
 
 type Analyzer struct{}

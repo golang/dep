@@ -7,7 +7,7 @@ package main
 import (
 	"testing"
 
-	"github.com/sdboyer/gps"
+	"github.com/golang/dep/gps"
 )
 
 func TestDeduceConstraint(t *testing.T) {

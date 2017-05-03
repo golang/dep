@@ -482,3 +482,118 @@ func TestGitSubmoduleHandling(t *testing.T) {
 	}
 
 }
+
+func TestGitSubmoduleHandling2(t *testing.T) {
+	tempDir, err := ioutil.TempDir("", "go-vcs-git-submodule-tests2")
+	if err != nil {
+		t.Error(err)
+	}
+	defer func() {
+		err = os.RemoveAll(tempDir)
+		if err != nil {
+			t.Error(err)
+		}
+	}()
+
+	repo, err := NewGitRepo("https://github.com/cloudfoundry/sonde-go", tempDir+"/VCSTestRepo2")
+	if err != nil {
+		t.Error(err)
+	}
+
+	if repo.Vcs() != Git {
+		t.Error("Git is detecting the wrong type")
+	}
+
+	// Check the basic getters.
+	if repo.Remote() != "https://github.com/cloudfoundry/sonde-go" {
+		t.Error("Remote not set properly")
+	}
+	if repo.LocalPath() != tempDir+"/VCSTestRepo2" {
+		t.Error("Local disk location not set properly")
+	}
+
+	//Logger = log.New(os.Stdout, "", log.LstdFlags)
+
+	// Do an initial clone.
+	err = repo.Get()
+	if err != nil {
+		t.Errorf("Unable to clone Git repo. Err was %s", err)
+	}
+
+	// Verify Git repo is a Git repo
+	if !repo.CheckLocal() {
+		t.Error("Problem checking out repo or Git CheckLocal is not working")
+	}
+
+	// Test internal lookup mechanism used outside of Git specific functionality.
+	ltype, err := DetectVcsFromFS(tempDir + "/VCSTestRepo2")
+	if err != nil {
+		t.Error("detectVcsFromFS unable to Git repo")
+	}
+	if ltype != Git {
+		t.Errorf("detectVcsFromFS detected %s instead of Git type", ltype)
+	}
+
+	// Test NewRepo on existing checkout. This should simply provide a working
+	// instance without error based on looking at the local directory.
+	nrepo, nrerr := NewRepo("https://github.com/cloudfoundry/sonde-go", tempDir+"/VCSTestRepo2")
+	if nrerr != nil {
+		t.Error(nrerr)
+	}
+	// Verify the right oject is returned. It will check the local repo type.
+	if !nrepo.CheckLocal() {
+		t.Error("Wrong version returned from NewRepo")
+	}
+
+	// Perform an update.
+	err = repo.Update()
+	if err != nil {
+		t.Error(err)
+	}
+
+	v, err := repo.Current()
+	if err != nil {
+		t.Errorf("Error trying Git Current: %s", err)
+	}
+	if v != "master" {
+		t.Errorf("Current failed to detect Git on tip of master. Got version: %s", v)
+	}
+
+
+	tempDir2, err := ioutil.TempDir("", "go-vcs-git-tests-export")
+	if err != nil {
+		t.Fatalf("Error creating temp directory: %s", err)
+	}
+	defer func() {
+		err = os.RemoveAll(tempDir2)
+		if err != nil {
+			t.Error(err)
+		}
+	}()
+
+	exportDir := filepath.Join(tempDir2, "src")
+
+	err = repo.ExportDir(exportDir)
+	if err != nil {
+		t.Errorf("Unable to export Git repo. Err was %s", err)
+	}
+
+	_, err = os.Stat(filepath.Join(exportDir, "README.md"))
+	if err != nil {
+		t.Errorf("Error checking exported file in Git: %s", err)
+	}
+
+	_, err = os.Stat(filepath.Join( filepath.Join(exportDir, "definitions"), "README.md"))
+	if err != nil {
+		t.Errorf("Error checking exported file in Git: %s", err)
+	}
+
+	_, err = os.Stat(filepath.Join(exportDir, string(repo.Vcs())))
+	if err != nil {
+		if found := os.IsNotExist(err); !found {
+			t.Errorf("Error checking exported metadata in Git: %s", err)
+		}
+	} else {
+		t.Error("Error checking Git metadata. It exists.")
+	}
+}

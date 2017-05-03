@@ -7,6 +7,7 @@ clone_folder: c:\gopath\src\github.com\golang\dep
 
 environment:
   GOPATH: c:\gopath
+  DEPTESTBYPASS501: 1
   matrix:
     - environment:
       GOVERSION: 1.7.5
@@ -23,7 +24,8 @@ install:
   - rmdir c:\go /s /q
   - appveyor DownloadFile https://storage.googleapis.com/golang/go%GOVERSION%.windows-amd64.msi
   - msiexec /i go%GOVERSION%.windows-amd64.msi /q
-  - set Path=c:\go\bin;c:\gopath\bin;%Path%
+  - choco install bzr
+  - set Path=c:\go\bin;c:\gopath\bin;C:\Program Files (x86)\Bazaar\;C:\Program Files\Mercurial\%Path%
   - go version
   - go env
 
@@ -34,3 +36,9 @@ test_script:
   - go build
   - go test .
   - go test ./cmd/dep
+  - go test ./gps
+  - go test ./gps/internal
+  - go test ./gps/internal/fs
+  - go test ./gps/pkgtree
+  - go test ./internal
+  - go test ./test

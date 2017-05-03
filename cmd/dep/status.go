@@ -16,9 +16,9 @@ import (
 	"text/tabwriter"
 
 	"github.com/golang/dep"
+	"github.com/golang/dep/gps"
+	"github.com/golang/dep/gps/pkgtree"
 	"github.com/pkg/errors"
-	"github.com/sdboyer/gps"
-	"github.com/sdboyer/gps/pkgtree"
 )
 
 const statusShortHelp = `Report the status of the project's dependencies`

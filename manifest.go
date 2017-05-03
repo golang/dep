@@ -10,9 +10,9 @@ import (
 
 	"bytes"
 
+	"github.com/golang/dep/gps"
 	"github.com/pelletier/go-toml"
 	"github.com/pkg/errors"
-	"github.com/sdboyer/gps"
 )
 
 const ManifestName = "Gopkg.toml"

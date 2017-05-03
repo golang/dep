@@ -1,7 +1,0 @@
-coverage:
-  ignore:
-  - remove_go16.go
-  - remove_go17.go
-  - solve_failures.go
-  - typed_radix.go
-  - discovery.go # copied from stdlib, don't need to test

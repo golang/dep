@@ -1,3 +1,8 @@
+# 1.11.1 (2017-04-28)
+
+## Fixed
+- #76: Fix submodule handling for Windows (thanks @m0j0hn)
+
 # 1.11.0 (2017-03-23)
 
 ## Added

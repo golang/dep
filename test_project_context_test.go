@@ -7,9 +7,9 @@ package dep
 import (
 	"path/filepath"
 
+	"github.com/golang/dep/gps"
 	"github.com/golang/dep/test"
 	"github.com/pkg/errors"
-	"github.com/sdboyer/gps"
 )
 
 // TestProjectContext groups together test project files and helps test them
