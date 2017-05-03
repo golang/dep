@@ -1,4 +1,4 @@
-memo = "71329a18f735441776be73d92d064f26a67fa30e616bbdfbb47e8dc68bda8c5c"
+memo = "932b7b1663f6eecccb1fada1d3670ae24cd8aa7c8b61e3b224edfefebe25954e"
 
 [[projects]]
   branch = "2.x"
@@ -9,8 +9,8 @@ memo = "71329a18f735441776be73d92d064f26a67fa30e616bbdfbb47e8dc68bda8c5c"
 [[projects]]
   name = "github.com/Masterminds/vcs"
   packages = ["."]
-  revision = "795e20f901c3d561de52811fb3488a2cb2c8588b"
-  version = "v1.11.0"
+  revision = "3084677c2c188840777bff30054f2b553729d329"
+  version = "v1.11.1"
 
 [[projects]]
   branch = "master"
@@ -41,9 +41,3 @@ memo = "71329a18f735441776be73d92d064f26a67fa30e616bbdfbb47e8dc68bda8c5c"
   name = "github.com/sdboyer/constext"
   packages = ["."]
   revision = "836a144573533ea4da4e6929c235fd348aed1c80"
-
-[[projects]]
-  name = "github.com/sdboyer/gps"
-  packages = [".","internal","internal/fs","pkgtree"]
-  revision = "da7569e414959d639654919aaf67259c3add73f4"
-  version = "v0.16.3"

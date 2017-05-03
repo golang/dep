@@ -13,9 +13,9 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/golang/dep/gps"
 	"github.com/pelletier/go-toml"
 	"github.com/pkg/errors"
-	"github.com/sdboyer/gps"
 )
 
 // Example string to be written to the manifest file
