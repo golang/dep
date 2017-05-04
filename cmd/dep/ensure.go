@@ -105,7 +105,7 @@ type ensureCommand struct {
 
 func (cmd *ensureCommand) Run(ctx *dep.Ctx, args []string) error {
 	if cmd.examples {
-		fmt.Fprintln(os.Stderr, strings.TrimSpace(ensureExamples))
+		internal.Logln(strings.TrimSpace(ensureExamples))
 		return nil
 	}
 
