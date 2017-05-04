@@ -308,7 +308,7 @@ func (sg *sourceGateway) listPackages(ctx context.Context, pr ProjectRoot, v Ver
 		return ptree, nil
 	}
 
-	_, err = sg.require(ctx, sourceIsSetUp|sourceExistsLocally)
+	_, err = sg.require(ctx, sourceIsSetUp|sourceExistsLocally|sourceHasLatestLocally)
 	if err != nil {
 		return pkgtree.PackageTree{}, err
 	}
