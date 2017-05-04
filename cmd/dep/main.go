@@ -62,12 +62,12 @@ func main() {
 	}
 
 	usage := func() {
-		fmt.Fprintln(os.Stderr, "dep is a tool for managing dependencies for Go projects")
-		fmt.Fprintln(os.Stderr)
-		fmt.Fprintln(os.Stderr, "Usage: dep <command>")
-		fmt.Fprintln(os.Stderr)
-		fmt.Fprintln(os.Stderr, "Commands:")
-		fmt.Fprintln(os.Stderr)
+		internal.Logln("dep is a tool for managing dependencies for Go projects")
+		internal.Logln()
+		internal.Logln("Usage: dep <command>")
+		internal.Logln()
+		internal.Logln("Commands:")
+		internal.Logln()
 		w := tabwriter.NewWriter(os.Stderr, 0, 4, 2, ' ', 0)
 		for _, cmd := range commands {
 			if !cmd.Hidden() {
@@ -75,14 +75,14 @@ func main() {
 			}
 		}
 		w.Flush()
-		fmt.Fprintln(os.Stderr)
-		fmt.Fprintln(os.Stderr, "Examples:")
+		internal.Logln()
+		internal.Logln("Examples:")
 		for _, example := range examples {
 			fmt.Fprintf(w, "\t%s\t%s\n", example[0], example[1])
 		}
 		w.Flush()
-		fmt.Fprintln(os.Stderr)
-		fmt.Fprintln(os.Stderr, "Use \"dep help [command]\" for more information about a command.")
+		internal.Logln()
+		internal.Logln("Use \"dep help [command]\" for more information about a command.")
 	}
 
 	cmdName, printCommandHelp, exit := parseArgs(os.Args)
@@ -120,7 +120,7 @@ func main() {
 			// Set up the dep context.
 			ctx, err := dep.NewContext()
 			if err != nil {
-				fmt.Fprintln(os.Stderr, err)
+				internal.Logln(err)
 				os.Exit(1)
 			}
 
@@ -135,7 +135,7 @@ func main() {
 		}
 	}
 
-	fmt.Fprintf(os.Stderr, "%s: no such command\n", cmdName)
+	internal.Logf("%s: no such command", cmdName)
 	usage()
 	os.Exit(1)
 }
@@ -159,13 +159,13 @@ func resetUsage(fs *flag.FlagSet, name, args, longHelp string) {
 	flagWriter.Flush()
 	fs.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage: dep %s %s\n", name, args)
-		fmt.Fprintln(os.Stderr)
-		fmt.Fprintln(os.Stderr, strings.TrimSpace(longHelp))
-		fmt.Fprintln(os.Stderr)
+		internal.Logln()
+		internal.Logln(strings.TrimSpace(longHelp))
+		internal.Logln()
 		if hasFlags {
-			fmt.Fprintln(os.Stderr, "Flags:")
-			fmt.Fprintln(os.Stderr)
-			fmt.Fprintln(os.Stderr, flagBlock.String())
+			internal.Logln("Flags:")
+			internal.Logln()
+			internal.Logln(flagBlock.String())
 		}
 	}
 }

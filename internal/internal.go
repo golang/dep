@@ -12,6 +12,10 @@ import (
 // Verbose specifies if verbose logging is enabled.
 var Verbose bool
 
+func Logln(args ...interface{}) {
+	fmt.Fprintln(os.Stderr, args...)
+}
+
 func Logf(format string, args ...interface{}) {
 	// TODO: something else?
 	fmt.Fprintf(os.Stderr, "dep: "+format+"\n", args...)
