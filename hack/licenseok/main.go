@@ -16,6 +16,8 @@ import (
 	"path/filepath"
 	"sync"
 	"time"
+
+	"github.com/golang/dep/internal"
 )
 
 const helpText = `Usage: licenseok [flags] pattern [pattern ...]
@@ -43,7 +45,7 @@ func init() {
 	flag.BoolVar(&update, "u", false, "modifies all source files in place and avoids adding a license header to any file that already has one.")
 
 	flag.Usage = func() {
-		fmt.Fprintln(os.Stderr, helpText)
+		internal.Logln(helpText)
 		flag.PrintDefaults()
 	}
 
@@ -74,7 +76,7 @@ func main() {
 
 				if !hasLicense(b) {
 					if !update {
-						fmt.Fprintln(os.Stderr, f.path)
+						internal.Logln(f.path)
 						exitStatus = 1
 					} else {
 						fmt.Fprintln(os.Stdout, f.path)
