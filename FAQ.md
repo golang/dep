@@ -6,7 +6,7 @@ _The first rule of FAQ is don't bikeshed the FAQ, leave that for
 Please contribute to the FAQ! Found an explanation in an issue or pull request helpful?
 Summarize the question and quote the reply, linking back to the original comment.
 
-* [What is the difference between the manifest and lock?](#what-is-the-difference-between-the-manifest-and-lock)
+* [What is the difference between Gopkg.toml (the "manifest") and Gopkg.lock (the "lock")?](#what-is-the-difference-between-gopkgtoml-the-manifest-and-gopkglock-the-lock)
 * [When should I use dependencies, overrides or required in the manifest?](#when-should-i-use-dependencies-overrides-required-or-ignored-in-the-manifest)
 * [What is a direct or transitive dependency?](#what-is-a-direct-or-transitive-dependency)
 * [Should I commit my vendor directory?](#should-i-commit-my-vendor-directory)
@@ -18,7 +18,7 @@ Summarize the question and quote the reply, linking back to the original comment
 * [Can I put the manifest and lock in the vendor directory?](#can-i-put-the-manifest-and-lock-in-the-vendor-directory)
 * [Why did dep use a different revision for package X instead of the revision in the lock file?](#why-did-dep-use-a-different-revision-for-package-x-instead-of-the-revision-in-the-lock-file)
 
-## What is the difference between the manifest and lock?
+## What is the difference between Gopkg.toml (the "manifest") and Gopkg.lock (the "lock")?
 
 > The manifest describes user intent, and the lock describes computed outputs. There's flexibility in manifests that isn't present in locks..., as the "branch": "master" constraint will match whatever revision master HAPPENS to be at right now, whereas the lock is nailed down to a specific revision.
 > 
