@@ -5,10 +5,9 @@
 package dep
 
 import (
+	"bytes"
 	"io"
 	"sort"
-
-	"bytes"
 
 	"github.com/golang/dep/gps"
 	"github.com/pelletier/go-toml"
@@ -138,14 +137,6 @@ func (m *Manifest) toRaw() rawManifest {
 	sort.Sort(sortedRawProjects(raw.Overrides))
 
 	return raw
-}
-
-// IsEmpty - Checks if payload is empty
-func (m *Manifest) IsEmpty() bool {
-	if len(m.Ovr) == 0 && len(m.Ignored) == 0 && len(m.Dependencies) == 0 && len(m.Required) == 0 {
-		return true
-	}
-	return false
 }
 
 type sortedRawProjects []rawProject
