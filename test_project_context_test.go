@@ -24,7 +24,7 @@ type TestProjectContext struct {
 }
 
 // NewTestProjectContext creates a new on-disk test project
-func NewTestProjectContext(h *test.Helper, projectName string) *TestProjectContext {
+func NewTestProjectContext(h *test.Helper, projectName string, logf func(string,...interface{})) *TestProjectContext {
 	pc := &TestProjectContext{h: h}
 
 	// Create the test project directory
@@ -38,7 +38,7 @@ func NewTestProjectContext(h *test.Helper, projectName string) *TestProjectConte
 	// Set up a Source Manager
 	var err error
 	pc.Context = &Ctx{GOPATH: pc.tempDir}
-	pc.SourceManager, err = pc.Context.SourceManager()
+	pc.SourceManager, err = pc.Context.SourceManager(logf)
 	h.Must(errors.Wrap(err, "Unable to create a SourceManager"))
 
 	return pc

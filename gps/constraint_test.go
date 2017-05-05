@@ -379,7 +379,7 @@ func TestVersionConstraintOps(t *testing.T) {
 		t.Errorf("Intersection of %s (version) with %s (branch) should return shared underlying rev", gu(v6), gu(o4))
 	}
 }
-
+//TODO why failing?
 func TestSemverVersionConstraintOps(t *testing.T) {
 	v1 := NewVersion("1.0.0").(semVersion)
 	v2 := NewVersion("2.0.0").(semVersion)

@@ -10,18 +10,9 @@ import (
 	"path/filepath"
 
 	"github.com/golang/dep/gps"
-	"github.com/pkg/errors"
 )
 
 var errProjectNotFound = fmt.Errorf("could not find project %s, use dep init to initiate a manifest", ManifestName)
-
-func findProjectRootFromWD() (string, error) {
-	path, err := os.Getwd()
-	if err != nil {
-		return "", errors.Errorf("could not get working directory: %s", err)
-	}
-	return findProjectRoot(path)
-}
 
 // findProjectRoot searches from the starting directory upwards looking for a
 // manifest file until we get to the root of the filesystem.

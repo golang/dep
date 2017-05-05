@@ -9,7 +9,6 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"math/rand"
 	"reflect"
 	"sort"
@@ -20,6 +19,7 @@ import (
 
 	"github.com/golang/dep/gps/internal"
 	"github.com/golang/dep/gps/pkgtree"
+	"github.com/golang/dep/log"
 )
 
 var fixtorun string
@@ -79,8 +79,7 @@ func fixSolve(params SolveParameters, sm SourceManager, t *testing.T) (Solution,
 	// Trace unconditionally; by passing the trace through t.Log(), the testing
 	// system will decide whether or not to actually show the output (based on
 	// -v, or selectively on test failure).
-	params.Trace = true
-	params.TraceLogger = log.New(testlogger{T: t}, "", 0)
+	params.TraceLogger = log.New(testlogger{T: t})
 
 	s, err := Prepare(params, sm)
 	if err != nil {
@@ -374,14 +373,7 @@ func TestBadSolveOpts(t *testing.T) {
 			},
 		},
 	}
-	params.Trace = true
-	_, err = Prepare(params, sm)
-	if err == nil {
-		t.Errorf("Should have errored on trace with no logger")
-	} else if !strings.Contains(err.Error(), "no logger provided") {
-		t.Error("Prepare should have given error on missing trace logger, but gave:", err)
-	}
-	params.TraceLogger = log.New(ioutil.Discard, "", 0)
+	params.TraceLogger = log.New(ioutil.Discard)
 
 	params.Manifest = simpleRootManifest{
 		ovr: ProjectConstraints{
@@ -390,7 +382,7 @@ func TestBadSolveOpts(t *testing.T) {
 	}
 	_, err = Prepare(params, sm)
 	if err == nil {
-		t.Errorf("Should have errored on override with empty ProjectProperties")
+		t.Error("Should have errored on override with empty ProjectProperties")
 	} else if !strings.Contains(err.Error(), "foo, but without any non-zero properties") {
 		t.Error("Prepare should have given error override with empty ProjectProperties, but gave:", err)
 	}

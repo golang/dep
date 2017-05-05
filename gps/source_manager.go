@@ -101,6 +101,7 @@ type SourceMgr struct {
 	qch         chan struct{}         // quit chan for signal handler
 	relonce     sync.Once             // once-er to ensure we only release once
 	releasing   int32                 // flag indicating release of sm has begun
+	logf func(string,...interface{})
 }
 
 type smIsReleased struct{}
@@ -124,7 +125,7 @@ var _ SourceManager = &SourceMgr{}
 // gps's SourceManager is intended to be threadsafe (if it's not, please file a
 // bug!). It should be safe to reuse across concurrent solving runs, even on
 // unrelated projects.
-func NewSourceManager(cachedir string) (*SourceMgr, error) {
+func NewSourceManager(cachedir string, logf func(string,...interface{})) (*SourceMgr, error) {
 	err := os.MkdirAll(filepath.Join(cachedir, "sources"), 0777)
 	if err != nil {
 		return nil, err
@@ -159,6 +160,7 @@ func NewSourceManager(cachedir string) (*SourceMgr, error) {
 		deduceCoord: deducer,
 		srcCoord:    newSourceCoordinator(superv, deducer, cachedir),
 		qch:         make(chan struct{}),
+		logf:         logf,
 	}
 
 	return sm, nil
@@ -216,7 +218,7 @@ func (sm *SourceMgr) HandleSignals(sigch chan os.Signal) {
 
 				opc := sm.suprvsr.count()
 				if opc > 0 {
-					fmt.Printf("Signal received: waiting for %v ops to complete...\n", opc)
+					sm.logf("Signal received: waiting for %v ops to complete...\n", opc)
 				}
 
 				// Mutex interaction in a signal handler is, as a general rule,

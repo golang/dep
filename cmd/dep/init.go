@@ -6,8 +6,6 @@ package main
 
 import (
 	"flag"
-	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -59,18 +57,14 @@ func trimPathPrefix(p1, p2 string) string {
 	return p1
 }
 
-func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
+func (cmd *initCommand) Run(ctx *dep.Ctx, loggers *Loggers, args []string) error {
 	if len(args) > 1 {
 		return errors.Errorf("too many args (%d)", len(args))
 	}
 
 	var root string
 	if len(args) <= 0 {
-		wd, err := os.Getwd()
-		if err != nil {
-			return err
-		}
-		root = wd
+		root = ctx.WorkingDir
 	} else {
 		root = args[0]
 	}
@@ -99,20 +93,24 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 	if err != nil {
 		return errors.Wrap(err, "determineProjectRoot")
 	}
-	internal.Vlogf("Finding dependencies for %q...", cpr)
+	if loggers.Verbose {
+		loggers.Err.LogDepfln("Finding dependencies for %q...", cpr)
+	}
 	pkgT, err := pkgtree.ListPackages(root, cpr)
 	if err != nil {
 		return errors.Wrap(err, "gps.ListPackages")
 	}
-	internal.Vlogf("Found %d dependencies.", len(pkgT.Packages))
-	sm, err := ctx.SourceManager()
+	if loggers.Verbose {
+		loggers.Err.LogDepfln("Found %d dependencies.", len(pkgT.Packages))
+	}
+	sm, err := ctx.SourceManager(loggers.Out.Logf)
 	if err != nil {
 		return errors.Wrap(err, "getSourceManager")
 	}
 	sm.UseDefaultSignalHandling()
 	defer sm.Release()
 
-	pd, err := getProjectData(ctx, pkgT, cpr, sm)
+	pd, err := getProjectData(ctx, loggers, pkgT, cpr, sm)
 	if err != nil {
 		return err
 	}
@@ -145,7 +143,9 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 	}
 
 	// Run solver with project versions found on disk
-	internal.Vlogf("Solving...")
+	if loggers.Verbose {
+		loggers.Err.LogDepfln("Solving...")
+	}
 	params := gps.SolveParameters{
 		RootDir:         root,
 		RootPackageTree: pkgT,
@@ -154,10 +154,10 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 		ProjectAnalyzer: dep.Analyzer{},
 	}
 
-	if *verbose {
-		params.Trace = true
-		params.TraceLogger = log.New(os.Stderr, "", 0)
+	if loggers.Verbose {
+		params.TraceLogger = loggers.Err
 	}
+
 	s, err := gps.Prepare(params, sm)
 	if err != nil {
 		return errors.Wrap(err, "prepare solver")
@@ -189,7 +189,9 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 
 	l.Memo = s.HashInputs()
 
-	internal.Vlogf("Writing manifest and lock files.")
+	if loggers.Verbose {
+		loggers.Err.LogDepfln("Writing manifest and lock files.")
+	}
 
 	sw, err := dep.NewSafeWriter(m, nil, l, dep.VendorAlways)
 	if err != nil {
@@ -274,7 +276,7 @@ type projectData struct {
 	ondisk       map[gps.ProjectRoot]gps.Version // projects that were found on disk
 }
 
-func getProjectData(ctx *dep.Ctx, pkgT pkgtree.PackageTree, cpr string, sm *gps.SourceMgr) (projectData, error) {
+func getProjectData(ctx *dep.Ctx, loggers *Loggers, pkgT pkgtree.PackageTree, cpr string, sm *gps.SourceMgr) (projectData, error) {
 	constraints := make(gps.ProjectConstraints)
 	dependencies := make(map[gps.ProjectRoot][]string)
 	packages := make(map[string]bool)
@@ -286,7 +288,7 @@ func getProjectData(ctx *dep.Ctx, pkgT pkgtree.PackageTree, cpr string, sm *gps.
 		if err := sm.SyncSourceFor(gps.ProjectIdentifier{ProjectRoot: pr}); err != nil {
 			message = "Unable to cache"
 		}
-		fmt.Fprintf(os.Stderr, "%s %s\n", message, pr)
+		loggers.Err.Logf("%s %s\n", message, pr)
 	}
 
 	rm, _ := pkgT.ToReachMap(true, true, false, nil)
@@ -294,7 +296,9 @@ func getProjectData(ctx *dep.Ctx, pkgT pkgtree.PackageTree, cpr string, sm *gps.
 		return projectData{}, nil
 	}
 
-	internal.Vlogf("Building dependency graph...")
+	if loggers.Verbose {
+		loggers.Err.LogDepfln("Building dependency graph...")
+	}
 	// Exclude stdlib imports from the list returned from Flatten().
 	const omitStdlib = false
 	for _, ip := range rm.Flatten(omitStdlib) {
@@ -310,13 +314,17 @@ func getProjectData(ctx *dep.Ctx, pkgT pkgtree.PackageTree, cpr string, sm *gps.
 		}
 		go syncDep(pr, sm)
 
-		internal.Vlogf("Found import of %q, analyzing...", ip)
+		if loggers.Verbose {
+			loggers.Err.LogDepfln("Found import of %q, analyzing...", ip)
+		}
 
 		dependencies[pr] = []string{ip}
 		v, err := ctx.VersionInWorkspace(pr)
 		if err != nil {
 			notondisk[pr] = true
-			internal.Vlogf("Could not determine version for %q, omitting from generated manifest", pr)
+			if loggers.Verbose {
+				loggers.Err.LogDepfln("Could not determine version for %q, omitting from generated manifest", pr)
+			}
 			continue
 		}
 
@@ -324,7 +332,9 @@ func getProjectData(ctx *dep.Ctx, pkgT pkgtree.PackageTree, cpr string, sm *gps.
 		constraints[pr] = getProjectPropertiesFromVersion(v)
 	}
 
-	internal.Vlogf("Analyzing transitive imports...")
+	if loggers.Verbose {
+		loggers.Err.LogDepfln("Analyzing transitive imports...")
+	}
 	// Explore the packages we've found for transitive deps, either
 	// completing the lock or identifying (more) missing projects that we'll
 	// need to ask gps to solve for us.
@@ -343,7 +353,9 @@ func getProjectData(ctx *dep.Ctx, pkgT pkgtree.PackageTree, cpr string, sm *gps.
 	dft = func(pkg string) error {
 		switch colors[pkg] {
 		case white:
-			internal.Vlogf("Analyzing %q...", pkg)
+			if loggers.Verbose {
+				loggers.Err.LogDepfln("Analyzing %q...", pkg)
+			}
 			colors[pkg] = grey
 
 			pr, err := sm.DeduceProjectRoot(pkg)
