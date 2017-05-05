@@ -1,4 +1,4 @@
-memo = "932b7b1663f6eecccb1fada1d3670ae24cd8aa7c8b61e3b224edfefebe25954e"
+memo = ""
 
 [[projects]]
   branch = "2.x"
@@ -17,6 +17,12 @@ memo = "932b7b1663f6eecccb1fada1d3670ae24cd8aa7c8b61e3b224edfefebe25954e"
   name = "github.com/armon/go-radix"
   packages = ["."]
   revision = "4239b77079c7b5d1243b7b4736304ce8ddb6f0f2"
+
+[[projects]]
+  branch = "v2"
+  name = "github.com/go-yaml/yaml"
+  packages = ["."]
+  revision = "cd8b52f8269e0feb286dfeef29f8fe4d5b397e0b"
 
 [[projects]]
   name = "github.com/pelletier/go-buffruneio"

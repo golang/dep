@@ -9,6 +9,10 @@ required = ["github.com/Masterminds/semver"]
   version = "^1.11.0"
 
 [[dependencies]]
+  branch = "v2"
+  name = "github.com/go-yaml/yaml"
+
+[[dependencies]]
   branch = "master"
   name = "github.com/pelletier/go-toml"
 
