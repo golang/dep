@@ -465,7 +465,7 @@ func (t PackageTree) ToReachMap(main, tests, backprop bool, ignore map[string]bo
 		// For each import, decide whether it should be ignored, or if it
 		// belongs in the external or internal imports list.
 		for _, imp := range imps {
-			if ignore[imp] {
+			if ignore[imp] || imp == "." {
 				continue
 			}
 
