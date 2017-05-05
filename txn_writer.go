@@ -16,6 +16,7 @@ import (
 	"github.com/golang/dep/gps"
 	"github.com/pelletier/go-toml"
 	"github.com/pkg/errors"
+	"github.com/golang/dep/log"
 )
 
 // Example string to be written to the manifest file
@@ -436,43 +437,43 @@ fail:
 	return failerr
 }
 
-func (sw *SafeWriter) PrintPreparedActions() error {
+func (sw *SafeWriter) PrintPreparedActions(stdout *log.Logger) error {
 	if sw.HasManifest() {
-		fmt.Printf("Would have written the following %s:\n", ManifestName)
+		stdout.Logf("Would have written the following %s:\n", ManifestName)
 		m, err := sw.Manifest.MarshalTOML()
 		if err != nil {
 			return errors.Wrap(err, "ensure DryRun cannot serialize manifest")
 		}
-		fmt.Println(string(m))
+		stdout.Logln(string(m))
 	}
 
 	if sw.HasLock() {
 		if sw.LockDiff == nil {
-			fmt.Printf("Would have written the following %s:\n", LockName)
+			stdout.Logf("Would have written the following %s:\n", LockName)
 			l, err := sw.Lock.MarshalTOML()
 			if err != nil {
 				return errors.Wrap(err, "ensure DryRun cannot serialize lock")
 			}
-			fmt.Println(string(l))
+			stdout.Logln(string(l))
 		} else {
-			fmt.Printf("Would have written the following changes to %s:\n", LockName)
+			stdout.Logf("Would have written the following changes to %s:\n", LockName)
 			diff, err := formatLockDiff(*sw.LockDiff)
 			if err != nil {
 				return errors.Wrap(err, "ensure DryRun cannot serialize the lock diff")
 			}
-			fmt.Println(diff)
+			stdout.Logln(diff)
 		}
 	}
 
 	if sw.HasVendor() {
-		fmt.Println("Would have written the following projects to the vendor directory:")
+		stdout.Logln("Would have written the following projects to the vendor directory:")
 		for _, project := range sw.Lock.Projects() {
 			prj := project.Ident()
 			rev, _, _ := gps.VersionComponentStrings(project.Version())
 			if prj.Source == "" {
-				fmt.Printf("%s@%s\n", prj.ProjectRoot, rev)
+				stdout.Logf("%s@%s\n", prj.ProjectRoot, rev)
 			} else {
-				fmt.Printf("%s -> %s@%s\n", prj.ProjectRoot, prj.Source, rev)
+				stdout.Logf("%s -> %s@%s\n", prj.ProjectRoot, prj.Source, rev)
 			}
 		}
 	}

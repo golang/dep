@@ -7,13 +7,13 @@ package gps
 import (
 	"container/heap"
 	"fmt"
-	"log"
 	"sort"
 	"strings"
 
 	"github.com/armon/go-radix"
 	"github.com/golang/dep/gps/internal"
 	"github.com/golang/dep/gps/pkgtree"
+	"github.com/golang/dep/log"
 )
 
 var (
@@ -105,12 +105,9 @@ type SolveParameters struct {
 	// typical case.
 	Downgrade bool
 
-	// Trace controls whether the solver will generate informative trace output
-	// as it moves through the solving process.
-	Trace bool
-
-	// TraceLogger is the logger to use for generating trace output. If Trace is
-	// true but no logger is provided, solving will result in an error.
+	// TraceLogger is the logger to use for generating trace output.
+	// If set, the solver will generate informative trace output as it moves
+	// through the solving process.
 	TraceLogger *log.Logger
 }
 
@@ -281,9 +278,6 @@ func Prepare(params SolveParameters, sm SourceManager) (Solver, error) {
 	if sm == nil {
 		return nil, badOptsFailure("must provide non-nil SourceManager")
 	}
-	if params.Trace && params.TraceLogger == nil {
-		return nil, badOptsFailure("trace requested, but no logger provided")
-	}
 
 	rd, err := params.toRootdata()
 	if err != nil {
@@ -378,7 +372,8 @@ func (s *solver) Solve() (Solution, error) {
 
 	s.traceFinish(soln, err)
 	if s.tl != nil {
-		s.mtr.dump(s.tl)
+		s.tl.Logln("\nSolver wall times by segment:")
+		s.tl.Logln(s.mtr.dump())
 	}
 	return soln, err
 }

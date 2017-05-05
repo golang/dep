@@ -9,13 +9,13 @@ package main
 import (
 	"go/build"
 	"io/ioutil"
-	"log"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/golang/dep/gps"
 	"github.com/golang/dep/gps/pkgtree"
+	"github.com/golang/dep/log"
 )
 
 // This is probably the simplest possible implementation of gps. It does the
@@ -36,8 +36,7 @@ func main() {
 	// Set up params, including tracing
 	params := gps.SolveParameters{
 		RootDir:         root,
-		Trace:           true,
-		TraceLogger:     log.New(os.Stdout, "", 0),
+		TraceLogger:     log.New(os.Stdout),
 		ProjectAnalyzer: NaiveAnalyzer{},
 	}
 	// Perform static analysis on the current project to find all of its imports.

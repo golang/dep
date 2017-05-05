@@ -27,7 +27,7 @@ func (s *solver) traceCheckPkgs(bmi bimodalIdentifier) {
 	}
 
 	prefix := getprei(len(s.vqs) + 1)
-	s.tl.Printf("%s\n", tracePrefix(fmt.Sprintf("? revisit %s to add %v pkgs", bmi.id.errString(), len(bmi.pl)), prefix, prefix))
+	s.tl.Logf("%s\n", tracePrefix(fmt.Sprintf("? revisit %s to add %v pkgs", bmi.id.errString(), len(bmi.pl)), prefix, prefix))
 }
 
 func (s *solver) traceCheckQueue(q *versionQueue, bmi bimodalIdentifier, cont bool, offset int) {
@@ -52,8 +52,7 @@ func (s *solver) traceCheckQueue(q *versionQueue, bmi bimodalIdentifier, cont bo
 	} else {
 		verb = "attempt"
 	}
-
-	s.tl.Printf("%s\n", tracePrefix(fmt.Sprintf("%s? %s %s with %v pkgs; %s versions to try", indent, verb, bmi.id.errString(), len(bmi.pl), vlen), prefix, prefix))
+	s.tl.Logf("%s\n", tracePrefix(fmt.Sprintf("%s? %s %s with %v pkgs; %s versions to try", indent, verb, bmi.id.errString(), len(bmi.pl), vlen), prefix, prefix))
 }
 
 // traceStartBacktrack is called with the bmi that first failed, thus initiating
@@ -71,7 +70,7 @@ func (s *solver) traceStartBacktrack(bmi bimodalIdentifier, err error, pkgonly b
 	}
 
 	prefix := getprei(len(s.sel.projects))
-	s.tl.Printf("%s\n", tracePrefix(msg, prefix, prefix))
+	s.tl.Logf("%s\n", tracePrefix(msg, prefix, prefix))
 }
 
 // traceBacktrack is called when a package or project is poppped off during
@@ -89,7 +88,7 @@ func (s *solver) traceBacktrack(bmi bimodalIdentifier, pkgonly bool) {
 	}
 
 	prefix := getprei(len(s.sel.projects))
-	s.tl.Printf("%s\n", tracePrefix(msg, prefix, prefix))
+	s.tl.Logf("%s\n", tracePrefix(msg, prefix, prefix))
 }
 
 // Called just once after solving has finished, whether success or not
@@ -103,9 +102,9 @@ func (s *solver) traceFinish(sol solution, err error) {
 		for _, lp := range sol.Projects() {
 			pkgcount += len(lp.pkgs)
 		}
-		s.tl.Printf("%s%s found solution with %v packages from %v projects", innerIndent, successChar, pkgcount, len(sol.Projects()))
+		s.tl.Logf("%s%s found solution with %v packages from %v projects", innerIndent, successChar, pkgcount, len(sol.Projects()))
 	} else {
-		s.tl.Printf("%s%s solving failed", innerIndent, failChar)
+		s.tl.Logf("%s%s solving failed", innerIndent, failChar)
 	}
 }
 
@@ -119,17 +118,16 @@ func (s *solver) traceSelectRoot(ptree pkgtree.PackageTree, cdeps []completeDep)
 	// so who cares
 	rm, _ := ptree.ToReachMap(true, true, false, s.rd.ig)
 
-	s.tl.Printf("Root project is %q", s.rd.rpt.ImportRoot)
+	s.tl.Logf("Root project is %q", s.rd.rpt.ImportRoot)
 
 	var expkgs int
 	for _, cdep := range cdeps {
 		expkgs += len(cdep.pl)
 	}
-
 	// TODO(sdboyer) include info on ignored pkgs/imports, etc.
-	s.tl.Printf(" %v transitively valid internal packages", len(rm))
-	s.tl.Printf(" %v external packages imported from %v projects", expkgs, len(cdeps))
-	s.tl.Printf("(0)   " + successCharSp + "select (root)")
+	s.tl.Logf(" %v transitively valid internal packages", len(rm))
+	s.tl.Logf(" %v external packages imported from %v projects", expkgs, len(cdeps))
+	s.tl.Logf("(0)   " + successCharSp + "select (root)")
 }
 
 // traceSelect is called when an atom is successfully selected
@@ -146,7 +144,7 @@ func (s *solver) traceSelect(awp atomWithPackages, pkgonly bool) {
 	}
 
 	prefix := getprei(len(s.sel.projects) - 1)
-	s.tl.Printf("%s\n", tracePrefix(msg, prefix, prefix))
+	s.tl.Logf("%s\n", tracePrefix(msg, prefix, prefix))
 }
 
 func (s *solver) traceInfo(args ...interface{}) {
@@ -176,7 +174,7 @@ func (s *solver) traceInfo(args ...interface{}) {
 	}
 
 	prefix := getprei(preflen)
-	s.tl.Printf("%s\n", tracePrefix(msg, prefix, prefix))
+	s.tl.Logf("%s\n", tracePrefix(msg, prefix, prefix))
 }
 
 func getprei(i int) string {

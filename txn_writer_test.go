@@ -22,7 +22,7 @@ const safeWriterGoldenLock = "txn_writer/expected_lock.toml"
 func TestSafeWriter_BadInput_MissingRoot(t *testing.T) {
 	h := test.NewHelper(t)
 	defer h.Cleanup()
-	pc := NewTestProjectContext(h, safeWriterProject)
+	pc := NewTestProjectContext(h, safeWriterProject, t.Logf)
 	defer pc.Release()
 
 	sw, _ := NewSafeWriter(nil, nil, nil, VendorOnChanged)
@@ -38,7 +38,7 @@ func TestSafeWriter_BadInput_MissingRoot(t *testing.T) {
 func TestSafeWriter_BadInput_MissingSourceManager(t *testing.T) {
 	h := test.NewHelper(t)
 	defer h.Cleanup()
-	pc := NewTestProjectContext(h, safeWriterProject)
+	pc := NewTestProjectContext(h, safeWriterProject, t.Logf)
 	defer pc.Release()
 	pc.CopyFile(LockName, safeWriterGoldenLock)
 	pc.Load()
@@ -56,7 +56,7 @@ func TestSafeWriter_BadInput_MissingSourceManager(t *testing.T) {
 func TestSafeWriter_BadInput_ForceVendorMissingLock(t *testing.T) {
 	h := test.NewHelper(t)
 	defer h.Cleanup()
-	pc := NewTestProjectContext(h, safeWriterProject)
+	pc := NewTestProjectContext(h, safeWriterProject, t.Logf)
 	defer pc.Release()
 
 	_, err := NewSafeWriter(nil, nil, nil, VendorAlways)
@@ -70,7 +70,7 @@ func TestSafeWriter_BadInput_ForceVendorMissingLock(t *testing.T) {
 func TestSafeWriter_BadInput_OldLockOnly(t *testing.T) {
 	h := test.NewHelper(t)
 	defer h.Cleanup()
-	pc := NewTestProjectContext(h, safeWriterProject)
+	pc := NewTestProjectContext(h, safeWriterProject, t.Logf)
 	defer pc.Release()
 	pc.CopyFile(LockName, safeWriterGoldenLock)
 	pc.Load()
@@ -86,7 +86,7 @@ func TestSafeWriter_BadInput_OldLockOnly(t *testing.T) {
 func TestSafeWriter_BadInput_NonexistentRoot(t *testing.T) {
 	h := test.NewHelper(t)
 	defer h.Cleanup()
-	pc := NewTestProjectContext(h, safeWriterProject)
+	pc := NewTestProjectContext(h, safeWriterProject, t.Logf)
 	defer pc.Release()
 
 	sw, _ := NewSafeWriter(nil, nil, nil, VendorOnChanged)
@@ -104,7 +104,7 @@ func TestSafeWriter_BadInput_NonexistentRoot(t *testing.T) {
 func TestSafeWriter_BadInput_RootIsFile(t *testing.T) {
 	h := test.NewHelper(t)
 	defer h.Cleanup()
-	pc := NewTestProjectContext(h, safeWriterProject)
+	pc := NewTestProjectContext(h, safeWriterProject, t.Logf)
 	defer pc.Release()
 
 	sw, _ := NewSafeWriter(nil, nil, nil, VendorOnChanged)
@@ -126,7 +126,7 @@ func TestSafeWriter_Manifest(t *testing.T) {
 	h := test.NewHelper(t)
 	defer h.Cleanup()
 
-	pc := NewTestProjectContext(h, safeWriterProject)
+	pc := NewTestProjectContext(h, safeWriterProject, t.Logf)
 	defer pc.Release()
 	pc.CopyFile(ManifestName, safeWriterGoldenManifest)
 	pc.Load()
@@ -167,7 +167,7 @@ func TestSafeWriter_ManifestAndUnmodifiedLock(t *testing.T) {
 	h := test.NewHelper(t)
 	defer h.Cleanup()
 
-	pc := NewTestProjectContext(h, safeWriterProject)
+	pc := NewTestProjectContext(h, safeWriterProject, t.Logf)
 	defer pc.Release()
 	pc.CopyFile(ManifestName, safeWriterGoldenManifest)
 	pc.CopyFile(LockName, safeWriterGoldenLock)
@@ -209,7 +209,7 @@ func TestSafeWriter_ManifestAndUnmodifiedLockWithForceVendor(t *testing.T) {
 	h := test.NewHelper(t)
 	defer h.Cleanup()
 
-	pc := NewTestProjectContext(h, safeWriterProject)
+	pc := NewTestProjectContext(h, safeWriterProject, t.Logf)
 	defer pc.Release()
 	pc.CopyFile(ManifestName, safeWriterGoldenManifest)
 	pc.CopyFile(LockName, safeWriterGoldenLock)
@@ -254,7 +254,7 @@ func TestSafeWriter_ModifiedLock(t *testing.T) {
 	h := test.NewHelper(t)
 	defer h.Cleanup()
 
-	pc := NewTestProjectContext(h, safeWriterProject)
+	pc := NewTestProjectContext(h, safeWriterProject, t.Logf)
 	defer pc.Release()
 	pc.CopyFile(LockName, safeWriterGoldenLock)
 	pc.Load()
@@ -301,7 +301,7 @@ func TestSafeWriter_ModifiedLockSkipVendor(t *testing.T) {
 	h := test.NewHelper(t)
 	defer h.Cleanup()
 
-	pc := NewTestProjectContext(h, safeWriterProject)
+	pc := NewTestProjectContext(h, safeWriterProject, t.Logf)
 	defer pc.Release()
 	pc.CopyFile(LockName, safeWriterGoldenLock)
 	pc.Load()
@@ -345,7 +345,7 @@ func TestSafeWriter_ForceVendorWhenVendorAlreadyExists(t *testing.T) {
 	h := test.NewHelper(t)
 	defer h.Cleanup()
 
-	pc := NewTestProjectContext(h, safeWriterProject)
+	pc := NewTestProjectContext(h, safeWriterProject, t.Logf)
 	defer pc.Release()
 	pc.CopyFile(LockName, safeWriterGoldenLock)
 	pc.Load()
@@ -391,7 +391,7 @@ func TestSafeWriter_NewLock(t *testing.T) {
 	h := test.NewHelper(t)
 	defer h.Cleanup()
 
-	pc := NewTestProjectContext(h, safeWriterProject)
+	pc := NewTestProjectContext(h, safeWriterProject, t.Logf)
 	defer pc.Release()
 	pc.Load()
 
@@ -435,7 +435,7 @@ func TestSafeWriter_NewLockSkipVendor(t *testing.T) {
 	h := test.NewHelper(t)
 	defer h.Cleanup()
 
-	pc := NewTestProjectContext(h, safeWriterProject)
+	pc := NewTestProjectContext(h, safeWriterProject, t.Logf)
 	defer pc.Release()
 	pc.Load()
 
@@ -479,7 +479,7 @@ func TestSafeWriter_DiffLocks(t *testing.T) {
 	h := test.NewHelper(t)
 	defer h.Cleanup()
 
-	pc := NewTestProjectContext(h, safeWriterProject)
+	pc := NewTestProjectContext(h, safeWriterProject, t.Logf)
 	defer pc.Release()
 	pc.CopyFile(LockName, "txn_writer/original_lock.toml")
 	pc.Load()
@@ -523,7 +523,7 @@ func TestSafeWriter_VendorDotGitPreservedWithForceVendor(t *testing.T) {
 	h := test.NewHelper(t)
 	defer h.Cleanup()
 
-	pc := NewTestProjectContext(h, safeWriterProject)
+	pc := NewTestProjectContext(h, safeWriterProject, t.Logf)
 	defer pc.Release()
 
 	gitDirPath := filepath.Join(pc.Project.AbsRoot, "vendor", ".git")

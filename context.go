@@ -5,9 +5,9 @@
 package dep
 
 import (
-	"go/build"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/Masterminds/vcs"
@@ -20,25 +20,22 @@ import (
 type Ctx struct {
 	GOPATH  string   // Selected Go path
 	GOPATHS []string // Other Go paths
+	WorkingDir string
 }
 
 // NewContext creates a struct with the project's GOPATH. It assumes
 // that of your "GOPATH"'s we want the one we are currently in.
-func NewContext() (*Ctx, error) {
-	// this way we get the default GOPATH that was added in 1.8
-	buildContext := build.Default
-	wd, err := os.Getwd()
+func NewContext(wd string, env []string) (*Ctx, error) {
+	ctx := &Ctx{WorkingDir:wd}
 
-	if err != nil {
-		return nil, errors.Wrap(err, "getting work directory")
+	GOPATH := getEnv(env, "GOPATH")
+	if GOPATH == "" {
+		GOPATH = defaultGOPATH()
 	}
-	wd = filepath.FromSlash(wd)
-	ctx := &Ctx{}
-
-	for _, gp := range filepath.SplitList(buildContext.GOPATH) {
+	for _, gp := range filepath.SplitList(GOPATH) {
 		gp = filepath.FromSlash(gp)
 
-		if internal.HasFilepathPrefix(wd, gp) {
+		if internal.HasFilepathPrefix(filepath.FromSlash(wd), gp) {
 			ctx.GOPATH = gp
 		}
 
@@ -52,8 +49,42 @@ func NewContext() (*Ctx, error) {
 	return ctx, nil
 }
 
-func (c *Ctx) SourceManager() (*gps.SourceMgr, error) {
-	return gps.NewSourceManager(filepath.Join(c.GOPATH, "pkg", "dep"))
+func getEnv(env []string, key string) string {
+	for _, v := range env {
+		kv := strings.SplitN(v, "=", 2)
+		if kv[0] == key {
+			if len(kv) > 1 {
+				return kv[1]
+			}
+			return ""
+		}
+	}
+	return ""
+}
+
+// defaultGOPATH gets the default GOPATH that was added in 1.8
+// copied from go/build/build.go
+func defaultGOPATH() string {
+	env := "HOME"
+	if runtime.GOOS == "windows" {
+		env = "USERPROFILE"
+	} else if runtime.GOOS == "plan9" {
+		env = "home"
+	}
+	if home := os.Getenv(env); home != "" {
+		def := filepath.Join(home, "go")
+		if def == runtime.GOROOT() {
+			// Don't set the default GOPATH to GOROOT,
+			// as that will trigger warnings from the go tool.
+			return ""
+		}
+		return def
+	}
+	return ""
+}
+
+func (c *Ctx) SourceManager(log func(string,...interface{})) (*gps.SourceMgr, error) {
+	return gps.NewSourceManager(filepath.Join(c.GOPATH, "pkg", "dep"), log)
 }
 
 // LoadProject takes a path and searches up the directory tree for
@@ -77,7 +108,7 @@ func (c *Ctx) LoadProject(path string) (*Project, error) {
 	}
 	switch path {
 	case "":
-		p.AbsRoot, err = findProjectRootFromWD()
+		p.AbsRoot, err = findProjectRoot(c.WorkingDir)
 	default:
 		p.AbsRoot, err = findProjectRoot(path)
 	}

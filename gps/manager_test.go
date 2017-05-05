@@ -50,7 +50,7 @@ func mkNaiveSM(t *testing.T) (*SourceMgr, func()) {
 		t.Fatalf("Failed to create temp dir: %s", err)
 	}
 
-	sm, err := NewSourceManager(cpath)
+	sm, err := NewSourceManager(cpath, t.Logf)
 	if err != nil {
 		t.Fatalf("Unexpected error on SourceManager creation: %s", err)
 	}
@@ -68,7 +68,7 @@ func remakeNaiveSM(osm *SourceMgr, t *testing.T) (*SourceMgr, func()) {
 	cpath := osm.cachedir
 	osm.Release()
 
-	sm, err := NewSourceManager(cpath)
+	sm, err := NewSourceManager(cpath, t.Logf)
 	if err != nil {
 		t.Fatalf("unexpected error on SourceManager recreation: %s", err)
 	}
@@ -92,13 +92,13 @@ func TestSourceManagerInit(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to create temp dir: %s", err)
 	}
-	sm, err := NewSourceManager(cpath)
+	sm, err := NewSourceManager(cpath, t.Logf)
 
 	if err != nil {
 		t.Errorf("Unexpected error on SourceManager creation: %s", err)
 	}
 
-	_, err = NewSourceManager(cpath)
+	_, err = NewSourceManager(cpath, t.Logf)
 	if err == nil {
 		t.Errorf("Creating second SourceManager should have failed due to file lock contention")
 	} else if te, ok := err.(CouldNotCreateLockError); !ok {
@@ -120,7 +120,7 @@ func TestSourceManagerInit(t *testing.T) {
 	}
 
 	// Set another one up at the same spot now, just to be sure
-	sm, err = NewSourceManager(cpath)
+	sm, err = NewSourceManager(cpath, t.Logf)
 	if err != nil {
 		t.Errorf("Creating a second SourceManager should have succeeded when the first was released, but failed with err %s", err)
 	}
@@ -143,7 +143,7 @@ func TestSourceInit(t *testing.T) {
 		t.Fatalf("Failed to create temp dir: %s", err)
 	}
 
-	sm, err := NewSourceManager(cpath)
+	sm, err := NewSourceManager(cpath, t.Logf)
 	if err != nil {
 		t.Fatalf("Unexpected error on SourceManager creation: %s", err)
 	}
@@ -237,7 +237,7 @@ func TestSourceInit(t *testing.T) {
 	if err != nil {
 		t.Errorf("Should have found revision in source, but got err: %s", err)
 	} else if !present {
-		t.Errorf("Should have found revision in source, but did not")
+		t.Error("Should have found revision in source, but did not")
 	}
 
 	// SyncSourceFor will ensure we have everything

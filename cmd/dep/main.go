@@ -9,16 +9,13 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 	"text/tabwriter"
 
 	"github.com/golang/dep"
-	"github.com/golang/dep/internal"
-)
-
-var (
-	verbose = flag.Bool("v", false, "enable verbose logging")
+	"github.com/golang/dep/log"
 )
 
 type command interface {
@@ -28,10 +25,36 @@ type command interface {
 	LongHelp() string       // "Foo the first bar meeting the following conditions..."
 	Register(*flag.FlagSet) // command-specific flags
 	Hidden() bool           // indicates whether the command should be hidden from help output
-	Run(*dep.Ctx, []string) error
+	Run(*dep.Ctx, *Loggers, []string) error
 }
 
 func main() {
+	wd, err := os.Getwd()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "failed to get working directory", err)
+		os.Exit(1)
+	}
+	c := &Config{
+		Args:       os.Args,
+		Stdout:     os.Stdout,
+		Stderr:     os.Stderr,
+		WorkingDir: wd,
+		Env:        os.Environ(),
+	}
+	os.Exit(c.Run())
+}
+
+// A Config specifies a full configuration for a dep execution.
+type Config struct {
+	// Args hold the command-line arguments, starting with the program name.
+	Args           []string
+	Stdout, Stderr io.Writer
+	WorkingDir     string
+	Env            []string
+}
+
+// Run executes a configuration and returns an exit code.
+func (c *Config) Run() (exitCode int) {
 	// Build the list of available commands.
 	commands := []command{
 		&initCommand{},
@@ -61,73 +84,82 @@ func main() {
 		},
 	}
 
+	errLogger := log.New(c.Stderr)
 	usage := func() {
-		internal.Logln("dep is a tool for managing dependencies for Go projects")
-		internal.Logln()
-		internal.Logln("Usage: dep <command>")
-		internal.Logln()
-		internal.Logln("Commands:")
-		internal.Logln()
-		w := tabwriter.NewWriter(os.Stderr, 0, 4, 2, ' ', 0)
+		errLogger.Logln("dep is a tool for managing dependencies for Go projects")
+		errLogger.Logln()
+		errLogger.Logln("Usage: dep <command>")
+		errLogger.Logln()
+		errLogger.Logln("Commands:")
+		errLogger.Logln()
+		w := tabwriter.NewWriter(c.Stderr, 0, 4, 2, ' ', 0)
 		for _, cmd := range commands {
 			if !cmd.Hidden() {
 				fmt.Fprintf(w, "\t%s\t%s\n", cmd.Name(), cmd.ShortHelp())
 			}
 		}
 		w.Flush()
-		internal.Logln()
-		internal.Logln("Examples:")
+		errLogger.Logln()
+		errLogger.Logln("Examples:")
 		for _, example := range examples {
 			fmt.Fprintf(w, "\t%s\t%s\n", example[0], example[1])
 		}
 		w.Flush()
-		internal.Logln()
-		internal.Logln("Use \"dep help [command]\" for more information about a command.")
+		errLogger.Logln()
+		errLogger.Logln("Use \"dep help [command]\" for more information about a command.")
 	}
 
-	cmdName, printCommandHelp, exit := parseArgs(os.Args)
+	cmdName, printCommandHelp, exit := parseArgs(c.Args)
 	if exit {
 		usage()
-		os.Exit(1)
+		exitCode = 1
+		return
 	}
 
 	for _, cmd := range commands {
 		if cmd.Name() == cmdName {
 			// Build flag set with global flags in there.
-			// TODO(pb): can we deglobalize verbose, pretty please?
-			fs := flag.NewFlagSet(cmdName, flag.ExitOnError)
-			fs.BoolVar(verbose, "v", false, "enable verbose logging")
+			fs := flag.NewFlagSet(cmdName, flag.ContinueOnError)
+			verbose := fs.Bool("v", false, "enable verbose logging")
 
 			// Register the subcommand flags in there, too.
 			cmd.Register(fs)
 
 			// Override the usage text to something nicer.
-			resetUsage(fs, cmdName, cmd.Args(), cmd.LongHelp())
+			resetUsage(errLogger, fs, cmdName, cmd.Args(), cmd.LongHelp())
 
 			if printCommandHelp {
 				fs.Usage()
-				os.Exit(1)
+				exitCode = 1
+				return
 			}
 
 			// Parse the flags the user gave us.
-			if err := fs.Parse(os.Args[2:]); err != nil {
+			if err := fs.Parse(c.Args[2:]); err != nil {
 				fs.Usage()
-				os.Exit(1)
+				exitCode = 1
+				return
 			}
 
-			internal.Verbose = *verbose
+			loggers := &Loggers{
+				Out:     log.New(c.Stdout),
+				Err:     log.New(c.Stderr),
+				Verbose: *verbose,
+			}
 
 			// Set up the dep context.
-			ctx, err := dep.NewContext()
+			ctx, err := dep.NewContext(c.WorkingDir, c.Env)
 			if err != nil {
-				internal.Logln(err)
-				os.Exit(1)
+				loggers.Err.Logln(err)
+				exitCode = 1
+				return
 			}
 
 			// Run the command with the post-flag-processing args.
-			if err := cmd.Run(ctx, fs.Args()); err != nil {
-				fmt.Fprintf(os.Stderr, "%v\n", err)
-				os.Exit(1)
+			if err := cmd.Run(ctx, loggers, fs.Args()); err != nil {
+				errLogger.Logf("%v\n", err)
+				exitCode = 1
+				return
 			}
 
 			// Easy peasy livin' breezy.
@@ -135,12 +167,13 @@ func main() {
 		}
 	}
 
-	internal.Logf("%s: no such command", cmdName)
+	errLogger.LogDepfln("%s: no such command", cmdName)
 	usage()
-	os.Exit(1)
+	exitCode = 1
+	return
 }
 
-func resetUsage(fs *flag.FlagSet, name, args, longHelp string) {
+func resetUsage(logger *log.Logger, fs *flag.FlagSet, name, args, longHelp string) {
 	var (
 		hasFlags   bool
 		flagBlock  bytes.Buffer
@@ -158,14 +191,14 @@ func resetUsage(fs *flag.FlagSet, name, args, longHelp string) {
 	})
 	flagWriter.Flush()
 	fs.Usage = func() {
-		fmt.Fprintf(os.Stderr, "Usage: dep %s %s\n", name, args)
-		internal.Logln()
-		internal.Logln(strings.TrimSpace(longHelp))
-		internal.Logln()
+		logger.Logf("Usage: dep %s %s\n", name, args)
+		logger.Logln()
+		logger.Logln(strings.TrimSpace(longHelp))
+		logger.Logln()
 		if hasFlags {
-			internal.Logln("Flags:")
-			internal.Logln()
-			internal.Logln(flagBlock.String())
+			logger.Logln("Flags:")
+			logger.Logln()
+			logger.Logln(flagBlock.String())
 		}
 	}
 }
