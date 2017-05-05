@@ -351,6 +351,14 @@ type bzrSource struct {
 func (s *bzrSource) listVersions(ctx context.Context) ([]PairedVersion, error) {
 	r := s.repo
 
+	// TODO(sdboyer) this should be handled through the gateway's FSM
+	if !r.CheckLocal() {
+		err := s.initLocal(ctx)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	// Now, list all the tags
 	out, err := runFromRepoDir(ctx, r, "bzr", "tags", "--show-ids", "-v")
 	if err != nil {
@@ -394,6 +402,14 @@ func (s *hgSource) listVersions(ctx context.Context) ([]PairedVersion, error) {
 	var vlist []PairedVersion
 
 	r := s.repo
+	// TODO(sdboyer) this should be handled through the gateway's FSM
+	if !r.CheckLocal() {
+		err := s.initLocal(ctx)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	// Now, list all the tags
 	out, err := runFromRepoDir(ctx, r, "hg", "tags", "--debug", "--verbose")
 	if err != nil {
