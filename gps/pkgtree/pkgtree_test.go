@@ -1895,6 +1895,25 @@ func TestToReachMapCycle(t *testing.T) {
 	}
 }
 
+func TestToReachMapFilterDot(t *testing.T) {
+	ptree, err := ListPackages(filepath.Join(getTestdataRootDir(t), "src", "relimport"), "relimport")
+	if err != nil {
+		t.Fatalf("ListPackages failed on relimport test case: %s", err)
+	}
+
+	rm, _ := ptree.ToReachMap(true, true, false, nil)
+	if _, has := rm["relimport/dot"]; !has {
+		t.Fatal("relimport/dot should not have had errors")
+	}
+
+	imports := dedupeStrings(rm["relimport/dot"].External, rm["relimport/dot"].Internal)
+	for _, imp := range imports {
+		if imp == "." {
+			t.Fatal("dot import should have been filtered by ToReachMap")
+		}
+	}
+}
+
 func getTestdataRootDir(t *testing.T) string {
 	cwd, err := os.Getwd()
 	if err != nil {
