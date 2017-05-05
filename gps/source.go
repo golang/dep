@@ -464,7 +464,7 @@ func (sg *sourceGateway) require(ctx context.Context, wanted sourceState) (errSt
 					return err
 				})
 
-				if err != nil {
+				if err == nil {
 					sg.cache.storeVersionMap(pvl, true)
 				}
 			case sourceHasLatestLocally:
