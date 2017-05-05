@@ -732,8 +732,8 @@ func TestListPackages(t *testing.T) {
 							&scanner.Error{
 								Pos: token.Position{
 									Filename: j("bad", "bad.go"),
-									Offset:   113,
-									Line:     2,
+									Offset:   273,
+									Line:     6,
 									Column:   43,
 								},
 								Msg: "expected 'package', found 'EOF'",
