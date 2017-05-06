@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"sort"
 	"text/tabwriter"
@@ -17,7 +18,6 @@ import (
 	"github.com/golang/dep/gps"
 	"github.com/golang/dep/gps/pkgtree"
 	"github.com/pkg/errors"
-	"io"
 )
 
 const statusShortHelp = `Report the status of the project's dependencies`
