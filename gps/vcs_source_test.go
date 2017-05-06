@@ -496,7 +496,6 @@ func testHgSourceInteractions(t *testing.T) {
 			NewBranch("another").Is(Revision("b10d05d581e5401f383e48ccfeb84b48fde99d06")),
 			NewBranch("default").Is(Revision("3d466f437f6616da594bbab6446cc1cb4328d1bb")),
 			NewBranch("newbranch").Is(Revision("5e2a01be9aee942098e44590ae545c7143da9675")),
-			NewBranch("tip").Is(Revision("5e2a01be9aee942098e44590ae545c7143da9675")),
 		})
 		close(donech)
 	}()
@@ -506,7 +505,6 @@ func testHgSourceInteractions(t *testing.T) {
 		newDefaultBranch("default").Is(Revision("3d466f437f6616da594bbab6446cc1cb4328d1bb")),
 		NewBranch("another").Is(Revision("b10d05d581e5401f383e48ccfeb84b48fde99d06")),
 		NewBranch("newbranch").Is(Revision("5e2a01be9aee942098e44590ae545c7143da9675")),
-		NewBranch("tip").Is(Revision("5e2a01be9aee942098e44590ae545c7143da9675")),
 	})
 
 	<-donech
