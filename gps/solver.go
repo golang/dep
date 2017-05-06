@@ -109,9 +109,8 @@ type SolveParameters struct {
 	// as it moves through the solving process.
 	Trace bool
 
-	// TraceLogger is the logger to use for generating trace output.
-	// If set, the solver will generate informative trace output as it moves
-	// through the solving process.
+	// TraceLogger is the logger to use for generating trace output. If Trace is
+	// true but no logger is provided, solving will result in an error.
 	TraceLogger *log.Logger
 }
 

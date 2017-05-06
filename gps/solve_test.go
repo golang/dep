@@ -375,7 +375,6 @@ func TestBadSolveOpts(t *testing.T) {
 		},
 	}
 	params.Trace = true
-	params.Trace = true
 	_, err = Prepare(params, sm)
 	if err == nil {
 		t.Errorf("Should have errored on trace with no logger")
