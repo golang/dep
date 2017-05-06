@@ -47,7 +47,7 @@ func (cmd *removeCommand) Run(ctx *dep.Ctx, loggers *Loggers, args []string) err
 		return err
 	}
 
-	sm, err := ctx.SourceManager(loggers.Out.Logf)
+	sm, err := ctx.SourceManager(loggers.Out.Printf)
 	if err != nil {
 		return err
 	}
@@ -89,7 +89,7 @@ func (cmd *removeCommand) Run(ctx *dep.Ctx, loggers *Loggers, args []string) err
 				// not being able to detect the root for an import path that's
 				// actually in the import list is a deeper problem. However,
 				// it's not our direct concern here, so we just warn.
-				loggers.Err.LogDepfln("could not infer root for %q", pr)
+				loggers.Err.Printf("dep: could not infer root for %q\n", pr)
 				continue
 			}
 			otherroots[pr] = true
@@ -104,7 +104,7 @@ func (cmd *removeCommand) Run(ctx *dep.Ctx, loggers *Loggers, args []string) err
 		}
 
 		if len(rm) == 0 {
-			loggers.Err.LogDepfln("nothing to do")
+			loggers.Err.Println("dep: nothing to do")
 			return nil
 		}
 	} else {

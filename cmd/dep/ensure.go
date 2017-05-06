@@ -10,6 +10,7 @@ import (
 	"flag"
 	"fmt"
 	"go/build"
+	"log"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -17,7 +18,6 @@ import (
 	"github.com/golang/dep"
 	"github.com/golang/dep/gps"
 	"github.com/golang/dep/gps/pkgtree"
-	"github.com/golang/dep/log"
 	"github.com/pkg/errors"
 )
 
@@ -103,7 +103,7 @@ type ensureCommand struct {
 
 func (cmd *ensureCommand) Run(ctx *dep.Ctx, loggers *Loggers, args []string) error {
 	if cmd.examples {
-		loggers.Err.Logln(strings.TrimSpace(ensureExamples))
+		loggers.Err.Println(strings.TrimSpace(ensureExamples))
 		return nil
 	}
 
@@ -112,7 +112,7 @@ func (cmd *ensureCommand) Run(ctx *dep.Ctx, loggers *Loggers, args []string) err
 		return err
 	}
 
-	sm, err := ctx.SourceManager(loggers.Out.Logf)
+	sm, err := ctx.SourceManager(loggers.Out.Printf)
 	if err != nil {
 		return err
 	}
@@ -205,7 +205,7 @@ func applyEnsureArgs(logger *log.Logger, args []string, overrides stringSlice, p
 			// TODO(sdboyer): for this case - or just in general - do we want to
 			// add project args to the requires list temporarily for this run?
 			if _, has := p.Manifest.Dependencies[pc.Ident.ProjectRoot]; !has {
-				logger.LogDepfln("No constraint or alternate source specified for %q, omitting from manifest", pc.Ident.ProjectRoot)
+				logger.Printf("dep: No constraint or alternate source specified for %q, omitting from manifest\n", pc.Ident.ProjectRoot)
 			}
 			// If it's already in the manifest, no need to log
 			continue

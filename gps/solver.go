@@ -7,13 +7,13 @@ package gps
 import (
 	"container/heap"
 	"fmt"
+	"log"
 	"sort"
 	"strings"
 
 	"github.com/armon/go-radix"
 	"github.com/golang/dep/gps/internal"
 	"github.com/golang/dep/gps/pkgtree"
-	"github.com/golang/dep/log"
 )
 
 var (
@@ -372,8 +372,8 @@ func (s *solver) Solve() (Solution, error) {
 
 	s.traceFinish(soln, err)
 	if s.tl != nil {
-		s.tl.Logln("\nSolver wall times by segment:")
-		s.tl.Logln(s.mtr.dump())
+		s.tl.Println("\nSolver wall times by segment:")
+		s.tl.Println(s.mtr.dump())
 	}
 	return soln, err
 }

@@ -9,7 +9,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"io"
+	"log"
 	"sort"
 	"text/tabwriter"
 
@@ -122,7 +122,7 @@ func (out *tableOutput) MissingFooter() {
 }
 
 type jsonOutput struct {
-	w       io.Writer
+	logger  *log.Logger
 	basic   []*BasicStatus
 	missing []*MissingStatus
 }
@@ -132,7 +132,8 @@ func (out *jsonOutput) BasicHeader() {
 }
 
 func (out *jsonOutput) BasicFooter() {
-	json.NewEncoder(out.w).Encode(out.basic)
+	b, _ := json.Marshal(out.basic)
+	out.logger.Print(string(b))
 }
 
 func (out *jsonOutput) BasicLine(bs *BasicStatus) {
@@ -148,14 +149,15 @@ func (out *jsonOutput) MissingLine(ms *MissingStatus) {
 }
 
 func (out *jsonOutput) MissingFooter() {
-	json.NewEncoder(out.w).Encode(out.missing)
+	b, _ := json.Marshal(out.missing)
+	out.logger.Print(b)
 }
 
 type dotOutput struct {
-	w io.Writer
-	o string
-	g *graphviz
-	p *dep.Project
+	logger *log.Logger
+	o      string
+	g      *graphviz
+	p      *dep.Project
 }
 
 func (out *dotOutput) BasicHeader() {
@@ -169,7 +171,7 @@ func (out *dotOutput) BasicHeader() {
 
 func (out *dotOutput) BasicFooter() {
 	gvo := out.g.output()
-	fmt.Fprintf(out.w, gvo.String())
+	out.logger.Printf(gvo.String())
 }
 
 func (out *dotOutput) BasicLine(bs *BasicStatus) {
@@ -186,7 +188,7 @@ func (cmd *statusCommand) Run(ctx *dep.Ctx, loggers *Loggers, args []string) err
 		return err
 	}
 
-	sm, err := ctx.SourceManager(loggers.Out.Logf)
+	sm, err := ctx.SourceManager(loggers.Out.Printf)
 	if err != nil {
 		return err
 	}
@@ -199,20 +201,35 @@ func (cmd *statusCommand) Run(ctx *dep.Ctx, loggers *Loggers, args []string) err
 		return errors.Errorf("not implemented")
 	case cmd.json:
 		out = &jsonOutput{
-			w: loggers.Out,
+			logger: loggers.Out,
 		}
 	case cmd.dot:
 		out = &dotOutput{
-			p: p,
-			o: cmd.output,
-			w: loggers.Out,
+			p:      p,
+			o:      cmd.output,
+			logger: loggers.Out,
 		}
 	default:
 		out = &tableOutput{
-			w: tabwriter.NewWriter(loggers.Out, 0, 4, 2, ' ', 0),
+			w: tabwriter.NewWriter(&logWriter{Logger: loggers.Out}, 0, 4, 2, ' ', 0),
 		}
 	}
 	return runStatusAll(loggers, out, p, sm)
+}
+
+// A logWriter adapts a log.Logger to the io.Writer interface.
+type logWriter struct {
+	*log.Logger
+}
+
+func (l *logWriter) Write(b []byte) (n int, err error) {
+	str := string(b)
+	if len(str) == 0 {
+		return 0, nil
+	}
+
+	l.Print(str)
+	return len(b), err
 }
 
 // BasicStatus contains all the information reported about a single dependency
@@ -388,9 +405,9 @@ func runStatusAll(loggers *Loggers, out outputter, p *dep.Project, sm *gps.Sourc
 		// TODO this is just a fix quick so staticcheck doesn't complain.
 		// Visually reconciling failure to deduce project roots with the rest of
 		// the mismatch output is a larger problem.
-		loggers.Err.Logf("Failed to deduce project roots for import paths:\n")
+		loggers.Err.Printf("Failed to deduce project roots for import paths:\n")
 		for _, fail := range errs {
-			loggers.Err.Logf("\t%s: %s\n", fail.ex, fail.err.Error())
+			loggers.Err.Printf("\t%s: %s\n", fail.ex, fail.err.Error())
 		}
 
 		return errors.New("address issues with undeducable import paths to get more status information.")

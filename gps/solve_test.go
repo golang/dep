@@ -9,6 +9,7 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"math/rand"
 	"reflect"
 	"sort"
@@ -19,7 +20,6 @@ import (
 
 	"github.com/golang/dep/gps/internal"
 	"github.com/golang/dep/gps/pkgtree"
-	"github.com/golang/dep/log"
 )
 
 var fixtorun string
@@ -79,7 +79,7 @@ func fixSolve(params SolveParameters, sm SourceManager, t *testing.T) (Solution,
 	// Trace unconditionally; by passing the trace through t.Log(), the testing
 	// system will decide whether or not to actually show the output (based on
 	// -v, or selectively on test failure).
-	params.TraceLogger = log.New(testlogger{T: t})
+	params.TraceLogger = log.New(testlogger{T: t}, "", 0)
 
 	s, err := Prepare(params, sm)
 	if err != nil {
@@ -373,7 +373,7 @@ func TestBadSolveOpts(t *testing.T) {
 			},
 		},
 	}
-	params.TraceLogger = log.New(ioutil.Discard)
+	params.TraceLogger = log.New(ioutil.Discard, "", 0)
 
 	params.Manifest = simpleRootManifest{
 		ovr: ProjectConstraints{
