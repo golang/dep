@@ -29,7 +29,7 @@ func (hashinCommand) Run(ctx *dep.Ctx, loggers *Loggers, args []string) error {
 		return err
 	}
 
-	sm, err := ctx.SourceManager(loggers.Out.Logf)
+	sm, err := ctx.SourceManager(loggers.Out.Printf)
 	if err != nil {
 		return err
 	}
@@ -51,6 +51,6 @@ func (hashinCommand) Run(ctx *dep.Ctx, loggers *Loggers, args []string) error {
 	if err != nil {
 		return errors.Wrap(err, "prepare solver")
 	}
-	loggers.Out.Logln(gps.HashingInputsAsString(s))
+	loggers.Out.Println(gps.HashingInputsAsString(s))
 	return nil
 }

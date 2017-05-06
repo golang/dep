@@ -42,7 +42,7 @@ func (cmd *pruneCommand) Run(ctx *dep.Ctx, loggers *Loggers, args []string) erro
 		return err
 	}
 
-	sm, err := ctx.SourceManager(loggers.Out.Logf)
+	sm, err := ctx.SourceManager(loggers.Out.Printf)
 	if err != nil {
 		return err
 	}

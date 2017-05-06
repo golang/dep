@@ -9,13 +9,13 @@ package main
 import (
 	"go/build"
 	"io/ioutil"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/golang/dep/gps"
 	"github.com/golang/dep/gps/pkgtree"
-	"github.com/golang/dep/log"
 )
 
 // This is probably the simplest possible implementation of gps. It does the

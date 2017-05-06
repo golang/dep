@@ -10,12 +10,12 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"strings"
 	"text/tabwriter"
 
 	"github.com/golang/dep"
-	"github.com/golang/dep/log"
 )
 
 type command interface {
@@ -84,14 +84,14 @@ func (c *Config) Run() (exitCode int) {
 		},
 	}
 
-	errLogger := log.New(c.Stderr)
+	errLogger := log.New(c.Stderr, "", 0)
 	usage := func() {
-		errLogger.Logln("dep is a tool for managing dependencies for Go projects")
-		errLogger.Logln()
-		errLogger.Logln("Usage: dep <command>")
-		errLogger.Logln()
-		errLogger.Logln("Commands:")
-		errLogger.Logln()
+		errLogger.Println("dep is a tool for managing dependencies for Go projects")
+		errLogger.Println()
+		errLogger.Println("Usage: dep <command>")
+		errLogger.Println()
+		errLogger.Println("Commands:")
+		errLogger.Println()
 		w := tabwriter.NewWriter(c.Stderr, 0, 4, 2, ' ', 0)
 		for _, cmd := range commands {
 			if !cmd.Hidden() {
@@ -99,14 +99,14 @@ func (c *Config) Run() (exitCode int) {
 			}
 		}
 		w.Flush()
-		errLogger.Logln()
-		errLogger.Logln("Examples:")
+		errLogger.Println()
+		errLogger.Println("Examples:")
 		for _, example := range examples {
 			fmt.Fprintf(w, "\t%s\t%s\n", example[0], example[1])
 		}
 		w.Flush()
-		errLogger.Logln()
-		errLogger.Logln("Use \"dep help [command]\" for more information about a command.")
+		errLogger.Println()
+		errLogger.Println("Use \"dep help [command]\" for more information about a command.")
 	}
 
 	cmdName, printCommandHelp, exit := parseArgs(c.Args)
@@ -142,22 +142,22 @@ func (c *Config) Run() (exitCode int) {
 			}
 
 			loggers := &Loggers{
-				Out:     log.New(c.Stdout),
-				Err:     log.New(c.Stderr),
+				Out:     log.New(c.Stdout, "", 0),
+				Err:     errLogger,
 				Verbose: *verbose,
 			}
 
 			// Set up the dep context.
 			ctx, err := dep.NewContext(c.WorkingDir, c.Env)
 			if err != nil {
-				loggers.Err.Logln(err)
+				loggers.Err.Println(err)
 				exitCode = 1
 				return
 			}
 
 			// Run the command with the post-flag-processing args.
 			if err := cmd.Run(ctx, loggers, fs.Args()); err != nil {
-				errLogger.Logf("%v\n", err)
+				errLogger.Printf("%v\n", err)
 				exitCode = 1
 				return
 			}
@@ -167,7 +167,7 @@ func (c *Config) Run() (exitCode int) {
 		}
 	}
 
-	errLogger.LogDepfln("%s: no such command", cmdName)
+	errLogger.Printf("dep: %s: no such command\n", cmdName)
 	usage()
 	exitCode = 1
 	return
@@ -191,14 +191,14 @@ func resetUsage(logger *log.Logger, fs *flag.FlagSet, name, args, longHelp strin
 	})
 	flagWriter.Flush()
 	fs.Usage = func() {
-		logger.Logf("Usage: dep %s %s\n", name, args)
-		logger.Logln()
-		logger.Logln(strings.TrimSpace(longHelp))
-		logger.Logln()
+		logger.Printf("Usage: dep %s %s\n", name, args)
+		logger.Println()
+		logger.Println(strings.TrimSpace(longHelp))
+		logger.Println()
 		if hasFlags {
-			logger.Logln("Flags:")
-			logger.Logln()
-			logger.Logln(flagBlock.String())
+			logger.Println("Flags:")
+			logger.Println()
+			logger.Println(flagBlock.String())
 		}
 	}
 }
