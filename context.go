@@ -18,15 +18,15 @@ import (
 
 // Ctx defines the supporting context of the tool.
 type Ctx struct {
-	GOPATH  string   // Selected Go path
-	GOPATHS []string // Other Go paths
+	GOPATH     string   // Selected Go path
+	GOPATHS    []string // Other Go paths
 	WorkingDir string
 }
 
 // NewContext creates a struct with the project's GOPATH. It assumes
 // that of your "GOPATH"'s we want the one we are currently in.
 func NewContext(wd string, env []string) (*Ctx, error) {
-	ctx := &Ctx{WorkingDir:wd}
+	ctx := &Ctx{WorkingDir: wd}
 
 	GOPATH := getEnv(env, "GOPATH")
 	if GOPATH == "" {
@@ -83,7 +83,7 @@ func defaultGOPATH() string {
 	return ""
 }
 
-func (c *Ctx) SourceManager(log func(string,...interface{})) (*gps.SourceMgr, error) {
+func (c *Ctx) SourceManager(log func(string, ...interface{})) (*gps.SourceMgr, error) {
 	return gps.NewSourceManager(filepath.Join(c.GOPATH, "pkg", "dep"), log)
 }
 

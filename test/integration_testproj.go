@@ -44,7 +44,7 @@ func NewTestProject(t *testing.T, initPath, wd string, run RunFunc) *Integration
 		t:      t,
 		origWd: wd,
 		env:    os.Environ(),
-		run: run,
+		run:    run,
 	}
 	new.makeRootTempDir()
 	new.TempDir(ProjectRoot, "vendor")

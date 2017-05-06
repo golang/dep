@@ -24,7 +24,7 @@ type TestProjectContext struct {
 }
 
 // NewTestProjectContext creates a new on-disk test project
-func NewTestProjectContext(h *test.Helper, projectName string, logf func(string,...interface{})) *TestProjectContext {
+func NewTestProjectContext(h *test.Helper, projectName string, logf func(string, ...interface{})) *TestProjectContext {
 	pc := &TestProjectContext{h: h}
 
 	// Create the test project directory
