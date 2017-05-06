@@ -162,6 +162,7 @@ func (cmd *removeCommand) Run(ctx *dep.Ctx, loggers *Loggers, args []string) err
 	params := p.MakeParams()
 	params.RootPackageTree = pkgT
 	if loggers.Verbose {
+		params.Trace = true
 		params.TraceLogger = loggers.Err
 	}
 	s, err := gps.Prepare(params, sm)
