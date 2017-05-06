@@ -35,8 +35,6 @@ func TestIntegration(t *testing.T) {
 			parse := strings.Split(path, string(filepath.Separator))
 			testName := strings.Join(parse[2:len(parse)-1], "/")
 			t.Run(testName, func(t *testing.T) {
-				t.Parallel()
-
 				t.Run("-external", testIntegration(testName, wd, execCmd))
 				t.Run("-internal", testIntegration(testName, wd, runMain))
 			})
