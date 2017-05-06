@@ -20,7 +20,7 @@ type TestProjectContext struct {
 
 	Context       *Ctx
 	Project       *Project
-	SourceManager *gps.SourceMgr
+	SourceManager gps.SourceManager
 }
 
 // NewTestProjectContext creates a new on-disk test project
