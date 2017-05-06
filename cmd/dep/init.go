@@ -274,14 +274,14 @@ type projectData struct {
 	ondisk       map[gps.ProjectRoot]gps.Version // projects that were found on disk
 }
 
-func getProjectData(ctx *dep.Ctx, pkgT pkgtree.PackageTree, cpr string, sm *gps.SourceMgr) (projectData, error) {
+func getProjectData(ctx *dep.Ctx, pkgT pkgtree.PackageTree, cpr string, sm gps.SourceManager) (projectData, error) {
 	constraints := make(gps.ProjectConstraints)
 	dependencies := make(map[gps.ProjectRoot][]string)
 	packages := make(map[string]bool)
 	notondisk := make(map[gps.ProjectRoot]bool)
 	ondisk := make(map[gps.ProjectRoot]gps.Version)
 
-	syncDep := func(pr gps.ProjectRoot, sm *gps.SourceMgr) {
+	syncDep := func(pr gps.ProjectRoot, sm gps.SourceManager) {
 		message := "Cached"
 		if err := sm.SyncSourceFor(gps.ProjectIdentifier{ProjectRoot: pr}); err != nil {
 			message = "Unable to cache"
