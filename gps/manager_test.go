@@ -237,7 +237,7 @@ func TestSourceInit(t *testing.T) {
 	if err != nil {
 		t.Errorf("Should have found revision in source, but got err: %s", err)
 	} else if !present {
-		t.Error("Should have found revision in source, but did not")
+		t.Errorf("Should have found revision in source, but did not")
 	}
 
 	// SyncSourceFor will ensure we have everything

@@ -372,8 +372,7 @@ func (s *solver) Solve() (Solution, error) {
 
 	s.traceFinish(soln, err)
 	if s.tl != nil {
-		s.tl.Println("\nSolver wall times by segment:")
-		s.tl.Println(s.mtr.dump())
+		s.mtr.dump(s.tl)
 	}
 	return soln, err
 }

@@ -52,6 +52,7 @@ func (s *solver) traceCheckQueue(q *versionQueue, bmi bimodalIdentifier, cont bo
 	} else {
 		verb = "attempt"
 	}
+
 	s.tl.Printf("%s\n", tracePrefix(fmt.Sprintf("%s? %s %s with %v pkgs; %s versions to try", indent, verb, bmi.id.errString(), len(bmi.pl), vlen), prefix, prefix))
 }
 
@@ -124,6 +125,7 @@ func (s *solver) traceSelectRoot(ptree pkgtree.PackageTree, cdeps []completeDep)
 	for _, cdep := range cdeps {
 		expkgs += len(cdep.pl)
 	}
+
 	// TODO(sdboyer) include info on ignored pkgs/imports, etc.
 	s.tl.Printf(" %v transitively valid internal packages", len(rm))
 	s.tl.Printf(" %v external packages imported from %v projects", expkgs, len(cdeps))

@@ -36,7 +36,7 @@ func main() {
 	// Set up params, including tracing
 	params := gps.SolveParameters{
 		RootDir:         root,
-		TraceLogger:     log.New(os.Stdout),
+		TraceLogger:     log.New(os.Stdout, "", 0),
 		ProjectAnalyzer: NaiveAnalyzer{},
 	}
 	// Perform static analysis on the current project to find all of its imports.
