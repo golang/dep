@@ -121,6 +121,7 @@ func (cmd *ensureCommand) Run(ctx *dep.Ctx, loggers *Loggers, args []string) err
 
 	params := p.MakeParams()
 	if loggers.Verbose {
+		params.Trace = true
 		params.TraceLogger = loggers.Err
 	}
 	params.RootPackageTree, err = pkgtree.ListPackages(p.AbsRoot, string(p.ImportRoot))

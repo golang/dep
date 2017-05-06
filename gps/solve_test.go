@@ -79,6 +79,7 @@ func fixSolve(params SolveParameters, sm SourceManager, t *testing.T) (Solution,
 	// Trace unconditionally; by passing the trace through t.Log(), the testing
 	// system will decide whether or not to actually show the output (based on
 	// -v, or selectively on test failure).
+	params.Trace = true
 	params.TraceLogger = log.New(testlogger{T: t}, "", 0)
 
 	s, err := Prepare(params, sm)
@@ -373,6 +374,14 @@ func TestBadSolveOpts(t *testing.T) {
 			},
 		},
 	}
+	params.Trace = true
+	params.Trace = true
+	_, err = Prepare(params, sm)
+	if err == nil {
+		t.Errorf("Should have errored on trace with no logger")
+	} else if !strings.Contains(err.Error(), "no logger provided") {
+		t.Error("Prepare should have given error on missing trace logger, but gave:", err)
+	}
 	params.TraceLogger = log.New(ioutil.Discard, "", 0)
 
 	params.Manifest = simpleRootManifest{
@@ -382,7 +391,7 @@ func TestBadSolveOpts(t *testing.T) {
 	}
 	_, err = Prepare(params, sm)
 	if err == nil {
-		t.Error("Should have errored on override with empty ProjectProperties")
+		t.Errorf("Should have errored on override with empty ProjectProperties")
 	} else if !strings.Contains(err.Error(), "foo, but without any non-zero properties") {
 		t.Error("Prepare should have given error override with empty ProjectProperties, but gave:", err)
 	}

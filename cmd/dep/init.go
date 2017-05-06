@@ -155,6 +155,7 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, loggers *Loggers, args []string) error
 	}
 
 	if loggers.Verbose {
+		params.Trace = true
 		params.TraceLogger = loggers.Err
 	}
 
