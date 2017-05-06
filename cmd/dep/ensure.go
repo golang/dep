@@ -123,7 +123,6 @@ func (cmd *ensureCommand) Run(ctx *dep.Ctx, args []string) error {
 
 	params := p.MakeParams()
 	if *verbose {
-		params.Trace = true
 		params.TraceLogger = log.New(os.Stderr, "", 0)
 	}
 	params.RootPackageTree, err = pkgtree.ListPackages(p.AbsRoot, string(p.ImportRoot))

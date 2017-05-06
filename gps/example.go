@@ -36,7 +36,6 @@ func main() {
 	// Set up params, including tracing
 	params := gps.SolveParameters{
 		RootDir:         root,
-		Trace:           true,
 		TraceLogger:     log.New(os.Stdout, "", 0),
 		ProjectAnalyzer: NaiveAnalyzer{},
 	}

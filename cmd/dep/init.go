@@ -155,7 +155,6 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 	}
 
 	if *verbose {
-		params.Trace = true
 		params.TraceLogger = log.New(os.Stderr, "", 0)
 	}
 	s, err := gps.Prepare(params, sm)

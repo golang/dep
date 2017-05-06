@@ -63,7 +63,6 @@ func (cmd *pruneCommand) Run(ctx *dep.Ctx, args []string) error {
 	params.RootPackageTree = ptree
 
 	if *verbose {
-		params.Trace = true
 		params.TraceLogger = log.New(os.Stderr, "", 0)
 	}
 
