@@ -83,8 +83,8 @@ func defaultGOPATH() string {
 	return ""
 }
 
-func (c *Ctx) SourceManager(log func(string, ...interface{})) (*gps.SourceMgr, error) {
-	return gps.NewSourceManager(filepath.Join(c.GOPATH, "pkg", "dep"), log)
+func (c *Ctx) SourceManager() (*gps.SourceMgr, error) {
+	return gps.NewSourceManager(filepath.Join(c.GOPATH, "pkg", "dep"))
 }
 
 // LoadProject takes a path and searches up the directory tree for

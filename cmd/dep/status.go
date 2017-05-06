@@ -17,6 +17,7 @@ import (
 	"github.com/golang/dep/gps"
 	"github.com/golang/dep/gps/pkgtree"
 	"github.com/pkg/errors"
+	"io"
 )
 
 const statusShortHelp = `Report the status of the project's dependencies`
@@ -122,7 +123,7 @@ func (out *tableOutput) MissingFooter() {
 }
 
 type jsonOutput struct {
-	logger  *log.Logger
+	w       io.Writer
 	basic   []*BasicStatus
 	missing []*MissingStatus
 }
@@ -132,8 +133,7 @@ func (out *jsonOutput) BasicHeader() {
 }
 
 func (out *jsonOutput) BasicFooter() {
-	b, _ := json.Marshal(out.basic)
-	out.logger.Print(string(b))
+	json.NewEncoder(out.w).Encode(out.basic)
 }
 
 func (out *jsonOutput) BasicLine(bs *BasicStatus) {
@@ -149,15 +149,14 @@ func (out *jsonOutput) MissingLine(ms *MissingStatus) {
 }
 
 func (out *jsonOutput) MissingFooter() {
-	b, _ := json.Marshal(out.missing)
-	out.logger.Print(b)
+	json.NewEncoder(out.w).Encode(out.missing)
 }
 
 type dotOutput struct {
-	logger *log.Logger
-	o      string
-	g      *graphviz
-	p      *dep.Project
+	w io.Writer
+	o string
+	g *graphviz
+	p *dep.Project
 }
 
 func (out *dotOutput) BasicHeader() {
@@ -171,7 +170,7 @@ func (out *dotOutput) BasicHeader() {
 
 func (out *dotOutput) BasicFooter() {
 	gvo := out.g.output()
-	out.logger.Printf(gvo.String())
+	fmt.Fprintf(out.w, gvo.String())
 }
 
 func (out *dotOutput) BasicLine(bs *BasicStatus) {
@@ -188,7 +187,7 @@ func (cmd *statusCommand) Run(ctx *dep.Ctx, loggers *Loggers, args []string) err
 		return err
 	}
 
-	sm, err := ctx.SourceManager(loggers.Out.Printf)
+	sm, err := ctx.SourceManager()
 	if err != nil {
 		return err
 	}
@@ -201,13 +200,13 @@ func (cmd *statusCommand) Run(ctx *dep.Ctx, loggers *Loggers, args []string) err
 		return errors.Errorf("not implemented")
 	case cmd.json:
 		out = &jsonOutput{
-			logger: loggers.Out,
+			w: &logWriter{Logger: loggers.Out},
 		}
 	case cmd.dot:
 		out = &dotOutput{
-			p:      p,
-			o:      cmd.output,
-			logger: loggers.Out,
+			p: p,
+			o: cmd.output,
+			w: &logWriter{Logger: loggers.Out},
 		}
 	default:
 		out = &tableOutput{
