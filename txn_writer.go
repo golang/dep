@@ -14,9 +14,9 @@ import (
 	"strings"
 
 	"github.com/golang/dep/gps"
+	"github.com/golang/dep/log"
 	"github.com/pelletier/go-toml"
 	"github.com/pkg/errors"
-	"github.com/golang/dep/log"
 )
 
 // Example string to be written to the manifest file

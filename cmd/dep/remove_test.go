@@ -54,7 +54,7 @@ func removeErrors(name, wd string, run test.RunFunc) func(*testing.T) {
 		if err := testProj.DoRun([]string{"remove", "github.com/not/used", "github.com/not/present"}); err == nil {
 			t.Fatal("rm with one arg not in manifest should have failed")
 		}
-		
+
 		if err := testProj.DoRun([]string{"remove", "github.com/sdboyer/deptest"}); err == nil {
 			t.Fatal("rm of arg in manifest and imports should have failed without -force")
 		}
