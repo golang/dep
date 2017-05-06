@@ -7,6 +7,7 @@ package gps
 import (
 	"bytes"
 	"fmt"
+	"log"
 	"sort"
 	"text/tabwriter"
 	"time"
@@ -44,7 +45,7 @@ func (m *metrics) pop() {
 	m.last = time.Now()
 }
 
-func (m *metrics) dump() string {
+func (m *metrics) dump(l *log.Logger) {
 	s := make(ndpairs, len(m.times))
 	k := 0
 	for n, d := range m.times {
@@ -67,7 +68,8 @@ func (m *metrics) dump() string {
 	fmt.Fprintf(w, "\n\tTOTAL:\t%v\t\n", tot)
 	w.Flush()
 
-	return buf.String()
+	l.Println("\nSolver wall times by segment:")
+	l.Println((&buf).String())
 }
 
 type ndpair struct {
