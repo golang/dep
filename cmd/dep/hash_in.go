@@ -29,7 +29,7 @@ func (hashinCommand) Run(ctx *dep.Ctx, loggers *Loggers, args []string) error {
 		return err
 	}
 
-	sm, err := ctx.SourceManager(loggers.Out.Printf)
+	sm, err := ctx.SourceManager()
 	if err != nil {
 		return err
 	}

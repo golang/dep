@@ -114,7 +114,7 @@ func BenchmarkCreateVendorTree(b *testing.B) {
 	tmp := path.Join(os.TempDir(), "vsolvtest")
 
 	clean := true
-	sm, err := NewSourceManager(path.Join(tmp, "cache"), b.Logf)
+	sm, err := NewSourceManager(path.Join(tmp, "cache"))
 	if err != nil {
 		b.Errorf("NewSourceManager errored unexpectedly: %q", err)
 		clean = false

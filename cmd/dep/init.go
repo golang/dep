@@ -103,7 +103,7 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, loggers *Loggers, args []string) error
 	if loggers.Verbose {
 		loggers.Err.Printf("dep: Found %d dependencies.\n", len(pkgT.Packages))
 	}
-	sm, err := ctx.SourceManager(loggers.Out.Printf)
+	sm, err := ctx.SourceManager()
 	if err != nil {
 		return errors.Wrap(err, "getSourceManager")
 	}
