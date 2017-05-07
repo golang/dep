@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package internal
+package util
 
 import (
 	"io"
@@ -95,7 +95,7 @@ func HasFilepathPrefix(path, prefix string) bool {
 	return true
 }
 
-// genTestFilename returns a string with at most one rune case-flipped.
+// GenTestFilename returns a string with at most one rune case-flipped.
 //
 // The transformation is applied only to the first rune that can be
 // reversibly case-flipped, meaning:
@@ -104,7 +104,7 @@ func HasFilepathPrefix(path, prefix string) bool {
 // * An uppercase rune for which it's true that upper(lower(r)) == r
 //
 // All the other runes are left intact.
-func genTestFilename(str string) string {
+func GenTestFilename(str string) string {
 	flip := true
 	return strings.Map(func(r rune) rune {
 		if flip {
@@ -147,7 +147,7 @@ func genTestFilename(str string) string {
 // return false.
 func isCaseSensitiveFilesystem(dir string) bool {
 	alt := filepath.Join(filepath.Dir(dir),
-		genTestFilename(filepath.Base(dir)))
+		GenTestFilename(filepath.Base(dir)))
 
 	dInfo, err := os.Stat(dir)
 	if err != nil {
@@ -190,7 +190,7 @@ func IsNonEmptyDir(name string) (bool, error) {
 	return len(files) != 0, nil
 }
 
-func writeFile(path string, in toml.Marshaler) error {
+func WriteFile(path string, in toml.Marshaler) error {
 	f, err := os.Create(path)
 	if err != nil {
 		return err
@@ -210,14 +210,14 @@ func writeFile(path string, in toml.Marshaler) error {
 // This is used to write arbitrary string data to a file, such as
 // updating the `Gopkg.toml` file with example data if no deps found
 // on init.
-func modifyWithString(path, data string) error {
+func ModifyWithString(path, data string) error {
 	return ioutil.WriteFile(path, []byte(data), 0644)
 }
 
 // renameWithFallback attempts to rename a file or directory, but falls back to
 // copying in the event of a cross-link device error. If the fallback copy
 // succeeds, src is still removed, emulating normal rename behavior.
-func renameWithFallback(src, dest string) error {
+func RenameWithFallback(src, dest string) error {
 	fi, err := os.Lstat(src)
 	if err != nil {
 		return errors.Wrapf(err, "cannot stat %s", src)

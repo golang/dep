@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/golang/dep/internal/test"
+	"github.com/golang/dep/internal/util"
 )
 
 func TestHasFilepathPrefix(t *testing.T) {
@@ -51,7 +52,7 @@ func TestHasFilepathPrefix(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		got := HasFilepathPrefix(c.dir, c.prefix)
+		got := util.HasFilepathPrefix(c.dir, c.prefix)
 		if c.want != got {
 			t.Fatalf("dir: %q, prefix: %q, expected: %v, got: %v", c.dir, c.prefix, c.want, got)
 		}
@@ -74,7 +75,7 @@ func TestGenTestFilename(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		got := genTestFilename(c.str)
+		got := util.GenTestFilename(c.str)
 		if c.want != got {
 			t.Fatalf("str: %q, expected: %q, got: %q", c.str, c.want, got)
 		}
@@ -92,7 +93,7 @@ func BenchmarkGenTestFilename(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		for _, str := range cases {
-			genTestFilename(str)
+			util.GenTestFilename(str)
 		}
 	}
 }
@@ -121,11 +122,11 @@ func TestCopyDir(t *testing.T) {
 	srcf.Close()
 
 	destdir := filepath.Join(dir, "dest")
-	if err = CopyDir(srcdir, destdir); err != nil {
+	if err = util.CopyDir(srcdir, destdir); err != nil {
 		t.Fatal(err)
 	}
 
-	dirOK, err := IsDir(destdir)
+	dirOK, err := util.IsDir(destdir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -177,7 +178,7 @@ func TestCopyFile(t *testing.T) {
 	srcf.Close()
 
 	destf := filepath.Join(dir, "destf")
-	if err := CopyFile(srcf.Name(), destf); err != nil {
+	if err := util.CopyFile(srcf.Name(), destf); err != nil {
 		t.Fatal(err)
 	}
 
@@ -214,12 +215,12 @@ func TestIsRegular(t *testing.T) {
 	tests := map[string]bool{
 		wd: false,
 		filepath.Join(wd, "testdata"):                       false,
-		filepath.Join(wd, "..", "cmd", "dep", "main.go"):    true,
+		filepath.Join(wd, "fs_test.go"):                     true,
 		filepath.Join(wd, "this_file_does_not_exist.thing"): false,
 	}
 
 	for f, want := range tests {
-		got, err := IsRegular(f)
+		got, err := util.IsRegular(f)
 		if err != nil {
 			if !want {
 				// this is the case where we expect an error so continue
@@ -245,12 +246,12 @@ func TestIsDir(t *testing.T) {
 	tests := map[string]bool{
 		wd: true,
 		filepath.Join(wd, "testdata"):                       true,
-		filepath.Join(wd, "main.go"):                        false,
+		filepath.Join(wd, "fs_test.go"):                     false,
 		filepath.Join(wd, "this_file_does_not_exist.thing"): false,
 	}
 
 	for f, want := range tests {
-		got, err := IsDir(f)
+		got, err := util.IsDir(f)
 		if err != nil {
 			if !want {
 				// this is the case where we expect an error so continue
@@ -280,13 +281,13 @@ func TestIsEmpty(t *testing.T) {
 	tests := map[string]string{
 		wd:                                                  "true",
 		"testdata":                                          "true",
-		filepath.Join(wd, "fs.go"):                          "err",
+		filepath.Join(wd, "fs_test.go"):                     "err",
 		filepath.Join(wd, "this_file_does_not_exist.thing"): "false",
 		h.Path("empty"):                                     "false",
 	}
 
 	for f, want := range tests {
-		empty, err := IsNonEmptyDir(f)
+		empty, err := util.IsNonEmptyDir(f)
 		if want == "err" {
 			if err == nil {
 				t.Fatalf("Wanted an error for %v, but it was nil", f)

@@ -54,7 +54,7 @@ type initCommand struct {
 }
 
 func trimPathPrefix(p1, p2 string) string {
-	if internal.HasFilepathPrefix(p1, p2) {
+	if util.HasFilepathPrefix(p1, p2) {
 		return p1[len(p2):]
 	}
 	return p1
@@ -79,7 +79,7 @@ func (cmd *initCommand) Run(ctx *internal.Ctx, args []string) error {
 	mf := filepath.Join(root, cfg.ManifestName)
 	lf := filepath.Join(root, cfg.LockName)
 
-	mok, err := internal.IsRegular(mf)
+	mok, err := util.IsRegular(mf)
 	if err != nil {
 		return err
 	}
@@ -88,7 +88,7 @@ func (cmd *initCommand) Run(ctx *internal.Ctx, args []string) error {
 	}
 	// Manifest file does not exist.
 
-	lok, err := internal.IsRegular(lf)
+	lok, err := util.IsRegular(lf)
 	if err != nil {
 		return err
 	}

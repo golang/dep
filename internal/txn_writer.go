@@ -15,6 +15,7 @@ import (
 
 	"github.com/golang/dep/gps"
 	"github.com/golang/dep/internal/cfg"
+	"github.com/golang/dep/internal/util"
 	"github.com/pelletier/go-toml"
 	"github.com/pkg/errors"
 )
@@ -262,7 +263,7 @@ func (sw SafeWriter) validate(root string, sm gps.SourceManager) error {
 	if root == "" {
 		return errors.New("root path must be non-empty")
 	}
-	if is, err := IsDir(root); !is {
+	if is, err := util.IsDir(root); !is {
 		if err != nil {
 			return err
 		}
@@ -327,7 +328,7 @@ func (sw *SafeWriter) Write(root string, sm gps.SourceManager, noExamples bool) 
 	}
 
 	if sw.HasLock() {
-		if err := writeFile(filepath.Join(td, cfg.LockName), sw.Lock); err != nil {
+		if err := util.WriteFile(filepath.Join(td, cfg.LockName), sw.Lock); err != nil {
 			return errors.Wrap(err, "failed to write lock file to temp dir")
 		}
 	}
@@ -341,7 +342,7 @@ func (sw *SafeWriter) Write(root string, sm gps.SourceManager, noExamples bool) 
 
 	// Ensure vendor/.git is preserved if present
 	if hasDotGit(vpath) {
-		err = renameWithFallback(filepath.Join(vpath, ".git"), filepath.Join(td, "vendor/.git"))
+		err = util.RenameWithFallback(filepath.Join(vpath, ".git"), filepath.Join(td, "vendor/.git"))
 		if _, ok := err.(*os.LinkError); ok {
 			return errors.Wrap(err, "failed to preserve vendor/.git")
 		}
@@ -360,7 +361,7 @@ func (sw *SafeWriter) Write(root string, sm gps.SourceManager, noExamples bool) 
 		if _, err := os.Stat(mpath); err == nil {
 			// Move out the old one.
 			tmploc := filepath.Join(td, cfg.ManifestName+".orig")
-			failerr = renameWithFallback(mpath, tmploc)
+			failerr = util.RenameWithFallback(mpath, tmploc)
 			if failerr != nil {
 				goto fail
 			}
@@ -368,7 +369,7 @@ func (sw *SafeWriter) Write(root string, sm gps.SourceManager, noExamples bool) 
 		}
 
 		// Move in the new one.
-		failerr = renameWithFallback(filepath.Join(td, cfg.ManifestName), mpath)
+		failerr = util.RenameWithFallback(filepath.Join(td, cfg.ManifestName), mpath)
 		if failerr != nil {
 			goto fail
 		}
@@ -379,7 +380,7 @@ func (sw *SafeWriter) Write(root string, sm gps.SourceManager, noExamples bool) 
 			// Move out the old one.
 			tmploc := filepath.Join(td, cfg.LockName+".orig")
 
-			failerr = renameWithFallback(lpath, tmploc)
+			failerr = util.RenameWithFallback(lpath, tmploc)
 			if failerr != nil {
 				goto fail
 			}
@@ -387,7 +388,7 @@ func (sw *SafeWriter) Write(root string, sm gps.SourceManager, noExamples bool) 
 		}
 
 		// Move in the new one.
-		failerr = renameWithFallback(filepath.Join(td, cfg.LockName), lpath)
+		failerr = util.RenameWithFallback(filepath.Join(td, cfg.LockName), lpath)
 		if failerr != nil {
 			goto fail
 		}
@@ -405,7 +406,7 @@ func (sw *SafeWriter) Write(root string, sm gps.SourceManager, noExamples bool) 
 				vendorbak = filepath.Join(td, "vendor.orig")
 			}
 
-			failerr = renameWithFallback(vpath, vendorbak)
+			failerr = util.RenameWithFallback(vpath, vendorbak)
 			if failerr != nil {
 				goto fail
 			}
@@ -413,7 +414,7 @@ func (sw *SafeWriter) Write(root string, sm gps.SourceManager, noExamples bool) 
 		}
 
 		// Move in the new one.
-		failerr = renameWithFallback(filepath.Join(td, "vendor"), vpath)
+		failerr = util.RenameWithFallback(filepath.Join(td, "vendor"), vpath)
 		if failerr != nil {
 			goto fail
 		}
@@ -432,7 +433,7 @@ fail:
 	// If we failed at any point, move all the things back into place, then bail.
 	for _, pair := range restore {
 		// Nothing we can do on err here, as we're already in recovery mode.
-		renameWithFallback(pair.from, pair.to)
+		util.RenameWithFallback(pair.from, pair.to)
 	}
 	return failerr
 }
@@ -521,14 +522,14 @@ func PruneProject(p *Project, sm gps.SourceManager) error {
 			// to a proper tempdir.
 			vendorbak = filepath.Join(td, "vendor.orig")
 		}
-		failerr = renameWithFallback(vpath, vendorbak)
+		failerr = util.RenameWithFallback(vpath, vendorbak)
 		if failerr != nil {
 			goto fail
 		}
 	}
 
 	// Move in the new one.
-	failerr = renameWithFallback(td, vpath)
+	failerr = util.RenameWithFallback(td, vpath)
 	if failerr != nil {
 		goto fail
 	}
@@ -538,7 +539,7 @@ func PruneProject(p *Project, sm gps.SourceManager) error {
 	return nil
 
 fail:
-	renameWithFallback(vendorbak, vpath)
+	util.RenameWithFallback(vendorbak, vpath)
 	return failerr
 }
 

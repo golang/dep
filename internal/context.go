@@ -13,6 +13,7 @@ import (
 	"github.com/Masterminds/vcs"
 	"github.com/golang/dep/gps"
 	"github.com/golang/dep/internal/cfg"
+	"github.com/golang/dep/internal/util"
 	"github.com/pkg/errors"
 )
 
@@ -38,7 +39,7 @@ func NewContext() (*Ctx, error) {
 	for _, gp := range filepath.SplitList(buildContext.GOPATH) {
 		gp = filepath.FromSlash(gp)
 
-		if HasFilepathPrefix(wd, gp) {
+		if util.HasFilepathPrefix(wd, gp) {
 			ctx.GOPATH = gp
 		}
 
@@ -165,7 +166,7 @@ func (c *Ctx) resolveProjectRoot(path string) (string, error) {
 	// Determine if the symlink is within any of the GOPATHs, in which case we're not
 	// sure how to resolve it.
 	for _, gp := range c.GOPATHS {
-		if HasFilepathPrefix(path, gp) {
+		if util.HasFilepathPrefix(path, gp) {
 			return "", errors.Errorf("'%s' is linked to another path within a GOPATH (%s)", path, gp)
 		}
 	}
@@ -180,7 +181,7 @@ func (c *Ctx) resolveProjectRoot(path string) (string, error) {
 // The second returned string indicates which GOPATH value was used.
 func (c *Ctx) SplitAbsoluteProjectRoot(path string) (string, error) {
 	srcprefix := filepath.Join(c.GOPATH, "src") + string(filepath.Separator)
-	if HasFilepathPrefix(path, srcprefix) {
+	if util.HasFilepathPrefix(path, srcprefix) {
 		// filepath.ToSlash because we're dealing with an import path now,
 		// not an fs path
 		return filepath.ToSlash(path[len(srcprefix):]), nil
@@ -194,7 +195,7 @@ func (c *Ctx) SplitAbsoluteProjectRoot(path string) (string, error) {
 // package directory needs to exist.
 func (c *Ctx) absoluteProjectRoot(path string) (string, error) {
 	posspath := filepath.Join(c.GOPATH, "src", path)
-	dirOK, err := IsDir(posspath)
+	dirOK, err := util.IsDir(posspath)
 	if err != nil {
 		return "", errors.Wrapf(err, "checking if %s is a directory", posspath)
 	}

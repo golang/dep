@@ -157,7 +157,7 @@ func (cmd *ensureCommand) Run(ctx *internal.Ctx, args []string) error {
 
 	// check if vendor exists, because if the locks are the same but
 	// vendor does not exist we should write vendor
-	vendorExists, err := internal.IsNonEmptyDir(filepath.Join(p.AbsRoot, "vendor"))
+	vendorExists, err := util.IsNonEmptyDir(filepath.Join(p.AbsRoot, "vendor"))
 	if err != nil {
 		return errors.Wrap(err, "ensure vendor is a directory")
 	}
