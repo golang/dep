@@ -2,14 +2,14 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package internal
+package cfg
 
 import (
+	"bytes"
 	"encoding/hex"
 	"io"
 	"sort"
 
-	"bytes"
 	"github.com/golang/dep/gps"
 	"github.com/pelletier/go-toml"
 	"github.com/pkg/errors"
@@ -36,7 +36,7 @@ type rawLockedProject struct {
 	Packages []string `toml:"packages"`
 }
 
-func readLock(r io.Reader) (*Lock, error) {
+func ReadLock(r io.Reader) (*Lock, error) {
 	buf := &bytes.Buffer{}
 	_, err := buf.ReadFrom(r)
 	if err != nil {

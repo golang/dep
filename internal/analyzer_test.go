@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/golang/dep/internal/cfg"
 	"github.com/golang/dep/internal/test"
 )
 
@@ -16,9 +17,9 @@ func TestAnalyzerDeriveManifestAndLock(t *testing.T) {
 	defer h.Cleanup()
 
 	h.TempDir("dep")
-	golden := filepath.Join("analyzer", ManifestName)
+	golden := filepath.Join("analyzer", cfg.ManifestName)
 	want := h.GetTestFileString(golden)
-	h.TempCopy(filepath.Join("dep", ManifestName), golden)
+	h.TempCopy(filepath.Join("dep", cfg.ManifestName), golden)
 
 	a := Analyzer{}
 
@@ -27,7 +28,7 @@ func TestAnalyzerDeriveManifestAndLock(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	got, err := m.(*Manifest).MarshalTOML()
+	got, err := m.(*cfg.Manifest).MarshalTOML()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -68,8 +69,8 @@ func TestAnalyzerDeriveManifestAndLockCannotOpen(t *testing.T) {
 	h.TempDir("dep")
 
 	// Simulate an inaccessible manifest file.
-	h.TempFile(filepath.Join("dep", ManifestName), "")
-	closer, err := makeUnreadable(filepath.Join(h.Path("dep"), ManifestName))
+	h.TempFile(filepath.Join("dep", cfg.ManifestName), "")
+	closer, err := makeUnreadable(filepath.Join(h.Path("dep"), cfg.ManifestName))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -92,7 +93,7 @@ func TestAnalyzerDeriveManifestAndLockInvalidManifest(t *testing.T) {
 	h.TempDir("dep")
 
 	// Create a manifest with invalid contents
-	h.TempFile(filepath.Join("dep", ManifestName), "invalid manifest")
+	h.TempFile(filepath.Join("dep", cfg.ManifestName), "invalid manifest")
 
 	a := Analyzer{}
 

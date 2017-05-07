@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	"github.com/golang/dep/gps"
+	"github.com/golang/dep/internal/cfg"
 	"github.com/pelletier/go-toml"
 	"github.com/pkg/errors"
 )
@@ -82,8 +83,8 @@ const exampleTOML = `
 // It is not impervious to errors (writing to disk is hard), but it should
 // guard against non-arcane failure conditions.
 type SafeWriter struct {
-	Manifest    *Manifest
-	Lock        *Lock
+	Manifest    *cfg.Manifest
+	Lock        *cfg.Lock
 	LockDiff    *gps.LockDiff
 	WriteVendor bool
 }
@@ -98,7 +99,7 @@ type SafeWriter struct {
 //   the vendor directory will be written beneath root based on newLock.
 // - If oldLock is provided without newLock, error.
 // - If vendor is VendorAlways without a newLock, error.
-func NewSafeWriter(manifest *Manifest, oldLock, newLock *Lock, vendor VendorBehavior) (*SafeWriter, error) {
+func NewSafeWriter(manifest *cfg.Manifest, oldLock, newLock *cfg.Lock, vendor VendorBehavior) (*SafeWriter, error) {
 	sw := &SafeWriter{
 		Manifest: manifest,
 		Lock:     newLock,
@@ -294,8 +295,8 @@ func (sw *SafeWriter) Write(root string, sm gps.SourceManager, noExamples bool) 
 		return nil
 	}
 
-	mpath := filepath.Join(root, ManifestName)
-	lpath := filepath.Join(root, LockName)
+	mpath := filepath.Join(root, cfg.ManifestName)
+	lpath := filepath.Join(root, cfg.LockName)
 	vpath := filepath.Join(root, "vendor")
 
 	td, err := ioutil.TempDir(os.TempDir(), "dep")
@@ -320,13 +321,13 @@ func (sw *SafeWriter) Write(root string, sm gps.SourceManager, noExamples bool) 
 
 		// 0666 is before umask; mirrors behavior of os.Create (used by
 		// writeFile())
-		if err = ioutil.WriteFile(filepath.Join(td, ManifestName), append([]byte(initOutput), tb...), 0666); err != nil {
+		if err = ioutil.WriteFile(filepath.Join(td, cfg.ManifestName), append([]byte(initOutput), tb...), 0666); err != nil {
 			return errors.Wrap(err, "failed to write manifest file to temp dir")
 		}
 	}
 
 	if sw.HasLock() {
-		if err := writeFile(filepath.Join(td, LockName), sw.Lock); err != nil {
+		if err := writeFile(filepath.Join(td, cfg.LockName), sw.Lock); err != nil {
 			return errors.Wrap(err, "failed to write lock file to temp dir")
 		}
 	}
@@ -358,7 +359,7 @@ func (sw *SafeWriter) Write(root string, sm gps.SourceManager, noExamples bool) 
 	if sw.HasManifest() {
 		if _, err := os.Stat(mpath); err == nil {
 			// Move out the old one.
-			tmploc := filepath.Join(td, ManifestName+".orig")
+			tmploc := filepath.Join(td, cfg.ManifestName+".orig")
 			failerr = renameWithFallback(mpath, tmploc)
 			if failerr != nil {
 				goto fail
@@ -367,7 +368,7 @@ func (sw *SafeWriter) Write(root string, sm gps.SourceManager, noExamples bool) 
 		}
 
 		// Move in the new one.
-		failerr = renameWithFallback(filepath.Join(td, ManifestName), mpath)
+		failerr = renameWithFallback(filepath.Join(td, cfg.ManifestName), mpath)
 		if failerr != nil {
 			goto fail
 		}
@@ -376,7 +377,7 @@ func (sw *SafeWriter) Write(root string, sm gps.SourceManager, noExamples bool) 
 	if sw.HasLock() {
 		if _, err := os.Stat(lpath); err == nil {
 			// Move out the old one.
-			tmploc := filepath.Join(td, LockName+".orig")
+			tmploc := filepath.Join(td, cfg.LockName+".orig")
 
 			failerr = renameWithFallback(lpath, tmploc)
 			if failerr != nil {
@@ -386,7 +387,7 @@ func (sw *SafeWriter) Write(root string, sm gps.SourceManager, noExamples bool) 
 		}
 
 		// Move in the new one.
-		failerr = renameWithFallback(filepath.Join(td, LockName), lpath)
+		failerr = renameWithFallback(filepath.Join(td, cfg.LockName), lpath)
 		if failerr != nil {
 			goto fail
 		}
@@ -438,7 +439,7 @@ fail:
 
 func (sw *SafeWriter) PrintPreparedActions() error {
 	if sw.HasManifest() {
-		fmt.Printf("Would have written the following %s:\n", ManifestName)
+		fmt.Printf("Would have written the following %s:\n", cfg.ManifestName)
 		m, err := sw.Manifest.MarshalTOML()
 		if err != nil {
 			return errors.Wrap(err, "ensure DryRun cannot serialize manifest")
@@ -448,14 +449,14 @@ func (sw *SafeWriter) PrintPreparedActions() error {
 
 	if sw.HasLock() {
 		if sw.LockDiff == nil {
-			fmt.Printf("Would have written the following %s:\n", LockName)
+			fmt.Printf("Would have written the following %s:\n", cfg.LockName)
 			l, err := sw.Lock.MarshalTOML()
 			if err != nil {
 				return errors.Wrap(err, "ensure DryRun cannot serialize lock")
 			}
 			fmt.Println(string(l))
 		} else {
-			fmt.Printf("Would have written the following changes to %s:\n", LockName)
+			fmt.Printf("Would have written the following changes to %s:\n", cfg.LockName)
 			diff, err := formatLockDiff(*sw.LockDiff)
 			if err != nil {
 				return errors.Wrap(err, "ensure DryRun cannot serialize the lock diff")

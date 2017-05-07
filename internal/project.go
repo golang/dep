@@ -10,10 +10,11 @@ import (
 	"path/filepath"
 
 	"github.com/golang/dep/gps"
+	"github.com/golang/dep/internal/cfg"
 	"github.com/pkg/errors"
 )
 
-var errProjectNotFound = fmt.Errorf("could not find project %s, use dep init to initiate a manifest", ManifestName)
+var errProjectNotFound = fmt.Errorf("could not find project %s, use dep init to initiate a manifest", cfg.ManifestName)
 
 func findProjectRootFromWD() (string, error) {
 	path, err := os.Getwd()
@@ -27,7 +28,7 @@ func findProjectRootFromWD() (string, error) {
 // manifest file until we get to the root of the filesystem.
 func findProjectRoot(from string) (string, error) {
 	for {
-		mp := filepath.Join(from, ManifestName)
+		mp := filepath.Join(from, cfg.ManifestName)
 
 		_, err := os.Stat(mp)
 		if err == nil {
@@ -51,8 +52,8 @@ type Project struct {
 	AbsRoot string
 	// ImportRoot is the import path of the project's root directory.
 	ImportRoot gps.ProjectRoot
-	Manifest   *Manifest
-	Lock       *Lock
+	Manifest   *cfg.Manifest
+	Lock       *cfg.Lock
 }
 
 // MakeParams is a simple helper to create a gps.SolveParameters without setting

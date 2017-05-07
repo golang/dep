@@ -2,13 +2,12 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package internal
+package cfg
 
 import (
+	"bytes"
 	"io"
 	"sort"
-
-	"bytes"
 
 	"github.com/golang/dep/gps"
 	"github.com/pelletier/go-toml"
@@ -39,7 +38,7 @@ type rawProject struct {
 	Source   string `toml:"source,omitempty"`
 }
 
-func readManifest(r io.Reader) (*Manifest, error) {
+func ReadManifest(r io.Reader) (*Manifest, error) {
 	buf := &bytes.Buffer{}
 	_, err := buf.ReadFrom(r)
 	if err != nil {

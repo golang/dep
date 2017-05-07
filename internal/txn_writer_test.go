@@ -11,6 +11,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/golang/dep/internal/cfg"
 	"github.com/golang/dep/internal/test"
 	"github.com/pkg/errors"
 )
@@ -40,7 +41,7 @@ func TestSafeWriter_BadInput_MissingSourceManager(t *testing.T) {
 	defer h.Cleanup()
 	pc := NewTestProjectContext(h, safeWriterProject)
 	defer pc.Release()
-	pc.CopyFile(LockName, safeWriterGoldenLock)
+	pc.CopyFile(cfg.LockName, safeWriterGoldenLock)
 	pc.Load()
 
 	sw, _ := NewSafeWriter(nil, nil, pc.Project.Lock, VendorAlways)
@@ -72,7 +73,7 @@ func TestSafeWriter_BadInput_OldLockOnly(t *testing.T) {
 	defer h.Cleanup()
 	pc := NewTestProjectContext(h, safeWriterProject)
 	defer pc.Release()
-	pc.CopyFile(LockName, safeWriterGoldenLock)
+	pc.CopyFile(cfg.LockName, safeWriterGoldenLock)
 	pc.Load()
 
 	_, err := NewSafeWriter(nil, pc.Project.Lock, nil, VendorAlways)
@@ -128,7 +129,7 @@ func TestSafeWriter_Manifest(t *testing.T) {
 
 	pc := NewTestProjectContext(h, safeWriterProject)
 	defer pc.Release()
-	pc.CopyFile(ManifestName, safeWriterGoldenManifest)
+	pc.CopyFile(cfg.ManifestName, safeWriterGoldenManifest)
 	pc.Load()
 
 	sw, _ := NewSafeWriter(pc.Project.Manifest, nil, nil, VendorOnChanged)
@@ -169,8 +170,8 @@ func TestSafeWriter_ManifestAndUnmodifiedLock(t *testing.T) {
 
 	pc := NewTestProjectContext(h, safeWriterProject)
 	defer pc.Release()
-	pc.CopyFile(ManifestName, safeWriterGoldenManifest)
-	pc.CopyFile(LockName, safeWriterGoldenLock)
+	pc.CopyFile(cfg.ManifestName, safeWriterGoldenManifest)
+	pc.CopyFile(cfg.LockName, safeWriterGoldenLock)
 	pc.Load()
 
 	sw, _ := NewSafeWriter(pc.Project.Manifest, pc.Project.Lock, pc.Project.Lock, VendorOnChanged)
@@ -211,8 +212,8 @@ func TestSafeWriter_ManifestAndUnmodifiedLockWithForceVendor(t *testing.T) {
 
 	pc := NewTestProjectContext(h, safeWriterProject)
 	defer pc.Release()
-	pc.CopyFile(ManifestName, safeWriterGoldenManifest)
-	pc.CopyFile(LockName, safeWriterGoldenLock)
+	pc.CopyFile(cfg.ManifestName, safeWriterGoldenManifest)
+	pc.CopyFile(cfg.LockName, safeWriterGoldenLock)
 	pc.Load()
 
 	sw, _ := NewSafeWriter(pc.Project.Manifest, pc.Project.Lock, pc.Project.Lock, VendorAlways)
@@ -256,10 +257,10 @@ func TestSafeWriter_ModifiedLock(t *testing.T) {
 
 	pc := NewTestProjectContext(h, safeWriterProject)
 	defer pc.Release()
-	pc.CopyFile(LockName, safeWriterGoldenLock)
+	pc.CopyFile(cfg.LockName, safeWriterGoldenLock)
 	pc.Load()
 
-	originalLock := new(Lock)
+	originalLock := new(cfg.Lock)
 	*originalLock = *pc.Project.Lock
 	originalLock.Memo = []byte{} // zero out the input hash to ensure non-equivalency
 	sw, _ := NewSafeWriter(nil, originalLock, pc.Project.Lock, VendorOnChanged)
@@ -303,10 +304,10 @@ func TestSafeWriter_ModifiedLockSkipVendor(t *testing.T) {
 
 	pc := NewTestProjectContext(h, safeWriterProject)
 	defer pc.Release()
-	pc.CopyFile(LockName, safeWriterGoldenLock)
+	pc.CopyFile(cfg.LockName, safeWriterGoldenLock)
 	pc.Load()
 
-	originalLock := new(Lock)
+	originalLock := new(cfg.Lock)
 	*originalLock = *pc.Project.Lock
 	originalLock.Memo = []byte{} // zero out the input hash to ensure non-equivalency
 	sw, _ := NewSafeWriter(nil, originalLock, pc.Project.Lock, VendorNever)
@@ -347,7 +348,7 @@ func TestSafeWriter_ForceVendorWhenVendorAlreadyExists(t *testing.T) {
 
 	pc := NewTestProjectContext(h, safeWriterProject)
 	defer pc.Release()
-	pc.CopyFile(LockName, safeWriterGoldenLock)
+	pc.CopyFile(cfg.LockName, safeWriterGoldenLock)
 	pc.Load()
 
 	sw, _ := NewSafeWriter(nil, pc.Project.Lock, pc.Project.Lock, VendorAlways)
@@ -397,7 +398,7 @@ func TestSafeWriter_NewLock(t *testing.T) {
 
 	lf := h.GetTestFile(safeWriterGoldenLock)
 	defer lf.Close()
-	newLock, err := readLock(lf)
+	newLock, err := cfg.ReadLock(lf)
 	h.Must(err)
 	sw, _ := NewSafeWriter(nil, nil, newLock, VendorOnChanged)
 
@@ -441,7 +442,7 @@ func TestSafeWriter_NewLockSkipVendor(t *testing.T) {
 
 	lf := h.GetTestFile(safeWriterGoldenLock)
 	defer lf.Close()
-	newLock, err := readLock(lf)
+	newLock, err := cfg.ReadLock(lf)
 	h.Must(err)
 	sw, _ := NewSafeWriter(nil, nil, newLock, VendorNever)
 
@@ -481,12 +482,12 @@ func TestSafeWriter_DiffLocks(t *testing.T) {
 
 	pc := NewTestProjectContext(h, safeWriterProject)
 	defer pc.Release()
-	pc.CopyFile(LockName, "txn_writer/original_lock.toml")
+	pc.CopyFile(cfg.LockName, "txn_writer/original_lock.toml")
 	pc.Load()
 
 	ulf := h.GetTestFile("txn_writer/updated_lock.toml")
 	defer ulf.Close()
-	updatedLock, err := readLock(ulf)
+	updatedLock, err := cfg.ReadLock(ulf)
 	h.Must(err)
 
 	sw, _ := NewSafeWriter(nil, pc.Project.Lock, updatedLock, VendorOnChanged)
@@ -530,8 +531,8 @@ func TestSafeWriter_VendorDotGitPreservedWithForceVendor(t *testing.T) {
 	os.MkdirAll(gitDirPath, 0777)
 	dummyFile := filepath.Join("vendor", ".git", "badinput_fileroot")
 	pc.CopyFile(dummyFile, "txn_writer/badinput_fileroot")
-	pc.CopyFile(ManifestName, safeWriterGoldenManifest)
-	pc.CopyFile(LockName, safeWriterGoldenLock)
+	pc.CopyFile(cfg.ManifestName, safeWriterGoldenManifest)
+	pc.CopyFile(cfg.LockName, safeWriterGoldenLock)
 	pc.Load()
 
 	sw, _ := NewSafeWriter(pc.Project.Manifest, pc.Project.Lock, pc.Project.Lock, VendorAlways)

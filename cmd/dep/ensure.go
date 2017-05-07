@@ -19,6 +19,7 @@ import (
 	"github.com/golang/dep/gps"
 	"github.com/golang/dep/gps/pkgtree"
 	"github.com/golang/dep/internal"
+	"github.com/golang/dep/internal/cfg"
 	"github.com/golang/dep/internal/util"
 	"github.com/pkg/errors"
 )
@@ -165,7 +166,7 @@ func (cmd *ensureCommand) Run(ctx *internal.Ctx, args []string) error {
 		writeV = internal.VendorAlways
 	}
 
-	newLock := internal.LockFromInterface(solution)
+	newLock := cfg.LockFromInterface(solution)
 	sw, err := internal.NewSafeWriter(nil, p.Lock, newLock, writeV)
 	if err != nil {
 		return err

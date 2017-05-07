@@ -13,6 +13,7 @@ import (
 	"github.com/golang/dep/gps"
 	"github.com/golang/dep/gps/pkgtree"
 	"github.com/golang/dep/internal"
+	"github.com/golang/dep/internal/cfg"
 	"github.com/golang/dep/internal/util"
 	"github.com/pkg/errors"
 )
@@ -180,7 +181,7 @@ func (cmd *removeCommand) Run(ctx *internal.Ctx, args []string) error {
 		return err
 	}
 
-	newLock := internal.LockFromInterface(soln)
+	newLock := cfg.LockFromInterface(soln)
 
 	sw, err := internal.NewSafeWriter(nil, p.Lock, newLock, internal.VendorOnChanged)
 	if err != nil {

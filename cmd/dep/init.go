@@ -15,6 +15,7 @@ import (
 	"github.com/golang/dep/gps"
 	"github.com/golang/dep/gps/pkgtree"
 	"github.com/golang/dep/internal"
+	"github.com/golang/dep/internal/cfg"
 	"github.com/golang/dep/internal/util"
 	"github.com/pkg/errors"
 )
@@ -75,8 +76,8 @@ func (cmd *initCommand) Run(ctx *internal.Ctx, args []string) error {
 		root = args[0]
 	}
 
-	mf := filepath.Join(root, internal.ManifestName)
-	lf := filepath.Join(root, internal.LockName)
+	mf := filepath.Join(root, cfg.ManifestName)
+	lf := filepath.Join(root, cfg.LockName)
 
 	mok, err := internal.IsRegular(mf)
 	if err != nil {
@@ -116,13 +117,13 @@ func (cmd *initCommand) Run(ctx *internal.Ctx, args []string) error {
 	if err != nil {
 		return err
 	}
-	m := &internal.Manifest{
+	m := &cfg.Manifest{
 		Dependencies: pd.constraints,
 	}
 
 	// Make an initial lock from what knowledge we've collected about the
 	// versions on disk
-	l := &internal.Lock{
+	l := &cfg.Lock{
 		P: make([]gps.LockedProject, 0, len(pd.ondisk)),
 	}
 
@@ -168,7 +169,7 @@ func (cmd *initCommand) Run(ctx *internal.Ctx, args []string) error {
 		handleAllTheFailuresOfTheWorld(err)
 		return err
 	}
-	l = internal.LockFromInterface(soln)
+	l = cfg.LockFromInterface(soln)
 
 	// Pick notondisk project constraints from solution and add to manifest
 	for k, _ := range pd.notondisk {

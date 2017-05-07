@@ -12,6 +12,7 @@ import (
 
 	"github.com/Masterminds/vcs"
 	"github.com/golang/dep/gps"
+	"github.com/golang/dep/internal/cfg"
 	"github.com/pkg/errors"
 )
 
@@ -98,24 +99,24 @@ func (c *Ctx) LoadProject(path string) (*Project, error) {
 	}
 	p.ImportRoot = gps.ProjectRoot(ip)
 
-	mp := filepath.Join(p.AbsRoot, ManifestName)
+	mp := filepath.Join(p.AbsRoot, cfg.ManifestName)
 	mf, err := os.Open(mp)
 	if err != nil {
 		if os.IsNotExist(err) {
 			// TODO: list possible solutions? (dep init, cd $project)
-			return nil, errors.Errorf("no %v found in project root %v", ManifestName, p.AbsRoot)
+			return nil, errors.Errorf("no %v found in project root %v", cfg.ManifestName, p.AbsRoot)
 		}
 		// Unable to read the manifest file
 		return nil, err
 	}
 	defer mf.Close()
 
-	p.Manifest, err = readManifest(mf)
+	p.Manifest, err = cfg.ReadManifest(mf)
 	if err != nil {
 		return nil, errors.Errorf("error while parsing %s: %s", mp, err)
 	}
 
-	lp := filepath.Join(p.AbsRoot, LockName)
+	lp := filepath.Join(p.AbsRoot, cfg.LockName)
 	lf, err := os.Open(lp)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -127,7 +128,7 @@ func (c *Ctx) LoadProject(path string) (*Project, error) {
 	}
 	defer lf.Close()
 
-	p.Lock, err = readLock(lf)
+	p.Lock, err = cfg.ReadLock(lf)
 	if err != nil {
 		return nil, errors.Errorf("error while parsing %s: %s", lp, err)
 	}

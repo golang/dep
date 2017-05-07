@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/golang/dep/internal"
+	"github.com/golang/dep/internal/cfg"
 	"github.com/golang/dep/internal/test"
 )
 
@@ -68,8 +68,8 @@ func TestIntegration(t *testing.T) {
 				testCase.CompareError(err, testProj.GetStderr())
 
 				// Check final manifest and lock
-				testCase.CompareFile(internal.ManifestName, testProj.ProjPath(internal.ManifestName))
-				testCase.CompareFile(internal.LockName, testProj.ProjPath(internal.LockName))
+				testCase.CompareFile(cfg.ManifestName, testProj.ProjPath(cfg.ManifestName))
+				testCase.CompareFile(cfg.LockName, testProj.ProjPath(cfg.LockName))
 
 				// Check vendor paths
 				testProj.CompareImportPaths()
