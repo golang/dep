@@ -16,10 +16,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/golang/dep"
 	"github.com/golang/dep/gps"
 	"github.com/golang/dep/gps/pkgtree"
 	"github.com/golang/dep/internal"
+	"github.com/golang/dep/internal/util"
 	"github.com/pkg/errors"
 )
 
@@ -103,9 +103,9 @@ type ensureCommand struct {
 	overrides stringSlice
 }
 
-func (cmd *ensureCommand) Run(ctx *dep.Ctx, args []string) error {
+func (cmd *ensureCommand) Run(ctx *internal.Ctx, args []string) error {
 	if cmd.examples {
-		internal.Logln(strings.TrimSpace(ensureExamples))
+		util.Logln(strings.TrimSpace(ensureExamples))
 		return nil
 	}
 
@@ -156,17 +156,17 @@ func (cmd *ensureCommand) Run(ctx *dep.Ctx, args []string) error {
 
 	// check if vendor exists, because if the locks are the same but
 	// vendor does not exist we should write vendor
-	vendorExists, err := dep.IsNonEmptyDir(filepath.Join(p.AbsRoot, "vendor"))
+	vendorExists, err := internal.IsNonEmptyDir(filepath.Join(p.AbsRoot, "vendor"))
 	if err != nil {
 		return errors.Wrap(err, "ensure vendor is a directory")
 	}
-	writeV := dep.VendorOnChanged
+	writeV := internal.VendorOnChanged
 	if !vendorExists && solution != nil {
-		writeV = dep.VendorAlways
+		writeV = internal.VendorAlways
 	}
 
-	newLock := dep.LockFromInterface(solution)
-	sw, err := dep.NewSafeWriter(nil, p.Lock, newLock, writeV)
+	newLock := internal.LockFromInterface(solution)
+	sw, err := internal.NewSafeWriter(nil, p.Lock, newLock, writeV)
 	if err != nil {
 		return err
 	}
@@ -190,7 +190,7 @@ func applyUpdateArgs(args []string, params *gps.SolveParameters) {
 	}
 }
 
-func applyEnsureArgs(args []string, overrides stringSlice, p *dep.Project, sm *gps.SourceMgr, params *gps.SolveParameters) error {
+func applyEnsureArgs(args []string, overrides stringSlice, p *internal.Project, sm *gps.SourceMgr, params *gps.SolveParameters) error {
 	var errs []error
 	for _, arg := range args {
 		pc, err := getProjectConstraint(arg, sm)
@@ -208,7 +208,7 @@ func applyEnsureArgs(args []string, overrides stringSlice, p *dep.Project, sm *g
 			// TODO(sdboyer): for this case - or just in general - do we want to
 			// add project args to the requires list temporarily for this run?
 			if _, has := p.Manifest.Dependencies[pc.Ident.ProjectRoot]; !has {
-				internal.Logf("No constraint or alternate source specified for %q, omitting from manifest", pc.Ident.ProjectRoot)
+				util.Logf("No constraint or alternate source specified for %q, omitting from manifest", pc.Ident.ProjectRoot)
 			}
 			// If it's already in the manifest, no need to log
 			continue

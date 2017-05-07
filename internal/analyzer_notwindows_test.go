@@ -4,7 +4,7 @@
 
 // +build !windows
 
-package dep
+package internal
 
 import (
 	"io"

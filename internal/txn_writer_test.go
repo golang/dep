@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package dep
+package internal
 
 import (
 	"io/ioutil"
@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/golang/dep/test"
+	"github.com/golang/dep/internal/test"
 	"github.com/pkg/errors"
 )
 

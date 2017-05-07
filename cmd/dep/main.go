@@ -13,8 +13,8 @@ import (
 	"strings"
 	"text/tabwriter"
 
-	"github.com/golang/dep"
 	"github.com/golang/dep/internal"
+	"github.com/golang/dep/internal/util"
 )
 
 var (
@@ -28,7 +28,7 @@ type command interface {
 	LongHelp() string       // "Foo the first bar meeting the following conditions..."
 	Register(*flag.FlagSet) // command-specific flags
 	Hidden() bool           // indicates whether the command should be hidden from help output
-	Run(*dep.Ctx, []string) error
+	Run(*internal.Ctx, []string) error
 }
 
 func main() {
@@ -62,12 +62,12 @@ func main() {
 	}
 
 	usage := func() {
-		internal.Logln("dep is a tool for managing dependencies for Go projects")
-		internal.Logln()
-		internal.Logln("Usage: dep <command>")
-		internal.Logln()
-		internal.Logln("Commands:")
-		internal.Logln()
+		util.Logln("dep is a tool for managing dependencies for Go projects")
+		util.Logln()
+		util.Logln("Usage: dep <command>")
+		util.Logln()
+		util.Logln("Commands:")
+		util.Logln()
 		w := tabwriter.NewWriter(os.Stderr, 0, 4, 2, ' ', 0)
 		for _, cmd := range commands {
 			if !cmd.Hidden() {
@@ -75,14 +75,14 @@ func main() {
 			}
 		}
 		w.Flush()
-		internal.Logln()
-		internal.Logln("Examples:")
+		util.Logln()
+		util.Logln("Examples:")
 		for _, example := range examples {
 			fmt.Fprintf(w, "\t%s\t%s\n", example[0], example[1])
 		}
 		w.Flush()
-		internal.Logln()
-		internal.Logln("Use \"dep help [command]\" for more information about a command.")
+		util.Logln()
+		util.Logln("Use \"dep help [command]\" for more information about a command.")
 	}
 
 	cmdName, printCommandHelp, exit := parseArgs(os.Args)
@@ -115,12 +115,12 @@ func main() {
 				os.Exit(1)
 			}
 
-			internal.Verbose = *verbose
+			util.Verbose = *verbose
 
 			// Set up the dep context.
-			ctx, err := dep.NewContext()
+			ctx, err := internal.NewContext()
 			if err != nil {
-				internal.Logln(err)
+				util.Logln(err)
 				os.Exit(1)
 			}
 
@@ -135,7 +135,7 @@ func main() {
 		}
 	}
 
-	internal.Logf("%s: no such command", cmdName)
+	util.Logf("%s: no such command", cmdName)
 	usage()
 	os.Exit(1)
 }
@@ -159,13 +159,13 @@ func resetUsage(fs *flag.FlagSet, name, args, longHelp string) {
 	flagWriter.Flush()
 	fs.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage: dep %s %s\n", name, args)
-		internal.Logln()
-		internal.Logln(strings.TrimSpace(longHelp))
-		internal.Logln()
+		util.Logln()
+		util.Logln(strings.TrimSpace(longHelp))
+		util.Logln()
 		if hasFlags {
-			internal.Logln("Flags:")
-			internal.Logln()
-			internal.Logln(flagBlock.String())
+			util.Logln("Flags:")
+			util.Logln()
+			util.Logln(flagBlock.String())
 		}
 	}
 }

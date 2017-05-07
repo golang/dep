@@ -11,10 +11,9 @@ import (
 	"log"
 	"os"
 
-	"github.com/golang/dep"
 	"github.com/golang/dep/gps"
 	"github.com/golang/dep/gps/pkgtree"
-
+	"github.com/golang/dep/internal"
 	"github.com/pkg/errors"
 )
 
@@ -38,7 +37,7 @@ func (cmd *pruneCommand) Hidden() bool      { return false }
 func (cmd *pruneCommand) Register(fs *flag.FlagSet) {
 }
 
-func (cmd *pruneCommand) Run(ctx *dep.Ctx, args []string) error {
+func (cmd *pruneCommand) Run(ctx *internal.Ctx, args []string) error {
 	p, err := ctx.LoadProject("")
 	if err != nil {
 		return err
@@ -76,5 +75,5 @@ func (cmd *pruneCommand) Run(ctx *dep.Ctx, args []string) error {
 		return fmt.Errorf("lock hash doesn't match")
 	}
 
-	return dep.PruneProject(p, sm)
+	return internal.PruneProject(p, sm)
 }

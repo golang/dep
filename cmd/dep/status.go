@@ -15,9 +15,9 @@ import (
 	"sort"
 	"text/tabwriter"
 
-	"github.com/golang/dep"
 	"github.com/golang/dep/gps"
 	"github.com/golang/dep/gps/pkgtree"
+	"github.com/golang/dep/internal"
 	"github.com/pkg/errors"
 )
 
@@ -157,7 +157,7 @@ type dotOutput struct {
 	w io.Writer
 	o string
 	g *graphviz
-	p *dep.Project
+	p *internal.Project
 }
 
 func (out *dotOutput) BasicHeader() {
@@ -182,7 +182,7 @@ func (out *dotOutput) MissingHeader()                {}
 func (out *dotOutput) MissingLine(ms *MissingStatus) {}
 func (out *dotOutput) MissingFooter()                {}
 
-func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
+func (cmd *statusCommand) Run(ctx *internal.Ctx, args []string) error {
 	p, err := ctx.LoadProject("")
 	if err != nil {
 		return err
@@ -234,7 +234,7 @@ type MissingStatus struct {
 	MissingPackages []string
 }
 
-func runStatusAll(out outputter, p *dep.Project, sm *gps.SourceMgr) error {
+func runStatusAll(out outputter, p *internal.Project, sm *gps.SourceMgr) error {
 	if p.Lock == nil {
 		// TODO if we have no lock file, do...other stuff
 		return nil
@@ -249,7 +249,7 @@ func runStatusAll(out outputter, p *dep.Project, sm *gps.SourceMgr) error {
 
 	// Set up a solver in order to check the InputHash.
 	params := gps.SolveParameters{
-		ProjectAnalyzer: dep.Analyzer{},
+		ProjectAnalyzer: internal.Analyzer{},
 		RootDir:         p.AbsRoot,
 		RootPackageTree: ptree,
 		Manifest:        p.Manifest,
@@ -271,7 +271,7 @@ func runStatusAll(out outputter, p *dep.Project, sm *gps.SourceMgr) error {
 	// deterministically ordered. (This may be superfluous if the lock is always
 	// written in alpha order, but it doesn't hurt to double down.)
 	slp := p.Lock.Projects()
-	sort.Sort(dep.SortedLockedProjects(slp))
+	sort.Sort(internal.SortedLockedProjects(slp))
 
 	if bytes.Equal(s.HashInputs(), p.Lock.Memo) {
 		// If these are equal, we're guaranteed that the lock is a transitively
@@ -435,7 +435,7 @@ func formatVersion(v gps.Version) string {
 	return v.String()
 }
 
-func collectConstraints(ptree pkgtree.PackageTree, p *dep.Project, sm *gps.SourceMgr) map[string][]gps.Constraint {
+func collectConstraints(ptree pkgtree.PackageTree, p *internal.Project, sm *gps.SourceMgr) map[string][]gps.Constraint {
 	// TODO
 	return map[string][]gps.Constraint{}
 }

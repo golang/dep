@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package dep
+package internal
 
 import (
 	"reflect"
@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	"github.com/golang/dep/gps"
-	"github.com/golang/dep/test"
+	"github.com/golang/dep/internal/test"
 )
 
 func TestReadManifest(t *testing.T) {
