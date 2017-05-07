@@ -12,8 +12,8 @@ import (
 
 	"github.com/golang/dep/gps"
 	"github.com/golang/dep/gps/pkgtree"
-	"github.com/golang/dep/internal"
 	"github.com/golang/dep/internal/cfg"
+	"github.com/golang/dep/internal/dep"
 	"github.com/golang/dep/internal/util"
 	"github.com/pkg/errors"
 )
@@ -45,7 +45,7 @@ type removeCommand struct {
 	keepSource bool
 }
 
-func (cmd *removeCommand) Run(ctx *internal.Ctx, args []string) error {
+func (cmd *removeCommand) Run(ctx *dep.Ctx, args []string) error {
 	p, err := ctx.LoadProject("")
 	if err != nil {
 		return err
@@ -183,7 +183,7 @@ func (cmd *removeCommand) Run(ctx *internal.Ctx, args []string) error {
 
 	newLock := cfg.LockFromInterface(soln)
 
-	sw, err := internal.NewSafeWriter(nil, p.Lock, newLock, internal.VendorOnChanged)
+	sw, err := dep.NewSafeWriter(nil, p.Lock, newLock, dep.VendorOnChanged)
 	if err != nil {
 		return err
 	}

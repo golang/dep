@@ -14,8 +14,8 @@ import (
 
 	"github.com/golang/dep/gps"
 	"github.com/golang/dep/gps/pkgtree"
-	"github.com/golang/dep/internal"
 	"github.com/golang/dep/internal/cfg"
+	"github.com/golang/dep/internal/dep"
 	"github.com/golang/dep/internal/util"
 	"github.com/pkg/errors"
 )
@@ -60,7 +60,7 @@ func trimPathPrefix(p1, p2 string) string {
 	return p1
 }
 
-func (cmd *initCommand) Run(ctx *internal.Ctx, args []string) error {
+func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 	if len(args) > 1 {
 		return errors.Errorf("too many args (%d)", len(args))
 	}
@@ -152,7 +152,7 @@ func (cmd *initCommand) Run(ctx *internal.Ctx, args []string) error {
 		RootPackageTree: pkgT,
 		Manifest:        m,
 		Lock:            l,
-		ProjectAnalyzer: internal.Analyzer{},
+		ProjectAnalyzer: dep.Analyzer{},
 	}
 
 	if *verbose {
@@ -192,7 +192,7 @@ func (cmd *initCommand) Run(ctx *internal.Ctx, args []string) error {
 
 	util.Vlogf("Writing manifest and lock files.")
 
-	sw, err := internal.NewSafeWriter(m, nil, l, internal.VendorAlways)
+	sw, err := dep.NewSafeWriter(m, nil, l, dep.VendorAlways)
 	if err != nil {
 		return err
 	}
@@ -275,7 +275,7 @@ type projectData struct {
 	ondisk       map[gps.ProjectRoot]gps.Version // projects that were found on disk
 }
 
-func getProjectData(ctx *internal.Ctx, pkgT pkgtree.PackageTree, cpr string, sm *gps.SourceMgr) (projectData, error) {
+func getProjectData(ctx *dep.Ctx, pkgT pkgtree.PackageTree, cpr string, sm *gps.SourceMgr) (projectData, error) {
 	constraints := make(gps.ProjectConstraints)
 	dependencies := make(map[gps.ProjectRoot][]string)
 	packages := make(map[string]bool)

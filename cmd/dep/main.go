@@ -13,7 +13,7 @@ import (
 	"strings"
 	"text/tabwriter"
 
-	"github.com/golang/dep/internal"
+	"github.com/golang/dep/internal/dep"
 	"github.com/golang/dep/internal/util"
 )
 
@@ -28,7 +28,7 @@ type command interface {
 	LongHelp() string       // "Foo the first bar meeting the following conditions..."
 	Register(*flag.FlagSet) // command-specific flags
 	Hidden() bool           // indicates whether the command should be hidden from help output
-	Run(*internal.Ctx, []string) error
+	Run(*dep.Ctx, []string) error
 }
 
 func main() {
@@ -118,7 +118,7 @@ func main() {
 			util.Verbose = *verbose
 
 			// Set up the dep context.
-			ctx, err := internal.NewContext()
+			ctx, err := dep.NewContext()
 			if err != nil {
 				util.Logln(err)
 				os.Exit(1)

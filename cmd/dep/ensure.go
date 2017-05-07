@@ -18,8 +18,8 @@ import (
 
 	"github.com/golang/dep/gps"
 	"github.com/golang/dep/gps/pkgtree"
-	"github.com/golang/dep/internal"
 	"github.com/golang/dep/internal/cfg"
+	"github.com/golang/dep/internal/dep"
 	"github.com/golang/dep/internal/util"
 	"github.com/pkg/errors"
 )
@@ -104,7 +104,7 @@ type ensureCommand struct {
 	overrides stringSlice
 }
 
-func (cmd *ensureCommand) Run(ctx *internal.Ctx, args []string) error {
+func (cmd *ensureCommand) Run(ctx *dep.Ctx, args []string) error {
 	if cmd.examples {
 		util.Logln(strings.TrimSpace(ensureExamples))
 		return nil
@@ -161,13 +161,13 @@ func (cmd *ensureCommand) Run(ctx *internal.Ctx, args []string) error {
 	if err != nil {
 		return errors.Wrap(err, "ensure vendor is a directory")
 	}
-	writeV := internal.VendorOnChanged
+	writeV := dep.VendorOnChanged
 	if !vendorExists && solution != nil {
-		writeV = internal.VendorAlways
+		writeV = dep.VendorAlways
 	}
 
 	newLock := cfg.LockFromInterface(solution)
-	sw, err := internal.NewSafeWriter(nil, p.Lock, newLock, writeV)
+	sw, err := dep.NewSafeWriter(nil, p.Lock, newLock, writeV)
 	if err != nil {
 		return err
 	}
@@ -191,7 +191,7 @@ func applyUpdateArgs(args []string, params *gps.SolveParameters) {
 	}
 }
 
-func applyEnsureArgs(args []string, overrides stringSlice, p *internal.Project, sm *gps.SourceMgr, params *gps.SolveParameters) error {
+func applyEnsureArgs(args []string, overrides stringSlice, p *dep.Project, sm *gps.SourceMgr, params *gps.SolveParameters) error {
 	var errs []error
 	for _, arg := range args {
 		pc, err := getProjectConstraint(arg, sm)
