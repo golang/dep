@@ -58,10 +58,16 @@ func TestSplitAbsoluteProjectRoot(t *testing.T) {
 		}
 	}
 
-	// test where it should return error
-	got, err := depCtx.SplitAbsoluteProjectRoot("tra/la/la/la")
+	// test where it should return an error when directly within $GOPATH/src
+	got, err := depCtx.SplitAbsoluteProjectRoot(filepath.Join(depCtx.GOPATH, "src"))
 	if err == nil {
-		t.Fatalf("should have gotten error but did not for tra/la/la/la: %s", got)
+		t.Fatalf("should have gotten an error but did not for %s", got)
+	}
+
+	// test where it should return an error
+	got, err = depCtx.SplitAbsoluteProjectRoot("tra/la/la/la")
+	if err == nil {
+		t.Fatalf("should have gotten an error but did not for tra/la/la/la: %s", got)
 	}
 }
 
