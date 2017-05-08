@@ -179,6 +179,10 @@ func (c *Ctx) resolveProjectRoot(path string) (string, error) {
 //
 // The second returned string indicates which GOPATH value was used.
 func (c *Ctx) SplitAbsoluteProjectRoot(path string) (string, error) {
+	if path == filepath.Join(c.GOPATH, "src") {
+		return "", errors.Errorf("Initializing a project in $GOPATH/src directly is not supported currently")
+	}
+
 	srcprefix := filepath.Join(c.GOPATH, "src") + string(filepath.Separator)
 	if internal.HasFilepathPrefix(path, srcprefix) {
 		// filepath.ToSlash because we're dealing with an import path now,
