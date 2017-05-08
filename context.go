@@ -49,8 +49,10 @@ func NewContext(wd string, env []string) (*Ctx, error) {
 	return ctx, nil
 }
 
+// getEnv returns the last instance of an environment variable.
 func getEnv(env []string, key string) string {
-	for _, v := range env {
+	for i := len(env) - 1; i >= 0; i-- {
+		v := env[i]
 		kv := strings.SplitN(v, "=", 2)
 		if kv[0] == key {
 			if len(kv) > 1 {
