@@ -7,14 +7,20 @@ package dep
 import (
 	"bytes"
 	"io"
+	"reflect"
 	"sort"
 
 	"github.com/golang/dep/gps"
+	"github.com/golang/dep/internal"
 	"github.com/pelletier/go-toml"
 	"github.com/pkg/errors"
 )
 
 const ManifestName = "Gopkg.toml"
+
+var ManifestFields = []string{
+	"dependencies", "overrides", "ignored", "required", "metadata",
+}
 
 type Manifest struct {
 	Dependencies gps.ProjectConstraints
@@ -38,11 +44,58 @@ type rawProject struct {
 	Source   string `toml:"source,omitempty"`
 }
 
+func validateManifest(b *bytes.Buffer) error {
+	// Load the TomlTree from reader
+	tree, err := toml.Load(b.String())
+	if err != nil {
+		return errors.Wrap(err, "Unable to load TomlTree from string")
+	}
+	// Convert tree to a map
+	manifest := tree.ToMap()
+
+	// Look for unknown fields and raise warnings
+	for prop, val := range manifest {
+		isValidField := false
+		for _, v := range ManifestFields {
+			if prop == v {
+				isValidField = true
+
+				// For metadata, check if it is a map type
+				if prop == "metadata" {
+					isValidMetadata := false
+					if metadata, ok := val.([]interface{}); ok {
+						for _, v := range metadata {
+							if reflect.TypeOf(v).Kind() == reflect.Map {
+								isValidMetadata = true
+							} else {
+								isValidMetadata = false
+								break
+							}
+						}
+					}
+					if !isValidMetadata {
+						internal.Logf("WARNING: metadata should consist of key-value pairs")
+					}
+				}
+			}
+		}
+		if !isValidField {
+			internal.Logf("WARNING: Unknown field in manifest: %v", prop)
+		}
+	}
+
+	return nil
+}
+
 func readManifest(r io.Reader) (*Manifest, error) {
 	buf := &bytes.Buffer{}
 	_, err := buf.ReadFrom(r)
 	if err != nil {
 		return nil, errors.Wrap(err, "Unable to read byte stream")
+	}
+	err = validateManifest(buf)
+	if err != nil {
+		return nil, errors.Wrap(err, "Manifest validation failed")
 	}
 
 	raw := rawManifest{}
