@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/golang/dep"
 	"github.com/golang/dep/gps"
@@ -284,12 +285,14 @@ func getProjectData(ctx *dep.Ctx, loggers *Loggers, pkgT pkgtree.PackageTree, cp
 	notondisk := make(map[gps.ProjectRoot]bool)
 	ondisk := make(map[gps.ProjectRoot]gps.Version)
 
+	var syncDepGroup sync.WaitGroup
 	syncDep := func(pr gps.ProjectRoot, sm *gps.SourceMgr) {
 		message := "Cached"
 		if err := sm.SyncSourceFor(gps.ProjectIdentifier{ProjectRoot: pr}); err != nil {
 			message = "Unable to cache"
 		}
 		loggers.Err.Printf("%s %s\n", message, pr)
+		syncDepGroup.Done()
 	}
 
 	rm, _ := pkgT.ToReachMap(true, true, false, nil)
@@ -313,6 +316,7 @@ func getProjectData(ctx *dep.Ctx, loggers *Loggers, pkgT pkgtree.PackageTree, cp
 			dependencies[pr] = append(dependencies[pr], ip)
 			continue
 		}
+		syncDepGroup.Add(1)
 		go syncDep(pr, sm)
 
 		if loggers.Verbose {
@@ -438,6 +442,7 @@ func getProjectData(ctx *dep.Ctx, loggers *Loggers, pkgT pkgtree.PackageTree, cp
 				}
 			} else {
 				dependencies[pr] = []string{pkg}
+				syncDepGroup.Add(1)
 				go syncDep(pr, sm)
 			}
 
@@ -469,6 +474,8 @@ func getProjectData(ctx *dep.Ctx, loggers *Loggers, pkgT pkgtree.PackageTree, cp
 			return projectData{}, err // already errors.Wrap()'d internally
 		}
 	}
+
+	syncDepGroup.Wait()
 
 	pd := projectData{
 		constraints:  constraints,
