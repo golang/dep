@@ -6,6 +6,7 @@ package dep
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"reflect"
 	"sort"
@@ -44,11 +45,12 @@ type rawProject struct {
 	Source   string `toml:"source,omitempty"`
 }
 
-func validateManifest(b *bytes.Buffer) error {
-	// Load the TomlTree from reader
-	tree, err := toml.Load(b.String())
+func validateManifest(s string) ([]error, error) {
+	var errs []error
+	// Load the TomlTree from string
+	tree, err := toml.Load(s)
 	if err != nil {
-		return errors.Wrap(err, "Unable to load TomlTree from string")
+		return errs, errors.Wrap(err, "Unable to load TomlTree from string")
 	}
 	// Convert tree to a map
 	manifest := tree.ToMap()
@@ -74,17 +76,17 @@ func validateManifest(b *bytes.Buffer) error {
 						}
 					}
 					if !isValidMetadata {
-						internal.Logf("WARNING: metadata should consist of key-value pairs")
+						errs = append(errs, errors.New("metadata should consist of key-value pairs"))
 					}
 				}
 			}
 		}
 		if !isValidField {
-			internal.Logf("WARNING: Unknown field in manifest: %v", prop)
+			errs = append(errs, fmt.Errorf("Unknown field in manifest: %v", prop))
 		}
 	}
 
-	return nil
+	return errs, nil
 }
 
 func readManifest(r io.Reader) (*Manifest, error) {
@@ -93,9 +95,14 @@ func readManifest(r io.Reader) (*Manifest, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "Unable to read byte stream")
 	}
-	err = validateManifest(buf)
+
+	// Validate manifest and log warnings
+	errs, err := validateManifest(buf.String())
 	if err != nil {
 		return nil, errors.Wrap(err, "Manifest validation failed")
+	}
+	for _, e := range errs {
+		internal.Logf("WARNING: %v", e)
 	}
 
 	raw := rawManifest{}
