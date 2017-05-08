@@ -39,7 +39,7 @@ type IntegrationTestProject struct {
 	run        RunFunc
 }
 
-func NewTestProject(t *testing.T, initPath, wd string, run RunFunc) *IntegrationTestProject {
+func NewTestProject(t *testing.T, initPath, wd string, externalProc bool, run RunFunc) *IntegrationTestProject {
 	new := &IntegrationTestProject{
 		t:      t,
 		origWd: wd,
@@ -55,7 +55,7 @@ func NewTestProject(t *testing.T, initPath, wd string, run RunFunc) *Integration
 	// below the wd, and therefore the GOPATH, is recorded as "/var/..." but the
 	// actual process runs in "/private/var/..." and dies due to not being in the
 	// GOPATH because the roots don't line up.
-	if runtime.GOOS == "darwin" && needsPrivateLeader(new.tempdir) {
+	if externalProc && runtime.GOOS == "darwin" && needsPrivateLeader(new.tempdir) {
 		new.Setenv("GOPATH", filepath.Join("/private", new.tempdir))
 	} else {
 		new.Setenv("GOPATH", new.tempdir)

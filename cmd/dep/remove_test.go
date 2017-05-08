@@ -21,14 +21,14 @@ func TestRemoveErrors(t *testing.T) {
 		panic(err)
 	}
 
-	t.Run(testName+"/external", removeErrors(testName, wd, execCmd))
-	t.Run(testName+"/internal", removeErrors(testName, wd, runMain))
+	t.Run(testName+"/external", removeErrors(testName, wd, true, execCmd))
+	t.Run(testName+"/internal", removeErrors(testName, wd, false, runMain))
 }
 
-func removeErrors(name, wd string, run test.RunFunc) func(*testing.T) {
+func removeErrors(name, wd string, externalProc bool, run test.RunFunc) func(*testing.T) {
 	return func(t *testing.T) {
 		testCase := test.NewTestCase(t, name, wd)
-		testProj := test.NewTestProject(t, testCase.InitialPath(), wd, run)
+		testProj := test.NewTestProject(t, testCase.InitialPath(), wd, externalProc, run)
 		defer testProj.Cleanup()
 
 		// Create and checkout the vendor revisions

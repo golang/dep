@@ -37,8 +37,8 @@ func TestIntegration(t *testing.T) {
 			t.Run(testName, func(t *testing.T) {
 				t.Parallel()
 
-				t.Run("external", testIntegration(testName, wd, execCmd))
-				t.Run("internal", testIntegration(testName, wd, runMain))
+				t.Run("external", testIntegration(testName, wd, true, execCmd))
+				t.Run("internal", testIntegration(testName, wd, false, runMain))
 			})
 		}
 		return nil
@@ -80,12 +80,12 @@ func runMain(prog string, args []string, stdout, stderr io.Writer, dir string, e
 	return
 }
 
-func testIntegration(name, wd string, run test.RunFunc) func(t *testing.T) {
+func testIntegration(name, wd string, externalProc bool, run test.RunFunc) func(t *testing.T) {
 	return func(t *testing.T) {
 		// Set up environment
 		testCase := test.NewTestCase(t, name, wd)
 		defer testCase.Cleanup()
-		testProj := test.NewTestProject(t, testCase.InitialPath(), wd, run)
+		testProj := test.NewTestProject(t, testCase.InitialPath(), wd, externalProc, run)
 		defer testProj.Cleanup()
 
 		// Create and checkout the vendor revisions
