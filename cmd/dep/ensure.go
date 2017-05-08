@@ -16,10 +16,11 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/golang/dep"
 	"github.com/golang/dep/gps"
 	"github.com/golang/dep/gps/pkgtree"
-	"github.com/golang/dep/internal"
+	"github.com/golang/dep/internal/cfg"
+	"github.com/golang/dep/internal/dep"
+	"github.com/golang/dep/internal/util"
 	"github.com/pkg/errors"
 )
 
@@ -105,7 +106,7 @@ type ensureCommand struct {
 
 func (cmd *ensureCommand) Run(ctx *dep.Ctx, args []string) error {
 	if cmd.examples {
-		internal.Logln(strings.TrimSpace(ensureExamples))
+		util.Logln(strings.TrimSpace(ensureExamples))
 		return nil
 	}
 
@@ -156,7 +157,7 @@ func (cmd *ensureCommand) Run(ctx *dep.Ctx, args []string) error {
 
 	// check if vendor exists, because if the locks are the same but
 	// vendor does not exist we should write vendor
-	vendorExists, err := dep.IsNonEmptyDir(filepath.Join(p.AbsRoot, "vendor"))
+	vendorExists, err := util.IsNonEmptyDir(filepath.Join(p.AbsRoot, "vendor"))
 	if err != nil {
 		return errors.Wrap(err, "ensure vendor is a directory")
 	}
@@ -165,7 +166,7 @@ func (cmd *ensureCommand) Run(ctx *dep.Ctx, args []string) error {
 		writeV = dep.VendorAlways
 	}
 
-	newLock := dep.LockFromInterface(solution)
+	newLock := cfg.LockFromInterface(solution)
 	sw, err := dep.NewSafeWriter(nil, p.Lock, newLock, writeV)
 	if err != nil {
 		return err
@@ -208,7 +209,7 @@ func applyEnsureArgs(args []string, overrides stringSlice, p *dep.Project, sm *g
 			// TODO(sdboyer): for this case - or just in general - do we want to
 			// add project args to the requires list temporarily for this run?
 			if _, has := p.Manifest.Dependencies[pc.Ident.ProjectRoot]; !has {
-				internal.Logf("No constraint or alternate source specified for %q, omitting from manifest", pc.Ident.ProjectRoot)
+				util.Logf("No constraint or alternate source specified for %q, omitting from manifest", pc.Ident.ProjectRoot)
 			}
 			// If it's already in the manifest, no need to log
 			continue

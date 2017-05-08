@@ -19,7 +19,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/golang/dep/internal"
+	"github.com/golang/dep/internal/util"
 	"github.com/pkg/errors"
 )
 
@@ -568,7 +568,7 @@ func (h *Helper) Cleanup() {
 	if h.wd != "" {
 		if err := os.Chdir(h.wd); err != nil {
 			// We are unlikely to be able to continue.
-			internal.Logln("could not restore working directory, crashing:", err)
+			util.Logln("could not restore working directory, crashing:", err)
 			os.Exit(2)
 		}
 	}

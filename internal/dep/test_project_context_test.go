@@ -8,7 +8,8 @@ import (
 	"path/filepath"
 
 	"github.com/golang/dep/gps"
-	"github.com/golang/dep/test"
+	"github.com/golang/dep/internal/cfg"
+	"github.com/golang/dep/internal/test"
 	"github.com/pkg/errors"
 )
 
@@ -56,20 +57,20 @@ func (pc *TestProjectContext) CopyFile(projectPath string, testdataPath string) 
 func (pc *TestProjectContext) Load() {
 	// TODO(carolynvs): Can't use Ctx.LoadProject until dep doesn't require a manifest at the project root or it also looks for lock
 	var err error
-	var m *Manifest
+	var m *cfg.Manifest
 	mp := pc.getManifestPath()
 	if pc.h.Exist(mp) {
 		mf := pc.h.GetFile(mp)
 		defer mf.Close()
-		m, err = readManifest(mf)
+		m, err = cfg.ReadManifest(mf)
 		pc.h.Must(errors.Wrapf(err, "Unable to read manifest at %s", mp))
 	}
-	var l *Lock
+	var l *cfg.Lock
 	lp := pc.getLockPath()
 	if pc.h.Exist(lp) {
 		lf := pc.h.GetFile(lp)
 		defer lf.Close()
-		l, err = readLock(lf)
+		l, err = cfg.ReadLock(lf)
 		pc.h.Must(errors.Wrapf(err, "Unable to read lock at %s", lp))
 	}
 	pc.Project.Manifest = m
@@ -78,12 +79,12 @@ func (pc *TestProjectContext) Load() {
 
 // GetLockPath returns the full path to the lock
 func (pc *TestProjectContext) getLockPath() string {
-	return filepath.Join(pc.Project.AbsRoot, LockName)
+	return filepath.Join(pc.Project.AbsRoot, cfg.LockName)
 }
 
 // GetManifestPath returns the full path to the manifest
 func (pc *TestProjectContext) getManifestPath() string {
-	return filepath.Join(pc.Project.AbsRoot, ManifestName)
+	return filepath.Join(pc.Project.AbsRoot, cfg.ManifestName)
 }
 
 // GetVendorPath returns the full path to the vendor directory

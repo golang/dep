@@ -7,7 +7,7 @@ package main
 import (
 	"testing"
 
-	"github.com/golang/dep/test"
+	"github.com/golang/dep/internal/test"
 )
 
 func TestEmptyProject(t *testing.T) {

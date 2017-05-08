@@ -8,9 +8,9 @@ import (
 	"flag"
 	"fmt"
 
-	"github.com/golang/dep"
 	"github.com/golang/dep/gps"
 	"github.com/golang/dep/gps/pkgtree"
+	"github.com/golang/dep/internal/dep"
 	"github.com/pkg/errors"
 )
 

@@ -10,10 +10,11 @@ import (
 	"os"
 	"strings"
 
-	"github.com/golang/dep"
 	"github.com/golang/dep/gps"
 	"github.com/golang/dep/gps/pkgtree"
-	"github.com/golang/dep/internal"
+	"github.com/golang/dep/internal/cfg"
+	"github.com/golang/dep/internal/dep"
+	"github.com/golang/dep/internal/util"
 	"github.com/pkg/errors"
 )
 
@@ -92,7 +93,7 @@ func (cmd *removeCommand) Run(ctx *dep.Ctx, args []string) error {
 				// not being able to detect the root for an import path that's
 				// actually in the import list is a deeper problem. However,
 				// it's not our direct concern here, so we just warn.
-				internal.Logf("could not infer root for %q", pr)
+				util.Logf("could not infer root for %q", pr)
 				continue
 			}
 			otherroots[pr] = true
@@ -107,7 +108,7 @@ func (cmd *removeCommand) Run(ctx *dep.Ctx, args []string) error {
 		}
 
 		if len(rm) == 0 {
-			internal.Logf("nothing to do")
+			util.Logf("nothing to do")
 			return nil
 		}
 	} else {
@@ -180,7 +181,7 @@ func (cmd *removeCommand) Run(ctx *dep.Ctx, args []string) error {
 		return err
 	}
 
-	newLock := dep.LockFromInterface(soln)
+	newLock := cfg.LockFromInterface(soln)
 
 	sw, err := dep.NewSafeWriter(nil, p.Lock, newLock, dep.VendorOnChanged)
 	if err != nil {

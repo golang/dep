@@ -11,7 +11,8 @@ import (
 	"testing"
 
 	"github.com/golang/dep/gps"
-	"github.com/golang/dep/test"
+	"github.com/golang/dep/internal/cfg"
+	"github.com/golang/dep/internal/test"
 )
 
 func TestFindRoot(t *testing.T) {
@@ -54,7 +55,7 @@ func TestFindRoot(t *testing.T) {
 	// The following test does not work on windows because syscall.Stat does not
 	// return a "not a directory" error.
 	if runtime.GOOS != "windows" {
-		got4, err := findProjectRoot(filepath.Join(want, ManifestName))
+		got4, err := findProjectRoot(filepath.Join(want, cfg.ManifestName))
 		if err == nil {
 			t.Errorf("Should have err'd when trying subdir of file, but returned %s", got4)
 		}
@@ -65,8 +66,8 @@ func TestProjectMakeParams(t *testing.T) {
 	p := Project{
 		AbsRoot:    "someroot",
 		ImportRoot: gps.ProjectRoot("Some project root"),
-		Manifest:   &Manifest{Ignored: []string{"ignoring this"}},
-		Lock:       &Lock{},
+		Manifest:   &cfg.Manifest{Ignored: []string{"ignoring this"}},
+		Lock:       &cfg.Lock{},
 	}
 
 	solveParam := p.MakeParams()

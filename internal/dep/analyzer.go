@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 
 	"github.com/golang/dep/gps"
+	"github.com/golang/dep/internal/cfg"
+	"github.com/golang/dep/internal/util"
 )
 
 type Analyzer struct{}
@@ -16,8 +18,8 @@ type Analyzer struct{}
 func (a Analyzer) DeriveManifestAndLock(path string, n gps.ProjectRoot) (gps.Manifest, gps.Lock, error) {
 	// TODO: If we decide to support other tools manifest, this is where we would need
 	// to add that support.
-	mf := filepath.Join(path, ManifestName)
-	if fileOK, err := IsRegular(mf); err != nil || !fileOK {
+	mf := filepath.Join(path, cfg.ManifestName)
+	if fileOK, err := util.IsRegular(mf); err != nil || !fileOK {
 		// Do not return an error, when does not exist.
 		return nil, nil, nil
 	}
@@ -27,7 +29,7 @@ func (a Analyzer) DeriveManifestAndLock(path string, n gps.ProjectRoot) (gps.Man
 	}
 	defer f.Close()
 
-	m, err := readManifest(f)
+	m, err := cfg.ReadManifest(f)
 	if err != nil {
 		return nil, nil, err
 	}

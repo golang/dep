@@ -15,9 +15,10 @@ import (
 	"sort"
 	"text/tabwriter"
 
-	"github.com/golang/dep"
 	"github.com/golang/dep/gps"
 	"github.com/golang/dep/gps/pkgtree"
+	"github.com/golang/dep/internal/cfg"
+	"github.com/golang/dep/internal/dep"
 	"github.com/pkg/errors"
 )
 
@@ -271,7 +272,7 @@ func runStatusAll(out outputter, p *dep.Project, sm *gps.SourceMgr) error {
 	// deterministically ordered. (This may be superfluous if the lock is always
 	// written in alpha order, but it doesn't hurt to double down.)
 	slp := p.Lock.Projects()
-	sort.Sort(dep.SortedLockedProjects(slp))
+	sort.Sort(cfg.SortedLockedProjects(slp))
 
 	if bytes.Equal(s.HashInputs(), p.Lock.Memo) {
 		// If these are equal, we're guaranteed that the lock is a transitively

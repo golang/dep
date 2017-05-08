@@ -12,7 +12,8 @@ import (
 
 	"github.com/Masterminds/vcs"
 	"github.com/golang/dep/gps"
-	"github.com/golang/dep/internal"
+	"github.com/golang/dep/internal/cfg"
+	"github.com/golang/dep/internal/util"
 	"github.com/pkg/errors"
 )
 
@@ -38,7 +39,7 @@ func NewContext() (*Ctx, error) {
 	for _, gp := range filepath.SplitList(buildContext.GOPATH) {
 		gp = filepath.FromSlash(gp)
 
-		if internal.HasFilepathPrefix(wd, gp) {
+		if util.HasFilepathPrefix(wd, gp) {
 			ctx.GOPATH = gp
 		}
 
@@ -99,24 +100,24 @@ func (c *Ctx) LoadProject(path string) (*Project, error) {
 	}
 	p.ImportRoot = gps.ProjectRoot(ip)
 
-	mp := filepath.Join(p.AbsRoot, ManifestName)
+	mp := filepath.Join(p.AbsRoot, cfg.ManifestName)
 	mf, err := os.Open(mp)
 	if err != nil {
 		if os.IsNotExist(err) {
 			// TODO: list possible solutions? (dep init, cd $project)
-			return nil, errors.Errorf("no %v found in project root %v", ManifestName, p.AbsRoot)
+			return nil, errors.Errorf("no %v found in project root %v", cfg.ManifestName, p.AbsRoot)
 		}
 		// Unable to read the manifest file
 		return nil, err
 	}
 	defer mf.Close()
 
-	p.Manifest, err = readManifest(mf)
+	p.Manifest, err = cfg.ReadManifest(mf)
 	if err != nil {
 		return nil, errors.Errorf("error while parsing %s: %s", mp, err)
 	}
 
-	lp := filepath.Join(p.AbsRoot, LockName)
+	lp := filepath.Join(p.AbsRoot, cfg.LockName)
 	lf, err := os.Open(lp)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -128,7 +129,7 @@ func (c *Ctx) LoadProject(path string) (*Project, error) {
 	}
 	defer lf.Close()
 
-	p.Lock, err = readLock(lf)
+	p.Lock, err = cfg.ReadLock(lf)
 	if err != nil {
 		return nil, errors.Errorf("error while parsing %s: %s", lp, err)
 	}
@@ -165,7 +166,7 @@ func (c *Ctx) resolveProjectRoot(path string) (string, error) {
 	// Determine if the symlink is within any of the GOPATHs, in which case we're not
 	// sure how to resolve it.
 	for _, gp := range c.GOPATHS {
-		if internal.HasFilepathPrefix(path, gp) {
+		if util.HasFilepathPrefix(path, gp) {
 			return "", errors.Errorf("'%s' is linked to another path within a GOPATH (%s)", path, gp)
 		}
 	}
@@ -180,7 +181,7 @@ func (c *Ctx) resolveProjectRoot(path string) (string, error) {
 // The second returned string indicates which GOPATH value was used.
 func (c *Ctx) SplitAbsoluteProjectRoot(path string) (string, error) {
 	srcprefix := filepath.Join(c.GOPATH, "src") + string(filepath.Separator)
-	if internal.HasFilepathPrefix(path, srcprefix) {
+	if util.HasFilepathPrefix(path, srcprefix) {
 		// filepath.ToSlash because we're dealing with an import path now,
 		// not an fs path
 		return filepath.ToSlash(path[len(srcprefix):]), nil
@@ -194,7 +195,7 @@ func (c *Ctx) SplitAbsoluteProjectRoot(path string) (string, error) {
 // package directory needs to exist.
 func (c *Ctx) absoluteProjectRoot(path string) (string, error) {
 	posspath := filepath.Join(c.GOPATH, "src", path)
-	dirOK, err := IsDir(posspath)
+	dirOK, err := util.IsDir(posspath)
 	if err != nil {
 		return "", errors.Wrapf(err, "checking if %s is a directory", posspath)
 	}

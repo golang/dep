@@ -12,10 +12,11 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/golang/dep"
 	"github.com/golang/dep/gps"
 	"github.com/golang/dep/gps/pkgtree"
-	"github.com/golang/dep/internal"
+	"github.com/golang/dep/internal/cfg"
+	"github.com/golang/dep/internal/dep"
+	"github.com/golang/dep/internal/util"
 	"github.com/pkg/errors"
 )
 
@@ -53,7 +54,7 @@ type initCommand struct {
 }
 
 func trimPathPrefix(p1, p2 string) string {
-	if internal.HasFilepathPrefix(p1, p2) {
+	if util.HasFilepathPrefix(p1, p2) {
 		return p1[len(p2):]
 	}
 	return p1
@@ -75,10 +76,10 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 		root = args[0]
 	}
 
-	mf := filepath.Join(root, dep.ManifestName)
-	lf := filepath.Join(root, dep.LockName)
+	mf := filepath.Join(root, cfg.ManifestName)
+	lf := filepath.Join(root, cfg.LockName)
 
-	mok, err := dep.IsRegular(mf)
+	mok, err := util.IsRegular(mf)
 	if err != nil {
 		return err
 	}
@@ -87,7 +88,7 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 	}
 	// Manifest file does not exist.
 
-	lok, err := dep.IsRegular(lf)
+	lok, err := util.IsRegular(lf)
 	if err != nil {
 		return err
 	}
@@ -99,12 +100,12 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 	if err != nil {
 		return errors.Wrap(err, "determineProjectRoot")
 	}
-	internal.Vlogf("Finding dependencies for %q...", cpr)
+	util.Vlogf("Finding dependencies for %q...", cpr)
 	pkgT, err := pkgtree.ListPackages(root, cpr)
 	if err != nil {
 		return errors.Wrap(err, "gps.ListPackages")
 	}
-	internal.Vlogf("Found %d dependencies.", len(pkgT.Packages))
+	util.Vlogf("Found %d dependencies.", len(pkgT.Packages))
 	sm, err := ctx.SourceManager()
 	if err != nil {
 		return errors.Wrap(err, "getSourceManager")
@@ -116,13 +117,13 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 	if err != nil {
 		return err
 	}
-	m := &dep.Manifest{
+	m := &cfg.Manifest{
 		Dependencies: pd.constraints,
 	}
 
 	// Make an initial lock from what knowledge we've collected about the
 	// versions on disk
-	l := &dep.Lock{
+	l := &cfg.Lock{
 		P: make([]gps.LockedProject, 0, len(pd.ondisk)),
 	}
 
@@ -145,7 +146,7 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 	}
 
 	// Run solver with project versions found on disk
-	internal.Vlogf("Solving...")
+	util.Vlogf("Solving...")
 	params := gps.SolveParameters{
 		RootDir:         root,
 		RootPackageTree: pkgT,
@@ -168,7 +169,7 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 		handleAllTheFailuresOfTheWorld(err)
 		return err
 	}
-	l = dep.LockFromInterface(soln)
+	l = cfg.LockFromInterface(soln)
 
 	// Pick notondisk project constraints from solution and add to manifest
 	for k, _ := range pd.notondisk {
@@ -189,7 +190,7 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 
 	l.Memo = s.HashInputs()
 
-	internal.Vlogf("Writing manifest and lock files.")
+	util.Vlogf("Writing manifest and lock files.")
 
 	sw, err := dep.NewSafeWriter(m, nil, l, dep.VendorAlways)
 	if err != nil {
@@ -294,7 +295,7 @@ func getProjectData(ctx *dep.Ctx, pkgT pkgtree.PackageTree, cpr string, sm *gps.
 		return projectData{}, nil
 	}
 
-	internal.Vlogf("Building dependency graph...")
+	util.Vlogf("Building dependency graph...")
 	// Exclude stdlib imports from the list returned from Flatten().
 	const omitStdlib = false
 	for _, ip := range rm.Flatten(omitStdlib) {
@@ -310,13 +311,13 @@ func getProjectData(ctx *dep.Ctx, pkgT pkgtree.PackageTree, cpr string, sm *gps.
 		}
 		go syncDep(pr, sm)
 
-		internal.Vlogf("Found import of %q, analyzing...", ip)
+		util.Vlogf("Found import of %q, analyzing...", ip)
 
 		dependencies[pr] = []string{ip}
 		v, err := ctx.VersionInWorkspace(pr)
 		if err != nil {
 			notondisk[pr] = true
-			internal.Vlogf("Could not determine version for %q, omitting from generated manifest", pr)
+			util.Vlogf("Could not determine version for %q, omitting from generated manifest", pr)
 			continue
 		}
 
@@ -324,7 +325,7 @@ func getProjectData(ctx *dep.Ctx, pkgT pkgtree.PackageTree, cpr string, sm *gps.
 		constraints[pr] = getProjectPropertiesFromVersion(v)
 	}
 
-	internal.Vlogf("Analyzing transitive imports...")
+	util.Vlogf("Analyzing transitive imports...")
 	// Explore the packages we've found for transitive deps, either
 	// completing the lock or identifying (more) missing projects that we'll
 	// need to ask gps to solve for us.
@@ -343,7 +344,7 @@ func getProjectData(ctx *dep.Ctx, pkgT pkgtree.PackageTree, cpr string, sm *gps.
 	dft = func(pkg string) error {
 		switch colors[pkg] {
 		case white:
-			internal.Vlogf("Analyzing %q...", pkg)
+			util.Vlogf("Analyzing %q...", pkg)
 			colors[pkg] = grey
 
 			pr, err := sm.DeduceProjectRoot(pkg)
