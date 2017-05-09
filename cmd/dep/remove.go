@@ -161,10 +161,10 @@ func (cmd *removeCommand) Run(ctx *dep.Ctx, loggers *Loggers, args []string) err
 
 	params := p.MakeParams()
 	params.RootPackageTree = pkgT
-	if loggers.Verbose {
-		params.Trace = true
+	
+  if loggers.Verbose {
 		params.TraceLogger = loggers.Err
-	}
+  }
 	s, err := gps.Prepare(params, sm)
 	if err != nil {
 		return errors.Wrap(err, "prepare solver")

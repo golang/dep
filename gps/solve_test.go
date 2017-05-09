@@ -79,7 +79,6 @@ func fixSolve(params SolveParameters, sm SourceManager, t *testing.T) (Solution,
 	// Trace unconditionally; by passing the trace through t.Log(), the testing
 	// system will decide whether or not to actually show the output (based on
 	// -v, or selectively on test failure).
-	params.Trace = true
 	params.TraceLogger = log.New(testlogger{T: t}, "", 0)
 
 	s, err := Prepare(params, sm)
@@ -373,13 +372,6 @@ func TestBadSolveOpts(t *testing.T) {
 				},
 			},
 		},
-	}
-	params.Trace = true
-	_, err = Prepare(params, sm)
-	if err == nil {
-		t.Errorf("Should have errored on trace with no logger")
-	} else if !strings.Contains(err.Error(), "no logger provided") {
-		t.Error("Prepare should have given error on missing trace logger, but gave:", err)
 	}
 	params.TraceLogger = log.New(ioutil.Discard, "", 0)
 

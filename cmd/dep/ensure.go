@@ -121,7 +121,6 @@ func (cmd *ensureCommand) Run(ctx *dep.Ctx, loggers *Loggers, args []string) err
 
 	params := p.MakeParams()
 	if loggers.Verbose {
-		params.Trace = true
 		params.TraceLogger = loggers.Err
 	}
 	params.RootPackageTree, err = pkgtree.ListPackages(p.AbsRoot, string(p.ImportRoot))
@@ -188,7 +187,7 @@ func applyUpdateArgs(args []string, params *gps.SolveParameters) {
 	}
 }
 
-func applyEnsureArgs(logger *log.Logger, args []string, overrides stringSlice, p *dep.Project, sm *gps.SourceMgr, params *gps.SolveParameters) error {
+func applyEnsureArgs(logger *log.Logger, args []string, overrides stringSlice, p *dep.Project, sm gps.SourceManager, params *gps.SolveParameters) error {
 	var errs []error
 	for _, arg := range args {
 		pc, err := getProjectConstraint(arg, sm)
@@ -261,7 +260,7 @@ func (s *stringSlice) Set(value string) error {
 	return nil
 }
 
-func getProjectConstraint(arg string, sm *gps.SourceMgr) (gps.ProjectConstraint, error) {
+func getProjectConstraint(arg string, sm gps.SourceManager) (gps.ProjectConstraint, error) {
 	constraint := gps.ProjectConstraint{
 		Constraint: gps.Any(), // default to any; avoids panics later
 	}

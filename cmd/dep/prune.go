@@ -61,7 +61,6 @@ func (cmd *pruneCommand) Run(ctx *dep.Ctx, loggers *Loggers, args []string) erro
 	params.RootPackageTree = ptree
 
 	if loggers.Verbose {
-		params.Trace = true
 		params.TraceLogger = loggers.Err
 	}
 

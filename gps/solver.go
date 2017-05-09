@@ -105,12 +105,9 @@ type SolveParameters struct {
 	// typical case.
 	Downgrade bool
 
-	// Trace controls whether the solver will generate informative trace output
-	// as it moves through the solving process.
-	Trace bool
-
-	// TraceLogger is the logger to use for generating trace output. If Trace is
-	// true but no logger is provided, solving will result in an error.
+	// TraceLogger is the logger to use for generating trace output. If set, the
+	// solver will generate informative trace output as it moves through the
+	// solving process.
 	TraceLogger *log.Logger
 }
 
@@ -122,7 +119,7 @@ type solver struct {
 	// starts moving forward again.
 	attempts int
 
-	// Logger used exclusively for trace output, if the trace option is set.
+	// Logger used exclusively for trace output, or nil to suppress.
 	tl *log.Logger
 
 	// A bridge to the standard SourceManager. The adapter does some local
@@ -280,9 +277,6 @@ func (params SolveParameters) toRootdata() (rootdata, error) {
 func Prepare(params SolveParameters, sm SourceManager) (Solver, error) {
 	if sm == nil {
 		return nil, badOptsFailure("must provide non-nil SourceManager")
-	}
-	if params.Trace && params.TraceLogger == nil {
-		return nil, badOptsFailure("trace requested, but no logger provided")
 	}
 
 	rd, err := params.toRootdata()
