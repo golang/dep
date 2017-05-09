@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"reflect"
 	"sort"
 
 	"github.com/golang/dep/gps"
@@ -54,12 +55,9 @@ func validateManifest(s string) ([]error, error) {
 	for prop, val := range manifest {
 		switch prop {
 		case "metadata":
-			// Invalid if type assertion fails. Not a TOML array of tables.
-			// This check is enough for map validation because any non-key-value
-			// pair inside array of tables becomes an invalid TOML and parser
-			// would fail.
-			if _, ok := val.([]interface{}); !ok {
-				errs = append(errs, errors.New("metadata should be a TOML array of tables"))
+			// Check if metadata is of Map type
+			if reflect.TypeOf(val).Kind() != reflect.Map {
+				errs = append(errs, errors.New("metadata should be a TOML table"))
 			}
 		case "dependencies", "overrides":
 			// Invalid if type assertion fails. Not a TOML array of tables.
@@ -67,11 +65,16 @@ func validateManifest(s string) ([]error, error) {
 				// Iterate through each array of tables
 				for _, v := range rawProj {
 					// Check the individual field's key to be valid
-					for key, _ := range v.(map[string]interface{}) {
+					for key, value := range v.(map[string]interface{}) {
 						// Check if the key is valid
 						switch key {
 						case "name", "branch", "revision", "version", "source":
 							// valid key
+						case "metadata":
+							// Check if metadata is of Map type
+							if reflect.TypeOf(value).Kind() != reflect.Map {
+								errs = append(errs, fmt.Errorf("metadata in %q should be a TOML table", prop))
+							}
 						default:
 							// unknown/invalid key
 							errs = append(errs, fmt.Errorf("Invalid key %q in %q", key, prop))
