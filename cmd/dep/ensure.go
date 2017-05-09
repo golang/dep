@@ -409,6 +409,9 @@ func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm
 		exrmap[root] = true
 	}
 
+	var reqlist []string
+	//pclist := make(map[gps.ProjectRoot]gps.ProjectConstraint)
+
 	for _, arg := range args {
 		// TODO(sdboyer) return all errors, not just the first one we encounter
 		// TODO(sdboyer) do these concurrently
@@ -421,14 +424,84 @@ func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm
 		inManifest := p.Manifest.HasConstraintsOn(pc.Ident.ProjectRoot)
 		inImports := exrmap[pc.Ident.ProjectRoot]
 		if inManifest && inImports {
-			return errors.Errorf("%s is already in %s and the project's direct imports, nothing to add", pc.Ident.ProjectRoot, dep.ManifestName)
+			return errors.Errorf("%s is already in %s and the project's direct imports or required list; nothing to add", pc.Ident.ProjectRoot, dep.ManifestName)
 		}
 
 		err = sm.SyncSourceFor(pc.Ident)
 		if err != nil {
 			return errors.Wrap(err, "failed to fetch source for %s", pc.Ident.ProjectRoot)
 		}
+
+		someConstraint = pc.Constraint != nil || pc.Ident.Source != ""
+		if inManifest {
+			if someConstraint {
+				return errors.Errorf("%s already contains constraints for %s, cannot specify a version constraint or alternate source", arg, dep.ManifestName)
+			}
+
+			reqlist = append(reqlist, arg)
+			p.Manifest.Required = append(p.Manifest.Required, arg)
+		} else if inImports {
+			if !someConstraint {
+				if exmap[arg] {
+					return errors.Errorf("%s is already imported or required; -add must specify a constraint, but none were provided", arg)
+				}
+
+				// TODO(sdboyer) this case seems like it's getting overly
+				// specific and risks muddying the water more than it helps
+				// No constraints, but the package isn't imported; require it.
+				reqlist = append(reqlist, arg)
+				p.Manifest.Required = append(p.Manifest.Required, arg)
+			} else {
+				p.Manifest.Dependencies[pc.Ident.ProjectRoot] = gps.ProjectProperties{
+					Source:     pc.Ident.Source,
+					Constraint: pc.Constraint,
+				}
+
+				// Don't require on this branch if the arg was a ProjectRoot;
+				// most common here will be the user adding constraints to
+				// something they already imported, and if they specify the
+				// root, there's a good chance they don't actually want to
+				// require the project's root package, but are just trying to
+				// indicate which project should receive the constraints.
+				if !exmap[arg] && string(pc.Ident.ProjectRoot) != arg {
+					reqlist = append(reqlist, arg)
+					p.Manifest.Required = append(p.Manifest.Required, arg)
+				}
+			}
+		} else {
+			p.Manifest.Dependencies[pc.Ident.ProjectRoot] = gps.ProjectProperties{
+				Source:     pc.Ident.Source,
+				Constraint: pc.Constraint,
+			}
+
+			reqlist = append(reqlist, arg)
+			p.Manifest.Required = append(p.Manifest.Required, arg)
+		}
 	}
+
+	// Re-prepare a solver now that our params are complete.
+	solver, err = gps.Prepare(params, sm)
+	if err != nil {
+		return errors.Wrap(err, "fastpath solver prepare")
+	}
+	solution, err := solver.Solve()
+	if err != nil {
+		// TODO(sdboyer) detect if the failure was specifically about some of
+		// the -add arguments
+		handleAllTheFailuresOfTheWorld(err)
+		return errors.Wrap(err, "ensure Solve()")
+	}
+
+	var sw dep.SafeWriter
+	sw.Prepare(nil, p.Lock, dep.LockFromInterface(solution), dep.VendorOnChanged)
+	// TODO(sdboyer) special handling for warning cases as described in spec -
+	// e.g., named projects did not upgrade even though newer versions were
+	// available.
+	if cmd.dryRun {
+		return sw.PrintPreparedActions()
+	}
+
+	return errors.Wrap(sw.Write(p.AbsRoot, sm, true), "grouped write of manifest, lock and vendor")
 }
 
 func applyEnsureArgs(args []string, overrides stringSlice, p *dep.Project, sm gps.SourceManager, params *gps.SolveParameters) error {
