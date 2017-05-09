@@ -248,7 +248,7 @@ type MissingStatus struct {
 	MissingPackages []string
 }
 
-func runStatusAll(loggers *Loggers, out outputter, p *dep.Project, sm *gps.SourceMgr) error {
+func runStatusAll(loggers *Loggers, out outputter, p *dep.Project, sm gps.SourceManager) error {
 	if p.Lock == nil {
 		// TODO if we have no lock file, do...other stuff
 		return nil
@@ -270,7 +270,6 @@ func runStatusAll(loggers *Loggers, out outputter, p *dep.Project, sm *gps.Sourc
 		// Locks aren't a part of the input hash check, so we can omit it.
 	}
 	if loggers.Verbose {
-		params.Trace = true
 		params.TraceLogger = loggers.Err
 	}
 
@@ -449,7 +448,7 @@ func formatVersion(v gps.Version) string {
 	return v.String()
 }
 
-func collectConstraints(ptree pkgtree.PackageTree, p *dep.Project, sm *gps.SourceMgr) map[string][]gps.Constraint {
+func collectConstraints(ptree pkgtree.PackageTree, p *dep.Project, sm gps.SourceManager) map[string][]gps.Constraint {
 	// TODO
 	return map[string][]gps.Constraint{}
 }
