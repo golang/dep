@@ -166,7 +166,6 @@ func (cmd *removeCommand) Run(ctx *dep.Ctx, args []string) error {
 	params.RootPackageTree = pkgT
 
 	if *verbose {
-		params.Trace = true
 		params.TraceLogger = log.New(os.Stderr, "", 0)
 	}
 	s, err := gps.Prepare(params, sm)
