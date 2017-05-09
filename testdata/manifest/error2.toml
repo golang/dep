@@ -1,9 +1,9 @@
 ignored = ["github.com/foo/bar"]
 
-[constraint]]
+[[constraint]]
   name = "github.com/golang/dep/gps"
   branch = "master"
 
-[constraint]]
+[[constraint]]
   name = "github.com/golang/dep/gps"
   branch = "master"
