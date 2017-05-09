@@ -9,7 +9,6 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"sync"
 	"testing"
 )
 
@@ -80,13 +79,10 @@ func testWriteDepTree(t *testing.T) {
 	sm, clean := mkNaiveSM(t)
 	defer clean()
 
-	var wg sync.WaitGroup
 	// Trigger simultaneous fetch of all three to speed up test execution time
 	for _, p := range r.p {
-		wg.Add(1)
 		go func(pi ProjectIdentifier) {
 			sm.SyncSourceFor(pi)
-			wg.Done()
 		}(p.pi)
 	}
 
@@ -110,8 +106,6 @@ func testWriteDepTree(t *testing.T) {
 	if _, err = os.Stat(filepath.Join(tmp, "bitbucket.org", "sdboyer", "withbm")); err != nil {
 		t.Errorf("Directory for bitbucket.org/sdboyer/withbm does not exist")
 	}
-
-	wg.Wait()
 }
 
 func BenchmarkCreateVendorTree(b *testing.B) {
