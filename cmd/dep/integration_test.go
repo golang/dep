@@ -82,6 +82,8 @@ func runMain(prog string, args []string, stdout, stderr io.Writer, dir string, e
 
 func testIntegration(name, wd string, externalProc bool, run test.RunFunc) func(t *testing.T) {
 	return func(t *testing.T) {
+		t.Parallel()
+
 		// Set up environment
 		testCase := test.NewTestCase(t, name, wd)
 		defer testCase.Cleanup()

@@ -437,43 +437,43 @@ fail:
 	return failerr
 }
 
-func (sw *SafeWriter) PrintPreparedActions(stdout *log.Logger) error {
+func (sw *SafeWriter) PrintPreparedActions(output *log.Logger) error {
 	if sw.HasManifest() {
-		stdout.Printf("Would have written the following %s:\n", ManifestName)
+		output.Printf("Would have written the following %s:\n", ManifestName)
 		m, err := sw.Manifest.MarshalTOML()
 		if err != nil {
 			return errors.Wrap(err, "ensure DryRun cannot serialize manifest")
 		}
-		stdout.Println(string(m))
+		output.Println(string(m))
 	}
 
 	if sw.HasLock() {
 		if sw.LockDiff == nil {
-			stdout.Printf("Would have written the following %s:\n", LockName)
+			output.Printf("Would have written the following %s:\n", LockName)
 			l, err := sw.Lock.MarshalTOML()
 			if err != nil {
 				return errors.Wrap(err, "ensure DryRun cannot serialize lock")
 			}
-			stdout.Println(string(l))
+			output.Println(string(l))
 		} else {
-			stdout.Printf("Would have written the following changes to %s:\n", LockName)
+			output.Printf("Would have written the following changes to %s:\n", LockName)
 			diff, err := formatLockDiff(*sw.LockDiff)
 			if err != nil {
 				return errors.Wrap(err, "ensure DryRun cannot serialize the lock diff")
 			}
-			stdout.Println(diff)
+			output.Println(diff)
 		}
 	}
 
 	if sw.HasVendor() {
-		stdout.Println("Would have written the following projects to the vendor directory:")
+		output.Println("Would have written the following projects to the vendor directory:")
 		for _, project := range sw.Lock.Projects() {
 			prj := project.Ident()
 			rev, _, _ := gps.VersionComponentStrings(project.Version())
 			if prj.Source == "" {
-				stdout.Printf("%s@%s\n", prj.ProjectRoot, rev)
+				output.Printf("%s@%s\n", prj.ProjectRoot, rev)
 			} else {
-				stdout.Printf("%s -> %s@%s\n", prj.ProjectRoot, prj.Source, rev)
+				output.Printf("%s -> %s@%s\n", prj.ProjectRoot, prj.Source, rev)
 			}
 		}
 	}
