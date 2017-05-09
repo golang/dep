@@ -116,7 +116,7 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, loggers *Loggers, args []string) error
 		return err
 	}
 	m := &dep.Manifest{
-		Dependencies: pd.constraints,
+		Constraints: pd.constraints,
 	}
 
 	// Make an initial lock from what knowledge we've collected about the
@@ -175,7 +175,7 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, loggers *Loggers, args []string) error
 	for k, _ := range pd.notondisk {
 		for _, x := range l.Projects() {
 			if k == x.Ident().ProjectRoot {
-				m.Dependencies[k] = getProjectPropertiesFromVersion(x.Version())
+				m.Constraints[k] = getProjectPropertiesFromVersion(x.Version())
 				break
 			}
 		}

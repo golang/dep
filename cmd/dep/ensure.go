@@ -204,14 +204,14 @@ func applyEnsureArgs(logger *log.Logger, args []string, overrides stringSlice, p
 			//
 			// TODO(sdboyer): for this case - or just in general - do we want to
 			// add project args to the requires list temporarily for this run?
-			if _, has := p.Manifest.Dependencies[pc.Ident.ProjectRoot]; !has {
+			if _, has := p.Manifest.Constraints[pc.Ident.ProjectRoot]; !has {
 				logger.Printf("dep: No constraint or alternate source specified for %q, omitting from manifest\n", pc.Ident.ProjectRoot)
 			}
 			// If it's already in the manifest, no need to log
 			continue
 		}
 
-		p.Manifest.Dependencies[pc.Ident.ProjectRoot] = gps.ProjectProperties{
+		p.Manifest.Constraints[pc.Ident.ProjectRoot] = gps.ProjectProperties{
 			Source:     pc.Ident.Source,
 			Constraint: pc.Constraint,
 		}
