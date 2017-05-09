@@ -100,7 +100,7 @@ func readManifest(r io.Reader) (*Manifest, error) {
 	}
 
 	// Validate manifest and log warnings
-	errs, err := validateManifest(buf.String())
+	_, err = validateManifest(buf.String())
 	if err != nil {
 		return nil, errors.Wrap(err, "Manifest validation failed")
 	}
