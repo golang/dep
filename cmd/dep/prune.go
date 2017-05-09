@@ -8,8 +8,6 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
-	"log"
-	"os"
 
 	"github.com/golang/dep"
 	"github.com/golang/dep/gps"
@@ -38,7 +36,7 @@ func (cmd *pruneCommand) Hidden() bool      { return false }
 func (cmd *pruneCommand) Register(fs *flag.FlagSet) {
 }
 
-func (cmd *pruneCommand) Run(ctx *dep.Ctx, args []string) error {
+func (cmd *pruneCommand) Run(ctx *dep.Ctx, loggers *Loggers, args []string) error {
 	p, err := ctx.LoadProject("")
 	if err != nil {
 		return err
@@ -62,8 +60,8 @@ func (cmd *pruneCommand) Run(ctx *dep.Ctx, args []string) error {
 	params := p.MakeParams()
 	params.RootPackageTree = ptree
 
-	if *verbose {
-		params.TraceLogger = log.New(os.Stderr, "", 0)
+	if loggers.Verbose {
+		params.TraceLogger = loggers.Err
 	}
 
 	s, err := gps.Prepare(params, sm)

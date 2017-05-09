@@ -140,7 +140,7 @@ func (tc *IntegrationTestCase) CompareError(err error, stderr string) {
 	} else if !wantExists && gotExists {
 		tc.t.Fatalf("error raised where none was expected: \n%v", stderr)
 	} else if wantExists && !gotExists {
-		tc.t.Error("error not raised where one was expected")
+		tc.t.Error("error not raised where one was expected:", want)
 	}
 }
 

@@ -81,7 +81,9 @@ func testWriteDepTree(t *testing.T) {
 
 	// Trigger simultaneous fetch of all three to speed up test execution time
 	for _, p := range r.p {
-		go sm.SyncSourceFor(p.pi)
+		go func(pi ProjectIdentifier) {
+			sm.SyncSourceFor(pi)
+		}(p.pi)
 	}
 
 	// nil lock/result should err immediately
