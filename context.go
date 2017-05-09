@@ -182,7 +182,6 @@ func (c *Ctx) SplitAbsoluteProjectRoot(path string) (string, error) {
 	srcprefix := filepath.Join(c.GOPATH, "src") + string(filepath.Separator)
 	if internal.HasFilepathPrefix(path, srcprefix) {
 		if len(path) <= len(srcprefix) {
-			// the project is directly within $GOPATH/src
 			return "", errors.New("projects directly within $GOPATH/src are not supported currently")
 		}
 
