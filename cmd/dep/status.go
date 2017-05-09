@@ -339,7 +339,7 @@ func runStatusAll(loggers *Loggers, out outputter, p *dep.Project, sm gps.Source
 			// Only if we have a non-rev and non-plain version do/can we display
 			// anything wrt the version's updateability.
 			if bs.Version != nil && bs.Version.Type() != gps.IsVersion {
-				c, has := p.Manifest.Dependencies[proj.Ident().ProjectRoot]
+				c, has := p.Manifest.Constraints[proj.Ident().ProjectRoot]
 				if !has {
 					c.Constraint = gps.Any()
 				}

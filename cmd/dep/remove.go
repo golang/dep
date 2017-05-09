@@ -96,9 +96,9 @@ func (cmd *removeCommand) Run(ctx *dep.Ctx, loggers *Loggers, args []string) err
 		}
 
 		var rm []gps.ProjectRoot
-		for pr := range p.Manifest.Dependencies {
+		for pr := range p.Manifest.Constraints {
 			if _, has := otherroots[pr]; !has {
-				delete(p.Manifest.Dependencies, pr)
+				delete(p.Manifest.Constraints, pr)
 				rm = append(rm, pr)
 			}
 		}
@@ -144,7 +144,7 @@ func (cmd *removeCommand) Run(ctx *dep.Ctx, loggers *Loggers, args []string) err
 				}
 			}
 
-			if _, indeps := p.Manifest.Dependencies[gps.ProjectRoot(arg)]; !indeps {
+			if _, indeps := p.Manifest.Constraints[gps.ProjectRoot(arg)]; !indeps {
 				return errors.Errorf("%q is not present in the manifest, cannot remove it", arg)
 			}
 
@@ -155,7 +155,7 @@ func (cmd *removeCommand) Run(ctx *dep.Ctx, loggers *Loggers, args []string) err
 				return errors.Errorf("not removing %q because it is imported by:\n\t%s (pass -force to override)", arg, strings.Join(pkgimport, "\n\t"))
 			}
 
-			delete(p.Manifest.Dependencies, gps.ProjectRoot(arg))
+			delete(p.Manifest.Constraints, gps.ProjectRoot(arg))
 		}
 	}
 

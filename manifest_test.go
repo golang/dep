@@ -26,7 +26,7 @@ func TestReadManifest(t *testing.T) {
 
 	c, _ := gps.NewSemverConstraint(">=0.12.0, <1.0.0")
 	want := Manifest{
-		Dependencies: map[gps.ProjectRoot]gps.ProjectProperties{
+		Constraints: map[gps.ProjectRoot]gps.ProjectProperties{
 			gps.ProjectRoot("github.com/golang/dep/gps"): {
 				Constraint: c,
 			},
@@ -43,7 +43,7 @@ func TestReadManifest(t *testing.T) {
 		Ignored: []string{"github.com/foo/bar"},
 	}
 
-	if !reflect.DeepEqual(got.Dependencies, want.Dependencies) {
+	if !reflect.DeepEqual(got.Constraints, want.Constraints) {
 		t.Error("Valid manifest's dependencies did not parse as expected")
 	}
 	if !reflect.DeepEqual(got.Ovr, want.Ovr) {
@@ -62,7 +62,7 @@ func TestWriteManifest(t *testing.T) {
 	want := h.GetTestFileString(golden)
 	c, _ := gps.NewSemverConstraint("^v0.12.0")
 	m := &Manifest{
-		Dependencies: map[gps.ProjectRoot]gps.ProjectProperties{
+		Constraints: map[gps.ProjectRoot]gps.ProjectProperties{
 			gps.ProjectRoot("github.com/golang/dep/gps"): {
 				Constraint: c,
 			},
