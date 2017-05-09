@@ -6,14 +6,11 @@ package main
 
 import (
 	"flag"
-	"log"
-	"os"
 	"strings"
 
 	"github.com/golang/dep"
 	"github.com/golang/dep/gps"
 	"github.com/golang/dep/gps/pkgtree"
-	"github.com/golang/dep/internal"
 	"github.com/pkg/errors"
 )
 
@@ -44,7 +41,7 @@ type removeCommand struct {
 	keepSource bool
 }
 
-func (cmd *removeCommand) Run(ctx *dep.Ctx, args []string) error {
+func (cmd *removeCommand) Run(ctx *dep.Ctx, loggers *Loggers, args []string) error {
 	p, err := ctx.LoadProject("")
 	if err != nil {
 		return err
@@ -92,7 +89,7 @@ func (cmd *removeCommand) Run(ctx *dep.Ctx, args []string) error {
 				// not being able to detect the root for an import path that's
 				// actually in the import list is a deeper problem. However,
 				// it's not our direct concern here, so we just warn.
-				internal.Logf("could not infer root for %q", pr)
+				loggers.Err.Printf("dep: could not infer root for %q\n", pr)
 				continue
 			}
 			otherroots[pr] = true
@@ -107,7 +104,7 @@ func (cmd *removeCommand) Run(ctx *dep.Ctx, args []string) error {
 		}
 
 		if len(rm) == 0 {
-			internal.Logf("nothing to do")
+			loggers.Err.Println("dep: nothing to do")
 			return nil
 		}
 	} else {
@@ -165,8 +162,8 @@ func (cmd *removeCommand) Run(ctx *dep.Ctx, args []string) error {
 	params := p.MakeParams()
 	params.RootPackageTree = pkgT
 
-	if *verbose {
-		params.TraceLogger = log.New(os.Stderr, "", 0)
+	if loggers.Verbose {
+		params.TraceLogger = loggers.Err
 	}
 	s, err := gps.Prepare(params, sm)
 	if err != nil {

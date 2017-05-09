@@ -11,7 +11,6 @@ import (
 	"fmt"
 	"go/build"
 	"log"
-	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -19,7 +18,6 @@ import (
 	"github.com/golang/dep"
 	"github.com/golang/dep/gps"
 	"github.com/golang/dep/gps/pkgtree"
-	"github.com/golang/dep/internal"
 	"github.com/pkg/errors"
 )
 
@@ -103,9 +101,9 @@ type ensureCommand struct {
 	overrides stringSlice
 }
 
-func (cmd *ensureCommand) Run(ctx *dep.Ctx, args []string) error {
+func (cmd *ensureCommand) Run(ctx *dep.Ctx, loggers *Loggers, args []string) error {
 	if cmd.examples {
-		internal.Logln(strings.TrimSpace(ensureExamples))
+		loggers.Err.Println(strings.TrimSpace(ensureExamples))
 		return nil
 	}
 
@@ -122,8 +120,8 @@ func (cmd *ensureCommand) Run(ctx *dep.Ctx, args []string) error {
 	defer sm.Release()
 
 	params := p.MakeParams()
-	if *verbose {
-		params.TraceLogger = log.New(os.Stderr, "", 0)
+	if loggers.Verbose {
+		params.TraceLogger = loggers.Err
 	}
 	params.RootPackageTree, err = pkgtree.ListPackages(p.AbsRoot, string(p.ImportRoot))
 	if err != nil {
@@ -137,7 +135,7 @@ func (cmd *ensureCommand) Run(ctx *dep.Ctx, args []string) error {
 	if cmd.update {
 		applyUpdateArgs(args, &params)
 	} else {
-		err := applyEnsureArgs(args, cmd.overrides, p, sm, &params)
+		err := applyEnsureArgs(loggers.Err, args, cmd.overrides, p, sm, &params)
 		if err != nil {
 			return err
 		}
@@ -170,7 +168,7 @@ func (cmd *ensureCommand) Run(ctx *dep.Ctx, args []string) error {
 		return err
 	}
 	if cmd.dryRun {
-		return sw.PrintPreparedActions()
+		return sw.PrintPreparedActions(loggers.Out)
 	}
 
 	return errors.Wrap(sw.Write(p.AbsRoot, sm, true), "grouped write of manifest, lock and vendor")
@@ -189,7 +187,7 @@ func applyUpdateArgs(args []string, params *gps.SolveParameters) {
 	}
 }
 
-func applyEnsureArgs(args []string, overrides stringSlice, p *dep.Project, sm gps.SourceManager, params *gps.SolveParameters) error {
+func applyEnsureArgs(logger *log.Logger, args []string, overrides stringSlice, p *dep.Project, sm gps.SourceManager, params *gps.SolveParameters) error {
 	var errs []error
 	for _, arg := range args {
 		pc, err := getProjectConstraint(arg, sm)
@@ -207,7 +205,7 @@ func applyEnsureArgs(args []string, overrides stringSlice, p *dep.Project, sm gp
 			// TODO(sdboyer): for this case - or just in general - do we want to
 			// add project args to the requires list temporarily for this run?
 			if _, has := p.Manifest.Dependencies[pc.Ident.ProjectRoot]; !has {
-				internal.Logf("No constraint or alternate source specified for %q, omitting from manifest", pc.Ident.ProjectRoot)
+				logger.Printf("dep: No constraint or alternate source specified for %q, omitting from manifest\n", pc.Ident.ProjectRoot)
 			}
 			// If it's already in the manifest, no need to log
 			continue

@@ -11,7 +11,6 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"os"
 	"sort"
 	"text/tabwriter"
 
@@ -182,7 +181,7 @@ func (out *dotOutput) MissingHeader()                {}
 func (out *dotOutput) MissingLine(ms *MissingStatus) {}
 func (out *dotOutput) MissingFooter()                {}
 
-func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
+func (cmd *statusCommand) Run(ctx *dep.Ctx, loggers *Loggers, args []string) error {
 	p, err := ctx.LoadProject("")
 	if err != nil {
 		return err
@@ -201,20 +200,35 @@ func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
 		return errors.Errorf("not implemented")
 	case cmd.json:
 		out = &jsonOutput{
-			w: os.Stdout,
+			w: &logWriter{Logger: loggers.Out},
 		}
 	case cmd.dot:
 		out = &dotOutput{
 			p: p,
 			o: cmd.output,
-			w: os.Stdout,
+			w: &logWriter{Logger: loggers.Out},
 		}
 	default:
 		out = &tableOutput{
-			w: tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0),
+			w: tabwriter.NewWriter(&logWriter{Logger: loggers.Out}, 0, 4, 2, ' ', 0),
 		}
 	}
-	return runStatusAll(out, p, sm)
+	return runStatusAll(loggers, out, p, sm)
+}
+
+// A logWriter adapts a log.Logger to the io.Writer interface.
+type logWriter struct {
+	*log.Logger
+}
+
+func (l *logWriter) Write(b []byte) (n int, err error) {
+	str := string(b)
+	if len(str) == 0 {
+		return 0, nil
+	}
+
+	l.Print(str)
+	return len(b), err
 }
 
 // BasicStatus contains all the information reported about a single dependency
@@ -234,7 +248,7 @@ type MissingStatus struct {
 	MissingPackages []string
 }
 
-func runStatusAll(out outputter, p *dep.Project, sm gps.SourceManager) error {
+func runStatusAll(loggers *Loggers, out outputter, p *dep.Project, sm gps.SourceManager) error {
 	if p.Lock == nil {
 		// TODO if we have no lock file, do...other stuff
 		return nil
@@ -255,8 +269,8 @@ func runStatusAll(out outputter, p *dep.Project, sm gps.SourceManager) error {
 		Manifest:        p.Manifest,
 		// Locks aren't a part of the input hash check, so we can omit it.
 	}
-	if *verbose {
-		params.TraceLogger = log.New(os.Stderr, "", 0)
+	if loggers.Verbose {
+		params.TraceLogger = loggers.Err
 	}
 
 	s, err := gps.Prepare(params, sm)
@@ -390,9 +404,9 @@ func runStatusAll(out outputter, p *dep.Project, sm gps.SourceManager) error {
 		// TODO this is just a fix quick so staticcheck doesn't complain.
 		// Visually reconciling failure to deduce project roots with the rest of
 		// the mismatch output is a larger problem.
-		fmt.Fprintf(os.Stderr, "Failed to deduce project roots for import paths:\n")
+		loggers.Err.Printf("Failed to deduce project roots for import paths:\n")
 		for _, fail := range errs {
-			fmt.Fprintf(os.Stderr, "\t%s: %s\n", fail.ex, fail.err.Error())
+			loggers.Err.Printf("\t%s: %s\n", fail.ex, fail.err.Error())
 		}
 
 		return errors.New("address issues with undeducable import paths to get more status information.")

@@ -6,11 +6,10 @@ package main
 
 import (
 	"flag"
-	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/golang/dep"
 	"github.com/golang/dep/gps"
@@ -59,18 +58,14 @@ func trimPathPrefix(p1, p2 string) string {
 	return p1
 }
 
-func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
+func (cmd *initCommand) Run(ctx *dep.Ctx, loggers *Loggers, args []string) error {
 	if len(args) > 1 {
 		return errors.Errorf("too many args (%d)", len(args))
 	}
 
 	var root string
 	if len(args) <= 0 {
-		wd, err := os.Getwd()
-		if err != nil {
-			return err
-		}
-		root = wd
+		root = ctx.WorkingDir
 	} else {
 		root = args[0]
 	}
@@ -99,12 +94,16 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 	if err != nil {
 		return errors.Wrap(err, "determineProjectRoot")
 	}
-	internal.Vlogf("Finding dependencies for %q...", cpr)
+	if loggers.Verbose {
+		loggers.Err.Printf("dep: Finding dependencies for %q...\n", cpr)
+	}
 	pkgT, err := pkgtree.ListPackages(root, cpr)
 	if err != nil {
 		return errors.Wrap(err, "gps.ListPackages")
 	}
-	internal.Vlogf("Found %d dependencies.", len(pkgT.Packages))
+	if loggers.Verbose {
+		loggers.Err.Printf("dep: Found %d dependencies.\n", len(pkgT.Packages))
+	}
 	sm, err := ctx.SourceManager()
 	if err != nil {
 		return errors.Wrap(err, "getSourceManager")
@@ -112,7 +111,7 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 	sm.UseDefaultSignalHandling()
 	defer sm.Release()
 
-	pd, err := getProjectData(ctx, pkgT, cpr, sm)
+	pd, err := getProjectData(ctx, loggers, pkgT, cpr, sm)
 	if err != nil {
 		return err
 	}
@@ -145,7 +144,9 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 	}
 
 	// Run solver with project versions found on disk
-	internal.Vlogf("Solving...")
+	if loggers.Verbose {
+		loggers.Err.Println("dep: Solving...")
+	}
 	params := gps.SolveParameters{
 		RootDir:         root,
 		RootPackageTree: pkgT,
@@ -154,9 +155,10 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 		ProjectAnalyzer: dep.Analyzer{},
 	}
 
-	if *verbose {
-		params.TraceLogger = log.New(os.Stderr, "", 0)
+	if loggers.Verbose {
+		params.TraceLogger = loggers.Err
 	}
+
 	s, err := gps.Prepare(params, sm)
 	if err != nil {
 		return errors.Wrap(err, "prepare solver")
@@ -188,7 +190,9 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 
 	l.Memo = s.HashInputs()
 
-	internal.Vlogf("Writing manifest and lock files.")
+	if loggers.Verbose {
+		loggers.Err.Println("dep: Writing manifest and lock files.")
+	}
 
 	sw, err := dep.NewSafeWriter(m, nil, l, dep.VendorAlways)
 	if err != nil {
@@ -273,19 +277,21 @@ type projectData struct {
 	ondisk       map[gps.ProjectRoot]gps.Version // projects that were found on disk
 }
 
-func getProjectData(ctx *dep.Ctx, pkgT pkgtree.PackageTree, cpr string, sm gps.SourceManager) (projectData, error) {
+func getProjectData(ctx *dep.Ctx, loggers *Loggers, pkgT pkgtree.PackageTree, cpr string, sm gps.SourceManager) (projectData, error) {
 	constraints := make(gps.ProjectConstraints)
 	dependencies := make(map[gps.ProjectRoot][]string)
 	packages := make(map[string]bool)
 	notondisk := make(map[gps.ProjectRoot]bool)
 	ondisk := make(map[gps.ProjectRoot]gps.Version)
 
+	var syncDepGroup sync.WaitGroup
 	syncDep := func(pr gps.ProjectRoot, sm gps.SourceManager) {
 		message := "Cached"
 		if err := sm.SyncSourceFor(gps.ProjectIdentifier{ProjectRoot: pr}); err != nil {
 			message = "Unable to cache"
 		}
-		fmt.Fprintf(os.Stderr, "%s %s\n", message, pr)
+		loggers.Err.Printf("%s %s\n", message, pr)
+		syncDepGroup.Done()
 	}
 
 	rm, _ := pkgT.ToReachMap(true, true, false, nil)
@@ -293,7 +299,9 @@ func getProjectData(ctx *dep.Ctx, pkgT pkgtree.PackageTree, cpr string, sm gps.S
 		return projectData{}, nil
 	}
 
-	internal.Vlogf("Building dependency graph...")
+	if loggers.Verbose {
+		loggers.Err.Println("dep: Building dependency graph...")
+	}
 	// Exclude stdlib imports from the list returned from Flatten().
 	const omitStdlib = false
 	for _, ip := range rm.Flatten(omitStdlib) {
@@ -307,15 +315,20 @@ func getProjectData(ctx *dep.Ctx, pkgT pkgtree.PackageTree, cpr string, sm gps.S
 			dependencies[pr] = append(dependencies[pr], ip)
 			continue
 		}
+		syncDepGroup.Add(1)
 		go syncDep(pr, sm)
 
-		internal.Vlogf("Found import of %q, analyzing...", ip)
+		if loggers.Verbose {
+			loggers.Err.Printf("dep: Found import of %q, analyzing...\n", ip)
+		}
 
 		dependencies[pr] = []string{ip}
 		v, err := ctx.VersionInWorkspace(pr)
 		if err != nil {
 			notondisk[pr] = true
-			internal.Vlogf("Could not determine version for %q, omitting from generated manifest", pr)
+			if loggers.Verbose {
+				loggers.Err.Printf("dep: Could not determine version for %q, omitting from generated manifest\n", pr)
+			}
 			continue
 		}
 
@@ -323,7 +336,9 @@ func getProjectData(ctx *dep.Ctx, pkgT pkgtree.PackageTree, cpr string, sm gps.S
 		constraints[pr] = getProjectPropertiesFromVersion(v)
 	}
 
-	internal.Vlogf("Analyzing transitive imports...")
+	if loggers.Verbose {
+		loggers.Err.Printf("dep: Analyzing transitive imports...\n")
+	}
 	// Explore the packages we've found for transitive deps, either
 	// completing the lock or identifying (more) missing projects that we'll
 	// need to ask gps to solve for us.
@@ -342,7 +357,9 @@ func getProjectData(ctx *dep.Ctx, pkgT pkgtree.PackageTree, cpr string, sm gps.S
 	dft = func(pkg string) error {
 		switch colors[pkg] {
 		case white:
-			internal.Vlogf("Analyzing %q...", pkg)
+			if loggers.Verbose {
+				loggers.Err.Printf("dep: Analyzing %q...\n", pkg)
+			}
 			colors[pkg] = grey
 
 			pr, err := sm.DeduceProjectRoot(pkg)
@@ -424,6 +441,7 @@ func getProjectData(ctx *dep.Ctx, pkgT pkgtree.PackageTree, cpr string, sm gps.S
 				}
 			} else {
 				dependencies[pr] = []string{pkg}
+				syncDepGroup.Add(1)
 				go syncDep(pr, sm)
 			}
 
@@ -455,6 +473,8 @@ func getProjectData(ctx *dep.Ctx, pkgT pkgtree.PackageTree, cpr string, sm gps.S
 			return projectData{}, err // already errors.Wrap()'d internally
 		}
 	}
+
+	syncDepGroup.Wait()
 
 	pd := projectData{
 		constraints:  constraints,

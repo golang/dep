@@ -7,6 +7,7 @@ package test
 import (
 	"bytes"
 	"flag"
+	"fmt"
 	"go/format"
 	"io"
 	"io/ioutil"
@@ -19,7 +20,6 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/golang/dep/internal"
 	"github.com/pkg/errors"
 )
 
@@ -568,7 +568,7 @@ func (h *Helper) Cleanup() {
 	if h.wd != "" {
 		if err := os.Chdir(h.wd); err != nil {
 			// We are unlikely to be able to continue.
-			internal.Logln("could not restore working directory, crashing:", err)
+			fmt.Fprintln(os.Stderr, "could not restore working directory, crashing:", err)
 			os.Exit(2)
 		}
 	}

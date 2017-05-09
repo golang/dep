@@ -23,6 +23,8 @@ const (
 	ProjectRoot string = "src/github.com/golang/notexist"
 )
 
+type RunFunc func(prog string, newargs []string, outW, errW io.Writer, dir string, env []string) error
+
 // IntegrationTestProject manages the "virtual" test project directory structure
 // and content
 type IntegrationTestProject struct {
@@ -34,13 +36,15 @@ type IntegrationTestProject struct {
 	origWd     string
 	stdout     bytes.Buffer
 	stderr     bytes.Buffer
+	run        RunFunc
 }
 
-func NewTestProject(t *testing.T, initPath, wd string) *IntegrationTestProject {
+func NewTestProject(t *testing.T, initPath, wd string, externalProc bool, run RunFunc) *IntegrationTestProject {
 	new := &IntegrationTestProject{
 		t:      t,
 		origWd: wd,
 		env:    os.Environ(),
+		run:    run,
 	}
 	new.makeRootTempDir()
 	new.TempDir(ProjectRoot, "vendor")
@@ -51,7 +55,7 @@ func NewTestProject(t *testing.T, initPath, wd string) *IntegrationTestProject {
 	// below the wd, and therefore the GOPATH, is recorded as "/var/..." but the
 	// actual process runs in "/private/var/..." and dies due to not being in the
 	// GOPATH because the roots don't line up.
-	if runtime.GOOS == "darwin" && needsPrivateLeader(new.tempdir) {
+	if externalProc && runtime.GOOS == "darwin" && needsPrivateLeader(new.tempdir) {
 		new.Setenv("GOPATH", filepath.Join("/private", new.tempdir))
 	} else {
 		new.Setenv("GOPATH", new.tempdir)
@@ -156,16 +160,13 @@ func (p *IntegrationTestProject) DoRun(args []string) error {
 		p.t.Logf("running testdep %v", args)
 	}
 	prog := filepath.Join(p.origWd, "testdep"+ExeSuffix)
-	newargs := []string{args[0], "-v"}
-	newargs = append(newargs, args[1:]...)
-	cmd := exec.Command(prog, newargs...)
+	newargs := append([]string{args[0], "-v"}, args[1:]...)
+
 	p.stdout.Reset()
 	p.stderr.Reset()
-	cmd.Stdout = &p.stdout
-	cmd.Stderr = &p.stderr
-	cmd.Env = p.env
-	cmd.Dir = p.ProjPath("")
-	status := cmd.Run()
+
+	status := p.run(prog, newargs, &p.stdout, &p.stderr, p.ProjPath(""), p.env)
+
 	if *PrintLogs {
 		if p.stdout.Len() > 0 {
 			p.t.Log("standard output:")
