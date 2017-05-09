@@ -36,9 +36,9 @@ const exampleTOML = `
 ## or in a dependency.
 # ignored = ["github.com/user/project/badpkg"]
 
-## Dependencies define constraints on dependent projects. They are respected by
+## Constraint define constraints on dependent projects. They are respected by
 ## dep whether coming from the Gopkg.toml of the current project or a dependency.
-# [[dependencies]]
+# [[constraint]]
 ## Required: the root import path of the project being constrained.
 # name = "github.com/user/project"
 #
@@ -51,8 +51,8 @@ const exampleTOML = `
 ## Optional: an alternate location (URL or import path) for the project's source.
 # source = "https://github.com/myfork/package.git"
 
-## Overrides have the same structure as [[dependencies]], but supercede all
-## [[dependencies]] declarations from all projects. Only the current project's
+## Overrides have the same structure as [[constraint]], but supercede all
+## [[constraint]] declarations from all projects. Only the current project's
 ## [[overrides]] are applied.
 ##
 ## Overrides are a sledgehammer. Use them only as a last resort.
