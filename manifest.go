@@ -12,7 +12,6 @@ import (
 	"sort"
 
 	"github.com/golang/dep/gps"
-	"github.com/golang/dep/internal"
 	"github.com/pelletier/go-toml"
 	"github.com/pkg/errors"
 )
@@ -105,9 +104,10 @@ func readManifest(r io.Reader) (*Manifest, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "Manifest validation failed")
 	}
-	for _, e := range errs {
-		internal.Logf("WARNING: %v", e)
-	}
+	//for _, e := range errs {
+	// FIXME(sdboyer) need to adapt this to use an injected *Loggers
+	//internal.Logf("WARNING: %v", e)
+	//}
 
 	raw := rawManifest{}
 	err = toml.Unmarshal(buf.Bytes(), &raw)
