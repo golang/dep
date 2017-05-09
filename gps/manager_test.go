@@ -23,8 +23,8 @@ import (
 var bd string
 
 // An analyzer that passes nothing back, but doesn't error. This is the naive
-// case - no constraints, no lock, and no errors. The SourceMgr will interpret
-// this as open/Any constraints on everything in the import graph.
+// case - no constraints, no lock, and no errors. The SourceManager will
+// interpret this as open/Any constraints on everything in the import graph.
 type naiveAnalyzer struct{}
 
 func (naiveAnalyzer) DeriveManifestAndLock(string, ProjectRoot) (Manifest, Lock, error) {
@@ -544,7 +544,7 @@ func TestMultiFetchThreadsafe(t *testing.T) {
 		//mkPI("bitbucket.org/sdboyer/nobm"),
 	}
 
-	do := func(name string, sm *SourceMgr) {
+	do := func(name string, sm SourceManager) {
 		t.Run(name, func(t *testing.T) {
 			// This gives us ten calls per op, per project, which should be(?)
 			// decently likely to reveal underlying concurrency problems

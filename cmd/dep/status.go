@@ -234,7 +234,7 @@ type MissingStatus struct {
 	MissingPackages []string
 }
 
-func runStatusAll(out outputter, p *dep.Project, sm *gps.SourceMgr) error {
+func runStatusAll(out outputter, p *dep.Project, sm gps.SourceManager) error {
 	if p.Lock == nil {
 		// TODO if we have no lock file, do...other stuff
 		return nil
@@ -434,7 +434,7 @@ func formatVersion(v gps.Version) string {
 	return v.String()
 }
 
-func collectConstraints(ptree pkgtree.PackageTree, p *dep.Project, sm *gps.SourceMgr) map[string][]gps.Constraint {
+func collectConstraints(ptree pkgtree.PackageTree, p *dep.Project, sm gps.SourceManager) map[string][]gps.Constraint {
 	// TODO
 	return map[string][]gps.Constraint{}
 }
