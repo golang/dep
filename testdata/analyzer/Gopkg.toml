@@ -1,8 +1,8 @@
 
-[[dependencies]]
+[[constraint]]
   name = "github.com/golang/dep/gps"
   version = ">=0.12.0, <1.0.0"
 
-[[dependencies]]
+[[constraint]]
   name = "github.com/pkg/errors"
   version = ">=0.8.0, <1.0.0"
