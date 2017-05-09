@@ -256,7 +256,6 @@ func runStatusAll(out outputter, p *dep.Project, sm *gps.SourceMgr) error {
 		// Locks aren't a part of the input hash check, so we can omit it.
 	}
 	if *verbose {
-		params.Trace = true
 		params.TraceLogger = log.New(os.Stderr, "", 0)
 	}
 
