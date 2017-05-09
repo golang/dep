@@ -129,7 +129,15 @@ func TestValidateManifest(t *testing.T) {
 		{
 			tomlString: `
 			[[dependencies]]
-        name = "github.com/foo/bar"
+			  name = "github.com/foo/bar"
+			`,
+			want: []error{},
+		},
+		{
+			tomlString: `
+			[[metadata]]
+			  authors = "foo"
+			  version = "1.0.0"
 			`,
 			want: []error{},
 		},
@@ -158,7 +166,33 @@ func TestValidateManifest(t *testing.T) {
 			[[dependencies]]
 			  name = "github.com/foo/bar"
 			`,
-			want: []error{errors.New("metadata should consist of key-value pairs")},
+			want: []error{errors.New("metadata should be a TOML array of tables")},
+		},
+		{
+			tomlString: `
+			dependencies = "foo"
+			overrides = "bar"
+			`,
+			want: []error{
+				errors.New("dependencies should be a TOML array of tables"),
+				errors.New("overrides should be a TOML array of tables"),
+			},
+		},
+		{
+			tomlString: `
+			[[dependencies]]
+			  name = "github.com/foo/bar"
+			  location = "some-value"
+			  link = "some-other-value"
+
+			[[overrides]]
+			  nick = "foo"
+			`,
+			want: []error{
+				errors.New("Invalid key \"location\" in \"dependencies\""),
+				errors.New("Invalid key \"link\" in \"dependencies\""),
+				errors.New("Invalid key \"nick\" in \"overrides\""),
+			},
 		},
 	}
 

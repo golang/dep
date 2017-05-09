@@ -8,7 +8,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"reflect"
 	"sort"
 
 	"github.com/golang/dep/gps"
@@ -18,10 +17,6 @@ import (
 )
 
 const ManifestName = "Gopkg.toml"
-
-var ManifestFields = []string{
-	"dependencies", "overrides", "ignored", "required", "metadata",
-}
 
 type Manifest struct {
 	Dependencies gps.ProjectConstraints
@@ -55,33 +50,39 @@ func validateManifest(s string) ([]error, error) {
 	// Convert tree to a map
 	manifest := tree.ToMap()
 
-	// Look for unknown fields and raise warnings
+	// Look for unknown fields and collect errors
 	for prop, val := range manifest {
-		isValidField := false
-		for _, v := range ManifestFields {
-			if prop == v {
-				isValidField = true
-
-				// For metadata, check if it is a map type
-				if prop == "metadata" {
-					isValidMetadata := false
-					if metadata, ok := val.([]interface{}); ok {
-						for _, v := range metadata {
-							if reflect.TypeOf(v).Kind() == reflect.Map {
-								isValidMetadata = true
-							} else {
-								isValidMetadata = false
-								break
-							}
+		switch prop {
+		case "metadata":
+			// Invalid if type assertion fails. Not a TOML array of tables.
+			// This check is enough for map validation because any non-key-value
+			// pair inside array of tables becomes an invalid TOML and parser
+			// would fail.
+			if _, ok := val.([]interface{}); !ok {
+				errs = append(errs, errors.New("metadata should be a TOML array of tables"))
+			}
+		case "dependencies", "overrides":
+			// Invalid if type assertion fails. Not a TOML array of tables.
+			if rawProj, ok := val.([]interface{}); ok {
+				// Iterate through each array of tables
+				for _, v := range rawProj {
+					// Check the individual field's key to be valid
+					for key, _ := range v.(map[string]interface{}) {
+						// Check if the key is valid
+						switch key {
+						case "name", "branch", "revision", "version", "source":
+							// valid key
+						default:
+							// unknown/invalid key
+							errs = append(errs, fmt.Errorf("Invalid key %q in %q", key, prop))
 						}
 					}
-					if !isValidMetadata {
-						errs = append(errs, errors.New("metadata should consist of key-value pairs"))
-					}
 				}
+			} else {
+				errs = append(errs, fmt.Errorf("%v should be a TOML array of tables", prop))
 			}
-		}
-		if !isValidField {
+		case "ignored", "required":
+		default:
 			errs = append(errs, fmt.Errorf("Unknown field in manifest: %v", prop))
 		}
 	}
