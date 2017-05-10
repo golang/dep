@@ -25,7 +25,7 @@ type Manifest struct {
 
 type rawManifest struct {
 	Constraints []rawProject `toml:"constraint,omitempty"`
-	Overrides   []rawProject `toml:"overrides,omitempty"`
+	Overrides   []rawProject `toml:"override,omitempty"`
 	Ignored     []string     `toml:"ignored,omitempty"`
 	Required    []string     `toml:"required,omitempty"`
 }
