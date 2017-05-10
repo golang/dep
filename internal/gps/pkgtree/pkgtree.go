@@ -203,6 +203,12 @@ func fillPackage(p *build.Package) error {
 		if filepath.Base(file)[0] == '_' {
 			continue
 		}
+
+		// Skip any directories that happen to end with ".go"
+		if stat, err := os.Stat(file); err == nil && stat.IsDir() {
+			continue
+		}
+
 		pf, err := parser.ParseFile(token.NewFileSet(), file, nil, parser.ImportsOnly|parser.ParseComments)
 		if err != nil {
 			if os.IsPermission(err) {
