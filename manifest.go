@@ -92,7 +92,7 @@ func validateManifest(s string) ([]error, error) {
 	return errs, nil
 }
 
-func readManifest(r io.Reader) (*Manifest, error) {
+func readManifest(r io.Reader, loggers *Loggers) (*Manifest, error) {
 	buf := &bytes.Buffer{}
 	_, err := buf.ReadFrom(r)
 	if err != nil {
@@ -100,14 +100,13 @@ func readManifest(r io.Reader) (*Manifest, error) {
 	}
 
 	// Validate manifest and log warnings
-	_, err = validateManifest(buf.String())
+	errs, err := validateManifest(buf.String())
 	if err != nil {
 		return nil, errors.Wrap(err, "Manifest validation failed")
 	}
-	//for _, e := range errs {
-	// FIXME(sdboyer) need to adapt this to use an injected *Loggers
-	//internal.Logf("WARNING: %v", e)
-	//}
+	for _, e := range errs {
+		loggers.Err.Printf("dep: WARNING: %v", e)
+	}
 
 	raw := rawManifest{}
 	err = toml.Unmarshal(buf.Bytes(), &raw)

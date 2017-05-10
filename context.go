@@ -145,7 +145,7 @@ func (c *Ctx) LoadProject(path string) (*Project, error) {
 	}
 	defer mf.Close()
 
-	p.Manifest, err = readManifest(mf)
+	p.Manifest, err = readManifest(mf, c.Loggers)
 	if err != nil {
 		return nil, errors.Errorf("error while parsing %s: %s", mp, err)
 	}
