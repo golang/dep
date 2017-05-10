@@ -8,7 +8,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/golang/dep/test"
+	"github.com/golang/dep/internal/test"
 )
 
 func TestRemoveErrors(t *testing.T) {

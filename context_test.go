@@ -13,7 +13,7 @@ import (
 	"unicode"
 
 	"github.com/golang/dep/internal/gps"
-	"github.com/golang/dep/test"
+	"github.com/golang/dep/internal/test"
 )
 
 func TestNewContextNoGOPATH(t *testing.T) {
