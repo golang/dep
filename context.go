@@ -11,8 +11,8 @@ import (
 	"strings"
 
 	"github.com/Masterminds/vcs"
-	"github.com/golang/dep/gps"
 	"github.com/golang/dep/internal"
+	"github.com/golang/dep/internal/gps"
 	"github.com/pkg/errors"
 )
 

@@ -7,7 +7,7 @@ package main
 import (
 	"testing"
 
-	"github.com/golang/dep/gps"
+	"github.com/golang/dep/internal/gps"
 )
 
 func TestStatusFormatVersion(t *testing.T) {

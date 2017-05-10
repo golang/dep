@@ -5,12 +5,12 @@
 package dep
 
 import (
+	"bytes"
 	"encoding/hex"
 	"io"
 	"sort"
 
-	"bytes"
-	"github.com/golang/dep/gps"
+	"github.com/golang/dep/internal/gps"
 	"github.com/pelletier/go-toml"
 	"github.com/pkg/errors"
 )
