@@ -63,6 +63,13 @@ func TestSplitAbsoluteProjectRoot(t *testing.T) {
 		}
 	}
 
+	// test when the full path corresponds to $GOPATH/src
+	if got, err := depCtx.SplitAbsoluteProjectRoot(filepath.Join(depCtx.GOPATH, "src")); err != nil {
+		t.Fatal(err)
+	} else if got != "." {
+		t.Fatalf("expected ., got %s", got)
+	}
+
 	// test where it should return error
 	got, err := depCtx.SplitAbsoluteProjectRoot("tra/la/la/la")
 	if err == nil {
