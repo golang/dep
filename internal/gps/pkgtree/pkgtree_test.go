@@ -17,8 +17,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/golang/dep/internal/fs"
 	"github.com/golang/dep/internal/gps/internal"
-	"github.com/golang/dep/internal/gps/internal/fs"
 )
 
 // Stores a reference to original IsStdLib, so we could restore overridden version.

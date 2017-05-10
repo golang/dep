@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/golang/dep/internal/fs"
 	"github.com/golang/dep/internal/gps"
 )
 
@@ -17,7 +18,7 @@ func (a Analyzer) DeriveManifestAndLock(path string, n gps.ProjectRoot) (gps.Man
 	// TODO: If we decide to support other tools manifest, this is where we would need
 	// to add that support.
 	mf := filepath.Join(path, ManifestName)
-	if fileOK, err := IsRegular(mf); err != nil || !fileOK {
+	if fileOK, err := fs.IsRegular(mf); err != nil || !fileOK {
 		// Do not return an error, when does not exist.
 		return nil, nil, nil
 	}
