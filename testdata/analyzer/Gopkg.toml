@@ -1,6 +1,6 @@
 
 [[dependencies]]
-  name = "github.com/golang/dep/gps"
+  name = "github.com/golang/dep/internal/gps"
   version = ">=0.12.0, <1.0.0"
 
 [[dependencies]]
