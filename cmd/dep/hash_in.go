@@ -23,7 +23,7 @@ func (cmd *hashinCommand) Register(fs *flag.FlagSet) {}
 
 type hashinCommand struct{}
 
-func (hashinCommand) Run(ctx *dep.Ctx, loggers *dep.Loggers, args []string) error {
+func (hashinCommand) Run(ctx *dep.Ctx, args []string) error {
 	p, err := ctx.LoadProject("")
 	if err != nil {
 		return err
@@ -51,6 +51,6 @@ func (hashinCommand) Run(ctx *dep.Ctx, loggers *dep.Loggers, args []string) erro
 	if err != nil {
 		return errors.Wrap(err, "prepare solver")
 	}
-	loggers.Out.Println(gps.HashingInputsAsString(s))
+	ctx.Loggers.Out.Println(gps.HashingInputsAsString(s))
 	return nil
 }

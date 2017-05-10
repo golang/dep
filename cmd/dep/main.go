@@ -25,7 +25,7 @@ type command interface {
 	LongHelp() string       // "Foo the first bar meeting the following conditions..."
 	Register(*flag.FlagSet) // command-specific flags
 	Hidden() bool           // indicates whether the command should be hidden from help output
-	Run(*dep.Ctx, *dep.Loggers, []string) error
+	Run(*dep.Ctx, []string) error
 }
 
 func main() {
@@ -148,7 +148,7 @@ func (c *Config) Run() (exitCode int) {
 			}
 
 			// Set up the dep context.
-			ctx, err := dep.NewContext(c.WorkingDir, c.Env)
+			ctx, err := dep.NewContext(c.WorkingDir, c.Env, loggers)
 			if err != nil {
 				loggers.Err.Println(err)
 				exitCode = 1
@@ -156,7 +156,7 @@ func (c *Config) Run() (exitCode int) {
 			}
 
 			// Run the command with the post-flag-processing args.
-			if err := cmd.Run(ctx, loggers, fs.Args()); err != nil {
+			if err := cmd.Run(ctx, fs.Args()); err != nil {
 				errLogger.Printf("%v\n", err)
 				exitCode = 1
 				return

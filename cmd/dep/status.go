@@ -181,7 +181,7 @@ func (out *dotOutput) MissingHeader()                {}
 func (out *dotOutput) MissingLine(ms *MissingStatus) {}
 func (out *dotOutput) MissingFooter()                {}
 
-func (cmd *statusCommand) Run(ctx *dep.Ctx, loggers *dep.Loggers, args []string) error {
+func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
 	p, err := ctx.LoadProject("")
 	if err != nil {
 		return err
@@ -200,20 +200,20 @@ func (cmd *statusCommand) Run(ctx *dep.Ctx, loggers *dep.Loggers, args []string)
 		return errors.Errorf("not implemented")
 	case cmd.json:
 		out = &jsonOutput{
-			w: &logWriter{Logger: loggers.Out},
+			w: &logWriter{Logger: ctx.Loggers.Out},
 		}
 	case cmd.dot:
 		out = &dotOutput{
 			p: p,
 			o: cmd.output,
-			w: &logWriter{Logger: loggers.Out},
+			w: &logWriter{Logger: ctx.Loggers.Out},
 		}
 	default:
 		out = &tableOutput{
-			w: tabwriter.NewWriter(&logWriter{Logger: loggers.Out}, 0, 4, 2, ' ', 0),
+			w: tabwriter.NewWriter(&logWriter{Logger: ctx.Loggers.Out}, 0, 4, 2, ' ', 0),
 		}
 	}
-	return runStatusAll(loggers, out, p, sm)
+	return runStatusAll(ctx.Loggers, out, p, sm)
 }
 
 // A logWriter adapts a log.Logger to the io.Writer interface.

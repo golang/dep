@@ -28,7 +28,7 @@ func TestNewContextNoGOPATH(t *testing.T) {
 		t.Fatal("failed to get work directory:", err)
 	}
 
-	c, err := NewContext(wd, os.Environ())
+	c, err := NewContext(wd, os.Environ(), &Loggers{})
 	if err == nil {
 		t.Fatal("error should not have been nil")
 	}

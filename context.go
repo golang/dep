@@ -21,12 +21,13 @@ type Ctx struct {
 	GOPATH     string   // Selected Go path
 	GOPATHS    []string // Other Go paths
 	WorkingDir string
+	Loggers    *Loggers
 }
 
 // NewContext creates a struct with the project's GOPATH. It assumes
 // that of your "GOPATH"'s we want the one we are currently in.
-func NewContext(wd string, env []string) (*Ctx, error) {
-	ctx := &Ctx{WorkingDir: wd}
+func NewContext(wd string, env []string, loggers *Loggers) (*Ctx, error) {
+	ctx := &Ctx{WorkingDir: wd, Loggers: loggers}
 
 	GOPATH := getEnv(env, "GOPATH")
 	if GOPATH == "" {
