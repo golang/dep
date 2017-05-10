@@ -143,6 +143,11 @@ func (p *IntegrationTestProject) RunGit(dir string, args ...string) {
 	}
 }
 
+// GetStdout gets the Stdout output from test run
+func (p *IntegrationTestProject) GetStdout() string {
+	return p.stdout.String()
+}
+
 // GetStderr gets the Stderr output from test run
 func (p *IntegrationTestProject) GetStderr() string {
 	return p.stderr.String()
