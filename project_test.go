@@ -92,13 +92,13 @@ func TestSlashedGOPATH(t *testing.T) {
 	env := os.Environ()
 
 	h.Setenv("GOPATH", filepath.ToSlash(h.Path(".")))
-	_, err = NewContext(wd, env)
+	_, err = NewContext(wd, env, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	h.Setenv("GOPATH", filepath.FromSlash(h.Path(".")))
-	_, err = NewContext(wd, env)
+	_, err = NewContext(wd, env, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -92,30 +92,27 @@ func validateManifest(s string) ([]error, error) {
 	return errs, nil
 }
 
-func readManifest(r io.Reader) (*Manifest, error) {
+// readManifest returns a Manifest read from r and a slice of validation warnings.
+func readManifest(r io.Reader) (*Manifest, []error, error) {
 	buf := &bytes.Buffer{}
 	_, err := buf.ReadFrom(r)
 	if err != nil {
-		return nil, errors.Wrap(err, "Unable to read byte stream")
+		return nil, nil, errors.Wrap(err, "Unable to read byte stream")
 	}
 
-	// Validate manifest and log warnings
-	_, err = validateManifest(buf.String())
+	warns, err := validateManifest(buf.String())
 	if err != nil {
-		return nil, errors.Wrap(err, "Manifest validation failed")
+		return nil, warns, errors.Wrap(err, "Manifest validation failed")
 	}
-	//for _, e := range errs {
-	// FIXME(sdboyer) need to adapt this to use an injected *Loggers
-	//internal.Logf("WARNING: %v", e)
-	//}
 
 	raw := rawManifest{}
 	err = toml.Unmarshal(buf.Bytes(), &raw)
 	if err != nil {
-		return nil, errors.Wrap(err, "Unable to parse the manifest as TOML")
+		return nil, warns, errors.Wrap(err, "Unable to parse the manifest as TOML")
 	}
 
-	return fromRawManifest(raw)
+	m, err := fromRawManifest(raw)
+	return m, warns, err
 }
 
 func fromRawManifest(raw rawManifest) (*Manifest, error) {

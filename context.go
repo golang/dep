@@ -5,6 +5,7 @@
 package dep
 
 import (
+	"log"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -21,12 +22,20 @@ type Ctx struct {
 	GOPATH     string   // Selected Go path
 	GOPATHS    []string // Other Go paths
 	WorkingDir string
+	*Loggers
+}
+
+// Loggers holds standard loggers and a verbosity flag.
+type Loggers struct {
+	Out, Err *log.Logger
+	// Whether verbose logging is enabled.
+	Verbose bool
 }
 
 // NewContext creates a struct with the project's GOPATH. It assumes
 // that of your "GOPATH"'s we want the one we are currently in.
-func NewContext(wd string, env []string) (*Ctx, error) {
-	ctx := &Ctx{WorkingDir: wd}
+func NewContext(wd string, env []string, loggers *Loggers) (*Ctx, error) {
+	ctx := &Ctx{WorkingDir: wd, Loggers: loggers}
 
 	GOPATH := getEnv(env, "GOPATH")
 	if GOPATH == "" {
@@ -144,7 +153,11 @@ func (c *Ctx) LoadProject(path string) (*Project, error) {
 	}
 	defer mf.Close()
 
-	p.Manifest, err = readManifest(mf)
+	var warns []error
+	p.Manifest, warns, err = readManifest(mf)
+	for _, warn := range warns {
+		c.Loggers.Err.Printf("dep: WARNING: %v\n", warn)
+	}
 	if err != nil {
 		return nil, errors.Errorf("error while parsing %s: %s", mp, err)
 	}
