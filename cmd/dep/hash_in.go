@@ -23,7 +23,7 @@ func (cmd *hashinCommand) Register(fs *flag.FlagSet) {}
 
 type hashinCommand struct{}
 
-func (hashinCommand) Run(ctx *dep.Ctx, loggers *Loggers, args []string) error {
+func (hashinCommand) Run(ctx *dep.Ctx, loggers *dep.Loggers, args []string) error {
 	p, err := ctx.LoadProject("")
 	if err != nil {
 		return err

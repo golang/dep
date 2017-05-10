@@ -181,7 +181,7 @@ func (out *dotOutput) MissingHeader()                {}
 func (out *dotOutput) MissingLine(ms *MissingStatus) {}
 func (out *dotOutput) MissingFooter()                {}
 
-func (cmd *statusCommand) Run(ctx *dep.Ctx, loggers *Loggers, args []string) error {
+func (cmd *statusCommand) Run(ctx *dep.Ctx, loggers *dep.Loggers, args []string) error {
 	p, err := ctx.LoadProject("")
 	if err != nil {
 		return err
@@ -248,7 +248,7 @@ type MissingStatus struct {
 	MissingPackages []string
 }
 
-func runStatusAll(loggers *Loggers, out outputter, p *dep.Project, sm gps.SourceManager) error {
+func runStatusAll(loggers *dep.Loggers, out outputter, p *dep.Project, sm gps.SourceManager) error {
 	if p.Lock == nil {
 		// TODO if we have no lock file, do...other stuff
 		return nil

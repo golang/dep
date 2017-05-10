@@ -58,7 +58,7 @@ func trimPathPrefix(p1, p2 string) string {
 	return p1
 }
 
-func (cmd *initCommand) Run(ctx *dep.Ctx, loggers *Loggers, args []string) error {
+func (cmd *initCommand) Run(ctx *dep.Ctx, loggers *dep.Loggers, args []string) error {
 	if len(args) > 1 {
 		return errors.Errorf("too many args (%d)", len(args))
 	}
@@ -277,7 +277,7 @@ type projectData struct {
 	ondisk       map[gps.ProjectRoot]gps.Version // projects that were found on disk
 }
 
-func getProjectData(ctx *dep.Ctx, loggers *Loggers, pkgT pkgtree.PackageTree, cpr string, sm gps.SourceManager) (projectData, error) {
+func getProjectData(ctx *dep.Ctx, loggers *dep.Loggers, pkgT pkgtree.PackageTree, cpr string, sm gps.SourceManager) (projectData, error) {
 	constraints := make(gps.ProjectConstraints)
 	dependencies := make(map[gps.ProjectRoot][]string)
 	packages := make(map[string]bool)

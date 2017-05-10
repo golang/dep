@@ -101,7 +101,7 @@ type ensureCommand struct {
 	overrides stringSlice
 }
 
-func (cmd *ensureCommand) Run(ctx *dep.Ctx, loggers *Loggers, args []string) error {
+func (cmd *ensureCommand) Run(ctx *dep.Ctx, loggers *dep.Loggers, args []string) error {
 	if cmd.examples {
 		loggers.Err.Println(strings.TrimSpace(ensureExamples))
 		return nil
