@@ -1,0 +1,10 @@
+{
+  "commands": [
+    ["ensure"],
+    ["status","-json"]
+  ],
+  "vendor-final": [
+    "github.com/sdboyer/deptest",
+    "github.com/sdboyer/deptestdos"
+  ]
+}
