@@ -34,11 +34,4 @@ deploy: false
 
 test_script:
   - go build
-  - go test .
-  - go test ./cmd/dep
-  - go test ./gps
-  - go test ./gps/internal
-  - go test ./gps/internal/fs
-  - go test ./gps/pkgtree
-  - go test ./internal
-  - go test ./test
+  - go test $(go list github.com/golang/dep/... | sls -NotMatch '/vendor/')
