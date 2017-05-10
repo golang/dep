@@ -9,7 +9,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/golang/dep/gps"
+	"github.com/golang/dep/internal/gps"
 )
 
 var errProjectNotFound = fmt.Errorf("could not find project %s, use dep init to initiate a manifest", ManifestName)
