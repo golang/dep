@@ -27,7 +27,8 @@ func (a Analyzer) DeriveManifestAndLock(path string, n gps.ProjectRoot) (gps.Man
 	}
 	defer f.Close()
 
-	m, err := readManifest(f)
+	// Ignore warnings irrelevant to user.
+	m, _, err := readManifest(f)
 	if err != nil {
 		return nil, nil, err
 	}
