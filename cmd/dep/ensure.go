@@ -12,7 +12,6 @@ import (
 	"go/build"
 	"log"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -183,38 +182,6 @@ func (cmd *ensureCommand) Run(ctx *dep.Ctx, args []string) error {
 		return cmd.runUpdate(ctx, args, p, sm, params)
 	}
 	return cmd.runDefault(ctx, args, p, sm, params)
-
-	solver, err := gps.Prepare(params, sm)
-	if err != nil {
-		return errors.Wrap(err, "ensure Prepare")
-	}
-	solution, err := solver.Solve()
-	if err != nil {
-		handleAllTheFailuresOfTheWorld(err)
-		return errors.Wrap(err, "ensure Solve()")
-	}
-
-	// check if vendor exists, because if the locks are the same but
-	// vendor does not exist we should write vendor
-	vendorExists, err := dep.IsNonEmptyDir(filepath.Join(p.AbsRoot, "vendor"))
-	if err != nil {
-		return errors.Wrap(err, "ensure vendor is a directory")
-	}
-	writeV := dep.VendorOnChanged
-	if !vendorExists && solution != nil {
-		writeV = dep.VendorAlways
-	}
-
-	newLock := dep.LockFromInterface(solution)
-	sw, err := dep.NewSafeWriter(nil, p.Lock, newLock, writeV)
-	if err != nil {
-		return err
-	}
-	if cmd.dryRun {
-		return sw.PrintPreparedActions()
-	}
-
-	return errors.Wrap(sw.Write(p.AbsRoot, sm, true), "grouped write of manifest, lock and vendor")
 }
 
 func (cmd *ensureCommand) runDefault(ctx *dep.Ctx, args []string, p *dep.Project, sm gps.SourceManager, params gps.SolveParameters) error {
@@ -338,7 +305,7 @@ func (cmd *ensureCommand) runUpdate(ctx *dep.Ctx, args []string, p *dep.Project,
 		}
 
 		if p.Ident.Source != "" {
-			return errors.Errorf("cannot specify alternate sources on -update (%s)")
+			return errors.Errorf("cannot specify alternate sources on -update (%s)", p.Ident)
 		}
 
 		if !gps.IsAny(pc.Constraint) {
