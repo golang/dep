@@ -1280,6 +1280,11 @@ func TestListPackages(t *testing.T) {
 				},
 			},
 		},
+		"skip '.go' directories": {
+			fileRoot:   j("dotgodir"),
+			importRoot: "dotgodir",
+			err:        nil,
+		},
 	}
 
 	for name, fix := range table {
