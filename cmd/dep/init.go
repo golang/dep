@@ -12,7 +12,7 @@ import (
 	"sync"
 
 	"github.com/golang/dep"
-	"github.com/golang/dep/internal"
+	"github.com/golang/dep/internal/fs"
 	"github.com/golang/dep/internal/gps"
 	"github.com/golang/dep/internal/gps/pkgtree"
 	"github.com/pkg/errors"
@@ -52,7 +52,7 @@ type initCommand struct {
 }
 
 func trimPathPrefix(p1, p2 string) string {
-	if internal.HasFilepathPrefix(p1, p2) {
+	if fs.HasFilepathPrefix(p1, p2) {
 		return p1[len(p2):]
 	}
 	return p1
@@ -73,7 +73,7 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, loggers *Loggers, args []string) error
 	mf := filepath.Join(root, dep.ManifestName)
 	lf := filepath.Join(root, dep.LockName)
 
-	mok, err := dep.IsRegular(mf)
+	mok, err := fs.IsRegular(mf)
 	if err != nil {
 		return err
 	}
@@ -82,7 +82,7 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, loggers *Loggers, args []string) error
 	}
 	// Manifest file does not exist.
 
-	lok, err := dep.IsRegular(lf)
+	lok, err := fs.IsRegular(lf)
 	if err != nil {
 		return err
 	}

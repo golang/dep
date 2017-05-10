@@ -14,6 +14,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/golang/dep/internal/fs"
 	"github.com/golang/dep/internal/gps"
 	"github.com/pelletier/go-toml"
 	"github.com/pkg/errors"
@@ -262,7 +263,7 @@ func (sw SafeWriter) validate(root string, sm gps.SourceManager) error {
 	if root == "" {
 		return errors.New("root path must be non-empty")
 	}
-	if is, err := IsDir(root); !is {
+	if is, err := fs.IsDir(root); !is {
 		if err != nil {
 			return err
 		}
@@ -341,7 +342,7 @@ func (sw *SafeWriter) Write(root string, sm gps.SourceManager, noExamples bool) 
 
 	// Ensure vendor/.git is preserved if present
 	if hasDotGit(vpath) {
-		err = renameWithFallback(filepath.Join(vpath, ".git"), filepath.Join(td, "vendor/.git"))
+		err = fs.RenameWithFallback(filepath.Join(vpath, ".git"), filepath.Join(td, "vendor/.git"))
 		if _, ok := err.(*os.LinkError); ok {
 			return errors.Wrap(err, "failed to preserve vendor/.git")
 		}
@@ -360,7 +361,7 @@ func (sw *SafeWriter) Write(root string, sm gps.SourceManager, noExamples bool) 
 		if _, err := os.Stat(mpath); err == nil {
 			// Move out the old one.
 			tmploc := filepath.Join(td, ManifestName+".orig")
-			failerr = renameWithFallback(mpath, tmploc)
+			failerr = fs.RenameWithFallback(mpath, tmploc)
 			if failerr != nil {
 				goto fail
 			}
@@ -368,7 +369,7 @@ func (sw *SafeWriter) Write(root string, sm gps.SourceManager, noExamples bool) 
 		}
 
 		// Move in the new one.
-		failerr = renameWithFallback(filepath.Join(td, ManifestName), mpath)
+		failerr = fs.RenameWithFallback(filepath.Join(td, ManifestName), mpath)
 		if failerr != nil {
 			goto fail
 		}
@@ -379,7 +380,7 @@ func (sw *SafeWriter) Write(root string, sm gps.SourceManager, noExamples bool) 
 			// Move out the old one.
 			tmploc := filepath.Join(td, LockName+".orig")
 
-			failerr = renameWithFallback(lpath, tmploc)
+			failerr = fs.RenameWithFallback(lpath, tmploc)
 			if failerr != nil {
 				goto fail
 			}
@@ -387,7 +388,7 @@ func (sw *SafeWriter) Write(root string, sm gps.SourceManager, noExamples bool) 
 		}
 
 		// Move in the new one.
-		failerr = renameWithFallback(filepath.Join(td, LockName), lpath)
+		failerr = fs.RenameWithFallback(filepath.Join(td, LockName), lpath)
 		if failerr != nil {
 			goto fail
 		}
@@ -405,7 +406,7 @@ func (sw *SafeWriter) Write(root string, sm gps.SourceManager, noExamples bool) 
 				vendorbak = filepath.Join(td, "vendor.orig")
 			}
 
-			failerr = renameWithFallback(vpath, vendorbak)
+			failerr = fs.RenameWithFallback(vpath, vendorbak)
 			if failerr != nil {
 				goto fail
 			}
@@ -413,7 +414,7 @@ func (sw *SafeWriter) Write(root string, sm gps.SourceManager, noExamples bool) 
 		}
 
 		// Move in the new one.
-		failerr = renameWithFallback(filepath.Join(td, "vendor"), vpath)
+		failerr = fs.RenameWithFallback(filepath.Join(td, "vendor"), vpath)
 		if failerr != nil {
 			goto fail
 		}
@@ -432,7 +433,7 @@ fail:
 	// If we failed at any point, move all the things back into place, then bail.
 	for _, pair := range restore {
 		// Nothing we can do on err here, as we're already in recovery mode.
-		renameWithFallback(pair.from, pair.to)
+		fs.RenameWithFallback(pair.from, pair.to)
 	}
 	return failerr
 }
@@ -521,14 +522,14 @@ func PruneProject(p *Project, sm gps.SourceManager) error {
 			// to a proper tempdir.
 			vendorbak = filepath.Join(td, "vendor.orig")
 		}
-		failerr = renameWithFallback(vpath, vendorbak)
+		failerr = fs.RenameWithFallback(vpath, vendorbak)
 		if failerr != nil {
 			goto fail
 		}
 	}
 
 	// Move in the new one.
-	failerr = renameWithFallback(td, vpath)
+	failerr = fs.RenameWithFallback(td, vpath)
 	if failerr != nil {
 		goto fail
 	}
@@ -538,7 +539,7 @@ func PruneProject(p *Project, sm gps.SourceManager) error {
 	return nil
 
 fail:
-	renameWithFallback(vendorbak, vpath)
+	fs.RenameWithFallback(vendorbak, vpath)
 	return failerr
 }
 
@@ -566,6 +567,22 @@ func calculatePrune(vendorDir string, keep []string) ([]string, error) {
 		return nil
 	})
 	return toDelete, err
+}
+
+func writeFile(path string, in toml.Marshaler) error {
+	f, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	s, err := in.MarshalTOML()
+	if err != nil {
+		return err
+	}
+
+	_, err = f.Write(s)
+	return err
 }
 
 func deleteDirs(toDelete []string) error {

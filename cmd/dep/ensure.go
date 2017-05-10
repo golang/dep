@@ -16,6 +16,7 @@ import (
 	"strings"
 
 	"github.com/golang/dep"
+	"github.com/golang/dep/internal/fs"
 	"github.com/golang/dep/internal/gps"
 	"github.com/golang/dep/internal/gps/pkgtree"
 	"github.com/pkg/errors"
@@ -153,7 +154,7 @@ func (cmd *ensureCommand) Run(ctx *dep.Ctx, loggers *Loggers, args []string) err
 
 	// check if vendor exists, because if the locks are the same but
 	// vendor does not exist we should write vendor
-	vendorExists, err := dep.IsNonEmptyDir(filepath.Join(p.AbsRoot, "vendor"))
+	vendorExists, err := fs.IsNonEmptyDir(filepath.Join(p.AbsRoot, "vendor"))
 	if err != nil {
 		return errors.Wrap(err, "ensure vendor is a directory")
 	}
