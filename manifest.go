@@ -11,7 +11,7 @@ import (
 	"reflect"
 	"sort"
 
-	"github.com/golang/dep/gps"
+	"github.com/golang/dep/internal/gps"
 	"github.com/pelletier/go-toml"
 	"github.com/pkg/errors"
 )
