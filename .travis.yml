@@ -13,9 +13,6 @@ matrix:
       go: tip
     - os: osx
       go: 1.8.x
-env:
-  # Flip bit to bypass tests - see dep#501 for more information
-  - DEPTESTBYPASS501=1
 install:
   - echo "This is an override of the default install deps step in travis."
 before_script:
