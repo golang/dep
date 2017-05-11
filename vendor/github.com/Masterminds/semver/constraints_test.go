@@ -520,22 +520,22 @@ func TestUnionErr(t *testing.T) {
 
 func TestIsSuperset(t *testing.T) {
 	rc := []rangeConstraint{
-		rangeConstraint{
+		{
 			min:        newV(1, 2, 0),
 			max:        newV(2, 0, 0),
 			includeMin: true,
 		},
-		rangeConstraint{
+		{
 			min: newV(1, 2, 0),
 			max: newV(2, 1, 0),
 		},
-		rangeConstraint{
+		{
 			max: newV(1, 10, 0),
 		},
-		rangeConstraint{
+		{
 			min: newV(2, 0, 0),
 		},
-		rangeConstraint{
+		{
 			min:        newV(1, 2, 0),
 			max:        newV(2, 0, 0),
 			includeMax: true,
