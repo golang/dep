@@ -28,7 +28,7 @@ func TestRemoveErrors(t *testing.T) {
 func removeErrors(name, wd string, externalProc bool, run test.RunFunc) func(*testing.T) {
 	return func(t *testing.T) {
 		testCase := test.NewTestCase(t, name, wd)
-		testProj := test.NewTestProject(t, testCase.InitialPath(), wd, externalProc, run)
+		testProj := test.NewTestProject(t, testCase.InitialPath(), wd, externalProc)
 		defer testProj.Cleanup()
 
 		// Create and checkout the vendor revisions
@@ -43,19 +43,19 @@ func removeErrors(name, wd string, externalProc bool, run test.RunFunc) func(*te
 			testProj.RunGit(testProj.Path("src", ip), "checkout", rev)
 		}
 
-		if err := testProj.DoRun([]string{"remove", "-unused", "github.com/not/used"}); err == nil {
+		if err := testProj.DoRun([]string{"remove", "-unused", "github.com/not/used"}, run); err == nil {
 			t.Fatal("rm with both -unused and arg should have failed")
 		}
 
-		if err := testProj.DoRun([]string{"remove", "github.com/not/present"}); err == nil {
+		if err := testProj.DoRun([]string{"remove", "github.com/not/present"}, run); err == nil {
 			t.Fatal("rm with arg not in manifest should have failed")
 		}
 
-		if err := testProj.DoRun([]string{"remove", "github.com/not/used", "github.com/not/present"}); err == nil {
+		if err := testProj.DoRun([]string{"remove", "github.com/not/used", "github.com/not/present"}, run); err == nil {
 			t.Fatal("rm with one arg not in manifest should have failed")
 		}
 
-		if err := testProj.DoRun([]string{"remove", "github.com/sdboyer/deptest"}); err == nil {
+		if err := testProj.DoRun([]string{"remove", "github.com/sdboyer/deptest"}, run); err == nil {
 			t.Fatal("rm of arg in manifest and imports should have failed without -force")
 		}
 	}

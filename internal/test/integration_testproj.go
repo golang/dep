@@ -28,7 +28,7 @@ type RunFunc func(prog string, newargs []string, outW, errW io.Writer, dir strin
 // IntegrationTestProject manages the "virtual" test project directory structure
 // and content
 type IntegrationTestProject struct {
-	t          *testing.T
+	tb         testing.TB
 	h          *Helper
 	preImports []string
 	tempdir    string
@@ -39,12 +39,11 @@ type IntegrationTestProject struct {
 	run        RunFunc
 }
 
-func NewTestProject(t *testing.T, initPath, wd string, externalProc bool, run RunFunc) *IntegrationTestProject {
+func NewTestProject(tb testing.TB, initPath, wd string, externalProc bool) *IntegrationTestProject {
 	new := &IntegrationTestProject{
-		t:      t,
+		tb:     tb,
 		origWd: wd,
 		env:    os.Environ(),
-		run:    run,
 	}
 	new.makeRootTempDir()
 	new.TempDir(ProjectRoot, "vendor")
@@ -80,7 +79,7 @@ func (p *IntegrationTestProject) ProjPath(args ...string) string {
 func (p *IntegrationTestProject) TempDir(args ...string) {
 	fullPath := p.Path(args...)
 	if err := os.MkdirAll(fullPath, 0755); err != nil && !os.IsExist(err) {
-		p.t.Fatalf("%+v", errors.Errorf("Unable to create temp directory: %s", fullPath))
+		p.tb.Fatalf("%+v", errors.Errorf("Unable to create temp directory: %s", fullPath))
 	}
 }
 
@@ -105,16 +104,15 @@ func (p *IntegrationTestProject) RunGo(args ...string) {
 	cmd.Env = p.env
 	status := cmd.Run()
 	if p.stdout.Len() > 0 {
-		p.t.Log("go standard output:")
-		p.t.Log(p.stdout.String())
+		p.tb.Log("go standard output:")
+		p.tb.Log(p.stdout.String())
 	}
 	if p.stderr.Len() > 0 {
-		p.t.Log("go standard error:")
-		p.t.Log(p.stderr.String())
+		p.tb.Log("go standard error:")
+		p.tb.Log(p.stderr.String())
 	}
 	if status != nil {
-		p.t.Logf("go %v failed unexpectedly: %v", args, status)
-		p.t.FailNow()
+		p.tb.Fatalf("go %v failed unexpectedly: %v", args, status)
 	}
 }
 
@@ -129,17 +127,16 @@ func (p *IntegrationTestProject) RunGit(dir string, args ...string) {
 	status := cmd.Run()
 	if *PrintLogs {
 		if p.stdout.Len() > 0 {
-			p.t.Logf("git %v standard output:", args)
-			p.t.Log(p.stdout.String())
+			p.tb.Logf("git %v standard output:", args)
+			p.tb.Log(p.stdout.String())
 		}
 		if p.stderr.Len() > 0 {
-			p.t.Logf("git %v standard error:", args)
-			p.t.Log(p.stderr.String())
+			p.tb.Logf("git %v standard error:", args)
+			p.tb.Log(p.stderr.String())
 		}
 	}
 	if status != nil {
-		p.t.Logf("git %v failed unexpectedly: %v", args, status)
-		p.t.FailNow()
+		p.tb.Fatalf("git %v failed unexpectedly: %v", args, status)
 	}
 }
 
@@ -160,9 +157,9 @@ func (p *IntegrationTestProject) GetVendorGit(ip string) {
 	p.RunGit(p.ProjPath("vendor", gitDir), "clone", "http://"+ip)
 }
 
-func (p *IntegrationTestProject) DoRun(args []string) error {
+func (p *IntegrationTestProject) DoRun(args []string, run RunFunc) error {
 	if *PrintLogs {
-		p.t.Logf("running testdep %v", args)
+		p.tb.Logf("running testdep %v", args)
 	}
 	prog := filepath.Join(p.origWd, "testdep"+ExeSuffix)
 	newargs := append([]string{args[0], "-v"}, args[1:]...)
@@ -170,16 +167,16 @@ func (p *IntegrationTestProject) DoRun(args []string) error {
 	p.stdout.Reset()
 	p.stderr.Reset()
 
-	status := p.run(prog, newargs, &p.stdout, &p.stderr, p.ProjPath(""), p.env)
+	status := run(prog, newargs, &p.stdout, &p.stderr, p.ProjPath(""), p.env)
 
 	if *PrintLogs {
 		if p.stdout.Len() > 0 {
-			p.t.Log("standard output:")
-			p.t.Log(p.stdout.String())
+			p.tb.Log("standard output:")
+			p.tb.Log(p.stdout.String())
 		}
 		if p.stderr.Len() > 0 {
-			p.t.Log("standard error:")
-			p.t.Log(p.stderr.String())
+			p.tb.Log("standard error:")
+			p.tb.Log(p.stderr.String())
 		}
 	}
 	return status
@@ -269,11 +266,11 @@ func (p *IntegrationTestProject) CompareImportPaths() {
 	wantImportPaths := p.preImports
 	gotImportPaths := p.GetImportPaths()
 	if len(gotImportPaths) != len(wantImportPaths) {
-		p.t.Fatalf("Import path count changed during command: pre %d post %d", len(wantImportPaths), len(gotImportPaths))
+		p.tb.Fatalf("Import path count changed during command: pre %d post %d", len(wantImportPaths), len(gotImportPaths))
 	}
 	for ind := range gotImportPaths {
 		if gotImportPaths[ind] != wantImportPaths[ind] {
-			p.t.Errorf("Change in import paths during: pre %s post %s", gotImportPaths, wantImportPaths)
+			p.tb.Errorf("Change in import paths during: pre %s post %s", gotImportPaths, wantImportPaths)
 		}
 	}
 }
@@ -297,7 +294,7 @@ func (p *IntegrationTestProject) Setenv(name, val string) {
 // Must gives a fatal error if err is not nil.
 func (p *IntegrationTestProject) Must(err error) {
 	if err != nil {
-		p.t.Fatalf("%+v", err)
+		p.tb.Fatalf("%+v", err)
 	}
 }
 
