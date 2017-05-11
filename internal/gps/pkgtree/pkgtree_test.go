@@ -1280,6 +1280,28 @@ func TestListPackages(t *testing.T) {
 				},
 			},
 		},
+		"skip directories starting with '.'": {
+			fileRoot:   j("dotgodir"),
+			importRoot: "dotgodir",
+			out: PackageTree{
+				ImportRoot: "dotgodir",
+				Packages: map[string]PackageOrErr{
+					"dotgodir": {
+						P: Package{
+							ImportPath: "dotgodir",
+							Imports:    []string{},
+						},
+					},
+					"dotgodir/foo.go": {
+						P: Package{
+							ImportPath: "dotgodir/foo.go",
+							Name:       "foo",
+							Imports:    []string{"sort"},
+						},
+					},
+				},
+			},
+		},
 	}
 
 	for name, fix := range table {
