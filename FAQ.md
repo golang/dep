@@ -21,14 +21,14 @@ Summarize the question and quote the reply, linking back to the original comment
 ## What is the difference between Gopkg.toml (the "manifest") and Gopkg.lock (the "lock")?
 
 > The manifest describes user intent, and the lock describes computed outputs. There's flexibility in manifests that isn't present in locks..., as the "branch": "master" constraint will match whatever revision master HAPPENS to be at right now, whereas the lock is nailed down to a specific revision.
-> 
-> This flexibility is important because it allows us to provide easy commands (e.g. dep ensure -update) that can manage an update process for you, within the constraints you specify, AND because it allows your project, when imported by someone else, to collaboratively specify the constraints for your own dependencies.
+>
+> This flexibility is important because it allows us to provide easy commands (e.g. `dep ensure -update`) that can manage an update process for you, within the constraints you specify, AND because it allows your project, when imported by someone else, to collaboratively specify the constraints for your own dependencies.
 -[@sdboyer in #281](https://github.com/golang/dep/issues/281#issuecomment-284118314)
 
 ## When should I use dependencies, overrides, required, or ignored in the manifest?
 
 * Use `dependencies` to constrain a [direct dependency](#what-is-a-direct-or-transitive-dependency) to a specific branch, version range, revision, or specify an alternate source such as a fork.
-* Use `overrides` to constrain a [transitive dependency](#what-is-a-direct-or-transitive-dependency). See [How do I constrain a transitive dependency's version?](#how-do-i-constrain-a-transitive-dependencys-version) for more details on when each section applies.
+* Use `overrides` to constrain a [transitive dependency](#what-is-a-direct-or-transitive-dependency). See [How do I constrain a transitive dependency's version?](#how-do-i-constrain-a-transitive-dependencys-version) for more details on how overrides differ from dependencies. Overrides should be used cautiously, sparingly, and temporarily.
 * Use `required` to explicitly add a dependency that is not imported directly or transitively, for example a development package used for code generation.
 * Use `ignored` to ignore a package and any of that package's unique dependencies.
 
