@@ -205,7 +205,7 @@ func fillPackage(p *build.Package) error {
 			continue
 		}
 
-		// Skip any directories that happen to end with ".go"
+		// Skip any directories that happened to get caught by glob
 		if stat, err := os.Stat(file); err == nil && stat.IsDir() {
 			continue
 		}
