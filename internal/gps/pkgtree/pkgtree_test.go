@@ -1280,7 +1280,7 @@ func TestListPackages(t *testing.T) {
 				},
 			},
 		},
-		"skip '.go' directories": {
+		"skip directories starting with '.'": {
 			fileRoot:   j("dotgodir"),
 			importRoot: "dotgodir",
 			err:        nil,
