@@ -6,6 +6,8 @@ _The first rule of FAQ is don't bikeshed the FAQ, leave that for
 Please contribute to the FAQ! Found an explanation in an issue or pull request helpful?
 Summarize the question and quote the reply, linking back to the original comment.
 
+* [What is the difference between Gopkg.toml (the "manifest") and Gopkg.lock (the "lock")?](#what-is-the-difference-between-gopkgtoml-the-manifest-and-gopkglock-the-lock)
+* [When should I use dependencies, overrides or required in the manifest?](#when-should-i-use-dependencies-overrides-required-or-ignored-in-the-manifest)
 * [What is a direct or transitive dependency?](#what-is-a-direct-or-transitive-dependency)
 * [Should I commit my vendor directory?](#should-i-commit-my-vendor-directory)
 * [Why is it `dep ensure` instead of `dep install`?](#why-is-it-dep-ensure-instead-of-dep-install)
@@ -15,6 +17,20 @@ Summarize the question and quote the reply, linking back to the original comment
 * [`dep` deleted my files in the vendor directory!](#dep-deleted-my-files-in-the-vendor-directory)
 * [Can I put the manifest and lock in the vendor directory?](#can-i-put-the-manifest-and-lock-in-the-vendor-directory)
 * [Why did dep use a different revision for package X instead of the revision in the lock file?](#why-did-dep-use-a-different-revision-for-package-x-instead-of-the-revision-in-the-lock-file)
+
+## What is the difference between Gopkg.toml (the "manifest") and Gopkg.lock (the "lock")?
+
+> The manifest describes user intent, and the lock describes computed outputs. There's flexibility in manifests that isn't present in locks..., as the "branch": "master" constraint will match whatever revision master HAPPENS to be at right now, whereas the lock is nailed down to a specific revision.
+>
+> This flexibility is important because it allows us to provide easy commands (e.g. `dep ensure -update`) that can manage an update process for you, within the constraints you specify, AND because it allows your project, when imported by someone else, to collaboratively specify the constraints for your own dependencies.
+-[@sdboyer in #281](https://github.com/golang/dep/issues/281#issuecomment-284118314)
+
+## When should I use dependencies, overrides, required, or ignored in the manifest?
+
+* Use `dependencies` to constrain a [direct dependency](#what-is-a-direct-or-transitive-dependency) to a specific branch, version range, revision, or specify an alternate source such as a fork.
+* Use `overrides` to constrain a [transitive dependency](#what-is-a-direct-or-transitive-dependency). See [How do I constrain a transitive dependency's version?](#how-do-i-constrain-a-transitive-dependencys-version) for more details on how overrides differ from dependencies. Overrides should be used cautiously, sparingly, and temporarily.
+* Use `required` to explicitly add a dependency that is not imported directly or transitively, for example a development package used for code generation.
+* Use `ignored` to ignore a package and any of that package's unique dependencies.
 
 ## What is a direct or transitive dependency?
 * Direct dependencies are dependencies that are imported directly by your project: they appear in at least one import statement from your project.
