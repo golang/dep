@@ -14,7 +14,7 @@ import (
 	"testing"
 
 	"github.com/golang/dep"
-	"github.com/golang/dep/test"
+	"github.com/golang/dep/internal/test"
 )
 
 func TestIntegration(t *testing.T) {
@@ -115,6 +115,9 @@ func testIntegration(name, wd string, externalProc bool, run test.RunFunc) func(
 
 		// Check error raised in final command
 		testCase.CompareError(err, testProj.GetStderr())
+
+		// Check output
+		testCase.CompareOutput(testProj.GetStdout())
 
 		// Check final manifest and lock
 		testCase.CompareFile(dep.ManifestName, testProj.ProjPath(dep.ManifestName))

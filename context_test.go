@@ -13,7 +13,7 @@ import (
 	"unicode"
 
 	"github.com/golang/dep/internal/gps"
-	"github.com/golang/dep/test"
+	"github.com/golang/dep/internal/test"
 )
 
 func TestNewContextNoGOPATH(t *testing.T) {
@@ -63,10 +63,16 @@ func TestSplitAbsoluteProjectRoot(t *testing.T) {
 		}
 	}
 
-	// test where it should return error
-	got, err := depCtx.SplitAbsoluteProjectRoot("tra/la/la/la")
+	// test where it should return an error when directly within $GOPATH/src
+	got, err := depCtx.SplitAbsoluteProjectRoot(filepath.Join(depCtx.GOPATH, "src"))
+	if err == nil || !strings.Contains(err.Error(), "$GOPATH/src") {
+		t.Fatalf("should have gotten an error for use directly in $GOPATH/src, but got %s", got)
+	}
+
+	// test where it should return an error
+	got, err = depCtx.SplitAbsoluteProjectRoot("tra/la/la/la")
 	if err == nil {
-		t.Fatalf("should have gotten error but did not for tra/la/la/la: %s", got)
+		t.Fatalf("should have gotten an error but did not for tra/la/la/la: %s", got)
 	}
 }
 

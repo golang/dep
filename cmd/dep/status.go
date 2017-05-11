@@ -10,7 +10,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"log"
 	"sort"
 	"text/tabwriter"
 
@@ -194,41 +193,33 @@ func (cmd *statusCommand) Run(ctx *dep.Ctx, loggers *Loggers, args []string) err
 	sm.UseDefaultSignalHandling()
 	defer sm.Release()
 
+	var buf bytes.Buffer
 	var out outputter
 	switch {
 	case cmd.detailed:
 		return errors.Errorf("not implemented")
 	case cmd.json:
 		out = &jsonOutput{
-			w: &logWriter{Logger: loggers.Out},
+			w: &buf,
 		}
 	case cmd.dot:
 		out = &dotOutput{
 			p: p,
 			o: cmd.output,
-			w: &logWriter{Logger: loggers.Out},
+			w: &buf,
 		}
 	default:
 		out = &tableOutput{
-			w: tabwriter.NewWriter(&logWriter{Logger: loggers.Out}, 0, 4, 2, ' ', 0),
+			w: tabwriter.NewWriter(&buf, 0, 4, 2, ' ', 0),
 		}
 	}
-	return runStatusAll(loggers, out, p, sm)
-}
 
-// A logWriter adapts a log.Logger to the io.Writer interface.
-type logWriter struct {
-	*log.Logger
-}
-
-func (l *logWriter) Write(b []byte) (n int, err error) {
-	str := string(b)
-	if len(str) == 0 {
-		return 0, nil
+	if err := runStatusAll(loggers, out, p, sm); err != nil {
+		return err
 	}
 
-	l.Print(str)
-	return len(b), err
+	loggers.Out.Print(buf.String())
+	return nil
 }
 
 // BasicStatus contains all the information reported about a single dependency
