@@ -199,10 +199,17 @@ func fillPackage(p *build.Package) error {
 	var testImports []string
 	var imports []string
 	for _, file := range gofiles {
-		// Skip underscore-led files, in keeping with the rest of the toolchain.
-		if filepath.Base(file)[0] == '_' {
+		// Skip underscore-led or dot-led files, in keeping with the rest of the toolchain.
+		bPrefix := filepath.Base(file)[0]
+		if bPrefix == '_' || bPrefix == '.' {
 			continue
 		}
+
+		// Skip any directories that happened to get caught by glob
+		if stat, err := os.Stat(file); err == nil && stat.IsDir() {
+			continue
+		}
+
 		pf, err := parser.ParseFile(token.NewFileSet(), file, nil, parser.ImportsOnly|parser.ParseComments)
 		if err != nil {
 			if os.IsPermission(err) {
