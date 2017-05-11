@@ -39,13 +39,13 @@ func TestStripVendorDirectory(t *testing.T) {
 	t.Run("vendor directory", stripVendorTestCase(fsTestCase{
 		before: filesystemState{
 			dirs: []fsPath{
-				fsPath{"package"},
-				fsPath{"package", "vendor"},
+				{"package"},
+				{"package", "vendor"},
 			},
 		},
 		after: filesystemState{
 			dirs: []fsPath{
-				fsPath{"package"},
+				{"package"},
 			},
 		},
 	}))
@@ -53,18 +53,18 @@ func TestStripVendorDirectory(t *testing.T) {
 	t.Run("vendor file", stripVendorTestCase(fsTestCase{
 		before: filesystemState{
 			dirs: []fsPath{
-				fsPath{"package"},
+				{"package"},
 			},
 			files: []fsPath{
-				fsPath{"package", "vendor"},
+				{"package", "vendor"},
 			},
 		},
 		after: filesystemState{
 			dirs: []fsPath{
-				fsPath{"package"},
+				{"package"},
 			},
 			files: []fsPath{
-				fsPath{"package", "vendor"},
+				{"package", "vendor"},
 			},
 		},
 	}))

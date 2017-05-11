@@ -172,7 +172,7 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, loggers *Loggers, args []string) error
 	l = dep.LockFromInterface(soln)
 
 	// Pick notondisk project constraints from solution and add to manifest
-	for k, _ := range pd.notondisk {
+	for k := range pd.notondisk {
 		for _, x := range l.Projects() {
 			if k == x.Ident().ProjectRoot {
 				m.Dependencies[k] = getProjectPropertiesFromVersion(x.Version())

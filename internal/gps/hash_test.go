@@ -215,7 +215,7 @@ func TestHashInputsOverrides(t *testing.T) {
 				// corresponding project properties in the dependencies from
 				// root
 				rm.ovr = map[ProjectRoot]ProjectProperties{
-					"c": ProjectProperties{
+					"c": {
 						Source: "car",
 					},
 				}

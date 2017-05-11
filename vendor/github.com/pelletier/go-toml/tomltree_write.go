@@ -4,11 +4,11 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"reflect"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
-	"reflect"
 )
 
 // encodes a string to a TOML-compliant string value
