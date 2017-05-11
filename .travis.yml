@@ -31,8 +31,7 @@ before_script:
 script:
   - go build -v ./cmd/dep
   - go vet $PKGS
-  # TODO (kris-nova) remove the ignore flag once we can refactor the code causing problems
-  - staticcheck -ignore='github.com/golang/dep/cmd/dep/status.go:SA4010' $PKGS
+  - staticcheck $PKGS
   #- ./hack/validate-gofmt.bash
   - ./hack/validate-vendor.bash
   - gosimple $PKGS
