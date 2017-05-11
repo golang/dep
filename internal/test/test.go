@@ -617,3 +617,10 @@ func (h *Helper) GetCommit(repo string) string {
 	}
 	return strings.TrimSpace(string(out))
 }
+
+func (h *Helper) RemoveFile(path string) {
+	err := os.RemoveAll(path)
+	if err != nil {
+		h.t.Fatalf("%+v", errors.Wrap(err, "could not remove file"))
+	}
+}
