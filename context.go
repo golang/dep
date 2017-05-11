@@ -214,6 +214,10 @@ func (c *Ctx) resolveProjectRoot(path string) (string, error) {
 func (c *Ctx) SplitAbsoluteProjectRoot(path string) (string, error) {
 	srcprefix := filepath.Join(c.GOPATH, "src") + string(filepath.Separator)
 	if fs.HasFilepathPrefix(path, srcprefix) {
+		if len(path) <= len(srcprefix) {
+			return "", errors.New("dep does not currently support using $GOPATH/src as the project root.")
+		}
+
 		// filepath.ToSlash because we're dealing with an import path now,
 		// not an fs path
 		return filepath.ToSlash(path[len(srcprefix):]), nil

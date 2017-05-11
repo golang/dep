@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/golang/dep/test"
+	"github.com/golang/dep/internal/test"
 )
 
 func TestAnalyzerDeriveManifestAndLock(t *testing.T) {

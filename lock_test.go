@@ -11,7 +11,7 @@ import (
 	"testing"
 
 	"github.com/golang/dep/internal/gps"
-	"github.com/golang/dep/test"
+	"github.com/golang/dep/internal/test"
 )
 
 func TestReadLock(t *testing.T) {
