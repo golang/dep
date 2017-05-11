@@ -145,8 +145,8 @@ var docData = testDoc{
 		Second: &subdoc,
 	},
 	SubDocList: []testSubDoc{
-		testSubDoc{"List.First", 0},
-		testSubDoc{"List.Second", 0},
+		{"List.First", 0},
+		{"List.Second", 0},
 	},
 	SubDocPtrs: []*testSubDoc{&subdoc},
 }
@@ -504,7 +504,7 @@ var strPtr = []*string{&str1, &str2}
 var strPtr2 = []*[]*string{&strPtr}
 
 var nestedTestData = nestedMarshalTestStruct{
-	String:    [][]string{[]string{"Five", "Six"}, []string{"One", "Two"}},
+	String:    [][]string{{"Five", "Six"}, {"One", "Two"}},
 	StringPtr: &strPtr2,
 }
 

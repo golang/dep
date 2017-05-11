@@ -33,7 +33,7 @@ func mkurl(s string) (u *url.URL) {
 }
 
 var pathDeductionFixtures = map[string][]pathDeductionFixture{
-	"github": []pathDeductionFixture{
+	"github": {
 		{
 			in:   "github.com/sdboyer/gps",
 			root: "github.com/sdboyer/gps",
@@ -126,7 +126,7 @@ var pathDeductionFixtures = map[string][]pathDeductionFixture{
 			},
 		},
 	},
-	"gopkg.in": []pathDeductionFixture{
+	"gopkg.in": {
 		{
 			in:   "gopkg.in/sdboyer/gps.v0",
 			root: "gopkg.in/sdboyer/gps.v0",
@@ -193,7 +193,7 @@ var pathDeductionFixtures = map[string][]pathDeductionFixture{
 			rerr: errors.New("gopkg.in/yaml.v1.2 is not a valid import path; gopkg.in only allows major versions (\"v1\" instead of \"v1.2\")"),
 		},
 	},
-	"jazz": []pathDeductionFixture{
+	"jazz": {
 		// IBM hub devops services - fixtures borrowed from go get
 		{
 			in:   "hub.jazz.net/git/user1/pkgname",
@@ -238,7 +238,7 @@ var pathDeductionFixtures = map[string][]pathDeductionFixture{
 			rerr: errors.New("hub.jazz.net/git/USER/pkgname is not a valid path for a source on hub.jazz.net"),
 		},
 	},
-	"bitbucket": []pathDeductionFixture{
+	"bitbucket": {
 		{
 			in:   "bitbucket.org/sdboyer/reporoot",
 			root: "bitbucket.org/sdboyer/reporoot",
@@ -309,7 +309,7 @@ var pathDeductionFixtures = map[string][]pathDeductionFixture{
 			srcerr: errors.New("git is not a valid scheme for accessing an hg repository"),
 		},
 	},
-	"launchpad": []pathDeductionFixture{
+	"launchpad": {
 		// tests for launchpad, mostly bazaar
 		// TODO(sdboyer) need more tests to deal w/launchpad's oddities
 		{
@@ -337,7 +337,7 @@ var pathDeductionFixtures = map[string][]pathDeductionFixture{
 			rerr: errors.New("launchpad.net/repo root is not a valid path for a source on launchpad.net"),
 		},
 	},
-	"git.launchpad": []pathDeductionFixture{
+	"git.launchpad": {
 		{
 			in:   "git.launchpad.net/reporoot",
 			root: "git.launchpad.net/reporoot",
@@ -363,7 +363,7 @@ var pathDeductionFixtures = map[string][]pathDeductionFixture{
 			rerr: errors.New("git.launchpad.net/repo root is not a valid path for a source on launchpad.net"),
 		},
 	},
-	"apache": []pathDeductionFixture{
+	"apache": {
 		{
 			in:   "git.apache.org/package-name.git",
 			root: "git.apache.org/package-name.git",
@@ -385,7 +385,7 @@ var pathDeductionFixtures = map[string][]pathDeductionFixture{
 			},
 		},
 	},
-	"vcsext": []pathDeductionFixture{
+	"vcsext": {
 		// VCS extension-based syntax
 		{
 			in:   "foobar.com/baz.git",
@@ -464,7 +464,7 @@ var pathDeductionFixtures = map[string][]pathDeductionFixture{
 			},
 		},
 	},
-	"vanity": []pathDeductionFixture{
+	"vanity": {
 		// Vanity imports
 		{
 			in:   "golang.org/x/exp",

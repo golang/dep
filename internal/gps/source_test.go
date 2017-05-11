@@ -140,7 +140,7 @@ func testSourceGateway(t *testing.T) {
 			wantptree := pkgtree.PackageTree{
 				ImportRoot: "github.com/sdboyer/deptest",
 				Packages: map[string]pkgtree.PackageOrErr{
-					"github.com/sdboyer/deptest": pkgtree.PackageOrErr{
+					"github.com/sdboyer/deptest": {
 						P: pkgtree.Package{
 							ImportPath: "github.com/sdboyer/deptest",
 							Name:       "deptest",

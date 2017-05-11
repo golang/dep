@@ -473,7 +473,7 @@ var bimodalFixtures = map[string]bimodalFixture{
 					f: &checkeeHasProblemPackagesFailure{
 						goal: mkAtom("a 1.0.0"),
 						failpkg: map[string]errDeppers{
-							"a/foo": errDeppers{
+							"a/foo": {
 								err: nil, // nil indicates package is missing
 								deppers: []atom{
 									mkAtom("root"),
@@ -935,7 +935,7 @@ var bimodalFixtures = map[string]bimodalFixture{
 					f: &checkeeHasProblemPackagesFailure{
 						goal: mkAtom("baz 1.0.0"),
 						failpkg: map[string]errDeppers{
-							"baz/qux": errDeppers{
+							"baz/qux": {
 								err: nil, // nil indicates package is missing
 								deppers: []atom{
 									mkAtom("root"),
@@ -976,7 +976,7 @@ var bimodalFixtures = map[string]bimodalFixture{
 					f: &checkeeHasProblemPackagesFailure{
 						goal: mkAtom("baz 1.0.0"),
 						failpkg: map[string]errDeppers{
-							"baz/qux": errDeppers{
+							"baz/qux": {
 								err: nil, // nil indicates package is missing
 								deppers: []atom{
 									mkAtom("root"),
@@ -1017,7 +1017,7 @@ var bimodalFixtures = map[string]bimodalFixture{
 					f: &checkeeHasProblemPackagesFailure{
 						goal: mkAtom("baz 1.0.0"),
 						failpkg: map[string]errDeppers{
-							"baz/qux": errDeppers{
+							"baz/qux": {
 								err: nil, // nil indicates package is missing
 								deppers: []atom{
 									mkAtom("root"),

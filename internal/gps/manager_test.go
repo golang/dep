@@ -526,7 +526,7 @@ func TestMultiFetchThreadsafe(t *testing.T) {
 	projects := []ProjectIdentifier{
 		mkPI("github.com/sdboyer/gps"),
 		mkPI("github.com/sdboyer/gpkt"),
-		ProjectIdentifier{
+		{
 			ProjectRoot: ProjectRoot("github.com/sdboyer/gpkt"),
 			Source:      "https://github.com/sdboyer/gpkt",
 		},

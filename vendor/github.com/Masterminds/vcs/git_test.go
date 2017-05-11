@@ -559,7 +559,6 @@ func TestGitSubmoduleHandling2(t *testing.T) {
 		t.Errorf("Current failed to detect Git on tip of master. Got version: %s", v)
 	}
 
-
 	tempDir2, err := ioutil.TempDir("", "go-vcs-git-tests-export")
 	if err != nil {
 		t.Fatalf("Error creating temp directory: %s", err)
@@ -583,7 +582,7 @@ func TestGitSubmoduleHandling2(t *testing.T) {
 		t.Errorf("Error checking exported file in Git: %s", err)
 	}
 
-	_, err = os.Stat(filepath.Join( filepath.Join(exportDir, "definitions"), "README.md"))
+	_, err = os.Stat(filepath.Join(filepath.Join(exportDir, "definitions"), "README.md"))
 	if err != nil {
 		t.Errorf("Error checking exported file in Git: %s", err)
 	}

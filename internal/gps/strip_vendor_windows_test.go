@@ -14,11 +14,11 @@ func TestStripVendorSymlinks(t *testing.T) {
 	t.Run("vendor symlink", stripVendorTestCase(fsTestCase{
 		before: filesystemState{
 			dirs: []fsPath{
-				fsPath{"package"},
-				fsPath{"package", "_vendor"},
+				{"package"},
+				{"package", "_vendor"},
 			},
 			links: []fsLink{
-				fsLink{
+				{
 					path: fsPath{"package", "vendor"},
 					to:   "_vendor",
 				},
@@ -26,11 +26,11 @@ func TestStripVendorSymlinks(t *testing.T) {
 		},
 		after: filesystemState{
 			dirs: []fsPath{
-				fsPath{"package"},
-				fsPath{"package", "_vendor"},
+				{"package"},
+				{"package", "_vendor"},
 			},
 			links: []fsLink{
-				fsLink{
+				{
 					path: fsPath{"package", "vendor"},
 					to:   "_vendor",
 				},
@@ -41,11 +41,11 @@ func TestStripVendorSymlinks(t *testing.T) {
 	t.Run("nonvendor symlink", stripVendorTestCase(fsTestCase{
 		before: filesystemState{
 			dirs: []fsPath{
-				fsPath{"package"},
-				fsPath{"package", "_vendor"},
+				{"package"},
+				{"package", "_vendor"},
 			},
 			links: []fsLink{
-				fsLink{
+				{
 					path: fsPath{"package", "link"},
 					to:   "_vendor",
 				},
@@ -53,11 +53,11 @@ func TestStripVendorSymlinks(t *testing.T) {
 		},
 		after: filesystemState{
 			dirs: []fsPath{
-				fsPath{"package"},
-				fsPath{"package", "_vendor"},
+				{"package"},
+				{"package", "_vendor"},
 			},
 			links: []fsLink{
-				fsLink{
+				{
 					path: fsPath{"package", "link"},
 					to:   "_vendor",
 				},
@@ -68,10 +68,10 @@ func TestStripVendorSymlinks(t *testing.T) {
 	t.Run("vendor symlink to file", stripVendorTestCase(fsTestCase{
 		before: filesystemState{
 			files: []fsPath{
-				fsPath{"file"},
+				{"file"},
 			},
 			links: []fsLink{
-				fsLink{
+				{
 					path: fsPath{"vendor"},
 					to:   "file",
 				},
@@ -79,10 +79,10 @@ func TestStripVendorSymlinks(t *testing.T) {
 		},
 		after: filesystemState{
 			files: []fsPath{
-				fsPath{"file"},
+				{"file"},
 			},
 			links: []fsLink{
-				fsLink{
+				{
 					path: fsPath{"vendor"},
 					to:   "file",
 				},
@@ -97,14 +97,14 @@ func TestStripVendorSymlinks(t *testing.T) {
 		// directory.
 		before: filesystemState{
 			dirs: []fsPath{
-				fsPath{"_vendor"},
+				{"_vendor"},
 			},
 			links: []fsLink{
-				fsLink{
+				{
 					path: fsPath{"vendor"},
 					to:   "vendor2",
 				},
-				fsLink{
+				{
 					path: fsPath{"vendor2"},
 					to:   "_vendor",
 				},
@@ -112,10 +112,10 @@ func TestStripVendorSymlinks(t *testing.T) {
 		},
 		after: filesystemState{
 			dirs: []fsPath{
-				fsPath{"_vendor"},
+				{"_vendor"},
 			},
 			links: []fsLink{
-				fsLink{
+				{
 					path: fsPath{"vendor2"},
 					to:   "_vendor",
 				},
@@ -126,14 +126,14 @@ func TestStripVendorSymlinks(t *testing.T) {
 	t.Run("circular symlinks", stripVendorTestCase(fsTestCase{
 		before: filesystemState{
 			dirs: []fsPath{
-				fsPath{"package"},
+				{"package"},
 			},
 			links: []fsLink{
-				fsLink{
+				{
 					path: fsPath{"package", "link1"},
 					to:   "link2",
 				},
-				fsLink{
+				{
 					path: fsPath{"package", "link2"},
 					to:   "link1",
 				},
@@ -141,14 +141,14 @@ func TestStripVendorSymlinks(t *testing.T) {
 		},
 		after: filesystemState{
 			dirs: []fsPath{
-				fsPath{"package"},
+				{"package"},
 			},
 			links: []fsLink{
-				fsLink{
+				{
 					path: fsPath{"package", "link1"},
 					to:   "link2",
 				},
-				fsLink{
+				{
 					path: fsPath{"package", "link2"},
 					to:   "link1",
 				},
