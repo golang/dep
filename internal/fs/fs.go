@@ -242,6 +242,10 @@ func CopyDir(src string, dst string) error {
 	}
 
 	for _, entry := range entries {
+		if entry.Mode()&os.ModeSymlink != 0 {
+			continue
+		}
+
 		srcPath := filepath.Join(src, entry.Name())
 		dstPath := filepath.Join(dst, entry.Name())
 
