@@ -82,11 +82,6 @@ func (sc *sourceCoordinator) getSourceGatewayFor(ctx context.Context, id Project
 
 	// No gateway exists for this path yet; set up a proto, being careful to fold
 	// together simultaneous attempts on the same path.
-	return sc.setUpSourceGateway(ctx, normalizedName)
-}
-
-// Not intended to be called externally - call getSourceGatewayFor instead.
-func (sc *sourceCoordinator) setUpSourceGateway(ctx context.Context, normalizedName string) (*sourceGateway, error) {
 	sc.psrcmut.Lock()
 	if chans, has := sc.protoSrcs[normalizedName]; has {
 		// Another goroutine is already working on this normalizedName. Fold
