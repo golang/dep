@@ -16,7 +16,11 @@ const glideYamlName = "glide.yaml"
 const glideLockName = "glide.lock"
 
 type glideImporter struct {
-	loggers *Loggers
+	loggers *dep.Loggers
+}
+
+func newGlideImporter(loggers *dep.Loggers) glideImporter {
+	return glideImporter{loggers: loggers}
 }
 
 func (i glideImporter) Info() (name string, version int) {
@@ -24,13 +28,9 @@ func (i glideImporter) Info() (name string, version int) {
 }
 
 func (i glideImporter) HasConfig(dir string) bool {
+	// Only require glide.yaml, the lock is optional
 	y := filepath.Join(dir, glideYamlName)
 	if _, err := os.Stat(y); err != nil {
-		return false
-	}
-
-	l := filepath.Join(dir, glideLockName)
-	if _, err := os.Stat(l); err != nil {
 		return false
 	}
 
@@ -49,4 +49,9 @@ func (i glideImporter) DeriveRootManifestAndLock(dir string, pr gps.ProjectRoot)
 
 func (i glideImporter) DeriveManifestAndLock(dir string, pr gps.ProjectRoot) (gps.Manifest, gps.Lock, error) {
 	return i.DeriveRootManifestAndLock(dir, pr)
+}
+
+func (a glideImporter) PostSolveShenanigans(*dep.Manifest, *dep.Lock) {
+	// do nothing
+	// TODO: importers don't need to be full root analyzers
 }

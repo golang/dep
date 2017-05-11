@@ -17,12 +17,12 @@ import (
 
 type glideFiles struct {
 	yaml    glideYaml
-	lock    glideLock
-	loggers *Loggers
+	lock    *glideLock
+	loggers *dep.Loggers
 }
 
-func newGlideFiles(loggers *Loggers) glideFiles {
-	return glideFiles{loggers: loggers}
+func newGlideFiles(loggers *dep.Loggers) *glideFiles {
+	return &glideFiles{loggers: loggers}
 }
 
 type glideYaml struct {
@@ -44,7 +44,7 @@ type glidePackage struct {
 	Repository string `yaml:"repo"`
 }
 
-func (files glideFiles) load(projectDir string) error {
+func (files *glideFiles) load(projectDir string) error {
 	y := filepath.Join(projectDir, glideYamlName)
 	if files.loggers.Verbose {
 		files.loggers.Err.Printf("dep: Loading %s", y)
@@ -59,22 +59,24 @@ func (files glideFiles) load(projectDir string) error {
 	}
 
 	l := filepath.Join(projectDir, glideLockName)
-	if files.loggers.Verbose {
-		files.loggers.Err.Printf("dep: Loading %s", l)
-	}
-	lb, err := ioutil.ReadFile(l)
-	if err != nil {
-		return errors.Wrapf(err, "Unable to read %s", l)
-	}
-	err = yaml.Unmarshal(lb, &files.lock)
-	if err != nil {
-		return errors.Wrapf(err, "Unable to parse %s", l)
+	if exists, _ := dep.IsRegular(l); exists {
+		if files.loggers.Verbose {
+			files.loggers.Err.Printf("dep: Loading %s", l)
+		}
+		lb, err := ioutil.ReadFile(l)
+		if err != nil {
+			return errors.Wrapf(err, "Unable to read %s", l)
+		}
+		err = yaml.Unmarshal(lb, &files.lock)
+		if err != nil {
+			return errors.Wrapf(err, "Unable to parse %s", l)
+		}
 	}
 
 	return nil
 }
 
-func (files glideFiles) convert(projectName string) (*dep.Manifest, *dep.Lock, error) {
+func (files *glideFiles) convert(projectName string) (*dep.Manifest, *dep.Lock, error) {
 	manifest := &dep.Manifest{
 		Dependencies: make(gps.ProjectConstraints),
 	}
@@ -105,24 +107,28 @@ func (files glideFiles) convert(projectName string) (*dep.Manifest, *dep.Lock, e
 		}
 	}
 
-	lock := &dep.Lock{}
+	var lock *dep.Lock
+	if files.lock != nil {
+		lock = &dep.Lock{}
 
-	lockDep := func(pkg glidePackage) {
-		id := gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot(pkg.Name)}
-		c, has := manifest.Dependencies[id.ProjectRoot]
-		if has {
-			id.Source = c.Source
+		lockDep := func(pkg glidePackage) {
+			id := gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot(pkg.Name)}
+			c, has := manifest.Dependencies[id.ProjectRoot]
+			if has {
+				id.Source = c.Source
+			}
+			version := gps.Revision(pkg.Reference)
+
+			lp := gps.NewLockedProject(id, version, nil)
+			lock.P = append(lock.P, lp)
 		}
-		version := gps.Revision(pkg.Reference)
 
-		lp := gps.NewLockedProject(id, version, nil)
-		lock.P = append(lock.P, lp)
-	}
-	for _, pkg := range files.lock.Imports {
-		lockDep(pkg)
-	}
-	for _, pkg := range files.lock.TestImports {
-		lockDep(pkg)
+		for _, pkg := range files.lock.Imports {
+			lockDep(pkg)
+		}
+		for _, pkg := range files.lock.TestImports {
+			lockDep(pkg)
+		}
 	}
 
 	return manifest, lock, nil

@@ -35,6 +35,10 @@ versions available from the upstream source per the following algorithm:
  - Default branch(es) (sorted lexicographically)
  - Non-semver tags (sorted lexicographically)
 
+If configuration files for other dependency management tools are found, they
+are used to pre-populate the manifest and lock. Specify -skip-tools to disable
+this behavior.
+
 A Gopkg.toml file will be written with inferred version constraints for all
 direct dependencies. Gopkg.lock will be written with precise versions, and
 vendor/ will be populated with the precise versions written to Gopkg.lock.
@@ -48,10 +52,12 @@ func (cmd *initCommand) Hidden() bool      { return false }
 
 func (cmd *initCommand) Register(fs *flag.FlagSet) {
 	fs.BoolVar(&cmd.noExamples, "no-examples", false, "don't include example in Gopkg.toml")
+	fs.BoolVar(&cmd.skipTools, "skip-tools", false, "skip importing configuration from other dependency managers")
 }
 
 type initCommand struct {
 	noExamples bool
+	skipTools  bool
 }
 
 func trimPathPrefix(p1, p2 string) string {
@@ -116,43 +122,29 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 	defer sm.Release()
 
 	ctx.Loggers.Err.Println("Searching GOPATH for projects...")
-	pd, err := getProjectData(ctx, pkgT, cpr, sm)
+	var rootAnalyzer rootProjectAnalyzer
+	var analyzer gps.ProjectAnalyzer
+	if cmd.skipTools {
+		rootAnalyzer = newGopathAnalyzer(ctx, pkgT, cpr, sm)
+		analyzer = dep.Analyzer{}
+	} else {
+		rootAnalyzer = compositeAnalyzer{
+			Analyzers: []rootProjectAnalyzer{
+				newGopathAnalyzer(ctx, pkgT, cpr, sm),
+				newImportAnalyzer(ctx.Loggers),
+			}}
+		analyzer = importAnalyzer{ctx.Loggers}
+	}
+
+	// Generate a manifest and lock for the root project
+	ctx.Loggers.Err.Println("Searching GOPATH for projects...")
+	m, l, err := rootAnalyzer.DeriveRootManifestAndLock(root, gps.ProjectRoot(cpr))
 	if err != nil {
-		return err
+		return errors.Wrap(err, "Error deriving a root manifest and lock")
 	}
-	m := &dep.Manifest{
-		Dependencies: pd.constraints,
-	}
-
-	// Make an initial lock from what knowledge we've collected about the
-	// versions on disk
-	l := &dep.Lock{
-		P: make([]gps.LockedProject, 0, len(pd.ondisk)),
-	}
-
-	for pr, v := range pd.ondisk {
-		// That we have to chop off these path prefixes is a symptom of
-		// a problem in gps itself
-		pkgs := make([]string, 0, len(pd.dependencies[pr]))
-		prslash := string(pr) + "/"
-		for _, pkg := range pd.dependencies[pr] {
-			if pkg == string(pr) {
-				pkgs = append(pkgs, ".")
-			} else {
-				pkgs = append(pkgs, trimPathPrefix(pkg, prslash))
-			}
-		}
-
-		l.P = append(l.P, gps.NewLockedProject(
-			gps.ProjectIdentifier{ProjectRoot: pr}, v, pkgs),
-		)
-	}
-
-	ctx.Loggers.Err.Println("Using network for remaining projects...")
-	// Copy lock before solving. Use this to separate new lock projects from soln
-	copyLock := *l
 
 	// Run solver with project versions found on disk
+	ctx.Loggers.Err.Println("Using network for remaining projects...")
 	if ctx.Loggers.Verbose {
 		ctx.Loggers.Err.Println("dep: Solving...")
 	}
@@ -161,7 +153,7 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 		RootPackageTree: pkgT,
 		Manifest:        m,
 		Lock:            l,
-		ProjectAnalyzer: dep.Analyzer{},
+		ProjectAnalyzer: analyzer,
 	}
 
 	if ctx.Loggers.Verbose {
@@ -180,29 +172,7 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 	}
 	l = dep.LockFromInterface(soln)
 
-	// Iterate through the new projects in solved lock and add them to manifest
-	// if direct deps and log feedback for all the new projects.
-	for _, x := range l.Projects() {
-		pr := x.Ident().ProjectRoot
-		newProject := true
-		// Check if it's a new project, not in the old lock
-		for _, y := range copyLock.Projects() {
-			if pr == y.Ident().ProjectRoot {
-				newProject = false
-			}
-		}
-		if newProject {
-			// Check if it's in notondisk project map. These are direct deps, should
-			// be added to manifest.
-			if _, ok := pd.notondisk[pr]; ok {
-				m.Dependencies[pr] = getProjectPropertiesFromVersion(x.Version())
-				feedback(x.Version(), pr, fb.DepTypeDirect, ctx)
-			} else {
-				// Log feedback of transitive project
-				feedback(x.Version(), pr, fb.DepTypeTransitive, ctx)
-			}
-		}
-	}
+	rootAnalyzer.PostSolveShenanigans(m, l)
 
 	// Run gps.Prepare with appropriate constraint solutions from solve run
 	// to generate the final lock memo.

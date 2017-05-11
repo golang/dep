@@ -5,13 +5,14 @@
 package main
 
 import (
+	"github.com/golang/dep"
 	"log"
 	"os"
 	"testing"
 )
 
 func TestGlideConvertProject(t *testing.T) {
-	loggers := &Loggers{
+	loggers := &dep.Loggers{
 		Out:     log.New(os.Stdout, "", 0),
 		Err:     log.New(os.Stderr, "", 0),
 		Verbose: true,
@@ -28,7 +29,7 @@ func TestGlideConvertProject(t *testing.T) {
 				},
 			},
 		},
-		lock: glideLock{
+		lock: &glideLock{
 			Imports: []glidePackage{
 				{
 					Name:      "github.com/sdboyer/deptest",
@@ -77,7 +78,7 @@ func TestGlideConvertProject(t *testing.T) {
 }
 
 func TestGlideConvertTestProject(t *testing.T) {
-	loggers := &Loggers{
+	loggers := &dep.Loggers{
 		Out:     log.New(os.Stdout, "", 0),
 		Err:     log.New(os.Stderr, "", 0),
 		Verbose: true,
@@ -93,7 +94,7 @@ func TestGlideConvertTestProject(t *testing.T) {
 				},
 			},
 		},
-		lock: glideLock{
+		lock: &glideLock{
 			TestImports: []glidePackage{
 				{
 					Name:      "github.com/sdboyer/deptest",
@@ -123,7 +124,7 @@ func TestGlideConvertTestProject(t *testing.T) {
 }
 
 func TestGlideConvertIgnore(t *testing.T) {
-	loggers := &Loggers{
+	loggers := &dep.Loggers{
 		Out:     log.New(os.Stdout, "", 0),
 		Err:     log.New(os.Stderr, "", 0),
 		Verbose: true,
@@ -151,7 +152,7 @@ func TestGlideConvertIgnore(t *testing.T) {
 }
 
 func TestGlideConvertExcludeDir(t *testing.T) {
-	loggers := &Loggers{
+	loggers := &dep.Loggers{
 		Out:     log.New(os.Stdout, "", 0),
 		Err:     log.New(os.Stderr, "", 0),
 		Verbose: true,
@@ -179,7 +180,7 @@ func TestGlideConvertExcludeDir(t *testing.T) {
 }
 
 func TestGlideConvertExcludeDir_IgnoresMismatchedPackageName(t *testing.T) {
-	loggers := &Loggers{
+	loggers := &dep.Loggers{
 		Out:     log.New(os.Stdout, "", 0),
 		Err:     log.New(os.Stderr, "", 0),
 		Verbose: true,
