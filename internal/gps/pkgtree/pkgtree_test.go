@@ -1296,7 +1296,7 @@ func TestListPackages(t *testing.T) {
 						P: Package{
 							ImportPath: "dotgodir/foo.go",
 							Name:       "foo",
-							Imports:    []string{},
+							Imports:    []string{"sort"},
 						},
 					},
 				},
