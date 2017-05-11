@@ -116,6 +116,9 @@ func testIntegration(name, wd string, externalProc bool, run test.RunFunc) func(
 		// Check error raised in final command
 		testCase.CompareError(err, testProj.GetStderr())
 
+		// Check output
+		testCase.CompareOutput(testProj.GetStdout())
+
 		// Check final manifest and lock
 		testCase.CompareFile(dep.ManifestName, testProj.ProjPath(dep.ManifestName))
 		testCase.CompareFile(dep.LockName, testProj.ProjPath(dep.LockName))

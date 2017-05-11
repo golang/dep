@@ -14,6 +14,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"unicode"
 )
 
 var (
@@ -126,6 +127,34 @@ func (tc *IntegrationTestCase) CompareFile(goldenPath, working string) {
 			tc.t.Errorf("%s not created where one was expected", goldenPath)
 		}
 	}
+}
+
+// CompareError compares expected and actual stdout output
+func (tc *IntegrationTestCase) CompareOutput(stdout string) {
+	expected, err := ioutil.ReadFile(filepath.Join(tc.rootPath, "stdout.txt"))
+	if err != nil {
+		if os.IsNotExist(err) {
+			// Nothing to verify
+			return
+		}
+		panic(err)
+	}
+
+	expStr := normalizeLines(string(expected))
+	stdout = normalizeLines(stdout)
+
+	if expStr != stdout {
+		tc.t.Errorf("expected: %q but got: %q", expStr, stdout)
+	}
+}
+
+// normalizeLines returns a version with trailing whitespace stripped from each line.
+func normalizeLines(s string) string {
+	lines := strings.Split(s, "\n")
+	for i := range lines {
+		lines[i] = strings.TrimRightFunc(lines[i], unicode.IsSpace)
+	}
+	return strings.Join(lines, "\n")
 }
 
 // CompareError compares exected and actual error

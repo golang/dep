@@ -12,6 +12,7 @@ The directory structure is as follows:
                 subcategory1/
                     case1/
                         testcase.json
+                        stdout.txt
                         initial/
                             file1.go
                             Gopkg.toml
@@ -36,7 +37,8 @@ will be included automatically.
 The json file needs to be accompanied by `initial` and `final` directories. The
 `initial` is copied verbatim into the test project before the `dep` commands are
 run, are the `manifest` and `lock` files in `final`, if present, are used to
-compare against the test project results after the commands.
+compare against the test project results after the commands. The `stdout.txt` file
+is optional, and if present will be compared with command output.
 
 The `testcase.json` file has the following format:
 
@@ -74,9 +76,10 @@ The test procedure is as follows:
 5. Fetch the repos and versions in `vendor-initial` to the project's `vendor` directory
 6. Run `commands` on the project, in declaration order
 7. Ensure that, if any errors are raised, it is only by the final command and their string output matches `error-expected`
-8. Check the resulting files against those in the `final` input directory
-9. Check the `vendor` directory for the projects listed under `vendor-final`
-10. Check that there were no changes to `src` listings
-11. Clean up
+8. Ensure that, if a stdout.txt file is present, the command's output matches (excluding trailing whitespace).
+9. Check the resulting files against those in the `final` input directory
+10. Check the `vendor` directory for the projects listed under `vendor-final`
+11. Check that there were no changes to `src` listings
+12. Clean up
 
 Note that for the remote fetches, only git repos are currently supported.
