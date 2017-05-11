@@ -90,15 +90,16 @@ func TestSlashedGOPATH(t *testing.T) {
 		t.Fatal("failed to get work directory:", err)
 	}
 	env := os.Environ()
+	loggers := &Loggers{}
 
 	h.Setenv("GOPATH", filepath.ToSlash(h.Path(".")))
-	_, err = NewContext(wd, env)
+	_, err = NewContext(wd, env, loggers)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	h.Setenv("GOPATH", filepath.FromSlash(h.Path(".")))
-	_, err = NewContext(wd, env)
+	_, err = NewContext(wd, env, loggers)
 	if err != nil {
 		t.Fatal(err)
 	}

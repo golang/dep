@@ -20,7 +20,7 @@ func TestReadManifest(t *testing.T) {
 
 	mf := h.GetTestFile("manifest/golden.toml")
 	defer mf.Close()
-	got, err := readManifest(mf)
+	got, err := readManifest(mf, &Loggers{})
 	if err != nil {
 		t.Fatalf("Should have read Manifest correctly, but got err %q", err)
 	}
@@ -112,7 +112,7 @@ func TestReadManifestErrors(t *testing.T) {
 	for _, tst := range tests {
 		mf := h.GetTestFile(tst.file)
 		defer mf.Close()
-		_, err = readManifest(mf)
+		_, err = readManifest(mf, &Loggers{})
 		if err == nil {
 			t.Errorf("Reading manifest with %s should have caused error, but did not", tst.name)
 		} else if !strings.Contains(err.Error(), tst.name) {

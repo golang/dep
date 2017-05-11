@@ -61,7 +61,7 @@ func (pc *TestProjectContext) Load() {
 	if pc.h.Exist(mp) {
 		mf := pc.h.GetFile(mp)
 		defer mf.Close()
-		m, err = readManifest(mf)
+		m, err = readManifest(mf, &Loggers{})
 		pc.h.Must(errors.Wrapf(err, "Unable to read manifest at %s", mp))
 	}
 	var l *Lock
