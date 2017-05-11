@@ -11,7 +11,7 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/golang/dep/test"
+	"github.com/golang/dep/internal/test"
 )
 
 func TestCopyDir(t *testing.T) {

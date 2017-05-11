@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 
 	"github.com/golang/dep/internal/gps"
-	"github.com/golang/dep/test"
+	"github.com/golang/dep/internal/test"
 	"github.com/pkg/errors"
 )
 
