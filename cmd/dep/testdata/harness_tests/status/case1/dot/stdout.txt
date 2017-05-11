@@ -1,0 +1,9 @@
+digraph {
+	node [shape=box];
+	388407825 [label="github.com/golang/notexist"];
+	2304687900 [label="github.com/sdboyer/deptest\nv0.8.0"];
+	2659405890 [label="github.com/sdboyer/deptestdos\nv2.0.0"];
+	388407825 -> 2304687900;
+	388407825 -> 2659405890;
+	2659405890 -> 2304687900;
+}
