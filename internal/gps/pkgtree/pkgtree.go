@@ -199,8 +199,9 @@ func fillPackage(p *build.Package) error {
 	var testImports []string
 	var imports []string
 	for _, file := range gofiles {
-		// Skip underscore-led files, in keeping with the rest of the toolchain.
-		if filepath.Base(file)[0] == '_' {
+		// Skip underscore-led or dot-led files, in keeping with the rest of the toolchain.
+		bPrefix := filepath.Base(file)[0]
+		if bPrefix == '_' || bPrefix == '.' {
 			continue
 		}
 
