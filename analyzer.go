@@ -13,15 +13,18 @@ import (
 
 type Analyzer struct{}
 
-func (a Analyzer) DeriveManifestAndLock(path string, n gps.ProjectRoot) (gps.Manifest, gps.Lock, error) {
-	// TODO: If we decide to support other tools manifest, this is where we would need
-	// to add that support.
+func (a Analyzer) HasConfig(path string) bool {
 	mf := filepath.Join(path, ManifestName)
-	if fileOK, err := IsRegular(mf); err != nil || !fileOK {
-		// Do not return an error, when does not exist.
+	fileOK, err := IsRegular(mf)
+	return err == nil && fileOK
+}
+
+func (a Analyzer) DeriveManifestAndLock(path string, n gps.ProjectRoot) (gps.Manifest, gps.Lock, error) {
+	if !a.HasConfig(path) {
 		return nil, nil, nil
 	}
-	f, err := os.Open(mf)
+
+	f, err := os.Open(filepath.Join(path, ManifestName))
 	if err != nil {
 		return nil, nil, err
 	}
