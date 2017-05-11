@@ -36,9 +36,8 @@ test_script:
   - go build
   - go test .
   - go test ./cmd/dep
+  - go test ./internal/fs
   - go test ./internal/gps
   - go test ./internal/gps/internal
-  - go test ./internal/gps/internal/fs
   - go test ./internal/gps/pkgtree
-  - go test ./internal
   - go test ./test
