@@ -37,7 +37,7 @@ func NewTestProjectContext(h *test.Helper, projectName string) *TestProjectConte
 
 	// Set up a Source Manager
 	var err error
-	pc.Context = &Ctx{GOPATH: pc.tempDir}
+	pc.Context = &Ctx{GOPATH: pc.tempDir, Loggers: discardLoggers}
 	pc.SourceManager, err = pc.Context.SourceManager()
 	h.Must(errors.Wrap(err, "Unable to create a SourceManager"))
 
@@ -61,7 +61,11 @@ func (pc *TestProjectContext) Load() {
 	if pc.h.Exist(mp) {
 		mf := pc.h.GetFile(mp)
 		defer mf.Close()
-		m, err = readManifest(mf)
+		var warns []error
+		m, warns, err = readManifest(mf)
+		for _, warn := range warns {
+			pc.Context.Loggers.Err.Printf("dep: WARNING: %v\n", warn)
+		}
 		pc.h.Must(errors.Wrapf(err, "Unable to read manifest at %s", mp))
 	}
 	var l *Lock
