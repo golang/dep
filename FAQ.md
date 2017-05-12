@@ -17,7 +17,7 @@ Summarize the question and quote the reply, linking back to the original comment
 * [`dep` deleted my files in the vendor directory!](#dep-deleted-my-files-in-the-vendor-directory)
 * [Can I put the manifest and lock in the vendor directory?](#can-i-put-the-manifest-and-lock-in-the-vendor-directory)
 * [Why did dep use a different revision for package X instead of the revision in the lock file?](#why-did-dep-use-a-different-revision-for-package-x-instead-of-the-revision-in-the-lock-file)
-* [Why is dep slow?](#why-is-dep-slow)
+* [Why is `dep` slow?](#why-is-dep-slow)
 
 ## What is the difference between Gopkg.toml (the "manifest") and Gopkg.lock (the "lock")?
 
@@ -145,7 +145,7 @@ Unable to update checked out version: fatal: reference is not a tree: 4dfc6a8a7e
 > Under most circumstances, if those arguments don't change, then the lock remains fine and correct. You've hit one one of the few cases where that guarantee doesn't apply. The fact that you ran dep ensure and it DID a solve is a product of some arguments changing; that solving failed because this particular commit had become stale is a separate problem.
 -[@sdboyer in #405](https://github.com/golang/dep/issues/405#issuecomment-295998489)
 
-## Why is dep slow?
+## Why is `dep` slow?
 
 There are two things that really slow `dep` down. One is unavoidable; for the other, we have a plan.
 
