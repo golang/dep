@@ -138,6 +138,10 @@ func TestBackupVendor(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Create another vendor directory. Previous vendor moved as backup.
+	os.MkdirAll("vendor", 0777)
+	pc.CopyFile(dummyFile, "txn_writer/badinput_fileroot")
+
 	// Should return error on creating backup with existing filename
 	vendorbak, err = BackupVendor("vendor", "sfx")
 
@@ -150,7 +154,9 @@ func TestBackupVendor(t *testing.T) {
 	}
 
 	// Delete vendor
-	pc.h.RemoveFile("vendor")
+	if err = os.RemoveAll("vendor"); err != nil {
+		t.Fatal(err)
+	}
 
 	// Should return empty backup file name when no vendor exists
 	vendorbak, err = BackupVendor("vendor", "sfx")
