@@ -152,8 +152,12 @@ There are two things that really slow `dep` down. One is unavoidable; for the ot
 The unavoidable part is the initial clone. `dep` relies on a cache of local
 repositories (stored under `$GOPATH/pkg/dep`), which is populated on demand.
 Unfortunately, the first `dep` run, especially for a large project, may take a
-while, as all dependencies are cloned into the cache. Fortunately, this is a
-one-time cost.
+while, as all dependencies are cloned into the cache.
+
+Fortunately, this is just an _initial_ clone - pay it once, and you're done.
+The problem repeats itself a bit when you're running `dep` for the first time
+in a while and there's new changesets to fetch, but even then, these costs are
+only paid once per changeset.
 
 The other part is the work of retrieving information about dependencies. There are three parts to this:
 
