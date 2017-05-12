@@ -17,6 +17,7 @@ Summarize the question and quote the reply, linking back to the original comment
 * [`dep` deleted my files in the vendor directory!](#dep-deleted-my-files-in-the-vendor-directory)
 * [Can I put the manifest and lock in the vendor directory?](#can-i-put-the-manifest-and-lock-in-the-vendor-directory)
 * [Why did dep use a different revision for package X instead of the revision in the lock file?](#why-did-dep-use-a-different-revision-for-package-x-instead-of-the-revision-in-the-lock-file)
+* [Why is dep so slow?](#why-is-dep-so-slow)
 
 ## What is the difference between Gopkg.toml (the "manifest") and Gopkg.lock (the "lock")?
 
@@ -143,3 +144,34 @@ Unable to update checked out version: fatal: reference is not a tree: 4dfc6a8a7e
 >
 > Under most circumstances, if those arguments don't change, then the lock remains fine and correct. You've hit one one of the few cases where that guarantee doesn't apply. The fact that you ran dep ensure and it DID a solve is a product of some arguments changing; that solving failed because this particular commit had become stale is a separate problem.
 -[@sdboyer in #405](https://github.com/golang/dep/issues/405#issuecomment-295998489)
+
+## Why is dep so slow?
+
+There are two things that really slow `dep` down. One is unavoidable; for the other, we have a plan.
+
+The unavoidable part is the initial clone. `dep` relies on a cache of local
+repositories (stored under `$GOPATH/pkg/dep`), which is populated on demand.
+Unfortunately, the first `dep` run, especially for a large project, may take a
+while, as all dependencies are cloned into the cache. Fortunately, this is a
+one-time cost.
+
+The other part is the work of retrieving information about dependencies. There are three parts to this:
+
+1. Getting an up-to-date list of versions from the upstream source
+2. Reading the `Gopkg.toml` for a particular version out of the local cache
+3. Parsing the tree of packages for import statements at a particular version
+
+The first requires one or more network calls; the second two usually mean
+something like a `git checkout`, and the third is a filesystem walk, plus
+loading and parsing `.go` files. All of these are expensive operations.
+
+Fortunately, we can cache the second and third. And that cache can be permanent
+when keyed on an immutable identifier for the version - like a git commit SHA1
+hash. The first is a bit trickier, but there are reasonable staleness tradeoffs
+we can consider to avoid the network entirely. There's an issue to [implement
+persistent caching](https://github.com/golang/dep/issues/431) that's the
+gateway to all of these improvements.
+
+There's another major performance issue that's much harder - the process of picking versions itself is an NP-complete problem in `dep`'s current design. This is a much trickier problem 😜
+
+
