@@ -1278,7 +1278,7 @@ func TestListPackages(t *testing.T) {
 				},
 			},
 		},
-		"skip directories starting with '.'": {
+		"does not skip directories starting with '.'": {
 			fileRoot:   j("dotgodir"),
 			importRoot: "dotgodir",
 			out: PackageTree{
