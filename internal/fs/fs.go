@@ -155,10 +155,8 @@ func RenameWithFallback(src, dst string) error {
 		return errors.Wrapf(err, "cannot stat %s", src)
 	}
 
-	if dstfi, err := os.Stat(src); err != nil {
-		return errors.Wrapf(err, "cannot stat %s", dst)
-	} else if dstfi.IsDir() {
-		return errors.Errorf("dst %s is an existing directory", dst)
+	if dstfi, err := os.Stat(dst); fi.IsDir() && err == nil && dstfi.IsDir() {
+		return errors.Errorf("cannot rename directory %s to existing dst %s", src, dst)
 	}
 
 	err = os.Rename(src, dst)
