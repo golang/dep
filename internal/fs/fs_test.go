@@ -21,6 +21,20 @@ func TestHasFilepathPrefix(t *testing.T) {
 	}
 	defer os.RemoveAll(dir)
 
+	path := filepath.Join(dir, "file")
+	if _, err := os.Create(path); err != nil {
+		t.Fatal(err)
+	}
+
+	if res := HasFilepathPrefix(path, dir); res {
+		t.Fatalf("expected: false, got: %v", res)
+	}
+
+	path = filepath.Join(dir, "does_not_exists")
+	if res := HasFilepathPrefix(path, dir); !res {
+		t.Fatalf("expected: false, got: %v", res)
+	}
+
 	cases := []struct {
 		dir    string
 		prefix string
@@ -32,6 +46,7 @@ func TestHasFilepathPrefix(t *testing.T) {
 		{filepath.Join(dir, "a", "b"), filepath.Join(dir, "c"), false},
 		{filepath.Join(dir, "a", "b"), filepath.Join(dir, "a", "d", "b"), false},
 		{filepath.Join(dir, "a", "b"), filepath.Join(dir, "a", "b2"), false},
+		{filepath.Join(dir), filepath.Join(dir, "a", "b"), false},
 		{filepath.Join(dir, "ab"), filepath.Join(dir, "a", "b"), false},
 		{filepath.Join(dir, "ab"), filepath.Join(dir, "a"), false},
 		{filepath.Join(dir, "123"), filepath.Join(dir, "123"), true},
@@ -42,20 +57,38 @@ func TestHasFilepathPrefix(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		err := os.MkdirAll(c.dir, 0755)
-		if err != nil {
+		if err := os.MkdirAll(c.dir, 0755); err != nil {
 			t.Fatal(err)
 		}
 
-		err = os.MkdirAll(c.prefix, 0755)
-		if err != nil {
+		if err = os.MkdirAll(c.prefix, 0755); err != nil {
 			t.Fatal(err)
 		}
 
-		got := HasFilepathPrefix(c.dir, c.prefix)
-		if c.want != got {
+		if got := HasFilepathPrefix(c.dir, c.prefix); c.want != got {
 			t.Fatalf("dir: %q, prefix: %q, expected: %v, got: %v", c.dir, c.prefix, c.want, got)
 		}
+	}
+}
+
+func TestRenameWithFallback(t *testing.T) {
+	dir, err := ioutil.TempDir("", "dep")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(dir)
+
+	if err = RenameWithFallback(filepath.Join(dir, "does_not_exists"), filepath.Join(dir, "dst")); err == nil {
+		t.Fatal("expected error for non existing file, but got nil")
+	}
+
+	srcpath := filepath.Join(dir, "src")
+	if _, err = os.Create(srcpath); err != nil {
+		t.Fatal(err)
+	}
+
+	if err = RenameWithFallback(srcpath, filepath.Join(dir, "dst")); err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -248,6 +281,60 @@ func TestCopyDirFailDst(t *testing.T) {
 
 	if err = CopyDir(srcdir, dstdir); err == nil {
 		t.Fatalf("expected error for CopyDir(%s, %s), got none", srcdir, dstdir)
+	}
+}
+
+func TestCopyDirFailDst2(t *testing.T) {
+	var srcdir, dstdir string
+
+	dir, err := ioutil.TempDir("", "dep")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(dir)
+
+	srcdir = filepath.Join(dir, "src")
+	if _, err = os.Create(srcdir); err != nil {
+		t.Fatal(err)
+	}
+
+	dstdir = filepath.Join(dir, "dst")
+
+	if err = CopyDir(srcdir, dstdir); err == nil {
+		t.Fatalf("expected error for CopyDir(%s, %s), got none", srcdir, dstdir)
+	}
+
+	if err != errSrcNotDir {
+		t.Fatalf("expected %v error for CopyDir(%s, %s), got %s", errSrcNotDir, srcdir, dstdir, err)
+	}
+
+}
+
+func TestCopyDirFailDst3(t *testing.T) {
+	var srcdir, dstdir string
+
+	dir, err := ioutil.TempDir("", "dep")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(dir)
+
+	srcdir = filepath.Join(dir, "src")
+	if err = os.MkdirAll(srcdir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	dstdir = filepath.Join(dir, "dst")
+	if err = os.MkdirAll(dstdir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	if err = CopyDir(srcdir, dstdir); err == nil {
+		t.Fatalf("expected error for CopyDir(%s, %s), got none", srcdir, dstdir)
+	}
+
+	if err != errDstExist {
+		t.Fatalf("expected %v error for CopyDir(%s, %s), got %s", errDstExist, srcdir, dstdir, err)
 	}
 }
 

@@ -155,14 +155,6 @@ func RenameWithFallback(src, dest string) error {
 		return errors.Wrapf(err, "cannot stat %s", src)
 	}
 
-	// Windows cannot use syscall.Rename to rename a directory
-	if runtime.GOOS == "windows" && fi.IsDir() {
-		if err := CopyDir(src, dest); err != nil {
-			return err
-		}
-		return errors.Wrapf(os.RemoveAll(src), "cannot delete %s", src)
-	}
-
 	err = os.Rename(src, dest)
 	if err == nil {
 		return nil
@@ -209,6 +201,11 @@ func RenameWithFallback(src, dest string) error {
 	return errors.Wrapf(os.RemoveAll(src), "cannot delete %s", src)
 }
 
+var (
+	errSrcNotDir = errors.New("source is not a directory")
+	errDstExist  = errors.New("destination already exists")
+)
+
 // CopyDir recursively copies a directory tree, attempting to preserve permissions.
 // Source directory must exist, destination directory must *not* exist.
 // Symlinks are ignored and skipped.
@@ -221,7 +218,7 @@ func CopyDir(src string, dst string) error {
 		return err
 	}
 	if !fi.IsDir() {
-		return errors.New("source is not a directory")
+		return errSrcNotDir
 	}
 
 	_, err = os.Stat(dst)
@@ -229,7 +226,7 @@ func CopyDir(src string, dst string) error {
 		return err
 	}
 	if err == nil {
-		return errors.New("destination already exists")
+		return errDstExist
 	}
 
 	if err = os.MkdirAll(dst, fi.Mode()); err != nil {
