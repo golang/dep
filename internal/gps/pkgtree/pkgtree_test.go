@@ -1073,20 +1073,18 @@ func TestListPackages(t *testing.T) {
 							},
 						},
 					},
-					// disallow/.m1p is ignored by listPackages...for now. Kept
-					// here commented because this might change again...
-					//"disallow/.m1p": {
-					//P: Package{
-					//ImportPath:  "disallow/.m1p",
-					//CommentPath: "",
-					//Name:        "m1p",
-					//Imports: []string{
-					//"github.com/golang/dep/internal/gps",
-					//"os",
-					//"sort",
-					//},
-					//},
-					//},
+					"disallow/.m1p": {
+						P: Package{
+							ImportPath:  "disallow/.m1p",
+							CommentPath: "",
+							Name:        "m1p",
+							Imports: []string{
+								"github.com/golang/dep/internal/gps",
+								"os",
+								"sort",
+							},
+						},
+					},
 					"disallow/testdata": {
 						P: Package{
 							ImportPath:  "disallow/testdata",
@@ -1289,6 +1287,13 @@ func TestListPackages(t *testing.T) {
 					"dotgodir": {
 						P: Package{
 							ImportPath: "dotgodir",
+							Imports:    []string{},
+						},
+					},
+					"dotgodir/.go": {
+						P: Package{
+							ImportPath: "dotgodir/.go",
+							Name:       "dot",
 							Imports:    []string{},
 						},
 					},
