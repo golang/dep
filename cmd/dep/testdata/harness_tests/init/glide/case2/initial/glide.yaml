@@ -1,0 +1,6 @@
+package: github.com/golang/notexist
+import:
+- package: github.com/sdboyer/deptestdos
+  version: a0196baa11ea047dd65037287451d36b861b00ea
+- package: github.com/sdboyer/deptest
+  version: v0.8.0
