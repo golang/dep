@@ -149,13 +149,13 @@ func genTestFilename(str string) string {
 // RenameWithFallback attempts to rename a file or directory, but falls back to
 // copying in the event of a cross-link device error. If the fallback copy
 // succeeds, src is still removed, emulating normal rename behavior.
-func RenameWithFallback(src, dest string) error {
+func RenameWithFallback(src, dst string) error {
 	fi, err := os.Stat(src)
 	if err != nil {
 		return errors.Wrapf(err, "cannot stat %s", src)
 	}
 
-	err = os.Rename(src, dest)
+	err = os.Rename(src, dst)
 	if err == nil {
 		return nil
 	}
@@ -172,9 +172,9 @@ func RenameWithFallback(src, dest string) error {
 	var cerr error
 	if terr.Err == syscall.EXDEV {
 		if fi.IsDir() {
-			cerr = CopyDir(src, dest)
+			cerr = CopyDir(src, dst)
 		} else {
-			cerr = CopyFile(src, dest)
+			cerr = CopyFile(src, dst)
 		}
 	} else if runtime.GOOS == "windows" {
 		// In windows it can drop down to an operating system call that
@@ -185,17 +185,17 @@ func RenameWithFallback(src, dest string) error {
 		// See https://msdn.microsoft.com/en-us/library/cc231199.aspx
 		if ok && noerr == 0x11 {
 			if fi.IsDir() {
-				cerr = CopyDir(src, dest)
+				cerr = CopyDir(src, dst)
 			} else {
-				cerr = CopyFile(src, dest)
+				cerr = CopyFile(src, dst)
 			}
 		}
 	} else {
-		return errors.Wrapf(terr, "link error: cannot rename %s to %s", src, dest)
+		return errors.Wrapf(terr, "link error: cannot rename %s to %s", src, dst)
 	}
 
 	if cerr != nil {
-		return errors.Wrapf(cerr, "second attemp failed: cannot rename %s to %s", src, dest)
+		return errors.Wrapf(cerr, "second attemp failed: cannot rename %s to %s", src, dst)
 	}
 
 	return errors.Wrapf(os.RemoveAll(src), "cannot delete %s", src)

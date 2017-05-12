@@ -79,7 +79,7 @@ func TestRenameWithFallback(t *testing.T) {
 	defer os.RemoveAll(dir)
 
 	if err = RenameWithFallback(filepath.Join(dir, "does_not_exists"), filepath.Join(dir, "dst")); err == nil {
-		t.Fatal("expected error for non existing file, but got nil")
+		t.Fatal("expected an error for non existing file, but got nil")
 	}
 
 	srcpath := filepath.Join(dir, "src")
