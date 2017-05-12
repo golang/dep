@@ -152,7 +152,7 @@ func TestWorkmapToReach(t *testing.T) {
 				},
 			},
 			em: map[string]*ProblemImportError{
-				"A": &ProblemImportError{
+				"A": {
 					ImportPath: "A",
 					Cause:      []string{"A/foo"},
 					Err:        missingPkgErr("A/foo"),
@@ -192,12 +192,12 @@ func TestWorkmapToReach(t *testing.T) {
 				},
 			},
 			em: map[string]*ProblemImportError{
-				"A": &ProblemImportError{
+				"A": {
 					ImportPath: "A",
 					Cause:      []string{"A/foo", "A/bar"},
 					Err:        missingPkgErr("A/bar"),
 				},
-				"A/foo": &ProblemImportError{
+				"A/foo": {
 					ImportPath: "A/foo",
 					Cause:      []string{"A/bar"},
 					Err:        missingPkgErr("A/bar"),
@@ -232,12 +232,12 @@ func TestWorkmapToReach(t *testing.T) {
 				},
 			},
 			em: map[string]*ProblemImportError{
-				"A": &ProblemImportError{
+				"A": {
 					ImportPath: "A",
 					Cause:      []string{"A/foo"},
 					Err:        fmt.Errorf("err pkg"),
 				},
-				"A/foo": &ProblemImportError{
+				"A/foo": {
 					ImportPath: "A/foo",
 					Err:        fmt.Errorf("err pkg"),
 				},
@@ -279,17 +279,17 @@ func TestWorkmapToReach(t *testing.T) {
 				},
 			},
 			em: map[string]*ProblemImportError{
-				"A": &ProblemImportError{
+				"A": {
 					ImportPath: "A",
 					Cause:      []string{"A/foo", "A/bar"},
 					Err:        fmt.Errorf("err pkg"),
 				},
-				"A/foo": &ProblemImportError{
+				"A/foo": {
 					ImportPath: "A/foo",
 					Cause:      []string{"A/bar"},
 					Err:        fmt.Errorf("err pkg"),
 				},
-				"A/bar": &ProblemImportError{
+				"A/bar": {
 					ImportPath: "A/bar",
 					Err:        fmt.Errorf("err pkg"),
 				},
@@ -340,7 +340,7 @@ func TestWorkmapToReach(t *testing.T) {
 				},
 			},
 			em: map[string]*ProblemImportError{
-				"A/bar": &ProblemImportError{
+				"A/bar": {
 					ImportPath: "A/bar",
 					Err:        fmt.Errorf("err pkg"),
 				},
@@ -1275,6 +1275,28 @@ func TestListPackages(t *testing.T) {
 							Imports: []string{
 								"sort",
 							},
+						},
+					},
+				},
+			},
+		},
+		"skip directories starting with '.'": {
+			fileRoot:   j("dotgodir"),
+			importRoot: "dotgodir",
+			out: PackageTree{
+				ImportRoot: "dotgodir",
+				Packages: map[string]PackageOrErr{
+					"dotgodir": {
+						P: Package{
+							ImportPath: "dotgodir",
+							Imports:    []string{},
+						},
+					},
+					"dotgodir/foo.go": {
+						P: Package{
+							ImportPath: "dotgodir/foo.go",
+							Name:       "foo",
+							Imports:    []string{"sort"},
 						},
 					},
 				},
