@@ -108,12 +108,12 @@ func TestRenameWithFallback(t *testing.T) {
 	}
 
 	srcpath = filepath.Join(dir, "a")
-	if err = os.MkdirAll(srcpath, 777); err != nil {
+	if err = os.MkdirAll(srcpath, 0777); err != nil {
 		t.Fatal(err)
 	}
 
 	dstpath := filepath.Join(dir, "b")
-	if err = os.MkdirAll(dstpath, 777); err != nil {
+	if err = os.MkdirAll(dstpath, 0777); err != nil {
 		t.Fatal(err)
 	}
 
