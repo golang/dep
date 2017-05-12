@@ -35,7 +35,7 @@ func (cmd *pruneCommand) Hidden() bool      { return false }
 func (cmd *pruneCommand) Register(fs *flag.FlagSet) {
 }
 
-func (cmd *pruneCommand) Run(ctx *dep.Ctx, loggers *Loggers, args []string) error {
+func (cmd *pruneCommand) Run(ctx *dep.Ctx, args []string) error {
 	p, err := ctx.LoadProject("")
 	if err != nil {
 		return err
@@ -59,8 +59,8 @@ func (cmd *pruneCommand) Run(ctx *dep.Ctx, loggers *Loggers, args []string) erro
 	params := p.MakeParams()
 	params.RootPackageTree = ptree
 
-	if loggers.Verbose {
-		params.TraceLogger = loggers.Err
+	if ctx.Loggers.Verbose {
+		params.TraceLogger = ctx.Loggers.Err
 	}
 
 	s, err := gps.Prepare(params, sm)

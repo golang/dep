@@ -41,7 +41,7 @@ type removeCommand struct {
 	keepSource bool
 }
 
-func (cmd *removeCommand) Run(ctx *dep.Ctx, loggers *Loggers, args []string) error {
+func (cmd *removeCommand) Run(ctx *dep.Ctx, args []string) error {
 	p, err := ctx.LoadProject("")
 	if err != nil {
 		return err
@@ -89,7 +89,7 @@ func (cmd *removeCommand) Run(ctx *dep.Ctx, loggers *Loggers, args []string) err
 				// not being able to detect the root for an import path that's
 				// actually in the import list is a deeper problem. However,
 				// it's not our direct concern here, so we just warn.
-				loggers.Err.Printf("dep: could not infer root for %q\n", pr)
+				ctx.Loggers.Err.Printf("dep: could not infer root for %q\n", pr)
 				continue
 			}
 			otherroots[pr] = true
@@ -104,7 +104,7 @@ func (cmd *removeCommand) Run(ctx *dep.Ctx, loggers *Loggers, args []string) err
 		}
 
 		if len(rm) == 0 {
-			loggers.Err.Println("dep: nothing to do")
+			ctx.Loggers.Err.Println("dep: nothing to do")
 			return nil
 		}
 	} else {
@@ -162,8 +162,8 @@ func (cmd *removeCommand) Run(ctx *dep.Ctx, loggers *Loggers, args []string) err
 	params := p.MakeParams()
 	params.RootPackageTree = pkgT
 
-	if loggers.Verbose {
-		params.TraceLogger = loggers.Err
+	if ctx.Loggers.Verbose {
+		params.TraceLogger = ctx.Loggers.Err
 	}
 	s, err := gps.Prepare(params, sm)
 	if err != nil {

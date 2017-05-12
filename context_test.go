@@ -5,6 +5,8 @@
 package dep
 
 import (
+	"io/ioutil"
+	"log"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -14,6 +16,11 @@ import (
 
 	"github.com/golang/dep/internal/gps"
 	"github.com/golang/dep/internal/test"
+)
+
+var (
+	discardLogger  = log.New(ioutil.Discard, "", 0)
+	discardLoggers = &Loggers{Out: discardLogger, Err: discardLogger}
 )
 
 func TestNewContextNoGOPATH(t *testing.T) {
@@ -28,7 +35,7 @@ func TestNewContextNoGOPATH(t *testing.T) {
 		t.Fatal("failed to get work directory:", err)
 	}
 
-	c, err := NewContext(wd, os.Environ())
+	c, err := NewContext(wd, os.Environ(), nil)
 	if err == nil {
 		t.Fatal("error should not have been nil")
 	}
@@ -211,7 +218,7 @@ func TestLoadProject(t *testing.T) {
 			t.Fatal("failed to get working directory", err)
 		}
 
-		ctx := &Ctx{GOPATH: tg.Path("."), WorkingDir: wd}
+		ctx := &Ctx{GOPATH: tg.Path("."), WorkingDir: wd, Loggers: discardLoggers}
 
 		proj, err := ctx.LoadProject(path)
 		tg.Must(err)
@@ -287,7 +294,7 @@ func TestLoadProjectManifestParseError(t *testing.T) {
 		t.Fatal("failed to get working directory", err)
 	}
 
-	ctx := &Ctx{GOPATH: tg.Path("."), WorkingDir: wd}
+	ctx := &Ctx{GOPATH: tg.Path("."), WorkingDir: wd, Loggers: discardLoggers}
 
 	_, err = ctx.LoadProject("")
 	if err == nil {
@@ -313,7 +320,7 @@ func TestLoadProjectLockParseError(t *testing.T) {
 		t.Fatal("failed to get working directory", err)
 	}
 
-	ctx := &Ctx{GOPATH: tg.Path("."), WorkingDir: wd}
+	ctx := &Ctx{GOPATH: tg.Path("."), WorkingDir: wd, Loggers: discardLoggers}
 
 	_, err = ctx.LoadProject("")
 	if err == nil {
