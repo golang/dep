@@ -21,22 +21,8 @@ func TestHasFilepathPrefix(t *testing.T) {
 	}
 	defer os.RemoveAll(dir)
 
-	path := filepath.Join(dir, "file")
-	if _, err := os.Create(path); err != nil {
-		t.Fatal(err)
-	}
-
-	if res := HasFilepathPrefix(path, dir); res {
-		t.Fatalf("expected: false, got: %v", res)
-	}
-
-	path = filepath.Join(dir, "does_not_exists")
-	if res := HasFilepathPrefix(path, dir); !res {
-		t.Fatalf("expected: false, got: %v", res)
-	}
-
 	cases := []struct {
-		dir    string
+		path   string
 		prefix string
 		want   bool
 	}{
@@ -57,7 +43,7 @@ func TestHasFilepathPrefix(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		if err := os.MkdirAll(c.dir, 0755); err != nil {
+		if err := os.MkdirAll(c.path, 0755); err != nil {
 			t.Fatal(err)
 		}
 
@@ -65,8 +51,38 @@ func TestHasFilepathPrefix(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if got := HasFilepathPrefix(c.dir, c.prefix); c.want != got {
-			t.Fatalf("dir: %q, prefix: %q, expected: %v, got: %v", c.dir, c.prefix, c.want, got)
+		if got := HasFilepathPrefix(c.path, c.prefix); c.want != got {
+			t.Fatalf("dir: %q, prefix: %q, expected: %v, got: %v", c.path, c.prefix, c.want, got)
+		}
+	}
+}
+
+func TestHasFilepathPrefix_Files(t *testing.T) {
+	dir, err := ioutil.TempDir("", "dep")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(dir)
+
+	existingFile := filepath.Join(dir, "exists")
+	if _, err := os.Create(existingFile); err != nil {
+		t.Fatal(err)
+	}
+
+	nonExistingFile := filepath.Join(dir, "does_not_exists")
+
+	cases := []struct {
+		path   string
+		prefix string
+		want   bool
+	}{
+		{existingFile, filepath.Join(dir), false},
+		{nonExistingFile, filepath.Join(dir), true},
+	}
+
+	for _, c := range cases {
+		if got := HasFilepathPrefix(c.path, c.prefix); c.want != got {
+			t.Fatalf("dir: %q, prefix: %q, expected: %v, got: %v", c.path, c.prefix, c.want, got)
 		}
 	}
 }
@@ -228,7 +244,7 @@ func TestCopyDir(t *testing.T) {
 	}
 }
 
-func TestCopyDirFailSrc(t *testing.T) {
+func TestCopyDirFail_SrcInaccessible(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		// XXX: setting permissions works differently in
 		// Microsoft Windows. Skipping this this until a
@@ -238,7 +254,7 @@ func TestCopyDirFailSrc(t *testing.T) {
 
 	var srcdir, dstdir string
 
-	err, cleanup := setupInaccesibleDir(func(dir string) (err error) {
+	err, cleanup := setupInaccessibleDir(func(dir string) (err error) {
 		srcdir = filepath.Join(dir, "src")
 		return os.MkdirAll(srcdir, 0755)
 	})
@@ -261,7 +277,7 @@ func TestCopyDirFailSrc(t *testing.T) {
 	}
 }
 
-func TestCopyDirFailDst(t *testing.T) {
+func TestCopyDirFail_DstInaccessible(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		// XXX: setting permissions works differently in
 		// Microsoft Windows. Skipping this this until a
@@ -282,7 +298,7 @@ func TestCopyDirFailDst(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err, cleanup := setupInaccesibleDir(func(dir string) error {
+	err, cleanup := setupInaccessibleDir(func(dir string) error {
 		dstdir = filepath.Join(dir, "dst")
 		return nil
 	})
@@ -298,7 +314,7 @@ func TestCopyDirFailDst(t *testing.T) {
 	}
 }
 
-func TestCopyDirFailDst2(t *testing.T) {
+func TestCopyDirFail_SrcIsNotDir(t *testing.T) {
 	var srcdir, dstdir string
 
 	dir, err := ioutil.TempDir("", "dep")
@@ -324,7 +340,7 @@ func TestCopyDirFailDst2(t *testing.T) {
 
 }
 
-func TestCopyDirFailDst3(t *testing.T) {
+func TestCopyDirFail_DstExists(t *testing.T) {
 	var srcdir, dstdir string
 
 	dir, err := ioutil.TempDir("", "dep")
@@ -464,7 +480,7 @@ func TestCopyFileFail(t *testing.T) {
 
 	var dstdir string
 
-	err, cleanup := setupInaccesibleDir(func(dir string) error {
+	err, cleanup := setupInaccessibleDir(func(dir string) error {
 		dstdir = filepath.Join(dir, "dir")
 		return os.Mkdir(dstdir, 0777)
 	})
@@ -481,7 +497,7 @@ func TestCopyFileFail(t *testing.T) {
 	}
 }
 
-// setupInaccesibleDir creates a temporary location with a single
+// setupInaccessibleDir creates a temporary location with a single
 // directory in it, in such a way that that directory is not accessible
 // after this function returns.
 //
@@ -492,7 +508,7 @@ func TestCopyFileFail(t *testing.T) {
 // that removes all the temporary files this function creates. It is
 // the caller's responsability to call this function before the test is
 // done running, whether there's an error or not.
-func setupInaccesibleDir(op func(dir string) error) (err error, cleanup func()) {
+func setupInaccessibleDir(op func(dir string) error) (err error, cleanup func()) {
 	cleanup = func() {}
 
 	dir, err := ioutil.TempDir("", "dep")
@@ -530,7 +546,7 @@ func TestIsRegular(t *testing.T) {
 
 	var fn string
 
-	err, cleanup := setupInaccesibleDir(func(dir string) error {
+	err, cleanup := setupInaccessibleDir(func(dir string) error {
 		fn = filepath.Join(dir, "file")
 		fh, err := os.Create(fn)
 		if err != nil {
@@ -595,7 +611,7 @@ func TestIsDir(t *testing.T) {
 
 	var dn string
 
-	err, cleanup := setupInaccesibleDir(func(dir string) error {
+	err, cleanup := setupInaccessibleDir(func(dir string) error {
 		dn = filepath.Join(dir, "dir")
 		return os.Mkdir(dn, 0777)
 	})
