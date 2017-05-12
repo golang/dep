@@ -28,6 +28,15 @@ type Package struct {
 	TestImports []string // Imports from all go test files (in go/build parlance: both TestImports and XTestImports)
 }
 
+// svnRoots is a set of directories we should not descend into in ListPackages when
+// searching for Go packages
+var svnRoots = map[string]struct{}{
+	".git": struct{}{},
+	".bzr": struct{}{},
+	".svn": struct{}{},
+	".hg":  struct{}{},
+}
+
 // ListPackages reports Go package information about all directories in the tree
 // at or below the provided fileRoot.
 //
@@ -78,10 +87,13 @@ func ListPackages(fileRoot, importRoot string) (PackageTree, error) {
 		case "vendor", "Godeps":
 			return filepath.SkipDir
 		}
-		// We do skip dot-dirs, though, because it's such a ubiquitous standard
-		// that they not be visited by normal commands, and because things get
-		// really weird if we don't.
-		if strings.HasPrefix(fi.Name(), ".") {
+
+		// Skip dirs that are known to be VCS roots.
+		//
+		// Note that there are some pathological edge cases this doesn't cover,
+		// such as a user using Git for version control, but having a package
+		// named "svn" in a directory named ".svn".
+		if _, ok := svnRoots[fi.Name()]; ok {
 			return filepath.SkipDir
 		}
 
