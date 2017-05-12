@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/golang/dep"
 	"github.com/golang/dep/internal"
@@ -72,6 +73,7 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 
 	mf := filepath.Join(root, dep.ManifestName)
 	lf := filepath.Join(root, dep.LockName)
+	vpath := filepath.Join(root, "vendor")
 
 	mok, err := dep.IsRegular(mf)
 	if err != nil {
@@ -189,6 +191,15 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 	}
 
 	l.Memo = s.HashInputs()
+
+	// Pass timestamp (yyyyMMddHHmmss format) as suffix to backup name.
+	vendorbak, err := dep.BackupVendor(vpath, time.Now().Format("20060102150405"))
+	if err != nil {
+		return err
+	}
+	if vendorbak != "" {
+		ctx.Loggers.Err.Printf("Old vendor backed up to %v", vendorbak)
+	}
 
 	if ctx.Loggers.Verbose {
 		ctx.Loggers.Err.Println("dep: Writing manifest and lock files.")

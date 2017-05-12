@@ -13,6 +13,7 @@ import (
 )
 
 var errProjectNotFound = fmt.Errorf("could not find project %s, use dep init to initiate a manifest", ManifestName)
+var errVendorBackupFailed = fmt.Errorf("Failed to create vendor backup. File with same name exists.")
 
 // findProjectRoot searches from the starting directory upwards looking for a
 // manifest file until we get to the root of the filesystem.
@@ -63,4 +64,29 @@ func (p *Project) MakeParams() gps.SolveParameters {
 	}
 
 	return params
+}
+
+// BackupVendor looks for existing vendor directory and if it's not empty,
+// creates a backup of it to a new directory with the provided suffix.
+func BackupVendor(vpath, suffix string) (string, error) {
+	// Check if there's a non-empty vendor directory
+	vendorExists, err := IsNonEmptyDir(vpath)
+	if err != nil {
+		return "", err
+	}
+	if vendorExists {
+		vendorbak := vpath + "-" + suffix
+		// Check if a directory with same name exists
+		if _, err = os.Stat(vendorbak); os.IsNotExist(err) {
+			// Rename existing vendor to vendor-{suffix}
+			if err := renameWithFallback(vpath, vendorbak); err != nil {
+				return "", err
+			}
+			return vendorbak, nil
+		} else {
+			return "", errVendorBackupFailed
+		}
+	}
+
+	return "", nil
 }
