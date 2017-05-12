@@ -198,11 +198,11 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 		return err
 	}
 	if vendorbak != "" {
-		ctx.loggers.Err.Printf("Old vendor backed up to %v", vendorbak)
+		ctx.Loggers.Err.Printf("Old vendor backed up to %v", vendorbak)
 	}
 
-	if ctx.loggers.Verbose {
-		loggers.Err.Println("dep: Writing manifest and lock files.")
+	if ctx.Loggers.Verbose {
+		ctx.Loggers.Err.Println("dep: Writing manifest and lock files.")
 	}
 
 	sw, err := dep.NewSafeWriter(m, nil, l, dep.VendorAlways)
