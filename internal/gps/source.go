@@ -82,29 +82,20 @@ func (sc *sourceCoordinator) getSourceGatewayFor(ctx context.Context, id Project
 
 	// No gateway exists for this path yet; set up a proto, being careful to fold
 	// together simultaneous attempts on the same path.
-	rc := srcReturnChans{
-		ret: make(chan *sourceGateway),
-		err: make(chan error),
-	}
-
-	// The rest of the work needs its own goroutine, the results of which will
-	// be re-joined to this call via the return chans.
-	go sc.setUpSourceGateway(ctx, normalizedName, rc)
-	return rc.awaitReturn()
-}
-
-// Not intended to be called externally - call getSourceGatewayFor instead.
-func (sc *sourceCoordinator) setUpSourceGateway(ctx context.Context, normalizedName string, rc srcReturnChans) {
 	sc.psrcmut.Lock()
 	if chans, has := sc.protoSrcs[normalizedName]; has {
 		// Another goroutine is already working on this normalizedName. Fold
 		// in with that work by attaching our return channels to the list.
+		rc := srcReturnChans{
+			ret: make(chan *sourceGateway, 1),
+			err: make(chan error, 1),
+		}
 		sc.protoSrcs[normalizedName] = append(chans, rc)
 		sc.psrcmut.Unlock()
-		return
+		return rc.awaitReturn()
 	}
 
-	sc.protoSrcs[normalizedName] = []srcReturnChans{rc}
+	sc.protoSrcs[normalizedName] = []srcReturnChans{}
 	sc.psrcmut.Unlock()
 
 	doReturn := func(sg *sourceGateway, err error) {
@@ -130,7 +121,7 @@ func (sc *sourceCoordinator) setUpSourceGateway(ctx context.Context, normalizedN
 		// As in the deducer, don't cache errors so that externally-driven retry
 		// strategies can be constructed.
 		doReturn(nil, err)
-		return
+		return nil, err
 	}
 
 	// It'd be quite the feat - but not impossible - for a gateway
@@ -144,7 +135,7 @@ func (sc *sourceCoordinator) setUpSourceGateway(ctx context.Context, normalizedN
 		if srcGate, has := sc.srcs[url]; has {
 			sc.srcmut.RUnlock()
 			doReturn(srcGate, nil)
-			return
+			return srcGate, nil
 		}
 		panic(fmt.Sprintf("%q was URL for %q in nameToURL, but no corresponding srcGate in srcs map", url, normalizedName))
 	}
@@ -165,7 +156,7 @@ func (sc *sourceCoordinator) setUpSourceGateway(ctx context.Context, normalizedN
 	url, err := srcGate.sourceURL(ctx)
 	if err != nil {
 		doReturn(nil, err)
-		return
+		return nil, err
 	}
 
 	// We know we have a working srcGateway at this point, and need to
@@ -178,11 +169,12 @@ func (sc *sourceCoordinator) setUpSourceGateway(ctx context.Context, normalizedN
 	if sa, has := sc.srcs[url]; has {
 		// URL already had an entry in the main map; use that as the result.
 		doReturn(sa, nil)
-		return
+		return sa, nil
 	}
 
 	sc.srcs[url] = srcGate
 	doReturn(srcGate, nil)
+	return srcGate, nil
 }
 
 // sourceGateways manage all incoming calls for data from sources, serializing
