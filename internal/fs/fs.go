@@ -155,6 +155,12 @@ func RenameWithFallback(src, dst string) error {
 		return errors.Wrapf(err, "cannot stat %s", src)
 	}
 
+	if dstfi, err := os.Stat(src); err != nil {
+		return errors.Wrapf(err, "cannot stat %s", dst)
+	} else if dstfi.IsDir() {
+		return errors.Errorf("dst %s is an existing directory", dst)
+	}
+
 	err = os.Rename(src, dst)
 	if err == nil {
 		return nil
@@ -165,7 +171,7 @@ func RenameWithFallback(src, dst string) error {
 		return err
 	}
 
-	// Rename may fail if src and dest are on different devices; fall back to
+	// Rename may fail if src and dst are on different devices; fall back to
 	// copy if we detect that case. syscall.EXDEV is the common name for the
 	// cross device link error which has varying output text across different
 	// operating systems.

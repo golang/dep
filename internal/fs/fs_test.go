@@ -90,6 +90,20 @@ func TestRenameWithFallback(t *testing.T) {
 	if err = RenameWithFallback(srcpath, filepath.Join(dir, "dst")); err != nil {
 		t.Fatal(err)
 	}
+
+	srcpath = filepath.Join(dir, "a")
+	if err = os.MkdirAll(srcpath, 777); err != nil {
+		t.Fatal(err)
+	}
+
+	dstpath := filepath.Join(dir, "b")
+	if err = os.MkdirAll(dstpath, 777); err != nil {
+		t.Fatal(err)
+	}
+
+	if err = RenameWithFallback(srcpath, dstpath); err == nil {
+		t.Fatal("expected an error if dst is an existing directory, but got nil")
+	}
 }
 
 func TestGenTestFilename(t *testing.T) {
