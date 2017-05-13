@@ -11,7 +11,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/golang/dep/test"
+	"github.com/golang/dep/internal/test"
 )
 
 // The TestMain function creates a dep command for testing purposes and

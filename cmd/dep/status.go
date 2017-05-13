@@ -10,14 +10,12 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"log"
-	"os"
 	"sort"
 	"text/tabwriter"
 
 	"github.com/golang/dep"
-	"github.com/golang/dep/gps"
-	"github.com/golang/dep/gps/pkgtree"
+	"github.com/golang/dep/internal/gps"
+	"github.com/golang/dep/internal/gps/pkgtree"
 	"github.com/pkg/errors"
 )
 
@@ -195,26 +193,33 @@ func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
 	sm.UseDefaultSignalHandling()
 	defer sm.Release()
 
+	var buf bytes.Buffer
 	var out outputter
 	switch {
 	case cmd.detailed:
 		return errors.Errorf("not implemented")
 	case cmd.json:
 		out = &jsonOutput{
-			w: os.Stdout,
+			w: &buf,
 		}
 	case cmd.dot:
 		out = &dotOutput{
 			p: p,
 			o: cmd.output,
-			w: os.Stdout,
+			w: &buf,
 		}
 	default:
 		out = &tableOutput{
-			w: tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0),
+			w: tabwriter.NewWriter(&buf, 0, 4, 2, ' ', 0),
 		}
 	}
-	return runStatusAll(out, p, sm)
+
+	if err := runStatusAll(ctx.Loggers, out, p, sm); err != nil {
+		return err
+	}
+
+	ctx.Loggers.Out.Print(buf.String())
+	return nil
 }
 
 // BasicStatus contains all the information reported about a single dependency
@@ -234,7 +239,7 @@ type MissingStatus struct {
 	MissingPackages []string
 }
 
-func runStatusAll(out outputter, p *dep.Project, sm gps.SourceManager) error {
+func runStatusAll(loggers *dep.Loggers, out outputter, p *dep.Project, sm gps.SourceManager) error {
 	if p.Lock == nil {
 		// TODO if we have no lock file, do...other stuff
 		return nil
@@ -255,8 +260,8 @@ func runStatusAll(out outputter, p *dep.Project, sm gps.SourceManager) error {
 		Manifest:        p.Manifest,
 		// Locks aren't a part of the input hash check, so we can omit it.
 	}
-	if *verbose {
-		params.TraceLogger = log.New(os.Stderr, "", 0)
+	if loggers.Verbose {
+		params.TraceLogger = loggers.Err
 	}
 
 	s, err := gps.Prepare(params, sm)
@@ -390,9 +395,9 @@ func runStatusAll(out outputter, p *dep.Project, sm gps.SourceManager) error {
 		// TODO this is just a fix quick so staticcheck doesn't complain.
 		// Visually reconciling failure to deduce project roots with the rest of
 		// the mismatch output is a larger problem.
-		fmt.Fprintf(os.Stderr, "Failed to deduce project roots for import paths:\n")
+		loggers.Err.Printf("Failed to deduce project roots for import paths:\n")
 		for _, fail := range errs {
-			fmt.Fprintf(os.Stderr, "\t%s: %s\n", fail.ex, fail.err.Error())
+			loggers.Err.Printf("\t%s: %s\n", fail.ex, fail.err.Error())
 		}
 
 		return errors.New("address issues with undeducable import paths to get more status information.")

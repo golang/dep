@@ -5,40 +5,46 @@
 package dep
 
 import (
-	"go/build"
+	"log"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/Masterminds/vcs"
-	"github.com/golang/dep/gps"
 	"github.com/golang/dep/internal"
+	"github.com/golang/dep/internal/gps"
 	"github.com/pkg/errors"
 )
 
 // Ctx defines the supporting context of the tool.
 type Ctx struct {
-	GOPATH  string   // Selected Go path
-	GOPATHS []string // Other Go paths
+	GOPATH     string   // Selected Go path
+	GOPATHS    []string // Other Go paths
+	WorkingDir string
+	*Loggers
+}
+
+// Loggers holds standard loggers and a verbosity flag.
+type Loggers struct {
+	Out, Err *log.Logger
+	// Whether verbose logging is enabled.
+	Verbose bool
 }
 
 // NewContext creates a struct with the project's GOPATH. It assumes
 // that of your "GOPATH"'s we want the one we are currently in.
-func NewContext() (*Ctx, error) {
-	// this way we get the default GOPATH that was added in 1.8
-	buildContext := build.Default
-	wd, err := os.Getwd()
+func NewContext(wd string, env []string, loggers *Loggers) (*Ctx, error) {
+	ctx := &Ctx{WorkingDir: wd, Loggers: loggers}
 
-	if err != nil {
-		return nil, errors.Wrap(err, "getting work directory")
+	GOPATH := getEnv(env, "GOPATH")
+	if GOPATH == "" {
+		GOPATH = defaultGOPATH()
 	}
-	wd = filepath.FromSlash(wd)
-	ctx := &Ctx{}
-
-	for _, gp := range filepath.SplitList(buildContext.GOPATH) {
+	for _, gp := range filepath.SplitList(GOPATH) {
 		gp = filepath.FromSlash(gp)
 
-		if internal.HasFilepathPrefix(wd, gp) {
+		if internal.HasFilepathPrefix(filepath.FromSlash(wd), gp) {
 			ctx.GOPATH = gp
 		}
 
@@ -50,6 +56,42 @@ func NewContext() (*Ctx, error) {
 	}
 
 	return ctx, nil
+}
+
+// getEnv returns the last instance of an environment variable.
+func getEnv(env []string, key string) string {
+	for i := len(env) - 1; i >= 0; i-- {
+		v := env[i]
+		kv := strings.SplitN(v, "=", 2)
+		if kv[0] == key {
+			if len(kv) > 1 {
+				return kv[1]
+			}
+			return ""
+		}
+	}
+	return ""
+}
+
+// defaultGOPATH gets the default GOPATH that was added in 1.8
+// copied from go/build/build.go
+func defaultGOPATH() string {
+	env := "HOME"
+	if runtime.GOOS == "windows" {
+		env = "USERPROFILE"
+	} else if runtime.GOOS == "plan9" {
+		env = "home"
+	}
+	if home := os.Getenv(env); home != "" {
+		def := filepath.Join(home, "go")
+		if def == runtime.GOROOT() {
+			// Don't set the default GOPATH to GOROOT,
+			// as that will trigger warnings from the go tool.
+			return ""
+		}
+		return def
+	}
+	return ""
 }
 
 func (c *Ctx) SourceManager() (*gps.SourceMgr, error) {
@@ -77,7 +119,7 @@ func (c *Ctx) LoadProject(path string) (*Project, error) {
 	}
 	switch path {
 	case "":
-		p.AbsRoot, err = findProjectRootFromWD()
+		p.AbsRoot, err = findProjectRoot(c.WorkingDir)
 	default:
 		p.AbsRoot, err = findProjectRoot(path)
 	}
@@ -111,7 +153,11 @@ func (c *Ctx) LoadProject(path string) (*Project, error) {
 	}
 	defer mf.Close()
 
-	p.Manifest, err = readManifest(mf)
+	var warns []error
+	p.Manifest, warns, err = readManifest(mf)
+	for _, warn := range warns {
+		c.Loggers.Err.Printf("dep: WARNING: %v\n", warn)
+	}
 	if err != nil {
 		return nil, errors.Errorf("error while parsing %s: %s", mp, err)
 	}
@@ -181,6 +227,10 @@ func (c *Ctx) resolveProjectRoot(path string) (string, error) {
 func (c *Ctx) SplitAbsoluteProjectRoot(path string) (string, error) {
 	srcprefix := filepath.Join(c.GOPATH, "src") + string(filepath.Separator)
 	if internal.HasFilepathPrefix(path, srcprefix) {
+		if len(path) <= len(srcprefix) {
+			return "", errors.New("dep does not currently support using $GOPATH/src as the project root.")
+		}
+
 		// filepath.ToSlash because we're dealing with an import path now,
 		// not an fs path
 		return filepath.ToSlash(path[len(srcprefix):]), nil

@@ -11,14 +11,12 @@ import (
 	"fmt"
 	"go/build"
 	"log"
-	"os"
 	"strconv"
 	"strings"
 
 	"github.com/golang/dep"
-	"github.com/golang/dep/gps"
-	"github.com/golang/dep/gps/pkgtree"
-	"github.com/golang/dep/internal"
+	"github.com/golang/dep/internal/gps"
+	"github.com/golang/dep/internal/gps/pkgtree"
 	"github.com/pkg/errors"
 )
 
@@ -129,7 +127,7 @@ type ensureCommand struct {
 
 func (cmd *ensureCommand) Run(ctx *dep.Ctx, args []string) error {
 	if cmd.examples {
-		internal.Logln(strings.TrimSpace(ensureExamples))
+		ctx.Loggers.Err.Println(strings.TrimSpace(ensureExamples))
 		return nil
 	}
 
@@ -163,8 +161,8 @@ func (cmd *ensureCommand) Run(ctx *dep.Ctx, args []string) error {
 	defer sm.Release()
 
 	params := p.MakeParams()
-	if *verbose {
-		params.TraceLogger = log.New(os.Stderr, "", 0)
+	if ctx.Loggers.Verbose {
+		params.TraceLogger = ctx.Loggers.Err
 	}
 	params.RootPackageTree, err = pkgtree.ListPackages(p.AbsRoot, string(p.ImportRoot))
 	if err != nil {
@@ -334,7 +332,7 @@ func (cmd *ensureCommand) runUpdate(ctx *dep.Ctx, args []string, p *dep.Project,
 	// e.g., named projects did not upgrade even though newer versions were
 	// available.
 	if cmd.dryRun {
-		return sw.PrintPreparedActions()
+		return sw.PrintPreparedActions(ctx.Loggers.Out)
 	}
 
 	return errors.Wrap(sw.Write(p.AbsRoot, sm, true), "grouped write of manifest, lock and vendor")
@@ -471,7 +469,7 @@ func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm
 	return errors.Wrap(sw.Write(p.AbsRoot, sm, true), "grouped write of manifest, lock and vendor")
 }
 
-func applyEnsureArgs(args []string, overrides stringSlice, p *dep.Project, sm gps.SourceManager, params *gps.SolveParameters) error {
+func applyEnsureArgs(logger *log.Logger, args []string, overrides stringSlice, p *dep.Project, sm gps.SourceManager, params *gps.SolveParameters) error {
 	var errs []error
 	for _, arg := range args {
 		pc, err := getProjectConstraint(arg, sm)
@@ -489,7 +487,7 @@ func applyEnsureArgs(args []string, overrides stringSlice, p *dep.Project, sm gp
 			// TODO(sdboyer): for this case - or just in general - do we want to
 			// add project args to the requires list temporarily for this run?
 			if _, has := p.Manifest.Dependencies[pc.Ident.ProjectRoot]; !has {
-				internal.Logf("No constraint or alternate source specified for %q, omitting from manifest", pc.Ident.ProjectRoot)
+				logger.Printf("dep: No constraint or alternate source specified for %q, omitting from manifest\n", pc.Ident.ProjectRoot)
 			}
 			// If it's already in the manifest, no need to log
 			continue

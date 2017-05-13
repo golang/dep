@@ -5,6 +5,8 @@
 package dep
 
 import (
+	"io/ioutil"
+	"log"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -12,8 +14,13 @@ import (
 	"testing"
 	"unicode"
 
-	"github.com/golang/dep/gps"
-	"github.com/golang/dep/test"
+	"github.com/golang/dep/internal/gps"
+	"github.com/golang/dep/internal/test"
+)
+
+var (
+	discardLogger  = log.New(ioutil.Discard, "", 0)
+	discardLoggers = &Loggers{Out: discardLogger, Err: discardLogger}
 )
 
 func TestNewContextNoGOPATH(t *testing.T) {
@@ -23,7 +30,12 @@ func TestNewContextNoGOPATH(t *testing.T) {
 	h.TempDir("src")
 	h.Cd(h.Path("."))
 
-	c, err := NewContext()
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatal("failed to get work directory:", err)
+	}
+
+	c, err := NewContext(wd, os.Environ(), nil)
 	if err == nil {
 		t.Fatal("error should not have been nil")
 	}
@@ -58,10 +70,16 @@ func TestSplitAbsoluteProjectRoot(t *testing.T) {
 		}
 	}
 
-	// test where it should return error
-	got, err := depCtx.SplitAbsoluteProjectRoot("tra/la/la/la")
+	// test where it should return an error when directly within $GOPATH/src
+	got, err := depCtx.SplitAbsoluteProjectRoot(filepath.Join(depCtx.GOPATH, "src"))
+	if err == nil || !strings.Contains(err.Error(), "$GOPATH/src") {
+		t.Fatalf("should have gotten an error for use directly in $GOPATH/src, but got %s", got)
+	}
+
+	// test where it should return an error
+	got, err = depCtx.SplitAbsoluteProjectRoot("tra/la/la/la")
 	if err == nil {
-		t.Fatalf("should have gotten error but did not for tra/la/la/la: %s", got)
+		t.Fatalf("should have gotten an error but did not for tra/la/la/la: %s", got)
 	}
 }
 
@@ -191,11 +209,17 @@ func TestLoadProject(t *testing.T) {
 	}
 
 	for _, testcase := range testcases {
-		ctx := &Ctx{GOPATH: tg.Path(".")}
-
 		start := testcase.start
 		path := testcase.path
 		tg.Cd(tg.Path(start))
+
+		wd, err := os.Getwd()
+		if err != nil {
+			t.Fatal("failed to get working directory", err)
+		}
+
+		ctx := &Ctx{GOPATH: tg.Path("."), WorkingDir: wd, Loggers: discardLoggers}
+
 		proj, err := ctx.LoadProject(path)
 		tg.Must(err)
 		if proj.Manifest == nil {
@@ -234,12 +258,18 @@ func TestLoadProjectNotFoundErrors(t *testing.T) {
 	}
 
 	for _, testcase := range testcases {
-		ctx := &Ctx{GOPATH: tg.Path(".")}
-
 		start := testcase.start
 		path := testcase.path
 		tg.Cd(tg.Path(start))
-		_, err := ctx.LoadProject(path)
+
+		wd, err := os.Getwd()
+		if err != nil {
+			t.Fatal("failed to get working directory", err)
+		}
+
+		ctx := &Ctx{GOPATH: tg.Path("."), WorkingDir: wd}
+
+		_, err = ctx.LoadProject(path)
 		if err == nil {
 			t.Fatalf("should have returned 'No Manifest Found' error -> from: %q, path: %q", start, path)
 		}
@@ -256,13 +286,19 @@ func TestLoadProjectManifestParseError(t *testing.T) {
 	tg.TempFile(filepath.Join("src/test1", LockName), `memo = "cdafe8641b28cd16fe025df278b0a49b9416859345d8b6ba0ace0272b74925ee"\n\n[[projects]]`)
 	tg.Setenv("GOPATH", tg.Path("."))
 
-	ctx := &Ctx{GOPATH: tg.Path(".")}
 	path := filepath.Join("src", "test1")
 	tg.Cd(tg.Path(path))
 
-	_, err := ctx.LoadProject("")
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatal("failed to get working directory", err)
+	}
+
+	ctx := &Ctx{GOPATH: tg.Path("."), WorkingDir: wd, Loggers: discardLoggers}
+
+	_, err = ctx.LoadProject("")
 	if err == nil {
-		t.Fatalf("should have returned 'Manifest Syntax' error")
+		t.Fatal("should have returned 'Manifest Syntax' error")
 	}
 }
 
@@ -276,13 +312,19 @@ func TestLoadProjectLockParseError(t *testing.T) {
 	tg.TempFile(filepath.Join("src/test1", LockName), `memo = "cdafe8641b28cd16fe025df278b0a49b9416859345d8b6ba0ace0272b74925ee"\n\n[[projects]]`)
 	tg.Setenv("GOPATH", tg.Path("."))
 
-	ctx := &Ctx{GOPATH: tg.Path(".")}
 	path := filepath.Join("src", "test1")
 	tg.Cd(tg.Path(path))
 
-	_, err := ctx.LoadProject("")
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatal("failed to get working directory", err)
+	}
+
+	ctx := &Ctx{GOPATH: tg.Path("."), WorkingDir: wd, Loggers: discardLoggers}
+
+	_, err = ctx.LoadProject("")
 	if err == nil {
-		t.Fatalf("should have returned 'Lock Syntax' error")
+		t.Fatal("should have returned 'Lock Syntax' error")
 	}
 }
 
@@ -304,7 +346,7 @@ func TestLoadProjectNoSrcDir(t *testing.T) {
 
 	_, err := ctx.LoadProject("")
 	if err == nil {
-		t.Fatalf("should have returned 'Split Absolute Root' error (no 'src' dir present)")
+		t.Fatal("should have returned 'Split Absolute Root' error (no 'src' dir present)")
 	}
 }
 
@@ -333,7 +375,11 @@ func TestCaseInsentitiveGOPATH(t *testing.T) {
 	}
 	gopath := string(rs)
 	h.Setenv("GOPATH", gopath)
-	depCtx := &Ctx{GOPATH: gopath}
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatal("failed to get working directory", err)
+	}
+	depCtx := &Ctx{GOPATH: gopath, WorkingDir: wd}
 
 	depCtx.LoadProject("")
 
