@@ -10,8 +10,8 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/golang/dep/gps"
-	"github.com/golang/dep/test"
+	"github.com/golang/dep/internal/gps"
+	"github.com/golang/dep/internal/test"
 )
 
 func TestFindRoot(t *testing.T) {
@@ -85,15 +85,86 @@ func TestSlashedGOPATH(t *testing.T) {
 	defer h.Cleanup()
 	h.TempDir("src")
 
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatal("failed to get work directory:", err)
+	}
+	env := os.Environ()
+
 	h.Setenv("GOPATH", filepath.ToSlash(h.Path(".")))
-	_, err := NewContext()
+	_, err = NewContext(wd, env, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	h.Setenv("GOPATH", filepath.FromSlash(h.Path(".")))
-	_, err = NewContext()
+	_, err = NewContext(wd, env, nil)
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestBackupVendor(t *testing.T) {
+	h := test.NewHelper(t)
+	defer h.Cleanup()
+
+	pc := NewTestProjectContext(h, "vendorbackupproject")
+	defer pc.Release()
+
+	dummyFile := filepath.Join("vendor", "badinput_fileroot")
+	pc.CopyFile(dummyFile, "txn_writer/badinput_fileroot")
+	pc.Load()
+
+	if err := pc.VendorShouldExist(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a backup
+	wantName := "vendor-sfx"
+	vendorbak, err := BackupVendor("vendor", "sfx")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if vendorbak != wantName {
+		t.Fatalf("Vendor backup name is not as expected: \n\t(GOT) %v\n\t(WNT) %v", vendorbak, wantName)
+	}
+
+	if err = pc.h.ShouldExist(vendorbak); err != nil {
+		t.Fatal(err)
+	}
+
+	if err = pc.h.ShouldExist(vendorbak + string(filepath.Separator) + "badinput_fileroot"); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create another vendor directory. Previous vendor moved as backup.
+	os.MkdirAll("vendor", 0777)
+	pc.CopyFile(dummyFile, "txn_writer/badinput_fileroot")
+
+	// Should return error on creating backup with existing filename
+	vendorbak, err = BackupVendor("vendor", "sfx")
+
+	if err != errVendorBackupFailed {
+		t.Fatalf("Vendor backup error is not as expected: \n\t(GOT) %v\n\t(WNT) %v", err, errVendorBackupFailed)
+	}
+
+	if vendorbak != "" {
+		t.Fatalf("Vendor backup name is not as expected: \n\t(GOT) %v\n\t(WNT) %v", vendorbak, "")
+	}
+
+	// Delete vendor
+	if err = os.RemoveAll("vendor"); err != nil {
+		t.Fatal(err)
+	}
+
+	// Should return empty backup file name when no vendor exists
+	vendorbak, err = BackupVendor("vendor", "sfx")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if vendorbak != "" {
+		t.Fatalf("Vendor backup name is not as expected: \n\t(GOT) %v\n\t(WNT) %v", vendorbak, "")
 	}
 }

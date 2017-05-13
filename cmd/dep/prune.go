@@ -8,13 +8,10 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
-	"log"
-	"os"
 
 	"github.com/golang/dep"
-	"github.com/golang/dep/gps"
-	"github.com/golang/dep/gps/pkgtree"
-
+	"github.com/golang/dep/internal/gps"
+	"github.com/golang/dep/internal/gps/pkgtree"
 	"github.com/pkg/errors"
 )
 
@@ -62,8 +59,8 @@ func (cmd *pruneCommand) Run(ctx *dep.Ctx, args []string) error {
 	params := p.MakeParams()
 	params.RootPackageTree = ptree
 
-	if *verbose {
-		params.TraceLogger = log.New(os.Stderr, "", 0)
+	if ctx.Loggers.Verbose {
+		params.TraceLogger = ctx.Loggers.Err
 	}
 
 	s, err := gps.Prepare(params, sm)

@@ -6,6 +6,8 @@ _The first rule of FAQ is don't bikeshed the FAQ, leave that for
 Please contribute to the FAQ! Found an explanation in an issue or pull request helpful?
 Summarize the question and quote the reply, linking back to the original comment.
 
+* [What is the difference between Gopkg.toml (the "manifest") and Gopkg.lock (the "lock")?](#what-is-the-difference-between-gopkgtoml-the-manifest-and-gopkglock-the-lock)
+* [When should I use dependencies, overrides or required in the manifest?](#when-should-i-use-dependencies-overrides-required-or-ignored-in-the-manifest)
 * [What is a direct or transitive dependency?](#what-is-a-direct-or-transitive-dependency)
 * [Should I commit my vendor directory?](#should-i-commit-my-vendor-directory)
 * [Why is it `dep ensure` instead of `dep install`?](#why-is-it-dep-ensure-instead-of-dep-install)
@@ -15,6 +17,21 @@ Summarize the question and quote the reply, linking back to the original comment
 * [`dep` deleted my files in the vendor directory!](#dep-deleted-my-files-in-the-vendor-directory)
 * [Can I put the manifest and lock in the vendor directory?](#can-i-put-the-manifest-and-lock-in-the-vendor-directory)
 * [Why did dep use a different revision for package X instead of the revision in the lock file?](#why-did-dep-use-a-different-revision-for-package-x-instead-of-the-revision-in-the-lock-file)
+* [Why is `dep` slow?](#why-is-dep-slow)
+
+## What is the difference between Gopkg.toml (the "manifest") and Gopkg.lock (the "lock")?
+
+> The manifest describes user intent, and the lock describes computed outputs. There's flexibility in manifests that isn't present in locks..., as the "branch": "master" constraint will match whatever revision master HAPPENS to be at right now, whereas the lock is nailed down to a specific revision.
+>
+> This flexibility is important because it allows us to provide easy commands (e.g. `dep ensure -update`) that can manage an update process for you, within the constraints you specify, AND because it allows your project, when imported by someone else, to collaboratively specify the constraints for your own dependencies.
+-[@sdboyer in #281](https://github.com/golang/dep/issues/281#issuecomment-284118314)
+
+## When should I use dependencies, overrides, required, or ignored in the manifest?
+
+* Use `dependencies` to constrain a [direct dependency](#what-is-a-direct-or-transitive-dependency) to a specific branch, version range, revision, or specify an alternate source such as a fork.
+* Use `overrides` to constrain a [transitive dependency](#what-is-a-direct-or-transitive-dependency). See [How do I constrain a transitive dependency's version?](#how-do-i-constrain-a-transitive-dependencys-version) for more details on how overrides differ from dependencies. Overrides should be used cautiously, sparingly, and temporarily.
+* Use `required` to explicitly add a dependency that is not imported directly or transitively, for example a development package used for code generation.
+* Use `ignored` to ignore a package and any of that package's unique dependencies.
 
 ## What is a direct or transitive dependency?
 * Direct dependencies are dependencies that are imported directly by your project: they appear in at least one import statement from your project.
@@ -127,3 +144,38 @@ Unable to update checked out version: fatal: reference is not a tree: 4dfc6a8a7e
 >
 > Under most circumstances, if those arguments don't change, then the lock remains fine and correct. You've hit one one of the few cases where that guarantee doesn't apply. The fact that you ran dep ensure and it DID a solve is a product of some arguments changing; that solving failed because this particular commit had become stale is a separate problem.
 -[@sdboyer in #405](https://github.com/golang/dep/issues/405#issuecomment-295998489)
+
+## Why is `dep` slow?
+
+There are two things that really slow `dep` down. One is unavoidable; for the other, we have a plan.
+
+The unavoidable part is the initial clone. `dep` relies on a cache of local
+repositories (stored under `$GOPATH/pkg/dep`), which is populated on demand.
+Unfortunately, the first `dep` run, especially for a large project, may take a
+while, as all dependencies are cloned into the cache.
+
+Fortunately, this is just an _initial_ clone - pay it once, and you're done.
+The problem repeats itself a bit when you're running `dep` for the first time
+in a while and there's new changesets to fetch, but even then, these costs are
+only paid once per changeset.
+
+The other part is the work of retrieving information about dependencies. There are three parts to this:
+
+1. Getting an up-to-date list of versions from the upstream source
+2. Reading the `Gopkg.toml` for a particular version out of the local cache
+3. Parsing the tree of packages for import statements at a particular version
+
+The first requires one or more network calls; the second two usually mean
+something like a `git checkout`, and the third is a filesystem walk, plus
+loading and parsing `.go` files. All of these are expensive operations.
+
+Fortunately, we can cache the second and third. And that cache can be permanent
+when keyed on an immutable identifier for the version - like a git commit SHA1
+hash. The first is a bit trickier, but there are reasonable staleness tradeoffs
+we can consider to avoid the network entirely. There's an issue to [implement
+persistent caching](https://github.com/golang/dep/issues/431) that's the
+gateway to all of these improvements.
+
+There's another major performance issue that's much harder - the process of picking versions itself is an NP-complete problem in `dep`'s current design. This is a much trickier problem 😜
+
+

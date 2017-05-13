@@ -6,11 +6,10 @@ package main
 
 import (
 	"flag"
-	"fmt"
 
 	"github.com/golang/dep"
-	"github.com/golang/dep/gps"
-	"github.com/golang/dep/gps/pkgtree"
+	"github.com/golang/dep/internal/gps"
+	"github.com/golang/dep/internal/gps/pkgtree"
 	"github.com/pkg/errors"
 )
 
@@ -52,7 +51,6 @@ func (hashinCommand) Run(ctx *dep.Ctx, args []string) error {
 	if err != nil {
 		return errors.Wrap(err, "prepare solver")
 	}
-
-	fmt.Println(gps.HashingInputsAsString(s))
+	ctx.Loggers.Out.Println(gps.HashingInputsAsString(s))
 	return nil
 }

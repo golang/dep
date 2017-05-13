@@ -5,12 +5,13 @@
 package dep
 
 import (
+	"errors"
 	"reflect"
 	"strings"
 	"testing"
 
-	"github.com/golang/dep/gps"
-	"github.com/golang/dep/test"
+	"github.com/golang/dep/internal/gps"
+	"github.com/golang/dep/internal/test"
 )
 
 func TestReadManifest(t *testing.T) {
@@ -19,7 +20,7 @@ func TestReadManifest(t *testing.T) {
 
 	mf := h.GetTestFile("manifest/golden.toml")
 	defer mf.Close()
-	got, err := readManifest(mf)
+	got, _, err := readManifest(mf)
 	if err != nil {
 		t.Fatalf("Should have read Manifest correctly, but got err %q", err)
 	}
@@ -27,7 +28,7 @@ func TestReadManifest(t *testing.T) {
 	c, _ := gps.NewSemverConstraint(">=0.12.0, <1.0.0")
 	want := Manifest{
 		Dependencies: map[gps.ProjectRoot]gps.ProjectProperties{
-			gps.ProjectRoot("github.com/golang/dep/gps"): {
+			gps.ProjectRoot("github.com/golang/dep/internal/gps"): {
 				Constraint: c,
 			},
 			gps.ProjectRoot("github.com/babble/brook"): {
@@ -35,8 +36,8 @@ func TestReadManifest(t *testing.T) {
 			},
 		},
 		Ovr: map[gps.ProjectRoot]gps.ProjectProperties{
-			gps.ProjectRoot("github.com/golang/dep/gps"): {
-				Source:     "https://github.com/golang/dep/gps",
+			gps.ProjectRoot("github.com/golang/dep/internal/gps"): {
+				Source:     "https://github.com/golang/dep/internal/gps",
 				Constraint: gps.NewBranch("master"),
 			},
 		},
@@ -63,7 +64,7 @@ func TestWriteManifest(t *testing.T) {
 	c, _ := gps.NewSemverConstraint("^v0.12.0")
 	m := &Manifest{
 		Dependencies: map[gps.ProjectRoot]gps.ProjectProperties{
-			gps.ProjectRoot("github.com/golang/dep/gps"): {
+			gps.ProjectRoot("github.com/golang/dep/internal/gps"): {
 				Constraint: c,
 			},
 			gps.ProjectRoot("github.com/babble/brook"): {
@@ -71,8 +72,8 @@ func TestWriteManifest(t *testing.T) {
 			},
 		},
 		Ovr: map[gps.ProjectRoot]gps.ProjectProperties{
-			gps.ProjectRoot("github.com/golang/dep/gps"): {
-				Source:     "https://github.com/golang/dep/gps",
+			gps.ProjectRoot("github.com/golang/dep/internal/gps"): {
+				Source:     "https://github.com/golang/dep/internal/gps",
 				Constraint: gps.NewBranch("master"),
 			},
 		},
@@ -111,11 +112,128 @@ func TestReadManifestErrors(t *testing.T) {
 	for _, tst := range tests {
 		mf := h.GetTestFile(tst.file)
 		defer mf.Close()
-		_, err = readManifest(mf)
+		_, _, err = readManifest(mf)
 		if err == nil {
 			t.Errorf("Reading manifest with %s should have caused error, but did not", tst.name)
 		} else if !strings.Contains(err.Error(), tst.name) {
 			t.Errorf("Unexpected error %q; expected %s error", err, tst.name)
+		}
+	}
+}
+
+func TestValidateManifest(t *testing.T) {
+	cases := []struct {
+		tomlString string
+		want       []error
+	}{
+		{
+			tomlString: `
+			[[dependencies]]
+			  name = "github.com/foo/bar"
+			`,
+			want: []error{},
+		},
+		{
+			tomlString: `
+			[metadata]
+			  authors = "foo"
+			  version = "1.0.0"
+			`,
+			want: []error{},
+		},
+		{
+			tomlString: `
+			foo = "some-value"
+			version = 14
+
+			[[bar]]
+			  author = "xyz"
+
+			[[dependencies]]
+			  name = "github.com/foo/bar"
+			  version = ""
+			`,
+			want: []error{
+				errors.New("Unknown field in manifest: foo"),
+				errors.New("Unknown field in manifest: bar"),
+				errors.New("Unknown field in manifest: version"),
+			},
+		},
+		{
+			tomlString: `
+			metadata = "project-name"
+
+			[[dependencies]]
+			  name = "github.com/foo/bar"
+			`,
+			want: []error{errors.New("metadata should be a TOML table")},
+		},
+		{
+			tomlString: `
+			dependencies = "foo"
+			overrides = "bar"
+			`,
+			want: []error{
+				errors.New("dependencies should be a TOML array of tables"),
+				errors.New("overrides should be a TOML array of tables"),
+			},
+		},
+		{
+			tomlString: `
+			[[dependencies]]
+			  name = "github.com/foo/bar"
+			  location = "some-value"
+			  link = "some-other-value"
+			  metadata = "foo"
+
+			[[overrides]]
+			  nick = "foo"
+			`,
+			want: []error{
+				errors.New("Invalid key \"location\" in \"dependencies\""),
+				errors.New("Invalid key \"link\" in \"dependencies\""),
+				errors.New("Invalid key \"nick\" in \"overrides\""),
+				errors.New("metadata in \"dependencies\" should be a TOML table"),
+			},
+		},
+		{
+			tomlString: `
+			[[dependencies]]
+			  name = "github.com/foo/bar"
+
+			  [dependencies.metadata]
+			    color = "blue"
+			`,
+			want: []error{},
+		},
+	}
+
+	// constains for error
+	contains := func(s []error, e error) bool {
+		for _, a := range s {
+			if a.Error() == e.Error() {
+				return true
+			}
+		}
+		return false
+	}
+
+	for _, c := range cases {
+		errs, err := validateManifest(c.tomlString)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// compare length of error slice
+		if len(errs) != len(c.want) {
+			t.Fatalf("Number of manifest errors are not as expected: \n\t(GOT) %v errors(%v)\n\t(WNT) %v errors(%v).", len(errs), errs, len(c.want), c.want)
+		}
+
+		// check if the expected errors exist in actual errors slice
+		for _, er := range errs {
+			if !contains(c.want, er) {
+				t.Fatalf("Manifest errors are not as expected: \n\t(MISSING) %v\n\t(FROM) %v", er, c.want)
+			}
 		}
 	}
 }

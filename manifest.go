@@ -6,10 +6,12 @@ package dep
 
 import (
 	"bytes"
+	"fmt"
 	"io"
+	"reflect"
 	"sort"
 
-	"github.com/golang/dep/gps"
+	"github.com/golang/dep/internal/gps"
 	"github.com/pelletier/go-toml"
 	"github.com/pkg/errors"
 )
@@ -38,20 +40,79 @@ type rawProject struct {
 	Source   string `toml:"source,omitempty"`
 }
 
-func readManifest(r io.Reader) (*Manifest, error) {
+func validateManifest(s string) ([]error, error) {
+	var errs []error
+	// Load the TomlTree from string
+	tree, err := toml.Load(s)
+	if err != nil {
+		return errs, errors.Wrap(err, "Unable to load TomlTree from string")
+	}
+	// Convert tree to a map
+	manifest := tree.ToMap()
+
+	// Look for unknown fields and collect errors
+	for prop, val := range manifest {
+		switch prop {
+		case "metadata":
+			// Check if metadata is of Map type
+			if reflect.TypeOf(val).Kind() != reflect.Map {
+				errs = append(errs, errors.New("metadata should be a TOML table"))
+			}
+		case "dependencies", "overrides":
+			// Invalid if type assertion fails. Not a TOML array of tables.
+			if rawProj, ok := val.([]interface{}); ok {
+				// Iterate through each array of tables
+				for _, v := range rawProj {
+					// Check the individual field's key to be valid
+					for key, value := range v.(map[string]interface{}) {
+						// Check if the key is valid
+						switch key {
+						case "name", "branch", "revision", "version", "source":
+							// valid key
+						case "metadata":
+							// Check if metadata is of Map type
+							if reflect.TypeOf(value).Kind() != reflect.Map {
+								errs = append(errs, fmt.Errorf("metadata in %q should be a TOML table", prop))
+							}
+						default:
+							// unknown/invalid key
+							errs = append(errs, fmt.Errorf("Invalid key %q in %q", key, prop))
+						}
+					}
+				}
+			} else {
+				errs = append(errs, fmt.Errorf("%v should be a TOML array of tables", prop))
+			}
+		case "ignored", "required":
+		default:
+			errs = append(errs, fmt.Errorf("Unknown field in manifest: %v", prop))
+		}
+	}
+
+	return errs, nil
+}
+
+// readManifest returns a Manifest read from r and a slice of validation warnings.
+func readManifest(r io.Reader) (*Manifest, []error, error) {
 	buf := &bytes.Buffer{}
 	_, err := buf.ReadFrom(r)
 	if err != nil {
-		return nil, errors.Wrap(err, "Unable to read byte stream")
+		return nil, nil, errors.Wrap(err, "Unable to read byte stream")
+	}
+
+	warns, err := validateManifest(buf.String())
+	if err != nil {
+		return nil, warns, errors.Wrap(err, "Manifest validation failed")
 	}
 
 	raw := rawManifest{}
 	err = toml.Unmarshal(buf.Bytes(), &raw)
 	if err != nil {
-		return nil, errors.Wrap(err, "Unable to parse the manifest as TOML")
+		return nil, warns, errors.Wrap(err, "Unable to parse the manifest as TOML")
 	}
 
-	return fromRawManifest(raw)
+	m, err := fromRawManifest(raw)
+	return m, warns, err
 }
 
 func fromRawManifest(raw rawManifest) (*Manifest, error) {
