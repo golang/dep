@@ -96,4 +96,18 @@ func (a *gopathAnalyzer) PostSolveShenanigans(m *dep.Manifest, l *dep.Lock) {
 			}
 		}
 	}
+
+	// Remove dependencies from the manifest that aren't used
+	for pr := range m.Dependencies {
+		var used bool
+		for _, y := range l.Projects() {
+			if pr == y.Ident().ProjectRoot {
+				used = true
+				break
+			}
+		}
+		if !used {
+			delete(m.Dependencies, pr)
+		}
+	}
 }
