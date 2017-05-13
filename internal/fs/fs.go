@@ -333,11 +333,23 @@ func IsNonEmptyDir(name string) (bool, error) {
 		return false, err
 	}
 
-	files, err := ioutil.ReadDir(name)
+	// Get file descriptor
+	f, err := os.Open(name)
 	if err != nil {
 		return false, err
 	}
-	return len(files) != 0, nil
+	defer f.Close()
+
+	// Query only 1 child. EOF if no children.
+	_, err = f.Readdirnames(1)
+	switch err {
+	case io.EOF:
+		return false, nil
+	case nil:
+		return true, nil
+	default:
+		return false, err
+	}
 }
 
 // IsRegular determines if the path given is a regular file or not.
