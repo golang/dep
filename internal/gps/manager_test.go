@@ -35,7 +35,7 @@ func (a naiveAnalyzer) Info() (name string, version int) {
 	return "naive-analyzer", 1
 }
 
-func sv(s string) *semver.Version {
+func sv(s string) semver.Version {
 	sv, err := semver.NewVersion(s)
 	if err != nil {
 		panic(fmt.Sprintf("Error creating semver from %q: %s", s, err))

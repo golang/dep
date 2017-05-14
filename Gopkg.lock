@@ -4,7 +4,7 @@ memo = "932b7b1663f6eecccb1fada1d3670ae24cd8aa7c8b61e3b224edfefebe25954e"
   branch = "2.x"
   name = "github.com/Masterminds/semver"
   packages = ["."]
-  revision = "94ad6eaf8457cf85a68c9b53fa42e9b1b8683783"
+  revision = "139cc0982c53f1367af5636b12b7643cd03757fc"
 
 [[projects]]
   name = "github.com/Masterminds/vcs"
