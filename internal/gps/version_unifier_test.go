@@ -26,7 +26,7 @@ func init() {
 		NewVersion("1.0.1").Is("other1"),
 		NewVersion("v2.0.5").Is(rev3),
 		NewVersion("2.0.5.2").Is(rev3),
-		newDefaultBranch("unwrapped").Is(rev3),
+		NewDefaultBranch("unwrapped").Is(rev3),
 		NewVersion("20.0.5.2").Is(rev1),
 		NewVersion("v1.5.5-beta.4").Is("other2"),
 		NewVersion("v3.0.1-alpha.1").Is(rev2),

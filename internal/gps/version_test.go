@@ -14,7 +14,7 @@ func TestVersionSorts(t *testing.T) {
 	v4 := NewVersion("1.0.1").Is(rev)
 	v5 := NewVersion("v2.0.5").Is(rev)
 	v6 := NewVersion("2.0.5.2").Is(rev)
-	v7 := newDefaultBranch("unwrapped").Is(rev)
+	v7 := NewDefaultBranch("unwrapped").Is(rev)
 	v8 := NewVersion("20.0.5.2").Is(rev)
 	v9 := NewVersion("v1.5.5-beta.4").Is(rev)
 	v10 := NewVersion("v3.0.1-alpha.1").Is(rev)
