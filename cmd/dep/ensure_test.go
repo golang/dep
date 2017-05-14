@@ -52,7 +52,7 @@ func TestDeduceConstraint_InvalidInput(t *testing.T) {
 	sm, err := gps.NewSourceManager(h.Path(cacheDir))
 	h.Must(err)
 
-	constraints := []string {
+	constraints := []string{
 		// invalid bzr revs
 		"go4@golang.org-lskjdfnkjsdnf-ksjdfnskjdfn",
 		//"go4@golang.org-sadfasdf-",

@@ -6,9 +6,9 @@ package main
 
 import (
 	"github.com/golang/dep"
+	fb "github.com/golang/dep/internal/feedback"
 	"github.com/golang/dep/internal/gps"
 	"github.com/golang/dep/internal/gps/pkgtree"
-	fb "github.com/golang/dep/internal/feedback"
 )
 
 // gopathAnalyzer deduces configuration from the projects in the GOPATH
@@ -31,6 +31,9 @@ func newGopathAnalyzer(ctx *dep.Ctx, pkgT pkgtree.PackageTree, cpr string, sm *g
 	}
 }
 
+// Perform analysis of the filesystem tree rooted at path, with the
+// root import path importRoot, to determine the project's constraints, as
+// indicated by a Manifest and Lock.
 func (a *gopathAnalyzer) DeriveRootManifestAndLock(path string, n gps.ProjectRoot) (*dep.Manifest, *dep.Lock, error) {
 	var err error
 
@@ -72,7 +75,7 @@ func (a *gopathAnalyzer) DeriveRootManifestAndLock(path string, n gps.ProjectRoo
 	return m, l, nil
 }
 
-func (a *gopathAnalyzer) PostSolveShenanigans(m *dep.Manifest, l *dep.Lock) {
+func (a *gopathAnalyzer) FinalizeManifestAndLock(m *dep.Manifest, l *dep.Lock) {
 	// Iterate through the new projects in solved lock and add them to manifest
 	// if direct deps and log feedback for all the new projects.
 	for _, x := range l.Projects() {

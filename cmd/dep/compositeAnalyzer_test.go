@@ -20,7 +20,7 @@ func (a testRootProjectAnalyzer) DeriveRootManifestAndLock(path string, n gps.Pr
 	return a.Manifest, a.Lock, nil
 }
 
-func (a testRootProjectAnalyzer) PostSolveShenanigans(*dep.Manifest, *dep.Lock) {
+func (a testRootProjectAnalyzer) FinalizeManifestAndLock(*dep.Manifest, *dep.Lock) {
 	// do nothing
 }
 

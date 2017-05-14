@@ -133,7 +133,7 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 				newGopathAnalyzer(ctx, pkgT, cpr, sm),
 				newImportAnalyzer(ctx.Loggers, sm),
 			}}
-		analyzer = importAnalyzer{ctx.Loggers, sm}
+		analyzer = newImportAnalyzer(ctx.Loggers, sm)
 	}
 
 	// Generate a manifest and lock for the root project
@@ -172,7 +172,7 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 	}
 	l = dep.LockFromInterface(soln)
 
-	rootAnalyzer.PostSolveShenanigans(m, l)
+	rootAnalyzer.FinalizeManifestAndLock(m, l)
 
 	// Run gps.Prepare with appropriate constraint solutions from solve run
 	// to generate the final lock memo.

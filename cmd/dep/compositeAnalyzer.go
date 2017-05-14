@@ -65,8 +65,8 @@ func (a compositeAnalyzer) DeriveRootManifestAndLock(path string, n gps.ProjectR
 	return rootM, rootL, nil
 }
 
-func (a compositeAnalyzer) PostSolveShenanigans(m *dep.Manifest, l *dep.Lock) {
+func (a compositeAnalyzer) FinalizeManifestAndLock(m *dep.Manifest, l *dep.Lock) {
 	for _, a := range a.Analyzers {
-		a.PostSolveShenanigans(m, l)
+		a.FinalizeManifestAndLock(m, l)
 	}
 }

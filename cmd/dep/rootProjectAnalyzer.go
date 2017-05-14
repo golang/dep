@@ -9,13 +9,12 @@ import (
 	"github.com/golang/dep/internal/gps"
 )
 
-// rootProjectAnalyzer is responsible for generating a root manifest and lock for
+// rootProjectAnalyzer is responsible for generating a manifest and lock for
 // a root project.
 type rootProjectAnalyzer interface {
-	// Perform analysis of the filesystem tree rooted at path, with the
-	// root import path importRoot, to determine the project's constraints, as
-	// indicated by a Manifest and Lock.
-	DeriveRootManifestAndLock(path string, n gps.ProjectRoot) (*dep.Manifest, *dep.Lock, error)
+	// Generate an initial manifest and lock for the root project.
+	DeriveRootManifestAndLock(path string, pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock, error)
 
-	PostSolveShenanigans(*dep.Manifest, *dep.Lock)
+	// Apply any final changes to the manifest and lock after the solver has been run.
+	FinalizeManifestAndLock(*dep.Manifest, *dep.Lock)
 }

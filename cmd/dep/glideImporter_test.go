@@ -42,7 +42,7 @@ func TestGlideImport(t *testing.T) {
 		t.Fatal("Expected the importer to detect the glide configuration files")
 	}
 
-	m, l, err := i.DeriveRootManifestAndLock(projectRoot, gps.ProjectRoot(testGlideProjectRoot))
+	m, l, err := i.Import(projectRoot, gps.ProjectRoot(testGlideProjectRoot))
 	h.Must(err)
 
 	if m == nil {
@@ -78,7 +78,7 @@ func TestGlideImport_MissingLockFile(t *testing.T) {
 		t.Fatal("The glide importer should gracefully handle when only glide.yaml is present")
 	}
 
-	m, l, err := i.DeriveRootManifestAndLock(projectRoot, gps.ProjectRoot(testGlideProjectRoot))
+	m, l, err := i.Import(projectRoot, gps.ProjectRoot(testGlideProjectRoot))
 	h.Must(err)
 
 	if m == nil {

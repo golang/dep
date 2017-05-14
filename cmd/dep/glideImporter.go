@@ -17,15 +17,11 @@ const glideLockName = "glide.lock"
 
 type glideImporter struct {
 	loggers *dep.Loggers
-	sm gps.SourceManager
+	sm      gps.SourceManager
 }
 
 func newGlideImporter(loggers *dep.Loggers, sm gps.SourceManager) glideImporter {
 	return glideImporter{loggers: loggers, sm: sm}
-}
-
-func (i glideImporter) Info() (name string, version int) {
-	return "glide", 1
 }
 
 func (i glideImporter) HasConfig(dir string) bool {
@@ -38,7 +34,7 @@ func (i glideImporter) HasConfig(dir string) bool {
 	return true
 }
 
-func (i glideImporter) DeriveRootManifestAndLock(dir string, pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock, error) {
+func (i glideImporter) Import(dir string, pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock, error) {
 	files := newGlideFiles(i.loggers)
 	err := files.load(dir)
 	if err != nil {
@@ -46,13 +42,4 @@ func (i glideImporter) DeriveRootManifestAndLock(dir string, pr gps.ProjectRoot)
 	}
 
 	return files.convert(string(pr), i.sm)
-}
-
-func (i glideImporter) DeriveManifestAndLock(dir string, pr gps.ProjectRoot) (gps.Manifest, gps.Lock, error) {
-	return i.DeriveRootManifestAndLock(dir, pr)
-}
-
-func (a glideImporter) PostSolveShenanigans(*dep.Manifest, *dep.Lock) {
-	// do nothing
-	// TODO: importers don't need to be full root analyzers
 }
