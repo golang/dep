@@ -46,15 +46,26 @@ func init() {
 		cvRegex, cvRegex))
 }
 
+// Constraint is the interface that wraps checking a semantic version against
+// one or more constraints to find a match.
 type Constraint interface {
-	// Constraints compose the fmt.Stringer interface. Printing a constraint
-	// will yield a string that, if passed to NewConstraint(), will produce the
-	// original constraint. (Bidirectional serialization)
+	// Constraints compose the fmt.Stringer interface. This method is the
+	// bijective inverse of NewConstraint(): if a string yielded from this
+	// method is passed to NewConstraint(), a byte-identical instance of the
+	// original Constraint will be returend.
 	fmt.Stringer
+
+	// ImpliedCaretString converts the Constraint to a string in the same manner
+	// as String(), but treats the empty operator as equivalent to ^, rather
+	// than =.
+	//
+	// In the same way that String() is the inverse of NewConstraint(), this
+	// method is the inverse of to NewConstraintIC().
+	ImpliedCaretString() string
 
 	// Matches checks that a version satisfies the constraint. If it does not,
 	// an error is returned indcating the problem; if it does, the error is nil.
-	Matches(v *Version) error
+	Matches(v Version) error
 
 	// Intersect computes the intersection between the receiving Constraint and
 	// passed Constraint, and returns a new Constraint representing the result.
@@ -84,9 +95,10 @@ type realConstraint interface {
 	_real()
 }
 
-// Controls whether or not parsed constraints are cached
+// CacheConstraints controls whether or not parsed constraints are cached
 var CacheConstraints = true
 var constraintCache = make(map[string]ccache)
+var constraintCacheIC = make(map[string]ccache)
 var constraintCacheLock sync.RWMutex
 
 type ccache struct {
@@ -102,9 +114,19 @@ type ccache struct {
 // If an invalid constraint string is passed, more information is provided in
 // the returned error string.
 func NewConstraint(in string) (Constraint, error) {
+	return newConstraint(in, false, constraintCache)
+}
+
+// NewConstraintIC (ImpliedConstraint) is the same as NewConstraint, except that
+// it treats an absent operator as being equivalent to ^ instead of =.
+func NewConstraintIC(in string) (Constraint, error) {
+	return newConstraint(in, true, constraintCacheIC)
+}
+
+func newConstraint(in string, ic bool, cache map[string]ccache) (Constraint, error) {
 	if CacheConstraints {
 		constraintCacheLock.RLock()
-		if final, exists := constraintCache[in]; exists {
+		if final, exists := cache[in]; exists {
 			constraintCacheLock.RUnlock()
 			return final.c, final.err
 		}
@@ -120,11 +142,11 @@ func NewConstraint(in string) (Constraint, error) {
 		cs := strings.Split(v, ",")
 		result := make([]Constraint, len(cs))
 		for i, s := range cs {
-			pc, err := parseConstraint(s)
+			pc, err := parseConstraint(s, ic)
 			if err != nil {
 				if CacheConstraints {
 					constraintCacheLock.Lock()
-					constraintCache[in] = ccache{err: err}
+					cache[in] = ccache{err: err}
 					constraintCacheLock.Unlock()
 				}
 				return nil, err
@@ -139,7 +161,7 @@ func NewConstraint(in string) (Constraint, error) {
 
 	if CacheConstraints {
 		constraintCacheLock.Lock()
-		constraintCache[in] = ccache{c: final}
+		cache[in] = ccache{c: final}
 		constraintCacheLock.Unlock()
 	}
 
@@ -201,10 +223,8 @@ func Union(cg ...Constraint) Constraint {
 			return c
 		case none:
 			continue
-		case *Version:
-			//if tc != nil {
+		case Version:
 			//heap.Push(&real, tc)
-			//}
 			real = append(real, tc)
 		case rangeConstraint:
 			//heap.Push(&real, tc)
@@ -233,9 +253,9 @@ func Union(cg ...Constraint) Constraint {
 
 		last := nuc[len(nuc)-1]
 		switch lt := last.(type) {
-		case *Version:
+		case Version:
 			switch ct := c.(type) {
-			case *Version:
+			case Version:
 				// Two versions in a row; only append if they're not equal
 				if !lt.Equal(ct) {
 					nuc = append(nuc, ct)
@@ -257,7 +277,7 @@ func Union(cg ...Constraint) Constraint {
 			}
 		case rangeConstraint:
 			switch ct := c.(type) {
-			case *Version:
+			case Version:
 				// Last was range, current is version. constraintList sort invariants guarantee
 				// that the version will be greater than the min, so we have to
 				// determine if the version is less than the max. If it is, we
