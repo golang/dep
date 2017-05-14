@@ -261,7 +261,7 @@ func (s *stringSlice) Set(value string) error {
 }
 
 func getProjectConstraint(arg string, sm gps.SourceManager) (gps.ProjectConstraint, error) {
-	constraint := gps.ProjectConstraint{
+	emptyPC := gps.ProjectConstraint{
 		Constraint: gps.Any(), // default to any; avoids panics later
 	}
 
@@ -272,65 +272,44 @@ func getProjectConstraint(arg string, sm gps.SourceManager) (gps.ProjectConstrai
 		parts := strings.SplitN(arg, "@", 2)
 		arg = parts[0]
 		versionStr = parts[1]
-		constraint.Constraint = deduceConstraint(parts[1])
 	}
+	
 	// TODO: What if there is no @, assume default branch (which may not be master) ?
 	// TODO: if we decide to keep equals.....
 
 	// split on colon if there is a network location
+	var source string
 	colonIndex := strings.Index(arg, ":")
 	if colonIndex > 0 {
 		parts := strings.SplitN(arg, ":", 2)
 		arg = parts[0]
-		constraint.Ident.Source = parts[1]
+		source = parts[1]
 	}
 
 	pr, err := sm.DeduceProjectRoot(arg)
 	if err != nil {
-		return constraint, errors.Wrapf(err, "could not infer project root from dependency path: %s", arg) // this should go through to the user
+		return emptyPC, errors.Wrapf(err, "could not infer project root from dependency path: %s", arg) // this should go through to the user
 	}
 
 	if string(pr) != arg {
-		return constraint, errors.Errorf("dependency path %s is not a project root, try %s instead", arg, pr)
+		return emptyPC, errors.Errorf("dependency path %s is not a project root, try %s instead", arg, pr)
 	}
 
-	constraint.Ident.ProjectRoot = gps.ProjectRoot(arg)
-
-	// Below we are checking if the constraint we deduced was valid.
-	if v, ok := constraint.Constraint.(gps.Version); ok && versionStr != "" {
-		if v.Type() == gps.IsVersion {
-			// we hit the fall through case in deduce constraint, let's call out to network
-			// and get the package's versions
-			versions, err := sm.ListVersions(constraint.Ident)
-			if err != nil {
-				return constraint, errors.Wrapf(err, "list versions for %s", arg) // means repo does not exist
-			}
-
-			var found bool
-			for _, version := range versions {
-				if versionStr == version.String() {
-					found = true
-					constraint.Constraint = version.Unpair()
-					break
-				}
-			}
-
-			if !found {
-				return constraint, errors.Errorf("%s is not a valid version for the package %s", versionStr, arg)
-			}
-		}
+	pi := gps.ProjectIdentifier{ProjectRoot: pr, Source: source}
+	c, err := deduceConstraint(versionStr, pi, sm)
+	if err != nil {
+		return emptyPC, err
 	}
-
-	return constraint, nil
+	return gps.ProjectConstraint{Ident:pi, Constraint: c}, nil
 }
 
 // deduceConstraint tries to puzzle out what kind of version is given in a string -
 // semver, a revision, or as a fallback, a plain tag
-func deduceConstraint(s string) gps.Constraint {
+func deduceConstraint(s string, pi gps.ProjectIdentifier, sm gps.SourceManager) (gps.Constraint, error) {
 	// always semver if we can
 	c, err := gps.NewSemverConstraint(s)
 	if err == nil {
-		return c
+		return c, nil
 	}
 
 	slen := len(s)
@@ -339,7 +318,7 @@ func deduceConstraint(s string) gps.Constraint {
 			// Whether or not it's intended to be a SHA1 digest, this is a
 			// valid byte sequence for that, so go with Revision. This
 			// covers git and hg
-			return gps.Revision(s)
+			return gps.Revision(s), nil
 		}
 	}
 	// Next, try for bzr, which has a three-component GUID separated by
@@ -350,20 +329,32 @@ func deduceConstraint(s string) gps.Constraint {
 		i3 := strings.LastIndex(s, "-")
 		// Skip if - is last char, otherwise this would panic on bounds err
 		if slen == i3+1 {
-			return gps.NewVersion(s)
+			return gps.NewVersion(s), nil
 		}
 
 		i2 := strings.LastIndex(s[:i3], "-")
 		if _, err = strconv.ParseUint(s[i2+1:i3], 10, 64); err == nil {
 			// Getting this far means it'd pretty much be nuts if it's not a
 			// bzr rev, so don't bother parsing the email.
-			return gps.Revision(s)
+			return gps.Revision(s), nil
 		}
 	}
 
 	// If not a plain SHA1 or bzr custom GUID, assume a plain version.
-	// TODO: if there is amgibuity here, then prompt the user?
-	return gps.NewVersion(s)
+	// return gps.NewVersion(s)
+
+	// call out to network and get the package's versions
+	versions, err := sm.ListVersions(pi)
+	if err != nil {
+		return nil, errors.Wrapf(err, "list versions for %s(%s)", pi.ProjectRoot, pi.Source) // means repo does not exist
+	}
+
+	for _, version := range versions {
+		if s == version.String() {
+			return version.Unpair(), nil
+		}
+	}
+	return nil, errors.Errorf("%s is not a valid version for the package %s(%s)", s, pi.ProjectRoot, pi.Source)
 }
 
 func checkErrors(m map[string]pkgtree.PackageOrErr) error {
