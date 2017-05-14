@@ -21,6 +21,8 @@ func TestGlideImport(t *testing.T) {
 	h := test.NewHelper(t)
 	defer h.Cleanup()
 
+	cacheDir := "gps-repocache"
+	h.TempDir(cacheDir)
 	h.TempDir("src")
 	h.TempDir(filepath.Join("src", testGlideProjectRoot))
 	h.TempCopy(filepath.Join(testGlideProjectRoot, glideYamlName), "glide.yaml")
@@ -32,8 +34,10 @@ func TestGlideImport(t *testing.T) {
 		Verbose: true,
 	}
 	projectRoot := h.Path(testGlideProjectRoot)
+	sm, err := gps.NewSourceManager(h.Path(cacheDir))
+	h.Must(err)
 
-	i := newGlideImporter(loggers)
+	i := newGlideImporter(loggers, sm)
 	if !i.HasConfig(projectRoot) {
 		t.Fatal("Expected the importer to detect the glide configuration files")
 	}
@@ -54,6 +58,8 @@ func TestGlideImport_MissingLockFile(t *testing.T) {
 	h := test.NewHelper(t)
 	defer h.Cleanup()
 
+	cacheDir := "gps-repocache"
+	h.TempDir(cacheDir)
 	h.TempDir("src")
 	h.TempDir(filepath.Join("src", "glidetest"))
 	h.TempCopy(filepath.Join("glidetest", glideYamlName), "glide.yaml")
@@ -64,8 +70,10 @@ func TestGlideImport_MissingLockFile(t *testing.T) {
 		Verbose: true,
 	}
 	projectRoot := h.Path("glidetest")
+	sm, err := gps.NewSourceManager(h.Path(cacheDir))
+	h.Must(err)
 
-	i := newGlideImporter(loggers)
+	i := newGlideImporter(loggers, sm)
 	if !i.HasConfig(projectRoot) {
 		t.Fatal("The glide importer should gracefully handle when only glide.yaml is present")
 	}

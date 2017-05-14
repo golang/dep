@@ -131,9 +131,9 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 		rootAnalyzer = compositeAnalyzer{
 			Analyzers: []rootProjectAnalyzer{
 				newGopathAnalyzer(ctx, pkgT, cpr, sm),
-				newImportAnalyzer(ctx.Loggers),
+				newImportAnalyzer(ctx.Loggers, sm),
 			}}
-		analyzer = importAnalyzer{ctx.Loggers}
+		analyzer = importAnalyzer{ctx.Loggers, sm}
 	}
 
 	// Generate a manifest and lock for the root project

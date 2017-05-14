@@ -20,10 +20,11 @@ type importer interface {
 // from both dep and external tools.
 type importAnalyzer struct {
 	loggers *dep.Loggers
+	sm      gps.SourceManager
 }
 
-func newImportAnalyzer(loggers *dep.Loggers) importAnalyzer {
-	return importAnalyzer{loggers: loggers}
+func newImportAnalyzer(loggers *dep.Loggers, sm gps.SourceManager) importAnalyzer {
+	return importAnalyzer{loggers: loggers, sm: sm}
 }
 
 func (a importAnalyzer) Info() (string, int) {
@@ -34,7 +35,7 @@ func (a importAnalyzer) Info() (string, int) {
 }
 
 func (a importAnalyzer) DeriveRootManifestAndLock(dir string, pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock, error) {
-	var importers []importer = []importer{newGlideImporter(a.loggers)}
+	var importers []importer = []importer{newGlideImporter(a.loggers, a.sm)}
 	for _, i := range importers {
 		if i.HasConfig(dir) {
 			tool, _ := i.Info()
@@ -55,7 +56,7 @@ func (a importAnalyzer) DeriveManifestAndLock(dir string, pr gps.ProjectRoot) (g
 		return depAnalyzer.DeriveManifestAndLock(dir, pr)
 	}
 
-	var importers []importer = []importer{newGlideImporter(a.loggers)}
+	var importers []importer = []importer{newGlideImporter(a.loggers, a.sm)}
 	for _, i := range importers {
 		if i.HasConfig(dir) {
 			tool, _ := i.Info()

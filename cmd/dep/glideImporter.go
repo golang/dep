@@ -17,10 +17,11 @@ const glideLockName = "glide.lock"
 
 type glideImporter struct {
 	loggers *dep.Loggers
+	sm gps.SourceManager
 }
 
-func newGlideImporter(loggers *dep.Loggers) glideImporter {
-	return glideImporter{loggers: loggers}
+func newGlideImporter(loggers *dep.Loggers, sm gps.SourceManager) glideImporter {
+	return glideImporter{loggers: loggers, sm: sm}
 }
 
 func (i glideImporter) Info() (name string, version int) {
@@ -44,7 +45,7 @@ func (i glideImporter) DeriveRootManifestAndLock(dir string, pr gps.ProjectRoot)
 		return nil, nil, err
 	}
 
-	return files.convert(string(pr))
+	return files.convert(string(pr), i.sm)
 }
 
 func (i glideImporter) DeriveManifestAndLock(dir string, pr gps.ProjectRoot) (gps.Manifest, gps.Lock, error) {

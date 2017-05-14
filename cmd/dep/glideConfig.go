@@ -76,22 +76,35 @@ func (files *glideFiles) load(projectDir string) error {
 	return nil
 }
 
-func (files *glideFiles) convert(projectName string) (*dep.Manifest, *dep.Lock, error) {
+func (files *glideFiles) convert(projectName string, sm gps.SourceManager) (*dep.Manifest, *dep.Lock, error) {
 	manifest := &dep.Manifest{
 		Dependencies: make(gps.ProjectConstraints),
 	}
 
-	constrainDep := func(pkg glidePackage) {
-		manifest.Dependencies[gps.ProjectRoot(pkg.Name)] = gps.ProjectProperties{
-			Source:     pkg.Repository,
-			Constraint: deduceConstraint(pkg.Reference),
+	constrainDep := func(pkg glidePackage) error {
+		pi := gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot(pkg.Name), Source: pkg.Repository}
+		c, err := deduceConstraint(pkg.Reference, pi, sm)
+		if err != nil {
+			return err
 		}
+
+		manifest.Dependencies[pi.ProjectRoot] = gps.ProjectProperties{
+			Source:     pi.Source,
+			Constraint: c,
+		}
+		return nil
 	}
 	for _, pkg := range files.yaml.Imports {
-		constrainDep(pkg)
+		err := constrainDep(pkg)
+		if err != nil {
+			return nil, nil, err
+		}
 	}
 	for _, pkg := range files.yaml.TestImports {
-		constrainDep(pkg)
+		err := constrainDep(pkg)
+		if err != nil {
+			return nil, nil, err
+		}
 	}
 
 	manifest.Ignored = append(manifest.Ignored, files.yaml.Ignores...)

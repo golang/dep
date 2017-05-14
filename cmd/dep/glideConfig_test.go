@@ -5,10 +5,11 @@
 package main
 
 import (
-	"github.com/golang/dep"
 	"log"
 	"os"
 	"testing"
+
+	"github.com/golang/dep"
 )
 
 func TestGlideConvertProject(t *testing.T) {
@@ -25,7 +26,7 @@ func TestGlideConvertProject(t *testing.T) {
 				{
 					Name:       "github.com/sdboyer/deptest",
 					Repository: "https://github.com/fork/deptest.git",
-					Reference:  "master",
+					Reference:  "v1.0.0",
 				},
 			},
 		},
@@ -33,13 +34,13 @@ func TestGlideConvertProject(t *testing.T) {
 			Imports: []glidePackage{
 				{
 					Name:      "github.com/sdboyer/deptest",
-					Reference: "abc123",
+					Reference: "6a741be0cc55ecbe4f45690ebfd606a956d5f14a",
 				},
 			},
 		},
 	}
 
-	manifest, lock, err := f.convert("")
+	manifest, lock, err := f.convert("", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -50,7 +51,7 @@ func TestGlideConvertProject(t *testing.T) {
 	}
 
 	v := d.Constraint.String()
-	if v != "master" {
+	if v != "v1.0.0" {
 		t.Fatalf("Expected manifest constraint to be master, got %s", v)
 	}
 
@@ -72,7 +73,7 @@ func TestGlideConvertProject(t *testing.T) {
 	}
 
 	lv := p.Version().String()
-	if lv != "abc123" {
+	if lv != "6a741be0cc55ecbe4f45690ebfd606a956d5f14a" {
 		t.Fatalf("Expected locked revision to be 'abc123', got %s", lv)
 	}
 }
@@ -90,7 +91,7 @@ func TestGlideConvertTestProject(t *testing.T) {
 			TestImports: []glidePackage{
 				{
 					Name:      "github.com/sdboyer/deptest",
-					Reference: "master",
+					Reference: "v1.0.0",
 				},
 			},
 		},
@@ -98,13 +99,13 @@ func TestGlideConvertTestProject(t *testing.T) {
 			TestImports: []glidePackage{
 				{
 					Name:      "github.com/sdboyer/deptest",
-					Reference: "abc123",
+					Reference: "6a741be0cc55ecbe4f45690ebfd606a956d5f14a",
 				},
 			},
 		},
 	}
 
-	manifest, lock, err := f.convert("")
+	manifest, lock, err := f.convert("", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -137,7 +138,7 @@ func TestGlideConvertIgnore(t *testing.T) {
 		},
 	}
 
-	manifest, _, err := f.convert("")
+	manifest, _, err := f.convert("", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -165,7 +166,7 @@ func TestGlideConvertExcludeDir(t *testing.T) {
 		},
 	}
 
-	manifest, _, err := f.convert("github.com/golang/notexist")
+	manifest, _, err := f.convert("github.com/golang/notexist", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -194,7 +195,7 @@ func TestGlideConvertExcludeDir_IgnoresMismatchedPackageName(t *testing.T) {
 		},
 	}
 
-	manifest, _, err := f.convert("github.com/golang/notexist")
+	manifest, _, err := f.convert("github.com/golang/notexist", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
