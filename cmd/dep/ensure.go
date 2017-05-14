@@ -273,8 +273,8 @@ func getProjectConstraint(arg string, sm gps.SourceManager) (gps.ProjectConstrai
 		arg = parts[0]
 		versionStr = parts[1]
 	}
-	
-	// TODO: What if there is no @, assume default branch (which may not be master) ?
+	// When there is no `@`, use the default branch
+
 	// TODO: if we decide to keep equals.....
 
 	// split on colon if there is a network location
@@ -300,12 +300,27 @@ func getProjectConstraint(arg string, sm gps.SourceManager) (gps.ProjectConstrai
 	if err != nil {
 		return emptyPC, err
 	}
-	return gps.ProjectConstraint{Ident:pi, Constraint: c}, nil
+	return gps.ProjectConstraint{Ident: pi, Constraint: c}, nil
 }
 
 // deduceConstraint tries to puzzle out what kind of version is given in a string -
 // semver, a revision, or as a fallback, a plain tag
 func deduceConstraint(s string, pi gps.ProjectIdentifier, sm gps.SourceManager) (gps.Constraint, error) {
+	if s == "" {
+		// Find the default branch
+		// TODO (carolynvs): Should this be defined on SourceManager directly?
+		versions, err := sm.ListVersions(pi)
+		if err != nil {
+			return nil, errors.Wrapf(err, "list versions for %s(%s)", pi.ProjectRoot, pi.Source) // means repo does not exist
+		}
+
+		for _, v := range versions {
+			if v.Type() == gps.IsBranch {
+				return v.Unpair(), nil
+			}
+		}
+	}
+
 	// always semver if we can
 	c, err := gps.NewSemverConstraint(s)
 	if err == nil {
