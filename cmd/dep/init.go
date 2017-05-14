@@ -407,7 +407,14 @@ func getProjectData(ctx *dep.Ctx, pkgT pkgtree.PackageTree, cpr string, sm gps.S
 		}
 
 		ondisk[pr] = v
-		constraints[pr] = getProjectPropertiesFromVersion(v)
+		pp := getProjectPropertiesFromVersion(v)
+		if pp.Constraint != nil || pp.Source != "" {
+			constraints[pr] = pp
+		} else {
+			if ctx.Loggers.Verbose {
+				ctx.Loggers.Err.Printf("dep: \"%v\" is unconstrained. Not adding to project data.\n", pr)
+			}
+		}
 
 		feedback(v, pr, fb.DepTypeDirect, ctx)
 	}
