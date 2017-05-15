@@ -13,34 +13,22 @@ import (
 	"github.com/pkg/errors"
 )
 
-// RenameWithFallback attempts to rename a file or directory, but falls back to
-// copying in the event of a cross-device link error. If the fallback copy
-// succeeds, src is still removed, emulating normal rename behavior.
-func RenameWithFallback(src, dst string) error {
-	fi, err := os.Stat(src)
-	if err != nil {
-		return errors.Wrapf(err, "cannot stat %s", src)
-	}
+func rename(src, dst string) error {
+	return os.Rename(src, dst)
+}
 
-	if dstfi, err := os.Stat(dst); fi.IsDir() && err == nil && dstfi.IsDir() {
-		return errors.Errorf("cannot rename directory %s to existing dst %s", src, dst)
-	}
-
-	err = os.Rename(src, dst)
-	if err == nil {
-		return nil
-	}
-
+// renameFallback attempts to determine the appropriate fallback to failed rename
+// operation depending on the resulting error.
+func renameFallback(src, dst string) error {
+	// Rename may fail if src and dst are on different devices; fall back to
+	// copy if we detect that case. syscall.EXDEV is the common name for the
+	// cross device link error which has varying output text across different
+	// operating systems.
 	terr, ok := err.(*os.LinkError)
 	if !ok {
 		return err
 	}
 
-	// Rename may fail if src and dst are on different devices; fall back to
-	// copy if we detect that case. syscall.EXDEV is the common name for the
-	// cross device link error which has varying output text across different
-	// operating systems.
-	var cerr error
 	if terr.Err != syscall.EXDEV {
 		// In windows it can drop down to an operating system call that
 		// returns an operating system error with a different number and
@@ -54,15 +42,5 @@ func RenameWithFallback(src, dst string) error {
 		}
 	}
 
-	if dir, _ := IsDir(src); dir {
-		cerr = CopyDir(src, dst)
-	} else {
-		cerr = copyFile(src, dst)
-	}
-
-	if cerr != nil {
-		return errors.Wrapf(cerr, "second attempt failed: cannot rename %s to %s", src, dst)
-	}
-
-	return errors.Wrapf(os.RemoveAll(src), "cannot delete %s", src)
+	return renameByCopy(src, dst)
 }

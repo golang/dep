@@ -77,6 +77,40 @@ func HasFilepathPrefix(path, prefix string) bool {
 	return true
 }
 
+// RenameWithFallback attempts to rename a file or directory, but falls back to
+// copying in the event of a cross-device link error. If the fallback copy
+// succeeds, src is still removed, emulating normal rename behavior.
+func RenameWithFallback(src, dst string) error {
+	_, err := os.Stat(src)
+	if err != nil {
+		return errors.Wrapf(err, "cannot stat %s", src)
+	}
+
+	err = rename(src, dst)
+	if err == nil {
+		return nil
+	}
+
+	return renameFallback(err, src, dst)
+}
+
+// renameByCopy attempts to rename a file or directory by copying it to the
+// destination and then removing the src thus emulating the rename behavior.
+func renameByCopy(src, dst string) error {
+	var cerr error
+	if dir, _ := IsDir(src); dir {
+		cerr = CopyDir(src, dst)
+	} else {
+		cerr = copyFile(src, dst)
+	}
+
+	if cerr != nil {
+		return errors.Wrapf(cerr, "second attempt failed: cannot rename %s to %s", src, dst)
+	}
+
+	return errors.Wrapf(os.RemoveAll(src), "cannot delete %s", src)
+}
+
 // isCaseSensitiveFilesystem determines if the filesystem where dir
 // exists is case sensitive or not.
 //
