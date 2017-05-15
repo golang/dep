@@ -9,9 +9,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
-	"syscall"
 	"unicode"
 
 	"github.com/pkg/errors"
@@ -146,65 +144,6 @@ func genTestFilename(str string) string {
 	}, str)
 }
 
-// RenameWithFallback attempts to rename a file or directory, but falls back to
-// copying in the event of a cross-device link error. If the fallback copy
-// succeeds, src is still removed, emulating normal rename behavior.
-func RenameWithFallback(src, dst string) error {
-	fi, err := os.Stat(src)
-	if err != nil {
-		return errors.Wrapf(err, "cannot stat %s", src)
-	}
-
-	if dstfi, err := os.Stat(dst); fi.IsDir() && err == nil && dstfi.IsDir() {
-		return errors.Errorf("cannot rename directory %s to existing dst %s", src, dst)
-	}
-
-	err = os.Rename(src, dst)
-	if err == nil {
-		return nil
-	}
-
-	terr, ok := err.(*os.LinkError)
-	if !ok {
-		return err
-	}
-
-	// Rename may fail if src and dst are on different devices; fall back to
-	// copy if we detect that case. syscall.EXDEV is the common name for the
-	// cross device link error which has varying output text across different
-	// operating systems.
-	var cerr error
-	if terr.Err == syscall.EXDEV {
-		if fi.IsDir() {
-			cerr = CopyDir(src, dst)
-		} else {
-			cerr = copyFile(src, dst)
-		}
-	} else if runtime.GOOS == "windows" {
-		// In windows it can drop down to an operating system call that
-		// returns an operating system error with a different number and
-		// message. Checking for that as a fall back.
-		noerr, ok := terr.Err.(syscall.Errno)
-		// 0x11 (ERROR_NOT_SAME_DEVICE) is the windows error.
-		// See https://msdn.microsoft.com/en-us/library/cc231199.aspx
-		if ok && noerr == 0x11 {
-			if fi.IsDir() {
-				cerr = CopyDir(src, dst)
-			} else {
-				cerr = copyFile(src, dst)
-			}
-		}
-	} else {
-		return errors.Wrapf(terr, "link error: cannot rename %s to %s", src, dst)
-	}
-
-	if cerr != nil {
-		return errors.Wrapf(cerr, "second attempt failed: cannot rename %s to %s", src, dst)
-	}
-
-	return errors.Wrapf(os.RemoveAll(src), "cannot delete %s", src)
-}
-
 var (
 	errSrcNotDir = errors.New("source is not a directory")
 	errDstExist  = errors.New("destination already exists")
@@ -212,7 +151,7 @@ var (
 
 // CopyDir recursively copies a directory tree, attempting to preserve permissions.
 // Source directory must exist, destination directory must *not* exist.
-func CopyDir(src string, dst string) error {
+func CopyDir(src, dst string) error {
 	src = filepath.Clean(src)
 	dst = filepath.Clean(dst)
 
