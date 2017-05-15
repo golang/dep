@@ -5,8 +5,10 @@
 package main
 
 import (
+	"bytes"
 	"log"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/golang/dep"
@@ -206,5 +208,63 @@ func TestGlideConvertExcludeDir_IgnoresMismatchedPackageName(t *testing.T) {
 	i := manifest.Ignored[0]
 	if i != "github.com/golang/notexist/samples" {
 		t.Fatalf("Expected the manifest to ignore 'github.com/golang/notexist/samples' but got '%s'", i)
+	}
+}
+
+func TestGlideConvertWarnsForUnusedFields(t *testing.T) {
+	testCases := map[string]glidePackage{
+		"specified subpackages": {Subpackages: []string{"foo"}},
+		"specified an os":       {OS: "windows"},
+		"specified an arch":     {Arch: "i686"},
+	}
+
+	for wantWarning, pkg := range testCases {
+		pkg.Name = "github.com/sdboyer/deptest"
+		pkg.Reference = "v1.0.0"
+
+		// Capture stderr so we can verify warnings
+		verboseOutput := &bytes.Buffer{}
+		loggers := &dep.Loggers{
+			Out:     log.New(os.Stdout, "", 0),
+			Err:     log.New(verboseOutput, "", 0),
+			Verbose: true,
+		}
+
+		f := glideFiles{
+			loggers: loggers,
+			yaml: glideYaml{
+				Imports: []glidePackage{pkg},
+			},
+		}
+
+		_, _, err := f.convert("", nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		warnings := verboseOutput.String()
+		if !strings.Contains(warnings, wantWarning) {
+			t.Errorf("Expected the output to include the warning '%s'", wantWarning)
+		}
+	}
+}
+
+func TestGlideConvertBadInput_EmptyPackageName(t *testing.T) {
+	loggers := &dep.Loggers{
+		Out:     log.New(os.Stdout, "", 0),
+		Err:     log.New(os.Stderr, "", 0),
+		Verbose: true,
+	}
+
+	f := glideFiles{
+		loggers: loggers,
+		yaml: glideYaml{
+			Imports: []glidePackage{{Name: ""}},
+		},
+	}
+
+	_, _, err := f.convert("", nil)
+	if err == nil {
+		t.Fatal("Expected conversion to fail because the package name is empty")
 	}
 }
