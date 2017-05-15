@@ -178,7 +178,7 @@ func RenameWithFallback(src, dst string) error {
 		if fi.IsDir() {
 			cerr = CopyDir(src, dst)
 		} else {
-			cerr = CopyFile(src, dst)
+			cerr = copyFile(src, dst)
 		}
 	} else if runtime.GOOS == "windows" {
 		// In windows it can drop down to an operating system call that
@@ -191,7 +191,7 @@ func RenameWithFallback(src, dst string) error {
 			if fi.IsDir() {
 				cerr = CopyDir(src, dst)
 			} else {
-				cerr = CopyFile(src, dst)
+				cerr = copyFile(src, dst)
 			}
 		}
 	} else {
@@ -212,7 +212,6 @@ var (
 
 // CopyDir recursively copies a directory tree, attempting to preserve permissions.
 // Source directory must exist, destination directory must *not* exist.
-// Symlinks are ignored and skipped.
 func CopyDir(src string, dst string) error {
 	src = filepath.Clean(src)
 	dst = filepath.Clean(dst)
@@ -243,10 +242,6 @@ func CopyDir(src string, dst string) error {
 	}
 
 	for _, entry := range entries {
-		if entry.Mode()&os.ModeSymlink != 0 {
-			continue
-		}
-
 		srcPath := filepath.Join(src, entry.Name())
 		dstPath := filepath.Join(dst, entry.Name())
 
@@ -255,9 +250,9 @@ func CopyDir(src string, dst string) error {
 				return err
 			}
 		} else {
-			// This will include symlinks, which is what we want in all cases
-			// where gps is copying things.
-			if err = CopyFile(srcPath, dstPath); err != nil {
+			// This will include symlinks, which is what we want when
+			// copying things.
+			if err = copyFile(srcPath, dstPath); err != nil {
 				return err
 			}
 		}
@@ -266,12 +261,12 @@ func CopyDir(src string, dst string) error {
 	return nil
 }
 
-// CopyFile copies the contents of the file named src to the file named
+// copyFile copies the contents of the file named src to the file named
 // by dst. The file will be created if it does not already exist. If the
 // destination file exists, all it's contents will be replaced by the contents
 // of the source file. The file mode will be copied from the source and
 // the copied data is synced/flushed to stable storage.
-func CopyFile(src, dst string) (err error) {
+func copyFile(src, dst string) (err error) {
 	in, err := os.Open(src)
 	if err != nil {
 		return
