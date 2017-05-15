@@ -67,8 +67,13 @@ func validateManifest(s string) ([]error, error) {
 					for key, value := range v.(map[string]interface{}) {
 						// Check if the key is valid
 						switch key {
-						case "name", "branch", "revision", "version", "source":
+						case "name", "branch", "version", "source":
 							// valid key
+						case "revision":
+							// Check if sha1 hash is abbreviated
+							if valueStr, ok := value.(string); ok && len(valueStr) < 40 {
+								errs = append(errs, fmt.Errorf("sha1 hash %q should not be in abbreviated form", valueStr))
+							}
 						case "metadata":
 							// Check if metadata is of Map type
 							if reflect.TypeOf(value).Kind() != reflect.Map {

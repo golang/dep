@@ -206,6 +206,14 @@ func TestValidateManifest(t *testing.T) {
 			`,
 			want: []error{},
 		},
+		{
+			tomlString: `
+			[[dependencies]]
+			  name = "github.com/foo/bar"
+			  revision = "b86ad16"
+			`,
+			want: []error{errors.New("sha1 hash \"b86ad16\" should not be in abbreviated form")},
+		},
 	}
 
 	// constains for error
