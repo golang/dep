@@ -430,7 +430,7 @@ func TestCopyFile(t *testing.T) {
 	srcf.Close()
 
 	destf := filepath.Join(dir, "destf")
-	if err := CopyFile(srcf.Name(), destf); err != nil {
+	if err := copyFile(srcf.Name(), destf); err != nil {
 		t.Fatal(err)
 	}
 
@@ -492,7 +492,7 @@ func TestCopyFileFail(t *testing.T) {
 	}
 
 	fn := filepath.Join(dstdir, "file")
-	if err := CopyFile(srcf.Name(), fn); err == nil {
+	if err := copyFile(srcf.Name(), fn); err == nil {
 		t.Fatalf("expected error for %s, got none", fn)
 	}
 }
