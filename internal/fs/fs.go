@@ -147,7 +147,7 @@ func genTestFilename(str string) string {
 }
 
 // RenameWithFallback attempts to rename a file or directory, but falls back to
-// copying in the event of a cross-link device error. If the fallback copy
+// copying in the event of a cross-device link error. If the fallback copy
 // succeeds, src is still removed, emulating normal rename behavior.
 func RenameWithFallback(src, dst string) error {
 	fi, err := os.Stat(src)
@@ -199,7 +199,7 @@ func RenameWithFallback(src, dst string) error {
 	}
 
 	if cerr != nil {
-		return errors.Wrapf(cerr, "second attemp failed: cannot rename %s to %s", src, dst)
+		return errors.Wrapf(cerr, "second attempt failed: cannot rename %s to %s", src, dst)
 	}
 
 	return errors.Wrapf(os.RemoveAll(src), "cannot delete %s", src)
