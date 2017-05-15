@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"reflect"
+	"regexp"
 	"sort"
 
 	"github.com/golang/dep/internal/gps"
@@ -70,9 +71,16 @@ func validateManifest(s string) ([]error, error) {
 						case "name", "branch", "version", "source":
 							// valid key
 						case "revision":
-							// Check if sha1 hash is abbreviated
-							if valueStr, ok := value.(string); ok && len(valueStr) < 40 {
-								errs = append(errs, fmt.Errorf("sha1 hash %q should not be in abbreviated form", valueStr))
+							if valueStr, ok := value.(string); ok {
+								// Check if sha1 hash is abbreviated
+								validGit := regexp.MustCompile("[a-f0-9]{40}").MatchString(valueStr)
+								if !validGit {
+									// Check for valid bzr revision-id
+									validBzr := regexp.MustCompile(".*-[0-9]{14}(-[a-zA-Z0-9]+)?").MatchString(valueStr)
+									if !validBzr {
+										errs = append(errs, fmt.Errorf("revision %q should not be in abbreviated form", valueStr))
+									}
+								}
 							}
 						case "metadata":
 							// Check if metadata is of Map type

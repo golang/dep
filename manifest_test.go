@@ -212,7 +212,23 @@ func TestValidateManifest(t *testing.T) {
 			  name = "github.com/foo/bar"
 			  revision = "b86ad16"
 			`,
-			want: []error{errors.New("sha1 hash \"b86ad16\" should not be in abbreviated form")},
+			want: []error{errors.New("revision \"b86ad16\" should not be in abbreviated form")},
+		},
+		{
+			tomlString: `
+                        [[dependencies]]
+			  name = "bazaar.foobar.com/~bzr/trunk"
+			  revision = "foo@bar.com-12345-wiuilyamo9ian0m7"
+			`,
+			want: []error{errors.New("revision \"foo@bar.com-12345-wiuilyamo9ian0m7\" should not be in abbreviated form")},
+		},
+		{
+			tomlString: `
+			[[dependencies]]
+			  name = "bazaar.foobar.com/~bzr/trunk"
+			  revision = "foo@bar.com-20161116211307-wiuilyamo9ian0m7"
+			`,
+			want: []error{},
 		},
 	}
 
