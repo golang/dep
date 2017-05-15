@@ -28,9 +28,9 @@ type Package struct {
 	TestImports []string // Imports from all go test files (in go/build parlance: both TestImports and XTestImports)
 }
 
-// svnRoots is a set of directories we should not descend into in ListPackages when
+// vcsRoots is a set of directories we should not descend into in ListPackages when
 // searching for Go packages
-var svnRoots = map[string]struct{}{
+var vcsRoots = map[string]struct{}{
 	".git": struct{}{},
 	".bzr": struct{}{},
 	".svn": struct{}{},
@@ -93,7 +93,7 @@ func ListPackages(fileRoot, importRoot string) (PackageTree, error) {
 		// Note that there are some pathological edge cases this doesn't cover,
 		// such as a user using Git for version control, but having a package
 		// named "svn" in a directory named ".svn".
-		if _, ok := svnRoots[fi.Name()]; ok {
+		if _, ok := vcsRoots[fi.Name()]; ok {
 			return filepath.SkipDir
 		}
 
