@@ -73,8 +73,8 @@ func validateManifest(s string) ([]error, error) {
 						case "revision":
 							if valueStr, ok := value.(string); ok {
 								// Check if sha1 hash is abbreviated
-								validGit := regexp.MustCompile("[a-f0-9]{40}").MatchString(valueStr)
-								if !validGit {
+								validHash := regexp.MustCompile("[a-f0-9]{40}").MatchString(valueStr)
+								if !validHash {
 									// Check for valid bzr revision-id
 									validBzr := regexp.MustCompile(".*-[0-9]{14}(-[a-zA-Z0-9]+)?").MatchString(valueStr)
 									if !validBzr {

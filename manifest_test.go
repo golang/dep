@@ -232,7 +232,7 @@ func TestValidateManifest(t *testing.T) {
 		},
 	}
 
-	// constains for error
+	// contains for error
 	contains := func(s []error, e error) bool {
 		for _, a := range s {
 			if a.Error() == e.Error() {
