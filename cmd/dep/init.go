@@ -178,7 +178,7 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 		handleAllTheFailuresOfTheWorld(err)
 		return err
 	}
-	l = dep.LockFromInterface(soln)
+	l = dep.LockFromSolution(soln)
 
 	// Iterate through the new projects in solved lock and add them to manifest
 	// if direct deps and log feedback for all the new projects.
