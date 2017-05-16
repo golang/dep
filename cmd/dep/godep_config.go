@@ -81,14 +81,14 @@ func (g *godepFile) convert(projectName string, sm gps.SourceManager) (*dep.Mani
 }
 
 func (g *godepFile) buildProjectConstraint(pkg godepPackage, sm gps.SourceManager) (pc gps.ProjectConstraint, err error) {
-	pc.Ident = gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot(pkg.ImportPath), Source: pkg.ImportPath}
+	pc.Ident = gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot(pkg.ImportPath)}
 	pc.Constraint, err = deduceConstraint(pkg.Comment, pc.Ident, sm)
 	return
 }
 
 func (g *godepFile) buildLockedProject(pkg godepPackage, manifest *dep.Manifest) gps.LockedProject {
 	var ver gps.Version
-	id := gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot(pkg.ImportPath), Source: pkg.ImportPath}
+	id := gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot(pkg.ImportPath)}
 	c, has := manifest.Dependencies[id.ProjectRoot]
 	if has {
 		// Create PairedVersion if constraint details are available

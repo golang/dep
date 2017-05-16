@@ -29,6 +29,7 @@ func newImportAnalyzer(loggers *dep.Loggers, sm gps.SourceManager) importAnalyze
 func (a importAnalyzer) importManifestAndLock(dir string, pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock, error) {
 	importers := []importer{
 		newGlideImporter(a.loggers, a.sm),
+		newGodepImporter(a.loggers, a.sm),
 	}
 
 	for _, i := range importers {

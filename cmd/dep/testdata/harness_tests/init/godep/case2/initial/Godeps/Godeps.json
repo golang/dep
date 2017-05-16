@@ -1,0 +1,10 @@
+{
+  "ImportPath": "github.com/golang/notexist",
+  "GoVersion": "go1.8",
+  "GodepVersion": "vXYZ",
+  "Deps": [
+    {
+      "Rev": "3f4c3bea144e112a69bbe5d8d01c1b09a544253f"
+    },
+  ]
+}
