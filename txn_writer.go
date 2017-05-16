@@ -84,7 +84,7 @@ const exampleTOML = `
 // guard against non-arcane failure conditions.
 type SafeWriter struct {
 	Manifest    *Manifest
-	Lock        *Lock
+	lock        *Lock
 	LockDiff    *gps.LockDiff
 	WriteVendor bool
 }
@@ -102,7 +102,7 @@ type SafeWriter struct {
 func NewSafeWriter(manifest *Manifest, oldLock, newLock *Lock, vendor VendorBehavior) (*SafeWriter, error) {
 	sw := &SafeWriter{
 		Manifest: manifest,
-		Lock:     newLock,
+		lock:     newLock,
 	}
 	if oldLock != nil {
 		if newLock == nil {
@@ -129,7 +129,7 @@ func NewSafeWriter(manifest *Manifest, oldLock, newLock *Lock, vendor VendorBeha
 
 // HasLock checks if a Lock is present in the SafeWriter
 func (sw *SafeWriter) HasLock() bool {
-	return sw.Lock != nil
+	return sw.lock != nil
 }
 
 // HasManifest checks if a Manifest is present in the SafeWriter
@@ -327,13 +327,13 @@ func (sw *SafeWriter) Write(root string, sm gps.SourceManager, noExamples bool) 
 	}
 
 	if sw.HasLock() {
-		if err := writeFile(filepath.Join(td, LockName), sw.Lock); err != nil {
+		if err := writeFile(filepath.Join(td, LockName), sw.lock); err != nil {
 			return errors.Wrap(err, "failed to write lock file to temp dir")
 		}
 	}
 
 	if sw.HasVendor() {
-		err = gps.WriteDepTree(filepath.Join(td, "vendor"), sw.Lock, sm, true)
+		err = gps.WriteDepTree(filepath.Join(td, "vendor"), sw.lock, sm, true)
 		if err != nil {
 			return errors.Wrap(err, "error while writing out vendor tree")
 		}
@@ -450,7 +450,7 @@ func (sw *SafeWriter) PrintPreparedActions(output *log.Logger) error {
 	if sw.HasLock() {
 		if sw.LockDiff == nil {
 			output.Printf("Would have written the following %s:\n", LockName)
-			l, err := sw.Lock.MarshalTOML()
+			l, err := sw.lock.MarshalTOML()
 			if err != nil {
 				return errors.Wrap(err, "ensure DryRun cannot serialize lock")
 			}
@@ -467,7 +467,7 @@ func (sw *SafeWriter) PrintPreparedActions(output *log.Logger) error {
 
 	if sw.HasVendor() {
 		output.Println("Would have written the following projects to the vendor directory:")
-		for _, project := range sw.Lock.Projects() {
+		for _, project := range sw.lock.Projects() {
 			prj := project.Ident()
 			rev, _, _ := gps.VersionComponentStrings(project.Version())
 			if prj.Source == "" {
