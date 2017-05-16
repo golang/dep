@@ -472,10 +472,14 @@ func TestListPackagesNoDir(t *testing.T) {
 	}
 }
 
-func TestListPackages(t *testing.T) {
+func testDir(t testing.TB, s ...string) string {
 	srcdir := filepath.Join(getTestdataRootDir(t), "src")
+	return filepath.Join(srcdir, filepath.Join(s...))
+}
+
+func TestListPackages(t *testing.T) {
 	j := func(s ...string) string {
-		return filepath.Join(srcdir, filepath.Join(s...))
+		return testDir(t, s...)
 	}
 
 	table := map[string]struct {
@@ -1976,7 +1980,7 @@ func TestToReachMapFilterDot(t *testing.T) {
 	}
 }
 
-func getTestdataRootDir(t *testing.T) string {
+func getTestdataRootDir(t testing.TB) string {
 	cwd, err := os.Getwd()
 	if err != nil {
 		t.Fatal(err)
