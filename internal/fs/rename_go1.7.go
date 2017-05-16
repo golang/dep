@@ -9,6 +9,7 @@ package fs
 
 import (
 	"os"
+	"syscall"
 
 	"github.com/pkg/errors"
 )
