@@ -86,7 +86,7 @@ type SafeWriter struct {
 	Manifest    *Manifest
 	lock        *Lock
 	LockDiff    *gps.LockDiff
-	WriteVendor bool
+	writeVendor bool
 }
 
 // NewSafeWriter sets up a SafeWriter to write a set of config yaml, lock and vendor tree.
@@ -113,14 +113,14 @@ func NewSafeWriter(manifest *Manifest, oldLock, newLock *Lock, vendor VendorBeha
 
 	switch vendor {
 	case VendorAlways:
-		sw.WriteVendor = true
+		sw.writeVendor = true
 	case VendorOnChanged:
 		if sw.LockDiff != nil || (newLock != nil && oldLock == nil) {
-			sw.WriteVendor = true
+			sw.writeVendor = true
 		}
 	}
 
-	if sw.WriteVendor && newLock == nil {
+	if sw.writeVendor && newLock == nil {
 		return nil, errors.New("must provide newLock in order to write out vendor")
 	}
 
@@ -135,11 +135,6 @@ func (sw *SafeWriter) HasLock() bool {
 // HasManifest checks if a Manifest is present in the SafeWriter
 func (sw *SafeWriter) HasManifest() bool {
 	return sw.Manifest != nil
-}
-
-// HasVendor returns the if SafeWriter should write to vendor
-func (sw *SafeWriter) HasVendor() bool {
-	return sw.WriteVendor
 }
 
 type rawStringDiff struct {
@@ -269,7 +264,7 @@ func (sw SafeWriter) validate(root string, sm gps.SourceManager) error {
 		return errors.Errorf("root path %q does not exist", root)
 	}
 
-	if sw.HasVendor() && sm == nil {
+	if sw.writeVendor && sm == nil {
 		return errors.New("must provide a SourceManager if writing out a vendor dir")
 	}
 
@@ -290,7 +285,7 @@ func (sw *SafeWriter) Write(root string, sm gps.SourceManager, noExamples bool) 
 		return err
 	}
 
-	if !sw.HasManifest() && !sw.HasLock() && !sw.HasVendor() {
+	if !sw.HasManifest() && !sw.HasLock() && !sw.writeVendor {
 		// nothing to do
 		return nil
 	}
@@ -332,7 +327,7 @@ func (sw *SafeWriter) Write(root string, sm gps.SourceManager, noExamples bool) 
 		}
 	}
 
-	if sw.HasVendor() {
+	if sw.writeVendor {
 		err = gps.WriteDepTree(filepath.Join(td, "vendor"), sw.lock, sm, true)
 		if err != nil {
 			return errors.Wrap(err, "error while writing out vendor tree")
@@ -393,7 +388,7 @@ func (sw *SafeWriter) Write(root string, sm gps.SourceManager, noExamples bool) 
 		}
 	}
 
-	if sw.HasVendor() {
+	if sw.writeVendor {
 		if _, err := os.Stat(vpath); err == nil {
 			// Move out the old vendor dir. just do it into an adjacent dir, to
 			// try to mitigate the possibility of a pointless cross-filesystem
@@ -421,7 +416,7 @@ func (sw *SafeWriter) Write(root string, sm gps.SourceManager, noExamples bool) 
 
 	// Renames all went smoothly. The deferred os.RemoveAll will get the temp
 	// dir, but if we wrote vendor, we have to clean that up directly
-	if sw.HasVendor() {
+	if sw.writeVendor {
 		// Nothing we can really do about an error at this point, so ignore it
 		os.RemoveAll(vendorbak)
 	}
@@ -465,7 +460,7 @@ func (sw *SafeWriter) PrintPreparedActions(output *log.Logger) error {
 		}
 	}
 
-	if sw.HasVendor() {
+	if sw.writeVendor {
 		output.Println("Would have written the following projects to the vendor directory:")
 		for _, project := range sw.lock.Projects() {
 			prj := project.Ident()
