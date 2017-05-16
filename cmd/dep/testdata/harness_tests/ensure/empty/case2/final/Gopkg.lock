@@ -1,4 +1,8 @@
-memo = "e7725ea56516a42a641aaaf5d48754258d9f3c59949cb8a0e8a21b1ab6e07179"
+
+[inputs]
+  analyzerName = "dep"
+  analyzerVersion = 1
+  memo = "e7725ea56516a42a641aaaf5d48754258d9f3c59949cb8a0e8a21b1ab6e07179"
 
 [[projects]]
   name = "github.com/sdboyer/deptest"

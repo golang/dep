@@ -14,6 +14,10 @@ import (
 // additional methods that report information about the solve run.
 type Solution interface {
 	Lock
+	// The name of the ProjectAnalyzer used in generating this solution.
+	AnalyzerName() string
+	// The version of the ProjectAanalyzer used in generating this solution.
+	AnalyzerVersion() int
 	Attempts() int
 }
 
@@ -26,6 +30,12 @@ type solution struct {
 
 	// The hash digest of the input opts
 	hd []byte
+
+	// The analyzer name
+	analyzerName string
+
+	// The analyzer version
+	analyzerVersion int
 }
 
 // WriteDepTree takes a basedir and a Lock, and exports all the projects
@@ -75,4 +85,12 @@ func (r solution) Attempts() int {
 
 func (r solution) InputHash() []byte {
 	return r.hd
+}
+
+func (r solution) AnalyzerName() string {
+	return r.analyzerName
+}
+
+func (r solution) AnalyzerVersion() int {
+	return r.analyzerVersion
 }

@@ -261,7 +261,7 @@ func TestSafeWriter_ModifiedLock(t *testing.T) {
 
 	originalLock := new(Lock)
 	*originalLock = *pc.Project.Lock
-	originalLock.Memo = []byte{} // zero out the input hash to ensure non-equivalency
+	originalLock.Inputs.Memo = []byte{} // zero out the input hash to ensure non-equivalency
 	sw, _ := NewSafeWriter(nil, originalLock, pc.Project.Lock, VendorOnChanged)
 
 	// Verify prepared actions
@@ -308,7 +308,7 @@ func TestSafeWriter_ModifiedLockSkipVendor(t *testing.T) {
 
 	originalLock := new(Lock)
 	*originalLock = *pc.Project.Lock
-	originalLock.Memo = []byte{} // zero out the input hash to ensure non-equivalency
+	originalLock.Inputs.Memo = []byte{} // zero out the input hash to ensure non-equivalency
 	sw, _ := NewSafeWriter(nil, originalLock, pc.Project.Lock, VendorNever)
 
 	// Verify prepared actions

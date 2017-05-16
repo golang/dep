@@ -18,13 +18,25 @@ import (
 const LockName = "Gopkg.lock"
 
 type Lock struct {
-	Memo []byte
-	P    []gps.LockedProject
+	Inputs InputInfo
+	P      []gps.LockedProject
+}
+
+type InputInfo struct {
+	Memo            []byte
+	AnalyzerName    string
+	AnalyzerVersion int
 }
 
 type rawLock struct {
-	Memo     string             `toml:"memo"`
+	Inputs   inputInfo          `toml:"inputs"`
 	Projects []rawLockedProject `toml:"projects"`
+}
+
+type inputInfo struct {
+	Memo            string `toml:"memo"`
+	AnalyzerName    string `toml:"analyzerName"`
+	AnalyzerVersion int    `toml:"analyzerVersion"`
 }
 
 type rawLockedProject struct {
@@ -58,10 +70,13 @@ func fromRawLock(raw rawLock) (*Lock, error) {
 		P: make([]gps.LockedProject, len(raw.Projects)),
 	}
 
-	l.Memo, err = hex.DecodeString(raw.Memo)
+	l.Inputs.Memo, err = hex.DecodeString(raw.Inputs.Memo)
 	if err != nil {
 		return nil, errors.Errorf("invalid hash digest in lock's memo field")
 	}
+
+	l.Inputs.AnalyzerName = raw.Inputs.AnalyzerName
+	l.Inputs.AnalyzerVersion = raw.Inputs.AnalyzerVersion
 
 	for i, ld := range raw.Projects {
 		r := gps.Revision(ld.Revision)
@@ -84,11 +99,12 @@ func fromRawLock(raw rawLock) (*Lock, error) {
 		}
 		l.P[i] = gps.NewLockedProject(id, v, ld.Packages)
 	}
+
 	return l, nil
 }
 
 func (l *Lock) InputHash() []byte {
-	return l.Memo
+	return l.Inputs.Memo
 }
 
 func (l *Lock) Projects() []gps.LockedProject {
@@ -98,7 +114,11 @@ func (l *Lock) Projects() []gps.LockedProject {
 // toRaw converts the manifest into a representation suitable to write to the lock file
 func (l *Lock) toRaw() rawLock {
 	raw := rawLock{
-		Memo:     hex.EncodeToString(l.Memo),
+		Inputs: inputInfo{
+			Memo:            hex.EncodeToString(l.Inputs.Memo),
+			AnalyzerName:    l.Inputs.AnalyzerName,
+			AnalyzerVersion: l.Inputs.AnalyzerVersion,
+		},
 		Projects: make([]rawLockedProject, len(l.P)),
 	}
 
@@ -137,21 +157,19 @@ func (l *Lock) MarshalTOML() ([]byte, error) {
 //
 // As gps.Solution is a superset of gps.Lock, this can also be used to convert
 // solutions to dep's lock format.
-func LockFromInterface(in gps.Lock) *Lock {
-	if in == nil {
-		return nil
-	} else if l, ok := in.(*Lock); ok {
-		return l
-	}
-
+func LockFromInterface(in gps.Solution) *Lock {
 	h, p := in.InputHash(), in.Projects()
 
 	l := &Lock{
-		Memo: make([]byte, len(h)),
-		P:    make([]gps.LockedProject, len(p)),
+		Inputs: InputInfo{
+			Memo:            make([]byte, len(h)),
+			AnalyzerName:    in.AnalyzerName(),
+			AnalyzerVersion: in.AnalyzerVersion(),
+		},
+		P: make([]gps.LockedProject, len(p)),
 	}
 
-	copy(l.Memo, h)
+	copy(l.Inputs.Memo, h)
 	copy(l.P, p)
 	return l
 }

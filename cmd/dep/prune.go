@@ -68,7 +68,7 @@ func (cmd *pruneCommand) Run(ctx *dep.Ctx, args []string) error {
 		return errors.Wrap(err, "could not set up solver for input hashing")
 	}
 
-	if !bytes.Equal(s.HashInputs(), p.Lock.Memo) {
+	if !bytes.Equal(s.HashInputs(), p.Lock.Inputs.Memo) {
 		return fmt.Errorf("lock hash doesn't match")
 	}
 
