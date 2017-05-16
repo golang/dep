@@ -149,15 +149,11 @@ func (l *Lock) MarshalTOML() ([]byte, error) {
 	return result, errors.Wrap(err, "Unable to marshal lock to TOML string")
 }
 
-// LockFromInterface converts an arbitrary gps.Lock to dep's representation of a
-// lock. If the input is already dep's *lock, the input is returned directly.
+// LockFromSolution converts a gps.Solution to dep's representation of a lock.
 //
 // Data is defensively copied wherever necessary to ensure the resulting *lock
 // shares no memory with the original lock.
-//
-// As gps.Solution is a superset of gps.Lock, this can also be used to convert
-// solutions to dep's lock format.
-func LockFromInterface(in gps.Solution) *Lock {
+func LockFromSolution(in gps.Solution) *Lock {
 	h, p := in.InputHash(), in.Projects()
 
 	l := &Lock{
