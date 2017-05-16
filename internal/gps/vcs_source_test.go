@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"os/exec"
 	"reflect"
+	"strings"
 	"sync"
 	"testing"
 )
@@ -152,10 +153,12 @@ func testGopkginSourceInteractions(t *testing.T) {
 			t.Errorf("URL was bad, lolwut? errtext: %s", err)
 			return
 		}
+		unstable := strings.HasSuffix(opath, gopkgUnstableSuffix)
 		mb := maybeGopkginSource{
-			opath: opath,
-			url:   u,
-			major: major,
+			opath:    opath,
+			url:      u,
+			major:    major,
+			unstable: unstable,
 		}
 
 		ctx := context.Background()
@@ -240,7 +243,7 @@ func testGopkginSourceInteractions(t *testing.T) {
 
 	// simultaneously run for v1, v2, and v3 filters of the target repo
 	wg := &sync.WaitGroup{}
-	wg.Add(3)
+	wg.Add(4)
 	go func() {
 		tfunc("gopkg.in/sdboyer/gpkt.v1", "github.com/sdboyer/gpkt", 1, []Version{
 			NewVersion("v1.1.0").Is(Revision("b2cb48dda625f6640b34d9ffb664533359ac8b91")),
@@ -261,6 +264,13 @@ func testGopkginSourceInteractions(t *testing.T) {
 	go func() {
 		tfunc("gopkg.in/sdboyer/gpkt.v3", "github.com/sdboyer/gpkt", 3, []Version{
 			newDefaultBranch("v3").Is(Revision("4a54adf81c75375d26d376459c00d5ff9b703e5e")),
+		})
+		wg.Done()
+	}()
+
+	go func() {
+		tfunc("gopkg.in/mgo.v2-unstable", "github.com/go-mgo/mgo", 2, []Version{
+			newDefaultBranch("v2-unstable").Is(Revision("9a2573d4ae52a2bf9f5b7900a50e2f8bcceeb774")),
 		})
 		wg.Done()
 	}()
