@@ -3,26 +3,27 @@
 // license that can be found in the LICENSE file.
 package pkgtree
 
-import "testing"
+import (
+	"os"
+	"path/filepath"
+	"testing"
+)
 
 func BenchmarkListPackages(b *testing.B) {
 	b.StopTimer()
 
-	j := func(s ...string) string {
-		return testDir(b, s...)
+	cwd, err := os.Getwd()
+	if err != nil {
+		b.Fatal(err)
 	}
-
-	table := []string{
-		"dotgodir",
-		"buildtag",
-		"varied",
-	}
+	root := filepath.Join(cwd, "..", "..", "..")
 
 	b.StartTimer()
 
-	for _, name := range table {
-		for n := 0; n < b.N; n++ {
-			ListPackages(j(name), name)
+	for n := 0; n < b.N; n++ {
+		_, err := ListPackages(root, "github.com/golang/dep")
+		if err != nil {
+			b.Error(err)
 		}
 	}
 }
