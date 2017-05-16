@@ -65,7 +65,7 @@ func ListPackages(fileRoot, importRoot string) (PackageTree, error) {
 		ImportRoot: importRoot,
 		Packages:   make(map[string]PackageOrErr),
 	}
-	mu := &sync.Mutex{}
+	var mu sync.Mutex
 
 	var err error
 	fileRoot, err = filepath.Abs(fileRoot)
