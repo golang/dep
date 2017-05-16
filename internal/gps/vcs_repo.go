@@ -31,6 +31,25 @@ type gitRepo struct {
 	*vcs.GitRepo
 }
 
+func newGitRepo(ustr, path string) (*gitRepo, error) {
+	r, err := vcs.NewGitRepo(ustr, path)
+	if err != nil {
+		if _, ok := err.(*vcs.LocalError); ok {
+			// if vcs could not initialize the repo due to a local error
+			// then the local repo is in an incorrect state. Remove and
+			// treat it as a new not-yet-cloned repo.
+			os.RemoveAll(path)
+			r, err = vcs.NewGitRepo(ustr, path)
+		}
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &gitRepo{r}, nil
+}
+
 func newVcsRemoteErrorOr(msg string, err error, out string) error {
 	if err == context.Canceled || err == context.DeadlineExceeded {
 		return err
@@ -101,6 +120,22 @@ type bzrRepo struct {
 	*vcs.BzrRepo
 }
 
+func newBzrRepo(ustr, path string) (*bzrRepo, error) {
+	r, err := vcs.NewBzrRepo(ustr, path)
+	if err != nil {
+		if _, ok := err.(*vcs.LocalError); ok {
+			os.RemoveAll(path)
+			r, err = vcs.NewBzrRepo(ustr, path)
+		}
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &bzrRepo{r}, nil
+}
+
 func (r *bzrRepo) get(ctx context.Context) error {
 	basePath := filepath.Dir(filepath.FromSlash(r.LocalPath()))
 	if _, err := os.Stat(basePath); os.IsNotExist(err) {
@@ -136,6 +171,22 @@ func (r *bzrRepo) updateVersion(ctx context.Context, version string) error {
 
 type hgRepo struct {
 	*vcs.HgRepo
+}
+
+func newHgRepo(ustr, path string) (*hgRepo, error) {
+	r, err := vcs.NewHgRepo(ustr, path)
+	if err != nil {
+		if _, ok := err.(*vcs.LocalError); ok {
+			os.RemoveAll(path)
+			r, err = vcs.NewHgRepo(ustr, path)
+		}
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &hgRepo{r}, nil
 }
 
 func (r *hgRepo) get(ctx context.Context) error {
