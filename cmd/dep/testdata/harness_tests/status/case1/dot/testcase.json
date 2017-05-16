@@ -1,8 +1,9 @@
 {
   "commands": [
     ["ensure"],
-    ["status","-dot"]
+    ["status", "-dot"]
   ],
+  "error-expected": "",
   "vendor-final": [
     "github.com/sdboyer/deptest",
     "github.com/sdboyer/deptestdos"

@@ -1,4 +1,8 @@
-memo = "af9a783a5430dabcaaf44683c09e2b729e1c0d61f13bfdf6677c4fd0b41387ca"
+
+[inputs]
+  analyzerName = "dep"
+  analyzerVersion = 1
+  memo = "af9a783a5430dabcaaf44683c09e2b729e1c0d61f13bfdf6677c4fd0b41387ca"
 
 [[projects]]
   branch = "master"

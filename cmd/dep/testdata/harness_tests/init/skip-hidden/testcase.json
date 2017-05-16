@@ -2,6 +2,7 @@
   "commands": [
     ["init", "-no-examples"]
   ],
+  "error-expected": "",
   "vendor-final": [
     "github.com/sdboyer/deptest"
   ]
