@@ -15,6 +15,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"unicode"
 )
 
@@ -64,6 +65,7 @@ func ListPackages(fileRoot, importRoot string) (PackageTree, error) {
 		ImportRoot: importRoot,
 		Packages:   make(map[string]PackageOrErr),
 	}
+	mu := &sync.Mutex{}
 
 	var err error
 	fileRoot, err = filepath.Abs(fileRoot)
@@ -71,10 +73,7 @@ func ListPackages(fileRoot, importRoot string) (PackageTree, error) {
 		return PackageTree{}, err
 	}
 
-	err = filepath.Walk(fileRoot, func(wp string, fi os.FileInfo, err error) error {
-		if err != nil && err != filepath.SkipDir {
-			return err
-		}
+	err = fastWalk(fileRoot, func(wp string, fi os.FileMode) error {
 		if !fi.IsDir() {
 			return nil
 		}
@@ -83,7 +82,7 @@ func ListPackages(fileRoot, importRoot string) (PackageTree, error) {
 		//
 		// We don't skip _*, or testdata dirs because, while it may be poor
 		// form, importing them is not a compilation error.
-		switch fi.Name() {
+		switch wp {
 		case "vendor", "Godeps":
 			return filepath.SkipDir
 		}
@@ -93,7 +92,7 @@ func ListPackages(fileRoot, importRoot string) (PackageTree, error) {
 		// Note that there are some pathological edge cases this doesn't cover,
 		// such as a user using Git for version control, but having a package
 		// named "svn" in a directory named ".svn".
-		if _, ok := vcsRoots[fi.Name()]; ok {
+		if _, ok := vcsRoots[wp]; ok {
 			return filepath.SkipDir
 		}
 
@@ -143,9 +142,11 @@ func ListPackages(fileRoot, importRoot string) (PackageTree, error) {
 			case gscan.ErrorList, *gscan.Error, *build.NoGoError:
 				// This happens if we encounter malformed or nonexistent Go
 				// source code
+				mu.Lock()
 				ptree.Packages[ip] = PackageOrErr{
 					Err: err,
 				}
+				mu.Unlock()
 				return nil
 			default:
 				return err
@@ -168,6 +169,7 @@ func ListPackages(fileRoot, importRoot string) (PackageTree, error) {
 			}
 		}
 
+		mu.Lock()
 		if len(lim) > 0 {
 			ptree.Packages[ip] = PackageOrErr{
 				Err: &LocalImportsError{
@@ -181,6 +183,7 @@ func ListPackages(fileRoot, importRoot string) (PackageTree, error) {
 				P: pkg,
 			}
 		}
+		mu.Unlock()
 
 		return nil
 	})
