@@ -107,6 +107,7 @@ func ListPackages(fileRoot, importRoot string) (PackageTree, error) {
 		// then will filepath.Walk have attempted to descend into the directory
 		// and encountered an error.
 		var f *os.File
+		var err error
 		f, err = os.Open(wp)
 		if err != nil {
 			if os.IsPermission(err) {
