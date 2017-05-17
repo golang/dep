@@ -140,7 +140,7 @@ func TestSafeWriter_Manifest(t *testing.T) {
 	if sw.HasLock() {
 		t.Fatal("Did not expect the payload to contain the lock")
 	}
-	if sw.HasVendor() {
+	if sw.writeVendor {
 		t.Fatal("Did not expect the payload to contain the vendor directory")
 	}
 
@@ -182,7 +182,7 @@ func TestSafeWriter_ManifestAndUnmodifiedLock(t *testing.T) {
 	if !sw.HasLock() {
 		t.Fatal("Expected the payload to contain the lock.")
 	}
-	if sw.HasVendor() {
+	if sw.writeVendor {
 		t.Fatal("Did not expect the payload to contain the vendor directory")
 	}
 
@@ -224,7 +224,7 @@ func TestSafeWriter_ManifestAndUnmodifiedLockWithForceVendor(t *testing.T) {
 	if !sw.HasLock() {
 		t.Fatal("Expected the payload to contain the lock")
 	}
-	if !sw.HasVendor() {
+	if !sw.writeVendor {
 		t.Fatal("Expected the payload to contain the vendor directory")
 	}
 
@@ -271,7 +271,7 @@ func TestSafeWriter_ModifiedLock(t *testing.T) {
 	if !sw.HasLock() {
 		t.Fatal("Expected the payload to contain the lock")
 	}
-	if !sw.HasVendor() {
+	if !sw.writeVendor {
 		t.Fatal("Expected the payload to contain the vendor directory")
 	}
 
@@ -318,7 +318,7 @@ func TestSafeWriter_ModifiedLockSkipVendor(t *testing.T) {
 	if !sw.HasLock() {
 		t.Fatal("Expected the payload to contain the lock")
 	}
-	if sw.HasVendor() {
+	if sw.writeVendor {
 		t.Fatal("Did not expect the payload to contain the vendor directory")
 	}
 
@@ -362,7 +362,7 @@ func TestSafeWriter_ForceVendorWhenVendorAlreadyExists(t *testing.T) {
 	if !sw.HasLock() {
 		t.Fatal("Expected the payload to contain the lock")
 	}
-	if !sw.HasVendor() {
+	if !sw.writeVendor {
 		t.Fatal("Expected the payload to contain the vendor directory ")
 	}
 
@@ -408,7 +408,7 @@ func TestSafeWriter_NewLock(t *testing.T) {
 	if !sw.HasLock() {
 		t.Fatal("Expected the payload to contain the lock")
 	}
-	if !sw.HasVendor() {
+	if !sw.writeVendor {
 		t.Fatal("Expected the payload to contain the vendor directory")
 	}
 
@@ -452,7 +452,7 @@ func TestSafeWriter_NewLockSkipVendor(t *testing.T) {
 	if !sw.HasLock() {
 		t.Fatal("Expected the payload to contain the lock")
 	}
-	if sw.HasVendor() {
+	if sw.writeVendor {
 		t.Fatal("Did not expect the payload to contain the vendor directory")
 	}
 
@@ -543,7 +543,7 @@ func TestSafeWriter_VendorDotGitPreservedWithForceVendor(t *testing.T) {
 	if !sw.HasLock() {
 		t.Fatal("Expected the payload to contain the lock")
 	}
-	if !sw.HasVendor() {
+	if !sw.writeVendor {
 		t.Fatal("Expected the payload to contain the vendor directory")
 	}
 
