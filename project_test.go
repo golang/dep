@@ -65,7 +65,7 @@ func TestProjectMakeParams(t *testing.T) {
 	p := Project{
 		AbsRoot:    "someroot",
 		ImportRoot: gps.ProjectRoot("Some project root"),
-		Manifest:   &Manifest{Ignored: []string{"ignoring this"}},
+		Manifest:   &Manifest{ignored: []string{"ignoring this"}},
 		Lock:       &Lock{},
 	}
 
