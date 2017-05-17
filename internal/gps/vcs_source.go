@@ -47,6 +47,10 @@ func (bs *baseVCSSource) getManifestAndLock(ctx context.Context, pr ProjectRoot,
 	}
 
 	m, l, err := an.DeriveManifestAndLock(bs.repo.LocalPath(), pr)
+	if os.IsNotExist(err) {
+		return prepManifest(nil), nil, nil
+	}
+
 	if err != nil {
 		return nil, nil, err
 	}
