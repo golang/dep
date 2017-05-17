@@ -8,7 +8,6 @@ import (
 	"sort"
 
 	"github.com/armon/go-radix"
-	"github.com/golang/dep/internal/gps/internal"
 	"github.com/golang/dep/internal/gps/pkgtree"
 )
 
@@ -49,6 +48,9 @@ type rootdata struct {
 
 	// The ProjectAnalyzer to use for all GetManifestAndLock calls.
 	an ProjectAnalyzer
+
+	// The function to use to recognize standard library import paths.
+	stdLibFn func(string) bool
 }
 
 // externalImportList returns a list of the unique imports from the root data.
@@ -56,13 +58,7 @@ type rootdata struct {
 // errors within the local set of package are not backpropagated.
 func (rd rootdata) externalImportList() []string {
 	rm, _ := rd.rpt.ToReachMap(true, true, false, rd.ig)
-	all := rm.Flatten(false)
-	reach := make([]string, 0, len(all))
-	for _, r := range all {
-		if !internal.IsStdLib(r) {
-			reach = append(reach, r)
-		}
-	}
+	reach := rm.FlattenFn(rd.stdLibFn)
 
 	// If there are any requires, slide them into the reach list, as well.
 	if len(rd.req) > 0 {
@@ -121,7 +117,7 @@ func (rd rootdata) getApplicableConstraints() []workingConstraint {
 	// Walk all dep import paths we have to consider and mark the corresponding
 	// wc entry in the trie, if any
 	for _, im := range rd.externalImportList() {
-		if internal.IsStdLib(im) {
+		if rd.stdLibFn(im) {
 			continue
 		}
 
