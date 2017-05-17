@@ -492,7 +492,7 @@ func TestSafeWriter_DiffLocks(t *testing.T) {
 	sw, _ := NewSafeWriter(nil, pc.Project.Lock, updatedLock, VendorOnChanged)
 
 	// Verify lock diff
-	diff := sw.LockDiff
+	diff := sw.lockDiff
 	if diff == nil {
 		t.Fatal("Expected the payload to contain a diff of the lock files")
 	}
