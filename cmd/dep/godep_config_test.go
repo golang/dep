@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/golang/dep"
+	"github.com/golang/dep/internal/gps"
 	"github.com/golang/dep/internal/test"
 )
 
@@ -102,9 +103,20 @@ func TestGodepConvertProject(t *testing.T) {
 		t.Fatalf("Expected the lock to have a project for 'github.com/sdboyer/deptest' but got '%s'", p.Ident().ProjectRoot)
 	}
 
-	lv := p.Version().String()
-	if lv != "v1.0.0" {
-		t.Fatalf("Expected locked revision to be 'v1.0.0', got %s", lv)
+	lv := p.Version()
+	lpv, ok := lv.(gps.PairedVersion)
+	if !ok {
+		t.Fatalf("Expected locked version to be PairedVersion but got %T", lv)
+	}
+
+	rev := lpv.Underlying()
+	if rev != "6a741be0cc55ecbe4f45690ebfd606a956d5f14a" {
+		t.Fatalf("Expected locked revision to be '6a741be0cc55ecbe4f45690ebfd606a956d5f14a', got %s", rev)
+	}
+
+	ver := lpv.String()
+	if ver != "v1.0.0" {
+		t.Fatalf("Expected locked version to be 'v1.0.0', got %s", ver)
 	}
 }
 
