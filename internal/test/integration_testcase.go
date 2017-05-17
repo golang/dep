@@ -23,7 +23,7 @@ var (
 
 // IntegrationTestCase manages a test case directory structure and content
 type IntegrationTestCase struct {
-	t             *testing.T
+	tb            testing.TB
 	name          string
 	rootPath      string
 	initialPath   string
@@ -35,10 +35,10 @@ type IntegrationTestCase struct {
 	VendorFinal   []string          `json:"vendor-final"`
 }
 
-func NewTestCase(t *testing.T, name, wd string) *IntegrationTestCase {
+func NewTestCase(tb testing.TB, name, wd string) *IntegrationTestCase {
 	rootPath := filepath.FromSlash(filepath.Join(wd, "testdata", "harness_tests", name))
 	n := &IntegrationTestCase{
-		t:           t,
+		tb:          tb,
 		name:        name,
 		rootPath:    rootPath,
 		initialPath: filepath.Join(rootPath, "initial"),
@@ -78,7 +78,7 @@ func (tc *IntegrationTestCase) Cleanup() {
 		j = append(j, '\n')
 		err = ioutil.WriteFile(filepath.Join(tc.rootPath, "testcase.json"), j, 0666)
 		if err != nil {
-			tc.t.Errorf("Failed to update testcase %s: %s", tc.name, err)
+			tc.tb.Errorf("Failed to update testcase %s: %s", tc.name, err)
 		}
 	}
 }
@@ -92,39 +92,39 @@ func (tc *IntegrationTestCase) CompareFile(goldenPath, working string) {
 
 	gotExists, got, err := getFile(working)
 	if err != nil {
-		tc.t.Fatalf("Error reading project file %s: %s", goldenPath, err)
+		tc.tb.Fatalf("Error reading project file %s: %s", goldenPath, err)
 	}
 	wantExists, want, err := getFile(golden)
 	if err != nil {
-		tc.t.Fatalf("Error reading testcase file %s: %s", goldenPath, err)
+		tc.tb.Fatalf("Error reading testcase file %s: %s", goldenPath, err)
 	}
 
 	if wantExists && gotExists {
 		if want != got {
 			if *UpdateGolden {
 				if err := tc.WriteFile(golden, got); err != nil {
-					tc.t.Fatal(err)
+					tc.tb.Fatal(err)
 				}
 			} else {
-				tc.t.Errorf("expected %s, got %s", want, got)
+				tc.tb.Errorf("expected %s, got %s", want, got)
 			}
 		}
 	} else if !wantExists && gotExists {
 		if *UpdateGolden {
 			if err := tc.WriteFile(golden, got); err != nil {
-				tc.t.Fatal(err)
+				tc.tb.Fatal(err)
 			}
 		} else {
-			tc.t.Errorf("%s created where none was expected", goldenPath)
+			tc.tb.Errorf("%s created where none was expected", goldenPath)
 		}
 	} else if wantExists && !gotExists {
 		if *UpdateGolden {
 			err := os.Remove(golden)
 			if err != nil {
-				tc.t.Fatal(err)
+				tc.tb.Fatal(err)
 			}
 		} else {
-			tc.t.Errorf("%s not created where one was expected", goldenPath)
+			tc.tb.Errorf("%s not created where one was expected", goldenPath)
 		}
 	}
 }
@@ -144,7 +144,7 @@ func (tc *IntegrationTestCase) CompareOutput(stdout string) {
 	stdout = normalizeLines(stdout)
 
 	if expStr != stdout {
-		tc.t.Errorf("expected: %q but got: %q", expStr, stdout)
+		tc.tb.Errorf("expected: %q but got: %q", expStr, stdout)
 	}
 }
 
@@ -164,12 +164,12 @@ func (tc *IntegrationTestCase) CompareError(err error, stderr string) {
 
 	if wantExists && gotExists {
 		if !strings.Contains(got, want) {
-			tc.t.Errorf("expected error containing %s, got error %s", want, got)
+			tc.tb.Errorf("expected error containing %s, got error %s", want, got)
 		}
 	} else if !wantExists && gotExists {
-		tc.t.Fatalf("error raised where none was expected: \n%v", stderr)
+		tc.tb.Fatalf("error raised where none was expected: \n%v", stderr)
 	} else if wantExists && !gotExists {
-		tc.t.Error("error not raised where one was expected:", want)
+		tc.tb.Error("error not raised where one was expected:", want)
 	}
 }
 
@@ -179,11 +179,11 @@ func (tc *IntegrationTestCase) CompareVendorPaths(gotVendorPaths []string) {
 	} else {
 		wantVendorPaths := tc.VendorFinal
 		if len(gotVendorPaths) != len(wantVendorPaths) {
-			tc.t.Fatalf("Wrong number of vendor paths created: want %d got %d", len(wantVendorPaths), len(gotVendorPaths))
+			tc.tb.Fatalf("Wrong number of vendor paths created: want %d got %d", len(wantVendorPaths), len(gotVendorPaths))
 		}
 		for ind := range gotVendorPaths {
 			if gotVendorPaths[ind] != wantVendorPaths[ind] {
-				tc.t.Errorf("Mismatch in vendor paths created: want %s got %s", gotVendorPaths, wantVendorPaths)
+				tc.tb.Errorf("Mismatch in vendor paths created: want %s got %s", gotVendorPaths, wantVendorPaths)
 			}
 		}
 	}
