@@ -20,6 +20,11 @@ func rename(src, dst string) error {
 		return errors.Wrapf(err, "cannot stat %s", src)
 	}
 
+	// In go 1.8, the behavior of os.Rename changed on non-Windows platforms. It no
+	// longer allows renames that would replace an existing directory. This has
+	// always been the case on Windows, though.
+	//
+	// For consistency, we replicate the go 1.8 behavior in earlier go versions here.
 	if dstfi, err := os.Stat(dst); fi.IsDir() && err == nil && dstfi.IsDir() {
 		return errors.Errorf("cannot rename directory %s to existing dst %s", src, dst)
 	}
