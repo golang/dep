@@ -17,24 +17,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/golang/dep/internal/gps/internal"
 	"github.com/golang/dep/internal/gps/internal/fs"
+	"github.com/golang/dep/internal/gps/internal/paths"
 )
-
-// Stores a reference to original IsStdLib, so we could restore overridden version.
-var doIsStdLib = internal.IsStdLib
-
-func init() {
-	overrideIsStdLib()
-}
-
-// sets the IsStdLib func to always return false, otherwise it would identify
-// pretty much all of our fixtures as being stdlib and skip everything.
-func overrideIsStdLib() {
-	internal.IsStdLib = func(path string) bool {
-		return false
-	}
-}
 
 // PackageTree.ToReachMap() uses an easily separable algorithm, wmToReach(),
 // to turn a discovered set of packages and their imports into a proper pair of
@@ -1730,22 +1715,6 @@ func TestFlattenReachMap(t *testing.T) {
 		t.Fatalf("listPackages failed on varied test case: %s", err)
 	}
 
-	var expect []string
-	var name string
-	var ignore map[string]bool
-	var stdlib, main, tests bool
-
-	validate := func() {
-		rm, em := vptree.ToReachMap(main, tests, true, ignore)
-		if len(em) != 0 {
-			t.Errorf("Should not have any error pkgs from ToReachMap, got %s", em)
-		}
-		result := rm.Flatten(stdlib)
-		if !reflect.DeepEqual(expect, result) {
-			t.Errorf("Wrong imports in %q case:\n\t(GOT): %s\n\t(WNT): %s", name, result, expect)
-		}
-	}
-
 	all := []string{
 		"encoding/binary",
 		"github.com/Masterminds/semver",
@@ -1757,11 +1726,11 @@ func TestFlattenReachMap(t *testing.T) {
 		"sort",
 	}
 
-	// helper to rewrite expect, except for a couple packages
+	// helper to generate testCase.expect as: all, except for a couple packages
 	//
 	// this makes it easier to see what we're taking out on each test
-	except := func(not ...string) {
-		expect = make([]string, len(all)-len(not))
+	except := func(not ...string) []string {
+		expect := make([]string, len(all)-len(not))
 
 		drop := make(map[string]bool)
 		for _, npath := range not {
@@ -1775,113 +1744,159 @@ func TestFlattenReachMap(t *testing.T) {
 				k++
 			}
 		}
+		return expect
 	}
 
-	// everything on
-	name = "simple"
-	except()
-	stdlib, main, tests = true, true, true
-	validate()
-
-	// turning off stdlib should cut most things, but we need to override the
-	// function
-	internal.IsStdLib = doIsStdLib
-	name = "no stdlib"
-	stdlib = false
-	except("encoding/binary", "go/parser", "hash", "net/http", "os", "sort")
-	validate()
-	// restore stdlib func override
-	overrideIsStdLib()
-
-	// stdlib back in; now exclude tests, which should just cut one
-	name = "no tests"
-	stdlib, tests = true, false
-	except("encoding/binary")
-	validate()
-
-	// Now skip main, which still just cuts out one
-	name = "no main"
-	main, tests = false, true
-	except("net/http")
-	validate()
-
-	// No test and no main, which should be additive
-	name = "no test, no main"
-	main, tests = false, false
-	except("net/http", "encoding/binary")
-	validate()
-
-	// now, the ignore tests. turn main and tests back on
-	main, tests = true, true
-
-	// start with non-matching
-	name = "non-matching ignore"
-	ignore = map[string]bool{
-		"nomatch": true,
+	for _, testCase := range []*flattenReachMapCase{
+		// everything on
+		{
+			name:       "simple",
+			expect:     except(),
+			isStdLibFn: nil,
+			main:       true,
+			tests:      true,
+		},
+		// no stdlib
+		{
+			name:       "no stdlib",
+			expect:     except("encoding/binary", "go/parser", "hash", "net/http", "os", "sort"),
+			isStdLibFn: paths.IsStandardImportPath,
+			main:       true,
+			tests:      true,
+		},
+		// stdlib back in; now exclude tests, which should just cut one
+		{
+			name:       "no tests",
+			expect:     except("encoding/binary"),
+			isStdLibFn: nil,
+			main:       true,
+			tests:      false,
+		},
+		// Now skip main, which still just cuts out one
+		{
+			name:       "no main",
+			expect:     except("net/http"),
+			isStdLibFn: nil,
+			main:       false,
+			tests:      true,
+		},
+		// No test and no main, which should be additive
+		{
+			name:       "no tests, no main",
+			expect:     except("net/http", "encoding/binary"),
+			isStdLibFn: nil,
+			main:       false,
+			tests:      false,
+		},
+		// now, the ignore tests. turn main and tests back on
+		// start with non-matching
+		{
+			name:       "non-matching ignore",
+			expect:     except(),
+			isStdLibFn: nil,
+			main:       true,
+			tests:      true,
+			ignore: map[string]bool{
+				"nomatch": true,
+			},
+		},
+		// should have the same effect as ignoring main
+		{
+			name:       "ignore the root",
+			expect:     except("net/http"),
+			isStdLibFn: nil,
+			main:       true,
+			tests:      true,
+			ignore: map[string]bool{
+				"github.com/example/varied": true,
+			},
+		},
+		// now drop a more interesting one
+		// we get github.com/golang/dep/internal/gps from m1p, too, so it should still be there
+		{
+			name:       "ignore simple",
+			expect:     except("go/parser"),
+			isStdLibFn: nil,
+			main:       true,
+			tests:      true,
+			ignore: map[string]bool{
+				"github.com/example/varied/simple": true,
+			},
+		},
+		// now drop two
+		{
+			name:       "ignore simple and nameismatch",
+			expect:     except("go/parser", "github.com/Masterminds/semver"),
+			isStdLibFn: nil,
+			main:       true,
+			tests:      true,
+			ignore: map[string]bool{
+				"github.com/example/varied/simple":       true,
+				"github.com/example/varied/namemismatch": true,
+			},
+		},
+		// make sure tests and main play nice with ignore
+		{
+			name:       "ignore simple and nameismatch, and no tests",
+			expect:     except("go/parser", "github.com/Masterminds/semver", "encoding/binary"),
+			isStdLibFn: nil,
+			main:       true,
+			tests:      false,
+			ignore: map[string]bool{
+				"github.com/example/varied/simple":       true,
+				"github.com/example/varied/namemismatch": true,
+			},
+		},
+		{
+			name:       "ignore simple and namemismatch, and no main",
+			expect:     except("go/parser", "github.com/Masterminds/semver", "net/http"),
+			isStdLibFn: nil,
+			main:       false,
+			tests:      true,
+			ignore: map[string]bool{
+				"github.com/example/varied/simple":       true,
+				"github.com/example/varied/namemismatch": true,
+			},
+		},
+		{
+			name:       "ignore simple and namemismatch, and no main or tests",
+			expect:     except("go/parser", "github.com/Masterminds/semver", "net/http", "encoding/binary"),
+			isStdLibFn: nil,
+			main:       false,
+			tests:      false,
+			ignore: map[string]bool{
+				"github.com/example/varied/simple":       true,
+				"github.com/example/varied/namemismatch": true,
+			},
+		},
+		// ignore two that should knock out gps
+		{
+			name:       "ignore both importers",
+			expect:     except("sort", "github.com/golang/dep/internal/gps", "go/parser"),
+			isStdLibFn: nil,
+			main:       true,
+			tests:      true,
+			ignore: map[string]bool{
+				"github.com/example/varied/simple": true,
+				"github.com/example/varied/m1p":    true,
+			},
+		},
+		// finally, directly ignore some external packages
+		{
+			name:       "ignore external",
+			expect:     except("sort", "github.com/golang/dep/internal/gps", "go/parser"),
+			isStdLibFn: nil,
+			main:       true,
+			tests:      true,
+			ignore: map[string]bool{
+				"github.com/golang/dep/internal/gps": true,
+				"go/parser":                          true,
+				"sort":                               true,
+			},
+		},
+	} {
+		t.Run(testCase.name, testFlattenReachMap(&vptree, testCase))
 	}
-	except()
-	validate()
-
-	// should have the same effect as ignoring main
-	name = "ignore the root"
-	ignore = map[string]bool{
-		"github.com/example/varied": true,
-	}
-	except("net/http")
-	validate()
-
-	// now drop a more interesting one
-	name = "ignore simple"
-	ignore = map[string]bool{
-		"github.com/example/varied/simple": true,
-	}
-	// we get github.com/golang/dep/internal/gps from m1p, too, so it should still be there
-	except("go/parser")
-	validate()
-
-	// now drop two
-	name = "ignore simple and namemismatch"
-	ignore = map[string]bool{
-		"github.com/example/varied/simple":       true,
-		"github.com/example/varied/namemismatch": true,
-	}
-	except("go/parser", "github.com/Masterminds/semver")
-	validate()
-
-	// make sure tests and main play nice with ignore
-	name = "ignore simple and namemismatch, and no tests"
-	tests = false
-	except("go/parser", "github.com/Masterminds/semver", "encoding/binary")
-	validate()
-	name = "ignore simple and namemismatch, and no main"
-	main, tests = false, true
-	except("go/parser", "github.com/Masterminds/semver", "net/http")
-	validate()
-	name = "ignore simple and namemismatch, and no main or tests"
-	main, tests = false, false
-	except("go/parser", "github.com/Masterminds/semver", "net/http", "encoding/binary")
-	validate()
-
-	main, tests = true, true
-
-	// ignore two that should knock out gps
-	name = "ignore both importers"
-	ignore = map[string]bool{
-		"github.com/example/varied/simple": true,
-		"github.com/example/varied/m1p":    true,
-	}
-	except("sort", "github.com/golang/dep/internal/gps", "go/parser")
-	validate()
-
-	// finally, directly ignore some external packages
-	name = "ignore external"
-	ignore = map[string]bool{
-		"github.com/golang/dep/internal/gps": true,
-		"go/parser":                          true,
-		"sort":                               true,
-	}
-	except("sort", "github.com/golang/dep/internal/gps", "go/parser")
-	validate()
 
 	// The only thing varied *doesn't* cover is disallowed path patterns
 	ptree, err := ListPackages(filepath.Join(getTestdataRootDir(t), "src", "disallow"), "disallow")
@@ -1889,14 +1904,34 @@ func TestFlattenReachMap(t *testing.T) {
 		t.Fatalf("ListPackages failed on disallow test case: %s", err)
 	}
 
-	rm, em := ptree.ToReachMap(false, false, true, nil)
-	if len(em) != 0 {
-		t.Errorf("Should not have any error packages from ToReachMap, got %s", em)
-	}
-	result := rm.Flatten(true)
-	expect = []string{"github.com/golang/dep/internal/gps", "hash", "sort"}
-	if !reflect.DeepEqual(expect, result) {
-		t.Errorf("Wrong imports in %q case:\n\t(GOT): %s\n\t(WNT): %s", name, result, expect)
+	t.Run("disallowed", testFlattenReachMap(&ptree, &flattenReachMapCase{
+		name:       "disallowed",
+		expect:     []string{"github.com/golang/dep/internal/gps", "hash", "sort"},
+		isStdLibFn: nil,
+		main:       false,
+		tests:      false,
+	}))
+}
+
+type flattenReachMapCase struct {
+	expect      []string
+	name        string
+	ignore      map[string]bool
+	main, tests bool
+	isStdLibFn  func(string) bool
+}
+
+func testFlattenReachMap(ptree *PackageTree, testCase *flattenReachMapCase) func(*testing.T) {
+	return func(t *testing.T) {
+		t.Parallel()
+		rm, em := ptree.ToReachMap(testCase.main, testCase.tests, true, testCase.ignore)
+		if len(em) != 0 {
+			t.Errorf("Should not have any error pkgs from ToReachMap, got %s", em)
+		}
+		result := rm.FlattenFn(testCase.isStdLibFn)
+		if !reflect.DeepEqual(testCase.expect, result) {
+			t.Errorf("Wrong imports in %q case:\n\t(GOT): %s\n\t(WNT): %s", testCase.name, result, testCase.expect)
+		}
 	}
 }
 

@@ -12,7 +12,7 @@ import (
 	"strings"
 
 	"github.com/armon/go-radix"
-	"github.com/golang/dep/internal/gps/internal"
+	"github.com/golang/dep/internal/gps/internal/paths"
 	"github.com/golang/dep/internal/gps/pkgtree"
 )
 
@@ -109,6 +109,10 @@ type SolveParameters struct {
 	// solver will generate informative trace output as it moves through the
 	// solving process.
 	TraceLogger *log.Logger
+
+	// stdLibFn is the function to use to recognize standard library import paths.
+	// Only overridden for tests. Defaults to paths.IsStandardImportPath if nil.
+	stdLibFn func(string) bool
 }
 
 // solver is a CDCL-style constraint solver with satisfiability conditions
@@ -186,17 +190,21 @@ func (params SolveParameters) toRootdata() (rootdata, error) {
 	if params.Manifest == nil {
 		params.Manifest = simpleRootManifest{}
 	}
+	if params.stdLibFn == nil {
+		params.stdLibFn = paths.IsStandardImportPath
+	}
 
 	rd := rootdata{
-		ig:      params.Manifest.IgnoredPackages(),
-		req:     params.Manifest.RequiredPackages(),
-		ovr:     params.Manifest.Overrides(),
-		rpt:     params.RootPackageTree.Copy(),
-		chng:    make(map[ProjectRoot]struct{}),
-		rlm:     make(map[ProjectRoot]LockedProject),
-		chngall: params.ChangeAll,
-		dir:     params.RootDir,
-		an:      params.ProjectAnalyzer,
+		ig:       params.Manifest.IgnoredPackages(),
+		req:      params.Manifest.RequiredPackages(),
+		ovr:      params.Manifest.Overrides(),
+		rpt:      params.RootPackageTree.Copy(),
+		chng:     make(map[ProjectRoot]struct{}),
+		rlm:      make(map[ProjectRoot]LockedProject),
+		chngall:  params.ChangeAll,
+		dir:      params.RootDir,
+		an:       params.ProjectAnalyzer,
+		stdLibFn: params.stdLibFn,
 	}
 
 	// Ensure the required, ignore and overrides maps are at least initialized
@@ -615,7 +623,7 @@ func (s *solver) intersectConstraintsWithImports(deps []workingConstraint, reach
 	dmap := make(map[ProjectRoot]completeDep)
 	for _, rp := range reach {
 		// If it's a stdlib-shaped package, skip it.
-		if internal.IsStdLib(rp) {
+		if s.rd.stdLibFn(rp) {
 			continue
 		}
 
