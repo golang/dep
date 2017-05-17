@@ -85,7 +85,7 @@ const exampleTOML = `
 type SafeWriter struct {
 	Manifest    *Manifest
 	lock        *Lock
-	LockDiff    *gps.LockDiff
+	lockDiff    *gps.LockDiff
 	writeVendor bool
 }
 
@@ -108,14 +108,14 @@ func NewSafeWriter(manifest *Manifest, oldLock, newLock *Lock, vendor VendorBeha
 		if newLock == nil {
 			return nil, errors.New("must provide newLock when oldLock is specified")
 		}
-		sw.LockDiff = gps.DiffLocks(oldLock, newLock)
+		sw.lockDiff = gps.DiffLocks(oldLock, newLock)
 	}
 
 	switch vendor {
 	case VendorAlways:
 		sw.writeVendor = true
 	case VendorOnChanged:
-		if sw.LockDiff != nil || (newLock != nil && oldLock == nil) {
+		if sw.lockDiff != nil || (newLock != nil && oldLock == nil) {
 			sw.writeVendor = true
 		}
 	}
@@ -443,7 +443,7 @@ func (sw *SafeWriter) PrintPreparedActions(output *log.Logger) error {
 	}
 
 	if sw.HasLock() {
-		if sw.LockDiff == nil {
+		if sw.lockDiff == nil {
 			output.Printf("Would have written the following %s:\n", LockName)
 			l, err := sw.lock.MarshalTOML()
 			if err != nil {
@@ -452,7 +452,7 @@ func (sw *SafeWriter) PrintPreparedActions(output *log.Logger) error {
 			output.Println(string(l))
 		} else {
 			output.Printf("Would have written the following changes to %s:\n", LockName)
-			diff, err := formatLockDiff(*sw.LockDiff)
+			diff, err := formatLockDiff(*sw.lockDiff)
 			if err != nil {
 				return errors.Wrap(err, "ensure DryRun cannot serialize the lock diff")
 			}
