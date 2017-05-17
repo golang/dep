@@ -46,6 +46,9 @@ func (g *godepFile) load(projectDir string) error {
 		return errors.Wrapf(err, "Unable to read %s", j)
 	}
 	err = json.Unmarshal(raw, &g.json)
+	if err != nil {
+		return errors.Wrapf(err, "Unable to parse %s", j)
+	}
 
 	return nil
 }
