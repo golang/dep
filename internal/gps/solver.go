@@ -12,7 +12,7 @@ import (
 	"strings"
 
 	"github.com/armon/go-radix"
-	"github.com/golang/dep/internal/gps/internal"
+	"github.com/golang/dep/internal/gps/internal/paths"
 	"github.com/golang/dep/internal/gps/pkgtree"
 )
 
@@ -92,6 +92,10 @@ type SolveParameters struct {
 	// solver will generate informative trace output as it moves through the
 	// solving process.
 	TraceLogger *log.Logger
+
+	// stdLibFn is the function to use to recognize standard library import paths.
+	// Only overridden for tests. Defaults to paths.IsStandardImportPath if nil.
+	stdLibFn func(string) bool
 }
 
 // solver is a CDCL-style constraint solver with satisfiability conditions
@@ -104,6 +108,9 @@ type solver struct {
 
 	// Logger used exclusively for trace output, or nil to suppress.
 	tl *log.Logger
+
+	// The function to use to recognize standard library import paths.
+	stdLibFn func(string) bool
 
 	// A bridge to the standard SourceManager. The adapter does some local
 	// caching of pre-sorted version lists, as well as translation between the
@@ -267,9 +274,14 @@ func Prepare(params SolveParameters, sm SourceManager) (Solver, error) {
 		return nil, err
 	}
 
+	if params.stdLibFn == nil {
+		params.stdLibFn = paths.IsStandardImportPath
+	}
+
 	s := &solver{
-		tl: params.TraceLogger,
-		rd: rd,
+		tl:       params.TraceLogger,
+		stdLibFn: params.stdLibFn,
+		rd:       rd,
 	}
 
 	// Set up the bridge and ensure the root dir is in good, working order
@@ -479,7 +491,7 @@ func (s *solver) selectRoot() error {
 
 	// If we're looking for root's deps, get it from opts and local root
 	// analysis, rather than having the sm do it
-	deps, err := s.intersectConstraintsWithImports(s.rd.combineConstraints(), s.rd.externalImportList())
+	deps, err := s.intersectConstraintsWithImports(s.rd.combineConstraints(), s.rd.externalImportList(s.stdLibFn))
 	if err != nil {
 		// TODO(sdboyer) this could well happen; handle it with a more graceful error
 		panic(fmt.Sprintf("shouldn't be possible %s", err))
@@ -598,7 +610,7 @@ func (s *solver) intersectConstraintsWithImports(deps []workingConstraint, reach
 	dmap := make(map[ProjectRoot]completeDep)
 	for _, rp := range reach {
 		// If it's a stdlib-shaped package, skip it.
-		if internal.IsStdLib(rp) {
+		if s.stdLibFn(rp) {
 			continue
 		}
 

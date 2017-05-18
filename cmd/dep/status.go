@@ -164,7 +164,7 @@ func (out *dotOutput) BasicHeader() {
 	ptree, _ := pkgtree.ListPackages(out.p.AbsRoot, string(out.p.ImportRoot))
 	prm, _ := ptree.ToReachMap(true, false, false, nil)
 
-	out.g.createNode(string(out.p.ImportRoot), "", prm.Flatten(false))
+	out.g.createNode(string(out.p.ImportRoot), "", prm.FlattenOmitStdLib())
 }
 
 func (out *dotOutput) BasicFooter() {
@@ -301,7 +301,7 @@ func runStatusAll(loggers *dep.Loggers, out outputter, p *dep.Project, sm gps.So
 				}
 
 				prm, _ := ptr.ToReachMap(true, false, false, nil)
-				bs.Children = prm.Flatten(false)
+				bs.Children = prm.FlattenOmitStdLib()
 			}
 
 			// Split apart the version from the lock into its constituent parts
@@ -370,7 +370,7 @@ func runStatusAll(loggers *dep.Loggers, out outputter, p *dep.Project, sm gps.So
 	// lock.
 	rm, _ := ptree.ToReachMap(true, true, false, nil)
 
-	external := rm.Flatten(false)
+	external := rm.FlattenOmitStdLib()
 	roots := make(map[gps.ProjectRoot][]string, len(external))
 
 	type fail struct {
