@@ -193,9 +193,6 @@ func (params SolveParameters) toRootdata() (rootdata, error) {
 	if params.Manifest == nil {
 		params.Manifest = simpleRootManifest{}
 	}
-	if params.stdLibFn == nil {
-		params.stdLibFn = paths.IsStandardImportPath
-	}
 
 	rd := rootdata{
 		ig:      params.Manifest.IgnoredPackages(),
@@ -292,6 +289,10 @@ func Prepare(params SolveParameters, sm SourceManager) (Solver, error) {
 	rd, err := params.toRootdata()
 	if err != nil {
 		return nil, err
+	}
+
+	if params.stdLibFn == nil {
+		params.stdLibFn = paths.IsStandardImportPath
 	}
 
 	s := &solver{
