@@ -104,15 +104,9 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 	if err != nil {
 		return errors.Wrap(err, "determineProjectRoot")
 	}
-	if ctx.Loggers.Verbose {
-		ctx.Loggers.Err.Printf("dep: Finding dependencies for %q...\n", cpr)
-	}
 	pkgT, err := pkgtree.ListPackages(root, cpr)
 	if err != nil {
 		return errors.Wrap(err, "gps.ListPackages")
-	}
-	if ctx.Loggers.Verbose {
-		ctx.Loggers.Err.Printf("dep: Found %d dependencies.\n", len(pkgT.Packages))
 	}
 	sm, err := ctx.SourceManager()
 	if err != nil {
@@ -154,14 +148,20 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 		)
 	}
 
-	ctx.Loggers.Err.Println("Using network for remaining projects...")
+	// Create a string slice of not on disk projects
+	var notondisk []string
+	for pname, _ := range pd.notondisk {
+		notondisk = append(notondisk, string(pname))
+	}
+
+	ctx.Loggers.Err.Printf("Following dependencies were not found in GOPATH. "+
+		"Dep will use the most recent versions of these projects.\n  %s",
+		strings.Join(notondisk, "\n  "))
+
 	// Copy lock before solving. Use this to separate new lock projects from soln
 	copyLock := *l
 
 	// Run solver with project versions found on disk
-	if ctx.Loggers.Verbose {
-		ctx.Loggers.Err.Println("dep: Solving...")
-	}
 	params := gps.SolveParameters{
 		RootDir:         root,
 		RootPackageTree: pkgT,
@@ -187,7 +187,7 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 	l = dep.LockFromInterface(soln)
 
 	// Iterate through the new projects in solved lock and add them to manifest
-	// if direct deps and log feedback for all the new projects.
+	// if direct deps
 	for _, x := range l.Projects() {
 		pr := x.Ident().ProjectRoot
 		newProject := true
@@ -198,14 +198,9 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 			}
 		}
 		if newProject {
-			// Check if it's in notondisk project map. These are direct deps, should
-			// be added to manifest.
+			// If it's in notondisk, add to manifest, these are direct dependencies.
 			if _, ok := pd.notondisk[pr]; ok {
 				m.Dependencies[pr] = getProjectPropertiesFromVersion(x.Version())
-				feedback(x.Version(), pr, fb.DepTypeDirect, ctx)
-			} else {
-				// Log feedback of transitive project
-				feedback(x.Version(), pr, fb.DepTypeTransitive, ctx)
 			}
 		}
 	}
@@ -226,10 +221,6 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 	}
 	if vendorbak != "" {
 		ctx.Loggers.Err.Printf("Old vendor backed up to %v", vendorbak)
-	}
-
-	if ctx.Loggers.Verbose {
-		ctx.Loggers.Err.Println("dep: Writing manifest and lock files.")
 	}
 
 	sw, err := dep.NewSafeWriter(m, nil, l, dep.VendorAlways)
@@ -379,9 +370,6 @@ func getProjectData(ctx *dep.Ctx, pkgT pkgtree.PackageTree, cpr string, sm gps.S
 		return projectData{}, nil
 	}
 
-	if ctx.Loggers.Verbose {
-		ctx.Loggers.Err.Println("dep: Building dependency graph...")
-	}
 	for _, ip := range rm.FlattenOmitStdLib() {
 		pr, err := sm.DeduceProjectRoot(ip)
 		if err != nil {
@@ -396,17 +384,10 @@ func getProjectData(ctx *dep.Ctx, pkgT pkgtree.PackageTree, cpr string, sm gps.S
 		syncDepGroup.Add(1)
 		go syncDep(pr, sm)
 
-		if ctx.Loggers.Verbose {
-			ctx.Loggers.Err.Printf("dep: Found import of %q, analyzing...\n", ip)
-		}
-
 		dependencies[pr] = []string{ip}
 		v, err := ctx.VersionInWorkspace(pr)
 		if err != nil {
 			notondisk[pr] = true
-			if ctx.Loggers.Verbose {
-				ctx.Loggers.Err.Printf("dep: Could not determine version for %q, omitting from generated manifest\n", pr)
-			}
 			continue
 		}
 
@@ -419,9 +400,6 @@ func getProjectData(ctx *dep.Ctx, pkgT pkgtree.PackageTree, cpr string, sm gps.S
 		feedback(v, pr, fb.DepTypeDirect, ctx)
 	}
 
-	if ctx.Loggers.Verbose {
-		ctx.Loggers.Err.Printf("dep: Analyzing transitive imports...\n")
-	}
 	// Explore the packages we've found for transitive deps, either
 	// completing the lock or identifying (more) missing projects that we'll
 	// need to ask gps to solve for us.
@@ -440,9 +418,6 @@ func getProjectData(ctx *dep.Ctx, pkgT pkgtree.PackageTree, cpr string, sm gps.S
 	dft = func(pkg string) error {
 		switch colors[pkg] {
 		case white:
-			if ctx.Loggers.Verbose {
-				ctx.Loggers.Err.Printf("dep: Analyzing %q...\n", pkg)
-			}
 			colors[pkg] = grey
 
 			pr, err := sm.DeduceProjectRoot(pkg)
