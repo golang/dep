@@ -315,7 +315,7 @@ func (s *gopkginSource) listVersions(ctx context.Context) ([]PairedVersion, erro
 
 			// Gopkg.in has a special "-unstable" suffix which we need to handle
 			// separately.
-			if s.unstable && !strings.HasSuffix(tv.name, gopkgUnstableSuffix) {
+			if s.unstable != strings.HasSuffix(tv.name, gopkgUnstableSuffix) {
 				continue
 			}
 
