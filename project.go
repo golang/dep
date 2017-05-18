@@ -83,9 +83,8 @@ func BackupVendor(vpath, suffix string) (string, error) {
 				return "", err
 			}
 			return vendorbak, nil
-		} else {
-			return "", errVendorBackupFailed
 		}
+		return "", errVendorBackupFailed
 	}
 
 	return "", nil
