@@ -48,17 +48,14 @@ type rootdata struct {
 
 	// The ProjectAnalyzer to use for all GetManifestAndLock calls.
 	an ProjectAnalyzer
-
-	// The function to use to recognize standard library import paths.
-	stdLibFn func(string) bool
 }
 
 // externalImportList returns a list of the unique imports from the root data.
 // Ignores and requires are taken into consideration, stdlib is excluded, and
 // errors within the local set of package are not backpropagated.
-func (rd rootdata) externalImportList() []string {
+func (rd rootdata) externalImportList(stdLibFn func(string) bool) []string {
 	rm, _ := rd.rpt.ToReachMap(true, true, false, rd.ig)
-	reach := rm.FlattenFn(rd.stdLibFn)
+	reach := rm.FlattenFn(stdLibFn)
 
 	// If there are any requires, slide them into the reach list, as well.
 	if len(rd.req) > 0 {
@@ -82,7 +79,7 @@ func (rd rootdata) externalImportList() []string {
 	return reach
 }
 
-func (rd rootdata) getApplicableConstraints() []workingConstraint {
+func (rd rootdata) getApplicableConstraints(stdLibFn func(string) bool) []workingConstraint {
 	// Merge the normal and test constraints together
 	pc := rd.rm.DependencyConstraints().merge(rd.rm.TestDependencyConstraints())
 
@@ -116,8 +113,8 @@ func (rd rootdata) getApplicableConstraints() []workingConstraint {
 
 	// Walk all dep import paths we have to consider and mark the corresponding
 	// wc entry in the trie, if any
-	for _, im := range rd.externalImportList() {
-		if rd.stdLibFn(im) {
+	for _, im := range rd.externalImportList(stdLibFn) {
+		if stdLibFn(im) {
 			continue
 		}
 
