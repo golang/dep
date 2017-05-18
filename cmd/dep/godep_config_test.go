@@ -76,8 +76,9 @@ func TestGodepConvertProject(t *testing.T) {
 			Imports: []godepPackage{
 				{
 					ImportPath: "github.com/sdboyer/deptest",
-					Rev:        "6a741be0cc55ecbe4f45690ebfd606a956d5f14a",
-					Comment:    "v1.0.0",
+					// This revision has 2 versions attached to it, v1.0.0 & v0.8.0.
+					Rev:     "ff2948a2ac8f538c4ecd55962e919d1e13e74baf",
+					Comment: "v0.8.0",
 				},
 			},
 		},
@@ -94,8 +95,8 @@ func TestGodepConvertProject(t *testing.T) {
 	}
 
 	v := d.Constraint.String()
-	if v != "v1.0.0" {
-		t.Fatalf("Expected manifest constraint to be master, got %s", v)
+	if v != "v0.8.0" {
+		t.Fatalf("Expected manifest constraint to be v0.8.0, got %s", v)
 	}
 
 	p := lock.P[0]
@@ -110,8 +111,76 @@ func TestGodepConvertProject(t *testing.T) {
 	}
 
 	rev := lpv.Underlying()
-	if rev != "6a741be0cc55ecbe4f45690ebfd606a956d5f14a" {
-		t.Fatalf("Expected locked revision to be '6a741be0cc55ecbe4f45690ebfd606a956d5f14a', got %s", rev)
+	if rev != "ff2948a2ac8f538c4ecd55962e919d1e13e74baf" {
+		t.Fatalf("Expected locked revision to be 'ff2948a2ac8f538c4ecd55962e919d1e13e74baf', got %s", rev)
+	}
+
+	ver := lpv.String()
+	if ver != "v0.8.0" {
+		t.Fatalf("Expected locked version to be 'v0.8.0', got %s", ver)
+	}
+}
+
+func TestGodepConvertProject_EmptyComment(t *testing.T) {
+	loggers := &dep.Loggers{
+		Out:     log.New(os.Stdout, "", 0),
+		Err:     log.New(os.Stdout, "", 0),
+		Verbose: true,
+	}
+
+	h := test.NewHelper(t)
+	defer h.Cleanup()
+	h.TempDir("src")
+
+	f := godepFile{
+		loggers: loggers,
+		json: godepJson{
+			Name: "github.com/foo/bar",
+			Imports: []godepPackage{
+				{
+					ImportPath: "github.com/sdboyer/deptest",
+					// This revision has 2 versions attached to it, v1.0.0 & v0.8.0.
+					Rev: "ff2948a2ac8f538c4ecd55962e919d1e13e74baf",
+				},
+			},
+		},
+	}
+
+	sm, err := gps.NewSourceManager(h.Path("."))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer sm.Release()
+
+	manifest, lock, err := f.convert("", sm)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	d, ok := manifest.Dependencies["github.com/sdboyer/deptest"]
+	if !ok {
+		t.Fatal("Expected the manifest to have a dependency for 'github.com/sdboyer/deptest' but got none")
+	}
+
+	v := d.Constraint.String()
+	if v != "v1.0.0" {
+		t.Fatalf("Expected manifest constraint to be v1.0.0, got %s", v)
+	}
+
+	p := lock.P[0]
+	if p.Ident().ProjectRoot != "github.com/sdboyer/deptest" {
+		t.Fatalf("Expected the lock to have a project for 'github.com/sdboyer/deptest' but got '%s'", p.Ident().ProjectRoot)
+	}
+
+	lv := p.Version()
+	lpv, ok := lv.(gps.PairedVersion)
+	if !ok {
+		t.Fatalf("Expected locked version to be PairedVersion but got %T", lv)
+	}
+
+	rev := lpv.Underlying()
+	if rev != "ff2948a2ac8f538c4ecd55962e919d1e13e74baf" {
+		t.Fatalf("Expected locked revision to be 'ff2948a2ac8f538c4ecd55962e919d1e13e74baf', got %s", rev)
 	}
 
 	ver := lpv.String()

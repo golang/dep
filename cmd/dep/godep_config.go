@@ -68,6 +68,32 @@ func (g *godepFile) convert(projectName string, sm gps.SourceManager) (*dep.Mani
 			return nil, nil, err
 		}
 
+		// Rev must not be empty
+		if pkg.Rev == "" {
+			err := errors.New("godep: Invalid godep configuration, Rev is required")
+			return nil, nil, err
+		}
+
+		if pkg.Comment == "" {
+			// When there's no comment, try to get corresponding version for the Rev
+			// and fill Comment.
+			// Get all the versions
+			pi := gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot(pkg.ImportPath)}
+			versions, err := sm.ListVersions(pi)
+			if err != nil {
+				return nil, nil, err
+			}
+			// Sort the versions in descending order, newer versions first
+			gps.SortPairedForUpgrade(versions)
+			// Match Rev with versions' underlying revision
+			for _, v := range versions {
+				if string(v.Underlying()) == pkg.Rev {
+					pkg.Comment = v.String()
+					break
+				}
+			}
+		}
+
 		if pkg.Comment != "" {
 			// If there's a comment, use it to create project constraint
 			pc, err := g.buildProjectConstraint(pkg, sm)
@@ -77,11 +103,9 @@ func (g *godepFile) convert(projectName string, sm gps.SourceManager) (*dep.Mani
 			manifest.Dependencies[pc.Ident.ProjectRoot] = gps.ProjectProperties{Source: pc.Ident.Source, Constraint: pc.Constraint}
 		}
 
-		if pkg.Rev != "" {
-			// Use the revision to create lock project
-			lp := g.buildLockedProject(pkg, manifest)
-			lock.P = append(lock.P, lp)
-		}
+		// Use the revision and comment to create lock project
+		lp := g.buildLockedProject(pkg, manifest)
+		lock.P = append(lock.P, lp)
 	}
 
 	return manifest, lock, nil
