@@ -344,7 +344,7 @@ func (v plainVersion) Is(r Revision) PairedVersion {
 }
 
 type semVersion struct {
-	sv *semver.Version
+	sv semver.Version
 }
 
 func (v semVersion) String() string {

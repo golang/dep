@@ -180,6 +180,33 @@ func TestCompare(t *testing.T) {
 			)
 		}
 	}
+
+	// One-off tests for special version comparisons
+	zero := Version{special: zeroVersion}
+	inf := Version{special: infiniteVersion}
+
+	if zero.Compare(inf) != -1 {
+		t.Error("Zero version should always be less than infinite version")
+	}
+	if zero.Compare(zero) != 0 {
+		t.Error("Zero version should equal itself")
+	}
+	if inf.Compare(zero) != 1 {
+		t.Error("Infinite version should always be greater than zero version")
+	}
+	if inf.Compare(inf) != 0 {
+		t.Error("Infinite version should equal itself")
+	}
+
+	// Need to work vs. a normal version, too.
+	v := Version{}
+
+	if zero.Compare(v) != -1 {
+		t.Error("Zero version should always be less than any normal version")
+	}
+	if inf.Compare(v) != 1 {
+		t.Error("Infinite version should always be greater than any normal version")
+	}
 }
 
 func TestLessThan(t *testing.T) {
