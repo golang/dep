@@ -155,7 +155,7 @@ func testSourceGateway(t *testing.T) {
 				t.Fatalf("unexpected err when getting package tree with known rev: %s", err)
 			}
 			if !reflect.DeepEqual(wantptree, ptree) {
-				t.Fatalf("got incorrect PackageTree:\n\t(GOT): %#v\n\t(WNT): %#v", wantptree, ptree)
+				t.Fatalf("got incorrect PackageTree:\n\t(GOT): %#v\n\t(WNT): %#v", ptree, wantptree)
 			}
 
 			ptree, err = sg.listPackages(ctx, ProjectRoot("github.com/sdboyer/deptest"), NewVersion("v1.0.0"))
@@ -163,7 +163,7 @@ func testSourceGateway(t *testing.T) {
 				t.Fatalf("unexpected err when getting package tree with unpaired good version: %s", err)
 			}
 			if !reflect.DeepEqual(wantptree, ptree) {
-				t.Fatalf("got incorrect PackageTree:\n\t(GOT): %#v\n\t(WNT): %#v", wantptree, ptree)
+				t.Fatalf("got incorrect PackageTree:\n\t(GOT): %#v\n\t(WNT): %#v", ptree, wantptree)
 			}
 		}
 	}
