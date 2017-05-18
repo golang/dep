@@ -216,6 +216,14 @@ func TestValidateManifest(t *testing.T) {
 		},
 		{
 			tomlString: `
+			[[dependencies]]
+			  name = "github.com/foo/bar"
+			  revision = "867f832e"
+			`,
+			want: []error{errors.New("revision \"867f832e\" should not be in abbreviated form")},
+		},
+		{
+			tomlString: `
                         [[dependencies]]
 			  name = "bazaar.foobar.com/~bzr/trunk"
 			  revision = "foo@bar.com-12345-wiuilyamo9ian0m7"
