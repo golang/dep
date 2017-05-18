@@ -8,7 +8,6 @@ import (
 	"sort"
 
 	"github.com/armon/go-radix"
-	"github.com/golang/dep/internal/gps/internal"
 	"github.com/golang/dep/internal/gps/pkgtree"
 )
 
@@ -54,15 +53,9 @@ type rootdata struct {
 // externalImportList returns a list of the unique imports from the root data.
 // Ignores and requires are taken into consideration, stdlib is excluded, and
 // errors within the local set of package are not backpropagated.
-func (rd rootdata) externalImportList() []string {
+func (rd rootdata) externalImportList(stdLibFn func(string) bool) []string {
 	rm, _ := rd.rpt.ToReachMap(true, true, false, rd.ig)
-	all := rm.Flatten(false)
-	reach := make([]string, 0, len(all))
-	for _, r := range all {
-		if !internal.IsStdLib(r) {
-			reach = append(reach, r)
-		}
-	}
+	reach := rm.FlattenFn(stdLibFn)
 
 	// If there are any requires, slide them into the reach list, as well.
 	if len(rd.req) > 0 {
@@ -86,7 +79,7 @@ func (rd rootdata) externalImportList() []string {
 	return reach
 }
 
-func (rd rootdata) getApplicableConstraints() []workingConstraint {
+func (rd rootdata) getApplicableConstraints(stdLibFn func(string) bool) []workingConstraint {
 	// Merge the normal and test constraints together
 	pc := rd.rm.DependencyConstraints().merge(rd.rm.TestDependencyConstraints())
 
@@ -120,8 +113,8 @@ func (rd rootdata) getApplicableConstraints() []workingConstraint {
 
 	// Walk all dep import paths we have to consider and mark the corresponding
 	// wc entry in the trie, if any
-	for _, im := range rd.externalImportList() {
-		if internal.IsStdLib(im) {
+	for _, im := range rd.externalImportList(stdLibFn) {
+		if stdLibFn(im) {
 			continue
 		}
 
