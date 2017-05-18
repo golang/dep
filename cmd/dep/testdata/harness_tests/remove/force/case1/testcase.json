@@ -2,6 +2,7 @@
   "commands": [
     ["remove", "-force", "github.com/sdboyer/deptestdos", "github.com/not/used"]
   ],
+  "error-expected": "",
   "vendor-final": [
     "github.com/sdboyer/deptest",
     "github.com/sdboyer/deptestdos"
