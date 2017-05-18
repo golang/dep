@@ -291,7 +291,7 @@ func (s *gopkginSource) listVersions(ctx context.Context) ([]PairedVersion, erro
 	vlist := make([]PairedVersion, len(ovlist))
 	k := 0
 	var dbranch int // index of branch to be marked default
-	var bsv *semver.Version
+	var bsv semver.Version
 	for _, v := range ovlist {
 		// all git versions will always be paired
 		pv := v.(versionPair)
@@ -318,7 +318,7 @@ func (s *gopkginSource) listVersions(ctx context.Context) ([]PairedVersion, erro
 			// which one to mark as default until we've seen them all
 			tv.isDefault = false
 			// Figure out if this is the current leader for default branch
-			if bsv == nil || bsv.LessThan(sv) {
+			if bsv == (semver.Version{}) || bsv.LessThan(sv) {
 				bsv = sv
 				dbranch = k
 			}
@@ -331,7 +331,7 @@ func (s *gopkginSource) listVersions(ctx context.Context) ([]PairedVersion, erro
 	}
 
 	vlist = vlist[:k]
-	if bsv != nil {
+	if bsv != (semver.Version{}) {
 		dbv := vlist[dbranch].(versionPair)
 		vlist[dbranch] = branchVersion{
 			name:      dbv.v.(branchVersion).name,
