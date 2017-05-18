@@ -1,6 +1,7 @@
 {
-   "commands": [
-     ["init"]
-   ],
-   "error-expected" : "manifest already exists:"
- }
+  "commands": [
+    ["init"]
+  ],
+  "error-expected": "manifest already exists:",
+  "vendor-final": []
+}
