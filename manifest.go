@@ -52,7 +52,7 @@ func validateManifest(s string) ([]error, error) {
 	// Convert tree to a map
 	manifest := tree.ToMap()
 
-	bzrRevID := regexp.MustCompile(".*-\\d{14}-[a-z0-9]{16}")
+	bzrRevID := regexp.MustCompile(`.*-\d{14}-[a-z0-9]{16}`)
 	// Look for unknown fields and collect errors
 	for prop, val := range manifest {
 		switch prop {
