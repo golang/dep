@@ -27,7 +27,7 @@ func TestRootdataExternalImports(t *testing.T) {
 	rd := is.(*solver).rd
 
 	want := []string{"a", "b"}
-	got := rd.externalImportList()
+	got := rd.externalImportList(params.stdLibFn)
 	if !reflect.DeepEqual(want, got) {
 		t.Errorf("Unexpected return from rootdata.externalImportList:\n\t(GOT): %s\n\t(WNT): %s", got, want)
 	}
@@ -36,7 +36,7 @@ func TestRootdataExternalImports(t *testing.T) {
 	rd.req["c"] = true
 
 	want = []string{"a", "b", "c"}
-	got = rd.externalImportList()
+	got = rd.externalImportList(params.stdLibFn)
 	if !reflect.DeepEqual(want, got) {
 		t.Errorf("Unexpected return from rootdata.externalImportList:\n\t(GOT): %s\n\t(WNT): %s", got, want)
 	}
@@ -47,7 +47,7 @@ func TestRootdataExternalImports(t *testing.T) {
 	rd.rpt.Packages["root"] = poe
 
 	// should still be the same
-	got = rd.externalImportList()
+	got = rd.externalImportList(params.stdLibFn)
 	if !reflect.DeepEqual(want, got) {
 		t.Errorf("Unexpected return from rootdata.externalImportList:\n\t(GOT): %s\n\t(WNT): %s", got, want)
 	}
@@ -57,7 +57,7 @@ func TestRootdataExternalImports(t *testing.T) {
 
 	rd.ig["b"] = true
 	want = []string{"a", "c"}
-	got = rd.externalImportList()
+	got = rd.externalImportList(params.stdLibFn)
 	if !reflect.DeepEqual(want, got) {
 		t.Errorf("Unexpected return from rootdata.externalImportList:\n\t(GOT): %s\n\t(WNT): %s", got, want)
 	}
@@ -213,7 +213,7 @@ func TestGetApplicableConstraints(t *testing.T) {
 		t.Run(fix.name, func(t *testing.T) {
 			fix.mut()
 
-			got := rd.getApplicableConstraints()
+			got := rd.getApplicableConstraints(params.stdLibFn)
 			if !reflect.DeepEqual(fix.result, got) {
 				t.Errorf("unexpected applicable constraint set:\n\t(GOT): %+v\n\t(WNT): %+v", got, fix.result)
 			}
