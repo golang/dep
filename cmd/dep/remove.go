@@ -11,6 +11,7 @@ import (
 	"github.com/golang/dep"
 	"github.com/golang/dep/internal/gps"
 	"github.com/golang/dep/internal/gps/pkgtree"
+	"github.com/golang/dep/internal/paths"
 	"github.com/pkg/errors"
 )
 
@@ -81,7 +82,7 @@ func (cmd *removeCommand) Run(ctx *dep.Ctx, args []string) error {
 
 		otherroots := make(map[gps.ProjectRoot]bool)
 		for _, im := range reachlist {
-			if isStdLib(im) {
+			if paths.IsStandardImportPath(im) {
 				continue
 			}
 			pr, err := sm.DeduceProjectRoot(im)

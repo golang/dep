@@ -22,23 +22,6 @@ func TestContains(t *testing.T) {
 	}
 }
 
-func TestIsStdLib(t *testing.T) {
-	tests := map[string]bool{
-		"github.com/Sirupsen/logrus": false,
-		"encoding/json":              true,
-		"golang.org/x/net/context":   false,
-		"net/context":                true,
-		".":                          false,
-	}
-
-	for p, e := range tests {
-		b := isStdLib(p)
-		if b != e {
-			t.Fatalf("%s: expected %t got %t", p, e, b)
-		}
-	}
-}
-
 func TestGetProjectPropertiesFromVersion(t *testing.T) {
 	wantSemver, _ := gps.NewSemverConstraint("^v1.0.0")
 	cases := []struct {
