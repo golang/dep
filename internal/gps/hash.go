@@ -61,7 +61,7 @@ func (s *solver) writeHashingInputs(w io.Writer) {
 	// getApplicableConstraints will apply overrides, incorporate requireds,
 	// apply local ignores, drop stdlib imports, and finally trim out
 	// ineffectual constraints.
-	for _, pd := range s.rd.getApplicableConstraints() {
+	for _, pd := range s.rd.getApplicableConstraints(s.stdLibFn) {
 		writeString(string(pd.Ident.ProjectRoot))
 		writeString(pd.Ident.Source)
 		writeString(pd.Constraint.typedString())
@@ -69,7 +69,7 @@ func (s *solver) writeHashingInputs(w io.Writer) {
 
 	// Write out each discrete import, including those derived from requires.
 	writeString(hhImportsReqs)
-	imports := s.rd.externalImportList()
+	imports := s.rd.externalImportList(s.stdLibFn)
 	sort.Strings(imports)
 	for _, im := range imports {
 		writeString(im)

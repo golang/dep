@@ -71,7 +71,7 @@ func (cmd *removeCommand) Run(ctx *dep.Ctx, args []string) error {
 			return errors.Errorf("remove takes no arguments when running with -unused")
 		}
 
-		reachlist := reachmap.Flatten(false)
+		reachlist := reachmap.FlattenOmitStdLib()
 
 		// warm the cache in parallel, in case any paths require go get metadata
 		// discovery
