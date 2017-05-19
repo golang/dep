@@ -58,7 +58,7 @@ func NewSemverConstraint(body string) (Constraint, error) {
 	}
 	// If we got a simple semver.Version, simplify by returning our
 	// corresponding type
-	if sv, ok := c.(*semver.Version); ok {
+	if sv, ok := c.(semver.Version); ok {
 		return semVersion{sv: sv}, nil
 	}
 	return semverConstraint{c: c}, nil

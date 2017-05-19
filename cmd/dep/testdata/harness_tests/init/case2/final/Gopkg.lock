@@ -1,4 +1,4 @@
-memo = "b4fe6e8bceac924197838b6ea47989abbdd3a8d31035d20ee0a1dabc0994c368"
+memo = "ced51326ad990b11098d8076d0f7d72d89eee1ba6e8dacc7bc73be05cddac438"
 
 [[projects]]
   name = "github.com/sdboyer/deptest"
