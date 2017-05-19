@@ -189,7 +189,9 @@ func CopyDir(src, dst string) error {
 	src = filepath.Clean(src)
 	dst = filepath.Clean(dst)
 
-	fi, err := os.Stat(src)
+	// We use os.Lstat() here to ensure we don't fall in a loop where a symlink
+	// actually links to a one of its parent directories.
+	fi, err := os.Lstat(src)
 	if err != nil {
 		return err
 	}
@@ -236,7 +238,7 @@ func CopyDir(src, dst string) error {
 
 // copyFile copies the contents of the file named src to the file named
 // by dst. The file will be created if it does not already exist. If the
-// destination file exists, all it's contents will be replaced by the contents
+// destination file exists, all its contents will be replaced by the contents
 // of the source file. The file mode will be copied from the source and
 // the copied data is synced/flushed to stable storage.
 func copyFile(src, dst string) (err error) {
