@@ -7,8 +7,6 @@ package pkgtree
 import (
 	"sort"
 	"strings"
-
-	"github.com/golang/dep/internal/paths"
 )
 
 // ReachMap maps a set of import paths (keys) to the sets of transitively
@@ -18,11 +16,6 @@ import (
 // See PackageTree.ToReachMap() for more information.
 type ReachMap map[string]struct {
 	Internal, External []string
-}
-
-// FlattenOmitStdLib calls FlattenFn with a function to exclude standard library import paths.
-func (rm ReachMap) FlattenOmitStdLib() []string {
-	return rm.FlattenFn(paths.IsStandardImportPath)
 }
 
 // Eliminate import paths with any elements having leading dots, leading
