@@ -18,6 +18,7 @@ import (
 	fb "github.com/golang/dep/internal/feedback"
 	"github.com/golang/dep/internal/gps"
 	"github.com/golang/dep/internal/gps/pkgtree"
+	"github.com/golang/dep/internal/paths"
 	"github.com/pkg/errors"
 )
 
@@ -246,20 +247,6 @@ func contains(a []string, b string) bool {
 		}
 	}
 	return false
-}
-
-// isStdLib reports whether $GOROOT/src/path should be considered
-// part of the standard distribution. For historical reasons we allow people to add
-// their own code to $GOROOT instead of using $GOPATH, but we assume that
-// code will start with a domain name (dot in the first element).
-// This was loving taken from src/cmd/go/pkg.go in Go's code (isStandardImportPath).
-func isStdLib(path string) bool {
-	i := strings.Index(path, "/")
-	if i < 0 {
-		i = len(path)
-	}
-	elem := path[:i]
-	return !strings.Contains(elem, ".")
 }
 
 // TODO solve failures can be really creative - we need to be similarly creative
@@ -525,7 +512,7 @@ func getProjectData(ctx *dep.Ctx, pkgT pkgtree.PackageTree, cpr string, sm gps.S
 
 			// recurse
 			for _, rpkg := range reached.External {
-				if isStdLib(rpkg) {
+				if paths.IsStandardImportPath(rpkg) {
 					continue
 				}
 
