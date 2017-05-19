@@ -17,8 +17,8 @@ import (
 	"github.com/golang/dep/internal"
 	fb "github.com/golang/dep/internal/feedback"
 	"github.com/golang/dep/internal/gps"
+	"github.com/golang/dep/internal/gps/paths"
 	"github.com/golang/dep/internal/gps/pkgtree"
-	"github.com/golang/dep/internal/paths"
 	"github.com/pkg/errors"
 )
 
@@ -363,7 +363,7 @@ func getProjectData(ctx *dep.Ctx, pkgT pkgtree.PackageTree, cpr string, sm gps.S
 	if ctx.Loggers.Verbose {
 		ctx.Loggers.Err.Println("dep: Building dependency graph...")
 	}
-	for _, ip := range rm.FlattenOmitStdLib() {
+	for _, ip := range rm.FlattenFn(paths.IsStandardImportPath) {
 		pr, err := sm.DeduceProjectRoot(ip)
 		if err != nil {
 			return projectData{}, errors.Wrap(err, "sm.DeduceProjectRoot") // TODO: Skip and report ?

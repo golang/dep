@@ -15,6 +15,7 @@ import (
 
 	"github.com/golang/dep"
 	"github.com/golang/dep/internal/gps"
+	"github.com/golang/dep/internal/gps/paths"
 	"github.com/golang/dep/internal/gps/pkgtree"
 	"github.com/pkg/errors"
 )
@@ -164,7 +165,7 @@ func (out *dotOutput) BasicHeader() {
 	ptree, _ := pkgtree.ListPackages(out.p.AbsRoot, string(out.p.ImportRoot))
 	prm, _ := ptree.ToReachMap(true, false, false, nil)
 
-	out.g.createNode(string(out.p.ImportRoot), "", prm.FlattenOmitStdLib())
+	out.g.createNode(string(out.p.ImportRoot), "", prm.FlattenFn(paths.IsStandardImportPath))
 }
 
 func (out *dotOutput) BasicFooter() {
@@ -301,7 +302,7 @@ func runStatusAll(loggers *dep.Loggers, out outputter, p *dep.Project, sm gps.So
 				}
 
 				prm, _ := ptr.ToReachMap(true, false, false, nil)
-				bs.Children = prm.FlattenOmitStdLib()
+				bs.Children = prm.FlattenFn(paths.IsStandardImportPath)
 			}
 
 			// Split apart the version from the lock into its constituent parts
@@ -370,7 +371,7 @@ func runStatusAll(loggers *dep.Loggers, out outputter, p *dep.Project, sm gps.So
 	// lock.
 	rm, _ := ptree.ToReachMap(true, true, false, nil)
 
-	external := rm.FlattenOmitStdLib()
+	external := rm.FlattenFn(paths.IsStandardImportPath)
 	roots := make(map[gps.ProjectRoot][]string, len(external))
 
 	type fail struct {
