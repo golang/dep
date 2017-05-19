@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package internal
+package paths
 
 import "testing"
 
-func TestIsStdLib(t *testing.T) {
+func TestIsStandardImportPath(t *testing.T) {
 	fix := []struct {
 		ip string
 		is bool
@@ -14,11 +14,12 @@ func TestIsStdLib(t *testing.T) {
 		{"appengine", true},
 		{"net/http", true},
 		{"github.com/anything", false},
+		{"github.com", false},
 		{"foo", true},
 	}
 
 	for _, f := range fix {
-		r := doIsStdLib(f.ip)
+		r := IsStandardImportPath(f.ip)
 		if r != f.is {
 			if r {
 				t.Errorf("%s was marked stdlib but should not have been", f.ip)
