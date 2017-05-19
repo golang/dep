@@ -80,6 +80,11 @@ type ProjectAnalyzer interface {
 	// Perform analysis of the filesystem tree rooted at path, with the
 	// root import path importRoot, to determine the project's constraints, as
 	// indicated by a Manifest and Lock.
+	//
+	// Note that an error will typically cause the solver to treat the analyzed
+	// version as unusable. As such, an error should generally only be returned
+	// if the code tree is somehow malformed, but not if the implementor's
+	// expected files containing Manifest and Lock data are merely absent.
 	DeriveManifestAndLock(path string, importRoot ProjectRoot) (Manifest, Lock, error)
 
 	// Report the name and version of this ProjectAnalyzer.

@@ -2,6 +2,7 @@
   "commands": [
     ["init", "-no-examples"]
   ],
+  "error-expected": "",
   "gopath-initial": {
     "github.com/sdboyer/deptest": "v0.8.0"
   },

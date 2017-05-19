@@ -1,7 +1,4 @@
 
 [[dependencies]]
   name = "github.com/sdboyer/deptest"
-  version = ">=0.8.0, <1.0.0"
-
-[[dependencies]]
-  name = "github.com/sdboyer/deptestdos"
+  version = "^0.8.0"

@@ -40,16 +40,6 @@ func (t *deducerTrie) Delete(s string) (pathDeducer, bool) {
 	return nil, false
 }
 
-// Get is used to lookup a specific key, returning the value and if it was found
-func (t *deducerTrie) Get(s string) (pathDeducer, bool) {
-	t.RLock()
-	defer t.RUnlock()
-	if d, has := t.t.Get(s); has {
-		return d.(pathDeducer), has
-	}
-	return nil, false
-}
-
 // Insert is used to add a newentry or update an existing entry. Returns if updated.
 func (t *deducerTrie) Insert(s string, d pathDeducer) (pathDeducer, bool) {
 	t.Lock()
@@ -58,13 +48,6 @@ func (t *deducerTrie) Insert(s string, d pathDeducer) (pathDeducer, bool) {
 		return d2.(pathDeducer), had
 	}
 	return nil, false
-}
-
-// Len is used to return the number of elements in the tree
-func (t *deducerTrie) Len() int {
-	t.RLock()
-	defer t.RUnlock()
-	return t.t.Len()
 }
 
 // LongestPrefix is like Get, but instead of an exact match, it will return the
@@ -76,19 +59,6 @@ func (t *deducerTrie) LongestPrefix(s string) (string, pathDeducer, bool) {
 		return p, d.(pathDeducer), has
 	}
 	return "", nil, false
-}
-
-// ToMap is used to walk the tree and convert it to a map.
-func (t *deducerTrie) ToMap() map[string]pathDeducer {
-	m := make(map[string]pathDeducer)
-	t.RLock()
-	t.t.Walk(func(s string, d interface{}) bool {
-		m[s] = d.(pathDeducer)
-		return false
-	})
-
-	t.RUnlock()
-	return m
 }
 
 // isPathPrefixOrEqual is an additional helper check to ensure that the literal

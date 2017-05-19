@@ -407,7 +407,10 @@ func getProjectData(ctx *dep.Ctx, pkgT pkgtree.PackageTree, cpr string, sm gps.S
 		}
 
 		ondisk[pr] = v
-		constraints[pr] = getProjectPropertiesFromVersion(v)
+		pp := getProjectPropertiesFromVersion(v)
+		if pp.Constraint != nil || pp.Source != "" {
+			constraints[pr] = pp
+		}
 
 		feedback(v, pr, fb.DepTypeDirect, ctx)
 	}
