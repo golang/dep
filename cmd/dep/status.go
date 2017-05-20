@@ -219,6 +219,10 @@ func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
 		if err := runStatusUnused(ctx.Loggers, p); err != nil {
 			return err
 		}
+	case cmd.missing:
+		if err := runStatusMissing(ctx.Loggers, p); err != nil {
+			return err
+		}
 	default:
 		if err := runStatusAll(ctx.Loggers, out, p, sm); err != nil {
 			return err
@@ -432,13 +436,10 @@ outer:
 // runStatusUnused analyses the project for unused dependencies that are present
 // in manifest but not imported in the project.
 func runStatusUnused(loggers *dep.Loggers, p *dep.Project) error {
-	ptree, err := pkgtree.ListPackages(p.AbsRoot, string(p.ImportRoot))
+	external, err := getExternalPackages(p)
 	if err != nil {
-		return errors.Errorf("analysis of local packages failed: %v", err)
+		return err
 	}
-
-	rm, _ := ptree.ToReachMap(true, true, false, nil)
-	external := rm.FlattenOmitStdLib()
 
 	var unusedDeps []string
 	for pr, _ := range p.Manifest.Dependencies {
@@ -454,6 +455,47 @@ func runStatusUnused(loggers *dep.Loggers, p *dep.Project) error {
 	}
 
 	return nil
+}
+
+// runStatusMissing analyses the project for missing dependencies in lock file.
+func runStatusMissing(loggers *dep.Loggers, p *dep.Project) error {
+	external, err := getExternalPackages(p)
+	if err != nil {
+		return err
+	}
+
+	var missingDeps []string
+
+missingOuter:
+	for _, d := range external {
+		for _, lp := range p.Lock.Projects() {
+			if string(lp.Ident().ProjectRoot) == d {
+				continue missingOuter
+			}
+		}
+
+		missingDeps = append(missingDeps, d)
+	}
+
+	loggers.Err.Println("Missing dependencies (not present in lock):\n")
+
+	for _, d := range missingDeps {
+		loggers.Err.Printf("  %v\n", d)
+	}
+
+	return nil
+}
+
+// getExternalPackages parses the project and returns a string slice of
+// projects' ImportRoot
+func getExternalPackages(p *dep.Project) ([]string, error) {
+	ptree, err := pkgtree.ListPackages(p.AbsRoot, string(p.ImportRoot))
+	if err != nil {
+		return nil, errors.Errorf("analysis of local packages failed: %v", err)
+	}
+
+	rm, _ := ptree.ToReachMap(true, true, false, nil)
+	return rm.FlattenOmitStdLib(), nil
 }
 
 func formatVersion(v gps.Version) string {
