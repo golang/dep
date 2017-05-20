@@ -214,8 +214,15 @@ func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
 		}
 	}
 
-	if err := runStatusAll(ctx.Loggers, out, p, sm); err != nil {
-		return err
+	switch {
+	case cmd.unused:
+		if err := runStatusUnused(ctx.Loggers, p); err != nil {
+			return err
+		}
+	default:
+		if err := runStatusAll(ctx.Loggers, out, p, sm); err != nil {
+			return err
+		}
 	}
 
 	ctx.Loggers.Out.Print(buf.String())
@@ -418,6 +425,33 @@ outer:
 		out.MissingLine(&MissingStatus{ProjectRoot: string(root), MissingPackages: pkgs})
 	}
 	out.MissingFooter()
+
+	return nil
+}
+
+// runStatusUnused analyses the project for unused dependencies that are present
+// in manifest but not imported in the project.
+func runStatusUnused(loggers *dep.Loggers, p *dep.Project) error {
+	ptree, err := pkgtree.ListPackages(p.AbsRoot, string(p.ImportRoot))
+	if err != nil {
+		return errors.Errorf("analysis of local packages failed: %v", err)
+	}
+
+	rm, _ := ptree.ToReachMap(true, true, false, nil)
+	external := rm.FlattenOmitStdLib()
+
+	var unusedDeps []string
+	for pr, _ := range p.Manifest.Dependencies {
+		if !contains(external, string(pr)) {
+			unusedDeps = append(unusedDeps, string(pr))
+		}
+	}
+
+	loggers.Err.Println("Unused dependencies present in manifest:\n")
+
+	for _, d := range unusedDeps {
+		loggers.Err.Printf("  %v\n", d)
+	}
 
 	return nil
 }
