@@ -36,28 +36,8 @@ type IntegrationTestCase struct {
 	InitPath      string            `json:"init-path"`
 }
 
-func NewTestCase(t *testing.T, name, wd string) *IntegrationTestCase {
-	rootPath := filepath.FromSlash(filepath.Join(wd, "testdata", "harness_tests", name))
-	n := &IntegrationTestCase{
-		t:           t,
-		name:        name,
-		rootPath:    rootPath,
-		initialPath: filepath.Join(rootPath, "initial"),
-		finalPath:   filepath.Join(rootPath, "final"),
-	}
-	j, err := ioutil.ReadFile(filepath.Join(rootPath, "testcase.json"))
-	if err != nil {
-		panic(err)
-	}
-	err = json.Unmarshal(j, n)
-	if err != nil {
-		panic(err)
-	}
-	return n
-}
-
-func NewTestCaseRelPath(t *testing.T, name, wd string) *IntegrationTestCase {
-	rootPath := filepath.FromSlash(filepath.Join(wd, "testdata", "init_path_tests", name))
+func NewTestCase(t *testing.T, name, test_dir, wd string) *IntegrationTestCase {
+	rootPath := filepath.FromSlash(filepath.Join(wd, "testdata", test_dir, name))
 	n := &IntegrationTestCase{
 		t:           t,
 		name:        name,

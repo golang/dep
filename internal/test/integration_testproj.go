@@ -64,31 +64,6 @@ func NewTestProject(t *testing.T, initPath, wd string, externalProc bool, run Ru
 	return new
 }
 
-func NewTestProjectRelPath(t *testing.T, initPath, wd, relativePath string, externalProc bool, run RunFunc) *IntegrationTestProject {
-	new := &IntegrationTestProject{
-		t:      t,
-		origWd: wd,
-		env:    os.Environ(),
-		run:    run,
-	}
-	new.makeRootTempDir()
-	new.TempDir(ProjectRoot, "vendor")
-	new.CopyTree(initPath)
-
-	// Note that the Travis darwin platform, directories with certain roots such
-	// as /var are actually links to a dirtree under /private.  Without the patch
-	// below the wd, and therefore the GOPATH, is recorded as "/var/..." but the
-	// actual process runs in "/private/var/..." and dies due to not being in the
-	// GOPATH because the roots don't line up.
-	if externalProc && runtime.GOOS == "darwin" && needsPrivateLeader(new.tempdir) {
-		new.Setenv("GOPATH", filepath.Join("/private", new.tempdir))
-	} else {
-		new.Setenv("GOPATH", new.tempdir)
-	}
-
-	return new
-}
-
 func (p *IntegrationTestProject) Cleanup() {
 	os.RemoveAll(p.tempdir)
 }
