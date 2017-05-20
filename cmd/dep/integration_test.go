@@ -109,7 +109,7 @@ func testIntegration(name, wd string, externalProc bool, run test.RunFunc) func(
 		t.Parallel()
 
 		// Set up environment
-		testCase := test.NewTestCase(t, name, wd)
+		testCase := test.NewTestCase(t, name, "harness_tests", wd)
 		defer testCase.Cleanup()
 		testProj := test.NewTestProject(t, testCase.InitialPath(), wd, externalProc, run)
 		defer testProj.Cleanup()
@@ -158,9 +158,9 @@ func testRelativePath(name, wd string, externalProc bool, run test.RunFunc) func
 		t.Parallel()
 
 		// Set up environment
-		testCase := test.NewTestCaseRelPath(t, name, wd)
+		testCase := test.NewTestCase(t, name, "init_path_tests", wd)
 		defer testCase.Cleanup()
-		testProj := test.NewTestProjectRelPath(t, testCase.InitialPath(), testCase.InitPath, wd, externalProc, run)
+		testProj := test.NewTestProject(t, testCase.InitialPath(), wd, externalProc, run)
 		defer testProj.Cleanup()
 
 		// Create and checkout the vendor revisions
@@ -196,7 +196,6 @@ func testRelativePath(name, wd string, externalProc bool, run test.RunFunc) func
 		testCase.CompareFile(dep.ManifestName, testProj.ProjPath(dep.ManifestName))
 		testCase.CompareFile(dep.LockName, testProj.ProjPath(dep.LockName))
 
-		// Check vendor paths
 		testProj.CompareImportPaths()
 	}
 }
