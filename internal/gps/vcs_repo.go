@@ -123,6 +123,9 @@ type bzrRepo struct {
 func newBzrRepo(ustr, path string) (*bzrRepo, error) {
 	r, err := vcs.NewBzrRepo(ustr, path)
 	if err != nil {
+		// if vcs could not initialize the repo due to a local error
+		// then the local repo is in an incorrect state. Remove and
+		// treat it as a new not-yet-cloned repo.
 		if _, ok := err.(*vcs.LocalError); ok {
 			os.RemoveAll(path)
 			r, err = vcs.NewBzrRepo(ustr, path)
@@ -176,6 +179,9 @@ type hgRepo struct {
 func newHgRepo(ustr, path string) (*hgRepo, error) {
 	r, err := vcs.NewHgRepo(ustr, path)
 	if err != nil {
+		// if vcs could not initialize the repo due to a local error
+		// then the local repo is in an incorrect state. Remove and
+		// treat it as a new not-yet-cloned repo.
 		if _, ok := err.(*vcs.LocalError); ok {
 			os.RemoveAll(path)
 			r, err = vcs.NewHgRepo(ustr, path)
