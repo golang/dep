@@ -223,6 +223,10 @@ func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
 		if err := runStatusMissing(ctx.Loggers, p); err != nil {
 			return err
 		}
+	case cmd.old:
+		if err := runStatusOld(ctx.Loggers, p, sm); err != nil {
+			return err
+		}
 	default:
 		if err := runStatusAll(ctx.Loggers, out, p, sm); err != nil {
 			return err
@@ -448,10 +452,14 @@ func runStatusUnused(loggers *dep.Loggers, p *dep.Project) error {
 		}
 	}
 
-	loggers.Err.Println("Unused dependencies present in manifest:\n")
+	if unusedDeps != nil {
+		loggers.Err.Println("Unused dependencies present in manifest:\n")
 
-	for _, d := range unusedDeps {
-		loggers.Err.Printf("  %v\n", d)
+		for _, d := range unusedDeps {
+			loggers.Err.Printf("  %v\n", d)
+		}
+	} else {
+		loggers.Err.Println("No unused dependencies found.")
 	}
 
 	return nil
@@ -477,10 +485,70 @@ missingOuter:
 		missingDeps = append(missingDeps, d)
 	}
 
-	loggers.Err.Println("Missing dependencies (not present in lock):\n")
+	if missingDeps != nil {
+		loggers.Err.Println("Missing dependencies (not present in lock):\n")
+		for _, d := range missingDeps {
+			loggers.Err.Printf("  %v\n", d)
+		}
+	} else {
+		loggers.Err.Println("No missing dependencies found.")
+	}
 
-	for _, d := range missingDeps {
-		loggers.Err.Printf("  %v\n", d)
+	return nil
+}
+
+// runStatusOld analyses the project for old dependencies that have a newer
+// version available.
+func runStatusOld(loggers *dep.Loggers, p *dep.Project, sm gps.SourceManager) error {
+	var projects []BasicStatus
+
+	for _, proj := range p.Lock.Projects() {
+		bs := BasicStatus{
+			ProjectRoot: string(proj.Ident().ProjectRoot),
+		}
+
+		switch tv := proj.Version().(type) {
+		case gps.UnpairedVersion:
+			bs.Version = tv
+		case gps.Revision:
+			bs.Revision = tv
+		case gps.PairedVersion:
+			bs.Version = tv.Unpair()
+			bs.Revision = tv.Underlying()
+		}
+
+		if bs.Version != nil && bs.Version.Type() != gps.IsVersion {
+			c, has := p.Manifest.Dependencies[proj.Ident().ProjectRoot]
+			if !has {
+				c.Constraint = gps.Any()
+			}
+			bs.Constraint = c.Constraint
+
+			vl, err := sm.ListVersions(proj.Ident())
+			if err == nil {
+				gps.SortPairedForUpgrade(vl)
+
+				for _, v := range vl {
+					if c.Constraint.Matches(v) {
+						bs.Latest = v.Underlying()
+						break
+					}
+				}
+			}
+		}
+
+		if bs.Latest != bs.Revision {
+			projects = append(projects, bs)
+		}
+	}
+
+	if projects != nil {
+		loggers.Err.Println("Following are the out-of-date dependencies:\n")
+		for _, project := range projects {
+			loggers.Err.Printf("%v is on %v, latest available is %v\n", project.ProjectRoot, project.Revision, project.Latest)
+		}
+	} else {
+		loggers.Err.Println("All the dependencies are up-to-date.")
 	}
 
 	return nil
