@@ -298,7 +298,7 @@ func (s *gopkginSource) listVersions(ctx context.Context) ([]PairedVersion, erro
 		pv := v.(versionPair)
 		switch tv := pv.v.(type) {
 		case semVersion:
-			if tv.sv.Major() == s.major {
+			if tv.sv.Major() == s.major && !s.unstable {
 				vlist[k] = v
 				k++
 			}
