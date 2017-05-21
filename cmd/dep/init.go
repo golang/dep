@@ -71,6 +71,12 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 		root = ctx.WorkingDir
 	} else {
 		root = args[0]
+		if !filepath.IsAbs(args[0]) {
+			root = filepath.Join(ctx.WorkingDir, args[0])
+		}
+		if err := os.MkdirAll(root, os.FileMode(0777)); err != nil {
+			return errors.Errorf("unable to create directory %s , err %v", root, err)
+		}
 	}
 
 	mf := filepath.Join(root, dep.ManifestName)
