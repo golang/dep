@@ -269,8 +269,8 @@ func testGopkginSourceInteractions(t *testing.T) {
 	}()
 
 	go func() {
-		tfunc("gopkg.in/mgo.v2-unstable", "github.com/go-mgo/mgo", 2, []Version{
-			newDefaultBranch("v2-unstable").Is(Revision("9a2573d4ae52a2bf9f5b7900a50e2f8bcceeb774")),
+		tfunc("github.com/sdboyer/gpkt2.v1-unstable", "github.com/sdboyer/gpkt2", 1, []Version{
+			newDefaultBranch("v1-unstable").Is(Revision("24de0be8f4a0b8a44321562117749b257bfcef69")),
 		})
 		wg.Done()
 	}()
