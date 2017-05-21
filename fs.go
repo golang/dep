@@ -13,7 +13,6 @@ import (
 	"syscall"
 
 	"github.com/golang/dep/internal"
-	"github.com/pelletier/go-toml"
 	"github.com/pkg/errors"
 )
 
@@ -59,22 +58,6 @@ func IsNonEmptyDir(name string) (bool, error) {
 	default:
 		return false, err
 	}
-}
-
-func writeFile(path string, in toml.Marshaler) error {
-	f, err := os.Create(path)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-
-	s, err := in.MarshalTOML()
-	if err != nil {
-		return err
-	}
-
-	_, err = f.Write(s)
-	return err
 }
 
 // modifyWithString modifies a given file with a new string input.
