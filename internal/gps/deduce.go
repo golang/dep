@@ -27,6 +27,8 @@ var (
 	svnSchemes = []string{"https", "http", "svn", "svn+ssh"}
 )
 
+const gopkgUnstableSuffix = "-unstable"
+
 func validateVCSScheme(scheme, typ string) bool {
 	// everything allows plain ssh
 	if scheme == "ssh" {
@@ -276,10 +278,18 @@ func (m gopkginDeducer) deduceSource(p string, u *url.URL) (maybeSource, error) 
 	} else {
 		u.Path = path.Join(v[2], v[3])
 	}
-	major, err := strconv.ParseUint(v[4][1:], 10, 64)
+
+	unstable := false
+	majorStr := v[4]
+
+	if strings.HasSuffix(majorStr, gopkgUnstableSuffix) {
+		unstable = true
+		majorStr = strings.TrimSuffix(majorStr, gopkgUnstableSuffix)
+	}
+	major, err := strconv.ParseUint(majorStr[1:], 10, 64)
 	if err != nil {
 		// this should only be reachable if there's an error in the regex
-		return nil, fmt.Errorf("could not parse %q as a gopkg.in major version", v[4][1:])
+		return nil, fmt.Errorf("could not parse %q as a gopkg.in major version", majorStr[1:])
 	}
 
 	mb := make(maybeSources, len(gitSchemes))
@@ -290,9 +300,10 @@ func (m gopkginDeducer) deduceSource(p string, u *url.URL) (maybeSource, error) 
 		}
 		u2.Scheme = scheme
 		mb[k] = maybeGopkginSource{
-			opath: v[1],
-			url:   &u2,
-			major: major,
+			opath:    v[1],
+			url:      &u2,
+			major:    major,
+			unstable: unstable,
 		}
 	}
 
