@@ -13,7 +13,6 @@ import (
 )
 
 var basicResult solution
-var kub atom
 
 func pi(n string) ProjectIdentifier {
 	return ProjectIdentifier{
@@ -34,12 +33,6 @@ func init() {
 				v:  NewVersion("1.0.0").Is(Revision("30605f6ac35fcb075ad0bfa9296f90a7d891523e")),
 			}, nil),
 		},
-	}
-
-	// just in case something needs punishing, kubernetes is happy to oblige
-	kub = atom{
-		id: pi("github.com/kubernetes/kubernetes"),
-		v:  NewVersion("1.0.0").Is(Revision("528f879e7d3790ea4287687ef0ab3f2a01cc2718")),
 	}
 }
 
