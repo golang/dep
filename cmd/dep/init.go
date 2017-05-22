@@ -211,7 +211,7 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 		return errors.Wrap(err, "prepare solver")
 	}
 
-	l.Inputs.Memo = s.HashInputs()
+	l.SolveMeta.Memo = s.HashInputs()
 
 	// Pass timestamp (yyyyMMddHHmmss format) as suffix to backup name.
 	vendorbak, err := dep.BackupVendor(vpath, time.Now().Format("20060102150405"))

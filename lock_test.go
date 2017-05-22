@@ -28,7 +28,7 @@ func TestReadLock(t *testing.T) {
 
 	b, _ := hex.DecodeString("2252a285ab27944a4d7adcba8dbd03980f59ba652f12db39fa93b927c345593e")
 	want := &Lock{
-		Inputs: InputInfo{
+		SolveMeta: SolveMeta{
 			Memo: b,
 		},
 		P: []gps.LockedProject{
@@ -54,7 +54,7 @@ func TestReadLock(t *testing.T) {
 
 	b, _ = hex.DecodeString("2252a285ab27944a4d7adcba8dbd03980f59ba652f12db39fa93b927c345593e")
 	want = &Lock{
-		Inputs: InputInfo{
+		SolveMeta: SolveMeta{
 			Memo: b,
 		},
 		P: []gps.LockedProject{
@@ -79,7 +79,7 @@ func TestWriteLock(t *testing.T) {
 	want := h.GetTestFileString(golden)
 	memo, _ := hex.DecodeString("2252a285ab27944a4d7adcba8dbd03980f59ba652f12db39fa93b927c345593e")
 	l := &Lock{
-		Inputs: InputInfo{
+		SolveMeta: SolveMeta{
 			Memo: memo,
 		},
 		P: []gps.LockedProject{
@@ -110,7 +110,7 @@ func TestWriteLock(t *testing.T) {
 	want = h.GetTestFileString(golden)
 	memo, _ = hex.DecodeString("2252a285ab27944a4d7adcba8dbd03980f59ba652f12db39fa93b927c345593e")
 	l = &Lock{
-		Inputs: InputInfo{
+		SolveMeta: SolveMeta{
 			Memo: memo,
 		},
 		P: []gps.LockedProject{
