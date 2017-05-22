@@ -1,4 +1,5 @@
-memo = "2252a285ab27944a4d7adcba8dbd03980f59ba652f12db39fa93b927c345593e"
+[solve-meta]
+  inputs-hash = "595716d270828e763c811ef79c9c41f85b1d1bfbdfe85280036405c03772206c"
 
 [[projects]]
   name = "github.com/foo/bar"

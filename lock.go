@@ -18,25 +18,29 @@ import (
 const LockName = "Gopkg.lock"
 
 type Lock struct {
-	Inputs InputInfo
-	P      []gps.LockedProject
+	SolveMeta SolveMeta
+	P         []gps.LockedProject
 }
 
-type InputInfo struct {
+type SolveMeta struct {
 	Memo            []byte
 	AnalyzerName    string
 	AnalyzerVersion int
+	SolverName      string
+	SolverVersion   int
 }
 
 type rawLock struct {
-	Inputs   inputInfo          `toml:"inputs"`
-	Projects []rawLockedProject `toml:"projects"`
+	SolveMeta solveMeta          `toml:"solve-meta"`
+	Projects  []rawLockedProject `toml:"projects"`
 }
 
-type inputInfo struct {
-	Memo            string `toml:"memo"`
-	AnalyzerName    string `toml:"analyzerName"`
-	AnalyzerVersion int    `toml:"analyzerVersion"`
+type solveMeta struct {
+	Memo            string `toml:"inputs-hash"`
+	AnalyzerName    string `toml:"analyzer-name"`
+	AnalyzerVersion int    `toml:"analyzer-version"`
+	SolverName      string `toml:"solver-name"`
+	SolverVersion   int    `toml:"solver-version"`
 }
 
 type rawLockedProject struct {
@@ -70,13 +74,15 @@ func fromRawLock(raw rawLock) (*Lock, error) {
 		P: make([]gps.LockedProject, len(raw.Projects)),
 	}
 
-	l.Inputs.Memo, err = hex.DecodeString(raw.Inputs.Memo)
+	l.SolveMeta.Memo, err = hex.DecodeString(raw.SolveMeta.Memo)
 	if err != nil {
 		return nil, errors.Errorf("invalid hash digest in lock's memo field")
 	}
 
-	l.Inputs.AnalyzerName = raw.Inputs.AnalyzerName
-	l.Inputs.AnalyzerVersion = raw.Inputs.AnalyzerVersion
+	l.SolveMeta.AnalyzerName = raw.SolveMeta.AnalyzerName
+	l.SolveMeta.AnalyzerVersion = raw.SolveMeta.AnalyzerVersion
+	l.SolveMeta.SolverName = raw.SolveMeta.SolverName
+	l.SolveMeta.SolverVersion = raw.SolveMeta.SolverVersion
 
 	for i, ld := range raw.Projects {
 		r := gps.Revision(ld.Revision)
@@ -104,7 +110,7 @@ func fromRawLock(raw rawLock) (*Lock, error) {
 }
 
 func (l *Lock) InputHash() []byte {
-	return l.Inputs.Memo
+	return l.SolveMeta.Memo
 }
 
 func (l *Lock) Projects() []gps.LockedProject {
@@ -114,10 +120,12 @@ func (l *Lock) Projects() []gps.LockedProject {
 // toRaw converts the manifest into a representation suitable to write to the lock file
 func (l *Lock) toRaw() rawLock {
 	raw := rawLock{
-		Inputs: inputInfo{
-			Memo:            hex.EncodeToString(l.Inputs.Memo),
-			AnalyzerName:    l.Inputs.AnalyzerName,
-			AnalyzerVersion: l.Inputs.AnalyzerVersion,
+		SolveMeta: solveMeta{
+			Memo:            hex.EncodeToString(l.SolveMeta.Memo),
+			AnalyzerName:    l.SolveMeta.AnalyzerName,
+			AnalyzerVersion: l.SolveMeta.AnalyzerVersion,
+			SolverName:      l.SolveMeta.SolverName,
+			SolverVersion:   l.SolveMeta.SolverVersion,
 		},
 		Projects: make([]rawLockedProject, len(l.P)),
 	}
@@ -157,15 +165,17 @@ func LockFromSolution(in gps.Solution) *Lock {
 	h, p := in.InputHash(), in.Projects()
 
 	l := &Lock{
-		Inputs: InputInfo{
+		SolveMeta: SolveMeta{
 			Memo:            make([]byte, len(h)),
 			AnalyzerName:    in.AnalyzerName(),
 			AnalyzerVersion: in.AnalyzerVersion(),
+			SolverName:      in.SolverName(),
+			SolverVersion:   in.SolverVersion(),
 		},
 		P: make([]gps.LockedProject, len(p)),
 	}
 
-	copy(l.Inputs.Memo, h)
+	copy(l.SolveMeta.Memo, h)
 	copy(l.P, p)
 	return l
 }

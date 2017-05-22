@@ -1,9 +1,4 @@
 
-[inputs]
-  analyzerName = "dep"
-  analyzerVersion = 1
-  memo = "b4fe6e8bceac924197838b6ea47989abbdd3a8d31035d20ee0a1dabc0994c368"
-
 [[projects]]
   name = "github.com/sdboyer/deptest"
   packages = ["."]
@@ -15,3 +10,10 @@
   packages = ["."]
   revision = "5c607206be5decd28e6263ffffdcee067266015e"
   version = "v2.0.0"
+
+[solve-meta]
+  analyzer-name = "dep"
+  analyzer-version = 1
+  inputs-hash = "b4fe6e8bceac924197838b6ea47989abbdd3a8d31035d20ee0a1dabc0994c368"
+  solver-name = "gps-cdcl"
+  solver-version = 1
