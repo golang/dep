@@ -131,6 +131,8 @@ type maybeGopkginSource struct {
 	url *url.URL
 	// the major version to apply for filtering
 	major uint64
+	// whether or not the source package is "unstable"
+	unstable bool
 }
 
 func (m maybeGopkginSource) try(ctx context.Context, cachedir string, c singleSourceCache, superv *supervisor) (source, sourceState, error) {
@@ -151,7 +153,8 @@ func (m maybeGopkginSource) try(ctx context.Context, cachedir string, c singleSo
 				repo: &gitRepo{r},
 			},
 		},
-		major: m.major,
+		major:    m.major,
+		unstable: m.unstable,
 	}
 
 	var vl []PairedVersion
