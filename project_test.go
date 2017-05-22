@@ -120,7 +120,7 @@ func TestBackupVendor(t *testing.T) {
 	}
 
 	// Create a backup
-	wantName := "vendor-sfx"
+	wantName := "_vendor-sfx"
 	vendorbak, err := BackupVendor("vendor", "sfx")
 	if err != nil {
 		t.Fatal(err)

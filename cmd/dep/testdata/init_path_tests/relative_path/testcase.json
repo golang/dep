@@ -1,0 +1,7 @@
+{
+  "commands": [
+    ["init", "project_dir"]
+  ],
+  "init-path": "project_dir"
+
+}

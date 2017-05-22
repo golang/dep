@@ -33,10 +33,11 @@ type IntegrationTestCase struct {
 	GopathInitial map[string]string `json:"gopath-initial"`
 	VendorInitial map[string]string `json:"vendor-initial"`
 	VendorFinal   []string          `json:"vendor-final"`
+	InitPath      string            `json:"init-path"`
 }
 
-func NewTestCase(t *testing.T, name, wd string) *IntegrationTestCase {
-	rootPath := filepath.FromSlash(filepath.Join(wd, "testdata", "harness_tests", name))
+func NewTestCase(t *testing.T, name, test_dir, wd string) *IntegrationTestCase {
+	rootPath := filepath.FromSlash(filepath.Join(wd, "testdata", test_dir, name))
 	n := &IntegrationTestCase{
 		t:           t,
 		name:        name,

@@ -31,7 +31,7 @@ func removeErrors(name, wd string, externalProc bool, run test.RunFunc) func(*te
 	return func(t *testing.T) {
 		t.Parallel()
 
-		testCase := test.NewTestCase(t, name, wd)
+		testCase := test.NewTestCase(t, name, "harness_tests", wd)
 		testProj := test.NewTestProject(t, testCase.InitialPath(), wd, externalProc, run)
 		defer testProj.Cleanup()
 
