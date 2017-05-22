@@ -16,8 +16,12 @@ type Solution interface {
 	Lock
 	// The name of the ProjectAnalyzer used in generating this solution.
 	AnalyzerName() string
-	// The version of the ProjectAanalyzer used in generating this solution.
+	// The version of the ProjectAnalyzer used in generating this solution.
 	AnalyzerVersion() int
+	// The name of the Solver used in generating this solution.
+	SolverName() string
+	// The version of the Solver used in generating this solution.
+	SolverVersion() int
 	Attempts() int
 }
 
@@ -36,6 +40,9 @@ type solution struct {
 
 	// The analyzer version
 	analyzerVersion int
+
+	// The solver used in producing this solution
+	solv Solver
 }
 
 // WriteDepTree takes a basedir and a Lock, and exports all the projects
@@ -93,4 +100,12 @@ func (r solution) AnalyzerName() string {
 
 func (r solution) AnalyzerVersion() int {
 	return r.analyzerVersion
+}
+
+func (r solution) SolverName() string {
+	return r.solv.Name()
+}
+
+func (r solution) SolverVersion() int {
+	return r.solv.Version()
 }

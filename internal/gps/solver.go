@@ -333,6 +333,49 @@ type Solver interface {
 	// Solve initiates a solving run. It will either complete successfully with
 	// a Solution, or fail with an informative error.
 	Solve() (Solution, error)
+
+	// Name returns a string identifying the particular solver backend.
+	//
+	// Different solvers likely have different invariants, and likely will not
+	// have identical possible result sets for any particular inputs; in some
+	// cases, they may even be disjoint.
+	Name() string
+
+	// Version returns an int indicating the version of the solver of the given
+	// Name(). Implementations should change their reported version ONLY when
+	// the logic is changed in such a way that substantially changes the result
+	// set that is possible for a substantial subset of likely inputs.
+	//
+	// "Substantial" is an imprecise term, and it is used intentionally. There
+	// are no easy, general ways of subdividing constraint solving problems such
+	// that one can know, a priori, the full impact that subtle algorithmic
+	// changes will have on possible result sets. Consequently, we have to fall
+	// back on coarser, intuition-based reasoning as to whether a change is
+	// large enough that it is likely to be broadly user-visible.
+	//
+	// This is acceptable, because this value is not used programmatically by
+	// the solver in any way. Rather, it is intend for implementing tools to
+	// use as a coarse signal to users about compatibility between their tool's
+	// version and the current data, typically via persistence to a Lock.
+	// Changes to the version number reported should be weighed between
+	// confusing teams by having two members' tools continuously rolling back
+	// each others' chosen Solutions for no apparent reason, and annoying teams
+	// by changing the number for changes so remote that warnings about solver
+	// version mismatches become meaningless.
+	//
+	// Err on the side of caution.
+	//
+	// Chronology is the only implication of the ordering - that lower version
+	// numbers were published before higher numbers.
+	Version() int
+}
+
+func (s *solver) Name() string {
+	return "gps-cdcl"
+}
+
+func (s *solver) Version() int {
+	return 1
 }
 
 // Solve attempts to find a dependency solution for the given project, as
@@ -356,7 +399,8 @@ func (s *solver) Solve() (Solution, error) {
 	var soln solution
 	if err == nil {
 		soln = solution{
-			att: s.attempts,
+			att:  s.attempts,
+			solv: s,
 		}
 		soln.analyzerName, soln.analyzerVersion = s.rd.an.Info()
 		soln.hd = s.HashInputs()
