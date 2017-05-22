@@ -35,6 +35,7 @@ func init() {
 			}, nil),
 		},
 	}
+	basicResult.analyzerName, basicResult.analyzerVersion = (naiveAnalyzer{}).Info()
 
 	// just in case something needs punishing, kubernetes is happy to oblige
 	kub = atom{

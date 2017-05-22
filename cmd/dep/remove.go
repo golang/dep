@@ -176,7 +176,7 @@ func (cmd *removeCommand) Run(ctx *dep.Ctx, args []string) error {
 		return err
 	}
 
-	newLock := dep.LockFromInterface(soln)
+	newLock := dep.LockFromSolution(soln)
 
 	sw, err := dep.NewSafeWriter(nil, p.Lock, newLock, dep.VendorOnChanged)
 	if err != nil {
