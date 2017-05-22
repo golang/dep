@@ -1,0 +1,13 @@
+memo = "1ed417a0bec57ffe988fae1cba8f3d49994fb893394d61844e0b3c96d69573fe"
+
+[[projects]]
+  name = "github.com/sdboyer/deptest"
+  packages = ["."]
+  revision = "3f4c3bea144e112a69bbe5d8d01c1b09a544253f"
+  version = "v0.8.1"
+
+[[projects]]
+  name = "github.com/sdboyer/deptestdos"
+  packages = ["."]
+  revision = "5c607206be5decd28e6263ffffdcee067266015e"
+  version = "v2.0.0"

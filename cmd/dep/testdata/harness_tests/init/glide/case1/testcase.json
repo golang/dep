@@ -1,0 +1,14 @@
+{
+  "commands": [
+    ["init", "-no-examples"]
+  ],
+  "error-expected": "",
+  "gopath-initial": {
+    "github.com/golang/lint": "cb00e5669539f047b2f4c53a421a01b0c8e172c6",
+    "github.com/sdboyer/deptest": "3f4c3bea144e112a69bbe5d8d01c1b09a544253f"
+  },
+  "vendor-final": [
+    "github.com/sdboyer/deptest",
+    "github.com/sdboyer/deptestdos"
+  ]
+}

@@ -391,7 +391,7 @@ func (s *bzrSource) listVersions(ctx context.Context) ([]PairedVersion, error) {
 
 	// Last, add the default branch, hardcoding the visual representation of it
 	// that bzr uses when operating in the workflow mode we're using.
-	v := newDefaultBranch("(default)")
+	v := NewDefaultBranch("(default)")
 	vlist = append(vlist, v.Is(Revision(string(branchrev))))
 
 	return vlist, nil
@@ -475,7 +475,7 @@ func (s *hgSource) listVersions(ctx context.Context) ([]PairedVersion, error) {
 			var v PairedVersion
 			if str == "@" {
 				magicAt = true
-				v = newDefaultBranch(str).Is(Revision(pair[1])).(PairedVersion)
+				v = NewDefaultBranch(str).Is(Revision(pair[1])).(PairedVersion)
 			} else {
 				v = NewBranch(str).Is(Revision(pair[1])).(PairedVersion)
 			}
@@ -504,7 +504,7 @@ func (s *hgSource) listVersions(ctx context.Context) ([]PairedVersion, error) {
 		// "default" branch, then mark it as default branch
 		var v PairedVersion
 		if !magicAt && str == "default" {
-			v = newDefaultBranch(str).Is(Revision(pair[1])).(PairedVersion)
+			v = NewDefaultBranch(str).Is(Revision(pair[1])).(PairedVersion)
 		} else {
 			v = NewBranch(str).Is(Revision(pair[1])).(PairedVersion)
 		}

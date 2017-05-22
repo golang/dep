@@ -93,7 +93,7 @@ func NewBranch(body string) UnpairedVersion {
 	}
 }
 
-func newDefaultBranch(body string) UnpairedVersion {
+func NewDefaultBranch(body string) UnpairedVersion {
 	return branchVersion{
 		name:      body,
 		isDefault: true,
