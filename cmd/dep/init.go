@@ -184,7 +184,7 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 		handleAllTheFailuresOfTheWorld(err)
 		return err
 	}
-	l = dep.LockFromInterface(soln)
+	l = dep.LockFromSolution(soln)
 
 	// Iterate through the new projects in solved lock and add them to manifest
 	// if direct deps and log feedback for all the new projects.
@@ -217,7 +217,7 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 		return errors.Wrap(err, "prepare solver")
 	}
 
-	l.Memo = s.HashInputs()
+	l.SolveMeta.Memo = s.HashInputs()
 
 	// Pass timestamp (yyyyMMddHHmmss format) as suffix to backup name.
 	vendorbak, err := dep.BackupVendor(vpath, time.Now().Format("20060102150405"))

@@ -1,4 +1,3 @@
-memo = "1b381263a360eafafe3ef7f9be626672668d17250a3c9a8debd169d1b5e2eebb"
 
 [[projects]]
   name = "github.com/sdboyer/deptest"
@@ -11,3 +10,10 @@ memo = "1b381263a360eafafe3ef7f9be626672668d17250a3c9a8debd169d1b5e2eebb"
   packages = ["."]
   revision = "5c607206be5decd28e6263ffffdcee067266015e"
   version = "v2.0.0"
+
+[solve-meta]
+  analyzer-name = "dep"
+  analyzer-version = 1
+  inputs-hash = "1b381263a360eafafe3ef7f9be626672668d17250a3c9a8debd169d1b5e2eebb"
+  solver-name = "gps-cdcl"
+  solver-version = 1

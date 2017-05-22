@@ -277,7 +277,7 @@ func runStatusAll(loggers *dep.Loggers, out outputter, p *dep.Project, sm gps.So
 	slp := p.Lock.Projects()
 	sort.Sort(dep.SortedLockedProjects(slp))
 
-	if bytes.Equal(s.HashInputs(), p.Lock.Memo) {
+	if bytes.Equal(s.HashInputs(), p.Lock.SolveMeta.Memo) {
 		// If these are equal, we're guaranteed that the lock is a transitively
 		// complete picture of all deps. That eliminates the need for at least
 		// some checks.
