@@ -24,30 +24,45 @@ type ctxRepo interface {
 	//ping(context.Context) (bool, error)
 }
 
+func newCtxRepo(s vcs.Type, ustr, path string) (r ctxRepo, err error) {
+	r, err = getVCSRepo(s, ustr, path)
+	if err != nil {
+		// if vcs could not initialize the repo due to a local error
+		// then the local repo is in an incorrect state. Remove and
+		// treat it as a new not-yet-cloned repo.
+
+		// TODO(marwan-at-work): pass a logger here to warn/give progress of the above comment.
+		os.RemoveAll(path)
+		r, err = getVCSRepo(s, ustr, path)
+	}
+
+	return
+}
+
+func getVCSRepo(s vcs.Type, ustr, path string) (r ctxRepo, err error) {
+	switch s {
+	case vcs.Git:
+		var repo *vcs.GitRepo
+		repo, err = vcs.NewGitRepo(ustr, path)
+		r = &gitRepo{repo}
+	case vcs.Bzr:
+		var repo *vcs.BzrRepo
+		repo, err = vcs.NewBzrRepo(ustr, path)
+		r = &bzrRepo{repo}
+	case vcs.Hg:
+		var repo *vcs.HgRepo
+		repo, err = vcs.NewHgRepo(ustr, path)
+		r = &hgRepo{repo}
+	}
+
+	return
+}
+
 // original implementation of these methods come from
 // https://github.com/Masterminds/vcs
 
 type gitRepo struct {
 	*vcs.GitRepo
-}
-
-func newGitRepo(ustr, path string) (*gitRepo, error) {
-	r, err := vcs.NewGitRepo(ustr, path)
-	if err != nil {
-		if _, ok := err.(*vcs.LocalError); ok {
-			// if vcs could not initialize the repo due to a local error
-			// then the local repo is in an incorrect state. Remove and
-			// treat it as a new not-yet-cloned repo.
-			os.RemoveAll(path)
-			r, err = vcs.NewGitRepo(ustr, path)
-		}
-	}
-
-	if err != nil {
-		return nil, err
-	}
-
-	return &gitRepo{r}, nil
 }
 
 func newVcsRemoteErrorOr(msg string, err error, out string) error {
@@ -120,25 +135,6 @@ type bzrRepo struct {
 	*vcs.BzrRepo
 }
 
-func newBzrRepo(ustr, path string) (*bzrRepo, error) {
-	r, err := vcs.NewBzrRepo(ustr, path)
-	if err != nil {
-		// if vcs could not initialize the repo due to a local error
-		// then the local repo is in an incorrect state. Remove and
-		// treat it as a new not-yet-cloned repo.
-		if _, ok := err.(*vcs.LocalError); ok {
-			os.RemoveAll(path)
-			r, err = vcs.NewBzrRepo(ustr, path)
-		}
-	}
-
-	if err != nil {
-		return nil, err
-	}
-
-	return &bzrRepo{r}, nil
-}
-
 func (r *bzrRepo) get(ctx context.Context) error {
 	basePath := filepath.Dir(filepath.FromSlash(r.LocalPath()))
 	if _, err := os.Stat(basePath); os.IsNotExist(err) {
@@ -174,25 +170,6 @@ func (r *bzrRepo) updateVersion(ctx context.Context, version string) error {
 
 type hgRepo struct {
 	*vcs.HgRepo
-}
-
-func newHgRepo(ustr, path string) (*hgRepo, error) {
-	r, err := vcs.NewHgRepo(ustr, path)
-	if err != nil {
-		// if vcs could not initialize the repo due to a local error
-		// then the local repo is in an incorrect state. Remove and
-		// treat it as a new not-yet-cloned repo.
-		if _, ok := err.(*vcs.LocalError); ok {
-			os.RemoveAll(path)
-			r, err = vcs.NewHgRepo(ustr, path)
-		}
-	}
-
-	if err != nil {
-		return nil, err
-	}
-
-	return &hgRepo{r}, nil
 }
 
 func (r *hgRepo) get(ctx context.Context) error {
