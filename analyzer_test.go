@@ -5,6 +5,7 @@
 package dep
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -55,9 +56,12 @@ func TestAnalyzerDeriveManifestAndLockDoesNotExist(t *testing.T) {
 
 	a := Analyzer{}
 
-	m, l, err := a.DeriveManifestAndLock(h.Path("dep"), "my/fake/project")
-	if m != nil || l != nil || err != nil {
-		t.Fatalf("expected manifest & lock & err to be nil: m -> %#v l -> %#v err-> %#v", m, l, err)
+	_, _, err := a.DeriveManifestAndLock(h.Path("dep"), "my/fake/project")
+	if err == nil {
+		t.Fatalf("expected non nil error for non existant project, got: %v", err)
+	}
+	if !os.IsNotExist(err) {
+		t.Fatalf("expected IsNotExist error for non existant project, got: %v", err)
 	}
 }
 
