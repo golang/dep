@@ -15,7 +15,7 @@ import (
 	"time"
 
 	"github.com/Masterminds/semver"
-	"github.com/golang/dep/internal/gps/internal/fs"
+	"github.com/golang/dep/internal/fs"
 	"github.com/golang/dep/internal/gps/pkgtree"
 )
 
