@@ -13,6 +13,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-hash = "af9a783a5430dabcaaf44683c09e2b729e1c0d61f13bfdf6677c4fd0b41387ca"
+  inputs-digest = "af9a783a5430dabcaaf44683c09e2b729e1c0d61f13bfdf6677c4fd0b41387ca"
   solver-name = "gps-cdcl"
   solver-version = 1
