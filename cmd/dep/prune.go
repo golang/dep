@@ -7,6 +7,7 @@ package main
 import (
 	"bytes"
 	"flag"
+	"log"
 
 	"github.com/golang/dep"
 	"github.com/golang/dep/internal/gps"
@@ -75,5 +76,9 @@ func (cmd *pruneCommand) Run(ctx *dep.Ctx, args []string) error {
 		return errors.Errorf("lock hash doesn't match")
 	}
 
-	return dep.PruneProject(p, sm)
+	var pruneLogger *log.Logger
+	if ctx.Loggers.Verbose {
+		pruneLogger = ctx.Loggers.Err
+	}
+	return dep.PruneProject(p, sm, pruneLogger)
 }
