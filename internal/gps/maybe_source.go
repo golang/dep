@@ -11,6 +11,8 @@ import (
 	"net/url"
 	"path/filepath"
 	"strings"
+
+	"github.com/Masterminds/vcs"
 )
 
 // A maybeSource represents a set of information that, given some
@@ -82,7 +84,7 @@ func (m maybeGitSource) try(ctx context.Context, cachedir string, c singleSource
 	ustr := m.url.String()
 	path := filepath.Join(cachedir, "sources", sanitizer.Replace(ustr))
 
-	r, err := newGitRepo(ustr, path)
+	r, err := newCtxRepo(vcs.Git, ustr, path)
 
 	if err != nil {
 		return nil, 0, unwrapVcsErr(err)
@@ -138,7 +140,7 @@ func (m maybeGopkginSource) try(ctx context.Context, cachedir string, c singleSo
 	// So, it's OK to just dumb-join the scheme with the path.
 	path := filepath.Join(cachedir, "sources", sanitizer.Replace(m.url.Scheme+"/"+m.opath))
 	ustr := m.url.String()
-	r, err := newGitRepo(ustr, path)
+	r, err := newCtxRepo(vcs.Git, ustr, path)
 
 	if err != nil {
 		return nil, 0, unwrapVcsErr(err)
@@ -186,7 +188,7 @@ func (m maybeBzrSource) try(ctx context.Context, cachedir string, c singleSource
 	ustr := m.url.String()
 	path := filepath.Join(cachedir, "sources", sanitizer.Replace(ustr))
 
-	r, err := newBzrRepo(ustr, path)
+	r, err := newCtxRepo(vcs.Bzr, ustr, path)
 
 	if err != nil {
 		return nil, 0, unwrapVcsErr(err)
@@ -228,7 +230,7 @@ func (m maybeHgSource) try(ctx context.Context, cachedir string, c singleSourceC
 	ustr := m.url.String()
 	path := filepath.Join(cachedir, "sources", sanitizer.Replace(ustr))
 
-	r, err := newHgRepo(ustr, path)
+	r, err := newCtxRepo(vcs.Hg, ustr, path)
 
 	if err != nil {
 		return nil, 0, unwrapVcsErr(err)
