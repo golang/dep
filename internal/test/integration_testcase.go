@@ -145,7 +145,7 @@ func (tc *IntegrationTestCase) CompareOutput(stdout string) {
 	stdout = normalizeLines(stdout)
 
 	if expStr != stdout {
-		tc.t.Errorf("expected: %q but got: %q", expStr, stdout)
+		tc.t.Errorf("(WNT):\n%s\n(GOT):\n%s\n", expStr, stdout)
 	}
 }
 

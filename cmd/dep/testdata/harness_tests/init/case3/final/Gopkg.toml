@@ -1,4 +1,4 @@
 
-[[dependencies]]
+[[constraint]]
   branch = "master"
   name = "github.com/sdboyer/deptest"

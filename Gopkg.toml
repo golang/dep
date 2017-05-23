@@ -1,17 +1,17 @@
 required = ["github.com/Masterminds/semver"]
 
-[[dependencies]]
+[[constraint]]
   branch = "2.x"
   name = "github.com/Masterminds/semver"
 
-[[dependencies]]
+[[constraint]]
   name = "github.com/Masterminds/vcs"
   version = "^1.11.0"
 
-[[dependencies]]
+[[constraint]]
   branch = "master"
   name = "github.com/pelletier/go-toml"
 
-[[dependencies]]
+[[constraint]]
   name = "github.com/pkg/errors"
   version = ">=0.8.0, <1.0.0"

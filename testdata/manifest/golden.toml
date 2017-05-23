@@ -1,14 +1,14 @@
 ignored = ["github.com/foo/bar"]
 
-[[dependencies]]
+[[constraint]]
   name = "github.com/babble/brook"
   revision = "d05d5aca9f895d19e9265839bffeadd74a2d2ecb"
 
-[[dependencies]]
+[[constraint]]
   name = "github.com/golang/dep/internal/gps"
   version = ">=0.12.0, <1.0.0"
 
-[[overrides]]
+[[override]]
   branch = "master"
   name = "github.com/golang/dep/internal/gps"
   source = "https://github.com/golang/dep/internal/gps"
