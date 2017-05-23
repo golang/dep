@@ -12,6 +12,8 @@ import (
 )
 
 func TestContains(t *testing.T) {
+	t.Parallel()
+
 	a := []string{"a", "b", "abcd"}
 
 	if !contains(a, "a") {
@@ -23,6 +25,8 @@ func TestContains(t *testing.T) {
 }
 
 func TestIsStdLib(t *testing.T) {
+	t.Parallel()
+
 	tests := map[string]bool{
 		"github.com/Sirupsen/logrus": false,
 		"encoding/json":              true,
@@ -40,6 +44,8 @@ func TestIsStdLib(t *testing.T) {
 }
 
 func TestGetProjectPropertiesFromVersion(t *testing.T) {
+	t.Parallel()
+
 	wantSemver, _ := gps.NewSemverConstraint("^v1.0.0")
 	cases := []struct {
 		version, want gps.Constraint

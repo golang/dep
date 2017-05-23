@@ -77,8 +77,8 @@ func (h *Helper) check(err error) {
 	}
 }
 
-// parallel runs the test in parallel by calling t.Parallel.
-func (h *Helper) parallel() {
+// Parallel runs the test in parallel by calling t.Parallel.
+func (h *Helper) Parallel() {
 	if h.ran {
 		h.t.Fatalf("%+v", errors.New("internal testsuite error: call to parallel after run"))
 	}
