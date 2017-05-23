@@ -36,7 +36,7 @@ type rawLock struct {
 }
 
 type solveMeta struct {
-	Memo            string `toml:"inputs-hash"`
+	InputsDigest    string `toml:"inputs-digest"`
 	AnalyzerName    string `toml:"analyzer-name"`
 	AnalyzerVersion int    `toml:"analyzer-version"`
 	SolverName      string `toml:"solver-name"`
@@ -74,7 +74,7 @@ func fromRawLock(raw rawLock) (*Lock, error) {
 		P: make([]gps.LockedProject, len(raw.Projects)),
 	}
 
-	l.SolveMeta.Memo, err = hex.DecodeString(raw.SolveMeta.Memo)
+	l.SolveMeta.Memo, err = hex.DecodeString(raw.SolveMeta.InputsDigest)
 	if err != nil {
 		return nil, errors.Errorf("invalid hash digest in lock's memo field")
 	}
@@ -121,7 +121,7 @@ func (l *Lock) Projects() []gps.LockedProject {
 func (l *Lock) toRaw() rawLock {
 	raw := rawLock{
 		SolveMeta: solveMeta{
-			Memo:            hex.EncodeToString(l.SolveMeta.Memo),
+			InputsDigest:    hex.EncodeToString(l.SolveMeta.Memo),
 			AnalyzerName:    l.SolveMeta.AnalyzerName,
 			AnalyzerVersion: l.SolveMeta.AnalyzerVersion,
 			SolverName:      l.SolveMeta.SolverName,
