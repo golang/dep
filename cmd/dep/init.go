@@ -127,7 +127,7 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 		return err
 	}
 	m := &dep.Manifest{
-		Dependencies: pd.constraints,
+		Constraints: pd.constraints,
 	}
 
 	// Make an initial lock from what knowledge we've collected about the
@@ -201,7 +201,7 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 			// Check if it's in notondisk project map. These are direct deps, should
 			// be added to manifest.
 			if _, ok := pd.notondisk[pr]; ok {
-				m.Dependencies[pr] = getProjectPropertiesFromVersion(x.Version())
+				m.Constraints[pr] = getProjectPropertiesFromVersion(x.Version())
 				feedback(x.Version(), pr, fb.DepTypeDirect, ctx)
 			} else {
 				// Log feedback of transitive project
