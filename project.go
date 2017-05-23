@@ -76,7 +76,10 @@ func BackupVendor(vpath, suffix string) (string, error) {
 		return "", err
 	}
 	if vendorExists {
-		vendorbak := vpath + "-" + suffix
+		// vpath is a full filepath. We need to split it to prefix the backup dir
+		// with an "_"
+		vpathDir, name := filepath.Split(vpath)
+		vendorbak := filepath.Join(vpathDir, "_"+name+"-"+suffix)
 		// Check if a directory with same name exists
 		if _, err = os.Stat(vendorbak); os.IsNotExist(err) {
 			// Rename existing vendor to vendor-{suffix}

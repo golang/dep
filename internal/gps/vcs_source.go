@@ -278,7 +278,8 @@ func (s *gitSource) listVersions(ctx context.Context) (vlist []PairedVersion, er
 // according to the input URL.
 type gopkginSource struct {
 	gitSource
-	major uint64
+	major    uint64
+	unstable bool
 }
 
 func (s *gopkginSource) listVersions(ctx context.Context) ([]PairedVersion, error) {
@@ -297,20 +298,24 @@ func (s *gopkginSource) listVersions(ctx context.Context) ([]PairedVersion, erro
 		pv := v.(versionPair)
 		switch tv := pv.v.(type) {
 		case semVersion:
-			if tv.sv.Major() == s.major {
+			if tv.sv.Major() == s.major && !s.unstable {
 				vlist[k] = v
 				k++
 			}
 		case branchVersion:
 			// The semver lib isn't exactly the same as gopkg.in's logic, but
 			// it's close enough that it's probably fine to use. We can be more
-			// exact if real problems crop up. The most obvious vector for
-			// problems is that we totally ignore the "unstable" designation
-			// right now.
+			// exact if real problems crop up.
 			sv, err := semver.NewVersion(tv.name)
 			if err != nil || sv.Major() != s.major {
 				// not a semver-shaped branch name at all, or not the same major
 				// version as specified in the import path constraint
+				continue
+			}
+
+			// Gopkg.in has a special "-unstable" suffix which we need to handle
+			// separately.
+			if s.unstable != strings.HasSuffix(tv.name, gopkgUnstableSuffix) {
 				continue
 			}
 

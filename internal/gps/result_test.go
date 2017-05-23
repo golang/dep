@@ -13,7 +13,6 @@ import (
 )
 
 var basicResult solution
-var kub atom
 
 func pi(n string) ProjectIdentifier {
 	return ProjectIdentifier{
@@ -36,11 +35,14 @@ func init() {
 		},
 	}
 
-	// just in case something needs punishing, kubernetes is happy to oblige
-	kub = atom{
-		id: pi("github.com/kubernetes/kubernetes"),
-		v:  NewVersion("1.0.0").Is(Revision("528f879e7d3790ea4287687ef0ab3f2a01cc2718")),
-	}
+	// Just in case something needs punishing, kubernetes offers a complex,
+	// real-world set of dependencies, and this revision is known to work.
+	/*
+		_ = atom{
+			id: pi("github.com/kubernetes/kubernetes"),
+			v:  NewVersion("1.0.0").Is(Revision("528f879e7d3790ea4287687ef0ab3f2a01cc2718")),
+		}
+	*/
 }
 
 func testWriteDepTree(t *testing.T) {
