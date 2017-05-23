@@ -3,5 +3,5 @@
   packages = ["."]
 
 [solve-meta]
-  inputs-hash = "2252a285ab27944a4d7adcba8dbd03980f59ba652f12db39fa93b927c345593e"
+  inputs-digest = "2252a285ab27944a4d7adcba8dbd03980f59ba652f12db39fa93b927c345593e"
 
