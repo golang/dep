@@ -587,21 +587,16 @@ func TestDeduceFromPath(t *testing.T) {
 			}
 		})
 	}
-	for typ, fixtures := range pathDeductionFixtures {
-		typ, fixtures := typ, fixtures
-		t.Run("first", func(t *testing.T) {
+	runSet := func(t *testing.T) {
+		for typ, fixtures := range pathDeductionFixtures {
 			do(typ, fixtures, t)
-		})
+		}
 	}
+	t.Run("first", runSet)
 
 	// Run the test set twice to ensure results are correct for both cached
 	// and uncached deductions.
-	for typ, fixtures := range pathDeductionFixtures {
-		typ, fixtures := typ, fixtures
-		t.Run("second", func(t *testing.T) {
-			do(typ, fixtures, t)
-		})
-	}
+	t.Run("second", runSet)
 }
 
 func TestVanityDeduction(t *testing.T) {
