@@ -1,0 +1,6 @@
+{
+  "commands": [
+    ["init", "-h"]
+  ],
+  "error-expected": "Usage: dep init [root]"
+}
