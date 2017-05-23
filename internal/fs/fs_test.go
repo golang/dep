@@ -99,8 +99,11 @@ func TestRenameWithFallback(t *testing.T) {
 	}
 
 	srcpath := filepath.Join(dir, "src")
-	if _, err = os.Create(srcpath); err != nil {
+
+	if srcf, err := os.Create(srcpath); err != nil {
 		t.Fatal(err)
+	} else {
+		srcf.Close()
 	}
 
 	if err = RenameWithFallback(srcpath, filepath.Join(dir, "dst")); err != nil {
