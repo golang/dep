@@ -17,7 +17,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/golang/dep/internal/gps/internal/fs"
+	"github.com/golang/dep/internal/fs"
 	"github.com/golang/dep/internal/gps/internal/paths"
 )
 
