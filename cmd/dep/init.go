@@ -14,8 +14,8 @@ import (
 	"time"
 
 	"github.com/golang/dep"
-	"github.com/golang/dep/internal"
 	fb "github.com/golang/dep/internal/feedback"
+	"github.com/golang/dep/internal/fs"
 	"github.com/golang/dep/internal/gps"
 	"github.com/golang/dep/internal/gps/paths"
 	"github.com/golang/dep/internal/gps/pkgtree"
@@ -56,7 +56,7 @@ type initCommand struct {
 }
 
 func trimPathPrefix(p1, p2 string) string {
-	if internal.HasFilepathPrefix(p1, p2) {
+	if fs.HasFilepathPrefix(p1, p2) {
 		return p1[len(p2):]
 	}
 	return p1
@@ -84,7 +84,7 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 	lf := filepath.Join(root, dep.LockName)
 	vpath := filepath.Join(root, "vendor")
 
-	mok, err := dep.IsRegular(mf)
+	mok, err := fs.IsRegular(mf)
 	if err != nil {
 		return err
 	}
@@ -93,7 +93,7 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 	}
 	// Manifest file does not exist.
 
-	lok, err := dep.IsRegular(lf)
+	lok, err := fs.IsRegular(lf)
 	if err != nil {
 		return err
 	}

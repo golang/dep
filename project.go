@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/golang/dep/internal/fs"
 	"github.com/golang/dep/internal/gps"
 )
 
@@ -70,7 +71,7 @@ func (p *Project) MakeParams() gps.SolveParameters {
 // creates a backup of it to a new directory with the provided suffix.
 func BackupVendor(vpath, suffix string) (string, error) {
 	// Check if there's a non-empty vendor directory
-	vendorExists, err := IsNonEmptyDir(vpath)
+	vendorExists, err := fs.IsNonEmptyDir(vpath)
 	if err != nil {
 		return "", err
 	}
@@ -82,7 +83,7 @@ func BackupVendor(vpath, suffix string) (string, error) {
 		// Check if a directory with same name exists
 		if _, err = os.Stat(vendorbak); os.IsNotExist(err) {
 			// Rename existing vendor to vendor-{suffix}
-			if err := renameWithFallback(vpath, vendorbak); err != nil {
+			if err := fs.RenameWithFallback(vpath, vendorbak); err != nil {
 				return "", err
 			}
 			return vendorbak, nil
