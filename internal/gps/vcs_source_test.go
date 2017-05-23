@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"os/exec"
 	"reflect"
+	"strings"
 	"sync"
 	"testing"
 )
@@ -152,10 +153,12 @@ func testGopkginSourceInteractions(t *testing.T) {
 			t.Errorf("URL was bad, lolwut? errtext: %s", err)
 			return
 		}
+		unstable := strings.HasSuffix(opath, gopkgUnstableSuffix)
 		mb := maybeGopkginSource{
-			opath: opath,
-			url:   u,
-			major: major,
+			opath:    opath,
+			url:      u,
+			major:    major,
+			unstable: unstable,
 		}
 
 		ctx := context.Background()
@@ -240,7 +243,7 @@ func testGopkginSourceInteractions(t *testing.T) {
 
 	// simultaneously run for v1, v2, and v3 filters of the target repo
 	wg := &sync.WaitGroup{}
-	wg.Add(3)
+	wg.Add(4)
 	go func() {
 		tfunc("gopkg.in/sdboyer/gpkt.v1", "github.com/sdboyer/gpkt", 1, []Version{
 			NewVersion("v1.1.0").Is(Revision("b2cb48dda625f6640b34d9ffb664533359ac8b91")),
@@ -261,6 +264,13 @@ func testGopkginSourceInteractions(t *testing.T) {
 	go func() {
 		tfunc("gopkg.in/sdboyer/gpkt.v3", "github.com/sdboyer/gpkt", 3, []Version{
 			newDefaultBranch("v3").Is(Revision("4a54adf81c75375d26d376459c00d5ff9b703e5e")),
+		})
+		wg.Done()
+	}()
+
+	go func() {
+		tfunc("github.com/sdboyer/gpkt2.v1-unstable", "github.com/sdboyer/gpkt2", 1, []Version{
+			newDefaultBranch("v1-unstable").Is(Revision("24de0be8f4a0b8a44321562117749b257bfcef69")),
 		})
 		wg.Done()
 	}()
