@@ -329,7 +329,7 @@ func getProjectConstraint(arg string, sm gps.SourceManager) (gps.ProjectConstrai
 // semver, a revision, or as a fallback, a plain tag
 func deduceConstraint(s string) gps.Constraint {
 	// always semver if we can
-	c, err := gps.NewSemverConstraint(s)
+	c, err := gps.NewSemverConstraintIC(s)
 	if err == nil {
 		return c
 	}

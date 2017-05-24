@@ -319,8 +319,7 @@ func getProjectPropertiesFromVersion(v gps.Version) gps.ProjectProperties {
 	case gps.IsBranch, gps.IsVersion:
 		pp.Constraint = v
 	case gps.IsSemver:
-		// TODO: remove "^" when https://github.com/golang/dep/issues/225 is ready.
-		c, err := gps.NewSemverConstraint("^" + v.String())
+		c, err := gps.NewSemverConstraintIC(v.String())
 		if err != nil {
 			panic(err)
 		}
