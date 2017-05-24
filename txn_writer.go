@@ -26,6 +26,11 @@ import (
 var exampleTOML = []byte(`
 ## Gopkg.toml example (these lines may be deleted)
 
+## "metadata" is used to define the project metadata.
+# [metadata]
+#   name = "Awesome project"
+#   authors = ["Jane Doe <jane@doe.com>", "John Doe <john@doe.com>"]
+
 ## "required" lists a set of packages (not projects) that must be included in
 ## Gopkg.lock. This list is merged with the set of packages imported by the current
 ## project. Use it when your project needs a package it doesn't explicitly import -
@@ -52,7 +57,7 @@ var exampleTOML = []byte(`
 ## Optional: an alternate location (URL or import path) for the project's source.
 # source = "https://github.com/myfork/package.git"
 
-## Overrides have the same structure as [[dependencies]], but supercede all
+## Overrides have the same structure as [[dependencies]], but supersede all
 ## [[dependencies]] declarations from all projects. Only the current project's
 ## [[overrides]] are applied.
 ##
@@ -62,7 +67,7 @@ var exampleTOML = []byte(`
 # name = "github.com/user/project"
 #
 ## Optional: specifying a version constraint override will cause all other
-## constraints on this project to be ignored; only the overriden constraint
+## constraints on this project to be ignored; only the overridden constraint
 ## need be satisfied.
 ## Again, only one of "branch", "version" or "revision" can be specified.
 # version = "1.0.0"
