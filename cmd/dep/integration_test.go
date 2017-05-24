@@ -18,6 +18,8 @@ import (
 )
 
 func TestIntegration(t *testing.T) {
+	t.Parallel()
+
 	test.NeedsExternalNetwork(t)
 	test.NeedsGit(t)
 

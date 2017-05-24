@@ -11,6 +11,8 @@ import (
 )
 
 func TestDeduceConstraint(t *testing.T) {
+	t.Parallel()
+
 	sv, err := gps.NewSemverConstraint("v1.2.3")
 	if err != nil {
 		t.Fatal(err)
