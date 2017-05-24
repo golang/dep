@@ -18,6 +18,7 @@ Summarize the question and quote the reply, linking back to the original comment
 * [Can I put the manifest and lock in the vendor directory?](#can-i-put-the-manifest-and-lock-in-the-vendor-directory)
 * [Why did dep use a different revision for package X instead of the revision in the lock file?](#why-did-dep-use-a-different-revision-for-package-x-instead-of-the-revision-in-the-lock-file)
 * [Why is `dep` slow?](#why-is-dep-slow)
+* [How does `dep` handle symbolic links?](#how-does-dep-handle-symbolic-links)
 
 ## What is the difference between Gopkg.toml (the "manifest") and Gopkg.lock (the "lock")?
 
@@ -178,4 +179,16 @@ gateway to all of these improvements.
 
 There's another major performance issue that's much harder - the process of picking versions itself is an NP-complete problem in `dep`'s current design. This is a much trickier problem 😜
 
+## How does `dep` handle symbolic links?
+
+> because we're not crazy people who delight in inviting chaos into our lives, we need to work within one GOPATH at a time.
+-[@sdboyer in #247](https://github.com/golang/dep/pull/247#issuecomment-284181879)
+
+Out of convenience, one might create a symlink to a directory within their `GOPATH`, e.g. `ln -s ~/go/src/github.com/golang/dep dep`. When `dep` is invoked it will resolve the current working directory accordingly:
+
+- If the cwd is a symlink outside a `GOPATH` and links to directory within a `GOPATH`, or vice versa, `dep` chooses whichever path is within the `GOPATH`.  If neither path is within a `GOPATH`, `dep` produces an error.
+- If both the cwd and resolved path are in the same `GOPATH`, an error is thrown since the users intentions and expectations can't be accurately deduced.
+- If the symlink is within a `GOPATH` and the real path is within a *different* `GOPATH` - an error is thrown.
+
+This is the only symbolic link support that `dep` really intends to provide. In keeping with the general practices of the `go` tool, `dep` tends to either ignore symlinks (when walking) or copy the symlink itself, depending on the filesystem operation being performed.
 

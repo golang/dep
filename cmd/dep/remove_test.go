@@ -12,6 +12,8 @@ import (
 )
 
 func TestRemoveErrors(t *testing.T) {
+	t.Parallel()
+
 	test.NeedsExternalNetwork(t)
 	test.NeedsGit(t)
 
@@ -27,6 +29,8 @@ func TestRemoveErrors(t *testing.T) {
 
 func removeErrors(name, wd string, externalProc bool, run test.RunFunc) func(*testing.T) {
 	return func(t *testing.T) {
+		t.Parallel()
+
 		testCase := test.NewTestCase(t, name, "harness_tests", wd)
 		testProj := test.NewTestProject(t, testCase.InitialPath(), wd, externalProc, run)
 		defer testProj.Cleanup()
