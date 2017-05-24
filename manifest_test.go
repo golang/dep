@@ -25,7 +25,7 @@ func TestReadManifest(t *testing.T) {
 		t.Fatalf("Should have read Manifest correctly, but got err %q", err)
 	}
 
-	c, _ := gps.NewSemverConstraint(">=0.12.0, <1.0.0")
+	c, _ := gps.NewSemverConstraint("^0.12.0")
 	want := Manifest{
 		Dependencies: map[gps.ProjectRoot]gps.ProjectProperties{
 			gps.ProjectRoot("github.com/golang/dep/internal/gps"): {
@@ -61,7 +61,7 @@ func TestWriteManifest(t *testing.T) {
 
 	golden := "manifest/golden.toml"
 	want := h.GetTestFileString(golden)
-	c, _ := gps.NewSemverConstraint(">=0.12.0, <1.0.0")
+	c, _ := gps.NewSemverConstraint("^0.12.0")
 	m := &Manifest{
 		Dependencies: map[gps.ProjectRoot]gps.ProjectProperties{
 			gps.ProjectRoot("github.com/golang/dep/internal/gps"): {

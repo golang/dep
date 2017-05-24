@@ -27,7 +27,7 @@ func TestContains(t *testing.T) {
 func TestGetProjectPropertiesFromVersion(t *testing.T) {
 	t.Parallel()
 
-	wantSemver, _ := gps.NewSemverConstraint("^v1.0.0")
+	wantSemver, _ := gps.NewSemverConstraintIC("v1.0.0")
 	cases := []struct {
 		version, want gps.Constraint
 	}{

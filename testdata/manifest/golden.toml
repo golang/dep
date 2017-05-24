@@ -6,7 +6,7 @@ ignored = ["github.com/foo/bar"]
 
 [[dependencies]]
   name = "github.com/golang/dep/internal/gps"
-  version = ">=0.12.0, <1.0.0"
+  version = "0.12.0"
 
 [[overrides]]
   branch = "master"
