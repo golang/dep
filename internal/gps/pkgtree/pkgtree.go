@@ -122,6 +122,12 @@ func ListPackages(fileRoot, importRoot string) (PackageTree, error) {
 		// import paths.
 		ip := filepath.ToSlash(filepath.Join(importRoot, strings.TrimPrefix(wp, fileRoot)))
 
+		// translate staging repo import path by cutting off the prefix
+		stagingPattern := "/staging/src/"
+		if p := strings.LastIndex(ip, stagingPattern); p != -1 {
+			ip = ip[p+len(stagingPattern):]
+		}
+
 		// Find all the imports, across all os/arch combos
 		//p, err := fullPackageInDir(wp)
 		p := &build.Package{
@@ -488,10 +494,10 @@ func (t PackageTree) ToReachMap(main, tests, backprop bool, ignore map[string]bo
 				continue
 			}
 
-			if !eqOrSlashedPrefix(imp, t.ImportRoot) {
-				w.ex[imp] = true
-			} else {
+			if _, internal := t.Packages[imp]; internal {
 				w.in[imp] = true
+			} else {
+				w.ex[imp] = true
 			}
 		}
 
