@@ -12,7 +12,7 @@ import (
 	"strings"
 
 	"github.com/armon/go-radix"
-	"github.com/golang/dep/internal/gps/internal/paths"
+	"github.com/golang/dep/internal/gps/paths"
 	"github.com/golang/dep/internal/gps/pkgtree"
 )
 

@@ -10,6 +10,7 @@ import (
 
 	"github.com/golang/dep"
 	"github.com/golang/dep/internal/gps"
+	"github.com/golang/dep/internal/gps/paths"
 	"github.com/golang/dep/internal/gps/pkgtree"
 	"github.com/pkg/errors"
 )
@@ -71,7 +72,7 @@ func (cmd *removeCommand) Run(ctx *dep.Ctx, args []string) error {
 			return errors.Errorf("remove takes no arguments when running with -unused")
 		}
 
-		reachlist := reachmap.FlattenOmitStdLib()
+		reachlist := reachmap.FlattenFn(paths.IsStandardImportPath)
 
 		// warm the cache in parallel, in case any paths require go get metadata
 		// discovery
@@ -81,7 +82,7 @@ func (cmd *removeCommand) Run(ctx *dep.Ctx, args []string) error {
 
 		otherroots := make(map[gps.ProjectRoot]bool)
 		for _, im := range reachlist {
-			if isStdLib(im) {
+			if paths.IsStandardImportPath(im) {
 				continue
 			}
 			pr, err := sm.DeduceProjectRoot(im)
