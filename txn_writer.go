@@ -151,10 +151,6 @@ func (diff rawStringDiff) MarshalTOML() ([]byte, error) {
 	return []byte(diff.String()), nil
 }
 
-type rawLockDiff struct {
-	*gps.LockDiff
-}
-
 type rawLockedProjectDiff struct {
 	Name     gps.ProjectRoot `toml:"name"`
 	Source   *rawStringDiff  `toml:"source,omitempty"`
@@ -570,22 +566,6 @@ func calculatePrune(vendorDir string, keep []string) ([]string, error) {
 		return nil
 	})
 	return toDelete, err
-}
-
-func writeFile(path string, in toml.Marshaler) error {
-	f, err := os.Create(path)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-
-	s, err := in.MarshalTOML()
-	if err != nil {
-		return err
-	}
-
-	_, err = f.Write(s)
-	return err
 }
 
 func deleteDirs(toDelete []string) error {
