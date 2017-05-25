@@ -30,7 +30,7 @@ type Constraint interface {
 	// than =.
 	//
 	// In the same way that String() is the inverse of NewConstraint(), this
-	// method is the inverse of to NewSemverConstraintIC().
+	// method is the inverse of NewSemverConstraintIC().
 	ImpliedCaretString() string
 
 	// Matches indicates if the provided Version is allowed by the Constraint.
@@ -73,7 +73,9 @@ func NewSemverConstraint(body string) (Constraint, error) {
 }
 
 // NewSemverConstraintIC attempts to construct a semver Constraint object from the
-// input string, defaulting to a caret, ^, when no constraint is specified.
+// input string, defaulting to a caret, ^, when no operator is specified. Put
+// differently, ^ is the default operator for NewSemverConstraintIC, while =
+// is the default operator for NewSemverConstraint.
 //
 // If the input string cannot be made into a valid semver Constraint, an error
 // is returned.
@@ -103,7 +105,7 @@ func (c semverConstraint) String() string {
 // than =.
 //
 // In the same way that String() is the inverse of NewConstraint(), this
-// method is the inverse of to NewSemverConstraintIC().
+// method is the inverse of NewSemverConstraintIC().
 func (c semverConstraint) ImpliedCaretString() string {
 	return c.c.ImpliedCaretString()
 }
