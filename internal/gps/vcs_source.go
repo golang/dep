@@ -148,7 +148,7 @@ func (s *gitSource) exportRevisionTo(ctx context.Context, rev Revision, to strin
 	//
 	// Sadly, this approach *does* also write out vendor dirs. There doesn't
 	// appear to be a way to make checkout-index respect sparse checkout
-	// rules (-a supercedes it). The alternative is using plain checkout,
+	// rules (-a supersedes it). The alternative is using plain checkout,
 	// though we have a bunch of housekeeping to do to set up, then tear
 	// down, the sparse checkout controls, as well as restore the original
 	// index and HEAD.
