@@ -1,12 +1,10 @@
-required = ["github.com/Masterminds/semver"]
-
 [[constraint]]
   branch = "2.x"
   name = "github.com/Masterminds/semver"
 
 [[constraint]]
   name = "github.com/Masterminds/vcs"
-  version = "^1.11.0"
+  version = "1.11.0"
 
 [[constraint]]
   branch = "master"
@@ -14,4 +12,4 @@ required = ["github.com/Masterminds/semver"]
 
 [[constraint]]
   name = "github.com/pkg/errors"
-  version = ">=0.8.0, <1.0.0"
+  version = "0.8.0"
