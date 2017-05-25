@@ -16,6 +16,7 @@ func TestIsStandardImportPath(t *testing.T) {
 		{"github.com/anything", false},
 		{"github.com", false},
 		{"foo", true},
+		{".", false},
 	}
 
 	for _, f := range fix {

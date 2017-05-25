@@ -162,7 +162,7 @@ func toProject(raw rawProject) (n gps.ProjectRoot, pp gps.ProjectProperties, err
 		}
 
 		// always semver if we can
-		pp.Constraint, err = gps.NewSemverConstraint(raw.Version)
+		pp.Constraint, err = gps.NewSemverConstraintIC(raw.Version)
 		if err != nil {
 			// but if not, fall back on plain versions
 			pp.Constraint = gps.NewVersion(raw.Version)
@@ -236,7 +236,7 @@ func toRawProject(name gps.ProjectRoot, project gps.ProjectProperties) rawProjec
 		case gps.IsBranch:
 			raw.Branch = v.String()
 		case gps.IsSemver, gps.IsVersion:
-			raw.Version = v.String()
+			raw.Version = v.ImpliedCaretString()
 		}
 		return raw
 	}
@@ -248,7 +248,7 @@ func toRawProject(name gps.ProjectRoot, project gps.ProjectProperties) rawProjec
 	// if !gps.IsAny(pp.Constraint) && !gps.IsNone(pp.Constraint) {
 	if !gps.IsAny(project.Constraint) && project.Constraint != nil {
 		// Has to be a semver range.
-		raw.Version = project.Constraint.String()
+		raw.Version = project.Constraint.ImpliedCaretString()
 	}
 	return raw
 }

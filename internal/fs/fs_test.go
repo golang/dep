@@ -1,8 +1,8 @@
-// Copyright 2017 The Go Authors. All rights reserved.
+// Copyright 2016 The Go Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package dep
+package fs
 
 import (
 	"io/ioutil"
@@ -14,6 +14,156 @@ import (
 	"github.com/golang/dep/internal/test"
 )
 
+func TestHasFilepathPrefix(t *testing.T) {
+	dir, err := ioutil.TempDir("", "dep")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(dir)
+
+	cases := []struct {
+		path   string
+		prefix string
+		want   bool
+	}{
+		{filepath.Join(dir, "a", "b"), filepath.Join(dir), true},
+		{filepath.Join(dir, "a", "b"), filepath.Join(dir, "a"), true},
+		{filepath.Join(dir, "a", "b"), filepath.Join(dir, "a", "b"), true},
+		{filepath.Join(dir, "a", "b"), filepath.Join(dir, "c"), false},
+		{filepath.Join(dir, "a", "b"), filepath.Join(dir, "a", "d", "b"), false},
+		{filepath.Join(dir, "a", "b"), filepath.Join(dir, "a", "b2"), false},
+		{filepath.Join(dir), filepath.Join(dir, "a", "b"), false},
+		{filepath.Join(dir, "ab"), filepath.Join(dir, "a", "b"), false},
+		{filepath.Join(dir, "ab"), filepath.Join(dir, "a"), false},
+		{filepath.Join(dir, "123"), filepath.Join(dir, "123"), true},
+		{filepath.Join(dir, "123"), filepath.Join(dir, "1"), false},
+		{filepath.Join(dir, "⌘"), filepath.Join(dir, "⌘"), true},
+		{filepath.Join(dir, "a"), filepath.Join(dir, "⌘"), false},
+		{filepath.Join(dir, "⌘"), filepath.Join(dir, "a"), false},
+	}
+
+	for _, c := range cases {
+		if err := os.MkdirAll(c.path, 0755); err != nil {
+			t.Fatal(err)
+		}
+
+		if err = os.MkdirAll(c.prefix, 0755); err != nil {
+			t.Fatal(err)
+		}
+
+		if got := HasFilepathPrefix(c.path, c.prefix); c.want != got {
+			t.Fatalf("dir: %q, prefix: %q, expected: %v, got: %v", c.path, c.prefix, c.want, got)
+		}
+	}
+}
+
+func TestHasFilepathPrefix_Files(t *testing.T) {
+	dir, err := ioutil.TempDir("", "dep")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(dir)
+
+	existingFile := filepath.Join(dir, "exists")
+	if _, err := os.Create(existingFile); err != nil {
+		t.Fatal(err)
+	}
+
+	nonExistingFile := filepath.Join(dir, "does_not_exists")
+
+	cases := []struct {
+		path   string
+		prefix string
+		want   bool
+	}{
+		{existingFile, filepath.Join(dir), false},
+		{nonExistingFile, filepath.Join(dir), true},
+	}
+
+	for _, c := range cases {
+		if got := HasFilepathPrefix(c.path, c.prefix); c.want != got {
+			t.Fatalf("dir: %q, prefix: %q, expected: %v, got: %v", c.path, c.prefix, c.want, got)
+		}
+	}
+}
+
+func TestRenameWithFallback(t *testing.T) {
+	dir, err := ioutil.TempDir("", "dep")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(dir)
+
+	if err = RenameWithFallback(filepath.Join(dir, "does_not_exists"), filepath.Join(dir, "dst")); err == nil {
+		t.Fatal("expected an error for non existing file, but got nil")
+	}
+
+	srcpath := filepath.Join(dir, "src")
+
+	if srcf, err := os.Create(srcpath); err != nil {
+		t.Fatal(err)
+	} else {
+		srcf.Close()
+	}
+
+	if err = RenameWithFallback(srcpath, filepath.Join(dir, "dst")); err != nil {
+		t.Fatal(err)
+	}
+
+	srcpath = filepath.Join(dir, "a")
+	if err = os.MkdirAll(srcpath, 0777); err != nil {
+		t.Fatal(err)
+	}
+
+	dstpath := filepath.Join(dir, "b")
+	if err = os.MkdirAll(dstpath, 0777); err != nil {
+		t.Fatal(err)
+	}
+
+	if err = RenameWithFallback(srcpath, dstpath); err == nil {
+		t.Fatal("expected an error if dst is an existing directory, but got nil")
+	}
+}
+
+func TestGenTestFilename(t *testing.T) {
+	cases := []struct {
+		str  string
+		want string
+	}{
+		{"abc", "Abc"},
+		{"ABC", "aBC"},
+		{"AbC", "abC"},
+		{"αβγ", "Αβγ"},
+		{"123", "123"},
+		{"1a2", "1A2"},
+		{"12a", "12A"},
+		{"⌘", "⌘"},
+	}
+
+	for _, c := range cases {
+		got := genTestFilename(c.str)
+		if c.want != got {
+			t.Fatalf("str: %q, expected: %q, got: %q", c.str, c.want, got)
+		}
+	}
+}
+
+func BenchmarkGenTestFilename(b *testing.B) {
+	cases := []string{
+		"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+		"αααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααα",
+		"11111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111",
+		"⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘",
+	}
+
+	for i := 0; i < b.N; i++ {
+		for _, str := range cases {
+			genTestFilename(str)
+		}
+	}
+}
+
 func TestCopyDir(t *testing.T) {
 	dir, err := ioutil.TempDir("", "dep")
 	if err != nil {
@@ -22,7 +172,7 @@ func TestCopyDir(t *testing.T) {
 	defer os.RemoveAll(dir)
 
 	srcdir := filepath.Join(dir, "src")
-	if err = os.MkdirAll(srcdir, 0755); err != nil {
+	if err := os.MkdirAll(srcdir, 0755); err != nil {
 		t.Fatal(err)
 	}
 
@@ -60,7 +210,7 @@ func TestCopyDir(t *testing.T) {
 	}
 
 	destdir := filepath.Join(dir, "dest")
-	if err = CopyDir(srcdir, destdir); err != nil {
+	if err := CopyDir(srcdir, destdir); err != nil {
 		t.Fatal(err)
 	}
 
@@ -97,7 +247,7 @@ func TestCopyDir(t *testing.T) {
 	}
 }
 
-func TestCopyDirFailSrc(t *testing.T) {
+func TestCopyDirFail_SrcInaccessible(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		// XXX: setting permissions works differently in
 		// Microsoft Windows. Skipping this this until a
@@ -107,7 +257,7 @@ func TestCopyDirFailSrc(t *testing.T) {
 
 	var srcdir, dstdir string
 
-	err, cleanup := setupInaccesibleDir(func(dir string) (err error) {
+	err, cleanup := setupInaccessibleDir(func(dir string) (err error) {
 		srcdir = filepath.Join(dir, "src")
 		return os.MkdirAll(srcdir, 0755)
 	})
@@ -130,7 +280,7 @@ func TestCopyDirFailSrc(t *testing.T) {
 	}
 }
 
-func TestCopyDirFailDst(t *testing.T) {
+func TestCopyDirFail_DstInaccessible(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		// XXX: setting permissions works differently in
 		// Microsoft Windows. Skipping this this until a
@@ -151,7 +301,7 @@ func TestCopyDirFailDst(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err, cleanup := setupInaccesibleDir(func(dir string) error {
+	err, cleanup := setupInaccessibleDir(func(dir string) error {
 		dstdir = filepath.Join(dir, "dst")
 		return nil
 	})
@@ -164,6 +314,60 @@ func TestCopyDirFailDst(t *testing.T) {
 
 	if err = CopyDir(srcdir, dstdir); err == nil {
 		t.Fatalf("expected error for CopyDir(%s, %s), got none", srcdir, dstdir)
+	}
+}
+
+func TestCopyDirFail_SrcIsNotDir(t *testing.T) {
+	var srcdir, dstdir string
+
+	dir, err := ioutil.TempDir("", "dep")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(dir)
+
+	srcdir = filepath.Join(dir, "src")
+	if _, err = os.Create(srcdir); err != nil {
+		t.Fatal(err)
+	}
+
+	dstdir = filepath.Join(dir, "dst")
+
+	if err = CopyDir(srcdir, dstdir); err == nil {
+		t.Fatalf("expected error for CopyDir(%s, %s), got none", srcdir, dstdir)
+	}
+
+	if err != errSrcNotDir {
+		t.Fatalf("expected %v error for CopyDir(%s, %s), got %s", errSrcNotDir, srcdir, dstdir, err)
+	}
+
+}
+
+func TestCopyDirFail_DstExists(t *testing.T) {
+	var srcdir, dstdir string
+
+	dir, err := ioutil.TempDir("", "dep")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(dir)
+
+	srcdir = filepath.Join(dir, "src")
+	if err = os.MkdirAll(srcdir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	dstdir = filepath.Join(dir, "dst")
+	if err = os.MkdirAll(dstdir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	if err = CopyDir(srcdir, dstdir); err == nil {
+		t.Fatalf("expected error for CopyDir(%s, %s), got none", srcdir, dstdir)
+	}
+
+	if err != errDstExist {
+		t.Fatalf("expected %v error for CopyDir(%s, %s), got %s", errDstExist, srcdir, dstdir, err)
 	}
 }
 
@@ -229,7 +433,7 @@ func TestCopyFile(t *testing.T) {
 	srcf.Close()
 
 	destf := filepath.Join(dir, "destf")
-	if err := CopyFile(srcf.Name(), destf); err != nil {
+	if err := copyFile(srcf.Name(), destf); err != nil {
 		t.Fatal(err)
 	}
 
@@ -279,7 +483,7 @@ func TestCopyFileFail(t *testing.T) {
 
 	var dstdir string
 
-	err, cleanup := setupInaccesibleDir(func(dir string) error {
+	err, cleanup := setupInaccessibleDir(func(dir string) error {
 		dstdir = filepath.Join(dir, "dir")
 		return os.Mkdir(dstdir, 0777)
 	})
@@ -291,12 +495,12 @@ func TestCopyFileFail(t *testing.T) {
 	}
 
 	fn := filepath.Join(dstdir, "file")
-	if err := CopyFile(srcf.Name(), fn); err == nil {
+	if err := copyFile(srcf.Name(), fn); err == nil {
 		t.Fatalf("expected error for %s, got none", fn)
 	}
 }
 
-// setupInaccesibleDir creates a temporary location with a single
+// setupInaccessibleDir creates a temporary location with a single
 // directory in it, in such a way that that directory is not accessible
 // after this function returns.
 //
@@ -307,7 +511,7 @@ func TestCopyFileFail(t *testing.T) {
 // that removes all the temporary files this function creates. It is
 // the caller's responsability to call this function before the test is
 // done running, whether there's an error or not.
-func setupInaccesibleDir(op func(dir string) error) (err error, cleanup func()) {
+func setupInaccessibleDir(op func(dir string) error) (err error, cleanup func()) {
 	cleanup = func() {}
 
 	dir, err := ioutil.TempDir("", "dep")
@@ -345,7 +549,7 @@ func TestIsRegular(t *testing.T) {
 
 	var fn string
 
-	err, cleanup := setupInaccesibleDir(func(dir string) error {
+	err, cleanup := setupInaccessibleDir(func(dir string) error {
 		fn = filepath.Join(dir, "file")
 		fh, err := os.Create(fn)
 		if err != nil {
@@ -367,7 +571,7 @@ func TestIsRegular(t *testing.T) {
 	}{
 		wd: {false, true},
 		filepath.Join(wd, "testdata"):                       {false, true},
-		filepath.Join(wd, "cmd", "dep", "main.go"):          {true, false},
+		filepath.Join(wd, "testdata", "test.file"):          {true, false},
 		filepath.Join(wd, "this_file_does_not_exist.thing"): {false, false},
 		fn: {false, true},
 	}
@@ -410,7 +614,7 @@ func TestIsDir(t *testing.T) {
 
 	var dn string
 
-	err, cleanup := setupInaccesibleDir(func(dir string) error {
+	err, cleanup := setupInaccessibleDir(func(dir string) error {
 		dn = filepath.Join(dir, "dir")
 		return os.Mkdir(dn, 0777)
 	})

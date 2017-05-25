@@ -11,9 +11,11 @@ import (
 )
 
 func TestEmptyProject(t *testing.T) {
-	g := new(graphviz).New()
 	h := test.NewHelper(t)
+	h.Parallel()
 	defer h.Cleanup()
+
+	g := new(graphviz).New()
 
 	b := g.output()
 	want := h.GetTestFileString("graphviz/empty.dot")
@@ -24,9 +26,11 @@ func TestEmptyProject(t *testing.T) {
 }
 
 func TestSimpleProject(t *testing.T) {
-	g := new(graphviz).New()
 	h := test.NewHelper(t)
+	h.Parallel()
 	defer h.Cleanup()
+
+	g := new(graphviz).New()
 
 	g.createNode("project", "", []string{"foo", "bar"})
 	g.createNode("foo", "master", []string{"bar"})
@@ -40,9 +44,11 @@ func TestSimpleProject(t *testing.T) {
 }
 
 func TestNoLinks(t *testing.T) {
-	g := new(graphviz).New()
 	h := test.NewHelper(t)
+	h.Parallel()
 	defer h.Cleanup()
+
+	g := new(graphviz).New()
 
 	g.createNode("project", "", []string{})
 
@@ -54,6 +60,8 @@ func TestNoLinks(t *testing.T) {
 }
 
 func TestIsPathPrefix(t *testing.T) {
+	t.Parallel()
+
 	tcs := []struct {
 		path string
 		pre  string
