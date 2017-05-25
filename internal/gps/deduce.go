@@ -730,7 +730,7 @@ func (hmd *httpMetadataDeducer) deduce(ctx context.Context, path string) (pathDe
 		}
 		pd.root = root
 
-		// If we got something back at all, then it supercedes the actual input for
+		// If we got something back at all, then it supersedes the actual input for
 		// the real URL to hit
 		repoURL, err := url.Parse(reporoot)
 		if err != nil {
