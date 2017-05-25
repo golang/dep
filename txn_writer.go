@@ -26,10 +26,12 @@ import (
 var exampleTOML = []byte(`
 ## Gopkg.toml example (these lines may be deleted)
 
-## "metadata" is used to define the project metadata.
+## "metadata" defines metadata about the project that could be used by other independent
+## systems. The metadata defined here will be ignored by dep.
 # [metadata]
-#   name = "Awesome project"
-#   authors = ["Jane Doe <jane@doe.com>", "John Doe <john@doe.com>"]
+# key1 = "value that convey data to other systems"
+# system1-data = "value that is used by a system"
+# system2-data = "value that is used by another system"
 
 ## "required" lists a set of packages (not projects) that must be included in
 ## Gopkg.lock. This list is merged with the set of packages imported by the current
@@ -56,6 +58,13 @@ var exampleTOML = []byte(`
 #
 ## Optional: an alternate location (URL or import path) for the project's source.
 # source = "https://github.com/myfork/package.git"
+#
+## "metadata" defines metadata about the dependency or override that could be used
+## by other independent systems. The metadata defined here will be ignored by dep.
+# [metadata]
+# key1 = "value that convey data to other systems"
+# system1-data = "value that is used by a system"
+# system2-data = "value that is used by another system"
 
 ## Overrides have the same structure as [[dependencies]], but supersede all
 ## [[dependencies]] declarations from all projects. Only the current project's
