@@ -42,3 +42,20 @@ script:
   - ./hack/validate-vendor.bash
 after_success:
   - codeclimate-test-reporter < coverage.txt
+
+jobs:
+  include:
+    - stage: precheck
+      install: skip
+      os: linux
+      go: 1.8.x
+      script:
+        - PKGS=$(go list ./... | grep -v /vendor/)
+        - go get -v honnef.co/go/tools/cmd/{gosimple,staticcheck}
+        - go vet $PKGS
+        - staticcheck $PKGS
+        - gosimple $PKGS
+        - ./hack/validate-vendor.bash
+        - go build ./hack/licenseok
+        - find . -path ./vendor -prune -o -type f -name "*.go" -printf '%P\n' | xargs ./licenseok
+    - stage: test
