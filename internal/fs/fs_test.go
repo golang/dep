@@ -257,16 +257,11 @@ func TestCopyDirFail_SrcInaccessible(t *testing.T) {
 
 	var srcdir, dstdir string
 
-	err, cleanup := setupInaccessibleDir(func(dir string) (err error) {
+	cleanup := setupInaccessibleDir(t, func(dir string) error {
 		srcdir = filepath.Join(dir, "src")
 		return os.MkdirAll(srcdir, 0755)
 	})
-
 	defer cleanup()
-
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	dir, err := ioutil.TempDir("", "dep")
 	if err != nil {
@@ -301,18 +296,13 @@ func TestCopyDirFail_DstInaccessible(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err, cleanup := setupInaccessibleDir(func(dir string) error {
+	cleanup := setupInaccessibleDir(t, func(dir string) error {
 		dstdir = filepath.Join(dir, "dst")
 		return nil
 	})
-
 	defer cleanup()
 
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if err = CopyDir(srcdir, dstdir); err == nil {
+	if err := CopyDir(srcdir, dstdir); err == nil {
 		t.Fatalf("expected error for CopyDir(%s, %s), got none", srcdir, dstdir)
 	}
 }
@@ -483,16 +473,11 @@ func TestCopyFileFail(t *testing.T) {
 
 	var dstdir string
 
-	err, cleanup := setupInaccessibleDir(func(dir string) error {
+	cleanup := setupInaccessibleDir(t, func(dir string) error {
 		dstdir = filepath.Join(dir, "dir")
 		return os.Mkdir(dstdir, 0777)
 	})
-
 	defer cleanup()
-
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	fn := filepath.Join(dstdir, "file")
 	if err := copyFile(srcf.Name(), fn); err == nil {
@@ -504,41 +489,52 @@ func TestCopyFileFail(t *testing.T) {
 // directory in it, in such a way that that directory is not accessible
 // after this function returns.
 //
-// The provided operation op is called with the directory as argument,
-// so that it can create files or other test artifacts.
+// op is called with the directory as argument, so that it can create
+// files or other test artifacts.
 //
-// This function returns a nil error on success, and a cleanup function
-// that removes all the temporary files this function creates. It is
-// the caller's responsibility to call this function before the test is
-// done running, whether there's an error or not.
-func setupInaccessibleDir(op func(dir string) error) (err error, cleanup func()) {
-	cleanup = func() {}
-
+// If setupInaccessibleDir fails in its preparation, or op fails, t.Fatal
+// will be invoked.
+//
+// This function returns a cleanup function that removes all the temporary
+// files this function creates. It is the caller's responsibility to call
+// this function before the test is done running, whether there's an error or not.
+func setupInaccessibleDir(t *testing.T, op func(dir string) error) func() {
 	dir, err := ioutil.TempDir("", "dep")
 	if err != nil {
-		return err, cleanup
+		t.Fatal(err)
+		return nil // keep compiler happy
 	}
 
 	subdir := filepath.Join(dir, "dir")
 
-	cleanup = func() {
-		os.Chmod(subdir, 0777)
-		os.RemoveAll(dir)
+	cleanup := func() {
+		if err := os.Chmod(subdir, 0777); err != nil {
+			t.Error(err)
+		}
+		if err := os.RemoveAll(dir); err != nil {
+			t.Error(err)
+		}
 	}
 
-	if err = os.Mkdir(subdir, 0777); err != nil {
-		return err, cleanup
+	if err := os.Mkdir(subdir, 0777); err != nil {
+		cleanup()
+		t.Fatal(err)
+		return nil
 	}
 
-	if err = op(subdir); err != nil {
-		return err, cleanup
+	if err := op(subdir); err != nil {
+		cleanup()
+		t.Fatal(err)
+		return nil
 	}
 
-	if err = os.Chmod(subdir, 0666); err != nil {
-		return err, cleanup
+	if err := os.Chmod(subdir, 0666); err != nil {
+		cleanup()
+		t.Fatal(err)
+		return nil
 	}
 
-	return err, cleanup
+	return cleanup
 }
 
 func TestIsRegular(t *testing.T) {
@@ -549,7 +545,7 @@ func TestIsRegular(t *testing.T) {
 
 	var fn string
 
-	err, cleanup := setupInaccessibleDir(func(dir string) error {
+	cleanup := setupInaccessibleDir(t, func(dir string) error {
 		fn = filepath.Join(dir, "file")
 		fh, err := os.Create(fn)
 		if err != nil {
@@ -558,12 +554,7 @@ func TestIsRegular(t *testing.T) {
 
 		return fh.Close()
 	})
-
 	defer cleanup()
-
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	tests := map[string]struct {
 		exists bool
@@ -614,16 +605,11 @@ func TestIsDir(t *testing.T) {
 
 	var dn string
 
-	err, cleanup := setupInaccessibleDir(func(dir string) error {
+	cleanup := setupInaccessibleDir(t, func(dir string) error {
 		dn = filepath.Join(dir, "dir")
 		return os.Mkdir(dn, 0777)
 	})
-
 	defer cleanup()
-
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	tests := map[string]struct {
 		exists bool
