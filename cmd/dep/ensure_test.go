@@ -5,13 +5,16 @@
 package main
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/golang/dep/internal/gps"
 )
 
 func TestDeduceConstraint(t *testing.T) {
-	sv, err := gps.NewSemverConstraint("v1.2.3")
+	t.Parallel()
+
+	sv, err := gps.NewSemverConstraintIC("v1.2.3")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -29,10 +32,16 @@ func TestDeduceConstraint(t *testing.T) {
 		"20120425195858-psty8c35ve2oej8t":           gps.NewVersion("20120425195858-psty8c35ve2oej8t"),
 	}
 
-	for str, expected := range constraints {
-		c := deduceConstraint(str)
-		if c != expected {
-			t.Fatalf("expected: %#v, got %#v for %s", expected, c, str)
+	for str, want := range constraints {
+		got := deduceConstraint(str)
+
+		wantT := reflect.TypeOf(want)
+		gotT := reflect.TypeOf(got)
+		if wantT != gotT {
+			t.Errorf("expected type: %s, got %s, for input %s", wantT, gotT, str)
+		}
+		if got.String() != want.String() {
+			t.Errorf("expected value: %s, got %s for input %s", want, got, str)
 		}
 	}
 }

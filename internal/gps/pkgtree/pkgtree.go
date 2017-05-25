@@ -626,7 +626,15 @@ func wmToReach(workmap map[string]wm, backprop bool) (ReachMap, map[string]*Prob
 		// that was already completed (black), we don't have to defend against
 		// an empty path here.
 
-		fromErr := errmap[from]
+		fromErr, exists := errmap[from]
+		// FIXME: It should not be possible for fromErr to not exist,
+		// See issue https://github.com/golang/dep/issues/351
+		// This is a temporary solution to avoid a panic.
+		if !exists {
+			fromErr = &ProblemImportError{
+				Err: fmt.Errorf("unknown error for %q, if you get this error see https://github.com/golang/dep/issues/351", from),
+			}
+		}
 		err := &ProblemImportError{
 			Err:   fromErr.Err,
 			Cause: make([]string, 0, len(path)+len(fromErr.Cause)+1),
