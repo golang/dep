@@ -66,7 +66,7 @@ var exampleTOML = []byte(`
 # system1-data = "value that is used by a system"
 # system2-data = "value that is used by another system"
 
-## Overrides have the same structure as [[dependencies]], but supercede all
+## Overrides have the same structure as [[dependencies]], but supersede all
 ## [[dependencies]] declarations from all projects. Only the current project's
 ## [[overrides]] are applied.
 ##
@@ -163,10 +163,6 @@ type rawStringDiff struct {
 
 func (diff rawStringDiff) MarshalTOML() ([]byte, error) {
 	return []byte(diff.String()), nil
-}
-
-type rawLockDiff struct {
-	*gps.LockDiff
 }
 
 type rawLockedProjectDiff struct {
@@ -584,22 +580,6 @@ func calculatePrune(vendorDir string, keep []string) ([]string, error) {
 		return nil
 	})
 	return toDelete, err
-}
-
-func writeFile(path string, in toml.Marshaler) error {
-	f, err := os.Create(path)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-
-	s, err := in.MarshalTOML()
-	if err != nil {
-		return err
-	}
-
-	_, err = f.Write(s)
-	return err
 }
 
 func deleteDirs(toDelete []string) error {
