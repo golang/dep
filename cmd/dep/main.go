@@ -120,6 +120,7 @@ func (c *Config) Run() (exitCode int) {
 		if cmd.Name() == cmdName {
 			// Build flag set with global flags in there.
 			fs := flag.NewFlagSet(cmdName, flag.ContinueOnError)
+			fs.SetOutput(c.Stderr)
 			verbose := fs.Bool("v", false, "enable verbose logging")
 
 			// Register the subcommand flags in there, too.
@@ -135,8 +136,9 @@ func (c *Config) Run() (exitCode int) {
 			}
 
 			// Parse the flags the user gave us.
+			// flag package automaticly prints usage and error message in err != nil
+			// or if '-h' flag provided
 			if err := fs.Parse(c.Args[2:]); err != nil {
-				fs.Usage()
 				exitCode = 1
 				return
 			}

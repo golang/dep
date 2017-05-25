@@ -164,8 +164,12 @@ func (tc *IntegrationTestCase) CompareError(err error, stderr string) {
 	gotExists, got := stderr != "" && err != nil, stderr
 
 	if wantExists && gotExists {
-		if !strings.Contains(got, want) {
+		switch c := strings.Count(got, want); c {
+		case 0:
 			tc.t.Errorf("expected error containing %s, got error %s", want, got)
+		case 1:
+		default:
+			tc.t.Errorf("expected error %s matches %d times to actual error %s", want, c, got)
 		}
 	} else if !wantExists && gotExists {
 		tc.t.Fatalf("error raised where none was expected: \n%v", stderr)
