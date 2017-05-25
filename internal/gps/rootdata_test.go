@@ -18,6 +18,7 @@ func TestRootdataExternalImports(t *testing.T) {
 		Manifest:        fix.rootmanifest(),
 		ProjectAnalyzer: naiveAnalyzer{},
 		stdLibFn:        func(string) bool { return false },
+		mkBridgeFn:      overrideMkBridge,
 	}
 
 	is, err := Prepare(params, newdepspecSM(fix.ds, nil))
@@ -72,6 +73,7 @@ func TestGetApplicableConstraints(t *testing.T) {
 		Manifest:        fix.rootmanifest(),
 		ProjectAnalyzer: naiveAnalyzer{},
 		stdLibFn:        func(string) bool { return false },
+		mkBridgeFn:      overrideMkBridge,
 	}
 
 	is, err := Prepare(params, newdepspecSM(fix.ds, nil))
