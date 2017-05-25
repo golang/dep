@@ -105,7 +105,7 @@ func renameByCopy(src, dst string) error {
 	}
 
 	if cerr != nil {
-		return errors.Wrapf(cerr, "second attempt failed: cannot rename %s to %s", src, dst)
+		return errors.Wrapf(cerr, "rename fallback failed: cannot rename %s to %s", src, dst)
 	}
 
 	return errors.Wrapf(os.RemoveAll(src), "cannot delete %s", src)
