@@ -7,7 +7,6 @@ package main
 import (
 	"bytes"
 	"flag"
-	"fmt"
 
 	"github.com/golang/dep"
 	"github.com/golang/dep/internal/gps"
@@ -68,8 +67,12 @@ func (cmd *pruneCommand) Run(ctx *dep.Ctx, args []string) error {
 		return errors.Wrap(err, "could not set up solver for input hashing")
 	}
 
+	if p.Lock == nil {
+		return errors.Errorf("Gopkg.lock must exist for prune to know what files are safe to remove.")
+	}
+
 	if !bytes.Equal(s.HashInputs(), p.Lock.Memo) {
-		return fmt.Errorf("lock hash doesn't match")
+		return errors.Errorf("lock hash doesn't match")
 	}
 
 	return dep.PruneProject(p, sm)
