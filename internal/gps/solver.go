@@ -96,6 +96,11 @@ type SolveParameters struct {
 	// stdLibFn is the function to use to recognize standard library import paths.
 	// Only overridden for tests. Defaults to paths.IsStandardImportPath if nil.
 	stdLibFn func(string) bool
+
+	// mkBridgeFn is the function to use to create sourceBridges.
+	// Only overridden for tests (so we can run with virtual RootDir).
+	// Defaults to mkBridge if nil.
+	mkBridgeFn func(*solver, SourceManager, bool) sourceBridge
 }
 
 // solver is a CDCL-style constraint solver with satisfiability conditions
@@ -285,9 +290,12 @@ func Prepare(params SolveParameters, sm SourceManager) (Solver, error) {
 	}
 
 	// Set up the bridge and ensure the root dir is in good, working order
-	// before doing anything else. (This call is stubbed out in tests, via
-	// overriding mkBridge(), so we can run with virtual RootDir.)
-	s.b = mkBridge(s, sm, params.Downgrade)
+	// before doing anything else.
+	if params.mkBridgeFn == nil {
+		s.b = mkBridge(s, sm, params.Downgrade)
+	} else {
+		s.b = params.mkBridgeFn(s, sm, params.Downgrade)
+	}
 	err = s.b.verifyRootDir(params.RootDir)
 	if err != nil {
 		return nil, err
