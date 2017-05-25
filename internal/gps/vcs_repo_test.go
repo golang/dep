@@ -52,10 +52,30 @@ func TestErrs(t *testing.T) {
 	}
 }
 
-func TestNewCtxRepo(t *testing.T) {
+func TestNewCtxRepoHappyPath(t *testing.T) {
 	t.Parallel()
 
-	tempDir, err := ioutil.TempDir("", "go-ctx-repo-test")
+	tempDir, err := ioutil.TempDir("", "go-ctx-repo-recovery-test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err = os.RemoveAll(tempDir)
+		if err != nil {
+			t.Error(err)
+		}
+	}()
+
+	_, err = newCtxRepo(vcs.Git, gitRemoteTestRepo, tempDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestNewCtxRepoRecovery(t *testing.T) {
+	t.Parallel()
+
+	tempDir, err := ioutil.TempDir("", "go-ctx-repo-recovery-test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -71,7 +91,7 @@ func TestNewCtxRepo(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	src := filepath.Join(cwd, "_testdata", "src", "corrupt", "corrupt_dot_git_directory.tar")
+	src := filepath.Join(cwd, "_testdata", "badrepo", "corrupt_dot_git_directory.tar")
 	f, err := os.Open(src)
 	if err != nil {
 		t.Fatal(err)

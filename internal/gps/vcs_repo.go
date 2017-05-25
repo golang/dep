@@ -31,7 +31,7 @@ func newCtxRepo(s vcs.Type, ustr, path string) (r ctxRepo, err error) {
 		// then the local repo is in an incorrect state. Remove and
 		// treat it as a new not-yet-cloned repo.
 
-		// TODO(marwan-at-work): pass a logger here to warn/give progress of the above comment.
+		// TODO(marwan-at-work): warn/give progress of the above comment.
 		os.RemoveAll(path)
 		r, err = getVCSRepo(s, ustr, path)
 	}
