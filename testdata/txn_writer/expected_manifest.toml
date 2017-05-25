@@ -41,7 +41,7 @@
 # system1-data = "value that is used by a system"
 # system2-data = "value that is used by another system"
 
-## Overrides have the same structure as [[dependencies]], but supersede all
+## Overrides have the same structure as [[dependencies]], but supercede all
 ## [[dependencies]] declarations from all projects. Only the current project's
 ## [[overrides]] are applied.
 ##
