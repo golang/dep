@@ -509,7 +509,7 @@ func TestCopyFileFail(t *testing.T) {
 //
 // This function returns a nil error on success, and a cleanup function
 // that removes all the temporary files this function creates. It is
-// the caller's responsability to call this function before the test is
+// the caller's responsibility to call this function before the test is
 // done running, whether there's an error or not.
 func setupInaccessibleDir(op func(dir string) error) (err error, cleanup func()) {
 	cleanup = func() {}
