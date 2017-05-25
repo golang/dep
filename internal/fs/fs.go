@@ -100,8 +100,14 @@ func renameByCopy(src, dst string) error {
 	var cerr error
 	if dir, _ := IsDir(src); dir {
 		cerr = CopyDir(src, dst)
+		if cerr != nil {
+			cerr = errors.Wrap(cerr, "copying directory failed")
+		}
 	} else {
 		cerr = copyFile(src, dst)
+		if cerr != nil {
+			cerr = errors.Wrap(cerr, "copying file failed")
+		}
 	}
 
 	if cerr != nil {
@@ -222,13 +228,13 @@ func CopyDir(src, dst string) error {
 
 		if entry.IsDir() {
 			if err = CopyDir(srcPath, dstPath); err != nil {
-				return err
+				return errors.Wrap(err, "copying directory failed")
 			}
 		} else {
 			// This will include symlinks, which is what we want when
 			// copying things.
 			if err = copyFile(srcPath, dstPath); err != nil {
-				return err
+				return errors.Wrap(err, "copying file failed")
 			}
 		}
 	}
