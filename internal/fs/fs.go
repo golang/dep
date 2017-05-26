@@ -242,9 +242,9 @@ func CopyDir(src, dst string) error {
 // of the source file. The file mode will be copied from the source and
 // the copied data is synced/flushed to stable storage.
 func copyFile(src, dst string) (err error) {
-	if isSymlink, err := IsSymlink(src); err != nil {
+	if sym, err := IsSymlink(src); err != nil {
 		return errors.Wrapf(err, "could not lstat %s", src)
-	} else if isSymlink {
+	} else if sym {
 		err := copySymlink(src, dst)
 		return err
 	}
