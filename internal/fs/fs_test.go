@@ -461,6 +461,75 @@ func TestCopyFile(t *testing.T) {
 	}
 }
 
+func TestCopyFileSymlink(t *testing.T) {
+	dir, err := ioutil.TempDir("", "dep")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(dir)
+
+	srcPath := filepath.Join(dir, "src")
+	symlinkPath := filepath.Join(dir, "symlink")
+	dstPath := filepath.Join(dir, "dst")
+
+	srcf, err := os.Create(srcPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	srcf.Close()
+
+	if err = os.Symlink(srcPath, symlinkPath); err != nil {
+		t.Fatalf("could not create symlink: %v", err)
+	}
+
+	if err = copyFile(symlinkPath, dstPath); err != nil {
+		t.Fatalf("failed to copy symlink: %e", err)
+	}
+
+	resolvedPath, err := os.Readlink(dstPath)
+	if err != nil {
+		t.Fatalf("could not resolve symlink: %v", err)
+	}
+
+	if resolvedPath != srcPath {
+		t.Fatalf("resolved path is incorrect. expected %s, got %s", srcPath, resolvedPath)
+	}
+}
+
+func TestCopyFileSymlinkToDirectory(t *testing.T) {
+	dir, err := ioutil.TempDir("", "dep")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(dir)
+
+	srcPath := filepath.Join(dir, "src")
+	symlinkPath := filepath.Join(dir, "symlink")
+	dstPath := filepath.Join(dir, "dst")
+
+	err = os.MkdirAll(srcPath, 0777)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err = os.Symlink(srcPath, symlinkPath); err != nil {
+		t.Fatalf("could not create symlink: %v", err)
+	}
+
+	if err = copyFile(symlinkPath, dstPath); err != nil {
+		t.Fatalf("failed to copy symlink: %s", err)
+	}
+
+	resolvedPath, err := os.Readlink(dstPath)
+	if err != nil {
+		t.Fatalf("could not resolve symlink: %s", err)
+	}
+
+	if resolvedPath != srcPath {
+		t.Fatalf("resolved path is incorrect. expected %s, got %s", srcPath, resolvedPath)
+	}
+}
+
 func TestCopyFileFail(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		// XXX: setting permissions works differently in
