@@ -41,7 +41,7 @@ func TestReadManifest(t *testing.T) {
 				Constraint: gps.NewBranch("master"),
 			},
 		},
-		Ignored: []string{"github.com/foo/bar"},
+		ignored: []string{"github.com/foo/bar"},
 	}
 
 	if !reflect.DeepEqual(got.Dependencies, want.Dependencies) {
@@ -50,7 +50,7 @@ func TestReadManifest(t *testing.T) {
 	if !reflect.DeepEqual(got.Ovr, want.Ovr) {
 		t.Error("Valid manifest's overrides did not parse as expected")
 	}
-	if !reflect.DeepEqual(got.Ignored, want.Ignored) {
+	if !reflect.DeepEqual(got.ignored, want.ignored) {
 		t.Error("Valid manifest's ignored did not parse as expected")
 	}
 }
@@ -77,7 +77,7 @@ func TestWriteManifest(t *testing.T) {
 				Constraint: gps.NewBranch("master"),
 			},
 		},
-		Ignored: []string{"github.com/foo/bar"},
+		ignored: []string{"github.com/foo/bar"},
 	}
 
 	got, err := m.MarshalTOML()
