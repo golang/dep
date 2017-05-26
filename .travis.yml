@@ -41,11 +41,16 @@ jobs:
       cache:
         directories:
           - $HOME/Library/Caches/Homebrew
+          - /usr/local/bin
       install:
-        # OSX as of El Capitan sets an exit trap that interacts poorly with our
-        # set -e below. So, unset the trap.
-        # Related: https://superuser.com/questions/1044130/why-am-i-having-how-can-i-fix-this-error-shell-session-update-command-not-f
-        - brew install bzr
+        # brew takes horribly long to update itself despite the above caching
+        # attempt; only bzr install if it's not on the $PATH
+        - test $(which bzr) || brew install bzr
       script:
+        # OSX as of El Capitan sets an exit trap that interacts poorly with how
+        # travis seems to spawn these shells; if set -e is set, then it can cause
+        # build failures. We're not doing that here, but retain the trap statement
+        # for future safety.
+        # Related: https://superuser.com/questions/1044130/why-am-i-having-how-can-i-fix-this-error-shell-session-update-command-not-f
         - trap EXIT
         - go test -race $(go list ./... | grep -v vendor)
