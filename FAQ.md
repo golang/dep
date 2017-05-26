@@ -255,8 +255,16 @@ highest level, though, these are the rules:
 * Below `v1.0.0`, anything goes. Use these releases to figure out what you want
   your API to be.
 * Above `v1.0.0`, the general Go best practices continue to apply - don't make
-  backwards-incompatible changes.
+  backwards-incompatible changes - exported identifiers can be added to, but
+  not changed or removed.
 * If you must make a backwards-incompatible change, then bump the major version.
+
+It's important to note that having a `v1.0.0` does not preclude you from having
+alpha/beta/etc releases. The semver spec allows for [prerelease
+versions](http://semver.org/#spec-item-9), and `dep` is careful to _not_ allow
+such versions unless `Gopkg.toml` contains a range constraint that explicitly
+includes prereleases: if there exists a version `v1.0.1-alpha4`, then the
+constraint `>=1.0.0` will not match it, but `>=1.0.1-alpha1` will.
 
 Some work has been done towards [a tool
 to](https://github.com/bradleyfalzon/apicompat) that will analyze and compare
@@ -269,9 +277,9 @@ Yes. But.
 `dep` will make it possible for the Go ecosystem to handle
 backwards-incompatible changes more gracefully. However, `dep` is not some
 magical panacea. Version and dependency management is hard, and dependency hell
-is real. _All_ of the community wisdom about avoiding breaking changes
-remains important. Once you release a `v1.0.0`, you should have a plan for how
-you can generally avoid breaking changes in the future.
+is real. The longstanding community wisdom about avoiding breaking changes
+remains important. Any `v1.0.0` release should be accompanied by a plan for how
+to avoid future breaking API changes.
 
 One good strategy may be to add to your API instead of changing it, deprecating
 old versions as you progress. Then, when the time is right, you can roll a new
