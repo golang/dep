@@ -45,9 +45,10 @@ notifications:
 
 jobs:
   include:
-    - stage: precheck
+    - stage: test
       install:
         - go get -u honnef.co/go/tools/cmd/{gosimple,staticcheck}
+        - npm install -g codeclimate-test-reporter
       os: linux
       go: 1.8.x
       script:
@@ -59,42 +60,26 @@ jobs:
         - ./hack/validate-vendor.bash
         - go build ./hack/licenseok
         - find . -path ./vendor -prune -o -type f -name "*.go" -printf '%P\n' | xargs ./licenseok
-    - stage: test
-      os: osx
-      go: 1.8.x
+        - set -e; for pkg in $PKGS; do go test -race -coverprofile=profile.out -covermode=atomic $pkg; if [[ -f profile.out ]]; then cat profile.out >> coverage.txt; rm profile.out; fi; done
+      after_success:
+        - codeclimate-test-reporter < coverage.txt
+    # YAML alias, for settings shared across build types
+    - &simple-test
+      stage: test
+      install: skip
       env:
         - DEPTESTBYPASS501=1
+      script: go test -race $(go list ./... | grep -v vendor)
+    - <<: *simple-test
+      go: tip
+    - <<: *simple-test
+      go: 1.7.x
+    - <<: *simple-test
+      os: osx
+      go: 1.8.x
       install:
         # OSX as of El Capitan sets an exit trap that interacts poorly with our
         # set -e below. So, unset the trap.
         # Related: https://superuser.com/questions/1044130/why-am-i-having-how-can-i-fix-this-error-shell-session-update-command-not-f
         - trap EXIT
         - brew install bzr
-      script: go test -race $(go list ./... | grep -v vendor)
-    - stage: test
-      install: skip
-      env:
-        - DEPTESTBYPASS501=1
-      os: linux
-      go: tip
-      script: go test -race $(go list ./... | grep -v vendor)
-    - stage: test
-      install: skip
-      os: linux
-      go: 1.7.x
-      env:
-        - DEPTESTBYPASS501=1
-      script: go test -race $(go list ./... | grep -v vendor)
-    - stage: test
-      cache: yarn
-      install: yarn global add codeclimate-test-reporter
-      language: node_js
-      node_js: 6
-      os: linux
-      go: 1.8.x
-      env:
-        - DEPTESTBYPASS501=1
-      script:
-        - set -e; for pkg in $PKGS; do go test -race -coverprofile=profile.out -covermode=atomic $pkg; if [[ -f profile.out ]]; then cat profile.out >> coverage.txt; rm profile.out; fi; done
-      after_success:
-        - codeclimate-test-reporter < coverage.txt
