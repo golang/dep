@@ -780,13 +780,13 @@ func TestIsSymlink(t *testing.T) {
 
 	dirPath := filepath.Join(dir, "directory")
 	if err = os.MkdirAll(dirPath, 0777); err != nil {
-
+		t.Fatal(err)
 	}
 
 	filePath := filepath.Join(dir, "file")
 	f, err := os.Create(filePath)
 	if err != nil {
-
+		t.Fatal(err)
 	}
 	f.Close()
 
@@ -811,11 +811,10 @@ func TestIsSymlink(t *testing.T) {
 		} else if err = fh.Close(); err != nil {
 			return err
 		}
+
 		inaccessibleSymlink = filepath.Join(dir, "symlink")
-		if err = os.Symlink(inaccessibleFile, inaccessibleSymlink); err != nil {
-			return err
-		}
-		return nil
+		err = os.Symlink(inaccessibleFile, inaccessibleSymlink)
+		return err
 	})
 	defer cleanup()
 	if err != nil {
@@ -835,6 +834,13 @@ func TestIsSymlink(t *testing.T) {
 	}
 
 	for path, want := range tests {
+		if runtime.GOOS == "windows" {
+			// XXX: setting permissions works differently in
+			// Microsoft Windows. Skipping this this until a
+			// compatible implementation is provided.
+			t.Skip("skipping on windows")
+		}
+
 		got, err := IsSymlink(path)
 		if err != nil {
 			if !want.err {
