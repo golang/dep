@@ -13,3 +13,5 @@ ratings:
 exclude_paths:
   - vendor/
   - internal/gps/_testdata
+  - cmd/dep/testdata
+  - testdata
