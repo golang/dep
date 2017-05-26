@@ -495,7 +495,7 @@ func (sw *SafeWriter) PrintPreparedActions(output *log.Logger) error {
 	return nil
 }
 
-func PruneProject(p *Project, sm gps.SourceManager) error {
+func PruneProject(p *Project, sm gps.SourceManager, logger *log.Logger) error {
 	td, err := ioutil.TempDir(os.TempDir(), "dep")
 	if err != nil {
 		return errors.Wrap(err, "error while creating temp dir for writing manifest/lock/vendor")
@@ -514,9 +514,20 @@ func PruneProject(p *Project, sm gps.SourceManager) error {
 		}
 	}
 
-	toDelete, err := calculatePrune(td, toKeep)
+	toDelete, err := calculatePrune(td, toKeep, logger)
 	if err != nil {
 		return err
+	}
+
+	if logger != nil {
+		if len(toDelete) > 0 {
+			logger.Println("Calculated the following directories to prune:")
+			for _, d := range toDelete {
+				logger.Printf("  %s\n", d)
+			}
+		} else {
+			logger.Println("No directories found to prune")
+		}
 	}
 
 	if err := deleteDirs(toDelete); err != nil {
@@ -556,7 +567,10 @@ fail:
 	return failerr
 }
 
-func calculatePrune(vendorDir string, keep []string) ([]string, error) {
+func calculatePrune(vendorDir string, keep []string, logger *log.Logger) ([]string, error) {
+	if logger != nil {
+		logger.Println("Calculating prune. Checking the following packages:")
+	}
 	sort.Strings(keep)
 	toDelete := []string{}
 	err := filepath.Walk(vendorDir, func(path string, info os.FileInfo, err error) error {
@@ -571,6 +585,9 @@ func calculatePrune(vendorDir string, keep []string) ([]string, error) {
 		}
 
 		name := strings.TrimPrefix(path, vendorDir+"/")
+		if logger != nil {
+			logger.Printf("  %s", name)
+		}
 		i := sort.Search(len(keep), func(i int) bool {
 			return name <= keep[i]
 		})
