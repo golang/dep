@@ -55,7 +55,7 @@ func TestErrs(t *testing.T) {
 func TestNewCtxRepoHappyPath(t *testing.T) {
 	t.Parallel()
 
-	tempDir, err := ioutil.TempDir("", "go-ctx-repo-recovery-test")
+	tempDir, err := ioutil.TempDir("", "go-ctx-repo-happy-test")
 	if err != nil {
 		t.Fatal(err)
 	}
