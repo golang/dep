@@ -246,10 +246,7 @@ func copyFile(src, dst string) (err error) {
 		return errors.Wrapf(err, "could not lstat %s", src)
 	} else if isSymlink {
 		err := copySymlink(src, dst)
-		if err != nil {
-			return err
-		}
-		return nil
+		return err
 	}
 
 	in, err := os.Open(src)
