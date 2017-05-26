@@ -523,8 +523,10 @@ func PruneProject(p *Project, sm gps.SourceManager, logger *log.Logger) error {
 		if len(toDelete) > 0 {
 			logger.Println("Calculated the following directories to prune:")
 			for _, d := range toDelete {
-				logger.Printf("  %s", d)
+				logger.Printf("  %s\n", d)
 			}
+		} else {
+			logger.Println("No directories found to prune")
 		}
 	}
 
