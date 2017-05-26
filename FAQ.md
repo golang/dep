@@ -119,7 +119,7 @@ behave differently:
 Overrides are also discussed with some visuals in [the gps docs](https://github.com/sdboyer/gps/wiki/gps-for-Implementors#overrides).
 
 ## `dep` deleted my files in the vendor directory!
-First, sorry! 😞 We hope you were able to recover your files...
+If you just ran `dep init`, there should be a copy of your original vendor directory named `_vendor-TIMESTAMP` in your project root. The other commands do not make a backup before modifying the vendor directory.
 
 > dep assumes complete control of vendor/, and may indeed blow things away if it feels like it.
 -[@peterbourgon in #206](https://github.com/golang/dep/issues/206#issuecomment-277139419)
@@ -241,7 +241,7 @@ Sorting for upgrade will result in the following slice.
 `[v1.1.0 v1.0.0 v1.1.0-alpha1 footag devel master f6e74e8d]`
 
 There are a number of factors that can eliminate a version from consideration,
-teh simplest of which is that it doesn't match a constraint. But if you're
+the simplest of which is that it doesn't match a constraint. But if you're
 trying to figure out why `dep` is doing what it does, understanding that its
 basic action is to attempt versions in this order should help you to reason
 about what's going on.
