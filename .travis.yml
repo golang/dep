@@ -45,5 +45,7 @@ jobs:
         # OSX as of El Capitan sets an exit trap that interacts poorly with our
         # set -e below. So, unset the trap.
         # Related: https://superuser.com/questions/1044130/why-am-i-having-how-can-i-fix-this-error-shell-session-update-command-not-f
-        - trap EXIT
         - brew install bzr
+      script:
+        - trap EXIT
+        - go test -race $(go list ./... | grep -v vendor)
