@@ -479,16 +479,16 @@ func TestCopyFileSymlink(t *testing.T) {
 	srcf.Close()
 
 	if err = os.Symlink(srcPath, symlinkPath); err != nil {
-		t.Fatalf("could not create symlink: %v", err)
+		t.Fatalf("could not create symlink: %s", err)
 	}
 
 	if err = copyFile(symlinkPath, dstPath); err != nil {
-		t.Fatalf("failed to copy symlink: %e", err)
+		t.Fatalf("failed to copy symlink: %s", err)
 	}
 
 	resolvedPath, err := os.Readlink(dstPath)
 	if err != nil {
-		t.Fatalf("could not resolve symlink: %v", err)
+		t.Fatalf("could not resolve symlink: %s", err)
 	}
 
 	if resolvedPath != srcPath {
@@ -728,7 +728,6 @@ func TestIsDir(t *testing.T) {
 			t.Fatalf("expected %t for %s, got %t", want.exists, f, got)
 		}
 	}
-
 }
 
 func TestIsEmpty(t *testing.T) {
@@ -768,6 +767,83 @@ func TestIsEmpty(t *testing.T) {
 
 		if want == "false" && empty {
 			t.Fatalf("Wanted false for %v, but got true", f)
+		}
+	}
+}
+
+func TestIsSymlink(t *testing.T) {
+	dir, err := ioutil.TempDir("", "dep")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(dir)
+
+	dirPath := filepath.Join(dir, "directory")
+	if err = os.MkdirAll(dirPath, 0777); err != nil {
+
+	}
+
+	filePath := filepath.Join(dir, "file")
+	f, err := os.Create(filePath)
+	if err != nil {
+
+	}
+	f.Close()
+
+	dirSymlink := filepath.Join(dir, "dirSymlink")
+	fileSymlink := filepath.Join(dir, "fileSymlink")
+	if err = os.Symlink(dirPath, dirSymlink); err != nil {
+		t.Fatal(err)
+	}
+	if err = os.Symlink(filePath, fileSymlink); err != nil {
+		t.Fatal(err)
+	}
+
+	var (
+		inaccessibleFile    string
+		inaccessibleSymlink string
+	)
+
+	err, cleanup := setupInaccessibleDir(func(dir string) error {
+		inaccessibleFile = filepath.Join(dir, "file")
+		if fh, err := os.Create(inaccessibleFile); err != nil {
+			return err
+		} else if err = fh.Close(); err != nil {
+			return err
+		}
+		inaccessibleSymlink = filepath.Join(dir, "symlink")
+		if err = os.Symlink(inaccessibleFile, inaccessibleSymlink); err != nil {
+			return err
+		}
+		return nil
+	})
+	defer cleanup()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tests := map[string]struct {
+		expected bool
+		err      bool
+	}{
+		dirPath:             {false, false},
+		filePath:            {false, false},
+		dirSymlink:          {true, false},
+		fileSymlink:         {true, false},
+		inaccessibleFile:    {false, true},
+		inaccessibleSymlink: {false, true},
+	}
+
+	for path, want := range tests {
+		got, err := IsSymlink(path)
+		if err != nil {
+			if !want.err {
+				t.Fatalf("expected no error, got %v", err)
+			}
+		}
+
+		if got != want.expected {
+			t.Fatalf("expected %t for %s, got %t", want.expected, path, got)
 		}
 	}
 }
