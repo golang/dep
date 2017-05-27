@@ -38,10 +38,6 @@ jobs:
     - <<: *simple-test
       os: osx
       go: 1.8.x
-      cache:
-        directories:
-          - $HOME/Library/Caches/Homebrew
-          - /usr/local/bin
       install:
         # brew takes horribly long to update itself despite the above caching
         # attempt; only bzr install if it's not on the $PATH
