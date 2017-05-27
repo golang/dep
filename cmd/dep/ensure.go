@@ -275,7 +275,7 @@ func getProjectConstraint(arg string, sm gps.SourceManager) (gps.ProjectConstrai
 		arg = parts[0]
 		versionStr = parts[1]
 	}
-	
+
 	// TODO: if we decide to keep equals.....
 
 	// split on colon if there is a network location

@@ -7,6 +7,10 @@
   version = "1.11.0"
 
 [[constraint]]
+  branch = "v2"
+  name = "github.com/go-yaml/yaml"
+
+[[constraint]]
   branch = "master"
   name = "github.com/pelletier/go-toml"
 
