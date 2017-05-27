@@ -772,6 +772,13 @@ func TestIsEmpty(t *testing.T) {
 }
 
 func TestIsSymlink(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		// XXX: creating symlinks is not supported in Go on
+		// Microsoft Windows. Skipping this this until a solution
+		// for creating symlinks is is provided.
+		t.Skip("skipping on windows")
+	}
+
 	dir, err := ioutil.TempDir("", "dep")
 	if err != nil {
 		t.Fatal(err)
@@ -834,22 +841,15 @@ func TestIsSymlink(t *testing.T) {
 	}
 
 	for path, want := range tests {
-		if runtime.GOOS == "windows" {
-			// XXX: setting permissions works differently in
-			// Microsoft Windows. Skipping this this until a
-			// compatible implementation is provided.
-			t.Skip("skipping on windows")
-		}
-
 		got, err := IsSymlink(path)
 		if err != nil {
 			if !want.err {
-				t.Fatalf("expected no error, got %v", err)
+				t.Errorf("expected no error, got %v", err)
 			}
 		}
 
 		if got != want.expected {
-			t.Fatalf("expected %t for %s, got %t", want.expected, path, got)
+			t.Errorf("expected %t for %s, got %t", want.expected, path, got)
 		}
 	}
 }
