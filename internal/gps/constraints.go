@@ -25,6 +25,14 @@ var (
 type Constraint interface {
 	fmt.Stringer
 
+	// ImpliedCaretString converts the Constraint to a string in the same manner
+	// as String(), but treats the empty operator as equivalent to ^, rather
+	// than =.
+	//
+	// In the same way that String() is the inverse of NewConstraint(), this
+	// method is the inverse of NewSemverConstraintIC().
+	ImpliedCaretString() string
+
 	// Matches indicates if the provided Version is allowed by the Constraint.
 	Matches(Version) bool
 
@@ -64,12 +72,42 @@ func NewSemverConstraint(body string) (Constraint, error) {
 	return semverConstraint{c: c}, nil
 }
 
+// NewSemverConstraintIC attempts to construct a semver Constraint object from the
+// input string, defaulting to a caret, ^, when no operator is specified. Put
+// differently, ^ is the default operator for NewSemverConstraintIC, while =
+// is the default operator for NewSemverConstraint.
+//
+// If the input string cannot be made into a valid semver Constraint, an error
+// is returned.
+func NewSemverConstraintIC(body string) (Constraint, error) {
+	c, err := semver.NewConstraintIC(body)
+	if err != nil {
+		return nil, err
+	}
+	// If we got a simple semver.Version, simplify by returning our
+	// corresponding type
+	if sv, ok := c.(semver.Version); ok {
+		return semVersion{sv: sv}, nil
+	}
+	return semverConstraint{c: c}, nil
+}
+
 type semverConstraint struct {
 	c semver.Constraint
 }
 
 func (c semverConstraint) String() string {
 	return c.c.String()
+}
+
+// ImpliedCaretString converts the Constraint to a string in the same manner
+// as String(), but treats the empty operator as equivalent to ^, rather
+// than =.
+//
+// In the same way that String() is the inverse of NewConstraint(), this
+// method is the inverse of NewSemverConstraintIC().
+func (c semverConstraint) ImpliedCaretString() string {
+	return c.c.ImpliedCaretString()
 }
 
 func (c semverConstraint) typedString() string {
@@ -153,6 +191,10 @@ func (anyConstraint) String() string {
 	return "*"
 }
 
+func (anyConstraint) ImpliedCaretString() string {
+	return "*"
+}
+
 func (anyConstraint) typedString() string {
 	return "any-*"
 }
@@ -174,6 +216,10 @@ func (anyConstraint) Intersect(c Constraint) Constraint {
 type noneConstraint struct{}
 
 func (noneConstraint) String() string {
+	return ""
+}
+
+func (noneConstraint) ImpliedCaretString() string {
 	return ""
 }
 
