@@ -243,7 +243,7 @@ func CopyDir(src, dst string) error {
 // the copied data is synced/flushed to stable storage.
 func copyFile(src, dst string) (err error) {
 	if sym, err := IsSymlink(src); err != nil {
-		return errors.Wrapf(err, "could not lstat %s", src)
+		return err
 	} else if sym {
 		err := copySymlink(src, dst)
 		return err
@@ -296,11 +296,8 @@ func copySymlink(src, dst string) error {
 	}
 
 	err = os.Symlink(resolved, dst)
-	if err != nil {
-		return errors.Wrapf(err, "failed to create symlink %s to %s", src, resolved)
-	}
 
-	return nil
+	return errors.Wrapf(err, "failed to create symlink %s to %s", src, resolved)
 }
 
 // IsDir determines is the path given is a directory or not.
