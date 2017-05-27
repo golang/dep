@@ -261,18 +261,18 @@ func TestSafeWriter_ModifiedLock(t *testing.T) {
 
 	originalLock := new(Lock)
 	*originalLock = *pc.Project.Lock
-	originalLock.Memo = []byte{} // zero out the input hash to ensure non-equivalency
+	originalLock.SolveMeta.InputsDigest = []byte{} // zero out the input hash to ensure non-equivalency
 	sw, _ := NewSafeWriter(nil, originalLock, pc.Project.Lock, VendorOnChanged)
 
 	// Verify prepared actions
 	if sw.HasManifest() {
-		t.Fatal("Did not expect the payload to contain the manifest")
+		t.Fatal("Did not expect the manifest to be written")
 	}
 	if !sw.HasLock() {
-		t.Fatal("Expected the payload to contain the lock")
+		t.Fatal("Expected that the writer should plan to write the lock")
 	}
 	if !sw.writeVendor {
-		t.Fatal("Expected the payload to contain the vendor directory")
+		t.Fatal("Expected that the writer should plan to write the vendor directory")
 	}
 
 	// Write changes
@@ -308,7 +308,7 @@ func TestSafeWriter_ModifiedLockSkipVendor(t *testing.T) {
 
 	originalLock := new(Lock)
 	*originalLock = *pc.Project.Lock
-	originalLock.Memo = []byte{} // zero out the input hash to ensure non-equivalency
+	originalLock.SolveMeta.InputsDigest = []byte{} // zero out the input hash to ensure non-equivalency
 	sw, _ := NewSafeWriter(nil, originalLock, pc.Project.Lock, VendorNever)
 
 	// Verify prepared actions

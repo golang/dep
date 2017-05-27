@@ -122,7 +122,7 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 		return err
 	}
 	m := &dep.Manifest{
-		Dependencies: pd.constraints,
+		Constraints: pd.constraints,
 	}
 
 	// Make an initial lock from what knowledge we've collected about the
@@ -185,7 +185,7 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 		handleAllTheFailuresOfTheWorld(err)
 		return err
 	}
-	l = dep.LockFromInterface(soln)
+	l = dep.LockFromSolution(soln)
 
 	// Iterate through the new projects in solved lock and add them to manifest
 	// if direct deps
@@ -201,7 +201,7 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 		if newProject {
 			// If it's in notondisk, add to manifest, these are direct dependencies.
 			if _, ok := pd.notondisk[pr]; ok {
-				m.Dependencies[pr] = getProjectPropertiesFromVersion(x.Version())
+				m.Constraints[pr] = getProjectPropertiesFromVersion(x.Version())
 			}
 		}
 	}
@@ -213,7 +213,7 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 		return errors.Wrap(err, "prepare solver")
 	}
 
-	l.Memo = s.HashInputs()
+	l.SolveMeta.InputsDigest = s.HashInputs()
 
 	// Pass timestamp (yyyyMMddHHmmss format) as suffix to backup name.
 	vendorbak, err := dep.BackupVendor(vpath, time.Now().Format("20060102150405"))
@@ -319,8 +319,7 @@ func getProjectPropertiesFromVersion(v gps.Version) gps.ProjectProperties {
 	case gps.IsBranch, gps.IsVersion:
 		pp.Constraint = v
 	case gps.IsSemver:
-		// TODO: remove "^" when https://github.com/golang/dep/issues/225 is ready.
-		c, err := gps.NewSemverConstraint("^" + v.String())
+		c, err := gps.NewSemverConstraintIC(v.String())
 		if err != nil {
 			panic(err)
 		}

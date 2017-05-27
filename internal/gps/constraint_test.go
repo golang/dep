@@ -674,6 +674,28 @@ func TestSemverConstraintOps(t *testing.T) {
 	}
 }
 
+func TestSemverConstraint_ImpliedCaret(t *testing.T) {
+	c, _ := NewSemverConstraintIC("1.0.0")
+
+	wantS := "^1.0.0"
+	gotS := c.String()
+	if wantS != gotS {
+		t.Errorf("Expected string %s, got %s", wantS, gotS)
+	}
+
+	wantI := "1.0.0"
+	gotI := c.ImpliedCaretString()
+	if wantI != gotI {
+		t.Errorf("Expected implied string %s, got %s", wantI, gotI)
+	}
+
+	wantT := "svc-^1.0.0"
+	gotT := c.typedString()
+	if wantT != gotT {
+		t.Errorf("Expected type string %s, got %s", wantT, gotT)
+	}
+}
+
 // Test that certain types of cross-version comparisons work when they are
 // expressed as a version union (but that others don't).
 func TestVersionUnion(t *testing.T) {

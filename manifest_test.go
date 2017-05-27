@@ -25,9 +25,9 @@ func TestReadManifest(t *testing.T) {
 		t.Fatalf("Should have read Manifest correctly, but got err %q", err)
 	}
 
-	c, _ := gps.NewSemverConstraint(">=0.12.0, <1.0.0")
+	c, _ := gps.NewSemverConstraint("^0.12.0")
 	want := Manifest{
-		Dependencies: map[gps.ProjectRoot]gps.ProjectProperties{
+		Constraints: map[gps.ProjectRoot]gps.ProjectProperties{
 			gps.ProjectRoot("github.com/golang/dep/internal/gps"): {
 				Constraint: c,
 			},
@@ -44,7 +44,7 @@ func TestReadManifest(t *testing.T) {
 		Ignored: []string{"github.com/foo/bar"},
 	}
 
-	if !reflect.DeepEqual(got.Dependencies, want.Dependencies) {
+	if !reflect.DeepEqual(got.Constraints, want.Constraints) {
 		t.Error("Valid manifest's dependencies did not parse as expected")
 	}
 	if !reflect.DeepEqual(got.Ovr, want.Ovr) {
@@ -61,9 +61,9 @@ func TestWriteManifest(t *testing.T) {
 
 	golden := "manifest/golden.toml"
 	want := h.GetTestFileString(golden)
-	c, _ := gps.NewSemverConstraint(">=0.12.0, <1.0.0")
+	c, _ := gps.NewSemverConstraint("^0.12.0")
 	m := &Manifest{
-		Dependencies: map[gps.ProjectRoot]gps.ProjectProperties{
+		Constraints: map[gps.ProjectRoot]gps.ProjectProperties{
 			gps.ProjectRoot("github.com/golang/dep/internal/gps"): {
 				Constraint: c,
 			},
@@ -128,7 +128,7 @@ func TestValidateManifest(t *testing.T) {
 	}{
 		{
 			tomlString: `
-			[[dependencies]]
+			[[constraint]]
 			  name = "github.com/foo/bar"
 			`,
 			want: []error{},
@@ -149,7 +149,7 @@ func TestValidateManifest(t *testing.T) {
 			[[bar]]
 			  author = "xyz"
 
-			[[dependencies]]
+			[[constraint]]
 			  name = "github.com/foo/bar"
 			  version = ""
 			`,
@@ -163,45 +163,45 @@ func TestValidateManifest(t *testing.T) {
 			tomlString: `
 			metadata = "project-name"
 
-			[[dependencies]]
+			[[constraint]]
 			  name = "github.com/foo/bar"
 			`,
 			want: []error{errors.New("metadata should be a TOML table")},
 		},
 		{
 			tomlString: `
-			dependencies = "foo"
-			overrides = "bar"
+			constraint = "foo"
+			override = "bar"
 			`,
 			want: []error{
-				errors.New("dependencies should be a TOML array of tables"),
-				errors.New("overrides should be a TOML array of tables"),
+				errors.New("constraint should be a TOML array of tables"),
+				errors.New("override should be a TOML array of tables"),
 			},
 		},
 		{
 			tomlString: `
-			[[dependencies]]
+			[[constraint]]
 			  name = "github.com/foo/bar"
 			  location = "some-value"
 			  link = "some-other-value"
 			  metadata = "foo"
 
-			[[overrides]]
+			[[override]]
 			  nick = "foo"
 			`,
 			want: []error{
-				errors.New("Invalid key \"location\" in \"dependencies\""),
-				errors.New("Invalid key \"link\" in \"dependencies\""),
-				errors.New("Invalid key \"nick\" in \"overrides\""),
-				errors.New("metadata in \"dependencies\" should be a TOML table"),
+				errors.New("Invalid key \"location\" in \"constraint\""),
+				errors.New("Invalid key \"link\" in \"constraint\""),
+				errors.New("Invalid key \"nick\" in \"override\""),
+				errors.New("metadata in \"constraint\" should be a TOML table"),
 			},
 		},
 		{
 			tomlString: `
-			[[dependencies]]
+			[[constraint]]
 			  name = "github.com/foo/bar"
 
-			  [dependencies.metadata]
+			  [constraint.metadata]
 			    color = "blue"
 			`,
 			want: []error{},

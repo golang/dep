@@ -72,8 +72,8 @@ func (cmd *pruneCommand) Run(ctx *dep.Ctx, args []string) error {
 		return errors.Errorf("Gopkg.lock must exist for prune to know what files are safe to remove.")
 	}
 
-	if !bytes.Equal(s.HashInputs(), p.Lock.Memo) {
-		return errors.Errorf("lock hash doesn't match")
+	if !bytes.Equal(s.HashInputs(), p.Lock.SolveMeta.InputsDigest) {
+		return errors.Errorf("Gopkg.lock is out of sync the project; run dep ensure before pruning.")
 	}
 
 	var pruneLogger *log.Logger
