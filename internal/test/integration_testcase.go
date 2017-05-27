@@ -5,13 +5,11 @@
 package test
 
 import (
-	"bytes"
 	"encoding/json"
 	"flag"
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"testing"
 	"unicode"
@@ -36,8 +34,9 @@ type IntegrationTestCase struct {
 	InitPath      string            `json:"init-path"`
 }
 
-func NewTestCase(t *testing.T, name, test_dir, wd string) *IntegrationTestCase {
-	rootPath := filepath.FromSlash(filepath.Join(wd, "testdata", test_dir, name))
+// NewTestCase creates a new IntegrationTestCase.
+func NewTestCase(t *testing.T, dir, name string) *IntegrationTestCase {
+	rootPath := filepath.FromSlash(filepath.Join(dir, name))
 	n := &IntegrationTestCase{
 		t:           t,
 		name:        name,
@@ -47,47 +46,40 @@ func NewTestCase(t *testing.T, name, test_dir, wd string) *IntegrationTestCase {
 	}
 	j, err := ioutil.ReadFile(filepath.Join(rootPath, "testcase.json"))
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 	err = json.Unmarshal(j, n)
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 	return n
-}
-
-var jsonNils *regexp.Regexp = regexp.MustCompile(`.*: null,.*\r?\n`)
-var jsonCmds *regexp.Regexp = regexp.MustCompile(`(?s)  "commands": \[(.*)  ],`)
-var jsonInds *regexp.Regexp = regexp.MustCompile(`(?s)\s*\n\s*`)
-
-// Cleanup writes the resulting TestCase back to the directory, if the -update
-// flag is set.  During the test, comparisons made to the TestCase should
-// write the result back to the TestCase when -update is enabled
-func (tc *IntegrationTestCase) Cleanup() {
-	if *UpdateGolden {
-		j, err := json.MarshalIndent(tc, "", "  ")
-		if err != nil {
-			panic(err)
-		}
-		j = jsonNils.ReplaceAll(j, []byte(""))
-		cmds := jsonCmds.FindAllSubmatch(j, -1)[0][1]
-		n := jsonInds.ReplaceAll(cmds, []byte(""))
-		n = bytes.Replace(n, []byte("["), []byte("\n    ["), -1)
-		n = bytes.Replace(n, []byte(`","`), []byte(`", "`), -1)
-		n = append(n, '\n')
-		j = bytes.Replace(j, cmds, n, -1)
-		j = append(j, '\n')
-		err = ioutil.WriteFile(filepath.Join(tc.rootPath, "testcase.json"), j, 0666)
-		if err != nil {
-			tc.t.Errorf("Failed to update testcase %s: %s", tc.name, err)
-		}
-	}
 }
 
 func (tc *IntegrationTestCase) InitialPath() string {
 	return tc.initialPath
 }
 
+// UpdateFile updates the golden file with the working result.
+func (tc *IntegrationTestCase) UpdateFile(goldenPath, workingPath string) {
+	exists, working, err := getFile(workingPath)
+	if err != nil {
+		tc.t.Fatalf("Error reading project file %s: %s", goldenPath, err)
+	}
+
+	golden := filepath.Join(tc.finalPath, goldenPath)
+	if exists {
+		if err := tc.WriteFile(golden, working); err != nil {
+			tc.t.Fatal(err)
+		}
+	} else {
+		err := os.Remove(golden)
+		if err != nil && !os.IsNotExist(err) {
+			tc.t.Fatal(err)
+		}
+	}
+}
+
+// CompareFile compares the golden file with the working result.
 func (tc *IntegrationTestCase) CompareFile(goldenPath, working string) {
 	golden := filepath.Join(tc.finalPath, goldenPath)
 
@@ -102,31 +94,12 @@ func (tc *IntegrationTestCase) CompareFile(goldenPath, working string) {
 
 	if wantExists && gotExists {
 		if want != got {
-			if *UpdateGolden {
-				if err := tc.WriteFile(golden, got); err != nil {
-					tc.t.Fatal(err)
-				}
-			} else {
-				tc.t.Errorf("expected %s, got %s", want, got)
-			}
+			tc.t.Errorf("expected %s, got %s", want, got)
 		}
 	} else if !wantExists && gotExists {
-		if *UpdateGolden {
-			if err := tc.WriteFile(golden, got); err != nil {
-				tc.t.Fatal(err)
-			}
-		} else {
-			tc.t.Errorf("%s created where none was expected", goldenPath)
-		}
+		tc.t.Errorf("%s created where none was expected", goldenPath)
 	} else if wantExists && !gotExists {
-		if *UpdateGolden {
-			err := os.Remove(golden)
-			if err != nil {
-				tc.t.Fatal(err)
-			}
-		} else {
-			tc.t.Errorf("%s not created where one was expected", goldenPath)
-		}
+		tc.t.Errorf("%s not created where one was expected", goldenPath)
 	}
 }
 
