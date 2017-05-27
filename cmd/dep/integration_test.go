@@ -23,52 +23,37 @@ func TestIntegration(t *testing.T) {
 	test.NeedsExternalNetwork(t)
 	test.NeedsGit(t)
 
-	filepath.Walk(filepath.Join("testdata", "harness_tests"), func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			t.Fatal("error walking filepath")
-		}
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
 
-		wd, err := os.Getwd()
-		if err != nil {
-			panic(err)
-		}
+	for _, dirName := range []string{
+		"harness_tests",
+		"init_path_tests",
+	} {
+		relPath := filepath.Join("testdata", dirName)
+		filepath.Walk(relPath, func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				t.Fatal("error walking filepath")
+			}
 
-		if filepath.Base(path) == "testcase.json" {
+			if filepath.Base(path) != "testcase.json" {
+				return nil
+			}
+
 			parse := strings.Split(path, string(filepath.Separator))
 			testName := strings.Join(parse[2:len(parse)-1], "/")
 			t.Run(testName, func(t *testing.T) {
 				t.Parallel()
 
-				t.Run("external", testIntegration(testName, wd, true, execCmd))
-				t.Run("internal", testIntegration(testName, wd, false, runMain))
+				t.Run("external", testIntegration(testName, relPath, wd, true, execCmd))
+				t.Run("internal", testIntegration(testName, relPath, wd, false, runMain))
 			})
-		}
-		return nil
-	})
 
-	filepath.Walk(filepath.Join("testdata", "init_path_tests"),
-		func(path string, info os.FileInfo, err error) error {
-			if err != nil {
-				t.Fatal("error walking filepath")
-			}
-
-			wd, err := os.Getwd()
-			if err != nil {
-				panic(err)
-			}
-
-			if filepath.Base(path) == "testcase.json" {
-				parse := strings.Split(path, string(filepath.Separator))
-				testName := strings.Join(parse[2:len(parse)-1], "/")
-				t.Run(testName, func(t *testing.T) {
-					t.Parallel()
-
-					t.Run("external", testRelativePath(testName, wd, true, execCmd))
-					t.Run("internal", testRelativePath(testName, wd, false, runMain))
-				})
-			}
 			return nil
 		})
+	}
 }
 
 // execCmd is a test.RunFunc which runs the program in another process.
@@ -106,13 +91,13 @@ func runMain(prog string, args []string, stdout, stderr io.Writer, dir string, e
 	return
 }
 
-func testIntegration(name, wd string, externalProc bool, run test.RunFunc) func(t *testing.T) {
+// testIntegration runs the test specified by <wd>/<relPath>/<name>/testcase.json
+func testIntegration(name, relPath, wd string, externalProc bool, run test.RunFunc) func(t *testing.T) {
 	return func(t *testing.T) {
 		t.Parallel()
 
 		// Set up environment
-		testCase := test.NewTestCase(t, name, "harness_tests", wd)
-		defer testCase.Cleanup()
+		testCase := test.NewTestCase(t, filepath.Join(wd, relPath), name)
 		testProj := test.NewTestProject(t, testCase.InitialPath(), wd, externalProc, run)
 		defer testProj.Cleanup()
 
@@ -144,60 +129,19 @@ func testIntegration(name, wd string, externalProc bool, run test.RunFunc) func(
 
 		// Check output
 		testCase.CompareOutput(testProj.GetStdout())
-
-		// Check final manifest and lock
-		testCase.CompareFile(dep.ManifestName, testProj.ProjPath(dep.ManifestName))
-		testCase.CompareFile(dep.LockName, testProj.ProjPath(dep.LockName))
 
 		// Check vendor paths
 		testProj.CompareImportPaths()
 		testCase.CompareVendorPaths(testProj.GetVendorPaths())
-	}
-}
 
-func testRelativePath(name, wd string, externalProc bool, run test.RunFunc) func(t *testing.T) {
-	return func(t *testing.T) {
-		t.Parallel()
-
-		// Set up environment
-		testCase := test.NewTestCase(t, name, "init_path_tests", wd)
-		defer testCase.Cleanup()
-		testProj := test.NewTestProject(t, testCase.InitialPath(), wd, externalProc, run)
-		defer testProj.Cleanup()
-
-		// Create and checkout the vendor revisions
-		for ip, rev := range testCase.VendorInitial {
-			testProj.GetVendorGit(ip)
-			testProj.RunGit(testProj.VendorPath(ip), "checkout", rev)
+		if *test.UpdateGolden {
+			// Update manifest and lock
+			testCase.UpdateFile(dep.ManifestName, testProj.ProjPath(dep.ManifestName))
+			testCase.UpdateFile(dep.LockName, testProj.ProjPath(dep.LockName))
+		} else {
+			// Check final manifest and lock
+			testCase.CompareFile(dep.ManifestName, testProj.ProjPath(dep.ManifestName))
+			testCase.CompareFile(dep.LockName, testProj.ProjPath(dep.LockName))
 		}
-
-		// Create and checkout the import revisions
-		for ip, rev := range testCase.GopathInitial {
-			testProj.RunGo("get", ip)
-			testProj.RunGit(testProj.Path("src", ip), "checkout", rev)
-		}
-
-		// Run commands
-		testProj.RecordImportPaths()
-
-		var err error
-		for i, args := range testCase.Commands {
-			err = testProj.DoRun(args)
-			if err != nil && i < len(testCase.Commands)-1 {
-				t.Fatalf("cmd %s raised an unexpected error: %s", args[0], err.Error())
-			}
-		}
-
-		// Check error raised in final command
-		testCase.CompareError(err, testProj.GetStderr())
-
-		// Check output
-		testCase.CompareOutput(testProj.GetStdout())
-
-		// Check final manifest and lock
-		testCase.CompareFile(dep.ManifestName, testProj.ProjPath(dep.ManifestName))
-		testCase.CompareFile(dep.LockName, testProj.ProjPath(dep.LockName))
-
-		testProj.CompareImportPaths()
 	}
 }

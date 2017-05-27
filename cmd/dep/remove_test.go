@@ -6,6 +6,7 @@ package main
 
 import (
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/golang/dep/internal/test"
@@ -31,7 +32,7 @@ func removeErrors(name, wd string, externalProc bool, run test.RunFunc) func(*te
 	return func(t *testing.T) {
 		t.Parallel()
 
-		testCase := test.NewTestCase(t, name, "harness_tests", wd)
+		testCase := test.NewTestCase(t, filepath.Join(wd, "testdata", "harness_tests"), name)
 		testProj := test.NewTestProject(t, testCase.InitialPath(), wd, externalProc, run)
 		defer testProj.Cleanup()
 
