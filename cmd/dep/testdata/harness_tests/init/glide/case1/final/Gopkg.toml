@@ -1,0 +1,5 @@
+ignored = ["github.com/sdboyer/dep-test","github.com/golang/notexist/samples"]
+
+[[constraint]]
+  name = "github.com/sdboyer/deptestdos"
+  version = "2.0.0"
