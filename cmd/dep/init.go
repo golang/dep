@@ -155,9 +155,11 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 		notondisk = append(notondisk, string(pname))
 	}
 
-	ctx.Loggers.Err.Printf("Following dependencies were not found in GOPATH. "+
-		"Dep will use the most recent versions of these projects.\n  %s",
-		strings.Join(notondisk, "\n  "))
+	if len(pd.notondisk) > 0 {
+		ctx.Loggers.Err.Printf("Following dependencies were not found in GOPATH. "+
+			"Dep will use the most recent versions of these projects.\n  %s",
+			strings.Join(notondisk, "\n  "))
+	}
 
 	// Copy lock before solving. Use this to separate new lock projects from soln
 	copyLock := *l
