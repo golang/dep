@@ -293,7 +293,7 @@ yet](https://groups.google.com/forum/#!topic/go-package-management/fp2uBMf6kq4).
 
 For the most part, you needn't do anything differently.
 
-The only possible issue is if your project is ever consuemed as a library. If
+The only possible issue is if your project is ever consumed as a library. If
 so, then you may want to be wary about committing your `vendor/` directory, as
 it can [cause
 problems](https://groups.google.com/d/msg/golang-nuts/AnMr9NL6dtc/UnyUUKcMCAAJ).
