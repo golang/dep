@@ -215,22 +215,22 @@ func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
 		}
 	}
 
-	digestMismatch, hasMissingPkgs, err := runStatusAll(ctx.Loggers, out, p, sm)
+	digestMismatch, hasMissingPkgs, err := runStatusAll(ctx, out, p, sm)
 	if err != nil {
 		return err
 	}
 
 	if digestMismatch {
 		if hasMissingPkgs {
-			ctx.Loggers.Err.Printf("Lock inputs-digest mismatch due to the following packages missing from the lock:\n\n")
-			ctx.Loggers.Out.Print(buf.String())
-			ctx.Loggers.Err.Printf("\nThis happens when a new import is added. Run `dep ensure` to install the missing packages.\n")
+			ctx.Err.Printf("Lock inputs-digest mismatch due to the following packages missing from the lock:\n\n")
+			ctx.Out.Print(buf.String())
+			ctx.Err.Printf("\nThis happens when a new import is added. Run `dep ensure` to install the missing packages.\n")
 		} else {
-			ctx.Loggers.Err.Printf("Lock inputs-digest mismatch. This happens when Gopkg.toml is modified.\n" +
+			ctx.Err.Printf("Lock inputs-digest mismatch. This happens when Gopkg.toml is modified.\n" +
 				"Run `dep ensure` to regenerate the inputs-digest.")
 		}
 	} else {
-		ctx.Loggers.Out.Print(buf.String())
+		ctx.Out.Print(buf.String())
 	}
 
 	return nil
@@ -253,7 +253,7 @@ type MissingStatus struct {
 	MissingPackages []string
 }
 
-func runStatusAll(loggers *dep.Loggers, out outputter, p *dep.Project, sm gps.SourceManager) (bool, bool, error) {
+func runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceManager) (bool, bool, error) {
 	var digestMismatch, hasMissingPkgs bool
 
 	if p.Lock == nil {
@@ -276,8 +276,8 @@ func runStatusAll(loggers *dep.Loggers, out outputter, p *dep.Project, sm gps.So
 		Manifest:        p.Manifest,
 		// Locks aren't a part of the input hash check, so we can omit it.
 	}
-	if loggers.Verbose {
-		params.TraceLogger = loggers.Err
+	if ctx.Verbose {
+		params.TraceLogger = ctx.Err
 	}
 
 	s, err := gps.Prepare(params, sm)
@@ -412,9 +412,9 @@ func runStatusAll(loggers *dep.Loggers, out outputter, p *dep.Project, sm gps.So
 		// TODO this is just a fix quick so staticcheck doesn't complain.
 		// Visually reconciling failure to deduce project roots with the rest of
 		// the mismatch output is a larger problem.
-		loggers.Err.Printf("Failed to deduce project roots for import paths:\n")
+		ctx.Err.Printf("Failed to deduce project roots for import paths:\n")
 		for _, fail := range errs {
-			loggers.Err.Printf("\t%s: %s\n", fail.ex, fail.err.Error())
+			ctx.Err.Printf("\t%s: %s\n", fail.ex, fail.err.Error())
 		}
 
 		return digestMismatch, hasMissingPkgs, errors.New("address issues with undeducible import paths to get more status information")

@@ -104,7 +104,7 @@ type ensureCommand struct {
 
 func (cmd *ensureCommand) Run(ctx *dep.Ctx, args []string) error {
 	if cmd.examples {
-		ctx.Loggers.Err.Println(strings.TrimSpace(ensureExamples))
+		ctx.Err.Println(strings.TrimSpace(ensureExamples))
 		return nil
 	}
 
@@ -121,8 +121,8 @@ func (cmd *ensureCommand) Run(ctx *dep.Ctx, args []string) error {
 	defer sm.Release()
 
 	params := p.MakeParams()
-	if ctx.Loggers.Verbose {
-		params.TraceLogger = ctx.Loggers.Err
+	if ctx.Verbose {
+		params.TraceLogger = ctx.Err
 	}
 	params.RootPackageTree, err = pkgtree.ListPackages(p.AbsRoot, string(p.ImportRoot))
 	if err != nil {
@@ -136,7 +136,7 @@ func (cmd *ensureCommand) Run(ctx *dep.Ctx, args []string) error {
 	if cmd.update {
 		applyUpdateArgs(args, &params)
 	} else {
-		err := applyEnsureArgs(ctx.Loggers.Err, args, cmd.overrides, p, sm, &params)
+		err := applyEnsureArgs(ctx.Err, args, cmd.overrides, p, sm, &params)
 		if err != nil {
 			return err
 		}
@@ -169,7 +169,7 @@ func (cmd *ensureCommand) Run(ctx *dep.Ctx, args []string) error {
 		return err
 	}
 	if cmd.dryRun {
-		return sw.PrintPreparedActions(ctx.Loggers.Out)
+		return sw.PrintPreparedActions(ctx.Out)
 	}
 
 	return errors.Wrap(sw.Write(p.AbsRoot, sm, false), "grouped write of manifest, lock and vendor")

@@ -12,6 +12,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"path/filepath"
 	"strings"
 	"text/tabwriter"
 
@@ -46,11 +47,10 @@ func main() {
 
 // A Config specifies a full configuration for a dep execution.
 type Config struct {
-	// Args hold the command-line arguments, starting with the program name.
-	Args           []string
-	Stdout, Stderr io.Writer
-	WorkingDir     string
-	Env            []string
+	WorkingDir     string    // Where to execute
+	Args           []string  // Command-line arguments, starting with the program name.
+	Env            []string  // Environment variables
+	Stdout, Stderr io.Writer // Log output
 }
 
 // Run executes a configuration and returns an exit code.
@@ -135,23 +135,23 @@ func (c *Config) Run() (exitCode int) {
 			}
 
 			// Parse the flags the user gave us.
-			// flag package automaticly prints usage and error message in err != nil
+			// flag package automatically prints usage and error message in err != nil
 			// or if '-h' flag provided
 			if err := fs.Parse(c.Args[2:]); err != nil {
 				exitCode = 1
 				return
 			}
 
-			loggers := &dep.Loggers{
+			// Set up the dep context.
+			ctx := &dep.Ctx{
 				Out:     log.New(c.Stdout, "", 0),
 				Err:     errLogger,
 				Verbose: *verbose,
 			}
-
-			// Set up the dep context.
-			ctx, err := dep.NewContext(c.WorkingDir, c.Env, loggers)
+			gopaths := filepath.SplitList(getEnv(c.Env, "GOPATH"))
+			err := ctx.SetPaths(c.WorkingDir, gopaths...)
 			if err != nil {
-				loggers.Err.Println(err)
+				errLogger.Printf("%q not in any GOPATH: %s\n", c.WorkingDir, err)
 				exitCode = 1
 				return
 			}
@@ -172,6 +172,18 @@ func (c *Config) Run() (exitCode int) {
 	usage()
 	exitCode = 1
 	return
+}
+
+// getEnv returns the last instance of the environment variable.
+func getEnv(env []string, key string) string {
+	pre := key + "="
+	for i := len(env) - 1; i >= 0; i-- {
+		v := env[i]
+		if strings.HasPrefix(v, pre) {
+			return strings.TrimPrefix(v, pre)
+		}
+	}
+	return ""
 }
 
 func resetUsage(logger *log.Logger, fs *flag.FlagSet, name, args, longHelp string) {

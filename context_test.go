@@ -19,29 +19,43 @@ import (
 )
 
 var (
-	discardLogger  = log.New(ioutil.Discard, "", 0)
-	discardLoggers = &Loggers{Out: discardLogger, Err: discardLogger}
+	discardLogger = log.New(ioutil.Discard, "", 0)
 )
 
-func TestNewContextNoGOPATH(t *testing.T) {
+func TestCtx_SetGOPATH(t *testing.T) {
+	h := test.NewHelper(t)
+	defer h.Cleanup()
+	h.TempDir("src")
+
+	wd := h.Path(".")
+
+	t.Run("slash", func(t *testing.T) {
+		var c Ctx
+		err := c.SetPaths(wd, filepath.ToSlash(wd))
+		if err != nil {
+			t.Error(err)
+		}
+	})
+
+	t.Run("separator", func(t *testing.T) {
+		var c Ctx
+		err := c.SetPaths(wd, filepath.FromSlash(wd))
+		if err != nil {
+			t.Error(err)
+		}
+	})
+}
+
+func TestCtx_SetGOPATH_empty(t *testing.T) {
 	h := test.NewHelper(t)
 	defer h.Cleanup()
 
 	h.TempDir("src")
-	h.Cd(h.Path("."))
+	var c Ctx
 
-	wd, err := os.Getwd()
-	if err != nil {
-		t.Fatal("failed to get work directory:", err)
-	}
-
-	c, err := NewContext(wd, os.Environ(), nil)
+	err := c.SetPaths(h.Path("."), "")
 	if err == nil {
 		t.Fatal("error should not have been nil")
-	}
-
-	if c != nil {
-		t.Fatalf("expected context to be nil, got: %#v", c)
 	}
 }
 
@@ -198,7 +212,12 @@ func TestLoadProject(t *testing.T) {
 	for _, testcase := range testcases {
 		start := testcase.start
 
-		ctx := &Ctx{GOPATH: tg.Path("."), WorkingDir: tg.Path(start), Loggers: discardLoggers}
+		ctx := &Ctx{
+			GOPATH:     tg.Path("."),
+			WorkingDir: tg.Path(start),
+			Out:        discardLogger,
+			Err:        discardLogger,
+		}
 
 		proj, err := ctx.LoadProject()
 		tg.Must(err)
@@ -261,7 +280,12 @@ func TestLoadProjectManifestParseError(t *testing.T) {
 		t.Fatal("failed to get working directory", err)
 	}
 
-	ctx := &Ctx{GOPATH: tg.Path("."), WorkingDir: wd, Loggers: discardLoggers}
+	ctx := &Ctx{
+		GOPATH:     tg.Path("."),
+		WorkingDir: wd,
+		Out:        discardLogger,
+		Err:        discardLogger,
+	}
 
 	_, err = ctx.LoadProject()
 	if err == nil {
@@ -287,7 +311,12 @@ func TestLoadProjectLockParseError(t *testing.T) {
 		t.Fatal("failed to get working directory", err)
 	}
 
-	ctx := &Ctx{GOPATH: tg.Path("."), WorkingDir: wd, Loggers: discardLoggers}
+	ctx := &Ctx{
+		GOPATH:     tg.Path("."),
+		WorkingDir: wd,
+		Out:        discardLogger,
+		Err:        discardLogger,
+	}
 
 	_, err = ctx.LoadProject()
 	if err == nil {
