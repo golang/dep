@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"reflect"
+	"regexp"
 	"sort"
 
 	"github.com/golang/dep/internal/gps"
@@ -50,6 +51,8 @@ func validateManifest(s string) ([]error, error) {
 	// Convert tree to a map
 	manifest := tree.ToMap()
 
+	// match abbreviated git hash (7chars) or hg hash (12chars)
+	abbrevRevHash := regexp.MustCompile("^[a-f0-9]{7}([a-f0-9]{5})?$")
 	// Look for unknown fields and collect errors
 	for prop, val := range manifest {
 		switch prop {
@@ -67,8 +70,14 @@ func validateManifest(s string) ([]error, error) {
 					for key, value := range v.(map[string]interface{}) {
 						// Check if the key is valid
 						switch key {
-						case "name", "branch", "revision", "version", "source":
+						case "name", "branch", "version", "source":
 							// valid key
+						case "revision":
+							if valueStr, ok := value.(string); ok {
+								if abbrevRevHash.MatchString(valueStr) {
+									errs = append(errs, fmt.Errorf("revision %q should not be in abbreviated form", valueStr))
+								}
+							}
 						case "metadata":
 							// Check if metadata is of Map type
 							if reflect.TypeOf(value).Kind() != reflect.Map {

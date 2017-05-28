@@ -206,9 +206,25 @@ func TestValidateManifest(t *testing.T) {
 			`,
 			want: []error{},
 		},
+		{
+			tomlString: `
+			[[constraint]]
+			  name = "github.com/foo/bar"
+			  revision = "b86ad16"
+			`,
+			want: []error{errors.New("revision \"b86ad16\" should not be in abbreviated form")},
+		},
+		{
+			tomlString: `
+			[[constraint]]
+			  name = "foobar.com/hg"
+			  revision = "8d43f8c0b836"
+			`,
+			want: []error{errors.New("revision \"8d43f8c0b836\" should not be in abbreviated form")},
+		},
 	}
 
-	// constains for error
+	// contains for error
 	contains := func(s []error, e error) bool {
 		for _, a := range s {
 			if a.Error() == e.Error() {
