@@ -136,8 +136,7 @@ func (a *rootAnalyzer) Info() (string, int) {
 	name := "dep"
 	version := 1
 	if !a.skipTools {
-		// TODO(carolynvs): Before merging this PR #500, uncomment and update testdata memos
-		//name = "dep+import"
+		name = "dep+import"
 	}
 	return name, version
 }
