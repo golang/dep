@@ -51,6 +51,6 @@ func (hashinCommand) Run(ctx *dep.Ctx, args []string) error {
 	if err != nil {
 		return errors.Wrap(err, "prepare solver")
 	}
-	ctx.Loggers.Out.Println(gps.HashingInputsAsString(s))
+	ctx.Out.Println(gps.HashingInputsAsString(s))
 	return nil
 }
