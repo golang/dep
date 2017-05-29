@@ -38,14 +38,13 @@ jobs:
     - <<: *simple-test
       os: osx
       go: 1.8.x
-      cache:
-        directories:
-          - $HOME/Library/Caches/Homebrew
-          - /usr/local/bin
       install:
         # brew takes horribly long to update itself despite the above caching
         # attempt; only bzr install if it's not on the $PATH
         - test $(which bzr) || brew install bzr
+      env:
+        - HOMEBREW_NO_AUTO_UPDATE=1
+        - DEPTESTBYPASS501=1
       script:
         # OSX as of El Capitan sets an exit trap that interacts poorly with how
         # travis seems to spawn these shells; if set -e is set, then it can cause
