@@ -348,7 +348,7 @@ func getProjectData(ctx *dep.Ctx, pkgT pkgtree.PackageTree, cpr string, sm gps.S
 	var syncDepGroup sync.WaitGroup
 	syncDep := func(pr gps.ProjectRoot, sm gps.SourceManager) {
 		if err := sm.SyncSourceFor(gps.ProjectIdentifier{ProjectRoot: pr}); err != nil {
-			ctx.Loggers.Err.Printf("Unable to cache %s", pr)
+			ctx.Loggers.Err.Printf("%+v", errors.Wrapf(err, "Unable to cache %s", pr))
 		}
 		syncDepGroup.Done()
 	}
