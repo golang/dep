@@ -26,24 +26,12 @@ var fixtorun string
 // TODO(sdboyer) regression test ensuring that locks with only revs for projects don't cause errors
 func init() {
 	flag.StringVar(&fixtorun, "gps.fix", "", "A single fixture to run in TestBasicSolves or TestBimodalSolves")
-	mkBridge(nil, nil, false)
-	overrideMkBridge()
 }
 
-// sets the mkBridge global func to one that allows virtualized RootDirs
-func overrideMkBridge() {
-	// For all tests, override the base bridge with the depspecBridge that skips
-	// verifyRootDir calls
-	mkBridge = func(s *solver, sm SourceManager, down bool) sourceBridge {
-		return &depspecBridge{
-			&bridge{
-				sm:     sm,
-				s:      s,
-				down:   down,
-				vlists: make(map[ProjectIdentifier][]Version),
-			},
-		}
-	}
+// overrideMkBridge overrides the base bridge with the depspecBridge that skips
+// verifyRootDir calls
+func overrideMkBridge(s *solver, sm SourceManager, down bool) sourceBridge {
+	return &depspecBridge{mkBridge(s, sm, down)}
 }
 
 type testlogger struct {
@@ -73,6 +61,7 @@ func fixSolve(params SolveParameters, sm SourceManager, t *testing.T) (Solution,
 	// always return false, otherwise it would identify pretty much all of
 	// our fixtures as being stdlib and skip everything
 	params.stdLibFn = func(string) bool { return false }
+	params.mkBridgeFn = overrideMkBridge
 	s, err := Prepare(params, sm)
 	if err != nil {
 		return nil, err
@@ -312,7 +301,9 @@ func TestBadSolveOpts(t *testing.T) {
 	fix.ds[0].n = ProjectRoot(pn)
 
 	sm := newdepspecSM(fix.ds, nil)
-	params := SolveParameters{}
+	params := SolveParameters{
+		mkBridgeFn: overrideMkBridge,
+	}
 
 	_, err := Prepare(params, nil)
 	if err == nil {
@@ -430,14 +421,7 @@ func TestBadSolveOpts(t *testing.T) {
 
 	// swap out the test mkBridge override temporarily, just to make sure we get
 	// the right error
-	mkBridge = func(s *solver, sm SourceManager, down bool) sourceBridge {
-		return &bridge{
-			sm:     sm,
-			s:      s,
-			down:   down,
-			vlists: make(map[ProjectIdentifier][]Version),
-		}
-	}
+	params.mkBridgeFn = nil
 
 	_, err = Prepare(params, sm)
 	if err == nil {
@@ -454,7 +438,4 @@ func TestBadSolveOpts(t *testing.T) {
 	} else if !strings.Contains(err.Error(), "is a file, not a directory") {
 		t.Error("Prepare should have given error on file as RootDir, but gave:", err)
 	}
-
-	// swap them back...not sure if this matters, but just in case
-	overrideMkBridge()
 }
