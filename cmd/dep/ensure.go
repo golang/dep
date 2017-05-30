@@ -35,7 +35,7 @@ Package spec:
 
 Examples:
 
-  dep ensure                            Populate vendor from existing manifest and lock
+  dep ensure                            Compute required deps, lock them, and populate vendor
   dep ensure github.com/pkg/foo@^1.0.1  Update a specific dependency to a specific version
 
 For more detailed usage examples, see dep ensure -examples.
@@ -46,7 +46,8 @@ dep ensure
     Solve the project's dependency graph, and place all dependencies in the
     vendor folder. If a dependency is in the lock file, use the version
     specified there. Otherwise, use the most recent version that can satisfy the
-    constraints in the manifest file.
+    constraints in the manifest file. Remove dependencies that are no longer needed
+    from the manifest file, and add any new ones.
 
 dep ensure -update
 
