@@ -296,8 +296,11 @@ func copySymlink(src, dst string) error {
 	}
 
 	err = os.Symlink(resolved, dst)
+	if err != nil {
+		return errors.Wrapf(err, "failed to create symlink %s to %s", src, resolved)
+	}
 
-	return errors.Wrapf(err, "failed to create symlink %s to %s", src, resolved)
+	return nil
 }
 
 // IsDir determines is the path given is a directory or not.
