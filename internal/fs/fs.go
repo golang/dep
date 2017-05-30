@@ -248,6 +248,13 @@ func CopyDir(src, dst string) error {
 // of the source file. The file mode will be copied from the source and
 // the copied data is synced/flushed to stable storage.
 func copyFile(src, dst string) (err error) {
+	if sym, err := IsSymlink(src); err != nil {
+		return err
+	} else if sym {
+		err := copySymlink(src, dst)
+		return err
+	}
+
 	in, err := os.Open(src)
 	if err != nil {
 		return
@@ -284,6 +291,22 @@ func copyFile(src, dst string) (err error) {
 	}
 
 	return
+}
+
+// copySymlink will resolve the src symlink and create a new symlink in dst.
+// If src is a relative symlink, dst will also be a relative symlink.
+func copySymlink(src, dst string) error {
+	resolved, err := os.Readlink(src)
+	if err != nil {
+		return errors.Wrap(err, "failed to resolve symlink")
+	}
+
+	err = os.Symlink(resolved, dst)
+	if err != nil {
+		return errors.Wrapf(err, "failed to create symlink %s to %s", src, resolved)
+	}
+
+	return nil
 }
 
 // IsDir determines is the path given is a directory or not.
@@ -342,4 +365,14 @@ func IsRegular(name string) (bool, error) {
 		return false, errors.Errorf("%q is a directory, should be a file", name)
 	}
 	return true, nil
+}
+
+// IsSymlink determines if the given path is a symbolic link.
+func IsSymlink(path string) (bool, error) {
+	l, err := os.Lstat(path)
+	if err != nil {
+		return false, err
+	}
+
+	return l.Mode()&os.ModeSymlink == os.ModeSymlink, nil
 }
