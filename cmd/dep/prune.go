@@ -73,7 +73,7 @@ func (cmd *pruneCommand) Run(ctx *dep.Ctx, args []string) error {
 	}
 
 	if !bytes.Equal(s.HashInputs(), p.Lock.SolveMeta.InputsDigest) {
-		return errors.Errorf("Gopkg.lock is out of sync the project; run dep ensure before pruning.")
+		return errors.Errorf("Gopkg.lock is out of sync; run dep ensure before pruning.")
 	}
 
 	var pruneLogger *log.Logger
