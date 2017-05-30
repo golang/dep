@@ -820,8 +820,7 @@ func TestIsSymlink(t *testing.T) {
 		}
 
 		inaccessibleSymlink = filepath.Join(dir, "symlink")
-		err = os.Symlink(inaccessibleFile, inaccessibleSymlink)
-		return err
+		return os.Symlink(inaccessibleFile, inaccessibleSymlink)
 	})
 	defer cleanup()
 	if err != nil {
