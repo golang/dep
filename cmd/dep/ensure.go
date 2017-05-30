@@ -108,7 +108,7 @@ func (cmd *ensureCommand) Run(ctx *dep.Ctx, args []string) error {
 		return nil
 	}
 
-	p, err := ctx.LoadProject("")
+	p, err := ctx.LoadProject()
 	if err != nil {
 		return err
 	}
