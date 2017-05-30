@@ -60,7 +60,6 @@ func (c *Config) Run() (exitCode int) {
 		&initCommand{},
 		&statusCommand{},
 		&ensureCommand{},
-		&removeCommand{},
 		&hashinCommand{},
 		&pruneCommand{},
 	}
