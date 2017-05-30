@@ -161,7 +161,7 @@ func (tc *IntegrationTestCase) CompareVendorPaths(gotVendorPaths []string) {
 		}
 		for ind := range gotVendorPaths {
 			if gotVendorPaths[ind] != wantVendorPaths[ind] {
-				tc.t.Errorf("Mismatch in vendor paths created: want %s got %s", gotVendorPaths, wantVendorPaths)
+				tc.t.Errorf("Mismatch in vendor paths created: want %s got %s", wantVendorPaths, gotVendorPaths)
 			}
 		}
 	}
