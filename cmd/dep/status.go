@@ -215,11 +215,24 @@ func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
 		}
 	}
 
-	if err := runStatusAll(ctx.Loggers, out, p, sm); err != nil {
+	digestMismatch, hasMissingPkgs, err := runStatusAll(ctx.Loggers, out, p, sm)
+	if err != nil {
 		return err
 	}
 
-	ctx.Loggers.Out.Print(buf.String())
+	if digestMismatch {
+		if hasMissingPkgs {
+			ctx.Loggers.Err.Println("Lock inputs-digest mismatch due to the following packages missing from the lock:\n")
+			ctx.Loggers.Out.Print(buf.String())
+			ctx.Loggers.Err.Println("\nThis happens when a new import is added. Run `dep ensure` to install the missing packages.")
+		} else {
+			ctx.Loggers.Err.Printf("Lock inputs-digest mismatch. This happens when Gopkg.toml is modified.\n" +
+				"Run `dep ensure` to regenerate the inputs-digest.")
+		}
+	} else {
+		ctx.Loggers.Out.Print(buf.String())
+	}
+
 	return nil
 }
 
@@ -240,17 +253,19 @@ type MissingStatus struct {
 	MissingPackages []string
 }
 
-func runStatusAll(loggers *dep.Loggers, out outputter, p *dep.Project, sm gps.SourceManager) error {
+func runStatusAll(loggers *dep.Loggers, out outputter, p *dep.Project, sm gps.SourceManager) (bool, bool, error) {
+	var digestMismatch, hasMissingPkgs bool
+
 	if p.Lock == nil {
 		// TODO if we have no lock file, do...other stuff
-		return nil
+		return digestMismatch, hasMissingPkgs, nil
 	}
 
 	// While the network churns on ListVersions() requests, statically analyze
 	// code from the current project.
 	ptree, err := pkgtree.ListPackages(p.AbsRoot, string(p.ImportRoot))
 	if err != nil {
-		return errors.Errorf("analysis of local packages failed: %v", err)
+		return digestMismatch, hasMissingPkgs, errors.Errorf("analysis of local packages failed: %v", err)
 	}
 
 	// Set up a solver in order to check the InputHash.
@@ -267,7 +282,7 @@ func runStatusAll(loggers *dep.Loggers, out outputter, p *dep.Project, sm gps.So
 
 	s, err := gps.Prepare(params, sm)
 	if err != nil {
-		return errors.Errorf("could not set up solver for input hashing: %s", err)
+		return digestMismatch, hasMissingPkgs, errors.Errorf("could not set up solver for input hashing: %s", err)
 	}
 
 	cm := collectConstraints(ptree, p, sm)
@@ -298,7 +313,7 @@ func runStatusAll(loggers *dep.Loggers, out outputter, p *dep.Project, sm gps.So
 				ptr, err := sm.ListPackages(proj.Ident(), proj.Version())
 
 				if err != nil {
-					return fmt.Errorf("analysis of %s package failed: %v", proj.Ident().ProjectRoot, err)
+					return digestMismatch, hasMissingPkgs, fmt.Errorf("analysis of %s package failed: %v", proj.Ident().ProjectRoot, err)
 				}
 
 				prm, _ := ptr.ToReachMap(true, false, false, nil)
@@ -360,7 +375,7 @@ func runStatusAll(loggers *dep.Loggers, out outputter, p *dep.Project, sm gps.So
 		}
 		out.BasicFooter()
 
-		return nil
+		return digestMismatch, hasMissingPkgs, nil
 	}
 
 	// Hash digest mismatch may indicate that some deps are no longer
@@ -369,6 +384,7 @@ func runStatusAll(loggers *dep.Loggers, out outputter, p *dep.Project, sm gps.So
 	//
 	// It's possible for digests to not match, but still have a correct
 	// lock.
+	digestMismatch = true
 	rm, _ := ptree.ToReachMap(true, true, false, nil)
 
 	external := rm.FlattenFn(paths.IsStandardImportPath)
@@ -401,7 +417,7 @@ func runStatusAll(loggers *dep.Loggers, out outputter, p *dep.Project, sm gps.So
 			loggers.Err.Printf("\t%s: %s\n", fail.ex, fail.err.Error())
 		}
 
-		return errors.New("address issues with undeducable import paths to get more status information.")
+		return digestMismatch, hasMissingPkgs, errors.New("address issues with undeducible import paths to get more status information")
 	}
 
 	out.MissingHeader()
@@ -416,11 +432,12 @@ outer:
 			}
 		}
 
+		hasMissingPkgs = true
 		out.MissingLine(&MissingStatus{ProjectRoot: string(root), MissingPackages: pkgs})
 	}
 	out.MissingFooter()
 
-	return nil
+	return digestMismatch, hasMissingPkgs, nil
 }
 
 func formatVersion(v gps.Version) string {
