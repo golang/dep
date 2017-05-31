@@ -6,9 +6,11 @@ package dep
 
 import (
 	"bytes"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"reflect"
+	"regexp"
 	"sort"
 
 	"github.com/golang/dep/internal/gps"
@@ -50,6 +52,7 @@ func validateManifest(s string) ([]error, error) {
 	// Convert tree to a map
 	manifest := tree.ToMap()
 
+	bzrRevID := regexp.MustCompile(`.*-\d{14}-[a-z0-9]{16}`)
 	// Look for unknown fields and collect errors
 	for prop, val := range manifest {
 		switch prop {
@@ -67,8 +70,19 @@ func validateManifest(s string) ([]error, error) {
 					for key, value := range v.(map[string]interface{}) {
 						// Check if the key is valid
 						switch key {
-						case "name", "branch", "revision", "version", "source":
+						case "name", "branch", "version", "source":
 							// valid key
+						case "revision":
+							if valueStr, ok := value.(string); ok {
+								// Check if sha1 hash is abbreviated
+								_, err = hex.DecodeString(valueStr)
+								if err != nil || len(valueStr) != 40 {
+									// Check for valid bzr revision-id
+									if !bzrRevID.MatchString(valueStr) {
+										errs = append(errs, fmt.Errorf("revision %q should not be in abbreviated form", valueStr))
+									}
+								}
+							}
 						case "metadata":
 							// Check if metadata is of Map type
 							if reflect.TypeOf(value).Kind() != reflect.Map {
