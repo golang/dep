@@ -15,13 +15,16 @@ import (
 	"github.com/pkg/errors"
 )
 
+// LockName is the lock file name used by dep.
 const LockName = "Gopkg.lock"
 
+// Lock holds lock file data and implements gps.Lock.
 type Lock struct {
 	SolveMeta SolveMeta
 	P         []gps.LockedProject
 }
 
+// SolveMeta holds solver meta data.
 type SolveMeta struct {
 	InputsDigest    []byte
 	AnalyzerName    string
@@ -109,10 +112,12 @@ func fromRawLock(raw rawLock) (*Lock, error) {
 	return l, nil
 }
 
+// InputHash returns the hash of inputs which produced this lock data.
 func (l *Lock) InputHash() []byte {
 	return l.SolveMeta.InputsDigest
 }
 
+// Projects returns the list of LockedProjects contained in the lock data.
 func (l *Lock) Projects() []gps.LockedProject {
 	return l.P
 }
@@ -146,11 +151,10 @@ func (l *Lock) toRaw() rawLock {
 		raw.Projects[k] = ld
 	}
 
-	// TODO sort output - #15
-
 	return raw
 }
 
+// MarshalTOML serializes this lock into TOML via an intermediate raw form.
 func (l *Lock) MarshalTOML() ([]byte, error) {
 	raw := l.toRaw()
 	result, err := toml.Marshal(raw)
@@ -180,6 +184,7 @@ func LockFromSolution(in gps.Solution) *Lock {
 	return l
 }
 
+// SortedLockedProjects implements sort.Interface.
 type SortedLockedProjects []gps.LockedProject
 
 func (s SortedLockedProjects) Len() int      { return len(s) }
