@@ -219,7 +219,12 @@ func (g *gopathScanner) scanGopathForDependencies() (projectData, error) {
 		go syncDep(pr, g.sm)
 
 		dependencies[pr] = []string{ip}
-		v, err := g.ctx.VersionInWorkspace(pr)
+		abs, err := g.ctx.AbsForImport(string(pr))
+		if err != nil {
+			notondisk[pr] = true
+			continue
+		}
+		v, err := gps.ProjectVersion(abs)
 		if err != nil {
 			notondisk[pr] = true
 			continue
@@ -283,7 +288,13 @@ func (g *gopathScanner) scanGopathForDependencies() (projectData, error) {
 				// was found in the initial pass on direct imports. We know it's
 				// the former if there's no entry for it in the ondisk map.
 				if _, in := ondisk[pr]; !in {
-					v, err := g.ctx.VersionInWorkspace(pr)
+					abs, err := g.ctx.AbsForImport(string(pr))
+					if err != nil {
+						colors[pkg] = black
+						notondisk[pr] = true
+						return nil
+					}
+					v, err := gps.ProjectVersion(abs)
 					if err != nil {
 						// Even if we know it's on disk, errors are still
 						// possible when trying to deduce version. If we
