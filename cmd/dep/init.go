@@ -116,9 +116,9 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 		return errors.Errorf("invalid state: manifest %q does not exist, but lock %q does", mf, lf)
 	}
 
-	ip, err := ctx.SplitAbsoluteProjectRoot(root)
+	ip, err := ctx.ImportForAbs(root)
 	if err != nil {
-		return errors.Wrap(err, "determineProjectRoot")
+		return errors.Wrap(err, "root project import")
 	}
 	p.ImportRoot = gps.ProjectRoot(ip)
 

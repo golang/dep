@@ -22,7 +22,7 @@ var (
 	discardLogger = log.New(ioutil.Discard, "", 0)
 )
 
-func TestSplitAbsoluteProjectRoot(t *testing.T) {
+func TestCtx_ProjectImport(t *testing.T) {
 	h := test.NewHelper(t)
 	defer h.Cleanup()
 
@@ -38,7 +38,7 @@ func TestSplitAbsoluteProjectRoot(t *testing.T) {
 
 	for _, want := range importPaths {
 		fullpath := filepath.Join(depCtx.GOPATH, "src", want)
-		got, err := depCtx.SplitAbsoluteProjectRoot(fullpath)
+		got, err := depCtx.ImportForAbs(fullpath)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -48,13 +48,13 @@ func TestSplitAbsoluteProjectRoot(t *testing.T) {
 	}
 
 	// test where it should return an error when directly within $GOPATH/src
-	got, err := depCtx.SplitAbsoluteProjectRoot(filepath.Join(depCtx.GOPATH, "src"))
+	got, err := depCtx.ImportForAbs(filepath.Join(depCtx.GOPATH, "src"))
 	if err == nil || !strings.Contains(err.Error(), "GOPATH/src") {
 		t.Fatalf("should have gotten an error for use directly in GOPATH/src, but got %s", got)
 	}
 
 	// test where it should return an error
-	got, err = depCtx.SplitAbsoluteProjectRoot("tra/la/la/la")
+	got, err = depCtx.ImportForAbs("tra/la/la/la")
 	if err == nil {
 		t.Fatalf("should have gotten an error but did not for tra/la/la/la: %s", got)
 	}
@@ -345,7 +345,7 @@ func TestCaseInsentitiveGOPATH(t *testing.T) {
 
 	ip := "github.com/pkg/errors"
 	fullpath := filepath.Join(depCtx.GOPATH, "src", ip)
-	pr, err := depCtx.SplitAbsoluteProjectRoot(fullpath)
+	pr, err := depCtx.ImportForAbs(fullpath)
 	if err != nil {
 		t.Fatal(err)
 	}
