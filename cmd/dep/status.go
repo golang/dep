@@ -222,9 +222,9 @@ func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
 
 	if digestMismatch {
 		if hasMissingPkgs {
-			ctx.Loggers.Err.Println("Lock inputs-digest mismatch due to the following packages missing from the lock:\n")
+			ctx.Loggers.Err.Printf("Lock inputs-digest mismatch due to the following packages missing from the lock:\n\n")
 			ctx.Loggers.Out.Print(buf.String())
-			ctx.Loggers.Err.Println("\nThis happens when a new import is added. Run `dep ensure` to install the missing packages.")
+			ctx.Loggers.Err.Printf("\nThis happens when a new import is added. Run `dep ensure` to install the missing packages.\n")
 		} else {
 			ctx.Loggers.Err.Printf("Lock inputs-digest mismatch. This happens when Gopkg.toml is modified.\n" +
 				"Run `dep ensure` to regenerate the inputs-digest.")
