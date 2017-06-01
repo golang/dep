@@ -246,9 +246,25 @@ func (sg *sourceGateway) exportVersionTo(ctx context.Context, v Version, to stri
 		return err
 	}
 
-	return sg.suprvsr.do(ctx, sg.src.upstreamURL(), ctExportTree, func(ctx context.Context) error {
+	err = sg.suprvsr.do(ctx, sg.src.upstreamURL(), ctExportTree, func(ctx context.Context) error {
 		return sg.src.exportRevisionTo(ctx, r, to)
 	})
+
+	// It's possible (in git) that we may have tried this against a version that
+	// doesn't exist in the repository cache, even though we know it exists in
+	// the upstream. If it looks like that might be the case, update the local
+	// and retry.
+	// TODO(sdboyer) It'd be better if we could check the error to see if this
+	// actually was the cause of the problem.
+	if err != nil && sg.srcState&sourceHasLatestLocally == 0 {
+		if _, err = sg.require(ctx, sourceHasLatestLocally); err != nil {
+			err = sg.suprvsr.do(ctx, sg.src.upstreamURL(), ctExportTree, func(ctx context.Context) error {
+				return sg.src.exportRevisionTo(ctx, r, to)
+			})
+		}
+	}
+
+	return err
 }
 
 func (sg *sourceGateway) getManifestAndLock(ctx context.Context, pr ProjectRoot, v Version, an ProjectAnalyzer) (Manifest, Lock, error) {
@@ -276,6 +292,27 @@ func (sg *sourceGateway) getManifestAndLock(ctx context.Context, pr ProjectRoot,
 		m, l, err = sg.src.getManifestAndLock(ctx, pr, r, an)
 		return err
 	})
+
+	// It's possible (in git) that we may have tried this against a version that
+	// doesn't exist in the repository cache, even though we know it exists in
+	// the upstream. If it looks like that might be the case, update the local
+	// and retry.
+	// TODO(sdboyer) It'd be better if we could check the error to see if this
+	// actually was the cause of the problem.
+	if err != nil && sg.srcState&sourceHasLatestLocally == 0 {
+		// TODO(sdboyer) we should warn/log/something in adaptive recovery
+		// situations like this
+		_, err = sg.require(ctx, sourceHasLatestLocally)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		err = sg.suprvsr.do(ctx, label, ctGetManifestAndLock, func(ctx context.Context) error {
+			m, l, err = sg.src.getManifestAndLock(ctx, pr, r, an)
+			return err
+		})
+	}
+
 	if err != nil {
 		return nil, nil, err
 	}
@@ -310,6 +347,27 @@ func (sg *sourceGateway) listPackages(ctx context.Context, pr ProjectRoot, v Ver
 		ptree, err = sg.src.listPackages(ctx, pr, r)
 		return err
 	})
+
+	// It's possible (in git) that we may have tried this against a version that
+	// doesn't exist in the repository cache, even though we know it exists in
+	// the upstream. If it looks like that might be the case, update the local
+	// and retry.
+	// TODO(sdboyer) It'd be better if we could check the error to see if this
+	// actually was the cause of the problem.
+	if err != nil && sg.srcState&sourceHasLatestLocally == 0 {
+		// TODO(sdboyer) we should warn/log/something in adaptive recovery
+		// situations like this
+		_, err = sg.require(ctx, sourceHasLatestLocally)
+		if err != nil {
+			return pkgtree.PackageTree{}, err
+		}
+
+		err = sg.suprvsr.do(ctx, label, ctGetManifestAndLock, func(ctx context.Context) error {
+			ptree, err = sg.src.listPackages(ctx, pr, r)
+			return err
+		})
+	}
+
 	if err != nil {
 		return pkgtree.PackageTree{}, err
 	}
