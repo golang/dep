@@ -29,8 +29,18 @@ import (
 // will return true. The implementation is *not* OS-specific, so a FAT32
 // filesystem mounted on Linux will be handled correctly.
 func HasFilepathPrefix(path, prefix string) bool {
-	if filepath.VolumeName(path) != filepath.VolumeName(prefix) {
+	// no need to check isCaseSensitiveFilesystem because VolumeName return
+	// empty string on all non-Windows machines
+	vnPath := strings.ToLower(filepath.VolumeName(path))
+	vnPrefix := strings.ToLower(filepath.VolumeName(prefix))
+	if vnPath != vnPrefix {
 		return false
+	}
+	if strings.HasSuffix(vnPath, ":") {
+		vnPath += string(os.PathSeparator)
+	}
+	if strings.HasSuffix(vnPrefix, ":") {
+		vnPrefix += string(os.PathSeparator)
 	}
 
 	var dn string
@@ -53,7 +63,8 @@ func HasFilepathPrefix(path, prefix string) bool {
 		return false
 	}
 
-	var d, p string
+	d := vnPath
+	p := vnPrefix
 
 	for i := range prefixes {
 		// need to test each component of the path for
