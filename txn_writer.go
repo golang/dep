@@ -297,7 +297,7 @@ func (sw SafeWriter) validate(root string, sm gps.SourceManager) error {
 // operations succeeded. It also does its best to roll back if any moves fail.
 // This mostly guarantees that dep cannot exit with a partial write that would
 // leave an undefined state on disk.
-func (sw *SafeWriter) Write(root string, sm gps.SourceManager, noExamples bool) error {
+func (sw *SafeWriter) Write(root string, sm gps.SourceManager, examples bool) error {
 	err := sw.validate(root, sm)
 	if err != nil {
 		return err
@@ -327,8 +327,8 @@ func (sw *SafeWriter) Write(root string, sm gps.SourceManager, noExamples bool) 
 
 		var initOutput []byte
 
-		// If examples are NOT disabled, use the example text
-		if !noExamples {
+		// If examples are enabled, use the example text
+		if examples {
 			initOutput = exampleTOML
 		}
 
