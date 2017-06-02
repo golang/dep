@@ -182,7 +182,7 @@ func (out *dotOutput) MissingLine(ms *MissingStatus) {}
 func (out *dotOutput) MissingFooter()                {}
 
 func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
-	p, err := ctx.LoadProject("")
+	p, err := ctx.LoadProject()
 	if err != nil {
 		return err
 	}

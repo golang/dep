@@ -188,47 +188,29 @@ func TestLoadProject(t *testing.T) {
 	var testcases = []struct {
 		lock  bool
 		start string
-		path  string
 	}{
-		{true, filepath.Join("src", "test1"), ""},                       //empty path, direct
-		{true, filepath.Join("src", "test1", "sub"), ""},                //empty path, ascending
-		{true, ".", filepath.Join(tg.Path("."), "src", "test1")},        //absolute path, direct
-		{true, ".", filepath.Join(tg.Path("."), "src", "test1", "sub")}, //absolute path, ascending
-		{true, ".", filepath.Join("src", "test1")},                      //relative path from wd, direct
-		{true, ".", filepath.Join("src", "test1", "sub")},               //relative path from wd, ascending
-		{true, "src", "test1"},                                          //relative path from relative path, direct
-		{true, "src", filepath.Join("test1", "sub")},                    //relative path from relative path, ascending
-		{false, filepath.Join("src", "test2"), ""},                      //repeat without lockfile present
-		{false, filepath.Join("src", "test2", "sub"), ""},
-		{false, ".", filepath.Join(tg.Path("."), "src", "test2")},
-		{false, ".", filepath.Join(tg.Path("."), "src", "test2", "sub")},
-		{false, ".", filepath.Join("src", "test2")},
-		{false, ".", filepath.Join("src", "test2", "sub")},
-		{false, "src", "test2"},
-		{false, "src", filepath.Join("test2", "sub")},
+		{true, filepath.Join("src", "test1")},        //direct
+		{true, filepath.Join("src", "test1", "sub")}, //ascending
+		{false, filepath.Join("src", "test2")},       //repeat without lockfile present
+		{false, filepath.Join("src", "test2", "sub")},
 	}
 
 	for _, testcase := range testcases {
 		start := testcase.start
-		path := testcase.path
-		tg.Cd(tg.Path(start))
 
-		wd, err := os.Getwd()
-		if err != nil {
-			t.Fatal("failed to get working directory", err)
-		}
+		ctx := &Ctx{GOPATH: tg.Path("."), WorkingDir: tg.Path(start), Loggers: discardLoggers}
 
-		ctx := &Ctx{GOPATH: tg.Path("."), WorkingDir: wd, Loggers: discardLoggers}
-
-		proj, err := ctx.LoadProject(path)
+		proj, err := ctx.LoadProject()
 		tg.Must(err)
-		if proj.Manifest == nil {
-			t.Fatalf("Manifest file didn't load -> from: %q, path: %q", start, path)
-		}
-		if testcase.lock && proj.Lock == nil {
-			t.Fatalf("Lock file didn't load -> from: %q, path: %q", start, path)
-		} else if !testcase.lock && proj.Lock != nil {
-			t.Fatalf("Non-existent Lock file loaded -> from: %q, path: %q", start, path)
+		switch {
+		case err != nil:
+			t.Errorf("%s: LoadProject failed: %+v", start, err)
+		case proj.Manifest == nil:
+			t.Errorf("%s: Manifest file didn't load", start)
+		case testcase.lock && proj.Lock == nil:
+			t.Errorf("%s: Lock file didn't load", start)
+		case !testcase.lock && proj.Lock != nil:
+			t.Errorf("%s: Non-existent Lock file loaded", start)
 		}
 	}
 }
@@ -247,31 +229,16 @@ func TestLoadProjectNotFoundErrors(t *testing.T) {
 		start string
 		path  string
 	}{
-		{true, filepath.Join("src", "test1"), ""},                       //empty path, direct
-		{true, filepath.Join("src", "test1", "sub"), ""},                //empty path, ascending
-		{true, ".", filepath.Join(tg.Path("."), "src", "test1")},        //absolute path, direct
-		{true, ".", filepath.Join(tg.Path("."), "src", "test1", "sub")}, //absolute path, ascending
-		{true, ".", filepath.Join("src", "test1")},                      //relative path from wd, direct
-		{true, ".", filepath.Join("src", "test1", "sub")},               //relative path from wd, ascending
-		{true, "src", "test1"},                                          //relative path from relative path, direct
-		{true, "src", filepath.Join("test1", "sub")},                    //relative path from relative path, ascending
+		{true, filepath.Join("src", "test1"), ""},        //direct
+		{true, filepath.Join("src", "test1", "sub"), ""}, //ascending
 	}
 
 	for _, testcase := range testcases {
-		start := testcase.start
-		path := testcase.path
-		tg.Cd(tg.Path(start))
+		ctx := &Ctx{GOPATH: tg.Path("."), WorkingDir: tg.Path(testcase.start)}
 
-		wd, err := os.Getwd()
-		if err != nil {
-			t.Fatal("failed to get working directory", err)
-		}
-
-		ctx := &Ctx{GOPATH: tg.Path("."), WorkingDir: wd}
-
-		_, err = ctx.LoadProject(path)
+		_, err := ctx.LoadProject()
 		if err == nil {
-			t.Fatalf("should have returned 'No Manifest Found' error -> from: %q, path: %q", start, path)
+			t.Errorf("%s: should have returned 'No Manifest Found' error", testcase.start)
 		}
 	}
 }
@@ -296,7 +263,7 @@ func TestLoadProjectManifestParseError(t *testing.T) {
 
 	ctx := &Ctx{GOPATH: tg.Path("."), WorkingDir: wd, Loggers: discardLoggers}
 
-	_, err = ctx.LoadProject("")
+	_, err = ctx.LoadProject()
 	if err == nil {
 		t.Fatal("should have returned 'Manifest Syntax' error")
 	}
@@ -322,7 +289,7 @@ func TestLoadProjectLockParseError(t *testing.T) {
 
 	ctx := &Ctx{GOPATH: tg.Path("."), WorkingDir: wd, Loggers: discardLoggers}
 
-	_, err = ctx.LoadProject("")
+	_, err = ctx.LoadProject()
 	if err == nil {
 		t.Fatal("should have returned 'Lock Syntax' error")
 	}
@@ -344,7 +311,7 @@ func TestLoadProjectNoSrcDir(t *testing.T) {
 	f, _ := os.OpenFile(filepath.Join(ctx.GOPATH, "src", "test1", LockName), os.O_WRONLY, os.ModePerm)
 	defer f.Close()
 
-	_, err := ctx.LoadProject("")
+	_, err := ctx.LoadProject()
 	if err == nil {
 		t.Fatal("should have returned 'Split Absolute Root' error (no 'src' dir present)")
 	}
@@ -381,7 +348,7 @@ func TestCaseInsentitiveGOPATH(t *testing.T) {
 	}
 	depCtx := &Ctx{GOPATH: gopath, WorkingDir: wd}
 
-	depCtx.LoadProject("")
+	depCtx.LoadProject()
 
 	ip := "github.com/pkg/errors"
 	fullpath := filepath.Join(depCtx.GOPATH, "src", ip)

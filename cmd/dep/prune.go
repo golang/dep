@@ -36,7 +36,7 @@ func (cmd *pruneCommand) Register(fs *flag.FlagSet) {
 }
 
 func (cmd *pruneCommand) Run(ctx *dep.Ctx, args []string) error {
-	p, err := ctx.LoadProject("")
+	p, err := ctx.LoadProject()
 	if err != nil {
 		return err
 	}
