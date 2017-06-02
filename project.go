@@ -82,8 +82,8 @@ func BackupVendor(vpath, suffix string) (string, error) {
 		vendorbak := filepath.Join(vpathDir, "_"+name+"-"+suffix)
 		// Check if a directory with same name exists
 		if _, err = os.Stat(vendorbak); os.IsNotExist(err) {
-			// Rename existing vendor to vendor-{suffix}
-			if err := fs.RenameWithFallback(vpath, vendorbak); err != nil {
+			// Copy existing vendor to vendor-{suffix}
+			if err := fs.CopyDir(vpath, vendorbak); err != nil {
 				return "", err
 			}
 			return vendorbak, nil
