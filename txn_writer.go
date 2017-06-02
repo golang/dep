@@ -113,12 +113,16 @@ type SafeWriter struct {
 // NewSafeWriter sets up a SafeWriter to write a set of config yaml, lock and vendor tree.
 //
 // - If manifest is provided, it will be written to the standard manifest file
-//   name beneath root.
+// name beneath root.
+//
 // - If newLock is provided, it will be written to the standard lock file
-//   name beneath root.
+// name beneath root.
+//
 // - If vendor is VendorAlways, or is VendorOnChanged and the locks are different,
-//   the vendor directory will be written beneath root based on newLock.
+// the vendor directory will be written beneath root based on newLock.
+//
 // - If oldLock is provided without newLock, error.
+//
 // - If vendor is VendorAlways without a newLock, error.
 func NewSafeWriter(manifest *Manifest, oldLock, newLock *Lock, vendor VendorBehavior) (*SafeWriter, error) {
 	sw := &SafeWriter{
