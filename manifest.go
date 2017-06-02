@@ -17,8 +17,10 @@ import (
 	"github.com/pkg/errors"
 )
 
+// ManifestName is the manifest file name used by dep.
 const ManifestName = "Gopkg.toml"
 
+// Manifest holds manifest file data and implements gps.RootManifest.
 type Manifest struct {
 	Constraints gps.ProjectConstraints
 	Ovr         gps.ProjectConstraints
@@ -226,6 +228,7 @@ func (s sortedRawProjects) Less(i, j int) bool {
 	return l.Source < r.Source
 }
 
+// MarshalTOML serializes this manifest into TOML via an intermediate raw form.
 func (m *Manifest) MarshalTOML() ([]byte, error) {
 	raw := m.toRaw()
 	result, err := toml.Marshal(raw)
@@ -262,19 +265,23 @@ func toRawProject(name gps.ProjectRoot, project gps.ProjectProperties) rawProjec
 	return raw
 }
 
+// DependencyConstraints returns a list of project-level constraints.
 func (m *Manifest) DependencyConstraints() gps.ProjectConstraints {
 	return m.Constraints
 }
 
+// TestDependencyConstraints remains unimplemented by returning nil for now.
 func (m *Manifest) TestDependencyConstraints() gps.ProjectConstraints {
 	// TODO decide whether we're going to incorporate this or not
 	return nil
 }
 
+// Overrides returns a list of project-level override constraints.
 func (m *Manifest) Overrides() gps.ProjectConstraints {
 	return m.Ovr
 }
 
+// IgnoredPackages returns a set of import paths to ignore.
 func (m *Manifest) IgnoredPackages() map[string]bool {
 	if len(m.Ignored) == 0 {
 		return nil
@@ -288,6 +295,7 @@ func (m *Manifest) IgnoredPackages() map[string]bool {
 	return mp
 }
 
+// RequiredPackages returns a set of import paths to require.
 func (m *Manifest) RequiredPackages() map[string]bool {
 	if len(m.Required) == 0 {
 		return nil
