@@ -1,0 +1,1 @@
+Ignore glide config at root when -skip-tools is specified.

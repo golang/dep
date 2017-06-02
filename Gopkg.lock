@@ -20,6 +20,12 @@
   revision = "4239b77079c7b5d1243b7b4736304ce8ddb6f0f2"
 
 [[projects]]
+  branch = "v2"
+  name = "github.com/go-yaml/yaml"
+  packages = ["."]
+  revision = "cd8b52f8269e0feb286dfeef29f8fe4d5b397e0b"
+
+[[projects]]
   name = "github.com/pelletier/go-buffruneio"
   packages = ["."]
   revision = "c37440a7cf42ac63b919c752ca73a85067e05992"
@@ -46,6 +52,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "04a69739bd134208497dbd584b8b6dbf9bbdc41337e9c1c81e24d9f1502d5153"
+  inputs-digest = "1096dfb111cbe243aa24ea824ea3e1db7bb178c01d5565107c6d9290d225d722"
   solver-name = "gps-cdcl"
   solver-version = 1

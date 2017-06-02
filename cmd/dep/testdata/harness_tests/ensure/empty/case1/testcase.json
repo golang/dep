@@ -1,6 +1,6 @@
 {
   "commands": [
-    ["init"],
+    ["init", "-skip-tools"],
     ["ensure", "-update"]
   ],
   "error-expected": "",
