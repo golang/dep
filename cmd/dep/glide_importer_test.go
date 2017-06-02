@@ -132,6 +132,8 @@ func TestGlideConfig_Convert_Project(t *testing.T) {
 	ctx := newTestContext(h)
 	sm, err := ctx.SourceManager()
 	h.Must(err)
+	defer sm.Release()
+
 	g := newGlideImporter(ctx, sm)
 	g.yaml = glideYaml{
 		Imports: []glidePackage{
@@ -218,6 +220,8 @@ func TestGlideConfig_Convert_TestProject(t *testing.T) {
 	ctx := newTestContext(h)
 	sm, err := ctx.SourceManager()
 	h.Must(err)
+	defer sm.Release()
+
 	g := newGlideImporter(ctx, sm)
 	g.yaml = glideYaml{
 		TestImports: []glidePackage{
