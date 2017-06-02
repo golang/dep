@@ -10,7 +10,7 @@ Dep is a prototype dependency management tool. It requires Go 1.7 or newer to co
 
 **Alpha**.
 Functionality is known to be broken, missing or incomplete. Changes are planned
-to the CLI commands soon.
+to the CLI commands soon. *It would be unwise to write scripts atop `dep` before then.*
 The repository is open to solicit feedback and contributions from the community.
 Please see below for feedback and contribution guidelines.
 
