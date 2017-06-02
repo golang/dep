@@ -15,6 +15,19 @@ import (
 	"github.com/golang/dep/internal/test"
 )
 
+// This function tests HadFilepathPrefix. It should test it on both case
+// sensitive and insensitive situations. However, the only reliable way to test
+// case-insensitive behaviour is if using case-insensitive filesystem.  This
+// cannot be guaranteed in an automated test. Therefore, the behaviour of the
+// tests is not to test case sensitivity on *nix and to assume that Windows is
+// case-insensitive. Please see link below for some background.
+//
+// https://superuser.com/questions/266110/how-do-you-make-windows-7-fully-case-sensitive-with-respect-to-the-filesystem
+//
+// NOTE: NTFS can be made case-sensitive. However many Windows programs,
+// including Windows Explorer do not handle gracefully multiple files that
+// differ only in capitalization. It is possible that this can cause these tests
+// to fail on some setups.
 func TestHasFilepathPrefix(t *testing.T) {
 	dir, err := ioutil.TempDir("", "dep")
 	if err != nil {
@@ -68,6 +81,19 @@ func TestHasFilepathPrefix(t *testing.T) {
 	}
 }
 
+// This function tests HadFilepathPrefix. It should test it on both case
+// sensitive and insensitive situations. However, the only reliable way to test
+// case-insensitive behaviour is if using case-insensitive filesystem.  This
+// cannot be guaranteed in an automated test. Therefore, the behaviour of the
+// tests is not to test case sensitivity on *nix and to assume that Windows is
+// case-insensitive. Please see link below for some background.
+//
+// https://superuser.com/questions/266110/how-do-you-make-windows-7-fully-case-sensitive-with-respect-to-the-filesystem
+//
+// NOTE: NTFS can be made case-sensitive. However many Windows programs,
+// including Windows Explorer do not handle gracefully multiple files that
+// differ only in capitalization. It is possible that this can cause these tests
+// to fail on some setups.
 func TestHasFilepathPrefix_Files(t *testing.T) {
 	dir, err := ioutil.TempDir("", "dep")
 	if err != nil {

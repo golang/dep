@@ -29,6 +29,12 @@ import (
 // will return true. The implementation is *not* OS-specific, so a FAT32
 // filesystem mounted on Linux will be handled correctly.
 func HasFilepathPrefix(path, prefix string) bool {
+	// this function is more convoluted then ideal due to need for special
+	// handling of volume name/drive letter on Windows. vnPath and vnPrefix
+	// are first compared, and then used to initialize initial values of p and
+	// d which will be appended to for incremental checks using
+	// isCaseSensitiveFilesystem and then equality.
+
 	// no need to check isCaseSensitiveFilesystem because VolumeName return
 	// empty string on all non-Windows machines
 	vnPath := strings.ToLower(filepath.VolumeName(path))
@@ -36,6 +42,8 @@ func HasFilepathPrefix(path, prefix string) bool {
 	if vnPath != vnPrefix {
 		return false
 	}
+
+	// because filepath.Join("c:","dir") returns "c:dir", we have to manually add path separator to drive letters
 	if strings.HasSuffix(vnPath, ":") {
 		vnPath += string(os.PathSeparator)
 	}
@@ -56,6 +64,7 @@ func HasFilepathPrefix(path, prefix string) bool {
 	dn = strings.TrimSuffix(dn, string(os.PathSeparator))
 	prefix = strings.TrimSuffix(prefix, string(os.PathSeparator))
 
+	// [1:] in the lines below eliminates empty string on *nix and volume name on Windows
 	dirs := strings.Split(dn, string(os.PathSeparator))[1:]
 	prefixes := strings.Split(prefix, string(os.PathSeparator))[1:]
 
@@ -63,6 +72,7 @@ func HasFilepathPrefix(path, prefix string) bool {
 		return false
 	}
 
+	// d,p are initialized with "" on *nix and volume name on Windows
 	d := vnPath
 	p := vnPrefix
 
