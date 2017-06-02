@@ -6,17 +6,22 @@ package feedback
 
 import (
 	"fmt"
-
-	"github.com/golang/dep"
+	"log"
 )
 
 // Constraint types
 const ConsTypeConstraint = "constraint"
 const ConsTypeHint = "hint"
 
-// Dependency types
+// DepTypeDirect represents a direct dependency
 const DepTypeDirect = "direct dep"
+
+// DepTypeTransitive represents a transitive dependency,
+// or a dependency of a dependency
 const DepTypeTransitive = "transitive dep"
+
+// DepTypeImported represents a dependency imported by an external tool
+const DepTypeImported = "imported dep"
 
 // ConstraintFeedback holds project constraint feedback data
 type ConstraintFeedback struct {
@@ -24,20 +29,20 @@ type ConstraintFeedback struct {
 }
 
 // LogFeedback logs the feedback
-func (cf ConstraintFeedback) LogFeedback(ctx *dep.Ctx) {
+func (cf ConstraintFeedback) LogFeedback(logger *log.Logger) {
 	// "Using" feedback for direct dep
-	if cf.DependencyType == DepTypeDirect {
+	if cf.DependencyType == DepTypeDirect || cf.DependencyType == DepTypeImported {
 		ver := cf.Version
 		// revision as version for hint
 		if cf.ConstraintType == ConsTypeHint {
 			ver = cf.Revision
 		}
-		ctx.Loggers.Err.Printf("  %v", GetUsingFeedback(ver, cf.ConstraintType, cf.DependencyType, cf.ProjectPath))
+		logger.Printf("  %v", GetUsingFeedback(ver, cf.ConstraintType, cf.DependencyType, cf.ProjectPath))
 	}
 	// No "Locking" feedback for hints. "Locking" feedback only for constraint
 	// and transitive dep
 	if cf.ConstraintType != ConsTypeHint {
-		ctx.Loggers.Err.Printf("  %v", GetLockingFeedback(cf.LockedVersion, cf.Revision, cf.DependencyType, cf.ProjectPath))
+		logger.Printf("  %v", GetLockingFeedback(cf.LockedVersion, cf.Revision, cf.DependencyType, cf.ProjectPath))
 	}
 }
 
@@ -46,6 +51,9 @@ func (cf ConstraintFeedback) LogFeedback(ctx *dep.Ctx) {
 // Using ^1.0.0 as constraint for direct dep github.com/foo/bar
 // Using 1b8edb3 as hint for direct dep github.com/bar/baz
 func GetUsingFeedback(version, consType, depType, projectPath string) string {
+	if depType == DepTypeImported {
+		return fmt.Sprintf("Using %s as initial %s for %s %s", version, consType, depType, projectPath)
+	}
 	return fmt.Sprintf("Using %s as %s for %s %s", version, consType, depType, projectPath)
 }
 
@@ -54,5 +62,8 @@ func GetUsingFeedback(version, consType, depType, projectPath string) string {
 // Locking in v1.1.4 (bc29b4f) for direct dep github.com/foo/bar
 // Locking in master (436f39d) for transitive dep github.com/baz/qux
 func GetLockingFeedback(version, revision, depType, projectPath string) string {
+	if depType == DepTypeImported {
+		return fmt.Sprintf("Trying %s (%s) as initial lock for %s %s", version, revision, depType, projectPath)
+	}
 	return fmt.Sprintf("Locking in %s (%s) for %s %s", version, revision, depType, projectPath)
 }
