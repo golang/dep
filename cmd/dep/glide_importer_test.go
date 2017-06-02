@@ -38,6 +38,8 @@ func newTestContext(h *test.Helper) *dep.Ctx {
 }
 
 func TestGlideConfig_Import(t *testing.T) {
+	t.Parallel()
+
 	h := test.NewHelper(t)
 	defer h.Cleanup()
 
@@ -54,12 +56,10 @@ func TestGlideConfig_Import(t *testing.T) {
 	defer sm.Release()
 
 	// Capture stderr so we can verify output
-	ctx := newTestContext(h)
-	ctx.Loggers.Verbose = false // Disable verbose so that we don't print values that change each test run
 	verboseOutput := &bytes.Buffer{}
-	ctx.Loggers.Err = log.New(verboseOutput, "", 0)
+	logger := log.New(verboseOutput, "", 0)
 
-	g := newGlideImporter(ctx, sm)
+	g := newGlideImporter(logger, false, sm) // Disable verbose so that we don't print values that change each test run
 	if !g.HasDepMetadata(projectRoot) {
 		t.Fatal("Expected the importer to detect the glide configuration files")
 	}
@@ -90,6 +90,8 @@ func TestGlideConfig_Import(t *testing.T) {
 }
 
 func TestGlideConfig_Import_MissingLockFile(t *testing.T) {
+	t.Parallel()
+
 	h := test.NewHelper(t)
 	defer h.Cleanup()
 
@@ -104,8 +106,8 @@ func TestGlideConfig_Import_MissingLockFile(t *testing.T) {
 	h.Must(err)
 	defer sm.Release()
 
-	ctx := newTestContext(h)
-	g := newGlideImporter(ctx, sm)
+	logger := log.New(os.Stderr, "", 0)
+	g := newGlideImporter(logger, true, sm)
 	if !g.HasDepMetadata(projectRoot) {
 		t.Fatal("The glide importer should gracefully handle when only glide.yaml is present")
 	}
@@ -123,6 +125,8 @@ func TestGlideConfig_Import_MissingLockFile(t *testing.T) {
 }
 
 func TestGlideConfig_Convert_Project(t *testing.T) {
+	t.Parallel()
+
 	h := test.NewHelper(t)
 	defer h.Cleanup()
 
@@ -134,7 +138,7 @@ func TestGlideConfig_Convert_Project(t *testing.T) {
 	h.Must(err)
 	defer sm.Release()
 
-	g := newGlideImporter(ctx, sm)
+	g := newGlideImporter(ctx.Err, true, sm)
 	g.yaml = glideYaml{
 		Imports: []glidePackage{
 			{
@@ -212,6 +216,8 @@ func TestGlideConfig_Convert_Project(t *testing.T) {
 }
 
 func TestGlideConfig_Convert_TestProject(t *testing.T) {
+	t.Parallel()
+
 	h := test.NewHelper(t)
 	defer h.Cleanup()
 
@@ -222,7 +228,7 @@ func TestGlideConfig_Convert_TestProject(t *testing.T) {
 	h.Must(err)
 	defer sm.Release()
 
-	g := newGlideImporter(ctx, sm)
+	g := newGlideImporter(ctx.Err, true, sm)
 	g.yaml = glideYaml{
 		TestImports: []glidePackage{
 			{
@@ -260,13 +266,12 @@ func TestGlideConfig_Convert_TestProject(t *testing.T) {
 }
 
 func TestGlideConfig_Convert_Ignore(t *testing.T) {
-	h := test.NewHelper(t)
-	defer h.Cleanup()
+	t.Parallel()
 
 	pkg := "github.com/sdboyer/deptest"
 
-	ctx := newTestContext(h)
-	g := newGlideImporter(ctx, nil)
+	logger := log.New(os.Stderr, "", 0)
+	g := newGlideImporter(logger, true, nil)
 	g.yaml = glideYaml{
 		Ignores: []string{pkg},
 	}
@@ -286,11 +291,10 @@ func TestGlideConfig_Convert_Ignore(t *testing.T) {
 }
 
 func TestGlideConfig_Convert_ExcludeDir(t *testing.T) {
-	h := test.NewHelper(t)
-	defer h.Cleanup()
+	t.Parallel()
 
-	ctx := newTestContext(h)
-	g := newGlideImporter(ctx, nil)
+	logger := log.New(os.Stderr, "", 0)
+	g := newGlideImporter(logger, true, nil)
 	g.yaml = glideYaml{
 		ExcludeDirs: []string{"samples"},
 	}
@@ -310,11 +314,10 @@ func TestGlideConfig_Convert_ExcludeDir(t *testing.T) {
 }
 
 func TestGlideConfig_Convert_ExcludeDir_IgnoresMismatchedPackageName(t *testing.T) {
-	h := test.NewHelper(t)
-	defer h.Cleanup()
+	t.Parallel()
 
-	ctx := newTestContext(h)
-	g := newGlideImporter(ctx, nil)
+	logger := log.New(os.Stderr, "", 0)
+	g := newGlideImporter(logger, true, nil)
 	g.yaml = glideYaml{
 		Name:        "github.com/golang/mismatched-package-name",
 		ExcludeDirs: []string{"samples"},
@@ -335,8 +338,7 @@ func TestGlideConfig_Convert_ExcludeDir_IgnoresMismatchedPackageName(t *testing.
 }
 
 func TestGlideConfig_Convert_WarnsForUnusedFields(t *testing.T) {
-	h := test.NewHelper(t)
-	defer h.Cleanup()
+	t.Parallel()
 
 	testCases := map[string]glidePackage{
 		"specified an os":   {OS: "windows"},
@@ -344,36 +346,36 @@ func TestGlideConfig_Convert_WarnsForUnusedFields(t *testing.T) {
 	}
 
 	for wantWarning, pkg := range testCases {
-		pkg.Name = "github.com/sdboyer/deptest"
-		pkg.Reference = "v1.0.0"
+		t.Run(wantWarning, func(t *testing.T) {
+			pkg.Name = "github.com/sdboyer/deptest"
+			pkg.Reference = "v1.0.0"
 
-		ctx := newTestContext(h)
-		// Capture stderr so we can verify warnings
-		verboseOutput := &bytes.Buffer{}
-		ctx.Loggers.Err = log.New(verboseOutput, "", 0)
-		g := newGlideImporter(ctx, nil)
-		g.yaml = glideYaml{
-			Imports: []glidePackage{pkg},
-		}
+			// Capture stderr so we can verify warnings
+			verboseOutput := &bytes.Buffer{}
+			logger := log.New(verboseOutput, "", 0)
+			g := newGlideImporter(logger, true, nil)
+			g.yaml = glideYaml{
+				Imports: []glidePackage{pkg},
+			}
 
-		_, _, err := g.convert(testGlideProjectRoot)
-		if err != nil {
-			t.Fatal(err)
-		}
+			_, _, err := g.convert(testGlideProjectRoot)
+			if err != nil {
+				t.Fatal(err)
+			}
 
-		warnings := verboseOutput.String()
-		if !strings.Contains(warnings, wantWarning) {
-			t.Errorf("Expected the output to include the warning '%s'", wantWarning)
-		}
+			warnings := verboseOutput.String()
+			if !strings.Contains(warnings, wantWarning) {
+				t.Errorf("Expected the output to include the warning '%s'", wantWarning)
+			}
+		})
 	}
 }
 
 func TestGlideConfig_Convert_BadInput_EmptyPackageName(t *testing.T) {
-	h := test.NewHelper(t)
-	defer h.Cleanup()
+	t.Parallel()
 
-	ctx := newTestContext(h)
-	g := newGlideImporter(ctx, nil)
+	logger := log.New(os.Stderr, "", 0)
+	g := newGlideImporter(logger, true, nil)
 	g.yaml = glideYaml{
 		Imports: []glidePackage{{Name: ""}},
 	}
