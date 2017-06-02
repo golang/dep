@@ -231,7 +231,7 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 		return err
 	}
 
-	if err := sw.Write(root, sm, cmd.noExamples); err != nil {
+	if err := sw.Write(root, sm, !cmd.noExamples); err != nil {
 		return errors.Wrap(err, "safe write of manifest and lock")
 	}
 
