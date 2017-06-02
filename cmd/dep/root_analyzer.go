@@ -11,6 +11,8 @@ import (
 	fb "github.com/golang/dep/internal/feedback"
 	"github.com/golang/dep/internal/gps"
 	"github.com/pkg/errors"
+	"io/ioutil"
+	"log"
 )
 
 // importer handles importing configuration from other dependency managers into
@@ -44,7 +46,7 @@ func newRootAnalyzer(skipTools bool, ctx *dep.Ctx, directDeps map[string]bool, s
 
 func (a *rootAnalyzer) InitializeRootManifestAndLock(dir string, pr gps.ProjectRoot) (rootM *dep.Manifest, rootL *dep.Lock, err error) {
 	if !a.skipTools {
-		rootM, rootL, err = a.importManifestAndLock(dir, pr)
+		rootM, rootL, err = a.importManifestAndLock(dir, pr, false)
 		if err != nil {
 			return
 		}
@@ -63,9 +65,14 @@ func (a *rootAnalyzer) InitializeRootManifestAndLock(dir string, pr gps.ProjectR
 	return
 }
 
-func (a *rootAnalyzer) importManifestAndLock(dir string, pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock, error) {
+func (a *rootAnalyzer) importManifestAndLock(dir string, pr gps.ProjectRoot, suppressLogs bool) (*dep.Manifest, *dep.Lock, error) {
+	logger := a.ctx.Err
+	if suppressLogs {
+		logger = log.New(ioutil.Discard, "", 0)
+	}
+
 	importers := []importer{
-		newGlideImporter(a.ctx, a.sm),
+		newGlideImporter(logger, a.ctx.Verbose, a.sm),
 	}
 
 	for _, i := range importers {
@@ -103,7 +110,7 @@ func (a *rootAnalyzer) DeriveManifestAndLock(dir string, pr gps.ProjectRoot) (gp
 		// The assignment back to an interface prevents interface-based nil checks from failing later
 		var manifest gps.Manifest = gps.SimpleManifest{}
 		var lock gps.Lock
-		im, il, err := a.importManifestAndLock(dir, pr)
+		im, il, err := a.importManifestAndLock(dir, pr, true)
 		if im != nil {
 			manifest = im
 		}
@@ -142,7 +149,7 @@ func (a *rootAnalyzer) Info() (string, int) {
 }
 
 // feedback logs project constraint as feedback to the user.
-func feedback(v gps.Version, pr gps.ProjectRoot, depType string, ctx *dep.Ctx) {
+func feedback(v gps.Version, pr gps.ProjectRoot, depType string, logger *log.Logger) {
 	rev, version, branch := gps.VersionComponentStrings(v)
 
 	// Check if it's a valid SHA1 digest and trim to 7 characters.
@@ -182,7 +189,7 @@ func feedback(v gps.Version, pr gps.ProjectRoot, depType string, ctx *dep.Ctx) {
 		}
 	}
 
-	cf.LogFeedback(ctx)
+	cf.LogFeedback(logger)
 }
 
 func lookupVersionForRevision(rev gps.Revision, pi gps.ProjectIdentifier, sm gps.SourceManager) (gps.Version, error) {

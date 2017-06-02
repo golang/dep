@@ -7,6 +7,7 @@ package main
 import (
 	"bytes"
 	"io/ioutil"
+	"log"
 	"os"
 	"path"
 	"path/filepath"
@@ -27,14 +28,16 @@ type glideImporter struct {
 	yaml glideYaml
 	lock *glideLock
 
-	ctx *dep.Ctx
-	sm  gps.SourceManager
+	logger  *log.Logger
+	verbose bool
+	sm      gps.SourceManager
 }
 
-func newGlideImporter(ctx *dep.Ctx, sm gps.SourceManager) *glideImporter {
+func newGlideImporter(logger *log.Logger, verbose bool, sm gps.SourceManager) *glideImporter {
 	return &glideImporter{
-		ctx: ctx,
-		sm:  sm,
+		logger:  logger,
+		verbose: verbose,
+		sm:      sm,
 	}
 }
 
@@ -93,10 +96,10 @@ func (g *glideImporter) Import(dir string, pr gps.ProjectRoot) (*dep.Manifest, *
 
 // load the glide configuration files.
 func (g *glideImporter) load(projectDir string) error {
-	g.ctx.Err.Println("Detected glide configuration files...")
+	g.logger.Println("Detected glide configuration files...")
 	y := filepath.Join(projectDir, glideYamlName)
-	if g.ctx.Loggers.Verbose {
-		g.ctx.Loggers.Err.Printf("  Loading %s", y)
+	if g.verbose {
+		g.logger.Printf("  Loading %s", y)
 	}
 	yb, err := ioutil.ReadFile(y)
 	if err != nil {
@@ -109,8 +112,8 @@ func (g *glideImporter) load(projectDir string) error {
 
 	l := filepath.Join(projectDir, glideLockName)
 	if exists, _ := fs.IsRegular(l); exists {
-		if g.ctx.Loggers.Verbose {
-			g.ctx.Loggers.Err.Printf("  Loading %s", l)
+		if g.verbose {
+			g.logger.Printf("  Loading %s", l)
 		}
 		lb, err := ioutil.ReadFile(l)
 		if err != nil {
@@ -136,7 +139,7 @@ func (g *glideImporter) convert(pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock, e
 		task.WriteString(" and glide.lock")
 	}
 	task.WriteString("...")
-	g.ctx.Loggers.Err.Println(task)
+	g.logger.Println(task)
 
 	manifest := &dep.Manifest{
 		Constraints: make(gps.ProjectConstraints),
@@ -161,7 +164,7 @@ func (g *glideImporter) convert(pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock, e
 
 	if len(g.yaml.ExcludeDirs) > 0 {
 		if g.yaml.Name != "" && g.yaml.Name != projectName {
-			g.ctx.Loggers.Err.Printf("  Glide thinks the package is '%s' but dep thinks it is '%s', using dep's value.\n", g.yaml.Name, projectName)
+			g.logger.Printf("  Glide thinks the package is '%s' but dep thinks it is '%s', using dep's value.\n", g.yaml.Name, projectName)
 		}
 
 		for _, dir := range g.yaml.ExcludeDirs {
@@ -193,12 +196,12 @@ func (g *glideImporter) buildProjectConstraint(pkg glidePackage) (pc gps.Project
 		return
 	}
 
-	if g.ctx.Loggers.Verbose {
+	if g.verbose {
 		if pkg.OS != "" {
-			g.ctx.Loggers.Err.Printf("  The %s package specified an os, but that isn't supported by dep yet, and will be ignored. See https://github.com/golang/dep/issues/291.\n", pkg.Name)
+			g.logger.Printf("  The %s package specified an os, but that isn't supported by dep yet, and will be ignored. See https://github.com/golang/dep/issues/291.\n", pkg.Name)
 		}
 		if pkg.Arch != "" {
-			g.ctx.Loggers.Err.Printf("  The %s package specified an arch, but that isn't supported by dep yet, and will be ignored. See https://github.com/golang/dep/issues/291.\n", pkg.Name)
+			g.logger.Printf("  The %s package specified an arch, but that isn't supported by dep yet, and will be ignored. See https://github.com/golang/dep/issues/291.\n", pkg.Name)
 		}
 	}
 
@@ -219,10 +222,10 @@ func (g *glideImporter) buildLockedProject(pkg glideLockedPackage) gps.LockedPro
 	if err != nil {
 		// Warn about the problem, it is not enough to warrant failing
 		warn := errors.Wrapf(err, "Unable to lookup the version represented by %s in %s(%s). Falling back to locking the revision only.", revision, pi.ProjectRoot, pi.Source)
-		g.ctx.Err.Printf(warn.Error())
+		g.logger.Printf(warn.Error())
 		version = revision
 	}
 
-	feedback(version, pi.ProjectRoot, fb.DepTypeImported, g.ctx)
+	feedback(version, pi.ProjectRoot, fb.DepTypeImported, g.logger)
 	return gps.NewLockedProject(pi, version, nil)
 }

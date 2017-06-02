@@ -6,8 +6,7 @@ package feedback
 
 import (
 	"fmt"
-
-	"github.com/golang/dep"
+	"log"
 )
 
 // Constraint types
@@ -30,7 +29,7 @@ type ConstraintFeedback struct {
 }
 
 // LogFeedback logs the feedback
-func (cf ConstraintFeedback) LogFeedback(ctx *dep.Ctx) {
+func (cf ConstraintFeedback) LogFeedback(logger *log.Logger) {
 	// "Using" feedback for direct dep
 	if cf.DependencyType == DepTypeDirect || cf.DependencyType == DepTypeImported {
 		ver := cf.Version
@@ -38,12 +37,12 @@ func (cf ConstraintFeedback) LogFeedback(ctx *dep.Ctx) {
 		if cf.ConstraintType == ConsTypeHint {
 			ver = cf.Revision
 		}
-		ctx.Loggers.Err.Printf("  %v", GetUsingFeedback(ver, cf.ConstraintType, cf.DependencyType, cf.ProjectPath))
+		logger.Printf("  %v", GetUsingFeedback(ver, cf.ConstraintType, cf.DependencyType, cf.ProjectPath))
 	}
 	// No "Locking" feedback for hints. "Locking" feedback only for constraint
 	// and transitive dep
 	if cf.ConstraintType != ConsTypeHint {
-		ctx.Loggers.Err.Printf("  %v", GetLockingFeedback(cf.LockedVersion, cf.Revision, cf.DependencyType, cf.ProjectPath))
+		logger.Printf("  %v", GetLockingFeedback(cf.LockedVersion, cf.Revision, cf.DependencyType, cf.ProjectPath))
 	}
 }
 
