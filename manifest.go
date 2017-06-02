@@ -8,11 +8,14 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"path/filepath"
 	"reflect"
 	"regexp"
 	"sort"
+	"strings"
 
 	"github.com/golang/dep/internal/gps"
+	"github.com/golang/dep/internal/gps/pkgtree"
 	"github.com/pelletier/go-toml"
 	"github.com/pkg/errors"
 )
@@ -282,14 +285,29 @@ func (m *Manifest) Overrides() gps.ProjectConstraints {
 }
 
 // IgnoredPackages returns a set of import paths to ignore.
-func (m *Manifest) IgnoredPackages() map[string]bool {
+func (m *Manifest) IgnoredPackages(solveParam gps.SolveParameters) map[string]bool {
 	if len(m.Ignored) == 0 {
 		return nil
 	}
 
 	mp := make(map[string]bool, len(m.Ignored))
 	for _, i := range m.Ignored {
-		mp[i] = true
+		// Check if the path has glob syntax (/...)
+		dir, base := filepath.Split(i)
+		if base == "..." {
+			pkgT, _ := pkgtree.ListPackages(filepath.Join(solveParam.RootDir, dir), dir)
+
+			// Ignored root packages found in package tree of ignored package
+			for p := range pkgT.Packages {
+				for rp := range solveParam.RootPackageTree.Packages {
+					if strings.HasSuffix(rp, p) {
+						mp[rp] = true
+					}
+				}
+			}
+		} else {
+			mp[i] = true
+		}
 	}
 
 	return mp

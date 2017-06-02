@@ -183,7 +183,7 @@ func (params SolveParameters) toRootdata() (rootdata, error) {
 	}
 
 	rd := rootdata{
-		ig:      params.Manifest.IgnoredPackages(),
+		ig:      params.Manifest.IgnoredPackages(params),
 		req:     params.Manifest.RequiredPackages(),
 		ovr:     params.Manifest.Overrides(),
 		rpt:     params.RootPackageTree.Copy(),

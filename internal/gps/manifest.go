@@ -50,7 +50,7 @@ type RootManifest interface {
 	//
 	// It is an error to include a package in both the ignored and required
 	// sets.
-	IgnoredPackages() map[string]bool
+	IgnoredPackages(SolveParameters) map[string]bool
 
 	// RequiredPackages returns a set of import paths to require. These packages
 	// are required to be present in any solution. The list can include main
@@ -103,7 +103,7 @@ func (m simpleRootManifest) TestDependencyConstraints() ProjectConstraints {
 func (m simpleRootManifest) Overrides() ProjectConstraints {
 	return m.ovr
 }
-func (m simpleRootManifest) IgnoredPackages() map[string]bool {
+func (m simpleRootManifest) IgnoredPackages(SolveParameters) map[string]bool {
 	return m.ig
 }
 func (m simpleRootManifest) RequiredPackages() map[string]bool {
