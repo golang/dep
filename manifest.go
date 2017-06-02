@@ -292,16 +292,32 @@ func (m *Manifest) IgnoredPackages(solveParam gps.SolveParameters) map[string]bo
 
 	mp := make(map[string]bool, len(m.Ignored))
 	for _, i := range m.Ignored {
-		// Check if the path has glob syntax (/...)
-		dir, base := filepath.Split(i)
-		if base == "..." {
-			pkgT, _ := pkgtree.ListPackages(filepath.Join(solveParam.RootDir, dir), dir)
+		// Check if it's a local package path
+		if strings.HasPrefix(i, "./") {
+			// Clean ./ from path
+			i = filepath.Clean(i)
+			rootPkgT := solveParam.RootPackageTree
 
-			// Ignored root packages found in package tree of ignored package
-			for p := range pkgT.Packages {
+			// Check if the path has glob syntax (/...)
+			if strings.HasSuffix(i, "/...") {
+				dir := filepath.Dir(i)
+				pkgT, _ := pkgtree.ListPackages(filepath.Join(solveParam.RootDir, dir), dir)
+
+				// Ignore root packages found in package tree of ignored package
+				for p := range pkgT.Packages {
+					for rp := range solveParam.RootPackageTree.Packages {
+						if strings.HasSuffix(rp, filepath.Join(rootPkgT.ImportRoot, p)) {
+							mp[rp] = true
+							break
+						}
+					}
+				}
+			} else {
+				// Ignore root package found in local ignored package
 				for rp := range solveParam.RootPackageTree.Packages {
-					if strings.HasSuffix(rp, p) {
+					if strings.HasSuffix(rp, filepath.Join(rootPkgT.ImportRoot, i)) {
 						mp[rp] = true
+						break
 					}
 				}
 			}

@@ -1,0 +1,9 @@
+{
+  "commands": [
+    ["ensure"]
+  ],
+  "error-expected": "",
+  "vendor-final": [
+    "github.com/sdboyer/deptest"
+  ]
+}
