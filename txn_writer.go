@@ -162,6 +162,7 @@ type rawStringDiff struct {
 	*gps.StringDiff
 }
 
+// MarshalTOML serializes the diff as a string.
 func (diff rawStringDiff) MarshalTOML() ([]byte, error) {
 	return []byte(diff.String()), nil
 }
@@ -452,6 +453,7 @@ fail:
 	return failerr
 }
 
+// PrintPreparedActions logs the actions a call to Write would perform.
 func (sw *SafeWriter) PrintPreparedActions(output *log.Logger) error {
 	if sw.HasManifest() {
 		output.Printf("Would have written the following %s:\n", ManifestName)
@@ -496,6 +498,7 @@ func (sw *SafeWriter) PrintPreparedActions(output *log.Logger) error {
 	return nil
 }
 
+// PruneProject removes unused packages from a project.
 func PruneProject(p *Project, sm gps.SourceManager, logger *log.Logger) error {
 	td, err := ioutil.TempDir(os.TempDir(), "dep")
 	if err != nil {
