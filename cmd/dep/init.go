@@ -126,6 +126,8 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 		return err
 	}
 
+	rootAnalyzer.skipTools = true // Don't import external config during solve for now
+
 	params := gps.SolveParameters{
 		RootDir:         root,
 		RootPackageTree: pkgT,
