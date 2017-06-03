@@ -78,6 +78,16 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 		}
 	}
 
+	// The root path may lie within a symlinked directory, resolve the path
+	// before moving forward
+	var err error
+	root, ctx.GOPATH, err = ctx.ResolveProjectRootAndGoPath(root)
+	if err != nil {
+		return errors.Wrapf(err, "resolve project root")
+	} else if ctx.GOPATH == "" {
+		return errors.New("project not within a GOPATH")
+	}
+
 	mf := filepath.Join(root, dep.ManifestName)
 	lf := filepath.Join(root, dep.LockName)
 	vpath := filepath.Join(root, "vendor")
