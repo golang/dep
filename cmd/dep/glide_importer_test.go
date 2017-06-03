@@ -38,8 +38,6 @@ func newTestContext(h *test.Helper) *dep.Ctx {
 }
 
 func TestGlideConfig_Import(t *testing.T) {
-	t.Parallel()
-
 	h := test.NewHelper(t)
 	defer h.Cleanup()
 
@@ -90,7 +88,6 @@ func TestGlideConfig_Import(t *testing.T) {
 }
 
 func TestGlideConfig_Import_MissingLockFile(t *testing.T) {
-	t.Parallel()
 
 	h := test.NewHelper(t)
 	defer h.Cleanup()
@@ -125,7 +122,6 @@ func TestGlideConfig_Import_MissingLockFile(t *testing.T) {
 }
 
 func TestGlideConfig_Convert_Project(t *testing.T) {
-	t.Parallel()
 
 	h := test.NewHelper(t)
 	defer h.Cleanup()
@@ -216,8 +212,6 @@ func TestGlideConfig_Convert_Project(t *testing.T) {
 }
 
 func TestGlideConfig_Convert_TestProject(t *testing.T) {
-	t.Parallel()
-
 	h := test.NewHelper(t)
 	defer h.Cleanup()
 
@@ -266,8 +260,6 @@ func TestGlideConfig_Convert_TestProject(t *testing.T) {
 }
 
 func TestGlideConfig_Convert_Ignore(t *testing.T) {
-	t.Parallel()
-
 	pkg := "github.com/sdboyer/deptest"
 
 	logger := log.New(os.Stderr, "", 0)
@@ -291,8 +283,6 @@ func TestGlideConfig_Convert_Ignore(t *testing.T) {
 }
 
 func TestGlideConfig_Convert_ExcludeDir(t *testing.T) {
-	t.Parallel()
-
 	logger := log.New(os.Stderr, "", 0)
 	g := newGlideImporter(logger, true, nil)
 	g.yaml = glideYaml{
@@ -314,8 +304,6 @@ func TestGlideConfig_Convert_ExcludeDir(t *testing.T) {
 }
 
 func TestGlideConfig_Convert_ExcludeDir_IgnoresMismatchedPackageName(t *testing.T) {
-	t.Parallel()
-
 	logger := log.New(os.Stderr, "", 0)
 	g := newGlideImporter(logger, true, nil)
 	g.yaml = glideYaml{
@@ -338,8 +326,6 @@ func TestGlideConfig_Convert_ExcludeDir_IgnoresMismatchedPackageName(t *testing.
 }
 
 func TestGlideConfig_Convert_WarnsForUnusedFields(t *testing.T) {
-	t.Parallel()
-
 	testCases := map[string]glidePackage{
 		"specified an os":   {OS: "windows"},
 		"specified an arch": {Arch: "i686"},
@@ -372,8 +358,6 @@ func TestGlideConfig_Convert_WarnsForUnusedFields(t *testing.T) {
 }
 
 func TestGlideConfig_Convert_BadInput_EmptyPackageName(t *testing.T) {
-	t.Parallel()
-
 	logger := log.New(os.Stderr, "", 0)
 	g := newGlideImporter(logger, true, nil)
 	g.yaml = glideYaml{
