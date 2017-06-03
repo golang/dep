@@ -161,8 +161,8 @@ func (c *Ctx) LoadProject() (*Project, error) {
 	return p, nil
 }
 
-// ResolveProjectRoot evaluates the project root and the containing GOPATH by doing
-// the following:
+// ResolveProjectRootAndGoPath evaluates the project root and the containing GOPATH
+// by doing the following:
 //
 // If path isn't a symlink and is within a GOPATH, path and its GOPATH are returned.
 //
@@ -207,15 +207,15 @@ func (c *Ctx) ResolveProjectRootAndGoPath(path string) (string, string, error) {
 
 	// path and resolved are within different GOPATHs
 	if pgp != "" && rgp != "" && pgp == rgp {
-		return "", "", errors.Errorf("path %s resolved to %s, each is in a different GOPATH")
+		return "", "", errors.Errorf("path %s resolved to %s, each is in a different GOPATH", path, resolved)
 	}
 
 	// Otherwise, either the symlink or the resolved path is within a GOPATH.
 	if pgp == "" {
 		return resolved, rgp, nil
-	} else {
-		return path, pgp, nil
 	}
+
+	return path, pgp, nil
 }
 
 // detectGoPath detects the GOPATH for a given path from ctx.GOPATHS.
