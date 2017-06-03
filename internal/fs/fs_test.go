@@ -797,7 +797,7 @@ func TestIsSymlink(t *testing.T) {
 		inaccessibleSymlink string
 	)
 
-	err, cleanup := setupInaccessibleDir(func(dir string) error {
+	cleanup := setupInaccessibleDir(t, func(dir string) error {
 		inaccessibleFile = filepath.Join(dir, "file")
 		if fh, err := os.Create(inaccessibleFile); err != nil {
 			return err
@@ -809,9 +809,6 @@ func TestIsSymlink(t *testing.T) {
 		return os.Symlink(inaccessibleFile, inaccessibleSymlink)
 	})
 	defer cleanup()
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	tests := map[string]struct {
 		expected bool
