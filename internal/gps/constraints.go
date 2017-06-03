@@ -331,7 +331,9 @@ func (m ProjectConstraints) asSortedSlice() []ProjectConstraint {
 		k++
 	}
 
-	sort.Stable(sortedConstraints(pcs))
+	sort.SliceStable(pcs, func(i, j int) bool {
+		return pcs[i].Ident.Less(pcs[j].Ident)
+	})
 	return pcs
 }
 
@@ -348,7 +350,9 @@ func (m ProjectConstraints) overrideAll(pcm ProjectConstraints) (out []workingCo
 		k++
 	}
 
-	sort.Stable(sortedWC(out))
+	sort.SliceStable(out, func(i, j int) bool {
+		return out[i].Ident.Less(out[j].Ident)
+	})
 	return
 }
 
@@ -389,15 +393,3 @@ func (m ProjectConstraints) override(pr ProjectRoot, pp ProjectProperties) worki
 
 	return wc
 }
-
-type sortedConstraints []ProjectConstraint
-
-func (s sortedConstraints) Len() int           { return len(s) }
-func (s sortedConstraints) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
-func (s sortedConstraints) Less(i, j int) bool { return s[i].Ident.less(s[j].Ident) }
-
-type sortedWC []workingConstraint
-
-func (s sortedWC) Len() int           { return len(s) }
-func (s sortedWC) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
-func (s sortedWC) Less(i, j int) bool { return s[i].Ident.less(s[j].Ident) }

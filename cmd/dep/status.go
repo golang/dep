@@ -341,7 +341,9 @@ func runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceMana
 	// deterministically ordered. (This may be superfluous if the lock is always
 	// written in alpha order, but it doesn't hurt to double down.)
 	slp := p.Lock.Projects()
-	sort.Sort(dep.SortedLockedProjects(slp))
+	sort.Slice(slp, func(i, j int) bool {
+		return slp[i].Ident().Less(slp[j].Ident())
+	})
 
 	if bytes.Equal(s.HashInputs(), p.Lock.SolveMeta.InputsDigest) {
 		// If these are equal, we're guaranteed that the lock is a transitively
