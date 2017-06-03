@@ -376,3 +376,26 @@ func IsSymlink(path string) (bool, error) {
 
 	return l.Mode()&os.ModeSymlink == os.ModeSymlink, nil
 }
+
+// ResolvePath resolves the path of the given symlink. If the given path is not a symlink,
+// then it returns the same path.
+func ResolvePath(path string) (string, error) {
+	// Determine if this path is a Symlink
+	l, err := os.Lstat(path)
+	if err != nil {
+		return "", errors.Wrap(err, "ResolveSymlink")
+	}
+
+	// Pass through if not
+	if l.Mode()&os.ModeSymlink == 0 {
+		return path, nil
+	}
+
+	// Resolve path
+	resolved, err := filepath.EvalSymlinks(path)
+	if err != nil {
+		return "", errors.Wrap(err, "ResolveSymlink")
+	}
+
+	return resolved, nil
+}
