@@ -189,11 +189,14 @@ There's another major performance issue that's much harder - the process of pick
 > because we're not crazy people who delight in inviting chaos into our lives, we need to work within one GOPATH at a time.
 -[@sdboyer in #247](https://github.com/golang/dep/pull/247#issuecomment-284181879)
 
-Out of convenience, one might create a symlink to a directory within their `GOPATH`, e.g. `ln -s ~/go/src/github.com/golang/dep dep`. When `dep` is invoked it will resolve the current working directory accordingly:
+Out of convenience, one might create a symlink to a directory within their `GOPATH/src`, e.g. `ln -s ~/go/src/github.com/user/awesome-project ~/Code/awesome-project`.
 
-- If the cwd is a symlink outside a `GOPATH` and links to directory within a `GOPATH`, or vice versa, `dep` chooses whichever path is within the `GOPATH`.  If neither path is within a `GOPATH`, `dep` produces an error.
-- If both the cwd and resolved path are in the same `GOPATH`, an error is thrown since the users intentions and expectations can't be accurately deduced.
-- If the symlink is within a `GOPATH` and the real path is within a *different* `GOPATH` - an error is thrown.
+When `dep` is invoked with a project root that is a symlink, it will be resolved according to the following rules:
+
+- If the symlink is outside `GOPATH` and links to a directory within a `GOPATH`, or vice versa, then `dep` will choose whichever path is within `GOPATH`.
+- If the symlink is within a `GOPATH` and the resolved path is within a *different* `GOPATH`, then an error is thrown.
+- If both the symlink and the resolved path are in the same `GOPATH`, then an error is thrown.
+- If both the symlink and the resolved path are not in a `GOPATH`, then an error is thrown.
 
 This is the only symbolic link support that `dep` really intends to provide. In keeping with the general practices of the `go` tool, `dep` tends to either ignore symlinks (when walking) or copy the symlink itself, depending on the filesystem operation being performed.
 
