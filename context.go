@@ -19,9 +19,9 @@ import (
 
 // Ctx defines the supporting context of the tool.
 type Ctx struct {
-	GOPATH     string   // Selected Go path
-	GOPATHS    []string // Other Go paths
 	WorkingDir string
+	GOPATHS    []string // Other Go paths
+	GOPATH     string   // Selected Go path
 	*Loggers
 }
 
@@ -32,30 +32,21 @@ type Loggers struct {
 	Verbose bool
 }
 
-// NewContext creates a struct with the project's GOPATH. It assumes
-// that of your "GOPATH"'s we want the one we are currently in.
-func NewContext(wd string, env []string, loggers *Loggers) (*Ctx, error) {
+// NewContext creates a struct with all the environment's GOPATHs.
+func NewContext(wd string, env []string, loggers *Loggers) *Ctx {
 	ctx := &Ctx{WorkingDir: wd, Loggers: loggers}
 
 	GOPATH := getEnv(env, "GOPATH")
+
 	if GOPATH == "" {
 		GOPATH = defaultGOPATH()
 	}
+
 	for _, gp := range filepath.SplitList(GOPATH) {
-		gp = filepath.FromSlash(gp)
-
-		if fs.HasFilepathPrefix(filepath.FromSlash(wd), gp) {
-			ctx.GOPATH = gp
-		}
-
-		ctx.GOPATHS = append(ctx.GOPATHS, gp)
+		ctx.GOPATHS = append(ctx.GOPATHS, filepath.FromSlash(gp))
 	}
 
-	if ctx.GOPATH == "" {
-		return nil, errors.New("project not in a GOPATH")
-	}
-
-	return ctx, nil
+	return ctx
 }
 
 // getEnv returns the last instance of an environment variable.
@@ -116,9 +107,11 @@ func (c *Ctx) LoadProject() (*Project, error) {
 
 	// The path may lie within a symlinked directory, resolve the path
 	// before moving forward
-	p.AbsRoot, err = c.resolveProjectRoot(p.AbsRoot)
+	p.AbsRoot, c.GOPATH, err = c.ResolveProjectRootAndGoPath(p.AbsRoot)
 	if err != nil {
 		return nil, errors.Wrapf(err, "resolve project root")
+	} else if c.GOPATH == "" {
+		return nil, errors.New("project not within a GOPATH")
 	}
 
 	ip, err := c.SplitAbsoluteProjectRoot(p.AbsRoot)
@@ -168,41 +161,72 @@ func (c *Ctx) LoadProject() (*Project, error) {
 	return p, nil
 }
 
-// resolveProjectRoot evaluates the root directory and does the following:
+// ResolveProjectRoot evaluates the project root and the containing GOPATH by doing
+// the following:
 //
-// If the passed path is a symlink outside GOPATH to a directory within a
-// GOPATH, the resolved full real path is returned.
+// If path isn't a symlink and is within a GOPATH, path and its GOPATH are returned.
 //
-// If the passed path is a symlink within a GOPATH, we return an error.
+// If path is a symlink not within any GOPATH and resolves to a directory within a
+// GOPATH, the resolved path and its GOPATH are returned.
 //
-// If the passed path isn't a symlink at all, we just pass through.
-func (c *Ctx) resolveProjectRoot(path string) (string, error) {
-	// Determine if this path is a Symlink
-	l, err := os.Lstat(path)
+// ResolveProjectRootAndGoPath will return an error in the following cases:
+//
+// If path is not a symlink and it's not within any GOPATH.
+// If both path and the directory it resolves to are not within any GOPATH.
+// If path is a symlink within a GOPATH, an error is returned.
+// If both path and the directory it resolves to are within the same GOPATH.
+// If path and the directory it resolves to are each within a different GOPATH.
+func (c *Ctx) ResolveProjectRootAndGoPath(path string) (string, string, error) {
+	pgp, pgperr := c.detectGoPath(path)
+
+	if sym, err := fs.IsSymlink(path); err != nil {
+		return "", "", errors.Wrap(err, "IsSymlink")
+	} else if !sym {
+		// If path is not a symlink and detectGoPath failed, then we assume that path is not
+		// within a known GOPATH.
+		if pgperr != nil {
+			return "", "", errors.Errorf("project root %v not within a GOPATH", path)
+		}
+		return path, pgp, nil
+	}
+
+	resolved, err := fs.ResolvePath(path)
 	if err != nil {
-		return "", errors.Wrap(err, "resolveProjectRoot")
+		return "", "", errors.Wrap(err, "resolveProjectRoot")
 	}
 
-	// Pass through if not
-	if l.Mode()&os.ModeSymlink == 0 {
-		return path, nil
+	rgp, rgperr := c.detectGoPath(resolved)
+	if pgperr != nil && rgperr != nil {
+		return "", "", errors.Errorf("path %s resolved to %s, both are not within any GOPATH", path, resolved)
 	}
 
-	// Resolve path
-	resolved, err := filepath.EvalSymlinks(path)
-	if err != nil {
-		return "", errors.Wrap(err, "resolveProjectRoot")
+	// If pgp equals rgp, then both are within the same GOPATH.
+	if pgp == rgp {
+		return "", "", errors.Errorf("path %s resolved to %s, both in the same GOPATH %s", path, resolved, pgp)
 	}
 
-	// Determine if the symlink is within any of the GOPATHs, in which case we're not
-	// sure how to resolve it.
+	// path and resolved are within different GOPATHs
+	if pgp != "" && rgp != "" && pgp == rgp {
+		return "", "", errors.Errorf("path %s resolved to %s, each is in a different GOPATH")
+	}
+
+	// Otherwise, either the symlink or the resolved path is within a GOPATH.
+	if pgp == "" {
+		return resolved, rgp, nil
+	} else {
+		return path, pgp, nil
+	}
+}
+
+// detectGoPath detects the GOPATH for a given path from ctx.GOPATHS.
+func (c *Ctx) detectGoPath(path string) (string, error) {
 	for _, gp := range c.GOPATHS {
-		if fs.HasFilepathPrefix(path, gp) {
-			return "", errors.Errorf("'%s' is linked to another path within a GOPATH (%s)", path, gp)
+		if fs.HasFilepathPrefix(filepath.FromSlash(path), gp) {
+			return gp, nil
 		}
 	}
 
-	return resolved, nil
+	return "", errors.Errorf("Unable to detect GOPATH for %s", path)
 }
 
 // SplitAbsoluteProjectRoot takes an absolute path and compares it against declared

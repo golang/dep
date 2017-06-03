@@ -149,12 +149,7 @@ func (c *Config) Run() (exitCode int) {
 			}
 
 			// Set up the dep context.
-			ctx, err := dep.NewContext(c.WorkingDir, c.Env, loggers)
-			if err != nil {
-				loggers.Err.Println(err)
-				exitCode = 1
-				return
-			}
+			ctx := dep.NewContext(c.WorkingDir, c.Env, loggers)
 
 			// Run the command with the post-flag-processing args.
 			if err := cmd.Run(ctx, fs.Args()); err != nil {
