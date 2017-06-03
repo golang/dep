@@ -5,7 +5,7 @@
   name = "github.com/sdboyer/deptest"
   packages = ["."]
   revision = "3f4c3bea144e112a69bbe5d8d01c1b09a544253f"
-  version = "master"
+  version = "v0.8.1"
 
 [[projects]]
   name = "github.com/sdboyer/deptestdos"

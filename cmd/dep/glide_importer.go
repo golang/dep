@@ -178,11 +178,11 @@ func (g *glideImporter) convert(pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock, e
 		lock = &dep.Lock{}
 
 		for _, pkg := range g.lock.Imports {
-			lp := g.buildLockedProject(pkg)
+			lp := g.buildLockedProject(pkg, manifest)
 			lock.P = append(lock.P, lp)
 		}
 		for _, pkg := range g.lock.TestImports {
-			lp := g.buildLockedProject(pkg)
+			lp := g.buildLockedProject(pkg, manifest)
 			lock.P = append(lock.P, lp)
 		}
 	}
@@ -217,19 +217,18 @@ func (g *glideImporter) buildProjectConstraint(pkg glidePackage) (pc gps.Project
 	return
 }
 
-func (g *glideImporter) buildLockedProject(pkg glideLockedPackage) gps.LockedProject {
+func (g *glideImporter) buildLockedProject(pkg glideLockedPackage, manifest *dep.Manifest) gps.LockedProject {
 	pi := gps.ProjectIdentifier{
 		ProjectRoot: gps.ProjectRoot(pkg.Name),
 		Source:      pkg.Repository,
 	}
 	revision := gps.Revision(pkg.Reference)
+	pp := manifest.Constraints[pi.ProjectRoot]
 
-	version, err := lookupVersionForRevision(revision, pi, g.sm)
+	version, err := lookupVersionForLockedProject(pi, pp.Constraint, revision, g.sm)
 	if err != nil {
-		// Warn about the problem, it is not enough to warrant failing
-		warn := errors.Wrapf(err, "Unable to lookup the version represented by %s in %s(%s). Falling back to locking the revision only.", revision, pi.ProjectRoot, pi.Source)
-		g.logger.Printf(warn.Error())
-		version = revision
+		// Only warn about the problem, it is not enough to warrant failing
+		g.logger.Println(err.Error())
 	}
 
 	lp := gps.NewLockedProject(pi, version, nil)
