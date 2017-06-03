@@ -39,20 +39,8 @@ func LocksAreEq(l1, l2 Lock, checkHash bool) bool {
 		return false
 	}
 
-	// Check if the slices are sorted already. If they are, we can compare
-	// without copying. Otherwise, we have to copy to avoid altering the
-	// original input.
-	sp1, sp2 := lpsorter(p1), lpsorter(p2)
-	if len(p1) > 1 && !sort.IsSorted(sp1) {
-		p1 = make([]LockedProject, len(p1))
-		copy(p1, l1.Projects())
-		sort.Sort(lpsorter(p1))
-	}
-	if len(p2) > 1 && !sort.IsSorted(sp2) {
-		p2 = make([]LockedProject, len(p2))
-		copy(p2, l2.Projects())
-		sort.Sort(lpsorter(p2))
-	}
+	p1 = sortedLockedProjects(p1)
+	p2 = sortedLockedProjects(p2)
 
 	for k, lp := range p1 {
 		if !lp.Eq(p2[k]) {
@@ -60,6 +48,21 @@ func LocksAreEq(l1, l2 Lock, checkHash bool) bool {
 		}
 	}
 	return true
+}
+
+// sortedLockedProjects returns a sorted copy of lps, or itself if already sorted.
+func sortedLockedProjects(lps []LockedProject) []LockedProject {
+	if len(lps) <= 1 || sort.SliceIsSorted(lps, func(i, j int) bool {
+		return lps[i].Ident().Less(lps[j].Ident())
+	}) {
+		return lps
+	}
+	cp := make([]LockedProject, len(lps))
+	copy(cp, lps)
+	sort.Slice(cp, func(i, j int) bool {
+		return cp[i].Ident().Less(cp[j].Ident())
+	})
+	return cp
 }
 
 // LockedProject is a single project entry from a lock file. It expresses the
@@ -229,24 +232,4 @@ func prepLock(l Lock) safeLock {
 	copy(rl.p, pl)
 
 	return rl
-}
-
-// SortLockedProjects sorts a slice of LockedProject in alphabetical order by
-// ProjectIdentifier.
-func SortLockedProjects(lps []LockedProject) {
-	sort.Stable(lpsorter(lps))
-}
-
-type lpsorter []LockedProject
-
-func (lps lpsorter) Swap(i, j int) {
-	lps[i], lps[j] = lps[j], lps[i]
-}
-
-func (lps lpsorter) Len() int {
-	return len(lps)
-}
-
-func (lps lpsorter) Less(i, j int) bool {
-	return lps[i].Ident().less(lps[j].Ident())
 }
