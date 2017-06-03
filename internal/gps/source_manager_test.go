@@ -2,41 +2,41 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package main
+package gps
 
 import (
 	"reflect"
 	"testing"
 
-	"github.com/golang/dep/internal/gps"
 	"github.com/golang/dep/internal/test"
 )
 
-func TestDeduceConstraint(t *testing.T) {
+func TestSourceManager_InferConstraint(t *testing.T) {
 	t.Parallel()
 	h := test.NewHelper(t)
 	cacheDir := "gps-repocache"
 	h.TempDir(cacheDir)
-	sm, err := gps.NewSourceManager(h.Path(cacheDir))
+	sm, err := NewSourceManager(h.Path(cacheDir))
 	h.Must(err)
 
-	sv, err := gps.NewSemverConstraintIC("v0.8.1")
+	sv, err := NewSemverConstraintIC("v0.8.1")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	constraints := map[string]gps.Constraint{
+	constraints := map[string]Constraint{
 		"v0.8.1": sv,
-		"master": gps.NewBranch("master"),
-		"5b3352dc16517996fb951394bcbbe913a2a616e3": gps.Revision("5b3352dc16517996fb951394bcbbe913a2a616e3"),
+		"v2":     NewBranch("v2"),
+		"master": NewBranch("master"),
+		"5b3352dc16517996fb951394bcbbe913a2a616e3": Revision("5b3352dc16517996fb951394bcbbe913a2a616e3"),
 
 		// valid bzr rev
-		"jess@linux.com-20161116211307-wiuilyamo9ian0m7": gps.Revision("jess@linux.com-20161116211307-wiuilyamo9ian0m7"),
+		"jess@linux.com-20161116211307-wiuilyamo9ian0m7": Revision("jess@linux.com-20161116211307-wiuilyamo9ian0m7"),
 		// invalid bzr rev
-		"go4@golang.org-sadfasdf-": gps.NewVersion("go4@golang.org-sadfasdf-"),
+		"go4@golang.org-sadfasdf-": NewVersion("go4@golang.org-sadfasdf-"),
 	}
 
-	pi := gps.ProjectIdentifier{ProjectRoot: "github.com/sdboyer/deptest"}
+	pi := ProjectIdentifier{ProjectRoot: "github.com/carolynvs/deptest"}
 	for str, want := range constraints {
 		got, err := sm.InferConstraint(str, pi)
 		h.Must(err)
@@ -52,12 +52,12 @@ func TestDeduceConstraint(t *testing.T) {
 	}
 }
 
-func TestDeduceConstraint_InvalidInput(t *testing.T) {
+func TestSourceManager_InferConstraint_InvalidInput(t *testing.T) {
 	h := test.NewHelper(t)
 
 	cacheDir := "gps-repocache"
 	h.TempDir(cacheDir)
-	sm, err := gps.NewSourceManager(h.Path(cacheDir))
+	sm, err := NewSourceManager(h.Path(cacheDir))
 	h.Must(err)
 
 	constraints := []string{
@@ -66,7 +66,7 @@ func TestDeduceConstraint_InvalidInput(t *testing.T) {
 		"20120425195858-psty8c35ve2oej8t",
 	}
 
-	pi := gps.ProjectIdentifier{ProjectRoot: "github.com/sdboyer/deptest"}
+	pi := ProjectIdentifier{ProjectRoot: "github.com/sdboyer/deptest"}
 	for _, str := range constraints {
 		_, err := sm.InferConstraint(str, pi)
 		if err == nil {

@@ -214,8 +214,8 @@ func TestGodepConfig_ConvertProject_EmptyComment(t *testing.T) {
 	}
 
 	ver := lpv.String()
-	if ver != "^1.0.0" {
-		t.Fatalf("Expected locked version to be '^1.0.0', got %s", ver)
+	if ver != "v1.0.0" {
+		t.Fatalf("Expected locked version to be 'v1.0.0', got %s", ver)
 	}
 }
 

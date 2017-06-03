@@ -173,11 +173,15 @@ func (a *rootAnalyzer) Info() gps.ProjectAnalyzerInfo {
 	}
 }
 
-func lookupVersionForRevision(rev gps.Revision, pi gps.ProjectIdentifier, sm gps.SourceManager) (gps.Version, error) {
+// lookupVersionForLockedProject figures out the appropriate version for a locked
+// project based on the locked revision and the constraint from the manifest.
+// First try matching the revision to a version, then try the constraint from the
+// manifest, then finally the revision.
+func lookupVersionForLockedProject(pi gps.ProjectIdentifier, c gps.Constraint, rev gps.Revision, sm gps.SourceManager) (gps.Version, error) {
 	// Find the version that goes with this revision, if any
 	versions, err := sm.ListVersions(pi)
 	if err != nil {
-		return nil, errors.Wrapf(err, "Unable to list versions for %s(%s)", pi.ProjectRoot, pi.Source)
+		return rev, errors.Wrapf(err, "Unable to lookup the version represented by %s in %s(%s). Falling back to locking the revision only.", rev, pi.ProjectRoot, pi.Source)
 	}
 
 	gps.SortPairedForUpgrade(versions) // Sort versions in asc order
@@ -187,5 +191,14 @@ func lookupVersionForRevision(rev gps.Revision, pi gps.ProjectIdentifier, sm gps
 		}
 	}
 
+	// Use the version from the manifest as long as it wasn't a range
+	switch tv := c.(type) {
+	case gps.PairedVersion:
+		return tv.Unpair().Pair(rev), nil
+	case gps.UnpairedVersion:
+		return tv.Pair(rev), nil
+	}
+
+	// Give up and lock only to a revision
 	return rev, nil
 }
