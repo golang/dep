@@ -39,13 +39,14 @@ func findProjectRoot(from string) (string, error) {
 	}
 }
 
+// A Project holds a Manifest and optional Lock for a project.
 type Project struct {
 	// AbsRoot is the absolute path to the root directory of the project.
 	AbsRoot string
 	// ImportRoot is the import path of the project's root directory.
 	ImportRoot gps.ProjectRoot
 	Manifest   *Manifest
-	Lock       *Lock
+	Lock       *Lock // Optional
 }
 
 // MakeParams is a simple helper to create a gps.SolveParameters without setting
