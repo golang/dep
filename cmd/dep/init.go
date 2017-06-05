@@ -8,7 +8,6 @@ import (
 	"flag"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/golang/dep"
@@ -203,11 +202,4 @@ func getDirectDependencies(root, cpr string) (pkgtree.PackageTree, map[string]bo
 // TODO solve failures can be really creative - we need to be similarly creative
 // in handling them and informing the user appropriately
 func handleAllTheFailuresOfTheWorld(err error) {
-}
-
-func hasImportPathPrefix(s, prefix string) bool {
-	if s == prefix {
-		return true
-	}
-	return strings.HasPrefix(s, prefix+"/")
 }
