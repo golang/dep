@@ -35,6 +35,7 @@ Flags:
   -add: add new dependencies
   -no-vendor: update Gopkg.lock if needed, but do not update vendor/
   -vendor-only: populate vendor/ without updating Gopkg.lock
+  -dry-run: only report the changes that would be made
 
 
 Ensure gets a project into a complete, compilable, and reproducible state:
@@ -115,6 +116,7 @@ func (cmd *ensureCommand) Register(fs *flag.FlagSet) {
 	fs.BoolVar(&cmd.add, "add", false, "add new dependencies, or populate Gopkg.toml with constraints for existing dependencies")
 	fs.BoolVar(&cmd.vendorOnly, "vendor-only", false, "populate vendor/ from Gopkg.lock without updating it first")
 	fs.BoolVar(&cmd.noVendor, "no-vendor", false, "update Gopkg.lock (if needed), but do not update vendor/")
+	fs.BoolVar(&cmd.dryRun, "dry-run", false, "only report the changes that would be made")
 }
 
 type ensureCommand struct {
