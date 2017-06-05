@@ -91,7 +91,12 @@ func (g *gopathScanner) overlay(rootM *dep.Manifest, rootL *dep.Lock) {
 		}
 		rootM.Constraints[pkg] = prj
 		v := g.pd.ondisk[pkg]
-		feedback(v, pkg, fb.DepTypeDirect, g.ctx.Err)
+
+		pi := gps.ProjectIdentifier{ProjectRoot: pkg, Source: prj.Source}
+		f := fb.NewConstraintFeedback(gps.ProjectConstraint{Ident: pi, Constraint: v}, fb.DepTypeDirect)
+		f.LogFeedback(g.ctx.Err)
+		f = fb.NewLockedProjectFeedback(gps.NewLockedProject(pi, v, nil), fb.DepTypeDirect)
+		f.LogFeedback(g.ctx.Err)
 	}
 
 	// Keep track of which projects have been locked
@@ -109,8 +114,8 @@ func (g *gopathScanner) overlay(rootM *dep.Manifest, rootL *dep.Lock) {
 		lockedProjects[pkg] = true
 
 		if _, isDirect := g.directDeps[string(pkg)]; !isDirect {
-			v := g.pd.ondisk[pkg]
-			feedback(v, pkg, fb.DepTypeTransitive, g.ctx.Err)
+			f := fb.NewLockedProjectFeedback(lp, fb.DepTypeTransitive)
+			f.LogFeedback(g.ctx.Err)
 		}
 	}
 
