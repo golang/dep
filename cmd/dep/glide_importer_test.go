@@ -6,8 +6,8 @@ package main
 
 import (
 	"bytes"
+	"io/ioutil"
 	"log"
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -20,20 +20,17 @@ import (
 
 const testGlideProjectRoot = "github.com/golang/notexist"
 
-func newTestLoggers() *dep.Loggers {
-	return &dep.Loggers{
-		Out:     log.New(os.Stdout, "", 0),
-		Err:     log.New(os.Stderr, "", 0),
-		Verbose: true,
-	}
-}
+var (
+	discardLogger  = log.New(ioutil.Discard, "", 0)
+	discardLoggers = &dep.Loggers{Out: discardLogger, Err: discardLogger}
+)
 
 func newTestContext(h *test.Helper) *dep.Ctx {
 	h.TempDir("src")
 	pwd := h.Path(".")
 	return &dep.Ctx{
 		GOPATH:  pwd,
-		Loggers: newTestLoggers(),
+		Loggers: discardLoggers,
 	}
 }
 
@@ -103,8 +100,7 @@ func TestGlideConfig_Import_MissingLockFile(t *testing.T) {
 	h.Must(err)
 	defer sm.Release()
 
-	logger := log.New(os.Stderr, "", 0)
-	g := newGlideImporter(logger, true, sm)
+	g := newGlideImporter(discardLogger, true, sm)
 	if !g.HasDepMetadata(projectRoot) {
 		t.Fatal("The glide importer should gracefully handle when only glide.yaml is present")
 	}
@@ -262,8 +258,7 @@ func TestGlideConfig_Convert_TestProject(t *testing.T) {
 func TestGlideConfig_Convert_Ignore(t *testing.T) {
 	pkg := "github.com/sdboyer/deptest"
 
-	logger := log.New(os.Stderr, "", 0)
-	g := newGlideImporter(logger, true, nil)
+	g := newGlideImporter(discardLogger, true, nil)
 	g.yaml = glideYaml{
 		Ignores: []string{pkg},
 	}
@@ -283,8 +278,7 @@ func TestGlideConfig_Convert_Ignore(t *testing.T) {
 }
 
 func TestGlideConfig_Convert_ExcludeDir(t *testing.T) {
-	logger := log.New(os.Stderr, "", 0)
-	g := newGlideImporter(logger, true, nil)
+	g := newGlideImporter(discardLogger, true, nil)
 	g.yaml = glideYaml{
 		ExcludeDirs: []string{"samples"},
 	}
@@ -304,8 +298,7 @@ func TestGlideConfig_Convert_ExcludeDir(t *testing.T) {
 }
 
 func TestGlideConfig_Convert_ExcludeDir_IgnoresMismatchedPackageName(t *testing.T) {
-	logger := log.New(os.Stderr, "", 0)
-	g := newGlideImporter(logger, true, nil)
+	g := newGlideImporter(discardLogger, true, nil)
 	g.yaml = glideYaml{
 		Name:        "github.com/golang/mismatched-package-name",
 		ExcludeDirs: []string{"samples"},
@@ -358,8 +351,7 @@ func TestGlideConfig_Convert_WarnsForUnusedFields(t *testing.T) {
 }
 
 func TestGlideConfig_Convert_BadInput_EmptyPackageName(t *testing.T) {
-	logger := log.New(os.Stderr, "", 0)
-	g := newGlideImporter(logger, true, nil)
+	g := newGlideImporter(discardLogger, true, nil)
 	g.yaml = glideYaml{
 		Imports: []glidePackage{{Name: ""}},
 	}
