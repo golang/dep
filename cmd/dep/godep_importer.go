@@ -159,6 +159,10 @@ func (g *godepImporter) convert(pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock, e
 func (g *godepImporter) buildProjectConstraint(pkg godepPackage) (pc gps.ProjectConstraint, err error) {
 	pc.Ident = gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot(pkg.ImportPath)}
 	pc.Constraint, err = deduceConstraint(pkg.Comment, pc.Ident, g.sm)
+
+	f := fb.NewConstraintFeedback(pc, fb.DepTypeImported)
+	f.LogFeedback(g.logger)
+
 	return
 }
 
@@ -175,8 +179,11 @@ func (g *godepImporter) buildLockedProject(pkg godepPackage) gps.LockedProject {
 		version = gps.Revision(pkg.Rev)
 	}
 
-	feedback(version, pi.ProjectRoot, fb.DepTypeImported, g.logger)
-	return gps.NewLockedProject(pi, version, nil)
+	lp := gps.NewLockedProject(pi, version, nil)
+	f := fb.NewLockedProjectFeedback(lp, fb.DepTypeImported)
+	f.LogFeedback(g.logger)
+
+	return lp
 }
 
 // projectExistsInLock checks if the given import path already existing in
