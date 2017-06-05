@@ -106,7 +106,7 @@ func (l *Lock) HasProjectWithRoot(root gps.ProjectRoot) bool {
 		}
 	}
 
-	return root
+	return false
 }
 
 // toRaw converts the manifest into a representation suitable to write to the lock file

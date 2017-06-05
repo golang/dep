@@ -122,6 +122,7 @@ type ensureCommand struct {
 	add        bool
 	noVendor   bool
 	vendorOnly bool
+	dryRun     bool
 	overrides  stringSlice
 }
 
@@ -173,7 +174,6 @@ func (cmd *ensureCommand) Run(ctx *dep.Ctx, args []string) error {
 		return err
 	}
 
-	var fail error
 	if cmd.add {
 		return cmd.runAdd(ctx, args, p, sm, params)
 	} else if cmd.update {
@@ -191,14 +191,13 @@ func (cmd *ensureCommand) runDefault(ctx *dep.Ctx, args []string, p *dep.Project
 		return errors.New("dep ensure only takes spec arguments with -add or -update - did you want one of those?")
 	}
 
-	sw := &dep.SafeWriter{}
 	if cmd.vendorOnly {
 		if p.Lock == nil {
 			return errors.Errorf("no %s exists from which to populate vendor/ directory", dep.LockName)
 		}
 		// Pass the same lock as old and new so that the writer will observe no
 		// difference and choose not to write it out.
-		err := sw.Prepare(nil, p.Lock, p.Lock, dep.VendorAlways)
+		sw, err := dep.NewSafeWriter(nil, p.Lock, p.Lock, dep.VendorAlways)
 		if err != nil {
 			return err
 		}
@@ -229,7 +228,7 @@ func (cmd *ensureCommand) runDefault(ctx *dep.Ctx, args []string, p *dep.Project
 		// that "verification" is supposed to look like (#121); in the meantime,
 		// we unconditionally write out vendor/ so that `dep ensure`'s behavior
 		// is maximally compatible with what it will eventually become.
-		err := sw.Prepare(nil, p.Lock, p.Lock, dep.VendorAlways)
+		sw, err := dep.NewSafeWriter(nil, p.Lock, p.Lock, dep.VendorAlways)
 		if err != nil {
 			return err
 		}
@@ -248,9 +247,12 @@ func (cmd *ensureCommand) runDefault(ctx *dep.Ctx, args []string, p *dep.Project
 		return errors.Wrap(err, "ensure Solve()")
 	}
 
-	sw.Prepare(nil, p.Lock, dep.LockFromInterface(solution), dep.VendorOnChanged)
+	sw, err := dep.NewSafeWriter(nil, p.Lock, dep.LockFromInterface(solution), dep.VendorOnChanged)
+	if err != nil {
+		return err
+	}
 	if cmd.dryRun {
-		return sw.PrintPreparedActions()
+		return sw.PrintPreparedActions(ctx.Loggers.Out)
 	}
 
 	return nil
@@ -258,7 +260,7 @@ func (cmd *ensureCommand) runDefault(ctx *dep.Ctx, args []string, p *dep.Project
 
 func (cmd *ensureCommand) runUpdate(ctx *dep.Ctx, args []string, p *dep.Project, sm gps.SourceManager, params gps.SolveParameters) error {
 	if p.Lock == nil {
-		return errors.New("%s does not exist. nothing to do, as -update works by updating the values in %s.", dep.LockName, dep.LockName)
+		return errors.Errorf("%s does not exist. nothing to do, as -update works by updating the values in %s.", dep.LockName, dep.LockName)
 	}
 
 	// We'll need to discard this prepared solver as later work changes params,
@@ -283,7 +285,6 @@ func (cmd *ensureCommand) runUpdate(ctx *dep.Ctx, args []string, p *dep.Project,
 	// versions, regardless of the lock file.
 	if len(args) == 0 {
 		params.ChangeAll = true
-		return
 	}
 
 	// Allow any of specified project versions to change, regardless of the lock
@@ -302,8 +303,8 @@ func (cmd *ensureCommand) runUpdate(ctx *dep.Ctx, args []string, p *dep.Project,
 			return errors.Errorf("%s is not present in %s, cannot -update it", pc.Ident.ProjectRoot, dep.LockName)
 		}
 
-		if p.Ident.Source != "" {
-			return errors.Errorf("cannot specify alternate sources on -update (%s)", p.Ident)
+		if pc.Ident.Source != "" {
+			return errors.Errorf("cannot specify alternate sources on -update (%s)", pc.Ident)
 		}
 
 		if !gps.IsAny(pc.Constraint) {
@@ -326,8 +327,10 @@ func (cmd *ensureCommand) runUpdate(ctx *dep.Ctx, args []string, p *dep.Project,
 		return errors.Wrap(err, "ensure Solve()")
 	}
 
-	var sw dep.SafeWriter
-	sw.Prepare(nil, p.Lock, dep.LockFromInterface(solution), dep.VendorOnChanged)
+	sw, err := dep.NewSafeWriter(nil, p.Lock, dep.LockFromInterface(solution), dep.VendorOnChanged)
+	if err != nil {
+		return err
+	}
 	// TODO(sdboyer) special handling for warning cases as described in spec -
 	// e.g., named projects did not upgrade even though newer versions were
 	// available.
@@ -341,6 +344,14 @@ func (cmd *ensureCommand) runUpdate(ctx *dep.Ctx, args []string, p *dep.Project,
 func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm gps.SourceManager, params gps.SolveParameters) error {
 	if len(args) == 0 {
 		return errors.New("must specify at least one project or package to add")
+	}
+
+	// We'll need to discard this prepared solver as later work changes params,
+	// but solver preparation is cheap and worth doing up front in order to
+	// perform the fastpath check of hash comparison.
+	solver, err := gps.Prepare(params, sm)
+	if err != nil {
+		return errors.Wrap(err, "fastpath solver prepare")
 	}
 
 	// Compare the hashes. If they're not equal, bail out and ask the user to
@@ -357,25 +368,29 @@ func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm
 	// Having some problematic internal packages isn't cause for termination,
 	// but the user needs to be warned.
 	for fail := range errmap {
-		internal.Logf("Warning: %s", fail)
+		ctx.Loggers.Err.Printf("Warning: %s", fail)
 	}
 
+	// Compile unique sets of 1) all external packages imported or required, and
+	// 2) the project roots under which they fall.
 	exmap := make(map[string]bool)
 	exrmap := make(map[gps.ProjectRoot]bool)
-	for _, ex := range append(rm.Flatten(false), p.Manifest.RequiredPackages()...) {
+
+	for _, ex := range append(rm.Flatten(false), p.Manifest.Required...) {
 		exmap[ex] = true
 		root, err := sm.DeduceProjectRoot(ex)
 		if err != nil {
-			// This should be essentially impossible to hit, as it entails that
-			// we couldn't deduce the root for an import, but that some previous
-			// solve run WAS able to deduce the root.
-			return errors.Wrap(err, "could not deduce project root")
+			// This should be very uncommon to hit, as it entails that we
+			// couldn't deduce the root for an import, but that some previous
+			// solve run WAS able to deduce the root. It's most likely to occur
+			// if the user has e.g. not connected to their organization's VPN,
+			// and thus cannot access an internal go-get metadata service.
+			return errors.Wrapf(err, "could not deduce project root for %s", ex)
 		}
 		exrmap[root] = true
 	}
 
 	var reqlist []string
-	//pclist := make(map[gps.ProjectRoot]gps.ProjectConstraint)
 
 	for _, arg := range args {
 		// TODO(sdboyer) return all errors, not just the first one we encounter
@@ -394,10 +409,10 @@ func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm
 
 		err = sm.SyncSourceFor(pc.Ident)
 		if err != nil {
-			return errors.Wrap(err, "failed to fetch source for %s", pc.Ident.ProjectRoot)
+			return errors.Wrapf(err, "failed to fetch source for %s", pc.Ident.ProjectRoot)
 		}
 
-		someConstraint = pc.Constraint != nil || pc.Ident.Source != ""
+		someConstraint := pc.Constraint != nil || pc.Ident.Source != ""
 		if inManifest {
 			if someConstraint {
 				return errors.Errorf("%s already contains constraints for %s, cannot specify a version constraint or alternate source", arg, dep.ManifestName)
@@ -457,13 +472,12 @@ func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm
 		return errors.Wrap(err, "ensure Solve()")
 	}
 
-	var sw dep.SafeWriter
-	sw.Prepare(nil, p.Lock, dep.LockFromInterface(solution), dep.VendorOnChanged)
+	sw, err := dep.NewSafeWriter(nil, p.Lock, dep.LockFromInterface(solution), dep.VendorOnChanged)
 	// TODO(sdboyer) special handling for warning cases as described in spec -
 	// e.g., named projects did not upgrade even though newer versions were
 	// available.
 	if cmd.dryRun {
-		return sw.PrintPreparedActions()
+		return sw.PrintPreparedActions(ctx.Loggers.Out)
 	}
 
 	return errors.Wrap(sw.Write(p.AbsRoot, sm, true), "grouped write of manifest, lock and vendor")
