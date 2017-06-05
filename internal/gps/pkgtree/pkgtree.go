@@ -28,6 +28,15 @@ type Package struct {
 	TestImports []string // Imports from all go test files (in go/build parlance: both TestImports and XTestImports)
 }
 
+// vcsRoots is a set of directories we should not descend into in ListPackages when
+// searching for Go packages
+var vcsRoots = map[string]struct{}{
+	".git": struct{}{},
+	".bzr": struct{}{},
+	".svn": struct{}{},
+	".hg":  struct{}{},
+}
+
 // ListPackages reports Go package information about all directories in the tree
 // at or below the provided fileRoot.
 //
@@ -78,10 +87,13 @@ func ListPackages(fileRoot, importRoot string) (PackageTree, error) {
 		case "vendor", "Godeps":
 			return filepath.SkipDir
 		}
-		// We do skip dot-dirs, though, because it's such a ubiquitous standard
-		// that they not be visited by normal commands, and because things get
-		// really weird if we don't.
-		if strings.HasPrefix(fi.Name(), ".") {
+
+		// Skip dirs that are known to be VCS roots.
+		//
+		// Note that there are some pathological edge cases this doesn't cover,
+		// such as a user using Git for version control, but having a package
+		// named "svn" in a directory named ".svn".
+		if _, ok := vcsRoots[fi.Name()]; ok {
 			return filepath.SkipDir
 		}
 
@@ -614,7 +626,15 @@ func wmToReach(workmap map[string]wm, backprop bool) (ReachMap, map[string]*Prob
 		// that was already completed (black), we don't have to defend against
 		// an empty path here.
 
-		fromErr := errmap[from]
+		fromErr, exists := errmap[from]
+		// FIXME: It should not be possible for fromErr to not exist,
+		// See issue https://github.com/golang/dep/issues/351
+		// This is a temporary solution to avoid a panic.
+		if !exists {
+			fromErr = &ProblemImportError{
+				Err: fmt.Errorf("unknown error for %q, if you get this error see https://github.com/golang/dep/issues/351", from),
+			}
+		}
 		err := &ProblemImportError{
 			Err:   fromErr.Err,
 			Cause: make([]string, 0, len(path)+len(fromErr.Cause)+1),

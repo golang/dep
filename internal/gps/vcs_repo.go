@@ -24,6 +24,40 @@ type ctxRepo interface {
 	//ping(context.Context) (bool, error)
 }
 
+func newCtxRepo(s vcs.Type, ustr, path string) (r ctxRepo, err error) {
+	r, err = getVCSRepo(s, ustr, path)
+	if err != nil {
+		// if vcs could not initialize the repo due to a local error
+		// then the local repo is in an incorrect state. Remove and
+		// treat it as a new not-yet-cloned repo.
+
+		// TODO(marwan-at-work): warn/give progress of the above comment.
+		os.RemoveAll(path)
+		r, err = getVCSRepo(s, ustr, path)
+	}
+
+	return
+}
+
+func getVCSRepo(s vcs.Type, ustr, path string) (r ctxRepo, err error) {
+	switch s {
+	case vcs.Git:
+		var repo *vcs.GitRepo
+		repo, err = vcs.NewGitRepo(ustr, path)
+		r = &gitRepo{repo}
+	case vcs.Bzr:
+		var repo *vcs.BzrRepo
+		repo, err = vcs.NewBzrRepo(ustr, path)
+		r = &bzrRepo{repo}
+	case vcs.Hg:
+		var repo *vcs.HgRepo
+		repo, err = vcs.NewHgRepo(ustr, path)
+		r = &hgRepo{repo}
+	}
+
+	return
+}
+
 // original implementation of these methods come from
 // https://github.com/Masterminds/vcs
 

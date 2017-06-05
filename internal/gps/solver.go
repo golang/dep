@@ -12,26 +12,9 @@ import (
 	"strings"
 
 	"github.com/armon/go-radix"
-	"github.com/golang/dep/internal/gps/internal"
+	"github.com/golang/dep/internal/gps/paths"
 	"github.com/golang/dep/internal/gps/pkgtree"
 )
-
-var (
-	osList     []string
-	archList   []string
-	ignoreTags = []string{} //[]string{"appengine", "ignore"} //TODO: appengine is a special case for now: https://github.com/tools/godep/issues/353
-)
-
-func init() {
-	// The supported systems are listed in
-	// https://github.com/golang/go/blob/master/src/go/build/syslist.go
-	// The lists are not exported, so we need to duplicate them here.
-	osListString := "android darwin dragonfly freebsd linux nacl netbsd openbsd plan9 solaris windows"
-	osList = strings.Split(osListString, " ")
-
-	archListString := "386 amd64 amd64p32 arm armbe arm64 arm64be ppc64 ppc64le mips mipsle mips64 mips64le mips64p32 mips64p32le ppc s390 s390x sparc sparc64"
-	archList = strings.Split(archListString, " ")
-}
 
 var rootRev = Revision("")
 
@@ -109,6 +92,15 @@ type SolveParameters struct {
 	// solver will generate informative trace output as it moves through the
 	// solving process.
 	TraceLogger *log.Logger
+
+	// stdLibFn is the function to use to recognize standard library import paths.
+	// Only overridden for tests. Defaults to paths.IsStandardImportPath if nil.
+	stdLibFn func(string) bool
+
+	// mkBridgeFn is the function to use to create sourceBridges.
+	// Only overridden for tests (so we can run with virtual RootDir).
+	// Defaults to mkBridge if nil.
+	mkBridgeFn func(*solver, SourceManager, bool) sourceBridge
 }
 
 // solver is a CDCL-style constraint solver with satisfiability conditions
@@ -121,6 +113,9 @@ type solver struct {
 
 	// Logger used exclusively for trace output, or nil to suppress.
 	tl *log.Logger
+
+	// The function to use to recognize standard library import paths.
+	stdLibFn func(string) bool
 
 	// A bridge to the standard SourceManager. The adapter does some local
 	// caching of pre-sorted version lists, as well as translation between the
@@ -284,15 +279,23 @@ func Prepare(params SolveParameters, sm SourceManager) (Solver, error) {
 		return nil, err
 	}
 
+	if params.stdLibFn == nil {
+		params.stdLibFn = paths.IsStandardImportPath
+	}
+
 	s := &solver{
-		tl: params.TraceLogger,
-		rd: rd,
+		tl:       params.TraceLogger,
+		stdLibFn: params.stdLibFn,
+		rd:       rd,
 	}
 
 	// Set up the bridge and ensure the root dir is in good, working order
-	// before doing anything else. (This call is stubbed out in tests, via
-	// overriding mkBridge(), so we can run with virtual RootDir.)
-	s.b = mkBridge(s, sm, params.Downgrade)
+	// before doing anything else.
+	if params.mkBridgeFn == nil {
+		s.b = mkBridge(s, sm, params.Downgrade)
+	} else {
+		s.b = params.mkBridgeFn(s, sm, params.Downgrade)
+	}
 	err = s.b.verifyRootDir(params.RootDir)
 	if err != nil {
 		return nil, err
@@ -333,6 +336,49 @@ type Solver interface {
 	// Solve initiates a solving run. It will either complete successfully with
 	// a Solution, or fail with an informative error.
 	Solve() (Solution, error)
+
+	// Name returns a string identifying the particular solver backend.
+	//
+	// Different solvers likely have different invariants, and likely will not
+	// have identical possible result sets for any particular inputs; in some
+	// cases, they may even be disjoint.
+	Name() string
+
+	// Version returns an int indicating the version of the solver of the given
+	// Name(). Implementations should change their reported version ONLY when
+	// the logic is changed in such a way that substantially changes the result
+	// set that is possible for a substantial subset of likely inputs.
+	//
+	// "Substantial" is an imprecise term, and it is used intentionally. There
+	// are no easy, general ways of subdividing constraint solving problems such
+	// that one can know, a priori, the full impact that subtle algorithmic
+	// changes will have on possible result sets. Consequently, we have to fall
+	// back on coarser, intuition-based reasoning as to whether a change is
+	// large enough that it is likely to be broadly user-visible.
+	//
+	// This is acceptable, because this value is not used programmatically by
+	// the solver in any way. Rather, it is intend for implementing tools to
+	// use as a coarse signal to users about compatibility between their tool's
+	// version and the current data, typically via persistence to a Lock.
+	// Changes to the version number reported should be weighed between
+	// confusing teams by having two members' tools continuously rolling back
+	// each others' chosen Solutions for no apparent reason, and annoying teams
+	// by changing the number for changes so remote that warnings about solver
+	// version mismatches become meaningless.
+	//
+	// Err on the side of caution.
+	//
+	// Chronology is the only implication of the ordering - that lower version
+	// numbers were published before higher numbers.
+	Version() int
+}
+
+func (s *solver) Name() string {
+	return "gps-cdcl"
+}
+
+func (s *solver) Version() int {
+	return 1
 }
 
 // Solve attempts to find a dependency solution for the given project, as
@@ -356,9 +402,10 @@ func (s *solver) Solve() (Solution, error) {
 	var soln solution
 	if err == nil {
 		soln = solution{
-			att: s.attempts,
+			att:  s.attempts,
+			solv: s,
 		}
-
+		soln.analyzerName, soln.analyzerVersion = s.rd.an.Info()
 		soln.hd = s.HashInputs()
 
 		// Convert ProjectAtoms into LockedProjects
@@ -496,7 +543,7 @@ func (s *solver) selectRoot() error {
 
 	// If we're looking for root's deps, get it from opts and local root
 	// analysis, rather than having the sm do it
-	deps, err := s.intersectConstraintsWithImports(s.rd.combineConstraints(), s.rd.externalImportList())
+	deps, err := s.intersectConstraintsWithImports(s.rd.combineConstraints(), s.rd.externalImportList(s.stdLibFn))
 	if err != nil {
 		// TODO(sdboyer) this could well happen; handle it with a more graceful error
 		panic(fmt.Sprintf("shouldn't be possible %s", err))
@@ -615,7 +662,7 @@ func (s *solver) intersectConstraintsWithImports(deps []workingConstraint, reach
 	dmap := make(map[ProjectRoot]completeDep)
 	for _, rp := range reach {
 		// If it's a stdlib-shaped package, skip it.
-		if internal.IsStdLib(rp) {
+		if s.stdLibFn(rp) {
 			continue
 		}
 

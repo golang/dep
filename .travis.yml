@@ -3,42 +3,53 @@ language: go
 sudo: false
 notifications:
   email: false
-matrix:
+jobs:
   include:
-    - os: linux
+    - stage: test
+      install:
+        - go get -u honnef.co/go/tools/cmd/{gosimple,staticcheck}
+        - npm install -g codeclimate-test-reporter
+      env:
+        - DEPTESTBYPASS501=1
+      os: linux
+      go: 1.8.x
+      script:
+        - go build -v ./cmd/dep
+        - PKGS=$(go list ./... | grep -v /vendor/)
+        - go vet $PKGS
+        - staticcheck $PKGS
+        - gosimple $PKGS
+        - ./hack/validate-vendor.bash
+        - go build ./hack/licenseok
+        - find . -path ./vendor -prune -o -type f -name "*.go" -printf '%P\n' | xargs ./licenseok
+        - set -e; for pkg in $PKGS; do go test -race -coverprofile=profile.out -covermode=atomic $pkg; if [[ -f profile.out ]]; then cat profile.out >> coverage.txt; rm profile.out; fi; done
+      after_success:
+        - codeclimate-test-reporter < coverage.txt
+    # YAML alias, for settings shared across the simpler builds
+    - &simple-test
       go: 1.7.x
-    - os: linux
-      go: 1.8.x
-    - os: linux
+      stage: test
+      install: skip
+      env:
+        - DEPTESTBYPASS501=1
+      script: go test -race $(go list ./... | grep -v vendor)
+    - <<: *simple-test
       go: tip
-    - os: osx
+    - <<: *simple-test
+      os: osx
       go: 1.8.x
-env:
-  # Flip bit to bypass tests - see dep#501 for more information
-  - DEPTESTBYPASS501=1
-install:
-  - echo "This is an override of the default install deps step in travis."
-before_script:
-  # OSX as of El Capitan sets an exit trap that interacts poorly with our
-  # set -e below. So, unset the trap.
-  # Related: https://superuser.com/questions/1044130/why-am-i-having-how-can-i-fix-this-error-shell-session-update-command-not-f
-  - if [[ "$(go env GOHOSTOS)" == "darwin" ]]; then trap EXIT; fi
-  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew update; fi
-  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew install bzr; fi
-  - PKGS=$(go list ./... | grep -v /vendor/ | grep -v _testdata/ )
-  - go get -v honnef.co/go/tools/cmd/{gosimple,staticcheck}
-  - npm install -g codeclimate-test-reporter
-script:
-  - go build -v ./cmd/dep
-  - go vet $PKGS
-  - staticcheck $PKGS
-  #- ./hack/validate-gofmt.bash
-  - ./hack/validate-vendor.bash
-  - gosimple $PKGS
-  #- go test -race $PKGS
-  - go build ./hack/licenseok
-  - set -e; for pkg in $PKGS; do go test -race -coverprofile=profile.out -covermode=atomic $pkg; if [[ -f profile.out ]]; then cat profile.out >> coverage.txt; rm profile.out; fi; done
-  - find . -path ./vendor -prune -o -type f -name "*.go" -printf '%P\n' | xargs ./licenseok
-  - ./hack/validate-vendor.bash
-after_success:
-  - codeclimate-test-reporter < coverage.txt
+      install:
+        # brew takes horribly long to update itself despite the above caching
+        # attempt; only bzr install if it's not on the $PATH
+        - test $(which bzr) || brew install bzr
+      env:
+        - HOMEBREW_NO_AUTO_UPDATE=1
+        - DEPTESTBYPASS501=1
+      script:
+        # OSX as of El Capitan sets an exit trap that interacts poorly with how
+        # travis seems to spawn these shells; if set -e is set, then it can cause
+        # build failures. We're not doing that here, but retain the trap statement
+        # for future safety.
+        # Related: https://superuser.com/questions/1044130/why-am-i-having-how-can-i-fix-this-error-shell-session-update-command-not-f
+        - trap EXIT
+        - go test -race $(go list ./... | grep -v vendor)

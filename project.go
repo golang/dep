@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/golang/dep/internal/fs"
 	"github.com/golang/dep/internal/gps"
 )
 
@@ -70,22 +71,24 @@ func (p *Project) MakeParams() gps.SolveParameters {
 // creates a backup of it to a new directory with the provided suffix.
 func BackupVendor(vpath, suffix string) (string, error) {
 	// Check if there's a non-empty vendor directory
-	vendorExists, err := IsNonEmptyDir(vpath)
+	vendorExists, err := fs.IsNonEmptyDir(vpath)
 	if err != nil {
 		return "", err
 	}
 	if vendorExists {
-		vendorbak := vpath + "-" + suffix
+		// vpath is a full filepath. We need to split it to prefix the backup dir
+		// with an "_"
+		vpathDir, name := filepath.Split(vpath)
+		vendorbak := filepath.Join(vpathDir, "_"+name+"-"+suffix)
 		// Check if a directory with same name exists
 		if _, err = os.Stat(vendorbak); os.IsNotExist(err) {
-			// Rename existing vendor to vendor-{suffix}
-			if err := renameWithFallback(vpath, vendorbak); err != nil {
+			// Copy existing vendor to vendor-{suffix}
+			if err := fs.CopyDir(vpath, vendorbak); err != nil {
 				return "", err
 			}
 			return vendorbak, nil
-		} else {
-			return "", errVendorBackupFailed
 		}
+		return "", errVendorBackupFailed
 	}
 
 	return "", nil

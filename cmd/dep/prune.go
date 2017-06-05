@@ -7,7 +7,7 @@ package main
 import (
 	"bytes"
 	"flag"
-	"fmt"
+	"log"
 
 	"github.com/golang/dep"
 	"github.com/golang/dep/internal/gps"
@@ -36,7 +36,7 @@ func (cmd *pruneCommand) Register(fs *flag.FlagSet) {
 }
 
 func (cmd *pruneCommand) Run(ctx *dep.Ctx, args []string) error {
-	p, err := ctx.LoadProject("")
+	p, err := ctx.LoadProject()
 	if err != nil {
 		return err
 	}
@@ -68,9 +68,17 @@ func (cmd *pruneCommand) Run(ctx *dep.Ctx, args []string) error {
 		return errors.Wrap(err, "could not set up solver for input hashing")
 	}
 
-	if !bytes.Equal(s.HashInputs(), p.Lock.Memo) {
-		return fmt.Errorf("lock hash doesn't match")
+	if p.Lock == nil {
+		return errors.Errorf("Gopkg.lock must exist for prune to know what files are safe to remove.")
 	}
 
-	return dep.PruneProject(p, sm)
+	if !bytes.Equal(s.HashInputs(), p.Lock.SolveMeta.InputsDigest) {
+		return errors.Errorf("Gopkg.lock is out of sync; run dep ensure before pruning.")
+	}
+
+	var pruneLogger *log.Logger
+	if ctx.Loggers.Verbose {
+		pruneLogger = ctx.Loggers.Err
+	}
+	return dep.PruneProject(p, sm, pruneLogger)
 }

@@ -75,9 +75,8 @@ type bridge struct {
 	down bool
 }
 
-// Global factory func to create a bridge. This exists solely to allow tests to
-// override it with a custom bridge and sm.
-var mkBridge = func(s *solver, sm SourceManager, down bool) sourceBridge {
+// mkBridge creates a bridge
+func mkBridge(s *solver, sm SourceManager, down bool) *bridge {
 	return &bridge{
 		sm:     sm,
 		s:      s,

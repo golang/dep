@@ -11,28 +11,34 @@ func TestParseConstraint(t *testing.T) {
 		{"*", Any(), false},
 		{">= 1.2", rangeConstraint{
 			min:        newV(1, 2, 0),
+			max:        Version{special: infiniteVersion},
 			includeMin: true,
 		}, false},
 		{"1.0", newV(1, 0, 0), false},
 		{"foo", nil, true},
 		{"<= 1.2", rangeConstraint{
+			min:        Version{special: zeroVersion},
 			max:        newV(1, 2, 0),
 			includeMax: true,
 		}, false},
 		{"=< 1.2", rangeConstraint{
+			min:        Version{special: zeroVersion},
 			max:        newV(1, 2, 0),
 			includeMax: true,
 		}, false},
 		{"=> 1.2", rangeConstraint{
 			min:        newV(1, 2, 0),
+			max:        Version{special: infiniteVersion},
 			includeMin: true,
 		}, false},
 		{"v1.2", newV(1, 2, 0), false},
 		{"=1.5", newV(1, 5, 0), false},
 		{"> 1.3", rangeConstraint{
 			min: newV(1, 3, 0),
+			max: Version{special: infiniteVersion},
 		}, false},
 		{"< 1.4.1", rangeConstraint{
+			min: Version{special: zeroVersion},
 			max: newV(1, 4, 1),
 		}, false},
 		{"~1.1.0", rangeConstraint{
@@ -50,7 +56,7 @@ func TestParseConstraint(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		c, err := parseConstraint(tc.in)
+		c, err := parseConstraint(tc.in, false)
 		if tc.err && err == nil {
 			t.Errorf("Expected error for %s didn't occur", tc.in)
 		} else if !tc.err && err != nil {
@@ -81,8 +87,8 @@ func constraintEq(c1, c2 Constraint) bool {
 			return false
 		}
 		return true
-	case *Version:
-		if tc2, ok := c2.(*Version); ok {
+	case Version:
+		if tc2, ok := c2.(Version); ok {
 			return tc1.Equal(tc2)
 		}
 		return false
@@ -136,8 +142,8 @@ func constraintEq(c1, c2 Constraint) bool {
 }
 
 // newV is a helper to create a new Version object.
-func newV(major, minor, patch uint64) *Version {
-	return &Version{
+func newV(major, minor, patch uint64) Version {
+	return Version{
 		major: major,
 		minor: minor,
 		patch: patch,
@@ -177,18 +183,22 @@ func TestConstraintCheck(t *testing.T) {
 		{">2.x", "3.0.0", true},
 		{">2.x", "2.9.9", false},
 		{">2.x", "1.9.9", false},
-		// TODO these are all pending the changes in #10
-		//{"<=2.x-beta1", "3.0.0-alpha2", false},
-		//{">2.x-beta1", "3.0.0-alpha2", true},
-		//{"<2.0.0", "2.0.0-alpha1", false},
-		//{"<=2.0.0", "2.0.0-alpha1", true},
+		{"<=2.x-alpha2", "3.0.0-alpha3", false},
+		{"<=2.0.0", "2.0.0-alpha1", false},
+		{">2.x-beta1", "3.0.0-alpha2", false},
+		{"^2.0.0", "3.0.0-alpha2", false},
+		{"^2.0.0", "2.0.0-alpha1", false},
+		{"^2.1.0-alpha1", "2.1.0-alpha2", true},  // allow prerelease match within same major/minor/patch
+		{"^2.1.0-alpha1", "2.1.1-alpha2", false}, // but ONLY within same major/minor/patch
+		{"^2.1.0-alpha3", "2.1.0-alpha2", false}, // still respect prerelease ordering
+		{"^2.0.0", "2.0.0-alpha2", false},        // and only if the min has a prerelease
 	}
 
 	for _, tc := range tests {
 		if testing.Verbose() {
 			t.Logf("Testing if %q allows %q", tc.constraint, tc.version)
 		}
-		c, err := parseConstraint(tc.constraint)
+		c, err := parseConstraint(tc.constraint, false)
 		if err != nil {
 			t.Errorf("err: %s", err)
 			continue
@@ -219,6 +229,7 @@ func TestNewConstraint(t *testing.T) {
 	}{
 		{">= 1.1", rangeConstraint{
 			min:        newV(1, 1, 0),
+			max:        Version{special: infiniteVersion},
 			includeMin: true,
 		}, false},
 		{"2.0", newV(2, 0, 0), false},
@@ -267,14 +278,17 @@ func TestNewConstraint(t *testing.T) {
 			includeMax: false,
 		}, false},
 		{"!=1.4.0", rangeConstraint{
-			excl: []*Version{
+			min: Version{special: zeroVersion},
+			max: Version{special: infiniteVersion},
+			excl: []Version{
 				newV(1, 4, 0),
 			},
 		}, false},
 		{">=1.1.0, !=1.4.0", rangeConstraint{
 			min:        newV(1, 1, 0),
+			max:        Version{special: infiniteVersion},
 			includeMin: true,
-			excl: []*Version{
+			excl: []Version{
 				newV(1, 4, 0),
 			},
 		}, false},
@@ -299,6 +313,45 @@ func TestNewConstraint(t *testing.T) {
 	}
 }
 
+func TestNewConstraintIC(t *testing.T) {
+	tests := []struct {
+		input string
+		c     Constraint
+		err   bool
+	}{
+		{"=2.0", newV(2, 0, 0), false},
+		{"= 2.0", newV(2, 0, 0), false},
+		{"1.1.0", rangeConstraint{
+			min:        newV(1, 1, 0),
+			max:        newV(2, 0, 0),
+			includeMin: true,
+		}, false},
+		{"1.1", rangeConstraint{
+			min:        newV(1, 1, 0),
+			max:        newV(2, 0, 0),
+			includeMin: true,
+		}, false},
+	}
+
+	for _, tc := range tests {
+		c, err := NewConstraintIC(tc.input)
+		if tc.err && err == nil {
+			t.Errorf("expected but did not get error for: %s", tc.input)
+			continue
+		} else if !tc.err && err != nil {
+			t.Errorf("unexpectederror for input %s: %s", tc.input, err)
+			continue
+		}
+		if tc.err {
+			continue
+		}
+
+		if !constraintEq(tc.c, c) {
+			t.Errorf("%q produced constraint %q, but expected %q", tc.input, c, tc.c)
+		}
+	}
+}
+
 func TestConstraintsCheck(t *testing.T) {
 	tests := []struct {
 		constraint string
@@ -306,9 +359,13 @@ func TestConstraintsCheck(t *testing.T) {
 		check      bool
 	}{
 		{"*", "1.2.3", true},
-		{"~0.0.0", "1.2.3", false}, // npm allows this weird thing, but we don't
+		{"~0.0.0", "1.2.3", false},
+		{"0.x.x", "1.2.3", false},
+		{"0.0.x", "1.2.3", false},
 		{"~0.0.0", "0.1.9", false},
 		{"~0.0.0", "0.0.9", true},
+		{"^0.0.0", "0.0.9", true},
+		{"^0.0.0", "0.1.9", false}, // caret behaves like tilde below 1.0.0
 		{"= 2.0", "1.2.3", false},
 		{"= 2.0", "2.0.0", true},
 		{"4.1", "4.1.0", true},
@@ -398,7 +455,6 @@ func TestBidirectionalSerialization(t *testing.T) {
 	}{
 		{"*", true},         // any
 		{"~0.0.0", false},   // tildes expand into ranges
-		{"^2.0", false},     // carets expand into ranges
 		{"=2.0", false},     // abbreviated versions print as full
 		{"4.1.x", false},    // wildcards expand into ranges
 		{">= 1.1.0", false}, // does not produce spaces on ranges
@@ -415,8 +471,8 @@ func TestBidirectionalSerialization(t *testing.T) {
 		{">1.1.1, <1.2.0", true},   // no unary op on gt min
 		{">1.1.7, <=2.0.0", true},  // no unary op on gt min and lte max
 		{">1.1.7, <=2.0.0", true},  // no unary op on gt min and lte max
-		{">=0.1.7, <1.0.0", true},  // carat shifting below 1.0.0
-		{">=0.1.7, <0.3.0", true},  // carat shifting width below 1.0.0
+		{">=0.1.7, <1.0.0", true},  // caret shifting below 1.0.0
+		{">=0.1.7, <0.3.0", true},  // caret shifting width below 1.0.0
 	}
 
 	for _, fix := range tests {
@@ -436,11 +492,38 @@ func TestBidirectionalSerialization(t *testing.T) {
 	}
 }
 
+func TestBidirectionalSerializationIC(t *testing.T) {
+	tests := []struct {
+		io string
+		eq bool
+	}{
+		{"*", true},      // any
+		{"=2.0.0", true}, // versions retain leading =
+		{"2.0.0", true},  // (no) caret in, (no) caret out
+	}
+
+	for _, fix := range tests {
+		c, err := NewConstraintIC(fix.io)
+		if err != nil {
+			t.Errorf("Valid constraint string produced unexpected error: %s", err)
+		}
+
+		eq := fix.io == c.ImpliedCaretString()
+		if eq != fix.eq {
+			if eq {
+				t.Errorf("Constraint %q should not have reproduced input string %q, but did", c, fix.io)
+			} else {
+				t.Errorf("Constraint should have reproduced input string %q, but instead produced %q", fix.io, c)
+			}
+		}
+	}
+}
+
 func TestPreferUnaryOpForm(t *testing.T) {
 	tests := []struct {
 		in, out string
 	}{
-		{">=0.1.7, <0.2.0", "^0.1.7"}, // carat shifting below 1.0.0
+		{">=0.1.7, <0.2.0", "^0.1.7"}, // caret shifting below 1.0.0
 		{">=1.1.0, <2.0.0", "^1.1.0"},
 		{">=1.1.0, <2.0.0, !=1.2.3", "^1.1.0, !=1.2.3"},
 	}
@@ -530,10 +613,12 @@ func TestIsSuperset(t *testing.T) {
 			max: newV(2, 1, 0),
 		},
 		{
+			min: Version{special: zeroVersion},
 			max: newV(1, 10, 0),
 		},
 		{
 			min: newV(2, 0, 0),
+			max: Version{special: infiniteVersion},
 		},
 		{
 			min:        newV(1, 2, 0),
@@ -604,7 +689,7 @@ func TestIsSuperset(t *testing.T) {
 
 	// isSupersetOf ignores excludes, so even though this would make rc[1] not a
 	// superset of rc[0] anymore, it should still say it is.
-	rc[1].excl = []*Version{
+	rc[1].excl = []Version{
 		newV(1, 5, 0),
 	}
 

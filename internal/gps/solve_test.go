@@ -18,7 +18,6 @@ import (
 	"testing"
 	"unicode"
 
-	"github.com/golang/dep/internal/gps/internal"
 	"github.com/golang/dep/internal/gps/pkgtree"
 )
 
@@ -27,33 +26,12 @@ var fixtorun string
 // TODO(sdboyer) regression test ensuring that locks with only revs for projects don't cause errors
 func init() {
 	flag.StringVar(&fixtorun, "gps.fix", "", "A single fixture to run in TestBasicSolves or TestBimodalSolves")
-	mkBridge(nil, nil, false)
-	overrideMkBridge()
-	overrideIsStdLib()
 }
 
-// sets the mkBridge global func to one that allows virtualized RootDirs
-func overrideMkBridge() {
-	// For all tests, override the base bridge with the depspecBridge that skips
-	// verifyRootDir calls
-	mkBridge = func(s *solver, sm SourceManager, down bool) sourceBridge {
-		return &depspecBridge{
-			&bridge{
-				sm:     sm,
-				s:      s,
-				down:   down,
-				vlists: make(map[ProjectIdentifier][]Version),
-			},
-		}
-	}
-}
-
-// sets the isStdLib func to always return false, otherwise it would identify
-// pretty much all of our fixtures as being stdlib and skip everything
-func overrideIsStdLib() {
-	internal.IsStdLib = func(path string) bool {
-		return false
-	}
+// overrideMkBridge overrides the base bridge with the depspecBridge that skips
+// verifyRootDir calls
+func overrideMkBridge(s *solver, sm SourceManager, down bool) sourceBridge {
+	return &depspecBridge{mkBridge(s, sm, down)}
 }
 
 type testlogger struct {
@@ -80,7 +58,10 @@ func fixSolve(params SolveParameters, sm SourceManager, t *testing.T) (Solution,
 	// system will decide whether or not to actually show the output (based on
 	// -v, or selectively on test failure).
 	params.TraceLogger = log.New(testlogger{T: t}, "", 0)
-
+	// always return false, otherwise it would identify pretty much all of
+	// our fixtures as being stdlib and skip everything
+	params.stdLibFn = func(string) bool { return false }
+	params.mkBridgeFn = overrideMkBridge
 	s, err := Prepare(params, sm)
 	if err != nil {
 		return nil, err
@@ -204,7 +185,7 @@ func fixtureSolveSimpleChecks(fix specfix, soln Solution, err error, t *testing.
 	if err != nil {
 		if fixfail == nil {
 			t.Errorf("Solve failed unexpectedly:\n%s", err)
-		} else if !reflect.DeepEqual(fixfail, err) {
+		} else if !(fixfail.Error() == err.Error()) {
 			// TODO(sdboyer) reflect.DeepEqual works for now, but once we start
 			// modeling more complex cases, this should probably become more robust
 			t.Errorf("Failure mismatch:\n\t(GOT): %s\n\t(WNT): %s", err, fixfail)
@@ -320,7 +301,9 @@ func TestBadSolveOpts(t *testing.T) {
 	fix.ds[0].n = ProjectRoot(pn)
 
 	sm := newdepspecSM(fix.ds, nil)
-	params := SolveParameters{}
+	params := SolveParameters{
+		mkBridgeFn: overrideMkBridge,
+	}
 
 	_, err := Prepare(params, nil)
 	if err == nil {
@@ -438,14 +421,7 @@ func TestBadSolveOpts(t *testing.T) {
 
 	// swap out the test mkBridge override temporarily, just to make sure we get
 	// the right error
-	mkBridge = func(s *solver, sm SourceManager, down bool) sourceBridge {
-		return &bridge{
-			sm:     sm,
-			s:      s,
-			down:   down,
-			vlists: make(map[ProjectIdentifier][]Version),
-		}
-	}
+	params.mkBridgeFn = nil
 
 	_, err = Prepare(params, sm)
 	if err == nil {
@@ -462,7 +438,4 @@ func TestBadSolveOpts(t *testing.T) {
 	} else if !strings.Contains(err.Error(), "is a file, not a directory") {
 		t.Error("Prepare should have given error on file as RootDir, but gave:", err)
 	}
-
-	// swap them back...not sure if this matters, but just in case
-	overrideMkBridge()
 }

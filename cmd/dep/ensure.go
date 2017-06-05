@@ -16,6 +16,7 @@ import (
 
 	"github.com/golang/dep"
 	"github.com/golang/dep/internal/gps"
+	"github.com/golang/dep/internal/gps/paths"
 	"github.com/golang/dep/internal/gps/pkgtree"
 	"github.com/pkg/errors"
 )
@@ -149,7 +150,7 @@ func (cmd *ensureCommand) Run(ctx *dep.Ctx, args []string) error {
 		}
 	}
 
-	p, err := ctx.LoadProject("")
+	p, err := ctx.LoadProject()
 	if err != nil {
 		return err
 	}
@@ -247,7 +248,7 @@ func (cmd *ensureCommand) runDefault(ctx *dep.Ctx, args []string, p *dep.Project
 		return errors.Wrap(err, "ensure Solve()")
 	}
 
-	sw, err := dep.NewSafeWriter(nil, p.Lock, dep.LockFromInterface(solution), dep.VendorOnChanged)
+	sw, err := dep.NewSafeWriter(nil, p.Lock, dep.LockFromSolution(solution), dep.VendorOnChanged)
 	if err != nil {
 		return err
 	}
@@ -327,7 +328,7 @@ func (cmd *ensureCommand) runUpdate(ctx *dep.Ctx, args []string, p *dep.Project,
 		return errors.Wrap(err, "ensure Solve()")
 	}
 
-	sw, err := dep.NewSafeWriter(nil, p.Lock, dep.LockFromInterface(solution), dep.VendorOnChanged)
+	sw, err := dep.NewSafeWriter(nil, p.Lock, dep.LockFromSolution(solution), dep.VendorOnChanged)
 	if err != nil {
 		return err
 	}
@@ -338,7 +339,7 @@ func (cmd *ensureCommand) runUpdate(ctx *dep.Ctx, args []string, p *dep.Project,
 		return sw.PrintPreparedActions(ctx.Loggers.Out)
 	}
 
-	return errors.Wrap(sw.Write(p.AbsRoot, sm, true), "grouped write of manifest, lock and vendor")
+	return errors.Wrap(sw.Write(p.AbsRoot, sm, false), "grouped write of manifest, lock and vendor")
 }
 
 func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm gps.SourceManager, params gps.SolveParameters) error {
@@ -376,7 +377,7 @@ func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm
 	exmap := make(map[string]bool)
 	exrmap := make(map[gps.ProjectRoot]bool)
 
-	for _, ex := range append(rm.Flatten(false), p.Manifest.Required...) {
+	for _, ex := range append(rm.FlattenFn(paths.IsStandardImportPath), p.Manifest.Required...) {
 		exmap[ex] = true
 		root, err := sm.DeduceProjectRoot(ex)
 		if err != nil {
@@ -432,7 +433,7 @@ func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm
 				reqlist = append(reqlist, arg)
 				p.Manifest.Required = append(p.Manifest.Required, arg)
 			} else {
-				p.Manifest.Dependencies[pc.Ident.ProjectRoot] = gps.ProjectProperties{
+				p.Manifest.Constraints[pc.Ident.ProjectRoot] = gps.ProjectProperties{
 					Source:     pc.Ident.Source,
 					Constraint: pc.Constraint,
 				}
@@ -449,7 +450,7 @@ func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm
 				}
 			}
 		} else {
-			p.Manifest.Dependencies[pc.Ident.ProjectRoot] = gps.ProjectProperties{
+			p.Manifest.Constraints[pc.Ident.ProjectRoot] = gps.ProjectProperties{
 				Source:     pc.Ident.Source,
 				Constraint: pc.Constraint,
 			}
@@ -472,7 +473,7 @@ func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm
 		return errors.Wrap(err, "ensure Solve()")
 	}
 
-	sw, err := dep.NewSafeWriter(nil, p.Lock, dep.LockFromInterface(solution), dep.VendorOnChanged)
+	sw, err := dep.NewSafeWriter(nil, p.Lock, dep.LockFromSolution(solution), dep.VendorOnChanged)
 	// TODO(sdboyer) special handling for warning cases as described in spec -
 	// e.g., named projects did not upgrade even though newer versions were
 	// available.
@@ -500,14 +501,14 @@ func applyEnsureArgs(logger *log.Logger, args []string, overrides stringSlice, p
 			//
 			// TODO(sdboyer): for this case - or just in general - do we want to
 			// add project args to the requires list temporarily for this run?
-			if _, has := p.Manifest.Dependencies[pc.Ident.ProjectRoot]; !has {
+			if _, has := p.Manifest.Constraints[pc.Ident.ProjectRoot]; !has {
 				logger.Printf("dep: No constraint or alternate source specified for %q, omitting from manifest\n", pc.Ident.ProjectRoot)
 			}
 			// If it's already in the manifest, no need to log
 			continue
 		}
 
-		p.Manifest.Dependencies[pc.Ident.ProjectRoot] = gps.ProjectProperties{
+		p.Manifest.Constraints[pc.Ident.ProjectRoot] = gps.ProjectProperties{
 			Source:     pc.Ident.Source,
 			Constraint: pc.Constraint,
 		}
@@ -559,76 +560,70 @@ func (s *stringSlice) Set(value string) error {
 func getProjectConstraint(arg string, sm gps.SourceManager) (gps.ProjectConstraint, error) {
 	// TODO(sdboyer) this func needs to be broken out, now that we admit
 	// different info in specs
-	constraint := gps.ProjectConstraint{
+	emptyPC := gps.ProjectConstraint{
 		Constraint: gps.Any(), // default to any; avoids panics later
 	}
 
 	// try to split on '@'
-	var versionStr string
+	// When there is no `@`, use any version
+	versionStr := "*"
 	atIndex := strings.Index(arg, "@")
 	if atIndex > 0 {
 		parts := strings.SplitN(arg, "@", 2)
 		arg = parts[0]
 		versionStr = parts[1]
-		constraint.Constraint = deduceConstraint(parts[1])
 	}
-	// TODO: What if there is no @, assume default branch (which may not be master) ?
+
 	// TODO: if we decide to keep equals.....
 
 	// split on colon if there is a network location
+	var source string
 	colonIndex := strings.Index(arg, ":")
 	if colonIndex > 0 {
 		parts := strings.SplitN(arg, ":", 2)
 		arg = parts[0]
-		constraint.Ident.Source = parts[1]
+		source = parts[1]
 	}
 
 	pr, err := sm.DeduceProjectRoot(arg)
 	if err != nil {
-		return constraint, errors.Wrapf(err, "could not infer project root from dependency path: %s", arg) // this should go through to the user
+		return emptyPC, errors.Wrapf(err, "could not infer project root from dependency path: %s", arg) // this should go through to the user
 	}
 
 	if string(pr) != arg {
-		return constraint, errors.Errorf("dependency path %s is not a project root, try %s instead", arg, pr)
+		return emptyPC, errors.Errorf("dependency path %s is not a project root, try %s instead", arg, pr)
 	}
 
-	constraint.Ident.ProjectRoot = gps.ProjectRoot(arg)
-
-	// Below we are checking if the constraint we deduced was valid.
-	if v, ok := constraint.Constraint.(gps.Version); ok && versionStr != "" {
-		if v.Type() == gps.IsVersion {
-			// we hit the fall through case in deduce constraint, let's call out to network
-			// and get the package's versions
-			versions, err := sm.ListVersions(constraint.Ident)
-			if err != nil {
-				return constraint, errors.Wrapf(err, "list versions for %s", arg) // means repo does not exist
-			}
-
-			var found bool
-			for _, version := range versions {
-				if versionStr == version.String() {
-					found = true
-					constraint.Constraint = version.Unpair()
-					break
-				}
-			}
-
-			if !found {
-				return constraint, errors.Errorf("%s is not a valid version for the package %s", versionStr, arg)
-			}
-		}
+	pi := gps.ProjectIdentifier{ProjectRoot: pr, Source: source}
+	c, err := deduceConstraint(versionStr, pi, sm)
+	if err != nil {
+		return emptyPC, err
 	}
-
-	return constraint, nil
+	return gps.ProjectConstraint{Ident: pi, Constraint: c}, nil
 }
 
 // deduceConstraint tries to puzzle out what kind of version is given in a string -
 // semver, a revision, or as a fallback, a plain tag
-func deduceConstraint(s string) gps.Constraint {
+func deduceConstraint(s string, pi gps.ProjectIdentifier, sm gps.SourceManager) (gps.Constraint, error) {
+	if s == "" {
+		// Find the default branch
+		versions, err := sm.ListVersions(pi)
+		if err != nil {
+			return nil, errors.Wrapf(err, "list versions for %s(%s)", pi.ProjectRoot, pi.Source) // means repo does not exist
+		}
+
+		gps.SortPairedForUpgrade(versions)
+		for _, v := range versions {
+			if v.Type() == gps.IsBranch {
+				return v.Unpair(), nil
+			}
+		}
+	}
+
 	// always semver if we can
-	c, err := gps.NewSemverConstraint(s)
+	c, err := gps.NewSemverConstraintIC(s)
 	if err == nil {
-		return c
+		return c, nil
 	}
 
 	slen := len(s)
@@ -637,7 +632,7 @@ func deduceConstraint(s string) gps.Constraint {
 			// Whether or not it's intended to be a SHA1 digest, this is a
 			// valid byte sequence for that, so go with Revision. This
 			// covers git and hg
-			return gps.Revision(s)
+			return gps.Revision(s), nil
 		}
 	}
 	// Next, try for bzr, which has a three-component GUID separated by
@@ -648,20 +643,29 @@ func deduceConstraint(s string) gps.Constraint {
 		i3 := strings.LastIndex(s, "-")
 		// Skip if - is last char, otherwise this would panic on bounds err
 		if slen == i3+1 {
-			return gps.NewVersion(s)
+			return gps.NewVersion(s), nil
 		}
 
 		i2 := strings.LastIndex(s[:i3], "-")
 		if _, err = strconv.ParseUint(s[i2+1:i3], 10, 64); err == nil {
 			// Getting this far means it'd pretty much be nuts if it's not a
 			// bzr rev, so don't bother parsing the email.
-			return gps.Revision(s)
+			return gps.Revision(s), nil
 		}
 	}
 
-	// If not a plain SHA1 or bzr custom GUID, assume a plain version.
-	// TODO: if there is amgibuity here, then prompt the user?
-	return gps.NewVersion(s)
+	// call out to network and get the package's versions
+	versions, err := sm.ListVersions(pi)
+	if err != nil {
+		return nil, errors.Wrapf(err, "list versions for %s(%s)", pi.ProjectRoot, pi.Source) // means repo does not exist
+	}
+
+	for _, version := range versions {
+		if s == version.String() {
+			return version.Unpair(), nil
+		}
+	}
+	return nil, errors.Errorf("%s is not a valid version for the package %s(%s)", s, pi.ProjectRoot, pi.Source)
 }
 
 func checkErrors(m map[string]pkgtree.PackageOrErr) error {

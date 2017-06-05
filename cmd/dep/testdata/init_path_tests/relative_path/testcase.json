@@ -1,0 +1,7 @@
+{
+  "commands": [
+    ["init", "-skip-tools", "project_dir"]
+  ],
+  "error-expected": "",
+  "init-path": "project_dir"
+}

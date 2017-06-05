@@ -34,7 +34,7 @@ type RootManifest interface {
 	Manifest
 
 	// Overrides returns a list of ProjectConstraints that will unconditionally
-	// supercede any ProjectConstraint declarations made in either the root
+	// supersede any ProjectConstraint declarations made in either the root
 	// manifest, or in any dependency's manifest.
 	//
 	// Overrides are a special control afforded only to root manifests. Tool
