@@ -18,31 +18,42 @@ import (
 )
 
 func TestIntegration(t *testing.T) {
+	t.Parallel()
+
 	test.NeedsExternalNetwork(t)
 	test.NeedsGit(t)
 
-	filepath.Walk(filepath.Join("testdata", "harness_tests"), func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			t.Fatal("error walking filepath")
-		}
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
 
-		wd, err := os.Getwd()
-		if err != nil {
-			panic(err)
-		}
+	for _, dirName := range []string{
+		"harness_tests",
+		"init_path_tests",
+	} {
+		relPath := filepath.Join("testdata", dirName)
+		filepath.Walk(relPath, func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				t.Fatal("error walking filepath")
+			}
 
-		if filepath.Base(path) == "testcase.json" {
+			if filepath.Base(path) != "testcase.json" {
+				return nil
+			}
+
 			parse := strings.Split(path, string(filepath.Separator))
 			testName := strings.Join(parse[2:len(parse)-1], "/")
 			t.Run(testName, func(t *testing.T) {
 				t.Parallel()
 
-				t.Run("external", testIntegration(testName, wd, true, execCmd))
-				t.Run("internal", testIntegration(testName, wd, false, runMain))
+				t.Run("external", testIntegration(testName, relPath, wd, true, execCmd))
+				t.Run("internal", testIntegration(testName, relPath, wd, false, runMain))
 			})
-		}
-		return nil
-	})
+
+			return nil
+		})
+	}
 }
 
 // execCmd is a test.RunFunc which runs the program in another process.
@@ -80,13 +91,13 @@ func runMain(prog string, args []string, stdout, stderr io.Writer, dir string, e
 	return
 }
 
-func testIntegration(name, wd string, externalProc bool, run test.RunFunc) func(t *testing.T) {
+// testIntegration runs the test specified by <wd>/<relPath>/<name>/testcase.json
+func testIntegration(name, relPath, wd string, externalProc bool, run test.RunFunc) func(t *testing.T) {
 	return func(t *testing.T) {
 		t.Parallel()
 
 		// Set up environment
-		testCase := test.NewTestCase(t, name, wd)
-		defer testCase.Cleanup()
+		testCase := test.NewTestCase(t, filepath.Join(wd, relPath), name)
 		testProj := test.NewTestProject(t, testCase.InitialPath(), wd, externalProc, run)
 		defer testProj.Cleanup()
 
@@ -119,12 +130,18 @@ func testIntegration(name, wd string, externalProc bool, run test.RunFunc) func(
 		// Check output
 		testCase.CompareOutput(testProj.GetStdout())
 
-		// Check final manifest and lock
-		testCase.CompareFile(dep.ManifestName, testProj.ProjPath(dep.ManifestName))
-		testCase.CompareFile(dep.LockName, testProj.ProjPath(dep.LockName))
-
 		// Check vendor paths
 		testProj.CompareImportPaths()
 		testCase.CompareVendorPaths(testProj.GetVendorPaths())
+
+		if *test.UpdateGolden {
+			// Update manifest and lock
+			testCase.UpdateFile(dep.ManifestName, testProj.ProjPath(dep.ManifestName))
+			testCase.UpdateFile(dep.LockName, testProj.ProjPath(dep.LockName))
+		} else {
+			// Check final manifest and lock
+			testCase.CompareFile(dep.ManifestName, testProj.ProjPath(dep.ManifestName))
+			testCase.CompareFile(dep.LockName, testProj.ProjPath(dep.LockName))
+		}
 	}
 }

@@ -12,7 +12,7 @@ import (
 	"strings"
 
 	"github.com/Masterminds/vcs"
-	"github.com/golang/dep/internal"
+	"github.com/golang/dep/internal/fs"
 	"github.com/golang/dep/internal/gps"
 	"github.com/pkg/errors"
 )
@@ -44,7 +44,7 @@ func NewContext(wd string, env []string, loggers *Loggers) (*Ctx, error) {
 	for _, gp := range filepath.SplitList(GOPATH) {
 		gp = filepath.FromSlash(gp)
 
-		if internal.HasFilepathPrefix(filepath.FromSlash(wd), gp) {
+		if fs.HasFilepathPrefix(filepath.FromSlash(wd), gp) {
 			ctx.GOPATH = gp
 		}
 
@@ -98,32 +98,18 @@ func (c *Ctx) SourceManager() (*gps.SourceMgr, error) {
 	return gps.NewSourceManager(filepath.Join(c.GOPATH, "pkg", "dep"))
 }
 
-// LoadProject takes a path and searches up the directory tree for
-// a project root.  If an absolute path is given, the search begins in that
-// directory.  If a relative or empty path is given, the search start is computed
-// from the current working directory.  The search stops when a file with the
-// name ManifestName (Gopkg.toml, by default) is located.
+// LoadProject starts from the current working directory and searches up the
+// directory tree for a project root.  The search stops when a file with the name
+// ManifestName (Gopkg.toml, by default) is located.
 //
 // The Project contains the parsed manifest as well as a parsed lock file, if
 // present.  The import path is calculated as the remaining path segment
 // below Ctx.GOPATH/src.
-func (c *Ctx) LoadProject(path string) (*Project, error) {
+func (c *Ctx) LoadProject() (*Project, error) {
 	var err error
 	p := new(Project)
 
-	if path != "" {
-		path, err = filepath.Abs(path)
-		if err != nil {
-			return nil, err
-		}
-	}
-	switch path {
-	case "":
-		p.AbsRoot, err = findProjectRoot(c.WorkingDir)
-	default:
-		p.AbsRoot, err = findProjectRoot(path)
-	}
-
+	p.AbsRoot, err = findProjectRoot(c.WorkingDir)
 	if err != nil {
 		return nil, err
 	}
@@ -211,7 +197,7 @@ func (c *Ctx) resolveProjectRoot(path string) (string, error) {
 	// Determine if the symlink is within any of the GOPATHs, in which case we're not
 	// sure how to resolve it.
 	for _, gp := range c.GOPATHS {
-		if internal.HasFilepathPrefix(path, gp) {
+		if fs.HasFilepathPrefix(path, gp) {
 			return "", errors.Errorf("'%s' is linked to another path within a GOPATH (%s)", path, gp)
 		}
 	}
@@ -226,7 +212,7 @@ func (c *Ctx) resolveProjectRoot(path string) (string, error) {
 // The second returned string indicates which GOPATH value was used.
 func (c *Ctx) SplitAbsoluteProjectRoot(path string) (string, error) {
 	srcprefix := filepath.Join(c.GOPATH, "src") + string(filepath.Separator)
-	if internal.HasFilepathPrefix(path, srcprefix) {
+	if fs.HasFilepathPrefix(path, srcprefix) {
 		if len(path) <= len(srcprefix) {
 			return "", errors.New("dep does not currently support using $GOPATH/src as the project root.")
 		}
@@ -244,7 +230,7 @@ func (c *Ctx) SplitAbsoluteProjectRoot(path string) (string, error) {
 // package directory needs to exist.
 func (c *Ctx) absoluteProjectRoot(path string) (string, error) {
 	posspath := filepath.Join(c.GOPATH, "src", path)
-	dirOK, err := IsDir(posspath)
+	dirOK, err := fs.IsDir(posspath)
 	if err != nil {
 		return "", errors.Wrapf(err, "checking if %s is a directory", posspath)
 	}

@@ -120,7 +120,7 @@ func TestBackupVendor(t *testing.T) {
 	}
 
 	// Create a backup
-	wantName := "vendor-sfx"
+	wantName := "_vendor-sfx"
 	vendorbak, err := BackupVendor("vendor", "sfx")
 	if err != nil {
 		t.Fatal(err)
@@ -137,10 +137,6 @@ func TestBackupVendor(t *testing.T) {
 	if err = pc.h.ShouldExist(vendorbak + string(filepath.Separator) + "badinput_fileroot"); err != nil {
 		t.Fatal(err)
 	}
-
-	// Create another vendor directory. Previous vendor moved as backup.
-	os.MkdirAll("vendor", 0777)
-	pc.CopyFile(dummyFile, "txn_writer/badinput_fileroot")
 
 	// Should return error on creating backup with existing filename
 	vendorbak, err = BackupVendor("vendor", "sfx")

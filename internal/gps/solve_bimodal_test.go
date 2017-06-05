@@ -589,7 +589,7 @@ var bimodalFixtures = map[string]bimodalFixture{
 	// Preferred version, as derived from a dep's lock, is attempted first, even
 	// if the root also has a direct dep on it (root doesn't need to use
 	// preferreds, because it has direct control AND because the root lock
-	// already supercedes dep lock "preferences")
+	// already supersedes dep lock "preferences")
 	"respect dep prefv with root import": {
 		ds: []depspec{
 			dsp(mkDepspec("root 0.0.0"),

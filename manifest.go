@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"reflect"
+	"regexp"
 	"sort"
 
 	"github.com/golang/dep/internal/gps"
@@ -16,20 +17,22 @@ import (
 	"github.com/pkg/errors"
 )
 
+// ManifestName is the manifest file name used by dep.
 const ManifestName = "Gopkg.toml"
 
+// Manifest holds manifest file data and implements gps.RootManifest.
 type Manifest struct {
-	Dependencies gps.ProjectConstraints
-	Ovr          gps.ProjectConstraints
-	Ignored      []string
-	Required     []string
+	Constraints gps.ProjectConstraints
+	Ovr         gps.ProjectConstraints
+	Ignored     []string
+	Required    []string
 }
 
 type rawManifest struct {
-	Dependencies []rawProject `toml:"dependencies,omitempty"`
-	Overrides    []rawProject `toml:"overrides,omitempty"`
-	Ignored      []string     `toml:"ignored,omitempty"`
-	Required     []string     `toml:"required,omitempty"`
+	Constraints []rawProject `toml:"constraint,omitempty"`
+	Overrides   []rawProject `toml:"override,omitempty"`
+	Ignored     []string     `toml:"ignored,omitempty"`
+	Required    []string     `toml:"required,omitempty"`
 }
 
 type rawProject struct {
@@ -50,6 +53,8 @@ func validateManifest(s string) ([]error, error) {
 	// Convert tree to a map
 	manifest := tree.ToMap()
 
+	// match abbreviated git hash (7chars) or hg hash (12chars)
+	abbrevRevHash := regexp.MustCompile("^[a-f0-9]{7}([a-f0-9]{5})?$")
 	// Look for unknown fields and collect errors
 	for prop, val := range manifest {
 		switch prop {
@@ -58,7 +63,7 @@ func validateManifest(s string) ([]error, error) {
 			if reflect.TypeOf(val).Kind() != reflect.Map {
 				errs = append(errs, errors.New("metadata should be a TOML table"))
 			}
-		case "dependencies", "overrides":
+		case "constraint", "override":
 			// Invalid if type assertion fails. Not a TOML array of tables.
 			if rawProj, ok := val.([]interface{}); ok {
 				// Iterate through each array of tables
@@ -67,8 +72,14 @@ func validateManifest(s string) ([]error, error) {
 					for key, value := range v.(map[string]interface{}) {
 						// Check if the key is valid
 						switch key {
-						case "name", "branch", "revision", "version", "source":
+						case "name", "branch", "version", "source":
 							// valid key
+						case "revision":
+							if valueStr, ok := value.(string); ok {
+								if abbrevRevHash.MatchString(valueStr) {
+									errs = append(errs, fmt.Errorf("revision %q should not be in abbreviated form", valueStr))
+								}
+							}
 						case "metadata":
 							// Check if metadata is of Map type
 							if reflect.TypeOf(value).Kind() != reflect.Map {
@@ -117,21 +128,21 @@ func readManifest(r io.Reader) (*Manifest, []error, error) {
 
 func fromRawManifest(raw rawManifest) (*Manifest, error) {
 	m := &Manifest{
-		Dependencies: make(gps.ProjectConstraints, len(raw.Dependencies)),
-		Ovr:          make(gps.ProjectConstraints, len(raw.Overrides)),
-		Ignored:      raw.Ignored,
-		Required:     raw.Required,
+		Constraints: make(gps.ProjectConstraints, len(raw.Constraints)),
+		Ovr:         make(gps.ProjectConstraints, len(raw.Overrides)),
+		Ignored:     raw.Ignored,
+		Required:    raw.Required,
 	}
 
-	for i := 0; i < len(raw.Dependencies); i++ {
-		name, prj, err := toProject(raw.Dependencies[i])
+	for i := 0; i < len(raw.Constraints); i++ {
+		name, prj, err := toProject(raw.Constraints[i])
 		if err != nil {
 			return nil, err
 		}
-		if _, exists := m.Dependencies[name]; exists {
+		if _, exists := m.Constraints[name]; exists {
 			return nil, errors.Errorf("multiple dependencies specified for %s, can only specify one", name)
 		}
-		m.Dependencies[name] = prj
+		m.Constraints[name] = prj
 	}
 
 	for i := 0; i < len(raw.Overrides); i++ {
@@ -162,7 +173,7 @@ func toProject(raw rawProject) (n gps.ProjectRoot, pp gps.ProjectProperties, err
 		}
 
 		// always semver if we can
-		pp.Constraint, err = gps.NewSemverConstraint(raw.Version)
+		pp.Constraint, err = gps.NewSemverConstraintIC(raw.Version)
 		if err != nil {
 			// but if not, fall back on plain versions
 			pp.Constraint = gps.NewVersion(raw.Version)
@@ -182,15 +193,15 @@ func toProject(raw rawProject) (n gps.ProjectRoot, pp gps.ProjectProperties, err
 // toRaw converts the manifest into a representation suitable to write to the manifest file
 func (m *Manifest) toRaw() rawManifest {
 	raw := rawManifest{
-		Dependencies: make([]rawProject, 0, len(m.Dependencies)),
-		Overrides:    make([]rawProject, 0, len(m.Ovr)),
-		Ignored:      m.Ignored,
-		Required:     m.Required,
+		Constraints: make([]rawProject, 0, len(m.Constraints)),
+		Overrides:   make([]rawProject, 0, len(m.Ovr)),
+		Ignored:     m.Ignored,
+		Required:    m.Required,
 	}
-	for n, prj := range m.Dependencies {
-		raw.Dependencies = append(raw.Dependencies, toRawProject(n, prj))
+	for n, prj := range m.Constraints {
+		raw.Constraints = append(raw.Constraints, toRawProject(n, prj))
 	}
-	sort.Sort(sortedRawProjects(raw.Dependencies))
+	sort.Sort(sortedRawProjects(raw.Constraints))
 
 	for n, prj := range m.Ovr {
 		raw.Overrides = append(raw.Overrides, toRawProject(n, prj))
@@ -217,6 +228,7 @@ func (s sortedRawProjects) Less(i, j int) bool {
 	return l.Source < r.Source
 }
 
+// MarshalTOML serializes this manifest into TOML via an intermediate raw form.
 func (m *Manifest) MarshalTOML() ([]byte, error) {
 	raw := m.toRaw()
 	result, err := toml.Marshal(raw)
@@ -236,7 +248,7 @@ func toRawProject(name gps.ProjectRoot, project gps.ProjectProperties) rawProjec
 		case gps.IsBranch:
 			raw.Branch = v.String()
 		case gps.IsSemver, gps.IsVersion:
-			raw.Version = v.String()
+			raw.Version = v.ImpliedCaretString()
 		}
 		return raw
 	}
@@ -248,24 +260,28 @@ func toRawProject(name gps.ProjectRoot, project gps.ProjectProperties) rawProjec
 	// if !gps.IsAny(pp.Constraint) && !gps.IsNone(pp.Constraint) {
 	if !gps.IsAny(project.Constraint) && project.Constraint != nil {
 		// Has to be a semver range.
-		raw.Version = project.Constraint.String()
+		raw.Version = project.Constraint.ImpliedCaretString()
 	}
 	return raw
 }
 
+// DependencyConstraints returns a list of project-level constraints.
 func (m *Manifest) DependencyConstraints() gps.ProjectConstraints {
-	return m.Dependencies
+	return m.Constraints
 }
 
+// TestDependencyConstraints remains unimplemented by returning nil for now.
 func (m *Manifest) TestDependencyConstraints() gps.ProjectConstraints {
 	// TODO decide whether we're going to incorporate this or not
 	return nil
 }
 
+// Overrides returns a list of project-level override constraints.
 func (m *Manifest) Overrides() gps.ProjectConstraints {
 	return m.Ovr
 }
 
+// IgnoredPackages returns a set of import paths to ignore.
 func (m *Manifest) IgnoredPackages() map[string]bool {
 	if len(m.Ignored) == 0 {
 		return nil
@@ -282,7 +298,7 @@ func (m *Manifest) IgnoredPackages() map[string]bool {
 // HasConstraintsOn checks if the manifest contains either constraints or
 // overrides on the provided ProjectRoot.
 func (m *Manifest) HasConstraintsOn(root gps.ProjectRoot) bool {
-	if _, has := m.Dependencies[root]; has {
+	if _, has := m.Constraints[root]; has {
 		return true
 	}
 	if _, has := m.Ovr[root]; has {
@@ -292,6 +308,7 @@ func (m *Manifest) HasConstraintsOn(root gps.ProjectRoot) bool {
 	return false
 }
 
+// RequiredPackages returns a set of import paths to require.
 func (m *Manifest) RequiredPackages() map[string]bool {
 	if len(m.Required) == 0 {
 		return nil

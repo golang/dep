@@ -26,6 +26,12 @@ The gophers there will answer or ask you to file an issue if you've tripped over
 Please read the [Contribution Guidelines](https://golang.org/doc/contribute.html)
 before sending patches.
 
+The
+[help-wanted](https://github.com/golang/dep/issues?q=is%3Aissue+is%3Aopen+label%3Ahelp-wanted)
+label highlights issues that are well-suited for folks to jump in on. The
+[good-first-pr](https://github.com/golang/dep/issues?q=is%3Aissue+is%3Aopen+label%3Agood-first-pr)
+label further identifies issues that are particularly well-sized for newcomers.
+
 Unless otherwise noted, the Dep source files are distributed under
 the BSD-style license found in the LICENSE file.
 

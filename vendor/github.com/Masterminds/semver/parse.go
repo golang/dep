@@ -20,7 +20,7 @@ func rewriteRange(i string) string {
 	return o
 }
 
-func parseConstraint(c string) (Constraint, error) {
+func parseConstraint(c string, cbd bool) (Constraint, error) {
 	m := constraintRegex.FindStringSubmatch(c)
 	if m == nil {
 		return nil, fmt.Errorf("Malformed constraint: %s", c)
@@ -47,6 +47,16 @@ func parseConstraint(c string) (Constraint, error) {
 		// The constraintRegex should catch any regex parsing errors. So,
 		// we should never get here.
 		return nil, errors.New("constraint Parser Error")
+	}
+
+	// We never want to keep the "original" data in a constraint, and keeping it
+	// around can disrupt simple equality comparisons. So, strip it out.
+	v.original = ""
+
+	// If caret-by-default flag is on and there's no operator, convert the
+	// operator to a caret.
+	if cbd && m[1] == "" {
+		m[1] = "^"
 	}
 
 	switch m[1] {
@@ -81,11 +91,13 @@ func parseConstraint(c string) (Constraint, error) {
 	}
 }
 
-func expandCaret(v *Version) Constraint {
-	maxv := &Version{
-		major: v.major + 1,
-		minor: 0,
-		patch: 0,
+func expandCaret(v Version) Constraint {
+	var maxv Version
+	// Caret behaves like tilde below 1.0.0
+	if v.major == 0 {
+		maxv.minor = v.minor + 1
+	} else {
+		maxv.major = v.major + 1
 	}
 
 	return rangeConstraint{
@@ -96,13 +108,13 @@ func expandCaret(v *Version) Constraint {
 	}
 }
 
-func expandTilde(v *Version, wildMinor bool) Constraint {
+func expandTilde(v Version, wildMinor bool) Constraint {
 	if wildMinor {
 		// When minor is wild on a tilde, behavior is same as caret
 		return expandCaret(v)
 	}
 
-	maxv := &Version{
+	maxv := Version{
 		major: v.major,
 		minor: v.minor + 1,
 		patch: 0,
@@ -122,23 +134,26 @@ func expandTilde(v *Version, wildMinor bool) Constraint {
 // (which is how we represent a disjoint set). If there are no wildcards, it
 // will expand to a rangeConstraint with no min or max, but having the one
 // exception.
-func expandNeq(v *Version, wildMinor, wildPatch bool) Constraint {
+func expandNeq(v Version, wildMinor, wildPatch bool) Constraint {
 	if !(wildMinor || wildPatch) {
 		return rangeConstraint{
-			excl: []*Version{v},
+			min:  Version{special: zeroVersion},
+			max:  Version{special: infiniteVersion},
+			excl: []Version{v},
 		}
 	}
 
 	// Create the low range with no min, and the max as the floor admitted by
 	// the wildcard
 	lr := rangeConstraint{
+		min:        Version{special: zeroVersion},
 		max:        v,
 		includeMax: false,
 	}
 
 	// The high range uses the derived version (bumped depending on where the
 	// wildcards were) as the min, and is inclusive
-	minv := &Version{
+	minv := Version{
 		major: v.major,
 		minor: v.minor,
 		patch: v.patch,
@@ -152,16 +167,17 @@ func expandNeq(v *Version, wildMinor, wildPatch bool) Constraint {
 
 	hr := rangeConstraint{
 		min:        minv,
+		max:        Version{special: infiniteVersion},
 		includeMin: true,
 	}
 
 	return Union(lr, hr)
 }
 
-func expandGreater(v *Version, wildMinor, wildPatch, eq bool) Constraint {
+func expandGreater(v Version, wildMinor, wildPatch, eq bool) Constraint {
 	if (wildMinor || wildPatch) && !eq {
 		// wildcards negate the meaning of prerelease and other info
-		v = &Version{
+		v = Version{
 			major: v.major,
 			minor: v.minor,
 			patch: v.patch,
@@ -176,20 +192,22 @@ func expandGreater(v *Version, wildMinor, wildPatch, eq bool) Constraint {
 		}
 		return rangeConstraint{
 			min:        v,
+			max:        Version{special: infiniteVersion},
 			includeMin: true,
 		}
 	}
 
 	return rangeConstraint{
 		min:        v,
+		max:        Version{special: infiniteVersion},
 		includeMin: eq,
 	}
 }
 
-func expandLess(v *Version, wildMinor, wildPatch, eq bool) Constraint {
+func expandLess(v Version, wildMinor, wildPatch, eq bool) Constraint {
 	if eq && (wildMinor || wildPatch) {
 		// wildcards negate the meaning of prerelease and other info
-		v = &Version{
+		v = Version{
 			major: v.major,
 			minor: v.minor,
 			patch: v.patch,
@@ -200,12 +218,14 @@ func expandLess(v *Version, wildMinor, wildPatch, eq bool) Constraint {
 			v.minor++
 		}
 		return rangeConstraint{
+			min:        Version{special: zeroVersion},
 			max:        v,
 			includeMax: false,
 		}
 	}
 
 	return rangeConstraint{
+		min:        Version{special: zeroVersion},
 		max:        v,
 		includeMax: eq,
 	}

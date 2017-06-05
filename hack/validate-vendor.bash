@@ -31,6 +31,14 @@ files=( $(validate_diff --diff-filter=ACMR --name-only -- 'Gopkg.toml' 'Gopkg.lo
 unset IFS
 
 if [ ${#files[@]} -gt 0 ]; then
+	# This will delete memo section from Gopkg.lock
+	# See https://github.com/golang/dep/issues/645 for more info
+	# This should go away after -vendor-only flag will be implemented
+	# sed -i not used because it works different on MacOS and Linux
+	TMP_FILE=`mktemp /tmp/Gopkg.lock.XXXXXXXXXX`
+	sed '/memo = \S*/d' Gopkg.lock > $TMP_FILE
+	mv $TMP_FILE Gopkg.lock
+
 	# We run ensure to and see if we have a diff afterwards
 	go build ./cmd/dep
 	./dep ensure

@@ -7,7 +7,7 @@ Please contribute to the FAQ! Found an explanation in an issue or pull request h
 Summarize the question and quote the reply, linking back to the original comment.
 
 * [What is the difference between Gopkg.toml (the "manifest") and Gopkg.lock (the "lock")?](#what-is-the-difference-between-gopkgtoml-the-manifest-and-gopkglock-the-lock)
-* [When should I use dependencies, overrides or required in the manifest?](#when-should-i-use-dependencies-overrides-required-or-ignored-in-the-manifest)
+* [When should I use `constraint`, `override` `required`, or `ignored` in the Gopkg.toml?](#when-should-i-use-constraint-override-required-or-ignored-in-gopkgtoml)
 * [What is a direct or transitive dependency?](#what-is-a-direct-or-transitive-dependency)
 * [Should I commit my vendor directory?](#should-i-commit-my-vendor-directory)
 * [Why is it `dep ensure` instead of `dep install`?](#why-is-it-dep-ensure-instead-of-dep-install)
@@ -18,6 +18,12 @@ Summarize the question and quote the reply, linking back to the original comment
 * [Can I put the manifest and lock in the vendor directory?](#can-i-put-the-manifest-and-lock-in-the-vendor-directory)
 * [Why did dep use a different revision for package X instead of the revision in the lock file?](#why-did-dep-use-a-different-revision-for-package-x-instead-of-the-revision-in-the-lock-file)
 * [Why is `dep` slow?](#why-is-dep-slow)
+* [How does `dep` handle symbolic links?](#how-does-dep-handle-symbolic-links)
+* [How do I roll releases that `dep` will be able to use?](#how-do-i-roll-releases-that-dep-will-be-able-to-use)
+* [How does `dep` decide what version of a dependency to use?](#how-does-dep-decide-what-version-of-a-dependency-to-use)
+* [What semver version should I use?](#what-semver-version-should-i-use)
+* [Is it OK to make backwards-incompatible changes now?](#is-it-ok-to-make-backwards-incompatible-changes-now)
+* [My dependers don't use `dep` yet. What should I do?](#my-dependers-dont-use-dep-yet-what-should-i-do)
 
 ## What is the difference between Gopkg.toml (the "manifest") and Gopkg.lock (the "lock")?
 
@@ -26,10 +32,10 @@ Summarize the question and quote the reply, linking back to the original comment
 > This flexibility is important because it allows us to provide easy commands (e.g. `dep ensure -update`) that can manage an update process for you, within the constraints you specify, AND because it allows your project, when imported by someone else, to collaboratively specify the constraints for your own dependencies.
 -[@sdboyer in #281](https://github.com/golang/dep/issues/281#issuecomment-284118314)
 
-## When should I use dependencies, overrides, required, or ignored in the manifest?
+## When should I use `constraint`, `override`, `required`, or `ignored` in `Gopkg.toml`?
 
-* Use `dependencies` to constrain a [direct dependency](#what-is-a-direct-or-transitive-dependency) to a specific branch, version range, revision, or specify an alternate source such as a fork.
-* Use `overrides` to constrain a [transitive dependency](#what-is-a-direct-or-transitive-dependency). See [How do I constrain a transitive dependency's version?](#how-do-i-constrain-a-transitive-dependencys-version) for more details on how overrides differ from dependencies. Overrides should be used cautiously, sparingly, and temporarily.
+* Use `constraint` to constrain a [direct dependency](#what-is-a-direct-or-transitive-dependency) to a specific branch, version range, revision, or specify an alternate source such as a fork.
+* Use `override` to constrain a [transitive dependency](#what-is-a-direct-or-transitive-dependency). See [How do I constrain a transitive dependency's version?](#how-do-i-constrain-a-transitive-dependencys-version) for more details on how overrides differ from dependencies. Overrides should be used cautiously, sparingly, and temporarily.
 * Use `required` to explicitly add a dependency that is not imported directly or transitively, for example a development package used for code generation.
 * Use `ignored` to ignore a package and any of that package's unique dependencies.
 
@@ -113,7 +119,7 @@ behave differently:
 Overrides are also discussed with some visuals in [the gps docs](https://github.com/sdboyer/gps/wiki/gps-for-Implementors#overrides).
 
 ## `dep` deleted my files in the vendor directory!
-First, sorry! 😞 We hope you were able to recover your files...
+If you just ran `dep init`, there should be a copy of your original vendor directory named `_vendor-TIMESTAMP` in your project root. The other commands do not make a backup before modifying the vendor directory.
 
 > dep assumes complete control of vendor/, and may indeed blow things away if it feels like it.
 -[@peterbourgon in #206](https://github.com/golang/dep/issues/206#issuecomment-277139419)
@@ -178,4 +184,118 @@ gateway to all of these improvements.
 
 There's another major performance issue that's much harder - the process of picking versions itself is an NP-complete problem in `dep`'s current design. This is a much trickier problem 😜
 
+## How does `dep` handle symbolic links?
 
+> because we're not crazy people who delight in inviting chaos into our lives, we need to work within one GOPATH at a time.
+-[@sdboyer in #247](https://github.com/golang/dep/pull/247#issuecomment-284181879)
+
+Out of convenience, one might create a symlink to a directory within their `GOPATH`, e.g. `ln -s ~/go/src/github.com/golang/dep dep`. When `dep` is invoked it will resolve the current working directory accordingly:
+
+- If the cwd is a symlink outside a `GOPATH` and links to directory within a `GOPATH`, or vice versa, `dep` chooses whichever path is within the `GOPATH`.  If neither path is within a `GOPATH`, `dep` produces an error.
+- If both the cwd and resolved path are in the same `GOPATH`, an error is thrown since the users intentions and expectations can't be accurately deduced.
+- If the symlink is within a `GOPATH` and the real path is within a *different* `GOPATH` - an error is thrown.
+
+This is the only symbolic link support that `dep` really intends to provide. In keeping with the general practices of the `go` tool, `dep` tends to either ignore symlinks (when walking) or copy the symlink itself, depending on the filesystem operation being performed.
+
+## How do I roll releases that `dep` will be able to use?
+
+In short: make sure you've committed your `Gopkg.toml` and `Gopkg.lock`, then
+just create a tag in your version control system and push it to the canonical
+location. `dep` is designed to work automatically with this sort of metadata
+from `git`, `bzr`, and `hg`.
+
+It's strongly preferred that you use [semver](http://semver.org)-compliant tag
+names. We hope to develop documentation soon that describes this more precisely,
+but in the meantime, the [npm](https://docs.npmjs.com/misc/semver) docs match
+our patterns pretty well.
+
+## How does `dep` decide what version of a dependency to use?
+
+The full algorithm is complex, but the most important thing to understand is
+that `dep` tries versions in a [certain
+order](https://godoc.org/github.com/golang/dep/internal/gps#SortForUpgrade),
+checking to see a version is acceptable according to specified constraints.
+
+- All semver versions come first, and sort mostly according to the semver 2.0
+  spec, with one exception:
+  - Semver versions with a prerelease are sorted after *all* non-prerelease
+    semver. Within this subset they are sorted first by their numerical
+    component, then lexicographically by their prerelease version.
+- The default branch(es) are next; the semantics of what "default branch" means
+  are specific to the underlying source type, but this is generally what you'd
+  get from a `go get`.
+- All other branches come next, sorted lexicographically.
+- All non-semver versions (tags) are next, sorted lexicographically.
+- Revisions, if any, are last, sorted lexicographically. Revisions do not
+  typically appear in version lists, so the only invariant we maintain is
+  determinism - deeper semantics, like chronology or topology, do not matter.
+
+So, given a slice of the following versions:
+
+- Branch: `master` `devel`
+- Semver tags: `v1.0.0` `v1.1.0` `v1.1.0-alpha1`
+- Non-semver tags: `footag`
+- Revision: `f6e74e8d`
+Sorting for upgrade will result in the following slice.
+
+`[v1.1.0 v1.0.0 v1.1.0-alpha1 footag devel master f6e74e8d]`
+
+There are a number of factors that can eliminate a version from consideration,
+the simplest of which is that it doesn't match a constraint. But if you're
+trying to figure out why `dep` is doing what it does, understanding that its
+basic action is to attempt versions in this order should help you to reason
+about what's going on.
+
+## What semver version should I use?
+
+This can be a nuanced question, and the community is going to have to work out
+some accepted standards for how semver should be applied to Go projects. At the
+highest level, though, these are the rules:
+
+* Below `v1.0.0`, anything goes. Use these releases to figure out what you want
+  your API to be.
+* Above `v1.0.0`, the general Go best practices continue to apply - don't make
+  backwards-incompatible changes - exported identifiers can be added to, but
+  not changed or removed.
+* If you must make a backwards-incompatible change, then bump the major version.
+
+It's important to note that having a `v1.0.0` does not preclude you from having
+alpha/beta/etc releases. The semver spec allows for [prerelease
+versions](http://semver.org/#spec-item-9), and `dep` is careful to _not_ allow
+such versions unless `Gopkg.toml` contains a range constraint that explicitly
+includes prereleases: if there exists a version `v1.0.1-alpha4`, then the
+constraint `>=1.0.0` will not match it, but `>=1.0.1-alpha1` will.
+
+Some work has been done towards [a tool
+to](https://github.com/bradleyfalzon/apicompat) that will analyze and compare
+your code with the last release, and suggest the next version you should use.
+
+## Is it OK to make backwards-incompatible changes now?
+
+Yes. But.
+
+`dep` will make it possible for the Go ecosystem to handle
+backwards-incompatible changes more gracefully. However, `dep` is not some
+magical panacea. Version and dependency management is hard, and dependency hell
+is real. The longstanding community wisdom about avoiding breaking changes
+remains important. Any `v1.0.0` release should be accompanied by a plan for how
+to avoid future breaking API changes.
+
+One good strategy may be to add to your API instead of changing it, deprecating
+old versions as you progress. Then, when the time is right, you can roll a new
+major version and clean out a bunch of deprecated symbols all at once.
+
+Note that providing an incremental migration path across breaking changes (i.e.,
+shims) is tricky, and something we [don't have a good answer for
+yet](https://groups.google.com/forum/#!topic/go-package-management/fp2uBMf6kq4).
+
+## My dependers don't use `dep` yet. What should I do?
+
+For the most part, you needn't do anything differently.
+
+The only possible issue is if your project is ever consumed as a library. If
+so, then you may want to be wary about committing your `vendor/` directory, as
+it can [cause
+problems](https://groups.google.com/d/msg/golang-nuts/AnMr9NL6dtc/UnyUUKcMCAAJ).
+If your dependers are using `dep`, this is not a concern, as `dep` takes care of
+stripping out nested `vendor` directories.

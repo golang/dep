@@ -119,6 +119,10 @@ func (r Revision) String() string {
 	return string(r)
 }
 
+func (r Revision) ImpliedCaretString() string {
+	return r.String()
+}
+
 func (r Revision) typedString() string {
 	return "r-" + string(r)
 }
@@ -193,6 +197,10 @@ type branchVersion struct {
 
 func (v branchVersion) String() string {
 	return string(v.name)
+}
+
+func (v branchVersion) ImpliedCaretString() string {
+	return v.String()
 }
 
 func (v branchVersion) typedString() string {
@@ -272,6 +280,10 @@ func (v plainVersion) String() string {
 	return string(v)
 }
 
+func (v plainVersion) ImpliedCaretString() string {
+	return v.String()
+}
+
 func (v plainVersion) typedString() string {
 	return fmt.Sprintf("pv-%s", v.String())
 }
@@ -344,7 +356,7 @@ func (v plainVersion) Is(r Revision) PairedVersion {
 }
 
 type semVersion struct {
-	sv *semver.Version
+	sv semver.Version
 }
 
 func (v semVersion) String() string {
@@ -353,6 +365,10 @@ func (v semVersion) String() string {
 		str = v.sv.String()
 	}
 	return str
+}
+
+func (v semVersion) ImpliedCaretString() string {
+	return v.sv.ImpliedCaretString()
 }
 
 func (v semVersion) typedString() string {
@@ -437,6 +453,10 @@ type versionPair struct {
 
 func (v versionPair) String() string {
 	return v.v.String()
+}
+
+func (v versionPair) ImpliedCaretString() string {
+	return v.v.ImpliedCaretString()
 }
 
 func (v versionPair) typedString() string {

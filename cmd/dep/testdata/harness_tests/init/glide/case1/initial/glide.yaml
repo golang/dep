@@ -1,0 +1,20 @@
+package: github.com/golang/notexist
+homepage: http://example.com
+license: MIT
+owners:
+- name: Sam Boyer
+  email: sdboyer@example.com
+  homepage: http://sdboyer.io
+ignore:
+- github.com/sdboyer/dep-test
+excludeDirs:
+- samples
+import:
+- package: github.com/sdboyer/deptest # This is a transitive dep and will be ignored
+  repo: https://github.com/sdboyer/deptest.git
+  vcs: git
+  version: v1.0.0
+- package: github.com/sdboyer/deptestdos
+  version: v2.0.0
+testImport:
+- package: github.com/golang/lint

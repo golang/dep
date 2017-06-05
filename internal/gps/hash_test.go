@@ -21,6 +21,8 @@ func TestHashInputs(t *testing.T) {
 		RootPackageTree: fix.rootTree(),
 		Manifest:        fix.rootmanifest(),
 		ProjectAnalyzer: naiveAnalyzer{},
+		stdLibFn:        func(string) bool { return false },
+		mkBridgeFn:      overrideMkBridge,
 	}
 
 	s, err := Prepare(params, newdepspecSM(fix.ds, nil))
@@ -72,6 +74,8 @@ func TestHashInputsReqsIgs(t *testing.T) {
 		RootPackageTree: fix.rootTree(),
 		Manifest:        rm,
 		ProjectAnalyzer: naiveAnalyzer{},
+		stdLibFn:        func(string) bool { return false },
+		mkBridgeFn:      overrideMkBridge,
 	}
 
 	s, err := Prepare(params, newdepspecSM(fix.ds, nil))
@@ -201,6 +205,8 @@ func TestHashInputsOverrides(t *testing.T) {
 		RootPackageTree: basefix.rootTree(),
 		Manifest:        rm,
 		ProjectAnalyzer: naiveAnalyzer{},
+		stdLibFn:        func(string) bool { return false },
+		mkBridgeFn:      overrideMkBridge,
 	}
 
 	table := []struct {

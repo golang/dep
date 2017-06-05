@@ -15,7 +15,7 @@ import (
 	"time"
 
 	"github.com/Masterminds/semver"
-	"github.com/golang/dep/internal/gps/internal/fs"
+	"github.com/golang/dep/internal/fs"
 	"github.com/golang/dep/internal/gps/pkgtree"
 )
 
@@ -148,7 +148,7 @@ func (s *gitSource) exportRevisionTo(ctx context.Context, rev Revision, to strin
 	//
 	// Sadly, this approach *does* also write out vendor dirs. There doesn't
 	// appear to be a way to make checkout-index respect sparse checkout
-	// rules (-a supercedes it). The alternative is using plain checkout,
+	// rules (-a supersedes it). The alternative is using plain checkout,
 	// though we have a bunch of housekeeping to do to set up, then tear
 	// down, the sparse checkout controls, as well as restore the original
 	// index and HEAD.
@@ -278,7 +278,8 @@ func (s *gitSource) listVersions(ctx context.Context) (vlist []PairedVersion, er
 // according to the input URL.
 type gopkginSource struct {
 	gitSource
-	major uint64
+	major    uint64
+	unstable bool
 }
 
 func (s *gopkginSource) listVersions(ctx context.Context) ([]PairedVersion, error) {
@@ -291,22 +292,20 @@ func (s *gopkginSource) listVersions(ctx context.Context) ([]PairedVersion, erro
 	vlist := make([]PairedVersion, len(ovlist))
 	k := 0
 	var dbranch int // index of branch to be marked default
-	var bsv *semver.Version
+	var bsv semver.Version
 	for _, v := range ovlist {
 		// all git versions will always be paired
 		pv := v.(versionPair)
 		switch tv := pv.v.(type) {
 		case semVersion:
-			if tv.sv.Major() == s.major {
+			if tv.sv.Major() == s.major && !s.unstable {
 				vlist[k] = v
 				k++
 			}
 		case branchVersion:
 			// The semver lib isn't exactly the same as gopkg.in's logic, but
 			// it's close enough that it's probably fine to use. We can be more
-			// exact if real problems crop up. The most obvious vector for
-			// problems is that we totally ignore the "unstable" designation
-			// right now.
+			// exact if real problems crop up.
 			sv, err := semver.NewVersion(tv.name)
 			if err != nil || sv.Major() != s.major {
 				// not a semver-shaped branch name at all, or not the same major
@@ -314,11 +313,17 @@ func (s *gopkginSource) listVersions(ctx context.Context) ([]PairedVersion, erro
 				continue
 			}
 
+			// Gopkg.in has a special "-unstable" suffix which we need to handle
+			// separately.
+			if s.unstable != strings.HasSuffix(tv.name, gopkgUnstableSuffix) {
+				continue
+			}
+
 			// Turn off the default branch marker unconditionally; we can't know
 			// which one to mark as default until we've seen them all
 			tv.isDefault = false
 			// Figure out if this is the current leader for default branch
-			if bsv == nil || bsv.LessThan(sv) {
+			if bsv == (semver.Version{}) || bsv.LessThan(sv) {
 				bsv = sv
 				dbranch = k
 			}
@@ -331,7 +336,7 @@ func (s *gopkginSource) listVersions(ctx context.Context) ([]PairedVersion, erro
 	}
 
 	vlist = vlist[:k]
-	if bsv != nil {
+	if bsv != (semver.Version{}) {
 		dbv := vlist[dbranch].(versionPair)
 		vlist[dbranch] = branchVersion{
 			name:      dbv.v.(branchVersion).name,

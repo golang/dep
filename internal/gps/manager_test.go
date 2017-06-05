@@ -16,11 +16,7 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
-
-	"github.com/Masterminds/semver"
 )
-
-var bd string
 
 // An analyzer that passes nothing back, but doesn't error. This is the naive
 // case - no constraints, no lock, and no errors. The SourceManager will
@@ -33,15 +29,6 @@ func (naiveAnalyzer) DeriveManifestAndLock(string, ProjectRoot) (Manifest, Lock,
 
 func (a naiveAnalyzer) Info() (name string, version int) {
 	return "naive-analyzer", 1
-}
-
-func sv(s string) *semver.Version {
-	sv, err := semver.NewVersion(s)
-	if err != nil {
-		panic(fmt.Sprintf("Error creating semver from %q: %s", s, err))
-	}
-
-	return sv
 }
 
 func mkNaiveSM(t *testing.T) (*SourceMgr, func()) {
@@ -80,11 +67,6 @@ func remakeNaiveSM(osm *SourceMgr, t *testing.T) (*SourceMgr, func()) {
 			t.Errorf("removeAll failed: %s", err)
 		}
 	}
-}
-
-func init() {
-	_, filename, _, _ := runtime.Caller(1)
-	bd = path.Dir(filename)
 }
 
 func TestSourceManagerInit(t *testing.T) {

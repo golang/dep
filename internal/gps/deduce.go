@@ -6,7 +6,6 @@ package gps
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -18,6 +17,7 @@ import (
 	"sync"
 
 	radix "github.com/armon/go-radix"
+	"github.com/pkg/errors"
 )
 
 var (
@@ -26,6 +26,8 @@ var (
 	hgSchemes  = []string{"https", "ssh", "http"}
 	svnSchemes = []string{"https", "http", "svn", "svn+ssh"}
 )
+
+const gopkgUnstableSuffix = "-unstable"
 
 func validateVCSScheme(scheme, typ string) bool {
 	// everything allows plain ssh
@@ -276,10 +278,18 @@ func (m gopkginDeducer) deduceSource(p string, u *url.URL) (maybeSource, error) 
 	} else {
 		u.Path = path.Join(v[2], v[3])
 	}
-	major, err := strconv.ParseUint(v[4][1:], 10, 64)
+
+	unstable := false
+	majorStr := v[4]
+
+	if strings.HasSuffix(majorStr, gopkgUnstableSuffix) {
+		unstable = true
+		majorStr = strings.TrimSuffix(majorStr, gopkgUnstableSuffix)
+	}
+	major, err := strconv.ParseUint(majorStr[1:], 10, 64)
 	if err != nil {
 		// this should only be reachable if there's an error in the regex
-		return nil, fmt.Errorf("could not parse %q as a gopkg.in major version", v[4][1:])
+		return nil, fmt.Errorf("could not parse %q as a gopkg.in major version", majorStr[1:])
 	}
 
 	mb := make(maybeSources, len(gitSchemes))
@@ -290,9 +300,10 @@ func (m gopkginDeducer) deduceSource(p string, u *url.URL) (maybeSource, error) 
 		}
 		u2.Scheme = scheme
 		mb[k] = maybeGopkginSource{
-			opath: v[1],
-			url:   &u2,
-			major: major,
+			opath:    v[1],
+			url:      &u2,
+			major:    major,
+			unstable: unstable,
 		}
 	}
 
@@ -696,6 +707,7 @@ func (hmd *httpMetadataDeducer) deduce(ctx context.Context, path string) (pathDe
 		opath := path
 		u, path, err := normalizeURI(path)
 		if err != nil {
+			err = errors.Wrapf(err, "unable to normalize URI")
 			hmd.deduceErr = err
 			return
 		}
@@ -705,20 +717,25 @@ func (hmd *httpMetadataDeducer) deduce(ctx context.Context, path string) (pathDe
 		// Make the HTTP call to attempt to retrieve go-get metadata
 		var root, vcs, reporoot string
 		err = hmd.suprvsr.do(ctx, path, ctHTTPMetadata, func(ctx context.Context) error {
-			root, vcs, reporoot, err = parseMetadata(ctx, path, u.Scheme)
+			root, vcs, reporoot, err = getMetadata(ctx, path, u.Scheme)
+			if err != nil {
+				err = errors.Wrapf(err, "unable to read metadata")
+			}
 			return err
 		})
 		if err != nil {
-			hmd.deduceErr = fmt.Errorf("unable to deduce repository and source type for: %q", opath)
+			err = errors.Wrapf(err, "unable to deduce repository and source type for %q", opath)
+			hmd.deduceErr = err
 			return
 		}
 		pd.root = root
 
-		// If we got something back at all, then it supercedes the actual input for
+		// If we got something back at all, then it supersedes the actual input for
 		// the real URL to hit
 		repoURL, err := url.Parse(reporoot)
 		if err != nil {
-			hmd.deduceErr = fmt.Errorf("server returned bad URL in go-get metadata: %q", reporoot)
+			err = errors.Wrapf(err, "server returned bad URL in go-get metadata, reporoot=%q", reporoot)
+			hmd.deduceErr = err
 			return
 		}
 
@@ -731,7 +748,7 @@ func (hmd *httpMetadataDeducer) deduce(ctx context.Context, path string) (pathDe
 			// To err on the secure side, do NOT allow the same in the other
 			// direction (https -> http).
 			if u.Scheme != "http" || repoURL.Scheme != "https" {
-				hmd.deduceErr = fmt.Errorf("scheme mismatch for %q: input asked for %q, but go-get metadata specified %q", path, u.Scheme, repoURL.Scheme)
+				hmd.deduceErr = errors.Errorf("scheme mismatch for %q: input asked for %q, but go-get metadata specified %q", path, u.Scheme, repoURL.Scheme)
 				return
 			}
 		}
@@ -744,7 +761,7 @@ func (hmd *httpMetadataDeducer) deduce(ctx context.Context, path string) (pathDe
 		case "hg":
 			pd.mb = maybeHgSource{url: repoURL}
 		default:
-			hmd.deduceErr = fmt.Errorf("unsupported vcs type %s in go-get metadata from %s", vcs, path)
+			hmd.deduceErr = errors.Errorf("unsupported vcs type %s in go-get metadata from %s", vcs, path)
 			return
 		}
 
@@ -781,7 +798,7 @@ func normalizeURI(p string) (u *url.URL, newpath string, err error) {
 	} else {
 		u, err = url.Parse(p)
 		if err != nil {
-			return nil, "", fmt.Errorf("%q is not a valid URI", p)
+			return nil, "", errors.Errorf("%q is not a valid URI", p)
 		}
 	}
 
@@ -794,7 +811,7 @@ func normalizeURI(p string) (u *url.URL, newpath string, err error) {
 	}
 
 	if !pathvld.MatchString(newpath) {
-		return nil, "", fmt.Errorf("%q is not a valid import path", newpath)
+		return nil, "", errors.Errorf("%q is not a valid import path", newpath)
 	}
 
 	return
@@ -802,12 +819,6 @@ func normalizeURI(p string) (u *url.URL, newpath string, err error) {
 
 // fetchMetadata fetches the remote metadata for path.
 func fetchMetadata(ctx context.Context, path, scheme string) (rc io.ReadCloser, err error) {
-	defer func() {
-		if err != nil {
-			err = fmt.Errorf("unable to determine remote metadata protocol: %s", err)
-		}
-	}()
-
 	if scheme == "http" {
 		rc, err = doFetchMetadata(ctx, "http", path)
 		return
@@ -828,35 +839,35 @@ func doFetchMetadata(ctx context.Context, scheme, path string) (io.ReadCloser, e
 	case "https", "http":
 		req, err := http.NewRequest("GET", url, nil)
 		if err != nil {
-			return nil, fmt.Errorf("failed to access url %q", url)
+			return nil, errors.Wrapf(err, "unable to build HTTP request for URL %q", url)
 		}
 
 		resp, err := http.DefaultClient.Do(req.WithContext(ctx))
 		if err != nil {
-			return nil, fmt.Errorf("failed to access url %q", url)
+			return nil, errors.Wrapf(err, "failed HTTP request to URL %q", url)
 		}
 
 		return resp.Body, nil
 	default:
-		return nil, fmt.Errorf("unknown remote protocol scheme: %q", scheme)
+		return nil, errors.Errorf("unknown remote protocol scheme: %q", scheme)
 	}
 }
 
-// parseMetadata fetches and decodes remote metadata for path.
+// getMetadata fetches and decodes remote metadata for path.
 //
 // scheme is optional. If it's http, only http will be attempted for fetching.
 // Any other scheme (including none) will first try https, then fall back to
 // http.
-func parseMetadata(ctx context.Context, path, scheme string) (string, string, string, error) {
+func getMetadata(ctx context.Context, path, scheme string) (string, string, string, error) {
 	rc, err := fetchMetadata(ctx, path, scheme)
 	if err != nil {
-		return "", "", "", err
+		return "", "", "", errors.Wrapf(err, "unable to fetch raw metadata")
 	}
 	defer rc.Close()
 
 	imports, err := parseMetaGoImports(rc)
 	if err != nil {
-		return "", "", "", err
+		return "", "", "", errors.Wrapf(err, "unable to parse go-import metadata")
 	}
 	match := -1
 	for i, im := range imports {
@@ -864,12 +875,12 @@ func parseMetadata(ctx context.Context, path, scheme string) (string, string, st
 			continue
 		}
 		if match != -1 {
-			return "", "", "", fmt.Errorf("multiple meta tags match import path %q", path)
+			return "", "", "", errors.Errorf("multiple meta tags match import path %q", path)
 		}
 		match = i
 	}
 	if match == -1 {
-		return "", "", "", fmt.Errorf("go-import metadata not found")
+		return "", "", "", errors.Errorf("go-import metadata not found")
 	}
 	return imports[match].Prefix, imports[match].VCS, imports[match].RepoRoot, nil
 }

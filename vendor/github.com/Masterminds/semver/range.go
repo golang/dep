@@ -7,13 +7,14 @@ import (
 )
 
 type rangeConstraint struct {
-	min, max               *Version
+	min, max               Version
 	includeMin, includeMax bool
-	excl                   []*Version
+	excl                   []Version
 }
 
-func (rc rangeConstraint) Matches(v *Version) error {
+func (rc rangeConstraint) Matches(v Version) error {
 	var fail bool
+	ispre := v.Prerelease() != ""
 
 	rce := RangeMatchFailure{
 		v:  v,
@@ -21,8 +22,6 @@ func (rc rangeConstraint) Matches(v *Version) error {
 	}
 
 	if !rc.minIsZero() {
-		// TODO ensure sane handling of prerelease versions (which are strictly
-		// less than the normal version, but should be admitted in a geq range)
 		cmp := rc.min.Compare(v)
 		if rc.includeMin {
 			rce.typ = rerrLT
@@ -38,8 +37,6 @@ func (rc rangeConstraint) Matches(v *Version) error {
 	}
 
 	if !rc.maxIsInf() {
-		// TODO ensure sane handling of prerelease versions (which are strictly
-		// less than the normal version, but should be admitted in a geq range)
 		cmp := rc.max.Compare(v)
 		if rc.includeMax {
 			rce.typ = rerrGT
@@ -47,6 +44,7 @@ func (rc rangeConstraint) Matches(v *Version) error {
 		} else {
 			rce.typ = rerrGTE
 			fail = cmp != 1
+
 		}
 
 		if fail {
@@ -61,6 +59,14 @@ func (rc rangeConstraint) Matches(v *Version) error {
 		}
 	}
 
+	// If the incoming version has prerelease info, it's usually a match failure
+	// - unless all the numeric parts are equal between the incoming and the
+	// minimum.
+	if !fail && ispre && !numPartsEq(rc.min, v) {
+		rce.typ = rerrPre
+		return rce
+	}
+
 	return nil
 }
 
@@ -70,8 +76,8 @@ func (rc rangeConstraint) dup() rangeConstraint {
 		return rc
 	}
 
-	var excl []*Version
-	excl = make([]*Version, len(rc.excl))
+	var excl []Version
+	excl = make([]Version, len(rc.excl))
 	copy(excl, rc.excl)
 
 	return rangeConstraint{
@@ -84,11 +90,11 @@ func (rc rangeConstraint) dup() rangeConstraint {
 }
 
 func (rc rangeConstraint) minIsZero() bool {
-	return rc.min == nil
+	return rc.min.special == zeroVersion
 }
 
 func (rc rangeConstraint) maxIsInf() bool {
-	return rc.max == nil
+	return rc.max.special == infiniteVersion
 }
 
 func (rc rangeConstraint) Intersect(c Constraint) Constraint {
@@ -99,12 +105,11 @@ func (rc rangeConstraint) Intersect(c Constraint) Constraint {
 		return None()
 	case unionConstraint:
 		return oc.Intersect(rc)
-	case *Version:
+	case Version:
 		if err := rc.Matches(oc); err != nil {
 			return None()
-		} else {
-			return c
 		}
+		return c
 	case rangeConstraint:
 		nr := rangeConstraint{
 			min:        rc.min,
@@ -174,7 +179,7 @@ func (rc rangeConstraint) Union(c Constraint) Constraint {
 		return rc
 	case unionConstraint:
 		return Union(rc, oc)
-	case *Version:
+	case Version:
 		if err := rc.Matches(oc); err == nil {
 			return rc
 		} else if len(rc.excl) > 0 { // TODO (re)checking like this is wasteful
@@ -182,7 +187,7 @@ func (rc rangeConstraint) Union(c Constraint) Constraint {
 			// it and return that
 			for k, e := range rc.excl {
 				if e.Equal(oc) {
-					excl := make([]*Version, len(rc.excl)-1)
+					excl := make([]Version, len(rc.excl)-1)
 
 					if k == len(rc.excl)-1 {
 						copy(excl, rc.excl[:k])
@@ -204,12 +209,12 @@ func (rc rangeConstraint) Union(c Constraint) Constraint {
 		if oc.LessThan(rc.min) {
 			return unionConstraint{oc, rc.dup()}
 		}
-		if areEq(oc, rc.min) {
+		if oc.Equal(rc.min) {
 			ret := rc.dup()
 			ret.includeMin = true
 			return ret
 		}
-		if areEq(oc, rc.max) {
+		if oc.Equal(rc.max) {
 			ret := rc.dup()
 			ret.includeMax = true
 			return ret
@@ -233,7 +238,10 @@ func (rc rangeConstraint) Union(c Constraint) Constraint {
 			}
 
 			// There's at least some dupes, which are all we need to include
-			nc := rangeConstraint{}
+			nc := rangeConstraint{
+				min: Version{special: zeroVersion},
+				max: Version{special: infiniteVersion},
+			}
 			for _, e1 := range rc.excl {
 				for _, e2 := range oc.excl {
 					if e1.Equal(e2) {
@@ -264,7 +272,10 @@ func (rc rangeConstraint) Union(c Constraint) Constraint {
 
 		} else if rc.MatchesAny(oc) {
 			// Receiver and input overlap; form a new range accordingly.
-			nc := rangeConstraint{}
+			nc := rangeConstraint{
+				min: Version{special: zeroVersion},
+				max: Version{special: infiniteVersion},
+			}
 
 			// For efficiency, we simultaneously determine if either of the
 			// ranges are supersets of the other, while also selecting the min
@@ -370,6 +381,14 @@ func (rc rangeConstraint) isSupersetOf(rc2 rangeConstraint) bool {
 }
 
 func (rc rangeConstraint) String() string {
+	return rc.toString(false)
+}
+
+func (rc rangeConstraint) ImpliedCaretString() string {
+	return rc.toString(true)
+}
+
+func (rc rangeConstraint) toString(impliedCaret bool) string {
 	var pieces []string
 
 	// We need to trigger the standard verbose handling from various points, so
@@ -393,7 +412,14 @@ func (rc rangeConstraint) String() string {
 	}
 
 	// Handle the possibility that we might be able to express the range
-	// with a carat or tilde, as we prefer those forms.
+	// with a caret or tilde, as we prefer those forms.
+	var caretstr string
+	if impliedCaret {
+		caretstr = "%s"
+	} else {
+		caretstr = "^%s"
+	}
+
 	switch {
 	case rc.minIsZero() && rc.maxIsInf():
 		// This if is internal because it's useful to know for the other cases
@@ -404,13 +430,13 @@ func (rc rangeConstraint) String() string {
 			return "*"
 		}
 	case rc.minIsZero(), rc.includeMax, !rc.includeMin:
-		// tilde and carat could never apply here
+		// tilde and caret could never apply here
 		noshort()
-	case !rc.maxIsInf() && rc.max.Minor() == 0 && rc.max.Patch() == 0: // basic carat
+	case !rc.maxIsInf() && rc.max.Minor() == 0 && rc.max.Patch() == 0: // basic caret
 		if rc.min.Major() == rc.max.Major()-1 && rc.min.Major() != 0 {
-			pieces = append(pieces, fmt.Sprintf("^%s", rc.min))
+			pieces = append(pieces, fmt.Sprintf(caretstr, rc.min))
 		} else {
-			// range is too wide for carat, need standard operators
+			// range is too wide for caret, need standard operators
 			noshort()
 		}
 	case !rc.maxIsInf() && rc.max.Major() != 0 && rc.max.Patch() == 0: // basic tilde
@@ -421,10 +447,10 @@ func (rc rangeConstraint) String() string {
 			noshort()
 		}
 	case !rc.maxIsInf() && rc.max.Major() == 0 && rc.max.Patch() == 0 && rc.max.Minor() != 0:
-		// below 1.0.0, tilde is meaningless but carat is shifted to the
+		// below 1.0.0, tilde is meaningless but caret is shifted to the
 		// right (so it basically behaves the same as tilde does above 1.0.0)
 		if rc.min.Minor() == rc.max.Minor()-1 {
-			pieces = append(pieces, fmt.Sprintf("^%s", rc.min))
+			pieces = append(pieces, fmt.Sprintf(caretstr, rc.min))
 		} else {
 			noshort()
 		}
@@ -457,7 +483,7 @@ func areAdjacent(c1, c2 Constraint) bool {
 		return false
 	}
 
-	if !areEq(rc1.max, rc2.min) {
+	if !rc1.max.Equal(rc2.min) {
 		return false
 	}
 
@@ -472,10 +498,10 @@ func (rc rangeConstraint) MatchesAny(c Constraint) bool {
 	return true
 }
 
-func dedupeExcls(ex1, ex2 []*Version) []*Version {
+func dedupeExcls(ex1, ex2 []Version) []Version {
 	// TODO stupid inefficient, but these are really only ever going to be
 	// small, so not worth optimizing right now
-	var ret []*Version
+	var ret []Version
 oloop:
 	for _, e1 := range ex1 {
 		for _, e2 := range ex2 {
@@ -491,14 +517,3 @@ oloop:
 
 func (rangeConstraint) _private() {}
 func (rangeConstraint) _real()    {}
-
-func areEq(v1, v2 *Version) bool {
-	if v1 == nil && v2 == nil {
-		return true
-	}
-
-	if v1 != nil && v2 != nil {
-		return v1.Equal(v2)
-	}
-	return false
-}

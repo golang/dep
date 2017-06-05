@@ -1,0 +1,6 @@
+{
+  "commands": [
+    ["init", "-not-defined-flag"]
+  ],
+  "error-expected": "flag provided but not defined: -not-defined-flag\nUsage: dep init [root]"
+}

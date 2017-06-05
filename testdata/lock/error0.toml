@@ -1,4 +1,5 @@
-memo = "2252a285ab27944a4d7adcba8dbd03980f59ba652f12db39fa93b927c345593e"
+[solve-meta]
+  inputs-digest = "2252a285ab27944a4d7adcba8dbd03980f59ba652f12db39fa93b927c345593e"
 
 [[projects]]
   name = "github.com/golang/dep/internal/gps"

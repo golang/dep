@@ -11,8 +11,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-
-	"github.com/golang/dep/internal/gps/pkgtree"
 )
 
 // string headers used to demarcate sections in hash input creation
@@ -63,7 +61,7 @@ func (s *solver) writeHashingInputs(w io.Writer) {
 	// getApplicableConstraints will apply overrides, incorporate requireds,
 	// apply local ignores, drop stdlib imports, and finally trim out
 	// ineffectual constraints.
-	for _, pd := range s.rd.getApplicableConstraints() {
+	for _, pd := range s.rd.getApplicableConstraints(s.stdLibFn) {
 		writeString(string(pd.Ident.ProjectRoot))
 		writeString(pd.Ident.Source)
 		writeString(pd.Constraint.typedString())
@@ -71,7 +69,7 @@ func (s *solver) writeHashingInputs(w io.Writer) {
 
 	// Write out each discrete import, including those derived from requires.
 	writeString(hhImportsReqs)
-	imports := s.rd.externalImportList()
+	imports := s.rd.externalImportList(s.stdLibFn)
 	sort.Strings(imports)
 	for _, im := range imports {
 		writeString(im)
@@ -132,26 +130,4 @@ func HashingInputsAsString(s Solver) string {
 	ts.writeHashingInputs(buf)
 
 	return (*bytes.Buffer)(buf).String()
-}
-
-type sortPackageOrErr []pkgtree.PackageOrErr
-
-func (s sortPackageOrErr) Len() int      { return len(s) }
-func (s sortPackageOrErr) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
-
-func (s sortPackageOrErr) Less(i, j int) bool {
-	a, b := s[i], s[j]
-	if a.Err != nil || b.Err != nil {
-		// Sort errors last.
-		if b.Err == nil {
-			return false
-		}
-		if a.Err == nil {
-			return true
-		}
-		// And then by string.
-		return a.Err.Error() < b.Err.Error()
-	}
-	// And finally, sort by import path.
-	return a.P.ImportPath < b.P.ImportPath
 }

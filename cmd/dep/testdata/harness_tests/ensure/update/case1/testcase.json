@@ -2,6 +2,7 @@
   "commands": [
     ["ensure", "-update", "github.com/sdboyer/deptest"]
   ],
+  "error-expected": "",
   "vendor-final": [
     "github.com/sdboyer/deptest",
     "github.com/sdboyer/deptestdos"

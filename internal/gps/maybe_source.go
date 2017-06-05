@@ -84,14 +84,15 @@ func (m maybeGitSource) try(ctx context.Context, cachedir string, c singleSource
 	ustr := m.url.String()
 	path := filepath.Join(cachedir, "sources", sanitizer.Replace(ustr))
 
-	r, err := vcs.NewGitRepo(ustr, path)
+	r, err := newCtxRepo(vcs.Git, ustr, path)
+
 	if err != nil {
 		return nil, 0, unwrapVcsErr(err)
 	}
 
 	src := &gitSource{
 		baseVCSSource: baseVCSSource{
-			repo: &gitRepo{r},
+			repo: r,
 		},
 	}
 
@@ -131,6 +132,8 @@ type maybeGopkginSource struct {
 	url *url.URL
 	// the major version to apply for filtering
 	major uint64
+	// whether or not the source package is "unstable"
+	unstable bool
 }
 
 func (m maybeGopkginSource) try(ctx context.Context, cachedir string, c singleSourceCache, superv *supervisor) (source, sourceState, error) {
@@ -139,8 +142,8 @@ func (m maybeGopkginSource) try(ctx context.Context, cachedir string, c singleSo
 	// So, it's OK to just dumb-join the scheme with the path.
 	path := filepath.Join(cachedir, "sources", sanitizer.Replace(m.url.Scheme+"/"+m.opath))
 	ustr := m.url.String()
+	r, err := newCtxRepo(vcs.Git, ustr, path)
 
-	r, err := vcs.NewGitRepo(ustr, path)
 	if err != nil {
 		return nil, 0, unwrapVcsErr(err)
 	}
@@ -148,10 +151,11 @@ func (m maybeGopkginSource) try(ctx context.Context, cachedir string, c singleSo
 	src := &gopkginSource{
 		gitSource: gitSource{
 			baseVCSSource: baseVCSSource{
-				repo: &gitRepo{r},
+				repo: r,
 			},
 		},
-		major: m.major,
+		major:    m.major,
+		unstable: m.unstable,
 	}
 
 	var vl []PairedVersion
@@ -187,7 +191,8 @@ func (m maybeBzrSource) try(ctx context.Context, cachedir string, c singleSource
 	ustr := m.url.String()
 	path := filepath.Join(cachedir, "sources", sanitizer.Replace(ustr))
 
-	r, err := vcs.NewBzrRepo(ustr, path)
+	r, err := newCtxRepo(vcs.Bzr, ustr, path)
+
 	if err != nil {
 		return nil, 0, unwrapVcsErr(err)
 	}
@@ -209,7 +214,7 @@ func (m maybeBzrSource) try(ctx context.Context, cachedir string, c singleSource
 
 	src := &bzrSource{
 		baseVCSSource: baseVCSSource{
-			repo: &bzrRepo{r},
+			repo: r,
 		},
 	}
 
@@ -228,7 +233,8 @@ func (m maybeHgSource) try(ctx context.Context, cachedir string, c singleSourceC
 	ustr := m.url.String()
 	path := filepath.Join(cachedir, "sources", sanitizer.Replace(ustr))
 
-	r, err := vcs.NewHgRepo(ustr, path)
+	r, err := newCtxRepo(vcs.Hg, ustr, path)
+
 	if err != nil {
 		return nil, 0, unwrapVcsErr(err)
 	}
@@ -250,7 +256,7 @@ func (m maybeHgSource) try(ctx context.Context, cachedir string, c singleSourceC
 
 	src := &hgSource{
 		baseVCSSource: baseVCSSource{
-			repo: &hgRepo{r},
+			repo: r,
 		},
 	}
 

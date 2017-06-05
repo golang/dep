@@ -1,8 +1,9 @@
 {
   "commands": [
-    ["init"],
-    ["ensure", "-override", "github.com/sdboyer/deptest@1.0.0"]
+    ["init", "-skip-tools"],
+    ["ensure", "-override", "github.com/sdboyer/deptest@=1.0.0"]
   ],
+  "error-expected": "",
   "vendor-final": [
     "github.com/sdboyer/deptest"
   ]
