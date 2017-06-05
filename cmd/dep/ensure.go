@@ -23,8 +23,6 @@ import (
 
 const ensureShortHelp = `Ensure a dependency is safely vendored in the project`
 const ensureLongHelp = `
-usage: dep ensure [-update | -add] [-no-vendor | -vendor-only] [<spec>...]
-
 Project spec:
 
   <path>[:alt source][@<constraint>]
@@ -104,8 +102,10 @@ dep ensure -override github.com/pkg/foo@^1.0.1
     a last resort, especially if your project may be imported by others.
 `
 
-func (cmd *ensureCommand) Name() string      { return "ensure" }
-func (cmd *ensureCommand) Args() string      { return "[spec...]" }
+func (cmd *ensureCommand) Name() string { return "ensure" }
+func (cmd *ensureCommand) Args() string {
+	return "[-update | -add] [-no-vendor | -vendor-only] [<spec>...]"
+}
 func (cmd *ensureCommand) ShortHelp() string { return ensureShortHelp }
 func (cmd *ensureCommand) LongHelp() string  { return ensureLongHelp }
 func (cmd *ensureCommand) Hidden() bool      { return false }
@@ -575,7 +575,7 @@ func getProjectConstraint(arg string, sm gps.SourceManager) (gps.ProjectConstrai
 
 	// try to split on '@'
 	// When there is no `@`, use any version
-	versionStr := "*"
+	var versionStr string
 	atIndex := strings.Index(arg, "@")
 	if atIndex > 0 {
 		parts := strings.SplitN(arg, "@", 2)
@@ -604,9 +604,14 @@ func getProjectConstraint(arg string, sm gps.SourceManager) (gps.ProjectConstrai
 	}
 
 	pi := gps.ProjectIdentifier{ProjectRoot: pr, Source: source}
-	c, err := deduceConstraint(versionStr, pi, sm)
-	if err != nil {
-		return emptyPC, err
+	var c gps.Constraint
+	if versionStr != "" {
+		c, err = deduceConstraint(versionStr, pi, sm)
+		if err != nil {
+			return emptyPC, err
+		}
+	} else {
+		c = gps.Any()
 	}
 	return gps.ProjectConstraint{Ident: pi, Constraint: c}, nil
 }
