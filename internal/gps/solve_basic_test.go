@@ -175,7 +175,7 @@ func mkPCstrnt(info string) ProjectConstraint {
 
 // mkCDep composes a completeDep struct from the inputs.
 //
-// The only real work here is passing the initial string to mkPDep. All the
+// The only real work here is passing the initial string to mkPCstrnt. All the
 // other args are taken as package names.
 func mkCDep(pdep string, pl ...string) completeDep {
 	pc := mkPCstrnt(pdep)
@@ -327,6 +327,12 @@ func mksolution(inputs ...interface{}) map[ProjectIdentifier]LockedProject {
 	return m
 }
 
+// mkWarn creates warning string for ineffectual contraints for the specified
+// package.
+func mkWarn(pkg string) string {
+	return fmt.Sprintf("WARN: ineffectual constraint: %s", pkg)
+}
+
 // mklp creates a LockedProject from string inputs
 func mklp(pair string, pkgs ...string) LockedProject {
 	a := mkAtom(pair)
@@ -381,6 +387,7 @@ type specfix interface {
 	maxTries() int
 	solution() map[ProjectIdentifier]LockedProject
 	failure() error
+	messages() []string
 }
 
 // A basicFixture is a declarative test fixture that can cover a wide variety of
@@ -412,6 +419,8 @@ type basicFixture struct {
 	l fixLock
 	// solve failure expected, if any
 	fail error
+	// solve warnings, if any
+	msgs []string
 	// overrides, if any
 	ovr ProjectConstraints
 	// request up/downgrade to all projects
@@ -473,6 +482,10 @@ func (f basicFixture) rootTree() pkgtree.PackageTree {
 
 func (f basicFixture) failure() error {
 	return f.fail
+}
+
+func (f basicFixture) messages() []string {
+	return f.msgs
 }
 
 // A table of basicFixtures, used in the basic solving test set.

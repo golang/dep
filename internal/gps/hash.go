@@ -61,7 +61,8 @@ func (s *solver) writeHashingInputs(w io.Writer) {
 	// getApplicableConstraints will apply overrides, incorporate requireds,
 	// apply local ignores, drop stdlib imports, and finally trim out
 	// ineffectual constraints.
-	for _, pd := range s.rd.getApplicableConstraints(s.stdLibFn) {
+	applicable, _ := s.rd.getApplicableConstraints(s.stdLibFn)
+	for _, pd := range applicable {
 		writeString(string(pd.Ident.ProjectRoot))
 		writeString(pd.Ident.Source)
 		writeString(pd.Constraint.typedString())

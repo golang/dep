@@ -239,6 +239,21 @@ func fixtureSolveSimpleChecks(fix specfix, soln Solution, err error, t *testing.
 				t.Errorf("Unexpected project %s@%s present in results, with pkgs:\n\t%s", ppi(id), pv(lp.Version()), lp.pkgs)
 			}
 		}
+
+		// Check warnings and messages
+		expectedMessages := make(map[string]bool)
+		for _, msg := range fix.messages() {
+			expectedMessages[msg] = true
+		}
+		for _, msg := range soln.Messages() {
+			if !expectedMessages[msg] {
+				t.Errorf("Unexpected warning: %s", msg)
+			}
+			delete(expectedMessages, msg)
+		}
+		for msg, _ := range expectedMessages {
+			t.Errorf("Did not receive expected warning: %s", msg)
+		}
 	}
 
 	return soln, err

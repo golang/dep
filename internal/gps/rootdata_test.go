@@ -83,9 +83,10 @@ func TestGetApplicableConstraints(t *testing.T) {
 	rd := is.(*solver).rd
 
 	table := []struct {
-		name   string
-		mut    func()
-		result []workingConstraint
+		name         string
+		mut          func()
+		result       []workingConstraint
+		ineffectuals []workingConstraint
 	}{
 		{
 			name: "base case, two constraints",
@@ -100,6 +101,7 @@ func TestGetApplicableConstraints(t *testing.T) {
 					Constraint: mkSVC("1.0.0"),
 				},
 			},
+			ineffectuals: nil,
 		},
 		{
 			name: "with unconstrained require",
@@ -117,6 +119,7 @@ func TestGetApplicableConstraints(t *testing.T) {
 					Constraint: mkSVC("1.0.0"),
 				},
 			},
+			ineffectuals: nil,
 		},
 		{
 			name: "with unconstrained import",
@@ -136,6 +139,7 @@ func TestGetApplicableConstraints(t *testing.T) {
 					Constraint: mkSVC("1.0.0"),
 				},
 			},
+			ineffectuals: nil,
 		},
 		{
 			name: "constraint on required",
@@ -158,6 +162,7 @@ func TestGetApplicableConstraints(t *testing.T) {
 					Constraint: NewBranch("foo"),
 				},
 			},
+			ineffectuals: nil,
 		},
 		{
 			name: "override on imported",
@@ -185,6 +190,7 @@ func TestGetApplicableConstraints(t *testing.T) {
 					overrConstraint: true,
 				},
 			},
+			ineffectuals: nil,
 		},
 		{
 			// It is certainly the simplest and most rule-abiding solution to
@@ -208,6 +214,13 @@ func TestGetApplicableConstraints(t *testing.T) {
 					Constraint: NewBranch("foo"),
 				},
 			},
+			ineffectuals: []workingConstraint{
+				{
+					Ident:           mkPI("d"),
+					Constraint:      NewBranch("bar"),
+					overrConstraint: true,
+				},
+			},
 		},
 	}
 
@@ -215,9 +228,12 @@ func TestGetApplicableConstraints(t *testing.T) {
 		t.Run(fix.name, func(t *testing.T) {
 			fix.mut()
 
-			got := rd.getApplicableConstraints(params.stdLibFn)
+			got, ineffectuals := rd.getApplicableConstraints(params.stdLibFn)
 			if !reflect.DeepEqual(fix.result, got) {
 				t.Errorf("unexpected applicable constraint set:\n\t(GOT): %+v\n\t(WNT): %+v", got, fix.result)
+			}
+			if !reflect.DeepEqual(fix.ineffectuals, ineffectuals) {
+				t.Errorf("unexpected ineffectuals:\n\t(GOT): %+v\n\t(WNT): %+v", ineffectuals, fix.ineffectuals)
 			}
 		})
 	}
