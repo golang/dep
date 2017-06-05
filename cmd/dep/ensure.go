@@ -135,21 +135,8 @@ func (cmd *ensureCommand) Run(ctx *dep.Ctx, args []string) error {
 		return nil
 	}
 
-	if cmd.add && cmd.update {
-		return errors.New("cannot pass both -add and -update")
-	}
-
-	if cmd.vendorOnly {
-		if cmd.update {
-			return errors.New("-vendor-only makes -update a no-op; cannot pass them together")
-		}
-		if cmd.add {
-			return errors.New("-vendor-only makes -add a no-op; cannot pass them together")
-		}
-		if cmd.noVendor {
-			// TODO(sdboyer) can't think of anything not snarky right now
-			return errors.New("really?")
-		}
+	if err := cmd.validateFlags(); err != nil {
+		return err
 	}
 
 	p, err := ctx.LoadProject()
@@ -183,6 +170,26 @@ func (cmd *ensureCommand) Run(ctx *dep.Ctx, args []string) error {
 		return cmd.runUpdate(ctx, args, p, sm, params)
 	}
 	return cmd.runDefault(ctx, args, p, sm, params)
+}
+
+func (cmd *ensureCommand) validateFlags() error {
+	if cmd.add && cmd.update {
+		return errors.New("cannot pass both -add and -update")
+	}
+
+	if cmd.vendorOnly {
+		if cmd.update {
+			return errors.New("-vendor-only makes -update a no-op; cannot pass them together")
+		}
+		if cmd.add {
+			return errors.New("-vendor-only makes -add a no-op; cannot pass them together")
+		}
+		if cmd.noVendor {
+			// TODO(sdboyer) can't think of anything not snarky right now
+			return errors.New("really?")
+		}
+	}
+	return nil
 }
 
 func (cmd *ensureCommand) runDefault(ctx *dep.Ctx, args []string, p *dep.Project, sm gps.SourceManager, params gps.SolveParameters) error {
