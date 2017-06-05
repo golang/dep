@@ -287,8 +287,8 @@ func (cmd *ensureCommand) runUpdate(ctx *dep.Ctx, args []string, p *dep.Project,
 	// user is isolating variables in the event of solve problems (was it the
 	// "pending" changes, or the -update that caused the problem?).
 	// TODO(sdboyer) reduce this to a warning?
-	if bytes.Equal(p.Lock.InputHash(), solver.HashInputs()) {
-		return errors.Errorf("%s and %s are out of sync. run a plain `dep ensure` to resync them before attempting an -update.", dep.ManifestName, dep.LockName)
+	if !bytes.Equal(p.Lock.InputHash(), solver.HashInputs()) {
+		return errors.Errorf("%s and %s are out of sync. run a plain dep ensure to resync them before attempting an -update.", dep.ManifestName, dep.LockName)
 	}
 
 	// When -update is specified without args, allow every dependency to change
@@ -370,8 +370,8 @@ func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm
 	// user is isolating variables in the event of solve problems (was it the
 	// "pending" changes, or the -add that caused the problem?).
 	// TODO(sdboyer) reduce this to a warning?
-	if bytes.Equal(p.Lock.InputHash(), solver.HashInputs()) {
-		return errors.Errorf("%s and %s are out of sync. run a plain `dep ensure` to resync them before attempting an -add.", dep.ManifestName, dep.LockName)
+	if !bytes.Equal(p.Lock.InputHash(), solver.HashInputs()) {
+		return errors.Errorf("%s and %s are out of sync. run a plain dep ensure to resync them before attempting an -add.", dep.ManifestName, dep.LockName)
 	}
 
 	rm, errmap := params.RootPackageTree.ToReachMap(true, true, false, p.Manifest.IgnoredPackages())
