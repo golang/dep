@@ -107,7 +107,7 @@ func (c *Ctx) LoadProject() (*Project, error) {
 
 	// The path may lie within a symlinked directory, resolve the path
 	// before moving forward
-	p.AbsRoot, c.GOPATH, err = c.ResolveProjectRootAndGoPath(p.AbsRoot)
+	p.AbsRoot, c.GOPATH, err = c.ResolveProjectRootAndGOPATH(p.AbsRoot)
 	if err != nil {
 		return nil, errors.Wrapf(err, "resolve project root")
 	} else if c.GOPATH == "" {
@@ -161,7 +161,7 @@ func (c *Ctx) LoadProject() (*Project, error) {
 	return p, nil
 }
 
-// ResolveProjectRootAndGoPath evaluates the project root and the containing GOPATH
+// ResolveProjectRootAndGOPATH evaluates the project root and the containing GOPATH
 // by doing the following:
 //
 // If path isn't a symlink and is within a GOPATH, path and its GOPATH are returned.
@@ -169,20 +169,20 @@ func (c *Ctx) LoadProject() (*Project, error) {
 // If path is a symlink not within any GOPATH and resolves to a directory within a
 // GOPATH, the resolved path and its GOPATH are returned.
 //
-// ResolveProjectRootAndGoPath will return an error in the following cases:
+// ResolveProjectRootAndGOPATH will return an error in the following cases:
 //
 // If path is not a symlink and it's not within any GOPATH.
 // If both path and the directory it resolves to are not within any GOPATH.
 // If path is a symlink within a GOPATH, an error is returned.
 // If both path and the directory it resolves to are within the same GOPATH.
 // If path and the directory it resolves to are each within a different GOPATH.
-func (c *Ctx) ResolveProjectRootAndGoPath(path string) (string, string, error) {
-	pgp, pgperr := c.detectGoPath(path)
+func (c *Ctx) ResolveProjectRootAndGOPATH(path string) (string, string, error) {
+	pgp, pgperr := c.detectGOPATH(path)
 
 	if sym, err := fs.IsSymlink(path); err != nil {
 		return "", "", errors.Wrap(err, "IsSymlink")
 	} else if !sym {
-		// If path is not a symlink and detectGoPath failed, then we assume that path is not
+		// If path is not a symlink and detectGOPATH() failed, then we assume that path is not
 		// within a known GOPATH.
 		if pgperr != nil {
 			return "", "", errors.Errorf("project root %v not within a GOPATH", path)
@@ -195,7 +195,7 @@ func (c *Ctx) ResolveProjectRootAndGoPath(path string) (string, string, error) {
 		return "", "", errors.Wrap(err, "resolveProjectRoot")
 	}
 
-	rgp, rgperr := c.detectGoPath(resolved)
+	rgp, rgperr := c.detectGOPATH(resolved)
 	if pgperr != nil && rgperr != nil {
 		return "", "", errors.Errorf("path %s resolved to %s, both are not within any GOPATH", path, resolved)
 	}
@@ -218,8 +218,8 @@ func (c *Ctx) ResolveProjectRootAndGoPath(path string) (string, string, error) {
 	return path, pgp, nil
 }
 
-// detectGoPath detects the GOPATH for a given path from ctx.GOPATHS.
-func (c *Ctx) detectGoPath(path string) (string, error) {
+// detectGOPATH detects the GOPATH for a given path from ctx.GOPATHS.
+func (c *Ctx) detectGOPATH(path string) (string, error) {
 	for _, gp := range c.GOPATHS {
 		if fs.HasFilepathPrefix(filepath.FromSlash(path), gp) {
 			return gp, nil
