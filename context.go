@@ -202,7 +202,7 @@ func (c *Ctx) ResolveProjectRootAndGOPATH(path string) (string, string, error) {
 
 	// If pgp equals rgp, then both are within the same GOPATH.
 	if pgp == rgp {
-		return "", "", errors.Errorf("path %s resolved to %s, both in the same GOPATH %s", path, resolved, pgp)
+		return "", "", errors.Errorf("path %s resolved to %s, both are in the same GOPATH %s", path, resolved, pgp)
 	}
 
 	// path and resolved are within different GOPATHs
@@ -226,7 +226,7 @@ func (c *Ctx) detectGOPATH(path string) (string, error) {
 		}
 	}
 
-	return "", errors.Errorf("Unable to detect GOPATH for %s", path)
+	return "", errors.Errorf("unable to detect GOPATH for %s", path)
 }
 
 // SplitAbsoluteProjectRoot takes an absolute path and compares it against declared
