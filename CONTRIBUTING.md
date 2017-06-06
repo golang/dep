@@ -1,6 +1,6 @@
 # Contributing to Dep
 
-Dep is an open source project.
+`dep` is an open source project.
 
 It is the work of hundreds of contributors. We appreciate your help!
 
@@ -52,3 +52,43 @@ your current agreements on file or to sign a new one.
 You generally only need to submit a CLA once, so if you've already submitted one
 (even if it was for a different project), you probably don't need to do it
 again.
+
+## Maintainer's Guide
+
+`dep` has subsystem maintainers; this guide is intended for them in performing their work as a maintainer.
+
+### General guidelines
+
+* _Be kind, respectful, and inclusive_. Really live [that CoC](https://github.com/golang/dep/blob/master/CODE_OF_CONDUCT.md). We've developed a reputation as one of the most welcoming and supportive project environments in the Go community, and we want to keep that up!
+* The lines of responsibility between maintainership areas can be fuzzy. Get to know your fellow maintainers - it's important to work _with_ them when an issue falls in this grey area.
+* Remember, the long-term goal of `dep` is to disappear into the `go` toolchain. That's going to be a challenging process, no matter what. Minimizing that eventual difficulty should be a guiding light for all your decisions today.
+* Being a maintainer doesn't mean you're always right. Admitting when you've made a mistake keeps the code flowing, the environment health, and the respect level up.
+* It's fine if you need to step back from maintainership responsibilities - just, please, don't fade away! Let other maintainers know what's going on.
+
+### Issue management
+
+* We use [Zenhub](https://www.zenhub.com) to manage the queue, in addition to what we do with labels.
+  * Pipelines, and [the board](https://github.com/golang/dep#boards) are one thing we try to utilize
+  * Marking dependencies/blockers is also quite useful where appropriate; please do that.
+  * We use epics and milestones in roughly the same way (because OSS projects don't have real sprints). Epics should be duplicated as milestones; if there's a main epic issue, it should contain a checklist of the relevant issues to complete it.
+* The `area:` labels correspond to maintainership areas. Apply yours to any issues or PRs that fall under your purview. It's to be expected that multiple `area:` labels may be applied to a single issue.
+* The [`help-wanted`](https://github.com/golang/dep/issues?q=is%3Aissue+is%3Aopen+label%3Ahelp-wanted) and [`good-first-pr`](https://github.com/golang/dep/issues?q=is%3Aissue+is%3Aopen+label%3Agood-first-pr) labels are two of our most important tools for making the project accessible to newcomers - a key goal for our community. Here's how to use them well.
+  * `good-first-pr` should be applied when there's a very straightforward, self-contained task that is very unlikely to have any hidden complexity. The real purpose of these is to provide a "chink in the armor", providing newcomers a lens through which to start understanding the project.
+  * `help-wanted` should be applied to issues where there's a clear, stated goal, there is at most one significant question that needs answering, and it looks like the implementation won't be inordinately difficult, or disruptive to other parts of the system.
+     * `help-wanted` should also be applied to all `good-first-pr` issues - it's duplicative, but not doing so seems unfriendly.
+
+
+### Pull Requests
+
+* Try to encourage, and make, smaller pull requests.
+* [No is temporary. Yes is forever](https://blog.jessfraz.com/post/the-art-of-closing/).
+* Long-running feature branches should generally be avoided. Discuss it with other maintainers first.
+* Unless it's trivial, don't merge your own PRs - ask another maintainer.
+* Commits should follow [Tim Pope's rules](http://tbaggery.com/2008/04/19/a-note-about-git-commit-messages.html).
+* Merge checklist!
+   * Does the PR pass [the code review comments](https://github.com/golang/go/wiki/CodeReviewComments)? (internalize these rules!)
+   * Are there tests to cover new or changed behavior? Prefer reliable tests > no tests > flaky tests.
+   * Does the first post in the PR contain "Fixes #..." text for any issues it resolves?
+   * Are any necessary follow-up issues _already_ posted, prior to merging?
+   * Does this change entail the updating of any docs?
+       * For docs kept in the repo, e.g. FAQ.md, docs changes _must_ be submitted as part of the same PR.
