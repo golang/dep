@@ -402,7 +402,7 @@ func TestCaseInsentitiveGOPATH(t *testing.T) {
 	}
 }
 
-func TestResolveProjectRootAndGoPath(t *testing.T) {
+func TestResolveProjectRootAndGOPATH(t *testing.T) {
 	tg := test.NewHelper(t)
 	defer tg.Cleanup()
 
@@ -472,7 +472,7 @@ func TestResolveProjectRootAndGoPath(t *testing.T) {
 				}
 			}
 
-			p, gp, err := ctx.ResolveProjectRootAndGoPath(tc.path)
+			p, gp, err := ctx.ResolveProjectRootAndGOPATH(tc.path)
 			if err != nil {
 				if !tc.expectErr {
 					t.Fatalf("Error resolving project root: %s", err)
@@ -516,7 +516,7 @@ func TestDetectGoPath(t *testing.T) {
 	}
 
 	for _, tc := range testcases {
-		gopath, err := ctx.detectGoPath(tc.path)
+		gopath, err := ctx.detectGOPATH(tc.path)
 		if tc.err && err == nil {
 			t.Error("Expected error but got none")
 		}
