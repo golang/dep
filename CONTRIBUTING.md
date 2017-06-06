@@ -69,6 +69,9 @@ again.
 
 * We use [Zenhub](https://www.zenhub.com) to manage the queue, in addition to what we do with labels.
   * Pipelines, and [the board](https://github.com/golang/dep#boards) are one thing we try to utilize
+    * **New Issues Pipeline**: When someone creates a new issue, it goes here first. Keep an eye out for issues that fall into your area. Add labels to them, and if it's something we should do, put it in the `Backlog` pipeline. If you aren't sure, throw it in the `Icebox`. It helps to sort this pipeline by date.
+    * **Icebox Pipeline**: Issues that we aren't immediately closing but aren't really ready to be prioritized and started on. It's not a wontfix bucket, but a "not sure if we should/can fix right now" bucket.
+    * **Backlog Pipeline**: Issues that we know we want to tackle. You can drag/drop up and down to prioritize issues.
   * Marking dependencies/blockers is also quite useful where appropriate; please do that.
   * We use epics and milestones in roughly the same way (because OSS projects don't have real sprints). Epics should be duplicated as milestones; if there's a main epic issue, it should contain a checklist of the relevant issues to complete it.
 * The `area:` labels correspond to maintainership areas. Apply yours to any issues or PRs that fall under your purview. It's to be expected that multiple `area:` labels may be applied to a single issue.
