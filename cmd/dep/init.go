@@ -30,13 +30,18 @@ disable this behavior. The following external tools are supported: glide.
 Any dependencies that are not constrained by external configuration use the
 GOPATH analysis below.
 
-The version of each dependency will reflect the current state of the GOPATH. If
-a dependency doesn't exist in the GOPATH, a version will be selected from the
-versions available from the upstream source per the following algorithm:
+By default, the dependencies are resolved over the network. A version will be
+selected from the versions available from the upstream source per the following
+algorithm:
 
  - Tags conforming to semver (sorted by semver rules)
  - Default branch(es) (sorted lexicographically)
  - Non-semver tags (sorted lexicographically)
+
+An alternate mode can be activated by passing -gopath. In this mode, the version
+of each dependency will reflect the current state of the GOPATH. If a dependency
+doesn't exist in the GOPATH, a version will be selected based on the above
+network version selection algorithm.
 
 A Gopkg.toml file will be written with inferred version constraints for all
 direct dependencies. Gopkg.lock will be written with precise versions, and
@@ -52,11 +57,13 @@ func (cmd *initCommand) Hidden() bool      { return false }
 func (cmd *initCommand) Register(fs *flag.FlagSet) {
 	fs.BoolVar(&cmd.noExamples, "no-examples", false, "don't include example in Gopkg.toml")
 	fs.BoolVar(&cmd.skipTools, "skip-tools", false, "skip importing configuration from other dependency managers")
+	fs.BoolVar(&cmd.gopath, "gopath", false, "search in GOPATH for dependencies")
 }
 
 type initCommand struct {
 	noExamples bool
 	skipTools  bool
+	gopath     bool
 }
 
 func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
@@ -132,10 +139,13 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 	if err != nil {
 		return err
 	}
+
 	gs := newGopathScanner(ctx, directDeps, sm)
-	err = gs.InitializeRootManifestAndLock(p.Manifest, p.Lock)
-	if err != nil {
-		return err
+	if cmd.gopath {
+		err = gs.InitializeRootManifestAndLock(p.Manifest, p.Lock)
+		if err != nil {
+			return err
+		}
 	}
 
 	rootAnalyzer.skipTools = true // Don't import external config during solve for now
@@ -165,7 +175,9 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 	p.Lock = dep.LockFromSolution(soln)
 
 	rootAnalyzer.FinalizeRootManifestAndLock(p.Manifest, p.Lock)
-	gs.FinalizeRootManifestAndLock(p.Manifest, p.Lock)
+	if cmd.gopath {
+		gs.FinalizeRootManifestAndLock(p.Manifest, p.Lock)
+	}
 
 	// Run gps.Prepare with appropriate constraint solutions from solve run
 	// to generate the final lock memo.
