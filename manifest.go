@@ -122,8 +122,8 @@ func validateManifest(s string) ([]error, error) {
 			valid := true
 			if rawList, ok := val.([]interface{}); ok {
 				// Check element type of the array. TOML doesn't let mixing of types in
-				// array. Checking one element would be enough.
-				if reflect.TypeOf(rawList[0]).Kind() != reflect.String {
+				// array. Checking one element would be enough. Empty array is valid.
+				if len(rawList) > 0 && reflect.TypeOf(rawList[0]).Kind() != reflect.String {
 					valid = false
 				}
 			} else {
