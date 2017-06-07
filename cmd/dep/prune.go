@@ -59,8 +59,8 @@ func (cmd *pruneCommand) Run(ctx *dep.Ctx, args []string) error {
 	params := p.MakeParams()
 	params.RootPackageTree = ptree
 
-	if ctx.Loggers.Verbose {
-		params.TraceLogger = ctx.Loggers.Err
+	if ctx.Verbose {
+		params.TraceLogger = ctx.Err
 	}
 
 	s, err := gps.Prepare(params, sm)
@@ -77,8 +77,8 @@ func (cmd *pruneCommand) Run(ctx *dep.Ctx, args []string) error {
 	}
 
 	var pruneLogger *log.Logger
-	if ctx.Loggers.Verbose {
-		pruneLogger = ctx.Loggers.Err
+	if ctx.Verbose {
+		pruneLogger = ctx.Err
 	}
 	return dep.PruneProject(p, sm, pruneLogger)
 }

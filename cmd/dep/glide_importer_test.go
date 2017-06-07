@@ -21,16 +21,16 @@ import (
 const testGlideProjectRoot = "github.com/golang/notexist"
 
 var (
-	discardLogger  = log.New(ioutil.Discard, "", 0)
-	discardLoggers = &dep.Loggers{Out: discardLogger, Err: discardLogger}
+	discardLogger = log.New(ioutil.Discard, "", 0)
 )
 
 func newTestContext(h *test.Helper) *dep.Ctx {
 	h.TempDir("src")
 	pwd := h.Path(".")
 	return &dep.Ctx{
-		GOPATH:  pwd,
-		Loggers: discardLoggers,
+		GOPATH: pwd,
+		Out:    discardLogger,
+		Err:    discardLogger,
 	}
 }
 
