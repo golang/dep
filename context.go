@@ -5,6 +5,7 @@
 package dep
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"path/filepath"
@@ -17,60 +18,79 @@ import (
 	"github.com/pkg/errors"
 )
 
-// Ctx defines the supporting context of the tool.
-type Ctx struct {
-	GOPATH     string   // Selected Go path
-	GOPATHS    []string // Other Go paths
-	WorkingDir string
-	*Loggers
-}
+/*
+Ctx defines the supporting context of the tool.
+A properly initialized Ctx has a GOPATH containing WorkingDir, and non-nil Loggers.
 
-// Loggers holds standard loggers and a verbosity flag.
-type Loggers struct {
-	Out, Err *log.Logger
-	// Whether verbose logging is enabled.
-	Verbose bool
-}
-
-// NewContext creates a struct with the project's GOPATH. It assumes
-// that of your "GOPATH"'s we want the one we are currently in.
-func NewContext(wd string, env []string, loggers *Loggers) (*Ctx, error) {
-	ctx := &Ctx{WorkingDir: wd, Loggers: loggers}
-
-	GOPATH := getEnv(env, "GOPATH")
-	if GOPATH == "" {
-		GOPATH = defaultGOPATH()
+	ctx := &dep.Ctx{
+		WorkingDir: gopath + "/src/project/root",
+		GOPATH: gopath,
+		Out: log.New(os.Stdout, "", 0),
+		Err: log.New(os.Stderr, "", 0),
 	}
-	for _, gp := range filepath.SplitList(GOPATH) {
+
+SetPaths assists with setting consistent path fields.
+
+	ctx := &dep.Ctx{
+		Out: log.New(os.Stdout, "", 0),
+		Err: log.New(os.Stderr, "", 0),
+	}
+	err := ctx.SetPaths(projectRootPath, filepath.SplitList(os.Getenv("GOPATH"))
+	if err != nil {
+		// projectRootPath not in any GOPATH
+	}
+
+*/
+type Ctx struct {
+	WorkingDir string      // Where to execute.
+	GOPATH     string      // Selected Go path, containing WorkingDir.
+	GOPATHS    []string    // Other Go paths.
+	Out, Err   *log.Logger // Required loggers.
+	Verbose    bool        // Enables more verbose logging.
+}
+
+/*
+SetPaths sets the WorkingDir, GOPATH, and GOPATHS fields.
+It selects the GOPATH containing WorkingDir, or returns an error if none is found.
+
+	err := ctx.SetPaths(projectRootPath, filepath.SplitList(os.Getenv("GOPATH"))
+	if err != nil {
+		// project root not in any GOPATH
+	}
+
+The default GOPATH is checked when none are provided.
+
+	err := ctx.SetPaths(projectRootPath)
+	if err != nil {
+		// project root not in default GOPATH, or none available
+	}
+
+*/
+func (c *Ctx) SetPaths(workingDir string, gopaths ...string) error {
+	c.WorkingDir = workingDir
+	if len(gopaths) == 0 {
+		d := defaultGOPATH()
+		if d == "" {
+			return errors.New("no default GOPATH available")
+		}
+		gopaths = []string{d}
+	}
+	wd := filepath.FromSlash(workingDir)
+	for _, gp := range gopaths {
 		gp = filepath.FromSlash(gp)
 
-		if fs.HasFilepathPrefix(filepath.FromSlash(wd), gp) {
-			ctx.GOPATH = gp
+		if fs.HasFilepathPrefix(wd, gp) {
+			c.GOPATH = gp
 		}
 
-		ctx.GOPATHS = append(ctx.GOPATHS, gp)
+		c.GOPATHS = append(c.GOPATHS, gp)
 	}
 
-	if ctx.GOPATH == "" {
-		return nil, errors.New("project not in a GOPATH")
+	if c.GOPATH == "" {
+		return fmt.Errorf("%q not in any GOPATH", wd)
 	}
 
-	return ctx, nil
-}
-
-// getEnv returns the last instance of an environment variable.
-func getEnv(env []string, key string) string {
-	for i := len(env) - 1; i >= 0; i-- {
-		v := env[i]
-		kv := strings.SplitN(v, "=", 2)
-		if kv[0] == key {
-			if len(kv) > 1 {
-				return kv[1]
-			}
-			return ""
-		}
-	}
-	return ""
+	return nil
 }
 
 // defaultGOPATH gets the default GOPATH that was added in 1.8
@@ -142,7 +162,7 @@ func (c *Ctx) LoadProject() (*Project, error) {
 	var warns []error
 	p.Manifest, warns, err = readManifest(mf)
 	for _, warn := range warns {
-		c.Loggers.Err.Printf("dep: WARNING: %v\n", warn)
+		c.Err.Printf("dep: WARNING: %v\n", warn)
 	}
 	if err != nil {
 		return nil, errors.Errorf("error while parsing %s: %s", mp, err)

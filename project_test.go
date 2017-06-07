@@ -80,30 +80,6 @@ func TestProjectMakeParams(t *testing.T) {
 	}
 }
 
-func TestSlashedGOPATH(t *testing.T) {
-	h := test.NewHelper(t)
-	defer h.Cleanup()
-	h.TempDir("src")
-
-	wd, err := os.Getwd()
-	if err != nil {
-		t.Fatal("failed to get work directory:", err)
-	}
-	env := os.Environ()
-
-	h.Setenv("GOPATH", filepath.ToSlash(h.Path(".")))
-	_, err = NewContext(wd, env, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	h.Setenv("GOPATH", filepath.FromSlash(h.Path(".")))
-	_, err = NewContext(wd, env, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-}
-
 func TestBackupVendor(t *testing.T) {
 	h := test.NewHelper(t)
 	defer h.Cleanup()
