@@ -9,6 +9,7 @@ import (
 	"log"
 
 	"github.com/golang/dep"
+	fb "github.com/golang/dep/internal/feedback"
 	"github.com/golang/dep/internal/gps"
 	"github.com/pkg/errors"
 )
@@ -138,6 +139,26 @@ func (a *rootAnalyzer) FinalizeRootManifestAndLock(m *dep.Manifest, l *dep.Lock)
 		if !used {
 			delete(m.Constraints, pr)
 		}
+	}
+	// Pick the direct dependencies from the solution lock and add to manifest.
+	// This is done to fill up the manifest constraints with the dependencies
+	// solved over the network.
+	for _, y := range l.Projects() {
+		var f *fb.ConstraintFeedback
+		pr := y.Ident().ProjectRoot
+		if _, ok := a.directDeps[string(pr)]; ok {
+			pp := getProjectPropertiesFromVersion(y.Version())
+			if pp.Constraint != nil {
+				m.Constraints[pr] = pp
+				pc := gps.ProjectConstraint{Ident: y.Ident(), Constraint: pp.Constraint}
+				f = fb.NewConstraintFeedback(pc, fb.DepTypeDirect)
+			} else {
+				f = fb.NewLockedProjectFeedback(y, fb.DepTypeDirect)
+			}
+		} else {
+			f = fb.NewLockedProjectFeedback(y, fb.DepTypeTransitive)
+		}
+		f.LogFeedback(a.ctx.Err)
 	}
 }
 
