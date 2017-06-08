@@ -143,6 +143,13 @@ func TestValidateManifest(t *testing.T) {
 		},
 		{
 			tomlString: `
+			required = []
+			`,
+			wantWarn:  []error{},
+			wantError: nil,
+		},
+		{
+			tomlString: `
 			required = [1, 2, 3]
 			`,
 			wantWarn:  []error{},
@@ -169,6 +176,13 @@ func TestValidateManifest(t *testing.T) {
 			`,
 			wantWarn:  []error{},
 			wantError: errInvalidIgnored,
+		},
+		{
+			tomlString: `
+			ignored = []
+			`,
+			wantWarn:  []error{},
+			wantError: nil,
 		},
 		{
 			tomlString: `
@@ -233,6 +247,13 @@ func TestValidateManifest(t *testing.T) {
 		},
 		{
 			tomlString: `
+			[[constraint]]
+			`,
+			wantWarn:  []error{},
+			wantError: nil,
+		},
+		{
+			tomlString: `
 			constraint = "foo"
 			`,
 			wantWarn:  []error{},
@@ -249,6 +270,13 @@ func TestValidateManifest(t *testing.T) {
 			tomlString: `
 			[[override]]
 			  name = "github.com/foo/bar"
+			`,
+			wantWarn:  []error{},
+			wantError: nil,
+		},
+		{
+			tomlString: `
+			[[override]]
 			`,
 			wantWarn:  []error{},
 			wantError: nil,
