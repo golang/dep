@@ -330,7 +330,7 @@ func mksolution(inputs ...interface{}) map[ProjectIdentifier]LockedProject {
 // mkWarn creates warning string for ineffectual contraints for the specified
 // package.
 func mkWarn(pkg string) string {
-	return fmt.Sprintf("WARN: ineffectual constraint: %s", pkg)
+	return fmt.Sprintf("WARNING: ineffectual constraint: %s", pkg)
 }
 
 // mklp creates a LockedProject from string inputs
