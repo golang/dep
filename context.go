@@ -79,7 +79,11 @@ func (c *Ctx) SetPaths(workingDir string, gopaths ...string) error {
 	for _, gp := range gopaths {
 		gp = filepath.FromSlash(gp)
 
-		if fs.HasFilepathPrefix(wd, gp) {
+		ok, err := hasFilepathPrefix(wd, gp)
+		if err != nil {
+			return errors.Wrap(err, "failed to check the path")
+		}
+		if ok {
 			c.GOPATH = gp
 		}
 
@@ -112,6 +116,19 @@ func defaultGOPATH() string {
 		return def
 	}
 	return ""
+}
+
+// Similar to fs.HasFilepathPrefix() but aware of symlinks.
+func hasFilepathPrefix(path, prefix string) (bool, error) {
+	p, err := filepath.EvalSymlinks(path)
+	if err != nil {
+		return false, errors.Wrap(err, "failed to resolve the symlink")
+	}
+	pre, err := filepath.EvalSymlinks(prefix)
+	if err != nil {
+		return false, errors.Wrap(err, "failed to resolve the symlink")
+	}
+	return fs.HasFilepathPrefix(p, pre), nil
 }
 
 func (c *Ctx) SourceManager() (*gps.SourceMgr, error) {
