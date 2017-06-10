@@ -25,7 +25,7 @@ func TestGodepConfig_Import(t *testing.T) {
 	h.TempDir(cacheDir)
 	h.TempDir("src")
 	h.TempDir(filepath.Join("src", testGodepProjectRoot))
-	h.TempCopy(filepath.Join(testGodepProjectRoot, "Godeps", godepJsonName), "godep/Godeps.json")
+	h.TempCopy(filepath.Join(testGodepProjectRoot, "Godeps", godepJSONName), "godep/Godeps.json")
 
 	projectRoot := h.Path(testGodepProjectRoot)
 	sm, err := gps.NewSourceManager(h.Path(cacheDir))
@@ -68,7 +68,7 @@ func TestGodepConfig_Import(t *testing.T) {
 
 func TestGodepConfig_JsonLoad(t *testing.T) {
 	// This is same as cmd/dep/testdata/Godeps.json
-	wantJSON := godepJson{
+	wantJSON := godepJSON{
 		Name: "github.com/golang/notexist",
 		Imports: []godepPackage{
 			{
@@ -88,7 +88,7 @@ func TestGodepConfig_JsonLoad(t *testing.T) {
 
 	ctx := newTestContext(h)
 
-	h.TempCopy(filepath.Join(testGodepProjectRoot, "Godeps", godepJsonName), "godep/Godeps.json")
+	h.TempCopy(filepath.Join(testGodepProjectRoot, "Godeps", godepJSONName), "godep/Godeps.json")
 
 	projectRoot := h.Path(testGodepProjectRoot)
 
@@ -117,7 +117,7 @@ func TestGodepConfig_ConvertProject(t *testing.T) {
 	defer sm.Release()
 
 	g := newGodepImporter(discardLogger, true, sm)
-	g.json = godepJson{
+	g.json = godepJSON{
 		Name: "github.com/foo/bar",
 		Imports: []godepPackage{
 			{
@@ -177,7 +177,7 @@ func TestGodepConfig_ConvertProject_EmptyComment(t *testing.T) {
 	defer sm.Release()
 
 	g := newGodepImporter(discardLogger, true, sm)
-	g.json = godepJson{
+	g.json = godepJSON{
 		Name: "github.com/foo/bar",
 		Imports: []godepPackage{
 			{
@@ -227,7 +227,7 @@ func TestGodepConfig_ConvertProject_EmptyComment(t *testing.T) {
 
 func TestGodepConfig_Convert_BadInput_EmptyPackageName(t *testing.T) {
 	g := newGodepImporter(discardLogger, true, nil)
-	g.json = godepJson{
+	g.json = godepJSON{
 		Imports: []godepPackage{{ImportPath: ""}},
 	}
 
