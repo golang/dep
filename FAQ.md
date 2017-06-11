@@ -85,10 +85,28 @@ Here are some suggestions for when you could use `dep` or `go get`:
 -[@sdboyer in #376](https://github.com/golang/dep/issues/376#issuecomment-294045873)
 
 ## Why is `dep` ignoring a version constraint in the manifest?
-Only your project's directly imported dependencies are affected by a `dependencies` entry
+Only your project's directly imported dependencies are affected by a `constraint` entry
 in the manifest. Transitive dependencies are unaffected.
 
 Use an `override` entry for transitive dependencies.
+
+By default, when you specify a version without an operator, such as `~` or `=`,
+`dep` automatically adds a caret operator, `^`. The caret operator pins the
+left-most non-zero digit in the version. For example:
+```
+^1.2.3 means 1.2.3 <= X < 2.0.0
+^0.2.3 means 0.2.3 <= X < 0.3.0
+^0.0.3 means 0.0.3 <= X < 0.0.4
+```
+
+To pin a version of direct dependency in manifest, prefix the version with `=`.
+For example:
+```
+[[constraint]]
+  name = "github.com/pkg/errors"
+  version = "=0.8.0"
+```
+
 
 ## How do I constrain a transitive dependency's version?
 First, if you're wondering about this because you're trying to keep the version
@@ -110,7 +128,7 @@ behave differently:
 * Constraints:
    1. Can be declared by any project's manifest, yours or a dependency
    2. Apply only to direct dependencies of the project declaring the constraint
-   3. Must not conflict with the `dependencies` declared in any other project's manifest
+   3. Must not conflict with the `constraint` entries declared in any other project's manifest
 * Overrides:
    1. Are only utilized from the current/your project's manifest
    2. Apply globally, to direct and transitive dependencies
