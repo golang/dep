@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/golang/dep"
 	"github.com/golang/dep/internal/gps"
 	"github.com/golang/dep/internal/test"
 	"github.com/pkg/errors"
@@ -69,7 +70,6 @@ func TestGodepConfig_Import(t *testing.T) {
 func TestGodepConfig_JsonLoad(t *testing.T) {
 	// This is same as cmd/dep/testdata/Godeps.json
 	wantJSON := godepJSON{
-		Name: "github.com/golang/notexist",
 		Imports: []godepPackage{
 			{
 				ImportPath: "github.com/sdboyer/deptest",
@@ -98,10 +98,6 @@ func TestGodepConfig_JsonLoad(t *testing.T) {
 		t.Fatalf("Error while loading... %v", err)
 	}
 
-	if g.json.Name != wantJSON.Name {
-		t.Fatalf("Expected project name to be %v, but got %v", wantJSON.Name, g.json.Name)
-	}
-
 	if !equalImports(g.json.Imports, wantJSON.Imports) {
 		t.Fatalf("Expected imports to be equal. \n\t(GOT): %v\n\t(WNT): %v", g.json.Imports, wantJSON.Imports)
 	}
@@ -118,7 +114,6 @@ func TestGodepConfig_ConvertProject(t *testing.T) {
 
 	g := newGodepImporter(discardLogger, true, sm)
 	g.json = godepJSON{
-		Name: "github.com/foo/bar",
 		Imports: []godepPackage{
 			{
 				ImportPath: "github.com/sdboyer/deptest",
@@ -178,7 +173,6 @@ func TestGodepConfig_ConvertProject_EmptyComment(t *testing.T) {
 
 	g := newGodepImporter(discardLogger, true, sm)
 	g.json = godepJSON{
-		Name: "github.com/foo/bar",
 		Imports: []godepPackage{
 			{
 				ImportPath: "github.com/sdboyer/deptest",
@@ -234,6 +228,106 @@ func TestGodepConfig_Convert_BadInput_EmptyPackageName(t *testing.T) {
 	_, _, err := g.convert("")
 	if err == nil {
 		t.Fatal("Expected conversion to fail because the ImportPath is empty")
+	}
+}
+
+func TestGodepConfig_Convert_BadInput_EmptyRev(t *testing.T) {
+	h := test.NewHelper(t)
+	defer h.Cleanup()
+	h.TempDir("src")
+
+	ctx := newTestContext(h)
+	sm, err := ctx.SourceManager()
+	h.Must(err)
+	defer sm.Release()
+
+	g := newGodepImporter(discardLogger, true, sm)
+	g.json = godepJSON{
+		Imports: []godepPackage{
+			{
+				ImportPath: "github.com/sdboyer/deptest",
+			},
+		},
+	}
+
+	_, _, err = g.convert("")
+	if err == nil {
+		t.Fatal("Expected conversion to fail because the Rev is empty")
+	}
+}
+
+func TestGodepConfig_Convert_SubPackages(t *testing.T) {
+	h := test.NewHelper(t)
+	defer h.Cleanup()
+	h.TempDir("src")
+
+	ctx := newTestContext(h)
+	sm, err := ctx.SourceManager()
+	h.Must(err)
+	defer sm.Release()
+
+	g := newGodepImporter(discardLogger, true, sm)
+	g.json = godepJSON{
+		Imports: []godepPackage{
+			{
+				ImportPath: "github.com/sdboyer/deptest",
+				Rev:        "ff2948a2ac8f538c4ecd55962e919d1e13e74baf",
+			},
+			{
+				ImportPath: "github.com/sdboyer/deptest/foo",
+				Rev:        "ff2948a2ac8f538c4ecd55962e919d1e13e74baf",
+			},
+		},
+	}
+
+	manifest, lock, err := g.convert("")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, present := manifest.Constraints["github.com/sdboyer/deptest"]; !present {
+		t.Fatal("Expected the manifest to have a dependency for 'github.com/sdboyer/deptest'")
+	}
+
+	if _, present := manifest.Constraints["github.com/sdboyer/deptest/foo"]; present {
+		t.Fatal("Expected the manifest to not have a dependency for 'github.com/sdboyer/deptest/foo'")
+	}
+
+	if len(lock.P) != 1 {
+		t.Fatalf("Expected lock to have 1 project, got %v", len(lock.P))
+	}
+
+	if string(lock.P[0].Ident().ProjectRoot) != "github.com/sdboyer/deptest" {
+		t.Fatal("Expected lock to have 'github.com/sdboyer/deptest'")
+	}
+}
+
+func TestGodepConfig_ProjectExistsInLock(t *testing.T) {
+	lock := &dep.Lock{}
+	pi := gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot("github.com/sdboyer/deptest")}
+	ver := gps.NewVersion("v1.0.0")
+	lock.P = append(lock.P, gps.NewLockedProject(pi, ver, nil))
+
+	cases := []struct {
+		importPath string
+		want       bool
+	}{
+		{
+			importPath: "github.com/sdboyer/deptest",
+			want:       true,
+		},
+		{
+			importPath: "github.com/golang/notexist",
+			want:       false,
+		},
+	}
+
+	for _, c := range cases {
+		result := projectExistsInLock(lock, c.importPath)
+
+		if result != c.want {
+			t.Fatalf("projectExistsInLock result is not as expected: \n\t(GOT) %v \n\t(WNT) %v", result, c.want)
+		}
 	}
 }
 

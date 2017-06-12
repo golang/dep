@@ -36,7 +36,6 @@ func newGodepImporter(logger *log.Logger, verbose bool, sm gps.SourceManager) *g
 }
 
 type godepJSON struct {
-	Name    string         `json:"ImportPath"`
 	Imports []godepPackage `json:"Deps"`
 }
 
@@ -101,6 +100,18 @@ func (g *godepImporter) convert(pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock, e
 			return nil, nil, err
 		}
 
+		// Obtain ProjectRoot. Required for avoiding sub-package imports.
+		ip, err := g.sm.DeduceProjectRoot(pkg.ImportPath)
+		if err != nil {
+			return nil, nil, err
+		}
+		pkg.ImportPath = string(ip)
+
+		// Check if it already existing in locked projects
+		if projectExistsInLock(lock, pkg.ImportPath) {
+			continue
+		}
+
 		// Rev must not be empty
 		if pkg.Rev == "" {
 			err := errors.New("Invalid godep configuration, Rev is required")
@@ -133,7 +144,7 @@ func (g *godepImporter) convert(pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock, e
 			if err != nil {
 				return nil, nil, err
 			}
-			manifest.Constraints[pc.Ident.ProjectRoot] = gps.ProjectProperties{Source: pc.Ident.Source, Constraint: pc.Constraint}
+			manifest.Constraints[pc.Ident.ProjectRoot] = gps.ProjectProperties{Constraint: pc.Constraint}
 		}
 
 		lp := g.buildLockedProject(pkg)
@@ -166,4 +177,16 @@ func (g *godepImporter) buildLockedProject(pkg godepPackage) gps.LockedProject {
 
 	feedback(version, pi.ProjectRoot, fb.DepTypeImported, g.logger)
 	return gps.NewLockedProject(pi, version, nil)
+}
+
+// projectExistsInLock checks if the given import path already existing in
+// locked projects.
+func projectExistsInLock(l *dep.Lock, ip string) bool {
+	for _, lp := range l.P {
+		if ip == string(lp.Ident().ProjectRoot) {
+			return true
+		}
+	}
+
+	return false
 }
