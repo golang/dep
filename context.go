@@ -25,6 +25,7 @@ type Ctx struct {
 	Verbose    bool        // Enables more verbose logging.
 }
 
+// NewContext creates a struct containing path information and loggers.
 func NewContext(wd string, gopaths []string, out, err *log.Logger, verbose bool) *Ctx {
 	ctx := &Ctx{
 		WorkingDir: wd,
@@ -167,9 +168,8 @@ func (c *Ctx) ResolveProjectRootAndGOPATH(path string) (string, string, error) {
 	// Otherwise, either the symlink or the resolved path is within a GOPATH.
 	if pgp == "" {
 		return resolved, rgp, nil
-	} else {
-		return path, pgp, nil
 	}
+	return path, pgp, nil
 }
 
 // detectGOPATH detects the GOPATH for a given path from ctx.GOPATHs.
