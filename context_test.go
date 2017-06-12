@@ -5,7 +5,6 @@
 package dep
 
 import (
-	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
@@ -20,71 +19,8 @@ import (
 )
 
 var (
-	discardLogger  = log.New(ioutil.Discard, "", 0)
-	discardLoggers = &Loggers{Out: discardLogger, Err: discardLogger}
+	discardLogger = log.New(ioutil.Discard, "", 0)
 )
-
-func TestNewContext(t *testing.T) {
-	wd, err := os.Getwd()
-	if err != nil {
-		t.Fatal("could get cwd")
-	}
-
-	multipleGopaths := fmt.Sprintf("%s%s%s", "/go", string(filepath.ListSeparator), "/go2")
-	testcases := []struct {
-		wd      string
-		env     []string
-		gopaths int
-	}{
-		{wd, []string{}, 1}, //default GOPATH
-		{wd, []string{"GOPATH=/go"}, 1},
-		{wd, []string{fmt.Sprintf("GOPATH=%s", multipleGopaths)}, 2},
-	}
-
-	for _, tc := range testcases {
-		ctx := NewContext(tc.wd, tc.env, &Loggers{})
-		if ctx == nil {
-			t.Error("expected context, got nil")
-		}
-		if len(ctx.GOPATHS) != tc.gopaths {
-			t.Errorf("expected %s ctx, got %s", tc.env[0], ctx.GOPATHS)
-		}
-	}
-}
-
-func TestNewContext_SlashedGOPATH(t *testing.T) {
-	h := test.NewHelper(t)
-	defer h.Cleanup()
-
-	h.TempDir("src")
-
-	wd, err := os.Getwd()
-	if err != nil {
-		t.Fatal("failed to get work directory:", err)
-	}
-
-	gopath := h.Path(".")
-	unslashedGopath := filepath.FromSlash(gopath)
-
-	testcases := []struct {
-		gopath   string
-		expected string
-	}{
-		{filepath.ToSlash(gopath), unslashedGopath},
-		{filepath.FromSlash(gopath), unslashedGopath},
-	}
-
-	for _, tc := range testcases {
-		env := []string{fmt.Sprintf("GOPATH=%v", tc.gopath)}
-		ctx := NewContext(wd, env, nil)
-		if ctx == nil {
-			t.Fatal(err)
-		}
-		if ctx.GOPATHS[0] != filepath.FromSlash(gopath) {
-			t.Fatalf("expected GOPATH %v, got: %v", ctx.GOPATHS[0], filepath.FromSlash(gopath))
-		}
-	}
-}
 
 func TestSplitAbsoluteProjectRoot(t *testing.T) {
 	h := test.NewHelper(t)
@@ -239,7 +175,12 @@ func TestLoadProject(t *testing.T) {
 	for _, testcase := range testcases {
 		start := testcase.start
 
-		ctx := &Ctx{GOPATHS: []string{tg.Path(".")}, WorkingDir: tg.Path(start), Loggers: discardLoggers}
+		ctx := &Ctx{
+			GOPATH:     tg.Path("."),
+			WorkingDir: tg.Path(start),
+			Out:        discardLogger,
+			Err:        discardLogger,
+		}
 
 		proj, err := ctx.LoadProject()
 		tg.Must(err)
@@ -275,7 +216,7 @@ func TestLoadProjectNotFoundErrors(t *testing.T) {
 	}
 
 	for _, testcase := range testcases {
-		ctx := &Ctx{GOPATHS: []string{tg.Path(".")}, WorkingDir: tg.Path(testcase.start)}
+		ctx := &Ctx{GOPATHs: []string{tg.Path(".")}, WorkingDir: tg.Path(testcase.start)}
 
 		_, err := ctx.LoadProject()
 		if err == nil {
@@ -302,7 +243,12 @@ func TestLoadProjectManifestParseError(t *testing.T) {
 		t.Fatal("failed to get working directory", err)
 	}
 
-	ctx := &Ctx{GOPATH: tg.Path("."), WorkingDir: wd, Loggers: discardLoggers}
+	ctx := &Ctx{
+		GOPATH:     tg.Path("."),
+		WorkingDir: wd,
+		Out:        discardLogger,
+		Err:        discardLogger,
+	}
 
 	_, err = ctx.LoadProject()
 	if err == nil {
@@ -328,7 +274,12 @@ func TestLoadProjectLockParseError(t *testing.T) {
 		t.Fatal("failed to get working directory", err)
 	}
 
-	ctx := &Ctx{GOPATH: tg.Path("."), WorkingDir: wd, Loggers: discardLoggers}
+	ctx := &Ctx{
+		GOPATH:     tg.Path("."),
+		WorkingDir: wd,
+		Out:        discardLogger,
+		Err:        discardLogger,
+	}
 
 	_, err = ctx.LoadProject()
 	if err == nil {
@@ -416,7 +367,7 @@ func TestResolveProjectRootAndGOPATH(t *testing.T) {
 	tg.TempDir("sym") // Directory for symlinks
 
 	ctx := &Ctx{
-		GOPATHS: []string{
+		GOPATHs: []string{
 			tg.Path(filepath.Join(".", "go")),
 			tg.Path(filepath.Join(".", "gotwo")),
 		},
@@ -432,29 +383,29 @@ func TestResolveProjectRootAndGOPATH(t *testing.T) {
 	}{
 		{
 			name:         "no-symlinks",
-			path:         filepath.Join(ctx.GOPATHS[0], "src/real/path"),
-			resolvedPath: filepath.Join(ctx.GOPATHS[0], "src/real/path"),
-			gopath:       ctx.GOPATHS[0],
+			path:         filepath.Join(ctx.GOPATHs[0], "src/real/path"),
+			resolvedPath: filepath.Join(ctx.GOPATHs[0], "src/real/path"),
+			gopath:       ctx.GOPATHs[0],
 		},
 		{
 			name:         "symlink-outside-gopath",
 			path:         filepath.Join(tg.Path("."), "sym/symlink"),
-			resolvedPath: filepath.Join(ctx.GOPATHS[0], "src/real/path"),
-			gopath:       ctx.GOPATHS[0],
+			resolvedPath: filepath.Join(ctx.GOPATHs[0], "src/real/path"),
+			gopath:       ctx.GOPATHs[0],
 			symlink:      true,
 		},
 		{
 			name:         "symlink-in-another-gopath",
 			path:         filepath.Join(tg.Path("."), "sym/symtwo"),
-			resolvedPath: filepath.Join(ctx.GOPATHS[1], "src/real/path"),
-			gopath:       ctx.GOPATHS[1],
+			resolvedPath: filepath.Join(ctx.GOPATHs[1], "src/real/path"),
+			gopath:       ctx.GOPATHs[1],
 			symlink:      true,
 		},
 		{
 			name:         "symlink-in-gopath",
-			path:         filepath.Join(ctx.GOPATHS[0], "src/sym/path"),
-			resolvedPath: filepath.Join(ctx.GOPATHS[0], "src/real/path"),
-			gopath:       ctx.GOPATHS[0],
+			path:         filepath.Join(ctx.GOPATHs[0], "src/sym/path"),
+			resolvedPath: filepath.Join(ctx.GOPATHs[0], "src/real/path"),
+			gopath:       ctx.GOPATHs[0],
 			symlink:      true,
 			expectErr:    true,
 		},
@@ -499,7 +450,7 @@ func TestDetectGoPath(t *testing.T) {
 	th.TempDir("go")
 	th.TempDir("gotwo")
 
-	ctx := &Ctx{GOPATHS: []string{
+	ctx := &Ctx{GOPATHs: []string{
 		th.Path("go"),
 		th.Path("gotwo"),
 	}}

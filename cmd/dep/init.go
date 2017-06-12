@@ -8,7 +8,6 @@ import (
 	"flag"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/golang/dep"
@@ -146,8 +145,8 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 		ProjectAnalyzer: rootAnalyzer,
 	}
 
-	if ctx.Loggers.Verbose {
-		params.TraceLogger = ctx.Loggers.Err
+	if ctx.Verbose {
+		params.TraceLogger = ctx.Err
 	}
 
 	s, err := gps.Prepare(params, sm)
@@ -180,7 +179,7 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 		return err
 	}
 	if vendorbak != "" {
-		ctx.Loggers.Err.Printf("Old vendor backed up to %v", vendorbak)
+		ctx.Err.Printf("Old vendor backed up to %v", vendorbak)
 	}
 
 	sw, err := dep.NewSafeWriter(m, nil, l, dep.VendorAlways)
@@ -213,11 +212,4 @@ func getDirectDependencies(root, cpr string) (pkgtree.PackageTree, map[string]bo
 // TODO solve failures can be really creative - we need to be similarly creative
 // in handling them and informing the user appropriately
 func handleAllTheFailuresOfTheWorld(err error) {
-}
-
-func hasImportPathPrefix(s, prefix string) bool {
-	if s == prefix {
-		return true
-	}
-	return strings.HasPrefix(s, prefix+"/")
 }

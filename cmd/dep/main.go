@@ -12,6 +12,8 @@ import (
 	"io"
 	"log"
 	"os"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"text/tabwriter"
 
@@ -46,11 +48,10 @@ func main() {
 
 // A Config specifies a full configuration for a dep execution.
 type Config struct {
-	// Args hold the command-line arguments, starting with the program name.
-	Args           []string
-	Stdout, Stderr io.Writer
-	WorkingDir     string
-	Env            []string
+	WorkingDir     string    // Where to execute
+	Args           []string  // Command-line arguments, starting with the program name.
+	Env            []string  // Environment variables
+	Stdout, Stderr io.Writer // Log output
 }
 
 // Run executes a configuration and returns an exit code.
@@ -83,7 +84,9 @@ func (c *Config) Run() (exitCode int) {
 		},
 	}
 
+	outLogger := log.New(c.Stdout, "", 0)
 	errLogger := log.New(c.Stderr, "", 0)
+
 	usage := func() {
 		errLogger.Println("dep is a tool for managing dependencies for Go projects")
 		errLogger.Println()
@@ -135,21 +138,23 @@ func (c *Config) Run() (exitCode int) {
 			}
 
 			// Parse the flags the user gave us.
-			// flag package automaticly prints usage and error message in err != nil
+			// flag package automatically prints usage and error message in err != nil
 			// or if '-h' flag provided
 			if err := fs.Parse(c.Args[2:]); err != nil {
 				exitCode = 1
 				return
 			}
 
-			loggers := &dep.Loggers{
-				Out:     log.New(c.Stdout, "", 0),
-				Err:     errLogger,
-				Verbose: *verbose,
+			// Set up the dep context.
+			gopaths := getGOPATHs(c.Env)
+			if len(gopaths) == 0 {
+				errLogger.Println("no default GOPATH available")
+				exitCode = 1
+				return
 			}
 
-			// Set up the dep context.
-			ctx := dep.NewContext(c.WorkingDir, c.Env, loggers)
+			// Set up dep context.
+			ctx := dep.NewContext(c.WorkingDir, gopaths, outLogger, errLogger, *verbose)
 
 			// Run the command with the post-flag-processing args.
 			if err := cmd.Run(ctx, fs.Args()); err != nil {
@@ -223,4 +228,51 @@ func parseArgs(args []string) (cmdName string, printCmdUsage bool, exit bool) {
 		}
 	}
 	return cmdName, printCmdUsage, exit
+}
+
+// getGOPATH returns the GOPATHs from the passed environment variables.
+// If GOPATH is not defined, fallback to defaultGOPATH().
+func getGOPATHs(env []string) []string {
+	GOPATH := getEnv(env, "GOPATH")
+	if GOPATH == "" {
+		GOPATH = defaultGOPATH()
+	}
+
+	return filepath.SplitList(GOPATH)
+}
+
+// getEnv returns the last instance of an environment variable.
+func getEnv(env []string, key string) string {
+	for i := len(env) - 1; i >= 0; i-- {
+		v := env[i]
+		kv := strings.SplitN(v, "=", 2)
+		if kv[0] == key {
+			if len(kv) > 1 {
+				return kv[1]
+			}
+			return ""
+		}
+	}
+	return ""
+}
+
+// defaultGOPATH gets the default GOPATH that was added in 1.8
+// copied from go/build/build.go
+func defaultGOPATH() string {
+	env := "HOME"
+	if runtime.GOOS == "windows" {
+		env = "USERPROFILE"
+	} else if runtime.GOOS == "plan9" {
+		env = "home"
+	}
+	if home := os.Getenv(env); home != "" {
+		def := filepath.Join(home, "go")
+		if def == runtime.GOROOT() {
+			// Don't set the default GOPATH to GOROOT,
+			// as that will trigger warnings from the go tool.
+			return ""
+		}
+		return def
+	}
+	return ""
 }

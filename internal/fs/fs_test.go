@@ -9,11 +9,25 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/golang/dep/internal/test"
 )
 
+// This function tests HadFilepathPrefix. It should test it on both case
+// sensitive and insensitive situations. However, the only reliable way to test
+// case-insensitive behaviour is if using case-insensitive filesystem.  This
+// cannot be guaranteed in an automated test. Therefore, the behaviour of the
+// tests is not to test case sensitivity on *nix and to assume that Windows is
+// case-insensitive. Please see link below for some background.
+//
+// https://superuser.com/questions/266110/how-do-you-make-windows-7-fully-case-sensitive-with-respect-to-the-filesystem
+//
+// NOTE: NTFS can be made case-sensitive. However many Windows programs,
+// including Windows Explorer do not handle gracefully multiple files that
+// differ only in capitalization. It is possible that this can cause these tests
+// to fail on some setups.
 func TestHasFilepathPrefix(t *testing.T) {
 	dir, err := ioutil.TempDir("", "dep")
 	if err != nil {
@@ -21,25 +35,35 @@ func TestHasFilepathPrefix(t *testing.T) {
 	}
 	defer os.RemoveAll(dir)
 
+	// dir2 is the same as dir but with different capitalization on Windows to
+	// test case insensitivity
+	var dir2 string
+	if runtime.GOOS == "windows" {
+		dir = strings.ToLower(dir)
+		dir2 = strings.ToUpper(dir)
+	} else {
+		dir2 = dir
+	}
+
 	cases := []struct {
 		path   string
 		prefix string
 		want   bool
 	}{
-		{filepath.Join(dir, "a", "b"), filepath.Join(dir), true},
-		{filepath.Join(dir, "a", "b"), filepath.Join(dir, "a"), true},
-		{filepath.Join(dir, "a", "b"), filepath.Join(dir, "a", "b"), true},
-		{filepath.Join(dir, "a", "b"), filepath.Join(dir, "c"), false},
-		{filepath.Join(dir, "a", "b"), filepath.Join(dir, "a", "d", "b"), false},
-		{filepath.Join(dir, "a", "b"), filepath.Join(dir, "a", "b2"), false},
-		{filepath.Join(dir), filepath.Join(dir, "a", "b"), false},
-		{filepath.Join(dir, "ab"), filepath.Join(dir, "a", "b"), false},
-		{filepath.Join(dir, "ab"), filepath.Join(dir, "a"), false},
-		{filepath.Join(dir, "123"), filepath.Join(dir, "123"), true},
-		{filepath.Join(dir, "123"), filepath.Join(dir, "1"), false},
-		{filepath.Join(dir, "⌘"), filepath.Join(dir, "⌘"), true},
-		{filepath.Join(dir, "a"), filepath.Join(dir, "⌘"), false},
-		{filepath.Join(dir, "⌘"), filepath.Join(dir, "a"), false},
+		{filepath.Join(dir, "a", "b"), filepath.Join(dir2), true},
+		{filepath.Join(dir, "a", "b"), filepath.Join(dir2, "a"), true},
+		{filepath.Join(dir, "a", "b"), filepath.Join(dir2, "a", "b"), true},
+		{filepath.Join(dir, "a", "b"), filepath.Join(dir2, "c"), false},
+		{filepath.Join(dir, "a", "b"), filepath.Join(dir2, "a", "d", "b"), false},
+		{filepath.Join(dir, "a", "b"), filepath.Join(dir2, "a", "b2"), false},
+		{filepath.Join(dir), filepath.Join(dir2, "a", "b"), false},
+		{filepath.Join(dir, "ab"), filepath.Join(dir2, "a", "b"), false},
+		{filepath.Join(dir, "ab"), filepath.Join(dir2, "a"), false},
+		{filepath.Join(dir, "123"), filepath.Join(dir2, "123"), true},
+		{filepath.Join(dir, "123"), filepath.Join(dir2, "1"), false},
+		{filepath.Join(dir, "⌘"), filepath.Join(dir2, "⌘"), true},
+		{filepath.Join(dir, "a"), filepath.Join(dir2, "⌘"), false},
+		{filepath.Join(dir, "⌘"), filepath.Join(dir2, "a"), false},
 	}
 
 	for _, c := range cases {
@@ -57,12 +81,35 @@ func TestHasFilepathPrefix(t *testing.T) {
 	}
 }
 
+// This function tests HadFilepathPrefix. It should test it on both case
+// sensitive and insensitive situations. However, the only reliable way to test
+// case-insensitive behaviour is if using case-insensitive filesystem.  This
+// cannot be guaranteed in an automated test. Therefore, the behaviour of the
+// tests is not to test case sensitivity on *nix and to assume that Windows is
+// case-insensitive. Please see link below for some background.
+//
+// https://superuser.com/questions/266110/how-do-you-make-windows-7-fully-case-sensitive-with-respect-to-the-filesystem
+//
+// NOTE: NTFS can be made case-sensitive. However many Windows programs,
+// including Windows Explorer do not handle gracefully multiple files that
+// differ only in capitalization. It is possible that this can cause these tests
+// to fail on some setups.
 func TestHasFilepathPrefix_Files(t *testing.T) {
 	dir, err := ioutil.TempDir("", "dep")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer os.RemoveAll(dir)
+
+	// dir2 is the same as dir but with different capitalization on Windows to
+	// test case insensitivity
+	var dir2 string
+	if runtime.GOOS == "windows" {
+		dir = strings.ToLower(dir)
+		dir2 = strings.ToUpper(dir)
+	} else {
+		dir2 = dir
+	}
 
 	existingFile := filepath.Join(dir, "exists")
 	if _, err := os.Create(existingFile); err != nil {
@@ -76,8 +123,8 @@ func TestHasFilepathPrefix_Files(t *testing.T) {
 		prefix string
 		want   bool
 	}{
-		{existingFile, filepath.Join(dir), false},
-		{nonExistingFile, filepath.Join(dir), true},
+		{existingFile, filepath.Join(dir2), false},
+		{nonExistingFile, filepath.Join(dir2), true},
 	}
 
 	for _, c := range cases {

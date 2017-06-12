@@ -7,7 +7,7 @@ package gps
 type selection struct {
 	projects []selected
 	deps     map[ProjectRoot][]dependency
-	vu       versionUnifier
+	vu       *versionUnifier
 }
 
 type selected struct {
