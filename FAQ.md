@@ -75,7 +75,7 @@ or another in the future but that is not guaranteed.
 Here are some suggestions for when you could use `dep` or `go get`:
 > I would say that dep doesn't replace go get, but they both can do similar things. Here's how I use them:
 >
-> `go get`: I want to download the source code for a go project so that I can work on it myself, or to install a tool. This clones the repo under GOPATH for all to use.
+> `go get`: I want to download the source code for a go project so that I can work on it myself, or to install a tool. This clones the repo under `GOPATH` for all to use.
 >
 > `dep ensure`: I have imported a new dependency in my code and want to download the dependency so I can start using it. My workflow is "add the import to the code, and then run dep ensure so that the manifest/lock/vendor are updated". This clones the repo under my project's vendor directory, and remembers the revision used so that everyone who works on my project is guaranteed to be using the same version of dependencies.
 -[@carolynvs in #376](https://github.com/golang/dep/issues/376#issuecomment-293964655)
@@ -153,7 +153,7 @@ No.
 Sometimes the revision specified in the lock file is no longer valid. There are a few
 ways this can occur:
 
-* When you generated the lock file, you had an unpushed commit in your local copy of package X's repository in your GOPATH. (This case will be going away soon)
+* When you generated the lock file, you had an unpushed commit in your local copy of package X's repository in your `GOPATH`. (This case will be going away soon)
 * After generating the lock file, new commits were force pushed to package X's repository, causing the commit revision in your lock file to no longer exist.
 
 To troubleshoot, you can revert dep's changes to your lock, and then run `dep ensure -v -n`.
@@ -204,7 +204,7 @@ There's another major performance issue that's much harder - the process of pick
 
 ## How does `dep` handle symbolic links?
 
-> because we're not crazy people who delight in inviting chaos into our lives, we need to work within one GOPATH at a time.
+> because we're not crazy people who delight in inviting chaos into our lives, we need to work within one `GOPATH` at a time.
 -[@sdboyer in #247](https://github.com/golang/dep/pull/247#issuecomment-284181879)
 
 Out of convenience, one might create a symlink to a directory within their `GOPATH/src`, e.g. `ln -s ~/go/src/github.com/user/awesome-project ~/Code/awesome-project`.
@@ -214,7 +214,7 @@ When `dep` is invoked with a project root that is a symlink, it will be resolved
 - If the symlink is outside `GOPATH` and links to a directory within a `GOPATH`, or vice versa, then `dep` will choose whichever path is within `GOPATH`.
 - If the symlink is within a `GOPATH` and the resolved path is within a *different* `GOPATH`, then an error is thrown.
 - If both the symlink and the resolved path are in the same `GOPATH`, then an error is thrown.
-- If both the symlink and the resolved path are not in a `GOPATH`, then an error is thrown.
+- If neither the symlink nor the resolved path are in a `GOPATH`, then an error is thrown.
 
 This is the only symbolic link support that `dep` really intends to provide. In keeping with the general practices of the `go` tool, `dep` tends to either ignore symlinks (when walking) or copy the symlink itself, depending on the filesystem operation being performed.
 
