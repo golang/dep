@@ -176,7 +176,7 @@ func TestLoadProject(t *testing.T) {
 		start := testcase.start
 
 		ctx := &Ctx{
-			GOPATH:     tg.Path("."),
+			GOPATHs:    []string{tg.Path(".")},
 			WorkingDir: tg.Path(start),
 			Out:        discardLogger,
 			Err:        discardLogger,
