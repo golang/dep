@@ -882,38 +882,3 @@ func TestIsSymlink(t *testing.T) {
 		}
 	}
 }
-
-func TestResolvePath(t *testing.T) {
-	h := test.NewHelper(t)
-	defer h.Cleanup()
-
-	h.TempDir("directory")
-	h.TempFile("file", "")
-
-	root := h.Path(".")
-
-	os.Symlink(h.Path("directory"), filepath.Join(root, "directory-symlink"))
-	os.Symlink(h.Path("file"), filepath.Join(root, "file-symlink"))
-
-	testcases := []struct {
-		path     string
-		expected string
-		err      bool
-	}{
-		{filepath.Join(root, "does-not-exists"), "", true},
-		{filepath.Join(root, "file"), filepath.Join(root, "file"), false},
-		{filepath.Join(root, "directory"), filepath.Join(root, "directory"), false},
-		{filepath.Join(root, "file-symlink"), filepath.Join(root, "file"), false},
-		{filepath.Join(root, "directory-symlink"), filepath.Join(root, "directory"), false},
-	}
-
-	for _, tc := range testcases {
-		got, err := ResolvePath(tc.path)
-		if tc.err && err == nil {
-			t.Errorf("Expected error for path %s, resolved to %s", tc.path, got)
-		}
-		if got != tc.expected {
-			t.Errorf("Expected %s for path %s, got %v", tc.expected, tc.path, got)
-		}
-	}
-}
