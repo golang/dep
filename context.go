@@ -8,7 +8,6 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 
 	"github.com/Masterminds/vcs"
@@ -17,72 +16,27 @@ import (
 	"github.com/pkg/errors"
 )
 
-// Ctx defines the supporting context of the tool.
+// Ctx defines the supporting context of dep.
 type Ctx struct {
-	WorkingDir string
-	GOPATHS    []string // Other Go paths
-	GOPATH     string   // Selected Go path
-	*Loggers
+	WorkingDir string      // Where to execute.
+	GOPATH     string      // Selected Go path, containing WorkingDir.
+	GOPATHs    []string    // Other Go paths.
+	Out, Err   *log.Logger // Required loggers.
+	Verbose    bool        // Enables more verbose logging.
 }
 
-// Loggers holds standard loggers and a verbosity flag.
-type Loggers struct {
-	Out, Err *log.Logger
-	// Whether verbose logging is enabled.
-	Verbose bool
-}
-
-// NewContext creates a struct with all the environment's GOPATHs.
-func NewContext(wd string, env []string, loggers *Loggers) *Ctx {
-	ctx := &Ctx{WorkingDir: wd, Loggers: loggers}
-
-	GOPATH := getEnv(env, "GOPATH")
-
-	if GOPATH == "" {
-		GOPATH = defaultGOPATH()
+func NewContext(wd string, gopaths []string, out, err *log.Logger, verbose bool) *Ctx {
+	ctx := &Ctx{
+		WorkingDir: wd,
+		Out:        out,
+		Err:        err,
+		Verbose:    verbose,
 	}
-
-	for _, gp := range filepath.SplitList(GOPATH) {
-		ctx.GOPATHS = append(ctx.GOPATHS, filepath.FromSlash(gp))
+	for _, gp := range gopaths {
+		ctx.GOPATHs = append(ctx.GOPATHs, filepath.ToSlash(gp))
 	}
 
 	return ctx
-}
-
-// getEnv returns the last instance of an environment variable.
-func getEnv(env []string, key string) string {
-	for i := len(env) - 1; i >= 0; i-- {
-		v := env[i]
-		kv := strings.SplitN(v, "=", 2)
-		if kv[0] == key {
-			if len(kv) > 1 {
-				return kv[1]
-			}
-			return ""
-		}
-	}
-	return ""
-}
-
-// defaultGOPATH gets the default GOPATH that was added in 1.8
-// copied from go/build/build.go
-func defaultGOPATH() string {
-	env := "HOME"
-	if runtime.GOOS == "windows" {
-		env = "USERPROFILE"
-	} else if runtime.GOOS == "plan9" {
-		env = "home"
-	}
-	if home := os.Getenv(env); home != "" {
-		def := filepath.Join(home, "go")
-		if def == runtime.GOROOT() {
-			// Don't set the default GOPATH to GOROOT,
-			// as that will trigger warnings from the go tool.
-			return ""
-		}
-		return def
-	}
-	return ""
 }
 
 func (c *Ctx) SourceManager() (*gps.SourceMgr, error) {
@@ -135,7 +89,7 @@ func (c *Ctx) LoadProject() (*Project, error) {
 	var warns []error
 	p.Manifest, warns, err = readManifest(mf)
 	for _, warn := range warns {
-		c.Loggers.Err.Printf("dep: WARNING: %v\n", warn)
+		c.Err.Printf("dep: WARNING: %v\n", warn)
 	}
 	if err != nil {
 		return nil, errors.Errorf("error while parsing %s: %s", mp, err)
@@ -190,7 +144,7 @@ func (c *Ctx) ResolveProjectRootAndGOPATH(path string) (string, string, error) {
 		return path, pgp, nil
 	}
 
-	resolved, err := fs.ResolvePath(path)
+	resolved, err := filepath.EvalSymlinks(path)
 	if err != nil {
 		return "", "", errors.Wrap(err, "resolveProjectRoot")
 	}
@@ -213,14 +167,14 @@ func (c *Ctx) ResolveProjectRootAndGOPATH(path string) (string, string, error) {
 	// Otherwise, either the symlink or the resolved path is within a GOPATH.
 	if pgp == "" {
 		return resolved, rgp, nil
+	} else {
+		return path, pgp, nil
 	}
-
-	return path, pgp, nil
 }
 
-// detectGOPATH detects the GOPATH for a given path from ctx.GOPATHS.
+// detectGOPATH detects the GOPATH for a given path from ctx.GOPATHs.
 func (c *Ctx) detectGOPATH(path string) (string, error) {
-	for _, gp := range c.GOPATHS {
+	for _, gp := range c.GOPATHs {
 		if fs.HasFilepathPrefix(filepath.FromSlash(path), gp) {
 			return gp, nil
 		}

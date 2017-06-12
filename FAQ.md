@@ -35,7 +35,7 @@ Summarize the question and quote the reply, linking back to the original comment
 ## When should I use `constraint`, `override`, `required`, or `ignored` in `Gopkg.toml`?
 
 * Use `constraint` to constrain a [direct dependency](#what-is-a-direct-or-transitive-dependency) to a specific branch, version range, revision, or specify an alternate source such as a fork.
-* Use `override` to constrain a [transitive dependency](#what-is-a-direct-or-transitive-dependency). See [How do I constrain a transitive dependency's version?](#how-do-i-constrain-a-transitive-dependencys-version) for more details on how overrides differ from dependencies. Overrides should be used cautiously, sparingly, and temporarily.
+* Use `override` to constrain a [transitive dependency](#what-is-a-direct-or-transitive-dependency). See [How do I constrain a transitive dependency's version?](#how-do-i-constrain-a-transitive-dependencys-version) for more details on how overrides differ from constraints. Overrides should be used cautiously, sparingly, and temporarily.
 * Use `required` to explicitly add a dependency that is not imported directly or transitively, for example a development package used for code generation.
 * Use `ignored` to ignore a package and any of that package's unique dependencies.
 
@@ -85,10 +85,28 @@ Here are some suggestions for when you could use `dep` or `go get`:
 -[@sdboyer in #376](https://github.com/golang/dep/issues/376#issuecomment-294045873)
 
 ## Why is `dep` ignoring a version constraint in the manifest?
-Only your project's directly imported dependencies are affected by a `dependencies` entry
+Only your project's directly imported dependencies are affected by a `constraint` entry
 in the manifest. Transitive dependencies are unaffected.
 
-Use an `overrides` entry for transitive dependencies.
+Use an `override` entry for transitive dependencies.
+
+By default, when you specify a version without an operator, such as `~` or `=`,
+`dep` automatically adds a caret operator, `^`. The caret operator pins the
+left-most non-zero digit in the version. For example:
+```
+^1.2.3 means 1.2.3 <= X < 2.0.0
+^0.2.3 means 0.2.3 <= X < 0.3.0
+^0.0.3 means 0.0.3 <= X < 0.0.4
+```
+
+To pin a version of direct dependency in manifest, prefix the version with `=`.
+For example:
+```
+[[constraint]]
+  name = "github.com/pkg/errors"
+  version = "=0.8.0"
+```
+
 
 ## How do I constrain a transitive dependency's version?
 First, if you're wondering about this because you're trying to keep the version
@@ -104,13 +122,13 @@ dependency, you have a couple of options:
 2. Use an override.
 
 Overrides are a sledgehammer, and should only be used as a last resort. While
-dependencies and overrides are declared in the same way in `Gopkg.toml`, they
+constraints and overrides are declared in the same way in `Gopkg.toml`, they
 behave differently:
 
-* Dependencies:
+* Constraints:
    1. Can be declared by any project's manifest, yours or a dependency
    2. Apply only to direct dependencies of the project declaring the constraint
-   3. Must not conflict with the `dependencies` declared in any other project's manifest
+   3. Must not conflict with the `constraint` entries declared in any other project's manifest
 * Overrides:
    1. Are only utilized from the current/your project's manifest
    2. Apply globally, to direct and transitive dependencies
