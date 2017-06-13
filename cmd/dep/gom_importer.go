@@ -251,13 +251,8 @@ func (g *gomImporter) convert(pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock, err
 			feedback(version, pi.ProjectRoot, fb.DepTypeImported, g.logger)
 			lp := gps.NewLockedProject(pi, version, nil)
 			lock.P = append(lock.P, lp)
-			pc.Constraint, err = gps.NewSemverConstraintIC(rev)
-			if err != nil {
-				return nil, nil, err
-			}
 		}
-
-		manifest.Constraints[pc.Ident.ProjectRoot] = gps.ProjectProperties{Source: pc.Ident.Source, Constraint: pc.Constraint}
+		manifest.Constraints[pc.Ident.ProjectRoot] = gps.ProjectProperties{Source: pc.Ident.Source, Constraint: nil}
 	}
 
 	return manifest, lock, nil
