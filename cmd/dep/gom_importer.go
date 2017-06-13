@@ -252,10 +252,10 @@ func (g *gomImporter) convert(pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock, err
 		}
 		var pc gps.ProjectConstraint
 		pc.Ident = gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot(pkg.name)}
+		pc.Constraint, err = gps.NewSemverConstraintIC(rev)
 		if err != nil {
 			return nil, nil, err
 		}
-		pc.Constraint, err = gps.NewSemverConstraintIC(rev)
 
 		manifest.Constraints[pc.Ident.ProjectRoot] = gps.ProjectProperties{Source: pc.Ident.Source, Constraint: pc.Constraint}
 	}
