@@ -195,7 +195,12 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 }
 
 func getDirectDependencies(root, cpr string) (pkgtree.PackageTree, map[string]bool, error) {
-	pkgT, err := pkgtree.ListPackages(root, cpr)
+	resolved, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		return pkgtree.PackageTree{}, nil, errors.Wrap(err, "filepath.EvalSymlinks")
+	}
+
+	pkgT, err := pkgtree.ListPackages(resolved, cpr)
 	if err != nil {
 		return pkgtree.PackageTree{}, nil, errors.Wrap(err, "gps.ListPackages")
 	}

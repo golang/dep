@@ -50,7 +50,7 @@ func (cmd *pruneCommand) Run(ctx *dep.Ctx, args []string) error {
 
 	// While the network churns on ListVersions() requests, statically analyze
 	// code from the current project.
-	ptree, err := pkgtree.ListPackages(p.AbsRoot, string(p.ImportRoot))
+	ptree, err := pkgtree.ListPackages(p.ResolvedAbsRoot(), string(p.ImportRoot))
 	if err != nil {
 		return errors.Wrap(err, "analysis of local packages failed: %v")
 	}

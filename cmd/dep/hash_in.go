@@ -42,7 +42,7 @@ func (hashinCommand) Run(ctx *dep.Ctx, args []string) error {
 		return errors.Wrap(err, "determineProjectRoot")
 	}
 
-	params.RootPackageTree, err = pkgtree.ListPackages(p.AbsRoot, cpr)
+	params.RootPackageTree, err = pkgtree.ListPackages(p.ResolvedAbsRoot(), cpr)
 	if err != nil {
 		return errors.Wrap(err, "gps.ListPackages")
 	}

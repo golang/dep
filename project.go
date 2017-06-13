@@ -49,6 +49,19 @@ type Project struct {
 	Lock       *Lock // Optional
 }
 
+// ResolvedAbsRoot return the resolved path if AbsRoot is a symlink.
+func (p *Project) ResolvedAbsRoot() string {
+	sym, err := fs.IsSymlink(p.AbsRoot)
+	if err != nil || !sym {
+		return p.AbsRoot
+	}
+	resolved, err := filepath.EvalSymlinks(p.AbsRoot)
+	if err != nil {
+		return p.AbsRoot
+	}
+	return resolved
+}
+
 // MakeParams is a simple helper to create a gps.SolveParameters without setting
 // any nils incorrectly.
 func (p *Project) MakeParams() gps.SolveParameters {
