@@ -198,7 +198,6 @@ func (g *gomImporter) load(projectDir string) error {
 		}
 		g.goms = append(g.goms, gomPackage{name, options})
 	}
-	return nil
 }
 
 // convert the gomfile into dep configuration files.
