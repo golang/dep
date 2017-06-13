@@ -106,12 +106,12 @@ func (g *gomImporter) has(c interface{}, key string) bool {
 
 func (g *gomImporter) parseOptions(line string, options map[string]interface{}) {
 	ss := gomReOptions.FindAllStringSubmatch(line, -1)
-	re_a := regexp.MustCompile(gomAx)
+	re := regexp.MustCompile(gomAx)
 	for _, s := range ss {
 		kvs := strings.SplitN(strings.TrimSpace(s[0])[1:], "=>", 2)
 		kvs[0], kvs[1] = strings.TrimSpace(kvs[0]), strings.TrimSpace(kvs[1])
 		if kvs[1][0] == '[' {
-			as := re_a.FindAllStringSubmatch(kvs[1][1:len(kvs[1])-1], -1)
+			as := re.FindAllStringSubmatch(kvs[1][1:len(kvs[1])-1], -1)
 			a := []string{}
 			for i := range as {
 				it := strings.TrimSpace(as[i][0])
