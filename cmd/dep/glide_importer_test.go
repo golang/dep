@@ -38,23 +38,21 @@ func TestGlideConfig_Import(t *testing.T) {
 	h := test.NewHelper(t)
 	defer h.Cleanup()
 
-	cacheDir := "gps-repocache"
-	h.TempDir(cacheDir)
-	h.TempDir("src")
-	h.TempDir(filepath.Join("src", testGlideProjectRoot))
-	h.TempCopy(filepath.Join(testGlideProjectRoot, glideYamlName), "glide/glide.yaml")
-	h.TempCopy(filepath.Join(testGlideProjectRoot, glideLockName), "glide/glide.lock")
-
-	projectRoot := h.Path(testGlideProjectRoot)
-	sm, err := gps.NewSourceManager(h.Path(cacheDir))
+	ctx := newTestContext(h)
+	sm, err := ctx.SourceManager()
 	h.Must(err)
 	defer sm.Release()
 
+	h.TempDir(filepath.Join("src", testGlideProjectRoot))
+	h.TempCopy(filepath.Join(testGlideProjectRoot, glideYamlName), "glide/glide.yaml")
+	h.TempCopy(filepath.Join(testGlideProjectRoot, glideLockName), "glide/glide.lock")
+	projectRoot := h.Path(testGlideProjectRoot)
+
 	// Capture stderr so we can verify output
 	verboseOutput := &bytes.Buffer{}
-	logger := log.New(verboseOutput, "", 0)
+	ctx.Err = log.New(verboseOutput, "", 0)
 
-	g := newGlideImporter(logger, false, sm) // Disable verbose so that we don't print values that change each test run
+	g := newGlideImporter(ctx.Err, false, sm) // Disable verbose so that we don't print values that change each test run
 	if !g.HasDepMetadata(projectRoot) {
 		t.Fatal("Expected the importer to detect the glide configuration files")
 	}
@@ -85,22 +83,19 @@ func TestGlideConfig_Import(t *testing.T) {
 }
 
 func TestGlideConfig_Import_MissingLockFile(t *testing.T) {
-
 	h := test.NewHelper(t)
 	defer h.Cleanup()
 
-	cacheDir := "gps-repocache"
-	h.TempDir(cacheDir)
-	h.TempDir("src")
-	h.TempDir(filepath.Join("src", "glidetest"))
-	h.TempCopy(filepath.Join("glidetest", glideYamlName), "glide/glide.yaml")
-
-	projectRoot := h.Path("glidetest")
-	sm, err := gps.NewSourceManager(h.Path(cacheDir))
+	ctx := newTestContext(h)
+	sm, err := ctx.SourceManager()
 	h.Must(err)
 	defer sm.Release()
 
-	g := newGlideImporter(discardLogger, true, sm)
+	h.TempDir(filepath.Join("src", "glidetest"))
+	h.TempCopy(filepath.Join("glidetest", glideYamlName), "glide/glide.yaml")
+	projectRoot := h.Path("glidetest")
+
+	g := newGlideImporter(ctx.Err, true, sm)
 	if !g.HasDepMetadata(projectRoot) {
 		t.Fatal("The glide importer should gracefully handle when only glide.yaml is present")
 	}
@@ -118,17 +113,16 @@ func TestGlideConfig_Import_MissingLockFile(t *testing.T) {
 }
 
 func TestGlideConfig_Convert_Project(t *testing.T) {
-
 	h := test.NewHelper(t)
 	defer h.Cleanup()
-
-	pkg := "github.com/sdboyer/deptest"
-	repo := "https://github.com/sdboyer/deptest.git"
 
 	ctx := newTestContext(h)
 	sm, err := ctx.SourceManager()
 	h.Must(err)
 	defer sm.Release()
+
+	pkg := "github.com/sdboyer/deptest"
+	repo := "https://github.com/sdboyer/deptest.git"
 
 	g := newGlideImporter(ctx.Err, true, sm)
 	g.yaml = glideYaml{
@@ -211,12 +205,12 @@ func TestGlideConfig_Convert_TestProject(t *testing.T) {
 	h := test.NewHelper(t)
 	defer h.Cleanup()
 
-	pkg := "github.com/sdboyer/deptest"
-
 	ctx := newTestContext(h)
 	sm, err := ctx.SourceManager()
 	h.Must(err)
 	defer sm.Release()
+
+	pkg := "github.com/sdboyer/deptest"
 
 	g := newGlideImporter(ctx.Err, true, sm)
 	g.yaml = glideYaml{
@@ -256,9 +250,17 @@ func TestGlideConfig_Convert_TestProject(t *testing.T) {
 }
 
 func TestGlideConfig_Convert_Ignore(t *testing.T) {
+	h := test.NewHelper(t)
+	defer h.Cleanup()
+
+	ctx := newTestContext(h)
+	sm, err := ctx.SourceManager()
+	h.Must(err)
+	defer sm.Release()
+
 	pkg := "github.com/sdboyer/deptest"
 
-	g := newGlideImporter(discardLogger, true, nil)
+	g := newGlideImporter(ctx.Err, true, sm)
 	g.yaml = glideYaml{
 		Ignores: []string{pkg},
 	}
@@ -278,7 +280,15 @@ func TestGlideConfig_Convert_Ignore(t *testing.T) {
 }
 
 func TestGlideConfig_Convert_ExcludeDir(t *testing.T) {
-	g := newGlideImporter(discardLogger, true, nil)
+	h := test.NewHelper(t)
+	defer h.Cleanup()
+
+	ctx := newTestContext(h)
+	sm, err := ctx.SourceManager()
+	h.Must(err)
+	defer sm.Release()
+
+	g := newGlideImporter(ctx.Err, true, sm)
 	g.yaml = glideYaml{
 		ExcludeDirs: []string{"samples"},
 	}
@@ -298,7 +308,15 @@ func TestGlideConfig_Convert_ExcludeDir(t *testing.T) {
 }
 
 func TestGlideConfig_Convert_ExcludeDir_IgnoresMismatchedPackageName(t *testing.T) {
-	g := newGlideImporter(discardLogger, true, nil)
+	h := test.NewHelper(t)
+	defer h.Cleanup()
+
+	ctx := newTestContext(h)
+	sm, err := ctx.SourceManager()
+	h.Must(err)
+	defer sm.Release()
+
+	g := newGlideImporter(ctx.Err, true, sm)
 	g.yaml = glideYaml{
 		Name:        "github.com/golang/mismatched-package-name",
 		ExcludeDirs: []string{"samples"},
@@ -326,18 +344,27 @@ func TestGlideConfig_Convert_WarnsForUnusedFields(t *testing.T) {
 
 	for wantWarning, pkg := range testCases {
 		t.Run(wantWarning, func(t *testing.T) {
+			h := test.NewHelper(t)
+			defer h.Cleanup()
+
 			pkg.Name = "github.com/sdboyer/deptest"
 			pkg.Reference = "v1.0.0"
 
+			ctx := newTestContext(h)
+			sm, err := ctx.SourceManager()
+			h.Must(err)
+			defer sm.Release()
+
 			// Capture stderr so we can verify warnings
 			verboseOutput := &bytes.Buffer{}
-			logger := log.New(verboseOutput, "", 0)
-			g := newGlideImporter(logger, true, nil)
+			ctx.Err = log.New(verboseOutput, "", 0)
+
+			g := newGlideImporter(ctx.Err, true, sm)
 			g.yaml = glideYaml{
 				Imports: []glidePackage{pkg},
 			}
 
-			_, _, err := g.convert(testGlideProjectRoot)
+			_, _, err = g.convert(testGlideProjectRoot)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -351,12 +378,20 @@ func TestGlideConfig_Convert_WarnsForUnusedFields(t *testing.T) {
 }
 
 func TestGlideConfig_Convert_BadInput_EmptyPackageName(t *testing.T) {
-	g := newGlideImporter(discardLogger, true, nil)
+	h := test.NewHelper(t)
+	defer h.Cleanup()
+
+	ctx := newTestContext(h)
+	sm, err := ctx.SourceManager()
+	h.Must(err)
+	defer sm.Release()
+
+	g := newGlideImporter(ctx.Err, true, sm)
 	g.yaml = glideYaml{
 		Imports: []glidePackage{{Name: ""}},
 	}
 
-	_, _, err := g.convert(testGlideProjectRoot)
+	_, _, err = g.convert(testGlideProjectRoot)
 	if err == nil {
 		t.Fatal("Expected conversion to fail because the package name is empty")
 	}
