@@ -80,6 +80,9 @@ func (a *rootAnalyzer) importManifestAndLock(dir string, pr gps.ProjectRoot, sup
 		if i.HasDepMetadata(dir) {
 			a.ctx.Err.Printf("Importing configuration from %s. These are only initial constraints, and are further refined during the solve process.", i.Name())
 			m, l, err := i.Import(dir, pr)
+			if err != nil {
+				return nil, nil, err
+			}
 			a.removeTransitiveDependencies(m)
 			return m, l, err
 		}
