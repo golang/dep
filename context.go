@@ -15,6 +15,7 @@ import (
 	"github.com/golang/dep/internal/fs"
 	"github.com/golang/dep/internal/gps"
 	"github.com/pkg/errors"
+	"golang.org/x/tools/go/gcimporter15/testdata"
 )
 
 // Ctx defines the supporting context of dep.
@@ -60,8 +61,9 @@ func (c *Ctx) LoadProject() (*Project, error) {
 		return nil, err
 	}
 
-	p, err := NewProject(root)
-	if err != nil {
+	p := new(Project)
+
+	if err = p.SetRoot(root); err != nil {
 		return nil, err
 	}
 
