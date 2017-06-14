@@ -189,7 +189,7 @@ func TestGlideConfig_Convert_Project(t *testing.T) {
 	}
 
 	wantRev := "ff2948a2ac8f538c4ecd55962e919d1e13e74baf"
-	gotRev := lpv.Underlying().String()
+	gotRev := lpv.Revision().String()
 	if gotRev != wantRev {
 		t.Fatalf("Expected locked revision to be %s, got %s", wantRev, gotRev)
 	}

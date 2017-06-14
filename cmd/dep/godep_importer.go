@@ -174,7 +174,7 @@ func (g *godepImporter) buildLockedProject(pkg godepPackage) gps.LockedProject {
 
 	if pkg.Comment != "" {
 		ver := gps.NewVersion(pkg.Comment)
-		version = ver.Is(gps.Revision(pkg.Rev))
+		version = ver.Pair(gps.Revision(pkg.Rev))
 	} else {
 		version = gps.Revision(pkg.Rev)
 	}

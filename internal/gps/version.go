@@ -47,8 +47,8 @@ type Version interface {
 type PairedVersion interface {
 	Version
 
-	// Underlying returns the immutable Revision that identifies this Version.
-	Underlying() Revision
+	// Revision returns the immutable Revision that identifies this Version.
+	Revision() Revision
 
 	// Unpair returns the surface-level UnpairedVersion that half of the pair.
 	//
@@ -64,9 +64,9 @@ type PairedVersion interface {
 // VersionPair by indicating the version's corresponding, underlying Revision.
 type UnpairedVersion interface {
 	Version
-	// Is takes the underlying Revision that this UnpairedVersion corresponds
+	// Pair takes the underlying Revision that this UnpairedVersion corresponds
 	// to and unites them into a PairedVersion.
-	Is(Revision) PairedVersion
+	Pair(Revision) PairedVersion
 	// Ensures it is impossible to be both a PairedVersion and an
 	// UnpairedVersion
 	_pair(bool)
@@ -267,7 +267,7 @@ func (v branchVersion) Intersect(c Constraint) Constraint {
 	return none
 }
 
-func (v branchVersion) Is(r Revision) PairedVersion {
+func (v branchVersion) Pair(r Revision) PairedVersion {
 	return versionPair{
 		v: v,
 		r: r,
@@ -348,7 +348,7 @@ func (v plainVersion) Intersect(c Constraint) Constraint {
 	return none
 }
 
-func (v plainVersion) Is(r Revision) PairedVersion {
+func (v plainVersion) Pair(r Revision) PairedVersion {
 	return versionPair{
 		v: v,
 		r: r,
@@ -439,7 +439,7 @@ func (v semVersion) Intersect(c Constraint) Constraint {
 	return none
 }
 
-func (v semVersion) Is(r Revision) PairedVersion {
+func (v semVersion) Pair(r Revision) PairedVersion {
 	return versionPair{
 		v: v,
 		r: r,
@@ -460,14 +460,14 @@ func (v versionPair) ImpliedCaretString() string {
 }
 
 func (v versionPair) typedString() string {
-	return fmt.Sprintf("%s-%s", v.Unpair().typedString(), v.Underlying().typedString())
+	return fmt.Sprintf("%s-%s", v.Unpair().typedString(), v.Revision().typedString())
 }
 
 func (v versionPair) Type() VersionType {
 	return v.v.Type()
 }
 
-func (v versionPair) Underlying() Revision {
+func (v versionPair) Revision() Revision {
 	return v.r
 }
 
@@ -786,7 +786,7 @@ func VersionComponentStrings(v Version) (revision string, branch string, version
 	case Revision:
 		revision = tv.String()
 	case PairedVersion:
-		revision = tv.Underlying().String()
+		revision = tv.Revision().String()
 	}
 
 	switch v.Type() {
