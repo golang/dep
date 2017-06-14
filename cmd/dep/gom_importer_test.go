@@ -92,9 +92,14 @@ func TestGomConfig_ConvertProject(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, ok := manifest.Constraints["github.com/sdboyer/deptest"]
+	d, ok := manifest.Constraints["github.com/sdboyer/deptest"]
 	if !ok {
 		t.Fatal("Expected the manifest to have a dependency for 'github.com/sdboyer/deptest' but got none")
+	}
+
+	v := d.Constraint.String()
+	if v != "ff2948a2ac8f538c4ecd55962e919d1e13e74baf" {
+		t.Fatalf("Expected manifest constraint to be %q got %q", "ff2948a2ac8f538c4ecd55962e919d1e13e74baf", v)
 	}
 
 	p := lock.P[0]
@@ -129,7 +134,7 @@ func TestGomConfig_ConvertProject_EmptyComment(t *testing.T) {
 		{
 			name: "github.com/sdboyer/deptest",
 			options: map[string]interface{}{
-				"commit": "ff2948a2ac8f538c4ecd55962e919d1e13e74baf",
+				"branch": "0.8.0",
 			},
 		},
 	}
@@ -139,9 +144,14 @@ func TestGomConfig_ConvertProject_EmptyComment(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, ok := manifest.Constraints["github.com/sdboyer/deptest"]
+	d, ok := manifest.Constraints["github.com/sdboyer/deptest"]
 	if !ok {
 		t.Fatal("Expected the manifest to have a dependency for 'github.com/sdboyer/deptest' but got none")
+	}
+
+	v := d.Constraint.String()
+	if v != "^0.8.0" {
+		t.Fatalf("Expected manifest constraint to be %q got %q", "^0.8.0", v)
 	}
 
 	p := lock.P[0]
@@ -149,14 +159,8 @@ func TestGomConfig_ConvertProject_EmptyComment(t *testing.T) {
 		t.Fatalf("Expected the lock to have a project for 'github.com/sdboyer/deptest' but got '%s'", p.Ident().ProjectRoot)
 	}
 
-	lv := p.Version()
-	lpv, ok := lv.(gps.PairedVersion)
-	if !ok {
-		t.Fatalf("Expected locked version to be PairedVersion but got %T", lv)
-	}
-
-	rev := lpv.Underlying()
-	if rev != "ff2948a2ac8f538c4ecd55962e919d1e13e74baf" {
+	rev := p.Version().String()
+	if rev != "0.8.0" {
 		t.Fatalf("Expected locked revision to be 'ff2948a2ac8f538c4ecd55962e919d1e13e74baf', got %s", rev)
 	}
 }
