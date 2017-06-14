@@ -5,14 +5,12 @@
 package main
 
 import (
-	"encoding/hex"
-
-	"github.com/golang/dep"
-	fb "github.com/golang/dep/internal/feedback"
-	"github.com/golang/dep/internal/gps"
-	"github.com/pkg/errors"
 	"io/ioutil"
 	"log"
+
+	"github.com/golang/dep"
+	"github.com/golang/dep/internal/gps"
+	"github.com/pkg/errors"
 )
 
 // importer handles importing configuration from other dependency managers into
@@ -150,50 +148,6 @@ func (a *rootAnalyzer) Info() (string, int) {
 		name = "dep+import"
 	}
 	return name, version
-}
-
-// feedback logs project constraint as feedback to the user.
-func feedback(v gps.Version, pr gps.ProjectRoot, depType string, logger *log.Logger) {
-	rev, version, branch := gps.VersionComponentStrings(v)
-
-	// Check if it's a valid SHA1 digest and trim to 7 characters.
-	if len(rev) == 40 {
-		if _, err := hex.DecodeString(rev); err == nil {
-			// Valid SHA1 digest
-			rev = rev[0:7]
-		}
-	}
-
-	// Get LockedVersion
-	var ver string
-	if version != "" {
-		ver = version
-	} else if branch != "" {
-		ver = branch
-	}
-
-	cf := &fb.ConstraintFeedback{
-		LockedVersion:  ver,
-		Revision:       rev,
-		ProjectPath:    string(pr),
-		DependencyType: depType,
-	}
-
-	// Get non-revision constraint if available
-	if c := getProjectPropertiesFromVersion(v).Constraint; c != nil {
-		cf.Version = c.String()
-	}
-
-	// Attach ConstraintType for direct/imported deps based on locked version
-	if cf.DependencyType == fb.DepTypeDirect || cf.DependencyType == fb.DepTypeImported {
-		if cf.LockedVersion != "" {
-			cf.ConstraintType = fb.ConsTypeConstraint
-		} else {
-			cf.ConstraintType = fb.ConsTypeHint
-		}
-	}
-
-	cf.LogFeedback(logger)
 }
 
 func lookupVersionForRevision(rev gps.Revision, pi gps.ProjectIdentifier, sm gps.SourceManager) (gps.Version, error) {
