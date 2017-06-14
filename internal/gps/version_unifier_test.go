@@ -20,16 +20,16 @@ func init() {
 	rev3 := Revision("revision-three")
 
 	lvfb1 = lvFixBridge{
-		NewBranch("master").Is(rev1),
-		NewBranch("test").Is(rev2),
-		NewVersion("1.0.0").Is(rev1),
-		NewVersion("1.0.1").Is("other1"),
-		NewVersion("v2.0.5").Is(rev3),
-		NewVersion("2.0.5.2").Is(rev3),
-		newDefaultBranch("unwrapped").Is(rev3),
-		NewVersion("20.0.5.2").Is(rev1),
-		NewVersion("v1.5.5-beta.4").Is("other2"),
-		NewVersion("v3.0.1-alpha.1").Is(rev2),
+		NewBranch("master").Pair(rev1),
+		NewBranch("test").Pair(rev2),
+		NewVersion("1.0.0").Pair(rev1),
+		NewVersion("1.0.1").Pair("other1"),
+		NewVersion("v2.0.5").Pair(rev3),
+		NewVersion("2.0.5.2").Pair(rev3),
+		newDefaultBranch("unwrapped").Pair(rev3),
+		NewVersion("20.0.5.2").Pair(rev1),
+		NewVersion("v1.5.5-beta.4").Pair("other2"),
+		NewVersion("v3.0.1-alpha.1").Pair(rev2),
 	}
 }
 
@@ -96,7 +96,7 @@ func TestTypeUnionIntersect(t *testing.T) {
 	}
 
 	gotc = vu.intersect(id, c, rev3)
-	if gotc != NewVersion("v2.0.5").Is(rev3) {
+	if gotc != NewVersion("v2.0.5").Pair(rev3) {
 		t.Fatalf("wanted v2.0.5, got %s from intersect", gotc.typedString())
 	}
 }

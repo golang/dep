@@ -174,7 +174,7 @@ func (c *singleSourceCacheMemory) getVersionsFor(r Revision) ([]UnpairedVersion,
 func (c *singleSourceCacheMemory) getAllVersions() []PairedVersion {
 	vlist := make([]PairedVersion, 0, len(c.vMap))
 	for v, r := range c.vMap {
-		vlist = append(vlist, v.Is(r))
+		vlist = append(vlist, v.Pair(r))
 	}
 	return vlist
 }

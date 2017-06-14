@@ -64,9 +64,9 @@ type PairedVersion interface {
 // VersionPair by indicating the version's corresponding, underlying Revision.
 type UnpairedVersion interface {
 	Version
-	// Is takes the underlying Revision that this UnpairedVersion corresponds
+	// Pair takes the underlying Revision that this UnpairedVersion corresponds
 	// to and unites them into a PairedVersion.
-	Is(Revision) PairedVersion
+	Pair(Revision) PairedVersion
 	// Ensures it is impossible to be both a PairedVersion and an
 	// UnpairedVersion
 	_pair(bool)
@@ -267,7 +267,7 @@ func (v branchVersion) Intersect(c Constraint) Constraint {
 	return none
 }
 
-func (v branchVersion) Is(r Revision) PairedVersion {
+func (v branchVersion) Pair(r Revision) PairedVersion {
 	return versionPair{
 		v: v,
 		r: r,
@@ -348,7 +348,7 @@ func (v plainVersion) Intersect(c Constraint) Constraint {
 	return none
 }
 
-func (v plainVersion) Is(r Revision) PairedVersion {
+func (v plainVersion) Pair(r Revision) PairedVersion {
 	return versionPair{
 		v: v,
 		r: r,
@@ -439,7 +439,7 @@ func (v semVersion) Intersect(c Constraint) Constraint {
 	return none
 }
 
-func (v semVersion) Is(r Revision) PairedVersion {
+func (v semVersion) Pair(r Revision) PairedVersion {
 	return versionPair{
 		v: v,
 		r: r,

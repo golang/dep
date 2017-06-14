@@ -113,7 +113,7 @@ func mkAtom(info string) atom {
 	}
 
 	if rev != "" {
-		v = v.(UnpairedVersion).Is(rev)
+		v = v.(UnpairedVersion).Pair(rev)
 	}
 
 	return atom{
@@ -164,7 +164,7 @@ func mkPCstrnt(info string) ProjectConstraint {
 		// Of course, this *will* panic if the predicate is a revision or a
 		// semver constraint, neither of which implement UnpairedVersion. This
 		// is as intended, to prevent bad data from entering the system.
-		c = c.(UnpairedVersion).Is(rev)
+		c = c.(UnpairedVersion).Pair(rev)
 	}
 
 	return ProjectConstraint{
@@ -1482,7 +1482,7 @@ func (sm *depspecSourceManager) ListVersions(id ProjectIdentifier) ([]PairedVers
 		case UnpairedVersion:
 			// Dummy revision; if the fixture doesn't provide it, we know
 			// the test doesn't need revision info, anyway.
-			pvl = append(pvl, tv.Is(Revision("FAKEREV")))
+			pvl = append(pvl, tv.Pair(Revision("FAKEREV")))
 		default:
 			panic(fmt.Sprintf("unreachable: type of version was %#v for spec %s", ds.v, id.errString()))
 		}
