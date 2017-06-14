@@ -78,10 +78,10 @@ func (cf ConstraintFeedback) LogFeedback(logger *log.Logger) {
 	}
 }
 
-// GetUsingFeedback returns dependency using feedback string.
-// Example:
-// Using ^1.0.0 as constraint for direct dep github.com/foo/bar
-// Using 1b8edb3 as hint for direct dep github.com/bar/baz
+// GetUsingFeedback returns a dependency "using" feedback message. For example:
+//
+//    Using ^1.0.0 as constraint for direct dep github.com/foo/bar
+//    Using 1b8edb3 as hint for direct dep github.com/bar/baz
 func GetUsingFeedback(version, consType, depType, projectPath string) string {
 	if depType == DepTypeImported {
 		return fmt.Sprintf("Using %s as initial %s for %s %s", version, consType, depType, projectPath)
@@ -89,10 +89,11 @@ func GetUsingFeedback(version, consType, depType, projectPath string) string {
 	return fmt.Sprintf("Using %s as %s for %s %s", version, consType, depType, projectPath)
 }
 
-// GetLockingFeedback returns dependency locking feedback string.
-// Example:
-// Locking in v1.1.4 (bc29b4f) for direct dep github.com/foo/bar
-// Locking in master (436f39d) for transitive dep github.com/baz/qux
+// GetLockingFeedback returns a dependency "locking" feedback message. For
+// example:
+//
+//    Locking in v1.1.4 (bc29b4f) for direct dep github.com/foo/bar
+//    Locking in master (436f39d) for transitive dep github.com/baz/qux
 func GetLockingFeedback(version, revision, depType, projectPath string) string {
 	// Check if it's a valid SHA1 digest and trim to 7 characters.
 	if len(revision) == 40 {
