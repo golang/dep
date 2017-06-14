@@ -52,10 +52,12 @@ func (c *Ctx) SourceManager() (*gps.SourceMgr, error) {
 // present.  The import path is calculated as the remaining path segment
 // below Ctx.GOPATH/src.
 func (c *Ctx) LoadProject() (*Project, error) {
-	var err error
-	p := new(Project)
+	root, err := findProjectRoot(c.WorkingDir)
+	if err != nil {
+		return nil, err
+	}
 
-	p.AbsRoot, err = findProjectRoot(c.WorkingDir)
+	p, err := NewProject(root)
 	if err != nil {
 		return nil, err
 	}
@@ -64,9 +66,7 @@ func (c *Ctx) LoadProject() (*Project, error) {
 	// before moving forward
 	p.AbsRoot, c.GOPATH, err = c.ResolveProjectRootAndGOPATH(p.AbsRoot)
 	if err != nil {
-		return nil, errors.Wrapf(err, "resolve project root")
-	} else if c.GOPATH == "" {
-		return nil, errors.New("project not within a GOPATH")
+		return nil, err
 	}
 
 	ip, err := c.SplitAbsoluteProjectRoot(p.AbsRoot)
@@ -179,20 +179,21 @@ func (c *Ctx) detectGOPATH(path string) (string, error) {
 			return gp, nil
 		}
 	}
-
-	return "", errors.Errorf("unable to detect GOPATH for %s", path)
+	return "", errors.Errorf("%s is not within a known GOPATH", path)
 }
 
-// SplitAbsoluteProjectRoot takes an absolute path and compares it against declared
-// GOPATH(s) to determine what portion of the input path should be treated as an
+// SplitAbsoluteProjectRoot takes an absolute path and compares it against the detected
+// GOPATH to determine what portion of the input path should be treated as an
 // import path - as a project root.
-//
-// The second returned string indicates which GOPATH value was used.
 func (c *Ctx) SplitAbsoluteProjectRoot(path string) (string, error) {
+	if c.GOPATH == "" {
+		return "", errors.Errorf("no GOPATH detected in this context")
+	}
+
 	srcprefix := filepath.Join(c.GOPATH, "src") + string(filepath.Separator)
 	if fs.HasFilepathPrefix(path, srcprefix) {
 		if len(path) <= len(srcprefix) {
-			return "", errors.New("dep does not currently support using $GOPATH/src as the project root.")
+			return "", errors.New("dep does not currently support using GOPATH/src as the project root.")
 		}
 
 		// filepath.ToSlash because we're dealing with an import path now,
@@ -200,7 +201,7 @@ func (c *Ctx) SplitAbsoluteProjectRoot(path string) (string, error) {
 		return filepath.ToSlash(path[len(srcprefix):]), nil
 	}
 
-	return "", errors.Errorf("%s not in any $GOPATH", path)
+	return "", errors.Errorf("%s not in any GOPATH", path)
 }
 
 // absoluteProjectRoot determines the absolute path to the project root
