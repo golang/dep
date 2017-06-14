@@ -58,7 +58,7 @@ func NewLockedProjectFeedback(lp gps.LockedProject, depType string) *ConstraintF
 	switch vt := lp.Version().(type) {
 	case gps.PairedVersion:
 		cf.LockedVersion = vt.String()
-		cf.Revision = vt.Underlying().String()
+		cf.Revision = vt.Revision().String()
 	case gps.UnpairedVersion: // Logically this should never occur, but handle for completeness sake
 		cf.LockedVersion = vt.String()
 	case gps.Revision:
