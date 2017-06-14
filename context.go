@@ -15,7 +15,6 @@ import (
 	"github.com/golang/dep/internal/fs"
 	"github.com/golang/dep/internal/gps"
 	"github.com/pkg/errors"
-	"golang.org/x/tools/go/gcimporter15/testdata"
 )
 
 // Ctx defines the supporting context of dep.
@@ -27,7 +26,7 @@ type Ctx struct {
 	Verbose    bool        // Enables more verbose logging.
 }
 
-// SetPaths creates a struct containing path information and loggers.
+// SetPaths sets the WorkingDir and GOPATHS fields.
 func (c *Ctx) SetPaths(wd string, GOPATHs ...string) error {
 	if wd == "" {
 		return errors.New("cannot set Ctx.WorkingDir to an empty path")
@@ -42,6 +41,53 @@ func (c *Ctx) SetPaths(wd string, GOPATHs ...string) error {
 	}
 
 	return nil
+}
+
+// getGOPATH returns the GOPATHs from the passed environment variables.
+// If GOPATH is not defined, fallback to defaultGOPATH().
+func getGOPATHs(env []string) []string {
+	GOPATH := getEnv(env, "GOPATH")
+	if GOPATH == "" {
+		GOPATH = defaultGOPATH()
+	}
+
+	return filepath.SplitList(GOPATH)
+}
+
+// getEnv returns the last instance of an environment variable.
+func getEnv(env []string, key string) string {
+	for i := len(env) - 1; i >= 0; i-- {
+		v := env[i]
+		kv := strings.SplitN(v, "=", 2)
+		if kv[0] == key {
+			if len(kv) > 1 {
+				return kv[1]
+			}
+			return ""
+		}
+	}
+	return ""
+}
+
+// defaultGOPATH gets the default GOPATH that was added in 1.8
+// copied from go/build/build.go
+func defaultGOPATH() string {
+	env := "HOME"
+	if runtime.GOOS == "windows" {
+		env = "USERPROFILE"
+	} else if runtime.GOOS == "plan9" {
+		env = "home"
+	}
+	if home := os.Getenv(env); home != "" {
+		def := filepath.Join(home, "go")
+		if def == runtime.GOROOT() {
+			// Don't set the default GOPATH to GOROOT,
+			// as that will trigger warnings from the go tool.
+			return ""
+		}
+		return def
+	}
+	return ""
 }
 
 func (c *Ctx) SourceManager() (*gps.SourceMgr, error) {
@@ -268,51 +314,4 @@ func contains(a []string, b string) bool {
 		}
 	}
 	return false
-}
-
-// getGOPATH returns the GOPATHs from the passed environment variables.
-// If GOPATH is not defined, fallback to defaultGOPATH().
-func getGOPATHs(env []string) []string {
-	GOPATH := getEnv(env, "GOPATH")
-	if GOPATH == "" {
-		GOPATH = defaultGOPATH()
-	}
-
-	return filepath.SplitList(GOPATH)
-}
-
-// getEnv returns the last instance of an environment variable.
-func getEnv(env []string, key string) string {
-	for i := len(env) - 1; i >= 0; i-- {
-		v := env[i]
-		kv := strings.SplitN(v, "=", 2)
-		if kv[0] == key {
-			if len(kv) > 1 {
-				return kv[1]
-			}
-			return ""
-		}
-	}
-	return ""
-}
-
-// defaultGOPATH gets the default GOPATH that was added in 1.8
-// copied from go/build/build.go
-func defaultGOPATH() string {
-	env := "HOME"
-	if runtime.GOOS == "windows" {
-		env = "USERPROFILE"
-	} else if runtime.GOOS == "plan9" {
-		env = "home"
-	}
-	if home := os.Getenv(env); home != "" {
-		def := filepath.Join(home, "go")
-		if def == runtime.GOROOT() {
-			// Don't set the default GOPATH to GOROOT,
-			// as that will trigger warnings from the go tool.
-			return ""
-		}
-		return def
-	}
-	return ""
 }
