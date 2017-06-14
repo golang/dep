@@ -927,3 +927,35 @@ func TestTypedConstraintString(t *testing.T) {
 		}
 	}
 }
+
+func TestConstraintsEqual(t *testing.T) {
+	for _, test := range []struct {
+		a, b Constraint
+		eq   bool
+	}{
+		{a: NewVersion("test"), b: NewVersion("test"), eq: true},
+		{a: NewVersion("test"), b: NewVersion("test2"), eq: false},
+		{a: NewBranch("test"), b: NewBranch("test"), eq: true},
+		{a: NewBranch("test"), b: newDefaultBranch("test"), eq: false},
+		{a: newDefaultBranch("test"), b: newDefaultBranch("test"), eq: true},
+		{a: Revision("test"), b: Revision("test"), eq: true},
+		{a: Revision("test"), b: Revision("test2"), eq: false},
+		{a: testSemverConstraint(t, "v2.10.7"), b: testSemverConstraint(t, "v2.10.7"), eq: true},
+	} {
+		if test.eq != test.a.equals(test.b) {
+			want := "equal"
+			if !test.eq {
+				want = "not " + want
+			}
+			t.Errorf("expected %s:\n\t(a) %#v\n\t(b) %#v", want, test.a, test.b)
+		}
+	}
+}
+
+func testSemverConstraint(t *testing.T, body string) Constraint {
+	c, err := NewSemverConstraint(body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return c
+}

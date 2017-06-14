@@ -190,6 +190,14 @@ func (r Revision) Intersect(c Constraint) Constraint {
 	return none
 }
 
+func (r Revision) equals(c Constraint) bool {
+	r2, ok := c.(Revision)
+	if !ok {
+		return false
+	}
+	return r == r2
+}
+
 type branchVersion struct {
 	name      string
 	isDefault bool
@@ -274,6 +282,14 @@ func (v branchVersion) Pair(r Revision) PairedVersion {
 	}
 }
 
+func (v branchVersion) equals(c Constraint) bool {
+	v2, ok := c.(branchVersion)
+	if !ok {
+		return false
+	}
+	return v == v2
+}
+
 type plainVersion string
 
 func (v plainVersion) String() string {
@@ -353,6 +369,14 @@ func (v plainVersion) Pair(r Revision) PairedVersion {
 		v: v,
 		r: r,
 	}
+}
+
+func (v plainVersion) equals(c Constraint) bool {
+	v2, ok := c.(plainVersion)
+	if !ok {
+		return false
+	}
+	return v == v2
 }
 
 type semVersion struct {
@@ -444,6 +468,14 @@ func (v semVersion) Pair(r Revision) PairedVersion {
 		v: v,
 		r: r,
 	}
+}
+
+func (v semVersion) equals(c Constraint) bool {
+	v2, ok := c.(semVersion)
+	if !ok {
+		return false
+	}
+	return v == v2
 }
 
 type versionPair struct {
@@ -545,6 +577,17 @@ func (v versionPair) Intersect(c2 Constraint) Constraint {
 	}
 
 	return none
+}
+
+func (v versionPair) equals(c Constraint) bool {
+	v2, ok := c.(versionPair)
+	if !ok {
+		return false
+	}
+	if v.r != v2.r {
+		return false
+	}
+	return v.v.equals(v2.v)
 }
 
 // compareVersionType is a sort func helper that makes a coarse-grained sorting
