@@ -8,16 +8,16 @@ import "testing"
 
 func TestVersionSorts(t *testing.T) {
 	rev := Revision("flooboofoobooo")
-	v1 := NewBranch("master").Is(rev)
-	v2 := NewBranch("test").Is(rev)
-	v3 := NewVersion("1.0.0").Is(rev)
-	v4 := NewVersion("1.0.1").Is(rev)
-	v5 := NewVersion("v2.0.5").Is(rev)
-	v6 := NewVersion("2.0.5.2").Is(rev)
-	v7 := newDefaultBranch("unwrapped").Is(rev)
-	v8 := NewVersion("20.0.5.2").Is(rev)
-	v9 := NewVersion("v1.5.5-beta.4").Is(rev)
-	v10 := NewVersion("v3.0.1-alpha.1").Is(rev)
+	v1 := NewBranch("master").Pair(rev)
+	v2 := NewBranch("test").Pair(rev)
+	v3 := NewVersion("1.0.0").Pair(rev)
+	v4 := NewVersion("1.0.1").Pair(rev)
+	v5 := NewVersion("v2.0.5").Pair(rev)
+	v6 := NewVersion("2.0.5.2").Pair(rev)
+	v7 := newDefaultBranch("unwrapped").Pair(rev)
+	v8 := NewVersion("20.0.5.2").Pair(rev)
+	v9 := NewVersion("v1.5.5-beta.4").Pair(rev)
+	v10 := NewVersion("v3.0.1-alpha.1").Pair(rev)
 
 	start := []Version{
 		v1,
