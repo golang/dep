@@ -151,11 +151,11 @@ func TestGetProjectPropertiesFromVersion(t *testing.T) {
 			want:    wantSemver,
 		},
 		{
-			version: gps.NewBranch("foo-branch").Is("some-revision"),
+			version: gps.NewBranch("foo-branch").Pair("some-revision"),
 			want:    gps.NewBranch("foo-branch"),
 		},
 		{
-			version: gps.NewVersion("foo-version").Is("some-revision"),
+			version: gps.NewVersion("foo-version").Pair("some-revision"),
 			want:    gps.NewVersion("foo-version"),
 		},
 		{
@@ -163,7 +163,7 @@ func TestGetProjectPropertiesFromVersion(t *testing.T) {
 			want:    nil,
 		},
 		{
-			version: gps.NewVersion("v1.0.0").Is("some-revision"),
+			version: gps.NewVersion("v1.0.0").Pair("some-revision"),
 			want:    wantSemver,
 		},
 	}

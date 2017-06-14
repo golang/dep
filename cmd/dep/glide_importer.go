@@ -208,6 +208,9 @@ func (g *glideImporter) buildProjectConstraint(pkg glidePackage) (pc gps.Project
 	pc.Ident = gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot(pkg.Name), Source: pkg.Repository}
 	pc.Constraint, err = deduceConstraint(pkg.Reference, pc.Ident, g.sm)
 
+	f := fb.NewConstraintFeedback(pc, fb.DepTypeImported)
+	f.LogFeedback(g.logger)
+
 	return
 }
 
@@ -226,6 +229,10 @@ func (g *glideImporter) buildLockedProject(pkg glideLockedPackage) gps.LockedPro
 		version = revision
 	}
 
-	feedback(version, pi.ProjectRoot, fb.DepTypeImported, g.logger)
-	return gps.NewLockedProject(pi, version, nil)
+	lp := gps.NewLockedProject(pi, version, nil)
+
+	f := fb.NewLockedProjectFeedback(lp, fb.DepTypeImported)
+	f.LogFeedback(g.logger)
+
+	return lp
 }
