@@ -193,7 +193,7 @@ func testGopkginSourceInteractions(t *testing.T) {
 		}
 
 		// check that an expected rev is present
-		rev := evl[0].(PairedVersion).Underlying()
+		rev := evl[0].(PairedVersion).Revision()
 		is, err := src.revisionPresentIn(rev)
 		if err != nil {
 			t.Errorf("Unexpected error while checking revision presence: %s", err)
