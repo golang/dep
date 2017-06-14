@@ -146,14 +146,14 @@ func (vu versionUnifier) createTypeUnion(id ProjectIdentifier, v Version) versio
 	case Revision:
 		return versionTypeUnion(vu.pairRevision(id, tv))
 	case PairedVersion:
-		return versionTypeUnion(vu.pairRevision(id, tv.Underlying()))
+		return versionTypeUnion(vu.pairRevision(id, tv.Revision()))
 	case UnpairedVersion:
 		pv := vu.pairVersion(id, tv)
 		if pv == nil {
 			return versionTypeUnion{tv}
 		}
 
-		return versionTypeUnion(vu.pairRevision(id, pv.Underlying()))
+		return versionTypeUnion(vu.pairRevision(id, pv.Revision()))
 	}
 
 	return nil

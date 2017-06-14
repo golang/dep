@@ -159,7 +159,7 @@ func lookupVersionForRevision(rev gps.Revision, pi gps.ProjectIdentifier, sm gps
 
 	gps.SortPairedForUpgrade(versions) // Sort versions in asc order
 	for _, v := range versions {
-		if v.Underlying() == rev {
+		if v.Revision() == rev {
 			return v, nil
 		}
 	}

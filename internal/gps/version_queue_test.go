@@ -16,11 +16,11 @@ type fakeBridge struct {
 }
 
 var fakevl = []Version{
-	NewVersion("v2.0.0").Is("200rev"),
-	NewVersion("v1.1.1").Is("111rev"),
-	NewVersion("v1.1.0").Is("110rev"),
-	NewVersion("v1.0.0").Is("100rev"),
-	NewBranch("master").Is("masterrev"),
+	NewVersion("v2.0.0").Pair("200rev"),
+	NewVersion("v1.1.1").Pair("111rev"),
+	NewVersion("v1.1.0").Pair("110rev"),
+	NewVersion("v1.0.0").Pair("100rev"),
+	NewBranch("master").Pair("masterrev"),
 }
 
 func init() {
