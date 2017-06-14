@@ -52,8 +52,8 @@ func TestFeedback_Constraint(t *testing.T) {
 }
 
 func TestFeedback_LockedProject(t *testing.T) {
-	v := gps.NewVersion("v1.1.4").Is("bc29b4f")
-	b := gps.NewBranch("master").Is("436f39d")
+	v := gps.NewVersion("v1.1.4").Pair("bc29b4f")
+	b := gps.NewBranch("master").Pair("436f39d")
 	pi := gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot("github.com/foo/bar")}
 
 	cases := []struct {
