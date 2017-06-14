@@ -239,7 +239,7 @@ func (c *Ctx) VersionInWorkspace(root gps.ProjectRoot) (gps.Version, error) {
 	if contains(tags, ver) {
 		// Assume semver if it starts with a v.
 		if strings.HasPrefix(ver, "v") {
-			return gps.NewVersion(ver).Is(gps.Revision(rev)), nil
+			return gps.NewVersion(ver).Pair(gps.Revision(rev)), nil
 		}
 
 		return nil, errors.Errorf("version for root %s does not start with a v: %q", pr, ver)
@@ -252,7 +252,7 @@ func (c *Ctx) VersionInWorkspace(root gps.ProjectRoot) (gps.Version, error) {
 	}
 	// Try to match the current version to a branch.
 	if contains(branches, ver) {
-		return gps.NewBranch(ver).Is(gps.Revision(rev)), nil
+		return gps.NewBranch(ver).Pair(gps.Revision(rev)), nil
 	}
 
 	return gps.Revision(rev), nil

@@ -6,26 +6,59 @@ _The first rule of FAQ is don't bikeshed the FAQ, leave that for
 Please contribute to the FAQ! Found an explanation in an issue or pull request helpful?
 Summarize the question and quote the reply, linking back to the original comment.
 
+* [Does `dep` replace `go get`?](#does-dep-replace-go-get)
+* [Why is it `dep ensure` instead of `dep install`?](#why-is-it-dep-ensure-instead-of-dep-install)
+
 * [What is the difference between Gopkg.toml (the "manifest") and Gopkg.lock (the "lock")?](#what-is-the-difference-between-gopkgtoml-the-manifest-and-gopkglock-the-lock)
 * [When should I use `constraint`, `override` `required`, or `ignored` in the Gopkg.toml?](#when-should-i-use-constraint-override-required-or-ignored-in-gopkgtoml)
 * [What is a direct or transitive dependency?](#what-is-a-direct-or-transitive-dependency)
-* [Should I commit my vendor directory?](#should-i-commit-my-vendor-directory)
-* [Why is it `dep ensure` instead of `dep install`?](#why-is-it-dep-ensure-instead-of-dep-install)
-* [Does `dep` replace `go get`?](#does-dep-replace-go-get)
+* [How does `dep` decide what version of a dependency to use?](#how-does-dep-decide-what-version-of-a-dependency-to-use)
 * [Why is `dep` ignoring a version constraint in the manifest?](#why-is-dep-ignoring-a-version-constraint-in-the-manifest)
 * [How do I constrain a transitive dependency's version?](#how-do-i-constrain-a-transitive-dependencys-version)
+* [Why did `dep` use a different revision for package X instead of the revision in the lock file?](#why-did-dep-use-a-different-revision-for-package-x-instead-of-the-revision-in-the-lock-file)
+
+* [Should I commit my vendor directory?](#should-i-commit-my-vendor-directory)
 * [`dep` deleted my files in the vendor directory!](#dep-deleted-my-files-in-the-vendor-directory)
 * [Can I put the manifest and lock in the vendor directory?](#can-i-put-the-manifest-and-lock-in-the-vendor-directory)
-* [Why did dep use a different revision for package X instead of the revision in the lock file?](#why-did-dep-use-a-different-revision-for-package-x-instead-of-the-revision-in-the-lock-file)
+* [How can I test changes to a dependency?](#how-can-i-test-changes-to-a-dependency)
+
 * [Why is `dep` slow?](#why-is-dep-slow)
 * [How does `dep` handle symbolic links?](#how-does-dep-handle-symbolic-links)
+
 * [How do I roll releases that `dep` will be able to use?](#how-do-i-roll-releases-that-dep-will-be-able-to-use)
-* [How does `dep` decide what version of a dependency to use?](#how-does-dep-decide-what-version-of-a-dependency-to-use)
 * [What semver version should I use?](#what-semver-version-should-i-use)
 * [Is it OK to make backwards-incompatible changes now?](#is-it-ok-to-make-backwards-incompatible-changes-now)
 * [My dependers don't use `dep` yet. What should I do?](#my-dependers-dont-use-dep-yet-what-should-i-do)
 
-## What is the difference between Gopkg.toml (the "manifest") and Gopkg.lock (the "lock")?
+## Does `dep` replace `go get`?
+
+No, `dep` is an experiment and is still in its infancy. Depending on how this
+experiment goes, it may be considered for inclusion in the go project in some form
+or another in the future but that is not guaranteed.
+
+Here are some suggestions for when you could use `dep` or `go get`:
+> I would say that dep doesn't replace go get, but they both can do similar things. Here's how I use them:
+>
+> `go get`: I want to download the source code for a go project so that I can work on it myself, or to install a tool. This clones the repo under GOPATH for all to use.
+>
+> `dep ensure`: I have imported a new dependency in my code and want to download the dependency so I can start using it. My workflow is "add the import to the code, and then run dep ensure so that the manifest/lock/vendor are updated". This clones the repo under my project's vendor directory, and remembers the revision used so that everyone who works on my project is guaranteed to be using the same version of dependencies.
+-[@carolynvs in #376](https://github.com/golang/dep/issues/376#issuecomment-293964655)
+
+> The long term vision is a sane, overall-consistent go tool. My general take is that `go get`
+> is for people consuming Go code, and dep-family commands are for people developing it.
+-[@sdboyer in #376](https://github.com/golang/dep/issues/376#issuecomment-294045873)
+
+## Why is it `dep ensure` instead of `dep install`?
+
+> Yeah, we went round and round on names. [A lot](https://gist.github.com/jessfraz/315db91b272441f510e81e449f675a8b).
+>
+> The idea of "ensure" is roughly, "ensure that all my local states - code tree, manifest, lock, and vendor - are in sync with each other." When arguments are passed, it becomes "ensure this argument is satisfied, along with synchronization between all my local states."
+>
+> We opted for this approach because we came to the conclusion that allowing the tool to perform partial work/exit in intermediate states ended up creating a tool that had more commands, had far more possible valid exit and input states, and was generally full of footguns. In this approach, the user has most of the same ultimate control, but exercises it differently (by modifying the code/manifest and re-running dep ensure).
+-[@sdboyer in #371](https://github.com/golang/dep/issues/371#issuecomment-293246832)
+
+
+## What is the difference between `Gopkg.toml` (the "manifest") and `Gopkg.lock` (the "lock")?
 
 > The manifest describes user intent, and the lock describes computed outputs. There's flexibility in manifests that isn't present in locks..., as the "branch": "master" constraint will match whatever revision master HAPPENS to be at right now, whereas the lock is nailed down to a specific revision.
 >
@@ -42,47 +75,42 @@ Summarize the question and quote the reply, linking back to the original comment
 ## What is a direct or transitive dependency?
 * Direct dependencies are dependencies that are imported directly by your project: they appear in at least one import statement from your project.
 * Transitive dependencies are the dependencies of your dependencies. Necessary to compile but are not directly used by your code.
+## How does `dep` decide what version of a dependency to use?
 
-## Should I commit my vendor directory?
+The full algorithm is complex, but the most important thing to understand is
+that `dep` tries versions in a [certain
+order](https://godoc.org/github.com/golang/dep/internal/gps#SortForUpgrade),
+checking to see a version is acceptable according to specified constraints.
 
-It's up to you:
+- All semver versions come first, and sort mostly according to the semver 2.0
+  spec, with one exception:
+  - Semver versions with a prerelease are sorted after *all* non-prerelease
+    semver. Within this subset they are sorted first by their numerical
+    component, then lexicographically by their prerelease version.
+- The default branch(es) are next; the semantics of what "default branch" means
+  are specific to the underlying source type, but this is generally what you'd
+  get from a `go get`.
+- All other branches come next, sorted lexicographically.
+- All non-semver versions (tags) are next, sorted lexicographically.
+- Revisions, if any, are last, sorted lexicographically. Revisions do not
+  typically appear in version lists, so the only invariant we maintain is
+  determinism - deeper semantics, like chronology or topology, do not matter.
 
-**Pros**
+So, given a slice of the following versions:
 
-- it's the only way to get truly reproducible builds, as it guards against upstream renames and deletes
-- you don't need an extra `dep ensure` step (to fetch dependencies) on fresh clones to build your repo
+- Branch: `master` `devel`
+- Semver tags: `v1.0.0` `v1.1.0` `v1.1.0-alpha1`
+- Non-semver tags: `footag`
+- Revision: `f6e74e8d`
+Sorting for upgrade will result in the following slice.
 
-**Cons**
+`[v1.1.0 v1.0.0 v1.1.0-alpha1 footag devel master f6e74e8d]`
 
-- your repo will be bigger, potentially a lot bigger
-- PR diffs are more annoying
-
-## Why is it `dep ensure` instead of `dep install`?
-
-> Yeah, we went round and round on names. [A lot](https://gist.github.com/jessfraz/315db91b272441f510e81e449f675a8b).
->
-> The idea of "ensure" is roughly, "ensure that all my local states - code tree, manifest, lock, and vendor - are in sync with each other." When arguments are passed, it becomes "ensure this argument is satisfied, along with synchronization between all my local states."
->
-> We opted for this approach because we came to the conclusion that allowing the tool to perform partial work/exit in intermediate states ended up creating a tool that had more commands, had far more possible valid exit and input states, and was generally full of footguns. In this approach, the user has most of the same ultimate control, but exercises it differently (by modifying the code/manifest and re-running dep ensure).
--[@sdboyer in #371](https://github.com/golang/dep/issues/371#issuecomment-293246832)
-
-## Does `dep` replace `go get`?
-
-No, `dep` is an experiment and is still in its infancy. Depending on how this
-experiment goes, it may be considered for inclusion in the go project in some form
-or another in the future but that is not guaranteed.
-
-Here are some suggestions for when you could use `dep` or `go get`:
-> I would say that dep doesn't replace go get, but they both can do similar things. Here's how I use them:
->
-> `go get`: I want to download the source code for a go project so that I can work on it myself, or to install a tool. This clones the repo under `GOPATH` for all to use.
->
-> `dep ensure`: I have imported a new dependency in my code and want to download the dependency so I can start using it. My workflow is "add the import to the code, and then run dep ensure so that the manifest/lock/vendor are updated". This clones the repo under my project's vendor directory, and remembers the revision used so that everyone who works on my project is guaranteed to be using the same version of dependencies.
--[@carolynvs in #376](https://github.com/golang/dep/issues/376#issuecomment-293964655)
-
-> The long term vision is a sane, overall-consistent go tool. My general take is that `go get`
-> is for people consuming Go code, and dep-family commands are for people developing it.
--[@sdboyer in #376](https://github.com/golang/dep/issues/376#issuecomment-294045873)
+There are a number of factors that can eliminate a version from consideration,
+the simplest of which is that it doesn't match a constraint. But if you're
+trying to figure out why `dep` is doing what it does, understanding that its
+basic action is to attempt versions in this order should help you to reason
+about what's going on.
 
 ## Why is `dep` ignoring a version constraint in the manifest?
 Only your project's directly imported dependencies are affected by a `constraint` entry
@@ -106,7 +134,6 @@ For example:
   name = "github.com/pkg/errors"
   version = "=0.8.0"
 ```
-
 
 ## How do I constrain a transitive dependency's version?
 First, if you're wondering about this because you're trying to keep the version
@@ -136,20 +163,7 @@ behave differently:
 
 Overrides are also discussed with some visuals in [the gps docs](https://github.com/sdboyer/gps/wiki/gps-for-Implementors#overrides).
 
-## `dep` deleted my files in the vendor directory!
-If you just ran `dep init`, there should be a copy of your original vendor directory named `_vendor-TIMESTAMP` in your project root. The other commands do not make a backup before modifying the vendor directory.
-
-> dep assumes complete control of vendor/, and may indeed blow things away if it feels like it.
--[@peterbourgon in #206](https://github.com/golang/dep/issues/206#issuecomment-277139419)
-
-## Can I put the manifest and lock in the vendor directory?
-No.
-
-> Placing these files inside `vendor/` would concretely bind us to `vendor/` in the long term.
-> We prefer to treat the `vendor/` as an implementation detail.
--[@sdboyer on go package management list](https://groups.google.com/d/msg/go-package-management/et1qFUjrkP4/LQFCHP4WBQAJ)
-
-## Why did dep use a different revision for package X instead of the revision in the lock file?
+## Why did `dep` use a different revision for package X instead of the revision in the lock file?
 Sometimes the revision specified in the lock file is no longer valid. There are a few
 ways this can occur:
 
@@ -168,6 +182,43 @@ Unable to update checked out version: fatal: reference is not a tree: 4dfc6a8a7e
 >
 > Under most circumstances, if those arguments don't change, then the lock remains fine and correct. You've hit one one of the few cases where that guarantee doesn't apply. The fact that you ran dep ensure and it DID a solve is a product of some arguments changing; that solving failed because this particular commit had become stale is a separate problem.
 -[@sdboyer in #405](https://github.com/golang/dep/issues/405#issuecomment-295998489)
+
+
+## Should I commit my vendor directory?
+
+It's up to you:
+
+**Pros**
+
+- it's the only way to get truly reproducible builds, as it guards against upstream renames and deletes
+- you don't need an extra `dep ensure` step (to fetch dependencies) on fresh clones to build your repo
+
+**Cons**
+
+- your repo will be bigger, potentially a lot bigger
+- PR diffs are more annoying
+
+## `dep` deleted my files in the vendor directory!
+If you just ran `dep init`, there should be a copy of your original vendor directory named `_vendor-TIMESTAMP` in your project root. The other commands do not make a backup before modifying the vendor directory.
+
+> dep assumes complete control of vendor/, and may indeed blow things away if it feels like it.
+-[@peterbourgon in #206](https://github.com/golang/dep/issues/206#issuecomment-277139419)
+
+## Can I put the manifest and lock in the vendor directory?
+No.
+
+> Placing these files inside `vendor/` would concretely bind us to `vendor/` in the long term.
+> We prefer to treat the `vendor/` as an implementation detail.
+-[@sdboyer on go package management list](https://groups.google.com/d/msg/go-package-management/et1qFUjrkP4/LQFCHP4WBQAJ)
+
+
+## How can I test changes to a dependency?
+
+>  I would recommend against ever working in your vendor directory since dep will overwrite any changes. It’s too easy to lose work that way.
+-[@carolynvs in #706](https://github.com/golang/dep/issues/706#issuecomment-305807261)
+
+If you have a fork, add a `[[constraint]]` entry for the project in `Gopkg.toml` and set `source` to the fork source. This will ensure that `dep` will fetch the project from the fork instead of the original source. 
+Otherwise, if you want to test changes locally, you can delete the package from `vendor/` and make changes directly in `GOPATH/src/*package*` so that your changes are picked up by the go tool chain.
 
 ## Why is `dep` slow?
 
@@ -229,43 +280,6 @@ It's strongly preferred that you use [semver](http://semver.org)-compliant tag
 names. We hope to develop documentation soon that describes this more precisely,
 but in the meantime, the [npm](https://docs.npmjs.com/misc/semver) docs match
 our patterns pretty well.
-
-## How does `dep` decide what version of a dependency to use?
-
-The full algorithm is complex, but the most important thing to understand is
-that `dep` tries versions in a [certain
-order](https://godoc.org/github.com/golang/dep/internal/gps#SortForUpgrade),
-checking to see a version is acceptable according to specified constraints.
-
-- All semver versions come first, and sort mostly according to the semver 2.0
-  spec, with one exception:
-  - Semver versions with a prerelease are sorted after *all* non-prerelease
-    semver. Within this subset they are sorted first by their numerical
-    component, then lexicographically by their prerelease version.
-- The default branch(es) are next; the semantics of what "default branch" means
-  are specific to the underlying source type, but this is generally what you'd
-  get from a `go get`.
-- All other branches come next, sorted lexicographically.
-- All non-semver versions (tags) are next, sorted lexicographically.
-- Revisions, if any, are last, sorted lexicographically. Revisions do not
-  typically appear in version lists, so the only invariant we maintain is
-  determinism - deeper semantics, like chronology or topology, do not matter.
-
-So, given a slice of the following versions:
-
-- Branch: `master` `devel`
-- Semver tags: `v1.0.0` `v1.1.0` `v1.1.0-alpha1`
-- Non-semver tags: `footag`
-- Revision: `f6e74e8d`
-Sorting for upgrade will result in the following slice.
-
-`[v1.1.0 v1.0.0 v1.1.0-alpha1 footag devel master f6e74e8d]`
-
-There are a number of factors that can eliminate a version from consideration,
-the simplest of which is that it doesn't match a constraint. But if you're
-trying to figure out why `dep` is doing what it does, understanding that its
-basic action is to attempt versions in this order should help you to reason
-about what's going on.
 
 ## What semver version should I use?
 

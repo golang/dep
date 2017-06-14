@@ -119,7 +119,7 @@ func TestVersionInWorkspace(t *testing.T) {
 		checkout bool
 	}{
 		"github.com/pkg/errors": {
-			rev:      gps.NewVersion("v0.8.0").Is("645ef00459ed84a119197bfb8d8205042c6df63d"), // semver
+			rev:      gps.NewVersion("v0.8.0").Pair("645ef00459ed84a119197bfb8d8205042c6df63d"), // semver
 			checkout: true,
 		},
 		"github.com/Sirupsen/logrus": {
@@ -127,7 +127,7 @@ func TestVersionInWorkspace(t *testing.T) {
 			checkout: true,
 		},
 		"github.com/rsc/go-get-default-branch": {
-			rev: gps.NewBranch("another-branch").Is("8e6902fdd0361e8fa30226b350e62973e3625ed5"),
+			rev: gps.NewBranch("another-branch").Pair("8e6902fdd0361e8fa30226b350e62973e3625ed5"),
 		},
 	}
 

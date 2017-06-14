@@ -229,7 +229,7 @@ func (s *gitSource) listVersions(ctx context.Context) (vlist []PairedVersion, er
 			v = branchVersion{
 				name:      n,
 				isDefault: isdef,
-			}.Is(rev).(PairedVersion)
+			}.Pair(rev).(PairedVersion)
 
 			vlist[uniq] = v
 			uniq++
@@ -247,7 +247,7 @@ func (s *gitSource) listVersions(ctx context.Context) (vlist []PairedVersion, er
 				// version first. Which should be impossible, but this
 				// covers us in case of weirdness, anyway.
 			}
-			v = NewVersion(vstr).Is(Revision(pair[:40])).(PairedVersion)
+			v = NewVersion(vstr).Pair(Revision(pair[:40])).(PairedVersion)
 			smap[vstr] = true
 			vlist[uniq] = v
 			uniq++
@@ -265,7 +265,7 @@ func (s *gitSource) listVersions(ctx context.Context) (vlist []PairedVersion, er
 			if bv, ok := pv.Unpair().(branchVersion); ok {
 				if bv.name != "master" && bv.isDefault {
 					bv.isDefault = false
-					vlist[k] = bv.Is(pv.Underlying())
+					vlist[k] = bv.Pair(pv.Revision())
 				}
 			}
 		}
@@ -341,7 +341,7 @@ func (s *gopkginSource) listVersions(ctx context.Context) ([]PairedVersion, erro
 		vlist[dbranch] = branchVersion{
 			name:      dbv.v.(branchVersion).name,
 			isDefault: true,
-		}.Is(dbv.r)
+		}.Pair(dbv.r)
 	}
 
 	return vlist, nil
@@ -386,13 +386,13 @@ func (s *bzrSource) listVersions(ctx context.Context) ([]PairedVersion, error) {
 		idx := bytes.IndexByte(line, 32) // space
 		v := NewVersion(string(line[:idx]))
 		r := Revision(bytes.TrimSpace(line[idx:]))
-		vlist = append(vlist, v.Is(r))
+		vlist = append(vlist, v.Pair(r))
 	}
 
 	// Last, add the default branch, hardcoding the visual representation of it
 	// that bzr uses when operating in the workflow mode we're using.
 	v := newDefaultBranch("(default)")
-	vlist = append(vlist, v.Is(Revision(string(branchrev))))
+	vlist = append(vlist, v.Pair(Revision(string(branchrev))))
 
 	return vlist, nil
 }
@@ -443,7 +443,7 @@ func (s *hgSource) listVersions(ctx context.Context) ([]PairedVersion, error) {
 		}
 
 		idx := bytes.IndexByte(pair[0], 32) // space
-		v := NewVersion(string(pair[0][:idx])).Is(Revision(pair[1])).(PairedVersion)
+		v := NewVersion(string(pair[0][:idx])).Pair(Revision(pair[1])).(PairedVersion)
 		vlist = append(vlist, v)
 	}
 
@@ -475,9 +475,9 @@ func (s *hgSource) listVersions(ctx context.Context) ([]PairedVersion, error) {
 			var v PairedVersion
 			if str == "@" {
 				magicAt = true
-				v = newDefaultBranch(str).Is(Revision(pair[1])).(PairedVersion)
+				v = newDefaultBranch(str).Pair(Revision(pair[1])).(PairedVersion)
 			} else {
-				v = NewBranch(str).Is(Revision(pair[1])).(PairedVersion)
+				v = NewBranch(str).Pair(Revision(pair[1])).(PairedVersion)
 			}
 			vlist = append(vlist, v)
 		}
@@ -504,9 +504,9 @@ func (s *hgSource) listVersions(ctx context.Context) ([]PairedVersion, error) {
 		// "default" branch, then mark it as default branch
 		var v PairedVersion
 		if !magicAt && str == "default" {
-			v = newDefaultBranch(str).Is(Revision(pair[1])).(PairedVersion)
+			v = newDefaultBranch(str).Pair(Revision(pair[1])).(PairedVersion)
 		} else {
-			v = NewBranch(str).Is(Revision(pair[1])).(PairedVersion)
+			v = NewBranch(str).Pair(Revision(pair[1])).(PairedVersion)
 		}
 		vlist = append(vlist, v)
 	}

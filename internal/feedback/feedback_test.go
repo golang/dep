@@ -5,47 +5,82 @@
 package feedback
 
 import (
+	"bytes"
+	log2 "log"
+	"strings"
 	"testing"
+
+	"github.com/golang/dep/internal/gps"
 )
 
-func TestGetConstraintString(t *testing.T) {
+func TestFeedback_Constraint(t *testing.T) {
+	ver, _ := gps.NewSemverConstraint("^1.0.0")
+	rev := gps.Revision("1b8edb3")
+	pi := gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot("github.com/foo/bar")}
+
 	cases := []struct {
-		feedback string
+		feedback *ConstraintFeedback
 		want     string
 	}{
 		{
-			feedback: GetUsingFeedback("^1.0.0", ConsTypeConstraint, DepTypeDirect, "github.com/foo/bar"),
+			feedback: NewConstraintFeedback(gps.ProjectConstraint{Constraint: ver, Ident: pi}, DepTypeDirect),
 			want:     "Using ^1.0.0 as constraint for direct dep github.com/foo/bar",
 		},
 		{
-			feedback: GetUsingFeedback("^1.0.0", ConsTypeConstraint, DepTypeImported, "github.com/foo/bar"),
+			feedback: NewConstraintFeedback(gps.ProjectConstraint{Constraint: ver, Ident: pi}, DepTypeImported),
 			want:     "Using ^1.0.0 as initial constraint for imported dep github.com/foo/bar",
 		},
 		{
-			feedback: GetUsingFeedback("1b8edb3", ConsTypeHint, DepTypeDirect, "github.com/bar/baz"),
-			want:     "Using 1b8edb3 as hint for direct dep github.com/bar/baz",
+			feedback: NewConstraintFeedback(gps.ProjectConstraint{Constraint: rev, Ident: pi}, DepTypeDirect),
+			want:     "Using 1b8edb3 as hint for direct dep github.com/foo/bar",
 		},
 		{
-			feedback: GetUsingFeedback("1b8edb3", ConsTypeHint, DepTypeImported, "github.com/bar/baz"),
-			want:     "Using 1b8edb3 as initial hint for imported dep github.com/bar/baz",
-		},
-		{
-			feedback: GetLockingFeedback("v1.1.4", "bc29b4f", DepTypeDirect, "github.com/foo/bar"),
-			want:     "Locking in v1.1.4 (bc29b4f) for direct dep github.com/foo/bar",
-		},
-		{
-			feedback: GetLockingFeedback("v1.1.4", "bc29b4f", DepTypeImported, "github.com/foo/bar"),
-			want:     "Trying v1.1.4 (bc29b4f) as initial lock for imported dep github.com/foo/bar",
-		},
-		{
-			feedback: GetLockingFeedback("master", "436f39d", DepTypeTransitive, "github.com/baz/qux"),
-			want:     "Locking in master (436f39d) for transitive dep github.com/baz/qux",
+			feedback: NewConstraintFeedback(gps.ProjectConstraint{Constraint: rev, Ident: pi}, DepTypeImported),
+			want:     "Using 1b8edb3 as initial hint for imported dep github.com/foo/bar",
 		},
 	}
 
 	for _, c := range cases {
-		if c.want != c.feedback {
-			t.Errorf("Feedbacks are not expected: \n\t(GOT) %v\n\t(WNT) %v", c.feedback, c.want)
+		buf := &bytes.Buffer{}
+		log := log2.New(buf, "", 0)
+		c.feedback.LogFeedback(log)
+		got := strings.TrimSpace(buf.String())
+		if c.want != got {
+			t.Errorf("Feedbacks are not expected: \n\t(GOT) '%s'\n\t(WNT) '%s'", got, c.want)
+		}
+	}
+}
+
+func TestFeedback_LockedProject(t *testing.T) {
+	v := gps.NewVersion("v1.1.4").Pair("bc29b4f")
+	b := gps.NewBranch("master").Pair("436f39d")
+	pi := gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot("github.com/foo/bar")}
+
+	cases := []struct {
+		feedback *ConstraintFeedback
+		want     string
+	}{
+		{
+			feedback: NewLockedProjectFeedback(gps.NewLockedProject(pi, v, nil), DepTypeDirect),
+			want:     "Locking in v1.1.4 (bc29b4f) for direct dep github.com/foo/bar",
+		},
+		{
+			feedback: NewLockedProjectFeedback(gps.NewLockedProject(pi, v, nil), DepTypeImported),
+			want:     "Trying v1.1.4 (bc29b4f) as initial lock for imported dep github.com/foo/bar",
+		},
+		{
+			feedback: NewLockedProjectFeedback(gps.NewLockedProject(pi, b, nil), DepTypeTransitive),
+			want:     "Locking in master (436f39d) for transitive dep github.com/foo/bar",
+		},
+	}
+
+	for _, c := range cases {
+		buf := &bytes.Buffer{}
+		log := log2.New(buf, "", 0)
+		c.feedback.LogFeedback(log)
+		got := strings.TrimSpace(buf.String())
+		if c.want != got {
+			t.Errorf("Feedbacks are not expected: \n\t(GOT) '%s'\n\t(WNT) '%s'", got, c.want)
 		}
 	}
 }

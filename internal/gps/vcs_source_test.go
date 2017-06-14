@@ -105,13 +105,13 @@ func testGitSourceInteractions(t *testing.T) {
 	} else {
 		SortForUpgrade(vlist)
 		evl := []Version{
-			NewVersion("v2.0.0").Is(Revision("4a54adf81c75375d26d376459c00d5ff9b703e5e")),
-			NewVersion("v1.1.0").Is(Revision("b2cb48dda625f6640b34d9ffb664533359ac8b91")),
-			NewVersion("v1.0.0").Is(Revision("bf85021c0405edbc4f3648b0603818d641674f72")),
-			newDefaultBranch("master").Is(Revision("bf85021c0405edbc4f3648b0603818d641674f72")),
-			NewBranch("v1").Is(Revision("e3777f683305eafca223aefe56b4e8ecf103f467")),
-			NewBranch("v1.1").Is(Revision("f1fbc520489a98306eb28c235204e39fa8a89c84")),
-			NewBranch("v3").Is(Revision("4a54adf81c75375d26d376459c00d5ff9b703e5e")),
+			NewVersion("v2.0.0").Pair(Revision("4a54adf81c75375d26d376459c00d5ff9b703e5e")),
+			NewVersion("v1.1.0").Pair(Revision("b2cb48dda625f6640b34d9ffb664533359ac8b91")),
+			NewVersion("v1.0.0").Pair(Revision("bf85021c0405edbc4f3648b0603818d641674f72")),
+			newDefaultBranch("master").Pair(Revision("bf85021c0405edbc4f3648b0603818d641674f72")),
+			NewBranch("v1").Pair(Revision("e3777f683305eafca223aefe56b4e8ecf103f467")),
+			NewBranch("v1.1").Pair(Revision("f1fbc520489a98306eb28c235204e39fa8a89c84")),
+			NewBranch("v3").Pair(Revision("4a54adf81c75375d26d376459c00d5ff9b703e5e")),
 		}
 		if !reflect.DeepEqual(vlist, evl) {
 			t.Errorf("Version list was not what we expected:\n\t(GOT): %s\n\t(WNT): %s", vlist, evl)
@@ -193,7 +193,7 @@ func testGopkginSourceInteractions(t *testing.T) {
 		}
 
 		// check that an expected rev is present
-		rev := evl[0].(PairedVersion).Underlying()
+		rev := evl[0].(PairedVersion).Revision()
 		is, err := src.revisionPresentIn(rev)
 		if err != nil {
 			t.Errorf("Unexpected error while checking revision presence: %s", err)
@@ -246,31 +246,31 @@ func testGopkginSourceInteractions(t *testing.T) {
 	wg.Add(4)
 	go func() {
 		tfunc("gopkg.in/sdboyer/gpkt.v1", "github.com/sdboyer/gpkt", 1, []Version{
-			NewVersion("v1.1.0").Is(Revision("b2cb48dda625f6640b34d9ffb664533359ac8b91")),
-			NewVersion("v1.0.0").Is(Revision("bf85021c0405edbc4f3648b0603818d641674f72")),
-			newDefaultBranch("v1.1").Is(Revision("f1fbc520489a98306eb28c235204e39fa8a89c84")),
-			NewBranch("v1").Is(Revision("e3777f683305eafca223aefe56b4e8ecf103f467")),
+			NewVersion("v1.1.0").Pair(Revision("b2cb48dda625f6640b34d9ffb664533359ac8b91")),
+			NewVersion("v1.0.0").Pair(Revision("bf85021c0405edbc4f3648b0603818d641674f72")),
+			newDefaultBranch("v1.1").Pair(Revision("f1fbc520489a98306eb28c235204e39fa8a89c84")),
+			NewBranch("v1").Pair(Revision("e3777f683305eafca223aefe56b4e8ecf103f467")),
 		})
 		wg.Done()
 	}()
 
 	go func() {
 		tfunc("gopkg.in/sdboyer/gpkt.v2", "github.com/sdboyer/gpkt", 2, []Version{
-			NewVersion("v2.0.0").Is(Revision("4a54adf81c75375d26d376459c00d5ff9b703e5e")),
+			NewVersion("v2.0.0").Pair(Revision("4a54adf81c75375d26d376459c00d5ff9b703e5e")),
 		})
 		wg.Done()
 	}()
 
 	go func() {
 		tfunc("gopkg.in/sdboyer/gpkt.v3", "github.com/sdboyer/gpkt", 3, []Version{
-			newDefaultBranch("v3").Is(Revision("4a54adf81c75375d26d376459c00d5ff9b703e5e")),
+			newDefaultBranch("v3").Pair(Revision("4a54adf81c75375d26d376459c00d5ff9b703e5e")),
 		})
 		wg.Done()
 	}()
 
 	go func() {
 		tfunc("github.com/sdboyer/gpkt2.v1-unstable", "github.com/sdboyer/gpkt2", 1, []Version{
-			newDefaultBranch("v1-unstable").Is(Revision("24de0be8f4a0b8a44321562117749b257bfcef69")),
+			newDefaultBranch("v1-unstable").Pair(Revision("24de0be8f4a0b8a44321562117749b257bfcef69")),
 		})
 		wg.Done()
 	}()
@@ -336,8 +336,8 @@ func testBzrSourceInteractions(t *testing.T) {
 		t.Errorf("Expected %s as source URL, got %s", un, src.upstreamURL())
 	}
 	evl := []Version{
-		NewVersion("1.0.0").Is(Revision("matt@mattfarina.com-20150731135137-pbphasfppmygpl68")),
-		newDefaultBranch("(default)").Is(Revision("matt@mattfarina.com-20150731135137-pbphasfppmygpl68")),
+		NewVersion("1.0.0").Pair(Revision("matt@mattfarina.com-20150731135137-pbphasfppmygpl68")),
+		newDefaultBranch("(default)").Pair(Revision("matt@mattfarina.com-20150731135137-pbphasfppmygpl68")),
 	}
 
 	// check that an expected rev is present
@@ -501,20 +501,20 @@ func testHgSourceInteractions(t *testing.T) {
 	donech := make(chan struct{})
 	go func() {
 		tfunc("bitbucket.org/sdboyer/withbm", []Version{
-			NewVersion("v1.0.0").Is(Revision("aa110802a0c64195d0a6c375c9f66668827c90b4")),
-			newDefaultBranch("@").Is(Revision("b10d05d581e5401f383e48ccfeb84b48fde99d06")),
-			NewBranch("another").Is(Revision("b10d05d581e5401f383e48ccfeb84b48fde99d06")),
-			NewBranch("default").Is(Revision("3d466f437f6616da594bbab6446cc1cb4328d1bb")),
-			NewBranch("newbranch").Is(Revision("5e2a01be9aee942098e44590ae545c7143da9675")),
+			NewVersion("v1.0.0").Pair(Revision("aa110802a0c64195d0a6c375c9f66668827c90b4")),
+			newDefaultBranch("@").Pair(Revision("b10d05d581e5401f383e48ccfeb84b48fde99d06")),
+			NewBranch("another").Pair(Revision("b10d05d581e5401f383e48ccfeb84b48fde99d06")),
+			NewBranch("default").Pair(Revision("3d466f437f6616da594bbab6446cc1cb4328d1bb")),
+			NewBranch("newbranch").Pair(Revision("5e2a01be9aee942098e44590ae545c7143da9675")),
 		})
 		close(donech)
 	}()
 
 	tfunc("bitbucket.org/sdboyer/nobm", []Version{
-		NewVersion("v1.0.0").Is(Revision("aa110802a0c64195d0a6c375c9f66668827c90b4")),
-		newDefaultBranch("default").Is(Revision("3d466f437f6616da594bbab6446cc1cb4328d1bb")),
-		NewBranch("another").Is(Revision("b10d05d581e5401f383e48ccfeb84b48fde99d06")),
-		NewBranch("newbranch").Is(Revision("5e2a01be9aee942098e44590ae545c7143da9675")),
+		NewVersion("v1.0.0").Pair(Revision("aa110802a0c64195d0a6c375c9f66668827c90b4")),
+		newDefaultBranch("default").Pair(Revision("3d466f437f6616da594bbab6446cc1cb4328d1bb")),
+		NewBranch("another").Pair(Revision("b10d05d581e5401f383e48ccfeb84b48fde99d06")),
+		NewBranch("newbranch").Pair(Revision("5e2a01be9aee942098e44590ae545c7143da9675")),
 	})
 
 	<-donech

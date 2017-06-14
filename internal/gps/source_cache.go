@@ -149,7 +149,7 @@ func (c *singleSourceCacheMemory) storeVersionMap(versionList []PairedVersion, f
 
 	for _, v := range versionList {
 		pv := v.(PairedVersion)
-		u, r := pv.Unpair(), pv.Underlying()
+		u, r := pv.Unpair(), pv.Revision()
 		c.vMap[u] = r
 		c.rMap[r] = append(c.rMap[r], u)
 	}
@@ -174,7 +174,7 @@ func (c *singleSourceCacheMemory) getVersionsFor(r Revision) ([]UnpairedVersion,
 func (c *singleSourceCacheMemory) getAllVersions() []PairedVersion {
 	vlist := make([]PairedVersion, 0, len(c.vMap))
 	for v, r := range c.vMap {
-		vlist = append(vlist, v.Is(r))
+		vlist = append(vlist, v.Pair(r))
 	}
 	return vlist
 }
@@ -191,7 +191,7 @@ func (c *singleSourceCacheMemory) toRevision(v Version) (Revision, bool) {
 	case Revision:
 		return t, true
 	case PairedVersion:
-		return t.Underlying(), true
+		return t.Revision(), true
 	case UnpairedVersion:
 		c.mut.Lock()
 		r, has := c.vMap[t]

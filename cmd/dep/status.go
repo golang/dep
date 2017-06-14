@@ -328,7 +328,7 @@ func runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceMana
 				bs.Revision = tv
 			case gps.PairedVersion:
 				bs.Version = tv.Unpair()
-				bs.Revision = tv.Underlying()
+				bs.Revision = tv.Revision()
 			}
 
 			// Check if the manifest has an override for this project. If so,
@@ -364,7 +364,7 @@ func runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceMana
 						// upgrade, the first version we encounter that
 						// matches our constraint will be what we want.
 						if c.Constraint.Matches(v) {
-							bs.Latest = v.Underlying()
+							bs.Latest = v.Revision()
 							break
 						}
 					}

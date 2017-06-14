@@ -36,7 +36,7 @@ func TestLockedProjectsEq(t *testing.T) {
 		NewLockedProject(mkPI("github.com/sdboyer/gps"), NewVersion("v0.10.0"), []string{"gps", "flugle"}),
 		NewLockedProject(mkPI("foo"), NewVersion("nada"), []string{"foo"}),
 		NewLockedProject(mkPI("github.com/sdboyer/gps"), NewVersion("v0.10.0"), []string{"flugle", "gps"}),
-		NewLockedProject(mkPI("github.com/sdboyer/gps"), NewVersion("v0.10.0").Is("278a227dfc3d595a33a77ff3f841fd8ca1bc8cd0"), []string{"gps"}),
+		NewLockedProject(mkPI("github.com/sdboyer/gps"), NewVersion("v0.10.0").Pair("278a227dfc3d595a33a77ff3f841fd8ca1bc8cd0"), []string{"gps"}),
 		NewLockedProject(mkPI("github.com/sdboyer/gps"), NewVersion("v0.11.0"), []string{"gps"}),
 		NewLockedProject(mkPI("github.com/sdboyer/gps"), Revision("278a227dfc3d595a33a77ff3f841fd8ca1bc8cd0"), []string{"gps"}),
 	}
@@ -81,9 +81,9 @@ func TestLockedProjectsEq(t *testing.T) {
 }
 
 func TestLocksAreEq(t *testing.T) {
-	gpl := NewLockedProject(mkPI("github.com/sdboyer/gps"), NewVersion("v0.10.0").Is("278a227dfc3d595a33a77ff3f841fd8ca1bc8cd0"), []string{"gps"})
+	gpl := NewLockedProject(mkPI("github.com/sdboyer/gps"), NewVersion("v0.10.0").Pair("278a227dfc3d595a33a77ff3f841fd8ca1bc8cd0"), []string{"gps"})
 	svpl := NewLockedProject(mkPI("github.com/Masterminds/semver"), NewVersion("v2.0.0"), []string{"semver"})
-	bbbt := NewLockedProject(mkPI("github.com/beeblebrox/browntown"), NewBranch("master").Is("63fc17eb7966a6f4cc0b742bf42731c52c4ac740"), []string{"browntown", "smoochies"})
+	bbbt := NewLockedProject(mkPI("github.com/beeblebrox/browntown"), NewBranch("master").Pair("63fc17eb7966a6f4cc0b742bf42731c52c4ac740"), []string{"browntown", "smoochies"})
 
 	l1 := solution{
 		hd: []byte("foo"),
