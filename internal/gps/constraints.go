@@ -52,6 +52,9 @@ type Constraint interface {
 	// It also forces Constraint to be a private/sealed interface, which is a
 	// design goal of the system.
 	typedString() string
+
+	// equals returns true if the constraints are logically equivalent.
+	equals(Constraint) bool
 }
 
 // NewSemverConstraint attempts to construct a semver Constraint object from the
@@ -172,6 +175,14 @@ func (c semverConstraint) Intersect(c2 Constraint) Constraint {
 	return none
 }
 
+func (c semverConstraint) equals(c2 Constraint) bool {
+	sc2, ok := c2.(semverConstraint)
+	if !ok {
+		return false
+	}
+	return c.c.String() == sc2.c.String()
+}
+
 // IsAny indicates if the provided constraint is the wildcard "Any" constraint.
 func IsAny(c Constraint) bool {
 	_, ok := c.(anyConstraint)
@@ -211,6 +222,10 @@ func (anyConstraint) Intersect(c Constraint) Constraint {
 	return c
 }
 
+func (anyConstraint) equals(c Constraint) bool {
+	return IsAny(c)
+}
+
 // noneConstraint is the empty set - it matches no versions. It mirrors the
 // behavior of the semver package's none type.
 type noneConstraint struct{}
@@ -237,6 +252,11 @@ func (noneConstraint) MatchesAny(Constraint) bool {
 
 func (noneConstraint) Intersect(Constraint) Constraint {
 	return none
+}
+
+func (noneConstraint) equals(c Constraint) bool {
+	_, ok := c.(noneConstraint)
+	return ok
 }
 
 // A ProjectConstraint combines a ProjectIdentifier with a Constraint. It

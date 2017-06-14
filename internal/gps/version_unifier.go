@@ -269,3 +269,12 @@ func (vtu versionTypeUnion) Intersect(c Constraint) Constraint {
 
 	return none
 }
+
+func (vtu versionTypeUnion) equals(c Constraint) bool {
+	for _, v := range vtu {
+		if v.equals(c) {
+			return true
+		}
+	}
+	return false
+}
