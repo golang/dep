@@ -52,24 +52,21 @@ type Project struct {
 	Lock       *Lock // Optional
 }
 
-// NewProject initialize a new project with the passed root. If the root is a symlink, it
-// attempts to resolve it.
-func NewProject(root string) (*Project, error) {
-	project := &Project{
-		AbsRoot:         root,
-		ResolvedAbsRoot: root,
-	}
+// SetRoot set the project AbsRoot. If the root is a symlink, it attempts to resolve it.
+func (p *Project) SetRoot(root string) error {
+	p.AbsRoot = root
+	p.ResolvedAbsRoot = root
 
 	// if p.AbsRoot is a symlink, set p.ResolvedAbsRoot to the resolved path.
-	if sym, err := fs.IsSymlink(project.AbsRoot); err != nil {
-		return &Project{}, err
+	if sym, err := fs.IsSymlink(p.AbsRoot); err != nil {
+		return err
 	} else if sym {
-		if project.ResolvedAbsRoot, err = filepath.EvalSymlinks(project.AbsRoot); err != nil {
-			return &Project{}, nil
+		if p.ResolvedAbsRoot, err = filepath.EvalSymlinks(p.AbsRoot); err != nil {
+			return err
 		}
 	}
 
-	return project, nil
+	return nil
 }
 
 // MakeParams is a simple helper to create a gps.SolveParameters without setting

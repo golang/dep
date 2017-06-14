@@ -77,8 +77,9 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 		}
 	}
 
-	p, err := dep.NewProject(root)
-	if err != nil {
+	var err error
+	p := new(dep.Project)
+	if err = p.SetRoot(root); err != nil {
 		return errors.Wrap(err, "NewProject")
 	}
 
