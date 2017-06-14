@@ -49,8 +49,8 @@ func TestSplitAbsoluteProjectRoot(t *testing.T) {
 
 	// test where it should return an error when directly within $GOPATH/src
 	got, err := depCtx.SplitAbsoluteProjectRoot(filepath.Join(depCtx.GOPATH, "src"))
-	if err == nil || !strings.Contains(err.Error(), "$GOPATH/src") {
-		t.Fatalf("should have gotten an error for use directly in $GOPATH/src, but got %s", got)
+	if err == nil || !strings.Contains(err.Error(), "GOPATH/src") {
+		t.Fatalf("should have gotten an error for use directly in GOPATH/src, but got %s", got)
 	}
 
 	// test where it should return an error

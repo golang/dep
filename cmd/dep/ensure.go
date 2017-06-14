@@ -124,7 +124,8 @@ func (cmd *ensureCommand) Run(ctx *dep.Ctx, args []string) error {
 	if ctx.Verbose {
 		params.TraceLogger = ctx.Err
 	}
-	params.RootPackageTree, err = pkgtree.ListPackages(p.ResolvedAbsRoot(), string(p.ImportRoot))
+
+	params.RootPackageTree, err = pkgtree.ListPackages(p.ResolvedAbsRoot, string(p.ImportRoot))
 	if err != nil {
 		return errors.Wrap(err, "ensure ListPackage for project")
 	}
