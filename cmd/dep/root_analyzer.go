@@ -141,13 +141,16 @@ func (a *rootAnalyzer) FinalizeRootManifestAndLock(m *dep.Manifest, l *dep.Lock)
 	}
 }
 
-func (a *rootAnalyzer) Info() (string, int) {
+func (a *rootAnalyzer) Info() gps.ProjectAnalyzerInfo {
 	name := "dep"
 	version := 1
 	if !a.skipTools {
 		name = "dep+import"
 	}
-	return name, version
+	return gps.ProjectAnalyzerInfo{
+		Name:    name,
+		Version: version,
+	}
 }
 
 func lookupVersionForRevision(rev gps.Revision, pi gps.ProjectIdentifier, sm gps.SourceManager) (gps.Version, error) {
