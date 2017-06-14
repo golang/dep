@@ -76,15 +76,19 @@ func (sf sourceFailures) Error() string {
 	return buf.String()
 }
 
+// sourceCachePath returns a url-sanitized source cache dir path.
+func sourceCachePath(cacheDir, sourceURL string) string {
+	return filepath.Join(cacheDir, "sources", sanitizer.Replace(sourceURL))
+}
+
 type maybeGitSource struct {
 	url *url.URL
 }
 
 func (m maybeGitSource) try(ctx context.Context, cachedir string, c singleSourceCache, superv *supervisor) (source, sourceState, error) {
 	ustr := m.url.String()
-	path := filepath.Join(cachedir, "sources", sanitizer.Replace(ustr))
 
-	r, err := newCtxRepo(vcs.Git, ustr, path)
+	r, err := newCtxRepo(vcs.Git, ustr, sourceCachePath(cachedir, ustr))
 
 	if err != nil {
 		return nil, 0, unwrapVcsErr(err)
@@ -140,7 +144,7 @@ func (m maybeGopkginSource) try(ctx context.Context, cachedir string, c singleSo
 	// We don't actually need a fully consistent transform into the on-disk path
 	// - just something that's unique to the particular gopkg.in domain context.
 	// So, it's OK to just dumb-join the scheme with the path.
-	path := filepath.Join(cachedir, "sources", sanitizer.Replace(m.url.Scheme+"/"+m.opath))
+	path := sourceCachePath(cachedir, m.url.Scheme+"/"+m.opath)
 	ustr := m.url.String()
 	r, err := newCtxRepo(vcs.Git, ustr, path)
 
@@ -189,9 +193,8 @@ type maybeBzrSource struct {
 
 func (m maybeBzrSource) try(ctx context.Context, cachedir string, c singleSourceCache, superv *supervisor) (source, sourceState, error) {
 	ustr := m.url.String()
-	path := filepath.Join(cachedir, "sources", sanitizer.Replace(ustr))
 
-	r, err := newCtxRepo(vcs.Bzr, ustr, path)
+	r, err := newCtxRepo(vcs.Bzr, ustr, sourceCachePath(cachedir, ustr))
 
 	if err != nil {
 		return nil, 0, unwrapVcsErr(err)
@@ -231,9 +234,8 @@ type maybeHgSource struct {
 
 func (m maybeHgSource) try(ctx context.Context, cachedir string, c singleSourceCache, superv *supervisor) (source, sourceState, error) {
 	ustr := m.url.String()
-	path := filepath.Join(cachedir, "sources", sanitizer.Replace(ustr))
 
-	r, err := newCtxRepo(vcs.Hg, ustr, path)
+	r, err := newCtxRepo(vcs.Hg, ustr, sourceCachePath(cachedir, ustr))
 
 	if err != nil {
 		return nil, 0, unwrapVcsErr(err)
