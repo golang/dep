@@ -79,9 +79,12 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 
 	p, err := dep.NewProject(root)
 	if err != nil {
-		return errors.Wrapf(err, "resolve project root")
-	} else if ctx.GOPATH == "" {
-		return errors.New("project not within a GOPATH")
+		return errors.Wrap(err, "NewProject")
+	}
+
+	ctx.GOPATH, err = ctx.DetectProjectGOPATH(p)
+	if err != nil {
+		return errors.Wrapf(err, "ctx.DetectProjectGOPATH")
 	}
 
 	mf := filepath.Join(root, dep.ManifestName)

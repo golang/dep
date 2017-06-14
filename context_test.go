@@ -353,7 +353,7 @@ func TestCaseInsentitiveGOPATH(t *testing.T) {
 	}
 }
 
-func TestResolveProjectRootAndGOPATH(t *testing.T) {
+func TestDetectProjectGOPATH(t *testing.T) {
 	tg := test.NewHelper(t)
 	defer tg.Cleanup()
 
@@ -377,35 +377,35 @@ func TestResolveProjectRootAndGOPATH(t *testing.T) {
 		name         string
 		path         string
 		resolvedPath string
-		gopath       string
+		GOPATH       string
 		symlink      bool
 		expectErr    bool
 	}{
 		{
-			name:         "no-symlinks",
+			name:         "no-symlink",
 			path:         filepath.Join(ctx.GOPATHs[0], "src/real/path"),
-			resolvedPath: filepath.Join(ctx.GOPATHs[0], "src/real/path"),
-			gopath:       ctx.GOPATHs[0],
+			resolvedPath: "",
+			GOPATH:       ctx.GOPATHs[0],
 		},
 		{
 			name:         "symlink-outside-gopath",
 			path:         filepath.Join(tg.Path("."), "sym/symlink"),
 			resolvedPath: filepath.Join(ctx.GOPATHs[0], "src/real/path"),
-			gopath:       ctx.GOPATHs[0],
+			GOPATH:       ctx.GOPATHs[0],
 			symlink:      true,
 		},
 		{
 			name:         "symlink-in-another-gopath",
 			path:         filepath.Join(tg.Path("."), "sym/symtwo"),
 			resolvedPath: filepath.Join(ctx.GOPATHs[1], "src/real/path"),
-			gopath:       ctx.GOPATHs[1],
+			GOPATH:       ctx.GOPATHs[1],
 			symlink:      true,
 		},
 		{
 			name:         "symlink-in-gopath",
 			path:         filepath.Join(ctx.GOPATHs[0], "src/sym/path"),
 			resolvedPath: filepath.Join(ctx.GOPATHs[0], "src/real/path"),
-			gopath:       ctx.GOPATHs[0],
+			GOPATH:       ctx.GOPATHs[0],
 			symlink:      true,
 			expectErr:    true,
 		},
@@ -413,17 +413,12 @@ func TestResolveProjectRootAndGOPATH(t *testing.T) {
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			if tc.symlink {
-				if err := os.Symlink(tc.resolvedPath, tc.path); err != nil {
-					if runtime.GOOS == "windows" {
-						t.Skipf("Not testing Windows symlinks because: %s", err)
-					} else {
-						t.Fatal(err)
-					}
-				}
+			project := &Project{
+				AbsRoot:         tc.path,
+				ResolvedAbsRoot: tc.resolvedPath,
 			}
 
-			p, gp, err := ctx.ResolveProjectRootAndGOPATH(tc.path)
+			GOPATH, err := ctx.DetectProjectGOPATH(project)
 			if err != nil {
 				if !tc.expectErr {
 					t.Fatalf("Error resolving project root: %s", err)
@@ -433,17 +428,14 @@ func TestResolveProjectRootAndGOPATH(t *testing.T) {
 			if err == nil && tc.expectErr {
 				t.Fatal("Wanted an error")
 			}
-			if gp != tc.gopath {
-				t.Errorf("Want go path to be %s, got %s", tc.gopath, gp)
-			}
-			if p != tc.resolvedPath {
-				t.Errorf("Want path to be %s, got %s", tc.resolvedPath, p)
+			if GOPATH != tc.GOPATH {
+				t.Errorf("Want go path to be %s, got %s", tc.GOPATH, GOPATH)
 			}
 		})
 	}
 }
 
-func TestDetectGoPath(t *testing.T) {
+func TestDetectGOPATH(t *testing.T) {
 	th := test.NewHelper(t)
 	defer th.Cleanup()
 
@@ -456,7 +448,7 @@ func TestDetectGoPath(t *testing.T) {
 	}}
 
 	testcases := []struct {
-		gopath string
+		GOPATH string
 		path   string
 		err    bool
 	}{
@@ -467,12 +459,12 @@ func TestDetectGoPath(t *testing.T) {
 	}
 
 	for _, tc := range testcases {
-		gopath, err := ctx.detectGOPATH(tc.path)
+		GOPATH, err := ctx.detectGOPATH(tc.path)
 		if tc.err && err == nil {
 			t.Error("Expected error but got none")
 		}
-		if gopath != tc.gopath {
-			t.Errorf("Expected GOPATH to be %s, got %s", gopath, tc.gopath)
+		if GOPATH != tc.GOPATH {
+			t.Errorf("Expected GOPATH to be %s, got %s", GOPATH, tc.GOPATH)
 		}
 	}
 }
