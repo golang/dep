@@ -276,7 +276,7 @@ func (sg *sourceGateway) getManifestAndLock(ctx context.Context, pr ProjectRoot,
 		return nil, nil, err
 	}
 
-	m, l, has := sg.cache.getManifestAndLock(r, an)
+	m, l, has := sg.cache.getManifestAndLock(r, an.Info())
 	if has {
 		return m, l, nil
 	}
@@ -286,8 +286,7 @@ func (sg *sourceGateway) getManifestAndLock(ctx context.Context, pr ProjectRoot,
 		return nil, nil, err
 	}
 
-	name, vers := an.Info()
-	label := fmt.Sprintf("%s:%s.%v", sg.src.upstreamURL(), name, vers)
+	label := fmt.Sprintf("%s:%s", sg.src.upstreamURL(), an.Info())
 	err = sg.suprvsr.do(ctx, label, ctGetManifestAndLock, func(ctx context.Context) error {
 		m, l, err = sg.src.getManifestAndLock(ctx, pr, r, an)
 		return err
@@ -317,7 +316,7 @@ func (sg *sourceGateway) getManifestAndLock(ctx context.Context, pr ProjectRoot,
 		return nil, nil, err
 	}
 
-	sg.cache.setManifestAndLock(r, an, m, l)
+	sg.cache.setManifestAndLock(r, an.Info(), m, l)
 	return m, l, nil
 }
 

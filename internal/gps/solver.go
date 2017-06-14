@@ -405,7 +405,7 @@ func (s *solver) Solve() (Solution, error) {
 			att:  s.attempts,
 			solv: s,
 		}
-		soln.analyzerName, soln.analyzerVersion = s.rd.an.Info()
+		soln.analyzerInfo = s.rd.an.Info()
 		soln.hd = s.HashInputs()
 
 		// Convert ProjectAtoms into LockedProjects
