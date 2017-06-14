@@ -12,7 +12,7 @@ import (
 // gu - helper func for stringifying what we assume is a VersionPair (otherwise
 // will panic), but is given as a Constraint
 func gu(v Constraint) string {
-	return fmt.Sprintf("%q at rev %q", v, v.(PairedVersion).Underlying())
+	return fmt.Sprintf("%q at rev %q", v, v.(PairedVersion).Revision())
 }
 
 func TestBranchConstraintOps(t *testing.T) {

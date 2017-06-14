@@ -150,7 +150,7 @@ func TestGodepConfig_ConvertProject(t *testing.T) {
 		t.Fatalf("Expected locked version to be PairedVersion but got %T", lv)
 	}
 
-	rev := lpv.Underlying()
+	rev := lpv.Revision()
 	if rev != "ff2948a2ac8f538c4ecd55962e919d1e13e74baf" {
 		t.Fatalf("Expected locked revision to be 'ff2948a2ac8f538c4ecd55962e919d1e13e74baf', got %s", rev)
 	}
@@ -208,7 +208,7 @@ func TestGodepConfig_ConvertProject_EmptyComment(t *testing.T) {
 		t.Fatalf("Expected locked version to be PairedVersion but got %T", lv)
 	}
 
-	rev := lpv.Underlying()
+	rev := lpv.Revision()
 	if rev != "ff2948a2ac8f538c4ecd55962e919d1e13e74baf" {
 		t.Fatalf("Expected locked revision to be 'ff2948a2ac8f538c4ecd55962e919d1e13e74baf', got %s", rev)
 	}

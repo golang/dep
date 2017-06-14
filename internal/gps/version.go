@@ -47,8 +47,8 @@ type Version interface {
 type PairedVersion interface {
 	Version
 
-	// Underlying returns the immutable Revision that identifies this Version.
-	Underlying() Revision
+	// Revision returns the immutable Revision that identifies this Version.
+	Revision() Revision
 
 	// Unpair returns the surface-level UnpairedVersion that half of the pair.
 	//
@@ -460,14 +460,14 @@ func (v versionPair) ImpliedCaretString() string {
 }
 
 func (v versionPair) typedString() string {
-	return fmt.Sprintf("%s-%s", v.Unpair().typedString(), v.Underlying().typedString())
+	return fmt.Sprintf("%s-%s", v.Unpair().typedString(), v.Revision().typedString())
 }
 
 func (v versionPair) Type() VersionType {
 	return v.v.Type()
 }
 
-func (v versionPair) Underlying() Revision {
+func (v versionPair) Revision() Revision {
 	return v.r
 }
 
@@ -786,7 +786,7 @@ func VersionComponentStrings(v Version) (revision string, branch string, version
 	case Revision:
 		revision = tv.String()
 	case PairedVersion:
-		revision = tv.Underlying().String()
+		revision = tv.Revision().String()
 	}
 
 	switch v.Type() {

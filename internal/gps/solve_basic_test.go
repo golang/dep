@@ -293,7 +293,7 @@ func mkrevlock(pairs ...string) fixLock {
 	l := make(fixLock, 0)
 	for _, s := range pairs {
 		pa := mkAtom(s)
-		l = append(l, NewLockedProject(pa.id, pa.v.(PairedVersion).Underlying(), nil))
+		l = append(l, NewLockedProject(pa.id, pa.v.(PairedVersion).Revision(), nil))
 	}
 
 	return l
@@ -1419,7 +1419,7 @@ func (sm *depspecSourceManager) ExternalReach(id ProjectIdentifier, v Version) (
 
 func (sm *depspecSourceManager) ListPackages(id ProjectIdentifier, v Version) (pkgtree.PackageTree, error) {
 	pid := pident{n: ProjectRoot(id.normalizedSource()), v: v}
-	if pv, ok := v.(PairedVersion); ok && pv.Underlying() == "FAKEREV" {
+	if pv, ok := v.(PairedVersion); ok && pv.Revision() == "FAKEREV" {
 		// An empty rev may come in here because that's what we produce in
 		// ListVersions(). If that's what we see, then just pretend like we have
 		// an unpaired.
@@ -1568,7 +1568,7 @@ func (b *depspecBridge) listVersions(id ProjectIdentifier) ([]Version, error) {
 	// remove the underlying component.
 	vl := make([]Version, 0, len(pvl))
 	for _, v := range pvl {
-		if v.Underlying() == "FAKEREV" {
+		if v.Revision() == "FAKEREV" {
 			vl = append(vl, v.Unpair())
 		} else {
 			vl = append(vl, v)
