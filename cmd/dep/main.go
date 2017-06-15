@@ -12,6 +12,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"path/filepath"
 	"strings"
 	"text/tabwriter"
 
@@ -150,7 +151,8 @@ func (c *Config) Run() (exitCode int) {
 				Verbose: *verbose,
 			}
 
-			ctx.SetPaths(c.WorkingDir)
+			GOPATHS := filepath.SplitList(getEnv(c.Env, "GOPATH"))
+			ctx.SetPaths(c.WorkingDir, GOPATHS...)
 
 			// Run the command with the post-flag-processing args.
 			if err := cmd.Run(ctx, fs.Args()); err != nil {
@@ -224,4 +226,19 @@ func parseArgs(args []string) (cmdName string, printCmdUsage bool, exit bool) {
 		}
 	}
 	return cmdName, printCmdUsage, exit
+}
+
+// getEnv returns the last instance of an environment variable.
+func getEnv(env []string, key string) string {
+	for i := len(env) - 1; i >= 0; i-- {
+		v := env[i]
+		kv := strings.SplitN(v, "=", 2)
+		if kv[0] == key {
+			if len(kv) > 1 {
+				return kv[1]
+			}
+			return ""
+		}
+	}
+	return ""
 }

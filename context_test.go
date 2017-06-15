@@ -334,13 +334,15 @@ func TestCaseInsentitiveGOPATH(t *testing.T) {
 	}
 	gopath := string(rs)
 	h.Setenv("GOPATH", gopath)
-	wd, err := os.Getwd()
-	if err != nil {
-		t.Fatal("failed to get working directory", err)
-	}
-	depCtx := &Ctx{GOPATH: gopath, WorkingDir: wd}
+	wd := h.Path("src/test1")
 
-	depCtx.LoadProject()
+	depCtx := &Ctx{}
+	if err := depCtx.SetPaths(wd, gopath); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := depCtx.LoadProject(); err != nil {
+		t.Fatal(err)
+	}
 
 	ip := "github.com/pkg/errors"
 	fullpath := filepath.Join(depCtx.GOPATH, "src", ip)
