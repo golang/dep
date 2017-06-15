@@ -87,8 +87,19 @@ type ProjectAnalyzer interface {
 	// expected files containing Manifest and Lock data are merely absent.
 	DeriveManifestAndLock(path string, importRoot ProjectRoot) (Manifest, Lock, error)
 
-	// Report the name and version of this ProjectAnalyzer.
-	Info() (name string, version int)
+	// Info reports this project analyzer's info.
+	Info() ProjectAnalyzerInfo
+}
+
+// ProjectAnalyzerInfo indicates a ProjectAnalyzer's name and version.
+type ProjectAnalyzerInfo struct {
+	Name    string
+	Version int
+}
+
+// String returns a string like: "<name>.<decimal version>"
+func (p ProjectAnalyzerInfo) String() string {
+	return fmt.Sprintf("%s.%d", p.Name, p.Version)
 }
 
 // SourceMgr is the default SourceManager for gps.

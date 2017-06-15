@@ -27,8 +27,11 @@ func (naiveAnalyzer) DeriveManifestAndLock(string, ProjectRoot) (Manifest, Lock,
 	return nil, nil, nil
 }
 
-func (a naiveAnalyzer) Info() (name string, version int) {
-	return "naive-analyzer", 1
+func (a naiveAnalyzer) Info() ProjectAnalyzerInfo {
+	return ProjectAnalyzerInfo{
+		Name:    "naive-analyzer",
+		Version: 1,
+	}
 }
 
 func mkNaiveSM(t *testing.T) (*SourceMgr, func()) {

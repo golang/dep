@@ -34,7 +34,7 @@ func init() {
 			}, nil),
 		},
 	}
-	basicResult.analyzerName, basicResult.analyzerVersion = (naiveAnalyzer{}).Info()
+	basicResult.analyzerInfo = (naiveAnalyzer{}).Info()
 
 	// Just in case something needs punishing, kubernetes offers a complex,
 	// real-world set of dependencies, and this revision is known to work.
