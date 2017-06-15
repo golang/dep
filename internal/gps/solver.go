@@ -10,6 +10,7 @@ import (
 	"log"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/armon/go-radix"
 	"github.com/golang/dep/internal/gps/paths"
@@ -381,6 +382,50 @@ func (s *solver) Version() int {
 	return 1
 }
 
+// DeductionErrs maps package import path to errors occurring during deduction.
+type DeductionErrs map[string]error
+
+func (e DeductionErrs) Error() string {
+	return "could not deduce external imports' project roots"
+}
+
+// ValidateParams validates the solver parameters to ensure solving can be completed.
+func ValidateParams(params SolveParameters, sm SourceManager) error {
+	// Ensure that all packages are deducible without issues.
+	var deducePkgsGroup sync.WaitGroup
+	deductionErrs := make(DeductionErrs)
+	var errsMut sync.Mutex
+
+	rd, err := params.toRootdata()
+	if err != nil {
+		return err
+	}
+
+	deducePkg := func(ip string, sm SourceManager) {
+		fmt.Println(ip)
+		_, err := sm.DeduceProjectRoot(ip)
+		if err != nil {
+			errsMut.Lock()
+			deductionErrs[ip] = err
+			errsMut.Unlock()
+		}
+		deducePkgsGroup.Done()
+	}
+
+	for _, ip := range rd.externalImportList(paths.IsStandardImportPath) {
+		deducePkgsGroup.Add(1)
+		go deducePkg(ip, sm)
+	}
+
+	deducePkgsGroup.Wait()
+
+	if len(deductionErrs) > 0 {
+		return deductionErrs
+	}
+
+	return nil
+}
+
 // Solve attempts to find a dependency solution for the given project, as
 // represented by the SolveParameters with which this Solver was created.
 //
@@ -391,8 +436,7 @@ func (s *solver) Solve() (Solution, error) {
 	s.vUnify.mtr = s.mtr
 
 	// Prime the queues with the root project
-	err := s.selectRoot()
-	if err != nil {
+	if err := s.selectRoot(); err != nil {
 		return nil, err
 	}
 
