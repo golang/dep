@@ -79,7 +79,7 @@ func (rd rootdata) externalImportList(stdLibFn func(string) bool) []string {
 	return reach
 }
 
-func (rd rootdata) getApplicableConstraints(stdLibFn func(string) bool) []workingConstraint {
+func (rd rootdata) getApplicableConstraints(stdLibFn func(string) bool) (applicable, ineffectual []workingConstraint) {
 	// Merge the normal and test constraints together
 	pc := rd.rm.DependencyConstraints().merge(rd.rm.TestDependencyConstraints())
 
@@ -125,17 +125,17 @@ func (rd rootdata) getApplicableConstraints(stdLibFn func(string) bool) []workin
 		}
 	}
 
-	var ret []workingConstraint
-
 	xt.Walk(func(s string, v interface{}) bool {
 		wcc := v.(wccount)
 		if wcc.count > 0 {
-			ret = append(ret, wcc.wc)
+			applicable = append(applicable, wcc.wc)
+		} else {
+			ineffectual = append(ineffectual, wcc.wc)
 		}
 		return false
 	})
 
-	return ret
+	return applicable, ineffectual
 }
 
 func (rd rootdata) combineConstraints() []workingConstraint {

@@ -23,6 +23,8 @@ type Solution interface {
 	// The version of the Solver used in generating this solution.
 	SolverVersion() int
 	Attempts() int
+	// Warnings and messages produced by the solver
+	Messages() []string
 }
 
 type solution struct {
@@ -40,6 +42,9 @@ type solution struct {
 
 	// The solver used in producing this solution
 	solv Solver
+
+	// Warnings and messages produced by the solver
+	msgs []string
 }
 
 // WriteDepTree takes a basedir and a Lock, and exports all the projects
@@ -105,4 +110,8 @@ func (r solution) SolverName() string {
 
 func (r solution) SolverVersion() int {
 	return r.solv.Version()
+}
+
+func (r solution) Messages() []string {
+	return r.msgs
 }

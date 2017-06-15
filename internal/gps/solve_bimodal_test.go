@@ -154,6 +154,9 @@ var bimodalFixtures = map[string]bimodalFixture{
 			"a 1.0.0",
 			"b 1.1.0",
 		),
+		msgs: []string{
+			mkWarn("b 1.0.0"),
+		},
 	},
 	// Constraints apply only if the project that declares them has a
 	// reachable import - non-root
@@ -406,6 +409,9 @@ var bimodalFixtures = map[string]bimodalFixture{
 			),
 		},
 		r: mksolution(),
+		msgs: []string{
+			mkWarn("a 1.0.0"),
+		},
 	},
 	// Transitive deps from one project (a) get incrementally included as other
 	// deps incorporate its various packages.
@@ -847,10 +853,13 @@ var bimodalFixtures = map[string]bimodalFixture{
 			"foo 1.0.0",
 			"bar from baz 1.0.0",
 		),
+		msgs: []string{
+			mkWarn("bar *"),
+		},
 	},
 	"overridden mismatched net addrs, alt in root": {
 		ds: []depspec{
-			dsp(mkDepspec("root 0.0.0", "bar from baz 1.0.0"),
+			dsp(mkDepspec("root 0.0.0", "bar from baz 2.0.0"),
 				pkg("root", "foo")),
 			dsp(mkDepspec("foo 1.0.0"),
 				pkg("foo", "bar")),
@@ -868,10 +877,13 @@ var bimodalFixtures = map[string]bimodalFixture{
 			"foo 1.0.0",
 			"bar from baz 1.0.0",
 		),
+		msgs: []string{
+			mkWarn("bar 2.0.0"),
+		},
 	},
 	"require package": {
 		ds: []depspec{
-			dsp(mkDepspec("root 0.0.0", "bar 1.0.0"),
+			dsp(mkDepspec("root 0.0.0", "bar 2.0.0"),
 				pkg("root", "foo")),
 			dsp(mkDepspec("foo 1.0.0"),
 				pkg("foo", "bar")),
@@ -886,10 +898,13 @@ var bimodalFixtures = map[string]bimodalFixture{
 			"bar 1.0.0",
 			"baz 1.0.0",
 		),
+		msgs: []string{
+			mkWarn("bar 2.0.0"),
+		},
 	},
 	"require subpackage": {
 		ds: []depspec{
-			dsp(mkDepspec("root 0.0.0", "bar 1.0.0"),
+			dsp(mkDepspec("root 0.0.0", "bar 2.0.0"),
 				pkg("root", "foo")),
 			dsp(mkDepspec("foo 1.0.0"),
 				pkg("foo", "bar")),
@@ -905,6 +920,9 @@ var bimodalFixtures = map[string]bimodalFixture{
 			"bar 1.0.0",
 			mklp("baz 1.0.0", "qux"),
 		),
+		msgs: []string{
+			mkWarn("bar 2.0.0"),
+		},
 	},
 	"require impossible subpackage": {
 		ds: []depspec{
@@ -1058,6 +1076,8 @@ type bimodalFixture struct {
 	lm map[string]fixLock
 	// solve failure expected, if any
 	fail error
+	// warnings, if any
+	msgs []string
 	// overrides, if any
 	ovr ProjectConstraints
 	// request up/downgrade to all projects
@@ -1126,6 +1146,10 @@ func (f bimodalFixture) rootTree() pkgtree.PackageTree {
 
 func (f bimodalFixture) failure() error {
 	return f.fail
+}
+
+func (f bimodalFixture) messages() []string {
+	return f.msgs
 }
 
 // bmSourceManager is an SM specifically for the bimodal fixtures. It composes

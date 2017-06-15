@@ -415,6 +415,14 @@ func (s *solver) Solve() (Solution, error) {
 			soln.p[k] = pa2lp(pa, pl)
 			k++
 		}
+
+		// list warnings
+		var msgs []string
+		_, ineffectuals := s.rd.getApplicableConstraints(s.stdLibFn)
+		for _, wc := range ineffectuals {
+			msgs = append(msgs, fmt.Sprintf("WARNING: ineffectual constraint: %s %s", wc.Ident.ProjectRoot, wc.Constraint.String()))
+		}
+		soln.msgs = msgs
 	}
 
 	s.traceFinish(soln, err)
