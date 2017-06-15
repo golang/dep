@@ -10,7 +10,6 @@ import (
 	"flag"
 	"fmt"
 	"go/build"
-	"log"
 	"strconv"
 	"strings"
 
@@ -491,65 +490,6 @@ func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm
 	}
 
 	return errors.Wrap(sw.Write(p.AbsRoot, sm, true), "grouped write of manifest, lock and vendor")
-}
-
-func applyEnsureArgs(logger *log.Logger, args []string, overrides stringSlice, p *dep.Project, sm gps.SourceManager, params *gps.SolveParameters) error {
-	var errs []error
-	for _, arg := range args {
-		pc, err := getProjectConstraint(arg, sm)
-		if err != nil {
-			errs = append(errs, err)
-			continue
-		}
-
-		if gps.IsAny(pc.Constraint) && pc.Ident.Source == "" {
-			// If the input specified neither a network name nor a constraint,
-			// then the strict thing to do would be to remove the entry
-			// entirely. But that would probably be quite surprising for users,
-			// and it's what rm is for, so just ignore the input.
-			//
-			// TODO(sdboyer): for this case - or just in general - do we want to
-			// add project args to the requires list temporarily for this run?
-			if _, has := p.Manifest.Constraints[pc.Ident.ProjectRoot]; !has {
-				logger.Printf("dep: No constraint or alternate source specified for %q, omitting from manifest\n", pc.Ident.ProjectRoot)
-			}
-			// If it's already in the manifest, no need to log
-			continue
-		}
-
-		p.Manifest.Constraints[pc.Ident.ProjectRoot] = gps.ProjectProperties{
-			Source:     pc.Ident.Source,
-			Constraint: pc.Constraint,
-		}
-	}
-
-	for _, ovr := range overrides {
-		pc, err := getProjectConstraint(ovr, sm)
-		if err != nil {
-			errs = append(errs, err)
-			continue
-		}
-
-		// Empty overrides are fine (in contrast to deps), because they actually
-		// carry meaning - they force the constraints entirely open for a given
-		// project. Inadvisable, but meaningful.
-
-		p.Manifest.Ovr[pc.Ident.ProjectRoot] = gps.ProjectProperties{
-			Source:     pc.Ident.Source,
-			Constraint: pc.Constraint,
-		}
-	}
-
-	if len(errs) > 0 {
-		var buf bytes.Buffer
-		for _, err := range errs {
-			fmt.Fprintln(&buf, err)
-		}
-
-		return errors.New(buf.String())
-	}
-
-	return nil
 }
 
 type stringSlice []string
