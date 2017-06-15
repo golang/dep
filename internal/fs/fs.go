@@ -374,7 +374,6 @@ func IsNonEmptyDir(name string) (bool, error) {
 
 // IsRegular determines if the path given is a regular file or not.
 func IsRegular(name string) (bool, error) {
-	// TODO: lstat?
 	fi, err := os.Stat(name)
 	if os.IsNotExist(err) {
 		return false, nil
@@ -382,8 +381,9 @@ func IsRegular(name string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	if fi.IsDir() {
-		return false, errors.Errorf("%q is a directory, should be a file", name)
+	mode := fi.Mode()
+	if mode&os.ModeType != 0 {
+		return false, errors.Errorf("%q is a %v, expected a file", name, mode)
 	}
 	return true, nil
 }
