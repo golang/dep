@@ -6,13 +6,11 @@ package main
 
 import (
 	"bytes"
-	"encoding/hex"
 	"flag"
 	"fmt"
 	"go/build"
 	"log"
 	"path/filepath"
-	"strconv"
 	"strings"
 
 	"github.com/golang/dep"
@@ -298,77 +296,11 @@ func getProjectConstraint(arg string, sm gps.SourceManager) (gps.ProjectConstrai
 	}
 
 	pi := gps.ProjectIdentifier{ProjectRoot: pr, Source: source}
-	c, err := deduceConstraint(versionStr, pi, sm)
+	c, err := sm.DeduceConstraint(versionStr, pi)
 	if err != nil {
 		return emptyPC, err
 	}
 	return gps.ProjectConstraint{Ident: pi, Constraint: c}, nil
-}
-
-// deduceConstraint tries to puzzle out what kind of version is given in a string -
-// semver, a revision, or as a fallback, a plain tag
-func deduceConstraint(s string, pi gps.ProjectIdentifier, sm gps.SourceManager) (gps.Constraint, error) {
-	if s == "" {
-		// Find the default branch
-		versions, err := sm.ListVersions(pi)
-		if err != nil {
-			return nil, errors.Wrapf(err, "list versions for %s(%s)", pi.ProjectRoot, pi.Source) // means repo does not exist
-		}
-
-		gps.SortPairedForUpgrade(versions)
-		for _, v := range versions {
-			if v.Type() == gps.IsBranch {
-				return v.Unpair(), nil
-			}
-		}
-	}
-
-	// always semver if we can
-	c, err := gps.NewSemverConstraintIC(s)
-	if err == nil {
-		return c, nil
-	}
-
-	slen := len(s)
-	if slen == 40 {
-		if _, err = hex.DecodeString(s); err == nil {
-			// Whether or not it's intended to be a SHA1 digest, this is a
-			// valid byte sequence for that, so go with Revision. This
-			// covers git and hg
-			return gps.Revision(s), nil
-		}
-	}
-	// Next, try for bzr, which has a three-component GUID separated by
-	// dashes. There should be two, but the email part could contain
-	// internal dashes
-	if strings.Count(s, "-") >= 2 {
-		// Work from the back to avoid potential confusion from the email
-		i3 := strings.LastIndex(s, "-")
-		// Skip if - is last char, otherwise this would panic on bounds err
-		if slen == i3+1 {
-			return gps.NewVersion(s), nil
-		}
-
-		i2 := strings.LastIndex(s[:i3], "-")
-		if _, err = strconv.ParseUint(s[i2+1:i3], 10, 64); err == nil {
-			// Getting this far means it'd pretty much be nuts if it's not a
-			// bzr rev, so don't bother parsing the email.
-			return gps.Revision(s), nil
-		}
-	}
-
-	// call out to network and get the package's versions
-	versions, err := sm.ListVersions(pi)
-	if err != nil {
-		return nil, errors.Wrapf(err, "list versions for %s(%s)", pi.ProjectRoot, pi.Source) // means repo does not exist
-	}
-
-	for _, version := range versions {
-		if s == version.String() {
-			return version.Unpair(), nil
-		}
-	}
-	return nil, errors.Errorf("%s is not a valid version for the package %s(%s)", s, pi.ProjectRoot, pi.Source)
 }
 
 func checkErrors(m map[string]pkgtree.PackageOrErr) error {

@@ -206,10 +206,10 @@ func (g *glideImporter) buildProjectConstraint(pkg glidePackage) (pc gps.Project
 	}
 
 	pc.Ident = gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot(pkg.Name), Source: pkg.Repository}
-	pc.Constraint, err = deduceConstraint(pkg.Reference, pc.Ident, g.sm)
-	if err != nil {
-		return
-	}
+	pc.Constraint, err = g.sm.DeduceConstraint(pkg.Reference, pc.Ident)
+    if err != nil {
+        return
+    }
 
 	f := fb.NewConstraintFeedback(pc, fb.DepTypeImported)
 	f.LogFeedback(g.logger)
