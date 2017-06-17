@@ -107,6 +107,7 @@ func TestReadManifestErrors(t *testing.T) {
 	}{
 		{"multiple constraints", "manifest/error1.toml"},
 		{"multiple dependencies", "manifest/error2.toml"},
+		{"multiple overrides", "manifest/error3.toml"},
 	}
 
 	for _, tst := range tests {

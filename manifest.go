@@ -193,6 +193,9 @@ func fromRawManifest(raw rawManifest) (*Manifest, error) {
 		if err != nil {
 			return nil, err
 		}
+		if _, exists := m.Ovr[name]; exists {
+			return nil, errors.Errorf("multiple overrides specified for %s, can only specify one", name)
+		}
 		m.Ovr[name] = prj
 	}
 
