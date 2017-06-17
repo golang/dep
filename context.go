@@ -188,7 +188,7 @@ func (c *Ctx) LoadProject() (*Project, error) {
 // DetectProjectGOPATH will return an error in the following cases:
 //
 //  If p.AbsRoot is not a symlink and is not within any known GOPATH.
-//  If neither p.AbsRoot or p.ResolvedAbsRoot are within a known GOPATH.
+//  If neither p.AbsRoot nor p.ResolvedAbsRoot are within a known GOPATH.
 //  If both p.AbsRoot and p.ResolvedAbsRoot are within the same GOPATH.
 //  If p.AbsRoot and p.ResolvedAbsRoot are each within a different GOPATH.
 func (c *Ctx) DetectProjectGOPATH(p *Project) (string, error) {
