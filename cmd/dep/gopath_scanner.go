@@ -134,27 +134,6 @@ func (g *gopathScanner) overlay(rootM *dep.Manifest, rootL *dep.Lock) {
 	}
 }
 
-func (g *gopathScanner) FinalizeRootManifestAndLock(m *dep.Manifest, l *dep.Lock) {
-	// Iterate through the new projects in solved lock and add them to manifest
-	// if direct deps and log feedback for all the new projects.
-	for _, x := range l.Projects() {
-		pr := x.Ident().ProjectRoot
-		newProject := true
-		// Check if it's a new project, not in the old lock
-		for _, y := range g.origL.Projects() {
-			if pr == y.Ident().ProjectRoot {
-				newProject = false
-			}
-		}
-		if newProject {
-			// If it's in notondisk, add to manifest, these are direct dependencies.
-			if _, ok := g.pd.notondisk[pr]; ok {
-				m.Constraints[pr] = getProjectPropertiesFromVersion(x.Version())
-			}
-		}
-	}
-}
-
 func trimPathPrefix(p1, p2 string) string {
 	if fs.HasFilepathPrefix(p1, p2) {
 		return p1[len(p2):]
