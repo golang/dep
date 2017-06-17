@@ -17,25 +17,24 @@ import (
 	"github.com/pkg/errors"
 )
 
-/*
-Ctx defines the supporting context of dep.
-
-A properly initialized Ctx has a GOPATH containing the project root and non-nil Loggers.
-
-	ctx := &dep.Ctx{
-		WorkingDir: GOPATH + "/src/project/root",
-		GOPATH: GOPATH,
-		Out: log.New(os.Stdout, "", 0),
-		Err: log.New(os.Stderr, "", 0),
-	}
-
-Ctx.DetectProjectGOPATH() helps with setting the containing GOPATH.
-
-	ctx.GOPATH, err := Ctx.DetectProjectGOPATH(project)
-	if err != nil {
-		// Could not determine which GOPATH to use for the project.
-	}
-*/
+// Ctx defines the supporting context of dep.
+//
+// A properly initialized Ctx has a GOPATH containing the project root and non-nil Loggers.
+//
+//	ctx := &dep.Ctx{
+//		WorkingDir: GOPATH + "/src/project/root",
+//		GOPATH: GOPATH,
+//		Out: log.New(os.Stdout, "", 0),
+//		Err: log.New(os.Stderr, "", 0),
+//	}
+//
+// Ctx.DetectProjectGOPATH() helps with setting the containing GOPATH.
+//
+//	ctx.GOPATH, err := Ctx.DetectProjectGOPATH(project)
+//	if err != nil {
+//		// Could not determine which GOPATH to use for the project.
+//	}
+//
 type Ctx struct {
 	WorkingDir string      // Where to execute.
 	GOPATH     string      // Selected Go path, containing WorkingDir.
@@ -44,19 +43,18 @@ type Ctx struct {
 	Verbose    bool        // Enables more verbose logging.
 }
 
-/*
-SetPaths sets the WorkingDir and GOPATHSs fields.
-
-	ctx := &dep.Ctx{
-		Out: log.New(os.Stdout, "", 0),
-		Err: log.New(os.Stderr, "", 0),
-	}
-
-	err := ctx.SetPaths(workingDir, filepath.SplitList(os.Getenv("GOPATH"))
-	if err != nil {
-		// Empty GOPATH
-	}
-*/
+// SetPaths sets the WorkingDir and GOPATHSs fields.
+//
+//	ctx := &dep.Ctx{
+//		Out: log.New(os.Stdout, "", 0),
+//		Err: log.New(os.Stderr, "", 0),
+//	}
+//
+//	err := ctx.SetPaths(workingDir, filepath.SplitList(os.Getenv("GOPATH"))
+//	if err != nil {
+//		// Empty GOPATH
+//	}
+//
 func (c *Ctx) SetPaths(wd string, GOPATHs ...string) error {
 	if wd == "" {
 		return errors.New("cannot set Ctx.WorkingDir to an empty path")
@@ -180,23 +178,24 @@ func (c *Ctx) LoadProject() (*Project, error) {
 	return p, nil
 }
 
-/*
-DetectProjectGOPATH attempt to find the GOPATH containing the project.
-
-If p.AbsRoot is assumed to be a symlink if does not have the same value as p.ResolvedAbsRoot.
-
-If p.AbsRoot is within a GOPATH and isn't a symlink, the GOPATH containing p.AbsRoot is returned.
-If p.AbsRoot is not within any GOPATH and is a symlink that resolves to a directory within a
-GOPATH, the GOPATH for the resolved path is returned.
-
-DetectProjectGOPATH will return an error in the following cases:
-
- If p.AbsRoot is not a symlink and is not within any known GOPATH.
- If neither p.AbsRoot or p.ResolvedAbsRoot are within a known GOPATH.
- If both p.AbsRoot and p.ResolvedAbsRoot are within the same GOPATH.
- If p.AbsRoot and p.ResolvedAbsRoot are each within a different GOPATH.
-*/
+// DetectProjectGOPATH attempt to find the GOPATH containing the project.
+//
+// If p.AbsRoot is not a symlink and is within a GOPATH, the GOPATH containing p.AbsRoot is returned.
+// If p.AbsRoot is a symlink and is not within any known GOPATH, the GOPATH containing p.ResolvedAbsRoot is returned.
+//
+// p.AbsRoot is assumed to be a symlink if it is not the same as p.ResolvedAbsRoot.
+//
+// DetectProjectGOPATH will return an error in the following cases:
+//
+// If p.AbsRoot is not a symlink and is not within any known GOPATH.
+// If neither p.AbsRoot or p.ResolvedAbsRoot are within a known GOPATH.
+// If both p.AbsRoot and p.ResolvedAbsRoot are within the same GOPATH.
+// If p.AbsRoot and p.ResolvedAbsRoot are each within a different GOPATH.
 func (c *Ctx) DetectProjectGOPATH(p *Project) (string, error) {
+	if p.AbsRoot == "" || p.ResolvedAbsRoot == "" {
+		return "", errors.New("project AbsRoot and ResolvedAbsRoot must be set to detect GOPATH")
+	}
+
 	pGOPATH, perr := c.detectGOPATH(p.AbsRoot)
 
 	// If p.AbsRoot is a not symlink, attempt to detect GOPATH for p.AbsRoot only.
