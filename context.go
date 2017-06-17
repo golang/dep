@@ -180,17 +180,17 @@ func (c *Ctx) LoadProject() (*Project, error) {
 
 // DetectProjectGOPATH attempt to find the GOPATH containing the project.
 //
-// If p.AbsRoot is not a symlink and is within a GOPATH, the GOPATH containing p.AbsRoot is returned.
-// If p.AbsRoot is a symlink and is not within any known GOPATH, the GOPATH containing p.ResolvedAbsRoot is returned.
+//  If p.AbsRoot is not a symlink and is within a GOPATH, the GOPATH containing p.AbsRoot is returned.
+//  If p.AbsRoot is a symlink and is not within any known GOPATH, the GOPATH containing p.ResolvedAbsRoot is returned.
 //
 // p.AbsRoot is assumed to be a symlink if it is not the same as p.ResolvedAbsRoot.
 //
 // DetectProjectGOPATH will return an error in the following cases:
 //
-// If p.AbsRoot is not a symlink and is not within any known GOPATH.
-// If neither p.AbsRoot or p.ResolvedAbsRoot are within a known GOPATH.
-// If both p.AbsRoot and p.ResolvedAbsRoot are within the same GOPATH.
-// If p.AbsRoot and p.ResolvedAbsRoot are each within a different GOPATH.
+//  If p.AbsRoot is not a symlink and is not within any known GOPATH.
+//  If neither p.AbsRoot or p.ResolvedAbsRoot are within a known GOPATH.
+//  If both p.AbsRoot and p.ResolvedAbsRoot are within the same GOPATH.
+//  If p.AbsRoot and p.ResolvedAbsRoot are each within a different GOPATH.
 func (c *Ctx) DetectProjectGOPATH(p *Project) (string, error) {
 	if p.AbsRoot == "" || p.ResolvedAbsRoot == "" {
 		return "", errors.New("project AbsRoot and ResolvedAbsRoot must be set to detect GOPATH")
