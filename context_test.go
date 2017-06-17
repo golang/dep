@@ -160,7 +160,6 @@ func TestLoadProject(t *testing.T) {
 	tg.TempDir("src/test2")
 	tg.TempDir("src/test2/sub")
 	tg.TempFile(filepath.Join("src/test2", ManifestName), "")
-	tg.Setenv("GOPATH", tg.Path("."))
 
 	var testcases = []struct {
 		lock  bool
@@ -183,7 +182,6 @@ func TestLoadProject(t *testing.T) {
 		}
 
 		proj, err := ctx.LoadProject()
-		tg.Must(err)
 		switch {
 		case err != nil:
 			t.Errorf("%s: LoadProject failed: %+v", start, err)
@@ -356,82 +354,97 @@ func TestCaseInsentitiveGOPATH(t *testing.T) {
 }
 
 func TestDetectProjectGOPATH(t *testing.T) {
-	tg := test.NewHelper(t)
-	defer tg.Cleanup()
+	h := test.NewHelper(t)
+	defer h.Cleanup()
 
-	tg.TempDir("go/src/real/path")
-	tg.TempDir("go/src/sym")
-
-	// Another directory used as a GOPATH
-	tg.TempDir("gotwo/src/real/path")
-	tg.TempDir("gotwo/src/sym")
-
-	tg.TempDir("sym") // Directory for symlinks
+	h.TempDir("go")
+	h.TempDir("go-two")
 
 	ctx := &Ctx{
-		GOPATHs: []string{
-			tg.Path(filepath.Join(".", "go")),
-			tg.Path(filepath.Join(".", "gotwo")),
-		},
+		GOPATHs: []string{h.Path("go"), h.Path("go-two")},
 	}
+
+	h.TempDir("go/src/real/path")
+	h.TempDir("go/src/sym")
+
+	// Another directory used as a GOPATH
+	h.TempDir("go-two/src/real/path")
+	h.TempDir("go-two/src/sym")
+
+	h.TempDir("sym") // Directory for symlinks
 
 	testcases := []struct {
 		name         string
-		path         string
-		resolvedPath string
+		root         string
+		resolvedRoot string
 		GOPATH       string
-		symlink      bool
 		expectErr    bool
 	}{
 		{
-			name:         "no-symlink",
-			path:         filepath.Join(ctx.GOPATHs[0], "src/real/path"),
-			resolvedPath: "",
-			GOPATH:       ctx.GOPATHs[0],
-		},
-		{
-			name:         "symlink-outside-gopath",
-			path:         filepath.Join(tg.Path("."), "sym/symlink"),
-			resolvedPath: filepath.Join(ctx.GOPATHs[0], "src/real/path"),
-			GOPATH:       ctx.GOPATHs[0],
-			symlink:      true,
-		},
-		{
-			name:         "symlink-in-another-gopath",
-			path:         filepath.Join(tg.Path("."), "sym/symtwo"),
-			resolvedPath: filepath.Join(ctx.GOPATHs[1], "src/real/path"),
-			GOPATH:       ctx.GOPATHs[1],
-			symlink:      true,
-		},
-		{
-			name:         "symlink-in-gopath",
-			path:         filepath.Join(ctx.GOPATHs[0], "src/sym/path"),
-			resolvedPath: filepath.Join(ctx.GOPATHs[0], "src/real/path"),
-			GOPATH:       ctx.GOPATHs[0],
-			symlink:      true,
+			name:         "project-with-no-AbsRoot",
+			root:         "",
+			resolvedRoot: filepath.Join(ctx.GOPATHs[0], "src", "real", "path"),
 			expectErr:    true,
+		},
+		{
+			name:         "project-with-no-ResolvedAbsRoot",
+			root:         filepath.Join(ctx.GOPATHs[0], "src", "real", "path"),
+			resolvedRoot: "",
+			expectErr:    true,
+		},
+		{
+			name:         "AbsRoot-is-not-within-any-GOPATH",
+			root:         filepath.Join(h.Path("."), "src", "real", "path"),
+			resolvedRoot: filepath.Join(h.Path("."), "src", "real", "path"),
+			expectErr:    true,
+		},
+		{
+			name:         "neither-AbsRoot-nor-ResolvedAbsRoot-are-in-any-GOPATH",
+			root:         filepath.Join(h.Path("."), "src", "sym", "path"),
+			resolvedRoot: filepath.Join(h.Path("."), "src", "real", "path"),
+			expectErr:    true,
+		},
+		{
+			name:         "both-AbsRoot-and-ResolvedAbsRoot-are-in-the-same-GOPATH",
+			root:         filepath.Join(ctx.GOPATHs[0], "src", "sym", "path"),
+			resolvedRoot: filepath.Join(ctx.GOPATHs[0], "src", "real", "path"),
+			expectErr:    true,
+		},
+		{
+			name:         "AbsRoot-and-ResolvedAbsRoot-are-each-within-a-different-GOPATH",
+			root:         filepath.Join(ctx.GOPATHs[0], "src", "sym", "path"),
+			resolvedRoot: filepath.Join(ctx.GOPATHs[1], "src", "real", "path"),
+			expectErr:    true,
+		},
+		{
+			name:         "AbsRoot-is-not-a-symlink",
+			root:         filepath.Join(ctx.GOPATHs[0], "src", "real", "path"),
+			resolvedRoot: filepath.Join(ctx.GOPATHs[0], "src", "real", "path"),
+			GOPATH:       ctx.GOPATHs[0],
+		},
+		{
+			name:         "AbsRoot-is-a-symlink-to-ResolvedAbsRoot",
+			root:         filepath.Join(h.Path("."), "sym", "symlink"),
+			resolvedRoot: filepath.Join(ctx.GOPATHs[0], "src", " real", "path"),
+			GOPATH:       ctx.GOPATHs[0],
 		},
 	}
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
 			project := &Project{
-				AbsRoot:         tc.path,
-				ResolvedAbsRoot: tc.resolvedPath,
+				AbsRoot:         tc.root,
+				ResolvedAbsRoot: tc.resolvedRoot,
 			}
 
 			GOPATH, err := ctx.DetectProjectGOPATH(project)
-			if err != nil {
-				if !tc.expectErr {
-					t.Fatalf("Error resolving project root: %s", err)
-				}
-				return
-			}
-			if err == nil && tc.expectErr {
-				t.Fatal("Wanted an error")
+			if !tc.expectErr {
+				h.Must(err)
+			} else if err == nil {
+				t.Fatal("expected an error, got nil")
 			}
 			if GOPATH != tc.GOPATH {
-				t.Errorf("Want go path to be %s, got %s", tc.GOPATH, GOPATH)
+				t.Errorf("expected GOPATH %s, got %s", tc.GOPATH, GOPATH)
 			}
 		})
 	}
