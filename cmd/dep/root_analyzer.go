@@ -9,6 +9,7 @@ import (
 	"log"
 
 	"github.com/golang/dep"
+	fb "github.com/golang/dep/internal/feedback"
 	"github.com/golang/dep/internal/gps"
 	"github.com/pkg/errors"
 )
@@ -125,18 +126,37 @@ func (a *rootAnalyzer) DeriveManifestAndLock(dir string, pr gps.ProjectRoot) (gp
 	return gps.SimpleManifest{}, nil, nil
 }
 
-func (a *rootAnalyzer) FinalizeRootManifestAndLock(m *dep.Manifest, l *dep.Lock) {
-	// Remove dependencies from the manifest that aren't used
-	for pr := range m.Constraints {
-		var used bool
-		for _, y := range l.Projects() {
-			if pr == y.Ident().ProjectRoot {
-				used = true
-				break
+func (a *rootAnalyzer) FinalizeRootManifestAndLock(m *dep.Manifest, l *dep.Lock, ol dep.Lock) {
+	// Iterate through the new projects in solved lock and add them to manifest
+	// if they are direct deps and log feedback for all the new projects.
+	for _, y := range l.Projects() {
+		var f *fb.ConstraintFeedback
+		pr := y.Ident().ProjectRoot
+		// New constraints: in new lock and dir dep but not in manifest
+		if _, ok := a.directDeps[string(pr)]; ok {
+			if _, ok := m.Constraints[pr]; !ok {
+				pp := getProjectPropertiesFromVersion(y.Version())
+				if pp.Constraint != nil {
+					m.Constraints[pr] = pp
+					pc := gps.ProjectConstraint{Ident: y.Ident(), Constraint: pp.Constraint}
+					f = fb.NewConstraintFeedback(pc, fb.DepTypeDirect)
+					f.LogFeedback(a.ctx.Err)
+				}
+				f = fb.NewLockedProjectFeedback(y, fb.DepTypeDirect)
+				f.LogFeedback(a.ctx.Err)
 			}
-		}
-		if !used {
-			delete(m.Constraints, pr)
+		} else {
+			// New locked projects: in new lock but not in old lock
+			newProject := true
+			for _, opl := range ol.Projects() {
+				if pr == opl.Ident().ProjectRoot {
+					newProject = false
+				}
+			}
+			if newProject {
+				f = fb.NewLockedProjectFeedback(y, fb.DepTypeTransitive)
+				f.LogFeedback(a.ctx.Err)
+			}
 		}
 	}
 }
