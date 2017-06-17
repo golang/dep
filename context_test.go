@@ -22,43 +22,6 @@ var (
 	discardLogger = log.New(ioutil.Discard, "", 0)
 )
 
-func TestCtx_SetGOPATH(t *testing.T) {
-	h := test.NewHelper(t)
-	defer h.Cleanup()
-	h.TempDir("src")
-
-	wd := h.Path(".")
-
-	t.Run("slash", func(t *testing.T) {
-		var c Ctx
-		err := c.SetPaths(wd, filepath.ToSlash(wd))
-		if err != nil {
-			t.Error(err)
-		}
-	})
-
-	t.Run("separator", func(t *testing.T) {
-		var c Ctx
-		err := c.SetPaths(wd, filepath.FromSlash(wd))
-		if err != nil {
-			t.Error(err)
-		}
-	})
-}
-
-func TestCtx_SetGOPATH_empty(t *testing.T) {
-	h := test.NewHelper(t)
-	defer h.Cleanup()
-
-	h.TempDir("src")
-	var c Ctx
-
-	err := c.SetPaths(h.Path("."), "")
-	if err == nil {
-		t.Fatal("error should not have been nil")
-	}
-}
-
 func TestSplitAbsoluteProjectRoot(t *testing.T) {
 	h := test.NewHelper(t)
 	defer h.Cleanup()
@@ -86,8 +49,8 @@ func TestSplitAbsoluteProjectRoot(t *testing.T) {
 
 	// test where it should return an error when directly within $GOPATH/src
 	got, err := depCtx.SplitAbsoluteProjectRoot(filepath.Join(depCtx.GOPATH, "src"))
-	if err == nil || !strings.Contains(err.Error(), "$GOPATH/src") {
-		t.Fatalf("should have gotten an error for use directly in $GOPATH/src, but got %s", got)
+	if err == nil || !strings.Contains(err.Error(), "GOPATH/src") {
+		t.Fatalf("should have gotten an error for use directly in GOPATH/src, but got %s", got)
 	}
 
 	// test where it should return an error
@@ -186,51 +149,50 @@ func TestVersionInWorkspace(t *testing.T) {
 }
 
 func TestLoadProject(t *testing.T) {
-	tg := test.NewHelper(t)
-	defer tg.Cleanup()
+	h := test.NewHelper(t)
+	defer h.Cleanup()
 
-	tg.TempDir("src")
-	tg.TempDir("src/test1")
-	tg.TempDir("src/test1/sub")
-	tg.TempFile(filepath.Join("src/test1", ManifestName), "")
-	tg.TempFile(filepath.Join("src/test1", LockName), `memo = "cdafe8641b28cd16fe025df278b0a49b9416859345d8b6ba0ace0272b74925ee"`)
-	tg.TempDir("src/test2")
-	tg.TempDir("src/test2/sub")
-	tg.TempFile(filepath.Join("src/test2", ManifestName), "")
-	tg.Setenv("GOPATH", tg.Path("."))
+	h.TempDir(filepath.Join("src", "test1", "sub"))
+	h.TempFile(filepath.Join("src", "test1", ManifestName), "")
+	h.TempFile(filepath.Join("src", "test1", LockName), `memo = "cdafe8641b28cd16fe025df278b0a49b9416859345d8b6ba0ace0272b74925ee"`)
+	h.TempDir(filepath.Join("src", "test2", "sub"))
+	h.TempFile(filepath.Join("src", "test2", ManifestName), "")
 
 	var testcases = []struct {
-		lock  bool
-		start string
+		name string
+		lock bool
+		wd   string
 	}{
-		{true, filepath.Join("src", "test1")},        //direct
-		{true, filepath.Join("src", "test1", "sub")}, //ascending
-		{false, filepath.Join("src", "test2")},       //repeat without lockfile present
-		{false, filepath.Join("src", "test2", "sub")},
+		{"direct", true, filepath.Join("src", "test1")},
+		{"ascending", true, filepath.Join("src", "test1", "sub")},
+		{"without lock", false, filepath.Join("src", "test2")},
+		{"ascending without lock", false, filepath.Join("src", "test2", "sub")},
 	}
 
-	for _, testcase := range testcases {
-		start := testcase.start
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := &Ctx{
+				Out: discardLogger,
+				Err: discardLogger,
+			}
 
-		ctx := &Ctx{
-			GOPATH:     tg.Path("."),
-			WorkingDir: tg.Path(start),
-			Out:        discardLogger,
-			Err:        discardLogger,
-		}
+			err := ctx.SetPaths(h.Path(tc.wd), h.Path("."))
+			if err != nil {
+				t.Fatalf("%+v", err)
+			}
 
-		proj, err := ctx.LoadProject()
-		tg.Must(err)
-		switch {
-		case err != nil:
-			t.Errorf("%s: LoadProject failed: %+v", start, err)
-		case proj.Manifest == nil:
-			t.Errorf("%s: Manifest file didn't load", start)
-		case testcase.lock && proj.Lock == nil:
-			t.Errorf("%s: Lock file didn't load", start)
-		case !testcase.lock && proj.Lock != nil:
-			t.Errorf("%s: Non-existent Lock file loaded", start)
-		}
+			p, err := ctx.LoadProject()
+			switch {
+			case err != nil:
+				t.Fatalf("%s: LoadProject failed: %+v", tc.wd, err)
+			case p.Manifest == nil:
+				t.Fatalf("%s: Manifest file didn't load", tc.wd)
+			case tc.lock && p.Lock == nil:
+				t.Fatalf("%s: Lock file didn't load", tc.wd)
+			case !tc.lock && p.Lock != nil:
+				t.Fatalf("%s: Non-existent Lock file loaded", tc.wd)
+			}
+		})
 	}
 }
 
@@ -253,7 +215,7 @@ func TestLoadProjectNotFoundErrors(t *testing.T) {
 	}
 
 	for _, testcase := range testcases {
-		ctx := &Ctx{GOPATH: tg.Path("."), WorkingDir: tg.Path(testcase.start)}
+		ctx := &Ctx{GOPATHs: []string{tg.Path(".")}, WorkingDir: tg.Path(testcase.start)}
 
 		_, err := ctx.LoadProject()
 		if err == nil {
@@ -371,13 +333,15 @@ func TestCaseInsentitiveGOPATH(t *testing.T) {
 	}
 	gopath := string(rs)
 	h.Setenv("GOPATH", gopath)
-	wd, err := os.Getwd()
-	if err != nil {
-		t.Fatal("failed to get working directory", err)
-	}
-	depCtx := &Ctx{GOPATH: gopath, WorkingDir: wd}
+	wd := h.Path("src/test1")
 
-	depCtx.LoadProject()
+	depCtx := &Ctx{}
+	if err := depCtx.SetPaths(wd, gopath); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := depCtx.LoadProject(); err != nil {
+		t.Fatal(err)
+	}
 
 	ip := "github.com/pkg/errors"
 	fullpath := filepath.Join(depCtx.GOPATH, "src", ip)
@@ -390,86 +354,133 @@ func TestCaseInsentitiveGOPATH(t *testing.T) {
 	}
 }
 
-func TestResolveProjectRoot(t *testing.T) {
-	tg := test.NewHelper(t)
-	defer tg.Cleanup()
+func TestDetectProjectGOPATH(t *testing.T) {
+	h := test.NewHelper(t)
+	defer h.Cleanup()
 
-	tg.TempDir("go/src/real/path")
-	tg.TempDir("go/src/sym")
-
-	// Another directory used as a GOPATH
-	tg.TempDir("gotwo/src/real/path")
-	tg.TempDir("gotwo/src/sym")
-
-	tg.TempDir("sym") // Directory for symlinks
+	h.TempDir("go")
+	h.TempDir("go-two")
 
 	ctx := &Ctx{
-		GOPATH: tg.Path(filepath.Join(".", "go")),
-		GOPATHS: []string{
-			tg.Path(filepath.Join(".", "go")),
-			tg.Path(filepath.Join(".", "gotwo")),
-		},
+		GOPATHs: []string{h.Path("go"), h.Path("go-two")},
 	}
+
+	h.TempDir("go/src/real/path")
+	h.TempDir("go/src/sym")
+
+	// Another directory used as a GOPATH
+	h.TempDir("go-two/src/real/path")
+	h.TempDir("go-two/src/sym")
+
+	h.TempDir("sym") // Directory for symlinks
 
 	testcases := []struct {
 		name         string
-		path         string
-		resolvedPath string
-		symlink      bool
+		root         string
+		resolvedRoot string
+		GOPATH       string
 		expectErr    bool
 	}{
 		{
-			name:         "no-symlinks",
-			path:         filepath.Join(ctx.GOPATH, "src/real/path"),
-			resolvedPath: filepath.Join(ctx.GOPATH, "src/real/path"),
-		},
-		{
-			name:         "symlink-outside-gopath",
-			path:         filepath.Join(tg.Path("."), "sym/symlink"),
-			resolvedPath: filepath.Join(ctx.GOPATH, "src/real/path"),
-			symlink:      true,
-		},
-		{
-			name:         "symlink-in-another-gopath",
-			path:         filepath.Join(tg.Path("."), "sym/symtwo"),
-			resolvedPath: filepath.Join(ctx.GOPATHS[1], "src/real/path"),
-			symlink:      true,
-		},
-		{
-			name:         "symlink-in-gopath",
-			path:         filepath.Join(ctx.GOPATH, "src/sym/path"),
-			resolvedPath: filepath.Join(ctx.GOPATH, "src/real/path"),
-			symlink:      true,
+			name:         "project-with-no-AbsRoot",
+			root:         "",
+			resolvedRoot: filepath.Join(ctx.GOPATHs[0], "src", "real", "path"),
 			expectErr:    true,
+		},
+		{
+			name:         "project-with-no-ResolvedAbsRoot",
+			root:         filepath.Join(ctx.GOPATHs[0], "src", "real", "path"),
+			resolvedRoot: "",
+			expectErr:    true,
+		},
+		{
+			name:         "AbsRoot-is-not-within-any-GOPATH",
+			root:         filepath.Join(h.Path("."), "src", "real", "path"),
+			resolvedRoot: filepath.Join(h.Path("."), "src", "real", "path"),
+			expectErr:    true,
+		},
+		{
+			name:         "neither-AbsRoot-nor-ResolvedAbsRoot-are-in-any-GOPATH",
+			root:         filepath.Join(h.Path("."), "src", "sym", "path"),
+			resolvedRoot: filepath.Join(h.Path("."), "src", "real", "path"),
+			expectErr:    true,
+		},
+		{
+			name:         "both-AbsRoot-and-ResolvedAbsRoot-are-in-the-same-GOPATH",
+			root:         filepath.Join(ctx.GOPATHs[0], "src", "sym", "path"),
+			resolvedRoot: filepath.Join(ctx.GOPATHs[0], "src", "real", "path"),
+			expectErr:    true,
+		},
+		{
+			name:         "AbsRoot-and-ResolvedAbsRoot-are-each-within-a-different-GOPATH",
+			root:         filepath.Join(ctx.GOPATHs[0], "src", "sym", "path"),
+			resolvedRoot: filepath.Join(ctx.GOPATHs[1], "src", "real", "path"),
+			expectErr:    true,
+		},
+		{
+			name:         "AbsRoot-is-not-a-symlink",
+			root:         filepath.Join(ctx.GOPATHs[0], "src", "real", "path"),
+			resolvedRoot: filepath.Join(ctx.GOPATHs[0], "src", "real", "path"),
+			GOPATH:       ctx.GOPATHs[0],
+		},
+		{
+			name:         "AbsRoot-is-a-symlink-to-ResolvedAbsRoot",
+			root:         filepath.Join(h.Path("."), "sym", "symlink"),
+			resolvedRoot: filepath.Join(ctx.GOPATHs[0], "src", " real", "path"),
+			GOPATH:       ctx.GOPATHs[0],
 		},
 	}
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			if tc.symlink {
-				if err := os.Symlink(tc.resolvedPath, tc.path); err != nil {
-					if runtime.GOOS == "windows" {
-						t.Skipf("Not testing Windows symlinks because: %s", err)
-					} else {
-						t.Fatal(err)
-					}
-				}
+			project := &Project{
+				AbsRoot:         tc.root,
+				ResolvedAbsRoot: tc.resolvedRoot,
 			}
 
-			p, err := ctx.resolveProjectRoot(tc.path)
-			if err != nil {
-				if !tc.expectErr {
-					t.Fatalf("Error resolving project root: %s", err)
-				}
-				return
+			GOPATH, err := ctx.DetectProjectGOPATH(project)
+			if !tc.expectErr && err != nil {
+				t.Fatalf("%+v", err)
+			} else if tc.expectErr && err == nil {
+				t.Fatalf("expected an error, got nil and gopath %s", GOPATH)
 			}
-			if err == nil && tc.expectErr {
-				t.Fatal("Wanted an error")
-			}
-
-			if p != tc.resolvedPath {
-				t.Errorf("Want path to be %s, got %s", tc.resolvedPath, p)
+			if GOPATH != tc.GOPATH {
+				t.Errorf("expected GOPATH %s, got %s", tc.GOPATH, GOPATH)
 			}
 		})
+	}
+}
+
+func TestDetectGOPATH(t *testing.T) {
+	th := test.NewHelper(t)
+	defer th.Cleanup()
+
+	th.TempDir("go")
+	th.TempDir("gotwo")
+
+	ctx := &Ctx{GOPATHs: []string{
+		th.Path("go"),
+		th.Path("gotwo"),
+	}}
+
+	testcases := []struct {
+		GOPATH string
+		path   string
+		err    bool
+	}{
+		{th.Path("go"), filepath.Join(th.Path("go"), "src/github.com/username/package"), false},
+		{th.Path("go"), filepath.Join(th.Path("go"), "src/github.com/username/package"), false},
+		{th.Path("gotwo"), filepath.Join(th.Path("gotwo"), "src/github.com/username/package"), false},
+		{"", filepath.Join(th.Path("."), "code/src/github.com/username/package"), true},
+	}
+
+	for _, tc := range testcases {
+		GOPATH, err := ctx.detectGOPATH(tc.path)
+		if tc.err && err == nil {
+			t.Error("Expected error but got none")
+		}
+		if GOPATH != tc.GOPATH {
+			t.Errorf("Expected GOPATH to be %s, got %s", GOPATH, tc.GOPATH)
+		}
 	}
 }

@@ -69,7 +69,7 @@ for example, it can be completely left out.
 
 The test procedure is as follows:
 
-1. Create a unique temporary directory (TMPDIR) as the test run's GOPATH
+1. Create a unique temporary directory (TMPDIR) as the test run's `GOPATH`
 2. Create `$TMPDIR/src/github.com/golang/notexist` as the current project
 3. Copy the contents of `initial` input directory to the project
 4. Fetch the repos and versions in `gopath-initial` into `$TMPDIR/src` directory

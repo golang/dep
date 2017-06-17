@@ -83,7 +83,9 @@ func (c *Config) Run() (exitCode int) {
 		},
 	}
 
+	outLogger := log.New(c.Stdout, "", 0)
 	errLogger := log.New(c.Stderr, "", 0)
+
 	usage := func() {
 		errLogger.Println("dep is a tool for managing dependencies for Go projects")
 		errLogger.Println()
@@ -142,19 +144,15 @@ func (c *Config) Run() (exitCode int) {
 				return
 			}
 
-			// Set up the dep context.
+			// Set up dep context.
 			ctx := &dep.Ctx{
-				Out:     log.New(c.Stdout, "", 0),
+				Out:     outLogger,
 				Err:     errLogger,
 				Verbose: *verbose,
 			}
-			gopaths := filepath.SplitList(getEnv(c.Env, "GOPATH"))
-			err := ctx.SetPaths(c.WorkingDir, gopaths...)
-			if err != nil {
-				errLogger.Printf("%q not in any GOPATH: %s\n", c.WorkingDir, err)
-				exitCode = 1
-				return
-			}
+
+			GOPATHS := filepath.SplitList(getEnv(c.Env, "GOPATH"))
+			ctx.SetPaths(c.WorkingDir, GOPATHS...)
 
 			// Run the command with the post-flag-processing args.
 			if err := cmd.Run(ctx, fs.Args()); err != nil {
@@ -172,18 +170,6 @@ func (c *Config) Run() (exitCode int) {
 	usage()
 	exitCode = 1
 	return
-}
-
-// getEnv returns the last instance of the environment variable.
-func getEnv(env []string, key string) string {
-	pre := key + "="
-	for i := len(env) - 1; i >= 0; i-- {
-		v := env[i]
-		if strings.HasPrefix(v, pre) {
-			return strings.TrimPrefix(v, pre)
-		}
-	}
-	return ""
 }
 
 func resetUsage(logger *log.Logger, fs *flag.FlagSet, name, args, longHelp string) {
@@ -240,4 +226,19 @@ func parseArgs(args []string) (cmdName string, printCmdUsage bool, exit bool) {
 		}
 	}
 	return cmdName, printCmdUsage, exit
+}
+
+// getEnv returns the last instance of an environment variable.
+func getEnv(env []string, key string) string {
+	for i := len(env) - 1; i >= 0; i-- {
+		v := env[i]
+		kv := strings.SplitN(v, "=", 2)
+		if kv[0] == key {
+			if len(kv) > 1 {
+				return kv[1]
+			}
+			return ""
+		}
+	}
+	return ""
 }
