@@ -77,6 +77,17 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 		}
 	}
 
+	var err error
+	p := new(dep.Project)
+	if err = p.SetRoot(root); err != nil {
+		return errors.Wrap(err, "NewProject")
+	}
+
+	ctx.GOPATH, err = ctx.DetectProjectGOPATH(p)
+	if err != nil {
+		return errors.Wrapf(err, "ctx.DetectProjectGOPATH")
+	}
+
 	mf := filepath.Join(root, dep.ManifestName)
 	lf := filepath.Join(root, dep.LockName)
 	vpath := filepath.Join(root, "vendor")
@@ -98,11 +109,13 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 		return errors.Errorf("invalid state: manifest %q does not exist, but lock %q does", mf, lf)
 	}
 
-	cpr, err := ctx.SplitAbsoluteProjectRoot(root)
+	ip, err := ctx.SplitAbsoluteProjectRoot(root)
 	if err != nil {
 		return errors.Wrap(err, "determineProjectRoot")
 	}
-	pkgT, directDeps, err := getDirectDependencies(root, cpr)
+	p.ImportRoot = gps.ProjectRoot(ip)
+
+	pkgT, directDeps, err := getDirectDependencies(p)
 	if err != nil {
 		return err
 	}
@@ -115,12 +128,12 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 
 	// Initialize with imported data, then fill in the gaps using the GOPATH
 	rootAnalyzer := newRootAnalyzer(cmd.skipTools, ctx, directDeps, sm)
-	m, l, err := rootAnalyzer.InitializeRootManifestAndLock(root, gps.ProjectRoot(cpr))
+	p.Manifest, p.Lock, err = rootAnalyzer.InitializeRootManifestAndLock(root, p.ImportRoot)
 	if err != nil {
 		return err
 	}
 	gs := newGopathScanner(ctx, directDeps, sm)
-	err = gs.InitializeRootManifestAndLock(m, l)
+	err = gs.InitializeRootManifestAndLock(p.Manifest, p.Lock)
 	if err != nil {
 		return err
 	}
@@ -130,8 +143,8 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 	params := gps.SolveParameters{
 		RootDir:         root,
 		RootPackageTree: pkgT,
-		Manifest:        m,
-		Lock:            l,
+		Manifest:        p.Manifest,
+		Lock:            p.Lock,
 		ProjectAnalyzer: rootAnalyzer,
 	}
 
@@ -149,10 +162,10 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 		handleAllTheFailuresOfTheWorld(err)
 		return err
 	}
-	l = dep.LockFromSolution(soln)
+	p.Lock = dep.LockFromSolution(soln)
 
-	rootAnalyzer.FinalizeRootManifestAndLock(m, l)
-	gs.FinalizeRootManifestAndLock(m, l)
+	rootAnalyzer.FinalizeRootManifestAndLock(p.Manifest, p.Lock)
+	gs.FinalizeRootManifestAndLock(p.Manifest, p.Lock)
 
 	// Run gps.Prepare with appropriate constraint solutions from solve run
 	// to generate the final lock memo.
@@ -161,7 +174,7 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 		return errors.Wrap(err, "prepare solver")
 	}
 
-	l.SolveMeta.InputsDigest = s.HashInputs()
+	p.Lock.SolveMeta.InputsDigest = s.HashInputs()
 
 	// Pass timestamp (yyyyMMddHHmmss format) as suffix to backup name.
 	vendorbak, err := dep.BackupVendor(vpath, time.Now().Format("20060102150405"))
@@ -172,7 +185,7 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 		ctx.Err.Printf("Old vendor backed up to %v", vendorbak)
 	}
 
-	sw, err := dep.NewSafeWriter(m, nil, l, dep.VendorAlways)
+	sw, err := dep.NewSafeWriter(p.Manifest, nil, p.Lock, dep.VendorAlways)
 	if err != nil {
 		return err
 	}
@@ -184,8 +197,8 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 	return nil
 }
 
-func getDirectDependencies(root, cpr string) (pkgtree.PackageTree, map[string]bool, error) {
-	pkgT, err := pkgtree.ListPackages(root, cpr)
+func getDirectDependencies(p *dep.Project) (pkgtree.PackageTree, map[string]bool, error) {
+	pkgT, err := pkgtree.ListPackages(p.ResolvedAbsRoot, string(p.ImportRoot))
 	if err != nil {
 		return pkgtree.PackageTree{}, nil, errors.Wrap(err, "gps.ListPackages")
 	}
