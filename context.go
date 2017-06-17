@@ -230,7 +230,7 @@ func (c *Ctx) DetectProjectGOPATH(p *Project) (string, error) {
 // detectGOPATH detects the GOPATH for a given path from ctx.GOPATHs.
 func (c *Ctx) detectGOPATH(path string) (string, error) {
 	for _, gp := range c.GOPATHs {
-		if fs.HasFilepathPrefix(filepath.ToSlash(path), gp) {
+		if fs.HasFilepathPrefix(filepath.FromSlash(path), gp) {
 			return gp, nil
 		}
 	}

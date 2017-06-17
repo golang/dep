@@ -149,49 +149,50 @@ func TestVersionInWorkspace(t *testing.T) {
 }
 
 func TestLoadProject(t *testing.T) {
-	tg := test.NewHelper(t)
-	defer tg.Cleanup()
+	h := test.NewHelper(t)
+	defer h.Cleanup()
 
-	tg.TempDir("src")
-	tg.TempDir("src/test1")
-	tg.TempDir("src/test1/sub")
-	tg.TempFile(filepath.Join("src/test1", ManifestName), "")
-	tg.TempFile(filepath.Join("src/test1", LockName), `memo = "cdafe8641b28cd16fe025df278b0a49b9416859345d8b6ba0ace0272b74925ee"`)
-	tg.TempDir("src/test2")
-	tg.TempDir("src/test2/sub")
-	tg.TempFile(filepath.Join("src/test2", ManifestName), "")
+	h.TempDir(filepath.Join("src", "test1", "sub"))
+	h.TempFile(filepath.Join("src", "test1", ManifestName), "")
+	h.TempFile(filepath.Join("src", "test1", LockName), `memo = "cdafe8641b28cd16fe025df278b0a49b9416859345d8b6ba0ace0272b74925ee"`)
+	h.TempDir(filepath.Join("src", "test2", "sub"))
+	h.TempFile(filepath.Join("src", "test2", ManifestName), "")
 
 	var testcases = []struct {
-		lock  bool
-		start string
+		name string
+		lock bool
+		wd   string
 	}{
-		{true, filepath.Join("src", "test1")},        //direct
-		{true, filepath.Join("src", "test1", "sub")}, //ascending
-		{false, filepath.Join("src", "test2")},       //repeat without lockfile present
-		{false, filepath.Join("src", "test2", "sub")},
+		{"direct", true, filepath.Join("src", "test1")},
+		{"ascending", true, filepath.Join("src", "test1", "sub")},
+		{"without lock", false, filepath.Join("src", "test2")},
+		{"ascending without lock", false, filepath.Join("src", "test2", "sub")},
 	}
 
-	for _, testcase := range testcases {
-		start := testcase.start
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := &Ctx{
+				Out: discardLogger,
+				Err: discardLogger,
+			}
 
-		ctx := &Ctx{
-			GOPATHs:    []string{tg.Path(".")},
-			WorkingDir: tg.Path(start),
-			Out:        discardLogger,
-			Err:        discardLogger,
-		}
+			err := ctx.SetPaths(h.Path(tc.wd), h.Path("."))
+			if err != nil {
+				t.Fatalf("%+v", err)
+			}
 
-		proj, err := ctx.LoadProject()
-		switch {
-		case err != nil:
-			t.Errorf("%s: LoadProject failed: %+v", start, err)
-		case proj.Manifest == nil:
-			t.Errorf("%s: Manifest file didn't load", start)
-		case testcase.lock && proj.Lock == nil:
-			t.Errorf("%s: Lock file didn't load", start)
-		case !testcase.lock && proj.Lock != nil:
-			t.Errorf("%s: Non-existent Lock file loaded", start)
-		}
+			p, err := ctx.LoadProject()
+			switch {
+			case err != nil:
+				t.Fatalf("%s: LoadProject failed: %+v", tc.wd, err)
+			case p.Manifest == nil:
+				t.Fatalf("%s: Manifest file didn't load", tc.wd)
+			case tc.lock && p.Lock == nil:
+				t.Fatalf("%s: Lock file didn't load", tc.wd)
+			case !tc.lock && p.Lock != nil:
+				t.Fatalf("%s: Non-existent Lock file loaded", tc.wd)
+			}
+		})
 	}
 }
 
@@ -438,10 +439,10 @@ func TestDetectProjectGOPATH(t *testing.T) {
 			}
 
 			GOPATH, err := ctx.DetectProjectGOPATH(project)
-			if !tc.expectErr {
-				h.Must(err)
-			} else if err == nil {
-				t.Fatal("expected an error, got nil")
+			if !tc.expectErr && err != nil {
+				t.Fatalf("%+v", err)
+			} else if tc.expectErr && err == nil {
+				t.Fatalf("expected an error, got nil and gopath %s", GOPATH)
 			}
 			if GOPATH != tc.GOPATH {
 				t.Errorf("expected GOPATH %s, got %s", tc.GOPATH, GOPATH)
