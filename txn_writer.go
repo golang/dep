@@ -108,6 +108,7 @@ type SafeWriter struct {
 	lock        *Lock
 	lockDiff    *gps.LockDiff
 	writeVendor bool
+	writeLock   bool
 }
 
 // NewSafeWriter sets up a SafeWriter to write a set of config yaml, lock and vendor tree.
@@ -129,20 +130,25 @@ func NewSafeWriter(manifest *Manifest, oldLock, newLock *Lock, vendor VendorBeha
 		Manifest: manifest,
 		lock:     newLock,
 	}
+
 	if oldLock != nil {
 		if newLock == nil {
 			return nil, errors.New("must provide newLock when oldLock is specified")
 		}
+
 		sw.lockDiff = gps.DiffLocks(oldLock, newLock)
+		if sw.lockDiff != nil {
+			sw.writeLock = true
+		}
+	} else if newLock != nil {
+		sw.writeLock = true
 	}
 
 	switch vendor {
 	case VendorAlways:
 		sw.writeVendor = true
 	case VendorOnChanged:
-		if sw.lockDiff != nil || (newLock != nil && oldLock == nil) {
-			sw.writeVendor = true
-		}
+		sw.writeVendor = sw.lockDiff != nil || (newLock != nil && oldLock == nil)
 	}
 
 	if sw.writeVendor && newLock == nil {
@@ -307,7 +313,7 @@ func (sw *SafeWriter) Write(root string, sm gps.SourceManager, examples bool) er
 		return err
 	}
 
-	if !sw.HasManifest() && !sw.HasLock() && !sw.writeVendor {
+	if !sw.HasManifest() && !sw.writeLock && !sw.writeVendor {
 		// nothing to do
 		return nil
 	}
@@ -341,7 +347,7 @@ func (sw *SafeWriter) Write(root string, sm gps.SourceManager, examples bool) er
 		}
 	}
 
-	if sw.HasLock() {
+	if sw.writeLock {
 		l, err := sw.lock.MarshalTOML()
 		if err != nil {
 			return errors.Wrap(err, "failed to marshal lock to TOML")
@@ -394,7 +400,7 @@ func (sw *SafeWriter) Write(root string, sm gps.SourceManager, examples bool) er
 		}
 	}
 
-	if sw.HasLock() {
+	if sw.writeLock {
 		if _, err := os.Stat(lpath); err == nil {
 			// Move out the old one.
 			tmploc := filepath.Join(td, LockName+".orig")
@@ -468,7 +474,7 @@ func (sw *SafeWriter) PrintPreparedActions(output *log.Logger) error {
 		output.Println(string(m))
 	}
 
-	if sw.HasLock() {
+	if sw.writeLock {
 		if sw.lockDiff == nil {
 			output.Printf("Would have written the following %s:\n", LockName)
 			l, err := sw.lock.MarshalTOML()
