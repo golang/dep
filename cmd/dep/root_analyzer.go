@@ -127,8 +127,6 @@ func (a *rootAnalyzer) DeriveManifestAndLock(dir string, pr gps.ProjectRoot) (gp
 }
 
 func (a *rootAnalyzer) FinalizeRootManifestAndLock(m *dep.Manifest, l *dep.Lock, ol dep.Lock) {
-	a.removeTransitiveDependencies(m)
-
 	// Iterate through the new projects in solved lock and add them to manifest
 	// if they are direct deps and log feedback for all the new projects.
 	for _, y := range l.Projects() {
@@ -142,9 +140,9 @@ func (a *rootAnalyzer) FinalizeRootManifestAndLock(m *dep.Manifest, l *dep.Lock,
 					m.Constraints[pr] = pp
 					pc := gps.ProjectConstraint{Ident: y.Ident(), Constraint: pp.Constraint}
 					f = fb.NewConstraintFeedback(pc, fb.DepTypeDirect)
-				} else {
-					f = fb.NewLockedProjectFeedback(y, fb.DepTypeDirect)
+					f.LogFeedback(a.ctx.Err)
 				}
+				f = fb.NewLockedProjectFeedback(y, fb.DepTypeDirect)
 				f.LogFeedback(a.ctx.Err)
 			}
 		} else {
