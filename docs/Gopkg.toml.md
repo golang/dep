@@ -26,7 +26,9 @@ system2-data = "value that is used by another system"
 ```
 
 ## `constraint`
-A `constraint` provides rules for how directly imported projects may be incorporated into the dependency graph. They are respected by dep whether coming from the Gopkg.toml of the current project or a dependency.
+A `constraint` provides rules for how a [direct dependency]((https://github.com/golang/dep/blob/master/FAQ.md#what-is-a-direct-or-transitive-dependency)) may be incorporated into the 
+dependency graph. 
+They are respected by dep whether coming from the Gopkg.toml of the current project or a dependency.
 ```toml
 [[constraint]]
   # Required: the root import path of the project being constrained.
@@ -50,7 +52,7 @@ A `constraint` provides rules for how directly imported projects may be incorpor
 ## `override`
 An `override` has the same structure as a `constraint` declaration, but supersede all `constraint` declarations from all projects. Only `override` declarations from the current project's are applied.
 
- **Overrides are a sledgehammer. Use them only as a last resort.**
+ [When should I use constraint, override, required, or ignored in Gopkg.toml?](https://github.com/golang/dep/blob/master/FAQ.md#when-should-i-use-constraint-override-required-or-ignored-in-gopkgtoml)
 ```toml
 [[override]]
   # Required: the root import path of the project being constrained.
