@@ -1,7 +1,6 @@
 {
   "commands": [
-    ["init", "-skip-tools", "-no-examples"],
-    ["ensure", "-update"]
+    ["ensure", "-vendor-only"]
   ],
   "vendor-final": [
     "github.com/sdboyer/deptest"

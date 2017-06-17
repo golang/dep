@@ -1,0 +1,6 @@
+{
+  "commands": [
+    ["ensure", "-update"]
+  ],
+  "error-expected": "-update works by updating the versions recorded in Gopkg.lock, but Gopkg.lock does not exist"
+}
