@@ -126,39 +126,40 @@ func (a *rootAnalyzer) DeriveManifestAndLock(dir string, pr gps.ProjectRoot) (gp
 	return gps.SimpleManifest{}, nil, nil
 }
 
-func (a *rootAnalyzer) FinalizeRootManifestAndLock(m *dep.Manifest, l *dep.Lock) {
-	// Remove dependencies from the manifest that aren't used
-	for pr := range m.Constraints {
-		var used bool
-		for _, y := range l.Projects() {
-			if pr == y.Ident().ProjectRoot {
-				used = true
-				break
-			}
-		}
-		if !used {
-			delete(m.Constraints, pr)
-		}
-	}
-	// Pick the direct dependencies from the solution lock and add to manifest.
-	// This is done to fill up the manifest constraints with the dependencies
-	// solved over the network.
+func (a *rootAnalyzer) FinalizeRootManifestAndLock(m *dep.Manifest, l *dep.Lock, ol dep.Lock) {
+	a.removeTransitiveDependencies(m)
+
+	// Iterate through the new projects in solved lock and add them to manifest
+	// if they are direct deps and log feedback for all the new projects.
 	for _, y := range l.Projects() {
 		var f *fb.ConstraintFeedback
 		pr := y.Ident().ProjectRoot
+		// New constraints: in new lock and dir dep but not in manifest
 		if _, ok := a.directDeps[string(pr)]; ok {
-			pp := getProjectPropertiesFromVersion(y.Version())
-			if pp.Constraint != nil {
-				m.Constraints[pr] = pp
-				pc := gps.ProjectConstraint{Ident: y.Ident(), Constraint: pp.Constraint}
-				f = fb.NewConstraintFeedback(pc, fb.DepTypeDirect)
-			} else {
-				f = fb.NewLockedProjectFeedback(y, fb.DepTypeDirect)
+			if _, ok := m.Constraints[pr]; !ok {
+				pp := getProjectPropertiesFromVersion(y.Version())
+				if pp.Constraint != nil {
+					m.Constraints[pr] = pp
+					pc := gps.ProjectConstraint{Ident: y.Ident(), Constraint: pp.Constraint}
+					f = fb.NewConstraintFeedback(pc, fb.DepTypeDirect)
+				} else {
+					f = fb.NewLockedProjectFeedback(y, fb.DepTypeDirect)
+				}
+				f.LogFeedback(a.ctx.Err)
 			}
 		} else {
-			f = fb.NewLockedProjectFeedback(y, fb.DepTypeTransitive)
+			// New locked projects: in new lock but not in old lock
+			newProject := true
+			for _, opl := range ol.Projects() {
+				if pr == opl.Ident().ProjectRoot {
+					newProject = false
+				}
+			}
+			if newProject {
+				f = fb.NewLockedProjectFeedback(y, fb.DepTypeTransitive)
+				f.LogFeedback(a.ctx.Err)
+			}
 		}
-		f.LogFeedback(a.ctx.Err)
 	}
 }
 

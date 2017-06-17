@@ -140,8 +140,8 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 		return err
 	}
 
-	gs := newGopathScanner(ctx, directDeps, sm)
 	if cmd.gopath {
+		gs := newGopathScanner(ctx, directDeps, sm)
 		err = gs.InitializeRootManifestAndLock(p.Manifest, p.Lock)
 		if err != nil {
 			return err
@@ -149,6 +149,7 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 	}
 
 	rootAnalyzer.skipTools = true // Don't import external config during solve for now
+	copyLock := *p.Lock           // Copy lock before solving. Use this to separate new lock projects from solved lock
 
 	params := gps.SolveParameters{
 		RootDir:         root,
@@ -174,10 +175,7 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 	}
 	p.Lock = dep.LockFromSolution(soln)
 
-	rootAnalyzer.FinalizeRootManifestAndLock(p.Manifest, p.Lock)
-	if cmd.gopath {
-		gs.FinalizeRootManifestAndLock(p.Manifest, p.Lock)
-	}
+	rootAnalyzer.FinalizeRootManifestAndLock(p.Manifest, p.Lock, copyLock)
 
 	// Run gps.Prepare with appropriate constraint solutions from solve run
 	// to generate the final lock memo.
