@@ -52,26 +52,14 @@ type Project struct {
 	Lock       *Lock // Optional
 }
 
-// SetRoot set the project AbsRoot. If the root is a symlink, it attempts to resolve it.
+// SetRoot sets the project AbsRoot and ResolvedAbsRoot. If root is a not symlink, ResolvedAbsRoot will be set to root.
 func (p *Project) SetRoot(root string) error {
-	sym, err := fs.IsSymlink(root)
+	rroot, err := filepath.EvalSymlinks(root)
 	if err != nil {
 		return err
 	}
 
-	// if root is a symlink, set p.ResolvedAbsRoot to the resolved path.
-	if sym {
-		resolved, err := filepath.EvalSymlinks(root)
-		if err != nil {
-			return err
-		}
-		p.ResolvedAbsRoot = resolved
-	} else {
-		p.ResolvedAbsRoot = root
-	}
-
-	p.AbsRoot = root
-
+	p.ResolvedAbsRoot, p.AbsRoot = rroot, root
 	return nil
 }
 
