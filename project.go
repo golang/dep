@@ -87,7 +87,7 @@ func (p *Project) MakeParams() gps.SolveParameters {
 func BackupVendor(vpath, suffix string) (string, error) {
 	// Check if there's a non-empty vendor directory
 	vendorExists, err := fs.IsNonEmptyDir(vpath)
-	if err != nil {
+	if err != nil && !os.IsNotExist(err) {
 		return "", err
 	}
 	if vendorExists {
