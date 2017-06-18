@@ -8,7 +8,6 @@ import (
 	"bytes"
 	"encoding/hex"
 	"flag"
-	"fmt"
 	"go/build"
 	"strconv"
 	"strings"
@@ -195,14 +194,14 @@ func (cmd *ensureCommand) runDefault(ctx *dep.Ctx, args []string, p *dep.Project
 	// Bare ensure doesn't take any args.
 	if len(args) != 0 {
 		if cmd.vendorOnly {
-			return errors.Errorf("dep ensure -vendor-only only populates vendor/ from %s; it takes no spec arguments.", dep.LockName)
+			return errors.Errorf("dep ensure -vendor-only only populates vendor/ from %s; it takes no spec arguments", dep.LockName)
 		}
-		return errors.New("dep ensure only takes spec arguments with -add or -update - did you want one of those?")
+		return errors.New("dep ensure only takes spec arguments with -add or -update")
 	}
 
 	if cmd.vendorOnly {
 		if p.Lock == nil {
-			return errors.Errorf("no %s exists from which to populate vendor/ directory", dep.LockName)
+			return errors.Errorf("no %s exists from which to populate vendor/", dep.LockName)
 		}
 		// Pass the same lock as old and new so that the writer will observe no
 		// difference and choose not to write it out.
@@ -212,7 +211,7 @@ func (cmd *ensureCommand) runDefault(ctx *dep.Ctx, args []string, p *dep.Project
 		}
 
 		if cmd.dryRun {
-			fmt.Printf("Would have populated vendor/ directory from %s", dep.LockName)
+			ctx.Loggers.Out.Printf("Would have populated vendor/ directory from %s", dep.LockName)
 			return nil
 		}
 
@@ -243,7 +242,7 @@ func (cmd *ensureCommand) runDefault(ctx *dep.Ctx, args []string, p *dep.Project
 		}
 
 		if cmd.dryRun {
-			fmt.Printf("Would have populated vendor/ directory from %s", dep.LockName)
+			ctx.Loggers.Out.Printf("Would have populated vendor/ directory from %s", dep.LockName)
 			return nil
 		}
 
@@ -269,7 +268,7 @@ func (cmd *ensureCommand) runDefault(ctx *dep.Ctx, args []string, p *dep.Project
 
 func (cmd *ensureCommand) runUpdate(ctx *dep.Ctx, args []string, p *dep.Project, sm gps.SourceManager, params gps.SolveParameters) error {
 	if p.Lock == nil {
-		return errors.Errorf("%s does not exist. nothing to do, as -update works by updating the values in %s.", dep.LockName, dep.LockName)
+		return errors.Errorf("-update works by updating the versions recorded in %s, but %s does not exist", dep.LockName, dep.LockName)
 	}
 
 	// We'll need to discard this prepared solver as later work changes params,
@@ -287,7 +286,7 @@ func (cmd *ensureCommand) runUpdate(ctx *dep.Ctx, args []string, p *dep.Project,
 	// "pending" changes, or the -update that caused the problem?).
 	// TODO(sdboyer) reduce this to a warning?
 	if !bytes.Equal(p.Lock.InputHash(), solver.HashInputs()) {
-		return errors.Errorf("%s and %s are out of sync. run a plain dep ensure to resync them before attempting an -update.", dep.ManifestName, dep.LockName)
+		return errors.Errorf("%s and %s are out of sync. Run a plain dep ensure to resync them before attempting to -update", dep.ManifestName, dep.LockName)
 	}
 
 	// When -update is specified without args, allow every dependency to change
@@ -313,13 +312,13 @@ func (cmd *ensureCommand) runUpdate(ctx *dep.Ctx, args []string, p *dep.Project,
 		}
 
 		if pc.Ident.Source != "" {
-			return errors.Errorf("cannot specify alternate sources on -update (%s)", pc.Ident)
+			return errors.Errorf("cannot specify alternate sources on -update (%s)", pc.Ident.Source)
 		}
 
 		if !gps.IsAny(pc.Constraint) {
 			// TODO(sdboyer) constraints should be allowed to allow solves that
 			// target particular versions while remaining within declared constraints
-			return errors.Errorf("-update operates according to constraints declared in %s, not CLI arguments.\nYou passed in %s for %s", dep.ManifestName, pc.Constraint, pc.Ident.ProjectRoot)
+			return errors.Errorf("version constraint %s passed for %s, but -update follows constraints declared in %s, not CLI arguments", pc.Constraint, pc.Ident.ProjectRoot, dep.ManifestName)
 		}
 
 		params.ToChange = append(params.ToChange, gps.ProjectRoot(arg))
@@ -352,7 +351,7 @@ func (cmd *ensureCommand) runUpdate(ctx *dep.Ctx, args []string, p *dep.Project,
 
 func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm gps.SourceManager, params gps.SolveParameters) error {
 	if len(args) == 0 {
-		return errors.New("must specify at least one project or package to add")
+		return errors.New("must specify at least one project or package to -add")
 	}
 
 	// We'll need to discard this prepared solver as later work changes params,
@@ -370,7 +369,7 @@ func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm
 	// "pending" changes, or the -add that caused the problem?).
 	// TODO(sdboyer) reduce this to a warning?
 	if !bytes.Equal(p.Lock.InputHash(), solver.HashInputs()) {
-		return errors.Errorf("%s and %s are out of sync. run a plain dep ensure to resync them before attempting an -add.", dep.ManifestName, dep.LockName)
+		return errors.Errorf("%s and %s are out of sync. Run a plain dep ensure to resync them before attempting to -add", dep.ManifestName, dep.LockName)
 	}
 
 	rm, errmap := params.RootPackageTree.ToReachMap(true, true, false, p.Manifest.IgnoredPackages())
