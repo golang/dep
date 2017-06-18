@@ -159,6 +159,9 @@ func (g *godepImporter) convert(pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock, e
 func (g *godepImporter) buildProjectConstraint(pkg godepPackage) (pc gps.ProjectConstraint, err error) {
 	pc.Ident = gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot(pkg.ImportPath)}
 	pc.Constraint, err = deduceConstraint(pkg.Comment, pc.Ident, g.sm)
+	if err != nil {
+		return
+	}
 
 	f := fb.NewConstraintFeedback(pc, fb.DepTypeImported)
 	f.LogFeedback(g.logger)
