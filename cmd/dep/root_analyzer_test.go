@@ -13,7 +13,7 @@ func TestRootAnalyzer_Info(t *testing.T) {
 	}
 	for skipTools, want := range testCases {
 		a := rootAnalyzer{skipTools: skipTools}
-		got, _ := a.Info()
+		got := a.Info().Name
 		if got != want {
 			t.Errorf("Expected the name of the importer with skipTools=%t to be '%s', got '%s'", skipTools, want, got)
 		}

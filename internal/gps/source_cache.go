@@ -16,11 +16,11 @@ import (
 type singleSourceCache interface {
 	// Store the manifest and lock information for a given revision, as defined by
 	// a particular ProjectAnalyzer.
-	setManifestAndLock(Revision, ProjectAnalyzer, Manifest, Lock)
+	setManifestAndLock(Revision, ProjectAnalyzerInfo, Manifest, Lock)
 
 	// Get the manifest and lock information for a given revision, as defined by
 	// a particular ProjectAnalyzer.
-	getManifestAndLock(Revision, ProjectAnalyzer) (Manifest, Lock, bool)
+	getManifestAndLock(Revision, ProjectAnalyzerInfo) (Manifest, Lock, bool)
 
 	// Store a PackageTree for a given revision.
 	setPackageTree(Revision, pkgtree.PackageTree)
@@ -63,7 +63,7 @@ type singleSourceCache interface {
 
 type singleSourceCacheMemory struct {
 	mut    sync.RWMutex // protects all maps
-	infos  map[ProjectAnalyzer]map[Revision]projectInfo
+	infos  map[ProjectAnalyzerInfo]map[Revision]projectInfo
 	ptrees map[Revision]pkgtree.PackageTree
 	vMap   map[UnpairedVersion]Revision
 	rMap   map[Revision][]UnpairedVersion
@@ -71,7 +71,7 @@ type singleSourceCacheMemory struct {
 
 func newMemoryCache() singleSourceCache {
 	return &singleSourceCacheMemory{
-		infos:  make(map[ProjectAnalyzer]map[Revision]projectInfo),
+		infos:  make(map[ProjectAnalyzerInfo]map[Revision]projectInfo),
 		ptrees: make(map[Revision]pkgtree.PackageTree),
 		vMap:   make(map[UnpairedVersion]Revision),
 		rMap:   make(map[Revision][]UnpairedVersion),
@@ -83,12 +83,12 @@ type projectInfo struct {
 	Lock
 }
 
-func (c *singleSourceCacheMemory) setManifestAndLock(r Revision, an ProjectAnalyzer, m Manifest, l Lock) {
+func (c *singleSourceCacheMemory) setManifestAndLock(r Revision, pai ProjectAnalyzerInfo, m Manifest, l Lock) {
 	c.mut.Lock()
-	inner, has := c.infos[an]
+	inner, has := c.infos[pai]
 	if !has {
 		inner = make(map[Revision]projectInfo)
-		c.infos[an] = inner
+		c.infos[pai] = inner
 	}
 	inner[r] = projectInfo{Manifest: m, Lock: l}
 
@@ -100,11 +100,11 @@ func (c *singleSourceCacheMemory) setManifestAndLock(r Revision, an ProjectAnaly
 	c.mut.Unlock()
 }
 
-func (c *singleSourceCacheMemory) getManifestAndLock(r Revision, an ProjectAnalyzer) (Manifest, Lock, bool) {
+func (c *singleSourceCacheMemory) getManifestAndLock(r Revision, pai ProjectAnalyzerInfo) (Manifest, Lock, bool) {
 	c.mut.Lock()
 	defer c.mut.Unlock()
 
-	inner, has := c.infos[an]
+	inner, has := c.infos[pai]
 	if !has {
 		return nil, nil, false
 	}
@@ -149,7 +149,7 @@ func (c *singleSourceCacheMemory) storeVersionMap(versionList []PairedVersion, f
 
 	for _, v := range versionList {
 		pv := v.(PairedVersion)
-		u, r := pv.Unpair(), pv.Underlying()
+		u, r := pv.Unpair(), pv.Revision()
 		c.vMap[u] = r
 		c.rMap[r] = append(c.rMap[r], u)
 	}
@@ -174,7 +174,7 @@ func (c *singleSourceCacheMemory) getVersionsFor(r Revision) ([]UnpairedVersion,
 func (c *singleSourceCacheMemory) getAllVersions() []PairedVersion {
 	vlist := make([]PairedVersion, 0, len(c.vMap))
 	for v, r := range c.vMap {
-		vlist = append(vlist, v.Is(r))
+		vlist = append(vlist, v.Pair(r))
 	}
 	return vlist
 }
@@ -191,7 +191,7 @@ func (c *singleSourceCacheMemory) toRevision(v Version) (Revision, bool) {
 	case Revision:
 		return t, true
 	case PairedVersion:
-		return t.Underlying(), true
+		return t.Revision(), true
 	case UnpairedVersion:
 		c.mut.Lock()
 		r, has := c.vMap[t]

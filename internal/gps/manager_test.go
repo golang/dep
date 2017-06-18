@@ -27,8 +27,11 @@ func (naiveAnalyzer) DeriveManifestAndLock(string, ProjectRoot) (Manifest, Lock,
 	return nil, nil, nil
 }
 
-func (a naiveAnalyzer) Info() (name string, version int) {
-	return "naive-analyzer", 1
+func (a naiveAnalyzer) Info() ProjectAnalyzerInfo {
+	return ProjectAnalyzerInfo{
+		Name:    "naive-analyzer",
+		Version: 1,
+	}
 }
 
 func mkNaiveSM(t *testing.T) (*SourceMgr, func()) {
@@ -148,13 +151,13 @@ func TestSourceInit(t *testing.T) {
 		t.Errorf("Expected seven version results from the test repo, got %v", len(pvl))
 	} else {
 		expected := []PairedVersion{
-			NewVersion("v2.0.0").Is(Revision("4a54adf81c75375d26d376459c00d5ff9b703e5e")),
-			NewVersion("v1.1.0").Is(Revision("b2cb48dda625f6640b34d9ffb664533359ac8b91")),
-			NewVersion("v1.0.0").Is(Revision("bf85021c0405edbc4f3648b0603818d641674f72")),
-			newDefaultBranch("master").Is(Revision("bf85021c0405edbc4f3648b0603818d641674f72")),
-			NewBranch("v1").Is(Revision("e3777f683305eafca223aefe56b4e8ecf103f467")),
-			NewBranch("v1.1").Is(Revision("f1fbc520489a98306eb28c235204e39fa8a89c84")),
-			NewBranch("v3").Is(Revision("4a54adf81c75375d26d376459c00d5ff9b703e5e")),
+			NewVersion("v2.0.0").Pair(Revision("4a54adf81c75375d26d376459c00d5ff9b703e5e")),
+			NewVersion("v1.1.0").Pair(Revision("b2cb48dda625f6640b34d9ffb664533359ac8b91")),
+			NewVersion("v1.0.0").Pair(Revision("bf85021c0405edbc4f3648b0603818d641674f72")),
+			newDefaultBranch("master").Pair(Revision("bf85021c0405edbc4f3648b0603818d641674f72")),
+			NewBranch("v1").Pair(Revision("e3777f683305eafca223aefe56b4e8ecf103f467")),
+			NewBranch("v1.1").Pair(Revision("f1fbc520489a98306eb28c235204e39fa8a89c84")),
+			NewBranch("v3").Pair(Revision("4a54adf81c75375d26d376459c00d5ff9b703e5e")),
 		}
 
 		// SourceManager itself doesn't guarantee ordering; sort them here so we
@@ -186,13 +189,13 @@ func TestSourceInit(t *testing.T) {
 		t.Errorf("Expected seven version results from the test repo, got %v", len(vl))
 	} else {
 		expected := []Version{
-			NewVersion("v2.0.0").Is(Revision("4a54adf81c75375d26d376459c00d5ff9b703e5e")),
-			NewVersion("v1.1.0").Is(Revision("b2cb48dda625f6640b34d9ffb664533359ac8b91")),
-			NewVersion("v1.0.0").Is(Revision("bf85021c0405edbc4f3648b0603818d641674f72")),
-			newDefaultBranch("master").Is(Revision("bf85021c0405edbc4f3648b0603818d641674f72")),
-			NewBranch("v1").Is(Revision("e3777f683305eafca223aefe56b4e8ecf103f467")),
-			NewBranch("v1.1").Is(Revision("f1fbc520489a98306eb28c235204e39fa8a89c84")),
-			NewBranch("v3").Is(Revision("4a54adf81c75375d26d376459c00d5ff9b703e5e")),
+			NewVersion("v2.0.0").Pair(Revision("4a54adf81c75375d26d376459c00d5ff9b703e5e")),
+			NewVersion("v1.1.0").Pair(Revision("b2cb48dda625f6640b34d9ffb664533359ac8b91")),
+			NewVersion("v1.0.0").Pair(Revision("bf85021c0405edbc4f3648b0603818d641674f72")),
+			newDefaultBranch("master").Pair(Revision("bf85021c0405edbc4f3648b0603818d641674f72")),
+			NewBranch("v1").Pair(Revision("e3777f683305eafca223aefe56b4e8ecf103f467")),
+			NewBranch("v1.1").Pair(Revision("f1fbc520489a98306eb28c235204e39fa8a89c84")),
+			NewBranch("v3").Pair(Revision("4a54adf81c75375d26d376459c00d5ff9b703e5e")),
 		}
 
 		for k, e := range expected {
@@ -273,9 +276,9 @@ func TestDefaultBranchAssignment(t *testing.T) {
 		brev := Revision("fda020843ac81352004b9dca3fcccdd517600149")
 		mrev := Revision("9f9c3a591773d9b28128309ac7a9a72abcab267d")
 		expected := []PairedVersion{
-			NewBranch("branchone").Is(brev),
-			NewBranch("otherbranch").Is(brev),
-			NewBranch("master").Is(mrev),
+			NewBranch("branchone").Pair(brev),
+			NewBranch("otherbranch").Pair(brev),
+			NewBranch("master").Pair(mrev),
 		}
 
 		SortPairedForUpgrade(v)

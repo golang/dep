@@ -20,6 +20,12 @@ import (
 // ManifestName is the manifest file name used by dep.
 const ManifestName = "Gopkg.toml"
 
+// Errors
+var errInvalidConstraint = errors.New("\"constraint\" must be a TOML array of tables")
+var errInvalidOverride = errors.New("\"override\" must be a TOML array of tables")
+var errInvalidRequired = errors.New("\"required\" must be a TOML list of strings")
+var errInvalidIgnored = errors.New("\"ignored\" must be a TOML list of strings")
+
 // Manifest holds manifest file data and implements gps.RootManifest.
 type Manifest struct {
 	Constraints gps.ProjectConstraints
@@ -44,11 +50,11 @@ type rawProject struct {
 }
 
 func validateManifest(s string) ([]error, error) {
-	var errs []error
+	var warns []error
 	// Load the TomlTree from string
 	tree, err := toml.Load(s)
 	if err != nil {
-		return errs, errors.Wrap(err, "Unable to load TomlTree from string")
+		return warns, errors.Wrap(err, "Unable to load TomlTree from string")
 	}
 	// Convert tree to a map
 	manifest := tree.ToMap()
@@ -61,46 +67,83 @@ func validateManifest(s string) ([]error, error) {
 		case "metadata":
 			// Check if metadata is of Map type
 			if reflect.TypeOf(val).Kind() != reflect.Map {
-				errs = append(errs, errors.New("metadata should be a TOML table"))
+				warns = append(warns, errors.New("metadata should be a TOML table"))
 			}
 		case "constraint", "override":
+			valid := true
 			// Invalid if type assertion fails. Not a TOML array of tables.
 			if rawProj, ok := val.([]interface{}); ok {
-				// Iterate through each array of tables
-				for _, v := range rawProj {
-					// Check the individual field's key to be valid
-					for key, value := range v.(map[string]interface{}) {
-						// Check if the key is valid
-						switch key {
-						case "name", "branch", "version", "source":
-							// valid key
-						case "revision":
-							if valueStr, ok := value.(string); ok {
-								if abbrevRevHash.MatchString(valueStr) {
-									errs = append(errs, fmt.Errorf("revision %q should not be in abbreviated form", valueStr))
+				// Check element type. Must be a map. Checking one element would be
+				// enough because TOML doesn't allow mixing of types.
+				if reflect.TypeOf(rawProj[0]).Kind() != reflect.Map {
+					valid = false
+				}
+
+				if valid {
+					// Iterate through each array of tables
+					for _, v := range rawProj {
+						// Check the individual field's key to be valid
+						for key, value := range v.(map[string]interface{}) {
+							// Check if the key is valid
+							switch key {
+							case "name", "branch", "version", "source":
+								// valid key
+							case "revision":
+								if valueStr, ok := value.(string); ok {
+									if abbrevRevHash.MatchString(valueStr) {
+										warns = append(warns, fmt.Errorf("revision %q should not be in abbreviated form", valueStr))
+									}
 								}
+							case "metadata":
+								// Check if metadata is of Map type
+								if reflect.TypeOf(value).Kind() != reflect.Map {
+									warns = append(warns, fmt.Errorf("metadata in %q should be a TOML table", prop))
+								}
+							default:
+								// unknown/invalid key
+								warns = append(warns, fmt.Errorf("Invalid key %q in %q", key, prop))
 							}
-						case "metadata":
-							// Check if metadata is of Map type
-							if reflect.TypeOf(value).Kind() != reflect.Map {
-								errs = append(errs, fmt.Errorf("metadata in %q should be a TOML table", prop))
-							}
-						default:
-							// unknown/invalid key
-							errs = append(errs, fmt.Errorf("Invalid key %q in %q", key, prop))
 						}
 					}
 				}
 			} else {
-				errs = append(errs, fmt.Errorf("%v should be a TOML array of tables", prop))
+				valid = false
+			}
+
+			if !valid {
+				if prop == "constraint" {
+					return warns, errInvalidConstraint
+				}
+				if prop == "override" {
+					return warns, errInvalidOverride
+				}
 			}
 		case "ignored", "required":
+			valid := true
+			if rawList, ok := val.([]interface{}); ok {
+				// Check element type of the array. TOML doesn't let mixing of types in
+				// array. Checking one element would be enough. Empty array is valid.
+				if len(rawList) > 0 && reflect.TypeOf(rawList[0]).Kind() != reflect.String {
+					valid = false
+				}
+			} else {
+				valid = false
+			}
+
+			if !valid {
+				if prop == "ignored" {
+					return warns, errInvalidIgnored
+				}
+				if prop == "required" {
+					return warns, errInvalidRequired
+				}
+			}
 		default:
-			errs = append(errs, fmt.Errorf("Unknown field in manifest: %v", prop))
+			warns = append(warns, fmt.Errorf("Unknown field in manifest: %v", prop))
 		}
 	}
 
-	return errs, nil
+	return warns, nil
 }
 
 // readManifest returns a Manifest read from r and a slice of validation warnings.
@@ -149,6 +192,9 @@ func fromRawManifest(raw rawManifest) (*Manifest, error) {
 		name, prj, err := toProject(raw.Overrides[i])
 		if err != nil {
 			return nil, err
+		}
+		if _, exists := m.Ovr[name]; exists {
+			return nil, errors.Errorf("multiple overrides specified for %s, can only specify one", name)
 		}
 		m.Ovr[name] = prj
 	}

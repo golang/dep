@@ -1,6 +1,6 @@
 {
   "commands": [
-    ["init", "-no-examples"]
+    ["init", "-no-examples", "-gopath"]
   ],
   "error-expected": "",
   "gopath-initial": {

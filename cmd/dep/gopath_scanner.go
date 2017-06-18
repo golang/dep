@@ -46,7 +46,7 @@ func newGopathScanner(ctx *dep.Ctx, directDeps map[string]bool, sm gps.SourceMan
 func (g *gopathScanner) InitializeRootManifestAndLock(rootM *dep.Manifest, rootL *dep.Lock) error {
 	var err error
 
-	g.ctx.Loggers.Err.Println("Searching GOPATH for projects...")
+	g.ctx.Err.Println("Searching GOPATH for projects...")
 	g.pd, err = g.scanGopathForDependencies()
 	if err != nil {
 		return err
@@ -91,7 +91,12 @@ func (g *gopathScanner) overlay(rootM *dep.Manifest, rootL *dep.Lock) {
 		}
 		rootM.Constraints[pkg] = prj
 		v := g.pd.ondisk[pkg]
-		feedback(v, pkg, fb.DepTypeDirect, g.ctx.Err)
+
+		pi := gps.ProjectIdentifier{ProjectRoot: pkg, Source: prj.Source}
+		f := fb.NewConstraintFeedback(gps.ProjectConstraint{Ident: pi, Constraint: v}, fb.DepTypeDirect)
+		f.LogFeedback(g.ctx.Err)
+		f = fb.NewLockedProjectFeedback(gps.NewLockedProject(pi, v, nil), fb.DepTypeDirect)
+		f.LogFeedback(g.ctx.Err)
 	}
 
 	// Keep track of which projects have been locked
@@ -109,8 +114,8 @@ func (g *gopathScanner) overlay(rootM *dep.Manifest, rootL *dep.Lock) {
 		lockedProjects[pkg] = true
 
 		if _, isDirect := g.directDeps[string(pkg)]; !isDirect {
-			v := g.pd.ondisk[pkg]
-			feedback(v, pkg, fb.DepTypeTransitive, g.ctx.Err)
+			f := fb.NewLockedProjectFeedback(lp, fb.DepTypeTransitive)
+			f.LogFeedback(g.ctx.Err)
 		}
 	}
 
@@ -123,30 +128,9 @@ func (g *gopathScanner) overlay(rootM *dep.Manifest, rootL *dep.Lock) {
 		unlockedProjects = append(unlockedProjects, string(pr))
 	}
 	if len(unlockedProjects) > 0 {
-		g.ctx.Loggers.Err.Printf("Following dependencies were not found in GOPATH. "+
+		g.ctx.Err.Printf("Following dependencies were not found in GOPATH. "+
 			"Dep will use the most recent versions of these projects.\n  %s",
 			strings.Join(unlockedProjects, "\n  "))
-	}
-}
-
-func (g *gopathScanner) FinalizeRootManifestAndLock(m *dep.Manifest, l *dep.Lock) {
-	// Iterate through the new projects in solved lock and add them to manifest
-	// if direct deps and log feedback for all the new projects.
-	for _, x := range l.Projects() {
-		pr := x.Ident().ProjectRoot
-		newProject := true
-		// Check if it's a new project, not in the old lock
-		for _, y := range g.origL.Projects() {
-			if pr == y.Ident().ProjectRoot {
-				newProject = false
-			}
-		}
-		if newProject {
-			// If it's in notondisk, add to manifest, these are direct dependencies.
-			if _, ok := g.pd.notondisk[pr]; ok {
-				m.Constraints[pr] = getProjectPropertiesFromVersion(x.Version())
-			}
-		}
 	}
 }
 
@@ -211,7 +195,7 @@ func (g *gopathScanner) scanGopathForDependencies() (projectData, error) {
 	var syncDepGroup sync.WaitGroup
 	syncDep := func(pr gps.ProjectRoot, sm gps.SourceManager) {
 		if err := sm.SyncSourceFor(gps.ProjectIdentifier{ProjectRoot: pr}); err != nil {
-			g.ctx.Loggers.Err.Printf("%+v", errors.Wrapf(err, "Unable to cache %s", pr))
+			g.ctx.Err.Printf("%+v", errors.Wrapf(err, "Unable to cache %s", pr))
 		}
 		syncDepGroup.Done()
 	}

@@ -39,13 +39,28 @@ func findProjectRoot(from string) (string, error) {
 	}
 }
 
+// A Project holds a Manifest and optional Lock for a project.
 type Project struct {
 	// AbsRoot is the absolute path to the root directory of the project.
 	AbsRoot string
+	// ResolvedAbsRoot is the resolved absolute path to the root directory of the project.
+	// If AbsRoot is not a symlink, then ResolvedAbsRoot should equal AbsRoot.
+	ResolvedAbsRoot string
 	// ImportRoot is the import path of the project's root directory.
 	ImportRoot gps.ProjectRoot
 	Manifest   *Manifest
-	Lock       *Lock
+	Lock       *Lock // Optional
+}
+
+// SetRoot sets the project AbsRoot and ResolvedAbsRoot. If root is a not symlink, ResolvedAbsRoot will be set to root.
+func (p *Project) SetRoot(root string) error {
+	rroot, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		return err
+	}
+
+	p.ResolvedAbsRoot, p.AbsRoot = rroot, root
+	return nil
 }
 
 // MakeParams is a simple helper to create a gps.SolveParameters without setting

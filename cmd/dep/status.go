@@ -162,7 +162,7 @@ type dotOutput struct {
 func (out *dotOutput) BasicHeader() {
 	out.g = new(graphviz).New()
 
-	ptree, _ := pkgtree.ListPackages(out.p.AbsRoot, string(out.p.ImportRoot))
+	ptree, _ := pkgtree.ListPackages(out.p.ResolvedAbsRoot, string(out.p.ImportRoot))
 	prm, _ := ptree.ToReachMap(true, false, false, nil)
 
 	out.g.createNode(string(out.p.ImportRoot), "", prm.FlattenFn(paths.IsStandardImportPath))
@@ -215,22 +215,22 @@ func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
 		}
 	}
 
-	digestMismatch, hasMissingPkgs, err := runStatusAll(ctx.Loggers, out, p, sm)
+	digestMismatch, hasMissingPkgs, err := runStatusAll(ctx, out, p, sm)
 	if err != nil {
 		return err
 	}
 
 	if digestMismatch {
 		if hasMissingPkgs {
-			ctx.Loggers.Err.Println("Lock inputs-digest mismatch due to the following packages missing from the lock:\n")
-			ctx.Loggers.Out.Print(buf.String())
-			ctx.Loggers.Err.Println("\nThis happens when a new import is added. Run `dep ensure` to install the missing packages.")
+			ctx.Err.Printf("Lock inputs-digest mismatch due to the following packages missing from the lock:\n\n")
+			ctx.Out.Print(buf.String())
+			ctx.Err.Printf("\nThis happens when a new import is added. Run `dep ensure` to install the missing packages.\n")
 		} else {
-			ctx.Loggers.Err.Printf("Lock inputs-digest mismatch. This happens when Gopkg.toml is modified.\n" +
+			ctx.Err.Printf("Lock inputs-digest mismatch. This happens when Gopkg.toml is modified.\n" +
 				"Run `dep ensure` to regenerate the inputs-digest.")
 		}
 	} else {
-		ctx.Loggers.Out.Print(buf.String())
+		ctx.Out.Print(buf.String())
 	}
 
 	return nil
@@ -253,7 +253,7 @@ type MissingStatus struct {
 	MissingPackages []string
 }
 
-func runStatusAll(loggers *dep.Loggers, out outputter, p *dep.Project, sm gps.SourceManager) (bool, bool, error) {
+func runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceManager) (bool, bool, error) {
 	var digestMismatch, hasMissingPkgs bool
 
 	if p.Lock == nil {
@@ -263,7 +263,7 @@ func runStatusAll(loggers *dep.Loggers, out outputter, p *dep.Project, sm gps.So
 
 	// While the network churns on ListVersions() requests, statically analyze
 	// code from the current project.
-	ptree, err := pkgtree.ListPackages(p.AbsRoot, string(p.ImportRoot))
+	ptree, err := pkgtree.ListPackages(p.ResolvedAbsRoot, string(p.ImportRoot))
 	if err != nil {
 		return digestMismatch, hasMissingPkgs, errors.Errorf("analysis of local packages failed: %v", err)
 	}
@@ -276,8 +276,8 @@ func runStatusAll(loggers *dep.Loggers, out outputter, p *dep.Project, sm gps.So
 		Manifest:        p.Manifest,
 		// Locks aren't a part of the input hash check, so we can omit it.
 	}
-	if loggers.Verbose {
-		params.TraceLogger = loggers.Err
+	if ctx.Verbose {
+		params.TraceLogger = ctx.Err
 	}
 
 	s, err := gps.Prepare(params, sm)
@@ -328,7 +328,7 @@ func runStatusAll(loggers *dep.Loggers, out outputter, p *dep.Project, sm gps.So
 				bs.Revision = tv
 			case gps.PairedVersion:
 				bs.Version = tv.Unpair()
-				bs.Revision = tv.Underlying()
+				bs.Revision = tv.Revision()
 			}
 
 			// Check if the manifest has an override for this project. If so,
@@ -364,7 +364,7 @@ func runStatusAll(loggers *dep.Loggers, out outputter, p *dep.Project, sm gps.So
 						// upgrade, the first version we encounter that
 						// matches our constraint will be what we want.
 						if c.Constraint.Matches(v) {
-							bs.Latest = v.Underlying()
+							bs.Latest = v.Revision()
 							break
 						}
 					}
@@ -412,9 +412,9 @@ func runStatusAll(loggers *dep.Loggers, out outputter, p *dep.Project, sm gps.So
 		// TODO this is just a fix quick so staticcheck doesn't complain.
 		// Visually reconciling failure to deduce project roots with the rest of
 		// the mismatch output is a larger problem.
-		loggers.Err.Printf("Failed to deduce project roots for import paths:\n")
+		ctx.Err.Printf("Failed to deduce project roots for import paths:\n")
 		for _, fail := range errs {
-			loggers.Err.Printf("\t%s: %s\n", fail.ex, fail.err.Error())
+			ctx.Err.Printf("\t%s: %s\n", fail.ex, fail.err.Error())
 		}
 
 		return digestMismatch, hasMissingPkgs, errors.New("address issues with undeducible import paths to get more status information")

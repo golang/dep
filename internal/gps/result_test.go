@@ -26,22 +26,22 @@ func init() {
 		p: []LockedProject{
 			pa2lp(atom{
 				id: pi("github.com/sdboyer/testrepo"),
-				v:  NewBranch("master").Is(Revision("4d59fb584b15a94d7401e356d2875c472d76ef45")),
+				v:  NewBranch("master").Pair(Revision("4d59fb584b15a94d7401e356d2875c472d76ef45")),
 			}, nil),
 			pa2lp(atom{
 				id: pi("github.com/Masterminds/VCSTestRepo"),
-				v:  NewVersion("1.0.0").Is(Revision("30605f6ac35fcb075ad0bfa9296f90a7d891523e")),
+				v:  NewVersion("1.0.0").Pair(Revision("30605f6ac35fcb075ad0bfa9296f90a7d891523e")),
 			}, nil),
 		},
 	}
-	basicResult.analyzerName, basicResult.analyzerVersion = (naiveAnalyzer{}).Info()
+	basicResult.analyzerInfo = (naiveAnalyzer{}).Info()
 
 	// Just in case something needs punishing, kubernetes offers a complex,
 	// real-world set of dependencies, and this revision is known to work.
 	/*
 		_ = atom{
 			id: pi("github.com/kubernetes/kubernetes"),
-			v:  NewVersion("1.0.0").Is(Revision("528f879e7d3790ea4287687ef0ab3f2a01cc2718")),
+			v:  NewVersion("1.0.0").Pair(Revision("528f879e7d3790ea4287687ef0ab3f2a01cc2718")),
 		}
 	*/
 }
@@ -66,15 +66,15 @@ func testWriteDepTree(t *testing.T) {
 		p: []LockedProject{
 			pa2lp(atom{
 				id: pi("github.com/sdboyer/testrepo"),
-				v:  NewBranch("master").Is(Revision("4d59fb584b15a94d7401e356d2875c472d76ef45")),
+				v:  NewBranch("master").Pair(Revision("4d59fb584b15a94d7401e356d2875c472d76ef45")),
 			}, nil),
 			pa2lp(atom{
 				id: pi("launchpad.net/govcstestbzrrepo"),
-				v:  NewVersion("1.0.0").Is(Revision("matt@mattfarina.com-20150731135137-pbphasfppmygpl68")),
+				v:  NewVersion("1.0.0").Pair(Revision("matt@mattfarina.com-20150731135137-pbphasfppmygpl68")),
 			}, nil),
 			pa2lp(atom{
 				id: pi("bitbucket.org/sdboyer/withbm"),
-				v:  NewVersion("v1.0.0").Is(Revision("aa110802a0c64195d0a6c375c9f66668827c90b4")),
+				v:  NewVersion("v1.0.0").Pair(Revision("aa110802a0c64195d0a6c375c9f66668827c90b4")),
 			}, nil),
 		},
 	}

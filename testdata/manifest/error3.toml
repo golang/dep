@@ -1,0 +1,9 @@
+ignored = ["github.com/foo/bar"]
+
+[[override]]
+  name = "github.com/golang/dep"
+  branch = "master"
+
+[[override]]
+  name = "github.com/golang/dep"
+  branch = "master"

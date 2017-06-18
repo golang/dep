@@ -145,7 +145,7 @@ func (lp LockedProject) Version() Version {
 		return lp.r
 	}
 
-	return lp.v.Is(lp.r)
+	return lp.v.Pair(lp.r)
 }
 
 // Eq checks if two LockedProject instances are equal.

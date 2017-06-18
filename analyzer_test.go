@@ -105,9 +105,9 @@ func TestAnalyzerDeriveManifestAndLockInvalidManifest(t *testing.T) {
 func TestAnalyzerInfo(t *testing.T) {
 	a := Analyzer{}
 
-	name, vers := a.Info()
+	info := a.Info()
 
-	if name != "dep" || vers != 1 {
-		t.Fatalf("expected name to be 'dep' and version to be 1: name -> %q vers -> %d", name, vers)
+	if info.Name != "dep" || info.Version != 1 {
+		t.Fatalf("expected name to be 'dep' and version to be 1: name -> %q vers -> %d", info.Name, info.Version)
 	}
 }

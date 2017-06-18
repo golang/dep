@@ -125,7 +125,7 @@ type solver struct {
 
 	// A versionUnifier, to facilitate cross-type version comparison and set
 	// operations.
-	vUnify versionUnifier
+	vUnify *versionUnifier
 
 	// A stack containing projects and packages that are currently "selected" -
 	// that is, they have passed all satisfiability checks, and are part of the
@@ -300,7 +300,7 @@ func Prepare(params SolveParameters, sm SourceManager) (Solver, error) {
 	if err != nil {
 		return nil, err
 	}
-	s.vUnify = versionUnifier{
+	s.vUnify = &versionUnifier{
 		b: s.b,
 	}
 
@@ -405,7 +405,7 @@ func (s *solver) Solve() (Solution, error) {
 			att:  s.attempts,
 			solv: s,
 		}
-		soln.analyzerName, soln.analyzerVersion = s.rd.an.Info()
+		soln.analyzerInfo = s.rd.an.Info()
 		soln.hd = s.HashInputs()
 
 		// Convert ProjectAtoms into LockedProjects
