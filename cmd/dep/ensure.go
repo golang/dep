@@ -413,7 +413,7 @@ func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm
 		inManifest := p.Manifest.HasConstraintsOn(pc.Ident.ProjectRoot)
 		inImports := exrmap[pc.Ident.ProjectRoot]
 		if inManifest && inImports {
-			return errors.Errorf("%s is already in %s and the project's direct imports or required list; nothing to add", pc.Ident.ProjectRoot, dep.ManifestName)
+			return errors.Errorf("nothing to -add, %s is already in %s and the project's direct imports or required list", pc.Ident.ProjectRoot, dep.ManifestName)
 		}
 
 		err = sm.SyncSourceFor(pc.Ident)

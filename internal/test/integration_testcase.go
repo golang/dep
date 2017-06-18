@@ -139,7 +139,7 @@ func (tc *IntegrationTestCase) CompareError(err error, stderr string) {
 	if wantExists && gotExists {
 		switch c := strings.Count(got, want); c {
 		case 0:
-			tc.t.Errorf("expected error containing %s, got error %s", want, got)
+			tc.t.Errorf("error did not contain expected string:\n\t(GOT): %s\n\t(WNT): %s", want, got)
 		case 1:
 		default:
 			tc.t.Errorf("expected error %s matches %d times to actual error %s", want, c, got)
