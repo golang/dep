@@ -334,9 +334,6 @@ func copySymlink(src, dst string) error {
 func IsDir(name string) (bool, error) {
 	// TODO: lstat?
 	fi, err := os.Stat(name)
-	if os.IsNotExist(err) {
-		return false, nil
-	}
 	if err != nil {
 		return false, err
 	}
@@ -349,8 +346,10 @@ func IsDir(name string) (bool, error) {
 // IsNonEmptyDir determines if the path given is a non-empty directory or not.
 func IsNonEmptyDir(name string) (bool, error) {
 	isDir, err := IsDir(name)
-	if !isDir || err != nil {
+	if err != nil && !os.IsNotExist(err) {
 		return false, err
+	} else if !isDir {
+		return false, nil
 	}
 
 	// Get file descriptor
