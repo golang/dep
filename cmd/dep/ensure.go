@@ -129,7 +129,7 @@ type ensureCommand struct {
 
 func (cmd *ensureCommand) Run(ctx *dep.Ctx, args []string) error {
 	if cmd.examples {
-		ctx.Loggers.Err.Println(strings.TrimSpace(ensureExamples))
+		ctx.Err.Println(strings.TrimSpace(ensureExamples))
 		return nil
 	}
 
@@ -150,10 +150,11 @@ func (cmd *ensureCommand) Run(ctx *dep.Ctx, args []string) error {
 	defer sm.Release()
 
 	params := p.MakeParams()
-	if ctx.Loggers.Verbose {
-		params.TraceLogger = ctx.Loggers.Err
+	if ctx.Verbose {
+		params.TraceLogger = ctx.Err
 	}
-	params.RootPackageTree, err = pkgtree.ListPackages(p.AbsRoot, string(p.ImportRoot))
+
+	params.RootPackageTree, err = pkgtree.ListPackages(p.ResolvedAbsRoot, string(p.ImportRoot))
 	if err != nil {
 		return errors.Wrap(err, "ensure ListPackage for project")
 	}
@@ -211,7 +212,7 @@ func (cmd *ensureCommand) runDefault(ctx *dep.Ctx, args []string, p *dep.Project
 		}
 
 		if cmd.dryRun {
-			ctx.Loggers.Out.Printf("Would have populated vendor/ directory from %s", dep.LockName)
+			ctx.Out.Printf("Would have populated vendor/ directory from %s", dep.LockName)
 			return nil
 		}
 
@@ -242,7 +243,7 @@ func (cmd *ensureCommand) runDefault(ctx *dep.Ctx, args []string, p *dep.Project
 		}
 
 		if cmd.dryRun {
-			ctx.Loggers.Out.Printf("Would have populated vendor/ directory from %s", dep.LockName)
+			ctx.Out.Printf("Would have populated vendor/ directory from %s", dep.LockName)
 			return nil
 		}
 
@@ -260,7 +261,7 @@ func (cmd *ensureCommand) runDefault(ctx *dep.Ctx, args []string, p *dep.Project
 		return err
 	}
 	if cmd.dryRun {
-		return sw.PrintPreparedActions(ctx.Loggers.Out)
+		return sw.PrintPreparedActions(ctx.Out)
 	}
 
 	return errors.Wrap(sw.Write(p.AbsRoot, sm, false), "grouped write of manifest, lock and vendor")
@@ -343,7 +344,7 @@ func (cmd *ensureCommand) runUpdate(ctx *dep.Ctx, args []string, p *dep.Project,
 	// e.g., named projects did not upgrade even though newer versions were
 	// available.
 	if cmd.dryRun {
-		return sw.PrintPreparedActions(ctx.Loggers.Out)
+		return sw.PrintPreparedActions(ctx.Out)
 	}
 
 	return errors.Wrap(sw.Write(p.AbsRoot, sm, false), "grouped write of manifest, lock and vendor")
@@ -376,7 +377,7 @@ func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm
 	// Having some problematic internal packages isn't cause for termination,
 	// but the user needs to be warned.
 	for fail := range errmap {
-		ctx.Loggers.Err.Printf("Warning: %s", fail)
+		ctx.Err.Printf("Warning: %s", fail)
 	}
 
 	// Compile unique sets of 1) all external packages imported or required, and
@@ -485,7 +486,7 @@ func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm
 	// e.g., named projects did not upgrade even though newer versions were
 	// available.
 	if cmd.dryRun {
-		return sw.PrintPreparedActions(ctx.Loggers.Out)
+		return sw.PrintPreparedActions(ctx.Out)
 	}
 
 	return errors.Wrap(sw.Write(p.AbsRoot, sm, true), "grouped write of manifest, lock and vendor")

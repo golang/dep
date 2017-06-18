@@ -8,7 +8,6 @@ import (
 	"flag"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/golang/dep"
@@ -31,13 +30,18 @@ disable this behavior. The following external tools are supported: glide.
 Any dependencies that are not constrained by external configuration use the
 GOPATH analysis below.
 
-The version of each dependency will reflect the current state of the GOPATH. If
-a dependency doesn't exist in the GOPATH, a version will be selected from the
-versions available from the upstream source per the following algorithm:
+By default, the dependencies are resolved over the network. A version will be
+selected from the versions available from the upstream source per the following
+algorithm:
 
  - Tags conforming to semver (sorted by semver rules)
  - Default branch(es) (sorted lexicographically)
  - Non-semver tags (sorted lexicographically)
+
+An alternate mode can be activated by passing -gopath. In this mode, the version
+of each dependency will reflect the current state of the GOPATH. If a dependency
+doesn't exist in the GOPATH, a version will be selected based on the above
+network version selection algorithm.
 
 A Gopkg.toml file will be written with inferred version constraints for all
 direct dependencies. Gopkg.lock will be written with precise versions, and
@@ -53,11 +57,13 @@ func (cmd *initCommand) Hidden() bool      { return false }
 func (cmd *initCommand) Register(fs *flag.FlagSet) {
 	fs.BoolVar(&cmd.noExamples, "no-examples", false, "don't include example in Gopkg.toml")
 	fs.BoolVar(&cmd.skipTools, "skip-tools", false, "skip importing configuration from other dependency managers")
+	fs.BoolVar(&cmd.gopath, "gopath", false, "search in GOPATH for dependencies")
 }
 
 type initCommand struct {
 	noExamples bool
 	skipTools  bool
+	gopath     bool
 }
 
 func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
@@ -76,6 +82,17 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 		if err := os.MkdirAll(root, os.FileMode(0777)); err != nil {
 			return errors.Errorf("unable to create directory %s , err %v", root, err)
 		}
+	}
+
+	var err error
+	p := new(dep.Project)
+	if err = p.SetRoot(root); err != nil {
+		return errors.Wrap(err, "NewProject")
+	}
+
+	ctx.GOPATH, err = ctx.DetectProjectGOPATH(p)
+	if err != nil {
+		return errors.Wrapf(err, "ctx.DetectProjectGOPATH")
 	}
 
 	mf := filepath.Join(root, dep.ManifestName)
@@ -99,11 +116,13 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 		return errors.Errorf("invalid state: manifest %q does not exist, but lock %q does", mf, lf)
 	}
 
-	cpr, err := ctx.SplitAbsoluteProjectRoot(root)
+	ip, err := ctx.SplitAbsoluteProjectRoot(root)
 	if err != nil {
 		return errors.Wrap(err, "determineProjectRoot")
 	}
-	pkgT, directDeps, err := getDirectDependencies(root, cpr)
+	p.ImportRoot = gps.ProjectRoot(ip)
+
+	pkgT, directDeps, err := getDirectDependencies(p)
 	if err != nil {
 		return err
 	}
@@ -116,28 +135,32 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 
 	// Initialize with imported data, then fill in the gaps using the GOPATH
 	rootAnalyzer := newRootAnalyzer(cmd.skipTools, ctx, directDeps, sm)
-	m, l, err := rootAnalyzer.InitializeRootManifestAndLock(root, gps.ProjectRoot(cpr))
-	if err != nil {
-		return err
-	}
-	gs := newGopathScanner(ctx, directDeps, sm)
-	err = gs.InitializeRootManifestAndLock(m, l)
+	p.Manifest, p.Lock, err = rootAnalyzer.InitializeRootManifestAndLock(root, p.ImportRoot)
 	if err != nil {
 		return err
 	}
 
+	if cmd.gopath {
+		gs := newGopathScanner(ctx, directDeps, sm)
+		err = gs.InitializeRootManifestAndLock(p.Manifest, p.Lock)
+		if err != nil {
+			return err
+		}
+	}
+
 	rootAnalyzer.skipTools = true // Don't import external config during solve for now
+	copyLock := *p.Lock           // Copy lock before solving. Use this to separate new lock projects from solved lock
 
 	params := gps.SolveParameters{
 		RootDir:         root,
 		RootPackageTree: pkgT,
-		Manifest:        m,
-		Lock:            l,
+		Manifest:        p.Manifest,
+		Lock:            p.Lock,
 		ProjectAnalyzer: rootAnalyzer,
 	}
 
-	if ctx.Loggers.Verbose {
-		params.TraceLogger = ctx.Loggers.Err
+	if ctx.Verbose {
+		params.TraceLogger = ctx.Err
 	}
 
 	s, err := gps.Prepare(params, sm)
@@ -150,10 +173,9 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 		handleAllTheFailuresOfTheWorld(err)
 		return err
 	}
-	l = dep.LockFromSolution(soln)
+	p.Lock = dep.LockFromSolution(soln)
 
-	rootAnalyzer.FinalizeRootManifestAndLock(m, l)
-	gs.FinalizeRootManifestAndLock(m, l)
+	rootAnalyzer.FinalizeRootManifestAndLock(p.Manifest, p.Lock, copyLock)
 
 	// Run gps.Prepare with appropriate constraint solutions from solve run
 	// to generate the final lock memo.
@@ -162,7 +184,7 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 		return errors.Wrap(err, "prepare solver")
 	}
 
-	l.SolveMeta.InputsDigest = s.HashInputs()
+	p.Lock.SolveMeta.InputsDigest = s.HashInputs()
 
 	// Pass timestamp (yyyyMMddHHmmss format) as suffix to backup name.
 	vendorbak, err := dep.BackupVendor(vpath, time.Now().Format("20060102150405"))
@@ -170,10 +192,10 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 		return err
 	}
 	if vendorbak != "" {
-		ctx.Loggers.Err.Printf("Old vendor backed up to %v", vendorbak)
+		ctx.Err.Printf("Old vendor backed up to %v", vendorbak)
 	}
 
-	sw, err := dep.NewSafeWriter(m, nil, l, dep.VendorAlways)
+	sw, err := dep.NewSafeWriter(p.Manifest, nil, p.Lock, dep.VendorAlways)
 	if err != nil {
 		return err
 	}
@@ -185,8 +207,8 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 	return nil
 }
 
-func getDirectDependencies(root, cpr string) (pkgtree.PackageTree, map[string]bool, error) {
-	pkgT, err := pkgtree.ListPackages(root, cpr)
+func getDirectDependencies(p *dep.Project) (pkgtree.PackageTree, map[string]bool, error) {
+	pkgT, err := pkgtree.ListPackages(p.ResolvedAbsRoot, string(p.ImportRoot))
 	if err != nil {
 		return pkgtree.PackageTree{}, nil, errors.Wrap(err, "gps.ListPackages")
 	}
@@ -203,11 +225,4 @@ func getDirectDependencies(root, cpr string) (pkgtree.PackageTree, map[string]bo
 // TODO solve failures can be really creative - we need to be similarly creative
 // in handling them and informing the user appropriately
 func handleAllTheFailuresOfTheWorld(err error) {
-}
-
-func hasImportPathPrefix(s, prefix string) bool {
-	if s == prefix {
-		return true
-	}
-	return strings.HasPrefix(s, prefix+"/")
 }

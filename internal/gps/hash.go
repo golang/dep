@@ -106,9 +106,9 @@ func (s *solver) writeHashingInputs(w io.Writer) {
 	}
 
 	writeString(hhAnalyzer)
-	an, av := s.rd.an.Info()
-	writeString(an)
-	writeString(strconv.Itoa(av))
+	ai := s.rd.an.Info()
+	writeString(ai.Name)
+	writeString(strconv.Itoa(ai.Version))
 }
 
 // bytes.Buffer wrapper that injects newlines after each call to Write().

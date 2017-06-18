@@ -81,10 +81,10 @@ func testSourceGateway(t *testing.T) {
 			} else {
 				SortPairedForUpgrade(vlist)
 				evl := []PairedVersion{
-					NewVersion("v1.0.0").Is(Revision("ff2948a2ac8f538c4ecd55962e919d1e13e74baf")),
-					NewVersion("v0.8.1").Is(Revision("3f4c3bea144e112a69bbe5d8d01c1b09a544253f")),
-					NewVersion("v0.8.0").Is(Revision("ff2948a2ac8f538c4ecd55962e919d1e13e74baf")),
-					newDefaultBranch("master").Is(Revision("3f4c3bea144e112a69bbe5d8d01c1b09a544253f")),
+					NewVersion("v1.0.0").Pair(Revision("ff2948a2ac8f538c4ecd55962e919d1e13e74baf")),
+					NewVersion("v0.8.1").Pair(Revision("3f4c3bea144e112a69bbe5d8d01c1b09a544253f")),
+					NewVersion("v0.8.0").Pair(Revision("ff2948a2ac8f538c4ecd55962e919d1e13e74baf")),
+					newDefaultBranch("master").Pair(Revision("3f4c3bea144e112a69bbe5d8d01c1b09a544253f")),
 				}
 				if !reflect.DeepEqual(vlist, evl) {
 					t.Fatalf("Version list was not what we expected:\n\t(GOT): %s\n\t(WNT): %s", vlist, evl)

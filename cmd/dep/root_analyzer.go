@@ -5,14 +5,13 @@
 package main
 
 import (
-	"encoding/hex"
+	"io/ioutil"
+	"log"
 
 	"github.com/golang/dep"
 	fb "github.com/golang/dep/internal/feedback"
 	"github.com/golang/dep/internal/gps"
 	"github.com/pkg/errors"
-	"io/ioutil"
-	"log"
 )
 
 // importer handles importing configuration from other dependency managers into
@@ -73,12 +72,16 @@ func (a *rootAnalyzer) importManifestAndLock(dir string, pr gps.ProjectRoot, sup
 
 	importers := []importer{
 		newGlideImporter(logger, a.ctx.Verbose, a.sm),
+		newGodepImporter(logger, a.ctx.Verbose, a.sm),
 	}
 
 	for _, i := range importers {
 		if i.HasDepMetadata(dir) {
-			a.ctx.Loggers.Err.Printf("Importing configuration from %s. These are only initial constraints, and are further refined during the solve process.", i.Name())
+			a.ctx.Err.Printf("Importing configuration from %s. These are only initial constraints, and are further refined during the solve process.", i.Name())
 			m, l, err := i.Import(dir, pr)
+			if err != nil {
+				return nil, nil, err
+			}
 			a.removeTransitiveDependencies(m)
 			return m, l, err
 		}
@@ -123,73 +126,51 @@ func (a *rootAnalyzer) DeriveManifestAndLock(dir string, pr gps.ProjectRoot) (gp
 	return gps.SimpleManifest{}, nil, nil
 }
 
-func (a *rootAnalyzer) FinalizeRootManifestAndLock(m *dep.Manifest, l *dep.Lock) {
-	// Remove dependencies from the manifest that aren't used
-	for pr := range m.Constraints {
-		var used bool
-		for _, y := range l.Projects() {
-			if pr == y.Ident().ProjectRoot {
-				used = true
-				break
+func (a *rootAnalyzer) FinalizeRootManifestAndLock(m *dep.Manifest, l *dep.Lock, ol dep.Lock) {
+	// Iterate through the new projects in solved lock and add them to manifest
+	// if they are direct deps and log feedback for all the new projects.
+	for _, y := range l.Projects() {
+		var f *fb.ConstraintFeedback
+		pr := y.Ident().ProjectRoot
+		// New constraints: in new lock and dir dep but not in manifest
+		if _, ok := a.directDeps[string(pr)]; ok {
+			if _, ok := m.Constraints[pr]; !ok {
+				pp := getProjectPropertiesFromVersion(y.Version())
+				if pp.Constraint != nil {
+					m.Constraints[pr] = pp
+					pc := gps.ProjectConstraint{Ident: y.Ident(), Constraint: pp.Constraint}
+					f = fb.NewConstraintFeedback(pc, fb.DepTypeDirect)
+					f.LogFeedback(a.ctx.Err)
+				}
+				f = fb.NewLockedProjectFeedback(y, fb.DepTypeDirect)
+				f.LogFeedback(a.ctx.Err)
 			}
-		}
-		if !used {
-			delete(m.Constraints, pr)
+		} else {
+			// New locked projects: in new lock but not in old lock
+			newProject := true
+			for _, opl := range ol.Projects() {
+				if pr == opl.Ident().ProjectRoot {
+					newProject = false
+				}
+			}
+			if newProject {
+				f = fb.NewLockedProjectFeedback(y, fb.DepTypeTransitive)
+				f.LogFeedback(a.ctx.Err)
+			}
 		}
 	}
 }
 
-func (a *rootAnalyzer) Info() (string, int) {
+func (a *rootAnalyzer) Info() gps.ProjectAnalyzerInfo {
 	name := "dep"
 	version := 1
 	if !a.skipTools {
 		name = "dep+import"
 	}
-	return name, version
-}
-
-// feedback logs project constraint as feedback to the user.
-func feedback(v gps.Version, pr gps.ProjectRoot, depType string, logger *log.Logger) {
-	rev, version, branch := gps.VersionComponentStrings(v)
-
-	// Check if it's a valid SHA1 digest and trim to 7 characters.
-	if len(rev) == 40 {
-		if _, err := hex.DecodeString(rev); err == nil {
-			// Valid SHA1 digest
-			rev = rev[0:7]
-		}
+	return gps.ProjectAnalyzerInfo{
+		Name:    name,
+		Version: version,
 	}
-
-	// Get LockedVersion
-	var ver string
-	if version != "" {
-		ver = version
-	} else if branch != "" {
-		ver = branch
-	}
-
-	cf := &fb.ConstraintFeedback{
-		LockedVersion:  ver,
-		Revision:       rev,
-		ProjectPath:    string(pr),
-		DependencyType: depType,
-	}
-
-	// Get non-revision constraint if available
-	if c := getProjectPropertiesFromVersion(v).Constraint; c != nil {
-		cf.Version = c.String()
-	}
-
-	// Attach ConstraintType for direct/imported deps based on locked version
-	if cf.DependencyType == fb.DepTypeDirect || cf.DependencyType == fb.DepTypeImported {
-		if cf.LockedVersion != "" {
-			cf.ConstraintType = fb.ConsTypeConstraint
-		} else {
-			cf.ConstraintType = fb.ConsTypeHint
-		}
-	}
-
-	cf.LogFeedback(logger)
 }
 
 func lookupVersionForRevision(rev gps.Revision, pi gps.ProjectIdentifier, sm gps.SourceManager) (gps.Version, error) {
@@ -201,7 +182,7 @@ func lookupVersionForRevision(rev gps.Revision, pi gps.ProjectIdentifier, sm gps
 
 	gps.SortPairedForUpgrade(versions) // Sort versions in asc order
 	for _, v := range versions {
-		if v.Underlying() == rev {
+		if v.Revision() == rev {
 			return v, nil
 		}
 	}

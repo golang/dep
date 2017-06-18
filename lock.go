@@ -95,9 +95,9 @@ func fromRawLock(raw rawLock) (*Lock, error) {
 			if ld.Branch != "" {
 				return nil, errors.Errorf("lock file specified both a branch (%s) and version (%s) for %s", ld.Branch, ld.Version, ld.Name)
 			}
-			v = gps.NewVersion(ld.Version).Is(r)
+			v = gps.NewVersion(ld.Version).Pair(r)
 		} else if ld.Branch != "" {
-			v = gps.NewBranch(ld.Branch).Is(r)
+			v = gps.NewBranch(ld.Branch).Pair(r)
 		} else if r == "" {
 			return nil, errors.Errorf("lock file has entry for %s, but specifies no branch or version", ld.Name)
 		}

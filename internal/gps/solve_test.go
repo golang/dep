@@ -176,7 +176,7 @@ func fixtureSolveSimpleChecks(fix specfix, soln Solution, err error, t *testing.
 
 	pv := func(v Version) string {
 		if pv, ok := v.(PairedVersion); ok {
-			return fmt.Sprintf("%s (%s)", pv.Unpair(), pv.Underlying())
+			return fmt.Sprintf("%s (%s)", pv.Unpair(), pv.Revision())
 		}
 		return v.String()
 	}

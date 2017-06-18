@@ -107,6 +107,7 @@ func TestReadManifestErrors(t *testing.T) {
 	}{
 		{"multiple constraints", "manifest/error1.toml"},
 		{"multiple dependencies", "manifest/error2.toml"},
+		{"multiple overrides", "manifest/error3.toml"},
 	}
 
 	for _, tst := range tests {
@@ -124,14 +125,80 @@ func TestReadManifestErrors(t *testing.T) {
 func TestValidateManifest(t *testing.T) {
 	cases := []struct {
 		tomlString string
-		want       []error
+		wantWarn   []error
+		wantError  error
 	}{
 		{
 			tomlString: `
-			[[constraint]]
-			  name = "github.com/foo/bar"
+			required = ["github.com/foo/bar"]
 			`,
-			want: []error{},
+			wantWarn:  []error{},
+			wantError: nil,
+		},
+		{
+			tomlString: `
+			required = "github.com/foo/bar"
+			`,
+			wantWarn:  []error{},
+			wantError: errInvalidRequired,
+		},
+		{
+			tomlString: `
+			required = []
+			`,
+			wantWarn:  []error{},
+			wantError: nil,
+		},
+		{
+			tomlString: `
+			required = [1, 2, 3]
+			`,
+			wantWarn:  []error{},
+			wantError: errInvalidRequired,
+		},
+		{
+			tomlString: `
+			[[required]]
+			  name = "foo"
+			`,
+			wantWarn:  []error{},
+			wantError: errInvalidRequired,
+		},
+		{
+			tomlString: `
+			ignored = ["foo"]
+			`,
+			wantWarn:  []error{},
+			wantError: nil,
+		},
+		{
+			tomlString: `
+			ignored = "foo"
+			`,
+			wantWarn:  []error{},
+			wantError: errInvalidIgnored,
+		},
+		{
+			tomlString: `
+			ignored = []
+			`,
+			wantWarn:  []error{},
+			wantError: nil,
+		},
+		{
+			tomlString: `
+			ignored = [1, 2, 3]
+			`,
+			wantWarn:  []error{},
+			wantError: errInvalidIgnored,
+		},
+		{
+			tomlString: `
+			[[ignored]]
+			  name = "foo"
+			`,
+			wantWarn:  []error{},
+			wantError: errInvalidIgnored,
 		},
 		{
 			tomlString: `
@@ -139,7 +206,8 @@ func TestValidateManifest(t *testing.T) {
 			  authors = "foo"
 			  version = "1.0.0"
 			`,
-			want: []error{},
+			wantWarn:  []error{},
+			wantError: nil,
 		},
 		{
 			tomlString: `
@@ -153,11 +221,12 @@ func TestValidateManifest(t *testing.T) {
 			  name = "github.com/foo/bar"
 			  version = ""
 			`,
-			want: []error{
+			wantWarn: []error{
 				errors.New("Unknown field in manifest: foo"),
 				errors.New("Unknown field in manifest: bar"),
 				errors.New("Unknown field in manifest: version"),
 			},
+			wantError: nil,
 		},
 		{
 			tomlString: `
@@ -166,17 +235,66 @@ func TestValidateManifest(t *testing.T) {
 			[[constraint]]
 			  name = "github.com/foo/bar"
 			`,
-			want: []error{errors.New("metadata should be a TOML table")},
+			wantWarn:  []error{errors.New("metadata should be a TOML table")},
+			wantError: nil,
+		},
+		{
+			tomlString: `
+			[[constraint]]
+			  name = "github.com/foo/bar"
+			`,
+			wantWarn:  []error{},
+			wantError: nil,
+		},
+		{
+			tomlString: `
+			[[constraint]]
+			`,
+			wantWarn:  []error{},
+			wantError: nil,
 		},
 		{
 			tomlString: `
 			constraint = "foo"
+			`,
+			wantWarn:  []error{},
+			wantError: errInvalidConstraint,
+		},
+		{
+			tomlString: `
+			constraint = ["foo", "bar"]
+			`,
+			wantWarn:  []error{},
+			wantError: errInvalidConstraint,
+		},
+		{
+			tomlString: `
+			[[override]]
+			  name = "github.com/foo/bar"
+			`,
+			wantWarn:  []error{},
+			wantError: nil,
+		},
+		{
+			tomlString: `
+			[[override]]
+			`,
+			wantWarn:  []error{},
+			wantError: nil,
+		},
+		{
+			tomlString: `
 			override = "bar"
 			`,
-			want: []error{
-				errors.New("constraint should be a TOML array of tables"),
-				errors.New("override should be a TOML array of tables"),
-			},
+			wantWarn:  []error{},
+			wantError: errInvalidOverride,
+		},
+		{
+			tomlString: `
+			override = ["foo", "bar"]
+			`,
+			wantWarn:  []error{},
+			wantError: errInvalidOverride,
 		},
 		{
 			tomlString: `
@@ -189,12 +307,13 @@ func TestValidateManifest(t *testing.T) {
 			[[override]]
 			  nick = "foo"
 			`,
-			want: []error{
+			wantWarn: []error{
 				errors.New("Invalid key \"location\" in \"constraint\""),
 				errors.New("Invalid key \"link\" in \"constraint\""),
 				errors.New("Invalid key \"nick\" in \"override\""),
 				errors.New("metadata in \"constraint\" should be a TOML table"),
 			},
+			wantError: nil,
 		},
 		{
 			tomlString: `
@@ -204,7 +323,8 @@ func TestValidateManifest(t *testing.T) {
 			  [constraint.metadata]
 			    color = "blue"
 			`,
-			want: []error{},
+			wantWarn:  []error{},
+			wantError: nil,
 		},
 		{
 			tomlString: `
@@ -212,7 +332,8 @@ func TestValidateManifest(t *testing.T) {
 			  name = "github.com/foo/bar"
 			  revision = "b86ad16"
 			`,
-			want: []error{errors.New("revision \"b86ad16\" should not be in abbreviated form")},
+			wantWarn:  []error{errors.New("revision \"b86ad16\" should not be in abbreviated form")},
+			wantError: nil,
 		},
 		{
 			tomlString: `
@@ -220,7 +341,8 @@ func TestValidateManifest(t *testing.T) {
 			  name = "foobar.com/hg"
 			  revision = "8d43f8c0b836"
 			`,
-			want: []error{errors.New("revision \"8d43f8c0b836\" should not be in abbreviated form")},
+			wantWarn:  []error{errors.New("revision \"8d43f8c0b836\" should not be in abbreviated form")},
+			wantError: nil,
 		},
 	}
 
@@ -236,19 +358,21 @@ func TestValidateManifest(t *testing.T) {
 
 	for _, c := range cases {
 		errs, err := validateManifest(c.tomlString)
-		if err != nil {
-			t.Fatal(err)
+
+		// compare validation errors
+		if err != c.wantError {
+			t.Fatalf("Manifest errors are not as expected: \n\t(GOT) %v \n\t(WNT) %v", err, c.wantError)
 		}
 
 		// compare length of error slice
-		if len(errs) != len(c.want) {
-			t.Fatalf("Number of manifest errors are not as expected: \n\t(GOT) %v errors(%v)\n\t(WNT) %v errors(%v).", len(errs), errs, len(c.want), c.want)
+		if len(errs) != len(c.wantWarn) {
+			t.Fatalf("Number of manifest errors are not as expected: \n\t(GOT) %v errors(%v)\n\t(WNT) %v errors(%v).", len(errs), errs, len(c.wantWarn), c.wantWarn)
 		}
 
 		// check if the expected errors exist in actual errors slice
 		for _, er := range errs {
-			if !contains(c.want, er) {
-				t.Fatalf("Manifest errors are not as expected: \n\t(MISSING) %v\n\t(FROM) %v", er, c.want)
+			if !contains(c.wantWarn, er) {
+				t.Fatalf("Manifest errors are not as expected: \n\t(MISSING) %v\n\t(FROM) %v", er, c.wantWarn)
 			}
 		}
 	}

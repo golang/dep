@@ -37,12 +37,7 @@ func (hashinCommand) Run(ctx *dep.Ctx, args []string) error {
 	defer sm.Release()
 
 	params := p.MakeParams()
-	cpr, err := ctx.SplitAbsoluteProjectRoot(p.AbsRoot)
-	if err != nil {
-		return errors.Wrap(err, "determineProjectRoot")
-	}
-
-	params.RootPackageTree, err = pkgtree.ListPackages(p.AbsRoot, cpr)
+	params.RootPackageTree, err = pkgtree.ListPackages(p.ResolvedAbsRoot, string(p.ImportRoot))
 	if err != nil {
 		return errors.Wrap(err, "gps.ListPackages")
 	}
@@ -51,6 +46,6 @@ func (hashinCommand) Run(ctx *dep.Ctx, args []string) error {
 	if err != nil {
 		return errors.Wrap(err, "prepare solver")
 	}
-	ctx.Loggers.Out.Println(gps.HashingInputsAsString(s))
+	ctx.Out.Println(gps.HashingInputsAsString(s))
 	return nil
 }
