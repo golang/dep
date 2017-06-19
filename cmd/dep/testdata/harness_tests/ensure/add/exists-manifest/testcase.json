@@ -1,6 +1,6 @@
 {
   "commands": [
-    ["ensure", "-add", "github.com/sdboyer/deptesttres"]
+    ["ensure", "-add", "github.com/sdboyer/deptest@1.0.0"]
   ],
-  "error-expected": "nothing to -add, github.com/sdboyer/deptest is already in Gopkg.toml and the project's direct imports or required list"
+  "error-expected": "Gopkg.toml already contains rules for github.com/sdboyer/deptest, cannot specify a version constraint"
 }
