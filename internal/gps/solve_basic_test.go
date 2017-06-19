@@ -191,11 +191,10 @@ func mkCDep(pdep string, pl ...string) completeDep {
 // A depspec is a fixture representing all the information a SourceManager would
 // ordinarily glean directly from interrogating a repository.
 type depspec struct {
-	n       ProjectRoot
-	v       Version
-	deps    []ProjectConstraint
-	devdeps []ProjectConstraint
-	pkgs    []tpkg
+	n    ProjectRoot
+	v    Version
+	deps []ProjectConstraint
+	pkgs []tpkg
 }
 
 // mkDepspec creates a depspec by processing a series of strings, each of which
@@ -205,9 +204,6 @@ type depspec struct {
 // described - see the docs on mkAtom for details. subsequent strings are
 // interpreted as dep constraints of that dep at that version. See the docs on
 // mkPDep for details.
-//
-// If a string other than the first includes a "(dev) " prefix, it will be
-// treated as a test-only dependency.
 func mkDepspec(pi string, deps ...string) depspec {
 	pa := mkAtom(pi)
 	if string(pa.id.ProjectRoot) != pa.id.Source && pa.id.Source != "" {
@@ -220,15 +216,7 @@ func mkDepspec(pi string, deps ...string) depspec {
 	}
 
 	for _, dep := range deps {
-		var sl *[]ProjectConstraint
-		if strings.HasPrefix(dep, "(dev) ") {
-			dep = strings.TrimPrefix(dep, "(dev) ")
-			sl = &ds.devdeps
-		} else {
-			sl = &ds.deps
-		}
-
-		*sl = append(*sl, mkPCstrnt(dep))
+		ds.deps = append(ds.deps, mkPCstrnt(dep))
 	}
 
 	return ds
@@ -356,13 +344,6 @@ func computeBasicReachMap(ds []depspec) reachMap {
 		for _, dep := range d.deps {
 			lm[n] = append(lm[n], string(dep.Ident.ProjectRoot))
 		}
-
-		// first is root
-		if k == 0 {
-			for _, dep := range d.devdeps {
-				lm[n] = append(lm[n], string(dep.Ident.ProjectRoot))
-			}
-		}
 	}
 
 	return rm
@@ -439,18 +420,14 @@ func (f basicFixture) solution() map[ProjectIdentifier]LockedProject {
 func (f basicFixture) rootmanifest() RootManifest {
 	return simpleRootManifest{
 		c:   pcSliceToMap(f.ds[0].deps),
-		tc:  pcSliceToMap(f.ds[0].devdeps),
 		ovr: f.ovr,
 	}
 }
 
 func (f basicFixture) rootTree() pkgtree.PackageTree {
-	var imp, timp []string
+	var imp []string
 	for _, dep := range f.ds[0].deps {
 		imp = append(imp, string(dep.Ident.ProjectRoot))
-	}
-	for _, dep := range f.ds[0].devdeps {
-		timp = append(timp, string(dep.Ident.ProjectRoot))
 	}
 
 	n := string(f.ds[0].n)
@@ -459,10 +436,9 @@ func (f basicFixture) rootTree() pkgtree.PackageTree {
 		Packages: map[string]pkgtree.PackageOrErr{
 			string(n): {
 				P: pkgtree.Package{
-					ImportPath:  n,
-					Name:        n,
-					Imports:     imp,
-					TestImports: timp,
+					ImportPath: n,
+					Name:       n,
+					Imports:    imp,
 				},
 			},
 		},
@@ -917,38 +893,38 @@ var basicFixtures = map[string]basicFixture{
 			"foo ptaggerino oldrev",
 		),
 	},
-	"includes root package's dev dependencies": {
-		ds: []depspec{
-			mkDepspec("root 1.0.0", "(dev) foo 1.0.0", "(dev) bar 1.0.0"),
-			mkDepspec("foo 1.0.0"),
-			mkDepspec("bar 1.0.0"),
-		},
-		r: mksolution(
-			"foo 1.0.0",
-			"bar 1.0.0",
-		),
-	},
-	"includes dev dependency's transitive dependencies": {
-		ds: []depspec{
-			mkDepspec("root 1.0.0", "(dev) foo 1.0.0"),
-			mkDepspec("foo 1.0.0", "bar 1.0.0"),
-			mkDepspec("bar 1.0.0"),
-		},
-		r: mksolution(
-			"foo 1.0.0",
-			"bar 1.0.0",
-		),
-	},
-	"ignores transitive dependency's dev dependencies": {
-		ds: []depspec{
-			mkDepspec("root 1.0.0", "(dev) foo 1.0.0"),
-			mkDepspec("foo 1.0.0", "(dev) bar 1.0.0"),
-			mkDepspec("bar 1.0.0"),
-		},
-		r: mksolution(
-			"foo 1.0.0",
-		),
-	},
+	// "includes root package's dev dependencies": {
+	// 	ds: []depspec{
+	// 		mkDepspec("root 1.0.0", "(dev) foo 1.0.0", "(dev) bar 1.0.0"),
+	// 		mkDepspec("foo 1.0.0"),
+	// 		mkDepspec("bar 1.0.0"),
+	// 	},
+	// 	r: mksolution(
+	// 		"foo 1.0.0",
+	// 		"bar 1.0.0",
+	// 	),
+	// },
+	// "includes dev dependency's transitive dependencies": {
+	// 	ds: []depspec{
+	// 		mkDepspec("root 1.0.0", "(dev) foo 1.0.0"),
+	// 		mkDepspec("foo 1.0.0", "bar 1.0.0"),
+	// 		mkDepspec("bar 1.0.0"),
+	// 	},
+	// 	r: mksolution(
+	// 		"foo 1.0.0",
+	// 		"bar 1.0.0",
+	// 	),
+	// },
+	// "ignores transitive dependency's dev dependencies": {
+	// 	ds: []depspec{
+	// 		mkDepspec("root 1.0.0", "(dev) foo 1.0.0"),
+	// 		mkDepspec("foo 1.0.0", "(dev) bar 1.0.0"),
+	// 		mkDepspec("bar 1.0.0"),
+	// 	},
+	// 	r: mksolution(
+	// 		"foo 1.0.0",
+	// 	),
+	// },
 	"no version that matches requirement": {
 		ds: []depspec{
 			mkDepspec("root 0.0.0", "foo ^1.0.0"),
@@ -1611,11 +1587,6 @@ var _ Lock = fixLock{}
 // impl Spec interface
 func (ds depspec) DependencyConstraints() ProjectConstraints {
 	return pcSliceToMap(ds.deps)
-}
-
-// impl Spec interface
-func (ds depspec) TestDependencyConstraints() ProjectConstraints {
-	return pcSliceToMap(ds.devdeps)
 }
 
 type fixLock []LockedProject

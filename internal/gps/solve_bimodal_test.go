@@ -1087,7 +1087,6 @@ func (f bimodalFixture) solution() map[ProjectIdentifier]LockedProject {
 func (f bimodalFixture) rootmanifest() RootManifest {
 	m := simpleRootManifest{
 		c:   pcSliceToMap(f.ds[0].deps),
-		tc:  pcSliceToMap(f.ds[0].devdeps),
 		ovr: f.ovr,
 		ig:  make(map[string]bool),
 		req: make(map[string]bool),
