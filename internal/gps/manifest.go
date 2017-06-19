@@ -5,8 +5,7 @@
 package gps
 
 // Manifest represents manifest-type data for a project at a particular version.
-// That means dependency constraints, both for normal dependencies and for
-// tests. The constraints expressed in a manifest determine the set of versions that
+// The constraints expressed in a manifest determine the set of versions that
 // are acceptable to try for a given project.
 //
 // Expressing a constraint in a manifest does not guarantee that a particular
@@ -20,12 +19,6 @@ package gps
 type Manifest interface {
 	// Returns a list of project-level constraints.
 	DependencyConstraints() ProjectConstraints
-
-	// Returns a list of constraints applicable to test imports.
-	//
-	// These are applied only when tests are incorporated. Typically, that
-	// will only be for root manifests.
-	TestDependencyConstraints() ProjectConstraints
 }
 
 // RootManifest extends Manifest to add special controls over solving that are
@@ -70,7 +63,7 @@ type RootManifest interface {
 // the fly for projects with no manifest metadata, or metadata through a foreign
 // tool's idioms.
 type SimpleManifest struct {
-	Deps, TestDeps ProjectConstraints
+	Deps ProjectConstraints
 }
 
 var _ Manifest = SimpleManifest{}
@@ -80,25 +73,15 @@ func (m SimpleManifest) DependencyConstraints() ProjectConstraints {
 	return m.Deps
 }
 
-// TestDependencyConstraints returns the project's test dependencies.
-func (m SimpleManifest) TestDependencyConstraints() ProjectConstraints {
-	return m.TestDeps
-}
-
 // simpleRootManifest exists so that we have a safe value to swap into solver
 // params when a nil Manifest is provided.
-//
-// Also, for tests.
 type simpleRootManifest struct {
-	c, tc, ovr ProjectConstraints
-	ig, req    map[string]bool
+	c, ovr  ProjectConstraints
+	ig, req map[string]bool
 }
 
 func (m simpleRootManifest) DependencyConstraints() ProjectConstraints {
 	return m.c
-}
-func (m simpleRootManifest) TestDependencyConstraints() ProjectConstraints {
-	return m.tc
 }
 func (m simpleRootManifest) Overrides() ProjectConstraints {
 	return m.ovr
@@ -112,7 +95,6 @@ func (m simpleRootManifest) RequiredPackages() map[string]bool {
 func (m simpleRootManifest) dup() simpleRootManifest {
 	m2 := simpleRootManifest{
 		c:   make(ProjectConstraints, len(m.c)),
-		tc:  make(ProjectConstraints, len(m.tc)),
 		ovr: make(ProjectConstraints, len(m.ovr)),
 		ig:  make(map[string]bool, len(m.ig)),
 		req: make(map[string]bool, len(m.req)),
@@ -120,9 +102,6 @@ func (m simpleRootManifest) dup() simpleRootManifest {
 
 	for k, v := range m.c {
 		m2.c[k] = v
-	}
-	for k, v := range m.tc {
-		m2.tc[k] = v
 	}
 	for k, v := range m.ovr {
 		m2.ovr[k] = v
@@ -149,11 +128,9 @@ func prepManifest(m Manifest) SimpleManifest {
 	}
 
 	deps := m.DependencyConstraints()
-	ddeps := m.TestDependencyConstraints()
 
 	rm := SimpleManifest{
-		Deps:     make(ProjectConstraints, len(deps)),
-		TestDeps: make(ProjectConstraints, len(ddeps)),
+		Deps: make(ProjectConstraints, len(deps)),
 	}
 
 	for k, d := range deps {
@@ -169,17 +146,6 @@ func prepManifest(m Manifest) SimpleManifest {
 		}
 
 		rm.Deps[k] = d
-	}
-
-	for k, d := range ddeps {
-		if d.Constraint == nil {
-			if d.Source == "" {
-				continue
-			}
-			d.Constraint = anyConstraint{}
-		}
-
-		rm.TestDeps[k] = d
 	}
 
 	return rm
