@@ -31,16 +31,16 @@ var exampleTOML = []byte(`
 #
 # required = ["github.com/user/thing/cmd/thing"]
 # ignored = ["github.com/user/project/pkgX", "bitbucket.org/user/project/pkgA/pkgY"]
-# 
+#
 # [[constraint]]
 #   name = "github.com/user/project"
 #   version = "1.0.0"
-# 
+#
 # [[constraint]]
 #   name = "github.com/user/project2"
 #   branch = "dev"
 #   source = "github.com/myfork/project2"
-# 
+#
 # [[override]]
 #  name = "github.com/x/y"
 #  version = "2.4.0"
