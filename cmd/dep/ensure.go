@@ -301,11 +301,15 @@ func (cmd *ensureCommand) runUpdate(ctx *dep.Ctx, args []string, p *dep.Project,
 	for _, arg := range args {
 		// Ensure the provided path has a deducible project root
 		// TODO(sdboyer) do these concurrently
-		pc, err := getProjectConstraint(arg, sm)
+		pc, path, err := getProjectConstraint(arg, sm)
 		if err != nil {
 			// TODO(sdboyer) return all errors, not just the first one we encounter
 			// TODO(sdboyer) ensure these errors are contextualized in a sensible way for -update
 			return err
+		}
+		if path != string(pc.Ident.ProjectRoot) {
+			// TODO(sdboyer): does this really merit an abortive error?
+			return errors.Errorf("%s is not a project root, try %s instead", path, pc.Ident.ProjectRoot)
 		}
 
 		if !p.Lock.HasProjectWithRoot(pc.Ident.ProjectRoot) {
@@ -369,7 +373,7 @@ func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm
 	// user is isolating variables in the event of solve problems (was it the
 	// "pending" changes, or the -add that caused the problem?).
 	// TODO(sdboyer) reduce this to a warning?
-	if !bytes.Equal(p.Lock.InputHash(), solver.HashInputs()) {
+	if p.Lock != nil && !bytes.Equal(p.Lock.InputHash(), solver.HashInputs()) {
 		return errors.Errorf("%s and %s are out of sync. Run a plain dep ensure to resync them before attempting to -add", dep.ManifestName, dep.LockName)
 	}
 
@@ -404,7 +408,7 @@ func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm
 	for _, arg := range args {
 		// TODO(sdboyer) return all errors, not just the first one we encounter
 		// TODO(sdboyer) do these concurrently
-		pc, err := getProjectConstraint(arg, sm)
+		pc, path, err := getProjectConstraint(arg, sm)
 		if err != nil {
 			// TODO(sdboyer) ensure these errors are contextualized in a sensible way for -add
 			return err
@@ -421,40 +425,40 @@ func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm
 			return errors.Wrapf(err, "failed to fetch source for %s", pc.Ident.ProjectRoot)
 		}
 
-		someConstraint := pc.Constraint != nil || pc.Ident.Source != ""
+		someConstraint := !gps.IsAny(pc.Constraint) || pc.Ident.Source != ""
 		if inManifest {
 			if someConstraint {
-				return errors.Errorf("%s already contains constraints for %s, cannot specify a version constraint or alternate source", arg, dep.ManifestName)
+				return errors.Errorf("%s already contains rules for %s, cannot specify a version constraint or alternate source", dep.ManifestName, path)
 			}
 
-			reqlist = append(reqlist, arg)
-			p.Manifest.Required = append(p.Manifest.Required, arg)
+			reqlist = append(reqlist, path)
+			p.Manifest.Required = append(p.Manifest.Required, path)
 		} else if inImports {
 			if !someConstraint {
-				if exmap[arg] {
-					return errors.Errorf("%s is already imported or required; -add must specify a constraint, but none were provided", arg)
+				if exmap[path] {
+					return errors.Errorf("%s is already imported or required; -add must specify a constraint, but none were provided", path)
 				}
 
+				// No constraints, but the package isn't imported; require it.
 				// TODO(sdboyer) this case seems like it's getting overly
 				// specific and risks muddying the water more than it helps
-				// No constraints, but the package isn't imported; require it.
-				reqlist = append(reqlist, arg)
-				p.Manifest.Required = append(p.Manifest.Required, arg)
+				reqlist = append(reqlist, path)
+				p.Manifest.Required = append(p.Manifest.Required, path)
 			} else {
 				p.Manifest.Constraints[pc.Ident.ProjectRoot] = gps.ProjectProperties{
 					Source:     pc.Ident.Source,
 					Constraint: pc.Constraint,
 				}
 
-				// Don't require on this branch if the arg was a ProjectRoot;
+				// Don't require on this branch if the path was a ProjectRoot;
 				// most common here will be the user adding constraints to
 				// something they already imported, and if they specify the
 				// root, there's a good chance they don't actually want to
 				// require the project's root package, but are just trying to
 				// indicate which project should receive the constraints.
-				if !exmap[arg] && string(pc.Ident.ProjectRoot) != arg {
-					reqlist = append(reqlist, arg)
-					p.Manifest.Required = append(p.Manifest.Required, arg)
+				if !exmap[path] && string(pc.Ident.ProjectRoot) != path {
+					reqlist = append(reqlist, path)
+					p.Manifest.Required = append(p.Manifest.Required, path)
 				}
 			}
 		} else {
@@ -463,8 +467,8 @@ func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm
 				Constraint: pc.Constraint,
 			}
 
-			reqlist = append(reqlist, arg)
-			p.Manifest.Required = append(p.Manifest.Required, arg)
+			reqlist = append(reqlist, path)
+			p.Manifest.Required = append(p.Manifest.Required, path)
 		}
 	}
 
@@ -489,7 +493,14 @@ func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm
 		return sw.PrintPreparedActions(ctx.Out)
 	}
 
-	return errors.Wrap(sw.Write(p.AbsRoot, sm, true), "grouped write of manifest, lock and vendor")
+	err = errors.Wrap(sw.Write(p.AbsRoot, sm, true), "grouped write of manifest, lock and vendor")
+	if err != nil {
+		return err
+	}
+
+	// TODO(sdboyer) handle appending of constraints to Gopkg.toml here, plus
+	// info messages to user
+	return nil
 }
 
 type stringSlice []string
@@ -506,41 +517,15 @@ func (s *stringSlice) Set(value string) error {
 	return nil
 }
 
-func getProjectConstraint(arg string, sm gps.SourceManager) (gps.ProjectConstraint, error) {
-	// TODO(sdboyer) this func needs to be broken out, now that we admit
-	// different info in specs
+func getProjectConstraint(arg string, sm gps.SourceManager) (gps.ProjectConstraint, string, error) {
 	emptyPC := gps.ProjectConstraint{
 		Constraint: gps.Any(), // default to any; avoids panics later
 	}
 
-	// try to split on '@'
-	// When there is no `@`, use any version
-	var versionStr string
-	atIndex := strings.Index(arg, "@")
-	if atIndex > 0 {
-		parts := strings.SplitN(arg, "@", 2)
-		arg = parts[0]
-		versionStr = parts[1]
-	}
-
-	// TODO: if we decide to keep equals.....
-
-	// split on colon if there is a network location
-	var source string
-	colonIndex := strings.Index(arg, ":")
-	if colonIndex > 0 {
-		parts := strings.SplitN(arg, ":", 2)
-		arg = parts[0]
-		source = parts[1]
-	}
-
-	pr, err := sm.DeduceProjectRoot(arg)
+	path, source, versionStr := parseSpecArg(arg)
+	pr, err := sm.DeduceProjectRoot(path)
 	if err != nil {
-		return emptyPC, errors.Wrapf(err, "could not infer project root from dependency path: %s", arg) // this should go through to the user
-	}
-
-	if string(pr) != arg {
-		return emptyPC, errors.Errorf("dependency path %s is not a project root, try %s instead", arg, pr)
+		return emptyPC, "", errors.Wrapf(err, "could not infer project root from dependency path: %s", path) // this should go through to the user
 	}
 
 	pi := gps.ProjectIdentifier{ProjectRoot: pr, Source: source}
@@ -548,12 +533,36 @@ func getProjectConstraint(arg string, sm gps.SourceManager) (gps.ProjectConstrai
 	if versionStr != "" {
 		c, err = deduceConstraint(versionStr, pi, sm)
 		if err != nil {
-			return emptyPC, err
+			return emptyPC, "", err
 		}
 	} else {
 		c = gps.Any()
 	}
-	return gps.ProjectConstraint{Ident: pi, Constraint: c}, nil
+	return gps.ProjectConstraint{Ident: pi, Constraint: c}, path, nil
+}
+
+// parseSpecArg takes a spec, as provided to dep ensure on the CLI, and splits
+// it into its constitutent path, source, and constraint parts.
+func parseSpecArg(arg string) (path, source, constraint string) {
+	path = arg
+	// try to split on '@'
+	// When there is no `@`, use any version
+	atIndex := strings.Index(arg, "@")
+	if atIndex > 0 {
+		parts := strings.SplitN(arg, "@", 2)
+		path = parts[0]
+		constraint = parts[1]
+	}
+
+	// split on colon if there is a network location
+	colonIndex := strings.Index(arg, ":")
+	if colonIndex > 0 {
+		parts := strings.SplitN(arg, ":", 2)
+		path = parts[0]
+		source = parts[1]
+	}
+
+	return path, source, constraint
 }
 
 // deduceConstraint tries to puzzle out what kind of version is given in a string -
