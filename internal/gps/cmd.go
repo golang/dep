@@ -127,11 +127,11 @@ func (c *monitoredCmd) hasTimedOut() bool {
 
 func (c *monitoredCmd) combinedOutput(ctx context.Context) ([]byte, error) {
 	if err := c.run(ctx); err != nil {
-		return c.stderr.buf.Bytes(), err
+		return c.stderr.Bytes(), err
 	}
 
 	// FIXME(sdboyer) this is not actually combined output
-	return c.stdout.buf.Bytes(), nil
+	return c.stdout.Bytes(), nil
 }
 
 // activityBuffer is a buffer that keeps track of the last time a Write
@@ -150,14 +150,31 @@ func newActivityBuffer() *activityBuffer {
 
 func (b *activityBuffer) Write(p []byte) (int, error) {
 	b.Lock()
-	b.lastActivityStamp = time.Now()
 	defer b.Unlock()
+
+	b.lastActivityStamp = time.Now()
+
 	return b.buf.Write(p)
+}
+
+func (b *activityBuffer) String() string {
+	b.Lock()
+	defer b.Unlock()
+
+	return b.buf.String()
+}
+
+func (b *activityBuffer) Bytes() []byte {
+	b.Lock()
+	defer b.Unlock()
+
+	return b.buf.Bytes()
 }
 
 func (b *activityBuffer) lastActivity() time.Time {
 	b.Lock()
 	defer b.Unlock()
+
 	return b.lastActivityStamp
 }
 
