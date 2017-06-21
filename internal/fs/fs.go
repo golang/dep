@@ -272,8 +272,7 @@ func copyFile(src, dst string) (err error) {
 	if sym, err := IsSymlink(src); err != nil {
 		return err
 	} else if sym {
-		err := copySymlink(src, dst)
-		return err
+		return cloneSymlink(src, dst)
 	}
 
 	in, err := os.Open(src)
@@ -314,17 +313,17 @@ func copyFile(src, dst string) (err error) {
 	return
 }
 
-// copySymlink will resolve the src symlink and create a new symlink in dst.
-// If src is a relative symlink, dst will also be a relative symlink.
-func copySymlink(src, dst string) error {
-	resolved, err := os.Readlink(src)
+// cloneSymlink will create a new symlink that points to the resolved path of sl.
+// If sl is a relative symlink, dst will also be a relative symlink.
+func cloneSymlink(sl, dst string) error {
+	resolved, err := os.Readlink(sl)
 	if err != nil {
 		return errors.Wrap(err, "failed to resolve symlink")
 	}
 
 	err = os.Symlink(resolved, dst)
 	if err != nil {
-		return errors.Wrapf(err, "failed to create symlink %s to %s", src, resolved)
+		return errors.Wrapf(err, "failed to create symlink %s to %s", dst, resolved)
 	}
 
 	return nil
