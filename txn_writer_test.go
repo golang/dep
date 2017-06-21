@@ -577,11 +577,12 @@ func TestCalculatePrune(t *testing.T) {
 
 	vendorDir := "vendor"
 	h.TempDir(vendorDir)
-	h.TempDir(filepath.Join(vendorDir, "github.com", "prune", "package"))
-	h.TempDir(filepath.Join(vendorDir, "github.com", "keep", "package"))
+	h.TempDir(filepath.Join(vendorDir, "github.com/keep/pkg/sub"))
+	h.TempDir(filepath.Join(vendorDir, "github.com/prune/pkg/sub"))
 
 	toKeep := []string{
-		"github.com/keep/package",
+		filepath.FromSlash("github.com/keep/pkg"),
+		filepath.FromSlash("github.com/keep/pkg/sub"),
 	}
 
 	got, err := calculatePrune(h.Path(vendorDir), toKeep, nil)
@@ -591,16 +592,13 @@ func TestCalculatePrune(t *testing.T) {
 
 	sort.Sort(byLen(got))
 
-	if len(got) != 2 {
-		t.Fatalf("expected 2 directories, got %v", len(got))
-	}
-
 	want := []string{
-		h.Path(filepath.Join(vendorDir, "github.com", "prune", "package")),
-		h.Path(filepath.Join(vendorDir, "github.com", "prune")),
+		h.Path(filepath.Join(vendorDir, "github.com/prune/pkg/sub")),
+		h.Path(filepath.Join(vendorDir, "github.com/prune/pkg")),
+		h.Path(filepath.Join(vendorDir, "github.com/prune")),
 	}
 
 	if !reflect.DeepEqual(want, got) {
-		t.Fatalf("expect %s, got %s", want, got)
+		t.Fatalf("calculated prune paths are not as expected.\n(WNT) %s\n(GOT) %s", want, got)
 	}
 }
