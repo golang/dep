@@ -64,9 +64,8 @@ func (c *Ctx) SetPaths(wd string, GOPATHs ...string) error {
 	if len(GOPATHs) == 0 {
 		GOPATHs = getGOPATHs(os.Environ())
 	}
-	for _, gp := range GOPATHs {
-		c.GOPATHs = append(c.GOPATHs, filepath.ToSlash(gp))
-	}
+
+	c.GOPATHs = append(c.GOPATHs, GOPATHs...)
 
 	return nil
 }
@@ -230,7 +229,7 @@ func (c *Ctx) DetectProjectGOPATH(p *Project) (string, error) {
 // detectGOPATH detects the GOPATH for a given path from ctx.GOPATHs.
 func (c *Ctx) detectGOPATH(path string) (string, error) {
 	for _, gp := range c.GOPATHs {
-		if fs.HasFilepathPrefix(filepath.FromSlash(path), gp) {
+		if fs.HasFilepathPrefix(path, gp) {
 			return gp, nil
 		}
 	}
