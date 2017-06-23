@@ -893,38 +893,6 @@ var basicFixtures = map[string]basicFixture{
 			"foo ptaggerino oldrev",
 		),
 	},
-	// "includes root package's dev dependencies": {
-	// 	ds: []depspec{
-	// 		mkDepspec("root 1.0.0", "(dev) foo 1.0.0", "(dev) bar 1.0.0"),
-	// 		mkDepspec("foo 1.0.0"),
-	// 		mkDepspec("bar 1.0.0"),
-	// 	},
-	// 	r: mksolution(
-	// 		"foo 1.0.0",
-	// 		"bar 1.0.0",
-	// 	),
-	// },
-	// "includes dev dependency's transitive dependencies": {
-	// 	ds: []depspec{
-	// 		mkDepspec("root 1.0.0", "(dev) foo 1.0.0"),
-	// 		mkDepspec("foo 1.0.0", "bar 1.0.0"),
-	// 		mkDepspec("bar 1.0.0"),
-	// 	},
-	// 	r: mksolution(
-	// 		"foo 1.0.0",
-	// 		"bar 1.0.0",
-	// 	),
-	// },
-	// "ignores transitive dependency's dev dependencies": {
-	// 	ds: []depspec{
-	// 		mkDepspec("root 1.0.0", "(dev) foo 1.0.0"),
-	// 		mkDepspec("foo 1.0.0", "(dev) bar 1.0.0"),
-	// 		mkDepspec("bar 1.0.0"),
-	// 	},
-	// 	r: mksolution(
-	// 		"foo 1.0.0",
-	// 	),
-	// },
 	"no version that matches requirement": {
 		ds: []depspec{
 			mkDepspec("root 0.0.0", "foo ^1.0.0"),
