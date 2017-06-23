@@ -19,6 +19,7 @@ Summarize the question and quote the reply, linking back to the original comment
 
 ## Behavior
 * [How does `dep` decide what version of a dependency to use?](#how-does-dep-decide-what-version-of-a-dependency-to-use)
+* [What external tools are supported?](#what-external-tools-are-supported)
 * [Why is `dep` ignoring a version constraint in the manifest?](#why-is-dep-ignoring-a-version-constraint-in-the-manifest)
 * [Why did `dep` use a different revision for package X instead of the revision in the lock file?](#why-did-dep-use-a-different-revision-for-package-x-instead-of-the-revision-in-the-lock-file)
 * [Why is `dep` slow?](#why-is-dep-slow)
@@ -155,6 +156,15 @@ the simplest of which is that it doesn't match a constraint. But if you're
 trying to figure out why `dep` is doing what it does, understanding that its
 basic action is to attempt versions in this order should help you to reason
 about what's going on.
+
+## What external tools are supported?
+During `dep init` configuration from other dependency managers is detected
+and imported, unless `-skip-tools` is specified.
+
+The following tools are supported: `glide` and `godep`.
+
+See [#186](https://github.com/golang/dep/issues/186#issuecomment-306363441) for
+how to add support for another tool.
 
 ## Why is `dep` ignoring a version constraint in the manifest?
 Only your project's directly imported dependencies are affected by a `constraint` entry
