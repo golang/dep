@@ -80,7 +80,6 @@ func (rd rootdata) externalImportList(stdLibFn func(string) bool) []string {
 }
 
 func (rd rootdata) getApplicableConstraints(stdLibFn func(string) bool) []workingConstraint {
-	// Merge the normal and test constraints together
 	pc := rd.rm.DependencyConstraints()
 
 	// Ensure that overrides which aren't in the combined pc map already make it
