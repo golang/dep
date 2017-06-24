@@ -5,7 +5,6 @@
 package gps
 
 import (
-	"encoding/hex"
 	"fmt"
 	"sort"
 	"strings"
@@ -44,10 +43,9 @@ func (diff *StringDiff) String() string {
 // LockDiff is the set of differences between an existing lock file and an updated lock file.
 // Fields are only populated when there is a difference, otherwise they are empty.
 type LockDiff struct {
-	HashDiff *StringDiff
-	Add      []LockedProjectDiff
-	Remove   []LockedProjectDiff
-	Modify   []LockedProjectDiff
+	Add    []LockedProjectDiff
+	Remove []LockedProjectDiff
+	Modify []LockedProjectDiff
 }
 
 // LockedProjectDiff contains the before and after snapshot of a project reference.
@@ -90,12 +88,6 @@ func DiffLocks(l1 Lock, l2 Lock) *LockDiff {
 	}
 
 	diff := LockDiff{}
-
-	h1 := hex.EncodeToString(l1.InputHash())
-	h2 := hex.EncodeToString(l2.InputHash())
-	if h1 != h2 {
-		diff.HashDiff = &StringDiff{Previous: h1, Current: h2}
-	}
 
 	var i2next int
 	for i1 := 0; i1 < len(p1); i1++ {
@@ -140,7 +132,7 @@ func DiffLocks(l1 Lock, l2 Lock) *LockDiff {
 		diff.Add = append(diff.Add, add)
 	}
 
-	if diff.HashDiff == nil && len(diff.Add) == 0 && len(diff.Remove) == 0 && len(diff.Modify) == 0 {
+	if len(diff.Add) == 0 && len(diff.Remove) == 0 && len(diff.Modify) == 0 {
 		return nil // The locks are the equivalent
 	}
 	return &diff

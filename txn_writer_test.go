@@ -8,12 +8,12 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"reflect"
 	"sort"
 	"strings"
 	"testing"
 
-	"reflect"
-
+	"github.com/golang/dep/internal/gps"
 	"github.com/golang/dep/internal/test"
 	"github.com/pkg/errors"
 )
@@ -250,6 +250,50 @@ func TestSafeWriter_ManifestAndUnmodifiedLockWithForceVendor(t *testing.T) {
 	}
 }
 
+func TestSafeWriter_ModifiedLockChangedHash(t *testing.T) {
+	test.NeedsExternalNetwork(t)
+	test.NeedsGit(t)
+
+	h := test.NewHelper(t)
+	defer h.Cleanup()
+
+	pc := NewTestProjectContext(h, safeWriterProject)
+	defer pc.Release()
+	pc.CopyFile(LockName, safeWriterGoldenLock)
+	pc.Load()
+
+	originalLock := new(Lock)
+	*originalLock = *pc.Project.Lock
+	originalLock.SolveMeta.InputsDigest = []byte{} // zero out the input hash to ensure non-equivalency
+	sw, _ := NewSafeWriter(nil, originalLock, pc.Project.Lock, VendorOnChanged)
+
+	// Verify prepared actions
+	if sw.HasManifest() {
+		t.Fatal("Did not expect the manifest to be written")
+	}
+	if !sw.HasLock() {
+		t.Fatal("Expected that the writer should plan to write the lock")
+	}
+	if sw.writeVendor {
+		t.Fatal("Did not expect vendor to be written to")
+	}
+
+	// Write changes
+	err := sw.Write(pc.Project.AbsRoot, pc.SourceManager, true)
+	h.Must(errors.Wrap(err, "SafeWriter.Write failed"))
+
+	// Verify file system changes
+	if err := pc.ManifestShouldNotExist(); err != nil {
+		t.Fatal(err)
+	}
+	if err := pc.LockShouldMatchGolden(safeWriterGoldenLock); err != nil {
+		t.Fatal(err)
+	}
+	if err := pc.VendorShouldExist(); err == nil {
+		t.Fatal(err)
+	}
+}
+
 func TestSafeWriter_ModifiedLock(t *testing.T) {
 	test.NeedsExternalNetwork(t)
 	test.NeedsGit(t)
@@ -265,6 +309,12 @@ func TestSafeWriter_ModifiedLock(t *testing.T) {
 	originalLock := new(Lock)
 	*originalLock = *pc.Project.Lock
 	originalLock.SolveMeta.InputsDigest = []byte{} // zero out the input hash to ensure non-equivalency
+	originalLock.P = append(originalLock.P, gps.NewLockedProject(
+		gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot("github.com/golang/dep")},
+		gps.NewBranch("master").Pair(gps.Revision("d05d5aca9f895d19e9265839bffeadd74a2d2ecb")),
+		[]string{"."},
+	))
+
 	sw, _ := NewSafeWriter(nil, originalLock, pc.Project.Lock, VendorOnChanged)
 
 	// Verify prepared actions
