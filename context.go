@@ -43,8 +43,8 @@ type Ctx struct {
 	Verbose    bool        // Enables more verbose logging.
 }
 
-// SetPaths sets the WorkingDir and GOPATHs fields. If GOPATHs are omitted, then
-// the $GOPATH environment variable, and the default GOPATH are checked - in that order.
+// SetPaths sets the WorkingDir and GOPATHs fields. If GOPATHs is empty, then
+// the GOPATH environment variable (or the default GOPATH) is used instead.
 func (c *Ctx) SetPaths(wd string, GOPATHs ...string) error {
 	if wd == "" {
 		return errors.New("cannot set Ctx.WorkingDir to an empty path")
