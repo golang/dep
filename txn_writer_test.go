@@ -8,8 +8,11 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
+
+	"reflect"
 
 	"github.com/golang/dep/internal/test"
 	"github.com/pkg/errors"
@@ -565,5 +568,37 @@ func TestSafeWriter_VendorDotGitPreservedWithForceVendor(t *testing.T) {
 	}
 	if err := pc.VendorFileShouldExist(".git/badinput_fileroot"); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestCalculatePrune(t *testing.T) {
+	h := test.NewHelper(t)
+	defer h.Cleanup()
+
+	vendorDir := "vendor"
+	h.TempDir(vendorDir)
+	h.TempDir(filepath.Join(vendorDir, "github.com/keep/pkg/sub"))
+	h.TempDir(filepath.Join(vendorDir, "github.com/prune/pkg/sub"))
+
+	toKeep := []string{
+		filepath.FromSlash("github.com/keep/pkg"),
+		filepath.FromSlash("github.com/keep/pkg/sub"),
+	}
+
+	got, err := calculatePrune(h.Path(vendorDir), toKeep, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	sort.Sort(byLen(got))
+
+	want := []string{
+		h.Path(filepath.Join(vendorDir, "github.com/prune/pkg/sub")),
+		h.Path(filepath.Join(vendorDir, "github.com/prune/pkg")),
+		h.Path(filepath.Join(vendorDir, "github.com/prune")),
+	}
+
+	if !reflect.DeepEqual(want, got) {
+		t.Fatalf("calculated prune paths are not as expected.\n(WNT) %s\n(GOT) %s", want, got)
 	}
 }

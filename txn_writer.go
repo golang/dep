@@ -530,6 +530,7 @@ fail:
 	return failerr
 }
 
+// calculatePrune returns the paths of the packages to be deleted from vendorDir.
 func calculatePrune(vendorDir string, keep []string, logger *log.Logger) ([]string, error) {
 	if logger != nil {
 		logger.Println("Calculating prune. Checking the following packages:")
@@ -547,7 +548,7 @@ func calculatePrune(vendorDir string, keep []string, logger *log.Logger) ([]stri
 			return nil
 		}
 
-		name := strings.TrimPrefix(path, vendorDir+"/")
+		name := strings.TrimPrefix(path, vendorDir+string(filepath.Separator))
 		if logger != nil {
 			logger.Printf("  %s", name)
 		}
