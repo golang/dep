@@ -43,18 +43,8 @@ type Ctx struct {
 	Verbose    bool        // Enables more verbose logging.
 }
 
-// SetPaths sets the WorkingDir and GOPATHSs fields.
-//
-//	ctx := &dep.Ctx{
-//		Out: log.New(os.Stdout, "", 0),
-//		Err: log.New(os.Stderr, "", 0),
-//	}
-//
-//	err := ctx.SetPaths(workingDir, filepath.SplitList(os.Getenv("GOPATH"))
-//	if err != nil {
-//		// Empty GOPATH
-//	}
-//
+// SetPaths sets the WorkingDir and GOPATHs fields. If GOPATHs is empty, then
+// the GOPATH environment variable (or the default GOPATH) is used instead.
 func (c *Ctx) SetPaths(wd string, GOPATHs ...string) error {
 	if wd == "" {
 		return errors.New("cannot set Ctx.WorkingDir to an empty path")
@@ -62,23 +52,16 @@ func (c *Ctx) SetPaths(wd string, GOPATHs ...string) error {
 	c.WorkingDir = wd
 
 	if len(GOPATHs) == 0 {
-		GOPATHs = getGOPATHs(os.Environ())
+		GOPATH := os.Getenv("GOPATH")
+		if GOPATH == "" {
+			GOPATH = defaultGOPATH()
+		}
+		GOPATHs = filepath.SplitList(GOPATH)
 	}
 
 	c.GOPATHs = append(c.GOPATHs, GOPATHs...)
 
 	return nil
-}
-
-// getGOPATH returns the GOPATHs from the passed environment variables.
-// If GOPATH is not defined, fallback to defaultGOPATH().
-func getGOPATHs(env []string) []string {
-	GOPATH := os.Getenv("GOPATH")
-	if GOPATH == "" {
-		GOPATH = defaultGOPATH()
-	}
-
-	return filepath.SplitList(GOPATH)
 }
 
 // defaultGOPATH gets the default GOPATH that was added in 1.8
