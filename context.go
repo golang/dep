@@ -113,9 +113,9 @@ func (c *Ctx) LoadProject() (*Project, error) {
 		return nil, err
 	}
 
-	ip, err := c.SplitAbsoluteProjectRoot(p.AbsRoot)
+	ip, err := c.ImportForAbs(p.AbsRoot)
 	if err != nil {
-		return nil, errors.Wrap(err, "split absolute project root")
+		return nil, errors.Wrap(err, "root project import")
 	}
 	p.ImportRoot = gps.ProjectRoot(ip)
 
@@ -219,14 +219,9 @@ func (c *Ctx) detectGOPATH(path string) (string, error) {
 	return "", errors.Errorf("%s is not within a known GOPATH", path)
 }
 
-// SplitAbsoluteProjectRoot takes an absolute path and compares it against the detected
-// GOPATH to determine what portion of the input path should be treated as an
-// import path - as a project root.
-func (c *Ctx) SplitAbsoluteProjectRoot(path string) (string, error) {
-	if c.GOPATH == "" {
-		return "", errors.Errorf("no GOPATH detected in this context")
-	}
-
+// ImportForAbs returns the import path for an absolute project path by trimming the
+// `$GOPATH/src/` prefix.  Returns an error for paths equal to, or without this prefix.
+func (c *Ctx) ImportForAbs(path string) (string, error) {
 	srcprefix := filepath.Join(c.GOPATH, "src") + string(filepath.Separator)
 	if fs.HasFilepathPrefix(path, srcprefix) {
 		if len(path) <= len(srcprefix) {
@@ -238,7 +233,7 @@ func (c *Ctx) SplitAbsoluteProjectRoot(path string) (string, error) {
 		return filepath.ToSlash(path[len(srcprefix):]), nil
 	}
 
-	return "", errors.Errorf("%s not in any GOPATH", path)
+	return "", errors.Errorf("%s not in GOPATH", path)
 }
 
 // absoluteProjectRoot determines the absolute path to the project root
