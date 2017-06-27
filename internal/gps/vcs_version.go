@@ -11,8 +11,8 @@ import (
 	"github.com/pkg/errors"
 )
 
-// ProjectVersion returns the current project version for an absolute path.
-func ProjectVersion(path string) (Version, error) {
+// VSCVersion returns the current project version for an absolute path.
+func VSCVersion(path string) (Version, error) {
 	repo, err := vcs.NewRepo("", path)
 	if err != nil {
 		return nil, errors.Wrapf(err, "creating new repo for root: %s", path)
