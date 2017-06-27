@@ -310,37 +310,6 @@ func (m ProjectConstraints) asSortedSlice() []ProjectConstraint {
 	return pcs
 }
 
-// merge pulls in all the constraints from other ProjectConstraints map(s),
-// merging them with the receiver into a new ProjectConstraints map.
-//
-// If duplicate ProjectRoots are encountered, the constraints are intersected
-// together and the latter's NetworkName, if non-empty, is taken.
-func (m ProjectConstraints) merge(other ...ProjectConstraints) (out ProjectConstraints) {
-	plen := len(m)
-	for _, pcm := range other {
-		plen += len(pcm)
-	}
-
-	out = make(ProjectConstraints, plen)
-	for pr, pp := range m {
-		out[pr] = pp
-	}
-
-	for _, pcm := range other {
-		for pr, pp := range pcm {
-			if rpp, exists := out[pr]; exists {
-				pp.Constraint = pp.Constraint.Intersect(rpp.Constraint)
-				if pp.Source == "" {
-					pp.Source = rpp.Source
-				}
-			}
-			out[pr] = pp
-		}
-	}
-
-	return
-}
-
 // overrideAll treats the receiver ProjectConstraints map as a set of override
 // instructions, and applies overridden values to the ProjectConstraints.
 //
