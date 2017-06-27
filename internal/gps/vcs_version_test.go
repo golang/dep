@@ -11,7 +11,7 @@ import (
 	"github.com/golang/dep/internal/test"
 )
 
-func TestProjectVersion(t *testing.T) {
+func TestVCSVersion(t *testing.T) {
 	test.NeedsExternalNetwork(t)
 	test.NeedsGit(t)
 
@@ -47,7 +47,7 @@ func TestProjectVersion(t *testing.T) {
 			h.RunGit(repoDir, "checkout", info.rev.String())
 		}
 		abs := filepath.FromSlash(filepath.Join(gopath, "src", ip))
-		got, err := ProjectVersion(abs)
+		got, err := VSCVersion(abs)
 		h.Must(err)
 
 		if got != info.rev {
