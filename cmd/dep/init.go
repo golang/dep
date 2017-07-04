@@ -8,6 +8,7 @@ import (
 	"flag"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/golang/dep"
@@ -73,6 +74,7 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 
 	var root string
 	if len(args) <= 0 {
+		// Set project root to current working directory.
 		root = ctx.WorkingDir
 	} else {
 		root = args[0]
@@ -106,7 +108,6 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 	if mok {
 		return errors.Errorf("manifest already exists: %s", mf)
 	}
-	// Manifest file does not exist.
 
 	lok, err := fs.IsRegular(lf)
 	if err != nil {
@@ -114,6 +115,26 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 	}
 	if lok {
 		return errors.Errorf("invalid state: manifest %q does not exist, but lock %q does", mf, lf)
+	}
+
+	// A manifest file does not exist in the current working directory.
+	// We want to search up the directory tree and warn if present.
+	// On attempts to load the project, ignore errors returned by ctx.LoadProject()
+	// and perform a nil-check on the project root returned.
+	pr, _ := ctx.LoadProject()
+	if pr != nil {
+		// TODO: Defining an error type `NoRootProjectFound` would allow for explicit checks against
+		// this type, handling it specifically. Thoughts?
+		ctx.Out.Println("WARNING: found manifest file in another directory.")
+	}
+
+	// Warn if new project initialization is being performed in a project subdirectory.
+	subdir, err := checkInSubdir(ctx)
+	if err != nil {
+		return errors.Wrap(err, "checkInSubDir")
+	}
+	if subdir {
+		ctx.Out.Println("WARNING: it is recommended that project initialization be performed at the project root, not a project subdirectory.")
 	}
 
 	ip, err := ctx.ImportForAbs(root)
@@ -205,6 +226,32 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 	}
 
 	return nil
+}
+
+// checkInSubdir returns true if project initialization is being performed in a subdirectory
+// relative to the project root directory `$GOPATH/src/github.com/user/project`; otherwise returns false.
+func checkInSubdir(ctx *dep.Ctx) (bool, error) {
+	sr, err := ctx.ImportForAbs(ctx.WorkingDir)
+	if err != nil {
+		return false, err
+	}
+
+	sm, err := ctx.SourceManager()
+	if err != nil {
+		return false, err
+	}
+	sm.UseDefaultSignalHandling()
+	defer sm.Release()
+
+	pr, err := sm.DeduceProjectRoot(sr)
+	if err != nil {
+		return false, err
+	}
+
+	// TODO: This is unlikely the cleanest way to determine if we are in a subdirectory
+	// of the project root path.
+	in := !strings.HasSuffix(ctx.WorkingDir, string(pr))
+	return in, nil
 }
 
 func getDirectDependencies(p *dep.Project) (pkgtree.PackageTree, map[string]bool, error) {
