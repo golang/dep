@@ -187,6 +187,15 @@ func lookupVersionForLockedProject(pi gps.ProjectIdentifier, c gps.Constraint, r
 	gps.SortPairedForUpgrade(versions) // Sort versions in asc order
 	for _, v := range versions {
 		if v.Revision() == rev {
+			// If the constraint is semver, make sure the version is acceptable.
+			// This prevents us from suggesting an incompatible version, which
+			// helps narrow the field when there are multiple matching versions.
+			if c != nil {
+				_, err := gps.NewSemverConstraint(c.String())
+				if err == nil && !c.Matches(v) {
+					continue
+				}
+			}
 			return v, nil
 		}
 	}
