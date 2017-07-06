@@ -38,7 +38,7 @@ func TestDeduceConstraint(t *testing.T) {
 
 	pi := gps.ProjectIdentifier{ProjectRoot: "github.com/sdboyer/deptest"}
 	for str, want := range constraints {
-		got, err := sm.DeduceConstraint(str, pi)
+		got, err := sm.InferConstraint(str, pi)
 		h.Must(err)
 
 		wantT := reflect.TypeOf(want)
@@ -68,7 +68,7 @@ func TestDeduceConstraint_InvalidInput(t *testing.T) {
 
 	pi := gps.ProjectIdentifier{ProjectRoot: "github.com/sdboyer/deptest"}
 	for _, str := range constraints {
-		_, err := sm.DeduceConstraint(str, pi)
+		_, err := sm.InferConstraint(str, pi)
 		if err == nil {
 			t.Errorf("expected %s to produce an error", str)
 		}

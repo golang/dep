@@ -5,15 +5,12 @@
 package gps
 
 import (
-	"encoding/hex"
 	"fmt"
 	"regexp"
-	"strconv"
 	"strings"
 
 	"github.com/Masterminds/semver"
 	"github.com/golang/dep/internal/gps/pkgtree"
-	"github.com/pkg/errors"
 )
 
 var regfrom = regexp.MustCompile(`^(\w*) from (\w*) ([0-9\.\*]*)`)
@@ -1497,70 +1494,13 @@ func (sm *depspecSourceManager) ignore() map[string]bool {
 	return sm.ig
 }
 
-// DeduceConstraint tries to puzzle out what kind of version is given in a string -
-// semver, a revision, or as a fallback, a plain tag
-func (sm *depspecSourceManager) DeduceConstraint(s string, pi ProjectIdentifier) (Constraint, error) {
-	if s == "" {
-		// Find the default branch
-		versions, err := sm.ListVersions(pi)
-		if err != nil {
-			return nil, errors.Wrapf(err, "list versions for %s(%s)", pi.ProjectRoot, pi.Source) // means repo does not exist
-		}
-
-		SortPairedForUpgrade(versions)
-		for _, v := range versions {
-			if v.Type() == IsBranch {
-				return v.Unpair(), nil
-			}
-		}
-	}
-
-	// always semver if we can
-	c, err := NewSemverConstraintIC(s)
-	if err == nil {
-		return c, nil
-	}
-
-	slen := len(s)
-	if slen == 40 {
-		if _, err = hex.DecodeString(s); err == nil {
-			// Whether or not it's intended to be a SHA1 digest, this is a
-			// valid byte sequence for that, so go with Revision. This
-			// covers git and hg
-			return Revision(s), nil
-		}
-	}
-	// Next, try for bzr, which has a three-component GUID separated by
-	// dashes. There should be two, but the email part could contain
-	// internal dashes
-	if strings.Count(s, "-") >= 2 {
-		// Work from the back to avoid potential confusion from the email
-		i3 := strings.LastIndex(s, "-")
-		// Skip if - is last char, otherwise this would panic on bounds err
-		if slen == i3+1 {
-			return NewVersion(s), nil
-		}
-
-		i2 := strings.LastIndex(s[:i3], "-")
-		if _, err = strconv.ParseUint(s[i2+1:i3], 10, 64); err == nil {
-			// Getting this far means it'd pretty much be nuts if it's not a
-			// bzr rev, so don't bother parsing the email.
-			return Revision(s), nil
-		}
-	}
-
-	// call out to network and get the package's versions
-	versions, err := sm.ListVersions(pi)
-	if err != nil {
-		return nil, errors.Wrapf(err, "list versions for %s(%s)", pi.ProjectRoot, pi.Source) // means repo does not exist
-	}
-
-	for _, version := range versions {
-		if s == version.String() {
-			return version.Unpair(), nil
-		}
-	}
-	return nil, errors.Errorf("%s is not a valid version for the package %s(%s)", s, pi.ProjectRoot, pi.Source)
+// InferConstraint tries to puzzle out what kind of version is given in a string -
+// semver, a revision, or as a fallback, a plain tag. This current implementation
+// is a panic because there's no current circumstance under which the depspecSourceManager
+// is useful outside of the gps solving tests, and it shouldn't be used anywhere else without a conscious and intentional
+// expansion of its semantics.
+func (sm *depspecSourceManager) InferConstraint(s string, pi ProjectIdentifier) (Constraint, error) {
+	panic("depsecSourceManager is only for gps solving tests")
 }
 
 type depspecBridge struct {
