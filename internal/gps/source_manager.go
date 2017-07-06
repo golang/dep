@@ -76,9 +76,9 @@ type SourceManager interface {
 	// immediately result in errors.
 	Release()
 
-	// DeduceConstraint tries to puzzle out what kind of version is given in a string -
+	// InferConstraint tries to puzzle out what kind of version is given in a string -
 	// semver, a revision, or as a fallback, a plain tag
-	DeduceConstraint(s string, pi ProjectIdentifier) (Constraint, error)
+	InferConstraint(s string, pi ProjectIdentifier) (Constraint, error)
 }
 
 // A ProjectAnalyzer is responsible for analyzing a given path for Manifest and
@@ -462,9 +462,9 @@ func (sm *SourceMgr) DeduceProjectRoot(ip string) (ProjectRoot, error) {
 	return ProjectRoot(pd.root), err
 }
 
-// DeduceConstraint tries to puzzle out what kind of version is given in a string -
+// InferConstraint tries to puzzle out what kind of version is given in a string -
 // semver, a revision, or as a fallback, a plain tag
-func (sm *SourceMgr) DeduceConstraint(s string, pi ProjectIdentifier) (Constraint, error) {
+func (sm *SourceMgr) InferConstraint(s string, pi ProjectIdentifier) (Constraint, error) {
 	if s == "" {
 		// Find the default branch
 		versions, err := sm.ListVersions(pi)
