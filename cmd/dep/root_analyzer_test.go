@@ -35,15 +35,37 @@ func TestLookupVersionForLockedProject_MatchRevisionToTag(t *testing.T) {
 	defer sm.Release()
 
 	pi := gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot("github.com/sdboyer/deptest")}
-	c, _ := gps.NewSemverConstraint("^0.8.1")
 	rev := gps.Revision("ff2948a2ac8f538c4ecd55962e919d1e13e74baf")
-	v, err := lookupVersionForLockedProject(pi, c, rev, sm)
+	v, err := lookupVersionForLockedProject(pi, nil, rev, sm)
 	h.Must(err)
 
 	wantV := "v1.0.0"
 	gotV := v.String()
 	if gotV != wantV {
 		t.Fatalf("Expected the locked version to be the tag paired with the manifest's pinned revision: wanted '%s', got '%s'", wantV, gotV)
+	}
+}
+
+func TestLookupVersionForLockedProject_MatchRevisionToMultipleTags(t *testing.T) {
+	h := test.NewHelper(t)
+	defer h.Cleanup()
+
+	ctx := newTestContext(h)
+	sm, err := ctx.SourceManager()
+	h.Must(err)
+	defer sm.Release()
+
+	pi := gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot("github.com/sdboyer/deptest")}
+	// Both 0.8.0 and 1.0.0 use the same rev, force dep to pick the lower version
+	c, _ := gps.NewSemverConstraint("<1.0.0")
+	rev := gps.Revision("ff2948a2ac8f538c4ecd55962e919d1e13e74baf")
+	v, err := lookupVersionForLockedProject(pi, c, rev, sm)
+	h.Must(err)
+
+	wantV := "v0.8.0"
+	gotV := v.String()
+	if gotV != wantV {
+		t.Fatalf("Expected the locked version to satisfy the manifest's semver constraint: wanted '%s', got '%s'", wantV, gotV)
 	}
 }
 
