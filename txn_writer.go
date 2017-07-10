@@ -235,7 +235,7 @@ func (sw SafeWriter) validate(root string, sm gps.SourceManager) error {
 		return errors.New("root path must be non-empty")
 	}
 	if is, err := fs.IsDir(root); !is {
-		if err != nil {
+		if err != nil && !os.IsNotExist(err) {
 			return err
 		}
 		return errors.Errorf("root path %q does not exist", root)

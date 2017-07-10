@@ -38,6 +38,7 @@ func TestCtx_ProjectImport(t *testing.T) {
 
 	for _, want := range importPaths {
 		fullpath := filepath.Join(depCtx.GOPATH, "src", want)
+		h.TempDir(filepath.Join("src", want))
 		got, err := depCtx.ImportForAbs(fullpath)
 		if err != nil {
 			t.Fatal(err)
@@ -345,6 +346,7 @@ func TestCaseInsentitiveGOPATH(t *testing.T) {
 
 	ip := "github.com/pkg/errors"
 	fullpath := filepath.Join(depCtx.GOPATH, "src", ip)
+	h.TempDir(filepath.Join("src", ip))
 	pr, err := depCtx.ImportForAbs(fullpath)
 	if err != nil {
 		t.Fatal(err)
@@ -366,13 +368,14 @@ func TestDetectProjectGOPATH(t *testing.T) {
 	}
 
 	h.TempDir("go/src/real/path")
-	h.TempDir("go/src/sym")
 
 	// Another directory used as a GOPATH
-	h.TempDir("go-two/src/real/path")
 	h.TempDir("go-two/src/sym")
 
-	h.TempDir("sym") // Directory for symlinks
+	h.TempDir(filepath.Join(".", "sym/symlink")) // Directory for symlinks
+	h.TempDir(filepath.Join("go", "src", "sym", "path"))
+	h.TempDir(filepath.Join("go", "src", " real", "path"))
+	h.TempDir(filepath.Join("go-two", "src", "real", "path"))
 
 	testcases := []struct {
 		name         string
@@ -462,6 +465,10 @@ func TestDetectGOPATH(t *testing.T) {
 		th.Path("go"),
 		th.Path("gotwo"),
 	}}
+
+	th.TempDir(filepath.Join("code", "src", "github.com", "username", "package"))
+	th.TempDir(filepath.Join("go", "src", "github.com", "username", "package"))
+	th.TempDir(filepath.Join("gotwo", "src", "github.com", "username", "package"))
 
 	testcases := []struct {
 		GOPATH string
