@@ -6,7 +6,6 @@ package dep
 
 import (
 	"bytes"
-	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
@@ -175,10 +174,6 @@ func toRawLockedProjectDiffs(diffs []gps.LockedProjectDiff) rawLockedProjectDiff
 
 func formatLockDiff(diff gps.LockDiff) (string, error) {
 	var buf bytes.Buffer
-
-	if diff.HashDiff != nil {
-		buf.WriteString(fmt.Sprintf("Memo: %s\n\n", diff.HashDiff))
-	}
 
 	writeDiffs := func(diffs []gps.LockedProjectDiff) error {
 		raw := toRawLockedProjectDiffs(diffs)
