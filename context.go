@@ -113,7 +113,7 @@ func (c *Ctx) LoadProject() (*Project, error) {
 		return nil, err
 	}
 
-	ip, err := c.ImportForAbs(p.AbsRoot)
+	ip, err := c.ImportForAbs(p.ResolvedAbsRoot)
 	if err != nil {
 		return nil, errors.Wrap(err, "root project import")
 	}
