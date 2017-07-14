@@ -83,6 +83,9 @@ Here are some suggestions for when you could use `dep` or `go get`:
 * Use `required` to explicitly add a dependency that is not imported directly or transitively, for example a development package used for code generation.
 * Use `ignored` to ignore a package and any of that package's unique dependencies.
 
+Refer [Gopkg.toml](https://github.com/golang/dep/blob/master/docs/Gopkg.toml.md)
+for detailed definitions of the above terms.
+
 ## How do I constrain a transitive dependency's version?
 First, if you're wondering about this because you're trying to keep the version
 of the transitive dependency from changing, then you're working against `dep`'s
@@ -171,20 +174,8 @@ Only your project's directly imported dependencies are affected by a `constraint
 in the manifest. Transitive dependencies are unaffected.
 
 Use an `override` entry for transitive dependencies.
-
-By default, when you specify a version without an operator, such as `~` or `=`,
-`dep` automatically adds a caret operator, `^`. The caret operator pins the
-left-most non-zero digit in the version. For example:
 ```
-^1.2.3 means 1.2.3 <= X < 2.0.0
-^0.2.3 means 0.2.3 <= X < 0.3.0
-^0.0.3 means 0.0.3 <= X < 0.1.0
-```
-
-To pin a version of direct dependency in manifest, prefix the version with `=`.
-For example:
-```
-[[constraint]]
+[[override]]
   name = "github.com/pkg/errors"
   version = "=0.8.0"
 ```
