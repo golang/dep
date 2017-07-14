@@ -79,8 +79,24 @@ version constraint of a specific dependency.
 Internally, dep uses [Masterminds/semver](https://github.com/Masterminds/semver)
 to work with semver versioning.
 
-[Why is dep ignoreing a version constraint in the manifest?](https://github.com/golang/dep/blob/master/FAQ.md#why-is-dep-ignoring-a-version-constraint-in-the-manifest)
+`~` and `=` operators can be used with the versions. When a version is specified
+without any operator, `dep` automatically adds a caret operator, `^`. The caret
+operator pins the left-most non-zero digit in the version. For example:
+```
+^1.2.3 means 1.2.3 <= X < 2.0.0
+^0.2.3 means 0.2.3 <= X < 0.3.0
+^0.0.3 means 0.0.3 <= X < 0.1.0
+```
 
+To pin a version of direct dependency in manifest, prefix the version with `=`.
+For example:
+```
+[[constraint]]
+  name = "github.com/pkg/errors"
+  version = "=0.8.0"
+```
+
+[Why is dep ignoring a version constraint in the manifest?](https://github.com/golang/dep/blob/master/FAQ.md#why-is-dep-ignoring-a-version-constraint-in-the-manifest)
 
 # Example
 
