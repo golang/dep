@@ -49,7 +49,6 @@ type govendorPackage struct {
 	// See the vendor spec for definitions.
 	Origin   string
 	Path     string
-	Tree     bool
 	Revision string
 	Version  string
 }
@@ -75,7 +74,7 @@ func (g *govendorImporter) Import(dir string, pr gps.ProjectRoot) (*dep.Manifest
 }
 
 func (g *govendorImporter) load(projectDir string) error {
-	g.logger.Println("Detected govendor configuration files...")
+	g.logger.Println("Detected govendor configuration file...")
 	v := filepath.Join(projectDir, govendorDir, govendorName)
 	if g.verbose {
 		g.logger.Printf("  Loading %s", v)
@@ -94,9 +93,7 @@ func (g *govendorImporter) load(projectDir string) error {
 func (g *govendorImporter) convert(pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock, error) {
 	g.logger.Println("Converting from vendor.json...")
 
-	manifest := &dep.Manifest{
-		Constraints: make(gps.ProjectConstraints),
-	}
+	manifest := dep.NewManifest()
 
 	if len(g.file.Ignore) > 0 {
 		// Govendor has three use cases here
@@ -107,14 +104,14 @@ func (g *govendorImporter) convert(pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock
 		// Dep doesn't support build tags right now: https://github.com/golang/dep/issues/120
 		for _, i := range strings.Split(g.file.Ignore, " ") {
 			if !strings.Contains(i, "/") {
-				g.logger.Printf("Warning: Not able to convert ignoring of build tag '%v'", i)
+				g.logger.Printf("  Govendor was configured to ignore the %s build tag, but that isn't supported by dep yet, and will be ignored. See https://github.com/golang/dep/issues/291.", i)
 				continue
 			}
 			_, err := g.sm.DeduceProjectRoot(i)
 			if err == nil {
 				manifest.Ignored = append(manifest.Ignored, i)
 			} else {
-				g.logger.Printf("Warning: Not able to convert ignoring of build tag '%v'\n", i)
+				g.logger.Printf("  Govendor was configured to ignore the %s package prefix, but that isn't supported by dep yet, and will be ignored.", i)
 			}
 		}
 	}
@@ -136,7 +133,7 @@ func (g *govendorImporter) convert(pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock
 		pkg.Path = string(pr)
 
 		// Check if it already existing in locked projects
-		if projectExistsInLock(lock, pkg.Path) {
+		if projectExistsInLock(lock, pr) {
 			continue
 		}
 
@@ -149,7 +146,7 @@ func (g *govendorImporter) convert(pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock
 		if pkg.Version == "" {
 			// When no version is specified try to get the corresponding version
 			pi := gps.ProjectIdentifier{
-				ProjectRoot: gps.ProjectRoot(pkg.Path),
+				ProjectRoot: pr,
 			}
 			if pkg.Origin != "" {
 				pi.Source = pkg.Origin
@@ -167,14 +164,12 @@ func (g *govendorImporter) convert(pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock
 			}
 		}
 
-		if pkg.Version != "" {
-			// If there's a version, use it to create project constraint
-			pc, err := g.buildProjectConstraint(pkg)
-			if err != nil {
-				return nil, nil, err
-			}
-			manifest.Constraints[pc.Ident.ProjectRoot] = gps.ProjectProperties{Constraint: pc.Constraint}
+		// If there's a version, use it to create project constraint
+		pc, err := g.buildProjectConstraint(pkg)
+		if err != nil {
+			return nil, nil, err
 		}
+		manifest.Constraints[pc.Ident.ProjectRoot] = gps.ProjectProperties{Constraint: pc.Constraint}
 
 		lp := g.buildLockedProject(pkg, manifest)
 		lock.P = append(lock.P, lp)
@@ -184,20 +179,15 @@ func (g *govendorImporter) convert(pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock
 }
 
 func (g *govendorImporter) buildProjectConstraint(pkg *govendorPackage) (pc gps.ProjectConstraint, err error) {
-	if pkg.Path == "" {
-		err = errors.New("Invalid vendor configuration, package path is required")
-		return
-	}
-
-	ref := pkg.Version
-	if ref == "" {
-		ref = pkg.Revision
-	}
-
 	pc.Ident = gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot(pkg.Path), Source: pkg.Path}
-	pc.Constraint, err = g.sm.InferConstraint(ref, pc.Ident)
-	if err != nil {
-		return
+
+	if pkg.Version != "" {
+		pc.Constraint, err = g.sm.InferConstraint(pkg.Version, pc.Ident)
+		if err != nil {
+			return
+		}
+	} else {
+		pc.Constraint = gps.Any()
 	}
 
 	f := fb.NewConstraintFeedback(pc, fb.DepTypeImported)
@@ -206,7 +196,6 @@ func (g *govendorImporter) buildProjectConstraint(pkg *govendorPackage) (pc gps.
 	return
 }
 
-// buildLockedProject uses the package Rev and Comment to create lock project
 func (g *govendorImporter) buildLockedProject(pkg *govendorPackage, manifest *dep.Manifest) gps.LockedProject {
 	pi := gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot(pkg.Path)}
 	revision := gps.Revision(pkg.Revision)
