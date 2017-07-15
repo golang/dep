@@ -5,13 +5,13 @@
 package dep
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
 
-	"fmt"
 	"github.com/Masterminds/vcs"
 	"github.com/golang/dep/internal/fs"
 	"github.com/golang/dep/internal/gps"
@@ -229,23 +229,23 @@ func (c *Ctx) ImportForAbs(path string) (string, error) {
 		return "", fmt.Errorf("Error evaluating symlinks in GOPATH %s: %s", c.GOPATH, err.Error())
 	}
 
-	path, err = filepath.EvalSymlinks(path)
+	pathEvaluated, err := filepath.EvalSymlinks(path)
 	if err != nil {
 		return "", fmt.Errorf("Error evaluating symlinks in %s: %s", path, err.Error())
 	}
 
 	srcprefix := filepath.Join(gopathEvaluated, "src") + string(filepath.Separator)
-	if fs.HasFilepathPrefix(path, srcprefix) {
-		if len(path) <= len(srcprefix) {
+	if fs.HasFilepathPrefix(pathEvaluated, srcprefix) {
+		if len(pathEvaluated) <= len(srcprefix) {
 			return "", errors.New("dep does not currently support using GOPATH/src as the project root")
 		}
 
 		// filepath.ToSlash because we're dealing with an import path now,
 		// not an fs path
-		return filepath.ToSlash(path[len(srcprefix):]), nil
+		return filepath.ToSlash(pathEvaluated[len(srcprefix):]), nil
 	}
 
-	return "", errors.Errorf("%s not in GOPATH", path)
+	return "", errors.Errorf("%s not in GOPATH", pathEvaluated)
 }
 
 // absoluteProjectRoot determines the absolute path to the project root
