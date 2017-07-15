@@ -1983,3 +1983,50 @@ func getTestdataRootDir(t *testing.T) string {
 	}
 	return filepath.Join(cwd, "..", "_testdata")
 }
+
+func getVerifyTestdataRootDir(t *testing.T) string {
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return filepath.Join(cwd, "..", "verify_testdata")
+}
+
+func TestVerifyDepTree(t *testing.T) {
+	pathname := getVerifyTestdataRootDir(t)
+
+	status, err := VerifyDepTree(pathname, map[string]string{
+		"github.com/alice/alice1":      "7428b8ac79007e9d46edd49b5798f7947c1ef73752cf31d4f7e451b8f25b3cb4", // match
+		"github.com/alice/alice2":      "non matching digest",                                              // mismatch
+		"github.com/charlie/notInTree": "",                                                                 // not in tree superseedes empty hash
+		"github.com/bob/bob1":          "1da9bd85997bf900d56a3b02b4f3e6232e1eb6948f6ba84ac54fae241ae9f980", // match
+		"github.com/bob/bob2":          "",                                                                 // empty hash
+		"launchpad.net/nifty":          "05a970598d198edf8e8f51127f322e91be0afadf026c1192f709f293230c6930", // match at unusual dir level
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if actual, expected := len(status), 7; actual != expected {
+		t.Errorf("Actual: %v; Expected: %v", actual, expected)
+	}
+
+	checkStatus := func(t *testing.T, status map[string]LibraryStatus, key string, expected LibraryStatus) {
+		actual, ok := status[key]
+		if ok != true {
+			t.Errorf("Expected key: %q", key)
+			return
+		}
+		if actual != expected {
+			t.Errorf("Key: %q; Actual: %v; Expected: %v", key, actual, expected)
+		}
+	}
+
+	checkStatus(t, status, "github.com/alice/alice1", NoMismatch)
+	checkStatus(t, status, "github.com/alice/alice2", DigestMismatchInLock)
+	checkStatus(t, status, "github.com/alice/notInLock", NotInLock)
+	checkStatus(t, status, "github.com/bob/bob1", NoMismatch)
+	checkStatus(t, status, "github.com/bob/bob2", EmptyDigestInLock)
+	checkStatus(t, status, "github.com/charlie/notInTree", NotInTree)
+	checkStatus(t, status, "launchpad.net/nifty", NoMismatch)
+}
