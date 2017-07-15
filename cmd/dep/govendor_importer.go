@@ -75,7 +75,7 @@ func (g *govendorImporter) Import(dir string, pr gps.ProjectRoot) (*dep.Manifest
 }
 
 func (g *govendorImporter) load(projectDir string) error {
-	g.logger.Println("Detected govendor configuration file...")
+	g.logger.Println("Detected govendor configuration files...")
 	v := filepath.Join(projectDir, govendorDir, govendorName)
 	if g.verbose {
 		g.logger.Printf("  Loading %s", v)
@@ -99,20 +99,88 @@ func (g *govendorImporter) convert(pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock
 	}
 
 	if len(g.file.Ignore) > 0 {
-		manifest.Ignored = strings.Split(g.file.Ignore, " ")
+		// Govendor has three use cases here
+		// 1. 'test' - special case for ignoring test files
+		// 2. build tags - any string without a slash (/) in it
+		// 3. path and path prefix - any string with a slash (/) in it.
+		//   The path case could be a full path or just a prefix.
+		// Dep doesn't support build tags right now: https://github.com/golang/dep/issues/120
+		for _, i := range strings.Split(g.file.Ignore, " ") {
+			if !strings.Contains(i, "/") {
+				g.logger.Printf("Warning: Not able to convert ignoring of build tag '%v'", i)
+				continue
+			}
+			_, err := g.sm.DeduceProjectRoot(i)
+			if err == nil {
+				manifest.Ignored = append(manifest.Ignored, i)
+			} else {
+				g.logger.Println("Warning: Not able to convert ignoring of build tag '%v'", i)
+			}
+		}
 	}
 
+	lock := &dep.Lock{}
 	for _, pkg := range g.file.Package {
-		pc, err := g.buildProjectConstraint(pkg)
+		// Path must not be empty
+		if pkg.Path == "" {
+			err := errors.New("Invalid govendor configuration, Path is required")
+			return nil, nil, err
+		}
+
+		// Obtain ProjectRoot. Required for avoiding sub-package imports.
+		// Use Path instead of Origin since we are trying to group by project here
+		pr, err := g.sm.DeduceProjectRoot(pkg.Path)
 		if err != nil {
 			return nil, nil, err
 		}
-		manifest.Constraints[pc.Ident.ProjectRoot] = gps.ProjectProperties{
-			Source:     pc.Ident.Source,
-			Constraint: pc.Constraint,
+		pkg.Path = string(pr)
+
+		// Check if it already existing in locked projects
+		if projectExistsInLock(lock, pkg.Path) {
+			continue
 		}
+
+		// Revision must not be empty
+		if pkg.Revision == "" {
+			err := errors.New("Invalid govendor configuration, Revision is required")
+			return nil, nil, err
+		}
+
+		if pkg.Version == "" {
+			// When no version is specified try to get the corresponding version
+			pi := gps.ProjectIdentifier{
+				ProjectRoot: gps.ProjectRoot(pkg.Path),
+			}
+			if pkg.Origin != "" {
+				pi.Source = pkg.Origin
+			}
+			revision := gps.Revision(pkg.Revision)
+			version, err := lookupVersionForLockedProject(pi, nil, revision, g.sm)
+			if err != nil {
+				// Only warn about the problem, it is not enough to warrant failing
+				g.logger.Println(err.Error())
+			} else {
+				pp := getProjectPropertiesFromVersion(version)
+				if pp.Constraint != nil {
+					pkg.Version = pp.Constraint.String()
+				}
+			}
+		}
+
+		if pkg.Version != "" {
+			// If there's a version, use it to create project constraint
+			pc, err := g.buildProjectConstraint(pkg)
+			if err != nil {
+				return nil, nil, err
+			}
+			manifest.Constraints[pc.Ident.ProjectRoot] = gps.ProjectProperties{Constraint: pc.Constraint}
+		}
+
+		lp := g.buildLockedProject(pkg, manifest)
+		lock.P = append(lock.P, lp)
 	}
-	return manifest, nil, nil
+
+	return manifest, lock, nil
 }
 
 func (g *govendorImporter) buildProjectConstraint(pkg *govendorPackage) (pc gps.ProjectConstraint, err error) {
@@ -136,4 +204,23 @@ func (g *govendorImporter) buildProjectConstraint(pkg *govendorPackage) (pc gps.
 	f.LogFeedback(g.logger)
 
 	return
+}
+
+// buildLockedProject uses the package Rev and Comment to create lock project
+func (g *govendorImporter) buildLockedProject(pkg *govendorPackage, manifest *dep.Manifest) gps.LockedProject {
+	pi := gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot(pkg.Path)}
+	revision := gps.Revision(pkg.Revision)
+	pp := manifest.Constraints[pi.ProjectRoot]
+
+	version, err := lookupVersionForLockedProject(pi, pp.Constraint, revision, g.sm)
+	if err != nil {
+		// Only warn about the problem, it is not enough to warrant failing
+		g.logger.Println(err.Error())
+	}
+
+	lp := gps.NewLockedProject(pi, version, nil)
+	f := fb.NewLockedProjectFeedback(lp, fb.DepTypeImported)
+	f.LogFeedback(g.logger)
+
+	return lp
 }
