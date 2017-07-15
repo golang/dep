@@ -1,7 +1,7 @@
 <!--
 
 Thanks for filing an issue! If this is a question or feature request, just delete
-everthing here and write out the request, providing as much context as you can.
+everything here and write out the request, providing as much context as you can.
 
 -->
 
