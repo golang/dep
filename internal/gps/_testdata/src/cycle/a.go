@@ -6,6 +6,7 @@ package cycle
 
 import (
 	"cycle/one"
+
 	"github.com/golang/dep/internal/gps"
 )
 
