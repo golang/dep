@@ -226,7 +226,7 @@ func (c *Ctx) ImportForAbs(path string) (string, error) {
 
 	gopathEvaluated, err := filepath.EvalSymlinks(c.GOPATH)
 	if err != nil {
-		return "", fmt.Errorf("Error evaluating symlinks in GOPATH %s: %s", path, err.Error())
+		return "", fmt.Errorf("Error evaluating symlinks in GOPATH %s: %s", c.GOPATH, err.Error())
 	}
 
 	path, err = filepath.EvalSymlinks(path)
