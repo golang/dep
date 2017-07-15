@@ -1,10 +1,9 @@
 {
 	"comment": "",
-	"ignore": "test github.com/sdboyer/dep-test",
+	"ignore": "test github.com/sdboyer/dep-test samples/",
 	"package": [
 		{
 			"checksumSHA1": "4R6TQcq0/gI/I2kKeUunuO/pEec=",
-			"origin": "github.com/carolynvs/deptest",
 			"path": "github.com/sdboyer/deptest",
 			"revision": "3f4c3bea144e112a69bbe5d8d01c1b09a544253f",
 			"revisionTime": "2017-02-22T03:31:47Z"

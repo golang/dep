@@ -114,7 +114,7 @@ func (g *govendorImporter) convert(pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock
 			if err == nil {
 				manifest.Ignored = append(manifest.Ignored, i)
 			} else {
-				g.logger.Println("Warning: Not able to convert ignoring of build tag '%v'", i)
+				g.logger.Printf("Warning: Not able to convert ignoring of build tag '%v'\n", i)
 			}
 		}
 	}
