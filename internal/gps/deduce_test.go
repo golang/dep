@@ -385,7 +385,7 @@ var pathDeductionFixtures = map[string][]pathDeductionFixture{
 			},
 		},
 	},
-	"gosource": {
+	"googlesource": {
 		// Official go repositories hosted on go.googlesource.com
 		{
 			in:   "go.googlesource.com/crypto",
@@ -529,8 +529,8 @@ func TestDeduceFromPath(t *testing.T) {
 				deducer = launchpadGitDeducer{regexp: glpRegex}
 			case "apache":
 				deducer = apacheDeducer{regexp: apacheRegex}
-			case "gosource":
-				deducer = goSourceDeducer{regexp: goSourceRegex}
+			case "googlesource":
+				deducer = googlesourceDeducer{regexp: googlesourceRegex}
 			case "vcsext":
 				deducer = vcsExtensionDeducer{regexp: vcsExtensionRegex}
 			default:

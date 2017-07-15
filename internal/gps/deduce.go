@@ -72,7 +72,7 @@ var (
 	//gcRegex      = regexp.MustCompile(`^(?P<root>code\.google\.com/[pr]/(?P<project>[a-z0-9\-]+)(\.(?P<subrepo>[a-z0-9\-]+))?)(/[A-Za-z0-9_.\-]+)*$`)
 	jazzRegex         = regexp.MustCompile(`^(?P<root>hub\.jazz\.net(/git/[a-z0-9]+/[A-Za-z0-9_.\-]+))((?:/[A-Za-z0-9_.\-]+)*)$`)
 	apacheRegex       = regexp.MustCompile(`^(?P<root>git\.apache\.org(/[a-z0-9_.\-]+\.git))((?:/[A-Za-z0-9_.\-]+)*)$`)
-	goSourceRegex     = regexp.MustCompile(`^(?P<root>go\.googlesource\.com(/[A-Za-z0-9-._]+))((?:/[A-Za-z0-9_.\-]+)*)$`)
+	googlesourceRegex = regexp.MustCompile(`^(?P<root>go\.googlesource\.com(/[A-Za-z0-9-._]+))((?:/[A-Za-z0-9_.\-]+)*)$`)
 	vcsExtensionRegex = regexp.MustCompile(`^(?P<root>([a-z0-9.\-]+\.)+[a-z0-9.\-]+(:[0-9]+)?/[A-Za-z0-9_.\-/~]*?\.(?P<vcs>bzr|git|hg|svn))((?:/[A-Za-z0-9_.\-]+)*)$`)
 )
 
@@ -92,7 +92,7 @@ func pathDeducerTrie() *deducerTrie {
 	dxt.Insert("git.launchpad.net/", launchpadGitDeducer{regexp: glpRegex})
 	dxt.Insert("hub.jazz.net/", jazzDeducer{regexp: jazzRegex})
 	dxt.Insert("git.apache.org/", apacheDeducer{regexp: apacheRegex})
-	dxt.Insert("go.googlesource.com/", goSourceDeducer{regexp: goSourceRegex})
+	dxt.Insert("go.googlesource.com/", googlesourceDeducer{regexp: googlesourceRegex})
 
 	return dxt
 }
@@ -465,11 +465,11 @@ func (m apacheDeducer) deduceSource(path string, u *url.URL) (maybeSource, error
 	return mb, nil
 }
 
-type goSourceDeducer struct {
+type googlesourceDeducer struct {
 	regexp *regexp.Regexp
 }
 
-func (m goSourceDeducer) deduceRoot(path string) (string, error) {
+func (m googlesourceDeducer) deduceRoot(path string) (string, error) {
 	v := m.regexp.FindStringSubmatch(path)
 	if v == nil {
 		return "", fmt.Errorf("%s is not a valid path for a source on go.googlesource.com", path)
@@ -478,7 +478,7 @@ func (m goSourceDeducer) deduceRoot(path string) (string, error) {
 	return "go.googlesource.com" + v[2], nil
 }
 
-func (m goSourceDeducer) deduceSource(path string, u *url.URL) (maybeSource, error) {
+func (m googlesourceDeducer) deduceSource(path string, u *url.URL) (maybeSource, error) {
 	v := m.regexp.FindStringSubmatch(path)
 	if v == nil {
 		return nil, fmt.Errorf("%s is not a valid path for a source on go.googlesource.com", path)
