@@ -11,11 +11,11 @@ import (
 	"runtime"
 	"strings"
 
+	"fmt"
 	"github.com/Masterminds/vcs"
 	"github.com/golang/dep/internal/fs"
 	"github.com/golang/dep/internal/gps"
 	"github.com/pkg/errors"
-	"fmt"
 )
 
 // Ctx defines the supporting context of dep.
@@ -224,13 +224,17 @@ func (c *Ctx) detectGOPATH(path string) (string, error) {
 // `$GOPATH/src/` prefix.  Returns an error for paths equal to, or without this prefix.
 func (c *Ctx) ImportForAbs(path string) (string, error) {
 
-	var err error
+	gopathEvaluated, err := filepath.EvalSymlinks(c.GOPATH)
+	if err != nil {
+		return "", fmt.Errorf("Error evaluating symlinks in GOPATH %s: %s", path, err.Error())
+	}
+
 	path, err = filepath.EvalSymlinks(path)
 	if err != nil {
 		return "", fmt.Errorf("Error evaluating symlinks in %s: %s", path, err.Error())
 	}
 
-	srcprefix := filepath.Join(c.GOPATH, "src") + string(filepath.Separator)
+	srcprefix := filepath.Join(gopathEvaluated, "src") + string(filepath.Separator)
 	if fs.HasFilepathPrefix(path, srcprefix) {
 		if len(path) <= len(srcprefix) {
 			return "", errors.New("dep does not currently support using GOPATH/src as the project root")
