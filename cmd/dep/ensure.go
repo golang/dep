@@ -304,20 +304,22 @@ func getProjectConstraint(arg string, sm gps.SourceManager) (gps.ProjectConstrai
 }
 
 func checkErrors(m map[string]pkgtree.PackageOrErr) error {
-	pkgErrors := []string{}
+	buildErrors, noGoErrors := []string{}, []string{}
 	for importPath, poe := range m {
 		if poe.Err != nil {
 			switch poe.Err.(type) {
 			case *build.NoGoError:
-				pkgErrors = append(pkgErrors, fmt.Sprintf("%s: no go code", importPath))
+				noGoErrors = append(noGoErrors, fmt.Sprintf("%s: no go code", importPath))
 			default:
-				pkgErrors = append(pkgErrors, fmt.Sprintf("%s: %s", importPath, poe.Err))
+				buildErrors = append(buildErrors, poe.Err.Error())
 			}
 		}
 	}
 
-	if len(pkgErrors) > 0 {
-		return errors.New(strings.Join(pkgErrors, "\n"))
+	buildErrors = append(buildErrors, noGoErrors...)
+
+	if len(buildErrors) > 0 {
+		return errors.Errorf("Found %d errors:\n\n%s", len(buildErrors), strings.Join(buildErrors, "\n"))
 	}
 
 	return nil
