@@ -212,6 +212,11 @@ func (c *Ctx) DetectProjectGOPATH(p *Project) (string, error) {
 // detectGOPATH detects the GOPATH for a given path from ctx.GOPATHs.
 func (c *Ctx) detectGOPATH(path string) (string, error) {
 	for _, gp := range c.GOPATHs {
+		// Evaluate symlinks in case the user's GOPATH contains a symlink.
+		gp, err := filepath.EvalSymlinks(gp)
+		if err != nil {
+			return "", errors.New("failed to evaluate symlinks on GOPATH")
+		}
 		if fs.HasFilepathPrefix(path, gp) {
 			return gp, nil
 		}

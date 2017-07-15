@@ -497,6 +497,16 @@ func (h *Helper) TempDir(path string) {
 	}
 }
 
+// TempSymlink adds a temporary symlink for a run of testgo.
+func (h *Helper) TempSymlink(old, new string) {
+	h.makeTempdir()
+	fullOldPath := filepath.Join(h.tempdir, old)
+	fullNewPath := filepath.Join(h.tempdir, new)
+	if err := os.Symlink(fullOldPath, fullNewPath); err != nil {
+		h.t.Fatalf("%+v", errors.Errorf("Unable to create symlink from %s -> %s", fullOldPath, fullNewPath))
+	}
+}
+
 // Path returns the absolute pathname to file with the temporary
 // directory.
 func (h *Helper) Path(name string) string {
@@ -504,19 +514,15 @@ func (h *Helper) Path(name string) string {
 		h.t.Fatalf("%+v", errors.Errorf("internal testsuite error: path(%q) with no tempdir", name))
 	}
 
-	var joined string
-	if name == "." {
-		joined = h.tempdir
-	} else {
-		joined = filepath.Join(h.tempdir, name)
+	evaled, err := filepath.EvalSymlinks(h.tempdir)
+	if err != nil {
+		h.t.Fatalf("%+v", errors.Wrapf(err, "internal testsuite error: could not evaluate symlinks for dir(%q)", h.tempdir))
 	}
 
-	// Ensure it's the absolute, symlink-less path we're returning
-	abs, err := filepath.EvalSymlinks(joined)
-	if err != nil {
-		h.t.Fatalf("%+v", errors.Wrapf(err, "internal testsuite error: could not get absolute path for dir(%q)", joined))
+	if name == "." {
+		return evaled
 	}
-	return abs
+	return filepath.Join(evaled, name)
 }
 
 // MustExist fails if path does not exist.

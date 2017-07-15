@@ -362,9 +362,11 @@ func TestDetectProjectGOPATH(t *testing.T) {
 
 	h.TempDir("go")
 	h.TempDir("go-two")
+	h.TempDir("go-symgopath")
+	h.TempSymlink("go-symgopath", "go-three")
 
 	ctx := &Ctx{
-		GOPATHs: []string{h.Path("go"), h.Path("go-two")},
+		GOPATHs: []string{h.Path("go"), h.Path("go-two"), h.Path("go-three")},
 	}
 
 	h.TempDir("go/src/real/path")
@@ -376,12 +378,14 @@ func TestDetectProjectGOPATH(t *testing.T) {
 	h.TempDir(filepath.Join("go", "src", "sym", "path"))
 	h.TempDir(filepath.Join("go", "src", " real", "path"))
 	h.TempDir(filepath.Join("go-two", "src", "real", "path"))
+	h.TempDir(filepath.Join("go-symgopath", "src", "real", "path"))
 
 	testcases := []struct {
 		name         string
 		root         string
 		resolvedRoot string
 		GOPATH       string
+		realGOPATH   string
 		expectErr    bool
 	}{
 		{
@@ -432,6 +436,13 @@ func TestDetectProjectGOPATH(t *testing.T) {
 			resolvedRoot: filepath.Join(ctx.GOPATHs[0], "src", " real", "path"),
 			GOPATH:       ctx.GOPATHs[0],
 		},
+		{
+			name:         "GOPATH-is-a-symlink",
+			root:         filepath.Join(h.Path("go-symgopath"), "src", "real", "path"),
+			resolvedRoot: filepath.Join(h.Path("go-symgopath"), "src", "real", "path"),
+			GOPATH:       ctx.GOPATHs[2],
+			realGOPATH:   h.Path("go-symgopath"),
+		},
 	}
 
 	for _, tc := range testcases {
@@ -447,8 +458,11 @@ func TestDetectProjectGOPATH(t *testing.T) {
 			} else if tc.expectErr && err == nil {
 				t.Fatalf("expected an error, got nil and gopath %s", GOPATH)
 			}
-			if GOPATH != tc.GOPATH {
-				t.Errorf("expected GOPATH %s, got %s", tc.GOPATH, GOPATH)
+			if tc.realGOPATH == "" {
+				tc.realGOPATH = tc.GOPATH
+			}
+			if GOPATH != tc.realGOPATH {
+				t.Errorf("expected GOPATH %s, got %s", tc.realGOPATH, GOPATH)
 			}
 		})
 	}
