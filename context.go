@@ -15,6 +15,7 @@ import (
 	"github.com/golang/dep/internal/fs"
 	"github.com/golang/dep/internal/gps"
 	"github.com/pkg/errors"
+	"fmt"
 )
 
 // Ctx defines the supporting context of dep.
@@ -113,7 +114,7 @@ func (c *Ctx) LoadProject() (*Project, error) {
 		return nil, err
 	}
 
-	ip, err := c.ImportForAbs(p.ResolvedAbsRoot)
+	ip, err := c.ImportForAbs(p.AbsRoot)
 	if err != nil {
 		return nil, errors.Wrap(err, "root project import")
 	}
@@ -222,6 +223,13 @@ func (c *Ctx) detectGOPATH(path string) (string, error) {
 // ImportForAbs returns the import path for an absolute project path by trimming the
 // `$GOPATH/src/` prefix.  Returns an error for paths equal to, or without this prefix.
 func (c *Ctx) ImportForAbs(path string) (string, error) {
+
+	var err error
+	path, err = filepath.EvalSymlinks(path)
+	if err != nil {
+		return "", fmt.Errorf("Error evaluating symlinks in %s: %s", path, err.Error())
+	}
+
 	srcprefix := filepath.Join(c.GOPATH, "src") + string(filepath.Separator)
 	if fs.HasFilepathPrefix(path, srcprefix) {
 		if len(path) <= len(srcprefix) {
