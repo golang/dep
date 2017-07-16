@@ -507,8 +507,7 @@ func TestDetectProjectSymlinkedOutsideGOPATH(t *testing.T) {
 
 	symlinkSrc := h.OriginalPath(filepath.Join("src", importPath))
 	symlinkTarget := h.OriginalPath("symlink/to/project/sym")
-	err := os.Symlink(symlinkSrc, symlinkTarget)
-	if err != nil {
+	if err := os.Symlink(symlinkSrc, symlinkTarget); err != nil {
 		t.Errorf("Error creating symlink from %s to %s: %s", symlinkSrc, symlinkTarget, err.Error())
 	}
 

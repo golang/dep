@@ -5,7 +5,6 @@
 package dep
 
 import (
-	"fmt"
 	"log"
 	"os"
 	"path/filepath"
@@ -223,15 +222,14 @@ func (c *Ctx) detectGOPATH(path string) (string, error) {
 // ImportForAbs returns the import path for an absolute project path by trimming the
 // `$GOPATH/src/` prefix.  Returns an error for paths equal to, or without this prefix.
 func (c *Ctx) ImportForAbs(path string) (string, error) {
-
 	gopathEvaluated, err := filepath.EvalSymlinks(c.GOPATH)
 	if err != nil {
-		return "", fmt.Errorf("Error evaluating symlinks in GOPATH %s: %s", c.GOPATH, err.Error())
+		return "", errors.Wrapf(err, "failed to evaluate symlink %s", c.GOPATH)
 	}
 
 	pathEvaluated, err := filepath.EvalSymlinks(path)
 	if err != nil {
-		return "", fmt.Errorf("Error evaluating symlinks in %s: %s", path, err.Error())
+		return "", errors.Wrapf(err, "failed to evaluate symlink %s", path)
 	}
 
 	srcprefix := filepath.Join(gopathEvaluated, "src") + string(filepath.Separator)
