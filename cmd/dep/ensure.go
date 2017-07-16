@@ -304,7 +304,8 @@ func getProjectConstraint(arg string, sm gps.SourceManager) (gps.ProjectConstrai
 }
 
 func checkErrors(m map[string]pkgtree.PackageOrErr) error {
-	buildErrors, noGoErrors := []string{}, []string{}
+	var buildErrors, noGoErrors []string
+
 	for importPath, poe := range m {
 		if poe.Err != nil {
 			switch poe.Err.(type) {
