@@ -174,7 +174,11 @@ func (out *dotOutput) BasicFooter() {
 }
 
 func (out *dotOutput) BasicLine(bs *BasicStatus) {
-	out.g.createNode(bs.ProjectRoot, bs.Version.String(), bs.Children)
+	version := formatVersion(bs.Revision)
+	if bs.Version != nil {
+		version = formatVersion(bs.Version)
+	}
+	out.g.createNode(bs.ProjectRoot, version, bs.Children)
 }
 
 func (out *dotOutput) MissingHeader()                {}
