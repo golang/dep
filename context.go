@@ -245,7 +245,7 @@ func (c *Ctx) ImportForAbs(path string) (string, error) {
 		return filepath.ToSlash(pathEvaluated[len(srcprefix):]), nil
 	}
 
-	return "", errors.Errorf("%s not in GOPATH", pathEvaluated)
+	return "", errors.Errorf("%s not in GOPATH", path)
 }
 
 // absoluteProjectRoot determines the absolute path to the project root
