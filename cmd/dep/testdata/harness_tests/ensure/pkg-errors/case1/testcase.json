@@ -3,6 +3,6 @@
     ["init", "-no-examples", "-skip-tools"],
     ["ensure", "-update"]
   ],
-  "error-expected": "all dirs lacked any go code",
+  "error-expected": "Found 1 errors:\n\ngithub.com/golang/notexist: no go code",
   "vendor-final": []
 }
