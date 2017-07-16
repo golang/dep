@@ -498,8 +498,21 @@ func (h *Helper) TempDir(path string) {
 }
 
 // Path returns the absolute pathname to file with the temporary
-// directory.
+// directory. Symlinks are evaluated.
 func (h *Helper) Path(name string) string {
+	path := h.OriginalPath(name)
+
+	// Ensure it's the absolute, symlink-less path we're returning
+	abs, err := filepath.EvalSymlinks(path)
+	if err != nil {
+		h.t.Fatalf("%+v", errors.Wrapf(err, "internal testsuite error: could not get absolute path for dir(%q)", path))
+	}
+	return abs
+}
+
+// OriginalPath returns the absolute pathname to file with the temporary
+// directory. Symlinks are NOT evaluated.
+func (h *Helper) OriginalPath(name string) string {
 	if h.tempdir == "" {
 		h.t.Fatalf("%+v", errors.Errorf("internal testsuite error: path(%q) with no tempdir", name))
 	}
@@ -511,12 +524,7 @@ func (h *Helper) Path(name string) string {
 		joined = filepath.Join(h.tempdir, name)
 	}
 
-	// Ensure it's the absolute, symlink-less path we're returning
-	abs, err := filepath.EvalSymlinks(joined)
-	if err != nil {
-		h.t.Fatalf("%+v", errors.Wrapf(err, "internal testsuite error: could not get absolute path for dir(%q)", joined))
-	}
-	return abs
+	return joined
 }
 
 // MustExist fails if path does not exist.

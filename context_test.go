@@ -491,3 +491,32 @@ func TestDetectGOPATH(t *testing.T) {
 		}
 	}
 }
+
+func TestDetectProjectSymlinkedOutsideGOPATH(t *testing.T) {
+	h := test.NewHelper(t)
+	defer h.Cleanup()
+
+	h.TempDir("src")
+
+	h.Setenv("GOPATH", h.Path("."))
+	depCtx := &Ctx{GOPATH: h.Path(".")}
+
+	importPath := "ti/ga/fato/la/večera"
+	h.TempDir(filepath.Join("src", importPath))
+	h.TempDir("symlink/to/project")
+
+	symlinkSrc := h.OriginalPath(filepath.Join("src", importPath))
+	symlinkTarget := h.OriginalPath("symlink/to/project/sym")
+	err := os.Symlink(symlinkSrc, symlinkTarget)
+	if err != nil {
+		t.Errorf("Error creating symlink from %s to %s: %s", symlinkSrc, symlinkTarget, err.Error())
+	}
+
+	got, err := depCtx.ImportForAbs(symlinkTarget)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != importPath {
+		t.Fatalf("expected %s, got %s", importPath, got)
+	}
+}
