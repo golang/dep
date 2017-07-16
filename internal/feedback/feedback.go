@@ -104,11 +104,10 @@ func GetLockingFeedback(version, revision, depType, projectPath string) string {
 	}
 
 	if depType == DepTypeImported {
-		if version != "" {
-			return fmt.Sprintf("Trying %s (%s) as initial lock for %s %s", version, revision, depType, projectPath)
+		if version == "" {
+			version = "*"
 		}
-		return fmt.Sprintf("Trying * (%s) as initial lock for %s %s", revision, depType, projectPath)
-
+		return fmt.Sprintf("Trying %s (%s) as initial lock for %s %s", version, revision, depType, projectPath)
 	}
 	return fmt.Sprintf("Locking in %s (%s) for %s %s", version, revision, depType, projectPath)
 }
