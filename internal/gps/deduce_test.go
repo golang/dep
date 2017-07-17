@@ -385,6 +385,30 @@ var pathDeductionFixtures = map[string][]pathDeductionFixture{
 			},
 		},
 	},
+	"googlesource": {
+		// Official go repositories hosted on go.googlesource.com
+		{
+			in:   "go.googlesource.com/crypto",
+			root: "go.googlesource.com/crypto",
+			mb:   maybeGitSource{url: mkurl("https://go.googlesource.com/crypto")},
+		},
+		{
+			in:   "go.googlesource.com/crypto/ssh",
+			root: "go.googlesource.com/crypto",
+			mb:   maybeGitSource{url: mkurl("https://go.googlesource.com/crypto")},
+		},
+		// Spaces are not valid in package names
+		{
+			in:   "go.googlesource.com/cry pto",
+			rerr: errors.New("go.googlesource.com/cry pto is not a valid path for a source on go.googlesource.com"),
+		},
+		// Non https schemes are not valid
+		{
+			in:     "gopher://go.googlesource.com/crypto",
+			root:   "go.googlesource.com/crypto",
+			srcerr: errors.New("go.googlesource.com only supports https, gopher://go.googlesource.com/crypto is not allowed"),
+		},
+	},
 	"vcsext": {
 		// VCS extension-based syntax
 		{
@@ -505,6 +529,8 @@ func TestDeduceFromPath(t *testing.T) {
 				deducer = launchpadGitDeducer{regexp: glpRegex}
 			case "apache":
 				deducer = apacheDeducer{regexp: apacheRegex}
+			case "googlesource":
+				deducer = googlesourceDeducer{regexp: googlesourceRegex}
 			case "vcsext":
 				deducer = vcsExtensionDeducer{regexp: vcsExtensionRegex}
 			default:
