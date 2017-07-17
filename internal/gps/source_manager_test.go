@@ -29,6 +29,7 @@ func TestSourceManager_InferConstraint(t *testing.T) {
 		"v2":     NewBranch("v2"),
 		"master": NewBranch("master"),
 		"5b3352dc16517996fb951394bcbbe913a2a616e3": Revision("5b3352dc16517996fb951394bcbbe913a2a616e3"),
+		"5b3352d": Revision("5b3352d"),
 
 		// valid bzr rev
 		"jess@linux.com-20161116211307-wiuilyamo9ian0m7": Revision("jess@linux.com-20161116211307-wiuilyamo9ian0m7"),
@@ -64,6 +65,10 @@ func TestSourceManager_InferConstraint_InvalidInput(t *testing.T) {
 		// invalid bzr revs
 		"go4@golang.org-lskjdfnkjsdnf-ksjdfnskjdfn",
 		"20120425195858-psty8c35ve2oej8t",
+		// Too long to be a SHA (41 chars)
+		"5b3352dc16517996fb951394bcbbe913a2a616e31",
+		// Too short to be a SHA (git default shortest length is 7)
+		"5b3352",
 	}
 
 	pi := ProjectIdentifier{ProjectRoot: "github.com/sdboyer/deptest"}

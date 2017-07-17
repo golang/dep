@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strconv"
 	"strings"
@@ -462,6 +463,8 @@ func (sm *SourceMgr) DeduceProjectRoot(ip string) (ProjectRoot, error) {
 	return ProjectRoot(pd.root), err
 }
 
+var shortSHARegex = regexp.MustCompile("^[0-9a-f]{7,40}$")
+
 // InferConstraint tries to puzzle out what kind of version is given in a string.
 // Preference is given first for revisions, then branches, then semver constraints,
 // and then plain tags.
@@ -524,6 +527,12 @@ func (sm *SourceMgr) InferConstraint(s string, pi ProjectIdentifier) (Constraint
 	// Tag
 	if version != nil {
 		return version.Unpair(), nil
+	}
+
+	// Git short SHA; only consider if all else fails, to avoid ambiguity
+	// Length may vary depending on what git determines is needed for uniqueness
+	if shortSHARegex.MatchString(s) {
+		return Revision(s), nil
 	}
 
 	return nil, errors.Errorf("%s is not a valid version for the package %s(%s)", s, pi.ProjectRoot, pi.Source)
