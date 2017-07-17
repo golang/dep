@@ -1,3 +1,6 @@
+# general
+* @sdboyer
+
 # init
 /cmd/dep/init*                          @carolynvs
 /cmd/dep/gopath_scanner*                @carolynvs
@@ -19,6 +22,3 @@
 /cmd/dep/status*                          @darkowlzz
 /cmd/dep/testdata/harness_tests/status**  @darkowlzz
 /cmd/dep/graphviz*                        @darkowlzz
-
-# gps
-/internal/gps   @sdboyer
