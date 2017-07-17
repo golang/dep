@@ -25,6 +25,7 @@ Summarize the question and quote the reply, linking back to the original comment
 * [Why is `dep` slow?](#why-is-dep-slow)
 * [How does `dep` handle symbolic links?](#how-does-dep-handle-symbolic-links)
 * [Does `dep` support relative imports?](#does-dep-support-relative-imports)
+* [How do I make `dep` resolve dependencies from my `GOPATH`?](#how-do-i-make-dep-resolve-dependencies-from-my-gopath)
 
 ## Best Practices
 * [Should I commit my vendor directory?](#should-i-commit-my-vendor-directory)
@@ -287,6 +288,13 @@ No.
 > ii. it's worse for our case, as we start venturing into [dot dot hell](http://doc.cat-v.org/plan_9/4th_edition/papers/lexnames) territory when trying to prove that the import does not escape the tree of the project -[@sdboyer in #899](https://github.com/golang/dep/issues/899#issuecomment-317904001)
 
 For a refresher on Go's recommended workspace organization, see the ["How To Write Go Code"](https://golang.org/doc/code.html) article in the Go docs. Organizing your code this way gives you a unique import path for every package.
+
+## How do I make `dep` resolve dependencies from my `GOPATH`?
+
+`dep init` provides an option to scan the `GOPATH` for dependencies by doing
+`dep init -gopath`, which falls back to network mode when the packages are not
+found in `GOPATH`. `dep ensure` doesn't work with projects in `GOPATH`.
+
 
 ## Best Practices
 ### Should I commit my vendor directory?
