@@ -16,6 +16,7 @@ Summarize the question and quote the reply, linking back to the original comment
 * [When should I use `constraint`, `override` `required`, or `ignored` in the Gopkg.toml?](#when-should-i-use-constraint-override-required-or-ignored-in-gopkgtoml)
 * [How do I constrain a transitive dependency's version?](#how-do-i-constrain-a-transitive-dependencys-version)
 * [Can I put the manifest and lock in the vendor directory?](#can-i-put-the-manifest-and-lock-in-the-vendor-directory)
+* [How do I get dep to authenticate to a git repo?](#how-do-i-get-dep-to-authenticate-to-a-git-repo)
 
 ## Behavior
 * [How does `dep` decide what version of a dependency to use?](#how-does-dep-decide-what-version-of-a-dependency-to-use)
@@ -121,6 +122,42 @@ No.
 > We prefer to treat the `vendor/` as an implementation detail.
 -[@sdboyer on go package management list](https://groups.google.com/d/msg/go-package-management/et1qFUjrkP4/LQFCHP4WBQAJ)
 
+## How do I get dep to authenticate to a git repo?
+
+dep currently uses the git command under the hood, so configuring the credentials
+for each repository you wish to authenticate to will allow dep to use an
+authenticated repository.
+
+First, configure git to use the credentials option for the specific repository.
+Yes, the example.com.username is weird, but it's correct; the 'username' would be
+the user repo you're authenticating to access, the 'myusername' is the username
+you would use for the actual authentication.
+
+For example, if you use gitlab, and you wish to access https://gitlab.example.com/example/package.git, 
+then you would want to use the following configuration:
+
+`$ git config --global credential.https://gitlab.example.com.example yourusername`
+
+You also need to tell git what authentication provider you wish to use. You can get
+a list of providers, with the following command:
+
+`$ git help -a | grep credential-
+  credential-cache          remote-fd
+  credential-cache--daemon  remote-ftp
+  credential-osxkeychain    remote-ftps
+  credential-store          remote-http`
+  
+You would then choose an appropriate provider. To use the osxkeychain, then you 
+would use the following:
+
+`git config --global credential.helper osxkeychain`
+
+If you need to do this for a CI system, then you may want to use the "store" provider.
+Please see the documentation on how to configure that: https://git-scm.com/docs/git-credential-store
+
+After configuring git, you may need to use git manually once to have it store the
+credentials. Once you've checked out the repo manually, it will then use the stored
+credentials. This at least appears to be the behaviour for the osxkeychain.
 
 ## Behavior
 ### How does `dep` decide what version of a dependency to use?
