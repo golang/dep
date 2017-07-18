@@ -31,6 +31,10 @@ func TestFeedback_Constraint(t *testing.T) {
 			want:     "Using ^1.0.0 as initial constraint for imported dep github.com/foo/bar",
 		},
 		{
+			feedback: NewConstraintFeedback(gps.ProjectConstraint{Constraint: gps.Any(), Ident: pi}, DepTypeImported),
+			want:     "Using * as initial constraint for imported dep github.com/foo/bar",
+		},
+		{
 			feedback: NewConstraintFeedback(gps.ProjectConstraint{Constraint: rev, Ident: pi}, DepTypeDirect),
 			want:     "Using 1b8edb3 as hint for direct dep github.com/foo/bar",
 		},
@@ -67,6 +71,10 @@ func TestFeedback_LockedProject(t *testing.T) {
 		{
 			feedback: NewLockedProjectFeedback(gps.NewLockedProject(pi, v, nil), DepTypeImported),
 			want:     "Trying v1.1.4 (bc29b4f) as initial lock for imported dep github.com/foo/bar",
+		},
+		{
+			feedback: NewLockedProjectFeedback(gps.NewLockedProject(pi, gps.NewVersion("").Pair("bc29b4f"), nil), DepTypeImported),
+			want:     "Trying * (bc29b4f) as initial lock for imported dep github.com/foo/bar",
 		},
 		{
 			feedback: NewLockedProjectFeedback(gps.NewLockedProject(pi, b, nil), DepTypeTransitive),
