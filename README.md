@@ -49,9 +49,13 @@ $ dep ensure -update
 `dep init` will do the following:
 
 1. Look for [existing dependency management files](docs/FAQ.md#what-external-tools-are-supported) to convert
-1. Back up your existing `vendor/` directory to
+1. Check if your dependencies use dep
+1. Identify your dependencies
+1. Back up your existing `vendor/` directory (if you have one) to
 `_vendor-TIMESTAMP/`
+1. Pick the highest compatible version for each dependency
 1. Generate [`Gopkg.toml`](Gopkg.toml.md) ("manifest") and `Gopkg.lock` files
+1. Install the dependencies in `vendor/`
 
 ### Day-to-day workflows
 
@@ -65,6 +69,8 @@ $ dep help ensure
 ```
 
 #### Installing dependencies
+
+(if your `vendor/` directory isn't [checked in with your code](](docs/FAQ.md#should-i-commit-my-vendor-directory)))
 
 ```sh
 $ dep ensure
@@ -85,12 +91,12 @@ matches the constraints from the manifest. If the dependency is missing from
 
 #### Changing dependencies
 
-When you want to do the following for one or more dependencies:
+If you want to:
 
 * Change the allowed `version`/`branch`/`revision`
 * Switch to using a fork
 
-do the following:
+for one or more dependencies, do the following:
 
 1. Modify your `Gopkg.toml`.
 1. Run
@@ -99,6 +105,16 @@ do the following:
     $ dep ensure
     ```
 
+#### Checking the status of dependencies
+
+```sh
+$ dep status
+PROJECT                             CONSTRAINT     VERSION        REVISION  LATEST
+github.com/Masterminds/semver       branch 2.x     branch 2.x     139cc09   c2e7f6c
+github.com/Masterminds/vcs          ^1.11.0        v1.11.1        3084677   3084677
+github.com/armon/go-radix           *              branch master  4239b77   4239b77
+```
+
 #### Updating dependencies
 
 (to the latest version allowed by the manifest)
@@ -106,6 +122,43 @@ do the following:
 ```sh
 $ dep ensure -update
 ```
+
+#### Removing dependencies
+
+1. Remove the `import`s and all usage from your code.
+1. Run
+
+    ```sh
+    $ dep ensure
+    ```
+
+1. Remove from `Gopkg.toml`, if it was in there.
+
+#### Testing changes to a dependency
+
+Making changes in your `vendor/` directory directly is not recommended, as dep
+will overwrite any changes. Instead:
+
+1. Delete the dependency from the `vendor/` directory.
+
+    ```sh
+    rm -rf vendor/<dependency>
+    ```
+
+1. Add that dependency to your `GOPATH`, if it isn't already.
+
+    ```sh
+    $ go get <dependency>
+    ```
+
+1. Modify the dependency in `$GOPATH/src/<dependency>`.
+1. Test, build, etc.
+
+Don't run `dep ensure` until you're done. `dep ensure` will reinstall the
+dependency into `vendor/` based on your manifest, as if you were installing from
+scratch.
+
+To test out code that is pushed, see [changing dependencies](#changing-dependencies).
 
 ## Feedback
 
