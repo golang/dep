@@ -27,7 +27,7 @@ That said, keep in mind the following:
   - [User Stories](https://docs.google.com/document/d/1wT8e8wBHMrSRHY4UF_60GCgyWGqvYye4THvaDARPySs/edit)
   - [Features](https://docs.google.com/document/d/1JNP6DgSK-c6KqveIhQk-n_HAw3hsZkL-okoleM43NgA/edit)
   - [Design Space](https://docs.google.com/document/d/1TpQlQYovCoX9FkpgsoxzdvZplghudHAiQOame30A-v8/edit)
-- [Frequently Asked Questions](FAQ.md)
+- [Frequently Asked Questions](docs/FAQ.md)
 
 ## Usage
 
@@ -58,7 +58,7 @@ Feedback is greatly appreciated.
 At this stage, the maintainers are most interested in feedback centered on the user experience (UX) of the tool.
 Do you have workflows that the tool supports well, or doesn't support at all?
 Do any of the commands have surprising effects, output, or results?
-Please check the existing issues and [FAQ](FAQ.md) to see if your feedback has already been reported.
+Please check the existing issues and [FAQ](docs/FAQ.md) to see if your feedback has already been reported.
 If not, please file an issue, describing what you did or wanted to do, what you expected to happen, and what actually happened.
 
 ## Contributing
@@ -68,4 +68,3 @@ The maintainers actively manage the issues list, and try to highlight issues sui
 The project follows the typical GitHub pull request model.
 See [CONTRIBUTING.md](CONTRIBUTING.md) for more details.
 Before starting any work, please either comment on an existing issue, or file a new one.
-

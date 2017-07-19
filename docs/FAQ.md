@@ -82,7 +82,7 @@ Here are some suggestions for when you could use `dep` or `go get`:
 * Use `required` to explicitly add a dependency that is not imported directly or transitively, for example a development package used for code generation.
 * Use `ignored` to ignore a package and any of that package's unique dependencies.
 
-Refer [Gopkg.toml](https://github.com/golang/dep/blob/master/docs/Gopkg.toml.md)
+Refer to the [Gopkg.toml documentation](Gopkg.toml.md)
 for detailed definitions of the above terms.
 
 ## How do I constrain a transitive dependency's version?
