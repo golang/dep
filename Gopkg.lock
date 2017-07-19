@@ -61,4 +61,3 @@
   inputs-digest = "48b2f69d59b2f321b14ee11547f4ac94468ac91bb99aad48337d42b75b791975"
   solver-name = "gps-cdcl"
   solver-version = 1
-
