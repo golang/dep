@@ -224,7 +224,7 @@ func (g *gopathScanner) scanGopathForDependencies() (projectData, error) {
 			notondisk[pr] = true
 			continue
 		}
-		v, err := gps.VSCVersion(abs)
+		v, err := gps.VCSVersion(abs)
 		if err != nil {
 			notondisk[pr] = true
 			continue
@@ -294,7 +294,7 @@ func (g *gopathScanner) scanGopathForDependencies() (projectData, error) {
 						notondisk[pr] = true
 						return nil
 					}
-					v, err := gps.VSCVersion(abs)
+					v, err := gps.VCSVersion(abs)
 					if err != nil {
 						// Even if we know it's on disk, errors are still
 						// possible when trying to deduce version. If we

@@ -30,7 +30,7 @@ func TestVCSVersion(t *testing.T) {
 			rev:      NewVersion("v0.8.0").Pair("645ef00459ed84a119197bfb8d8205042c6df63d"), // semver
 			checkout: true,
 		},
-		"github.com/Sirupsen/logrus": {
+		"github.com/sirupsen/logrus": {
 			rev:      Revision("42b84f9ec624953ecbf81a94feccb3f5935c5edf"), // random sha
 			checkout: true,
 		},
@@ -47,7 +47,7 @@ func TestVCSVersion(t *testing.T) {
 			h.RunGit(repoDir, "checkout", info.rev.String())
 		}
 		abs := filepath.FromSlash(filepath.Join(gopath, "src", ip))
-		got, err := VSCVersion(abs)
+		got, err := VCSVersion(abs)
 		h.Must(err)
 
 		if got != info.rev {
