@@ -41,10 +41,9 @@ To start managing dependencies using dep, run the following from your project ro
 
 ```sh
 $ dep init
-$ dep ensure -update
 ```
 
-`dep init` will do the following:
+This does the following:
 
 1. Look for [existing dependency management files](docs/FAQ.md#what-external-tools-are-supported) to convert
 1. Check if your dependencies use dep
@@ -57,10 +56,13 @@ $ dep ensure -update
 
 ## Usage
 
-There is one main subcommand you will use: `dep ensure`. `ensure` synchronizes
-your dependencies in `vendor/` to make sure they match what's in your `import`s
-and `Gopkg.toml`. `dep ensure` is safe to run early and often. See the help text
-for more detailed usage instructions.
+There is one main subcommand you will use: `dep ensure`. `ensure` first makes
+sure `Gopkg.lock` is consistent with your `import`s and `Gopkg.toml`. If any
+changes are detected, it then populates `vendor/` with exactly what's described
+in `Gopkg.lock`.
+
+`dep ensure` is safe to run early and often. See the help text for more detailed
+usage instructions.
 
 ```sh
 $ dep help ensure
@@ -69,6 +71,8 @@ $ dep help ensure
 ### Installing dependencies
 
 (if your `vendor/` directory isn't [checked in with your code](](docs/FAQ.md#should-i-commit-my-vendor-directory)))
+
+<!-- may change with https://github.com/golang/dep/pull/489 -->
 
 ```sh
 $ dep ensure
@@ -80,8 +84,8 @@ matches the constraints from the manifest. If the dependency is missing from
 
 ### Adding a dependency
 
-1. Add the `import` in your source code file(s).
-1. Download via dep.
+1. `import` the package in your `*.go` source code file(s).
+1. Run the following command to update your `Gopkg.lock` and populate `vendor/` with the new dependency.
 
     ```sh
     $ dep ensure
@@ -156,7 +160,11 @@ Don't run `dep ensure` until you're done. `dep ensure` will reinstall the
 dependency into `vendor/` based on your manifest, as if you were installing from
 scratch.
 
-To test out code that is pushed, see [changing dependencies](#changing-dependencies).
+This solution works for short-term use, but for something long-term, take a look
+at [virtualgo](https://github.com/GetStream/vg).
+
+To test out code that has been pushed as a new version, or to a branch or fork,
+see [changing dependencies](#changing-dependencies).
 
 ## Feedback
 
