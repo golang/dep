@@ -945,8 +945,8 @@ func TestConstraintsIdentical(t *testing.T) {
 		{Revision("test"), Revision("test"), true},
 		{Revision("test"), Revision("test2"), false},
 		{testSemverConstraint(t, "v2.10.7"), testSemverConstraint(t, "v2.10.7"), true},
-		{&versionTypeUnion{NewVersion("test"), NewBranch("branch")},
-			&versionTypeUnion{NewBranch("branch"), NewVersion("test")}, true},
+		{versionTypeUnion{NewVersion("test"), NewBranch("branch")},
+			versionTypeUnion{NewBranch("branch"), NewVersion("test")}, true},
 	} {
 		if test.eq != test.a.identical(test.b) {
 			want := "identical"

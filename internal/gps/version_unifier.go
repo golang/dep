@@ -271,17 +271,17 @@ func (vtu versionTypeUnion) Intersect(c Constraint) Constraint {
 }
 
 func (vtu versionTypeUnion) identical(c Constraint) bool {
-	vtu2, ok := c.(*versionTypeUnion)
+	vtu2, ok := c.(versionTypeUnion)
 	if !ok {
 		return false
 	}
-	if len(vtu) != len(*vtu2) {
+	if len(vtu) != len(vtu2) {
 		return false
 	}
 	used := make([]bool, len(vtu))
 outter:
 	for _, v := range vtu {
-		for i, v2 := range *vtu2 {
+		for i, v2 := range vtu2 {
 			if used[i] {
 				continue
 			}
