@@ -29,9 +29,7 @@ That said, keep in mind the following:
   - [Design Space](https://docs.google.com/document/d/1TpQlQYovCoX9FkpgsoxzdvZplghudHAiQOame30A-v8/edit)
 - [Frequently Asked Questions](docs/FAQ.md)
 
-## Usage
-
-### Initial setup
+## Setup
 
 Get the tool via
 
@@ -57,7 +55,7 @@ $ dep ensure -update
 1. Generate [`Gopkg.toml`](Gopkg.toml.md) ("manifest") and `Gopkg.lock` files
 1. Install the dependencies in `vendor/`
 
-### Day-to-day workflows
+## Usage
 
 There is one main subcommand you will use: `dep ensure`. `ensure` synchronizes
 your dependencies in `vendor/` to make sure they match what's in your `import`s
@@ -68,7 +66,7 @@ for more detailed usage instructions.
 $ dep help ensure
 ```
 
-#### Installing dependencies
+### Installing dependencies
 
 (if your `vendor/` directory isn't [checked in with your code](](docs/FAQ.md#should-i-commit-my-vendor-directory)))
 
@@ -80,7 +78,7 @@ If a dependency already exists in your `vendor/` folder, dep will ensure it
 matches the constraints from the manifest. If the dependency is missing from
 `vendor/`, the latest version allowed by your manifest will be installed.
 
-#### Adding a dependency
+### Adding a dependency
 
 1. Add the `import` in your source code file(s).
 1. Download via dep.
@@ -89,7 +87,7 @@ matches the constraints from the manifest. If the dependency is missing from
     $ dep ensure
     ```
 
-#### Changing dependencies
+### Changing dependencies
 
 If you want to:
 
@@ -105,7 +103,7 @@ for one or more dependencies, do the following:
     $ dep ensure
     ```
 
-#### Checking the status of dependencies
+### Checking the status of dependencies
 
 ```sh
 $ dep status
@@ -115,7 +113,7 @@ github.com/Masterminds/vcs          ^1.11.0        v1.11.1        3084677   3084
 github.com/armon/go-radix           *              branch master  4239b77   4239b77
 ```
 
-#### Updating dependencies
+### Updating dependencies
 
 (to the latest version allowed by the manifest)
 
@@ -123,7 +121,7 @@ github.com/armon/go-radix           *              branch master  4239b77   4239
 $ dep ensure -update
 ```
 
-#### Removing dependencies
+### Removing dependencies
 
 1. Remove the `import`s and all usage from your code.
 1. Run
@@ -134,7 +132,7 @@ $ dep ensure -update
 
 1. Remove from `Gopkg.toml`, if it was in there.
 
-#### Testing changes to a dependency
+### Testing changes to a dependency
 
 Making changes in your `vendor/` directory directly is not recommended, as dep
 will overwrite any changes. Instead:
