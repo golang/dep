@@ -37,12 +37,14 @@ Get the tool via
 $ go get -u github.com/golang/dep/cmd/dep
 ```
 
-Typical usage on a new repo might be
+Typical usage - either on a new project or converting an existing one - is
 
 ```sh
 $ dep init
 $ dep ensure -update
 ```
+
+If your project was already using a `vendor/` directory, it was backed up to `_vendor-TIMESTAMP/`.
 
 To update a dependency to a new version, you might run
 
@@ -51,6 +53,10 @@ $ dep ensure github.com/pkg/errors@^0.8.0
 ```
 
 See the help text for more detailed usage instructions.
+
+```sh
+$ dep help ensure
+```
 
 ## Feedback
 

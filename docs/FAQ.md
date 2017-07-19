@@ -25,7 +25,6 @@ Summarize the question and quote the reply, linking back to the original comment
 * [Why did `dep` use a different revision for package X instead of the revision in the lock file?](#why-did-dep-use-a-different-revision-for-package-x-instead-of-the-revision-in-the-lock-file)
 * [Why is `dep` slow?](#why-is-dep-slow)
 * [How does `dep` handle symbolic links?](#how-does-dep-handle-symbolic-links)
-* [`dep` deleted my files in the vendor directory!](#dep-deleted-my-files-in-the-vendor-directory)
 
 ## Best Practices
 * [Should I commit my vendor directory?](#should-i-commit-my-vendor-directory)
@@ -291,13 +290,6 @@ When `dep` is invoked with a project root that is a symlink, it will be resolved
 
 This is the only symbolic link support that `dep` really intends to provide. In keeping with the general practices of the `go` tool, `dep` tends to either ignore symlinks (when walking) or copy the symlink itself, depending on the filesystem operation being performed.
 
-## `dep` deleted my files in the vendor directory!
-If you just ran `dep init`, there should be a copy of your original vendor directory named `_vendor-TIMESTAMP` in your project root. The other commands do not make a backup before modifying the vendor directory.
-
-> dep assumes complete control of vendor/, and may indeed blow things away if it feels like it.
--[@peterbourgon in #206](https://github.com/golang/dep/issues/206#issuecomment-277139419)
-
-
 ## Best Practices
 ### Should I commit my vendor directory?
 
@@ -318,7 +310,7 @@ It's up to you:
 >  I would recommend against ever working in your vendor directory since dep will overwrite any changes. It’s too easy to lose work that way.
 -[@carolynvs in #706](https://github.com/golang/dep/issues/706#issuecomment-305807261)
 
-If you have a fork, add a `[[constraint]]` entry for the project in `Gopkg.toml` and set `source` to the fork source. This will ensure that `dep` will fetch the project from the fork instead of the original source. 
+If you have a fork, add a `[[constraint]]` entry for the project in `Gopkg.toml` and set `source` to the fork source. This will ensure that `dep` will fetch the project from the fork instead of the original source.
 Otherwise, if you want to test changes locally, you can delete the package from `vendor/` and make changes directly in `GOPATH/src/*package*` so that your changes are picked up by the go tool chain.
 
 ## How do I roll releases that `dep` will be able to use?
