@@ -39,7 +39,7 @@ Get the tool via
 $ go get -u github.com/golang/dep/cmd/dep
 ```
 
-To set up Dep on a project, run the following from your project root directory:
+To start managing dependencies using dep, run the following from your project root directory:
 
 ```sh
 $ dep init
@@ -48,8 +48,7 @@ $ dep ensure -update
 
 `dep init` will do the following:
 
-1. Look for [existing dependency management
-files](docs/FAQ.md#what-external-tools-are-supported) to convert
+1. Look for [existing dependency management files](docs/FAQ.md#what-external-tools-are-supported) to convert
 1. Back up your existing `vendor/` directory to
 `_vendor-TIMESTAMP/`
 1. Generate [`Gopkg.toml`](Gopkg.toml.md) and `Gopkg.lock` files
