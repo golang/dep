@@ -40,9 +40,7 @@ ___
 ## Concepts
 ### Does `dep` replace `go get`?
 
-No, `dep` is an experiment and is still in its infancy. Depending on how this
-experiment goes, it may be considered for inclusion in the go project in some form
-or another in the future but that is not guaranteed.
+No. `dep` and `go get` serve mostly different purposes.
 
 Here are some suggestions for when you could use `dep` or `go get`:
 > I would say that dep doesn't replace go get, but they both can do similar things. Here's how I use them:

@@ -8,15 +8,16 @@ Dep is a prototype dependency management tool. It requires Go 1.7 or newer to co
 
 ## Current status
 
-**Alpha**.
-Functionality is known to be broken, missing or incomplete. Changes are planned
-to the CLI commands soon. *It would be unwise to write scripts atop `dep` before then.*
-The repository is open to solicit feedback and contributions from the community.
-Please see below for feedback and contribution guidelines.
+`dep` is safe for production use. That means two things:
 
-`Gopkg.toml` and `Gopkg.lock` have reached a stable structure, and it is safe to
-commit them in your projects. We plan to add more to these files, but we
-guarantee these changes will be backwards-compatible.
+* Any valid metadata file (`Gopkg.toml` and `Gopkg.lock`) will be readable and considered valid by any future version of `dep`.
+* Generally speaking, it has comparable or fewer bugs than other tools out there.
+
+That said, keep in mind the following:
+
+* `dep` is still changing rapidly. If you need stability (e.g. for CI), it's best to rely on a released version, not tip.
+* [Some changes](https://github.com/golang/dep/pull/489) are pending to the CLI interface. Scripting on dep before they land is unwise.
+* `dep`'s exported API interface will continue to change in unpredictable, backwards-incompatible ways until we tag a v1.0.0 release.
 
 ## Context
 
