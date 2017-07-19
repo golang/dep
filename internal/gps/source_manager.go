@@ -170,6 +170,21 @@ func NewSourceManager(cachedir string) (*SourceMgr, error) {
 		}
 	}
 
+	process, err := lockfile.GetOwner()
+	if err == nil {
+		// If we didn't get an error, then the lockfile exists already. We should
+		// check to see if it's us already:
+		if process.Pid == os.Getpid() {
+			return nil, CouldNotCreateLockError{
+				Path: glpath,
+				Err:  fmt.Errorf("lockfile %s already locked by this process", glpath),
+			}
+		}
+
+		// there is a lockfile, but it's owned by someone else. We'll try to lock
+		// it anyway.
+	}
+
 	// If it's a TemporaryError, we retry every second. Otherwise, we fail
 	// permanently.
 
