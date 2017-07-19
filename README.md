@@ -51,23 +51,60 @@ $ dep ensure -update
 1. Look for [existing dependency management files](docs/FAQ.md#what-external-tools-are-supported) to convert
 1. Back up your existing `vendor/` directory to
 `_vendor-TIMESTAMP/`
-1. Generate [`Gopkg.toml`](Gopkg.toml.md) and `Gopkg.lock` files
+1. Generate [`Gopkg.toml`](Gopkg.toml.md) ("manifest") and `Gopkg.lock` files
 
-### Day-to-day workflow
+### Day-to-day workflows
 
-When you or a collaborator add/remove/change dependencies by modifying
-your `import`s or `Gopkg.toml`, run
+There is one main subcommand you will use: `dep ensure`. `ensure` synchronizes
+your dependencies in `vendor/` to make sure they match what's in your `import`s
+and `Gopkg.toml`. `dep ensure` is safe to run early and often. See the help text
+for more detailed usage instructions.
+
+```sh
+$ dep help ensure
+```
+
+#### Installing dependencies
 
 ```sh
 $ dep ensure
 ```
 
-This will synchronize your dependencies in `vendor/` to make sure they match
-what's in your `import`s and `Gopkg.toml`. `dep ensure` is safe to run early and
-often. See the help text for more detailed usage instructions.
+If a dependency already exists in your `vendor/` folder, dep will ensure it
+matches the constraints from the manifest. If the dependency is missing from
+`vendor/`, the latest version allowed by your manifest will be installed.
+
+#### Adding a dependency
+
+1. Add the `import` in your source code file(s).
+1. Download via dep.
+
+    ```sh
+    $ dep ensure
+    ```
+
+#### Changing dependencies
+
+When you want to do the following for one or more dependencies:
+
+* Change the allowed `version`/`branch`/`revision`
+* Switch to using a fork
+
+do the following:
+
+1. Modify your `Gopkg.toml`.
+1. Run
+
+    ```sh
+    $ dep ensure
+    ```
+
+#### Updating dependencies
+
+(to the latest version allowed by the manifest)
 
 ```sh
-$ dep help ensure
+$ dep ensure -update
 ```
 
 ## Feedback
