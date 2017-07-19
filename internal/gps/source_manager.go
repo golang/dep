@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/golang/dep/internal/gps/pkgtree"
+	"github.com/nightlyone/lockfile"
 	"github.com/pkg/errors"
 	"github.com/sdboyer/constext"
 )
@@ -115,7 +116,7 @@ func (p ProjectAnalyzerInfo) String() string {
 // tools; control via dependency injection is intended to be sufficient.
 type SourceMgr struct {
 	cachedir    string                // path to root of cache dir
-	lf          *os.File              // handle for the sm lock file on disk
+	lf          *lockfile.Lockfile    // handle for the sm lock file on disk
 	suprvsr     *supervisor           // subsystem that supervises running calls/io
 	cancelAll   context.CancelFunc    // cancel func to kill all running work
 	deduceCoord *deductionCoordinator // subsystem that manages import path deduction
@@ -153,21 +154,38 @@ func NewSourceManager(cachedir string) (*SourceMgr, error) {
 		return nil, err
 	}
 
-	glpath := filepath.Join(cachedir, "sm.lock")
-	_, err = os.Stat(glpath)
-	if err == nil {
-		return nil, CouldNotCreateLockError{
-			Path: glpath,
-			Err:  fmt.Errorf("cache lock file %s exists - another process crashed or is still running?", glpath),
-		}
-	}
+	// Fix for #820
+	//
+	// Consult https://godoc.org/github.com/nightlyone/lockfile for the lockfile
+	// behaviour. It's magic. It deals with stale processes, and if there is
+	// a process keeping the lock busy, it will pass back a temporary error that
+	// we can spin on.
 
-	fi, err := os.OpenFile(glpath, os.O_CREATE|os.O_EXCL, 0600) // is 0600 sane for this purpose?
+	glpath := filepath.Join(cachedir, "sm.lock")
+	lockfile, err := lockfile.New(glpath)
 	if err != nil {
 		return nil, CouldNotCreateLockError{
 			Path: glpath,
-			Err:  fmt.Errorf("err on attempting to create global cache lock: %s", err),
+			Err:  fmt.Errorf("Unable to create lock %s: %s", glpath, err.Error()),
 		}
+	}
+
+	// If it's a TemporaryError, we retry every second. Otherwise, we fail
+	// permanently.
+
+	err = lockfile.TryLock()
+	for err != nil {
+		if _, ok := err.(interface {
+			Temporary() bool
+		}); ok {
+			time.Sleep(time.Second * 1)
+		} else {
+			return nil, CouldNotCreateLockError{
+				Path: glpath,
+				Err:  fmt.Errorf("Unable to lock %s: %s", glpath, err.Error()),
+			}
+		}
+		err = lockfile.TryLock()
 	}
 
 	ctx, cf := context.WithCancel(context.TODO())
@@ -176,7 +194,7 @@ func NewSourceManager(cachedir string) (*SourceMgr, error) {
 
 	sm := &SourceMgr{
 		cachedir:    cachedir,
-		lf:          fi,
+		lf:          &lockfile,
 		suprvsr:     superv,
 		cancelAll:   cf,
 		deduceCoord: deducer,
@@ -314,7 +332,7 @@ func (sm *SourceMgr) doRelease() {
 	sm.suprvsr.wait()
 
 	// Close the file handle for the lock file and remove it from disk
-	sm.lf.Close()
+	sm.lf.Unlock()
 	os.Remove(filepath.Join(sm.cachedir, "sm.lock"))
 
 	// Close the qch, if non-nil, so the signal handlers run out. This will
