@@ -7,6 +7,8 @@ package gps
 import (
 	"fmt"
 	"testing"
+
+	"github.com/pkg/errors"
 )
 
 // gu - helper func for stringifying what we assume is a VersionPair (otherwise
@@ -928,22 +930,26 @@ func TestTypedConstraintString(t *testing.T) {
 	}
 }
 
-func TestConstraintsEqual(t *testing.T) {
+func TestConstraintsIdentical(t *testing.T) {
 	for _, test := range []struct {
 		a, b Constraint
 		eq   bool
 	}{
-		{a: NewVersion("test"), b: NewVersion("test"), eq: true},
-		{a: NewVersion("test"), b: NewVersion("test2"), eq: false},
-		{a: NewBranch("test"), b: NewBranch("test"), eq: true},
-		{a: NewBranch("test"), b: newDefaultBranch("test"), eq: false},
-		{a: newDefaultBranch("test"), b: newDefaultBranch("test"), eq: true},
-		{a: Revision("test"), b: Revision("test"), eq: true},
-		{a: Revision("test"), b: Revision("test2"), eq: false},
-		{a: testSemverConstraint(t, "v2.10.7"), b: testSemverConstraint(t, "v2.10.7"), eq: true},
+		{Any(), Any(), true},
+		{none, noneConstraint{}, true},
+		{NewVersion("test"), NewVersion("test"), true},
+		{NewVersion("test"), NewVersion("test2"), false},
+		{NewBranch("test"), NewBranch("test"), true},
+		{NewBranch("test"), newDefaultBranch("test"), false},
+		{newDefaultBranch("test"), newDefaultBranch("test"), true},
+		{Revision("test"), Revision("test"), true},
+		{Revision("test"), Revision("test2"), false},
+		{testSemverConstraint(t, "v2.10.7"), testSemverConstraint(t, "v2.10.7"), true},
+		{&versionTypeUnion{NewVersion("test"), NewBranch("branch")},
+			&versionTypeUnion{NewBranch("branch"), NewVersion("test")}, true},
 	} {
 		if test.eq != test.a.identical(test.b) {
-			want := "equal"
+			want := "identical"
 			if !test.eq {
 				want = "not " + want
 			}
@@ -955,7 +961,7 @@ func TestConstraintsEqual(t *testing.T) {
 func testSemverConstraint(t *testing.T, body string) Constraint {
 	c, err := NewSemverConstraint(body)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatal(errors.Wrapf(err, "failed to create semver constraint: %s", body))
 	}
 	return c
 }
