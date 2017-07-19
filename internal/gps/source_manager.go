@@ -166,7 +166,7 @@ func NewSourceManager(cachedir string) (*SourceMgr, error) {
 	if err != nil {
 		return nil, CouldNotCreateLockError{
 			Path: glpath,
-			Err:  fmt.Errorf("Unable to create lock %s: %s", glpath, err.Error()),
+			Err:  fmt.Errorf("unable to create lock %s: %s", glpath, err.Error()),
 		}
 	}
 
@@ -182,7 +182,7 @@ func NewSourceManager(cachedir string) (*SourceMgr, error) {
 		} else {
 			return nil, CouldNotCreateLockError{
 				Path: glpath,
-				Err:  fmt.Errorf("Unable to lock %s: %s", glpath, err.Error()),
+				Err:  fmt.Errorf("unable to lock %s: %s", glpath, err.Error()),
 			}
 		}
 		err = lockfile.TryLock()
