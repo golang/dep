@@ -942,7 +942,7 @@ func TestConstraintsEqual(t *testing.T) {
 		{a: Revision("test"), b: Revision("test2"), eq: false},
 		{a: testSemverConstraint(t, "v2.10.7"), b: testSemverConstraint(t, "v2.10.7"), eq: true},
 	} {
-		if test.eq != test.a.equals(test.b) {
+		if test.eq != test.a.identical(test.b) {
 			want := "equal"
 			if !test.eq {
 				want = "not " + want
