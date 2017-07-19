@@ -21,14 +21,6 @@ func TestSingleSourceCache(t *testing.T) {
 	const root = "example.com/test"
 
 	t.Run("info", func(t *testing.T) {
-		newSemverConstraint := func(s string) Constraint {
-			c, err := NewSemverConstraint(s)
-			if err != nil {
-				t.Fatal(errors.Wrapf(err, "failed to create semver constraint: %s", s))
-			}
-			return c
-		}
-
 		const rev Revision = "revision"
 
 		c := newMemoryCache()
@@ -38,7 +30,7 @@ func TestSingleSourceCache(t *testing.T) {
 				ProjectRoot("foo"): ProjectProperties{},
 				ProjectRoot("bar"): ProjectProperties{
 					Source:     "whatever",
-					Constraint: newSemverConstraint("> 1.3"),
+					Constraint: testSemverConstraint(t, "> 1.3"),
 				},
 			},
 			overrides: ProjectConstraints{
