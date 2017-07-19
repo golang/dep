@@ -28,7 +28,6 @@ Summarize the question and quote the reply, linking back to the original comment
 
 ## Best Practices
 * [Should I commit my vendor directory?](#should-i-commit-my-vendor-directory)
-* [How can I test changes to a dependency?](#how-can-i-test-changes-to-a-dependency)
 * [How do I roll releases that `dep` will be able to use?](#how-do-i-roll-releases-that-dep-will-be-able-to-use)
 * [What semver version should I use?](#what-semver-version-should-i-use)
 * [Is it OK to make backwards-incompatible changes now?](#is-it-ok-to-make-backwards-incompatible-changes-now)
@@ -304,14 +303,6 @@ It's up to you:
 
 - your repo will be bigger, potentially a lot bigger
 - PR diffs are more annoying
-
-## How can I test changes to a dependency?
-
->  I would recommend against ever working in your vendor directory since dep will overwrite any changes. It’s too easy to lose work that way.
--[@carolynvs in #706](https://github.com/golang/dep/issues/706#issuecomment-305807261)
-
-If you have a fork, add a `[[constraint]]` entry for the project in `Gopkg.toml` and set `source` to the fork source. This will ensure that `dep` will fetch the project from the fork instead of the original source.
-Otherwise, if you want to test changes locally, you can delete the package from `vendor/` and make changes directly in `GOPATH/src/*package*` so that your changes are picked up by the go tool chain.
 
 ## How do I roll releases that `dep` will be able to use?
 
