@@ -56,7 +56,8 @@ files](docs/FAQ.md#what-external-tools-are-supported) to convert
 
 ### Day-to-day workflow
 
-When you or a collaborator add/remove/change dependencies, run
+When you or a collaborator add/remove/change dependencies by modifying
+your `import`s or `Gopkg.toml`, run
 
 ```sh
 $ dep ensure
@@ -64,21 +65,10 @@ $ dep ensure
 
 This will synchronize your dependencies in `vendor/` to make sure they match
 what's in your `import`s and `Gopkg.toml`. `dep ensure` is safe to run early and
-often.
-
-#### Updating a specific dependency
-
-To update a dependency to a new version, you might run
-
-```sh
-$ dep ensure github.com/pkg/errors@^0.8.0
-```
-
-See the help text for more detailed usage instructions.
+often. See the help text for more detailed usage instructions.
 
 ```sh
 $ dep help ensure
-$ dep ensure -examples
 ```
 
 ## Feedback
