@@ -31,20 +31,42 @@ That said, keep in mind the following:
 
 ## Usage
 
+### Initial setup
+
 Get the tool via
 
 ```sh
 $ go get -u github.com/golang/dep/cmd/dep
 ```
 
-Typical usage - either on a new project or converting an existing one - is
+To set up Dep on a project, run the following from your project root directory:
 
 ```sh
 $ dep init
 $ dep ensure -update
 ```
 
-If your project was already using a `vendor/` directory, it was backed up to `_vendor-TIMESTAMP/`.
+`dep init` will do the following:
+
+1. Look for [existing dependency management
+files](docs/FAQ.md#what-external-tools-are-supported) to convert
+1. Back up your existing `vendor/` directory to
+`_vendor-TIMESTAMP/`
+1. Generate [`Gopkg.toml`](Gopkg.toml.md) and `Gopkg.lock` files
+
+### Day-to-day workflow
+
+When you or a collaborator add/remove/change dependencies, run
+
+```sh
+$ dep ensure
+```
+
+This will synchronize your dependencies in `vendor/` to make sure they match
+what's in your `import`s and `Gopkg.toml`. `dep ensure` is safe to run early and
+often.
+
+#### Updating a specific dependency
 
 To update a dependency to a new version, you might run
 
@@ -56,6 +78,7 @@ See the help text for more detailed usage instructions.
 
 ```sh
 $ dep help ensure
+$ dep ensure -examples
 ```
 
 ## Feedback
