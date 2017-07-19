@@ -197,7 +197,7 @@ func TestSingleSourceCache(t *testing.T) {
 			} else {
 				SortPairedForDowngrade(got)
 				for i := range versions {
-					if !versions[i].equals(got[i]) {
+					if !versions[i].identical(got[i]) {
 						t.Errorf("unexpected versions:\n\t(GOT): %#v\n\t(WNT): %#v", got, versions)
 						break
 					}
@@ -267,7 +267,7 @@ func TestSingleSourceCache(t *testing.T) {
 					uv, ok := c.toUnpaired(rev)
 					if !ok {
 						t.Errorf("no UnpairedVersion found:\n\t(WNT): %#v", uv)
-					} else if !uv.equals(want) {
+					} else if !uv.identical(want) {
 						t.Errorf("unexpected UnpairedVersion:\n\t(GOT): %#v\n\t(WNT): %#v", uv, want)
 					}
 				})
@@ -356,7 +356,7 @@ func projectConstraintsEqual(want, got ProjectConstraints) bool {
 			if pp.Constraint != nil || pp2.Constraint != nil {
 				return false
 			}
-		} else if !pp.Constraint.equals(pp2.Constraint) {
+		} else if !pp.Constraint.identical(pp2.Constraint) {
 			return false
 		}
 	}

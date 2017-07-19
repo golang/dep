@@ -53,8 +53,13 @@ type Constraint interface {
 	// design goal of the system.
 	typedString() string
 
-	// equals returns true if the constraints are logically equivalent.
-	equals(Constraint) bool
+	// identical returns true if the constraints are identical.
+	//
+	// Identical Constraints behave identically for all methods defined by the
+	// interface. A Constraint is always identical to itself.
+	//
+	// Constraints serialized for caching are de-serialized into identical instances.
+	identical(Constraint) bool
 }
 
 // NewSemverConstraint attempts to construct a semver Constraint object from the
@@ -175,7 +180,7 @@ func (c semverConstraint) Intersect(c2 Constraint) Constraint {
 	return none
 }
 
-func (c semverConstraint) equals(c2 Constraint) bool {
+func (c semverConstraint) identical(c2 Constraint) bool {
 	sc2, ok := c2.(semverConstraint)
 	if !ok {
 		return false
@@ -222,7 +227,7 @@ func (anyConstraint) Intersect(c Constraint) Constraint {
 	return c
 }
 
-func (anyConstraint) equals(c Constraint) bool {
+func (anyConstraint) identical(c Constraint) bool {
 	return IsAny(c)
 }
 
@@ -254,7 +259,7 @@ func (noneConstraint) Intersect(Constraint) Constraint {
 	return none
 }
 
-func (noneConstraint) equals(c Constraint) bool {
+func (noneConstraint) identical(c Constraint) bool {
 	_, ok := c.(noneConstraint)
 	return ok
 }

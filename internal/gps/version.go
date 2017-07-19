@@ -190,7 +190,7 @@ func (r Revision) Intersect(c Constraint) Constraint {
 	return none
 }
 
-func (r Revision) equals(c Constraint) bool {
+func (r Revision) identical(c Constraint) bool {
 	r2, ok := c.(Revision)
 	if !ok {
 		return false
@@ -282,7 +282,7 @@ func (v branchVersion) Pair(r Revision) PairedVersion {
 	}
 }
 
-func (v branchVersion) equals(c Constraint) bool {
+func (v branchVersion) identical(c Constraint) bool {
 	v2, ok := c.(branchVersion)
 	if !ok {
 		return false
@@ -371,7 +371,7 @@ func (v plainVersion) Pair(r Revision) PairedVersion {
 	}
 }
 
-func (v plainVersion) equals(c Constraint) bool {
+func (v plainVersion) identical(c Constraint) bool {
 	v2, ok := c.(plainVersion)
 	if !ok {
 		return false
@@ -470,7 +470,7 @@ func (v semVersion) Pair(r Revision) PairedVersion {
 	}
 }
 
-func (v semVersion) equals(c Constraint) bool {
+func (v semVersion) identical(c Constraint) bool {
 	v2, ok := c.(semVersion)
 	if !ok {
 		return false
@@ -579,7 +579,7 @@ func (v versionPair) Intersect(c2 Constraint) Constraint {
 	return none
 }
 
-func (v versionPair) equals(c Constraint) bool {
+func (v versionPair) identical(c Constraint) bool {
 	v2, ok := c.(versionPair)
 	if !ok {
 		return false
@@ -587,7 +587,7 @@ func (v versionPair) equals(c Constraint) bool {
 	if v.r != v2.r {
 		return false
 	}
-	return v.v.equals(v2.v)
+	return v.v.identical(v2.v)
 }
 
 // compareVersionType is a sort func helper that makes a coarse-grained sorting

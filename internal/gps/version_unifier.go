@@ -270,9 +270,9 @@ func (vtu versionTypeUnion) Intersect(c Constraint) Constraint {
 	return none
 }
 
-func (vtu versionTypeUnion) equals(c Constraint) bool {
+func (vtu versionTypeUnion) identical(c Constraint) bool {
 	for _, v := range vtu {
-		if v.equals(c) {
+		if v.identical(c) {
 			return true
 		}
 	}
