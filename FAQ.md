@@ -34,6 +34,7 @@ Summarize the question and quote the reply, linking back to the original comment
 * [What semver version should I use?](#what-semver-version-should-i-use)
 * [Is it OK to make backwards-incompatible changes now?](#is-it-ok-to-make-backwards-incompatible-changes-now)
 * [My dependers don't use `dep` yet. What should I do?](#my-dependers-dont-use-dep-yet-what-should-i-do)
+* [One or more of my dependencies doesn't tag its releases. What should I do?](#one-or-more-of-my-dependencies-dont-tag-their-releases-what-should-i-do)
 
 ___
 
@@ -381,3 +382,11 @@ it can [cause
 problems](https://groups.google.com/d/msg/golang-nuts/AnMr9NL6dtc/UnyUUKcMCAAJ).
 If your dependers are using `dep`, this is not a concern, as `dep` takes care of
 stripping out nested `vendor` directories.
+
+## One or more of my dependencies doesn't tag its releases. What should I do?
+
+Simply add a constrainit to your manifest that specifies `"branch": "master"`
+for the dependency. Dep will deduce the current revision number of your
+dependencies master branch, and place it the lock-file (`Gopkg.lock`) for you.
+Anyone who clones your project will, therefore, wind up with same version of the dependency,
+until you `dep ensure -update`. See also: [What is the difference between Gopkg.toml and Gopkg.lock?](https://github.com/golang/dep/blob/master/FAQ.md#what-is-the-difference-between-gopkgtoml-the-manifest-and-gopkglock-the-lock)
