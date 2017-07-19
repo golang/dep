@@ -713,10 +713,6 @@ func TestSignalHandling(t *testing.T) {
 		t.Error("Releasing flag did not get set")
 	}
 
-	lpath := filepath.Join(sm.cachedir, "sm.lock")
-	if _, err := os.Stat(lpath); err == nil {
-		t.Fatal("Expected error on statting what should be an absent lock file")
-	}
 	clean()
 
 	// Test again, this time with a running call
