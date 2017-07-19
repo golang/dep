@@ -13,7 +13,6 @@ Summarize the question and quote the reply, linking back to the original comment
 
 ## Configuration
 * [What is the difference between Gopkg.toml (the "manifest") and Gopkg.lock (the "lock")?](#what-is-the-difference-between-gopkgtoml-the-manifest-and-gopkglock-the-lock)
-* [When should I use `constraint`, `override` `required`, or `ignored` in the Gopkg.toml?](#when-should-i-use-constraint-override-required-or-ignored-in-gopkgtoml)
 * [How do I constrain a transitive dependency's version?](#how-do-i-constrain-a-transitive-dependencys-version)
 * [Can I put the manifest and lock in the vendor directory?](#can-i-put-the-manifest-and-lock-in-the-vendor-directory)
 * [How do I get `dep` to authenticate to a `git` repo?](#how-do-i-get-dep-to-authenticate-to-a-git-repo)
@@ -72,16 +71,6 @@ Here are some suggestions for when you could use `dep` or `go get`:
 >
 > This flexibility is important because it allows us to provide easy commands (e.g. `dep ensure -update`) that can manage an update process for you, within the constraints you specify, AND because it allows your project, when imported by someone else, to collaboratively specify the constraints for your own dependencies.
 -[@sdboyer in #281](https://github.com/golang/dep/issues/281#issuecomment-284118314)
-
-### When should I use `constraint`, `override`, `required`, or `ignored` in `Gopkg.toml`?
-
-* Use `constraint` to constrain a [direct dependency](#what-is-a-direct-or-transitive-dependency) to a specific branch, version range, revision, or specify an alternate source such as a fork.
-* Use `override` to constrain a [transitive dependency](#what-is-a-direct-or-transitive-dependency). See [How do I constrain a transitive dependency's version?](#how-do-i-constrain-a-transitive-dependencys-version) for more details on how overrides differ from constraints. Overrides should be used cautiously, sparingly, and temporarily.
-* Use `required` to explicitly add a dependency that is not imported directly or transitively, for example a development package used for code generation.
-* Use `ignored` to ignore a package and any of that package's unique dependencies.
-
-Refer to the [Gopkg.toml documentation](Gopkg.toml.md)
-for detailed definitions of the above terms.
 
 ## How do I constrain a transitive dependency's version?
 First, if you're wondering about this because you're trying to keep the version
