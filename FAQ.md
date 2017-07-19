@@ -129,28 +129,35 @@ for each repository you wish to authenticate to will allow `dep` to use an
 authenticated repository.
 
 First, configure `git` to use the credentials option for the specific repository.
-Yes, the example.com.username is weird, but it's correct; the 'username' would be
-the user repo you're authenticating to access, the 'myusername' is the username
-you would use for the actual authentication.
 
-For example, if you use gitlab, and you wish to access https://gitlab.example.com/example/package.git, 
+For example, if you use gitlab, and you wish to access `https://gitlab.example.com/example/package.git`, 
 then you would want to use the following configuration:
 
-`$ git config --global credential.https://gitlab.example.com.example yourusername`
+```
+$ git config --global credential.https://gitlab.example.com.example yourusername
+```
 
-You also need to tell `git` what authentication provider you wish to use. You can get
-a list of providers, with the following command:
+In the example the hostname `gitlab.example.com.username` string seems incorrect, but 
+it's actually the hostname plus the name of the repo you are accessing which is `username`.
+The trailing 'yourusername' is the username you would use for the actual authentication.
 
-`$ git help -a | grep credential-
+You also need to configure `git` with the authentication provider you wish to use. You can get
+a list of providers, with the command:
+
+```
+$ git help -a | grep credential-
   credential-cache          remote-fd
   credential-cache--daemon  remote-ftp
   credential-osxkeychain    remote-ftps
-  credential-store          remote-http`
+  credential-store          remote-http
+```
   
-You would then choose an appropriate provider. To use the osxkeychain, then you 
+You would then choose an appropriate provider. For example, to use the osxkeychain, you 
 would use the following:
 
-`git config --global credential.helper osxkeychain`
+```
+git config --global credential.helper osxkeychain
+```
 
 If you need to do this for a CI system, then you may want to use the "store" provider.
 Please see the documentation on how to configure that: https://git-scm.com/docs/git-credential-store
