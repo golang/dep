@@ -13,6 +13,8 @@ import (
 	"strings"
 	"sync"
 	"testing"
+
+	"github.com/golang/dep/internal/test"
 )
 
 // Parent test that executes all the slow vcs interaction tests in parallel.
@@ -524,7 +526,11 @@ func requiresBins(t *testing.T, bins ...string) {
 	for _, b := range bins {
 		_, err := exec.LookPath(b)
 		if err != nil {
-			t.Fatalf("%s is not installed", b)
+			if *test.SkipMissingBinTests {
+				t.Skipf("Skipping: %s is not installed", b)
+			} else {
+				t.Fatalf("%s is not installed. Rerun with the -skip-missing-bin flag to skip this test instead.", b)
+			}
 		}
 	}
 }

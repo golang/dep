@@ -24,9 +24,10 @@ import (
 )
 
 var (
-	ExeSuffix string // ".exe" on Windows
-	mu        sync.Mutex
-	PrintLogs *bool = flag.Bool("logs", false, "log stdin/stdout of test commands")
+	ExeSuffix           string // ".exe" on Windows
+	mu                  sync.Mutex
+	PrintLogs           *bool = flag.Bool("logs", false, "log stdin/stdout of test commands")
+	SkipMissingBinTests *bool = flag.Bool("skip-missing-bin", false, "Skip tests when a required binary is missing, instead of failing")
 )
 
 const (

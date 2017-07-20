@@ -125,6 +125,7 @@ func testSvnRepo(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping slow test in short mode")
 	}
+	requiresBins(t, "svn")
 
 	ctx := context.Background()
 	tempDir, err := ioutil.TempDir("", "go-vcs-svn-tests")
@@ -218,6 +219,7 @@ func testHgRepo(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping slow test in short mode")
 	}
+	requiresBins(t, "hg")
 
 	ctx := context.Background()
 	tempDir, err := ioutil.TempDir("", "go-vcs-hg-tests")
@@ -278,6 +280,7 @@ func testGitRepo(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping slow test in short mode")
 	}
+	requiresBins(t, "git")
 
 	ctx := context.Background()
 	tempDir, err := ioutil.TempDir("", "go-vcs-git-tests")
@@ -355,6 +358,7 @@ func testBzrRepo(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping slow test in short mode")
 	}
+	requiresBins(t, "bzr")
 
 	ctx := context.Background()
 	tempDir, err := ioutil.TempDir("", "go-vcs-bzr-tests")
