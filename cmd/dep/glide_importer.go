@@ -145,14 +145,7 @@ func (g *glideImporter) convert(pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock, e
 		Constraints: make(gps.ProjectConstraints),
 	}
 
-	for _, pkg := range g.yaml.Imports {
-		pc, err := g.buildProjectConstraint(pkg)
-		if err != nil {
-			return nil, nil, err
-		}
-		manifest.Constraints[pc.Ident.ProjectRoot] = gps.ProjectProperties{Source: pc.Ident.Source, Constraint: pc.Constraint}
-	}
-	for _, pkg := range g.yaml.TestImports {
+	for _, pkg := range append(g.yaml.Imports, g.yaml.TestImports...) {
 		pc, err := g.buildProjectConstraint(pkg)
 		if err != nil {
 			return nil, nil, err
@@ -177,11 +170,7 @@ func (g *glideImporter) convert(pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock, e
 	if g.lock != nil {
 		lock = &dep.Lock{}
 
-		for _, pkg := range g.lock.Imports {
-			lp := g.buildLockedProject(pkg, manifest)
-			lock.P = append(lock.P, lp)
-		}
-		for _, pkg := range g.lock.TestImports {
+		for _, pkg := range append(g.lock.Imports, g.lock.TestImports...) {
 			lp := g.buildLockedProject(pkg, manifest)
 			lock.P = append(lock.P, lp)
 		}
