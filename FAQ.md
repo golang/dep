@@ -383,7 +383,7 @@ stripping out nested `vendor` directories.
 
 ## How do I configure a dependency that doesn't tag its releases?
 
-Add a constraint to your manifest that specifies `"branch": "master"`
+Add a constraint to your manifest that specifies `branch: "master"`
 for the dependency. `dep` will deduce the current revision number of your
 dependencies master branch, and place it the lock-file (`Gopkg.lock`) for you.
 Anyone who clones your project will, therefore, wind up with same version of the dependency,
