@@ -181,12 +181,15 @@ func NewSourceManager(cachedir string) (*SourceMgr, error) {
 			}
 		}
 
-		// there is a lockfile, but it's owned by someone else. We'll try to lock
+		// There is a lockfile, but it's owned by someone else. We'll try to lock
 		// it anyway.
 	}
 
 	// If it's a TemporaryError, we retry every second. Otherwise, we fail
 	// permanently.
+	//
+	// TODO: After some time, we should emit some kind of warning that we're waiting
+	// for the lockfile to be released. #534 should be address before we will do that.
 
 	err = lockfile.TryLock()
 	for err != nil {
