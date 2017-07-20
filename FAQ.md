@@ -16,7 +16,7 @@ Summarize the question and quote the reply, linking back to the original comment
 * [When should I use `constraint`, `override` `required`, or `ignored` in the Gopkg.toml?](#when-should-i-use-constraint-override-required-or-ignored-in-gopkgtoml)
 * [How do I constrain a transitive dependency's version?](#how-do-i-constrain-a-transitive-dependencys-version)
 * [Can I put the manifest and lock in the vendor directory?](#can-i-put-the-manifest-and-lock-in-the-vendor-directory)
-* [How do I get `dep` to authenticate to a `git` repo?](#how-do-i-get-dep-to-authenticate-to-a-git-repo)
+* [How do I get `dep` to authenticate to a `git` repo?](#how-do-i-configure-a-dependency-that-doesnt-tag-its-releases)
 
 ## Behavior
 * [How does `dep` decide what version of a dependency to use?](#how-does-dep-decide-what-version-of-a-dependency-to-use)
