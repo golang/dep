@@ -45,14 +45,14 @@ func (c *monitoredCmd) run(ctx context.Context) error {
 		return ctx.Err()
 	}
 
-	ticker := time.NewTicker(c.timeout)
-	done := make(chan error, 1)
-	defer ticker.Stop()
-
 	err := c.cmd.Start()
 	if err != nil {
 		return err
 	}
+
+	ticker := time.NewTicker(c.timeout)
+	defer ticker.Stop()
+	done := make(chan error, 1)
 
 	go func() {
 		done <- c.cmd.Wait()
@@ -62,14 +62,14 @@ func (c *monitoredCmd) run(ctx context.Context) error {
 		select {
 		case <-ticker.C:
 			if c.hasTimedOut() {
-				if err := c.cmd.Process.Kill(); err != nil {
+				if err := killProcess(c.cmd); err != nil {
 					return &killCmdError{err}
 				}
 
 				return &timeoutError{c.timeout}
 			}
 		case <-ctx.Done():
-			if err := c.cmd.Process.Kill(); err != nil {
+			if err := killProcess(c.cmd); err != nil {
 				return &killCmdError{err}
 			}
 			return ctx.Err()
@@ -90,6 +90,7 @@ func (c *monitoredCmd) combinedOutput(ctx context.Context) ([]byte, error) {
 		return c.stderr.buf.Bytes(), err
 	}
 
+	// FIXME(sdboyer) this is not actually combined output
 	return c.stdout.buf.Bytes(), nil
 }
 
