@@ -21,8 +21,7 @@ func TestSlowVcs(t *testing.T) {
 	t.Run("source-gateway", testSourceGateway)
 	t.Run("bzr-repo", testBzrRepo)
 	t.Run("bzr-source", testBzrSourceInteractions)
-	// TODO(kris-nova) re-enable syn-repo after gps is merged into dep
-	//t.Run("svn-repo", testSvnRepo)
+	t.Run("svn-repo", testSvnRepo)
 	// TODO(sdboyer) svn-source
 	t.Run("hg-repo", testHgRepo)
 	t.Run("hg-source", testHgSourceInteractions)
