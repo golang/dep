@@ -63,7 +63,8 @@ type SafeWriter struct {
 	writeVendor bool
 }
 
-// NewSafeWriter sets up a SafeWriter to write a set of config yaml, lock and vendor tree.
+// NewSafeWriter sets up a SafeWriter to write a set of manifest, lock, and
+// vendor tree.
 //
 // - If manifest is provided, it will be written to the standard manifest file
 // name beneath root.
