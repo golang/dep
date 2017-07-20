@@ -34,7 +34,7 @@ Summarize the question and quote the reply, linking back to the original comment
 * [What semver version should I use?](#what-semver-version-should-i-use)
 * [Is it OK to make backwards-incompatible changes now?](#is-it-ok-to-make-backwards-incompatible-changes-now)
 * [My dependers don't use `dep` yet. What should I do?](#my-dependers-dont-use-dep-yet-what-should-i-do)
-*-[How-do-I-configure-a-dependency-that-doesn't-tag-its-releases?](#how-do-I-configure-a-dependency-that-doesnt-tag-its-releases)
+* [How do I configure a dependency that doesn't tag its releases?](#how-do-I-configure-a-dependency-that-doesnt-tag-its-releases)
 
 ___
 
