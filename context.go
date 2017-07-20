@@ -9,9 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"strings"
 
-	"github.com/Masterminds/vcs"
 	"github.com/golang/dep/internal/fs"
 	"github.com/golang/dep/internal/gps"
 	"github.com/pkg/errors"
@@ -236,10 +234,10 @@ func (c *Ctx) ImportForAbs(path string) (string, error) {
 	return "", errors.Errorf("%s not in GOPATH", path)
 }
 
-// absoluteProjectRoot determines the absolute path to the project root
+// AbsForImport returns the absolute path for the project root
 // including the $GOPATH. This will not work with stdlib packages and the
 // package directory needs to exist.
-func (c *Ctx) absoluteProjectRoot(path string) (string, error) {
+func (c *Ctx) AbsForImport(path string) (string, error) {
 	posspath := filepath.Join(c.GOPATH, "src", path)
 	dirOK, err := fs.IsDir(posspath)
 	if err != nil {
@@ -249,63 +247,4 @@ func (c *Ctx) absoluteProjectRoot(path string) (string, error) {
 		return "", errors.Errorf("%s does not exist", posspath)
 	}
 	return posspath, nil
-}
-
-func (c *Ctx) VersionInWorkspace(root gps.ProjectRoot) (gps.Version, error) {
-	pr, err := c.absoluteProjectRoot(string(root))
-	if err != nil {
-		return nil, errors.Wrapf(err, "determine project root for %s", root)
-	}
-
-	repo, err := vcs.NewRepo("", pr)
-	if err != nil {
-		return nil, errors.Wrapf(err, "creating new repo for root: %s", pr)
-	}
-
-	ver, err := repo.Current()
-	if err != nil {
-		return nil, errors.Wrapf(err, "finding current branch/version for root: %s", pr)
-	}
-
-	rev, err := repo.Version()
-	if err != nil {
-		return nil, errors.Wrapf(err, "getting repo version for root: %s", pr)
-	}
-
-	// First look through tags.
-	tags, err := repo.Tags()
-	if err != nil {
-		return nil, errors.Wrapf(err, "getting repo tags for root: %s", pr)
-	}
-	// Try to match the current version to a tag.
-	if contains(tags, ver) {
-		// Assume semver if it starts with a v.
-		if strings.HasPrefix(ver, "v") {
-			return gps.NewVersion(ver).Pair(gps.Revision(rev)), nil
-		}
-
-		return nil, errors.Errorf("version for root %s does not start with a v: %q", pr, ver)
-	}
-
-	// Look for the current branch.
-	branches, err := repo.Branches()
-	if err != nil {
-		return nil, errors.Wrapf(err, "getting repo branch for root: %s")
-	}
-	// Try to match the current version to a branch.
-	if contains(branches, ver) {
-		return gps.NewBranch(ver).Pair(gps.Revision(rev)), nil
-	}
-
-	return gps.Revision(rev), nil
-}
-
-// contains checks if a array of strings contains a value
-func contains(a []string, b string) bool {
-	for _, v := range a {
-		if b == v {
-			return true
-		}
-	}
-	return false
 }
