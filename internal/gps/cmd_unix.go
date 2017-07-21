@@ -9,6 +9,7 @@ package gps
 import (
 	"os"
 	"os/exec"
+	"sync/atomic"
 	"time"
 )
 
@@ -18,7 +19,7 @@ import (
 //
 // TODO(sdboyer) should the return differentiate between whether gentle methods
 // succeeded vs. falling back to a hard kill?
-func killProcess(cmd *exec.Cmd) error {
+func killProcess(cmd *exec.Cmd, isDone *int32) error {
 	if err := cmd.Process.Signal(os.Interrupt); err != nil {
 		// If an error comes back from attempting to signal, proceed immediately
 		// to hard kill.
@@ -30,8 +31,10 @@ func killProcess(cmd *exec.Cmd) error {
 	//
 	// Cannot rely on cmd.ProcessState.Exited() here, as that is not set
 	// correctly when the process exits due to a signal. See
-	// https://github.com/golang/go/issues/19798
-	if cmd.ProcessState == nil || !cmd.ProcessState.Exited() {
+	// https://github.com/golang/go/issues/19798 . Also cannot rely on it
+	// because cmd.ProcessState will be nil before the process exits, and
+	// checking if nil create a data race.
+	if !atomic.CompareAndSwapInt32(isDone, 1, 1) {
 		to := time.NewTimer(3 * time.Second)
 		tick := time.NewTicker(50 * time.Millisecond)
 
@@ -40,7 +43,7 @@ func killProcess(cmd *exec.Cmd) error {
 
 		// Loop until the ProcessState shows up, indicating the proc has exited,
 		// or the timer expires and
-		for cmd.ProcessState != nil {
+		for !atomic.CompareAndSwapInt32(isDone, 1, 1) {
 			select {
 			case <-to.C:
 				return cmd.Process.Kill()
