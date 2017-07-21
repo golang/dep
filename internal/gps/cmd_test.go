@@ -16,7 +16,7 @@ import (
 func mkTestCmd(iterations int) *monitoredCmd {
 	return newMonitoredCmd(
 		exec.Command("./echosleep", "-n", fmt.Sprint(iterations)),
-		500*time.Millisecond,
+		490*time.Millisecond,
 	)
 }
 
@@ -49,7 +49,7 @@ func TestMonitoredCmd(t *testing.T) {
 		t.Error("Expected command to fail")
 	}
 
-	_, ok := err.(*timeoutError)
+	_, ok := err.(*noProgressError)
 	if !ok {
 		t.Errorf("Expected a timeout error, but got: %s", err)
 	}
