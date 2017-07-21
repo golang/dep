@@ -384,7 +384,6 @@ stripping out nested `vendor` directories.
 ## How do I configure a dependency that doesn't tag its releases?
 
 Add a constraint to your manifest that specifies `branch: "master"`
-for the dependency. `dep` will deduce the current revision number of your
-dependencies master branch, and place it the lock-file (`Gopkg.lock`) for you.
-Anyone who clones your project will, therefore, wind up with same version of the dependency,
-until you `dep ensure -update`. See also: [What is the difference between Gopkg.toml and Gopkg.lock?](https://github.com/golang/dep/blob/master/FAQ.md#what-is-the-difference-between-gopkgtoml-the-manifest-and-gopkglock-the-lock)
+for the dependency. `dep ensure` will deduce the current revision of your
+dependency's master branch, and place it the lock-file (`Gopkg.lock`) for you.
+See also: [What is the difference between Gopkg.toml and Gopkg.lock?](https://github.com/golang/dep/blob/master/FAQ.md#what-is-the-difference-between-gopkgtoml-the-manifest-and-gopkglock-the-lock)
