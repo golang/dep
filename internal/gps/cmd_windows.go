@@ -8,7 +8,7 @@ package gps
 
 import "os/exec"
 
-func killProcess(cmd *exec.Cmd) error {
+func killProcess(cmd *exec.Cmd, isDone *int32) error {
 	// TODO it'd be great if this could be more sophisticated...
 	return cmd.Process.Kill()
 }
