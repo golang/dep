@@ -7,6 +7,7 @@ package main
 import (
 	"testing"
 
+	"github.com/golang/dep"
 	"github.com/golang/dep/internal/gps"
 	"github.com/golang/dep/internal/test"
 )
@@ -109,5 +110,44 @@ func TestLookupVersionForLockedProject_FallbackToRevision(t *testing.T) {
 	gotV := v.String()
 	if gotV != wantV {
 		t.Fatalf("Expected the locked version to be the manifest's pinned revision: wanted '%s', got '%s'", wantV, gotV)
+	}
+}
+
+func TestProjectExistsInLock(t *testing.T) {
+	lock := &dep.Lock{}
+	pi := gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot("github.com/sdboyer/deptest")}
+	ver := gps.NewVersion("v1.0.0")
+	lock.P = append(lock.P, gps.NewLockedProject(pi, ver, nil))
+
+	cases := []struct {
+		name       string
+		importPath string
+		want       bool
+	}{
+		{
+			name:       "root project",
+			importPath: "github.com/sdboyer/deptest",
+			want:       true,
+		},
+		{
+			name:       "sub package",
+			importPath: "github.com/sdboyer/deptest/foo",
+			want:       false,
+		},
+		{
+			name:       "nonexisting project",
+			importPath: "github.com/golang/notexist",
+			want:       false,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			result := projectExistsInLock(lock, gps.ProjectRoot(c.importPath))
+
+			if result != c.want {
+				t.Fatalf("projectExistsInLock result is not as want: \n\t(GOT) %v \n\t(WNT) %v", result, c.want)
+			}
+		})
 	}
 }
