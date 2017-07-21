@@ -22,3 +22,6 @@
 /cmd/dep/status*                          @darkowlzz
 /cmd/dep/testdata/harness_tests/status**  @darkowlzz
 /cmd/dep/graphviz*                        @darkowlzz
+
+# gps caching
+/internal/gps/source_cache* @jmank88
