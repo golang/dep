@@ -479,7 +479,7 @@ func (sm *SourceMgr) InferConstraint(s string, pi ProjectIdentifier) (Constraint
 	// Next, try for bzr, which has a three-component GUID separated by
 	// dashes. There should be two, but the email part could contain
 	// internal dashes
-	if strings.Count(s, "-") >= 2 {
+	if strings.Contains(s, "@") && strings.Count(s, "-") >= 2 {
 		// Work from the back to avoid potential confusion from the email
 		i3 := strings.LastIndex(s, "-")
 		// Skip if - is last char, otherwise this would panic on bounds err

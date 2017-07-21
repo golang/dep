@@ -161,6 +161,47 @@ func TestGodepConfig_ConvertProject(t *testing.T) {
 	}
 }
 
+func TestGodepConfig_ConvertProject_WithSemverSuffix(t *testing.T) {
+	h := test.NewHelper(t)
+	defer h.Cleanup()
+
+	ctx := newTestContext(h)
+	sm, err := ctx.SourceManager()
+	h.Must(err)
+	defer sm.Release()
+
+	g := newGodepImporter(discardLogger, true, sm)
+	g.json = godepJSON{
+		Imports: []godepPackage{
+			{
+				ImportPath: "github.com/sdboyer/deptest",
+				Rev:        "ff2948a2ac8f538c4ecd55962e919d1e13e74baf",
+				Comment:    "v1.12.0-12-g2fd980e",
+			},
+		},
+	}
+
+	manifest, lock, err := g.convert("")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	d, ok := manifest.Constraints["github.com/sdboyer/deptest"]
+	if !ok {
+		t.Fatal("Expected the manifest to have a dependency for 'github.com/sdboyer/deptest' but got none")
+	}
+
+	v := d.Constraint.String()
+	if v != ">=1.12.0, <=12.0.0-g2fd980e" {
+		t.Fatalf("Expected manifest constraint to be >=1.12.0, <=12.0.0-g2fd980e, got %s", v)
+	}
+
+	p := lock.P[0]
+	if p.Ident().ProjectRoot != "github.com/sdboyer/deptest" {
+		t.Fatalf("Expected the lock to have a project for 'github.com/sdboyer/deptest' but got '%s'", p.Ident().ProjectRoot)
+	}
+}
+
 func TestGodepConfig_ConvertProject_EmptyComment(t *testing.T) {
 	h := test.NewHelper(t)
 	defer h.Cleanup()
