@@ -402,7 +402,6 @@ func ValidateParams(params SolveParameters, sm SourceManager) error {
 	}
 
 	deducePkg := func(ip string, sm SourceManager) {
-		fmt.Println(ip)
 		_, err := sm.DeduceProjectRoot(ip)
 		if err != nil {
 			errsMut.Lock()
