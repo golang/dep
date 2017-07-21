@@ -65,11 +65,13 @@ See the help text for more detailed usage instructions.
 
 You might, for example, include a constraint in your manifest that specifies `version = "=2.0.0"` to pin a dependency to version 2.0.0.
 
-**Note** however, whenever you specify a version *without an operator*, `dep ensure` will interpret the given version as the min-boundry of a range, such that:
+**Note** however, whenever you specify a version *without an operator*, `dep ensure` will interpret the given version as the min-boundry of a range, such that (for example)...
 
 * `1.2.3` becomes the range `>=1.2.3, <2.0.0`
 * `0.2.3` becomes the range `>=0.2.3, <0.3.0`
 * `0.0.3` becomes the range `>=0.0.3, <0.1.0`
+
+... and so on.
 
 ## Feedback
 
