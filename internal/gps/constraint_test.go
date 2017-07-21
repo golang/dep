@@ -7,6 +7,8 @@ package gps
 import (
 	"fmt"
 	"testing"
+
+	"github.com/pkg/errors"
 )
 
 // gu - helper func for stringifying what we assume is a VersionPair (otherwise
@@ -926,4 +928,40 @@ func TestTypedConstraintString(t *testing.T) {
 			t.Errorf("Typed string for %v (%T) was not expected %q; got %q", fix.in, fix.in, fix.out, got)
 		}
 	}
+}
+
+func TestConstraintsIdentical(t *testing.T) {
+	for _, test := range []struct {
+		a, b Constraint
+		eq   bool
+	}{
+		{Any(), Any(), true},
+		{none, noneConstraint{}, true},
+		{NewVersion("test"), NewVersion("test"), true},
+		{NewVersion("test"), NewVersion("test2"), false},
+		{NewBranch("test"), NewBranch("test"), true},
+		{NewBranch("test"), newDefaultBranch("test"), false},
+		{newDefaultBranch("test"), newDefaultBranch("test"), true},
+		{Revision("test"), Revision("test"), true},
+		{Revision("test"), Revision("test2"), false},
+		{testSemverConstraint(t, "v2.10.7"), testSemverConstraint(t, "v2.10.7"), true},
+		{versionTypeUnion{NewVersion("test"), NewBranch("branch")},
+			versionTypeUnion{NewBranch("branch"), NewVersion("test")}, true},
+	} {
+		if test.eq != test.a.identical(test.b) {
+			want := "identical"
+			if !test.eq {
+				want = "not " + want
+			}
+			t.Errorf("expected %s:\n\t(a) %#v\n\t(b) %#v", want, test.a, test.b)
+		}
+	}
+}
+
+func testSemverConstraint(t *testing.T, body string) Constraint {
+	c, err := NewSemverConstraint(body)
+	if err != nil {
+		t.Fatal(errors.Wrapf(err, "failed to create semver constraint: %s", body))
+	}
+	return c
 }
