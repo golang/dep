@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"os/exec"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/Masterminds/vcs"
@@ -25,6 +26,18 @@ type monitoredCmd struct {
 	stderr  *activityBuffer
 }
 
+// timeoutError indicates that the monitored process was terminated due to
+// exceeding activity timeouts.
+type timeoutError struct {
+	timeout time.Duration
+}
+
+// killCmdError indicates that an error occurred while sending a kill signal to
+// the monitored process.
+type killCmdError struct {
+	err error
+}
+
 func newMonitoredCmd(cmd *exec.Cmd, timeout time.Duration) *monitoredCmd {
 	stdout, stderr := newActivityBuffer(), newActivityBuffer()
 	cmd.Stdout, cmd.Stderr = stdout, stderr
@@ -37,8 +50,8 @@ func newMonitoredCmd(cmd *exec.Cmd, timeout time.Duration) *monitoredCmd {
 }
 
 // run will wait for the command to finish and return the error, if any. If the
-// command does not show any activity for more than the specified timeout the
-// process will be killed.
+// command does not show any progress, as indicated by writing to stdout or
+// stderr, for more than the specified timeout, the process will be killed.
 func (c *monitoredCmd) run(ctx context.Context) error {
 	// Check for cancellation before even starting
 	if ctx.Err() != nil {
@@ -52,31 +65,58 @@ func (c *monitoredCmd) run(ctx context.Context) error {
 
 	ticker := time.NewTicker(c.timeout)
 	defer ticker.Stop()
+
+	// Atomic marker to track proc exit state. Guards against bad channel
+	// select receive order, where a tick or context cancellation could come
+	// in at the same time as process completion, but one of the former are
+	// picked first; in such a case, cmd.Process could(?) be nil by the time we
+	// call signal methods on it.
+	var isDone *int32 = new(int32)
 	done := make(chan error, 1)
 
 	go func() {
+		// Wait() can only be called once, so this must act as the completion
+		// indicator for both normal *and* signal-induced termination.
 		done <- c.cmd.Wait()
+		atomic.CompareAndSwapInt32(isDone, 0, 1)
 	}()
 
+	var killerr error
+selloop:
 	for {
 		select {
-		case <-ticker.C:
-			if c.hasTimedOut() {
-				if err := killProcess(c.cmd); err != nil {
-					return &killCmdError{err}
-				}
-
-				return &timeoutError{c.timeout}
-			}
-		case <-ctx.Done():
-			if err := killProcess(c.cmd); err != nil {
-				return &killCmdError{err}
-			}
-			return ctx.Err()
 		case err := <-done:
 			return err
+		case <-ticker.C:
+			if !atomic.CompareAndSwapInt32(isDone, 1, 1) && c.hasTimedOut() {
+				if err := killProcess(c.cmd, isDone); err != nil {
+					killerr = &killCmdError{err}
+				} else {
+					killerr = &timeoutError{c.timeout}
+				}
+				break selloop
+			}
+		case <-ctx.Done():
+			if !atomic.CompareAndSwapInt32(isDone, 1, 1) {
+				if err := killProcess(c.cmd, isDone); err != nil {
+					killerr = &killCmdError{err}
+				} else {
+					killerr = ctx.Err()
+				}
+				break selloop
+			}
 		}
 	}
+
+	// This is only reachable on the signal-induced termination path, so block
+	// until a message comes through the channel indicating that the command has
+	// exited.
+	//
+	// TODO(sdboyer) if the signaling process errored (resulting in a
+	// killCmdError stored in killerr), is it possible that this receive could
+	// block forever on some kind of hung process?
+	<-done
+	return killerr
 }
 
 func (c *monitoredCmd) hasTimedOut() bool {
@@ -121,16 +161,8 @@ func (b *activityBuffer) lastActivity() time.Time {
 	return b.lastActivityStamp
 }
 
-type timeoutError struct {
-	timeout time.Duration
-}
-
 func (e timeoutError) Error() string {
 	return fmt.Sprintf("command killed after %s of no activity", e.timeout)
-}
-
-type killCmdError struct {
-	err error
 }
 
 func (e killCmdError) Error() string {
