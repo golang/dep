@@ -504,43 +504,46 @@ func TestCopyFileSymlink(t *testing.T) {
 	h.TempDir(".")
 
 	testcases := map[string]string{
-		filepath.Join("./testdata/symlinks/file-symlink"):    filepath.Join(h.Path("."), "dst-file"),
-		filepath.Join("./testdata/symlinks/dir-symlink"):     filepath.Join(h.Path("."), "dst-dir"),
-		filepath.Join("./testdata/symlinks/invalid-symlink"): filepath.Join(h.Path("."), "invalid-symlink"),
+		filepath.Join("./testdata/symlinks/file-symlink"):         filepath.Join(h.Path("."), "dst-file"),
+		filepath.Join("./testdata/symlinks/windows-file-symlink"): filepath.Join(h.Path("."), "windows-dst-file"),
+		filepath.Join("./testdata/symlinks/dir-symlink"):          filepath.Join(h.Path("."), "dst-dir"),
+		filepath.Join("./testdata/symlinks/invalid-symlink"):      filepath.Join(h.Path("."), "invalid-symlink"),
 	}
 
 	for symlink, dst := range testcases {
-		var err error
-		if err = copyFile(symlink, dst); err != nil {
-			t.Fatalf("failed to copy symlink: %s", err)
-		}
-
-		var want, got string
-
-		if runtime.GOOS == "windows" {
-			// Creating symlinks on Windows require an additional permission
-			// regular users aren't granted usually. So we copy the file
-			// content as a fall back instead of creating a real symlink.
-			srcb, err := ioutil.ReadFile(symlink)
-			h.Must(err)
-			dstb, err := ioutil.ReadFile(dst)
-			h.Must(err)
-
-			want = string(srcb)
-			got = string(dstb)
-		} else {
-			want, err = os.Readlink(symlink)
-			h.Must(err)
-
-			got, err = os.Readlink(dst)
-			if err != nil {
-				t.Fatalf("could not resolve symlink: %s", err)
+		t.Run(symlink, func(t *testing.T) {
+			var err error
+			if err = copyFile(symlink, dst); err != nil {
+				t.Fatalf("failed to copy symlink: %s", err)
 			}
-		}
 
-		if want != got {
-			t.Fatalf("resolved path is incorrect. expected %s, got %s", want, got)
-		}
+			var want, got string
+
+			if runtime.GOOS == "windows" {
+				// Creating symlinks on Windows require an additional permission
+				// regular users aren't granted usually. So we copy the file
+				// content as a fall back instead of creating a real symlink.
+				srcb, err := ioutil.ReadFile(symlink)
+				h.Must(err)
+				dstb, err := ioutil.ReadFile(dst)
+				h.Must(err)
+
+				want = string(srcb)
+				got = string(dstb)
+			} else {
+				want, err = os.Readlink(symlink)
+				h.Must(err)
+
+				got, err = os.Readlink(dst)
+				if err != nil {
+					t.Fatalf("could not resolve symlink: %s", err)
+				}
+			}
+
+			if want != got {
+				t.Fatalf("resolved path is incorrect. expected %s, got %s", want, got)
+			}
+		})
 	}
 }
 
@@ -791,13 +794,6 @@ func TestIsNonEmptyDir(t *testing.T) {
 }
 
 func TestIsSymlink(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		// XXX: creating symlinks is not supported in Go on
-		// Microsoft Windows. Skipping this this until a solution
-		// for creating symlinks is is provided.
-		t.Skip("skipping on windows")
-	}
-
 	dir, err := ioutil.TempDir("", "dep")
 	if err != nil {
 		t.Fatal(err)
@@ -818,6 +814,7 @@ func TestIsSymlink(t *testing.T) {
 
 	dirSymlink := filepath.Join(dir, "dirSymlink")
 	fileSymlink := filepath.Join(dir, "fileSymlink")
+
 	if err = os.Symlink(dirPath, dirSymlink); err != nil {
 		t.Fatal(err)
 	}
