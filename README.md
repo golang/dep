@@ -109,6 +109,8 @@ for one or more dependencies, do the following:
 
 ### Checking the status of dependencies
 
+Run `dep status` to see the current status of all your dependencies.
+
 ```sh
 $ dep status
 PROJECT                             CONSTRAINT     VERSION        REVISION  LATEST
@@ -116,6 +118,20 @@ github.com/Masterminds/semver       branch 2.x     branch 2.x     139cc09   c2e7
 github.com/Masterminds/vcs          ^1.11.0        v1.11.1        3084677   3084677
 github.com/armon/go-radix           *              branch master  4239b77   4239b77
 ```
+
+On top of that, if you have added new imports to your project or modified the manifest file without running `dep ensure` again, `dep status` will tell you there is a mismatch between the lock file and the current status of the project.
+
+```sh
+$ dep status
+Lock inputs-digest mismatch due to the following packages missing from the lock:
+
+PROJECT                         MISSING PACKAGES
+github.com/Masterminds/goutils  [github.com/Masterminds/goutils]
+
+This happens when a new import is added. Run `dep ensure` to install the missing packages.
+```
+
+As `dep status` suggests, run `dep ensure` to update your lockfile. Then run `dep status` again, and the lock mismatch should go away.
 
 ### Updating dependencies
 
