@@ -462,9 +462,9 @@ func (sm *SourceMgr) DeduceProjectRoot(ip string) (ProjectRoot, error) {
 	return ProjectRoot(pd.root), err
 }
 
-// InferConstraint tries to puzzle out what kind of version is given in a string.
-// Preference is given first for revisions, then branches, then semver constraints,
-// and then plain tags.
+// InferConstraint tries to puzzle out what kind of version is given in a
+// string. Preference is given first for revisions, then branches, then semver
+// constraints, and then plain tags.
 func (sm *SourceMgr) InferConstraint(s string, pi ProjectIdentifier) (Constraint, error) {
 	slen := len(s)
 	if slen == 40 {
