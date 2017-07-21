@@ -1,10 +1,18 @@
 # Gopkg.toml
 
 ## `required`
-`required` lists a set of packages (not projects) that must be included in Gopkg.lock. This list is merged with the set of packages imported by the current project. Use it when your project needs a package it doesn't explicitly import - including "main" packages.
- ```toml
+`required` lists a set of packages (not projects) that must be included in
+Gopkg.lock. This list is merged with the set of packages imported by the current
+project.
+```toml
 required = ["github.com/user/thing/cmd/thing"]
 ```
+
+**Use this for:** linters, generators, and other development tools that
+
+* Are needed by your project
+* Aren't `import`ed by your project, [directly or transitively](FAQ.md#what-is-a-direct-or-transitive-dependency)
+* You don't want put in your `GOPATH`, and/or you want to lock the version
 
 ## `ignored`
 `ignored` lists a set of packages (not projects) that are ignored when dep statically analyzes source code. Ignored packages can be in this project, or in a dependency.
@@ -12,8 +20,11 @@ required = ["github.com/user/thing/cmd/thing"]
 ignored = ["github.com/user/project/badpkg"]
 ```
 
+**Use this for:** preventing a package and any of that package's unique
+dependencies from being installed.
+
 ## `metadata`
-`metadata` can exist at the root as well as under `constraint` and `override` declarations. 
+`metadata` can exist at the root as well as under `constraint` and `override` declarations.
 
 `metadata` declarations are ignored by dep and are meant for usage by other independent systems.
 
@@ -26,8 +37,8 @@ system2-data = "value that is used by another system"
 ```
 
 ## `constraint`
-A `constraint` provides rules for how a [direct dependency]((https://github.com/golang/dep/blob/master/FAQ.md#what-is-a-direct-or-transitive-dependency)) may be incorporated into the 
-dependency graph. 
+A `constraint` provides rules for how a [direct dependency](FAQ.md#what-is-a-direct-or-transitive-dependency) may be incorporated into the
+dependency graph.
 They are respected by dep whether coming from the Gopkg.toml of the current project or a dependency.
 ```toml
 [[constraint]]
@@ -47,12 +58,15 @@ They are respected by dep whether coming from the Gopkg.toml of the current proj
   key1 = "value that convey data to other systems"
   system1-data = "value that is used by a system"
   system2-data = "value that is used by another system"
-  ```
+```
+
+**Use this for:** having a [direct dependency](FAQ.md#what-is-a-direct-or-transitive-dependency)
+use a specific branch, version range, revision, or alternate source (such as a
+fork).
 
 ## `override`
 An `override` has the same structure as a `constraint` declaration, but supersede all `constraint` declarations from all projects. Only `override` declarations from the current project's are applied.
 
- [When should I use constraint, override, required, or ignored in Gopkg.toml?](https://github.com/golang/dep/blob/master/FAQ.md#when-should-i-use-constraint-override-required-or-ignored-in-gopkgtoml)
 ```toml
 [[override]]
   # Required: the root import path of the project being constrained.
@@ -70,6 +84,12 @@ An `override` has the same structure as a `constraint` declaration, but supersed
   system1-data = "value that is used by a system"
   system2-data = "value that is used by another system"
 ```
+
+**Use this for:** all the same things as a [`constraint`](#constraint), but for
+[transitive dependencies](FAQ.md#what-is-a-direct-or-transitive-dependency).
+See [How do I constrain a transitive dependency's version?](FAQ.md#how-do-i-constrain-a-transitive-dependencys-version)
+for more details on how overrides differ from `constraint`s. _Overrides should
+be used cautiously, sparingly, and temporarily._
 
 ## `version`
 
@@ -90,13 +110,13 @@ operator pins the left-most non-zero digit in the version. For example:
 
 To pin a version of direct dependency in manifest, prefix the version with `=`.
 For example:
-```
+```toml
 [[constraint]]
   name = "github.com/pkg/errors"
   version = "=0.8.0"
 ```
 
-[Why is dep ignoring a version constraint in the manifest?](https://github.com/golang/dep/blob/master/FAQ.md#why-is-dep-ignoring-a-version-constraint-in-the-manifest)
+[Why is dep ignoring a version constraint in the manifest?](FAQ.md#why-is-dep-ignoring-a-version-constraint-in-the-manifest)
 
 # Example
 
