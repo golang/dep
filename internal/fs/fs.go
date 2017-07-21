@@ -9,7 +9,9 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
+	"syscall"
 	"unicode"
 
 	"github.com/pkg/errors"
@@ -270,9 +272,25 @@ func CopyDir(src, dst string) error {
 // the copied data is synced/flushed to stable storage.
 func copyFile(src, dst string) (err error) {
 	if sym, err := IsSymlink(src); err != nil {
-		return err
+		return errors.Wrap(err, "symlink check failed")
 	} else if sym {
-		return cloneSymlink(src, dst)
+		if err := cloneSymlink(src, dst); err != nil {
+			if runtime.GOOS == "windows" {
+				// If cloning the symlink fails on Windows because the user
+				// does not have the required privileges, ignore the error and
+				// fall back to copying the file contents.
+				//
+				// ERROR_PRIVILEGE_NOT_HELD is 1314 (0x522):
+				// https://msdn.microsoft.com/en-us/library/windows/desktop/ms681385(v=vs.85).aspx
+				if lerr, ok := err.(*os.LinkError); ok && lerr.Err != syscall.Errno(1314) {
+					return err
+				}
+			} else {
+				return err
+			}
+		} else {
+			return nil
+		}
 	}
 
 	in, err := os.Open(src)
@@ -285,19 +303,13 @@ func copyFile(src, dst string) (err error) {
 	if err != nil {
 		return
 	}
-	defer func() {
-		if e := out.Close(); e != nil {
-			err = e
-		}
-	}()
+	defer out.Close()
 
-	_, err = io.Copy(out, in)
-	if err != nil {
+	if _, err = io.Copy(out, in); err != nil {
 		return
 	}
 
-	err = out.Sync()
-	if err != nil {
+	if err = out.Sync(); err != nil {
 		return
 	}
 
@@ -305,10 +317,8 @@ func copyFile(src, dst string) (err error) {
 	if err != nil {
 		return
 	}
+
 	err = os.Chmod(dst, si.Mode())
-	if err != nil {
-		return
-	}
 
 	return
 }
@@ -318,15 +328,10 @@ func copyFile(src, dst string) (err error) {
 func cloneSymlink(sl, dst string) error {
 	resolved, err := os.Readlink(sl)
 	if err != nil {
-		return errors.Wrap(err, "failed to resolve symlink")
+		return err
 	}
 
-	err = os.Symlink(resolved, dst)
-	if err != nil {
-		return errors.Wrapf(err, "failed to create symlink %s to %s", dst, resolved)
-	}
-
-	return nil
+	return os.Symlink(resolved, dst)
 }
 
 // IsDir determines is the path given is a directory or not.
