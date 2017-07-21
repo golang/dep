@@ -63,7 +63,33 @@ func (c *monitoredCmd) run(ctx context.Context) error {
 		return err
 	}
 
-	ticker := time.NewTicker(c.timeout)
+	// With ticker-based timeout control, the maximum possible running time
+	// without progress is equal to timeout + ticker cycle - 1ns. As such, we
+	// want a shorter ticker cycle time than the timeout; setting them equally
+	// would result in a ceiling of nearly 2x the requested timeout.
+	//
+	// This is difficult to know for the general case, but we know that the
+	// processes gps is launching will often run for either the multiple-minutes
+	// range, the couple-seconds range, or the 10-200ms range. Given these
+	// buckets, we can make some sane approximations for ticker values - we
+	// start with a default of ten checks per timeout duration. For large
+	// values, we can reduce this further to checking once per second, as that
+	// will never be terribly costly. For smaller values, we can define a floor
+	// of five milliseconds, or equal to the timeout duration, whichever is
+	// less.
+	tickDuration := c.timeout / 10
+	switch {
+	case tickDuration > time.Second:
+		tickDuration = time.Second
+	case tickDuration < 5*time.Millisecond:
+		if c.timeout < 5*time.Millisecond {
+			tickDuration = c.timeout
+		} else {
+			tickDuration = 5 * time.Millisecond
+		}
+	}
+
+	ticker := time.NewTicker(tickDuration)
 	defer ticker.Stop()
 
 	// Atomic marker to track proc exit state. Guards against bad channel
