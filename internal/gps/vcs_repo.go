@@ -80,7 +80,7 @@ func newVcsLocalErrorOr(msg string, err error, out string) error {
 }
 
 func (r *gitRepo) get(ctx context.Context) error {
-	out, err := runFromCwd(ctx, "git", "clone", "--recursive", r.Remote(), r.LocalPath())
+	out, err := runFromCwd(ctx, "git", "clone", "--recursive", "-v", "--progress", r.Remote(), r.LocalPath())
 	if err != nil {
 		return newVcsRemoteErrorOr("unable to get repository", err, string(out))
 	}
