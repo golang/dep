@@ -10,7 +10,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/golang/dep"
 	"github.com/golang/dep/internal/gps"
 	"github.com/golang/dep/internal/test"
 	"github.com/pkg/errors"
@@ -274,35 +273,6 @@ func TestGodepConfig_JsonLoad(t *testing.T) {
 
 	if !equalImports(g.json.Imports, wantJSON.Imports) {
 		t.Fatalf("Expected imports to be equal. \n\t(GOT): %v\n\t(WNT): %v", g.json.Imports, wantJSON.Imports)
-	}
-}
-
-func TestGodepConfig_ProjectExistsInLock(t *testing.T) {
-	lock := &dep.Lock{}
-	pi := gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot("github.com/sdboyer/deptest")}
-	ver := gps.NewVersion("v1.0.0")
-	lock.P = append(lock.P, gps.NewLockedProject(pi, ver, nil))
-
-	cases := []struct {
-		importPath string
-		want       bool
-	}{
-		{
-			importPath: "github.com/sdboyer/deptest",
-			want:       true,
-		},
-		{
-			importPath: "github.com/golang/notexist",
-			want:       false,
-		},
-	}
-
-	for _, c := range cases {
-		result := projectExistsInLock(lock, c.importPath)
-
-		if result != c.want {
-			t.Fatalf("projectExistsInLock result is not as want: \n\t(GOT) %v \n\t(WNT) %v", result, c.want)
-		}
 	}
 }
 
