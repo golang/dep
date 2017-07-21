@@ -52,6 +52,25 @@ $ dep ensure github.com/pkg/errors@^0.8.0
 
 See the help text for more detailed usage instructions.
 
+## Semantic Versioning
+
+`dep ensure` a uses an external [semver library](https://github.com/Masterminds/semver) to interpret the version constraints you specify in the manifest. The basic comparison operators are:
+
+* `=`: equal (aliased to no operator)
+* `!=`: not equal
+* `>`: greater than
+* `<`: less than
+* `>=`: greater than or equal to
+* `<=`: less than or equal to
+
+You might, for example, include a constraint in your manifest that specifies `version = "=2.0.0"` to pin a dependency to version 2.0.0.
+
+**Note** however, whenever you specify a version *without an operator*, `dep ensure` will interpret the given version as the min-boundry of a range, such that:
+
+* `1.2.3` becomes the range `>=1.2.3, <2.0.0`
+* `0.2.3` becomes the range `>=0.2.3, <0.3.0`
+* `0.0.3` becomes the range `>=0.0.3, <0.1.0`
+
 ## Feedback
 
 Feedback is greatly appreciated.
