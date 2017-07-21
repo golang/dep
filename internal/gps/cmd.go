@@ -26,9 +26,9 @@ type monitoredCmd struct {
 	stderr  *activityBuffer
 }
 
-// timeoutError indicates that the monitored process was terminated due to
-// exceeding activity timeouts.
-type timeoutError struct {
+// noProgressError indicates that the monitored process was terminated due to
+// exceeding exceeding the progress timeout.
+type noProgressError struct {
 	timeout time.Duration
 }
 
@@ -92,7 +92,7 @@ selloop:
 				if err := killProcess(c.cmd, isDone); err != nil {
 					killerr = &killCmdError{err}
 				} else {
-					killerr = &timeoutError{c.timeout}
+					killerr = &noProgressError{c.timeout}
 				}
 				break selloop
 			}
@@ -161,7 +161,7 @@ func (b *activityBuffer) lastActivity() time.Time {
 	return b.lastActivityStamp
 }
 
-func (e timeoutError) Error() string {
+func (e noProgressError) Error() string {
 	return fmt.Sprintf("command killed after %s of no activity", e.timeout)
 }
 
