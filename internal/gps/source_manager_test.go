@@ -24,7 +24,7 @@ func TestSourceManager_InferConstraint(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	svs, err := NewSemverConstraintIC(">=0.12.0, <=12.0.0-de4dcafe0")
+	svs, err := NewSemverConstraintIC("v0.12.0-12-de4dcafe0")
 	if err != nil {
 		t.Fatal(err)
 	}
