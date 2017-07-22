@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"testing"
@@ -274,9 +275,11 @@ func (p *IntegrationTestProject) makeRootTempDir() {
 		p.tempdir, err = ioutil.TempDir("", "gotest")
 		p.Must(err)
 
-		// Fox for OSX where the tempdir is a symlink:
-		p.tempdir, err = filepath.EvalSymlinks(p.tempdir)
-		p.Must(err)
+		// Fix for OSX where the tempdir is a symlink:
+		if runtime.GOOS == "darwin" {
+			p.tempdir, err = filepath.EvalSymlinks(p.tempdir)
+			p.Must(err)
+		}
 	}
 }
 
