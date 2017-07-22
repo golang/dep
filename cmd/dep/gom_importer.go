@@ -248,14 +248,17 @@ func (g *gomImporter) convert(pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock, err
 				g.logger.Printf(warn.Error())
 				version = revision
 			}
-			feedback(version, pi.ProjectRoot, fb.DepTypeImported, g.logger)
-			lp := gps.NewLockedProject(pi, version, nil)
-			lock.P = append(lock.P, lp)
 
 			pc.Constraint, err = deduceConstraint(rev, pc.Ident, g.sm)
 			if err != nil {
 				return nil, nil, err
 			}
+
+			lp := gps.NewLockedProject(pi, version, nil)
+
+			f := fb.NewLockedProjectFeedback(lp, fb.DepTypeImported)
+			f.LogFeedback(g.logger)
+			lock.P = append(lock.P, lp)
 		}
 		manifest.Constraints[pc.Ident.ProjectRoot] = gps.ProjectProperties{Source: pc.Ident.Source, Constraint: pc.Constraint}
 	}
