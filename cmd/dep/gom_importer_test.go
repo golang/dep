@@ -8,10 +8,8 @@ import (
 	"bytes"
 	"log"
 	"path/filepath"
-	"reflect"
 	"testing"
 
-	"github.com/golang/dep"
 	"github.com/golang/dep/internal/gps"
 	"github.com/golang/dep/internal/test"
 	"github.com/pkg/errors"
@@ -163,57 +161,4 @@ func TestGomConfig_ConvertProject_EmptyComment(t *testing.T) {
 	if rev != "0.8.0" {
 		t.Fatalf("Expected locked revision to be 'ff2948a2ac8f538c4ecd55962e919d1e13e74baf', got %s", rev)
 	}
-}
-
-func TestGomConfig_ProjectExistsInLock(t *testing.T) {
-	lock := &dep.Lock{}
-	pi := gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot("github.com/sdboyer/deptest")}
-	ver := gps.NewVersion("v1.0.0")
-	lock.P = append(lock.P, gps.NewLockedProject(pi, ver, nil))
-
-	cases := []struct {
-		importPath string
-		want       bool
-	}{
-		{
-			importPath: "github.com/sdboyer/deptest",
-			want:       true,
-		},
-		{
-			importPath: "github.com/golang/notexist",
-			want:       false,
-		},
-	}
-
-	for _, c := range cases {
-		result := projectExistsInLock(lock, c.importPath)
-
-		if result != c.want {
-			t.Fatalf("projectExistsInLock result is not as expected: \n\t(GOT) %v \n\t(WNT) %v", result, c.want)
-		}
-	}
-}
-
-// Compares two slices of gomPackage and checks if they are equal.
-func equalGomImports(a, b []gomPackage) bool {
-
-	if a == nil && b == nil {
-		return true
-	}
-
-	if a == nil || b == nil {
-		return false
-	}
-
-	if len(a) != len(b) {
-		return false
-	}
-
-	for i := range a {
-		if !reflect.DeepEqual(a[i], b[i]) {
-			return false
-		}
-	}
-
-	return true
 }
