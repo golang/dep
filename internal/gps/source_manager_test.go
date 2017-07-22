@@ -24,10 +24,16 @@ func TestSourceManager_InferConstraint(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	svs, err := NewSemverConstraintIC("v0.12.0-12-de4dcafe0")
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	constraints := map[string]Constraint{
 		"v0.8.1": sv,
 		"v2":     NewBranch("v2"),
-		"master": NewBranch("master"),
+		"v0.12.0-12-de4dcafe0": svs,
+		"master":               NewBranch("master"),
 		"5b3352dc16517996fb951394bcbbe913a2a616e3": Revision("5b3352dc16517996fb951394bcbbe913a2a616e3"),
 
 		// valid bzr rev
