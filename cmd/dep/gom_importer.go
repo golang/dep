@@ -235,23 +235,24 @@ func (g *gomImporter) convert(pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock, err
 		}
 
 		var pc gps.ProjectConstraint
-		pc.Ident = gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot(pkg.name)}
+		pi := gps.ProjectIdentifier{
+			ProjectRoot: gps.ProjectRoot(pkg.name),
+		}
+
+		pc.Ident = pi
 
 		if rev != "" {
-			pi := gps.ProjectIdentifier{
-				ProjectRoot: gps.ProjectRoot(pkg.name),
+			pc.Constraint, err = g.sm.InferConstraint(rev, pc.Ident)
+			if err != nil {
+				return nil, nil, err
 			}
+
 			revision := gps.Revision(rev)
-			version, err := lookupVersionForRevision(revision, pi, g.sm)
+			version, err := lookupVersionForLockedProject(pi, pc.Constraint, revision, g.sm)
 			if err != nil {
 				warn := errors.Wrapf(err, "Unable to lookup the version represented by %s in %s. Falling back to locking the revision only.", rev, pi.ProjectRoot)
 				g.logger.Printf(warn.Error())
 				version = revision
-			}
-
-			pc.Constraint, err = deduceConstraint(rev, pc.Ident, g.sm)
-			if err != nil {
-				return nil, nil, err
 			}
 
 			lp := gps.NewLockedProject(pi, version, nil)
