@@ -186,12 +186,22 @@ func (e killCmdError) Error() string {
 	return fmt.Sprintf("error killing command: %s", e.err)
 }
 
-func runFromCwd(ctx context.Context, cmd string, args ...string) ([]byte, error) {
-	c := newMonitoredCmd(exec.Command(cmd, args...), 2*time.Minute)
+func runFromCwd(ctx context.Context, timeout time.Duration, cmd string, args ...string) ([]byte, error) {
+	c := newMonitoredCmd(exec.Command(cmd, args...), timeout)
 	return c.combinedOutput(ctx)
 }
 
-func runFromRepoDir(ctx context.Context, repo vcs.Repo, cmd string, args ...string) ([]byte, error) {
-	c := newMonitoredCmd(repo.CmdFromDir(cmd, args...), 2*time.Minute)
+func runFromRepoDir(ctx context.Context, repo vcs.Repo, timeout time.Duration, cmd string, args ...string) ([]byte, error) {
+	c := newMonitoredCmd(repo.CmdFromDir(cmd, args...), timeout)
 	return c.combinedOutput(ctx)
 }
+
+const (
+	// expensiveCmdTimeout is meant to be used in a command that is expensive
+	// in terms of computation and we know it will take long or one that uses
+	// the network, such as clones, updates, ....
+	expensiveCmdTimeout = 2 * time.Minute
+	// defaultCmdTimeout is just an umbrella value for all other commands that
+	// should not take much.
+	defaultCmdTimeout = 10 * time.Second
+)
