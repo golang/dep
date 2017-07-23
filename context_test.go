@@ -527,7 +527,7 @@ func TestDetectProjectSymlinkedOutsideGOPATH(t *testing.T) {
 		t.Fatal(err)
 	}
 	if p.AbsRoot == p.ResolvedAbsRoot {
-		t.Fatalf("expected changed resolved abs root: %s==%s", p.AbsRoot , p.ResolvedAbsRoot)
+		t.Fatalf("expected changed resolved abs root: %s==%s", p.AbsRoot, p.ResolvedAbsRoot)
 	}
 
 	got, err := depCtx.ImportPathForProject(&p)
