@@ -163,6 +163,26 @@ func (cmd *ensureCommand) Run(ctx *dep.Ctx, args []string) error {
 	}
 
 	newLock := dep.LockFromSolution(solution)
+
+	// check if any projects are missing from vendor, if they are
+	// we'll need to write the vendor directory.
+	if writeV != dep.VendorAlways {
+		for _, proj := range newLock.Projects() {
+			projVendorPath := filepath.Join(p.AbsRoot, "vendor", string(proj.Ident().ProjectRoot))
+			projInVendor, err := fs.IsNonEmptyDir(projVendorPath)
+			if err != nil {
+				return errors.Wrapf(err, "ensure %v is a directory or remove it")
+			}
+			if !projInVendor {
+				if ctx.Verbose {
+					ctx.Out.Printf("%q needs to be added to vendor path", proj.Ident().ProjectRoot)
+				}
+				writeV = dep.VendorAlways
+				break
+			}
+		}
+	}
+
 	sw, err := dep.NewSafeWriter(nil, p.Lock, newLock, writeV)
 	if err != nil {
 		return err
