@@ -113,7 +113,7 @@ func (c *Ctx) LoadProject() (*Project, error) {
 		return nil, err
 	}
 
-	ip, err := c.ImportForAbs(p.AbsRoot)
+	ip, err := c.ImportPathForProject(p)
 	if err != nil {
 		return nil, errors.Wrap(err, "root project import")
 	}
@@ -219,28 +219,23 @@ func (c *Ctx) detectGOPATH(path string) (string, error) {
 	return "", errors.Errorf("%s is not within a known GOPATH", path)
 }
 
-// ImportForAbs returns the import path for an absolute project path by trimming the
-// `$GOPATH/src/` prefix.  Returns an error for paths equal to, or without this prefix.
-func (c *Ctx) ImportForAbs(path string) (string, error) {
-	gopathEvaluated, err := filepath.EvalSymlinks(c.GOPATH)
-	if err != nil {
-		return "", errors.Wrapf(err, "failed to evaluate symlink %s", c.GOPATH)
+// ImportPathForProject returns the import path for an absolute project path by trimming the
+// `GOPATH/src/` prefix.  Returns an error for paths equal to, or without this prefix.
+func (c *Ctx) ImportPathForProject(p *Project) (string, error) {
+	path := p.AbsRoot
+	if p.AbsRoot != p.ResolvedAbsRoot {
+		path = p.ResolvedAbsRoot
 	}
 
-	pathEvaluated, err := filepath.EvalSymlinks(path)
-	if err != nil {
-		return "", errors.Wrapf(err, "failed to evaluate symlink %s", path)
-	}
-
-	srcprefix := filepath.Join(gopathEvaluated, "src") + string(filepath.Separator)
-	if fs.HasFilepathPrefix(pathEvaluated, srcprefix) {
-		if len(pathEvaluated) <= len(srcprefix) {
+	srcprefix := filepath.Join(c.GOPATH, "src") + string(filepath.Separator)
+	if fs.HasFilepathPrefix(path, srcprefix) {
+		if len(path) <= len(srcprefix) {
 			return "", errors.New("dep does not currently support using GOPATH/src as the project root")
 		}
 
 		// filepath.ToSlash because we're dealing with an import path now,
 		// not an fs path
-		return filepath.ToSlash(pathEvaluated[len(srcprefix):]), nil
+		return filepath.ToSlash(path[len(srcprefix):]), nil
 	}
 
 	return "", errors.Errorf("%s not in GOPATH", path)

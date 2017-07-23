@@ -39,7 +39,13 @@ func TestCtx_ProjectImport(t *testing.T) {
 	for _, want := range importPaths {
 		fullpath := filepath.Join(depCtx.GOPATH, "src", want)
 		h.TempDir(filepath.Join("src", want))
-		got, err := depCtx.ImportForAbs(fullpath)
+
+		p := &Project{}
+		if err := p.SetRoot(fullpath); err != nil {
+			t.Fatal(err)
+		}
+		got, err := depCtx.ImportPathForProject(p)
+
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -49,15 +55,14 @@ func TestCtx_ProjectImport(t *testing.T) {
 	}
 
 	// test where it should return an error when directly within $GOPATH/src
-	got, err := depCtx.ImportForAbs(filepath.Join(depCtx.GOPATH, "src"))
+	p := &Project{}
+	if err := p.SetRoot(filepath.Join(depCtx.GOPATH, "src")); err != nil {
+		t.Fatal(err)
+	}
+	got, err := depCtx.ImportPathForProject(p)
+
 	if err == nil || !strings.Contains(err.Error(), "GOPATH/src") {
 		t.Fatalf("should have gotten an error for use directly in GOPATH/src, but got %s", got)
-	}
-
-	// test where it should return an error
-	got, err = depCtx.ImportForAbs("tra/la/la/la")
-	if err == nil {
-		t.Fatalf("should have gotten an error but did not for tra/la/la/la: %s", got)
 	}
 }
 
@@ -347,7 +352,13 @@ func TestCaseInsentitiveGOPATH(t *testing.T) {
 	ip := "github.com/pkg/errors"
 	fullpath := filepath.Join(depCtx.GOPATH, "src", ip)
 	h.TempDir(filepath.Join("src", ip))
-	pr, err := depCtx.ImportForAbs(fullpath)
+
+	p := &Project{}
+	if err := p.SetRoot(fullpath); err != nil {
+		t.Fatal(err)
+	}
+	pr, err := depCtx.ImportPathForProject(p)
+
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -511,7 +522,15 @@ func TestDetectProjectSymlinkedOutsideGOPATH(t *testing.T) {
 		t.Errorf("Error creating symlink from %s to %s: %s", symlinkSrc, symlinkTarget, err.Error())
 	}
 
-	got, err := depCtx.ImportForAbs(symlinkTarget)
+	p := Project{}
+	if err := p.SetRoot(symlinkSrc); err != nil {
+		t.Fatal(err)
+	}
+	if p.AbsRoot == p.ResolvedAbsRoot {
+		t.Fatalf("expected changed resolved abs root: %s==%s", p.AbsRoot , p.ResolvedAbsRoot)
+	}
+
+	got, err := depCtx.ImportPathForProject(&p)
 	if err != nil {
 		t.Fatal(err)
 	}
