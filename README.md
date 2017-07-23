@@ -70,7 +70,7 @@ $ dep help ensure
 
 ### Installing dependencies
 
-(if your `vendor/` directory isn't [checked in with your code](](docs/FAQ.md#should-i-commit-my-vendor-directory)))
+(if your `vendor/` directory isn't [checked in with your code](docs/FAQ.md#should-i-commit-my-vendor-directory))
 
 <!-- may change with https://github.com/golang/dep/pull/489 -->
 
