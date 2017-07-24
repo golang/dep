@@ -62,13 +62,12 @@ See the help text for more detailed usage instructions.
 * `<`: less than
 * `>=`: greater than or equal to
 * `<=`: less than or equal to
-* `<=`: less than or equal to
-* `-`: literal range. Eg: 1.2.4 - 1.3
+* `-`: literal range. Eg: 1.2 - 1.4.5 is equivalent to >= 1.2, <= 1.4.5
 * `~`: minor range. Eg: ~1.2.3 is equivalent to >= 1.2.3, < 1.3.0
 * `^`: major range. Eg: ^1.2.3 is equivalent to >= 1.2.3, < 2.0.0
-* `[xX*]`: wildcard. Eg: >=1.2.x
+* `[xX*]`: wildcard. Eg: 1.2.x is equivalent to >= 1.2.0, < 1.3.0
 
-You might, for example, include a constraint in your manifest that specifies `version = "=2.0.0"` to pin a dependency to version 2.0.0, or constraint to minor releases with: `version = "2.*"`. Refer to the [semver library](https://github.com/Masterminds/semver) documentation for more info.
+You might, for example, include a constraint in your manifest that specifies `version = "=2.0.0"` to pin a dependency to version 2.0.0, or constrain to minor releases with: `version = "2.*"`. Refer to the [semver library](https://github.com/Masterminds/semver) documentation for more info.
 
 **Note** however, whenever you specify a version *without an operator*, `dep ensure` will interpret the given version as the min-boundry of a range, for example:
 
