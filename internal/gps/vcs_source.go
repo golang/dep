@@ -107,9 +107,6 @@ func (bs *baseVCSSource) exportRevisionTo(ctx context.Context, r Revision, to st
 		return unwrapVcsErr(err)
 	}
 
-	// TODO(sdboyer) this is a simplistic approach and relying on the tools
-	// themselves might make it faster, but git's the overwhelming case (and has
-	// its own method) so fine for now
 	return fs.CopyDir(bs.repo.LocalPath(), to)
 }
 
@@ -353,6 +350,20 @@ type bzrSource struct {
 	baseVCSSource
 }
 
+func (s *bzrSource) exportRevisionTo(ctx context.Context, rev Revision, to string) error {
+	// TODO: use bzr instead of the generic approach in
+	// baseVCSSource.exportRevisionTo to make it faster.
+	if err := s.baseVCSSource.exportRevisionTo(ctx, rev, to); err != nil {
+		return err
+	}
+
+	if err := os.RemoveAll(filepath.Join(to, ".bzr")); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (s *bzrSource) listVersions(ctx context.Context) ([]PairedVersion, error) {
 	r := s.repo
 
@@ -401,6 +412,20 @@ func (s *bzrSource) listVersions(ctx context.Context) ([]PairedVersion, error) {
 // all standard mercurial servers.
 type hgSource struct {
 	baseVCSSource
+}
+
+func (s *hgSource) exportRevisionTo(ctx context.Context, rev Revision, to string) error {
+	// TODO: use bzr instead of the generic approach in
+	// baseVCSSource.exportRevisionTo to make it faster.
+	if err := s.baseVCSSource.exportRevisionTo(ctx, rev, to); err != nil {
+		return err
+	}
+
+	if err := os.RemoveAll(filepath.Join(to, ".hg")); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (s *hgSource) listVersions(ctx context.Context) ([]PairedVersion, error) {
