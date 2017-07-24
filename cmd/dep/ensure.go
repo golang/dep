@@ -10,11 +10,9 @@ import (
 	"fmt"
 	"go/build"
 	"log"
-	"path/filepath"
 	"strings"
 
 	"github.com/golang/dep"
-	"github.com/golang/dep/internal/fs"
 	"github.com/golang/dep/internal/gps"
 	"github.com/golang/dep/internal/gps/pkgtree"
 	"github.com/pkg/errors"
@@ -151,19 +149,8 @@ func (cmd *ensureCommand) Run(ctx *dep.Ctx, args []string) error {
 		return errors.Wrap(err, "ensure Solve()")
 	}
 
-	// check if vendor exists, because if the locks are the same but
-	// vendor does not exist we should write vendor
-	vendorExists, err := fs.IsNonEmptyDir(filepath.Join(p.AbsRoot, "vendor"))
-	if err != nil {
-		return errors.Wrap(err, "ensure vendor is a directory")
-	}
-	writeV := dep.VendorOnChanged
-	if !vendorExists && solution != nil {
-		writeV = dep.VendorAlways
-	}
-
 	newLock := dep.LockFromSolution(solution)
-	sw, err := dep.NewSafeWriter(nil, p.Lock, newLock, writeV)
+	sw, err := dep.NewSafeWriter(nil, p.Lock, newLock, dep.VendorAlways)
 	if err != nil {
 		return err
 	}
