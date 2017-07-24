@@ -1,0 +1,1 @@
+Test that we will fall back to 2.0.0 if our dependency has a broken glide.yaml in 2.1.0.
