@@ -40,6 +40,28 @@ information on using pull requests.
 
 [GitHub Help]: https://help.github.com/articles/about-pull-requests/
 
+### Running tests
+On go 1.9, run all the tests with the following command:
+
+```
+go test ./...
+```
+
+On older version of go, run all the tests (excluding tests in vendor/) with the following command:
+
+```
+go test -race $(go list ./... | grep -v vendor)
+```
+
+The following test flags are defined:
+* `-skip-missing-bin`: Some tests require that software is installed on your machine
+   such as git, svn, hg, and bzr. Use this flag to skip those tests,
+   e.g. `go test ./... -skip-missing-bin`.
+* `-update`: Our tests use the [golden file pattern](https://github.com/golang/dep/issues/204)
+   where expected output is saved in files in this repo, instead of embedded in tests.
+   Use this flag when the expected output of a test has changed, and the golden
+   files will be rewritten during the test run, e.g. `go test ./... -update`.
+
 ## Contributor License Agreement
 
 Contributions to this project must be accompanied by a Contributor License
