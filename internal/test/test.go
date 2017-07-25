@@ -248,7 +248,11 @@ func NeedsExternalNetwork(t *testing.T) {
 // git binary is not available.
 func NeedsGit(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("skipping because git binary not found")
+		if *SkipMissingBinTests {
+			t.Skip("Skipping: git is not installed")
+		} else {
+			t.Fatal("git is not installed. Rerun with the -skip-missing-bin flag to skip this test instead.")
+		}
 	}
 }
 
