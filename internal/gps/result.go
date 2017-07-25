@@ -73,7 +73,6 @@ func WriteDepTree(basedir string, l Lock, sm SourceManager, sv bool) error {
 		if sv {
 			filepath.Walk(to, stripVendor)
 		}
-		// TODO(sdboyer) dump version metadata file
 	}
 
 	return nil

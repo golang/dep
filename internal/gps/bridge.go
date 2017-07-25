@@ -201,8 +201,6 @@ func (b *bridge) breakLock() {
 
 	for _, lp := range b.s.rd.rl.Projects() {
 		if _, is := b.s.sel.selected(lp.pi); !is {
-			// TODO(sdboyer) use this as an opportunity to detect
-			// inconsistencies between upstream and the lock (e.g., moved tags)?
 			pi, v := lp.pi, lp.Version()
 			go func() {
 				// Sync first
