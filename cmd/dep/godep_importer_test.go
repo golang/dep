@@ -18,6 +18,188 @@ import (
 
 const testGodepProjectRoot = "github.com/golang/notexist"
 
+func TestGoDepConfig_Convert(t *testing.T) {
+	testCases := map[string]struct {
+		json                   godepJSON
+		expectConvertErr       bool
+		matchPairedVersion     bool
+		projectRoot            gps.ProjectRoot
+		notExpectedProjectRoot *gps.ProjectRoot
+		expectedConstraint     string
+		expectedRevision       *gps.Revision
+		expectedVersion        string
+		expectedLockCount      *int
+	}{
+		"convert project": {
+			json: godepJSON{
+				Imports: []godepPackage{
+					{
+						ImportPath: "github.com/sdboyer/deptest",
+						// This revision has 2 versions attached to it, v1.0.0 & v0.8.0.
+						Rev:     "ff2948a2ac8f538c4ecd55962e919d1e13e74baf",
+						Comment: "v0.8.0",
+					},
+				},
+			},
+			matchPairedVersion: true,
+			projectRoot:        gps.ProjectRoot("github.com/sdboyer/deptest"),
+			expectedConstraint: "^0.8.0",
+			expectedRevision:   gps.RevisionPtr(gps.Revision("ff2948a2ac8f538c4ecd55962e919d1e13e74baf")),
+			expectedVersion:    "v0.8.0",
+		},
+		"with semver suffix": {
+			json: godepJSON{
+				Imports: []godepPackage{
+					{
+						ImportPath: "github.com/sdboyer/deptest",
+						Rev:        "ff2948a2ac8f538c4ecd55962e919d1e13e74baf",
+						Comment:    "v1.12.0-12-g2fd980e",
+					},
+				},
+			},
+			projectRoot:        gps.ProjectRoot("github.com/sdboyer/deptest"),
+			matchPairedVersion: false,
+			expectedConstraint: ">=1.12.0, <=12.0.0-g2fd980e",
+		},
+		"empty comment": {
+			json: godepJSON{
+				Imports: []godepPackage{
+					{
+						ImportPath: "github.com/sdboyer/deptest",
+						// This revision has 2 versions attached to it, v1.0.0 & v0.8.0.
+						Rev: "ff2948a2ac8f538c4ecd55962e919d1e13e74baf",
+					},
+				},
+			},
+			projectRoot:        gps.ProjectRoot("github.com/sdboyer/deptest"),
+			matchPairedVersion: true,
+			expectedConstraint: "^1.0.0",
+			expectedRevision:   gps.RevisionPtr(gps.Revision("ff2948a2ac8f538c4ecd55962e919d1e13e74baf")),
+			expectedVersion:    "v1.0.0",
+		},
+		"bad input - empty package name": {
+			json: godepJSON{
+				Imports: []godepPackage{{ImportPath: ""}},
+			},
+			expectConvertErr: true,
+		},
+		"bad input - empty revision": {
+			json: godepJSON{
+				Imports: []godepPackage{
+					{
+						ImportPath: "github.com/sdboyer/deptest",
+					},
+				},
+			},
+			expectConvertErr: true,
+		},
+		"sub-packages": {
+			json: godepJSON{
+				Imports: []godepPackage{
+					{
+						ImportPath: "github.com/sdboyer/deptest",
+						// This revision has 2 versions attached to it, v1.0.0 & v0.8.0.
+						Rev: "ff2948a2ac8f538c4ecd55962e919d1e13e74baf",
+					},
+					{
+						ImportPath: "github.com/sdboyer/deptest/foo",
+						// This revision has 2 versions attached to it, v1.0.0 & v0.8.0.
+						Rev: "ff2948a2ac8f538c4ecd55962e919d1e13e74baf",
+					},
+				},
+			},
+			projectRoot:            gps.ProjectRoot("github.com/sdboyer/deptest"),
+			notExpectedProjectRoot: gps.ProjectRootPtr(gps.ProjectRoot("github.com/sdboyer/deptest/foo")),
+			expectedLockCount:      intPtr(1),
+			expectedConstraint:     "^1.0.0",
+			expectedVersion:        "v1.0.0",
+		},
+	}
+
+	h := test.NewHelper(t)
+	defer h.Cleanup()
+
+	ctx := newTestContext(h)
+	sm, err := ctx.SourceManager()
+	h.Must(err)
+	defer sm.Release()
+
+	for name, testCase := range testCases {
+		t.Logf("Running test case: %s", name)
+
+		g := newGodepImporter(discardLogger, true, sm)
+		g.json = testCase.json
+
+		manifest, lock, err := g.convert(testCase.projectRoot)
+		if err != nil {
+			if testCase.expectConvertErr {
+				continue
+			}
+
+			t.Fatal(err)
+		}
+
+		if testCase.expectedLockCount != nil {
+			if len(lock.P) != *testCase.expectedLockCount {
+				t.Fatalf("Expected lock to have %d project(s), got %d",
+					*testCase.expectedLockCount,
+					len(lock.P))
+			}
+		}
+
+		d, ok := manifest.Constraints[testCase.projectRoot]
+		if !ok {
+			t.Fatalf("Expected the manifest to have a dependency for '%s' but got none",
+				testCase.projectRoot)
+		}
+
+		v := d.Constraint.String()
+		if v != testCase.expectedConstraint {
+			t.Fatalf("Expected manifest constraint to be %s, got %s", testCase.expectedConstraint, v)
+		}
+
+		if testCase.notExpectedProjectRoot != nil {
+			_, ok := manifest.Constraints[*testCase.notExpectedProjectRoot]
+			if ok {
+				t.Fatalf("Expected the manifest to not have a dependency for '%s' but got none",
+					*testCase.notExpectedProjectRoot)
+			}
+		}
+
+		p := lock.P[0]
+		if p.Ident().ProjectRoot != testCase.projectRoot {
+			t.Fatalf("Expected the lock to have a project for '%s' but got '%s'",
+				testCase.projectRoot,
+				p.Ident().ProjectRoot)
+		}
+
+		lv := p.Version()
+		lpv, ok := lv.(gps.PairedVersion)
+
+		if !ok {
+			if testCase.matchPairedVersion {
+				t.Fatalf("Expected locked version to be PairedVersion but got %T", lv)
+			}
+
+			continue
+		}
+
+		ver := lpv.String()
+		if ver != testCase.expectedVersion {
+			t.Fatalf("Expected locked version to be '%s', got %s", testCase.expectedVersion, ver)
+		}
+
+		if testCase.expectedRevision != nil {
+			rev := lpv.Revision()
+			if rev != *testCase.expectedRevision {
+				t.Fatalf("Expected locked revision to be '%s', got %s",
+					*testCase.expectedRevision,
+					rev)
+			}
+		}
+	}
+}
+
 func TestGodepConfig_Import(t *testing.T) {
 	h := test.NewHelper(t)
 	defer h.Cleanup()
@@ -103,246 +285,6 @@ func TestGodepConfig_JsonLoad(t *testing.T) {
 	}
 }
 
-func TestGodepConfig_ConvertProject(t *testing.T) {
-	h := test.NewHelper(t)
-	defer h.Cleanup()
-
-	ctx := newTestContext(h)
-	sm, err := ctx.SourceManager()
-	h.Must(err)
-	defer sm.Release()
-
-	g := newGodepImporter(discardLogger, true, sm)
-	g.json = godepJSON{
-		Imports: []godepPackage{
-			{
-				ImportPath: "github.com/sdboyer/deptest",
-				// This revision has 2 versions attached to it, v1.0.0 & v0.8.0.
-				Rev:     "ff2948a2ac8f538c4ecd55962e919d1e13e74baf",
-				Comment: "v0.8.0",
-			},
-		},
-	}
-
-	manifest, lock, err := g.convert("")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	d, ok := manifest.Constraints["github.com/sdboyer/deptest"]
-	if !ok {
-		t.Fatal("Expected the manifest to have a dependency for 'github.com/sdboyer/deptest' but got none")
-	}
-
-	v := d.Constraint.String()
-	if v != "^0.8.0" {
-		t.Fatalf("Expected manifest constraint to be ^0.8.0, got %s", v)
-	}
-
-	p := lock.P[0]
-	if p.Ident().ProjectRoot != "github.com/sdboyer/deptest" {
-		t.Fatalf("Expected the lock to have a project for 'github.com/sdboyer/deptest' but got '%s'", p.Ident().ProjectRoot)
-	}
-
-	lv := p.Version()
-	lpv, ok := lv.(gps.PairedVersion)
-	if !ok {
-		t.Fatalf("Expected locked version to be PairedVersion but got %T", lv)
-	}
-
-	rev := lpv.Revision()
-	if rev != "ff2948a2ac8f538c4ecd55962e919d1e13e74baf" {
-		t.Fatalf("Expected locked revision to be 'ff2948a2ac8f538c4ecd55962e919d1e13e74baf', got %s", rev)
-	}
-
-	ver := lpv.String()
-	if ver != "v0.8.0" {
-		t.Fatalf("Expected locked version to be 'v0.8.0', got %s", ver)
-	}
-}
-
-func TestGodepConfig_ConvertProject_WithSemverSuffix(t *testing.T) {
-	h := test.NewHelper(t)
-	defer h.Cleanup()
-
-	ctx := newTestContext(h)
-	sm, err := ctx.SourceManager()
-	h.Must(err)
-	defer sm.Release()
-
-	g := newGodepImporter(discardLogger, true, sm)
-	g.json = godepJSON{
-		Imports: []godepPackage{
-			{
-				ImportPath: "github.com/sdboyer/deptest",
-				Rev:        "ff2948a2ac8f538c4ecd55962e919d1e13e74baf",
-				Comment:    "v1.12.0-12-g2fd980e",
-			},
-		},
-	}
-
-	manifest, lock, err := g.convert("")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	d, ok := manifest.Constraints["github.com/sdboyer/deptest"]
-	if !ok {
-		t.Fatal("Expected the manifest to have a dependency for 'github.com/sdboyer/deptest' but got none")
-	}
-
-	v := d.Constraint.String()
-	if v != "^1.12.0-12-g2fd980e" {
-		t.Fatalf("Expected manifest constraint to be ^1.12.0-12-g2fd980e, got %s", v)
-	}
-
-	p := lock.P[0]
-	if p.Ident().ProjectRoot != "github.com/sdboyer/deptest" {
-		t.Fatalf("Expected the lock to have a project for 'github.com/sdboyer/deptest' but got '%s'", p.Ident().ProjectRoot)
-	}
-}
-
-func TestGodepConfig_ConvertProject_EmptyComment(t *testing.T) {
-	h := test.NewHelper(t)
-	defer h.Cleanup()
-	h.TempDir("src")
-
-	ctx := newTestContext(h)
-	sm, err := ctx.SourceManager()
-	h.Must(err)
-	defer sm.Release()
-
-	g := newGodepImporter(discardLogger, true, sm)
-	g.json = godepJSON{
-		Imports: []godepPackage{
-			{
-				ImportPath: "github.com/sdboyer/deptest",
-				// This revision has 2 versions attached to it, v1.0.0 & v0.8.0.
-				Rev: "ff2948a2ac8f538c4ecd55962e919d1e13e74baf",
-			},
-		},
-	}
-
-	manifest, lock, err := g.convert("")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	d, ok := manifest.Constraints["github.com/sdboyer/deptest"]
-	if !ok {
-		t.Fatal("Expected the manifest to have a dependency for 'github.com/sdboyer/deptest' but got none")
-	}
-
-	v := d.Constraint.String()
-	if v != "^1.0.0" {
-		t.Fatalf("Expected manifest constraint to be ^1.0.0, got %s", v)
-	}
-
-	p := lock.P[0]
-	if p.Ident().ProjectRoot != "github.com/sdboyer/deptest" {
-		t.Fatalf("Expected the lock to have a project for 'github.com/sdboyer/deptest' but got '%s'", p.Ident().ProjectRoot)
-	}
-
-	lv := p.Version()
-	lpv, ok := lv.(gps.PairedVersion)
-	if !ok {
-		t.Fatalf("Expected locked version to be PairedVersion but got %T", lv)
-	}
-
-	rev := lpv.Revision()
-	if rev != "ff2948a2ac8f538c4ecd55962e919d1e13e74baf" {
-		t.Fatalf("Expected locked revision to be 'ff2948a2ac8f538c4ecd55962e919d1e13e74baf', got %s", rev)
-	}
-
-	ver := lpv.String()
-	if ver != "v1.0.0" {
-		t.Fatalf("Expected locked version to be 'v1.0.0', got %s", ver)
-	}
-}
-
-func TestGodepConfig_Convert_BadInput_EmptyPackageName(t *testing.T) {
-	g := newGodepImporter(discardLogger, true, nil)
-	g.json = godepJSON{
-		Imports: []godepPackage{{ImportPath: ""}},
-	}
-
-	_, _, err := g.convert("")
-	if err == nil {
-		t.Fatal("Expected conversion to fail because the ImportPath is empty")
-	}
-}
-
-func TestGodepConfig_Convert_BadInput_EmptyRev(t *testing.T) {
-	h := test.NewHelper(t)
-	defer h.Cleanup()
-	h.TempDir("src")
-
-	ctx := newTestContext(h)
-	sm, err := ctx.SourceManager()
-	h.Must(err)
-	defer sm.Release()
-
-	g := newGodepImporter(discardLogger, true, sm)
-	g.json = godepJSON{
-		Imports: []godepPackage{
-			{
-				ImportPath: "github.com/sdboyer/deptest",
-			},
-		},
-	}
-
-	_, _, err = g.convert("")
-	if err == nil {
-		t.Fatal("Expected conversion to fail because the Rev is empty")
-	}
-}
-
-func TestGodepConfig_Convert_SubPackages(t *testing.T) {
-	h := test.NewHelper(t)
-	defer h.Cleanup()
-	h.TempDir("src")
-
-	ctx := newTestContext(h)
-	sm, err := ctx.SourceManager()
-	h.Must(err)
-	defer sm.Release()
-
-	g := newGodepImporter(discardLogger, true, sm)
-	g.json = godepJSON{
-		Imports: []godepPackage{
-			{
-				ImportPath: "github.com/sdboyer/deptest",
-				Rev:        "ff2948a2ac8f538c4ecd55962e919d1e13e74baf",
-			},
-			{
-				ImportPath: "github.com/sdboyer/deptest/foo",
-				Rev:        "ff2948a2ac8f538c4ecd55962e919d1e13e74baf",
-			},
-		},
-	}
-
-	manifest, lock, err := g.convert("")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if _, present := manifest.Constraints["github.com/sdboyer/deptest"]; !present {
-		t.Fatal("Expected the manifest to have a dependency for 'github.com/sdboyer/deptest'")
-	}
-
-	if _, present := manifest.Constraints["github.com/sdboyer/deptest/foo"]; present {
-		t.Fatal("Expected the manifest to not have a dependency for 'github.com/sdboyer/deptest/foo'")
-	}
-
-	if len(lock.P) != 1 {
-		t.Fatalf("Expected lock to have 1 project, got %v", len(lock.P))
-	}
-
-	if string(lock.P[0].Ident().ProjectRoot) != "github.com/sdboyer/deptest" {
-		t.Fatal("Expected lock to have 'github.com/sdboyer/deptest'")
-	}
-}
-
 func TestGodepConfig_ProjectExistsInLock(t *testing.T) {
 	lock := &dep.Lock{}
 	pi := gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot("github.com/sdboyer/deptest")}
@@ -372,9 +314,9 @@ func TestGodepConfig_ProjectExistsInLock(t *testing.T) {
 	}
 }
 
-// Compares two slices of godepPackage and checks if they are equal.
+// equalImports compares two slices of godepPackage and checks if they are
+// equal.
 func equalImports(a, b []godepPackage) bool {
-
 	if a == nil && b == nil {
 		return true
 	}
@@ -394,4 +336,9 @@ func equalImports(a, b []godepPackage) bool {
 	}
 
 	return true
+}
+
+// intPtr takes a int value and returns a pointer.
+func intPtr(i int) *int {
+	return &i
 }
