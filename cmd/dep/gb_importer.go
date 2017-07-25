@@ -105,23 +105,44 @@ func (i *gbImporter) convert(pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock, erro
 	lock := &dep.Lock{}
 
 	for _, pkg := range i.manifest.Dependencies {
+		if pkg.Importpath == "" {
+			return nil, nil, errors.New("Invalid gb configuration, package import path is required")
+		}
+
+		if pkg.Revision == "" {
+			return nil, nil, errors.New("Invalid gb configuration, package revision is required")
+		}
+
+		// Deduce the project root. This is necessary because gb manifests can have
+		// multiple entries for the same project root, one for each imported subpackage
+		var ip gps.ProjectRoot
+		var err error
+		if ip, err = i.sm.DeduceProjectRoot(pkg.Importpath); err != nil {
+			return nil, nil, err
+		}
+
+		// Set the proper import path back on the dependency
+		pkg.Importpath = string(ip)
+
+		// If we've already locked this project root then we can skip
+		if projectExistsInLock(lock, pkg.Importpath) {
+			continue
+		}
+
 		pc, lp, err := i.convertOne(pkg)
 		if err != nil {
 			return nil, nil, err
 		}
+
 		manifest.Constraints[pc.Ident.ProjectRoot] = gps.ProjectProperties{Source: pc.Ident.Source, Constraint: pc.Constraint}
 		lock.P = append(lock.P, lp)
+
 	}
 
 	return manifest, lock, nil
 }
 
 func (i *gbImporter) convertOne(pkg gbDependency) (pc gps.ProjectConstraint, lp gps.LockedProject, err error) {
-	if pkg.Importpath == "" {
-		err = errors.New("Invalid gb configuration, package import path is required")
-		return
-	}
-
 	/*
 		gb's vendor plugin (gb vendor), which manages the vendor tree and manifest
 		file, supports fetching by a specific tag or revision, but if you specify
@@ -136,7 +157,6 @@ func (i *gbImporter) convertOne(pkg gbDependency) (pc gps.ProjectConstraint, lp 
 		However, if we can infer a tag that points to the revision or the branch, we may be able
 		to use that as the constraint
 	*/
-
 	pc.Ident = gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot(pkg.Importpath), Source: pkg.Repository}
 
 	// Generally, gb tracks revisions
