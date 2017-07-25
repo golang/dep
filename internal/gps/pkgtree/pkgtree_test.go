@@ -19,6 +19,7 @@ import (
 
 	"github.com/golang/dep/internal/fs"
 	"github.com/golang/dep/internal/gps/paths"
+	_ "github.com/golang/dep/internal/test" // Define test flags globally
 )
 
 // PackageTree.ToReachMap() uses an easily separable algorithm, wmToReach(),

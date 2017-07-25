@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/golang/dep/internal/gps"
+	_ "github.com/golang/dep/internal/test" // Define test flags globally
 )
 
 func TestFeedback_Constraint(t *testing.T) {

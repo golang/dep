@@ -4,7 +4,11 @@
 
 package paths
 
-import "testing"
+import (
+	"testing"
+
+	_ "github.com/golang/dep/internal/test" // Define test flags globally
+)
 
 func TestIsStandardImportPath(t *testing.T) {
 	fix := []struct {
