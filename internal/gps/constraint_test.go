@@ -95,9 +95,6 @@ func TestBranchConstraintOps(t *testing.T) {
 	}
 
 	// Now add same rev to different branches
-	// TODO(sdboyer) this might not actually be a good idea, when you consider the
-	// semantics of floating versions...matching on an underlying rev might be
-	// nice in the short term, but it's probably shit most of the time
 	v5 := v2.Pair(Revision("snuffleupagus")).(versionPair)
 	if !v5.Matches(v3) {
 		t.Errorf("%s should match %s", gu(v5), gu(v3))
