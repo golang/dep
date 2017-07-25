@@ -1,0 +1,4 @@
+package: .
+import:
+- package: github.com/chriswhelix/deptestglide1
+  version: gt080

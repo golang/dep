@@ -1,0 +1,1 @@
+Baseline case for single transitive reference to deptest.

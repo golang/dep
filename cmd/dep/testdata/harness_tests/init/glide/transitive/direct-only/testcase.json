@@ -1,0 +1,10 @@
+{
+  "commands": [
+    ["init", "-no-examples"]
+  ],
+  "error-expected": "",
+  "gopath-initial": {},
+  "vendor-final": [
+    "github.com/sdboyer/deptest"
+  ]
+}

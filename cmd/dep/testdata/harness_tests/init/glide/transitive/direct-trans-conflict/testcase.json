@@ -1,0 +1,7 @@
+{
+  "commands": [
+    ["init", "-no-examples"]
+  ],
+  "error-expected": "No versions of github.com/chriswhelix/deptestglide1 met constraints",
+  "gopath-initial": {}
+}

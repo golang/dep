@@ -1,0 +1,11 @@
+{
+  "commands": [
+    ["init", "-no-examples"]
+  ],
+  "error-expected": "",
+  "gopath-initial": {},
+  "vendor-final": [
+    "github.com/chriswhelix/deptestglide1",
+    "github.com/sdboyer/deptest"
+  ]
+}

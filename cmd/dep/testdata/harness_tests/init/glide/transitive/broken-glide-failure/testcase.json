@@ -1,0 +1,7 @@
+{
+  "commands": [
+    ["init", "-no-examples"]
+  ],
+  "error-expected": "2.1.0: Unable to parse",
+  "gopath-initial": {}
+}

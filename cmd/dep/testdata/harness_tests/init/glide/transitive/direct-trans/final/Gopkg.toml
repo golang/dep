@@ -1,0 +1,8 @@
+
+[[constraint]]
+  name = "github.com/chriswhelix/deptestglide1"
+  version = "gt080"
+
+[[constraint]]
+  name = "github.com/sdboyer/deptest"
+  version = ">0.8.0"
