@@ -56,7 +56,7 @@ See the help text for more detailed usage instructions.
 
 `dep ensure` a uses an external [semver library](https://github.com/Masterminds/semver) to interpret the version constraints you specify in the manifest. The comparison operators are:
 
-* `=`: equal (aliased to no operator)
+* `=`: equal
 * `!=`: not equal
 * `>`: greater than
 * `<`: less than
@@ -69,7 +69,7 @@ See the help text for more detailed usage instructions.
 
 You might, for example, include a constraint in your manifest that specifies `version = "=2.0.0"` to pin a dependency to version 2.0.0, or constrain to minor releases with: `version = "2.*"`. Refer to the [semver library](https://github.com/Masterminds/semver) documentation for more info.
 
-**Note** however, whenever you specify a version *without an operator*, `dep ensure` will interpret the given version as the min-boundry of a range, for example:
+**Note**: When you specify a version *without an operator*, `dep` automatically uses the `^` operator by default. `dep ensure` will interpret the given version as the min-boundry of a range, for example:
 
 * `1.2.3` becomes the range `>=1.2.3, <2.0.0`
 * `0.2.3` becomes the range `>=0.2.3, <0.3.0`
