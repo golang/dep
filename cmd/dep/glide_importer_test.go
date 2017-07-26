@@ -160,14 +160,14 @@ func TestGlideConfig_Convert(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		// Lock checks
+		// Lock checks.
 		if lock != nil && len(lock.P) != testCase.expectedLockCount {
 			t.Fatalf("Expected lock to have %d project(s), got %d",
 				testCase.expectedLockCount,
 				len(lock.P))
 		}
 
-		// Ignored projects checks
+		// Ignored projects checks.
 		if len(manifest.Ignored) != testCase.expectedIgnoreCount {
 			t.Fatalf("Expected manifest to have %d ignored project(s), got %d",
 				testCase.expectedIgnoreCount,
