@@ -28,7 +28,7 @@ func TestGoDepConfig_Convert(t *testing.T) {
 		expectedConstraint     string
 		expectedRevision       *gps.Revision
 		expectedVersion        string
-		expectedLockCount      *int
+		expectedLockCount      int
 	}{
 		"convert project": {
 			json: godepJSON{
@@ -46,6 +46,7 @@ func TestGoDepConfig_Convert(t *testing.T) {
 			expectedConstraint: "^0.8.0",
 			expectedRevision:   gps.RevisionPtr(gps.Revision("ff2948a2ac8f538c4ecd55962e919d1e13e74baf")),
 			expectedVersion:    "v0.8.0",
+			expectedLockCount:  1,
 		},
 		"with semver suffix": {
 			json: godepJSON{
@@ -60,6 +61,7 @@ func TestGoDepConfig_Convert(t *testing.T) {
 			projectRoot:        gps.ProjectRoot("github.com/sdboyer/deptest"),
 			matchPairedVersion: false,
 			expectedConstraint: ">=1.12.0, <=12.0.0-g2fd980e",
+			expectedLockCount:  1,
 		},
 		"empty comment": {
 			json: godepJSON{
@@ -76,6 +78,7 @@ func TestGoDepConfig_Convert(t *testing.T) {
 			expectedConstraint: "^1.0.0",
 			expectedRevision:   gps.RevisionPtr(gps.Revision("ff2948a2ac8f538c4ecd55962e919d1e13e74baf")),
 			expectedVersion:    "v1.0.0",
+			expectedLockCount:  1,
 		},
 		"bad input - empty package name": {
 			json: godepJSON{
@@ -110,7 +113,7 @@ func TestGoDepConfig_Convert(t *testing.T) {
 			},
 			projectRoot:            gps.ProjectRoot("github.com/sdboyer/deptest"),
 			notExpectedProjectRoot: gps.ProjectRootPtr(gps.ProjectRoot("github.com/sdboyer/deptest/foo")),
-			expectedLockCount:      intPtr(1),
+			expectedLockCount:      1,
 			expectedConstraint:     "^1.0.0",
 			expectedVersion:        "v1.0.0",
 		},
@@ -139,12 +142,10 @@ func TestGoDepConfig_Convert(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if testCase.expectedLockCount != nil {
-			if len(lock.P) != *testCase.expectedLockCount {
-				t.Fatalf("Expected lock to have %d project(s), got %d",
-					*testCase.expectedLockCount,
-					len(lock.P))
-			}
+		if len(lock.P) != testCase.expectedLockCount {
+			t.Fatalf("Expected lock to have %d project(s), got %d",
+				testCase.expectedLockCount,
+				len(lock.P))
 		}
 
 		d, ok := manifest.Constraints[testCase.projectRoot]
@@ -336,9 +337,4 @@ func equalImports(a, b []godepPackage) bool {
 	}
 
 	return true
-}
-
-// intPtr takes a int value and returns a pointer.
-func intPtr(i int) *int {
-	return &i
 }
