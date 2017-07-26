@@ -17,7 +17,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-const godepJSONName = "Godeps.json"
+const godepPath = "Godeps" + string(os.PathSeparator) + "Godeps.json"
 
 type godepImporter struct {
 	json godepJSON
@@ -50,7 +50,7 @@ func (g *godepImporter) Name() string {
 }
 
 func (g *godepImporter) HasDepMetadata(dir string) bool {
-	y := filepath.Join(dir, "Godeps", godepJSONName)
+	y := filepath.Join(dir, godepPath)
 	if _, err := os.Stat(y); err != nil {
 		return false
 	}
@@ -69,7 +69,7 @@ func (g *godepImporter) Import(dir string, pr gps.ProjectRoot) (*dep.Manifest, *
 
 func (g *godepImporter) load(projectDir string) error {
 	g.logger.Println("Detected godep configuration files...")
-	j := filepath.Join(projectDir, "Godeps", godepJSONName)
+	j := filepath.Join(projectDir, godepPath)
 	if g.verbose {
 		g.logger.Printf("  Loading %s", j)
 	}
