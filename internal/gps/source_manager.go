@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/golang/dep/internal/gps/pkgtree"
+	"github.com/nightlyone/lockfile"
 	"github.com/pkg/errors"
 	"github.com/sdboyer/constext"
 )
@@ -115,7 +116,7 @@ func (p ProjectAnalyzerInfo) String() string {
 // tools; control via dependency injection is intended to be sufficient.
 type SourceMgr struct {
 	cachedir    string                // path to root of cache dir
-	lf          *os.File              // handle for the sm lock file on disk
+	lf          *lockfile.Lockfile    // handle for the sm lock file on disk
 	suprvsr     *supervisor           // subsystem that supervises running calls/io
 	cancelAll   context.CancelFunc    // cancel func to kill all running work
 	deduceCoord *deductionCoordinator // subsystem that manages import path deduction
@@ -153,21 +154,56 @@ func NewSourceManager(cachedir string) (*SourceMgr, error) {
 		return nil, err
 	}
 
-	glpath := filepath.Join(cachedir, "sm.lock")
-	_, err = os.Stat(glpath)
-	if err == nil {
-		return nil, CouldNotCreateLockError{
-			Path: glpath,
-			Err:  fmt.Errorf("cache lock file %s exists - another process crashed or is still running?", glpath),
-		}
-	}
+	// Fix for #820
+	//
+	// Consult https://godoc.org/github.com/nightlyone/lockfile for the lockfile
+	// behaviour. It's magic. It deals with stale processes, and if there is
+	// a process keeping the lock busy, it will pass back a temporary error that
+	// we can spin on.
 
-	fi, err := os.OpenFile(glpath, os.O_CREATE|os.O_EXCL, 0600) // is 0600 sane for this purpose?
+	glpath := filepath.Join(cachedir, "sm.lock")
+	lockfile, err := lockfile.New(glpath)
 	if err != nil {
 		return nil, CouldNotCreateLockError{
 			Path: glpath,
-			Err:  fmt.Errorf("err on attempting to create global cache lock: %s", err),
+			Err:  fmt.Errorf("unable to create lock %s: %s", glpath, err.Error()),
 		}
+	}
+
+	process, err := lockfile.GetOwner()
+	if err == nil {
+		// If we didn't get an error, then the lockfile exists already. We should
+		// check to see if it's us already:
+		if process.Pid == os.Getpid() {
+			return nil, CouldNotCreateLockError{
+				Path: glpath,
+				Err:  fmt.Errorf("lockfile %s already locked by this process", glpath),
+			}
+		}
+
+		// There is a lockfile, but it's owned by someone else. We'll try to lock
+		// it anyway.
+	}
+
+	// If it's a TemporaryError, we retry every second. Otherwise, we fail
+	// permanently.
+	//
+	// TODO: After some time, we should emit some kind of warning that we're waiting
+	// for the lockfile to be released. #534 should be address before we will do that.
+
+	err = lockfile.TryLock()
+	for err != nil {
+		if _, ok := err.(interface {
+			Temporary() bool
+		}); ok {
+			time.Sleep(time.Second * 1)
+		} else {
+			return nil, CouldNotCreateLockError{
+				Path: glpath,
+				Err:  fmt.Errorf("unable to lock %s: %s", glpath, err.Error()),
+			}
+		}
+		err = lockfile.TryLock()
 	}
 
 	ctx, cf := context.WithCancel(context.TODO())
@@ -176,7 +212,7 @@ func NewSourceManager(cachedir string) (*SourceMgr, error) {
 
 	sm := &SourceMgr{
 		cachedir:    cachedir,
-		lf:          fi,
+		lf:          &lockfile,
 		suprvsr:     superv,
 		cancelAll:   cf,
 		deduceCoord: deducer,
@@ -314,7 +350,7 @@ func (sm *SourceMgr) doRelease() {
 	sm.suprvsr.wait()
 
 	// Close the file handle for the lock file and remove it from disk
-	sm.lf.Close()
+	sm.lf.Unlock()
 	os.Remove(filepath.Join(sm.cachedir, "sm.lock"))
 
 	// Close the qch, if non-nil, so the signal handlers run out. This will
@@ -462,9 +498,9 @@ func (sm *SourceMgr) DeduceProjectRoot(ip string) (ProjectRoot, error) {
 	return ProjectRoot(pd.root), err
 }
 
-// InferConstraint tries to puzzle out what kind of version is given in a string.
-// Preference is given first for revisions, then branches, then semver constraints,
-// and then plain tags.
+// InferConstraint tries to puzzle out what kind of version is given in a
+// string. Preference is given first for revisions, then branches, then semver
+// constraints, and then plain tags.
 func (sm *SourceMgr) InferConstraint(s string, pi ProjectIdentifier) (Constraint, error) {
 	slen := len(s)
 	if slen == 40 {
@@ -479,7 +515,7 @@ func (sm *SourceMgr) InferConstraint(s string, pi ProjectIdentifier) (Constraint
 	// Next, try for bzr, which has a three-component GUID separated by
 	// dashes. There should be two, but the email part could contain
 	// internal dashes
-	if strings.Count(s, "-") >= 2 {
+	if strings.Contains(s, "@") && strings.Count(s, "-") >= 2 {
 		// Work from the back to avoid potential confusion from the email
 		i3 := strings.LastIndex(s, "-")
 		// Skip if - is last char, otherwise this would panic on bounds err

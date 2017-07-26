@@ -13,9 +13,9 @@ Summarize the question and quote the reply, linking back to the original comment
 
 ## Configuration
 * [What is the difference between Gopkg.toml (the "manifest") and Gopkg.lock (the "lock")?](#what-is-the-difference-between-gopkgtoml-the-manifest-and-gopkglock-the-lock)
-* [When should I use `constraint`, `override` `required`, or `ignored` in the Gopkg.toml?](#when-should-i-use-constraint-override-required-or-ignored-in-gopkgtoml)
 * [How do I constrain a transitive dependency's version?](#how-do-i-constrain-a-transitive-dependencys-version)
 * [Can I put the manifest and lock in the vendor directory?](#can-i-put-the-manifest-and-lock-in-the-vendor-directory)
+* [How do I get `dep` to authenticate to a `git` repo?](#how-do-i-get-dep-to-authenticate-to-a-git-repo)
 
 ## Behavior
 * [How does `dep` decide what version of a dependency to use?](#how-does-dep-decide-what-version-of-a-dependency-to-use)
@@ -24,11 +24,9 @@ Summarize the question and quote the reply, linking back to the original comment
 * [Why did `dep` use a different revision for package X instead of the revision in the lock file?](#why-did-dep-use-a-different-revision-for-package-x-instead-of-the-revision-in-the-lock-file)
 * [Why is `dep` slow?](#why-is-dep-slow)
 * [How does `dep` handle symbolic links?](#how-does-dep-handle-symbolic-links)
-* [`dep` deleted my files in the vendor directory!](#dep-deleted-my-files-in-the-vendor-directory)
 
 ## Best Practices
 * [Should I commit my vendor directory?](#should-i-commit-my-vendor-directory)
-* [How can I test changes to a dependency?](#how-can-i-test-changes-to-a-dependency)
 * [How do I roll releases that `dep` will be able to use?](#how-do-i-roll-releases-that-dep-will-be-able-to-use)
 * [What semver version should I use?](#what-semver-version-should-i-use)
 * [Is it OK to make backwards-incompatible changes now?](#is-it-ok-to-make-backwards-incompatible-changes-now)
@@ -39,9 +37,7 @@ ___
 ## Concepts
 ### Does `dep` replace `go get`?
 
-No, `dep` is an experiment and is still in its infancy. Depending on how this
-experiment goes, it may be considered for inclusion in the go project in some form
-or another in the future but that is not guaranteed.
+No. `dep` and `go get` serve mostly different purposes.
 
 Here are some suggestions for when you could use `dep` or `go get`:
 > I would say that dep doesn't replace go get, but they both can do similar things. Here's how I use them:
@@ -75,16 +71,6 @@ Here are some suggestions for when you could use `dep` or `go get`:
 >
 > This flexibility is important because it allows us to provide easy commands (e.g. `dep ensure -update`) that can manage an update process for you, within the constraints you specify, AND because it allows your project, when imported by someone else, to collaboratively specify the constraints for your own dependencies.
 -[@sdboyer in #281](https://github.com/golang/dep/issues/281#issuecomment-284118314)
-
-### When should I use `constraint`, `override`, `required`, or `ignored` in `Gopkg.toml`?
-
-* Use `constraint` to constrain a [direct dependency](#what-is-a-direct-or-transitive-dependency) to a specific branch, version range, revision, or specify an alternate source such as a fork.
-* Use `override` to constrain a [transitive dependency](#what-is-a-direct-or-transitive-dependency). See [How do I constrain a transitive dependency's version?](#how-do-i-constrain-a-transitive-dependencys-version) for more details on how overrides differ from constraints. Overrides should be used cautiously, sparingly, and temporarily.
-* Use `required` to explicitly add a dependency that is not imported directly or transitively, for example a development package used for code generation.
-* Use `ignored` to ignore a package and any of that package's unique dependencies.
-
-Refer [Gopkg.toml](https://github.com/golang/dep/blob/master/docs/Gopkg.toml.md)
-for detailed definitions of the above terms.
 
 ## How do I constrain a transitive dependency's version?
 First, if you're wondering about this because you're trying to keep the version
@@ -121,6 +107,49 @@ No.
 > We prefer to treat the `vendor/` as an implementation detail.
 -[@sdboyer on go package management list](https://groups.google.com/d/msg/go-package-management/et1qFUjrkP4/LQFCHP4WBQAJ)
 
+## How do I get dep to authenticate to a git repo?
+
+`dep` currently uses the `git` command under the hood, so configuring the credentials
+for each repository you wish to authenticate to will allow `dep` to use an
+authenticated repository.
+
+First, configure `git` to use the credentials option for the specific repository.
+
+For example, if you use gitlab, and you wish to access `https://gitlab.example.com/example/package.git`, 
+then you would want to use the following configuration:
+
+```
+$ git config --global credential.https://gitlab.example.com.example yourusername
+```
+
+In the example the hostname `gitlab.example.com.username` string seems incorrect, but 
+it's actually the hostname plus the name of the repo you are accessing which is `username`.
+The trailing 'yourusername' is the username you would use for the actual authentication.
+
+You also need to configure `git` with the authentication provider you wish to use. You can get
+a list of providers, with the command:
+
+```
+$ git help -a | grep credential-
+  credential-cache          remote-fd
+  credential-cache--daemon  remote-ftp
+  credential-osxkeychain    remote-ftps
+  credential-store          remote-http
+```
+  
+You would then choose an appropriate provider. For example, to use the osxkeychain, you 
+would use the following:
+
+```
+git config --global credential.helper osxkeychain
+```
+
+If you need to do this for a CI system, then you may want to use the "store" provider.
+Please see the documentation on how to configure that: https://git-scm.com/docs/git-credential-store
+
+After configuring `git`, you may need to use `git` manually once to have it store the
+credentials. Once you've checked out the repo manually, it will then use the stored
+credentials. This at least appears to be the behavior for the osxkeychain provider.
 
 ## Behavior
 ### How does `dep` decide what version of a dependency to use?
@@ -249,13 +278,6 @@ When `dep` is invoked with a project root that is a symlink, it will be resolved
 
 This is the only symbolic link support that `dep` really intends to provide. In keeping with the general practices of the `go` tool, `dep` tends to either ignore symlinks (when walking) or copy the symlink itself, depending on the filesystem operation being performed.
 
-## `dep` deleted my files in the vendor directory!
-If you just ran `dep init`, there should be a copy of your original vendor directory named `_vendor-TIMESTAMP` in your project root. The other commands do not make a backup before modifying the vendor directory.
-
-> dep assumes complete control of vendor/, and may indeed blow things away if it feels like it.
--[@peterbourgon in #206](https://github.com/golang/dep/issues/206#issuecomment-277139419)
-
-
 ## Best Practices
 ### Should I commit my vendor directory?
 
@@ -270,14 +292,6 @@ It's up to you:
 
 - your repo will be bigger, potentially a lot bigger
 - PR diffs are more annoying
-
-## How can I test changes to a dependency?
-
->  I would recommend against ever working in your vendor directory since dep will overwrite any changes. It’s too easy to lose work that way.
--[@carolynvs in #706](https://github.com/golang/dep/issues/706#issuecomment-305807261)
-
-If you have a fork, add a `[[constraint]]` entry for the project in `Gopkg.toml` and set `source` to the fork source. This will ensure that `dep` will fetch the project from the fork instead of the original source. 
-Otherwise, if you want to test changes locally, you can delete the package from `vendor/` and make changes directly in `GOPATH/src/*package*` so that your changes are picked up by the go tool chain.
 
 ## How do I roll releases that `dep` will be able to use?
 

@@ -12,6 +12,6 @@ General maintainers:
   * source manager: (vacant)
   * root deduction: (vacant)
   * source/vcs interaction: (vacant)
-  * caching: (vacant)
+  * caching: Jordan Krage (@jmank88)
   * pkgtree: (vacant)
   * versions and constraints: (vacant)
