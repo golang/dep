@@ -12,19 +12,23 @@ import (
 	"github.com/golang/dep/internal/gps"
 )
 
-// Constraint types
-const ConsTypeConstraint = "constraint"
-const ConsTypeHint = "hint"
+const (
+	// ConsTypeConstraint represents a constraint
+	ConsTypeConstraint = "constraint"
 
-// DepTypeDirect represents a direct dependency
-const DepTypeDirect = "direct dep"
+	// ConsTypeHint represents a constraint type hint
+	ConsTypeHint = "hint"
 
-// DepTypeTransitive represents a transitive dependency,
-// or a dependency of a dependency
-const DepTypeTransitive = "transitive dep"
+	// DepTypeDirect represents a direct dependency
+	DepTypeDirect = "direct dep"
 
-// DepTypeImported represents a dependency imported by an external tool
-const DepTypeImported = "imported dep"
+	// DepTypeTransitive represents a transitive dependency,
+	// or a dependency of a dependency
+	DepTypeTransitive = "transitive dep"
+
+	// DepTypeImported represents a dependency imported by an external tool
+	DepTypeImported = "imported dep"
+)
 
 // ConstraintFeedback holds project constraint feedback data
 type ConstraintFeedback struct {
