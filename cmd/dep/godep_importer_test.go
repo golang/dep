@@ -26,7 +26,7 @@ func TestGodepConfig_Import(t *testing.T) {
 	h.TempDir(cacheDir)
 	h.TempDir("src")
 	h.TempDir(filepath.Join("src", testGodepProjectRoot))
-	h.TempCopy(filepath.Join(testGodepProjectRoot, "Godeps", godepJSONName), "godep/Godeps.json")
+	h.TempCopy(filepath.Join(testGodepProjectRoot, godepPath), "godep/Godeps.json")
 
 	projectRoot := h.Path(testGodepProjectRoot)
 	sm, err := gps.NewSourceManager(h.Path(cacheDir))
@@ -88,7 +88,7 @@ func TestGodepConfig_JsonLoad(t *testing.T) {
 
 	ctx := newTestContext(h)
 
-	h.TempCopy(filepath.Join(testGodepProjectRoot, "Godeps", godepJSONName), "godep/Godeps.json")
+	h.TempCopy(filepath.Join(testGodepProjectRoot, godepPath), "godep/Godeps.json")
 
 	projectRoot := h.Path(testGodepProjectRoot)
 
