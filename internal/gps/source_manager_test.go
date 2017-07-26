@@ -30,6 +30,7 @@ func TestSourceManager_InferConstraint(t *testing.T) {
 	}
 
 	constraints := map[string]Constraint{
+		"":       Any(),
 		"v0.8.1": sv,
 		"v2":     NewBranch("v2"),
 		"v0.12.0-12-de4dcafe0": svs,
