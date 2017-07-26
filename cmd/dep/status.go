@@ -252,6 +252,7 @@ type BasicStatus struct {
 	PackageCount int
 }
 
+// MissingStatus contains information about all the missing packages in a project.
 type MissingStatus struct {
 	ProjectRoot     string
 	MissingPackages []string
