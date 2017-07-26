@@ -182,6 +182,29 @@ at [virtualgo](https://github.com/GetStream/vg).
 To test out code that has been pushed as a new version, or to a branch or fork,
 see [changing dependencies](#changing-dependencies).
 
+## Semantic Versioning
+
+`dep ensure` a uses an external [semver library](https://github.com/Masterminds/semver) to interpret the version constraints you specify in the manifest. The comparison operators are:
+
+* `=`: equal
+* `!=`: not equal
+* `>`: greater than
+* `<`: less than
+* `>=`: greater than or equal to
+* `<=`: less than or equal to
+* `-`: literal range. Eg: 1.2 - 1.4.5 is equivalent to >= 1.2, <= 1.4.5
+* `~`: minor range. Eg: ~1.2.3 is equivalent to >= 1.2.3, < 1.3.0
+* `^`: major range. Eg: ^1.2.3 is equivalent to >= 1.2.3, < 2.0.0
+* `[xX*]`: wildcard. Eg: 1.2.x is equivalent to >= 1.2.0, < 1.3.0
+
+You might, for example, include a constraint in your manifest that specifies `version = "=2.0.0"` to pin a dependency to version 2.0.0, or constrain to minor releases with: `version = "2.*"`. Refer to the [semver library](https://github.com/Masterminds/semver) documentation for more info.
+
+**Note**: When you specify a version *without an operator*, `dep` automatically uses the `^` operator by default. `dep ensure` will interpret the given version as the min-boundry of a range, for example:
+
+* `1.2.3` becomes the range `>=1.2.3, <2.0.0`
+* `0.2.3` becomes the range `>=0.2.3, <0.3.0`
+* `0.0.3` becomes the range `>=0.0.3, <0.1.0`
+
 ## Feedback
 
 Feedback is greatly appreciated.
