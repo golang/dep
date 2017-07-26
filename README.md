@@ -51,7 +51,7 @@ This does the following:
 1. Back up your existing `vendor/` directory (if you have one) to
 `_vendor-TIMESTAMP/`
 1. Pick the highest compatible version for each dependency
-1. Generate [`Gopkg.toml`](Gopkg.toml.md) ("manifest") and `Gopkg.lock` files
+1. Generate [`Gopkg.toml`](docs/Gopkg.toml.md) ("manifest") and `Gopkg.lock` files
 1. Install the dependencies in `vendor/`
 
 ## Usage
