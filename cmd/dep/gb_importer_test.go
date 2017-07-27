@@ -17,6 +17,29 @@ import (
 
 const testGbProjectRoot = "github.com/golang/notexist"
 
+func TestGbConfig_ImportNoVendor(t *testing.T) {
+	h := test.NewHelper(t)
+	defer h.Cleanup()
+
+	ctx := newTestContext(h)
+	sm, err := ctx.SourceManager()
+	h.Must(err)
+	defer sm.Release()
+
+	h.TempDir(filepath.Join("src", testGbProjectRoot, "vendor"))
+	h.TempCopy(filepath.Join(testGbProjectRoot, "vendor", "_not-a-manifest"), "gb/manifest")
+	projectRoot := h.Path(testGbProjectRoot)
+
+	// Capture stderr so we can verify output
+	verboseOutput := &bytes.Buffer{}
+	ctx.Err = log.New(verboseOutput, "", 0)
+
+	g := newGbImporter(ctx.Err, false, sm) // Disable verbose so that we don't print values that change each test run
+	if g.HasDepMetadata(projectRoot) {
+		t.Fatal("Expected the importer to return false if there's no vendor manifest")
+	}
+}
+
 func TestGbConfig_Import(t *testing.T) {
 	h := test.NewHelper(t)
 	defer h.Cleanup()
@@ -35,6 +58,9 @@ func TestGbConfig_Import(t *testing.T) {
 	ctx.Err = log.New(verboseOutput, "", 0)
 
 	g := newGbImporter(ctx.Err, false, sm) // Disable verbose so that we don't print values that change each test run
+	if g.Name() != "gb" {
+		t.Fatal("Expected the importer to return the name 'gb'")
+	}
 	if !g.HasDepMetadata(projectRoot) {
 		t.Fatal("Expected the importer to detect the gb manifest file")
 	}
@@ -144,7 +170,7 @@ func TestGbConfig_Convert_Project(t *testing.T) {
 	}
 }
 
-func TestGbConfig_Convert_BadInput_EmptyPackageName(t *testing.T) {
+func TestGbConfig_Convert_BadInput(t *testing.T) {
 	h := test.NewHelper(t)
 	defer h.Cleanup()
 
@@ -161,5 +187,15 @@ func TestGbConfig_Convert_BadInput_EmptyPackageName(t *testing.T) {
 	_, _, err = g.convert(testGbProjectRoot)
 	if err == nil {
 		t.Fatal("Expected conversion to fail because the package name is empty")
+	}
+
+	g = newGbImporter(ctx.Err, true, sm)
+	g.manifest = gbManifest{
+		Dependencies: []gbDependency{{Importpath: "github.com/sdboyer/deptest"}},
+	}
+
+	_, _, err = g.convert(testGbProjectRoot)
+	if err == nil {
+		t.Fatal("Expected conversion to fail because the package has no revision")
 	}
 }
