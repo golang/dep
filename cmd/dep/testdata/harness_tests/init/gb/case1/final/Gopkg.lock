@@ -2,6 +2,20 @@
 
 
 [[projects]]
+  name = "github.com/carolynvs/deptest"
+  packages = ["."]
+  revision = "3f4c3bea144e112a69bbe5d8d01c1b09a544253f"
+  source = "https://github.com/carolynvs/deptest"
+  version = "v0.8.1"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/carolynvs/deptest-subpkg"
+  packages = ["subby"]
+  revision = "b90e5f3a888585ea5df81d3fe0c81fc6e3e3d70b"
+  source = "https://github.com/carolynvs/deptest-subpkg"
+
+[[projects]]
   name = "github.com/sdboyer/deptest"
   packages = ["."]
   revision = "ff2948a2ac8f538c4ecd55962e919d1e13e74baf"
@@ -9,15 +23,15 @@
   version = "v1.0.0"
 
 [[projects]]
+  branch = "master"
   name = "github.com/sdboyer/deptestdos"
   packages = ["."]
-  revision = "5c607206be5decd28e6263ffffdcee067266015e"
+  revision = "a0196baa11ea047dd65037287451d36b861b00ea"
   source = "https://github.com/sdboyer/deptestdos"
-  version = "v2.0.0"
 
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "62680061d5d8c907570d533bb4f242b8dd3e7b9b8bdb800ccda0224a8230fddd"
+  inputs-digest = "ae7f33ba976551de3e6004f4cfa44f2981e825f42d61dad5bbe80a70a644631e"
   solver-name = "gps-cdcl"
   solver-version = 1

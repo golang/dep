@@ -1,10 +1,20 @@
 
 [[constraint]]
+  branch = "master"
+  name = "github.com/carolynvs/deptest"
+  source = "https://github.com/carolynvs/deptest"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/carolynvs/deptest-subpkg"
+  source = "https://github.com/carolynvs/deptest-subpkg"
+
+[[constraint]]
   name = "github.com/sdboyer/deptest"
   source = "https://github.com/sdboyer/deptest"
   version = "1.0.0"
 
 [[constraint]]
+  branch = "master"
   name = "github.com/sdboyer/deptestdos"
   source = "https://github.com/sdboyer/deptestdos"
-  version = "2.0.0"

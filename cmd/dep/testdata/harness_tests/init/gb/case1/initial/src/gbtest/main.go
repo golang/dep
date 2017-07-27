@@ -5,14 +5,15 @@
 package main
 
 import (
-	"fmt"
-
+	cdt "github.com/carolynvs/deptest"
+	"github.com/carolynvs/deptest-subpkg/subby"
 	"github.com/sdboyer/deptest"
 	"github.com/sdboyer/deptestdos"
 )
 
 func main() {
-	var x deptestdos.Bar
+	_ = deptestdos.Bar{}
 	_ = deptest.Foo{}
-	fmt.Println(x)
+	_ = cdt.Foo{}
+	_ = subby.SayHi()
 }
