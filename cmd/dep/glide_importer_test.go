@@ -142,103 +142,103 @@ func TestGlideConfig_Convert(t *testing.T) {
 	defer sm.Release()
 
 	for name, testCase := range testCases {
-		t.Logf("Running test case: %s", name)
+		t.Run(name, func(t *testing.T) {
+			g := newGlideImporter(discardLogger, true, sm)
+			g.yaml = testCase.yaml
 
-		g := newGlideImporter(discardLogger, true, sm)
-		g.yaml = testCase.yaml
-
-		if testCase.lock != nil {
-			g.lock = testCase.lock
-		}
-
-		manifest, lock, err := g.convert(testCase.projectRoot)
-		if err != nil {
-			if testCase.expectConvertErr {
-				continue
+			if testCase.lock != nil {
+				g.lock = testCase.lock
 			}
 
-			t.Fatal(err)
-		}
+			manifest, lock, err := g.convert(testCase.projectRoot)
+			if err != nil {
+				if testCase.expectConvertErr {
+					return
+				}
 
-		// Lock checks.
-		if lock != nil && len(lock.P) != testCase.expectedLockCount {
-			t.Fatalf("Expected lock to have %d project(s), got %d",
-				testCase.expectedLockCount,
-				len(lock.P))
-		}
-
-		// Ignored projects checks.
-		if len(manifest.Ignored) != testCase.expectedIgnoreCount {
-			t.Fatalf("Expected manifest to have %d ignored project(s), got %d",
-				testCase.expectedIgnoreCount,
-				len(manifest.Ignored))
-		}
-
-		if !equalSlice(manifest.Ignored, testCase.expectedIgnoredPackages) {
-			t.Fatalf("Expected manifest to have ignore %s, got %s",
-				strings.Join(testCase.expectedIgnoredPackages, ", "),
-				strings.Join(manifest.Ignored, ", "))
-		}
-
-		// Constraints checks below. Skip if there is no expected constraint.
-		if testCase.expectedConstraint == "" {
-			continue
-		}
-
-		d, ok := manifest.Constraints[testCase.projectRoot]
-		if !ok {
-			t.Fatalf("Expected the manifest to have a dependency for '%s' but got none",
-				testCase.projectRoot)
-		}
-
-		v := d.Constraint.String()
-		if v != testCase.expectedConstraint {
-			t.Fatalf("Expected manifest constraint to be %s, got %s", testCase.expectedConstraint, v)
-		}
-
-		if testCase.notExpectedProjectRoot != nil {
-			_, ok := manifest.Constraints[*testCase.notExpectedProjectRoot]
-			if ok {
-				t.Fatalf("Expected the manifest to not have a dependency for '%s' but got none",
-					*testCase.notExpectedProjectRoot)
-			}
-		}
-
-		p := lock.P[0]
-
-		if p.Ident().ProjectRoot != testCase.projectRoot {
-			t.Fatalf("Expected the lock to have a project for '%s' but got '%s'",
-				testCase.projectRoot,
-				p.Ident().ProjectRoot)
-		}
-
-		if p.Ident().Source != testCase.sourceRepo {
-			t.Fatalf("Expected locked source to be %s, got '%s'", testCase.sourceRepo, p.Ident().Source)
-		}
-
-		lv := p.Version()
-		lpv, ok := lv.(gps.PairedVersion)
-
-		if !ok {
-			if testCase.matchPairedVersion {
-				t.Fatalf("Expected locked version to be PairedVersion but got %T", lv)
+				t.Fatal(err)
 			}
 
-			continue
-		}
-
-		ver := lpv.String()
-		if ver != testCase.expectedVersion {
-			t.Fatalf("Expected locked version to be '%s', got %s", testCase.expectedVersion, ver)
-		}
-
-		if testCase.expectedRevision != nil {
-			rev := lpv.Revision()
-			if rev != *testCase.expectedRevision {
-				t.Fatalf("Expected locked revision to be '%s', got %s", *testCase.expectedRevision,
-					rev)
+			// Lock checks.
+			if lock != nil && len(lock.P) != testCase.expectedLockCount {
+				t.Fatalf("Expected lock to have %d project(s), got %d",
+					testCase.expectedLockCount,
+					len(lock.P))
 			}
-		}
+
+			// Ignored projects checks.
+			if len(manifest.Ignored) != testCase.expectedIgnoreCount {
+				t.Fatalf("Expected manifest to have %d ignored project(s), got %d",
+					testCase.expectedIgnoreCount,
+					len(manifest.Ignored))
+			}
+
+			if !equalSlice(manifest.Ignored, testCase.expectedIgnoredPackages) {
+				t.Fatalf("Expected manifest to have ignore %s, got %s",
+					strings.Join(testCase.expectedIgnoredPackages, ", "),
+					strings.Join(manifest.Ignored, ", "))
+			}
+
+			// Constraints checks below. Skip if there is no expected constraint.
+			if testCase.expectedConstraint == "" {
+				return
+			}
+
+			d, ok := manifest.Constraints[testCase.projectRoot]
+			if !ok {
+				t.Fatalf("Expected the manifest to have a dependency for '%s' but got none",
+					testCase.projectRoot)
+			}
+
+			v := d.Constraint.String()
+			if v != testCase.expectedConstraint {
+				t.Fatalf("Expected manifest constraint to be %s, got %s", testCase.expectedConstraint, v)
+			}
+
+			if testCase.notExpectedProjectRoot != nil {
+				_, ok := manifest.Constraints[*testCase.notExpectedProjectRoot]
+				if ok {
+					t.Fatalf("Expected the manifest to not have a dependency for '%s' but got none",
+						*testCase.notExpectedProjectRoot)
+				}
+			}
+
+			p := lock.P[0]
+
+			if p.Ident().ProjectRoot != testCase.projectRoot {
+				t.Fatalf("Expected the lock to have a project for '%s' but got '%s'",
+					testCase.projectRoot,
+					p.Ident().ProjectRoot)
+			}
+
+			if p.Ident().Source != testCase.sourceRepo {
+				t.Fatalf("Expected locked source to be %s, got '%s'", testCase.sourceRepo, p.Ident().Source)
+			}
+
+			lv := p.Version()
+			lpv, ok := lv.(gps.PairedVersion)
+
+			if !ok {
+				if testCase.matchPairedVersion {
+					t.Fatalf("Expected locked version to be PairedVersion but got %T", lv)
+				}
+
+				return
+			}
+
+			ver := lpv.String()
+			if ver != testCase.expectedVersion {
+				t.Fatalf("Expected locked version to be '%s', got %s", testCase.expectedVersion, ver)
+			}
+
+			if testCase.expectedRevision != nil {
+				rev := lpv.Revision()
+				if rev != *testCase.expectedRevision {
+					t.Fatalf("Expected locked revision to be '%s', got %s", *testCase.expectedRevision,
+						rev)
+				}
+			}
+		})
 	}
 }
 
