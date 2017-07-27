@@ -18,7 +18,7 @@ import (
 
 const testGodepProjectRoot = "github.com/golang/notexist"
 
-func TestGoDepConfig_Convert(t *testing.T) {
+func TestGodepConfig_Convert(t *testing.T) {
 	testCases := map[string]struct {
 		json                   godepJSON
 		expectConvertErr       bool
@@ -128,76 +128,76 @@ func TestGoDepConfig_Convert(t *testing.T) {
 	defer sm.Release()
 
 	for name, testCase := range testCases {
-		t.Logf("Running test case: %s", name)
+		t.Run(name, func(t *testing.T) {
+			g := newGodepImporter(discardLogger, true, sm)
+			g.json = testCase.json
 
-		g := newGodepImporter(discardLogger, true, sm)
-		g.json = testCase.json
+			manifest, lock, err := g.convert(testCase.projectRoot)
+			if err != nil {
+				if testCase.expectConvertErr {
+					return
+				}
 
-		manifest, lock, err := g.convert(testCase.projectRoot)
-		if err != nil {
-			if testCase.expectConvertErr {
-				continue
+				t.Fatal(err)
 			}
 
-			t.Fatal(err)
-		}
-
-		if len(lock.P) != testCase.expectedLockCount {
-			t.Fatalf("Expected lock to have %d project(s), got %d",
-				testCase.expectedLockCount,
-				len(lock.P))
-		}
-
-		d, ok := manifest.Constraints[testCase.projectRoot]
-		if !ok {
-			t.Fatalf("Expected the manifest to have a dependency for '%s' but got none",
-				testCase.projectRoot)
-		}
-
-		v := d.Constraint.String()
-		if v != testCase.expectedConstraint {
-			t.Fatalf("Expected manifest constraint to be %s, got %s", testCase.expectedConstraint, v)
-		}
-
-		if testCase.notExpectedProjectRoot != nil {
-			_, ok := manifest.Constraints[*testCase.notExpectedProjectRoot]
-			if ok {
-				t.Fatalf("Expected the manifest to not have a dependency for '%s' but got none",
-					*testCase.notExpectedProjectRoot)
-			}
-		}
-
-		p := lock.P[0]
-		if p.Ident().ProjectRoot != testCase.projectRoot {
-			t.Fatalf("Expected the lock to have a project for '%s' but got '%s'",
-				testCase.projectRoot,
-				p.Ident().ProjectRoot)
-		}
-
-		lv := p.Version()
-		lpv, ok := lv.(gps.PairedVersion)
-
-		if !ok {
-			if testCase.matchPairedVersion {
-				t.Fatalf("Expected locked version to be PairedVersion but got %T", lv)
+			if len(lock.P) != testCase.expectedLockCount {
+				t.Fatalf("Expected lock to have %d project(s), got %d",
+					testCase.expectedLockCount,
+					len(lock.P))
 			}
 
-			continue
-		}
-
-		ver := lpv.String()
-		if ver != testCase.expectedVersion {
-			t.Fatalf("Expected locked version to be '%s', got %s", testCase.expectedVersion, ver)
-		}
-
-		if testCase.expectedRevision != nil {
-			rev := lpv.Revision()
-			if rev != *testCase.expectedRevision {
-				t.Fatalf("Expected locked revision to be '%s', got %s",
-					*testCase.expectedRevision,
-					rev)
+			d, ok := manifest.Constraints[testCase.projectRoot]
+			if !ok {
+				t.Fatalf("Expected the manifest to have a dependency for '%s' but got none",
+					testCase.projectRoot)
 			}
-		}
+
+			v := d.Constraint.String()
+			if v != testCase.expectedConstraint {
+				t.Fatalf("Expected manifest constraint to be %s, got %s", testCase.expectedConstraint, v)
+			}
+
+			if testCase.notExpectedProjectRoot != nil {
+				_, ok := manifest.Constraints[*testCase.notExpectedProjectRoot]
+				if ok {
+					t.Fatalf("Expected the manifest to not have a dependency for '%s' but got none",
+						*testCase.notExpectedProjectRoot)
+				}
+			}
+
+			p := lock.P[0]
+			if p.Ident().ProjectRoot != testCase.projectRoot {
+				t.Fatalf("Expected the lock to have a project for '%s' but got '%s'",
+					testCase.projectRoot,
+					p.Ident().ProjectRoot)
+			}
+
+			lv := p.Version()
+			lpv, ok := lv.(gps.PairedVersion)
+
+			if !ok {
+				if testCase.matchPairedVersion {
+					t.Fatalf("Expected locked version to be PairedVersion but got %T", lv)
+				}
+
+				return
+			}
+
+			ver := lpv.String()
+			if ver != testCase.expectedVersion {
+				t.Fatalf("Expected locked version to be '%s', got %s", testCase.expectedVersion, ver)
+			}
+
+			if testCase.expectedRevision != nil {
+				rev := lpv.Revision()
+				if rev != *testCase.expectedRevision {
+					t.Fatalf("Expected locked revision to be '%s', got %s",
+						*testCase.expectedRevision,
+						rev)
+				}
+			}
+		})
 	}
 }
 
