@@ -115,20 +115,21 @@ func (i *gbImporter) convert(pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock, erro
 
 		// Deduce the project root. This is necessary because gb manifests can have
 		// multiple entries for the same project root, one for each imported subpackage
-		var ip gps.ProjectRoot
+		var root gps.ProjectRoot
 		var err error
-		if ip, err = i.sm.DeduceProjectRoot(pkg.Importpath); err != nil {
+		if root, err = i.sm.DeduceProjectRoot(pkg.Importpath); err != nil {
 			return nil, nil, err
 		}
 
 		// Set the proper import path back on the dependency
-		pkg.Importpath = string(ip)
+		pkg.Importpath = string(root)
 
 		// If we've already locked this project root then we can skip
 		if projectExistsInLock(lock, pkg.Importpath) {
 			continue
 		}
 
+		// Otherwise, attempt to convert this specific package, which returns a constraint and a lock
 		pc, lp, err := i.convertOne(pkg)
 		if err != nil {
 			return nil, nil, err
@@ -156,6 +157,11 @@ func (i *gbImporter) convertOne(pkg gbDependency) (pc gps.ProjectConstraint, lp 
 
 		However, if we can infer a tag that points to the revision or the branch, we may be able
 		to use that as the constraint
+
+		So, the order of operations to convert a single dependency in a gb manifest is:
+			- Find a specific version for the revision (and branch, if set)
+			- If there's a branch available, use that as the constraint
+			- If there's no branch, but we found a version from step 1, use the version as the constraint
 	*/
 	pc.Ident = gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot(pkg.Importpath), Source: pkg.Repository}
 
@@ -164,7 +170,7 @@ func (i *gbImporter) convertOne(pkg gbDependency) (pc gps.ProjectConstraint, lp 
 
 	// But if the branch field is not "HEAD", we can use that as the initial constraint
 	var constraint gps.Constraint
-	if pkg.Branch != "HEAD" {
+	if pkg.Branch != "" && pkg.Branch != "HEAD" {
 		constraint = gps.NewBranch(pkg.Branch)
 	}
 
@@ -175,11 +181,20 @@ func (i *gbImporter) convertOne(pkg gbDependency) (pc gps.ProjectConstraint, lp 
 		i.logger.Println(err.Error())
 	}
 
-	// And now try to infer a constraint from the returned version
-	pc.Constraint, err = i.sm.InferConstraint(version.String(), pc.Ident)
-	if err != nil {
-		return
+	// If the constraint is nil (no branch), but there's a version, infer a constraint from there
+	if constraint == nil && version != nil {
+		constraint, err = i.sm.InferConstraint(version.String(), pc.Ident)
+		if err != nil {
+			return
+		}
 	}
+
+	// If there's *still* no constraint, set the constraint to the revision
+	if constraint == nil {
+		constraint = revision
+	}
+
+	pc.Constraint = constraint
 
 	lp = gps.NewLockedProject(pc.Ident, version, nil)
 
