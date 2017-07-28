@@ -502,6 +502,10 @@ func (sm *SourceMgr) DeduceProjectRoot(ip string) (ProjectRoot, error) {
 // string. Preference is given first for revisions, then branches, then semver
 // constraints, and then plain tags.
 func (sm *SourceMgr) InferConstraint(s string, pi ProjectIdentifier) (Constraint, error) {
+	if s == "" {
+		return Any(), nil
+	}
+
 	slen := len(s)
 	if slen == 40 {
 		if _, err := hex.DecodeString(s); err == nil {
@@ -539,8 +543,7 @@ func (sm *SourceMgr) InferConstraint(s string, pi ProjectIdentifier) (Constraint
 	}
 	SortPairedForUpgrade(versions)
 	for _, v := range versions {
-		// Pick the default branch if no constraint is given
-		if s == "" || s == v.String() {
+		if s == v.String() {
 			version = v
 			break
 		}
