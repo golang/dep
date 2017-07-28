@@ -351,8 +351,6 @@ type bzrSource struct {
 }
 
 func (s *bzrSource) exportRevisionTo(ctx context.Context, rev Revision, to string) error {
-	// TODO: use bzr instead of the generic approach in
-	// baseVCSSource.exportRevisionTo to make it faster.
 	if err := s.baseVCSSource.exportRevisionTo(ctx, rev, to); err != nil {
 		return err
 	}
@@ -415,7 +413,7 @@ type hgSource struct {
 }
 
 func (s *hgSource) exportRevisionTo(ctx context.Context, rev Revision, to string) error {
-	// TODO: use bzr instead of the generic approach in
+	// TODO: use hg instead of the generic approach in
 	// baseVCSSource.exportRevisionTo to make it faster.
 	if err := s.baseVCSSource.exportRevisionTo(ctx, rev, to); err != nil {
 		return err
