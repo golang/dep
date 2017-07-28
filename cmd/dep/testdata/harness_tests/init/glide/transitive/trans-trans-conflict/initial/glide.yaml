@@ -3,4 +3,4 @@ import:
 - package: github.com/chriswhelix/deptestglide1
   version: gt100
 - package: github.com/chriswhelix/deptestglide2
-  version: exactly081
+  version: eq081
