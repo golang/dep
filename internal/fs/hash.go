@@ -21,8 +21,8 @@ var pathSeparator = string(os.PathSeparator)
 // skips symbolic links, and for now, it's a design requirement for this
 // function to follow symbolic links.
 //
-// WARNING: This function has undefined behavior when it encounters a file
-// system loop caused by poorly created symbolic links. If this protection is required
+// WARNING: This function loops indefinitely when it encounters a loop caused by
+// poorly created symbolic links.
 func HashFromNode(pathname string) (hash string, err error) {
 	// bool argument: whether or not prevent file system loops due to symbolic
 	// links
