@@ -4,23 +4,23 @@ import (
 	"testing"
 )
 
-func TestHashFromPathnameWithFile(t *testing.T) {
-	actual, err := HashFromPathname("testdata/blob")
+func TestHashFromElementWithFile(t *testing.T) {
+	actual, err := HashFromElement("./testdata/blob")
 	if err != nil {
 		t.Fatal(err)
 	}
-	expected := "825dc11fe41d8f604ab48a8cd6cecf304005bd82fd0228a6e411e992d4d03a08"
+	expected := "2d1c82d4643e6c95d4a472c5bad4f3f044474fc20c42ced663f446a0b59524cd"
 	if actual != expected {
 		t.Errorf("Actual:\n\t%#q\nExpected:\n\t%#q", actual, expected)
 	}
 }
 
-func TestHashFromPathnameWithDirectory(t *testing.T) {
-	actual, err := HashFromPathname("testdata/recursive")
+func TestHashFromElementWithDirectory(t *testing.T) {
+	actual, err := HashFromElement("testdata/recursive")
 	if err != nil {
 		t.Fatal(err)
 	}
-	expected := "9b3a1f1f63c0c54860799cc5464a3c380a697a3ec49ca103a62d9c09ad9fedf8"
+	expected := "ec272227655cca9517bdcbd27c925c50ae65112a124bc61d0d743a1ed9323d5e"
 	if actual != expected {
 		t.Errorf("Actual:\n\t%#q\nExpected:\n\t%#q", actual, expected)
 	}

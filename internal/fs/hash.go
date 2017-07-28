@@ -3,89 +3,83 @@ package fs
 import (
 	"crypto/sha256"
 	"fmt"
-	"io"
 	"os"
+	"path/filepath"
+	"sort"
 	"strconv"
 
 	"github.com/pkg/errors"
 )
 
-// HashFromPathname returns a hash of the specified file or directory, ignoring
-// all file system objects named, `vendor` and their descendants. This function
-// follows symbolic links.
-func HashFromPathname(pathname string) (hash string, err error) {
-	fi, err := os.Stat(pathname)
-	if err != nil {
-		return "", errors.Wrap(err, "could not stat")
-	}
-	if fi.IsDir() {
-		return hashFromDirectory(pathname, fi)
-	}
-	return hashFromFile(pathname, fi)
-}
+var pathSeparator = string(os.PathSeparator)
 
-func hashFromFile(pathname string, fi os.FileInfo) (hash string, err error) {
-	fh, err := os.Open(pathname)
-	if err != nil {
-		return "", errors.Wrap(err, "could not open")
-	}
-	defer func() {
-		err = errors.Wrap(fh.Close(), "could not close")
-	}()
-
-	h := sha256.New()
-	_, _ = h.Write([]byte(strconv.FormatInt(fi.Size(), 10)))
-
-	if _, err = io.Copy(h, fh); err != nil {
-		err = errors.Wrap(err, "could not read file")
-		return
-	}
-
-	hash = fmt.Sprintf("%x", h.Sum(nil))
-	return
-}
-
-func hashFromDirectory(pathname string, fi os.FileInfo) (hash string, err error) {
-	const maxFileInfos = 32
-
-	fh, err := os.Open(pathname)
-	if err != nil {
-		return hash, errors.Wrap(err, "could not open")
-	}
-	defer func() {
-		err = errors.Wrap(fh.Close(), "could not close")
-	}()
-
+// HashFromElement returns a deterministic hash of the file system object
+// specified by pathname, performing a breadth-first traversal of directories,
+// while ignoring any directory named "vendor".
+func HashFromElement(pathname string) (hash string, err error) {
 	h := sha256.New()
 
-	// NOTE: Chunk through file system objects to prevent allocating too much
-	// memory for directories with tens of thousands of child objects.
-	for {
-		var children []os.FileInfo
-		var childHash string
+	// Initialize a work queue with the os-agnostic cleaned up pathname.
+	pathnameQueue := []string{filepath.Clean(pathname)}
 
-		children, err = fh.Readdir(maxFileInfos)
-		if err != nil {
-			if err == io.EOF {
-				err = nil
-				break
-			}
-			return hash, errors.Wrap(err, "could not read directory")
+	for len(pathnameQueue) > 0 {
+		// NOTE: pop a pathname from the queue
+		pathname, pathnameQueue = pathnameQueue[0], pathnameQueue[1:]
+
+		fi, er := os.Stat(pathname)
+		if er != nil {
+			err = errors.Wrap(er, "cannot stat")
+			return
 		}
-		for _, child := range children {
-			switch child.Name() {
-			case ".", "..", "vendor":
-				// skip
-			default:
-				childPathname := pathname + string(os.PathSeparator) + child.Name()
-				if childHash, err = HashFromPathname(childPathname); err != nil {
-					err = errors.Wrap(err, "could not compute hash from pathname")
-					return
+		fh, er := os.Open(pathname)
+		if er != nil {
+			err = errors.Wrap(er, "cannot open")
+			return
+		}
+		// NOTE: Write pathname to hash, because hash ought to be as much a
+		// function of the names of the files and directories as their
+		// contents. Added benefit is that empty directories effect final hash
+		// value.
+		//
+		// Ignore return values from writing to the hash, because hash write
+		// always returns nil error.
+		_, _ = h.Write([]byte(pathname))
+
+		if fi.IsDir() {
+			childrenNames, er := fh.Readdirnames(0) // 0: read names of all children
+			if er != nil {
+				err = errors.Wrap(er, "cannot read directory")
+				return
+			}
+			// NOTE: Sort children names to ensure deterministic ordering of
+			// contents of each directory, so hash remains same even if
+			// operating system returns same values in a different order on
+			// subsequent invocation.
+			sort.Strings(childrenNames)
+
+			for _, childName := range childrenNames {
+				switch childName {
+				case ".", "..", "vendor":
+					// skip
+				default:
+					pathnameQueue = append(pathnameQueue, pathname+pathSeparator+childName)
 				}
-				_, _ = h.Write([]byte(childPathname))
-				_, _ = h.Write([]byte(childHash))
 			}
+		} else {
+			// NOTE: Format the file size as a base 10 integer, and ignore
+			// return values from writing to the hash, because hash write always
+			// returns a nil error.
+			_, _ = h.Write([]byte(strconv.FormatInt(fi.Size(), 10)))
+			err = errors.Wrap(er, "cannot read file") // errors.Wrap only wraps non-nil, so elide checking here
 		}
+		// NOTE: Close the file handle to the open directory or file.
+		if er = fh.Close(); err == nil {
+			err = errors.Wrap(er, "cannot close")
+		}
+		if err != nil {
+			return // early termination if error
+		}
+
 	}
 
 	hash = fmt.Sprintf("%x", h.Sum(nil))
