@@ -5,7 +5,7 @@ import (
 )
 
 func TestHashFromElementWithFile(t *testing.T) {
-	actual, err := HashFromElement("./testdata/blob")
+	actual, err := HashFromNode("./testdata/blob")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -16,7 +16,7 @@ func TestHashFromElementWithFile(t *testing.T) {
 }
 
 func TestHashFromElementWithDirectory(t *testing.T) {
-	actual, err := HashFromElement("testdata/recursive")
+	actual, err := HashFromNode("testdata/recursive")
 	if err != nil {
 		t.Fatal(err)
 	}
