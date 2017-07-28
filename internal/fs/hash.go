@@ -3,6 +3,7 @@ package fs
 import (
 	"crypto/sha256"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
@@ -99,6 +100,7 @@ func hashFromNode(pathname string, preventLoops bool) (hash string, err error) {
 			// return values from writing to the hash, because hash write always
 			// returns a nil error.
 			_, _ = h.Write([]byte(strconv.FormatInt(fi.Size(), 10)))
+			_, er = io.Copy(h, fh)
 			err = errors.Wrap(er, "cannot read file") // errors.Wrap only wraps non-nil, so elide checking here
 		}
 
@@ -110,7 +112,6 @@ func hashFromNode(pathname string, preventLoops bool) (hash string, err error) {
 		if err != nil {
 			return // early termination if error
 		}
-
 	}
 
 	hash = fmt.Sprintf("%x", h.Sum(nil))

@@ -9,7 +9,7 @@ func TestHashFromElementWithFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	expected := "2d1c82d4643e6c95d4a472c5bad4f3f044474fc20c42ced663f446a0b59524cd"
+	expected := "bf7c45881248f74466f9624e8336747277d7901a4f7af43940be07c5539b78a8"
 	if actual != expected {
 		t.Errorf("Actual:\n\t%#q\nExpected:\n\t%#q", actual, expected)
 	}
@@ -20,7 +20,7 @@ func TestHashFromElementWithDirectory(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	expected := "ec272227655cca9517bdcbd27c925c50ae65112a124bc61d0d743a1ed9323d5e"
+	expected := "d5ac28114417eae59b9ac02e3fac5bdff673e93cc91b408cde1989e1cd2efbd0"
 	if actual != expected {
 		t.Errorf("Actual:\n\t%#q\nExpected:\n\t%#q", actual, expected)
 	}
