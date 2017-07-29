@@ -36,19 +36,18 @@ func newTestContext(h *test.Helper) *dep.Ctx {
 
 func TestGlideConfig_Convert(t *testing.T) {
 	testCases := map[string]struct {
-		yaml                    glideYaml
-		lock                    *glideLock
-		expectConvertErr        bool
-		matchPairedVersion      bool
-		projectRoot             gps.ProjectRoot
-		sourceRepo              string
-		notExpectedProjectRoot  *gps.ProjectRoot
-		expectedConstraint      string
-		expectedRevision        *gps.Revision
-		expectedVersion         string
-		expectedLockCount       int
-		expectedIgnoreCount     int
-		expectedIgnoredPackages []string
+		yaml                glideYaml
+		lock                *glideLock
+		wantConvertErr      bool
+		matchPairedVersion  bool
+		projectRoot         gps.ProjectRoot
+		sourceRepo          string
+		wantConstraint      string
+		wantRevision        *gps.Revision
+		wantVersion         string
+		wantLockCount       int
+		wantIgnoreCount     int
+		wantIgnoredPackages []string
 	}{
 		"project": {
 			yaml: glideYaml{
@@ -72,10 +71,10 @@ func TestGlideConfig_Convert(t *testing.T) {
 			projectRoot:        "github.com/sdboyer/deptest",
 			sourceRepo:         "https://github.com/sdboyer/deptest.git",
 			matchPairedVersion: true,
-			expectedConstraint: "^1.0.0",
-			expectedLockCount:  1,
-			expectedRevision:   gps.RevisionPtr(gps.Revision("ff2948a2ac8f538c4ecd55962e919d1e13e74baf")),
-			expectedVersion:    "v1.0.0",
+			wantConstraint:     "^1.0.0",
+			wantLockCount:      1,
+			wantRevision:       revisionPtr(gps.Revision("ff2948a2ac8f538c4ecd55962e919d1e13e74baf")),
+			wantVersion:        "v1.0.0",
 		},
 		"test project": {
 			yaml: glideYaml{
@@ -94,42 +93,42 @@ func TestGlideConfig_Convert(t *testing.T) {
 					},
 				},
 			},
-			projectRoot:        "github.com/sdboyer/deptest",
-			expectedLockCount:  1,
-			expectedConstraint: "^1.0.0",
-			expectedVersion:    "v1.0.0",
+			projectRoot:    "github.com/sdboyer/deptest",
+			wantLockCount:  1,
+			wantConstraint: "^1.0.0",
+			wantVersion:    "v1.0.0",
 		},
 		"with ignored package": {
 			yaml: glideYaml{
 				Ignores: []string{"github.com/sdboyer/deptest"},
 			},
-			projectRoot:             "github.com/sdboyer/deptest",
-			expectedIgnoreCount:     1,
-			expectedIgnoredPackages: []string{"github.com/sdboyer/deptest"},
+			projectRoot:         "github.com/sdboyer/deptest",
+			wantIgnoreCount:     1,
+			wantIgnoredPackages: []string{"github.com/sdboyer/deptest"},
 		},
 		"with exclude dir": {
 			yaml: glideYaml{
 				ExcludeDirs: []string{"samples"},
 			},
-			projectRoot:             testGlideProjectRoot,
-			expectedIgnoreCount:     1,
-			expectedIgnoredPackages: []string{"github.com/golang/notexist/samples"},
+			projectRoot:         testGlideProjectRoot,
+			wantIgnoreCount:     1,
+			wantIgnoredPackages: []string{"github.com/golang/notexist/samples"},
 		},
 		"exclude dir ignores mismatched package name": {
 			yaml: glideYaml{
 				Name:        "github.com/golang/mismatched-package-name",
 				ExcludeDirs: []string{"samples"},
 			},
-			projectRoot:             testGlideProjectRoot,
-			expectedIgnoreCount:     1,
-			expectedIgnoredPackages: []string{"github.com/golang/notexist/samples"},
+			projectRoot:         testGlideProjectRoot,
+			wantIgnoreCount:     1,
+			wantIgnoredPackages: []string{"github.com/golang/notexist/samples"},
 		},
 		"bad input, empty package name": {
 			yaml: glideYaml{
 				Imports: []glidePackage{{Name: ""}},
 			},
-			projectRoot:      testGlideProjectRoot,
-			expectConvertErr: true,
+			projectRoot:    testGlideProjectRoot,
+			wantConvertErr: true,
 		},
 	}
 
@@ -152,7 +151,7 @@ func TestGlideConfig_Convert(t *testing.T) {
 
 			manifest, lock, err := g.convert(testCase.projectRoot)
 			if err != nil {
-				if testCase.expectConvertErr {
+				if testCase.wantConvertErr {
 					return
 				}
 
@@ -160,27 +159,27 @@ func TestGlideConfig_Convert(t *testing.T) {
 			}
 
 			// Lock checks.
-			if lock != nil && len(lock.P) != testCase.expectedLockCount {
+			if lock != nil && len(lock.P) != testCase.wantLockCount {
 				t.Fatalf("Expected lock to have %d project(s), got %d",
-					testCase.expectedLockCount,
+					testCase.wantLockCount,
 					len(lock.P))
 			}
 
 			// Ignored projects checks.
-			if len(manifest.Ignored) != testCase.expectedIgnoreCount {
+			if len(manifest.Ignored) != testCase.wantIgnoreCount {
 				t.Fatalf("Expected manifest to have %d ignored project(s), got %d",
-					testCase.expectedIgnoreCount,
+					testCase.wantIgnoreCount,
 					len(manifest.Ignored))
 			}
 
-			if !equalSlice(manifest.Ignored, testCase.expectedIgnoredPackages) {
+			if !equalSlice(manifest.Ignored, testCase.wantIgnoredPackages) {
 				t.Fatalf("Expected manifest to have ignore %s, got %s",
-					strings.Join(testCase.expectedIgnoredPackages, ", "),
+					strings.Join(testCase.wantIgnoredPackages, ", "),
 					strings.Join(manifest.Ignored, ", "))
 			}
 
-			// Constraints checks below. Skip if there is no expected constraint.
-			if testCase.expectedConstraint == "" {
+			// Constraints checks below. Skip if there is no want constraint.
+			if testCase.wantConstraint == "" {
 				return
 			}
 
@@ -191,16 +190,8 @@ func TestGlideConfig_Convert(t *testing.T) {
 			}
 
 			v := d.Constraint.String()
-			if v != testCase.expectedConstraint {
-				t.Fatalf("Expected manifest constraint to be %s, got %s", testCase.expectedConstraint, v)
-			}
-
-			if testCase.notExpectedProjectRoot != nil {
-				_, ok := manifest.Constraints[*testCase.notExpectedProjectRoot]
-				if ok {
-					t.Fatalf("Expected the manifest to not have a dependency for '%s' but got none",
-						*testCase.notExpectedProjectRoot)
-				}
+			if v != testCase.wantConstraint {
+				t.Fatalf("Expected manifest constraint to be %s, got %s", testCase.wantConstraint, v)
 			}
 
 			p := lock.P[0]
@@ -227,14 +218,14 @@ func TestGlideConfig_Convert(t *testing.T) {
 			}
 
 			ver := lpv.String()
-			if ver != testCase.expectedVersion {
-				t.Fatalf("Expected locked version to be '%s', got %s", testCase.expectedVersion, ver)
+			if ver != testCase.wantVersion {
+				t.Fatalf("Expected locked version to be '%s', got %s", testCase.wantVersion, ver)
 			}
 
-			if testCase.expectedRevision != nil {
+			if testCase.wantRevision != nil {
 				rev := lpv.Revision()
-				if rev != *testCase.expectedRevision {
-					t.Fatalf("Expected locked revision to be '%s', got %s", *testCase.expectedRevision,
+				if rev != *testCase.wantRevision {
+					t.Fatalf("Expected locked revision to be '%s', got %s", *testCase.wantRevision,
 						rev)
 				}
 			}
@@ -285,7 +276,7 @@ func TestGlideConfig_Import(t *testing.T) {
 				t.Fatalf("%+v", errors.Wrapf(err, "Unable to write updated golden file %s", goldenFile))
 			}
 		} else {
-			t.Fatalf("expected %s, got %s", want, got)
+			t.Fatalf("want %s, got %s", want, got)
 		}
 	}
 }
