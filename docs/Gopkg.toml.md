@@ -14,6 +14,15 @@ required = ["github.com/user/thing/cmd/thing"]
 * Aren't `import`ed by your project, [directly or transitively](FAQ.md#what-is-a-direct-or-transitive-dependency)
 * You don't want put in your `GOPATH`, and/or you want to lock the version
 
+Please note that this only pulls in the sources of these dependencies. It does not install or compile them. So, if you need the tool to be installed you should still run the following (manually or from a `Makefile`)  after each `dep ensure`:
+
+```bash
+cd vendor/pkg/to/install
+go install .
+```
+
+Another option is to use [virtualgo](https://github.com/GetStream/vg), which installs dependencies in the `required` list automatically.
+
 ## `ignored`
 `ignored` lists a set of packages (not projects) that are ignored when dep statically analyzes source code. Ignored packages can be in this project, or in a dependency.
 ```toml
