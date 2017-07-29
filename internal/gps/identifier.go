@@ -40,11 +40,6 @@ import (
 // the type system when a path-ish string must have particular semantics.
 type ProjectRoot string
 
-// ProjectRootPtr takes a ProjectRoot value and returns a pointer.
-func ProjectRootPtr(p ProjectRoot) *ProjectRoot {
-	return &p
-}
-
 // A ProjectIdentifier provides the name and source location of a dependency. It
 // is related to, but differs in two keys ways from, an plain import path.
 //

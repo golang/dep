@@ -20,15 +20,15 @@ const testGodepProjectRoot = "github.com/golang/notexist"
 
 func TestGodepConfig_Convert(t *testing.T) {
 	testCases := map[string]struct {
-		json                   godepJSON
-		expectConvertErr       bool
-		matchPairedVersion     bool
-		projectRoot            gps.ProjectRoot
-		notExpectedProjectRoot *gps.ProjectRoot
-		expectedConstraint     string
-		expectedRevision       *gps.Revision
-		expectedVersion        string
-		expectedLockCount      int
+		json                 godepJSON
+		wantConvertErr       bool
+		matchPairedVersion   bool
+		projectRoot          gps.ProjectRoot
+		notWantedProjectRoot *gps.ProjectRoot
+		wantConstraint       string
+		wantRevision         *gps.Revision
+		wantVersion          string
+		wantLockCount        int
 	}{
 		"convert project": {
 			json: godepJSON{
@@ -43,10 +43,10 @@ func TestGodepConfig_Convert(t *testing.T) {
 			},
 			matchPairedVersion: true,
 			projectRoot:        gps.ProjectRoot("github.com/sdboyer/deptest"),
-			expectedConstraint: "^0.8.0",
-			expectedRevision:   gps.RevisionPtr(gps.Revision("ff2948a2ac8f538c4ecd55962e919d1e13e74baf")),
-			expectedVersion:    "v0.8.0",
-			expectedLockCount:  1,
+			wantConstraint:     "^0.8.0",
+			wantRevision:       revisionPtr(gps.Revision("ff2948a2ac8f538c4ecd55962e919d1e13e74baf")),
+			wantVersion:        "v0.8.0",
+			wantLockCount:      1,
 		},
 		"with semver suffix": {
 			json: godepJSON{
@@ -60,8 +60,8 @@ func TestGodepConfig_Convert(t *testing.T) {
 			},
 			projectRoot:        gps.ProjectRoot("github.com/sdboyer/deptest"),
 			matchPairedVersion: false,
-			expectedConstraint: ">=1.12.0, <=12.0.0-g2fd980e",
-			expectedLockCount:  1,
+			wantConstraint:     ">=1.12.0, <=12.0.0-g2fd980e",
+			wantLockCount:      1,
 		},
 		"empty comment": {
 			json: godepJSON{
@@ -75,16 +75,16 @@ func TestGodepConfig_Convert(t *testing.T) {
 			},
 			projectRoot:        gps.ProjectRoot("github.com/sdboyer/deptest"),
 			matchPairedVersion: true,
-			expectedConstraint: "^1.0.0",
-			expectedRevision:   gps.RevisionPtr(gps.Revision("ff2948a2ac8f538c4ecd55962e919d1e13e74baf")),
-			expectedVersion:    "v1.0.0",
-			expectedLockCount:  1,
+			wantConstraint:     "^1.0.0",
+			wantRevision:       revisionPtr(gps.Revision("ff2948a2ac8f538c4ecd55962e919d1e13e74baf")),
+			wantVersion:        "v1.0.0",
+			wantLockCount:      1,
 		},
 		"bad input - empty package name": {
 			json: godepJSON{
 				Imports: []godepPackage{{ImportPath: ""}},
 			},
-			expectConvertErr: true,
+			wantConvertErr: true,
 		},
 		"bad input - empty revision": {
 			json: godepJSON{
@@ -94,7 +94,7 @@ func TestGodepConfig_Convert(t *testing.T) {
 					},
 				},
 			},
-			expectConvertErr: true,
+			wantConvertErr: true,
 		},
 		"sub-packages": {
 			json: godepJSON{
@@ -111,11 +111,11 @@ func TestGodepConfig_Convert(t *testing.T) {
 					},
 				},
 			},
-			projectRoot:            gps.ProjectRoot("github.com/sdboyer/deptest"),
-			notExpectedProjectRoot: gps.ProjectRootPtr(gps.ProjectRoot("github.com/sdboyer/deptest/foo")),
-			expectedLockCount:      1,
-			expectedConstraint:     "^1.0.0",
-			expectedVersion:        "v1.0.0",
+			projectRoot:          gps.ProjectRoot("github.com/sdboyer/deptest"),
+			notWantedProjectRoot: projectRootPtr(gps.ProjectRoot("github.com/sdboyer/deptest/foo")),
+			wantLockCount:        1,
+			wantConstraint:       "^1.0.0",
+			wantVersion:          "v1.0.0",
 		},
 	}
 
@@ -134,16 +134,16 @@ func TestGodepConfig_Convert(t *testing.T) {
 
 			manifest, lock, err := g.convert(testCase.projectRoot)
 			if err != nil {
-				if testCase.expectConvertErr {
+				if testCase.wantConvertErr {
 					return
 				}
 
 				t.Fatal(err)
 			}
 
-			if len(lock.P) != testCase.expectedLockCount {
+			if len(lock.P) != testCase.wantLockCount {
 				t.Fatalf("Expected lock to have %d project(s), got %d",
-					testCase.expectedLockCount,
+					testCase.wantLockCount,
 					len(lock.P))
 			}
 
@@ -154,15 +154,15 @@ func TestGodepConfig_Convert(t *testing.T) {
 			}
 
 			v := d.Constraint.String()
-			if v != testCase.expectedConstraint {
-				t.Fatalf("Expected manifest constraint to be %s, got %s", testCase.expectedConstraint, v)
+			if v != testCase.wantConstraint {
+				t.Fatalf("Expected manifest constraint to be %s, got %s", testCase.wantConstraint, v)
 			}
 
-			if testCase.notExpectedProjectRoot != nil {
-				_, ok := manifest.Constraints[*testCase.notExpectedProjectRoot]
+			if testCase.notWantedProjectRoot != nil {
+				_, ok := manifest.Constraints[*testCase.notWantedProjectRoot]
 				if ok {
 					t.Fatalf("Expected the manifest to not have a dependency for '%s' but got none",
-						*testCase.notExpectedProjectRoot)
+						*testCase.notWantedProjectRoot)
 				}
 			}
 
@@ -185,15 +185,15 @@ func TestGodepConfig_Convert(t *testing.T) {
 			}
 
 			ver := lpv.String()
-			if ver != testCase.expectedVersion {
-				t.Fatalf("Expected locked version to be '%s', got %s", testCase.expectedVersion, ver)
+			if ver != testCase.wantVersion {
+				t.Fatalf("Expected locked version to be '%s', got %s", testCase.wantVersion, ver)
 			}
 
-			if testCase.expectedRevision != nil {
+			if testCase.wantRevision != nil {
 				rev := lpv.Revision()
-				if rev != *testCase.expectedRevision {
+				if rev != *testCase.wantRevision {
 					t.Fatalf("Expected locked revision to be '%s', got %s",
-						*testCase.expectedRevision,
+						*testCase.wantRevision,
 						rev)
 				}
 			}
@@ -236,7 +236,7 @@ func TestGodepConfig_Import(t *testing.T) {
 		t.Fatal("Expected the lock to be generated")
 	}
 
-	goldenFile := "godep/expected_import_output.txt"
+	goldenFile := "godep/want_import_output.txt"
 	got := verboseOutput.String()
 	want := h.GetTestFileString(goldenFile)
 	if want != got {
@@ -245,7 +245,7 @@ func TestGodepConfig_Import(t *testing.T) {
 				t.Fatalf("%+v", errors.Wrapf(err, "Unable to write updated golden file %s", goldenFile))
 			}
 		} else {
-			t.Fatalf("expected %s, got %s", want, got)
+			t.Fatalf("want %s, got %s", want, got)
 		}
 	}
 }
@@ -310,7 +310,7 @@ func TestGodepConfig_ProjectExistsInLock(t *testing.T) {
 		result := projectExistsInLock(lock, c.importPath)
 
 		if result != c.want {
-			t.Fatalf("projectExistsInLock result is not as expected: \n\t(GOT) %v \n\t(WNT) %v", result, c.want)
+			t.Fatalf("projectExistsInLock result is not as want: \n\t(GOT) %v \n\t(WNT) %v", result, c.want)
 		}
 	}
 }
@@ -337,4 +337,14 @@ func equalImports(a, b []godepPackage) bool {
 	}
 
 	return true
+}
+
+// projectRootPtr takes a ProjectRoot value and returns a pointer.
+func projectRootPtr(p gps.ProjectRoot) *gps.ProjectRoot {
+	return &p
+}
+
+// revisionPtr takes a revision value and return it's pointer.
+func revisionPtr(r gps.Revision) *gps.Revision {
+	return &r
 }

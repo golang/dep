@@ -198,11 +198,6 @@ func (r Revision) identical(c Constraint) bool {
 	return r == r2
 }
 
-// RevisionPtr takes a revision value and return it's pointer.
-func RevisionPtr(r Revision) *Revision {
-	return &r
-}
-
 type branchVersion struct {
 	name      string
 	isDefault bool
