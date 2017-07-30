@@ -15,102 +15,104 @@ import (
 var pathSeparator = string(os.PathSeparator)
 
 // HashFromNode returns a deterministic hash of the file system node specified
-// by pathname, performing a breadth-first traversal of directories, while
-// ignoring any directory child named "vendor".
+// by pathname, performing a breadth-first traversal of directories.
+//
+// This function ignores any file system node named `vendor`, `.bzr`, `.git`,
+// `.hg`, and `.svn`, as these are typically used as Version Control System
+// (VCS) directories.
+//
+// Other than the `vendor` and VCS directories mentioned above, the calculated
+// hash includes the pathname to every discovered file system node, whether it
+// is an empty directory, a non-empty directory, empty file, non-empty file, or
+// symbolic link. If a symbolic link, the referent name is included. If a
+// non-empty file, the file's contents are incuded. If a non-empty directory,
+// the contents of the directory are included.
 //
 // While filepath.Walk could have been used, that standard library function
-// skips symbolic links, and for now, it's a design requirement for this
-// function to follow symbolic links.
-//
-// WARNING: This function loops indefinitely when it encounters a loop caused by
-// poorly created symbolic links.
+// skips symbolic links, and for now, we want to hash the referent string of
+// symbolic links.
 func HashFromNode(pathname string) (hash string, err error) {
-	// bool argument: whether or not prevent file system loops due to symbolic
-	// links
-	return hashFromNode(pathname, false)
-}
-
-func hashFromNode(pathname string, preventLoops bool) (hash string, err error) {
+	// Create a single hash instance for the entire operation, rather than a new
+	// hash for each node we encounter.
 	h := sha256.New()
-	var fileInfos []os.FileInfo
 
 	// Initialize a work queue with the os-agnostic cleaned up pathname.
 	pathnameQueue := []string{filepath.Clean(pathname)}
 
 	for len(pathnameQueue) > 0 {
-		// NOTE: pop a pathname from the queue
+		// NOTE: unshift a pathname from the queue
 		pathname, pathnameQueue = pathnameQueue[0], pathnameQueue[1:]
 
-		fi, er := os.Stat(pathname)
+		fi, er := os.Lstat(pathname)
 		if er != nil {
-			err = errors.Wrap(er, "cannot stat")
+			err = errors.Wrap(er, "cannot Lstat")
 			return
-		}
-
-		fh, er := os.Open(pathname)
-		if er != nil {
-			err = errors.Wrap(er, "cannot open")
-			return
-		}
-
-		// NOTE: Optionally disable checks to prevent infinite recursion when a
-		// symbolic link causes an infinite loop, because this method does not
-		// scale.
-		if preventLoops {
-			// Have we visited this node already?
-			for _, seen := range fileInfos {
-				if os.SameFile(fi, seen) {
-					goto skipNode
-				}
-			}
-			fileInfos = append(fileInfos, fi)
 		}
 
 		// NOTE: Write pathname to hash, because hash ought to be as much a
 		// function of the names of the files and directories as their
-		// contents. Added benefit is that empty directories effect final hash
-		// value.
+		// contents. Added benefit is that even empty directories and symbolic
+		// links will effect final hash value.
 		//
-		// Ignore return values from writing to the hash, because hash write
-		// always returns nil error.
+		// NOTE: Throughout this function, we ignore return values from writing
+		// to the hash, because hash write always returns nil error.
 		_, _ = h.Write([]byte(pathname))
+
+		if fi.Mode()&os.ModeSymlink != 0 {
+			referent, er := os.Readlink(pathname)
+			if er != nil {
+				err = errors.Wrap(er, "cannot Readlink")
+				return
+			}
+			// Write the referent to the hash and proceed to the next pathname
+			// in the queue.
+			_, _ = h.Write([]byte(referent))
+			continue
+		}
+
+		fh, er := os.Open(pathname)
+		if er != nil {
+			err = errors.Wrap(er, "cannot Open")
+			return
+		}
 
 		if fi.IsDir() {
 			childrenNames, er := fh.Readdirnames(0) // 0: read names of all children
 			if er != nil {
-				err = errors.Wrap(er, "cannot read directory")
-				return
+				err = errors.Wrap(er, "cannot Readdirnames")
+				// NOTE: Even if there was an error reading the names of the
+				// directory entries, we still must close file handle for the
+				// open directory before we return. In this case, we simply skip
+				// sorting and adding entry names to the work queue beforehand.
+				childrenNames = nil
 			}
+
 			// NOTE: Sort children names to ensure deterministic ordering of
-			// contents of each directory, so hash remains same even if
+			// contents of each directory, ensuring hash remains same even if
 			// operating system returns same values in a different order on
 			// subsequent invocation.
 			sort.Strings(childrenNames)
 
 			for _, childName := range childrenNames {
 				switch childName {
-				case ".", "..", "vendor":
+				case ".", "..", "vendor", ".bzr", ".git", ".hg", ".svn":
 					// skip
 				default:
 					pathnameQueue = append(pathnameQueue, pathname+pathSeparator+childName)
 				}
 			}
 		} else {
-			// NOTE: Format the file size as a base 10 integer, and ignore
-			// return values from writing to the hash, because hash write always
-			// returns a nil error.
-			_, _ = h.Write([]byte(strconv.FormatInt(fi.Size(), 10)))
+			_, _ = h.Write([]byte(strconv.FormatInt(fi.Size(), 10))) // format file size as base 10 integer
 			_, er = io.Copy(h, fh)
-			err = errors.Wrap(er, "cannot read file") // errors.Wrap only wraps non-nil, so elide checking here
+			err = errors.Wrap(er, "cannot Copy") // errors.Wrap only wraps non-nil, so elide checking here
 		}
 
-	skipNode:
 		// NOTE: Close the file handle to the open directory or file.
 		if er = fh.Close(); err == nil {
-			err = errors.Wrap(er, "cannot close")
+			err = errors.Wrap(er, "cannot Close")
 		}
 		if err != nil {
-			return // early termination if error
+			return // early termination iff error
 		}
 	}
 
