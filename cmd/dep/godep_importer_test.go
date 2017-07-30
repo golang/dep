@@ -236,7 +236,7 @@ func TestGodepConfig_Import(t *testing.T) {
 		t.Fatal("Expected the lock to be generated")
 	}
 
-	goldenFile := "godep/want_import_output.txt"
+	goldenFile := "godep/expected_import_output.txt"
 	got := verboseOutput.String()
 	want := h.GetTestFileString(goldenFile)
 	if want != got {
