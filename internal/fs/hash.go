@@ -36,7 +36,10 @@ func HashFromNode(pathname string) (hash string, err error) {
 	// hash for each node we encounter.
 	h := sha256.New()
 
-	// Initialize a work queue with the os-agnostic cleaned up pathname.
+	// Initialize a work queue with the os-agnostic cleaned up pathname. Note
+	// that we use `filepath.Clean` rather than `filepath.Abs`, because we don't
+	// want the hash to be based on the absolute pathnames of the specified
+	// directory and contents.
 	pathnameQueue := []string{filepath.Clean(pathname)}
 
 	for len(pathnameQueue) > 0 {
