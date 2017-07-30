@@ -8,11 +8,15 @@ import (
 	"context"
 	"io/ioutil"
 	"net/url"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"sync"
 	"testing"
+
+	"github.com/golang/dep/internal/test"
 )
 
 // Parent test that executes all the slow vcs interaction tests in parallel.
@@ -321,7 +325,7 @@ func testBzrSourceInteractions(t *testing.T) {
 
 	err = isrc.initLocal(ctx)
 	if err != nil {
-		t.Fatalf("Error on cloning git repo: %s", err)
+		t.Fatalf("Error on cloning bzr repo: %s", err)
 	}
 
 	src, ok := isrc.(*bzrSource)
@@ -433,7 +437,7 @@ func testHgSourceInteractions(t *testing.T) {
 
 		err = isrc.initLocal(ctx)
 		if err != nil {
-			t.Fatalf("Error on cloning git repo: %s", err)
+			t.Fatalf("Error on cloning hg repo: %s", err)
 		}
 
 		src, ok := isrc.(*hgSource)
@@ -518,6 +522,114 @@ func testHgSourceInteractions(t *testing.T) {
 	})
 
 	<-donech
+}
+
+func Test_bzrSource_exportRevisionTo_removeVcsFiles(t *testing.T) {
+	t.Parallel()
+
+	// This test is slow, so skip it on -short
+	if testing.Short() {
+		t.Skip("Skipping hg source version fetching test in short mode")
+	}
+	requiresBins(t, "bzr")
+
+	h := test.NewHelper(t)
+	defer h.Cleanup()
+	h.TempDir("smcache")
+	cpath := h.Path("smcache")
+	repoPath := filepath.Join(h.Path("."), "repo")
+
+	rev := Revision("matt@mattfarina.com-20150731135137-pbphasfppmygpl68")
+	n := "launchpad.net/govcstestbzrrepo"
+	un := "https://" + n
+	u, err := url.Parse(un)
+	if err != nil {
+		t.Errorf("URL was bad, lolwut? errtext: %s", err)
+		return
+	}
+	mb := maybeBzrSource{u}
+
+	ctx := context.Background()
+	superv := newSupervisor(ctx)
+	isrc, _, err := mb.try(ctx, cpath, newMemoryCache(), superv)
+	if err != nil {
+		t.Fatalf("unexpected error while setting up hgSource for test repo: %s", err)
+	}
+
+	err = isrc.initLocal(ctx)
+	if err != nil {
+		t.Fatalf("Error on cloning bzr repo: %s", err)
+	}
+
+	src, ok := isrc.(*bzrSource)
+	if !ok {
+		t.Fatalf("expected a bzrSource, got a %T", isrc)
+	}
+
+	if err := src.exportRevisionTo(ctx, rev, repoPath); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	_, err = os.Stat(filepath.Join(repoPath, ".bzr"))
+	if err == nil {
+		t.Fatal("expected .bzr/ to not exists")
+	} else if !os.IsNotExist(err) {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func Test_hgSource_exportRevisionTo_removeVcsFiles(t *testing.T) {
+	t.Parallel()
+
+	// This test is slow, so skip it on -short
+	if testing.Short() {
+		t.Skip("Skipping hg source version fetching test in short mode")
+	}
+	requiresBins(t, "hg")
+
+	h := test.NewHelper(t)
+	defer h.Cleanup()
+	h.TempDir("smcache")
+	cpath := h.Path("smcache")
+	repoPath := filepath.Join(h.Path("."), "repo")
+
+	rev := Revision("6f55e1f03d91f8a7cce35d1968eb60a2352e4d59")
+	n := "bitbucket.org/golang-dep/dep-test"
+	un := "https://" + n
+	u, err := url.Parse(un)
+	if err != nil {
+		t.Errorf("URL was bad, lolwut? errtext: %s", err)
+		return
+	}
+	mb := maybeHgSource{u}
+
+	ctx := context.Background()
+	superv := newSupervisor(ctx)
+	isrc, _, err := mb.try(ctx, cpath, newMemoryCache(), superv)
+	if err != nil {
+		t.Fatalf("unexpected error while setting up hgSource for test repo: %s", err)
+	}
+
+	err = isrc.initLocal(ctx)
+	if err != nil {
+		t.Fatalf("Error on cloning hg repo: %s", err)
+	}
+
+	src, ok := isrc.(*hgSource)
+	if !ok {
+		t.Fatalf("expected a hgSource, got a %T", isrc)
+	}
+
+	if err := src.exportRevisionTo(ctx, rev, repoPath); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	_, err = os.Stat(filepath.Join(repoPath, ".hg"))
+	if err == nil {
+		t.Fatal("expected .hg/ to not exists")
+	} else if !os.IsNotExist(err) {
+		t.Fatalf("unexpected error: %v", err)
+	}
 }
 
 // Fail a test if the specified binaries aren't installed.
