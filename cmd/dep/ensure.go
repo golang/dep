@@ -6,13 +6,11 @@ package main
 
 import (
 	"bytes"
-	"encoding/hex"
 	"flag"
 	"go/build"
 	"os"
 	"path/filepath"
 	"sort"
-	"strconv"
 	"strings"
 
 	"github.com/golang/dep"
@@ -633,119 +631,43 @@ func (s *stringSlice) Set(value string) error {
 	*s = append(*s, value)
 	return nil
 }
-
 func getProjectConstraint(arg string, sm gps.SourceManager) (gps.ProjectConstraint, string, error) {
 	emptyPC := gps.ProjectConstraint{
 		Constraint: gps.Any(), // default to any; avoids panics later
 	}
 
-	path, source, versionStr := parseSpecArg(arg)
-	pr, err := sm.DeduceProjectRoot(path)
-	if err != nil {
-		return emptyPC, "", errors.Wrapf(err, "could not infer project root from dependency path: %s", path) // this should go through to the user
-	}
-
-	pi := gps.ProjectIdentifier{ProjectRoot: pr, Source: source}
-	var c gps.Constraint
-	if versionStr != "" {
-		c, err = deduceConstraint(versionStr, pi, sm)
-		if err != nil {
-			return emptyPC, "", err
-		}
-	} else {
-		c = gps.Any()
-	}
-	return gps.ProjectConstraint{Ident: pi, Constraint: c}, path, nil
-}
-
-// parseSpecArg takes a spec, as provided to dep ensure on the CLI, and splits
-// it into its constitutent path, source, and constraint parts.
-func parseSpecArg(arg string) (path, source, constraint string) {
-	path = arg
 	// try to split on '@'
 	// When there is no `@`, use any version
+	versionStr := "*"
 	atIndex := strings.Index(arg, "@")
 	if atIndex > 0 {
 		parts := strings.SplitN(arg, "@", 2)
-		path = parts[0]
-		constraint = parts[1]
+		arg = parts[0]
+		versionStr = parts[1]
 	}
 
+	// TODO: if we decide to keep equals.....
+
 	// split on colon if there is a network location
+	var source string
 	colonIndex := strings.Index(arg, ":")
 	if colonIndex > 0 {
 		parts := strings.SplitN(arg, ":", 2)
-		path = parts[0]
+		arg = parts[0]
 		source = parts[1]
 	}
 
-	return path, source, constraint
-}
-
-// deduceConstraint tries to puzzle out what kind of version is given in a string -
-// semver, a revision, or as a fallback, a plain tag
-func deduceConstraint(s string, pi gps.ProjectIdentifier, sm gps.SourceManager) (gps.Constraint, error) {
-	if s == "" {
-		// Find the default branch
-		versions, err := sm.ListVersions(pi)
-		if err != nil {
-			return nil, errors.Wrapf(err, "list versions for %s(%s)", pi.ProjectRoot, pi.Source) // means repo does not exist
-		}
-
-		gps.SortPairedForUpgrade(versions)
-		for _, v := range versions {
-			if v.Type() == gps.IsBranch {
-				return v.Unpair(), nil
-			}
-		}
-	}
-
-	// always semver if we can
-	c, err := gps.NewSemverConstraintIC(s)
-	if err == nil {
-		return c, nil
-	}
-
-	slen := len(s)
-	if slen == 40 {
-		if _, err = hex.DecodeString(s); err == nil {
-			// Whether or not it's intended to be a SHA1 digest, this is a
-			// valid byte sequence for that, so go with Revision. This
-			// covers git and hg
-			return gps.Revision(s), nil
-		}
-	}
-	// Next, try for bzr, which has a three-component GUID separated by
-	// dashes. There should be two, but the email part could contain
-	// internal dashes
-	if strings.Count(s, "-") >= 2 {
-		// Work from the back to avoid potential confusion from the email
-		i3 := strings.LastIndex(s, "-")
-		// Skip if - is last char, otherwise this would panic on bounds err
-		if slen == i3+1 {
-			return gps.NewVersion(s), nil
-		}
-
-		i2 := strings.LastIndex(s[:i3], "-")
-		if _, err = strconv.ParseUint(s[i2+1:i3], 10, 64); err == nil {
-			// Getting this far means it'd pretty much be nuts if it's not a
-			// bzr rev, so don't bother parsing the email.
-			return gps.Revision(s), nil
-		}
-	}
-
-	// call out to network and get the package's versions
-	versions, err := sm.ListVersions(pi)
+	pr, err := sm.DeduceProjectRoot(arg)
 	if err != nil {
-		return nil, errors.Wrapf(err, "list versions for %s(%s)", pi.ProjectRoot, pi.Source) // means repo does not exist
+		return emptyPC, "", errors.Wrapf(err, "could not infer project root from dependency path: %s", arg) // this should go through to the user
 	}
 
-	for _, version := range versions {
-		if s == version.String() {
-			return version.Unpair(), nil
-		}
+	pi := gps.ProjectIdentifier{ProjectRoot: pr, Source: source}
+	c, err := sm.InferConstraint(versionStr, pi)
+	if err != nil {
+		return emptyPC, "", err
 	}
-	return nil, errors.Errorf("%s is not a valid version for the package %s(%s)", s, pi.ProjectRoot, pi.Source)
+	return gps.ProjectConstraint{Ident: pi, Constraint: c}, arg, nil
 }
 
 func checkErrors(m map[string]pkgtree.PackageOrErr) error {

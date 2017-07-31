@@ -26,7 +26,7 @@ specified, use the current directory.
 
 When configuration for another dependency management tool is detected, it is
 imported into the initial manifest and lock. Use the -skip-tools flag to
-disable this behavior. The following external tools are supported: glide.
+disable this behavior. The following external tools are supported: glide, godep.
 Any dependencies that are not constrained by external configuration use the
 GOPATH analysis below.
 
@@ -116,22 +116,23 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 		return errors.Errorf("invalid state: manifest %q does not exist, but lock %q does", mf, lf)
 	}
 
-	ip, err := ctx.SplitAbsoluteProjectRoot(root)
+	ip, err := ctx.ImportForAbs(root)
 	if err != nil {
-		return errors.Wrap(err, "determineProjectRoot")
+		return errors.Wrap(err, "root project import")
 	}
 	p.ImportRoot = gps.ProjectRoot(ip)
 
-	pkgT, directDeps, err := getDirectDependencies(p)
-	if err != nil {
-		return err
-	}
 	sm, err := ctx.SourceManager()
 	if err != nil {
 		return errors.Wrap(err, "getSourceManager")
 	}
 	sm.UseDefaultSignalHandling()
 	defer sm.Release()
+
+	pkgT, directDeps, err := getDirectDependencies(sm, p)
+	if err != nil {
+		return err
+	}
 
 	// Initialize with imported data, then fill in the gaps using the GOPATH
 	rootAnalyzer := newRootAnalyzer(cmd.skipTools, ctx, directDeps, sm)
@@ -207,7 +208,7 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 	return nil
 }
 
-func getDirectDependencies(p *dep.Project) (pkgtree.PackageTree, map[string]bool, error) {
+func getDirectDependencies(sm gps.SourceManager, p *dep.Project) (pkgtree.PackageTree, map[string]bool, error) {
 	pkgT, err := pkgtree.ListPackages(p.ResolvedAbsRoot, string(p.ImportRoot))
 	if err != nil {
 		return pkgtree.PackageTree{}, nil, errors.Wrap(err, "gps.ListPackages")
@@ -215,8 +216,12 @@ func getDirectDependencies(p *dep.Project) (pkgtree.PackageTree, map[string]bool
 
 	directDeps := map[string]bool{}
 	rm, _ := pkgT.ToReachMap(true, true, false, nil)
-	for _, pr := range rm.FlattenFn(paths.IsStandardImportPath) {
-		directDeps[pr] = true
+	for _, ip := range rm.FlattenFn(paths.IsStandardImportPath) {
+		pr, err := sm.DeduceProjectRoot(ip)
+		if err != nil {
+			return pkgtree.PackageTree{}, nil, err
+		}
+		directDeps[string(pr)] = true
 	}
 
 	return pkgT, directDeps, nil

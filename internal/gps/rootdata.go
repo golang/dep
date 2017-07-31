@@ -80,8 +80,7 @@ func (rd rootdata) externalImportList(stdLibFn func(string) bool) []string {
 }
 
 func (rd rootdata) getApplicableConstraints(stdLibFn func(string) bool) []workingConstraint {
-	// Merge the normal and test constraints together
-	pc := rd.rm.DependencyConstraints().merge(rd.rm.TestDependencyConstraints())
+	pc := rd.rm.DependencyConstraints()
 
 	// Ensure that overrides which aren't in the combined pc map already make it
 	// in. Doing so makes input hashes equal in more useful cases.
@@ -139,7 +138,7 @@ func (rd rootdata) getApplicableConstraints(stdLibFn func(string) bool) []workin
 }
 
 func (rd rootdata) combineConstraints() []workingConstraint {
-	return rd.ovr.overrideAll(rd.rm.DependencyConstraints().merge(rd.rm.TestDependencyConstraints()))
+	return rd.ovr.overrideAll(rd.rm.DependencyConstraints())
 }
 
 // needVersionListFor indicates whether we need a version list for a given

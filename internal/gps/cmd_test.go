@@ -16,7 +16,7 @@ import (
 func mkTestCmd(iterations int) *monitoredCmd {
 	return newMonitoredCmd(
 		exec.Command("./echosleep", "-n", fmt.Sprint(iterations)),
-		500*time.Millisecond,
+		490*time.Millisecond,
 	)
 }
 
@@ -32,49 +32,60 @@ func TestMonitoredCmd(t *testing.T) {
 	}
 	defer os.Remove("./echosleep")
 
-	cmd := mkTestCmd(2)
-	err = cmd.run(context.Background())
-	if err != nil {
-		t.Errorf("Expected command not to fail: %s", err)
+	tests := []struct {
+		name       string
+		iterations int
+		output     string
+		err        bool
+		timeout    bool
+	}{
+		{"success", 2, "foo\nfoo\n", false, false},
+		{"timeout", 5, "foo\nfoo\nfoo\nfoo\n", true, true},
 	}
 
-	expectedOutput := "foo\nfoo\n"
-	if cmd.stdout.buf.String() != expectedOutput {
-		t.Errorf("Unexpected output:\n\t(GOT): %s\n\t(WNT): %s", cmd.stdout.buf.String(), expectedOutput)
+	for _, want := range tests {
+		t.Run(want.name, func(t *testing.T) {
+			cmd := mkTestCmd(want.iterations)
+
+			err := cmd.run(context.Background())
+			if !want.err && err != nil {
+				t.Errorf("Eexpected command not to fail, got error: %s", err)
+			} else if want.err && err == nil {
+				t.Error("expected command to fail")
+			}
+
+			got := cmd.stdout.String()
+			if want.output != got {
+				t.Errorf("unexpected output:\n\t(GOT):\n%s\n\t(WNT):\n%s", got, want.output)
+			}
+
+			if want.timeout {
+				_, ok := err.(*noProgressError)
+				if !ok {
+					t.Errorf("Expected a timeout error, but got: %s", err)
+				}
+			}
+		})
 	}
 
-	cmd2 := mkTestCmd(10)
-	err = cmd2.run(context.Background())
-	if err == nil {
-		t.Error("Expected command to fail")
-	}
+	t.Run("cancel", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		sync, errchan := make(chan struct{}), make(chan error)
+		cmd := mkTestCmd(2)
+		go func() {
+			close(sync)
+			errchan <- cmd.run(ctx)
+		}()
 
-	_, ok := err.(*timeoutError)
-	if !ok {
-		t.Errorf("Expected a timeout error, but got: %s", err)
-	}
+		// Make sure goroutine is at least started before we cancel the context.
+		<-sync
+		// Give it a bit to get the process started.
+		<-time.After(5 * time.Millisecond)
+		cancel()
 
-	expectedOutput = "foo\nfoo\nfoo\nfoo\n"
-	if cmd2.stdout.buf.String() != expectedOutput {
-		t.Errorf("Unexpected output:\n\t(GOT): %s\n\t(WNT): %s", cmd2.stdout.buf.String(), expectedOutput)
-	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	sync1, errchan := make(chan struct{}), make(chan error)
-	cmd3 := mkTestCmd(2)
-	go func() {
-		close(sync1)
-		errchan <- cmd3.run(ctx)
-	}()
-
-	// Make sure goroutine is at least started before we cancel the context.
-	<-sync1
-	// Give it a bit to get the process started.
-	<-time.After(5 * time.Millisecond)
-	cancel()
-
-	err = <-errchan
-	if err != context.Canceled {
-		t.Errorf("should have gotten canceled error, got %s", err)
-	}
+		err := <-errchan
+		if err != context.Canceled {
+			t.Errorf("expected a canceled error, got %s", err)
+		}
+	})
 }

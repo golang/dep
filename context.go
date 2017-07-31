@@ -9,9 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"strings"
 
-	"github.com/Masterminds/vcs"
 	"github.com/golang/dep/internal/fs"
 	"github.com/golang/dep/internal/gps"
 	"github.com/pkg/errors"
@@ -43,18 +41,8 @@ type Ctx struct {
 	Verbose    bool        // Enables more verbose logging.
 }
 
-// SetPaths sets the WorkingDir and GOPATHSs fields.
-//
-//	ctx := &dep.Ctx{
-//		Out: log.New(os.Stdout, "", 0),
-//		Err: log.New(os.Stderr, "", 0),
-//	}
-//
-//	err := ctx.SetPaths(workingDir, filepath.SplitList(os.Getenv("GOPATH"))
-//	if err != nil {
-//		// Empty GOPATH
-//	}
-//
+// SetPaths sets the WorkingDir and GOPATHs fields. If GOPATHs is empty, then
+// the GOPATH environment variable (or the default GOPATH) is used instead.
 func (c *Ctx) SetPaths(wd string, GOPATHs ...string) error {
 	if wd == "" {
 		return errors.New("cannot set Ctx.WorkingDir to an empty path")
@@ -62,24 +50,16 @@ func (c *Ctx) SetPaths(wd string, GOPATHs ...string) error {
 	c.WorkingDir = wd
 
 	if len(GOPATHs) == 0 {
-		GOPATHs = getGOPATHs(os.Environ())
+		GOPATH := os.Getenv("GOPATH")
+		if GOPATH == "" {
+			GOPATH = defaultGOPATH()
+		}
+		GOPATHs = filepath.SplitList(GOPATH)
 	}
-	for _, gp := range GOPATHs {
-		c.GOPATHs = append(c.GOPATHs, filepath.ToSlash(gp))
-	}
+
+	c.GOPATHs = append(c.GOPATHs, GOPATHs...)
 
 	return nil
-}
-
-// getGOPATH returns the GOPATHs from the passed environment variables.
-// If GOPATH is not defined, fallback to defaultGOPATH().
-func getGOPATHs(env []string) []string {
-	GOPATH := os.Getenv("GOPATH")
-	if GOPATH == "" {
-		GOPATH = defaultGOPATH()
-	}
-
-	return filepath.SplitList(GOPATH)
 }
 
 // defaultGOPATH gets the default GOPATH that was added in 1.8
@@ -131,9 +111,9 @@ func (c *Ctx) LoadProject() (*Project, error) {
 		return nil, err
 	}
 
-	ip, err := c.SplitAbsoluteProjectRoot(p.AbsRoot)
+	ip, err := c.ImportForAbs(p.AbsRoot)
 	if err != nil {
-		return nil, errors.Wrap(err, "split absolute project root")
+		return nil, errors.Wrap(err, "root project import")
 	}
 	p.ImportRoot = gps.ProjectRoot(ip)
 
@@ -230,21 +210,16 @@ func (c *Ctx) DetectProjectGOPATH(p *Project) (string, error) {
 // detectGOPATH detects the GOPATH for a given path from ctx.GOPATHs.
 func (c *Ctx) detectGOPATH(path string) (string, error) {
 	for _, gp := range c.GOPATHs {
-		if fs.HasFilepathPrefix(filepath.FromSlash(path), gp) {
+		if fs.HasFilepathPrefix(path, gp) {
 			return gp, nil
 		}
 	}
 	return "", errors.Errorf("%s is not within a known GOPATH", path)
 }
 
-// SplitAbsoluteProjectRoot takes an absolute path and compares it against the detected
-// GOPATH to determine what portion of the input path should be treated as an
-// import path - as a project root.
-func (c *Ctx) SplitAbsoluteProjectRoot(path string) (string, error) {
-	if c.GOPATH == "" {
-		return "", errors.Errorf("no GOPATH detected in this context")
-	}
-
+// ImportForAbs returns the import path for an absolute project path by trimming the
+// `$GOPATH/src/` prefix.  Returns an error for paths equal to, or without this prefix.
+func (c *Ctx) ImportForAbs(path string) (string, error) {
 	srcprefix := filepath.Join(c.GOPATH, "src") + string(filepath.Separator)
 	if fs.HasFilepathPrefix(path, srcprefix) {
 		if len(path) <= len(srcprefix) {
@@ -256,13 +231,13 @@ func (c *Ctx) SplitAbsoluteProjectRoot(path string) (string, error) {
 		return filepath.ToSlash(path[len(srcprefix):]), nil
 	}
 
-	return "", errors.Errorf("%s not in any GOPATH", path)
+	return "", errors.Errorf("%s not in GOPATH", path)
 }
 
-// absoluteProjectRoot determines the absolute path to the project root
+// AbsForImport returns the absolute path for the project root
 // including the $GOPATH. This will not work with stdlib packages and the
 // package directory needs to exist.
-func (c *Ctx) absoluteProjectRoot(path string) (string, error) {
+func (c *Ctx) AbsForImport(path string) (string, error) {
 	posspath := filepath.Join(c.GOPATH, "src", path)
 	dirOK, err := fs.IsDir(posspath)
 	if err != nil {
@@ -272,63 +247,4 @@ func (c *Ctx) absoluteProjectRoot(path string) (string, error) {
 		return "", errors.Errorf("%s does not exist", posspath)
 	}
 	return posspath, nil
-}
-
-func (c *Ctx) VersionInWorkspace(root gps.ProjectRoot) (gps.Version, error) {
-	pr, err := c.absoluteProjectRoot(string(root))
-	if err != nil {
-		return nil, errors.Wrapf(err, "determine project root for %s", root)
-	}
-
-	repo, err := vcs.NewRepo("", pr)
-	if err != nil {
-		return nil, errors.Wrapf(err, "creating new repo for root: %s", pr)
-	}
-
-	ver, err := repo.Current()
-	if err != nil {
-		return nil, errors.Wrapf(err, "finding current branch/version for root: %s", pr)
-	}
-
-	rev, err := repo.Version()
-	if err != nil {
-		return nil, errors.Wrapf(err, "getting repo version for root: %s", pr)
-	}
-
-	// First look through tags.
-	tags, err := repo.Tags()
-	if err != nil {
-		return nil, errors.Wrapf(err, "getting repo tags for root: %s", pr)
-	}
-	// Try to match the current version to a tag.
-	if contains(tags, ver) {
-		// Assume semver if it starts with a v.
-		if strings.HasPrefix(ver, "v") {
-			return gps.NewVersion(ver).Pair(gps.Revision(rev)), nil
-		}
-
-		return nil, errors.Errorf("version for root %s does not start with a v: %q", pr, ver)
-	}
-
-	// Look for the current branch.
-	branches, err := repo.Branches()
-	if err != nil {
-		return nil, errors.Wrapf(err, "getting repo branch for root: %s")
-	}
-	// Try to match the current version to a branch.
-	if contains(branches, ver) {
-		return gps.NewBranch(ver).Pair(gps.Revision(rev)), nil
-	}
-
-	return gps.Revision(rev), nil
-}
-
-// contains checks if a array of strings contains a value
-func contains(a []string, b string) bool {
-	for _, v := range a {
-		if b == v {
-			return true
-		}
-	}
-	return false
 }

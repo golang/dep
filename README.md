@@ -8,15 +8,16 @@ Dep is a prototype dependency management tool. It requires Go 1.7 or newer to co
 
 ## Current status
 
-**Alpha**.
-Functionality is known to be broken, missing or incomplete. Changes are planned
-to the CLI commands soon. *It would be unwise to write scripts atop `dep` before then.*
-The repository is open to solicit feedback and contributions from the community.
-Please see below for feedback and contribution guidelines.
+`dep` is safe for production use. That means two things:
 
-`Gopkg.toml` and `Gopkg.lock` have reached a stable structure, and it is safe to
-commit them in your projects. We plan to add more to these files, but we
-guarantee these changes will be backwards-compatible.
+* Any valid metadata file (`Gopkg.toml` and `Gopkg.lock`) will be readable and considered valid by any future version of `dep`.
+* Generally speaking, it has comparable or fewer bugs than other tools out there.
+
+That said, keep in mind the following:
+
+* `dep` is still changing rapidly. If you need stability (e.g. for CI), it's best to rely on a released version, not tip.
+* [Some changes](https://github.com/golang/dep/pull/489) are pending to the CLI interface. Scripting on dep before they land is unwise.
+* `dep`'s exported API interface will continue to change in unpredictable, backwards-incompatible ways until we tag a v1.0.0 release.
 
 ## Context
 
@@ -26,9 +27,9 @@ guarantee these changes will be backwards-compatible.
   - [User Stories](https://docs.google.com/document/d/1wT8e8wBHMrSRHY4UF_60GCgyWGqvYye4THvaDARPySs/edit)
   - [Features](https://docs.google.com/document/d/1JNP6DgSK-c6KqveIhQk-n_HAw3hsZkL-okoleM43NgA/edit)
   - [Design Space](https://docs.google.com/document/d/1TpQlQYovCoX9FkpgsoxzdvZplghudHAiQOame30A-v8/edit)
-- [Frequently Asked Questions](FAQ.md)
+- [Frequently Asked Questions](docs/FAQ.md)
 
-## Usage
+## Setup
 
 Get the tool via
 
@@ -36,20 +37,173 @@ Get the tool via
 $ go get -u github.com/golang/dep/cmd/dep
 ```
 
-Typical usage on a new repo might be
+To start managing dependencies using dep, run the following from your project root directory:
 
 ```sh
 $ dep init
+```
+
+This does the following:
+
+1. Look for [existing dependency management files](docs/FAQ.md#what-external-tools-are-supported) to convert
+1. Check if your dependencies use dep
+1. Identify your dependencies
+1. Back up your existing `vendor/` directory (if you have one) to
+`_vendor-TIMESTAMP/`
+1. Pick the highest compatible version for each dependency
+1. Generate [`Gopkg.toml`](docs/Gopkg.toml.md) ("manifest") and `Gopkg.lock` files
+1. Install the dependencies in `vendor/`
+
+## Usage
+
+There is one main subcommand you will use: `dep ensure`. `ensure` first makes
+sure `Gopkg.lock` is consistent with your `import`s and `Gopkg.toml`. If any
+changes are detected, it then populates `vendor/` with exactly what's described
+in `Gopkg.lock`.
+
+`dep ensure` is safe to run early and often. See the help text for more detailed
+usage instructions.
+
+```sh
+$ dep help ensure
+```
+
+### Installing dependencies
+
+(if your `vendor/` directory isn't [checked in with your code](docs/FAQ.md#should-i-commit-my-vendor-directory))
+
+<!-- may change with https://github.com/golang/dep/pull/489 -->
+
+```sh
+$ dep ensure
+```
+
+If a dependency already exists in your `vendor/` folder, dep will ensure it
+matches the constraints from the manifest. If the dependency is missing from
+`vendor/`, the latest version allowed by your manifest will be installed.
+
+### Adding a dependency
+
+1. `import` the package in your `*.go` source code file(s).
+1. Run the following command to update your `Gopkg.lock` and populate `vendor/` with the new dependency.
+
+    ```sh
+    $ dep ensure
+    ```
+
+### Changing dependencies
+
+If you want to:
+
+* Change the allowed `version`/`branch`/`revision`
+* Switch to using a fork
+
+for one or more dependencies, do the following:
+
+1. Modify your `Gopkg.toml`.
+1. Run
+
+    ```sh
+    $ dep ensure
+    ```
+
+### Checking the status of dependencies
+
+Run `dep status` to see the current status of all your dependencies.
+
+```sh
+$ dep status
+PROJECT                             CONSTRAINT     VERSION        REVISION  LATEST
+github.com/Masterminds/semver       branch 2.x     branch 2.x     139cc09   c2e7f6c
+github.com/Masterminds/vcs          ^1.11.0        v1.11.1        3084677   3084677
+github.com/armon/go-radix           *              branch master  4239b77   4239b77
+```
+
+On top of that, if you have added new imports to your project or modified the manifest file without running `dep ensure` again, `dep status` will tell you there is a mismatch between the lock file and the current status of the project.
+
+```sh
+$ dep status
+Lock inputs-digest mismatch due to the following packages missing from the lock:
+
+PROJECT                         MISSING PACKAGES
+github.com/Masterminds/goutils  [github.com/Masterminds/goutils]
+
+This happens when a new import is added. Run `dep ensure` to install the missing packages.
+```
+
+As `dep status` suggests, run `dep ensure` to update your lockfile. Then run `dep status` again, and the lock mismatch should go away.
+
+### Updating dependencies
+
+(to the latest version allowed by the manifest)
+
+```sh
 $ dep ensure -update
 ```
 
-To update a dependency to a new version, you might run
+### Removing dependencies
 
-```sh
-$ dep ensure github.com/pkg/errors@^0.8.0
-```
+1. Remove the `import`s and all usage from your code.
+1. Run
 
-See the help text for more detailed usage instructions.
+    ```sh
+    $ dep ensure
+    ```
+
+1. Remove from `Gopkg.toml`, if it was in there.
+
+### Testing changes to a dependency
+
+Making changes in your `vendor/` directory directly is not recommended, as dep
+will overwrite any changes. Instead:
+
+1. Delete the dependency from the `vendor/` directory.
+
+    ```sh
+    rm -rf vendor/<dependency>
+    ```
+
+1. Add that dependency to your `GOPATH`, if it isn't already.
+
+    ```sh
+    $ go get <dependency>
+    ```
+
+1. Modify the dependency in `$GOPATH/src/<dependency>`.
+1. Test, build, etc.
+
+Don't run `dep ensure` until you're done. `dep ensure` will reinstall the
+dependency into `vendor/` based on your manifest, as if you were installing from
+scratch.
+
+This solution works for short-term use, but for something long-term, take a look
+at [virtualgo](https://github.com/GetStream/vg).
+
+To test out code that has been pushed as a new version, or to a branch or fork,
+see [changing dependencies](#changing-dependencies).
+
+## Semantic Versioning
+
+`dep ensure` a uses an external [semver library](https://github.com/Masterminds/semver) to interpret the version constraints you specify in the manifest. The comparison operators are:
+
+* `=`: equal
+* `!=`: not equal
+* `>`: greater than
+* `<`: less than
+* `>=`: greater than or equal to
+* `<=`: less than or equal to
+* `-`: literal range. Eg: 1.2 - 1.4.5 is equivalent to >= 1.2, <= 1.4.5
+* `~`: minor range. Eg: ~1.2.3 is equivalent to >= 1.2.3, < 1.3.0
+* `^`: major range. Eg: ^1.2.3 is equivalent to >= 1.2.3, < 2.0.0
+* `[xX*]`: wildcard. Eg: 1.2.x is equivalent to >= 1.2.0, < 1.3.0
+
+You might, for example, include a constraint in your manifest that specifies `version = "=2.0.0"` to pin a dependency to version 2.0.0, or constrain to minor releases with: `version = "2.*"`. Refer to the [semver library](https://github.com/Masterminds/semver) documentation for more info.
+
+**Note**: When you specify a version *without an operator*, `dep` automatically uses the `^` operator by default. `dep ensure` will interpret the given version as the min-boundry of a range, for example:
+
+* `1.2.3` becomes the range `>=1.2.3, <2.0.0`
+* `0.2.3` becomes the range `>=0.2.3, <0.3.0`
+* `0.0.3` becomes the range `>=0.0.3, <0.1.0`
 
 ## Feedback
 
@@ -57,7 +211,7 @@ Feedback is greatly appreciated.
 At this stage, the maintainers are most interested in feedback centered on the user experience (UX) of the tool.
 Do you have workflows that the tool supports well, or doesn't support at all?
 Do any of the commands have surprising effects, output, or results?
-Please check the existing issues and [FAQ](FAQ.md) to see if your feedback has already been reported.
+Please check the existing issues and [FAQ](docs/FAQ.md) to see if your feedback has already been reported.
 If not, please file an issue, describing what you did or wanted to do, what you expected to happen, and what actually happened.
 
 ## Contributing
@@ -67,4 +221,3 @@ The maintainers actively manage the issues list, and try to highlight issues sui
 The project follows the typical GitHub pull request model.
 See [CONTRIBUTING.md](CONTRIBUTING.md) for more details.
 Before starting any work, please either comment on an existing issue, or file a new one.
-

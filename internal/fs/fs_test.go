@@ -112,7 +112,7 @@ func TestHasFilepathPrefix_Files(t *testing.T) {
 	}
 
 	existingFile := filepath.Join(dir, "exists")
-	if _, err := os.Create(existingFile); err != nil {
+	if err = os.MkdirAll(existingFile, 0755); err != nil {
 		t.Fatal(err)
 	}
 
@@ -123,8 +123,8 @@ func TestHasFilepathPrefix_Files(t *testing.T) {
 		prefix string
 		want   bool
 	}{
-		{existingFile, filepath.Join(dir2), false},
-		{nonExistingFile, filepath.Join(dir2), true},
+		{existingFile, filepath.Join(dir2), true},
+		{nonExistingFile, filepath.Join(dir2), false},
 	}
 
 	for _, c := range cases {
@@ -733,7 +733,7 @@ func TestIsDir(t *testing.T) {
 	}{
 		wd: {true, false},
 		filepath.Join(wd, "testdata"):                       {true, false},
-		filepath.Join(wd, "main.go"):                        {false, false},
+		filepath.Join(wd, "main.go"):                        {false, true},
 		filepath.Join(wd, "this_file_does_not_exist.thing"): {false, true},
 		dn: {false, true},
 	}
@@ -748,13 +748,8 @@ func TestIsDir(t *testing.T) {
 
 	for f, want := range tests {
 		got, err := IsDir(f)
-		if err != nil {
-			if want.exists != got {
-				t.Fatalf("expected %t for %s, got %t", want.exists, f, got)
-			}
-			if !want.err {
-				t.Fatalf("expected no error, got %v", err)
-			}
+		if err != nil && !want.err {
+			t.Fatalf("expected no error, got %v", err)
 		}
 
 		if got != want.exists {
@@ -763,7 +758,7 @@ func TestIsDir(t *testing.T) {
 	}
 }
 
-func TestIsEmpty(t *testing.T) {
+func TestIsNonEmptyDir(t *testing.T) {
 	wd, err := os.Getwd()
 	if err != nil {
 		t.Fatal(err)
@@ -773,33 +768,47 @@ func TestIsEmpty(t *testing.T) {
 	defer h.Cleanup()
 
 	h.TempDir("empty")
-	tests := map[string]string{
-		wd:                                                  "true",
-		"testdata":                                          "true",
-		filepath.Join(wd, "fs.go"):                          "err",
-		filepath.Join(wd, "this_file_does_not_exist.thing"): "false",
-		h.Path("empty"):                                     "false",
+
+	testCases := []struct {
+		path  string
+		empty bool
+		err   bool
+	}{
+		{wd, true, false},
+		{"testdata", true, false},
+		{filepath.Join(wd, "fs.go"), false, true},
+		{filepath.Join(wd, "this_file_does_not_exist.thing"), false, false},
+		{h.Path("empty"), false, false},
 	}
 
-	for f, want := range tests {
-		empty, err := IsNonEmptyDir(f)
-		if want == "err" {
-			if err == nil {
-				t.Fatalf("Wanted an error for %v, but it was nil", f)
+	// This test case doesn't work on Microsoft Windows because of the
+	// differences in how file permissions are implemented.
+	if runtime.GOOS != "windows" {
+		var inaccessibleDir string
+		cleanup := setupInaccessibleDir(t, func(dir string) error {
+			inaccessibleDir = filepath.Join(dir, "empty")
+			return os.Mkdir(inaccessibleDir, 0777)
+		})
+		defer cleanup()
+
+		testCases = append(testCases, struct {
+			path  string
+			empty bool
+			err   bool
+		}{inaccessibleDir, false, true})
+	}
+
+	for _, want := range testCases {
+		got, err := IsNonEmptyDir(want.path)
+		if want.err && err == nil {
+			if got {
+				t.Fatalf("wanted false with error for %v, but got true", want.path)
 			}
-			if empty {
-				t.Fatalf("Wanted false with error for %v, but got true", f)
-			}
-		} else if err != nil {
-			t.Fatalf("Wanted no error for %v, got %v", f, err)
+			t.Fatalf("wanted an error for %v, but it was nil", want.path)
 		}
 
-		if want == "true" && !empty {
-			t.Fatalf("Wanted true for %v, but got false", f)
-		}
-
-		if want == "false" && empty {
-			t.Fatalf("Wanted false for %v, but got true", f)
+		if got != want.empty {
+			t.Fatalf("wanted %t for %v, but got %t", want.empty, want.path, got)
 		}
 	}
 }
