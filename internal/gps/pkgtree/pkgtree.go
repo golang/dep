@@ -16,6 +16,8 @@ import (
 	"strconv"
 	"strings"
 	"unicode"
+
+	"github.com/karrick/dep/internal/fs"
 )
 
 // Package represents a Go package. It contains a subset of the information
@@ -920,4 +922,53 @@ func uniq(a []string) []string {
 		}
 	}
 	return a[:i]
+}
+
+var pathSeparator = string(filepath.Separator)
+
+// HashVendorTree returns an associative array of the libraries found in the
+// specified vendor directory, paired with their deterministic hash of their
+// contents. The output keys are the library names, e.g.,
+// "github.com/Masterminds/semver", while the value is the respective directory
+// contents hash.
+//
+// QUESTION: Do we signal an error if extra files or directories found that do
+// not fit mold of expectations above?
+func HashVendorTree(vendorPathname string) (map[string]string, error) {
+	vendorPathname = filepath.Clean(vendorPathname)
+
+	components := strings.Split(vendorPathname, pathSeparator)
+	maxDepth := len(components) + 3 // focus on 3 directory levels below vendor directory
+
+	prefixLength := len(vendorPathname)
+	if prefixLength > 0 {
+		prefixLength += len(pathSeparator) // if not empty string, include len of path separator
+	}
+
+	status := make(map[string]string)
+
+	err := filepath.Walk(vendorPathname, func(pathname string, fi os.FileInfo, err error) error {
+		if err != nil && err != filepath.SkipDir {
+			return err
+		}
+
+		// How many levels deep is pathname below the directory specified by
+		// vendorPathname?
+		if depth := len(strings.Split(pathname, pathSeparator)); depth > maxDepth {
+			return filepath.SkipDir
+		} else if depth == maxDepth {
+			libraryName := pathname[prefixLength:] // chop off the prefix
+			sum, err := fs.HashFromNode(vendorPathname, libraryName)
+			if err != nil {
+				return err
+			}
+			status[libraryName] = sum
+		}
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+	return status, nil
 }

@@ -1983,3 +1983,11 @@ func getTestdataRootDir(t *testing.T) string {
 	}
 	return filepath.Join(cwd, "..", "_testdata")
 }
+
+func TestHashVendorTree(t *testing.T) {
+	status, err := HashVendorTree("../../../vendor")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("status: %#v\n", status)
+}
