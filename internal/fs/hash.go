@@ -12,10 +12,13 @@ import (
 	"github.com/pkg/errors"
 )
 
-var pathSeparator = string(os.PathSeparator)
+var pathSeparator = string(filepath.Separator)
 
-// HashFromNode returns a deterministic hash of the file system node specified
-// by pathname, performing a breadth-first traversal of directories.
+// HashFromNode returns a deterministic hash of the specified file system node,
+// performing a breadth-first traversal of directories. While the specified
+// prefix is joined with the pathname to walk the file system, the prefix string
+// is eliminated from the pathname of the nodes encounted when hashing the
+// pathnames.
 //
 // This function ignores any file system node named `vendor`, `.bzr`, `.git`,
 // `.hg`, and `.svn`, as these are typically used as Version Control System
@@ -31,16 +34,23 @@ var pathSeparator = string(os.PathSeparator)
 // While filepath.Walk could have been used, that standard library function
 // skips symbolic links, and for now, we want to hash the referent string of
 // symbolic links.
-func HashFromNode(pathname string) (hash string, err error) {
+func HashFromNode(prefix, pathname string) (hash string, err error) {
 	// Create a single hash instance for the entire operation, rather than a new
 	// hash for each node we encounter.
 	h := sha256.New()
+
+	// "../../../vendor", "github.com/account/library"
+	prefixLength := len(prefix)
+	if prefixLength > 0 {
+		prefixLength += len(pathSeparator) // if not empty string, include len of path separator
+	}
+	joined := filepath.Join(prefix, pathname)
 
 	// Initialize a work queue with the os-agnostic cleaned up pathname. Note
 	// that we use `filepath.Clean` rather than `filepath.Abs`, because we don't
 	// want the hash to be based on the absolute pathnames of the specified
 	// directory and contents.
-	pathnameQueue := []string{filepath.Clean(pathname)}
+	pathnameQueue := []string{joined}
 
 	for len(pathnameQueue) > 0 {
 		// NOTE: unshift a pathname from the queue
@@ -59,7 +69,7 @@ func HashFromNode(pathname string) (hash string, err error) {
 		//
 		// NOTE: Throughout this function, we ignore return values from writing
 		// to the hash, because hash write always returns nil error.
-		_, _ = h.Write([]byte(pathname))
+		_, _ = h.Write([]byte(pathname)[prefixLength:])
 
 		if fi.Mode()&os.ModeSymlink != 0 {
 			referent, er := os.Readlink(pathname)
