@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strings"
 	"testing"
 	"time"
 )
@@ -26,7 +27,7 @@ func TestMonitoredCmd(t *testing.T) {
 		t.Skip("skipping test with sleeps on short")
 	}
 
-	err := exec.Command("go", "build", "./_testdata/cmd/echosleep.go").Run()
+	err := exec.Command("go", "build", "./_testdata/cmd/echosleep/echosleep.go").Run()
 	if err != nil {
 		t.Errorf("Unable to build echosleep binary: %s", err)
 	}
@@ -88,4 +89,36 @@ func TestMonitoredCmd(t *testing.T) {
 			t.Errorf("expected a canceled error, got %s", err)
 		}
 	})
+}
+
+func TestCombinedOutput(t *testing.T) {
+	// Compile makes this a bit slow
+	if testing.Short() {
+		t.Skip("skipping test with compilation on short")
+	}
+
+	err := exec.Command("go", "build", "./_testdata/cmd/stdout_stderr/stdout_stderr.go").Run()
+	if err != nil {
+		t.Errorf("Unable to build stdout_stderr binary: %s", err)
+	}
+	defer os.Remove("./stdout_stderr")
+
+	cmd := newMonitoredCmd(
+		exec.Command("./stdout_stderr"),
+		490*time.Millisecond,
+	)
+
+	out, err := cmd.combinedOutput(context.Background())
+	if err != nil {
+		t.Errorf("Unexpected error: %s", err)
+	}
+
+	output := string(out)
+	if !strings.Contains(output, "stdout") {
+		t.Errorf("Expecting to receive output from stdout")
+	}
+
+	if !strings.Contains(output, "stderr") {
+		t.Errorf("Expecting to receive output from stderr")
+	}
 }
