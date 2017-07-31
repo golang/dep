@@ -1998,7 +1998,7 @@ func TestHashVendorTree(t *testing.T) {
 var goSource = filepath.Join(os.Getenv("GOPATH"), "src")
 
 func TestHashVendorTreeGoSource(t *testing.T) {
-	t.Skip("long test if lots of files in $GOPATH/src")
+	t.Skip("long test of lots of files in $GOPATH/src")
 	status, err := HashVendorTree(goSource)
 	if err != nil {
 		t.Fatal(err)
