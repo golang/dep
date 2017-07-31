@@ -73,7 +73,7 @@ func (cf ConstraintFeedback) LogFeedback(logger *log.Logger) {
 	if cf.Constraint != "" {
 		logger.Printf("  %v", GetUsingFeedback(cf.Constraint, cf.ConstraintType, cf.DependencyType, cf.ProjectPath))
 	}
-	if cf.LockedVersion != "" && cf.Revision != "" {
+	if cf.Revision != "" {
 		logger.Printf("  %v", GetLockingFeedback(cf.LockedVersion, cf.Revision, cf.DependencyType, cf.ProjectPath))
 	}
 }
@@ -104,6 +104,9 @@ func GetLockingFeedback(version, revision, depType, projectPath string) string {
 	}
 
 	if depType == DepTypeImported {
+		if version == "" {
+			version = "*"
+		}
 		return fmt.Sprintf("Trying %s (%s) as initial lock for %s %s", version, revision, depType, projectPath)
 	}
 	return fmt.Sprintf("Locking in %s (%s) for %s %s", version, revision, depType, projectPath)

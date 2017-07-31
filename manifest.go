@@ -316,12 +316,6 @@ func (m *Manifest) DependencyConstraints() gps.ProjectConstraints {
 	return m.Constraints
 }
 
-// TestDependencyConstraints remains unimplemented by returning nil for now.
-func (m *Manifest) TestDependencyConstraints() gps.ProjectConstraints {
-	// TODO decide whether we're going to incorporate this or not
-	return nil
-}
-
 // Overrides returns a list of project-level override constraints.
 func (m *Manifest) Overrides() gps.ProjectConstraints {
 	return m.Ovr

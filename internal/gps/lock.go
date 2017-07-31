@@ -226,7 +226,7 @@ func prepLock(l Lock) safeLock {
 }
 
 // SortLockedProjects sorts a slice of LockedProject in alphabetical order by
-// ProjectRoot.
+// ProjectIdentifier.
 func SortLockedProjects(lps []LockedProject) {
 	sort.Stable(lpsorter(lps))
 }
@@ -242,5 +242,5 @@ func (lps lpsorter) Len() int {
 }
 
 func (lps lpsorter) Less(i, j int) bool {
-	return lps[i].pi.ProjectRoot < lps[j].pi.ProjectRoot
+	return lps[i].Ident().less(lps[j].Ident())
 }

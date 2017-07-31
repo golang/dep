@@ -14,7 +14,6 @@ import (
 	"testing"
 	"unicode"
 
-	"github.com/golang/dep/internal/gps"
 	"github.com/golang/dep/internal/test"
 )
 
@@ -22,7 +21,7 @@ var (
 	discardLogger = log.New(ioutil.Discard, "", 0)
 )
 
-func TestSplitAbsoluteProjectRoot(t *testing.T) {
+func TestCtx_ProjectImport(t *testing.T) {
 	h := test.NewHelper(t)
 	defer h.Cleanup()
 
@@ -38,7 +37,8 @@ func TestSplitAbsoluteProjectRoot(t *testing.T) {
 
 	for _, want := range importPaths {
 		fullpath := filepath.Join(depCtx.GOPATH, "src", want)
-		got, err := depCtx.SplitAbsoluteProjectRoot(fullpath)
+		h.TempDir(filepath.Join("src", want))
+		got, err := depCtx.ImportForAbs(fullpath)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -48,13 +48,13 @@ func TestSplitAbsoluteProjectRoot(t *testing.T) {
 	}
 
 	// test where it should return an error when directly within $GOPATH/src
-	got, err := depCtx.SplitAbsoluteProjectRoot(filepath.Join(depCtx.GOPATH, "src"))
+	got, err := depCtx.ImportForAbs(filepath.Join(depCtx.GOPATH, "src"))
 	if err == nil || !strings.Contains(err.Error(), "GOPATH/src") {
 		t.Fatalf("should have gotten an error for use directly in GOPATH/src, but got %s", got)
 	}
 
 	// test where it should return an error
-	got, err = depCtx.SplitAbsoluteProjectRoot("tra/la/la/la")
+	got, err = depCtx.ImportForAbs("tra/la/la/la")
 	if err == nil {
 		t.Fatalf("should have gotten an error but did not for tra/la/la/la: %s", got)
 	}
@@ -80,7 +80,7 @@ func TestAbsoluteProjectRoot(t *testing.T) {
 	}
 
 	for i, ok := range importPaths {
-		got, err := depCtx.absoluteProjectRoot(i)
+		got, err := depCtx.AbsForImport(i)
 		if ok {
 			h.Must(err)
 			want := h.Path(filepath.Join("src", i))
@@ -97,54 +97,9 @@ func TestAbsoluteProjectRoot(t *testing.T) {
 
 	// test that a file fails
 	h.TempFile("src/thing/thing.go", "hello world")
-	_, err := depCtx.absoluteProjectRoot("thing/thing.go")
+	_, err := depCtx.AbsForImport("thing/thing.go")
 	if err == nil {
 		t.Fatal("error should not be nil for a file found")
-	}
-}
-
-func TestVersionInWorkspace(t *testing.T) {
-	test.NeedsExternalNetwork(t)
-	test.NeedsGit(t)
-
-	h := test.NewHelper(t)
-	defer h.Cleanup()
-
-	h.TempDir("src")
-	h.Setenv("GOPATH", h.Path("."))
-	depCtx := &Ctx{GOPATH: h.Path(".")}
-
-	importPaths := map[string]struct {
-		rev      gps.Version
-		checkout bool
-	}{
-		"github.com/pkg/errors": {
-			rev:      gps.NewVersion("v0.8.0").Pair("645ef00459ed84a119197bfb8d8205042c6df63d"), // semver
-			checkout: true,
-		},
-		"github.com/Sirupsen/logrus": {
-			rev:      gps.Revision("42b84f9ec624953ecbf81a94feccb3f5935c5edf"), // random sha
-			checkout: true,
-		},
-		"github.com/rsc/go-get-default-branch": {
-			rev: gps.NewBranch("another-branch").Pair("8e6902fdd0361e8fa30226b350e62973e3625ed5"),
-		},
-	}
-
-	// checkout the specified revisions
-	for ip, info := range importPaths {
-		h.RunGo("get", ip)
-		repoDir := h.Path("src/" + ip)
-		if info.checkout {
-			h.RunGit(repoDir, "checkout", info.rev.String())
-		}
-
-		got, err := depCtx.VersionInWorkspace(gps.ProjectRoot(ip))
-		h.Must(err)
-
-		if got != info.rev {
-			t.Fatalf("expected %q, got %q", got.String(), info.rev.String())
-		}
 	}
 }
 
@@ -345,7 +300,8 @@ func TestCaseInsentitiveGOPATH(t *testing.T) {
 
 	ip := "github.com/pkg/errors"
 	fullpath := filepath.Join(depCtx.GOPATH, "src", ip)
-	pr, err := depCtx.SplitAbsoluteProjectRoot(fullpath)
+	h.TempDir(filepath.Join("src", ip))
+	pr, err := depCtx.ImportForAbs(fullpath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -366,13 +322,14 @@ func TestDetectProjectGOPATH(t *testing.T) {
 	}
 
 	h.TempDir("go/src/real/path")
-	h.TempDir("go/src/sym")
 
 	// Another directory used as a GOPATH
-	h.TempDir("go-two/src/real/path")
 	h.TempDir("go-two/src/sym")
 
-	h.TempDir("sym") // Directory for symlinks
+	h.TempDir(filepath.Join(".", "sym/symlink")) // Directory for symlinks
+	h.TempDir(filepath.Join("go", "src", "sym", "path"))
+	h.TempDir(filepath.Join("go", "src", " real", "path"))
+	h.TempDir(filepath.Join("go-two", "src", "real", "path"))
 
 	testcases := []struct {
 		name         string
@@ -462,6 +419,10 @@ func TestDetectGOPATH(t *testing.T) {
 		th.Path("go"),
 		th.Path("gotwo"),
 	}}
+
+	th.TempDir(filepath.Join("code", "src", "github.com", "username", "package"))
+	th.TempDir(filepath.Join("go", "src", "github.com", "username", "package"))
+	th.TempDir(filepath.Join("gotwo", "src", "github.com", "username", "package"))
 
 	testcases := []struct {
 		GOPATH string

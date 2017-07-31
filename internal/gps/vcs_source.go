@@ -107,9 +107,6 @@ func (bs *baseVCSSource) exportRevisionTo(ctx context.Context, r Revision, to st
 		return unwrapVcsErr(err)
 	}
 
-	// TODO(sdboyer) this is a simplistic approach and relying on the tools
-	// themselves might make it faster, but git's the overwhelming case (and has
-	// its own method) so fine for now
 	return fs.CopyDir(bs.repo.LocalPath(), to)
 }
 
@@ -136,7 +133,7 @@ func (s *gitSource) exportRevisionTo(ctx context.Context, rev Revision, to strin
 	// could have an err here...but it's hard to imagine how?
 	defer fs.RenameWithFallback(bak, idx)
 
-	out, err := runFromRepoDir(ctx, r, "git", "read-tree", rev.String())
+	out, err := runFromRepoDir(ctx, r, defaultCmdTimeout, "git", "read-tree", rev.String())
 	if err != nil {
 		return fmt.Errorf("%s: %s", out, err)
 	}
@@ -152,7 +149,7 @@ func (s *gitSource) exportRevisionTo(ctx context.Context, rev Revision, to strin
 	// though we have a bunch of housekeeping to do to set up, then tear
 	// down, the sparse checkout controls, as well as restore the original
 	// index and HEAD.
-	out, err = runFromRepoDir(ctx, r, "git", "checkout-index", "-a", "--prefix="+to)
+	out, err = runFromRepoDir(ctx, r, defaultCmdTimeout, "git", "checkout-index", "-a", "--prefix="+to)
 	if err != nil {
 		return fmt.Errorf("%s: %s", out, err)
 	}
@@ -353,6 +350,18 @@ type bzrSource struct {
 	baseVCSSource
 }
 
+func (s *bzrSource) exportRevisionTo(ctx context.Context, rev Revision, to string) error {
+	if err := s.baseVCSSource.exportRevisionTo(ctx, rev, to); err != nil {
+		return err
+	}
+
+	if err := os.RemoveAll(filepath.Join(to, ".bzr")); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (s *bzrSource) listVersions(ctx context.Context) ([]PairedVersion, error) {
 	r := s.repo
 
@@ -365,7 +374,7 @@ func (s *bzrSource) listVersions(ctx context.Context) ([]PairedVersion, error) {
 	}
 
 	// Now, list all the tags
-	out, err := runFromRepoDir(ctx, r, "bzr", "tags", "--show-ids", "-v")
+	out, err := runFromRepoDir(ctx, r, defaultCmdTimeout, "bzr", "tags", "--show-ids", "-v")
 	if err != nil {
 		return nil, fmt.Errorf("%s: %s", err, string(out))
 	}
@@ -373,7 +382,7 @@ func (s *bzrSource) listVersions(ctx context.Context) ([]PairedVersion, error) {
 	all := bytes.Split(bytes.TrimSpace(out), []byte("\n"))
 
 	var branchrev []byte
-	branchrev, err = runFromRepoDir(ctx, r, "bzr", "version-info", "--custom", "--template={revision_id}", "--revision=branch:.")
+	branchrev, err = runFromRepoDir(ctx, r, defaultCmdTimeout, "bzr", "version-info", "--custom", "--template={revision_id}", "--revision=branch:.")
 	br := string(branchrev)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %s", err, br)
@@ -403,6 +412,20 @@ type hgSource struct {
 	baseVCSSource
 }
 
+func (s *hgSource) exportRevisionTo(ctx context.Context, rev Revision, to string) error {
+	// TODO: use hg instead of the generic approach in
+	// baseVCSSource.exportRevisionTo to make it faster.
+	if err := s.baseVCSSource.exportRevisionTo(ctx, rev, to); err != nil {
+		return err
+	}
+
+	if err := os.RemoveAll(filepath.Join(to, ".hg")); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (s *hgSource) listVersions(ctx context.Context) ([]PairedVersion, error) {
 	var vlist []PairedVersion
 
@@ -416,7 +439,7 @@ func (s *hgSource) listVersions(ctx context.Context) ([]PairedVersion, error) {
 	}
 
 	// Now, list all the tags
-	out, err := runFromRepoDir(ctx, r, "hg", "tags", "--debug", "--verbose")
+	out, err := runFromRepoDir(ctx, r, defaultCmdTimeout, "hg", "tags", "--debug", "--verbose")
 	if err != nil {
 		return nil, fmt.Errorf("%s: %s", err, string(out))
 	}
@@ -450,7 +473,7 @@ func (s *hgSource) listVersions(ctx context.Context) ([]PairedVersion, error) {
 	// bookmarks next, because the presence of the magic @ bookmark has to
 	// determine how we handle the branches
 	var magicAt bool
-	out, err = runFromRepoDir(ctx, r, "hg", "bookmarks", "--debug")
+	out, err = runFromRepoDir(ctx, r, defaultCmdTimeout, "hg", "bookmarks", "--debug")
 	if err != nil {
 		// better nothing than partial and misleading
 		return nil, fmt.Errorf("%s: %s", err, string(out))
@@ -483,7 +506,7 @@ func (s *hgSource) listVersions(ctx context.Context) ([]PairedVersion, error) {
 		}
 	}
 
-	out, err = runFromRepoDir(ctx, r, "hg", "branches", "-c", "--debug")
+	out, err = runFromRepoDir(ctx, r, defaultCmdTimeout, "hg", "branches", "-c", "--debug")
 	if err != nil {
 		// better nothing than partial and misleading
 		return nil, fmt.Errorf("%s: %s", err, string(out))

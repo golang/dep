@@ -6,7 +6,6 @@ package gps
 
 import (
 	"bytes"
-	"flag"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -20,13 +19,6 @@ import (
 
 	"github.com/golang/dep/internal/gps/pkgtree"
 )
-
-var fixtorun string
-
-// TODO(sdboyer) regression test ensuring that locks with only revs for projects don't cause errors
-func init() {
-	flag.StringVar(&fixtorun, "gps.fix", "", "A single fixture to run in TestBasicSolves or TestBimodalSolves")
-}
 
 // overrideMkBridge overrides the base bridge with the depspecBridge that skips
 // verifyRootDir calls
@@ -74,24 +66,18 @@ func fixSolve(params SolveParameters, sm SourceManager, t *testing.T) (Solution,
 //
 // Or, just the one named in the fix arg.
 func TestBasicSolves(t *testing.T) {
-	if fixtorun != "" {
-		if fix, exists := basicFixtures[fixtorun]; exists {
-			solveBasicsAndCheck(fix, t)
-		}
-	} else {
-		// sort them by their keys so we get stable output
-		var names []string
-		for n := range basicFixtures {
-			names = append(names, n)
-		}
+	// sort them by their keys so we get stable output
+	names := make([]string, 0, len(basicFixtures))
+	for n := range basicFixtures {
+		names = append(names, n)
+	}
 
-		sort.Strings(names)
-		for _, n := range names {
-			t.Run(n, func(t *testing.T) {
-				//t.Parallel() // until trace output is fixed in parallel
-				solveBasicsAndCheck(basicFixtures[n], t)
-			})
-		}
+	sort.Strings(names)
+	for _, n := range names {
+		t.Run(n, func(t *testing.T) {
+			t.Parallel()
+			solveBasicsAndCheck(basicFixtures[n], t)
+		})
 	}
 }
 
@@ -122,24 +108,18 @@ func solveBasicsAndCheck(fix basicFixture, t *testing.T) (res Solution, err erro
 //
 // Or, just the one named in the fix arg.
 func TestBimodalSolves(t *testing.T) {
-	if fixtorun != "" {
-		if fix, exists := bimodalFixtures[fixtorun]; exists {
-			solveBimodalAndCheck(fix, t)
-		}
-	} else {
-		// sort them by their keys so we get stable output
-		var names []string
-		for n := range bimodalFixtures {
-			names = append(names, n)
-		}
+	// sort them by their keys so we get stable output
+	names := make([]string, 0, len(bimodalFixtures))
+	for n := range bimodalFixtures {
+		names = append(names, n)
+	}
 
-		sort.Strings(names)
-		for _, n := range names {
-			t.Run(n, func(t *testing.T) {
-				//t.Parallel() // until trace output is fixed in parallel
-				solveBimodalAndCheck(bimodalFixtures[n], t)
-			})
-		}
+	sort.Strings(names)
+	for _, n := range names {
+		t.Run(n, func(t *testing.T) {
+			t.Parallel()
+			solveBimodalAndCheck(bimodalFixtures[n], t)
+		})
 	}
 }
 

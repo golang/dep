@@ -52,6 +52,14 @@ type Constraint interface {
 	// It also forces Constraint to be a private/sealed interface, which is a
 	// design goal of the system.
 	typedString() string
+
+	// identical returns true if the constraints are identical.
+	//
+	// Identical Constraints behave identically for all methods defined by the
+	// interface. A Constraint is always identical to itself.
+	//
+	// Constraints serialized for caching are de-serialized into identical instances.
+	identical(Constraint) bool
 }
 
 // NewSemverConstraint attempts to construct a semver Constraint object from the
@@ -172,6 +180,14 @@ func (c semverConstraint) Intersect(c2 Constraint) Constraint {
 	return none
 }
 
+func (c semverConstraint) identical(c2 Constraint) bool {
+	sc2, ok := c2.(semverConstraint)
+	if !ok {
+		return false
+	}
+	return c.c.String() == sc2.c.String()
+}
+
 // IsAny indicates if the provided constraint is the wildcard "Any" constraint.
 func IsAny(c Constraint) bool {
 	_, ok := c.(anyConstraint)
@@ -211,6 +227,10 @@ func (anyConstraint) Intersect(c Constraint) Constraint {
 	return c
 }
 
+func (anyConstraint) identical(c Constraint) bool {
+	return IsAny(c)
+}
+
 // noneConstraint is the empty set - it matches no versions. It mirrors the
 // behavior of the semver package's none type.
 type noneConstraint struct{}
@@ -237,6 +257,11 @@ func (noneConstraint) MatchesAny(Constraint) bool {
 
 func (noneConstraint) Intersect(Constraint) Constraint {
 	return none
+}
+
+func (noneConstraint) identical(c Constraint) bool {
+	_, ok := c.(noneConstraint)
+	return ok
 }
 
 // A ProjectConstraint combines a ProjectIdentifier with a Constraint. It
@@ -308,37 +333,6 @@ func (m ProjectConstraints) asSortedSlice() []ProjectConstraint {
 
 	sort.Stable(sortedConstraints(pcs))
 	return pcs
-}
-
-// merge pulls in all the constraints from other ProjectConstraints map(s),
-// merging them with the receiver into a new ProjectConstraints map.
-//
-// If duplicate ProjectRoots are encountered, the constraints are intersected
-// together and the latter's NetworkName, if non-empty, is taken.
-func (m ProjectConstraints) merge(other ...ProjectConstraints) (out ProjectConstraints) {
-	plen := len(m)
-	for _, pcm := range other {
-		plen += len(pcm)
-	}
-
-	out = make(ProjectConstraints, plen)
-	for pr, pp := range m {
-		out[pr] = pp
-	}
-
-	for _, pcm := range other {
-		for pr, pp := range pcm {
-			if rpp, exists := out[pr]; exists {
-				pp.Constraint = pp.Constraint.Intersect(rpp.Constraint)
-				if pp.Source == "" {
-					pp.Source = rpp.Source
-				}
-			}
-			out[pr] = pp
-		}
-	}
-
-	return
 }
 
 // overrideAll treats the receiver ProjectConstraints map as a set of override

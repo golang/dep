@@ -1,4 +1,4 @@
-<--
+<!--
 Work-in-progress PRs are welcome as a way to get early feedback - just prefix
 the title with [WIP].
 -->
@@ -11,7 +11,7 @@ the title with [WIP].
 
 ### Which issue(s) does this PR fix?
 
-<--
+<!--
 
 fixes #
 fixes #
