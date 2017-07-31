@@ -7,8 +7,9 @@ package simple
 import (
 	"sort"
 
-	"github.com/golang/dep/internal/gps"
 	"missing/missing"
+
+	"github.com/karrick/dep/internal/gps"
 )
 
 var (

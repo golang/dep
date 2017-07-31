@@ -10,7 +10,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/golang/dep/internal/gps/pkgtree"
+	"github.com/karrick/dep/internal/gps/pkgtree"
 )
 
 // sourceState represent the states that a source can be in, depending on how
@@ -144,7 +144,7 @@ func (sc *sourceCoordinator) getSourceGatewayFor(ctx context.Context, id Project
 	srcGate = newSourceGateway(pd.mb, sc.supervisor, sc.cachedir)
 
 	// The normalized name is usually different from the source URL- e.g.
-	// github.com/golang/dep/internal/gps vs. https://github.com/golang/dep/internal/gps. But it's
+	// github.com/karrick/dep/internal/gps vs. https://github.com/karrick/dep/internal/gps. But it's
 	// possible to arrive here with a full URL as the normalized name - and
 	// both paths *must* lead to the same sourceGateway instance in order to
 	// ensure disk access is correctly managed.

@@ -12,8 +12,8 @@ import (
 	"strings"
 
 	"github.com/armon/go-radix"
-	"github.com/golang/dep/internal/gps/paths"
-	"github.com/golang/dep/internal/gps/pkgtree"
+	"github.com/karrick/dep/internal/gps/paths"
+	"github.com/karrick/dep/internal/gps/pkgtree"
 )
 
 var rootRev = Revision("")

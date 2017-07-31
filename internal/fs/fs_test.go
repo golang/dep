@@ -12,7 +12,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/golang/dep/internal/test"
+	"github.com/karrick/dep/internal/test"
 )
 
 // This function tests HadFilepathPrefix. It should test it on both case

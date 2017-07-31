@@ -18,7 +18,7 @@ import (
 	"testing"
 	"unicode"
 
-	"github.com/golang/dep/internal/gps/pkgtree"
+	"github.com/karrick/dep/internal/gps/pkgtree"
 )
 
 var fixtorun string

@@ -8,7 +8,7 @@ import (
 	"disallow/testdata"
 	"sort"
 
-	"github.com/golang/dep/internal/gps"
+	"github.com/karrick/dep/internal/gps"
 )
 
 var (

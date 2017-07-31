@@ -951,18 +951,20 @@ func HashVendorTree(vendorPathname string) (map[string]string, error) {
 		if err != nil && err != filepath.SkipDir {
 			return err
 		}
-
-		// How many levels deep is pathname below the directory specified by
-		// vendorPathname?
-		if depth := len(strings.Split(pathname, pathSeparator)); depth > maxDepth {
-			return filepath.SkipDir
-		} else if depth == maxDepth {
-			libraryName := pathname[prefixLength:] // chop off the prefix
-			sum, err := fs.HashFromNode(vendorPathname, libraryName)
-			if err != nil {
-				return err
+		// NOTE: Ignore file system nodes that are not directories.
+		if fi.IsDir() {
+			// How many levels deep is pathname below the directory specified by
+			// vendorPathname?
+			if depth := len(strings.Split(pathname, pathSeparator)); depth > maxDepth {
+				return filepath.SkipDir
+			} else if depth == maxDepth {
+				libraryName := pathname[prefixLength:] // chop off the prefix
+				sum, err := fs.HashFromNode(vendorPathname, libraryName)
+				if err != nil {
+					return err
+				}
+				status[libraryName] = sum
 			}
-			status[libraryName] = sum
 		}
 		return nil
 	})

@@ -18,7 +18,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/golang/dep/internal/gps/pkgtree"
+	"github.com/karrick/dep/internal/gps/pkgtree"
 	"github.com/pkg/errors"
 	"github.com/sdboyer/constext"
 )

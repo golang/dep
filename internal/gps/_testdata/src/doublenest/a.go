@@ -7,7 +7,7 @@ package base
 import (
 	"go/parser"
 
-	"github.com/golang/dep/internal/gps"
+	"github.com/karrick/dep/internal/gps"
 )
 
 var (
