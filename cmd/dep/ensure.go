@@ -587,7 +587,7 @@ func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm
 		return errors.Wrapf(err, "opening %s failed", dep.ManifestName)
 	}
 
-	_, err = f.Write(append([]byte("\n"), extra...))
+	_, err = f.Write(extra)
 	if err != nil {
 		return errors.Wrapf(err, "writing to %s failed", dep.ManifestName)
 	}
@@ -638,7 +638,7 @@ func getProjectConstraint(arg string, sm gps.SourceManager) (gps.ProjectConstrai
 
 	// try to split on '@'
 	// When there is no `@`, use any version
-	versionStr := "*"
+	var versionStr string
 	atIndex := strings.Index(arg, "@")
 	if atIndex > 0 {
 		parts := strings.SplitN(arg, "@", 2)
