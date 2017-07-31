@@ -14,6 +14,8 @@ import (
 
 var pathSeparator = string(filepath.Separator)
 
+var skipModes = os.ModeDevice | os.ModeNamedPipe | os.ModeSocket | os.ModeCharDevice
+
 // HashFromNode returns a deterministic hash of the specified file system node,
 // performing a breadth-first traversal of directories. While the specified
 // prefix is joined with the pathname to walk the file system, the prefix string
@@ -62,6 +64,13 @@ func HashFromNode(prefix, pathname string) (hash string, err error) {
 			return
 		}
 
+		mode := fi.Mode()
+
+		// Skip special files
+		if mode&skipModes != 0 {
+			continue
+		}
+
 		// NOTE: Write pathname to hash, because hash ought to be as much a
 		// function of the names of the files and directories as their
 		// contents. Added benefit is that even empty directories and symbolic
@@ -71,7 +80,7 @@ func HashFromNode(prefix, pathname string) (hash string, err error) {
 		// to the hash, because hash write always returns nil error.
 		_, _ = h.Write([]byte(pathname)[prefixLength:])
 
-		if fi.Mode()&os.ModeSymlink != 0 {
+		if mode&os.ModeSymlink != 0 {
 			referent, er := os.Readlink(pathname)
 			if er != nil {
 				err = errors.Wrap(er, "cannot Readlink")

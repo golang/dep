@@ -1,15 +1,9 @@
 package fs
 
 import (
-	"crypto/sha256"
-	"fmt"
-	"io"
 	"os"
 	"path/filepath"
-	"strconv"
 	"testing"
-
-	"github.com/pkg/errors"
 )
 
 func TestHashFromNodeWithFile(t *testing.T) {
@@ -34,70 +28,13 @@ func TestHashFromNodeWithDirectory(t *testing.T) {
 	}
 }
 
-const benchmarkSource = "/usr/local/Cellar/go/1.8.3/libexec/src"
+var goSource = filepath.Join(os.Getenv("GOPATH"), "src")
 
 func BenchmarkHashFromNode(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		_, err := HashFromNode("", benchmarkSource)
+		_, err := HashFromNode("", goSource)
 		if err != nil {
 			b.Fatal(err)
 		}
 	}
-}
-
-func BenchmarkHashFromNodeUsingWalk(b *testing.B) {
-	for i := 0; i < b.N; i++ {
-		_, err := hashFromNodeUsingWalk(benchmarkSource)
-		if err != nil {
-			b.Fatal(err)
-		}
-	}
-}
-
-// hashFromNodeUsingWalk uses `filepath.Walk` in order to establish a
-// performance benchmark. The actual hash function cannot use `filepath.Walk`
-// because we want to detect symbolic links and include their referent in the
-// hash output.
-func hashFromNodeUsingWalk(pathname string) (hash string, err error) {
-	h := sha256.New()
-
-	err = filepath.Walk(filepath.Clean(pathname), func(pathname string, fi os.FileInfo, err error) error {
-		if err != nil && err != filepath.SkipDir {
-			return err
-		}
-
-		switch fi.Name() {
-		case ".", "..", "vendor", ".bzr", ".git", ".hg", ".svn":
-			return filepath.SkipDir
-		}
-
-		_, _ = h.Write([]byte(pathname))
-
-		if fi.IsDir() {
-			return nil
-		}
-
-		fi, er := os.Stat(pathname)
-		if er != nil {
-			return errors.Wrap(er, "cannot Stat")
-		}
-
-		fh, er := os.Open(pathname)
-		if er != nil {
-			return errors.Wrap(er, "cannot Open")
-		}
-
-		_, _ = h.Write([]byte(strconv.FormatInt(fi.Size(), 10))) // format file size as base 10 integer
-		_, er = io.Copy(h, fh)
-		err = errors.Wrap(er, "cannot Copy") // errors.Wrap only wraps non-nil, so elide checking here
-
-		// NOTE: Close the file handle to the open directory or file.
-		if er = fh.Close(); err == nil {
-			err = errors.Wrap(er, "cannot Close")
-		}
-		return err
-	})
-
-	hash = fmt.Sprintf("%x", h.Sum(nil))
-	return
 }
