@@ -14,6 +14,22 @@ required = ["github.com/user/thing/cmd/thing"]
 * Aren't `import`ed by your project, [directly or transitively](FAQ.md#what-is-a-direct-or-transitive-dependency)
 * You don't want put in your `GOPATH`, and/or you want to lock the version
 
+Please note that this only pulls in the sources of these dependencies. It does not install or compile them. So, if you need the tool to be installed you should still run the following (manually or from a `Makefile`)  after each `dep ensure`:
+
+```bash
+cd vendor/pkg/to/install
+go install .
+```
+
+This only works reliably if this is the only project to install these executables. This is not enough if you want to be able to run a different version of the same executable depending on the project you're working. In that case you have to use a different `GOBIN` for each project, by doing something like this before running the above commands:
+
+```bash
+export GOBIN=$PWD/bin
+export PATH=$GOBIN:$PATH
+```
+
+You might also try [virtualgo](https://github.com/GetStream/vg), which installs dependencies in the `required` list automatically in a project specific `GOBIN`.
+
 ## `ignored`
 `ignored` lists a set of packages (not projects) that are ignored when dep statically analyzes source code. Ignored packages can be in this project, or in a dependency.
 ```toml
