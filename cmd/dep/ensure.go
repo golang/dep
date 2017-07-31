@@ -9,6 +9,9 @@ import (
 	"encoding/hex"
 	"flag"
 	"go/build"
+	"os"
+	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -34,10 +37,10 @@ Flags:
   -dry-run: only report the changes that would be made
 
 
-Ensure gets a project into a complete, compilable, and reproducible state:
+Ensure gets a project into a complete, reproducible, and likely compilable state:
 
   * All non-stdlib imports are fulfilled
-  * All constraints and overrides in Gopkg.toml are respected
+  * All rules in Gopkg.toml are respected
   * Gopkg.lock records precise versions for all dependencies
   * vendor/ is populated according to Gopkg.lock
 
@@ -336,6 +339,9 @@ func (cmd *ensureCommand) runUpdate(ctx *dep.Ctx, args []string, p *dep.Project,
 	}
 	solution, err := solver.Solve()
 	if err != nil {
+		// TODO(sdboyer) special handling for warning cases as described in spec
+		// - e.g., named projects did not upgrade even though newer versions
+		// were available.
 		handleAllTheFailuresOfTheWorld(err)
 		return errors.Wrap(err, "ensure Solve()")
 	}
@@ -344,9 +350,6 @@ func (cmd *ensureCommand) runUpdate(ctx *dep.Ctx, args []string, p *dep.Project,
 	if err != nil {
 		return err
 	}
-	// TODO(sdboyer) special handling for warning cases as described in spec -
-	// e.g., named projects did not upgrade even though newer versions were
-	// available.
 	if cmd.dryRun {
 		return sw.PrintPreparedActions(ctx.Out)
 	}
@@ -403,11 +406,38 @@ func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm
 		exrmap[root] = true
 	}
 
-	var reqlist []string
+	// Note: these flags are only partialy used by the latter parts of the
+	// algorithm; rather, it relies on inference. However, they remain in their
+	// entirety as future needs may make further use of them, being a handy,
+	// terse way of expressing the original context of the arg inputs.
+	type addType uint8
+	const (
+		// Straightforward case - this induces a temporary require, and thus
+		// a warning message about it being ephemeral.
+		isInManifest addType = 1 << iota
+		// If solving works, we'll pull this constraint from the in-memory
+		// manifest (where we recorded it earlier) and then append it to the
+		// manifest on disk.
+		isInImportsWithConstraint
+		// If solving works, we'll extract a constraint from the lock and
+		// append it into the manifest on disk, similar to init's behavior.
+		isInImportsNoConstraint
+		// This gets a message AND a hoist from the solution up into the
+		// manifest on disk.
+		isInNeither
+	)
+
+	type addInstruction struct {
+		id         gps.ProjectIdentifier
+		ephReq     map[string]bool
+		constraint gps.Constraint
+		typ        addType
+	}
+	addInstructions := make(map[gps.ProjectRoot]addInstruction)
 
 	for _, arg := range args {
 		// TODO(sdboyer) return all errors, not just the first one we encounter
-		// TODO(sdboyer) do these concurrently
+		// TODO(sdboyer) do these concurrently?
 		pc, path, err := getProjectConstraint(arg, sm)
 		if err != nil {
 			// TODO(sdboyer) ensure these errors are contextualized in a sensible way for -add
@@ -426,30 +456,44 @@ func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm
 		}
 
 		someConstraint := !gps.IsAny(pc.Constraint) || pc.Ident.Source != ""
+
+		instr, has := addInstructions[pc.Ident.ProjectRoot]
+		if has {
+			// Multiple packages from the same project were specified as
+			// arguments; make sure they agree on declared constraints.
+			// TODO(sdboyer) until we have a general method for checking constraint equality, only allow one to declare
+			if someConstraint {
+				if !gps.IsAny(instr.constraint) || instr.id.Source != "" {
+					return errors.Errorf("can only specify rules once per project being added; rules were given at least twice for %s", pc.Ident.ProjectRoot)
+				}
+				instr.constraint = pc.Constraint
+				instr.id = pc.Ident
+			}
+		} else {
+			instr.ephReq = make(map[string]bool)
+			instr.constraint = pc.Constraint
+			instr.id = pc.Ident
+		}
+
 		if inManifest {
 			if someConstraint {
 				return errors.Errorf("%s already contains rules for %s, cannot specify a version constraint or alternate source", dep.ManifestName, path)
 			}
 
-			reqlist = append(reqlist, path)
-			p.Manifest.Required = append(p.Manifest.Required, path)
+			instr.ephReq[path] = true
+			instr.typ |= isInManifest
+			//p.Manifest.Required = append(p.Manifest.Required, path)
 		} else if inImports {
 			if !someConstraint {
 				if exmap[path] {
-					return errors.Errorf("%s is already imported or required; -add must specify a constraint, but none were provided", path)
+					return errors.Errorf("%s is already imported or required, so -add is only valid with a constraint", path)
 				}
 
 				// No constraints, but the package isn't imported; require it.
-				// TODO(sdboyer) this case seems like it's getting overly
-				// specific and risks muddying the water more than it helps
-				reqlist = append(reqlist, path)
-				p.Manifest.Required = append(p.Manifest.Required, path)
+				// TODO(sdboyer) this case seems like it's getting overly specific and risks muddying the water more than it helps
+				instr.ephReq[path] = true
+				instr.typ |= isInImportsNoConstraint
 			} else {
-				p.Manifest.Constraints[pc.Ident.ProjectRoot] = gps.ProjectProperties{
-					Source:     pc.Ident.Source,
-					Constraint: pc.Constraint,
-				}
-
 				// Don't require on this branch if the path was a ProjectRoot;
 				// most common here will be the user adding constraints to
 				// something they already imported, and if they specify the
@@ -457,18 +501,36 @@ func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm
 				// require the project's root package, but are just trying to
 				// indicate which project should receive the constraints.
 				if !exmap[path] && string(pc.Ident.ProjectRoot) != path {
-					reqlist = append(reqlist, path)
-					p.Manifest.Required = append(p.Manifest.Required, path)
+					instr.ephReq[path] = true
 				}
+				instr.typ |= isInImportsWithConstraint
 			}
 		} else {
-			p.Manifest.Constraints[pc.Ident.ProjectRoot] = gps.ProjectProperties{
-				Source:     pc.Ident.Source,
-				Constraint: pc.Constraint,
-			}
+			instr.typ |= isInNeither
+			instr.ephReq[path] = true
+		}
 
-			reqlist = append(reqlist, path)
+		addInstructions[pc.Ident.ProjectRoot] = instr
+	}
+
+	// We're now sure all of our add instructions are individually and mutually
+	// valid, so it's safe to begin modifying the input parameters.
+	for pr, instr := range addInstructions {
+		// The arg processing logic above only adds to the ephReq list if
+		// that package definitely needs to be on that list, so we don't
+		// need to check instr.typ here - if it's in instr.ephReq, it
+		// definitely needs to be added to the manifest's required list.
+		for path := range instr.ephReq {
 			p.Manifest.Required = append(p.Manifest.Required, path)
+		}
+
+		// Only two branches can possibly be adding rules, though the
+		// isInNeither case may or may not have an empty constraint.
+		if instr.typ&(isInNeither|isInImportsWithConstraint) != 0 {
+			p.Manifest.Constraints[pr] = gps.ProjectProperties{
+				Source:     instr.id.Source,
+				Constraint: instr.constraint,
+			}
 		}
 	}
 
@@ -485,10 +547,33 @@ func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm
 		return errors.Wrap(err, "ensure Solve()")
 	}
 
+	// Prep post-actions and feedback from adds.
+	var reqlist []string
+	appender := &dep.Manifest{
+		Constraints: make(gps.ProjectConstraints),
+	}
+	for pr, instr := range addInstructions {
+		for path := range instr.ephReq {
+			reqlist = append(reqlist, path)
+		}
+
+		if !gps.IsAny(instr.constraint) || instr.id.Source != "" {
+			appender.Constraints[pr] = gps.ProjectProperties{
+				Source:     instr.id.Source,
+				Constraint: instr.constraint,
+			}
+		} else {
+			// TODO(sdboyer) hoist a constraint into the manifest from the lock
+		}
+	}
+
+	extra, err := appender.MarshalTOML()
+	if err != nil {
+		return errors.Wrap(err, "could not marshal manifest into TOML")
+	}
+	sort.Strings(reqlist)
+
 	sw, err := dep.NewSafeWriter(nil, p.Lock, dep.LockFromSolution(solution), dep.VendorOnChanged)
-	// TODO(sdboyer) special handling for warning cases as described in spec -
-	// e.g., named projects did not upgrade even though newer versions were
-	// available.
 	if cmd.dryRun {
 		return sw.PrintPreparedActions(ctx.Out)
 	}
@@ -498,9 +583,41 @@ func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm
 		return err
 	}
 
-	// TODO(sdboyer) handle appending of constraints to Gopkg.toml here, plus
-	// info messages to user
-	return nil
+	// FIXME(sdboyer) manifest writes ABSOLUTELY need verification - follow up!
+	f, err := os.OpenFile(filepath.Join(p.AbsRoot, dep.ManifestName), os.O_APPEND|os.O_WRONLY, 0666)
+	if err != nil {
+		return errors.Wrapf(err, "opening %s failed", dep.ManifestName)
+	}
+
+	_, err = f.Write(append([]byte("\n"), extra...))
+	if err != nil {
+		return errors.Wrapf(err, "writing to %s failed", dep.ManifestName)
+	}
+
+	switch len(reqlist) {
+	case 0:
+		// nothing to tell the user
+	case 1:
+		if cmd.noVendor {
+			ctx.Out.Printf("%q is not imported by your project, and has been temporarily added to %s.\n", reqlist[0], dep.LockName)
+			ctx.Out.Printf("If you run \"dep ensure\" again before actually importing it, it will disappear from %s. Running \"dep ensure -vendor-only\" is safe, and will guarantee it is present in vendor/.", dep.LockName)
+		} else {
+			ctx.Out.Printf("%q is not imported by your project, and has been temporarily added to %s and vendor/.\n", reqlist[0], dep.LockName)
+			ctx.Out.Printf("If you run \"dep ensure\" again before actually importing it, it will disappear from %s and vendor/.", dep.LockName)
+		}
+	default:
+		if cmd.noVendor {
+			ctx.Out.Printf("The following packages are not imported by your project, and have been temporarily added to %s:\n", dep.LockName)
+			ctx.Out.Printf("\t%s\n", strings.Join(reqlist, "\n\t"))
+			ctx.Out.Printf("If you run \"dep ensure\" again before actually importing them, they will disappear from %s. Running \"dep ensure -vendor-only\" is safe, and will guarantee they are present in vendor/.", dep.LockName)
+		} else {
+			ctx.Out.Printf("The following packages are not imported by your project, and have been temporarily added to %s and vendor/:\n", dep.LockName)
+			ctx.Out.Printf("\t%s\n", strings.Join(reqlist, "\n\t"))
+			ctx.Out.Printf("If you run \"dep ensure\" again before actually importing them, they will disappear from %s and vendor/.", dep.LockName)
+		}
+	}
+
+	return errors.Wrapf(f.Close(), "closing %s", dep.ManifestName)
 }
 
 type stringSlice []string
