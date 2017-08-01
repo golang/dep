@@ -103,7 +103,7 @@ dep ensure -override github.com/pkg/foo@^1.0.1
 
 func (cmd *ensureCommand) Name() string { return "ensure" }
 func (cmd *ensureCommand) Args() string {
-	return "[-update | -add] [-no-vendor | -vendor-only] [<spec>...]"
+	return "[-update | -add] [-no-vendor | -vendor-only] [-dry-run] [<spec>...]"
 }
 func (cmd *ensureCommand) ShortHelp() string { return ensureShortHelp }
 func (cmd *ensureCommand) LongHelp() string  { return ensureLongHelp }
