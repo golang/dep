@@ -480,7 +480,6 @@ func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm
 
 			instr.ephReq[path] = true
 			instr.typ |= isInManifest
-			//p.Manifest.Required = append(p.Manifest.Required, path)
 		} else if inImports {
 			if !someConstraint {
 				if exmap[path] {
@@ -539,8 +538,7 @@ func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm
 	}
 	solution, err := solver.Solve()
 	if err != nil {
-		// TODO(sdboyer) detect if the failure was specifically about some of
-		// the -add arguments
+		// TODO(sdboyer) detect if the failure was specifically about some of the -add arguments
 		handleAllTheFailuresOfTheWorld(err)
 		return errors.Wrap(err, "ensure Solve()")
 	}
