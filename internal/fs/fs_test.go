@@ -134,6 +134,46 @@ func TestHasFilepathPrefix_Files(t *testing.T) {
 	}
 }
 
+func TestEqualPaths(t *testing.T) {
+	h := test.NewHelper(t)
+	h.TempDir("dir")
+	h.TempDir("dir2")
+
+	h.TempFile("file", "")
+	h.TempFile("file2", "")
+
+	h.TempDir("DIR")
+	h.TempFile("FILE", "")
+
+	// caseInsensitive flag ensures that these cases are only equivalent on a
+	// case-insensitive filesystem.
+	caseInsensitive := isCaseSensitiveFilesystem(h.Path("dir"))
+
+	testcases := []struct {
+		p1, p2 string
+		want   bool
+		err    bool
+	}{
+		{h.Path("dir"), h.Path("dir"), true, false},
+		{h.Path("file"), h.Path("file"), true, false},
+		{h.Path("dir"), h.Path("dir2"), false, false},
+		{h.Path("file"), h.Path("file2"), false, false},
+		{h.Path("dir"), h.Path("file"), false, false},
+		{h.Path("dir"), h.Path("DIR"), caseInsensitive, false},
+		{strings.ToLower(h.Path("dir")), strings.ToUpper(h.Path("dir")), caseInsensitive, true},
+	}
+
+	for _, tc := range testcases {
+		got, err := EqualPaths(tc.p1, tc.p2)
+		if err != nil && !tc.err {
+			t.Error("unexpected error:", err)
+		}
+		if got != tc.want {
+			t.Errorf("expected EqualPaths(%q, %q) to be %t, got %t", tc.p1, tc.p2, tc.want, got)
+		}
+	}
+}
+
 func TestRenameWithFallback(t *testing.T) {
 	dir, err := ioutil.TempDir("", "dep")
 	if err != nil {

@@ -100,6 +100,36 @@ func HasFilepathPrefix(path, prefix string) bool {
 	return true
 }
 
+// EqualPaths compares the paths passed to check if the are equivalent.
+// It respects the case-sensitivity of the underlaying filesysyems.
+func EqualPaths(p1, p2 string) (bool, error) {
+	p1 = filepath.Clean(p1)
+	p2 = filepath.Clean(p2)
+
+	if isDir, err := IsDir(p2); err != nil && !strings.HasSuffix(err.Error(), "is not a directory") {
+		return false, err
+	} else if !isDir {
+		// If p2 is not a directory, compare the bases of the paths to ensure
+		// they are equivalent.
+		var p1Base, p2Base string
+
+		p1, p1Base = filepath.Split(p1)
+		p2, p2Base = filepath.Split(p2)
+
+		if isCaseSensitiveFilesystem(p1) {
+			if p1Base != p2Base {
+				return false, nil
+			}
+		} else {
+			if strings.ToLower(p1Base) != strings.ToLower(p2Base) {
+				return false, nil
+			}
+		}
+	}
+
+	return len(p1) == len(p2) && HasFilepathPrefix(p1, p2), nil
+}
+
 // RenameWithFallback attempts to rename a file or directory, but falls back to
 // copying in the event of a cross-device link error. If the fallback copy
 // succeeds, src is still removed, emulating normal rename behavior.
@@ -343,7 +373,6 @@ func cloneSymlink(sl, dst string) error {
 
 // IsDir determines is the path given is a directory or not.
 func IsDir(name string) (bool, error) {
-	// TODO: lstat?
 	fi, err := os.Stat(name)
 	if err != nil {
 		return false, err
