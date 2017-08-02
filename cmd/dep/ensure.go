@@ -24,15 +24,7 @@ const ensureShortHelp = `Ensure a dependency is safely vendored in the project`
 const ensureLongHelp = `
 Project spec:
 
-  <path>[:alt source][@<constraint>]
-
-Flags:
-
-  -update: update all, or only the named, dependencies in Gopkg.lock
-  -add: add new dependencies
-  -no-vendor: update Gopkg.lock if needed, but do not update vendor/
-  -vendor-only: populate vendor/ without updating Gopkg.lock
-  -dry-run: only report the changes that would be made
+  <import path>[:alt source URL][@<constraint>]
 
 
 Ensure gets a project into a complete, reproducible, and likely compilable state:
@@ -54,8 +46,9 @@ combination of flags that are passed.
 
 Examples:
 
-  dep ensure                            Populate vendor from existing manifest and lock
-  dep ensure github.com/pkg/foo@^1.0.1  Update a specific dependency to a specific version
+  dep ensure                                 Populate vendor from existing Gopkg.toml and Gopkg.lock
+  dep ensure -add github.com/pkg/foo         Introduce a named dependency at its newest version
+  dep ensure -add github.com/pkg/foo@^1.0.1  Introduce a named dependency with a particular constraint
 
 For more detailed usage examples, see dep ensure -examples.
 `
@@ -67,38 +60,52 @@ dep ensure
     specified there. Otherwise, use the most recent version that can satisfy the
     constraints in the manifest file.
 
-dep ensure -update
+dep ensure -vendor-only
 
-    Update all dependencies to the latest versions allowed by the manifest,
-    ignoring any versions specified in the lock file. Update the lock file with
-    any changes.
+    Write vendor/ from an exising Gopkg.lock file, without first verifying that
+    the lock is in sync with imports and Gopkg.toml. (This may be useful for
+    e.g. strategically layering a Docker images)
+
+dep ensure -add github.com/pkg/foo github.com/pkg/foo/bar
+
+    Introduce one or more dependencies, at their newest version, ensuring that
+    specific packages are present in Gopkg.lock and vendor/. Also, append a
+    corresponding constraint to Gopkg.toml.
+
+    Note: packages introduced in this way will disappear on the next "dep
+    ensure" if an import statement is not added first.
+
+dep ensure -add github.com/pkg/foo/subpkg@1.0.0 bitbucket.org/pkg/bar/baz@master
+
+    Append version constraints to Gopkg.toml for one or more packages, if no
+    such rules already exist.
+
+    If the named packages are not already imported, also ensure they are present
+    in Gopkg.lock and vendor/. As in the preceding example, packages introduced
+    in this way will disappear on the next "dep ensure" if an import statement
+    is not added first.
+
+dep ensure -add github.com/pkg/foo:git.internal.com/alt/foo
+
+    Specify an alternate location to treat as the upstream source for a dependency.
 
 dep ensure -update github.com/pkg/foo github.com/pkg/bar
 
-    Update a list of dependencies to the latest versions allowed by the manifest,
-    ignoring any versions specified in the lock file. Update the lock file with
-    any changes.
+    Update a list of dependencies to the latest versions allowed by Gopkg.toml,
+    ignoring any versions recorded in Gopkg.lock. Write the results to
+    Gopkg.lock and vendor/.
 
-dep ensure github.com/pkg/foo@^1.0.1
+dep ensure -update
 
-    Constrain pkg/foo to the latest release matching >= 1.0.1, < 2.0.0, and
-    place that release in the vendor folder. If a constraint was previously set
-    in the manifest, this resets it. This form of constraint strikes a good
-    balance of safety and flexibility, and should be preferred for libraries.
+    Update all dependencies to the latest versions allowed by Gopkg.toml,
+    ignoring any versions recorded in Gopkg.lock. Update the lock file with any
+    changes. (NOTE: Not recommended. Updating one/some dependencies at a time is
+    preferred.)
 
-dep ensure github.com/pkg/foo@~1.0.1
+dep ensure -update -no-vendor
 
-    Same as above, but choose any release matching 1.0.x, preferring latest.
+    As above, but only modify Gopkg.lock; leave vendor/ unchanged.
 
-dep ensure github.com/pkg/foo:git.internal.com/alt/foo
-
-    Fetch the dependency from a different location.
-
-dep ensure -override github.com/pkg/foo@^1.0.1
-
-    Forcefully and transitively override any constraint for this dependency.
-    Overrides are powerful, but harmful in the long term. They should be used as
-    a last resort, especially if your project may be imported by others.
 `
 
 func (cmd *ensureCommand) Name() string { return "ensure" }
