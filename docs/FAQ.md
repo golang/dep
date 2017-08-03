@@ -286,6 +286,8 @@ No.
 >  i. the toolchain already frowns heavily on them<br>
 > ii. it's worse for our case, as we start venturing into [dot dot hell](http://doc.cat-v.org/plan_9/4th_edition/papers/lexnames) territory when trying to prove that the import does not escape the tree of the project -[@sdboyer in #899](https://github.com/golang/dep/issues/899#issuecomment-317904001)
 
+For a refresher on Go's recommended workspace organization, see https://golang.org/doc/code.html. Organizing your code this way gives you a unique import path for every package.
+
 ## Best Practices
 ### Should I commit my vendor directory?
 
