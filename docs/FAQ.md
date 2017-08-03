@@ -281,9 +281,10 @@ This is the only symbolic link support that `dep` really intends to provide. In 
 
 ## Does `dep` support relative imports?
 
-Dep doesn't allow relative imports. It's one of the few cases in which dep restricts what the Go toolchain allows (although the toolchain already frowns heavily on them, so tread carefully!)
-
-Dep doesn't support them because of the difficulty required trying to prove that a '../' import doesn't escape the tree of the project. 
+No.
+> dep simply doesn't allow relative imports. this is one of the few places where we restrict a case that the toolchain itself allows. we disallow them only because:
+>  i. the toolchain already frowns heavily on them
+> ii. it's worse for our case, as we start venturing into [dot dot hell](http://doc.cat-v.org/plan_9/4th_edition/papers/lexnames) territory when trying to prove that the import does not escape the tree of the project -[@sdboyer in #899](https://github.com/golang/dep/issues/899#issuecomment-317904001)
 
 ## Best Practices
 ### Should I commit my vendor directory?
