@@ -74,6 +74,7 @@ func TestBasicSolves(t *testing.T) {
 
 	sort.Strings(names)
 	for _, n := range names {
+		n := n
 		t.Run(n, func(t *testing.T) {
 			t.Parallel()
 			solveBasicsAndCheck(basicFixtures[n], t)
@@ -116,6 +117,7 @@ func TestBimodalSolves(t *testing.T) {
 
 	sort.Strings(names)
 	for _, n := range names {
+		n := n
 		t.Run(n, func(t *testing.T) {
 			t.Parallel()
 			solveBimodalAndCheck(bimodalFixtures[n], t)

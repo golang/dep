@@ -261,8 +261,7 @@ func runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceMana
 	var digestMismatch, hasMissingPkgs bool
 
 	if p.Lock == nil {
-		// TODO if we have no lock file, do...other stuff
-		return digestMismatch, hasMissingPkgs, nil
+		return digestMismatch, hasMissingPkgs, errors.Errorf("no Gopkg.lock found. Run `dep ensure` to generate lock file")
 	}
 
 	// While the network churns on ListVersions() requests, statically analyze

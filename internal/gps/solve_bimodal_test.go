@@ -887,6 +887,23 @@ var bimodalFixtures = map[string]bimodalFixture{
 			"baz 1.0.0",
 		),
 	},
+	"require activates constraints": {
+		ds: []depspec{
+			dsp(mkDepspec("root 0.0.0", "foo 1.0.0", "bar 1.0.0"),
+				pkg("root", "foo")),
+			dsp(mkDepspec("foo 1.0.0"),
+				pkg("foo", "bar")),
+			dsp(mkDepspec("bar 1.0.0"),
+				pkg("bar")),
+			dsp(mkDepspec("bar 1.1.0"),
+				pkg("bar")),
+		},
+		require: []string{"bar"},
+		r: mksolution(
+			"foo 1.0.0",
+			"bar 1.0.0",
+		),
+	},
 	"require subpackage": {
 		ds: []depspec{
 			dsp(mkDepspec("root 0.0.0", "bar 1.0.0"),

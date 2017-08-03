@@ -499,71 +499,51 @@ func TestCopyFile(t *testing.T) {
 }
 
 func TestCopyFileSymlink(t *testing.T) {
-	dir, err := ioutil.TempDir("", "dep")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(dir)
+	h := test.NewHelper(t)
+	defer h.Cleanup()
+	h.TempDir(".")
 
-	srcPath := filepath.Join(dir, "src")
-	symlinkPath := filepath.Join(dir, "symlink")
-	dstPath := filepath.Join(dir, "dst")
-
-	srcf, err := os.Create(srcPath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	srcf.Close()
-
-	if err = os.Symlink(srcPath, symlinkPath); err != nil {
-		t.Fatalf("could not create symlink: %s", err)
+	testcases := map[string]string{
+		filepath.Join("./testdata/symlinks/file-symlink"):         filepath.Join(h.Path("."), "dst-file"),
+		filepath.Join("./testdata/symlinks/windows-file-symlink"): filepath.Join(h.Path("."), "windows-dst-file"),
+		filepath.Join("./testdata/symlinks/dir-symlink"):          filepath.Join(h.Path("."), "dst-dir"),
+		filepath.Join("./testdata/symlinks/invalid-symlink"):      filepath.Join(h.Path("."), "invalid-symlink"),
 	}
 
-	if err = copyFile(symlinkPath, dstPath); err != nil {
-		t.Fatalf("failed to copy symlink: %s", err)
-	}
+	for symlink, dst := range testcases {
+		t.Run(symlink, func(t *testing.T) {
+			var err error
+			if err = copyFile(symlink, dst); err != nil {
+				t.Fatalf("failed to copy symlink: %s", err)
+			}
 
-	resolvedPath, err := os.Readlink(dstPath)
-	if err != nil {
-		t.Fatalf("could not resolve symlink: %s", err)
-	}
+			var want, got string
 
-	if resolvedPath != srcPath {
-		t.Fatalf("resolved path is incorrect. expected %s, got %s", srcPath, resolvedPath)
-	}
-}
+			if runtime.GOOS == "windows" {
+				// Creating symlinks on Windows require an additional permission
+				// regular users aren't granted usually. So we copy the file
+				// content as a fall back instead of creating a real symlink.
+				srcb, err := ioutil.ReadFile(symlink)
+				h.Must(err)
+				dstb, err := ioutil.ReadFile(dst)
+				h.Must(err)
 
-func TestCopyFileSymlinkToDirectory(t *testing.T) {
-	dir, err := ioutil.TempDir("", "dep")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(dir)
+				want = string(srcb)
+				got = string(dstb)
+			} else {
+				want, err = os.Readlink(symlink)
+				h.Must(err)
 
-	srcPath := filepath.Join(dir, "src")
-	symlinkPath := filepath.Join(dir, "symlink")
-	dstPath := filepath.Join(dir, "dst")
+				got, err = os.Readlink(dst)
+				if err != nil {
+					t.Fatalf("could not resolve symlink: %s", err)
+				}
+			}
 
-	err = os.MkdirAll(srcPath, 0777)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if err = os.Symlink(srcPath, symlinkPath); err != nil {
-		t.Fatalf("could not create symlink: %v", err)
-	}
-
-	if err = copyFile(symlinkPath, dstPath); err != nil {
-		t.Fatalf("failed to copy symlink: %s", err)
-	}
-
-	resolvedPath, err := os.Readlink(dstPath)
-	if err != nil {
-		t.Fatalf("could not resolve symlink: %s", err)
-	}
-
-	if resolvedPath != srcPath {
-		t.Fatalf("resolved path is incorrect. expected %s, got %s", srcPath, resolvedPath)
+			if want != got {
+				t.Fatalf("resolved path is incorrect. expected %s, got %s", want, got)
+			}
+		})
 	}
 }
 
@@ -814,13 +794,6 @@ func TestIsNonEmptyDir(t *testing.T) {
 }
 
 func TestIsSymlink(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		// XXX: creating symlinks is not supported in Go on
-		// Microsoft Windows. Skipping this this until a solution
-		// for creating symlinks is is provided.
-		t.Skip("skipping on windows")
-	}
-
 	dir, err := ioutil.TempDir("", "dep")
 	if err != nil {
 		t.Fatal(err)
@@ -841,6 +814,7 @@ func TestIsSymlink(t *testing.T) {
 
 	dirSymlink := filepath.Join(dir, "dirSymlink")
 	fileSymlink := filepath.Join(dir, "fileSymlink")
+
 	if err = os.Symlink(dirPath, dirSymlink); err != nil {
 		t.Fatal(err)
 	}
@@ -866,16 +840,20 @@ func TestIsSymlink(t *testing.T) {
 	})
 	defer cleanup()
 
-	tests := map[string]struct {
-		expected bool
-		err      bool
-	}{
+	tests := map[string]struct{ expected, err bool }{
 		dirPath:             {false, false},
 		filePath:            {false, false},
 		dirSymlink:          {true, false},
 		fileSymlink:         {true, false},
 		inaccessibleFile:    {false, true},
 		inaccessibleSymlink: {false, true},
+	}
+
+	if runtime.GOOS == "windows" {
+		// XXX: setting permissions works differently in Windows. Skipping
+		// these cases until a compatible implementation is provided.
+		delete(tests, inaccessibleFile)
+		delete(tests, inaccessibleSymlink)
 	}
 
 	for path, want := range tests {
