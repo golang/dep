@@ -574,7 +574,7 @@ func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm
 				Source:     instr.id.Source,
 				Constraint: instr.constraint,
 			}
-		} else {
+			//} else {
 			// TODO(sdboyer) hoist a constraint into the manifest from the lock
 		}
 	}
@@ -586,12 +586,15 @@ func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm
 	sort.Strings(reqlist)
 
 	sw, err := dep.NewSafeWriter(nil, p.Lock, dep.LockFromSolution(solution), dep.VendorOnChanged)
+	if err != nil {
+		return err
+	}
+
 	if cmd.dryRun {
 		return sw.PrintPreparedActions(ctx.Out)
 	}
 
-	err = errors.Wrap(sw.Write(p.AbsRoot, sm, true), "grouped write of manifest, lock and vendor")
-	if err != nil {
+	if err := errors.Wrap(sw.Write(p.AbsRoot, sm, true), "grouped write of manifest, lock and vendor"); err != nil {
 		return err
 	}
 
@@ -601,8 +604,8 @@ func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm
 		return errors.Wrapf(err, "opening %s failed", dep.ManifestName)
 	}
 
-	_, err = f.Write(extra)
-	if err != nil {
+	if _, err := f.Write(extra); err != nil {
+		f.Close()
 		return errors.Wrapf(err, "writing to %s failed", dep.ManifestName)
 	}
 
