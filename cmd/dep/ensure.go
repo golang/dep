@@ -239,6 +239,10 @@ func (cmd *ensureCommand) runDefault(ctx *dep.Ctx, args []string, p *dep.Project
 			return nil
 		}
 
+		if ctx.Verbose {
+			ctx.Out.Printf("%s was already in sync with imports and %s, recreating vendor/ directory", dep.LockName, dep.ManifestName)
+		}
+
 		// TODO(sdboyer) The desired behavior at this point is to determine
 		// whether it's necessary to write out vendor, or if it's already
 		// consistent with the lock. However, we haven't yet determined what
@@ -385,12 +389,17 @@ func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm
 		return errors.Errorf("%s and %s are out of sync. Run a plain dep ensure to resync them before attempting to -add", dep.ManifestName, dep.LockName)
 	}
 
-	rm, errmap := params.RootPackageTree.ToReachMap(true, true, false, p.Manifest.IgnoredPackages())
+	rm, _ := params.RootPackageTree.ToReachMap(true, true, false, p.Manifest.IgnoredPackages())
+
+	// TODO(sdboyer) re-enable this once we ToReachMap() intelligently filters out normally-excluded (_*, .*), dirs from errmap
+	//rm, errmap := params.RootPackageTree.ToReachMap(true, true, false, p.Manifest.IgnoredPackages())
 	// Having some problematic internal packages isn't cause for termination,
 	// but the user needs to be warned.
-	for fail := range errmap {
-		ctx.Err.Printf("Warning: %s", fail)
-	}
+	//for fail, err := range errmap {
+	//if _, is := err.Err.(*build.NoGoError); !is {
+	//ctx.Err.Printf("Warning: %s, %s", fail, err)
+	//}
+	//}
 
 	// Compile unique sets of 1) all external packages imported or required, and
 	// 2) the project roots under which they fall.
