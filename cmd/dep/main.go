@@ -78,7 +78,7 @@ func (c *Config) Run() (exitCode int) {
 			"update the locked versions of all dependencies",
 		},
 		{
-			"dep ensure github.com/pkg/errors",
+			"dep ensure -add github.com/pkg/errors",
 			"add a dependency to the project",
 		},
 	}
