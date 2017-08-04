@@ -162,6 +162,10 @@ func (cmd *ensureCommand) Run(ctx *dep.Ctx, args []string) error {
 		params.TraceLogger = ctx.Err
 	}
 
+	if cmd.vendorOnly {
+		return cmd.runVendorOnly(ctx, args, p, sm, params)
+	}
+
 	params.RootPackageTree, err = pkgtree.ListPackages(p.ResolvedAbsRoot, string(p.ImportRoot))
 	if err != nil {
 		return errors.Wrap(err, "ensure ListPackage for project")
@@ -202,29 +206,7 @@ func (cmd *ensureCommand) validateFlags() error {
 func (cmd *ensureCommand) runDefault(ctx *dep.Ctx, args []string, p *dep.Project, sm gps.SourceManager, params gps.SolveParameters) error {
 	// Bare ensure doesn't take any args.
 	if len(args) != 0 {
-		if cmd.vendorOnly {
-			return errors.Errorf("dep ensure -vendor-only only populates vendor/ from %s; it takes no spec arguments", dep.LockName)
-		}
 		return errors.New("dep ensure only takes spec arguments with -add or -update")
-	}
-
-	if cmd.vendorOnly {
-		if p.Lock == nil {
-			return errors.Errorf("no %s exists from which to populate vendor/", dep.LockName)
-		}
-		// Pass the same lock as old and new so that the writer will observe no
-		// difference and choose not to write it out.
-		sw, err := dep.NewSafeWriter(nil, p.Lock, p.Lock, dep.VendorAlways)
-		if err != nil {
-			return err
-		}
-
-		if cmd.dryRun {
-			ctx.Out.Printf("Would have populated vendor/ directory from %s", dep.LockName)
-			return nil
-		}
-
-		return errors.WithMessage(sw.Write(p.AbsRoot, sm, true), "grouped write of manifest, lock and vendor")
 	}
 
 	solver, err := gps.Prepare(params, sm)
@@ -277,6 +259,29 @@ func (cmd *ensureCommand) runDefault(ctx *dep.Ctx, args []string, p *dep.Project
 	}
 
 	return errors.Wrap(sw.Write(p.AbsRoot, sm, false), "grouped write of manifest, lock and vendor")
+}
+
+func (cmd *ensureCommand) runVendorOnly(ctx *dep.Ctx, args []string, p *dep.Project, sm gps.SourceManager, params gps.SolveParameters) error {
+	if len(args) != 0 {
+		return errors.Errorf("dep ensure -vendor-only only populates vendor/ from %s; it takes no spec arguments", dep.LockName)
+	}
+
+	if p.Lock == nil {
+		return errors.Errorf("no %s exists from which to populate vendor/", dep.LockName)
+	}
+	// Pass the same lock as old and new so that the writer will observe no
+	// difference and choose not to write it out.
+	sw, err := dep.NewSafeWriter(nil, p.Lock, p.Lock, dep.VendorAlways)
+	if err != nil {
+		return err
+	}
+
+	if cmd.dryRun {
+		ctx.Out.Printf("Would have populated vendor/ directory from %s", dep.LockName)
+		return nil
+	}
+
+	return errors.WithMessage(sw.Write(p.AbsRoot, sm, true), "grouped write of manifest, lock and vendor")
 }
 
 func (cmd *ensureCommand) runUpdate(ctx *dep.Ctx, args []string, p *dep.Project, sm gps.SourceManager, params gps.SolveParameters) error {
