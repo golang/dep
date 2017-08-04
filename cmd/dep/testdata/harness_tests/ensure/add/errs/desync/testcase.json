@@ -1,0 +1,6 @@
+{
+  "commands": [
+    ["ensure", "-add", "foobar.com/baz"]
+  ],
+  "error-expected": "Gopkg.toml and Gopkg.lock are out of sync. Run a plain dep ensure to resync them before attempting to -add"
+}
