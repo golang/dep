@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"runtime"
+	"sort"
 	"strings"
 	"testing"
 
@@ -1982,4 +1983,46 @@ func getTestdataRootDir(t *testing.T) string {
 		t.Fatal(err)
 	}
 	return filepath.Join(cwd, "..", "_testdata")
+}
+
+func TestVerifyDepTree(t *testing.T) {
+	status, err := VerifyDepTree("../../../vendor", map[string]string{
+		"github.com/Masterminds/semver":      "d3511d3621f2e283d57bd477bf26bcab4e628e872b72b52faeba1ea3b10d29a1",
+		"github.com/Masterminds/vcs":         "557f661d280126ca17cf856c4e2262aa08ef5caa9f9f457ba74e0b6d837dae1b",
+		"github.com/armon/go-radix":          "1ca6e9dba03baa33758f3df7354098d4970e45b90f5b669c81f751e2b993aa1f",
+		"github.com/go-yaml/yaml":            "4dfaf7deadf9f5ebc143c2db7f9472681a4cb4fcf4398261d11ce2c17e2067a7",
+		"github.com/pelletier/go-buffruneio": "2b6549576ebd314cc97aa89533c958155e8411a33ac09063d5b341671fffeeac",
+		"github.com/pelletier/go-toml":       "2bf88c59831e0396161c9b956a0509627d29b1c4bff6e434511c236422c939b9",
+		// "github.com/pelletier/go-toml": "",
+		"github.com/pkg/errors":       "9f165bc70ee38d1c833f2fcf77a1e53edd4018f7daf5b628ee11ef2b5a7d6461",
+		"github.com/sdboyer/constext": "f3d232a2dd91ded49a56eeb8d4c9bf1e43a969fc4abccc7ae5b94186626d77be",
+		// "github.com/sdboyer/constext": "-f3d232a2dd91ded49a56eeb8d4c9bf1e43a969fc4abccc7ae5b94186626d77be",
+		// "github.com/karrick/gorill":   "",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	keys := make([]string, 0, len(status))
+	for key := range status {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		s := status[key]
+		// if s != NoMismatch {
+		t.Logf("%q: %v\n", key, s)
+		// }
+	}
+}
+
+func TestVerifyDepTreeGoSource(t *testing.T) {
+	t.Skip("long test of lots of files in $GOPATH/src")
+	var goSource = filepath.Join(os.Getenv("GOPATH"), "src")
+	status, err := VerifyDepTree(goSource, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for k, v := range status {
+		t.Logf("%q: %q\n", k, v)
+	}
 }
