@@ -1,0 +1,6 @@
+{
+  "commands": [
+    ["ensure", "-update", "github.com/sdboyer/deptest/subpkg"]
+  ],
+  "error-expected": "github.com/sdboyer/deptest/subpkg is not a project root, try github.com/sdboyer/deptest instead"
+}

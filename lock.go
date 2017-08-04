@@ -122,6 +122,20 @@ func (l *Lock) Projects() []gps.LockedProject {
 	return l.P
 }
 
+// HasProjectWithRoot checks if the lock contains a project with the provided
+// ProjectRoot.
+//
+// This check is O(n) in the number of projects.
+func (l *Lock) HasProjectWithRoot(root gps.ProjectRoot) bool {
+	for _, p := range l.P {
+		if p.Ident().ProjectRoot == root {
+			return true
+		}
+	}
+
+	return false
+}
+
 // toRaw converts the manifest into a representation suitable to write to the lock file
 func (l *Lock) toRaw() rawLock {
 	raw := rawLock{

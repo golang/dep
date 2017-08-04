@@ -1,0 +1,6 @@
+{
+  "commands": [
+    ["ensure", "-update", "github.com/sdboyer/deptest:github.com/other/deptest"]
+  ],
+  "error-expected": "cannot specify alternate sources on -update (github.com/other/deptest)"
+}

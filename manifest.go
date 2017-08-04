@@ -335,6 +335,19 @@ func (m *Manifest) IgnoredPackages() map[string]bool {
 	return mp
 }
 
+// HasConstraintsOn checks if the manifest contains either constraints or
+// overrides on the provided ProjectRoot.
+func (m *Manifest) HasConstraintsOn(root gps.ProjectRoot) bool {
+	if _, has := m.Constraints[root]; has {
+		return true
+	}
+	if _, has := m.Ovr[root]; has {
+		return true
+	}
+
+	return false
+}
+
 // RequiredPackages returns a set of import paths to require.
 func (m *Manifest) RequiredPackages() map[string]bool {
 	if len(m.Required) == 0 {

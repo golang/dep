@@ -1,0 +1,8 @@
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/sdboyer/deptesttres"
+
+[[constraint]]
+  name = "github.com/sdboyer/deptest"
+  version = "0.8.1"
