@@ -24,6 +24,7 @@ Summarize the question and quote the reply, linking back to the original comment
 * [Why did `dep` use a different revision for package X instead of the revision in the lock file?](#why-did-dep-use-a-different-revision-for-package-x-instead-of-the-revision-in-the-lock-file)
 * [Why is `dep` slow?](#why-is-dep-slow)
 * [How does `dep` handle symbolic links?](#how-does-dep-handle-symbolic-links)
+* [Does `dep` support relative imports?](#does-dep-support-relative-imports)
 
 ## Best Practices
 * [Should I commit my vendor directory?](#should-i-commit-my-vendor-directory)
@@ -277,6 +278,15 @@ When `dep` is invoked with a project root that is a symlink, it will be resolved
 - If neither the symlink nor the resolved path are in a `GOPATH`, then an error is thrown.
 
 This is the only symbolic link support that `dep` really intends to provide. In keeping with the general practices of the `go` tool, `dep` tends to either ignore symlinks (when walking) or copy the symlink itself, depending on the filesystem operation being performed.
+
+## Does `dep` support relative imports?
+
+No.
+> dep simply doesn't allow relative imports. this is one of the few places where we restrict a case that the toolchain itself allows. we disallow them only because:<br>
+>  i. the toolchain already frowns heavily on them<br>
+> ii. it's worse for our case, as we start venturing into [dot dot hell](http://doc.cat-v.org/plan_9/4th_edition/papers/lexnames) territory when trying to prove that the import does not escape the tree of the project -[@sdboyer in #899](https://github.com/golang/dep/issues/899#issuecomment-317904001)
+
+For a refresher on Go's recommended workspace organization, see the ["How To Write Go Code"](https://golang.org/doc/code.html) article in the Go docs. Organizing your code this way gives you a unique import path for every package.
 
 ## Best Practices
 ### Should I commit my vendor directory?
