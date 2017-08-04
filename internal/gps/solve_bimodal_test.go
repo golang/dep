@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/karrick/dep/internal/gps/pkgtree"
+	"github.com/golang/dep/internal/gps/pkgtree"
 )
 
 // dsp - "depspec with packages"

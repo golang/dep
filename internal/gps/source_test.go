@@ -11,7 +11,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/karrick/dep/internal/gps/pkgtree"
+	"github.com/golang/dep/internal/gps/pkgtree"
 )
 
 // Executed in parallel by TestSlowVcs

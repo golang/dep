@@ -7,7 +7,7 @@ package simple
 import (
 	"sort"
 
-	"github.com/karrick/dep/internal/gps"
+	"github.com/golang/dep/internal/gps"
 )
 
 var (

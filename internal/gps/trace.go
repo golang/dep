@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/karrick/dep/internal/gps/pkgtree"
+	"github.com/golang/dep/internal/gps/pkgtree"
 )
 
 const (

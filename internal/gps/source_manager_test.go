@@ -8,7 +8,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/karrick/dep/internal/test"
+	"github.com/golang/dep/internal/test"
 )
 
 func TestSourceManager_InferConstraint(t *testing.T) {

@@ -17,7 +17,7 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/karrick/dep/internal/fs"
+	"github.com/golang/dep/internal/fs"
 	"github.com/pkg/errors"
 )
 
