@@ -925,57 +925,6 @@ func uniq(a []string) []string {
 	return a[:i]
 }
 
-var pathSeparator = string(filepath.Separator)
-
-// HashVendorTree returns an associative array of the libraries found in the
-// specified vendor directory, paired with their deterministic hash of their
-// contents. The output keys are the library names, e.g.,
-// "github.com/Masterminds/semver", while the value is the respective directory
-// contents hash.
-//
-// QUESTION: Do we signal an error if extra files or directories found that do
-// not fit mold of expectations above?
-func HashVendorTree(vendorPathname string) (map[string]string, error) {
-	vendorPathname = filepath.Clean(vendorPathname)
-
-	components := strings.Split(vendorPathname, pathSeparator)
-	maxDepth := len(components) + 3 // focus on 3 directory levels below vendor directory
-
-	prefixLength := len(vendorPathname)
-	if prefixLength > 0 {
-		prefixLength += len(pathSeparator) // if not empty string, include len of path separator
-	}
-
-	status := make(map[string]string)
-
-	err := filepath.Walk(vendorPathname, func(pathname string, fi os.FileInfo, err error) error {
-		if err != nil && err != filepath.SkipDir {
-			return err
-		}
-		// NOTE: Ignore file system nodes that are not directories.
-		if fi.IsDir() {
-			// How many levels deep is pathname below the directory specified by
-			// vendorPathname?
-			if depth := len(strings.Split(pathname, pathSeparator)); depth > maxDepth {
-				return filepath.SkipDir
-			} else if depth == maxDepth {
-				libraryName := pathname[prefixLength:] // chop off the prefix
-				sum, err := fs.HashFromNode(vendorPathname, libraryName)
-				if err != nil {
-					return err
-				}
-				status[libraryName] = sum
-			}
-		}
-		return nil
-	})
-
-	if err != nil {
-		return nil, err
-	}
-	return status, nil
-}
-
 // LibraryStatus represents one of a handful of possible statuses of a
 // particular subdirectory under vendor.
 type LibraryStatus uint8
@@ -1063,6 +1012,8 @@ func sortedListOfDirectoryChildren(pathname string) (childrenNames []string, err
 	return
 }
 
+const pathSeparator = string(filepath.Separator)
+
 // VerifyDepTree verifies dep tree according to expected digests, and returns an
 // associative array of file system nodes and their respective status in
 // accordance with the provided expectedSums parameter.
@@ -1090,10 +1041,6 @@ func VerifyDepTree(vendorPathname string, expectedSums map[string]string) (statu
 	// NOTE: Mark directories of expected dependencies and their parents as required
 	for pathname := range expectedSums {
 		status[pathname] = NotInTree
-		// components := strings.Split(pathname, pathSeparator)
-		// for i := 1; i < len(components)+1; i++ {
-		// 	log.Printf("%v", strings.Join(components[:i], pathSeparator))
-		// }
 	}
 
 	for len(queue) > 0 {
@@ -1130,7 +1077,7 @@ func VerifyDepTree(vendorPathname string, expectedSums map[string]string) (statu
 
 		childrenNames, er := sortedListOfDirectoryChildren(currentNode.pathname)
 		if er != nil {
-			err = errors.Wrap(er, "cannot get list of directory children")
+			err = errors.Wrap(er, "cannot get sorted list of directory children")
 			return
 		}
 		for _, childName := range childrenNames {
@@ -1159,14 +1106,13 @@ func VerifyDepTree(vendorPathname string, expectedSums map[string]string) (statu
 				}
 			}
 		}
-		// }
 
 		if err != nil {
 			return // early termination iff error
 		}
 	}
 
-	// Walk nodes from end to beginning; ignore root node
+	// Walk nodes from end to beginning; ignore first node in list
 	for i := len(nodes) - 1; i > 0; i-- {
 		currentNode = nodes[i]
 		// log.Printf("FINAL: %s", currentNode)

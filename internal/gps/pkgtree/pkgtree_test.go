@@ -1985,17 +1985,6 @@ func getTestdataRootDir(t *testing.T) string {
 	return filepath.Join(cwd, "..", "_testdata")
 }
 
-func TestHashVendorTree(t *testing.T) {
-	status, err := HashVendorTree("../../../vendor")
-	if err != nil {
-		t.Fatal(err)
-	}
-	for k, v := range status {
-		_, _ = k, v
-		// t.Logf("%q: %q\n", k, v)
-	}
-}
-
 func TestVerifyDepTree(t *testing.T) {
 	status, err := VerifyDepTree("../../../vendor", map[string]string{
 		"github.com/Masterminds/semver":      "d3511d3621f2e283d57bd477bf26bcab4e628e872b72b52faeba1ea3b10d29a1",

@@ -12,9 +12,10 @@ import (
 	"github.com/pkg/errors"
 )
 
-var pathSeparator = string(filepath.Separator)
-
-var skipModes = os.ModeDevice | os.ModeNamedPipe | os.ModeSocket | os.ModeCharDevice
+const (
+	pathSeparator = string(filepath.Separator)
+	skipModes     = os.ModeDevice | os.ModeNamedPipe | os.ModeSocket | os.ModeCharDevice
+)
 
 // HashFromNode returns a deterministic hash of the specified file system node,
 // performing a breadth-first traversal of directories. While the specified
