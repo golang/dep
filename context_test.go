@@ -314,22 +314,15 @@ func TestDetectProjectGOPATH(t *testing.T) {
 	h := test.NewHelper(t)
 	defer h.Cleanup()
 
-	h.TempDir("go")
-	h.TempDir("go-two")
+	h.TempDir(filepath.Join("sym", "symlink"))
+	h.TempDir(filepath.Join("go", "src", "sym", "path"))
+	h.TempDir(filepath.Join("go", "src", "real", "path"))
+	h.TempDir(filepath.Join("go-two", "src", "real", "path"))
+	h.TempDir(filepath.Join("go-two", "src", "sym"))
 
 	ctx := &Ctx{
 		GOPATHs: []string{h.Path("go"), h.Path("go-two")},
 	}
-
-	h.TempDir("go/src/real/path")
-
-	// Another directory used as a GOPATH
-	h.TempDir("go-two/src/sym")
-
-	h.TempDir(filepath.Join(".", "sym/symlink")) // Directory for symlinks
-	h.TempDir(filepath.Join("go", "src", "sym", "path"))
-	h.TempDir(filepath.Join("go", "src", " real", "path"))
-	h.TempDir(filepath.Join("go-two", "src", "real", "path"))
 
 	testcases := []struct {
 		name         string
@@ -383,7 +376,7 @@ func TestDetectProjectGOPATH(t *testing.T) {
 		{
 			name:         "AbsRoot-is-a-symlink-to-ResolvedAbsRoot",
 			root:         filepath.Join(h.Path("."), "sym", "symlink"),
-			resolvedRoot: filepath.Join(ctx.GOPATHs[0], "src", " real", "path"),
+			resolvedRoot: filepath.Join(ctx.GOPATHs[0], "src", "real", "path"),
 			GOPATH:       ctx.GOPATHs[0],
 		},
 	}
@@ -412,36 +405,33 @@ func TestDetectGOPATH(t *testing.T) {
 	th := test.NewHelper(t)
 	defer th.Cleanup()
 
-	th.TempDir("go")
-	th.TempDir("gotwo")
+	th.TempDir(filepath.Join("code", "src", "github.com", "username", "package"))
+	th.TempDir(filepath.Join("go", "src", "github.com", "username", "package"))
+	th.TempDir(filepath.Join("gotwo", "src", "github.com", "username", "package"))
 
 	ctx := &Ctx{GOPATHs: []string{
 		th.Path("go"),
 		th.Path("gotwo"),
 	}}
 
-	th.TempDir(filepath.Join("code", "src", "github.com", "username", "package"))
-	th.TempDir(filepath.Join("go", "src", "github.com", "username", "package"))
-	th.TempDir(filepath.Join("gotwo", "src", "github.com", "username", "package"))
-
 	testcases := []struct {
 		GOPATH string
 		path   string
 		err    bool
 	}{
-		{th.Path("go"), filepath.Join(th.Path("go"), "src/github.com/username/package"), false},
-		{th.Path("go"), filepath.Join(th.Path("go"), "src/github.com/username/package"), false},
-		{th.Path("gotwo"), filepath.Join(th.Path("gotwo"), "src/github.com/username/package"), false},
-		{"", filepath.Join(th.Path("."), "code/src/github.com/username/package"), true},
+		{th.Path("go"), th.Path(filepath.Join("go", "src", "github.com", "username", "package")), false},
+		{th.Path("go"), th.Path(filepath.Join("go", "src", "github.com", "username", "package")), false},
+		{th.Path("gotwo"), th.Path(filepath.Join("gotwo", "src", "github.com", "username", "package")), false},
+		{"", th.Path(filepath.Join("code", "src", "github.com", "username", "package")), true},
 	}
 
 	for _, tc := range testcases {
 		GOPATH, err := ctx.detectGOPATH(tc.path)
 		if tc.err && err == nil {
-			t.Error("Expected error but got none")
+			t.Error("expected error but got none")
 		}
 		if GOPATH != tc.GOPATH {
-			t.Errorf("Expected GOPATH to be %s, got %s", GOPATH, tc.GOPATH)
+			t.Errorf("expected GOPATH to be %s, got %s", GOPATH, tc.GOPATH)
 		}
 	}
 }
