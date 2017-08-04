@@ -45,13 +45,11 @@ func HasFilepathPrefix(path, prefix string) bool {
 		return false
 	}
 
-	// because filepath.Join("c:","dir") returns "c:dir", we have to manually add path separator to drive letters
-	if strings.HasSuffix(vnPath, ":") {
-		vnPath += string(os.PathSeparator)
-	}
-	if strings.HasSuffix(vnPrefix, ":") {
-		vnPrefix += string(os.PathSeparator)
-	}
+	// Because filepath.Join("c:","dir") returns "c:dir", we have to manually
+	// add path separator to drive letters. Also, we need to set the path root
+	// on *nix systems, since filepath.Join("", "dir") returns a relative path.
+	vnPath += string(os.PathSeparator)
+	vnPrefix += string(os.PathSeparator)
 
 	var dn string
 
@@ -74,7 +72,7 @@ func HasFilepathPrefix(path, prefix string) bool {
 		return false
 	}
 
-	// d,p are initialized with "" on *nix and volume name on Windows
+	// d,p are initialized with "/" on *nix and volume name on Windows
 	d := vnPath
 	p := vnPrefix
 
@@ -84,7 +82,11 @@ func HasFilepathPrefix(path, prefix string) bool {
 		// something like ext4 filesystem mounted on FAT
 		// mountpoint, mounted on ext4 filesystem, i.e. the
 		// problematic filesystem is not the last one.
-		if isCaseSensitiveFilesystem(filepath.Join(d, dirs[i])) {
+		caseSensitive, err := isCaseSensitiveFilesystem(filepath.Join(d, dirs[i]))
+		if err != nil {
+			return false
+		}
+		if caseSensitive {
 			d = filepath.Join(d, dirs[i])
 			p = filepath.Join(p, prefixes[i])
 		} else {
@@ -106,28 +108,45 @@ func EqualPaths(p1, p2 string) (bool, error) {
 	p1 = filepath.Clean(p1)
 	p2 = filepath.Clean(p2)
 
-	if isDir, err := IsDir(p2); err != nil && !strings.HasSuffix(err.Error(), "is not a directory") {
-		return false, err
-	} else if !isDir {
-		// If p2 is not a directory, compare the bases of the paths to ensure
-		// they are equivalent.
-		var p1Base, p2Base string
+	fi1, err := os.Stat(p1)
+	if err != nil {
+		return false, errors.Wrapf(err, "could not check for path equivalence")
+	}
+	fi2, err := os.Stat(p2)
+	if err != nil {
+		return false, errors.Wrapf(err, "could not check for path equivalence")
+	}
 
-		p1, p1Base = filepath.Split(p1)
-		p2, p2Base = filepath.Split(p2)
+	p1Filename, p2Filename := "", ""
 
-		if isCaseSensitiveFilesystem(p1) {
-			if p1Base != p2Base {
+	if !fi1.IsDir() {
+		p1, p1Filename = filepath.Split(p1)
+	}
+	if !fi2.IsDir() {
+		p2, p2Filename = filepath.Split(p2)
+	}
+
+	if !HasFilepathPrefix(p1, p2) || !HasFilepathPrefix(p2, p1) {
+		return false, nil
+	}
+
+	if p1Filename != "" || p2Filename != "" {
+		caseSensitive, err := isCaseSensitiveFilesystem(filepath.Join(p1, p1Filename))
+		if err != nil {
+			return false, errors.Wrap(err, "could not check for filesystem case-sensitivity")
+		}
+		if caseSensitive {
+			if p1Filename != p2Filename {
 				return false, nil
 			}
 		} else {
-			if strings.ToLower(p1Base) != strings.ToLower(p2Base) {
+			if strings.ToLower(p1Filename) != strings.ToLower(p2Filename) {
 				return false, nil
 			}
 		}
 	}
 
-	return len(p1) == len(p2) && HasFilepathPrefix(p1, p2), nil
+	return true, nil
 }
 
 // RenameWithFallback attempts to rename a file or directory, but falls back to
@@ -189,21 +208,20 @@ func renameByCopy(src, dst string) error {
 // If the input directory is such that the last component is composed
 // exclusively of case-less codepoints (e.g.  numbers), this function will
 // return false.
-func isCaseSensitiveFilesystem(dir string) bool {
-	alt := filepath.Join(filepath.Dir(dir),
-		genTestFilename(filepath.Base(dir)))
+func isCaseSensitiveFilesystem(dir string) (bool, error) {
+	alt := filepath.Join(filepath.Dir(dir), genTestFilename(filepath.Base(dir)))
 
 	dInfo, err := os.Stat(dir)
 	if err != nil {
-		return true
+		return false, errors.Wrap(err, "could not determine the case-sensitivity of the filesystem")
 	}
 
 	aInfo, err := os.Stat(alt)
 	if err != nil {
-		return true
+		return false, errors.Wrap(err, "could not determine the case-sensitivity of the filesystem")
 	}
 
-	return !os.SameFile(dInfo, aInfo)
+	return !os.SameFile(dInfo, aInfo), nil
 }
 
 // genTestFilename returns a string with at most one rune case-flipped.

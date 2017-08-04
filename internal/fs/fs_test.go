@@ -145,22 +145,24 @@ func TestEqualPaths(t *testing.T) {
 	h.TempDir("DIR")
 	h.TempFile("FILE", "")
 
-	// caseInsensitive flag ensures that these cases are only equivalent on a
-	// case-insensitive filesystem.
-	caseInsensitive := isCaseSensitiveFilesystem(h.Path("dir"))
-
 	testcases := []struct {
-		p1, p2 string
-		want   bool
-		err    bool
+		p1, p2                   string
+		caseSensitiveEquivalent  bool
+		caseInensitiveEquivalent bool
+		err                      bool
 	}{
-		{h.Path("dir"), h.Path("dir"), true, false},
-		{h.Path("file"), h.Path("file"), true, false},
-		{h.Path("dir"), h.Path("dir2"), false, false},
-		{h.Path("file"), h.Path("file2"), false, false},
-		{h.Path("dir"), h.Path("file"), false, false},
-		{h.Path("dir"), h.Path("DIR"), caseInsensitive, false},
-		{strings.ToLower(h.Path("dir")), strings.ToUpper(h.Path("dir")), caseInsensitive, true},
+		{h.Path("dir"), h.Path("dir"), true, true, false},
+		{h.Path("file"), h.Path("file"), true, true, false},
+		{h.Path("dir"), h.Path("dir2"), false, false, false},
+		{h.Path("file"), h.Path("file2"), false, false, false},
+		{h.Path("dir"), h.Path("file"), false, false, false},
+		{h.Path("dir"), h.Path("DIR"), false, true, false},
+		{strings.ToLower(h.Path("dir")), strings.ToUpper(h.Path("dir")), false, true, true},
+	}
+
+	caseSensitive, err := isCaseSensitiveFilesystem(h.Path("dir"))
+	if err != nil {
+		t.Fatal("unexpcted error:", err)
 	}
 
 	for _, tc := range testcases {
@@ -168,8 +170,14 @@ func TestEqualPaths(t *testing.T) {
 		if err != nil && !tc.err {
 			t.Error("unexpected error:", err)
 		}
-		if got != tc.want {
-			t.Errorf("expected EqualPaths(%q, %q) to be %t, got %t", tc.p1, tc.p2, tc.want, got)
+		if caseSensitive {
+			if tc.caseSensitiveEquivalent != got {
+				t.Errorf("expected EqualPaths(%q, %q) to be %t on case-sensitive filesystem, got %t", tc.p1, tc.p2, tc.caseSensitiveEquivalent, got)
+			}
+		} else {
+			if tc.caseInensitiveEquivalent != got {
+				t.Errorf("expected EqualPaths(%q, %q) to be %t on case-insensitive filesystem, got %t", tc.p1, tc.p2, tc.caseInensitiveEquivalent, got)
+			}
 		}
 	}
 }
