@@ -13,8 +13,10 @@ import (
 	"github.com/golang/dep/internal/gps"
 )
 
-var errProjectNotFound = fmt.Errorf("could not find project %s, use dep init to initiate a manifest", ManifestName)
-var errVendorBackupFailed = fmt.Errorf("Failed to create vendor backup. File with same name exists.")
+var (
+	errProjectNotFound    = fmt.Errorf("could not find project %s, use dep init to initiate a manifest", ManifestName)
+	errVendorBackupFailed = fmt.Errorf("failed to create vendor backup. File with same name exists")
+)
 
 // findProjectRoot searches from the starting directory upwards looking for a
 // manifest file until we get to the root of the filesystem.
