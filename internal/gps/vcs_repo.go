@@ -98,7 +98,7 @@ func (r *gitRepo) fetch(ctx context.Context) error {
 }
 
 func (r *gitRepo) updateVersion(ctx context.Context, v string) error {
-	out, err := runFromRepoDir(ctx, r, defaultCmdTimeout, "git", "checkout", v)
+	out, err := runFromRepoDir(ctx, r, expensiveCmdTimeout, "git", "checkout", v)
 	if err != nil {
 		return newVcsLocalErrorOr("Unable to update checked out version", err, string(out))
 	}
