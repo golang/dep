@@ -1996,12 +1996,12 @@ func TestVerifyDepTree(t *testing.T) {
 	pathname := getVerifyTestdataRootDir(t)
 
 	status, err := VerifyDepTree(pathname, map[string]string{
-		"github.com/alice/alice1":      "7428b8ac79007e9d46edd49b5798f7947c1ef73752cf31d4f7e451b8f25b3cb4", // match
+		"github.com/alice/alice1":      "f49816b46140e3e12e1175da2d9fabe18593f0cc576371cdee6b72bbf7a9d87c", // match
 		"github.com/alice/alice2":      "non matching digest",                                              // mismatch
 		"github.com/charlie/notInTree": "",                                                                 // not in tree superseedes empty hash
-		"github.com/bob/bob1":          "1da9bd85997bf900d56a3b02b4f3e6232e1eb6948f6ba84ac54fae241ae9f980", // match
+		"github.com/bob/bob1":          "675dc8ab3389edbd2b42cbf0b15ae2371e0a046f114fe5298ffcb292bff03e30", // match
 		"github.com/bob/bob2":          "",                                                                 // empty hash
-		"launchpad.net/nifty":          "05a970598d198edf8e8f51127f322e91be0afadf026c1192f709f293230c6930", // match at unusual dir level
+		"launchpad.net/nifty":          "6bf586f1f8cc58fb0875f9f7d4eadac3601536b670112031cf59a07abd220826", // match at unusual dir level
 	})
 	if err != nil {
 		t.Fatal(err)
