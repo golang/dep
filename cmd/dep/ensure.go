@@ -209,6 +209,18 @@ func (cmd *ensureCommand) runDefault(ctx *dep.Ctx, args []string, p *dep.Project
 		return errors.New("dep ensure only takes spec arguments with -add or -update")
 	}
 
+	err = gps.ValidateParams(params, sm)
+	if err != nil {
+		if deduceErrs, ok := err.(gps.DeductionErrs); ok {
+			ctx.Err.Println("The following errors occurred while deducing packages:")
+			for ip, dErr := range deduceErrs {
+				ctx.Err.Printf("  * \"%s\": %s", ip, dErr)
+			}
+			ctx.Err.Println()
+		}
+		return errors.Wrap(err, "validateParams")
+	}
+
 	solver, err := gps.Prepare(params, sm)
 	if err != nil {
 		return errors.Wrap(err, "prepare solver")
