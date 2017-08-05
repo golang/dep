@@ -21,10 +21,12 @@ import (
 const ManifestName = "Gopkg.toml"
 
 // Errors
-var errInvalidConstraint = errors.New("\"constraint\" must be a TOML array of tables")
-var errInvalidOverride = errors.New("\"override\" must be a TOML array of tables")
-var errInvalidRequired = errors.New("\"required\" must be a TOML list of strings")
-var errInvalidIgnored = errors.New("\"ignored\" must be a TOML list of strings")
+var (
+	errInvalidConstraint = errors.New("\"constraint\" must be a TOML array of tables")
+	errInvalidOverride   = errors.New("\"override\" must be a TOML array of tables")
+	errInvalidRequired   = errors.New("\"required\" must be a TOML list of strings")
+	errInvalidIgnored    = errors.New("\"ignored\" must be a TOML list of strings")
+)
 
 // Manifest holds manifest file data and implements gps.RootManifest.
 type Manifest struct {
