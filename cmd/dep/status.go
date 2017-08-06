@@ -470,7 +470,12 @@ func runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceMana
 				if bs.Version != nil && bs.Version.Type() != gps.IsVersion {
 					c, has := p.Manifest.Constraints[proj.Ident().ProjectRoot]
 					if !has {
-						c.Constraint = gps.Any()
+						// Get constraint for locked project
+						for _, lockedP := range p.Lock.P {
+							if lockedP.Ident().ProjectRoot == proj.Ident().ProjectRoot {
+								c.Constraint = lockedP.Version()
+							}
+						}
 					}
 					// TODO: This constraint is only the constraint imposed by the
 					// current project, not by any transitive deps. As a result,
