@@ -253,6 +253,72 @@ func (sw SafeWriter) validate(root string, sm gps.SourceManager) error {
 	return nil
 }
 
+// createStagingLinksForPackage looks into <pkgPath>/staging/src and symlinks those staging
+// repositories into vendor/. If packages only contain subpackages, a deeper level is linked.
+// E.g. if <pkgPath>/staging/src/github.com has no real files and only directories the algorithm
+// looks at a deeper level, e.g. at pkgPath/staging/src/github.com/foo. If foo has files (for
+// example *.go files), a relative symlink is created:
+//
+//   tempVendor/github.com/foo -> .../../../staging/src/github.com/foo
+//
+// The tempVendor directory corresponds logically to root/vendor. But, because th caller of
+// this func creates vendor/ dirs as temporary directories first, we have to support this
+// distinction.
+func createStagingLinksForPackage(root, pkgPath string, tempVendor string) error {
+	stagingRoot := filepath.Join(pkgPath, "staging", "src")
+	if _, err := os.Lstat(stagingRoot); os.IsNotExist(err) {
+		return nil
+	}
+
+	logicalVendor := filepath.Join(root, "vendor")
+	return filepath.Walk(stagingRoot, func(wp string, fi os.FileInfo, err error) error {
+		if err != nil && err != filepath.SkipDir {
+			return err
+		}
+		if !fi.IsDir() || strings.HasPrefix(fi.Name(), ".") {
+			return filepath.SkipDir
+		}
+
+		// find out whether the directory has directories only
+		f, err := os.Open(wp)
+		if err != nil {
+			return err
+		}
+		ffis, err := f.Readdir(0)
+		f.Close()
+		if err != nil {
+			return err
+		}
+		filesFound := false
+		for _, ffi := range ffis {
+			if !ffi.IsDir() && !strings.HasPrefix(ffi.Name(), ".") {
+				filesFound = true
+				break
+			}
+		}
+
+		// dive deeper if no files where found, only more subdirectories
+		if !filesFound {
+			return nil
+		}
+
+		// files were found. Let's create a symlink in the vendor dir
+		ip := strings.TrimPrefix(wp, stagingRoot)
+		if err := os.MkdirAll(filepath.Join(tempVendor, filepath.Dir(ip)), 0755); err != nil {
+			return err
+		}
+		rel, err := filepath.Rel(filepath.Join(logicalVendor, filepath.Dir(ip)), wp)
+		if err != nil {
+			return err
+		}
+		if err := os.Symlink(rel, filepath.Join(tempVendor, ip)); err != nil {
+			return err
+		}
+
+		return filepath.SkipDir
+	})
+}
+
 // Write saves some combination of config yaml, lock, and a vendor tree.
 // root is the absolute path of root dir in which to write.
 // sm is only required if vendor is being written.
@@ -316,6 +382,20 @@ func (sw *SafeWriter) Write(root string, sm gps.SourceManager, examples bool) er
 		err = gps.WriteDepTree(filepath.Join(td, "vendor"), sw.lock, sm, true)
 		if err != nil {
 			return errors.Wrap(err, "error while writing out vendor tree")
+		}
+
+		// symlink staging repos of the root package
+		if err := createStagingLinksForPackage(root, root, filepath.Join(td, "vendor")); err != nil {
+			return errors.Wrap(err, "error creating staging symlinks")
+		}
+
+		// symlink staging repos of the vendored packages. These are exported into the temporary
+		// directory td. So we can use that as the root.
+		for _, p := range sw.Lock.Projects() {
+			pkgPath := filepath.Join(td, "vendor", string(p.Ident().ProjectRoot))
+			if err := createStagingLinksForPackage(td, pkgPath, filepath.Join(td, "vendor")); err != nil {
+				return errors.Wrap(err, fmt.Sprintf("error creating staging symlinks for vendored package %q", p.Ident().ProjectRoot))
+			}
 		}
 	}
 
