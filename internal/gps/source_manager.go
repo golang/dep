@@ -190,17 +190,17 @@ func NewSourceManager(cachedir string) (*SourceMgr, error) {
 	//
 	// TODO: #534 needs to be implemented to provide a better way to log warnings,
 	// but until then we will just use stderr.
-	//
-	// #947 appears to be caused by some locking issue; as this is the most likely
-	// culprit, we will add some warnings here, so every 15 seconds we will emit
-	// a warning to stderr that we're waiting for the lockfile.
 
-	lasttime := time.Now()
+	// Implicit Time of 0.
+	var lasttime time.Time
 	err = lockfile.TryLock()
 	for err != nil {
 		nowtime := time.Now()
 		duration := nowtime.Sub(lasttime)
 
+		// The first time this is evaluated, duration will be very large as lasttime is 0.
+		// Unless time travel is invented and someone travels back to the year 1, we should
+		// be ok.
 		if duration > 15*time.Second {
 			fmt.Fprintf(os.Stderr, "waiting for lockfile %s: %s\n", glpath, err.Error())
 			lasttime = nowtime
