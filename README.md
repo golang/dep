@@ -37,6 +37,13 @@ Get the tool via
 $ go get -u github.com/golang/dep/cmd/dep
 ```
 
+On macOS you can install or upgrade to the latest released version with Homebrew:
+
+```sh
+$ brew install dep
+$ brew upgrade dep
+```
+
 To start managing dependencies using dep, run the following from your project root directory:
 
 ```sh
