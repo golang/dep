@@ -6,6 +6,7 @@ package gps
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 )
@@ -51,9 +52,13 @@ type solution struct {
 // It requires a SourceManager to do the work, and takes a flag indicating
 // whether or not to strip vendor directories contained in the exported
 // dependencies.
-func WriteDepTree(basedir string, l Lock, sm SourceManager, sv bool) error {
+func WriteDepTree(basedir string, l Lock, sm SourceManager, sv bool, logger *log.Logger) error {
 	if l == nil {
 		return fmt.Errorf("must provide non-nil Lock to WriteDepTree")
+	}
+
+	if logger != nil {
+		logger.Println("Creating vendor dir ...")
 	}
 
 	err := os.MkdirAll(basedir, 0777)
@@ -64,6 +69,10 @@ func WriteDepTree(basedir string, l Lock, sm SourceManager, sv bool) error {
 	// TODO(sdboyer) parallelize
 	for _, p := range l.Projects() {
 		to := filepath.FromSlash(filepath.Join(basedir, string(p.Ident().ProjectRoot)))
+
+		if logger != nil {
+			logger.Printf("Ensure %v exists", p)
+		}
 
 		err = sm.ExportProject(p.Ident(), p.Version(), to)
 		if err != nil {

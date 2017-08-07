@@ -97,7 +97,7 @@ func pruneProject(p *dep.Project, sm gps.SourceManager, logger *log.Logger) erro
 	}
 	defer os.RemoveAll(td)
 
-	if err := gps.WriteDepTree(td, p.Lock, sm, true); err != nil {
+	if err := gps.WriteDepTree(td, p.Lock, sm, true, logger); err != nil {
 		return err
 	}
 

@@ -6,6 +6,7 @@ package main
 
 import (
 	"flag"
+	"log"
 	"os"
 	"path/filepath"
 	"time"
@@ -201,7 +202,11 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 		return err
 	}
 
-	if err := sw.Write(root, sm, !cmd.noExamples); err != nil {
+	var logger *log.Logger
+	if ctx.Verbose {
+		logger = ctx.Out
+	}
+	if err := sw.Write(root, sm, !cmd.noExamples, logger); err != nil {
 		return errors.Wrap(err, "safe write of manifest and lock")
 	}
 

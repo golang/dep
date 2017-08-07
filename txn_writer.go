@@ -261,7 +261,7 @@ func (sw SafeWriter) validate(root string, sm gps.SourceManager) error {
 // operations succeeded. It also does its best to roll back if any moves fail.
 // This mostly guarantees that dep cannot exit with a partial write that would
 // leave an undefined state on disk.
-func (sw *SafeWriter) Write(root string, sm gps.SourceManager, examples bool) error {
+func (sw *SafeWriter) Write(root string, sm gps.SourceManager, examples bool, logger *log.Logger) error {
 	err := sw.validate(root, sm)
 	if err != nil {
 		return err
@@ -313,7 +313,7 @@ func (sw *SafeWriter) Write(root string, sm gps.SourceManager, examples bool) er
 	}
 
 	if sw.writeVendor {
-		err = gps.WriteDepTree(filepath.Join(td, "vendor"), sw.lock, sm, true)
+		err = gps.WriteDepTree(filepath.Join(td, "vendor"), sw.lock, sm, true, logger)
 		if err != nil {
 			return errors.Wrap(err, "error while writing out vendor tree")
 		}
@@ -449,13 +449,7 @@ func (sw *SafeWriter) PrintPreparedActions(output *log.Logger) error {
 	if sw.writeVendor {
 		output.Println("Would have written the following projects to the vendor directory:")
 		for _, project := range sw.lock.Projects() {
-			prj := project.Ident()
-			rev, _, _ := gps.VersionComponentStrings(project.Version())
-			if prj.Source == "" {
-				output.Printf("%s@%s\n", prj.ProjectRoot, rev)
-			} else {
-				output.Printf("%s -> %s@%s\n", prj.ProjectRoot, prj.Source, rev)
-			}
+			output.Println(project)
 		}
 	}
 
