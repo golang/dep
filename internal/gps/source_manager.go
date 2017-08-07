@@ -188,11 +188,24 @@ func NewSourceManager(cachedir string) (*SourceMgr, error) {
 	// If it's a TemporaryError, we retry every second. Otherwise, we fail
 	// permanently.
 	//
-	// TODO: After some time, we should emit some kind of warning that we're waiting
-	// for the lockfile to be released. #534 should be address before we will do that.
+	// TODO: #534 needs to be implemented to provide a better way to log warnings,
+	// but until then we will just use stderr.
 
+	// Implicit Time of 0.
+	var lasttime time.Time
 	err = lockfile.TryLock()
 	for err != nil {
+		nowtime := time.Now()
+		duration := nowtime.Sub(lasttime)
+
+		// The first time this is evaluated, duration will be very large as lasttime is 0.
+		// Unless time travel is invented and someone travels back to the year 1, we should
+		// be ok.
+		if duration > 15*time.Second {
+			fmt.Fprintf(os.Stderr, "waiting for lockfile %s: %s\n", glpath, err.Error())
+			lasttime = nowtime
+		}
+
 		if _, ok := err.(interface {
 			Temporary() bool
 		}); ok {
