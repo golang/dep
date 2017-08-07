@@ -52,10 +52,9 @@ func (g *gopathScanner) InitializeRootManifestAndLock(rootM *dep.Manifest, rootL
 		return err
 	}
 
-	g.origM = &dep.Manifest{
-		Constraints: g.pd.constraints,
-		Ovr:         make(gps.ProjectConstraints),
-	}
+	g.origM = dep.NewManifest()
+	g.origM.Constraints = g.pd.constraints
+
 	g.origL = &dep.Lock{
 		P: make([]gps.LockedProject, 0, len(g.pd.ondisk)),
 	}

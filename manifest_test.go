@@ -62,23 +62,18 @@ func TestWriteManifest(t *testing.T) {
 	golden := "manifest/golden.toml"
 	want := h.GetTestFileString(golden)
 	c, _ := gps.NewSemverConstraint("^0.12.0")
-	m := &Manifest{
-		Constraints: map[gps.ProjectRoot]gps.ProjectProperties{
-			gps.ProjectRoot("github.com/golang/dep/internal/gps"): {
-				Constraint: c,
-			},
-			gps.ProjectRoot("github.com/babble/brook"): {
-				Constraint: gps.Revision("d05d5aca9f895d19e9265839bffeadd74a2d2ecb"),
-			},
-		},
-		Ovr: map[gps.ProjectRoot]gps.ProjectProperties{
-			gps.ProjectRoot("github.com/golang/dep/internal/gps"): {
-				Source:     "https://github.com/golang/dep/internal/gps",
-				Constraint: gps.NewBranch("master"),
-			},
-		},
-		Ignored: []string{"github.com/foo/bar"},
+	m := NewManifest()
+	m.Constraints[gps.ProjectRoot("github.com/golang/dep/internal/gps")] = gps.ProjectProperties{
+		Constraint: c,
 	}
+	m.Constraints[gps.ProjectRoot("github.com/babble/brook")] = gps.ProjectProperties{
+		Constraint: gps.Revision("d05d5aca9f895d19e9265839bffeadd74a2d2ecb"),
+	}
+	m.Ovr[gps.ProjectRoot("github.com/golang/dep/internal/gps")] = gps.ProjectProperties{
+		Source:     "https://github.com/golang/dep/internal/gps",
+		Constraint: gps.NewBranch("master"),
+	}
+	m.Ignored = []string{"github.com/foo/bar"}
 
 	got, err := m.MarshalTOML()
 	if err != nil {
@@ -222,9 +217,9 @@ func TestValidateManifest(t *testing.T) {
 			  version = ""
 			`,
 			wantWarn: []error{
-				errors.New("Unknown field in manifest: foo"),
-				errors.New("Unknown field in manifest: bar"),
-				errors.New("Unknown field in manifest: version"),
+				errors.New("unknown field in manifest: foo"),
+				errors.New("unknown field in manifest: bar"),
+				errors.New("unknown field in manifest: version"),
 			},
 			wantError: nil,
 		},
@@ -308,9 +303,9 @@ func TestValidateManifest(t *testing.T) {
 			  nick = "foo"
 			`,
 			wantWarn: []error{
-				errors.New("Invalid key \"location\" in \"constraint\""),
-				errors.New("Invalid key \"link\" in \"constraint\""),
-				errors.New("Invalid key \"nick\" in \"override\""),
+				errors.New("invalid key \"location\" in \"constraint\""),
+				errors.New("invalid key \"link\" in \"constraint\""),
+				errors.New("invalid key \"nick\" in \"override\""),
 				errors.New("metadata in \"constraint\" should be a TOML table"),
 			},
 			wantError: nil,
@@ -361,18 +356,18 @@ func TestValidateManifest(t *testing.T) {
 
 		// compare validation errors
 		if err != c.wantError {
-			t.Fatalf("Manifest errors are not as expected: \n\t(GOT) %v \n\t(WNT) %v", err, c.wantError)
+			t.Fatalf("manifest errors are not as expected: \n\t(GOT) %v \n\t(WNT) %v", err, c.wantError)
 		}
 
 		// compare length of error slice
 		if len(errs) != len(c.wantWarn) {
-			t.Fatalf("Number of manifest errors are not as expected: \n\t(GOT) %v errors(%v)\n\t(WNT) %v errors(%v).", len(errs), errs, len(c.wantWarn), c.wantWarn)
+			t.Fatalf("number of manifest errors are not as expected: \n\t(GOT) %v errors(%v)\n\t(WNT) %v errors(%v).", len(errs), errs, len(c.wantWarn), c.wantWarn)
 		}
 
 		// check if the expected errors exist in actual errors slice
 		for _, er := range errs {
 			if !contains(c.wantWarn, er) {
-				t.Fatalf("Manifest errors are not as expected: \n\t(MISSING) %v\n\t(FROM) %v", er, c.wantWarn)
+				t.Fatalf("manifest errors are not as expected: \n\t(MISSING) %v\n\t(FROM) %v", er, c.wantWarn)
 			}
 		}
 	}

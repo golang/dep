@@ -141,9 +141,7 @@ func (g *glideImporter) convert(pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock, e
 	task.WriteString("...")
 	g.logger.Println(task)
 
-	manifest := &dep.Manifest{
-		Constraints: make(gps.ProjectConstraints),
-	}
+	manifest := dep.NewManifest()
 
 	for _, pkg := range append(g.yaml.Imports, g.yaml.TestImports...) {
 		pc, err := g.buildProjectConstraint(pkg)
