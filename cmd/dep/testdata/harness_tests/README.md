@@ -36,7 +36,7 @@ will be included automatically.
 
 The json file needs to be accompanied by `initial` and `final` directories. The
 `initial` is copied verbatim into the test project before the `dep` commands are
-run, are the `manifest` and `lock` files in `final`, if present, are used to
+run, and the `manifest` and `lock` files in `final`, if present, are used to
 compare against the test project results after the commands. The `stdout.txt` file
 is optional, and if present will be compared with command output.
 
