@@ -7,7 +7,6 @@ package main
 import (
 	"bytes"
 	"flag"
-	"go/build"
 	"os"
 	"path/filepath"
 	"sort"
@@ -168,10 +167,6 @@ func (cmd *ensureCommand) Run(ctx *dep.Ctx, args []string) error {
 
 	params.RootPackageTree, err = pkgtree.ListPackages(p.ResolvedAbsRoot, string(p.ImportRoot))
 	if err != nil {
-		return errors.Wrap(err, "ensure ListPackage for project")
-	}
-
-	if err := checkErrors(params.RootPackageTree.Packages); err != nil {
 		return err
 	}
 
@@ -701,31 +696,4 @@ func getProjectConstraint(arg string, sm gps.SourceManager) (gps.ProjectConstrai
 		return emptyPC, "", err
 	}
 	return gps.ProjectConstraint{Ident: pi, Constraint: c}, arg, nil
-}
-
-func checkErrors(m map[string]pkgtree.PackageOrErr) error {
-	noGoErrors, pkgErrors := 0, 0
-	for _, poe := range m {
-		if poe.Err != nil {
-			switch poe.Err.(type) {
-			case *build.NoGoError:
-				noGoErrors++
-			default:
-				pkgErrors++
-			}
-		}
-	}
-	if len(m) == 0 || len(m) == noGoErrors {
-		return errors.New("all dirs lacked any go code")
-	}
-
-	if len(m) == pkgErrors {
-		return errors.New("all dirs had go code with errors")
-	}
-
-	if len(m) == pkgErrors+noGoErrors {
-		return errors.Errorf("%d dirs had errors and %d had no go code", pkgErrors, noGoErrors)
-	}
-
-	return nil
 }

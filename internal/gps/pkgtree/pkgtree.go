@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"go/build"
 	"go/parser"
-	gscan "go/scanner"
+	"go/scanner"
 	"go/token"
 	"os"
 	"path/filepath"
@@ -16,6 +16,8 @@ import (
 	"strconv"
 	"strings"
 	"unicode"
+
+	"github.com/pkg/errors"
 )
 
 // Package represents a Go package. It contains a subset of the information
@@ -140,11 +142,19 @@ func ListPackages(fileRoot, importRoot string) (PackageTree, error) {
 			}
 		} else {
 			switch err.(type) {
-			case gscan.ErrorList, *gscan.Error, *build.NoGoError:
+			case *build.NoGoError:
+				return nil
+			case scanner.ErrorList:
+				el := err.(scanner.ErrorList)
+				var els []string
+
+				for _, e := range el {
+					els = append(els, fmt.Sprintf("%v", e))
+				}
 				// This happens if we encounter malformed or nonexistent Go
 				// source code
 				ptree.Packages[ip] = PackageOrErr{
-					Err: err,
+					Err: errors.Wrapf(err, "\n\t%v", strings.Join(els, "\n\t")),
 				}
 				return nil
 			default:
@@ -189,7 +199,15 @@ func ListPackages(fileRoot, importRoot string) (PackageTree, error) {
 		return PackageTree{}, err
 	}
 
-	return ptree, nil
+	return ptree, checkError(ptree)
+}
+
+func checkError(ptree PackageTree) error {
+	var el []string
+	for _, et := range ptree.Packages {
+		el = append(el, fmt.Sprintf("%v", et.Err))
+	}
+	return fmt.Errorf("can't resolve Go import: %v", strings.Join(el, "\n\t"))
 }
 
 // fillPackage full of info. Assumes p.Dir is set at a minimum
