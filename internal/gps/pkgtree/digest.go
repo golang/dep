@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"fmt"
+	"hash"
 	"io"
 	"os"
 	"path/filepath"
@@ -78,10 +79,7 @@ func DigestFromPathname(prefix, pathname string) ([]byte, error) {
 		// it is their contents. Added benefit is that even empty directories
 		// and symbolic links will effect final hash value. Use
 		// `filepath.ToSlash` to ensure relative pathname is os-agnostic.
-		//
-		// NOTE: Throughout this function, we ignore return values from writing
-		// to the hash, because hash write always returns nil error.
-		_, _ = h.Write([]byte(filepath.ToSlash(pathname[prefixLength:])))
+		writeBytesWithNull(h, []byte(filepath.ToSlash(pathname[prefixLength:])))
 
 		if mode&os.ModeSymlink != 0 {
 			referent, err := os.Readlink(pathname)
@@ -90,7 +88,7 @@ func DigestFromPathname(prefix, pathname string) ([]byte, error) {
 			}
 			// Write the os-agnostic referent to the hash and proceed to the
 			// next pathname in the queue.
-			_, _ = h.Write([]byte(filepath.ToSlash(referent)))
+			writeBytesWithNull(h, []byte(filepath.ToSlash(referent)))
 			continue
 		}
 
@@ -102,20 +100,23 @@ func DigestFromPathname(prefix, pathname string) ([]byte, error) {
 		}
 
 		if fi.IsDir() {
-			if childrenNames, err := sortedListOfDirectoryChildrenFromFileHandle(fh); err == nil {
-				for _, childName := range childrenNames {
-					switch childName {
-					case ".", "..", "vendor", ".bzr", ".git", ".hg", ".svn":
-						// skip
-					default:
-						pathnameQueue = append(pathnameQueue, filepath.Join(pathname, childName))
-					}
+			childrenNames, err := sortedListOfDirectoryChildrenFromFileHandle(fh)
+			if err != nil {
+				_ = fh.Close() // already have an error reading directory; ignore Close result.
+				return nil, errors.Wrap(err, "cannot get list of directory children")
+			}
+			for _, childName := range childrenNames {
+				switch childName {
+				case ".", "..", "vendor", ".bzr", ".git", ".hg", ".svn":
+					// skip
+				default:
+					pathnameQueue = append(pathnameQueue, filepath.Join(pathname, childName))
 				}
 			}
 		} else {
-			_, _ = h.Write([]byte(strconv.FormatInt(fi.Size(), 10))) // format file size as base 10 integer
-			_, err = io.Copy(h, fh)                                  // fast copy of file contents to hash
-			err = errors.Wrap(err, "cannot Copy")                    // errors.Wrap only wraps non-nil, so elide guard condition
+			writeBytesWithNull(h, []byte(strconv.FormatInt(fi.Size(), 10))) // format file size as base 10 integer
+			_, err = io.Copy(h, fh)                                         // fast copy of file contents to hash
+			err = errors.Wrap(err, "cannot Copy")                           // errors.Wrap only wraps non-nil, so elide guard condition
 		}
 
 		// Close the file handle to the open directory without masking possible
@@ -129,6 +130,14 @@ func DigestFromPathname(prefix, pathname string) ([]byte, error) {
 	}
 
 	return h.Sum(nil), nil
+}
+
+// writeBytesWithNull appends the specified data to the specified hash, followed by
+// the NULL byte, in order to make accidental hash collisions less likely.
+func writeBytesWithNull(h hash.Hash, data []byte) {
+	// Ignore return values from writing to the hash, because hash write always
+	// returns nil error.
+	_, _ = h.Write(append(data, 0))
 }
 
 // VendorStatus represents one of a handful of possible statuses of a particular
