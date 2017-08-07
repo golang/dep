@@ -88,9 +88,7 @@ func (g *godepImporter) load(projectDir string) error {
 func (g *godepImporter) convert(pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock, error) {
 	g.logger.Println("Converting from Godeps.json ...")
 
-	manifest := &dep.Manifest{
-		Constraints: make(gps.ProjectConstraints),
-	}
+	manifest := dep.NewManifest()
 	lock := &dep.Lock{}
 
 	for _, pkg := range g.json.Imports {

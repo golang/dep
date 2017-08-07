@@ -62,23 +62,18 @@ func TestWriteManifest(t *testing.T) {
 	golden := "manifest/golden.toml"
 	want := h.GetTestFileString(golden)
 	c, _ := gps.NewSemverConstraint("^0.12.0")
-	m := &Manifest{
-		Constraints: map[gps.ProjectRoot]gps.ProjectProperties{
-			gps.ProjectRoot("github.com/golang/dep/internal/gps"): {
-				Constraint: c,
-			},
-			gps.ProjectRoot("github.com/babble/brook"): {
-				Constraint: gps.Revision("d05d5aca9f895d19e9265839bffeadd74a2d2ecb"),
-			},
-		},
-		Ovr: map[gps.ProjectRoot]gps.ProjectProperties{
-			gps.ProjectRoot("github.com/golang/dep/internal/gps"): {
-				Source:     "https://github.com/golang/dep/internal/gps",
-				Constraint: gps.NewBranch("master"),
-			},
-		},
-		Ignored: []string{"github.com/foo/bar"},
+	m := NewManifest()
+	m.Constraints[gps.ProjectRoot("github.com/golang/dep/internal/gps")] = gps.ProjectProperties{
+		Constraint: c,
 	}
+	m.Constraints[gps.ProjectRoot("github.com/babble/brook")] = gps.ProjectProperties{
+		Constraint: gps.Revision("d05d5aca9f895d19e9265839bffeadd74a2d2ecb"),
+	}
+	m.Ovr[gps.ProjectRoot("github.com/golang/dep/internal/gps")] = gps.ProjectProperties{
+		Source:     "https://github.com/golang/dep/internal/gps",
+		Constraint: gps.NewBranch("master"),
+	}
+	m.Ignored = []string{"github.com/foo/bar"}
 
 	got, err := m.MarshalTOML()
 	if err != nil {

@@ -175,16 +175,13 @@ func TestVndrConfig_Import(t *testing.T) {
 
 	constraint, err := gps.NewSemverConstraint("^2.0.0")
 	h.Must(err)
-	wantM := &dep.Manifest{
-		Constraints: gps.ProjectConstraints{
-			"github.com/sdboyer/deptest": gps.ProjectProperties{
-				Source:     "https://github.com/sdboyer/deptest.git",
-				Constraint: gps.Revision("3f4c3bea144e112a69bbe5d8d01c1b09a544253f"),
-			},
-			"github.com/sdboyer/deptestdos": gps.ProjectProperties{
-				Constraint: constraint,
-			},
-		},
+	wantM := dep.NewManifest()
+	wantM.Constraints["github.com/sdboyer/deptest"] = gps.ProjectProperties{
+		Source:     "https://github.com/sdboyer/deptest.git",
+		Constraint: gps.Revision("3f4c3bea144e112a69bbe5d8d01c1b09a544253f"),
+	}
+	wantM.Constraints["github.com/sdboyer/deptestdos"] = gps.ProjectProperties{
+		Constraint: constraint,
 	}
 	if !reflect.DeepEqual(wantM, m) {
 		t.Errorf("unexpected manifest\nhave=%+v\nwant=%+v", m, wantM)
