@@ -192,8 +192,8 @@ func TestGodepConfig_ConvertProject_WithSemverSuffix(t *testing.T) {
 	}
 
 	v := d.Constraint.String()
-	if v != ">=1.12.0, <=12.0.0-g2fd980e" {
-		t.Fatalf("Expected manifest constraint to be >=1.12.0, <=12.0.0-g2fd980e, got %s", v)
+	if v != "^1.12.0-12-g2fd980e" {
+		t.Fatalf("Expected manifest constraint to be ^1.12.0-12-g2fd980e, got %s", v)
 	}
 
 	p := lock.P[0]
