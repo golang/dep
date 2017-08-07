@@ -52,7 +52,6 @@ func TestGodepConfig_Convert(t *testing.T) {
 				},
 			},
 			convertTestCase: &convertTestCase{
-
 				projectRoot:    gps.ProjectRoot("github.com/sdboyer/deptest"),
 				wantConstraint: "^1.12.0-12-g2fd980e",
 				wantLockCount:  1,
@@ -70,7 +69,6 @@ func TestGodepConfig_Convert(t *testing.T) {
 				},
 			},
 			convertTestCase: &convertTestCase{
-
 				projectRoot:    gps.ProjectRoot("github.com/sdboyer/deptest"),
 				wantConstraint: "^1.0.0",
 				wantRevision:   gps.Revision("ff2948a2ac8f538c4ecd55962e919d1e13e74baf"),
@@ -83,7 +81,6 @@ func TestGodepConfig_Convert(t *testing.T) {
 				Imports: []godepPackage{{ImportPath: ""}},
 			},
 			convertTestCase: &convertTestCase{
-
 				wantConvertErr: true,
 			},
 		},
@@ -96,7 +93,6 @@ func TestGodepConfig_Convert(t *testing.T) {
 				},
 			},
 			convertTestCase: &convertTestCase{
-
 				wantConvertErr: true,
 			},
 		},
@@ -116,7 +112,6 @@ func TestGodepConfig_Convert(t *testing.T) {
 				},
 			},
 			convertTestCase: &convertTestCase{
-
 				projectRoot:    gps.ProjectRoot("github.com/sdboyer/deptest"),
 				wantLockCount:  1,
 				wantConstraint: "^1.0.0",

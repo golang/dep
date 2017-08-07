@@ -51,6 +51,14 @@ type rawProject struct {
 	Source   string `toml:"source,omitempty"`
 }
 
+// NewManifest instantites a new manifest.
+func NewManifest() *Manifest {
+	return &Manifest{
+		Constraints: make(gps.ProjectConstraints),
+		Ovr:         make(gps.ProjectConstraints),
+	}
+}
+
 func validateManifest(s string) ([]error, error) {
 	var warns []error
 	// Load the TomlTree from string
@@ -172,12 +180,12 @@ func readManifest(r io.Reader) (*Manifest, []error, error) {
 }
 
 func fromRawManifest(raw rawManifest) (*Manifest, error) {
-	m := &Manifest{
-		Constraints: make(gps.ProjectConstraints, len(raw.Constraints)),
-		Ovr:         make(gps.ProjectConstraints, len(raw.Overrides)),
-		Ignored:     raw.Ignored,
-		Required:    raw.Required,
-	}
+	m := NewManifest()
+
+	m.Constraints = make(gps.ProjectConstraints, len(raw.Constraints))
+	m.Ovr = make(gps.ProjectConstraints, len(raw.Overrides))
+	m.Ignored = raw.Ignored
+	m.Required = raw.Required
 
 	for i := 0; i < len(raw.Constraints); i++ {
 		name, prj, err := toProject(raw.Constraints[i])
