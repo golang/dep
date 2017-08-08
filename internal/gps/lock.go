@@ -198,11 +198,10 @@ func (lp LockedProject) Packages() []string {
 
 func (lp LockedProject) String() string {
 	prj := lp.Ident()
-	rev, _, _ := VersionComponentStrings(lp.Version())
 	if prj.Source == "" {
-		return fmt.Sprintf("%s@%s", prj.ProjectRoot, rev)
+		return fmt.Sprintf("%s@%v for packages: %v", prj.ProjectRoot, lp.Version(), lp.pkgs)
 	}
-	return fmt.Sprintf("%s -> %s@%s", prj.ProjectRoot, prj.Source, rev)
+	return fmt.Sprintf("%s -> %s@%v for packages: %v", prj.ProjectRoot, prj.Source, lp.Version(), lp.pkgs)
 }
 
 type safeLock struct {
