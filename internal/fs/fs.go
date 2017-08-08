@@ -102,9 +102,9 @@ func HasFilepathPrefix(path, prefix string) bool {
 	return true
 }
 
-// EqualPaths compares the paths passed to check if the are equivalent.
+// EquivalentPaths compares the paths passed to check if the are equivalent.
 // It respects the case-sensitivity of the underlaying filesysyems.
-func EqualPaths(p1, p2 string) (bool, error) {
+func EquivalentPaths(p1, p2 string) (bool, error) {
 	p1 = filepath.Clean(p1)
 	p2 = filepath.Clean(p2)
 

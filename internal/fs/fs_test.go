@@ -134,7 +134,7 @@ func TestHasFilepathPrefix_Files(t *testing.T) {
 	}
 }
 
-func TestEqualPaths(t *testing.T) {
+func TestEquivalentPaths(t *testing.T) {
 	h := test.NewHelper(t)
 	h.TempDir("dir")
 	h.TempDir("dir2")
@@ -166,17 +166,17 @@ func TestEqualPaths(t *testing.T) {
 	}
 
 	for _, tc := range testcases {
-		got, err := EqualPaths(tc.p1, tc.p2)
+		got, err := EquivalentPaths(tc.p1, tc.p2)
 		if err != nil && !tc.err {
 			t.Error("unexpected error:", err)
 		}
 		if caseSensitive {
 			if tc.caseSensitiveEquivalent != got {
-				t.Errorf("expected EqualPaths(%q, %q) to be %t on case-sensitive filesystem, got %t", tc.p1, tc.p2, tc.caseSensitiveEquivalent, got)
+				t.Errorf("expected EquivalentPaths(%q, %q) to be %t on case-sensitive filesystem, got %t", tc.p1, tc.p2, tc.caseSensitiveEquivalent, got)
 			}
 		} else {
 			if tc.caseInensitiveEquivalent != got {
-				t.Errorf("expected EqualPaths(%q, %q) to be %t on case-insensitive filesystem, got %t", tc.p1, tc.p2, tc.caseInensitiveEquivalent, got)
+				t.Errorf("expected EquivalentPaths(%q, %q) to be %t on case-insensitive filesystem, got %t", tc.p1, tc.p2, tc.caseInensitiveEquivalent, got)
 			}
 		}
 	}

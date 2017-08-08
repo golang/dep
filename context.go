@@ -179,7 +179,7 @@ func (c *Ctx) DetectProjectGOPATH(p *Project) (string, error) {
 	pGOPATH, perr := c.detectGOPATH(p.AbsRoot)
 
 	// If p.AbsRoot is a not symlink, attempt to detect GOPATH for p.AbsRoot only.
-	if equal, _ := fs.EqualPaths(p.AbsRoot, p.ResolvedAbsRoot); equal {
+	if equal, _ := fs.EquivalentPaths(p.AbsRoot, p.ResolvedAbsRoot); equal {
 		return pGOPATH, perr
 	}
 
@@ -191,7 +191,7 @@ func (c *Ctx) DetectProjectGOPATH(p *Project) (string, error) {
 	}
 
 	// If pGOPATH equals rGOPATH, then both are within the same GOPATH.
-	if equal, _ := fs.EqualPaths(pGOPATH, rGOPATH); equal {
+	if equal, _ := fs.EquivalentPaths(pGOPATH, rGOPATH); equal {
 		return "", errors.Errorf("both %s and %s are in the same GOPATH %s", p.AbsRoot, p.ResolvedAbsRoot, pGOPATH)
 	}
 
