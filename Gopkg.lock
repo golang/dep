@@ -2,10 +2,11 @@
 
 
 [[projects]]
-  branch = "2.x"
+  branch = "parse-constraints-with-dash-in-pre"
   name = "github.com/Masterminds/semver"
   packages = ["."]
-  revision = "139cc0982c53f1367af5636b12b7643cd03757fc"
+  revision = "a93e51b5a57ef416dac8bb02d11407b6f55d8929"
+  source = "https://github.com/carolynvs/semver.git"
 
 [[projects]]
   name = "github.com/Masterminds/vcs"
@@ -58,6 +59,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "48b2f69d59b2f321b14ee11547f4ac94468ac91bb99aad48337d42b75b791975"
+  inputs-digest = "7c692c08851064cf6167056c23082edcf393d3af6bc0768c3111e0dde7444960"
   solver-name = "gps-cdcl"
   solver-version = 1
