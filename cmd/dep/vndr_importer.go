@@ -81,7 +81,7 @@ func (v *vndrImporter) Import(dir string, pr gps.ProjectRoot) (*dep.Manifest, *d
 
 		lp := gps.NewLockedProject(pc.Ident, version, nil)
 
-		lock.P = append(lock.P)
+		lock.P = append(lock.P, lp)
 		fb.NewLockedProjectFeedback(lp, fb.DepTypeImported).LogFeedback(v.logger)
 	}
 
