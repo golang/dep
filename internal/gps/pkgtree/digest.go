@@ -60,6 +60,8 @@ func DigestFromPathname(prefix, pathname string) ([]byte, error) {
 	prefixLength := len(prefix) // store length to trim off pathnames later
 	pathnameQueue := []string{filepath.Join(prefix, pathname)}
 
+	var written int64
+
 	// As we enumerate over the queue and encounter a directory, its children
 	// will be added to the work queue.
 	for len(pathnameQueue) > 0 {
@@ -118,9 +120,9 @@ func DigestFromPathname(prefix, pathname string) ([]byte, error) {
 				}
 			}
 		} else {
-			writeBytesWithNull(h, []byte(strconv.FormatInt(fi.Size(), 10))) // format file size as base 10 integer
-			_, err = io.Copy(h, &lineEndingWriterTo{fh})                    // fast copy of file contents to hash
-			err = errors.Wrap(err, "cannot Copy")                           // errors.Wrap only wraps non-nil, so elide guard condition
+			written, err = io.Copy(h, newLineEndingReader(fh))            // fast copy of file contents to hash
+			err = errors.Wrap(err, "cannot Copy")                         // errors.Wrap only wraps non-nil, so elide guard condition
+			writeBytesWithNull(h, []byte(strconv.FormatInt(written, 10))) // format file size as base 10 integer
 		}
 
 		// Close the file handle to the open directory without masking possible
@@ -136,109 +138,63 @@ func DigestFromPathname(prefix, pathname string) ([]byte, error) {
 	return h.Sum(nil), nil
 }
 
-// lineEndingWriterTo
-type lineEndingWriterTo struct {
-	src io.Reader
-}
-
-func (liw *lineEndingWriterTo) Read(buf []byte) (int, error) {
-	return liw.src.Read(buf)
-}
-
-// WriteTo writes data to w until there's no more data to write or
-// when an error occurs. The return value n is the number of bytes
-// written. Any error encountered during the write is also returned.
+// lineEndingReader is a `io.Reader` that converts CRLF sequences to LF.
 //
-// The Copy function uses WriterTo if available.
-func (liw *lineEndingWriterTo) WriteTo(dst io.Writer) (int64, error) {
-	// Some VCS systems automatically convert LF line endings to CRLF on some OS
-	// platforms, such as Windows. This would cause the a file checked out on
-	// Windows to have a different digest than the same file on macOS or
-	// Linux. In order to ensure file contents normalize the same, we need to
-	// modify the file's contents when we compute its hash.
-	//
-	// Keep reading from embedded io.Reader and writing to io.Writer until EOF.
-	// For each blob, when read CRLF, convert to LF.  Ensure handle case when CR
-	// read in one buffer and LF read in another.  Another option is just filter
-	// out all CR bytes, but unneeded removal of CR bytes increases our surface
-	// area for accidental hash collisions. Therefore, we will only convert CRLF
-	// to LF.
+// Some VCS systems automatically convert LF line endings to CRLF on some OS
+// platforms. This would cause the a file checked out on those platforms to have
+// a different digest than the same file on platforms that do not perform this
+// translation. In order to ensure file contents normalize and hash the same,
+// this struct satisfies the io.Reader interface by providing a Read method that
+// modifies the file's contents when it is read, translating all CRLF sequences
+// to LF.
+type lineEndingReader struct {
+	src             io.Reader // source io.Reader from which this reads
+	prevReadEndedCR bool      // used to track whether final byte of previous Read was CR
+}
 
-	// Create a buffer to hold file contents; use same size as `io.Copy`
-	// creates.
-	buf := make([]byte, 32*1024)
+// newLineEndingReader returns a new lineEndingReader that reads from the
+// specified source io.Reader.
+func newLineEndingReader(src io.Reader) *lineEndingReader {
+	return &lineEndingReader{src: src}
+}
 
-	var err error
-	var finalCR bool
-	var written int64
+// Read consumes bytes from the structure's source io.Reader to fill the
+// specified slice of bytes. It converts all CRLF byte sequences to LF, and
+// handles cases where CR and LF straddle across two Read operations.
+func (f *lineEndingReader) Read(buf []byte) (int, error) {
+	var startIndex int
+	if f.prevReadEndedCR {
+		// Read one less byte in case we need to insert CR in there
+		startIndex++
+	}
+	nr, er := f.src.Read(buf[startIndex:])
+	if nr > 0 {
+		if f.prevReadEndedCR && buf[startIndex] != '\n' {
+			buf[0] = '\r'
+			startIndex = 0
+		}
 
-	for {
-		nr, er := liw.src.Read(buf)
-		if nr > 0 {
-			// When previous buffer ended in CR and this buffer does not start
-			// in LF, we need to emit a CR byte.
-			if finalCR && buf[0] != '\n' {
-				// We owe the destination a CR byte because we held onto it from
-				// last loop.
-				nw, ew := dst.Write([]byte{'\r'})
-				if nw > 0 {
-					written += int64(nw)
-				}
-				if ew != nil {
-					err = ew
-					break
-				}
-			}
-
-			// Remove any CRLF sequences in buf, using `bytes.Index` because
-			// that takes advantage of machine opcodes for searching for byte
-			// patterns on many platforms.
-			for {
-				index := bytes.Index(buf, []byte("\r\n"))
-				if index == -1 {
-					break
-				}
-				// Want to skip index byte, where the CR is.
-				copy(buf[index:nr-1], buf[index+1:nr])
-				nr--
-			}
-
-			// When final byte is CR, do not emit until we ensure first byte on
-			// next read is LF.
-			if finalCR = buf[nr-1] == '\r'; finalCR {
-				nr-- // pretend byte was never read from source
-			}
-
-			nw, ew := dst.Write(buf[:nr])
-			if nw > 0 {
-				written += int64(nw)
-			}
-			if ew != nil {
-				err = ew
+		// Remove any CRLF sequences in buf, using `bytes.Index` because that
+		// takes advantage of machine opcodes that search for byte patterns on
+		// many architectures.
+		index := startIndex
+		for {
+			index = bytes.Index(buf[index:], []byte("\r\n"))
+			if index == -1 {
 				break
 			}
-			if nr != nw {
-				err = io.ErrShortWrite
-				break
-			}
+			// Want to skip index byte, where the CR is.
+			copy(buf[index:nr-1], buf[index+1:nr])
+			nr--
 		}
-		if er != nil {
-			if er != io.EOF {
-				err = er
-			}
-			break
-		}
-	}
-	if finalCR {
-		nw, ew := dst.Write([]byte{'\r'})
-		if nw > 0 {
-			written += int64(nw)
-		}
-		if ew != nil {
-			err = ew
+
+		// When final byte is CR, do not emit until we ensure first byte on
+		// next read is LF.
+		if f.prevReadEndedCR = buf[nr-1] == '\r'; f.prevReadEndedCR {
+			nr-- // pretend byte was never read from source
 		}
 	}
-	return written, err
+	return nr, er
 }
 
 // writeBytesWithNull appends the specified data to the specified hash, followed by
