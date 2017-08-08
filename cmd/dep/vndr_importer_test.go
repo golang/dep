@@ -94,3 +94,71 @@ func TestVndrConfig_Import(t *testing.T) {
 		}
 	}
 }
+
+func TestParseVndrLine(t *testing.T) {
+	testcase := func(in string, wantPkg *vndrPackage, wantErr error) func(*testing.T) {
+		return func(t *testing.T) {
+			havePkg, haveErr := parseVndrLine(in)
+			switch {
+			case wantPkg == nil:
+				if havePkg != nil {
+					t.Errorf("expected nil package, have %v", havePkg)
+				}
+			case havePkg == nil:
+				if wantPkg != nil {
+					t.Errorf("expected non-nil package %v, have nil", wantPkg)
+				}
+			default:
+				if !reflect.DeepEqual(havePkg, wantPkg) {
+					t.Errorf("unexpected package, have=%v, want=%v", *havePkg, *wantPkg)
+				}
+			}
+
+			switch {
+			case wantErr == nil:
+				if haveErr != nil {
+					t.Errorf("expected nil err, have %v", haveErr)
+				}
+			case haveErr == nil:
+				if wantErr != nil {
+					t.Errorf("expected non-nil err %v, have nil", wantErr)
+				}
+			default:
+				if haveErr.Error() != wantErr.Error() {
+					t.Errorf("expected err=%q, have err=%q", wantErr.Error(), haveErr.Error())
+				}
+			}
+		}
+	}
+	t.Run("normal line",
+		testcase("github.com/golang/notreal v1.0.0",
+			&vndrPackage{
+				importPath: "github.com/golang/notreal",
+				revision:   "v1.0.0",
+			}, nil))
+
+	t.Run("with repo",
+		testcase("github.com/golang/notreal v1.0.0 https://github.com/golang/notreal",
+			&vndrPackage{
+				importPath: "github.com/golang/notreal",
+				revision:   "v1.0.0",
+				repository: "https://github.com/golang/notreal",
+			}, nil))
+
+	t.Run("trailing comment",
+		testcase("github.com/golang/notreal v1.0.0 https://github.com/golang/notreal  # cool comment",
+			&vndrPackage{
+				importPath: "github.com/golang/notreal",
+				revision:   "v1.0.0",
+				repository: "https://github.com/golang/notreal",
+			}, nil))
+
+	t.Run("empty line", testcase("", nil, nil))
+	t.Run("comment line", testcase("# comment", nil, nil))
+	t.Run("comment line with leading whitespace", testcase("  # comment", nil, nil))
+
+	t.Run("missing revision",
+		testcase("github.com/golang/notreal", nil,
+			errors.New("invalid config format: \"github.com/golang/notreal\""),
+		))
+}
