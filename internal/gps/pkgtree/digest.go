@@ -385,7 +385,7 @@ func VerifyDepTree(vendorPathname string, wantSums map[string][]byte) (map[strin
 					ls = DigestMismatchInLock
 				}
 			}
-			status[short] = ls
+			status[filepath.ToSlash(short)] = ls
 
 			// NOTE: Mark current nodes and all parents: required.
 			for pni := currentNode.myIndex; pni != -1; pni = otherNode.parentIndex {
@@ -438,7 +438,7 @@ func VerifyDepTree(vendorPathname string, wantSums map[string][]byte) (map[strin
 	for i := len(nodes) - 1; i > 0; i-- {
 		currentNode = nodes[i]
 		if !currentNode.isRequiredAncestor && nodes[currentNode.parentIndex].isRequiredAncestor {
-			status[currentNode.pathname[prefixLength:]] = NotInLock
+			status[filepath.ToSlash(currentNode.pathname[prefixLength:])] = NotInLock
 		}
 	}
 
