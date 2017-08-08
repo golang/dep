@@ -22,14 +22,16 @@ func vndrFile(dir string) string {
 }
 
 type vndrImporter struct {
-	logger *log.Logger
-	sm     gps.SourceManager
+	logger  *log.Logger
+	verbose bool
+	sm      gps.SourceManager
 }
 
 func newVndrImporter(log *log.Logger, verbose bool, sm gps.SourceManager) *vndrImporter {
 	return &vndrImporter{
-		logger: log,
-		sm:     sm,
+		logger:  log,
+		verbose: verbose,
+		sm:      sm,
 	}
 }
 
@@ -41,11 +43,11 @@ func (v *vndrImporter) HasDepMetadata(dir string) bool {
 }
 
 func (v *vndrImporter) Import(dir string, pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock, error) {
-	v.logger.Println("Converting from vendor.conf")
+	v.logger.Println("Detected vndr configuration file...")
 
-	packages, err := parseVndrFile(dir)
+	packages, err := v.loadVndrFile(dir)
 	if err != nil {
-		return nil, nil, errors.Wrapf(err, "unable to parse vndr file")
+		return nil, nil, errors.Wrapf(err, "unable to load vndr file")
 	}
 
 	manifest := &dep.Manifest{
@@ -62,15 +64,14 @@ func (v *vndrImporter) Import(dir string, pr gps.ProjectRoot) (*dep.Manifest, *d
 		}
 		pc.Constraint, err = v.sm.InferConstraint(pkg.revision, pc.Ident)
 		if err != nil {
-			pc.Constraint = gps.Revision(pkg.revision)
+			return nil, nil, errors.Wrapf(err, "Unable to interpret revision specifier '%s' for package %s", pkg.importPath, pkg.revision)
 		}
-
-		fb.NewConstraintFeedback(pc, fb.DepTypeImported).LogFeedback(v.logger)
 
 		manifest.Constraints[pc.Ident.ProjectRoot] = gps.ProjectProperties{
 			Source:     pc.Ident.Source,
 			Constraint: pc.Constraint,
 		}
+		fb.NewConstraintFeedback(pc, fb.DepTypeImported).LogFeedback(v.logger)
 
 		revision := gps.Revision(pkg.revision)
 		version, err := lookupVersionForLockedProject(pc.Ident, pc.Constraint, revision, v.sm)
@@ -80,14 +81,16 @@ func (v *vndrImporter) Import(dir string, pr gps.ProjectRoot) (*dep.Manifest, *d
 
 		lp := gps.NewLockedProject(pc.Ident, version, nil)
 
-		fb.NewLockedProjectFeedback(lp, fb.DepTypeImported).LogFeedback(v.logger)
 		lock.P = append(lock.P)
+		fb.NewLockedProjectFeedback(lp, fb.DepTypeImported).LogFeedback(v.logger)
 	}
 
 	return manifest, lock, nil
 }
 
-func parseVndrFile(dir string) ([]vndrPackage, error) {
+func (v *vndrImporter) loadVndrFile(dir string) ([]vndrPackage, error) {
+	v.logger.Printf("Converting from vendor.conf...")
+
 	f, err := os.Open(vndrFile(dir))
 	if err != nil {
 		return nil, errors.Wrapf(err, "Unable to open %s", vndrFile(dir))

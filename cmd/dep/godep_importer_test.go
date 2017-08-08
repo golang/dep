@@ -16,7 +16,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-const testGodepProjectRoot = "github.com/golang/notexist"
+const testProjectRoot = "github.com/golang/notexist"
 
 func TestGodepConfig_Import(t *testing.T) {
 	h := test.NewHelper(t)
@@ -25,10 +25,10 @@ func TestGodepConfig_Import(t *testing.T) {
 	cacheDir := "gps-repocache"
 	h.TempDir(cacheDir)
 	h.TempDir("src")
-	h.TempDir(filepath.Join("src", testGodepProjectRoot))
-	h.TempCopy(filepath.Join(testGodepProjectRoot, godepPath), "godep/Godeps.json")
+	h.TempDir(filepath.Join("src", testProjectRoot))
+	h.TempCopy(filepath.Join(testProjectRoot, godepPath), "godep/Godeps.json")
 
-	projectRoot := h.Path(testGodepProjectRoot)
+	projectRoot := h.Path(testProjectRoot)
 	sm, err := gps.NewSourceManager(h.Path(cacheDir))
 	h.Must(err)
 	defer sm.Release()
@@ -42,7 +42,7 @@ func TestGodepConfig_Import(t *testing.T) {
 		t.Fatal("Expected the importer to detect godep configuration file")
 	}
 
-	m, l, err := g.Import(projectRoot, testGodepProjectRoot)
+	m, l, err := g.Import(projectRoot, testProjectRoot)
 	h.Must(err)
 
 	if m == nil {
@@ -88,9 +88,9 @@ func TestGodepConfig_JsonLoad(t *testing.T) {
 
 	ctx := newTestContext(h)
 
-	h.TempCopy(filepath.Join(testGodepProjectRoot, godepPath), "godep/Godeps.json")
+	h.TempCopy(filepath.Join(testProjectRoot, godepPath), "godep/Godeps.json")
 
-	projectRoot := h.Path(testGodepProjectRoot)
+	projectRoot := h.Path(testProjectRoot)
 
 	g := newGodepImporter(ctx.Err, true, nil)
 	err := g.load(projectRoot)

@@ -18,8 +18,6 @@ import (
 	"github.com/pkg/errors"
 )
 
-const testGlideProjectRoot = "github.com/golang/notexist"
-
 var (
 	discardLogger = log.New(ioutil.Discard, "", 0)
 )
@@ -43,10 +41,10 @@ func TestGlideConfig_Import(t *testing.T) {
 	h.Must(err)
 	defer sm.Release()
 
-	h.TempDir(filepath.Join("src", testGlideProjectRoot))
-	h.TempCopy(filepath.Join(testGlideProjectRoot, glideYamlName), "glide/glide.yaml")
-	h.TempCopy(filepath.Join(testGlideProjectRoot, glideLockName), "glide/glide.lock")
-	projectRoot := h.Path(testGlideProjectRoot)
+	h.TempDir(filepath.Join("src", testProjectRoot))
+	h.TempCopy(filepath.Join(testProjectRoot, glideYamlName), "glide/glide.yaml")
+	h.TempCopy(filepath.Join(testProjectRoot, glideLockName), "glide/glide.lock")
+	projectRoot := h.Path(testProjectRoot)
 
 	// Capture stderr so we can verify output
 	verboseOutput := &bytes.Buffer{}
@@ -57,7 +55,7 @@ func TestGlideConfig_Import(t *testing.T) {
 		t.Fatal("Expected the importer to detect the glide configuration files")
 	}
 
-	m, l, err := g.Import(projectRoot, testGlideProjectRoot)
+	m, l, err := g.Import(projectRoot, testProjectRoot)
 	h.Must(err)
 
 	if m == nil {
@@ -91,16 +89,16 @@ func TestGlideConfig_Import_MissingLockFile(t *testing.T) {
 	h.Must(err)
 	defer sm.Release()
 
-	h.TempDir(filepath.Join("src", testGlideProjectRoot))
-	h.TempCopy(filepath.Join(testGlideProjectRoot, glideYamlName), "glide/glide.yaml")
-	projectRoot := h.Path(testGlideProjectRoot)
+	h.TempDir(filepath.Join("src", testProjectRoot))
+	h.TempCopy(filepath.Join(testProjectRoot, glideYamlName), "glide/glide.yaml")
+	projectRoot := h.Path(testProjectRoot)
 
 	g := newGlideImporter(ctx.Err, true, sm)
 	if !g.HasDepMetadata(projectRoot) {
 		t.Fatal("The glide importer should gracefully handle when only glide.yaml is present")
 	}
 
-	m, l, err := g.Import(projectRoot, testGlideProjectRoot)
+	m, l, err := g.Import(projectRoot, testProjectRoot)
 	h.Must(err)
 
 	if m == nil {
@@ -144,7 +142,7 @@ func TestGlideConfig_Convert_Project(t *testing.T) {
 		},
 	}
 
-	manifest, lock, err := g.convert(testGlideProjectRoot)
+	manifest, lock, err := g.convert(testProjectRoot)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -230,7 +228,7 @@ func TestGlideConfig_Convert_TestProject(t *testing.T) {
 		},
 	}
 
-	manifest, lock, err := g.convert(testGlideProjectRoot)
+	manifest, lock, err := g.convert(testProjectRoot)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -265,7 +263,7 @@ func TestGlideConfig_Convert_Ignore(t *testing.T) {
 		Ignores: []string{pkg},
 	}
 
-	manifest, _, err := g.convert(testGlideProjectRoot)
+	manifest, _, err := g.convert(testProjectRoot)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -293,7 +291,7 @@ func TestGlideConfig_Convert_ExcludeDir(t *testing.T) {
 		ExcludeDirs: []string{"samples"},
 	}
 
-	manifest, _, err := g.convert(testGlideProjectRoot)
+	manifest, _, err := g.convert(testProjectRoot)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -322,7 +320,7 @@ func TestGlideConfig_Convert_ExcludeDir_IgnoresMismatchedPackageName(t *testing.
 		ExcludeDirs: []string{"samples"},
 	}
 
-	manifest, _, err := g.convert(testGlideProjectRoot)
+	manifest, _, err := g.convert(testProjectRoot)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -364,7 +362,7 @@ func TestGlideConfig_Convert_WarnsForUnusedFields(t *testing.T) {
 				Imports: []glidePackage{pkg},
 			}
 
-			_, _, err = g.convert(testGlideProjectRoot)
+			_, _, err = g.convert(testProjectRoot)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -391,7 +389,7 @@ func TestGlideConfig_Convert_BadInput_EmptyPackageName(t *testing.T) {
 		Imports: []glidePackage{{Name: ""}},
 	}
 
-	_, _, err = g.convert(testGlideProjectRoot)
+	_, _, err = g.convert(testProjectRoot)
 	if err == nil {
 		t.Fatal("Expected conversion to fail because the package name is empty")
 	}
