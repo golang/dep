@@ -169,6 +169,10 @@ func TestVerifyDepTree(t *testing.T) {
 		}
 	}
 
+	for k, v := range status {
+		log.Printf("STATUS: %q: %v", k, v)
+	}
+
 	if got, want := len(status), 7; got != want {
 		t.Errorf("\n(GOT): %v; (WNT): %v", got, want)
 	}
@@ -182,10 +186,6 @@ func TestVerifyDepTree(t *testing.T) {
 		if got != want {
 			t.Errorf("Key: %q; (GOT): %v; (WNT): %v", key, got, want)
 		}
-	}
-
-	for k, v := range status {
-		log.Printf("%q: %v", k, v)
 	}
 
 	checkStatus(t, status, "github.com/alice/match", NoMismatch)
