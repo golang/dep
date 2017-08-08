@@ -2,6 +2,7 @@ package pkgtree
 
 import (
 	"bytes"
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
@@ -142,5 +143,63 @@ func BenchmarkVerifyDepTree(b *testing.B) {
 		if err != nil {
 			b.Fatal(err)
 		}
+	}
+}
+
+type crossBuffer struct {
+	readCount int
+}
+
+func (cb *crossBuffer) Read(buf []byte) (int, error) {
+	const first = "this is the result\r\nfrom the first read\r"
+	const second = "\nthis is the result\r\nfrom the second read\r"
+
+	cb.readCount++
+
+	switch cb.readCount {
+	case 1:
+		return copy(buf, first), nil
+	case 2:
+		return copy(buf, second), nil
+	default:
+		return 0, io.EOF
+	}
+}
+
+func TestLineEndingWriteToCrossBufferCRLF(t *testing.T) {
+	src := &lineEndingWriterTo{new(crossBuffer)}
+	dst := new(bytes.Buffer)
+
+	// the final CR byte ought to be conveyed to destination
+	const output = "this is the result\nfrom the first read\nthis is the result\nfrom the second read\r"
+
+	n, err := io.Copy(dst, src)
+	if got, want := err, error(nil); got != want {
+		t.Errorf("(GOT): %v; (WNT): %v", got, want)
+	}
+	if got, want := n, int64(len(output)); got != want {
+		t.Errorf("(GOT): %v; (WNT): %v", got, want)
+	}
+	if got, want := dst.Bytes(), []byte(output); !bytes.Equal(got, want) {
+		t.Errorf("(GOT): %#q; (WNT): %#q", got, want)
+	}
+}
+
+func TestLineEndingWriteTo(t *testing.T) {
+	const input = "now is the time\r\nfor all good engineers\r\nto improve their test coverage!\r\n"
+	const output = "now is the time\nfor all good engineers\nto improve their test coverage!\n"
+
+	src := &lineEndingWriterTo{bytes.NewBufferString(input)}
+	dst := new(bytes.Buffer)
+
+	n, err := io.Copy(dst, src)
+	if got, want := err, error(nil); got != want {
+		t.Errorf("(GOT): %v; (WNT): %v", got, want)
+	}
+	if got, want := n, int64(len(output)); got != want {
+		t.Errorf("(GOT): %v; (WNT): %v", got, want)
+	}
+	if got, want := dst.Bytes(), []byte(output); !bytes.Equal(got, want) {
+		t.Errorf("(GOT): %#q; (WNT): %#q", got, want)
 	}
 }
