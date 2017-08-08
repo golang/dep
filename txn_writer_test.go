@@ -190,7 +190,7 @@ func TestSafeWriter_ManifestAndUnmodifiedLock(t *testing.T) {
 	}
 
 	// Write changes
-	err := sw.Write(pc.Project.AbsRoot, pc.SourceManager, true, nil)
+	err := sw.Write(pc.Project.AbsRoot, pc.SourceManager, true, discardLogger)
 	h.Must(errors.Wrap(err, "SafeWriter.Write failed"))
 
 	// Verify file system changes

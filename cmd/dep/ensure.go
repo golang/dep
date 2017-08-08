@@ -300,7 +300,7 @@ func (cmd *ensureCommand) runVendorOnly(ctx *dep.Ctx, args []string, p *dep.Proj
 	if cmd.dryRun {
 		ctx.Out.Printf("Would have populated vendor/ directory from %s", dep.LockName)
 		if ctx.Verbose {
-			err := sw.PrintPreparedActions(ctx.Out)
+			err := sw.PrintPreparedActions(ctx.Err)
 			if err != nil {
 				return errors.WithMessage(err, "prepared actions")
 			}
@@ -634,9 +634,9 @@ func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm
 		return sw.PrintPreparedActions(ctx.Out)
 	}
 
-	var logger *log.Logger
-	if ctx.Verbose {
-		logger = ctx.Out
+	logger := ctx.Err
+	if !ctx.Verbose {
+		logger = log.New(ioutil.Discard, "", 0)
 	}
 	if err := errors.Wrap(sw.Write(p.AbsRoot, sm, true, logger), "grouped write of manifest, lock and vendor"); err != nil {
 		return err
