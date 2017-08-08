@@ -23,7 +23,7 @@ const (
 
 	// when walking vendor root hierarchy, ignore file system nodes of the
 	// following types.
-	skipModes = os.ModeDevice | os.ModeNamedPipe | os.ModeSocket | os.ModeCharDevice
+	skipSpecialNodes = os.ModeDevice | os.ModeNamedPipe | os.ModeSocket | os.ModeCharDevice
 )
 
 // DigestFromPathname returns a deterministic hash of the specified file system
@@ -76,7 +76,7 @@ func DigestFromPathname(prefix, pathname string) ([]byte, error) {
 		mode := fi.Mode()
 
 		// Skip file system nodes we are not concerned with
-		if mode&skipModes != 0 {
+		if mode&skipSpecialNodes != 0 {
 			continue
 		}
 
@@ -363,15 +363,14 @@ func VerifyDepTree(vendorPathname string, wantSums map[string][]byte) (map[strin
 	// expected digest.
 	status := make(map[string]VendorStatus)
 	for pathname := range wantSums {
-		status[pathname] = NotInTree
+		status[filepath.ToSlash(pathname)] = NotInTree
 	}
 
 	for len(queue) > 0 {
-		// pop node from the queue (depth first traversal, reverse lexicographical order)
+		// pop node from the queue (depth first traversal, reverse lexicographical order inside a directory)
 		lq1 := len(queue) - 1
 		currentNode, queue = queue[lq1], queue[:lq1]
 
-		// log.Printf("NODE: %s", currentNode)
 		short := currentNode.pathname[prefixLength:] // chop off the vendor root prefix, including the path separator
 		if expectedSum, ok := wantSums[short]; ok {
 			ls := EmptyDigestInLock
@@ -388,10 +387,8 @@ func VerifyDepTree(vendorPathname string, wantSums map[string][]byte) (map[strin
 			status[filepath.ToSlash(short)] = ls
 
 			// NOTE: Mark current nodes and all parents: required.
-			for pni := currentNode.myIndex; pni != -1; pni = otherNode.parentIndex {
-				otherNode = nodes[pni]
-				otherNode.isRequiredAncestor = true
-				// log.Printf("parent node: %s", otherNode)
+			for i := currentNode.myIndex; i != -1; i = nodes[i].parentIndex {
+				nodes[i].isRequiredAncestor = true
 			}
 
 			continue // do not need to process directory's contents
@@ -414,21 +411,16 @@ func VerifyDepTree(vendorPathname string, wantSums map[string][]byte) (map[strin
 					return nil, errors.Wrap(err, "cannot Stat")
 				}
 				// Skip non-interesting file system nodes
-				mode := fi.Mode()
-				if mode&skipModes != 0 || mode&os.ModeSymlink != 0 {
-					// log.Printf("DEBUG: skipping: %v; %q", mode, currentNode.pathname)
+				if fi.Mode()&skipSpecialNodes != 0 {
 					continue
 				}
-
+				// Keep track of all regular files and directories, but do not
+				// need to visit files.
 				nodes = append(nodes, otherNode)
 				if fi.IsDir() {
 					queue = append(queue, otherNode)
 				}
 			}
-		}
-
-		if err != nil {
-			return nil, err // early termination iff error
 		}
 	}
 
