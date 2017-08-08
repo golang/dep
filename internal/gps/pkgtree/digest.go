@@ -162,37 +162,50 @@ func newLineEndingReader(src io.Reader) *lineEndingReader {
 // specified slice of bytes. It converts all CRLF byte sequences to LF, and
 // handles cases where CR and LF straddle across two Read operations.
 func (f *lineEndingReader) Read(buf []byte) (int, error) {
-	var startIndex int
+	buflen := len(buf)
 	if f.prevReadEndedCR {
 		// Read one less byte in case we need to insert CR in there
-		startIndex++
+		buflen--
 	}
-	nr, er := f.src.Read(buf[startIndex:])
+	nr, er := f.src.Read(buf[:buflen])
 	if nr > 0 {
-		if f.prevReadEndedCR && buf[startIndex] != '\n' {
-			buf[0] = '\r'
-			startIndex = 0
+		if f.prevReadEndedCR && buf[0] != '\n' {
+			// Having a CRLF split across two Read operations is rare, so
+			// ignoring performance impact of copying entire buffer by one
+			// byte. Plus, `copy` builtin likely uses machien opcode for
+			// performing the memory copy.
+			copy(buf[1:nr+1], buf[:nr]) // shift data to right one byte
+			buf[0] = '\r'               // insert the previous skipped CR byte at start of buf
+			nr++                        // pretend we read one more byte
 		}
 
 		// Remove any CRLF sequences in buf, using `bytes.Index` because that
 		// takes advantage of machine opcodes that search for byte patterns on
 		// many architectures.
-		index := startIndex
+		var prevIndex int
 		for {
-			index = bytes.Index(buf[index:], []byte("\r\n"))
+			index := bytes.Index(buf[prevIndex:nr], []byte("\r\n"))
 			if index == -1 {
 				break
 			}
 			// Want to skip index byte, where the CR is.
-			copy(buf[index:nr-1], buf[index+1:nr])
+			copy(buf[prevIndex+index:nr-1], buf[prevIndex+index+1:nr])
 			nr--
+			prevIndex = index
 		}
 
-		// When final byte is CR, do not emit until we ensure first byte on
-		// next read is LF.
+		// When final byte from a read operation is CR, do not emit it until
+		// ensure first byte on next read is not LF.
 		if f.prevReadEndedCR = buf[nr-1] == '\r'; f.prevReadEndedCR {
 			nr-- // pretend byte was never read from source
 		}
+	} else if f.prevReadEndedCR {
+		// Reading from source returned nothing, but this struct is sitting on a
+		// trailing CR from previous Read, so let's give it to client now.
+		buf[0] = '\r'
+		nr = 1
+		er = nil
+		f.prevReadEndedCR = false // prevent infinite loop
 	}
 	return nr, er
 }

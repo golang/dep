@@ -14,64 +14,58 @@ import (
 
 // crossBuffer is a test io.Reader that emits a few canned responses.
 type crossBuffer struct {
-	readCount int
+	readCount  int
+	iterations []string
 }
 
 func (cb *crossBuffer) Read(buf []byte) (int, error) {
-	const first = "this is the result\r\nfrom the first read\r"
-	const second = "\nthis is the result\r\nfrom the second read\r"
-
-	cb.readCount++
-
-	switch cb.readCount {
-	case 1:
-		return copy(buf, first), nil
-	case 2:
-		return copy(buf, second), nil
-	default:
+	if cb.readCount == len(cb.iterations) {
 		return 0, io.EOF
+	}
+	cb.readCount++
+	return copy(buf, cb.iterations[cb.readCount-1]), nil
+}
+
+func streamThruLineEndingReader(t *testing.T, iterations []string) []byte {
+	dst := new(bytes.Buffer)
+	n, err := io.Copy(dst, newLineEndingReader(&crossBuffer{iterations: iterations}))
+	if got, want := err, error(nil); got != want {
+		t.Errorf("(GOT): %v; (WNT): %v", got, want)
+	}
+	if got, want := n, int64(dst.Len()); got != want {
+		t.Errorf("(GOT): %v; (WNT): %v", got, want)
+	}
+	return dst.Bytes()
+}
+
+func TestLineEndingReader(t *testing.T) {
+	testCases := []struct {
+		input  []string
+		output string
+	}{
+		{[]string{"now is the time\r\n"}, "now is the time\n"},
+		{[]string{"now is the time\n"}, "now is the time\n"},
+		{[]string{"now is the time\r"}, "now is the time\r"},     // trailing CR ought to convey
+		{[]string{"\rnow is the time"}, "\rnow is the time"},     // CR not followed by LF ought to convey
+		{[]string{"\rnow is the time\r"}, "\rnow is the time\r"}, // CR not followed by LF ought to convey
+
+		{[]string{"this is the result\r\nfrom the first read\r", "\nthis is the result\r\nfrom the second read\r"},
+			"this is the result\nfrom the first read\nthis is the result\nfrom the second read\r"},
+		{[]string{"now is the time\r\nfor all good engineers\r\nto improve their test coverage!\r\n"},
+			"now is the time\nfor all good engineers\nto improve their test coverage!\n"},
+		{[]string{"now is the time\r\nfor all good engineers\r", "\nto improve their test coverage!\r\n"},
+			"now is the time\nfor all good engineers\nto improve their test coverage!\n"},
+	}
+
+	for _, testCase := range testCases {
+		got := streamThruLineEndingReader(t, testCase.input)
+		if want := []byte(testCase.output); !bytes.Equal(got, want) {
+			t.Errorf("Input: %#v; (GOT): %#q; (WNT): %#q", testCase.input, got, want)
+		}
 	}
 }
 
 ////////////////////////////////////////
-
-func TestLineEndingReadCrossBufferCRLF(t *testing.T) {
-	// The final CR byte ought to be conveyed to destination.
-	const output = "this is the result\nfrom the first read\nthis is the result\nfrom the second read\r"
-
-	src := newLineEndingReader(new(crossBuffer))
-	dst := new(bytes.Buffer)
-
-	n, err := io.Copy(dst, src)
-	if got, want := err, error(nil); got != want {
-		t.Errorf("(GOT): %v; (WNT): %v", got, want)
-	}
-	if got, want := n, int64(len(output)); got != want {
-		t.Errorf("(GOT): %v; (WNT): %v", got, want)
-	}
-	if got, want := dst.Bytes(), []byte(output); !bytes.Equal(got, want) {
-		t.Errorf("(GOT): %#q; (WNT): %#q", got, want)
-	}
-}
-
-func TestLineEndingRead(t *testing.T) {
-	const input = "now is the time\r\nfor all good engineers\r\nto improve their test coverage!\r\n"
-	const output = "now is the time\nfor all good engineers\nto improve their test coverage!\n"
-
-	src := newLineEndingReader(bytes.NewBufferString(input))
-	dst := new(bytes.Buffer)
-
-	n, err := io.Copy(dst, src)
-	if got, want := err, error(nil); got != want {
-		t.Errorf("(GOT): %v; (WNT): %v", got, want)
-	}
-	if got, want := n, int64(len(output)); got != want {
-		t.Errorf("(GOT): %v; (WNT): %v", got, want)
-	}
-	if got, want := dst.Bytes(), []byte(output); !bytes.Equal(got, want) {
-		t.Errorf("(GOT): %#q; (WNT): %#q", got, want)
-	}
-}
 
 func getTestdataVerifyRoot(t *testing.T) string {
 	cwd, err := os.Getwd()
