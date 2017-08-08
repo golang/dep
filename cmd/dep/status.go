@@ -140,6 +140,13 @@ func (out *jsonOutput) BasicFooter() {
 }
 
 func (out *jsonOutput) BasicLine(bs *BasicStatus) {
+	if v, ok := bs.Constraint.(gps.Version); ok {
+		bs.JSONConstraint = formatVersion(v)
+	} else {
+		bs.JSONConstraint = bs.Constraint.String()
+	}
+
+	bs.JSONVersion = formatVersion(bs.Version)
 	out.basic = append(out.basic, bs)
 }
 
@@ -246,6 +253,7 @@ func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
 // BasicStatus contains all the information reported about a single dependency
 // in the summary/list status output mode.
 type BasicStatus struct {
+<<<<<<< HEAD
 	ProjectRoot  string
 	Children     []string
 	Constraint   gps.Constraint
@@ -254,6 +262,17 @@ type BasicStatus struct {
 	Latest       gps.Version
 	PackageCount int
 	hasOverride  bool
+=======
+	ProjectRoot    string
+	Children       []string
+	Constraint     gps.Constraint      `json:"-"`
+	Version        gps.UnpairedVersion `json:"-"`
+	Revision       gps.Revision
+	Latest         gps.Version
+	PackageCount   int
+	JSONConstraint string `json:"Constraint"`
+	JSONVersion    string `json:"Version"`
+>>>>>>> fix(status): fix `Constraint` & `Version` output
 }
 
 // MissingStatus contains information about all the missing packages in a project.
