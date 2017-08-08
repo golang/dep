@@ -5,10 +5,12 @@
 package gps
 
 import (
-	"fmt"
 	"log"
 	"os"
 	"path/filepath"
+	"sync"
+
+	"github.com/pkg/errors"
 )
 
 // A Solution is returned by a solver run. It is mostly just a Lock, with some
@@ -43,38 +45,65 @@ type solution struct {
 	solv Solver
 }
 
-// WriteDepTree takes a basedir and a Lock, and exports all the projects
-// listed in the lock to the appropriate target location within the basedir.
+// WriteDepTree takes a baseDir and a Lock, and exports all the projects
+// listed in the lock to the appropriate target location within baseDir.
 //
-// If the goal is to populate a vendor directory, basedir should be the absolute
+// If the goal is to populate a vendor directory, baseDir should be the absolute
 // path to that vendor directory, not its parent (a project root, typically).
 //
-// It requires a SourceManager to do the work, and takes a flag indicating
-// whether or not to strip vendor directories contained in the exported
-// dependencies.
-func WriteDepTree(basedir string, l Lock, sm SourceManager, sv bool, logger *log.Logger) error {
+// It requires a SourceManager to do the work, and takes a PruneOptions
+// indicating the pruning options required for the exported dependencies.
+func WriteDepTree(baseDir string, l Lock, sm SourceManager, prune PruneOptions, logger *log.Logger) error {
+	if baseDir == "" {
+		return errors.New("must provide a non-empty baseDir")
+	}
 	if l == nil {
-		return fmt.Errorf("must provide non-nil Lock to WriteDepTree")
+		return errors.New("must provide a non-nil Lock to WriteDepTree")
+	}
+	if sm == nil {
+		return errors.New("must provide a non-nil SourceManager to WriteDepTree")
 	}
 
-	err := os.MkdirAll(basedir, 0777)
-	if err != nil {
+	if err := os.MkdirAll(baseDir, 0777); err != nil {
 		return err
 	}
 
-	// TODO(sdboyer) parallelize
-	for _, p := range l.Projects() {
-		to := filepath.FromSlash(filepath.Join(basedir, string(p.Ident().ProjectRoot)))
+	var wg sync.WaitGroup
+	errCh := make(chan error, len(l.Projects()))
 
-		logger.Printf("Writing out %s@%s", p.Ident().errString(), p.Version())
-		err = sm.ExportProject(p.Ident(), p.Version(), to)
-		if err != nil {
-			removeAll(basedir)
-			return fmt.Errorf("error while exporting %s@%s: %s", p.Ident().errString(), p.Version(), err)
+	for _, p := range l.Projects() {
+		wg.Add(1)
+		go func(p LockedProject) {
+			to := filepath.FromSlash(filepath.Join(baseDir, string(p.Ident().ProjectRoot)))
+
+			logger.Printf("Writing out %s@%s", p.Ident().errString(), p.Version())
+
+			if err := sm.ExportProject(p.Ident(), p.Version(), to); err != nil {
+				removeAll(to)
+				errCh <- errors.Wrapf(err, "failed to export %s", p.Ident().ProjectRoot)
+			}
+
+			wg.Done()
+		}(p)
+	}
+
+	wg.Wait()
+	close(errCh)
+
+	if len(errCh) > 0 {
+		logger.Println("Failed to write dep tree. The following errors occurred:")
+		for err := range errCh {
+			logger.Println(" * ", err)
 		}
-		if sv {
-			filepath.Walk(to, stripVendor)
-		}
+		removeAll(baseDir)
+		// TODO(ibrasho) handle multiple errors
+		return <-errCh
+	}
+
+	if err := Prune(baseDir, prune, l, logger); err != nil {
+		logger.Println("Failed to prune dep tree.")
+		removeAll(baseDir)
+		return err
 	}
 
 	return nil
