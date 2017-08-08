@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"flag"
 	"go/build"
+	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
@@ -253,9 +254,9 @@ func (cmd *ensureCommand) runDefault(ctx *dep.Ctx, args []string, p *dep.Project
 			return nil
 		}
 
-		var logger *log.Logger
-		if ctx.Verbose {
-			logger = ctx.Out
+		logger := ctx.Out
+		if !ctx.Verbose {
+			logger = log.New(ioutil.Discard, "", 0)
 		}
 		return errors.WithMessage(sw.Write(p.AbsRoot, sm, true, logger), "grouped write of manifest, lock and vendor")
 	}
@@ -273,9 +274,10 @@ func (cmd *ensureCommand) runDefault(ctx *dep.Ctx, args []string, p *dep.Project
 	if cmd.dryRun {
 		return sw.PrintPreparedActions(ctx.Out)
 	}
-	var logger *log.Logger
-	if ctx.Verbose {
-		logger = ctx.Out
+
+	logger := ctx.Out
+	if !ctx.Verbose {
+		logger = log.New(ioutil.Discard, "", 0)
 	}
 	return errors.Wrap(sw.Write(p.AbsRoot, sm, false, logger), "grouped write of manifest, lock and vendor")
 }
@@ -305,9 +307,10 @@ func (cmd *ensureCommand) runVendorOnly(ctx *dep.Ctx, args []string, p *dep.Proj
 		}
 		return nil
 	}
-	var logger *log.Logger
-	if ctx.Verbose {
-		logger = ctx.Out
+
+	logger := ctx.Out
+	if !ctx.Verbose {
+		logger = log.New(ioutil.Discard, "", 0)
 	}
 	return errors.WithMessage(sw.Write(p.AbsRoot, sm, true, logger), "grouped write of manifest, lock and vendor")
 }
@@ -396,9 +399,9 @@ func (cmd *ensureCommand) runUpdate(ctx *dep.Ctx, args []string, p *dep.Project,
 		return sw.PrintPreparedActions(ctx.Out)
 	}
 
-	var logger *log.Logger
-	if ctx.Verbose {
-		logger = ctx.Out
+	logger := ctx.Out
+	if !ctx.Verbose {
+		logger = log.New(ioutil.Discard, "", 0)
 	}
 	return errors.Wrap(sw.Write(p.AbsRoot, sm, false, logger), "grouped write of manifest, lock and vendor")
 }
