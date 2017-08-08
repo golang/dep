@@ -254,7 +254,7 @@ func (cmd *ensureCommand) runDefault(ctx *dep.Ctx, args []string, p *dep.Project
 			return nil
 		}
 
-		logger := ctx.Out
+		logger := ctx.Err
 		if !ctx.Verbose {
 			logger = log.New(ioutil.Discard, "", 0)
 		}
@@ -275,7 +275,7 @@ func (cmd *ensureCommand) runDefault(ctx *dep.Ctx, args []string, p *dep.Project
 		return sw.PrintPreparedActions(ctx.Out)
 	}
 
-	logger := ctx.Out
+	logger := ctx.Err
 	if !ctx.Verbose {
 		logger = log.New(ioutil.Discard, "", 0)
 	}
@@ -308,7 +308,7 @@ func (cmd *ensureCommand) runVendorOnly(ctx *dep.Ctx, args []string, p *dep.Proj
 		return nil
 	}
 
-	logger := ctx.Out
+	logger := ctx.Err
 	if !ctx.Verbose {
 		logger = log.New(ioutil.Discard, "", 0)
 	}
@@ -399,7 +399,7 @@ func (cmd *ensureCommand) runUpdate(ctx *dep.Ctx, args []string, p *dep.Project,
 		return sw.PrintPreparedActions(ctx.Out)
 	}
 
-	logger := ctx.Out
+	logger := ctx.Err
 	if !ctx.Verbose {
 		logger = log.New(ioutil.Discard, "", 0)
 	}

@@ -6,6 +6,7 @@ package main
 
 import (
 	"flag"
+	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
@@ -202,9 +203,9 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 		return err
 	}
 
-	var logger *log.Logger
-	if ctx.Verbose {
-		logger = ctx.Out
+	logger := ctx.Err
+	if !ctx.Verbose {
+		logger = log.New(ioutil.Discard, "", 0)
 	}
 	if err := sw.Write(root, sm, !cmd.noExamples, logger); err != nil {
 		return errors.Wrap(err, "safe write of manifest and lock")
