@@ -7,6 +7,7 @@ package pkgtree
 import (
 	"bytes"
 	"io"
+	"log"
 	"os"
 	"path/filepath"
 	"testing"
@@ -202,5 +203,19 @@ func BenchmarkVerifyDepTree(b *testing.B) {
 		if err != nil {
 			b.Fatal(err)
 		}
+	}
+}
+
+func TestScaffolding(t *testing.T) {
+	err := filepath.Walk(getTestdataVerifyRoot(t), func(pathname string, info os.FileInfo, err error) error {
+		if err != nil {
+			t.Error(err)
+			return err
+		}
+		log.Printf("pathname: %q", pathname)
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
 }
