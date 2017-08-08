@@ -19,7 +19,6 @@ import (
 	"github.com/golang/dep"
 	"github.com/golang/dep/gps"
 	"github.com/golang/dep/gps/paths"
-	"github.com/golang/dep/gps/pkgtree"
 	"github.com/pkg/errors"
 )
 
@@ -389,7 +388,7 @@ func runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceMana
 		return false, 0, errors.Wrapf(err, "could not set up solver for input hashing")
 	}
 
-	cm := collectConstraints(ptree, p, sm)
+	cm := collectConstraints(ctx, p, sm)
 
 	// Get the project list and sort it so that the printed output users see is
 	// deterministically ordered. (This may be superfluous if the lock is always
@@ -644,7 +643,35 @@ func formatVersion(v gps.Version) string {
 	return v.String()
 }
 
-func collectConstraints(ptree pkgtree.PackageTree, p *dep.Project, sm gps.SourceManager) map[string][]gps.Constraint {
-	// TODO
-	return map[string][]gps.Constraint{}
+// collectConstraints collects constraints declared by all the dependencies.
+func collectConstraints(ctx *dep.Ctx, p *dep.Project, sm gps.SourceManager) map[string][]gps.Constraint {
+	constraintCollection := make(map[string][]gps.Constraint)
+
+	// Get direct deps of the root project.
+	_, directDeps, err := getDirectDependencies(sm, p)
+	if err != nil {
+		ctx.Err.Println("Error getting direct deps:", err)
+	}
+	// Create a root analyzer.
+	rootAnalyzer := newRootAnalyzer(false, ctx, directDeps, sm)
+
+	// Iterate through the locked projects and collect constraints of all the projects.
+	for _, proj := range p.Lock.Projects() {
+		manifest, _, err := sm.GetManifestAndLock(proj.Ident(), proj.Version(), rootAnalyzer)
+		if err != nil {
+			ctx.Err.Println("Error getting manifest and lock:", err)
+			continue
+		}
+
+		// Get project constraints.
+		pc := manifest.DependencyConstraints()
+
+		// Iterate through the project constraints to get individual dependency
+		// project and constraint values.
+		for pr, pp := range pc {
+			constraintCollection[string(pr)] = append(constraintCollection[string(pr)], pp.Constraint)
+		}
+	}
+
+	return constraintCollection
 }
