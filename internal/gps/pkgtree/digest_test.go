@@ -7,7 +7,6 @@ package pkgtree
 import (
 	"bytes"
 	"io"
-	"log"
 	"os"
 	"path/filepath"
 	"testing"
@@ -167,10 +166,6 @@ func TestVerifyDepTree(t *testing.T) {
 				t.Errorf("%q\n(GOT):\n\t%#v\n(WNT):\n\t%#v", k, got, want)
 			}
 		}
-	}
-
-	for k, v := range status {
-		log.Printf("STATUS: %q: %v", k, v)
 	}
 
 	if got, want := len(status), 7; got != want {
