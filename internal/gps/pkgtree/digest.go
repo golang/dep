@@ -278,15 +278,12 @@ func sortedListOfDirectoryChildrenFromPathname(pathname string) ([]string, error
 	if err != nil {
 		return nil, errors.Wrap(err, "cannot Open")
 	}
-
 	childrenNames, err := sortedListOfDirectoryChildrenFromFileHandle(fh)
-
 	// Close the file handle to the open directory without masking possible
 	// previous error value.
 	if er := fh.Close(); err == nil {
 		err = errors.Wrap(er, "cannot Close")
 	}
-
 	return childrenNames, err
 }
 
@@ -298,31 +295,34 @@ func sortedListOfDirectoryChildrenFromFileHandle(fh *os.File) ([]string, error) 
 	if err != nil {
 		return nil, errors.Wrap(err, "cannot Readdirnames")
 	}
-	if len(childrenNames) > 0 {
-		sort.Strings(childrenNames)
-	}
+	sort.Strings(childrenNames)
 	return childrenNames, nil
 }
 
 // VerifyDepTree verifies dependency tree according to expected digest sums, and
 // returns an associative array of file system nodes and their respective vendor
 // status, in accordance with the provided expected digest sums parameter.
-func VerifyDepTree(vendorPathname string, wantSums map[string][]byte) (map[string]VendorStatus, error) {
+//
+// The vendor root will be converted to os-specific pathname for processing, and
+// the map of project names to their expected digests are required to have the
+// solidus character, `/`, as their path separator. For example,
+// "github.com/alice/alice1".
+func VerifyDepTree(vendorRoot string, wantSums map[string][]byte) (map[string]VendorStatus, error) {
+	vendorRoot = filepath.Clean(vendorRoot) + pathSeparator
+
 	// NOTE: Ensure top level pathname is a directory
-	fi, err := os.Stat(vendorPathname)
+	fi, err := os.Stat(vendorRoot)
 	if err != nil {
 		return nil, errors.Wrap(err, "cannot Stat")
 	}
 	if !fi.IsDir() {
-		return nil, errors.Errorf("cannot verify non directory: %q", vendorPathname)
+		return nil, errors.Errorf("cannot verify non directory: %q", vendorRoot)
 	}
 
-	vendorPathname = filepath.Clean(vendorPathname) + pathSeparator
-	prefixLength := len(vendorPathname)
-
 	var otherNode *fsnode
-	currentNode := &fsnode{pathname: vendorPathname, parentIndex: -1, isRequiredAncestor: true}
+	currentNode := &fsnode{pathname: vendorRoot, parentIndex: -1, isRequiredAncestor: true}
 	queue := []*fsnode{currentNode} // queue of directories that must be inspected
+	prefixLength := len(vendorRoot)
 
 	// In order to identify all file system nodes that are not in the lock file,
 	// represented by the specified expected sums parameter, and in order to
@@ -363,7 +363,7 @@ func VerifyDepTree(vendorPathname string, wantSums map[string][]byte) (map[strin
 	// expected digest.
 	status := make(map[string]VendorStatus)
 	for pathname := range wantSums {
-		status[filepath.ToSlash(pathname)] = NotInTree
+		status[pathname] = NotInTree
 	}
 
 	for len(queue) > 0 {
@@ -371,20 +371,24 @@ func VerifyDepTree(vendorPathname string, wantSums map[string][]byte) (map[strin
 		lq1 := len(queue) - 1
 		currentNode, queue = queue[lq1], queue[:lq1]
 
-		short := currentNode.pathname[prefixLength:] // chop off the vendor root prefix, including the path separator
-		if expectedSum, ok := wantSums[short]; ok {
+		// Chop off the vendor root prefix, including the path separator, then
+		// normalize.
+		projectNormalized := filepath.ToSlash(currentNode.pathname[prefixLength:])
+
+		if expectedSum, ok := wantSums[projectNormalized]; ok {
 			ls := EmptyDigestInLock
 			if len(expectedSum) > 0 {
-				ls = NoMismatch
-				projectSum, err := DigestFromPathname(vendorPathname, short)
+				projectSum, err := DigestFromPathname(vendorRoot, projectNormalized)
 				if err != nil {
 					return nil, errors.Wrap(err, "cannot compute dependency hash")
 				}
-				if !bytes.Equal(projectSum, expectedSum) {
+				if bytes.Equal(projectSum, expectedSum) {
+					ls = NoMismatch
+				} else {
 					ls = DigestMismatchInLock
 				}
 			}
-			status[filepath.ToSlash(short)] = ls
+			status[projectNormalized] = ls
 
 			// NOTE: Mark current nodes and all parents: required.
 			for i := currentNode.myIndex; i != -1; i = nodes[i].parentIndex {
