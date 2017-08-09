@@ -41,9 +41,9 @@ func TestGlideConfig_Convert(t *testing.T) {
 		wantConvertErr      bool
 		matchPairedVersion  bool
 		projectRoot         gps.ProjectRoot
-		sourceRepo          string
+		wantSourceRepo      string
 		wantConstraint      string
-		wantRevision        *gps.Revision
+		wantRevision        gps.Revision
 		wantVersion         string
 		wantLockCount       int
 		wantIgnoreCount     int
@@ -69,11 +69,11 @@ func TestGlideConfig_Convert(t *testing.T) {
 				},
 			},
 			projectRoot:        "github.com/sdboyer/deptest",
-			sourceRepo:         "https://github.com/sdboyer/deptest.git",
+			wantSourceRepo:     "https://github.com/sdboyer/deptest.git",
 			matchPairedVersion: true,
 			wantConstraint:     "^1.0.0",
 			wantLockCount:      1,
-			wantRevision:       revisionPtr(gps.Revision("ff2948a2ac8f538c4ecd55962e919d1e13e74baf")),
+			wantRevision:       gps.Revision("ff2948a2ac8f538c4ecd55962e919d1e13e74baf"),
 			wantVersion:        "v1.0.0",
 		},
 		"test project": {
@@ -202,8 +202,8 @@ func TestGlideConfig_Convert(t *testing.T) {
 					p.Ident().ProjectRoot)
 			}
 
-			if p.Ident().Source != testCase.sourceRepo {
-				t.Fatalf("Expected locked source to be %s, got '%s'", testCase.sourceRepo, p.Ident().Source)
+			if p.Ident().Source != testCase.wantSourceRepo {
+				t.Fatalf("Expected locked source to be %s, got '%s'", testCase.wantSourceRepo, p.Ident().Source)
 			}
 
 			lv := p.Version()
@@ -222,10 +222,11 @@ func TestGlideConfig_Convert(t *testing.T) {
 				t.Fatalf("Expected locked version to be '%s', got %s", testCase.wantVersion, ver)
 			}
 
-			if testCase.wantRevision != nil {
+			if testCase.wantRevision != "" {
 				rev := lpv.Revision()
-				if rev != *testCase.wantRevision {
-					t.Fatalf("Expected locked revision to be '%s', got %s", *testCase.wantRevision,
+				if rev != testCase.wantRevision {
+					t.Fatalf("Expected locked revision to be '%s', got %s",
+						testCase.wantRevision,
 						rev)
 				}
 			}
