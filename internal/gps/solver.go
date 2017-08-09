@@ -1253,8 +1253,16 @@ func (s *solver) selectAtom(a atomWithPackages, pkgonly bool) {
 		}
 
 		if len(newp) > 0 {
+			// If there was a previously-established alternate source for this
+			// dependency, but the current atom did not express one (and getting
+			// here means the atom passed the source hot-swapping check - see
+			// checkIdentMatches()), then we have to create the new bmi with the
+			// alternate source. Otherwise, we end up with two discrete project
+			// entries for the project root in the final output, one with the
+			// alternate source, and one without. See #969.
+			id, _ := s.sel.getIdentFor(dep.Ident.ProjectRoot)
 			bmi := bimodalIdentifier{
-				id: dep.Ident,
+				id: id,
 				pl: newp,
 				// This puts in a preferred version if one's in the map, else
 				// drops in the zero value (nil)
