@@ -57,8 +57,6 @@ func WriteDepTree(basedir string, l Lock, sm SourceManager, sv bool, logger *log
 		return fmt.Errorf("must provide non-nil Lock to WriteDepTree")
 	}
 
-	logger.Println("Creating vendor dir ...")
-
 	err := os.MkdirAll(basedir, 0777)
 	if err != nil {
 		return err
@@ -68,7 +66,7 @@ func WriteDepTree(basedir string, l Lock, sm SourceManager, sv bool, logger *log
 	for _, p := range l.Projects() {
 		to := filepath.FromSlash(filepath.Join(basedir, string(p.Ident().ProjectRoot)))
 
-		logger.Printf("Ensure %v exists", p)
+		logger.Printf("Writing out %s", p)
 		err = sm.ExportProject(p.Ident(), p.Version(), to)
 		if err != nil {
 			removeAll(basedir)
