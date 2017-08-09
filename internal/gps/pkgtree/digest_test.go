@@ -43,7 +43,10 @@ func TestLineEndingReader(t *testing.T) {
 		input  []string
 		output string
 	}{
+		{[]string{"\r"}, "\r"},
+		{[]string{"\r\n"}, "\n"},
 		{[]string{"now is the time\r\n"}, "now is the time\n"},
+		{[]string{"now is the time\r\n(trailing data)"}, "now is the time\n(trailing data)"},
 		{[]string{"now is the time\n"}, "now is the time\n"},
 		{[]string{"now is the time\r"}, "now is the time\r"},     // trailing CR ought to convey
 		{[]string{"\rnow is the time"}, "\rnow is the time"},     // CR not followed by LF ought to convey
@@ -193,7 +196,7 @@ func TestVerifyDepTree(t *testing.T) {
 }
 
 func BenchmarkVerifyDepTree(b *testing.B) {
-	b.Skip("Eliding benchmark of user's Go source directory")
+	// b.Skip("Eliding benchmark of user's Go source directory")
 
 	prefix := filepath.Join(os.Getenv("GOPATH"), "src")
 

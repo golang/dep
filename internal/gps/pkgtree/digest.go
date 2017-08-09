@@ -158,6 +158,8 @@ func newLineEndingReader(src io.Reader) *lineEndingReader {
 	return &lineEndingReader{src: src}
 }
 
+var crlf = []byte("\r\n")
+
 // Read consumes bytes from the structure's source io.Reader to fill the
 // specified slice of bytes. It converts all CRLF byte sequences to LF, and
 // handles cases where CR and LF straddle across two Read operations.
@@ -172,27 +174,40 @@ func (f *lineEndingReader) Read(buf []byte) (int, error) {
 		if f.prevReadEndedCR && buf[0] != '\n' {
 			// Having a CRLF split across two Read operations is rare, so
 			// ignoring performance impact of copying entire buffer by one
-			// byte. Plus, `copy` builtin likely uses machien opcode for
+			// byte. Plus, `copy` builtin likely uses machine opcode for
 			// performing the memory copy.
 			copy(buf[1:nr+1], buf[:nr]) // shift data to right one byte
 			buf[0] = '\r'               // insert the previous skipped CR byte at start of buf
 			nr++                        // pretend we read one more byte
 		}
 
-		// Remove any CRLF sequences in buf, using `bytes.Index` because that
+		// Remove any CRLF sequences in buf, using `bytes.Index` because it
 		// takes advantage of machine opcodes that search for byte patterns on
-		// many architectures.
-		var prevIndex int
+		// many architectures; and, using builtin `copy` which also takes
+		// advantage of machine opcodes to quickly move overlapping regions of
+		// bytes in memory.
+		var searchOffset, shiftCount int
+		previousIndex := -1 // index of previous CRLF index; -1 means no previous index known
 		for {
-			index := bytes.Index(buf[prevIndex:nr], []byte("\r\n"))
+			index := bytes.Index(buf[searchOffset:nr], crlf)
 			if index == -1 {
 				break
 			}
-			// Want to skip index byte, where the CR is.
-			copy(buf[prevIndex+index:nr-1], buf[prevIndex+index+1:nr])
-			nr--
-			prevIndex = index
+			index += searchOffset // convert relative index to absolute
+			if previousIndex != -1 {
+				// shift substring between previous index and this index
+				copy(buf[previousIndex-shiftCount:], buf[previousIndex+1:index])
+				shiftCount++ // next shift needs to be 1 byte to the left
+			}
+			previousIndex = index
+			searchOffset = index + 2 // start next search after len(crlf)
 		}
+		if previousIndex != -1 {
+			// handle final shift
+			copy(buf[previousIndex-shiftCount:], buf[previousIndex+1:nr])
+			shiftCount++
+		}
+		nr -= shiftCount // shorten byte read count by number of shifts executed
 
 		// When final byte from a read operation is CR, do not emit it until
 		// ensure first byte on next read is not LF.
