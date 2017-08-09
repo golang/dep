@@ -582,7 +582,7 @@ func (s *solver) selectRoot() error {
 	s.mtr.push("select-root")
 	// Push the root project onto the queue.
 	awp := s.rd.rootAtom()
-	s.sel.pushSelection(awp, true)
+	s.sel.pushSelection(awp, false)
 
 	// If we're looking for root's deps, get it from opts and local root
 	// analysis, rather than having the sm do it
@@ -749,11 +749,9 @@ func (s *solver) intersectConstraintsWithImports(deps []workingConstraint, reach
 	}
 
 	// Dump all the deps from the map into the expected return slice
-	cdeps := make([]completeDep, len(dmap))
-	k := 0
+	cdeps := make([]completeDep, 0, len(dmap))
 	for _, cdep := range dmap {
-		cdeps[k] = cdep
-		k++
+		cdeps = append(cdeps, cdep)
 	}
 
 	return cdeps, nil
@@ -860,14 +858,11 @@ func (s *solver) createVersionQueue(bmi bimodalIdentifier) (*versionQueue, error
 	// TODO(sdboyer) while this does work, it bypasses the interface-implied guarantees
 	// of the version queue, and is therefore not a great strategy for API
 	// coherency. Folding this in to a formal interface would be better.
-	switch tc := s.sel.getConstraint(bmi.id).(type) {
-	case Revision:
+	if tc, ok := s.sel.getConstraint(bmi.id).(Revision); ok && q.pi[0] != tc {
 		// We know this is the only thing that could possibly match, so put it
 		// in at the front - if it isn't there already.
-		if q.pi[0] != tc {
-			// Existence of the revision is guaranteed by checkRevisionExists().
-			q.pi = append([]Version{tc}, q.pi...)
-		}
+		// TODO(sdboyer) existence of the revision is guaranteed by checkRevisionExists(); restore that call.
+		q.pi = append([]Version{tc}, q.pi...)
 	}
 
 	// Having assembled the queue, search it for a valid version.
