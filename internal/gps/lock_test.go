@@ -155,7 +155,7 @@ func TestLockedProjectsString(t *testing.T) {
 			lp: NewLockedProject(
 				ProjectIdentifier{ProjectRoot: "github.com/sdboyer/gps", Source: "github.com/another/repo"},
 				NewVersion("v0.10.0"), []string{"."}),
-			want: "github.com/sdboyer/gps -> github.com/another/repo@v0.10.0 for packages: [.]",
+			want: "github.com/sdboyer/gps (from github.com/another/repo)@v0.10.0 for packages: [.]",
 		},
 		{
 			name: "Version pair",
