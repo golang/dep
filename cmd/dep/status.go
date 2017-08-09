@@ -284,6 +284,10 @@ func runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceMana
 		params.TraceLogger = ctx.Err
 	}
 
+	if err := ctx.ValidateParams(sm, params); err != nil {
+		return digestMismatch, hasMissingPkgs, err
+	}
+
 	s, err := gps.Prepare(params, sm)
 	if err != nil {
 		return digestMismatch, hasMissingPkgs, errors.Errorf("could not set up solver for input hashing: %s", err)
