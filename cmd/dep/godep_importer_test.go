@@ -59,8 +59,9 @@ func TestGodepConfig_Convert(t *testing.T) {
 			},
 			projectRoot:        gps.ProjectRoot("github.com/sdboyer/deptest"),
 			matchPairedVersion: false,
-			wantConstraint:     ">=1.12.0, <=12.0.0-g2fd980e",
+			wantConstraint:     "^1.12.0-12-g2fd980e",
 			wantLockCount:      1,
+			wantVersion:        "v1.0.0",
 		},
 		"empty comment": {
 			json: godepJSON{
