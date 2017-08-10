@@ -96,7 +96,7 @@ func (out *tableOutput) BasicLine(bs *BasicStatus) {
 		constraint = bs.Constraint.String()
 	}
 	if bs.hasOverride {
-		constraint += "(override)"
+		constraint += " (override)"
 	}
 	fmt.Fprintf(out.w,
 		"%s\t%s\t%s\t%s\t%s\t%d\t\n",
