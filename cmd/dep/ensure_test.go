@@ -1,13 +1,16 @@
-// Copyright 2016 The Go Authors. All rights reserved.
+// Copyright 2017 The Go Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
 package main
 
 import (
+	"errors"
+	"go/build"
 	"testing"
 
 	"github.com/golang/dep/internal/gps"
+	"github.com/golang/dep/internal/gps/pkgtree"
 )
 
 func TestInvalidEnsureFlagCombinations(t *testing.T) {
@@ -47,5 +50,64 @@ func TestInvalidEnsureFlagCombinations(t *testing.T) {
 	ec.vendorOnly = false
 	if err := ec.runDefault(nil, []string{"foo"}, nil, nil, gps.SolveParameters{}); err == nil {
 		t.Errorf("no args to plain ensure")
+	}
+}
+
+func TestCheckErrors(t *testing.T) {
+	tt := []struct {
+		name        string
+		hasErrs     bool
+		pkgOrErrMap map[string]pkgtree.PackageOrErr
+	}{
+		{
+			name:    "noErrors",
+			hasErrs: false,
+			pkgOrErrMap: map[string]pkgtree.PackageOrErr{
+				"mypkg": {
+					P: pkgtree.Package{},
+				},
+			},
+		},
+		{
+			name:    "hasErrors",
+			hasErrs: true,
+			pkgOrErrMap: map[string]pkgtree.PackageOrErr{
+				"github.com/me/pkg": {
+					Err: &build.NoGoError{},
+				},
+				"github.com/someone/pkg": {
+					Err: errors.New("code is busted"),
+				},
+			},
+		},
+		{
+			name:    "onlyGoErrors",
+			hasErrs: false,
+			pkgOrErrMap: map[string]pkgtree.PackageOrErr{
+				"github.com/me/pkg": {
+					Err: &build.NoGoError{},
+				},
+				"github.com/someone/pkg": {
+					P: pkgtree.Package{},
+				},
+			},
+		},
+		{
+			name:    "allGoErrors",
+			hasErrs: true,
+			pkgOrErrMap: map[string]pkgtree.PackageOrErr{
+				"github.com/me/pkg": {
+					Err: &build.NoGoError{},
+				},
+			},
+		},
+	}
+
+	for _, tc := range tt {
+		t.Run(tc.name, func(t *testing.T) {
+			if hasErrs := checkErrors(tc.pkgOrErrMap) != nil; hasErrs != tc.hasErrs {
+				t.Fail()
+			}
+		})
 	}
 }
