@@ -89,19 +89,10 @@ func (out *tableOutput) BasicFooter() {
 }
 
 func (out *tableOutput) BasicLine(bs *BasicStatus) {
-	var constraint string
-	if v, ok := bs.Constraint.(gps.Version); ok {
-		constraint = formatVersion(v)
-	} else {
-		constraint = bs.Constraint.String()
-	}
-	if bs.hasOverride {
-		constraint += " (override)"
-	}
 	fmt.Fprintf(out.w,
 		"%s\t%s\t%s\t%s\t%s\t%d\t\n",
 		bs.ProjectRoot,
-		constraint,
+		bs.getConsolidatedConstraint(),
 		formatVersion(bs.Version),
 		formatVersion(bs.Revision),
 		formatVersion(bs.Latest),
@@ -140,12 +131,7 @@ func (out *jsonOutput) BasicFooter() {
 }
 
 func (out *jsonOutput) BasicLine(bs *BasicStatus) {
-	if v, ok := bs.Constraint.(gps.Version); ok {
-		bs.JSONConstraint = formatVersion(v)
-	} else {
-		bs.JSONConstraint = bs.Constraint.String()
-	}
-
+	bs.JSONConstraint = bs.getConsolidatedConstraint()
 	bs.JSONVersion = formatVersion(bs.Version)
 	out.basic = append(out.basic, bs)
 }
@@ -184,11 +170,7 @@ func (out *dotOutput) BasicFooter() {
 }
 
 func (out *dotOutput) BasicLine(bs *BasicStatus) {
-	version := formatVersion(bs.Revision)
-	if bs.Version != nil {
-		version = formatVersion(bs.Version)
-	}
-	out.g.createNode(bs.ProjectRoot, version, bs.Children)
+	out.g.createNode(bs.ProjectRoot, bs.getConsolidatedVersion(), bs.Children)
 }
 
 func (out *dotOutput) MissingHeader()                {}
@@ -253,7 +235,6 @@ func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
 // BasicStatus contains all the information reported about a single dependency
 // in the summary/list status output mode.
 type BasicStatus struct {
-<<<<<<< HEAD
 	ProjectRoot  string
 	Children     []string
 	Constraint   gps.Constraint
@@ -262,17 +243,31 @@ type BasicStatus struct {
 	Latest       gps.Version
 	PackageCount int
 	hasOverride  bool
-=======
-	ProjectRoot    string
-	Children       []string
-	Constraint     gps.Constraint      `json:"-"`
-	Version        gps.UnpairedVersion `json:"-"`
-	Revision       gps.Revision
-	Latest         gps.Version
-	PackageCount   int
-	JSONConstraint string `json:"Constraint"`
-	JSONVersion    string `json:"Version"`
->>>>>>> fix(status): fix `Constraint` & `Version` output
+}
+
+func (bs *BasicStatus) getConsolidatedConstraint() string {
+	var constraint string
+	if bs.Constraint != nil {
+		if v, ok := bs.Constraint.(gps.Version); ok {
+			constraint = formatVersion(v)
+		} else {
+			constraint = bs.Constraint.String()
+		}
+	}
+
+	if bs.hasOverride {
+		constraint += " (override)"
+	}
+
+	return constraint
+}
+
+func (bs *BasicStatus) getConsolidatedVersion() string {
+	version := formatVersion(bs.Revision)
+	if bs.Version != nil {
+		version = formatVersion(bs.Version)
+	}
+	return version
 }
 
 // MissingStatus contains information about all the missing packages in a project.
