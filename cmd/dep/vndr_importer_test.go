@@ -17,6 +17,138 @@ import (
 	"github.com/pkg/errors"
 )
 
+func TestVndrConfig_Convert(t *testing.T) {
+	testCases := map[string]struct {
+		vndr               []vndrPackage
+		wantConvertErr     bool
+		matchPairedVersion bool
+		projectRoot        gps.ProjectRoot
+		wantConstraint     string
+		wantRevision       gps.Revision
+		wantVersion        string
+		wantLockCount      int
+	}{
+		"project": {
+			vndr: []vndrPackage{{
+				importPath: "github.com/sdboyer/deptest",
+				revision:   "v0.8.0",
+				repository: "https://github.com/sdboyer/deptest.git",
+			}},
+			matchPairedVersion: false,
+			projectRoot:        gps.ProjectRoot("github.com/sdboyer/deptest"),
+			wantConstraint:     "^0.8.0",
+			wantRevision:       gps.Revision("ff2948a2ac8f538c4ecd55962e919d1e13e74baf"),
+			wantVersion:        "v0.8.0",
+			wantLockCount:      1,
+		},
+		"with semver suffix": {
+			vndr: []vndrPackage{{
+				importPath: "github.com/sdboyer/deptest",
+				revision:   "v1.12.0-12-g2fd980e",
+			}},
+			matchPairedVersion: false,
+			projectRoot:        gps.ProjectRoot("github.com/sdboyer/deptest"),
+			wantConstraint:     "^1.12.0-12-g2fd980e",
+			wantVersion:        "v1.0.0",
+			wantLockCount:      1,
+		},
+		"hash revision": {
+			vndr: []vndrPackage{{
+				importPath: "github.com/sdboyer/deptest",
+				revision:   "ff2948a2ac8f538c4ecd55962e919d1e13e74baf",
+			}},
+			matchPairedVersion: false,
+			projectRoot:        gps.ProjectRoot("github.com/sdboyer/deptest"),
+			wantConstraint:     "ff2948a2ac8f538c4ecd55962e919d1e13e74baf",
+			wantVersion:        "v1.0.0",
+			wantLockCount:      1,
+		},
+		"missing importPath": {
+			vndr: []vndrPackage{{
+				revision: "v1.0.0",
+			}},
+			wantConvertErr: true,
+		},
+	}
+
+	h := test.NewHelper(t)
+	defer h.Cleanup()
+
+	ctx := newTestContext(h)
+	sm, err := ctx.SourceManager()
+	h.Must(err)
+	defer sm.Release()
+
+	for name, testCase := range testCases {
+		t.Run(name, func(t *testing.T) {
+			v := newVndrImporter(discardLogger, true, sm)
+			v.packages = testCase.vndr
+
+			manifest, lock, err := v.convert(testCase.projectRoot)
+			if err != nil {
+				if testCase.wantConvertErr {
+					return
+				}
+				t.Fatal(err)
+			} else {
+				if testCase.wantConvertErr {
+					t.Fatal("expected err, have nil")
+				}
+			}
+
+			if len(lock.P) != testCase.wantLockCount {
+				t.Fatalf("Expected lock to have %d project(s), got %d",
+					testCase.wantLockCount,
+					len(lock.P))
+			}
+
+			d, ok := manifest.Constraints[testCase.projectRoot]
+			if !ok {
+				t.Fatalf("Expected the manifest to have a dependency for '%s' but got none",
+					testCase.projectRoot)
+			}
+
+			c := d.Constraint.String()
+			if c != testCase.wantConstraint {
+				t.Fatalf("Expected manifest constraint to be %s, got %s", testCase.wantConstraint, c)
+			}
+
+			p := lock.P[0]
+			if p.Ident().ProjectRoot != testCase.projectRoot {
+				t.Fatalf("Expected the lock to have a project for '%s' but got '%s'",
+					testCase.projectRoot,
+					p.Ident().ProjectRoot)
+			}
+
+			lv := p.Version()
+			lpv, ok := lv.(gps.PairedVersion)
+
+			if !ok {
+				if testCase.matchPairedVersion {
+					t.Fatalf("Expected locked version to be PairedVersion but got %T", lv)
+				}
+
+				return
+			}
+
+			ver := lpv.String()
+			if ver != testCase.wantVersion {
+				t.Fatalf("Expected locked version to be '%s', got %s", testCase.wantVersion, ver)
+			}
+
+			if testCase.wantRevision != "" {
+				rev := lpv.Revision()
+				if rev != testCase.wantRevision {
+					t.Fatalf("Expected locked revision to be '%s', got %s",
+						testCase.wantRevision,
+						rev)
+				}
+			}
+		})
+	}
+
+}
+
 func TestVndrConfig_Import(t *testing.T) {
 	h := test.NewHelper(t)
 	defer h.Cleanup()

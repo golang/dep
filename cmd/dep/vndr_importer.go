@@ -22,6 +22,8 @@ func vndrFile(dir string) string {
 }
 
 type vndrImporter struct {
+	packages []vndrPackage
+
 	logger  *log.Logger
 	verbose bool
 	sm      gps.SourceManager
@@ -45,17 +47,53 @@ func (v *vndrImporter) HasDepMetadata(dir string) bool {
 func (v *vndrImporter) Import(dir string, pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock, error) {
 	v.logger.Println("Detected vndr configuration file...")
 
-	packages, err := v.loadVndrFile(dir)
+	err := v.loadVndrFile(dir)
 	if err != nil {
 		return nil, nil, errors.Wrapf(err, "unable to load vndr file")
 	}
 
-	manifest := &dep.Manifest{
-		Constraints: make(gps.ProjectConstraints),
-	}
-	lock := &dep.Lock{}
+	return v.convert(pr)
+}
 
-	for _, pkg := range packages {
+func (v *vndrImporter) loadVndrFile(dir string) error {
+	v.logger.Printf("Converting from vendor.conf...")
+
+	f, err := os.Open(vndrFile(dir))
+	if err != nil {
+		return errors.Wrapf(err, "Unable to open %s", vndrFile(dir))
+	}
+	defer f.Close()
+
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		pkg, err := parseVndrLine(scanner.Text())
+		if err != nil {
+			return errors.Wrapf(err, "unable to parse line")
+		}
+		if pkg == nil {
+			// Could be an empty line or one which is just a comment
+			continue
+		}
+		v.packages = append(v.packages, *pkg)
+	}
+
+	if scanner.Err() != nil {
+		return errors.Wrapf(err, "unable to read %s", vndrFile(dir))
+	}
+
+	return nil
+}
+
+func (v *vndrImporter) convert(pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock, error) {
+	var (
+		manifest = &dep.Manifest{
+			Constraints: make(gps.ProjectConstraints),
+		}
+		lock = &dep.Lock{}
+		err  error
+	)
+
+	for _, pkg := range v.packages {
 		pc := gps.ProjectConstraint{
 			Ident: gps.ProjectIdentifier{
 				ProjectRoot: gps.ProjectRoot(pkg.importPath),
@@ -88,34 +126,10 @@ func (v *vndrImporter) Import(dir string, pr gps.ProjectRoot) (*dep.Manifest, *d
 	return manifest, lock, nil
 }
 
-func (v *vndrImporter) loadVndrFile(dir string) ([]vndrPackage, error) {
-	v.logger.Printf("Converting from vendor.conf...")
-
-	f, err := os.Open(vndrFile(dir))
-	if err != nil {
-		return nil, errors.Wrapf(err, "Unable to open %s", vndrFile(dir))
-	}
-	defer f.Close()
-
-	var packages []vndrPackage
-	scanner := bufio.NewScanner(f)
-	for scanner.Scan() {
-		pkg, err := parseVndrLine(scanner.Text())
-		if err != nil {
-			return nil, errors.Wrapf(err, "unable to parse line")
-		}
-		if pkg == nil {
-			// Could be an empty line or one which is just a comment
-			continue
-		}
-		packages = append(packages, *pkg)
-	}
-
-	if scanner.Err() != nil {
-		return nil, errors.Wrapf(err, "unable to read %s", vndrFile(dir))
-	}
-
-	return packages, nil
+type vndrPackage struct {
+	importPath string
+	revision   string
+	repository string
 }
 
 func parseVndrLine(line string) (*vndrPackage, error) {
@@ -144,10 +158,4 @@ func parseVndrLine(line string) (*vndrPackage, error) {
 	}
 
 	return pkg, nil
-}
-
-type vndrPackage struct {
-	importPath string
-	revision   string
-	repository string
 }
