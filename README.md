@@ -99,10 +99,10 @@ matches the constraints from the manifest. If the dependency is missing from
 Adding a project as a dependency has three essential steps:
 
 1. `import` a package from the project in one of your `*.go` source files
-2. Add a version constraint on the project to `Gopkg.toml` (Optional, but recommended)
+2. Add a `version` or `branch` rule in the project's `[[constraint]]` section in `Gopkg.toml` (Optional, but recommended)
 3. Run `dep ensure`
 
-`dep ensure -add` provides some CLI sugar to ease this process:
+`dep ensure -add` is CLI sugar to ease this a bit:
 
 ```sh
 $ dep ensure -add github.com/some/project github.com/other/project/subpackage@v1.0.0
