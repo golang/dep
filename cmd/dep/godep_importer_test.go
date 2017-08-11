@@ -19,14 +19,8 @@ const testProjectRoot = "github.com/golang/notexist"
 
 func TestGodepConfig_Convert(t *testing.T) {
 	testCases := map[string]struct {
-		json               godepJSON
-		wantConvertErr     bool
-		matchPairedVersion bool
-		projectRoot        gps.ProjectRoot
-		wantConstraint     string
-		wantRevision       gps.Revision
-		wantVersion        string
-		wantLockCount      int
+		*convertTestCase
+		json godepJSON
 	}{
 		"convert project": {
 			json: godepJSON{
@@ -39,12 +33,13 @@ func TestGodepConfig_Convert(t *testing.T) {
 					},
 				},
 			},
-			matchPairedVersion: true,
-			projectRoot:        gps.ProjectRoot("github.com/sdboyer/deptest"),
-			wantConstraint:     "^0.8.0",
-			wantRevision:       gps.Revision("ff2948a2ac8f538c4ecd55962e919d1e13e74baf"),
-			wantVersion:        "v0.8.0",
-			wantLockCount:      1,
+			convertTestCase: &convertTestCase{
+				projectRoot:    gps.ProjectRoot("github.com/sdboyer/deptest"),
+				wantConstraint: "^0.8.0",
+				wantRevision:   gps.Revision("ff2948a2ac8f538c4ecd55962e919d1e13e74baf"),
+				wantVersion:    "v0.8.0",
+				wantLockCount:  1,
+			},
 		},
 		"with semver suffix": {
 			json: godepJSON{
@@ -56,11 +51,13 @@ func TestGodepConfig_Convert(t *testing.T) {
 					},
 				},
 			},
-			projectRoot:        gps.ProjectRoot("github.com/sdboyer/deptest"),
-			matchPairedVersion: false,
-			wantConstraint:     "^1.12.0-12-g2fd980e",
-			wantLockCount:      1,
-			wantVersion:        "v1.0.0",
+			convertTestCase: &convertTestCase{
+
+				projectRoot:    gps.ProjectRoot("github.com/sdboyer/deptest"),
+				wantConstraint: "^1.12.0-12-g2fd980e",
+				wantLockCount:  1,
+				wantVersion:    "v1.0.0",
+			},
 		},
 		"empty comment": {
 			json: godepJSON{
@@ -72,18 +69,23 @@ func TestGodepConfig_Convert(t *testing.T) {
 					},
 				},
 			},
-			projectRoot:        gps.ProjectRoot("github.com/sdboyer/deptest"),
-			matchPairedVersion: true,
-			wantConstraint:     "^1.0.0",
-			wantRevision:       gps.Revision("ff2948a2ac8f538c4ecd55962e919d1e13e74baf"),
-			wantVersion:        "v1.0.0",
-			wantLockCount:      1,
+			convertTestCase: &convertTestCase{
+
+				projectRoot:    gps.ProjectRoot("github.com/sdboyer/deptest"),
+				wantConstraint: "^1.0.0",
+				wantRevision:   gps.Revision("ff2948a2ac8f538c4ecd55962e919d1e13e74baf"),
+				wantVersion:    "v1.0.0",
+				wantLockCount:  1,
+			},
 		},
 		"bad input - empty package name": {
 			json: godepJSON{
 				Imports: []godepPackage{{ImportPath: ""}},
 			},
-			wantConvertErr: true,
+			convertTestCase: &convertTestCase{
+
+				wantConvertErr: true,
+			},
 		},
 		"bad input - empty revision": {
 			json: godepJSON{
@@ -93,7 +95,10 @@ func TestGodepConfig_Convert(t *testing.T) {
 					},
 				},
 			},
-			wantConvertErr: true,
+			convertTestCase: &convertTestCase{
+
+				wantConvertErr: true,
+			},
 		},
 		"sub-packages": {
 			json: godepJSON{
@@ -110,10 +115,13 @@ func TestGodepConfig_Convert(t *testing.T) {
 					},
 				},
 			},
-			projectRoot:    gps.ProjectRoot("github.com/sdboyer/deptest"),
-			wantLockCount:  1,
-			wantConstraint: "^1.0.0",
-			wantVersion:    "v1.0.0",
+			convertTestCase: &convertTestCase{
+
+				projectRoot:    gps.ProjectRoot("github.com/sdboyer/deptest"),
+				wantLockCount:  1,
+				wantConstraint: "^1.0.0",
+				wantVersion:    "v1.0.0",
+			},
 		},
 	}
 
@@ -130,62 +138,10 @@ func TestGodepConfig_Convert(t *testing.T) {
 			g := newGodepImporter(discardLogger, true, sm)
 			g.json = testCase.json
 
-			manifest, lock, err := g.convert(testCase.projectRoot)
+			manifest, lock, convertErr := g.convert(testCase.projectRoot)
+			err := validateConvertTestCase(testCase.convertTestCase, manifest, lock, convertErr)
 			if err != nil {
-				if testCase.wantConvertErr {
-					return
-				}
-
-				t.Fatal(err)
-			}
-
-			if len(lock.P) != testCase.wantLockCount {
-				t.Fatalf("Expected lock to have %d project(s), got %d",
-					testCase.wantLockCount,
-					len(lock.P))
-			}
-
-			d, ok := manifest.Constraints[testCase.projectRoot]
-			if !ok {
-				t.Fatalf("Expected the manifest to have a dependency for '%s' but got none",
-					testCase.projectRoot)
-			}
-
-			v := d.Constraint.String()
-			if v != testCase.wantConstraint {
-				t.Fatalf("Expected manifest constraint to be %s, got %s", testCase.wantConstraint, v)
-			}
-
-			p := lock.P[0]
-			if p.Ident().ProjectRoot != testCase.projectRoot {
-				t.Fatalf("Expected the lock to have a project for '%s' but got '%s'",
-					testCase.projectRoot,
-					p.Ident().ProjectRoot)
-			}
-
-			lv := p.Version()
-			lpv, ok := lv.(gps.PairedVersion)
-
-			if !ok {
-				if testCase.matchPairedVersion {
-					t.Fatalf("Expected locked version to be PairedVersion but got %T", lv)
-				}
-
-				return
-			}
-
-			ver := lpv.String()
-			if ver != testCase.wantVersion {
-				t.Fatalf("Expected locked version to be '%s', got %s", testCase.wantVersion, ver)
-			}
-
-			if testCase.wantRevision != "" {
-				rev := lpv.Revision()
-				if rev != testCase.wantRevision {
-					t.Fatalf("Expected locked revision to be '%s', got %s",
-						testCase.wantRevision,
-						rev)
-				}
+				t.Fatalf("%+v", err)
 			}
 		})
 	}

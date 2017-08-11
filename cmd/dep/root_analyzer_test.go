@@ -5,11 +5,13 @@
 package main
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/golang/dep"
 	"github.com/golang/dep/internal/gps"
 	"github.com/golang/dep/internal/test"
+	"github.com/pkg/errors"
 )
 
 func TestRootAnalyzer_Info(t *testing.T) {
@@ -150,4 +152,101 @@ func TestProjectExistsInLock(t *testing.T) {
 			}
 		})
 	}
+}
+
+// convertTestCase is a common set of validations applied to the result
+// of an importer converting from an external config format to dep's.
+type convertTestCase struct {
+	wantConvertErr      bool
+	projectRoot         gps.ProjectRoot
+	wantSourceRepo      string
+	wantConstraint      string
+	wantRevision        gps.Revision
+	wantVersion         string
+	wantLockCount       int
+	wantIgnoreCount     int
+	wantIgnoredPackages []string
+}
+
+// validateConvertTestCase returns an error if any of the importer's
+// conversion validations failed.
+func validateConvertTestCase(testCase *convertTestCase, manifest *dep.Manifest, lock *dep.Lock, convertErr error) error {
+	if convertErr != nil {
+		if testCase.wantConvertErr {
+			return nil
+		}
+
+		return convertErr
+	}
+	
+	// Ignored projects checks.
+	if len(manifest.Ignored) != testCase.wantIgnoreCount {
+		return errors.Errorf("Expected manifest to have %d ignored project(s), got %d",
+			testCase.wantIgnoreCount,
+			len(manifest.Ignored))
+	}
+
+	if !equalSlice(manifest.Ignored, testCase.wantIgnoredPackages) {
+		return errors.Errorf("Expected manifest to have ignore %s, got %s",
+			strings.Join(testCase.wantIgnoredPackages, ", "),
+			strings.Join(manifest.Ignored, ", "))
+	}
+
+	// Constraints checks below.
+	if testCase.wantConstraint != "" {
+		d, ok := manifest.Constraints[testCase.projectRoot]
+		if !ok {
+			return errors.Errorf("Expected the manifest to have a dependency for '%s' but got none",
+				testCase.projectRoot)
+		}
+
+		v := d.Constraint.String()
+		if v != testCase.wantConstraint {
+			return errors.Errorf("Expected manifest constraint to be %s, got %s", testCase.wantConstraint, v)
+		}
+	}
+
+	// Lock checks.
+	if lock != nil {
+		if len(lock.P) != testCase.wantLockCount {
+			return errors.Errorf("Expected lock to have %d project(s), got %d",
+				testCase.wantLockCount,
+				len(lock.P))
+		}
+
+		p := lock.P[0]
+
+		if p.Ident().ProjectRoot != testCase.projectRoot {
+			return errors.Errorf("Expected the lock to have a project for '%s' but got '%s'",
+				testCase.projectRoot,
+				p.Ident().ProjectRoot)
+		}
+
+		if p.Ident().Source != testCase.wantSourceRepo {
+			return errors.Errorf("Expected locked source to be %s, got '%s'", testCase.wantSourceRepo, p.Ident().Source)
+		}
+
+		if testCase.wantVersion != "" {
+			ver := p.Version().String()
+			if ver != testCase.wantVersion {
+				return errors.Errorf("Expected locked version to be '%s', got %s", testCase.wantVersion, ver)
+			}
+		}
+
+		if testCase.wantRevision != "" {
+			lv := p.Version()
+			lpv, ok := lv.(gps.PairedVersion)
+			if !ok {
+				return errors.Errorf("Expected locked version to be PairedVersion but got %T", lv)
+			}
+
+			rev := lpv.Revision()
+			if rev != testCase.wantRevision {
+				return errors.Errorf("Expected locked revision to be '%s', got %s",
+					testCase.wantRevision,
+					rev)
+			}
+		}
+	}
+	return nil
 }
