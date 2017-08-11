@@ -26,7 +26,9 @@ specified, use the current directory.
 
 When configuration for another dependency management tool is detected, it is
 imported into the initial manifest and lock. Use the -skip-tools flag to
-disable this behavior. The following external tools are supported: glide, godep.
+disable this behavior. The following external tools are supported:
+glide, godep, vndr.
+
 Any dependencies that are not constrained by external configuration use the
 GOPATH analysis below.
 
