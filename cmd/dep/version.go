@@ -12,9 +12,9 @@ import (
 )
 
 var (
-	version = "devel"
-	date    string
-	hash    string
+	version    = "devel"
+	buildDate  string
+	commitHash string
 )
 
 const versionHelp = `Show the dep version information`
@@ -39,7 +39,7 @@ func (cmd *versionCommand) Run(ctx *dep.Ctx, args []string) error {
  go version  : %s
  go compiler : %s
  platform    : %s/%s
-`, version, date, hash,
+`, version, buildDate, commitHash,
 		runtime.Version(), runtime.Compiler, runtime.GOOS, runtime.GOARCH)
 	return nil
 }
