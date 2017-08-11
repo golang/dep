@@ -11,12 +11,12 @@ Dep is a prototype dependency management tool. It requires Go 1.7 or newer to co
 `dep` is safe for production use. That means two things:
 
 * Any valid metadata file (`Gopkg.toml` and `Gopkg.lock`) will be readable and considered valid by any future version of `dep`.
+* The CLI UI is mostly stable. `dep init` and `dep ensure` are mostly set; `dep status` is likely to change a fair bit, and `dep prune` is [going to be absorbed into `dep ensure`](https://github.com/golang/dep/issues/944).
 * Generally speaking, it has comparable or fewer bugs than other tools out there.
 
 That said, keep in mind the following:
 
 * `dep` is still changing rapidly. If you need stability (e.g. for CI), it's best to rely on a released version, not tip.
-* [Some changes](https://github.com/golang/dep/pull/489) are pending to the CLI interface. Scripting on dep before they land is unwise.
 * `dep`'s exported API interface will continue to change in unpredictable, backwards-incompatible ways until we tag a v1.0.0 release.
 
 ## Context
@@ -44,7 +44,7 @@ $ brew install dep
 $ brew upgrade dep
 ```
 
-To start managing dependencies using dep, run the following from your project root directory:
+To start managing dependencies using dep, run the following from your project's root directory:
 
 ```sh
 $ dep init
@@ -63,10 +63,15 @@ This does the following:
 
 ## Usage
 
-There is one main subcommand you will use: `dep ensure`. `ensure` first makes
-sure `Gopkg.lock` is consistent with your `import`s and `Gopkg.toml`. If any
-changes are detected, it then populates `vendor/` with exactly what's described
-in `Gopkg.lock`.
+There is one main subcommand you will use: `dep ensure`. `ensure` first checks that `Gopkg.lock` is consistent with `Gopkg.toml` and the `import`s in your code. If any
+changes are detected, `dep`'s solver works out a new `Gopkg.lock`. Then, `dep` checks if the contents of `vendor/` are what `Gopkg.lock` (the new one if applicable, else the existing one) says it should be, and rewrites `vendor/` as needed to bring it into line.
+
+In essence, `dep ensure` [works in two phases to keep four buckets of state in sync](https://youtu.be/5LtMb090AZI?t=20m4s):
+
+<img width="463" alt="states-flow" src="https://user-images.githubusercontent.com/21599/29223886-22dd2578-7e96-11e7-8b51-3637b9ddc715.png">
+
+
+_Note: until we ship [vendor verification](https://github.com/golang/dep/issues/121), we can't efficiently perform the `Gopkg.lock` <-> `vendor/` comparison, so `dep ensure` unconditionally regenerates all of `vendor/` to be safe._
 
 `dep ensure` is safe to run early and often. See the help text for more detailed
 usage instructions.
@@ -91,12 +96,19 @@ matches the constraints from the manifest. If the dependency is missing from
 
 ### Adding a dependency
 
-1. `import` the package in your `*.go` source code file(s).
-1. Run the following command to update your `Gopkg.lock` and populate `vendor/` with the new dependency.
+Adding a project as a dependency has three essential steps:
 
-    ```sh
-    $ dep ensure
-    ```
+1. `import` a package from the project in one of your `*.go` source files
+2. Add a version constraint on the project to `Gopkg.toml` (Optional, but recommended)
+3. Run `dep ensure`
+
+`dep ensure -add` provides some CLI sugar to ease this process:
+
+```sh
+$ dep ensure -add github.com/some/project github.com/other/project/subpackage@v1.0.0
+```
+
+`dep ensure -add`'s behavior varies slightly depending on whether there are already rules in `Gopkg.toml` for the named project(s), as well as whether you already import packages from the named project(s). See `dep ensure -examples` for more sample combinations.
 
 ### Changing dependencies
 
@@ -107,7 +119,7 @@ If you want to:
 
 for one or more dependencies, do the following:
 
-1. Modify your `Gopkg.toml`.
+1. Manually edit your `Gopkg.toml`.
 1. Run
 
     ```sh
@@ -126,7 +138,7 @@ github.com/Masterminds/vcs          ^1.11.0        v1.11.1        3084677   3084
 github.com/armon/go-radix           *              branch master  4239b77   4239b77
 ```
 
-On top of that, if you have added new imports to your project or modified the manifest file without running `dep ensure` again, `dep status` will tell you there is a mismatch between the lock file and the current status of the project.
+On top of that, if you have added new imports to your project or modified `Gopkg.toml` without running `dep ensure` again, `dep status` will tell you there is a mismatch between `Gopkg.lock` and the current status of the project.
 
 ```sh
 $ dep status
@@ -142,22 +154,32 @@ As `dep status` suggests, run `dep ensure` to update your lockfile. Then run `de
 
 ### Updating dependencies
 
-(to the latest version allowed by the manifest)
+Updating brings the version of a dependency in `Gopkg.lock` and `vendor/` to the latest version allowed by the constraints in `Gopkg.toml`.
+
+You can update just a targeted subset of dependencies (recommended):
+
+```sh
+$ dep ensure -update github.com/some/project github.com/other/project
+$ dep ensure -update github.com/another/project
+```
+
+Or you can update all your dependencies at once:
 
 ```sh
 $ dep ensure -update
 ```
 
+"Latest" means different things depending on the type of constraint in use. If you're depending on a `branch`, `dep` will update to the latest tip of that branch. If you're depending on a `version` using [a semver range](#semantic-versioning), it will update to the latest version in that range.
+
 ### Removing dependencies
 
 1. Remove the `import`s and all usage from your code.
+1. Remove `[[constraint]]` rules from `Gopkg.toml` (if any).
 1. Run
 
     ```sh
     $ dep ensure
     ```
-
-1. Remove from `Gopkg.toml`, if it was in there.
 
 ### Testing changes to a dependency
 
