@@ -989,8 +989,8 @@ func (s *solver) getLockVersionIfValid(id ProjectIdentifier) (Version, error) {
 
 		if !found {
 			// No match found, which means we're going to be breaking the lock
+			// Still return the invalid version so that is included in the trace
 			s.b.breakLock()
-			return nil, nil
 		}
 	}
 
