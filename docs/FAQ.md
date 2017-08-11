@@ -32,8 +32,7 @@ Summarize the question and quote the reply, linking back to the original comment
 * [What semver version should I use?](#what-semver-version-should-i-use)
 * [Is it OK to make backwards-incompatible changes now?](#is-it-ok-to-make-backwards-incompatible-changes-now)
 * [My dependers don't use `dep` yet. What should I do?](#my-dependers-dont-use-dep-yet-what-should-i-do)
-
-___
+* [How do I configure a dependency that doesn't tag its releases?](#how-do-i-configure-a-dependency-that-doesnt-tag-its-releases)
 
 ## Concepts
 ### Does `dep` replace `go get`?
@@ -368,3 +367,7 @@ it can [cause
 problems](https://groups.google.com/d/msg/golang-nuts/AnMr9NL6dtc/UnyUUKcMCAAJ).
 If your dependers are using `dep`, this is not a concern, as `dep` takes care of
 stripping out nested `vendor` directories.
+
+## How do I configure a dependency that doesn't tag its releases?
+
+Add a constraint to `Gopkg.toml` that specifies `branch: "master"` (or whichever branch you need) in the `[[constraint]]` for that dependency. `dep ensure` will determine the current revision of your dependency's master branch, and place it in `Gopkg.lock` for you. See also: [What is the difference between Gopkg.toml and Gopkg.lock?](https://github.com/golang/dep/blob/master/FAQ.md#what-is-the-difference-between-gopkgtoml-the-manifest-and-gopkglock-the-lock)
