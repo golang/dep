@@ -18,8 +18,6 @@ import (
 	"github.com/pkg/errors"
 )
 
-const testGlideProjectRoot = "github.com/golang/notexist"
-
 var (
 	discardLogger = log.New(ioutil.Discard, "", 0)
 )
@@ -110,7 +108,7 @@ func TestGlideConfig_Convert(t *testing.T) {
 			yaml: glideYaml{
 				ExcludeDirs: []string{"samples"},
 			},
-			projectRoot:         testGlideProjectRoot,
+			projectRoot:         testProjectRoot,
 			wantIgnoreCount:     1,
 			wantIgnoredPackages: []string{"github.com/golang/notexist/samples"},
 		},
@@ -119,7 +117,7 @@ func TestGlideConfig_Convert(t *testing.T) {
 				Name:        "github.com/golang/mismatched-package-name",
 				ExcludeDirs: []string{"samples"},
 			},
-			projectRoot:         testGlideProjectRoot,
+			projectRoot:         testProjectRoot,
 			wantIgnoreCount:     1,
 			wantIgnoredPackages: []string{"github.com/golang/notexist/samples"},
 		},
@@ -127,7 +125,7 @@ func TestGlideConfig_Convert(t *testing.T) {
 			yaml: glideYaml{
 				Imports: []glidePackage{{Name: ""}},
 			},
-			projectRoot:    testGlideProjectRoot,
+			projectRoot:    testProjectRoot,
 			wantConvertErr: true,
 		},
 	}
@@ -243,10 +241,10 @@ func TestGlideConfig_Import(t *testing.T) {
 	h.Must(err)
 	defer sm.Release()
 
-	h.TempDir(filepath.Join("src", testGlideProjectRoot))
-	h.TempCopy(filepath.Join(testGlideProjectRoot, glideYamlName), "glide/glide.yaml")
-	h.TempCopy(filepath.Join(testGlideProjectRoot, glideLockName), "glide/glide.lock")
-	projectRoot := h.Path(testGlideProjectRoot)
+	h.TempDir(filepath.Join("src", testProjectRoot))
+	h.TempCopy(filepath.Join(testProjectRoot, glideYamlName), "glide/glide.yaml")
+	h.TempCopy(filepath.Join(testProjectRoot, glideLockName), "glide/glide.lock")
+	projectRoot := h.Path(testProjectRoot)
 
 	// Capture stderr so we can verify output
 	verboseOutput := &bytes.Buffer{}
@@ -257,7 +255,7 @@ func TestGlideConfig_Import(t *testing.T) {
 		t.Fatal("Expected the importer to detect the glide configuration files")
 	}
 
-	m, l, err := g.Import(projectRoot, testGlideProjectRoot)
+	m, l, err := g.Import(projectRoot, testProjectRoot)
 	h.Must(err)
 
 	if m == nil {
@@ -291,16 +289,16 @@ func TestGlideConfig_Import_MissingLockFile(t *testing.T) {
 	h.Must(err)
 	defer sm.Release()
 
-	h.TempDir(filepath.Join("src", testGlideProjectRoot))
-	h.TempCopy(filepath.Join(testGlideProjectRoot, glideYamlName), "glide/glide.yaml")
-	projectRoot := h.Path(testGlideProjectRoot)
+	h.TempDir(filepath.Join("src", testProjectRoot))
+	h.TempCopy(filepath.Join(testProjectRoot, glideYamlName), "glide/glide.yaml")
+	projectRoot := h.Path(testProjectRoot)
 
 	g := newGlideImporter(ctx.Err, true, sm)
 	if !g.HasDepMetadata(projectRoot) {
 		t.Fatal("The glide importer should gracefully handle when only glide.yaml is present")
 	}
 
-	m, l, err := g.Import(projectRoot, testGlideProjectRoot)
+	m, l, err := g.Import(projectRoot, testProjectRoot)
 	h.Must(err)
 
 	if m == nil {
@@ -340,7 +338,7 @@ func TestGlideConfig_Convert_WarnsForUnusedFields(t *testing.T) {
 				Imports: []glidePackage{pkg},
 			}
 
-			_, _, err = g.convert(testGlideProjectRoot)
+			_, _, err = g.convert(testProjectRoot)
 			if err != nil {
 				t.Fatal(err)
 			}
