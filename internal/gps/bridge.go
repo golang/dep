@@ -195,6 +195,9 @@ func (b *bridge) breakLock() {
 	// No real conceivable circumstance in which multiple calls are made to
 	// this, but being that this is the entrance point to a bunch of async work,
 	// protect it with an atomic CAS in case things change in the future.
+	//
+	// We avoid using a sync.Once here, as there's no reason for other callers
+	// to block until completion.
 	if !atomic.CompareAndSwapInt32(&b.lockbroken, 0, 1) {
 		return
 	}
