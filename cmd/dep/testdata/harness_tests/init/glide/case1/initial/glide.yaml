@@ -16,5 +16,6 @@ import:
   version: v1.0.0
 - package: github.com/sdboyer/deptestdos
   version: v2.0.0
+- package: github.com/carolynvs/deptest-subpkg/subby
 testImport:
 - package: github.com/golang/lint

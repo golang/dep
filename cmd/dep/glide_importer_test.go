@@ -375,3 +375,50 @@ func equalSlice(a, b []string) bool {
 
 	return true
 }
+
+func TestGlideConfig_Convert_ConsolidateRootPackages(t *testing.T) {
+	h := test.NewHelper(t)
+	defer h.Cleanup()
+
+	ctx := newTestContext(h)
+	sm, err := ctx.SourceManager()
+	h.Must(err)
+	defer sm.Release()
+
+	g := newGlideImporter(ctx.Err, true, sm)
+	g.yaml = glideYaml{
+		Imports: []glidePackage{
+			{Name: "github.com/carolynvs/deptest-subpkg/subby"},
+			{Name: "github.com/carolynvs/deptest-subpkg"},
+		},
+	}
+	g.lock = &glideLock{
+		Imports: []glideLockedPackage{
+			{Name: "github.com/carolynvs/deptest-subpkg/subby"},
+			{Name: "github.com/carolynvs/deptest-subpkg"},
+		},
+	}
+
+	manifest, lock, err := g.convert(testGlideProjectRoot)
+	h.Must(err)
+
+	gotMLen := len(manifest.Constraints)
+	if gotMLen != 1 {
+		t.Fatalf("Expected manifest to contain 1 constraint, got %d", gotMLen)
+	}
+
+	wantRoot := gps.ProjectRoot("github.com/carolynvs/deptest-subpkg")
+	if _, has := manifest.Constraints[wantRoot]; !has {
+		t.Fatalf("Expected manifest to contain a constraint for %s, got %v", wantRoot, manifest.Constraints)
+	}
+
+	gotLLen := len(lock.P)
+	if gotLLen != 1 {
+		t.Fatalf("Expected lock to contain 1 project, got %d", gotLLen)
+	}
+
+	gotRoot := lock.P[0].Ident().ProjectRoot
+	if gotRoot != wantRoot {
+		t.Fatalf("Expected lock to contain a project for %s, got %v", wantRoot, gotRoot)
+	}
+}

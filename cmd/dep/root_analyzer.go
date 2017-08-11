@@ -211,3 +211,15 @@ func lookupVersionForLockedProject(pi gps.ProjectIdentifier, c gps.Constraint, r
 	// Give up and lock only to a revision
 	return rev, nil
 }
+
+// projectExistsInLock checks if the given project already exists in
+// a lockfile.
+func projectExistsInLock(l *dep.Lock, pr gps.ProjectRoot) bool {
+	for _, lp := range l.P {
+		if pr == lp.Ident().ProjectRoot {
+			return true
+		}
+	}
+
+	return false
+}
