@@ -145,18 +145,16 @@ func (g *glideImporter) convert(pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock, e
 		Constraints: make(gps.ProjectConstraints),
 	}
 
-	for _, pkg := range g.yaml.Imports {
+	for _, pkg := range append(g.yaml.Imports, g.yaml.TestImports...) {
 		pc, err := g.buildProjectConstraint(pkg)
 		if err != nil {
 			return nil, nil, err
 		}
-		manifest.Constraints[pc.Ident.ProjectRoot] = gps.ProjectProperties{Source: pc.Ident.Source, Constraint: pc.Constraint}
-	}
-	for _, pkg := range g.yaml.TestImports {
-		pc, err := g.buildProjectConstraint(pkg)
-		if err != nil {
-			return nil, nil, err
+
+		if _, isDup := manifest.Constraints[pc.Ident.ProjectRoot]; isDup {
+			continue
 		}
+
 		manifest.Constraints[pc.Ident.ProjectRoot] = gps.ProjectProperties{Source: pc.Ident.Source, Constraint: pc.Constraint}
 	}
 
@@ -177,12 +175,16 @@ func (g *glideImporter) convert(pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock, e
 	if g.lock != nil {
 		lock = &dep.Lock{}
 
-		for _, pkg := range g.lock.Imports {
-			lp := g.buildLockedProject(pkg, manifest)
-			lock.P = append(lock.P, lp)
-		}
-		for _, pkg := range g.lock.TestImports {
-			lp := g.buildLockedProject(pkg, manifest)
+		for _, pkg := range append(g.lock.Imports, g.lock.TestImports...) {
+			lp, err := g.buildLockedProject(pkg, manifest)
+			if err != nil {
+				return nil, nil, err
+			}
+
+			if projectExistsInLock(lock, lp.Ident().ProjectRoot) {
+				continue
+			}
+
 			lock.P = append(lock.P, lp)
 		}
 	}
@@ -191,8 +193,17 @@ func (g *glideImporter) convert(pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock, e
 }
 
 func (g *glideImporter) buildProjectConstraint(pkg glidePackage) (pc gps.ProjectConstraint, err error) {
-	if pkg.Name == "" {
-		err = errors.New("Invalid glide configuration, package name is required")
+	pr, err := g.sm.DeduceProjectRoot(pkg.Name)
+	if err != nil {
+		return
+	}
+
+	pc.Ident = gps.ProjectIdentifier{
+		ProjectRoot: pr,
+		Source:      pkg.Repository,
+	}
+	pc.Constraint, err = g.sm.InferConstraint(pkg.Reference, pc.Ident)
+	if err != nil {
 		return
 	}
 
@@ -205,21 +216,20 @@ func (g *glideImporter) buildProjectConstraint(pkg glidePackage) (pc gps.Project
 		}
 	}
 
-	pc.Ident = gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot(pkg.Name), Source: pkg.Repository}
-	pc.Constraint, err = g.sm.InferConstraint(pkg.Reference, pc.Ident)
-	if err != nil {
-		return
-	}
-
 	f := fb.NewConstraintFeedback(pc, fb.DepTypeImported)
 	f.LogFeedback(g.logger)
 
 	return
 }
 
-func (g *glideImporter) buildLockedProject(pkg glideLockedPackage, manifest *dep.Manifest) gps.LockedProject {
+func (g *glideImporter) buildLockedProject(pkg glideLockedPackage, manifest *dep.Manifest) (lp gps.LockedProject, err error) {
+	pr, err := g.sm.DeduceProjectRoot(pkg.Name)
+	if err != nil {
+		return
+	}
+
 	pi := gps.ProjectIdentifier{
-		ProjectRoot: gps.ProjectRoot(pkg.Name),
+		ProjectRoot: pr,
 		Source:      pkg.Repository,
 	}
 	revision := gps.Revision(pkg.Reference)
@@ -231,10 +241,10 @@ func (g *glideImporter) buildLockedProject(pkg glideLockedPackage, manifest *dep
 		g.logger.Println(err.Error())
 	}
 
-	lp := gps.NewLockedProject(pi, version, nil)
+	lp = gps.NewLockedProject(pi, version, nil)
 
 	f := fb.NewLockedProjectFeedback(lp, fb.DepTypeImported)
 	f.LogFeedback(g.logger)
 
-	return lp
+	return
 }
