@@ -187,15 +187,3 @@ func (g *godepImporter) buildLockedProject(pkg godepPackage, manifest *dep.Manif
 
 	return lp
 }
-
-// projectExistsInLock checks if the given import path already existing in
-// locked projects.
-func projectExistsInLock(l *dep.Lock, ip string) bool {
-	for _, lp := range l.P {
-		if ip == string(lp.Ident().ProjectRoot) {
-			return true
-		}
-	}
-
-	return false
-}

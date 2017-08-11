@@ -73,6 +73,7 @@ func (a *rootAnalyzer) importManifestAndLock(dir string, pr gps.ProjectRoot, sup
 	importers := []importer{
 		newGlideImporter(logger, a.ctx.Verbose, a.sm),
 		newGodepImporter(logger, a.ctx.Verbose, a.sm),
+		newGbImporter(logger, a.ctx.Verbose, a.sm),
 	}
 
 	for _, i := range importers {
@@ -210,4 +211,16 @@ func lookupVersionForLockedProject(pi gps.ProjectIdentifier, c gps.Constraint, r
 
 	// Give up and lock only to a revision
 	return rev, nil
+}
+
+// projectExistsInLock checks if the given import path already existing in
+// locked projects.
+func projectExistsInLock(l *dep.Lock, ip string) bool {
+	for _, lp := range l.P {
+		if ip == string(lp.Ident().ProjectRoot) {
+			return true
+		}
+	}
+
+	return false
 }

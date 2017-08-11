@@ -1,0 +1,10 @@
+Detected gb manifest file...
+Converting from gb manifest...
+  Using master as initial constraint for imported dep github.com/sdboyer/deptestdos
+  Trying v2.0.0 (5c60720) as initial lock for imported dep github.com/sdboyer/deptestdos
+  Using ^1.0.0 as initial constraint for imported dep github.com/sdboyer/deptest
+  Trying v1.0.0 (ff2948a) as initial lock for imported dep github.com/sdboyer/deptest
+  Using master as initial constraint for imported dep github.com/carolynvs/deptest
+  Trying v2 (4982dd1) as initial lock for imported dep github.com/carolynvs/deptest
+  Using master as initial constraint for imported dep github.com/carolynvs/deptest-subpkg
+  Trying master (b90e5f3) as initial lock for imported dep github.com/carolynvs/deptest-subpkg
