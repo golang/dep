@@ -397,7 +397,7 @@ func TestGlideConfig_Convert_ConsolidateRootPackages(t *testing.T) {
 		},
 	}
 
-	manifest, lock, err := g.convert(testGlideProjectRoot)
+	manifest, lock, err := g.convert(testProjectRoot)
 	h.Must(err)
 
 	gotMLen := len(manifest.Constraints)
