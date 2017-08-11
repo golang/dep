@@ -171,14 +171,17 @@ type convertTestCase struct {
 // validateConvertTestCase returns an error if any of the importer's
 // conversion validations failed.
 func validateConvertTestCase(testCase *convertTestCase, manifest *dep.Manifest, lock *dep.Lock, convertErr error) error {
-	if convertErr != nil {
-		if testCase.wantConvertErr {
-			return nil
+	if testCase.wantConvertErr {
+		if convertErr == nil {
+			return errors.New("Expected the conversion to fail, but it did not return an error")
 		}
-
-		return convertErr
+		return nil
 	}
-	
+
+	if convertErr != nil {
+		return errors.Wrap(convertErr, "Expected the conversion to pass, but it returned an error")
+	}
+
 	// Ignored projects checks.
 	if len(manifest.Ignored) != testCase.wantIgnoreCount {
 		return errors.Errorf("Expected manifest to have %d ignored project(s), got %d",

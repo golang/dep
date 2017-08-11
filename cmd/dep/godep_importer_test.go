@@ -141,7 +141,7 @@ func TestGodepConfig_Convert(t *testing.T) {
 			manifest, lock, convertErr := g.convert(testCase.projectRoot)
 			err := validateConvertTestCase(testCase.convertTestCase, manifest, lock, convertErr)
 			if err != nil {
-				t.Fatalf("%+v", err)
+				t.Fatalf("%#v", err)
 			}
 		})
 	}
