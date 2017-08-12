@@ -95,6 +95,9 @@ func (out *tableOutput) BasicLine(bs *BasicStatus) {
 	} else {
 		constraint = bs.Constraint.String()
 	}
+	if bs.hasOverride {
+		constraint += " (override)"
+	}
 	fmt.Fprintf(out.w,
 		"%s\t%s\t%s\t%s\t%s\t%d\t\n",
 		bs.ProjectRoot,
@@ -250,6 +253,7 @@ type BasicStatus struct {
 	Revision     gps.Revision
 	Latest       gps.Version
 	PackageCount int
+	hasOverride  bool
 }
 
 // MissingStatus contains information about all the missing packages in a project.
@@ -338,7 +342,7 @@ func runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceMana
 			// Check if the manifest has an override for this project. If so,
 			// set that as the constraint.
 			if pp, has := p.Manifest.Ovr[proj.Ident().ProjectRoot]; has && pp.Constraint != nil {
-				// TODO note somehow that it's overridden
+				bs.hasOverride = true
 				bs.Constraint = pp.Constraint
 			} else {
 				bs.Constraint = gps.Any()
