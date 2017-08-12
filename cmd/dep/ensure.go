@@ -69,7 +69,8 @@ dep ensure -vendor-only
 dep ensure -add github.com/pkg/foo github.com/pkg/foo/bar
 
     Introduce one or more dependencies, at their newest version, ensuring that
-    specific packages are present in Gopkg.lock and vendor/.
+    specific packages are present in Gopkg.lock and vendor/. Also, append a
+    corresponding constraint to Gopkg.toml.
 
     Note: packages introduced in this way will disappear on the next "dep
     ensure" if an import statement is not added first.
