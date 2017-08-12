@@ -382,7 +382,7 @@ func (sm *SourceMgr) GetManifestAndLock(id ProjectIdentifier, v Version, an Proj
 		return nil, nil, smIsReleased{}
 	}
 
-	srcg, err := sm.srcCoord.getSourceGatewayFor(context.TODO(), id)
+	srcg, _, err := sm.srcCoord.getSourceGatewayFor(context.TODO(), id)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -397,12 +397,13 @@ func (sm *SourceMgr) ListPackages(id ProjectIdentifier, v Version) (pkgtree.Pack
 		return pkgtree.PackageTree{}, smIsReleased{}
 	}
 
-	srcg, err := sm.srcCoord.getSourceGatewayFor(context.TODO(), id)
+	srcg, postfix, err := sm.srcCoord.getSourceGatewayFor(context.TODO(), id)
 	if err != nil {
 		return pkgtree.PackageTree{}, err
 	}
 
-	return srcg.listPackages(context.TODO(), id.ProjectRoot, v)
+	ret, err := srcg.listPackages(context.TODO(), postfix, id.ProjectRoot, v)
+	return ret, err
 }
 
 // ListVersions retrieves a list of the available versions for a given
@@ -422,7 +423,7 @@ func (sm *SourceMgr) ListVersions(id ProjectIdentifier) ([]PairedVersion, error)
 		return nil, smIsReleased{}
 	}
 
-	srcg, err := sm.srcCoord.getSourceGatewayFor(context.TODO(), id)
+	srcg, _, err := sm.srcCoord.getSourceGatewayFor(context.TODO(), id)
 	if err != nil {
 		// TODO(sdboyer) More-er proper-er errors
 		return nil, err
@@ -438,7 +439,7 @@ func (sm *SourceMgr) RevisionPresentIn(id ProjectIdentifier, r Revision) (bool, 
 		return false, smIsReleased{}
 	}
 
-	srcg, err := sm.srcCoord.getSourceGatewayFor(context.TODO(), id)
+	srcg, _, err := sm.srcCoord.getSourceGatewayFor(context.TODO(), id)
 	if err != nil {
 		// TODO(sdboyer) More-er proper-er errors
 		return false, err
@@ -454,7 +455,7 @@ func (sm *SourceMgr) SourceExists(id ProjectIdentifier) (bool, error) {
 		return false, smIsReleased{}
 	}
 
-	srcg, err := sm.srcCoord.getSourceGatewayFor(context.TODO(), id)
+	srcg, _, err := sm.srcCoord.getSourceGatewayFor(context.TODO(), id)
 	if err != nil {
 		return false, err
 	}
@@ -472,7 +473,7 @@ func (sm *SourceMgr) SyncSourceFor(id ProjectIdentifier) error {
 		return smIsReleased{}
 	}
 
-	srcg, err := sm.srcCoord.getSourceGatewayFor(context.TODO(), id)
+	srcg, _, err := sm.srcCoord.getSourceGatewayFor(context.TODO(), id)
 	if err != nil {
 		return err
 	}
@@ -487,7 +488,7 @@ func (sm *SourceMgr) ExportProject(id ProjectIdentifier, v Version, to string) e
 		return smIsReleased{}
 	}
 
-	srcg, err := sm.srcCoord.getSourceGatewayFor(context.TODO(), id)
+	srcg, _, err := sm.srcCoord.getSourceGatewayFor(context.TODO(), id)
 	if err != nil {
 		return err
 	}

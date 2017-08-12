@@ -40,7 +40,7 @@ func testSourceGateway(t *testing.T) {
 			sc := newSourceCoordinator(superv, newDeductionCoordinator(superv), cachedir)
 
 			id := mkPI("github.com/sdboyer/deptest")
-			sg, err := sc.getSourceGatewayFor(ctx, id)
+			sg, _, err := sc.getSourceGatewayFor(ctx, id)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -123,7 +123,7 @@ func testSourceGateway(t *testing.T) {
 				t.Fatalf("wanted nonexistent err when passing bad version, got: %s", err)
 			}
 
-			_, err = sg.listPackages(ctx, ProjectRoot("github.com/sdboyer/deptest"), badver)
+			_, err = sg.listPackages(ctx, "", ProjectRoot("github.com/sdboyer/deptest"), badver)
 			if err == nil {
 				t.Fatal("wanted err on nonexistent version")
 			} else if err.Error() != wanterr.Error() {
@@ -150,7 +150,7 @@ func testSourceGateway(t *testing.T) {
 				},
 			}
 
-			ptree, err := sg.listPackages(ctx, ProjectRoot("github.com/sdboyer/deptest"), Revision("ff2948a2ac8f538c4ecd55962e919d1e13e74baf"))
+			ptree, err := sg.listPackages(ctx, "", ProjectRoot("github.com/sdboyer/deptest"), Revision("ff2948a2ac8f538c4ecd55962e919d1e13e74baf"))
 			if err != nil {
 				t.Fatalf("unexpected err when getting package tree with known rev: %s", err)
 			}
@@ -158,7 +158,7 @@ func testSourceGateway(t *testing.T) {
 				t.Fatalf("got incorrect PackageTree:\n\t(GOT): %#v\n\t(WNT): %#v", ptree, wantptree)
 			}
 
-			ptree, err = sg.listPackages(ctx, ProjectRoot("github.com/sdboyer/deptest"), NewVersion("v1.0.0"))
+			ptree, err = sg.listPackages(ctx, "", ProjectRoot("github.com/sdboyer/deptest"), NewVersion("v1.0.0"))
 			if err != nil {
 				t.Fatalf("unexpected err when getting package tree with unpaired good version: %s", err)
 			}

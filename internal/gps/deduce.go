@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/url"
 	"path"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -587,7 +588,7 @@ func (dc *deductionCoordinator) deduceRootPath(ctx context.Context, path string)
 	if has && isPathPrefixOrEqual(prefix, path) {
 		switch d := data.(type) {
 		case maybeSource:
-			return pathDeduction{root: prefix, mb: d}, nil
+			return pathDeduction{root: prefix, postfix: pathPostfix(path, prefix), mb: d}, nil
 		case *httpMetadataDeducer:
 			// Multiple calls have come in for a similar path shape during
 			// the window in which the HTTP request to retrieve go get
@@ -643,12 +644,19 @@ func (dc *deductionCoordinator) deduceRootPath(ctx context.Context, path string)
 	return hmd.deduce(ctx, path)
 }
 
+// pathPostfix removes the prefix from s (including the path seperator.
+func pathPostfix(s, prefix string) string {
+	return strings.TrimLeft(strings.TrimPrefix(s, prefix), string([]rune{filepath.Separator}))
+}
+
 // pathDeduction represents the results of a successful import path deduction -
 // a root path, plus a maybeSource that can be used to attempt to connect to
-// the source.
+// the source. The source corresponds to the root path. If a sub-path of root has
+// been given for deduction, the root+"/"+postfix is the original input path.
 type pathDeduction struct {
-	root string
-	mb   maybeSource
+	root    string
+	postfix string
+	mb      maybeSource
 }
 
 var errNoKnownPathMatch = errors.New("no known path match")
@@ -671,8 +679,9 @@ func (dc *deductionCoordinator) deduceKnownPaths(path string) (pathDeduction, er
 		}
 
 		return pathDeduction{
-			root: root,
-			mb:   mb,
+			root:    root,
+			postfix: pathPostfix(path, root),
+			mb:      mb,
 		}, nil
 	}
 
@@ -685,8 +694,9 @@ func (dc *deductionCoordinator) deduceKnownPaths(path string) (pathDeduction, er
 		}
 
 		return pathDeduction{
-			root: root,
-			mb:   mb,
+			root:    root,
+			postfix: pathPostfix(path, root),
+			mb:      mb,
 		}, nil
 	}
 
@@ -729,6 +739,7 @@ func (hmd *httpMetadataDeducer) deduce(ctx context.Context, path string) (pathDe
 			return
 		}
 		pd.root = root
+		pd.postfix = pathPostfix(path, root)
 
 		// If we got something back at all, then it supersedes the actual input for
 		// the real URL to hit

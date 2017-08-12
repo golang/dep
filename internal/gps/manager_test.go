@@ -354,14 +354,14 @@ func TestGetSources(t *testing.T) {
 			t.Run(lpi.normalizedSource(), func(t *testing.T) {
 				t.Parallel()
 
-				srcg, err := sm.srcCoord.getSourceGatewayFor(ctx, lpi)
+				srcg, _, err := sm.srcCoord.getSourceGatewayFor(ctx, lpi)
 				if err != nil {
 					t.Errorf("unexpected error setting up source: %s", err)
 					return
 				}
 
 				// Re-get the same, make sure they are the same
-				srcg2, err := sm.srcCoord.getSourceGatewayFor(ctx, lpi)
+				srcg2, _, err := sm.srcCoord.getSourceGatewayFor(ctx, lpi)
 				if err != nil {
 					t.Errorf("unexpected error re-getting source: %s", err)
 				} else if srcg != srcg2 {
@@ -370,7 +370,7 @@ func TestGetSources(t *testing.T) {
 
 				// All of them _should_ select https, so this should work
 				lpi.Source = "https://" + lpi.Source
-				srcg3, err := sm.srcCoord.getSourceGatewayFor(ctx, lpi)
+				srcg3, _, err := sm.srcCoord.getSourceGatewayFor(ctx, lpi)
 				if err != nil {
 					t.Errorf("unexpected error getting explicit https source: %s", err)
 				} else if srcg != srcg3 {
@@ -379,7 +379,7 @@ func TestGetSources(t *testing.T) {
 
 				// Now put in http, and they should differ
 				lpi.Source = "http://" + string(lpi.ProjectRoot)
-				srcg4, err := sm.srcCoord.getSourceGatewayFor(ctx, lpi)
+				srcg4, _, err := sm.srcCoord.getSourceGatewayFor(ctx, lpi)
 				if err != nil {
 					t.Errorf("unexpected error getting explicit http source: %s", err)
 				} else if srcg == srcg4 {

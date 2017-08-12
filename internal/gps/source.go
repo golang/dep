@@ -8,6 +8,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"path/filepath"
+	"strings"
 	"sync"
 
 	"github.com/golang/dep/internal/gps/pkgtree"
@@ -62,9 +64,9 @@ func newSourceCoordinator(superv *supervisor, deducer deducer, cachedir string) 
 	}
 }
 
-func (sc *sourceCoordinator) getSourceGatewayFor(ctx context.Context, id ProjectIdentifier) (*sourceGateway, error) {
+func (sc *sourceCoordinator) getSourceGatewayFor(ctx context.Context, id ProjectIdentifier) (*sourceGateway, string, error) {
 	if sc.supervisor.getLifetimeContext().Err() != nil {
-		return nil, errors.New("sourceCoordinator has been terminated")
+		return nil, "", errors.New("sourceCoordinator has been terminated")
 	}
 
 	normalizedName := id.normalizedSource()
@@ -74,7 +76,7 @@ func (sc *sourceCoordinator) getSourceGatewayFor(ctx context.Context, id Project
 		srcGate, has := sc.srcs[url]
 		sc.srcmut.RUnlock()
 		if has {
-			return srcGate, nil
+			return srcGate, "", nil
 		}
 		panic(fmt.Sprintf("%q was URL for %q in nameToURL, but no corresponding srcGate in srcs map", url, normalizedName))
 	}
@@ -92,7 +94,8 @@ func (sc *sourceCoordinator) getSourceGatewayFor(ctx context.Context, id Project
 		}
 		sc.protoSrcs[normalizedName] = append(chans, rc)
 		sc.psrcmut.Unlock()
-		return rc.awaitReturn()
+		sg, err := rc.awaitReturn()
+		return sg, "", err
 	}
 
 	sc.protoSrcs[normalizedName] = []srcReturnChans{}
@@ -121,7 +124,7 @@ func (sc *sourceCoordinator) getSourceGatewayFor(ctx context.Context, id Project
 		// As in the deducer, don't cache errors so that externally-driven retry
 		// strategies can be constructed.
 		doReturn(nil, err)
-		return nil, err
+		return nil, "", err
 	}
 
 	// It'd be quite the feat - but not impossible - for a gateway
@@ -135,7 +138,7 @@ func (sc *sourceCoordinator) getSourceGatewayFor(ctx context.Context, id Project
 		if srcGate, has := sc.srcs[url]; has {
 			sc.srcmut.RUnlock()
 			doReturn(srcGate, nil)
-			return srcGate, nil
+			return srcGate, "", nil
 		}
 		panic(fmt.Sprintf("%q was URL for %q in nameToURL, but no corresponding srcGate in srcs map", url, normalizedName))
 	}
@@ -156,7 +159,7 @@ func (sc *sourceCoordinator) getSourceGatewayFor(ctx context.Context, id Project
 	url, err := srcGate.sourceURL(ctx)
 	if err != nil {
 		doReturn(nil, err)
-		return nil, err
+		return nil, "", err
 	}
 
 	// We know we have a working srcGateway at this point, and need to
@@ -164,17 +167,18 @@ func (sc *sourceCoordinator) getSourceGatewayFor(ctx context.Context, id Project
 	sc.srcmut.Lock()
 	defer sc.srcmut.Unlock()
 	// Record the name -> URL mapping, even if it's a self-mapping.
-	sc.nameToURL[normalizedName] = url
+	name := strings.TrimRight(strings.TrimSuffix(normalizedName, pd.postfix), string([]rune{filepath.Separator}))
+	sc.nameToURL[name] = url
 
 	if sa, has := sc.srcs[url]; has {
 		// URL already had an entry in the main map; use that as the result.
 		doReturn(sa, nil)
-		return sa, nil
+		return sa, pd.postfix, nil
 	}
 
 	sc.srcs[url] = srcGate
 	doReturn(srcGate, nil)
-	return srcGate, nil
+	return srcGate, pd.postfix, nil
 }
 
 // sourceGateways manage all incoming calls for data from sources, serializing
@@ -322,7 +326,7 @@ func (sg *sourceGateway) getManifestAndLock(ctx context.Context, pr ProjectRoot,
 
 // FIXME ProjectRoot input either needs to parameterize the cache, or be
 // incorporated on the fly on egress...?
-func (sg *sourceGateway) listPackages(ctx context.Context, pr ProjectRoot, v Version) (pkgtree.PackageTree, error) {
+func (sg *sourceGateway) listPackages(ctx context.Context, sourceRoot string, pr ProjectRoot, v Version) (pkgtree.PackageTree, error) {
 	sg.mu.Lock()
 	defer sg.mu.Unlock()
 
@@ -343,7 +347,7 @@ func (sg *sourceGateway) listPackages(ctx context.Context, pr ProjectRoot, v Ver
 
 	label := fmt.Sprintf("%s:%s", pr, sg.src.upstreamURL())
 	err = sg.suprvsr.do(ctx, label, ctListPackages, func(ctx context.Context) error {
-		ptree, err = sg.src.listPackages(ctx, pr, r)
+		ptree, err = sg.src.listPackages(ctx, sourceRoot, pr, r)
 		return err
 	})
 
@@ -362,7 +366,7 @@ func (sg *sourceGateway) listPackages(ctx context.Context, pr ProjectRoot, v Ver
 		}
 
 		err = sg.suprvsr.do(ctx, label, ctGetManifestAndLock, func(ctx context.Context) error {
-			ptree, err = sg.src.listPackages(ctx, pr, r)
+			ptree, err = sg.src.listPackages(ctx, sourceRoot, pr, r)
 			return err
 		})
 	}
@@ -548,7 +552,7 @@ type source interface {
 	updateLocal(context.Context) error
 	listVersions(context.Context) ([]PairedVersion, error)
 	getManifestAndLock(context.Context, ProjectRoot, Revision, ProjectAnalyzer) (Manifest, Lock, error)
-	listPackages(context.Context, ProjectRoot, Revision) (pkgtree.PackageTree, error)
+	listPackages(context.Context, string, ProjectRoot, Revision) (pkgtree.PackageTree, error)
 	revisionPresentIn(Revision) (bool, error)
 	exportRevisionTo(context.Context, Revision, string) error
 	sourceType() string
