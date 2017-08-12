@@ -37,11 +37,7 @@ That said, keep in mind the following:
 
 ## Setup
 
-Get the tool via
-
-```sh
-$ go get -u github.com/golang/dep/cmd/dep
-```
+Grab the latest binary from the [releases](https://github.com/golang/dep/releases) page.
 
 On macOS you can install or upgrade to the latest released version with Homebrew:
 
