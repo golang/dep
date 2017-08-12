@@ -172,8 +172,12 @@ func (cmd *ensureCommand) Run(ctx *dep.Ctx, args []string) error {
 		return errors.Wrap(err, "ensure ListPackage for project")
 	}
 
-	if err := checkErrors(params.RootPackageTree.Packages); err != nil {
-		return err
+	if fatal, err := checkErrors(params.RootPackageTree.Packages); err != nil {
+		if fatal {
+			return err
+		} else if ctx.Verbose {
+			ctx.Out.Println(err)
+		}
 	}
 
 	if cmd.add {
@@ -719,10 +723,10 @@ func getProjectConstraint(arg string, sm gps.SourceManager) (gps.ProjectConstrai
 	return gps.ProjectConstraint{Ident: pi, Constraint: c}, arg, nil
 }
 
-func checkErrors(m map[string]pkgtree.PackageOrErr) error {
+func checkErrors(m map[string]pkgtree.PackageOrErr) (fatal bool, err error) {
 	var (
-		buildErrors []string
-		noGoErrors  int
+		noGoErrors    int
+		pkgtreeErrors = make(pkgtreeErrs, 0, len(m))
 	)
 
 	for _, poe := range m {
@@ -731,18 +735,42 @@ func checkErrors(m map[string]pkgtree.PackageOrErr) error {
 			case *build.NoGoError:
 				noGoErrors++
 			default:
-				buildErrors = append(buildErrors, poe.Err.Error())
+				pkgtreeErrors = append(pkgtreeErrors, poe.Err)
 			}
 		}
 	}
 
+	// If pkgtree was empty or all dirs lacked any Go code, return an error.
 	if len(m) == 0 || len(m) == noGoErrors {
-		return errors.New("all dirs lacked any go code")
+		return true, errors.New("no dirs contained any Go code")
 	}
 
-	if len(buildErrors) > 0 {
-		return errors.Errorf("Found %d errors:\n\n%s", len(buildErrors), strings.Join(buildErrors, "\n"))
+	// If all dirs contained build errors, return an error.
+	if len(m) == len(pkgtreeErrors) {
+		return true, errors.New("all dirs contained build errors")
 	}
 
-	return nil
+	// If all directories either had no Go files or caused a build error, return an error.
+	if len(m) == len(pkgtreeErrors)+noGoErrors {
+		return true, pkgtreeErrors
+	}
+
+	// If m contained some errors, return a warning with those errors.
+	if len(pkgtreeErrors) > 0 {
+		return false, pkgtreeErrors
+	}
+
+	return false, nil
+}
+
+type pkgtreeErrs []error
+
+func (e pkgtreeErrs) Error() string {
+	errs := make([]string, 0, len(e))
+
+	for _, err := range e {
+		errs = append(errs, err.Error())
+	}
+
+	return fmt.Sprintf("found %d errors in the package tree:\n%s", len(e), strings.Join(errs, "\n"))
 }
