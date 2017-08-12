@@ -7,6 +7,7 @@ package main
 import (
 	"bytes"
 	"flag"
+	"fmt"
 	"go/build"
 	"os"
 	"path/filepath"
@@ -585,13 +586,28 @@ func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm
 			reqlist = append(reqlist, path)
 		}
 
-		if !gps.IsAny(instr.constraint) || instr.id.Source != "" {
-			appender.Constraints[pr] = gps.ProjectProperties{
-				Source:     instr.id.Source,
-				Constraint: instr.constraint,
+		if instr.typ&isInManifest == 0 {
+			var pp gps.ProjectProperties
+			var found bool
+			for _, proj := range solution.Projects() {
+				// We compare just ProjectRoot instead of the whole
+				// ProjectIdentifier here because an empty source on the input side
+				// could have been converted into a source by the solver.
+				if proj.Ident().ProjectRoot == pr {
+					found = true
+					pp = getProjectPropertiesFromVersion(proj.Version())
+					break
+				}
 			}
-			//} else {
-			// TODO(sdboyer) hoist a constraint into the manifest from the lock
+			if !found {
+				panic(fmt.Sprintf("unreachable: solution did not contain -add argument %s, but solver did not fail", pr))
+			}
+			pp.Source = instr.id.Source
+
+			if !gps.IsAny(instr.constraint) {
+				pp.Constraint = instr.constraint
+			}
+			appender.Constraints[pr] = pp
 		}
 	}
 
