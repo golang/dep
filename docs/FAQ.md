@@ -180,6 +180,7 @@ So, given a slice of the following versions:
 - Semver tags: `v1.0.0` `v1.1.0` `v1.1.0-alpha1`
 - Non-semver tags: `footag`
 - Revision: `f6e74e8d`
+
 Sorting for upgrade will result in the following slice.
 
 `[v1.1.0 v1.0.0 v1.1.0-alpha1 footag devel master f6e74e8d]`
