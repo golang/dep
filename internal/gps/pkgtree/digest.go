@@ -181,43 +181,33 @@ func (f *lineEndingReader) Read(buf []byte) (int, error) {
 			nr++                        // pretend we read one more byte
 		}
 
-		// Remove any CRLF sequences in buf, using `bytes.Index` because that
+		// Remove any CRLF sequences in buf, using `bytes.Index` because it
 		// takes advantage of machine opcodes that search for byte patterns on
-		// many architectures. This operation is done in two parts: find and
-		// record the CRLF sequence positions, then loop through and copy bytes
-		// to eliminate the CR bytes.
-		//
-		// Record indexes of all CRLF sequences in buffer, bound by number of
-		// bytes read.
-		var indexes []int
-		var offset int
+		// many architectures; and, using builtin `copy` which also takes
+		// advantage of machine opcodes to quickly move overlapping regions of
+		// bytes in memory.
+		var searchOffset, shiftCount int
+		previousIndex := -1 // index of previous CRLF index; -1 means no previous index known
 		for {
-			index := bytes.Index(buf[offset:nr], crlf)
+			index := bytes.Index(buf[searchOffset:nr], crlf)
 			if index == -1 {
 				break
 			}
-			index += offset
-			indexes = append(indexes, index)
-			offset = index + 2 // or: len(crlf)
-		}
-		// Shift sub strings between indexes recorded in above loop.
-		if count := len(indexes); count > 0 {
-			offset = 0
-			var i, j, ij int
-			for ii := 0; ii < count; ii++ {
-				i = indexes[ii]
-				if ij = ii + 1; ij == count {
-					j = nr // last substring: bound by number of bytes read
-				} else {
-					j = indexes[ij] // bound copy by index of following substring
-				}
-				copy(buf[i+offset:], buf[i+1:j])
-				// Each loop we replace 2 bytes with 1 byte, and thus alter
-				// future shifts by 1 byte to the left for each iteration.
-				offset--
+			index += searchOffset // convert relative index to absolute
+			if previousIndex != -1 {
+				// shift substring between previous index and this index
+				copy(buf[previousIndex-shiftCount:], buf[previousIndex+1:index])
+				shiftCount++ // next shift needs to be 1 byte to the left
 			}
-			nr -= len(indexes)
+			previousIndex = index
+			searchOffset = index + 2 // start next search after len(crlf)
 		}
+		if previousIndex != -1 {
+			// handle final shift
+			copy(buf[previousIndex-shiftCount:], buf[previousIndex+1:nr])
+			shiftCount++
+		}
+		nr -= shiftCount // shorten byte read count by number of shifts executed
 
 		// When final byte from a read operation is CR, do not emit it until
 		// ensure first byte on next read is not LF.
