@@ -7,6 +7,7 @@ package main
 import (
 	"bytes"
 	"flag"
+	"fmt"
 	"go/build"
 	"os"
 	"path/filepath"
@@ -587,14 +588,19 @@ func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm
 
 		if instr.typ&isInManifest == 0 {
 			var pp gps.ProjectProperties
+			var found bool
 			for _, proj := range solution.Projects() {
 				// We compare just ProjectRoot instead of the whole
 				// ProjectIdentifier here because an empty source on the input side
 				// could have been converted into a source by the solver.
 				if proj.Ident().ProjectRoot == pr {
+					found = true
 					pp = getProjectPropertiesFromVersion(proj.Version())
 					break
 				}
+			}
+			if !found {
+				panic(fmt.Sprintf("unreachable: solution did not contain -add argument %s, but solver did not fail", pr))
 			}
 			pp.Source = instr.id.Source
 
