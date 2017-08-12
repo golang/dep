@@ -83,7 +83,7 @@ func DigestFromPathname(prefix, pathname string) ([]byte, error) {
 		// Write the prefix-stripped pathname to hash because the hash is as
 		// much a function of the relative names of the files and directories as
 		// it is their contents. Added benefit is that even empty directories
-		// and symbolic links will effect final hash value. Use
+		// and symbolic links will affect final hash value. Use
 		// `filepath.ToSlash` to ensure relative pathname is os-agnostic.
 		writeBytesWithNull(h, []byte(filepath.ToSlash(pathname[prefixLength:])))
 
@@ -251,8 +251,8 @@ const (
 	NoMismatch
 
 	// EmptyDigestInLock is used when the digest for a dependency listed in the
-	// lock file is the empty string. NOTE: Seems like a special case of
-	// DigestMismatchInLock.
+	// lock file is the empty string. While this is a special case of
+	// DigestMismatchInLock, keeping both cases discrete is a desired feature.
 	EmptyDigestInLock
 
 	// DigestMismatchInLock is used when the digest for a dependency listed in
@@ -314,9 +314,10 @@ func sortedListOfDirectoryChildrenFromFileHandle(fh *os.File) ([]string, error) 
 	return childrenNames, nil
 }
 
-// VerifyDepTree verifies dependency tree according to expected digest sums, and
-// returns an associative array of file system nodes and their respective vendor
-// status, in accordance with the provided expected digest sums parameter.
+// VerifyDepTree verifies a dependency tree according to expected digest sums,
+// and returns an associative array of file system nodes and their respective
+// vendor status, in accordance with the provided expected digest sums
+// parameter.
 //
 // The vendor root will be converted to os-specific pathname for processing, and
 // the map of project names to their expected digests are required to have the
@@ -343,9 +344,10 @@ func VerifyDepTree(vendorRoot string, wantSums map[string][]byte) (map[string]Ve
 	// represented by the specified expected sums parameter, and in order to
 	// only report the top level of a subdirectory of file system nodes, rather
 	// than every node internal to them, we will create a tree of nodes stored
-	// in a slice.  We do this because we do not know at what level a project
-	// exists at. Some projects are fewer than and some projects more than the
-	// typical three layer subdirectory under the vendor root directory.
+	// in a slice. We do this because we cannot predict the depth at which
+	// project roots occur. Some projects are fewer than and some projects more
+	// than the typical three layer subdirectory under the vendor root
+	// directory.
 	//
 	// For a following few examples, assume the below vendor root directory:
 	//
@@ -353,7 +355,7 @@ func VerifyDepTree(vendorRoot string, wantSums map[string][]byte) (map[string]Ve
 	// github.com/alice/alice2/a2.go
 	// github.com/bob/bob1/b1.go
 	// github.com/bob/bob2/b2.go
-	// launghpad.net/nifty/n1.go
+	// launchpad.net/nifty/n1.go
 	//
 	// 1) If only the `alice1` and `alice2` projects were in the lock file, we'd
 	// prefer the output to state that `github.com/bob` is `NotInLock`.

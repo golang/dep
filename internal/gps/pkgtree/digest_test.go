@@ -75,8 +75,7 @@ func getTestdataVerifyRoot(t *testing.T) string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	parent, _ := filepath.Split(cwd)
-	return filepath.Join(parent, "testdata_digest")
+	return filepath.Join(filepath.Dir(cwd), "testdata_digest")
 }
 
 func TestDigestFromPathnameWithFile(t *testing.T) {
