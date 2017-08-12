@@ -102,19 +102,13 @@ matches the constraints from the manifest. If the dependency is missing from
 
 ### Adding a dependency
 
-Adding a project as a dependency has three essential steps:
-
-1. `import` a package from the project in one of your `*.go` source files
-2. Add a `version` or `branch` rule in the project's `[[constraint]]` section in `Gopkg.toml` (Optional, but recommended)
-3. Run `dep ensure`
-
-`dep ensure -add` is CLI sugar to ease this a bit:
-
 ```sh
-$ dep ensure -add github.com/some/project github.com/other/project/subpackage@v1.0.0
+$ dep ensure -add github.com/foo/bar
 ```
 
-`dep ensure -add`'s behavior varies slightly depending on whether there are already rules in `Gopkg.toml` for the named project(s), as well as whether you already import packages from the named project(s). See `dep ensure -examples` for more sample combinations.
+This adds a version constraint to your `Gopkg.toml`, and updates `Gopkg.lock` and `vendor/`. Now, import and use the package in your code! ✨
+
+`dep ensure -add` has some subtle behavior variations depending on the project or package named, and the state of your tree. See `dep ensure -examples` for more information.
 
 ### Changing dependencies
 
