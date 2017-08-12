@@ -197,7 +197,7 @@ func (lp LockedProject) Packages() []string {
 }
 
 func (lp LockedProject) String() string {
-	return fmt.Sprintf("%s@%v for packages: %v",
+	return fmt.Sprintf("%s@%s with packages: %v",
 		lp.Ident().errString(), lp.Version(), lp.pkgs)
 }
 
