@@ -66,11 +66,11 @@ func WriteDepTree(basedir string, l Lock, sm SourceManager, sv bool, logger *log
 	for _, p := range l.Projects() {
 		to := filepath.FromSlash(filepath.Join(basedir, string(p.Ident().ProjectRoot)))
 
-		logger.Printf("Writing out %s", p)
+		logger.Printf("Writing out %s@%s", p.Ident().errString(), p.Version())
 		err = sm.ExportProject(p.Ident(), p.Version(), to)
 		if err != nil {
 			removeAll(basedir)
-			return fmt.Errorf("error while exporting %s: %s", p.Ident().ProjectRoot, err)
+			return fmt.Errorf("error while exporting %s@%s: %s", p.Ident().errString(), p.Version(), err)
 		}
 		if sv {
 			filepath.Walk(to, stripVendor)
