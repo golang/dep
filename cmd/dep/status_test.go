@@ -165,6 +165,14 @@ func TestBasicStatusGetConsolidatedConstraint(t *testing.T) {
 			},
 			wantConstraint: "1.2.1",
 		},
+		{
+			name: "BasicStatus with Override",
+			basicStatus: BasicStatus{
+				Constraint:  aSemverConstraint,
+				hasOverride: true,
+			},
+			wantConstraint: "1.2.1 (override)",
+		},
 	}
 
 	for _, tc := range testCases {
