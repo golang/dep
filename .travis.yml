@@ -65,6 +65,7 @@ jobs:
         - cd cmd/dep
         - CGO_ENABLED=0 GOOS=linux go build -ldflags "-s -w -X main.commitHash=$(git rev-parse --short HEAD 2>/dev/null) -X main.buildDate=$(date --iso-8601=seconds) -X main.version=$(git describe --tags --dirty)" -a -installsuffix cgo -o ../../release/dep-linux-amd64
         - CGO_ENABLED=0 GOOS=darwin go build -ldflags "-s -w -X main.commitHash=$(git rev-parse --short HEAD 2>/dev/null) -X main.buildDate=$(date --iso-8601=seconds) -X main.version=$(git describe --tags --dirty)" -a -installsuffix cgo -o ../../release/dep-darwin-amd64
+        - CGO_ENABLED=0 GOOS=windows go build -ldflags "-s -w -X main.commitHash=$(git rev-parse --short HEAD 2>/dev/null) -X main.buildDate=$(date --iso-8601=seconds) -X main.version=$(git describe --tags --dirty)" -a -installsuffix cgo -o ../../release/dep-windows-amd64
         - cd ../..
       deploy:
         - provider: releases
