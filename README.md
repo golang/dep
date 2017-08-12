@@ -1,10 +1,16 @@
-# Dep
+<p align="center"><img src="docs/img/DigbyShadows.png" width="360"></p>
+<p align="center">
+  <a href="https://travis-ci.org/golang/dep"><img src="https://travis-ci.org/golang/dep.svg?branch=master" alt="Build Status"></img></a>
+  <a href="https://ci.appveyor.com/project/golang/dep"><img src="https://ci.appveyor.com/api/projects/status/github/golang/dep?svg=true&branch=master&passingText=Windows%20-%20OK&failingText=Windows%20-%20failed&pendingText=Windows%20-%20pending" alt="Windows Build Status"></a>
+  <a href="https://codeclimate.com/github/golang/dep"><img src="https://codeclimate.com/github/golang/dep/badges/gpa.svg" alt="Code Climate"></img></a>
+  <a href="https://codeclimate.com/github/golang/dep/coverage"><img src="https://codeclimate.com/github/golang/dep/badges/coverage.svg" /></a>
+</p>
 
-Linux: [![Build Status](https://travis-ci.org/golang/dep.svg?branch=master)](https://travis-ci.org/golang/dep) | Windows: [![Build status](https://ci.appveyor.com/api/projects/status/4pu2xnnrikol2gsf/branch/master?svg=true)](https://ci.appveyor.com/project/golang/dep/branch/master) | [![Code Climate](https://codeclimate.com/github/golang/dep/badges/gpa.svg)](https://codeclimate.com/github/golang/dep)
+## Dep
 
-Dep is a prototype dependency management tool. It requires Go 1.7 or newer to compile.
+`dep` is a prototype dependency management tool for Go. It requires Go 1.7 or newer to compile.
 
-`dep` is NOT an official tool. Yet. Check out the [Roadmap](https://github.com/golang/dep/wiki/Roadmap)!
+`dep` is the official _experiment_, but not yet the official tool. Check out the [Roadmap](https://github.com/golang/dep/wiki/Roadmap) for more on what this means!
 
 ## Current status
 
