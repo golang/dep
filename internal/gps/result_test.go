@@ -112,10 +112,20 @@ func testWriteDepTree(t *testing.T) {
 }
 
 func BenchmarkCreateVendorTree(b *testing.B) {
-	// We're fs-bound here, so restrict to single parallelism
-	b.SetParallelism(1)
-
 	r := basicResult
+
+	r.p = append(
+		r.p,
+		pa2lp(atom{
+			id: pi("launchpad.net/govcstestbzrrepo"),
+			v:  NewVersion("1.0.0").Pair(Revision("matt@mattfarina.com-20150731135137-pbphasfppmygpl68")),
+		}, nil),
+		pa2lp(atom{
+			id: pi("bitbucket.org/sdboyer/withbm"),
+			v:  NewVersion("v1.0.0").Pair(Revision("aa110802a0c64195d0a6c375c9f66668827c90b4")),
+		}, nil),
+	)
+
 	tmp := path.Join(os.TempDir(), "vsolvtest")
 
 	clean := true

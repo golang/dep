@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 // A Solution is returned by a solver run. It is mostly just a Lock, with some
@@ -61,18 +62,97 @@ func WriteDepTree(basedir string, l Lock, sm SourceManager, sv bool) error {
 		return err
 	}
 
-	// TODO(sdboyer) parallelize
-	for _, p := range l.Projects() {
-		to := filepath.FromSlash(filepath.Join(basedir, string(p.Ident().ProjectRoot)))
+	wp := newWorkerPool(l.Projects(), 2)
 
-		err = sm.ExportProject(p.Ident(), p.Version(), to)
-		if err != nil {
-			removeAll(basedir)
-			return fmt.Errorf("error while exporting %s: %s", p.Ident().ProjectRoot, err)
+	err = wp.writeDepTree(
+		func(p LockedProject) error {
+			to := filepath.FromSlash(filepath.Join(basedir, string(p.Ident().ProjectRoot)))
+
+			if err := sm.ExportProject(p.Ident(), p.Version(), to); err != nil {
+				return err
+			}
+
+			if sv {
+				filepath.Walk(to, stripVendor)
+			}
+
+			// TODO(sdboyer) dump version metadata file
+
+			return nil
+		},
+	)
+
+	if err != nil {
+		removeAll(basedir)
+		return err
+	}
+
+	return nil
+}
+
+func newWorkerPool(pjs []LockedProject, wc int) *workerPool {
+	wp := &workerPool{
+		workChan:    make(chan LockedProject),
+		doneChan:    make(chan done),
+		projects:    pjs,
+		workerCount: wc,
+	}
+
+	wp.spawnWorkers()
+
+	return wp
+}
+
+type workerPool struct {
+	workChan    chan LockedProject
+	doneChan    chan done
+	projects    []LockedProject
+	wpFunc      writeProjectFunc
+	workerCount int
+}
+
+type done struct {
+	root ProjectRoot
+	err  error
+}
+
+type writeProjectFunc func(p LockedProject) error
+
+func (wp *workerPool) spawnWorkers() {
+	for i := 0; i < wp.workerCount; i++ {
+		go func() {
+			for p := range wp.workChan {
+				wp.doneChan <- done{p.Ident().ProjectRoot, wp.wpFunc(p)}
+			}
+		}()
+	}
+}
+
+func (wp *workerPool) writeDepTree(f writeProjectFunc) error {
+	wp.wpFunc = f
+	go wp.dispatchJobs()
+	return wp.reportProgress()
+}
+
+func (wp *workerPool) dispatchJobs() {
+	defer close(wp.workChan)
+	for _, p := range wp.projects {
+		wp.workChan <- p
+	}
+}
+
+func (wp *workerPool) reportProgress() error {
+	var errs []string
+
+	for i := 0; i < len(wp.projects); i++ {
+		d := <-wp.doneChan
+		if d.err != nil {
+			errs = append(errs, fmt.Sprintf("error while exporting %s: %s", d.root, d.err))
 		}
-		if sv {
-			filepath.Walk(to, stripVendor)
-		}
+	}
+
+	if errs != nil {
+		return fmt.Errorf(strings.Join(errs, "\n"))
 	}
 
 	return nil
