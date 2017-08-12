@@ -33,7 +33,6 @@ func TestStatusFormatVersion(t *testing.T) {
 }
 
 func TestBasicLine(t *testing.T) {
-
 	project := dep.Project{}
 	aSemverConstraint, _ := gps.NewSemverConstraint("1.2.3")
 
@@ -140,7 +139,6 @@ func TestBasicLine(t *testing.T) {
 }
 
 func TestBasicStatusGetConsolidatedConstraint(t *testing.T) {
-
 	aSemverConstraint, _ := gps.NewSemverConstraint("1.2.1")
 
 	testCases := []struct {

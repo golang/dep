@@ -118,12 +118,12 @@ func (out *tableOutput) MissingFooter() {
 
 type jsonOutput struct {
 	w       io.Writer
-	basic   []*BasicStatus
+	basic   []*rawStatus
 	missing []*MissingStatus
 }
 
 func (out *jsonOutput) BasicHeader() {
-	out.basic = []*BasicStatus{}
+	out.basic = []*rawStatus{}
 }
 
 func (out *jsonOutput) BasicFooter() {
@@ -131,9 +131,7 @@ func (out *jsonOutput) BasicFooter() {
 }
 
 func (out *jsonOutput) BasicLine(bs *BasicStatus) {
-	bs.JSONConstraint = bs.getConsolidatedConstraint()
-	bs.JSONVersion = formatVersion(bs.Version)
-	out.basic = append(out.basic, bs)
+	out.basic = append(out.basic, bs.marshalJSON())
 }
 
 func (out *jsonOutput) MissingHeader() {
@@ -232,6 +230,15 @@ func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
 	return nil
 }
 
+type rawStatus struct {
+	ProjectRoot  string
+	Constraint   string
+	Version      string
+	Revision     gps.Revision
+	Latest       gps.Version
+	PackageCount int
+}
+
 // BasicStatus contains all the information reported about a single dependency
 // in the summary/list status output mode.
 type BasicStatus struct {
@@ -268,6 +275,17 @@ func (bs *BasicStatus) getConsolidatedVersion() string {
 		version = formatVersion(bs.Version)
 	}
 	return version
+}
+
+func (bs *BasicStatus) marshalJSON() *rawStatus {
+	return &rawStatus{
+		ProjectRoot:  bs.ProjectRoot,
+		Constraint:   bs.getConsolidatedConstraint(),
+		Version:      formatVersion(bs.Version),
+		Revision:     bs.Revision,
+		Latest:       bs.Latest,
+		PackageCount: bs.PackageCount,
+	}
 }
 
 // MissingStatus contains information about all the missing packages in a project.
