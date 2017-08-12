@@ -74,6 +74,7 @@ jobs:
           file:
             - release/dep-linux-amd64
             - release/dep-darwin-amd64
+            - release/dep-windows-amd64
           skip_cleanup: true
           on:
             repo: ebati/dep
