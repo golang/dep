@@ -201,14 +201,7 @@ how to add support for another tool.
 
 ## Why is `dep` ignoring a version constraint in the manifest?
 Only your project's directly imported dependencies are affected by a `constraint` entry
-in the manifest. Transitive dependencies are unaffected.
-
-Use an `override` entry for transitive dependencies.
-```
-[[override]]
-  name = "github.com/pkg/errors"
-  version = "=0.8.0"
-```
+in the manifest. Transitive dependencies are unaffected. See [How do I constrain a transitive dependency's version](#how-do-i-constrain-a-transitive-dependencys-version)?
 
 ## Why did `dep` use a different revision for package X instead of the revision in the lock file?
 Sometimes the revision specified in the lock file is no longer valid. There are a few
