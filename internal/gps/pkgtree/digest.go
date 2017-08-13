@@ -445,15 +445,19 @@ func VerifyDepTree(vendorRoot string, wantSums map[string][]byte) (map[string]Ve
 		}
 	}
 
-	// Ignoring first node in the list, walk nodes from end to
-	// beginning. Whenever a node is not required, but its parent is required,
-	// then that node and all under it ought to be marked as `NotInLock`.
-	for i := len(nodes) - 1; i > 0; i-- {
-		currentNode = nodes[i]
+	// Ignoring first node in the list, walk nodes from last to first. Whenever
+	// the current node is not required, but its parent is required, then the
+	// current node ought to be marked as `NotInLock`.
+	for len(nodes) > 1 {
+		// pop off right-most node from slice of nodes
+		ln1 := len(nodes) - 1
+		currentNode, nodes = nodes[ln1], nodes[:ln1]
+
 		if !currentNode.isRequiredAncestor && nodes[currentNode.parentIndex].isRequiredAncestor {
 			status[filepath.ToSlash(currentNode.pathname[prefixLength:])] = NotInLock
 		}
 	}
+	currentNode, nodes = nil, nil
 
 	return status, nil
 }
