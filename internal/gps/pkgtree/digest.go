@@ -429,7 +429,7 @@ func VerifyDepTree(vendorRoot string, wantSums map[string][]byte) (map[string]Ve
 	for len(queue) > 0 {
 		// pop node from the queue (depth first traversal, reverse lexicographical order inside a directory)
 		lq1 := len(queue) - 1
-		currentNode, queue = queue[lq1], queue[:lq1]
+		currentNode, queue[lq1], queue = queue[lq1], nil, queue[:lq1]
 
 		// Chop off the vendor root prefix, including the path separator, then
 		// normalize.
@@ -494,7 +494,7 @@ func VerifyDepTree(vendorRoot string, wantSums map[string][]byte) (map[string]Ve
 	for len(nodes) > 1 {
 		// pop off right-most node from slice of nodes
 		ln1 := len(nodes) - 1
-		currentNode, nodes = nodes[ln1], nodes[:ln1]
+		currentNode, nodes[ln1], nodes = nodes[ln1], nil, nodes[:ln1]
 
 		if !currentNode.isRequiredAncestor && nodes[currentNode.parentIndex].isRequiredAncestor {
 			status[filepath.ToSlash(currentNode.pathname[prefixLength:])] = NotInLock
