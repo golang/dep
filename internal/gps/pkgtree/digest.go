@@ -365,7 +365,8 @@ func sortedListOfDirectoryChildrenFromFileHandle(fh *os.File) ([]string, error) 
 // The vendor root will be converted to os-specific pathname for processing, and
 // the map of project names to their expected digests are required to have the
 // solidus character, `/`, as their path separator. For example,
-// "github.com/alice/alice1".
+// "github.com/alice/alice1", even on platforms where the file system path
+// separator is a different character.
 func VerifyDepTree(vendorRoot string, wantSums map[string][]byte) (map[string]VendorStatus, error) {
 	vendorRoot = filepath.Clean(vendorRoot) + pathSeparator
 
@@ -401,13 +402,16 @@ func VerifyDepTree(vendorRoot string, wantSums map[string][]byte) (map[string]Ve
 	// launchpad.net/nifty/n1.go
 	//
 	// 1) If only the `alice1` and `alice2` projects were in the lock file, we'd
-	// prefer the output to state that `github.com/bob` is `NotInLock`.
+	// prefer the output to state that `github.com/bob` is `NotInLock`, and
+	// `launchpad.net/nifty` is `NotInLock`.
 	//
 	// 2) If `alice1`, `alice2`, and `bob1` were in the lock file, we'd want to
-	// report `github.com/bob/bob2` as `NotInLock`.
+	// report `github.com/bob/bob2` as `NotInLock`, and `launchpad.net/nifty` is
+	// `NotInLock`.
 	//
 	// 3) If none of `alice1`, `alice2`, `bob1`, or `bob2` were in the lock
-	// file, the entire `github.com` directory would be reported as `NotInLock`.
+	// file, the entire `github.com` directory would be reported as `NotInLock`,
+	// along with `launchpad.net/nifty` is `NotInLock`.
 	//
 	// Each node in our tree has the slice index of its parent node, so once we
 	// can categorically state a particular directory is required because it is
@@ -418,9 +422,9 @@ func VerifyDepTree(vendorRoot string, wantSums map[string][]byte) (map[string]Ve
 	nodes := []*fsnode{currentNode}
 
 	// Mark directories of expected projects as required. When the respective
-	// project is found in the vendor root hierarchy, its status will be updated
-	// to reflect whether its digest is empty, or whether or not it matches the
-	// expected digest.
+	// project is later found while traversing the vendor root hierarchy, its
+	// status will be updated to reflect whether its digest is empty, or whether
+	// or not it matches the expected digest.
 	status := make(map[string]VendorStatus)
 	for pathname := range wantSums {
 		status[pathname] = NotInTree
