@@ -5,119 +5,215 @@ import (
 	"log"
 	"testing"
 
+	"github.com/golang/dep/internal/fs"
 	"github.com/golang/dep/internal/test"
 )
 
 func TestPruneEmptyDirs(t *testing.T) {
 	h := test.NewHelper(t)
-	h.TempDir("baseDir1/empty-dir")
+	defer h.Cleanup()
 
-	h.TempDir("baseDir2/non-empty-dir")
-	h.TempFile("baseDir2/non-empty-dir/file", "")
-
-	h.TempDir("baseDir3/nested-empty-dirs")
-	h.TempDir("baseDir3/nested-empty-dirs/empty-dir1")
-	h.TempDir("baseDir3/nested-empty-dirs/empty-dir2")
-
-	h.TempDir("baseDir4")
-	h.TempDir("baseDir4/empty-dir1")
-	h.TempDir("baseDir4/empty-dir2")
-	h.TempDir("baseDir4/non-empty-dir1")
-	h.TempFile("baseDir4/non-empty-dir1/file", "")
-	h.TempDir("baseDir4/non-empty-dir2")
-	h.TempFile("baseDir4/non-empty-dir2/file", "")
+	h.TempDir(".")
 
 	testcases := []struct {
-		name      string
-		baseDir   string
-		emptyDirs []string
-		err       bool
+		name string
+		fs   fsTestCase
+		err  bool
 	}{
-		{"1 empty dir", h.Path("baseDir1"), []string{
-			h.Path("baseDir1/empty-dir"),
-		}, false},
-		{"1 non-empty dir", h.Path("baseDir2"), []string{}, false},
-		{"nested empty dirs", h.Path("baseDir3"), []string{
-			h.Path("baseDir3/nested-empty-dirs/empty-dir1"),
-			h.Path("baseDir3/nested-empty-dirs/empty-dir2"),
-		}, false},
-		{"mixed dirs", h.Path("baseDir4"), []string{
-			h.Path("baseDir4/empty-dir1"),
-		}, false},
+		{
+			"empty-dir",
+			fsTestCase{
+				before: filesystemState{
+					dirs: []fsPath{
+						{"dir"},
+					},
+				},
+				after: filesystemState{},
+			},
+			false,
+		},
+		{
+			"non-empty-dir",
+			fsTestCase{
+				before: filesystemState{
+					dirs: []fsPath{
+						{"dir"},
+					},
+					files: []fsPath{
+						{"dir", "file"},
+					},
+				},
+				after: filesystemState{
+					dirs: []fsPath{
+						{"dir"},
+					},
+					files: []fsPath{
+						{"dir", "file"},
+					},
+				},
+			},
+			false,
+		},
+		{
+			"nested-empty-dirs",
+			fsTestCase{
+				before: filesystemState{
+					dirs: []fsPath{
+						{"dirs"},
+						{"dirs", "dir1"},
+						{"dirs", "dir2"},
+					},
+				},
+				after: filesystemState{
+					dirs: []fsPath{
+						{"dirs"},
+					},
+				},
+			},
+			false,
+		},
+		{
+			"mixed-dirs",
+			fsTestCase{
+				before: filesystemState{
+					dirs: []fsPath{
+						{"dir1"},
+						{"dir2"},
+						{"dir3"},
+						{"dir4"},
+					},
+					files: []fsPath{
+						{"dir3", "file"},
+						{"dir4", "file"},
+					},
+				},
+				after: filesystemState{
+					dirs: []fsPath{
+						{"dir3"},
+						{"dir4"},
+					},
+					files: []fsPath{
+						{"dir3", "file"},
+						{"dir4", "file"},
+					},
+				},
+			},
+			false,
+		},
 	}
 
 	logger := log.New(ioutil.Discard, "", 0)
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			err := pruneEmptyDirs(tc.baseDir, logger)
+			h.TempDir(tc.name)
+			baseDir := h.Path(tc.name)
+			tc.fs.before.root = baseDir
+			tc.fs.after.root = baseDir
+
+			tc.fs.before.setup(t)
+
+			err := pruneEmptyDirs(baseDir, logger)
 			if tc.err && err == nil {
 				t.Errorf("expected an error, got nil")
 			} else if !tc.err && err != nil {
 				t.Errorf("unexpected error: %s", err)
 			}
-			for _, path := range tc.emptyDirs {
-				h.ShouldNotExist(path)
-			}
+
+			tc.fs.after.assert(t)
 		})
 	}
 }
 
 func TestCalculateEmptyDirs(t *testing.T) {
 	h := test.NewHelper(t)
+	defer h.Cleanup()
 
-	h.TempDir("baseDir1/empty-dir")
-
-	h.TempDir("baseDir2/non-empty-dir")
-	h.TempFile("baseDir2/non-empty-dir/file", "")
-
-	h.TempDir("baseDir3/nested-empty-dirs")
-	h.TempDir("baseDir3/nested-empty-dirs/empty-dir1")
-	h.TempDir("baseDir3/nested-empty-dirs/empty-dir2")
-
-	h.TempDir("baseDir4")
-	h.TempDir("baseDir4/empty-dir1")
-	h.TempDir("baseDir4/empty-dir2")
-	h.TempDir("baseDir4/non-empty-dir1")
-	h.TempFile("baseDir4/non-empty-dir1/file", "")
-	h.TempDir("baseDir4/non-empty-dir2")
-	h.TempFile("baseDir4/non-empty-dir2/file", "")
+	h.TempDir(".")
 
 	testcases := []struct {
 		name      string
-		baseDir   string
-		emptyDirs []string
+		fs        filesystemState
+		emptyDirs int
 		err       bool
 	}{
-		{"1 empty dir", h.Path("baseDir1"), []string{
-			h.Path("baseDir1/empty-dir"),
-		}, false},
-		{"1 non-empty dir", h.Path("baseDir2"), []string{}, false},
-		{"nested empty dirs", h.Path("baseDir3"), []string{
-			h.Path("baseDir3/nested-empty-dirs/empty-dir1"),
-			h.Path("baseDir3/nested-empty-dirs/empty-dir2"),
-		}, false},
-		{"mixed dirs", h.Path("baseDir4"), []string{
-			h.Path("baseDir4/empty-dir1"),
-			h.Path("baseDir4/empty-dir2"),
-		}, false},
+		{
+			"empty-dir",
+			filesystemState{
+				dirs: []fsPath{
+					{"dir"},
+				},
+			},
+			1,
+			false,
+		},
+		{
+			"non-empty-dir",
+			filesystemState{
+				dirs: []fsPath{
+					{"dir"},
+				},
+				files: []fsPath{
+					{"dir", "file"},
+				},
+			},
+			0,
+			false,
+		},
+		{
+			"nested-empty-dirs",
+			filesystemState{
+				dirs: []fsPath{
+					{"dirs"},
+					{"dirs", "dir1"},
+					{"dirs", "dir2"},
+				},
+			},
+			2,
+			false,
+		},
+		{
+			"mixed-dirs",
+			filesystemState{
+				dirs: []fsPath{
+					{"dir1"},
+					{"dir2"},
+					{"dir3"},
+					{"dir4"},
+				},
+				files: []fsPath{
+					{"dir3", "file"},
+					{"dir4", "file"},
+				},
+			},
+			2,
+			false,
+		},
 	}
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			emptyDirs, err := calculateEmptyDirs(tc.baseDir)
-			if len(emptyDirs) != len(tc.emptyDirs) {
-				t.Fatalf("expected %d paths, got %d", len(tc.emptyDirs), len(emptyDirs))
-			}
-			for i := range tc.emptyDirs {
-				if tc.emptyDirs[i] != emptyDirs[i] {
-					t.Fatalf("expected %s to exists in the list, got %s", tc.emptyDirs[i], emptyDirs)
-				}
-			}
+			h.TempDir(tc.name)
+			baseDir := h.Path(tc.name)
+
+			tc.fs.root = baseDir
+			tc.fs.setup(t)
+
+			emptyDirs, err := calculateEmptyDirs(baseDir)
 			if tc.err && err == nil {
 				t.Errorf("expected an error, got nil")
 			} else if !tc.err && err != nil {
 				t.Errorf("unexpected error: %s", err)
+			}
+			if len(emptyDirs) != tc.emptyDirs {
+				t.Fatalf("expected %d paths, got %d", tc.emptyDirs, len(emptyDirs))
+			}
+			for _, dir := range emptyDirs {
+				if nonEmpty, err := fs.IsNonEmptyDir(dir); err != nil {
+					t.Fatalf("unexpected error: %s", err)
+				} else if nonEmpty {
+					t.Fatalf("expected %s to be empty, but it wasn't", dir)
+				}
 			}
 		})
 	}
