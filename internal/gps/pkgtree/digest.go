@@ -8,7 +8,6 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/binary"
-	"fmt"
 	"hash"
 	"io"
 	"os"
@@ -20,12 +19,144 @@ import (
 )
 
 const (
-	pathSeparator = string(filepath.Separator)
+	osPathSeparator = string(filepath.Separator)
 
 	// when walking vendor root hierarchy, ignore file system nodes of the
 	// following types.
 	skipSpecialNodes = os.ModeDevice | os.ModeNamedPipe | os.ModeSocket | os.ModeCharDevice
 )
+
+// lineEndingReader is a `io.Reader` that converts CRLF sequences to LF.
+//
+// When cloning or checking out repositories, some Version Control Systems,
+// VCSs, on some supported Go Operating System architectures, GOOS, will
+// automatically convert line endings that end in a single line feed byte, LF,
+// to line endings that end in a two byte sequence of carriage return, CR,
+// followed by LF. This LF to CRLF conversion would cause otherwise identical
+// versioned files to have different on disk contents simply based on which VCS
+// and GOOS are involved. Different file contents for the same file would cause
+// the resultant hashes to differ. In order to ensure file contents normalize
+// and produce the same hash, this structure wraps an io.Reader that modifies
+// the file's contents when it is read, translating all CRLF sequences to LF.
+type lineEndingReader struct {
+	src             io.Reader // source io.Reader from which this reads
+	prevReadEndedCR bool      // used to track whether final byte of previous Read was CR
+}
+
+// newLineEndingReader returns a new lineEndingReader that reads from the
+// specified source io.Reader.
+func newLineEndingReader(src io.Reader) *lineEndingReader {
+	return &lineEndingReader{src: src}
+}
+
+var crlf = []byte("\r\n")
+
+// Read consumes bytes from the structure's source io.Reader to fill the
+// specified slice of bytes. It converts all CRLF byte sequences to LF, and
+// handles cases where CR and LF straddle across two Read operations.
+func (f *lineEndingReader) Read(buf []byte) (int, error) {
+	buflen := len(buf)
+	if f.prevReadEndedCR {
+		// Read one fewer bytes so we have room if the first byte of the
+		// upcoming Read is not a LF, in which case we will need to insert
+		// trailing CR from previous read.
+		buflen--
+	}
+	nr, er := f.src.Read(buf[:buflen])
+	if nr > 0 {
+		if f.prevReadEndedCR && buf[0] != '\n' {
+			// Having a CRLF split across two Read operations is rare, so the
+			// performance impact of copying entire buffer to the right by one
+			// byte, while suboptimal, will at least will not happen very
+			// often. This negative performance impact is mitigated somewhat on
+			// many Go compilation architectures, GOARCH, because the `copy`
+			// builtin uses a machine opcode for performing the memory copy on
+			// possibly overlapping regions of memory. This machine opcodes is
+			// not instantaneous and does require multiple CPU cycles to
+			// complete, but is significantly faster than the application
+			// looping through bytes.
+			copy(buf[1:nr+1], buf[:nr]) // shift data to right one byte
+			buf[0] = '\r'               // insert the previous skipped CR byte at start of buf
+			nr++                        // pretend we read one more byte
+		}
+
+		// Remove any CRLF sequences in the buffer using `bytes.Index` because,
+		// like the `copy` builtin on many GOARCHs, it also takes advantage of a
+		// machine opcode to search for byte patterns.
+		var searchOffset int // index within buffer from whence the search will commence for each loop; set to the index of the end of the previous loop.
+		var shiftCount int   // each subsequenct shift operation needs to shift bytes to the left by one more position than the shift that preceded it.
+		previousIndex := -1  // index of previously found CRLF; -1 means no previous index
+		for {
+			index := bytes.Index(buf[searchOffset:nr], crlf)
+			if index == -1 {
+				break
+			}
+			index += searchOffset // convert relative index to absolute
+			if previousIndex != -1 {
+				// shift substring between previous index and this index
+				copy(buf[previousIndex-shiftCount:], buf[previousIndex+1:index])
+				shiftCount++ // next shift needs to be 1 byte to the left
+			}
+			previousIndex = index
+			searchOffset = index + 2 // start next search after len(crlf)
+		}
+		if previousIndex != -1 {
+			// handle final shift
+			copy(buf[previousIndex-shiftCount:], buf[previousIndex+1:nr])
+			shiftCount++
+		}
+		nr -= shiftCount // shorten byte read count by number of shifts executed
+
+		// When final byte from a read operation is CR, do not emit it until
+		// ensure first byte on next read is not LF.
+		if f.prevReadEndedCR = buf[nr-1] == '\r'; f.prevReadEndedCR {
+			nr-- // pretend byte was never read from source
+		}
+	} else if f.prevReadEndedCR {
+		// Reading from source returned nothing, but this struct is sitting on a
+		// trailing CR from previous Read, so let's give it to client now.
+		buf[0] = '\r'
+		nr = 1
+		er = nil
+		f.prevReadEndedCR = false // prevent infinite loop
+	}
+	return nr, er
+}
+
+// sortedChildrenFromDirname returns a lexicographically sorted list of child
+// nodes for the specified directory.
+func sortedChildrenFromDirname(osDirname string) ([]string, error) {
+	fh, err := os.Open(osDirname)
+	if err != nil {
+		return nil, errors.Wrap(err, "cannot Open")
+	}
+	osChildrenNames, err := sortedChildrenFromDirectorFileHandle(fh)
+	// Close the file handle to the open directory without masking possible
+	// previous error value.
+	if er := fh.Close(); err == nil {
+		err = errors.Wrap(er, "cannot Close")
+	}
+	return osChildrenNames, err
+}
+
+// sortedChildrenFromDirectorFileHandle returns a lexicographically sorted list
+// of child nodes for the specified file handle to a directory.
+func sortedChildrenFromDirectorFileHandle(fh *os.File) ([]string, error) {
+	osChildrenNames, err := fh.Readdirnames(0) // 0: read names of all children
+	if err != nil {
+		return nil, errors.Wrap(err, "cannot Readdirnames")
+	}
+	sort.Strings(osChildrenNames)
+	return osChildrenNames, nil
+}
+
+// writeBytesWithNull appends the specified data to the specified hash, followed by
+// the NULL byte, in order to make accidental hash collisions less likely.
+func writeBytesWithNull(h hash.Hash, data []byte) {
+	// Ignore return values from writing to the hash, because hash write always
+	// returns nil error.
+	_, _ = h.Write(append(data, 0))
+}
 
 // DigestFromDirectory returns a hash of the specified directory contents, which
 // will match the hash computed for any directory on any supported Go platform
@@ -45,16 +176,16 @@ const (
 // While filepath.Walk could have been used, that standard library function
 // skips symbolic links, and for now, we want the hash to include the symbolic
 // link referents.
-func DigestFromDirectory(dirname string) ([]byte, error) {
-	dirname = filepath.Clean(dirname)
+func DigestFromDirectory(osDirname string) ([]byte, error) {
+	osDirname = filepath.Clean(osDirname)
 
 	// Ensure parameter is a directory
-	fi, err := os.Stat(dirname)
+	fi, err := os.Stat(osDirname)
 	if err != nil {
 		return nil, errors.Wrap(err, "cannot Stat")
 	}
 	if !fi.IsDir() {
-		return nil, errors.Errorf("cannot verify non directory: %q", dirname)
+		return nil, errors.Errorf("cannot verify non directory: %q", osDirname)
 	}
 
 	// Create a single hash instance for the entire operation, rather than a new
@@ -65,8 +196,7 @@ func DigestFromDirectory(dirname string) ([]byte, error) {
 	// starting directory itself.
 	queue := []string{""}
 
-	var relative string // pathname relative to dirname
-	var pathname string // formed by combining dirname with relative for each node
+	var osRelative string // os-specific relative pathname under dirname
 	var bytesWritten int64
 	modeBytes := make([]byte, 4) // scratch place to store encoded os.FileMode (uint32)
 
@@ -75,10 +205,10 @@ func DigestFromDirectory(dirname string) ([]byte, error) {
 	for len(queue) > 0 {
 		// Unshift a pathname from the queue (breadth-first traversal of
 		// hierarchy)
-		relative, queue = queue[0], queue[1:]
-		pathname = filepath.Join(dirname, relative)
+		osRelative, queue = queue[0], queue[1:]
+		osPathname := filepath.Join(osDirname, osRelative)
 
-		fi, err = os.Lstat(pathname)
+		fi, err = os.Lstat(osPathname)
 		if err != nil {
 			return nil, errors.Wrap(err, "cannot Lstat")
 		}
@@ -118,54 +248,51 @@ func DigestFromDirectory(dirname string) ([]byte, error) {
 		// Write the relative pathname to hash because the hash is a function of
 		// the node names, node types, and node contents. Added benefit is that
 		// empty directories, named pipes, sockets, devices, and symbolic links
-		// will affect final hash value. Use `filepath.ToSlash` to ensure
+		// will also affect final hash value. Use `filepath.ToSlash` to ensure
 		// relative pathname is os-agnostic.
-		writeBytesWithNull(h, []byte(filepath.ToSlash(relative)))
+		writeBytesWithNull(h, []byte(filepath.ToSlash(osRelative)))
 
 		binary.LittleEndian.PutUint32(modeBytes, uint32(mt)) // encode the type of mode
 		writeBytesWithNull(h, modeBytes)                     // and write to hash
 
 		if shouldSkip {
-			// There is nothing more to do for some of the node types.
-			continue
+			continue // nothing more to do for some of the node types
 		}
 
 		if mt == os.ModeSymlink { // okay to check for equivalence because we set to this value
-			relative, err = os.Readlink(pathname) // read the symlink referent
+			osRelative, err = os.Readlink(osPathname) // read the symlink referent
 			if err != nil {
 				return nil, errors.Wrap(err, "cannot Readlink")
 			}
-			// Write the os-agnostic referent to the hash and proceed to the
-			// next pathname in the queue.
-			writeBytesWithNull(h, []byte(filepath.ToSlash(relative))) // and write it to hash
-			continue
+			writeBytesWithNull(h, []byte(filepath.ToSlash(osRelative))) // write referent to hash
+			continue                                                    // proceed to next node in queue
 		}
 
 		// For both directories and regular files, we must create a file system
 		// handle in order to read their contents.
-		fh, err := os.Open(pathname)
+		fh, err := os.Open(osPathname)
 		if err != nil {
 			return nil, errors.Wrap(err, "cannot Open")
 		}
 
 		if mt == os.ModeDir {
-			childrenNames, err := sortedListOfDirectoryChildrenFromFileHandle(fh)
+			osChildrenNames, err := sortedChildrenFromDirectorFileHandle(fh)
 			if err != nil {
 				_ = fh.Close() // ignore close error because we already have an error reading directory
 				return nil, errors.Wrap(err, "cannot get list of directory children")
 			}
-			for _, childName := range childrenNames {
-				switch childName {
+			for _, osChildName := range osChildrenNames {
+				switch osChildName {
 				case ".", "..", "vendor", ".bzr", ".git", ".hg", ".svn":
 					// skip
 				default:
-					queue = append(queue, filepath.Join(relative, childName))
+					queue = append(queue, filepath.Join(osRelative, osChildName))
 				}
 			}
 		} else {
 			bytesWritten, err = io.Copy(h, newLineEndingReader(fh))            // fast copy of file contents to hash
 			err = errors.Wrap(err, "cannot Copy")                              // errors.Wrap only wraps non-nil, so skip extra check
-			writeBytesWithNull(h, []byte(strconv.FormatInt(bytesWritten, 10))) // format file size as base 10 integer
+			writeBytesWithNull(h, []byte(strconv.FormatInt(bytesWritten, 10))) // 10: format file size as base 10 integer
 		}
 
 		// Close the file handle to the open directory or file without masking
@@ -181,103 +308,8 @@ func DigestFromDirectory(dirname string) ([]byte, error) {
 	return h.Sum(nil), nil
 }
 
-// lineEndingReader is a `io.Reader` that converts CRLF sequences to LF.
-//
-// Some VCS systems automatically convert LF line endings to CRLF on some OS
-// platforms. This would cause the a file checked out on those platforms to have
-// a different digest than the same file on platforms that do not perform this
-// translation. In order to ensure file contents normalize and hash the same,
-// this struct satisfies the io.Reader interface by providing a Read method that
-// modifies the file's contents when it is read, translating all CRLF sequences
-// to LF.
-type lineEndingReader struct {
-	src             io.Reader // source io.Reader from which this reads
-	prevReadEndedCR bool      // used to track whether final byte of previous Read was CR
-}
-
-// newLineEndingReader returns a new lineEndingReader that reads from the
-// specified source io.Reader.
-func newLineEndingReader(src io.Reader) *lineEndingReader {
-	return &lineEndingReader{src: src}
-}
-
-var crlf = []byte("\r\n")
-
-// Read consumes bytes from the structure's source io.Reader to fill the
-// specified slice of bytes. It converts all CRLF byte sequences to LF, and
-// handles cases where CR and LF straddle across two Read operations.
-func (f *lineEndingReader) Read(buf []byte) (int, error) {
-	buflen := len(buf)
-	if f.prevReadEndedCR {
-		// Read one less byte in case we need to insert CR in there
-		buflen--
-	}
-	nr, er := f.src.Read(buf[:buflen])
-	if nr > 0 {
-		if f.prevReadEndedCR && buf[0] != '\n' {
-			// Having a CRLF split across two Read operations is rare, so
-			// ignoring performance impact of copying entire buffer by one
-			// byte. Plus, `copy` builtin likely uses machine opcode for
-			// performing the memory copy.
-			copy(buf[1:nr+1], buf[:nr]) // shift data to right one byte
-			buf[0] = '\r'               // insert the previous skipped CR byte at start of buf
-			nr++                        // pretend we read one more byte
-		}
-
-		// Remove any CRLF sequences in buf, using `bytes.Index` because it
-		// takes advantage of machine opcodes that search for byte patterns on
-		// many architectures; and, using builtin `copy` which also takes
-		// advantage of machine opcodes to quickly move overlapping regions of
-		// bytes in memory.
-		var searchOffset, shiftCount int
-		previousIndex := -1 // index of previous CRLF index; -1 means no previous index known
-		for {
-			index := bytes.Index(buf[searchOffset:nr], crlf)
-			if index == -1 {
-				break
-			}
-			index += searchOffset // convert relative index to absolute
-			if previousIndex != -1 {
-				// shift substring between previous index and this index
-				copy(buf[previousIndex-shiftCount:], buf[previousIndex+1:index])
-				shiftCount++ // next shift needs to be 1 byte to the left
-			}
-			previousIndex = index
-			searchOffset = index + 2 // start next search after len(crlf)
-		}
-		if previousIndex != -1 {
-			// handle final shift
-			copy(buf[previousIndex-shiftCount:], buf[previousIndex+1:nr])
-			shiftCount++
-		}
-		nr -= shiftCount // shorten byte read count by number of shifts executed
-
-		// When final byte from a read operation is CR, do not emit it until
-		// ensure first byte on next read is not LF.
-		if f.prevReadEndedCR = buf[nr-1] == '\r'; f.prevReadEndedCR {
-			nr-- // pretend byte was never read from source
-		}
-	} else if f.prevReadEndedCR {
-		// Reading from source returned nothing, but this struct is sitting on a
-		// trailing CR from previous Read, so let's give it to client now.
-		buf[0] = '\r'
-		nr = 1
-		er = nil
-		f.prevReadEndedCR = false // prevent infinite loop
-	}
-	return nr, er
-}
-
-// writeBytesWithNull appends the specified data to the specified hash, followed by
-// the NULL byte, in order to make accidental hash collisions less likely.
-func writeBytesWithNull(h hash.Hash, data []byte) {
-	// Ignore return values from writing to the hash, because hash write always
-	// returns nil error.
-	_, _ = h.Write(append(data, 0))
-}
-
-// VendorStatus represents one of a handful of possible statuses of a particular
-// subdirectory under vendor.
+// VendorStatus represents one of a handful of possible status conditions for a
+// particular file sytem node in the vendor directory tree.
 type VendorStatus uint8
 
 const (
@@ -319,70 +351,44 @@ func (ls VendorStatus) String() string {
 	return "unknown"
 }
 
+// fsnode is used to track which file system nodes are required by the lock
+// file. When a directory is found whose name matches one of the declared
+// projects in the lock file, e.g., "github.com/alice/alice1", an fsnode is
+// created for that directory, but not for any of its children. All other file
+// system nodes encountered will result in a fsnode created to represent it.
 type fsnode struct {
-	pathname             string
-	isRequiredAncestor   bool
-	myIndex, parentIndex int
-}
-
-func (n fsnode) String() string {
-	return fmt.Sprintf("[%d:%d %q %t]", n.myIndex, n.parentIndex, n.pathname, n.isRequiredAncestor)
-}
-
-// sortedListOfDirectoryChildrenFromPathname returns a lexicographical sorted
-// list of child nodes for the specified directory.
-func sortedListOfDirectoryChildrenFromPathname(pathname string) ([]string, error) {
-	fh, err := os.Open(pathname)
-	if err != nil {
-		return nil, errors.Wrap(err, "cannot Open")
-	}
-	childrenNames, err := sortedListOfDirectoryChildrenFromFileHandle(fh)
-	// Close the file handle to the open directory without masking possible
-	// previous error value.
-	if er := fh.Close(); err == nil {
-		err = errors.Wrap(er, "cannot Close")
-	}
-	return childrenNames, err
-}
-
-// sortedListOfDirectoryChildrenFromPathname returns a lexicographical sorted
-// list of child nodes for the specified open file handle to a directory. This
-// function is written once to avoid writing the logic in two places.
-func sortedListOfDirectoryChildrenFromFileHandle(fh *os.File) ([]string, error) {
-	childrenNames, err := fh.Readdirnames(0) // 0: read names of all children
-	if err != nil {
-		return nil, errors.Wrap(err, "cannot Readdirnames")
-	}
-	sort.Strings(childrenNames)
-	return childrenNames, nil
+	osRelative           string // os-specific relative path of a resource under vendor root
+	isRequiredAncestor   bool   // true iff this node or one of its descendants is in the lock file
+	myIndex, parentIndex int    // index of this node and its parent in the tree's slice
 }
 
 // VerifyDepTree verifies a dependency tree according to expected digest sums,
 // and returns an associative array of file system nodes and their respective
-// vendor status, in accordance with the provided expected digest sums
-// parameter.
+// vendor status conditions.
 //
-// The vendor root will be converted to os-specific pathname for processing, and
-// the map of project names to their expected digests are required to have the
-// solidus character, `/`, as their path separator. For example,
-// "github.com/alice/alice1", even on platforms where the file system path
-// separator is a different character.
-func VerifyDepTree(vendorRoot string, wantSums map[string][]byte) (map[string]VendorStatus, error) {
-	vendorRoot = filepath.Clean(vendorRoot) + pathSeparator
+// The keys to the expected digest sums associative array represent the
+// project's dependencies, and each is required to be expressed using the
+// solidus character, `/`, as its path separator. For example, even on a GOOS
+// platform where the file system path separator is a character other than
+// solidus, one particular dependency would be represented as
+// "github.com/alice/alice1".
+func VerifyDepTree(osDirname string, wantSums map[string][]byte) (map[string]VendorStatus, error) {
+	osDirname = filepath.Clean(osDirname)
 
-	// NOTE: Ensure top level pathname is a directory
-	fi, err := os.Stat(vendorRoot)
+	// Ensure top level pathname is a directory
+	fi, err := os.Stat(osDirname)
 	if err != nil {
 		return nil, errors.Wrap(err, "cannot Stat")
 	}
 	if !fi.IsDir() {
-		return nil, errors.Errorf("cannot verify non directory: %q", vendorRoot)
+		return nil, errors.Errorf("cannot verify non directory: %q", osDirname)
 	}
 
-	var otherNode *fsnode
-	currentNode := &fsnode{pathname: vendorRoot, parentIndex: -1, isRequiredAncestor: true}
+	// Initialize work queue with a node representing the specified directory
+	// name by declaring its relative pathname under the directory name as the
+	// empty string.
+	currentNode := &fsnode{osRelative: "", parentIndex: -1, isRequiredAncestor: true}
 	queue := []*fsnode{currentNode} // queue of directories that must be inspected
-	prefixLength := len(vendorRoot)
 
 	// In order to identify all file system nodes that are not in the lock file,
 	// represented by the specified expected sums parameter, and in order to
@@ -421,28 +427,30 @@ func VerifyDepTree(vendorRoot string, wantSums map[string][]byte) (map[string]Ve
 	// `NotInLock`.
 	nodes := []*fsnode{currentNode}
 
-	// Mark directories of expected projects as required. When the respective
+	// Create associative array to store the results of calling this function.
+	slashStatus := make(map[string]VendorStatus)
+
+	// Mark directories of expected projects as required. When each respective
 	// project is later found while traversing the vendor root hierarchy, its
-	// status will be updated to reflect whether its digest is empty, or whether
-	// or not it matches the expected digest.
-	status := make(map[string]VendorStatus)
-	for pathname := range wantSums {
-		status[pathname] = NotInTree
+	// status will be updated to reflect whether its digest is empty, or,
+	// whether or not it matches the expected digest.
+	for slashPathname := range wantSums {
+		slashStatus[slashPathname] = NotInTree
 	}
 
 	for len(queue) > 0 {
-		// pop node from the queue (depth first traversal, reverse lexicographical order inside a directory)
+		// Pop node from the top of queue (depth first traversal, reverse
+		// lexicographical order inside a directory), clearing the value stored
+		// in the slice's backing array as we proceed.
 		lq1 := len(queue) - 1
 		currentNode, queue[lq1], queue = queue[lq1], nil, queue[:lq1]
+		slashPathname := filepath.ToSlash(currentNode.osRelative)
+		osPathname := filepath.Join(osDirname, currentNode.osRelative)
 
-		// Chop off the vendor root prefix, including the path separator, then
-		// normalize.
-		projectNormalized := filepath.ToSlash(currentNode.pathname[prefixLength:])
-
-		if expectedSum, ok := wantSums[projectNormalized]; ok {
+		if expectedSum, ok := wantSums[slashPathname]; ok {
 			ls := EmptyDigestInLock
 			if len(expectedSum) > 0 {
-				projectSum, err := DigestFromDirectory(filepath.Join(vendorRoot, projectNormalized))
+				projectSum, err := DigestFromDirectory(osPathname)
 				if err != nil {
 					return nil, errors.Wrap(err, "cannot compute dependency hash")
 				}
@@ -452,29 +460,35 @@ func VerifyDepTree(vendorRoot string, wantSums map[string][]byte) (map[string]Ve
 					ls = DigestMismatchInLock
 				}
 			}
-			status[projectNormalized] = ls
+			slashStatus[slashPathname] = ls
 
-			// NOTE: Mark current nodes and all parents: required.
+			// Mark current nodes and all its parents as required.
 			for i := currentNode.myIndex; i != -1; i = nodes[i].parentIndex {
 				nodes[i].isRequiredAncestor = true
 			}
 
-			continue // do not need to process directory's contents
+			// Do not need to process this directory's contents because we
+			// already accounted for its contents while calculating its digest.
+			continue
 		}
 
-		childrenNames, err := sortedListOfDirectoryChildrenFromPathname(currentNode.pathname)
+		osChildrenNames, err := sortedChildrenFromDirname(osPathname)
 		if err != nil {
 			return nil, errors.Wrap(err, "cannot get sorted list of directory children")
 		}
-		for _, childName := range childrenNames {
-			switch childName {
+		for _, osChildName := range osChildrenNames {
+			switch osChildName {
 			case ".", "..", "vendor", ".bzr", ".git", ".hg", ".svn":
 				// skip
 			default:
-				childPathname := filepath.Join(currentNode.pathname, childName)
-				otherNode = &fsnode{pathname: childPathname, myIndex: len(nodes), parentIndex: currentNode.myIndex}
+				osChildRelative := filepath.Join(currentNode.osRelative, osChildName)
+				osChildPathname := filepath.Join(osDirname, osChildRelative)
 
-				fi, err := os.Stat(childPathname)
+				// Create a new fsnode for this file system node, with a parent
+				// index set to the index of the current node.
+				otherNode := &fsnode{osRelative: osChildRelative, myIndex: len(nodes), parentIndex: currentNode.myIndex}
+
+				fi, err := os.Stat(osChildPathname)
 				if err != nil {
 					return nil, errors.Wrap(err, "cannot Stat")
 				}
@@ -482,8 +496,8 @@ func VerifyDepTree(vendorRoot string, wantSums map[string][]byte) (map[string]Ve
 				if fi.Mode()&skipSpecialNodes != 0 {
 					continue
 				}
-				// Keep track of all regular files and directories, but do not
-				// need to visit files.
+				// Track all file system nodes, but only need to add directories
+				// to the work queue.
 				nodes = append(nodes, otherNode)
 				if fi.IsDir() {
 					queue = append(queue, otherNode)
@@ -496,15 +510,16 @@ func VerifyDepTree(vendorRoot string, wantSums map[string][]byte) (map[string]Ve
 	// the current node is not required, but its parent is required, then the
 	// current node ought to be marked as `NotInLock`.
 	for len(nodes) > 1 {
-		// pop off right-most node from slice of nodes
+		// Pop node from top of queue, clearing the value stored in the slice's
+		// backing array as we proceed.
 		ln1 := len(nodes) - 1
 		currentNode, nodes[ln1], nodes = nodes[ln1], nil, nodes[:ln1]
 
 		if !currentNode.isRequiredAncestor && nodes[currentNode.parentIndex].isRequiredAncestor {
-			status[filepath.ToSlash(currentNode.pathname[prefixLength:])] = NotInLock
+			slashStatus[filepath.ToSlash(currentNode.osRelative)] = NotInLock
 		}
 	}
 	currentNode, nodes = nil, nil
 
-	return status, nil
+	return slashStatus, nil
 }
