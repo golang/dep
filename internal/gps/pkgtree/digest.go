@@ -7,6 +7,7 @@ package pkgtree
 import (
 	"bytes"
 	"crypto/sha256"
+	"encoding/binary"
 	"fmt"
 	"hash"
 	"io"
@@ -26,12 +27,9 @@ const (
 	skipSpecialNodes = os.ModeDevice | os.ModeNamedPipe | os.ModeSocket | os.ModeCharDevice
 )
 
-// DigestFromPathname returns a deterministic hash of the specified file system
-// node, performing a breadth-first traversal of directories. While the
-// specified prefix is joined with the pathname to walk the file system, the
-// prefix string is eliminated from the pathname of the nodes encounted when
-// hashing the pathnames, so that the resultant hash is agnostic to the absolute
-// root directory path of the nodes being checked.
+// DigestFromDirectory returns a hash of the specified directory contents, which
+// will match the hash computed for any directory on any supported Go platform
+// whose contents exactly match the specified directory.
 //
 // This function ignores any file system node named `vendor`, `.bzr`, `.git`,
 // `.hg`, and `.svn`, as these are typically used as Version Control System
@@ -41,60 +39,105 @@ const (
 // hash includes the pathname to every discovered file system node, whether it
 // is an empty directory, a non-empty directory, empty file, non-empty file, or
 // symbolic link. If a symbolic link, the referent name is included. If a
-// non-empty file, the file's contents are incuded. If a non-empty directory,
+// non-empty file, the file's contents are included. If a non-empty directory,
 // the contents of the directory are included.
 //
 // While filepath.Walk could have been used, that standard library function
 // skips symbolic links, and for now, we want the hash to include the symbolic
 // link referents.
-func DigestFromPathname(prefix, pathname string) ([]byte, error) {
+func DigestFromDirectory(dirname string) ([]byte, error) {
+	dirname = filepath.Clean(dirname)
+
+	// Ensure parameter is a directory
+	fi, err := os.Stat(dirname)
+	if err != nil {
+		return nil, errors.Wrap(err, "cannot Stat")
+	}
+	if !fi.IsDir() {
+		return nil, errors.Errorf("cannot verify non directory: %q", dirname)
+	}
+
 	// Create a single hash instance for the entire operation, rather than a new
 	// hash for each node we encounter.
 	h := sha256.New()
 
-	// Initialize a work queue with the os-agnostic cleaned up pathname. Note
-	// that we use `filepath.Clean` rather than `filepath.Abs`, because the hash
-	// has pathnames which are relative to prefix, and there is no reason to
-	// convert to absolute pathname for every invocation of this function.
-	prefix = filepath.Clean(prefix) + pathSeparator
-	prefixLength := len(prefix) // store length to trim off pathnames later
-	pathnameQueue := []string{filepath.Join(prefix, pathname)}
+	// Initialize a work queue with the empty string, which signifies the
+	// starting directory itself.
+	queue := []string{""}
 
-	var written int64
+	var relative string // pathname relative to dirname
+	var pathname string // formed by combining dirname with relative for each node
+	var bytesWritten int64
+	modeBytes := make([]byte, 4) // scratch place to store encoded os.FileMode (uint32)
 
 	// As we enumerate over the queue and encounter a directory, its children
 	// will be added to the work queue.
-	for len(pathnameQueue) > 0 {
+	for len(queue) > 0 {
 		// Unshift a pathname from the queue (breadth-first traversal of
 		// hierarchy)
-		pathname, pathnameQueue = pathnameQueue[0], pathnameQueue[1:]
+		relative, queue = queue[0], queue[1:]
+		pathname = filepath.Join(dirname, relative)
 
-		fi, err := os.Lstat(pathname)
+		fi, err = os.Lstat(pathname)
 		if err != nil {
 			return nil, errors.Wrap(err, "cannot Lstat")
 		}
-		mode := fi.Mode()
 
-		// Skip file system nodes we are not concerned with
-		if mode&skipSpecialNodes != 0 {
+		// We could make our own enum-like data type for encoding the file type,
+		// but Go's runtime already gives us architecture independent file
+		// modes, as discussed in `os/types.go`:
+		//
+		//    Go's runtime FileMode type has same definition on all systems, so
+		//    that information about files can be moved from one system to
+		//    another portably.
+		var mt os.FileMode
+
+		// We only care about the bits that identify the type of a file system
+		// node, and can ignore append, exclusive, temporary, setuid, setgid,
+		// permission bits, and sticky bits, which are coincident to bits which
+		// declare type of the file system node.
+		modeType := fi.Mode() & os.ModeType
+		var shouldSkip bool // skip some types of file system nodes
+
+		switch {
+		case modeType&os.ModeDir > 0:
+			mt = os.ModeDir
+		case modeType&os.ModeSymlink > 0:
+			mt = os.ModeSymlink
+		case modeType&os.ModeNamedPipe > 0:
+			mt = os.ModeNamedPipe
+			shouldSkip = true
+		case modeType&os.ModeSocket > 0:
+			mt = os.ModeSocket
+			shouldSkip = true
+		case modeType&os.ModeDevice > 0:
+			mt = os.ModeDevice
+			shouldSkip = true
+		}
+
+		// Write the relative pathname to hash because the hash is a function of
+		// the node names, node types, and node contents. Added benefit is that
+		// empty directories, named pipes, sockets, devices, and symbolic links
+		// will affect final hash value. Use `filepath.ToSlash` to ensure
+		// relative pathname is os-agnostic.
+		writeBytesWithNull(h, []byte(filepath.ToSlash(relative)))
+
+		binary.LittleEndian.PutUint32(modeBytes, uint32(mt)) // encode the type of mode
+		writeBytesWithNull(h, modeBytes)                     // and write to hash
+
+		if shouldSkip {
+			// There is nothing more to do for some of the node types.
 			continue
 		}
 
-		// Write the prefix-stripped pathname to hash because the hash is as
-		// much a function of the relative names of the files and directories as
-		// it is their contents. Added benefit is that even empty directories
-		// and symbolic links will affect final hash value. Use
-		// `filepath.ToSlash` to ensure relative pathname is os-agnostic.
-		writeBytesWithNull(h, []byte(filepath.ToSlash(pathname[prefixLength:])))
-
-		if mode&os.ModeSymlink != 0 {
-			referent, err := os.Readlink(pathname)
+		if mt == os.ModeSymlink { // okay to check for equivalence because we set to this value
+			relative, err = os.Readlink(pathname) // read the symlink referent
 			if err != nil {
 				return nil, errors.Wrap(err, "cannot Readlink")
 			}
 			// Write the os-agnostic referent to the hash and proceed to the
 			// next pathname in the queue.
-			writeBytesWithNull(h, []byte(filepath.ToSlash(referent)))
+			writeBytesWithNull(h, []byte(filepath.ToSlash(relative))) // and write it to hash
 			continue
 		}
 
@@ -105,10 +148,10 @@ func DigestFromPathname(prefix, pathname string) ([]byte, error) {
 			return nil, errors.Wrap(err, "cannot Open")
 		}
 
-		if fi.IsDir() {
+		if mt == os.ModeDir {
 			childrenNames, err := sortedListOfDirectoryChildrenFromFileHandle(fh)
 			if err != nil {
-				_ = fh.Close() // already have an error reading directory; ignore Close result.
+				_ = fh.Close() // ignore close error because we already have an error reading directory
 				return nil, errors.Wrap(err, "cannot get list of directory children")
 			}
 			for _, childName := range childrenNames {
@@ -116,17 +159,17 @@ func DigestFromPathname(prefix, pathname string) ([]byte, error) {
 				case ".", "..", "vendor", ".bzr", ".git", ".hg", ".svn":
 					// skip
 				default:
-					pathnameQueue = append(pathnameQueue, filepath.Join(pathname, childName))
+					queue = append(queue, filepath.Join(relative, childName))
 				}
 			}
 		} else {
-			written, err = io.Copy(h, newLineEndingReader(fh))            // fast copy of file contents to hash
-			err = errors.Wrap(err, "cannot Copy")                         // errors.Wrap only wraps non-nil, so elide guard condition
-			writeBytesWithNull(h, []byte(strconv.FormatInt(written, 10))) // format file size as base 10 integer
+			bytesWritten, err = io.Copy(h, newLineEndingReader(fh))            // fast copy of file contents to hash
+			err = errors.Wrap(err, "cannot Copy")                              // errors.Wrap only wraps non-nil, so skip extra check
+			writeBytesWithNull(h, []byte(strconv.FormatInt(bytesWritten, 10))) // format file size as base 10 integer
 		}
 
-		// Close the file handle to the open directory without masking possible
-		// previous error value.
+		// Close the file handle to the open directory or file without masking
+		// possible previous error value.
 		if er := fh.Close(); err == nil {
 			err = errors.Wrap(er, "cannot Close")
 		}
@@ -395,7 +438,7 @@ func VerifyDepTree(vendorRoot string, wantSums map[string][]byte) (map[string]Ve
 		if expectedSum, ok := wantSums[projectNormalized]; ok {
 			ls := EmptyDigestInLock
 			if len(expectedSum) > 0 {
-				projectSum, err := DigestFromPathname(vendorRoot, projectNormalized)
+				projectSum, err := DigestFromDirectory(filepath.Join(vendorRoot, projectNormalized))
 				if err != nil {
 					return nil, errors.Wrap(err, "cannot compute dependency hash")
 				}
