@@ -212,15 +212,8 @@ func (cmd *ensureCommand) runDefault(ctx *dep.Ctx, args []string, p *dep.Project
 		return errors.New("dep ensure only takes spec arguments with -add or -update")
 	}
 
-	if err := gps.ValidateParams(params, sm); err != nil {
-		if deduceErrs, ok := err.(gps.DeductionErrs); ok {
-			ctx.Err.Println("The following errors occurred while deducing packages:")
-			for ip, dErr := range deduceErrs {
-				ctx.Err.Printf("  * \"%s\": %s", ip, dErr)
-			}
-			ctx.Err.Println()
-		}
-		return errors.Wrap(err, "validateParams")
+	if err := ctx.ValidateParams(sm, params); err != nil {
+		return err
 	}
 
 	solver, err := gps.Prepare(params, sm)
@@ -321,6 +314,10 @@ func (cmd *ensureCommand) runUpdate(ctx *dep.Ctx, args []string, p *dep.Project,
 		return errors.Errorf("-update works by updating the versions recorded in %s, but %s does not exist", dep.LockName, dep.LockName)
 	}
 
+	if err := ctx.ValidateParams(sm, params); err != nil {
+		return err
+	}
+
 	// We'll need to discard this prepared solver as later work changes params,
 	// but solver preparation is cheap and worth doing up front in order to
 	// perform the fastpath check of hash comparison.
@@ -410,6 +407,10 @@ func (cmd *ensureCommand) runUpdate(ctx *dep.Ctx, args []string, p *dep.Project,
 func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm gps.SourceManager, params gps.SolveParameters) error {
 	if len(args) == 0 {
 		return errors.New("must specify at least one project or package to -add")
+	}
+
+	if err := ctx.ValidateParams(sm, params); err != nil {
+		return err
 	}
 
 	// We'll need to discard this prepared solver as later work changes params,

@@ -168,6 +168,10 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 		params.TraceLogger = ctx.Err
 	}
 
+	if err := ctx.ValidateParams(sm, params); err != nil {
+		return err
+	}
+
 	s, err := gps.Prepare(params, sm)
 	if err != nil {
 		return errors.Wrap(err, "prepare solver")

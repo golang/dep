@@ -248,3 +248,19 @@ func (c *Ctx) AbsForImport(path string) (string, error) {
 	}
 	return posspath, nil
 }
+
+// ValidateParams ensure that solving can be completed with the specified params.
+func (c *Ctx) ValidateParams(sm gps.SourceManager, params gps.SolveParameters) error {
+	err := gps.ValidateParams(params, sm)
+	if err != nil {
+		if deduceErrs, ok := err.(gps.DeductionErrs); ok {
+			c.Err.Println("The following errors occurred while deducing packages:")
+			for ip, dErr := range deduceErrs {
+				c.Err.Printf("  * \"%s\": %s", ip, dErr)
+			}
+			c.Err.Println()
+		}
+	}
+
+	return errors.Wrap(err, "validateParams")
+}
