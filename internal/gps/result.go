@@ -6,6 +6,7 @@ package gps
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 )
@@ -51,7 +52,7 @@ type solution struct {
 // It requires a SourceManager to do the work, and takes a flag indicating
 // whether or not to strip vendor directories contained in the exported
 // dependencies.
-func WriteDepTree(basedir string, l Lock, sm SourceManager, sv bool) error {
+func WriteDepTree(basedir string, l Lock, sm SourceManager, sv bool, logger *log.Logger) error {
 	if l == nil {
 		return fmt.Errorf("must provide non-nil Lock to WriteDepTree")
 	}
@@ -65,10 +66,11 @@ func WriteDepTree(basedir string, l Lock, sm SourceManager, sv bool) error {
 	for _, p := range l.Projects() {
 		to := filepath.FromSlash(filepath.Join(basedir, string(p.Ident().ProjectRoot)))
 
+		logger.Printf("Writing out %s@%s", p.Ident().errString(), p.Version())
 		err = sm.ExportProject(p.Ident(), p.Version(), to)
 		if err != nil {
 			removeAll(basedir)
-			return fmt.Errorf("error while exporting %s: %s", p.Ident().ProjectRoot, err)
+			return fmt.Errorf("error while exporting %s@%s: %s", p.Ident().errString(), p.Version(), err)
 		}
 		if sv {
 			filepath.Walk(to, stripVendor)

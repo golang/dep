@@ -6,6 +6,7 @@ package gps
 
 import (
 	"bytes"
+	"fmt"
 	"sort"
 )
 
@@ -193,6 +194,11 @@ func (lp LockedProject) Eq(lp2 LockedProject) bool {
 //  * The slice is not a copy. If you need to modify it, copy it first.
 func (lp LockedProject) Packages() []string {
 	return lp.pkgs
+}
+
+func (lp LockedProject) String() string {
+	return fmt.Sprintf("%s@%s with packages: %v",
+		lp.Ident().errString(), lp.Version(), lp.pkgs)
 }
 
 type safeLock struct {

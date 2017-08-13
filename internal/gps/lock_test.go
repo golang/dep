@@ -128,3 +128,54 @@ func TestLocksAreEq(t *testing.T) {
 		t.Error("should fail when individual lp were not eq")
 	}
 }
+
+func TestLockedProjectsString(t *testing.T) {
+	tt := []struct {
+		name string
+		lp   LockedProject
+		want string
+	}{
+		{
+			name: "full info",
+			lp:   NewLockedProject(mkPI("github.com/sdboyer/gps"), NewVersion("v0.10.0"), []string{"gps"}),
+			want: "github.com/sdboyer/gps@v0.10.0 with packages: [gps]",
+		},
+		{
+			name: "empty package list",
+			lp:   NewLockedProject(mkPI("github.com/sdboyer/gps"), NewVersion("v0.10.0"), []string{}),
+			want: "github.com/sdboyer/gps@v0.10.0 with packages: []",
+		},
+		{
+			name: "nil package",
+			lp:   NewLockedProject(mkPI("github.com/sdboyer/gps"), NewVersion("v0.10.0"), nil),
+			want: "github.com/sdboyer/gps@v0.10.0 with packages: []",
+		},
+		{
+			name: "with source",
+			lp: NewLockedProject(
+				ProjectIdentifier{ProjectRoot: "github.com/sdboyer/gps", Source: "github.com/another/repo"},
+				NewVersion("v0.10.0"), []string{"."}),
+			want: "github.com/sdboyer/gps (from github.com/another/repo)@v0.10.0 with packages: [.]",
+		},
+		{
+			name: "version pair",
+			lp:   NewLockedProject(mkPI("github.com/sdboyer/gps"), NewVersion("v0.10.0").Pair("278a227dfc3d595a33a77ff3f841fd8ca1bc8cd0"), []string{"gps"}),
+			want: "github.com/sdboyer/gps@v0.10.0 with packages: [gps]",
+		},
+		{
+			name: "revision only",
+			lp:   NewLockedProject(mkPI("github.com/sdboyer/gps"), Revision("278a227dfc3d595a33a77ff3f841fd8ca1bc8cd0"), []string{"gps"}),
+			want: "github.com/sdboyer/gps@278a227dfc3d595a33a77ff3f841fd8ca1bc8cd0 with packages: [gps]",
+		},
+	}
+
+	for _, tc := range tt {
+		t.Run(tc.name, func(t *testing.T) {
+			s := tc.lp.String()
+			if tc.want != s {
+				t.Fatalf("want %s, got %s", tc.want, s)
+			}
+		})
+	}
+
+}
