@@ -26,21 +26,24 @@ var (
 	errInvalidOverride   = errors.New("\"override\" must be a TOML array of tables")
 	errInvalidRequired   = errors.New("\"required\" must be a TOML list of strings")
 	errInvalidIgnored    = errors.New("\"ignored\" must be a TOML list of strings")
+	errInvalidPrune      = errors.New("\"prune\" must be a TOML table of boolean values")
 )
 
 // Manifest holds manifest file data and implements gps.RootManifest.
 type Manifest struct {
-	Constraints gps.ProjectConstraints
-	Ovr         gps.ProjectConstraints
-	Ignored     []string
-	Required    []string
+	Constraints  gps.ProjectConstraints
+	Ovr          gps.ProjectConstraints
+	Ignored      []string
+	Required     []string
+	PruneOptions gps.PruneOptions
 }
 
 type rawManifest struct {
-	Constraints []rawProject `toml:"constraint,omitempty"`
-	Overrides   []rawProject `toml:"override,omitempty"`
-	Ignored     []string     `toml:"ignored,omitempty"`
-	Required    []string     `toml:"required,omitempty"`
+	Constraints  []rawProject    `toml:"constraint,omitempty"`
+	Overrides    []rawProject    `toml:"override,omitempty"`
+	Ignored      []string        `toml:"ignored,omitempty"`
+	Required     []string        `toml:"required,omitempty"`
+	PruneOptions rawPruneOptions `toml:"prune,omitempty"`
 }
 
 type rawProject struct {
@@ -49,6 +52,23 @@ type rawProject struct {
 	Revision string `toml:"revision,omitempty"`
 	Version  string `toml:"version,omitempty"`
 	Source   string `toml:"source,omitempty"`
+}
+
+type rawPruneOptions struct {
+	UnusedPackages bool `toml:"unused-packages,omitempty"`
+	NonGoFiles     bool `toml:"non-go,omitempty"`
+	GoTests        bool `toml:"go-tests,omitempty"`
+}
+
+// NewManifest instantites a new manifest.
+func NewManifest() *Manifest {
+	return &Manifest{
+		Constraints:  make(gps.ProjectConstraints),
+		Ovr:          make(gps.ProjectConstraints),
+		Ignored:      make([]string, 0),
+		Required:     make([]string, 0),
+		PruneOptions: gps.PruneNestedVendorDirs,
+	}
 }
 
 func validateManifest(s string) ([]error, error) {
@@ -103,7 +123,7 @@ func validateManifest(s string) ([]error, error) {
 								}
 							default:
 								// unknown/invalid key
-								warns = append(warns, fmt.Errorf("Invalid key %q in %q", key, prop))
+								warns = append(warns, fmt.Errorf("invalid key %q in %q", key, prop))
 							}
 						}
 					}
@@ -140,8 +160,24 @@ func validateManifest(s string) ([]error, error) {
 					return warns, errInvalidRequired
 				}
 			}
+		case "prune":
+			// Check if prune is of Map type
+			if reflect.TypeOf(val).Kind() != reflect.Map {
+				warns = append(warns, errors.New("prune should be a TOML table"))
+			}
+			for key, value := range val.(map[string]interface{}) {
+				switch key {
+				case "non-go", "go-tests", "unused-packages":
+					if _, ok := value.(bool); !ok {
+						warns = append(warns, errors.Errorf("unexpected type for prune.%s: %T", key, value))
+						return warns, errInvalidPrune
+					}
+				default:
+					warns = append(warns, errors.Errorf("unknown field: prune.%s", key))
+				}
+			}
 		default:
-			warns = append(warns, fmt.Errorf("Unknown field in manifest: %v", prop))
+			warns = append(warns, fmt.Errorf("unknown field in manifest: %v", prop))
 		}
 	}
 
@@ -172,12 +208,12 @@ func readManifest(r io.Reader) (*Manifest, []error, error) {
 }
 
 func fromRawManifest(raw rawManifest) (*Manifest, error) {
-	m := &Manifest{
-		Constraints: make(gps.ProjectConstraints, len(raw.Constraints)),
-		Ovr:         make(gps.ProjectConstraints, len(raw.Overrides)),
-		Ignored:     raw.Ignored,
-		Required:    raw.Required,
-	}
+	m := NewManifest()
+
+	m.Constraints = make(gps.ProjectConstraints, len(raw.Constraints))
+	m.Ovr = make(gps.ProjectConstraints, len(raw.Overrides))
+	m.Ignored = raw.Ignored
+	m.Required = raw.Required
 
 	for i := 0; i < len(raw.Constraints); i++ {
 		name, prj, err := toProject(raw.Constraints[i])
@@ -199,6 +235,16 @@ func fromRawManifest(raw rawManifest) (*Manifest, error) {
 			return nil, errors.Errorf("multiple overrides specified for %s, can only specify one", name)
 		}
 		m.Ovr[name] = prj
+	}
+
+	if raw.PruneOptions.UnusedPackages {
+		m.PruneOptions |= gps.PruneUnusedPackages
+	}
+	if raw.PruneOptions.GoTests {
+		m.PruneOptions |= gps.PruneGoTestFiles
+	}
+	if raw.PruneOptions.NonGoFiles {
+		m.PruneOptions |= gps.PruneNonGoFiles
 	}
 
 	return m, nil

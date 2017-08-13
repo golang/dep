@@ -252,7 +252,9 @@ func (cmd *ensureCommand) runDefault(ctx *dep.Ctx, args []string, p *dep.Project
 		if !ctx.Verbose {
 			logger = log.New(ioutil.Discard, "", 0)
 		}
-		return errors.WithMessage(sw.Write(p.AbsRoot, sm, true, logger), "grouped write of manifest, lock and vendor")
+
+		err = sw.Write(p.AbsRoot, sm, true, p.Manifest.PruneOptions, logger)
+		return errors.WithMessage(err, "grouped write of manifest, lock and vendor")
 	}
 
 	solution, err := solver.Solve()
@@ -273,7 +275,9 @@ func (cmd *ensureCommand) runDefault(ctx *dep.Ctx, args []string, p *dep.Project
 	if !ctx.Verbose {
 		logger = log.New(ioutil.Discard, "", 0)
 	}
-	return errors.Wrap(sw.Write(p.AbsRoot, sm, false, logger), "grouped write of manifest, lock and vendor")
+
+	err = sw.Write(p.AbsRoot, sm, false, p.Manifest.PruneOptions, logger)
+	return errors.Wrap(err, "grouped write of manifest, lock and vendor")
 }
 
 func (cmd *ensureCommand) runVendorOnly(ctx *dep.Ctx, args []string, p *dep.Project, sm gps.SourceManager, params gps.SolveParameters) error {
@@ -306,7 +310,9 @@ func (cmd *ensureCommand) runVendorOnly(ctx *dep.Ctx, args []string, p *dep.Proj
 	if !ctx.Verbose {
 		logger = log.New(ioutil.Discard, "", 0)
 	}
-	return errors.WithMessage(sw.Write(p.AbsRoot, sm, true, logger), "grouped write of manifest, lock and vendor")
+
+	err = sw.Write(p.AbsRoot, sm, true, p.Manifest.PruneOptions, logger)
+	return errors.WithMessage(err, "grouped write of manifest, lock and vendor")
 }
 
 func (cmd *ensureCommand) runUpdate(ctx *dep.Ctx, args []string, p *dep.Project, sm gps.SourceManager, params gps.SolveParameters) error {
@@ -401,7 +407,9 @@ func (cmd *ensureCommand) runUpdate(ctx *dep.Ctx, args []string, p *dep.Project,
 	if !ctx.Verbose {
 		logger = log.New(ioutil.Discard, "", 0)
 	}
-	return errors.Wrap(sw.Write(p.AbsRoot, sm, false, logger), "grouped write of manifest, lock and vendor")
+
+	err = sw.Write(p.AbsRoot, sm, false, p.Manifest.PruneOptions, logger)
+	return errors.Wrap(err, "grouped write of manifest, lock and vendor")
 }
 
 func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm gps.SourceManager, params gps.SolveParameters) error {
@@ -603,9 +611,8 @@ func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm
 
 	// Prep post-actions and feedback from adds.
 	var reqlist []string
-	appender := &dep.Manifest{
-		Constraints: make(gps.ProjectConstraints),
-	}
+	appender := dep.NewManifest()
+
 	for pr, instr := range addInstructions {
 		for path := range instr.ephReq {
 			reqlist = append(reqlist, path)
@@ -655,7 +662,9 @@ func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm
 	if !ctx.Verbose {
 		logger = log.New(ioutil.Discard, "", 0)
 	}
-	if err := errors.Wrap(sw.Write(p.AbsRoot, sm, true, logger), "grouped write of manifest, lock and vendor"); err != nil {
+
+	err = sw.Write(p.AbsRoot, sm, true, p.Manifest.PruneOptions, logger)
+	if err := errors.Wrap(err, "grouped write of manifest, lock and vendor"); err != nil {
 		return err
 	}
 

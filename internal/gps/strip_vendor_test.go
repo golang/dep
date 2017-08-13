@@ -27,7 +27,7 @@ func stripVendorTestCase(tc fsTestCase) func(*testing.T) {
 
 		tc.before.setup(t)
 
-		if err := filepath.Walk(tempDir, stripVendor); err != nil {
+		if err := filepath.Walk(tempDir, stripNestedVendorDirs(tempDir)); err != nil {
 			t.Errorf("filepath.Walk err=%q", err)
 		}
 

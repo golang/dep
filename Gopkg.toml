@@ -18,3 +18,8 @@
 [[constraint]]
   name = "github.com/pkg/errors"
   version = "0.8.0"
+
+[prune]
+  non-go = true
+  go-tests = true
+  unused-packages = true

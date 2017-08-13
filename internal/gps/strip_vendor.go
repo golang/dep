@@ -6,25 +6,43 @@
 
 package gps
 
-import "os"
+import (
+	"os"
+	"path/filepath"
+)
 
-func stripVendor(path string, info os.FileInfo, err error) error {
-	if info.Name() == "vendor" {
-		if _, err := os.Lstat(path); err == nil {
-			if (info.Mode() & os.ModeSymlink) != 0 {
-				realInfo, err := os.Stat(path)
-				if err != nil {
-					return err
-				}
-				if realInfo.IsDir() {
-					return os.Remove(path)
-				}
+func stripNestedVendorDirs(baseDir string) filepath.WalkFunc {
+	return func(path string, info os.FileInfo, err error) error {
+		// Ignore anything that's not named "vendor".
+		if info.Name() != "vendor" {
+			return nil
+		}
+
+		// Ignore the base vendor directory.
+		if path == baseDir {
+			return nil
+		}
+
+		// If it's a directory, delete it along with its content.
+		if info.IsDir() {
+			return removeAll(path)
+		}
+
+		if _, err := os.Lstat(path); err != nil {
+			return nil
+		}
+
+		// If it is a symlink, check if the target is a directory and delete that instead.
+		if (info.Mode() & os.ModeSymlink) != 0 {
+			realInfo, err := os.Stat(path)
+			if err != nil {
+				return err
 			}
-			if info.IsDir() {
-				return removeAll(path)
+			if realInfo.IsDir() {
+				return os.Remove(path)
 			}
 		}
-	}
 
-	return nil
+		return nil
+	}
 }

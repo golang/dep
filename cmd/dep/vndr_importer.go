@@ -86,11 +86,9 @@ func (v *vndrImporter) loadVndrFile(dir string) error {
 
 func (v *vndrImporter) convert(pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock, error) {
 	var (
-		manifest = &dep.Manifest{
-			Constraints: make(gps.ProjectConstraints),
-		}
-		lock = &dep.Lock{}
-		err  error
+		manifest = dep.NewManifest()
+		lock     = &dep.Lock{}
+		err      error
 	)
 
 	for _, pkg := range v.packages {
