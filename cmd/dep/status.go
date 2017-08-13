@@ -89,19 +89,10 @@ func (out *tableOutput) BasicFooter() {
 }
 
 func (out *tableOutput) BasicLine(bs *BasicStatus) {
-	var constraint string
-	if v, ok := bs.Constraint.(gps.Version); ok {
-		constraint = formatVersion(v)
-	} else {
-		constraint = bs.Constraint.String()
-	}
-	if bs.hasOverride {
-		constraint += " (override)"
-	}
 	fmt.Fprintf(out.w,
 		"%s\t%s\t%s\t%s\t%s\t%d\t\n",
 		bs.ProjectRoot,
-		constraint,
+		bs.getConsolidatedConstraint(),
 		formatVersion(bs.Version),
 		formatVersion(bs.Revision),
 		formatVersion(bs.Latest),
@@ -127,12 +118,12 @@ func (out *tableOutput) MissingFooter() {
 
 type jsonOutput struct {
 	w       io.Writer
-	basic   []*BasicStatus
+	basic   []*rawStatus
 	missing []*MissingStatus
 }
 
 func (out *jsonOutput) BasicHeader() {
-	out.basic = []*BasicStatus{}
+	out.basic = []*rawStatus{}
 }
 
 func (out *jsonOutput) BasicFooter() {
@@ -140,7 +131,7 @@ func (out *jsonOutput) BasicFooter() {
 }
 
 func (out *jsonOutput) BasicLine(bs *BasicStatus) {
-	out.basic = append(out.basic, bs)
+	out.basic = append(out.basic, bs.marshalJSON())
 }
 
 func (out *jsonOutput) MissingHeader() {
@@ -177,11 +168,7 @@ func (out *dotOutput) BasicFooter() {
 }
 
 func (out *dotOutput) BasicLine(bs *BasicStatus) {
-	version := formatVersion(bs.Revision)
-	if bs.Version != nil {
-		version = formatVersion(bs.Version)
-	}
-	out.g.createNode(bs.ProjectRoot, version, bs.Children)
+	out.g.createNode(bs.ProjectRoot, bs.getConsolidatedVersion(), bs.Children)
 }
 
 func (out *dotOutput) MissingHeader()                {}
@@ -243,6 +230,15 @@ func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
 	return nil
 }
 
+type rawStatus struct {
+	ProjectRoot  string
+	Constraint   string
+	Version      string
+	Revision     gps.Revision
+	Latest       gps.Version
+	PackageCount int
+}
+
 // BasicStatus contains all the information reported about a single dependency
 // in the summary/list status output mode.
 type BasicStatus struct {
@@ -254,6 +250,42 @@ type BasicStatus struct {
 	Latest       gps.Version
 	PackageCount int
 	hasOverride  bool
+}
+
+func (bs *BasicStatus) getConsolidatedConstraint() string {
+	var constraint string
+	if bs.Constraint != nil {
+		if v, ok := bs.Constraint.(gps.Version); ok {
+			constraint = formatVersion(v)
+		} else {
+			constraint = bs.Constraint.String()
+		}
+	}
+
+	if bs.hasOverride {
+		constraint += " (override)"
+	}
+
+	return constraint
+}
+
+func (bs *BasicStatus) getConsolidatedVersion() string {
+	version := formatVersion(bs.Revision)
+	if bs.Version != nil {
+		version = formatVersion(bs.Version)
+	}
+	return version
+}
+
+func (bs *BasicStatus) marshalJSON() *rawStatus {
+	return &rawStatus{
+		ProjectRoot:  bs.ProjectRoot,
+		Constraint:   bs.getConsolidatedConstraint(),
+		Version:      formatVersion(bs.Version),
+		Revision:     bs.Revision,
+		Latest:       bs.Latest,
+		PackageCount: bs.PackageCount,
+	}
 }
 
 // MissingStatus contains information about all the missing packages in a project.
