@@ -157,13 +157,11 @@ func ListPackages(fileRoot, importRoot string) (PackageTree, error) {
 		// see any.
 		var lim []string
 		for _, imp := range append(pkg.Imports, pkg.TestImports...) {
-			switch {
-			// Do allow the single-dot, at least for now
-			case imp == "..":
-				lim = append(lim, imp)
-			case strings.HasPrefix(imp, "./"):
-				lim = append(lim, imp)
-			case strings.HasPrefix(imp, "../"):
+			if build.IsLocalImport(imp) {
+				// Do allow the single-dot, at least for now
+				if imp == "." {
+					continue
+				}
 				lim = append(lim, imp)
 			}
 		}
