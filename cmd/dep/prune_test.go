@@ -27,7 +27,7 @@ func TestCalculatePrune(t *testing.T) {
 		filepath.FromSlash("github.com/keep/pkg/sub"),
 	}
 
-	got, err := calculatePrune(h.Path(vendorDir), toKeep, nil)
+	got, err := calculatePrune(h.Path(vendorDir), toKeep, discardLogger)
 	if err != nil {
 		t.Fatal(err)
 	}
