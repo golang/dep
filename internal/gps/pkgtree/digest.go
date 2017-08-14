@@ -492,15 +492,9 @@ func VerifyDepTree(osDirname string, wantSums map[string][]byte) (map[string]Ven
 				if err != nil {
 					return nil, errors.Wrap(err, "cannot Stat")
 				}
-				// Skip non-interesting file system nodes
-				if fi.Mode()&skipSpecialNodes != 0 {
-					continue
-				}
-				// Track all file system nodes, but only need to add directories
-				// to the work queue.
-				nodes = append(nodes, otherNode)
+				nodes = append(nodes, otherNode) // Track all file system nodes...
 				if fi.IsDir() {
-					queue = append(queue, otherNode)
+					queue = append(queue, otherNode) // but only need to add directories to the work queue.
 				}
 			}
 		}
