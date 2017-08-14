@@ -5,7 +5,9 @@
 package pkgtree
 
 import (
+	"bytes"
 	"fmt"
+	"go/ast"
 	"go/build"
 	"go/parser"
 	gscan "go/scanner"
@@ -123,9 +125,9 @@ func ListPackages(fileRoot, importRoot string) (PackageTree, error) {
 		ip := filepath.ToSlash(filepath.Join(importRoot, strings.TrimPrefix(wp, fileRoot)))
 
 		// Find all the imports, across all os/arch combos
-		//p, err := fullPackageInDir(wp)
 		p := &build.Package{
-			Dir: wp,
+			Dir:        wp,
+			ImportPath: ip,
 		}
 		err = fillPackage(p)
 
@@ -208,6 +210,7 @@ func fillPackage(p *build.Package) error {
 
 	var testImports []string
 	var imports []string
+	var importComments []string
 	for _, file := range gofiles {
 		// Skip underscore-led or dot-led files, in keeping with the rest of the toolchain.
 		bPrefix := filepath.Base(file)[0]
@@ -232,6 +235,10 @@ func fillPackage(p *build.Package) error {
 
 		var ignored bool
 		for _, c := range pf.Comments {
+			ic := findImportComment(pf.Name, c)
+			if ic != "" {
+				importComments = append(importComments, ic)
+			}
 			if c.Pos() > pf.Package { // +build comment must come before package
 				continue
 			}
@@ -280,12 +287,75 @@ func fillPackage(p *build.Package) error {
 			}
 		}
 	}
-
+	importComments = uniq(importComments)
+	if len(importComments) > 1 {
+		return &ConflictingImportComments{
+			ImportPath:     p.ImportPath,
+			ImportComments: importComments,
+		}
+	}
+	if len(importComments) > 0 {
+		p.ImportComment = importComments[0]
+	}
 	imports = uniq(imports)
 	testImports = uniq(testImports)
 	p.Imports = imports
 	p.TestImports = testImports
 	return nil
+}
+
+var (
+	slashSlash = []byte("//")
+	slashStar  = []byte("/*")
+	starSlash  = []byte("*/")
+	newline    = []byte("\n")
+	importKwd  = []byte("import ")
+)
+
+func findImportComment(pkgName *ast.Ident, c *ast.CommentGroup) string {
+	afterPkg := pkgName.NamePos + token.Pos(len(pkgName.Name)) + 1
+	commentSlash := c.List[0].Slash
+	if afterPkg != commentSlash {
+		return ""
+	}
+	text := []byte(c.List[0].Text)
+	switch {
+	case bytes.HasPrefix(text, slashSlash):
+		eol := bytes.IndexByte(text, '\n')
+		if eol < 0 {
+			eol = len(text)
+		}
+		text = text[2:eol]
+	case bytes.HasPrefix(text, slashStar):
+		text = text[2:]
+		end := bytes.Index(text, starSlash)
+		if end < 0 {
+			// malformed comment
+			return ""
+		}
+		text = text[:end]
+		if bytes.IndexByte(text, '\n') > 0 {
+			// multiline comment, can't be an import comment
+			return ""
+		}
+	}
+	text = bytes.TrimSpace(text)
+	if !bytes.HasPrefix(text, importKwd) {
+		return ""
+	}
+	quotedPath := bytes.TrimSpace(text[len(importKwd):])
+	return string(bytes.Trim(quotedPath, `"`))
+}
+
+// ConflictingImportComments conflict
+type ConflictingImportComments struct {
+	ImportPath     string
+	ImportComments []string
+}
+
+func (e *ConflictingImportComments) Error() string {
+	return fmt.Sprintf("import path %s had conflicting import comments: %q",
+		e.ImportPath, strings.Join(e.ImportComments, "\", \""))
 }
 
 // LocalImportsError indicates that a package contains at least one relative
