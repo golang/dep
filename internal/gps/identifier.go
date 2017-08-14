@@ -41,10 +41,10 @@ import (
 type ProjectRoot string
 
 // A ProjectIdentifier provides the name and source location of a dependency. It
-// is related to, but differs in two keys ways from, an plain import path.
+// is related to, but differs in two key ways from, a plain import path.
 //
 // First, ProjectIdentifiers do not identify a single package. Rather, they
-// encompasses the whole tree of packages, including tree's root - the
+// encompass the whole tree of packages, including tree's root - the
 // ProjectRoot. In gps' current design, this ProjectRoot almost always
 // corresponds to the root of a repository.
 //
