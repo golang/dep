@@ -10,6 +10,7 @@ import (
 	"encoding/binary"
 	"hash"
 	"io"
+	// "log"
 	"os"
 	"path/filepath"
 	"sort"
@@ -177,6 +178,113 @@ func writeBytesWithNull(h hash.Hash, data []byte) {
 // skips symbolic links, and for now, we want the hash to include the symbolic
 // link referents.
 func DigestFromDirectory(osDirname string) ([]byte, error) {
+	osDirname = filepath.Clean(osDirname)
+	dirlen := len(osDirname) + len(osPathSeparator)
+	// log.Printf("DirWalkFunc: osDirname: %s", osDirname)
+	// log.Printf("DirWalkFunc: dirlen: %d", dirlen)
+
+	// Create a single hash instance for the entire operation, rather than a new
+	// hash for each node we encounter.
+	h := sha256.New()
+	var bytesWritten int64
+	modeBytes := make([]byte, 4) // scratch place to store encoded os.FileMode (uint32)
+
+	err := DirWalk(osDirname, func(osPathname string, fi os.FileInfo, err error) error {
+		// log.Printf("DirWalkFunc: osPathname: %s", osPathname)
+		var osRelative string
+		if len(osPathname) > dirlen {
+			osRelative = osPathname[dirlen:]
+			// } else {
+			// 	osRelative = osPathname
+		}
+		// log.Printf("DirWalkFunc: osRelative: %s", osRelative)
+
+		switch osRelative {
+		case "vendor", ".bzr", ".git", ".hg", ".svn":
+			return filepath.SkipDir // skip
+		}
+
+		// We could make our own enum-like data type for encoding the file type,
+		// but Go's runtime already gives us architecture independent file
+		// modes, as discussed in `os/types.go`:
+		//
+		//    Go's runtime FileMode type has same definition on all systems, so
+		//    that information about files can be moved from one system to
+		//    another portably.
+		var mt os.FileMode
+
+		// We only care about the bits that identify the type of a file system
+		// node, and can ignore append, exclusive, temporary, setuid, setgid,
+		// permission bits, and sticky bits, which are coincident to bits which
+		// declare type of the file system node.
+		modeType := fi.Mode() & os.ModeType
+		var shouldSkip bool // skip some types of file system nodes
+
+		switch {
+		case modeType&os.ModeDir > 0:
+			mt = os.ModeDir
+			// Walk function itself does not need to enumerate children, because
+			// DirWalk will do that for us.
+			shouldSkip = true
+		case modeType&os.ModeSymlink > 0:
+			mt = os.ModeSymlink
+		case modeType&os.ModeNamedPipe > 0:
+			mt = os.ModeNamedPipe
+			shouldSkip = true
+		case modeType&os.ModeSocket > 0:
+			mt = os.ModeSocket
+			shouldSkip = true
+		case modeType&os.ModeDevice > 0:
+			mt = os.ModeDevice
+			shouldSkip = true
+		}
+
+		// Write the relative pathname to hash because the hash is a function of
+		// the node names, node types, and node contents. Added benefit is that
+		// empty directories, named pipes, sockets, devices, and symbolic links
+		// will also affect final hash value. Use `filepath.ToSlash` to ensure
+		// relative pathname is os-agnostic.
+		writeBytesWithNull(h, []byte(filepath.ToSlash(osRelative)))
+
+		binary.LittleEndian.PutUint32(modeBytes, uint32(mt)) // encode the type of mode
+		writeBytesWithNull(h, modeBytes)                     // and write to hash
+
+		if shouldSkip {
+			return nil // nothing more to do for some of the node types
+		}
+
+		if mt == os.ModeSymlink { // okay to check for equivalence because we set to this value
+			osRelative, err = os.Readlink(osPathname) // read the symlink referent
+			if err != nil {
+				return errors.Wrap(err, "cannot Readlink")
+			}
+			writeBytesWithNull(h, []byte(filepath.ToSlash(osRelative))) // write referent to hash
+			return nil                                                  // proceed to next node in queue
+		}
+
+		fh, err := os.Open(osPathname)
+		if err != nil {
+			return errors.Wrap(err, "cannot Open")
+		}
+
+		bytesWritten, err = io.Copy(h, newLineEndingReader(fh))            // fast copy of file contents to hash
+		err = errors.Wrap(err, "cannot Copy")                              // errors.Wrap only wraps non-nil, so skip extra check
+		writeBytesWithNull(h, []byte(strconv.FormatInt(bytesWritten, 10))) // 10: format file size as base 10 integer
+
+		// Close the file handle to the open file without masking
+		// possible previous error value.
+		if er := fh.Close(); err == nil {
+			err = errors.Wrap(er, "cannot Close")
+		}
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
+	return h.Sum(nil), nil
+}
+
+func DigestFromDirectoryGood(osDirname string) ([]byte, error) {
 	osDirname = filepath.Clean(osDirname)
 
 	// Ensure parameter is a directory
