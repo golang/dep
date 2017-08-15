@@ -5,9 +5,9 @@
 package pkgtree
 
 import (
-	"log"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -42,17 +42,17 @@ func DirWalk(osDirname string, walkFn DirWalkFunc) error {
 	// Ensure parameter is a directory
 	fi, err := os.Stat(osDirname)
 	if err != nil {
-		return errors.Wrap(err, "cannot Stat")
+		return errors.Wrap(err, "cannot read node")
 	}
 	if !fi.IsDir() {
-		return errors.Errorf("cannot verify non directory: %q", osDirname)
+		return errors.Errorf("cannot walk non directory: %q", osDirname)
 	}
 
 	// Initialize a work queue with the empty string, which signifies the
 	// starting directory itself.
 	queue := []string{""}
 
-	var osRelative string // os-specific relative pathname under dirname
+	var osRelative string // os-specific relative pathname under directory name
 
 	// As we enumerate over the queue and encounter a directory, its children
 	// will be added to the work queue.
@@ -62,28 +62,40 @@ func DirWalk(osDirname string, walkFn DirWalkFunc) error {
 		osRelative, queue = queue[0], queue[1:]
 		osPathname := filepath.Join(osDirname, osRelative)
 
+		// walkFn needs to choose how to handle symbolic links, therefore obtain
+		// lstat rather than stat.
 		fi, err = os.Lstat(osPathname)
-		err = walkFn(osPathname, fi, errors.Wrap(err, "cannot Lstat"))
+		if err == nil {
+			err = walkFn(osPathname, fi, nil)
+		} else {
+			err = walkFn(osPathname, nil, errors.Wrap(err, "cannot read node"))
+		}
+
 		if err != nil {
 			if err == filepath.SkipDir {
-				// We have lstat, and we need stat right now
-				fi, err = os.Stat(osPathname)
-				if err != nil {
-					return errors.Wrap(err, "cannot Stat")
+				if fi.Mode()&os.ModeSymlink > 0 {
+					// Resolve symbolic link referent to determine whether node
+					// is directory or not.
+					fi, err = os.Stat(osPathname)
+					if err != nil {
+						return errors.Wrap(err, "cannot visit node")
+					}
 				}
+				// If current node is directory, then skip this
+				// directory. Otherwise, skip all nodes in the same parent
+				// directory.
 				if !fi.IsDir() {
-					// Consume items from queue while they have the same parent
-					// as the current item.
-					osParent := filepath.Dir(osPathname)
+					// Consume nodes from queue while they have the same parent
+					// as the current node.
+					osParent := filepath.Dir(osPathname) + osPathSeparator
 					for len(queue) > 0 && strings.HasPrefix(queue[0], osParent) {
-						log.Printf("skipping sibling: %s", queue[0])
-						queue = queue[1:]
+						queue = queue[1:] // drop sibling from queue
 					}
 				}
 
 				continue
 			}
-			return errors.Wrap(err, "DirWalkFunction")
+			return errors.Wrap(err, "DirWalkFunction") // wrap error returned by walkFn
 		}
 
 		if fi.IsDir() {
@@ -102,4 +114,26 @@ func DirWalk(osDirname string, walkFn DirWalkFunc) error {
 		}
 	}
 	return nil
+}
+
+// sortedChildrenFromDirname returns a lexicographically sorted list of child
+// nodes for the specified directory.
+func sortedChildrenFromDirname(osDirname string) ([]string, error) {
+	fh, err := os.Open(osDirname)
+	if err != nil {
+		return nil, errors.Wrap(err, "cannot Open")
+	}
+
+	osChildrenNames, err := fh.Readdirnames(0) // 0: read names of all children
+	if err != nil {
+		return nil, errors.Wrap(err, "cannot Readdirnames")
+	}
+	sort.Strings(osChildrenNames)
+
+	// Close the file handle to the open directory without masking possible
+	// previous error value.
+	if er := fh.Close(); err == nil {
+		err = errors.Wrap(er, "cannot Close")
+	}
+	return osChildrenNames, err
 }

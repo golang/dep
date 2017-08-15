@@ -12,7 +12,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"sort"
 	"strconv"
 
 	"github.com/pkg/errors"
@@ -123,39 +122,21 @@ func (f *lineEndingReader) Read(buf []byte) (int, error) {
 	return nr, er
 }
 
-// sortedChildrenFromDirname returns a lexicographically sorted list of child
-// nodes for the specified directory.
-func sortedChildrenFromDirname(osDirname string) ([]string, error) {
-	fh, err := os.Open(osDirname)
-	if err != nil {
-		return nil, errors.Wrap(err, "cannot Open")
-	}
-	osChildrenNames, err := sortedChildrenFromDirectorFileHandle(fh)
-	// Close the file handle to the open directory without masking possible
-	// previous error value.
-	if er := fh.Close(); err == nil {
-		err = errors.Wrap(er, "cannot Close")
-	}
-	return osChildrenNames, err
-}
-
-// sortedChildrenFromDirectorFileHandle returns a lexicographically sorted list
-// of child nodes for the specified file handle to a directory.
-func sortedChildrenFromDirectorFileHandle(fh *os.File) ([]string, error) {
-	osChildrenNames, err := fh.Readdirnames(0) // 0: read names of all children
-	if err != nil {
-		return nil, errors.Wrap(err, "cannot Readdirnames")
-	}
-	sort.Strings(osChildrenNames)
-	return osChildrenNames, nil
-}
-
 // writeBytesWithNull appends the specified data to the specified hash, followed by
 // the NULL byte, in order to make accidental hash collisions less likely.
 func writeBytesWithNull(h hash.Hash, data []byte) {
 	// Ignore return values from writing to the hash, because hash write always
 	// returns nil error.
 	_, _ = h.Write(append(data, 0))
+}
+
+// dirWalkClosure is used to reduce number of allocation involved in closing
+// over these variables.
+type dirWalkClosure struct {
+	someCopyBufer []byte // allocate once and reuse for each file copy
+	someModeBytes []byte // allocate once and reuse for each node
+	someDirLen    int
+	someHash      hash.Hash
 }
 
 // DigestFromDirectory returns a hash of the specified directory contents, which
@@ -179,40 +160,25 @@ func writeBytesWithNull(h hash.Hash, data []byte) {
 func DigestFromDirectory(osDirname string) ([]byte, error) {
 	osDirname = filepath.Clean(osDirname)
 
-	// Ensure parameter is a directory
-	fi, err := os.Stat(osDirname)
-	if err != nil {
-		return nil, errors.Wrap(err, "cannot Stat")
-	}
-	if !fi.IsDir() {
-		return nil, errors.Errorf("cannot verify non directory: %q", osDirname)
-	}
-
 	// Create a single hash instance for the entire operation, rather than a new
 	// hash for each node we encounter.
-	h := sha256.New()
 
-	someCopyBufer := make([]byte, 32*1024) // same size as what io.Copy uses
+	closure := dirWalkClosure{
+		someCopyBufer: make([]byte, 4*1024), // only allocate a single page
+		someModeBytes: make([]byte, 4),      // scratch place to store encoded os.FileMode (uint32)
+		someDirLen:    len(osDirname) + len(osPathSeparator),
+		someHash:      sha256.New(),
+	}
 
-	// Initialize a work queue with the empty string, which signifies the
-	// starting directory itself.
-	queue := []string{""}
+	err := DirWalk(osDirname, func(osPathname string, info os.FileInfo, err error) error {
+		var osRelative string
+		if len(osPathname) > closure.someDirLen {
+			osRelative = osPathname[closure.someDirLen:]
+		}
 
-	var osRelative string // os-specific relative pathname under dirname
-	var bytesWritten int64
-	modeBytes := make([]byte, 4) // scratch place to store encoded os.FileMode (uint32)
-
-	// As we enumerate over the queue and encounter a directory, its children
-	// will be added to the work queue.
-	for len(queue) > 0 {
-		// Unshift a pathname from the queue (breadth-first traversal of
-		// hierarchy)
-		osRelative, queue = queue[0], queue[1:]
-		osPathname := filepath.Join(osDirname, osRelative)
-
-		fi, err = os.Lstat(osPathname)
-		if err != nil {
-			return nil, errors.Wrap(err, "cannot Lstat")
+		switch filepath.Base(osRelative) {
+		case "vendor", ".bzr", ".git", ".hg", ".svn":
+			return filepath.SkipDir
 		}
 
 		// We could make our own enum-like data type for encoding the file type,
@@ -228,12 +194,15 @@ func DigestFromDirectory(osDirname string) ([]byte, error) {
 		// node, and can ignore append, exclusive, temporary, setuid, setgid,
 		// permission bits, and sticky bits, which are coincident to bits which
 		// declare type of the file system node.
-		modeType := fi.Mode() & os.ModeType
+		modeType := info.Mode() & os.ModeType
 		var shouldSkip bool // skip some types of file system nodes
 
 		switch {
 		case modeType&os.ModeDir > 0:
 			mt = os.ModeDir
+			// DirWalkFunc itself does not need to enumerate children, because
+			// DirWalk will do that for us.
+			shouldSkip = true
 		case modeType&os.ModeSymlink > 0:
 			mt = os.ModeSymlink
 		case modeType&os.ModeNamedPipe > 0:
@@ -252,62 +221,46 @@ func DigestFromDirectory(osDirname string) ([]byte, error) {
 		// empty directories, named pipes, sockets, devices, and symbolic links
 		// will also affect final hash value. Use `filepath.ToSlash` to ensure
 		// relative pathname is os-agnostic.
-		writeBytesWithNull(h, []byte(filepath.ToSlash(osRelative)))
+		writeBytesWithNull(closure.someHash, []byte(filepath.ToSlash(osRelative)))
 
-		binary.LittleEndian.PutUint32(modeBytes, uint32(mt)) // encode the type of mode
-		writeBytesWithNull(h, modeBytes)                     // and write to hash
+		binary.LittleEndian.PutUint32(closure.someModeBytes, uint32(mt)) // encode the type of mode
+		writeBytesWithNull(closure.someHash, closure.someModeBytes)      // and write to hash
 
 		if shouldSkip {
-			continue // nothing more to do for some of the node types
+			return nil // nothing more to do for some of the node types
 		}
 
 		if mt == os.ModeSymlink { // okay to check for equivalence because we set to this value
 			osRelative, err = os.Readlink(osPathname) // read the symlink referent
 			if err != nil {
-				return nil, errors.Wrap(err, "cannot Readlink")
+				return errors.Wrap(err, "cannot Readlink")
 			}
-			writeBytesWithNull(h, []byte(filepath.ToSlash(osRelative))) // write referent to hash
-			continue                                                    // proceed to next node in queue
+			writeBytesWithNull(closure.someHash, []byte(filepath.ToSlash(osRelative))) // write referent to hash
+			return nil                                                                 // proceed to next node in queue
 		}
 
-		// For both directories and regular files, we must create a file system
-		// handle in order to read their contents.
+		// If we get here, node is a regular file.
 		fh, err := os.Open(osPathname)
 		if err != nil {
-			return nil, errors.Wrap(err, "cannot Open")
+			return errors.Wrap(err, "cannot Open")
 		}
 
-		if mt == os.ModeDir {
-			osChildrenNames, err := sortedChildrenFromDirectorFileHandle(fh)
-			if err != nil {
-				_ = fh.Close() // ignore close error because we already have an error reading directory
-				return nil, errors.Wrap(err, "cannot get list of directory children")
-			}
-			for _, osChildName := range osChildrenNames {
-				switch osChildName {
-				case ".", "..", "vendor", ".bzr", ".git", ".hg", ".svn":
-					// skip
-				default:
-					queue = append(queue, filepath.Join(osRelative, osChildName))
-				}
-			}
-		} else {
-			bytesWritten, err = io.CopyBuffer(h, newLineEndingReader(fh), someCopyBufer) // fast copy of file contents to hash
-			err = errors.Wrap(err, "cannot Copy")                                        // errors.Wrap only wraps non-nil, so skip extra check
-			writeBytesWithNull(h, []byte(strconv.FormatInt(bytesWritten, 10)))           // 10: format file size as base 10 integer
-		}
+		var bytesWritten int64
+		bytesWritten, err = io.CopyBuffer(closure.someHash, newLineEndingReader(fh), closure.someCopyBufer) // fast copy of file contents to hash
+		err = errors.Wrap(err, "cannot Copy")                                                               // errors.Wrap only wraps non-nil, so skip extra check
+		writeBytesWithNull(closure.someHash, []byte(strconv.FormatInt(bytesWritten, 10)))                   // 10: format file size as base 10 integer
 
-		// Close the file handle to the open directory or file without masking
+		// Close the file handle to the open file without masking
 		// possible previous error value.
 		if er := fh.Close(); err == nil {
 			err = errors.Wrap(er, "cannot Close")
 		}
-		if err != nil {
-			return nil, err // early termination iff error
-		}
+		return err
+	})
+	if err != nil {
+		return nil, err
 	}
-
-	return h.Sum(nil), nil
+	return closure.someHash.Sum(nil), nil
 }
 
 // VendorStatus represents one of a handful of possible status conditions for a
