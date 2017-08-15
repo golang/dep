@@ -193,8 +193,21 @@ func TestVerifyDepTree(t *testing.T) {
 	}
 }
 
+func BenchmarkDigestFromDirectory(b *testing.B) {
+	b.Skip("Eliding benchmark of user's Go source directory")
+
+	prefix := filepath.Join(os.Getenv("GOPATH"), "src")
+
+	for i := 0; i < b.N; i++ {
+		_, err := DigestFromDirectory(prefix)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
 func BenchmarkVerifyDepTree(b *testing.B) {
-	// b.Skip("Eliding benchmark of user's Go source directory")
+	b.Skip("Eliding benchmark of user's Go source directory")
 
 	prefix := filepath.Join(os.Getenv("GOPATH"), "src")
 
