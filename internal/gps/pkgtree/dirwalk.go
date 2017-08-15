@@ -13,12 +13,12 @@ import (
 	"github.com/pkg/errors"
 )
 
-// DirWalk is the type of the function called for each file system node visited
-// by DirWalk. The path argument contains the argument to DirWalk as a prefix;
-// that is, if DirWalk is called with "dir", which is a directory containing the
-// file "a", the walk function will be called with the argument "dir/a", using
-// the correct os.PathSeparator for the Go Operating System architecture,
-// GOOS. The info argument is the os.FileInfo for the named path.
+// DirWalkFunc is the type of the function called for each file system node
+// visited by DirWalk. The path argument contains the argument to DirWalk as a
+// prefix; that is, if DirWalk is called with "dir", which is a directory
+// containing the file "a", the walk function will be called with the argument
+// "dir/a", using the correct os.PathSeparator for the Go Operating System
+// architecture, GOOS. The info argument is the os.FileInfo for the named path.
 //
 // If there was a problem walking to the file or directory named by path, the
 // incoming error will describe the problem and the function can decide how to
