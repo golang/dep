@@ -17,13 +17,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-const (
-	osPathSeparator = string(filepath.Separator)
-
-	// when walking vendor root hierarchy, ignore file system nodes of the
-	// following types.
-	skipSpecialNodes = os.ModeDevice | os.ModeNamedPipe | os.ModeSocket | os.ModeCharDevice
-)
+const osPathSeparator = string(filepath.Separator)
 
 // lineEndingReader is a `io.Reader` that converts CRLF sequences to LF.
 //
