@@ -171,6 +171,10 @@ func DigestFromDirectory(osDirname string) ([]byte, error) {
 	}
 
 	err := DirWalk(osDirname, func(osPathname string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err // DirWalk received an error during initial Lstat
+		}
+
 		var osRelative string
 		if len(osPathname) > closure.someDirLen {
 			osRelative = osPathname[closure.someDirLen:]
