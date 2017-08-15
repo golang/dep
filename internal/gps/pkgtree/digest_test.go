@@ -157,20 +157,6 @@ func TestVerifyDepTree(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// NOTE: When true, display the digests of the directories specified by the
-	// digest keys.
-	if false {
-		for k, want := range wantSums {
-			got, err := DigestFromDirectory(filepath.Join(vendorRoot, k))
-			if err != nil {
-				t.Error(err)
-			}
-			if !bytes.Equal(got, want) {
-				t.Errorf("%q\n(GOT):\n\t%#v\n(WNT):\n\t%#v", k, got, want)
-			}
-		}
-	}
-
 	if got, want := len(status), 7; got != want {
 		t.Errorf("\n(GOT): %v; (WNT): %v", got, want)
 	}
@@ -193,6 +179,18 @@ func TestVerifyDepTree(t *testing.T) {
 	checkStatus(t, status, "github.com/bob/emptyDigest", EmptyDigestInLock)
 	checkStatus(t, status, "github.com/charlie/notInTree", NotInTree)
 	checkStatus(t, status, "launchpad.net/match", NoMismatch)
+
+	if t.Failed() {
+		for k, want := range wantSums {
+			got, err := DigestFromDirectory(filepath.Join(vendorRoot, k))
+			if err != nil {
+				t.Error(err)
+			}
+			if !bytes.Equal(got, want) {
+				t.Errorf("%q\n(GOT):\n\t%#v\n(WNT):\n\t%#v", k, got, want)
+			}
+		}
+	}
 }
 
 func BenchmarkVerifyDepTree(b *testing.B) {
