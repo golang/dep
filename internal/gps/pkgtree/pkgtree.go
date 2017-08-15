@@ -154,6 +154,13 @@ func ListPackages(fileRoot, importRoot string) (PackageTree, error) {
 			}
 		}
 
+		if pkg.CommentPath != "" && !strings.HasPrefix(pkg.CommentPath, importRoot) {
+			return &NonCanonicalImportRoot{
+				ImportRoot: importRoot,
+				Canonical:  pkg.CommentPath,
+			}
+		}
+
 		// This area has some...fuzzy rules, but check all the imports for
 		// local/relative/dot-ness, and record an error for the package if we
 		// see any.
@@ -347,15 +354,36 @@ func findImportComment(pkgName *ast.Ident, c *ast.CommentGroup) string {
 	return string(bytes.Trim(quotedPath, `"`))
 }
 
-// ConflictingImportComments conflict
+// ConflictingImportComments indicates that the package declares more than one
+// different canonical paths.
 type ConflictingImportComments struct {
 	ImportPath     string
 	ImportComments []string
 }
 
 func (e *ConflictingImportComments) Error() string {
-	return fmt.Sprintf("import path %s had conflicting import comments: %q",
-		e.ImportPath, strings.Join(e.ImportComments, "\", \""))
+	return fmt.Sprintf("import path %s had conflicting import comments: %s",
+		e.ImportPath, quotedPaths(e.ImportComments))
+}
+
+// NonCanonicalImportRoot reports the situation when the dependee imports a
+// package via something else that the package's declared canonical path.
+type NonCanonicalImportRoot struct {
+	ImportRoot string
+	Canonical  string
+}
+
+func (e *NonCanonicalImportRoot) Error() string {
+	return fmt.Sprintf("importing via path %q, but package insists on a canonical path %q",
+		e.ImportRoot, e.Canonical)
+}
+
+func quotedPaths(ps []string) string {
+	var quoted []string
+	for _, p := range ps {
+		quoted = append(quoted, fmt.Sprintf("%q", p))
+	}
+	return strings.Join(quoted, ", ")
 }
 
 // LocalImportsError indicates that a package contains at least one relative
@@ -376,7 +404,7 @@ func (e *LocalImportsError) Error() string {
 	case 1:
 		return fmt.Sprintf("import path %s had a local import: %q", e.ImportPath, e.LocalImports[0])
 	default:
-		return fmt.Sprintf("import path %s had local imports: %q", e.ImportPath, strings.Join(e.LocalImports, "\", \""))
+		return fmt.Sprintf("import path %s had local imports: %s", e.ImportPath, quotedPaths(e.LocalImports))
 	}
 }
 
