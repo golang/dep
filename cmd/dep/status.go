@@ -10,6 +10,8 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"io/ioutil"
+	"log"
 	"sort"
 	"text/tabwriter"
 
@@ -316,8 +318,12 @@ func runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceMana
 		Manifest:        p.Manifest,
 		// Locks aren't a part of the input hash check, so we can omit it.
 	}
+
+	logger := ctx.Err
 	if ctx.Verbose {
 		params.TraceLogger = ctx.Err
+	} else {
+		logger = log.New(ioutil.Discard, "", 0)
 	}
 
 	if err := ctx.ValidateParams(sm, params); err != nil {
@@ -344,7 +350,11 @@ func runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceMana
 
 		out.BasicHeader()
 
+		logger.Println("Checking upstream projects:")
+
 		for _, proj := range slp {
+			logger.Println(proj.Ident().ProjectRoot)
+
 			bs := BasicStatus{
 				ProjectRoot:  string(proj.Ident().ProjectRoot),
 				PackageCount: len(proj.Packages()),
