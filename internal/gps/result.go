@@ -9,6 +9,9 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"sync"
+
+	"github.com/pkg/errors"
 )
 
 // A Solution is returned by a solver run. It is mostly just a Lock, with some
@@ -62,21 +65,39 @@ func WriteDepTree(basedir string, l Lock, sm SourceManager, sv bool, logger *log
 		return err
 	}
 
-	// TODO(sdboyer) parallelize
-	for _, p := range l.Projects() {
-		to := filepath.FromSlash(filepath.Join(basedir, string(p.Ident().ProjectRoot)))
+	var wg sync.WaitGroup
+	errCh := make(chan error, len(l.Projects()))
 
-		logger.Printf("Writing out %s@%s", p.Ident().errString(), p.Version())
-		err = sm.ExportProject(p.Ident(), p.Version(), to)
-		if err != nil {
-			removeAll(basedir)
-			return fmt.Errorf("error while exporting %s@%s: %s", p.Ident().errString(), p.Version(), err)
-		}
-		if sv {
-			filepath.Walk(to, stripVendor)
-		}
+	for _, p := range l.Projects() {
+		wg.Add(1)
+		go func(p LockedProject) {
+			to := filepath.FromSlash(filepath.Join(basedir, string(p.Ident().ProjectRoot)))
+			logger.Printf("Writing out %s@%s", p.Ident().errString(), p.Version())
+
+			if err := sm.ExportProject(p.Ident(), p.Version(), to); err != nil {
+				errCh <- errors.Wrapf(err, "failed to export %s", p.Ident().ProjectRoot)
+			}
+
+			if sv {
+				filepath.Walk(to, stripVendor)
+			}
+			wg.Done()
+		}(p)
 	}
 
+	wg.Wait()
+	close(errCh)
+
+	if len(errCh) > 0 {
+		logger.Println("Failed to write dep tree. The following errors occurred:")
+		for err := range errCh {
+			logger.Println(" * ", err)
+		}
+
+		removeAll(basedir)
+
+		return errors.New("failed to write dep tree")
+	}
 	return nil
 }
 
