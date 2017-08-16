@@ -214,11 +214,7 @@ func pruneNonGoFiles(baseDir string, logger *log.Logger) error {
 		return errors.Wrap(err, "could not prune non-Go files")
 	}
 
-	if err := deleteFiles(files); err != nil {
-		return err
-	}
-
-	return nil
+	return deleteFiles(files)
 }
 
 // calculateNonGoFiles returns a list of all non-Go files within baseDir.
@@ -279,11 +275,7 @@ func pruneGoTestFiles(baseDir string, logger *log.Logger) error {
 		return errors.Wrap(err, "could not prune Go test files")
 	}
 
-	if err := deleteFiles(files); err != nil {
-		return err
-	}
-
-	return nil
+	return deleteFiles(files)
 }
 
 // calculateGoTestFiles walks over baseDir and returns a list of all
