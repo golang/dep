@@ -112,7 +112,7 @@ func (m maybeGitSource) try(ctx context.Context, cachedir string, c singleSource
 		return nil, 0, err
 	}
 
-	c.storeVersionMap(vl, true)
+	c.setVersionMap(vl)
 	state := sourceIsSetUp | sourceExistsUpstream | sourceHasLatestVersionList
 
 	if r.CheckLocal() {
@@ -173,7 +173,7 @@ func (m maybeGopkginSource) try(ctx context.Context, cachedir string, c singleSo
 		return nil, 0, err
 	}
 
-	c.storeVersionMap(vl, true)
+	c.setVersionMap(vl)
 	state := sourceIsSetUp | sourceExistsUpstream | sourceHasLatestVersionList
 
 	if r.CheckLocal() {
