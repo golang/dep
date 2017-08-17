@@ -180,7 +180,7 @@ func TestSingleSourceCache(t *testing.T) {
 			NewVersion(ver).Pair(rev2),
 		}
 		SortPairedForDowngrade(versions)
-		c.storeVersionMap(versions, true)
+		c.setVersionMap(versions)
 
 		t.Run("getAllVersions", func(t *testing.T) {
 			got := c.getAllVersions()
