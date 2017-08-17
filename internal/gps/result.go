@@ -86,7 +86,6 @@ func WriteDepTree(basedir string, l Lock, sm SourceManager, sv bool, logger *log
 					errCh <- errors.Wrapf(err, "failed to strip vendor from %s", p.Ident().ProjectRoot)
 				}
 			}
-			return
 		}(p)
 	}
 
