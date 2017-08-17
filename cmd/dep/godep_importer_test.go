@@ -153,7 +153,10 @@ func TestGodepConfig_Import(t *testing.T) {
 	h.TempCopy(filepath.Join(testProjectRoot, godepPath), "godep/Godeps.json")
 
 	projectRoot := h.Path(testProjectRoot)
-	sm, err := gps.NewSourceManager(h.Path(cacheDir))
+	sm, err := gps.NewSourceManager(gps.SourceManagerConfig{
+		Cachedir: h.Path(cacheDir),
+		Logger:   log.New(test.Writer{t}, "", 0),
+	})
 	h.Must(err)
 	defer sm.Release()
 

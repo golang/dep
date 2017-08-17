@@ -6,11 +6,12 @@ package gps
 
 import (
 	"context"
-	"errors"
 	"fmt"
+	"log"
 	"sync"
 
 	"github.com/golang/dep/internal/gps/pkgtree"
+	"github.com/pkg/errors"
 )
 
 // sourceState represent the states that a source can be in, depending on how
@@ -49,16 +50,26 @@ type sourceCoordinator struct {
 	protoSrcs  map[string][]srcReturnChans
 	deducer    deducer
 	cachedir   string
+	logger     *log.Logger
 }
 
-func newSourceCoordinator(superv *supervisor, deducer deducer, cachedir string) *sourceCoordinator {
+func newSourceCoordinator(superv *supervisor, deducer deducer, cachedir string, logger *log.Logger) *sourceCoordinator {
 	return &sourceCoordinator{
 		supervisor: superv,
 		deducer:    deducer,
 		cachedir:   cachedir,
+		logger:     logger,
 		srcs:       make(map[string]*sourceGateway),
 		nameToURL:  make(map[string]string),
 		protoSrcs:  make(map[string][]srcReturnChans),
+	}
+}
+
+func (sc *sourceCoordinator) close() {
+	for k, v := range sc.srcs {
+		if err := v.close(); err != nil {
+			sc.logger.Println(errors.Wrapf(err, "error closing source gateway for %q", k))
+		}
 	}
 }
 
@@ -198,6 +209,10 @@ func newSourceGateway(maybe maybeSource, superv *supervisor, cachedir string) *s
 	sg.cache = sg.createSingleSourceCache()
 
 	return sg
+}
+
+func (sg *sourceGateway) close() error {
+	return errors.Wrap(sg.cache.close(), "error closing cache")
 }
 
 func (sg *sourceGateway) syncLocal(ctx context.Context) error {

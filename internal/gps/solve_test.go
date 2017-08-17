@@ -10,9 +10,9 @@ import (
 	"log"
 	"reflect"
 	"sort"
-	"strings"
 	"testing"
-	"unicode"
+
+	"github.com/golang/dep/internal/test"
 )
 
 // overrideMkBridge overrides the base bridge with the depspecBridge that skips
@@ -21,30 +21,11 @@ func overrideMkBridge(s *solver, sm SourceManager, down bool) sourceBridge {
 	return &depspecBridge{mkBridge(s, sm, down)}
 }
 
-type testlogger struct {
-	*testing.T
-}
-
-func (t testlogger) Write(b []byte) (n int, err error) {
-	str := string(b)
-	if len(str) == 0 {
-		return 0, nil
-	}
-
-	for _, part := range strings.Split(str, "\n") {
-		str := strings.TrimRightFunc(part, unicode.IsSpace)
-		if len(str) != 0 {
-			t.T.Log(str)
-		}
-	}
-	return len(b), err
-}
-
 func fixSolve(params SolveParameters, sm SourceManager, t *testing.T) (Solution, error) {
 	// Trace unconditionally; by passing the trace through t.Log(), the testing
 	// system will decide whether or not to actually show the output (based on
 	// -v, or selectively on test failure).
-	params.TraceLogger = log.New(testlogger{T: t}, "", 0)
+	params.TraceLogger = log.New(test.Writer{t}, "", 0)
 	// always return false, otherwise it would identify pretty much all of
 	// our fixtures as being stdlib and skip everything
 	params.stdLibFn = func(string) bool { return false }
