@@ -566,19 +566,27 @@ func (sm *SourceMgr) InferConstraint(s string, pi ProjectIdentifier) (Constraint
 		return version.Unpair(), nil
 	}
 
-	// Abbreviated git revision? If the string is present, there's a good shot of
-	// this.
-	if present, _ := sm.RevisionPresentIn(pi, Revision(s)); present {
-		srcg, err := sm.srcCoord.getSourceGatewayFor(context.TODO(), pi)
-		if err == nil {
-			r, err := srcg.disambiguateRevision(context.TODO(), Revision(s))
-			if err == nil {
-				return r, nil
-			}
-		}
+	// Revision, possibly abbreviated
+	r, err := sm.disambiguateRevision(context.TODO(), pi, Revision(s))
+	if err == nil {
+		return r, nil
 	}
 
 	return nil, errors.Errorf("%s is not a valid version for the package %s(%s)", s, pi.ProjectRoot, pi.Source)
+}
+
+// disambiguateRevision looks up a revision in the underlying source, spitting
+// it back out in an unabbreviated, disambiguated form.
+//
+// For example, if pi refers to a git-based project, then rev could be an
+// abbreviated git commit hash. disambiguateRevision would return the complete
+// hash.
+func (sm *SourceMgr) disambiguateRevision(ctx context.Context, pi ProjectIdentifier, rev Revision) (Revision, error) {
+	srcg, err := sm.srcCoord.getSourceGatewayFor(context.TODO(), pi)
+	if err != nil {
+		return "", err
+	}
+	return srcg.disambiguateRevision(ctx, rev)
 }
 
 type timeCount struct {
