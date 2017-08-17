@@ -6,7 +6,6 @@ package gps
 
 import (
 	"context"
-	"encoding/hex"
 	"fmt"
 	"os"
 	"os/signal"
@@ -519,24 +518,13 @@ func (sm *SourceMgr) InferConstraint(s string, pi ProjectIdentifier) (Constraint
 		return Any(), nil
 	}
 
-	slen := len(s)
-	if slen == 40 {
-		if _, err := hex.DecodeString(s); err == nil {
-			// Whether or not it's intended to be a SHA1 digest, this is a
-			// valid byte sequence for that, so go with Revision. This
-			// covers git and hg
-			return Revision(s), nil
-		}
-	}
-
-	// Next, try for bzr, which has a three-component GUID separated by
-	// dashes. There should be two, but the email part could contain
-	// internal dashes
+	// Bazaar has a three-component GUID separated by dashes. There should be two,
+	// but the email part could contain internal dashes.
 	if strings.Contains(s, "@") && strings.Count(s, "-") >= 2 {
 		// Work from the back to avoid potential confusion from the email
 		i3 := strings.LastIndex(s, "-")
 		// Skip if - is last char, otherwise this would panic on bounds err
-		if slen == i3+1 {
+		if len(s) == i3+1 {
 			return NewVersion(s), nil
 		}
 
