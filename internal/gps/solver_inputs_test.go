@@ -169,7 +169,10 @@ func TestValidateParams(t *testing.T) {
 
 	cacheDir := "gps-cache"
 	h.TempDir(cacheDir)
-	sm, err := NewSourceManager(h.Path(cacheDir))
+	sm, err := NewSourceManager(SourceManagerConfig{
+		Cachedir: h.Path(cacheDir),
+		Logger:   log.New(test.Writer{t}, "", 0),
+	})
 	h.Must(err)
 	defer sm.Release()
 

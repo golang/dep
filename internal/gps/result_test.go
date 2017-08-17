@@ -11,6 +11,8 @@ import (
 	"path"
 	"path/filepath"
 	"testing"
+
+	"github.com/golang/dep/internal/test"
 )
 
 var discardLogger = log.New(ioutil.Discard, "", 0)
@@ -122,9 +124,12 @@ func BenchmarkCreateVendorTree(b *testing.B) {
 	tmp := path.Join(os.TempDir(), "vsolvtest")
 
 	clean := true
-	sm, err := NewSourceManager(path.Join(tmp, "cache"))
+	sm, err := NewSourceManager(SourceManagerConfig{
+		Cachedir: path.Join(tmp, "cache"),
+		Logger:   log.New(test.Writer{b}, "", 0),
+	})
 	if err != nil {
-		b.Errorf("NewSourceManager errored unexpectedly: %q", err)
+		b.Errorf("failed to create SourceManager: %q", err)
 		clean = false
 	}
 

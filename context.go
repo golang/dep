@@ -84,7 +84,10 @@ func defaultGOPATH() string {
 }
 
 func (c *Ctx) SourceManager() (*gps.SourceMgr, error) {
-	return gps.NewSourceManager(filepath.Join(c.GOPATH, "pkg", "dep"))
+	return gps.NewSourceManager(gps.SourceManagerConfig{
+		Cachedir: filepath.Join(c.GOPATH, "pkg", "dep"),
+		Logger:   c.Out,
+	})
 }
 
 // LoadProject starts from the current working directory and searches up the
