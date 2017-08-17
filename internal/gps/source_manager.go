@@ -578,6 +578,18 @@ func (sm *SourceMgr) InferConstraint(s string, pi ProjectIdentifier) (Constraint
 		return version.Unpair(), nil
 	}
 
+	// Abbreviated git revision? If the string is present, there's a good shot of
+	// this.
+	if present, _ := sm.RevisionPresentIn(pi, Revision(s)); present {
+		srcg, err := sm.srcCoord.getSourceGatewayFor(context.TODO(), pi)
+		if err == nil {
+			ci, err := srcg.commitInfo(context.TODO(), Revision(s))
+			if err == nil {
+				return Revision(ci.Commit), nil
+			}
+		}
+	}
+
 	return nil, errors.Errorf("%s is not a valid version for the package %s(%s)", s, pi.ProjectRoot, pi.Source)
 }
 
