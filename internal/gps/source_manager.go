@@ -583,9 +583,9 @@ func (sm *SourceMgr) InferConstraint(s string, pi ProjectIdentifier) (Constraint
 	if present, _ := sm.RevisionPresentIn(pi, Revision(s)); present {
 		srcg, err := sm.srcCoord.getSourceGatewayFor(context.TODO(), pi)
 		if err == nil {
-			ci, err := srcg.commitInfo(context.TODO(), Revision(s))
+			r, err := srcg.disambiguateRevision(context.TODO(), Revision(s))
 			if err == nil {
-				return Revision(ci.Commit), nil
+				return r, nil
 			}
 		}
 	}

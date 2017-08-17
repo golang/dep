@@ -15,7 +15,6 @@ import (
 	"time"
 
 	"github.com/Masterminds/semver"
-	"github.com/Masterminds/vcs"
 	"github.com/golang/dep/internal/fs"
 	"github.com/golang/dep/internal/gps/pkgtree"
 )
@@ -41,8 +40,12 @@ func (bs *baseVCSSource) upstreamURL() string {
 	return bs.repo.Remote()
 }
 
-func (bs *baseVCSSource) commitInfo(ctx context.Context, r Revision) (*vcs.CommitInfo, error) {
-	return bs.repo.CommitInfo(string(r))
+func (bs *baseVCSSource) disambiguateRevision(ctx context.Context, r Revision) (Revision, error) {
+	ci, err := bs.repo.CommitInfo(string(r))
+	if err != nil {
+		return "", err
+	}
+	return Revision(ci.Commit), nil
 }
 
 func (bs *baseVCSSource) getManifestAndLock(ctx context.Context, pr ProjectRoot, r Revision, an ProjectAnalyzer) (Manifest, Lock, error) {
