@@ -40,7 +40,10 @@ func stripVendor(path string, info os.FileInfo, err error) error {
 				}
 
 			case dir:
-				return removeAll(path)
+				if err := removeAll(path); err != nil {
+					return err
+				}
+				return filepath.SkipDir
 			}
 		}
 	}
