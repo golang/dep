@@ -514,7 +514,7 @@ func (sg *sourceGateway) require(ctx context.Context, wanted sourceState) (errSt
 				})
 
 				if err == nil {
-					sg.cache.storeVersionMap(pvl, true)
+					sg.cache.setVersionMap(pvl)
 				}
 			case sourceHasLatestLocally:
 				err = sg.suprvsr.do(ctx, sg.src.sourceType(), ctSourceFetch, func(ctx context.Context) error {
