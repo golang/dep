@@ -12,7 +12,7 @@ import (
 )
 
 func stripVendor(path string, info os.FileInfo, err error) error {
-	if err != nil && err != filepath.SkipDir {
+	if err != nil {
 		return err
 	}
 
