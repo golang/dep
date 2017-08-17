@@ -79,7 +79,10 @@ func WriteDepTree(basedir string, l Lock, sm SourceManager, sv bool, logger *log
 			}
 
 			if sv {
-				filepath.Walk(to, stripVendor)
+				err := filepath.Walk(to, stripVendor)
+				if err != nil {
+					errCh <- errors.Wrapf(err, "failed to strip vendor from %s", p.Ident().ProjectRoot)
+				}
 			}
 			wg.Done()
 		}(p)

@@ -6,9 +6,16 @@
 
 package gps
 
-import "os"
+import (
+	"os"
+	"path/filepath"
+)
 
 func stripVendor(path string, info os.FileInfo, err error) error {
+	if err != nil && err != filepath.SkipDir {
+		return err
+	}
+
 	if info.Name() == "vendor" {
 		if _, err := os.Lstat(path); err == nil {
 			if (info.Mode() & os.ModeSymlink) != 0 {
