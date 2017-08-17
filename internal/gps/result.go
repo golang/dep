@@ -71,11 +71,13 @@ func WriteDepTree(basedir string, l Lock, sm SourceManager, sv bool, logger *log
 	for _, p := range l.Projects() {
 		wg.Add(1)
 		go func(p LockedProject) {
+			defer wg.Done()
 			to := filepath.FromSlash(filepath.Join(basedir, string(p.Ident().ProjectRoot)))
 			logger.Printf("Writing out %s@%s", p.Ident().errString(), p.Version())
 
 			if err := sm.ExportProject(p.Ident(), p.Version(), to); err != nil {
 				errCh <- errors.Wrapf(err, "failed to export %s", p.Ident().ProjectRoot)
+				return
 			}
 
 			if sv {
@@ -84,7 +86,7 @@ func WriteDepTree(basedir string, l Lock, sm SourceManager, sv bool, logger *log
 					errCh <- errors.Wrapf(err, "failed to strip vendor from %s", p.Ident().ProjectRoot)
 				}
 			}
-			wg.Done()
+			return
 		}(p)
 	}
 
