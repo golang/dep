@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/Masterminds/vcs"
 	"github.com/golang/dep/internal/gps/pkgtree"
 )
 
@@ -450,6 +451,18 @@ func (sg *sourceGateway) revisionPresentIn(ctx context.Context, r Revision) (boo
 	return present, err
 }
 
+func (sg *sourceGateway) commitInfo(ctx context.Context, r Revision) (*vcs.CommitInfo, error) {
+	sg.mu.Lock()
+	defer sg.mu.Unlock()
+
+	_, err := sg.require(ctx, sourceIsSetUp|sourceExistsLocally)
+	if err != nil {
+		return nil, err
+	}
+
+	return sg.src.commitInfo(ctx, r)
+}
+
 func (sg *sourceGateway) sourceURL(ctx context.Context) (string, error) {
 	sg.mu.Lock()
 	defer sg.mu.Unlock()
@@ -550,6 +563,7 @@ type source interface {
 	getManifestAndLock(context.Context, ProjectRoot, Revision, ProjectAnalyzer) (Manifest, Lock, error)
 	listPackages(context.Context, ProjectRoot, Revision) (pkgtree.PackageTree, error)
 	revisionPresentIn(Revision) (bool, error)
+	commitInfo(context.Context, Revision) (*vcs.CommitInfo, error)
 	exportRevisionTo(context.Context, Revision, string) error
 	sourceType() string
 }

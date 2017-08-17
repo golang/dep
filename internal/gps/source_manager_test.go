@@ -36,6 +36,8 @@ func TestSourceManager_InferConstraint(t *testing.T) {
 		"v0.12.0-12-de4dcafe0": svs,
 		"master":               NewBranch("master"),
 		"5b3352dc16517996fb951394bcbbe913a2a616e3": Revision("5b3352dc16517996fb951394bcbbe913a2a616e3"),
+		// abbreviated git ref
+		"3f4c3bea": Revision("3f4c3bea144e112a69bbe5d8d01c1b09a544253f"),
 
 		// valid bzr rev
 		"jess@linux.com-20161116211307-wiuilyamo9ian0m7": Revision("jess@linux.com-20161116211307-wiuilyamo9ian0m7"),
