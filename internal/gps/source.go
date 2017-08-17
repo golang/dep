@@ -402,7 +402,7 @@ func (sg *sourceGateway) convertToRevision(ctx context.Context, v Version) (Revi
 
 	// The version list is out of date; it's possible this version might
 	// show up after loading it.
-	_, err := sg.require(ctx, sourceIsSetUp|sourceHasLatestVersionList|sourceHasLatestLocally)
+	_, err := sg.require(ctx, sourceIsSetUp|sourceHasLatestVersionList)
 	if err != nil {
 		return "", err
 	}
@@ -507,14 +507,16 @@ func (sg *sourceGateway) require(ctx context.Context, wanted sourceState) (errSt
 					}
 				}
 			case sourceHasLatestVersionList:
-				var pvl []PairedVersion
-				err = sg.suprvsr.do(ctx, sg.src.sourceType(), ctListVersions, func(ctx context.Context) error {
-					pvl, err = sg.src.listVersions(ctx)
-					return err
-				})
+				if len(sg.cache.getAllVersions()) == 0 {
+					var pvl []PairedVersion
+					err = sg.suprvsr.do(ctx, sg.src.sourceType(), ctListVersions, func(ctx context.Context) error {
+						pvl, err = sg.src.listVersions(ctx)
+						return err
+					})
 
-				if err == nil {
-					sg.cache.storeVersionMap(pvl, true)
+					if err == nil {
+						sg.cache.storeVersionMap(pvl, true)
+					}
 				}
 			case sourceHasLatestLocally:
 				err = sg.suprvsr.do(ctx, sg.src.sourceType(), ctSourceFetch, func(ctx context.Context) error {
