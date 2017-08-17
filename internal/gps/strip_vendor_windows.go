@@ -10,6 +10,10 @@ import (
 )
 
 func stripVendor(path string, info os.FileInfo, err error) error {
+	if err != nil && err != filepath.SkipDir {
+		return err
+	}
+
 	if info.Name() == "vendor" {
 		if _, err := os.Lstat(path); err == nil {
 			symlink := (info.Mode() & os.ModeSymlink) != 0
