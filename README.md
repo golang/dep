@@ -46,6 +46,12 @@ $ brew install dep
 $ brew upgrade dep
 ```
 
+You can also install dep via
+
+```sh
+go get -u github.com/dep/cmd/dep
+```
+
 To start managing dependencies using dep, run the following from your project's root directory:
 
 ```sh
