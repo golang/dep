@@ -15,14 +15,9 @@ jobs:
       go: 1.8.x
       script:
         - go build -v ./cmd/dep
-        - PKGS=$(go list ./... | grep -v /vendor/)
-        - go vet $PKGS
-        - staticcheck $PKGS
-        - gosimple $PKGS
+        - ./hack/validate-linter.bash
         - ./hack/validate-vendor.bash
-        - go build ./hack/licenseok
-        - find . -path ./vendor -prune -o -type f -name "*.go" -printf '%P\n' | xargs ./licenseok
-        - set -e; for pkg in $PKGS; do go test -race -coverprofile=profile.out -covermode=atomic $pkg; if [[ -f profile.out ]]; then cat profile.out >> coverage.txt; rm profile.out; fi; done
+        - ./hack/coverage.bash
       after_success:
         - echo "CHANGE BACK THIS"
         # - codeclimate-test-reporter < coverage.txt
@@ -61,20 +56,18 @@ jobs:
       install: skip
       script: skip
       before_deploy:
-        - mkdir -p release
-        - cd cmd/dep
-        - CGO_ENABLED=0 GOOS=linux go build -ldflags "-s -w -X main.commitHash=$(git rev-parse --short HEAD 2>/dev/null) -X main.buildDate=$(date --iso-8601=seconds) -X main.version=$(git describe --tags --dirty)" -a -installsuffix cgo -o ../../release/dep-linux-amd64
-        - CGO_ENABLED=0 GOOS=darwin go build -ldflags "-s -w -X main.commitHash=$(git rev-parse --short HEAD 2>/dev/null) -X main.buildDate=$(date --iso-8601=seconds) -X main.version=$(git describe --tags --dirty)" -a -installsuffix cgo -o ../../release/dep-darwin-amd64
-        - CGO_ENABLED=0 GOOS=windows go build -ldflags "-s -w -X main.commitHash=$(git rev-parse --short HEAD 2>/dev/null) -X main.buildDate=$(date --iso-8601=seconds) -X main.version=$(git describe --tags --dirty)" -a -installsuffix cgo -o ../../release/dep-windows-amd64
-        - cd ../..
+        - ./hack/build-all.bash
       deploy:
         - provider: releases
           api_key:
             secure: IP1BqLO5WAkI/LFT/4WkiTS7g0zgliUt3y5zqJJKfXatnv4tD/mZIaaJsApjTcVpcI9zbTtZZKFcWPJG3JMVVSUQHSLwupyTk/2dCzUfFadZzRnOtkHysNWJjstYUsNkpr/Qh8Dnvf2HQ7vMA4F2mGMPOA/JT0u4UKJLWmiNdmV0pcqHUqszGnomoXP497bXpvGzn7AMG+QtKe/s5OIihaPoGCfr2UF+tldVPbOuykrlVH8u/Rxv2N8RePjKBNoLWnnMLp6Gg5VvSBJX0Ns7bPx1nQdOiSAY0sNuETe2SDSIoGhuSk9hGppPrCTxcql5SaRnxFigN1zr/XOstFMh9mAzjYG2H2MiRKvRaZFVT8pzvvhSLNKUYsW9G/dts63BJuUdFgV+sp0yeO5al9aR4h7g6QGUlnUJ4rtUE8rB2JINfTFSP1U00i6ihTwDLt7xspAWQ5DaCky3SLeLCuKc9Gj3moMDozW4a2iN/ooujYin3Lbbh65o6bWz71P+sjczb+igXKwOkwxscAwdR7IY3yWJ7hvx0KsDADvLtEeXG4IahL0C7Z2ZzHfAHaLiPvDNZ/CBOzYSjOQDx0c92kFfruts57kwgzNaNUAlzZtv5CdxWZDZ/n2HxOb1Bd74RxW4oyXrxcWS6trHzoPwTJ0RSbO8gfneU7xqBHhp7LXoG4E=
           file:
             - release/dep-linux-amd64
+            - release/dep-linux-amd64.sha256
             - release/dep-darwin-amd64
+            - release/dep-darwin-amd64.sha256
             - release/dep-windows-amd64
+            - release/dep-windows-amd64.sha256
           skip_cleanup: true
           on:
             repo: ebati/dep
