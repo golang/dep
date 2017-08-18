@@ -361,7 +361,7 @@ func (sg *sourceGateway) listPackages(ctx context.Context, pr ProjectRoot, v Ver
 			return pkgtree.PackageTree{}, err
 		}
 
-		err = sg.suprvsr.do(ctx, label, ctGetManifestAndLock, func(ctx context.Context) error {
+		err = sg.suprvsr.do(ctx, label, ctListPackages, func(ctx context.Context) error {
 			ptree, err = sg.src.listPackages(ctx, pr, r)
 			return err
 		})
@@ -507,16 +507,14 @@ func (sg *sourceGateway) require(ctx context.Context, wanted sourceState) (errSt
 					}
 				}
 			case sourceHasLatestVersionList:
-				if len(sg.cache.getAllVersions()) == 0 {
-					var pvl []PairedVersion
-					err = sg.suprvsr.do(ctx, sg.src.sourceType(), ctListVersions, func(ctx context.Context) error {
-						pvl, err = sg.src.listVersions(ctx)
-						return err
-					})
+				var pvl []PairedVersion
+				err = sg.suprvsr.do(ctx, sg.src.sourceType(), ctListVersions, func(ctx context.Context) error {
+					pvl, err = sg.src.listVersions(ctx)
+					return err
+				})
 
-					if err == nil {
-						sg.cache.setVersionMap(pvl)
-					}
+				if err == nil {
+					sg.cache.setVersionMap(pvl)
 				}
 			case sourceHasLatestLocally:
 				err = sg.suprvsr.do(ctx, sg.src.sourceType(), ctSourceFetch, func(ctx context.Context) error {
