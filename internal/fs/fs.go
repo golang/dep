@@ -109,7 +109,7 @@ func RenameWithFallback(src, dst string) error {
 		return errors.Wrapf(err, "cannot stat %s", src)
 	}
 
-	err = rename(src, dst)
+	err = os.Rename(src, dst)
 	if err == nil {
 		return nil
 	}
