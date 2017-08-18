@@ -49,7 +49,7 @@ func testGitSourceInteractions(t *testing.T) {
 		t.Errorf("Failed to create temp dir: %s", err)
 	}
 	defer func() {
-		if err := removeAll(cpath); err != nil {
+		if err := os.RemoveAll(cpath); err != nil {
 			t.Errorf("removeAll failed: %s", err)
 		}
 	}()
@@ -145,7 +145,7 @@ func testGopkginSourceInteractions(t *testing.T) {
 		t.Errorf("Failed to create temp dir: %s", err)
 	}
 	defer func() {
-		if err := removeAll(cpath); err != nil {
+		if err := os.RemoveAll(cpath); err != nil {
 			t.Errorf("removeAll failed: %s", err)
 		}
 	}()
@@ -296,7 +296,7 @@ func testBzrSourceInteractions(t *testing.T) {
 		t.Errorf("Failed to create temp dir: %s", err)
 	}
 	defer func() {
-		if err := removeAll(cpath); err != nil {
+		if err := os.RemoveAll(cpath); err != nil {
 			t.Errorf("removeAll failed: %s", err)
 		}
 	}()
@@ -406,7 +406,7 @@ func testHgSourceInteractions(t *testing.T) {
 		t.Errorf("Failed to create temp dir: %s", err)
 	}
 	defer func() {
-		if err := removeAll(cpath); err != nil {
+		if err := os.RemoveAll(cpath); err != nil {
 			t.Errorf("removeAll failed: %s", err)
 		}
 	}()
