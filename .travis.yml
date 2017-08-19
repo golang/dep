@@ -15,7 +15,7 @@ jobs:
       go: 1.8.x
       script:
         - go build -v ./cmd/dep
-        - ./hack/validate-linter.bash
+        - ./hack/lint.bash
         - ./hack/validate-vendor.bash
         - ./hack/coverage.bash
       after_success:
@@ -69,6 +69,19 @@ jobs:
             - release/dep-windows-amd64
             - release/dep-windows-amd64.sha256
           skip_cleanup: true
+          on:
+            repo: ebati/dep
+            branch: ci-make-version
+            tags: true
+    - go: 1.8.x
+      os: osx
+      stage: brew-deploy
+      install: skip
+      script: skip
+      deploy:
+        - provider: script
+          script:
+              - brew bump-formula-pr --dry-run --message= --url=https://github.com/ebati/dep/releases/download/$TRAVIS_TAG/dep-darwin-amd64 --sha256=https://github.com/ebati/dep/releases/download/$TRAVIS_TAG/dep-darwin-amd64.sha256 dep
           on:
             repo: ebati/dep
             branch: ci-make-version
