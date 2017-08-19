@@ -71,6 +71,7 @@ func (a *rootAnalyzer) importManifestAndLock(dir string, pr gps.ProjectRoot, sup
 		newGlideImporter(logger, a.ctx.Verbose, a.sm),
 		newGodepImporter(logger, a.ctx.Verbose, a.sm),
 		newVndrImporter(logger, a.ctx.Verbose, a.sm),
+		newGovendImporter(logger, a.ctx.Verbose, a.sm),
 	}
 
 	for _, i := range importers {
