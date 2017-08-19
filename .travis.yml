@@ -81,7 +81,7 @@ jobs:
       deploy:
         - provider: script
           script:
-              - brew bump-formula-pr --dry-run --message= --url=https://github.com/ebati/dep/releases/download/$TRAVIS_TAG/dep-darwin-amd64 --sha256=https://github.com/ebati/dep/releases/download/$TRAVIS_TAG/dep-darwin-amd64.sha256 dep
+              - brew update && brew bump-formula-pr --dry-run --message= --url=https://github.com/ebati/dep/releases/download/$TRAVIS_TAG/dep-darwin-amd64 --sha256=https://github.com/ebati/dep/releases/download/$TRAVIS_TAG/dep-darwin-amd64.sha256 dep
           on:
             repo: ebati/dep
             branch: ci-make-version
