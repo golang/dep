@@ -133,9 +133,15 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 	sm.UseDefaultSignalHandling()
 	defer sm.Release()
 
+	if ctx.Verbose {
+		ctx.Out.Println("Getting direct dependencies...")
+	}
 	pkgT, directDeps, err := getDirectDependencies(sm, p)
 	if err != nil {
 		return err
+	}
+	if ctx.Verbose {
+		ctx.Out.Printf("Checked %d directories for packages.\nFound %d direct dependencies.\n", len(pkgT.Packages), len(directDeps))
 	}
 
 	// Initialize with imported data, then fill in the gaps using the GOPATH
