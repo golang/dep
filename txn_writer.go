@@ -418,38 +418,51 @@ fail:
 }
 
 // PrintPreparedActions logs the actions a call to Write would perform.
-func (sw *SafeWriter) PrintPreparedActions(output *log.Logger) error {
+func (sw *SafeWriter) PrintPreparedActions(verbose bool, output *log.Logger) error {
 	if sw.HasManifest() {
-		output.Printf("Would have written the following %s:\n", ManifestName)
-		m, err := sw.Manifest.MarshalTOML()
-		if err != nil {
-			return errors.Wrap(err, "ensure DryRun cannot serialize manifest")
+		if verbose {
+			m, err := sw.Manifest.MarshalTOML()
+			if err != nil {
+				return errors.Wrap(err, "ensure DryRun cannot serialize manifest")
+			}
+			output.Printf("Would have written the following %s:\n%s\n", ManifestName, string(m))
+		} else {
+			output.Printf("Would have written %s.\n", ManifestName)
 		}
-		output.Println(string(m))
 	}
 
 	if sw.writeLock {
 		if sw.lockDiff == nil {
-			output.Printf("Would have written the following %s:\n", LockName)
-			l, err := sw.lock.MarshalTOML()
-			if err != nil {
-				return errors.Wrap(err, "ensure DryRun cannot serialize lock")
+			if verbose {
+				l, err := sw.lock.MarshalTOML()
+				if err != nil {
+					return errors.Wrap(err, "ensure DryRun cannot serialize lock")
+				}
+				output.Printf("Would have written the following %s:\n%s\n", LockName, string(l))
+			} else {
+				output.Printf("Would have written %s.\n", LockName)
 			}
-			output.Println(string(l))
 		} else {
-			output.Printf("Would have written the following changes to %s:\n", LockName)
-			diff, err := formatLockDiff(*sw.lockDiff)
-			if err != nil {
-				return errors.Wrap(err, "ensure DryRun cannot serialize the lock diff")
+			if verbose {
+				diff, err := formatLockDiff(*sw.lockDiff)
+				if err != nil {
+					return errors.Wrap(err, "ensure DryRun cannot serialize the lock diff")
+				}
+				output.Printf("Would have written the following changes to %s:\n%s\n", LockName, diff)
+			} else {
+				output.Printf("Would have written changes to %s.\n", LockName)
 			}
-			output.Println(diff)
 		}
 	}
 
 	if sw.writeVendor {
-		output.Println("Would have written the following projects to the vendor directory:")
-		for _, project := range sw.lock.Projects() {
-			output.Println(project)
+		if verbose {
+			output.Printf("Would have written the following %d projects to the vendor directory:\n", len(sw.lock.Projects()))
+			for _, project := range sw.lock.Projects() {
+				output.Println(project)
+			}
+		} else {
+			output.Printf("Would have written %d projects to the vendor directory.\n", len(sw.lock.Projects()))
 		}
 	}
 

@@ -223,13 +223,13 @@ func (cmd *ensureCommand) runDefault(ctx *dep.Ctx, args []string, p *dep.Project
 
 	if p.Lock != nil && bytes.Equal(p.Lock.InputHash(), solver.HashInputs()) {
 		// Memo matches, so there's probably nothing to do.
+		if ctx.Verbose {
+			ctx.Out.Printf("%s was already in sync with imports and %s\n", dep.LockName, dep.ManifestName)
+		}
+
 		if cmd.noVendor {
 			// The user said not to touch vendor/, so definitely nothing to do.
 			return nil
-		}
-
-		if ctx.Verbose {
-			ctx.Out.Printf("%s was already in sync with imports and %s, recreating vendor/ directory", dep.LockName, dep.ManifestName)
 		}
 
 		// TODO(sdboyer) The desired behavior at this point is to determine
@@ -244,8 +244,7 @@ func (cmd *ensureCommand) runDefault(ctx *dep.Ctx, args []string, p *dep.Project
 		}
 
 		if cmd.dryRun {
-			ctx.Out.Printf("Would have populated vendor/ directory from %s", dep.LockName)
-			return nil
+			return sw.PrintPreparedActions(ctx.Verbose, ctx.Out)
 		}
 
 		logger := ctx.Err
@@ -261,12 +260,16 @@ func (cmd *ensureCommand) runDefault(ctx *dep.Ctx, args []string, p *dep.Project
 		return errors.Wrap(err, "ensure Solve()")
 	}
 
-	sw, err := dep.NewSafeWriter(nil, p.Lock, dep.LockFromSolution(solution), dep.VendorOnChanged)
+	vendorBehavior := dep.VendorOnChanged
+	if cmd.noVendor {
+		vendorBehavior = dep.VendorNever
+	}
+	sw, err := dep.NewSafeWriter(nil, p.Lock, dep.LockFromSolution(solution), vendorBehavior)
 	if err != nil {
 		return err
 	}
 	if cmd.dryRun {
-		return sw.PrintPreparedActions(ctx.Out)
+		return sw.PrintPreparedActions(ctx.Verbose, ctx.Out)
 	}
 
 	logger := ctx.Err
@@ -292,14 +295,7 @@ func (cmd *ensureCommand) runVendorOnly(ctx *dep.Ctx, args []string, p *dep.Proj
 	}
 
 	if cmd.dryRun {
-		ctx.Out.Printf("Would have populated vendor/ directory from %s", dep.LockName)
-		if ctx.Verbose {
-			err := sw.PrintPreparedActions(ctx.Err)
-			if err != nil {
-				return errors.WithMessage(err, "prepared actions")
-			}
-		}
-		return nil
+		return sw.PrintPreparedActions(ctx.Verbose, ctx.Err)
 	}
 
 	logger := ctx.Err
@@ -394,7 +390,7 @@ func (cmd *ensureCommand) runUpdate(ctx *dep.Ctx, args []string, p *dep.Project,
 		return err
 	}
 	if cmd.dryRun {
-		return sw.PrintPreparedActions(ctx.Out)
+		return sw.PrintPreparedActions(ctx.Verbose, ctx.Out)
 	}
 
 	logger := ctx.Err
@@ -648,7 +644,7 @@ func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm
 	}
 
 	if cmd.dryRun {
-		return sw.PrintPreparedActions(ctx.Out)
+		return sw.PrintPreparedActions(ctx.Verbose, ctx.Out)
 	}
 
 	logger := ctx.Err
