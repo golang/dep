@@ -244,7 +244,7 @@ func (cmd *ensureCommand) runDefault(ctx *dep.Ctx, args []string, p *dep.Project
 		}
 
 		if cmd.dryRun {
-			return sw.PrintPreparedActions(ctx.Verbose, ctx.Out)
+			return sw.PrintPreparedActions(ctx.Out, ctx.Verbose)
 		}
 
 		logger := ctx.Err
@@ -269,7 +269,7 @@ func (cmd *ensureCommand) runDefault(ctx *dep.Ctx, args []string, p *dep.Project
 		return err
 	}
 	if cmd.dryRun {
-		return sw.PrintPreparedActions(ctx.Verbose, ctx.Out)
+		return sw.PrintPreparedActions(ctx.Out, ctx.Verbose)
 	}
 
 	logger := ctx.Err
@@ -295,7 +295,7 @@ func (cmd *ensureCommand) runVendorOnly(ctx *dep.Ctx, args []string, p *dep.Proj
 	}
 
 	if cmd.dryRun {
-		return sw.PrintPreparedActions(ctx.Verbose, ctx.Err)
+		return sw.PrintPreparedActions(ctx.Err, ctx.Verbose)
 	}
 
 	logger := ctx.Err
@@ -390,7 +390,7 @@ func (cmd *ensureCommand) runUpdate(ctx *dep.Ctx, args []string, p *dep.Project,
 		return err
 	}
 	if cmd.dryRun {
-		return sw.PrintPreparedActions(ctx.Verbose, ctx.Out)
+		return sw.PrintPreparedActions(ctx.Out, ctx.Verbose)
 	}
 
 	logger := ctx.Err
@@ -644,7 +644,7 @@ func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm
 	}
 
 	if cmd.dryRun {
-		return sw.PrintPreparedActions(ctx.Verbose, ctx.Out)
+		return sw.PrintPreparedActions(ctx.Out, ctx.Verbose)
 	}
 
 	logger := ctx.Err

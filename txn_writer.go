@@ -418,7 +418,7 @@ fail:
 }
 
 // PrintPreparedActions logs the actions a call to Write would perform.
-func (sw *SafeWriter) PrintPreparedActions(verbose bool, output *log.Logger) error {
+func (sw *SafeWriter) PrintPreparedActions(output *log.Logger, verbose bool) error {
 	if sw.HasManifest() {
 		if verbose {
 			m, err := sw.Manifest.MarshalTOML()
@@ -443,15 +443,12 @@ func (sw *SafeWriter) PrintPreparedActions(verbose bool, output *log.Logger) err
 				output.Printf("Would have written %s.\n", LockName)
 			}
 		} else {
-			if verbose {
-				diff, err := formatLockDiff(*sw.lockDiff)
-				if err != nil {
-					return errors.Wrap(err, "ensure DryRun cannot serialize the lock diff")
-				}
-				output.Printf("Would have written the following changes to %s:\n%s\n", LockName, diff)
-			} else {
-				output.Printf("Would have written changes to %s.\n", LockName)
+			output.Printf("Would have written the following changes to %s:\n", LockName)
+			diff, err := formatLockDiff(*sw.lockDiff)
+			if err != nil {
+				return errors.Wrap(err, "ensure DryRun cannot serialize the lock diff")
 			}
+			output.Println(diff)
 		}
 	}
 
