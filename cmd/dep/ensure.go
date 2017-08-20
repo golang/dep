@@ -295,7 +295,7 @@ func (cmd *ensureCommand) runVendorOnly(ctx *dep.Ctx, args []string, p *dep.Proj
 	}
 
 	if cmd.dryRun {
-		return sw.PrintPreparedActions(ctx.Err, ctx.Verbose)
+		return sw.PrintPreparedActions(ctx.Out, ctx.Verbose)
 	}
 
 	logger := ctx.Err
