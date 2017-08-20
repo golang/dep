@@ -19,8 +19,7 @@ jobs:
         - ./hack/validate-vendor.bash
         - ./hack/coverage.bash
       after_success:
-        - echo "CHANGE BACK THIS"
-        # - codeclimate-test-reporter < coverage.txt
+        - codeclimate-test-reporter < coverage.txt
     # YAML alias, for settings shared across the simpler builds
     - &simple-test
       go: 1.7.x
@@ -60,7 +59,7 @@ jobs:
       deploy:
         - provider: releases
           api_key:
-            secure: IP1BqLO5WAkI/LFT/4WkiTS7g0zgliUt3y5zqJJKfXatnv4tD/mZIaaJsApjTcVpcI9zbTtZZKFcWPJG3JMVVSUQHSLwupyTk/2dCzUfFadZzRnOtkHysNWJjstYUsNkpr/Qh8Dnvf2HQ7vMA4F2mGMPOA/JT0u4UKJLWmiNdmV0pcqHUqszGnomoXP497bXpvGzn7AMG+QtKe/s5OIihaPoGCfr2UF+tldVPbOuykrlVH8u/Rxv2N8RePjKBNoLWnnMLp6Gg5VvSBJX0Ns7bPx1nQdOiSAY0sNuETe2SDSIoGhuSk9hGppPrCTxcql5SaRnxFigN1zr/XOstFMh9mAzjYG2H2MiRKvRaZFVT8pzvvhSLNKUYsW9G/dts63BJuUdFgV+sp0yeO5al9aR4h7g6QGUlnUJ4rtUE8rB2JINfTFSP1U00i6ihTwDLt7xspAWQ5DaCky3SLeLCuKc9Gj3moMDozW4a2iN/ooujYin3Lbbh65o6bWz71P+sjczb+igXKwOkwxscAwdR7IY3yWJ7hvx0KsDADvLtEeXG4IahL0C7Z2ZzHfAHaLiPvDNZ/CBOzYSjOQDx0c92kFfruts57kwgzNaNUAlzZtv5CdxWZDZ/n2HxOb1Bd74RxW4oyXrxcWS6trHzoPwTJ0RSbO8gfneU7xqBHhp7LXoG4E=
+            secure: fL9GX11J3JLizEBTPZHN32wuAT91eAJsGl0kjlAdIc6Lb/9UCe1XZGgFnpQFN4qo/S+omhHBDbM6Ty1xhNy7xmjDecpQGDU8Rmap9Oll0TuxqMigG+njOuPp5VUYPofPP0PGKdxAcYg+KaFM7x0o2rK+qA046NHwo2gH1BbE+bn55TZglEajEfc8j9iX4jt96KC7zlu+WiKArLmfUtlrI8m8ZYgbYcvFmlYjeCiEqlNhvNL59ejug9Rl0PLtPbamqVXkGLafYtekgPCb4WSxBiCt8pq5Rb5svk9YcdXpiaWQhZjMPAuKN6BrmN2lw1PiXzADUG5fjvNc8eo2HY70GD2utU9cAsY8VIafhoH5n6uM1WI8MHwDfd7P1PiQA3ZGQ8CPwk4q/8HSfQU9ap7vZgSF63pTIbtlviyIG67orOJE9PWWncl9olYM946UylZu6m3hWI/rmJxOeJ1UJjym/3GNPMRfKubaGhV/TyRdM0bKX4M0cXHU6k/ESVFupGXdKRt4RpvkD4/1Km6b2OShW6PNI+ifFspnJr7obkI7dm7ubySdnNz4lMv9WWymxRpMVc8hUAhuoDvXeZJq7pSnkjBEWDxIRoTkA93CU3/Rf7MFYCJMnGSqjcxWUpIfCAk2/r4BqL9NQnqBvvVt+MYi64QaD5n7ZF3dVbr6HZ2zjSU=
           file:
             - release/dep-linux-amd64
             - release/dep-linux-amd64.sha256
@@ -70,19 +69,6 @@ jobs:
             - release/dep-windows-amd64.sha256
           skip_cleanup: true
           on:
-            repo: ebati/dep
-            branch: ci-make-version
-            tags: true
-    - go: 1.8.x
-      os: osx
-      stage: brew-deploy
-      install: skip
-      script: skip
-      deploy:
-        - provider: script
-          script:
-              - brew update && brew bump-formula-pr --dry-run --message= --url=https://github.com/ebati/dep/releases/download/$TRAVIS_TAG/dep-darwin-amd64 --sha256=https://github.com/ebati/dep/releases/download/$TRAVIS_TAG/dep-darwin-amd64.sha256 dep
-          on:
-            repo: ebati/dep
-            branch: ci-make-version
+            repo: golang/dep
+            branch: master
             tags: true
