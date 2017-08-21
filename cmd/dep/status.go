@@ -352,8 +352,8 @@ func runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceMana
 
 		logger.Println("Checking upstream projects:")
 
-		for _, proj := range slp {
-			logger.Println(proj.Ident().ProjectRoot)
+		for i, proj := range slp {
+			logger.Printf("(%d/%d) %s\n", i+1, len(slp), proj.Ident().ProjectRoot)
 
 			bs := BasicStatus{
 				ProjectRoot:  string(proj.Ident().ProjectRoot),
@@ -427,6 +427,7 @@ func runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceMana
 
 			out.BasicLine(&bs)
 		}
+		logger.Println()
 		out.BasicFooter()
 
 		return digestMismatch, hasMissingPkgs, nil
