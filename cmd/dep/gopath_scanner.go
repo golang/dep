@@ -134,7 +134,7 @@ func (g *gopathScanner) overlay(rootM *dep.Manifest, rootL *dep.Lock) {
 }
 
 func trimPathPrefix(p1, p2 string) string {
-	if fs.HasFilepathPrefix(p1, p2) {
+	if isPrefix, _ := fs.HasFilepathPrefix(p1, p2); isPrefix {
 		return p1[len(p2):]
 	}
 	return p1

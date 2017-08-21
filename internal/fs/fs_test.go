@@ -75,7 +75,11 @@ func TestHasFilepathPrefix(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if got := HasFilepathPrefix(c.path, c.prefix); c.want != got {
+		got, err := HasFilepathPrefix(c.path, c.prefix)
+		if err != nil {
+			t.Fatalf("unexpected error: %s", err)
+		}
+		if c.want != got {
 			t.Fatalf("dir: %q, prefix: %q, expected: %v, got: %v", c.path, c.prefix, c.want, got)
 		}
 	}
@@ -122,13 +126,18 @@ func TestHasFilepathPrefix_Files(t *testing.T) {
 		path   string
 		prefix string
 		want   bool
+		err    bool
 	}{
-		{existingFile, filepath.Join(dir2), true},
-		{nonExistingFile, filepath.Join(dir2), false},
+		{existingFile, filepath.Join(dir2), true, false},
+		{nonExistingFile, filepath.Join(dir2), false, true},
 	}
 
 	for _, c := range cases {
-		if got := HasFilepathPrefix(c.path, c.prefix); c.want != got {
+		got, err := HasFilepathPrefix(c.path, c.prefix)
+		if err != nil && !c.err {
+			t.Fatalf("unexpected error: %s", err)
+		}
+		if c.want != got {
 			t.Fatalf("dir: %q, prefix: %q, expected: %v, got: %v", c.path, c.prefix, c.want, got)
 		}
 	}
