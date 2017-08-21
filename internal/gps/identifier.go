@@ -148,6 +148,10 @@ func (i ProjectIdentifier) errString() string {
 	return fmt.Sprintf("%s (from %s)", i.ProjectRoot, i.Source)
 }
 
+func (i ProjectIdentifier) String() string {
+	return i.errString()
+}
+
 func (i ProjectIdentifier) normalize() ProjectIdentifier {
 	if i.Source == "" {
 		i.Source = string(i.ProjectRoot)

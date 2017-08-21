@@ -9,7 +9,6 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"sync"
 
 	"github.com/pkg/errors"
 )
@@ -65,37 +64,59 @@ func WriteDepTree(basedir string, l Lock, sm SourceManager, sv bool, logger *log
 		return err
 	}
 
-	var wg sync.WaitGroup
-	errCh := make(chan error, len(l.Projects()))
+	lps := l.Projects()
 
-	for _, p := range l.Projects() {
-		wg.Add(1)
-		go func(p LockedProject) {
-			defer wg.Done()
+	type resp struct {
+		i   int
+		err error
+	}
+	respCh := make(chan resp, len(lps))
+
+	for i := range lps {
+		go func(i int) {
+			p := lps[i]
+
+			var err error
+			defer func() {
+				if r := recover(); r != nil {
+					err = errors.Errorf("recovered from panic exporting %s: %s", p.Ident().ProjectRoot, r)
+				}
+				respCh <- resp{i, err}
+			}()
+
 			to := filepath.FromSlash(filepath.Join(basedir, string(p.Ident().ProjectRoot)))
-			logger.Printf("Writing out %s@%s", p.Ident().errString(), p.Version())
 
-			if err := sm.ExportProject(p.Ident(), p.Version(), to); err != nil {
-				errCh <- errors.Wrapf(err, "failed to export %s", p.Ident().ProjectRoot)
+			if err = sm.ExportProject(p.Ident(), p.Version(), to); err != nil {
+				err = errors.Wrapf(err, "failed to export %s", p.Ident().ProjectRoot)
 				return
 			}
 
 			if sv {
-				err := filepath.Walk(to, stripVendor)
+				err = filepath.Walk(to, stripVendor)
 				if err != nil {
-					errCh <- errors.Wrapf(err, "failed to strip vendor from %s", p.Ident().ProjectRoot)
+					err = errors.Wrapf(err, "failed to strip vendor from %s", p.Ident().ProjectRoot)
 				}
 			}
-		}(p)
+		}(i)
 	}
 
-	wg.Wait()
-	close(errCh)
+	var errs []error
+	for i := 0; i < len(lps); i++ {
+		resp := <-respCh
+		msg := "Wrote"
+		if resp.err != nil {
+			errs = append(errs, resp.err)
+			msg = "Failed to write"
+		}
+		p := lps[resp.i]
+		logger.Printf("(%d/%d) %s %s@%s\n", i+1, len(lps), msg, p.Ident(), p.Version())
+	}
+	close(respCh)
 
-	if len(errCh) > 0 {
+	if len(errs) > 0 {
 		logger.Println("Failed to write dep tree. The following errors occurred:")
-		for err := range errCh {
-			logger.Println(" * ", err)
+		for i, err := range errs {
+			logger.Printf("(%d/%d) %s\n", i+1, len(errs), err)
 		}
 
 		removeAll(basedir)
