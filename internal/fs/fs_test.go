@@ -547,6 +547,37 @@ func TestCopyFileSymlink(t *testing.T) {
 	}
 }
 
+func TestCopyFileLongFilePath(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		// We want to ensure the temporary fix actually fixes the issue with
+		// os.Chmod and long file paths. This is only applicable on Windows.
+		t.Skip("skipping on non-windows")
+	}
+
+	h := test.NewHelper(t)
+	h.TempDir(".")
+
+	tmpPath := h.Path(".")
+
+	// Create a directory with a long-enough path name to cause the bug in #774.
+	dirName := ""
+	for len(tmpPath+string(os.PathSeparator)+dirName) <= 300 {
+		dirName += "directory"
+	}
+
+	h.TempDir(dirName)
+	h.TempFile(dirName+string(os.PathSeparator)+"src", "")
+
+	tmpDirPath := tmpPath + string(os.PathSeparator) + dirName + string(os.PathSeparator)
+
+	err := copyFile(tmpDirPath+"src", tmpDirPath+"dst")
+	if err != nil {
+		t.Fatalf("unexpected error while copying file: %v", err)
+	}
+}
+
+// C:\Users\appveyor\AppData\Local\Temp\1\gotest639065787\dir4567890\dir4567890\dir4567890\dir4567890\dir4567890\dir4567890\dir4567890\dir4567890\dir4567890\dir4567890\dir4567890\dir4567890\dir4567890\dir4567890\dir4567890\dir4567890\dir4567890\dir4567890\dir4567890\dir4567890\dir4567890\dir4567890\dir4567890
+
 func TestCopyFileFail(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		// XXX: setting permissions works differently in
