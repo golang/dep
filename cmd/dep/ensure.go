@@ -599,9 +599,8 @@ func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm
 
 	// Prep post-actions and feedback from adds.
 	var reqlist []string
-	appender := &dep.Manifest{
-		Constraints: make(gps.ProjectConstraints),
-	}
+	appender := dep.NewManifest()
+
 	for pr, instr := range addInstructions {
 		for path := range instr.ephReq {
 			reqlist = append(reqlist, path)

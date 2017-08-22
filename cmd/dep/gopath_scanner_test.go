@@ -27,19 +27,14 @@ func TestGopathScanner_OverlayManifestConstraints(t *testing.T) {
 	v1 := gps.NewVersion("v1.0.0")
 	v2 := gps.NewVersion("v2.0.0")
 	v3 := gps.NewVersion("v3.0.0")
-	rootM := &dep.Manifest{
-		Constraints: gps.ProjectConstraints{
-			pi1.ProjectRoot: gps.ProjectProperties{Constraint: v1},
-		},
-	}
+	rootM := dep.NewManifest()
+	rootM.Constraints[pi1.ProjectRoot] = gps.ProjectProperties{Constraint: v1}
 	rootL := &dep.Lock{}
+	origM := dep.NewManifest()
+	origM.Constraints[pi1.ProjectRoot] = gps.ProjectProperties{Constraint: v2}
+	origM.Constraints[pi2.ProjectRoot] = gps.ProjectProperties{Constraint: v3}
 	gs := gopathScanner{
-		origM: &dep.Manifest{
-			Constraints: gps.ProjectConstraints{
-				pi1.ProjectRoot: gps.ProjectProperties{Constraint: v2},
-				pi2.ProjectRoot: gps.ProjectProperties{Constraint: v3},
-			},
-		},
+		origM: origM,
 		origL: &dep.Lock{},
 		ctx:   ctx,
 		pd: projectData{
@@ -79,7 +74,7 @@ func TestGopathScanner_OverlayLockProjects(t *testing.T) {
 	h := test.NewHelper(t)
 	ctx := newTestContext(h)
 
-	rootM := &dep.Manifest{}
+	rootM := dep.NewManifest()
 	pi1 := gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot(testProject1)}
 	pi2 := gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot(testProject2)}
 	v1 := gps.NewVersion("v1.0.0")
@@ -89,7 +84,7 @@ func TestGopathScanner_OverlayLockProjects(t *testing.T) {
 		P: []gps.LockedProject{gps.NewLockedProject(pi1, v1, []string{})},
 	}
 	gs := gopathScanner{
-		origM: &dep.Manifest{Constraints: make(gps.ProjectConstraints)},
+		origM: dep.NewManifest(),
 		origL: &dep.Lock{
 			P: []gps.LockedProject{
 				gps.NewLockedProject(pi1, v2, []string{}), // ignored, already exists in lock
