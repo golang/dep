@@ -56,12 +56,12 @@ func TestInvalidEnsureFlagCombinations(t *testing.T) {
 func TestCheckErrors(t *testing.T) {
 	tt := []struct {
 		name        string
-		hasErrs     bool
+		fatal       bool
 		pkgOrErrMap map[string]pkgtree.PackageOrErr
 	}{
 		{
-			name:    "noErrors",
-			hasErrs: false,
+			name:  "noErrors",
+			fatal: false,
 			pkgOrErrMap: map[string]pkgtree.PackageOrErr{
 				"mypkg": {
 					P: pkgtree.Package{},
@@ -69,8 +69,8 @@ func TestCheckErrors(t *testing.T) {
 			},
 		},
 		{
-			name:    "hasErrors",
-			hasErrs: true,
+			name:  "hasErrors",
+			fatal: true,
 			pkgOrErrMap: map[string]pkgtree.PackageOrErr{
 				"github.com/me/pkg": {
 					Err: &build.NoGoError{},
@@ -81,8 +81,8 @@ func TestCheckErrors(t *testing.T) {
 			},
 		},
 		{
-			name:    "onlyGoErrors",
-			hasErrs: false,
+			name:  "onlyGoErrors",
+			fatal: false,
 			pkgOrErrMap: map[string]pkgtree.PackageOrErr{
 				"github.com/me/pkg": {
 					Err: &build.NoGoError{},
@@ -93,11 +93,35 @@ func TestCheckErrors(t *testing.T) {
 			},
 		},
 		{
-			name:    "allGoErrors",
-			hasErrs: true,
+			name:  "onlyBuildErrors",
+			fatal: false,
 			pkgOrErrMap: map[string]pkgtree.PackageOrErr{
 				"github.com/me/pkg": {
 					Err: &build.NoGoError{},
+				},
+				"github.com/someone/pkg": {
+					P: pkgtree.Package{},
+				},
+			},
+		},
+		{
+			name:  "allGoErrors",
+			fatal: true,
+			pkgOrErrMap: map[string]pkgtree.PackageOrErr{
+				"github.com/me/pkg": {
+					Err: &build.NoGoError{},
+				},
+			},
+		},
+		{
+			name:  "allMixedErrors",
+			fatal: true,
+			pkgOrErrMap: map[string]pkgtree.PackageOrErr{
+				"github.com/me/pkg": {
+					Err: &build.NoGoError{},
+				},
+				"github.com/someone/pkg": {
+					Err: errors.New("code is busted"),
 				},
 			},
 		},
@@ -105,8 +129,12 @@ func TestCheckErrors(t *testing.T) {
 
 	for _, tc := range tt {
 		t.Run(tc.name, func(t *testing.T) {
-			if hasErrs := checkErrors(tc.pkgOrErrMap) != nil; hasErrs != tc.hasErrs {
-				t.Fail()
+			fatal, err := checkErrors(tc.pkgOrErrMap)
+			if tc.fatal != fatal {
+				t.Fatalf("expected fatal flag to be %T, got %T", tc.fatal, fatal)
+			}
+			if err == nil && fatal {
+				t.Fatal("unexpected fatal flag value while err is nil")
 			}
 		})
 	}
