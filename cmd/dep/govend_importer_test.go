@@ -108,7 +108,7 @@ func TestGovendConfig_Import(t *testing.T) {
 	// Disable verbose so that we don't print values that change each test run
 	g := newGovendImporter(logger, false, sm)
 	if !g.HasDepMetadata(projectRoot) {
-		t.Fatal("Expected the importer to detect godep configuration file")
+		t.Fatal("Expected the importer to detect govend configuration file")
 	}
 
 	m, l, err := g.Import(projectRoot, testProjectRoot)

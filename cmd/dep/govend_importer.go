@@ -91,9 +91,7 @@ func (g *govendImporter) load(projectDir string) error {
 func (g *govendImporter) convert(pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock, error) {
 	g.logger.Println("Converting from vendor.yaml...")
 
-	manifest := &dep.Manifest{
-		Constraints: make(gps.ProjectConstraints),
-	}
+	manifest := dep.NewManifest()
 	lock := &dep.Lock{}
 
 	for _, pkg := range g.yaml.Imports {
