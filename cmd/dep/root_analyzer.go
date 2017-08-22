@@ -52,10 +52,7 @@ func (a *rootAnalyzer) InitializeRootManifestAndLock(dir string, pr gps.ProjectR
 	}
 
 	if rootM == nil {
-		rootM = &dep.Manifest{
-			Constraints: make(gps.ProjectConstraints),
-			Ovr:         make(gps.ProjectConstraints),
-		}
+		rootM = dep.NewManifest()
 	}
 	if rootL == nil {
 		rootL = &dep.Lock{}
@@ -88,7 +85,8 @@ func (a *rootAnalyzer) importManifestAndLock(dir string, pr gps.ProjectRoot, sup
 		}
 	}
 
-	var emptyManifest = &dep.Manifest{Constraints: make(gps.ProjectConstraints), Ovr: make(gps.ProjectConstraints)}
+	var emptyManifest = dep.NewManifest()
+
 	return emptyManifest, nil, nil
 }
 
