@@ -201,15 +201,18 @@ func (s *gitSource) listVersions(ctx context.Context) (vlist []PairedVersion, er
 	//
 	// If all of those conditions are met, then the user would end up with an
 	// erroneous non-default branch in their lock file.
-	headrev := Revision(all[0][:40])
+	var headrev Revision
 	var onedef, multidef, defmaster bool
 
 	smap := make(map[string]bool)
 	uniq := 0
-	vlist = make([]PairedVersion, len(all)-1) // less 1, because always ignore HEAD
+	vlist = make([]PairedVersion, len(all))
 	for _, pair := range all {
 		var v PairedVersion
-		if string(pair[46:51]) == "heads" {
+		if string(pair[41:]) == "HEAD" {
+			// If HEAD is present, it's always first
+			headrev = Revision(pair[:40])
+		} else if string(pair[46:51]) == "heads" {
 			rev := Revision(pair[:40])
 
 			isdef := rev == headrev
