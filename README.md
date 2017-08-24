@@ -152,6 +152,26 @@ This happens when a new import is added. Run `dep ensure` to install the missing
 
 As `dep status` suggests, run `dep ensure` to update your lockfile. Then run `dep status` again, and the lock mismatch should go away.
 
+### Visualizing dependencies
+
+Generate a visual representation of the dependency tree by piping the output of `dep status -dot` to [graphviz](http://www.graphviz.org/).
+#### Linux
+```
+$ sudo apt-get install graphviz
+$ dep status -dot | dot -T png | display
+```
+#### MacOS
+```
+$ brew install graphviz
+$ dep status -dot | dot -T png | open -f -a /Applications/Preview.app
+```
+#### Windows
+```
+> choco install graphviz.portable
+> dep status -dot | dot -T png -o status.png; start status.png
+```
+<p align="center"><img src="docs/img/StatusGraph.png"></p>
+
 ### Updating dependencies
 
 Updating brings the version of a dependency in `Gopkg.lock` and `vendor/` to the latest version allowed by the constraints in `Gopkg.toml`.
