@@ -92,6 +92,12 @@ func (v *vndrImporter) convert(pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock, er
 	)
 
 	for _, pkg := range v.packages {
+		// ImportPath must not be empty
+		if pkg.importPath == "" {
+			err := errors.New("Invalid vndr configuration, missing import path")
+			return nil, nil, err
+		}
+
 		pc := gps.ProjectConstraint{
 			Ident: gps.ProjectIdentifier{
 				ProjectRoot: gps.ProjectRoot(pkg.importPath),
