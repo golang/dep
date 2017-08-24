@@ -74,7 +74,7 @@ func (g *govendImporter) load(projectDir string) error {
 	g.logger.Println("Detected govend configuration files...")
 	y := filepath.Join(projectDir, govendYAMLName)
 	if g.verbose {
-		g.logger.Printf("	Loading %s", y)
+		g.logger.Printf("  Loading %s", y)
 	}
 	yb, err := ioutil.ReadFile(y)
 	if err != nil {
@@ -97,7 +97,7 @@ func (g *govendImporter) convert(pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock, 
 	for _, pkg := range g.yaml.Imports {
 		// Path must not be empty
 		if pkg.Path == "" || pkg.Revision == "" {
-			return nil, nil, errors.New("Invalid govend configuration, Path or Rev is required")
+			return nil, nil, errors.New("Invalid govend configuration, Path and Rev are required")
 		}
 
 		p, err := g.sm.DeduceProjectRoot(pkg.Path)
@@ -124,7 +124,8 @@ func (g *govendImporter) convert(pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock, 
 			if pp.Constraint != nil {
 				pc, err := g.buildProjectConstraint(pkg, pp.Constraint.String())
 				if err != nil {
-					return nil, nil, err
+					g.logger.Printf("Unable to infer a constraint for revision %s for package %s: %s", pkg.Revision, pkg.Path, err.Error())
+					continue
 				}
 				manifest.Constraints[pc.Ident.ProjectRoot] = gps.ProjectProperties{Constraint: pc.Constraint}
 			}
