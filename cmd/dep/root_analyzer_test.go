@@ -229,26 +229,27 @@ func validateConvertTestCase(testCase *convertTestCase, manifest *dep.Manifest, 
 			return errors.Errorf("Expected locked source to be %s, got '%s'", testCase.wantSourceRepo, p.Ident().Source)
 		}
 
-		if testCase.wantVersion != "" {
-			ver := p.Version().String()
-			if ver != testCase.wantVersion {
-				return errors.Errorf("Expected locked version to be '%s', got %s", testCase.wantVersion, ver)
-			}
+		// Break down the locked "version" into a version (optional) and revision
+		var gotVersion string
+		var gotRevision gps.Revision
+		if lpv, ok := p.Version().(gps.PairedVersion); ok {
+			gotVersion = lpv.String()
+			gotRevision = lpv.Revision()
+		} else if lr, ok := p.Version().(gps.Revision); ok {
+			gotRevision = lr
+		} else {
+			return errors.New("could not determine the type of the locked version")
 		}
 
-		if testCase.wantRevision != "" {
-			lv := p.Version()
-			lpv, ok := lv.(gps.PairedVersion)
-			if !ok {
-				return errors.Errorf("Expected locked version to be PairedVersion but got %T", lv)
-			}
-
-			rev := lpv.Revision()
-			if rev != testCase.wantRevision {
-				return errors.Errorf("Expected locked revision to be '%s', got %s",
-					testCase.wantRevision,
-					rev)
-			}
+		if gotRevision != testCase.wantRevision {
+			return errors.Errorf("Expected locked revision to be '%s', got %s",
+				testCase.wantRevision,
+				gotRevision)
+		}
+		if gotVersion != testCase.wantVersion {
+			return errors.Errorf("Expected locked version to be '%s', got %s",
+				testCase.wantVersion,
+				gotVersion)
 		}
 	}
 	return nil
