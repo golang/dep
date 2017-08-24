@@ -193,6 +193,16 @@ func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
 	var buf bytes.Buffer
 	var out outputter
 	switch {
+	case cmd.template:
+		return errors.Errorf("not implemented")
+	case cmd.modified:
+		return errors.Errorf("not implemented")
+	case cmd.unused:
+		return errors.Errorf("not implemented")
+	case cmd.missing:
+		return errors.Errorf("not implemented")
+	case cmd.old:
+		return errors.Errorf("not implemented")
 	case cmd.detailed:
 		return errors.Errorf("not implemented")
 	case cmd.json:
