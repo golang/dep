@@ -192,8 +192,8 @@ func TestGlideConfig_Import(t *testing.T) {
 	defer sm.Release()
 
 	h.TempDir(filepath.Join("src", testProjectRoot))
-	h.TempCopy(filepath.Join(testProjectRoot, glideYamlName), "glide/glide.yaml")
-	h.TempCopy(filepath.Join(testProjectRoot, glideLockName), "glide/glide.lock")
+	h.TempCopy(filepath.Join(testProjectRoot, glideYamlName), "init/glide/glide.yaml")
+	h.TempCopy(filepath.Join(testProjectRoot, glideLockName), "init/glide/glide.lock")
 	projectRoot := h.Path(testProjectRoot)
 
 	// Capture stderr so we can verify output
@@ -216,7 +216,7 @@ func TestGlideConfig_Import(t *testing.T) {
 		t.Fatal("Expected the lock to be generated")
 	}
 
-	goldenFile := "glide/golden.txt"
+	goldenFile := "init/glide/golden.txt"
 	got := verboseOutput.String()
 	want := h.GetTestFileString(goldenFile)
 	if want != got {
@@ -240,7 +240,7 @@ func TestGlideConfig_Import_MissingLockFile(t *testing.T) {
 	defer sm.Release()
 
 	h.TempDir(filepath.Join("src", testProjectRoot))
-	h.TempCopy(filepath.Join(testProjectRoot, glideYamlName), "glide/glide.yaml")
+	h.TempCopy(filepath.Join(testProjectRoot, glideYamlName), "init/glide/glide.yaml")
 	projectRoot := h.Path(testProjectRoot)
 
 	g := newGlideImporter(ctx.Err, true, sm)
