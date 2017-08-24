@@ -88,6 +88,7 @@ func TestGlideConfig_Convert(t *testing.T) {
 				wantLockCount:  1,
 				wantConstraint: "^1.0.0",
 				wantVersion:    "v1.0.0",
+				wantRevision:   "ff2948a2ac8f538c4ecd55962e919d1e13e74baf",
 			},
 		},
 		"revision only": {
@@ -110,6 +111,7 @@ func TestGlideConfig_Convert(t *testing.T) {
 				projectRoot:   "github.com/sdboyer/deptest",
 				wantLockCount: 1,
 				wantRevision:  gps.Revision("ff2948a2ac8f538c4ecd55962e919d1e13e74baf"),
+				wantVersion:   "v1.0.0",
 			},
 		},
 		"with ignored package": {

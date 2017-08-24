@@ -56,6 +56,7 @@ func TestGodepConfig_Convert(t *testing.T) {
 				wantConstraint: "^1.12.0-12-g2fd980e",
 				wantLockCount:  1,
 				wantVersion:    "v1.0.0",
+				wantRevision:   "ff2948a2ac8f538c4ecd55962e919d1e13e74baf",
 			},
 		},
 		"empty comment": {
@@ -116,6 +117,7 @@ func TestGodepConfig_Convert(t *testing.T) {
 				wantLockCount:  1,
 				wantConstraint: "^1.0.0",
 				wantVersion:    "v1.0.0",
+				wantRevision:   "ff2948a2ac8f538c4ecd55962e919d1e13e74baf",
 			},
 		},
 	}
