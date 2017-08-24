@@ -236,7 +236,7 @@ You might, for example, include a constraint in your manifest that specifies `ve
 
 ## Timeouts
 
-`dep ensure` can sometime fail on very slow system due to underlying operations taking too long to perform. This is especially true on Windows due to filesystem issues.
+`dep ensure` can sometime fail on very slow system due to underlying operations taking too long to perform.
 
 If the built-in timeouts are not suitable to your environment, you can override those by setting specific environment variables:
 
