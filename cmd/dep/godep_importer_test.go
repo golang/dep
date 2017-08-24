@@ -152,7 +152,7 @@ func TestGodepConfig_Import(t *testing.T) {
 	h.TempDir(cacheDir)
 	h.TempDir("src")
 	h.TempDir(filepath.Join("src", testProjectRoot))
-	h.TempCopy(filepath.Join(testProjectRoot, godepPath), "godep/Godeps.json")
+	h.TempCopy(filepath.Join(testProjectRoot, godepPath), "init/godep/Godeps.json")
 
 	projectRoot := h.Path(testProjectRoot)
 	sm, err := gps.NewSourceManager(gps.SourceManagerConfig{
@@ -182,7 +182,7 @@ func TestGodepConfig_Import(t *testing.T) {
 		t.Fatal("Expected the lock to be generated")
 	}
 
-	goldenFile := "godep/expected_import_output.txt"
+	goldenFile := "init/godep/expected_import_output.txt"
 	got := verboseOutput.String()
 	want := h.GetTestFileString(goldenFile)
 	if want != got {
@@ -197,7 +197,7 @@ func TestGodepConfig_Import(t *testing.T) {
 }
 
 func TestGodepConfig_JsonLoad(t *testing.T) {
-	// This is same as cmd/dep/testdata/Godeps.json
+	// This is same as cmd/dep/testdata/init/Godeps.json
 	wantJSON := godepJSON{
 		Imports: []godepPackage{
 			{
@@ -217,7 +217,7 @@ func TestGodepConfig_JsonLoad(t *testing.T) {
 
 	ctx := newTestContext(h)
 
-	h.TempCopy(filepath.Join(testProjectRoot, godepPath), "godep/Godeps.json")
+	h.TempCopy(filepath.Join(testProjectRoot, godepPath), "init/godep/Godeps.json")
 
 	projectRoot := h.Path(testProjectRoot)
 

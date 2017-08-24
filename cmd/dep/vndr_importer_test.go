@@ -113,7 +113,7 @@ func TestVndrConfig_Import(t *testing.T) {
 	defer sm.Release()
 
 	h.TempDir(filepath.Join("src", testProjectRoot))
-	h.TempCopy(vndrFile(testProjectRoot), "vndr/vendor.conf")
+	h.TempCopy(vndrFile(testProjectRoot), "init/vndr/vendor.conf")
 	projectRoot := h.Path(testProjectRoot)
 
 	logOutput := bytes.NewBuffer(nil)
@@ -164,7 +164,7 @@ func TestVndrConfig_Import(t *testing.T) {
 		t.Errorf("unexpected lock\nhave=%+v\nwant=%+v", l, wantL)
 	}
 
-	goldenFile := "vndr/golden.txt"
+	goldenFile := "init/vndr/golden.txt"
 	got := logOutput.String()
 	want := h.GetTestFileString(goldenFile)
 	if want != got {
