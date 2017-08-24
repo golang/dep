@@ -88,13 +88,28 @@ func (v *vndrImporter) convert(pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock, er
 	var (
 		manifest = dep.NewManifest()
 		lock     = &dep.Lock{}
-		err      error
 	)
 
 	for _, pkg := range v.packages {
-		// ImportPath must not be empty
 		if pkg.importPath == "" {
-			err := errors.New("Invalid vndr configuration, missing import path")
+			err := errors.New("Invalid vndr configuration, import path is required")
+			return nil, nil, err
+		}
+
+		// Obtain ProjectRoot. Required for avoiding sub-package imports.
+		ip, err := v.sm.DeduceProjectRoot(pkg.importPath)
+		if err != nil {
+			return nil, nil, err
+		}
+		pkg.importPath = string(ip)
+
+		// Check if it already existing in locked projects
+		if projectExistsInLock(lock, ip) {
+			continue
+		}
+
+		if pkg.reference == "" {
+			err := errors.New("Invalid vndr configuration, revision is required")
 			return nil, nil, err
 		}
 
@@ -103,10 +118,27 @@ func (v *vndrImporter) convert(pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock, er
 				ProjectRoot: gps.ProjectRoot(pkg.importPath),
 				Source:      pkg.repository,
 			},
+			Constraint: gps.Any(),
 		}
-		pc.Constraint, err = v.sm.InferConstraint(pkg.revision, pc.Ident)
+
+		isVersion, version, err := isVersion(pc.Ident, pkg.reference, v.sm)
 		if err != nil {
-			return nil, nil, errors.Wrapf(err, "Unable to interpret revision specifier '%s' for package %s", pkg.importPath, pkg.revision)
+			return nil, nil, err
+		}
+
+		// Check if the revision was tagged with a version
+		if !isVersion {
+			revision := gps.Revision(pkg.reference)
+			version, err = lookupVersionForLockedProject(pc.Ident, nil, revision, v.sm)
+			if err != nil {
+				v.logger.Println(err.Error())
+			}
+		}
+
+		// Try to build a constraint from the version
+		pp := getProjectPropertiesFromVersion(version)
+		if pp.Constraint != nil {
+			pc.Constraint = pp.Constraint
 		}
 
 		manifest.Constraints[pc.Ident.ProjectRoot] = gps.ProjectProperties{
@@ -115,14 +147,7 @@ func (v *vndrImporter) convert(pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock, er
 		}
 		fb.NewConstraintFeedback(pc, fb.DepTypeImported).LogFeedback(v.logger)
 
-		revision := gps.Revision(pkg.revision)
-		version, err := lookupVersionForLockedProject(pc.Ident, pc.Constraint, revision, v.sm)
-		if err != nil {
-			v.logger.Println(err.Error())
-		}
-
 		lp := gps.NewLockedProject(pc.Ident, version, nil)
-
 		lock.P = append(lock.P, lp)
 		fb.NewLockedProjectFeedback(lp, fb.DepTypeImported).LogFeedback(v.logger)
 	}
@@ -132,7 +157,7 @@ func (v *vndrImporter) convert(pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock, er
 
 type vndrPackage struct {
 	importPath string
-	revision   string
+	reference  string
 	repository string
 }
 
@@ -155,7 +180,7 @@ func parseVndrLine(line string) (*vndrPackage, error) {
 
 	pkg := &vndrPackage{
 		importPath: parts[0],
-		revision:   parts[1],
+		reference:  parts[1],
 	}
 	if len(parts) == 3 {
 		pkg.repository = parts[2]
