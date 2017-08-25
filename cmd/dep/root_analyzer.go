@@ -181,6 +181,10 @@ func isVersion(pi gps.ProjectIdentifier, value string, sm gps.SourceManager) (bo
 	}
 
 	for _, version := range versions {
+		if version.Type() != gps.IsVersion && version.Type() != gps.IsSemver {
+			continue
+		}
+
 		if value == version.String() {
 			return true, version, nil
 		}
