@@ -121,12 +121,13 @@ func (v *vndrImporter) convert(pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock, er
 			Constraint: gps.Any(),
 		}
 
+		// A vndr entry could contain either a version or a revision
 		isVersion, version, err := isVersion(pc.Ident, pkg.reference, v.sm)
 		if err != nil {
 			return nil, nil, err
 		}
 
-		// Check if the revision was tagged with a version
+		// If the reference is a revision, check if it is tagged with a version
 		if !isVersion {
 			revision := gps.Revision(pkg.reference)
 			version, err = lookupVersionForLockedProject(pc.Ident, nil, revision, v.sm)
