@@ -154,6 +154,41 @@ func TestProjectExistsInLock(t *testing.T) {
 	}
 }
 
+func TestIsVersion(t *testing.T) {
+	testcases := map[string]struct {
+		wantIsVersion bool
+		wantVersion   gps.Version
+	}{
+		"v1.0.0": {wantIsVersion: true, wantVersion: gps.NewVersion("v1.0.0").Pair("ff2948a2ac8f538c4ecd55962e919d1e13e74baf")},
+		"3f4c3bea144e112a69bbe5d8d01c1b09a544253f": {wantIsVersion: false},
+		"master": {wantIsVersion: false},
+	}
+
+	pi := gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot("github.com/sdboyer/deptest")}
+	h := test.NewHelper(t)
+	defer h.Cleanup()
+
+	ctx := newTestContext(h)
+	sm, err := ctx.SourceManager()
+	h.Must(err)
+	defer sm.Release()
+
+	for value, testcase := range testcases {
+		t.Run(value, func(t *testing.T) {
+			gotIsVersion, gotVersion, err := isVersion(pi, value, sm)
+			h.Must(err)
+
+			if testcase.wantIsVersion != gotIsVersion {
+				t.Fatalf("Expected isVersion for %s to be %t", value, testcase.wantIsVersion)
+			}
+
+			if testcase.wantVersion != gotVersion {
+				t.Fatalf("Expected version for %s to be %s, got %s", value, testcase.wantVersion, gotVersion)
+			}
+		})
+	}
+}
+
 // convertTestCase is a common set of validations applied to the result
 // of an importer converting from an external config format to dep's.
 type convertTestCase struct {
