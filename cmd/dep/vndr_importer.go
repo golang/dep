@@ -128,10 +128,7 @@ func (v *vndrImporter) convert(pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock, er
 		fb.NewLockedProjectFeedback(lp, fb.DepTypeImported).LogFeedback(v.logger)
 	}
 
-	if len(manifest.Constraints) > 0 {
-		return manifest, lock, nil
-	}
-	return nil, nil, fmt.ErrorF("No enforcable constraints found")
+	return manifest, lock, nil
 }
 
 type vndrPackage struct {
