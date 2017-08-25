@@ -8,6 +8,8 @@
 /cmd/dep/*_importer*                    @carolynvs
 /cmd/dep/testdata/glide                 @carolynvs
 /cmd/dep/testdata/godep                 @carolynvs
+/cmd/dep/testdata/vndr                  @carolynvs
+/cmd/dep/testdata/govend                @carolynvs
 /cmd/dep/testdata/harness_tests/init    @carolynvs
 /cmd/dep/testdata/init**                @carolynvs
 /analyzer*                              @carolynvs
