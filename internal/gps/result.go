@@ -9,6 +9,8 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"runtime"
+	"sync"
 
 	"github.com/pkg/errors"
 )
@@ -71,47 +73,79 @@ func WriteDepTree(basedir string, l Lock, sm SourceManager, sv bool, logger *log
 		err error
 	}
 	respCh := make(chan resp, len(lps))
+	writeCh := make(chan int, len(lps))
+	cancel := make(chan struct{})
 
+	// Queue work.
 	for i := range lps {
-		go func(i int) {
-			p := lps[i]
-
-			var err error
-			defer func() {
-				if r := recover(); r != nil {
-					err = errors.Errorf("recovered from panic exporting %s: %s", p.Ident().ProjectRoot, r)
-				}
-				respCh <- resp{i, err}
-			}()
-
-			to := filepath.FromSlash(filepath.Join(basedir, string(p.Ident().ProjectRoot)))
-
-			if err = sm.ExportProject(p.Ident(), p.Version(), to); err != nil {
-				err = errors.Wrapf(err, "failed to export %s", p.Ident().ProjectRoot)
-				return
-			}
-
-			if sv {
-				err = filepath.Walk(to, stripVendor)
-				if err != nil {
-					err = errors.Wrapf(err, "failed to strip vendor from %s", p.Ident().ProjectRoot)
-				}
-			}
-		}(i)
+		writeCh <- i
 	}
+	close(writeCh)
+	// Launch writers.
+	writers := runtime.GOMAXPROCS(-1)
+	if len(lps) < writers {
+		writers = len(lps)
+	}
+	var wg sync.WaitGroup
+	wg.Add(writers)
+	for i := 0; i < writers; i++ {
+		go func() {
+			defer wg.Done()
 
+			for i := range writeCh {
+				select {
+				case <-cancel:
+					return
+				default:
+				}
+
+				p := lps[i]
+				to := filepath.FromSlash(filepath.Join(basedir, string(p.Ident().ProjectRoot)))
+
+				if err := sm.ExportProject(p.Ident(), p.Version(), to); err != nil {
+					respCh <- resp{i, errors.Wrapf(err, "failed to export %s", p.Ident().ProjectRoot)}
+					continue
+				}
+
+				if sv {
+					select {
+					case <-cancel:
+						return
+					default:
+					}
+
+					if err := filepath.Walk(to, stripVendor); err != nil {
+						respCh <- resp{i, errors.Wrapf(err, "failed to strip vendor from %s", p.Ident().ProjectRoot)}
+						continue
+					}
+				}
+
+				respCh <- resp{i, nil}
+			}
+		}()
+	}
+	// Monitor writers
+	go func() {
+		wg.Wait()
+		close(respCh)
+	}()
+
+	// Log results and collect errors
 	var errs []error
-	for i := 0; i < len(lps); i++ {
-		resp := <-respCh
+	var cnt int
+	for resp := range respCh {
+		cnt++
 		msg := "Wrote"
 		if resp.err != nil {
+			if len(errs) == 0 {
+				close(cancel)
+			}
 			errs = append(errs, resp.err)
 			msg = "Failed to write"
 		}
 		p := lps[resp.i]
-		logger.Printf("(%d/%d) %s %s@%s\n", i+1, len(lps), msg, p.Ident(), p.Version())
+		logger.Printf("(%d/%d) %s %s@%s\n", cnt, len(lps), msg, p.Ident(), p.Version())
 	}
-	close(respCh)
 
 	if len(errs) > 0 {
 		logger.Println("Failed to write dep tree. The following errors occurred:")
