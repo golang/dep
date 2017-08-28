@@ -296,13 +296,13 @@ It's up to you:
 
 **Pros**
 
-- it's the only way to get truly reproducible builds, as it guards against upstream renames and deletes
-- you don't need an extra `dep ensure` step (to fetch dependencies) on fresh clones to build your repo
+- It's the only way to get truly reproducible builds, as it guards against upstream renames, deletes and commit history overwrites.
+- You don't need an extra `dep ensure` step (to fetch dependencies) on fresh clones to build your repo: you can use `go get` as usual.
 
 **Cons**
 
-- your repo will be bigger, potentially a lot bigger
-- PR diffs are more annoying
+- Your repo will be bigger, potentially a lot bigger.
+- PR diffs are more annoying (but files in `vendor/` are [hidden by default](https://github.com/github/linguist/blob/v5.2.0/lib/linguist/generated.rb#L328) on Github).
 
 ## How do I roll releases that `dep` will be able to use?
 
