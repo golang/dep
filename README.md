@@ -14,14 +14,14 @@
 
 ## Current status
 
-`dep` is safe for production use. That means two things:
+`dep` has achieved the following milestones:
 
 * Any valid metadata file (`Gopkg.toml` and `Gopkg.lock`) will be readable and considered valid by any future version of `dep`.
+
+The next milestones need to be achieved in order to become safe for production grade usage:
+
 * The CLI UI is mostly stable. `dep init` and `dep ensure` are mostly set; `dep status` is likely to change a fair bit, and `dep prune` is [going to be absorbed into `dep ensure`](https://github.com/golang/dep/issues/944).
 * Generally speaking, it has comparable or fewer bugs than other tools out there.
-
-That said, keep in mind the following:
-
 * `dep` is still changing rapidly. If you need stability (e.g. for CI), it's best to rely on a released version, not tip.
 * `dep`'s exported API interface will continue to change in unpredictable, backwards-incompatible ways until we tag a v1.0.0 release.
 
