@@ -450,6 +450,18 @@ func (sg *sourceGateway) revisionPresentIn(ctx context.Context, r Revision) (boo
 	return present, err
 }
 
+func (sg *sourceGateway) disambiguateRevision(ctx context.Context, r Revision) (Revision, error) {
+	sg.mu.Lock()
+	defer sg.mu.Unlock()
+
+	_, err := sg.require(ctx, sourceIsSetUp|sourceExistsLocally)
+	if err != nil {
+		return "", err
+	}
+
+	return sg.src.disambiguateRevision(ctx, r)
+}
+
 func (sg *sourceGateway) sourceURL(ctx context.Context) (string, error) {
 	sg.mu.Lock()
 	defer sg.mu.Unlock()
@@ -550,6 +562,7 @@ type source interface {
 	getManifestAndLock(context.Context, ProjectRoot, Revision, ProjectAnalyzer) (Manifest, Lock, error)
 	listPackages(context.Context, ProjectRoot, Revision) (pkgtree.PackageTree, error)
 	revisionPresentIn(Revision) (bool, error)
+	disambiguateRevision(context.Context, Revision) (Revision, error)
 	exportRevisionTo(context.Context, Revision, string) error
 	sourceType() string
 }

@@ -13,71 +13,94 @@ import (
 
 func TestSourceManager_InferConstraint(t *testing.T) {
 	t.Parallel()
-	h := test.NewHelper(t)
-	cacheDir := "gps-repocache"
-	h.TempDir(cacheDir)
-	sm, err := NewSourceManager(h.Path(cacheDir))
-	h.Must(err)
 
-	sv, err := NewSemverConstraintIC("v0.8.1")
+	// Used in git subtests:
+	v081, err := NewSemverConstraintIC("v0.8.1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	v012, err := NewSemverConstraintIC("v0.12.0-12-de4dcafe0")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	svs, err := NewSemverConstraintIC("v0.12.0-12-de4dcafe0")
+	// Used in hg and bzr subtests:
+	v1, err := NewSemverConstraintIC("v1.0.0")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	constraints := map[string]Constraint{
-		"":       Any(),
-		"v0.8.1": sv,
-		"v2":     NewBranch("v2"),
-		"v0.12.0-12-de4dcafe0": svs,
-		"master":               NewBranch("master"),
-		"5b3352dc16517996fb951394bcbbe913a2a616e3": Revision("5b3352dc16517996fb951394bcbbe913a2a616e3"),
+	var (
+		gitProj = ProjectIdentifier{ProjectRoot: "github.com/carolynvs/deptest"}
+		bzrProj = ProjectIdentifier{ProjectRoot: "launchpad.net/govcstestbzrrepo"}
+		hgProj  = ProjectIdentifier{ProjectRoot: "bitbucket.org/golang-dep/dep-test"}
 
-		// valid bzr rev
-		"jess@linux.com-20161116211307-wiuilyamo9ian0m7": Revision("jess@linux.com-20161116211307-wiuilyamo9ian0m7"),
-		// invalid bzr rev
-		"go4@golang.org-sadfasdf-": NewVersion("go4@golang.org-sadfasdf-"),
-	}
+		testcases = []struct {
+			project ProjectIdentifier
+			name    string
+			str     string
+			want    Constraint
+		}{
+			{gitProj, "empty", "", Any()},
+			{gitProj, "semver-short", "v0.8.1", v081},
+			{gitProj, "long semver constraint", "v0.12.0-12-de4dcafe0", v012},
+			{gitProj, "branch v2", "v2", NewBranch("v2")},
+			{gitProj, "branch master", "master", NewBranch("master")},
+			{gitProj, "long revision", "3f4c3bea144e112a69bbe5d8d01c1b09a544253f",
+				Revision("3f4c3bea144e112a69bbe5d8d01c1b09a544253f")},
+			{gitProj, "short revision", "3f4c3bea",
+				Revision("3f4c3bea144e112a69bbe5d8d01c1b09a544253f")},
 
-	pi := ProjectIdentifier{ProjectRoot: "github.com/carolynvs/deptest"}
-	for str, want := range constraints {
-		got, err := sm.InferConstraint(str, pi)
-		h.Must(err)
+			{bzrProj, "empty", "", Any()},
+			{bzrProj, "semver", "v1.0.0", v1},
+			{bzrProj, "revision", "matt@mattfarina.com-20150731135137-pbphasfppmygpl68",
+				Revision("matt@mattfarina.com-20150731135137-pbphasfppmygpl68")},
 
-		wantT := reflect.TypeOf(want)
-		gotT := reflect.TypeOf(got)
-		if wantT != gotT {
-			t.Errorf("expected type: %s, got %s, for input %s", wantT, gotT, str)
+			{hgProj, "empty", "", Any()},
+			{hgProj, "semver", "v1.0.0", v1},
+			{hgProj, "default branch", "default", NewBranch("default")},
+			{hgProj, "revision", "6f55e1f03d91f8a7cce35d1968eb60a2352e4d59",
+				Revision("6f55e1f03d91f8a7cce35d1968eb60a2352e4d59")},
+			{hgProj, "short revision", "6f55e1f03d91",
+				Revision("6f55e1f03d91f8a7cce35d1968eb60a2352e4d59")},
 		}
-		if got.String() != want.String() {
-			t.Errorf("expected value: %s, got %s for input %s", want, got, str)
+	)
+
+	for _, tc := range testcases {
+		var subtestName string
+		switch tc.project {
+		case gitProj:
+			subtestName = "git-" + tc.name
+		case bzrProj:
+			subtestName = "bzr-" + tc.name
+		case hgProj:
+			subtestName = "hg-" + tc.name
+		default:
+			subtestName = tc.name
 		}
-	}
-}
 
-func TestSourceManager_InferConstraint_InvalidInput(t *testing.T) {
-	h := test.NewHelper(t)
+		t.Run(subtestName, func(t *testing.T) {
+			t.Parallel()
+			h := test.NewHelper(t)
+			defer h.Cleanup()
 
-	cacheDir := "gps-repocache"
-	h.TempDir(cacheDir)
-	sm, err := NewSourceManager(h.Path(cacheDir))
-	h.Must(err)
+			cacheDir := "gps-repocache"
+			h.TempDir(cacheDir)
 
-	constraints := []string{
-		// invalid bzr revs
-		"go4@golang.org-lskjdfnkjsdnf-ksjdfnskjdfn",
-		"20120425195858-psty8c35ve2oej8t",
-	}
+			sm, err := NewSourceManager(h.Path(cacheDir))
+			h.Must(err)
 
-	pi := ProjectIdentifier{ProjectRoot: "github.com/sdboyer/deptest"}
-	for _, str := range constraints {
-		_, err := sm.InferConstraint(str, pi)
-		if err == nil {
-			t.Errorf("expected %s to produce an error", str)
-		}
+			got, err := sm.InferConstraint(tc.str, tc.project)
+			h.Must(err)
+
+			wantT := reflect.TypeOf(tc.want)
+			gotT := reflect.TypeOf(got)
+			if wantT != gotT {
+				t.Errorf("expected type: %s, got %s, for input %s", wantT, gotT, tc.str)
+			}
+			if got.String() != tc.want.String() {
+				t.Errorf("expected value: %s, got %s for input %s", tc.want, got, tc.str)
+			}
+		})
 	}
 }
