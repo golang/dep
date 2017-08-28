@@ -511,29 +511,11 @@ func (sm *SourceMgr) DeduceProjectRoot(ip string) (ProjectRoot, error) {
 }
 
 // InferConstraint tries to puzzle out what kind of version is given in a
-// string. Preference is given first for revisions, then branches, then semver
-// constraints, and then plain tags.
+// string. Preference is given first for branches, then semver constraints, then
+// plain tags, and then revisions.
 func (sm *SourceMgr) InferConstraint(s string, pi ProjectIdentifier) (Constraint, error) {
 	if s == "" {
 		return Any(), nil
-	}
-
-	// Bazaar has a three-component GUID separated by dashes. There should be two,
-	// but the email part could contain internal dashes.
-	if strings.Contains(s, "@") && strings.Count(s, "-") >= 2 {
-		// Work from the back to avoid potential confusion from the email
-		i3 := strings.LastIndex(s, "-")
-		// Skip if - is last char, otherwise this would panic on bounds err
-		if len(s) == i3+1 {
-			return NewVersion(s), nil
-		}
-
-		i2 := strings.LastIndex(s[:i3], "-")
-		if _, err := strconv.ParseUint(s[i2+1:i3], 10, 64); err == nil {
-			// Getting this far means it'd pretty much be nuts if it's not a
-			// bzr rev, so don't bother parsing the email.
-			return Revision(s), nil
-		}
 	}
 
 	// Lookup the string in the repository
@@ -570,6 +552,26 @@ func (sm *SourceMgr) InferConstraint(s string, pi ProjectIdentifier) (Constraint
 	r, err := sm.disambiguateRevision(context.TODO(), pi, Revision(s))
 	if err == nil {
 		return r, nil
+	}
+
+	// Bazaar revision
+	//
+	// Bazaar has a three-component GUID separated by dashes. There should be two,
+	// but the email part could contain internal dashes.
+	if strings.Contains(s, "@") && strings.Count(s, "-") >= 2 {
+		// Work from the back to avoid potential confusion from the email
+		i3 := strings.LastIndex(s, "-")
+		// Skip if - is last char, otherwise this would panic on bounds err
+		if len(s) == i3+1 {
+			return NewVersion(s), nil
+		}
+
+		i2 := strings.LastIndex(s[:i3], "-")
+		if _, err := strconv.ParseUint(s[i2+1:i3], 10, 64); err == nil {
+			// Getting this far means it'd pretty much be nuts if it's not a
+			// bzr rev, so don't bother parsing the email.
+			return Revision(s), nil
+		}
 	}
 
 	return nil, errors.Errorf("%s is not a valid version for the package %s(%s)", s, pi.ProjectRoot, pi.Source)
