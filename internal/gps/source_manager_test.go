@@ -34,7 +34,6 @@ func TestSourceManager_InferConstraint(t *testing.T) {
 		gitProj = ProjectIdentifier{ProjectRoot: "github.com/carolynvs/deptest"}
 		bzrProj = ProjectIdentifier{ProjectRoot: "launchpad.net/govcstestbzrrepo"}
 		hgProj  = ProjectIdentifier{ProjectRoot: "bitbucket.org/golang-dep/dep-test"}
-		svnProj = ProjectIdentifier{ProjectRoot: "bitbucket.org/golang-dep/dep-test"}
 
 		testcases = []struct {
 			project ProjectIdentifier
@@ -76,8 +75,6 @@ func TestSourceManager_InferConstraint(t *testing.T) {
 			subtestName = "bzr-" + tc.name
 		case hgProj:
 			subtestName = "hg-" + tc.name
-		case svnProj:
-			subtestName = "svn-" + tc.name
 		default:
 			subtestName = tc.name
 		}
