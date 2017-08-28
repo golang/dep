@@ -13,72 +13,82 @@ import (
 
 func TestSourceManager_InferConstraint(t *testing.T) {
 	t.Parallel()
-	h := test.NewHelper(t)
-	cacheDir := "gps-repocache"
-	h.TempDir(cacheDir)
-	sm, err := NewSourceManager(h.Path(cacheDir))
-	h.Must(err)
 
-	sv, err := NewSemverConstraintIC("v0.8.1")
-	if err != nil {
-		t.Fatal(err)
-	}
+	testcase := func(str string, pi ProjectIdentifier, want Constraint) func(*testing.T) {
+		return func(t *testing.T) {
+			t.Parallel()
+			h := test.NewHelper(t)
+			defer h.Cleanup()
 
-	svs, err := NewSemverConstraintIC("v0.12.0-12-de4dcafe0")
-	if err != nil {
-		t.Fatal(err)
-	}
+			cacheDir := "gps-repocache"
+			h.TempDir(cacheDir)
 
-	constraints := map[string]Constraint{
-		"":       Any(),
-		"v0.8.1": sv,
-		"v2":     NewBranch("v2"),
-		"v0.12.0-12-de4dcafe0": svs,
-		"master":               NewBranch("master"),
-		"3f4c3bea144e112a69bbe5d8d01c1b09a544253f": Revision("3f4c3bea144e112a69bbe5d8d01c1b09a544253f"),
-		"3f4c3bea": Revision("3f4c3bea144e112a69bbe5d8d01c1b09a544253f"),
+			sm, err := NewSourceManager(h.Path(cacheDir))
+			h.Must(err)
 
-		// valid bzr rev
-		"jess@linux.com-20161116211307-wiuilyamo9ian0m7": Revision("jess@linux.com-20161116211307-wiuilyamo9ian0m7"),
-		// invalid bzr rev
-		"go4@golang.org-sadfasdf-": NewVersion("go4@golang.org-sadfasdf-"),
-	}
+			got, err := sm.InferConstraint(str, pi)
+			h.Must(err)
 
-	pi := ProjectIdentifier{ProjectRoot: "github.com/carolynvs/deptest"}
-	for str, want := range constraints {
-		got, err := sm.InferConstraint(str, pi)
-		h.Must(err)
-
-		wantT := reflect.TypeOf(want)
-		gotT := reflect.TypeOf(got)
-		if wantT != gotT {
-			t.Errorf("expected type: %s, got %s, for input %s", wantT, gotT, str)
-		}
-		if got.String() != want.String() {
-			t.Errorf("expected value: %s, got %s for input %s", want, got, str)
+			wantT := reflect.TypeOf(want)
+			gotT := reflect.TypeOf(got)
+			if wantT != gotT {
+				t.Errorf("expected type: %s, got %s, for input %s", wantT, gotT, str)
+			}
+			if got.String() != want.String() {
+				t.Errorf("expected value: %s, got %s for input %s", want, got, str)
+			}
 		}
 	}
-}
 
-func TestSourceManager_InferConstraint_InvalidInput(t *testing.T) {
-	h := test.NewHelper(t)
+	var (
+		gitProj = ProjectIdentifier{ProjectRoot: "github.com/carolynvs/deptest"}
+		bzrProj = ProjectIdentifier{ProjectRoot: "launchpad.net/govcstestbzrrepo"}
+		hgProj  = ProjectIdentifier{ProjectRoot: "bitbucket.org/golang-dep/dep-test"}
+	)
 
-	cacheDir := "gps-repocache"
-	h.TempDir(cacheDir)
-	sm, err := NewSourceManager(h.Path(cacheDir))
-	h.Must(err)
+	t.Run("git", func(t *testing.T) {
+		t.Parallel()
+		t.Run("empty", testcase("", gitProj, Any()))
 
-	constraints := []string{
-		// invalid bzr revs
-		"go4@golang.org-lskjdfnkjsdnf-ksjdfnskjdfn",
-		"20120425195858-psty8c35ve2oej8t",
-	}
-
-	pi := ProjectIdentifier{ProjectRoot: "github.com/sdboyer/deptest"}
-	for _, str := range constraints {
-		_, err := sm.InferConstraint(str, pi)
-		if err == nil {
-			t.Errorf("expected %s to produce an error", str)
+		v081, err := NewSemverConstraintIC("v0.8.1")
+		if err != nil {
+			t.Fatal(err)
 		}
-	}
+
+		v012, err := NewSemverConstraintIC("v0.12.0-12-de4dcafe0")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		t.Run("semver constraint", testcase("v0.8.1", gitProj, v081))
+		t.Run("long semver constraint", testcase("v0.12.0-12-de4dcafe0", gitProj, v012))
+		t.Run("branch v2", testcase("v2", gitProj, NewBranch("v2")))
+		t.Run("branch master", testcase("master", gitProj, NewBranch("master")))
+		t.Run("long revision", testcase("3f4c3bea144e112a69bbe5d8d01c1b09a544253f", gitProj, Revision("3f4c3bea144e112a69bbe5d8d01c1b09a544253f")))
+		t.Run("short revision", testcase("3f4c3bea", gitProj, Revision("3f4c3bea144e112a69bbe5d8d01c1b09a544253f")))
+	})
+
+	t.Run("bzr", func(t *testing.T) {
+		t.Parallel()
+		v1, err := NewSemverConstraintIC("v1.0.0")
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Run("empty", testcase("", bzrProj, Any()))
+		t.Run("semver", testcase("v1.0.0", bzrProj, v1))
+		t.Run("revision", testcase("matt@mattfarina.com-20150731135137-pbphasfppmygpl68", bzrProj, Revision("matt@mattfarina.com-20150731135137-pbphasfppmygpl68")))
+	})
+
+	t.Run("hg", func(t *testing.T) {
+		t.Parallel()
+		v1, err := NewSemverConstraintIC("v1.0.0")
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Run("empty", testcase("", hgProj, Any()))
+		t.Run("semver", testcase("v1.0.0", hgProj, v1))
+		t.Run("default branch", testcase("default", hgProj, NewBranch("default")))
+		t.Run("revision", testcase("6f55e1f03d91f8a7cce35d1968eb60a2352e4d59", hgProj, Revision("6f55e1f03d91f8a7cce35d1968eb60a2352e4d59")))
+		t.Run("short revision", testcase("6f55e1f03d91", hgProj, Revision("6f55e1f03d91f8a7cce35d1968eb60a2352e4d59")))
+	})
 }
