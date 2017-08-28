@@ -18,10 +18,12 @@
 
 * Any valid metadata file (`Gopkg.toml` and `Gopkg.lock`) will be readable and considered valid by any future version of `dep`.
 * The CLI UI is mostly stable. `dep init` and `dep ensure` are mostly set; `dep status` is likely to change a fair bit, and `dep prune` is [going to be absorbed into `dep ensure`](https://github.com/golang/dep/issues/944).
-* Generally speaking, it has comparable or fewer bugs than other tools out there.
 
 That said, keep in mind the following:
 
+* `dep init` on an existing project can be a rocky experience - we try to automatically convert from other tools' metadata files, and that process is often complex and murky. Once your project is converted and you're using `dep ensure`, its behavior is quite stable.
+* `dep` still has nasty bugs, but in general these are comparable or fewer to other tools out there.
+* `dep` is [pretty slow right now](https://github.com/golang/dep/blob/master/docs/FAQ.md#why-is-dep-slow), especially on the first couple times you run it. Just know that there is a _lot_ of headroom for improvement, and work is actively underway.
 * `dep` is still changing rapidly. If you need stability (e.g. for CI), it's best to rely on a released version, not tip.
 * `dep`'s exported API interface will continue to change in unpredictable, backwards-incompatible ways until we tag a v1.0.0 release.
 
