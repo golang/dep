@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"os"
 	"os/exec"
 	"sync"
 	"sync/atomic"
@@ -196,12 +197,22 @@ func runFromRepoDir(ctx context.Context, repo vcs.Repo, timeout time.Duration, c
 	return c.combinedOutput(ctx)
 }
 
+func getIntEnv(envName string, defaultVal int) string {
+	val, found := os.LookupEnv(envName)
+	num, err := strconv.Atoi(val)
+	if found && (err == nil) {
+		return val
+	} else {
+		return defaultVal
+	}
+}
+
 const (
 	// expensiveCmdTimeout is meant to be used in a command that is expensive
 	// in terms of computation and we know it will take long or one that uses
 	// the network, such as clones, updates, ....
-	expensiveCmdTimeout = 2 * time.Minute
+	expensiveCmdTimeout = getIntEnv("DEP_EXP_CMD_TIMEOUT", 2) * time.Minute
 	// defaultCmdTimeout is just an umbrella value for all other commands that
 	// should not take much.
-	defaultCmdTimeout = 10 * time.Second
+	defaultCmdTimeout = getIntEnv("DEP_CMD_TIMEOUT", 10) * time.Second
 )
