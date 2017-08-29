@@ -8,7 +8,9 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"os"
 	"os/exec"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -196,12 +198,31 @@ func runFromRepoDir(ctx context.Context, repo vcs.Repo, timeout time.Duration, c
 	return c.combinedOutput(ctx)
 }
 
+func getenvDuration(key string, def time.Duration) time.Duration {
+	seconds, err := strconv.Atoi(os.Getenv(key))
+
+	if err != nil {
+		return def
+	}
+
+	return time.Duration(seconds) * time.Second
+}
+
 const (
+	// envExpensiveCmdTimeout is the environment variable to read for the
+	// expensiveCmdTimeout default, in seconds.
+	envExpensiveCmdTimeout = "DEP_EXPENSIVE_CMD_TIMEOUT"
+	// envDefaultCmdTimeout is the environment variable to read for the
+	// envDefaultCmdTimeout default, in seconds.
+	envDefaultCmdTimeout = "DEP_DEFAULT_CMD_TIMEOUT"
+)
+
+var (
 	// expensiveCmdTimeout is meant to be used in a command that is expensive
 	// in terms of computation and we know it will take long or one that uses
 	// the network, such as clones, updates, ....
-	expensiveCmdTimeout = 2 * time.Minute
+	expensiveCmdTimeout = getenvDuration(envExpensiveCmdTimeout, 2*time.Minute)
 	// defaultCmdTimeout is just an umbrella value for all other commands that
 	// should not take much.
-	defaultCmdTimeout = 10 * time.Second
+	defaultCmdTimeout = getenvDuration(envDefaultCmdTimeout, 10*time.Second)
 )

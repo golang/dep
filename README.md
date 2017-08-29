@@ -258,6 +258,15 @@ You might, for example, include a constraint in your manifest that specifies `ve
 * `0.2.3` becomes the range `>=0.2.3, <0.3.0`
 * `0.0.3` becomes the range `>=0.0.3, <0.1.0`
 
+## Timeouts
+
+`dep ensure` can sometime fail on very slow system due to underlying operations taking too long to perform.
+
+If the built-in timeouts are not suitable to your environment, you can override those by setting specific environment variables:
+
+* `DEP_EXPENSIVE_CMD_TIMEOUT`: Set the maximum number of seconds expensive operations can take. The default is 2 minutes (120 seconds).
+* `DEP_DEFAULT_CMD_TIMEOUT`: Set the maximum number of seconds common operations can take. The default is 10 seconds.
+
 ## Feedback
 
 Feedback is greatly appreciated.
