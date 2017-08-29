@@ -179,11 +179,11 @@ func TestIsVersion(t *testing.T) {
 			h.Must(err)
 
 			if testcase.wantIsVersion != gotIsVersion {
-				t.Fatalf("Expected isVersion for %s to be %t", value, testcase.wantIsVersion)
+				t.Fatalf("unexpected isVersion result for %s: \n\t(GOT) %v \n\t(WNT) %v", value, gotIsVersion, testcase.wantIsVersion)
 			}
 
 			if testcase.wantVersion != gotVersion {
-				t.Fatalf("Expected version for %s to be %s, got %s", value, testcase.wantVersion, gotVersion)
+				t.Fatalf("unexpected version for %s: \n\t(GOT) %v \n\t(WNT) %v", value, testcase.wantVersion, gotVersion)
 			}
 		})
 	}
@@ -277,12 +277,12 @@ func validateConvertTestCase(testCase *convertTestCase, manifest *dep.Manifest, 
 		}
 
 		if gotRevision != testCase.wantRevision {
-			return errors.Errorf("Expected locked revision to be '%s', got %s",
+			return errors.Errorf("unexpected locked revision : \n\t(GOT) %v \n\t(WNT) %v",
 				testCase.wantRevision,
 				gotRevision)
 		}
 		if gotVersion != testCase.wantVersion {
-			return errors.Errorf("Expected locked version to be '%s', got %s",
+			return errors.Errorf("unexpected locked version: \n\t(GOT) %v \n\t(WNT) %v",
 				testCase.wantVersion,
 				gotVersion)
 		}
