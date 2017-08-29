@@ -5,10 +5,10 @@ everything here and write out the request, providing as much context as you can.
 
 -->
 
-### What version of dep are you using (`dep version`)?
+### What version of `dep` are you using (`dep version`)?
 <!--
-  If not using release version what version of Go (`go version`)
-  and `dep` (`git describe --tags`) are you using?
+  If you installed `dep` via `go get`, report the version instead with
+  `cd $GOPATH/src/github.com/golang/dep && git describe --tags`
 -->
 
 ### What `dep` command did you run?
