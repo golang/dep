@@ -204,9 +204,9 @@ func getIntEnv(envName string, defaultVal int) int {
 	num, err := strconv.Atoi(val)
 	if found && (err == nil) {
 		return num
-	} else {
-		return defaultVal
 	}
+
+	return defaultVal
 }
 
 func getExpensiveCmdTimeout() time.Duration {
