@@ -80,14 +80,14 @@ type ProjectIdentifier struct {
 	Source      string
 }
 
-func (i ProjectIdentifier) less(j ProjectIdentifier) bool {
+// Less compares by ProjectRoot then normalized Source.
+func (i ProjectIdentifier) Less(j ProjectIdentifier) bool {
 	if i.ProjectRoot < j.ProjectRoot {
 		return true
 	}
 	if j.ProjectRoot < i.ProjectRoot {
 		return false
 	}
-
 	return i.normalizedSource() < j.normalizedSource()
 }
 

@@ -47,7 +47,7 @@ func mkNaiveSM(t *testing.T) (*SourceMgr, func()) {
 
 	return sm, func() {
 		sm.Release()
-		err := removeAll(cpath)
+		err := os.RemoveAll(cpath)
 		if err != nil {
 			t.Errorf("removeAll failed: %s", err)
 		}
@@ -65,7 +65,7 @@ func remakeNaiveSM(osm *SourceMgr, t *testing.T) (*SourceMgr, func()) {
 
 	return sm, func() {
 		sm.Release()
-		err := removeAll(cpath)
+		err := os.RemoveAll(cpath)
 		if err != nil {
 			t.Errorf("removeAll failed: %s", err)
 		}
@@ -95,7 +95,7 @@ func TestSourceManagerInit(t *testing.T) {
 	}
 
 	sm.Release()
-	err = removeAll(cpath)
+	err = os.RemoveAll(cpath)
 	if err != nil {
 		t.Errorf("removeAll failed: %s", err)
 	}
@@ -111,7 +111,7 @@ func TestSourceManagerInit(t *testing.T) {
 	}
 
 	sm.Release()
-	err = removeAll(cpath)
+	err = os.RemoveAll(cpath)
 	if err != nil {
 		t.Errorf("removeAll failed: %s", err)
 	}
@@ -135,7 +135,7 @@ func TestSourceInit(t *testing.T) {
 
 	defer func() {
 		sm.Release()
-		err := removeAll(cpath)
+		err := os.RemoveAll(cpath)
 		if err != nil {
 			t.Errorf("removeAll failed: %s", err)
 		}
