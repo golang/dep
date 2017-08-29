@@ -202,7 +202,7 @@ func (g *glideImporter) buildProjectConstraint(pkg glidePackage) (pc gps.Project
 	}
 	pc.Constraint, err = g.sm.InferConstraint(pkg.Reference, pc.Ident)
 	if err != nil {
-		g.logger.Printf("Unable to interpret revision specifier '%s' for package %s: %s", pkg.Name, pc.Ident, err.Error())
+		g.logger.Printf("Unable to interpret revision specifier '%s' for package %s: %s, (using the 'any' constraint instead)\n", pkg.Name, pc.Ident, err.Error())
 		pc.Constraint = gps.Any()
 	}
 
