@@ -7,6 +7,8 @@ package gps
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
+	"log"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -43,7 +45,6 @@ type SourceManager interface {
 
 	// ListVersions retrieves a list of the available versions for a given
 	// repository name.
-	// TODO convert to []PairedVersion
 	ListVersions(ProjectIdentifier) ([]PairedVersion, error)
 
 	// RevisionPresentIn indicates whether the provided Version is present in
@@ -133,9 +134,13 @@ func (smIsReleased) Error() string {
 
 var _ SourceManager = &SourceMgr{}
 
-// NewSourceManager produces an instance of gps's built-in SourceManager. It
-// takes a cache directory, where local instances of upstream sources are
-// stored.
+// SourceManagerConfig holds configuration information for creating SourceMgrs.
+type SourceManagerConfig struct {
+	Cachedir string      // Where to store local instances of upstream sources.
+	Logger   *log.Logger // Optional info/warn logger. Discards if nil.
+}
+
+// NewSourceManager produces an instance of gps's built-in SourceManager.
 //
 // The returned SourceManager aggressively caches information wherever possible.
 // If tools need to do preliminary work involving upstream repository analysis
@@ -146,8 +151,12 @@ var _ SourceManager = &SourceMgr{}
 // gps's SourceManager is intended to be threadsafe (if it's not, please file a
 // bug!). It should be safe to reuse across concurrent solving runs, even on
 // unrelated projects.
-func NewSourceManager(cachedir string) (*SourceMgr, error) {
-	err := os.MkdirAll(filepath.Join(cachedir, "sources"), 0777)
+func NewSourceManager(c SourceManagerConfig) (*SourceMgr, error) {
+	if c.Logger == nil {
+		c.Logger = log.New(ioutil.Discard, "", 0)
+	}
+
+	err := os.MkdirAll(filepath.Join(c.Cachedir, "sources"), 0777)
 	if err != nil {
 		return nil, err
 	}
@@ -159,7 +168,7 @@ func NewSourceManager(cachedir string) (*SourceMgr, error) {
 	// a process keeping the lock busy, it will pass back a temporary error that
 	// we can spin on.
 
-	glpath := filepath.Join(cachedir, "sm.lock")
+	glpath := filepath.Join(c.Cachedir, "sm.lock")
 	lockfile, err := lockfile.New(glpath)
 	if err != nil {
 		return nil, CouldNotCreateLockError{
@@ -222,12 +231,12 @@ func NewSourceManager(cachedir string) (*SourceMgr, error) {
 	deducer := newDeductionCoordinator(superv)
 
 	sm := &SourceMgr{
-		cachedir:    cachedir,
+		cachedir:    c.Cachedir,
 		lf:          &lockfile,
 		suprvsr:     superv,
 		cancelAll:   cf,
 		deduceCoord: deducer,
-		srcCoord:    newSourceCoordinator(superv, deducer, cachedir),
+		srcCoord:    newSourceCoordinator(superv, deducer, c.Cachedir, c.Logger),
 		qch:         make(chan struct{}),
 	}
 
@@ -348,7 +357,7 @@ func (sm *SourceMgr) Release() {
 	// until after the doRelease process is done, as doing so could cause the
 	// process to terminate before a signal-driven doRelease() call has a chance
 	// to finish its cleanup.
-	sm.relonce.Do(func() { sm.doRelease() })
+	sm.relonce.Do(sm.doRelease)
 }
 
 // doRelease actually releases physical resources (files on disk, etc.).
@@ -359,6 +368,9 @@ func (sm *SourceMgr) doRelease() {
 	// Send the signal to the supervisor to cancel all running calls
 	sm.cancelAll()
 	sm.suprvsr.wait()
+
+	// Close the source coordinator.
+	sm.srcCoord.close()
 
 	// Close the file handle for the lock file and remove it from disk
 	sm.lf.Unlock()

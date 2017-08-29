@@ -58,6 +58,9 @@ type singleSourceCache interface {
 	// If the input is a revision and multiple UnpairedVersions are associated
 	// with it, whatever happens to be the first is returned.
 	toUnpaired(v Version) (UnpairedVersion, bool)
+
+	// close closes the cache and any backing resources.
+	close() error
 }
 
 type singleSourceCacheMemory struct {
@@ -76,6 +79,8 @@ func newMemoryCache() singleSourceCache {
 		rMap:   make(map[Revision][]UnpairedVersion),
 	}
 }
+
+func (*singleSourceCacheMemory) close() error { return nil }
 
 type projectInfo struct {
 	Manifest
