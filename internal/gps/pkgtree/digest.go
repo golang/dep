@@ -20,8 +20,9 @@ import (
 )
 
 const (
-	scratchBufferSize     = 16 * 1024
+	digestNoAction        = os.ModeDir | os.ModeDevice | os.ModeCharDevice | os.ModeNamedPipe | os.ModeSocket
 	osPathSeparatorLength = 1
+	scratchBufferSize     = 16 * 1024
 )
 
 // writeBytesWithNull appends the specified data to the specified hash, followed
@@ -116,8 +117,8 @@ func digestFromDirectoryBuffer(osDirname string, scratchBuffer []byte) ([]byte, 
 				}
 				writeBytesWithNull(closure.someHash, []byte(filepath.ToSlash(osRelative))) // write referent to hash
 				return nil                                                                 // proceed to next node
-			case modeType&(os.ModeDir|os.ModeDevice|os.ModeCharDevice|os.ModeNamedPipe|os.ModeSocket) != 0:
-				return nil // nothing more to do for this type
+			case modeType&digestNoAction != 0:
+				return nil // nothing more to do for these types
 			}
 
 			// If we get here, node is a regular file.
