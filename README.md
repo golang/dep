@@ -39,17 +39,19 @@ That said, keep in mind the following:
 
 ## Setup
 
-Get the tool via
-
-```sh
-$ go get -u github.com/golang/dep/cmd/dep
-```
+Grab the latest binary from the [releases](https://github.com/golang/dep/releases) page.
 
 On macOS you can install or upgrade to the latest released version with Homebrew:
 
 ```sh
 $ brew install dep
 $ brew upgrade dep
+```
+
+If you're interested in hacking on `dep`, you can install via `go get`:
+
+```sh
+go get -u github.com/dep/cmd/dep
 ```
 
 To start managing dependencies using dep, run the following from your project's root directory:

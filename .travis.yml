@@ -1,4 +1,3 @@
----
 language: go
 sudo: false
 notifications:
@@ -6,6 +5,7 @@ notifications:
 jobs:
   include:
     - stage: test
+      go_import_path: github.com/golang/dep
       install:
         - go get -u honnef.co/go/tools/cmd/{gosimple,staticcheck}
         - npm install -g codeclimate-test-reporter
@@ -15,20 +15,16 @@ jobs:
       go: 1.8.x
       script:
         - go build -v ./cmd/dep
-        - PKGS=$(go list ./... | grep -v /vendor/)
-        - go vet $PKGS
-        - staticcheck $PKGS
-        - gosimple $PKGS
+        - ./hack/lint.bash
         - ./hack/validate-vendor.bash
-        - go build ./hack/licenseok
-        - find . -path ./vendor -prune -o -type f -name "*.go" -printf '%P\n' | xargs ./licenseok
-        - set -e; for pkg in $PKGS; do go test -race -coverprofile=profile.out -covermode=atomic $pkg; if [[ -f profile.out ]]; then cat profile.out >> coverage.txt; rm profile.out; fi; done
+        - ./hack/coverage.bash
       after_success:
         - codeclimate-test-reporter < coverage.txt
     # YAML alias, for settings shared across the simpler builds
     - &simple-test
       go: 1.9.x
       stage: test
+      go_import_path: github.com/golang/dep
       install: skip
       env:
         - DEPTESTBYPASS501=1
@@ -53,3 +49,26 @@ jobs:
         # Related: https://superuser.com/questions/1044130/why-am-i-having-how-can-i-fix-this-error-shell-session-update-command-not-f
         - trap EXIT
         - go test -race $(go list ./... | grep -v vendor)
+    - go: 1.8.x
+      stage: deploy
+      go_import_path: github.com/golang/dep
+      install: skip
+      script: skip
+      before_deploy:
+        - ./hack/build-all.bash
+      deploy:
+        - provider: releases
+          api_key:
+            secure: fL9GX11J3JLizEBTPZHN32wuAT91eAJsGl0kjlAdIc6Lb/9UCe1XZGgFnpQFN4qo/S+omhHBDbM6Ty1xhNy7xmjDecpQGDU8Rmap9Oll0TuxqMigG+njOuPp5VUYPofPP0PGKdxAcYg+KaFM7x0o2rK+qA046NHwo2gH1BbE+bn55TZglEajEfc8j9iX4jt96KC7zlu+WiKArLmfUtlrI8m8ZYgbYcvFmlYjeCiEqlNhvNL59ejug9Rl0PLtPbamqVXkGLafYtekgPCb4WSxBiCt8pq5Rb5svk9YcdXpiaWQhZjMPAuKN6BrmN2lw1PiXzADUG5fjvNc8eo2HY70GD2utU9cAsY8VIafhoH5n6uM1WI8MHwDfd7P1PiQA3ZGQ8CPwk4q/8HSfQU9ap7vZgSF63pTIbtlviyIG67orOJE9PWWncl9olYM946UylZu6m3hWI/rmJxOeJ1UJjym/3GNPMRfKubaGhV/TyRdM0bKX4M0cXHU6k/ESVFupGXdKRt4RpvkD4/1Km6b2OShW6PNI+ifFspnJr7obkI7dm7ubySdnNz4lMv9WWymxRpMVc8hUAhuoDvXeZJq7pSnkjBEWDxIRoTkA93CU3/Rf7MFYCJMnGSqjcxWUpIfCAk2/r4BqL9NQnqBvvVt+MYi64QaD5n7ZF3dVbr6HZ2zjSU=
+          file:
+            - release/dep-linux-amd64
+            - release/dep-linux-amd64.sha256
+            - release/dep-darwin-amd64
+            - release/dep-darwin-amd64.sha256
+            - release/dep-windows-amd64
+            - release/dep-windows-amd64.sha256
+          skip_cleanup: true
+          on:
+            repo: golang/dep
+            branch: master
+            tags: true
