@@ -98,7 +98,7 @@ func WriteDepTree(basedir string, l Lock, sm SourceManager, sv bool, logger *log
 			logger.Println(" * ", err)
 		}
 
-		removeAll(basedir)
+		os.RemoveAll(basedir)
 
 		return errors.New("failed to write dep tree")
 	}

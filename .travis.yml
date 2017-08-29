@@ -27,7 +27,7 @@ jobs:
         - codeclimate-test-reporter < coverage.txt
     # YAML alias, for settings shared across the simpler builds
     - &simple-test
-      go: 1.7.x
+      go: 1.9.x
       stage: test
       install: skip
       env:
