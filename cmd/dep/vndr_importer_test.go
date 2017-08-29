@@ -19,55 +19,65 @@ import (
 
 func TestVndrConfig_Convert(t *testing.T) {
 	testCases := map[string]struct {
-		vndr               []vndrPackage
-		wantConvertErr     bool
-		matchPairedVersion bool
-		projectRoot        gps.ProjectRoot
-		wantConstraint     string
-		wantRevision       gps.Revision
-		wantVersion        string
-		wantLockCount      int
+		*convertTestCase
+		packages []vndrPackage
 	}{
-		"project": {
-			vndr: []vndrPackage{{
+		"semver reference": {
+			packages: []vndrPackage{{
 				importPath: "github.com/sdboyer/deptest",
-				revision:   "v0.8.0",
+				reference:  "v0.8.0",
 				repository: "https://github.com/sdboyer/deptest.git",
 			}},
-			matchPairedVersion: false,
-			projectRoot:        gps.ProjectRoot("github.com/sdboyer/deptest"),
-			wantConstraint:     "^0.8.0",
-			wantRevision:       gps.Revision("ff2948a2ac8f538c4ecd55962e919d1e13e74baf"),
-			wantVersion:        "v0.8.0",
-			wantLockCount:      1,
+			convertTestCase: &convertTestCase{
+				projectRoot:    gps.ProjectRoot("github.com/sdboyer/deptest"),
+				wantSourceRepo: "https://github.com/sdboyer/deptest.git",
+				wantConstraint: "^0.8.0",
+				wantRevision:   gps.Revision("ff2948a2ac8f538c4ecd55962e919d1e13e74baf"),
+				wantVersion:    "v0.8.0",
+				wantLockCount:  1,
+			},
 		},
-		"with semver suffix": {
-			vndr: []vndrPackage{{
+		"revision reference": {
+			packages: []vndrPackage{{
 				importPath: "github.com/sdboyer/deptest",
-				revision:   "v1.12.0-12-g2fd980e",
+				reference:  "ff2948a2ac8f538c4ecd55962e919d1e13e74baf",
 			}},
-			matchPairedVersion: false,
-			projectRoot:        gps.ProjectRoot("github.com/sdboyer/deptest"),
-			wantConstraint:     "^1.12.0-12-g2fd980e",
-			wantVersion:        "v1.0.0",
-			wantLockCount:      1,
+			convertTestCase: &convertTestCase{
+				projectRoot:    gps.ProjectRoot("github.com/sdboyer/deptest"),
+				wantConstraint: "^1.0.0",
+				wantVersion:    "v1.0.0",
+				wantRevision:   gps.Revision("ff2948a2ac8f538c4ecd55962e919d1e13e74baf"),
+				wantLockCount:  1,
+			},
 		},
-		"hash revision": {
-			vndr: []vndrPackage{{
-				importPath: "github.com/sdboyer/deptest",
-				revision:   "ff2948a2ac8f538c4ecd55962e919d1e13e74baf",
+		"untagged revision reference": {
+			packages: []vndrPackage{{
+				importPath: "github.com/carolynvs/deptest-subpkg",
+				reference:  "6c41d90f78bb1015696a2ad591debfa8971512d5",
 			}},
-			matchPairedVersion: false,
-			projectRoot:        gps.ProjectRoot("github.com/sdboyer/deptest"),
-			wantConstraint:     "ff2948a2ac8f538c4ecd55962e919d1e13e74baf",
-			wantVersion:        "v1.0.0",
-			wantLockCount:      1,
+			convertTestCase: &convertTestCase{
+				projectRoot:    gps.ProjectRoot("github.com/carolynvs/deptest-subpkg"),
+				wantConstraint: "*",
+				wantVersion:    "",
+				wantRevision:   gps.Revision("6c41d90f78bb1015696a2ad591debfa8971512d5"),
+				wantLockCount:  1,
+			},
 		},
 		"missing importPath": {
-			vndr: []vndrPackage{{
-				revision: "v1.0.0",
+			packages: []vndrPackage{{
+				reference: "v1.0.0",
 			}},
-			wantConvertErr: true,
+			convertTestCase: &convertTestCase{
+				wantConvertErr: true,
+			},
+		},
+		"missing reference": {
+			packages: []vndrPackage{{
+				importPath: "github.com/sdboyer/deptest",
+			}},
+			convertTestCase: &convertTestCase{
+				wantConvertErr: true,
+			},
 		},
 	}
 
@@ -81,72 +91,16 @@ func TestVndrConfig_Convert(t *testing.T) {
 
 	for name, testCase := range testCases {
 		t.Run(name, func(t *testing.T) {
-			v := newVndrImporter(discardLogger, true, sm)
-			v.packages = testCase.vndr
+			g := newVndrImporter(discardLogger, true, sm)
+			g.packages = testCase.packages
 
-			manifest, lock, err := v.convert(testCase.projectRoot)
+			manifest, lock, convertErr := g.convert(testCase.projectRoot)
+			err = validateConvertTestCase(testCase.convertTestCase, manifest, lock, convertErr)
 			if err != nil {
-				if testCase.wantConvertErr {
-					return
-				}
-				t.Fatal(err)
-			} else {
-				if testCase.wantConvertErr {
-					t.Fatal("expected err, have nil")
-				}
-			}
-
-			if len(lock.P) != testCase.wantLockCount {
-				t.Fatalf("Expected lock to have %d project(s), got %d",
-					testCase.wantLockCount,
-					len(lock.P))
-			}
-
-			d, ok := manifest.Constraints[testCase.projectRoot]
-			if !ok {
-				t.Fatalf("Expected the manifest to have a dependency for '%s' but got none",
-					testCase.projectRoot)
-			}
-
-			c := d.Constraint.String()
-			if c != testCase.wantConstraint {
-				t.Fatalf("Expected manifest constraint to be %s, got %s", testCase.wantConstraint, c)
-			}
-
-			p := lock.P[0]
-			if p.Ident().ProjectRoot != testCase.projectRoot {
-				t.Fatalf("Expected the lock to have a project for '%s' but got '%s'",
-					testCase.projectRoot,
-					p.Ident().ProjectRoot)
-			}
-
-			lv := p.Version()
-			lpv, ok := lv.(gps.PairedVersion)
-
-			if !ok {
-				if testCase.matchPairedVersion {
-					t.Fatalf("Expected locked version to be PairedVersion but got %T", lv)
-				}
-
-				return
-			}
-
-			ver := lpv.String()
-			if ver != testCase.wantVersion {
-				t.Fatalf("Expected locked version to be '%s', got %s", testCase.wantVersion, ver)
-			}
-
-			if testCase.wantRevision != "" {
-				rev := lpv.Revision()
-				if rev != testCase.wantRevision {
-					t.Fatalf("Expected locked revision to be '%s', got %s",
-						testCase.wantRevision,
-						rev)
-				}
+				t.Fatalf("%#v", err)
 			}
 		})
 	}
-
 }
 
 func TestVndrConfig_Import(t *testing.T) {
@@ -173,15 +127,15 @@ func TestVndrConfig_Import(t *testing.T) {
 	m, l, err := v.Import(projectRoot, testProjectRoot)
 	h.Must(err)
 
-	constraint, err := gps.NewSemverConstraint("^2.0.0")
-	h.Must(err)
 	wantM := dep.NewManifest()
+	c1, _ := gps.NewSemverConstraint("^0.8.1")
 	wantM.Constraints["github.com/sdboyer/deptest"] = gps.ProjectProperties{
 		Source:     "https://github.com/sdboyer/deptest.git",
-		Constraint: gps.Revision("3f4c3bea144e112a69bbe5d8d01c1b09a544253f"),
+		Constraint: c1,
 	}
+	c2, _ := gps.NewSemverConstraint("^2.0.0")
 	wantM.Constraints["github.com/sdboyer/deptestdos"] = gps.ProjectProperties{
-		Constraint: constraint,
+		Constraint: c2,
 	}
 	if !reflect.DeepEqual(wantM, m) {
 		t.Errorf("unexpected manifest\nhave=%+v\nwant=%+v", m, wantM)
@@ -194,14 +148,14 @@ func TestVndrConfig_Import(t *testing.T) {
 					ProjectRoot: "github.com/sdboyer/deptest",
 					Source:      "https://github.com/sdboyer/deptest.git",
 				},
-				gps.NewVersion("v0.8.1").Pair(gps.Revision("3f4c3bea144e112a69bbe5d8d01c1b09a544253f")),
+				gps.NewVersion("v0.8.1").Pair("3f4c3bea144e112a69bbe5d8d01c1b09a544253f"),
 				nil,
 			),
 			gps.NewLockedProject(
 				gps.ProjectIdentifier{
 					ProjectRoot: "github.com/sdboyer/deptestdos",
 				},
-				gps.Revision("v2.0.0"),
+				gps.NewVersion("v2.0.0").Pair("5c607206be5decd28e6263ffffdcee067266015e"),
 				nil,
 			),
 		},
@@ -263,14 +217,14 @@ func TestParseVndrLine(t *testing.T) {
 		testcase("github.com/golang/notreal v1.0.0",
 			&vndrPackage{
 				importPath: "github.com/golang/notreal",
-				revision:   "v1.0.0",
+				reference:  "v1.0.0",
 			}, nil))
 
 	t.Run("with repo",
 		testcase("github.com/golang/notreal v1.0.0 https://github.com/golang/notreal",
 			&vndrPackage{
 				importPath: "github.com/golang/notreal",
-				revision:   "v1.0.0",
+				reference:  "v1.0.0",
 				repository: "https://github.com/golang/notreal",
 			}, nil))
 
@@ -278,7 +232,7 @@ func TestParseVndrLine(t *testing.T) {
 		testcase("github.com/golang/notreal v1.0.0 https://github.com/golang/notreal  # cool comment",
 			&vndrPackage{
 				importPath: "github.com/golang/notreal",
-				revision:   "v1.0.0",
+				reference:  "v1.0.0",
 				repository: "https://github.com/golang/notreal",
 			}, nil))
 
