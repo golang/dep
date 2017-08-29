@@ -46,7 +46,7 @@ $ brew install dep
 $ brew upgrade dep
 ```
 
-You can also install dep via
+If you're interested in hacking on `dep`, you can install via `go get`:
 
 ```sh
 go get -u github.com/dep/cmd/dep
