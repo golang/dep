@@ -7,7 +7,7 @@
 package gps
 
 import (
-        "fmt"
+	"fmt"
 	"os"
 	"path/filepath"
 )
