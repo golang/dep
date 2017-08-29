@@ -21,6 +21,12 @@
   revision = "4239b77079c7b5d1243b7b4736304ce8ddb6f0f2"
 
 [[projects]]
+  name = "github.com/boltdb/bolt"
+  packages = ["."]
+  revision = "2f1ce7a837dcb8da3ec595b1dac9d0632f0f99e8"
+  version = "v1.3.1"
+
+[[projects]]
   branch = "v2"
   name = "github.com/go-yaml/yaml"
   packages = ["."]
@@ -56,9 +62,15 @@
   packages = ["."]
   revision = "836a144573533ea4da4e6929c235fd348aed1c80"
 
+[[projects]]
+  branch = "master"
+  name = "golang.org/x/sys"
+  packages = ["unix"]
+  revision = "bb24a47a89eac6c1227fbcb2ae37a8b9ed323366"
+
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "7c692c08851064cf6167056c23082edcf393d3af6bc0768c3111e0dde7444960"
+  inputs-digest = "0ba2aa4b3860c5fcc1719b31afaf30c1fcf3b97cbb0a5116b498cafedbb06b1b"
   solver-name = "gps-cdcl"
   solver-version = 1
