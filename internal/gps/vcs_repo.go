@@ -117,13 +117,13 @@ func (r *gitRepo) defendAgainstSubmodules(ctx context.Context) error {
 
 	// Now, do a special extra-aggressive clean in case changing versions caused
 	// one or more submodules to go away.
-	out, err = runFromRepoDir(ctx, r, defaultCmdTimeout, "git", "clean", "-x", "-d", "-f", "-f")
+	out, err = runFromRepoDir(ctx, r, getDefaultCmdTimeout(), "git", "clean", "-x", "-d", "-f", "-f")
 	if err != nil {
 		return newVcsLocalErrorOr("unexpected error while defensively cleaning up after possible derelict submodule directories", err, string(out))
 	}
 
 	// Then, repeat just in case there are any nested submodules that went away.
-	out, err = runFromRepoDir(ctx, r, defaultCmdTimeout, "git", "submodule", "foreach", "--recursive", "git", "clean", "-x", "-d", "-f", "-f")
+	out, err = runFromRepoDir(ctx, r, getDefaultCmdTimeout(), "git", "submodule", "foreach", "--recursive", "git", "clean", "-x", "-d", "-f", "-f")
 	if err != nil {
 		return newVcsLocalErrorOr("unexpected error while defensively cleaning up after possible derelict nested submodule directories", err, string(out))
 	}
@@ -250,7 +250,7 @@ func (r *svnRepo) CommitInfo(id string) (*vcs.CommitInfo, error) {
 			Commit commit `xml:"entry>commit"`
 		}
 
-		out, err := runFromRepoDir(ctx, r, defaultCmdTimeout, "svn", "info", "-r", id, "--xml")
+		out, err := runFromRepoDir(ctx, r, getDefaultCmdTimeout(), "svn", "info", "-r", id, "--xml")
 		if err != nil {
 			return nil, newVcsLocalErrorOr("unable to retrieve commit information", err, string(out))
 		}
@@ -267,7 +267,7 @@ func (r *svnRepo) CommitInfo(id string) (*vcs.CommitInfo, error) {
 		}
 	}
 
-	out, err := runFromRepoDir(ctx, r, defaultCmdTimeout, "svn", "log", "-r", id, "--xml")
+	out, err := runFromRepoDir(ctx, r, getDefaultCmdTimeout(), "svn", "log", "-r", id, "--xml")
 	if err != nil {
 		return nil, newVcsRemoteErrorOr("unable to retrieve commit information", err, string(out))
 	}

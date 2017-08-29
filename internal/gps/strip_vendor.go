@@ -7,6 +7,7 @@
 package gps
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 )
@@ -33,7 +34,8 @@ func stripVendor(path string, info os.FileInfo, err error) error {
 
 		if info.IsDir() {
 			if err := os.RemoveAll(path); err != nil {
-				return err
+				fmt.Printf("could not remove %s completly: %s, skipping\n", path, err)
+				// return err
 			}
 			return filepath.SkipDir
 		}

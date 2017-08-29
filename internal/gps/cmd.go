@@ -8,12 +8,14 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"os"
 	"os/exec"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/Masterminds/vcs"
+	"strconv"
 )
 
 // monitoredCmd wraps a cmd and will keep monitoring the process until it
@@ -194,6 +196,25 @@ func runFromCwd(ctx context.Context, timeout time.Duration, cmd string, args ...
 func runFromRepoDir(ctx context.Context, repo vcs.Repo, timeout time.Duration, cmd string, args ...string) ([]byte, error) {
 	c := newMonitoredCmd(repo.CmdFromDir(cmd, args...), timeout)
 	return c.combinedOutput(ctx)
+}
+
+func getIntEnv(envName string, defaultVal int) int {
+	val, found := os.LookupEnv(envName)
+
+	num, err := strconv.Atoi(val)
+	if found && (err == nil) {
+		return num
+	}
+
+	return defaultVal
+}
+
+func getExpensiveCmdTimeout() time.Duration {
+	return time.Duration(getIntEnv("DEP_EXP_CMD_TIMEOUT", 2)) * time.Minute
+}
+
+func getDefaultCmdTimeout() time.Duration {
+	return time.Duration(getIntEnv("DEP_CMD_TIMEOUT", 10)) * time.Second
 }
 
 const (
