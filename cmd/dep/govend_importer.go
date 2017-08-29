@@ -140,7 +140,7 @@ func (g *govendImporter) convert(pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock, 
 
 func (g *govendImporter) buildProjectConstraint(pkg govendPackage, constraint string) (pc gps.ProjectConstraint, err error) {
 	pc.Ident = gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot(pkg.Path)}
-	pc.Constraint, err = g.sm.InferConstraint(constraint, pc.Ident)
+	pc.Constraint, err = g.sm.InferConstraint(constraint, pc.Ident, true)
 	if err != nil {
 		return
 	}

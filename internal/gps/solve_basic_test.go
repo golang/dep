@@ -1499,7 +1499,7 @@ func (sm *depspecSourceManager) ignore() map[string]bool {
 // is a panic because there's no current circumstance under which the depspecSourceManager
 // is useful outside of the gps solving tests, and it shouldn't be used anywhere else without a conscious and intentional
 // expansion of its semantics.
-func (sm *depspecSourceManager) InferConstraint(s string, pi ProjectIdentifier) (Constraint, error) {
+func (sm *depspecSourceManager) InferConstraint(s string, pi ProjectIdentifier, ic bool) (Constraint, error) {
 	panic("depsecSourceManager is only for gps solving tests")
 }
 

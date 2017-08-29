@@ -156,7 +156,7 @@ func (g *godepImporter) convert(pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock, e
 // create a project constraint
 func (g *godepImporter) buildProjectConstraint(pkg godepPackage) (pc gps.ProjectConstraint, err error) {
 	pc.Ident = gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot(pkg.ImportPath)}
-	pc.Constraint, err = g.sm.InferConstraint(pkg.Comment, pc.Ident)
+	pc.Constraint, err = g.sm.InferConstraint(pkg.Comment, pc.Ident, true)
 	if err != nil {
 		return
 	}

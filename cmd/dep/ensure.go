@@ -740,7 +740,7 @@ func getProjectConstraint(arg string, sm gps.SourceManager) (gps.ProjectConstrai
 	}
 
 	pi := gps.ProjectIdentifier{ProjectRoot: pr, Source: source}
-	c, err := sm.InferConstraint(versionStr, pi)
+	c, err := sm.InferConstraint(versionStr, pi, true)
 	if err != nil {
 		return emptyPC, "", err
 	}

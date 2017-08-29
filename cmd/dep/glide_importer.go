@@ -200,7 +200,7 @@ func (g *glideImporter) buildProjectConstraint(pkg glidePackage) (pc gps.Project
 		ProjectRoot: pr,
 		Source:      pkg.Repository,
 	}
-	pc.Constraint, err = g.sm.InferConstraint(pkg.Reference, pc.Ident)
+	pc.Constraint, err = g.sm.InferConstraint(pkg.Reference, pc.Ident, true)
 	if err != nil {
 		return
 	}
