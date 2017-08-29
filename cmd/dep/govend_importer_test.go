@@ -17,11 +17,11 @@ import (
 
 func TestGovendConfig_Convert(t *testing.T) {
 	testCases := map[string]struct {
-		*convertTestCase
 		yaml govendYAML
+		convertTestCase
 	}{
 		"project": {
-			yaml: govendYAML{
+			govendYAML{
 				Imports: []govendPackage{
 					{
 						Path:     "github.com/sdboyer/deptest",
@@ -29,36 +29,35 @@ func TestGovendConfig_Convert(t *testing.T) {
 					},
 				},
 			},
-			convertTestCase: &convertTestCase{
-				projectRoot:    gps.ProjectRoot("github.com/sdboyer/deptest"),
-				wantConstraint: "^1.0.0",
-				wantLockCount:  1,
-				wantRevision:   gps.Revision("ff2948a2ac8f538c4ecd55962e919d1e13e74baf"),
-				wantVersion:    "v1.0.0",
+			convertTestCase{
+				wantProjectRoot: "github.com/sdboyer/deptest",
+				wantConstraint:  "^1.0.0",
+				wantRevision:    "ff2948a2ac8f538c4ecd55962e919d1e13e74baf",
+				wantVersion:     "v1.0.0",
 			},
 		},
 		"bad input - empty package name": {
-			yaml: govendYAML{
+			govendYAML{
 				Imports: []govendPackage{
 					{
 						Path: "",
 					},
 				},
 			},
-			convertTestCase: &convertTestCase{
+			convertTestCase{
 				wantConvertErr: true,
 			},
 		},
 
 		"bad input - empty revision": {
-			yaml: govendYAML{
+			govendYAML{
 				Imports: []govendPackage{
 					{
 						Path: "github.com/sdboyer/deptest",
 					},
 				},
 			},
-			convertTestCase: &convertTestCase{
+			convertTestCase{
 				wantConvertErr: true,
 			},
 		},
@@ -77,7 +76,7 @@ func TestGovendConfig_Convert(t *testing.T) {
 			g := newGovendImporter(discardLogger, true, sm)
 			g.yaml = testCase.yaml
 
-			manifest, lock, convertErr := g.convert(testCase.projectRoot)
+			manifest, lock, convertErr := g.convert(testProjectRoot)
 			err = validateConvertTestCase(testCase.convertTestCase, manifest, lock, convertErr)
 			if err != nil {
 				t.Fatalf("%#v", err)
