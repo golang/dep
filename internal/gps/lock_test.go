@@ -6,6 +6,7 @@ package gps
 
 import (
 	"reflect"
+	"sort"
 	"testing"
 )
 
@@ -20,7 +21,9 @@ func TestLockedProjectSorting(t *testing.T) {
 	lps2 := make([]LockedProject, len(lps))
 	copy(lps2, lps)
 
-	SortLockedProjects(lps2)
+	sort.SliceStable(lps2, func(i, j int) bool {
+		return lps2[i].Ident().Less(lps2[j].Ident())
+	})
 
 	// only the two should have switched positions
 	lps[0], lps[2] = lps[2], lps[0]

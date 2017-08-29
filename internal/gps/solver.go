@@ -1123,7 +1123,7 @@ func (s *solver) unselectedComparator(i, j int) bool {
 	case !ilock && jlock:
 		return false
 	case ilock && jlock:
-		return iname.less(jname)
+		return iname.Less(jname)
 	}
 
 	// Now, sort by number of available versions. This will trigger network
@@ -1152,7 +1152,7 @@ func (s *solver) unselectedComparator(i, j int) bool {
 	}
 
 	// Finally, if all else fails, fall back to comparing by name
-	return iname.less(jname)
+	return iname.Less(jname)
 }
 
 func (s *solver) fail(id ProjectIdentifier) {

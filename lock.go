@@ -149,7 +149,9 @@ func (l *Lock) toRaw() rawLock {
 		Projects: make([]rawLockedProject, len(l.P)),
 	}
 
-	sort.Sort(SortedLockedProjects(l.P))
+	sort.Slice(l.P, func(i, j int) bool {
+		return l.P[i].Ident().Less(l.P[j].Ident())
+	})
 
 	for k, lp := range l.P {
 		id := lp.Ident()
@@ -196,22 +198,4 @@ func LockFromSolution(in gps.Solution) *Lock {
 	copy(l.SolveMeta.InputsDigest, h)
 	copy(l.P, p)
 	return l
-}
-
-// SortedLockedProjects implements sort.Interface.
-type SortedLockedProjects []gps.LockedProject
-
-func (s SortedLockedProjects) Len() int      { return len(s) }
-func (s SortedLockedProjects) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
-func (s SortedLockedProjects) Less(i, j int) bool {
-	l, r := s[i].Ident(), s[j].Ident()
-
-	if l.ProjectRoot < r.ProjectRoot {
-		return true
-	}
-	if r.ProjectRoot < l.ProjectRoot {
-		return false
-	}
-
-	return l.Source < r.Source
 }
