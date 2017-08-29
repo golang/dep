@@ -71,6 +71,49 @@ func (e *noVersionError) traceString() string {
 	return buf.String()
 }
 
+// caseMismatchFailure occurs when there are import paths that differ only by
+// case. The compiler disallows this case.
+type caseMismatchFailure struct {
+	// goal is the depender atom that tried to introduce the case-varying name,
+	// along with the case-varying name.
+	goal dependency
+	// current is the specific casing of a ProjectRoot that is presently
+	// selected for all possible case variations of its contained unicode code
+	// points.
+	current ProjectRoot
+	// failsib is the list of active dependencies that have determined the
+	// specific casing for the target project.
+	failsib []dependency
+}
+
+func (e *caseMismatchFailure) Error() string {
+	if len(e.failsib) == 1 {
+		str := "Could not introduce %s due to a case-only variation: it depends on %q, but %q was already established as the case variant for that project root by depender %s"
+		return fmt.Sprintf(str, a2vs(e.goal.depender), e.goal.dep.Ident.ProjectRoot, e.current, a2vs(e.failsib[0].depender))
+	}
+
+	var buf bytes.Buffer
+
+	str := "Could not introduce %s due to a case-only variation: it depends on %q, but %q was already established as the case variant for that project root by the following other dependers:\n"
+	fmt.Fprintf(&buf, str, e.goal.dep.Ident.ProjectRoot, e.current, a2vs(e.goal.depender))
+
+	for _, c := range e.failsib {
+		fmt.Fprintf(&buf, "\t%s\n", a2vs(c.depender))
+	}
+
+	return buf.String()
+}
+
+func (e *caseMismatchFailure) traceString() string {
+	var buf bytes.Buffer
+	fmt.Fprintf(&buf, "case-only variation in dependency on %q; %q already established by:\n", e.goal.dep.Ident.ProjectRoot, e.current)
+	for _, f := range e.failsib {
+		fmt.Fprintf(&buf, "%s\n", a2vs(f.depender))
+	}
+
+	return buf.String()
+}
+
 // disjointConstraintFailure occurs when attempting to introduce an atom that
 // itself has an acceptable version, but one of its dependency constraints is
 // disjoint with one or more dependency constraints already active for that

@@ -307,8 +307,9 @@ func Prepare(params SolveParameters, sm SourceManager) (Solver, error) {
 
 	// Initialize stacks and queues
 	s.sel = &selection{
-		deps: make(map[ProjectRoot][]dependency),
-		vu:   s.vUnify,
+		deps:     make(map[ProjectRoot][]dependency),
+		prLenMap: make(map[int][]ProjectRoot),
+		vu:       s.vUnify,
 	}
 	s.unsel = &unselected{
 		sl:  make([]bimodalIdentifier, 0),
