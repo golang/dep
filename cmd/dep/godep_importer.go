@@ -12,7 +12,6 @@ import (
 	"path/filepath"
 
 	"github.com/golang/dep"
-	fb "github.com/golang/dep/internal/feedback"
 	"github.com/golang/dep/internal/gps"
 	"github.com/pkg/errors"
 )
@@ -20,19 +19,12 @@ import (
 const godepPath = "Godeps" + string(os.PathSeparator) + "Godeps.json"
 
 type godepImporter struct {
+	*baseImporter
 	json godepJSON
-
-	logger  *log.Logger
-	verbose bool
-	sm      gps.SourceManager
 }
 
 func newGodepImporter(logger *log.Logger, verbose bool, sm gps.SourceManager) *godepImporter {
-	return &godepImporter{
-		logger:  logger,
-		verbose: verbose,
-		sm:      sm,
-	}
+	return &godepImporter{baseImporter: newBaseImporter(logger, verbose, sm)}
 }
 
 type godepJSON struct {
@@ -75,11 +67,11 @@ func (g *godepImporter) load(projectDir string) error {
 	}
 	jb, err := ioutil.ReadFile(j)
 	if err != nil {
-		return errors.Wrapf(err, "Unable to read %s", j)
+		return errors.Wrapf(err, "unable to read %s", j)
 	}
 	err = json.Unmarshal(jb, &g.json)
 	if err != nil {
-		return errors.Wrapf(err, "Unable to parse %s", j)
+		return errors.Wrapf(err, "unable to parse %s", j)
 	}
 
 	return nil
@@ -88,100 +80,31 @@ func (g *godepImporter) load(projectDir string) error {
 func (g *godepImporter) convert(pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock, error) {
 	g.logger.Println("Converting from Godeps.json ...")
 
-	manifest := dep.NewManifest()
-	lock := &dep.Lock{}
-
+	packages := make([]importedPackage, 0, len(g.json.Imports))
 	for _, pkg := range g.json.Imports {
-		// ImportPath must not be empty
+		// Validate
 		if pkg.ImportPath == "" {
-			err := errors.New("Invalid godep configuration, ImportPath is required")
+			err := errors.New("invalid godep configuration, ImportPath is required")
 			return nil, nil, err
 		}
 
-		// Obtain ProjectRoot. Required for avoiding sub-package imports.
-		ip, err := g.sm.DeduceProjectRoot(pkg.ImportPath)
-		if err != nil {
-			return nil, nil, err
-		}
-		pkg.ImportPath = string(ip)
-
-		// Check if it already existing in locked projects
-		if projectExistsInLock(lock, ip) {
-			continue
-		}
-
-		// Rev must not be empty
 		if pkg.Rev == "" {
-			err := errors.New("Invalid godep configuration, Rev is required")
+			err := errors.New("invalid godep configuration, Rev is required")
 			return nil, nil, err
 		}
 
-		if pkg.Comment == "" {
-			// When there's no comment, try to get corresponding version for the Rev
-			// and fill Comment.
-			pi := gps.ProjectIdentifier{
-				ProjectRoot: gps.ProjectRoot(pkg.ImportPath),
-			}
-			revision := gps.Revision(pkg.Rev)
-
-			version, err := lookupVersionForLockedProject(pi, nil, revision, g.sm)
-			if err != nil {
-				// Only warn about the problem, it is not enough to warrant failing
-				g.logger.Println(err.Error())
-			} else {
-				pp := getProjectPropertiesFromVersion(version)
-				if pp.Constraint != nil {
-					pkg.Comment = pp.Constraint.String()
-				}
-			}
+		ip := importedPackage{
+			Name:           pkg.ImportPath,
+			LockHint:       pkg.Rev,
+			ConstraintHint: pkg.Comment,
 		}
-
-		if pkg.Comment != "" {
-			// If there's a comment, use it to create project constraint
-			pc, err := g.buildProjectConstraint(pkg)
-			if err != nil {
-				return nil, nil, err
-			}
-			manifest.Constraints[pc.Ident.ProjectRoot] = gps.ProjectProperties{Constraint: pc.Constraint}
-		}
-
-		lp := g.buildLockedProject(pkg, manifest)
-		lock.P = append(lock.P, lp)
+		packages = append(packages, ip)
 	}
 
-	return manifest, lock, nil
-}
-
-// buildProjectConstraint uses the provided package ImportPath and Comment to
-// create a project constraint
-func (g *godepImporter) buildProjectConstraint(pkg godepPackage) (pc gps.ProjectConstraint, err error) {
-	pc.Ident = gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot(pkg.ImportPath)}
-	pc.Constraint, err = g.sm.InferConstraint(pkg.Comment, pc.Ident)
+	err := g.importPackages(packages, true)
 	if err != nil {
-		return
+		return nil, nil, err
 	}
 
-	f := fb.NewConstraintFeedback(pc, fb.DepTypeImported)
-	f.LogFeedback(g.logger)
-
-	return
-}
-
-// buildLockedProject uses the package Rev and Comment to create lock project
-func (g *godepImporter) buildLockedProject(pkg godepPackage, manifest *dep.Manifest) gps.LockedProject {
-	pi := gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot(pkg.ImportPath)}
-	revision := gps.Revision(pkg.Rev)
-	pp := manifest.Constraints[pi.ProjectRoot]
-
-	version, err := lookupVersionForLockedProject(pi, pp.Constraint, revision, g.sm)
-	if err != nil {
-		// Only warn about the problem, it is not enough to warrant failing
-		g.logger.Println(err.Error())
-	}
-
-	lp := gps.NewLockedProject(pi, version, nil)
-	f := fb.NewLockedProjectFeedback(lp, fb.DepTypeImported)
-	f.LogFeedback(g.logger)
-
-	return lp
+	return g.manifest, g.lock, nil
 }
