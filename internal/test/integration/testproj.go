@@ -21,14 +21,15 @@ import (
 )
 
 const (
-	ProjectRoot string = "src/github.com/golang/notexist"
+	projectRoot string = "src/github.com/golang/notexist"
 )
 
+// RunFunc defines the function signature for an integration test command to execute.
 type RunFunc func(prog string, newargs []string, outW, errW io.Writer, dir string, env []string) error
 
-// IntegrationTestProject manages the "virtual" test project directory structure
+// TestProject manages the "virtual" test project directory structure
 // and content
-type IntegrationTestProject struct {
+type TestProject struct {
 	t          *testing.T
 	h          *test.Helper
 	preImports []string
@@ -40,15 +41,16 @@ type IntegrationTestProject struct {
 	run        RunFunc
 }
 
-func NewTestProject(t *testing.T, initPath, wd string, externalProc bool, run RunFunc) *IntegrationTestProject {
-	new := &IntegrationTestProject{
+// NewTestProject initializes a new test's project directory.
+func NewTestProject(t *testing.T, initPath, wd string, externalProc bool, run RunFunc) *TestProject {
+	new := &TestProject{
 		t:      t,
 		origWd: wd,
 		env:    os.Environ(),
 		run:    run,
 	}
 	new.makeRootTempDir()
-	new.TempDir(ProjectRoot, "vendor")
+	new.TempDir(projectRoot, "vendor")
 	new.CopyTree(initPath)
 
 	new.Setenv("GOPATH", new.tempdir)
@@ -56,38 +58,45 @@ func NewTestProject(t *testing.T, initPath, wd string, externalProc bool, run Ru
 	return new
 }
 
-func (p *IntegrationTestProject) Cleanup() {
+// Cleanup (remove) the test project's directory.
+func (p *TestProject) Cleanup() {
 	os.RemoveAll(p.tempdir)
 }
 
-func (p *IntegrationTestProject) Path(args ...string) string {
+// Path to the test project directory.
+func (p *TestProject) Path(args ...string) string {
 	return filepath.Join(p.tempdir, filepath.Join(args...))
 }
 
-func (p *IntegrationTestProject) ProjPath(args ...string) string {
-	localPath := append([]string{ProjectRoot}, args...)
+// ProjPath builds an import path for the test project.
+func (p *TestProject) ProjPath(args ...string) string {
+	localPath := append([]string{projectRoot}, args...)
 	return p.Path(localPath...)
 }
 
-func (p *IntegrationTestProject) TempDir(args ...string) {
+// TempDir creates a temporary directory for the test project.
+func (p *TestProject) TempDir(args ...string) {
 	fullPath := p.Path(args...)
 	if err := os.MkdirAll(fullPath, 0755); err != nil && !os.IsExist(err) {
 		p.t.Fatalf("%+v", errors.Errorf("Unable to create temp directory: %s", fullPath))
 	}
 }
 
-func (p *IntegrationTestProject) TempProjDir(args ...string) {
-	localPath := append([]string{ProjectRoot}, args...)
+// TempProjDir builds the path to a package within the test project.
+func (p *TestProject) TempProjDir(args ...string) {
+	localPath := append([]string{projectRoot}, args...)
 	p.TempDir(localPath...)
 }
 
-func (p *IntegrationTestProject) VendorPath(args ...string) string {
-	localPath := append([]string{ProjectRoot, "vendor"}, args...)
+// VendorPath lists the contents of the test project's vendor directory.
+func (p *TestProject) VendorPath(args ...string) string {
+	localPath := append([]string{projectRoot, "vendor"}, args...)
 	p.TempDir(localPath...)
 	return p.Path(localPath...)
 }
 
-func (p *IntegrationTestProject) RunGo(args ...string) {
+// RunGo runs a go command, and expects it to succeed.
+func (p *TestProject) RunGo(args ...string) {
 	cmd := exec.Command("go", args...)
 	p.stdout.Reset()
 	p.stderr.Reset()
@@ -110,7 +119,8 @@ func (p *IntegrationTestProject) RunGo(args ...string) {
 	}
 }
 
-func (p *IntegrationTestProject) RunGit(dir string, args ...string) {
+// RunGit runs a git command, and expects it to succeed.
+func (p *TestProject) RunGit(dir string, args ...string) {
 	cmd := exec.Command("git", args...)
 	p.stdout.Reset()
 	p.stderr.Reset()
@@ -135,24 +145,26 @@ func (p *IntegrationTestProject) RunGit(dir string, args ...string) {
 	}
 }
 
-// GetStdout gets the Stdout output from test run
-func (p *IntegrationTestProject) GetStdout() string {
+// GetStdout gets the Stdout output from test run.
+func (p *TestProject) GetStdout() string {
 	return p.stdout.String()
 }
 
-// GetStderr gets the Stderr output from test run
-func (p *IntegrationTestProject) GetStderr() string {
+// GetStderr gets the Stderr output from test run.
+func (p *TestProject) GetStderr() string {
 	return p.stderr.String()
 }
 
-func (p *IntegrationTestProject) GetVendorGit(ip string) {
+// GetVendorGit populates the initial vendor directory for a test project.
+func (p *TestProject) GetVendorGit(ip string) {
 	parse := strings.Split(ip, "/")
 	gitDir := strings.Join(parse[:len(parse)-1], string(filepath.Separator))
 	p.TempProjDir("vendor", gitDir)
 	p.RunGit(p.ProjPath("vendor", gitDir), "clone", "http://"+ip)
 }
 
-func (p *IntegrationTestProject) DoRun(args []string) error {
+// DoRun executes the integration test command against the test project.
+func (p *TestProject) DoRun(args []string) error {
 	if *test.PrintLogs {
 		p.t.Logf("running testdep %v", args)
 	}
@@ -175,13 +187,14 @@ func (p *IntegrationTestProject) DoRun(args []string) error {
 	return status
 }
 
-func (p *IntegrationTestProject) CopyTree(src string) {
+// CopyTree recursively copies a source directory into the test project's directory.
+func (p *TestProject) CopyTree(src string) {
 	filepath.Walk(src,
 		func(path string, info os.FileInfo, err error) error {
 			if path != src {
 				localpath := path[len(src)+1:]
 				if info.IsDir() {
-					p.TempDir(ProjectRoot, localpath)
+					p.TempDir(projectRoot, localpath)
 				} else {
 					destpath := filepath.Join(p.ProjPath(), localpath)
 					copyFile(destpath, path)
@@ -207,8 +220,8 @@ func copyFile(dest, src string) {
 	io.Copy(out, in)
 }
 
-// Collect final vendor paths at a depth of three levels
-func (p *IntegrationTestProject) GetVendorPaths() []string {
+// GetVendorPaths collects final vendor paths at a depth of three levels.
+func (p *TestProject) GetVendorPaths() []string {
 	vendorPath := p.ProjPath("vendor")
 	result := make([]string, 0)
 	filepath.Walk(
@@ -228,8 +241,8 @@ func (p *IntegrationTestProject) GetVendorPaths() []string {
 	return result
 }
 
-// Collect final vendor paths at a depth of three levels
-func (p *IntegrationTestProject) GetImportPaths() []string {
+// GetImportPaths collect final vendor paths at a depth of three levels.
+func (p *TestProject) GetImportPaths() []string {
 	importPath := p.Path("src")
 	result := make([]string, 0)
 	filepath.Walk(
@@ -249,13 +262,13 @@ func (p *IntegrationTestProject) GetImportPaths() []string {
 	return result
 }
 
-// Take a snapshot of the import paths before test is run
-func (p *IntegrationTestProject) RecordImportPaths() {
+// RecordImportPaths takes a snapshot of the import paths before test is run.
+func (p *TestProject) RecordImportPaths() {
 	p.preImports = p.GetImportPaths()
 }
 
-// Compare import paths before and after commands
-func (p *IntegrationTestProject) CompareImportPaths() {
+// CompareImportPaths compares import paths before and after test commands.
+func (p *TestProject) CompareImportPaths() {
 	wantImportPaths := p.preImports
 	gotImportPaths := p.GetImportPaths()
 	if len(gotImportPaths) != len(wantImportPaths) {
@@ -270,7 +283,7 @@ func (p *IntegrationTestProject) CompareImportPaths() {
 
 // makeRootTempdir makes a temporary directory for a run of testgo. If
 // the temporary directory was already created, this does nothing.
-func (p *IntegrationTestProject) makeRootTempDir() {
+func (p *TestProject) makeRootTempDir() {
 	if p.tempdir == "" {
 		var err error
 		p.tempdir, err = ioutil.TempDir("", "gotest")
@@ -286,12 +299,12 @@ func (p *IntegrationTestProject) makeRootTempDir() {
 
 // Setenv sets an environment variable to use when running the test go
 // command.
-func (p *IntegrationTestProject) Setenv(name, val string) {
+func (p *TestProject) Setenv(name, val string) {
 	p.env = append(p.env, name+"="+val)
 }
 
 // Must gives a fatal error if err is not nil.
-func (p *IntegrationTestProject) Must(err error) {
+func (p *TestProject) Must(err error) {
 	if err != nil {
 		p.t.Fatalf("%+v", err)
 	}
