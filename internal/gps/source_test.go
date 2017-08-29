@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"os"
 	"reflect"
 	"testing"
 
@@ -32,7 +33,7 @@ func testSourceGateway(t *testing.T) {
 	bgc := context.Background()
 	ctx, cancelFunc := context.WithCancel(bgc)
 	defer func() {
-		removeAll(cachedir)
+		os.RemoveAll(cachedir)
 		cancelFunc()
 	}()
 

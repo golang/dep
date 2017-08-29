@@ -62,6 +62,7 @@ func (c *Config) Run() (exitCode int) {
 		&ensureCommand{},
 		&hashinCommand{},
 		&pruneCommand{},
+		&versionCommand{},
 	}
 
 	examples := [][2]string{

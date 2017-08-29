@@ -74,20 +74,8 @@ func DiffLocks(l1 Lock, l2 Lock) *LockDiff {
 
 	p1, p2 := l1.Projects(), l2.Projects()
 
-	// Check if the slices are sorted already. If they are, we can compare
-	// without copying. Otherwise, we have to copy to avoid altering the
-	// original input.
-	sp1, sp2 := lpsorter(p1), lpsorter(p2)
-	if len(p1) > 1 && !sort.IsSorted(sp1) {
-		p1 = make([]LockedProject, len(p1))
-		copy(p1, l1.Projects())
-		sort.Sort(lpsorter(p1))
-	}
-	if len(p2) > 1 && !sort.IsSorted(sp2) {
-		p2 = make([]LockedProject, len(p2))
-		copy(p2, l2.Projects())
-		sort.Sort(lpsorter(p2))
-	}
+	p1 = sortedLockedProjects(p1)
+	p2 = sortedLockedProjects(p2)
 
 	diff := LockDiff{}
 

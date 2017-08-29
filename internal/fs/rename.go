@@ -3,7 +3,6 @@
 // license that can be found in the LICENSE file.
 
 // +build !windows
-// +build go1.8
 
 package fs
 
@@ -13,10 +12,6 @@ import (
 
 	"github.com/pkg/errors"
 )
-
-func rename(src, dst string) error {
-	return os.Rename(src, dst)
-}
 
 // renameFallback attempts to determine the appropriate fallback to failed rename
 // operation depending on the resulting error.
