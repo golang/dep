@@ -106,7 +106,8 @@ func (v *vndrImporter) convert(pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock, er
 		}
 		pc.Constraint, err = v.sm.InferConstraint(pkg.revision, pc.Ident)
 		if err != nil {
-			return nil, nil, errors.Wrapf(err, "Unable to interpret revision specifier '%s' for package %s", pkg.importPath, pkg.revision)
+			v.logger.Printf("Unable to interpret revision specifier '%s' for package %s: %s", pkg.importPath, pkg.revision, err.Error())
+			pc.Constraint = gps.Any()
 		}
 
 		manifest.Constraints[pc.Ident.ProjectRoot] = gps.ProjectProperties{
