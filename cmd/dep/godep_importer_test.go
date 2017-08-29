@@ -19,11 +19,17 @@ const testProjectRoot = "github.com/golang/notexist"
 
 func TestGodepConfig_Convert(t *testing.T) {
 	testCases := map[string]struct {
-		*convertTestCase
+		convertTestCase
 		json godepJSON
 	}{
 		"convert project": {
-			json: godepJSON{
+			convertTestCase{
+				wantProjectRoot: "github.com/sdboyer/deptest",
+				wantConstraint:  "^0.8.0",
+				wantRevision:    "ff2948a2ac8f538c4ecd55962e919d1e13e74baf",
+				wantVersion:     "v0.8.0",
+			},
+			godepJSON{
 				Imports: []godepPackage{
 					{
 						ImportPath: "github.com/sdboyer/deptest",
@@ -33,16 +39,15 @@ func TestGodepConfig_Convert(t *testing.T) {
 					},
 				},
 			},
-			convertTestCase: &convertTestCase{
-				projectRoot:    gps.ProjectRoot("github.com/sdboyer/deptest"),
-				wantConstraint: "^0.8.0",
-				wantRevision:   gps.Revision("ff2948a2ac8f538c4ecd55962e919d1e13e74baf"),
-				wantVersion:    "v0.8.0",
-				wantLockCount:  1,
-			},
 		},
 		"with semver suffix": {
-			json: godepJSON{
+			convertTestCase{
+				wantProjectRoot: "github.com/sdboyer/deptest",
+				wantConstraint:  "^1.12.0-12-g2fd980e",
+				wantVersion:     "v1.0.0",
+				wantRevision:    "ff2948a2ac8f538c4ecd55962e919d1e13e74baf",
+			},
+			godepJSON{
 				Imports: []godepPackage{
 					{
 						ImportPath: "github.com/sdboyer/deptest",
@@ -51,16 +56,15 @@ func TestGodepConfig_Convert(t *testing.T) {
 					},
 				},
 			},
-			convertTestCase: &convertTestCase{
-				projectRoot:    gps.ProjectRoot("github.com/sdboyer/deptest"),
-				wantConstraint: "^1.12.0-12-g2fd980e",
-				wantLockCount:  1,
-				wantVersion:    "v1.0.0",
-				wantRevision:   "ff2948a2ac8f538c4ecd55962e919d1e13e74baf",
-			},
 		},
 		"empty comment": {
-			json: godepJSON{
+			convertTestCase{
+				wantProjectRoot: "github.com/sdboyer/deptest",
+				wantConstraint:  "^1.0.0",
+				wantRevision:    "ff2948a2ac8f538c4ecd55962e919d1e13e74baf",
+				wantVersion:     "v1.0.0",
+			},
+			godepJSON{
 				Imports: []godepPackage{
 					{
 						ImportPath: "github.com/sdboyer/deptest",
@@ -69,36 +73,35 @@ func TestGodepConfig_Convert(t *testing.T) {
 					},
 				},
 			},
-			convertTestCase: &convertTestCase{
-				projectRoot:    gps.ProjectRoot("github.com/sdboyer/deptest"),
-				wantConstraint: "^1.0.0",
-				wantRevision:   gps.Revision("ff2948a2ac8f538c4ecd55962e919d1e13e74baf"),
-				wantVersion:    "v1.0.0",
-				wantLockCount:  1,
-			},
 		},
 		"bad input - empty package name": {
-			json: godepJSON{
-				Imports: []godepPackage{{ImportPath: ""}},
-			},
-			convertTestCase: &convertTestCase{
+			convertTestCase{
 				wantConvertErr: true,
+			},
+			godepJSON{
+				Imports: []godepPackage{{ImportPath: ""}},
 			},
 		},
 		"bad input - empty revision": {
-			json: godepJSON{
+			convertTestCase{
+				wantConvertErr: true,
+			},
+			godepJSON{
 				Imports: []godepPackage{
 					{
 						ImportPath: "github.com/sdboyer/deptest",
 					},
 				},
 			},
-			convertTestCase: &convertTestCase{
-				wantConvertErr: true,
-			},
 		},
 		"sub-packages": {
-			json: godepJSON{
+			convertTestCase{
+				wantProjectRoot: "github.com/sdboyer/deptest",
+				wantConstraint:  "^1.0.0",
+				wantVersion:     "v1.0.0",
+				wantRevision:    "ff2948a2ac8f538c4ecd55962e919d1e13e74baf",
+			},
+			godepJSON{
 				Imports: []godepPackage{
 					{
 						ImportPath: "github.com/sdboyer/deptest",
@@ -111,13 +114,6 @@ func TestGodepConfig_Convert(t *testing.T) {
 						Rev: "ff2948a2ac8f538c4ecd55962e919d1e13e74baf",
 					},
 				},
-			},
-			convertTestCase: &convertTestCase{
-				projectRoot:    gps.ProjectRoot("github.com/sdboyer/deptest"),
-				wantLockCount:  1,
-				wantConstraint: "^1.0.0",
-				wantVersion:    "v1.0.0",
-				wantRevision:   "ff2948a2ac8f538c4ecd55962e919d1e13e74baf",
 			},
 		},
 	}
@@ -135,7 +131,7 @@ func TestGodepConfig_Convert(t *testing.T) {
 			g := newGodepImporter(discardLogger, true, sm)
 			g.json = testCase.json
 
-			manifest, lock, convertErr := g.convert(testCase.projectRoot)
+			manifest, lock, convertErr := g.convert(testProjectRoot)
 			err := validateConvertTestCase(testCase.convertTestCase, manifest, lock, convertErr)
 			if err != nil {
 				t.Fatalf("%#v", err)

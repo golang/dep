@@ -11,7 +11,6 @@ import (
 	"github.com/golang/dep"
 	fb "github.com/golang/dep/internal/feedback"
 	"github.com/golang/dep/internal/gps"
-	"github.com/pkg/errors"
 )
 
 // importer handles importing configuration from other dependency managers into
@@ -167,75 +166,4 @@ func (a *rootAnalyzer) Info() gps.ProjectAnalyzerInfo {
 		Name:    "dep",
 		Version: 1,
 	}
-}
-
-// isVersion determines if the specified value is a version/tag in the project.
-func isVersion(pi gps.ProjectIdentifier, value string, sm gps.SourceManager) (bool, gps.Version, error) {
-	versions, err := sm.ListVersions(pi)
-	if err != nil {
-		return false, nil, errors.Wrapf(err, "list versions for %s(%s)", pi.ProjectRoot, pi.Source) // means repo does not exist
-	}
-
-	for _, version := range versions {
-		if version.Type() != gps.IsVersion && version.Type() != gps.IsSemver {
-			continue
-		}
-
-		if value == version.String() {
-			return true, version, nil
-		}
-	}
-
-	return false, nil, nil
-}
-
-// lookupVersionForLockedProject figures out the appropriate version for a locked
-// project based on the locked revision and the constraint from the manifest.
-// First try matching the revision to a version, then try the constraint from the
-// manifest, then finally the revision.
-func lookupVersionForLockedProject(pi gps.ProjectIdentifier, c gps.Constraint, rev gps.Revision, sm gps.SourceManager) (gps.Version, error) {
-	// Find the version that goes with this revision, if any
-	versions, err := sm.ListVersions(pi)
-	if err != nil {
-		return rev, errors.Wrapf(err, "Unable to lookup the version represented by %s in %s(%s). Falling back to locking the revision only.", rev, pi.ProjectRoot, pi.Source)
-	}
-
-	gps.SortPairedForUpgrade(versions) // Sort versions in asc order
-	for _, v := range versions {
-		if v.Revision() == rev {
-			// If the constraint is semver, make sure the version is acceptable.
-			// This prevents us from suggesting an incompatible version, which
-			// helps narrow the field when there are multiple matching versions.
-			if c != nil {
-				_, err := gps.NewSemverConstraint(c.String())
-				if err == nil && !c.Matches(v) {
-					continue
-				}
-			}
-			return v, nil
-		}
-	}
-
-	// Use the version from the manifest as long as it wasn't a range
-	switch tv := c.(type) {
-	case gps.PairedVersion:
-		return tv.Unpair().Pair(rev), nil
-	case gps.UnpairedVersion:
-		return tv.Pair(rev), nil
-	}
-
-	// Give up and lock only to a revision
-	return rev, nil
-}
-
-// projectExistsInLock checks if the given project already exists in
-// a lockfile.
-func projectExistsInLock(l *dep.Lock, pr gps.ProjectRoot) bool {
-	for _, lp := range l.P {
-		if pr == lp.Ident().ProjectRoot {
-			return true
-		}
-	}
-
-	return false
 }

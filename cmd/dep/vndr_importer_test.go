@@ -19,63 +19,60 @@ import (
 
 func TestVndrConfig_Convert(t *testing.T) {
 	testCases := map[string]struct {
-		*convertTestCase
 		packages []vndrPackage
+		convertTestCase
 	}{
 		"semver reference": {
-			packages: []vndrPackage{{
+			[]vndrPackage{{
 				importPath: "github.com/sdboyer/deptest",
 				reference:  "v0.8.0",
 				repository: "https://github.com/sdboyer/deptest.git",
 			}},
-			convertTestCase: &convertTestCase{
-				projectRoot:    gps.ProjectRoot("github.com/sdboyer/deptest"),
-				wantSourceRepo: "https://github.com/sdboyer/deptest.git",
-				wantConstraint: "^0.8.0",
-				wantRevision:   gps.Revision("ff2948a2ac8f538c4ecd55962e919d1e13e74baf"),
-				wantVersion:    "v0.8.0",
-				wantLockCount:  1,
+			convertTestCase{
+				wantProjectRoot: "github.com/sdboyer/deptest",
+				wantSourceRepo:  "https://github.com/sdboyer/deptest.git",
+				wantConstraint:  "^0.8.0",
+				wantRevision:    "ff2948a2ac8f538c4ecd55962e919d1e13e74baf",
+				wantVersion:     "v0.8.0",
 			},
 		},
 		"revision reference": {
-			packages: []vndrPackage{{
+			[]vndrPackage{{
 				importPath: "github.com/sdboyer/deptest",
 				reference:  "ff2948a2ac8f538c4ecd55962e919d1e13e74baf",
 			}},
-			convertTestCase: &convertTestCase{
-				projectRoot:    gps.ProjectRoot("github.com/sdboyer/deptest"),
-				wantConstraint: "^1.0.0",
-				wantVersion:    "v1.0.0",
-				wantRevision:   gps.Revision("ff2948a2ac8f538c4ecd55962e919d1e13e74baf"),
-				wantLockCount:  1,
+			convertTestCase{
+				wantProjectRoot: "github.com/sdboyer/deptest",
+				wantConstraint:  "^1.0.0",
+				wantVersion:     "v1.0.0",
+				wantRevision:    "ff2948a2ac8f538c4ecd55962e919d1e13e74baf",
 			},
 		},
 		"untagged revision reference": {
-			packages: []vndrPackage{{
+			[]vndrPackage{{
 				importPath: "github.com/carolynvs/deptest-subpkg",
 				reference:  "6c41d90f78bb1015696a2ad591debfa8971512d5",
 			}},
-			convertTestCase: &convertTestCase{
-				projectRoot:    gps.ProjectRoot("github.com/carolynvs/deptest-subpkg"),
-				wantConstraint: "*",
-				wantVersion:    "",
-				wantRevision:   gps.Revision("6c41d90f78bb1015696a2ad591debfa8971512d5"),
-				wantLockCount:  1,
+			convertTestCase{
+				wantProjectRoot: "github.com/carolynvs/deptest-subpkg",
+				wantConstraint:  "*",
+				wantVersion:     "",
+				wantRevision:    "6c41d90f78bb1015696a2ad591debfa8971512d5",
 			},
 		},
 		"missing importPath": {
-			packages: []vndrPackage{{
+			[]vndrPackage{{
 				reference: "v1.0.0",
 			}},
-			convertTestCase: &convertTestCase{
+			convertTestCase{
 				wantConvertErr: true,
 			},
 		},
 		"missing reference": {
-			packages: []vndrPackage{{
+			[]vndrPackage{{
 				importPath: "github.com/sdboyer/deptest",
 			}},
-			convertTestCase: &convertTestCase{
+			convertTestCase{
 				wantConvertErr: true,
 			},
 		},
@@ -94,7 +91,7 @@ func TestVndrConfig_Convert(t *testing.T) {
 			g := newVndrImporter(discardLogger, true, sm)
 			g.packages = testCase.packages
 
-			manifest, lock, convertErr := g.convert(testCase.projectRoot)
+			manifest, lock, convertErr := g.convert(testProjectRoot)
 			err = validateConvertTestCase(testCase.convertTestCase, manifest, lock, convertErr)
 			if err != nil {
 				t.Fatalf("%#v", err)
