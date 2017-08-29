@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package test
+package integration
 
 import (
 	"bytes"
@@ -16,6 +16,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/golang/dep/internal/test"
 	"github.com/pkg/errors"
 )
 
@@ -29,7 +30,7 @@ type RunFunc func(prog string, newargs []string, outW, errW io.Writer, dir strin
 // and content
 type IntegrationTestProject struct {
 	t          *testing.T
-	h          *Helper
+	h          *test.Helper
 	preImports []string
 	tempdir    string
 	env        []string
@@ -118,7 +119,7 @@ func (p *IntegrationTestProject) RunGit(dir string, args ...string) {
 	cmd.Dir = dir
 	cmd.Env = p.env
 	status := cmd.Run()
-	if *PrintLogs {
+	if *test.PrintLogs {
 		if p.stdout.Len() > 0 {
 			p.t.Logf("git %v standard output:", args)
 			p.t.Log(p.stdout.String())
@@ -152,10 +153,10 @@ func (p *IntegrationTestProject) GetVendorGit(ip string) {
 }
 
 func (p *IntegrationTestProject) DoRun(args []string) error {
-	if *PrintLogs {
+	if *test.PrintLogs {
 		p.t.Logf("running testdep %v", args)
 	}
-	prog := filepath.Join(p.origWd, "testdep"+ExeSuffix)
+	prog := filepath.Join(p.origWd, "testdep"+test.ExeSuffix)
 	newargs := append([]string{args[0], "-v"}, args[1:]...)
 
 	p.stdout.Reset()
@@ -163,7 +164,7 @@ func (p *IntegrationTestProject) DoRun(args []string) error {
 
 	status := p.run(prog, newargs, &p.stdout, &p.stderr, p.ProjPath(""), p.env)
 
-	if *PrintLogs {
+	if *test.PrintLogs {
 		if p.stdout.Len() > 0 {
 			p.t.Logf("\nstandard output:%s", p.stdout.String())
 		}

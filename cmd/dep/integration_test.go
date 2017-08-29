@@ -15,6 +15,7 @@ import (
 
 	"github.com/golang/dep"
 	"github.com/golang/dep/internal/test"
+	"github.com/golang/dep/internal/test/integration"
 )
 
 func TestIntegration(t *testing.T) {
@@ -92,13 +93,13 @@ func runMain(prog string, args []string, stdout, stderr io.Writer, dir string, e
 }
 
 // testIntegration runs the test specified by <wd>/<relPath>/<name>/testcase.json
-func testIntegration(name, relPath, wd string, externalProc bool, run test.RunFunc) func(t *testing.T) {
+func testIntegration(name, relPath, wd string, externalProc bool, run integration.RunFunc) func(t *testing.T) {
 	return func(t *testing.T) {
 		t.Parallel()
 
 		// Set up environment
-		testCase := test.NewTestCase(t, filepath.Join(wd, relPath), name)
-		testProj := test.NewTestProject(t, testCase.InitialPath(), wd, externalProc, run)
+		testCase := integration.NewTestCase(t, filepath.Join(wd, relPath), name)
+		testProj := integration.NewTestProject(t, testCase.InitialPath(), wd, externalProc, run)
 		defer testProj.Cleanup()
 
 		// Create and checkout the vendor revisions

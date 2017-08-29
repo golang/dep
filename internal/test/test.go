@@ -24,9 +24,10 @@ import (
 )
 
 var (
-	ExeSuffix string // ".exe" on Windows
-	mu        sync.Mutex
-	PrintLogs *bool = flag.Bool("logs", false, "log stdin/stdout of test commands")
+	ExeSuffix    string // ".exe" on Windows
+	mu           sync.Mutex
+	PrintLogs    *bool = flag.Bool("logs", false, "log stdin/stdout of test commands")
+	UpdateGolden *bool = flag.Bool("update", false, "update golden files")
 )
 
 const (

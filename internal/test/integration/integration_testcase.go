@@ -2,21 +2,17 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package test
+package integration
 
 import (
 	"encoding/json"
-	"flag"
+	"github.com/golang/dep/internal/test"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"unicode"
-)
-
-var (
-	UpdateGolden *bool = flag.Bool("update", false, "update golden files")
 )
 
 // IntegrationTestCase manages a test case directory structure and content
@@ -152,7 +148,7 @@ func (tc *IntegrationTestCase) CompareError(err error, stderr string) {
 }
 
 func (tc *IntegrationTestCase) CompareVendorPaths(gotVendorPaths []string) {
-	if *UpdateGolden {
+	if *test.UpdateGolden {
 		tc.VendorFinal = gotVendorPaths
 	} else {
 		wantVendorPaths := tc.VendorFinal
