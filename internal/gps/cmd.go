@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/Masterminds/vcs"
+	"strconv"
 )
 
 // monitoredCmd wraps a cmd and will keep monitoring the process until it
@@ -197,22 +198,31 @@ func runFromRepoDir(ctx context.Context, repo vcs.Repo, timeout time.Duration, c
 	return c.combinedOutput(ctx)
 }
 
-func getIntEnv(envName string, defaultVal int) string {
+func getIntEnv(envName string, defaultVal int) int {
 	val, found := os.LookupEnv(envName)
+
 	num, err := strconv.Atoi(val)
 	if found && (err == nil) {
-		return val
+		return num
 	} else {
 		return defaultVal
 	}
+}
+
+func getExpensiveCmdTimeout() time.Duration {
+	return time.Duration(getIntEnv("DEP_EXP_CMD_TIMEOUT", 2)) * time.Minute
+}
+
+func getDefaultCmdTimeout() time.Duration {
+	return time.Duration(getIntEnv("DEP_CMD_TIMEOUT", 10)) * time.Second
 }
 
 const (
 	// expensiveCmdTimeout is meant to be used in a command that is expensive
 	// in terms of computation and we know it will take long or one that uses
 	// the network, such as clones, updates, ....
-	expensiveCmdTimeout = getIntEnv("DEP_EXP_CMD_TIMEOUT", 2) * time.Minute
+	expensiveCmdTimeout = 2 * time.Minute
 	// defaultCmdTimeout is just an umbrella value for all other commands that
 	// should not take much.
-	defaultCmdTimeout = getIntEnv("DEP_CMD_TIMEOUT", 10) * time.Second
+	defaultCmdTimeout = 10 * time.Second
 )
