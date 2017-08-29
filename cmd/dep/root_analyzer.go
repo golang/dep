@@ -173,6 +173,26 @@ func (a *rootAnalyzer) Info() gps.ProjectAnalyzerInfo {
 	}
 }
 
+// isVersion determines if the specified value is a version/tag in the project.
+func isVersion(pi gps.ProjectIdentifier, value string, sm gps.SourceManager) (bool, gps.Version, error) {
+	versions, err := sm.ListVersions(pi)
+	if err != nil {
+		return false, nil, errors.Wrapf(err, "list versions for %s(%s)", pi.ProjectRoot, pi.Source) // means repo does not exist
+	}
+
+	for _, version := range versions {
+		if version.Type() != gps.IsVersion && version.Type() != gps.IsSemver {
+			continue
+		}
+
+		if value == version.String() {
+			return true, version, nil
+		}
+	}
+
+	return false, nil, nil
+}
+
 // lookupVersionForLockedProject figures out the appropriate version for a locked
 // project based on the locked revision and the constraint from the manifest.
 // First try matching the revision to a version, then try the constraint from the

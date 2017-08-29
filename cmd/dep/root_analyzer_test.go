@@ -154,6 +154,41 @@ func TestProjectExistsInLock(t *testing.T) {
 	}
 }
 
+func TestIsVersion(t *testing.T) {
+	testcases := map[string]struct {
+		wantIsVersion bool
+		wantVersion   gps.Version
+	}{
+		"v1.0.0": {wantIsVersion: true, wantVersion: gps.NewVersion("v1.0.0").Pair("ff2948a2ac8f538c4ecd55962e919d1e13e74baf")},
+		"3f4c3bea144e112a69bbe5d8d01c1b09a544253f": {wantIsVersion: false},
+		"master": {wantIsVersion: false},
+	}
+
+	pi := gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot("github.com/sdboyer/deptest")}
+	h := test.NewHelper(t)
+	defer h.Cleanup()
+
+	ctx := newTestContext(h)
+	sm, err := ctx.SourceManager()
+	h.Must(err)
+	defer sm.Release()
+
+	for value, testcase := range testcases {
+		t.Run(value, func(t *testing.T) {
+			gotIsVersion, gotVersion, err := isVersion(pi, value, sm)
+			h.Must(err)
+
+			if testcase.wantIsVersion != gotIsVersion {
+				t.Fatalf("unexpected isVersion result for %s: \n\t(GOT) %v \n\t(WNT) %v", value, gotIsVersion, testcase.wantIsVersion)
+			}
+
+			if testcase.wantVersion != gotVersion {
+				t.Fatalf("unexpected version for %s: \n\t(GOT) %v \n\t(WNT) %v", value, testcase.wantVersion, gotVersion)
+			}
+		})
+	}
+}
+
 // convertTestCase is a common set of validations applied to the result
 // of an importer converting from an external config format to dep's.
 type convertTestCase struct {
@@ -229,26 +264,27 @@ func validateConvertTestCase(testCase *convertTestCase, manifest *dep.Manifest, 
 			return errors.Errorf("Expected locked source to be %s, got '%s'", testCase.wantSourceRepo, p.Ident().Source)
 		}
 
-		if testCase.wantVersion != "" {
-			ver := p.Version().String()
-			if ver != testCase.wantVersion {
-				return errors.Errorf("Expected locked version to be '%s', got %s", testCase.wantVersion, ver)
-			}
+		// Break down the locked "version" into a version (optional) and revision
+		var gotVersion string
+		var gotRevision gps.Revision
+		if lpv, ok := p.Version().(gps.PairedVersion); ok {
+			gotVersion = lpv.String()
+			gotRevision = lpv.Revision()
+		} else if lr, ok := p.Version().(gps.Revision); ok {
+			gotRevision = lr
+		} else {
+			return errors.New("could not determine the type of the locked version")
 		}
 
-		if testCase.wantRevision != "" {
-			lv := p.Version()
-			lpv, ok := lv.(gps.PairedVersion)
-			if !ok {
-				return errors.Errorf("Expected locked version to be PairedVersion but got %T", lv)
-			}
-
-			rev := lpv.Revision()
-			if rev != testCase.wantRevision {
-				return errors.Errorf("Expected locked revision to be '%s', got %s",
-					testCase.wantRevision,
-					rev)
-			}
+		if gotRevision != testCase.wantRevision {
+			return errors.Errorf("unexpected locked revision : \n\t(GOT) %v \n\t(WNT) %v",
+				testCase.wantRevision,
+				gotRevision)
+		}
+		if gotVersion != testCase.wantVersion {
+			return errors.Errorf("unexpected locked version: \n\t(GOT) %v \n\t(WNT) %v",
+				testCase.wantVersion,
+				gotVersion)
 		}
 	}
 	return nil
