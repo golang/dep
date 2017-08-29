@@ -9,7 +9,6 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"runtime"
 	"sync"
 
 	"github.com/pkg/errors"
@@ -47,6 +46,8 @@ type solution struct {
 	solv Solver
 }
 
+const concurrentWriters = 16
+
 // WriteDepTree takes a basedir and a Lock, and exports all the projects
 // listed in the lock to the appropriate target location within the basedir.
 //
@@ -82,7 +83,7 @@ func WriteDepTree(basedir string, l Lock, sm SourceManager, sv bool, logger *log
 	}
 	close(writeCh)
 	// Launch writers.
-	writers := runtime.GOMAXPROCS(-1)
+	writers := concurrentWriters
 	if len(lps) < writers {
 		writers = len(lps)
 	}
