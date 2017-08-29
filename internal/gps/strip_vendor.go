@@ -33,7 +33,8 @@ func stripVendor(path string, info os.FileInfo, err error) error {
 
 		if info.IsDir() {
 			if err := os.RemoveAll(path); err != nil {
-				return err
+				fmt.Printf("could not remove %s completly: %s, skipping", path, err)
+				// return err
 			}
 			return filepath.SkipDir
 		}
