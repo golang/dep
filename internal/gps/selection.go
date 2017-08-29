@@ -4,9 +4,12 @@
 
 package gps
 
+import "strings"
+
 type selection struct {
 	projects []selected
 	deps     map[ProjectRoot][]dependency
+	prLenMap map[int][]ProjectRoot
 	vu       *versionUnifier
 }
 
@@ -59,13 +62,43 @@ func (s *selection) popSelection() (atomWithPackages, bool) {
 	return sel.a, sel.first
 }
 
+func (s *selection) findCaseConflicts(pr ProjectRoot) (bool, ProjectRoot) {
+	prlist, has := s.prLenMap[len(pr)]
+	if !has {
+		return false, ""
+	}
+
+	// TODO(sdboyer) bug here if it's possible that strings.ToLower() could
+	// change the length of the string
+	lowpr := strings.ToLower(string(pr))
+	for _, existing := range prlist {
+		if lowpr != strings.ToLower(string(existing)) {
+			continue
+		}
+		// If the converted strings match, then whatever we figure out here will
+		// be definitive - we needn't walk the rest of the slice.
+		if pr == existing {
+			return false, ""
+		} else {
+			return true, existing
+		}
+	}
+
+	return false, ""
+}
+
 func (s *selection) pushDep(dep dependency) {
-	s.deps[dep.dep.Ident.ProjectRoot] = append(s.deps[dep.dep.Ident.ProjectRoot], dep)
+	pr := dep.dep.Ident.ProjectRoot
+	s.deps[pr] = append(s.deps[pr], dep)
+	s.prLenMap[len(pr)] = append(s.prLenMap[len(pr)], pr)
 }
 
 func (s *selection) popDep(id ProjectIdentifier) (dep dependency) {
 	deps := s.deps[id.ProjectRoot]
 	dep, s.deps[id.ProjectRoot] = deps[len(deps)-1], deps[:len(deps)-1]
+
+	prlist := s.prLenMap[len(id.ProjectRoot)]
+	s.prLenMap[len(id.ProjectRoot)] = prlist[:len(prlist)-1]
 	return dep
 }
 
