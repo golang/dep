@@ -361,7 +361,7 @@ func (sg *sourceGateway) listPackages(ctx context.Context, pr ProjectRoot, v Ver
 			return pkgtree.PackageTree{}, err
 		}
 
-		err = sg.suprvsr.do(ctx, label, ctGetManifestAndLock, func(ctx context.Context) error {
+		err = sg.suprvsr.do(ctx, label, ctListPackages, func(ctx context.Context) error {
 			ptree, err = sg.src.listPackages(ctx, pr, r)
 			return err
 		})
@@ -402,7 +402,7 @@ func (sg *sourceGateway) convertToRevision(ctx context.Context, v Version) (Revi
 
 	// The version list is out of date; it's possible this version might
 	// show up after loading it.
-	_, err := sg.require(ctx, sourceIsSetUp|sourceHasLatestVersionList|sourceHasLatestLocally)
+	_, err := sg.require(ctx, sourceIsSetUp|sourceHasLatestVersionList)
 	if err != nil {
 		return "", err
 	}
