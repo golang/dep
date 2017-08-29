@@ -8,11 +8,13 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"os"
 	"reflect"
 	"testing"
 
 	"github.com/golang/dep/internal/gps/pkgtree"
+	"github.com/golang/dep/internal/test"
 )
 
 // Executed in parallel by TestSlowVcs
@@ -38,7 +40,7 @@ func testSourceGateway(t *testing.T) {
 	do := func(wantstate sourceState) func(t *testing.T) {
 		return func(t *testing.T) {
 			superv := newSupervisor(ctx)
-			sc := newSourceCoordinator(superv, newDeductionCoordinator(superv), cachedir)
+			sc := newSourceCoordinator(superv, newDeductionCoordinator(superv), cachedir, log.New(test.Writer{t}, "", 0))
 
 			id := mkPI("github.com/sdboyer/deptest")
 			sg, err := sc.getSourceGatewayFor(ctx, id)

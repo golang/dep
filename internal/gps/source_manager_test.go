@@ -5,6 +5,7 @@
 package gps
 
 import (
+	"log"
 	"reflect"
 	"testing"
 
@@ -87,7 +88,10 @@ func TestSourceManager_InferConstraint(t *testing.T) {
 			cacheDir := "gps-repocache"
 			h.TempDir(cacheDir)
 
-			sm, err := NewSourceManager(h.Path(cacheDir))
+			sm, err := NewSourceManager(SourceManagerConfig{
+				Cachedir: h.Path(cacheDir),
+				Logger:   log.New(test.Writer{t}, "", 0),
+			})
 			h.Must(err)
 
 			got, err := sm.InferConstraint(tc.str, tc.project)
