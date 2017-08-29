@@ -20,7 +20,7 @@ import (
 )
 
 const (
-	bufsize               = 16 * 1024
+	scratchBufferSize     = 16 * 1024
 	osPathSeparatorLength = 1
 )
 
@@ -63,7 +63,7 @@ type dirWalkClosure struct {
 // each file system node discovered, while the godirwalk.WalkFileMode fetches
 // the file system node type while it's reading the parent directory.
 func DigestFromDirectory(osDirname string) ([]byte, error) {
-	return digestFromDirectoryBuffer(osDirname, make([]byte, bufsize))
+	return digestFromDirectoryBuffer(osDirname, make([]byte, scratchBufferSize))
 }
 
 func digestFromDirectoryBuffer(osDirname string, scratchBuffer []byte) ([]byte, error) {
@@ -116,15 +116,7 @@ func digestFromDirectoryBuffer(osDirname string, scratchBuffer []byte) ([]byte, 
 				}
 				writeBytesWithNull(closure.someHash, []byte(filepath.ToSlash(osRelative))) // write referent to hash
 				return nil                                                                 // proceed to next node
-			case modeType&os.ModeDir != 0:
-				return nil // nothing more to do for this type
-			case modeType&os.ModeDevice != 0:
-				return nil // nothing more to do for this type
-			case modeType&os.ModeCharDevice != 0:
-				return nil // nothing more to do for this type
-			case modeType&os.ModeNamedPipe != 0:
-				return nil // nothing more to do for this type
-			case modeType&os.ModeSocket != 0:
+			case modeType&(os.ModeDir|os.ModeDevice|os.ModeCharDevice|os.ModeNamedPipe|os.ModeSocket) != 0:
 				return nil // nothing more to do for this type
 			}
 
@@ -285,7 +277,7 @@ func VerifyDepTree(osDirname string, wantSums map[string][]byte) (map[string]Ven
 	}
 
 	// create a scratch buffer for raw bytes from reading directory entries
-	scratchBuffer := make([]byte, bufsize)
+	scratchBuffer := make([]byte, scratchBufferSize)
 
 	for len(queue) > 0 {
 		// Pop node from the top of queue (depth first traversal, reverse
