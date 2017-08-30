@@ -670,7 +670,7 @@ func (s *solver) getImportsAndConstraintsOf(a atomWithPackages) ([]string, []com
 			}
 
 			// Nope, it's actually full-on not there.
-			return nil, nil, fmt.Errorf("package %s does not exist within project %s", pkg, a.a.id.errString())
+			return nil, nil, fmt.Errorf("package %s does not exist within project %s", pkg, a.a.id)
 		}
 
 		for _, ex := range ie.External {
@@ -887,7 +887,7 @@ func (s *solver) findValidVersion(q *versionQueue, pl []string) error {
 
 	for {
 		cur := q.current()
-		s.traceInfo("try %s@%s", q.id.errString(), cur)
+		s.traceInfo("try %s@%s", q.id, cur)
 		err := s.check(atomWithPackages{
 			a: atom{
 				id: q.id,
