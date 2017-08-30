@@ -161,15 +161,11 @@ func (a *rootAnalyzer) FinalizeRootManifestAndLock(m *dep.Manifest, l *dep.Lock,
 	}
 }
 
+// Info provides metadata on the analyzer algorithm used during solve.
 func (a *rootAnalyzer) Info() gps.ProjectAnalyzerInfo {
-	name := "dep"
-	version := 1
-	if !a.skipTools {
-		name = "dep+import"
-	}
 	return gps.ProjectAnalyzerInfo{
-		Name:    name,
-		Version: version,
+		Name:    "dep",
+		Version: 1,
 	}
 }
 
