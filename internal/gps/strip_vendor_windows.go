@@ -41,7 +41,7 @@ func stripVendor(path string, info os.FileInfo, err error) error {
 
 			case dir:
 				if err := os.RemoveAll(path); err != nil {
-					return err
+					fmt.Printf("removing %s failed: %s, skipping. Please check manually\n", path, err)
 				}
 				return filepath.SkipDir
 			}
