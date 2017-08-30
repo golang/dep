@@ -203,5 +203,5 @@ const (
 	expensiveCmdTimeout = 2 * time.Minute
 	// defaultCmdTimeout is just an umbrella value for all other commands that
 	// should not take much.
-	defaultCmdTimeout = 10 * time.Second
+	defaultCmdTimeout = 30 * time.Second
 )
