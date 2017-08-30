@@ -7,17 +7,12 @@ package gps
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
 	"log"
-	"math/rand"
 	"reflect"
 	"sort"
-	"strconv"
-	"strings"
 	"testing"
-	"unicode"
 
-	"github.com/golang/dep/internal/gps/pkgtree"
+	"github.com/golang/dep/internal/test"
 )
 
 // overrideMkBridge overrides the base bridge with the depspecBridge that skips
@@ -26,30 +21,11 @@ func overrideMkBridge(s *solver, sm SourceManager, down bool) sourceBridge {
 	return &depspecBridge{mkBridge(s, sm, down)}
 }
 
-type testlogger struct {
-	*testing.T
-}
-
-func (t testlogger) Write(b []byte) (n int, err error) {
-	str := string(b)
-	if len(str) == 0 {
-		return 0, nil
-	}
-
-	for _, part := range strings.Split(str, "\n") {
-		str := strings.TrimRightFunc(part, unicode.IsSpace)
-		if len(str) != 0 {
-			t.T.Log(str)
-		}
-	}
-	return len(b), err
-}
-
 func fixSolve(params SolveParameters, sm SourceManager, t *testing.T) (Solution, error) {
 	// Trace unconditionally; by passing the trace through t.Log(), the testing
 	// system will decide whether or not to actually show the output (based on
 	// -v, or selectively on test failure).
-	params.TraceLogger = log.New(testlogger{T: t}, "", 0)
+	params.TraceLogger = log.New(test.Writer{t}, "", 0)
 	// always return false, otherwise it would identify pretty much all of
 	// our fixtures as being stdlib and skip everything
 	params.stdLibFn = func(string) bool { return false }
@@ -74,6 +50,7 @@ func TestBasicSolves(t *testing.T) {
 
 	sort.Strings(names)
 	for _, n := range names {
+		n := n
 		t.Run(n, func(t *testing.T) {
 			t.Parallel()
 			solveBasicsAndCheck(basicFixtures[n], t)
@@ -116,6 +93,7 @@ func TestBimodalSolves(t *testing.T) {
 
 	sort.Strings(names)
 	for _, n := range names {
+		n := n
 		t.Run(n, func(t *testing.T) {
 			t.Parallel()
 			solveBimodalAndCheck(bimodalFixtures[n], t)
@@ -271,151 +249,4 @@ func TestRootLockNoVersionPairMatching(t *testing.T) {
 	res, err := fixSolve(params, sm, t)
 
 	fixtureSolveSimpleChecks(fix, res, err, t)
-}
-
-// TestBadSolveOpts exercises the different possible inputs to a solver that can
-// be determined as invalid in Prepare(), without any further work
-func TestBadSolveOpts(t *testing.T) {
-	pn := strconv.FormatInt(rand.Int63(), 36)
-	fix := basicFixtures["no dependencies"]
-	fix.ds[0].n = ProjectRoot(pn)
-
-	sm := newdepspecSM(fix.ds, nil)
-	params := SolveParameters{
-		mkBridgeFn: overrideMkBridge,
-	}
-
-	_, err := Prepare(params, nil)
-	if err == nil {
-		t.Errorf("Prepare should have errored on nil SourceManager")
-	} else if !strings.Contains(err.Error(), "non-nil SourceManager") {
-		t.Error("Prepare should have given error on nil SourceManager, but gave:", err)
-	}
-
-	_, err = Prepare(params, sm)
-	if err == nil {
-		t.Errorf("Prepare should have errored without ProjectAnalyzer")
-	} else if !strings.Contains(err.Error(), "must provide a ProjectAnalyzer") {
-		t.Error("Prepare should have given error without ProjectAnalyzer, but gave:", err)
-	}
-
-	params.ProjectAnalyzer = naiveAnalyzer{}
-	_, err = Prepare(params, sm)
-	if err == nil {
-		t.Errorf("Prepare should have errored on empty root")
-	} else if !strings.Contains(err.Error(), "non-empty root directory") {
-		t.Error("Prepare should have given error on empty root, but gave:", err)
-	}
-
-	params.RootDir = pn
-	_, err = Prepare(params, sm)
-	if err == nil {
-		t.Errorf("Prepare should have errored on empty name")
-	} else if !strings.Contains(err.Error(), "non-empty import root") {
-		t.Error("Prepare should have given error on empty import root, but gave:", err)
-	}
-
-	params.RootPackageTree = pkgtree.PackageTree{
-		ImportRoot: pn,
-	}
-	_, err = Prepare(params, sm)
-	if err == nil {
-		t.Errorf("Prepare should have errored on empty name")
-	} else if !strings.Contains(err.Error(), "at least one package") {
-		t.Error("Prepare should have given error on empty import root, but gave:", err)
-	}
-
-	params.RootPackageTree = pkgtree.PackageTree{
-		ImportRoot: pn,
-		Packages: map[string]pkgtree.PackageOrErr{
-			pn: {
-				P: pkgtree.Package{
-					ImportPath: pn,
-					Name:       pn,
-				},
-			},
-		},
-	}
-	params.TraceLogger = log.New(ioutil.Discard, "", 0)
-
-	params.Manifest = simpleRootManifest{
-		ovr: ProjectConstraints{
-			ProjectRoot("foo"): ProjectProperties{},
-		},
-	}
-	_, err = Prepare(params, sm)
-	if err == nil {
-		t.Errorf("Should have errored on override with empty ProjectProperties")
-	} else if !strings.Contains(err.Error(), "foo, but without any non-zero properties") {
-		t.Error("Prepare should have given error override with empty ProjectProperties, but gave:", err)
-	}
-
-	params.Manifest = simpleRootManifest{
-		ig:  map[string]bool{"foo": true},
-		req: map[string]bool{"foo": true},
-	}
-	_, err = Prepare(params, sm)
-	if err == nil {
-		t.Errorf("Should have errored on pkg both ignored and required")
-	} else if !strings.Contains(err.Error(), "was given as both a required and ignored package") {
-		t.Error("Prepare should have given error with single ignore/require conflict error, but gave:", err)
-	}
-
-	params.Manifest = simpleRootManifest{
-		ig:  map[string]bool{"foo": true, "bar": true},
-		req: map[string]bool{"foo": true, "bar": true},
-	}
-	_, err = Prepare(params, sm)
-	if err == nil {
-		t.Errorf("Should have errored on pkg both ignored and required")
-	} else if !strings.Contains(err.Error(), "multiple packages given as both required and ignored:") {
-		t.Error("Prepare should have given error with multiple ignore/require conflict error, but gave:", err)
-	}
-	params.Manifest = nil
-
-	params.ToChange = []ProjectRoot{"foo"}
-	_, err = Prepare(params, sm)
-	if err == nil {
-		t.Errorf("Should have errored on non-empty ToChange without a lock provided")
-	} else if !strings.Contains(err.Error(), "update specifically requested for") {
-		t.Error("Prepare should have given error on ToChange without Lock, but gave:", err)
-	}
-
-	params.Lock = safeLock{
-		p: []LockedProject{
-			NewLockedProject(mkPI("bar"), Revision("makebelieve"), nil),
-		},
-	}
-	_, err = Prepare(params, sm)
-	if err == nil {
-		t.Errorf("Should have errored on ToChange containing project not in lock")
-	} else if !strings.Contains(err.Error(), "cannot update foo as it is not in the lock") {
-		t.Error("Prepare should have given error on ToChange with item not present in Lock, but gave:", err)
-	}
-
-	params.Lock, params.ToChange = nil, nil
-	_, err = Prepare(params, sm)
-	if err != nil {
-		t.Error("Basic conditions satisfied, prepare should have completed successfully, err as:", err)
-	}
-
-	// swap out the test mkBridge override temporarily, just to make sure we get
-	// the right error
-	params.mkBridgeFn = nil
-
-	_, err = Prepare(params, sm)
-	if err == nil {
-		t.Errorf("Should have errored on nonexistent root")
-	} else if !strings.Contains(err.Error(), "could not read project root") {
-		t.Error("Prepare should have given error nonexistent project root dir, but gave:", err)
-	}
-
-	// Pointing it at a file should also be an err
-	params.RootDir = "solve_test.go"
-	_, err = Prepare(params, sm)
-	if err == nil {
-		t.Errorf("Should have errored on file for RootDir")
-	} else if !strings.Contains(err.Error(), "is a file, not a directory") {
-		t.Error("Prepare should have given error on file as RootDir, but gave:", err)
-	}
 }

@@ -1,0 +1,6 @@
+{
+  "commands": [
+    ["ensure", "-add"]
+  ],
+  "error-expected": "must specify at least one project or package to -add"
+}

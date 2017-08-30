@@ -1,0 +1,6 @@
+{
+  "commands": [
+    ["ensure", "-update", "github.com/sdboyer/deptesttres"]
+  ],
+  "error-expected": "github.com/sdboyer/deptesttres is not present in Gopkg.lock, cannot -update it"
+}

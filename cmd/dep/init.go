@@ -6,6 +6,8 @@ package main
 
 import (
 	"flag"
+	"io/ioutil"
+	"log"
 	"os"
 	"path/filepath"
 	"time"
@@ -26,7 +28,9 @@ specified, use the current directory.
 
 When configuration for another dependency management tool is detected, it is
 imported into the initial manifest and lock. Use the -skip-tools flag to
-disable this behavior. The following external tools are supported: glide, godep.
+disable this behavior. The following external tools are supported:
+glide, godep, vndr, govend.
+
 Any dependencies that are not constrained by external configuration use the
 GOPATH analysis below.
 
@@ -129,9 +133,15 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 	sm.UseDefaultSignalHandling()
 	defer sm.Release()
 
+	if ctx.Verbose {
+		ctx.Out.Println("Getting direct dependencies...")
+	}
 	pkgT, directDeps, err := getDirectDependencies(sm, p)
 	if err != nil {
 		return err
+	}
+	if ctx.Verbose {
+		ctx.Out.Printf("Checked %d directories for packages.\nFound %d direct dependencies.\n", len(pkgT.Packages), len(directDeps))
 	}
 
 	// Initialize with imported data, then fill in the gaps using the GOPATH
@@ -161,6 +171,10 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 
 	if ctx.Verbose {
 		params.TraceLogger = ctx.Err
+	}
+
+	if err := ctx.ValidateParams(sm, params); err != nil {
+		return err
 	}
 
 	s, err := gps.Prepare(params, sm)
@@ -200,7 +214,11 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 		return err
 	}
 
-	if err := sw.Write(root, sm, !cmd.noExamples); err != nil {
+	logger := ctx.Err
+	if !ctx.Verbose {
+		logger = log.New(ioutil.Discard, "", 0)
+	}
+	if err := sw.Write(root, sm, !cmd.noExamples, logger); err != nil {
 		return errors.Wrap(err, "safe write of manifest and lock")
 	}
 

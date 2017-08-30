@@ -10,6 +10,8 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"io/ioutil"
+	"log"
 	"sort"
 	"text/tabwriter"
 
@@ -89,16 +91,10 @@ func (out *tableOutput) BasicFooter() {
 }
 
 func (out *tableOutput) BasicLine(bs *BasicStatus) {
-	var constraint string
-	if v, ok := bs.Constraint.(gps.Version); ok {
-		constraint = formatVersion(v)
-	} else {
-		constraint = bs.Constraint.String()
-	}
 	fmt.Fprintf(out.w,
 		"%s\t%s\t%s\t%s\t%s\t%d\t\n",
 		bs.ProjectRoot,
-		constraint,
+		bs.getConsolidatedConstraint(),
 		formatVersion(bs.Version),
 		formatVersion(bs.Revision),
 		formatVersion(bs.Latest),
@@ -124,12 +120,12 @@ func (out *tableOutput) MissingFooter() {
 
 type jsonOutput struct {
 	w       io.Writer
-	basic   []*BasicStatus
+	basic   []*rawStatus
 	missing []*MissingStatus
 }
 
 func (out *jsonOutput) BasicHeader() {
-	out.basic = []*BasicStatus{}
+	out.basic = []*rawStatus{}
 }
 
 func (out *jsonOutput) BasicFooter() {
@@ -137,7 +133,7 @@ func (out *jsonOutput) BasicFooter() {
 }
 
 func (out *jsonOutput) BasicLine(bs *BasicStatus) {
-	out.basic = append(out.basic, bs)
+	out.basic = append(out.basic, bs.marshalJSON())
 }
 
 func (out *jsonOutput) MissingHeader() {
@@ -174,11 +170,7 @@ func (out *dotOutput) BasicFooter() {
 }
 
 func (out *dotOutput) BasicLine(bs *BasicStatus) {
-	version := formatVersion(bs.Revision)
-	if bs.Version != nil {
-		version = formatVersion(bs.Version)
-	}
-	out.g.createNode(bs.ProjectRoot, version, bs.Children)
+	out.g.createNode(bs.ProjectRoot, bs.getConsolidatedVersion(), bs.Children)
 }
 
 func (out *dotOutput) MissingHeader()                {}
@@ -201,6 +193,14 @@ func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
 	var buf bytes.Buffer
 	var out outputter
 	switch {
+	case cmd.modified:
+		return errors.Errorf("not implemented")
+	case cmd.unused:
+		return errors.Errorf("not implemented")
+	case cmd.missing:
+		return errors.Errorf("not implemented")
+	case cmd.old:
+		return errors.Errorf("not implemented")
 	case cmd.detailed:
 		return errors.Errorf("not implemented")
 	case cmd.json:
@@ -240,6 +240,15 @@ func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
 	return nil
 }
 
+type rawStatus struct {
+	ProjectRoot  string
+	Constraint   string
+	Version      string
+	Revision     gps.Revision
+	Latest       gps.Version
+	PackageCount int
+}
+
 // BasicStatus contains all the information reported about a single dependency
 // in the summary/list status output mode.
 type BasicStatus struct {
@@ -250,8 +259,46 @@ type BasicStatus struct {
 	Revision     gps.Revision
 	Latest       gps.Version
 	PackageCount int
+	hasOverride  bool
 }
 
+func (bs *BasicStatus) getConsolidatedConstraint() string {
+	var constraint string
+	if bs.Constraint != nil {
+		if v, ok := bs.Constraint.(gps.Version); ok {
+			constraint = formatVersion(v)
+		} else {
+			constraint = bs.Constraint.String()
+		}
+	}
+
+	if bs.hasOverride {
+		constraint += " (override)"
+	}
+
+	return constraint
+}
+
+func (bs *BasicStatus) getConsolidatedVersion() string {
+	version := formatVersion(bs.Revision)
+	if bs.Version != nil {
+		version = formatVersion(bs.Version)
+	}
+	return version
+}
+
+func (bs *BasicStatus) marshalJSON() *rawStatus {
+	return &rawStatus{
+		ProjectRoot:  bs.ProjectRoot,
+		Constraint:   bs.getConsolidatedConstraint(),
+		Version:      formatVersion(bs.Version),
+		Revision:     bs.Revision,
+		Latest:       bs.Latest,
+		PackageCount: bs.PackageCount,
+	}
+}
+
+// MissingStatus contains information about all the missing packages in a project.
 type MissingStatus struct {
 	ProjectRoot     string
 	MissingPackages []string
@@ -261,8 +308,7 @@ func runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceMana
 	var digestMismatch, hasMissingPkgs bool
 
 	if p.Lock == nil {
-		// TODO if we have no lock file, do...other stuff
-		return digestMismatch, hasMissingPkgs, nil
+		return digestMismatch, hasMissingPkgs, errors.Errorf("no Gopkg.lock found. Run `dep ensure` to generate lock file")
 	}
 
 	// While the network churns on ListVersions() requests, statically analyze
@@ -280,8 +326,16 @@ func runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceMana
 		Manifest:        p.Manifest,
 		// Locks aren't a part of the input hash check, so we can omit it.
 	}
+
+	logger := ctx.Err
 	if ctx.Verbose {
 		params.TraceLogger = ctx.Err
+	} else {
+		logger = log.New(ioutil.Discard, "", 0)
+	}
+
+	if err := ctx.ValidateParams(sm, params); err != nil {
+		return digestMismatch, hasMissingPkgs, err
 	}
 
 	s, err := gps.Prepare(params, sm)
@@ -295,7 +349,9 @@ func runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceMana
 	// deterministically ordered. (This may be superfluous if the lock is always
 	// written in alpha order, but it doesn't hurt to double down.)
 	slp := p.Lock.Projects()
-	sort.Sort(dep.SortedLockedProjects(slp))
+	sort.Slice(slp, func(i, j int) bool {
+		return slp[i].Ident().Less(slp[j].Ident())
+	})
 
 	if bytes.Equal(s.HashInputs(), p.Lock.SolveMeta.InputsDigest) {
 		// If these are equal, we're guaranteed that the lock is a transitively
@@ -304,7 +360,11 @@ func runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceMana
 
 		out.BasicHeader()
 
-		for _, proj := range slp {
+		logger.Println("Checking upstream projects:")
+
+		for i, proj := range slp {
+			logger.Printf("(%d/%d) %s\n", i+1, len(slp), proj.Ident().ProjectRoot)
+
 			bs := BasicStatus{
 				ProjectRoot:  string(proj.Ident().ProjectRoot),
 				PackageCount: len(proj.Packages()),
@@ -338,7 +398,7 @@ func runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceMana
 			// Check if the manifest has an override for this project. If so,
 			// set that as the constraint.
 			if pp, has := p.Manifest.Ovr[proj.Ident().ProjectRoot]; has && pp.Constraint != nil {
-				// TODO note somehow that it's overridden
+				bs.hasOverride = true
 				bs.Constraint = pp.Constraint
 			} else {
 				bs.Constraint = gps.Any()
@@ -377,6 +437,7 @@ func runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceMana
 
 			out.BasicLine(&bs)
 		}
+		logger.Println()
 		out.BasicFooter()
 
 		return digestMismatch, hasMissingPkgs, nil

@@ -6,8 +6,12 @@ package gps
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
+	"sync"
+
+	"github.com/pkg/errors"
 )
 
 // A Solution is returned by a solver run. It is mostly just a Lock, with some
@@ -42,6 +46,8 @@ type solution struct {
 	solv Solver
 }
 
+const concurrentWriters = 16
+
 // WriteDepTree takes a basedir and a Lock, and exports all the projects
 // listed in the lock to the appropriate target location within the basedir.
 //
@@ -51,7 +57,7 @@ type solution struct {
 // It requires a SourceManager to do the work, and takes a flag indicating
 // whether or not to strip vendor directories contained in the exported
 // dependencies.
-func WriteDepTree(basedir string, l Lock, sm SourceManager, sv bool) error {
+func WriteDepTree(basedir string, l Lock, sm SourceManager, sv bool, logger *log.Logger) error {
 	if l == nil {
 		return fmt.Errorf("must provide non-nil Lock to WriteDepTree")
 	}
@@ -61,20 +67,97 @@ func WriteDepTree(basedir string, l Lock, sm SourceManager, sv bool) error {
 		return err
 	}
 
-	// TODO(sdboyer) parallelize
-	for _, p := range l.Projects() {
-		to := filepath.FromSlash(filepath.Join(basedir, string(p.Ident().ProjectRoot)))
+	lps := l.Projects()
 
-		err = sm.ExportProject(p.Ident(), p.Version(), to)
-		if err != nil {
-			removeAll(basedir)
-			return fmt.Errorf("error while exporting %s: %s", p.Ident().ProjectRoot, err)
+	type resp struct {
+		i   int
+		err error
+	}
+	respCh := make(chan resp, len(lps))
+	writeCh := make(chan int, len(lps))
+	cancel := make(chan struct{})
+
+	// Queue work.
+	for i := range lps {
+		writeCh <- i
+	}
+	close(writeCh)
+	// Launch writers.
+	writers := concurrentWriters
+	if len(lps) < writers {
+		writers = len(lps)
+	}
+	var wg sync.WaitGroup
+	wg.Add(writers)
+	for i := 0; i < writers; i++ {
+		go func() {
+			defer wg.Done()
+
+			for i := range writeCh {
+				select {
+				case <-cancel:
+					return
+				default:
+				}
+
+				p := lps[i]
+				to := filepath.FromSlash(filepath.Join(basedir, string(p.Ident().ProjectRoot)))
+
+				if err := sm.ExportProject(p.Ident(), p.Version(), to); err != nil {
+					respCh <- resp{i, errors.Wrapf(err, "failed to export %s", p.Ident().ProjectRoot)}
+					continue
+				}
+
+				if sv {
+					select {
+					case <-cancel:
+						return
+					default:
+					}
+
+					if err := filepath.Walk(to, stripVendor); err != nil {
+						respCh <- resp{i, errors.Wrapf(err, "failed to strip vendor from %s", p.Ident().ProjectRoot)}
+						continue
+					}
+				}
+
+				respCh <- resp{i, nil}
+			}
+		}()
+	}
+	// Monitor writers
+	go func() {
+		wg.Wait()
+		close(respCh)
+	}()
+
+	// Log results and collect errors
+	var errs []error
+	var cnt int
+	for resp := range respCh {
+		cnt++
+		msg := "Wrote"
+		if resp.err != nil {
+			if len(errs) == 0 {
+				close(cancel)
+			}
+			errs = append(errs, resp.err)
+			msg = "Failed to write"
 		}
-		if sv {
-			filepath.Walk(to, stripVendor)
-		}
+		p := lps[resp.i]
+		logger.Printf("(%d/%d) %s %s@%s\n", cnt, len(lps), msg, p.Ident(), p.Version())
 	}
 
+	if len(errs) > 0 {
+		logger.Println("Failed to write dep tree. The following errors occurred:")
+		for i, err := range errs {
+			logger.Printf("(%d/%d) %s\n", i+1, len(errs), err)
+		}
+
+		os.RemoveAll(basedir)
+
+		return errors.New("failed to write dep tree")
+	}
 	return nil
 }
 

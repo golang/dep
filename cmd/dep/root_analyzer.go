@@ -52,10 +52,7 @@ func (a *rootAnalyzer) InitializeRootManifestAndLock(dir string, pr gps.ProjectR
 	}
 
 	if rootM == nil {
-		rootM = &dep.Manifest{
-			Constraints: make(gps.ProjectConstraints),
-			Ovr:         make(gps.ProjectConstraints),
-		}
+		rootM = dep.NewManifest()
 	}
 	if rootL == nil {
 		rootL = &dep.Lock{}
@@ -73,6 +70,8 @@ func (a *rootAnalyzer) importManifestAndLock(dir string, pr gps.ProjectRoot, sup
 	importers := []importer{
 		newGlideImporter(logger, a.ctx.Verbose, a.sm),
 		newGodepImporter(logger, a.ctx.Verbose, a.sm),
+		newVndrImporter(logger, a.ctx.Verbose, a.sm),
+		newGovendImporter(logger, a.ctx.Verbose, a.sm),
 	}
 
 	for _, i := range importers {
@@ -87,7 +86,8 @@ func (a *rootAnalyzer) importManifestAndLock(dir string, pr gps.ProjectRoot, sup
 		}
 	}
 
-	var emptyManifest = &dep.Manifest{Constraints: make(gps.ProjectConstraints), Ovr: make(gps.ProjectConstraints)}
+	var emptyManifest = dep.NewManifest()
+
 	return emptyManifest, nil, nil
 }
 
@@ -173,6 +173,26 @@ func (a *rootAnalyzer) Info() gps.ProjectAnalyzerInfo {
 	}
 }
 
+// isVersion determines if the specified value is a version/tag in the project.
+func isVersion(pi gps.ProjectIdentifier, value string, sm gps.SourceManager) (bool, gps.Version, error) {
+	versions, err := sm.ListVersions(pi)
+	if err != nil {
+		return false, nil, errors.Wrapf(err, "list versions for %s(%s)", pi.ProjectRoot, pi.Source) // means repo does not exist
+	}
+
+	for _, version := range versions {
+		if version.Type() != gps.IsVersion && version.Type() != gps.IsSemver {
+			continue
+		}
+
+		if value == version.String() {
+			return true, version, nil
+		}
+	}
+
+	return false, nil, nil
+}
+
 // lookupVersionForLockedProject figures out the appropriate version for a locked
 // project based on the locked revision and the constraint from the manifest.
 // First try matching the revision to a version, then try the constraint from the
@@ -210,4 +230,16 @@ func lookupVersionForLockedProject(pi gps.ProjectIdentifier, c gps.Constraint, r
 
 	// Give up and lock only to a revision
 	return rev, nil
+}
+
+// projectExistsInLock checks if the given project already exists in
+// a lockfile.
+func projectExistsInLock(l *dep.Lock, pr gps.ProjectRoot) bool {
+	for _, lp := range l.P {
+		if pr == lp.Ident().ProjectRoot {
+			return true
+		}
+	}
+
+	return false
 }

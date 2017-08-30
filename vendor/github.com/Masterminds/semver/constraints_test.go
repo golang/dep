@@ -53,6 +53,12 @@ func TestParseConstraint(t *testing.T) {
 			includeMin: true,
 			includeMax: false,
 		}, false},
+		{"^1.1.0-12-abc123", rangeConstraint{
+			min:        Version{major: 1, minor: 1, patch: 0, pre: "12-abc123"},
+			max:        newV(2, 0, 0),
+			includeMin: true,
+			includeMax: false,
+		}, false},
 	}
 
 	for _, tc := range tests {
@@ -70,7 +76,7 @@ func TestParseConstraint(t *testing.T) {
 		}
 
 		if !constraintEq(tc.c, c) {
-			t.Errorf("Incorrect version found on %s", tc.in)
+			t.Errorf("%q produced constraint %q, but expected %q", tc.in, c, tc.c)
 		}
 	}
 }
@@ -331,6 +337,12 @@ func TestNewConstraintIC(t *testing.T) {
 			max:        newV(2, 0, 0),
 			includeMin: true,
 		}, false},
+		{"v1.1.0-12-abc123", rangeConstraint{
+			min:        Version{major: 1, minor: 1, patch: 0, pre: "12-abc123"},
+			max:        newV(2, 0, 0),
+			includeMin: true,
+			includeMax: false,
+		}, false},
 	}
 
 	for _, tc := range tests {
@@ -548,6 +560,7 @@ func TestRewriteRange(t *testing.T) {
 		{"2-3", ">= 2, <= 3"},
 		{"2-3, 2-3", ">= 2, <= 3,>= 2, <= 3"},
 		{"2-3, 4.0.0-5.1", ">= 2, <= 3,>= 4.0.0, <= 5.1"},
+		{"v2-3, 2-3", "v2-3,>= 2, <= 3"},
 	}
 
 	for _, tc := range tests {

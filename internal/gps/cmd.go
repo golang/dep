@@ -126,11 +126,11 @@ func (c *monitoredCmd) hasTimedOut() bool {
 }
 
 func (c *monitoredCmd) combinedOutput(ctx context.Context) ([]byte, error) {
+	c.cmd.Stderr = c.stdout
 	if err := c.run(ctx); err != nil {
-		return c.stderr.Bytes(), err
+		return c.stdout.Bytes(), err
 	}
 
-	// FIXME(sdboyer) this is not actually combined output
 	return c.stdout.Bytes(), nil
 }
 
@@ -203,5 +203,5 @@ const (
 	expensiveCmdTimeout = 2 * time.Minute
 	// defaultCmdTimeout is just an umbrella value for all other commands that
 	// should not take much.
-	defaultCmdTimeout = 10 * time.Second
+	defaultCmdTimeout = 30 * time.Second
 )

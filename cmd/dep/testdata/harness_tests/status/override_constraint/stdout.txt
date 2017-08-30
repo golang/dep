@@ -1,0 +1,3 @@
+PROJECT                        CONSTRAINT    VERSION  REVISION  LATEST   PKGS USED
+github.com/sdboyer/deptest     * (override)  v0.8.1   3f4c3be   ff2948a  1
+github.com/sdboyer/deptestdos  *             v2.0.0   5c60720   5c60720  1

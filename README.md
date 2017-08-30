@@ -1,22 +1,30 @@
-# Dep
+<p align="center"><img src="docs/img/DigbyShadows.png" width="360"></p>
+<p align="center">
+  <a href="https://travis-ci.org/golang/dep"><img src="https://travis-ci.org/golang/dep.svg?branch=master" alt="Build Status"></img></a>
+  <a href="https://ci.appveyor.com/project/golang/dep"><img src="https://ci.appveyor.com/api/projects/status/github/golang/dep?svg=true&branch=master&passingText=Windows%20-%20OK&failingText=Windows%20-%20failed&pendingText=Windows%20-%20pending" alt="Windows Build Status"></a>
+  <a href="https://codeclimate.com/github/golang/dep"><img src="https://codeclimate.com/github/golang/dep/badges/gpa.svg" alt="Code Climate"></img></a>
+  <a href="https://codeclimate.com/github/golang/dep/coverage"><img src="https://codeclimate.com/github/golang/dep/badges/coverage.svg" /></a>
+</p>
 
-Linux: [![Build Status](https://travis-ci.org/golang/dep.svg?branch=master)](https://travis-ci.org/golang/dep) | Windows: [![Build status](https://ci.appveyor.com/api/projects/status/4pu2xnnrikol2gsf/branch/master?svg=true)](https://ci.appveyor.com/project/golang/dep/branch/master) | [![Code Climate](https://codeclimate.com/github/golang/dep/badges/gpa.svg)](https://codeclimate.com/github/golang/dep)
+## Dep
 
-Dep is a prototype dependency management tool. It requires Go 1.7 or newer to compile.
+`dep` is a prototype dependency management tool for Go. It requires Go 1.8 or newer to compile.
 
-`dep` is NOT an official tool. Yet. Check out the [Roadmap](https://github.com/golang/dep/wiki/Roadmap)!
+`dep` is the official _experiment_, but not yet the official tool. Check out the [Roadmap](https://github.com/golang/dep/wiki/Roadmap) for more on what this means!
 
 ## Current status
 
 `dep` is safe for production use. That means two things:
 
 * Any valid metadata file (`Gopkg.toml` and `Gopkg.lock`) will be readable and considered valid by any future version of `dep`.
-* Generally speaking, it has comparable or fewer bugs than other tools out there.
+* The CLI UI is mostly stable. `dep init` and `dep ensure` are mostly set; `dep status` is likely to change a fair bit, and `dep prune` is [going to be absorbed into `dep ensure`](https://github.com/golang/dep/issues/944).
 
 That said, keep in mind the following:
 
+* `dep init` on an existing project can be a rocky experience - we try to automatically convert from other tools' metadata files, and that process is often complex and murky. Once your project is converted and you're using `dep ensure`, its behavior is quite stable.
+* `dep` still has nasty bugs, but in general these are comparable or fewer to other tools out there.
+* `dep` is [pretty slow right now](https://github.com/golang/dep/blob/master/docs/FAQ.md#why-is-dep-slow), especially on the first couple times you run it. Just know that there is a _lot_ of headroom for improvement, and work is actively underway.
 * `dep` is still changing rapidly. If you need stability (e.g. for CI), it's best to rely on a released version, not tip.
-* [Some changes](https://github.com/golang/dep/pull/489) are pending to the CLI interface. Scripting on dep before they land is unwise.
 * `dep`'s exported API interface will continue to change in unpredictable, backwards-incompatible ways until we tag a v1.0.0 release.
 
 ## Context
@@ -31,13 +39,22 @@ That said, keep in mind the following:
 
 ## Setup
 
-Get the tool via
+Grab the latest binary from the [releases](https://github.com/golang/dep/releases) page.
+
+On macOS you can install or upgrade to the latest released version with Homebrew:
 
 ```sh
-$ go get -u github.com/golang/dep/cmd/dep
+$ brew install dep
+$ brew upgrade dep
 ```
 
-To start managing dependencies using dep, run the following from your project root directory:
+If you're interested in hacking on `dep`, you can install via `go get`:
+
+```sh
+go get -u github.com/golang/dep/cmd/dep
+```
+
+To start managing dependencies using dep, run the following from your project's root directory:
 
 ```sh
 $ dep init
@@ -56,10 +73,15 @@ This does the following:
 
 ## Usage
 
-There is one main subcommand you will use: `dep ensure`. `ensure` first makes
-sure `Gopkg.lock` is consistent with your `import`s and `Gopkg.toml`. If any
-changes are detected, it then populates `vendor/` with exactly what's described
-in `Gopkg.lock`.
+There is one main subcommand you will use: `dep ensure`. `ensure` first checks that `Gopkg.lock` is consistent with `Gopkg.toml` and the `import`s in your code. If any
+changes are detected, `dep`'s solver works out a new `Gopkg.lock`. Then, `dep` checks if the contents of `vendor/` are what `Gopkg.lock` (the new one if applicable, else the existing one) says it should be, and rewrites `vendor/` as needed to bring it into line.
+
+In essence, `dep ensure` [works in two phases to keep four buckets of state in sync](https://youtu.be/5LtMb090AZI?t=20m4s):
+
+<img width="463" alt="states-flow" src="https://user-images.githubusercontent.com/21599/29223886-22dd2578-7e96-11e7-8b51-3637b9ddc715.png">
+
+
+_Note: until we ship [vendor verification](https://github.com/golang/dep/issues/121), we can't efficiently perform the `Gopkg.lock` <-> `vendor/` comparison, so `dep ensure` unconditionally regenerates all of `vendor/` to be safe._
 
 `dep ensure` is safe to run early and often. See the help text for more detailed
 usage instructions.
@@ -84,12 +106,13 @@ matches the constraints from the manifest. If the dependency is missing from
 
 ### Adding a dependency
 
-1. `import` the package in your `*.go` source code file(s).
-1. Run the following command to update your `Gopkg.lock` and populate `vendor/` with the new dependency.
+```sh
+$ dep ensure -add github.com/foo/bar
+```
 
-    ```sh
-    $ dep ensure
-    ```
+This adds a version constraint to your `Gopkg.toml`, and updates `Gopkg.lock` and `vendor/`. Now, import and use the package in your code! ✨
+
+`dep ensure -add` has some subtle behavior variations depending on the project or package named, and the state of your tree. See `dep ensure -examples` for more information.
 
 ### Changing dependencies
 
@@ -100,7 +123,7 @@ If you want to:
 
 for one or more dependencies, do the following:
 
-1. Modify your `Gopkg.toml`.
+1. Manually edit your `Gopkg.toml`.
 1. Run
 
     ```sh
@@ -119,7 +142,7 @@ github.com/Masterminds/vcs          ^1.11.0        v1.11.1        3084677   3084
 github.com/armon/go-radix           *              branch master  4239b77   4239b77
 ```
 
-On top of that, if you have added new imports to your project or modified the manifest file without running `dep ensure` again, `dep status` will tell you there is a mismatch between the lock file and the current status of the project.
+On top of that, if you have added new imports to your project or modified `Gopkg.toml` without running `dep ensure` again, `dep status` will tell you there is a mismatch between `Gopkg.lock` and the current status of the project.
 
 ```sh
 $ dep status
@@ -133,24 +156,54 @@ This happens when a new import is added. Run `dep ensure` to install the missing
 
 As `dep status` suggests, run `dep ensure` to update your lockfile. Then run `dep status` again, and the lock mismatch should go away.
 
+### Visualizing dependencies
+
+Generate a visual representation of the dependency tree by piping the output of `dep status -dot` to [graphviz](http://www.graphviz.org/).
+#### Linux
+```
+$ sudo apt-get install graphviz
+$ dep status -dot | dot -T png | display
+```
+#### MacOS
+```
+$ brew install graphviz
+$ dep status -dot | dot -T png | open -f -a /Applications/Preview.app
+```
+#### Windows
+```
+> choco install graphviz.portable
+> dep status -dot | dot -T png -o status.png; start status.png
+```
+<p align="center"><img src="docs/img/StatusGraph.png"></p>
+
 ### Updating dependencies
 
-(to the latest version allowed by the manifest)
+Updating brings the version of a dependency in `Gopkg.lock` and `vendor/` to the latest version allowed by the constraints in `Gopkg.toml`.
+
+You can update just a targeted subset of dependencies (recommended):
+
+```sh
+$ dep ensure -update github.com/some/project github.com/other/project
+$ dep ensure -update github.com/another/project
+```
+
+Or you can update all your dependencies at once:
 
 ```sh
 $ dep ensure -update
 ```
 
+"Latest" means different things depending on the type of constraint in use. If you're depending on a `branch`, `dep` will update to the latest tip of that branch. If you're depending on a `version` using [a semver range](#semantic-versioning), it will update to the latest version in that range.
+
 ### Removing dependencies
 
 1. Remove the `import`s and all usage from your code.
+1. Remove `[[constraint]]` rules from `Gopkg.toml` (if any).
 1. Run
 
     ```sh
     $ dep ensure
     ```
-
-1. Remove from `Gopkg.toml`, if it was in there.
 
 ### Testing changes to a dependency
 

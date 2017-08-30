@@ -6,11 +6,12 @@ package gps
 
 import (
 	"context"
-	"errors"
 	"fmt"
+	"log"
 	"sync"
 
 	"github.com/golang/dep/internal/gps/pkgtree"
+	"github.com/pkg/errors"
 )
 
 // sourceState represent the states that a source can be in, depending on how
@@ -49,16 +50,26 @@ type sourceCoordinator struct {
 	protoSrcs  map[string][]srcReturnChans
 	deducer    deducer
 	cachedir   string
+	logger     *log.Logger
 }
 
-func newSourceCoordinator(superv *supervisor, deducer deducer, cachedir string) *sourceCoordinator {
+func newSourceCoordinator(superv *supervisor, deducer deducer, cachedir string, logger *log.Logger) *sourceCoordinator {
 	return &sourceCoordinator{
 		supervisor: superv,
 		deducer:    deducer,
 		cachedir:   cachedir,
+		logger:     logger,
 		srcs:       make(map[string]*sourceGateway),
 		nameToURL:  make(map[string]string),
 		protoSrcs:  make(map[string][]srcReturnChans),
+	}
+}
+
+func (sc *sourceCoordinator) close() {
+	for k, v := range sc.srcs {
+		if err := v.close(); err != nil {
+			sc.logger.Println(errors.Wrapf(err, "error closing source gateway for %q", k))
+		}
 	}
 }
 
@@ -198,6 +209,10 @@ func newSourceGateway(maybe maybeSource, superv *supervisor, cachedir string) *s
 	sg.cache = sg.createSingleSourceCache()
 
 	return sg
+}
+
+func (sg *sourceGateway) close() error {
+	return errors.Wrap(sg.cache.close(), "error closing cache")
 }
 
 func (sg *sourceGateway) syncLocal(ctx context.Context) error {
@@ -361,7 +376,7 @@ func (sg *sourceGateway) listPackages(ctx context.Context, pr ProjectRoot, v Ver
 			return pkgtree.PackageTree{}, err
 		}
 
-		err = sg.suprvsr.do(ctx, label, ctGetManifestAndLock, func(ctx context.Context) error {
+		err = sg.suprvsr.do(ctx, label, ctListPackages, func(ctx context.Context) error {
 			ptree, err = sg.src.listPackages(ctx, pr, r)
 			return err
 		})
@@ -402,7 +417,7 @@ func (sg *sourceGateway) convertToRevision(ctx context.Context, v Version) (Revi
 
 	// The version list is out of date; it's possible this version might
 	// show up after loading it.
-	_, err := sg.require(ctx, sourceIsSetUp|sourceHasLatestVersionList|sourceHasLatestLocally)
+	_, err := sg.require(ctx, sourceIsSetUp|sourceHasLatestVersionList)
 	if err != nil {
 		return "", err
 	}
@@ -448,6 +463,18 @@ func (sg *sourceGateway) revisionPresentIn(ctx context.Context, r Revision) (boo
 		sg.cache.markRevisionExists(r)
 	}
 	return present, err
+}
+
+func (sg *sourceGateway) disambiguateRevision(ctx context.Context, r Revision) (Revision, error) {
+	sg.mu.Lock()
+	defer sg.mu.Unlock()
+
+	_, err := sg.require(ctx, sourceIsSetUp|sourceExistsLocally)
+	if err != nil {
+		return "", err
+	}
+
+	return sg.src.disambiguateRevision(ctx, r)
 }
 
 func (sg *sourceGateway) sourceURL(ctx context.Context) (string, error) {
@@ -514,7 +541,7 @@ func (sg *sourceGateway) require(ctx context.Context, wanted sourceState) (errSt
 				})
 
 				if err == nil {
-					sg.cache.storeVersionMap(pvl, true)
+					sg.cache.setVersionMap(pvl)
 				}
 			case sourceHasLatestLocally:
 				err = sg.suprvsr.do(ctx, sg.src.sourceType(), ctSourceFetch, func(ctx context.Context) error {
@@ -550,6 +577,7 @@ type source interface {
 	getManifestAndLock(context.Context, ProjectRoot, Revision, ProjectAnalyzer) (Manifest, Lock, error)
 	listPackages(context.Context, ProjectRoot, Revision) (pkgtree.PackageTree, error)
 	revisionPresentIn(Revision) (bool, error)
+	disambiguateRevision(context.Context, Revision) (Revision, error)
 	exportRevisionTo(context.Context, Revision, string) error
 	sourceType() string
 }

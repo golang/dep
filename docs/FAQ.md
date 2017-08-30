@@ -24,6 +24,8 @@ Summarize the question and quote the reply, linking back to the original comment
 * [Why did `dep` use a different revision for package X instead of the revision in the lock file?](#why-did-dep-use-a-different-revision-for-package-x-instead-of-the-revision-in-the-lock-file)
 * [Why is `dep` slow?](#why-is-dep-slow)
 * [How does `dep` handle symbolic links?](#how-does-dep-handle-symbolic-links)
+* [Does `dep` support relative imports?](#does-dep-support-relative-imports)
+* [How do I make `dep` resolve dependencies from my `GOPATH`?](#how-do-i-make-dep-resolve-dependencies-from-my-gopath)
 
 ## Best Practices
 * [Should I commit my vendor directory?](#should-i-commit-my-vendor-directory)
@@ -31,8 +33,7 @@ Summarize the question and quote the reply, linking back to the original comment
 * [What semver version should I use?](#what-semver-version-should-i-use)
 * [Is it OK to make backwards-incompatible changes now?](#is-it-ok-to-make-backwards-incompatible-changes-now)
 * [My dependers don't use `dep` yet. What should I do?](#my-dependers-dont-use-dep-yet-what-should-i-do)
-
-___
+* [How do I configure a dependency that doesn't tag its releases?](#how-do-i-configure-a-dependency-that-doesnt-tag-its-releases)
 
 ## Concepts
 ### Does `dep` replace `go get`?
@@ -179,6 +180,7 @@ So, given a slice of the following versions:
 - Semver tags: `v1.0.0` `v1.1.0` `v1.1.0-alpha1`
 - Non-semver tags: `footag`
 - Revision: `f6e74e8d`
+
 Sorting for upgrade will result in the following slice.
 
 `[v1.1.0 v1.0.0 v1.1.0-alpha1 footag devel master f6e74e8d]`
@@ -193,21 +195,14 @@ about what's going on.
 During `dep init` configuration from other dependency managers is detected
 and imported, unless `-skip-tools` is specified.
 
-The following tools are supported: `glide` and `godep`.
+The following tools are supported: `glide`, `godep`, `vndr` and `govend`.
 
 See [#186](https://github.com/golang/dep/issues/186#issuecomment-306363441) for
 how to add support for another tool.
 
 ## Why is `dep` ignoring a version constraint in the manifest?
 Only your project's directly imported dependencies are affected by a `constraint` entry
-in the manifest. Transitive dependencies are unaffected.
-
-Use an `override` entry for transitive dependencies.
-```
-[[override]]
-  name = "github.com/pkg/errors"
-  version = "=0.8.0"
-```
+in the manifest. Transitive dependencies are unaffected. See [How do I constrain a transitive dependency's version](#how-do-i-constrain-a-transitive-dependencys-version)?
 
 ## Why did `dep` use a different revision for package X instead of the revision in the lock file?
 Sometimes the revision specified in the lock file is no longer valid. There are a few
@@ -277,6 +272,22 @@ When `dep` is invoked with a project root that is a symlink, it will be resolved
 - If neither the symlink nor the resolved path are in a `GOPATH`, then an error is thrown.
 
 This is the only symbolic link support that `dep` really intends to provide. In keeping with the general practices of the `go` tool, `dep` tends to either ignore symlinks (when walking) or copy the symlink itself, depending on the filesystem operation being performed.
+
+## Does `dep` support relative imports?
+
+No.
+> dep simply doesn't allow relative imports. this is one of the few places where we restrict a case that the toolchain itself allows. we disallow them only because:<br>
+>  i. the toolchain already frowns heavily on them<br>
+> ii. it's worse for our case, as we start venturing into [dot dot hell](http://doc.cat-v.org/plan_9/4th_edition/papers/lexnames) territory when trying to prove that the import does not escape the tree of the project -[@sdboyer in #899](https://github.com/golang/dep/issues/899#issuecomment-317904001)
+
+For a refresher on Go's recommended workspace organization, see the ["How To Write Go Code"](https://golang.org/doc/code.html) article in the Go docs. Organizing your code this way gives you a unique import path for every package.
+
+## How do I make `dep` resolve dependencies from my `GOPATH`?
+
+`dep init` provides an option to scan the `GOPATH` for dependencies by doing
+`dep init -gopath`, which falls back to network mode when the packages are not
+found in `GOPATH`. `dep ensure` doesn't work with projects in `GOPATH`.
+
 
 ## Best Practices
 ### Should I commit my vendor directory?
@@ -358,3 +369,7 @@ it can [cause
 problems](https://groups.google.com/d/msg/golang-nuts/AnMr9NL6dtc/UnyUUKcMCAAJ).
 If your dependers are using `dep`, this is not a concern, as `dep` takes care of
 stripping out nested `vendor` directories.
+
+## How do I configure a dependency that doesn't tag its releases?
+
+Add a constraint to `Gopkg.toml` that specifies `branch: "master"` (or whichever branch you need) in the `[[constraint]]` for that dependency. `dep ensure` will determine the current revision of your dependency's master branch, and place it in `Gopkg.lock` for you. See also: [What is the difference between Gopkg.toml and Gopkg.lock?](#what-is-the-difference-between-gopkgtoml-the-manifest-and-gopkglock-the-lock)

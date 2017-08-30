@@ -8,6 +8,7 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"os"
 	"path"
 	"path/filepath"
@@ -16,6 +17,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/golang/dep/internal/test"
 )
 
 // An analyzer that passes nothing back, but doesn't error. This is the naive
@@ -40,14 +43,17 @@ func mkNaiveSM(t *testing.T) (*SourceMgr, func()) {
 		t.Fatalf("Failed to create temp dir: %s", err)
 	}
 
-	sm, err := NewSourceManager(cpath)
+	sm, err := NewSourceManager(SourceManagerConfig{
+		Cachedir: cpath,
+		Logger:   log.New(test.Writer{t}, "", 0),
+	})
 	if err != nil {
 		t.Fatalf("Unexpected error on SourceManager creation: %s", err)
 	}
 
 	return sm, func() {
 		sm.Release()
-		err := removeAll(cpath)
+		err := os.RemoveAll(cpath)
 		if err != nil {
 			t.Errorf("removeAll failed: %s", err)
 		}
@@ -58,14 +64,17 @@ func remakeNaiveSM(osm *SourceMgr, t *testing.T) (*SourceMgr, func()) {
 	cpath := osm.cachedir
 	osm.Release()
 
-	sm, err := NewSourceManager(cpath)
+	sm, err := NewSourceManager(SourceManagerConfig{
+		Cachedir: cpath,
+		Logger:   log.New(test.Writer{t}, "", 0),
+	})
 	if err != nil {
 		t.Fatalf("unexpected error on SourceManager recreation: %s", err)
 	}
 
 	return sm, func() {
 		sm.Release()
-		err := removeAll(cpath)
+		err := os.RemoveAll(cpath)
 		if err != nil {
 			t.Errorf("removeAll failed: %s", err)
 		}
@@ -77,13 +86,18 @@ func TestSourceManagerInit(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to create temp dir: %s", err)
 	}
-	sm, err := NewSourceManager(cpath)
+	cfg := SourceManagerConfig{
+		Cachedir: cpath,
+		Logger:   log.New(test.Writer{t}, "", 0),
+	}
+
+	sm, err := NewSourceManager(cfg)
 
 	if err != nil {
 		t.Errorf("Unexpected error on SourceManager creation: %s", err)
 	}
 
-	_, err = NewSourceManager(cpath)
+	_, err = NewSourceManager(cfg)
 	if err == nil {
 		t.Errorf("Creating second SourceManager should have failed due to file lock contention")
 	} else if te, ok := err.(CouldNotCreateLockError); !ok {
@@ -95,7 +109,7 @@ func TestSourceManagerInit(t *testing.T) {
 	}
 
 	sm.Release()
-	err = removeAll(cpath)
+	err = os.RemoveAll(cpath)
 	if err != nil {
 		t.Errorf("removeAll failed: %s", err)
 	}
@@ -105,13 +119,13 @@ func TestSourceManagerInit(t *testing.T) {
 	}
 
 	// Set another one up at the same spot now, just to be sure
-	sm, err = NewSourceManager(cpath)
+	sm, err = NewSourceManager(cfg)
 	if err != nil {
 		t.Errorf("Creating a second SourceManager should have succeeded when the first was released, but failed with err %s", err)
 	}
 
 	sm.Release()
-	err = removeAll(cpath)
+	err = os.RemoveAll(cpath)
 	if err != nil {
 		t.Errorf("removeAll failed: %s", err)
 	}
@@ -128,14 +142,17 @@ func TestSourceInit(t *testing.T) {
 		t.Fatalf("Failed to create temp dir: %s", err)
 	}
 
-	sm, err := NewSourceManager(cpath)
+	sm, err := NewSourceManager(SourceManagerConfig{
+		Cachedir: cpath,
+		Logger:   log.New(test.Writer{t}, "", 0),
+	})
 	if err != nil {
 		t.Fatalf("Unexpected error on SourceManager creation: %s", err)
 	}
 
 	defer func() {
 		sm.Release()
-		err := removeAll(cpath)
+		err := os.RemoveAll(cpath)
 		if err != nil {
 			t.Errorf("removeAll failed: %s", err)
 		}

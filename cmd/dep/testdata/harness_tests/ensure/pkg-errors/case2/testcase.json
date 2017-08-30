@@ -1,0 +1,7 @@
+{
+    "commands": [
+        ["ensure"]
+    ],
+    "error-expected": "found 1 errors",
+    "vendor-final": []
+}

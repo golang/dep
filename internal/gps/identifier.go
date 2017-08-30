@@ -80,14 +80,14 @@ type ProjectIdentifier struct {
 	Source      string
 }
 
-func (i ProjectIdentifier) less(j ProjectIdentifier) bool {
+// Less compares by ProjectRoot then normalized Source.
+func (i ProjectIdentifier) Less(j ProjectIdentifier) bool {
 	if i.ProjectRoot < j.ProjectRoot {
 		return true
 	}
 	if j.ProjectRoot < i.ProjectRoot {
 		return false
 	}
-
 	return i.normalizedSource() < j.normalizedSource()
 }
 
@@ -146,6 +146,10 @@ func (i ProjectIdentifier) errString() string {
 		return string(i.ProjectRoot)
 	}
 	return fmt.Sprintf("%s (from %s)", i.ProjectRoot, i.Source)
+}
+
+func (i ProjectIdentifier) String() string {
+	return i.errString()
 }
 
 func (i ProjectIdentifier) normalize() ProjectIdentifier {

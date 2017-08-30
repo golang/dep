@@ -1,6 +1,7 @@
 [[constraint]]
-  branch = "2.x"
+  branch = "parse-constraints-with-dash-in-pre"
   name = "github.com/Masterminds/semver"
+  source = "https://github.com/carolynvs/semver.git"
 
 [[constraint]]
   name = "github.com/Masterminds/vcs"

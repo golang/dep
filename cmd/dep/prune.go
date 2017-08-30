@@ -82,9 +82,9 @@ func (cmd *pruneCommand) Run(ctx *dep.Ctx, args []string) error {
 		return errors.Errorf("Gopkg.lock is out of sync; run dep ensure before pruning.")
 	}
 
-	var pruneLogger *log.Logger
-	if ctx.Verbose {
-		pruneLogger = ctx.Err
+	pruneLogger := ctx.Err
+	if !ctx.Verbose {
+		pruneLogger = log.New(ioutil.Discard, "", 0)
 	}
 	return pruneProject(p, sm, pruneLogger)
 }
@@ -97,7 +97,7 @@ func pruneProject(p *dep.Project, sm gps.SourceManager, logger *log.Logger) erro
 	}
 	defer os.RemoveAll(td)
 
-	if err := gps.WriteDepTree(td, p.Lock, sm, true); err != nil {
+	if err := gps.WriteDepTree(td, p.Lock, sm, true, logger); err != nil {
 		return err
 	}
 
@@ -114,15 +114,13 @@ func pruneProject(p *dep.Project, sm gps.SourceManager, logger *log.Logger) erro
 		return err
 	}
 
-	if logger != nil {
-		if len(toDelete) > 0 {
-			logger.Println("Calculated the following directories to prune:")
-			for _, d := range toDelete {
-				logger.Printf("  %s\n", d)
-			}
-		} else {
-			logger.Println("No directories found to prune")
+	if len(toDelete) > 0 {
+		logger.Println("Calculated the following directories to prune:")
+		for _, d := range toDelete {
+			logger.Printf("  %s\n", d)
 		}
+	} else {
+		logger.Println("No directories found to prune")
 	}
 
 	if err := deleteDirs(toDelete); err != nil {
@@ -163,9 +161,7 @@ fail:
 }
 
 func calculatePrune(vendorDir string, keep []string, logger *log.Logger) ([]string, error) {
-	if logger != nil {
-		logger.Println("Calculating prune. Checking the following packages:")
-	}
+	logger.Println("Calculating prune. Checking the following packages:")
 	sort.Strings(keep)
 	toDelete := []string{}
 	err := filepath.Walk(vendorDir, func(path string, info os.FileInfo, err error) error {
@@ -180,9 +176,7 @@ func calculatePrune(vendorDir string, keep []string, logger *log.Logger) ([]stri
 		}
 
 		name := strings.TrimPrefix(path, vendorDir+string(filepath.Separator))
-		if logger != nil {
-			logger.Printf("  %s", name)
-		}
+		logger.Printf("  %s", name)
 		i := sort.Search(len(keep), func(i int) bool {
 			return name <= keep[i]
 		})

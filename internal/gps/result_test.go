@@ -6,11 +6,16 @@ package gps
 
 import (
 	"io/ioutil"
+	"log"
 	"os"
 	"path"
 	"path/filepath"
 	"testing"
+
+	"github.com/golang/dep/internal/test"
 )
+
+var discardLogger = log.New(ioutil.Discard, "", 0)
 
 var basicResult solution
 
@@ -90,12 +95,12 @@ func testWriteDepTree(t *testing.T) {
 	}
 
 	// nil lock/result should err immediately
-	err = WriteDepTree(tmp, nil, sm, true)
+	err = WriteDepTree(tmp, nil, sm, true, discardLogger)
 	if err == nil {
 		t.Errorf("Should error if nil lock is passed to WriteDepTree")
 	}
 
-	err = WriteDepTree(tmp, r, sm, true)
+	err = WriteDepTree(tmp, r, sm, true, discardLogger)
 	if err != nil {
 		t.Errorf("Unexpected error while creating vendor tree: %s", err)
 	}
@@ -119,9 +124,12 @@ func BenchmarkCreateVendorTree(b *testing.B) {
 	tmp := path.Join(os.TempDir(), "vsolvtest")
 
 	clean := true
-	sm, err := NewSourceManager(path.Join(tmp, "cache"))
+	sm, err := NewSourceManager(SourceManagerConfig{
+		Cachedir: path.Join(tmp, "cache"),
+		Logger:   log.New(test.Writer{b}, "", 0),
+	})
 	if err != nil {
-		b.Errorf("NewSourceManager errored unexpectedly: %q", err)
+		b.Errorf("failed to create SourceManager: %q", err)
 		clean = false
 	}
 
@@ -143,7 +151,7 @@ func BenchmarkCreateVendorTree(b *testing.B) {
 			// ease manual inspection
 			os.RemoveAll(exp)
 			b.StartTimer()
-			err = WriteDepTree(exp, r, sm, true)
+			err = WriteDepTree(exp, r, sm, true, discardLogger)
 			b.StopTimer()
 			if err != nil {
 				b.Errorf("unexpected error after %v iterations: %s", i, err)

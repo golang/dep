@@ -6,13 +6,13 @@ package gps
 
 import (
 	"context"
-	"encoding/hex"
 	"fmt"
+	"io/ioutil"
+	"log"
 	"os"
 	"os/signal"
 	"path/filepath"
 	"runtime"
-	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -45,7 +45,6 @@ type SourceManager interface {
 
 	// ListVersions retrieves a list of the available versions for a given
 	// repository name.
-	// TODO convert to []PairedVersion
 	ListVersions(ProjectIdentifier) ([]PairedVersion, error)
 
 	// RevisionPresentIn indicates whether the provided Version is present in
@@ -135,9 +134,13 @@ func (smIsReleased) Error() string {
 
 var _ SourceManager = &SourceMgr{}
 
-// NewSourceManager produces an instance of gps's built-in SourceManager. It
-// takes a cache directory, where local instances of upstream sources are
-// stored.
+// SourceManagerConfig holds configuration information for creating SourceMgrs.
+type SourceManagerConfig struct {
+	Cachedir string      // Where to store local instances of upstream sources.
+	Logger   *log.Logger // Optional info/warn logger. Discards if nil.
+}
+
+// NewSourceManager produces an instance of gps's built-in SourceManager.
 //
 // The returned SourceManager aggressively caches information wherever possible.
 // If tools need to do preliminary work involving upstream repository analysis
@@ -148,8 +151,12 @@ var _ SourceManager = &SourceMgr{}
 // gps's SourceManager is intended to be threadsafe (if it's not, please file a
 // bug!). It should be safe to reuse across concurrent solving runs, even on
 // unrelated projects.
-func NewSourceManager(cachedir string) (*SourceMgr, error) {
-	err := os.MkdirAll(filepath.Join(cachedir, "sources"), 0777)
+func NewSourceManager(c SourceManagerConfig) (*SourceMgr, error) {
+	if c.Logger == nil {
+		c.Logger = log.New(ioutil.Discard, "", 0)
+	}
+
+	err := os.MkdirAll(filepath.Join(c.Cachedir, "sources"), 0777)
 	if err != nil {
 		return nil, err
 	}
@@ -161,7 +168,7 @@ func NewSourceManager(cachedir string) (*SourceMgr, error) {
 	// a process keeping the lock busy, it will pass back a temporary error that
 	// we can spin on.
 
-	glpath := filepath.Join(cachedir, "sm.lock")
+	glpath := filepath.Join(c.Cachedir, "sm.lock")
 	lockfile, err := lockfile.New(glpath)
 	if err != nil {
 		return nil, CouldNotCreateLockError{
@@ -188,11 +195,24 @@ func NewSourceManager(cachedir string) (*SourceMgr, error) {
 	// If it's a TemporaryError, we retry every second. Otherwise, we fail
 	// permanently.
 	//
-	// TODO: After some time, we should emit some kind of warning that we're waiting
-	// for the lockfile to be released. #534 should be address before we will do that.
+	// TODO: #534 needs to be implemented to provide a better way to log warnings,
+	// but until then we will just use stderr.
 
+	// Implicit Time of 0.
+	var lasttime time.Time
 	err = lockfile.TryLock()
 	for err != nil {
+		nowtime := time.Now()
+		duration := nowtime.Sub(lasttime)
+
+		// The first time this is evaluated, duration will be very large as lasttime is 0.
+		// Unless time travel is invented and someone travels back to the year 1, we should
+		// be ok.
+		if duration > 15*time.Second {
+			fmt.Fprintf(os.Stderr, "waiting for lockfile %s: %s\n", glpath, err.Error())
+			lasttime = nowtime
+		}
+
 		if _, ok := err.(interface {
 			Temporary() bool
 		}); ok {
@@ -211,12 +231,12 @@ func NewSourceManager(cachedir string) (*SourceMgr, error) {
 	deducer := newDeductionCoordinator(superv)
 
 	sm := &SourceMgr{
-		cachedir:    cachedir,
+		cachedir:    c.Cachedir,
 		lf:          &lockfile,
 		suprvsr:     superv,
 		cancelAll:   cf,
 		deduceCoord: deducer,
-		srcCoord:    newSourceCoordinator(superv, deducer, cachedir),
+		srcCoord:    newSourceCoordinator(superv, deducer, c.Cachedir, c.Logger),
 		qch:         make(chan struct{}),
 	}
 
@@ -337,7 +357,7 @@ func (sm *SourceMgr) Release() {
 	// until after the doRelease process is done, as doing so could cause the
 	// process to terminate before a signal-driven doRelease() call has a chance
 	// to finish its cleanup.
-	sm.relonce.Do(func() { sm.doRelease() })
+	sm.relonce.Do(sm.doRelease)
 }
 
 // doRelease actually releases physical resources (files on disk, etc.).
@@ -348,6 +368,9 @@ func (sm *SourceMgr) doRelease() {
 	// Send the signal to the supervisor to cancel all running calls
 	sm.cancelAll()
 	sm.suprvsr.wait()
+
+	// Close the source coordinator.
+	sm.srcCoord.close()
 
 	// Close the file handle for the lock file and remove it from disk
 	sm.lf.Unlock()
@@ -499,40 +522,11 @@ func (sm *SourceMgr) DeduceProjectRoot(ip string) (ProjectRoot, error) {
 }
 
 // InferConstraint tries to puzzle out what kind of version is given in a
-// string. Preference is given first for revisions, then branches, then semver
-// constraints, and then plain tags.
+// string. Preference is given first for branches, then semver constraints, then
+// plain tags, and then revisions.
 func (sm *SourceMgr) InferConstraint(s string, pi ProjectIdentifier) (Constraint, error) {
 	if s == "" {
 		return Any(), nil
-	}
-
-	slen := len(s)
-	if slen == 40 {
-		if _, err := hex.DecodeString(s); err == nil {
-			// Whether or not it's intended to be a SHA1 digest, this is a
-			// valid byte sequence for that, so go with Revision. This
-			// covers git and hg
-			return Revision(s), nil
-		}
-	}
-
-	// Next, try for bzr, which has a three-component GUID separated by
-	// dashes. There should be two, but the email part could contain
-	// internal dashes
-	if strings.Contains(s, "@") && strings.Count(s, "-") >= 2 {
-		// Work from the back to avoid potential confusion from the email
-		i3 := strings.LastIndex(s, "-")
-		// Skip if - is last char, otherwise this would panic on bounds err
-		if slen == i3+1 {
-			return NewVersion(s), nil
-		}
-
-		i2 := strings.LastIndex(s[:i3], "-")
-		if _, err := strconv.ParseUint(s[i2+1:i3], 10, 64); err == nil {
-			// Getting this far means it'd pretty much be nuts if it's not a
-			// bzr rev, so don't bother parsing the email.
-			return Revision(s), nil
-		}
 	}
 
 	// Lookup the string in the repository
@@ -565,7 +559,27 @@ func (sm *SourceMgr) InferConstraint(s string, pi ProjectIdentifier) (Constraint
 		return version.Unpair(), nil
 	}
 
+	// Revision, possibly abbreviated
+	r, err := sm.disambiguateRevision(context.TODO(), pi, Revision(s))
+	if err == nil {
+		return r, nil
+	}
+
 	return nil, errors.Errorf("%s is not a valid version for the package %s(%s)", s, pi.ProjectRoot, pi.Source)
+}
+
+// disambiguateRevision looks up a revision in the underlying source, spitting
+// it back out in an unabbreviated, disambiguated form.
+//
+// For example, if pi refers to a git-based project, then rev could be an
+// abbreviated git commit hash. disambiguateRevision would return the complete
+// hash.
+func (sm *SourceMgr) disambiguateRevision(ctx context.Context, pi ProjectIdentifier, rev Revision) (Revision, error) {
+	srcg, err := sm.srcCoord.getSourceGatewayFor(context.TODO(), pi)
+	if err != nil {
+		return "", err
+	}
+	return srcg.disambiguateRevision(ctx, rev)
 }
 
 type timeCount struct {

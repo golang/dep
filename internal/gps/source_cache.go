@@ -34,11 +34,10 @@ type singleSourceCache interface {
 	// Store the mappings between a set of PairedVersions' surface versions
 	// their corresponding revisions.
 	//
-	// If flush is true, the existing list of versions will be purged before
-	// writing. Revisions will have their pairings purged, but record of the
-	// revision existing will be kept, on the assumption that revisions are
-	// immutable and permanent.
-	storeVersionMap(versionList []PairedVersion, flush bool)
+	// The existing list of versions will be purged before writing. Revisions
+	// will have their pairings purged, but record of the revision existing will
+	// be kept, on the assumption that revisions are immutable and permanent.
+	setVersionMap(versionList []PairedVersion)
 
 	// Get the list of unpaired versions corresponding to the given revision.
 	getVersionsFor(Revision) ([]UnpairedVersion, bool)
@@ -59,6 +58,9 @@ type singleSourceCache interface {
 	// If the input is a revision and multiple UnpairedVersions are associated
 	// with it, whatever happens to be the first is returned.
 	toUnpaired(v Version) (UnpairedVersion, bool)
+
+	// close closes the cache and any backing resources.
+	close() error
 }
 
 type singleSourceCacheMemory struct {
@@ -77,6 +79,8 @@ func newMemoryCache() singleSourceCache {
 		rMap:   make(map[Revision][]UnpairedVersion),
 	}
 }
+
+func (*singleSourceCacheMemory) close() error { return nil }
 
 type projectInfo struct {
 	Manifest
@@ -135,20 +139,17 @@ func (c *singleSourceCacheMemory) getPackageTree(r Revision) (pkgtree.PackageTre
 	return ptree, has
 }
 
-func (c *singleSourceCacheMemory) storeVersionMap(versionList []PairedVersion, flush bool) {
+func (c *singleSourceCacheMemory) setVersionMap(versionList []PairedVersion) {
 	c.mut.Lock()
-	if flush {
-		// TODO(sdboyer) how do we handle cache consistency here - revs that may
-		// be out of date vis-a-vis the ptrees or infos maps?
-		for r := range c.rMap {
-			c.rMap[r] = nil
-		}
-
-		c.vMap = make(map[UnpairedVersion]Revision)
+	// TODO(sdboyer) how do we handle cache consistency here - revs that may
+	// be out of date vis-a-vis the ptrees or infos maps?
+	for r := range c.rMap {
+		c.rMap[r] = nil
 	}
 
-	for _, v := range versionList {
-		pv := v.(PairedVersion)
+	c.vMap = make(map[UnpairedVersion]Revision)
+
+	for _, pv := range versionList {
 		u, r := pv.Unpair(), pv.Revision()
 		c.vMap[u] = r
 		c.rMap[r] = append(c.rMap[r], u)
@@ -172,6 +173,9 @@ func (c *singleSourceCacheMemory) getVersionsFor(r Revision) ([]UnpairedVersion,
 }
 
 func (c *singleSourceCacheMemory) getAllVersions() []PairedVersion {
+	if len(c.vMap) == 0 {
+		return nil
+	}
 	vlist := make([]PairedVersion, 0, len(c.vMap))
 	for v, r := range c.vMap {
 		vlist = append(vlist, v.Pair(r))

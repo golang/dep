@@ -21,10 +21,12 @@ import (
 const ManifestName = "Gopkg.toml"
 
 // Errors
-var errInvalidConstraint = errors.New("\"constraint\" must be a TOML array of tables")
-var errInvalidOverride = errors.New("\"override\" must be a TOML array of tables")
-var errInvalidRequired = errors.New("\"required\" must be a TOML list of strings")
-var errInvalidIgnored = errors.New("\"ignored\" must be a TOML list of strings")
+var (
+	errInvalidConstraint = errors.New("\"constraint\" must be a TOML array of tables")
+	errInvalidOverride   = errors.New("\"override\" must be a TOML array of tables")
+	errInvalidRequired   = errors.New("\"required\" must be a TOML list of strings")
+	errInvalidIgnored    = errors.New("\"ignored\" must be a TOML list of strings")
+)
 
 // Manifest holds manifest file data and implements gps.RootManifest.
 type Manifest struct {
@@ -47,6 +49,14 @@ type rawProject struct {
 	Revision string `toml:"revision,omitempty"`
 	Version  string `toml:"version,omitempty"`
 	Source   string `toml:"source,omitempty"`
+}
+
+// NewManifest instantites a new manifest.
+func NewManifest() *Manifest {
+	return &Manifest{
+		Constraints: make(gps.ProjectConstraints),
+		Ovr:         make(gps.ProjectConstraints),
+	}
 }
 
 func validateManifest(s string) ([]error, error) {
@@ -170,12 +180,12 @@ func readManifest(r io.Reader) (*Manifest, []error, error) {
 }
 
 func fromRawManifest(raw rawManifest) (*Manifest, error) {
-	m := &Manifest{
-		Constraints: make(gps.ProjectConstraints, len(raw.Constraints)),
-		Ovr:         make(gps.ProjectConstraints, len(raw.Overrides)),
-		Ignored:     raw.Ignored,
-		Required:    raw.Required,
-	}
+	m := NewManifest()
+
+	m.Constraints = make(gps.ProjectConstraints, len(raw.Constraints))
+	m.Ovr = make(gps.ProjectConstraints, len(raw.Overrides))
+	m.Ignored = raw.Ignored
+	m.Required = raw.Required
 
 	for i := 0; i < len(raw.Constraints); i++ {
 		name, prj, err := toProject(raw.Constraints[i])
@@ -333,6 +343,19 @@ func (m *Manifest) IgnoredPackages() map[string]bool {
 	}
 
 	return mp
+}
+
+// HasConstraintsOn checks if the manifest contains either constraints or
+// overrides on the provided ProjectRoot.
+func (m *Manifest) HasConstraintsOn(root gps.ProjectRoot) bool {
+	if _, has := m.Constraints[root]; has {
+		return true
+	}
+	if _, has := m.Ovr[root]; has {
+		return true
+	}
+
+	return false
 }
 
 // RequiredPackages returns a set of import paths to require.

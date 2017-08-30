@@ -10,6 +10,7 @@ import (
 	"log"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/armon/go-radix"
 	"github.com/golang/dep/internal/gps/paths"
@@ -381,6 +382,49 @@ func (s *solver) Version() int {
 	return 1
 }
 
+// DeductionErrs maps package import path to errors occurring during deduction.
+type DeductionErrs map[string]error
+
+func (e DeductionErrs) Error() string {
+	return "could not deduce external imports' project roots"
+}
+
+// ValidateParams validates the solver parameters to ensure solving can be completed.
+func ValidateParams(params SolveParameters, sm SourceManager) error {
+	// Ensure that all packages are deducible without issues.
+	var deducePkgsGroup sync.WaitGroup
+	deductionErrs := make(DeductionErrs)
+	var errsMut sync.Mutex
+
+	rd, err := params.toRootdata()
+	if err != nil {
+		return err
+	}
+
+	deducePkg := func(ip string, sm SourceManager) {
+		_, err := sm.DeduceProjectRoot(ip)
+		if err != nil {
+			errsMut.Lock()
+			deductionErrs[ip] = err
+			errsMut.Unlock()
+		}
+		deducePkgsGroup.Done()
+	}
+
+	for _, ip := range rd.externalImportList(paths.IsStandardImportPath) {
+		deducePkgsGroup.Add(1)
+		go deducePkg(ip, sm)
+	}
+
+	deducePkgsGroup.Wait()
+
+	if len(deductionErrs) > 0 {
+		return deductionErrs
+	}
+
+	return nil
+}
+
 // Solve attempts to find a dependency solution for the given project, as
 // represented by the SolveParameters with which this Solver was created.
 //
@@ -391,8 +435,7 @@ func (s *solver) Solve() (Solution, error) {
 	s.vUnify.mtr = s.mtr
 
 	// Prime the queues with the root project
-	err := s.selectRoot()
-	if err != nil {
+	if err := s.selectRoot(); err != nil {
 		return nil, err
 	}
 
@@ -539,7 +582,7 @@ func (s *solver) selectRoot() error {
 	s.mtr.push("select-root")
 	// Push the root project onto the queue.
 	awp := s.rd.rootAtom()
-	s.sel.pushSelection(awp, true)
+	s.sel.pushSelection(awp, false)
 
 	// If we're looking for root's deps, get it from opts and local root
 	// analysis, rather than having the sm do it
@@ -706,11 +749,9 @@ func (s *solver) intersectConstraintsWithImports(deps []workingConstraint, reach
 	}
 
 	// Dump all the deps from the map into the expected return slice
-	cdeps := make([]completeDep, len(dmap))
-	k := 0
+	cdeps := make([]completeDep, 0, len(dmap))
 	for _, cdep := range dmap {
-		cdeps[k] = cdep
-		k++
+		cdeps = append(cdeps, cdep)
 	}
 
 	return cdeps, nil
@@ -817,14 +858,11 @@ func (s *solver) createVersionQueue(bmi bimodalIdentifier) (*versionQueue, error
 	// TODO(sdboyer) while this does work, it bypasses the interface-implied guarantees
 	// of the version queue, and is therefore not a great strategy for API
 	// coherency. Folding this in to a formal interface would be better.
-	switch tc := s.sel.getConstraint(bmi.id).(type) {
-	case Revision:
+	if tc, ok := s.sel.getConstraint(bmi.id).(Revision); ok && q.pi[0] != tc {
 		// We know this is the only thing that could possibly match, so put it
 		// in at the front - if it isn't there already.
-		if q.pi[0] != tc {
-			// Existence of the revision is guaranteed by checkRevisionExists().
-			q.pi = append([]Version{tc}, q.pi...)
-		}
+		// TODO(sdboyer) existence of the revision is guaranteed by checkRevisionExists(); restore that call.
+		q.pi = append([]Version{tc}, q.pi...)
 	}
 
 	// Having assembled the queue, search it for a valid version.
@@ -951,8 +989,8 @@ func (s *solver) getLockVersionIfValid(id ProjectIdentifier) (Version, error) {
 
 		if !found {
 			// No match found, which means we're going to be breaking the lock
+			// Still return the invalid version so that is included in the trace
 			s.b.breakLock()
-			return nil, nil
 		}
 	}
 
@@ -1085,7 +1123,7 @@ func (s *solver) unselectedComparator(i, j int) bool {
 	case !ilock && jlock:
 		return false
 	case ilock && jlock:
-		return iname.less(jname)
+		return iname.Less(jname)
 	}
 
 	// Now, sort by number of available versions. This will trigger network
@@ -1114,7 +1152,7 @@ func (s *solver) unselectedComparator(i, j int) bool {
 	}
 
 	// Finally, if all else fails, fall back to comparing by name
-	return iname.less(jname)
+	return iname.Less(jname)
 }
 
 func (s *solver) fail(id ProjectIdentifier) {
@@ -1210,8 +1248,16 @@ func (s *solver) selectAtom(a atomWithPackages, pkgonly bool) {
 		}
 
 		if len(newp) > 0 {
+			// If there was a previously-established alternate source for this
+			// dependency, but the current atom did not express one (and getting
+			// here means the atom passed the source hot-swapping check - see
+			// checkIdentMatches()), then we have to create the new bmi with the
+			// alternate source. Otherwise, we end up with two discrete project
+			// entries for the project root in the final output, one with the
+			// alternate source, and one without. See #969.
+			id, _ := s.sel.getIdentFor(dep.Ident.ProjectRoot)
 			bmi := bimodalIdentifier{
-				id: dep.Ident,
+				id: id,
 				pl: newp,
 				// This puts in a preferred version if one's in the map, else
 				// drops in the zero value (nil)

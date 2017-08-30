@@ -1,0 +1,10 @@
+{
+  "commands": [
+    ["init", "-no-examples"],
+    ["ensure", "-add", "github.com/sdboyer/deptest@0.8.1", "github.com/sdboyer/deptest@1.0.0"]
+  ],
+  "vendor-final": [
+      "github.com/sdboyer/deptesttres"
+  ],
+  "error-expected": "can only specify rules once per project being added; rules were given at least twice for github.com/sdboyer/deptest"
+}

@@ -528,7 +528,8 @@ func TestHashInputsOverrides(t *testing.T) {
 
 		s, err := Prepare(params, newdepspecSM(basefix.ds, nil))
 		if err != nil {
-			t.Fatalf("(fix: %q) Unexpected error while prepping solver: %s", fix.name, err)
+			t.Errorf("(fix: %q) Unexpected error while prepping solver: %s", fix.name, err)
+			continue
 		}
 
 		h := sha256.New()

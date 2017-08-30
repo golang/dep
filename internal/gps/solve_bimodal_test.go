@@ -353,6 +353,28 @@ var bimodalFixtures = map[string]bimodalFixture{
 			"b 1.0.2",
 		),
 	},
+	"unify project on disjoint package imports + source switching": {
+		ds: []depspec{
+			dsp(mkDepspec("root 0.0.0", "b from baz 1.0.0"),
+				pkg("root", "a", "b"),
+			),
+			dsp(mkDepspec("a 1.0.0"),
+				pkg("a", "b/foo"),
+			),
+			dsp(mkDepspec("b 1.0.0"),
+				pkg("b"),
+				pkg("b/foo"),
+			),
+			dsp(mkDepspec("baz 1.0.0"),
+				pkg("b"),
+				pkg("b/foo"),
+			),
+		},
+		r: mksolution(
+			"a 1.0.0",
+			mklp("b from baz 1.0.0", ".", "foo"),
+		),
+	},
 	"project cycle not involving root": {
 		ds: []depspec{
 			dsp(mkDepspec("root 0.0.0", "a ~1.0.0"),
@@ -885,6 +907,23 @@ var bimodalFixtures = map[string]bimodalFixture{
 			"foo 1.0.0",
 			"bar 1.0.0",
 			"baz 1.0.0",
+		),
+	},
+	"require activates constraints": {
+		ds: []depspec{
+			dsp(mkDepspec("root 0.0.0", "foo 1.0.0", "bar 1.0.0"),
+				pkg("root", "foo")),
+			dsp(mkDepspec("foo 1.0.0"),
+				pkg("foo", "bar")),
+			dsp(mkDepspec("bar 1.0.0"),
+				pkg("bar")),
+			dsp(mkDepspec("bar 1.1.0"),
+				pkg("bar")),
+		},
+		require: []string{"bar"},
+		r: mksolution(
+			"foo 1.0.0",
+			"bar 1.0.0",
 		),
 	},
 	"require subpackage": {

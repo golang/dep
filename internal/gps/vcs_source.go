@@ -40,6 +40,14 @@ func (bs *baseVCSSource) upstreamURL() string {
 	return bs.repo.Remote()
 }
 
+func (bs *baseVCSSource) disambiguateRevision(ctx context.Context, r Revision) (Revision, error) {
+	ci, err := bs.repo.CommitInfo(string(r))
+	if err != nil {
+		return "", err
+	}
+	return Revision(ci.Commit), nil
+}
+
 func (bs *baseVCSSource) getManifestAndLock(ctx context.Context, pr ProjectRoot, r Revision, an ProjectAnalyzer) (Manifest, Lock, error) {
 	err := bs.repo.updateVersion(ctx, r.String())
 	if err != nil {
@@ -107,9 +115,6 @@ func (bs *baseVCSSource) exportRevisionTo(ctx context.Context, r Revision, to st
 		return unwrapVcsErr(err)
 	}
 
-	// TODO(sdboyer) this is a simplistic approach and relying on the tools
-	// themselves might make it faster, but git's the overwhelming case (and has
-	// its own method) so fine for now
 	return fs.CopyDir(bs.repo.LocalPath(), to)
 }
 
@@ -353,6 +358,18 @@ type bzrSource struct {
 	baseVCSSource
 }
 
+func (s *bzrSource) exportRevisionTo(ctx context.Context, rev Revision, to string) error {
+	if err := s.baseVCSSource.exportRevisionTo(ctx, rev, to); err != nil {
+		return err
+	}
+
+	if err := os.RemoveAll(filepath.Join(to, ".bzr")); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (s *bzrSource) listVersions(ctx context.Context) ([]PairedVersion, error) {
 	r := s.repo
 
@@ -397,10 +414,39 @@ func (s *bzrSource) listVersions(ctx context.Context) ([]PairedVersion, error) {
 	return vlist, nil
 }
 
+func (s *bzrSource) disambiguateRevision(ctx context.Context, r Revision) (Revision, error) {
+	// If we used the default baseVCSSource behavior here, we would return the
+	// bazaar revision number, which is not a globally unique identifier - it is
+	// only unique within a branch. This is just the way that
+	// github.com/Masterminds/vcs chooses to handle bazaar. We want a
+	// disambiguated unique ID, though, so we need slightly different behavior:
+	// check whether r doesn't error when we try to look it up. If so, trust that
+	// it's a revision.
+	_, err := s.repo.CommitInfo(string(r))
+	if err != nil {
+		return "", err
+	}
+	return r, nil
+}
+
 // hgSource is a generic hg repository implementation that should work with
 // all standard mercurial servers.
 type hgSource struct {
 	baseVCSSource
+}
+
+func (s *hgSource) exportRevisionTo(ctx context.Context, rev Revision, to string) error {
+	// TODO: use hg instead of the generic approach in
+	// baseVCSSource.exportRevisionTo to make it faster.
+	if err := s.baseVCSSource.exportRevisionTo(ctx, rev, to); err != nil {
+		return err
+	}
+
+	if err := os.RemoveAll(filepath.Join(to, ".hg")); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (s *hgSource) listVersions(ctx context.Context) ([]PairedVersion, error) {

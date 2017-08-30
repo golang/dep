@@ -61,6 +61,7 @@ type SafeWriter struct {
 	lock        *Lock
 	lockDiff    *gps.LockDiff
 	writeVendor bool
+	writeLock   bool
 }
 
 // NewSafeWriter sets up a SafeWriter to write a set of manifest, lock, and
@@ -83,20 +84,25 @@ func NewSafeWriter(manifest *Manifest, oldLock, newLock *Lock, vendor VendorBeha
 		Manifest: manifest,
 		lock:     newLock,
 	}
+
 	if oldLock != nil {
 		if newLock == nil {
 			return nil, errors.New("must provide newLock when oldLock is specified")
 		}
+
 		sw.lockDiff = gps.DiffLocks(oldLock, newLock)
+		if sw.lockDiff != nil {
+			sw.writeLock = true
+		}
+	} else if newLock != nil {
+		sw.writeLock = true
 	}
 
 	switch vendor {
 	case VendorAlways:
 		sw.writeVendor = true
 	case VendorOnChanged:
-		if sw.lockDiff != nil || (newLock != nil && oldLock == nil) {
-			sw.writeVendor = true
-		}
+		sw.writeVendor = sw.lockDiff != nil || (newLock != nil && oldLock == nil)
 	}
 
 	if sw.writeVendor && newLock == nil {
@@ -255,13 +261,13 @@ func (sw SafeWriter) validate(root string, sm gps.SourceManager) error {
 // operations succeeded. It also does its best to roll back if any moves fail.
 // This mostly guarantees that dep cannot exit with a partial write that would
 // leave an undefined state on disk.
-func (sw *SafeWriter) Write(root string, sm gps.SourceManager, examples bool) error {
+func (sw *SafeWriter) Write(root string, sm gps.SourceManager, examples bool, logger *log.Logger) error {
 	err := sw.validate(root, sm)
 	if err != nil {
 		return err
 	}
 
-	if !sw.HasManifest() && !sw.HasLock() && !sw.writeVendor {
+	if !sw.HasManifest() && !sw.writeLock && !sw.writeVendor {
 		// nothing to do
 		return nil
 	}
@@ -295,7 +301,7 @@ func (sw *SafeWriter) Write(root string, sm gps.SourceManager, examples bool) er
 		}
 	}
 
-	if sw.HasLock() {
+	if sw.writeLock {
 		l, err := sw.lock.MarshalTOML()
 		if err != nil {
 			return errors.Wrap(err, "failed to marshal lock to TOML")
@@ -307,7 +313,7 @@ func (sw *SafeWriter) Write(root string, sm gps.SourceManager, examples bool) er
 	}
 
 	if sw.writeVendor {
-		err = gps.WriteDepTree(filepath.Join(td, "vendor"), sw.lock, sm, true)
+		err = gps.WriteDepTree(filepath.Join(td, "vendor"), sw.lock, sm, true, logger)
 		if err != nil {
 			return errors.Wrap(err, "error while writing out vendor tree")
 		}
@@ -348,7 +354,7 @@ func (sw *SafeWriter) Write(root string, sm gps.SourceManager, examples bool) er
 		}
 	}
 
-	if sw.HasLock() {
+	if sw.writeLock {
 		if _, err := os.Stat(lpath); err == nil {
 			// Move out the old one.
 			tmploc := filepath.Join(td, LockName+".orig")
@@ -412,24 +418,30 @@ fail:
 }
 
 // PrintPreparedActions logs the actions a call to Write would perform.
-func (sw *SafeWriter) PrintPreparedActions(output *log.Logger) error {
+func (sw *SafeWriter) PrintPreparedActions(output *log.Logger, verbose bool) error {
 	if sw.HasManifest() {
-		output.Printf("Would have written the following %s:\n", ManifestName)
-		m, err := sw.Manifest.MarshalTOML()
-		if err != nil {
-			return errors.Wrap(err, "ensure DryRun cannot serialize manifest")
+		if verbose {
+			m, err := sw.Manifest.MarshalTOML()
+			if err != nil {
+				return errors.Wrap(err, "ensure DryRun cannot serialize manifest")
+			}
+			output.Printf("Would have written the following %s:\n%s\n", ManifestName, string(m))
+		} else {
+			output.Printf("Would have written %s.\n", ManifestName)
 		}
-		output.Println(string(m))
 	}
 
-	if sw.HasLock() {
+	if sw.writeLock {
 		if sw.lockDiff == nil {
-			output.Printf("Would have written the following %s:\n", LockName)
-			l, err := sw.lock.MarshalTOML()
-			if err != nil {
-				return errors.Wrap(err, "ensure DryRun cannot serialize lock")
+			if verbose {
+				l, err := sw.lock.MarshalTOML()
+				if err != nil {
+					return errors.Wrap(err, "ensure DryRun cannot serialize lock")
+				}
+				output.Printf("Would have written the following %s:\n%s\n", LockName, string(l))
+			} else {
+				output.Printf("Would have written %s.\n", LockName)
 			}
-			output.Println(string(l))
 		} else {
 			output.Printf("Would have written the following changes to %s:\n", LockName)
 			diff, err := formatLockDiff(*sw.lockDiff)
@@ -441,15 +453,14 @@ func (sw *SafeWriter) PrintPreparedActions(output *log.Logger) error {
 	}
 
 	if sw.writeVendor {
-		output.Println("Would have written the following projects to the vendor directory:")
-		for _, project := range sw.lock.Projects() {
-			prj := project.Ident()
-			rev, _, _ := gps.VersionComponentStrings(project.Version())
-			if prj.Source == "" {
-				output.Printf("%s@%s\n", prj.ProjectRoot, rev)
-			} else {
-				output.Printf("%s -> %s@%s\n", prj.ProjectRoot, prj.Source, rev)
+		if verbose {
+			output.Printf("Would have written the following %d projects to the vendor directory:\n", len(sw.lock.Projects()))
+			lps := sw.lock.Projects()
+			for i, p := range lps {
+				output.Printf("(%d/%d) %s@%s\n", i+1, len(lps), p.Ident(), p.Version())
 			}
+		} else {
+			output.Printf("Would have written %d projects to the vendor directory.\n", len(sw.lock.Projects()))
 		}
 	}
 
