@@ -158,7 +158,7 @@ func (g *godepImporter) buildProjectConstraint(pkg godepPackage) (pc gps.Project
 	pc.Ident = gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot(pkg.ImportPath)}
 	pc.Constraint, err = g.sm.InferConstraint(pkg.Comment, pc.Ident)
 	if err != nil {
-		g.logger.Printf("Unable to interpret revision specifier '%s' for package %s: %s, (using the 'any' constraint instead)\n", pkg.ImportPath, pc.Ident, err.Error())
+		g.logger.Printf("Unable to interpret constraint '%s' for package %s: %s, (using the 'any' constraint instead)\n", pkg.Comment, pc.Ident, err.Error())
 		pc.Constraint = gps.Any()
 	}
 
