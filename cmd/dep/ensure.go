@@ -506,6 +506,10 @@ func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm
 			return errors.Errorf("nothing to -add, %s is already in %s and the project's direct imports or required list", pc.Ident.ProjectRoot, dep.ManifestName)
 		}
 
+		if !gps.IsAny(pc.Constraint) && gps.IsSemverRange(pc.Constraint) {
+			return errors.Errorf("can only specify literal versions via -add command; you provided a version range for %s", pc.Ident.ProjectRoot)
+		}
+
 		err = sm.SyncSourceFor(pc.Ident)
 		if err != nil {
 			return errors.Wrapf(err, "failed to fetch source for %s", pc.Ident.ProjectRoot)
@@ -739,8 +743,9 @@ func getProjectConstraint(arg string, sm gps.SourceManager) (gps.ProjectConstrai
 		return emptyPC, "", errors.Wrapf(err, "could not infer project root from dependency path: %s", arg) // this should go through to the user
 	}
 
+	// note: we are disabling infer-caret behaviour here, add and update need specific versions
 	pi := gps.ProjectIdentifier{ProjectRoot: pr, Source: source}
-	c, err := sm.InferConstraint(versionStr, pi, true)
+	c, err := sm.InferConstraint(versionStr, pi, false)
 	if err != nil {
 		return emptyPC, "", err
 	}

@@ -962,3 +962,28 @@ func testSemverConstraint(t *testing.T, body string) Constraint {
 	}
 	return c
 }
+
+func TestIsSemverRange(t *testing.T) {
+	for _, testcase := range []struct {
+		name       string
+		constraint Constraint
+		expected   bool
+	}{
+		{"Any", Any(), false},
+		{"None", none, false},
+		{"Branch", NewBranch("test"), false},
+		{"Revision", Revision("vitamins"), false},
+		{"Simple Version", testSemverConstraint(t, "1.0.0"), false},
+		{"Explicit Version", testSemverConstraint(t, "=1.0.0"), false},
+		{"Gt Range", testSemverConstraint(t, ">1.0.0"), true},
+		{"Caret Range", testSemverConstraint(t, "^1.0.0"), true},
+		{"Caret Range2", testSemverConstraint(t, "^v1.0.0"), true},
+	} {
+		t.Run(testcase.name, func(t *testing.T) {
+			result := IsSemverRange(testcase.constraint)
+			if result != testcase.expected {
+				t.Errorf("expected %v; got %v", testcase.expected, result)
+			}
+		})
+	}
+}

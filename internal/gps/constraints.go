@@ -393,3 +393,19 @@ func (m ProjectConstraints) override(pr ProjectRoot, pp ProjectProperties) worki
 
 	return wc
 }
+
+// IsSemverRange is a helper that returns whether the given constraint is a range constraint.
+// branches, tags, revisions, and explicit versions should return false.
+func IsSemverRange(c Constraint) bool {
+	sv, ok := c.(semverConstraint)
+
+	if !ok {
+		// its some kind of other branch/tag/revision
+		return false
+	}
+
+	_, isSimpleVersion := sv.c.(semver.Version)
+
+	// semver lib has 2 representations of version - Version and rangedVersion.
+	return !isSimpleVersion
+}
