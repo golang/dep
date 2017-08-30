@@ -1,0 +1,7 @@
+{
+  "commands": [
+    ["init", "-no-examples"],
+    ["ensure", "-add", "github.com/sdboyer/deptestdos@>2.0.0"]
+  ],
+  "error-expected": "-add does not allow semver range for github.com/sdboyer/deptestdos; use an explicit version or add the constraint manually"
+}

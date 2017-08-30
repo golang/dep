@@ -507,7 +507,7 @@ func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm
 		}
 
 		if !gps.IsAny(pc.Constraint) && gps.IsSemverRange(pc.Constraint) {
-			return errors.Errorf("can only specify literal versions via -add command; you provided a version range for %s", pc.Ident.ProjectRoot)
+			return errors.Errorf("-add does not allow semver range for %s; use an explicit version or add the constraint manually", pc.Ident.ProjectRoot)
 		}
 
 		err = sm.SyncSourceFor(pc.Ident)
