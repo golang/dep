@@ -8,8 +8,8 @@
   revision = "54aaeb0023e1f3dcf5f98f31dd8c565457945a12"
 
 [solve-meta]
-  analyzer-name = "dep"
+  analyzer-name = "dep+import"
   analyzer-version = 1
-  inputs-digest = "342afd8c8a616d084eb7b67bf3a891710eca3ce5abc3cf60af0dae4ccfdcd001"
+  inputs-digest = "d77bef4c52240f80ca0feae60aece200a4ed9c4e48456e2b05d64e555d659ed8"
   solver-name = "gps-cdcl"
   solver-version = 1
