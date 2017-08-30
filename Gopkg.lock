@@ -36,7 +36,7 @@
   branch = "master"
   name = "github.com/karrick/godirwalk"
   packages = ["."]
-  revision = "2209ce92518a6de2b4d645eb17c3e74fdbd02c4c"
+  revision = "7f521a0f3f6cb6735babc444d586460aad1131c1"
 
 [[projects]]
   branch = "master"
