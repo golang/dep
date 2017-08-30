@@ -46,6 +46,8 @@ type solution struct {
 	solv Solver
 }
 
+const concurrentWriters = 16
+
 // WriteDepTree takes a basedir and a Lock, and exports all the projects
 // listed in the lock to the appropriate target location within the basedir.
 //
@@ -65,37 +67,91 @@ func WriteDepTree(basedir string, l Lock, sm SourceManager, sv bool, logger *log
 		return err
 	}
 
+	lps := l.Projects()
+
+	type resp struct {
+		i   int
+		err error
+	}
+	respCh := make(chan resp, len(lps))
+	writeCh := make(chan int, len(lps))
+	cancel := make(chan struct{})
+
+	// Queue work.
+	for i := range lps {
+		writeCh <- i
+	}
+	close(writeCh)
+	// Launch writers.
+	writers := concurrentWriters
+	if len(lps) < writers {
+		writers = len(lps)
+	}
 	var wg sync.WaitGroup
-	errCh := make(chan error, len(l.Projects()))
-
-	for _, p := range l.Projects() {
-		wg.Add(1)
-		go func(p LockedProject) {
+	wg.Add(writers)
+	for i := 0; i < writers; i++ {
+		go func() {
 			defer wg.Done()
-			to := filepath.FromSlash(filepath.Join(basedir, string(p.Ident().ProjectRoot)))
-			logger.Printf("Writing out %s@%s", p.Ident().errString(), p.Version())
 
-			if err := sm.ExportProject(p.Ident(), p.Version(), to); err != nil {
-				errCh <- errors.Wrapf(err, "failed to export %s", p.Ident().ProjectRoot)
-				return
-			}
-
-			if sv {
-				err := filepath.Walk(to, stripVendor)
-				if err != nil {
-					errCh <- errors.Wrapf(err, "failed to strip vendor from %s", p.Ident().ProjectRoot)
+			for i := range writeCh {
+				select {
+				case <-cancel:
+					return
+				default:
 				}
+
+				p := lps[i]
+				to := filepath.FromSlash(filepath.Join(basedir, string(p.Ident().ProjectRoot)))
+
+				if err := sm.ExportProject(p.Ident(), p.Version(), to); err != nil {
+					respCh <- resp{i, errors.Wrapf(err, "failed to export %s", p.Ident().ProjectRoot)}
+					continue
+				}
+
+				if sv {
+					select {
+					case <-cancel:
+						return
+					default:
+					}
+
+					if err := filepath.Walk(to, stripVendor); err != nil {
+						respCh <- resp{i, errors.Wrapf(err, "failed to strip vendor from %s", p.Ident().ProjectRoot)}
+						continue
+					}
+				}
+
+				respCh <- resp{i, nil}
 			}
-		}(p)
+		}()
+	}
+	// Monitor writers
+	go func() {
+		wg.Wait()
+		close(respCh)
+	}()
+
+	// Log results and collect errors
+	var errs []error
+	var cnt int
+	for resp := range respCh {
+		cnt++
+		msg := "Wrote"
+		if resp.err != nil {
+			if len(errs) == 0 {
+				close(cancel)
+			}
+			errs = append(errs, resp.err)
+			msg = "Failed to write"
+		}
+		p := lps[resp.i]
+		logger.Printf("(%d/%d) %s %s@%s\n", cnt, len(lps), msg, p.Ident(), p.Version())
 	}
 
-	wg.Wait()
-	close(errCh)
-
-	if len(errCh) > 0 {
+	if len(errs) > 0 {
 		logger.Println("Failed to write dep tree. The following errors occurred:")
-		for err := range errCh {
-			logger.Println(" * ", err)
+		for i, err := range errs {
+			logger.Printf("(%d/%d) %s\n", i+1, len(errs), err)
 		}
 
 		os.RemoveAll(basedir)
