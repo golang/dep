@@ -5,29 +5,64 @@
 package gps
 
 import (
+	"io/ioutil"
+	"log"
 	"sort"
 	"testing"
+	"time"
 
 	"github.com/golang/dep/internal/gps/pkgtree"
+	"github.com/golang/dep/internal/test"
 	"github.com/pkg/errors"
 )
+
+func Test_singleSourceCache(t *testing.T) {
+	newMem := func(*testing.T, string, string) singleSourceCache { return newMemoryCache() }
+	t.Run("mem", singleSourceCacheTest{newCache: newMem}.run)
+
+	epoch := time.Now().Unix()
+	newBolt := func(t *testing.T, cachedir, root string) singleSourceCache {
+		pi := mkPI(root).normalize()
+		c, err := newBoltCache(cachedir, pi, epoch, log.New(test.Writer{t}, "", 0))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return c
+	}
+	t.Run("bolt/open", singleSourceCacheTest{newCache: newBolt}.run)
+	t.Run("bolt/refresh", singleSourceCacheTest{newCache: newBolt, persistent: true}.run)
+}
 
 var testAnalyzerInfo = ProjectAnalyzerInfo{
 	Name:    "test-analyzer",
 	Version: 1,
 }
 
-func TestSingleSourceCache(t *testing.T) {
+type singleSourceCacheTest struct {
+	newCache   func(*testing.T, string, string) singleSourceCache
+	persistent bool
+}
+
+// run tests singleSourceCache methods of caches returned by test.newCache.
+// For test.persistent caches, test.newCache is periodically called mid-test to ensure persistence.
+func (test singleSourceCacheTest) run(t *testing.T) {
 	const root = "example.com/test"
+	cpath, err := ioutil.TempDir("", "singlesourcecache")
+	if err != nil {
+		t.Fatalf("Failed to create temp cache dir: %s", err)
+	}
 
 	t.Run("info", func(t *testing.T) {
 		const rev Revision = "revision"
 
-		c := newMemoryCache()
+		c := test.newCache(t, cpath, root)
+		defer c.close()
 
 		var m Manifest = &cachedManifest{
 			constraints: ProjectConstraints{
-				ProjectRoot("foo"): ProjectProperties{},
+				ProjectRoot("foo"): ProjectProperties{
+					Constraint: Any(),
+				},
 				ProjectRoot("bar"): ProjectProperties{
 					Source:     "whatever",
 					Constraint: testSemverConstraint(t, "> 1.3"),
@@ -35,7 +70,7 @@ func TestSingleSourceCache(t *testing.T) {
 			},
 			overrides: ProjectConstraints{
 				ProjectRoot("b"): ProjectProperties{
-					Constraint: NewVersion("2.0.0"),
+					Constraint: testSemverConstraint(t, "2.0.0"),
 				},
 			},
 			ignored: map[string]bool{
@@ -51,13 +86,18 @@ func TestSingleSourceCache(t *testing.T) {
 			inputHash: []byte("test_hash"),
 			projects: []LockedProject{
 				NewLockedProject(mkPI("github.com/sdboyer/gps"), NewVersion("v0.10.0"), []string{"gps"}),
-				NewLockedProject(mkPI("github.com/sdboyer/gps"), NewVersion("v0.10.0"), nil),
-				NewLockedProject(mkPI("github.com/sdboyer/gps"), NewVersion("v0.10.0"), []string{"gps", "flugle"}),
+				NewLockedProject(mkPI("github.com/sdboyer/gps2"), NewVersion("v0.10.0"), nil),
+				NewLockedProject(mkPI("github.com/sdboyer/gps3"), NewVersion("v0.10.0"), []string{"gps", "flugle"}),
 				NewLockedProject(mkPI("foo"), NewVersion("nada"), []string{"foo"}),
-				NewLockedProject(mkPI("github.com/sdboyer/gps"), NewVersion("v0.10.0"), []string{"flugle", "gps"}),
+				NewLockedProject(mkPI("github.com/sdboyer/gps4"), NewVersion("v0.10.0"), []string{"flugle", "gps"}),
 			},
 		}
 		c.setManifestAndLock(rev, testAnalyzerInfo, m, l)
+
+		if test.persistent {
+			c.close()
+			c = test.newCache(t, cpath, root)
+		}
 
 		gotM, gotL, ok := c.getManifestAndLock(rev, testAnalyzerInfo)
 		if !ok {
@@ -71,12 +111,13 @@ func TestSingleSourceCache(t *testing.T) {
 		m = &cachedManifest{
 			constraints: ProjectConstraints{
 				ProjectRoot("foo"): ProjectProperties{
-					Source: "whatever",
+					Source:     "whatever",
+					Constraint: Any(),
 				},
 			},
 			overrides: ProjectConstraints{
 				ProjectRoot("bar"): ProjectProperties{
-					Constraint: NewVersion("2.0.0"),
+					Constraint: testSemverConstraint(t, "2.0.0"),
 				},
 			},
 			ignored: map[string]bool{
@@ -92,11 +133,16 @@ func TestSingleSourceCache(t *testing.T) {
 			inputHash: []byte("different_test_hash"),
 			projects: []LockedProject{
 				NewLockedProject(mkPI("github.com/sdboyer/gps"), NewVersion("v0.10.0").Pair("278a227dfc3d595a33a77ff3f841fd8ca1bc8cd0"), []string{"gps"}),
-				NewLockedProject(mkPI("github.com/sdboyer/gps"), NewVersion("v0.11.0"), []string{"gps"}),
-				NewLockedProject(mkPI("github.com/sdboyer/gps"), Revision("278a227dfc3d595a33a77ff3f841fd8ca1bc8cd0"), []string{"gps"}),
+				NewLockedProject(mkPI("github.com/sdboyer/gps2"), NewVersion("v0.11.0"), []string{"gps"}),
+				NewLockedProject(mkPI("github.com/sdboyer/gps3"), Revision("278a227dfc3d595a33a77ff3f841fd8ca1bc8cd0"), []string{"gps"}),
 			},
 		}
 		c.setManifestAndLock(rev, testAnalyzerInfo, m, l)
+
+		if test.persistent {
+			c.close()
+			c = test.newCache(t, cpath, root)
+		}
 
 		gotM, gotL, ok = c.getManifestAndLock(rev, testAnalyzerInfo)
 		if !ok {
@@ -109,12 +155,18 @@ func TestSingleSourceCache(t *testing.T) {
 	})
 
 	t.Run("pkgTree", func(t *testing.T) {
-		c := newMemoryCache()
+		c := test.newCache(t, cpath, root)
+		defer c.close()
 
 		const rev Revision = "rev_adsfjkl"
 
 		if got, ok := c.getPackageTree(rev); ok {
 			t.Fatalf("unexpected result before setting package tree: %v", got)
+		}
+
+		if test.persistent {
+			c.close()
+			c = test.newCache(t, cpath, root)
 		}
 
 		pt := pkgtree.PackageTree{
@@ -147,11 +199,21 @@ func TestSingleSourceCache(t *testing.T) {
 		}
 		c.setPackageTree(rev, pt)
 
+		if test.persistent {
+			c.close()
+			c = test.newCache(t, cpath, root)
+		}
+
 		got, ok := c.getPackageTree(rev)
 		if !ok {
 			t.Errorf("no package tree found:\n\t(WNT): %#v", pt)
 		}
 		comparePackageTree(t, pt, got)
+
+		if test.persistent {
+			c.close()
+			c = test.newCache(t, cpath, root)
+		}
 
 		pt = pkgtree.PackageTree{
 			ImportRoot: root,
@@ -163,6 +225,11 @@ func TestSingleSourceCache(t *testing.T) {
 		}
 		c.setPackageTree(rev, pt)
 
+		if test.persistent {
+			c.close()
+			c = test.newCache(t, cpath, root)
+		}
+
 		got, ok = c.getPackageTree(rev)
 		if !ok {
 			t.Errorf("no package tree found:\n\t(WNT): %#v", pt)
@@ -171,7 +238,8 @@ func TestSingleSourceCache(t *testing.T) {
 	})
 
 	t.Run("versions", func(t *testing.T) {
-		c := newMemoryCache()
+		c := test.newCache(t, cpath, root)
+		defer c.close()
 
 		const rev1, rev2 = "rev1", "rev2"
 		const br, ver = "branch_name", "2.10"
@@ -181,6 +249,11 @@ func TestSingleSourceCache(t *testing.T) {
 		}
 		SortPairedForDowngrade(versions)
 		c.setVersionMap(versions)
+
+		if test.persistent {
+			c.close()
+			c = test.newCache(t, cpath, root)
+		}
 
 		t.Run("getAllVersions", func(t *testing.T) {
 			got := c.getAllVersions()
@@ -270,6 +343,10 @@ func TestSingleSourceCache(t *testing.T) {
 
 // compareManifests compares two manifests and reports differences as test errors.
 func compareManifests(t *testing.T, want, got Manifest) {
+	if (want == nil || got == nil) && (got != nil || want != nil) {
+		t.Errorf("one manifest is nil:\n\t(GOT): %#v\n\t(WNT): %#v", got, want)
+		return
+	}
 	{
 		want, got := want.DependencyConstraints(), got.DependencyConstraints()
 		if !projectConstraintsEqual(want, got) {
