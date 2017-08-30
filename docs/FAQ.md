@@ -26,6 +26,7 @@ Summarize the question and quote the reply, linking back to the original comment
 * [How does `dep` handle symbolic links?](#how-does-dep-handle-symbolic-links)
 * [Does `dep` support relative imports?](#does-dep-support-relative-imports)
 * [How do I make `dep` resolve dependencies from my `GOPATH`?](#how-do-i-make-dep-resolve-dependencies-from-my-gopath)
+* [How do I use `dep` with Docker?](#how-do-i-make-dep-resolve-dependencies-from-my-gopath)
 
 ## Best Practices
 * [Should I commit my vendor directory?](#should-i-commit-my-vendor-directory)
@@ -287,6 +288,38 @@ For a refresher on Go's recommended workspace organization, see the ["How To Wri
 `dep init` provides an option to scan the `GOPATH` for dependencies by doing
 `dep init -gopath`, which falls back to network mode when the packages are not
 found in `GOPATH`. `dep ensure` doesn't work with projects in `GOPATH`.
+
+## How do I use `dep` with Docker?
+
+`dep ensure -vendor-only` creates the vendor folder from a valid `Gopkg.toml` and `Gopkg.lock` without checking for Go code.
+This is especially useful for builds inside docker utilizing cache layers.
+
+Sample dockerfile:
+
+    FROM golang:1.8 AS builder
+
+    RUN apt-get update && apt-get install -y unzip --no-install-recommends && \
+        apt-get autoremove -y && apt-get clean -y && \
+        wget -O dep.zip https://github.com/golang/dep/releases/download/v0.3.0/dep-linux-amd64.zip && \
+        echo '96c191251164b1404332793fb7d1e5d8de2641706b128bf8d65772363758f364  dep.zip' | sha256sum -c - && \
+        unzip -d /usr/bin dep.zip && rm dep.zip
+
+    RUN mkdir -p /go/src/github.com/***
+    WORKDIR /go/src/github.com/***
+
+    COPY Gopkg.toml Gopkg.lock ./
+
+    RUN dep ensure -vendor-only
+    COPY . .
+    RUN CGO_ENABLED=0 GOOS=linux go build -ldflags "-s -w" -a -installsuffix cgo -o *** 
+
+    FROM alpine:latest
+    RUN apk --no-cache add ca-certificates
+
+    WORKDIR /root/
+
+    COPY --from=builder /go/src/github.com/***  .
+    ENTRYPOINT ["./***"]
 
 
 ## Best Practices
