@@ -3,7 +3,6 @@
 package godirwalk
 
 import (
-	"bytes"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -13,7 +12,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-var defaultBufferSize, pageSize int
+var defaultBufferSize, pageSize, maxNameLength int
 
 func init() {
 	pageSize = os.Getpagesize()
@@ -34,11 +33,10 @@ func readdirents(osDirname string, scratchBuffer []byte) (Dirents, error) {
 		scratchBuffer = make([]byte, defaultBufferSize)
 	}
 
-	var nameSlice []byte                                                  // will be updated to point to syscall.Dirent.Name
+	var nameSlice []byte
 	nameSliceHeader := (*reflect.SliceHeader)(unsafe.Pointer(&nameSlice)) // save slice header, so we can re-use each loop
 
 	var de *syscall.Dirent
-	maxNameLength := len(de.Name)
 
 	for {
 		n, err := syscall.ReadDirent(fd, scratchBuffer)
@@ -59,24 +57,21 @@ func readdirents(osDirname string, scratchBuffer []byte) (Dirents, error) {
 				continue // this item has been deleted, but not yet removed from directory
 			}
 
+			// Not every GOOS version of syscall.Dirent provides field that
+			// specifies name length.
+			namlen := updateSliceDirentName(de, &nameSlice, nameSliceHeader)
+			if (namlen == 0) || (namlen == 1 && de.Name[0] == '.') || (namlen == 2 && de.Name[0] == '.' && de.Name[1] == '.') {
+				continue // skip unimportant entries
+			}
+
 			// Convert syscall.Dirent.Name, which is array of int8, to []byte,
 			// by overwriting Cap, Len, and Data slice header fields to values
 			// from syscall.Dirent fields. Setting the Cap, Len, and Data field
 			// values for the slice header modifies what the slice header points
 			// to, and in this case, the name buffer.
-			nameSliceHeader.Cap = maxNameLength
-			nameSliceHeader.Len = maxNameLength
-			nameSliceHeader.Data = uintptr(unsafe.Pointer(&de.Name[0]))
-
-			// Not every GOOS version of syscall.Dirent provides field that
-			// specifies name length, so will need to find the NULL byte.
-			nameLength := bytes.IndexByte(nameSlice, 0)
-			if nameLength >= 0 {
-				if (nameLength == 1 && nameSlice[0] == '.') || (nameLength == 2 && nameSlice[0] == '.' && nameSlice[1] == '.') {
-					continue // skip "." and ".." entries
-				}
-				nameSlice = nameSlice[:nameLength] // trim slice to name length
-			}
+			// nameSliceHeader.Cap = namlen
+			// nameSliceHeader.Len = namlen
+			// nameSliceHeader.Data = uintptr(unsafe.Pointer(&de.Name[0]))
 
 			osChildname := string(nameSlice)
 
