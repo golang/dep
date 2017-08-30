@@ -455,8 +455,9 @@ func (sw *SafeWriter) PrintPreparedActions(output *log.Logger, verbose bool) err
 	if sw.writeVendor {
 		if verbose {
 			output.Printf("Would have written the following %d projects to the vendor directory:\n", len(sw.lock.Projects()))
-			for _, project := range sw.lock.Projects() {
-				output.Println(project)
+			lps := sw.lock.Projects()
+			for i, p := range lps {
+				output.Printf("(%d/%d) %s@%s\n", i+1, len(lps), p.Ident(), p.Version())
 			}
 		} else {
 			output.Printf("Would have written %d projects to the vendor directory.\n", len(sw.lock.Projects()))
