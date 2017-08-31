@@ -4,13 +4,20 @@
 
 package gps
 
-import "strings"
-
 type selection struct {
+	// projects is a stack of the atoms that have currently been selected by the
+	// solver. It can also be thought of as the vertex set of the current
+	// selection graph.
 	projects []selected
-	deps     map[ProjectRoot][]dependency
-	prLenMap map[int][]ProjectRoot
-	vu       *versionUnifier
+	// deps records the set of dependers on a given ProjectRoot. It is
+	// essentially an adjacency list of *inbound* edges.
+	deps map[ProjectRoot][]dependency
+	// foldRoots records a mapping from a canonical, case-folded form of
+	// ProjectRoots to the particular case variant that has currently been
+	// selected.
+	foldRoots map[string]ProjectRoot
+	// The versoinUnifier in use for this solve run.
+	vu *versionUnifier
 }
 
 type selected struct {
@@ -62,26 +69,12 @@ func (s *selection) popSelection() (atomWithPackages, bool) {
 	return sel.a, sel.first
 }
 
+// findCaseConflicts checks to see if the given ProjectRoot has a
+// case-insensitive overlap with another, different ProjectRoot that's already
+// been picked.
 func (s *selection) findCaseConflicts(pr ProjectRoot) (bool, ProjectRoot) {
-	prlist, has := s.prLenMap[len(pr)]
-	if !has {
-		return false, ""
-	}
-
-	// TODO(sdboyer) bug here if it's possible that strings.ToLower() could
-	// change the length of the string
-	lowpr := strings.ToLower(string(pr))
-	for _, existing := range prlist {
-		if lowpr != strings.ToLower(string(existing)) {
-			continue
-		}
-		// If the converted strings match, then whatever we figure out here will
-		// be definitive - we needn't walk the rest of the slice.
-		if pr == existing {
-			return false, ""
-		} else {
-			return true, existing
-		}
+	if current, has := s.foldRoots[toFold(string(pr))]; has && pr != current {
+		return true, current
 	}
 
 	return false, ""
@@ -89,16 +82,22 @@ func (s *selection) findCaseConflicts(pr ProjectRoot) (bool, ProjectRoot) {
 
 func (s *selection) pushDep(dep dependency) {
 	pr := dep.dep.Ident.ProjectRoot
-	s.deps[pr] = append(s.deps[pr], dep)
-	s.prLenMap[len(pr)] = append(s.prLenMap[len(pr)], pr)
+	deps := s.deps[pr]
+	s.deps[pr] = append(deps, dep)
+
+	if len(deps) == 1 {
+		s.foldRoots[toFold(string(pr))] = pr
+	}
 }
 
 func (s *selection) popDep(id ProjectIdentifier) (dep dependency) {
 	deps := s.deps[id.ProjectRoot]
-	dep, s.deps[id.ProjectRoot] = deps[len(deps)-1], deps[:len(deps)-1]
+	dlen := len(deps)
+	if dlen == 1 {
+		delete(s.foldRoots, toFold(string(id.ProjectRoot)))
+	}
 
-	prlist := s.prLenMap[len(id.ProjectRoot)]
-	s.prLenMap[len(id.ProjectRoot)] = prlist[:len(prlist)-1]
+	dep, s.deps[id.ProjectRoot] = deps[dlen-1], deps[:dlen-1]
 	return dep
 }
 
