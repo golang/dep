@@ -18,13 +18,58 @@ import (
 	"github.com/pkg/errors"
 )
 
+// boltCache manages a bolt.DB cache and provides singleSourceCaches.
+type boltCache struct {
+	db     *bolt.DB
+	epoch  int64       // getters will not return values older than this unix timestamp
+	logger *log.Logger // info logging
+}
+
+// newBoltCache returns a new boltCache backed by a BoltDB file under the cache directory.
+func newBoltCache(cd string, epoch int64, logger *log.Logger) (*boltCache, error) {
+	path := sourceCachePath(cd, "bolt") + ".db"
+	dir := filepath.Dir(path)
+	if fi, err := os.Stat(dir); os.IsNotExist(err) {
+		if err := os.MkdirAll(dir, os.ModeDir|os.ModePerm); err != nil {
+			return nil, errors.Wrapf(err, "failed to create source cache directory: %s", dir)
+		}
+	} else if err != nil {
+		return nil, errors.Wrapf(err, "failed to check source cache directory: ", dir)
+	} else if !fi.IsDir() {
+		return nil, errors.Wrapf(err, "source cache path is not directory: %s", dir)
+	}
+	db, err := bolt.Open(path, 0600, &bolt.Options{Timeout: 1 * time.Second})
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to open BoltDB cache file %q", path)
+	}
+	return &boltCache{
+		db:     db,
+		epoch:  epoch,
+		logger: logger,
+	}, nil
+}
+
+// newSingleSourceCache returns a new singleSourceCache for pi.
+func (c *boltCache) newSingleSourceCache(pi ProjectIdentifier) singleSourceCache {
+	return &singleSourceCacheBolt{
+		boltCache:  c,
+		pi:         pi,
+		sourceName: []byte(pi.normalizedSource()),
+	}
+}
+
+// close releases all cache resources.
+func (c *boltCache) close() error {
+	return errors.Wrapf(c.db.Close(), "error closing Bolt database %q", c.db.String())
+}
+
 // singleSourceCacheBolt implements a singleSourceCache backed by a persistent BoltDB file.
 // Version mappings are timestamped, and the `epoch` field limits the age of returned values.
-// Database access methods are safe for concurrent use with each other (excluding close).
+// Database access methods are safe for concurrent use.
 //
 // Implementation:
 //
-// At the top level there are buckets for (1) versions and (2) revisions.
+// Each source has a top-level bucket containing sub-buckets for (1) versions and (2) revisions.
 //
 // 1) Versions buckets hold version keys with revision values:
 //
@@ -54,41 +99,9 @@ import (
 //	Keys: "<sequence_number>"
 //	Values: "branch:<branch>", "defaultBranch:<branch>", "ver:<version>"
 type singleSourceCacheBolt struct {
-	ProjectRoot
-	db     *bolt.DB
-	epoch  int64       // getters will not return values older than this unix timestamp
-	logger *log.Logger // info logging
-}
-
-// newBoltCache returns a new singleSourceCacheBolt backed by a project's BoltDB file under the cache directory.
-func newBoltCache(cd string, pi ProjectIdentifier, epoch int64, logger *log.Logger) (*singleSourceCacheBolt, error) {
-	path := sourceCachePath(cd, pi.normalizedSource()) + ".db"
-	dir := filepath.Dir(path)
-	if fi, err := os.Stat(dir); os.IsNotExist(err) {
-		if err := os.MkdirAll(dir, os.ModeDir|os.ModePerm); err != nil {
-			return nil, errors.Wrapf(err, "failed to create source cache directory: %s", dir)
-		}
-	} else if err != nil {
-		return nil, errors.Wrapf(err, "failed to check source cache directory: ", dir)
-	} else if !fi.IsDir() {
-		return nil, errors.Wrapf(err, "source cache path is not directory: %s", dir)
-	}
-	db, err := bolt.Open(path, 0600, &bolt.Options{Timeout: 1 * time.Second})
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to open BoltDB cache file %q", path)
-	}
-	return &singleSourceCacheBolt{
-		ProjectRoot: pi.ProjectRoot,
-		db:          db,
-		epoch:       epoch,
-		logger:      logger,
-	}, nil
-}
-
-// close releases all database resources.
-// Must not be called concurrently with any other methods.
-func (s *singleSourceCacheBolt) close() error {
-	return errors.Wrapf(s.db.Close(), "error closing Bolt database %q", s.db.String())
+	*boltCache
+	pi         ProjectIdentifier
+	sourceName []byte
 }
 
 func (s *singleSourceCacheBolt) setManifestAndLock(rev Revision, ai ProjectAnalyzerInfo, m Manifest, l Lock) {
@@ -239,7 +252,7 @@ func (s *singleSourceCacheBolt) getPackageTree(rev Revision) (ptree pkgtree.Pack
 		if err != nil {
 			return err
 		}
-		ptree.ImportRoot = string(s.ProjectRoot)
+		ptree.ImportRoot = string(s.pi.ProjectRoot)
 		ptree.Packages = pkgs
 		ok = true
 		return nil
@@ -260,19 +273,19 @@ func (s *singleSourceCacheBolt) markRevisionExists(rev Revision) {
 }
 
 func (s *singleSourceCacheBolt) setVersionMap(pvs []PairedVersion) {
-	err := s.db.Update(func(tx *bolt.Tx) error {
-		if err := cachePrefixDelete(tx, "versions:"); err != nil {
+	err := s.updateSourceBucket(func(src *bolt.Bucket) error {
+		if err := cachePrefixDelete(src, "versions:"); err != nil {
 			return err
 		}
 		vk := cacheTimestampedKey("versions:", time.Now())
-		versions, err := tx.CreateBucket(vk)
+		versions, err := src.CreateBucket(vk)
 		if err != nil {
 			return err
 		}
 
-		c := tx.Cursor()
+		c := src.Cursor()
 		for k, _ := c.Seek(cacheRev); bytes.HasPrefix(k, cacheRev); k, _ = c.Next() {
-			rb := tx.Bucket(k)
+			rb := src.Bucket(k)
 			if err := cachePrefixDelete(rb, "versions:"); err != nil {
 				return err
 			}
@@ -289,7 +302,7 @@ func (s *singleSourceCacheBolt) setVersionMap(pvs []PairedVersion) {
 				return errors.Wrap(err, "failed to put version->revision")
 			}
 
-			b, err := tx.CreateBucketIfNotExists(cacheRevisionName(rev))
+			b, err := src.CreateBucketIfNotExists(cacheRevisionName(rev))
 			if err != nil {
 				return errors.Wrapf(err, "failed to create bucket for revision: %s", rev)
 			}
@@ -344,8 +357,8 @@ func (s *singleSourceCacheBolt) getVersionsFor(rev Revision) (uvs []UnpairedVers
 
 func (s *singleSourceCacheBolt) getAllVersions() []PairedVersion {
 	var pvs []PairedVersion
-	err := s.db.View(func(tx *bolt.Tx) error {
-		versions := cacheFindLatestValid(tx, "versions:", s.epoch)
+	err := s.viewSourceBucket(func(src *bolt.Bucket) error {
+		versions := cacheFindLatestValid(src, "versions:", s.epoch)
 		if versions == nil {
 			return nil
 		}
@@ -367,8 +380,8 @@ func (s *singleSourceCacheBolt) getAllVersions() []PairedVersion {
 }
 
 func (s *singleSourceCacheBolt) getRevisionFor(uv UnpairedVersion) (rev Revision, ok bool) {
-	err := s.db.View(func(tx *bolt.Tx) error {
-		versions := cacheFindLatestValid(tx, "versions:", s.epoch)
+	err := s.viewSourceBucket(func(src *bolt.Bucket) error {
+		versions := cacheFindLatestValid(src, "versions:", s.epoch)
 		if versions == nil {
 			return nil
 		}
@@ -452,10 +465,10 @@ func cacheRevisionName(rev Revision) []byte {
 	return name
 }
 
-// viewRevBucket executes view with rev's bucket, if it exists.
-func (s *singleSourceCacheBolt) viewRevBucket(rev Revision, view func(b *bolt.Bucket) error) error {
+// viewSourceBucket executes view with the source bucket, if it exists.
+func (s *singleSourceCacheBolt) viewSourceBucket(view func(b *bolt.Bucket) error) error {
 	return s.db.View(func(tx *bolt.Tx) error {
-		b := tx.Bucket(cacheRevisionName(rev))
+		b := tx.Bucket(s.sourceName)
 		if b == nil {
 			return nil
 		}
@@ -463,11 +476,33 @@ func (s *singleSourceCacheBolt) viewRevBucket(rev Revision, view func(b *bolt.Bu
 	})
 }
 
-// updateRevBucket executes update with rev's bucket, creating it first if necessary.
-func (s *singleSourceCacheBolt) updateRevBucket(rev Revision, update func(b *bolt.Bucket) error) error {
+// updateSourceBucket executes update with the source bucket, creating it first if necessary.
+func (s *singleSourceCacheBolt) updateSourceBucket(update func(b *bolt.Bucket) error) error {
 	return s.db.Update(func(tx *bolt.Tx) error {
+		b, err := tx.CreateBucketIfNotExists(s.sourceName)
+		if err != nil {
+			return errors.Wrapf(err, "failed to create bucket: %s", s.sourceName)
+		}
+		return update(b)
+	})
+}
+
+// viewRevBucket executes view with rev's bucket for this source, if it exists.
+func (s *singleSourceCacheBolt) viewRevBucket(rev Revision, view func(b *bolt.Bucket) error) error {
+	return s.viewSourceBucket(func(src *bolt.Bucket) error {
+		b := src.Bucket(cacheRevisionName(rev))
+		if b == nil {
+			return nil
+		}
+		return view(b)
+	})
+}
+
+// updateRevBucket executes update with rev's bucket for this source, creating it first if necessary.
+func (s *singleSourceCacheBolt) updateRevBucket(rev Revision, update func(b *bolt.Bucket) error) error {
+	return s.updateSourceBucket(func(src *bolt.Bucket) error {
 		name := cacheRevisionName(rev)
-		b, err := tx.CreateBucketIfNotExists(name)
+		b, err := src.CreateBucketIfNotExists(name)
 		if err != nil {
 			return errors.Wrapf(err, "failed to create bucket: %s", name)
 		}
