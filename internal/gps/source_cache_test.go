@@ -62,8 +62,8 @@ func (test singleSourceCacheTest) run(t *testing.T) {
 			}
 		}()
 
-		var m Manifest = &cachedManifest{
-			constraints: ProjectConstraints{
+		var m Manifest = &simpleRootManifest{
+			c: ProjectConstraints{
 				ProjectRoot("foo"): ProjectProperties{
 					Constraint: Any(),
 				},
@@ -72,23 +72,23 @@ func (test singleSourceCacheTest) run(t *testing.T) {
 					Constraint: testSemverConstraint(t, "> 1.3"),
 				},
 			},
-			overrides: ProjectConstraints{
+			ovr: ProjectConstraints{
 				ProjectRoot("b"): ProjectProperties{
 					Constraint: testSemverConstraint(t, "2.0.0"),
 				},
 			},
-			ignored: map[string]bool{
+			ig: map[string]bool{
 				"a": true,
 				"b": true,
 			},
-			required: map[string]bool{
+			req: map[string]bool{
 				"c": true,
 				"d": true,
 			},
 		}
-		var l Lock = &cachedLock{
-			inputHash: []byte("test_hash"),
-			projects: []LockedProject{
+		var l Lock = &safeLock{
+			h: []byte("test_hash"),
+			p: []LockedProject{
 				NewLockedProject(mkPI("github.com/sdboyer/gps"), NewVersion("v0.10.0"), []string{"gps"}),
 				NewLockedProject(mkPI("github.com/sdboyer/gps2"), NewVersion("v0.10.0"), nil),
 				NewLockedProject(mkPI("github.com/sdboyer/gps3"), NewVersion("v0.10.0"), []string{"gps", "flugle"}),
@@ -114,30 +114,30 @@ func (test singleSourceCacheTest) run(t *testing.T) {
 			t.Errorf("lock differences:\n\t %#v", dl)
 		}
 
-		m = &cachedManifest{
-			constraints: ProjectConstraints{
+		m = &simpleRootManifest{
+			c: ProjectConstraints{
 				ProjectRoot("foo"): ProjectProperties{
 					Source:     "whatever",
 					Constraint: Any(),
 				},
 			},
-			overrides: ProjectConstraints{
+			ovr: ProjectConstraints{
 				ProjectRoot("bar"): ProjectProperties{
 					Constraint: testSemverConstraint(t, "2.0.0"),
 				},
 			},
-			ignored: map[string]bool{
+			ig: map[string]bool{
 				"c": true,
 				"d": true,
 			},
-			required: map[string]bool{
+			req: map[string]bool{
 				"a": true,
 				"b": true,
 			},
 		}
-		l = &cachedLock{
-			inputHash: []byte("different_test_hash"),
-			projects: []LockedProject{
+		l = &safeLock{
+			h: []byte("different_test_hash"),
+			p: []LockedProject{
 				NewLockedProject(mkPI("github.com/sdboyer/gps"), NewVersion("v0.10.0").Pair("278a227dfc3d595a33a77ff3f841fd8ca1bc8cd0"), []string{"gps"}),
 				NewLockedProject(mkPI("github.com/sdboyer/gps2"), NewVersion("v0.11.0"), []string{"gps"}),
 				NewLockedProject(mkPI("github.com/sdboyer/gps3"), Revision("278a227dfc3d595a33a77ff3f841fd8ca1bc8cd0"), []string{"gps"}),
