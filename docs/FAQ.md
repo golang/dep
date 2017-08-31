@@ -26,7 +26,6 @@ Summarize the question and quote the reply, linking back to the original comment
 * [How does `dep` handle symbolic links?](#how-does-dep-handle-symbolic-links)
 * [Does `dep` support relative imports?](#does-dep-support-relative-imports)
 * [How do I make `dep` resolve dependencies from my `GOPATH`?](#how-do-i-make-dep-resolve-dependencies-from-my-gopath)
-* [How do I use `dep` with Docker?](#how-do-i-use-dep-with-docker)
 
 ## Best Practices
 * [Should I commit my vendor directory?](#should-i-commit-my-vendor-directory)
@@ -35,6 +34,7 @@ Summarize the question and quote the reply, linking back to the original comment
 * [Is it OK to make backwards-incompatible changes now?](#is-it-ok-to-make-backwards-incompatible-changes-now)
 * [My dependers don't use `dep` yet. What should I do?](#my-dependers-dont-use-dep-yet-what-should-i-do)
 * [How do I configure a dependency that doesn't tag its releases?](#how-do-i-configure-a-dependency-that-doesnt-tag-its-releases)
+* [How do I use `dep` with Docker?](#how-do-i-use-dep-with-docker)
 
 ## Concepts
 ### Does `dep` replace `go get`?
@@ -289,40 +289,6 @@ For a refresher on Go's recommended workspace organization, see the ["How To Wri
 `dep init -gopath`, which falls back to network mode when the packages are not
 found in `GOPATH`. `dep ensure` doesn't work with projects in `GOPATH`.
 
-## How do I use `dep` with Docker?
-
-`dep ensure -vendor-only` creates the vendor folder from a valid `Gopkg.toml` and `Gopkg.lock` without checking for Go code.
-This is especially useful for builds inside docker utilizing cache layers.
-
-Sample dockerfile:
-
-    FROM golang:1.8 AS builder
-
-    RUN curl -fsSL -o /usr/local/bin/dep https://github.com/golang/dep/releases/download/vX.X.X/dep-linux-amd64 && chmod +x /usr/local/bin/dep
-
-    RUN mkdir -p /go/src/github.com/***
-    WORKDIR /go/src/github.com/***
-
-    COPY Gopkg.toml Gopkg.lock ./
-    # copies the Gopkg.toml and Gopkg.lock to WORKDIR
-
-    RUN dep ensure -vendor-only
-    # install the dependencies without checking for go code
-    COPY . .
-    # copies any other required code to the WORKDIR
-    RUN go build -o *** 
-    # the -o flag is used to specify the name of the executable to be installed
-
-    FROM alpine:latest
-    RUN apk --no-cache add ca-certificates
-
-    WORKDIR /root/
-
-    COPY --from=builder /go/src/github.com/***  .
-    # copies only the built executable to the new image
-    ENTRYPOINT ["./***"]
-
-
 ## Best Practices
 ### Should I commit my vendor directory?
 
@@ -407,3 +373,38 @@ stripping out nested `vendor` directories.
 ## How do I configure a dependency that doesn't tag its releases?
 
 Add a constraint to `Gopkg.toml` that specifies `branch: "master"` (or whichever branch you need) in the `[[constraint]]` for that dependency. `dep ensure` will determine the current revision of your dependency's master branch, and place it in `Gopkg.lock` for you. See also: [What is the difference between Gopkg.toml and Gopkg.lock?](#what-is-the-difference-between-gopkgtoml-the-manifest-and-gopkglock-the-lock)
+
+## How do I use `dep` with Docker?
+
+`dep ensure -vendor-only` creates the vendor folder from a valid `Gopkg.toml` and `Gopkg.lock` without checking for Go code.
+This is especially useful for builds inside docker utilizing cache layers.
+
+Sample dockerfile:
+
+    FROM golang:1.8 AS builder
+
+    RUN curl -fsSL -o /usr/local/bin/dep https://github.com/golang/dep/releases/download/vX.X.X/dep-linux-amd64 && chmod +x /usr/local/bin/dep
+
+    RUN mkdir -p /go/src/github.com/***
+    WORKDIR /go/src/github.com/***
+
+    COPY Gopkg.toml Gopkg.lock ./
+    # copies the Gopkg.toml and Gopkg.lock to WORKDIR
+
+    RUN dep ensure -vendor-only
+    # install the dependencies without checking for go code
+    COPY . .
+    # copies any other required code to the WORKDIR
+    RUN go build -o *** 
+    # the -o flag is used to specify the name of the executable to be installed
+
+    FROM alpine:latest
+    RUN apk --no-cache add ca-certificates
+
+    WORKDIR /root/
+
+    COPY --from=builder /go/src/github.com/***  .
+    # copies only the built executable to the new image
+    ENTRYPOINT ["./***"]
+
+
