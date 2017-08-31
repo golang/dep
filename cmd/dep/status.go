@@ -315,7 +315,7 @@ func runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceMana
 	// code from the current project.
 	ptree, err := pkgtree.ListPackages(p.ResolvedAbsRoot, string(p.ImportRoot))
 	if err != nil {
-		return digestMismatch, hasMissingPkgs, errors.Errorf("analysis of local packages failed: %v", err)
+		return digestMismatch, hasMissingPkgs, errors.Wrapf(err, "analysis of local packages failed")
 	}
 
 	// Set up a solver in order to check the InputHash.
@@ -340,7 +340,7 @@ func runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceMana
 
 	s, err := gps.Prepare(params, sm)
 	if err != nil {
-		return digestMismatch, hasMissingPkgs, errors.Errorf("could not set up solver for input hashing: %s", err)
+		return digestMismatch, hasMissingPkgs, errors.Wrapf(err, "could not set up solver for input hashing")
 	}
 
 	cm := collectConstraints(ptree, p, sm)
