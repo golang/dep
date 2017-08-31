@@ -26,7 +26,7 @@ Summarize the question and quote the reply, linking back to the original comment
 * [How does `dep` handle symbolic links?](#how-does-dep-handle-symbolic-links)
 * [Does `dep` support relative imports?](#does-dep-support-relative-imports)
 * [How do I make `dep` resolve dependencies from my `GOPATH`?](#how-do-i-make-dep-resolve-dependencies-from-my-gopath)
-* [How do I use `dep` with Docker?](#how-do-i-make-dep-resolve-dependencies-from-my-gopath)
+* [How do I use `dep` with Docker?](#how-do-i-use-dep-with-docker)
 
 ## Best Practices
 * [Should I commit my vendor directory?](#should-i-commit-my-vendor-directory)
@@ -298,20 +298,20 @@ Sample dockerfile:
 
     FROM golang:1.8 AS builder
 
-    RUN apt-get update && apt-get install -y unzip --no-install-recommends && \
-        apt-get autoremove -y && apt-get clean -y && \
-        wget -O dep.zip https://github.com/golang/dep/releases/download/v0.3.0/dep-linux-amd64.zip && \
-        echo '96c191251164b1404332793fb7d1e5d8de2641706b128bf8d65772363758f364  dep.zip' | sha256sum -c - && \
-        unzip -d /usr/bin dep.zip && rm dep.zip
+    RUN curl -fsSL -o /usr/local/bin/dep https://github.com/golang/dep/releases/download/vX.X.X/dep-linux-amd64 && chmod +x /usr/local/bin/dep
 
     RUN mkdir -p /go/src/github.com/***
     WORKDIR /go/src/github.com/***
 
     COPY Gopkg.toml Gopkg.lock ./
+    # copies the Gopkg.toml and Gopkg.lock to WORKDIR
 
     RUN dep ensure -vendor-only
+    # install the dependencies without checking for go code
     COPY . .
-    RUN CGO_ENABLED=0 GOOS=linux go build -ldflags "-s -w" -a -installsuffix cgo -o *** 
+    # copies any other required code to the WORKDIR
+    RUN go build -o *** 
+    # the -o flag is used to specify the name of the executable to be installed
 
     FROM alpine:latest
     RUN apk --no-cache add ca-certificates
@@ -319,6 +319,7 @@ Sample dockerfile:
     WORKDIR /root/
 
     COPY --from=builder /go/src/github.com/***  .
+    # copies only the built executable to the new image
     ENTRYPOINT ["./***"]
 
 
