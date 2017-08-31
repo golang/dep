@@ -17,17 +17,19 @@ import (
 )
 
 func Test_singleSourceCache(t *testing.T) {
-	newMem := func(*testing.T, string, string) singleSourceCache { return newMemoryCache() }
+	newMem := func(*testing.T, string, string) (singleSourceCache, func() error) {
+		return newMemoryCache(), func() error { return nil }
+	}
 	t.Run("mem", singleSourceCacheTest{newCache: newMem}.run)
 
 	epoch := time.Now().Unix()
-	newBolt := func(t *testing.T, cachedir, root string) singleSourceCache {
+	newBolt := func(t *testing.T, cachedir, root string) (singleSourceCache, func() error) {
 		pi := mkPI(root).normalize()
-		c, err := newBoltCache(cachedir, pi, epoch, log.New(test.Writer{t}, "", 0))
+		bc, err := newBoltCache(cachedir, epoch, log.New(test.Writer{t}, "", 0))
 		if err != nil {
 			t.Fatal(err)
 		}
-		return c
+		return bc.newSingleSourceCache(pi), bc.close
 	}
 	t.Run("bolt/open", singleSourceCacheTest{newCache: newBolt}.run)
 	t.Run("bolt/refresh", singleSourceCacheTest{newCache: newBolt, persistent: true}.run)
@@ -39,7 +41,7 @@ var testAnalyzerInfo = ProjectAnalyzerInfo{
 }
 
 type singleSourceCacheTest struct {
-	newCache   func(*testing.T, string, string) singleSourceCache
+	newCache   func(*testing.T, string, string) (cache singleSourceCache, close func() error)
 	persistent bool
 }
 
@@ -55,9 +57,9 @@ func (test singleSourceCacheTest) run(t *testing.T) {
 	t.Run("info", func(t *testing.T) {
 		const rev Revision = "revision"
 
-		c := test.newCache(t, cpath, root)
+		c, close := test.newCache(t, cpath, root)
 		defer func() {
-			if err := c.close(); err != nil {
+			if err := close(); err != nil {
 				t.Fatal("failed to close cache:", err)
 			}
 		}()
@@ -99,10 +101,10 @@ func (test singleSourceCacheTest) run(t *testing.T) {
 		c.setManifestAndLock(rev, testAnalyzerInfo, m, l)
 
 		if test.persistent {
-			if err := c.close(); err != nil {
+			if err := close(); err != nil {
 				t.Fatal("failed to close cache:", err)
 			}
-			c = test.newCache(t, cpath, root)
+			c, close = test.newCache(t, cpath, root)
 		}
 
 		gotM, gotL, ok := c.getManifestAndLock(rev, testAnalyzerInfo)
@@ -146,10 +148,10 @@ func (test singleSourceCacheTest) run(t *testing.T) {
 		c.setManifestAndLock(rev, testAnalyzerInfo, m, l)
 
 		if test.persistent {
-			if err := c.close(); err != nil {
+			if err := close(); err != nil {
 				t.Fatal("failed to close cache:", err)
 			}
-			c = test.newCache(t, cpath, root)
+			c, close = test.newCache(t, cpath, root)
 		}
 
 		gotM, gotL, ok = c.getManifestAndLock(rev, testAnalyzerInfo)
@@ -163,9 +165,9 @@ func (test singleSourceCacheTest) run(t *testing.T) {
 	})
 
 	t.Run("pkgTree", func(t *testing.T) {
-		c := test.newCache(t, cpath, root)
+		c, close := test.newCache(t, cpath, root)
 		defer func() {
-			if err := c.close(); err != nil {
+			if err := close(); err != nil {
 				t.Fatal("failed to close cache:", err)
 			}
 		}()
@@ -177,10 +179,10 @@ func (test singleSourceCacheTest) run(t *testing.T) {
 		}
 
 		if test.persistent {
-			if err := c.close(); err != nil {
+			if err := close(); err != nil {
 				t.Fatal("failed to close cache:", err)
 			}
-			c = test.newCache(t, cpath, root)
+			c, close = test.newCache(t, cpath, root)
 		}
 
 		pt := pkgtree.PackageTree{
@@ -214,10 +216,10 @@ func (test singleSourceCacheTest) run(t *testing.T) {
 		c.setPackageTree(rev, pt)
 
 		if test.persistent {
-			if err := c.close(); err != nil {
+			if err := close(); err != nil {
 				t.Fatal("failed to close cache:", err)
 			}
-			c = test.newCache(t, cpath, root)
+			c, close = test.newCache(t, cpath, root)
 		}
 
 		got, ok := c.getPackageTree(rev)
@@ -227,10 +229,10 @@ func (test singleSourceCacheTest) run(t *testing.T) {
 		comparePackageTree(t, pt, got)
 
 		if test.persistent {
-			if err := c.close(); err != nil {
+			if err := close(); err != nil {
 				t.Fatal("failed to close cache:", err)
 			}
-			c = test.newCache(t, cpath, root)
+			c, close = test.newCache(t, cpath, root)
 		}
 
 		pt = pkgtree.PackageTree{
@@ -244,10 +246,10 @@ func (test singleSourceCacheTest) run(t *testing.T) {
 		c.setPackageTree(rev, pt)
 
 		if test.persistent {
-			if err := c.close(); err != nil {
+			if err := close(); err != nil {
 				t.Fatal("failed to close cache:", err)
 			}
-			c = test.newCache(t, cpath, root)
+			c, close = test.newCache(t, cpath, root)
 		}
 
 		got, ok = c.getPackageTree(rev)
@@ -258,9 +260,9 @@ func (test singleSourceCacheTest) run(t *testing.T) {
 	})
 
 	t.Run("versions", func(t *testing.T) {
-		c := test.newCache(t, cpath, root)
+		c, close := test.newCache(t, cpath, root)
 		defer func() {
-			if err := c.close(); err != nil {
+			if err := close(); err != nil {
 				t.Fatal("failed to close cache:", err)
 			}
 		}()
@@ -275,10 +277,10 @@ func (test singleSourceCacheTest) run(t *testing.T) {
 		c.setVersionMap(versions)
 
 		if test.persistent {
-			if err := c.close(); err != nil {
+			if err := close(); err != nil {
 				t.Fatal("failed to close cache:", err)
 			}
-			c = test.newCache(t, cpath, root)
+			c, close = test.newCache(t, cpath, root)
 		}
 
 		t.Run("getAllVersions", func(t *testing.T) {

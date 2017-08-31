@@ -65,13 +65,7 @@ func newSourceCoordinator(superv *supervisor, deducer deducer, cachedir string, 
 	}
 }
 
-func (sc *sourceCoordinator) close() {
-	for k, v := range sc.srcs {
-		if err := v.close(); err != nil {
-			sc.logger.Println(errors.Wrapf(err, "error closing source gateway for %q", k))
-		}
-	}
-}
+func (sc *sourceCoordinator) close() {}
 
 func (sc *sourceCoordinator) getSourceGatewayFor(ctx context.Context, id ProjectIdentifier) (*sourceGateway, error) {
 	if sc.supervisor.getLifetimeContext().Err() != nil {
@@ -209,10 +203,6 @@ func newSourceGateway(maybe maybeSource, superv *supervisor, cachedir string) *s
 	sg.cache = sg.createSingleSourceCache()
 
 	return sg
-}
-
-func (sg *sourceGateway) close() error {
-	return errors.Wrap(sg.cache.close(), "error closing cache")
 }
 
 func (sg *sourceGateway) syncLocal(ctx context.Context) error {

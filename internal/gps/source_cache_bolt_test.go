@@ -24,11 +24,12 @@ func TestBoltCacheTimeout(t *testing.T) {
 	logger := log.New(test.Writer{t}, "", 0)
 
 	start := time.Now()
-	c, err := newBoltCache(cpath, pi, start.Unix(), logger)
+	bc, err := newBoltCache(cpath, start.Unix(), logger)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer c.close()
+	defer bc.close()
+	c := bc.newSingleSourceCache(pi)
 
 	rev := Revision("test")
 	ai := ProjectAnalyzerInfo{Name: "name", Version: 42}
@@ -132,7 +133,7 @@ func TestBoltCacheTimeout(t *testing.T) {
 		}
 	}
 
-	if err := c.close(); err != nil {
+	if err := bc.close(); err != nil {
 		t.Fatal("failed to close cache:", err)
 	}
 
@@ -143,10 +144,11 @@ func TestBoltCacheTimeout(t *testing.T) {
 			// Ensure a future timestamp.
 			after = start.Add(10 * time.Second)
 		}
-		c, err = newBoltCache(cpath, pi, after.Unix(), logger)
+		bc, err = newBoltCache(cpath, after.Unix(), logger)
 		if err != nil {
 			t.Fatal(err)
 		}
+		c = bc.newSingleSourceCache(pi)
 
 		gotM, gotL, ok := c.getManifestAndLock(rev, ai)
 		if !ok {
@@ -169,15 +171,16 @@ func TestBoltCacheTimeout(t *testing.T) {
 		}
 	}
 
-	if err := c.close(); err != nil {
+	if err := bc.close(); err != nil {
 		t.Fatal("failed to close cache:", err)
 	}
 
 	// Re-connect with the original epoch.
-	c, err = newBoltCache(cpath, pi, start.Unix(), logger)
+	bc, err = newBoltCache(cpath, start.Unix(), logger)
 	if err != nil {
 		t.Fatal(err)
 	}
+	c = bc.newSingleSourceCache(pi)
 	// Read values timestamped > `start`.
 	{
 		gotM, gotL, ok := c.getManifestAndLock(rev, ai)
