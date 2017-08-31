@@ -33,8 +33,8 @@ func TestBoltCacheTimeout(t *testing.T) {
 	rev := Revision("test")
 	ai := ProjectAnalyzerInfo{Name: "name", Version: 42}
 
-	manifest := &cachedManifest{
-		constraints: ProjectConstraints{
+	manifest := &simpleRootManifest{
+		c: ProjectConstraints{
 			ProjectRoot("foo"): ProjectProperties{
 				Constraint: Any(),
 			},
@@ -43,16 +43,16 @@ func TestBoltCacheTimeout(t *testing.T) {
 				Constraint: testSemverConstraint(t, "> 1.3"),
 			},
 		},
-		overrides: ProjectConstraints{
+		ovr: ProjectConstraints{
 			ProjectRoot("b"): ProjectProperties{
 				Constraint: testSemverConstraint(t, "2.0.0"),
 			},
 		},
 	}
 
-	lock := &cachedLock{
-		inputHash: []byte("test_hash"),
-		projects: []LockedProject{
+	lock := &safeLock{
+		h: []byte("test_hash"),
+		p: []LockedProject{
 			NewLockedProject(mkPI("github.com/sdboyer/gps"), NewVersion("v0.10.0"), []string{"gps"}),
 			NewLockedProject(mkPI("github.com/sdboyer/gps2"), NewVersion("v0.10.0"), nil),
 			NewLockedProject(mkPI("github.com/sdboyer/gps3"), NewVersion("v0.10.0"), []string{"gps", "flugle"}),
@@ -205,8 +205,8 @@ func TestBoltCacheTimeout(t *testing.T) {
 	}
 
 	// New values.
-	newManifest := &cachedManifest{
-		constraints: ProjectConstraints{
+	newManifest := &simpleRootManifest{
+		c: ProjectConstraints{
 			ProjectRoot("foo"): ProjectProperties{
 				Constraint: NewBranch("master"),
 			},
@@ -217,9 +217,9 @@ func TestBoltCacheTimeout(t *testing.T) {
 		},
 	}
 
-	newLock := &cachedLock{
-		inputHash: []byte("new_test_hash"),
-		projects: []LockedProject{
+	newLock := &safeLock{
+		h: []byte("new_test_hash"),
+		p: []LockedProject{
 			NewLockedProject(mkPI("github.com/sdboyer/gps"), NewVersion("v1"), []string{"gps"}),
 		},
 	}

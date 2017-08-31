@@ -225,39 +225,3 @@ func (c *singleSourceCacheMemory) toUnpaired(v Version) (UnpairedVersion, bool) 
 		panic(fmt.Sprintf("unknown version type %T", v))
 	}
 }
-
-// cachedManifest implements RootManifest and is populated from cached data.
-type cachedManifest struct {
-	constraints, overrides ProjectConstraints
-	ignored, required      map[string]bool
-}
-
-func (m *cachedManifest) DependencyConstraints() ProjectConstraints {
-	return m.constraints
-}
-
-func (m *cachedManifest) Overrides() ProjectConstraints {
-	return m.overrides
-}
-
-func (m *cachedManifest) IgnoredPackages() map[string]bool {
-	return m.ignored
-}
-
-func (m *cachedManifest) RequiredPackages() map[string]bool {
-	return m.required
-}
-
-// cachedManifest implements Lock and is populated from cached data.
-type cachedLock struct {
-	inputHash []byte
-	projects  []LockedProject
-}
-
-func (l *cachedLock) InputHash() []byte {
-	return l.inputHash
-}
-
-func (l *cachedLock) Projects() []LockedProject {
-	return l.projects
-}

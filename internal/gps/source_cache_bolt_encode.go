@@ -195,11 +195,11 @@ func cachePutManifest(b *bolt.Bucket, m Manifest) error {
 
 // cacheGetManifest returns a new RootManifest with the data retrieved from the bolt.Bucket.
 func cacheGetManifest(b *bolt.Bucket) (RootManifest, error) {
-	m := &cachedManifest{
-		constraints: make(ProjectConstraints),
-		overrides:   make(ProjectConstraints),
-		ignored:     make(map[string]bool),
-		required:    make(map[string]bool),
+	m := &simpleRootManifest{
+		c:   make(ProjectConstraints),
+		ovr: make(ProjectConstraints),
+		ig:  make(map[string]bool),
+		req: make(map[string]bool),
 	}
 
 	// Constraints
@@ -209,7 +209,7 @@ func cacheGetManifest(b *bolt.Bucket) (RootManifest, error) {
 			if err != nil {
 				return err
 			}
-			m.constraints[ip] = pp
+			m.c[ip] = pp
 			return nil
 		})
 		if err != nil {
@@ -220,7 +220,7 @@ func cacheGetManifest(b *bolt.Bucket) (RootManifest, error) {
 	// Ignored
 	if ig := b.Get([]byte("ig")); len(ig) > 0 {
 		for _, ip := range splitString(string(ig), ",") {
-			m.ignored[ip] = true
+			m.ig[ip] = true
 		}
 	}
 
@@ -231,7 +231,7 @@ func cacheGetManifest(b *bolt.Bucket) (RootManifest, error) {
 			if err != nil {
 				return err
 			}
-			m.overrides[ip] = pp
+			m.ovr[ip] = pp
 			return nil
 		})
 		if err != nil {
@@ -242,7 +242,7 @@ func cacheGetManifest(b *bolt.Bucket) (RootManifest, error) {
 	// Required
 	if req := b.Get([]byte("req")); len(req) > 0 {
 		for _, ip := range splitString(string(req), ",") {
-			m.required[ip] = true
+			m.req[ip] = true
 		}
 	}
 
@@ -319,10 +319,10 @@ func cachePutLock(b *bolt.Bucket, l Lock) error {
 	return nil
 }
 
-// cacheGetLock returns a new *cacheLock with the fields retrieved from the bolt.Bucket.
-func cacheGetLock(b *bolt.Bucket) (*cachedLock, error) {
-	l := &cachedLock{
-		inputHash: b.Get([]byte("hash")),
+// cacheGetLock returns a new *safeLock with the fields retrieved from the bolt.Bucket.
+func cacheGetLock(b *bolt.Bucket) (*safeLock, error) {
+	l := &safeLock{
+		h: b.Get([]byte("hash")),
 	}
 	c := b.Cursor()
 	p := []byte("lock:")
@@ -332,7 +332,7 @@ func cacheGetLock(b *bolt.Bucket) (*cachedLock, error) {
 			return nil, errors.Wrap(err, "failed to get lock")
 		}
 		lp.pi.ProjectRoot = ProjectRoot(bytes.TrimPrefix(k, p))
-		l.projects = append(l.projects, lp)
+		l.p = append(l.p, lp)
 	}
 	return l, nil
 }
