@@ -15,12 +15,32 @@ import (
 	"github.com/pkg/errors"
 )
 
+const (
+	importerTestProject              = "github.com/carolynvs/deptest-importers"
+	importerTestProjectSrc           = "https://github.com/carolynvs/deptest-importers.git"
+	importerTestUntaggedRev          = "9b670d143bfb4a00f7461451d5c4a62f80e9d11d"
+	importerTestUntaggedRevAbbrv     = "v1.0.0-1-g9b670d1"
+	importerTestBeta1Tag             = "beta1"
+	importerTestBeta1Rev             = "7913ab26988c6fb1e16225f845a178e8849dd254"
+	importerTestV2Branch             = "v2"
+	importerTestV2Rev                = "45dcf5a09c64b48b6e836028a3bc672b19b9d11d"
+	importerTestV2PatchTag           = "v2.0.0-alpha1"
+	importerTestV2PatchRev           = "347760b50204948ea63e531dd6560e56a9adde8f"
+	importerTestV1Tag                = "v1.0.0"
+	importerTestV1Rev                = "d0c29640b17f77426b111f4c1640d716591aa70e"
+	importerTestV1PatchTag           = "v1.0.2"
+	importerTestV1PatchRev           = "788963efe22e3e6e24c776a11a57468bb2fcd780"
+	importerTestV1Constraint         = "^1.0.0"
+	importerTestMultiTaggedRev       = "34cf993cc346f65601fe4356dd68bd54d20a1bfe"
+	importerTestMultiTaggedSemverTag = "v1.0.4"
+	importerTestMultiTaggedPlainTag  = "stable"
+)
+
 // convertTestCase is a common set of validations applied to the result
 // of an importer converting from an external config format to dep's.
 type convertTestCase struct {
 	defaultConstraintFromLock bool
 	wantConvertErr            bool
-	wantProjectRoot           gps.ProjectRoot
 	wantSourceRepo            string
 	wantConstraint            string
 	wantRevision              gps.Revision
@@ -30,16 +50,30 @@ type convertTestCase struct {
 
 func TestBaseImporter_IsTag(t *testing.T) {
 	testcases := map[string]struct {
+		input     string
 		wantIsTag bool
 		wantTag   gps.Version
 	}{
-		// TODO(carolynvs): need repo with a non-semver tag
-		"v1.0.0": {wantIsTag: true, wantTag: gps.NewVersion("v1.0.0").Pair("ff2948a2ac8f538c4ecd55962e919d1e13e74baf")},
-		"3f4c3bea144e112a69bbe5d8d01c1b09a544253f": {wantIsTag: false},
-		"master": {wantIsTag: false},
+		"non-semver tag": {
+			input:     importerTestBeta1Tag,
+			wantIsTag: true,
+			wantTag:   gps.NewVersion(importerTestBeta1Tag).Pair(importerTestBeta1Rev),
+		},
+		"semver-tag": {
+			input:     importerTestV1PatchTag,
+			wantIsTag: true,
+			wantTag:   gps.NewVersion(importerTestV1PatchTag).Pair(importerTestV1PatchRev)},
+		"untagged revision": {
+			input:     importerTestUntaggedRev,
+			wantIsTag: false,
+		},
+		"branch name": {
+			input:     importerTestV2Branch,
+			wantIsTag: false,
+		},
 	}
 
-	pi := gps.ProjectIdentifier{ProjectRoot: "github.com/sdboyer/deptest"}
+	pi := gps.ProjectIdentifier{ProjectRoot: importerTestProject}
 	h := test.NewHelper(t)
 	defer h.Cleanup()
 
@@ -48,49 +82,58 @@ func TestBaseImporter_IsTag(t *testing.T) {
 	h.Must(err)
 	defer sm.Release()
 
-	for value, testcase := range testcases {
-		t.Run(value, func(t *testing.T) {
+	for name, testcase := range testcases {
+		t.Run(name, func(t *testing.T) {
 			i := newBaseImporter(discardLogger, false, sm)
 
-			gotIsTag, gotTag, err := i.isTag(pi, value)
+			gotIsTag, gotTag, err := i.isTag(pi, testcase.input)
 			h.Must(err)
 
 			if testcase.wantIsTag != gotIsTag {
-				t.Fatalf("unexpected isVersion result for %v: \n\t(GOT) %v \n\t(WNT) %v", value, gotIsTag, testcase.wantIsTag)
+				t.Fatalf("unexpected isTag result for %v: \n\t(GOT) %v \n\t(WNT) %v",
+					testcase.input, gotIsTag, testcase.wantIsTag)
 			}
 
 			if testcase.wantTag != gotTag {
-				t.Fatalf("unexpected version for %v: \n\t(GOT) %v \n\t(WNT) %v", value, gotTag, testcase.wantTag)
+				t.Fatalf("unexpected tag for %v: \n\t(GOT) %v \n\t(WNT) %v",
+					testcase.input, gotTag, testcase.wantTag)
 			}
 		})
 	}
 }
 
 func TestBaseImporter_LookupVersionForLockedProject(t *testing.T) {
-	lessThanV1, _ := gps.NewSemverConstraint("<1.0.0")
-
 	testcases := map[string]struct {
 		revision    gps.Revision
 		constraint  gps.Constraint
 		wantVersion string
 	}{
 		"match revision to tag": {
-			revision:    "ff2948a2ac8f538c4ecd55962e919d1e13e74baf",
-			wantVersion: "v1.0.0",
+			revision:    importerTestV1PatchRev,
+			wantVersion: importerTestV1PatchTag,
 		},
-		"match revision to multiple tags": {
-			revision:    "ff2948a2ac8f538c4ecd55962e919d1e13e74baf",
-			constraint:  lessThanV1,
-			wantVersion: "v0.8.0",
+		"match revision with multiple tags using constraint": {
+			revision:    importerTestMultiTaggedRev,
+			constraint:  gps.NewVersion(importerTestMultiTaggedPlainTag),
+			wantVersion: importerTestMultiTaggedPlainTag,
 		},
-		"fallback to branch constraint": {
-			revision:    "c575196502940c07bf89fd6d95e83b999162e051",
+		"revision with multiple tags with no constraint defaults to best match": {
+			revision:    importerTestMultiTaggedRev,
+			wantVersion: importerTestMultiTaggedSemverTag,
+		},
+		"revision with multiple tags with nonmatching constraint defaults to best match": {
+			revision:    importerTestMultiTaggedRev,
+			constraint:  gps.NewVersion("thismatchesnothing"),
+			wantVersion: importerTestMultiTaggedSemverTag,
+		},
+		"untagged revision fallback to branch constraint": {
+			revision:    importerTestUntaggedRev,
 			constraint:  gps.NewBranch("master"),
 			wantVersion: "master",
 		},
 		"fallback to revision": {
-			revision:    "c575196502940c07bf89fd6d95e83b999162e051",
-			wantVersion: "c575196502940c07bf89fd6d95e83b999162e051",
+			revision:    importerTestUntaggedRev,
+			wantVersion: importerTestUntaggedRev,
 		},
 	}
 
@@ -102,7 +145,8 @@ func TestBaseImporter_LookupVersionForLockedProject(t *testing.T) {
 	h.Must(err)
 	defer sm.Release()
 
-	pi := gps.ProjectIdentifier{ProjectRoot: "github.com/sdboyer/deptest"}
+	pi := gps.ProjectIdentifier{ProjectRoot: importerTestProject}
+	sm.SyncSourceFor(pi)
 
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
@@ -119,209 +163,223 @@ func TestBaseImporter_LookupVersionForLockedProject(t *testing.T) {
 }
 
 func TestBaseImporter_ImportProjects(t *testing.T) {
+
 	testcases := map[string]struct {
 		convertTestCase
 		projects []importedPackage
 	}{
-		"constraint only": {
+		"tag constraints are ignored": {
 			convertTestCase{
-				wantProjectRoot: "github.com/sdboyer/deptestdos",
-				wantConstraint:  "master",
+				wantConstraint: "*",
+				wantVersion:    importerTestBeta1Tag,
+				wantRevision:   importerTestBeta1Rev,
 			},
 			[]importedPackage{
 				{
-					Name:           "github.com/sdboyer/deptestdos",
-					ConstraintHint: "master", // make a repo with a tag that isn't semver, e.g. beta1
+					Name:           importerTestProject,
+					LockHint:       importerTestBeta1Rev,
+					ConstraintHint: importerTestBeta1Tag,
 				},
 			},
 		},
-		"untagged revision ignores tag constraint": {
+		"tag lock hints lock to tagged revision": {
 			convertTestCase{
-				wantProjectRoot: "github.com/sdboyer/deptestdos",
-				wantConstraint:  "*",
-				wantRevision:    "5eff28fbbf20a75c9ea1140a3d71338648dad508",
+				wantConstraint: "*",
+				wantVersion:    importerTestBeta1Tag,
+				wantRevision:   importerTestBeta1Rev,
 			},
 			[]importedPackage{
 				{
-					Name:           "github.com/sdboyer/deptestdos",
-					LockHint:       "5eff28fbbf20a75c9ea1140a3d71338648dad508",
-					ConstraintHint: "TODO", // make a repo with a tag that isn't semver, e.g. beta1
+					Name:     importerTestProject,
+					LockHint: importerTestBeta1Tag,
 				},
 			},
 		},
 		"untagged revision ignores range constraint": {
 			convertTestCase{
-				wantProjectRoot: "github.com/sdboyer/deptestdos",
-				wantConstraint:  "*",
-				wantRevision:    "5eff28fbbf20a75c9ea1140a3d71338648dad508",
+				wantConstraint: "*",
+				wantRevision:   importerTestUntaggedRev,
 			},
 			[]importedPackage{
 				{
-					Name:           "github.com/sdboyer/deptestdos",
-					LockHint:       "5eff28fbbf20a75c9ea1140a3d71338648dad508",
-					ConstraintHint: "2.0.0",
+					Name:           importerTestProject,
+					LockHint:       importerTestUntaggedRev,
+					ConstraintHint: importerTestV1Constraint,
 				},
 			},
 		},
 		"untagged revision keeps branch constraint": {
 			convertTestCase{
-				wantProjectRoot: "github.com/sdboyer/deptestdos",
-				wantConstraint:  "master",
-				wantVersion:     "master",
-				wantRevision:    "5eff28fbbf20a75c9ea1140a3d71338648dad508",
+				wantConstraint: "master",
+				wantVersion:    "master",
+				wantRevision:   importerTestUntaggedRev,
 			},
 			[]importedPackage{
 				{
-					Name:           "github.com/sdboyer/deptestdos",
-					LockHint:       "5eff28fbbf20a75c9ea1140a3d71338648dad508",
+					Name:           importerTestProject,
+					LockHint:       importerTestUntaggedRev,
 					ConstraintHint: "master",
 				},
 			},
 		},
-		"HEAD revisions default to the matching branch": {
+		"HEAD revisions default constraint to the matching branch": {
 			convertTestCase{
-				wantProjectRoot: "github.com/sdboyer/deptestdos",
-				wantConstraint:  "*",
-				wantVersion:     "master",
-				wantRevision:    "a0196baa11ea047dd65037287451d36b861b00ea",
+				defaultConstraintFromLock: true,
+				wantConstraint:            importerTestV2Branch,
+				wantVersion:               importerTestV2Branch,
+				wantRevision:              importerTestV2Rev,
 			},
 			[]importedPackage{
 				{
-					Name:     "github.com/sdboyer/deptestdos",
-					LockHint: "a0196baa11ea047dd65037287451d36b861b00ea",
+					Name:     importerTestProject,
+					LockHint: importerTestV2Rev,
 				},
 			},
 		},
 		"Semver tagged revisions default to ^VERSION": {
 			convertTestCase{
 				defaultConstraintFromLock: true,
-				wantProjectRoot:           "github.com/sdboyer/deptest",
-				wantConstraint:            "^1.0.0",
-				wantVersion:               "v1.0.0",
-				wantRevision:              "ff2948a2ac8f538c4ecd55962e919d1e13e74baf",
+				wantConstraint:            importerTestV1Constraint,
+				wantVersion:               importerTestV1Tag,
+				wantRevision:              importerTestV1Rev,
 			},
 			[]importedPackage{
 				{
-					Name:     "github.com/sdboyer/deptest",
-					LockHint: "ff2948a2ac8f538c4ecd55962e919d1e13e74baf",
+					Name:     importerTestProject,
+					LockHint: importerTestV1Rev,
 				},
 			},
 		},
 		"Semver lock hint defaults constraint to ^VERSION": {
 			convertTestCase{
 				defaultConstraintFromLock: true,
-				wantProjectRoot:           "github.com/sdboyer/deptest",
-				wantConstraint:            "^1.0.0",
-				wantVersion:               "v1.0.0",
-				wantRevision:              "ff2948a2ac8f538c4ecd55962e919d1e13e74baf",
+				wantConstraint:            importerTestV1Constraint,
+				wantVersion:               importerTestV1Tag,
+				wantRevision:              importerTestV1Rev,
 			},
 			[]importedPackage{
 				{
-					Name:     "github.com/sdboyer/deptest",
-					LockHint: "v1.0.0",
+					Name:     importerTestProject,
+					LockHint: importerTestV1Tag,
 				},
 			},
 		},
 		"Semver constraint hint": {
 			convertTestCase{
-				wantProjectRoot: "github.com/sdboyer/deptest",
-				wantConstraint:  ">0.8.0",
-				wantVersion:     "v1.0.0",
-				wantRevision:    "ff2948a2ac8f538c4ecd55962e919d1e13e74baf",
+				wantConstraint: importerTestV1Constraint,
+				wantVersion:    importerTestV1PatchTag,
+				wantRevision:   importerTestV1PatchRev,
 			},
 			[]importedPackage{
 				{
-					Name:           "github.com/sdboyer/deptest",
-					LockHint:       "ff2948a2ac8f538c4ecd55962e919d1e13e74baf",
-					ConstraintHint: ">0.8.0",
+					Name:           importerTestProject,
+					LockHint:       importerTestV1PatchRev,
+					ConstraintHint: importerTestV1Constraint,
+				},
+			},
+		},
+		"Semver prerelease lock hint": {
+			convertTestCase{
+				wantConstraint: importerTestV2Branch,
+				wantVersion:    importerTestV2PatchTag,
+				wantRevision:   importerTestV2PatchRev,
+			},
+			[]importedPackage{
+				{
+					Name:           importerTestProject,
+					LockHint:       importerTestV2PatchRev,
+					ConstraintHint: importerTestV2Branch,
 				},
 			},
 		},
 		"Revision constraints are ignored": {
 			convertTestCase{
-				wantProjectRoot: "github.com/sdboyer/deptest",
-				wantConstraint:  "*",
-				wantVersion:     "v1.0.0",
-				wantRevision:    "ff2948a2ac8f538c4ecd55962e919d1e13e74baf",
+				wantConstraint: "*",
+				wantVersion:    importerTestV1Tag,
+				wantRevision:   importerTestV1Rev,
 			},
 			[]importedPackage{
 				{
-					Name:           "github.com/sdboyer/deptest",
-					LockHint:       "ff2948a2ac8f538c4ecd55962e919d1e13e74baf",
-					ConstraintHint: "ff2948a2ac8f538c4ecd55962e919d1e13e74baf",
+					Name:           importerTestProject,
+					LockHint:       importerTestV1Rev,
+					ConstraintHint: importerTestV1Rev,
 				},
 			},
 		},
 		"Branch constraint hint": {
 			convertTestCase{
-				wantProjectRoot: "github.com/sdboyer/deptest",
-				wantConstraint:  "master",
-				wantVersion:     "v0.8.1",
-				wantRevision:    "3f4c3bea144e112a69bbe5d8d01c1b09a544253f",
+				wantConstraint: "master",
+				wantVersion:    importerTestV1Tag,
+				wantRevision:   importerTestV1Rev,
 			},
 			[]importedPackage{
 				{
-					Name:           "github.com/sdboyer/deptest",
-					LockHint:       "3f4c3bea144e112a69bbe5d8d01c1b09a544253f",
+					Name:           importerTestProject,
+					LockHint:       importerTestV1Rev,
 					ConstraintHint: "master",
 				},
 			},
 		},
 		"Non-matching semver constraint is ignored": {
 			convertTestCase{
-				wantProjectRoot: "github.com/sdboyer/deptest",
-				wantConstraint:  "*",
-				wantVersion:     "v0.8.1",
-				wantRevision:    "3f4c3bea144e112a69bbe5d8d01c1b09a544253f",
+				wantConstraint: "*",
+				wantVersion:    importerTestV1Tag,
+				wantRevision:   importerTestV1Rev,
 			},
 			[]importedPackage{
 				{
-					Name:           "github.com/sdboyer/deptest",
-					LockHint:       "3f4c3bea144e112a69bbe5d8d01c1b09a544253f",
+					Name:           importerTestProject,
+					LockHint:       importerTestV1Rev,
 					ConstraintHint: "^2.0.0",
+				},
+			},
+		},
+		"git describe constraint is ignored": {
+			convertTestCase{
+				wantConstraint: "*",
+				wantRevision:   importerTestUntaggedRev,
+			},
+			[]importedPackage{
+				{
+					Name:           importerTestProject,
+					LockHint:       importerTestUntaggedRev,
+					ConstraintHint: importerTestUntaggedRevAbbrv,
 				},
 			},
 		},
 		"consolidate subpackages under root": {
 			convertTestCase{
-				wantProjectRoot: "github.com/carolynvs/deptest-subpkg",
-				wantConstraint:  "master",
-				wantVersion:     "master",
-				wantRevision:    "6c41d90f78bb1015696a2ad591debfa8971512d5",
+				wantConstraint: "master",
+				wantVersion:    "master",
+				wantRevision:   importerTestUntaggedRev,
 			},
 			[]importedPackage{
 				{
-					Name:           "github.com/carolynvs/deptest-subpkg/subby",
+					Name:           importerTestProject + "/subpkA",
 					ConstraintHint: "master",
 				},
 				{
-					Name:     "github.com/carolynvs/deptest-subpkg",
-					LockHint: "6c41d90f78bb1015696a2ad591debfa8971512d5",
+					Name:     importerTestProject,
+					LockHint: importerTestUntaggedRev,
 				},
 			},
 		},
 		"ignore duplicate packages": {
 			convertTestCase{
-				wantProjectRoot: "github.com/carolynvs/deptest-subpkg",
-				wantConstraint:  "*",
-				wantRevision:    "6c41d90f78bb1015696a2ad591debfa8971512d5",
+				wantConstraint: "*",
+				wantRevision:   importerTestUntaggedRev,
 			},
 			[]importedPackage{
 				{
-					Name:     "github.com/carolynvs/deptest-subpkg/supkg1",
-					LockHint: "6c41d90f78bb1015696a2ad591debfa8971512d5", // first wins
+					Name:     importerTestProject + "/subpkgA",
+					LockHint: importerTestUntaggedRev, // first wins
 				},
 				{
-					Name:     "github.com/carolynvs/deptest-subpkg/supkg2",
-					LockHint: "b90e5f3a888585ea5df81d3fe0c81fc6e3e3d70b",
+					Name:     importerTestProject + "/subpkgB",
+					LockHint: importerTestV1Rev,
 				},
 			},
 		},
-
-		// TODO: classify v1.12.0-gabc123 testcase
-		// TODO: unhelpful constraints like "HEAD"
-		// TODO: unhelpful locks like a revision that doesn't exist
-		// * Versions that don't satisfy the constraint, drop the constraint.
 	}
 
 	h := test.NewHelper(t)
@@ -375,10 +433,10 @@ func validateConvertTestCase(testCase convertTestCase, manifest *dep.Manifest, l
 	}
 
 	if testCase.wantConstraint != "" {
-		d, ok := manifest.Constraints[testCase.wantProjectRoot]
+		d, ok := manifest.Constraints[importerTestProject]
 		if !ok {
 			return errors.Errorf("Expected the manifest to have a dependency for '%v'",
-				testCase.wantProjectRoot)
+				importerTestProject)
 		}
 
 		gotConstraint := d.Constraint.String()
@@ -407,9 +465,9 @@ func validateConvertTestCase(testCase convertTestCase, manifest *dep.Manifest, l
 		lp := lock.P[0]
 
 		gotProjectRoot := lp.Ident().ProjectRoot
-		if gotProjectRoot != testCase.wantProjectRoot {
+		if gotProjectRoot != importerTestProject {
 			return errors.Errorf("unexpected root project in lock: \n\t(GOT) %v \n\t(WNT) %v",
-				gotProjectRoot, testCase.wantProjectRoot)
+				gotProjectRoot, importerTestProject)
 		}
 
 		gotSource := lp.Ident().Source

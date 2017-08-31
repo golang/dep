@@ -41,92 +41,70 @@ func TestGlideConfig_Convert(t *testing.T) {
 			glideYaml{
 				Imports: []glidePackage{
 					{
-						Name:       "github.com/sdboyer/deptest",
-						Repository: "https://github.com/sdboyer/deptest.git",
-						Reference:  "v1.0.0",
+						Name:       importerTestProject,
+						Repository: importerTestProjectSrc,
+						Reference:  importerTestV2Branch,
 					},
 				},
 			},
 			glideLock{
 				Imports: []glideLockedPackage{
 					{
-						Name:       "github.com/sdboyer/deptest",
-						Repository: "https://github.com/sdboyer/deptest.git",
-						Revision:   "ff2948a2ac8f538c4ecd55962e919d1e13e74baf",
+						Name:       importerTestProject,
+						Repository: importerTestProjectSrc,
+						Revision:   importerTestV2PatchRev,
 					},
 				},
 			},
 			convertTestCase{
-				wantProjectRoot: "github.com/sdboyer/deptest",
-				wantSourceRepo:  "https://github.com/sdboyer/deptest.git",
-				wantConstraint:  "^1.0.0",
-				wantRevision:    "ff2948a2ac8f538c4ecd55962e919d1e13e74baf",
-				wantVersion:     "v1.0.0",
+				wantSourceRepo: importerTestProjectSrc,
+				wantConstraint: importerTestV2Branch,
+				wantRevision:   importerTestV2PatchRev,
+				wantVersion:    importerTestV2PatchTag,
 			},
 		},
 		"test project": {
 			glideYaml{
-				TestImports: []glidePackage{
-					{
-						Name:      "github.com/sdboyer/deptest",
-						Reference: "v1.0.0",
-					},
-				},
-			},
-			glideLock{
-				TestImports: []glideLockedPackage{
-					{
-						Name:     "github.com/sdboyer/deptest",
-						Revision: "ff2948a2ac8f538c4ecd55962e919d1e13e74baf",
-					},
-				},
-			},
-			convertTestCase{
-				wantProjectRoot: "github.com/sdboyer/deptest",
-				wantConstraint:  "^1.0.0",
-				wantVersion:     "v1.0.0",
-				wantRevision:    "ff2948a2ac8f538c4ecd55962e919d1e13e74baf",
-			},
-		},
-		"revision only": {
-			glideYaml{
 				Imports: []glidePackage{
 					{
-						Name: "github.com/sdboyer/deptest",
+						Name:       importerTestProject,
+						Repository: importerTestProjectSrc,
+						Reference:  importerTestV2Branch,
 					},
 				},
 			},
 			glideLock{
 				Imports: []glideLockedPackage{
 					{
-						Name:     "github.com/sdboyer/deptest",
-						Revision: "ff2948a2ac8f538c4ecd55962e919d1e13e74baf",
+						Name:       importerTestProject,
+						Repository: importerTestProjectSrc,
+						Revision:   importerTestV2PatchRev,
 					},
 				},
 			},
 			convertTestCase{
-				wantProjectRoot: "github.com/sdboyer/deptest",
-				wantConstraint:  "*",
-				wantRevision:    "ff2948a2ac8f538c4ecd55962e919d1e13e74baf",
-				wantVersion:     "v1.0.0",
+				wantSourceRepo: importerTestProjectSrc,
+				wantConstraint: importerTestV2Branch,
+				wantRevision:   importerTestV2PatchRev,
+				wantVersion:    importerTestV2PatchTag,
 			},
 		},
-		"with ignored package": {
+		"ignored package": {
 			glideYaml{
-				Ignores: []string{"github.com/sdboyer/deptest"},
+				Ignores: []string{importerTestProject},
 			},
 			glideLock{},
 			convertTestCase{
-				wantIgnored: []string{"github.com/sdboyer/deptest"},
+				wantIgnored: []string{importerTestProject},
 			},
 		},
-		"with exclude dir": {
+		"exclude dir": {
 			glideYaml{
 				ExcludeDirs: []string{"samples"},
 			},
 			glideLock{},
 			convertTestCase{
-				wantIgnored: []string{"github.com/golang/notexist/samples"},
+				wantIgnored: []string{testProjectRoot + "/samples"},
 			},
 		},
 		"exclude dir ignores mismatched package name": {
@@ -136,10 +114,10 @@ func TestGlideConfig_Convert(t *testing.T) {
 			},
 			glideLock{},
 			convertTestCase{
-				wantIgnored: []string{"github.com/golang/notexist/samples"},
+				wantIgnored: []string{testProjectRoot + "/samples"},
 			},
 		},
-		"bad input, empty package name": {
+		"missing package name": {
 			glideYaml{
 				Imports: []glidePackage{{Name: ""}},
 			},

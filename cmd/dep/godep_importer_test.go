@@ -22,59 +22,38 @@ func TestGodepConfig_Convert(t *testing.T) {
 		convertTestCase
 		json godepJSON
 	}{
-		"convert project": {
+		"package without comment": {
 			convertTestCase{
-				wantProjectRoot: "github.com/sdboyer/deptest",
-				wantConstraint:  "^0.8.0",
-				wantRevision:    "ff2948a2ac8f538c4ecd55962e919d1e13e74baf",
-				wantVersion:     "v0.8.0",
+				wantConstraint: importerTestV1Constraint,
+				wantRevision:   importerTestV1Rev,
+				wantVersion:    importerTestV1Tag,
 			},
 			godepJSON{
 				Imports: []godepPackage{
 					{
-						ImportPath: "github.com/sdboyer/deptest",
-						// This revision has 2 versions attached to it, v1.0.0 & v0.8.0.
-						Rev:     "ff2948a2ac8f538c4ecd55962e919d1e13e74baf",
-						Comment: "v0.8.0",
+						ImportPath: importerTestProject,
+						Rev:        importerTestV1Rev,
 					},
 				},
 			},
 		},
-		"with semver suffix": {
+		"package with comment": {
 			convertTestCase{
-				wantProjectRoot: "github.com/sdboyer/deptest",
-				wantConstraint:  "^1.12.0-12-g2fd980e",
-				wantVersion:     "v1.0.0",
-				wantRevision:    "ff2948a2ac8f538c4ecd55962e919d1e13e74baf",
+				wantConstraint: importerTestV2Branch,
+				wantRevision:   importerTestV2PatchRev,
+				wantVersion:    importerTestV2PatchTag,
 			},
 			godepJSON{
 				Imports: []godepPackage{
 					{
-						ImportPath: "github.com/sdboyer/deptest",
-						Rev:        "ff2948a2ac8f538c4ecd55962e919d1e13e74baf",
-						Comment:    "v1.12.0-12-g2fd980e",
+						ImportPath: importerTestProject,
+						Rev:        importerTestV2PatchRev,
+						Comment:    importerTestV2Branch,
 					},
 				},
 			},
 		},
-		"empty comment": {
-			convertTestCase{
-				wantProjectRoot: "github.com/sdboyer/deptest",
-				wantConstraint:  "^1.0.0",
-				wantRevision:    "ff2948a2ac8f538c4ecd55962e919d1e13e74baf",
-				wantVersion:     "v1.0.0",
-			},
-			godepJSON{
-				Imports: []godepPackage{
-					{
-						ImportPath: "github.com/sdboyer/deptest",
-						// This revision has 2 versions attached to it, v1.0.0 & v0.8.0.
-						Rev: "ff2948a2ac8f538c4ecd55962e919d1e13e74baf",
-					},
-				},
-			},
-		},
-		"bad input - empty package name": {
+		"missing package name": {
 			convertTestCase{
 				wantConvertErr: true,
 			},
@@ -82,36 +61,14 @@ func TestGodepConfig_Convert(t *testing.T) {
 				Imports: []godepPackage{{ImportPath: ""}},
 			},
 		},
-		"bad input - empty revision": {
+		"missing revision": {
 			convertTestCase{
 				wantConvertErr: true,
 			},
 			godepJSON{
 				Imports: []godepPackage{
 					{
-						ImportPath: "github.com/sdboyer/deptest",
-					},
-				},
-			},
-		},
-		"sub-packages": {
-			convertTestCase{
-				wantProjectRoot: "github.com/sdboyer/deptest",
-				wantConstraint:  "^1.0.0",
-				wantVersion:     "v1.0.0",
-				wantRevision:    "ff2948a2ac8f538c4ecd55962e919d1e13e74baf",
-			},
-			godepJSON{
-				Imports: []godepPackage{
-					{
-						ImportPath: "github.com/sdboyer/deptest",
-						// This revision has 2 versions attached to it, v1.0.0 & v0.8.0.
-						Rev: "ff2948a2ac8f538c4ecd55962e919d1e13e74baf",
-					},
-					{
-						ImportPath: "github.com/sdboyer/deptest/foo",
-						// This revision has 2 versions attached to it, v1.0.0 & v0.8.0.
-						Rev: "ff2948a2ac8f538c4ecd55962e919d1e13e74baf",
+						ImportPath: importerTestProject,
 					},
 				},
 			},
@@ -128,7 +85,7 @@ func TestGodepConfig_Convert(t *testing.T) {
 
 	for name, testCase := range testCases {
 		t.Run(name, func(t *testing.T) {
-			g := newGodepImporter(discardLogger, true, sm)
+			g := newGodepImporter(discardLogger, false, sm)
 			g.json = testCase.json
 
 			manifest, lock, convertErr := g.convert(testProjectRoot)

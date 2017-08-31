@@ -20,23 +20,22 @@ func TestGovendConfig_Convert(t *testing.T) {
 		yaml govendYAML
 		convertTestCase
 	}{
-		"project": {
+		"package": {
 			govendYAML{
 				Imports: []govendPackage{
 					{
-						Path:     "github.com/sdboyer/deptest",
-						Revision: "ff2948a2ac8f538c4ecd55962e919d1e13e74baf",
+						Path:     importerTestProject,
+						Revision: importerTestV1Rev,
 					},
 				},
 			},
 			convertTestCase{
-				wantProjectRoot: "github.com/sdboyer/deptest",
-				wantConstraint:  "^1.0.0",
-				wantRevision:    "ff2948a2ac8f538c4ecd55962e919d1e13e74baf",
-				wantVersion:     "v1.0.0",
+				wantConstraint: importerTestV1Constraint,
+				wantRevision:   importerTestV1Rev,
+				wantVersion:    importerTestV1Tag,
 			},
 		},
-		"bad input - empty package name": {
+		"missing package name": {
 			govendYAML{
 				Imports: []govendPackage{
 					{
@@ -49,11 +48,11 @@ func TestGovendConfig_Convert(t *testing.T) {
 			},
 		},
 
-		"bad input - empty revision": {
+		"missing revision": {
 			govendYAML{
 				Imports: []govendPackage{
 					{
-						Path: "github.com/sdboyer/deptest",
+						Path: importerTestProject,
 					},
 				},
 			},

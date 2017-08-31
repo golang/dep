@@ -22,47 +22,22 @@ func TestVndrConfig_Convert(t *testing.T) {
 		packages []vndrPackage
 		convertTestCase
 	}{
-		"semver reference": {
+		"package": {
 			[]vndrPackage{{
-				importPath: "github.com/sdboyer/deptest",
-				reference:  "v0.8.0",
-				repository: "https://github.com/sdboyer/deptest.git",
+				importPath: importerTestProject,
+				reference:  importerTestV1Rev,
+				repository: importerTestProjectSrc,
 			}},
 			convertTestCase{
-				wantProjectRoot: "github.com/sdboyer/deptest",
-				wantSourceRepo:  "https://github.com/sdboyer/deptest.git",
-				wantConstraint:  "^0.8.0",
-				wantRevision:    "ff2948a2ac8f538c4ecd55962e919d1e13e74baf",
-				wantVersion:     "v0.8.0",
-			},
-		},
-		"revision reference": {
-			[]vndrPackage{{
-				importPath: "github.com/sdboyer/deptest",
-				reference:  "ff2948a2ac8f538c4ecd55962e919d1e13e74baf",
-			}},
-			convertTestCase{
-				wantProjectRoot: "github.com/sdboyer/deptest",
-				wantConstraint:  "^1.0.0",
-				wantVersion:     "v1.0.0",
-				wantRevision:    "ff2948a2ac8f538c4ecd55962e919d1e13e74baf",
-			},
-		},
-		"untagged revision reference": {
-			[]vndrPackage{{
-				importPath: "github.com/carolynvs/deptest-subpkg",
-				reference:  "6c41d90f78bb1015696a2ad591debfa8971512d5",
-			}},
-			convertTestCase{
-				wantProjectRoot: "github.com/carolynvs/deptest-subpkg",
-				wantConstraint:  "*",
-				wantVersion:     "",
-				wantRevision:    "6c41d90f78bb1015696a2ad591debfa8971512d5",
+				wantSourceRepo: importerTestProjectSrc,
+				wantConstraint: importerTestV1Constraint,
+				wantRevision:   importerTestV1Rev,
+				wantVersion:    importerTestV1Tag,
 			},
 		},
 		"missing importPath": {
 			[]vndrPackage{{
-				reference: "v1.0.0",
+				reference: importerTestV1Tag,
 			}},
 			convertTestCase{
 				wantConvertErr: true,
@@ -70,7 +45,7 @@ func TestVndrConfig_Convert(t *testing.T) {
 		},
 		"missing reference": {
 			[]vndrPackage{{
-				importPath: "github.com/sdboyer/deptest",
+				importPath: importerTestProject,
 			}},
 			convertTestCase{
 				wantConvertErr: true,
