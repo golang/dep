@@ -28,32 +28,27 @@ func TestIntegration(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	for _, dirName := range []string{
-		"harness_tests",
-		"init_path_tests",
-	} {
-		relPath := filepath.Join("testdata", dirName)
-		filepath.Walk(relPath, func(path string, info os.FileInfo, err error) error {
-			if err != nil {
-				t.Fatal("error walking filepath")
-			}
+	relPath := "testdata/harness_tests"
+	filepath.Walk(relPath, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			t.Fatal("error walking filepath")
+		}
 
-			if filepath.Base(path) != "testcase.json" {
-				return nil
-			}
-
-			parse := strings.Split(path, string(filepath.Separator))
-			testName := strings.Join(parse[2:len(parse)-1], "/")
-			t.Run(testName, func(t *testing.T) {
-				t.Parallel()
-
-				t.Run("external", testIntegration(testName, relPath, wd, true, execCmd))
-				t.Run("internal", testIntegration(testName, relPath, wd, false, runMain))
-			})
-
+		if filepath.Base(path) != "testcase.json" {
 			return nil
+		}
+
+		parse := strings.Split(path, string(filepath.Separator))
+		testName := strings.Join(parse[2:len(parse)-1], "/")
+		t.Run(testName, func(t *testing.T) {
+			t.Parallel()
+
+			t.Run("external", testIntegration(testName, relPath, wd, true, execCmd))
+			t.Run("internal", testIntegration(testName, relPath, wd, false, runMain))
 		})
-	}
+
+		return nil
+	})
 }
 
 // execCmd is a test.RunFunc which runs the program in another process.
