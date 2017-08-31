@@ -19,7 +19,7 @@ import (
 )
 
 // singleSourceCacheBolt implements a singleSourceCache backed by a persistent BoltDB file.
-// Stored values are timestamped, and the `epoch` field limits the age of returned values.
+// Version mappings are timestamped, and the `epoch` field limits the age of returned values.
 // Database access methods are safe for concurrent use with each other (excluding close).
 //
 // Implementation:
@@ -37,15 +37,14 @@ import (
 //
 //	Bucket: "rev:<revision>"
 //
-// a) Manifest and Lock info are stored in a bucket derived from ProjectAnalyzer.Info:
+// a) Manifest and Lock info are stored in buckets derived from ProjectAnalyzer.Info:
 //
-//	Sub-Bucket: "info:<name>.<version>:<timestamp>"
-//	Sub-Bucket: "manifest", "lock"
+//	Sub-Bucket: "info:<name>.<version>:manifest", "info:<name>.<version>:lock"
 //	Keys/Values: Manifest or Lock fields
 //
 // b) Package tree buckets contain package import path keys and package-or-error buckets:
 //
-//	Sub-Bucket: "ptree:<timestamp>"
+//	Sub-Bucket: "ptree"
 //	Sub-Bucket: "<import_path>"
 //	Key/Values: PackageOrErr fields
 //
@@ -94,17 +93,20 @@ func (s *singleSourceCacheBolt) close() error {
 
 func (s *singleSourceCacheBolt) setManifestAndLock(rev Revision, ai ProjectAnalyzerInfo, m Manifest, l Lock) {
 	err := s.updateRevBucket(rev, func(b *bolt.Bucket) error {
-		pre := "info:" + ai.String() + ":"
-		if err := cachePrefixDelete(b, pre); err != nil {
-			return err
+		mName, lName := cacheInfoNames(ai)
+		if b.Bucket(mName) != nil {
+			if err := b.DeleteBucket(mName); err != nil {
+				return err
+			}
 		}
-		info, err := b.CreateBucket(cacheTimestampedKey(pre, time.Now()))
-		if err != nil {
-			return err
+		if b.Bucket(lName) != nil {
+			if err := b.DeleteBucket(lName); err != nil {
+				return err
+			}
 		}
 
 		// Manifest
-		mb, err := info.CreateBucket([]byte("manifest"))
+		mb, err := b.CreateBucket(mName)
 		if err != nil {
 			return err
 		}
@@ -116,7 +118,7 @@ func (s *singleSourceCacheBolt) setManifestAndLock(rev Revision, ai ProjectAnaly
 		}
 
 		// Lock
-		lb, err := info.CreateBucket([]byte("lock"))
+		lb, err := b.CreateBucket(lName)
 		if err != nil {
 			return err
 		}
@@ -127,15 +129,37 @@ func (s *singleSourceCacheBolt) setManifestAndLock(rev Revision, ai ProjectAnaly
 	}
 }
 
+// cache info bucket prefixes and suffixes.
+var (
+	cacheInfo     = []byte("info:")
+	cacheManifest = []byte(":manifest")
+	cacheLock     = []byte(":lock")
+)
+
+// cacheInfoNames returns the manifest and lock bucket names for ai.
+func cacheInfoNames(ai ProjectAnalyzerInfo) (manifest, lock []byte) {
+	info := ai.String()
+	l := len(cacheInfo) + len(info)
+	manifest = make([]byte, l+len(cacheManifest))
+	lock = make([]byte, l+len(cacheLock))
+
+	copy(manifest, cacheInfo)
+	copy(manifest[len(cacheInfo):], info)
+	copy(manifest[l:], cacheManifest)
+
+	copy(lock, cacheInfo)
+	copy(lock[len(cacheInfo):], info)
+	copy(lock[l:], cacheLock)
+
+	return
+}
+
 func (s *singleSourceCacheBolt) getManifestAndLock(rev Revision, ai ProjectAnalyzerInfo) (m Manifest, l Lock, ok bool) {
 	err := s.viewRevBucket(rev, func(b *bolt.Bucket) error {
-		info := cacheFindLatestValid(b, "info:"+ai.String()+":", s.epoch)
-		if info == nil {
-			return nil
-		}
+		mName, lName := cacheInfoNames(ai)
 
 		// Manifest
-		mb := info.Bucket([]byte("manifest"))
+		mb := b.Bucket(mName)
 		if mb == nil {
 			return nil
 		}
@@ -146,7 +170,7 @@ func (s *singleSourceCacheBolt) getManifestAndLock(rev Revision, ai ProjectAnaly
 		}
 
 		// Lock
-		lb := info.Bucket([]byte("lock"))
+		lb := b.Bucket(lName)
 		if lb == nil {
 			ok = true
 			return nil
@@ -165,12 +189,16 @@ func (s *singleSourceCacheBolt) getManifestAndLock(rev Revision, ai ProjectAnaly
 	return
 }
 
+var cachePTree = []byte("ptree")
+
 func (s *singleSourceCacheBolt) setPackageTree(rev Revision, ptree pkgtree.PackageTree) {
 	err := s.updateRevBucket(rev, func(b *bolt.Bucket) error {
-		if err := cachePrefixDelete(b, "ptree:"); err != nil {
-			return err
+		if b.Bucket(cachePTree) != nil {
+			if err := b.DeleteBucket(cachePTree); err != nil {
+				return err
+			}
 		}
-		ptrees, err := b.CreateBucket(cacheTimestampedKey("ptree:", time.Now()))
+		ptrees, err := b.CreateBucket(cachePTree)
 		if err != nil {
 			return err
 		}
@@ -194,7 +222,7 @@ func (s *singleSourceCacheBolt) setPackageTree(rev Revision, ptree pkgtree.Packa
 
 func (s *singleSourceCacheBolt) getPackageTree(rev Revision) (ptree pkgtree.PackageTree, ok bool) {
 	err := s.viewRevBucket(rev, func(b *bolt.Bucket) error {
-		ptrees := cacheFindLatestValid(b, "ptree:", s.epoch)
+		ptrees := b.Bucket(cachePTree)
 		if ptrees == nil {
 			return nil
 		}

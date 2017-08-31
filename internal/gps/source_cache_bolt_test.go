@@ -95,13 +95,13 @@ func TestBoltCacheTimeout(t *testing.T) {
 		NewVersion("originalver").Pair("rev2"),
 	}
 
-	// Write values timestamped > start.
+	// Write values timestamped > `start`.
 	{
 		c.setManifestAndLock(rev, ai, manifest, lock)
 		c.setPackageTree(rev, ptree)
 		c.setVersionMap(pvs)
 	}
-	// Read back values timestamped > start.
+	// Read back values timestamped > `start`.
 	{
 		gotM, gotL, ok := c.getManifestAndLock(rev, ai)
 		if !ok {
@@ -136,7 +136,7 @@ func TestBoltCacheTimeout(t *testing.T) {
 		t.Fatal("failed to close cache:", err)
 	}
 
-	// Read with a later epoch. Expect no values, since all timestamped < after.
+	// Read with a later epoch. Expect no *timestamped* values, since all were < `after`.
 	{
 		after := time.Now()
 		if after.Unix() <= start.Unix() {
@@ -148,15 +148,20 @@ func TestBoltCacheTimeout(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		m, l, ok := c.getManifestAndLock(rev, ai)
-		if ok {
-			t.Errorf("expected no cached info, but got:\n\tManifest: %#v\n\tLock: %#v\n", m, l)
+		gotM, gotL, ok := c.getManifestAndLock(rev, ai)
+		if !ok {
+			t.Error("no manifest and lock found for revision")
+		}
+		compareManifests(t, manifest, gotM)
+		if dl := DiffLocks(lock, gotL); dl != nil {
+			t.Errorf("lock differences:\n\t %#v", dl)
 		}
 
-		ptree, ok := c.getPackageTree(rev)
-		if ok {
-			t.Errorf("expected no cached package tree, but got:\n\t%#v", ptree)
+		gotPtree, ok := c.getPackageTree(rev)
+		if !ok {
+			t.Errorf("no package tree found:\n\t(WNT): %#v", ptree)
 		}
+		comparePackageTree(t, ptree, gotPtree)
 
 		pvs := c.getAllVersions()
 		if len(pvs) > 0 {
@@ -173,7 +178,7 @@ func TestBoltCacheTimeout(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Read values timestamped > start.
+	// Read values timestamped > `start`.
 	{
 		gotM, gotL, ok := c.getManifestAndLock(rev, ai)
 		if !ok {
@@ -255,7 +260,7 @@ func TestBoltCacheTimeout(t *testing.T) {
 		NewBranch("newbranch").Pair("revA"),
 		NewVersion("newver").Pair("revB"),
 	}
-	// Overwrite with new values with newer timestamps.
+	// Overwrite with new values, and with timestamps > `after`.
 	{
 		c.setManifestAndLock(rev, ai, newManifest, newLock)
 		c.setPackageTree(rev, newPtree)
@@ -290,5 +295,30 @@ func TestBoltCacheTimeout(t *testing.T) {
 				}
 			}
 		}
+	}
+}
+
+func TestBoltCacheRevisionName(t *testing.T) {
+	const (
+		rev  = Revision("test")
+		want = "rev:test"
+	)
+	if got := string(cacheRevisionName(rev)); got != want {
+		t.Errorf("unexpected cache revision name: (GOT):%q (WNT):%q", got, want)
+	}
+}
+
+func TestBoltCacheInfoName(t *testing.T) {
+	ai := ProjectAnalyzerInfo{
+		Name:    "name",
+		Version: 42,
+	}
+	const (
+		wantM = "info:name.42:manifest"
+		wantL = "info:name.42:lock"
+	)
+	gotM, gotL := cacheInfoNames(ai)
+	if string(gotM) != wantM || string(gotL) != wantL {
+		t.Errorf("unexpected info revision names: (GOT):%q,%q (WNT):%q,%q", gotM, gotL, wantM, wantL)
 	}
 }
