@@ -533,7 +533,7 @@ func (sm *SourceMgr) InferConstraint(s string, pi ProjectIdentifier) (Constraint
 	var version PairedVersion
 	versions, err := sm.ListVersions(pi)
 	if err != nil {
-		return nil, errors.Wrapf(err, "list versions for %s(%s)", pi.ProjectRoot, pi.Source) // means repo does not exist
+		return nil, errors.Wrapf(err, "list versions for %s", pi) // means repo does not exist
 	}
 	SortPairedForUpgrade(versions)
 	for _, v := range versions {
