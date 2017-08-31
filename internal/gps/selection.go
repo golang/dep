@@ -83,11 +83,11 @@ func (s *selection) findCaseConflicts(pr ProjectRoot) (bool, ProjectRoot) {
 func (s *selection) pushDep(dep dependency) {
 	pr := dep.dep.Ident.ProjectRoot
 	deps := s.deps[pr]
-	s.deps[pr] = append(deps, dep)
-
-	if len(deps) == 1 {
+	if len(deps) == 0 {
 		s.foldRoots[toFold(string(pr))] = pr
 	}
+
+	s.deps[pr] = append(deps, dep)
 }
 
 func (s *selection) popDep(id ProjectIdentifier) (dep dependency) {
