@@ -54,7 +54,7 @@ func (s *solver) check(a atomWithPackages, pkgonly bool) error {
 		if err = s.checkIdentMatches(a, dep); err != nil {
 			return err
 		}
-		if err = s.checkCaseConflicts(a, dep); err != nil {
+		if err = s.checkRootCaseConflicts(a, dep); err != nil {
 			return err
 		}
 		if err = s.checkDepsConstraintsAllowable(a, dep); err != nil {
@@ -221,19 +221,19 @@ func (s *solver) checkIdentMatches(a atomWithPackages, cdep completeDep) error {
 	return nil
 }
 
-// checkCaseConflicts ensures that the ProjectRoot specified in the completeDep
+// checkRootCaseConflicts ensures that the ProjectRoot specified in the completeDep
 // does not have case conflicts with any existing dependencies.
 //
 // We only need to check the ProjectRoot, rather than any packages therein, as
 // the later check for package existence is case-sensitive.
-func (s *solver) checkCaseConflicts(a atomWithPackages, cdep completeDep) error {
+func (s *solver) checkRootCaseConflicts(a atomWithPackages, cdep completeDep) error {
 	pr := cdep.workingConstraint.Ident.ProjectRoot
 	hasConflict, current := s.sel.findCaseConflicts(pr)
 	if !hasConflict {
 		return nil
 	}
 
-	curid, _ := s.sel.getIdentFor(pr)
+	curid, _ := s.sel.getIdentFor(current)
 	deps := s.sel.getDependenciesOn(curid)
 	for _, d := range deps {
 		s.fail(d.depender.id)

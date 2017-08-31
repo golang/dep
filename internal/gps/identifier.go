@@ -217,6 +217,9 @@ type completeDep struct {
 	pl []string
 }
 
+// dependency represents an incomplete edge in the depgraph. It has a
+// fully-realized atom as the depender (the tail/source of the edge), and a set
+// of requirements that any atom to be attached at the head/target must satisfy.
 type dependency struct {
 	depender atom
 	dep      completeDep
