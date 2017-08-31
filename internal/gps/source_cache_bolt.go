@@ -93,7 +93,7 @@ func (s *singleSourceCacheBolt) close() error {
 }
 
 func (s *singleSourceCacheBolt) setManifestAndLock(rev Revision, ai ProjectAnalyzerInfo, m Manifest, l Lock) {
-	err := s.updateBucket("rev:"+string(rev), func(b *bolt.Bucket) error {
+	err := s.updateRevBucket(rev, func(b *bolt.Bucket) error {
 		pre := "info:" + ai.String() + ":"
 		if err := cachePrefixDelete(b, pre); err != nil {
 			return err
@@ -128,7 +128,7 @@ func (s *singleSourceCacheBolt) setManifestAndLock(rev Revision, ai ProjectAnaly
 }
 
 func (s *singleSourceCacheBolt) getManifestAndLock(rev Revision, ai ProjectAnalyzerInfo) (m Manifest, l Lock, ok bool) {
-	err := s.viewBucket("rev:"+string(rev), func(b *bolt.Bucket) error {
+	err := s.viewRevBucket(rev, func(b *bolt.Bucket) error {
 		info := cacheFindLatestValid(b, "info:"+ai.String()+":", s.epoch)
 		if info == nil {
 			return nil
@@ -166,7 +166,7 @@ func (s *singleSourceCacheBolt) getManifestAndLock(rev Revision, ai ProjectAnaly
 }
 
 func (s *singleSourceCacheBolt) setPackageTree(rev Revision, ptree pkgtree.PackageTree) {
-	err := s.updateBucket("rev:"+string(rev), func(b *bolt.Bucket) error {
+	err := s.updateRevBucket(rev, func(b *bolt.Bucket) error {
 		if err := cachePrefixDelete(b, "ptree:"); err != nil {
 			return err
 		}
@@ -193,7 +193,7 @@ func (s *singleSourceCacheBolt) setPackageTree(rev Revision, ptree pkgtree.Packa
 }
 
 func (s *singleSourceCacheBolt) getPackageTree(rev Revision) (ptree pkgtree.PackageTree, ok bool) {
-	err := s.viewBucket("rev:"+string(rev), func(b *bolt.Bucket) error {
+	err := s.viewRevBucket(rev, func(b *bolt.Bucket) error {
 		ptrees := cacheFindLatestValid(b, "ptree:", s.epoch)
 		if ptrees == nil {
 			return nil
@@ -223,7 +223,7 @@ func (s *singleSourceCacheBolt) getPackageTree(rev Revision) (ptree pkgtree.Pack
 }
 
 func (s *singleSourceCacheBolt) markRevisionExists(rev Revision) {
-	err := s.updateBucket("rev:"+string(rev), func(versions *bolt.Bucket) error {
+	err := s.updateRevBucket(rev, func(versions *bolt.Bucket) error {
 		return nil
 	})
 	if err != nil {
@@ -243,8 +243,7 @@ func (s *singleSourceCacheBolt) setVersionMap(pvs []PairedVersion) {
 		}
 
 		c := tx.Cursor()
-		pre := []byte("rev:")
-		for k, _ := c.Seek(pre); bytes.HasPrefix(k, pre); k, _ = c.Next() {
+		for k, _ := c.Seek(cacheRev); bytes.HasPrefix(k, cacheRev); k, _ = c.Next() {
 			rb := tx.Bucket(k)
 			if err := cachePrefixDelete(rb, "versions:"); err != nil {
 				return err
@@ -262,7 +261,7 @@ func (s *singleSourceCacheBolt) setVersionMap(pvs []PairedVersion) {
 				return errors.Wrap(err, "failed to put version->revision")
 			}
 
-			b, err := tx.CreateBucketIfNotExists([]byte("rev:" + rev))
+			b, err := tx.CreateBucketIfNotExists(cacheRevisionName(rev))
 			if err != nil {
 				return errors.Wrapf(err, "failed to create bucket for revision: %s", rev)
 			}
@@ -291,7 +290,7 @@ func (s *singleSourceCacheBolt) setVersionMap(pvs []PairedVersion) {
 }
 
 func (s *singleSourceCacheBolt) getVersionsFor(rev Revision) (uvs []UnpairedVersion, ok bool) {
-	err := s.viewBucket("rev:"+string(rev), func(b *bolt.Bucket) error {
+	err := s.viewRevBucket(rev, func(b *bolt.Bucket) error {
 		versions := cacheFindLatestValid(b, "versions:", s.epoch)
 		if versions == nil {
 			return nil
@@ -385,7 +384,7 @@ func (s *singleSourceCacheBolt) toUnpaired(v Version) (uv UnpairedVersion, ok bo
 	case PairedVersion:
 		return t.Unpair(), true
 	case Revision:
-		err := s.viewBucket("rev:"+string(t), func(b *bolt.Bucket) error {
+		err := s.viewRevBucket(t, func(b *bolt.Bucket) error {
 			versions := cacheFindLatestValid(b, "versions:", s.epoch)
 			if versions == nil {
 				return nil
@@ -414,10 +413,21 @@ func (s *singleSourceCacheBolt) toUnpaired(v Version) (uv UnpairedVersion, ok bo
 	}
 }
 
-// viewBucket executes view with the named bucket, if it exists.
-func (s *singleSourceCacheBolt) viewBucket(name string, view func(b *bolt.Bucket) error) error {
+// cache revision bucket prefix.
+var cacheRev = []byte("rev:")
+
+// cacheRevisionName returns the bucket name for rev.
+func cacheRevisionName(rev Revision) []byte {
+	name := make([]byte, len(cacheRev)+len(rev))
+	copy(name, cacheRev)
+	copy(name[len(cacheRev):], string(rev))
+	return name
+}
+
+// viewRevBucket executes view with rev's bucket, if it exists.
+func (s *singleSourceCacheBolt) viewRevBucket(rev Revision, view func(b *bolt.Bucket) error) error {
 	return s.db.View(func(tx *bolt.Tx) error {
-		b := tx.Bucket([]byte(name))
+		b := tx.Bucket(cacheRevisionName(rev))
 		if b == nil {
 			return nil
 		}
@@ -425,10 +435,11 @@ func (s *singleSourceCacheBolt) viewBucket(name string, view func(b *bolt.Bucket
 	})
 }
 
-// updateBucket executes update with the named bucket, creating it first if necessary.
-func (s *singleSourceCacheBolt) updateBucket(name string, update func(b *bolt.Bucket) error) error {
+// updateRevBucket executes update with rev's bucket, creating it first if necessary.
+func (s *singleSourceCacheBolt) updateRevBucket(rev Revision, update func(b *bolt.Bucket) error) error {
 	return s.db.Update(func(tx *bolt.Tx) error {
-		b, err := tx.CreateBucketIfNotExists([]byte(name))
+		name := cacheRevisionName(rev)
+		b, err := tx.CreateBucketIfNotExists(name)
 		if err != nil {
 			return errors.Wrapf(err, "failed to create bucket: %s", name)
 		}
