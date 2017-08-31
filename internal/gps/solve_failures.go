@@ -27,7 +27,7 @@ func a2vs(a atom) string {
 		return "(root)"
 	}
 
-	return fmt.Sprintf("%s@%s", a.id.errString(), a.v)
+	return fmt.Sprintf("%s@%s", a.id, a.v)
 }
 
 type traceError interface {
@@ -95,7 +95,7 @@ type disjointConstraintFailure struct {
 func (e *disjointConstraintFailure) Error() string {
 	if len(e.failsib) == 1 {
 		str := "Could not introduce %s, as it has a dependency on %s with constraint %s, which has no overlap with existing constraint %s from %s"
-		return fmt.Sprintf(str, a2vs(e.goal.depender), e.goal.dep.Ident.errString(), e.goal.dep.Constraint.String(), e.failsib[0].dep.Constraint.String(), a2vs(e.failsib[0].depender))
+		return fmt.Sprintf(str, a2vs(e.goal.depender), e.goal.dep.Ident, e.goal.dep.Constraint.String(), e.failsib[0].dep.Constraint.String(), a2vs(e.failsib[0].depender))
 	}
 
 	var buf bytes.Buffer
@@ -105,12 +105,12 @@ func (e *disjointConstraintFailure) Error() string {
 		sibs = e.failsib
 
 		str := "Could not introduce %s, as it has a dependency on %s with constraint %s, which has no overlap with the following existing constraints:\n"
-		fmt.Fprintf(&buf, str, a2vs(e.goal.depender), e.goal.dep.Ident.errString(), e.goal.dep.Constraint.String())
+		fmt.Fprintf(&buf, str, a2vs(e.goal.depender), e.goal.dep.Ident, e.goal.dep.Constraint.String())
 	} else {
 		sibs = e.nofailsib
 
 		str := "Could not introduce %s, as it has a dependency on %s with constraint %s, which does not overlap with the intersection of existing constraints from other currently selected packages:\n"
-		fmt.Fprintf(&buf, str, a2vs(e.goal.depender), e.goal.dep.Ident.errString(), e.goal.dep.Constraint.String())
+		fmt.Fprintf(&buf, str, a2vs(e.goal.depender), e.goal.dep.Ident, e.goal.dep.Constraint.String())
 	}
 
 	for _, c := range sibs {
@@ -122,7 +122,7 @@ func (e *disjointConstraintFailure) Error() string {
 
 func (e *disjointConstraintFailure) traceString() string {
 	var buf bytes.Buffer
-	fmt.Fprintf(&buf, "constraint %s on %s disjoint with other dependers:\n", e.goal.dep.Constraint.String(), e.goal.dep.Ident.errString())
+	fmt.Fprintf(&buf, "constraint %s on %s disjoint with other dependers:\n", e.goal.dep.Constraint.String(), e.goal.dep.Ident)
 	for _, f := range e.failsib {
 		fmt.Fprintf(
 			&buf,
@@ -159,7 +159,7 @@ func (e *constraintNotAllowedFailure) Error() string {
 	return fmt.Sprintf(
 		"Could not introduce %s, as it has a dependency on %s with constraint %s, which does not allow the currently selected version of %s",
 		a2vs(e.goal.depender),
-		e.goal.dep.Ident.errString(),
+		e.goal.dep.Ident,
 		e.goal.dep.Constraint,
 		e.v,
 	)
@@ -198,7 +198,7 @@ func (e *versionNotAllowedFailure) Error() string {
 			"Could not introduce %s, as it is not allowed by constraint %s from project %s.",
 			a2vs(e.goal),
 			e.failparent[0].dep.Constraint.String(),
-			e.failparent[0].depender.id.errString(),
+			e.failparent[0].depender.id,
 		)
 	}
 
@@ -268,9 +268,9 @@ func (e *sourceMismatchFailure) traceString() string {
 	var buf bytes.Buffer
 	fmt.Fprintf(&buf, "disagreement on network addr for %s:\n", e.shared)
 
-	fmt.Fprintf(&buf, "  %s from %s\n", e.mismatch, e.prob.id.errString())
+	fmt.Fprintf(&buf, "  %s from %s\n", e.mismatch, e.prob.id)
 	for _, dep := range e.sel {
-		fmt.Fprintf(&buf, "  %s from %s\n", e.current, dep.depender.id.errString())
+		fmt.Fprintf(&buf, "  %s from %s\n", e.current, dep.depender.id)
 	}
 
 	return buf.String()
@@ -361,7 +361,7 @@ func (e *checkeeHasProblemPackagesFailure) traceString() string {
 		} else {
 			fmt.Fprintf(&buf, " required by:")
 			for _, pa := range errdep.deppers {
-				fmt.Fprintf(&buf, "\n\t\t%s at %s", pa.id.errString(), pa.v)
+				fmt.Fprintf(&buf, "\n\t\t%s at %s", pa.id, pa.v)
 			}
 		}
 	}
@@ -411,7 +411,7 @@ func (e *depHasProblemPackagesFailure) Error() string {
 			"Could not introduce %s, as it requires package %s from %s, but in version %s that package %s",
 			a2vs(e.goal.depender),
 			pkg,
-			e.goal.dep.Ident.errString(),
+			e.goal.dep.Ident,
 			e.v,
 			fcause(pkg),
 		)
@@ -421,7 +421,7 @@ func (e *depHasProblemPackagesFailure) Error() string {
 	fmt.Fprintf(
 		&buf, "Could not introduce %s, as it requires problematic packages from %s (current version %s):",
 		a2vs(e.goal.depender),
-		e.goal.dep.Ident.errString(),
+		e.goal.dep.Ident,
 		e.v,
 	)
 
@@ -451,7 +451,7 @@ func (e *depHasProblemPackagesFailure) traceString() string {
 	fmt.Fprintf(
 		&buf, "%s depping on %s at %s has problem subpkg(s):",
 		a2vs(e.goal.depender),
-		e.goal.dep.Ident.errString(),
+		e.goal.dep.Ident,
 		e.v,
 	)
 
@@ -481,7 +481,7 @@ func (e *nonexistentRevisionFailure) Error() string {
 	return fmt.Sprintf(
 		"Could not introduce %s, as it requires %s at revision %s, but that revision does not exist",
 		a2vs(e.goal.depender),
-		e.goal.dep.Ident.errString(),
+		e.goal.dep.Ident,
 		e.r,
 	)
 }
@@ -491,6 +491,6 @@ func (e *nonexistentRevisionFailure) traceString() string {
 		"%s wants missing rev %s of %s",
 		a2vs(e.goal.depender),
 		e.r,
-		e.goal.dep.Ident.errString(),
+		e.goal.dep.Ident,
 	)
 }

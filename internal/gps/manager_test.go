@@ -563,14 +563,14 @@ func TestMultiFetchThreadsafe(t *testing.T) {
 
 				switch op {
 				case 0:
-					t.Run(fmt.Sprintf("deduce:%v:%s", opcount, id.errString()), func(t *testing.T) {
+					t.Run(fmt.Sprintf("deduce:%v:%s", opcount, id), func(t *testing.T) {
 						t.Parallel()
 						if _, err := sm.DeduceProjectRoot(string(id.ProjectRoot)); err != nil {
 							t.Error(err)
 						}
 					})
 				case 1:
-					t.Run(fmt.Sprintf("sync:%v:%s", opcount, id.errString()), func(t *testing.T) {
+					t.Run(fmt.Sprintf("sync:%v:%s", opcount, id), func(t *testing.T) {
 						t.Parallel()
 						err := sm.SyncSourceFor(id)
 						if err != nil {
@@ -578,7 +578,7 @@ func TestMultiFetchThreadsafe(t *testing.T) {
 						}
 					})
 				case 2:
-					t.Run(fmt.Sprintf("listVersions:%v:%s", opcount, id.errString()), func(t *testing.T) {
+					t.Run(fmt.Sprintf("listVersions:%v:%s", opcount, id), func(t *testing.T) {
 						t.Parallel()
 						vl, err := sm.ListVersions(id)
 						if err != nil {
@@ -589,7 +589,7 @@ func TestMultiFetchThreadsafe(t *testing.T) {
 						}
 					})
 				case 3:
-					t.Run(fmt.Sprintf("exists:%v:%s", opcount, id.errString()), func(t *testing.T) {
+					t.Run(fmt.Sprintf("exists:%v:%s", opcount, id), func(t *testing.T) {
 						t.Parallel()
 						y, err := sm.SourceExists(id)
 						if err != nil {

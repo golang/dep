@@ -201,7 +201,7 @@ func (lp LockedProject) Packages() []string {
 
 func (lp LockedProject) String() string {
 	return fmt.Sprintf("%s@%s with packages: %v",
-		lp.Ident().errString(), lp.Version(), lp.pkgs)
+		lp.Ident(), lp.Version(), lp.pkgs)
 }
 
 type safeLock struct {

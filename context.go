@@ -138,7 +138,7 @@ func (c *Ctx) LoadProject() (*Project, error) {
 		c.Err.Printf("dep: WARNING: %v\n", warn)
 	}
 	if err != nil {
-		return nil, errors.Errorf("error while parsing %s: %s", mp, err)
+		return nil, errors.Wrapf(err, "error while parsing %s", mp)
 	}
 
 	lp := filepath.Join(p.AbsRoot, LockName)
@@ -149,13 +149,13 @@ func (c *Ctx) LoadProject() (*Project, error) {
 			return p, nil
 		}
 		// But if a lock does exist and we can't open it, that's a problem
-		return nil, errors.Errorf("could not open %s: %s", lp, err)
+		return nil, errors.Wrapf(err, "could not open %s", lp)
 	}
 	defer lf.Close()
 
 	p.Lock, err = readLock(lf)
 	if err != nil {
-		return nil, errors.Errorf("error while parsing %s: %s", lp, err)
+		return nil, errors.Wrapf(err, "error while parsing %s", lp)
 	}
 
 	return p, nil

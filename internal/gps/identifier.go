@@ -141,15 +141,11 @@ func (i ProjectIdentifier) normalizedSource() string {
 	return i.Source
 }
 
-func (i ProjectIdentifier) errString() string {
+func (i ProjectIdentifier) String() string {
 	if i.Source == "" || i.Source == string(i.ProjectRoot) {
 		return string(i.ProjectRoot)
 	}
 	return fmt.Sprintf("%s (from %s)", i.ProjectRoot, i.Source)
-}
-
-func (i ProjectIdentifier) String() string {
-	return i.errString()
 }
 
 func (i ProjectIdentifier) normalize() ProjectIdentifier {

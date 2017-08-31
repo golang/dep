@@ -14,20 +14,6 @@ import (
 	"github.com/pkg/errors"
 )
 
-func TestRootAnalyzer_Info(t *testing.T) {
-	testCases := map[bool]string{
-		true:  "dep",
-		false: "dep+import",
-	}
-	for skipTools, want := range testCases {
-		a := rootAnalyzer{skipTools: skipTools}
-		got := a.Info().Name
-		if got != want {
-			t.Errorf("Expected the name of the importer with skipTools=%t to be '%s', got '%s'", skipTools, want, got)
-		}
-	}
-}
-
 func TestLookupVersionForLockedProject_MatchRevisionToTag(t *testing.T) {
 	h := test.NewHelper(t)
 	defer h.Cleanup()

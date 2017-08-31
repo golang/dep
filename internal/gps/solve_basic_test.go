@@ -1350,7 +1350,7 @@ func (sm *depspecSourceManager) GetManifestAndLock(id ProjectIdentifier, v Versi
 	}
 
 	// TODO(sdboyer) proper solver-type errors
-	return nil, nil, fmt.Errorf("Project %s at version %s could not be found", id.errString(), v)
+	return nil, nil, fmt.Errorf("Project %s at version %s could not be found", id, v)
 }
 
 func (sm *depspecSourceManager) ExternalReach(id ProjectIdentifier, v Version) (map[string][]string, error) {
@@ -1358,7 +1358,7 @@ func (sm *depspecSourceManager) ExternalReach(id ProjectIdentifier, v Version) (
 	if m, exists := sm.rm[pid]; exists {
 		return m, nil
 	}
-	return nil, fmt.Errorf("No reach data for %s at version %s", id.errString(), v)
+	return nil, fmt.Errorf("No reach data for %s at version %s", id, v)
 }
 
 func (sm *depspecSourceManager) ListPackages(id ProjectIdentifier, v Version) (pkgtree.PackageTree, error) {
@@ -1428,12 +1428,12 @@ func (sm *depspecSourceManager) ListVersions(id ProjectIdentifier) ([]PairedVers
 			// the test doesn't need revision info, anyway.
 			pvl = append(pvl, tv.Pair(Revision("FAKEREV")))
 		default:
-			panic(fmt.Sprintf("unreachable: type of version was %#v for spec %s", ds.v, id.errString()))
+			panic(fmt.Sprintf("unreachable: type of version was %#v for spec %s", ds.v, id))
 		}
 	}
 
 	if len(pvl) == 0 {
-		return nil, fmt.Errorf("Project %s could not be found", id.errString())
+		return nil, fmt.Errorf("Project %s could not be found", id)
 	}
 	return pvl, nil
 }
@@ -1445,7 +1445,7 @@ func (sm *depspecSourceManager) RevisionPresentIn(id ProjectIdentifier, r Revisi
 		}
 	}
 
-	return false, fmt.Errorf("Project %s has no revision %s", id.errString(), r)
+	return false, fmt.Errorf("Project %s has no revision %s", id, r)
 }
 
 func (sm *depspecSourceManager) SourceExists(id ProjectIdentifier) (bool, error) {
@@ -1461,7 +1461,7 @@ func (sm *depspecSourceManager) SourceExists(id ProjectIdentifier) (bool, error)
 func (sm *depspecSourceManager) SyncSourceFor(id ProjectIdentifier) error {
 	// Ignore err because it can't happen
 	if exist, _ := sm.SourceExists(id); !exist {
-		return fmt.Errorf("Source %s does not exist", id.errString())
+		return fmt.Errorf("Source %s does not exist", id)
 	}
 	return nil
 }

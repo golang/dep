@@ -27,7 +27,7 @@ func (s *solver) traceCheckPkgs(bmi bimodalIdentifier) {
 	}
 
 	prefix := getprei(len(s.vqs) + 1)
-	s.tl.Printf("%s\n", tracePrefix(fmt.Sprintf("? revisit %s to add %v pkgs", bmi.id.errString(), len(bmi.pl)), prefix, prefix))
+	s.tl.Printf("%s\n", tracePrefix(fmt.Sprintf("? revisit %s to add %v pkgs", bmi.id, len(bmi.pl)), prefix, prefix))
 }
 
 func (s *solver) traceCheckQueue(q *versionQueue, bmi bimodalIdentifier, cont bool, offset int) {
@@ -53,7 +53,7 @@ func (s *solver) traceCheckQueue(q *versionQueue, bmi bimodalIdentifier, cont bo
 		verb = "attempt"
 	}
 
-	s.tl.Printf("%s\n", tracePrefix(fmt.Sprintf("%s? %s %s with %v pkgs; %s versions to try", indent, verb, bmi.id.errString(), len(bmi.pl), vlen), prefix, prefix))
+	s.tl.Printf("%s\n", tracePrefix(fmt.Sprintf("%s? %s %s with %v pkgs; %s versions to try", indent, verb, bmi.id, len(bmi.pl), vlen), prefix, prefix))
 }
 
 // traceStartBacktrack is called with the bmi that first failed, thus initiating
@@ -65,9 +65,9 @@ func (s *solver) traceStartBacktrack(bmi bimodalIdentifier, err error, pkgonly b
 
 	var msg string
 	if pkgonly {
-		msg = fmt.Sprintf("%s%s could not add %v pkgs to %s; begin backtrack", innerIndent, backChar, len(bmi.pl), bmi.id.errString())
+		msg = fmt.Sprintf("%s%s could not add %v pkgs to %s; begin backtrack", innerIndent, backChar, len(bmi.pl), bmi.id)
 	} else {
-		msg = fmt.Sprintf("%s%s no more versions of %s to try; begin backtrack", innerIndent, backChar, bmi.id.errString())
+		msg = fmt.Sprintf("%s%s no more versions of %s to try; begin backtrack", innerIndent, backChar, bmi.id)
 	}
 
 	prefix := getprei(len(s.sel.projects))
@@ -83,9 +83,9 @@ func (s *solver) traceBacktrack(bmi bimodalIdentifier, pkgonly bool) {
 
 	var msg string
 	if pkgonly {
-		msg = fmt.Sprintf("%s backtrack: popped %v pkgs from %s", backChar, len(bmi.pl), bmi.id.errString())
+		msg = fmt.Sprintf("%s backtrack: popped %v pkgs from %s", backChar, len(bmi.pl), bmi.id)
 	} else {
-		msg = fmt.Sprintf("%s backtrack: no more versions of %s to try", backChar, bmi.id.errString())
+		msg = fmt.Sprintf("%s backtrack: no more versions of %s to try", backChar, bmi.id)
 	}
 
 	prefix := getprei(len(s.sel.projects))

@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/Masterminds/vcs"
+	"github.com/pkg/errors"
 )
 
 // monitoredCmd wraps a cmd and will keep monitoring the process until it
@@ -127,11 +128,8 @@ func (c *monitoredCmd) hasTimedOut() bool {
 
 func (c *monitoredCmd) combinedOutput(ctx context.Context) ([]byte, error) {
 	c.cmd.Stderr = c.stdout
-	if err := c.run(ctx); err != nil {
-		return c.stdout.Bytes(), err
-	}
-
-	return c.stdout.Bytes(), nil
+	err := c.run(ctx)
+	return c.stdout.Bytes(), errors.Wrapf(err, "command failed: %v", c.cmd.Args)
 }
 
 // activityBuffer is a buffer that keeps track of the last time a Write
