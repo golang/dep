@@ -683,6 +683,143 @@ var bimodalFixtures = map[string]bimodalFixture{
 			"a 1.0.0",
 		),
 	},
+	"simple case-only variations": {
+		ds: []depspec{
+			dsp(mkDepspec("root 0.0.0"),
+				pkg("root", "foo", "bar")),
+			dsp(mkDepspec("foo 1.0.0"),
+				pkg("foo", "Bar")),
+			dsp(mkDepspec("bar 1.0.0"),
+				pkg("bar")),
+			dsp(mkDepspec("Bar 1.0.0"),
+				pkg("Bar")),
+		},
+		fail: &noVersionError{
+			pn: mkPI("foo"),
+			fails: []failedVersion{
+				{
+					v: NewVersion("1.0.0"),
+					f: &caseMismatchFailure{
+						goal:    mkDep("foo 1.0.0", "Bar 1.0.0", "Bar"),
+						current: ProjectRoot("bar"),
+						failsib: []dependency{mkDep("root", "bar 1.0.0", "bar")},
+					},
+				},
+			},
+		},
+	},
+	"case variations within root": {
+		ds: []depspec{
+			dsp(mkDepspec("root 0.0.0"),
+				pkg("root", "foo", "bar", "Bar")),
+			dsp(mkDepspec("foo 1.0.0"),
+				pkg("foo")),
+			dsp(mkDepspec("bar 1.0.0"),
+				pkg("bar")),
+			dsp(mkDepspec("Bar 1.0.0"),
+				pkg("Bar")),
+		},
+		fail: &noVersionError{
+			pn: mkPI("foo"),
+			fails: []failedVersion{
+				{
+					v: NewVersion("1.0.0"),
+					f: &caseMismatchFailure{
+						goal:    mkDep("foo 1.0.0", "Bar 1.0.0", "Bar"),
+						current: ProjectRoot("bar"),
+						failsib: []dependency{mkDep("root", "foo 1.0.0", "foo")},
+					},
+				},
+			},
+		},
+	},
+	"case variations within single dep": {
+		ds: []depspec{
+			dsp(mkDepspec("root 0.0.0"),
+				pkg("root", "foo")),
+			dsp(mkDepspec("foo 1.0.0"),
+				pkg("foo", "bar", "Bar")),
+			dsp(mkDepspec("bar 1.0.0"),
+				pkg("bar")),
+			dsp(mkDepspec("Bar 1.0.0"),
+				pkg("Bar")),
+		},
+		fail: &noVersionError{
+			pn: mkPI("foo"),
+			fails: []failedVersion{
+				{
+					v: NewVersion("1.0.0"),
+					f: &caseMismatchFailure{
+						goal:    mkDep("foo 1.0.0", "Bar 1.0.0", "Bar"),
+						current: ProjectRoot("bar"),
+						failsib: []dependency{mkDep("root", "foo 1.0.0", "foo")},
+					},
+				},
+			},
+		},
+	},
+	"case variations within multiple deps": {
+		ds: []depspec{
+			dsp(mkDepspec("root 0.0.0"),
+				pkg("root", "foo", "bar")),
+			dsp(mkDepspec("foo 1.0.0"),
+				pkg("foo", "bar", "baz")),
+			dsp(mkDepspec("baz 1.0.0"),
+				pkg("baz", "Bar")),
+			dsp(mkDepspec("bar 1.0.0"),
+				pkg("bar")),
+			dsp(mkDepspec("Bar 1.0.0"),
+				pkg("Bar")),
+		},
+		fail: &noVersionError{
+			pn: mkPI("baz"),
+			fails: []failedVersion{
+				{
+					v: NewVersion("1.0.0"),
+					f: &caseMismatchFailure{
+						goal:    mkDep("baz 1.0.0", "Bar 1.0.0", "Bar"),
+						current: ProjectRoot("bar"),
+						failsib: []dependency{
+							mkDep("root", "bar 1.0.0", "bar"),
+							mkDep("foo 1.0.0", "bar 1.0.0", "bar"),
+						},
+					},
+				},
+			},
+		},
+	},
+	// This isn't actually as crazy as it might seem, as the root is defined by
+	// the addresser, not the addressee. It would occur if, e.g. something
+	// imports github.com/Sirupsen/logrus, as the contained subpackage at
+	// github.com/Sirupsen/logrus/hooks/syslog imports
+	// github.com/sirupsen/logrus. The only reason that doesn't blow up all the
+	// time is that most people only import the root package, not the syslog
+	// subpackage.
+	"case variations from self": {
+		ds: []depspec{
+			dsp(mkDepspec("root 0.0.0"),
+				pkg("root", "foo")),
+			dsp(mkDepspec("foo 1.0.0"),
+				pkg("foo", "bar")),
+			dsp(mkDepspec("bar 1.0.0"),
+				pkg("bar", "Bar")),
+			dsp(mkDepspec("Bar 1.0.0"),
+				pkg("Bar")),
+		},
+		fail: &noVersionError{
+			pn: mkPI("foo"),
+			fails: []failedVersion{
+				{
+					v: NewVersion("1.0.0"),
+					f: &caseMismatchFailure{
+						goal:    mkDep("foo 1.0.0", "Bar 1.0.0", "Bar"),
+						current: ProjectRoot("bar"),
+						failsib: []dependency{mkDep("root", "foo 1.0.0", "foo")},
+					},
+				},
+			},
+		},
+	},
 	"alternate net address": {
 		ds: []depspec{
 			dsp(mkDepspec("root 1.0.0", "foo from bar 2.0.0"),
