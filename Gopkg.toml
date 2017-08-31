@@ -25,4 +25,4 @@
 
 [[constraint]]
   name = "github.com/karrick/godirwalk"
-  version = "1.2.6"
+  version = "1.2.7"
