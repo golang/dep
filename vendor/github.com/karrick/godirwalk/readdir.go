@@ -84,7 +84,6 @@ func ReadDirents(osDirname string, scratchBuffer []byte) (Dirents, error) {
 // ReadDirents directly, rather than calling this function, then looping over
 // the results and calling os.Stat for each child.
 //
-//
 //    children, err := godirwalk.ReadDirnames(osDirname, nil)
 //    if err != nil {
 //        return nil, errors.Wrap(err, "cannot get list of directory children")

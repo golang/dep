@@ -5,7 +5,6 @@ package godirwalk
 import (
 	"os"
 	"path/filepath"
-	"reflect"
 	"syscall"
 	"unsafe"
 
@@ -33,9 +32,6 @@ func readdirents(osDirname string, scratchBuffer []byte) (Dirents, error) {
 		scratchBuffer = make([]byte, defaultBufferSize)
 	}
 
-	var nameSlice []byte
-	nameSliceHeader := (*reflect.SliceHeader)(unsafe.Pointer(&nameSlice)) // save slice header, so we can re-use each loop
-
 	var de *syscall.Dirent
 
 	for {
@@ -57,22 +53,11 @@ func readdirents(osDirname string, scratchBuffer []byte) (Dirents, error) {
 				continue // this item has been deleted, but not yet removed from directory
 			}
 
-			// Not every GOOS version of syscall.Dirent provides field that
-			// specifies name length.
-			namlen := updateSliceDirentName(de, &nameSlice, nameSliceHeader)
-			if (namlen == 0) || (namlen == 1 && de.Name[0] == '.') || (namlen == 2 && de.Name[0] == '.' && de.Name[1] == '.') {
+			nameSlice := nameFromDirent(de)
+			namlen := len(nameSlice)
+			if (namlen == 0) || (namlen == 1 && nameSlice[0] == '.') || (namlen == 2 && nameSlice[0] == '.' && nameSlice[1] == '.') {
 				continue // skip unimportant entries
 			}
-
-			// Convert syscall.Dirent.Name, which is array of int8, to []byte,
-			// by overwriting Cap, Len, and Data slice header fields to values
-			// from syscall.Dirent fields. Setting the Cap, Len, and Data field
-			// values for the slice header modifies what the slice header points
-			// to, and in this case, the name buffer.
-			// nameSliceHeader.Cap = namlen
-			// nameSliceHeader.Len = namlen
-			// nameSliceHeader.Data = uintptr(unsafe.Pointer(&de.Name[0]))
-
 			osChildname := string(nameSlice)
 
 			// Convert syscall constant, which is in purview of OS, to a

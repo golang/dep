@@ -33,10 +33,10 @@
   revision = "cd8b52f8269e0feb286dfeef29f8fe4d5b397e0b"
 
 [[projects]]
-  branch = "master"
   name = "github.com/karrick/godirwalk"
   packages = ["."]
-  revision = "7f521a0f3f6cb6735babc444d586460aad1131c1"
+  revision = "63816e441b398cb5ed329810fe9094777465fc4c"
+  version = "v1.2.4"
 
 [[projects]]
   branch = "master"
@@ -77,6 +77,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "7341fe1d5922ebb9f71066d90bd0e166189b849bc167e5bfbb10af4168f6eac2"
+  inputs-digest = "9e0cf7824ef9c98bd9673012ea937915772ed645a0e4c08dd9c50afeb3dbc7c3"
   solver-name = "gps-cdcl"
   solver-version = 1

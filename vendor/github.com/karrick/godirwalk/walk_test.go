@@ -38,8 +38,8 @@ func helperGodirwalkWalk(tb testing.TB, osDirname string) []string {
 			if dirent.Name() == "skip" {
 				return filepath.SkipDir
 			}
-			// filepath.Walk invokes callback function with a slashed version of the
-			// pathname, while godirwalk invokes callback function with the
+			// filepath.Walk invokes callback function with a slashed version of
+			// the pathname, while godirwalk invokes callback function with the
 			// os-specific pathname separator.
 			entries = append(entries, filepath.ToSlash(osPathname))
 			return nil
@@ -122,8 +122,8 @@ func TestWalkFollowSymbolicLinksFalse(t *testing.T) {
 			if dirent.Name() == "skip" {
 				return filepath.SkipDir
 			}
-			// filepath.Walk invokes callback function with a slashed version of the
-			// pathname, while godirwalk invokes callback function with the
+			// filepath.Walk invokes callback function with a slashed version of
+			// the pathname, while godirwalk invokes callback function with the
 			// os-specific pathname separator.
 			actual = append(actual, filepath.ToSlash(osPathname))
 			return nil
@@ -163,8 +163,8 @@ func TestWalkFollowSymbolicLinksTrue(t *testing.T) {
 			if dirent.Name() == "skip" {
 				return filepath.SkipDir
 			}
-			// filepath.Walk invokes callback function with a slashed version of the
-			// pathname, while godirwalk invokes callback function with the
+			// filepath.Walk invokes callback function with a slashed version of
+			// the pathname, while godirwalk invokes callback function with the
 			// os-specific pathname separator.
 			actual = append(actual, filepath.ToSlash(osPathname))
 			return nil
