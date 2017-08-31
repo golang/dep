@@ -11,7 +11,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-var defaultBufferSize, pageSize, maxNameLength int
+var defaultBufferSize, pageSize int
 
 func init() {
 	pageSize = os.Getpagesize()

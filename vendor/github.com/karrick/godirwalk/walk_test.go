@@ -217,8 +217,6 @@ func BenchmarkGoDirWalk(b *testing.B) {
 	}
 }
 
-var flamePrefix = "testdata/dir1"
-
 const flameIterations = 10
 
 func BenchmarkFlameGraphFilepathWalk(b *testing.B) {
