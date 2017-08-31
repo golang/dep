@@ -1,4 +1,4 @@
-// Copyright 2016 The Go Authors. All rights reserved.
+// Copyright 2017 The Go Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
@@ -34,7 +34,7 @@ func newBaseImporter(logger *log.Logger, verbose bool, sm gps.SourceManager) *ba
 	}
 }
 
-// isVersion determines if the specified value is a tag (plain or semver).
+// isTag determines if the specified value is a tag (plain or semver).
 func (i *baseImporter) isTag(pi gps.ProjectIdentifier, value string) (bool, gps.Version, error) {
 	versions, err := i.sm.ListVersions(pi)
 	if err != nil {
@@ -65,28 +65,33 @@ func (i *baseImporter) lookupVersionForLockedProject(pi gps.ProjectIdentifier, c
 		return rev, errors.Wrapf(err, "Unable to lookup the version represented by %s in %s(%s). Falling back to locking the revision only.", rev, pi.ProjectRoot, pi.Source)
 	}
 
+	var branchConstraint gps.PairedVersion
 	gps.SortPairedForUpgrade(versions) // Sort versions in asc order
+	matches := []gps.Version{}
 	for _, v := range versions {
 		if v.Revision() == rev {
-			// If the constraint is semver, make sure the version is acceptable.
-			// This prevents us from suggesting an incompatible version, which
-			// helps narrow the field when there are multiple matching versions.
-			if c != nil {
-				_, err := gps.NewSemverConstraint(c.String())
-				if err == nil && !c.Matches(v) {
-					continue
-				}
-			}
-			return v, nil
+			matches = append(matches, v)
+		}
+		if c != nil && v.Type() == gps.IsBranch && v.String() == c.String() {
+			branchConstraint = v
 		}
 	}
 
-	// Use the version from the manifest as long as it wasn't a range
-	switch tv := c.(type) {
-	case gps.PairedVersion:
-		return tv.Unpair().Pair(rev), nil
-	case gps.UnpairedVersion:
-		return tv.Pair(rev), nil
+	// Try to narrow down the matches with the constraint. Otherwise return the first match.
+	if len(matches) > 0 {
+		if c != nil {
+			for _, v := range matches {
+				if i.testConstraint(c, v) {
+					return v, nil
+				}
+			}
+		}
+		return matches[0], nil
+	}
+
+	// Use branch constraint from the manifest
+	if branchConstraint != nil {
+		return branchConstraint.Unpair().Pair(rev), nil
 	}
 
 	// Give up and lock only to a revision
@@ -156,7 +161,7 @@ func (i *baseImporter) loadPackages(packages []importedPackage) ([]importedProje
 	return orderedProjects, nil
 }
 
-// importProject loads imported projects into the manifest and lock.
+// importPackages loads imported packages into the manifest and lock.
 // - defaultConstraintFromLock specifies if a constraint should be defaulted
 //   based on the locked version when there wasn't a constraint hint.
 //
@@ -207,12 +212,30 @@ func (i *baseImporter) importPackages(packages []importedPackage, defaultConstra
 				}
 			}
 
+			// Default the constraint based on the locked version
 			if defaultConstraintFromLock && prj.ConstraintHint == "" && version != nil {
 				props := getProjectPropertiesFromVersion(version)
 				if props.Constraint != nil {
 					pc.Constraint = props.Constraint
 				}
 			}
+		}
+
+		// Ignore pinned constraints
+		if i.isConstraintPinned(pc.Constraint) {
+			if i.verbose {
+				i.logger.Printf("Ignoring pinned constraint %v for %v.\n", pc.Constraint, pc.Ident)
+			}
+			pc.Constraint = gps.Any()
+		}
+
+		// Ignore constraints which conflict with the locked revision, so that
+		// solve doesn't later change the revision to satisfy the constraint.
+		if !i.testConstraint(pc.Constraint, version) {
+			if i.verbose {
+				i.logger.Printf("Ignoring constraint %v for %v because it would invalidate the locked version %v.\n", pc.Constraint, pc.Ident, version)
+			}
+			pc.Constraint = gps.Any()
 		}
 
 		i.manifest.Constraints[pc.Ident.ProjectRoot] = gps.ProjectProperties{
@@ -229,4 +252,28 @@ func (i *baseImporter) importPackages(packages []importedPackage, defaultConstra
 	}
 
 	return nil
+}
+
+func (i *baseImporter) isConstraintPinned(c gps.Constraint) bool {
+	if version, isVersion := c.(gps.Version); isVersion {
+		switch version.Type() {
+		case gps.IsRevision:
+			return true
+		case gps.IsVersion:
+			return true
+		}
+	}
+	return false
+}
+
+func (i *baseImporter) testConstraint(c gps.Constraint, v gps.Version) bool {
+	// Assume branch constraints are satisfied
+	if version, isVersion := c.(gps.Version); isVersion {
+		if version.Type() == gps.IsBranch {
+
+			return true
+		}
+	}
+
+	return c.Matches(v)
 }
