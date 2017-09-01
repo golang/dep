@@ -530,7 +530,7 @@ func (sg *sourceGateway) require(ctx context.Context, wanted sourceState) (errSt
 					if err == nil {
 						addlState |= sourceHasLatestLocally
 					} else {
-						err = fmt.Errorf("%s does not exist in the local cache and fetching failed: %s", sg.src.upstreamURL(), err)
+						err = errors.Wrapf(err, "%s does not exist in the local cache and fetching failed", sg.src.upstreamURL())
 					}
 				}
 			case sourceHasLatestVersionList:
