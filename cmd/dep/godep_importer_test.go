@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/golang/dep"
 	"github.com/golang/dep/internal/gps"
 	"github.com/golang/dep/internal/test"
 	"github.com/pkg/errors"
@@ -75,21 +76,15 @@ func TestGodepConfig_Convert(t *testing.T) {
 		},
 	}
 
-	h := test.NewHelper(t)
-	defer h.Cleanup()
-
-	ctx := newTestContext(h)
-	sm, err := ctx.SourceManager()
-	h.Must(err)
-	defer sm.Release()
-
 	for name, testCase := range testCases {
 		t.Run(name, func(t *testing.T) {
-			g := newGodepImporter(discardLogger, false, sm)
-			g.json = testCase.json
+			t.Parallel()
 
-			manifest, lock, convertErr := g.convert(testProjectRoot)
-			err := validateConvertTestCase(testCase.convertTestCase, manifest, lock, convertErr)
+			err := testCase.Exec(t, func(logger *log.Logger, sm gps.SourceManager) (*dep.Manifest, *dep.Lock, error) {
+				g := newGodepImporter(logger, true, sm)
+				g.json = testCase.json
+				return g.convert(testProjectRoot)
+			})
 			if err != nil {
 				t.Fatalf("%#v", err)
 			}

@@ -53,21 +53,15 @@ func TestVndrConfig_Convert(t *testing.T) {
 		},
 	}
 
-	h := test.NewHelper(t)
-	defer h.Cleanup()
-
-	ctx := newTestContext(h)
-	sm, err := ctx.SourceManager()
-	h.Must(err)
-	defer sm.Release()
-
 	for name, testCase := range testCases {
 		t.Run(name, func(t *testing.T) {
-			g := newVndrImporter(discardLogger, true, sm)
-			g.packages = testCase.packages
+			t.Parallel()
 
-			manifest, lock, convertErr := g.convert(testProjectRoot)
-			err = validateConvertTestCase(testCase.convertTestCase, manifest, lock, convertErr)
+			err := testCase.Exec(t, func(logger *log.Logger, sm gps.SourceManager) (*dep.Manifest, *dep.Lock, error) {
+				g := newVndrImporter(logger, true, sm)
+				g.packages = testCase.packages
+				return g.convert(testProjectRoot)
+			})
 			if err != nil {
 				t.Fatalf("%#v", err)
 			}
