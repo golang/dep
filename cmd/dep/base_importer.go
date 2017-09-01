@@ -189,8 +189,6 @@ func (i *baseImporter) importPackages(packages []importedPackage, defaultConstra
 		pc.Constraint, err = i.sm.InferConstraint(prj.ConstraintHint, pc.Ident)
 		if err != nil {
 			pc.Constraint = gps.Any()
-			err = errors.Wrapf(err, "Unable to interpret constraint '%s' for package %s. Using the 'any' constraint instead.")
-			i.logger.Println(err)
 		}
 
 		var version gps.Version
@@ -224,7 +222,7 @@ func (i *baseImporter) importPackages(packages []importedPackage, defaultConstra
 		// Ignore pinned constraints
 		if i.isConstraintPinned(pc.Constraint) {
 			if i.verbose {
-				i.logger.Printf("Ignoring pinned constraint %v for %v.\n", pc.Constraint, pc.Ident)
+				i.logger.Printf("  Ignoring pinned constraint %v for %v.\n", pc.Constraint, pc.Ident)
 			}
 			pc.Constraint = gps.Any()
 		}
@@ -233,7 +231,7 @@ func (i *baseImporter) importPackages(packages []importedPackage, defaultConstra
 		// solve doesn't later change the revision to satisfy the constraint.
 		if !i.testConstraint(pc.Constraint, version) {
 			if i.verbose {
-				i.logger.Printf("Ignoring constraint %v for %v because it would invalidate the locked version %v.\n", pc.Constraint, pc.Ident, version)
+				i.logger.Printf("  Ignoring constraint %v for %v because it would invalidate the locked version %v.\n", pc.Constraint, pc.Ident, version)
 			}
 			pc.Constraint = gps.Any()
 		}

@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"log"
 	"sort"
+	"strings"
 	"testing"
 
 	"github.com/golang/dep"
@@ -397,6 +398,7 @@ type convertTestCase struct {
 	wantRevision              gps.Revision
 	wantVersion               string
 	wantIgnored               []string
+	wantWarning               string
 }
 
 func (tc convertTestCase) Exec(t *testing.T, convert func(logger *log.Logger, sm gps.SourceManager) (*dep.Manifest, *dep.Lock, error)) error {
@@ -409,15 +411,15 @@ func (tc convertTestCase) Exec(t *testing.T, convert func(logger *log.Logger, sm
 	defer sm.Release()
 
 	// Capture stderr so we can verify warnings
-	verboseOutput := &bytes.Buffer{}
-	ctx.Err = log.New(verboseOutput, "", 0)
+	output := &bytes.Buffer{}
+	ctx.Err = log.New(output, "", 0)
 
 	manifest, lock, convertErr := convert(ctx.Err, sm)
-	return tc.validate(manifest, lock, convertErr)
+	return tc.validate(manifest, lock, convertErr, output)
 }
 
 // validate returns an error if any of the testcase validations failed.
-func (tc convertTestCase) validate(manifest *dep.Manifest, lock *dep.Lock, convertErr error) error {
+func (tc convertTestCase) validate(manifest *dep.Manifest, lock *dep.Lock, convertErr error, output *bytes.Buffer) error {
 	if tc.wantConvertErr {
 		if convertErr == nil {
 			return errors.New("Expected the conversion to fail, but it did not return an error")
@@ -509,6 +511,12 @@ func (tc convertTestCase) validate(manifest *dep.Manifest, lock *dep.Lock, conve
 			return errors.Errorf("unexpected locked version: \n\t(GOT) %v \n\t(WNT) %v",
 				gotVersion,
 				tc.wantVersion)
+		}
+	}
+
+	if tc.wantWarning != "" {
+		if !strings.Contains(output.String(), tc.wantWarning) {
+			return errors.Errorf("Expected the output to include the warning '%s'", tc.wantWarning)
 		}
 	}
 
