@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	"github.com/golang/dep"
+	"github.com/golang/dep/internal/gps"
 	"github.com/golang/dep/internal/test"
 	"github.com/pkg/errors"
 )
@@ -89,6 +90,22 @@ func TestGlideConfig_Convert(t *testing.T) {
 				wantVersion:    importerTestV2PatchTag,
 			},
 		},
+		"yaml only": {
+			glideYaml{
+				Imports: []glidePackage{
+					{
+						Name:       importerTestProject,
+						Repository: importerTestProjectSrc,
+						Reference:  importerTestV2Branch,
+					},
+				},
+			},
+			glideLock{},
+			convertTestCase{
+				wantSourceRepo: importerTestProjectSrc,
+				wantConstraint: importerTestV2Branch,
+			},
+		},
 		"ignored package": {
 			glideYaml{
 				Ignores: []string{importerTestProject},
@@ -128,23 +145,16 @@ func TestGlideConfig_Convert(t *testing.T) {
 		},
 	}
 
-	h := test.NewHelper(t)
-	defer h.Cleanup()
-
-	ctx := newTestContext(h)
-	sm, err := ctx.SourceManager()
-	h.Must(err)
-	defer sm.Release()
-
 	for name, testCase := range testCases {
 		t.Run(name, func(t *testing.T) {
-			g := newGlideImporter(discardLogger, true, sm)
-			g.glideConfig = testCase.yaml
-			g.glideLock = testCase.lock
-			g.lockFound = true
+			t.Parallel()
 
-			manifest, lock, convertErr := g.convert(testProjectRoot)
-			err := validateConvertTestCase(testCase.convertTestCase, manifest, lock, convertErr)
+			err := testCase.Exec(t, func(logger *log.Logger, sm gps.SourceManager) (*dep.Manifest, *dep.Lock, error) {
+				g := newGlideImporter(logger, true, sm)
+				g.glideConfig = testCase.yaml
+				g.glideLock = testCase.lock
+				return g.convert(testProjectRoot)
+			})
 			if err != nil {
 				t.Fatalf("%#v", err)
 			}
@@ -200,28 +210,6 @@ func TestGlideConfig_Import(t *testing.T) {
 	}
 }
 
-func TestGlideConfig_Import_MissingLockFile(t *testing.T) {
-	h := test.NewHelper(t)
-	defer h.Cleanup()
-
-	ctx := newTestContext(h)
-	sm, err := ctx.SourceManager()
-	h.Must(err)
-	defer sm.Release()
-
-	h.TempDir(filepath.Join("src", testProjectRoot))
-	h.TempCopy(filepath.Join(testProjectRoot, glideYamlName), "init/glide/glide.yaml")
-	projectRoot := h.Path(testProjectRoot)
-
-	g := newGlideImporter(ctx.Err, true, sm)
-	if !g.HasDepMetadata(projectRoot) {
-		t.Fatal("The glide importer should gracefully handle when only glide.yaml is present")
-	}
-
-	_, _, err = g.Import(projectRoot, testProjectRoot)
-	h.Must(err)
-}
-
 func TestGlideConfig_Convert_WarnsForUnusedFields(t *testing.T) {
 	testCases := map[string]glidePackage{
 		"specified an os":   {OS: "windows"},
@@ -232,6 +220,7 @@ func TestGlideConfig_Convert_WarnsForUnusedFields(t *testing.T) {
 		t.Run(wantWarning, func(t *testing.T) {
 			h := test.NewHelper(t)
 			defer h.Cleanup()
+			h.Parallel()
 
 			pkg.Name = "github.com/sdboyer/deptest"
 			pkg.Reference = "v1.0.0"
