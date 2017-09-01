@@ -173,7 +173,7 @@ func NewSourceManager(c SourceManagerConfig) (*SourceMgr, error) {
 	if err != nil {
 		return nil, CouldNotCreateLockError{
 			Path: glpath,
-			Err:  fmt.Errorf("unable to create lock %s: %s", glpath, err.Error()),
+			Err:  errors.Wrapf(err, "unable to create lock %s", glpath),
 		}
 	}
 
@@ -220,7 +220,7 @@ func NewSourceManager(c SourceManagerConfig) (*SourceMgr, error) {
 		} else {
 			return nil, CouldNotCreateLockError{
 				Path: glpath,
-				Err:  fmt.Errorf("unable to lock %s: %s", glpath, err.Error()),
+				Err:  errors.Wrapf(err, "unable to lock %s", glpath),
 			}
 		}
 		err = lockfile.TryLock()
