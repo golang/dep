@@ -94,7 +94,7 @@ func TestGovendConfig_Import(t *testing.T) {
 	h.TempDir(cacheDir)
 	h.TempDir("src")
 	h.TempDir(filepath.Join("src", testProjectRoot))
-	h.TempCopy(filepath.Join(testProjectRoot, govendYAMLName), "govend/vendor.yml")
+	h.TempCopy(filepath.Join(testProjectRoot, govendYAMLName), "init/govend/vendor.yml")
 
 	projectRoot := h.Path(testProjectRoot)
 	sm, err := gps.NewSourceManager(gps.SourceManagerConfig{Cachedir: h.Path(cacheDir)})
@@ -122,7 +122,7 @@ func TestGovendConfig_Import(t *testing.T) {
 		t.Fatal("Expected the lock to be generated")
 	}
 
-	govendImportOutputFile := "govend/expected_govend_import_output.txt"
+	govendImportOutputFile := "init/govend/golden.txt"
 	got := verboseOutput.String()
 	want := h.GetTestFileString(govendImportOutputFile)
 	if want != got {
@@ -138,7 +138,7 @@ func TestGovendConfig_Import(t *testing.T) {
 }
 
 func TestGovendConfig_YAMLLoad(t *testing.T) {
-	// This is same as cmd/testdata/govend/vendor.yml
+	// This is same as cmd/testdata/init/govend/vendor.yml
 	wantYAML := govendYAML{
 		Imports: []govendPackage{
 			{
@@ -155,7 +155,7 @@ func TestGovendConfig_YAMLLoad(t *testing.T) {
 	defer h.Cleanup()
 
 	ctx := newTestContext(h)
-	h.TempCopy(filepath.Join(testProjectRoot, govendYAMLName), "govend/vendor.yml")
+	h.TempCopy(filepath.Join(testProjectRoot, govendYAMLName), "init/govend/vendor.yml")
 
 	projectRoot := h.Path(testProjectRoot)
 
