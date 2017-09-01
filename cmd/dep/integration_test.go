@@ -28,7 +28,7 @@ func TestIntegration(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	relPath := "testdata/harness_tests"
+	relPath := filepath.Join("testdata", "harness_tests")
 	filepath.Walk(relPath, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			t.Fatal("error walking filepath")
