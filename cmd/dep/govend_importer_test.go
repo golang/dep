@@ -122,7 +122,7 @@ func TestGovendConfig_Import(t *testing.T) {
 		t.Fatal("Expected the lock to be generated")
 	}
 
-	govendImportOutputFile := "init/govend/expected_govend_import_output.txt"
+	govendImportOutputFile := "init/govend/golden.txt"
 	got := verboseOutput.String()
 	want := h.GetTestFileString(govendImportOutputFile)
 	if want != got {
