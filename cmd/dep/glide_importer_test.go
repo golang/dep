@@ -9,7 +9,6 @@ import (
 	"io/ioutil"
 	"log"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/golang/dep"
@@ -143,6 +142,34 @@ func TestGlideConfig_Convert(t *testing.T) {
 				wantConvertErr: true,
 			},
 		},
+		"warn unused os field": {
+			glideYaml{
+				Imports: []glidePackage{
+					{
+						Name: importerTestProject,
+						OS:   "windows",
+					},
+				}},
+			glideLock{},
+			convertTestCase{
+				wantConstraint: "*",
+				wantWarning:    "specified an os",
+			},
+		},
+		"warn unused arch field": {
+			glideYaml{
+				Imports: []glidePackage{
+					{
+						Name: importerTestProject,
+						Arch: "i686",
+					},
+				}},
+			glideLock{},
+			convertTestCase{
+				wantConstraint: "*",
+				wantWarning:    "specified an arch",
+			},
+		},
 	}
 
 	for name, testCase := range testCases {
@@ -207,47 +234,5 @@ func TestGlideConfig_Import(t *testing.T) {
 		} else {
 			t.Fatalf("want %s, got %s", want, got)
 		}
-	}
-}
-
-func TestGlideConfig_Convert_WarnsForUnusedFields(t *testing.T) {
-	testCases := map[string]glidePackage{
-		"specified an os":   {OS: "windows"},
-		"specified an arch": {Arch: "i686"},
-	}
-
-	for wantWarning, pkg := range testCases {
-		t.Run(wantWarning, func(t *testing.T) {
-			h := test.NewHelper(t)
-			defer h.Cleanup()
-			h.Parallel()
-
-			pkg.Name = "github.com/sdboyer/deptest"
-			pkg.Reference = "v1.0.0"
-
-			ctx := newTestContext(h)
-			sm, err := ctx.SourceManager()
-			h.Must(err)
-			defer sm.Release()
-
-			// Capture stderr so we can verify warnings
-			verboseOutput := &bytes.Buffer{}
-			ctx.Err = log.New(verboseOutput, "", 0)
-
-			g := newGlideImporter(ctx.Err, true, sm)
-			g.glideConfig = glideYaml{
-				Imports: []glidePackage{pkg},
-			}
-
-			_, _, err = g.convert(testProjectRoot)
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			warnings := verboseOutput.String()
-			if !strings.Contains(warnings, wantWarning) {
-				t.Errorf("Expected the output to include the warning '%s'", wantWarning)
-			}
-		})
 	}
 }
