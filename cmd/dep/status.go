@@ -377,7 +377,7 @@ func runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceMana
 				ptr, err := sm.ListPackages(proj.Ident(), proj.Version())
 
 				if err != nil {
-					return digestMismatch, hasMissingPkgs, fmt.Errorf("analysis of %s package failed: %v", proj.Ident().ProjectRoot, err)
+					return digestMismatch, hasMissingPkgs, errors.Wrapf(err, "analysis of %s package failed", proj.Ident().ProjectRoot)
 				}
 
 				prm, _ := ptr.ToReachMap(true, false, false, nil)
