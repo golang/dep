@@ -12,7 +12,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/Masterminds/semver"
 	"github.com/golang/dep/internal/fs"
@@ -142,9 +141,12 @@ func (s *gitSource) exportRevisionTo(ctx context.Context, rev Revision, to strin
 	// could have an err here...but it's hard to imagine how?
 	defer fs.RenameWithFallback(bak, idx)
 
-	out, err := runFromRepoDir(ctx, r, defaultCmdTimeout, "git", "read-tree", rev.String())
-	if err != nil {
-		return errors.Wrap(err, string(out))
+	{
+		cmd := exec.CommandContext(ctx, "git", "read-tree", rev.String())
+		cmd.Dir = r.LocalPath()
+		if out, err := cmd.CombinedOutput(); err != nil {
+			return errors.Wrap(err, string(out))
+		}
 	}
 
 	// Ensure we have exactly one trailing slash
@@ -158,9 +160,12 @@ func (s *gitSource) exportRevisionTo(ctx context.Context, rev Revision, to strin
 	// though we have a bunch of housekeeping to do to set up, then tear
 	// down, the sparse checkout controls, as well as restore the original
 	// index and HEAD.
-	out, err = runFromRepoDir(ctx, r, defaultCmdTimeout, "git", "checkout-index", "-a", "--prefix="+to)
-	if err != nil {
-		return errors.Wrap(err, string(out))
+	{
+		cmd := exec.CommandContext(ctx, "git", "checkout-index", "-a", "--prefix="+to)
+		cmd.Dir = r.LocalPath()
+		if out, err := cmd.CombinedOutput(); err != nil {
+			return errors.Wrap(err, string(out))
+		}
 	}
 
 	return nil
@@ -169,12 +174,10 @@ func (s *gitSource) exportRevisionTo(ctx context.Context, rev Revision, to strin
 func (s *gitSource) listVersions(ctx context.Context) (vlist []PairedVersion, err error) {
 	r := s.repo
 
-	var out []byte
-	c := newMonitoredCmd(exec.Command("git", "ls-remote", r.Remote()), 30*time.Second)
+	cmd := exec.CommandContext(ctx, "git", "ls-remote", r.Remote())
 	// Ensure no prompting for PWs
-	c.cmd.Env = mergeEnvLists([]string{"GIT_ASKPASS=", "GIT_TERMINAL_PROMPT=0"}, os.Environ())
-	out, err = c.combinedOutput(ctx)
-
+	cmd.Env = append([]string{"GIT_ASKPASS=", "GIT_TERMINAL_PROMPT=0"}, os.Environ()...)
+	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return nil, err
 	}
@@ -393,15 +396,18 @@ func (s *bzrSource) listVersions(ctx context.Context) ([]PairedVersion, error) {
 	}
 
 	// Now, list all the tags
-	out, err := runFromRepoDir(ctx, r, defaultCmdTimeout, "bzr", "tags", "--show-ids", "-v")
+	tagsCmd := exec.CommandContext(ctx, "bzr", "tags", "--show-ids", "-v")
+	tagsCmd.Dir = r.LocalPath()
+	out, err := tagsCmd.CombinedOutput()
 	if err != nil {
 		return nil, errors.Wrap(err, string(out))
 	}
 
 	all := bytes.Split(bytes.TrimSpace(out), []byte("\n"))
 
-	var branchrev []byte
-	branchrev, err = runFromRepoDir(ctx, r, defaultCmdTimeout, "bzr", "version-info", "--custom", "--template={revision_id}", "--revision=branch:.")
+	viCmd := exec.CommandContext(ctx, "bzr", "version-info", "--custom", "--template={revision_id}", "--revision=branch:.")
+	viCmd.Dir = r.LocalPath()
+	branchrev, err := viCmd.CombinedOutput()
 	if err != nil {
 		return nil, errors.Wrap(err, string(branchrev))
 	}
@@ -472,7 +478,9 @@ func (s *hgSource) listVersions(ctx context.Context) ([]PairedVersion, error) {
 	}
 
 	// Now, list all the tags
-	out, err := runFromRepoDir(ctx, r, defaultCmdTimeout, "hg", "tags", "--debug", "--verbose")
+	tagsCmd := exec.CommandContext(ctx, "hg", "tags", "--debug", "--verbose")
+	tagsCmd.Dir = r.LocalPath()
+	out, err := tagsCmd.CombinedOutput()
 	if err != nil {
 		return nil, errors.Wrap(err, string(out))
 	}
@@ -506,7 +514,9 @@ func (s *hgSource) listVersions(ctx context.Context) ([]PairedVersion, error) {
 	// bookmarks next, because the presence of the magic @ bookmark has to
 	// determine how we handle the branches
 	var magicAt bool
-	out, err = runFromRepoDir(ctx, r, defaultCmdTimeout, "hg", "bookmarks", "--debug")
+	bookmarksCmd := exec.CommandContext(ctx, "hg", "bookmarks", "--debug")
+	bookmarksCmd.Dir = r.LocalPath()
+	out, err = bookmarksCmd.CombinedOutput()
 	if err != nil {
 		// better nothing than partial and misleading
 		return nil, errors.Wrap(err, string(out))
@@ -539,7 +549,9 @@ func (s *hgSource) listVersions(ctx context.Context) ([]PairedVersion, error) {
 		}
 	}
 
-	out, err = runFromRepoDir(ctx, r, defaultCmdTimeout, "hg", "branches", "-c", "--debug")
+	cmd := exec.CommandContext(ctx, "hg", "branches", "-c", "--debug")
+	cmd.Dir = r.LocalPath()
+	out, err = cmd.CombinedOutput()
 	if err != nil {
 		// better nothing than partial and misleading
 		return nil, errors.Wrap(err, string(out))
@@ -568,20 +580,4 @@ func (s *hgSource) listVersions(ctx context.Context) ([]PairedVersion, error) {
 	}
 
 	return vlist, nil
-}
-
-// This func copied from Masterminds/vcs so we can exec our own commands
-func mergeEnvLists(in, out []string) []string {
-NextVar:
-	for _, inkv := range in {
-		k := strings.SplitAfterN(inkv, "=", 2)[0]
-		for i, outkv := range out {
-			if strings.HasPrefix(outkv, k) {
-				out[i] = inkv
-				continue NextVar
-			}
-		}
-		out = append(out, inkv)
-	}
-	return out
 }
