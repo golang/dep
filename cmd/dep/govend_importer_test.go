@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/golang/dep"
 	"github.com/golang/dep/internal/gps"
 	"github.com/golang/dep/internal/test"
 	"github.com/pkg/errors"
@@ -62,21 +63,15 @@ func TestGovendConfig_Convert(t *testing.T) {
 		},
 	}
 
-	h := test.NewHelper(t)
-	defer h.Cleanup()
-
-	ctx := newTestContext(h)
-	sm, err := ctx.SourceManager()
-	h.Must(err)
-	defer sm.Release()
-
 	for name, testCase := range testCases {
 		t.Run(name, func(t *testing.T) {
-			g := newGovendImporter(discardLogger, true, sm)
-			g.yaml = testCase.yaml
+			t.Parallel()
 
-			manifest, lock, convertErr := g.convert(testProjectRoot)
-			err = validateConvertTestCase(testCase.convertTestCase, manifest, lock, convertErr)
+			err := testCase.Exec(t, func(logger *log.Logger, sm gps.SourceManager) (*dep.Manifest, *dep.Lock, error) {
+				g := newGovendImporter(logger, true, sm)
+				g.yaml = testCase.yaml
+				return g.convert(testProjectRoot)
+			})
 			if err != nil {
 				t.Fatalf("%#v", err)
 			}

@@ -5,9 +5,10 @@
 package main
 
 import (
-	"testing"
-
+	"bytes"
+	"log"
 	"sort"
+	"testing"
 
 	"github.com/golang/dep"
 	"github.com/golang/dep/internal/gps"
@@ -36,18 +37,6 @@ const (
 	importerTestMultiTaggedPlainTag  = "stable"
 )
 
-// convertTestCase is a common set of validations applied to the result
-// of an importer converting from an external config format to dep's.
-type convertTestCase struct {
-	defaultConstraintFromLock bool
-	wantConvertErr            bool
-	wantSourceRepo            string
-	wantConstraint            string
-	wantRevision              gps.Revision
-	wantVersion               string
-	wantIgnored               []string
-}
-
 func TestBaseImporter_IsTag(t *testing.T) {
 	testcases := map[string]struct {
 		input     string
@@ -74,29 +63,30 @@ func TestBaseImporter_IsTag(t *testing.T) {
 	}
 
 	pi := gps.ProjectIdentifier{ProjectRoot: importerTestProject}
-	h := test.NewHelper(t)
-	defer h.Cleanup()
 
-	ctx := newTestContext(h)
-	sm, err := ctx.SourceManager()
-	h.Must(err)
-	defer sm.Release()
-
-	for name, testcase := range testcases {
+	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
-			i := newBaseImporter(discardLogger, false, sm)
+			h := test.NewHelper(t)
+			defer h.Cleanup()
+			h.Parallel()
 
-			gotIsTag, gotTag, err := i.isTag(pi, testcase.input)
+			ctx := newTestContext(h)
+			sm, err := ctx.SourceManager()
+			h.Must(err)
+			defer sm.Release()
+
+			i := newBaseImporter(discardLogger, false, sm)
+			gotIsTag, gotTag, err := i.isTag(pi, tc.input)
 			h.Must(err)
 
-			if testcase.wantIsTag != gotIsTag {
+			if tc.wantIsTag != gotIsTag {
 				t.Fatalf("unexpected isTag result for %v: \n\t(GOT) %v \n\t(WNT) %v",
-					testcase.input, gotIsTag, testcase.wantIsTag)
+					tc.input, gotIsTag, tc.wantIsTag)
 			}
 
-			if testcase.wantTag != gotTag {
+			if tc.wantTag != gotTag {
 				t.Fatalf("unexpected tag for %v: \n\t(GOT) %v \n\t(WNT) %v",
-					testcase.input, gotTag, testcase.wantTag)
+					tc.input, gotTag, tc.wantTag)
 			}
 		})
 	}
@@ -137,19 +127,19 @@ func TestBaseImporter_LookupVersionForLockedProject(t *testing.T) {
 		},
 	}
 
-	h := test.NewHelper(t)
-	defer h.Cleanup()
-
-	ctx := newTestContext(h)
-	sm, err := ctx.SourceManager()
-	h.Must(err)
-	defer sm.Release()
-
 	pi := gps.ProjectIdentifier{ProjectRoot: importerTestProject}
-	sm.SyncSourceFor(pi)
 
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
+			h := test.NewHelper(t)
+			defer h.Cleanup()
+			h.Parallel()
+
+			ctx := newTestContext(h)
+			sm, err := ctx.SourceManager()
+			h.Must(err)
+			defer sm.Release()
+
 			i := newBaseImporter(discardLogger, false, sm)
 			v, err := i.lookupVersionForLockedProject(pi, tc.constraint, tc.revision)
 			h.Must(err)
@@ -163,7 +153,6 @@ func TestBaseImporter_LookupVersionForLockedProject(t *testing.T) {
 }
 
 func TestBaseImporter_ImportProjects(t *testing.T) {
-
 	testcases := map[string]struct {
 		convertTestCase
 		projects []importedPackage
@@ -382,6 +371,35 @@ func TestBaseImporter_ImportProjects(t *testing.T) {
 		},
 	}
 
+	for name, tc := range testcases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			err := tc.Exec(t, func(logger *log.Logger, sm gps.SourceManager) (*dep.Manifest, *dep.Lock, error) {
+				i := newBaseImporter(logger, true, sm)
+				convertErr := i.importPackages(tc.projects, tc.defaultConstraintFromLock)
+				return i.manifest, i.lock, convertErr
+			})
+			if err != nil {
+				t.Fatalf("%#v", err)
+			}
+		})
+	}
+}
+
+// convertTestCase is a common set of validations applied to the result
+// of an importer converting from an external config format to dep's.
+type convertTestCase struct {
+	defaultConstraintFromLock bool
+	wantConvertErr            bool
+	wantSourceRepo            string
+	wantConstraint            string
+	wantRevision              gps.Revision
+	wantVersion               string
+	wantIgnored               []string
+}
+
+func (tc convertTestCase) Exec(t *testing.T, convert func(logger *log.Logger, sm gps.SourceManager) (*dep.Manifest, *dep.Lock, error)) error {
 	h := test.NewHelper(t)
 	defer h.Cleanup()
 
@@ -390,23 +408,17 @@ func TestBaseImporter_ImportProjects(t *testing.T) {
 	h.Must(err)
 	defer sm.Release()
 
-	for name, testcase := range testcases {
-		t.Run(name, func(t *testing.T) {
-			i := newBaseImporter(discardLogger, false, sm)
+	// Capture stderr so we can verify warnings
+	verboseOutput := &bytes.Buffer{}
+	ctx.Err = log.New(verboseOutput, "", 0)
 
-			convertErr := i.importPackages(testcase.projects, testcase.defaultConstraintFromLock)
-			err := validateConvertTestCase(testcase.convertTestCase, i.manifest, i.lock, convertErr)
-			if err != nil {
-				t.Fatalf("%#v", err)
-			}
-		})
-	}
+	manifest, lock, convertErr := convert(ctx.Err, sm)
+	return tc.validate(manifest, lock, convertErr)
 }
 
-// validateConvertTestCase returns an error if any of the importer's
-// conversion validations failed.
-func validateConvertTestCase(testCase convertTestCase, manifest *dep.Manifest, lock *dep.Lock, convertErr error) error {
-	if testCase.wantConvertErr {
+// validate returns an error if any of the testcase validations failed.
+func (tc convertTestCase) validate(manifest *dep.Manifest, lock *dep.Lock, convertErr error) error {
+	if tc.wantConvertErr {
 		if convertErr == nil {
 			return errors.New("Expected the conversion to fail, but it did not return an error")
 		}
@@ -417,13 +429,13 @@ func validateConvertTestCase(testCase convertTestCase, manifest *dep.Manifest, l
 		return errors.Wrap(convertErr, "Expected the conversion to pass, but it returned an error")
 	}
 
-	if !equalSlice(manifest.Ignored, testCase.wantIgnored) {
+	if !equalSlice(manifest.Ignored, tc.wantIgnored) {
 		return errors.Errorf("unexpected set of ignored projects: \n\t(GOT) %v \n\t(WNT) %v",
-			manifest.Ignored, testCase.wantIgnored)
+			manifest.Ignored, tc.wantIgnored)
 	}
 
 	wantConstraintCount := 0
-	if testCase.wantConstraint != "" {
+	if tc.wantConstraint != "" {
 		wantConstraintCount = 1
 	}
 	gotConstraintCount := len(manifest.Constraints)
@@ -432,7 +444,7 @@ func validateConvertTestCase(testCase convertTestCase, manifest *dep.Manifest, l
 			gotConstraintCount, wantConstraintCount)
 	}
 
-	if testCase.wantConstraint != "" {
+	if tc.wantConstraint != "" {
 		d, ok := manifest.Constraints[importerTestProject]
 		if !ok {
 			return errors.Errorf("Expected the manifest to have a dependency for '%v'",
@@ -440,16 +452,16 @@ func validateConvertTestCase(testCase convertTestCase, manifest *dep.Manifest, l
 		}
 
 		gotConstraint := d.Constraint.String()
-		if gotConstraint != testCase.wantConstraint {
+		if gotConstraint != tc.wantConstraint {
 			return errors.Errorf("unexpected constraint: \n\t(GOT) %v \n\t(WNT) %v",
-				gotConstraint, testCase.wantConstraint)
+				gotConstraint, tc.wantConstraint)
 		}
 
 	}
 
 	// Lock checks.
 	wantLockCount := 0
-	if testCase.wantRevision != "" {
+	if tc.wantRevision != "" {
 		wantLockCount = 1
 	}
 	gotLockCount := 0
@@ -461,7 +473,7 @@ func validateConvertTestCase(testCase convertTestCase, manifest *dep.Manifest, l
 			gotLockCount, wantLockCount)
 	}
 
-	if testCase.wantRevision != "" {
+	if tc.wantRevision != "" {
 		lp := lock.P[0]
 
 		gotProjectRoot := lp.Ident().ProjectRoot
@@ -471,9 +483,9 @@ func validateConvertTestCase(testCase convertTestCase, manifest *dep.Manifest, l
 		}
 
 		gotSource := lp.Ident().Source
-		if gotSource != testCase.wantSourceRepo {
+		if gotSource != tc.wantSourceRepo {
 			return errors.Errorf("unexpected source repository: \n\t(GOT) %v \n\t(WNT) %v",
-				gotSource, testCase.wantSourceRepo)
+				gotSource, tc.wantSourceRepo)
 		}
 
 		// Break down the locked "version" into a version (optional) and revision
@@ -488,15 +500,15 @@ func validateConvertTestCase(testCase convertTestCase, manifest *dep.Manifest, l
 			return errors.New("could not determine the type of the locked version")
 		}
 
-		if gotRevision != testCase.wantRevision {
+		if gotRevision != tc.wantRevision {
 			return errors.Errorf("unexpected locked revision: \n\t(GOT) %v \n\t(WNT) %v",
 				gotRevision,
-				testCase.wantRevision)
+				tc.wantRevision)
 		}
-		if gotVersion != testCase.wantVersion {
+		if gotVersion != tc.wantVersion {
 			return errors.Errorf("unexpected locked version: \n\t(GOT) %v \n\t(WNT) %v",
 				gotVersion,
-				testCase.wantVersion)
+				tc.wantVersion)
 		}
 	}
 
