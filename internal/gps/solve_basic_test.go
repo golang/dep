@@ -1343,13 +1343,13 @@ func (sm *depspecSourceManager) GetManifestAndLock(id ProjectIdentifier, v Versi
 		v = pv.Unpair()
 	}
 
+	src := toFold(id.normalizedSource())
 	for _, ds := range sm.specs {
-		if id.normalizedSource() == string(ds.n) && v.Matches(ds.v) {
+		if src == string(ds.n) && v.Matches(ds.v) {
 			return ds, dummyLock{}, nil
 		}
 	}
 
-	// TODO(sdboyer) proper solver-type errors
 	return nil, nil, fmt.Errorf("Project %s at version %s could not be found", id, v)
 }
 
@@ -1362,7 +1362,7 @@ func (sm *depspecSourceManager) ExternalReach(id ProjectIdentifier, v Version) (
 }
 
 func (sm *depspecSourceManager) ListPackages(id ProjectIdentifier, v Version) (pkgtree.PackageTree, error) {
-	pid := pident{n: ProjectRoot(id.normalizedSource()), v: v}
+	pid := pident{n: ProjectRoot(toFold(id.normalizedSource())), v: v}
 	if pv, ok := v.(PairedVersion); ok && pv.Revision() == "FAKEREV" {
 		// An empty rev may come in here because that's what we produce in
 		// ListVersions(). If that's what we see, then just pretend like we have
@@ -1372,7 +1372,7 @@ func (sm *depspecSourceManager) ListPackages(id ProjectIdentifier, v Version) (p
 
 	if r, exists := sm.rm[pid]; exists {
 		return pkgtree.PackageTree{
-			ImportRoot: string(pid.n),
+			ImportRoot: id.normalizedSource(),
 			Packages: map[string]pkgtree.PackageOrErr{
 				string(pid.n): {
 					P: pkgtree.Package{
@@ -1392,7 +1392,7 @@ func (sm *depspecSourceManager) ListPackages(id ProjectIdentifier, v Version) (p
 		for pid, r := range sm.rm {
 			if uv.Matches(pid.v) {
 				return pkgtree.PackageTree{
-					ImportRoot: string(pid.n),
+					ImportRoot: id.normalizedSource(),
 					Packages: map[string]pkgtree.PackageOrErr{
 						string(pid.n): {
 							P: pkgtree.Package{
@@ -1412,8 +1412,9 @@ func (sm *depspecSourceManager) ListPackages(id ProjectIdentifier, v Version) (p
 
 func (sm *depspecSourceManager) ListVersions(id ProjectIdentifier) ([]PairedVersion, error) {
 	var pvl []PairedVersion
+	src := toFold(id.normalizedSource())
 	for _, ds := range sm.specs {
-		if id.normalizedSource() != string(ds.n) {
+		if src != string(ds.n) {
 			continue
 		}
 
@@ -1439,8 +1440,9 @@ func (sm *depspecSourceManager) ListVersions(id ProjectIdentifier) ([]PairedVers
 }
 
 func (sm *depspecSourceManager) RevisionPresentIn(id ProjectIdentifier, r Revision) (bool, error) {
+	src := toFold(id.normalizedSource())
 	for _, ds := range sm.specs {
-		if id.normalizedSource() == string(ds.n) && r == ds.v {
+		if src == string(ds.n) && r == ds.v {
 			return true, nil
 		}
 	}
@@ -1449,8 +1451,9 @@ func (sm *depspecSourceManager) RevisionPresentIn(id ProjectIdentifier, r Revisi
 }
 
 func (sm *depspecSourceManager) SourceExists(id ProjectIdentifier) (bool, error) {
+	src := toFold(id.normalizedSource())
 	for _, ds := range sm.specs {
-		if id.normalizedSource() == string(ds.n) {
+		if src == string(ds.n) {
 			return true, nil
 		}
 	}
@@ -1473,10 +1476,11 @@ func (sm *depspecSourceManager) ExportProject(id ProjectIdentifier, v Version, t
 }
 
 func (sm *depspecSourceManager) DeduceProjectRoot(ip string) (ProjectRoot, error) {
+	fip := toFold(ip)
 	for _, ds := range sm.allSpecs() {
 		n := string(ds.n)
-		if ip == n || strings.HasPrefix(ip, n+"/") {
-			return ProjectRoot(n), nil
+		if fip == n || strings.HasPrefix(fip, n+"/") {
+			return ProjectRoot(ip[:len(n)]), nil
 		}
 	}
 	return "", fmt.Errorf("Could not find %s, or any parent, in list of known fixtures", ip)

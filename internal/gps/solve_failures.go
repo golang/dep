@@ -139,7 +139,7 @@ func (e *wrongCaseFailure) Error() string {
 	var buf bytes.Buffer
 
 	str := "Could not introduce %s; its packages import each other using %q, establishing that as correct, but the following projects tried to import it as %q"
-	return fmt.Sprintf(str, a2vs(e.goal.depender), e.correct, e.badcase[0].dep.Ident.ProjectRoot)
+	fmt.Fprintf(&buf, str, a2vs(e.goal.depender), e.correct, e.badcase[0].dep.Ident.ProjectRoot)
 
 	for _, c := range e.badcase {
 		fmt.Fprintf(&buf, "\t%s\n", a2vs(c.depender))

@@ -691,8 +691,6 @@ var bimodalFixtures = map[string]bimodalFixture{
 				pkg("foo", "Bar")),
 			dsp(mkDepspec("bar 1.0.0"),
 				pkg("bar")),
-			dsp(mkDepspec("Bar 1.0.0"),
-				pkg("Bar")),
 		},
 		fail: &noVersionError{
 			pn: mkPI("foo"),
@@ -1324,14 +1322,26 @@ func newbmSM(bmf bimodalFixture) *bmSourceManager {
 }
 
 func (sm *bmSourceManager) ListPackages(id ProjectIdentifier, v Version) (pkgtree.PackageTree, error) {
+	src, fsrc := id.normalizedSource(), toFold(id.normalizedSource())
 	for k, ds := range sm.specs {
 		// Cheat for root, otherwise we blow up b/c version is empty
-		if id.normalizedSource() == string(ds.n) && (k == 0 || ds.v.Matches(v)) {
+		if fsrc == string(ds.n) && (k == 0 || ds.v.Matches(v)) {
+			var replace bool
+			if src != string(ds.n) {
+				// We're in a case-varying lookup; ensure we replace the actual
+				// leading ProjectRoot portion of import paths with the literal
+				// string from the input.
+				replace = true
+			}
+
 			ptree := pkgtree.PackageTree{
-				ImportRoot: id.normalizedSource(),
+				ImportRoot: src,
 				Packages:   make(map[string]pkgtree.PackageOrErr),
 			}
 			for _, pkg := range ds.pkgs {
+				if replace {
+					pkg.path = strings.Replace(pkg.path, fsrc, src, 1)
+				}
 				ptree.Packages[pkg.path] = pkgtree.PackageOrErr{
 					P: pkgtree.Package{
 						ImportPath: pkg.path,
@@ -1349,9 +1359,10 @@ func (sm *bmSourceManager) ListPackages(id ProjectIdentifier, v Version) (pkgtre
 }
 
 func (sm *bmSourceManager) GetManifestAndLock(id ProjectIdentifier, v Version, an ProjectAnalyzer) (Manifest, Lock, error) {
+	src := toFold(id.normalizedSource())
 	for _, ds := range sm.specs {
-		if id.normalizedSource() == string(ds.n) && v.Matches(ds.v) {
-			if l, exists := sm.lm[id.normalizedSource()+" "+v.String()]; exists {
+		if src == string(ds.n) && v.Matches(ds.v) {
+			if l, exists := sm.lm[src+" "+v.String()]; exists {
 				return ds, l, nil
 			}
 			return ds, dummyLock{}, nil
