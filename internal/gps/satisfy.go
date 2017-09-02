@@ -239,6 +239,32 @@ func (s *solver) checkRootCaseConflicts(a atomWithPackages, cdep completeDep) er
 		s.fail(d.depender.id)
 	}
 
+	// If a project has multiple packages that import each other, we treat that
+	// as establishing a canonical case variant for the ProjectRoot. It's possible,
+	// however, that that canonical variant is not the same one that others
+	// imported it under. If that's the situation, then we'll have arrived here
+	// when visiting the project, not its dependers, having misclassified its
+	// internal imports as external. That means the atomWithPackages will
+	// be the wrong case variant induced by the importers, and the cdep will be
+	// a link pointing back at the canonical case variant.
+	//
+	// If this is the case, use a special failure, wrongCaseFailure, that
+	// makes a stronger statement as to the correctness of case variants.
+	//
+	// TODO(sdboyer) This approach to marking failure is less than great, as
+	// this will mark the current atom as failed, as well, causing the
+	// backtracker to work through it. While that could prove fruitful, it's
+	// quite likely just to be wasted effort. Addressing this - if that's a good
+	// idea - would entail creating another path back out of checking to enable
+	// backjumping directly to the incorrect importers.
+	if current == a.a.id.ProjectRoot {
+		return &wrongCaseFailure{
+			correct: pr,
+			goal:    dependency{depender: a.a, dep: cdep},
+			badcase: deps,
+		}
+	}
+
 	return &caseMismatchFailure{
 		goal:    dependency{depender: a.a, dep: cdep},
 		current: current,
