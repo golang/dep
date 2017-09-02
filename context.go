@@ -105,6 +105,11 @@ func (c *Ctx) LoadProject() (*Project, error) {
 		return nil, err
 	}
 
+	err = checkCfgFilenames(root)
+	if err != nil {
+		return nil, err
+	}
+
 	p := new(Project)
 
 	if err = p.SetRoot(root); err != nil {
