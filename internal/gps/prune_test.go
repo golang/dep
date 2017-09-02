@@ -9,11 +9,135 @@ import (
 	"log"
 	"testing"
 
-	"github.com/golang/dep/internal/fs"
 	"github.com/golang/dep/internal/test"
 )
 
-func TestPruneEmptyDirs(t *testing.T) {
+func TestPruneUnusedPackages(t *testing.T) {
+	h := test.NewHelper(t)
+	defer h.Cleanup()
+
+	h.TempDir(".")
+
+	pr := "github.com/test/project"
+	pi := ProjectIdentifier{ProjectRoot: ProjectRoot(pr)}
+
+	testcases := []struct {
+		name string
+		lp   LockedProject
+		fs   fsTestCase
+		err  bool
+	}{
+		{
+			"one-package",
+			LockedProject{
+				pi:   pi,
+				pkgs: []string{"."},
+			},
+			fsTestCase{
+				before: filesystemState{
+					files: []fsPath{
+						{"main.go"},
+					},
+				},
+				after: filesystemState{
+					files: []fsPath{
+						{"main.go"},
+					},
+				},
+			},
+			false,
+		},
+		{
+			"nested-package",
+			LockedProject{
+				pi:   pi,
+				pkgs: []string{"pkg"},
+			},
+			fsTestCase{
+				before: filesystemState{
+					dirs: []fsPath{
+						{"pkg"},
+					},
+					files: []fsPath{
+						{"main.go"},
+						{"pkg", "main.go"},
+					},
+				},
+				after: filesystemState{
+					dirs: []fsPath{
+						{"pkg"},
+					},
+					files: []fsPath{
+						{"pkg", "main.go"},
+					},
+				},
+			},
+			false,
+		},
+		{
+			"complex-project",
+			LockedProject{
+				pi:   pi,
+				pkgs: []string{"pkg", "pkg/nestedpkg/otherpkg"},
+			},
+			fsTestCase{
+				before: filesystemState{
+					dirs: []fsPath{
+						{"pkg"},
+						{"pkg", "nestedpkg"},
+						{"pkg", "nestedpkg", "otherpkg"},
+					},
+					files: []fsPath{
+						{"main.go"},
+						{"COPYING"},
+						{"pkg", "main.go"},
+						{"pkg", "nestedpkg", "main.go"},
+						{"pkg", "nestedpkg", "PATENT.md"},
+						{"pkg", "nestedpkg", "otherpkg", "main.go"},
+					},
+				},
+				after: filesystemState{
+					dirs: []fsPath{
+						{"pkg"},
+						{"pkg", "nestedpkg"},
+						{"pkg", "nestedpkg", "otherpkg"},
+					},
+					files: []fsPath{
+						{"COPYING"},
+						{"pkg", "main.go"},
+						{"pkg", "nestedpkg", "PATENT.md"},
+						{"pkg", "nestedpkg", "otherpkg", "main.go"},
+					},
+				},
+			},
+			false,
+		},
+	}
+
+	logger := log.New(ioutil.Discard, "", 0)
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			h.TempDir(pr)
+			projectDir := h.Path(pr)
+			tc.fs.before.root = projectDir
+			tc.fs.after.root = projectDir
+
+			tc.fs.before.setup(t)
+
+			err := pruneUnusedPackages(tc.lp, projectDir, logger)
+			if tc.err && err == nil {
+				t.Errorf("expected an error, got nil")
+			} else if !tc.err && err != nil {
+				t.Errorf("unexpected error: %s", err)
+			}
+
+			tc.fs.after.assert(t)
+		})
+	}
+}
+
+func TestPruneNonGoFiles(t *testing.T) {
 	h := test.NewHelper(t)
 	defer h.Cleanup()
 
@@ -25,11 +149,11 @@ func TestPruneEmptyDirs(t *testing.T) {
 		err  bool
 	}{
 		{
-			"empty-dir",
+			"one-file",
 			fsTestCase{
 				before: filesystemState{
-					dirs: []fsPath{
-						{"dir"},
+					files: []fsPath{
+						{"README.md"},
 					},
 				},
 				after: filesystemState{},
@@ -37,68 +161,44 @@ func TestPruneEmptyDirs(t *testing.T) {
 			false,
 		},
 		{
-			"non-empty-dir",
+			"multiple-files",
 			fsTestCase{
 				before: filesystemState{
-					dirs: []fsPath{
-						{"dir"},
-					},
 					files: []fsPath{
-						{"dir", "file"},
+						{"main.go"},
+						{"main_test.go"},
+						{"README"},
 					},
 				},
 				after: filesystemState{
-					dirs: []fsPath{
-						{"dir"},
-					},
 					files: []fsPath{
-						{"dir", "file"},
+						{"main.go"},
+						{"main_test.go"},
 					},
 				},
 			},
 			false,
 		},
 		{
-			"nested-empty-dirs",
+			"mixed-files",
 			fsTestCase{
 				before: filesystemState{
 					dirs: []fsPath{
-						{"dirs"},
-						{"dirs", "dir1"},
-						{"dirs", "dir2"},
+						{"dir"},
+					},
+					files: []fsPath{
+						{"dir", "main.go"},
+						{"dir", "main_test.go"},
+						{"dir", "db.sqlite"},
 					},
 				},
 				after: filesystemState{
 					dirs: []fsPath{
-						{"dirs"},
-					},
-				},
-			},
-			false,
-		},
-		{
-			"mixed-dirs",
-			fsTestCase{
-				before: filesystemState{
-					dirs: []fsPath{
-						{"dir1"},
-						{"dir2"},
-						{"dir3"},
-						{"dir4"},
+						{"dir"},
 					},
 					files: []fsPath{
-						{"dir3", "file"},
-						{"dir4", "file"},
-					},
-				},
-				after: filesystemState{
-					dirs: []fsPath{
-						{"dir3"},
-						{"dir4"},
-					},
-					files: []fsPath{
-						{"dir3", "file"},
-						{"dir4", "file"},
+						{"dir", "main.go"},
+						{"dir", "main_test.go"},
 					},
 				},
 			},
@@ -117,7 +217,7 @@ func TestPruneEmptyDirs(t *testing.T) {
 
 			tc.fs.before.setup(t)
 
-			err := pruneEmptyDirs(baseDir, logger)
+			err := pruneNonGoFiles(baseDir, logger)
 			if tc.err && err == nil {
 				t.Errorf("expected an error, got nil")
 			} else if !tc.err && err != nil {
@@ -129,96 +229,96 @@ func TestPruneEmptyDirs(t *testing.T) {
 	}
 }
 
-func TestCalculateEmptyDirs(t *testing.T) {
+func TestPruneGoTestFiles(t *testing.T) {
 	h := test.NewHelper(t)
 	defer h.Cleanup()
 
 	h.TempDir(".")
 
 	testcases := []struct {
-		name      string
-		fs        filesystemState
-		emptyDirs int
-		err       bool
+		name string
+		fs   fsTestCase
+		err  bool
 	}{
 		{
-			"empty-dir",
-			filesystemState{
-				dirs: []fsPath{
-					{"dir"},
+			"one-test-file",
+			fsTestCase{
+				before: filesystemState{
+					files: []fsPath{
+						{"main_test.go"},
+					},
 				},
+				after: filesystemState{},
 			},
-			1,
 			false,
 		},
 		{
-			"non-empty-dir",
-			filesystemState{
-				dirs: []fsPath{
-					{"dir"},
+			"multiple-files",
+			fsTestCase{
+				before: filesystemState{
+					dirs: []fsPath{
+						{"dir"},
+					},
+					files: []fsPath{
+						{"dir", "main_test.go"},
+						{"dir", "main2_test.go"},
+					},
 				},
-				files: []fsPath{
-					{"dir", "file"},
+				after: filesystemState{
+					dirs: []fsPath{
+						{"dir"},
+					},
 				},
 			},
-			0,
 			false,
 		},
 		{
-			"nested-empty-dirs",
-			filesystemState{
-				dirs: []fsPath{
-					{"dirs"},
-					{"dirs", "dir1"},
-					{"dirs", "dir2"},
+			"mixed-files",
+			fsTestCase{
+				before: filesystemState{
+					dirs: []fsPath{
+						{"dir"},
+					},
+					files: []fsPath{
+						{"dir", "main.go"},
+						{"dir", "main2.go"},
+						{"dir", "main_test.go"},
+						{"dir", "main2_test.go"},
+					},
+				},
+				after: filesystemState{
+					dirs: []fsPath{
+						{"dir"},
+					},
+					files: []fsPath{
+						{"dir", "main.go"},
+						{"dir", "main2.go"},
+					},
 				},
 			},
-			2,
-			false,
-		},
-		{
-			"mixed-dirs",
-			filesystemState{
-				dirs: []fsPath{
-					{"dir1"},
-					{"dir2"},
-					{"dir3"},
-					{"dir4"},
-				},
-				files: []fsPath{
-					{"dir3", "file"},
-					{"dir4", "file"},
-				},
-			},
-			2,
 			false,
 		},
 	}
+
+	logger := log.New(ioutil.Discard, "", 0)
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
 			h.TempDir(tc.name)
 			baseDir := h.Path(tc.name)
+			tc.fs.before.root = baseDir
+			tc.fs.after.root = baseDir
 
-			tc.fs.root = baseDir
-			tc.fs.setup(t)
+			tc.fs.before.setup(t)
 
-			emptyDirs, err := calculateEmptyDirs(baseDir)
+			err := pruneGoTestFiles(baseDir, logger)
 			if tc.err && err == nil {
 				t.Errorf("expected an error, got nil")
 			} else if !tc.err && err != nil {
 				t.Errorf("unexpected error: %s", err)
 			}
-			if len(emptyDirs) != tc.emptyDirs {
-				t.Fatalf("expected %d paths, got %d", tc.emptyDirs, len(emptyDirs))
-			}
-			for _, dir := range emptyDirs {
-				if nonEmpty, err := fs.IsNonEmptyDir(dir); err != nil {
-					t.Fatalf("unexpected error: %s", err)
-				} else if nonEmpty {
-					t.Fatalf("expected %s to be empty, but it wasn't", dir)
-				}
-			}
+
+			tc.fs.after.assert(t)
 		})
 	}
 }
