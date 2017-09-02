@@ -683,7 +683,7 @@ var bimodalFixtures = map[string]bimodalFixture{
 			"a 1.0.0",
 		),
 	},
-	"simple case-only variations": {
+	"simple case-only differences": {
 		ds: []depspec{
 			dsp(mkDepspec("root 0.0.0"),
 				pkg("root", "foo", "bar")),
@@ -706,6 +706,23 @@ var bimodalFixtures = map[string]bimodalFixture{
 			},
 		},
 	},
+	"case variations acceptable with agreement": {
+		ds: []depspec{
+			dsp(mkDepspec("root 0.0.0"),
+				pkg("root", "foo")),
+			dsp(mkDepspec("foo 1.0.0"),
+				pkg("foo", "Bar", "baz")),
+			dsp(mkDepspec("baz 1.0.0"),
+				pkg("baz", "Bar")),
+			dsp(mkDepspec("bar 1.0.0"),
+				pkg("bar")),
+		},
+		r: mksolution(
+			"foo 1.0.0",
+			"Bar 1.0.0",
+			"baz 1.0.0",
+		),
+	},
 	"case variations within root": {
 		ds: []depspec{
 			dsp(mkDepspec("root 0.0.0"),
@@ -714,8 +731,6 @@ var bimodalFixtures = map[string]bimodalFixture{
 				pkg("foo")),
 			dsp(mkDepspec("bar 1.0.0"),
 				pkg("bar")),
-			dsp(mkDepspec("Bar 1.0.0"),
-				pkg("Bar")),
 		},
 		fail: &noVersionError{
 			pn: mkPI("foo"),
@@ -730,6 +745,7 @@ var bimodalFixtures = map[string]bimodalFixture{
 				},
 			},
 		},
+		broken: "need to implement checking for import case variations *within* the root",
 	},
 	"case variations within single dep": {
 		ds: []depspec{
@@ -739,8 +755,6 @@ var bimodalFixtures = map[string]bimodalFixture{
 				pkg("foo", "bar", "Bar")),
 			dsp(mkDepspec("bar 1.0.0"),
 				pkg("bar")),
-			dsp(mkDepspec("Bar 1.0.0"),
-				pkg("Bar")),
 		},
 		fail: &noVersionError{
 			pn: mkPI("foo"),
@@ -755,8 +769,9 @@ var bimodalFixtures = map[string]bimodalFixture{
 				},
 			},
 		},
+		broken: "need to implement checking for import case variations *within* a single project",
 	},
-	"case variations within multiple deps": {
+	"case variations across multiple deps": {
 		ds: []depspec{
 			dsp(mkDepspec("root 0.0.0"),
 				pkg("root", "foo", "bar")),
@@ -766,8 +781,6 @@ var bimodalFixtures = map[string]bimodalFixture{
 				pkg("baz", "Bar")),
 			dsp(mkDepspec("bar 1.0.0"),
 				pkg("bar")),
-			dsp(mkDepspec("Bar 1.0.0"),
-				pkg("Bar")),
 		},
 		fail: &noVersionError{
 			pn: mkPI("baz"),
@@ -787,36 +800,85 @@ var bimodalFixtures = map[string]bimodalFixture{
 		},
 	},
 	// This isn't actually as crazy as it might seem, as the root is defined by
-	// the addresser, not the addressee. It would occur if, e.g. something
-	// imports github.com/Sirupsen/logrus, as the contained subpackage at
+	// the addresser, not the addressee. It would occur (to provide a
+	// real-as-of-this-writing example) if something imports
+	// github.com/Sirupsen/logrus, as the contained subpackage at
 	// github.com/Sirupsen/logrus/hooks/syslog imports
 	// github.com/sirupsen/logrus. The only reason that doesn't blow up all the
 	// time is that most people only import the root package, not the syslog
 	// subpackage.
-	"case variations from self": {
+	"canonical case is established by mutual self-imports": {
 		ds: []depspec{
 			dsp(mkDepspec("root 0.0.0"),
 				pkg("root", "foo")),
 			dsp(mkDepspec("foo 1.0.0"),
-				pkg("foo", "bar")),
+				pkg("foo", "Bar")),
 			dsp(mkDepspec("bar 1.0.0"),
-				pkg("bar", "Bar")),
-			dsp(mkDepspec("Bar 1.0.0"),
-				pkg("Bar")),
+				pkg("bar", "bar/subpkg"),
+				pkg("bar/subpkg")),
 		},
 		fail: &noVersionError{
-			pn: mkPI("foo"),
+			pn: mkPI("Bar"),
 			fails: []failedVersion{
 				{
 					v: NewVersion("1.0.0"),
-					f: &caseMismatchFailure{
-						goal:    mkDep("foo 1.0.0", "Bar 1.0.0", "Bar"),
-						current: ProjectRoot("bar"),
-						failsib: []dependency{mkDep("root", "foo 1.0.0", "foo")},
+					f: &wrongCaseFailure{
+						correct: ProjectRoot("bar"),
+						goal:    mkDep("Bar 1.0.0", "bar 1.0.0", "bar"),
+						badcase: []dependency{mkDep("foo 1.0.0", "Bar 1.0.0", "Bar/subpkg")},
 					},
 				},
 			},
 		},
+	},
+	"canonical case only applies if relevant imports are activated": {
+		ds: []depspec{
+			dsp(mkDepspec("root 0.0.0"),
+				pkg("root", "foo")),
+			dsp(mkDepspec("foo 1.0.0"),
+				pkg("foo", "Bar/subpkg")),
+			dsp(mkDepspec("bar 1.0.0"),
+				pkg("bar", "bar/subpkg"),
+				pkg("bar/subpkg")),
+		},
+		r: mksolution(
+			"foo 1.0.0",
+			mklp("Bar 1.0.0", "subpkg"),
+		),
+	},
+	"simple case-only variations plus source variance": {
+		// COPYPASTA BELOW, FIX IT
+		ds: []depspec{
+			dsp(mkDepspec("root 0.0.0"),
+				pkg("root", "foo", "Bar")), // TODO align the froms
+			dsp(mkDepspec("foo 1.0.0", "Bar from quux 1.0.0"),
+				pkg("foo", "Bar")),
+			dsp(mkDepspec("bar 1.0.0"),
+				pkg("bar")),
+			dsp(mkDepspec("quux 1.0.0"),
+				pkg("bar")),
+		},
+		r: mksolution(
+			"foo 1.0.0",
+			"Bar from quux 1.0.0",
+		),
+	},
+	"case-only variations plus source variance with internal canonicality": {
+		// COPYPASTA BELOW, FIX IT
+		ds: []depspec{
+			dsp(mkDepspec("root 0.0.0"),
+				pkg("root", "foo", "Bar")),
+			dsp(mkDepspec("foo 1.0.0", "Bar from quux 1.0.0"),
+				pkg("foo", "Bar")),
+			dsp(mkDepspec("bar 1.0.0"),
+				pkg("bar")),
+			dsp(mkDepspec("quux 1.0.0"),
+				pkg("bar")),
+		},
+		r: mksolution(
+			"foo 1.0.0",
+			"Bar from quux 1.0.0",
+		),
 	},
 	"alternate net address": {
 		ds: []depspec{
@@ -1240,6 +1302,9 @@ type bimodalFixture struct {
 	ignore []string
 	// pkgs to require
 	require []string
+	// if the fixture is currently broken/expected to fail, this has a message
+	// recording why
+	broken string
 }
 
 func (f bimodalFixture) name() string {

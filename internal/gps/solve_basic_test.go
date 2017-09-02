@@ -399,6 +399,9 @@ type basicFixture struct {
 	changeall bool
 	// individual projects to change
 	changelist []ProjectRoot
+	// if the fixture is currently broken/expected to fail, this has a message
+	// recording why
+	broken string
 }
 
 func (f basicFixture) name() string {
