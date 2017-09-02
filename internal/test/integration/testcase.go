@@ -2,25 +2,22 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package test
+package integration
 
 import (
 	"encoding/json"
-	"flag"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"unicode"
+
+	"github.com/golang/dep/internal/test"
 )
 
-var (
-	UpdateGolden *bool = flag.Bool("update", false, "update golden files")
-)
-
-// IntegrationTestCase manages a test case directory structure and content
-type IntegrationTestCase struct {
+// TestCase manages a test case directory structure and content
+type TestCase struct {
 	t             *testing.T
 	name          string
 	rootPath      string
@@ -34,10 +31,10 @@ type IntegrationTestCase struct {
 	InitPath      string            `json:"init-path"`
 }
 
-// NewTestCase creates a new IntegrationTestCase.
-func NewTestCase(t *testing.T, dir, name string) *IntegrationTestCase {
+// NewTestCase creates a new TestCase.
+func NewTestCase(t *testing.T, dir, name string) *TestCase {
 	rootPath := filepath.FromSlash(filepath.Join(dir, name))
-	n := &IntegrationTestCase{
+	n := &TestCase{
 		t:           t,
 		name:        name,
 		rootPath:    rootPath,
@@ -55,12 +52,13 @@ func NewTestCase(t *testing.T, dir, name string) *IntegrationTestCase {
 	return n
 }
 
-func (tc *IntegrationTestCase) InitialPath() string {
+// InitialPath represents the initial set of files in a project.
+func (tc *TestCase) InitialPath() string {
 	return tc.initialPath
 }
 
 // UpdateFile updates the golden file with the working result.
-func (tc *IntegrationTestCase) UpdateFile(goldenPath, workingPath string) {
+func (tc *TestCase) UpdateFile(goldenPath, workingPath string) {
 	exists, working, err := getFile(workingPath)
 	if err != nil {
 		tc.t.Fatalf("Error reading project file %s: %s", goldenPath, err)
@@ -80,7 +78,7 @@ func (tc *IntegrationTestCase) UpdateFile(goldenPath, workingPath string) {
 }
 
 // CompareFile compares the golden file with the working result.
-func (tc *IntegrationTestCase) CompareFile(goldenPath, working string) {
+func (tc *TestCase) CompareFile(goldenPath, working string) {
 	golden := filepath.Join(tc.finalPath, goldenPath)
 
 	gotExists, got, err := getFile(working)
@@ -103,8 +101,8 @@ func (tc *IntegrationTestCase) CompareFile(goldenPath, working string) {
 	}
 }
 
-// CompareError compares expected and actual stdout output
-func (tc *IntegrationTestCase) CompareOutput(stdout string) {
+// CompareOutput compares expected and actual stdout output.
+func (tc *TestCase) CompareOutput(stdout string) {
 	expected, err := ioutil.ReadFile(filepath.Join(tc.rootPath, "stdout.txt"))
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -131,8 +129,8 @@ func normalizeLines(s string) string {
 	return strings.Join(lines, "\n")
 }
 
-// CompareError compares exected and actual error
-func (tc *IntegrationTestCase) CompareError(err error, stderr string) {
+// CompareError compares expected and actual stderr output.
+func (tc *TestCase) CompareError(err error, stderr string) {
 	wantExists, want := tc.ErrorExpected != "", tc.ErrorExpected
 	gotExists, got := stderr != "" && err != nil, stderr
 
@@ -151,8 +149,9 @@ func (tc *IntegrationTestCase) CompareError(err error, stderr string) {
 	}
 }
 
-func (tc *IntegrationTestCase) CompareVendorPaths(gotVendorPaths []string) {
-	if *UpdateGolden {
+// CompareVendorPaths validates the vendor directory contents.
+func (tc *TestCase) CompareVendorPaths(gotVendorPaths []string) {
+	if *test.UpdateGolden {
 		tc.VendorFinal = gotVendorPaths
 	} else {
 		wantVendorPaths := tc.VendorFinal
@@ -167,9 +166,9 @@ func (tc *IntegrationTestCase) CompareVendorPaths(gotVendorPaths []string) {
 	}
 }
 
-func (tc *IntegrationTestCase) WriteFile(src string, content string) error {
-	err := ioutil.WriteFile(src, []byte(content), 0666)
-	return err
+// WriteFile writes a file using the default file permissions.
+func (tc *TestCase) WriteFile(src string, content string) error {
+	return ioutil.WriteFile(src, []byte(content), 0666)
 }
 
 func getFile(path string) (bool, string, error) {

@@ -12,11 +12,9 @@ import (
 )
 
 func TestVCSVersion(t *testing.T) {
-	test.NeedsExternalNetwork(t)
-	test.NeedsGit(t)
-
 	h := test.NewHelper(t)
 	defer h.Cleanup()
+	requiresBins(t, "git")
 
 	h.TempDir("src")
 	gopath := h.Path(".")
