@@ -474,6 +474,52 @@ func TestGetSources(t *testing.T) {
 	clean()
 }
 
+func TestFSCaseSensitivityConvergesSources(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping slow test in short mode")
+	}
+
+	sm, clean := mkNaiveSM(t)
+	defer clean()
+
+	pi1 := mkPI("github.com/sdboyer/deptest").normalize()
+	sm.SyncSourceFor(pi1)
+	sg1, err := sm.srcCoord.getSourceGatewayFor(context.Background(), pi1)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	pi2 := mkPI("github.com/Sdboyer/deptest").normalize()
+	sm.SyncSourceFor(pi2)
+	sg2, err := sm.srcCoord.getSourceGatewayFor(context.Background(), pi2)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	path1 := sg1.src.(*gitSource).repo.LocalPath()
+	t.Log("path1:", path1)
+	stat1, err := os.Stat(path1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	path2 := sg2.src.(*gitSource).repo.LocalPath()
+	t.Log("path2:", path2)
+	stat2, err := os.Stat(path2)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	same, count := os.SameFile(stat1, stat2), len(sm.srcCoord.srcs)
+	if same && count != 1 {
+		t.Log("are same, count", count)
+		t.Fatal("on case-insensitive filesystem, case-varying sources should have been folded together but were not")
+	}
+	if !same && count != 2 {
+		t.Log("not same, count", count)
+		t.Fatal("on case-sensitive filesystem, case-varying sources should not have been folded together, but were")
+	}
+}
+
 // Regression test for #32
 func TestGetInfoListVersionsOrdering(t *testing.T) {
 	// This test is quite slow, skip it on -short
