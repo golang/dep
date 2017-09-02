@@ -11,6 +11,7 @@ import (
 
 	"github.com/golang/dep/internal/fs"
 	"github.com/golang/dep/internal/gps"
+	"github.com/pkg/errors"
 )
 
 var (
@@ -39,6 +40,44 @@ func findProjectRoot(from string) (string, error) {
 		}
 		from = parent
 	}
+}
+
+// checkCfgFilenames validates filename case for the manifest and lock files.
+// This is relevant on case-insensitive systems like Windows.
+func checkCfgFilenames(projectRoot string) error {
+	// ReadActualFilenames is actually costly.  Since this check is not relevant
+	// to case-sensitive filesystems like ext4, try for an early return.
+	caseSensitive, err := fs.IsCaseSensitiveFilesystem(projectRoot)
+	if err != nil {
+		return errors.Wrap(err, "could not check validity of configuration filenames")
+	}
+	if caseSensitive {
+		return nil
+	}
+
+	actualFilenames, err := fs.ReadActualFilenames(projectRoot, []string{ManifestName, LockName})
+
+	if err != nil {
+		return errors.Wrap(err, "could not check validity of configuration filenames")
+	}
+
+	// Since this check is done after `findProjectRoot`, we can assume that
+	// manifest file will be present. Even if it is not, error will still be thrown.
+	// But error message will be a tad inaccurate.
+	actualMfName := actualFilenames[ManifestName]
+	if actualMfName != ManifestName {
+		return fmt.Errorf("manifest filename '%s' does not match '%s'", actualMfName, ManifestName)
+	}
+
+	// If a file is not found, the string map returned by `fs.ReadActualFilenames`
+	// will not have an entry for the given filename. Since the lock file
+	// is optional, we should check for equality only if it was found.
+	actualLfName := actualFilenames[LockName]
+	if len(actualLfName) > 0 && actualLfName != LockName {
+		return fmt.Errorf("lock filename '%s' does not match '%s'", actualLfName, LockName)
+	}
+
+	return nil
 }
 
 // A Project holds a Manifest and optional Lock for a project.

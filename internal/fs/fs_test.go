@@ -8,11 +8,13 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"reflect"
 	"runtime"
 	"strings"
 	"testing"
 
 	"github.com/golang/dep/internal/test"
+	"github.com/pkg/errors"
 )
 
 // This function tests HadFilepathPrefix. It should test it on both case
@@ -169,7 +171,7 @@ func TestEquivalentPaths(t *testing.T) {
 		{strings.ToLower(h.Path("dir")), strings.ToUpper(h.Path("dir")), false, true, true},
 	}
 
-	caseSensitive, err := isCaseSensitiveFilesystem(h.Path("dir"))
+	caseSensitive, err := IsCaseSensitiveFilesystem(h.Path("dir"))
 	if err != nil {
 		t.Fatal("unexpcted error:", err)
 	}
@@ -229,6 +231,98 @@ func TestRenameWithFallback(t *testing.T) {
 	}
 }
 
+func TestIsCaseSensitiveFilesystem(t *testing.T) {
+	isLinux := runtime.GOOS == "linux"
+	isWindows := runtime.GOOS == "windows"
+	isMacOS := runtime.GOOS == "darwin"
+
+	if !isLinux && !isWindows && !isMacOS {
+		t.Skip("Run this test on Windows, Linux and macOS only")
+	}
+
+	dir, err := ioutil.TempDir("", "TestCaseSensitivity")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(dir)
+
+	var want bool
+	if isLinux {
+		want = true
+	} else {
+		want = false
+	}
+
+	got, err := IsCaseSensitiveFilesystem(dir)
+
+	if err != nil {
+		t.Fatalf("unexpected error message: \n\t(GOT) %+v", err)
+	}
+
+	if want != got {
+		t.Fatalf("unexpected value returned: \n\t(GOT) %t\n\t(WNT) %t", got, want)
+	}
+}
+
+func TestReadActualFilenames(t *testing.T) {
+	if runtime.GOOS != "windows" && runtime.GOOS != "darwin" {
+		t.Skip("skip this test on non-Windows, non-macOS")
+	}
+
+	h := test.NewHelper(t)
+	defer h.Cleanup()
+
+	h.TempDir("")
+	tmpPath := h.Path(".")
+
+	_, err := ReadActualFilenames(filepath.Join(tmpPath, "does_not_exists"), []string{""})
+	switch {
+	case err == nil:
+		t.Fatal("expected err for non-existing folder")
+	case !os.IsNotExist(errors.Cause(err)):
+		t.Fatalf("unexpected error: %+v", err)
+	}
+	h.TempFile("tmpFile", "")
+	_, err = ReadActualFilenames(h.Path("tmpFile"), []string{""})
+	switch {
+	case err == nil:
+		t.Fatal("expected err for passing file instead of directory")
+	case err != errPathNotDir:
+		t.Fatalf("unexpected error: %+v", err)
+	}
+
+	cases := []struct {
+		createFiles []string
+		names       []string
+		want        map[string]string
+	}{
+		{nil, nil, map[string]string{}}, {
+			[]string{"test1.txt"},
+			[]string{"Test1.txt"},
+			map[string]string{"Test1.txt": "test1.txt"},
+		}, {
+			[]string{"test2.txt", "test3.TXT"},
+			[]string{"test2.txt", "Test3.txt", "Test4.txt"},
+			map[string]string{
+				"test2.txt": "test2.txt",
+				"Test3.txt": "test3.TXT",
+			},
+		},
+	}
+	for _, c := range cases {
+		for _, file := range c.createFiles {
+			h.TempFile(file, "")
+		}
+		got, err := ReadActualFilenames(tmpPath, c.names)
+		if err != nil {
+			t.Fatalf("unexpected error: %+v", err)
+		}
+		if !reflect.DeepEqual(c.want, got) {
+			t.Fatalf("returned value does not match expected: \n\t(GOT) %v\n\t(WNT) %v", got, c.want)
+		}
+	}
+}
+
 func TestGenTestFilename(t *testing.T) {
 	cases := []struct {
 		str  string
@@ -254,11 +348,11 @@ func TestGenTestFilename(t *testing.T) {
 
 func BenchmarkGenTestFilename(b *testing.B) {
 	cases := []string{
-		"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-		"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
-		"αααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααα",
-		"11111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111",
-		"⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘",
+		strings.Repeat("a", 128),
+		strings.Repeat("A", 128),
+		strings.Repeat("α", 128),
+		strings.Repeat("1", 128),
+		strings.Repeat("⌘", 128),
 	}
 
 	for i := 0; i < b.N; i++ {
@@ -613,6 +707,7 @@ func TestCopyFileLongFilePath(t *testing.T) {
 
 	h := test.NewHelper(t)
 	h.TempDir(".")
+	defer h.Cleanup()
 
 	tmpPath := h.Path(".")
 

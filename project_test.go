@@ -5,9 +5,11 @@
 package dep
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/golang/dep/internal/gps"
@@ -57,6 +59,60 @@ func TestFindRoot(t *testing.T) {
 		got4, err := findProjectRoot(filepath.Join(want, ManifestName))
 		if err == nil {
 			t.Errorf("Should have err'd when trying subdir of file, but returned %s", got4)
+		}
+	}
+}
+
+func TestCheckCfgFilenames(t *testing.T) {
+	if runtime.GOOS != "windows" && runtime.GOOS != "darwin" {
+		t.Skip("skip this test on non-Windows, non-macOS")
+	}
+
+	errMsgFor := func(filetype, filename string) func(string) string {
+		return func(name string) string {
+			return fmt.Sprintf("%s filename '%s' does not match '%s'", filetype, name, filename)
+		}
+	}
+
+	manifestErrMsg := errMsgFor("manifest", ManifestName)
+	lockErrMsg := errMsgFor("lock", LockName)
+
+	invalidMfName := strings.ToLower(ManifestName)
+	invalidLfName := strings.ToLower(LockName)
+
+	cases := []struct {
+		wantErr     bool
+		createFiles []string
+		wantErrMsg  string
+	}{
+		{false, []string{ManifestName}, ""},
+		{false, []string{ManifestName, LockName}, ""},
+		{true, nil, manifestErrMsg("")},
+		{true, []string{invalidMfName}, manifestErrMsg(invalidMfName)},
+		{true, []string{ManifestName, invalidLfName}, lockErrMsg(invalidLfName)},
+	}
+
+	for _, c := range cases {
+		h := test.NewHelper(t)
+		defer h.Cleanup()
+
+		h.TempDir("")
+		tmpPath := h.Path(".")
+
+		for _, file := range c.createFiles {
+			h.TempFile(file, "")
+		}
+		err := checkCfgFilenames(tmpPath)
+
+		if c.wantErr {
+			if err == nil {
+				t.Fatalf("unexpected error message: \n\t(GOT) nil\n\t(WNT) %s", c.wantErrMsg)
+			} else if err.Error() != c.wantErrMsg {
+				t.Fatalf("unexpected error message: \n\t(GOT) %s\n\t(WNT) %s", err.Error(), c.wantErrMsg)
+			}
+		} else if err != nil {
+			// Error was not expected but still we got one
+			t.Fatalf("unexpected error message: \n\t(GOT) %+v", err)
 		}
 	}
 }

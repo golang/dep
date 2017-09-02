@@ -5,6 +5,7 @@
 package dep
 
 import (
+	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
@@ -260,6 +261,50 @@ func TestLoadProjectNoSrcDir(t *testing.T) {
 	_, err := ctx.LoadProject()
 	if err == nil {
 		t.Fatal("should have returned 'Split Absolute Root' error (no 'src' dir present)")
+	}
+}
+
+func TestLoadProjectCfgFileCase(t *testing.T) {
+	if runtime.GOOS != "windows" && runtime.GOOS != "darwin" {
+		t.Skip("skip this test on non-Windows, non-macOS")
+	}
+
+	// Here we test that a manifest filename with incorrect case
+	// throws an error. Similar error will also be thrown for the
+	// lock file as well which has been tested in
+	// `project_test.go#TestCheckCfgFilenames`. So not repeating here.
+
+	h := test.NewHelper(t)
+	defer h.Cleanup()
+
+	invalidMfName := strings.ToLower(ManifestName)
+
+	wd := filepath.Join("src", "test")
+	h.TempFile(filepath.Join(wd, invalidMfName), "")
+
+	ctx := &Ctx{
+		Out: discardLogger(),
+		Err: discardLogger(),
+	}
+
+	err := ctx.SetPaths(h.Path(wd), h.Path("."))
+	if err != nil {
+		t.Fatalf("%+v", err)
+	}
+
+	_, err = ctx.LoadProject()
+
+	if err == nil {
+		t.Fatal("should have returned 'Manifest Filename' error")
+	}
+
+	expectedErrMsg := fmt.Sprintf(
+		"manifest filename '%s' does not match '%s'",
+		invalidMfName, ManifestName,
+	)
+
+	if err.Error() != expectedErrMsg {
+		t.Fatalf("unexpected error: %+v", err)
 	}
 }
 
