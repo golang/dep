@@ -75,7 +75,11 @@ func TestHasFilepathPrefix(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if got := HasFilepathPrefix(c.path, c.prefix); c.want != got {
+		got, err := HasFilepathPrefix(c.path, c.prefix)
+		if err != nil {
+			t.Fatalf("unexpected error: %s", err)
+		}
+		if c.want != got {
 			t.Fatalf("dir: %q, prefix: %q, expected: %v, got: %v", c.path, c.prefix, c.want, got)
 		}
 	}
@@ -122,14 +126,67 @@ func TestHasFilepathPrefix_Files(t *testing.T) {
 		path   string
 		prefix string
 		want   bool
+		err    bool
 	}{
-		{existingFile, filepath.Join(dir2), true},
-		{nonExistingFile, filepath.Join(dir2), false},
+		{existingFile, filepath.Join(dir2), true, false},
+		{nonExistingFile, filepath.Join(dir2), false, true},
 	}
 
 	for _, c := range cases {
-		if got := HasFilepathPrefix(c.path, c.prefix); c.want != got {
+		got, err := HasFilepathPrefix(c.path, c.prefix)
+		if err != nil && !c.err {
+			t.Fatalf("unexpected error: %s", err)
+		}
+		if c.want != got {
 			t.Fatalf("dir: %q, prefix: %q, expected: %v, got: %v", c.path, c.prefix, c.want, got)
+		}
+	}
+}
+
+func TestEquivalentPaths(t *testing.T) {
+	h := test.NewHelper(t)
+	h.TempDir("dir")
+	h.TempDir("dir2")
+
+	h.TempFile("file", "")
+	h.TempFile("file2", "")
+
+	h.TempDir("DIR")
+	h.TempFile("FILE", "")
+
+	testcases := []struct {
+		p1, p2                   string
+		caseSensitiveEquivalent  bool
+		caseInensitiveEquivalent bool
+		err                      bool
+	}{
+		{h.Path("dir"), h.Path("dir"), true, true, false},
+		{h.Path("file"), h.Path("file"), true, true, false},
+		{h.Path("dir"), h.Path("dir2"), false, false, false},
+		{h.Path("file"), h.Path("file2"), false, false, false},
+		{h.Path("dir"), h.Path("file"), false, false, false},
+		{h.Path("dir"), h.Path("DIR"), false, true, false},
+		{strings.ToLower(h.Path("dir")), strings.ToUpper(h.Path("dir")), false, true, true},
+	}
+
+	caseSensitive, err := isCaseSensitiveFilesystem(h.Path("dir"))
+	if err != nil {
+		t.Fatal("unexpcted error:", err)
+	}
+
+	for _, tc := range testcases {
+		got, err := EquivalentPaths(tc.p1, tc.p2)
+		if err != nil && !tc.err {
+			t.Error("unexpected error:", err)
+		}
+		if caseSensitive {
+			if tc.caseSensitiveEquivalent != got {
+				t.Errorf("expected EquivalentPaths(%q, %q) to be %t on case-sensitive filesystem, got %t", tc.p1, tc.p2, tc.caseSensitiveEquivalent, got)
+			}
+		} else {
+			if tc.caseInensitiveEquivalent != got {
+				t.Errorf("expected EquivalentPaths(%q, %q) to be %t on case-insensitive filesystem, got %t", tc.p1, tc.p2, tc.caseInensitiveEquivalent, got)
+			}
 		}
 	}
 }
