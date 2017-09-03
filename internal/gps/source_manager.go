@@ -19,9 +19,9 @@ import (
 	"time"
 
 	"github.com/golang/dep/internal/gps/pkgtree"
-	"github.com/nightlyone/lockfile"
 	"github.com/pkg/errors"
 	"github.com/sdboyer/constext"
+	flock "github.com/theckman/go-flock"
 )
 
 // Used to compute a friendly filepath from a URL-shaped input.
@@ -115,7 +115,7 @@ func (p ProjectAnalyzerInfo) String() string {
 // tools; control via dependency injection is intended to be sufficient.
 type SourceMgr struct {
 	cachedir    string                // path to root of cache dir
-	lf          *lockfile.Lockfile    // handle for the sm lock file on disk
+	lf          *flock.Flock          // handle for the sm lock file on disk
 	suprvsr     *supervisor           // subsystem that supervises running calls/io
 	cancelAll   context.CancelFunc    // cancel func to kill all running work
 	deduceCoord *deductionCoordinator // subsystem that manages import path deduction
@@ -152,78 +152,58 @@ type SourceManagerConfig struct {
 // bug!). It should be safe to reuse across concurrent solving runs, even on
 // unrelated projects.
 func NewSourceManager(c SourceManagerConfig) (*SourceMgr, error) {
+	var locked bool
+	var err error
+	var lasttime time.Time
+
 	if c.Logger == nil {
 		c.Logger = log.New(ioutil.Discard, "", 0)
 	}
 
-	err := os.MkdirAll(filepath.Join(c.Cachedir, "sources"), 0777)
+	err = os.MkdirAll(filepath.Join(c.Cachedir, "sources"), 0777)
 	if err != nil {
 		return nil, err
 	}
 
-	// Fix for #820
+	// Lockfile semantics using go-flock. The reason for switching to this is
+	// that github.com/nightlyone/lockfile uses hard links for it's locking
+	// strategy which does not work on filesystems that don't support hard links.
 	//
-	// Consult https://godoc.org/github.com/nightlyone/lockfile for the lockfile
-	// behaviour. It's magic. It deals with stale processes, and if there is
-	// a process keeping the lock busy, it will pass back a temporary error that
-	// we can spin on.
+	// go-flock uses the OS native file locking function, so has a better chance
+	// of working.
+	//
+	// go-flock uses a mutex so is safe if multiple goroutines/threads try to call
+	// gps.NewSourceManager()
 
 	glpath := filepath.Join(c.Cachedir, "sm.lock")
-	lockfile, err := lockfile.New(glpath)
-	if err != nil {
-		return nil, CouldNotCreateLockError{
-			Path: glpath,
-			Err:  errors.Wrapf(err, "unable to create lock %s", glpath),
-		}
-	}
+	lockfile := flock.NewFlock(glpath)
 
-	process, err := lockfile.GetOwner()
-	if err == nil {
-		// If we didn't get an error, then the lockfile exists already. We should
-		// check to see if it's us already:
-		if process.Pid == os.Getpid() {
+	for !locked {
+		locked, err = lockfile.TryLock()
+
+		if err != nil {
 			return nil, CouldNotCreateLockError{
 				Path: glpath,
-				Err:  fmt.Errorf("lockfile %s already locked by this process", glpath),
+				Err:  errors.Wrapf(err, "unable to create lock %s", glpath),
 			}
 		}
 
-		// There is a lockfile, but it's owned by someone else. We'll try to lock
-		// it anyway.
-	}
+		if !locked {
+			nowtime := time.Now()
+			duration := nowtime.Sub(lasttime)
 
-	// If it's a TemporaryError, we retry every second. Otherwise, we fail
-	// permanently.
-	//
-	// TODO: #534 needs to be implemented to provide a better way to log warnings,
-	// but until then we will just use stderr.
+			// When locking fails we retry every second. There does not appear to be
+			//
+			// TODO: #534 needs to be implemented to provide a better way to log warnings,
+			// but until then we will use stderr.
 
-	// Implicit Time of 0.
-	var lasttime time.Time
-	err = lockfile.TryLock()
-	for err != nil {
-		nowtime := time.Now()
-		duration := nowtime.Sub(lasttime)
-
-		// The first time this is evaluated, duration will be very large as lasttime is 0.
-		// Unless time travel is invented and someone travels back to the year 1, we should
-		// be ok.
-		if duration > 15*time.Second {
-			fmt.Fprintf(os.Stderr, "waiting for lockfile %s: %s\n", glpath, err.Error())
-			lasttime = nowtime
-		}
-
-		if _, ok := err.(interface {
-			Temporary() bool
-		}); ok {
-			time.Sleep(time.Second * 1)
-		} else {
-			return nil, CouldNotCreateLockError{
-				Path: glpath,
-				Err:  errors.Wrapf(err, "unable to lock %s", glpath),
+			if duration > 15*time.Second {
+				fmt.Fprintf(os.Stderr, "waiting for lockfile %s\n", glpath)
+				lasttime = nowtime
 			}
+
+			time.Sleep(1 * time.Second)
 		}
-		err = lockfile.TryLock()
 	}
 
 	ctx, cf := context.WithCancel(context.TODO())
@@ -232,7 +212,7 @@ func NewSourceManager(c SourceManagerConfig) (*SourceMgr, error) {
 
 	sm := &SourceMgr{
 		cachedir:    c.Cachedir,
-		lf:          &lockfile,
+		lf:          lockfile,
 		suprvsr:     superv,
 		cancelAll:   cf,
 		deduceCoord: deducer,
