@@ -156,6 +156,29 @@ func validateManifest(s string) ([]error, error) {
 	return warns, nil
 }
 
+// ValidateProjectRoots validates the project roots present in manifest.
+func ValidateProjectRoots(c *Ctx, m *Manifest, sm gps.SourceManager) error {
+	projectRoots := make([]gps.ProjectRoot, 0, len(m.Constraints)+len(m.Ovr))
+	for pr := range m.Constraints {
+		projectRoots = append(projectRoots, pr)
+	}
+	for pr := range m.Ovr {
+		projectRoots = append(projectRoots, pr)
+	}
+
+	for _, pr := range projectRoots {
+		origPR, err := sm.DeduceProjectRoot(string(pr))
+		if err != nil {
+			return errors.Wrapf(err, "could not deduce project root for %s", pr)
+		}
+		if origPR != pr {
+			c.Err.Printf("dep: WARNING: name %q in Gopkg.toml should be project root", pr)
+		}
+	}
+
+	return nil
+}
+
 // readManifest returns a Manifest read from r and a slice of validation warnings.
 func readManifest(r io.Reader) (*Manifest, []error, error) {
 	buf := &bytes.Buffer{}

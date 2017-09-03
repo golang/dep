@@ -190,6 +190,10 @@ func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
 	sm.UseDefaultSignalHandling()
 	defer sm.Release()
 
+	if err := dep.ValidateProjectRoots(ctx, p.Manifest, sm); err != nil {
+		return err
+	}
+
 	var buf bytes.Buffer
 	var out outputter
 	switch {
