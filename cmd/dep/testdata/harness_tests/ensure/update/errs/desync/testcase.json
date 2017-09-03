@@ -2,5 +2,5 @@
   "commands": [
     ["ensure", "-update"]
   ],
-  "error-expected": "Gopkg.toml and Gopkg.lock are out of sync. Run a plain dep ensure to resync them before attempting to -update"
+  "error-expected": "Gopkg.lock is out of sync with Gopkg.toml or the project's imports. Run \"dep ensure\" to resync them first before running \"dep ensure -update\""
 }
