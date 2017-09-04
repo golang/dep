@@ -426,9 +426,9 @@ func TestValidateProjectRoots(t *testing.T) {
 			},
 			wantError: false,
 			wantWarn: []string{
-				"name \"github.com/golang/dep/foo\" in Gopkg.toml should be project root",
-				"name \"github.com/golang/mock/bar\" in Gopkg.toml should be project root",
-				"name \"github.com/golang/go/xyz\" in Gopkg.toml should be project root",
+				"the name for \"github.com/golang/dep/foo\" in Gopkg.toml should be changed to \"github.com/golang/dep\"",
+				"the name for \"github.com/golang/mock/bar\" in Gopkg.toml should be changed to \"github.com/golang/mock\"",
+				"the name for \"github.com/golang/go/xyz\" in Gopkg.toml should be changed to \"github.com/golang/go\"",
 			},
 		},
 		{
