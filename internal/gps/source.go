@@ -272,7 +272,7 @@ func (sg *sourceGateway) exportVersionTo(ctx context.Context, v Version, to stri
 	// TODO(sdboyer) It'd be better if we could check the error to see if this
 	// actually was the cause of the problem.
 	if err != nil && sg.srcState&sourceHasLatestLocally == 0 {
-		if _, err = sg.require(ctx, sourceHasLatestLocally); err != nil {
+		if _, err = sg.require(ctx, sourceHasLatestLocally); err == nil {
 			err = sg.suprvsr.do(ctx, sg.src.upstreamURL(), ctExportTree, func(ctx context.Context) error {
 				return sg.src.exportRevisionTo(ctx, r, to)
 			})
