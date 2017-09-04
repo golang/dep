@@ -172,7 +172,7 @@ func ValidateProjectRoots(c *Ctx, m *Manifest, sm gps.SourceManager) error {
 			return errors.Wrapf(err, "could not deduce project root for %s", pr)
 		}
 		if origPR != pr {
-			c.Err.Printf("dep: WARNING: name %q in Gopkg.toml should be project root", pr)
+			c.Err.Printf("dep: WARNING: the name for %q in Gopkg.toml should be changed to %q", pr, origPR)
 		}
 	}
 
