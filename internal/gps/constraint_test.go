@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/golang/dep/internal/gps/internal/pb"
+	"github.com/golang/protobuf/proto"
 	"github.com/pkg/errors"
 )
 
@@ -961,4 +963,45 @@ func testSemverConstraint(t *testing.T, body string) Constraint {
 		t.Fatal(errors.Wrapf(err, "failed to create semver constraint: %s", body))
 	}
 	return c
+}
+
+func TestConstraintEncoding(t *testing.T) {
+	for _, test := range []struct {
+		name string
+		c    Constraint
+	}{
+		{"defaultBranch", newDefaultBranch("test")},
+		{"branch", NewBranch("test")},
+		{"ver", NewVersion("test")},
+		{"semver", testSemverConstraint(t, "^1.0.0")},
+		{"rev", Revision("test")},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			var msg pb.Constraint
+			test.c.copyTo(&msg)
+			b, err := proto.Marshal(&msg)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if err := proto.Unmarshal(b, &msg); err != nil {
+				t.Fatal(err)
+			}
+			got, err := constraintFromCache(&msg)
+			if err != nil {
+				t.Error("failed to decode:", err)
+			} else if !got.identical(test.c) {
+				t.Errorf("decoded non-identical Constraint:\n\t(GOT): %#v\n\t(WNT): %#v", got, test.c)
+			}
+
+			if _, ok := test.c.(UnpairedVersion); ok {
+				got, err := unpairedVersionFromCache(&msg)
+				if err != nil {
+					t.Error("failed to decode:", err)
+				} else if !got.identical(test.c) {
+					t.Errorf("decoded non-identical UnpairedVersion:\n\t(GOT): %#v\n\t(WNT): %#v", got, test.c)
+				}
+			}
+		})
+	}
 }

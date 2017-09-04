@@ -296,28 +296,3 @@ func TestBoltCacheTimeout(t *testing.T) {
 		}
 	}
 }
-
-func TestBoltCacheRevisionName(t *testing.T) {
-	const (
-		rev  = Revision("test")
-		want = "rev:test"
-	)
-	if got := string(cacheRevisionName(rev)); got != want {
-		t.Errorf("unexpected cache revision name: (GOT):%q (WNT):%q", got, want)
-	}
-}
-
-func TestBoltCacheInfoName(t *testing.T) {
-	ai := ProjectAnalyzerInfo{
-		Name:    "name",
-		Version: 42,
-	}
-	const (
-		wantM = "info:name.42:manifest"
-		wantL = "info:name.42:lock"
-	)
-	gotM, gotL := cacheInfoNames(ai)
-	if string(gotM) != wantM || string(gotL) != wantL {
-		t.Errorf("unexpected info revision names: (GOT):%q,%q (WNT):%q,%q", gotM, gotL, wantM, wantL)
-	}
-}

@@ -9,6 +9,7 @@ import (
 	"sort"
 
 	"github.com/Masterminds/semver"
+	"github.com/golang/dep/internal/gps/internal/pb"
 )
 
 var (
@@ -53,6 +54,10 @@ type Constraint interface {
 	// design goal of the system.
 	typedString() string
 
+	// copyTo copies fields into a serializable representation which can be
+	// converted back into an identical Constraint with constraintFromCache.
+	copyTo(*pb.Constraint)
+
 	// identical returns true if the constraints are identical.
 	//
 	// Identical Constraints behave identically for all methods defined by the
@@ -60,6 +65,46 @@ type Constraint interface {
 	//
 	// Constraints serialized for caching are de-serialized into identical instances.
 	identical(Constraint) bool
+}
+
+// constraintFromCache returns a Constraint identical to the one which produced m.
+func constraintFromCache(m *pb.Constraint) (Constraint, error) {
+	switch m.Type {
+	case pb.Constraint_Revision:
+		return Revision(m.Value), nil
+	case pb.Constraint_Branch:
+		return NewBranch(m.Value), nil
+	case pb.Constraint_DefaultBranch:
+		return newDefaultBranch(m.Value), nil
+	case pb.Constraint_Version:
+		return plainVersion(m.Value), nil
+	case pb.Constraint_Semver:
+		return NewSemverConstraint(m.Value)
+
+	default:
+		return nil, fmt.Errorf("unrecognized Constraint type: %#v", m)
+	}
+}
+
+// unpairedVersionFromCache returns an UnpairedVersion identical to the one which produced m.
+func unpairedVersionFromCache(m *pb.Constraint) (UnpairedVersion, error) {
+	switch m.Type {
+	case pb.Constraint_Branch:
+		return NewBranch(m.Value), nil
+	case pb.Constraint_DefaultBranch:
+		return newDefaultBranch(m.Value), nil
+	case pb.Constraint_Version:
+		return plainVersion(m.Value), nil
+	case pb.Constraint_Semver:
+		sv, err := semver.NewVersion(m.Value)
+		if err != nil {
+			return nil, err
+		}
+		return semVersion{sv: sv}, nil
+
+	default:
+		return nil, fmt.Errorf("unrecognized UnpairedVersion type: %#v", m)
+	}
 }
 
 // NewSemverConstraint attempts to construct a semver Constraint object from the
@@ -188,6 +233,11 @@ func (c semverConstraint) identical(c2 Constraint) bool {
 	return c.c.String() == sc2.c.String()
 }
 
+func (c semverConstraint) copyTo(msg *pb.Constraint) {
+	msg.Type = pb.Constraint_Semver
+	msg.Value = c.String()
+}
+
 // IsAny indicates if the provided constraint is the wildcard "Any" constraint.
 func IsAny(c Constraint) bool {
 	_, ok := c.(anyConstraint)
@@ -231,6 +281,10 @@ func (anyConstraint) identical(c Constraint) bool {
 	return IsAny(c)
 }
 
+func (anyConstraint) copyTo(*pb.Constraint) {
+	panic("anyConstraint should never be serialized; it is solver internal-only")
+}
+
 // noneConstraint is the empty set - it matches no versions. It mirrors the
 // behavior of the semver package's none type.
 type noneConstraint struct{}
@@ -262,6 +316,10 @@ func (noneConstraint) Intersect(Constraint) Constraint {
 func (noneConstraint) identical(c Constraint) bool {
 	_, ok := c.(noneConstraint)
 	return ok
+}
+
+func (noneConstraint) copyTo(*pb.Constraint) {
+	panic("noneConstraint should never be serialized; it is solver internal-only")
 }
 
 // A ProjectConstraint combines a ProjectIdentifier with a Constraint. It
