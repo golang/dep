@@ -539,7 +539,7 @@ func TestMultiFetchThreadsafe(t *testing.T) {
 		mkPI("gopkg.in/sdboyer/gpkt.v2"),
 		mkPI("github.com/Masterminds/VCSTestRepo"),
 		mkPI("github.com/go-yaml/yaml"),
-		mkPI("github.com/Sirupsen/logrus"),
+		mkPI("github.com/sirupsen/logrus"),
 		mkPI("github.com/Masterminds/semver"),
 		mkPI("github.com/Masterminds/vcs"),
 		//mkPI("bitbucket.org/sdboyer/withbm"),
