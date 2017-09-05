@@ -256,9 +256,7 @@ func (i *baseImporter) importPackages(packages []importedPackage, defaultConstra
 func (i *baseImporter) isConstraintPinned(c gps.Constraint) bool {
 	if version, isVersion := c.(gps.Version); isVersion {
 		switch version.Type() {
-		case gps.IsRevision:
-			return true
-		case gps.IsVersion:
+		case gps.IsRevision, gps.IsVersion:
 			return true
 		}
 	}
