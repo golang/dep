@@ -70,7 +70,7 @@ func TestCheckCfgFilenames(t *testing.T) {
 
 	errMsgFor := func(filetype, filename string) func(string) string {
 		return func(name string) string {
-			return fmt.Sprintf("%s filename '%s' does not match '%s'", filetype, name, filename)
+			return fmt.Sprintf("%s filename %q does not match %q", filetype, name, filename)
 		}
 	}
 
@@ -85,10 +85,20 @@ func TestCheckCfgFilenames(t *testing.T) {
 		createFiles []string
 		wantErrMsg  string
 	}{
+		// No error should be returned when the project contains a valid manifest file
+		// but no lock file.
 		{false, []string{ManifestName}, ""},
+		// No error should be returned when the project contains a valid manifest file as
+		// well as a valid lock file.
 		{false, []string{ManifestName, LockName}, ""},
-		{true, nil, manifestErrMsg("")},
+		// Error indicating the project was not found should be returned if a manifest
+		// file is not found.
+		{true, nil, errProjectNotFound.Error()},
+		// Error should be returned if the project has a manifest file with invalid name
+		// but no lock file.
 		{true, []string{invalidMfName}, manifestErrMsg(invalidMfName)},
+		// Error should be returned if the project has a valid manifest file and an
+		// invalid lock file.
 		{true, []string{ManifestName, invalidLfName}, lockErrMsg(invalidLfName)},
 	}
 
@@ -96,9 +106,12 @@ func TestCheckCfgFilenames(t *testing.T) {
 		h := test.NewHelper(t)
 		defer h.Cleanup()
 
+		// Create a temporary directory which we will use as the project folder.
 		h.TempDir("")
 		tmpPath := h.Path(".")
 
+		// Create any files that are needed for the test before invoking
+		// `checkCfgFilenames`.
 		for _, file := range c.createFiles {
 			h.TempFile(file, "")
 		}
@@ -106,8 +119,10 @@ func TestCheckCfgFilenames(t *testing.T) {
 
 		if c.wantErr {
 			if err == nil {
+				// We were expecting an error but did not get one.
 				t.Fatalf("unexpected error message: \n\t(GOT) nil\n\t(WNT) %s", c.wantErrMsg)
 			} else if err.Error() != c.wantErrMsg {
+				// We got an error but it is not the one we were expecting.
 				t.Fatalf("unexpected error message: \n\t(GOT) %s\n\t(WNT) %s", err.Error(), c.wantErrMsg)
 			}
 		} else if err != nil {

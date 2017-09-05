@@ -275,10 +275,12 @@ func TestReadActualFilenames(t *testing.T) {
 	h.TempDir("")
 	tmpPath := h.Path(".")
 
+	// First, check the scenarios for which we expect an error.
 	_, err := ReadActualFilenames(filepath.Join(tmpPath, "does_not_exists"), []string{""})
 	switch {
 	case err == nil:
 		t.Fatal("expected err for non-existing folder")
+	// use `errors.Cause` because the error is wrapped and returned
 	case !os.IsNotExist(errors.Cause(err)):
 		t.Fatalf("unexpected error: %+v", err)
 	}
@@ -296,11 +298,23 @@ func TestReadActualFilenames(t *testing.T) {
 		names       []string
 		want        map[string]string
 	}{
-		{nil, nil, map[string]string{}}, {
+		// If we supply no filenames to the function, it should return an empty map.
+		{nil, nil, map[string]string{}},
+		// If the directory contains the given file with different case, it should return
+		// a map which has the given filename as the key and actual filename as the value.
+		{
 			[]string{"test1.txt"},
 			[]string{"Test1.txt"},
 			map[string]string{"Test1.txt": "test1.txt"},
-		}, {
+		},
+		// 1. If the given filename is same as the actual filename, map should have the
+		//    same key and value for the file.
+		// 2. If the given filename is present with different case for file extension,
+		//    it should return a map which has the given filename as the key and actual
+		//    filename as the value.
+		// 3. If the given filename is not present even with a different case, the map
+		//    returned should not have an entry for that filename.
+		{
 			[]string{"test2.txt", "test3.TXT"},
 			[]string{"test2.txt", "Test3.txt", "Test4.txt"},
 			map[string]string{
