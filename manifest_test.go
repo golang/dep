@@ -380,13 +380,13 @@ func TestValidateProjectRoots(t *testing.T) {
 	cases := []struct {
 		name      string
 		manifest  Manifest
-		wantError bool
+		wantError error
 		wantWarn  []string
 	}{
 		{
 			name:      "empty Manifest",
 			manifest:  Manifest{},
-			wantError: false,
+			wantError: nil,
 			wantWarn:  []string{},
 		},
 		{
@@ -398,7 +398,7 @@ func TestValidateProjectRoots(t *testing.T) {
 					},
 				},
 			},
-			wantError: false,
+			wantError: nil,
 			wantWarn:  []string{},
 		},
 		{
@@ -424,11 +424,11 @@ func TestValidateProjectRoots(t *testing.T) {
 					},
 				},
 			},
-			wantError: false,
+			wantError: errInvalidProjectRoot,
 			wantWarn: []string{
-				"the name for \"github.com/golang/dep/foo\" in Gopkg.toml should be changed to \"github.com/golang/dep\"",
-				"the name for \"github.com/golang/mock/bar\" in Gopkg.toml should be changed to \"github.com/golang/mock\"",
-				"the name for \"github.com/golang/go/xyz\" in Gopkg.toml should be changed to \"github.com/golang/go\"",
+				"the name for \"github.com/golang/dep/foo\" should be changed to \"github.com/golang/dep\"",
+				"the name for \"github.com/golang/mock/bar\" should be changed to \"github.com/golang/mock\"",
+				"the name for \"github.com/golang/go/xyz\" should be changed to \"github.com/golang/go\"",
 			},
 		},
 		{
@@ -440,7 +440,7 @@ func TestValidateProjectRoots(t *testing.T) {
 					},
 				},
 			},
-			wantError: true,
+			wantError: errInvalidProjectRoot,
 			wantWarn:  []string{},
 		},
 	}
@@ -469,14 +469,14 @@ func TestValidateProjectRoots(t *testing.T) {
 			// Empty the buffer for every case
 			stderrOutput.Reset()
 			err := ValidateProjectRoots(ctx, &c.manifest, sm)
-			if err != nil && !c.wantError {
-				t.Fatalf("Unexpected error while validating project roots: %q", err)
+			if err != c.wantError {
+				t.Fatalf("Unexpected error while validating project roots:\n\t(GOT): %v\n\t(WNT): %v", err, c.wantError)
 			}
 
 			warnings := stderrOutput.String()
 			for _, warn := range c.wantWarn {
 				if !strings.Contains(warnings, warn) {
-					t.Fatalf("Expected ValidateProjectRoot warnings to contain: %q", warn)
+					t.Fatalf("Expected ValidateProjectRoot errors to contain: %q", warn)
 				}
 			}
 		})
