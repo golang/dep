@@ -252,6 +252,7 @@ func (i *baseImporter) importPackages(packages []importedPackage, defaultConstra
 	return nil
 }
 
+// isConstraintPinned returns if a constraint is pinned to a specific revision.
 func (i *baseImporter) isConstraintPinned(c gps.Constraint) bool {
 	if version, isVersion := c.(gps.Version); isVersion {
 		switch version.Type() {
@@ -264,6 +265,7 @@ func (i *baseImporter) isConstraintPinned(c gps.Constraint) bool {
 	return false
 }
 
+// testConstraint verifies that the constraint won't invalidate the locked version.
 func (i *baseImporter) testConstraint(c gps.Constraint, v gps.Version) bool {
 	// Assume branch constraints are satisfied
 	if version, isVersion := c.(gps.Version); isVersion {
