@@ -132,13 +132,13 @@ type wrongCaseFailure struct {
 
 func (e *wrongCaseFailure) Error() string {
 	if len(e.badcase) == 1 {
-		str := "Could not introduce %s; mutual imports by its packages establish %q as the canonical casing for root, but %s tried to import it as %q"
+		str := "Could not introduce %s; imports amongst its packages establish %q as the canonical casing for root, but %s tried to import it as %q"
 		return fmt.Sprintf(str, a2vs(e.goal.depender), e.correct, a2vs(e.badcase[0].depender), e.badcase[0].dep.Ident.ProjectRoot)
 	}
 
 	var buf bytes.Buffer
 
-	str := "Could not introduce %s; mutual imports by its packages establish %q as the canonical casing for root, but the following projects tried to import it as %q"
+	str := "Could not introduce %s; imports amongst its packages establish %q as the canonical casing for root, but the following projects tried to import it as %q"
 	fmt.Fprintf(&buf, str, a2vs(e.goal.depender), e.correct, e.badcase[0].dep.Ident.ProjectRoot)
 
 	for _, c := range e.badcase {
