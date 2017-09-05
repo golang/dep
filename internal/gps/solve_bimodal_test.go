@@ -847,10 +847,9 @@ var bimodalFixtures = map[string]bimodalFixture{
 		),
 	},
 	"simple case-only variations plus source variance": {
-		// COPYPASTA BELOW, FIX IT
 		ds: []depspec{
 			dsp(mkDepspec("root 0.0.0"),
-				pkg("root", "foo", "Bar")), // TODO align the froms
+				pkg("root", "foo", "bar")),
 			dsp(mkDepspec("foo 1.0.0", "Bar from quux 1.0.0"),
 				pkg("foo", "Bar")),
 			dsp(mkDepspec("bar 1.0.0"),
@@ -858,27 +857,46 @@ var bimodalFixtures = map[string]bimodalFixture{
 			dsp(mkDepspec("quux 1.0.0"),
 				pkg("bar")),
 		},
-		r: mksolution(
-			"foo 1.0.0",
-			"Bar from quux 1.0.0",
-		),
+		fail: &noVersionError{
+			pn: mkPI("foo"),
+			fails: []failedVersion{
+				{
+					v: NewVersion("1.0.0"),
+					f: &caseMismatchFailure{
+						goal:    mkDep("foo 1.0.0", "Bar from quux 1.0.0", "Bar"),
+						current: ProjectRoot("bar"),
+						failsib: []dependency{mkDep("root", "bar 1.0.0", "bar")},
+					},
+				},
+			},
+		},
 	},
 	"case-only variations plus source variance with internal canonicality": {
-		// COPYPASTA BELOW, FIX IT
 		ds: []depspec{
-			dsp(mkDepspec("root 0.0.0"),
+			dsp(mkDepspec("root 0.0.0", "Bar from quux 1.0.0"),
 				pkg("root", "foo", "Bar")),
 			dsp(mkDepspec("foo 1.0.0", "Bar from quux 1.0.0"),
 				pkg("foo", "Bar")),
 			dsp(mkDepspec("bar 1.0.0"),
-				pkg("bar")),
+				pkg("bar", "bar/subpkg"),
+				pkg("bar/subpkg")),
 			dsp(mkDepspec("quux 1.0.0"),
-				pkg("bar")),
+				pkg("bar", "bar/subpkg"),
+				pkg("bar/subpkg")),
 		},
-		r: mksolution(
-			"foo 1.0.0",
-			"Bar from quux 1.0.0",
-		),
+		fail: &noVersionError{
+			pn: mkPI("Bar"),
+			fails: []failedVersion{
+				{
+					v: NewVersion("1.0.0"),
+					f: &wrongCaseFailure{
+						correct: ProjectRoot("bar"),
+						goal:    mkDep("Bar from quux 1.0.0", "bar 1.0.0", "bar"),
+						badcase: []dependency{mkDep("root", "Bar 1.0.0", "Bar/subpkg")},
+					},
+				},
+			},
+		},
 	},
 	"alternate net address": {
 		ds: []depspec{
@@ -1387,12 +1405,22 @@ func newbmSM(bmf bimodalFixture) *bmSourceManager {
 }
 
 func (sm *bmSourceManager) ListPackages(id ProjectIdentifier, v Version) (pkgtree.PackageTree, error) {
-	src, fsrc := id.normalizedSource(), toFold(id.normalizedSource())
+	// Deal with address-based root-switching with both case folding and
+	// alternate sources.
+	var src, fsrc, root, froot string
+	src, fsrc = id.normalizedSource(), toFold(id.normalizedSource())
+	if id.Source != "" {
+		root = string(id.ProjectRoot)
+		froot = toFold(root)
+	} else {
+		root, froot = src, fsrc
+	}
+
 	for k, ds := range sm.specs {
 		// Cheat for root, otherwise we blow up b/c version is empty
 		if fsrc == string(ds.n) && (k == 0 || ds.v.Matches(v)) {
 			var replace bool
-			if src != string(ds.n) {
+			if root != string(ds.n) {
 				// We're in a case-varying lookup; ensure we replace the actual
 				// leading ProjectRoot portion of import paths with the literal
 				// string from the input.
@@ -1405,7 +1433,7 @@ func (sm *bmSourceManager) ListPackages(id ProjectIdentifier, v Version) (pkgtre
 			}
 			for _, pkg := range ds.pkgs {
 				if replace {
-					pkg.path = strings.Replace(pkg.path, fsrc, src, 1)
+					pkg.path = strings.Replace(pkg.path, froot, root, 1)
 				}
 				ptree.Packages[pkg.path] = pkgtree.PackageOrErr{
 					P: pkgtree.Package{
