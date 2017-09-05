@@ -12,6 +12,10 @@ import (
 )
 
 func TestVCSVersion(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping slow test in short mode")
+	}
+
 	h := test.NewHelper(t)
 	defer h.Cleanup()
 	requiresBins(t, "git")

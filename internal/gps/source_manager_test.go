@@ -13,6 +13,10 @@ import (
 )
 
 func TestSourceManager_InferConstraint(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping slow test in short mode")
+	}
+
 	t.Parallel()
 
 	// Used in git subtests:
