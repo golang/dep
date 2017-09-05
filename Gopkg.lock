@@ -27,12 +27,6 @@
   revision = "cd8b52f8269e0feb286dfeef29f8fe4d5b397e0b"
 
 [[projects]]
-  branch = "master"
-  name = "github.com/nightlyone/lockfile"
-  packages = ["."]
-  revision = "e83dc5e7bba095e8d32fb2124714bf41f2a30cb5"
-
-[[projects]]
   name = "github.com/pelletier/go-buffruneio"
   packages = ["."]
   revision = "c37440a7cf42ac63b919c752ca73a85067e05992"
@@ -56,9 +50,15 @@
   packages = ["."]
   revision = "836a144573533ea4da4e6929c235fd348aed1c80"
 
+[[projects]]
+  branch = "master"
+  name = "github.com/theckman/go-flock"
+  packages = ["."]
+  revision = "6de226b0d5f040ed85b88c82c381709b98277f3d"
+
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "7c692c08851064cf6167056c23082edcf393d3af6bc0768c3111e0dde7444960"
+  inputs-digest = "bb3f72fff849c3fe5cf827c32437acd4e9a91127653ec097c6062574f20cc90a"
   solver-name = "gps-cdcl"
   solver-version = 1
