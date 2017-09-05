@@ -467,9 +467,10 @@ func TestGetSources(t *testing.T) {
 	})
 
 	// nine entries (of which three are dupes): for each vcs, raw import path,
-	// the https url, and the http url
-	if len(sm.srcCoord.nameToURL) != 9 {
-		t.Errorf("Should have nine discrete entries in the nameToURL map, got %v", len(sm.srcCoord.nameToURL))
+	// the https url, and the http url. also three more from case folding of
+	// github.com/Masterminds/VCSTestRepo -> github.com/masterminds/vcstestrepo
+	if len(sm.srcCoord.nameToURL) != 12 {
+		t.Errorf("Should have twelve discrete entries in the nameToURL map, got %v", len(sm.srcCoord.nameToURL))
 	}
 	clean()
 }
