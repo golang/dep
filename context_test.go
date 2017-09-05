@@ -269,9 +269,8 @@ func TestLoadProjectCfgFileCase(t *testing.T) {
 		t.Skip("skip this test on non-Windows, non-macOS")
 	}
 
-	// Here we test that a manifest filename with incorrect case
-	// throws an error. Similar error will also be thrown for the
-	// lock file as well which has been tested in
+	// Here we test that a manifest filename with incorrect case throws an error. Similar
+	// error will also be thrown for the lock file as well which has been tested in
 	// `project_test.go#TestCheckCfgFilenames`. So not repeating here.
 
 	h := test.NewHelper(t)
@@ -299,7 +298,7 @@ func TestLoadProjectCfgFileCase(t *testing.T) {
 	}
 
 	expectedErrMsg := fmt.Sprintf(
-		"manifest filename '%s' does not match '%s'",
+		"manifest filename %q does not match %q",
 		invalidMfName, ManifestName,
 	)
 

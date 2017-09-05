@@ -271,12 +271,13 @@ var errPathNotDir = errors.New("given path is not a directory")
 // On case sensitive file systems like ext4, it will check if those files exist using
 // `os.Stat` and return a map with key and value as filenames which exist in the folder.
 //
-// Otherwise, it reads the contents of the directory
+// Otherwise, it reads the contents of the directory and returns a map which has the
+// given file name as the key and actual filename as the value if it was found.
 func ReadActualFilenames(dirPath string, names []string) (map[string]string, error) {
 	actualFilenames := make(map[string]string, len(names))
-	if len(names) <= 0 {
-		// This isn't expected to happen for current usage.
-		// Adding edge case handling, maybe useful in future
+	if len(names) == 0 {
+		// This isn't expected to happen for current usage. Adding edge case handling,
+		// as it may be useful in future.
 		return actualFilenames, nil
 	}
 	// First, check that the given path is valid and it is a directory
@@ -289,23 +290,23 @@ func ReadActualFilenames(dirPath string, names []string) (map[string]string, err
 		return nil, errPathNotDir
 	}
 
-	// Ideally, we would use `os.Stat` for getting the actual file names
-	// but that returns the name we passed in as an argument and not the actual filename.
-	// So we are forced to list the directory contents and check
-	// against that. Since this check is costly, we do it only if absolutely necessary.
+	// Ideally, we would use `os.Stat` for getting the actual file names but that returns
+	// the name we passed in as an argument and not the actual filename. So we are forced
+	// to list the directory contents and check against that. Since this check is costly,
+	// we do it only if absolutely necessary.
 	caseSensitive, err := IsCaseSensitiveFilesystem(dirPath)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to read actual filenames")
 	}
 	if caseSensitive {
-		// There will be no difference between actual filename and given filename
-		// So just check if those files exist.
+		// There will be no difference between actual filename and given filename. So
+		// just check if those files exist.
 		for _, name := range names {
 			_, err := os.Stat(filepath.Join(dirPath, name))
 			if err == nil {
 				actualFilenames[name] = name
 			} else if !os.IsNotExist(err) {
-				// Some unexpected err, return it.
+				// Some unexpected err, wrap and return it.
 				return nil, errors.Wrap(err, "failed to read actual filenames")
 			}
 		}
@@ -318,29 +319,27 @@ func ReadActualFilenames(dirPath string, names []string) (map[string]string, err
 	}
 	defer dir.Close()
 
-	// Pass -1 to read all files in directory
-	files, err := dir.Readdir(-1)
+	// Pass -1 to read all filenames in directory
+	filenames, err := dir.Readdirnames(-1)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to read actual filenames")
 	}
 
-	// namesMap holds the mapping from lowercase name to search name.
-	// Using this, we can avoid repeatedly looping through names.
+	// namesMap holds the mapping from lowercase name to search name. Using this, we can
+	// avoid repeatedly looping through names.
 	namesMap := make(map[string]string, len(names))
 	for _, name := range names {
 		namesMap[strings.ToLower(name)] = name
 	}
 
-	for _, file := range files {
-		if file.Mode().IsRegular() {
-			searchName, ok := namesMap[strings.ToLower(file.Name())]
-			if ok {
-				// We are interested in this file, case insensitive match successful
-				actualFilenames[searchName] = file.Name()
-				if len(actualFilenames) == len(names) {
-					// We found all that we were looking for
-					return actualFilenames, nil
-				}
+	for _, filename := range filenames {
+		searchName, ok := namesMap[strings.ToLower(filename)]
+		if ok {
+			// We are interested in this file, case insensitive match successful.
+			actualFilenames[searchName] = filename
+			if len(actualFilenames) == len(names) {
+				// We found all that we were looking for.
+				return actualFilenames, nil
 			}
 		}
 	}

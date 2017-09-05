@@ -43,10 +43,16 @@ func findProjectRoot(from string) (string, error) {
 }
 
 // checkCfgFilenames validates filename case for the manifest and lock files.
-// This is relevant on case-insensitive systems like Windows.
+//
+// This is relevant on case-insensitive file systems like Windows and macOS.
+//
+// If manifest file is not found, it returns an error indicating the project could not be
+// found. If it is found but the case does not match, an error is returned. If a lock
+// file is not found, no error is returned as lock file is optional. If it is found but
+// the case does not match, an error is returned.
 func checkCfgFilenames(projectRoot string) error {
-	// ReadActualFilenames is actually costly.  Since this check is not relevant
-	// to case-sensitive filesystems like ext4, try for an early return.
+	// ReadActualFilenames is actually costly. Since this check is not relevant to
+	// case-sensitive filesystems like ext4(linux), try for an early return.
 	caseSensitive, err := fs.IsCaseSensitiveFilesystem(projectRoot)
 	if err != nil {
 		return errors.Wrap(err, "could not check validity of configuration filenames")
@@ -61,20 +67,22 @@ func checkCfgFilenames(projectRoot string) error {
 		return errors.Wrap(err, "could not check validity of configuration filenames")
 	}
 
-	// Since this check is done after `findProjectRoot`, we can assume that
-	// manifest file will be present. Even if it is not, error will still be thrown.
-	// But error message will be a tad inaccurate.
-	actualMfName := actualFilenames[ManifestName]
+	actualMfName, found := actualFilenames[ManifestName]
+	if !found {
+		// Ideally this part of the code won't ever be executed if it is called after
+		// `findProjectRoot`. But be thorough and handle it anyway.
+		return errProjectNotFound
+	}
 	if actualMfName != ManifestName {
-		return fmt.Errorf("manifest filename '%s' does not match '%s'", actualMfName, ManifestName)
+		return fmt.Errorf("manifest filename %q does not match %q", actualMfName, ManifestName)
 	}
 
-	// If a file is not found, the string map returned by `fs.ReadActualFilenames`
-	// will not have an entry for the given filename. Since the lock file
-	// is optional, we should check for equality only if it was found.
-	actualLfName := actualFilenames[LockName]
-	if len(actualLfName) > 0 && actualLfName != LockName {
-		return fmt.Errorf("lock filename '%s' does not match '%s'", actualLfName, LockName)
+	// If a file is not found, the string map returned by `fs.ReadActualFilenames` will
+	// not have an entry for the given filename. Since the lock file is optional, we
+	// should check for equality only if it was found.
+	actualLfName, found := actualFilenames[LockName]
+	if found && actualLfName != LockName {
+		return fmt.Errorf("lock filename %q does not match %q", actualLfName, LockName)
 	}
 
 	return nil
