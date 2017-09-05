@@ -160,29 +160,28 @@ func validateManifest(s string) ([]error, error) {
 
 // ValidateProjectRoots validates the project roots present in manifest.
 func ValidateProjectRoots(c *Ctx, m *Manifest, sm gps.SourceManager) error {
-	projectRoots := make([]gps.ProjectRoot, 0, len(m.Constraints)+len(m.Ovr))
-	for pr := range m.Constraints {
-		projectRoots = append(projectRoots, pr)
-	}
-	for pr := range m.Ovr {
-		projectRoots = append(projectRoots, pr)
-	}
-
 	// Channel to receive all the errors
-	errorCh := make(chan error, len(projectRoots))
+	errorCh := make(chan error, len(m.Constraints)+len(m.Ovr))
 
 	var wg sync.WaitGroup
-	for _, pr := range projectRoots {
+
+	validate := func(pr gps.ProjectRoot) {
+		defer wg.Done()
+		origPR, err := sm.DeduceProjectRoot(string(pr))
+		if err != nil {
+			errorCh <- err
+		} else if origPR != pr {
+			errorCh <- fmt.Errorf("the name for %q should be changed to %q", pr, origPR)
+		}
+	}
+
+	for pr := range m.Constraints {
 		wg.Add(1)
-		go func(pr gps.ProjectRoot) {
-			defer wg.Done()
-			origPR, err := sm.DeduceProjectRoot(string(pr))
-			if err != nil {
-				errorCh <- err
-			} else if origPR != pr {
-				errorCh <- fmt.Errorf("the name for %q should be changed to %q", pr, origPR)
-			}
-		}(pr)
+		go validate(pr)
+	}
+	for pr := range m.Ovr {
+		wg.Add(1)
+		go validate(pr)
 	}
 
 	wg.Wait()
