@@ -61,6 +61,10 @@ func TestBaseImporter_IsTag(t *testing.T) {
 			input:     importerTestV2Branch,
 			wantIsTag: false,
 		},
+		"empty": {
+			input:     "",
+			wantIsTag: false,
+		},
 	}
 
 	pi := gps.ProjectIdentifier{ProjectRoot: importerTestProject}
@@ -371,6 +375,18 @@ func TestBaseImporter_ImportProjects(t *testing.T) {
 				{
 					Name:     importerTestProject + "/subpkgB",
 					LockHint: importerTestV1Rev,
+				},
+			},
+		},
+		"skip empty lock hints": {
+			convertTestCase{
+				wantConstraint: "*",
+				wantRevision:   "",
+			},
+			[]importedPackage{
+				{
+					Name:     importerTestProject,
+					LockHint: "",
 				},
 			},
 		},
