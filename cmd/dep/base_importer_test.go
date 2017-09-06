@@ -66,6 +66,8 @@ func TestBaseImporter_IsTag(t *testing.T) {
 	pi := gps.ProjectIdentifier{ProjectRoot: importerTestProject}
 
 	for name, tc := range testcases {
+		name := name
+		tc := tc
 		t.Run(name, func(t *testing.T) {
 			h := test.NewHelper(t)
 			defer h.Cleanup()
@@ -131,6 +133,8 @@ func TestBaseImporter_LookupVersionForLockedProject(t *testing.T) {
 	pi := gps.ProjectIdentifier{ProjectRoot: importerTestProject}
 
 	for name, tc := range testcases {
+		name := name
+		tc := tc
 		t.Run(name, func(t *testing.T) {
 			h := test.NewHelper(t)
 			defer h.Cleanup()
@@ -373,6 +377,8 @@ func TestBaseImporter_ImportProjects(t *testing.T) {
 	}
 
 	for name, tc := range testcases {
+		name := name
+		tc := tc
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
