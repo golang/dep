@@ -144,7 +144,8 @@ func (m maybeGopkginSource) try(ctx context.Context, cachedir string, c singleSo
 	// We don't actually need a fully consistent transform into the on-disk path
 	// - just something that's unique to the particular gopkg.in domain context.
 	// So, it's OK to just dumb-join the scheme with the path.
-	path := sourceCachePath(cachedir, m.url.Scheme+"/"+m.opath)
+	aliasURL := m.url.Scheme + "://" + m.opath
+	path := sourceCachePath(cachedir, aliasURL)
 	ustr := m.url.String()
 	r, err := newCtxRepo(vcs.Git, ustr, path)
 
@@ -160,6 +161,7 @@ func (m maybeGopkginSource) try(ctx context.Context, cachedir string, c singleSo
 		},
 		major:    m.major,
 		unstable: m.unstable,
+		aliasURL: aliasURL,
 	}
 
 	var vl []PairedVersion
