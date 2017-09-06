@@ -168,8 +168,12 @@ func (sc *sourceCoordinator) getSourceGatewayFor(ctx context.Context, id Project
 	// integrate it back into the main map.
 	sc.srcmut.Lock()
 	defer sc.srcmut.Unlock()
-	// Record the name -> URL mapping, even if it's a self-mapping.
+	// Record the name -> URL mapping, making sure that we also get the
+	// self-mapping.
 	sc.nameToURL[normalizedName] = url
+	if url != normalizedName {
+		sc.nameToURL[url] = url
+	}
 
 	if sa, has := sc.srcs[url]; has {
 		// URL already had an entry in the main map; use that as the result.
