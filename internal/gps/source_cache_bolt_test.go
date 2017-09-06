@@ -139,11 +139,7 @@ func TestBoltCacheTimeout(t *testing.T) {
 
 	// Read with a later epoch. Expect no *timestamped* values, since all were < `after`.
 	{
-		after := time.Now()
-		if after.Unix() <= start.Unix() {
-			// Ensure a future timestamp.
-			after = start.Add(10 * time.Second)
-		}
+		after := start.Add(1000 * time.Hour)
 		bc, err = newBoltCache(cpath, after.Unix(), logger)
 		if err != nil {
 			t.Fatal(err)
