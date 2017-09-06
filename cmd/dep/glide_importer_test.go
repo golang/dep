@@ -173,6 +173,8 @@ func TestGlideConfig_Convert(t *testing.T) {
 	}
 
 	for name, testCase := range testCases {
+		name := name
+		testCase := testCase
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
