@@ -31,8 +31,29 @@ func Test_singleSourceCache(t *testing.T) {
 		}
 		return bc.newSingleSourceCache(pi), bc.close
 	}
-	t.Run("bolt/open", singleSourceCacheTest{newCache: newBolt}.run)
-	t.Run("bolt/refresh", singleSourceCacheTest{newCache: newBolt, persistent: true}.run)
+	t.Run("bolt/keepOpen", singleSourceCacheTest{newCache: newBolt}.run)
+	t.Run("bolt/reOpen", singleSourceCacheTest{newCache: newBolt, persistent: true}.run)
+
+	newMulti := func(t *testing.T, cachedir, root string) (singleSourceCache, func() error) {
+		disk, close := newBolt(t, cachedir, root)
+		return &multiCache{mem: newMemoryCache(), disk: disk}, close
+	}
+	t.Run("multi/keepOpen", singleSourceCacheTest{newCache: newMulti}.run)
+	t.Run("multi/reOpen", singleSourceCacheTest{persistent: true, newCache: newMulti}.run)
+
+	t.Run("multi/keepOpen/noDisk", singleSourceCacheTest{
+		newCache: func(*testing.T, string, string) (singleSourceCache, func() error) {
+			return &multiCache{mem: newMemoryCache(), disk: discardCache{}}, func() error { return nil }
+		},
+	}.run)
+
+	t.Run("multi/reOpen/noMem", singleSourceCacheTest{
+		persistent: true,
+		newCache: func(t *testing.T, cachedir, root string) (singleSourceCache, func() error) {
+			disk, close := newBolt(t, cachedir, root)
+			return &multiCache{mem: discardCache{}, disk: disk}, close
+		},
+	}.run)
 }
 
 var testAnalyzerInfo = ProjectAnalyzerInfo{
@@ -520,4 +541,43 @@ func packageOrErrEqual(a, b pkgtree.PackageOrErr) bool {
 	}
 
 	return true
+}
+
+// discardCache discards set values and returns nothing.
+type discardCache struct{}
+
+func (discardCache) setManifestAndLock(Revision, ProjectAnalyzerInfo, Manifest, Lock) {}
+
+func (discardCache) getManifestAndLock(Revision, ProjectAnalyzerInfo) (Manifest, Lock, bool) {
+	return nil, nil, false
+}
+
+func (discardCache) setPackageTree(Revision, pkgtree.PackageTree) {}
+
+func (discardCache) getPackageTree(Revision) (pkgtree.PackageTree, bool) {
+	return pkgtree.PackageTree{}, false
+}
+
+func (discardCache) markRevisionExists(r Revision) {}
+
+func (discardCache) setVersionMap(versionList []PairedVersion) {}
+
+func (discardCache) getVersionsFor(Revision) ([]UnpairedVersion, bool) {
+	return nil, false
+}
+
+func (discardCache) getAllVersions() []PairedVersion {
+	return nil
+}
+
+func (discardCache) getRevisionFor(UnpairedVersion) (Revision, bool) {
+	return "", false
+}
+
+func (discardCache) toRevision(v Version) (Revision, bool) {
+	return "", false
+}
+
+func (discardCache) toUnpaired(v Version) (UnpairedVersion, bool) {
+	return nil, false
 }
