@@ -524,7 +524,7 @@ func testHgSourceInteractions(t *testing.T) {
 	<-donech
 }
 
-func Test_gitSource_listVersions_noHEAD(t *testing.T) {
+func TestGitSourceListVersionsNoHEAD(t *testing.T) {
 	t.Parallel()
 
 	requiresBins(t, "git")
