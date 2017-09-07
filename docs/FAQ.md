@@ -16,6 +16,7 @@ Summarize the question and quote the reply, linking back to the original comment
 * [How do I constrain a transitive dependency's version?](#how-do-i-constrain-a-transitive-dependencys-version)
 * [Can I put the manifest and lock in the vendor directory?](#can-i-put-the-manifest-and-lock-in-the-vendor-directory)
 * [How do I get `dep` to authenticate to a `git` repo?](#how-do-i-get-dep-to-authenticate-to-a-git-repo)
+* [How do I get `dep` to consume private `git` repos using a Github Token?](#how-do-i-get-dep-to-consume-private-git-repos-using-a-github-token)
 
 ## Behavior
 * [How does `dep` decide what version of a dependency to use?](#how-does-dep-decide-what-version-of-a-dependency-to-use)
@@ -151,6 +152,19 @@ Please see the documentation on how to configure that: https://git-scm.com/docs/
 After configuring `git`, you may need to use `git` manually once to have it store the
 credentials. Once you've checked out the repo manually, it will then use the stored
 credentials. This at least appears to be the behavior for the osxkeychain provider.
+
+### How do I get dep to consume private git repos using a Github Token?
+
+Another alternative to make `dep` work with private repos is to use a [Personal Github
+Token](https://help.github.com/articles/creating-a-personal-access-token-for-the-command-line/)
+and configure it inside the [`.netrc` file](https://www.gnu.org/software/inetutils/manual/html_node/The-_002enetrc-file.html)
+as the following example:
+```
+machine github.com
+    login [YOUR_GITHUB_TOKEN]
+```
+
+Once you have set that up, dep will automatically use that Token to authenticate to the repositories.
 
 ## Behavior
 ### How does `dep` decide what version of a dependency to use?
