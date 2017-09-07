@@ -13,6 +13,7 @@ import (
 	"io/ioutil"
 	"log"
 	"sort"
+	"sync"
 	"text/tabwriter"
 
 	"github.com/golang/dep"
@@ -366,82 +367,121 @@ func runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceMana
 
 		logger.Println("Checking upstream projects:")
 
+		// BasicStatus channel to collect all the BasicStatus
+		bsCh := make(chan *BasicStatus, len(slp))
+
+		// Error channel to collect all the errors
+		errorCh := make(chan error, len(slp))
+
+		var wg sync.WaitGroup
+
 		for i, proj := range slp {
+			wg.Add(1)
 			logger.Printf("(%d/%d) %s\n", i+1, len(slp), proj.Ident().ProjectRoot)
 
-			bs := BasicStatus{
-				ProjectRoot:  string(proj.Ident().ProjectRoot),
-				PackageCount: len(proj.Packages()),
-			}
+			go func(proj gps.LockedProject) {
+				defer wg.Done()
 
-			// Get children only for specific outputers
-			// in order to avoid slower status process
-			switch out.(type) {
-			case *dotOutput:
-				ptr, err := sm.ListPackages(proj.Ident(), proj.Version())
-
-				if err != nil {
-					return digestMismatch, hasMissingPkgs, errors.Wrapf(err, "analysis of %s package failed", proj.Ident().ProjectRoot)
+				bs := BasicStatus{
+					ProjectRoot:  string(proj.Ident().ProjectRoot),
+					PackageCount: len(proj.Packages()),
 				}
 
-				prm, _ := ptr.ToReachMap(true, false, false, nil)
-				bs.Children = prm.FlattenFn(paths.IsStandardImportPath)
-			}
+				// Get children only for specific outputers
+				// in order to avoid slower status process
+				switch out.(type) {
+				case *dotOutput:
+					ptr, err := sm.ListPackages(proj.Ident(), proj.Version())
 
-			// Split apart the version from the lock into its constituent parts
-			switch tv := proj.Version().(type) {
-			case gps.UnpairedVersion:
-				bs.Version = tv
-			case gps.Revision:
-				bs.Revision = tv
-			case gps.PairedVersion:
-				bs.Version = tv.Unpair()
-				bs.Revision = tv.Revision()
-			}
+					if err != nil {
+						errorCh <- err
+					}
 
-			// Check if the manifest has an override for this project. If so,
-			// set that as the constraint.
-			if pp, has := p.Manifest.Ovr[proj.Ident().ProjectRoot]; has && pp.Constraint != nil {
-				bs.hasOverride = true
-				bs.Constraint = pp.Constraint
-			} else {
-				bs.Constraint = gps.Any()
-				for _, c := range cm[bs.ProjectRoot] {
-					bs.Constraint = c.Intersect(bs.Constraint)
+					prm, _ := ptr.ToReachMap(true, false, false, nil)
+					bs.Children = prm.FlattenFn(paths.IsStandardImportPath)
 				}
-			}
 
-			// Only if we have a non-rev and non-plain version do/can we display
-			// anything wrt the version's updateability.
-			if bs.Version != nil && bs.Version.Type() != gps.IsVersion {
-				c, has := p.Manifest.Constraints[proj.Ident().ProjectRoot]
-				if !has {
-					c.Constraint = gps.Any()
+				// Split apart the version from the lock into its constituent parts
+				switch tv := proj.Version().(type) {
+				case gps.UnpairedVersion:
+					bs.Version = tv
+				case gps.Revision:
+					bs.Revision = tv
+				case gps.PairedVersion:
+					bs.Version = tv.Unpair()
+					bs.Revision = tv.Revision()
 				}
-				// TODO: This constraint is only the constraint imposed by the
-				// current project, not by any transitive deps. As a result,
-				// transitive project deps will always show "any" here.
-				bs.Constraint = c.Constraint
 
-				vl, err := sm.ListVersions(proj.Ident())
-				if err == nil {
-					gps.SortPairedForUpgrade(vl)
+				// Check if the manifest has an override for this project. If so,
+				// set that as the constraint.
+				if pp, has := p.Manifest.Ovr[proj.Ident().ProjectRoot]; has && pp.Constraint != nil {
+					bs.hasOverride = true
+					bs.Constraint = pp.Constraint
+				} else {
+					bs.Constraint = gps.Any()
+					for _, c := range cm[bs.ProjectRoot] {
+						bs.Constraint = c.Intersect(bs.Constraint)
+					}
+				}
 
-					for _, v := range vl {
-						// Because we've sorted the version list for
-						// upgrade, the first version we encounter that
-						// matches our constraint will be what we want.
-						if c.Constraint.Matches(v) {
-							bs.Latest = v.Revision()
-							break
+				// Only if we have a non-rev and non-plain version do/can we display
+				// anything wrt the version's updateability.
+				if bs.Version != nil && bs.Version.Type() != gps.IsVersion {
+					c, has := p.Manifest.Constraints[proj.Ident().ProjectRoot]
+					if !has {
+						c.Constraint = gps.Any()
+					}
+					// TODO: This constraint is only the constraint imposed by the
+					// current project, not by any transitive deps. As a result,
+					// transitive project deps will always show "any" here.
+					bs.Constraint = c.Constraint
+
+					vl, err := sm.ListVersions(proj.Ident())
+					if err == nil {
+						gps.SortPairedForUpgrade(vl)
+
+						for _, v := range vl {
+							// Because we've sorted the version list for
+							// upgrade, the first version we encounter that
+							// matches our constraint will be what we want.
+							if c.Constraint.Matches(v) {
+								bs.Latest = v.Revision()
+								break
+							}
 						}
 					}
 				}
-			}
 
-			out.BasicLine(&bs)
+				bsCh <- &bs
+
+			}(proj)
 		}
+
+		wg.Wait()
+		close(bsCh)
+		close(errorCh)
 		logger.Println()
+
+		if len(errorCh) > 0 {
+			for err := range errorCh {
+				ctx.Err.Println(err.Error())
+			}
+			ctx.Err.Println()
+		}
+
+		// A map of ProjectRoot and *BasicStatus. This is used in maintain the
+		// order of BasicStatus in output by collecting all the BasicStatus and
+		// then using them in order.
+		bsMap := make(map[string]*BasicStatus)
+		for bs := range bsCh {
+			bsMap[bs.ProjectRoot] = bs
+		}
+
+		// Use the collected BasicStatus in outputter
+		for _, proj := range slp {
+			out.BasicLine(bsMap[string(proj.Ident().ProjectRoot)])
+		}
+
 		out.BasicFooter()
 
 		return digestMismatch, hasMissingPkgs, nil
