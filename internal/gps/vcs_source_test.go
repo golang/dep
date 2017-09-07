@@ -548,8 +548,7 @@ func TestGitSourceListVersionsNoHEAD(t *testing.T) {
 	un := "file://" + repoPath
 	u, err := url.Parse(un)
 	if err != nil {
-		t.Errorf("URL was bad, lolwut? errtext: %s", err)
-		return
+		t.Fatalf("Error parsing URL %s: %s", un, err)
 	}
 	mb := maybeGitSource{u}
 
@@ -557,26 +556,26 @@ func TestGitSourceListVersionsNoHEAD(t *testing.T) {
 	superv := newSupervisor(ctx)
 	isrc, _, err := mb.try(ctx, cpath, newMemoryCache(), superv)
 	if err != nil {
-		t.Fatalf("unexpected error while setting up gitSource for test repo: %s", err)
+		t.Fatalf("Unexpected error while setting up gitSource for test repo: %s", err)
 	}
 
 	err = isrc.initLocal(ctx)
 	if err != nil {
-		t.Fatalf("error on cloning git repo: %s", err)
+		t.Fatalf("Error on cloning git repo: %s", err)
 	}
 
 	src, ok := isrc.(*gitSource)
 	if !ok {
-		t.Fatalf("expected a gitSource, got a %T", isrc)
+		t.Fatalf("Expected a gitSource, got a %T", isrc)
 	}
 
 	pvlist, err := src.listVersions(ctx)
 	if err != nil {
-		t.Fatalf("unexpected error getting version pairs from git repo: %s", err)
+		t.Fatalf("Unexpected error getting version pairs from git repo: %s", err)
 	}
 
 	if len(pvlist) != 1 {
-		t.Errorf("expected 1 version pair from listVersions(), got %d", len(pvlist))
+		t.Errorf("Unexpected version pair length:\n\t(GOT): %d\n\t(WNT): %d", len(pvlist), 1)
 	}
 }
 
