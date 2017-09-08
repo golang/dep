@@ -538,7 +538,9 @@ func TestGitSourceListVersionsNoHEAD(t *testing.T) {
 
 	// Create test repo with a single commit on the master branch
 	h.RunGit(repoPath, "init")
-	h.RunGit(repoPath, "commit", "--allow-empty", `--message="Initial commit"`, `--author="Test author <test@example.com>"`)
+	h.RunGit(repoPath, "config", "--local", "user.email", "test@example.com")
+	h.RunGit(repoPath, "config", "--local", "user.name", "Test author")
+	h.RunGit(repoPath, "commit", "--allow-empty", `--message="Initial commit"`)
 
 	// Make HEAD point at a nonexistent branch (deleting it is not allowed)
 	// The `git ls-remote` that listVersions() calls will not return a HEAD ref
