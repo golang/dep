@@ -547,7 +547,7 @@ func TestGitSourceListVersionsNoHEAD(t *testing.T) {
 	// because it points at a nonexistent branch
 	h.RunGit(repoPath, "symbolic-ref", "HEAD", "refs/heads/nonexistent")
 
-	un := "file://" + repoPath
+	un := "file://" + filepath.ToSlash(repoPath)
 	u, err := url.Parse(un)
 	if err != nil {
 		t.Fatalf("Error parsing URL %s: %s", un, err)
