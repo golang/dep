@@ -42,6 +42,8 @@ var (
 	// legalFileSubstrings contains substrings that are likey part of a legal
 	// declaration file.
 	legalFileSubstrings = []string{
+		"authors",
+		"contributors",
 		"legal",
 		"notice",
 		"disclaimer",
