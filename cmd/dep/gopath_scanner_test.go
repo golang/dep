@@ -5,6 +5,8 @@
 package main
 
 import (
+	"io/ioutil"
+	"log"
 	"reflect"
 	"testing"
 
@@ -16,12 +18,25 @@ import (
 const testProject1 string = "github.com/sdboyer/deptest"
 const testProject2 string = "github.com/sdboyer/deptestdos"
 
+// NewTestContext creates a unique context with its own GOPATH for a single test.
+func NewTestContext(h *test.Helper) *dep.Ctx {
+	h.TempDir("src")
+	pwd := h.Path(".")
+	discardLogger := log.New(ioutil.Discard, "", 0)
+
+	return &dep.Ctx{
+		GOPATH: pwd,
+		Out:    discardLogger,
+		Err:    discardLogger,
+	}
+}
+
 func TestGopathScanner_OverlayManifestConstraints(t *testing.T) {
 	h := test.NewHelper(t)
 	h.Parallel()
 	defer h.Cleanup()
 
-	ctx := newTestContext(h)
+	ctx := NewTestContext(h)
 
 	pi1 := gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot(testProject1)}
 	pi2 := gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot(testProject2)}
@@ -74,7 +89,7 @@ func TestGopathScanner_OverlayLockProjects(t *testing.T) {
 	h.Parallel()
 	defer h.Cleanup()
 
-	ctx := newTestContext(h)
+	ctx := NewTestContext(h)
 
 	rootM := dep.NewManifest()
 	pi1 := gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot(testProject1)}

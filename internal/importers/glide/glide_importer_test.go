@@ -2,116 +2,102 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package main
+package glide
 
 import (
 	"bytes"
-	"io/ioutil"
 	"log"
 	"path/filepath"
 	"testing"
 
 	"github.com/golang/dep"
 	"github.com/golang/dep/internal/gps"
+	"github.com/golang/dep/internal/importers/importertest"
 	"github.com/golang/dep/internal/test"
 	"github.com/pkg/errors"
 )
-
-var (
-	discardLogger = log.New(ioutil.Discard, "", 0)
-)
-
-func newTestContext(h *test.Helper) *dep.Ctx {
-	h.TempDir("src")
-	pwd := h.Path(".")
-	return &dep.Ctx{
-		GOPATH: pwd,
-		Out:    discardLogger,
-		Err:    discardLogger,
-	}
-}
 
 func TestGlideConfig_Convert(t *testing.T) {
 	testCases := map[string]struct {
 		yaml glideYaml
 		lock glideLock
-		convertTestCase
+		importertest.TestCase
 	}{
 		"project": {
 			glideYaml{
 				Imports: []glidePackage{
 					{
-						Name:       importerTestProject,
-						Repository: importerTestProjectSrc,
-						Reference:  importerTestV2Branch,
+						Name:       importertest.Project,
+						Repository: importertest.ProjectSrc,
+						Reference:  importertest.V2Branch,
 					},
 				},
 			},
 			glideLock{
 				Imports: []glideLockedPackage{
 					{
-						Name:       importerTestProject,
-						Repository: importerTestProjectSrc,
-						Revision:   importerTestV2PatchRev,
+						Name:       importertest.Project,
+						Repository: importertest.ProjectSrc,
+						Revision:   importertest.V2PatchRev,
 					},
 				},
 			},
-			convertTestCase{
-				wantSourceRepo: importerTestProjectSrc,
-				wantConstraint: importerTestV2Branch,
-				wantRevision:   importerTestV2PatchRev,
-				wantVersion:    importerTestV2PatchTag,
+			importertest.TestCase{
+				WantSourceRepo: importertest.ProjectSrc,
+				WantConstraint: importertest.V2Branch,
+				WantRevision:   importertest.V2PatchRev,
+				WantVersion:    importertest.V2PatchTag,
 			},
 		},
 		"test project": {
 			glideYaml{
 				Imports: []glidePackage{
 					{
-						Name:       importerTestProject,
-						Repository: importerTestProjectSrc,
-						Reference:  importerTestV2Branch,
+						Name:       importertest.Project,
+						Repository: importertest.ProjectSrc,
+						Reference:  importertest.V2Branch,
 					},
 				},
 			},
 			glideLock{
 				Imports: []glideLockedPackage{
 					{
-						Name:       importerTestProject,
-						Repository: importerTestProjectSrc,
-						Revision:   importerTestV2PatchRev,
+						Name:       importertest.Project,
+						Repository: importertest.ProjectSrc,
+						Revision:   importertest.V2PatchRev,
 					},
 				},
 			},
-			convertTestCase{
-				wantSourceRepo: importerTestProjectSrc,
-				wantConstraint: importerTestV2Branch,
-				wantRevision:   importerTestV2PatchRev,
-				wantVersion:    importerTestV2PatchTag,
+			importertest.TestCase{
+				WantSourceRepo: importertest.ProjectSrc,
+				WantConstraint: importertest.V2Branch,
+				WantRevision:   importertest.V2PatchRev,
+				WantVersion:    importertest.V2PatchTag,
 			},
 		},
 		"yaml only": {
 			glideYaml{
 				Imports: []glidePackage{
 					{
-						Name:       importerTestProject,
-						Repository: importerTestProjectSrc,
-						Reference:  importerTestV2Branch,
+						Name:       importertest.Project,
+						Repository: importertest.ProjectSrc,
+						Reference:  importertest.V2Branch,
 					},
 				},
 			},
 			glideLock{},
-			convertTestCase{
-				wantSourceRepo: importerTestProjectSrc,
-				wantConstraint: importerTestV2Branch,
+			importertest.TestCase{
+				WantSourceRepo: importertest.ProjectSrc,
+				WantConstraint: importertest.V2Branch,
 			},
 		},
 		"ignored package": {
 			glideYaml{
-				Ignores: []string{importerTestProject},
+				Ignores: []string{importertest.Project},
 			},
 			glideLock{},
-			convertTestCase{
-				wantIgnored: []string{importerTestProject},
+			importertest.TestCase{
+				WantIgnored: []string{importertest.Project},
 			},
 		},
 		"exclude dir": {
@@ -119,8 +105,8 @@ func TestGlideConfig_Convert(t *testing.T) {
 				ExcludeDirs: []string{"samples"},
 			},
 			glideLock{},
-			convertTestCase{
-				wantIgnored: []string{testProjectRoot + "/samples"},
+			importertest.TestCase{
+				WantIgnored: []string{importertest.RootProject + "/samples"},
 			},
 		},
 		"exclude dir ignores mismatched package name": {
@@ -129,8 +115,8 @@ func TestGlideConfig_Convert(t *testing.T) {
 				ExcludeDirs: []string{"samples"},
 			},
 			glideLock{},
-			convertTestCase{
-				wantIgnored: []string{testProjectRoot + "/samples"},
+			importertest.TestCase{
+				WantIgnored: []string{importertest.RootProject + "/samples"},
 			},
 		},
 		"missing package name": {
@@ -138,36 +124,36 @@ func TestGlideConfig_Convert(t *testing.T) {
 				Imports: []glidePackage{{Name: ""}},
 			},
 			glideLock{},
-			convertTestCase{
-				wantConvertErr: true,
+			importertest.TestCase{
+				WantConvertErr: true,
 			},
 		},
 		"warn unused os field": {
 			glideYaml{
 				Imports: []glidePackage{
 					{
-						Name: importerTestProject,
+						Name: importertest.Project,
 						OS:   "windows",
 					},
 				}},
 			glideLock{},
-			convertTestCase{
-				wantConstraint: "*",
-				wantWarning:    "specified an os",
+			importertest.TestCase{
+				WantConstraint: "*",
+				WantWarning:    "specified an os",
 			},
 		},
 		"warn unused arch field": {
 			glideYaml{
 				Imports: []glidePackage{
 					{
-						Name: importerTestProject,
+						Name: importertest.Project,
 						Arch: "i686",
 					},
 				}},
 			glideLock{},
-			convertTestCase{
-				wantConstraint: "*",
-				wantWarning:    "specified an arch",
+			importertest.TestCase{
+				WantConstraint: "*",
+				WantWarning:    "specified an arch",
 			},
 		},
 	}
@@ -176,11 +162,11 @@ func TestGlideConfig_Convert(t *testing.T) {
 		name := name
 		testCase := testCase
 		t.Run(name, func(t *testing.T) {
-			err := testCase.Exec(t, func(logger *log.Logger, sm gps.SourceManager) (*dep.Manifest, *dep.Lock, error) {
-				g := newGlideImporter(logger, true, sm)
+			err := testCase.Execute(t, func(logger *log.Logger, sm gps.SourceManager) (*dep.Manifest, *dep.Lock, error) {
+				g := NewImporter(logger, true, sm)
 				g.glideConfig = testCase.yaml
 				g.glideLock = testCase.lock
-				return g.convert(testProjectRoot)
+				return g.convert(importertest.RootProject)
 			})
 			if err != nil {
 				t.Fatalf("%#v", err)
@@ -193,26 +179,26 @@ func TestGlideConfig_Import(t *testing.T) {
 	h := test.NewHelper(t)
 	defer h.Cleanup()
 
-	ctx := newTestContext(h)
+	ctx := importertest.NewTestContext(h)
 	sm, err := ctx.SourceManager()
 	h.Must(err)
 	defer sm.Release()
 
-	h.TempDir(filepath.Join("src", testProjectRoot))
-	h.TempCopy(filepath.Join(testProjectRoot, glideYamlName), "init/glide/glide.yaml")
-	h.TempCopy(filepath.Join(testProjectRoot, glideLockName), "init/glide/glide.lock")
-	projectRoot := h.Path(testProjectRoot)
+	h.TempDir(filepath.Join("src", importertest.RootProject))
+	h.TempCopy(filepath.Join(importertest.RootProject, glideYamlName), "glide.yaml")
+	h.TempCopy(filepath.Join(importertest.RootProject, glideLockName), "glide.lock")
+	projectRoot := h.Path(importertest.RootProject)
 
 	// Capture stderr so we can verify output
 	verboseOutput := &bytes.Buffer{}
 	ctx.Err = log.New(verboseOutput, "", 0)
 
-	g := newGlideImporter(ctx.Err, false, sm) // Disable verbose so that we don't print values that change each test run
+	g := NewImporter(ctx.Err, false, sm) // Disable verbose so that we don't print values that change each test run
 	if !g.HasDepMetadata(projectRoot) {
 		t.Fatal("Expected the importer to detect the glide configuration files")
 	}
 
-	m, l, err := g.Import(projectRoot, testProjectRoot)
+	m, l, err := g.Import(projectRoot, importertest.RootProject)
 	h.Must(err)
 
 	if m == nil {
@@ -223,7 +209,7 @@ func TestGlideConfig_Import(t *testing.T) {
 		t.Fatal("Expected the lock to be generated")
 	}
 
-	goldenFile := "init/glide/golden.txt"
+	goldenFile := "golden.txt"
 	got := verboseOutput.String()
 	want := h.GetTestFileString(goldenFile)
 	if want != got {

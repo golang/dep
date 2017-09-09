@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package main
+package godep
 
 import (
 	"bytes"
@@ -12,64 +12,63 @@ import (
 
 	"github.com/golang/dep"
 	"github.com/golang/dep/internal/gps"
+	"github.com/golang/dep/internal/importers/importertest"
 	"github.com/golang/dep/internal/test"
 	"github.com/pkg/errors"
 )
 
-const testProjectRoot = "github.com/golang/notexist"
-
 func TestGodepConfig_Convert(t *testing.T) {
 	testCases := map[string]struct {
-		convertTestCase
+		importertest.TestCase
 		json godepJSON
 	}{
 		"package without comment": {
-			convertTestCase{
-				wantConstraint: importerTestV1Constraint,
-				wantRevision:   importerTestV1Rev,
-				wantVersion:    importerTestV1Tag,
+			importertest.TestCase{
+				WantConstraint: importertest.V1Constraint,
+				WantRevision:   importertest.V1Rev,
+				WantVersion:    importertest.V1Tag,
 			},
 			godepJSON{
 				Imports: []godepPackage{
 					{
-						ImportPath: importerTestProject,
-						Rev:        importerTestV1Rev,
+						ImportPath: importertest.Project,
+						Rev:        importertest.V1Rev,
 					},
 				},
 			},
 		},
 		"package with comment": {
-			convertTestCase{
-				wantConstraint: importerTestV2Branch,
-				wantRevision:   importerTestV2PatchRev,
-				wantVersion:    importerTestV2PatchTag,
+			importertest.TestCase{
+				WantConstraint: importertest.V2Branch,
+				WantRevision:   importertest.V2PatchRev,
+				WantVersion:    importertest.V2PatchTag,
 			},
 			godepJSON{
 				Imports: []godepPackage{
 					{
-						ImportPath: importerTestProject,
-						Rev:        importerTestV2PatchRev,
-						Comment:    importerTestV2Branch,
+						ImportPath: importertest.Project,
+						Rev:        importertest.V2PatchRev,
+						Comment:    importertest.V2Branch,
 					},
 				},
 			},
 		},
 		"missing package name": {
-			convertTestCase{
-				wantConvertErr: true,
+			importertest.TestCase{
+				WantConvertErr: true,
 			},
 			godepJSON{
 				Imports: []godepPackage{{ImportPath: ""}},
 			},
 		},
 		"missing revision": {
-			convertTestCase{
-				wantConvertErr: true,
+			importertest.TestCase{
+				WantConvertErr: true,
 			},
 			godepJSON{
 				Imports: []godepPackage{
 					{
-						ImportPath: importerTestProject,
+						ImportPath: importertest.Project,
 					},
 				},
 			},
@@ -80,10 +79,10 @@ func TestGodepConfig_Convert(t *testing.T) {
 		name := name
 		testCase := testCase
 		t.Run(name, func(t *testing.T) {
-			err := testCase.Exec(t, func(logger *log.Logger, sm gps.SourceManager) (*dep.Manifest, *dep.Lock, error) {
-				g := newGodepImporter(logger, true, sm)
+			err := testCase.Execute(t, func(logger *log.Logger, sm gps.SourceManager) (*dep.Manifest, *dep.Lock, error) {
+				g := NewImporter(logger, true, sm)
 				g.json = testCase.json
-				return g.convert(testProjectRoot)
+				return g.convert(importertest.RootProject)
 			})
 			if err != nil {
 				t.Fatalf("%#v", err)
@@ -99,10 +98,10 @@ func TestGodepConfig_Import(t *testing.T) {
 	cacheDir := "gps-repocache"
 	h.TempDir(cacheDir)
 	h.TempDir("src")
-	h.TempDir(filepath.Join("src", testProjectRoot))
-	h.TempCopy(filepath.Join(testProjectRoot, godepPath), "init/godep/Godeps.json")
+	h.TempDir(filepath.Join("src", importertest.RootProject))
+	h.TempCopy(filepath.Join(importertest.RootProject, godepPath), "Godeps.json")
 
-	projectRoot := h.Path(testProjectRoot)
+	projectRoot := h.Path(importertest.RootProject)
 	sm, err := gps.NewSourceManager(gps.SourceManagerConfig{
 		Cachedir: h.Path(cacheDir),
 		Logger:   log.New(test.Writer{TB: t}, "", 0),
@@ -114,12 +113,12 @@ func TestGodepConfig_Import(t *testing.T) {
 	verboseOutput := &bytes.Buffer{}
 	logger := log.New(verboseOutput, "", 0)
 
-	g := newGodepImporter(logger, false, sm) // Disable verbose so that we don't print values that change each test run
+	g := NewImporter(logger, false, sm) // Disable Verbose so that we don't print values that change each test run
 	if !g.HasDepMetadata(projectRoot) {
 		t.Fatal("Expected the importer to detect godep configuration file")
 	}
 
-	m, l, err := g.Import(projectRoot, testProjectRoot)
+	m, l, err := g.Import(projectRoot, importertest.RootProject)
 	h.Must(err)
 
 	if m == nil {
@@ -130,7 +129,7 @@ func TestGodepConfig_Import(t *testing.T) {
 		t.Fatal("Expected the lock to be generated")
 	}
 
-	goldenFile := "init/godep/golden.txt"
+	goldenFile := "golden.txt"
 	got := verboseOutput.String()
 	want := h.GetTestFileString(goldenFile)
 	if want != got {
@@ -163,13 +162,13 @@ func TestGodepConfig_JsonLoad(t *testing.T) {
 	h := test.NewHelper(t)
 	defer h.Cleanup()
 
-	ctx := newTestContext(h)
+	ctx := importertest.NewTestContext(h)
 
-	h.TempCopy(filepath.Join(testProjectRoot, godepPath), "init/godep/Godeps.json")
+	h.TempCopy(filepath.Join(importertest.RootProject, godepPath), "Godeps.json")
 
-	projectRoot := h.Path(testProjectRoot)
+	projectRoot := h.Path(importertest.RootProject)
 
-	g := newGodepImporter(ctx.Err, true, nil)
+	g := NewImporter(ctx.Err, true, nil)
 	err := g.load(projectRoot)
 	if err != nil {
 		t.Fatalf("Error while loading... %v", err)
