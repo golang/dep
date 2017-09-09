@@ -155,10 +155,13 @@ func ListPackages(fileRoot, importRoot string) (PackageTree, error) {
 		}
 
 		if pkg.CommentPath != "" && !strings.HasPrefix(pkg.CommentPath, importRoot) {
-			return &NonCanonicalImportRoot{
-				ImportRoot: importRoot,
-				Canonical:  pkg.CommentPath,
+			ptree.Packages[ip] = PackageOrErr{
+				Err: &NonCanonicalImportRoot{
+					ImportRoot: importRoot,
+					Canonical:  pkg.CommentPath,
+				},
 			}
+			return nil
 		}
 
 		// This area has some...fuzzy rules, but check all the imports for
@@ -355,7 +358,7 @@ func findImportComment(pkgName *ast.Ident, c *ast.CommentGroup) string {
 }
 
 // ConflictingImportComments indicates that the package declares more than one
-// different canonical paths.
+// different canonical path.
 type ConflictingImportComments struct {
 	ImportPath     string
 	ImportComments []string
@@ -367,7 +370,7 @@ func (e *ConflictingImportComments) Error() string {
 }
 
 // NonCanonicalImportRoot reports the situation when the dependee imports a
-// package via something else that the package's declared canonical path.
+// package via something other than the package's declared canonical path.
 type NonCanonicalImportRoot struct {
 	ImportRoot string
 	Canonical  string
