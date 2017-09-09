@@ -5,7 +5,6 @@
 package gps
 
 import (
-	"fmt"
 	"log"
 	"os"
 	"path/filepath"
@@ -23,7 +22,8 @@ const (
 	// PruneUnusedPackages indicates if unused Go packages should be pruned.
 	PruneUnusedPackages
 	// PruneNonGoFiles indicates if non-Go files should be pruned.
-	// LICENSE & COPYING files are kept for convience.
+	// Files matching licenseFilePrefixes and legalFileSubstrings are kept in
+	// an attempt to comply with legal requirements.
 	PruneNonGoFiles
 	// PruneGoTestFiles indicates if Go test files should be pruned.
 	PruneGoTestFiles
@@ -61,7 +61,7 @@ func Prune(baseDir string, options PruneOptions, l Lock, logger *log.Logger) err
 	// TODO(ibrasho) allow passing specific options per project
 	for _, lp := range l.Projects() {
 		projectDir := filepath.Join(baseDir, string(lp.Ident().ProjectRoot))
-		err := pruneProject(projectDir, lp, options, logger)
+		err := PruneProject(projectDir, lp, options, logger)
 		if err != nil {
 			return err
 		}
@@ -70,9 +70,9 @@ func Prune(baseDir string, options PruneOptions, l Lock, logger *log.Logger) err
 	return nil
 }
 
-// pruneProject remove excess files according to the options passed, from
+// PruneProject remove excess files according to the options passed, from
 // the lp directory in baseDir.
-func pruneProject(baseDir string, lp LockedProject, options PruneOptions, logger *log.Logger) error {
+func PruneProject(baseDir string, lp LockedProject, options PruneOptions, logger *log.Logger) error {
 	projectDir := filepath.Join(baseDir, string(lp.Ident().ProjectRoot))
 
 	if (options & PruneNestedVendorDirs) != 0 {
@@ -158,8 +158,8 @@ func calculateUnusedPackages(lp LockedProject, projectDir string) (map[string]st
 		if err != nil {
 			return errors.Wrap(err, "unexpected error while calculating unused packages")
 		}
-		fmt.Println(pkg)
 
+		pkg = filepath.ToSlash(pkg)
 		if _, ok := imported[pkg]; !ok {
 			unused[pkg] = struct{}{}
 		}
@@ -174,7 +174,6 @@ func calculateUnusedPackages(lp LockedProject, projectDir string) (map[string]st
 func collectUnusedPackagesFiles(projectDir string, unusedPackages map[string]struct{}) ([]string, error) {
 	// TODO(ibrasho): is this useful?
 	files := make([]string, 0, len(unusedPackages))
-	fmt.Println(unusedPackages)
 
 	err := filepath.Walk(projectDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -196,6 +195,7 @@ func collectUnusedPackagesFiles(projectDir string, unusedPackages map[string]str
 			return errors.Wrap(err, "unexpected error while calculating unused packages")
 		}
 
+		pkg = filepath.ToSlash(pkg)
 		if _, ok := unusedPackages[pkg]; ok {
 			files = append(files, path)
 		}
@@ -255,10 +255,8 @@ func collectNonGoFiles(baseDir string, logger *log.Logger) ([]string, error) {
 	return files, err
 }
 
-// isPreservedFile checks if the file name idicates that the file should be
-// preserved.
-// isPreservedFile checks if the file name contains one of the prefixes in
-// licenseFilePrefixes or contains one of the legalFileSubstrings entries.
+// isPreservedFile checks if the file name indicates that the file should be
+// preserved based on licenseFilePrefixes or legalFileSubstrings.
 func isPreservedFile(name string) bool {
 	name = strings.ToLower(name)
 
@@ -279,7 +277,7 @@ func isPreservedFile(name string) bool {
 
 // pruneGoTestFiles deletes all Go test files (*_test.go) within baseDir.
 func pruneGoTestFiles(baseDir string, logger *log.Logger) error {
-	files, err := collectGoTestsFile(baseDir)
+	files, err := collectGoTestFiles(baseDir)
 	if err != nil {
 		return errors.Wrap(err, "could not collect Go test files")
 	}
@@ -291,9 +289,9 @@ func pruneGoTestFiles(baseDir string, logger *log.Logger) error {
 	return nil
 }
 
-// collectGoTestsFile returns a slice contains all Go test files (any files
+// collectGoTestFiles returns a slice contains all Go test files (any files
 // prefixed with _test.go) in baseDir.
-func collectGoTestsFile(baseDir string) ([]string, error) {
+func collectGoTestFiles(baseDir string) ([]string, error) {
 	files := make([]string, 0)
 
 	err := filepath.Walk(baseDir, func(path string, info os.FileInfo, err error) error {
