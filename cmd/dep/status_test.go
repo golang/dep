@@ -85,6 +85,16 @@ func TestBasicLine(t *testing.T) {
 			wantJSONStatus:  []string{`"Revision":"revxyz"`, `"Constraint":"1.2.3"`, `"Version":"1.0.0"`},
 			wantTableStatus: []string{`github.com/foo/bar  1.2.3       1.0.0    revxyz            0`},
 		},
+		{
+			name: "BasicStatus with update error",
+			status: BasicStatus{
+				ProjectRoot: "github.com/foo/bar",
+				hasError:    true,
+			},
+			wantDotStatus:   []string{`[label="github.com/foo/bar"];`},
+			wantJSONStatus:  []string{`"Version":""`, `"Revision":""`, `"Latest":"unknown"`},
+			wantTableStatus: []string{`github.com/foo/bar                                 unknown  0`},
+		},
 	}
 
 	for _, test := range tests {
