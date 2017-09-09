@@ -19,83 +19,51 @@ import (
 
 func TestVndrConfig_Convert(t *testing.T) {
 	testCases := map[string]struct {
-		*convertTestCase
 		packages []vndrPackage
+		convertTestCase
 	}{
-		"semver reference": {
-			packages: []vndrPackage{{
-				importPath: "github.com/sdboyer/deptest",
-				reference:  "v0.8.0",
-				repository: "https://github.com/sdboyer/deptest.git",
+		"package": {
+			[]vndrPackage{{
+				importPath: importerTestProject,
+				reference:  importerTestV1Rev,
+				repository: importerTestProjectSrc,
 			}},
-			convertTestCase: &convertTestCase{
-				projectRoot:    gps.ProjectRoot("github.com/sdboyer/deptest"),
-				wantSourceRepo: "https://github.com/sdboyer/deptest.git",
-				wantConstraint: "^0.8.0",
-				wantRevision:   gps.Revision("ff2948a2ac8f538c4ecd55962e919d1e13e74baf"),
-				wantVersion:    "v0.8.0",
-				wantLockCount:  1,
-			},
-		},
-		"revision reference": {
-			packages: []vndrPackage{{
-				importPath: "github.com/sdboyer/deptest",
-				reference:  "ff2948a2ac8f538c4ecd55962e919d1e13e74baf",
-			}},
-			convertTestCase: &convertTestCase{
-				projectRoot:    gps.ProjectRoot("github.com/sdboyer/deptest"),
-				wantConstraint: "^1.0.0",
-				wantVersion:    "v1.0.0",
-				wantRevision:   gps.Revision("ff2948a2ac8f538c4ecd55962e919d1e13e74baf"),
-				wantLockCount:  1,
-			},
-		},
-		"untagged revision reference": {
-			packages: []vndrPackage{{
-				importPath: "github.com/carolynvs/deptest-subpkg",
-				reference:  "6c41d90f78bb1015696a2ad591debfa8971512d5",
-			}},
-			convertTestCase: &convertTestCase{
-				projectRoot:    gps.ProjectRoot("github.com/carolynvs/deptest-subpkg"),
-				wantConstraint: "*",
-				wantVersion:    "",
-				wantRevision:   gps.Revision("6c41d90f78bb1015696a2ad591debfa8971512d5"),
-				wantLockCount:  1,
+			convertTestCase{
+				wantSourceRepo: importerTestProjectSrc,
+				wantConstraint: importerTestV1Constraint,
+				wantRevision:   importerTestV1Rev,
+				wantVersion:    importerTestV1Tag,
 			},
 		},
 		"missing importPath": {
-			packages: []vndrPackage{{
-				reference: "v1.0.0",
+			[]vndrPackage{{
+				reference: importerTestV1Tag,
 			}},
-			convertTestCase: &convertTestCase{
+			convertTestCase{
 				wantConvertErr: true,
 			},
 		},
 		"missing reference": {
-			packages: []vndrPackage{{
-				importPath: "github.com/sdboyer/deptest",
+			[]vndrPackage{{
+				importPath: importerTestProject,
 			}},
-			convertTestCase: &convertTestCase{
+			convertTestCase{
 				wantConvertErr: true,
 			},
 		},
 	}
 
-	h := test.NewHelper(t)
-	defer h.Cleanup()
-
-	ctx := newTestContext(h)
-	sm, err := ctx.SourceManager()
-	h.Must(err)
-	defer sm.Release()
-
 	for name, testCase := range testCases {
+		name := name
+		testCase := testCase
 		t.Run(name, func(t *testing.T) {
-			g := newVndrImporter(discardLogger, true, sm)
-			g.packages = testCase.packages
+			t.Parallel()
 
-			manifest, lock, convertErr := g.convert(testCase.projectRoot)
-			err = validateConvertTestCase(testCase.convertTestCase, manifest, lock, convertErr)
+			err := testCase.Exec(t, func(logger *log.Logger, sm gps.SourceManager) (*dep.Manifest, *dep.Lock, error) {
+				g := newVndrImporter(logger, true, sm)
+				g.packages = testCase.packages
+				return g.convert(testProjectRoot)
+			})
 			if err != nil {
 				t.Fatalf("%#v", err)
 			}

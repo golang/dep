@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/golang/dep"
 	"github.com/golang/dep/internal/gps"
 	"github.com/golang/dep/internal/test"
 	"github.com/pkg/errors"
@@ -19,124 +20,73 @@ const testProjectRoot = "github.com/golang/notexist"
 
 func TestGodepConfig_Convert(t *testing.T) {
 	testCases := map[string]struct {
-		*convertTestCase
+		convertTestCase
 		json godepJSON
 	}{
-		"convert project": {
-			json: godepJSON{
+		"package without comment": {
+			convertTestCase{
+				wantConstraint: importerTestV1Constraint,
+				wantRevision:   importerTestV1Rev,
+				wantVersion:    importerTestV1Tag,
+			},
+			godepJSON{
 				Imports: []godepPackage{
 					{
-						ImportPath: "github.com/sdboyer/deptest",
-						// This revision has 2 versions attached to it, v1.0.0 & v0.8.0.
-						Rev:     "ff2948a2ac8f538c4ecd55962e919d1e13e74baf",
-						Comment: "v0.8.0",
+						ImportPath: importerTestProject,
+						Rev:        importerTestV1Rev,
 					},
 				},
 			},
-			convertTestCase: &convertTestCase{
-				projectRoot:    gps.ProjectRoot("github.com/sdboyer/deptest"),
-				wantConstraint: "^0.8.0",
-				wantRevision:   gps.Revision("ff2948a2ac8f538c4ecd55962e919d1e13e74baf"),
-				wantVersion:    "v0.8.0",
-				wantLockCount:  1,
-			},
 		},
-		"with semver suffix": {
-			json: godepJSON{
+		"package with comment": {
+			convertTestCase{
+				wantConstraint: importerTestV2Branch,
+				wantRevision:   importerTestV2PatchRev,
+				wantVersion:    importerTestV2PatchTag,
+			},
+			godepJSON{
 				Imports: []godepPackage{
 					{
-						ImportPath: "github.com/sdboyer/deptest",
-						Rev:        "ff2948a2ac8f538c4ecd55962e919d1e13e74baf",
-						Comment:    "v1.12.0-12-g2fd980e",
+						ImportPath: importerTestProject,
+						Rev:        importerTestV2PatchRev,
+						Comment:    importerTestV2Branch,
 					},
 				},
 			},
-			convertTestCase: &convertTestCase{
-				projectRoot:    gps.ProjectRoot("github.com/sdboyer/deptest"),
-				wantConstraint: "^1.12.0-12-g2fd980e",
-				wantLockCount:  1,
-				wantVersion:    "v1.0.0",
-				wantRevision:   "ff2948a2ac8f538c4ecd55962e919d1e13e74baf",
-			},
 		},
-		"empty comment": {
-			json: godepJSON{
-				Imports: []godepPackage{
-					{
-						ImportPath: "github.com/sdboyer/deptest",
-						// This revision has 2 versions attached to it, v1.0.0 & v0.8.0.
-						Rev: "ff2948a2ac8f538c4ecd55962e919d1e13e74baf",
-					},
-				},
+		"missing package name": {
+			convertTestCase{
+				wantConvertErr: true,
 			},
-			convertTestCase: &convertTestCase{
-				projectRoot:    gps.ProjectRoot("github.com/sdboyer/deptest"),
-				wantConstraint: "^1.0.0",
-				wantRevision:   gps.Revision("ff2948a2ac8f538c4ecd55962e919d1e13e74baf"),
-				wantVersion:    "v1.0.0",
-				wantLockCount:  1,
-			},
-		},
-		"bad input - empty package name": {
-			json: godepJSON{
+			godepJSON{
 				Imports: []godepPackage{{ImportPath: ""}},
 			},
-			convertTestCase: &convertTestCase{
+		},
+		"missing revision": {
+			convertTestCase{
 				wantConvertErr: true,
 			},
-		},
-		"bad input - empty revision": {
-			json: godepJSON{
+			godepJSON{
 				Imports: []godepPackage{
 					{
-						ImportPath: "github.com/sdboyer/deptest",
+						ImportPath: importerTestProject,
 					},
 				},
-			},
-			convertTestCase: &convertTestCase{
-				wantConvertErr: true,
-			},
-		},
-		"sub-packages": {
-			json: godepJSON{
-				Imports: []godepPackage{
-					{
-						ImportPath: "github.com/sdboyer/deptest",
-						// This revision has 2 versions attached to it, v1.0.0 & v0.8.0.
-						Rev: "ff2948a2ac8f538c4ecd55962e919d1e13e74baf",
-					},
-					{
-						ImportPath: "github.com/sdboyer/deptest/foo",
-						// This revision has 2 versions attached to it, v1.0.0 & v0.8.0.
-						Rev: "ff2948a2ac8f538c4ecd55962e919d1e13e74baf",
-					},
-				},
-			},
-			convertTestCase: &convertTestCase{
-				projectRoot:    gps.ProjectRoot("github.com/sdboyer/deptest"),
-				wantLockCount:  1,
-				wantConstraint: "^1.0.0",
-				wantVersion:    "v1.0.0",
-				wantRevision:   "ff2948a2ac8f538c4ecd55962e919d1e13e74baf",
 			},
 		},
 	}
 
-	h := test.NewHelper(t)
-	defer h.Cleanup()
-
-	ctx := newTestContext(h)
-	sm, err := ctx.SourceManager()
-	h.Must(err)
-	defer sm.Release()
-
 	for name, testCase := range testCases {
+		name := name
+		testCase := testCase
 		t.Run(name, func(t *testing.T) {
-			g := newGodepImporter(discardLogger, true, sm)
-			g.json = testCase.json
+			t.Parallel()
 
-			manifest, lock, convertErr := g.convert(testCase.projectRoot)
-			err := validateConvertTestCase(testCase.convertTestCase, manifest, lock, convertErr)
+			err := testCase.Exec(t, func(logger *log.Logger, sm gps.SourceManager) (*dep.Manifest, *dep.Lock, error) {
+				g := newGodepImporter(logger, true, sm)
+				g.json = testCase.json
+				return g.convert(testProjectRoot)
+			})
 			if err != nil {
 				t.Fatalf("%#v", err)
 			}
