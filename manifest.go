@@ -190,7 +190,7 @@ func ValidateProjectRoots(c *Ctx, m *Manifest, sm gps.SourceManager) error {
 	var valErr error
 	if len(errorCh) > 0 {
 		valErr = errInvalidProjectRoot
-		c.Err.Printf("The Following issues were found in Gopkg.toml:\n\n")
+		c.Err.Printf("The following issues were found in Gopkg.toml:\n\n")
 		for err := range errorCh {
 			c.Err.Println("  ✗", err.Error())
 		}

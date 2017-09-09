@@ -393,7 +393,7 @@ func TestValidateProjectRoots(t *testing.T) {
 			name: "valid project root",
 			manifest: Manifest{
 				Constraints: map[gps.ProjectRoot]gps.ProjectProperties{
-					gps.ProjectRoot("github.com/goland/dep"): {
+					gps.ProjectRoot("github.com/golang/dep"): {
 						Constraint: gps.Any(),
 					},
 				},
