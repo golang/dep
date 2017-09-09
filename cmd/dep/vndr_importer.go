@@ -12,7 +12,6 @@ import (
 	"strings"
 
 	"github.com/golang/dep"
-	fb "github.com/golang/dep/internal/feedback"
 	"github.com/golang/dep/internal/gps"
 	"github.com/pkg/errors"
 )
@@ -22,19 +21,12 @@ func vndrFile(dir string) string {
 }
 
 type vndrImporter struct {
+	*baseImporter
 	packages []vndrPackage
-
-	logger  *log.Logger
-	verbose bool
-	sm      gps.SourceManager
 }
 
 func newVndrImporter(log *log.Logger, verbose bool, sm gps.SourceManager) *vndrImporter {
-	return &vndrImporter{
-		logger:  log,
-		verbose: verbose,
-		sm:      sm,
-	}
+	return &vndrImporter{baseImporter: newBaseImporter(log, verbose, sm)}
 }
 
 func (v *vndrImporter) Name() string { return "vndr" }
@@ -60,7 +52,7 @@ func (v *vndrImporter) loadVndrFile(dir string) error {
 
 	f, err := os.Open(vndrFile(dir))
 	if err != nil {
-		return errors.Wrapf(err, "Unable to open %s", vndrFile(dir))
+		return errors.Wrapf(err, "unable to open %s", vndrFile(dir))
 	}
 	defer f.Close()
 
@@ -85,75 +77,32 @@ func (v *vndrImporter) loadVndrFile(dir string) error {
 }
 
 func (v *vndrImporter) convert(pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock, error) {
-	var (
-		manifest = dep.NewManifest()
-		lock     = &dep.Lock{}
-	)
-
+	packages := make([]importedPackage, 0, len(v.packages))
 	for _, pkg := range v.packages {
+		// Validate
 		if pkg.importPath == "" {
-			err := errors.New("Invalid vndr configuration, import path is required")
+			err := errors.New("invalid vndr configuration: import path is required")
 			return nil, nil, err
-		}
-
-		// Obtain ProjectRoot. Required for avoiding sub-package imports.
-		ip, err := v.sm.DeduceProjectRoot(pkg.importPath)
-		if err != nil {
-			return nil, nil, err
-		}
-		pkg.importPath = string(ip)
-
-		// Check if it already existing in locked projects
-		if projectExistsInLock(lock, ip) {
-			continue
 		}
 
 		if pkg.reference == "" {
-			err := errors.New("Invalid vndr configuration, revision is required")
+			err := errors.New("invalid vndr configuration: revision is required")
 			return nil, nil, err
 		}
 
-		pc := gps.ProjectConstraint{
-			Ident: gps.ProjectIdentifier{
-				ProjectRoot: gps.ProjectRoot(pkg.importPath),
-				Source:      pkg.repository,
-			},
-			Constraint: gps.Any(),
+		ip := importedPackage{
+			Name:     pkg.importPath,
+			Source:   pkg.repository,
+			LockHint: pkg.reference,
 		}
-
-		// A vndr entry could contain either a version or a revision
-		isVersion, version, err := isVersion(pc.Ident, pkg.reference, v.sm)
-		if err != nil {
-			return nil, nil, err
-		}
-
-		// If the reference is a revision, check if it is tagged with a version
-		if !isVersion {
-			revision := gps.Revision(pkg.reference)
-			version, err = lookupVersionForLockedProject(pc.Ident, nil, revision, v.sm)
-			if err != nil {
-				v.logger.Println(err.Error())
-			}
-		}
-
-		// Try to build a constraint from the version
-		pp := getProjectPropertiesFromVersion(version)
-		if pp.Constraint != nil {
-			pc.Constraint = pp.Constraint
-		}
-
-		manifest.Constraints[pc.Ident.ProjectRoot] = gps.ProjectProperties{
-			Source:     pc.Ident.Source,
-			Constraint: pc.Constraint,
-		}
-		fb.NewConstraintFeedback(pc, fb.DepTypeImported).LogFeedback(v.logger)
-
-		lp := gps.NewLockedProject(pc.Ident, version, nil)
-		lock.P = append(lock.P, lp)
-		fb.NewLockedProjectFeedback(lp, fb.DepTypeImported).LogFeedback(v.logger)
+		packages = append(packages, ip)
+	}
+	err := v.importPackages(packages, true)
+	if err != nil {
+		return nil, nil, err
 	}
 
-	return manifest, lock, nil
+	return v.manifest, v.lock, nil
 }
 
 type vndrPackage struct {
