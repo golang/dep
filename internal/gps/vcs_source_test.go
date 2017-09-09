@@ -524,6 +524,63 @@ func testHgSourceInteractions(t *testing.T) {
 	<-donech
 }
 
+func TestGitSourceListVersionsNoHEAD(t *testing.T) {
+	t.Parallel()
+
+	requiresBins(t, "git")
+
+	h := test.NewHelper(t)
+	defer h.Cleanup()
+	h.TempDir("smcache")
+	cpath := h.Path("smcache")
+	h.TempDir("repo")
+	repoPath := h.Path("repo")
+
+	// Create test repo with a single commit on the master branch
+	h.RunGit(repoPath, "init")
+	h.RunGit(repoPath, "config", "--local", "user.email", "test@example.com")
+	h.RunGit(repoPath, "config", "--local", "user.name", "Test author")
+	h.RunGit(repoPath, "commit", "--allow-empty", `--message="Initial commit"`)
+
+	// Make HEAD point at a nonexistent branch (deleting it is not allowed)
+	// The `git ls-remote` that listVersions() calls will not return a HEAD ref
+	// because it points at a nonexistent branch
+	h.RunGit(repoPath, "symbolic-ref", "HEAD", "refs/heads/nonexistent")
+
+	un := "file://" + filepath.ToSlash(repoPath)
+	u, err := url.Parse(un)
+	if err != nil {
+		t.Fatalf("Error parsing URL %s: %s", un, err)
+	}
+	mb := maybeGitSource{u}
+
+	ctx := context.Background()
+	superv := newSupervisor(ctx)
+	isrc, _, err := mb.try(ctx, cpath, newMemoryCache(), superv)
+	if err != nil {
+		t.Fatalf("Unexpected error while setting up gitSource for test repo: %s", err)
+	}
+
+	err = isrc.initLocal(ctx)
+	if err != nil {
+		t.Fatalf("Error on cloning git repo: %s", err)
+	}
+
+	src, ok := isrc.(*gitSource)
+	if !ok {
+		t.Fatalf("Expected a gitSource, got a %T", isrc)
+	}
+
+	pvlist, err := src.listVersions(ctx)
+	if err != nil {
+		t.Fatalf("Unexpected error getting version pairs from git repo: %s", err)
+	}
+
+	if len(pvlist) != 1 {
+		t.Errorf("Unexpected version pair length:\n\t(GOT): %d\n\t(WNT): %d", len(pvlist), 1)
+	}
+}
+
 func Test_bzrSource_exportRevisionTo_removeVcsFiles(t *testing.T) {
 	t.Parallel()
 
