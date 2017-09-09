@@ -396,8 +396,6 @@ func TestBaseImporter_ImportProjects(t *testing.T) {
 		name := name
 		tc := tc
 		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-
 			err := tc.Exec(t, func(logger *log.Logger, sm gps.SourceManager) (*dep.Manifest, *dep.Lock, error) {
 				i := newBaseImporter(logger, true, sm)
 				convertErr := i.importPackages(tc.projects, tc.defaultConstraintFromLock)
@@ -426,6 +424,7 @@ type convertTestCase struct {
 func (tc convertTestCase) Exec(t *testing.T, convert func(logger *log.Logger, sm gps.SourceManager) (*dep.Manifest, *dep.Lock, error)) error {
 	h := test.NewHelper(t)
 	defer h.Cleanup()
+	h.Parallel()
 
 	ctx := newTestContext(h)
 	sm, err := ctx.SourceManager()
