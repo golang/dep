@@ -43,6 +43,8 @@ print an extended status output for each dependency of the project.
 Status returns exit code zero if all dependencies are in a "good state".
 `
 
+var errFailedUpdate = errors.New("failed to fetch updates")
+
 func (cmd *statusCommand) Name() string      { return "status" }
 func (cmd *statusCommand) Args() string      { return "[package...]" }
 func (cmd *statusCommand) ShortHelp() string { return statusShortHelp }
@@ -98,7 +100,7 @@ func (out *tableOutput) BasicLine(bs *BasicStatus) {
 		bs.getConsolidatedConstraint(),
 		formatVersion(bs.Version),
 		formatVersion(bs.Revision),
-		formatVersion(bs.Latest),
+		bs.getConsolidatedLatest(),
 		bs.PackageCount,
 	)
 }
@@ -226,6 +228,15 @@ func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
 
 	digestMismatch, hasMissingPkgs, err := runStatusAll(ctx, out, p, sm)
 	if err != nil {
+		// Print the outdated results
+		if err == errFailedUpdate {
+			ctx.Out.Println(buf.String())
+
+			// Print the help when in non-verbose mode
+			if !ctx.Verbose {
+				ctx.Out.Println("Failed to get status of some projects. Run `dep status -v` to see the error messages.")
+			}
+		}
 		return err
 	}
 
@@ -249,8 +260,8 @@ type rawStatus struct {
 	ProjectRoot  string
 	Constraint   string
 	Version      string
-	Revision     gps.Revision
-	Latest       gps.Version
+	Revision     string
+	Latest       string
 	PackageCount int
 }
 
@@ -265,6 +276,7 @@ type BasicStatus struct {
 	Latest       gps.Version
 	PackageCount int
 	hasOverride  bool
+	hasError     bool
 }
 
 func (bs *BasicStatus) getConsolidatedConstraint() string {
@@ -292,13 +304,26 @@ func (bs *BasicStatus) getConsolidatedVersion() string {
 	return version
 }
 
+func (bs *BasicStatus) getConsolidatedLatest() string {
+	latest := ""
+	if bs.Latest != nil {
+		latest = formatVersion(bs.Latest)
+	}
+
+	if bs.hasError {
+		latest += "unknown"
+	}
+
+	return latest
+}
+
 func (bs *BasicStatus) marshalJSON() *rawStatus {
 	return &rawStatus{
 		ProjectRoot:  bs.ProjectRoot,
 		Constraint:   bs.getConsolidatedConstraint(),
 		Version:      formatVersion(bs.Version),
-		Revision:     bs.Revision,
-		Latest:       bs.Latest,
+		Revision:     formatVersion(bs.Revision),
+		Latest:       bs.getConsolidatedLatest(),
 		PackageCount: bs.PackageCount,
 	}
 }
@@ -394,6 +419,7 @@ func runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceMana
 					ptr, err := sm.ListPackages(proj.Ident(), proj.Version())
 
 					if err != nil {
+						bs.hasError = true
 						errorCh <- err
 					}
 
@@ -449,6 +475,11 @@ func runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceMana
 								break
 							}
 						}
+					} else {
+						// Failed to fetch version list (could happen due to
+						// network issue)
+						bs.hasError = true
+						errorCh <- err
 					}
 				}
 
@@ -462,11 +493,16 @@ func runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceMana
 		close(errorCh)
 		logger.Println()
 
+		var updateError error
+
 		if len(errorCh) > 0 {
-			for err := range errorCh {
-				ctx.Err.Println(err.Error())
+			updateError = errFailedUpdate
+			if ctx.Verbose {
+				for err := range errorCh {
+					ctx.Err.Println(err.Error())
+				}
+				ctx.Err.Println()
 			}
-			ctx.Err.Println()
 		}
 
 		// A map of ProjectRoot and *BasicStatus. This is used in maintain the
@@ -484,7 +520,7 @@ func runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceMana
 
 		out.BasicFooter()
 
-		return digestMismatch, hasMissingPkgs, nil
+		return digestMismatch, hasMissingPkgs, updateError
 	}
 
 	// Hash digest mismatch may indicate that some deps are no longer
