@@ -150,8 +150,8 @@ func contains(a []string, b string) bool {
 	return false
 }
 
-// getProjectPropertiesFromVersion takes a gps.Version and returns a proper
-// gps.ProjectProperties with Constraint value based on the provided version.
+// getProjectPropertiesFromVersion takes a Version and returns a proper
+// ProjectProperties with Constraint value based on the provided version.
 func getProjectPropertiesFromVersion(v gps.Version) gps.ProjectProperties {
 	pp := gps.ProjectProperties{}
 
