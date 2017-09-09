@@ -116,14 +116,14 @@ authenticated repository.
 
 First, configure `git` to use the credentials option for the specific repository.
 
-For example, if you use gitlab, and you wish to access `https://gitlab.example.com/example/package.git`, 
+For example, if you use gitlab, and you wish to access `https://gitlab.example.com/example/package.git`,
 then you would want to use the following configuration:
 
 ```
 $ git config --global credential.https://gitlab.example.com.example yourusername
 ```
 
-In the example the hostname `gitlab.example.com.username` string seems incorrect, but 
+In the example the hostname `gitlab.example.com.username` string seems incorrect, but
 it's actually the hostname plus the name of the repo you are accessing which is `username`.
 The trailing 'yourusername' is the username you would use for the actual authentication.
 
@@ -137,8 +137,8 @@ $ git help -a | grep credential-
   credential-osxkeychain    remote-ftps
   credential-store          remote-http
 ```
-  
-You would then choose an appropriate provider. For example, to use the osxkeychain, you 
+
+You would then choose an appropriate provider. For example, to use the osxkeychain, you
 would use the following:
 
 ```
@@ -296,13 +296,17 @@ It's up to you:
 
 **Pros**
 
-- It's the only way to get truly reproducible builds, as it guards against upstream renames, deletes and commit history overwrites.
-- You don't need an extra `dep ensure` step (to fetch dependencies) on fresh clones to build your repo: you can use `go get` as usual.
+- It's the only way to get truly reproducible builds, as it guards against upstream renames,
+  deletes and commit history overwrites.
+- You don't need an extra `dep ensure` step to sync `vendor/` with Gopkg.lock after most operations,
+  such as `go get`, cloning, getting latest, merging, etc.
 
 **Cons**
 
-- Your repo will be bigger, potentially a lot bigger.
-- PR diffs are more annoying (but files in `vendor/` are [hidden by default](https://github.com/github/linguist/blob/v5.2.0/lib/linguist/generated.rb#L328) on Github).
+- Your repo will be bigger, potentially a lot bigger,
+  though `dep prune` can help minimize this problem.
+- PR diffs will include changes for files under `vendor/` when Gopkg.lock is modified,
+  however files in `vendor/` are [hidden by default](https://github.com/github/linguist/blob/v5.2.0/lib/linguist/generated.rb#L328) on Github.
 
 ## How do I roll releases that `dep` will be able to use?
 
