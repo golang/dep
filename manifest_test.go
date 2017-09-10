@@ -5,7 +5,10 @@
 package dep
 
 import (
+	"bytes"
 	"errors"
+	"io/ioutil"
+	"log"
 	"reflect"
 	"strings"
 	"testing"
@@ -370,5 +373,112 @@ func TestValidateManifest(t *testing.T) {
 				t.Fatalf("Manifest errors are not as expected: \n\t(MISSING) %v\n\t(FROM) %v", er, c.wantWarn)
 			}
 		}
+	}
+}
+
+func TestValidateProjectRoots(t *testing.T) {
+	cases := []struct {
+		name      string
+		manifest  Manifest
+		wantError error
+		wantWarn  []string
+	}{
+		{
+			name:      "empty Manifest",
+			manifest:  Manifest{},
+			wantError: nil,
+			wantWarn:  []string{},
+		},
+		{
+			name: "valid project root",
+			manifest: Manifest{
+				Constraints: map[gps.ProjectRoot]gps.ProjectProperties{
+					gps.ProjectRoot("github.com/golang/dep"): {
+						Constraint: gps.Any(),
+					},
+				},
+			},
+			wantError: nil,
+			wantWarn:  []string{},
+		},
+		{
+			name: "invalid project roots in Constraints and Overrides",
+			manifest: Manifest{
+				Constraints: map[gps.ProjectRoot]gps.ProjectProperties{
+					gps.ProjectRoot("github.com/golang/dep/foo"): {
+						Constraint: gps.Any(),
+					},
+					gps.ProjectRoot("github.com/golang/go/xyz"): {
+						Constraint: gps.Any(),
+					},
+					gps.ProjectRoot("github.com/golang/fmt"): {
+						Constraint: gps.Any(),
+					},
+				},
+				Ovr: map[gps.ProjectRoot]gps.ProjectProperties{
+					gps.ProjectRoot("github.com/golang/mock/bar"): {
+						Constraint: gps.Any(),
+					},
+					gps.ProjectRoot("github.com/golang/mock"): {
+						Constraint: gps.Any(),
+					},
+				},
+			},
+			wantError: errInvalidProjectRoot,
+			wantWarn: []string{
+				"the name for \"github.com/golang/dep/foo\" should be changed to \"github.com/golang/dep\"",
+				"the name for \"github.com/golang/mock/bar\" should be changed to \"github.com/golang/mock\"",
+				"the name for \"github.com/golang/go/xyz\" should be changed to \"github.com/golang/go\"",
+			},
+		},
+		{
+			name: "invalid source path",
+			manifest: Manifest{
+				Constraints: map[gps.ProjectRoot]gps.ProjectProperties{
+					gps.ProjectRoot("github.com/golang"): {
+						Constraint: gps.Any(),
+					},
+				},
+			},
+			wantError: errInvalidProjectRoot,
+			wantWarn:  []string{},
+		},
+	}
+
+	h := test.NewHelper(t)
+	defer h.Cleanup()
+
+	h.TempDir("src")
+	pwd := h.Path(".")
+
+	// Capture the stderr to verify the warnings
+	stderrOutput := &bytes.Buffer{}
+	errLogger := log.New(stderrOutput, "", 0)
+	ctx := &Ctx{
+		GOPATH: pwd,
+		Out:    log.New(ioutil.Discard, "", 0),
+		Err:    errLogger,
+	}
+
+	sm, err := ctx.SourceManager()
+	h.Must(err)
+	defer sm.Release()
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			// Empty the buffer for every case
+			stderrOutput.Reset()
+			err := ValidateProjectRoots(ctx, &c.manifest, sm)
+			if err != c.wantError {
+				t.Fatalf("Unexpected error while validating project roots:\n\t(GOT): %v\n\t(WNT): %v", err, c.wantError)
+			}
+
+			warnings := stderrOutput.String()
+			for _, warn := range c.wantWarn {
+				if !strings.Contains(warnings, warn) {
+					t.Fatalf("Expected ValidateProjectRoot errors to contain: %q", warn)
+				}
+			}
+		})
 	}
 }
