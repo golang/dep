@@ -230,3 +230,60 @@ func TestBasicStatusGetConsolidatedVersion(t *testing.T) {
 		})
 	}
 }
+
+func TestBasicStatusGetConsolidatedLatest(t *testing.T) {
+	testCases := []struct {
+		name        string
+		basicStatus BasicStatus
+		revSize     int
+		wantLatest  string
+	}{
+		{
+			name:        "empty BasicStatus",
+			basicStatus: BasicStatus{},
+			revSize:     shortRev,
+			wantLatest:  "",
+		},
+		{
+			name: "nil latest",
+			basicStatus: BasicStatus{
+				Latest: nil,
+			},
+			revSize:    shortRev,
+			wantLatest: "",
+		},
+		{
+			name: "with error",
+			basicStatus: BasicStatus{
+				hasError: true,
+			},
+			revSize:    shortRev,
+			wantLatest: "unknown",
+		},
+		{
+			name: "short latest",
+			basicStatus: BasicStatus{
+				Latest: gps.Revision("adummylonglongrevision"),
+			},
+			revSize:    shortRev,
+			wantLatest: "adummyl",
+		},
+		{
+			name: "long latest",
+			basicStatus: BasicStatus{
+				Latest: gps.Revision("adummylonglongrevision"),
+			},
+			revSize:    longRev,
+			wantLatest: "adummylonglongrevision",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			gotRev := tc.basicStatus.getConsolidatedLatest(tc.revSize)
+			if gotRev != tc.wantLatest {
+				t.Errorf("unexpected consolidated latest: \n\t(GOT) %v \n\t(WNT) %v", gotRev, tc.wantLatest)
+			}
+		})
+	}
+}
