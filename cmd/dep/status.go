@@ -43,7 +43,11 @@ print an extended status output for each dependency of the project.
 Status returns exit code zero if all dependencies are in a "good state".
 `
 
-var errFailedUpdate = errors.New("failed to fetch updates")
+var (
+	errFailedUpdate     = errors.New("failed to fetch updates")
+	errFailedListPkg    = errors.New("failed to list packages")
+	errMultipleFailures = errors.New("multiple sources of failure")
+)
 
 func (cmd *statusCommand) Name() string      { return "status" }
 func (cmd *statusCommand) Args() string      { return "[package...]" }
@@ -226,18 +230,22 @@ func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
 		}
 	}
 
-	digestMismatch, hasMissingPkgs, err := runStatusAll(ctx, out, p, sm)
-	if err != nil {
-		// Print the outdated results
-		if err == errFailedUpdate {
+	digestMismatch, hasMissingPkgs, errStatus := runStatusAll(ctx, out, p, sm)
+	if errStatus.err != nil {
+		// If it's only update errors
+		if errStatus.err == errFailedUpdate {
+			// Print the results with unknown data
 			ctx.Out.Println(buf.String())
 
 			// Print the help when in non-verbose mode
 			if !ctx.Verbose {
-				ctx.Out.Println("Failed to get status of some projects. Run `dep status -v` to see the error messages.")
+				ctx.Out.Printf("The status of %d projects are unknown due to errors. Rerun with `-v` flag to see details.\n", errStatus.count)
 			}
+		} else {
+			// List package failure or multiple failures
+			ctx.Out.Println("Failed to get status. Rerun with `-v` flag to see details.")
 		}
-		return err
+		return errStatus.err
 	}
 
 	if digestMismatch {
@@ -334,18 +342,24 @@ type MissingStatus struct {
 	MissingPackages []string
 }
 
-func runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceManager) (bool, bool, error) {
+// errorStatus contains information about error and number of status failures.
+type errorStatus struct {
+	err   error
+	count int
+}
+
+func runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceManager) (bool, bool, errorStatus) {
 	var digestMismatch, hasMissingPkgs bool
 
 	if p.Lock == nil {
-		return digestMismatch, hasMissingPkgs, errors.Errorf("no Gopkg.lock found. Run `dep ensure` to generate lock file")
+		return digestMismatch, hasMissingPkgs, errorStatus{err: errors.Errorf("no Gopkg.lock found. Run `dep ensure` to generate lock file")}
 	}
 
 	// While the network churns on ListVersions() requests, statically analyze
 	// code from the current project.
 	ptree, err := pkgtree.ListPackages(p.ResolvedAbsRoot, string(p.ImportRoot))
 	if err != nil {
-		return digestMismatch, hasMissingPkgs, errors.Wrapf(err, "analysis of local packages failed")
+		return digestMismatch, hasMissingPkgs, errorStatus{err: errors.Wrapf(err, "analysis of local packages failed")}
 	}
 
 	// Set up a solver in order to check the InputHash.
@@ -365,12 +379,12 @@ func runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceMana
 	}
 
 	if err := ctx.ValidateParams(sm, params); err != nil {
-		return digestMismatch, hasMissingPkgs, err
+		return digestMismatch, hasMissingPkgs, errorStatus{err: err}
 	}
 
 	s, err := gps.Prepare(params, sm)
 	if err != nil {
-		return digestMismatch, hasMissingPkgs, errors.Wrapf(err, "could not set up solver for input hashing")
+		return digestMismatch, hasMissingPkgs, errorStatus{err: errors.Wrapf(err, "could not set up solver for input hashing")}
 	}
 
 	cm := collectConstraints(ptree, p, sm)
@@ -395,8 +409,9 @@ func runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceMana
 		// BasicStatus channel to collect all the BasicStatus
 		bsCh := make(chan *BasicStatus, len(slp))
 
-		// Error channel to collect all the errors
-		errorCh := make(chan error, len(slp))
+		// Error channels to collect different errors
+		errListPkgCh := make(chan error, len(slp))
+		errListVerCh := make(chan error, len(slp))
 
 		var wg sync.WaitGroup
 
@@ -420,7 +435,7 @@ func runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceMana
 
 					if err != nil {
 						bs.hasError = true
-						errorCh <- err
+						errListPkgCh <- err
 					}
 
 					prm, _ := ptr.ToReachMap(true, false, false, nil)
@@ -479,7 +494,7 @@ func runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceMana
 						// Failed to fetch version list (could happen due to
 						// network issue)
 						bs.hasError = true
-						errorCh <- err
+						errListVerCh <- err
 					}
 				}
 
@@ -490,15 +505,37 @@ func runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceMana
 
 		wg.Wait()
 		close(bsCh)
-		close(errorCh)
+		close(errListPkgCh)
+		close(errListVerCh)
+
+		// Newline after printing the status progress output
 		logger.Println()
 
-		var updateError error
+		var statusError error
+		var errorCount int
 
-		if len(errorCh) > 0 {
-			updateError = errFailedUpdate
+		// List Packages errors. This would happen only for dot output.
+		if len(errListPkgCh) > 0 {
+			statusError = errFailedListPkg
 			if ctx.Verbose {
-				for err := range errorCh {
+				for err := range errListPkgCh {
+					ctx.Err.Println(err.Error())
+				}
+				ctx.Err.Println()
+			}
+		}
+
+		// List Version errors
+		if len(errListVerCh) > 0 {
+			if statusError == errFailedListPkg {
+				statusError = errMultipleFailures
+			} else {
+				statusError = errFailedUpdate
+			}
+
+			errorCount = len(errListVerCh)
+			if ctx.Verbose {
+				for err := range errListVerCh {
 					ctx.Err.Println(err.Error())
 				}
 				ctx.Err.Println()
@@ -520,7 +557,7 @@ func runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceMana
 
 		out.BasicFooter()
 
-		return digestMismatch, hasMissingPkgs, updateError
+		return digestMismatch, hasMissingPkgs, errorStatus{err: statusError, count: errorCount}
 	}
 
 	// Hash digest mismatch may indicate that some deps are no longer
@@ -562,7 +599,7 @@ func runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceMana
 			ctx.Err.Printf("\t%s: %s\n", fail.ex, fail.err.Error())
 		}
 
-		return digestMismatch, hasMissingPkgs, errors.New("address issues with undeducible import paths to get more status information")
+		return digestMismatch, hasMissingPkgs, errorStatus{err: errors.New("address issues with undeducible import paths to get more status information")}
 	}
 
 	out.MissingHeader()
@@ -582,7 +619,7 @@ outer:
 	}
 	out.MissingFooter()
 
-	return digestMismatch, hasMissingPkgs, nil
+	return digestMismatch, hasMissingPkgs, errorStatus{}
 }
 
 func formatVersion(v gps.Version) string {
