@@ -1332,10 +1332,22 @@ func TestListPackages(t *testing.T) {
 		"non-canonical": {
 			fileRoot:   j("canonical"),
 			importRoot: "noncanonical",
-			out:        PackageTree{},
-			err: &NonCanonicalImportRoot{
+			out: PackageTree{
 				ImportRoot: "noncanonical",
-				Canonical:  "canonical",
+				Packages: map[string]PackageOrErr{
+					"noncanonical": PackageOrErr{
+						Err: &NonCanonicalImportRoot{
+							ImportRoot: "noncanonical",
+							Canonical:  "canonical",
+						},
+					},
+					"noncanonical/sub": PackageOrErr{
+						Err: &NonCanonicalImportRoot{
+							ImportRoot: "noncanonical",
+							Canonical:  "canonical/subpackage",
+						},
+					},
+				},
 			},
 		},
 	}
