@@ -1,0 +1,5 @@
+ignored = ["./samples", "github.com/Sirupsen/logrus"]
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/sdboyer/deptest"

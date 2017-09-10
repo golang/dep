@@ -8,11 +8,14 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"path/filepath"
 	"reflect"
 	"regexp"
 	"sort"
+	"strings"
 
 	"github.com/golang/dep/internal/gps"
+	"github.com/golang/dep/internal/gps/pkgtree"
 	"github.com/pelletier/go-toml"
 	"github.com/pkg/errors"
 )
@@ -332,14 +335,45 @@ func (m *Manifest) Overrides() gps.ProjectConstraints {
 }
 
 // IgnoredPackages returns a set of import paths to ignore.
-func (m *Manifest) IgnoredPackages() map[string]bool {
+func (m *Manifest) IgnoredPackages(solveParam gps.SolveParameters) map[string]bool {
 	if len(m.Ignored) == 0 {
 		return nil
 	}
 
 	mp := make(map[string]bool, len(m.Ignored))
 	for _, i := range m.Ignored {
-		mp[i] = true
+		// Check if it's a local package path
+		if strings.HasPrefix(i, "./") {
+			// Clean ./ from path
+			i = filepath.Clean(i)
+			rootPkgT := solveParam.RootPackageTree
+
+			// Check if the path has glob syntax (/...)
+			if strings.HasSuffix(i, "/...") {
+				dir := filepath.Dir(i)
+				pkgT, _ := pkgtree.ListPackages(filepath.Join(solveParam.RootDir, dir), dir)
+
+				// Ignore root packages found in package tree of ignored package
+				for p := range pkgT.Packages {
+					for rp := range solveParam.RootPackageTree.Packages {
+						if strings.HasSuffix(rp, filepath.Join(rootPkgT.ImportRoot, p)) {
+							mp[rp] = true
+							break
+						}
+					}
+				}
+			} else {
+				// Ignore root package found in local ignored package
+				for rp := range solveParam.RootPackageTree.Packages {
+					if strings.HasSuffix(rp, filepath.Join(rootPkgT.ImportRoot, i)) {
+						mp[rp] = true
+						break
+					}
+				}
+			}
+		} else {
+			mp[i] = true
+		}
 	}
 
 	return mp
