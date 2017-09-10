@@ -500,6 +500,11 @@ func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm
 			return err
 		}
 
+		// check if the the parsed path is the current root path
+		if p.ImportRoot == pc.Ident.ProjectRoot {
+			return errors.New("cannot add current project to itself")
+		}
+
 		inManifest := p.Manifest.HasConstraintsOn(pc.Ident.ProjectRoot)
 		inImports := exrmap[pc.Ident.ProjectRoot]
 		if inManifest && inImports {
