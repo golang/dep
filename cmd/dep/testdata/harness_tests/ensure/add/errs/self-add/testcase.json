@@ -1,0 +1,6 @@
+{
+  "commands": [
+    ["ensure", "-add", "github.com/golang/notexist"]
+  ],
+  "error-expected": "cannot add current project to itself"
+}
