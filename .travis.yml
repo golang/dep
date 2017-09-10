@@ -17,6 +17,7 @@ jobs:
         - go build -v ./cmd/dep
         - ./hack/lint.bash
         - ./hack/validate-vendor.bash
+        - ./hack/validate-licence.bash
         - ./hack/coverage.bash
       after_success:
         - codeclimate-test-reporter < coverage.txt
