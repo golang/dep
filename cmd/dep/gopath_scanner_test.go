@@ -17,9 +17,10 @@ const testProject1 string = "github.com/sdboyer/deptest"
 const testProject2 string = "github.com/sdboyer/deptestdos"
 
 func TestGopathScanner_OverlayManifestConstraints(t *testing.T) {
-	t.Parallel()
-
 	h := test.NewHelper(t)
+	h.Parallel()
+	defer h.Cleanup()
+
 	ctx := newTestContext(h)
 
 	pi1 := gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot(testProject1)}
@@ -69,9 +70,10 @@ func TestGopathScanner_OverlayManifestConstraints(t *testing.T) {
 }
 
 func TestGopathScanner_OverlayLockProjects(t *testing.T) {
-	t.Parallel()
-
 	h := test.NewHelper(t)
+	h.Parallel()
+	defer h.Cleanup()
+
 	ctx := newTestContext(h)
 
 	rootM := dep.NewManifest()

@@ -80,8 +80,6 @@ func TestGodepConfig_Convert(t *testing.T) {
 		name := name
 		testCase := testCase
 		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-
 			err := testCase.Exec(t, func(logger *log.Logger, sm gps.SourceManager) (*dep.Manifest, *dep.Lock, error) {
 				g := newGodepImporter(logger, true, sm)
 				g.json = testCase.json
