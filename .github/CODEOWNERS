@@ -5,9 +5,9 @@
 /cmd/dep/init*                          @carolynvs
 /cmd/dep/gopath_scanner*                @carolynvs
 /cmd/dep/root_analyzer*                 @carolynvs
-/cmd/dep/*_importer*                    @carolynvs
 /cmd/dep/testdata/init                  @carolynvs
 /cmd/dep/testdata/harness_tests/init    @carolynvs
+/internal/importers                     @carolynvs
 /analyzer*                              @carolynvs
 /testdata/analyzer                      @carolynvs
 /internal/feedback                      @carolynvs
