@@ -43,6 +43,11 @@ print an extended status output for each dependency of the project.
 Status returns exit code zero if all dependencies are in a "good state".
 `
 
+const (
+	shortRev = iota
+	longRev  = iota
+)
+
 var (
 	errFailedUpdate     = errors.New("failed to fetch updates")
 	errFailedListPkg    = errors.New("failed to list packages")
@@ -104,7 +109,7 @@ func (out *tableOutput) BasicLine(bs *BasicStatus) {
 		bs.getConsolidatedConstraint(),
 		formatVersion(bs.Version),
 		formatVersion(bs.Revision),
-		bs.getConsolidatedLatest(),
+		bs.getConsolidatedLatest(shortRev),
 		bs.PackageCount,
 	)
 }
@@ -312,10 +317,15 @@ func (bs *BasicStatus) getConsolidatedVersion() string {
 	return version
 }
 
-func (bs *BasicStatus) getConsolidatedLatest() string {
+func (bs *BasicStatus) getConsolidatedLatest(revSize int) string {
 	latest := ""
 	if bs.Latest != nil {
-		latest = formatVersion(bs.Latest)
+		switch revSize {
+		case shortRev:
+			latest = formatVersion(bs.Latest)
+		case longRev:
+			latest = bs.Latest.String()
+		}
 	}
 
 	if bs.hasError {
@@ -330,8 +340,8 @@ func (bs *BasicStatus) marshalJSON() *rawStatus {
 		ProjectRoot:  bs.ProjectRoot,
 		Constraint:   bs.getConsolidatedConstraint(),
 		Version:      formatVersion(bs.Version),
-		Revision:     formatVersion(bs.Revision),
-		Latest:       bs.getConsolidatedLatest(),
+		Revision:     string(bs.Revision),
+		Latest:       bs.getConsolidatedLatest(longRev),
 		PackageCount: bs.PackageCount,
 	}
 }
