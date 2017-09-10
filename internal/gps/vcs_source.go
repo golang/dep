@@ -289,6 +289,13 @@ type gopkginSource struct {
 	gitSource
 	major    uint64
 	unstable bool
+	// The aliased URL we report as being the one we talk to, even though we're
+	// actually talking directly to GitHub.
+	aliasURL string
+}
+
+func (s *gopkginSource) upstreamURL() string {
+	return s.aliasURL
 }
 
 func (s *gopkginSource) listVersions(ctx context.Context) ([]PairedVersion, error) {
