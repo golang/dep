@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/Masterminds/vcs"
+	"github.com/pkg/errors"
 )
 
 // A maybeSource represents a set of information that, given some
@@ -89,7 +90,6 @@ func (m maybeGitSource) try(ctx context.Context, cachedir string, c singleSource
 	ustr := m.url.String()
 
 	r, err := newCtxRepo(vcs.Git, ustr, sourceCachePath(cachedir, ustr))
-
 	if err != nil {
 		return nil, 0, unwrapVcsErr(err)
 	}
@@ -102,13 +102,11 @@ func (m maybeGitSource) try(ctx context.Context, cachedir string, c singleSource
 
 	// Pinging invokes the same action as calling listVersions, so just do that.
 	var vl []PairedVersion
-	err = superv.do(ctx, "git:lv:maybe", ctListVersions, func(ctx context.Context) (err error) {
-		if vl, err = src.listVersions(ctx); err != nil {
-			return fmt.Errorf("remote repository at %s does not exist, or is inaccessible", ustr)
-		}
-		return nil
-	})
-	if err != nil {
+	if err := superv.do(ctx, "git:lv:maybe", ctListVersions, func(ctx context.Context) error {
+		var err error
+		vl, err = src.listVersions(ctx)
+		return errors.Wrapf(err, "remote repository at %s does not exist, or is inaccessible", ustr)
+	}); err != nil {
 		return nil, 0, err
 	}
 
@@ -146,8 +144,8 @@ func (m maybeGopkginSource) try(ctx context.Context, cachedir string, c singleSo
 	// So, it's OK to just dumb-join the scheme with the path.
 	path := sourceCachePath(cachedir, m.url.Scheme+"/"+m.opath)
 	ustr := m.url.String()
-	r, err := newCtxRepo(vcs.Git, ustr, path)
 
+	r, err := newCtxRepo(vcs.Git, ustr, path)
 	if err != nil {
 		return nil, 0, unwrapVcsErr(err)
 	}
@@ -163,13 +161,11 @@ func (m maybeGopkginSource) try(ctx context.Context, cachedir string, c singleSo
 	}
 
 	var vl []PairedVersion
-	err = superv.do(ctx, "git:lv:maybe", ctListVersions, func(ctx context.Context) (err error) {
-		if vl, err = src.listVersions(ctx); err != nil {
-			return fmt.Errorf("remote repository at %s does not exist, or is inaccessible", ustr)
-		}
-		return nil
-	})
-	if err != nil {
+	if err := superv.do(ctx, "git:lv:maybe", ctListVersions, func(ctx context.Context) error {
+		var err error
+		vl, err = src.listVersions(ctx)
+		return errors.Wrapf(err, "remote repository at %s does not exist, or is inaccessible", ustr)
+	}); err != nil {
 		return nil, 0, err
 	}
 
@@ -195,18 +191,16 @@ func (m maybeBzrSource) try(ctx context.Context, cachedir string, c singleSource
 	ustr := m.url.String()
 
 	r, err := newCtxRepo(vcs.Bzr, ustr, sourceCachePath(cachedir, ustr))
-
 	if err != nil {
 		return nil, 0, unwrapVcsErr(err)
 	}
 
-	err = superv.do(ctx, "bzr:ping", ctSourcePing, func(ctx context.Context) error {
+	if err := superv.do(ctx, "bzr:ping", ctSourcePing, func(ctx context.Context) error {
 		if !r.Ping() {
 			return fmt.Errorf("remote repository at %s does not exist, or is inaccessible", ustr)
 		}
 		return nil
-	})
-	if err != nil {
+	}); err != nil {
 		return nil, 0, err
 	}
 
@@ -236,18 +230,16 @@ func (m maybeHgSource) try(ctx context.Context, cachedir string, c singleSourceC
 	ustr := m.url.String()
 
 	r, err := newCtxRepo(vcs.Hg, ustr, sourceCachePath(cachedir, ustr))
-
 	if err != nil {
 		return nil, 0, unwrapVcsErr(err)
 	}
 
-	err = superv.do(ctx, "hg:ping", ctSourcePing, func(ctx context.Context) error {
+	if err := superv.do(ctx, "hg:ping", ctSourcePing, func(ctx context.Context) error {
 		if !r.Ping() {
 			return fmt.Errorf("remote repository at %s does not exist, or is inaccessible", ustr)
 		}
 		return nil
-	})
-	if err != nil {
+	}); err != nil {
 		return nil, 0, err
 	}
 
