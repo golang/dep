@@ -11,6 +11,7 @@ import (
 	"reflect"
 	"regexp"
 	"sort"
+	"sync"
 
 	"github.com/golang/dep/internal/gps"
 	"github.com/pelletier/go-toml"
@@ -22,10 +23,11 @@ const ManifestName = "Gopkg.toml"
 
 // Errors
 var (
-	errInvalidConstraint = errors.New("\"constraint\" must be a TOML array of tables")
-	errInvalidOverride   = errors.New("\"override\" must be a TOML array of tables")
-	errInvalidRequired   = errors.New("\"required\" must be a TOML list of strings")
-	errInvalidIgnored    = errors.New("\"ignored\" must be a TOML list of strings")
+	errInvalidConstraint  = errors.New("\"constraint\" must be a TOML array of tables")
+	errInvalidOverride    = errors.New("\"override\" must be a TOML array of tables")
+	errInvalidRequired    = errors.New("\"required\" must be a TOML list of strings")
+	errInvalidIgnored     = errors.New("\"ignored\" must be a TOML list of strings")
+	errInvalidProjectRoot = errors.New("ProjectRoot name validation failed")
 )
 
 // Manifest holds manifest file data and implements gps.RootManifest.
@@ -154,6 +156,48 @@ func validateManifest(s string) ([]error, error) {
 	}
 
 	return warns, nil
+}
+
+// ValidateProjectRoots validates the project roots present in manifest.
+func ValidateProjectRoots(c *Ctx, m *Manifest, sm gps.SourceManager) error {
+	// Channel to receive all the errors
+	errorCh := make(chan error, len(m.Constraints)+len(m.Ovr))
+
+	var wg sync.WaitGroup
+
+	validate := func(pr gps.ProjectRoot) {
+		defer wg.Done()
+		origPR, err := sm.DeduceProjectRoot(string(pr))
+		if err != nil {
+			errorCh <- err
+		} else if origPR != pr {
+			errorCh <- fmt.Errorf("the name for %q should be changed to %q", pr, origPR)
+		}
+	}
+
+	for pr := range m.Constraints {
+		wg.Add(1)
+		go validate(pr)
+	}
+	for pr := range m.Ovr {
+		wg.Add(1)
+		go validate(pr)
+	}
+
+	wg.Wait()
+	close(errorCh)
+
+	var valErr error
+	if len(errorCh) > 0 {
+		valErr = errInvalidProjectRoot
+		c.Err.Printf("The following issues were found in Gopkg.toml:\n\n")
+		for err := range errorCh {
+			c.Err.Println("  ✗", err.Error())
+		}
+		c.Err.Println()
+	}
+
+	return valErr
 }
 
 // readManifest returns a Manifest read from r and a slice of validation warnings.
