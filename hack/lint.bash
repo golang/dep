@@ -8,6 +8,4 @@ set -e
 
 PKGS=$(go list ./... | grep -v /vendor/)
 go vet $PKGS
-staticcheck $PKGS
-gosimple $PKGS
-unused -exported -ignore github.com/golang/dep/internal/test/test.go:U1000 $PKGS
+megacheck -unused.exported -ignore github.com/golang/dep/internal/test/test.go:U1000 $PKGS
