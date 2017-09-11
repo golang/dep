@@ -388,7 +388,7 @@ func (sm *SourceMgr) doRelease() {
 // manifest and lock is delegated to the provided ProjectAnalyzer's
 // DeriveManifestAndLock() method.
 func (sm *SourceMgr) GetManifestAndLock(id ProjectIdentifier, v Version, an ProjectAnalyzer) (Manifest, Lock, error) {
-	if atomic.CompareAndSwapInt32(&sm.releasing, 1, 1) {
+	if atomic.LoadInt32(&sm.releasing) == 1 {
 		return nil, nil, smIsReleased{}
 	}
 
@@ -403,7 +403,7 @@ func (sm *SourceMgr) GetManifestAndLock(id ProjectIdentifier, v Version, an Proj
 // ListPackages parses the tree of the Go packages at and below the ProjectRoot
 // of the given ProjectIdentifier, at the given version.
 func (sm *SourceMgr) ListPackages(id ProjectIdentifier, v Version) (pkgtree.PackageTree, error) {
-	if atomic.CompareAndSwapInt32(&sm.releasing, 1, 1) {
+	if atomic.LoadInt32(&sm.releasing) == 1 {
 		return pkgtree.PackageTree{}, smIsReleased{}
 	}
 
@@ -428,7 +428,7 @@ func (sm *SourceMgr) ListPackages(id ProjectIdentifier, v Version) (pkgtree.Pack
 // is not accessible (network outage, access issues, or the resource actually
 // went away), an error will be returned.
 func (sm *SourceMgr) ListVersions(id ProjectIdentifier) ([]PairedVersion, error) {
-	if atomic.CompareAndSwapInt32(&sm.releasing, 1, 1) {
+	if atomic.LoadInt32(&sm.releasing) == 1 {
 		return nil, smIsReleased{}
 	}
 
@@ -444,7 +444,7 @@ func (sm *SourceMgr) ListVersions(id ProjectIdentifier) ([]PairedVersion, error)
 // RevisionPresentIn indicates whether the provided Revision is present in the given
 // repository.
 func (sm *SourceMgr) RevisionPresentIn(id ProjectIdentifier, r Revision) (bool, error) {
-	if atomic.CompareAndSwapInt32(&sm.releasing, 1, 1) {
+	if atomic.LoadInt32(&sm.releasing) == 1 {
 		return false, smIsReleased{}
 	}
 
@@ -460,7 +460,7 @@ func (sm *SourceMgr) RevisionPresentIn(id ProjectIdentifier, r Revision) (bool, 
 // SourceExists checks if a repository exists, either upstream or in the cache,
 // for the provided ProjectIdentifier.
 func (sm *SourceMgr) SourceExists(id ProjectIdentifier) (bool, error) {
-	if atomic.CompareAndSwapInt32(&sm.releasing, 1, 1) {
+	if atomic.LoadInt32(&sm.releasing) == 1 {
 		return false, smIsReleased{}
 	}
 
@@ -478,7 +478,7 @@ func (sm *SourceMgr) SourceExists(id ProjectIdentifier) (bool, error) {
 //
 // The primary use case for this is prefetching.
 func (sm *SourceMgr) SyncSourceFor(id ProjectIdentifier) error {
-	if atomic.CompareAndSwapInt32(&sm.releasing, 1, 1) {
+	if atomic.LoadInt32(&sm.releasing) == 1 {
 		return smIsReleased{}
 	}
 
@@ -493,7 +493,7 @@ func (sm *SourceMgr) SyncSourceFor(id ProjectIdentifier) error {
 // ExportProject writes out the tree of the provided ProjectIdentifier's
 // ProjectRoot, at the provided version, to the provided directory.
 func (sm *SourceMgr) ExportProject(id ProjectIdentifier, v Version, to string) error {
-	if atomic.CompareAndSwapInt32(&sm.releasing, 1, 1) {
+	if atomic.LoadInt32(&sm.releasing) == 1 {
 		return smIsReleased{}
 	}
 
@@ -513,7 +513,7 @@ func (sm *SourceMgr) ExportProject(id ProjectIdentifier, v Version, to string) e
 // paths. (A special exception is written for gopkg.in to minimize network
 // activity, as its behavior is well-structured)
 func (sm *SourceMgr) DeduceProjectRoot(ip string) (ProjectRoot, error) {
-	if atomic.CompareAndSwapInt32(&sm.releasing, 1, 1) {
+	if atomic.LoadInt32(&sm.releasing) == 1 {
 		return "", smIsReleased{}
 	}
 
