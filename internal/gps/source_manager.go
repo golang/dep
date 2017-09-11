@@ -280,10 +280,9 @@ func (sm *SourceMgr) HandleSignals(sigch chan os.Signal) {
 			// Set up a timer to uninstall the signal handler after three
 			// seconds, so that the user can easily force termination with a
 			// second ctrl-c
-			go func(c <-chan time.Time) {
-				<-c
+			time.AfterFunc(3*time.Second, func() {
 				signal.Stop(sch)
-			}(time.After(3 * time.Second))
+			})
 
 			if !atomic.CompareAndSwapInt32(&sm.releasing, 0, 1) {
 				// Something's already called Release() on this sm, so we
