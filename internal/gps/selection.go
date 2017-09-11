@@ -73,10 +73,6 @@ func (s *selection) depperCount(id ProjectIdentifier) int {
 	return len(s.deps[id.ProjectRoot])
 }
 
-func (s *selection) setDependenciesOn(id ProjectIdentifier, deps []dependency) {
-	s.deps[id.ProjectRoot] = deps
-}
-
 // Compute a list of the unique packages within the given ProjectIdentifier that
 // have dependers, and the number of dependers they have.
 func (s *selection) getRequiredPackagesIn(id ProjectIdentifier) map[string]int {
@@ -92,6 +88,9 @@ func (s *selection) getRequiredPackagesIn(id ProjectIdentifier) map[string]int {
 
 	return uniq
 }
+
+// Suppress unused warning.
+var _ = (*selection)(nil).getSelectedPackagesIn
 
 // Compute a list of the unique packages within the given ProjectIdentifier that
 // are currently selected, and the number of times each package has been

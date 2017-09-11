@@ -570,11 +570,6 @@ func (s *hgSource) listVersions(ctx context.Context) ([]PairedVersion, error) {
 	return vlist, nil
 }
 
-type repo struct {
-	// Object for direct repo interaction
-	r ctxRepo
-}
-
 // This func copied from Masterminds/vcs so we can exec our own commands
 func mergeEnvLists(in, out []string) []string {
 NextVar:
