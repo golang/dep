@@ -126,7 +126,7 @@ func BenchmarkCreateVendorTree(b *testing.B) {
 	clean := true
 	sm, err := NewSourceManager(SourceManagerConfig{
 		Cachedir: path.Join(tmp, "cache"),
-		Logger:   log.New(test.Writer{b}, "", 0),
+		Logger:   log.New(test.Writer{TB: b}, "", 0),
 	})
 	if err != nil {
 		b.Errorf("failed to create SourceManager: %q", err)

@@ -25,7 +25,7 @@ func Test_singleSourceCache(t *testing.T) {
 	epoch := time.Now().Unix()
 	newBolt := func(t *testing.T, cachedir, root string) (singleSourceCache, func() error) {
 		pi := mkPI(root).normalize()
-		bc, err := newBoltCache(cachedir, epoch, log.New(test.Writer{t}, "", 0))
+		bc, err := newBoltCache(cachedir, epoch, log.New(test.Writer{TB: t}, "", 0))
 		if err != nil {
 			t.Fatal(err)
 		}
