@@ -14,7 +14,7 @@ jobs:
       os: linux
       go: 1.9.x
       script:
-        - go build -v ./cmd/dep
+        - go test -i ./...
         - ./hack/lint.bash
         - ./hack/validate-vendor.bash
         - ./hack/validate-licence.bash
