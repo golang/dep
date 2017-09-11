@@ -284,30 +284,13 @@ func (sm *SourceMgr) HandleSignals(sigch chan os.Signal) {
 				signal.Stop(sch)
 			})
 
-			if !atomic.CompareAndSwapInt32(&sm.releasing, 0, 1) {
-				// Something's already called Release() on this sm, so we
-				// don't have to do anything, as we'd just be redoing
-				// that work. Instead, deregister and return.
-				return
-			}
-
-			opc := sm.suprvsr.count()
-			if opc > 0 {
+			if opc := sm.suprvsr.count(); opc > 0 {
 				fmt.Printf("Signal received: waiting for %v ops to complete...\n", opc)
 			}
 
-			// Mutex interaction in a signal handler is, as a general rule,
-			// unsafe. I'm not clear on whether the guarantees Go provides
-			// around signal handling, or having passed this through a
-			// channel in general, obviate those concerns, but it's a lot
-			// easier to just rely on the mutex contained in the Once right
-			// now, so do that until it proves problematic or someone
-			// provides a clear explanation.
-			sm.relonce.Do(func() { sm.doRelease() })
-			return
+			sm.Release()
 		case <-qch:
 			// quit channel triggered - deregister our sigch and return
-			return
 		}
 	}(sigch, sm.qch)
 	// Try to ensure handler is blocked in for-select before releasing the mutex
@@ -346,38 +329,26 @@ func (e CouldNotCreateLockError) Error() string {
 // longer safe to call methods against it; all method calls will immediately
 // result in errors.
 func (sm *SourceMgr) Release() {
-	// Set sm.releasing before entering the Once func to guarantee that no
-	// _more_ method calls will stack up if/while waiting.
-	atomic.CompareAndSwapInt32(&sm.releasing, 0, 1)
+	atomic.StoreInt32(&sm.releasing, 1)
 
-	// Whether 'releasing' is set or not, we don't want this function to return
-	// until after the doRelease process is done, as doing so could cause the
-	// process to terminate before a signal-driven doRelease() call has a chance
-	// to finish its cleanup.
-	sm.relonce.Do(sm.doRelease)
-}
+	sm.relonce.Do(func() {
+		// Send the signal to the supervisor to cancel all running calls.
+		sm.cancelAll()
+		sm.suprvsr.wait()
 
-// doRelease actually releases physical resources (files on disk, etc.).
-//
-// This must be called only and exactly once. Calls to it should be wrapped in
-// the sm.relonce sync.Once instance.
-func (sm *SourceMgr) doRelease() {
-	// Send the signal to the supervisor to cancel all running calls
-	sm.cancelAll()
-	sm.suprvsr.wait()
+		// Close the source coordinator.
+		sm.srcCoord.close()
 
-	// Close the source coordinator.
-	sm.srcCoord.close()
+		// Close the file handle for the lock file and remove it from disk
+		sm.lf.Unlock()
+		os.Remove(filepath.Join(sm.cachedir, "sm.lock"))
 
-	// Close the file handle for the lock file and remove it from disk
-	sm.lf.Unlock()
-	os.Remove(filepath.Join(sm.cachedir, "sm.lock"))
-
-	// Close the qch, if non-nil, so the signal handlers run out. This will
-	// also deregister the sig channel, if any has been set up.
-	if sm.qch != nil {
-		close(sm.qch)
-	}
+		// Close the qch, if non-nil, so the signal handlers run out. This will
+		// also deregister the sig channel, if any has been set up.
+		if sm.qch != nil {
+			close(sm.qch)
+		}
+	})
 }
 
 // GetManifestAndLock returns manifest and lock information for the provided
