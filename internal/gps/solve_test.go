@@ -25,7 +25,7 @@ func fixSolve(params SolveParameters, sm SourceManager, t *testing.T) (Solution,
 	// Trace unconditionally; by passing the trace through t.Log(), the testing
 	// system will decide whether or not to actually show the output (based on
 	// -v, or selectively on test failure).
-	params.TraceLogger = log.New(test.Writer{t}, "", 0)
+	params.TraceLogger = log.New(test.Writer{TB: t}, "", 0)
 	// always return false, otherwise it would identify pretty much all of
 	// our fixtures as being stdlib and skip everything
 	params.stdLibFn = func(string) bool { return false }
