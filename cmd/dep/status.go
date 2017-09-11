@@ -235,22 +235,22 @@ func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
 		}
 	}
 
-	digestMismatch, hasMissingPkgs, errStatus := runStatusAll(ctx, out, p, sm)
-	if errStatus.err != nil {
+	digestMismatch, hasMissingPkgs, errCount, err := runStatusAll(ctx, out, p, sm)
+	if err != nil {
 		// If it's only update errors
-		if errStatus.err == errFailedUpdate {
+		if err == errFailedUpdate {
 			// Print the results with unknown data
 			ctx.Out.Println(buf.String())
 
 			// Print the help when in non-verbose mode
 			if !ctx.Verbose {
-				ctx.Out.Printf("The status of %d projects are unknown due to errors. Rerun with `-v` flag to see details.\n", errStatus.count)
+				ctx.Out.Printf("The status of %d projects are unknown due to errors. Rerun with `-v` flag to see details.\n", errCount)
 			}
 		} else {
 			// List package failure or multiple failures
 			ctx.Out.Println("Failed to get status. Rerun with `-v` flag to see details.")
 		}
-		return errStatus.err
+		return err
 	}
 
 	if digestMismatch {
@@ -352,26 +352,16 @@ type MissingStatus struct {
 	MissingPackages []string
 }
 
-// errorStatus contains information about error and number of status failures.
-type errorStatus struct {
-	err error
-	// count is for counting errors due to which we don't fail completely, but
-	// return partial results with missing/unknown data.
-	count int
-}
-
-func runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceManager) (digestMismatch bool, hasMissingPkgs bool, errStatus errorStatus) {
+func runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceManager) (digestMismatch bool, hasMissingPkgs bool, errCount int, err error) {
 	if p.Lock == nil {
-		errStatus.err = errors.Errorf("no Gopkg.lock found. Run `dep ensure` to generate lock file")
-		return digestMismatch, hasMissingPkgs, errStatus
+		return false, false, 0, errors.Errorf("no Gopkg.lock found. Run `dep ensure` to generate lock file")
 	}
 
 	// While the network churns on ListVersions() requests, statically analyze
 	// code from the current project.
 	ptree, err := pkgtree.ListPackages(p.ResolvedAbsRoot, string(p.ImportRoot))
 	if err != nil {
-		errStatus.err = errors.Wrapf(err, "analysis of local packages failed")
-		return digestMismatch, hasMissingPkgs, errStatus
+		return false, false, 0, errors.Wrapf(err, "analysis of local packages failed")
 	}
 
 	// Set up a solver in order to check the InputHash.
@@ -391,13 +381,12 @@ func runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceMana
 	}
 
 	if err := ctx.ValidateParams(sm, params); err != nil {
-		return digestMismatch, hasMissingPkgs, errorStatus{err: err}
+		return false, false, 0, err
 	}
 
 	s, err := gps.Prepare(params, sm)
 	if err != nil {
-		errStatus.err = errors.Wrapf(err, "could not set up solver for input hashing")
-		return digestMismatch, hasMissingPkgs, errStatus
+		return false, false, 0, errors.Wrapf(err, "could not set up solver for input hashing")
 	}
 
 	cm := collectConstraints(ptree, p, sm)
@@ -526,7 +515,7 @@ func runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceMana
 
 		// List Packages errors. This would happen only for dot output.
 		if len(errListPkgCh) > 0 {
-			errStatus.err = errFailedListPkg
+			err = errFailedListPkg
 			if ctx.Verbose {
 				for err := range errListPkgCh {
 					ctx.Err.Println(err.Error())
@@ -537,15 +526,15 @@ func runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceMana
 
 		// List Version errors
 		if len(errListVerCh) > 0 {
-			if errStatus.err == nil {
-				errStatus.err = errFailedUpdate
+			if err == nil {
+				err = errFailedUpdate
 			} else {
-				errStatus.err = errMultipleFailures
+				err = errMultipleFailures
 			}
 
 			// Count ListVersions error because we get partial results when
 			// this happens.
-			errStatus.count = len(errListVerCh)
+			errCount = len(errListVerCh)
 			if ctx.Verbose {
 				for err := range errListVerCh {
 					ctx.Err.Println(err.Error())
@@ -569,7 +558,7 @@ func runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceMana
 
 		out.BasicFooter()
 
-		return digestMismatch, hasMissingPkgs, errStatus
+		return false, false, errCount, err
 	}
 
 	// Hash digest mismatch may indicate that some deps are no longer
@@ -578,7 +567,6 @@ func runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceMana
 	//
 	// It's possible for digests to not match, but still have a correct
 	// lock.
-	digestMismatch = true
 	rm, _ := ptree.ToReachMap(true, true, false, nil)
 
 	external := rm.FlattenFn(paths.IsStandardImportPath)
@@ -611,7 +599,7 @@ func runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceMana
 			ctx.Err.Printf("\t%s: %s\n", fail.ex, fail.err.Error())
 		}
 
-		return digestMismatch, hasMissingPkgs, errorStatus{err: errors.New("address issues with undeducible import paths to get more status information")}
+		return true, false, 0, errors.New("address issues with undeducible import paths to get more status information")
 	}
 
 	out.MissingHeader()
@@ -631,7 +619,7 @@ outer:
 	}
 	out.MissingFooter()
 
-	return digestMismatch, hasMissingPkgs, errorStatus{}
+	return true, hasMissingPkgs, 0, nil
 }
 
 func formatVersion(v gps.Version) string {
