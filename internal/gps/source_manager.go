@@ -213,9 +213,9 @@ func NewSourceManager(c SourceManagerConfig) (*SourceMgr, error) {
 			lasttime = nowtime
 		}
 
-		if _, ok := err.(interface {
+		if t, ok := err.(interface {
 			Temporary() bool
-		}); ok {
+		}); ok && t.Temporary() {
 			time.Sleep(time.Second * 1)
 		} else {
 			return nil, CouldNotCreateLockError{
@@ -677,7 +677,6 @@ const (
 	ctSourcePing
 	ctSourceInit
 	ctSourceFetch
-	ctCheckoutVersion
 	ctExportTree
 )
 

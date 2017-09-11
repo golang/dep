@@ -11,17 +11,6 @@ import (
 	"strings"
 )
 
-type errorLevel uint8
-
-// TODO(sdboyer) consistent, sensible way of handling 'type' and 'severity' - or figure
-// out that they're not orthogonal and collapse into just 'type'
-
-const (
-	warning errorLevel = 1 << iota
-	mustResolve
-	cannotResolve
-)
-
 func a2vs(a atom) string {
 	if a.v == rootRev || a.v == nil {
 		return "(root)"

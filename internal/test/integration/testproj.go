@@ -31,7 +31,6 @@ type RunFunc func(prog string, newargs []string, outW, errW io.Writer, dir strin
 // and content
 type TestProject struct {
 	t          *testing.T
-	h          *test.Helper
 	preImports []string
 	tempdir    string
 	env        []string
