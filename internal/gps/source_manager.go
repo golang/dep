@@ -593,21 +593,18 @@ type durCount struct {
 }
 
 type supervisor struct {
-	ctx        context.Context
-	cancelFunc context.CancelFunc
-	mu         sync.Mutex // Guards all maps
-	cond       sync.Cond  // Wraps mu so callers can wait until all calls end
-	running    map[callInfo]timeCount
-	ran        map[callType]durCount
+	ctx     context.Context
+	mu      sync.Mutex // Guards all maps
+	cond    sync.Cond  // Wraps mu so callers can wait until all calls end
+	running map[callInfo]timeCount
+	ran     map[callType]durCount
 }
 
 func newSupervisor(ctx context.Context) *supervisor {
-	ctx, cf := context.WithCancel(ctx)
 	supv := &supervisor{
-		ctx:        ctx,
-		cancelFunc: cf,
-		running:    make(map[callInfo]timeCount),
-		ran:        make(map[callType]durCount),
+		ctx:     ctx,
+		running: make(map[callInfo]timeCount),
+		ran:     make(map[callType]durCount),
 	}
 
 	supv.cond = sync.Cond{L: &supv.mu}
@@ -635,16 +632,12 @@ func (sup *supervisor) do(inctx context.Context, name string, typ callType, f fu
 	return err
 }
 
-func (sup *supervisor) getLifetimeContext() context.Context {
-	return sup.ctx
-}
-
 func (sup *supervisor) start(ci callInfo) (context.Context, error) {
 	sup.mu.Lock()
 	defer sup.mu.Unlock()
-	if sup.ctx.Err() != nil {
+	if err := sup.ctx.Err(); err != nil {
 		// We've already been canceled; error out.
-		return nil, sup.ctx.Err()
+		return nil, err
 	}
 
 	if existingInfo, has := sup.running[ci]; has {
