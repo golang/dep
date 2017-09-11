@@ -5,6 +5,7 @@
 package gps
 
 import (
+	"context"
 	"fmt"
 	"regexp"
 	"strings"
@@ -1460,7 +1461,7 @@ func (sm *depspecSourceManager) SyncSourceFor(id ProjectIdentifier) error {
 
 func (sm *depspecSourceManager) Release() {}
 
-func (sm *depspecSourceManager) ExportProject(id ProjectIdentifier, v Version, to string) error {
+func (sm *depspecSourceManager) ExportProject(context.Context, ProjectIdentifier, Version, string) error {
 	return fmt.Errorf("dummy sm doesn't support exporting")
 }
 

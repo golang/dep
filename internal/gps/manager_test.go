@@ -343,7 +343,7 @@ func TestMgrMethodsFailWithBadPath(t *testing.T) {
 	if _, _, err = sm.GetManifestAndLock(bad, nil, naiveAnalyzer{}); err == nil {
 		t.Error("GetManifestAndLock() did not error on bad input")
 	}
-	if err = sm.ExportProject(bad, nil, ""); err == nil {
+	if err = sm.ExportProject(context.Background(), bad, nil, ""); err == nil {
 		t.Error("ExportProject() did not error on bad input")
 	}
 }
@@ -758,7 +758,7 @@ func TestErrAfterRelease(t *testing.T) {
 		t.Errorf("GetManifestAndLock errored after Release(), but with unexpected error: %T %s", terr, terr.Error())
 	}
 
-	err = sm.ExportProject(id, nil, "")
+	err = sm.ExportProject(context.Background(), id, nil, "")
 	if err == nil {
 		t.Errorf("ExportProject did not error after calling Release()")
 	} else if terr, ok := err.(smIsReleased); !ok {

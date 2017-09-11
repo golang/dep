@@ -5,6 +5,7 @@
 package gps
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
@@ -12,6 +13,7 @@ import (
 	"sync"
 
 	"github.com/pkg/errors"
+	"golang.org/x/sync/errgroup"
 )
 
 // A Solution is returned by a solver run. It is mostly just a Lock, with some
@@ -62,103 +64,76 @@ func WriteDepTree(basedir string, l Lock, sm SourceManager, sv bool, logger *log
 		return fmt.Errorf("must provide non-nil Lock to WriteDepTree")
 	}
 
-	err := os.MkdirAll(basedir, 0777)
-	if err != nil {
+	if err := os.MkdirAll(basedir, 0777); err != nil {
 		return err
 	}
 
+	g, ctx := errgroup.WithContext(context.TODO())
 	lps := l.Projects()
-
-	type resp struct {
-		i   int
-		err error
+	sem := make(chan struct{}, concurrentWriters)
+	var cnt struct {
+		sync.Mutex
+		i int
 	}
-	respCh := make(chan resp, len(lps))
-	writeCh := make(chan int, len(lps))
-	cancel := make(chan struct{})
 
-	// Queue work.
 	for i := range lps {
-		writeCh <- i
-	}
-	close(writeCh)
-	// Launch writers.
-	writers := concurrentWriters
-	if len(lps) < writers {
-		writers = len(lps)
-	}
-	var wg sync.WaitGroup
-	wg.Add(writers)
-	for i := 0; i < writers; i++ {
-		go func() {
-			defer wg.Done()
+		p := lps[i] // per-iteration copy
 
-			for i := range writeCh {
+		g.Go(func() error {
+			err := func() error {
 				select {
-				case <-cancel:
-					return
-				default:
+				case sem <- struct{}{}:
+					defer func() { <-sem }()
+				case <-ctx.Done():
+					return ctx.Err()
 				}
 
-				p := lps[i]
-				to := filepath.FromSlash(filepath.Join(basedir, string(p.Ident().ProjectRoot)))
+				ident := p.Ident()
+				projectRoot := string(ident.ProjectRoot)
+				to := filepath.FromSlash(filepath.Join(basedir, projectRoot))
 
-				if err := sm.ExportProject(p.Ident(), p.Version(), to); err != nil {
-					respCh <- resp{i, errors.Wrapf(err, "failed to export %s", p.Ident().ProjectRoot)}
-					continue
+				if err := sm.ExportProject(ctx, ident, p.Version(), to); err != nil {
+					return errors.Wrapf(err, "failed to export %s", projectRoot)
 				}
 
 				if sv {
-					select {
-					case <-cancel:
-						return
-					default:
+					if err := ctx.Err(); err != nil {
+						return err
 					}
 
 					if err := filepath.Walk(to, stripVendor); err != nil {
-						respCh <- resp{i, errors.Wrapf(err, "failed to strip vendor from %s", p.Ident().ProjectRoot)}
-						continue
+						return errors.Wrapf(err, "failed to strip vendor from %s", projectRoot)
 					}
 				}
 
-				respCh <- resp{i, nil}
-			}
-		}()
-	}
-	// Monitor writers
-	go func() {
-		wg.Wait()
-		close(respCh)
-	}()
+				return nil
+			}()
 
-	// Log results and collect errors
-	var errs []error
-	var cnt int
-	for resp := range respCh {
-		cnt++
-		msg := "Wrote"
-		if resp.err != nil {
-			if len(errs) == 0 {
-				close(cancel)
+			switch err {
+			case context.Canceled, context.DeadlineExceeded:
+				// Don't log "secondary" errors.
+			default:
+				msg := "Wrote"
+				if err != nil {
+					msg = "Failed to write"
+				}
+
+				// Log and increment atomically to prevent re-ordering.
+				cnt.Lock()
+				cnt.i++
+				logger.Printf("(%d/%d) %s %s@%s\n", cnt.i, len(lps), msg, p.Ident(), p.Version())
+				cnt.Unlock()
 			}
-			errs = append(errs, resp.err)
-			msg = "Failed to write"
-		}
-		p := lps[resp.i]
-		logger.Printf("(%d/%d) %s %s@%s\n", cnt, len(lps), msg, p.Ident(), p.Version())
+
+			return err
+		})
 	}
 
-	if len(errs) > 0 {
-		logger.Println("Failed to write dep tree. The following errors occurred:")
-		for i, err := range errs {
-			logger.Printf("(%d/%d) %s\n", i+1, len(errs), err)
-		}
-
+	err := g.Wait()
+	if err != nil {
 		os.RemoveAll(basedir)
-
-		return errors.New("failed to write dep tree")
 	}
-	return nil
+	return errors.Wrap(err, "failed to write dep tree")
 }
 
 func (r solution) Projects() []LockedProject {

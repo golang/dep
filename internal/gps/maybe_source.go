@@ -28,21 +28,29 @@ type maybeSource interface {
 	getURL() string
 }
 
+type errorSlice []error
+
+func (errs *errorSlice) Error() string {
+	var buf bytes.Buffer
+	for _, err := range *errs {
+		fmt.Fprintf(&buf, "\n\t%s", err)
+	}
+	return buf.String()
+}
+
 type maybeSources []maybeSource
 
 func (mbs maybeSources) try(ctx context.Context, cachedir string, c singleSourceCache, superv *supervisor) (source, sourceState, error) {
-	var e sourceFailures
+	var errs errorSlice
 	for _, mb := range mbs {
 		src, state, err := mb.try(ctx, cachedir, c, superv)
 		if err == nil {
 			return src, state, nil
 		}
-		e = append(e, sourceSetupFailure{
-			ident: mb.getURL(),
-			err:   err,
-		})
+		errs = append(errs, errors.Wrapf(err, "failed to set up %q", mb.getURL()))
 	}
-	return nil, 0, e
+
+	return nil, 0, errors.Wrap(&errs, "no valid source could be created")
 }
 
 // This really isn't generally intended to be used - the interface is for
@@ -54,27 +62,6 @@ func (mbs maybeSources) getURL() string {
 		strslice = append(strslice, mb.getURL())
 	}
 	return strings.Join(strslice, "\n")
-}
-
-type sourceSetupFailure struct {
-	ident string
-	err   error
-}
-
-func (e sourceSetupFailure) Error() string {
-	return fmt.Sprintf("failed to set up %q, error %s", e.ident, e.err.Error())
-}
-
-type sourceFailures []sourceSetupFailure
-
-func (sf sourceFailures) Error() string {
-	var buf bytes.Buffer
-	fmt.Fprintf(&buf, "no valid source could be created:")
-	for _, e := range sf {
-		fmt.Fprintf(&buf, "\n\t%s", e.Error())
-	}
-
-	return buf.String()
 }
 
 // sourceCachePath returns a url-sanitized source cache dir path.
