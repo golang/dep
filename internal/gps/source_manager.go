@@ -275,42 +275,40 @@ func (sm *SourceMgr) HandleSignals(sigch chan os.Signal) {
 	// Run a new goroutine with the input sigch and the fresh qch
 	go func(sch chan os.Signal, qch <-chan struct{}) {
 		defer signal.Stop(sch)
-		for {
-			select {
-			case <-sch:
-				// Set up a timer to uninstall the signal handler after three
-				// seconds, so that the user can easily force termination with a
-				// second ctrl-c
-				go func(c <-chan time.Time) {
-					<-c
-					signal.Stop(sch)
-				}(time.After(3 * time.Second))
+		select {
+		case <-sch:
+			// Set up a timer to uninstall the signal handler after three
+			// seconds, so that the user can easily force termination with a
+			// second ctrl-c
+			go func(c <-chan time.Time) {
+				<-c
+				signal.Stop(sch)
+			}(time.After(3 * time.Second))
 
-				if !atomic.CompareAndSwapInt32(&sm.releasing, 0, 1) {
-					// Something's already called Release() on this sm, so we
-					// don't have to do anything, as we'd just be redoing
-					// that work. Instead, deregister and return.
-					return
-				}
-
-				opc := sm.suprvsr.count()
-				if opc > 0 {
-					fmt.Printf("Signal received: waiting for %v ops to complete...\n", opc)
-				}
-
-				// Mutex interaction in a signal handler is, as a general rule,
-				// unsafe. I'm not clear on whether the guarantees Go provides
-				// around signal handling, or having passed this through a
-				// channel in general, obviate those concerns, but it's a lot
-				// easier to just rely on the mutex contained in the Once right
-				// now, so do that until it proves problematic or someone
-				// provides a clear explanation.
-				sm.relonce.Do(func() { sm.doRelease() })
-				return
-			case <-qch:
-				// quit channel triggered - deregister our sigch and return
+			if !atomic.CompareAndSwapInt32(&sm.releasing, 0, 1) {
+				// Something's already called Release() on this sm, so we
+				// don't have to do anything, as we'd just be redoing
+				// that work. Instead, deregister and return.
 				return
 			}
+
+			opc := sm.suprvsr.count()
+			if opc > 0 {
+				fmt.Printf("Signal received: waiting for %v ops to complete...\n", opc)
+			}
+
+			// Mutex interaction in a signal handler is, as a general rule,
+			// unsafe. I'm not clear on whether the guarantees Go provides
+			// around signal handling, or having passed this through a
+			// channel in general, obviate those concerns, but it's a lot
+			// easier to just rely on the mutex contained in the Once right
+			// now, so do that until it proves problematic or someone
+			// provides a clear explanation.
+			sm.relonce.Do(func() { sm.doRelease() })
+			return
+		case <-qch:
+			// quit channel triggered - deregister our sigch and return
+			return
 		}
 	}(sigch, sm.qch)
 	// Try to ensure handler is blocked in for-select before releasing the mutex
