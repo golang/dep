@@ -575,8 +575,8 @@ func newDeductionCoordinator(superv *supervisor) *deductionCoordinator {
 // the root path and a list of maybeSources, which can be subsequently used to
 // create a handler that will manage the particular source.
 func (dc *deductionCoordinator) deduceRootPath(ctx context.Context, path string) (pathDeduction, error) {
-	if dc.suprvsr.getLifetimeContext().Err() != nil {
-		return pathDeduction{}, errors.New("deductionCoordinator has been terminated")
+	if err := dc.suprvsr.ctx.Err(); err != nil {
+		return pathDeduction{}, err
 	}
 
 	// First, check the rootxt to see if there's a prefix match - if so, we

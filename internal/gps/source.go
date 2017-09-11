@@ -68,8 +68,8 @@ func newSourceCoordinator(superv *supervisor, deducer deducer, cachedir string, 
 func (sc *sourceCoordinator) close() {}
 
 func (sc *sourceCoordinator) getSourceGatewayFor(ctx context.Context, id ProjectIdentifier) (*sourceGateway, error) {
-	if sc.supervisor.getLifetimeContext().Err() != nil {
-		return nil, errors.New("sourceCoordinator has been terminated")
+	if err := sc.supervisor.ctx.Err(); err != nil {
+		return nil, err
 	}
 
 	normalizedName := id.normalizedSource()
