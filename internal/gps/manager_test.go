@@ -349,8 +349,8 @@ func TestMgrMethodsFailWithBadPath(t *testing.T) {
 }
 
 type sourceCreationTestFixture struct {
-	roots              []ProjectIdentifier
-	urlcount, srccount int
+	roots               []ProjectIdentifier
+	namecount, srccount int
 }
 
 func (f sourceCreationTestFixture) run(t *testing.T) {
@@ -365,8 +365,8 @@ func (f sourceCreationTestFixture) run(t *testing.T) {
 		}
 	}
 
-	if len(sm.srcCoord.nameToURL) != f.urlcount {
-		t.Errorf("want %v names in the name->url map, but got %v. contents: \n%v", f.urlcount, len(sm.srcCoord.nameToURL), sm.srcCoord.nameToURL)
+	if len(sm.srcCoord.nameToURL) != f.namecount {
+		t.Errorf("want %v names in the name->url map, but got %v. contents: \n%v", f.namecount, len(sm.srcCoord.nameToURL), sm.srcCoord.nameToURL)
 	}
 
 	if len(sm.srcCoord.srcs) != f.srccount {
@@ -390,16 +390,26 @@ func TestSourceCreationCounts(t *testing.T) {
 				mkPI("gopkg.in/sdboyer/gpkt.v2"),
 				mkPI("gopkg.in/sdboyer/gpkt.v3"),
 			},
-			urlcount: 6,
-			srccount: 3,
+			namecount: 6,
+			srccount:  3,
 		},
 		"gopkgin separation from github": {
 			roots: []ProjectIdentifier{
 				mkPI("gopkg.in/sdboyer/gpkt.v1"),
 				mkPI("github.com/sdboyer/gpkt"),
 			},
-			urlcount: 4,
-			srccount: 2,
+			namecount: 4,
+			srccount:  2,
+		},
+		"case variance across path and URL-based access": {
+			roots: []ProjectIdentifier{
+				ProjectIdentifier{ProjectRoot: ProjectRoot("github.com/sdboyer/gpkt"), Source: "https://github.com/Sdboyer/gpkt"},
+				mkPI("github.com/sdboyer/gpkt"),
+				ProjectIdentifier{ProjectRoot: ProjectRoot("github.com/sdboyer/gpkt"), Source: "https://github.com/sdboyeR/gpkt"},
+				mkPI("github.com/sdboyeR/gpkt"),
+			},
+			namecount: 5,
+			srccount:  1,
 		},
 	}
 
