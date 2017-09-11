@@ -171,7 +171,7 @@ func TestValidateParams(t *testing.T) {
 	h.TempDir(cacheDir)
 	sm, err := NewSourceManager(SourceManagerConfig{
 		Cachedir: h.Path(cacheDir),
-		Logger:   log.New(test.Writer{t}, "", 0),
+		Logger:   log.New(test.Writer{TB: t}, "", 0),
 	})
 	h.Must(err)
 	defer sm.Release()

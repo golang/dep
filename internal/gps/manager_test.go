@@ -45,7 +45,7 @@ func mkNaiveSM(t *testing.T) (*SourceMgr, func()) {
 
 	sm, err := NewSourceManager(SourceManagerConfig{
 		Cachedir: cpath,
-		Logger:   log.New(test.Writer{t}, "", 0),
+		Logger:   log.New(test.Writer{TB: t}, "", 0),
 	})
 	if err != nil {
 		t.Fatalf("Unexpected error on SourceManager creation: %s", err)
@@ -66,7 +66,7 @@ func remakeNaiveSM(osm *SourceMgr, t *testing.T) (*SourceMgr, func()) {
 
 	sm, err := NewSourceManager(SourceManagerConfig{
 		Cachedir: cpath,
-		Logger:   log.New(test.Writer{t}, "", 0),
+		Logger:   log.New(test.Writer{TB: t}, "", 0),
 	})
 	if err != nil {
 		t.Fatalf("unexpected error on SourceManager recreation: %s", err)
@@ -88,7 +88,7 @@ func TestSourceManagerInit(t *testing.T) {
 	}
 	cfg := SourceManagerConfig{
 		Cachedir: cpath,
-		Logger:   log.New(test.Writer{t}, "", 0),
+		Logger:   log.New(test.Writer{TB: t}, "", 0),
 	}
 
 	sm, err := NewSourceManager(cfg)
@@ -144,7 +144,7 @@ func TestSourceInit(t *testing.T) {
 
 	sm, err := NewSourceManager(SourceManagerConfig{
 		Cachedir: cpath,
-		Logger:   log.New(test.Writer{t}, "", 0),
+		Logger:   log.New(test.Writer{TB: t}, "", 0),
 	})
 	if err != nil {
 		t.Fatalf("Unexpected error on SourceManager creation: %s", err)

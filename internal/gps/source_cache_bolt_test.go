@@ -21,7 +21,7 @@ func TestBoltCacheTimeout(t *testing.T) {
 		t.Fatalf("Failed to create temp cache dir: %s", err)
 	}
 	pi := ProjectIdentifier{ProjectRoot: root}
-	logger := log.New(test.Writer{t}, "", 0)
+	logger := log.New(test.Writer{TB: t}, "", 0)
 
 	start := time.Now()
 	bc, err := newBoltCache(cpath, start.Unix(), logger)
