@@ -399,7 +399,7 @@ This is especially useful for builds inside docker utilizing cache layers.
 
 Sample dockerfile:
 
-    FROM golang:1.8 AS builder
+    FROM golang:1.9 AS builder
 
     RUN curl -fsSL -o /usr/local/bin/dep https://github.com/golang/dep/releases/download/vX.X.X/dep-linux-amd64 && chmod +x /usr/local/bin/dep
 
@@ -411,18 +411,7 @@ Sample dockerfile:
 
     RUN dep ensure -vendor-only
     # install the dependencies without checking for go code
-    COPY . .
-    # copies any other required code to the WORKDIR
-    RUN go build -o *** 
-    # the -o flag is used to specify the name of the executable to be installed
 
-    FROM alpine:latest
-    RUN apk --no-cache add ca-certificates
-
-    WORKDIR /root/
-
-    COPY --from=builder /go/src/github.com/***  .
-    # copies only the built executable to the new image
-    ENTRYPOINT ["./***"]
+    ...
 
 
