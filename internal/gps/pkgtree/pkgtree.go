@@ -18,7 +18,12 @@ import (
 	"strconv"
 	"strings"
 	"unicode"
+
+	radix "github.com/armon/go-radix"
 )
+
+// recursive ignore suffix
+const recIgnoreSuffix = "/*"
 
 // Package represents a Go package. It contains a subset of the information
 // go/build.Package does.
@@ -550,6 +555,15 @@ func (t PackageTree) ToReachMap(main, tests, backprop bool, ignore map[string]bo
 		ignore = make(map[string]bool)
 	}
 
+	// Create a radix tree for ignore prefixes
+	xt := radix.New()
+	for i := range ignore {
+		if strings.HasSuffix(i, recIgnoreSuffix) {
+			i = strings.TrimSuffix(i, recIgnoreSuffix)
+			xt.Insert(i, true)
+		}
+	}
+
 	// world's simplest adjacency list
 	workmap := make(map[string]wm)
 
@@ -569,6 +583,12 @@ func (t PackageTree) ToReachMap(main, tests, backprop bool, ignore map[string]bo
 		}
 		// Skip ignored packages
 		if ignore[ip] {
+			continue
+		}
+
+		// Skip ignored packages prefix matches
+		_, _, ok := xt.LongestPrefix(ip)
+		if ok {
 			continue
 		}
 
