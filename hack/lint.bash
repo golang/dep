@@ -6,7 +6,7 @@
 # This script will validate code with various linters
 set -e
 
-PKGS=$(go list ./... | grep -v /vendor/)
+PKGS=$(go list ./... | grep -vF /vendor/)
 go vet $PKGS
-staticcheck $PKGS
-gosimple $PKGS
+golint $PKGS
+megacheck -unused.exported -ignore github.com/golang/dep/internal/test/test.go:U1000 $PKGS

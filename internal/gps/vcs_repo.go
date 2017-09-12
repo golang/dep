@@ -53,6 +53,10 @@ func getVCSRepo(s vcs.Type, ustr, path string) (r ctxRepo, err error) {
 		var repo *vcs.HgRepo
 		repo, err = vcs.NewHgRepo(ustr, path)
 		r = &hgRepo{repo}
+	case vcs.Svn:
+		var repo *vcs.SvnRepo
+		repo, err = vcs.NewSvnRepo(ustr, path)
+		r = &svnRepo{repo}
 	}
 
 	return
@@ -218,7 +222,7 @@ func (r *svnRepo) get(ctx context.Context) error {
 	return nil
 }
 
-func (r *svnRepo) update(ctx context.Context) error {
+func (r *svnRepo) fetch(ctx context.Context) error {
 	out, err := runFromRepoDir(ctx, r, expensiveCmdTimeout, "svn", "update")
 	if err != nil {
 		return newVcsRemoteErrorOr("unable to update repository", err, string(out))

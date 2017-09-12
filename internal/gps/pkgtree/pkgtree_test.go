@@ -32,9 +32,6 @@ func TestWorkmapToReach(t *testing.T) {
 		return make(map[string]bool)
 	}
 
-	e := struct {
-		Internal, External []string
-	}{}
 	table := map[string]struct {
 		workmap  map[string]wm
 		rm       ReachMap
@@ -49,7 +46,7 @@ func TestWorkmapToReach(t *testing.T) {
 				},
 			},
 			rm: ReachMap{
-				"foo": e,
+				"foo": {},
 			},
 		},
 		"no external": {
@@ -64,8 +61,8 @@ func TestWorkmapToReach(t *testing.T) {
 				},
 			},
 			rm: ReachMap{
-				"foo":     e,
-				"foo/bar": e,
+				"foo":     {},
+				"foo/bar": {},
 			},
 		},
 		"no external with subpkg": {
@@ -85,7 +82,7 @@ func TestWorkmapToReach(t *testing.T) {
 				"foo": {
 					Internal: []string{"foo/bar"},
 				},
-				"foo/bar": e,
+				"foo/bar": {},
 			},
 		},
 		"simple base transitive": {
