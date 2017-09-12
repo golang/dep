@@ -7,16 +7,17 @@ jobs:
     - stage: test
       go_import_path: github.com/golang/dep
       install:
-        - go get -u honnef.co/go/tools/cmd/{gosimple,staticcheck}
+        - go get -u github.com/golang/lint/golint honnef.co/go/tools/cmd/megacheck
         - npm install -g codeclimate-test-reporter
       env:
         - DEPTESTBYPASS501=1
       os: linux
       go: 1.9.x
       script:
-        - go build -v ./cmd/dep
+        - go test -i ./...
         - ./hack/lint.bash
         - ./hack/validate-vendor.bash
+        - ./hack/validate-licence.bash
         - ./hack/coverage.bash
       after_success:
         - codeclimate-test-reporter < coverage.txt

@@ -171,7 +171,7 @@ func testSvnRepo(t *testing.T) {
 	}
 
 	// Perform an update which should take up back to the latest version.
-	err = repo.update(ctx)
+	err = repo.fetch(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}

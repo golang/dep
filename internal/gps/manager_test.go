@@ -45,7 +45,7 @@ func mkNaiveSM(t *testing.T) (*SourceMgr, func()) {
 
 	sm, err := NewSourceManager(SourceManagerConfig{
 		Cachedir: cpath,
-		Logger:   log.New(test.Writer{t}, "", 0),
+		Logger:   log.New(test.Writer{TB: t}, "", 0),
 	})
 	if err != nil {
 		t.Fatalf("Unexpected error on SourceManager creation: %s", err)
@@ -66,7 +66,7 @@ func remakeNaiveSM(osm *SourceMgr, t *testing.T) (*SourceMgr, func()) {
 
 	sm, err := NewSourceManager(SourceManagerConfig{
 		Cachedir: cpath,
-		Logger:   log.New(test.Writer{t}, "", 0),
+		Logger:   log.New(test.Writer{TB: t}, "", 0),
 	})
 	if err != nil {
 		t.Fatalf("unexpected error on SourceManager recreation: %s", err)
@@ -88,7 +88,7 @@ func TestSourceManagerInit(t *testing.T) {
 	}
 	cfg := SourceManagerConfig{
 		Cachedir: cpath,
-		Logger:   log.New(test.Writer{t}, "", 0),
+		Logger:   log.New(test.Writer{TB: t}, "", 0),
 	}
 
 	sm, err := NewSourceManager(cfg)
@@ -144,7 +144,7 @@ func TestSourceInit(t *testing.T) {
 
 	sm, err := NewSourceManager(SourceManagerConfig{
 		Cachedir: cpath,
-		Logger:   log.New(test.Writer{t}, "", 0),
+		Logger:   log.New(test.Writer{TB: t}, "", 0),
 	})
 	if err != nil {
 		t.Fatalf("Unexpected error on SourceManager creation: %s", err)
@@ -348,6 +348,66 @@ func TestMgrMethodsFailWithBadPath(t *testing.T) {
 	}
 }
 
+type sourceCreationTestFixture struct {
+	roots              []ProjectIdentifier
+	urlcount, srccount int
+}
+
+func (f sourceCreationTestFixture) run(t *testing.T) {
+	t.Parallel()
+	sm, clean := mkNaiveSM(t)
+	defer clean()
+
+	for _, pi := range f.roots {
+		_, err := sm.SourceExists(pi)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if len(sm.srcCoord.nameToURL) != f.urlcount {
+		t.Errorf("want %v names in the name->url map, but got %v. contents: \n%v", f.urlcount, len(sm.srcCoord.nameToURL), sm.srcCoord.nameToURL)
+	}
+
+	if len(sm.srcCoord.srcs) != f.srccount {
+		t.Errorf("want %v gateways in the sources map, but got %v", f.srccount, len(sm.srcCoord.srcs))
+	}
+}
+
+// This test is primarily about making sure that the logic around folding
+// together different ways of referencing the same underlying resource - whether
+// that be intentionally folding them, or intentionally keeping them separate -
+// work as intended.
+func TestSourceCreationCounts(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping slow test in short mode")
+	}
+
+	fixtures := map[string]sourceCreationTestFixture{
+		"gopkgin uniqueness": {
+			roots: []ProjectIdentifier{
+				mkPI("gopkg.in/sdboyer/gpkt.v1"),
+				mkPI("gopkg.in/sdboyer/gpkt.v2"),
+				mkPI("gopkg.in/sdboyer/gpkt.v3"),
+			},
+			urlcount: 6,
+			srccount: 3,
+		},
+		"gopkgin separation from github": {
+			roots: []ProjectIdentifier{
+				mkPI("gopkg.in/sdboyer/gpkt.v1"),
+				mkPI("github.com/sdboyer/gpkt"),
+			},
+			urlcount: 4,
+			srccount: 2,
+		},
+	}
+
+	for name, fix := range fixtures {
+		t.Run(name, fix.run)
+	}
+}
+
 func TestGetSources(t *testing.T) {
 	// This test is a tad slow, skip it on -short
 	if testing.Short() {
@@ -539,7 +599,7 @@ func TestMultiFetchThreadsafe(t *testing.T) {
 		mkPI("gopkg.in/sdboyer/gpkt.v2"),
 		mkPI("github.com/Masterminds/VCSTestRepo"),
 		mkPI("github.com/go-yaml/yaml"),
-		mkPI("github.com/Sirupsen/logrus"),
+		mkPI("github.com/sirupsen/logrus"),
 		mkPI("github.com/Masterminds/semver"),
 		mkPI("github.com/Masterminds/vcs"),
 		//mkPI("bitbucket.org/sdboyer/withbm"),

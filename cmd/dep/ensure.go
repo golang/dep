@@ -135,7 +135,6 @@ type ensureCommand struct {
 	noVendor   bool
 	vendorOnly bool
 	dryRun     bool
-	overrides  stringSlice
 }
 
 func (cmd *ensureCommand) Run(ctx *dep.Ctx, args []string) error {
@@ -159,6 +158,10 @@ func (cmd *ensureCommand) Run(ctx *dep.Ctx, args []string) error {
 	}
 	sm.UseDefaultSignalHandling()
 	defer sm.Release()
+
+	if err := dep.ValidateProjectRoots(ctx, p.Manifest, sm); err != nil {
+		return err
+	}
 
 	params := p.MakeParams()
 	if ctx.Verbose {
@@ -333,7 +336,7 @@ func (cmd *ensureCommand) runUpdate(ctx *dep.Ctx, args []string, p *dep.Project,
 	// "pending" changes, or the -update that caused the problem?).
 	// TODO(sdboyer) reduce this to a warning?
 	if !bytes.Equal(p.Lock.InputHash(), solver.HashInputs()) {
-		return errors.Errorf("%s and %s are out of sync. Run a plain dep ensure to resync them before attempting to -update", dep.ManifestName, dep.LockName)
+		return errors.Errorf("%s is out of sync with %s or the project's imports. Run \"dep ensure\" to resync them first before running \"dep ensure -update\"", dep.LockName, dep.ManifestName)
 	}
 
 	// When -update is specified without args, allow every dependency to change
@@ -428,7 +431,7 @@ func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm
 	// "pending" changes, or the -add that caused the problem?).
 	// TODO(sdboyer) reduce this to a warning?
 	if p.Lock != nil && !bytes.Equal(p.Lock.InputHash(), solver.HashInputs()) {
-		return errors.Errorf("%s and %s are out of sync. Run a plain dep ensure to resync them before attempting to -add", dep.ManifestName, dep.LockName)
+		return errors.Errorf("%s is out of sync with %s or the project's imports. Run \"dep ensure\" to resync them first before running \"dep ensure -add\"", dep.LockName, dep.ManifestName)
 	}
 
 	rm, _ := params.RootPackageTree.ToReachMap(true, true, false, p.Manifest.IgnoredPackages())
@@ -695,19 +698,6 @@ func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm
 	return errors.Wrapf(f.Close(), "closing %s", dep.ManifestName)
 }
 
-type stringSlice []string
-
-func (s *stringSlice) String() string {
-	if len(*s) == 0 {
-		return "<none>"
-	}
-	return strings.Join(*s, ", ")
-}
-
-func (s *stringSlice) Set(value string) error {
-	*s = append(*s, value)
-	return nil
-}
 func getProjectConstraint(arg string, sm gps.SourceManager) (gps.ProjectConstraint, string, error) {
 	emptyPC := gps.ProjectConstraint{
 		Constraint: gps.Any(), // default to any; avoids panics later

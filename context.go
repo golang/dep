@@ -83,6 +83,8 @@ func defaultGOPATH() string {
 	return ""
 }
 
+// SourceManager produces an instance of gps's built-in SourceManager
+// initialized to log to the receiver's logger.
 func (c *Ctx) SourceManager() (*gps.SourceMgr, error) {
 	return gps.NewSourceManager(gps.SourceManagerConfig{
 		Cachedir: filepath.Join(c.GOPATH, "pkg", "dep"),
@@ -182,7 +184,7 @@ func (c *Ctx) DetectProjectGOPATH(p *Project) (string, error) {
 	pGOPATH, perr := c.detectGOPATH(p.AbsRoot)
 
 	// If p.AbsRoot is a not symlink, attempt to detect GOPATH for p.AbsRoot only.
-	if p.AbsRoot == p.ResolvedAbsRoot {
+	if equal, _ := fs.EquivalentPaths(p.AbsRoot, p.ResolvedAbsRoot); equal {
 		return pGOPATH, perr
 	}
 
@@ -194,7 +196,7 @@ func (c *Ctx) DetectProjectGOPATH(p *Project) (string, error) {
 	}
 
 	// If pGOPATH equals rGOPATH, then both are within the same GOPATH.
-	if pGOPATH == rGOPATH {
+	if equal, _ := fs.EquivalentPaths(pGOPATH, rGOPATH); equal {
 		return "", errors.Errorf("both %s and %s are in the same GOPATH %s", p.AbsRoot, p.ResolvedAbsRoot, pGOPATH)
 	}
 
@@ -213,7 +215,11 @@ func (c *Ctx) DetectProjectGOPATH(p *Project) (string, error) {
 // detectGOPATH detects the GOPATH for a given path from ctx.GOPATHs.
 func (c *Ctx) detectGOPATH(path string) (string, error) {
 	for _, gp := range c.GOPATHs {
-		if fs.HasFilepathPrefix(path, gp) {
+		isPrefix, err := fs.HasFilepathPrefix(path, gp)
+		if err != nil {
+			return "", errors.Wrap(err, "failed to detect GOPATH")
+		}
+		if isPrefix {
 			return gp, nil
 		}
 	}
@@ -224,7 +230,11 @@ func (c *Ctx) detectGOPATH(path string) (string, error) {
 // `$GOPATH/src/` prefix.  Returns an error for paths equal to, or without this prefix.
 func (c *Ctx) ImportForAbs(path string) (string, error) {
 	srcprefix := filepath.Join(c.GOPATH, "src") + string(filepath.Separator)
-	if fs.HasFilepathPrefix(path, srcprefix) {
+	isPrefix, err := fs.HasFilepathPrefix(path, srcprefix)
+	if err != nil {
+		return "", errors.Wrap(err, "failed to find import path")
+	}
+	if isPrefix {
 		if len(path) <= len(srcprefix) {
 			return "", errors.New("dep does not currently support using GOPATH/src as the project root")
 		}

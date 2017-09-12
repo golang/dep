@@ -65,17 +65,11 @@ func newSourceCoordinator(superv *supervisor, deducer deducer, cachedir string, 
 	}
 }
 
-func (sc *sourceCoordinator) close() {
-	for k, v := range sc.srcs {
-		if err := v.close(); err != nil {
-			sc.logger.Println(errors.Wrapf(err, "error closing source gateway for %q", k))
-		}
-	}
-}
+func (sc *sourceCoordinator) close() {}
 
 func (sc *sourceCoordinator) getSourceGatewayFor(ctx context.Context, id ProjectIdentifier) (*sourceGateway, error) {
-	if sc.supervisor.getLifetimeContext().Err() != nil {
-		return nil, errors.New("sourceCoordinator has been terminated")
+	if err := sc.supervisor.ctx.Err(); err != nil {
+		return nil, err
 	}
 
 	normalizedName := id.normalizedSource()
@@ -174,8 +168,12 @@ func (sc *sourceCoordinator) getSourceGatewayFor(ctx context.Context, id Project
 	// integrate it back into the main map.
 	sc.srcmut.Lock()
 	defer sc.srcmut.Unlock()
-	// Record the name -> URL mapping, even if it's a self-mapping.
+	// Record the name -> URL mapping, making sure that we also get the
+	// self-mapping.
 	sc.nameToURL[normalizedName] = url
+	if url != normalizedName {
+		sc.nameToURL[url] = url
+	}
 
 	if sa, has := sc.srcs[url]; has {
 		// URL already had an entry in the main map; use that as the result.
@@ -209,10 +207,6 @@ func newSourceGateway(maybe maybeSource, superv *supervisor, cachedir string) *s
 	sg.cache = sg.createSingleSourceCache()
 
 	return sg
-}
-
-func (sg *sourceGateway) close() error {
-	return errors.Wrap(sg.cache.close(), "error closing cache")
 }
 
 func (sg *sourceGateway) syncLocal(ctx context.Context) error {
@@ -272,7 +266,7 @@ func (sg *sourceGateway) exportVersionTo(ctx context.Context, v Version, to stri
 	// TODO(sdboyer) It'd be better if we could check the error to see if this
 	// actually was the cause of the problem.
 	if err != nil && sg.srcState&sourceHasLatestLocally == 0 {
-		if _, err = sg.require(ctx, sourceHasLatestLocally); err != nil {
+		if _, err = sg.require(ctx, sourceHasLatestLocally); err == nil {
 			err = sg.suprvsr.do(ctx, sg.src.upstreamURL(), ctExportTree, func(ctx context.Context) error {
 				return sg.src.exportRevisionTo(ctx, r, to)
 			})
@@ -530,7 +524,7 @@ func (sg *sourceGateway) require(ctx context.Context, wanted sourceState) (errSt
 					if err == nil {
 						addlState |= sourceHasLatestLocally
 					} else {
-						err = fmt.Errorf("%s does not exist in the local cache and fetching failed: %s", sg.src.upstreamURL(), err)
+						err = errors.Wrapf(err, "%s does not exist in the local cache and fetching failed", sg.src.upstreamURL())
 					}
 				}
 			case sourceHasLatestVersionList:

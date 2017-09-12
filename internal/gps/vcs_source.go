@@ -17,6 +17,7 @@ import (
 	"github.com/Masterminds/semver"
 	"github.com/golang/dep/internal/fs"
 	"github.com/golang/dep/internal/gps/pkgtree"
+	"github.com/pkg/errors"
 )
 
 type baseVCSSource struct {
@@ -143,7 +144,7 @@ func (s *gitSource) exportRevisionTo(ctx context.Context, rev Revision, to strin
 
 	out, err := runFromRepoDir(ctx, r, defaultCmdTimeout, "git", "read-tree", rev.String())
 	if err != nil {
-		return fmt.Errorf("%s: %s", out, err)
+		return errors.Wrap(err, string(out))
 	}
 
 	// Ensure we have exactly one trailing slash
@@ -159,7 +160,7 @@ func (s *gitSource) exportRevisionTo(ctx context.Context, rev Revision, to strin
 	// index and HEAD.
 	out, err = runFromRepoDir(ctx, r, defaultCmdTimeout, "git", "checkout-index", "-a", "--prefix="+to)
 	if err != nil {
-		return fmt.Errorf("%s: %s", out, err)
+		return errors.Wrap(err, string(out))
 	}
 
 	return nil
@@ -209,15 +210,18 @@ func (s *gitSource) listVersions(ctx context.Context) (vlist []PairedVersion, er
 	//
 	// If all of those conditions are met, then the user would end up with an
 	// erroneous non-default branch in their lock file.
-	headrev := Revision(all[0][:40])
+	var headrev Revision
 	var onedef, multidef, defmaster bool
 
 	smap := make(map[string]bool)
 	uniq := 0
-	vlist = make([]PairedVersion, len(all)-1) // less 1, because always ignore HEAD
+	vlist = make([]PairedVersion, len(all))
 	for _, pair := range all {
 		var v PairedVersion
-		if string(pair[46:51]) == "heads" {
+		if string(pair[41:]) == "HEAD" {
+			// If HEAD is present, it's always first
+			headrev = Revision(pair[:40])
+		} else if string(pair[46:51]) == "heads" {
 			rev := Revision(pair[:40])
 
 			isdef := rev == headrev
@@ -285,6 +289,13 @@ type gopkginSource struct {
 	gitSource
 	major    uint64
 	unstable bool
+	// The aliased URL we report as being the one we talk to, even though we're
+	// actually talking directly to GitHub.
+	aliasURL string
+}
+
+func (s *gopkginSource) upstreamURL() string {
+	return s.aliasURL
 }
 
 func (s *gopkginSource) listVersions(ctx context.Context) ([]PairedVersion, error) {
@@ -384,16 +395,15 @@ func (s *bzrSource) listVersions(ctx context.Context) ([]PairedVersion, error) {
 	// Now, list all the tags
 	out, err := runFromRepoDir(ctx, r, defaultCmdTimeout, "bzr", "tags", "--show-ids", "-v")
 	if err != nil {
-		return nil, fmt.Errorf("%s: %s", err, string(out))
+		return nil, errors.Wrap(err, string(out))
 	}
 
 	all := bytes.Split(bytes.TrimSpace(out), []byte("\n"))
 
 	var branchrev []byte
 	branchrev, err = runFromRepoDir(ctx, r, defaultCmdTimeout, "bzr", "version-info", "--custom", "--template={revision_id}", "--revision=branch:.")
-	br := string(branchrev)
 	if err != nil {
-		return nil, fmt.Errorf("%s: %s", err, br)
+		return nil, errors.Wrap(err, string(branchrev))
 	}
 
 	vlist := make([]PairedVersion, 0, len(all)+1)
@@ -464,7 +474,7 @@ func (s *hgSource) listVersions(ctx context.Context) ([]PairedVersion, error) {
 	// Now, list all the tags
 	out, err := runFromRepoDir(ctx, r, defaultCmdTimeout, "hg", "tags", "--debug", "--verbose")
 	if err != nil {
-		return nil, fmt.Errorf("%s: %s", err, string(out))
+		return nil, errors.Wrap(err, string(out))
 	}
 
 	all := bytes.Split(bytes.TrimSpace(out), []byte("\n"))
@@ -499,7 +509,7 @@ func (s *hgSource) listVersions(ctx context.Context) ([]PairedVersion, error) {
 	out, err = runFromRepoDir(ctx, r, defaultCmdTimeout, "hg", "bookmarks", "--debug")
 	if err != nil {
 		// better nothing than partial and misleading
-		return nil, fmt.Errorf("%s: %s", err, string(out))
+		return nil, errors.Wrap(err, string(out))
 	}
 
 	out = bytes.TrimSpace(out)
@@ -532,7 +542,7 @@ func (s *hgSource) listVersions(ctx context.Context) ([]PairedVersion, error) {
 	out, err = runFromRepoDir(ctx, r, defaultCmdTimeout, "hg", "branches", "-c", "--debug")
 	if err != nil {
 		// better nothing than partial and misleading
-		return nil, fmt.Errorf("%s: %s", err, string(out))
+		return nil, errors.Wrap(err, string(out))
 	}
 
 	all = bytes.Split(bytes.TrimSpace(out), []byte("\n"))
@@ -558,11 +568,6 @@ func (s *hgSource) listVersions(ctx context.Context) ([]PairedVersion, error) {
 	}
 
 	return vlist, nil
-}
-
-type repo struct {
-	// Object for direct repo interaction
-	r ctxRepo
 }
 
 // This func copied from Masterminds/vcs so we can exec our own commands

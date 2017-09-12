@@ -16,6 +16,7 @@ Summarize the question and quote the reply, linking back to the original comment
 * [How do I constrain a transitive dependency's version?](#how-do-i-constrain-a-transitive-dependencys-version)
 * [Can I put the manifest and lock in the vendor directory?](#can-i-put-the-manifest-and-lock-in-the-vendor-directory)
 * [How do I get `dep` to authenticate to a `git` repo?](#how-do-i-get-dep-to-authenticate-to-a-git-repo)
+* [How do I get `dep` to consume private `git` repos using a Github Token?](#how-do-i-get-dep-to-consume-private-git-repos-using-a-github-token)
 
 ## Behavior
 * [How does `dep` decide what version of a dependency to use?](#how-does-dep-decide-what-version-of-a-dependency-to-use)
@@ -117,14 +118,14 @@ authenticated repository.
 
 First, configure `git` to use the credentials option for the specific repository.
 
-For example, if you use gitlab, and you wish to access `https://gitlab.example.com/example/package.git`, 
+For example, if you use gitlab, and you wish to access `https://gitlab.example.com/example/package.git`,
 then you would want to use the following configuration:
 
 ```
 $ git config --global credential.https://gitlab.example.com.example yourusername
 ```
 
-In the example the hostname `gitlab.example.com.username` string seems incorrect, but 
+In the example the hostname `gitlab.example.com.username` string seems incorrect, but
 it's actually the hostname plus the name of the repo you are accessing which is `username`.
 The trailing 'yourusername' is the username you would use for the actual authentication.
 
@@ -138,8 +139,8 @@ $ git help -a | grep credential-
   credential-osxkeychain    remote-ftps
   credential-store          remote-http
 ```
-  
-You would then choose an appropriate provider. For example, to use the osxkeychain, you 
+
+You would then choose an appropriate provider. For example, to use the osxkeychain, you
 would use the following:
 
 ```
@@ -152,6 +153,19 @@ Please see the documentation on how to configure that: https://git-scm.com/docs/
 After configuring `git`, you may need to use `git` manually once to have it store the
 credentials. Once you've checked out the repo manually, it will then use the stored
 credentials. This at least appears to be the behavior for the osxkeychain provider.
+
+### How do I get dep to consume private git repos using a Github Token?
+
+Another alternative to make `dep` work with private repos is to use a [Personal Github
+Token](https://help.github.com/articles/creating-a-personal-access-token-for-the-command-line/)
+and configure it inside the [`.netrc` file](https://www.gnu.org/software/inetutils/manual/html_node/The-_002enetrc-file.html)
+as the following example:
+```
+machine github.com
+    login [YOUR_GITHUB_TOKEN]
+```
+
+Once you have set that up, dep will automatically use that Token to authenticate to the repositories.
 
 ## Behavior
 ### How does `dep` decide what version of a dependency to use?
@@ -296,13 +310,17 @@ It's up to you:
 
 **Pros**
 
-- it's the only way to get truly reproducible builds, as it guards against upstream renames and deletes
-- you don't need an extra `dep ensure` step (to fetch dependencies) on fresh clones to build your repo
+- It's the only way to get truly reproducible builds, as it guards against upstream renames,
+  deletes and commit history overwrites.
+- You don't need an extra `dep ensure` step to sync `vendor/` with Gopkg.lock after most operations,
+  such as `go get`, cloning, getting latest, merging, etc.
 
 **Cons**
 
-- your repo will be bigger, potentially a lot bigger
-- PR diffs are more annoying
+- Your repo will be bigger, potentially a lot bigger,
+  though `dep prune` can help minimize this problem.
+- PR diffs will include changes for files under `vendor/` when Gopkg.lock is modified,
+  however files in `vendor/` are [hidden by default](https://github.com/github/linguist/blob/v5.2.0/lib/linguist/generated.rb#L328) on Github.
 
 ## How do I roll releases that `dep` will be able to use?
 

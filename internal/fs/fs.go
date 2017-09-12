@@ -30,7 +30,7 @@ import (
 // same file. In that situation HasFilepathPrefix("/Foo/Bar", "/foo")
 // will return true. The implementation is *not* OS-specific, so a FAT32
 // filesystem mounted on Linux will be handled correctly.
-func HasFilepathPrefix(path, prefix string) bool {
+func HasFilepathPrefix(path, prefix string) (bool, error) {
 	// this function is more convoluted then ideal due to need for special
 	// handling of volume name/drive letter on Windows. vnPath and vnPrefix
 	// are first compared, and then used to initialize initial values of p and
@@ -42,21 +42,19 @@ func HasFilepathPrefix(path, prefix string) bool {
 	vnPath := strings.ToLower(filepath.VolumeName(path))
 	vnPrefix := strings.ToLower(filepath.VolumeName(prefix))
 	if vnPath != vnPrefix {
-		return false
+		return false, nil
 	}
 
-	// because filepath.Join("c:","dir") returns "c:dir", we have to manually add path separator to drive letters
-	if strings.HasSuffix(vnPath, ":") {
-		vnPath += string(os.PathSeparator)
-	}
-	if strings.HasSuffix(vnPrefix, ":") {
-		vnPrefix += string(os.PathSeparator)
-	}
+	// Because filepath.Join("c:","dir") returns "c:dir", we have to manually
+	// add path separator to drive letters. Also, we need to set the path root
+	// on *nix systems, since filepath.Join("", "dir") returns a relative path.
+	vnPath += string(os.PathSeparator)
+	vnPrefix += string(os.PathSeparator)
 
 	var dn string
 
 	if isDir, err := IsDir(path); err != nil {
-		return false
+		return false, errors.Wrap(err, "failed to check filepath prefix")
 	} else if isDir {
 		dn = path
 	} else {
@@ -71,10 +69,10 @@ func HasFilepathPrefix(path, prefix string) bool {
 	prefixes := strings.Split(prefix, string(os.PathSeparator))[1:]
 
 	if len(prefixes) > len(dirs) {
-		return false
+		return false, nil
 	}
 
-	// d,p are initialized with "" on *nix and volume name on Windows
+	// d,p are initialized with "/" on *nix and volume name on Windows
 	d := vnPath
 	p := vnPrefix
 
@@ -84,7 +82,11 @@ func HasFilepathPrefix(path, prefix string) bool {
 		// something like ext4 filesystem mounted on FAT
 		// mountpoint, mounted on ext4 filesystem, i.e. the
 		// problematic filesystem is not the last one.
-		if isCaseSensitiveFilesystem(filepath.Join(d, dirs[i])) {
+		caseSensitive, err := isCaseSensitiveFilesystem(filepath.Join(d, dirs[i]))
+		if err != nil {
+			return false, errors.Wrap(err, "failed to check filepath prefix")
+		}
+		if caseSensitive {
 			d = filepath.Join(d, dirs[i])
 			p = filepath.Join(p, prefixes[i])
 		} else {
@@ -93,11 +95,62 @@ func HasFilepathPrefix(path, prefix string) bool {
 		}
 
 		if p != d {
-			return false
+			return false, nil
 		}
 	}
 
-	return true
+	return true, nil
+}
+
+// EquivalentPaths compares the paths passed to check if they are equivalent.
+// It respects the case-sensitivity of the underlying filesysyems.
+func EquivalentPaths(p1, p2 string) (bool, error) {
+	p1 = filepath.Clean(p1)
+	p2 = filepath.Clean(p2)
+
+	fi1, err := os.Stat(p1)
+	if err != nil {
+		return false, errors.Wrapf(err, "could not check for path equivalence")
+	}
+	fi2, err := os.Stat(p2)
+	if err != nil {
+		return false, errors.Wrapf(err, "could not check for path equivalence")
+	}
+
+	p1Filename, p2Filename := "", ""
+
+	if !fi1.IsDir() {
+		p1, p1Filename = filepath.Split(p1)
+	}
+	if !fi2.IsDir() {
+		p2, p2Filename = filepath.Split(p2)
+	}
+
+	if isPrefix1, err := HasFilepathPrefix(p1, p2); err != nil {
+		return false, errors.Wrap(err, "failed to check for path equivalence")
+	} else if isPrefix2, err := HasFilepathPrefix(p2, p1); err != nil {
+		return false, errors.Wrap(err, "failed to check for path equivalence")
+	} else if !isPrefix1 || !isPrefix2 {
+		return false, nil
+	}
+
+	if p1Filename != "" || p2Filename != "" {
+		caseSensitive, err := isCaseSensitiveFilesystem(filepath.Join(p1, p1Filename))
+		if err != nil {
+			return false, errors.Wrap(err, "could not check for filesystem case-sensitivity")
+		}
+		if caseSensitive {
+			if p1Filename != p2Filename {
+				return false, nil
+			}
+		} else {
+			if strings.ToLower(p1Filename) != strings.ToLower(p2Filename) {
+				return false, nil
+			}
+		}
+	}
+
+	return true, nil
 }
 
 // RenameWithFallback attempts to rename a file or directory, but falls back to
@@ -159,21 +212,25 @@ func renameByCopy(src, dst string) error {
 // If the input directory is such that the last component is composed
 // exclusively of case-less codepoints (e.g.  numbers), this function will
 // return false.
-func isCaseSensitiveFilesystem(dir string) bool {
-	alt := filepath.Join(filepath.Dir(dir),
-		genTestFilename(filepath.Base(dir)))
+func isCaseSensitiveFilesystem(dir string) (bool, error) {
+	alt := filepath.Join(filepath.Dir(dir), genTestFilename(filepath.Base(dir)))
 
 	dInfo, err := os.Stat(dir)
 	if err != nil {
-		return true
+		return false, errors.Wrap(err, "could not determine the case-sensitivity of the filesystem")
 	}
 
 	aInfo, err := os.Stat(alt)
 	if err != nil {
-		return true
+		// If the file doesn't exists, assume we are on a case-sensitive filesystem.
+		if os.IsNotExist(err) {
+			return true, nil
+		}
+
+		return false, errors.Wrap(err, "could not determine the case-sensitivity of the filesystem")
 	}
 
-	return !os.SameFile(dInfo, aInfo)
+	return !os.SameFile(dInfo, aInfo), nil
 }
 
 // genTestFilename returns a string with at most one rune case-flipped.
@@ -343,7 +400,6 @@ func cloneSymlink(sl, dst string) error {
 
 // IsDir determines is the path given is a directory or not.
 func IsDir(name string) (bool, error) {
-	// TODO: lstat?
 	fi, err := os.Stat(name)
 	if err != nil {
 		return false, err

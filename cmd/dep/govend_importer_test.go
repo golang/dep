@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/golang/dep"
 	"github.com/golang/dep/internal/gps"
 	"github.com/golang/dep/internal/test"
 	"github.com/pkg/errors"
@@ -17,68 +18,60 @@ import (
 
 func TestGovendConfig_Convert(t *testing.T) {
 	testCases := map[string]struct {
-		*convertTestCase
 		yaml govendYAML
+		convertTestCase
 	}{
-		"project": {
-			yaml: govendYAML{
+		"package": {
+			govendYAML{
 				Imports: []govendPackage{
 					{
-						Path:     "github.com/sdboyer/deptest",
-						Revision: "ff2948a2ac8f538c4ecd55962e919d1e13e74baf",
+						Path:     importerTestProject,
+						Revision: importerTestV1Rev,
 					},
 				},
 			},
-			convertTestCase: &convertTestCase{
-				projectRoot:    gps.ProjectRoot("github.com/sdboyer/deptest"),
-				wantConstraint: "^1.0.0",
-				wantLockCount:  1,
-				wantRevision:   gps.Revision("ff2948a2ac8f538c4ecd55962e919d1e13e74baf"),
-				wantVersion:    "v1.0.0",
+			convertTestCase{
+				wantConstraint: importerTestV1Constraint,
+				wantRevision:   importerTestV1Rev,
+				wantVersion:    importerTestV1Tag,
 			},
 		},
-		"bad input - empty package name": {
-			yaml: govendYAML{
+		"missing package name": {
+			govendYAML{
 				Imports: []govendPackage{
 					{
 						Path: "",
 					},
 				},
 			},
-			convertTestCase: &convertTestCase{
+			convertTestCase{
 				wantConvertErr: true,
 			},
 		},
 
-		"bad input - empty revision": {
-			yaml: govendYAML{
+		"missing revision": {
+			govendYAML{
 				Imports: []govendPackage{
 					{
-						Path: "github.com/sdboyer/deptest",
+						Path: importerTestProject,
 					},
 				},
 			},
-			convertTestCase: &convertTestCase{
+			convertTestCase{
 				wantConvertErr: true,
 			},
 		},
 	}
 
-	h := test.NewHelper(t)
-	defer h.Cleanup()
-
-	ctx := newTestContext(h)
-	sm, err := ctx.SourceManager()
-	h.Must(err)
-	defer sm.Release()
-
 	for name, testCase := range testCases {
+		name := name
+		testCase := testCase
 		t.Run(name, func(t *testing.T) {
-			g := newGovendImporter(discardLogger, true, sm)
-			g.yaml = testCase.yaml
-
-			manifest, lock, convertErr := g.convert(testCase.projectRoot)
-			err = validateConvertTestCase(testCase.convertTestCase, manifest, lock, convertErr)
+			err := testCase.Exec(t, func(logger *log.Logger, sm gps.SourceManager) (*dep.Manifest, *dep.Lock, error) {
+				g := newGovendImporter(logger, true, sm)
+				g.yaml = testCase.yaml
+				return g.convert(testProjectRoot)
+			})
 			if err != nil {
 				t.Fatalf("%#v", err)
 			}
@@ -94,7 +87,7 @@ func TestGovendConfig_Import(t *testing.T) {
 	h.TempDir(cacheDir)
 	h.TempDir("src")
 	h.TempDir(filepath.Join("src", testProjectRoot))
-	h.TempCopy(filepath.Join(testProjectRoot, govendYAMLName), "govend/vendor.yml")
+	h.TempCopy(filepath.Join(testProjectRoot, govendYAMLName), "init/govend/vendor.yml")
 
 	projectRoot := h.Path(testProjectRoot)
 	sm, err := gps.NewSourceManager(gps.SourceManagerConfig{Cachedir: h.Path(cacheDir)})
@@ -122,7 +115,7 @@ func TestGovendConfig_Import(t *testing.T) {
 		t.Fatal("Expected the lock to be generated")
 	}
 
-	govendImportOutputFile := "govend/expected_govend_import_output.txt"
+	govendImportOutputFile := "init/govend/golden.txt"
 	got := verboseOutput.String()
 	want := h.GetTestFileString(govendImportOutputFile)
 	if want != got {
@@ -138,7 +131,7 @@ func TestGovendConfig_Import(t *testing.T) {
 }
 
 func TestGovendConfig_YAMLLoad(t *testing.T) {
-	// This is same as cmd/testdata/govend/vendor.yml
+	// This is same as cmd/testdata/init/govend/vendor.yml
 	wantYAML := govendYAML{
 		Imports: []govendPackage{
 			{
@@ -155,7 +148,7 @@ func TestGovendConfig_YAMLLoad(t *testing.T) {
 	defer h.Cleanup()
 
 	ctx := newTestContext(h)
-	h.TempCopy(filepath.Join(testProjectRoot, govendYAMLName), "govend/vendor.yml")
+	h.TempCopy(filepath.Join(testProjectRoot, govendYAMLName), "init/govend/vendor.yml")
 
 	projectRoot := h.Path(testProjectRoot)
 

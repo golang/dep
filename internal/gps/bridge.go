@@ -56,12 +56,6 @@ type bridge struct {
 	// held by the solver that it ends up being easier and saner to do this.
 	s *solver
 
-	// Simple, local cache of the root's PackageTree
-	crp *struct {
-		ptree pkgtree.PackageTree
-		err   error
-	}
-
 	// Map of project root name to their available version list. This cache is
 	// layered on top of the proper SourceManager's cache; the only difference
 	// is that this keeps the versions sorted in the direction required by the

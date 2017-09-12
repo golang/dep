@@ -13,6 +13,10 @@ import (
 )
 
 func TestSourceManager_InferConstraint(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping slow test in short mode")
+	}
+
 	t.Parallel()
 
 	// Used in git subtests:
@@ -90,7 +94,7 @@ func TestSourceManager_InferConstraint(t *testing.T) {
 
 			sm, err := NewSourceManager(SourceManagerConfig{
 				Cachedir: h.Path(cacheDir),
-				Logger:   log.New(test.Writer{t}, "", 0),
+				Logger:   log.New(test.Writer{TB: t}, "", 0),
 			})
 			h.Must(err)
 

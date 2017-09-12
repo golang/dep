@@ -5,21 +5,31 @@
 package gps
 
 import (
-	"fmt"
-
 	"github.com/Masterminds/vcs"
+	"github.com/pkg/errors"
 )
 
-// unwrapVcsErr will extract actual command output from a vcs err, if possible
-//
-// TODO this is really dumb, lossy, and needs proper handling
+// unwrapVcsErr recognizes *vcs.LocalError and *vsc.RemoteError, and returns a form
+// preserving the actual vcs command output and error, in addition to the message.
+// All other types pass through unchanged.
 func unwrapVcsErr(err error) error {
-	switch verr := err.(type) {
+	var cause error
+	var out, msg string
+
+	switch t := err.(type) {
 	case *vcs.LocalError:
-		return fmt.Errorf("%s: %s", verr.Error(), verr.Out())
+		cause, out, msg = t.Original(), t.Out(), t.Error()
 	case *vcs.RemoteError:
-		return fmt.Errorf("%s: %s", verr.Error(), verr.Out())
+		cause, out, msg = t.Original(), t.Out(), t.Error()
+
 	default:
 		return err
 	}
+
+	if cause == nil {
+		cause = errors.New(out)
+	} else {
+		cause = errors.Wrap(cause, out)
+	}
+	return errors.Wrap(cause, msg)
 }

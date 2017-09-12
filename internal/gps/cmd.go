@@ -72,14 +72,14 @@ func (c *monitoredCmd) run(ctx context.Context) error {
 	// in at the same time as process completion, but one of the former are
 	// picked first; in such a case, cmd.Process could(?) be nil by the time we
 	// call signal methods on it.
-	var isDone *int32 = new(int32)
+	var isDone int32
 	done := make(chan error, 1)
 
 	go func() {
 		// Wait() can only be called once, so this must act as the completion
 		// indicator for both normal *and* signal-induced termination.
 		done <- c.cmd.Wait()
-		atomic.CompareAndSwapInt32(isDone, 0, 1)
+		atomic.CompareAndSwapInt32(&isDone, 0, 1)
 	}()
 
 	var killerr error
@@ -89,8 +89,8 @@ selloop:
 		case err := <-done:
 			return err
 		case <-ticker.C:
-			if !atomic.CompareAndSwapInt32(isDone, 1, 1) && c.hasTimedOut() {
-				if err := killProcess(c.cmd, isDone); err != nil {
+			if !atomic.CompareAndSwapInt32(&isDone, 1, 1) && c.hasTimedOut() {
+				if err := killProcess(c.cmd, &isDone); err != nil {
 					killerr = &killCmdError{err}
 				} else {
 					killerr = &noProgressError{c.timeout}
@@ -98,8 +98,8 @@ selloop:
 				break selloop
 			}
 		case <-ctx.Done():
-			if !atomic.CompareAndSwapInt32(isDone, 1, 1) {
-				if err := killProcess(c.cmd, isDone); err != nil {
+			if !atomic.CompareAndSwapInt32(&isDone, 1, 1) {
+				if err := killProcess(c.cmd, &isDone); err != nil {
 					killerr = &killCmdError{err}
 				} else {
 					killerr = ctx.Err()
