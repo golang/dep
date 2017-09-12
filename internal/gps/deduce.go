@@ -66,7 +66,7 @@ var (
 	//gpinOldRegex = regexp.MustCompile(`^(?P<root>gopkg\.in/(?:([a-z0-9][-a-z0-9]+)/)?((?:v0|v[1-9][0-9]*)(?:\.0|\.[1-9][0-9]*){0,2}(-unstable)?)/([a-zA-Z][-a-zA-Z0-9]*)(?:\.git)?)((?:/[a-zA-Z][-a-zA-Z0-9]*)*)$`)
 	bbRegex = regexp.MustCompile(`^(?P<root>bitbucket\.org(?P<bitname>/[A-Za-z0-9_.\-]+/[A-Za-z0-9_.\-]+))((?:/[A-Za-z0-9_.\-]+)*)$`)
 	//lpRegex = regexp.MustCompile(`^(?P<root>launchpad\.net/([A-Za-z0-9-._]+)(/[A-Za-z0-9-._]+)?)(/.+)?`)
-	lpRegex = regexp.MustCompile(`^(?P<root>launchpad\.net(/[A-Za-z0-9-._]+))((?:/[A-Za-z0-9_.\-]+)*)?`)
+	lpRegex = regexp.MustCompile(`^(?P<root>launchpad\.net(/[A-Za-z0-9-._]+))((?:/[A-Za-z0-9_.\-]+)*)?$`)
 	//glpRegex = regexp.MustCompile(`^(?P<root>git\.launchpad\.net/([A-Za-z0-9_.\-]+)|~[A-Za-z0-9_.\-]+/(\+git|[A-Za-z0-9_.\-]+)/[A-Za-z0-9_.\-]+)$`)
 	glpRegex = regexp.MustCompile(`^(?P<root>git\.launchpad\.net(/[A-Za-z0-9_.\-]+))((?:/[A-Za-z0-9_.\-]+)*)$`)
 	//gcRegex      = regexp.MustCompile(`^(?P<root>code\.google\.com/[pr]/(?P<project>[a-z0-9\-]+)(\.(?P<subrepo>[a-z0-9\-]+))?)(/[A-Za-z0-9_.\-]+)*$`)
@@ -782,7 +782,12 @@ func (hmd *httpMetadataDeducer) deduce(ctx context.Context, path string) (pathDe
 	return hmd.deduced, hmd.deduceErr
 }
 
-func normalizeURI(p string) (u *url.URL, newpath string, err error) {
+// normalizeURI takes a path string - which can be a plain import path, or a
+// proper URI, or something SCP-shaped - performs basic validity checks, and
+// returns both a full URL and just the path portion.
+func normalizeURI(p string) (*url.URL, string, error) {
+	var u *url.URL
+	var newpath string
 	if m := scpSyntaxRe.FindStringSubmatch(p); m != nil {
 		// Match SCP-like syntax and convert it to a URL.
 		// Eg, "git@github.com:user/repo" becomes
@@ -796,6 +801,7 @@ func normalizeURI(p string) (u *url.URL, newpath string, err error) {
 			//RawPath: m[3],
 		}
 	} else {
+		var err error
 		u, err = url.Parse(p)
 		if err != nil {
 			return nil, "", errors.Errorf("%q is not a valid URI", p)
@@ -810,11 +816,7 @@ func normalizeURI(p string) (u *url.URL, newpath string, err error) {
 		newpath = path.Join(u.Host, u.Path)
 	}
 
-	if !pathvld.MatchString(newpath) {
-		return nil, "", errors.Errorf("%q is not a valid import path", newpath)
-	}
-
-	return
+	return u, newpath, nil
 }
 
 // fetchMetadata fetches the remote metadata for path.
