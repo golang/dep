@@ -135,7 +135,6 @@ type ensureCommand struct {
 	noVendor   bool
 	vendorOnly bool
 	dryRun     bool
-	overrides  stringSlice
 }
 
 func (cmd *ensureCommand) Run(ctx *dep.Ctx, args []string) error {
@@ -699,19 +698,6 @@ func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm
 	return errors.Wrapf(f.Close(), "closing %s", dep.ManifestName)
 }
 
-type stringSlice []string
-
-func (s *stringSlice) String() string {
-	if len(*s) == 0 {
-		return "<none>"
-	}
-	return strings.Join(*s, ", ")
-}
-
-func (s *stringSlice) Set(value string) error {
-	*s = append(*s, value)
-	return nil
-}
 func getProjectConstraint(arg string, sm gps.SourceManager) (gps.ProjectConstraint, string, error) {
 	emptyPC := gps.ProjectConstraint{
 		Constraint: gps.Any(), // default to any; avoids panics later

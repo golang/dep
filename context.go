@@ -83,6 +83,8 @@ func defaultGOPATH() string {
 	return ""
 }
 
+// SourceManager produces an instance of gps's built-in SourceManager
+// initialized to log to the receiver's logger.
 func (c *Ctx) SourceManager() (*gps.SourceMgr, error) {
 	return gps.NewSourceManager(gps.SourceManagerConfig{
 		Cachedir: filepath.Join(c.GOPATH, "pkg", "dep"),

@@ -5,11 +5,12 @@
 package gps
 
 import (
-	"fmt"
 	"testing"
+
+	"github.com/pkg/errors"
 )
 
-// just need a ListVersions method
+// just need a listVersions method
 type fakeBridge struct {
 	*bridge
 	vl []Version
@@ -27,10 +28,6 @@ func init() {
 	SortForUpgrade(fakevl)
 }
 
-func (fb *fakeBridge) ListVersions(id ProjectIdentifier) ([]PairedVersion, error) {
-	return nil, nil
-}
-
 func (fb *fakeBridge) listVersions(id ProjectIdentifier) ([]Version, error) {
 	// it's a fixture, we only ever do the one, regardless of id
 	return fb.vl, nil
@@ -40,11 +37,7 @@ type fakeFailBridge struct {
 	*bridge
 }
 
-var errVQ = fmt.Errorf("vqerr")
-
-func (fb *fakeFailBridge) ListVersions(id ProjectIdentifier) ([]PairedVersion, error) {
-	return nil, nil
-}
+var errVQ = errors.New("vqerr")
 
 func (fb *fakeFailBridge) listVersions(id ProjectIdentifier) ([]Version, error) {
 	return nil, errVQ
@@ -152,7 +145,7 @@ func TestVersionQueueAdvance(t *testing.T) {
 	}
 
 	for k, v := range fakevl[1:] {
-		err = vq.advance(fmt.Errorf("advancment fail for %s", fakevl[k]))
+		err = vq.advance(errors.Errorf("advancment fail for %s", fakevl[k]))
 		if err != nil {
 			t.Errorf("error on advancing vq from %s to %s", fakevl[k], v)
 			break
@@ -166,7 +159,7 @@ func TestVersionQueueAdvance(t *testing.T) {
 	if vq.isExhausted() {
 		t.Error("should not be exhausted until advancing 'past' the end")
 	}
-	if err = vq.advance(fmt.Errorf("final advance failure")); err != nil {
+	if err = vq.advance(errors.Errorf("final advance failure")); err != nil {
 		t.Errorf("should not error on advance, even past end, but got %s", err)
 	}
 
@@ -191,7 +184,7 @@ func TestVersionQueueAdvance(t *testing.T) {
 		t.Error("can't be exhausted, we aren't even 'allLoaded' yet")
 	}
 
-	err = vq.advance(fmt.Errorf("dequeue lockv"))
+	err = vq.advance(errors.Errorf("dequeue lockv"))
 	if err != nil {
 		t.Error("unexpected error when advancing past lockv", err)
 	} else {
@@ -203,7 +196,7 @@ func TestVersionQueueAdvance(t *testing.T) {
 		}
 	}
 
-	err = vq.advance(fmt.Errorf("dequeue prefv"))
+	err = vq.advance(errors.Errorf("dequeue prefv"))
 	if err != nil {
 		t.Error("unexpected error when advancing past prefv", err)
 	} else {

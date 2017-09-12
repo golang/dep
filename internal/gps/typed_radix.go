@@ -30,6 +30,9 @@ func newDeducerTrie() *deducerTrie {
 	}
 }
 
+// Suppress unused warning.
+var _ = (*deducerTrie)(nil).Delete
+
 // Delete is used to delete a key, returning the previous value and if it was deleted
 func (t *deducerTrie) Delete(s string) (pathDeducer, bool) {
 	t.Lock()

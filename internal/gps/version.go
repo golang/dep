@@ -119,6 +119,9 @@ func (r Revision) String() string {
 	return string(r)
 }
 
+// ImpliedCaretString follows the same rules as String(), but in accordance with
+// the Constraint interface will always print a leading "=", as all Versions,
+// when acting as a Constraint, act as exact matches.
 func (r Revision) ImpliedCaretString() string {
 	return r.String()
 }

@@ -1353,14 +1353,6 @@ func (sm *depspecSourceManager) GetManifestAndLock(id ProjectIdentifier, v Versi
 	return nil, nil, fmt.Errorf("Project %s at version %s could not be found", id, v)
 }
 
-func (sm *depspecSourceManager) ExternalReach(id ProjectIdentifier, v Version) (map[string][]string, error) {
-	pid := pident{n: ProjectRoot(id.normalizedSource()), v: v}
-	if m, exists := sm.rm[pid]; exists {
-		return m, nil
-	}
-	return nil, fmt.Errorf("No reach data for %s at version %s", id, v)
-}
-
 func (sm *depspecSourceManager) ListPackages(id ProjectIdentifier, v Version) (pkgtree.PackageTree, error) {
 	pid := pident{n: ProjectRoot(id.normalizedSource()), v: v}
 	if pv, ok := v.(PairedVersion); ok && pv.Revision() == "FAKEREV" {
@@ -1568,10 +1560,6 @@ func (ds depspec) DependencyConstraints() ProjectConstraints {
 
 type fixLock []LockedProject
 
-func (fixLock) SolverVersion() string {
-	return "-1"
-}
-
 // impl Lock interface
 func (fixLock) InputHash() []byte {
 	return []byte("fooooorooooofooorooofoo")
@@ -1583,11 +1571,6 @@ func (l fixLock) Projects() []LockedProject {
 }
 
 type dummyLock struct{}
-
-// impl Lock interface
-func (dummyLock) SolverVersion() string {
-	return "-1"
-}
 
 // impl Lock interface
 func (dummyLock) InputHash() []byte {
