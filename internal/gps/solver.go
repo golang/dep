@@ -17,6 +17,9 @@ import (
 	"github.com/golang/dep/internal/gps/pkgtree"
 )
 
+// recursive ignore suffix
+const recIgnoreSuffix = "/*"
+
 var rootRev = Revision("")
 
 // SolveParameters hold all arguments to a solver run.
@@ -261,6 +264,9 @@ func (params SolveParameters) toRootdata() (rootdata, error) {
 		}
 		rd.chng[p] = struct{}{}
 	}
+
+	// Create ignore prefix tree using the provided ignore packages
+	rd.igpfx = createIgnorePrefixTree(rd.ig)
 
 	return rd, nil
 }
@@ -658,7 +664,7 @@ func (s *solver) getImportsAndConstraintsOf(a atomWithPackages) ([]string, []com
 	// explicitly listed in the atom
 	for _, pkg := range a.pl {
 		// Skip ignored packages
-		if s.rd.ig[pkg] {
+		if s.rd.isIgnored(pkg) {
 			continue
 		}
 
@@ -1337,4 +1343,19 @@ func pa2lp(pa atom, pkgs map[string]struct{}) LockedProject {
 	sort.Strings(lp.pkgs)
 
 	return lp
+}
+
+func createIgnorePrefixTree(ig map[string]bool) *radix.Tree {
+	xt := radix.New()
+
+	for i := range ig {
+		// Check if it's a recursive ignore
+		if strings.HasSuffix(i, recIgnoreSuffix) {
+			// Create the ignore prefix and insert in the radix tree
+			i = strings.TrimSuffix(i, recIgnoreSuffix)
+			xt.Insert(i, true)
+		}
+	}
+
+	return xt
 }

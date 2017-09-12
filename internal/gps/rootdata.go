@@ -20,6 +20,9 @@ type rootdata struct {
 	// Map of packages to ignore.
 	ig map[string]bool
 
+	// Radix tree of ignore prefixes.
+	igpfx *radix.Tree
+
 	// Map of packages to require.
 	req map[string]bool
 
@@ -201,4 +204,17 @@ func (rd rootdata) rootAtom() atomWithPackages {
 		a:  a,
 		pl: list,
 	}
+}
+
+// isIgnored checks if a given path is ignored, comparing with the list of
+// ignore packages and ignore prefixes.
+func (rd rootdata) isIgnored(path string) bool {
+	// Check if the path is present in ignore packages.
+	if rd.ig[path] {
+		return true
+	}
+
+	// Check if the path matches any of the ignore prefixes.
+	_, _, ok := rd.igpfx.LongestPrefix(path)
+	return ok
 }
