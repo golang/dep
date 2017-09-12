@@ -22,3 +22,7 @@
 [[constraint]]
   name = "github.com/boltdb/bolt"
   version = "1.0.0"
+
+[[constraint]]
+  name = "github.com/karrick/godirwalk"
+  version = "1.2.7"
