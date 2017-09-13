@@ -7,6 +7,7 @@ package gps
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"regexp"
 	"strings"
 
@@ -1473,6 +1474,10 @@ func (sm *depspecSourceManager) DeduceProjectRoot(ip string) (ProjectRoot, error
 		}
 	}
 	return "", fmt.Errorf("Could not find %s, or any parent, in list of known fixtures", ip)
+}
+
+func (sm *depspecSourceManager) SourceURLsForPath(ip string) ([]*url.URL, error) {
+	return nil, fmt.Errorf("dummy sm doesn't implement SourceURLsForPath")
 }
 
 func (sm *depspecSourceManager) rootSpec() depspec {

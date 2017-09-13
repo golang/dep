@@ -21,10 +21,11 @@ import (
 )
 
 var (
-	gitSchemes = []string{"https", "ssh", "git", "http"}
-	bzrSchemes = []string{"https", "bzr+ssh", "bzr", "http"}
-	hgSchemes  = []string{"https", "ssh", "http"}
-	svnSchemes = []string{"https", "http", "svn", "svn+ssh"}
+	gitSchemes     = []string{"https", "ssh", "git", "http"}
+	bzrSchemes     = []string{"https", "bzr+ssh", "bzr", "http"}
+	hgSchemes      = []string{"https", "ssh", "http"}
+	svnSchemes     = []string{"https", "http", "svn", "svn+ssh"}
+	gopkginSchemes = []string{"https", "http"}
 )
 
 const gopkgUnstableSuffix = "-unstable"
@@ -292,12 +293,9 @@ func (m gopkginDeducer) deduceSource(p string, u *url.URL) (maybeSource, error) 
 		return nil, fmt.Errorf("could not parse %q as a gopkg.in major version", majorStr[1:])
 	}
 
-	mb := make(maybeSources, len(gitSchemes))
-	for k, scheme := range gitSchemes {
+	mb := make(maybeSources, len(gopkginSchemes))
+	for k, scheme := range gopkginSchemes {
 		u2 := *u
-		if scheme == "ssh" {
-			u2.User = url.User("git")
-		}
 		u2.Scheme = scheme
 		mb[k] = maybeGopkginSource{
 			opath:    v[1],

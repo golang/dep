@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"net/url"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -70,6 +71,9 @@ type SourceManager interface {
 	// DeduceRootProject takes an import path and deduces the corresponding
 	// project/source root.
 	DeduceProjectRoot(ip string) (ProjectRoot, error)
+
+	// SourceURLsForPath takes an import path and deduces the possible source URLs
+	SourceURLsForPath(ip string) ([]*url.URL, error)
 
 	// Release lets go of any locks held by the SourceManager. Once called, it is
 	// no longer safe to call methods against it; all method calls will
@@ -534,6 +538,17 @@ func (sm *SourceMgr) InferConstraint(s string, pi ProjectIdentifier) (Constraint
 	}
 
 	return nil, errors.Errorf("%s is not a valid version for the package %s(%s)", s, pi.ProjectRoot, pi.Source)
+}
+
+// SourceURLsForPath takes an import path, deduces it's root path,
+// and returns a list of possible souce URLs for fetching it
+func (sm *SourceMgr) SourceURLsForPath(ip string) ([]*url.URL, error) {
+	deduced, err := sm.deduceCoord.deduceRootPath(context.TODO(), ip)
+	if err != nil {
+		return nil, err
+	}
+
+	return deduced.mb.possibleURLs(), nil
 }
 
 // disambiguateRevision looks up a revision in the underlying source, spitting
