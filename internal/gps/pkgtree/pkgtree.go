@@ -22,8 +22,8 @@ import (
 	radix "github.com/armon/go-radix"
 )
 
-// recursive ignore suffix
-const recIgnoreSuffix = "/*"
+// wildcard ignore suffix
+const wcIgnoreSuffix = "*"
 
 // Package represents a Go package. It contains a subset of the information
 // go/build.Package does.
@@ -555,11 +555,16 @@ func (t PackageTree) ToReachMap(main, tests, backprop bool, ignore map[string]bo
 		ignore = make(map[string]bool)
 	}
 
-	// Create a radix tree for ignore prefixes
-	xt := radix.New()
+	// Declare a radix tree for ignore prefixes
+	var xt *radix.Tree
+
 	for i := range ignore {
-		if strings.HasSuffix(i, recIgnoreSuffix) {
-			i = strings.TrimSuffix(i, recIgnoreSuffix)
+		if strings.HasSuffix(i, wcIgnoreSuffix) {
+			// Create trie if it doesn't exists
+			if xt == nil {
+				xt = radix.New()
+			}
+			i = strings.TrimSuffix(i, wcIgnoreSuffix)
 			xt.Insert(i, true)
 		}
 	}
@@ -586,10 +591,12 @@ func (t PackageTree) ToReachMap(main, tests, backprop bool, ignore map[string]bo
 			continue
 		}
 
-		// Skip ignored packages prefix matches
-		_, _, ok := xt.LongestPrefix(ip)
-		if ok {
-			continue
+		if xt != nil {
+			// Skip ignored packages prefix matches
+			_, _, ok := xt.LongestPrefix(ip)
+			if ok {
+				continue
+			}
 		}
 
 		// TODO (kris-nova) Disable to get staticcheck passing

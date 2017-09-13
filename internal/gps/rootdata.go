@@ -214,7 +214,11 @@ func (rd rootdata) isIgnored(path string) bool {
 		return true
 	}
 
-	// Check if the path matches any of the ignore prefixes.
-	_, _, ok := rd.igpfx.LongestPrefix(path)
-	return ok
+	if rd.igpfx != nil {
+		// Check if the path matches any of the ignore prefixes.
+		_, _, ok := rd.igpfx.LongestPrefix(path)
+		return ok
+	}
+
+	return false
 }
