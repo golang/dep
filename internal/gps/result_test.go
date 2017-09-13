@@ -15,7 +15,9 @@ import (
 	"github.com/golang/dep/internal/test"
 )
 
-var discardLogger = log.New(ioutil.Discard, "", 0)
+func discardLogger() *log.Logger {
+	return log.New(ioutil.Discard, "", 0)
+}
 
 var basicResult solution
 
@@ -95,12 +97,12 @@ func testWriteDepTree(t *testing.T) {
 	}
 
 	// nil lock/result should err immediately
-	err = WriteDepTree(tmp, nil, sm, true, discardLogger)
+	err = WriteDepTree(tmp, nil, sm, true, discardLogger())
 	if err == nil {
 		t.Errorf("Should error if nil lock is passed to WriteDepTree")
 	}
 
-	err = WriteDepTree(tmp, r, sm, true, discardLogger)
+	err = WriteDepTree(tmp, r, sm, true, discardLogger())
 	if err != nil {
 		t.Errorf("Unexpected error while creating vendor tree: %s", err)
 	}
@@ -143,6 +145,7 @@ func BenchmarkCreateVendorTree(b *testing.B) {
 	}
 
 	if clean {
+		logger := discardLogger()
 		b.ResetTimer()
 		b.StopTimer()
 		exp := path.Join(tmp, "export")
@@ -151,7 +154,7 @@ func BenchmarkCreateVendorTree(b *testing.B) {
 			// ease manual inspection
 			os.RemoveAll(exp)
 			b.StartTimer()
-			err = WriteDepTree(exp, r, sm, true, discardLogger)
+			err = WriteDepTree(exp, r, sm, true, logger)
 			b.StopTimer()
 			if err != nil {
 				b.Errorf("unexpected error after %v iterations: %s", i, err)
