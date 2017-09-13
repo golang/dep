@@ -17,8 +17,8 @@ import (
 	"github.com/golang/dep/internal/gps/pkgtree"
 )
 
-// recursive ignore suffix
-const recIgnoreSuffix = "/*"
+// wildcard ignore suffix
+const wcIgnoreSuffix = "*"
 
 var rootRev = Revision("")
 
@@ -1346,13 +1346,17 @@ func pa2lp(pa atom, pkgs map[string]struct{}) LockedProject {
 }
 
 func createIgnorePrefixTree(ig map[string]bool) *radix.Tree {
-	xt := radix.New()
+	var xt *radix.Tree
 
 	for i := range ig {
 		// Check if it's a recursive ignore
-		if strings.HasSuffix(i, recIgnoreSuffix) {
+		if strings.HasSuffix(i, wcIgnoreSuffix) {
+			// Create trie if it doesn't exists
+			if xt == nil {
+				xt = radix.New()
+			}
 			// Create the ignore prefix and insert in the radix tree
-			i = strings.TrimSuffix(i, recIgnoreSuffix)
+			i = strings.TrimSuffix(i, wcIgnoreSuffix)
 			xt.Insert(i, true)
 		}
 	}
