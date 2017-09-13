@@ -17,9 +17,9 @@ import (
 	"github.com/golang/dep/internal/test"
 )
 
-var (
-	discardLogger = log.New(ioutil.Discard, "", 0)
-)
+func discardLogger() *log.Logger {
+	return log.New(ioutil.Discard, "", 0)
+}
 
 func TestCtx_ProjectImport(t *testing.T) {
 	h := test.NewHelper(t)
@@ -127,8 +127,8 @@ func TestLoadProject(t *testing.T) {
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := &Ctx{
-				Out: discardLogger,
-				Err: discardLogger,
+				Out: discardLogger(),
+				Err: discardLogger(),
 			}
 
 			err := ctx.SetPaths(h.Path(tc.wd), h.Path("."))
@@ -200,8 +200,8 @@ func TestLoadProjectManifestParseError(t *testing.T) {
 	ctx := &Ctx{
 		GOPATH:     tg.Path("."),
 		WorkingDir: wd,
-		Out:        discardLogger,
-		Err:        discardLogger,
+		Out:        discardLogger(),
+		Err:        discardLogger(),
 	}
 
 	_, err = ctx.LoadProject()
@@ -231,8 +231,8 @@ func TestLoadProjectLockParseError(t *testing.T) {
 	ctx := &Ctx{
 		GOPATH:     tg.Path("."),
 		WorkingDir: wd,
-		Out:        discardLogger,
-		Err:        discardLogger,
+		Out:        discardLogger(),
+		Err:        discardLogger(),
 	}
 
 	_, err = ctx.LoadProject()
