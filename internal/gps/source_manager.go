@@ -65,7 +65,7 @@ type SourceManager interface {
 
 	// ExportProject writes out the tree of the provided import path, at the
 	// provided version, to the provided directory.
-	ExportProject(ProjectIdentifier, Version, string) error
+	ExportProject(context.Context, ProjectIdentifier, Version, string) error
 
 	// DeduceRootProject takes an import path and deduces the corresponding
 	// project/source root.
@@ -460,17 +460,17 @@ func (sm *SourceMgr) SyncSourceFor(id ProjectIdentifier) error {
 
 // ExportProject writes out the tree of the provided ProjectIdentifier's
 // ProjectRoot, at the provided version, to the provided directory.
-func (sm *SourceMgr) ExportProject(id ProjectIdentifier, v Version, to string) error {
+func (sm *SourceMgr) ExportProject(ctx context.Context, id ProjectIdentifier, v Version, to string) error {
 	if atomic.LoadInt32(&sm.releasing) == 1 {
 		return smIsReleased{}
 	}
 
-	srcg, err := sm.srcCoord.getSourceGatewayFor(context.TODO(), id)
+	srcg, err := sm.srcCoord.getSourceGatewayFor(ctx, id)
 	if err != nil {
 		return err
 	}
 
-	return srcg.exportVersionTo(context.TODO(), v, to)
+	return srcg.exportVersionTo(ctx, v, to)
 }
 
 // DeduceProjectRoot takes an import path and deduces the corresponding
