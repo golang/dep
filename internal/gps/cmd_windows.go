@@ -2,13 +2,25 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// +build windows
-
 package gps
 
-import "os/exec"
+import (
+	"context"
+	"os/exec"
+)
 
-func killProcess(cmd *exec.Cmd, isDone *int32) error {
-	// TODO it'd be great if this could be more sophisticated...
-	return cmd.Process.Kill()
+type cmd struct {
+	*exec.Cmd
+}
+
+func commandContext(ctx context.Context, name string, arg ...string) cmd {
+	return cmd{Cmd: exec.CommandContext(ctx, name, arg...)}
+}
+
+func (c cmd) Args() []string {
+	return c.Cmd.Args
+}
+
+func (c cmd) SetDir(dir string) {
+	c.Cmd.Dir = dir
 }

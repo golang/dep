@@ -7,50 +7,83 @@
 package gps
 
 import (
+	"bytes"
+	"context"
 	"os"
 	"os/exec"
-	"sync/atomic"
 	"time"
+
+	"github.com/pkg/errors"
 )
 
-// killProcess manages the termination of subprocesses in a way that tries to be
-// gentle (via os.Interrupt), but resorts to Kill if needed.
-//
-//
-// TODO(sdboyer) should the return differentiate between whether gentle methods
-// succeeded vs. falling back to a hard kill?
-func killProcess(cmd *exec.Cmd, isDone *int32) error {
-	if err := cmd.Process.Signal(os.Interrupt); err != nil {
-		// If an error comes back from attempting to signal, proceed immediately
-		// to hard kill.
-		return cmd.Process.Kill()
+type cmd struct {
+	// ctx is provided by the caller; SIGINT is sent when it is cancelled.
+	ctx context.Context
+	// cancel is called when the graceful shutdown timeout expires.
+	cancel context.CancelFunc
+	cmd    *exec.Cmd
+}
+
+func commandContext(ctx context.Context, name string, arg ...string) cmd {
+	// Grab the caller's context and pass a derived one to CommandContext.
+	c := cmd{ctx: ctx}
+	ctx, cancel := context.WithCancel(ctx)
+	c.cmd = exec.CommandContext(ctx, name, arg...)
+	c.cancel = cancel
+	return c
+}
+
+func (c cmd) Args() []string {
+	return c.cmd.Args
+}
+
+func (c cmd) SetDir(dir string) {
+	c.cmd.Dir = dir
+}
+
+// CombinedOutput is like (*os/exec.Cmd).CombinedOutput except that it
+// terminates subprocesses gently (via os.Interrupt), but resorts to Kill if
+// the subprocess fails to exit after 1 minute.
+func (c cmd) CombinedOutput() ([]byte, error) {
+	// Adapted from (*os/exec.Cmd).CombinedOutput
+	if c.cmd.Stdout != nil {
+		return nil, errors.New("exec: Stdout already set")
+	}
+	if c.cmd.Stderr != nil {
+		return nil, errors.New("exec: Stderr already set")
+	}
+	var b bytes.Buffer
+	c.cmd.Stdout = &b
+	c.cmd.Stderr = &b
+	if err := c.cmd.Start(); err != nil {
+		return nil, err
 	}
 
-	// If the process doesn't exit immediately, check every 50ms, up to 3s,
-	// after which send a hard kill.
-	//
-	// Cannot rely on cmd.ProcessState.Exited() here, as that is not set
-	// correctly when the process exits due to a signal. See
-	// https://github.com/golang/go/issues/19798 . Also cannot rely on it
-	// because cmd.ProcessState will be nil before the process exits, and
-	// checking if nil create a data race.
-	if !atomic.CompareAndSwapInt32(isDone, 1, 1) {
-		to := time.NewTimer(3 * time.Second)
-		tick := time.NewTicker(50 * time.Millisecond)
-
-		defer to.Stop()
-		defer tick.Stop()
-
-		// Loop until the ProcessState shows up, indicating the proc has exited,
-		// or the timer expires and
-		for !atomic.CompareAndSwapInt32(isDone, 1, 1) {
-			select {
-			case <-to.C:
-				return cmd.Process.Kill()
-			case <-tick.C:
-			}
+	var t *time.Timer
+	defer func() {
+		if t != nil {
+			t.Stop()
 		}
-	}
+	}()
+	// Adapted from (*os/exec.Cmd).Start
+	waitDone := make(chan struct{})
+	defer close(waitDone)
+	go func() {
+		select {
+		case <-c.ctx.Done():
+			if err := c.cmd.Process.Signal(os.Interrupt); err != nil {
+				// If an error comes back from attempting to signal, proceed
+				// immediately to hard kill.
+				c.cancel()
+			} else {
+				t = time.AfterFunc(time.Minute, c.cancel)
+			}
+		case <-waitDone:
+		}
+	}()
 
-	return nil
+	if err := c.cmd.Wait(); err != nil {
+		return nil, err
+	}
+	return b.Bytes(), nil
 }
