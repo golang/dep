@@ -27,7 +27,10 @@ var (
 	svnSchemes = []string{"https", "http", "svn", "svn+ssh"}
 )
 
-const gopkgUnstableSuffix = "-unstable"
+const (
+	gopkgUnstableSuffix = "-unstable"
+	vbomUtilPkg         = "vbom.ml/util"
+)
 
 func validateVCSScheme(scheme, typ string) bool {
 	// everything allows plain ssh
@@ -91,6 +94,7 @@ func pathDeducerTrie() *deducerTrie {
 	dxt.Insert("git.launchpad.net/", launchpadGitDeducer{regexp: glpRegex})
 	dxt.Insert("hub.jazz.net/", jazzDeducer{regexp: jazzRegex})
 	dxt.Insert("git.apache.org/", apacheDeducer{regexp: apacheRegex})
+	dxt.Insert("vbom.ml/", vbomDeducer{})
 
 	return dxt
 }
@@ -537,6 +541,33 @@ func (m vcsExtensionDeducer) deduceSource(path string, u *url.URL) (maybeSource,
 	default:
 		return nil, fmt.Errorf("unknown repository type: %q", v[4])
 	}
+}
+
+type vbomDeducer struct{}
+
+func (m vbomDeducer) deduceRoot(path string) (string, error) {
+	if !strings.HasPrefix(path, vbomUtilPkg) {
+		return "", fmt.Errorf("%s is not %s package", path, vbomUtilPkg)
+	}
+	return vbomUtilPkg, nil
+}
+
+func (m vbomDeducer) deduceSource(path string, u *url.URL) (maybeSource, error) {
+	if !strings.HasPrefix(path, vbomUtilPkg) {
+		return nil, fmt.Errorf("%s is not %s package", path, vbomUtilPkg)
+	}
+
+	if u.Scheme != "" {
+		if !validateVCSScheme(u.Scheme, "git") {
+			return nil, fmt.Errorf("%s is not a valid scheme for accessing a git repository", u.Scheme)
+		}
+		return maybeGitSource{url: u}, nil
+	}
+
+	u.Scheme = "https"
+	u.Host = "github.com"
+	u.Path = "/fvbommel/util.git"
+	return maybeGitSource{url: u}, nil
 }
 
 // A deducer takes an import path and inspects it to determine where the
