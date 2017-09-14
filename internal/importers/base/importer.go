@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package main
+package base
 
 import (
 	"log"
@@ -13,29 +13,30 @@ import (
 	"github.com/pkg/errors"
 )
 
-// baseImporter provides a common implementation for importing from other
+// Importer provides a common implementation for importing from other
 // dependency managers.
-type baseImporter struct {
-	logger   *log.Logger
-	verbose  bool
-	sm       gps.SourceManager
-	manifest *dep.Manifest
-	lock     *dep.Lock
+type Importer struct {
+	sm gps.SourceManager
+
+	Logger   *log.Logger
+	Verbose  bool
+	Manifest *dep.Manifest
+	Lock     *dep.Lock
 }
 
-// newBaseImporter creates a new baseImporter for embedding in an importer.
-func newBaseImporter(logger *log.Logger, verbose bool, sm gps.SourceManager) *baseImporter {
-	return &baseImporter{
-		logger:   logger,
-		verbose:  verbose,
-		manifest: dep.NewManifest(),
-		lock:     &dep.Lock{},
+// NewImporter creates a new Importer for embedding in an importer.
+func NewImporter(logger *log.Logger, verbose bool, sm gps.SourceManager) *Importer {
+	return &Importer{
+		Logger:   logger,
+		Verbose:  verbose,
+		Manifest: dep.NewManifest(),
+		Lock:     &dep.Lock{},
 		sm:       sm,
 	}
 }
 
 // isTag determines if the specified value is a tag (plain or semver).
-func (i *baseImporter) isTag(pi gps.ProjectIdentifier, value string) (bool, gps.Version, error) {
+func (i *Importer) isTag(pi gps.ProjectIdentifier, value string) (bool, gps.Version, error) {
 	versions, err := i.sm.ListVersions(pi)
 	if err != nil {
 		return false, nil, errors.Wrapf(err, "unable to list versions for %s(%s)", pi.ProjectRoot, pi.Source)
@@ -58,7 +59,7 @@ func (i *baseImporter) isTag(pi gps.ProjectIdentifier, value string) (bool, gps.
 // project based on the locked revision and the constraint from the manifest.
 // First try matching the revision to a version, then try the constraint from the
 // manifest, then finally the revision.
-func (i *baseImporter) lookupVersionForLockedProject(pi gps.ProjectIdentifier, c gps.Constraint, rev gps.Revision) (gps.Version, error) {
+func (i *Importer) lookupVersionForLockedProject(pi gps.ProjectIdentifier, c gps.Constraint, rev gps.Revision) (gps.Version, error) {
 	// Find the version that goes with this revision, if any
 	versions, err := i.sm.ListVersions(pi)
 	if err != nil {
@@ -98,9 +99,9 @@ func (i *baseImporter) lookupVersionForLockedProject(pi gps.ProjectIdentifier, c
 	return rev, nil
 }
 
-// importedPackage is a common intermediate representation of a package imported
+// ImportedPackage is a common intermediate representation of a package imported
 // from an external tool's configuration.
-type importedPackage struct {
+type ImportedPackage struct {
 	// Required. The package path, not necessarily the project root.
 	Name string
 
@@ -118,11 +119,11 @@ type importedPackage struct {
 // for the same project root.
 type importedProject struct {
 	Root gps.ProjectRoot
-	importedPackage
+	ImportedPackage
 }
 
 // loadPackages consolidates all package references into a set of project roots.
-func (i *baseImporter) loadPackages(packages []importedPackage) ([]importedProject, error) {
+func (i *Importer) loadPackages(packages []ImportedPackage) ([]importedProject, error) {
 	// preserve the original order of the packages so that messages that
 	// are printed as they are processed are in a consistent order.
 	orderedProjects := make([]importedProject, 0, len(packages))
@@ -161,7 +162,7 @@ func (i *baseImporter) loadPackages(packages []importedPackage) ([]importedProje
 	return orderedProjects, nil
 }
 
-// importPackages loads imported packages into the manifest and lock.
+// ImportPackages loads imported packages into the manifest and lock.
 // - defaultConstraintFromLock specifies if a constraint should be defaulted
 //   based on the locked version when there wasn't a constraint hint.
 //
@@ -172,7 +173,7 @@ func (i *baseImporter) loadPackages(packages []importedPackage) ([]importedProje
 // * Revision constraints are ignored.
 // * Versions that don't satisfy the constraint, drop the constraint.
 // * Untagged revisions ignore non-branch constraint hints.
-func (i *baseImporter) importPackages(packages []importedPackage, defaultConstraintFromLock bool) (err error) {
+func (i *Importer) ImportPackages(packages []ImportedPackage, defaultConstraintFromLock bool) (err error) {
 	projects, err := i.loadPackages(packages)
 	if err != nil {
 		return err
@@ -206,23 +207,23 @@ func (i *baseImporter) importPackages(packages []importedPackage, defaultConstra
 				version, err = i.lookupVersionForLockedProject(pc.Ident, pc.Constraint, revision)
 				if err != nil {
 					version = nil
-					i.logger.Println(err)
+					i.Logger.Println(err)
 				}
 			}
 
 			// Default the constraint based on the locked version
 			if defaultConstraintFromLock && prj.ConstraintHint == "" && version != nil {
-				props := getProjectPropertiesFromVersion(version)
-				if props.Constraint != nil {
-					pc.Constraint = props.Constraint
+				c := i.convertToConstraint(version)
+				if c != nil {
+					pc.Constraint = c
 				}
 			}
 		}
 
 		// Ignore pinned constraints
 		if i.isConstraintPinned(pc.Constraint) {
-			if i.verbose {
-				i.logger.Printf("  Ignoring pinned constraint %v for %v.\n", pc.Constraint, pc.Ident)
+			if i.Verbose {
+				i.Logger.Printf("  Ignoring pinned constraint %v for %v.\n", pc.Constraint, pc.Ident)
 			}
 			pc.Constraint = gps.Any()
 		}
@@ -230,22 +231,22 @@ func (i *baseImporter) importPackages(packages []importedPackage, defaultConstra
 		// Ignore constraints which conflict with the locked revision, so that
 		// solve doesn't later change the revision to satisfy the constraint.
 		if !i.testConstraint(pc.Constraint, version) {
-			if i.verbose {
-				i.logger.Printf("  Ignoring constraint %v for %v because it would invalidate the locked version %v.\n", pc.Constraint, pc.Ident, version)
+			if i.Verbose {
+				i.Logger.Printf("  Ignoring constraint %v for %v because it would invalidate the locked version %v.\n", pc.Constraint, pc.Ident, version)
 			}
 			pc.Constraint = gps.Any()
 		}
 
-		i.manifest.Constraints[pc.Ident.ProjectRoot] = gps.ProjectProperties{
+		i.Manifest.Constraints[pc.Ident.ProjectRoot] = gps.ProjectProperties{
 			Source:     pc.Ident.Source,
 			Constraint: pc.Constraint,
 		}
-		fb.NewConstraintFeedback(pc, fb.DepTypeImported).LogFeedback(i.logger)
+		fb.NewConstraintFeedback(pc, fb.DepTypeImported).LogFeedback(i.Logger)
 
 		if version != nil {
 			lp := gps.NewLockedProject(pc.Ident, version, nil)
-			i.lock.P = append(i.lock.P, lp)
-			fb.NewLockedProjectFeedback(lp, fb.DepTypeImported).LogFeedback(i.logger)
+			i.Lock.P = append(i.Lock.P, lp)
+			fb.NewLockedProjectFeedback(lp, fb.DepTypeImported).LogFeedback(i.Logger)
 		}
 	}
 
@@ -253,7 +254,7 @@ func (i *baseImporter) importPackages(packages []importedPackage, defaultConstra
 }
 
 // isConstraintPinned returns if a constraint is pinned to a specific revision.
-func (i *baseImporter) isConstraintPinned(c gps.Constraint) bool {
+func (i *Importer) isConstraintPinned(c gps.Constraint) bool {
 	if version, isVersion := c.(gps.Version); isVersion {
 		switch version.Type() {
 		case gps.IsRevision, gps.IsVersion:
@@ -264,7 +265,7 @@ func (i *baseImporter) isConstraintPinned(c gps.Constraint) bool {
 }
 
 // testConstraint verifies that the constraint won't invalidate the locked version.
-func (i *baseImporter) testConstraint(c gps.Constraint, v gps.Version) bool {
+func (i *Importer) testConstraint(c gps.Constraint, v gps.Version) bool {
 	// Assume branch constraints are satisfied
 	if version, isVersion := c.(gps.Version); isVersion {
 		if version.Type() == gps.IsBranch {
@@ -274,4 +275,19 @@ func (i *baseImporter) testConstraint(c gps.Constraint, v gps.Version) bool {
 	}
 
 	return c.Matches(v)
+}
+
+// convertToConstraint turns a version into a constraint.
+// Semver tags are converted to a range with the caret operator.
+func (i *Importer) convertToConstraint(v gps.Version) gps.Constraint {
+	if v.Type() == gps.IsSemver {
+		c, err := gps.NewSemverConstraintIC(v.String())
+		if err != nil {
+			// This should never fail, because the type is semver.
+			// If it does fail somehow, don't let that impact the import.
+			return nil
+		}
+		return c
+	}
+	return v
 }

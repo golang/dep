@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package main
+package govend
 
 import (
 	"bytes"
@@ -12,6 +12,7 @@ import (
 
 	"github.com/golang/dep"
 	"github.com/golang/dep/internal/gps"
+	"github.com/golang/dep/internal/importers/importertest"
 	"github.com/golang/dep/internal/test"
 	"github.com/pkg/errors"
 )
@@ -19,21 +20,21 @@ import (
 func TestGovendConfig_Convert(t *testing.T) {
 	testCases := map[string]struct {
 		yaml govendYAML
-		convertTestCase
+		importertest.TestCase
 	}{
 		"package": {
 			govendYAML{
 				Imports: []govendPackage{
 					{
-						Path:     importerTestProject,
-						Revision: importerTestV1Rev,
+						Path:     importertest.Project,
+						Revision: importertest.V1Rev,
 					},
 				},
 			},
-			convertTestCase{
-				wantConstraint: importerTestV1Constraint,
-				wantRevision:   importerTestV1Rev,
-				wantVersion:    importerTestV1Tag,
+			importertest.TestCase{
+				WantConstraint: importertest.V1Constraint,
+				WantRevision:   importertest.V1Rev,
+				WantVersion:    importertest.V1Tag,
 			},
 		},
 		"missing package name": {
@@ -44,8 +45,8 @@ func TestGovendConfig_Convert(t *testing.T) {
 					},
 				},
 			},
-			convertTestCase{
-				wantConvertErr: true,
+			importertest.TestCase{
+				WantConvertErr: true,
 			},
 		},
 
@@ -53,12 +54,12 @@ func TestGovendConfig_Convert(t *testing.T) {
 			govendYAML{
 				Imports: []govendPackage{
 					{
-						Path: importerTestProject,
+						Path: importertest.Project,
 					},
 				},
 			},
-			convertTestCase{
-				wantConvertErr: true,
+			importertest.TestCase{
+				WantConvertErr: true,
 			},
 		},
 	}
@@ -67,10 +68,10 @@ func TestGovendConfig_Convert(t *testing.T) {
 		name := name
 		testCase := testCase
 		t.Run(name, func(t *testing.T) {
-			err := testCase.Exec(t, func(logger *log.Logger, sm gps.SourceManager) (*dep.Manifest, *dep.Lock, error) {
-				g := newGovendImporter(logger, true, sm)
+			err := testCase.Execute(t, func(logger *log.Logger, sm gps.SourceManager) (*dep.Manifest, *dep.Lock, error) {
+				g := NewImporter(logger, true, sm)
 				g.yaml = testCase.yaml
-				return g.convert(testProjectRoot)
+				return g.convert(importertest.RootProject)
 			})
 			if err != nil {
 				t.Fatalf("%#v", err)
@@ -86,10 +87,10 @@ func TestGovendConfig_Import(t *testing.T) {
 	cacheDir := "gps-repocache"
 	h.TempDir(cacheDir)
 	h.TempDir("src")
-	h.TempDir(filepath.Join("src", testProjectRoot))
-	h.TempCopy(filepath.Join(testProjectRoot, govendYAMLName), "init/govend/vendor.yml")
+	h.TempDir(filepath.Join("src", importertest.RootProject))
+	h.TempCopy(filepath.Join(importertest.RootProject, govendYAMLName), "vendor.yml")
 
-	projectRoot := h.Path(testProjectRoot)
+	projectRoot := h.Path(importertest.RootProject)
 	sm, err := gps.NewSourceManager(gps.SourceManagerConfig{Cachedir: h.Path(cacheDir)})
 	h.Must(err)
 	defer sm.Release()
@@ -98,13 +99,13 @@ func TestGovendConfig_Import(t *testing.T) {
 	verboseOutput := &bytes.Buffer{}
 	logger := log.New(verboseOutput, "", 0)
 
-	// Disable verbose so that we don't print values that change each test run
-	g := newGovendImporter(logger, false, sm)
+	// Disable Verbose so that we don't print values that change each test run
+	g := NewImporter(logger, false, sm)
 	if !g.HasDepMetadata(projectRoot) {
 		t.Fatal("Expected the importer to detect govend configuration file")
 	}
 
-	m, l, err := g.Import(projectRoot, testProjectRoot)
+	m, l, err := g.Import(projectRoot, importertest.RootProject)
 	h.Must(err)
 
 	if m == nil {
@@ -115,7 +116,7 @@ func TestGovendConfig_Import(t *testing.T) {
 		t.Fatal("Expected the lock to be generated")
 	}
 
-	govendImportOutputFile := "init/govend/golden.txt"
+	govendImportOutputFile := "golden.txt"
 	got := verboseOutput.String()
 	want := h.GetTestFileString(govendImportOutputFile)
 	if want != got {
@@ -132,7 +133,7 @@ func TestGovendConfig_Import(t *testing.T) {
 
 func TestGovendConfig_YAMLLoad(t *testing.T) {
 	// This is same as cmd/testdata/init/govend/vendor.yml
-	wantYAML := govendYAML{
+	wantYaml := govendYAML{
 		Imports: []govendPackage{
 			{
 				Path:     "github.com/sdboyer/deptest",
@@ -147,19 +148,19 @@ func TestGovendConfig_YAMLLoad(t *testing.T) {
 	h := test.NewHelper(t)
 	defer h.Cleanup()
 
-	ctx := newTestContext(h)
-	h.TempCopy(filepath.Join(testProjectRoot, govendYAMLName), "init/govend/vendor.yml")
+	ctx := importertest.NewTestContext(h)
+	h.TempCopy(filepath.Join(importertest.RootProject, govendYAMLName), "vendor.yml")
 
-	projectRoot := h.Path(testProjectRoot)
+	projectRoot := h.Path(importertest.RootProject)
 
-	g := newGovendImporter(ctx.Err, true, nil)
+	g := NewImporter(ctx.Err, true, nil)
 	err := g.load(projectRoot)
 	if err != nil {
 		t.Fatalf("Error while loading %v", err)
 	}
 
-	if !equalGovendImports(g.yaml.Imports, wantYAML.Imports) {
-		t.Fatalf("Expected import to be equal. \n\t(GOT): %v\n\t(WNT): %v", g.yaml.Imports, wantYAML.Imports)
+	if !equalGovendImports(g.yaml.Imports, wantYaml.Imports) {
+		t.Fatalf("Expected import to be equal. \n\t(GOT): %v\n\t(WNT): %v", g.yaml.Imports, wantYaml.Imports)
 	}
 }
 

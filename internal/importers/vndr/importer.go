@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package main
+package vndr
 
 import (
 	"bufio"
@@ -13,6 +13,7 @@ import (
 
 	"github.com/golang/dep"
 	"github.com/golang/dep/internal/gps"
+	"github.com/golang/dep/internal/importers/base"
 	"github.com/pkg/errors"
 )
 
@@ -20,24 +21,29 @@ func vndrFile(dir string) string {
 	return filepath.Join(dir, "vendor.conf")
 }
 
-type vndrImporter struct {
-	*baseImporter
+// Importer imports vndr configuration into the dep configuration format.
+type Importer struct {
+	*base.Importer
 	packages []vndrPackage
 }
 
-func newVndrImporter(log *log.Logger, verbose bool, sm gps.SourceManager) *vndrImporter {
-	return &vndrImporter{baseImporter: newBaseImporter(log, verbose, sm)}
+// NewImporter for vndr.
+func NewImporter(log *log.Logger, verbose bool, sm gps.SourceManager) *Importer {
+	return &Importer{Importer: base.NewImporter(log, verbose, sm)}
 }
 
-func (v *vndrImporter) Name() string { return "vndr" }
+// Name of the importer.
+func (v *Importer) Name() string { return "vndr" }
 
-func (v *vndrImporter) HasDepMetadata(dir string) bool {
+// HasDepMetadata checks if a directory contains config that the importer can handle.
+func (v *Importer) HasDepMetadata(dir string) bool {
 	_, err := os.Stat(vndrFile(dir))
 	return err == nil
 }
 
-func (v *vndrImporter) Import(dir string, pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock, error) {
-	v.logger.Println("Detected vndr configuration file...")
+// Import the config found in the directory.
+func (v *Importer) Import(dir string, pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock, error) {
+	v.Logger.Println("Detected vndr configuration file...")
 
 	err := v.loadVndrFile(dir)
 	if err != nil {
@@ -47,8 +53,8 @@ func (v *vndrImporter) Import(dir string, pr gps.ProjectRoot) (*dep.Manifest, *d
 	return v.convert(pr)
 }
 
-func (v *vndrImporter) loadVndrFile(dir string) error {
-	v.logger.Printf("Converting from vendor.conf...")
+func (v *Importer) loadVndrFile(dir string) error {
+	v.Logger.Printf("Converting from vendor.conf...")
 
 	f, err := os.Open(vndrFile(dir))
 	if err != nil {
@@ -76,8 +82,8 @@ func (v *vndrImporter) loadVndrFile(dir string) error {
 	return nil
 }
 
-func (v *vndrImporter) convert(pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock, error) {
-	packages := make([]importedPackage, 0, len(v.packages))
+func (v *Importer) convert(pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock, error) {
+	packages := make([]base.ImportedPackage, 0, len(v.packages))
 	for _, pkg := range v.packages {
 		// Validate
 		if pkg.importPath == "" {
@@ -90,19 +96,19 @@ func (v *vndrImporter) convert(pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock, er
 			return nil, nil, err
 		}
 
-		ip := importedPackage{
+		ip := base.ImportedPackage{
 			Name:     pkg.importPath,
 			Source:   pkg.repository,
 			LockHint: pkg.reference,
 		}
 		packages = append(packages, ip)
 	}
-	err := v.importPackages(packages, true)
+	err := v.ImportPackages(packages, true)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	return v.manifest, v.lock, nil
+	return v.Manifest, v.Lock, nil
 }
 
 type vndrPackage struct {

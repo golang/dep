@@ -11,15 +11,8 @@ import (
 	"github.com/golang/dep"
 	fb "github.com/golang/dep/internal/feedback"
 	"github.com/golang/dep/internal/gps"
+	"github.com/golang/dep/internal/importers"
 )
-
-// importer handles importing configuration from other dependency managers into
-// the dep configuration format.
-type importer interface {
-	Name() string
-	Import(path string, pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock, error)
-	HasDepMetadata(dir string) bool
-}
 
 // rootAnalyzer supplies manifest/lock data from both dep and external tool's
 // configuration files.
@@ -66,14 +59,7 @@ func (a *rootAnalyzer) importManifestAndLock(dir string, pr gps.ProjectRoot, sup
 		logger = log.New(ioutil.Discard, "", 0)
 	}
 
-	importers := []importer{
-		newGlideImporter(logger, a.ctx.Verbose, a.sm),
-		newGodepImporter(logger, a.ctx.Verbose, a.sm),
-		newVndrImporter(logger, a.ctx.Verbose, a.sm),
-		newGovendImporter(logger, a.ctx.Verbose, a.sm),
-	}
-
-	for _, i := range importers {
+	for _, i := range importers.BuildAll(logger, a.ctx.Verbose, a.sm) {
 		if i.HasDepMetadata(dir) {
 			a.ctx.Err.Printf("Importing configuration from %s. These are only initial constraints, and are further refined during the solve process.", i.Name())
 			m, l, err := i.Import(dir, pr)

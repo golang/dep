@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package main
+package godep
 
 import (
 	"encoding/json"
@@ -13,18 +13,21 @@ import (
 
 	"github.com/golang/dep"
 	"github.com/golang/dep/internal/gps"
+	"github.com/golang/dep/internal/importers/base"
 	"github.com/pkg/errors"
 )
 
 const godepPath = "Godeps" + string(os.PathSeparator) + "Godeps.json"
 
-type godepImporter struct {
-	*baseImporter
+// Importer imports godep configuration into the dep configuration format.
+type Importer struct {
+	*base.Importer
 	json godepJSON
 }
 
-func newGodepImporter(logger *log.Logger, verbose bool, sm gps.SourceManager) *godepImporter {
-	return &godepImporter{baseImporter: newBaseImporter(logger, verbose, sm)}
+// NewImporter for godep.
+func NewImporter(logger *log.Logger, verbose bool, sm gps.SourceManager) *Importer {
+	return &Importer{Importer: base.NewImporter(logger, verbose, sm)}
 }
 
 type godepJSON struct {
@@ -37,11 +40,13 @@ type godepPackage struct {
 	Comment    string `json:"Comment"`
 }
 
-func (g *godepImporter) Name() string {
+// Name of the importer.
+func (g *Importer) Name() string {
 	return "godep"
 }
 
-func (g *godepImporter) HasDepMetadata(dir string) bool {
+// HasDepMetadata checks if a directory contains config that the importer can handle.
+func (g *Importer) HasDepMetadata(dir string) bool {
 	y := filepath.Join(dir, godepPath)
 	if _, err := os.Stat(y); err != nil {
 		return false
@@ -50,7 +55,8 @@ func (g *godepImporter) HasDepMetadata(dir string) bool {
 	return true
 }
 
-func (g *godepImporter) Import(dir string, pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock, error) {
+// Import the config found in the directory.
+func (g *Importer) Import(dir string, pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock, error) {
 	err := g.load(dir)
 	if err != nil {
 		return nil, nil, err
@@ -59,11 +65,11 @@ func (g *godepImporter) Import(dir string, pr gps.ProjectRoot) (*dep.Manifest, *
 	return g.convert(pr)
 }
 
-func (g *godepImporter) load(projectDir string) error {
-	g.logger.Println("Detected godep configuration files...")
+func (g *Importer) load(projectDir string) error {
+	g.Logger.Println("Detected godep configuration files...")
 	j := filepath.Join(projectDir, godepPath)
-	if g.verbose {
-		g.logger.Printf("  Loading %s", j)
+	if g.Verbose {
+		g.Logger.Printf("  Loading %s", j)
 	}
 	jb, err := ioutil.ReadFile(j)
 	if err != nil {
@@ -77,10 +83,10 @@ func (g *godepImporter) load(projectDir string) error {
 	return nil
 }
 
-func (g *godepImporter) convert(pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock, error) {
-	g.logger.Println("Converting from Godeps.json ...")
+func (g *Importer) convert(pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock, error) {
+	g.Logger.Println("Converting from Godeps.json ...")
 
-	packages := make([]importedPackage, 0, len(g.json.Imports))
+	packages := make([]base.ImportedPackage, 0, len(g.json.Imports))
 	for _, pkg := range g.json.Imports {
 		// Validate
 		if pkg.ImportPath == "" {
@@ -93,7 +99,7 @@ func (g *godepImporter) convert(pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock, e
 			return nil, nil, err
 		}
 
-		ip := importedPackage{
+		ip := base.ImportedPackage{
 			Name:           pkg.ImportPath,
 			LockHint:       pkg.Rev,
 			ConstraintHint: pkg.Comment,
@@ -101,10 +107,10 @@ func (g *godepImporter) convert(pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock, e
 		packages = append(packages, ip)
 	}
 
-	err := g.importPackages(packages, true)
+	err := g.ImportPackages(packages, true)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	return g.manifest, g.lock, nil
+	return g.Manifest, g.Lock, nil
 }
