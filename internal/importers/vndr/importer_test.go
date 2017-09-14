@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package main
+package vndr
 
 import (
 	"bytes"
@@ -13,6 +13,7 @@ import (
 
 	"github.com/golang/dep"
 	"github.com/golang/dep/internal/gps"
+	"github.com/golang/dep/internal/importers/importertest"
 	"github.com/golang/dep/internal/test"
 	"github.com/pkg/errors"
 )
@@ -20,35 +21,35 @@ import (
 func TestVndrConfig_Convert(t *testing.T) {
 	testCases := map[string]struct {
 		packages []vndrPackage
-		convertTestCase
+		importertest.TestCase
 	}{
 		"package": {
 			[]vndrPackage{{
-				importPath: importerTestProject,
-				reference:  importerTestV1Rev,
-				repository: importerTestProjectSrc,
+				importPath: importertest.Project,
+				reference:  importertest.V1Rev,
+				repository: importertest.ProjectSrc,
 			}},
-			convertTestCase{
-				wantSourceRepo: importerTestProjectSrc,
-				wantConstraint: importerTestV1Constraint,
-				wantRevision:   importerTestV1Rev,
-				wantVersion:    importerTestV1Tag,
+			importertest.TestCase{
+				WantSourceRepo: importertest.ProjectSrc,
+				WantConstraint: importertest.V1Constraint,
+				WantRevision:   importertest.V1Rev,
+				WantVersion:    importertest.V1Tag,
 			},
 		},
 		"missing importPath": {
 			[]vndrPackage{{
-				reference: importerTestV1Tag,
+				reference: importertest.V1Tag,
 			}},
-			convertTestCase{
-				wantConvertErr: true,
+			importertest.TestCase{
+				WantConvertErr: true,
 			},
 		},
 		"missing reference": {
 			[]vndrPackage{{
-				importPath: importerTestProject,
+				importPath: importertest.Project,
 			}},
-			convertTestCase{
-				wantConvertErr: true,
+			importertest.TestCase{
+				WantConvertErr: true,
 			},
 		},
 	}
@@ -57,10 +58,10 @@ func TestVndrConfig_Convert(t *testing.T) {
 		name := name
 		testCase := testCase
 		t.Run(name, func(t *testing.T) {
-			err := testCase.Exec(t, func(logger *log.Logger, sm gps.SourceManager) (*dep.Manifest, *dep.Lock, error) {
-				g := newVndrImporter(logger, true, sm)
+			err := testCase.Execute(t, func(logger *log.Logger, sm gps.SourceManager) (*dep.Manifest, *dep.Lock, error) {
+				g := NewImporter(logger, true, sm)
 				g.packages = testCase.packages
-				return g.convert(testProjectRoot)
+				return g.convert(importertest.RootProject)
 			})
 			if err != nil {
 				t.Fatalf("%#v", err)
@@ -73,24 +74,24 @@ func TestVndrConfig_Import(t *testing.T) {
 	h := test.NewHelper(t)
 	defer h.Cleanup()
 
-	ctx := newTestContext(h)
+	ctx := importertest.NewTestContext(h)
 	sm, err := ctx.SourceManager()
 	h.Must(err)
 	defer sm.Release()
 
-	h.TempDir(filepath.Join("src", testProjectRoot))
-	h.TempCopy(vndrFile(testProjectRoot), "init/vndr/vendor.conf")
-	projectRoot := h.Path(testProjectRoot)
+	h.TempDir(filepath.Join("src", importertest.RootProject))
+	h.TempCopy(vndrFile(importertest.RootProject), "vendor.conf")
+	projectRoot := h.Path(importertest.RootProject)
 
 	logOutput := bytes.NewBuffer(nil)
 	ctx.Err = log.New(logOutput, "", 0)
 
-	v := newVndrImporter(ctx.Err, false, sm)
+	v := NewImporter(ctx.Err, false, sm)
 	if !v.HasDepMetadata(projectRoot) {
 		t.Fatal("Expected the importer to detect vndr configuration file")
 	}
 
-	m, l, err := v.Import(projectRoot, testProjectRoot)
+	m, l, err := v.Import(projectRoot, importertest.RootProject)
 	h.Must(err)
 
 	wantM := dep.NewManifest()
@@ -130,7 +131,7 @@ func TestVndrConfig_Import(t *testing.T) {
 		t.Errorf("unexpected lock\nhave=%+v\nwant=%+v", l, wantL)
 	}
 
-	goldenFile := "init/vndr/golden.txt"
+	goldenFile := "golden.txt"
 	got := logOutput.String()
 	want := h.GetTestFileString(goldenFile)
 	if want != got {

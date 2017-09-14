@@ -5,9 +5,8 @@
 package main
 
 import (
-	"testing"
-
 	"path/filepath"
+	"testing"
 
 	"github.com/golang/dep"
 	"github.com/golang/dep/internal/gps"
@@ -18,7 +17,7 @@ func TestGetDirectDependencies_ConsolidatesRootProjects(t *testing.T) {
 	h := test.NewHelper(t)
 	defer h.Cleanup()
 
-	ctx := newTestContext(h)
+	ctx := NewTestContext(h)
 	sm, err := ctx.SourceManager()
 	h.Must(err)
 	defer sm.Release()

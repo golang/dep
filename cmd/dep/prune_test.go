@@ -5,6 +5,8 @@
 package main
 
 import (
+	"io/ioutil"
+	"log"
 	"path/filepath"
 	"reflect"
 	"sort"
@@ -26,6 +28,8 @@ func TestCalculatePrune(t *testing.T) {
 		filepath.FromSlash("github.com/keep/pkg"),
 		filepath.FromSlash("github.com/keep/pkg/sub"),
 	}
+
+	discardLogger := log.New(ioutil.Discard, "", 0)
 
 	got, err := calculatePrune(h.Path(vendorDir), toKeep, discardLogger)
 	if err != nil {
