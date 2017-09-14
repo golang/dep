@@ -555,13 +555,15 @@ type deductionCoordinator struct {
 	mut      sync.RWMutex
 	rootxt   *radix.Tree
 	deducext *deducerTrie
+	registry Registry
 }
 
-func newDeductionCoordinator(superv *supervisor) *deductionCoordinator {
+func newDeductionCoordinator(superv *supervisor, registry Registry) *deductionCoordinator {
 	dc := &deductionCoordinator{
 		suprvsr:  superv,
 		rootxt:   radix.New(),
 		deducext: pathDeducerTrie(),
+		registry: registry,
 	}
 
 	return dc
@@ -588,6 +590,8 @@ func (dc *deductionCoordinator) deduceRootPath(ctx context.Context, path string)
 		switch d := data.(type) {
 		case maybeSource:
 			return pathDeduction{root: prefix, mb: d}, nil
+		case *registryDeducer:
+			return d.deduce(ctx, path)
 		case *httpMetadataDeducer:
 			// Multiple calls have come in for a similar path shape during
 			// the window in which the HTTP request to retrieve go get
@@ -598,6 +602,29 @@ func (dc *deductionCoordinator) deduceRootPath(ctx context.Context, path string)
 		}
 
 		panic(fmt.Sprintf("unexpected %T in deductionCoordinator.rootxt: %v", data, data))
+	}
+
+	if dc.registry != nil {
+		rd := &registryDeducer{
+			registry: dc.registry,
+			basePath: path,
+			suprvsr:  dc.suprvsr,
+			// The vanity deducer will call this func with a completed
+			// pathDeduction if it succeeds in finding one. We process it
+			// back through the action channel to ensure serialized
+			// access to the rootxt map.
+			returnFunc: func(pd pathDeduction) {
+				dc.mut.Lock()
+				dc.rootxt.Insert(pd.root, pd.mb)
+				dc.mut.Unlock()
+			},
+		}
+		dc.mut.Lock()
+		dc.rootxt.Insert(path, rd)
+		dc.mut.Unlock()
+
+		// Trigger the HTTP-backed deduction process for this requestor.
+		return rd.deduce(ctx, path)
 	}
 
 	// No match. Try known path deduction first.
@@ -691,6 +718,48 @@ func (dc *deductionCoordinator) deduceKnownPaths(path string) (pathDeduction, er
 	}
 
 	return pathDeduction{}, errNoKnownPathMatch
+}
+
+type registryDeducer struct {
+	once       sync.Once
+	deduced    pathDeduction
+	deduceErr  error
+	basePath   string
+	registry   Registry
+	returnFunc func(pathDeduction)
+	suprvsr    *supervisor
+}
+
+func (rd *registryDeducer) deduce(ctx context.Context, path string) (pathDeduction, error) {
+	rd.once.Do(func() {
+		spath := strings.Split(path, "/")
+		currPath := spath[0]
+		for i := 1; i < len(spath); i++ {
+			currPath = currPath + "/" + spath[i]
+			registry, err := NewRegistrySource(rd.registry.Url(), rd.registry.Token(), currPath, "")
+			if err != nil {
+				rd.deduceErr = err
+				return
+			}
+			_, err = registry.listVersions(ctx)
+			if err == nil {
+				pd := pathDeduction{mb: maybeRegistrySource{path: currPath, url: rd.registry.Url(), token: rd.registry.Token()}, root: currPath}
+				rd.deduced = pd
+				rd.returnFunc(pd)
+				return
+			}
+
+			if err != errNotFound {
+				fmt.Println(err)
+				rd.deduceErr = err
+				return
+			}
+		}
+		if rd.deduced.mb == nil {
+			rd.deduceErr = errors.Errorf("unable to find root path for: %s", path)
+		}
+	})
+	return rd.deduced, rd.deduceErr
 }
 
 type httpMetadataDeducer struct {

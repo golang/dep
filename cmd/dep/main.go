@@ -63,6 +63,7 @@ func (c *Config) Run() (exitCode int) {
 		&hashinCommand{},
 		&pruneCommand{},
 		&versionCommand{},
+		&loginCommand{},
 	}
 
 	examples := [][2]string{

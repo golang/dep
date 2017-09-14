@@ -1,0 +1,11 @@
+{
+  "commands": [
+    ["login", "-u=admin", "-p=password", "http://localhost:9090"],
+    ["init", "-no-examples"]
+  ],
+  "error-expected": "",
+  "vendor-final": [
+    "github.com/sdboyer/deptest",
+    "github.com/sdboyer/deptestdos"
+  ]
+}

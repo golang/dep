@@ -106,7 +106,7 @@ func TestGodepConfig_Import(t *testing.T) {
 	sm, err := gps.NewSourceManager(gps.SourceManagerConfig{
 		Cachedir: h.Path(cacheDir),
 		Logger:   log.New(test.Writer{TB: t}, "", 0),
-	})
+	}, nil)
 	h.Must(err)
 	defer sm.Release()
 

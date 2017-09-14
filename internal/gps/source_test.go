@@ -40,7 +40,7 @@ func testSourceGateway(t *testing.T) {
 	do := func(wantstate sourceState) func(t *testing.T) {
 		return func(t *testing.T) {
 			superv := newSupervisor(ctx)
-			sc := newSourceCoordinator(superv, newDeductionCoordinator(superv), cachedir, log.New(test.Writer{TB: t}, "", 0))
+			sc := newSourceCoordinator(superv, newDeductionCoordinator(superv, nil), cachedir, log.New(test.Writer{TB: t}, "", 0))
 
 			id := mkPI("github.com/sdboyer/deptest")
 			sg, err := sc.getSourceGatewayFor(ctx, id)

@@ -151,7 +151,7 @@ type SourceManagerConfig struct {
 // gps's SourceManager is intended to be threadsafe (if it's not, please file a
 // bug!). It should be safe to reuse across concurrent solving runs, even on
 // unrelated projects.
-func NewSourceManager(c SourceManagerConfig) (*SourceMgr, error) {
+func NewSourceManager(c SourceManagerConfig, registry Registry) (*SourceMgr, error) {
 	if c.Logger == nil {
 		c.Logger = log.New(ioutil.Discard, "", 0)
 	}
@@ -228,7 +228,7 @@ func NewSourceManager(c SourceManagerConfig) (*SourceMgr, error) {
 
 	ctx, cf := context.WithCancel(context.TODO())
 	superv := newSupervisor(ctx)
-	deducer := newDeductionCoordinator(superv)
+	deducer := newDeductionCoordinator(superv, registry)
 
 	sm := &SourceMgr{
 		cachedir:    c.Cachedir,

@@ -23,6 +23,7 @@ func TestIntegration(t *testing.T) {
 
 	test.NeedsExternalNetwork(t)
 	test.NeedsGit(t)
+	test.SetupRegistry(t)
 
 	wd, err := os.Getwd()
 	if err != nil {
@@ -134,10 +135,12 @@ func testIntegration(name, relPath, wd string, externalProc bool, run integratio
 			// Update manifest and lock
 			testCase.UpdateFile(dep.ManifestName, testProj.ProjPath(dep.ManifestName))
 			testCase.UpdateFile(dep.LockName, testProj.ProjPath(dep.LockName))
+			testCase.UpdateFile(dep.RegistryConfigName, testProj.ProjPath(dep.RegistryConfigName))
 		} else {
 			// Check final manifest and lock
 			testCase.CompareFile(dep.ManifestName, testProj.ProjPath(dep.ManifestName))
 			testCase.CompareFile(dep.LockName, testProj.ProjPath(dep.LockName))
+			testCase.CompareFile(dep.RegistryConfigName, testProj.ProjPath(dep.RegistryConfigName))
 		}
 	}
 }
