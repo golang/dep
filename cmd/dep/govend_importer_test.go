@@ -90,7 +90,7 @@ func TestGovendConfig_Import(t *testing.T) {
 	h.TempCopy(filepath.Join(testProjectRoot, govendYAMLName), "init/govend/vendor.yml")
 
 	projectRoot := h.Path(testProjectRoot)
-	sm, err := gps.NewSourceManager(gps.SourceManagerConfig{Cachedir: h.Path(cacheDir)})
+	sm, err := gps.NewSourceManager(gps.SourceManagerConfig{Cachedir: h.Path(cacheDir)}, nil)
 	h.Must(err)
 	defer sm.Release()
 

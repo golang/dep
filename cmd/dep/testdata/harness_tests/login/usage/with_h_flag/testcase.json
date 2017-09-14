@@ -1,0 +1,6 @@
+{
+  "commands": [
+    ["login", "-h"]
+  ],
+  "error-expected": "Usage: dep login <url>"
+}

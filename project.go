@@ -22,15 +22,16 @@ var (
 // manifest file until we get to the root of the filesystem.
 func findProjectRoot(from string) (string, error) {
 	for {
-		mp := filepath.Join(from, ManifestName)
-
-		_, err := os.Stat(mp)
-		if err == nil {
-			return from, nil
-		}
-		if !os.IsNotExist(err) {
-			// Some err other than non-existence - return that out
-			return "", err
+		for _, fileName := range []string{ManifestName, RegistryConfigName} {
+			mp := filepath.Join(from, fileName)
+			_, err := os.Stat(mp)
+			if err == nil {
+				return from, nil
+			}
+			if !os.IsNotExist(err) {
+				// Some err other than non-existence - return that out
+				return "", err
+			}
 		}
 
 		parent := filepath.Dir(from)
@@ -52,6 +53,8 @@ type Project struct {
 	ImportRoot gps.ProjectRoot
 	Manifest   *Manifest
 	Lock       *Lock // Optional
+	// Registry config, if provided all dependency resolution will be from the registry.
+	RegistryConfig *registryConfig
 }
 
 // SetRoot sets the project AbsRoot and ResolvedAbsRoot. If root is a not symlink, ResolvedAbsRoot will be set to root.

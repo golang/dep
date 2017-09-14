@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"github.com/pkg/errors"
+	"github.com/golang/dep/cmd/dep/testdata/registry"
 )
 
 var (
@@ -253,6 +254,17 @@ func NeedsGit(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("skipping because git binary not found")
 	}
+}
+
+// NeedsGit will make sure the tests that require git will be skipped if the
+// git binary is not available.
+func SetupRegistry(t *testing.T) {
+	go func(t *testing.T) {
+		if err := registry.SetupAndRun(":9090"); err != nil {
+			t.Fatal(err)
+			t.Skip(err)
+		}
+	}(t)
 }
 
 // RunGit runs a git command, and expects it to succeed.

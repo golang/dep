@@ -86,10 +86,40 @@ func defaultGOPATH() string {
 // SourceManager produces an instance of gps's built-in SourceManager
 // initialized to log to the receiver's logger.
 func (c *Ctx) SourceManager() (*gps.SourceMgr, error) {
-	return gps.NewSourceManager(gps.SourceManagerConfig{
+	var registry *registryConfig
+	if root, err := findProjectRoot(c.WorkingDir); err == nil {
+		registry, err = c.getRegistryConfig(root)
+		if err != nil {
+			return nil, err
+		}
+	}
+	smc := gps.SourceManagerConfig{
 		Cachedir: filepath.Join(c.GOPATH, "pkg", "dep"),
 		Logger:   c.Out,
-	})
+	}
+	if registry != nil {
+		return gps.NewSourceManager(smc, registry)
+	}
+	return gps.NewSourceManager(smc, nil)
+}
+
+func (c *Ctx) getRegistryConfig(rootPath string) (*registryConfig, error) {
+	cp := filepath.Join(rootPath, RegistryConfigName)
+	cf, err := os.Open(cp)
+	if err != nil {
+		if os.IsExist(err) {
+			// If config does exist and we can't open it, that's a problem
+			return nil, errors.Errorf("could not open %s: %s", cp, err)
+		}
+	} else {
+		registryConfig, err := readConfig(cf)
+		if err != nil {
+			return nil, errors.Errorf("error while parsing %s: %s", cp, err)
+		}
+		defer cf.Close()
+		return registryConfig, err
+	}
+	return nil, nil
 }
 
 // LoadProject starts from the current working directory and searches up the
@@ -122,12 +152,17 @@ func (c *Ctx) LoadProject() (*Project, error) {
 	}
 	p.ImportRoot = gps.ProjectRoot(ip)
 
+	p.RegistryConfig, err = c.getRegistryConfig(p.AbsRoot)
+	if err != nil {
+		return nil, err
+	}
+
 	mp := filepath.Join(p.AbsRoot, ManifestName)
 	mf, err := os.Open(mp)
 	if err != nil {
 		if os.IsNotExist(err) {
 			// TODO: list possible solutions? (dep init, cd $project)
-			return nil, errors.Errorf("no %v found in project root %v", ManifestName, p.AbsRoot)
+			return p, errors.Errorf("no %v found in project root %v", ManifestName, p.AbsRoot)
 		}
 		// Unable to read the manifest file
 		return nil, err
