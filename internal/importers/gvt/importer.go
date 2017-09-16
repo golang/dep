@@ -67,7 +67,7 @@ func (g *Importer) Import(dir string, pr gps.ProjectRoot) (*dep.Manifest, *dep.L
 }
 
 func (g *Importer) load(projectDir string) error {
-	g.Logger.Println("Detected gvt configuration files...")
+	g.Logger.Println("Detected gb/gvt configuration files...")
 	j := filepath.Join(projectDir, gvtPath)
 	if g.Verbose {
 		g.Logger.Printf("  Loading %s", j)
@@ -101,7 +101,13 @@ func (g *Importer) convert(pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock, error)
 		}
 
 		var contstraintHint = ""
-		if pkg.Branch != "master" {
+		if pkg.Branch == "HEAD" {
+			// gb-vendor sets "branch" to "HEAD", if the package was feteched via -tag or -revision,
+			// we we pass the revision as the constraint hint
+			contstraintHint = pkg.Revision
+		} else if pkg.Branch != "master" {
+			// both gvt & gb-vendor set "branch" to "master" unless a different branch was requested.
+			// so it's not realy a constraint unless it's a different branch
 			contstraintHint = pkg.Branch
 		}
 

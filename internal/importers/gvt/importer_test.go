@@ -54,6 +54,22 @@ func TestGvtConfig_Convert(t *testing.T) {
 				},
 			},
 		},
+		"package with HEAD branch": {
+			importertest.TestCase{
+				WantConstraint: "*",
+				WantRevision:   importertest.V1Rev,
+				WantVersion:    importertest.V1Tag,
+			},
+			gvtManifest{
+				Deps: []gvtPkg{
+					{
+						ImportPath: importertest.Project,
+						Revision:   importertest.V1Rev,
+						Branch:     "HEAD",
+					},
+				},
+			},
+		},
 		"missing package name": {
 			importertest.TestCase{
 				WantConvertErr: true,
@@ -151,7 +167,7 @@ func TestGvtConfig_JsonLoad(t *testing.T) {
 			{
 				ImportPath: "github.com/sdboyer/deptest",
 				Revision:   "3f4c3bea144e112a69bbe5d8d01c1b09a544253f",
-				Branch:     "master",
+				Branch:     "HEAD",
 			},
 			{
 				ImportPath: "github.com/sdboyer/deptestdos",
