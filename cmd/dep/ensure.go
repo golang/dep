@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/golang/dep"
 	"github.com/golang/dep/internal/gps"
@@ -110,6 +111,8 @@ dep ensure -update -no-vendor
     As above, but only modify Gopkg.lock; leave vendor/ unchanged.
 
 `
+
+var errUpdateArgsValidation = errors.New("update arguments validation failed")
 
 func (cmd *ensureCommand) Name() string { return "ensure" }
 func (cmd *ensureCommand) Args() string {
@@ -345,36 +348,72 @@ func (cmd *ensureCommand) runUpdate(ctx *dep.Ctx, args []string, p *dep.Project,
 		params.ChangeAll = true
 	}
 
+	// Channel for receiving all the valid arguments
+	validArgsCh := make(chan string, len(args))
+
+	// Channel for receiving all the validation errors
+	errArgsValidationCh := make(chan error, len(args))
+
+	var wg sync.WaitGroup
+
 	// Allow any of specified project versions to change, regardless of the lock
 	// file.
 	for _, arg := range args {
-		// Ensure the provided path has a deducible project root
-		// TODO(sdboyer) do these concurrently
-		pc, path, err := getProjectConstraint(arg, sm)
-		if err != nil {
-			// TODO(sdboyer) return all errors, not just the first one we encounter
-			// TODO(sdboyer) ensure these errors are contextualized in a sensible way for -update
-			return err
-		}
-		if path != string(pc.Ident.ProjectRoot) {
-			// TODO(sdboyer): does this really merit an abortive error?
-			return errors.Errorf("%s is not a project root, try %s instead", path, pc.Ident.ProjectRoot)
-		}
+		wg.Add(1)
 
-		if !p.Lock.HasProjectWithRoot(pc.Ident.ProjectRoot) {
-			return errors.Errorf("%s is not present in %s, cannot -update it", pc.Ident.ProjectRoot, dep.LockName)
-		}
+		go func(arg string) {
+			defer wg.Done()
 
-		if pc.Ident.Source != "" {
-			return errors.Errorf("cannot specify alternate sources on -update (%s)", pc.Ident.Source)
-		}
+			// Ensure the provided path has a deducible project root
+			pc, path, err := getProjectConstraint(arg, sm)
+			if err != nil {
+				// TODO(sdboyer) ensure these errors are contextualized in a sensible way for -update
+				errArgsValidationCh <- err
+				return
+			}
+			if path != string(pc.Ident.ProjectRoot) {
+				// TODO(sdboyer): does this really merit an abortive error?
+				errArgsValidationCh <- errors.Errorf("%s is not a project root, try %s instead", path, pc.Ident.ProjectRoot)
+				return
+			}
 
-		if !gps.IsAny(pc.Constraint) {
-			// TODO(sdboyer) constraints should be allowed to allow solves that
-			// target particular versions while remaining within declared constraints
-			return errors.Errorf("version constraint %s passed for %s, but -update follows constraints declared in %s, not CLI arguments", pc.Constraint, pc.Ident.ProjectRoot, dep.ManifestName)
-		}
+			if !p.Lock.HasProjectWithRoot(pc.Ident.ProjectRoot) {
+				errArgsValidationCh <- errors.Errorf("%s is not present in %s, cannot -update it", pc.Ident.ProjectRoot, dep.LockName)
+				return
+			}
 
+			if pc.Ident.Source != "" {
+				errArgsValidationCh <- errors.Errorf("cannot specify alternate sources on -update (%s)", pc.Ident.Source)
+				return
+			}
+
+			if !gps.IsAny(pc.Constraint) {
+				// TODO(sdboyer) constraints should be allowed to allow solves that
+				// target particular versions while remaining within declared constraints
+				errArgsValidationCh <- errors.Errorf("version constraint %s passed for %s, but -update follows constraints declared in %s, not CLI arguments", pc.Constraint, pc.Ident.ProjectRoot, dep.ManifestName)
+				return
+			}
+
+			// Valid argument
+			validArgsCh <- arg
+		}(arg)
+	}
+
+	wg.Wait()
+	close(errArgsValidationCh)
+	close(validArgsCh)
+
+	// Log all the errors
+	if len(errArgsValidationCh) > 0 {
+		for err := range errArgsValidationCh {
+			ctx.Err.Println(err.Error())
+		}
+		ctx.Err.Println()
+		return errUpdateArgsValidation
+	}
+
+	// Add all the valid arguments to solve params
+	for arg := range validArgsCh {
 		params.ToChange = append(params.ToChange, gps.ProjectRoot(arg))
 	}
 
