@@ -1,0 +1,12 @@
+{
+  "commands": [
+    ["login", "-u=admin", "-p=password", "http://localhost:9090"],
+    ["init", "-no-examples"],
+    ["publish", "-v", "-vendor", "-revision", "*"]
+  ],
+  "error-expected": "cannot provide -branch or -revision with -vendor flag",
+  "vendor-final": [
+    "github.com/sdboyer/deptest",
+    "github.com/sdboyer/deptestdos"
+  ]
+}

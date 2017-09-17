@@ -1,0 +1,12 @@
+{
+  "commands": [
+    ["login", "-u=admin", "-p=password", "http://localhost:9090"],
+    ["init", "-no-examples"],
+    ["publish", "-revision"]
+  ],
+  "error-expected": "Unable to retrieve checked out version",
+  "vendor-final": [
+    "github.com/sdboyer/deptest",
+    "github.com/sdboyer/deptestdos"
+  ]
+}

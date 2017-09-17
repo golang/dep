@@ -1,0 +1,6 @@
+{
+  "commands": [
+    ["publish", "-h"]
+  ],
+  "error-expected": "Usage: dep publish [-vendor] [-branch | -revision] [<version>]"
+}

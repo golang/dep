@@ -1,0 +1,6 @@
+{
+  "commands": [
+    ["publish", "-not-defined-flag"]
+  ],
+  "error-expected": "flag provided but not defined: -not-defined-flag\nUsage: dep publish [-vendor] [-branch | -revision] [<version>]"
+}

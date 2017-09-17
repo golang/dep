@@ -10,6 +10,7 @@ import (
 	"os"
 	"errors"
 	"path/filepath"
+	"encoding/hex"
 )
 
 const TOKEN_AUTH = "2erygdasE45rty5JKwewrr75cb15rdeE"
@@ -134,7 +135,7 @@ func getDependency(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Add("X-Go-Project-Name", strings.Replace(nameVer[0], "%2F", "/", -1))
 	w.Header().Add("X-Go-Project-Version", nameVer[1])
-	w.Header().Add("X-Checksum-Sha2", fmt.Sprintf("%x", h.Sum(nil)))
+	w.Header().Add("X-Checksum-Sha256", hex.EncodeToString(h.Sum(nil)))
 	w.Write(b)
 }
 
@@ -143,6 +144,18 @@ func putDependency(w http.ResponseWriter, r *http.Request) {
 		fmt.Println("StatusUnauthorized")
 		http.Error(w, err.Error(), http.StatusUnauthorized)
 		return
+	}
+
+	content, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+	// validate content with sha256 header
+	h := sha256.New()
+	h.Write(content)
+
+	if hex.EncodeToString(h.Sum(nil)) != r.Header.Get("X-Checksum-Sha256") {
+		http.Error(w, "sha256 checksum validation failed", http.StatusForbidden)
 	}
 	// Do nothing with the received dependency
 	return

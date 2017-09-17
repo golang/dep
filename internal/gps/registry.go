@@ -3,7 +3,6 @@ package gps
 import (
 	"context"
 	"github.com/golang/dep/internal/gps/pkgtree"
-	"fmt"
 	"path/filepath"
 	"net/url"
 	"path"
@@ -16,6 +15,8 @@ import (
 	"os"
 	"compress/gzip"
 	"github.com/golang/dep/internal/fs"
+	"crypto/sha256"
+	"encoding/hex"
 )
 
 var errNotFound = errors.New(http.StatusText(http.StatusNotFound))
@@ -157,13 +158,20 @@ func (s *registrySource) getManifestAndLock(ctx context.Context, pr ProjectRoot,
 func (s *registrySource) listPackages(ctx context.Context, pr ProjectRoot, r Revision) (ptree pkgtree.PackageTree, err error) {
 	resp, err := s.execDownloadDependency(pr, r)
 	if err != nil {
-		fmt.Println(err)
 		return pkgtree.PackageTree{}, err
 	}
 	defer resp.Body.Close()
-	err = extractDependency(resp.Body, s.sourceCachePath)
+
+	h := sha256.New()
+	tee := io.TeeReader(resp.Body, h)
+
+	err = extractDependency(tee, s.sourceCachePath)
 	if err != nil {
 		return pkgtree.PackageTree{}, err
+	}
+
+	if hex.EncodeToString(h.Sum(nil)) != resp.Header.Get("X-Checksum-Sha256") {
+		return pkgtree.PackageTree{}, errors.Errorf("sha256 checksum validation failed for %s %s", s.path, r)
 	}
 
 	return pkgtree.ListPackages(s.sourceCachePath, string(pr))
