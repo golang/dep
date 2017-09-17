@@ -153,18 +153,18 @@ func (cmd *publishCommand) getVersion(version, projectPath string) (string, erro
 	if version != "" {
 		return version, nil
 	}
-	repo, err := vcs.NewGitRepo("", projectPath)
+	if !cmd.revision && !cmd.branch {
+		return "", errors.New("must provide version argument or -branch or -revision flags")
+	}
+
+	repo, err := vcs.NewRepo("", projectPath)
 	if err != nil {
 		return "", err
 	}
 	if cmd.revision {
 		return repo.Version()
 	}
-	if cmd.branch {
-		return repo.Current()
-	}
-
-	return "", errors.New("must provide version argument or -branch or -revision flags")
+	return repo.Current()
 }
 
 func isWildcard(s string) bool {

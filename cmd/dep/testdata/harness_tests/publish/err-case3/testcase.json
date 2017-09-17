@@ -4,7 +4,7 @@
     ["init", "-no-examples"],
     ["publish", "-revision"]
   ],
-  "error-expected": "Unable to retrieve checked out version",
+  "error-expected": "Cannot detect VCS",
   "vendor-final": [
     "github.com/sdboyer/deptest",
     "github.com/sdboyer/deptestdos"
