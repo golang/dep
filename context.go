@@ -85,7 +85,7 @@ func defaultGOPATH() string {
 
 // SourceManager produces an instance of gps's built-in SourceManager
 // initialized to log to the receiver's logger.
-func (c *Ctx) SourceManager() (*gps.SourceMgr, error) {
+func (c *Ctx) SourceManager(noRegistry bool) (*gps.SourceMgr, error) {
 	var registry *registryConfig
 	if root, err := findProjectRoot(c.WorkingDir); err == nil {
 		registry, err = c.getRegistryConfig(root)
@@ -97,7 +97,7 @@ func (c *Ctx) SourceManager() (*gps.SourceMgr, error) {
 		Cachedir: filepath.Join(c.GOPATH, "pkg", "dep"),
 		Logger:   c.Out,
 	}
-	if registry != nil {
+	if registry != nil && !noRegistry {
 		return gps.NewSourceManager(smc, registry)
 	}
 	return gps.NewSourceManager(smc, nil)

@@ -20,8 +20,10 @@ import (
 
 var errNotFound = errors.New(http.StatusText(http.StatusNotFound))
 
+// registry configuration interface
+// use login command to create registry config
 type Registry interface {
-	Url() string
+	URL() string
 	Token() string
 }
 
@@ -32,7 +34,7 @@ type registrySource struct {
 	sourceCachePath string
 }
 
-func (s *registrySource) Url() string {
+func (s *registrySource) URL() string {
 	return s.url
 }
 
@@ -83,7 +85,7 @@ func (s *registrySource) execGetVersions() (*rawVersions, error) {
 		if resp.StatusCode == http.StatusNotFound {
 			return nil, errNotFound
 		}
-		return nil, errors.New(fmt.Sprintf("%s %s", u.String(), http.StatusText(resp.StatusCode)))
+		return nil, errors.Errorf("%s %s", u.String(), http.StatusText(resp.StatusCode))
 	}
 
 	var bytes []byte
@@ -114,7 +116,7 @@ func (s *registrySource) execDownloadDependency(pr ProjectRoot, r Revision) (*ht
 		if resp.StatusCode == http.StatusNotFound {
 			return nil, errNotFound
 		}
-		return nil, errors.New(fmt.Sprintf("%s %s", u.String(), http.StatusText(resp.StatusCode)))
+		return nil, errors.Errorf("%s %s", u.String(), http.StatusText(resp.StatusCode))
 	}
 	return resp, nil
 }
@@ -249,8 +251,9 @@ func (m maybeRegistrySource) try(ctx context.Context, cachedir string, c singleS
 	return registry, sourceIsSetUp | sourceExistsUpstream, nil
 }
 
-func NewRegistrySource(rUrl, token, rPath, cachedir string) (source, error) {
-	u, err := url.Parse(rUrl)
+// create new registry source
+func NewRegistrySource(rURL, token, rPath, cachedir string) (source, error) {
+	u, err := url.Parse(rURL)
 	if err != nil {
 		return nil, err
 	}
@@ -258,7 +261,7 @@ func NewRegistrySource(rUrl, token, rPath, cachedir string) (source, error) {
 
 	return &registrySource{
 		path:            rPath,
-		url:             rUrl,
+		url:             rURL,
 		token:           token,
 		sourceCachePath: sourceCachePath(cachedir, u.String()),
 	}, nil

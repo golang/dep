@@ -126,7 +126,7 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 	}
 	p.ImportRoot = gps.ProjectRoot(ip)
 
-	sm, err := ctx.SourceManager()
+	sm, err := ctx.SourceManager(false)
 	if err != nil {
 		return errors.Wrap(err, "getSourceManager")
 	}

@@ -16,11 +16,12 @@ type registryConfig struct {
 	token string
 }
 
+// create new registry config using url and token for authentication
 func NewRegistryConfig(url, token string) *registryConfig {
 	return &registryConfig{url: url, token: token}
 }
 
-func (rc *registryConfig) Url() string {
+func (rc *registryConfig) URL() string {
 	return rc.url
 }
 

@@ -135,7 +135,7 @@ func getToken(url, user, password string) (string, error) {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return "", errors.New(fmt.Sprintf("%s %s", url, http.StatusText(resp.StatusCode)))
+		return "", errors.Errorf("%s %s", url, http.StatusText(resp.StatusCode))
 	}
 	var bytes []byte
 	bytes, err = ioutil.ReadAll(resp.Body)

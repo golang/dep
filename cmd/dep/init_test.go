@@ -19,7 +19,7 @@ func TestGetDirectDependencies_ConsolidatesRootProjects(t *testing.T) {
 	defer h.Cleanup()
 
 	ctx := newTestContext(h)
-	sm, err := ctx.SourceManager()
+	sm, err := ctx.SourceManager(false)
 	h.Must(err)
 	defer sm.Release()
 

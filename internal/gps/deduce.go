@@ -736,14 +736,14 @@ func (rd *registryDeducer) deduce(ctx context.Context, path string) (pathDeducti
 		currPath := spath[0]
 		for i := 1; i < len(spath); i++ {
 			currPath = currPath + "/" + spath[i]
-			registry, err := NewRegistrySource(rd.registry.Url(), rd.registry.Token(), currPath, "")
+			registry, err := NewRegistrySource(rd.registry.URL(), rd.registry.Token(), currPath, "")
 			if err != nil {
 				rd.deduceErr = err
 				return
 			}
 			_, err = registry.listVersions(ctx)
 			if err == nil {
-				pd := pathDeduction{mb: maybeRegistrySource{path: currPath, url: rd.registry.Url(), token: rd.registry.Token()}, root: currPath}
+				pd := pathDeduction{mb: maybeRegistrySource{path: currPath, url: rd.registry.URL(), token: rd.registry.Token()}, root: currPath}
 				rd.deduced = pd
 				rd.returnFunc(pd)
 				return

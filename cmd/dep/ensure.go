@@ -125,6 +125,7 @@ func (cmd *ensureCommand) Register(fs *flag.FlagSet) {
 	fs.BoolVar(&cmd.add, "add", false, "add new dependencies, or populate Gopkg.toml with constraints for existing dependencies")
 	fs.BoolVar(&cmd.vendorOnly, "vendor-only", false, "populate vendor/ from Gopkg.lock without updating it first")
 	fs.BoolVar(&cmd.noVendor, "no-vendor", false, "update Gopkg.lock (if needed), but do not update vendor/")
+	fs.BoolVar(&cmd.noRegistry, "no-registry", false, "disable downloading dependencies using registry config")
 	fs.BoolVar(&cmd.dryRun, "dry-run", false, "only report the changes that would be made")
 }
 
@@ -134,6 +135,7 @@ type ensureCommand struct {
 	add        bool
 	noVendor   bool
 	vendorOnly bool
+	noRegistry bool
 	dryRun     bool
 }
 
@@ -152,7 +154,7 @@ func (cmd *ensureCommand) Run(ctx *dep.Ctx, args []string) error {
 		return err
 	}
 
-	sm, err := ctx.SourceManager()
+	sm, err := ctx.SourceManager(cmd.noRegistry)
 	if err != nil {
 		return err
 	}
