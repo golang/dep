@@ -83,41 +83,85 @@ func (sc *sourceCoordinator) getSourceGatewayFor(ctx context.Context, id Project
 		}
 		panic(fmt.Sprintf("%q was URL for %q in nameToURL, but no corresponding srcGate in srcs map", url, normalizedName))
 	}
+
+	// Without a direct match, we must fold the input name to a generally
+	// stable, caseless variant and primarily work from that. This ensures that
+	// on case-insensitive filesystems, we do not end up with multiple
+	// sourceGateways for paths that vary only by case. We perform folding
+	// unconditionally, independent of whether the underlying fs is
+	// case-sensitive, in order to ensure uniform behavior.
+	//
+	// This has significant implications. It is effectively deciding that the
+	// ProjectRoot portion of import paths are case-insensitive, which is by no
+	// means an invariant maintained by all hosting systems. If this presents a
+	// problem in practice, then we can explore expanding the deduction system
+	// to include case-sensitivity-for-roots metadata and treat it on a
+	// host-by-host basis. Such cases would still be rejected by the Go
+	// toolchain's compiler, though, and case-sensitivity in root names is
+	// likely to be at least frowned on if not disallowed by most hosting
+	// systems. So we follow this path, which is both a vastly simpler solution
+	// and one that seems quite likely to work in practice.
+	foldedNormalName := toFold(normalizedName)
+	notFolded := foldedNormalName != normalizedName
+	if notFolded {
+		// If the folded name differs from the input name, then there may
+		// already be an entry for it in the nameToURL map, so check again.
+		if url, has := sc.nameToURL[foldedNormalName]; has {
+			// There was a match on the canonical folded variant. Upgrade to a
+			// write lock, so that future calls on this name don't need to
+			// burn cycles on folding.
+			sc.srcmut.RUnlock()
+			sc.srcmut.Lock()
+			// It may be possible that another goroutine could interleave
+			// between the unlock and re-lock. Even if they do, though, they'll
+			// only have recorded the same url value as we have here. In other
+			// words, these operations commute, so we can safely write here
+			// without checking again.
+			sc.nameToURL[normalizedName] = url
+
+			srcGate, has := sc.srcs[url]
+			sc.srcmut.Unlock()
+			if has {
+				return srcGate, nil
+			}
+			panic(fmt.Sprintf("%q was URL for %q in nameToURL, but no corresponding srcGate in srcs map", url, normalizedName))
+		}
+	}
 	sc.srcmut.RUnlock()
 
 	// No gateway exists for this path yet; set up a proto, being careful to fold
-	// together simultaneous attempts on the same path.
+	// together simultaneous attempts on the same case-folded path.
 	sc.psrcmut.Lock()
-	if chans, has := sc.protoSrcs[normalizedName]; has {
+	if chans, has := sc.protoSrcs[foldedNormalName]; has {
 		// Another goroutine is already working on this normalizedName. Fold
 		// in with that work by attaching our return channels to the list.
 		rc := srcReturnChans{
 			ret: make(chan *sourceGateway, 1),
 			err: make(chan error, 1),
 		}
-		sc.protoSrcs[normalizedName] = append(chans, rc)
+		sc.protoSrcs[foldedNormalName] = append(chans, rc)
 		sc.psrcmut.Unlock()
 		return rc.awaitReturn()
 	}
 
-	sc.protoSrcs[normalizedName] = []srcReturnChans{}
+	sc.protoSrcs[foldedNormalName] = []srcReturnChans{}
 	sc.psrcmut.Unlock()
 
 	doReturn := func(sg *sourceGateway, err error) {
 		sc.psrcmut.Lock()
 		if sg != nil {
-			for _, rc := range sc.protoSrcs[normalizedName] {
+			for _, rc := range sc.protoSrcs[foldedNormalName] {
 				rc.ret <- sg
 			}
 		} else if err != nil {
-			for _, rc := range sc.protoSrcs[normalizedName] {
+			for _, rc := range sc.protoSrcs[foldedNormalName] {
 				rc.err <- err
 			}
 		} else {
 			panic("sg and err both nil")
 		}
 
-		delete(sc.protoSrcs, normalizedName)
+		delete(sc.protoSrcs, foldedNormalName)
 		sc.psrcmut.Unlock()
 	}
 
@@ -136,7 +180,7 @@ func (sc *sourceCoordinator) getSourceGatewayFor(ctx context.Context, id Project
 	// and bailing out if we find an entry.
 	var srcGate *sourceGateway
 	sc.srcmut.RLock()
-	if url, has := sc.nameToURL[normalizedName]; has {
+	if url, has := sc.nameToURL[foldedNormalName]; has {
 		if srcGate, has := sc.srcs[url]; has {
 			sc.srcmut.RUnlock()
 			doReturn(srcGate, nil)
@@ -149,10 +193,10 @@ func (sc *sourceCoordinator) getSourceGatewayFor(ctx context.Context, id Project
 	srcGate = newSourceGateway(pd.mb, sc.supervisor, sc.cachedir)
 
 	// The normalized name is usually different from the source URL- e.g.
-	// github.com/golang/dep/internal/gps vs. https://github.com/golang/dep/internal/gps. But it's
-	// possible to arrive here with a full URL as the normalized name - and
-	// both paths *must* lead to the same sourceGateway instance in order to
-	// ensure disk access is correctly managed.
+	// github.com/sdboyer/gps vs. https://github.com/sdboyer/gps. But it's
+	// possible to arrive here with a full URL as the normalized name - and both
+	// paths *must* lead to the same sourceGateway instance in order to ensure
+	// disk access is correctly managed.
 	//
 	// Therefore, we now must query the sourceGateway to get the actual
 	// sourceURL it's operating on, and ensure it's *also* registered at
@@ -164,15 +208,30 @@ func (sc *sourceCoordinator) getSourceGatewayFor(ctx context.Context, id Project
 		return nil, err
 	}
 
+	// If the normalizedName and foldedNormalName differ, then we're pretty well
+	// guaranteed that returned URL will also need folding into canonical form.
+	var unfoldedURL string
+	if notFolded {
+		unfoldedURL = url
+		url = toFold(url)
+	}
+
 	// We know we have a working srcGateway at this point, and need to
 	// integrate it back into the main map.
 	sc.srcmut.Lock()
 	defer sc.srcmut.Unlock()
 	// Record the name -> URL mapping, making sure that we also get the
 	// self-mapping.
-	sc.nameToURL[normalizedName] = url
-	if url != normalizedName {
+	sc.nameToURL[foldedNormalName] = url
+	if url != foldedNormalName {
 		sc.nameToURL[url] = url
+	}
+
+	// Make sure we have both the folded and unfolded names and URLs recorded in
+	// the map, if the input needed folding.
+	if notFolded {
+		sc.nameToURL[normalizedName] = url
+		sc.nameToURL[unfoldedURL] = url
 	}
 
 	if sa, has := sc.srcs[url]; has {

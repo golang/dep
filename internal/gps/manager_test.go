@@ -5,6 +5,7 @@
 package gps
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io/ioutil"
@@ -13,9 +14,11 @@ import (
 	"path"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"sync"
 	"sync/atomic"
 	"testing"
+	"text/tabwriter"
 	"time"
 
 	"github.com/golang/dep/internal/test"
@@ -349,8 +352,8 @@ func TestMgrMethodsFailWithBadPath(t *testing.T) {
 }
 
 type sourceCreationTestFixture struct {
-	roots              []ProjectIdentifier
-	urlcount, srccount int
+	roots               []ProjectIdentifier
+	namecount, srccount int
 }
 
 func (f sourceCreationTestFixture) run(t *testing.T) {
@@ -365,12 +368,32 @@ func (f sourceCreationTestFixture) run(t *testing.T) {
 		}
 	}
 
-	if len(sm.srcCoord.nameToURL) != f.urlcount {
-		t.Errorf("want %v names in the name->url map, but got %v. contents: \n%v", f.urlcount, len(sm.srcCoord.nameToURL), sm.srcCoord.nameToURL)
+	if len(sm.srcCoord.nameToURL) != f.namecount {
+		t.Errorf("want %v names in the name->url map, but got %v. contents: \n%v", f.namecount, len(sm.srcCoord.nameToURL), sm.srcCoord.nameToURL)
 	}
 
 	if len(sm.srcCoord.srcs) != f.srccount {
 		t.Errorf("want %v gateways in the sources map, but got %v", f.srccount, len(sm.srcCoord.srcs))
+	}
+
+	var keys []string
+	for k := range sm.srcCoord.nameToURL {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	var buf bytes.Buffer
+	w := tabwriter.NewWriter(&buf, 0, 4, 2, ' ', 0)
+	fmt.Fprint(w, "NAME\tMAPPED URL\n")
+	for _, r := range keys {
+		fmt.Fprintf(w, "%s\t%s\n", r, sm.srcCoord.nameToURL[r])
+	}
+	w.Flush()
+	t.Log("\n", buf.String())
+
+	t.Log("SRC KEYS")
+	for k := range sm.srcCoord.srcs {
+		t.Log(k)
 	}
 }
 
@@ -390,16 +413,27 @@ func TestSourceCreationCounts(t *testing.T) {
 				mkPI("gopkg.in/sdboyer/gpkt.v2"),
 				mkPI("gopkg.in/sdboyer/gpkt.v3"),
 			},
-			urlcount: 6,
-			srccount: 3,
+			namecount: 6,
+			srccount:  3,
 		},
 		"gopkgin separation from github": {
 			roots: []ProjectIdentifier{
 				mkPI("gopkg.in/sdboyer/gpkt.v1"),
 				mkPI("github.com/sdboyer/gpkt"),
 			},
-			urlcount: 4,
-			srccount: 2,
+			namecount: 4,
+			srccount:  2,
+		},
+		"case variance across path and URL-based access": {
+			roots: []ProjectIdentifier{
+				ProjectIdentifier{ProjectRoot: ProjectRoot("github.com/sdboyer/gpkt"), Source: "https://github.com/Sdboyer/gpkt"},
+				ProjectIdentifier{ProjectRoot: ProjectRoot("github.com/sdboyer/gpkt"), Source: "https://github.com/SdbOyer/gpkt"},
+				mkPI("github.com/sdboyer/gpkt"),
+				ProjectIdentifier{ProjectRoot: ProjectRoot("github.com/sdboyer/gpkt"), Source: "https://github.com/sdboyeR/gpkt"},
+				mkPI("github.com/sdboyeR/gpkt"),
+			},
+			namecount: 6,
+			srccount:  1,
 		},
 	}
 
@@ -467,11 +501,68 @@ func TestGetSources(t *testing.T) {
 	})
 
 	// nine entries (of which three are dupes): for each vcs, raw import path,
-	// the https url, and the http url
-	if len(sm.srcCoord.nameToURL) != 9 {
-		t.Errorf("Should have nine discrete entries in the nameToURL map, got %v", len(sm.srcCoord.nameToURL))
+	// the https url, and the http url. also three more from case folding of
+	// github.com/Masterminds/VCSTestRepo -> github.com/masterminds/vcstestrepo
+	if len(sm.srcCoord.nameToURL) != 12 {
+		t.Errorf("Should have twelve discrete entries in the nameToURL map, got %v", len(sm.srcCoord.nameToURL))
 	}
 	clean()
+}
+
+func TestFSCaseSensitivityConvergesSources(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping slow test in short mode")
+	}
+
+	f := func(name string, pi1, pi2 ProjectIdentifier) {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			sm, clean := mkNaiveSM(t)
+			defer clean()
+
+			sm.SyncSourceFor(pi1)
+			sg1, err := sm.srcCoord.getSourceGatewayFor(context.Background(), pi1)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			sm.SyncSourceFor(pi2)
+			sg2, err := sm.srcCoord.getSourceGatewayFor(context.Background(), pi2)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			path1 := sg1.src.(*gitSource).repo.LocalPath()
+			t.Log("path1:", path1)
+			stat1, err := os.Stat(path1)
+			if err != nil {
+				t.Fatal(err)
+			}
+			path2 := sg2.src.(*gitSource).repo.LocalPath()
+			t.Log("path2:", path2)
+			stat2, err := os.Stat(path2)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			same, count := os.SameFile(stat1, stat2), len(sm.srcCoord.srcs)
+			if same && count != 1 {
+				t.Log("are same, count", count)
+				t.Fatal("on case-insensitive filesystem, case-varying sources should have been folded together but were not")
+			}
+			if !same && count != 2 {
+				t.Log("not same, count", count)
+				t.Fatal("on case-sensitive filesystem, case-varying sources should not have been folded together, but were")
+			}
+		})
+	}
+
+	folded := mkPI("github.com/sdboyer/deptest").normalize()
+	casevar1 := mkPI("github.com/Sdboyer/deptest").normalize()
+	casevar2 := mkPI("github.com/SdboyeR/deptest").normalize()
+	f("folded first", folded, casevar1)
+	f("folded second", casevar1, folded)
+	f("both unfolded", casevar1, casevar2)
 }
 
 // Regression test for #32
