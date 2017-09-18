@@ -102,7 +102,8 @@ func (sc *sourceCoordinator) getSourceGatewayFor(ctx context.Context, id Project
 	// systems. So we follow this path, which is both a vastly simpler solution
 	// and one that seems quite likely to work in practice.
 	foldedNormalName := toFold(normalizedName)
-	if foldedNormalName != normalizedName {
+	notFolded := foldedNormalName != normalizedName
+	if notFolded {
 		// If the folded name differs from the input name, then there may
 		// already be an entry for it in the nameToURL map, so check again.
 		if url, has := sc.nameToURL[foldedNormalName]; has {
@@ -164,7 +165,7 @@ func (sc *sourceCoordinator) getSourceGatewayFor(ctx context.Context, id Project
 		sc.psrcmut.Unlock()
 	}
 
-	pd, err := sc.deducer.deduceRootPath(ctx, foldedNormalName)
+	pd, err := sc.deducer.deduceRootPath(ctx, normalizedName)
 	if err != nil {
 		// As in the deducer, don't cache errors so that externally-driven retry
 		// strategies can be constructed.
@@ -207,6 +208,14 @@ func (sc *sourceCoordinator) getSourceGatewayFor(ctx context.Context, id Project
 		return nil, err
 	}
 
+	// If the normalizedName and foldedNormalName differ, then we're pretty well
+	// guaranteed that returned URL will also need folding into canonical form.
+	var unfoldedURL string
+	if notFolded {
+		unfoldedURL = url
+		url = toFold(url)
+	}
+
 	// We know we have a working srcGateway at this point, and need to
 	// integrate it back into the main map.
 	sc.srcmut.Lock()
@@ -218,10 +227,11 @@ func (sc *sourceCoordinator) getSourceGatewayFor(ctx context.Context, id Project
 		sc.nameToURL[url] = url
 	}
 
-	// Make sure we have both the folded and unfolded names recorded in the map,
-	// should they differ.
-	if normalizedName != foldedNormalName {
+	// Make sure we have both the folded and unfolded names and URLs recorded in
+	// the map, if the input needed folding.
+	if notFolded {
 		sc.nameToURL[normalizedName] = url
+		sc.nameToURL[unfoldedURL] = url
 	}
 
 	if sa, has := sc.srcs[url]; has {
