@@ -427,11 +427,12 @@ func TestSourceCreationCounts(t *testing.T) {
 		"case variance across path and URL-based access": {
 			roots: []ProjectIdentifier{
 				ProjectIdentifier{ProjectRoot: ProjectRoot("github.com/sdboyer/gpkt"), Source: "https://github.com/Sdboyer/gpkt"},
+				ProjectIdentifier{ProjectRoot: ProjectRoot("github.com/sdboyer/gpkt"), Source: "https://github.com/SdbOyer/gpkt"},
 				mkPI("github.com/sdboyer/gpkt"),
 				ProjectIdentifier{ProjectRoot: ProjectRoot("github.com/sdboyer/gpkt"), Source: "https://github.com/sdboyeR/gpkt"},
 				mkPI("github.com/sdboyeR/gpkt"),
 			},
-			namecount: 5,
+			namecount: 6,
 			srccount:  1,
 		},
 	}
