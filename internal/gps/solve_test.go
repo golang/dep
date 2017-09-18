@@ -60,6 +60,9 @@ func TestBasicSolves(t *testing.T) {
 
 func solveBasicsAndCheck(fix basicFixture, t *testing.T) (res Solution, err error) {
 	sm := newdepspecSM(fix.ds, nil)
+	if fix.broken != "" {
+		t.Skip(fix.broken)
+	}
 
 	params := SolveParameters{
 		RootDir:         string(fix.ds[0].n),
@@ -103,6 +106,9 @@ func TestBimodalSolves(t *testing.T) {
 
 func solveBimodalAndCheck(fix bimodalFixture, t *testing.T) (res Solution, err error) {
 	sm := newbmSM(fix)
+	if fix.broken != "" {
+		t.Skip(fix.broken)
+	}
 
 	params := SolveParameters{
 		RootDir:         string(fix.ds[0].n),
