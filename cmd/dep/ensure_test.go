@@ -5,12 +5,18 @@
 package main
 
 import (
+	"bytes"
 	"errors"
 	"go/build"
+	"io/ioutil"
+	"log"
+	"strings"
 	"testing"
 
+	"github.com/golang/dep"
 	"github.com/golang/dep/internal/gps"
 	"github.com/golang/dep/internal/gps/pkgtree"
+	"github.com/golang/dep/internal/test"
 )
 
 func TestInvalidEnsureFlagCombinations(t *testing.T) {
@@ -135,6 +141,106 @@ func TestCheckErrors(t *testing.T) {
 			}
 			if err == nil && fatal {
 				t.Fatal("unexpected fatal flag value while err is nil")
+			}
+		})
+	}
+}
+
+func TestValidateUpdateArgs(t *testing.T) {
+	cases := []struct {
+		name           string
+		args           []string
+		wantError      error
+		wantWarn       []string
+		lockedProjects []string
+	}{
+		{
+			name:      "empty args",
+			args:      []string{},
+			wantError: nil,
+		},
+		{
+			name:      "not project root",
+			args:      []string{"github.com/golang/dep/cmd"},
+			wantError: errUpdateArgsValidation,
+			wantWarn: []string{
+				"github.com/golang/dep/cmd is not a project root, try github.com/golang/dep instead",
+			},
+		},
+		{
+			name:      "not present in lock",
+			args:      []string{"github.com/golang/dep"},
+			wantError: errUpdateArgsValidation,
+			wantWarn: []string{
+				"github.com/golang/dep is not present in Gopkg.lock, cannot -update it",
+			},
+		},
+		{
+			name:      "cannot specify alternate sources",
+			args:      []string{"github.com/golang/dep:github.com/example/dep"},
+			wantError: errUpdateArgsValidation,
+			wantWarn: []string{
+				"cannot specify alternate sources on -update (github.com/example/dep)",
+			},
+			lockedProjects: []string{"github.com/golang/dep"},
+		},
+		{
+			name:      "version constraint passed",
+			args:      []string{"github.com/golang/dep@master"},
+			wantError: errUpdateArgsValidation,
+			wantWarn: []string{
+				"version constraint master passed for github.com/golang/dep, but -update follows constraints declared in Gopkg.toml, not CLI arguments",
+			},
+			lockedProjects: []string{"github.com/golang/dep"},
+		},
+	}
+
+	h := test.NewHelper(t)
+	defer h.Cleanup()
+
+	h.TempDir("src")
+	pwd := h.Path(".")
+
+	stderrOutput := &bytes.Buffer{}
+	errLogger := log.New(stderrOutput, "", 0)
+	ctx := &dep.Ctx{
+		GOPATH: pwd,
+		Out:    log.New(ioutil.Discard, "", 0),
+		Err:    errLogger,
+	}
+
+	sm, err := ctx.SourceManager()
+	h.Must(err)
+	defer sm.Release()
+
+	p := new(dep.Project)
+	params := p.MakeParams()
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			// Empty the buffer for every case
+			stderrOutput.Reset()
+
+			// Fill up the locked projects
+			lockedProjects := []gps.LockedProject{}
+			for _, lp := range c.lockedProjects {
+				pi := gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot(lp)}
+				lockedProjects = append(lockedProjects, gps.NewLockedProject(pi, gps.NewVersion("v1.0.0"), []string{}))
+			}
+
+			// Add lock to project
+			p.Lock = &dep.Lock{P: lockedProjects}
+
+			err := validateUpdateArgs(ctx, c.args, p, sm, &params)
+			if err != c.wantError {
+				t.Fatalf("Unexpected error while validating update args:\n\t(GOT): %v\n\t(WNT): %v", err, c.wantError)
+			}
+
+			warnings := stderrOutput.String()
+			for _, warn := range c.wantWarn {
+				if !strings.Contains(warnings, warn) {
+					t.Fatalf("Expected validateUpdateArgs errors to contain: %q", warn)
+				}
 			}
 		})
 	}
