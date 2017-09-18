@@ -16,11 +16,3 @@ type cmd struct {
 func commandContext(ctx context.Context, name string, arg ...string) cmd {
 	return cmd{Cmd: exec.CommandContext(ctx, name, arg...)}
 }
-
-func (c cmd) Args() []string {
-	return c.Cmd.Args
-}
-
-func (c cmd) SetDir(dir string) {
-	c.Cmd.Dir = dir
-}
