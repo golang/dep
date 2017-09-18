@@ -72,7 +72,9 @@ type SourceManager interface {
 	// project/source root.
 	DeduceProjectRoot(ip string) (ProjectRoot, error)
 
-	// SourceURLsForPath takes an import path and deduces the possible source URLs
+	// SourceURLsForPath takes an import path and deduces the set of source URLs
+	// that may refer to a canonical upstream source.
+	// In general, these URLs differ only by protocol (e.g. https vs. ssh), not path
 	SourceURLsForPath(ip string) ([]*url.URL, error)
 
 	// Release lets go of any locks held by the SourceManager. Once called, it is
@@ -540,8 +542,9 @@ func (sm *SourceMgr) InferConstraint(s string, pi ProjectIdentifier) (Constraint
 	return nil, errors.Errorf("%s is not a valid version for the package %s(%s)", s, pi.ProjectRoot, pi.Source)
 }
 
-// SourceURLsForPath takes an import path, deduces it's root path,
-// and returns a list of possible souce URLs for fetching it
+// SourceURLsForPath takes an import path and deduces the set of source URLs
+// that may refer to a canonical upstream source.
+// In general, these URLs differ only by protocol (e.g. https vs. ssh), not path
 func (sm *SourceMgr) SourceURLsForPath(ip string) ([]*url.URL, error) {
 	deduced, err := sm.deduceCoord.deduceRootPath(context.TODO(), ip)
 	if err != nil {
