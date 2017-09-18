@@ -11,3 +11,7 @@ func (c cmd) Args() []string {
 func (c cmd) SetDir(dir string) {
 	c.Cmd.Dir = dir
 }
+
+func (c cmd) SetEnv(env []string) {
+	c.Cmd.Env = env
+}

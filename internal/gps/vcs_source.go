@@ -9,7 +9,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -142,8 +141,8 @@ func (s *gitSource) exportRevisionTo(ctx context.Context, rev Revision, to strin
 	defer fs.RenameWithFallback(bak, idx)
 
 	{
-		cmd := exec.CommandContext(ctx, "git", "read-tree", rev.String())
-		cmd.Dir = r.LocalPath()
+		cmd := commandContext(ctx, "git", "read-tree", rev.String())
+		cmd.SetDir(r.LocalPath())
 		if out, err := cmd.CombinedOutput(); err != nil {
 			return errors.Wrap(err, string(out))
 		}
@@ -161,8 +160,8 @@ func (s *gitSource) exportRevisionTo(ctx context.Context, rev Revision, to strin
 	// down, the sparse checkout controls, as well as restore the original
 	// index and HEAD.
 	{
-		cmd := exec.CommandContext(ctx, "git", "checkout-index", "-a", "--prefix="+to)
-		cmd.Dir = r.LocalPath()
+		cmd := commandContext(ctx, "git", "checkout-index", "-a", "--prefix="+to)
+		cmd.SetDir(r.LocalPath())
 		if out, err := cmd.CombinedOutput(); err != nil {
 			return errors.Wrap(err, string(out))
 		}
@@ -174,9 +173,9 @@ func (s *gitSource) exportRevisionTo(ctx context.Context, rev Revision, to strin
 func (s *gitSource) listVersions(ctx context.Context) (vlist []PairedVersion, err error) {
 	r := s.repo
 
-	cmd := exec.CommandContext(ctx, "git", "ls-remote", r.Remote())
+	cmd := commandContext(ctx, "git", "ls-remote", r.Remote())
 	// Ensure no prompting for PWs
-	cmd.Env = append([]string{"GIT_ASKPASS=", "GIT_TERMINAL_PROMPT=0"}, os.Environ()...)
+	cmd.SetEnv(append([]string{"GIT_ASKPASS=", "GIT_TERMINAL_PROMPT=0"}, os.Environ()...))
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return nil, errors.Wrap(err, string(out))
@@ -396,8 +395,8 @@ func (s *bzrSource) listVersions(ctx context.Context) ([]PairedVersion, error) {
 	}
 
 	// Now, list all the tags
-	tagsCmd := exec.CommandContext(ctx, "bzr", "tags", "--show-ids", "-v")
-	tagsCmd.Dir = r.LocalPath()
+	tagsCmd := commandContext(ctx, "bzr", "tags", "--show-ids", "-v")
+	tagsCmd.SetDir(r.LocalPath())
 	out, err := tagsCmd.CombinedOutput()
 	if err != nil {
 		return nil, errors.Wrap(err, string(out))
@@ -405,8 +404,8 @@ func (s *bzrSource) listVersions(ctx context.Context) ([]PairedVersion, error) {
 
 	all := bytes.Split(bytes.TrimSpace(out), []byte("\n"))
 
-	viCmd := exec.CommandContext(ctx, "bzr", "version-info", "--custom", "--template={revision_id}", "--revision=branch:.")
-	viCmd.Dir = r.LocalPath()
+	viCmd := commandContext(ctx, "bzr", "version-info", "--custom", "--template={revision_id}", "--revision=branch:.")
+	viCmd.SetDir(r.LocalPath())
 	branchrev, err := viCmd.CombinedOutput()
 	if err != nil {
 		return nil, errors.Wrap(err, string(branchrev))
@@ -478,8 +477,8 @@ func (s *hgSource) listVersions(ctx context.Context) ([]PairedVersion, error) {
 	}
 
 	// Now, list all the tags
-	tagsCmd := exec.CommandContext(ctx, "hg", "tags", "--debug", "--verbose")
-	tagsCmd.Dir = r.LocalPath()
+	tagsCmd := commandContext(ctx, "hg", "tags", "--debug", "--verbose")
+	tagsCmd.SetDir(r.LocalPath())
 	out, err := tagsCmd.CombinedOutput()
 	if err != nil {
 		return nil, errors.Wrap(err, string(out))
@@ -514,8 +513,8 @@ func (s *hgSource) listVersions(ctx context.Context) ([]PairedVersion, error) {
 	// bookmarks next, because the presence of the magic @ bookmark has to
 	// determine how we handle the branches
 	var magicAt bool
-	bookmarksCmd := exec.CommandContext(ctx, "hg", "bookmarks", "--debug")
-	bookmarksCmd.Dir = r.LocalPath()
+	bookmarksCmd := commandContext(ctx, "hg", "bookmarks", "--debug")
+	bookmarksCmd.SetDir(r.LocalPath())
 	out, err = bookmarksCmd.CombinedOutput()
 	if err != nil {
 		// better nothing than partial and misleading
@@ -549,8 +548,8 @@ func (s *hgSource) listVersions(ctx context.Context) ([]PairedVersion, error) {
 		}
 	}
 
-	cmd := exec.CommandContext(ctx, "hg", "branches", "-c", "--debug")
-	cmd.Dir = r.LocalPath()
+	cmd := commandContext(ctx, "hg", "branches", "-c", "--debug")
+	cmd.SetDir(r.LocalPath())
 	out, err = cmd.CombinedOutput()
 	if err != nil {
 		// better nothing than partial and misleading
