@@ -67,7 +67,7 @@ type SourceManager interface {
 	// provided version, to the provided directory.
 	ExportProject(context.Context, ProjectIdentifier, Version, string) error
 
-	// DeduceRootProject takes an import path and deduces the corresponding
+	// DeduceProjectRoot takes an import path and deduces the corresponding
 	// project/source root.
 	DeduceProjectRoot(ip string) (ProjectRoot, error)
 
