@@ -179,7 +179,7 @@ func (s *gitSource) listVersions(ctx context.Context) (vlist []PairedVersion, er
 	cmd.Env = append([]string{"GIT_ASKPASS=", "GIT_TERMINAL_PROMPT=0"}, os.Environ()...)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, string(out))
 	}
 
 	all := bytes.Split(bytes.TrimSpace(out), []byte("\n"))
