@@ -10,12 +10,14 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
-	"reflect"
+	// "reflect"
 	"strings"
 	"testing"
 
+	"github.com/d4l3k/messagediff"
 	"github.com/golang/dep/gps"
 	"github.com/golang/dep/internal/test"
+	"github.com/sergi/go-diff/diffmatchpatch"
 )
 
 func TestReadManifest(t *testing.T) {
@@ -53,14 +55,14 @@ func TestReadManifest(t *testing.T) {
 		},
 	}
 
-	if !reflect.DeepEqual(got.Constraints, want.Constraints) {
-		t.Error("Valid manifest's dependencies did not parse as expected")
+	if diff, equal := messagediff.PrettyDiff(want.Constraints, got.Constraints); !equal {
+		t.Errorf("Valid manifest's dependencies did not parse as expected:\n%s", diff)
 	}
-	if !reflect.DeepEqual(got.Ovr, want.Ovr) {
-		t.Error("Valid manifest's overrides did not parse as expected")
+	if diff, equal := messagediff.PrettyDiff(want.Ovr, got.Ovr); !equal {
+		t.Errorf("Valid manifest's overrides did not parse as expected:\n%s", diff)
 	}
-	if !reflect.DeepEqual(got.Ignored, want.Ignored) {
-		t.Error("Valid manifest's ignored did not parse as expected")
+	if diff, equal := messagediff.PrettyDiff(want.Ignored, got.Ignored); !equal {
+		t.Errorf("Valid manifest's ignored did not parse as expected:\n%s", diff)
 	}
 }
 
@@ -89,13 +91,15 @@ func TestWriteManifest(t *testing.T) {
 		t.Fatalf("error while marshaling valid manifest to TOML: %q", err)
 	}
 
-	if string(got) != want {
+	if want != string(got) {
 		if *test.UpdateGolden {
 			if err = h.WriteTestFile(golden, string(got)); err != nil {
 				t.Fatal(err)
 			}
 		} else {
-			t.Errorf("valid manifest did not marshal to TOML as expected:\n(GOT):\n%s\n(WNT):\n%s", string(got), want)
+			dmp := diffmatchpatch.New()
+			diff := dmp.DiffMain(want, string(got), false)
+			t.Errorf("Valid manifest did not marshal to TOML as expected:\n%s", dmp.DiffPrettyText(diff))
 		}
 	}
 }

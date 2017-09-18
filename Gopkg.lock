@@ -27,6 +27,12 @@
   version = "v1.3.1"
 
 [[projects]]
+  name = "github.com/d4l3k/messagediff"
+  packages = ["."]
+  revision = "7b706999d935b04cf2dbc71a5a5afcbd288aeb48"
+  version = "v1.1.0"
+
+[[projects]]
   branch = "v2"
   name = "github.com/go-yaml/yaml"
   packages = ["."]
@@ -76,6 +82,12 @@
 
 [[projects]]
   branch = "master"
+  name = "github.com/sergi/go-diff"
+  packages = ["diffmatchpatch"]
+  revision = "feef008d51ad2b3778f85d387ccf91735543008d"
+
+[[projects]]
+  branch = "master"
   name = "golang.org/x/net"
   packages = ["context"]
   revision = "66aacef3dd8a676686c7ae3716979581e8b03c47"
@@ -95,6 +107,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "05c1cd69be2c917c0cc4b32942830c2acfa044d8200fdc94716aae48a8083702"
+  inputs-digest = "661cda9030b4accfeae2a1ddf855e7c5cc1637ce263f9023add83d42b3700b41"
   solver-name = "gps-cdcl"
   solver-version = 1
