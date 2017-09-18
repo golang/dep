@@ -50,7 +50,7 @@ func (mbs maybeSources) try(ctx context.Context, cachedir string, c singleSource
 		for _, url := range mb.possibleURLs() {
 			urls += url.String() + "\n"
 		}
-		errs = append(errs, errors.Wrapf(err, "failed to set up %q", urls))
+		errs = append(errs, errors.Wrapf(err, "failed to set up sources from the following URLs:\n%s", urls))
 	}
 
 	return nil, 0, errors.Wrap(&errs, "no valid source could be created")
