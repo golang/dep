@@ -5,6 +5,7 @@
 package gps
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io/ioutil"
@@ -13,9 +14,11 @@ import (
 	"path"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"sync"
 	"sync/atomic"
 	"testing"
+	"text/tabwriter"
 	"time"
 
 	"github.com/golang/dep/internal/test"
@@ -371,6 +374,26 @@ func (f sourceCreationTestFixture) run(t *testing.T) {
 
 	if len(sm.srcCoord.srcs) != f.srccount {
 		t.Errorf("want %v gateways in the sources map, but got %v", f.srccount, len(sm.srcCoord.srcs))
+	}
+
+	var keys []string
+	for k := range sm.srcCoord.nameToURL {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	var buf bytes.Buffer
+	w := tabwriter.NewWriter(&buf, 0, 4, 2, ' ', 0)
+	fmt.Fprint(w, "NAME\tMAPPED URL\n")
+	for _, r := range keys {
+		fmt.Fprintf(w, "%s\t%s\n", r, sm.srcCoord.nameToURL[r])
+	}
+	w.Flush()
+	t.Log("\n", buf.String())
+
+	t.Log("SRC KEYS")
+	for k := range sm.srcCoord.srcs {
+		t.Log(k)
 	}
 }
 
