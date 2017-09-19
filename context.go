@@ -223,7 +223,7 @@ func (c *Ctx) detectGOPATH(path string) (string, error) {
 			return gp, nil
 		}
 	}
-	return "", errors.Errorf("%s is not within a known GOPATH", path)
+	return "", errors.Errorf("%s is not within a known GOPATH/src", path)
 }
 
 // ImportForAbs returns the import path for an absolute project path by trimming the
@@ -244,7 +244,7 @@ func (c *Ctx) ImportForAbs(path string) (string, error) {
 		return filepath.ToSlash(path[len(srcprefix):]), nil
 	}
 
-	return "", errors.Errorf("%s not in GOPATH", path)
+	return "", errors.Errorf("%s is not within any GOPATH/src", path)
 }
 
 // AbsForImport returns the absolute path for the project root
