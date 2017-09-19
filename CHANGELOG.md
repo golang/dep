@@ -1,4 +1,6 @@
-# 0.3.1 (Unreleased)
+# v0.3.2 (Unreleased)
+
+# v0.3.1
 
 * gps: Add satisfiability check for case variants (#1079)
 * Validate Project Roots in manifest (#1116)
