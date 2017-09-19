@@ -132,8 +132,6 @@ var pathDeductionFixtures = map[string][]pathDeductionFixture{
 			root: "gopkg.in/sdboyer/gps.v0",
 			mb: maybeSources{
 				maybeGopkginSource{opath: "gopkg.in/sdboyer/gps.v0", url: mkurl("https://github.com/sdboyer/gps"), major: 0},
-				maybeGopkginSource{opath: "gopkg.in/sdboyer/gps.v0", url: mkurl("ssh://git@github.com/sdboyer/gps"), major: 0},
-				maybeGopkginSource{opath: "gopkg.in/sdboyer/gps.v0", url: mkurl("git://github.com/sdboyer/gps"), major: 0},
 				maybeGopkginSource{opath: "gopkg.in/sdboyer/gps.v0", url: mkurl("http://github.com/sdboyer/gps"), major: 0},
 			},
 		},
@@ -142,8 +140,6 @@ var pathDeductionFixtures = map[string][]pathDeductionFixture{
 			root: "gopkg.in/sdboyer/gps.v0",
 			mb: maybeSources{
 				maybeGopkginSource{opath: "gopkg.in/sdboyer/gps.v0", url: mkurl("https://github.com/sdboyer/gps"), major: 0},
-				maybeGopkginSource{opath: "gopkg.in/sdboyer/gps.v0", url: mkurl("ssh://git@github.com/sdboyer/gps"), major: 0},
-				maybeGopkginSource{opath: "gopkg.in/sdboyer/gps.v0", url: mkurl("git://github.com/sdboyer/gps"), major: 0},
 				maybeGopkginSource{opath: "gopkg.in/sdboyer/gps.v0", url: mkurl("http://github.com/sdboyer/gps"), major: 0},
 			},
 		},
@@ -152,8 +148,6 @@ var pathDeductionFixtures = map[string][]pathDeductionFixture{
 			root: "gopkg.in/sdboyer/gps.v1",
 			mb: maybeSources{
 				maybeGopkginSource{opath: "gopkg.in/sdboyer/gps.v1", url: mkurl("https://github.com/sdboyer/gps"), major: 1},
-				maybeGopkginSource{opath: "gopkg.in/sdboyer/gps.v1", url: mkurl("ssh://git@github.com/sdboyer/gps"), major: 1},
-				maybeGopkginSource{opath: "gopkg.in/sdboyer/gps.v1", url: mkurl("git://github.com/sdboyer/gps"), major: 1},
 				maybeGopkginSource{opath: "gopkg.in/sdboyer/gps.v1", url: mkurl("http://github.com/sdboyer/gps"), major: 1},
 			},
 		},
@@ -162,8 +156,6 @@ var pathDeductionFixtures = map[string][]pathDeductionFixture{
 			root: "gopkg.in/yaml.v1",
 			mb: maybeSources{
 				maybeGopkginSource{opath: "gopkg.in/yaml.v1", url: mkurl("https://github.com/go-yaml/yaml"), major: 1},
-				maybeGopkginSource{opath: "gopkg.in/yaml.v1", url: mkurl("ssh://git@github.com/go-yaml/yaml"), major: 1},
-				maybeGopkginSource{opath: "gopkg.in/yaml.v1", url: mkurl("git://github.com/go-yaml/yaml"), major: 1},
 				maybeGopkginSource{opath: "gopkg.in/yaml.v1", url: mkurl("http://github.com/go-yaml/yaml"), major: 1},
 			},
 		},
@@ -172,8 +164,6 @@ var pathDeductionFixtures = map[string][]pathDeductionFixture{
 			root: "gopkg.in/yaml.v1",
 			mb: maybeSources{
 				maybeGopkginSource{opath: "gopkg.in/yaml.v1", url: mkurl("https://github.com/go-yaml/yaml"), major: 1},
-				maybeGopkginSource{opath: "gopkg.in/yaml.v1", url: mkurl("ssh://git@github.com/go-yaml/yaml"), major: 1},
-				maybeGopkginSource{opath: "gopkg.in/yaml.v1", url: mkurl("git://github.com/go-yaml/yaml"), major: 1},
 				maybeGopkginSource{opath: "gopkg.in/yaml.v1", url: mkurl("http://github.com/go-yaml/yaml"), major: 1},
 			},
 		},
@@ -182,8 +172,6 @@ var pathDeductionFixtures = map[string][]pathDeductionFixture{
 			root: "gopkg.in/inf.v0",
 			mb: maybeSources{
 				maybeGopkginSource{opath: "gopkg.in/inf.v0", url: mkurl("https://github.com/go-inf/inf"), major: 0},
-				maybeGopkginSource{opath: "gopkg.in/inf.v0", url: mkurl("ssh://git@github.com/go-inf/inf"), major: 0},
-				maybeGopkginSource{opath: "gopkg.in/inf.v0", url: mkurl("git://github.com/go-inf/inf"), major: 0},
 				maybeGopkginSource{opath: "gopkg.in/inf.v0", url: mkurl("http://github.com/go-inf/inf"), major: 0},
 			},
 		},
@@ -582,6 +570,11 @@ func TestDeduceFromPath(t *testing.T) {
 						} else {
 							t.Errorf("Deducer did not return expected source:\n\t(GOT) %s\n\t(WNT) %s", printmb(mb, t), printmb(fix.mb, t))
 						}
+					} else {
+						gotURLs, wantURLs := mb.possibleURLs(), fix.mb.possibleURLs()
+						if !reflect.DeepEqual(gotURLs, wantURLs) {
+							t.Errorf("Deducer did not return expected source:\n\t(GOT) %s\n\t(WNT) %s", gotURLs, wantURLs)
+						}
 					}
 				})
 			}
@@ -633,6 +626,19 @@ func TestVanityDeduction(t *testing.T) {
 				goturl, wanturl := pd.mb.(maybeGitSource).url.String(), fix.mb.(maybeGitSource).url.String()
 				if goturl != wanturl {
 					t.Errorf("Deduced repo ident does not match fixture:\n\t(GOT) %s\n\t(WNT) %s", goturl, wanturl)
+				}
+
+				urls, err := sm.SourceURLsForPath(fix.in)
+				if err != nil {
+					t.Errorf("Unexpected err on deducing source urls: %s", err)
+					return
+				}
+				if len(urls) != 1 {
+					t.Errorf("Deduced source URLs count for a vanity import should be 1, got %d", len(urls))
+				}
+				goturl = urls[0].String()
+				if goturl != wanturl {
+					t.Errorf("Deduced source URL does not match fixture:\n\t(GOT) %s\n\t(WNT) %s", goturl, wanturl)
 				}
 			})
 		}
