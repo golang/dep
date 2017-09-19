@@ -81,7 +81,7 @@ use a specific branch, version range, revision, or alternate source (such as a
 fork).
 
 ## `override`
-An `override` has the same structure as a `constraint` declaration, but supersede all `constraint` declarations from all projects. Only `override` declarations from the current project's are applied.
+An `override` has the same structure as a `constraint` declaration, but supersede all `constraint` declarations from all projects. Only `override` declarations from the current project's `Gopkg.toml` are applied.
 
 ```toml
 [[override]]
