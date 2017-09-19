@@ -58,6 +58,7 @@ func main() {
 	}
 }
 
+// NaiveAnalyzer is a project analyzer that implements gps.ProjectAnalyzer interface.
 type NaiveAnalyzer struct{}
 
 // DeriveManifestAndLock is called when the solver needs manifest/lock data
@@ -68,7 +69,7 @@ func (a NaiveAnalyzer) DeriveManifestAndLock(path string, n gps.ProjectRoot) (gp
 	return nil, nil, nil
 }
 
-// Reports the name and version of the analyzer. This is used internally as part
+// Info reports the name and version of the analyzer. This is used internally as part
 // of gps' hashing memoization scheme.
 func (a NaiveAnalyzer) Info() gps.ProjectAnalyzerInfo {
 	return gps.ProjectAnalyzerInfo{
