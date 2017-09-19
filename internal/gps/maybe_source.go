@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"net/url"
 	"path/filepath"
-	"strings"
 
 	"github.com/Masterminds/vcs"
 	"github.com/pkg/errors"
@@ -25,7 +24,7 @@ import (
 // * Makes it easy to attempt multiple URLs for a given import path
 type maybeSource interface {
 	try(ctx context.Context, cachedir string, c singleSourceCache, superv *supervisor) (source, sourceState, error)
-	getURL() string
+	possibleURLs() []*url.URL
 }
 
 type errorSlice []error
@@ -47,7 +46,11 @@ func (mbs maybeSources) try(ctx context.Context, cachedir string, c singleSource
 		if err == nil {
 			return src, state, nil
 		}
-		errs = append(errs, errors.Wrapf(err, "failed to set up %q", mb.getURL()))
+		urls := ""
+		for _, url := range mb.possibleURLs() {
+			urls += url.String() + "\n"
+		}
+		errs = append(errs, errors.Wrapf(err, "failed to set up sources from the following URLs:\n%s", urls))
 	}
 
 	return nil, 0, errors.Wrap(&errs, "no valid source could be created")
@@ -56,12 +59,12 @@ func (mbs maybeSources) try(ctx context.Context, cachedir string, c singleSource
 // This really isn't generally intended to be used - the interface is for
 // maybeSources to be able to interrogate its members, not other things to
 // interrogate a maybeSources.
-func (mbs maybeSources) getURL() string {
-	strslice := make([]string, 0, len(mbs))
+func (mbs maybeSources) possibleURLs() []*url.URL {
+	urlslice := make([]*url.URL, 0, len(mbs))
 	for _, mb := range mbs {
-		strslice = append(strslice, mb.getURL())
+		urlslice = append(urlslice, mb.possibleURLs()...)
 	}
-	return strings.Join(strslice, "\n")
+	return urlslice
 }
 
 // sourceCachePath returns a url-sanitized source cache dir path.
@@ -107,8 +110,8 @@ func (m maybeGitSource) try(ctx context.Context, cachedir string, c singleSource
 	return src, state, nil
 }
 
-func (m maybeGitSource) getURL() string {
-	return m.url.String()
+func (m maybeGitSource) possibleURLs() []*url.URL {
+	return []*url.URL{m.url}
 }
 
 type maybeGopkginSource struct {
@@ -168,8 +171,8 @@ func (m maybeGopkginSource) try(ctx context.Context, cachedir string, c singleSo
 	return src, state, nil
 }
 
-func (m maybeGopkginSource) getURL() string {
-	return m.opath
+func (m maybeGopkginSource) possibleURLs() []*url.URL {
+	return []*url.URL{m.url}
 }
 
 type maybeBzrSource struct {
@@ -207,8 +210,8 @@ func (m maybeBzrSource) try(ctx context.Context, cachedir string, c singleSource
 	return src, state, nil
 }
 
-func (m maybeBzrSource) getURL() string {
-	return m.url.String()
+func (m maybeBzrSource) possibleURLs() []*url.URL {
+	return []*url.URL{m.url}
 }
 
 type maybeHgSource struct {
@@ -246,6 +249,6 @@ func (m maybeHgSource) try(ctx context.Context, cachedir string, c singleSourceC
 	return src, state, nil
 }
 
-func (m maybeHgSource) getURL() string {
-	return m.url.String()
+func (m maybeHgSource) possibleURLs() []*url.URL {
+	return []*url.URL{m.url}
 }
