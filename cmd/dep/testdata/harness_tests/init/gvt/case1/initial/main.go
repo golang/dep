@@ -7,10 +7,14 @@ package main
 import (
 	"fmt"
 
+	"github.com/sdboyer/deptest"
 	"github.com/sdboyer/deptestdos"
+	"gopkg.in/yaml.v2"
 )
 
 func main() {
-	var x deptestdos.Bar
-	fmt.Println(x)
+	var a deptestdos.Bar
+	var b yaml.MapItem
+	var c deptest.Foo
+	fmt.Println(a, b, c)
 }

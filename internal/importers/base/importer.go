@@ -180,10 +180,18 @@ func (i *Importer) ImportPackages(packages []ImportedPackage, defaultConstraintF
 	}
 
 	for _, prj := range projects {
+		source := prj.Source
+		if len(source) > 0 {
+			isDefault, err := i.isDefaultSource(prj.Root, source)
+			if err == nil && isDefault {
+				source = ""
+			}
+		}
+
 		pc := gps.ProjectConstraint{
 			Ident: gps.ProjectIdentifier{
 				ProjectRoot: prj.Root,
-				Source:      prj.Source,
+				Source:      source,
 			},
 		}
 
@@ -290,4 +298,21 @@ func (i *Importer) convertToConstraint(v gps.Version) gps.Constraint {
 		return c
 	}
 	return v
+}
+
+func (i *Importer) isDefaultSource(projectRoot gps.ProjectRoot, sourceURL string) (bool, error) {
+	if sourceURL == "https://"+string(projectRoot) {
+		return true, nil
+	}
+
+	sourceURLs, err := i.sm.SourceURLsForPath(string(projectRoot))
+	if err != nil {
+		return false, err
+	}
+	// The first url in the slice will be the default one (usually https://...)
+	if len(sourceURLs) > 0 && sourceURL == sourceURLs[0].String() {
+		return true, nil
+	}
+
+	return false, nil
 }

@@ -70,6 +70,24 @@ func TestGvtConfig_Convert(t *testing.T) {
 				},
 			},
 		},
+		"package with alternate repository": {
+			importertest.TestCase{
+				WantConstraint: importertest.V1Constraint,
+				WantRevision:   importertest.V1Rev,
+				WantVersion:    importertest.V1Tag,
+				WantSourceRepo: importertest.ProjectSrc,
+			},
+			gvtManifest{
+				Deps: []gvtPkg{
+					{
+						ImportPath: importertest.Project,
+						Repository: importertest.ProjectSrc,
+						Revision:   importertest.V1Rev,
+						Branch:     "master",
+					},
+				},
+			},
+		},
 		"missing package name": {
 			importertest.TestCase{
 				WantConvertErr: true,

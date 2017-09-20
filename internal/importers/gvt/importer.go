@@ -103,7 +103,7 @@ func (g *Importer) convert(pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock, error)
 		var contstraintHint = ""
 		if pkg.Branch == "HEAD" {
 			// gb-vendor sets "branch" to "HEAD", if the package was feteched via -tag or -revision,
-			// we we pass the revision as the constraint hint
+			// we pass the revision as the constraint hint
 			contstraintHint = pkg.Revision
 		} else if pkg.Branch != "master" {
 			// both gvt & gb-vendor set "branch" to "master" unless a different branch was requested.
@@ -112,9 +112,8 @@ func (g *Importer) convert(pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock, error)
 		}
 
 		ip := base.ImportedPackage{
-			Name: pkg.ImportPath,
-			//TODO: temporarly ignore .Repository. see https://github.com/golang/dep/pull/1166
-			// Source:         pkg.Repository,
+			Name:           pkg.ImportPath,
+			Source:         pkg.Repository,
 			LockHint:       pkg.Revision,
 			ConstraintHint: contstraintHint,
 		}
