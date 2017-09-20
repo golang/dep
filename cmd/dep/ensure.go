@@ -826,8 +826,9 @@ func validateUpdateArgs(ctx *dep.Ctx, args []string, p *dep.Project, sm gps.Sour
 
 	// Log all the errors
 	if len(errArgsValidationCh) > 0 {
+		ctx.Err.Printf("Invalid arguments passed to ensure -update:\n\n")
 		for err := range errArgsValidationCh {
-			ctx.Err.Println(err.Error())
+			ctx.Err.Println("  ✗", err.Error())
 		}
 		ctx.Err.Println()
 		return errUpdateArgsValidation
