@@ -42,17 +42,19 @@ func findProjectRoot(from string) (string, error) {
 	}
 }
 
-// checkCfgFilenames validates filename case for the manifest and lock files.
+// checkGopkgFilenames validates filename case for the manifest and lock files.
 //
-// This is relevant on case-insensitive file systems like Windows and macOS.
+// This is relevant on case-insensitive file systems like the defaults in Windows and
+// macOS.
 //
 // If manifest file is not found, it returns an error indicating the project could not be
 // found. If it is found but the case does not match, an error is returned. If a lock
 // file is not found, no error is returned as lock file is optional. If it is found but
 // the case does not match, an error is returned.
-func checkCfgFilenames(projectRoot string) error {
-	// ReadActualFilenames is actually costly. Since this check is not relevant to
-	// case-sensitive filesystems like ext4(linux), try for an early return.
+func checkGopkgFilenames(projectRoot string) error {
+	// ReadActualFilenames is actually costly. Since the check to validate filename case
+	// for Gopkg filenames is not relevant to case-sensitive filesystems like
+	// ext4(linux), try for an early return.
 	caseSensitive, err := fs.IsCaseSensitiveFilesystem(projectRoot)
 	if err != nil {
 		return errors.Wrap(err, "could not check validity of configuration filenames")

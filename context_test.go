@@ -264,14 +264,20 @@ func TestLoadProjectNoSrcDir(t *testing.T) {
 	}
 }
 
-func TestLoadProjectCfgFileCase(t *testing.T) {
+func TestLoadProjectGopkgFilenames(t *testing.T) {
+	// We are trying to skip this test on file systems which are case-sensiive. We could
+	// have used `fs.IsCaseSensitiveFilesystem` for this check. However, the code we are
+	// testing also relies on `fs.IsCaseSensitiveFilesystem`. So a bug in
+	// `fs.IsCaseSensitiveFilesystem` could prevent this test from being run. This is the
+	// only scenario where we prefer the OS heuristic over doing the actual work of
+	// validating filesystem case sensitivity via `fs.IsCaseSensitiveFilesystem`.
 	if runtime.GOOS != "windows" && runtime.GOOS != "darwin" {
 		t.Skip("skip this test on non-Windows, non-macOS")
 	}
 
 	// Here we test that a manifest filename with incorrect case throws an error. Similar
 	// error will also be thrown for the lock file as well which has been tested in
-	// `project_test.go#TestCheckCfgFilenames`. So not repeating here.
+	// `project_test.go#TestCheckGopkgFilenames`. So not repeating here.
 
 	h := test.NewHelper(t)
 	defer h.Cleanup()

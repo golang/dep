@@ -265,6 +265,12 @@ func TestIsCaseSensitiveFilesystem(t *testing.T) {
 }
 
 func TestReadActualFilenames(t *testing.T) {
+	// We are trying to skip this test on file systems which are case-sensiive. We could
+	// have used `fs.IsCaseSensitiveFilesystem` for this check. However, the code we are
+	// testing also relies on `fs.IsCaseSensitiveFilesystem`. So a bug in
+	// `fs.IsCaseSensitiveFilesystem` could prevent this test from being run. This is the
+	// only scenario where we prefer the OS heuristic over doing the actual work of
+	// validating filesystem case sensitivity via `fs.IsCaseSensitiveFilesystem`.
 	if runtime.GOOS != "windows" && runtime.GOOS != "darwin" {
 		t.Skip("skip this test on non-Windows, non-macOS")
 	}
@@ -332,7 +338,8 @@ func TestReadActualFilenames(t *testing.T) {
 			t.Fatalf("unexpected error: %+v", err)
 		}
 		if !reflect.DeepEqual(c.want, got) {
-			t.Fatalf("returned value does not match expected: \n\t(GOT) %v\n\t(WNT) %v", got, c.want)
+			t.Fatalf("returned value does not match expected: \n\t(GOT) %v\n\t(WNT) %v",
+				got, c.want)
 		}
 	}
 }

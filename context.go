@@ -105,7 +105,7 @@ func (c *Ctx) LoadProject() (*Project, error) {
 		return nil, err
 	}
 
-	err = checkCfgFilenames(root)
+	err = checkGopkgFilenames(root)
 	if err != nil {
 		return nil, err
 	}
