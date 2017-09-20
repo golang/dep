@@ -272,7 +272,7 @@ var errPathNotDir = errors.New("given path is not a directory")
 // `os.Stat` and return a map with key and value as filenames which exist in the folder.
 //
 // Otherwise, it reads the contents of the directory and returns a map which has the
-// given file name as the key and actual filename as the value if it was found.
+// given file name as the key and actual filename as the value(if it was found).
 func ReadActualFilenames(dirPath string, names []string) (map[string]string, error) {
 	actualFilenames := make(map[string]string, len(names))
 	if len(names) == 0 {
