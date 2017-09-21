@@ -17,19 +17,22 @@ import (
 )
 
 var (
-	cacheKeyC = []byte("c")
-	cacheKeyE = []byte("e")
-	cacheKeyH = []byte("h")
-	cacheKeyI = []byte("i")
-	cacheKeyL = []byte("l")
-	cacheKeyN = []byte("n")
-	cacheKeyO = []byte("o")
-	cacheKeyP = []byte("p")
-	cacheKeyR = []byte("r")
-	cacheKeyT = []byte("t")
+	cacheKeyComment    = []byte("c")
+	cacheKeyConstraint = cacheKeyComment
+	cacheKeyError      = []byte("e")
+	cacheKeyHash       = []byte("h")
+	cacheKeyIgnored    = []byte("i")
+	cacheKeyImport     = cacheKeyIgnored
+	cacheKeyLock       = []byte("l")
+	cacheKeyName       = []byte("n")
+	cacheKeyOverride   = []byte("o")
+	cacheKeyPTree      = []byte("p")
+	cacheKeyRequired   = []byte("r")
+	cacheKeyRevision   = cacheKeyRequired
+	cacheKeyTestImport = []byte("t")
 
-	cacheR = byte('r')
-	cacheV = byte('v')
+	cacheRevision = byte('r')
+	cacheVersion  = byte('v')
 )
 
 // propertiesFromCache returns a new ProjectRoot and ProjectProperties with the fields from m.
@@ -76,7 +79,7 @@ func cachePutManifest(b *bolt.Bucket, m Manifest) error {
 
 	constraints := m.DependencyConstraints()
 	if len(constraints) > 0 {
-		cs, err := b.CreateBucket(cacheKeyC)
+		cs, err := b.CreateBucket(cacheKeyConstraint)
 		if err != nil {
 			return err
 		}
@@ -103,7 +106,7 @@ func cachePutManifest(b *bolt.Bucket, m Manifest) error {
 
 	ignored := rm.IgnoredPackages()
 	if len(ignored) > 0 {
-		ig, err := b.CreateBucket(cacheKeyI)
+		ig, err := b.CreateBucket(cacheKeyIgnored)
 		if err != nil {
 			return err
 		}
@@ -122,7 +125,7 @@ func cachePutManifest(b *bolt.Bucket, m Manifest) error {
 
 	overrides := rm.Overrides()
 	if len(overrides) > 0 {
-		ovr, err := b.CreateBucket(cacheKeyO)
+		ovr, err := b.CreateBucket(cacheKeyOverride)
 		if err != nil {
 			return err
 		}
@@ -144,7 +147,7 @@ func cachePutManifest(b *bolt.Bucket, m Manifest) error {
 
 	required := rm.RequiredPackages()
 	if len(required) > 0 {
-		req, err := b.CreateBucket(cacheKeyR)
+		req, err := b.CreateBucket(cacheKeyRequired)
 		if err != nil {
 			return err
 		}
@@ -166,6 +169,7 @@ func cachePutManifest(b *bolt.Bucket, m Manifest) error {
 
 // cacheGetManifest returns a new RootManifest with the data retrieved from the bolt.Bucket.
 func cacheGetManifest(b *bolt.Bucket) (RootManifest, error) {
+	//TODO consider storing slice/map lens to enable calling make() with capacity
 	m := &simpleRootManifest{
 		c:   make(ProjectConstraints),
 		ovr: make(ProjectConstraints),
@@ -174,7 +178,7 @@ func cacheGetManifest(b *bolt.Bucket) (RootManifest, error) {
 	}
 
 	// Constraints
-	if cs := b.Bucket(cacheKeyC); cs != nil {
+	if cs := b.Bucket(cacheKeyConstraint); cs != nil {
 		var msg pb.ProjectProperties
 		err := cs.ForEach(func(_, v []byte) error {
 			if err := proto.Unmarshal(v, &msg); err != nil {
@@ -193,7 +197,7 @@ func cacheGetManifest(b *bolt.Bucket) (RootManifest, error) {
 	}
 
 	// Ignored
-	if ig := b.Bucket(cacheKeyI); ig != nil {
+	if ig := b.Bucket(cacheKeyIgnored); ig != nil {
 		err := ig.ForEach(func(_, v []byte) error {
 			m.ig[string(v)] = true
 			return nil
@@ -204,7 +208,7 @@ func cacheGetManifest(b *bolt.Bucket) (RootManifest, error) {
 	}
 
 	// Overrides
-	if os := b.Bucket(cacheKeyO); os != nil {
+	if os := b.Bucket(cacheKeyOverride); os != nil {
 		var msg pb.ProjectProperties
 		err := os.ForEach(func(_, v []byte) error {
 			if err := proto.Unmarshal(v, &msg); err != nil {
@@ -223,7 +227,7 @@ func cacheGetManifest(b *bolt.Bucket) (RootManifest, error) {
 	}
 
 	// Required
-	if req := b.Bucket(cacheKeyR); req != nil {
+	if req := b.Bucket(cacheKeyRequired); req != nil {
 		err := req.ForEach(func(_, v []byte) error {
 			m.req[string(v)] = true
 			return nil
@@ -275,14 +279,14 @@ func lockedProjectFromCache(m *pb.LockedProject) (LockedProject, error) {
 func cachePutLock(b *bolt.Bucket, l Lock) error {
 	// InputHash
 	if v := l.InputHash(); len(v) > 0 {
-		if err := b.Put(cacheKeyH, v); err != nil {
+		if err := b.Put(cacheKeyHash, v); err != nil {
 			return errors.Wrap(err, "failed to put hash")
 		}
 	}
 
 	// Projects
 	if projects := l.Projects(); len(projects) > 0 {
-		lb, err := b.CreateBucket(cacheKeyL)
+		lb, err := b.CreateBucket(cacheKeyLock)
 		if err != nil {
 			return err
 		}
@@ -308,9 +312,9 @@ func cachePutLock(b *bolt.Bucket, l Lock) error {
 // cacheGetLock returns a new *safeLock with the fields retrieved from the bolt.Bucket.
 func cacheGetLock(b *bolt.Bucket) (*safeLock, error) {
 	l := &safeLock{
-		h: b.Get(cacheKeyH),
+		h: b.Get(cacheKeyHash),
 	}
-	if locked := b.Bucket(cacheKeyL); locked != nil {
+	if locked := b.Bucket(cacheKeyLock); locked != nil {
 		var msg pb.LockedProject
 		err := locked.ForEach(func(_, v []byte) error {
 			if err := proto.Unmarshal(v, &msg); err != nil {
@@ -333,17 +337,17 @@ func cacheGetLock(b *bolt.Bucket) (*safeLock, error) {
 // cachePutPackageOrError stores the pkgtree.PackageOrErr as fields in the bolt.Bucket.
 func cachePutPackageOrErr(b *bolt.Bucket, poe pkgtree.PackageOrErr) error {
 	if poe.Err != nil {
-		err := b.Put(cacheKeyE, []byte(poe.Err.Error()))
+		err := b.Put(cacheKeyError, []byte(poe.Err.Error()))
 		return errors.Wrapf(err, "failed to put error: %v", poe.Err)
 	}
 	if len(poe.P.CommentPath) > 0 {
-		err := b.Put(cacheKeyC, []byte(poe.P.CommentPath))
+		err := b.Put(cacheKeyComment, []byte(poe.P.CommentPath))
 		if err != nil {
 			return errors.Wrapf(err, "failed to put package: %v", poe.P)
 		}
 	}
 	if len(poe.P.Imports) > 0 {
-		ip, err := b.CreateBucket(cacheKeyI)
+		ip, err := b.CreateBucket(cacheKeyImport)
 		if err != nil {
 			return err
 		}
@@ -358,14 +362,14 @@ func cachePutPackageOrErr(b *bolt.Bucket, poe pkgtree.PackageOrErr) error {
 	}
 
 	if len(poe.P.Name) > 0 {
-		err := b.Put(cacheKeyN, []byte(poe.P.Name))
+		err := b.Put(cacheKeyName, []byte(poe.P.Name))
 		if err != nil {
 			return errors.Wrapf(err, "failed to put package: %v", poe.P)
 		}
 	}
 
 	if len(poe.P.TestImports) > 0 {
-		ip, err := b.CreateBucket(cacheKeyT)
+		ip, err := b.CreateBucket(cacheKeyTestImport)
 		if err != nil {
 			return err
 		}
@@ -384,15 +388,15 @@ func cachePutPackageOrErr(b *bolt.Bucket, poe pkgtree.PackageOrErr) error {
 // cacheGetPackageOrErr returns a new pkgtree.PackageOrErr with fields retrieved
 // from the bolt.Bucket.
 func cacheGetPackageOrErr(b *bolt.Bucket) (pkgtree.PackageOrErr, error) {
-	if v := b.Get(cacheKeyE); len(v) > 0 {
+	if v := b.Get(cacheKeyError); len(v) > 0 {
 		return pkgtree.PackageOrErr{
 			Err: errors.New(string(v)),
 		}, nil
 	}
 
 	var p pkgtree.Package
-	p.CommentPath = string(b.Get(cacheKeyC))
-	if ip := b.Bucket(cacheKeyI); ip != nil {
+	p.CommentPath = string(b.Get(cacheKeyComment))
+	if ip := b.Bucket(cacheKeyImport); ip != nil {
 		err := ip.ForEach(func(_, v []byte) error {
 			p.Imports = append(p.Imports, string(v))
 			return nil
@@ -401,8 +405,8 @@ func cacheGetPackageOrErr(b *bolt.Bucket) (pkgtree.PackageOrErr, error) {
 			return pkgtree.PackageOrErr{}, err
 		}
 	}
-	p.Name = string(b.Get(cacheKeyN))
-	if tip := b.Bucket(cacheKeyT); tip != nil {
+	p.Name = string(b.Get(cacheKeyName))
+	if tip := b.Bucket(cacheKeyTestImport); tip != nil {
 		err := tip.ForEach(func(_, v []byte) error {
 			p.TestImports = append(p.TestImports, string(v))
 			return nil

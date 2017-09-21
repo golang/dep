@@ -189,12 +189,12 @@ func (s *singleSourceCacheBolt) getManifestAndLock(rev Revision, ai ProjectAnaly
 
 func (s *singleSourceCacheBolt) setPackageTree(rev Revision, ptree pkgtree.PackageTree) {
 	err := s.updateRevBucket(rev, func(b *bolt.Bucket) error {
-		if b.Bucket(cacheKeyP) != nil {
-			if err := b.DeleteBucket(cacheKeyP); err != nil {
+		if b.Bucket(cacheKeyPTree) != nil {
+			if err := b.DeleteBucket(cacheKeyPTree); err != nil {
 				return err
 			}
 		}
-		ptrees, err := b.CreateBucket(cacheKeyP)
+		ptrees, err := b.CreateBucket(cacheKeyPTree)
 		if err != nil {
 			return err
 		}
@@ -218,7 +218,7 @@ func (s *singleSourceCacheBolt) setPackageTree(rev Revision, ptree pkgtree.Packa
 
 func (s *singleSourceCacheBolt) getPackageTree(rev Revision) (ptree pkgtree.PackageTree, ok bool) {
 	err := s.viewRevBucket(rev, func(b *bolt.Bucket) error {
-		ptrees := b.Bucket(cacheKeyP)
+		ptrees := b.Bucket(cacheKeyPTree)
 		if ptrees == nil {
 			return nil
 		}
@@ -260,19 +260,19 @@ func (s *singleSourceCacheBolt) markRevisionExists(rev Revision) {
 
 func (s *singleSourceCacheBolt) setVersionMap(pvs []PairedVersion) {
 	err := s.updateSourceBucket(func(src *bolt.Bucket) error {
-		if err := cachePrefixDelete(src, cacheV); err != nil {
+		if err := cachePrefixDelete(src, cacheVersion); err != nil {
 			return err
 		}
-		vk := cacheTimestampedKey(cacheV, time.Now())
+		vk := cacheTimestampedKey(cacheVersion, time.Now())
 		versions, err := src.CreateBucket(vk)
 		if err != nil {
 			return err
 		}
 
 		c := src.Cursor()
-		for k, _ := c.Seek(cacheKeyR); len(k) > 0 && k[0] == cacheR; k, _ = c.Next() {
+		for k, _ := c.Seek(cacheKeyRevision); len(k) > 0 && k[0] == cacheRevision; k, _ = c.Next() {
 			rb := src.Bucket(k)
-			if err := cachePrefixDelete(rb, cacheV); err != nil {
+			if err := cachePrefixDelete(rb, cacheVersion); err != nil {
 				return err
 			}
 		}
@@ -299,7 +299,7 @@ func (s *singleSourceCacheBolt) setVersionMap(pvs []PairedVersion) {
 
 			var versions *bolt.Bucket
 			if versions = revVersions[rev]; versions == nil {
-				err := cachePrefixDelete(b, cacheV)
+				err := cachePrefixDelete(b, cacheVersion)
 				if err != nil {
 					return err
 				}
@@ -324,7 +324,7 @@ func (s *singleSourceCacheBolt) setVersionMap(pvs []PairedVersion) {
 
 func (s *singleSourceCacheBolt) getVersionsFor(rev Revision) (uvs []UnpairedVersion, ok bool) {
 	err := s.viewRevBucket(rev, func(b *bolt.Bucket) error {
-		versions := cacheFindLatestValid(b, cacheV, s.epoch)
+		versions := cacheFindLatestValid(b, cacheVersion, s.epoch)
 		if versions == nil {
 			return nil
 		}
@@ -354,7 +354,7 @@ func (s *singleSourceCacheBolt) getVersionsFor(rev Revision) (uvs []UnpairedVers
 func (s *singleSourceCacheBolt) getAllVersions() []PairedVersion {
 	var pvs []PairedVersion
 	err := s.viewSourceBucket(func(src *bolt.Bucket) error {
-		versions := cacheFindLatestValid(src, cacheV, s.epoch)
+		versions := cacheFindLatestValid(src, cacheVersion, s.epoch)
 		if versions == nil {
 			return nil
 		}
@@ -381,7 +381,7 @@ func (s *singleSourceCacheBolt) getAllVersions() []PairedVersion {
 
 func (s *singleSourceCacheBolt) getRevisionFor(uv UnpairedVersion) (rev Revision, ok bool) {
 	err := s.viewSourceBucket(func(src *bolt.Bucket) error {
-		versions := cacheFindLatestValid(src, cacheV, s.epoch)
+		versions := cacheFindLatestValid(src, cacheVersion, s.epoch)
 		if versions == nil {
 			return nil
 		}
@@ -429,7 +429,7 @@ func (s *singleSourceCacheBolt) toUnpaired(v Version) (uv UnpairedVersion, ok bo
 		return t.Unpair(), true
 	case Revision:
 		err := s.viewRevBucket(t, func(b *bolt.Bucket) error {
-			versions := cacheFindLatestValid(b, cacheV, s.epoch)
+			versions := cacheFindLatestValid(b, cacheVersion, s.epoch)
 			if versions == nil {
 				return nil
 			}
