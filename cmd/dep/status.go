@@ -44,8 +44,8 @@ Status returns exit code zero if all dependencies are in a "good state".
 `
 
 const (
-	shortRev = iota
-	longRev  = iota
+	shortRev uint8 = iota
+	longRev
 )
 
 var (
@@ -317,7 +317,7 @@ func (bs *BasicStatus) getConsolidatedVersion() string {
 	return version
 }
 
-func (bs *BasicStatus) getConsolidatedLatest(revSize int) string {
+func (bs *BasicStatus) getConsolidatedLatest(revSize uint8) string {
 	latest := ""
 	if bs.Latest != nil {
 		switch revSize {
@@ -408,10 +408,10 @@ func runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceMana
 
 		logger.Println("Checking upstream projects:")
 
-		// BasicStatus channel to collect all the BasicStatus
+		// BasicStatus channel to collect all the BasicStatus.
 		bsCh := make(chan *BasicStatus, len(slp))
 
-		// Error channels to collect different errors
+		// Error channels to collect different errors.
 		errListPkgCh := make(chan error, len(slp))
 		errListVerCh := make(chan error, len(slp))
 
@@ -422,15 +422,13 @@ func runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceMana
 			logger.Printf("(%d/%d) %s\n", i+1, len(slp), proj.Ident().ProjectRoot)
 
 			go func(proj gps.LockedProject) {
-				defer wg.Done()
-
 				bs := BasicStatus{
 					ProjectRoot:  string(proj.Ident().ProjectRoot),
 					PackageCount: len(proj.Packages()),
 				}
 
 				// Get children only for specific outputers
-				// in order to avoid slower status process
+				// in order to avoid slower status process.
 				switch out.(type) {
 				case *dotOutput:
 					ptr, err := sm.ListPackages(proj.Ident(), proj.Version())
@@ -444,7 +442,7 @@ func runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceMana
 					bs.Children = prm.FlattenFn(paths.IsStandardImportPath)
 				}
 
-				// Split apart the version from the lock into its constituent parts
+				// Split apart the version from the lock into its constituent parts.
 				switch tv := proj.Version().(type) {
 				case gps.UnpairedVersion:
 					bs.Version = tv
@@ -494,7 +492,7 @@ func runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceMana
 						}
 					} else {
 						// Failed to fetch version list (could happen due to
-						// network issue)
+						// network issue).
 						bs.hasError = true
 						errListVerCh <- err
 					}
@@ -502,6 +500,7 @@ func runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceMana
 
 				bsCh <- &bs
 
+				wg.Done()
 			}(proj)
 		}
 
@@ -510,7 +509,7 @@ func runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceMana
 		close(errListPkgCh)
 		close(errListVerCh)
 
-		// Newline after printing the status progress output
+		// Newline after printing the status progress output.
 		logger.Println()
 
 		// List Packages errors. This would happen only for dot output.
@@ -524,7 +523,7 @@ func runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceMana
 			}
 		}
 
-		// List Version errors
+		// List Version errors.
 		if len(errListVerCh) > 0 {
 			if err == nil {
 				err = errFailedUpdate
@@ -551,7 +550,7 @@ func runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceMana
 			bsMap[bs.ProjectRoot] = bs
 		}
 
-		// Use the collected BasicStatus in outputter
+		// Use the collected BasicStatus in outputter.
 		for _, proj := range slp {
 			out.BasicLine(bsMap[string(proj.Ident().ProjectRoot)])
 		}
