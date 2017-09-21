@@ -13,6 +13,7 @@ import (
 	"io/ioutil"
 	"log"
 	"sort"
+	"sync"
 	"text/tabwriter"
 
 	"github.com/golang/dep"
@@ -41,6 +42,17 @@ print an extended status output for each dependency of the project.
 
 Status returns exit code zero if all dependencies are in a "good state".
 `
+
+const (
+	shortRev uint8 = iota
+	longRev
+)
+
+var (
+	errFailedUpdate     = errors.New("failed to fetch updates")
+	errFailedListPkg    = errors.New("failed to list packages")
+	errMultipleFailures = errors.New("multiple sources of failure")
+)
 
 func (cmd *statusCommand) Name() string      { return "status" }
 func (cmd *statusCommand) Args() string      { return "[package...]" }
@@ -97,7 +109,7 @@ func (out *tableOutput) BasicLine(bs *BasicStatus) {
 		bs.getConsolidatedConstraint(),
 		formatVersion(bs.Version),
 		formatVersion(bs.Revision),
-		formatVersion(bs.Latest),
+		bs.getConsolidatedLatest(shortRev),
 		bs.PackageCount,
 	)
 }
@@ -223,8 +235,21 @@ func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
 		}
 	}
 
-	digestMismatch, hasMissingPkgs, err := runStatusAll(ctx, out, p, sm)
+	digestMismatch, hasMissingPkgs, errCount, err := runStatusAll(ctx, out, p, sm)
 	if err != nil {
+		// If it's only update errors
+		if err == errFailedUpdate {
+			// Print the results with unknown data
+			ctx.Out.Println(buf.String())
+
+			// Print the help when in non-verbose mode
+			if !ctx.Verbose {
+				ctx.Out.Printf("The status of %d projects are unknown due to errors. Rerun with `-v` flag to see details.\n", errCount)
+			}
+		} else {
+			// List package failure or multiple failures
+			ctx.Out.Println("Failed to get status. Rerun with `-v` flag to see details.")
+		}
 		return err
 	}
 
@@ -248,8 +273,8 @@ type rawStatus struct {
 	ProjectRoot  string
 	Constraint   string
 	Version      string
-	Revision     gps.Revision
-	Latest       gps.Version
+	Revision     string
+	Latest       string
 	PackageCount int
 }
 
@@ -264,6 +289,7 @@ type BasicStatus struct {
 	Latest       gps.Version
 	PackageCount int
 	hasOverride  bool
+	hasError     bool
 }
 
 func (bs *BasicStatus) getConsolidatedConstraint() string {
@@ -291,13 +317,31 @@ func (bs *BasicStatus) getConsolidatedVersion() string {
 	return version
 }
 
+func (bs *BasicStatus) getConsolidatedLatest(revSize uint8) string {
+	latest := ""
+	if bs.Latest != nil {
+		switch revSize {
+		case shortRev:
+			latest = formatVersion(bs.Latest)
+		case longRev:
+			latest = bs.Latest.String()
+		}
+	}
+
+	if bs.hasError {
+		latest += "unknown"
+	}
+
+	return latest
+}
+
 func (bs *BasicStatus) marshalJSON() *rawStatus {
 	return &rawStatus{
 		ProjectRoot:  bs.ProjectRoot,
 		Constraint:   bs.getConsolidatedConstraint(),
 		Version:      formatVersion(bs.Version),
-		Revision:     bs.Revision,
-		Latest:       bs.Latest,
+		Revision:     string(bs.Revision),
+		Latest:       bs.getConsolidatedLatest(longRev),
 		PackageCount: bs.PackageCount,
 	}
 }
@@ -308,18 +352,16 @@ type MissingStatus struct {
 	MissingPackages []string
 }
 
-func runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceManager) (bool, bool, error) {
-	var digestMismatch, hasMissingPkgs bool
-
+func runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceManager) (digestMismatch bool, hasMissingPkgs bool, errCount int, err error) {
 	if p.Lock == nil {
-		return digestMismatch, hasMissingPkgs, errors.Errorf("no Gopkg.lock found. Run `dep ensure` to generate lock file")
+		return false, false, 0, errors.Errorf("no Gopkg.lock found. Run `dep ensure` to generate lock file")
 	}
 
 	// While the network churns on ListVersions() requests, statically analyze
 	// code from the current project.
 	ptree, err := pkgtree.ListPackages(p.ResolvedAbsRoot, string(p.ImportRoot))
 	if err != nil {
-		return digestMismatch, hasMissingPkgs, errors.Wrapf(err, "analysis of local packages failed")
+		return false, false, 0, errors.Wrapf(err, "analysis of local packages failed")
 	}
 
 	// Set up a solver in order to check the InputHash.
@@ -339,12 +381,12 @@ func runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceMana
 	}
 
 	if err := ctx.ValidateParams(sm, params); err != nil {
-		return digestMismatch, hasMissingPkgs, err
+		return false, false, 0, err
 	}
 
 	s, err := gps.Prepare(params, sm)
 	if err != nil {
-		return digestMismatch, hasMissingPkgs, errors.Wrapf(err, "could not set up solver for input hashing")
+		return false, false, 0, errors.Wrapf(err, "could not set up solver for input hashing")
 	}
 
 	cm := collectConstraints(ptree, p, sm)
@@ -366,85 +408,156 @@ func runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceMana
 
 		logger.Println("Checking upstream projects:")
 
+		// BasicStatus channel to collect all the BasicStatus.
+		bsCh := make(chan *BasicStatus, len(slp))
+
+		// Error channels to collect different errors.
+		errListPkgCh := make(chan error, len(slp))
+		errListVerCh := make(chan error, len(slp))
+
+		var wg sync.WaitGroup
+
 		for i, proj := range slp {
+			wg.Add(1)
 			logger.Printf("(%d/%d) %s\n", i+1, len(slp), proj.Ident().ProjectRoot)
 
-			bs := BasicStatus{
-				ProjectRoot:  string(proj.Ident().ProjectRoot),
-				PackageCount: len(proj.Packages()),
-			}
-
-			// Get children only for specific outputers
-			// in order to avoid slower status process
-			switch out.(type) {
-			case *dotOutput:
-				ptr, err := sm.ListPackages(proj.Ident(), proj.Version())
-
-				if err != nil {
-					return digestMismatch, hasMissingPkgs, errors.Wrapf(err, "analysis of %s package failed", proj.Ident().ProjectRoot)
+			go func(proj gps.LockedProject) {
+				bs := BasicStatus{
+					ProjectRoot:  string(proj.Ident().ProjectRoot),
+					PackageCount: len(proj.Packages()),
 				}
 
-				prm, _ := ptr.ToReachMap(true, false, false, nil)
-				bs.Children = prm.FlattenFn(paths.IsStandardImportPath)
-			}
+				// Get children only for specific outputers
+				// in order to avoid slower status process.
+				switch out.(type) {
+				case *dotOutput:
+					ptr, err := sm.ListPackages(proj.Ident(), proj.Version())
 
-			// Split apart the version from the lock into its constituent parts
-			switch tv := proj.Version().(type) {
-			case gps.UnpairedVersion:
-				bs.Version = tv
-			case gps.Revision:
-				bs.Revision = tv
-			case gps.PairedVersion:
-				bs.Version = tv.Unpair()
-				bs.Revision = tv.Revision()
-			}
+					if err != nil {
+						bs.hasError = true
+						errListPkgCh <- err
+					}
 
-			// Check if the manifest has an override for this project. If so,
-			// set that as the constraint.
-			if pp, has := p.Manifest.Ovr[proj.Ident().ProjectRoot]; has && pp.Constraint != nil {
-				bs.hasOverride = true
-				bs.Constraint = pp.Constraint
-			} else {
-				bs.Constraint = gps.Any()
-				for _, c := range cm[bs.ProjectRoot] {
-					bs.Constraint = c.Intersect(bs.Constraint)
+					prm, _ := ptr.ToReachMap(true, false, false, nil)
+					bs.Children = prm.FlattenFn(paths.IsStandardImportPath)
 				}
-			}
 
-			// Only if we have a non-rev and non-plain version do/can we display
-			// anything wrt the version's updateability.
-			if bs.Version != nil && bs.Version.Type() != gps.IsVersion {
-				c, has := p.Manifest.Constraints[proj.Ident().ProjectRoot]
-				if !has {
-					c.Constraint = gps.Any()
+				// Split apart the version from the lock into its constituent parts.
+				switch tv := proj.Version().(type) {
+				case gps.UnpairedVersion:
+					bs.Version = tv
+				case gps.Revision:
+					bs.Revision = tv
+				case gps.PairedVersion:
+					bs.Version = tv.Unpair()
+					bs.Revision = tv.Revision()
 				}
-				// TODO: This constraint is only the constraint imposed by the
-				// current project, not by any transitive deps. As a result,
-				// transitive project deps will always show "any" here.
-				bs.Constraint = c.Constraint
 
-				vl, err := sm.ListVersions(proj.Ident())
-				if err == nil {
-					gps.SortPairedForUpgrade(vl)
-
-					for _, v := range vl {
-						// Because we've sorted the version list for
-						// upgrade, the first version we encounter that
-						// matches our constraint will be what we want.
-						if c.Constraint.Matches(v) {
-							bs.Latest = v.Revision()
-							break
-						}
+				// Check if the manifest has an override for this project. If so,
+				// set that as the constraint.
+				if pp, has := p.Manifest.Ovr[proj.Ident().ProjectRoot]; has && pp.Constraint != nil {
+					bs.hasOverride = true
+					bs.Constraint = pp.Constraint
+				} else {
+					bs.Constraint = gps.Any()
+					for _, c := range cm[bs.ProjectRoot] {
+						bs.Constraint = c.Intersect(bs.Constraint)
 					}
 				}
+
+				// Only if we have a non-rev and non-plain version do/can we display
+				// anything wrt the version's updateability.
+				if bs.Version != nil && bs.Version.Type() != gps.IsVersion {
+					c, has := p.Manifest.Constraints[proj.Ident().ProjectRoot]
+					if !has {
+						c.Constraint = gps.Any()
+					}
+					// TODO: This constraint is only the constraint imposed by the
+					// current project, not by any transitive deps. As a result,
+					// transitive project deps will always show "any" here.
+					bs.Constraint = c.Constraint
+
+					vl, err := sm.ListVersions(proj.Ident())
+					if err == nil {
+						gps.SortPairedForUpgrade(vl)
+
+						for _, v := range vl {
+							// Because we've sorted the version list for
+							// upgrade, the first version we encounter that
+							// matches our constraint will be what we want.
+							if c.Constraint.Matches(v) {
+								bs.Latest = v.Revision()
+								break
+							}
+						}
+					} else {
+						// Failed to fetch version list (could happen due to
+						// network issue).
+						bs.hasError = true
+						errListVerCh <- err
+					}
+				}
+
+				bsCh <- &bs
+
+				wg.Done()
+			}(proj)
+		}
+
+		wg.Wait()
+		close(bsCh)
+		close(errListPkgCh)
+		close(errListVerCh)
+
+		// Newline after printing the status progress output.
+		logger.Println()
+
+		// List Packages errors. This would happen only for dot output.
+		if len(errListPkgCh) > 0 {
+			err = errFailedListPkg
+			if ctx.Verbose {
+				for err := range errListPkgCh {
+					ctx.Err.Println(err.Error())
+				}
+				ctx.Err.Println()
+			}
+		}
+
+		// List Version errors.
+		if len(errListVerCh) > 0 {
+			if err == nil {
+				err = errFailedUpdate
+			} else {
+				err = errMultipleFailures
 			}
 
-			out.BasicLine(&bs)
+			// Count ListVersions error because we get partial results when
+			// this happens.
+			errCount = len(errListVerCh)
+			if ctx.Verbose {
+				for err := range errListVerCh {
+					ctx.Err.Println(err.Error())
+				}
+				ctx.Err.Println()
+			}
 		}
-		logger.Println()
+
+		// A map of ProjectRoot and *BasicStatus. This is used in maintain the
+		// order of BasicStatus in output by collecting all the BasicStatus and
+		// then using them in order.
+		bsMap := make(map[string]*BasicStatus)
+		for bs := range bsCh {
+			bsMap[bs.ProjectRoot] = bs
+		}
+
+		// Use the collected BasicStatus in outputter.
+		for _, proj := range slp {
+			out.BasicLine(bsMap[string(proj.Ident().ProjectRoot)])
+		}
+
 		out.BasicFooter()
 
-		return digestMismatch, hasMissingPkgs, nil
+		return false, false, errCount, err
 	}
 
 	// Hash digest mismatch may indicate that some deps are no longer
@@ -453,7 +566,6 @@ func runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceMana
 	//
 	// It's possible for digests to not match, but still have a correct
 	// lock.
-	digestMismatch = true
 	rm, _ := ptree.ToReachMap(true, true, false, nil)
 
 	external := rm.FlattenFn(paths.IsStandardImportPath)
@@ -486,7 +598,7 @@ func runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceMana
 			ctx.Err.Printf("\t%s: %s\n", fail.ex, fail.err.Error())
 		}
 
-		return digestMismatch, hasMissingPkgs, errors.New("address issues with undeducible import paths to get more status information")
+		return true, false, 0, errors.New("address issues with undeducible import paths to get more status information")
 	}
 
 	out.MissingHeader()
@@ -506,7 +618,7 @@ outer:
 	}
 	out.MissingFooter()
 
-	return digestMismatch, hasMissingPkgs, nil
+	return true, hasMissingPkgs, 0, nil
 }
 
 func formatVersion(v gps.Version) string {
