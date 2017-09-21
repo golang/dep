@@ -31,11 +31,7 @@ func stripVendor(path string, info os.FileInfo, err error) error {
 				return filepath.SkipDir
 
 			case symlink:
-				realInfo, err := os.Stat(path)
-				if err != nil {
-					return err
-				}
-				if realInfo.IsDir() {
+				if realInfo, err := os.Stat(path); err == nil && realInfo.IsDir() {
 					return os.Remove(path)
 				}
 
