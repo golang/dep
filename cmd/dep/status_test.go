@@ -235,7 +235,7 @@ func TestBasicStatusGetConsolidatedLatest(t *testing.T) {
 	testCases := []struct {
 		name        string
 		basicStatus BasicStatus
-		revSize     int
+		revSize     uint8
 		wantLatest  string
 	}{
 		{
