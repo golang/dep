@@ -51,12 +51,6 @@ func (c cmd) CombinedOutput() ([]byte, error) {
 		return nil, err
 	}
 
-	var t *time.Timer
-	defer func() {
-		if t != nil {
-			t.Stop()
-		}
-	}()
 	// Adapted from (*os/exec.Cmd).Start
 	waitDone := make(chan struct{})
 	defer close(waitDone)
@@ -68,7 +62,9 @@ func (c cmd) CombinedOutput() ([]byte, error) {
 				// immediately to hard kill.
 				c.cancel()
 			} else {
-				t = time.AfterFunc(time.Minute, c.cancel)
+				stopCancel := time.AfterFunc(time.Minute, c.cancel).Stop
+				<-waitDone
+				stopCancel()
 			}
 		case <-waitDone:
 		}
