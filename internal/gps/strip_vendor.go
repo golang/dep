@@ -16,29 +16,27 @@ func stripVendor(path string, info os.FileInfo, err error) error {
 		return err
 	}
 
-	if info.Name() == "vendor" {
-		if _, err := os.Lstat(path); err != nil {
+	// Skip anything not named vendor
+	if info.Name() != "vendor" {
+		return nil
+	}
+
+	// If the file is a symlink to a directory, delete the symlink.
+	if (info.Mode() & os.ModeSymlink) != 0 {
+		realInfo, err := os.Stat(path)
+		if err != nil {
 			return err
 		}
-
-		if (info.Mode() & os.ModeSymlink) != 0 {
-			realInfo, err := os.Stat(path)
-			if err != nil {
-				return err
-			}
-			if realInfo.IsDir() {
-				return os.Remove(path)
-			}
+		if realInfo.IsDir() {
+			return os.Remove(path)
 		}
+	}
 
-		if info.IsDir() {
-			if err := os.RemoveAll(path); err != nil {
-				return err
-			}
-			return filepath.SkipDir
+	if info.IsDir() {
+		if err := os.RemoveAll(path); err != nil {
+			return err
 		}
-
-		return nil
+		return filepath.SkipDir
 	}
 
 	return nil
