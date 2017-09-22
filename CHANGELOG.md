@@ -5,8 +5,8 @@ IMPROVEMENTS:
 * File name case check is now performed on `Gopkg.toml` and `Gopkg.lock`.
 (#1114)
 * gps: gps now supports pruning. (#1020)
-* `dep ensure -add` now concurrently validates the passed project arguments.
-Improving performance when adding new dependencies with `-add`. (#1175)
+* `dep ensure -update` now concurrently validates the passed project arguments.
+Improving performance when updating dependencies with `-update`. (#1175)
 * `dep status` now concurrently fetches repo info. Improving status performance.
 (#1135)
 
