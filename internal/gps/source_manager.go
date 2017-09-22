@@ -28,6 +28,41 @@ import (
 // Used to compute a friendly filepath from a URL-shaped input.
 var sanitizer = strings.NewReplacer("-", "--", ":", "-", "/", "-", "+", "-")
 
+// A locker is responsible for preventing multiple instances of dep from interfereing
+// with one-another.
+//
+// Currently, anything that can either TryLock(), Unlock(), or GetOwner() satifies
+// that need.
+type locker interface {
+	TryLock() error
+	Unlock() error
+	GetOwner() (*os.Process, error)
+}
+
+// A falselocker adheres to the locker inteface and it's purpose is to quietly
+// fail to lock when the DEPNOLOCK environment variable is set.
+//
+// This allows dep to run on systems where file locking doesn't work --
+// particularly those that use union mount type filesystems that don't
+// implement hard links or fnctl() style locking.
+type falseLocker struct{}
+
+// Always returns an error to indicate there's no current ower PID for our
+// lock.
+func (fl falseLocker) GetOwner() (*os.Process, error) {
+	return nil, fmt.Errorf("falseLocker always fails")
+}
+
+// Does nothing and returns a nil error so caller beleives locking succeeded.
+func (fl falseLocker) TryLock() error {
+	return nil
+}
+
+// Does nothing and returns a nil error so caller beleives unlocking succeeded.
+func (fl falseLocker) Unlock() error {
+	return nil
+}
+
 // A SourceManager is responsible for retrieving, managing, and interrogating
 // source repositories. Its primary purpose is to serve the needs of a Solver,
 // but it is handy for other purposes, as well.
@@ -121,7 +156,7 @@ func (p ProjectAnalyzerInfo) String() string {
 // tools; control via dependency injection is intended to be sufficient.
 type SourceMgr struct {
 	cachedir    string                // path to root of cache dir
-	lf          *lockfile.Lockfile    // handle for the sm lock file on disk
+	lf          locker                // handle for the sm lock file on disk
 	suprvsr     *supervisor           // subsystem that supervises running calls/io
 	cancelAll   context.CancelFunc    // cancel func to kill all running work
 	deduceCoord *deductionCoordinator // subsystem that manages import path deduction
@@ -142,8 +177,9 @@ var _ SourceManager = &SourceMgr{}
 
 // SourceManagerConfig holds configuration information for creating SourceMgrs.
 type SourceManagerConfig struct {
-	Cachedir string      // Where to store local instances of upstream sources.
-	Logger   *log.Logger // Optional info/warn logger. Discards if nil.
+	Cachedir       string      // Where to store local instances of upstream sources.
+	Logger         *log.Logger // Optional info/warn logger. Discards if nil.
+	DisableLocking bool        // True if dep SourceManager shoud NOT lock.
 }
 
 // NewSourceManager produces an instance of gps's built-in SourceManager.
@@ -175,7 +211,14 @@ func NewSourceManager(c SourceManagerConfig) (*SourceMgr, error) {
 	// we can spin on.
 
 	glpath := filepath.Join(c.Cachedir, "sm.lock")
-	lockfile, err := lockfile.New(glpath)
+
+	lockfile, err := func() (locker, error) {
+		if c.DisableLocking {
+			return falseLocker{}, nil
+		}
+		return lockfile.New(glpath)
+	}()
+
 	if err != nil {
 		return nil, CouldNotCreateLockError{
 			Path: glpath,
@@ -214,7 +257,7 @@ func NewSourceManager(c SourceManagerConfig) (*SourceMgr, error) {
 		// The first time this is evaluated, duration will be very large as lasttime is 0.
 		// Unless time travel is invented and someone travels back to the year 1, we should
 		// be ok.
-		if duration > 15*time.Second {
+		if duration > 14*time.Second {
 			fmt.Fprintf(os.Stderr, "waiting for lockfile %s: %s\n", glpath, err.Error())
 			lasttime = nowtime
 		}
@@ -238,7 +281,7 @@ func NewSourceManager(c SourceManagerConfig) (*SourceMgr, error) {
 
 	sm := &SourceMgr{
 		cachedir:    c.Cachedir,
-		lf:          &lockfile,
+		lf:          lockfile,
 		suprvsr:     superv,
 		cancelAll:   cf,
 		deduceCoord: deducer,
