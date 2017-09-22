@@ -1,5 +1,16 @@
 # v0.3.2 (Unreleased)
 
+IMPROVEMENTS:
+
+* File name case check is now performed on `Gopkg.toml` and `Gopkg.lock`.
+(#1114)
+* gps: gps now supports pruning. (#1020)
+* `dep ensure -add` now concurrently validates the passed project arguments.
+Improving performance when adding new dependencies with `-add`. (#1175)
+* `dep status` now concurrently fetches repo info. Improving status performance.
+(#1135)
+
+
 # v0.3.1
 
 * gps: Add satisfiability check for case variants (#1079)
