@@ -5,8 +5,6 @@
 package gps
 
 import (
-	"bytes"
-	"encoding/binary"
 	"fmt"
 	"log"
 	"os"
@@ -14,7 +12,10 @@ import (
 	"time"
 
 	"github.com/boltdb/bolt"
+	"github.com/golang/dep/internal/gps/internal/pb"
 	"github.com/golang/dep/internal/gps/pkgtree"
+	"github.com/golang/protobuf/proto"
+	"github.com/jmank88/nuts"
 	"github.com/pkg/errors"
 )
 
@@ -73,31 +74,31 @@ func (c *boltCache) close() error {
 //
 // 1) Versions buckets hold version keys with revision values:
 //
-//	Bucket: "versions:<timestamp>"
-//	Keys: "branch:<branch>", "defaultBranch:<branch>", "ver:<version>"
+//	Bucket: "v<timestamp>"
+//	Keys: Unpaired Versions serialized via ConstraintMsg
 //	Values: "<revision>"
 //
 // 2) Revision buckets hold (a) manifest and lock data for various ProjectAnalyzers,
 // (b) package trees, and (c) version lists.
 //
-//	Bucket: "rev:<revision>"
+//	Bucket: "r<revision>"
 //
 // a) Manifest and Lock info are stored in buckets derived from ProjectAnalyzer.Info:
 //
-//	Sub-Bucket: "info:<name>.<version>:manifest", "info:<name>.<version>:lock"
+//	Sub-Bucket: "<name>.<version>m", "<name>.<version>l"
 //	Keys/Values: Manifest or Lock fields
 //
 // b) Package tree buckets contain package import path keys and package-or-error buckets:
 //
-//	Sub-Bucket: "ptree"
+//	Sub-Bucket: "p"
 //	Sub-Bucket: "<import_path>"
 //	Key/Values: PackageOrErr fields
 //
 // c) Revision-versions buckets contain lists of version values:
 //
-//	Sub-Bucket: "versions:<timestamp>"
+//	Sub-Bucket: "v<timestamp>"
 //	Keys: "<sequence_number>"
-//	Values: "branch:<branch>", "defaultBranch:<branch>", "ver:<version>"
+//	Values: Unpaired Versions serialized via ConstraintMsg
 type singleSourceCacheBolt struct {
 	*boltCache
 	pi         ProjectIdentifier
@@ -106,20 +107,19 @@ type singleSourceCacheBolt struct {
 
 func (s *singleSourceCacheBolt) setManifestAndLock(rev Revision, ai ProjectAnalyzerInfo, m Manifest, l Lock) {
 	err := s.updateRevBucket(rev, func(b *bolt.Bucket) error {
-		mName, lName := cacheInfoNames(ai)
-		if b.Bucket(mName) != nil {
-			if err := b.DeleteBucket(mName); err != nil {
-				return err
-			}
-		}
-		if b.Bucket(lName) != nil {
-			if err := b.DeleteBucket(lName); err != nil {
+		info := ai.String()
+		name := make([]byte, len(info)+1)
+		copy(name, info)
+		name[len(info)] = 'm'
+
+		if b.Bucket(name) != nil {
+			if err := b.DeleteBucket(name); err != nil {
 				return err
 			}
 		}
 
 		// Manifest
-		mb, err := b.CreateBucket(mName)
+		mb, err := b.CreateBucket(name)
 		if err != nil {
 			return err
 		}
@@ -131,7 +131,13 @@ func (s *singleSourceCacheBolt) setManifestAndLock(rev Revision, ai ProjectAnaly
 		}
 
 		// Lock
-		lb, err := b.CreateBucket(lName)
+		name[len(info)] = 'l'
+		if b.Bucket(name) != nil {
+			if err := b.DeleteBucket(name); err != nil {
+				return err
+			}
+		}
+		lb, err := b.CreateBucket(name)
 		if err != nil {
 			return err
 		}
@@ -142,37 +148,15 @@ func (s *singleSourceCacheBolt) setManifestAndLock(rev Revision, ai ProjectAnaly
 	}
 }
 
-// cache info bucket prefixes and suffixes.
-var (
-	cacheInfo     = []byte("info:")
-	cacheManifest = []byte(":manifest")
-	cacheLock     = []byte(":lock")
-)
-
-// cacheInfoNames returns the manifest and lock bucket names for ai.
-func cacheInfoNames(ai ProjectAnalyzerInfo) (manifest, lock []byte) {
-	info := ai.String()
-	l := len(cacheInfo) + len(info)
-	manifest = make([]byte, l+len(cacheManifest))
-	lock = make([]byte, l+len(cacheLock))
-
-	copy(manifest, cacheInfo)
-	copy(manifest[len(cacheInfo):], info)
-	copy(manifest[l:], cacheManifest)
-
-	copy(lock, cacheInfo)
-	copy(lock[len(cacheInfo):], info)
-	copy(lock[l:], cacheLock)
-
-	return
-}
-
 func (s *singleSourceCacheBolt) getManifestAndLock(rev Revision, ai ProjectAnalyzerInfo) (m Manifest, l Lock, ok bool) {
 	err := s.viewRevBucket(rev, func(b *bolt.Bucket) error {
-		mName, lName := cacheInfoNames(ai)
+		info := ai.String()
+		name := make([]byte, len(info)+1)
+		copy(name, info)
+		name[len(info)] = 'm'
 
 		// Manifest
-		mb := b.Bucket(mName)
+		mb := b.Bucket(name)
 		if mb == nil {
 			return nil
 		}
@@ -183,7 +167,8 @@ func (s *singleSourceCacheBolt) getManifestAndLock(rev Revision, ai ProjectAnaly
 		}
 
 		// Lock
-		lb := b.Bucket(lName)
+		name[len(info)] = 'l'
+		lb := b.Bucket(name)
 		if lb == nil {
 			ok = true
 			return nil
@@ -202,16 +187,14 @@ func (s *singleSourceCacheBolt) getManifestAndLock(rev Revision, ai ProjectAnaly
 	return
 }
 
-var cachePTree = []byte("ptree")
-
 func (s *singleSourceCacheBolt) setPackageTree(rev Revision, ptree pkgtree.PackageTree) {
 	err := s.updateRevBucket(rev, func(b *bolt.Bucket) error {
-		if b.Bucket(cachePTree) != nil {
-			if err := b.DeleteBucket(cachePTree); err != nil {
+		if b.Bucket(cacheKeyPTree) != nil {
+			if err := b.DeleteBucket(cacheKeyPTree); err != nil {
 				return err
 			}
 		}
-		ptrees, err := b.CreateBucket(cachePTree)
+		ptrees, err := b.CreateBucket(cacheKeyPTree)
 		if err != nil {
 			return err
 		}
@@ -235,14 +218,17 @@ func (s *singleSourceCacheBolt) setPackageTree(rev Revision, ptree pkgtree.Packa
 
 func (s *singleSourceCacheBolt) getPackageTree(rev Revision) (ptree pkgtree.PackageTree, ok bool) {
 	err := s.viewRevBucket(rev, func(b *bolt.Bucket) error {
-		ptrees := b.Bucket(cachePTree)
+		ptrees := b.Bucket(cacheKeyPTree)
 		if ptrees == nil {
 			return nil
 		}
 
 		pkgs := make(map[string]pkgtree.PackageOrErr)
 		err := ptrees.ForEach(func(ip, _ []byte) error {
-			poe := cacheGetPackageOrErr(ptrees.Bucket(ip))
+			poe, err := cacheGetPackageOrErr(ptrees.Bucket(ip))
+			if err != nil {
+				return err
+			}
 			if poe.Err == nil {
 				poe.P.ImportPath = string(ip)
 			}
@@ -274,28 +260,32 @@ func (s *singleSourceCacheBolt) markRevisionExists(rev Revision) {
 
 func (s *singleSourceCacheBolt) setVersionMap(pvs []PairedVersion) {
 	err := s.updateSourceBucket(func(src *bolt.Bucket) error {
-		if err := cachePrefixDelete(src, "versions:"); err != nil {
+		if err := cachePrefixDelete(src, cacheVersion); err != nil {
 			return err
 		}
-		vk := cacheTimestampedKey("versions:", time.Now())
+		vk := cacheTimestampedKey(cacheVersion, time.Now())
 		versions, err := src.CreateBucket(vk)
 		if err != nil {
 			return err
 		}
 
 		c := src.Cursor()
-		for k, _ := c.Seek(cacheRev); bytes.HasPrefix(k, cacheRev); k, _ = c.Next() {
+		for k, _ := c.Seek(cacheKeyRevision); len(k) > 0 && k[0] == cacheRevision; k, _ = c.Next() {
 			rb := src.Bucket(k)
-			if err := cachePrefixDelete(rb, "versions:"); err != nil {
+			if err := cachePrefixDelete(rb, cacheVersion); err != nil {
 				return err
 			}
 		}
 
-		for _, pv := range pvs {
+		revVersions := make(map[Revision]*bolt.Bucket)
+		key := make(nuts.Key, nuts.KeyLen(uint64(len(pvs)-1)))
+		var msg pb.Constraint
+		for i, pv := range pvs {
 			uv, rev := pv.Unpair(), pv.Revision()
-			uvB, err := cacheEncodeUnpairedVersion(uv)
+			uv.copyTo(&msg)
+			uvB, err := proto.Marshal(&msg)
 			if err != nil {
-				return errors.Wrapf(err, "failed to encode unpaired version: %v", uv)
+				return errors.Wrapf(err, "failed to serialize UnpairedVersion: %#v", uv)
 			}
 
 			if err := versions.Put(uvB, []byte(rev)); err != nil {
@@ -306,20 +296,22 @@ func (s *singleSourceCacheBolt) setVersionMap(pvs []PairedVersion) {
 			if err != nil {
 				return errors.Wrapf(err, "failed to create bucket for revision: %s", rev)
 			}
-			if err := cachePrefixDelete(b, "versions:"); err != nil {
-				return err
+
+			var versions *bolt.Bucket
+			if versions = revVersions[rev]; versions == nil {
+				err := cachePrefixDelete(b, cacheVersion)
+				if err != nil {
+					return err
+				}
+				versions, err = b.CreateBucket(vk)
+				if err != nil {
+					return errors.Wrapf(err, "failed to create bucket for revision versions: %s", rev)
+				}
+				revVersions[rev] = versions
 			}
-			versions, err := b.CreateBucket(vk)
-			if err != nil {
-				return errors.Wrapf(err, "failed to create bucket for revision versions: %s", rev)
-			}
-			i, err := versions.NextSequence()
-			if err != nil {
-				return errors.Wrapf(err, "failed to generate sequence number for revision: %s", rev)
-			}
-			k := [8]byte{}
-			binary.BigEndian.PutUint64(k[:], i)
-			if err := versions.Put(k[:], uvB); err != nil {
+
+			key.Put(uint64(i))
+			if err := versions.Put(key, uvB); err != nil {
 				return errors.Wrap(err, "failed to put revision->version")
 			}
 		}
@@ -332,15 +324,19 @@ func (s *singleSourceCacheBolt) setVersionMap(pvs []PairedVersion) {
 
 func (s *singleSourceCacheBolt) getVersionsFor(rev Revision) (uvs []UnpairedVersion, ok bool) {
 	err := s.viewRevBucket(rev, func(b *bolt.Bucket) error {
-		versions := cacheFindLatestValid(b, "versions:", s.epoch)
+		versions := cacheFindLatestValid(b, cacheVersion, s.epoch)
 		if versions == nil {
 			return nil
 		}
 
 		ok = true
 
+		var msg pb.Constraint
 		return versions.ForEach(func(_, v []byte) error {
-			uv, err := cacheDecodeUnpairedVersion(v)
+			if err := proto.Unmarshal(v, &msg); err != nil {
+				return err
+			}
+			uv, err := unpairedVersionFromCache(&msg)
 			if err != nil {
 				return err
 			}
@@ -358,15 +354,19 @@ func (s *singleSourceCacheBolt) getVersionsFor(rev Revision) (uvs []UnpairedVers
 func (s *singleSourceCacheBolt) getAllVersions() []PairedVersion {
 	var pvs []PairedVersion
 	err := s.viewSourceBucket(func(src *bolt.Bucket) error {
-		versions := cacheFindLatestValid(src, "versions:", s.epoch)
+		versions := cacheFindLatestValid(src, cacheVersion, s.epoch)
 		if versions == nil {
 			return nil
 		}
 
+		var msg pb.Constraint
 		return versions.ForEach(func(k, v []byte) error {
-			uv, err := cacheDecodeUnpairedVersion(k)
+			if err := proto.Unmarshal(k, &msg); err != nil {
+				return err
+			}
+			uv, err := unpairedVersionFromCache(&msg)
 			if err != nil {
-				return errors.Wrapf(err, "failed to decode unpaired version: %s", k)
+				return err
 			}
 			pvs = append(pvs, uv.Pair(Revision(v)))
 			return nil
@@ -381,16 +381,19 @@ func (s *singleSourceCacheBolt) getAllVersions() []PairedVersion {
 
 func (s *singleSourceCacheBolt) getRevisionFor(uv UnpairedVersion) (rev Revision, ok bool) {
 	err := s.viewSourceBucket(func(src *bolt.Bucket) error {
-		versions := cacheFindLatestValid(src, "versions:", s.epoch)
+		versions := cacheFindLatestValid(src, cacheVersion, s.epoch)
 		if versions == nil {
 			return nil
 		}
 
-		k, err := cacheEncodeUnpairedVersion(uv)
+		var msg pb.Constraint
+		uv.copyTo(&msg)
+		b, err := proto.Marshal(&msg)
 		if err != nil {
-			return err
+			return errors.Wrapf(err, "failed to serialize UnpairedVersion: %#v", uv)
 		}
-		v := versions.Get(k)
+
+		v := versions.Get(b)
 		if len(v) > 0 {
 			rev = Revision(v)
 			ok = true
@@ -426,7 +429,7 @@ func (s *singleSourceCacheBolt) toUnpaired(v Version) (uv UnpairedVersion, ok bo
 		return t.Unpair(), true
 	case Revision:
 		err := s.viewRevBucket(t, func(b *bolt.Bucket) error {
-			versions := cacheFindLatestValid(b, "versions:", s.epoch)
+			versions := cacheFindLatestValid(b, cacheVersion, s.epoch)
 			if versions == nil {
 				return nil
 			}
@@ -435,8 +438,12 @@ func (s *singleSourceCacheBolt) toUnpaired(v Version) (uv UnpairedVersion, ok bo
 			if len(v) == 0 {
 				return nil
 			}
+			var msg pb.Constraint
+			if err := proto.Unmarshal(v, &msg); err != nil {
+				return err
+			}
 			var err error
-			uv, err = cacheDecodeUnpairedVersion(v)
+			uv, err = unpairedVersionFromCache(&msg)
 			if err != nil {
 				return err
 			}
@@ -454,14 +461,11 @@ func (s *singleSourceCacheBolt) toUnpaired(v Version) (uv UnpairedVersion, ok bo
 	}
 }
 
-// cache revision bucket prefix.
-var cacheRev = []byte("rev:")
-
 // cacheRevisionName returns the bucket name for rev.
 func cacheRevisionName(rev Revision) []byte {
-	name := make([]byte, len(cacheRev)+len(rev))
-	copy(name, cacheRev)
-	copy(name[len(cacheRev):], string(rev))
+	name := make([]byte, 1+len(rev))
+	name[0] = 'r'
+	copy(name[1:], string(rev))
 	return name
 }
 
@@ -476,9 +480,9 @@ func (s *singleSourceCacheBolt) viewSourceBucket(view func(b *bolt.Bucket) error
 	})
 }
 
-// updateSourceBucket executes update with the source bucket, creating it first if necessary.
+// updateSourceBucket executes update (in batch) with the source bucket, creating it first if necessary.
 func (s *singleSourceCacheBolt) updateSourceBucket(update func(b *bolt.Bucket) error) error {
-	return s.db.Update(func(tx *bolt.Tx) error {
+	return s.db.Batch(func(tx *bolt.Tx) error {
 		b, err := tx.CreateBucketIfNotExists(s.sourceName)
 		if err != nil {
 			return errors.Wrapf(err, "failed to create bucket: %s", s.sourceName)
