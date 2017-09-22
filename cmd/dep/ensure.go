@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/golang/dep"
 	"github.com/golang/dep/internal/gps"
@@ -110,6 +111,8 @@ dep ensure -update -no-vendor
     As above, but only modify Gopkg.lock; leave vendor/ unchanged.
 
 `
+
+var errUpdateArgsValidation = errors.New("update arguments validation failed")
 
 func (cmd *ensureCommand) Name() string { return "ensure" }
 func (cmd *ensureCommand) Args() string {
@@ -345,37 +348,8 @@ func (cmd *ensureCommand) runUpdate(ctx *dep.Ctx, args []string, p *dep.Project,
 		params.ChangeAll = true
 	}
 
-	// Allow any of specified project versions to change, regardless of the lock
-	// file.
-	for _, arg := range args {
-		// Ensure the provided path has a deducible project root
-		// TODO(sdboyer) do these concurrently
-		pc, path, err := getProjectConstraint(arg, sm)
-		if err != nil {
-			// TODO(sdboyer) return all errors, not just the first one we encounter
-			// TODO(sdboyer) ensure these errors are contextualized in a sensible way for -update
-			return err
-		}
-		if path != string(pc.Ident.ProjectRoot) {
-			// TODO(sdboyer): does this really merit an abortive error?
-			return errors.Errorf("%s is not a project root, try %s instead", path, pc.Ident.ProjectRoot)
-		}
-
-		if !p.Lock.HasProjectWithRoot(pc.Ident.ProjectRoot) {
-			return errors.Errorf("%s is not present in %s, cannot -update it", pc.Ident.ProjectRoot, dep.LockName)
-		}
-
-		if pc.Ident.Source != "" {
-			return errors.Errorf("cannot specify alternate sources on -update (%s)", pc.Ident.Source)
-		}
-
-		if !gps.IsAny(pc.Constraint) {
-			// TODO(sdboyer) constraints should be allowed to allow solves that
-			// target particular versions while remaining within declared constraints
-			return errors.Errorf("version constraint %s passed for %s, but -update follows constraints declared in %s, not CLI arguments", pc.Constraint, pc.Ident.ProjectRoot, dep.ManifestName)
-		}
-
-		params.ToChange = append(params.ToChange, gps.ProjectRoot(arg))
+	if err := validateUpdateArgs(ctx, args, p, sm, &params); err != nil {
+		return err
 	}
 
 	// Re-prepare a solver now that our params are complete.
@@ -792,4 +766,78 @@ func (e pkgtreeErrs) Error() string {
 	}
 
 	return fmt.Sprintf("found %d errors in the package tree:\n%s", len(e), strings.Join(errs, "\n"))
+}
+
+func validateUpdateArgs(ctx *dep.Ctx, args []string, p *dep.Project, sm gps.SourceManager, params *gps.SolveParameters) error {
+	// Channel for receiving all the valid arguments.
+	argsCh := make(chan string, len(args))
+
+	// Channel for receiving all the validation errors.
+	errCh := make(chan error, len(args))
+
+	var wg sync.WaitGroup
+
+	// Allow any of specified project versions to change, regardless of the lock
+	// file.
+	for _, arg := range args {
+		wg.Add(1)
+
+		go func(arg string) {
+			defer wg.Done()
+
+			// Ensure the provided path has a deducible project root.
+			pc, path, err := getProjectConstraint(arg, sm)
+			if err != nil {
+				// TODO(sdboyer) ensure these errors are contextualized in a sensible way for -update
+				errCh <- err
+				return
+			}
+			if path != string(pc.Ident.ProjectRoot) {
+				// TODO(sdboyer): does this really merit an abortive error?
+				errCh <- errors.Errorf("%s is not a project root, try %s instead", path, pc.Ident.ProjectRoot)
+				return
+			}
+
+			if !p.Lock.HasProjectWithRoot(pc.Ident.ProjectRoot) {
+				errCh <- errors.Errorf("%s is not present in %s, cannot -update it", pc.Ident.ProjectRoot, dep.LockName)
+				return
+			}
+
+			if pc.Ident.Source != "" {
+				errCh <- errors.Errorf("cannot specify alternate sources on -update (%s)", pc.Ident.Source)
+				return
+			}
+
+			if !gps.IsAny(pc.Constraint) {
+				// TODO(sdboyer) constraints should be allowed to allow solves that
+				// target particular versions while remaining within declared constraints.
+				errCh <- errors.Errorf("version constraint %s passed for %s, but -update follows constraints declared in %s, not CLI arguments", pc.Constraint, pc.Ident.ProjectRoot, dep.ManifestName)
+				return
+			}
+
+			// Valid argument.
+			argsCh <- arg
+		}(arg)
+	}
+
+	wg.Wait()
+	close(errCh)
+	close(argsCh)
+
+	// Log all the errors.
+	if len(errCh) > 0 {
+		ctx.Err.Printf("Invalid arguments passed to ensure -update:\n\n")
+		for err := range errCh {
+			ctx.Err.Println("  ✗", err.Error())
+		}
+		ctx.Err.Println()
+		return errUpdateArgsValidation
+	}
+
+	// Add all the valid arguments to solve params.
+	for arg := range argsCh {
+		params.ToChange = append(params.ToChange, gps.ProjectRoot(arg))
+	}
+
+	return nil
 }
