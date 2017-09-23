@@ -580,6 +580,73 @@ func TestGitSourceListVersionsNoHEAD(t *testing.T) {
 	}
 }
 
+func TestGitSourceListVersionsNoDupes(t *testing.T) {
+	t.Parallel()
+
+	// This test is slowish, skip it on -short
+	if testing.Short() {
+		t.Skip("Skipping git source version fetching test in short mode")
+	}
+	requiresBins(t, "git")
+
+	cpath, err := ioutil.TempDir("", "smcache")
+	if err != nil {
+		t.Errorf("Failed to create temp dir: %s", err)
+	}
+	defer func() {
+		if err := os.RemoveAll(cpath); err != nil {
+			t.Errorf("removeAll failed: %s", err)
+		}
+	}()
+
+	n := "github.com/carolynvs/deptest-importers"
+	un := "https://" + n
+	u, err := url.Parse(un)
+	if err != nil {
+		t.Fatalf("Error parsing URL %s: %s", un, err)
+	}
+	mb := maybeGitSource{
+		url: u,
+	}
+
+	ctx := context.Background()
+	superv := newSupervisor(ctx)
+	src, state, err := mb.try(ctx, cpath, newMemoryCache(), superv)
+	if err != nil {
+		t.Fatalf("Unexpected error while setting up gitSource for test repo: %s", err)
+	}
+
+	wantstate := sourceIsSetUp | sourceExistsUpstream | sourceHasLatestVersionList
+	if state != wantstate {
+		t.Errorf("Expected return state to be %v, got %v", wantstate, state)
+	}
+
+	err = src.initLocal(ctx)
+	if err != nil {
+		t.Fatalf("Error on cloning git repo: %s", err)
+	}
+
+	pvlist, err := src.listVersions(ctx)
+	if err != nil {
+		t.Fatalf("Unexpected error getting version pairs from git repo: %s", err)
+	}
+
+	for i := range pvlist {
+		pv1 := pvlist[i]
+		uv1 := pv1.Unpair()
+		for j := range pvlist {
+			if i == j {
+				continue
+			}
+			pv2 := pvlist[j]
+			uv2 := pv2.Unpair()
+			if uv1 == uv2 {
+				t.Errorf("duplicate version pair mapping from %#v to both %q and %q", uv1, pv1.Revision(), pv2.Revision())
+			}
+		}
+	}
+}
+
 func Test_bzrSource_exportRevisionTo_removeVcsFiles(t *testing.T) {
 	t.Parallel()
 
