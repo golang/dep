@@ -1,5 +1,10 @@
 # v0.3.2 (Unreleased)
 
+BUG FIXES:
+
+* Fix `status` shows incorrect reason for lock mismatch when ignoring packages.
+(#1216)
+
 IMPROVEMENTS:
 
 * File name case check is now performed on `Gopkg.toml` and `Gopkg.lock`.
