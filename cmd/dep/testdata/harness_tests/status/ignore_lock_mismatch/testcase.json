@@ -1,0 +1,7 @@
+{
+  "commands": [
+    ["status"]
+  ],
+  "error-expected": "inputs-digest mismatch",
+  "vendor-final": []
+}
