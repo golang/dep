@@ -77,19 +77,19 @@ func (c *multiCache) getVersionsFor(rev Revision) ([]UnpairedVersion, bool) {
 	return c.disk.getVersionsFor(rev)
 }
 
-func (c *multiCache) getAllVersions() []PairedVersion {
-	pvs := c.mem.getAllVersions()
-	if pvs != nil {
-		return pvs
+func (c *multiCache) getAllVersions() ([]PairedVersion, bool) {
+	pvs, ok := c.mem.getAllVersions()
+	if ok {
+		return pvs, true
 	}
 
-	pvs = c.disk.getAllVersions()
-	if pvs != nil {
+	pvs, ok = c.disk.getAllVersions()
+	if ok {
 		c.mem.setVersionMap(pvs)
-		return pvs
+		return pvs, true
 	}
 
-	return nil
+	return nil, false
 }
 
 func (c *multiCache) getRevisionFor(uv UnpairedVersion) (Revision, bool) {

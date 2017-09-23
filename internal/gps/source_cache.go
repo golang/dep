@@ -43,7 +43,7 @@ type singleSourceCache interface {
 	getVersionsFor(Revision) ([]UnpairedVersion, bool)
 
 	// Gets all the version pairs currently known to the cache.
-	getAllVersions() []PairedVersion
+	getAllVersions() ([]PairedVersion, bool)
 
 	// Get the revision corresponding to the given unpaired version.
 	getRevisionFor(UnpairedVersion) (Revision, bool)
@@ -169,17 +169,17 @@ func (c *singleSourceCacheMemory) getVersionsFor(r Revision) ([]UnpairedVersion,
 	return versionList, has
 }
 
-func (c *singleSourceCacheMemory) getAllVersions() []PairedVersion {
+func (c *singleSourceCacheMemory) getAllVersions() ([]PairedVersion, bool) {
 	c.mut.Lock()
 	vList := c.vList
 	c.mut.Unlock()
 
 	if vList == nil {
-		return nil
+		return nil, false
 	}
 	cp := make([]PairedVersion, len(vList))
 	copy(cp, vList)
-	return cp
+	return cp, true
 }
 
 func (c *singleSourceCacheMemory) getRevisionFor(uv UnpairedVersion) (Revision, bool) {

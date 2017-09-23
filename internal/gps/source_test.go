@@ -60,8 +60,8 @@ func testSourceGateway(t *testing.T) {
 				t.Fatalf("error on cloning git repo: %s", err)
 			}
 
-			cvlist := sg.cache.getAllVersions()
-			if len(cvlist) != 4 {
+			cvlist, ok := sg.cache.getAllVersions()
+			if !ok || len(cvlist) != 4 {
 				t.Fatalf("repo setup should've cached four versions, got %v: %s", len(cvlist), cvlist)
 			}
 
