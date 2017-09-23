@@ -2,6 +2,6 @@
   "commands": [
     ["status"]
   ],
-  "error-expected": "inputs-digest mismatch",
+  "error-expected": "This happens when Gopkg.toml is modified",
   "vendor-final": []
 }
