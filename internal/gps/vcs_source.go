@@ -376,11 +376,7 @@ func (s *bzrSource) exportRevisionTo(ctx context.Context, rev Revision, to strin
 		return err
 	}
 
-	if err := os.RemoveAll(filepath.Join(to, ".bzr")); err != nil {
-		return err
-	}
-
-	return nil
+	return os.RemoveAll(filepath.Join(to, ".bzr"))
 }
 
 func (s *bzrSource) listVersions(ctx context.Context) ([]PairedVersion, error) {
@@ -457,11 +453,7 @@ func (s *hgSource) exportRevisionTo(ctx context.Context, rev Revision, to string
 		return err
 	}
 
-	if err := os.RemoveAll(filepath.Join(to, ".hg")); err != nil {
-		return err
-	}
-
-	return nil
+	return os.RemoveAll(filepath.Join(to, ".hg"))
 }
 
 func (s *hgSource) listVersions(ctx context.Context) ([]PairedVersion, error) {
