@@ -2,6 +2,8 @@
 
 IMPROVEMENTS:
 
+* `dep ensure -add` now concurrently fetches the source and adds the projects.
+(#1218)
 * File name case check is now performed on `Gopkg.toml` and `Gopkg.lock`.
 (#1114)
 * gps: gps now supports pruning. (#1020)
