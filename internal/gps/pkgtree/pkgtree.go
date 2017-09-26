@@ -555,19 +555,8 @@ func (t PackageTree) ToReachMap(main, tests, backprop bool, ignore map[string]bo
 		ignore = make(map[string]bool)
 	}
 
-	// Declare a radix tree for ignore prefixes
-	var xt *radix.Tree
-
-	for i := range ignore {
-		if strings.HasSuffix(i, wcIgnoreSuffix) {
-			// Create trie if it doesn't exists
-			if xt == nil {
-				xt = radix.New()
-			}
-			i = strings.TrimSuffix(i, wcIgnoreSuffix)
-			xt.Insert(i, true)
-		}
-	}
+	// Radix tree for ignore prefixes.
+	xt := CreateIgnorePrefixTree(ignore)
 
 	// world's simplest adjacency list
 	workmap := make(map[string]wm)
@@ -1052,4 +1041,29 @@ func uniq(a []string) []string {
 		}
 	}
 	return a[:i]
+}
+
+// CreateIgnorePrefixTree takes a set of strings to be ignored and returns a
+// trie consisting of strings prefixed with wildcard ignore suffix (*).
+func CreateIgnorePrefixTree(ig map[string]bool) *radix.Tree {
+	var xt *radix.Tree
+
+	for i := range ig {
+		// Skip global ignore.
+		if i == "*" {
+			continue
+		}
+
+		// Check if it's a recursive ignore.
+		if strings.HasSuffix(i, wcIgnoreSuffix) {
+			// Create trie if it doesn't exists.
+			if xt == nil {
+				xt = radix.New()
+			}
+			// Create the ignore prefix and insert in the radix tree.
+			xt.Insert(i[:len(i)-len(wcIgnoreSuffix)], true)
+		}
+	}
+
+	return xt
 }
