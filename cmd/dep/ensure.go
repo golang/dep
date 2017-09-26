@@ -22,7 +22,6 @@ import (
 	"github.com/golang/dep/internal/gps/paths"
 	"github.com/golang/dep/internal/gps/pkgtree"
 	"github.com/pkg/errors"
-	"golang.org/x/sync/syncmap"
 )
 
 const ensureShortHelp = `Ensure a dependency is safely vendored in the project`
@@ -470,9 +469,10 @@ func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm
 		constraint gps.Constraint
 		typ        addType
 	}
+	addInstructions := make(map[gps.ProjectRoot]addInstruction)
 
-	// Create a syncmap to store all the addInstruction(s) concurrently.
-	addInstructions := new(syncmap.Map)
+	// A mutex for limited access to addInstructions by goroutines.
+	var mutex sync.Mutex
 
 	// Channel for receiving all the errors.
 	errCh := make(chan error, len(args))
@@ -519,8 +519,10 @@ func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm
 
 			someConstraint := !gps.IsAny(pc.Constraint) || pc.Ident.Source != ""
 
-			instrInterface, has := addInstructions.LoadOrStore(pc.Ident.ProjectRoot, addInstruction{})
-			instr := instrInterface.(addInstruction)
+			// Obtain a lock for addInstructions
+			mutex.Lock()
+			defer mutex.Unlock()
+			instr, has := addInstructions[pc.Ident.ProjectRoot]
 			if has {
 				// Multiple packages from the same project were specified as
 				// arguments; make sure they agree on declared constraints.
@@ -575,7 +577,7 @@ func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm
 				instr.ephReq[path] = true
 			}
 
-			addInstructions.Store(pc.Ident.ProjectRoot, instr)
+			addInstructions[pc.Ident.ProjectRoot] = instr
 		}(arg)
 	}
 
@@ -597,9 +599,7 @@ func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm
 
 	// We're now sure all of our add instructions are individually and mutually
 	// valid, so it's safe to begin modifying the input parameters.
-	addInstructions.Range(func(ki, vi interface{}) bool {
-		pr := ki.(gps.ProjectRoot)
-		instr := vi.(addInstruction)
+	for pr, instr := range addInstructions {
 		// The arg processing logic above only adds to the ephReq list if
 		// that package definitely needs to be on that list, so we don't
 		// need to check instr.typ here - if it's in instr.ephReq, it
@@ -616,9 +616,7 @@ func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm
 				Constraint: instr.constraint,
 			}
 		}
-
-		return true
-	})
+	}
 
 	// Re-prepare a solver now that our params are complete.
 	solver, err = gps.Prepare(params, sm)
@@ -636,10 +634,7 @@ func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm
 	var reqlist []string
 	appender := dep.NewManifest()
 
-	addInstructions.Range(func(ki, vi interface{}) bool {
-		pr := ki.(gps.ProjectRoot)
-		instr := vi.(addInstruction)
-
+	for pr, instr := range addInstructions {
 		for path := range instr.ephReq {
 			reqlist = append(reqlist, path)
 		}
@@ -667,9 +662,7 @@ func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm
 			}
 			appender.Constraints[pr] = pp
 		}
-
-		return true
-	})
+	}
 
 	extra, err := appender.MarshalTOML()
 	if err != nil {
