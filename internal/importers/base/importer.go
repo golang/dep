@@ -183,7 +183,10 @@ func (i *Importer) ImportPackages(packages []ImportedPackage, defaultConstraintF
 		source := prj.Source
 		if len(source) > 0 {
 			isDefault, err := i.isDefaultSource(prj.Root, source)
-			if err == nil && isDefault {
+			if err != nil {
+				i.Logger.Printf("  Ignoring imported source %s for %s: %s", source, prj.Root, err.Error())
+				source = ""
+			} else if isDefault {
 				source = ""
 			}
 		}
@@ -301,6 +304,9 @@ func (i *Importer) convertToConstraint(v gps.Version) gps.Constraint {
 }
 
 func (i *Importer) isDefaultSource(projectRoot gps.ProjectRoot, sourceURL string) (bool, error) {
+	// this condition is mainly for gopkg.in imports,
+	// as some importers specify the repository url as https://gopkg.in/...,
+	// but sm.SourceURLsForPath() returns https://github.com/... urls for gopkg.in
 	if sourceURL == "https://"+string(projectRoot) {
 		return true, nil
 	}

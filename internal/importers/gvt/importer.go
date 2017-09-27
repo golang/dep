@@ -25,7 +25,7 @@ type Importer struct {
 	gvtConfig gvtManifest
 }
 
-// NewImporter for gvt.
+// NewImporter for gvt. It handles gb (gb-vendor) too as they share a common manifest file & format
 func NewImporter(logger *log.Logger, verbose bool, sm gps.SourceManager) *Importer {
 	return &Importer{Importer: base.NewImporter(logger, verbose, sm)}
 }
