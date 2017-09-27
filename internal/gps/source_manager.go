@@ -257,7 +257,7 @@ func NewSourceManager(c SourceManagerConfig) (*SourceMgr, error) {
 		// The first time this is evaluated, duration will be very large as lasttime is 0.
 		// Unless time travel is invented and someone travels back to the year 1, we should
 		// be ok.
-		if duration > 14*time.Second {
+		if duration > 15*time.Second {
 			fmt.Fprintf(os.Stderr, "waiting for lockfile %s: %s\n", glpath, err.Error())
 			lasttime = nowtime
 		}
