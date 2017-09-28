@@ -1048,7 +1048,15 @@ func uniq(a []string) []string {
 func CreateIgnorePrefixTree(ig map[string]bool) *radix.Tree {
 	var xt *radix.Tree
 
-	for i := range ig {
+	// Create a sorted list of all the ignores to have a proper order in
+	// ignores parsing.
+	sortedIgnores := make([]string, len(ig))
+	for k := range ig {
+		sortedIgnores = append(sortedIgnores, k)
+	}
+	sort.Strings(sortedIgnores)
+
+	for _, i := range sortedIgnores {
 		// Skip global ignore.
 		if i == "*" {
 			continue
@@ -1059,6 +1067,12 @@ func CreateIgnorePrefixTree(ig map[string]bool) *radix.Tree {
 			// Create trie if it doesn't exists.
 			if xt == nil {
 				xt = radix.New()
+			}
+			// Check if it is ineffectual.
+			_, _, ok := xt.LongestPrefix(i)
+			if ok {
+				// Skip ineffectual wildcard ignore.
+				continue
 			}
 			// Create the ignore prefix and insert in the radix tree.
 			xt.Insert(i[:len(i)-len(wcIgnoreSuffix)], true)
