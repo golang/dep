@@ -1,0 +1,23 @@
+{
+  "version": "0",
+  "dependencies": [
+    {
+      "importpath": "github.com/sdboyer/deptest",
+      "repository": "https://github.com/carolynvs/deptest",
+      "revision": "3f4c3bea144e112a69bbe5d8d01c1b09a544253f",
+      "branch": "HEAD"
+    },
+    {
+      "importpath": "github.com/sdboyer/deptestdos",
+      "repository": "https://github.com/sdboyer/deptestdos",
+      "revision": "5c607206be5decd28e6263ffffdcee067266015eXXX",
+      "branch": "master"
+    },
+    {
+      "importpath": "gopkg.in/yaml.v2",
+      "repository": "https://gopkg.in/yaml.v2",
+      "revision": "f7716cbe52baa25d2e9b0d0da546fcf909fc16b4",
+      "branch": "v2"
+    }
+  ]
+}

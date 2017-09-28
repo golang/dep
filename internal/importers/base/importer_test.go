@@ -370,6 +370,30 @@ func TestBaseImporter_ImportProjects(t *testing.T) {
 				},
 			},
 		},
+		"alternate source": {
+			importertest.TestCase{
+				WantConstraint: "*",
+				WantSourceRepo: importertest.ProjectSrc,
+			},
+			[]ImportedPackage{
+				{
+					Name:   importertest.Project,
+					Source: importertest.ProjectSrc,
+				},
+			},
+		},
+		"ignoring default source": {
+			importertest.TestCase{
+				WantConstraint: "*",
+				WantSourceRepo: "",
+			},
+			[]ImportedPackage{
+				{
+					Name:   importertest.Project,
+					Source: "https://" + importertest.Project,
+				},
+			},
+		},
 	}
 
 	for name, tc := range testcases {

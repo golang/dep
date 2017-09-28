@@ -1,0 +1,19 @@
+{
+  "dependencies": [
+    {
+      "importpath": "github.com/sdboyer/deptest",
+      "revision": "3f4c3bea144e112a69bbe5d8d01c1b09a544253f",
+      "branch": "HEAD"
+    },
+    {
+      "importpath": "github.com/sdboyer/deptestdos",
+      "revision": "5c607206be5decd28e6263ffffdcee067266015e",
+      "branch": "master"
+    },
+    {
+      "importpath": "github.com/carolynvs/deptest-importers",
+      "revision": "b79bc9482da8bb7402cdc3e3fd984db250718dd7",
+      "branch": "v2" 
+    }
+  ]
+}
