@@ -566,7 +566,7 @@ func runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceMana
 	//
 	// It's possible for digests to not match, but still have a correct
 	// lock.
-	rm, _ := ptree.ToReachMap(true, true, false, nil)
+	rm, _ := ptree.ToReachMap(true, true, false, p.Manifest.IgnoredPackages())
 
 	external := rm.FlattenFn(paths.IsStandardImportPath)
 	roots := make(map[gps.ProjectRoot][]string, len(external))
@@ -603,9 +603,6 @@ func runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceMana
 
 	out.MissingHeader()
 
-	// Ignored packages.
-	igPkgs := p.Manifest.IgnoredPackages()
-
 outer:
 	for root, pkgs := range roots {
 		// TODO also handle the case where the project is present, but there
@@ -614,10 +611,6 @@ outer:
 			if lp.Ident().ProjectRoot == root {
 				continue outer
 			}
-		}
-
-		if _, ok := igPkgs[string(root)]; ok {
-			continue outer
 		}
 
 		hasMissingPkgs = true
