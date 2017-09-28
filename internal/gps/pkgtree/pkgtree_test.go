@@ -2086,6 +2086,17 @@ func TestCreateIgnorePrefixTree(t *testing.T) {
 			wantInTree:    []string{"gophers", "x/y/z"},
 			notWantInTree: []string{"*", "a/b/c"},
 		},
+		{
+			name: "ineffectual ignore with wildcard",
+			ignoreMap: map[string]bool{
+				"a/b*":    true,
+				"a/b/c*":  true,
+				"a/b/x/y": true,
+				"a/c*":    true,
+			},
+			wantInTree:    []string{"a/b", "a/c"},
+			notWantInTree: []string{"a/b/c", "a/b/x/y"},
+		},
 	}
 
 	for _, c := range cases {
