@@ -112,7 +112,10 @@ dep ensure -update -no-vendor
 
 `
 
-var errUpdateArgsValidation = errors.New("update arguments validation failed")
+var (
+	errUpdateArgsValidation = errors.New("update arguments validation failed")
+	errAddDepsFailed        = errors.New("adding dependencies failed")
+)
 
 func (cmd *ensureCommand) Name() string { return "ensure" }
 func (cmd *ensureCommand) Args() string {
@@ -468,86 +471,130 @@ func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm
 	}
 	addInstructions := make(map[gps.ProjectRoot]addInstruction)
 
-	for _, arg := range args {
-		// TODO(sdboyer) return all errors, not just the first one we encounter
-		// TODO(sdboyer) do these concurrently?
-		pc, path, err := getProjectConstraint(arg, sm)
-		if err != nil {
-			// TODO(sdboyer) ensure these errors are contextualized in a sensible way for -add
-			return err
+	// A mutex for limited access to addInstructions by goroutines.
+	var mutex sync.Mutex
+
+	// Channel for receiving all the errors.
+	errCh := make(chan error, len(args))
+
+	var wg sync.WaitGroup
+
+	fmt.Println("Fetching sources...")
+
+	for i, arg := range args {
+		wg.Add(1)
+
+		if ctx.Verbose {
+			ctx.Err.Printf("(%d/%d) %s\n", i+1, len(args), arg)
 		}
 
-		// check if the the parsed path is the current root path
-		if strings.EqualFold(string(p.ImportRoot), string(pc.Ident.ProjectRoot)) {
-			return errors.New("cannot add current project to itself")
-		}
+		go func(arg string) {
+			defer wg.Done()
 
-		inManifest := p.Manifest.HasConstraintsOn(pc.Ident.ProjectRoot)
-		inImports := exrmap[pc.Ident.ProjectRoot]
-		if inManifest && inImports {
-			return errors.Errorf("nothing to -add, %s is already in %s and the project's direct imports or required list", pc.Ident.ProjectRoot, dep.ManifestName)
-		}
+			pc, path, err := getProjectConstraint(arg, sm)
+			if err != nil {
+				// TODO(sdboyer) ensure these errors are contextualized in a sensible way for -add
+				errCh <- err
+				return
+			}
 
-		err = sm.SyncSourceFor(pc.Ident)
-		if err != nil {
-			return errors.Wrapf(err, "failed to fetch source for %s", pc.Ident.ProjectRoot)
-		}
+			// check if the the parsed path is the current root path
+			if strings.EqualFold(string(p.ImportRoot), string(pc.Ident.ProjectRoot)) {
+				errCh <- errors.New("cannot add current project to itself")
+				return
+			}
 
-		someConstraint := !gps.IsAny(pc.Constraint) || pc.Ident.Source != ""
+			inManifest := p.Manifest.HasConstraintsOn(pc.Ident.ProjectRoot)
+			inImports := exrmap[pc.Ident.ProjectRoot]
+			if inManifest && inImports {
+				errCh <- errors.Errorf("nothing to -add, %s is already in %s and the project's direct imports or required list", pc.Ident.ProjectRoot, dep.ManifestName)
+				return
+			}
 
-		instr, has := addInstructions[pc.Ident.ProjectRoot]
-		if has {
-			// Multiple packages from the same project were specified as
-			// arguments; make sure they agree on declared constraints.
-			// TODO(sdboyer) until we have a general method for checking constraint equality, only allow one to declare
-			if someConstraint {
-				if !gps.IsAny(instr.constraint) || instr.id.Source != "" {
-					return errors.Errorf("can only specify rules once per project being added; rules were given at least twice for %s", pc.Ident.ProjectRoot)
+			err = sm.SyncSourceFor(pc.Ident)
+			if err != nil {
+				errCh <- errors.Wrapf(err, "failed to fetch source for %s", pc.Ident.ProjectRoot)
+				return
+			}
+
+			someConstraint := !gps.IsAny(pc.Constraint) || pc.Ident.Source != ""
+
+			// Obtain a lock for addInstructions
+			mutex.Lock()
+			defer mutex.Unlock()
+			instr, has := addInstructions[pc.Ident.ProjectRoot]
+			if has {
+				// Multiple packages from the same project were specified as
+				// arguments; make sure they agree on declared constraints.
+				// TODO(sdboyer) until we have a general method for checking constraint equality, only allow one to declare
+				if someConstraint {
+					if !gps.IsAny(instr.constraint) || instr.id.Source != "" {
+						errCh <- errors.Errorf("can only specify rules once per project being added; rules were given at least twice for %s", pc.Ident.ProjectRoot)
+						return
+					}
+					instr.constraint = pc.Constraint
+					instr.id = pc.Ident
 				}
+			} else {
+				instr.ephReq = make(map[string]bool)
 				instr.constraint = pc.Constraint
 				instr.id = pc.Ident
 			}
-		} else {
-			instr.ephReq = make(map[string]bool)
-			instr.constraint = pc.Constraint
-			instr.id = pc.Ident
-		}
 
-		if inManifest {
-			if someConstraint {
-				return errors.Errorf("%s already contains rules for %s, cannot specify a version constraint or alternate source", dep.ManifestName, path)
-			}
-
-			instr.ephReq[path] = true
-			instr.typ |= isInManifest
-		} else if inImports {
-			if !someConstraint {
-				if exmap[path] {
-					return errors.Errorf("%s is already imported or required, so -add is only valid with a constraint", path)
+			if inManifest {
+				if someConstraint {
+					errCh <- errors.Errorf("%s already contains rules for %s, cannot specify a version constraint or alternate source", dep.ManifestName, path)
+					return
 				}
 
-				// No constraints, but the package isn't imported; require it.
-				// TODO(sdboyer) this case seems like it's getting overly specific and risks muddying the water more than it helps
 				instr.ephReq[path] = true
-				instr.typ |= isInImportsNoConstraint
-			} else {
-				// Don't require on this branch if the path was a ProjectRoot;
-				// most common here will be the user adding constraints to
-				// something they already imported, and if they specify the
-				// root, there's a good chance they don't actually want to
-				// require the project's root package, but are just trying to
-				// indicate which project should receive the constraints.
-				if !exmap[path] && string(pc.Ident.ProjectRoot) != path {
-					instr.ephReq[path] = true
-				}
-				instr.typ |= isInImportsWithConstraint
-			}
-		} else {
-			instr.typ |= isInNeither
-			instr.ephReq[path] = true
-		}
+				instr.typ |= isInManifest
+			} else if inImports {
+				if !someConstraint {
+					if exmap[path] {
+						errCh <- errors.Errorf("%s is already imported or required, so -add is only valid with a constraint", path)
+						return
+					}
 
-		addInstructions[pc.Ident.ProjectRoot] = instr
+					// No constraints, but the package isn't imported; require it.
+					// TODO(sdboyer) this case seems like it's getting overly specific and risks muddying the water more than it helps
+					instr.ephReq[path] = true
+					instr.typ |= isInImportsNoConstraint
+				} else {
+					// Don't require on this branch if the path was a ProjectRoot;
+					// most common here will be the user adding constraints to
+					// something they already imported, and if they specify the
+					// root, there's a good chance they don't actually want to
+					// require the project's root package, but are just trying to
+					// indicate which project should receive the constraints.
+					if !exmap[path] && string(pc.Ident.ProjectRoot) != path {
+						instr.ephReq[path] = true
+					}
+					instr.typ |= isInImportsWithConstraint
+				}
+			} else {
+				instr.typ |= isInNeither
+				instr.ephReq[path] = true
+			}
+
+			addInstructions[pc.Ident.ProjectRoot] = instr
+		}(arg)
+	}
+
+	wg.Wait()
+	close(errCh)
+
+	// Newline after printing the fetching source output.
+	ctx.Err.Println()
+
+	// Log all the errors.
+	if len(errCh) > 0 {
+		ctx.Err.Printf("Failed to add the dependencies:\n\n")
+		for err := range errCh {
+			ctx.Err.Println("  ✗", err.Error())
+		}
+		ctx.Err.Println()
+		return errAddDepsFailed
 	}
 
 	// We're now sure all of our add instructions are individually and mutually
