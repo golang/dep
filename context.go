@@ -39,7 +39,7 @@ type Ctx struct {
 	GOPATHs        []string    // Other Go paths.
 	Out, Err       *log.Logger // Required loggers.
 	Verbose        bool        // Enables more verbose logging.
-	DisableLocking bool        // When set, disables locking.
+	DisableLocking bool        // When set, no lock file will be created to protect against simultaneous dep processes.
 }
 
 // SetPaths sets the WorkingDir and GOPATHs fields. If GOPATHs is empty, then
