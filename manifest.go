@@ -67,7 +67,7 @@ func validateManifest(s string) ([]error, error) {
 	// Load the TomlTree from string
 	tree, err := toml.Load(s)
 	if err != nil {
-		return warns, errors.Wrap(err, "Unable to load TomlTree from string")
+		return warns, errors.Wrap(err, "unable to load TomlTree from string")
 	}
 	// Convert tree to a map
 	manifest := tree.ToMap()
@@ -114,7 +114,7 @@ func validateManifest(s string) ([]error, error) {
 								}
 							default:
 								// unknown/invalid key
-								warns = append(warns, fmt.Errorf("Invalid key %q in %q", key, prop))
+								warns = append(warns, fmt.Errorf("invalid key %q in %q", key, prop))
 							}
 						}
 					}
@@ -152,7 +152,7 @@ func validateManifest(s string) ([]error, error) {
 				}
 			}
 		default:
-			warns = append(warns, fmt.Errorf("Unknown field in manifest: %v", prop))
+			warns = append(warns, fmt.Errorf("unknown field in manifest: %v", prop))
 		}
 	}
 
@@ -206,18 +206,18 @@ func readManifest(r io.Reader) (*Manifest, []error, error) {
 	buf := &bytes.Buffer{}
 	_, err := buf.ReadFrom(r)
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "Unable to read byte stream")
+		return nil, nil, errors.Wrap(err, "unable to read byte stream")
 	}
 
 	warns, err := validateManifest(buf.String())
 	if err != nil {
-		return nil, warns, errors.Wrap(err, "Manifest validation failed")
+		return nil, warns, errors.Wrap(err, "manifest validation failed")
 	}
 
 	raw := rawManifest{}
 	err = toml.Unmarshal(buf.Bytes(), &raw)
 	if err != nil {
-		return nil, warns, errors.Wrap(err, "Unable to parse the manifest as TOML")
+		return nil, warns, errors.Wrap(err, "unable to parse the manifest as TOML")
 	}
 
 	m, err := fromRawManifest(raw)
