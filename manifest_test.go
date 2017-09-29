@@ -44,7 +44,11 @@ func TestReadManifest(t *testing.T) {
 				Constraint: gps.NewBranch("master"),
 			},
 		},
-		Ignored: []string{"github.com/foo/bar"},
+		Ignored:      []string{"github.com/foo/bar"},
+		PruneOptions: gps.PruneNestedVendorDirs | gps.PruneNonGoFiles,
+		PruneProjectOptions: gps.PruneProjectOptions{
+			gps.ProjectRoot("github.com/golang/dep"): gps.PruneNestedVendorDirs,
+		},
 	}
 
 	if !reflect.DeepEqual(got.Constraints, want.Constraints) {
@@ -78,6 +82,11 @@ func TestWriteManifest(t *testing.T) {
 	}
 	m.Ignored = []string{"github.com/foo/bar"}
 
+	m.PruneOptions = gps.PruneNestedVendorDirs | gps.PruneNonGoFiles
+	m.PruneProjectOptions = gps.PruneProjectOptions{
+		gps.ProjectRoot("github.com/golang/dep"): gps.PruneNestedVendorDirs,
+	}
+
 	got, err := m.MarshalTOML()
 	if err != nil {
 		t.Fatalf("error while marshaling valid manifest to TOML: %q", err)
@@ -89,7 +98,7 @@ func TestWriteManifest(t *testing.T) {
 				t.Fatal(err)
 			}
 		} else {
-			t.Errorf("valid manifest did not marshal to TOML as expected:\n\t(GOT): %s\n\t(WNT): %s", string(got), want)
+			t.Errorf("valid manifest did not marshal to TOML as expected:\n(GOT):\n%s\n(WNT):\n%s", string(got), want)
 		}
 	}
 }
@@ -367,6 +376,32 @@ func TestValidateManifest(t *testing.T) {
 			`,
 			wantWarn:  []error{errors.New("revision \"8d43f8c0b836\" should not be in abbreviated form")},
 			wantError: nil,
+		},
+		{
+			name: "valid prune options",
+			tomlString: `
+			[[constraint]]
+			  name = "github.com/foo/bar"
+			  version = "1.0.0"
+
+			[prune]
+			  non-go = true
+			`,
+			wantWarn:  []error{},
+			wantError: nil,
+		},
+		{
+			name: "invalid root prune options",
+			tomlString: `
+			[[constraint]]
+			  name = "github.com/foo/bar"
+			  version = "1.0.0"
+
+			[prune]
+			  non-go = false
+			`,
+			wantWarn:  []error{},
+			wantError: errInvalidRootPruneValue,
 		},
 	}
 
