@@ -39,7 +39,7 @@ type locker interface {
 	GetOwner() (*os.Process, error)
 }
 
-// A falselocker adheres to the locker inteface and it's purpose is to quietly
+// A falselocker adheres to the locker interface and its purpose is to quietly
 // fail to lock when the DEPNOLOCK environment variable is set.
 //
 // This allows dep to run on systems where file locking doesn't work --
