@@ -251,7 +251,7 @@ func (cmd *ensureCommand) runDefault(ctx *dep.Ctx, args []string, p *dep.Project
 		// that "verification" is supposed to look like (#121); in the meantime,
 		// we unconditionally write out vendor/ so that `dep ensure`'s behavior
 		// is maximally compatible with what it will eventually become.
-		sw, err := dep.NewSafeWriter(nil, p.Lock, p.Lock, dep.VendorAlways)
+		sw, err := dep.NewSafeWriter(nil, nil, p.Lock, p.Lock, dep.VendorAlways)
 		if err != nil {
 			return err
 		}
@@ -277,7 +277,7 @@ func (cmd *ensureCommand) runDefault(ctx *dep.Ctx, args []string, p *dep.Project
 	if cmd.noVendor {
 		vendorBehavior = dep.VendorNever
 	}
-	sw, err := dep.NewSafeWriter(nil, p.Lock, dep.LockFromSolution(solution), vendorBehavior)
+	sw, err := dep.NewSafeWriter(nil, nil, p.Lock, dep.LockFromSolution(solution), vendorBehavior)
 	if err != nil {
 		return err
 	}
@@ -302,7 +302,7 @@ func (cmd *ensureCommand) runVendorOnly(ctx *dep.Ctx, args []string, p *dep.Proj
 	}
 	// Pass the same lock as old and new so that the writer will observe no
 	// difference and choose not to write it out.
-	sw, err := dep.NewSafeWriter(nil, p.Lock, p.Lock, dep.VendorAlways)
+	sw, err := dep.NewSafeWriter(nil, nil, p.Lock, p.Lock, dep.VendorAlways)
 	if err != nil {
 		return err
 	}
@@ -369,7 +369,7 @@ func (cmd *ensureCommand) runUpdate(ctx *dep.Ctx, args []string, p *dep.Project,
 		return errors.Wrap(err, "ensure Solve()")
 	}
 
-	sw, err := dep.NewSafeWriter(nil, p.Lock, dep.LockFromSolution(solution), dep.VendorOnChanged)
+	sw, err := dep.NewSafeWriter(nil, nil, p.Lock, dep.LockFromSolution(solution), dep.VendorOnChanged)
 	if err != nil {
 		return err
 	}
@@ -670,7 +670,7 @@ func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm
 	}
 	sort.Strings(reqlist)
 
-	sw, err := dep.NewSafeWriter(nil, p.Lock, dep.LockFromSolution(solution), dep.VendorOnChanged)
+	sw, err := dep.NewSafeWriter(nil, nil, p.Lock, dep.LockFromSolution(solution), dep.VendorOnChanged)
 	if err != nil {
 		return err
 	}
