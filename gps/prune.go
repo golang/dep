@@ -16,9 +16,12 @@ import (
 // PruneOptions represents the pruning options used to write the dependecy tree.
 type PruneOptions uint8
 
+// PruneProjectOptions is map of prune options per project name.
+type PruneProjectOptions map[ProjectRoot]PruneOptions
+
 const (
 	// PruneNestedVendorDirs indicates if nested vendor directories should be pruned.
-	PruneNestedVendorDirs = 1 << iota
+	PruneNestedVendorDirs PruneOptions = 1 << iota
 	// PruneUnusedPackages indicates if unused Go packages should be pruned.
 	PruneUnusedPackages
 	// PruneNonGoFiles indicates if non-Go files should be pruned.
