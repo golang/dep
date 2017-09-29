@@ -477,7 +477,7 @@ func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm
 
 	var wg sync.WaitGroup
 
-	fmt.Println("Fetching sources...")
+	ctx.Out.Println("Fetching sources...")
 
 	for i, arg := range args {
 		wg.Add(1)
