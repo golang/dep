@@ -206,10 +206,13 @@ func (params SolveParameters) toRootdata() (rootdata, error) {
 		rd.ovr = make(ProjectConstraints)
 	}
 
+	// Create ignore prefix tree using the provided ignore packages
+	rd.igpfx = pkgtree.CreateIgnorePrefixTree(rd.ig)
+
 	if len(rd.ig) != 0 {
 		var both []string
 		for pkg := range params.Manifest.RequiredPackages() {
-			if rd.ig[pkg] {
+			if rd.isIgnored(pkg) {
 				both = append(both, pkg)
 			}
 		}
@@ -261,9 +264,6 @@ func (params SolveParameters) toRootdata() (rootdata, error) {
 		}
 		rd.chng[p] = struct{}{}
 	}
-
-	// Create ignore prefix tree using the provided ignore packages
-	rd.igpfx = pkgtree.CreateIgnorePrefixTree(rd.ig)
 
 	return rd, nil
 }
