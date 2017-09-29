@@ -34,11 +34,12 @@ import (
 //	}
 //
 type Ctx struct {
-	WorkingDir string      // Where to execute.
-	GOPATH     string      // Selected Go path, containing WorkingDir.
-	GOPATHs    []string    // Other Go paths.
-	Out, Err   *log.Logger // Required loggers.
-	Verbose    bool        // Enables more verbose logging.
+	WorkingDir     string      // Where to execute.
+	GOPATH         string      // Selected Go path, containing WorkingDir.
+	GOPATHs        []string    // Other Go paths.
+	Out, Err       *log.Logger // Required loggers.
+	Verbose        bool        // Enables more verbose logging.
+	DisableLocking bool        // When set, no lock file will be created to protect against simultaneous dep processes.
 }
 
 // SetPaths sets the WorkingDir and GOPATHs fields. If GOPATHs is empty, then
@@ -87,8 +88,9 @@ func defaultGOPATH() string {
 // initialized to log to the receiver's logger.
 func (c *Ctx) SourceManager() (*gps.SourceMgr, error) {
 	return gps.NewSourceManager(gps.SourceManagerConfig{
-		Cachedir: filepath.Join(c.GOPATH, "pkg", "dep"),
-		Logger:   c.Out,
+		Cachedir:       filepath.Join(c.GOPATH, "pkg", "dep"),
+		Logger:         c.Out,
+		DisableLocking: c.DisableLocking,
 	})
 }
 

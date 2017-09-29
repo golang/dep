@@ -147,9 +147,10 @@ func (c *Config) Run() (exitCode int) {
 
 			// Set up dep context.
 			ctx := &dep.Ctx{
-				Out:     outLogger,
-				Err:     errLogger,
-				Verbose: *verbose,
+				Out:            outLogger,
+				Err:            errLogger,
+				Verbose:        *verbose,
+				DisableLocking: getEnv(c.Env, "DEPNOLOCK") != "",
 			}
 
 			GOPATHS := filepath.SplitList(getEnv(c.Env, "GOPATH"))
