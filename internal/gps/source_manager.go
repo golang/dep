@@ -28,11 +28,11 @@ import (
 // Used to compute a friendly filepath from a URL-shaped input.
 var sanitizer = strings.NewReplacer("-", "--", ":", "-", "/", "-", "+", "-")
 
-// A locker is responsible for preventing multiple instances of dep from interfereing
-// with one-another.
+// A locker is responsible for preventing multiple instances of dep from
+// interfering with one-another.
 //
-// Currently, anything that can either TryLock(), Unlock(), or GetOwner() satifies
-// that need.
+// Currently, anything that can either TryLock(), Unlock(), or GetOwner()
+// satifies that need.
 type locker interface {
 	TryLock() error
 	Unlock() error
@@ -179,7 +179,7 @@ var _ SourceManager = &SourceMgr{}
 type SourceManagerConfig struct {
 	Cachedir       string      // Where to store local instances of upstream sources.
 	Logger         *log.Logger // Optional info/warn logger. Discards if nil.
-	DisableLocking bool        // True if dep SourceManager shoud NOT lock.
+	DisableLocking bool        // True if the SourceManager should NOT use a lock file to protect the Cachedir from multiple processes.
 }
 
 // NewSourceManager produces an instance of gps's built-in SourceManager.
