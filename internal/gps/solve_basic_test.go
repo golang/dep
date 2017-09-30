@@ -404,6 +404,8 @@ type basicFixture struct {
 	// if the fixture is currently broken/expected to fail, this has a message
 	// recording why
 	broken string
+	// for testing innefectual constraints in manifests
+	ineffectuals []ProjectRoot
 }
 
 func (f basicFixture) name() string {

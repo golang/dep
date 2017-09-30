@@ -154,6 +154,9 @@ var bimodalFixtures = map[string]bimodalFixture{
 			"a 1.0.0",
 			"b 1.1.0",
 		),
+		ineffectuals: []ProjectRoot{
+			"b",
+		},
 	},
 	// Constraints apply only if the project that declares them has a
 	// reachable import - non-root
@@ -1323,6 +1326,8 @@ type bimodalFixture struct {
 	// if the fixture is currently broken/expected to fail, this has a message
 	// recording why
 	broken string
+	// for testing innefectual constraints in manifests
+	ineffectuals []ProjectRoot
 }
 
 func (f bimodalFixture) name() string {
