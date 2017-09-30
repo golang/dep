@@ -351,8 +351,7 @@ func (s *singleSourceCacheBolt) getVersionsFor(rev Revision) (uvs []UnpairedVers
 	return
 }
 
-func (s *singleSourceCacheBolt) getAllVersions() []PairedVersion {
-	var pvs []PairedVersion
+func (s *singleSourceCacheBolt) getAllVersions() (pvs []PairedVersion, ok bool) {
 	err := s.viewSourceBucket(func(src *bolt.Bucket) error {
 		versions := cacheFindLatestValid(src, cacheVersion, s.epoch)
 		if versions == nil {
@@ -369,14 +368,15 @@ func (s *singleSourceCacheBolt) getAllVersions() []PairedVersion {
 				return err
 			}
 			pvs = append(pvs, uv.Pair(Revision(v)))
+			ok = true
 			return nil
 		})
 	})
 	if err != nil {
 		s.logger.Println(errors.Wrap(err, "failed to get all cached versions"))
-		return nil
+		return nil, false
 	}
-	return pvs
+	return
 }
 
 func (s *singleSourceCacheBolt) getRevisionFor(uv UnpairedVersion) (rev Revision, ok bool) {
