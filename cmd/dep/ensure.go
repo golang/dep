@@ -677,7 +677,7 @@ func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm
 	if !ctx.Verbose {
 		logger = log.New(ioutil.Discard, "", 0)
 	}
-	if err := errors.Wrap(sw.Write(p.AbsRoot, sm, true, logger), "grouped write of manifest, lock and vendor"); err != nil {
+	if err := errors.Wrap(sw.Write(p.AbsRoot, sm, false, logger), "grouped write of manifest, lock and vendor"); err != nil {
 		return err
 	}
 
