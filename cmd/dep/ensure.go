@@ -664,7 +664,12 @@ func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm
 
 	sort.Strings(reqlist)
 
-	sw, err := dep.NewSafeWriter(p.Manifest, appender, p.Lock, dep.LockFromSolution(solution), dep.VendorOnChanged)
+	ep, err := ctx.LoadProject()
+	if err != nil {
+		errors.Wrap(err, "failed to locate project root from current working directory")
+	}
+
+	sw, err := dep.NewSafeWriter(ep.Manifest, appender, p.Lock, dep.LockFromSolution(solution), dep.VendorOnChanged)
 	if err != nil {
 		return err
 	}
