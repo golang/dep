@@ -11,8 +11,6 @@ import (
 	"go/build"
 	"io/ioutil"
 	"log"
-	"os"
-	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
@@ -664,13 +662,9 @@ func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm
 		}
 	}
 
-	extra, err := appender.MarshalTOML()
-	if err != nil {
-		return errors.Wrap(err, "could not marshal manifest into TOML")
-	}
 	sort.Strings(reqlist)
 
-	sw, err := dep.NewSafeWriter(nil, nil, p.Lock, dep.LockFromSolution(solution), dep.VendorOnChanged)
+	sw, err := dep.NewSafeWriter(p.Manifest, appender, p.Lock, dep.LockFromSolution(solution), dep.VendorOnChanged)
 	if err != nil {
 		return err
 	}
@@ -685,17 +679,6 @@ func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm
 	}
 	if err := errors.Wrap(sw.Write(p.AbsRoot, sm, true, logger), "grouped write of manifest, lock and vendor"); err != nil {
 		return err
-	}
-
-	// FIXME(sdboyer) manifest writes ABSOLUTELY need verification - follow up!
-	f, err := os.OpenFile(filepath.Join(p.AbsRoot, dep.ManifestName), os.O_APPEND|os.O_WRONLY, 0666)
-	if err != nil {
-		return errors.Wrapf(err, "opening %s failed", dep.ManifestName)
-	}
-
-	if _, err := f.Write(extra); err != nil {
-		f.Close()
-		return errors.Wrapf(err, "writing to %s failed", dep.ManifestName)
 	}
 
 	switch len(reqlist) {
@@ -721,7 +704,7 @@ func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm
 		}
 	}
 
-	return errors.Wrapf(f.Close(), "closing %s", dep.ManifestName)
+	return nil
 }
 
 func getProjectConstraint(arg string, sm gps.SourceManager) (gps.ProjectConstraint, string, error) {
