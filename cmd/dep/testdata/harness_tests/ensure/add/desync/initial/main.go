@@ -7,6 +7,7 @@ package main
 import (
 	"github.com/sdboyer/deptest"
 	"github.com/sdboyer/deptestdos"
+	"github.com/sdboyer/deptesttres"
 )
 
 func main() {
@@ -15,4 +16,6 @@ func main() {
 		deptest.Map["yo yo!"]
 	}
 	deptestdos.diMeLo("whatev")
+
+	type a deptesttres.Bar
 }
