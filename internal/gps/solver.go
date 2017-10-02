@@ -583,11 +583,14 @@ func (s *solver) selectRoot() error {
 	s.sel.pushSelection(awp, false)
 
 	// If we're looking for root's deps, get it from opts and local root
-	// analysis, rather than having the sm do it
+	// analysis, rather than having the sm do it.
 	deps, err := s.intersectConstraintsWithImports(s.rd.combineConstraints(), s.rd.externalImportList(s.stdLibFn))
 	if err != nil {
+		if contextCanceledOrSMReleased(err) {
+			return err
+		}
 		// TODO(sdboyer) this could well happen; handle it with a more graceful error
-		panic(fmt.Sprintf("shouldn't be possible %s", err))
+		panic(fmt.Sprintf("canary - shouldn't be possible %s", err))
 	}
 
 	for _, dep := range deps {
@@ -1175,7 +1178,7 @@ func (s *solver) fail(id ProjectIdentifier) {
 // the unselected priority queue.
 //
 // Behavior is slightly diffferent if pkgonly is true.
-func (s *solver) selectAtom(a atomWithPackages, pkgonly bool) {
+func (s *solver) selectAtom(a atomWithPackages, pkgonly bool) error {
 	s.mtr.push("select-atom")
 	s.unsel.remove(bimodalIdentifier{
 		id: a.a.id,
@@ -1184,6 +1187,9 @@ func (s *solver) selectAtom(a atomWithPackages, pkgonly bool) {
 
 	pl, deps, err := s.getImportsAndConstraintsOf(a)
 	if err != nil {
+		if contextCanceledOrSMReleased(err) {
+			return err
+		}
 		// This shouldn't be possible; other checks should have ensured all
 		// packages and deps are present for any argument passed to this method.
 		panic(fmt.Sprintf("canary - shouldn't be possible %s", err))
@@ -1269,13 +1275,16 @@ func (s *solver) selectAtom(a atomWithPackages, pkgonly bool) {
 	s.mtr.pop()
 }
 
-func (s *solver) unselectLast() (atomWithPackages, bool) {
+func (s *solver) unselectLast() (atomWithPackages, bool, error) {
 	s.mtr.push("unselect")
 	awp, first := s.sel.popSelection()
 	heap.Push(s.unsel, bimodalIdentifier{id: awp.a.id, pl: awp.pl})
 
 	_, deps, err := s.getImportsAndConstraintsOf(awp)
 	if err != nil {
+		if contextCanceledOrSMReleased(err) {
+			return atomWithPackages{}, false, err
+		}
 		// This shouldn't be possible; other checks should have ensured all
 		// packages and deps are present for any argument passed to this method.
 		panic(fmt.Sprintf("canary - shouldn't be possible %s", err))
@@ -1334,4 +1343,8 @@ func pa2lp(pa atom, pkgs map[string]struct{}) LockedProject {
 	sort.Strings(lp.pkgs)
 
 	return lp
+}
+
+func contextCanceledOrSMReleased(err error) bool {
+	return err == context.Canceled || err == context.DeadlineExceeded || err == smIsReleased{}
 }
