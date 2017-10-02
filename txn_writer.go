@@ -124,7 +124,7 @@ func (sw *SafeWriter) HasManifest() bool {
 	return sw.Manifest != nil
 }
 
-// HasManifest checks if a Manifest is present in the SafeWriter
+// HasRegistryConfig if registry is configured
 func (sw *SafeWriter) HasRegistryConfig() bool {
 	return sw.RegistryConfig != nil
 }

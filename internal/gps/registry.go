@@ -1,22 +1,22 @@
 package gps
 
 import (
-	"context"
-	"github.com/golang/dep/internal/gps/pkgtree"
-	"path/filepath"
-	"net/url"
-	"path"
-	"io/ioutil"
-	"net/http"
-	"github.com/pkg/errors"
-	"encoding/json"
 	"archive/tar"
-	"io"
-	"os"
 	"compress/gzip"
-	"github.com/golang/dep/internal/fs"
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
+	"github.com/golang/dep/internal/fs"
+	"github.com/golang/dep/internal/gps/pkgtree"
+	"github.com/pkg/errors"
+	"io"
+	"io/ioutil"
+	"net/http"
+	"net/url"
+	"os"
+	"path"
+	"path/filepath"
 )
 
 var errNotFound = errors.New(http.StatusText(http.StatusNotFound))
@@ -96,7 +96,7 @@ func (s *registrySource) execGetVersions() (*rawVersions, error) {
 	return &versionsResp, err
 }
 
-func (s *registrySource) execDownloadDependency(pr ProjectRoot, r Revision) (*http.Response, error) {
+func (s *registrySource) execDownloadDependency(ctx context.Context, pr ProjectRoot, r Revision) (*http.Response, error) {
 	u, err := url.Parse(s.url)
 	if err != nil {
 		return nil, err
@@ -156,7 +156,7 @@ func (s *registrySource) getManifestAndLock(ctx context.Context, pr ProjectRoot,
 }
 
 func (s *registrySource) listPackages(ctx context.Context, pr ProjectRoot, r Revision) (ptree pkgtree.PackageTree, err error) {
-	resp, err := s.execDownloadDependency(pr, r)
+	resp, err := s.execDownloadDependency(ctx, pr, r)
 	if err != nil {
 		return pkgtree.PackageTree{}, err
 	}

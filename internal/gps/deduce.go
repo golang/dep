@@ -609,10 +609,6 @@ func (dc *deductionCoordinator) deduceRootPath(ctx context.Context, path string)
 			registry: dc.registry,
 			basePath: path,
 			suprvsr:  dc.suprvsr,
-			// The vanity deducer will call this func with a completed
-			// pathDeduction if it succeeds in finding one. We process it
-			// back through the action channel to ensure serialized
-			// access to the rootxt map.
 			returnFunc: func(pd pathDeduction) {
 				dc.mut.Lock()
 				dc.rootxt.Insert(pd.root, pd.mb)

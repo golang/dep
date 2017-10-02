@@ -1,10 +1,10 @@
 package dep
 
 import (
-	"io"
 	"bytes"
 	"github.com/pelletier/go-toml"
 	"github.com/pkg/errors"
+	"io"
 )
 
 // RegistryConfigName is the registry config file name used by dep.

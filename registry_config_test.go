@@ -5,9 +5,9 @@
 package dep
 
 import (
+	"github.com/golang/dep/internal/test"
 	"reflect"
 	"testing"
-	"github.com/golang/dep/internal/test"
 )
 
 func TestReadConfig(t *testing.T) {

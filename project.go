@@ -50,10 +50,9 @@ type Project struct {
 	// If AbsRoot is not a symlink, then ResolvedAbsRoot should equal AbsRoot.
 	ResolvedAbsRoot string
 	// ImportRoot is the import path of the project's root directory.
-	ImportRoot gps.ProjectRoot
-	Manifest   *Manifest
-	Lock       *Lock // Optional
-	// Registry config, if provided all dependency resolution will be from the registry.
+	ImportRoot     gps.ProjectRoot
+	Manifest       *Manifest
+	Lock           *Lock // Optional
 	RegistryConfig *registryConfig
 }
 

@@ -20,8 +20,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/pkg/errors"
 	"github.com/golang/dep/cmd/dep/testdata/registry"
+	"github.com/pkg/errors"
 )
 
 var (

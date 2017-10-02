@@ -1,17 +1,17 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
+	"fmt"
 	"github.com/golang/dep"
 	"github.com/pkg/errors"
-	"fmt"
-	"path"
-	"net/http"
-	"syscall"
 	"golang.org/x/crypto/ssh/terminal"
-	"encoding/json"
 	"io/ioutil"
+	"net/http"
 	"net/url"
+	"path"
+	"syscall"
 )
 
 const loginShortHelp = `Login to a registry server and save configuration`
