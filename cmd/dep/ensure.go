@@ -340,9 +340,8 @@ func (cmd *ensureCommand) runUpdate(ctx *dep.Ctx, args []string, p *dep.Project,
 	// user a bit, but the extra effort required is minimal, and it ensures the
 	// user is isolating variables in the event of solve problems (was it the
 	// "pending" changes, or the -update that caused the problem?).
-	// TODO(sdboyer) reduce this to a warning?
 	if !bytes.Equal(p.Lock.InputHash(), solver.HashInputs()) {
-		return errors.Errorf("%s is out of sync with %s or the project's imports. Run \"dep ensure\" to resync them first before running \"dep ensure -update\"", dep.LockName, dep.ManifestName)
+		ctx.Out.Printf("Warning: %s is out of sync with %s or the project's imports.", dep.LockName, dep.ManifestName)
 	}
 
 	// When -update is specified without args, allow every dependency to change
@@ -406,9 +405,8 @@ func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm
 	// user a bit, but the extra effort required is minimal, and it ensures the
 	// user is isolating variables in the event of solve problems (was it the
 	// "pending" changes, or the -add that caused the problem?).
-	// TODO(sdboyer) reduce this to a warning?
 	if p.Lock != nil && !bytes.Equal(p.Lock.InputHash(), solver.HashInputs()) {
-		return errors.Errorf("%s is out of sync with %s or the project's imports. Run \"dep ensure\" to resync them first before running \"dep ensure -add\"", dep.LockName, dep.ManifestName)
+		ctx.Out.Printf("Warning: %s is out of sync with %s or the project's imports.", dep.LockName, dep.ManifestName)
 	}
 
 	rm, _ := params.RootPackageTree.ToReachMap(true, true, false, p.Manifest.IgnoredPackages())
@@ -479,7 +477,7 @@ func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm
 
 	var wg sync.WaitGroup
 
-	fmt.Println("Fetching sources...")
+	ctx.Out.Println("Fetching sources...")
 
 	for i, arg := range args {
 		wg.Add(1)
