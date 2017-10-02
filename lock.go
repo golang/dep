@@ -112,8 +112,8 @@ func fromRawLock(raw rawLock) (*Lock, error) {
 	return l, nil
 }
 
-// InputHash returns the hash of inputs which produced this lock data.
-func (l *Lock) InputHash() []byte {
+// InputsDigest returns the hash of inputs which produced this lock data.
+func (l *Lock) InputsDigest() []byte {
 	return l.SolveMeta.InputsDigest
 }
 
@@ -182,7 +182,7 @@ func (l *Lock) MarshalTOML() ([]byte, error) {
 // Data is defensively copied wherever necessary to ensure the resulting *lock
 // shares no memory with the original lock.
 func LockFromSolution(in gps.Solution) *Lock {
-	h, p := in.InputHash(), in.Projects()
+	h, p := in.InputsDigest(), in.Projects()
 
 	l := &Lock{
 		SolveMeta: SolveMeta{
