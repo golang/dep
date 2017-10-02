@@ -256,8 +256,7 @@ func NeedsGit(t *testing.T) {
 	}
 }
 
-// NeedsGit will make sure the tests that require git will be skipped if the
-// git binary is not available.
+// SetupRegistry sets and runs mock registry for the tests.
 func SetupRegistry(t *testing.T) {
 	go func(t *testing.T) {
 		if err := registry.SetupAndRun(":9090"); err != nil {

@@ -21,7 +21,7 @@ import (
 
 var errNotFound = errors.New(http.StatusText(http.StatusNotFound))
 
-// registry configuration interface
+// Registry configuration interface
 // use login command to create registry config
 type Registry interface {
 	URL() string
@@ -259,7 +259,7 @@ func (m maybeRegistrySource) try(ctx context.Context, cachedir string, c singleS
 	return registry, sourceIsSetUp | sourceExistsUpstream, nil
 }
 
-// create new registry source
+// NewRegistrySource creates new registry source
 func NewRegistrySource(rURL, token, rPath, cachedir string) (source, error) {
 	u, err := url.Parse(rURL)
 	if err != nil {
