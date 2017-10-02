@@ -79,8 +79,8 @@ func DiffLocks(l1 Lock, l2 Lock) *LockDiff {
 
 	diff := LockDiff{}
 
-	h1 := hex.EncodeToString(l1.InputHash())
-	h2 := hex.EncodeToString(l2.InputHash())
+	h1 := hex.EncodeToString(l1.InputsDigest())
+	h2 := hex.EncodeToString(l2.InputsDigest())
 	if h1 != h2 {
 		diff.HashDiff = &StringDiff{Previous: h1, Current: h2}
 	}
