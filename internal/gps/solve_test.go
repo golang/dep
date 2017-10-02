@@ -6,6 +6,7 @@ package gps
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"log"
 	"reflect"
@@ -35,7 +36,7 @@ func fixSolve(params SolveParameters, sm SourceManager, t *testing.T) (Solution,
 		return nil, err
 	}
 
-	return s.Solve()
+	return s.Solve(context.Background())
 }
 
 // Test all the basic table fixtures.

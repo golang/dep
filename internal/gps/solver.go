@@ -6,15 +6,18 @@ package gps
 
 import (
 	"container/heap"
+	"context"
 	"fmt"
 	"log"
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"github.com/armon/go-radix"
 	"github.com/golang/dep/internal/gps/paths"
 	"github.com/golang/dep/internal/gps/pkgtree"
+	"github.com/pkg/errors"
 )
 
 var rootRev = Revision("")
@@ -160,6 +163,10 @@ type solver struct {
 
 	// metrics for the current solve run.
 	mtr *metrics
+
+	// Indicates whether the solver has been run. It is invalid to run this type
+	// of solver more than once.
+	hasrun int32
 }
 
 func (params SolveParameters) toRootdata() (rootdata, error) {
@@ -332,9 +339,13 @@ type Solver interface {
 	// In such a case, it may not be necessary to run Solve() at all.
 	HashInputs() []byte
 
-	// Solve initiates a solving run. It will either complete successfully with
-	// a Solution, or fail with an informative error.
-	Solve() (Solution, error)
+	// Solve initiates a solving run. It will either abort due to a canceled
+	// Context, complete successfully with a Solution, or fail with an
+	// informative error.
+	//
+	// It is generally not allowed that this method be called twice for any
+	// given solver.
+	Solve(context.Context) (Solution, error)
 
 	// Name returns a string identifying the particular solver backend.
 	//
@@ -427,7 +438,14 @@ func ValidateParams(params SolveParameters, sm SourceManager) error {
 // represented by the SolveParameters with which this Solver was created.
 //
 // This is the entry point to the main gps workhorse.
-func (s *solver) Solve() (Solution, error) {
+func (s *solver) Solve(ctx context.Context) (Solution, error) {
+	// Solving can only be run once per solver.
+	if atomic.LoadInt32(&s.hasrun) == 1 {
+		return nil, errors.New("solve method can only be run once per instance")
+	}
+	// Make sure the bridge has the context before we start.
+	//s.b.ctx = ctx
+
 	// Set up a metrics object
 	s.mtr = newMetrics()
 	s.vUnify.mtr = s.mtr
@@ -437,7 +455,7 @@ func (s *solver) Solve() (Solution, error) {
 		return nil, err
 	}
 
-	all, err := s.solve()
+	all, err := s.solve(ctx)
 
 	s.mtr.pop()
 	var soln solution
@@ -466,9 +484,19 @@ func (s *solver) Solve() (Solution, error) {
 }
 
 // solve is the top-level loop for the solving process.
-func (s *solver) solve() (map[atom]map[string]struct{}, error) {
+func (s *solver) solve(ctx context.Context) (map[atom]map[string]struct{}, error) {
+	// Pull out the donechan once up front so that we're not potentially
+	// triggering mutex cycling and channel creation on each iteration.
+	donechan := ctx.Done()
+
 	// Main solving loop
 	for {
+		select {
+		case <-donechan:
+			return nil, ctx.Err()
+		default:
+		}
+
 		bmi, has := s.nextUnselected()
 
 		if !has {
@@ -491,11 +519,14 @@ func (s *solver) solve() (map[atom]map[string]struct{}, error) {
 			if err != nil {
 				// Err means a failure somewhere down the line; try backtracking.
 				s.traceStartBacktrack(bmi, err, false)
-				s.mtr.pop()
-				if s.backtrack() {
+				success, berr := s.backtrack(ctx)
+				if berr != nil {
+					err = berr
+				} else if success {
 					// backtracking succeeded, move to the next unselected id
 					continue
 				}
+				s.mtr.pop()
 				return nil, err
 			}
 
@@ -510,7 +541,12 @@ func (s *solver) solve() (map[atom]map[string]struct{}, error) {
 				},
 				pl: bmi.pl,
 			}
-			s.selectAtom(awp, false)
+			err = s.selectAtom(awp, false)
+			if err != nil {
+				// Only a released SourceManager should be able to cause this.
+				return nil, err
+			}
+
 			s.vqs = append(s.vqs, queue)
 			s.mtr.pop()
 		} else {
@@ -539,14 +575,22 @@ func (s *solver) solve() (map[atom]map[string]struct{}, error) {
 			if err != nil {
 				// Err means a failure somewhere down the line; try backtracking.
 				s.traceStartBacktrack(bmi, err, true)
-				if s.backtrack() {
+				success, berr := s.backtrack(ctx)
+				if berr != nil {
+					err = berr
+				} else if success {
 					// backtracking succeeded, move to the next unselected id
 					continue
 				}
 				s.mtr.pop()
 				return nil, err
 			}
-			s.selectAtom(nawp, true)
+			err = s.selectAtom(nawp, false)
+			if err != nil {
+				// Only a released SourceManager should be able to cause this.
+				return nil, err
+			}
+
 			// We don't add anything to the stack of version queues because the
 			// backtracker knows not to pop the vqstack if it backtracks
 			// across a pure-package addition.
@@ -1000,18 +1044,26 @@ func (s *solver) getLockVersionIfValid(id ProjectIdentifier) (Version, error) {
 
 // backtrack works backwards from the current failed solution to find the next
 // solution to try.
-func (s *solver) backtrack() bool {
+func (s *solver) backtrack(ctx context.Context) (bool, error) {
 	if len(s.vqs) == 0 {
 		// nothing to backtrack to
-		return false
+		return false, nil
 	}
 
+	donechan := ctx.Done()
 	s.mtr.push("backtrack")
+	defer s.mtr.pop()
 	for {
 		for {
+			select {
+			case <-donechan:
+				return false, ctx.Err()
+			default:
+			}
+
 			if len(s.vqs) == 0 {
 				// no more versions, nowhere further to backtrack
-				return false
+				return false, nil
 			}
 			if s.vqs[len(s.vqs)-1].failed {
 				break
@@ -1023,7 +1075,12 @@ func (s *solver) backtrack() bool {
 			var proj bool
 			var awp atomWithPackages
 			for !proj {
-				awp, proj = s.unselectLast()
+				var err error
+				awp, proj, err = s.unselectLast()
+				if err != nil {
+					// Should only be possible if SourceManager was released
+					return false, err
+				}
 				s.traceBacktrack(awp.bmi(), !proj)
 			}
 		}
@@ -1036,7 +1093,12 @@ func (s *solver) backtrack() bool {
 		var proj bool
 		var awp atomWithPackages
 		for !proj {
-			awp, proj = s.unselectLast()
+			var err error
+			awp, proj, err = s.unselectLast()
+			if err != nil {
+				// Should only be possible if SourceManager was released
+				return false, err
+			}
 			s.traceBacktrack(awp.bmi(), !proj)
 		}
 
@@ -1055,13 +1117,16 @@ func (s *solver) backtrack() bool {
 
 				// reusing the old awp is fine
 				awp.a.v = q.current()
-				s.selectAtom(awp, false)
+				err := s.selectAtom(awp, false)
+				if err != nil {
+					// Only a released SourceManager should be able to cause this.
+					return false, err
+				}
 				break
 			}
 		}
 
 		s.traceBacktrack(awp.bmi(), false)
-		//s.traceInfo("no more versions of %s, backtracking", q.id.errString())
 
 		// No solution found; continue backtracking after popping the queue
 		// we just inspected off the list
@@ -1069,13 +1134,12 @@ func (s *solver) backtrack() bool {
 		s.vqs, s.vqs[len(s.vqs)-1] = s.vqs[:len(s.vqs)-1], nil
 	}
 
-	s.mtr.pop()
 	// Backtracking was successful if loop ended before running out of versions
 	if len(s.vqs) == 0 {
-		return false
+		return false, nil
 	}
 	s.attempts++
-	return true
+	return true, nil
 }
 
 func (s *solver) nextUnselected() (bimodalIdentifier, bool) {
@@ -1273,10 +1337,13 @@ func (s *solver) selectAtom(a atomWithPackages, pkgonly bool) error {
 
 	s.traceSelect(a, pkgonly)
 	s.mtr.pop()
+
+	return nil
 }
 
 func (s *solver) unselectLast() (atomWithPackages, bool, error) {
 	s.mtr.push("unselect")
+	defer s.mtr.pop()
 	awp, first := s.sel.popSelection()
 	heap.Push(s.unsel, bimodalIdentifier{id: awp.a.id, pl: awp.pl})
 
@@ -1305,8 +1372,7 @@ func (s *solver) unselectLast() (atomWithPackages, bool, error) {
 		}
 	}
 
-	s.mtr.pop()
-	return awp, first
+	return awp, first, nil
 }
 
 // simple (temporary?) helper just to convert atoms into locked projects
