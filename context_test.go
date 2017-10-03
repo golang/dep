@@ -485,3 +485,42 @@ func TestDetectGOPATH(t *testing.T) {
 		}
 	}
 }
+
+func TestDepCachedir(t *testing.T) {
+	h := test.NewHelper(t)
+	defer h.Cleanup()
+
+	h.TempDir("cache")
+	// Create the directory for fallback cachedir location.
+	h.TempDir(filepath.Join("go", "pkg", "dep"))
+
+	testCachedir := h.Path("cache")
+	gopath := h.Path("go")
+	discardLgr := discardLogger()
+
+	cases := []struct {
+		cachedir     string
+		wantCachedir string
+	}{
+		// If `Cachedir` is not set in the context, it should use `$GOPATH/pkg/dep`.
+		{cachedir: "", wantCachedir: h.Path(filepath.Join("go", "pkg", "dep"))},
+		// If `Cachedir` is set in the context, it should use that.
+		{cachedir: testCachedir, wantCachedir: testCachedir},
+	}
+
+	for _, c := range cases {
+		ctx := &Ctx{
+			GOPATH:   gopath,
+			Cachedir: c.cachedir,
+			Out:      discardLgr,
+			Err:      discardLgr,
+		}
+		sm, err := ctx.SourceManager()
+		h.Must(err)
+		defer sm.Release()
+
+		if sm.Cachedir() != c.wantCachedir {
+			t.Errorf("expected cachedir to be %s, got %s", c.wantCachedir, sm.Cachedir())
+		}
+	}
+}

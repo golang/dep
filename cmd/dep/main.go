@@ -180,12 +180,17 @@ func (c *Config) Run() int {
 				return errorExitCode
 			}
 
+			// Cachedir is loaded from env if present. `$GOPATH/pkg/dep` is used as the
+			// fallback cache location.
+			cachedir := getEnv(c.Env, "DEPCACHEDIR")
+
 			// Set up dep context.
 			ctx := &dep.Ctx{
 				Out:            outLogger,
 				Err:            errLogger,
 				Verbose:        *verbose,
 				DisableLocking: getEnv(c.Env, "DEPNOLOCK") != "",
+				Cachedir:       cachedir,
 			}
 
 			GOPATHS := filepath.SplitList(getEnv(c.Env, "GOPATH"))

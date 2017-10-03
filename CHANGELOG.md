@@ -3,6 +3,8 @@
 NEW FEATURES:
 * Add support for importing from [govendor](https://github.com/kardianos/govendor)
   based projects (#815).
+* Allow override of cache directory location using environment variable
+`DEPCACHEDIR`. ([#1234](https://github.com/golang/dep/pull/1234))
 
 BUG FIXES:
 
