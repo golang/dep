@@ -52,6 +52,46 @@ func TestIntegration(t *testing.T) {
 	})
 }
 
+func TestDepCachedir(t *testing.T) {
+	t.Parallel()
+
+	test.NeedsExternalNetwork(t)
+	test.NeedsGit(t)
+
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	initPath := filepath.Join("testdata", "cachedir")
+
+	testProj := integration.NewTestProject(t, initPath, wd, runMain)
+	defer testProj.Cleanup()
+
+	testProj.TempDir("cachedir")
+	cachedir := testProj.Path("cachedir")
+	testProj.Setenv("DEPCACHEDIR", cachedir)
+
+	// Running `dep ensure` will pull in the dependency into cachedir.
+	err = testProj.DoRun([]string{"ensure"})
+	if err != nil {
+		// Log the error output from running `dep ensure`, could be useful.
+		t.Log(testProj.GetStderr())
+		t.Fatalf("got an unexpected error: %s", err.Error())
+	}
+
+	// Check that the cache was created in the cachedir. Our fixture has the dependency
+	// `github.com/sdboyer/deptest`
+	_, err = os.Stat(testProj.Path("cachedir", "sources", "https---github.com-sdboyer-deptest"))
+	if err != nil {
+		if os.IsNotExist(err) {
+			t.Fatal("Expected cachedir to have been populated but none was found")
+		} else {
+			t.Fatalf("Got unexpected error: %s", err)
+		}
+	}
+}
+
 // execCmd is a test.RunFunc which runs the program in another process.
 func execCmd(prog string, args []string, stdout, stderr io.Writer, dir string, env []string) error {
 	cmd := exec.Command(prog, args...)
