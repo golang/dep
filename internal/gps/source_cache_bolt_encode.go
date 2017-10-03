@@ -278,7 +278,7 @@ func lockedProjectFromCache(m *pb.LockedProject) (LockedProject, error) {
 // cachePutLock stores the Lock as fields in the bolt.Bucket.
 func cachePutLock(b *bolt.Bucket, l Lock) error {
 	// InputHash
-	if v := l.InputHash(); len(v) > 0 {
+	if v := l.InputsDigest(); len(v) > 0 {
 		if err := b.Put(cacheKeyHash, v); err != nil {
 			return errors.Wrap(err, "failed to put hash")
 		}
