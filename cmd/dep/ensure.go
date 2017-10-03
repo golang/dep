@@ -234,7 +234,7 @@ func (cmd *ensureCommand) runDefault(ctx *dep.Ctx, args []string, p *dep.Project
 		return errors.Wrap(err, "prepare solver")
 	}
 
-	if p.Lock != nil && bytes.Equal(p.Lock.InputHash(), solver.HashInputs()) {
+	if p.Lock != nil && bytes.Equal(p.Lock.InputsDigest(), solver.HashInputs()) {
 		// Memo matches, so there's probably nothing to do.
 		if ctx.Verbose {
 			ctx.Out.Printf("%s was already in sync with imports and %s\n", dep.LockName, dep.ManifestName)
@@ -340,7 +340,7 @@ func (cmd *ensureCommand) runUpdate(ctx *dep.Ctx, args []string, p *dep.Project,
 	// user a bit, but the extra effort required is minimal, and it ensures the
 	// user is isolating variables in the event of solve problems (was it the
 	// "pending" changes, or the -update that caused the problem?).
-	if !bytes.Equal(p.Lock.InputHash(), solver.HashInputs()) {
+	if !bytes.Equal(p.Lock.InputsDigest(), solver.HashInputs()) {
 		ctx.Out.Printf("Warning: %s is out of sync with %s or the project's imports.", dep.LockName, dep.ManifestName)
 	}
 
@@ -405,7 +405,7 @@ func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm
 	// user a bit, but the extra effort required is minimal, and it ensures the
 	// user is isolating variables in the event of solve problems (was it the
 	// "pending" changes, or the -add that caused the problem?).
-	if p.Lock != nil && !bytes.Equal(p.Lock.InputHash(), solver.HashInputs()) {
+	if p.Lock != nil && !bytes.Equal(p.Lock.InputsDigest(), solver.HashInputs()) {
 		ctx.Out.Printf("Warning: %s is out of sync with %s or the project's imports.", dep.LockName, dep.ManifestName)
 	}
 

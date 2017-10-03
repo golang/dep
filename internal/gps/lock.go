@@ -18,8 +18,8 @@ import (
 // solution is all that would be necessary to constitute a lock file, though
 // tools can include whatever other information they want in their storage.
 type Lock interface {
-	// The hash of inputs to gps that resulted in this lock data
-	InputHash() []byte
+	// The hash digest of inputs to gps that resulted in this lock data.
+	InputsDigest() []byte
 
 	// Projects returns the list of LockedProjects contained in the lock data.
 	Projects() []LockedProject
@@ -30,7 +30,7 @@ type Lock interface {
 // parameter is true) whether the locks' input hashes are equal.
 func LocksAreEq(l1, l2 Lock, checkHash bool) bool {
 	// Cheapest ops first
-	if checkHash && !bytes.Equal(l1.InputHash(), l2.InputHash()) {
+	if checkHash && !bytes.Equal(l1.InputsDigest(), l2.InputsDigest()) {
 		return false
 	}
 
@@ -82,10 +82,10 @@ type SimpleLock []LockedProject
 
 var _ Lock = SimpleLock{}
 
-// InputHash always returns an empty string for SimpleLock. This makes it useless
+// InputsDigest always returns an empty string for SimpleLock. This makes it useless
 // as a stable lock to be written to disk, but still useful for some ephemeral
 // purposes.
-func (SimpleLock) InputHash() []byte {
+func (SimpleLock) InputsDigest() []byte {
 	return nil
 }
 
@@ -209,7 +209,7 @@ type safeLock struct {
 	p []LockedProject
 }
 
-func (sl safeLock) InputHash() []byte {
+func (sl safeLock) InputsDigest() []byte {
 	return sl.h
 }
 
@@ -226,7 +226,7 @@ func prepLock(l Lock) safeLock {
 	pl := l.Projects()
 
 	rl := safeLock{
-		h: l.InputHash(),
+		h: l.InputsDigest(),
 		p: make([]LockedProject, len(pl)),
 	}
 	copy(rl.p, pl)

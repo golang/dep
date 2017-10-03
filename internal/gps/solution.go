@@ -144,7 +144,7 @@ func (r solution) Attempts() int {
 	return r.att
 }
 
-func (r solution) InputHash() []byte {
+func (r solution) InputsDigest() []byte {
 	return r.hd
 }
 
