@@ -291,6 +291,11 @@ func NewSourceManager(c SourceManagerConfig) (*SourceMgr, error) {
 	return sm, nil
 }
 
+// Cachedir returns the location of the cache directory.
+func (sm *SourceMgr) Cachedir() string {
+	return sm.cachedir
+}
+
 // UseDefaultSignalHandling sets up typical os.Interrupt signal handling for a
 // SourceMgr.
 func (sm *SourceMgr) UseDefaultSignalHandling() {
