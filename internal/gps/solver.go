@@ -517,6 +517,7 @@ func (s *solver) solve(ctx context.Context) (map[atom]map[string]struct{}, error
 			// to create a version queue.
 			queue, err := s.createVersionQueue(bmi)
 			if err != nil {
+				s.mtr.pop()
 				// Err means a failure somewhere down the line; try backtracking.
 				s.traceStartBacktrack(bmi, err, false)
 				success, berr := s.backtrack(ctx)
@@ -526,7 +527,6 @@ func (s *solver) solve(ctx context.Context) (map[atom]map[string]struct{}, error
 					// backtracking succeeded, move to the next unselected id
 					continue
 				}
-				s.mtr.pop()
 				return nil, err
 			}
 
@@ -542,13 +542,13 @@ func (s *solver) solve(ctx context.Context) (map[atom]map[string]struct{}, error
 				pl: bmi.pl,
 			}
 			err = s.selectAtom(awp, false)
+			s.mtr.pop()
 			if err != nil {
 				// Only a released SourceManager should be able to cause this.
 				return nil, err
 			}
 
 			s.vqs = append(s.vqs, queue)
-			s.mtr.pop()
 		} else {
 			s.mtr.push("add-atom")
 			// We're just trying to add packages to an already-selected project.
@@ -573,6 +573,7 @@ func (s *solver) solve(ctx context.Context) (map[atom]map[string]struct{}, error
 			s.traceCheckPkgs(bmi)
 			err := s.check(nawp, true)
 			if err != nil {
+				s.mtr.pop()
 				// Err means a failure somewhere down the line; try backtracking.
 				s.traceStartBacktrack(bmi, err, true)
 				success, berr := s.backtrack(ctx)
@@ -582,10 +583,10 @@ func (s *solver) solve(ctx context.Context) (map[atom]map[string]struct{}, error
 					// backtracking succeeded, move to the next unselected id
 					continue
 				}
-				s.mtr.pop()
 				return nil, err
 			}
 			err = s.selectAtom(nawp, false)
+			s.mtr.pop()
 			if err != nil {
 				// Only a released SourceManager should be able to cause this.
 				return nil, err
@@ -594,7 +595,6 @@ func (s *solver) solve(ctx context.Context) (map[atom]map[string]struct{}, error
 			// We don't add anything to the stack of version queues because the
 			// backtracker knows not to pop the vqstack if it backtracks
 			// across a pure-package addition.
-			s.mtr.pop()
 		}
 	}
 
