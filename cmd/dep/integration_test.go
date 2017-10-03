@@ -44,8 +44,8 @@ func TestIntegration(t *testing.T) {
 		t.Run(testName, func(t *testing.T) {
 			t.Parallel()
 
-			t.Run("external", testIntegration(testName, relPath, wd, true, execCmd))
-			t.Run("internal", testIntegration(testName, relPath, wd, false, runMain))
+			t.Run("external", testIntegration(testName, relPath, wd, execCmd))
+			t.Run("internal", testIntegration(testName, relPath, wd, runMain))
 		})
 
 		return nil
@@ -88,13 +88,13 @@ func runMain(prog string, args []string, stdout, stderr io.Writer, dir string, e
 }
 
 // testIntegration runs the test specified by <wd>/<relPath>/<name>/testcase.json
-func testIntegration(name, relPath, wd string, externalProc bool, run integration.RunFunc) func(t *testing.T) {
+func testIntegration(name, relPath, wd string, run integration.RunFunc) func(t *testing.T) {
 	return func(t *testing.T) {
 		t.Parallel()
 
 		// Set up environment
 		testCase := integration.NewTestCase(t, filepath.Join(wd, relPath), name)
-		testProj := integration.NewTestProject(t, testCase.InitialPath(), wd, externalProc, run)
+		testProj := integration.NewTestProject(t, testCase.InitialPath(), wd, run)
 		defer testProj.Cleanup()
 
 		// Create and checkout the vendor revisions
