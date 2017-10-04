@@ -261,8 +261,6 @@ func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
 				ctx.Err.Printf("Lock inputs-digest mismatch. This happens when Gopkg.toml is modified.\n" +
 					"Run `dep ensure` to regenerate the inputs-digest.")
 			}
-		default:
-			ctx.Out.Println("Failed to get status. Rerun with `-v` flag to see details.")
 		}
 
 		return err
