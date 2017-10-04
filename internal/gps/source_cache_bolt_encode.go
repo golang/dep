@@ -5,140 +5,97 @@
 package gps
 
 import (
-	"bytes"
 	"encoding/binary"
-	"fmt"
-	"strings"
 	"time"
 
 	"github.com/boltdb/bolt"
+	"github.com/golang/dep/internal/gps/internal/pb"
 	"github.com/golang/dep/internal/gps/pkgtree"
+	"github.com/golang/protobuf/proto"
+	"github.com/jmank88/nuts"
 	"github.com/pkg/errors"
 )
 
-// cacheEncodeUnpairedVersion returns an encoded UnpairedVersion.
-func cacheEncodeUnpairedVersion(uv UnpairedVersion) ([]byte, error) {
-	var pre string
-	switch uv.Type() {
-	case IsBranch:
-		if uv.(branchVersion).isDefault {
-			pre = "defaultBranch:"
-		} else {
-			pre = "branch:"
-		}
-	case IsSemver, IsVersion:
-		pre = "ver:"
-	default:
-		return nil, fmt.Errorf("unrecognized version type: %d", uv.Type())
-	}
-	return []byte(pre + uv.String()), nil
-}
+var (
+	cacheKeyComment    = []byte("c")
+	cacheKeyConstraint = cacheKeyComment
+	cacheKeyError      = []byte("e")
+	cacheKeyHash       = []byte("h")
+	cacheKeyIgnored    = []byte("i")
+	cacheKeyImport     = cacheKeyIgnored
+	cacheKeyLock       = []byte("l")
+	cacheKeyName       = []byte("n")
+	cacheKeyOverride   = []byte("o")
+	cacheKeyPTree      = []byte("p")
+	cacheKeyRequired   = []byte("r")
+	cacheKeyRevision   = cacheKeyRequired
+	cacheKeyTestImport = []byte("t")
 
-// cacheDecodeUnpairedVersion decodes and returns a new UnpairedVersion.
-func cacheDecodeUnpairedVersion(b []byte) (UnpairedVersion, error) {
-	const br, dbr, ver = "branch:", "defaultBranch:", "ver:"
-	s := string(b)
-	switch {
-	case strings.HasPrefix(s, br):
-		return NewBranch(strings.TrimPrefix(s, br)), nil
-	case strings.HasPrefix(s, dbr):
-		return newDefaultBranch(strings.TrimPrefix(s, dbr)), nil
-	case strings.HasPrefix(s, ver):
-		return NewVersion(strings.TrimPrefix(s, ver)), nil
-	default:
-		return nil, fmt.Errorf("unrecognized prefix: %s", s)
-	}
-}
+	cacheRevision = byte('r')
+	cacheVersion  = byte('v')
+)
 
-// cacheDecodeProjectProperties returns a new ProjectRoot and ProjectProperties with the
-// data encoded in the key/value pair.
-func cacheDecodeProjectProperties(k, v []byte) (ProjectRoot, ProjectProperties, error) {
+// propertiesFromCache returns a new ProjectRoot and ProjectProperties with the fields from m.
+func propertiesFromCache(m *pb.ProjectProperties) (ProjectRoot, ProjectProperties, error) {
+	ip := ProjectRoot(m.Root)
 	var pp ProjectProperties
-	ks := strings.SplitN(string(k), ",", 2)
-	ip := ProjectRoot(ks[0])
-	if len(ks) > 1 {
-		pp.Source = ks[1]
-	}
-	if len(v) == 0 {
+	pp.Source = m.Source
+
+	if m.Constraint == nil {
 		pp.Constraint = Any()
 	} else {
-		const br, dbr, ver, rev = "branch:", "defaultBranch:", "ver:", "rev:"
-		vs := string(v)
-		switch {
-		case strings.HasPrefix(vs, br):
-			pp.Constraint = NewBranch(strings.TrimPrefix(vs, br))
-
-		case strings.HasPrefix(vs, dbr):
-			pp.Constraint = newDefaultBranch(strings.TrimPrefix(vs, dbr))
-
-		case strings.HasPrefix(vs, ver):
-			vs = strings.TrimPrefix(vs, ver)
-			if c, err := NewSemverConstraint(vs); err != nil {
-				pp.Constraint = NewVersion(vs)
-			} else {
-				pp.Constraint = c
-			}
-
-		case strings.HasPrefix(vs, rev):
-			pp.Constraint = Revision(strings.TrimPrefix(vs, rev))
-
-		default:
-			return "", ProjectProperties{}, fmt.Errorf("unrecognized prefix: %s", vs)
+		c, err := constraintFromCache(m.Constraint)
+		if err != nil {
+			return "", ProjectProperties{}, err
 		}
+		pp.Constraint = c
 	}
 
 	return ip, pp, nil
 }
 
-// cacheEncodeProjectProperties returns a key/value pair containing the encoded
-// ProjectRoot and ProjectProperties.
-func cacheEncodeProjectProperties(ip ProjectRoot, pp ProjectProperties) ([]byte, []byte, error) {
-	k := string(ip)
-	if len(pp.Source) > 0 {
-		k += "," + pp.Source
-	}
-	if pp.Constraint == nil || IsAny(pp.Constraint) {
-		return []byte(k), []byte{}, nil
-	}
+// projectPropertiesMsgs is a convenience tuple.
+type projectPropertiesMsgs struct {
+	pp pb.ProjectProperties
+	c  pb.Constraint
+}
 
-	if v, ok := pp.Constraint.(Version); ok {
-		var val string
-		switch v.Type() {
-		case IsRevision:
-			val = "rev:" + v.String()
-		case IsBranch:
-			if v.(branchVersion).isDefault {
-				val = "defaultBranch:" + v.String()
-			} else {
-				val = "branch:" + v.String()
-			}
-		case IsSemver, IsVersion:
-			val = "ver:" + v.String()
-		default:
-			return nil, nil, fmt.Errorf("unrecognized VersionType: %v", v.Type())
-		}
-		return []byte(k), []byte(val), nil
-	}
+// copyFrom sets the ProjectPropertiesMsg fields from ip and pp.
+func (ms *projectPropertiesMsgs) copyFrom(ip ProjectRoot, pp ProjectProperties) {
+	ms.pp.Root = string(ip)
+	ms.pp.Source = pp.Source
 
-	// Has to be a semver range.
-	v := pp.Constraint.String()
-	return []byte(k), []byte("ver:" + v), nil
+	if pp.Constraint != nil && !IsAny(pp.Constraint) {
+		pp.Constraint.copyTo(&ms.c)
+		ms.pp.Constraint = &ms.c
+	} else {
+		ms.pp.Constraint = nil
+	}
 }
 
 // cachePutManifest stores a Manifest in the bolt.Bucket.
 func cachePutManifest(b *bolt.Bucket, m Manifest) error {
-	// Constraints
-	cs, err := b.CreateBucket([]byte("cs"))
-	if err != nil {
-		return err
-	}
-	for ip, pp := range m.DependencyConstraints() {
-		k, v, err := cacheEncodeProjectProperties(ip, pp)
+	var ppMsg projectPropertiesMsgs
+
+	constraints := m.DependencyConstraints()
+	if len(constraints) > 0 {
+		cs, err := b.CreateBucket(cacheKeyConstraint)
 		if err != nil {
 			return err
 		}
-		if err := cs.Put(k, v); err != nil {
-			return err
+		key := make(nuts.Key, nuts.KeyLen(uint64(len(constraints)-1)))
+		var i uint64
+		for ip, pp := range constraints {
+			ppMsg.copyFrom(ip, pp)
+			v, err := proto.Marshal(&ppMsg.pp)
+			if err != nil {
+				return err
+			}
+			key.Put(i)
+			i++
+			if err := cs.Put(key, v); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -147,46 +104,63 @@ func cachePutManifest(b *bolt.Bucket, m Manifest) error {
 		return nil
 	}
 
-	// Ignored
-	var igPkgs []string
-	for ip, ok := range rm.IgnoredPackages() {
-		if ok {
-			igPkgs = append(igPkgs, ip)
-		}
-	}
-	if len(igPkgs) > 0 {
-		v := []byte(strings.Join(igPkgs, ","))
-		if err := b.Put([]byte("ig"), v); err != nil {
-			return err
-		}
-	}
-
-	// Overrides
-	ovr, err := b.CreateBucket([]byte("ovr"))
-	if err != nil {
-		return err
-	}
-	for ip, pp := range rm.Overrides() {
-		k, v, err := cacheEncodeProjectProperties(ip, pp)
+	ignored := rm.IgnoredPackages()
+	if len(ignored) > 0 {
+		ig, err := b.CreateBucket(cacheKeyIgnored)
 		if err != nil {
 			return err
 		}
-		if err := ovr.Put(k, v); err != nil {
-			return err
+		key := make(nuts.Key, nuts.KeyLen(uint64(len(ignored)-1)))
+		var i uint64
+		for ip, ok := range ignored {
+			if ok {
+				key.Put(i)
+				i++
+				if err := ig.Put(key, []byte(ip)); err != nil {
+					return err
+				}
+			}
 		}
 	}
 
-	// Required
-	var reqPkgs []string
-	for ip, ok := range rm.RequiredPackages() {
-		if ok {
-			reqPkgs = append(reqPkgs, ip)
+	overrides := rm.Overrides()
+	if len(overrides) > 0 {
+		ovr, err := b.CreateBucket(cacheKeyOverride)
+		if err != nil {
+			return err
+		}
+		key := make(nuts.Key, nuts.KeyLen(uint64(len(overrides)-1)))
+		var i uint64
+		for ip, pp := range overrides {
+			ppMsg.copyFrom(ip, pp)
+			v, err := proto.Marshal(&ppMsg.pp)
+			if err != nil {
+				return err
+			}
+			key.Put(i)
+			i++
+			if err := ovr.Put(key, v); err != nil {
+				return err
+			}
 		}
 	}
-	if len(reqPkgs) > 0 {
-		v := []byte(strings.Join(reqPkgs, ","))
-		if err := b.Put([]byte("req"), v); err != nil {
+
+	required := rm.RequiredPackages()
+	if len(required) > 0 {
+		req, err := b.CreateBucket(cacheKeyRequired)
+		if err != nil {
 			return err
+		}
+		key := make(nuts.Key, nuts.KeyLen(uint64(len(required)-1)))
+		var i uint64
+		for ip, ok := range required {
+			if ok {
+				key.Put(i)
+				i++
+				if err := req.Put(key, []byte(ip)); err != nil {
+					return err
+				}
+			}
 		}
 	}
 
@@ -195,6 +169,7 @@ func cachePutManifest(b *bolt.Bucket, m Manifest) error {
 
 // cacheGetManifest returns a new RootManifest with the data retrieved from the bolt.Bucket.
 func cacheGetManifest(b *bolt.Bucket) (RootManifest, error) {
+	//TODO consider storing slice/map lens to enable calling make() with capacity
 	m := &simpleRootManifest{
 		c:   make(ProjectConstraints),
 		ovr: make(ProjectConstraints),
@@ -203,9 +178,13 @@ func cacheGetManifest(b *bolt.Bucket) (RootManifest, error) {
 	}
 
 	// Constraints
-	if cs := b.Bucket([]byte("cs")); cs != nil {
-		err := cs.ForEach(func(k, v []byte) error {
-			ip, pp, err := cacheDecodeProjectProperties(k, v)
+	if cs := b.Bucket(cacheKeyConstraint); cs != nil {
+		var msg pb.ProjectProperties
+		err := cs.ForEach(func(_, v []byte) error {
+			if err := proto.Unmarshal(v, &msg); err != nil {
+				return err
+			}
+			ip, pp, err := propertiesFromCache(&msg)
 			if err != nil {
 				return err
 			}
@@ -218,16 +197,24 @@ func cacheGetManifest(b *bolt.Bucket) (RootManifest, error) {
 	}
 
 	// Ignored
-	if ig := b.Get([]byte("ig")); len(ig) > 0 {
-		for _, ip := range splitString(string(ig), ",") {
-			m.ig[ip] = true
+	if ig := b.Bucket(cacheKeyIgnored); ig != nil {
+		err := ig.ForEach(func(_, v []byte) error {
+			m.ig[string(v)] = true
+			return nil
+		})
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to get ignored")
 		}
 	}
 
 	// Overrides
-	if os := b.Bucket([]byte("ovr")); os != nil {
-		err := os.ForEach(func(k, v []byte) error {
-			ip, pp, err := cacheDecodeProjectProperties(k, v)
+	if os := b.Bucket(cacheKeyOverride); os != nil {
+		var msg pb.ProjectProperties
+		err := os.ForEach(func(_, v []byte) error {
+			if err := proto.Unmarshal(v, &msg); err != nil {
+				return err
+			}
+			ip, pp, err := propertiesFromCache(&msg)
 			if err != nil {
 				return err
 			}
@@ -240,77 +227,80 @@ func cacheGetManifest(b *bolt.Bucket) (RootManifest, error) {
 	}
 
 	// Required
-	if req := b.Get([]byte("req")); len(req) > 0 {
-		for _, ip := range splitString(string(req), ",") {
-			m.req[ip] = true
+	if req := b.Bucket(cacheKeyRequired); req != nil {
+		err := req.ForEach(func(_, v []byte) error {
+			m.req[string(v)] = true
+			return nil
+		})
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to get required")
 		}
 	}
 
 	return m, nil
 }
 
-// cachePutLockedProject stores the LockedProject as fields in the bolt.Bucket.
-func cachePutLockedProject(b *bolt.Bucket, lp LockedProject) error {
-	rev, branch, ver := VersionComponentStrings(lp.Version())
-	for _, field := range []struct{ k, v string }{
-		{"branch", branch},
-		{"pkgs", strings.Join(lp.pkgs, ",")},
-		{"rev", rev},
-		{"src", string(lp.Ident().Source)},
-		{"ver", ver},
-	} {
-		if len(field.v) > 0 {
-			if err := b.Put([]byte(field.k), []byte(field.v)); err != nil {
-				return errors.Wrap(err, "failed to put locked project")
-			}
-		}
+// copyTo returns a serializable representation of lp.
+func (lp LockedProject) copyTo(msg *pb.LockedProject, c *pb.Constraint) {
+	if lp.v == nil {
+		msg.UnpairedVersion = nil
+	} else {
+		lp.v.copyTo(c)
+		msg.UnpairedVersion = c
 	}
-	return nil
+	msg.Root = string(lp.pi.ProjectRoot)
+	msg.Source = lp.pi.Source
+	msg.Revision = string(lp.r)
+	msg.Packages = lp.pkgs
 }
 
-// cacheGetLockedProject returns a new LockedProject with fields from the bolt.Bucket.
-func cacheGetLockedProject(b *bolt.Bucket) (lp LockedProject, err error) {
-	br := string(b.Get([]byte("branch")))
-	pkgs := splitString(string(b.Get([]byte("pkgs"))), ",")
-	r := string(b.Get([]byte("rev")))
-	pi := ProjectIdentifier{Source: string(b.Get([]byte("src")))}
-	v := string(b.Get([]byte("ver")))
-
-	var ver Version = Revision(r)
-	if v != "" {
-		if br != "" {
-			err = errors.New("both branch and version specified")
-			return
+// lockedProjectFromCache returns a new LockedProject with fields from m.
+func lockedProjectFromCache(m *pb.LockedProject) (LockedProject, error) {
+	var uv UnpairedVersion
+	var err error
+	if m.UnpairedVersion != nil {
+		uv, err = unpairedVersionFromCache(m.UnpairedVersion)
+		if err != nil {
+			return LockedProject{}, err
 		}
-		ver = NewVersion(v).Pair(Revision(r))
-	} else if br != "" {
-		ver = NewBranch(br).Pair(Revision(r))
-	} else if r == "" {
-		err = errors.New("no branch, version, or revision")
-		return
 	}
-
-	lp = NewLockedProject(pi, ver, pkgs)
-	return
+	return LockedProject{
+		pi: ProjectIdentifier{
+			ProjectRoot: ProjectRoot(m.Root),
+			Source:      m.Source,
+		},
+		v:    uv,
+		r:    Revision(m.Revision),
+		pkgs: m.Packages,
+	}, nil
 }
 
 // cachePutLock stores the Lock as fields in the bolt.Bucket.
 func cachePutLock(b *bolt.Bucket, l Lock) error {
 	// InputHash
-	if v := l.InputHash(); len(v) > 0 {
-		if err := b.Put([]byte("hash"), v); err != nil {
+	if v := l.InputsDigest(); len(v) > 0 {
+		if err := b.Put(cacheKeyHash, v); err != nil {
 			return errors.Wrap(err, "failed to put hash")
 		}
 	}
 
 	// Projects
-	if len(l.Projects()) > 0 {
-		for _, lp := range l.Projects() {
-			lb, err := b.CreateBucket([]byte("lock:" + lp.pi.ProjectRoot))
+	if projects := l.Projects(); len(projects) > 0 {
+		lb, err := b.CreateBucket(cacheKeyLock)
+		if err != nil {
+			return err
+		}
+		key := make(nuts.Key, nuts.KeyLen(uint64(len(projects)-1)))
+		var msg pb.LockedProject
+		var cMsg pb.Constraint
+		for i, lp := range projects {
+			lp.copyTo(&msg, &cMsg)
+			v, err := proto.Marshal(&msg)
 			if err != nil {
-				return errors.Wrapf(err, "failed to create bucket for project identifier: %v", lp.pi)
+				return err
 			}
-			if err := cachePutLockedProject(lb, lp); err != nil {
+			key.Put(uint64(i))
+			if err := lb.Put(key, v); err != nil {
 				return err
 			}
 		}
@@ -322,17 +312,24 @@ func cachePutLock(b *bolt.Bucket, l Lock) error {
 // cacheGetLock returns a new *safeLock with the fields retrieved from the bolt.Bucket.
 func cacheGetLock(b *bolt.Bucket) (*safeLock, error) {
 	l := &safeLock{
-		h: b.Get([]byte("hash")),
+		h: b.Get(cacheKeyHash),
 	}
-	c := b.Cursor()
-	p := []byte("lock:")
-	for k, _ := c.Seek(p); bytes.HasPrefix(k, p); k, _ = c.Next() {
-		lp, err := cacheGetLockedProject(b.Bucket(k))
+	if locked := b.Bucket(cacheKeyLock); locked != nil {
+		var msg pb.LockedProject
+		err := locked.ForEach(func(_, v []byte) error {
+			if err := proto.Unmarshal(v, &msg); err != nil {
+				return err
+			}
+			lp, err := lockedProjectFromCache(&msg)
+			if err != nil {
+				return err
+			}
+			l.p = append(l.p, lp)
+			return nil
+		})
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to get lock")
+			return nil, errors.Wrap(err, "failed to get locked projects")
 		}
-		lp.pi.ProjectRoot = ProjectRoot(bytes.TrimPrefix(k, p))
-		l.p = append(l.p, lp)
 	}
 	return l, nil
 }
@@ -340,22 +337,48 @@ func cacheGetLock(b *bolt.Bucket) (*safeLock, error) {
 // cachePutPackageOrError stores the pkgtree.PackageOrErr as fields in the bolt.Bucket.
 func cachePutPackageOrErr(b *bolt.Bucket, poe pkgtree.PackageOrErr) error {
 	if poe.Err != nil {
-		err := b.Put([]byte("err"), []byte(poe.Err.Error()))
+		err := b.Put(cacheKeyError, []byte(poe.Err.Error()))
+		return errors.Wrapf(err, "failed to put error: %v", poe.Err)
+	}
+	if len(poe.P.CommentPath) > 0 {
+		err := b.Put(cacheKeyComment, []byte(poe.P.CommentPath))
 		if err != nil {
-			return errors.Wrapf(err, "failed to put error: %v", poe.Err)
+			return errors.Wrapf(err, "failed to put package: %v", poe.P)
 		}
-	} else {
-		for _, f := range []struct{ k, v string }{
-			{"cp", poe.P.CommentPath},
-			{"ip", strings.Join(poe.P.Imports, ",")},
-			{"nm", poe.P.Name},
-			{"tip", strings.Join(poe.P.TestImports, ",")},
-		} {
-			if len(f.v) > 0 {
-				err := b.Put([]byte(f.k), []byte(f.v))
-				if err != nil {
-					return errors.Wrapf(err, "failed to put package: %v", poe.P)
-				}
+	}
+	if len(poe.P.Imports) > 0 {
+		ip, err := b.CreateBucket(cacheKeyImport)
+		if err != nil {
+			return err
+		}
+		key := make(nuts.Key, nuts.KeyLen(uint64(len(poe.P.Imports)-1)))
+		for i := range poe.P.Imports {
+			v := []byte(poe.P.Imports[i])
+			key.Put(uint64(i))
+			if err := ip.Put(key, v); err != nil {
+				return err
+			}
+		}
+	}
+
+	if len(poe.P.Name) > 0 {
+		err := b.Put(cacheKeyName, []byte(poe.P.Name))
+		if err != nil {
+			return errors.Wrapf(err, "failed to put package: %v", poe.P)
+		}
+	}
+
+	if len(poe.P.TestImports) > 0 {
+		ip, err := b.CreateBucket(cacheKeyTestImport)
+		if err != nil {
+			return err
+		}
+		key := make(nuts.Key, nuts.KeyLen(uint64(len(poe.P.TestImports)-1)))
+		for i := range poe.P.TestImports {
+			v := []byte(poe.P.TestImports[i])
+			key.Put(uint64(i))
+			if err := ip.Put(key, v); err != nil {
+				return err
 			}
 		}
 	}
@@ -364,27 +387,42 @@ func cachePutPackageOrErr(b *bolt.Bucket, poe pkgtree.PackageOrErr) error {
 
 // cacheGetPackageOrErr returns a new pkgtree.PackageOrErr with fields retrieved
 // from the bolt.Bucket.
-func cacheGetPackageOrErr(b *bolt.Bucket) pkgtree.PackageOrErr {
-	if v := b.Get([]byte("err")); len(v) > 0 {
+func cacheGetPackageOrErr(b *bolt.Bucket) (pkgtree.PackageOrErr, error) {
+	if v := b.Get(cacheKeyError); len(v) > 0 {
 		return pkgtree.PackageOrErr{
 			Err: errors.New(string(v)),
+		}, nil
+	}
+
+	var p pkgtree.Package
+	p.CommentPath = string(b.Get(cacheKeyComment))
+	if ip := b.Bucket(cacheKeyImport); ip != nil {
+		err := ip.ForEach(func(_, v []byte) error {
+			p.Imports = append(p.Imports, string(v))
+			return nil
+		})
+		if err != nil {
+			return pkgtree.PackageOrErr{}, err
 		}
 	}
-	return pkgtree.PackageOrErr{
-		P: pkgtree.Package{
-			CommentPath: string(b.Get([]byte("cp"))),
-			Imports:     splitString(string(b.Get([]byte("ip"))), ","),
-			Name:        string(b.Get([]byte("nm"))),
-			TestImports: splitString(string(b.Get([]byte("tip"))), ","),
-		},
+	p.Name = string(b.Get(cacheKeyName))
+	if tip := b.Bucket(cacheKeyTestImport); tip != nil {
+		err := tip.ForEach(func(_, v []byte) error {
+			p.TestImports = append(p.TestImports, string(v))
+			return nil
+		})
+		if err != nil {
+			return pkgtree.PackageOrErr{}, err
+		}
 	}
+	return pkgtree.PackageOrErr{P: p}, nil
 }
 
-//cacheTimestampedKey returns a prefixed key with a trailing timestamp
-func cacheTimestampedKey(pre string, t time.Time) []byte {
-	b := make([]byte, len(pre)+8)
-	copy(b, pre)
-	binary.BigEndian.PutUint64(b[len(pre):], uint64(t.Unix()))
+// cacheTimestampedKey returns a prefixed key with a trailing timestamp.
+func cacheTimestampedKey(pre byte, t time.Time) []byte {
+	b := make([]byte, 9)
+	b[0] = pre
+	binary.BigEndian.PutUint64(b[1:], uint64(t.Unix()))
 	return b
 }
 
@@ -396,10 +434,9 @@ type boltTxOrBucket interface {
 }
 
 // cachePrefixDelete prefix scans and deletes each bucket.
-func cachePrefixDelete(tob boltTxOrBucket, pre string) error {
+func cachePrefixDelete(tob boltTxOrBucket, pre byte) error {
 	c := tob.Cursor()
-	p := []byte(pre)
-	for k, _ := c.Seek(p); bytes.HasPrefix(k, p); k, _ = c.Next() {
+	for k, _ := c.Seek([]byte{pre}); len(k) > 0 && k[0] == pre; k, _ = c.Next() {
 		if err := tob.DeleteBucket(k); err != nil {
 			return errors.Wrapf(err, "failed to delete bucket: %s", k)
 		}
@@ -409,17 +446,16 @@ func cachePrefixDelete(tob boltTxOrBucket, pre string) error {
 
 // cacheFindLatestValid prefix scans for the latest bucket which is timestamped >= epoch,
 // or returns nil if none exists.
-func cacheFindLatestValid(tob boltTxOrBucket, pre string, epoch int64) *bolt.Bucket {
+func cacheFindLatestValid(tob boltTxOrBucket, pre byte, epoch int64) *bolt.Bucket {
 	c := tob.Cursor()
-	p := []byte(pre)
 	var latest []byte
-	for k, _ := c.Seek(p); bytes.HasPrefix(k, p); k, _ = c.Next() {
+	for k, _ := c.Seek([]byte{pre}); len(k) > 0 && k[0] == pre; k, _ = c.Next() {
 		latest = k
 	}
 	if latest == nil {
 		return nil
 	}
-	ts := bytes.TrimPrefix(latest, p)
+	ts := latest[1:]
 	if len(ts) != 8 {
 		return nil
 	}
@@ -427,13 +463,4 @@ func cacheFindLatestValid(tob boltTxOrBucket, pre string, epoch int64) *bolt.Buc
 		return nil
 	}
 	return tob.Bucket(latest)
-}
-
-// splitString delegates to strings.Split, but returns nil in place of a single empty element.
-func splitString(s, sep string) []string {
-	r := strings.Split(s, sep)
-	if len(r) == 1 && r[0] == "" {
-		return nil
-	}
-	return r
 }

@@ -12,7 +12,7 @@ set -e
 
 VERSION=$(git describe --tags --dirty)
 COMMIT_HASH=$(git rev-parse --short HEAD 2>/dev/null)
-DATE=$(date --iso-8601)
+DATE=$(date "+%Y-%m-%d")
 
 GO_BUILD_CMD="go build -a -installsuffix cgo"
 GO_BUILD_LDFLAGS="-s -w -X main.commitHash=$COMMIT_HASH -X main.buildDate=$DATE -X main.version=$VERSION"
@@ -32,6 +32,6 @@ for OS in ${DEP_BUILD_PLATFORMS[@]}; do
     echo "Building for $OS/$ARCH"
     GOARCH=$ARCH GOOS=$OS CGO_ENABLED=0 $GO_BUILD_CMD -ldflags "$GO_BUILD_LDFLAGS"\
      -o "release/dep-$OS-$ARCH" ./cmd/dep/
-    sha256sum "release/dep-$OS-$ARCH" > "release/dep-$OS-$ARCH".sha256
+    shasum -a 256 "release/dep-$OS-$ARCH" > "release/dep-$OS-$ARCH".sha256
   done
 done

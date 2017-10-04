@@ -73,6 +73,9 @@ func ListPackages(fileRoot, importRoot string) (PackageTree, error) {
 
 	err = filepath.Walk(fileRoot, func(wp string, fi os.FileInfo, err error) error {
 		if err != nil && err != filepath.SkipDir {
+			if os.IsPermission(err) {
+				return filepath.SkipDir
+			}
 			return err
 		}
 		if !fi.IsDir() {
@@ -97,25 +100,29 @@ func ListPackages(fileRoot, importRoot string) (PackageTree, error) {
 			return filepath.SkipDir
 		}
 
-		// The entry error is nil when visiting a directory that itself is
-		// untraversable, as it's still governed by the parent directory's
-		// perms. We have to check readability of the dir here, because
-		// otherwise we'll have an empty package entry when we fail to read any
-		// of the dir's contents.
-		//
-		// If we didn't check here, then the next time this closure is called it
-		// would have an err with the same path as is called this time, as only
-		// then will filepath.Walk have attempted to descend into the directory
-		// and encountered an error.
-		var f *os.File
-		f, err = os.Open(wp)
-		if err != nil {
-			if os.IsPermission(err) {
-				return filepath.SkipDir
+		{
+			// For Go 1.9 and earlier:
+			//
+			// The entry error is nil when visiting a directory that itself is
+			// untraversable, as it's still governed by the parent directory's
+			// perms. We have to check readability of the dir here, because
+			// otherwise we'll have an empty package entry when we fail to read any
+			// of the dir's contents.
+			//
+			// If we didn't check here, then the next time this closure is called it
+			// would have an err with the same path as is called this time, as only
+			// then will filepath.Walk have attempted to descend into the directory
+			// and encountered an error.
+			var f *os.File
+			f, err = os.Open(wp)
+			if err != nil {
+				if os.IsPermission(err) {
+					return filepath.SkipDir
+				}
+				return err
 			}
-			return err
+			f.Close()
 		}
-		f.Close()
 
 		// Compute the import path. Run the result through ToSlash(), so that
 		// windows file paths are normalized to slashes, as is expected of

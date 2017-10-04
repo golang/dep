@@ -43,7 +43,7 @@ type singleSourceCache interface {
 	getVersionsFor(Revision) ([]UnpairedVersion, bool)
 
 	// Gets all the version pairs currently known to the cache.
-	getAllVersions() []PairedVersion
+	getAllVersions() ([]PairedVersion, bool)
 
 	// Get the revision corresponding to the given unpaired version.
 	getRevisionFor(UnpairedVersion) (Revision, bool)
@@ -61,9 +61,10 @@ type singleSourceCache interface {
 }
 
 type singleSourceCacheMemory struct {
-	mut    sync.RWMutex // protects all maps
+	mut    sync.RWMutex // protects all fields
 	infos  map[ProjectAnalyzerInfo]map[Revision]projectInfo
 	ptrees map[Revision]pkgtree.PackageTree
+	vList  []PairedVersion // replaced, never modified
 	vMap   map[UnpairedVersion]Revision
 	rMap   map[Revision][]UnpairedVersion
 }
@@ -136,13 +137,14 @@ func (c *singleSourceCacheMemory) getPackageTree(r Revision) (pkgtree.PackageTre
 
 func (c *singleSourceCacheMemory) setVersionMap(versionList []PairedVersion) {
 	c.mut.Lock()
+	c.vList = versionList
 	// TODO(sdboyer) how do we handle cache consistency here - revs that may
 	// be out of date vis-a-vis the ptrees or infos maps?
 	for r := range c.rMap {
 		c.rMap[r] = nil
 	}
 
-	c.vMap = make(map[UnpairedVersion]Revision)
+	c.vMap = make(map[UnpairedVersion]Revision, len(versionList))
 
 	for _, pv := range versionList {
 		u, r := pv.Unpair(), pv.Revision()
@@ -167,15 +169,17 @@ func (c *singleSourceCacheMemory) getVersionsFor(r Revision) ([]UnpairedVersion,
 	return versionList, has
 }
 
-func (c *singleSourceCacheMemory) getAllVersions() []PairedVersion {
-	if len(c.vMap) == 0 {
-		return nil
+func (c *singleSourceCacheMemory) getAllVersions() ([]PairedVersion, bool) {
+	c.mut.Lock()
+	vList := c.vList
+	c.mut.Unlock()
+
+	if vList == nil {
+		return nil, false
 	}
-	vlist := make([]PairedVersion, 0, len(c.vMap))
-	for v, r := range c.vMap {
-		vlist = append(vlist, v.Pair(r))
-	}
-	return vlist
+	cp := make([]PairedVersion, len(vList))
+	copy(cp, vList)
+	return cp, true
 }
 
 func (c *singleSourceCacheMemory) getRevisionFor(uv UnpairedVersion) (Revision, bool) {

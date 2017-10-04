@@ -22,3 +22,11 @@
 [[constraint]]
   name = "github.com/boltdb/bolt"
   version = "1.0.0"
+
+[[constraint]]
+  name = "github.com/jmank88/nuts"
+  version = "0.2.0"
+
+[[constraint]]
+  name = "github.com/golang/protobuf"
+  branch = "master"

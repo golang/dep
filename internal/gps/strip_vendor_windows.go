@@ -14,34 +14,35 @@ func stripVendor(path string, info os.FileInfo, err error) error {
 		return err
 	}
 
-	if info.Name() == "vendor" {
-		if _, err := os.Lstat(path); err == nil {
-			symlink := (info.Mode() & os.ModeSymlink) != 0
-			dir := info.IsDir()
+ 	if info.Name() != "vendor" {
+		return nil
+	}
 
-			switch {
-			case symlink && dir:
-				// This could be a windows junction directory. Support for these in the
-				// standard library is spotty, and we could easily delete an important
-				// folder if we called os.Remove or os.RemoveAll. Just skip these.
-				//
-				// TODO: If we could distinguish between junctions and Windows symlinks,
-				// we might be able to safely delete symlinks, even though junctions are
-				// dangerous.
-				return filepath.SkipDir
+	if _, err := os.Lstat(path); err == nil {
+		symlink := (info.Mode() & os.ModeSymlink) != 0
+		dir := info.IsDir()
 
-			case symlink:
-				if realInfo, err := os.Stat(path); err == nil && realInfo.IsDir() {
-					return os.Remove(path)
-				}
+		switch {
+		case symlink && dir:
+			// This could be a windows junction directory. Support for these in the
+			// standard library is spotty, and we could easily delete an important
+			// folder if we called os.Remove or os.RemoveAll. Just skip these.
+			//
+			// TODO: If we could distinguish between junctions and Windows symlinks,
+			// we might be able to safely delete symlinks, even though junctions are
+			// dangerous.
+			return filepath.SkipDir
 
-			case dir:
-				if err := os.RemoveAll(path); err != nil {
-					return err
-				}
-				return filepath.SkipDir
+		case symlink:
+			if realInfo, err := os.Stat(path); err == nil && realInfo.IsDir() {
+				return os.Remove(path)
 			}
-		}
+
+		case dir:
+  		if err := os.RemoveAll(path); err != nil {
+	  		return err
+		  }
+		return filepath.SkipDir
 	}
 
 	return nil

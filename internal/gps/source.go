@@ -494,8 +494,10 @@ func (sg *sourceGateway) listVersions(ctx context.Context) ([]PairedVersion, err
 	if err != nil {
 		return nil, err
 	}
-
-	return sg.cache.getAllVersions(), nil
+	if pvs, ok := sg.cache.getAllVersions(); ok {
+		return pvs, nil
+	}
+	return nil, nil
 }
 
 func (sg *sourceGateway) revisionPresentIn(ctx context.Context, r Revision) (bool, error) {
