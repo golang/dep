@@ -1,0 +1,8 @@
+Detected gb/gvt configuration files...
+Converting from vendor/manifest ...
+  Using * as initial constraint for imported dep github.com/sdboyer/deptest
+  Trying v0.8.1 (3f4c3be) as initial lock for imported dep github.com/sdboyer/deptest
+  Using ^2.0.0 as initial constraint for imported dep github.com/sdboyer/deptestdos
+  Trying v2.0.0 (5c60720) as initial lock for imported dep github.com/sdboyer/deptestdos
+  Using v2 as initial constraint for imported dep github.com/carolynvs/deptest-importers
+  Trying v2 (b79bc94) as initial lock for imported dep github.com/carolynvs/deptest-importers

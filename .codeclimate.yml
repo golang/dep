@@ -13,3 +13,4 @@ exclude_paths:
   - internal/gps/_testdata
   - cmd/dep/testdata
   - testdata
+  - internal/gps/internal/pb

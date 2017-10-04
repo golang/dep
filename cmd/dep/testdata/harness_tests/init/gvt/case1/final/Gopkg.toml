@@ -1,0 +1,11 @@
+
+[[constraint]]
+  name = "github.com/sdboyer/deptest"
+  source = "https://github.com/carolynvs/deptest"
+
+[[constraint]]
+  name = "github.com/sdboyer/deptestdos"
+
+[[constraint]]
+  branch = "v2"
+  name = "gopkg.in/yaml.v2"

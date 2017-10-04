@@ -9,6 +9,7 @@ import (
 	"sort"
 
 	"github.com/Masterminds/semver"
+	"github.com/golang/dep/internal/gps/internal/pb"
 )
 
 // VersionType indicates a type for a Version that conveys some additional
@@ -201,6 +202,11 @@ func (r Revision) identical(c Constraint) bool {
 	return r == r2
 }
 
+func (r Revision) copyTo(msg *pb.Constraint) {
+	msg.Type = pb.Constraint_Revision
+	msg.Value = string(r)
+}
+
 type branchVersion struct {
 	name      string
 	isDefault bool
@@ -293,6 +299,15 @@ func (v branchVersion) identical(c Constraint) bool {
 	return v == v2
 }
 
+func (v branchVersion) copyTo(msg *pb.Constraint) {
+	if v.isDefault {
+		msg.Type = pb.Constraint_DefaultBranch
+	} else {
+		msg.Type = pb.Constraint_Branch
+	}
+	msg.Value = v.name
+}
+
 type plainVersion string
 
 func (v plainVersion) String() string {
@@ -380,6 +395,11 @@ func (v plainVersion) identical(c Constraint) bool {
 		return false
 	}
 	return v == v2
+}
+
+func (v plainVersion) copyTo(msg *pb.Constraint) {
+	msg.Type = pb.Constraint_Version
+	msg.Value = string(v)
 }
 
 type semVersion struct {
@@ -479,6 +499,11 @@ func (v semVersion) identical(c Constraint) bool {
 		return false
 	}
 	return v == v2
+}
+
+func (v semVersion) copyTo(msg *pb.Constraint) {
+	msg.Type = pb.Constraint_Semver
+	msg.Value = v.String() //TODO better encoding which doesn't require re-parsing
 }
 
 type versionPair struct {
@@ -591,6 +616,10 @@ func (v versionPair) identical(c Constraint) bool {
 		return false
 	}
 	return v.v.identical(v2.v)
+}
+
+func (v versionPair) copyTo(*pb.Constraint) {
+	panic("versionPair should never be serialized; it is solver internal-only")
 }
 
 // compareVersionType is a sort func helper that makes a coarse-grained sorting

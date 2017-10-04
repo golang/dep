@@ -305,8 +305,8 @@ func (test singleSourceCacheTest) run(t *testing.T) {
 		}
 
 		t.Run("getAllVersions", func(t *testing.T) {
-			got := c.getAllVersions()
-			if len(got) != len(versions) {
+			got, ok := c.getAllVersions()
+			if !ok || len(got) != len(versions) {
 				t.Errorf("unexpected versions:\n\t(GOT): %#v\n\t(WNT): %#v", got, versions)
 			} else {
 				SortPairedForDowngrade(got)
@@ -566,8 +566,8 @@ func (discardCache) getVersionsFor(Revision) ([]UnpairedVersion, bool) {
 	return nil, false
 }
 
-func (discardCache) getAllVersions() []PairedVersion {
-	return nil
+func (discardCache) getAllVersions() ([]PairedVersion, bool) {
+	return nil, false
 }
 
 func (discardCache) getRevisionFor(UnpairedVersion) (Revision, bool) {

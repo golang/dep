@@ -35,9 +35,9 @@ func HasFilepathPrefix(path, prefix string) (bool, error) {
 	// handling of volume name/drive letter on Windows. vnPath and vnPrefix
 	// are first compared, and then used to initialize initial values of p and
 	// d which will be appended to for incremental checks using
-	// isCaseSensitiveFilesystem and then equality.
+	// IsCaseSensitiveFilesystem and then equality.
 
-	// no need to check isCaseSensitiveFilesystem because VolumeName return
+	// no need to check IsCaseSensitiveFilesystem because VolumeName return
 	// empty string on all non-Windows machines
 	vnPath := strings.ToLower(filepath.VolumeName(path))
 	vnPrefix := strings.ToLower(filepath.VolumeName(prefix))
@@ -82,7 +82,7 @@ func HasFilepathPrefix(path, prefix string) (bool, error) {
 		// something like ext4 filesystem mounted on FAT
 		// mountpoint, mounted on ext4 filesystem, i.e. the
 		// problematic filesystem is not the last one.
-		caseSensitive, err := isCaseSensitiveFilesystem(filepath.Join(d, dirs[i]))
+		caseSensitive, err := IsCaseSensitiveFilesystem(filepath.Join(d, dirs[i]))
 		if err != nil {
 			return false, errors.Wrap(err, "failed to check filepath prefix")
 		}
@@ -135,7 +135,7 @@ func EquivalentPaths(p1, p2 string) (bool, error) {
 	}
 
 	if p1Filename != "" || p2Filename != "" {
-		caseSensitive, err := isCaseSensitiveFilesystem(filepath.Join(p1, p1Filename))
+		caseSensitive, err := IsCaseSensitiveFilesystem(filepath.Join(p1, p1Filename))
 		if err != nil {
 			return false, errors.Wrap(err, "could not check for filesystem case-sensitivity")
 		}
@@ -193,7 +193,7 @@ func renameByCopy(src, dst string) error {
 	return errors.Wrapf(os.RemoveAll(src), "cannot delete %s", src)
 }
 
-// isCaseSensitiveFilesystem determines if the filesystem where dir
+// IsCaseSensitiveFilesystem determines if the filesystem where dir
 // exists is case sensitive or not.
 //
 // CAVEAT: this function works by taking the last component of the given
@@ -212,7 +212,7 @@ func renameByCopy(src, dst string) error {
 // If the input directory is such that the last component is composed
 // exclusively of case-less codepoints (e.g.  numbers), this function will
 // return false.
-func isCaseSensitiveFilesystem(dir string) (bool, error) {
+func IsCaseSensitiveFilesystem(dir string) (bool, error) {
 	alt := filepath.Join(filepath.Dir(dir), genTestFilename(filepath.Base(dir)))
 
 	dInfo, err := os.Stat(dir)
@@ -262,6 +262,88 @@ func genTestFilename(str string) string {
 		}
 		return r
 	}, str)
+}
+
+var errPathNotDir = errors.New("given path is not a directory")
+
+// ReadActualFilenames is used to determine the actual file names in given directory.
+//
+// On case sensitive file systems like ext4, it will check if those files exist using
+// `os.Stat` and return a map with key and value as filenames which exist in the folder.
+//
+// Otherwise, it reads the contents of the directory and returns a map which has the
+// given file name as the key and actual filename as the value(if it was found).
+func ReadActualFilenames(dirPath string, names []string) (map[string]string, error) {
+	actualFilenames := make(map[string]string, len(names))
+	if len(names) == 0 {
+		// This isn't expected to happen for current usage. Adding edge case handling,
+		// as it may be useful in future.
+		return actualFilenames, nil
+	}
+	// First, check that the given path is valid and it is a directory
+	dirStat, err := os.Stat(dirPath)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to read actual filenames")
+	}
+
+	if !dirStat.IsDir() {
+		return nil, errPathNotDir
+	}
+
+	// Ideally, we would use `os.Stat` for getting the actual file names but that returns
+	// the name we passed in as an argument and not the actual filename. So we are forced
+	// to list the directory contents and check against that. Since this check is costly,
+	// we do it only if absolutely necessary.
+	caseSensitive, err := IsCaseSensitiveFilesystem(dirPath)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to read actual filenames")
+	}
+	if caseSensitive {
+		// There will be no difference between actual filename and given filename. So
+		// just check if those files exist.
+		for _, name := range names {
+			_, err := os.Stat(filepath.Join(dirPath, name))
+			if err == nil {
+				actualFilenames[name] = name
+			} else if !os.IsNotExist(err) {
+				// Some unexpected err, wrap and return it.
+				return nil, errors.Wrap(err, "failed to read actual filenames")
+			}
+		}
+		return actualFilenames, nil
+	}
+
+	dir, err := os.Open(dirPath)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to read actual filenames")
+	}
+	defer dir.Close()
+
+	// Pass -1 to read all filenames in directory
+	filenames, err := dir.Readdirnames(-1)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to read actual filenames")
+	}
+
+	// namesMap holds the mapping from lowercase name to search name. Using this, we can
+	// avoid repeatedly looping through names.
+	namesMap := make(map[string]string, len(names))
+	for _, name := range names {
+		namesMap[strings.ToLower(name)] = name
+	}
+
+	for _, filename := range filenames {
+		searchName, ok := namesMap[strings.ToLower(filename)]
+		if ok {
+			// We are interested in this file, case insensitive match successful.
+			actualFilenames[searchName] = filename
+			if len(actualFilenames) == len(names) {
+				// We found all that we were looking for.
+				return actualFilenames, nil
+			}
+		}
+	}
+	return actualFilenames, nil
 }
 
 var (

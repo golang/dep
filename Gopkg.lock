@@ -34,6 +34,18 @@
 
 [[projects]]
   branch = "master"
+  name = "github.com/golang/protobuf"
+  packages = ["proto"]
+  revision = "5afd06f9d81a86d6e3bb7dc702d6bd148ea3ff23"
+
+[[projects]]
+  name = "github.com/jmank88/nuts"
+  packages = ["."]
+  revision = "a1e02c788669d022c325a8ee674f15360d7104f4"
+  version = "v0.2.0"
+
+[[projects]]
+  branch = "master"
   name = "github.com/nightlyone/lockfile"
   packages = ["."]
   revision = "e83dc5e7bba095e8d32fb2124714bf41f2a30cb5"
@@ -83,6 +95,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "cf87e8aad053ddbd0ea5c73e3ae6c70a8f9badd931e6db02598831867a2fb2ca"
+  inputs-digest = "05c1cd69be2c917c0cc4b32942830c2acfa044d8200fdc94716aae48a8083702"
   solver-name = "gps-cdcl"
   solver-version = 1

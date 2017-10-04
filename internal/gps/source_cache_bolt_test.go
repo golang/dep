@@ -119,8 +119,8 @@ func TestBoltCacheTimeout(t *testing.T) {
 		}
 		comparePackageTree(t, ptree, got)
 
-		gotV := c.getAllVersions()
-		if len(gotV) != len(pvs) {
+		gotV, ok := c.getAllVersions()
+		if !ok || len(gotV) != len(pvs) {
 			t.Errorf("unexpected versions:\n\t(GOT): %#v\n\t(WNT): %#v", gotV, pvs)
 		} else {
 			SortPairedForDowngrade(gotV)
@@ -161,8 +161,8 @@ func TestBoltCacheTimeout(t *testing.T) {
 		}
 		comparePackageTree(t, ptree, gotPtree)
 
-		pvs := c.getAllVersions()
-		if len(pvs) > 0 {
+		pvs, ok := c.getAllVersions()
+		if ok || len(pvs) > 0 {
 			t.Errorf("expected no cached versions, but got:\n\t%#v", pvs)
 		}
 	}
@@ -194,8 +194,8 @@ func TestBoltCacheTimeout(t *testing.T) {
 		}
 		comparePackageTree(t, ptree, got)
 
-		gotV := c.getAllVersions()
-		if len(gotV) != len(pvs) {
+		gotV, ok := c.getAllVersions()
+		if !ok || len(gotV) != len(pvs) {
 			t.Errorf("unexpected versions:\n\t(GOT): %#v\n\t(WNT): %#v", gotV, pvs)
 		} else {
 			SortPairedForDowngrade(gotV)
@@ -282,8 +282,8 @@ func TestBoltCacheTimeout(t *testing.T) {
 		}
 		comparePackageTree(t, newPtree, got)
 
-		gotV := c.getAllVersions()
-		if len(gotV) != len(newPVS) {
+		gotV, ok := c.getAllVersions()
+		if !ok || len(gotV) != len(newPVS) {
 			t.Errorf("unexpected versions:\n\t(GOT): %#v\n\t(WNT): %#v", gotV, newPVS)
 		} else {
 			SortPairedForDowngrade(gotV)
@@ -294,30 +294,5 @@ func TestBoltCacheTimeout(t *testing.T) {
 				}
 			}
 		}
-	}
-}
-
-func TestBoltCacheRevisionName(t *testing.T) {
-	const (
-		rev  = Revision("test")
-		want = "rev:test"
-	)
-	if got := string(cacheRevisionName(rev)); got != want {
-		t.Errorf("unexpected cache revision name: (GOT):%q (WNT):%q", got, want)
-	}
-}
-
-func TestBoltCacheInfoName(t *testing.T) {
-	ai := ProjectAnalyzerInfo{
-		Name:    "name",
-		Version: 42,
-	}
-	const (
-		wantM = "info:name.42:manifest"
-		wantL = "info:name.42:lock"
-	)
-	gotM, gotL := cacheInfoNames(ai)
-	if string(gotM) != wantM || string(gotL) != wantL {
-		t.Errorf("unexpected info revision names: (GOT):%q,%q (WNT):%q,%q", gotM, gotL, wantM, wantL)
 	}
 }

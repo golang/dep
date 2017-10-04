@@ -215,7 +215,7 @@ func (s *gitSource) listVersions(ctx context.Context) (vlist []PairedVersion, er
 	var headrev Revision
 	var onedef, multidef, defmaster bool
 
-	smap := make(map[string]bool)
+	smap := make(map[string]int)
 	uniq := 0
 	vlist = make([]PairedVersion, len(all))
 	for _, pair := range all {
@@ -250,7 +250,12 @@ func (s *gitSource) listVersions(ctx context.Context) (vlist []PairedVersion, er
 				// If the suffix is there, then we *know* this is the rev of
 				// the underlying commit object that we actually want
 				vstr = strings.TrimSuffix(vstr, "^{}")
-			} else if smap[vstr] {
+				if i, ok := smap[vstr]; ok {
+					v = NewVersion(vstr).Pair(Revision(pair[:40]))
+					vlist[i] = v
+					continue
+				}
+			} else if _, ok := smap[vstr]; ok {
 				// Already saw the deref'd version of this tag, if one
 				// exists, so skip this.
 				continue
@@ -258,8 +263,8 @@ func (s *gitSource) listVersions(ctx context.Context) (vlist []PairedVersion, er
 				// version first. Which should be impossible, but this
 				// covers us in case of weirdness, anyway.
 			}
-			v = NewVersion(vstr).Pair(Revision(pair[:40])).(PairedVersion)
-			smap[vstr] = true
+			v = NewVersion(vstr).Pair(Revision(pair[:40]))
+			smap[vstr] = uniq
 			vlist[uniq] = v
 			uniq++
 		}
@@ -376,11 +381,7 @@ func (s *bzrSource) exportRevisionTo(ctx context.Context, rev Revision, to strin
 		return err
 	}
 
-	if err := os.RemoveAll(filepath.Join(to, ".bzr")); err != nil {
-		return err
-	}
-
-	return nil
+	return os.RemoveAll(filepath.Join(to, ".bzr"))
 }
 
 func (s *bzrSource) listVersions(ctx context.Context) ([]PairedVersion, error) {
@@ -457,11 +458,7 @@ func (s *hgSource) exportRevisionTo(ctx context.Context, rev Revision, to string
 		return err
 	}
 
-	if err := os.RemoveAll(filepath.Join(to, ".hg")); err != nil {
-		return err
-	}
-
-	return nil
+	return os.RemoveAll(filepath.Join(to, ".hg"))
 }
 
 func (s *hgSource) listVersions(ctx context.Context) ([]PairedVersion, error) {

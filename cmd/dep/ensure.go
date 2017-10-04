@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/golang/dep"
 	"github.com/golang/dep/internal/gps"
@@ -110,6 +111,11 @@ dep ensure -update -no-vendor
     As above, but only modify Gopkg.lock; leave vendor/ unchanged.
 
 `
+
+var (
+	errUpdateArgsValidation = errors.New("update arguments validation failed")
+	errAddDepsFailed        = errors.New("adding dependencies failed")
+)
 
 func (cmd *ensureCommand) Name() string { return "ensure" }
 func (cmd *ensureCommand) Args() string {
@@ -228,7 +234,7 @@ func (cmd *ensureCommand) runDefault(ctx *dep.Ctx, args []string, p *dep.Project
 		return errors.Wrap(err, "prepare solver")
 	}
 
-	if p.Lock != nil && bytes.Equal(p.Lock.InputHash(), solver.HashInputs()) {
+	if p.Lock != nil && bytes.Equal(p.Lock.InputsDigest(), solver.HashInputs()) {
 		// Memo matches, so there's probably nothing to do.
 		if ctx.Verbose {
 			ctx.Out.Printf("%s was already in sync with imports and %s\n", dep.LockName, dep.ManifestName)
@@ -334,9 +340,8 @@ func (cmd *ensureCommand) runUpdate(ctx *dep.Ctx, args []string, p *dep.Project,
 	// user a bit, but the extra effort required is minimal, and it ensures the
 	// user is isolating variables in the event of solve problems (was it the
 	// "pending" changes, or the -update that caused the problem?).
-	// TODO(sdboyer) reduce this to a warning?
-	if !bytes.Equal(p.Lock.InputHash(), solver.HashInputs()) {
-		return errors.Errorf("%s is out of sync with %s or the project's imports. Run \"dep ensure\" to resync them first before running \"dep ensure -update\"", dep.LockName, dep.ManifestName)
+	if !bytes.Equal(p.Lock.InputsDigest(), solver.HashInputs()) {
+		ctx.Out.Printf("Warning: %s is out of sync with %s or the project's imports.", dep.LockName, dep.ManifestName)
 	}
 
 	// When -update is specified without args, allow every dependency to change
@@ -345,37 +350,8 @@ func (cmd *ensureCommand) runUpdate(ctx *dep.Ctx, args []string, p *dep.Project,
 		params.ChangeAll = true
 	}
 
-	// Allow any of specified project versions to change, regardless of the lock
-	// file.
-	for _, arg := range args {
-		// Ensure the provided path has a deducible project root
-		// TODO(sdboyer) do these concurrently
-		pc, path, err := getProjectConstraint(arg, sm)
-		if err != nil {
-			// TODO(sdboyer) return all errors, not just the first one we encounter
-			// TODO(sdboyer) ensure these errors are contextualized in a sensible way for -update
-			return err
-		}
-		if path != string(pc.Ident.ProjectRoot) {
-			// TODO(sdboyer): does this really merit an abortive error?
-			return errors.Errorf("%s is not a project root, try %s instead", path, pc.Ident.ProjectRoot)
-		}
-
-		if !p.Lock.HasProjectWithRoot(pc.Ident.ProjectRoot) {
-			return errors.Errorf("%s is not present in %s, cannot -update it", pc.Ident.ProjectRoot, dep.LockName)
-		}
-
-		if pc.Ident.Source != "" {
-			return errors.Errorf("cannot specify alternate sources on -update (%s)", pc.Ident.Source)
-		}
-
-		if !gps.IsAny(pc.Constraint) {
-			// TODO(sdboyer) constraints should be allowed to allow solves that
-			// target particular versions while remaining within declared constraints
-			return errors.Errorf("version constraint %s passed for %s, but -update follows constraints declared in %s, not CLI arguments", pc.Constraint, pc.Ident.ProjectRoot, dep.ManifestName)
-		}
-
-		params.ToChange = append(params.ToChange, gps.ProjectRoot(arg))
+	if err := validateUpdateArgs(ctx, args, p, sm, &params); err != nil {
+		return err
 	}
 
 	// Re-prepare a solver now that our params are complete.
@@ -429,9 +405,8 @@ func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm
 	// user a bit, but the extra effort required is minimal, and it ensures the
 	// user is isolating variables in the event of solve problems (was it the
 	// "pending" changes, or the -add that caused the problem?).
-	// TODO(sdboyer) reduce this to a warning?
-	if p.Lock != nil && !bytes.Equal(p.Lock.InputHash(), solver.HashInputs()) {
-		return errors.Errorf("%s is out of sync with %s or the project's imports. Run \"dep ensure\" to resync them first before running \"dep ensure -add\"", dep.LockName, dep.ManifestName)
+	if p.Lock != nil && !bytes.Equal(p.Lock.InputsDigest(), solver.HashInputs()) {
+		ctx.Out.Printf("Warning: %s is out of sync with %s or the project's imports.", dep.LockName, dep.ManifestName)
 	}
 
 	rm, _ := params.RootPackageTree.ToReachMap(true, true, false, p.Manifest.IgnoredPackages())
@@ -494,86 +469,130 @@ func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm
 	}
 	addInstructions := make(map[gps.ProjectRoot]addInstruction)
 
-	for _, arg := range args {
-		// TODO(sdboyer) return all errors, not just the first one we encounter
-		// TODO(sdboyer) do these concurrently?
-		pc, path, err := getProjectConstraint(arg, sm)
-		if err != nil {
-			// TODO(sdboyer) ensure these errors are contextualized in a sensible way for -add
-			return err
+	// A mutex for limited access to addInstructions by goroutines.
+	var mutex sync.Mutex
+
+	// Channel for receiving all the errors.
+	errCh := make(chan error, len(args))
+
+	var wg sync.WaitGroup
+
+	ctx.Out.Println("Fetching sources...")
+
+	for i, arg := range args {
+		wg.Add(1)
+
+		if ctx.Verbose {
+			ctx.Err.Printf("(%d/%d) %s\n", i+1, len(args), arg)
 		}
 
-		// check if the the parsed path is the current root path
-		if strings.EqualFold(string(p.ImportRoot), string(pc.Ident.ProjectRoot)) {
-			return errors.New("cannot add current project to itself")
-		}
+		go func(arg string) {
+			defer wg.Done()
 
-		inManifest := p.Manifest.HasConstraintsOn(pc.Ident.ProjectRoot)
-		inImports := exrmap[pc.Ident.ProjectRoot]
-		if inManifest && inImports {
-			return errors.Errorf("nothing to -add, %s is already in %s and the project's direct imports or required list", pc.Ident.ProjectRoot, dep.ManifestName)
-		}
+			pc, path, err := getProjectConstraint(arg, sm)
+			if err != nil {
+				// TODO(sdboyer) ensure these errors are contextualized in a sensible way for -add
+				errCh <- err
+				return
+			}
 
-		err = sm.SyncSourceFor(pc.Ident)
-		if err != nil {
-			return errors.Wrapf(err, "failed to fetch source for %s", pc.Ident.ProjectRoot)
-		}
+			// check if the the parsed path is the current root path
+			if strings.EqualFold(string(p.ImportRoot), string(pc.Ident.ProjectRoot)) {
+				errCh <- errors.New("cannot add current project to itself")
+				return
+			}
 
-		someConstraint := !gps.IsAny(pc.Constraint) || pc.Ident.Source != ""
+			inManifest := p.Manifest.HasConstraintsOn(pc.Ident.ProjectRoot)
+			inImports := exrmap[pc.Ident.ProjectRoot]
+			if inManifest && inImports {
+				errCh <- errors.Errorf("nothing to -add, %s is already in %s and the project's direct imports or required list", pc.Ident.ProjectRoot, dep.ManifestName)
+				return
+			}
 
-		instr, has := addInstructions[pc.Ident.ProjectRoot]
-		if has {
-			// Multiple packages from the same project were specified as
-			// arguments; make sure they agree on declared constraints.
-			// TODO(sdboyer) until we have a general method for checking constraint equality, only allow one to declare
-			if someConstraint {
-				if !gps.IsAny(instr.constraint) || instr.id.Source != "" {
-					return errors.Errorf("can only specify rules once per project being added; rules were given at least twice for %s", pc.Ident.ProjectRoot)
+			err = sm.SyncSourceFor(pc.Ident)
+			if err != nil {
+				errCh <- errors.Wrapf(err, "failed to fetch source for %s", pc.Ident.ProjectRoot)
+				return
+			}
+
+			someConstraint := !gps.IsAny(pc.Constraint) || pc.Ident.Source != ""
+
+			// Obtain a lock for addInstructions
+			mutex.Lock()
+			defer mutex.Unlock()
+			instr, has := addInstructions[pc.Ident.ProjectRoot]
+			if has {
+				// Multiple packages from the same project were specified as
+				// arguments; make sure they agree on declared constraints.
+				// TODO(sdboyer) until we have a general method for checking constraint equality, only allow one to declare
+				if someConstraint {
+					if !gps.IsAny(instr.constraint) || instr.id.Source != "" {
+						errCh <- errors.Errorf("can only specify rules once per project being added; rules were given at least twice for %s", pc.Ident.ProjectRoot)
+						return
+					}
+					instr.constraint = pc.Constraint
+					instr.id = pc.Ident
 				}
+			} else {
+				instr.ephReq = make(map[string]bool)
 				instr.constraint = pc.Constraint
 				instr.id = pc.Ident
 			}
-		} else {
-			instr.ephReq = make(map[string]bool)
-			instr.constraint = pc.Constraint
-			instr.id = pc.Ident
-		}
 
-		if inManifest {
-			if someConstraint {
-				return errors.Errorf("%s already contains rules for %s, cannot specify a version constraint or alternate source", dep.ManifestName, path)
-			}
-
-			instr.ephReq[path] = true
-			instr.typ |= isInManifest
-		} else if inImports {
-			if !someConstraint {
-				if exmap[path] {
-					return errors.Errorf("%s is already imported or required, so -add is only valid with a constraint", path)
+			if inManifest {
+				if someConstraint {
+					errCh <- errors.Errorf("%s already contains rules for %s, cannot specify a version constraint or alternate source", dep.ManifestName, path)
+					return
 				}
 
-				// No constraints, but the package isn't imported; require it.
-				// TODO(sdboyer) this case seems like it's getting overly specific and risks muddying the water more than it helps
 				instr.ephReq[path] = true
-				instr.typ |= isInImportsNoConstraint
-			} else {
-				// Don't require on this branch if the path was a ProjectRoot;
-				// most common here will be the user adding constraints to
-				// something they already imported, and if they specify the
-				// root, there's a good chance they don't actually want to
-				// require the project's root package, but are just trying to
-				// indicate which project should receive the constraints.
-				if !exmap[path] && string(pc.Ident.ProjectRoot) != path {
-					instr.ephReq[path] = true
-				}
-				instr.typ |= isInImportsWithConstraint
-			}
-		} else {
-			instr.typ |= isInNeither
-			instr.ephReq[path] = true
-		}
+				instr.typ |= isInManifest
+			} else if inImports {
+				if !someConstraint {
+					if exmap[path] {
+						errCh <- errors.Errorf("%s is already imported or required, so -add is only valid with a constraint", path)
+						return
+					}
 
-		addInstructions[pc.Ident.ProjectRoot] = instr
+					// No constraints, but the package isn't imported; require it.
+					// TODO(sdboyer) this case seems like it's getting overly specific and risks muddying the water more than it helps
+					instr.ephReq[path] = true
+					instr.typ |= isInImportsNoConstraint
+				} else {
+					// Don't require on this branch if the path was a ProjectRoot;
+					// most common here will be the user adding constraints to
+					// something they already imported, and if they specify the
+					// root, there's a good chance they don't actually want to
+					// require the project's root package, but are just trying to
+					// indicate which project should receive the constraints.
+					if !exmap[path] && string(pc.Ident.ProjectRoot) != path {
+						instr.ephReq[path] = true
+					}
+					instr.typ |= isInImportsWithConstraint
+				}
+			} else {
+				instr.typ |= isInNeither
+				instr.ephReq[path] = true
+			}
+
+			addInstructions[pc.Ident.ProjectRoot] = instr
+		}(arg)
+	}
+
+	wg.Wait()
+	close(errCh)
+
+	// Newline after printing the fetching source output.
+	ctx.Err.Println()
+
+	// Log all the errors.
+	if len(errCh) > 0 {
+		ctx.Err.Printf("Failed to add the dependencies:\n\n")
+		for err := range errCh {
+			ctx.Err.Println("  ✗", err.Error())
+		}
+		ctx.Err.Println()
+		return errAddDepsFailed
 	}
 
 	// We're now sure all of our add instructions are individually and mutually
@@ -792,4 +811,78 @@ func (e pkgtreeErrs) Error() string {
 	}
 
 	return fmt.Sprintf("found %d errors in the package tree:\n%s", len(e), strings.Join(errs, "\n"))
+}
+
+func validateUpdateArgs(ctx *dep.Ctx, args []string, p *dep.Project, sm gps.SourceManager, params *gps.SolveParameters) error {
+	// Channel for receiving all the valid arguments.
+	argsCh := make(chan string, len(args))
+
+	// Channel for receiving all the validation errors.
+	errCh := make(chan error, len(args))
+
+	var wg sync.WaitGroup
+
+	// Allow any of specified project versions to change, regardless of the lock
+	// file.
+	for _, arg := range args {
+		wg.Add(1)
+
+		go func(arg string) {
+			defer wg.Done()
+
+			// Ensure the provided path has a deducible project root.
+			pc, path, err := getProjectConstraint(arg, sm)
+			if err != nil {
+				// TODO(sdboyer) ensure these errors are contextualized in a sensible way for -update
+				errCh <- err
+				return
+			}
+			if path != string(pc.Ident.ProjectRoot) {
+				// TODO(sdboyer): does this really merit an abortive error?
+				errCh <- errors.Errorf("%s is not a project root, try %s instead", path, pc.Ident.ProjectRoot)
+				return
+			}
+
+			if !p.Lock.HasProjectWithRoot(pc.Ident.ProjectRoot) {
+				errCh <- errors.Errorf("%s is not present in %s, cannot -update it", pc.Ident.ProjectRoot, dep.LockName)
+				return
+			}
+
+			if pc.Ident.Source != "" {
+				errCh <- errors.Errorf("cannot specify alternate sources on -update (%s)", pc.Ident.Source)
+				return
+			}
+
+			if !gps.IsAny(pc.Constraint) {
+				// TODO(sdboyer) constraints should be allowed to allow solves that
+				// target particular versions while remaining within declared constraints.
+				errCh <- errors.Errorf("version constraint %s passed for %s, but -update follows constraints declared in %s, not CLI arguments", pc.Constraint, pc.Ident.ProjectRoot, dep.ManifestName)
+				return
+			}
+
+			// Valid argument.
+			argsCh <- arg
+		}(arg)
+	}
+
+	wg.Wait()
+	close(errCh)
+	close(argsCh)
+
+	// Log all the errors.
+	if len(errCh) > 0 {
+		ctx.Err.Printf("Invalid arguments passed to ensure -update:\n\n")
+		for err := range errCh {
+			ctx.Err.Println("  ✗", err.Error())
+		}
+		ctx.Err.Println()
+		return errUpdateArgsValidation
+	}
+
+	// Add all the valid arguments to solve params.
+	for arg := range argsCh {
+		params.ToChange = append(params.ToChange, gps.ProjectRoot(arg))
+	}
+
+	return nil
 }

@@ -1574,7 +1574,7 @@ func (ds depspec) DependencyConstraints() ProjectConstraints {
 type fixLock []LockedProject
 
 // impl Lock interface
-func (fixLock) InputHash() []byte {
+func (fixLock) InputsDigest() []byte {
 	return []byte("fooooorooooofooorooofoo")
 }
 
@@ -1586,7 +1586,7 @@ func (l fixLock) Projects() []LockedProject {
 type dummyLock struct{}
 
 // impl Lock interface
-func (dummyLock) InputHash() []byte {
+func (dummyLock) InputsDigest() []byte {
 	return []byte("fooooorooooofooorooofoo")
 }
 

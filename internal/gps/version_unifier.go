@@ -4,6 +4,8 @@
 
 package gps
 
+import "github.com/golang/dep/internal/gps/internal/pb"
+
 // versionUnifier facilitates cross-type version comparison and set operations.
 type versionUnifier struct {
 	b   sourceBridge
@@ -293,4 +295,8 @@ outter:
 		return false
 	}
 	return true
+}
+
+func (vtu versionTypeUnion) copyTo(*pb.Constraint) {
+	panic("versionTypeUnion should never be serialized; it is solver internal-only")
 }
