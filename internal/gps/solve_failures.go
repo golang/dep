@@ -84,7 +84,7 @@ func (e *caseMismatchFailure) Error() string {
 	var buf bytes.Buffer
 
 	str := "Could not introduce %s due to a case-only variation: it depends on %q, but %q was already established as the case variant for that project root by the following other dependers:\n"
-	fmt.Fprintf(&buf, str, e.goal.dep.Ident.ProjectRoot, e.current, a2vs(e.goal.depender))
+	fmt.Fprintf(&buf, str, a2vs(e.goal.depender), e.goal.dep.Ident.ProjectRoot, e.current)
 
 	for _, c := range e.failsib {
 		fmt.Fprintf(&buf, "\t%s\n", a2vs(c.depender))
