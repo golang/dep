@@ -1,0 +1,7 @@
+{
+  "commands": [
+    ["status"]
+  ],
+  "error-expected": "due to the following packages missing from the lock",
+  "vendor-final": []
+}

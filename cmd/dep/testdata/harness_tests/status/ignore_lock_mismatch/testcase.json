@@ -1,0 +1,7 @@
+{
+  "commands": [
+    ["status"]
+  ],
+  "error-expected": "This happens when Gopkg.toml is modified",
+  "vendor-final": []
+}

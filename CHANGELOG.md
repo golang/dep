@@ -1,5 +1,10 @@
 # v0.3.2 (Unreleased)
 
+BUG FIXES:
+
+* Fix `status` shows incorrect reason for lock mismatch when ignoring packages.
+(#1216)
+
 IMPROVEMENTS:
 
 * `dep ensure -add` now concurrently fetches the source and adds the projects.
