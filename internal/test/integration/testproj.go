@@ -41,7 +41,7 @@ type TestProject struct {
 }
 
 // NewTestProject initializes a new test's project directory.
-func NewTestProject(t *testing.T, initPath, wd string, externalProc bool, run RunFunc) *TestProject {
+func NewTestProject(t *testing.T, initPath, wd string, run RunFunc) *TestProject {
 	new := &TestProject{
 		t:      t,
 		origWd: wd,
