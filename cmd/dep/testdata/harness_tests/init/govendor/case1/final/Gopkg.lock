@@ -2,12 +2,6 @@
 
 
 [[projects]]
-  name = "github.com/carolynvs/go-dep-test"
-  packages = ["."]
-  revision = "6b35265ebb3003525cd3ad6498d7e81a89be106b"
-  version = "0.2.0"
-
-[[projects]]
   name = "github.com/sdboyer/deptest"
   packages = ["."]
   revision = "3f4c3bea144e112a69bbe5d8d01c1b09a544253f"
@@ -22,6 +16,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "f8e9ea65524b2cebafacf6c9b91441301c6b231bdaf408700a27ae7f9418a273"
+  inputs-digest = "9cc662f2e1b80c8df205d9d667fe2c47825a06961ceae378f44a8290d01dd359"
   solver-name = "gps-cdcl"
   solver-version = 1
