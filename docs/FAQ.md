@@ -27,6 +27,7 @@ Summarize the question and quote the reply, linking back to the original comment
 * [How does `dep` handle symbolic links?](#how-does-dep-handle-symbolic-links)
 * [Does `dep` support relative imports?](#does-dep-support-relative-imports)
 * [How do I make `dep` resolve dependencies from my `GOPATH`?](#how-do-i-make-dep-resolve-dependencies-from-my-gopath)
+* [Will `dep` let me use git submodules to store dependencies in `vendor`?](#will-dep-let-me-use-git-submodules-to-store-dependencies-in-vendor)
 
 ## Best Practices
 * [Should I commit my vendor directory?](#should-i-commit-my-vendor-directory)
@@ -48,11 +49,13 @@ Here are some suggestions for when you could use `dep` or `go get`:
 > `go get`: I want to download the source code for a go project so that I can work on it myself, or to install a tool. This clones the repo under GOPATH for all to use.
 >
 > `dep ensure`: I have imported a new dependency in my code and want to download the dependency so I can start using it. My workflow is "add the import to the code, and then run dep ensure so that the manifest/lock/vendor are updated". This clones the repo under my project's vendor directory, and remembers the revision used so that everyone who works on my project is guaranteed to be using the same version of dependencies.
--[@carolynvs in #376](https://github.com/golang/dep/issues/376#issuecomment-293964655)
+> 
+> [@carolynvs in #376](https://github.com/golang/dep/issues/376#issuecomment-293964655)
 
 > The long term vision is a sane, overall-consistent go tool. My general take is that `go get`
 > is for people consuming Go code, and dep-family commands are for people developing it.
--[@sdboyer in #376](https://github.com/golang/dep/issues/376#issuecomment-294045873)
+> 
+> [@sdboyer in #376](https://github.com/golang/dep/issues/376#issuecomment-294045873)
 
 ### Why is it `dep ensure` instead of `dep install`?
 
@@ -61,7 +64,8 @@ Here are some suggestions for when you could use `dep` or `go get`:
 > The idea of "ensure" is roughly, "ensure that all my local states - code tree, manifest, lock, and vendor - are in sync with each other." When arguments are passed, it becomes "ensure this argument is satisfied, along with synchronization between all my local states."
 >
 > We opted for this approach because we came to the conclusion that allowing the tool to perform partial work/exit in intermediate states ended up creating a tool that had more commands, had far more possible valid exit and input states, and was generally full of footguns. In this approach, the user has most of the same ultimate control, but exercises it differently (by modifying the code/manifest and re-running dep ensure).
--[@sdboyer in #371](https://github.com/golang/dep/issues/371#issuecomment-293246832)
+> 
+> [@sdboyer in #371](https://github.com/golang/dep/issues/371#issuecomment-293246832)
 
 ### What is a direct or transitive dependency?
 * Direct dependencies are dependencies that are imported directly by your project: they appear in at least one import statement from your project.
@@ -73,7 +77,8 @@ Here are some suggestions for when you could use `dep` or `go get`:
 > The manifest describes user intent, and the lock describes computed outputs. There's flexibility in manifests that isn't present in locks..., as the "branch": "master" constraint will match whatever revision master HAPPENS to be at right now, whereas the lock is nailed down to a specific revision.
 >
 > This flexibility is important because it allows us to provide easy commands (e.g. `dep ensure -update`) that can manage an update process for you, within the constraints you specify, AND because it allows your project, when imported by someone else, to collaboratively specify the constraints for your own dependencies.
--[@sdboyer in #281](https://github.com/golang/dep/issues/281#issuecomment-284118314)
+> 
+> [@sdboyer in #281](https://github.com/golang/dep/issues/281#issuecomment-284118314)
 
 ## How do I constrain a transitive dependency's version?
 First, if you're wondering about this because you're trying to keep the version
@@ -108,7 +113,8 @@ No.
 
 > Placing these files inside `vendor/` would concretely bind us to `vendor/` in the long term.
 > We prefer to treat the `vendor/` as an implementation detail.
--[@sdboyer on go package management list](https://groups.google.com/d/msg/go-package-management/et1qFUjrkP4/LQFCHP4WBQAJ)
+> 
+> [@sdboyer on go package management list](https://groups.google.com/d/msg/go-package-management/et1qFUjrkP4/LQFCHP4WBQAJ)
 
 ## How do I get dep to authenticate to a git repo?
 
@@ -237,7 +243,8 @@ Unable to update checked out version: fatal: reference is not a tree: 4dfc6a8a7e
 > The lock file represents a set of precise, typically immutable versions for the entire transitive closure of dependencies for a project. But "the project" can be, and is, decomposed into just a bunch of arguments to an algorithm. When those inputs change, the lock may need to change as well.
 >
 > Under most circumstances, if those arguments don't change, then the lock remains fine and correct. You've hit one one of the few cases where that guarantee doesn't apply. The fact that you ran dep ensure and it DID a solve is a product of some arguments changing; that solving failed because this particular commit had become stale is a separate problem.
--[@sdboyer in #405](https://github.com/golang/dep/issues/405#issuecomment-295998489)
+> 
+> [@sdboyer in #405](https://github.com/golang/dep/issues/405#issuecomment-295998489)
 
 ## Why is `dep` slow?
 
@@ -291,9 +298,12 @@ This is the only symbolic link support that `dep` really intends to provide. In 
 ## Does `dep` support relative imports?
 
 No.
-> dep simply doesn't allow relative imports. this is one of the few places where we restrict a case that the toolchain itself allows. we disallow them only because:<br>
->  i. the toolchain already frowns heavily on them<br>
-> ii. it's worse for our case, as we start venturing into [dot dot hell](http://doc.cat-v.org/plan_9/4th_edition/papers/lexnames) territory when trying to prove that the import does not escape the tree of the project -[@sdboyer in #899](https://github.com/golang/dep/issues/899#issuecomment-317904001)
+> dep simply doesn't allow relative imports. this is one of the few places where we restrict a case that the toolchain itself allows. we disallow them only because:
+> 
+> * the toolchain already frowns heavily on them<br>
+> * it's worse for our case, as we start venturing into [dot dot hell](http://doc.cat-v.org/plan_9/4th_edition/papers/lexnames) territory when trying to prove that the import does not escape the tree of the project
+> 
+> [@sdboyer in #899](https://github.com/golang/dep/issues/899#issuecomment-317904001)
 
 For a refresher on Go's recommended workspace organization, see the ["How To Write Go Code"](https://golang.org/doc/code.html) article in the Go docs. Organizing your code this way gives you a unique import path for every package.
 
@@ -302,6 +312,24 @@ For a refresher on Go's recommended workspace organization, see the ["How To Wri
 `dep init` provides an option to scan the `GOPATH` for dependencies by doing
 `dep init -gopath`, which falls back to network mode when the packages are not
 found in `GOPATH`. `dep ensure` doesn't work with projects in `GOPATH`.
+
+## Will `dep` let me use git submodules to store dependencies in `vendor`?
+
+No, with just one tiny exception: `dep` preserves `/vendor/.git`, if it exists. This was added at [cockroachdb](https://github.com/cockroachdb/cockroach)'s request, who rely on it to keep `vendor` from bloating their primary repository. 
+
+The reasons why git submodules will not be a part of dep are best expressed as a pro/con list:
+
+**Pros**
+
+* git submodules provide a well-structured way of nesting repositories within repositories.
+
+**Cons**
+
+* The nesting that git submodules perform is no more powerful or expressive than what dep already does, but dep does it both more generally (for bzr and hg) and more domain-specifically (e.g. elimination of nested vendor directories).
+* Incorporating git submodules in any way would new fork new paths in the logic to handle the submodule cases, meaning nontrivial complexity increases.
+* dep does not currently know or care if the project it operates on is under version control. Relying on submodules would entail that dep start paying attention to that. That it would only be conditionally does not make it better - again, more forking paths in the logic, more complexity.
+* Incorporating submodules in a way that is at all visible to the user (and why else would you do it?) makes dep's workflows both more complicated and less predictable: _sometimes_ submodule-related actions are expected; _sometimes_ submodule-derived workflows are sufficient.
+* Nesting one repository within another implies that changes could, potentially, be made directly in that subrepository. This is directly contrary to dep's foundational principle that `vendor` is dead code, and directly modifying anything in there is an error.
 
 ## Best Practices
 ### Should I commit my vendor directory?
