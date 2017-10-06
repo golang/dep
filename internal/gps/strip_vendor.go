@@ -23,11 +23,7 @@ func stripVendor(path string, info os.FileInfo, err error) error {
 
 	// If the file is a symlink to a directory, delete the symlink.
 	if (info.Mode() & os.ModeSymlink) != 0 {
-		realInfo, err := os.Stat(path)
-		if err != nil {
-			return err
-		}
-		if realInfo.IsDir() {
+		if realInfo, err := os.Stat(path); err == nil && realInfo.IsDir() {
 			return os.Remove(path)
 		}
 	}

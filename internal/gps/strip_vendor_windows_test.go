@@ -90,6 +90,31 @@ func TestStripVendorSymlinks(t *testing.T) {
 		},
 	}))
 
+	t.Run("broken vendor symlink", stripVendorTestCase(fsTestCase{
+		before: filesystemState{
+			dirs: []fsPath{
+				{"package"},
+			},
+			links: []fsLink{
+				{
+					path: fsPath{"package", "vendor"},
+					to:   "nonexistence",
+				},
+			},
+		},
+		after: filesystemState{
+			dirs: []fsPath{
+				{"package"},
+			},
+			links: []fsLink{
+				{
+					path: fsPath{"package", "vendor"},
+					to:   "nonexistence",
+				},
+			},
+		},
+	}))
+
 	t.Run("chained symlinks", stripVendorTestCase(fsTestCase{
 		// Curiously, if a symlink on windows points to *another* symlink which
 		// eventually points at a directory, we'll correctly remove that first
