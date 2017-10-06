@@ -11,8 +11,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-
-	"github.com/armon/go-radix"
 )
 
 const wcIgnoreSuffix = "*"
@@ -97,10 +95,10 @@ func (s *solver) writeHashingInputs(w io.Writer) {
 
 	// Add wildcard ignores to ignore list.
 	if s.rd.igpfx != nil {
-		s.rd.igpfx.Walk(radix.WalkFn(func(s string, v interface{}) bool {
+		s.rd.igpfx.Walk(func(s string, v interface{}) bool {
 			ig = append(ig, s+"*")
 			return false
-		}))
+		})
 	}
 
 	sort.Strings(ig)
