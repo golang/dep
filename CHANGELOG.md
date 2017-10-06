@@ -2,6 +2,7 @@
 
 BUG FIXES:
 
+* Skip broken `vendor` symlink rather than returning an error. (#1191)
 * Fix `status` shows incorrect reason for lock mismatch when ignoring packages.
 (#1216)
 
