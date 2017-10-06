@@ -300,8 +300,8 @@ func fillPackage(p *build.Package) error {
 	importComments = uniq(importComments)
 	if len(importComments) > 1 {
 		return &ConflictingImportComments{
-			ImportPath:     p.ImportPath,
-			ImportComments: importComments,
+			ImportPath:                p.ImportPath,
+			ConflictingImportComments: importComments,
 		}
 	}
 	if len(importComments) > 0 {
@@ -360,29 +360,29 @@ func findImportComment(pkgName *ast.Ident, c *ast.CommentGroup) string {
 // ConflictingImportComments indicates that the package declares more than one
 // different canonical path.
 type ConflictingImportComments struct {
-	ImportPath     string
-	ImportComments []string
+	ImportPath                string   // An import path refering to this package
+	ConflictingImportComments []string // All distinct "canonical" paths encountered in the package files
 }
 
 func (e *ConflictingImportComments) Error() string {
 	return fmt.Sprintf("import path %s had conflicting import comments: %s",
-		e.ImportPath, quotedPaths(e.ImportComments))
+		e.ImportPath, quotedPaths(e.ConflictingImportComments))
 }
 
 // NonCanonicalImportRoot reports the situation when the dependee imports a
 // package via something other than the package's declared canonical path.
 type NonCanonicalImportRoot struct {
-	ImportRoot string
-	Canonical  string
+	ImportRoot string // A root path that is being used to import a package
+	Canonical  string // A canonical path declared by the package being imported
 }
 
 func (e *NonCanonicalImportRoot) Error() string {
-	return fmt.Sprintf("importing via path %q, but package insists on a canonical path %q",
+	return fmt.Sprintf("import root %q is not a prefix for the package's declared canonical path %q",
 		e.ImportRoot, e.Canonical)
 }
 
 func quotedPaths(ps []string) string {
-	var quoted []string
+	quoted := make([]string, 0, len(ps))
 	for _, p := range ps {
 		quoted = append(quoted, fmt.Sprintf("%q", p))
 	}

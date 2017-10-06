@@ -1323,7 +1323,7 @@ func TestListPackages(t *testing.T) {
 			out:        PackageTree{},
 			err: &ConflictingImportComments{
 				ImportPath: "canon_confl",
-				ImportComments: []string{
+				ConflictingImportComments: []string{
 					"vanity1",
 					"vanity2",
 				},
