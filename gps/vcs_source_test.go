@@ -212,11 +212,11 @@ func testGopkginSourceInteractions(t *testing.T) {
 
 		vlist := hidePair(pvlist)
 		if len(vlist) != len(evl) {
-			t.Errorf("gopkgin test repo should've produced %v versions, got %v", len(evl), len(vlist))
+			t.Errorf("gopkgin test repo (%s) should've produced %v versions, got %v.\n%v", un, len(evl), len(vlist), vlist)
 		} else {
 			SortForUpgrade(vlist)
 			if !reflect.DeepEqual(vlist, evl) {
-				t.Errorf("Version list was not what we expected:\n\t(GOT): %s\n\t(WNT): %s", vlist, evl)
+				t.Errorf("Version list for %s was not what we expected:\n\t(GOT): %#v\n\t(WNT): %#v", un, vlist, evl)
 			}
 		}
 
@@ -232,7 +232,7 @@ func testGopkginSourceInteractions(t *testing.T) {
 		} else {
 			SortForUpgrade(vlist)
 			if !reflect.DeepEqual(vlist, evl) {
-				t.Errorf("Version list was not what we expected:\n\t(GOT): %s\n\t(WNT): %s", vlist, evl)
+				t.Errorf("Version list for %s was not what we expected:\n\t(GOT): %#v\n\t(WNT): %#v", un, vlist, evl)
 			}
 		}
 
@@ -247,7 +247,24 @@ func testGopkginSourceInteractions(t *testing.T) {
 
 	// simultaneously run for v1, v2, and v3 filters of the target repo
 	wg := &sync.WaitGroup{}
-	wg.Add(4)
+	wg.Add(6)
+
+	go func() {
+		// Treat master as v0 when no other branches/tags exist that match gopkg.in's rules
+		tfunc("gopkg.in/carolynvs/deptest-gopkgin-implicit-v0.v0", "github.com/carolynvs/deptest-gopkgin-implicit-v0", 0, []Version{
+			newDefaultBranch("notmaster").Pair(Revision("94ee631b9833cd805d15f50a52e0533124ec0292")),
+		})
+		wg.Done()
+	}()
+
+	go func() {
+		// Use the existing v0 branch for v0, not master
+		tfunc("gopkg.in/carolynvs/deptest-gopkgin-explicit-v0.v0", "github.com/carolynvs/deptest-gopkgin-explicit-v0", 0, []Version{
+			newDefaultBranch("v0").Pair(Revision("ec73e84554fb28f08dba630e48dbec868e77f734")),
+		})
+		wg.Done()
+	}()
+
 	go func() {
 		tfunc("gopkg.in/sdboyer/gpkt.v1", "github.com/sdboyer/gpkt", 1, []Version{
 			NewVersion("v1.1.0").Pair(Revision("b2cb48dda625f6640b34d9ffb664533359ac8b91")),
