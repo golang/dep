@@ -19,7 +19,7 @@ import (
 	"strings"
 	"unicode"
 
-	radix "github.com/armon/go-radix"
+	"github.com/armon/go-radix"
 )
 
 // wildcard ignore suffix
