@@ -236,6 +236,11 @@ func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
 		}
 	}
 
+	// Check if the lock file exists.
+	if p.Lock == nil {
+		return errors.Errorf("no Gopkg.lock found. Run `dep ensure` to generate lock file")
+	}
+
 	hasMissingPkgs, errCount, err := runStatusAll(ctx, out, p, sm)
 	if err != nil {
 		switch err {
@@ -256,8 +261,6 @@ func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
 				ctx.Err.Printf("Lock inputs-digest mismatch. This happens when Gopkg.toml is modified.\n" +
 					"Run `dep ensure` to regenerate the inputs-digest.")
 			}
-		default:
-			ctx.Out.Println("Failed to get status. Rerun with `-v` flag to see details.")
 		}
 
 		return err
@@ -353,10 +356,6 @@ type MissingStatus struct {
 }
 
 func runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceManager) (hasMissingPkgs bool, errCount int, err error) {
-	if p.Lock == nil {
-		return false, 0, errors.Errorf("no Gopkg.lock found. Run `dep ensure` to generate lock file")
-	}
-
 	// While the network churns on ListVersions() requests, statically analyze
 	// code from the current project.
 	ptree, err := pkgtree.ListPackages(p.ResolvedAbsRoot, string(p.ImportRoot))
