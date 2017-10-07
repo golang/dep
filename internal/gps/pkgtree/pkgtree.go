@@ -318,7 +318,6 @@ var (
 	slashSlash = []byte("//")
 	slashStar  = []byte("/*")
 	starSlash  = []byte("*/")
-	newline    = []byte("\n")
 	importKwd  = []byte("import ")
 )
 
