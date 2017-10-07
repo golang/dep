@@ -97,7 +97,7 @@ func getTestdataVerifyRoot(t *testing.T) string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return filepath.Join(filepath.Dir(cwd), "testdata_digest")
+	return filepath.Join(filepath.Dir(cwd), "_testdata/digest")
 }
 
 func TestDigestFromDirectoryBailsUnlessDirectory(t *testing.T) {
@@ -128,7 +128,7 @@ func TestDigestFromDirectory(t *testing.T) {
 	})
 
 	t.Run("RelativePrefix", func(t *testing.T) {
-		prefix := "../testdata_digest"
+		prefix := "../_testdata/digest"
 		got, err := DigestFromDirectory(filepath.Join(prefix, relativePathname))
 		if err != nil {
 			t.Fatal(err)
