@@ -1,5 +1,9 @@
 # v0.3.2 (Unreleased)
 
+NEW FEATURES:
+
+* Wildcard ignore support. (#1156)
+
 BUG FIXES:
 
 * Skip broken `vendor` symlink rather than returning an error. (#1191)
