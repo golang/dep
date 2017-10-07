@@ -1289,6 +1289,64 @@ func TestListPackages(t *testing.T) {
 				},
 			},
 		},
+		"canonical": {
+			fileRoot:   j("canonical"),
+			importRoot: "canonical",
+			out: PackageTree{
+				ImportRoot: "canonical",
+				Packages: map[string]PackageOrErr{
+					"canonical": {
+						P: Package{
+							ImportPath:  "canonical",
+							CommentPath: "canonical",
+							Name:        "pkg",
+							Imports:     []string{},
+						},
+					},
+					"canonical/sub": {
+						P: Package{
+							ImportPath:  "canonical/sub",
+							CommentPath: "canonical/subpackage",
+							Name:        "sub",
+							Imports:     []string{},
+						},
+					},
+				},
+			},
+		},
+		"conflicting canonical comments": {
+			fileRoot:   j("canon_confl"),
+			importRoot: "canon_confl",
+			out:        PackageTree{},
+			err: &ConflictingImportComments{
+				ImportPath: "canon_confl",
+				ConflictingImportComments: []string{
+					"vanity1",
+					"vanity2",
+				},
+			},
+		},
+		"non-canonical": {
+			fileRoot:   j("canonical"),
+			importRoot: "noncanonical",
+			out: PackageTree{
+				ImportRoot: "noncanonical",
+				Packages: map[string]PackageOrErr{
+					"noncanonical": PackageOrErr{
+						Err: &NonCanonicalImportRoot{
+							ImportRoot: "noncanonical",
+							Canonical:  "canonical",
+						},
+					},
+					"noncanonical/sub": PackageOrErr{
+						Err: &NonCanonicalImportRoot{
+							ImportRoot: "noncanonical",
+							Canonical:  "canonical/subpackage",
+						},
+					},
+				},
+			},
+		},
 	}
 
 	for name, fix := range table {

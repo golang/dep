@@ -5,7 +5,9 @@
 package pkgtree
 
 import (
+	"bytes"
 	"fmt"
+	"go/ast"
 	"go/build"
 	"go/parser"
 	gscan "go/scanner"
@@ -130,9 +132,9 @@ func ListPackages(fileRoot, importRoot string) (PackageTree, error) {
 		ip := filepath.ToSlash(filepath.Join(importRoot, strings.TrimPrefix(wp, fileRoot)))
 
 		// Find all the imports, across all os/arch combos
-		//p, err := fullPackageInDir(wp)
 		p := &build.Package{
-			Dir: wp,
+			Dir:        wp,
+			ImportPath: ip,
 		}
 		err = fillPackage(p)
 
@@ -159,18 +161,26 @@ func ListPackages(fileRoot, importRoot string) (PackageTree, error) {
 			}
 		}
 
+		if pkg.CommentPath != "" && !strings.HasPrefix(pkg.CommentPath, importRoot) {
+			ptree.Packages[ip] = PackageOrErr{
+				Err: &NonCanonicalImportRoot{
+					ImportRoot: importRoot,
+					Canonical:  pkg.CommentPath,
+				},
+			}
+			return nil
+		}
+
 		// This area has some...fuzzy rules, but check all the imports for
 		// local/relative/dot-ness, and record an error for the package if we
 		// see any.
 		var lim []string
 		for _, imp := range append(pkg.Imports, pkg.TestImports...) {
-			switch {
-			// Do allow the single-dot, at least for now
-			case imp == "..":
-				lim = append(lim, imp)
-			case strings.HasPrefix(imp, "./"):
-				lim = append(lim, imp)
-			case strings.HasPrefix(imp, "../"):
+			if build.IsLocalImport(imp) {
+				// Do allow the single-dot, at least for now
+				if imp == "." {
+					continue
+				}
 				lim = append(lim, imp)
 			}
 		}
@@ -217,6 +227,7 @@ func fillPackage(p *build.Package) error {
 
 	var testImports []string
 	var imports []string
+	var importComments []string
 	for _, file := range gofiles {
 		// Skip underscore-led or dot-led files, in keeping with the rest of the toolchain.
 		bPrefix := filepath.Base(file)[0]
@@ -241,6 +252,10 @@ func fillPackage(p *build.Package) error {
 
 		var ignored bool
 		for _, c := range pf.Comments {
+			ic := findImportComment(pf.Name, c)
+			if ic != "" {
+				importComments = append(importComments, ic)
+			}
 			if c.Pos() > pf.Package { // +build comment must come before package
 				continue
 			}
@@ -289,12 +304,95 @@ func fillPackage(p *build.Package) error {
 			}
 		}
 	}
-
+	importComments = uniq(importComments)
+	if len(importComments) > 1 {
+		return &ConflictingImportComments{
+			ImportPath:                p.ImportPath,
+			ConflictingImportComments: importComments,
+		}
+	}
+	if len(importComments) > 0 {
+		p.ImportComment = importComments[0]
+	}
 	imports = uniq(imports)
 	testImports = uniq(testImports)
 	p.Imports = imports
 	p.TestImports = testImports
 	return nil
+}
+
+var (
+	slashSlash = []byte("//")
+	slashStar  = []byte("/*")
+	starSlash  = []byte("*/")
+	importKwd  = []byte("import ")
+)
+
+func findImportComment(pkgName *ast.Ident, c *ast.CommentGroup) string {
+	afterPkg := pkgName.NamePos + token.Pos(len(pkgName.Name)) + 1
+	commentSlash := c.List[0].Slash
+	if afterPkg != commentSlash {
+		return ""
+	}
+	text := []byte(c.List[0].Text)
+	switch {
+	case bytes.HasPrefix(text, slashSlash):
+		eol := bytes.IndexByte(text, '\n')
+		if eol < 0 {
+			eol = len(text)
+		}
+		text = text[2:eol]
+	case bytes.HasPrefix(text, slashStar):
+		text = text[2:]
+		end := bytes.Index(text, starSlash)
+		if end < 0 {
+			// malformed comment
+			return ""
+		}
+		text = text[:end]
+		if bytes.IndexByte(text, '\n') > 0 {
+			// multiline comment, can't be an import comment
+			return ""
+		}
+	}
+	text = bytes.TrimSpace(text)
+	if !bytes.HasPrefix(text, importKwd) {
+		return ""
+	}
+	quotedPath := bytes.TrimSpace(text[len(importKwd):])
+	return string(bytes.Trim(quotedPath, `"`))
+}
+
+// ConflictingImportComments indicates that the package declares more than one
+// different canonical path.
+type ConflictingImportComments struct {
+	ImportPath                string   // An import path refering to this package
+	ConflictingImportComments []string // All distinct "canonical" paths encountered in the package files
+}
+
+func (e *ConflictingImportComments) Error() string {
+	return fmt.Sprintf("import path %s had conflicting import comments: %s",
+		e.ImportPath, quotedPaths(e.ConflictingImportComments))
+}
+
+// NonCanonicalImportRoot reports the situation when the dependee imports a
+// package via something other than the package's declared canonical path.
+type NonCanonicalImportRoot struct {
+	ImportRoot string // A root path that is being used to import a package
+	Canonical  string // A canonical path declared by the package being imported
+}
+
+func (e *NonCanonicalImportRoot) Error() string {
+	return fmt.Sprintf("import root %q is not a prefix for the package's declared canonical path %q",
+		e.ImportRoot, e.Canonical)
+}
+
+func quotedPaths(ps []string) string {
+	quoted := make([]string, 0, len(ps))
+	for _, p := range ps {
+		quoted = append(quoted, fmt.Sprintf("%q", p))
+	}
+	return strings.Join(quoted, ", ")
 }
 
 // LocalImportsError indicates that a package contains at least one relative
@@ -315,7 +413,7 @@ func (e *LocalImportsError) Error() string {
 	case 1:
 		return fmt.Sprintf("import path %s had a local import: %q", e.ImportPath, e.LocalImports[0])
 	default:
-		return fmt.Sprintf("import path %s had local imports: %q", e.ImportPath, strings.Join(e.LocalImports, "\", \""))
+		return fmt.Sprintf("import path %s had local imports: %s", e.ImportPath, quotedPaths(e.LocalImports))
 	}
 }
 
