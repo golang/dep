@@ -376,24 +376,26 @@ func (f sourceCreationTestFixture) run(t *testing.T) {
 		t.Errorf("want %v gateways in the sources map, but got %v", f.srccount, len(sm.srcCoord.srcs))
 	}
 
-	var keys []string
-	for k := range sm.srcCoord.nameToURL {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
+	if t.Failed() {
+		var keys []string
+		for k := range sm.srcCoord.nameToURL {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
 
-	var buf bytes.Buffer
-	w := tabwriter.NewWriter(&buf, 0, 4, 2, ' ', 0)
-	fmt.Fprint(w, "NAME\tMAPPED URL\n")
-	for _, r := range keys {
-		fmt.Fprintf(w, "%s\t%s\n", r, sm.srcCoord.nameToURL[r])
-	}
-	w.Flush()
-	t.Log("\n", buf.String())
+		var buf bytes.Buffer
+		w := tabwriter.NewWriter(&buf, 0, 4, 2, ' ', 0)
+		fmt.Fprint(w, "NAME\tMAPPED URL\n")
+		for _, r := range keys {
+			fmt.Fprintf(w, "%s\t%s\n", r, sm.srcCoord.nameToURL[r])
+		}
+		w.Flush()
+		t.Log("\n", buf.String())
 
-	t.Log("SRC KEYS")
-	for k := range sm.srcCoord.srcs {
-		t.Log(k)
+		t.Log("SRC KEYS")
+		for k := range sm.srcCoord.srcs {
+			t.Log(k)
+		}
 	}
 }
 
@@ -420,9 +422,11 @@ func TestSourceCreationCounts(t *testing.T) {
 			roots: []ProjectIdentifier{
 				mkPI("gopkg.in/sdboyer/gpkt.v1"),
 				mkPI("github.com/sdboyer/gpkt"),
+				mkPI("http://github.com/sdboyer/gpkt"),
+				mkPI("https://github.com/sdboyer/gpkt"),
 			},
-			namecount: 4,
-			srccount:  2,
+			namecount: 5,
+			srccount:  3,
 		},
 		"case variance across path and URL-based access": {
 			roots: []ProjectIdentifier{
@@ -533,16 +537,14 @@ func TestFSCaseSensitivityConvergesSources(t *testing.T) {
 			}
 
 			path1 := sg1.src.(*gitSource).repo.LocalPath()
-			t.Log("path1:", path1)
 			stat1, err := os.Stat(path1)
 			if err != nil {
-				t.Fatal(err)
+				t.Fatal("path1:", path1, err)
 			}
 			path2 := sg2.src.(*gitSource).repo.LocalPath()
-			t.Log("path2:", path2)
 			stat2, err := os.Stat(path2)
 			if err != nil {
-				t.Fatal(err)
+				t.Fatal("path2:", path2, err)
 			}
 
 			same, count := os.SameFile(stat1, stat2), len(sm.srcCoord.srcs)

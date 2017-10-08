@@ -334,6 +334,7 @@ func cacheGetLock(b *bolt.Bucket) (*safeLock, error) {
 }
 
 // cachePutPackageOrError stores the pkgtree.PackageOrErr as fields in the bolt.Bucket.
+// Package.ImportPath is ignored.
 func cachePutPackageOrErr(b *bolt.Bucket, poe pkgtree.PackageOrErr) error {
 	if poe.Err != nil {
 		err := b.Put(cacheKeyError, []byte(poe.Err.Error()))

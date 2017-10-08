@@ -11,7 +11,6 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"reflect"
 	"testing"
 
 	"github.com/golang/dep/gps/pkgtree"
@@ -42,7 +41,10 @@ func testSourceGateway(t *testing.T) {
 	do := func(wantstate sourceState) func(t *testing.T) {
 		return func(t *testing.T) {
 			superv := newSupervisor(ctx)
-			sc := newSourceCoordinator(superv, newDeductionCoordinator(superv), cachedir, log.New(test.Writer{TB: t}, "", 0))
+			deducer := newDeductionCoordinator(superv)
+			logger := log.New(test.Writer{TB: t}, "", 0)
+			sc := newSourceCoordinator(superv, deducer, cachedir, logger)
+			defer sc.close()
 
 			id := mkPI("github.com/sdboyer/deptest")
 			sg, err := sc.getSourceGatewayFor(ctx, id)
@@ -50,35 +52,43 @@ func testSourceGateway(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			if _, ok := sg.src.(*gitSource); !ok {
-				t.Fatalf("Expected a gitSource, got a %T", sg.src)
+			if sg.srcState != wantstate {
+				t.Fatalf("expected state to be %q, got %q", wantstate, sg.srcState)
 			}
 
+			if err := sg.existsUpstream(ctx); err != nil {
+				t.Fatalf("failed to verify upstream source: %s", err)
+			}
+
+			wantstate |= sourceExistsUpstream
+			if sg.src.existsCallsListVersions() {
+				wantstate |= sourceHasLatestVersionList
+			}
 			if sg.srcState != wantstate {
-				t.Fatalf("expected state on initial create to be %v, got %v", wantstate, sg.srcState)
+				t.Fatalf("expected state to be %q, got %q", wantstate, sg.srcState)
 			}
 
 			if err := sg.syncLocal(ctx); err != nil {
 				t.Fatalf("error on cloning git repo: %s", err)
 			}
 
-			cvlist, ok := sg.cache.getAllVersions()
-			if !ok || len(cvlist) != 4 {
-				t.Fatalf("repo setup should've cached four versions, got %v: %s", len(cvlist), cvlist)
+			wantstate |= sourceExistsLocally | sourceHasLatestLocally
+			if sg.srcState != wantstate {
+				t.Fatalf("expected state to be %q, got %q", wantstate, sg.srcState)
 			}
 
-			wanturl := "https://" + id.normalizedSource()
-			goturl, err := sg.sourceURL(ctx)
-			if err != nil {
-				t.Fatalf("got err from sourceURL: %s", err)
-			}
-			if wanturl != goturl {
-				t.Fatalf("Expected %s as source URL, got %s", wanturl, goturl)
+			if _, ok := sg.src.(*gitSource); !ok {
+				t.Fatalf("Expected a gitSource, got a %T", sg.src)
 			}
 
 			vlist, err := sg.listVersions(ctx)
 			if err != nil {
 				t.Fatalf("Unexpected error getting version pairs from git repo: %s", err)
+			}
+
+			wantstate |= sourceHasLatestVersionList
+			if sg.srcState != wantstate {
+				t.Fatalf("expected state to be %q, got %q", wantstate, sg.srcState)
 			}
 
 			if len(vlist) != 4 {
@@ -91,8 +101,14 @@ func testSourceGateway(t *testing.T) {
 					NewVersion("v0.8.0").Pair(Revision("ff2948a2ac8f538c4ecd55962e919d1e13e74baf")),
 					newDefaultBranch("master").Pair(Revision("3f4c3bea144e112a69bbe5d8d01c1b09a544253f")),
 				}
-				if !reflect.DeepEqual(vlist, evl) {
-					t.Fatalf("Version list was not what we expected:\n\t(GOT): %s\n\t(WNT): %s", vlist, evl)
+				if len(evl) != len(vlist) {
+					t.Errorf("expected %d versions but got %d", len(evl), len(vlist))
+				} else {
+					for i := range evl {
+						if !evl[i].identical(vlist[i]) {
+							t.Errorf("index %d: expected version identical to %#v but got %#v", i, evl[i], vlist[i])
+						}
+					}
 				}
 			}
 
@@ -103,7 +119,7 @@ func testSourceGateway(t *testing.T) {
 				t.Fatal("shouldn't have bare revs in cache without specifically requesting them")
 			}
 
-			is, err := sg.revisionPresentIn(ctx, Revision("c575196502940c07bf89fd6d95e83b999162e051"))
+			is, err := sg.revisionPresentIn(ctx, rev)
 			if err != nil {
 				t.Fatalf("unexpected error while checking revision presence: %s", err)
 			} else if !is {
@@ -159,22 +175,17 @@ func testSourceGateway(t *testing.T) {
 			if err != nil {
 				t.Fatalf("unexpected err when getting package tree with known rev: %s", err)
 			}
-			if !reflect.DeepEqual(wantptree, ptree) {
-				t.Fatalf("got incorrect PackageTree:\n\t(GOT): %#v\n\t(WNT): %#v", ptree, wantptree)
-			}
+			comparePackageTree(t, wantptree, ptree)
 
 			ptree, err = sg.listPackages(ctx, ProjectRoot("github.com/sdboyer/deptest"), NewVersion("v1.0.0"))
 			if err != nil {
 				t.Fatalf("unexpected err when getting package tree with unpaired good version: %s", err)
 			}
-			if !reflect.DeepEqual(wantptree, ptree) {
-				t.Fatalf("got incorrect PackageTree:\n\t(GOT): %#v\n\t(WNT): %#v", ptree, wantptree)
-			}
+			comparePackageTree(t, wantptree, ptree)
 		}
 	}
 
-	// Run test twice so that we cover both the existing and non-existing case;
-	// only difference in results is the initial setup state.
-	t.Run("empty", do(sourceIsSetUp|sourceExistsUpstream|sourceHasLatestVersionList))
-	t.Run("exists", do(sourceIsSetUp|sourceExistsLocally|sourceExistsUpstream|sourceHasLatestVersionList))
+	// Run test twice so that we cover both the existing and non-existing case.
+	t.Run("empty", do(0))
+	t.Run("exists", do(sourceExistsLocally))
 }

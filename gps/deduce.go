@@ -16,7 +16,7 @@ import (
 	"strings"
 	"sync"
 
-	radix "github.com/armon/go-radix"
+	"github.com/armon/go-radix"
 	"github.com/pkg/errors"
 )
 
@@ -104,7 +104,7 @@ type pathDeducer interface {
 	// So the return of the above string would be
 	// "github.com/some-user/some-package"
 	deduceRoot(string) (string, error)
-	deduceSource(string, *url.URL) (maybeSource, error)
+	deduceSource(string, *url.URL) (maybeSources, error)
 }
 
 type githubDeducer struct {
@@ -120,7 +120,7 @@ func (m githubDeducer) deduceRoot(path string) (string, error) {
 	return "github.com" + v[2], nil
 }
 
-func (m githubDeducer) deduceSource(path string, u *url.URL) (maybeSource, error) {
+func (m githubDeducer) deduceSource(path string, u *url.URL) (maybeSources, error) {
 	v := m.regexp.FindStringSubmatch(path)
 	if v == nil {
 		return nil, fmt.Errorf("%s is not a valid path for a source on github.com", path)
@@ -138,7 +138,7 @@ func (m githubDeducer) deduceSource(path string, u *url.URL) (maybeSource, error
 		if u.Scheme == "ssh" {
 			u.User = url.User("git")
 		}
-		return maybeGitSource{url: u}, nil
+		return maybeSources{maybeGitSource{url: u}}, nil
 	}
 
 	mb := make(maybeSources, len(gitSchemes))
@@ -167,7 +167,7 @@ func (m bitbucketDeducer) deduceRoot(path string) (string, error) {
 	return "bitbucket.org" + v[2], nil
 }
 
-func (m bitbucketDeducer) deduceSource(path string, u *url.URL) (maybeSource, error) {
+func (m bitbucketDeducer) deduceSource(path string, u *url.URL) (maybeSources, error) {
 	v := m.regexp.FindStringSubmatch(path)
 	if v == nil {
 		return nil, fmt.Errorf("%s is not a valid path for a source on bitbucket.org", path)
@@ -189,12 +189,12 @@ func (m bitbucketDeducer) deduceSource(path string, u *url.URL) (maybeSource, er
 				// superset of the hg schemes
 				return nil, fmt.Errorf("%s is not a valid scheme for accessing a git repository", u.Scheme)
 			}
-			return maybeGitSource{url: u}, nil
+			return maybeSources{maybeGitSource{url: u}}, nil
 		} else if ishg {
 			if !validhg {
 				return nil, fmt.Errorf("%s is not a valid scheme for accessing an hg repository", u.Scheme)
 			}
-			return maybeHgSource{url: u}, nil
+			return maybeSources{maybeHgSource{url: u}}, nil
 		} else if !validgit && !validhg {
 			return nil, fmt.Errorf("%s is not a valid scheme for accessing either a git or hg repository", u.Scheme)
 		}
@@ -265,7 +265,7 @@ func (m gopkginDeducer) parseAndValidatePath(p string) ([]string, error) {
 	return v, nil
 }
 
-func (m gopkginDeducer) deduceSource(p string, u *url.URL) (maybeSource, error) {
+func (m gopkginDeducer) deduceSource(p string, u *url.URL) (maybeSources, error) {
 	// Reuse root detection logic for initial validation
 	v, err := m.parseAndValidatePath(p)
 	if err != nil {
@@ -329,7 +329,7 @@ func (m launchpadDeducer) deduceRoot(path string) (string, error) {
 	return "launchpad.net" + v[2], nil
 }
 
-func (m launchpadDeducer) deduceSource(path string, u *url.URL) (maybeSource, error) {
+func (m launchpadDeducer) deduceSource(path string, u *url.URL) (maybeSources, error) {
 	v := m.regexp.FindStringSubmatch(path)
 	if v == nil {
 		return nil, fmt.Errorf("%s is not a valid path for a source on launchpad.net", path)
@@ -342,7 +342,7 @@ func (m launchpadDeducer) deduceSource(path string, u *url.URL) (maybeSource, er
 		if !validateVCSScheme(u.Scheme, "bzr") {
 			return nil, fmt.Errorf("%s is not a valid scheme for accessing a bzr repository", u.Scheme)
 		}
-		return maybeBzrSource{url: u}, nil
+		return maybeSources{maybeBzrSource{url: u}}, nil
 	}
 
 	mb := make(maybeSources, len(bzrSchemes))
@@ -369,7 +369,7 @@ func (m launchpadGitDeducer) deduceRoot(path string) (string, error) {
 	return "git.launchpad.net" + v[2], nil
 }
 
-func (m launchpadGitDeducer) deduceSource(path string, u *url.URL) (maybeSource, error) {
+func (m launchpadGitDeducer) deduceSource(path string, u *url.URL) (maybeSources, error) {
 	v := m.regexp.FindStringSubmatch(path)
 	if v == nil {
 		return nil, fmt.Errorf("%s is not a valid path for a source on git.launchpad.net", path)
@@ -382,7 +382,7 @@ func (m launchpadGitDeducer) deduceSource(path string, u *url.URL) (maybeSource,
 		if !validateVCSScheme(u.Scheme, "git") {
 			return nil, fmt.Errorf("%s is not a valid scheme for accessing a git repository", u.Scheme)
 		}
-		return maybeGitSource{url: u}, nil
+		return maybeSources{maybeGitSource{url: u}}, nil
 	}
 
 	mb := make(maybeSources, len(gitSchemes))
@@ -408,7 +408,7 @@ func (m jazzDeducer) deduceRoot(path string) (string, error) {
 	return "hub.jazz.net" + v[2], nil
 }
 
-func (m jazzDeducer) deduceSource(path string, u *url.URL) (maybeSource, error) {
+func (m jazzDeducer) deduceSource(path string, u *url.URL) (maybeSources, error) {
 	v := m.regexp.FindStringSubmatch(path)
 	if v == nil {
 		return nil, fmt.Errorf("%s is not a valid path for a source on hub.jazz.net", path)
@@ -422,7 +422,7 @@ func (m jazzDeducer) deduceSource(path string, u *url.URL) (maybeSource, error) 
 		u.Scheme = "https"
 		fallthrough
 	case "https":
-		return maybeGitSource{url: u}, nil
+		return maybeSources{maybeGitSource{url: u}}, nil
 	default:
 		return nil, fmt.Errorf("IBM's jazz hub only supports https, %s is not allowed", u.String())
 	}
@@ -441,7 +441,7 @@ func (m apacheDeducer) deduceRoot(path string) (string, error) {
 	return "git.apache.org" + v[2], nil
 }
 
-func (m apacheDeducer) deduceSource(path string, u *url.URL) (maybeSource, error) {
+func (m apacheDeducer) deduceSource(path string, u *url.URL) (maybeSources, error) {
 	v := m.regexp.FindStringSubmatch(path)
 	if v == nil {
 		return nil, fmt.Errorf("%s is not a valid path for a source on git.apache.org", path)
@@ -454,7 +454,7 @@ func (m apacheDeducer) deduceSource(path string, u *url.URL) (maybeSource, error
 		if !validateVCSScheme(u.Scheme, "git") {
 			return nil, fmt.Errorf("%s is not a valid scheme for accessing a git repository", u.Scheme)
 		}
-		return maybeGitSource{url: u}, nil
+		return maybeSources{maybeGitSource{url: u}}, nil
 	}
 
 	mb := make(maybeSources, len(gitSchemes))
@@ -480,7 +480,7 @@ func (m vcsExtensionDeducer) deduceRoot(path string) (string, error) {
 	return v[1], nil
 }
 
-func (m vcsExtensionDeducer) deduceSource(path string, u *url.URL) (maybeSource, error) {
+func (m vcsExtensionDeducer) deduceSource(path string, u *url.URL) (maybeSources, error) {
 	v := m.regexp.FindStringSubmatch(path)
 	if v == nil {
 		return nil, fmt.Errorf("%s contains no vcs extension hints for matching", path)
@@ -500,11 +500,11 @@ func (m vcsExtensionDeducer) deduceSource(path string, u *url.URL) (maybeSource,
 
 			switch v[4] {
 			case "git":
-				return maybeGitSource{url: u}, nil
+				return maybeSources{maybeGitSource{url: u}}, nil
 			case "bzr":
-				return maybeBzrSource{url: u}, nil
+				return maybeSources{maybeBzrSource{url: u}}, nil
 			case "hg":
-				return maybeHgSource{url: u}, nil
+				return maybeSources{maybeHgSource{url: u}}, nil
 			}
 		}
 
@@ -590,7 +590,7 @@ func (dc *deductionCoordinator) deduceRootPath(ctx context.Context, path string)
 	dc.mut.RUnlock()
 	if has && isPathPrefixOrEqual(prefix, path) {
 		switch d := data.(type) {
-		case maybeSource:
+		case maybeSources:
 			return pathDeduction{root: prefix, mb: d}, nil
 		case *httpMetadataDeducer:
 			// Multiple calls have come in for a similar path shape during
@@ -652,7 +652,7 @@ func (dc *deductionCoordinator) deduceRootPath(ctx context.Context, path string)
 // the source.
 type pathDeduction struct {
 	root string
-	mb   maybeSource
+	mb   maybeSources
 }
 
 var errNoKnownPathMatch = errors.New("no known path match")
@@ -759,11 +759,11 @@ func (hmd *httpMetadataDeducer) deduce(ctx context.Context, path string) (pathDe
 
 		switch vcs {
 		case "git":
-			pd.mb = maybeGitSource{url: repoURL}
+			pd.mb = maybeSources{maybeGitSource{url: repoURL}}
 		case "bzr":
-			pd.mb = maybeBzrSource{url: repoURL}
+			pd.mb = maybeSources{maybeBzrSource{url: repoURL}}
 		case "hg":
-			pd.mb = maybeHgSource{url: repoURL}
+			pd.mb = maybeSources{maybeHgSource{url: repoURL}}
 		default:
 			hmd.deduceErr = errors.Errorf("unsupported vcs type %s in go-get metadata from %s", vcs, path)
 			return

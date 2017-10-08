@@ -31,9 +31,16 @@ func (bs *baseVCSSource) existsLocally(ctx context.Context) bool {
 	return bs.repo.CheckLocal()
 }
 
-// TODO reimpl for git
 func (bs *baseVCSSource) existsUpstream(ctx context.Context) bool {
-	return !bs.repo.Ping()
+	return bs.repo.Ping()
+}
+
+func (*baseVCSSource) existsCallsListVersions() bool {
+	return false
+}
+
+func (*baseVCSSource) listVersionsRequiresLocal() bool {
+	return false
 }
 
 func (bs *baseVCSSource) upstreamURL() string {
@@ -85,8 +92,20 @@ func (bs *baseVCSSource) initLocal(ctx context.Context) error {
 // source is fully up to date with that of the canonical upstream source.
 func (bs *baseVCSSource) updateLocal(ctx context.Context) error {
 	err := bs.repo.fetch(ctx)
+	if err == nil {
+		return nil
+	}
 
-	if err != nil {
+	ec, ok := bs.repo.(ensureCleaner)
+	if !ok {
+		return err
+	}
+
+	if err := ec.ensureClean(ctx); err != nil {
+		return unwrapVcsErr(err)
+	}
+
+	if err := bs.repo.fetch(ctx); err != nil {
 		return unwrapVcsErr(err)
 	}
 	return nil
@@ -126,74 +145,6 @@ var (
 // all standard git remotes.
 type gitSource struct {
 	baseVCSSource
-}
-
-// ensureClean sees to it that a git repository is clean and in working order,
-// or returns an error if the adaptive recovery attempts fail.
-func (s *gitSource) ensureClean(ctx context.Context) error {
-	r := s.repo.(*gitRepo)
-	cmd := commandContext(
-		ctx,
-		"git",
-		"status",
-		"--porcelain",
-	)
-	cmd.SetDir(r.LocalPath())
-
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		// An error on simple git status indicates some aggressive repository
-		// corruption, outside of the purview that we can deal with here.
-		return err
-	}
-
-	if len(bytes.TrimSpace(out)) == 0 {
-		// No output from status indicates a clean tree, without any modified or
-		// untracked files - we're in good shape.
-		return nil
-	}
-
-	// We could be more parsimonious about this, but it's probably not worth it
-	// - it's a rare case to have to do any cleanup anyway, so when we do, we
-	// might as well just throw the kitchen sink at it.
-	cmd = commandContext(
-		ctx,
-		"git",
-		"reset",
-		"--hard",
-	)
-	cmd.SetDir(r.LocalPath())
-	_, err = cmd.CombinedOutput()
-	if err != nil {
-		return err
-	}
-
-	// We also need to git clean -df; just reuse defendAgainstSubmodules here,
-	// even though it's a bit layer-breaky.
-	err = r.defendAgainstSubmodules(ctx)
-	if err != nil {
-		return err
-	}
-
-	// Check status one last time. If it's still not clean, give up.
-	cmd = commandContext(
-		ctx,
-		"git",
-		"status",
-		"--porcelain",
-	)
-	cmd.SetDir(r.LocalPath())
-
-	out, err = cmd.CombinedOutput()
-	if err != nil {
-		return err
-	}
-
-	if len(bytes.TrimSpace(out)) != 0 {
-		return errors.Errorf("failed to clean up git repository at %s - dirty? corrupted? status output: \n%s", r.LocalPath(), string(out))
-	}
-
-	return nil
 }
 
 func (s *gitSource) exportRevisionTo(ctx context.Context, rev Revision, to string) error {
@@ -245,6 +196,10 @@ func (s *gitSource) exportRevisionTo(ctx context.Context, rev Revision, to strin
 
 func (s *gitSource) isValidHash(hash []byte) bool {
 	return gitHashRE.Match(hash)
+}
+
+func (*gitSource) existsCallsListVersions() bool {
+	return true
 }
 
 func (s *gitSource) listVersions(ctx context.Context) (vlist []PairedVersion, err error) {
@@ -495,16 +450,12 @@ func (s *bzrSource) exportRevisionTo(ctx context.Context, rev Revision, to strin
 	return os.RemoveAll(filepath.Join(to, ".bzr"))
 }
 
+func (s *bzrSource) listVersionsRequiresLocal() bool {
+	return true
+}
+
 func (s *bzrSource) listVersions(ctx context.Context) ([]PairedVersion, error) {
 	r := s.repo
-
-	// TODO(sdboyer) this should be handled through the gateway's FSM
-	if !r.CheckLocal() {
-		err := s.initLocal(ctx)
-		if err != nil {
-			return nil, err
-		}
-	}
 
 	// Now, list all the tags
 	tagsCmd := commandContext(ctx, "bzr", "tags", "--show-ids", "-v")
@@ -572,17 +523,14 @@ func (s *hgSource) exportRevisionTo(ctx context.Context, rev Revision, to string
 	return os.RemoveAll(filepath.Join(to, ".hg"))
 }
 
+func (s *hgSource) listVersionsRequiresLocal() bool {
+	return true
+}
+
 func (s *hgSource) listVersions(ctx context.Context) ([]PairedVersion, error) {
 	var vlist []PairedVersion
 
 	r := s.repo
-	// TODO(sdboyer) this should be handled through the gateway's FSM
-	if !r.CheckLocal() {
-		err := s.initLocal(ctx)
-		if err != nil {
-			return nil, err
-		}
-	}
 
 	// Now, list all the tags
 	tagsCmd := commandContext(ctx, "hg", "tags", "--debug", "--verbose")

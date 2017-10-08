@@ -2271,3 +2271,31 @@ func TestCanaryPackageTreeCopy(t *testing.T) {
 		t.Errorf("PackageTree.Copy is designed to work with an exact set of fields in the Package struct - make sure it (and this test) have been updated!\n\t(GOT):%s\n\t(WNT):%s", packageFields, packageRefl)
 	}
 }
+
+func TestPackageTreeCopy(t *testing.T) {
+	want := PackageTree{
+		ImportRoot: "ren",
+		Packages: map[string]PackageOrErr{
+			"ren": {
+				Err: &build.NoGoError{
+					Dir: "some/dir",
+				},
+			},
+			"ren/m1p": {
+				P: Package{
+					ImportPath:  "ren/m1p",
+					CommentPath: "",
+					Name:        "m1p",
+					Imports: []string{
+						"github.com/sdboyer/gps",
+						"sort",
+					},
+				},
+			},
+		},
+	}
+	got := want.Copy()
+	if !reflect.DeepEqual(want, got) {
+		t.Errorf("Did not get expected PackageOrErrs:\n\t(GOT): %+v\n\t(WNT): %+v", got, want)
+	}
+}

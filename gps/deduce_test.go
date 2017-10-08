@@ -18,7 +18,7 @@ type pathDeductionFixture struct {
 	in     string
 	root   string
 	rerr   error
-	mb     maybeSource
+	mb     maybeSources
 	srcerr error
 }
 
@@ -69,17 +69,23 @@ var pathDeductionFixtures = map[string][]pathDeductionFixture{
 		{
 			in:   "git@github.com:sdboyer/gps",
 			root: "github.com/sdboyer/gps",
-			mb:   maybeGitSource{url: mkurl("ssh://git@github.com/sdboyer/gps")},
+			mb: maybeSources{
+				maybeGitSource{url: mkurl("ssh://git@github.com/sdboyer/gps")},
+			},
 		},
 		{
 			in:   "https://github.com/sdboyer/gps",
 			root: "github.com/sdboyer/gps",
-			mb:   maybeGitSource{url: mkurl("https://github.com/sdboyer/gps")},
+			mb: maybeSources{
+				maybeGitSource{url: mkurl("https://github.com/sdboyer/gps")},
+			},
 		},
 		{
 			in:   "https://github.com/sdboyer/gps/foo/bar",
 			root: "github.com/sdboyer/gps",
-			mb:   maybeGitSource{url: mkurl("https://github.com/sdboyer/gps")},
+			mb: maybeSources{
+				maybeGitSource{url: mkurl("https://github.com/sdboyer/gps")},
+			},
 		},
 		{
 			in:   "github.com/sdboyer-/gps/foo",
@@ -163,6 +169,7 @@ var pathDeductionFixtures = map[string][]pathDeductionFixture{
 			in:   "gopkg.in/yaml.v1/foo/bar",
 			root: "gopkg.in/yaml.v1",
 			mb: maybeSources{
+
 				maybeGopkginSource{opath: "gopkg.in/yaml.v1", url: mkurl("https://github.com/go-yaml/yaml"), major: 1},
 				maybeGopkginSource{opath: "gopkg.in/yaml.v1", url: mkurl("http://github.com/go-yaml/yaml"), major: 1},
 			},
@@ -186,12 +193,16 @@ var pathDeductionFixtures = map[string][]pathDeductionFixture{
 		{
 			in:   "hub.jazz.net/git/user1/pkgname",
 			root: "hub.jazz.net/git/user1/pkgname",
-			mb:   maybeGitSource{url: mkurl("https://hub.jazz.net/git/user1/pkgname")},
+			mb: maybeSources{
+				maybeGitSource{url: mkurl("https://hub.jazz.net/git/user1/pkgname")},
+			},
 		},
 		{
 			in:   "hub.jazz.net/git/user1/pkgname/submodule/submodule/submodule",
 			root: "hub.jazz.net/git/user1/pkgname",
-			mb:   maybeGitSource{url: mkurl("https://hub.jazz.net/git/user1/pkgname")},
+			mb: maybeSources{
+				maybeGitSource{url: mkurl("https://hub.jazz.net/git/user1/pkgname")},
+			},
 		},
 		{
 			in:   "hub.jazz.net/someotherprefix",
@@ -218,7 +229,9 @@ var pathDeductionFixtures = map[string][]pathDeductionFixture{
 		{
 			in:   "hub.jazz.net/git/user1/pkg.name",
 			root: "hub.jazz.net/git/user1/pkg.name",
-			mb:   maybeGitSource{url: mkurl("https://hub.jazz.net/git/user1/pkg.name")},
+			mb: maybeSources{
+				maybeGitSource{url: mkurl("https://hub.jazz.net/git/user1/pkg.name")},
+			},
 		},
 		// User names cannot have uppercase letters
 		{
@@ -275,7 +288,9 @@ var pathDeductionFixtures = map[string][]pathDeductionFixture{
 		{
 			in:   "git@bitbucket.org:sdboyer/reporoot.git",
 			root: "bitbucket.org/sdboyer/reporoot.git",
-			mb:   maybeGitSource{url: mkurl("ssh://git@bitbucket.org/sdboyer/reporoot.git")},
+			mb: maybeSources{
+				maybeGitSource{url: mkurl("ssh://git@bitbucket.org/sdboyer/reporoot.git")},
+			},
 		},
 		{
 			in:   "bitbucket.org/sdboyer/reporoot.hg",
@@ -289,7 +304,9 @@ var pathDeductionFixtures = map[string][]pathDeductionFixture{
 		{
 			in:   "hg@bitbucket.org:sdboyer/reporoot",
 			root: "bitbucket.org/sdboyer/reporoot",
-			mb:   maybeHgSource{url: mkurl("ssh://hg@bitbucket.org/sdboyer/reporoot")},
+			mb: maybeSources{
+				maybeHgSource{url: mkurl("ssh://hg@bitbucket.org/sdboyer/reporoot")},
+			},
 		},
 		{
 			in:     "git://bitbucket.org/sdboyer/reporoot.hg",
@@ -417,22 +434,30 @@ var pathDeductionFixtures = map[string][]pathDeductionFixture{
 		{
 			in:   "git@foobar.com:baz.git",
 			root: "foobar.com/baz.git",
-			mb:   maybeGitSource{url: mkurl("ssh://git@foobar.com/baz.git")},
+			mb: maybeSources{
+				maybeGitSource{url: mkurl("ssh://git@foobar.com/baz.git")},
+			},
 		},
 		{
 			in:   "bzr+ssh://foobar.com/baz.bzr",
 			root: "foobar.com/baz.bzr",
-			mb:   maybeBzrSource{url: mkurl("bzr+ssh://foobar.com/baz.bzr")},
+			mb: maybeSources{
+				maybeBzrSource{url: mkurl("bzr+ssh://foobar.com/baz.bzr")},
+			},
 		},
 		{
 			in:   "ssh://foobar.com/baz.bzr",
 			root: "foobar.com/baz.bzr",
-			mb:   maybeBzrSource{url: mkurl("ssh://foobar.com/baz.bzr")},
+			mb: maybeSources{
+				maybeBzrSource{url: mkurl("ssh://foobar.com/baz.bzr")},
+			},
 		},
 		{
 			in:   "https://foobar.com/baz.hg",
 			root: "foobar.com/baz.hg",
-			mb:   maybeHgSource{url: mkurl("https://foobar.com/baz.hg")},
+			mb: maybeSources{
+				maybeHgSource{url: mkurl("https://foobar.com/baz.hg")},
+			},
 		},
 		{
 			in:     "git://foobar.com/baz.hg",
@@ -457,17 +482,23 @@ var pathDeductionFixtures = map[string][]pathDeductionFixture{
 		{
 			in:   "golang.org/x/exp",
 			root: "golang.org/x/exp",
-			mb:   maybeGitSource{url: mkurl("https://go.googlesource.com/exp")},
+			mb: maybeSources{
+				maybeGitSource{url: mkurl("https://go.googlesource.com/exp")},
+			},
 		},
 		{
 			in:   "golang.org/x/exp/inotify",
 			root: "golang.org/x/exp",
-			mb:   maybeGitSource{url: mkurl("https://go.googlesource.com/exp")},
+			mb: maybeSources{
+				maybeGitSource{url: mkurl("https://go.googlesource.com/exp")},
+			},
 		},
 		{
 			in:   "golang.org/x/net/html",
 			root: "golang.org/x/net",
-			mb:   maybeGitSource{url: mkurl("https://go.googlesource.com/net")},
+			mb: maybeSources{
+				maybeGitSource{url: mkurl("https://go.googlesource.com/net")},
+			},
 		},
 	},
 }
@@ -501,28 +532,13 @@ func TestDeduceFromPath(t *testing.T) {
 				t.SkipNow()
 			}
 
-			var printmb func(mb maybeSource, t *testing.T) string
-			printmb = func(mb maybeSource, t *testing.T) string {
-				switch tmb := mb.(type) {
-				case maybeSources:
-					var buf bytes.Buffer
-					fmt.Fprintf(&buf, "%v maybeSources:", len(tmb))
-					for _, elem := range tmb {
-						fmt.Fprintf(&buf, "\n\t\t%s", printmb(elem, t))
-					}
-					return buf.String()
-				case maybeGitSource:
-					return fmt.Sprintf("%T: %s", tmb, ufmt(tmb.url))
-				case maybeBzrSource:
-					return fmt.Sprintf("%T: %s", tmb, ufmt(tmb.url))
-				case maybeHgSource:
-					return fmt.Sprintf("%T: %s", tmb, ufmt(tmb.url))
-				case maybeGopkginSource:
-					return fmt.Sprintf("%T: %s (v%v) %s ", tmb, tmb.opath, tmb.major, ufmt(tmb.url))
-				default:
-					t.Errorf("Unknown maybeSource type: %T", mb)
+			printmb := func(mb maybeSources) string {
+				var buf bytes.Buffer
+				fmt.Fprintf(&buf, "%v maybeSources:", len(mb))
+				for _, elem := range mb {
+					fmt.Fprintf(&buf, "\n\t\t%s", elem)
 				}
-				return ""
+				return buf.String()
 			}
 
 			for _, fix := range fixtures {
@@ -564,16 +580,11 @@ func TestDeduceFromPath(t *testing.T) {
 						}
 					} else if !reflect.DeepEqual(mb, fix.mb) {
 						if mb == nil {
-							t.Errorf("Deducer returned source maybes, but none expected:\n\t(GOT) (none)\n\t(WNT) %s", printmb(fix.mb, t))
+							t.Errorf("Deducer returned source maybes, but none expected:\n\t(GOT) (none)\n\t(WNT) %s", printmb(fix.mb))
 						} else if fix.mb == nil {
-							t.Errorf("Deducer returned source maybes, but none expected:\n\t(GOT) %s\n\t(WNT) (none)", printmb(mb, t))
+							t.Errorf("Deducer returned source maybes, but none expected:\n\t(GOT) %s\n\t(WNT) (none)", printmb(mb))
 						} else {
-							t.Errorf("Deducer did not return expected source:\n\t(GOT) %s\n\t(WNT) %s", printmb(mb, t), printmb(fix.mb, t))
-						}
-					} else {
-						gotURLs, wantURLs := mb.possibleURLs(), fix.mb.possibleURLs()
-						if !reflect.DeepEqual(gotURLs, wantURLs) {
-							t.Errorf("Deducer did not return expected source:\n\t(GOT) %s\n\t(WNT) %s", gotURLs, wantURLs)
+							t.Errorf("Deducer did not return expected source:\n\t(GOT) %s\n\t(WNT) %s", printmb(mb), printmb(fix.mb))
 						}
 					}
 				})
@@ -623,7 +634,12 @@ func TestVanityDeduction(t *testing.T) {
 					return
 				}
 
-				goturl, wanturl := pd.mb.(maybeGitSource).url.String(), fix.mb.(maybeGitSource).url.String()
+				if len(pd.mb) != 1 {
+					t.Errorf("Expected single maybeSource, but found: %d", len(pd.mb))
+					return
+				}
+
+				goturl, wanturl := pd.mb[0].(maybeGitSource).url.String(), fix.mb[0].(maybeGitSource).url.String()
 				if goturl != wanturl {
 					t.Errorf("Deduced repo ident does not match fixture:\n\t(GOT) %s\n\t(WNT) %s", goturl, wanturl)
 				}
@@ -662,18 +678,4 @@ func TestVanityDeductionSchemeMismatch(t *testing.T) {
 	if err == nil {
 		t.Error("should have errored on scheme mismatch between input and go-get metadata")
 	}
-}
-
-// borrow from stdlib
-// more useful string for debugging than fmt's struct printer
-func ufmt(u *url.URL) string {
-	var user, pass interface{}
-	if u.User != nil {
-		user = u.User.Username()
-		if p, ok := u.User.Password(); ok {
-			pass = p
-		}
-	}
-	return fmt.Sprintf("host=%q, path=%q, opaque=%q, scheme=%q, user=%#v, pass=%#v, rawpath=%q, rawq=%q, frag=%q",
-		u.Host, u.Path, u.Opaque, u.Scheme, user, pass, u.RawPath, u.RawQuery, u.Fragment)
 }
