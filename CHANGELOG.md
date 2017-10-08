@@ -4,6 +4,7 @@ BUG FIXES:
 
 * Releases targeting Windows now have a `.exe` suffix (#1291).
 * Adaptively recover from dirty and corrupted git repositories in cache (#1279).
+* Suppress git password prompts in more places (#1357).
 
 IMPROVEMENTS:
 
