@@ -1315,7 +1315,7 @@ func TestListPackages(t *testing.T) {
 			},
 		},
 		"conflicting canonical comments": {
-			fileRoot:   j("canon_confl"),
+			fileRoot:   j("canon_confl", "vendor", "canon_confl"),
 			importRoot: "canon_confl",
 			out:        PackageTree{},
 			err: &ConflictingImportComments{
