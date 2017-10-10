@@ -102,6 +102,11 @@ func ListPackages(fileRoot, importRoot string) (PackageTree, error) {
 			return filepath.SkipDir
 		}
 
+		// Skip hidden directories.
+		if fi.Name()[0] == '.' {
+			return filepath.SkipDir
+		}
+
 		{
 			// For Go 1.9 and earlier:
 			//
