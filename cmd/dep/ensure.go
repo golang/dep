@@ -110,6 +110,12 @@ dep ensure -update -no-vendor
 
     As above, but only modify Gopkg.lock; leave vendor/ unchanged.
 
+dep ensure -no-vendor -dry-run
+
+	This fails with a non zero exit code if Gopkg.lock is not up to date with
+	the Gopkg.toml or the project imports. It can be useful to run this during
+	CI to check if Gopkg.lock is up to date.
+
 `
 
 var (
@@ -265,6 +271,10 @@ func (cmd *ensureCommand) runDefault(ctx *dep.Ctx, args []string, p *dep.Project
 			logger = log.New(ioutil.Discard, "", 0)
 		}
 		return errors.WithMessage(sw.Write(p.AbsRoot, sm, true, logger), "grouped write of manifest, lock and vendor")
+	}
+
+	if cmd.noVendor && cmd.dryRun {
+		return errors.New("Gopkg.lock was not up to date")
 	}
 
 	solution, err := solver.Solve()
