@@ -17,6 +17,8 @@ IMPROVEMENTS:
 Improving performance when updating dependencies with `-update`. (#1175)
 * `dep status` now concurrently fetches repo info. Improving status performance.
 (#1135)
+* `dep ensure -no-vendor -dry-run` now exits with an error when changes would
+have to be made to `Gopkg.lock`. This is useful for CI. (#1256)
 
 
 # v0.3.1
