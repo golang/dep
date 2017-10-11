@@ -70,18 +70,18 @@ type gitRepo struct {
 	*vcs.GitRepo
 }
 
-func newVcsRemoteErrorOr(msg string, err error, out string) error {
+func newVcsRemoteErrorOr(err error, args []string, out, msg string) error {
 	if err == context.Canceled || err == context.DeadlineExceeded {
 		return err
 	}
-	return vcs.NewRemoteError(msg, err, out)
+	return vcs.NewRemoteError(msg, errors.Wrapf(err, "command failed: %v", args), out)
 }
 
-func newVcsLocalErrorOr(msg string, err error, out string) error {
+func newVcsLocalErrorOr(err error, args []string, out, msg string) error {
 	if err == context.Canceled || err == context.DeadlineExceeded {
 		return err
 	}
-	return vcs.NewLocalError(msg, err, out)
+	return vcs.NewLocalError(msg, errors.Wrapf(err, "command failed: %v", args), out)
 }
 
 func (r *gitRepo) get(ctx context.Context) error {
@@ -96,11 +96,8 @@ func (r *gitRepo) get(ctx context.Context) error {
 		r.LocalPath(),
 	)
 	if out, err := cmd.CombinedOutput(); err != nil {
-		return newVcsRemoteErrorOr(
-			"unable to get repository",
-			errors.Wrapf(err, "command failed: %v", cmd.Args()),
-			string(out),
-		)
+		return newVcsRemoteErrorOr(err, cmd.Args(), string(out),
+			"unable to get repository")
 	}
 
 	return nil
@@ -117,10 +114,8 @@ func (r *gitRepo) fetch(ctx context.Context) error {
 	)
 	cmd.SetDir(r.LocalPath())
 	if out, err := cmd.CombinedOutput(); err != nil {
-		return newVcsRemoteErrorOr(
-			"unable to update repository",
-			errors.Wrapf(err, "command failed: %v", cmd.Args()),
-			string(out))
+		return newVcsRemoteErrorOr(err, cmd.Args(), string(out),
+			"unable to update repository")
 	}
 	return nil
 }
@@ -129,10 +124,8 @@ func (r *gitRepo) updateVersion(ctx context.Context, v string) error {
 	cmd := commandContext(ctx, "git", "checkout", v)
 	cmd.SetDir(r.LocalPath())
 	if out, err := cmd.CombinedOutput(); err != nil {
-		return newVcsLocalErrorOr(
-			"unable to update checked out version",
-			errors.Wrapf(err, "command failed: %v", cmd.Args()),
-			string(out))
+		return newVcsLocalErrorOr(err, cmd.Args(), string(out),
+			"unable to update checked out version")
 	}
 
 	return r.defendAgainstSubmodules(ctx)
@@ -153,11 +146,8 @@ func (r *gitRepo) defendAgainstSubmodules(ctx context.Context) error {
 		)
 		cmd.SetDir(r.LocalPath())
 		if out, err := cmd.CombinedOutput(); err != nil {
-			return newVcsLocalErrorOr(
-				"unexpected error while defensively updating submodules",
-				errors.Wrapf(err, "command failed: %v", cmd.Args()),
-				string(out),
-			)
+			return newVcsLocalErrorOr(err, cmd.Args(), string(out),
+				"unexpected error while defensively updating submodules")
 		}
 	}
 
@@ -167,11 +157,8 @@ func (r *gitRepo) defendAgainstSubmodules(ctx context.Context) error {
 		cmd := commandContext(ctx, "git", "clean", "-x", "-d", "-f", "-f")
 		cmd.SetDir(r.LocalPath())
 		if out, err := cmd.CombinedOutput(); err != nil {
-			return newVcsLocalErrorOr(
-				"unexpected error while defensively cleaning up after possible derelict submodule directories",
-				errors.Wrapf(err, "command failed: %v", cmd.Args()),
-				string(out),
-			)
+			return newVcsLocalErrorOr(err, cmd.Args(), string(out),
+				"unexpected error while defensively cleaning up after possible derelict submodule directories")
 		}
 	}
 
@@ -188,11 +175,8 @@ func (r *gitRepo) defendAgainstSubmodules(ctx context.Context) error {
 		)
 		cmd.SetDir(r.LocalPath())
 		if out, err := cmd.CombinedOutput(); err != nil {
-			return newVcsLocalErrorOr(
-				"unexpected error while defensively cleaning up after possible derelict nested submodule directories",
-				errors.Wrapf(err, "command failed: %v", cmd.Args()),
-				string(out),
-			)
+			return newVcsLocalErrorOr(err, cmd.Args(), string(out),
+				"unexpected error while defensively cleaning up after possible derelict nested submodule directories")
 		}
 	}
 
@@ -208,17 +192,14 @@ func (r *bzrRepo) get(ctx context.Context) error {
 	if _, err := os.Stat(basePath); os.IsNotExist(err) {
 		err = os.MkdirAll(basePath, 0755)
 		if err != nil {
-			return newVcsLocalErrorOr("unable to create directory", err, "")
+			return newVcsLocalErrorOr(err, nil, "", "unable to create directory")
 		}
 	}
 
 	cmd := commandContext(ctx, "bzr", "branch", r.Remote(), r.LocalPath())
 	if out, err := cmd.CombinedOutput(); err != nil {
-		return newVcsRemoteErrorOr(
-			"unable to get repository",
-			errors.Wrapf(err, "command failed: %v", cmd.Args()),
-			string(out),
-		)
+		return newVcsRemoteErrorOr(err, cmd.Args(), string(out),
+			"unable to get repository")
 	}
 
 	return nil
@@ -228,11 +209,8 @@ func (r *bzrRepo) fetch(ctx context.Context) error {
 	cmd := commandContext(ctx, "bzr", "pull")
 	cmd.SetDir(r.LocalPath())
 	if out, err := cmd.CombinedOutput(); err != nil {
-		return newVcsRemoteErrorOr(
-			"unable to update repository",
-			errors.Wrapf(err, "command failed: %v", cmd.Args()),
-			string(out),
-		)
+		return newVcsRemoteErrorOr(err, cmd.Args(), string(out),
+			"unable to update repository")
 	}
 	return nil
 }
@@ -241,11 +219,8 @@ func (r *bzrRepo) updateVersion(ctx context.Context, version string) error {
 	cmd := commandContext(ctx, "bzr", "update", "-r", version)
 	cmd.SetDir(r.LocalPath())
 	if out, err := cmd.CombinedOutput(); err != nil {
-		return newVcsLocalErrorOr(
-			"unable to update checked out version",
-			errors.Wrapf(err, "command failed: %v", cmd.Args()),
-			string(out),
-		)
+		return newVcsLocalErrorOr(err, cmd.Args(), string(out),
+			"unable to update checked out version")
 	}
 	return nil
 }
@@ -257,11 +232,8 @@ type hgRepo struct {
 func (r *hgRepo) get(ctx context.Context) error {
 	cmd := commandContext(ctx, "hg", "clone", r.Remote(), r.LocalPath())
 	if out, err := cmd.CombinedOutput(); err != nil {
-		return newVcsRemoteErrorOr(
-			"unable to get repository",
-			errors.Wrapf(err, "command failed: %v", cmd.Args()),
-			string(out),
-		)
+		return newVcsRemoteErrorOr(err, cmd.Args(), string(out),
+			"unable to get repository")
 	}
 
 	return nil
@@ -271,11 +243,8 @@ func (r *hgRepo) fetch(ctx context.Context) error {
 	cmd := commandContext(ctx, "hg", "pull")
 	cmd.SetDir(r.LocalPath())
 	if out, err := cmd.CombinedOutput(); err != nil {
-		return newVcsRemoteErrorOr(
-			"unable to fetch latest changes",
-			errors.Wrapf(err, "command failed: %v", cmd.Args()),
-			string(out),
-		)
+		return newVcsRemoteErrorOr(err, cmd.Args(), string(out),
+			"unable to fetch latest changes")
 	}
 	return nil
 }
@@ -284,11 +253,8 @@ func (r *hgRepo) updateVersion(ctx context.Context, version string) error {
 	cmd := commandContext(ctx, "hg", "update", version)
 	cmd.SetDir(r.LocalPath())
 	if out, err := cmd.CombinedOutput(); err != nil {
-		return newVcsRemoteErrorOr(
-			"unable to update checked out version",
-			errors.Wrapf(err, "command failed: %v", cmd.Args()),
-			string(out),
-		)
+		return newVcsRemoteErrorOr(err, cmd.Args(), string(out),
+			"unable to update checked out version")
 	}
 
 	return nil
@@ -308,11 +274,8 @@ func (r *svnRepo) get(ctx context.Context) error {
 
 	cmd := commandContext(ctx, "svn", "checkout", remote, r.LocalPath())
 	if out, err := cmd.CombinedOutput(); err != nil {
-		return newVcsRemoteErrorOr(
-			"unable to get repository",
-			errors.Wrapf(err, "command failed: %v", cmd.Args()),
-			string(out),
-		)
+		return newVcsRemoteErrorOr(err, cmd.Args(), string(out),
+			"unable to get repository")
 	}
 
 	return nil
@@ -322,11 +285,8 @@ func (r *svnRepo) fetch(ctx context.Context) error {
 	cmd := commandContext(ctx, "svn", "update")
 	cmd.SetDir(r.LocalPath())
 	if out, err := cmd.CombinedOutput(); err != nil {
-		return newVcsRemoteErrorOr(
-			"unable to update repository",
-			errors.Wrapf(err, "command failed: %v", cmd.Args()),
-			string(out),
-		)
+		return newVcsRemoteErrorOr(err, cmd.Args(), string(out),
+			"unable to update repository")
 	}
 
 	return nil
@@ -336,11 +296,8 @@ func (r *svnRepo) updateVersion(ctx context.Context, version string) error {
 	cmd := commandContext(ctx, "svn", "update", "-r", version)
 	cmd.SetDir(r.LocalPath())
 	if out, err := cmd.CombinedOutput(); err != nil {
-		return newVcsRemoteErrorOr(
-			"unable to update checked out version",
-			errors.Wrapf(err, "command failed: %v", cmd.Args()),
-			string(out),
-		)
+		return newVcsRemoteErrorOr(err, cmd.Args(), string(out),
+			"unable to update checked out version")
 	}
 
 	return nil
@@ -364,15 +321,14 @@ func (r *svnRepo) CommitInfo(id string) (*vcs.CommitInfo, error) {
 		cmd.SetDir(r.LocalPath())
 		out, err := cmd.CombinedOutput()
 		if err != nil {
-			return nil, newVcsLocalErrorOr("unable to retrieve commit information",
-				errors.Wrapf(err, "command failed: %v", cmd.Args()),
-				string(out),
-			)
+			return nil, newVcsLocalErrorOr(err, cmd.Args(), string(out),
+				"unable to retrieve commit information")
 		}
 
 		infos := new(info)
 		if err := xml.Unmarshal(out, &infos); err != nil {
-			return nil, newVcsLocalErrorOr("unable to retrieve commit information", err, string(out))
+			return nil, newVcsLocalErrorOr(err, cmd.Args(), string(out),
+				"unable to retrieve commit information")
 		}
 
 		id = infos.Commit.Revision
@@ -385,10 +341,8 @@ func (r *svnRepo) CommitInfo(id string) (*vcs.CommitInfo, error) {
 	cmd.SetDir(r.LocalPath())
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		return nil, newVcsRemoteErrorOr("unable to retrieve commit information",
-			errors.Wrapf(err, "command failed: %v", cmd.Args()),
-			string(out),
-		)
+		return nil, newVcsRemoteErrorOr(err, cmd.Args(), string(out),
+			"unable to retrieve commit information")
 	}
 
 	type logentry struct {
@@ -404,7 +358,8 @@ func (r *svnRepo) CommitInfo(id string) (*vcs.CommitInfo, error) {
 
 	logs := new(log)
 	if err := xml.Unmarshal(out, &logs); err != nil {
-		return nil, newVcsLocalErrorOr("unable to retrieve commit information", err, string(out))
+		return nil, newVcsLocalErrorOr(err, cmd.Args(), string(out),
+			"unable to retrieve commit information")
 	}
 
 	if len(logs.Logs) == 0 {
@@ -420,7 +375,8 @@ func (r *svnRepo) CommitInfo(id string) (*vcs.CommitInfo, error) {
 	if len(logs.Logs[0].Date) > 0 {
 		ci.Date, err = time.Parse(time.RFC3339Nano, logs.Logs[0].Date)
 		if err != nil {
-			return nil, newVcsLocalErrorOr("unable to retrieve commit information", err, string(out))
+			return nil, newVcsLocalErrorOr(err, cmd.Args(), string(out),
+				"unable to retrieve commit information")
 		}
 	}
 

@@ -25,28 +25,28 @@ import (
 const gitRemoteTestRepo = "https://github.com/Masterminds/VCSTestRepo"
 
 func TestErrs(t *testing.T) {
-	err := newVcsLocalErrorOr("", context.Canceled, "")
+	err := newVcsLocalErrorOr(context.Canceled, nil, "", "")
 	if err != context.Canceled {
 		t.Errorf("context errors should always pass through, got %s", err)
 	}
-	err = newVcsRemoteErrorOr("", context.Canceled, "")
+	err = newVcsRemoteErrorOr(context.Canceled, nil, "", "")
 	if err != context.Canceled {
 		t.Errorf("context errors should always pass through, got %s", err)
 	}
-	err = newVcsLocalErrorOr("", context.DeadlineExceeded, "")
+	err = newVcsLocalErrorOr(context.DeadlineExceeded, nil, "", "")
 	if err != context.DeadlineExceeded {
 		t.Errorf("context errors should always pass through, got %s", err)
 	}
-	err = newVcsRemoteErrorOr("", context.DeadlineExceeded, "")
+	err = newVcsRemoteErrorOr(context.DeadlineExceeded, nil, "", "")
 	if err != context.DeadlineExceeded {
 		t.Errorf("context errors should always pass through, got %s", err)
 	}
 
-	err = newVcsLocalErrorOr("foo", errors.New("bar"), "baz")
+	err = newVcsLocalErrorOr(errors.New("bar"), nil, "foo", "baz")
 	if _, is := err.(*vcs.LocalError); !is {
 		t.Errorf("should have gotten local error, got %T %v", err, err)
 	}
-	err = newVcsRemoteErrorOr("foo", errors.New("bar"), "baz")
+	err = newVcsRemoteErrorOr(errors.New("bar"), nil, "foo", "baz")
 	if _, is := err.(*vcs.RemoteError); !is {
 		t.Errorf("should have gotten remote error, got %T %v", err, err)
 	}
@@ -147,7 +147,7 @@ func testSvnRepo(t *testing.T) {
 	// Do an initial checkout.
 	err = repo.get(ctx)
 	if err != nil {
-		t.Fatalf("Unable to checkout SVN repo. Err was %#v", err)
+		t.Fatalf("Unable to checkout SVN repo. Err was %s", err)
 	}
 
 	// Verify SVN repo is a SVN repo
