@@ -10,7 +10,7 @@ import "strings"
 // part of the standard distribution. For historical reasons we allow people to add
 // their own code to $GOROOT instead of using $GOPATH, but we assume that
 // code will start with a domain name (dot in the first element).
-// This was loving taken from src/cmd/go/pkg.go in Go's code (isStandardImportPath).
+// This was lovingly taken from src/cmd/go/pkg.go in Go's code (isStandardImportPath).
 func IsStandardImportPath(path string) bool {
 	i := strings.Index(path, "/")
 	if i < 0 {

@@ -97,6 +97,12 @@ func pathDeducerTrie() *deducerTrie {
 }
 
 type pathDeducer interface {
+	// deduceRoot takes an import path such as
+	// "github.com/some-user/some-package/some-subpackage"
+	// and returns the root folder to where the version control
+	// system exists. For example, the root folder where .git exists.
+	// So the return of the above string would be
+	// "github.com/some-user/some-package"
 	deduceRoot(string) (string, error)
 	deduceSource(string, *url.URL) (maybeSource, error)
 }
