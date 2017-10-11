@@ -56,7 +56,7 @@ type Config struct {
 // Run executes a configuration and returns an exit code.
 func (c *Config) Run() (exitCode int) {
 	// Build the list of available commands.
-	commands := []command{
+	commands := [...]command{
 		&initCommand{},
 		&statusCommand{},
 		&ensureCommand{},
@@ -65,7 +65,7 @@ func (c *Config) Run() (exitCode int) {
 		&versionCommand{},
 	}
 
-	examples := [][2]string{
+	examples := [...][2]string{
 		{
 			"dep init",
 			"set up a new project",
@@ -94,7 +94,7 @@ func (c *Config) Run() (exitCode int) {
 		errLogger.Println()
 		errLogger.Println("Commands:")
 		errLogger.Println()
-		w := tabwriter.NewWriter(c.Stderr, 0, 4, 2, ' ', 0)
+		w := tabwriter.NewWriter(c.Stderr, 0, 0, 2, ' ', 0)
 		for _, cmd := range commands {
 			if !cmd.Hidden() {
 				fmt.Fprintf(w, "\t%s\t%s\n", cmd.Name(), cmd.ShortHelp())
@@ -115,7 +115,7 @@ func (c *Config) Run() (exitCode int) {
 	if exit {
 		usage()
 		exitCode = 1
-		return
+		return exitCode
 	}
 
 	for _, cmd := range commands {
@@ -134,7 +134,7 @@ func (c *Config) Run() (exitCode int) {
 			if printCommandHelp {
 				fs.Usage()
 				exitCode = 1
-				return
+				return exitCode
 			}
 
 			// Parse the flags the user gave us.
@@ -142,7 +142,7 @@ func (c *Config) Run() (exitCode int) {
 			// or if '-h' flag provided
 			if err := fs.Parse(c.Args[2:]); err != nil {
 				exitCode = 1
-				return
+				return exitCode
 			}
 
 			// Set up dep context.
@@ -160,18 +160,18 @@ func (c *Config) Run() (exitCode int) {
 			if err := cmd.Run(ctx, fs.Args()); err != nil {
 				errLogger.Printf("%v\n", err)
 				exitCode = 1
-				return
+				return exitCode
 			}
 
 			// Easy peasy livin' breezy.
-			return
+			return exitCode
 		}
 	}
 
 	errLogger.Printf("dep: %s: no such command\n", cmdName)
 	usage()
 	exitCode = 1
-	return
+	return exitCode
 }
 
 func resetUsage(logger *log.Logger, fs *flag.FlagSet, name, args, longHelp string) {

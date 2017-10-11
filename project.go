@@ -103,7 +103,7 @@ type Project struct {
 	Lock       *Lock // Optional
 }
 
-// SetRoot sets the project AbsRoot and ResolvedAbsRoot. If root is a not symlink, ResolvedAbsRoot will be set to root.
+// SetRoot sets the project AbsRoot and ResolvedAbsRoot. If root is not a symlink, ResolvedAbsRoot will be set to root.
 func (p *Project) SetRoot(root string) error {
 	rroot, err := filepath.EvalSymlinks(root)
 	if err != nil {
