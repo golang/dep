@@ -112,9 +112,9 @@ dep ensure -update -no-vendor
 
 dep ensure -no-vendor -dry-run
 
-	This fails with a non zero exit code if Gopkg.lock is not up to date with
-	the Gopkg.toml or the project imports. It can be useful to run this during
-	CI to check if Gopkg.lock is up to date.
+    This fails with a non zero exit code if Gopkg.lock is not up to date with
+    the Gopkg.toml or the project imports. It can be useful to run this during
+    CI to check if Gopkg.lock is up to date.
 
 `
 
