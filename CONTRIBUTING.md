@@ -30,9 +30,9 @@ Please read the [Contribution Guidelines](https://golang.org/doc/contribute.html
 before sending patches.
 
 The
-[help-wanted](https://github.com/golang/dep/issues?q=is%3Aissue+is%3Aopen+label%3Ahelp-wanted)
+[help wanted](https://github.com/golang/dep/issues?q=is%3Aissue+is%3Aopen+label%3Ahelp wanted)
 label highlights issues that are well-suited for folks to jump in on. The
-[good-first-pr](https://github.com/golang/dep/issues?q=is%3Aissue+is%3Aopen+label%3Agood-first-pr)
+[good first issue](https://github.com/golang/dep/issues?q=is%3Aissue+is%3Aopen+label%3Agood first issue)
 label further identifies issues that are particularly well-sized for newcomers.
 
 Unless otherwise noted, the `dep` source files are distributed under
