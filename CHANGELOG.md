@@ -2,6 +2,7 @@
 
 NEW FEATURES:
 
+* Wildcard ignore support. (#1156)
 * Disable SourceManager lock by setting `DEPNOLOCK` environment variable.
 (#1206)
 
