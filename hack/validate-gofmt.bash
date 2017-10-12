@@ -7,7 +7,7 @@
 # and is passing for certain directories in the project.
 #
 # Here we use `go list` to help determine which packages
-# we need to check for `go gmt`
+# we need to check for `go fmt`
 #
 # EXIT 0 - The check is successful
 # EXIT 1 - The check has failed
