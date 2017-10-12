@@ -634,6 +634,48 @@ func (t PackageTree) Copy() PackageTree {
 	return t2
 }
 
+// TrimHiddenPackages returns a new PackageTree with packages removed that
+// are either ignored, or both hidden and unreachable.
+//
+// The package list is partitioned into two sets: normal, and hidden, where
+// packages are considered hidden if they are within or beneath directories
+// with:
+//
+//  * leading dots
+//  * leading underscores
+//  * the exact name "testdata"
+//
+// Packages in the hidden set are dropped from the returned PackageTree, unless
+// they are transitively reachable from imports in the normal set.
+//
+// The "main", "tests" and "ignored" parameters have the same behavior as with
+// PackageTree.ToReachMap(): the first two determine, respectively, whether
+// imports from main packages, and imports from tests, should be considered for
+// reachability checks. "ignored" designates packages, or patterns of packages,
+// whose imports should be excluded from reachability checks, if encountered.
+func (t PackageTree) TrimHiddenPackages(main, tests bool, ignore map[string]bool) PackageTree {
+	rm, _ := t.ToReachMap(main, tests, false, ignore)
+	t2 := t.Copy()
+
+	preserve := make(map[string]bool)
+	for pkg, ie := range rm {
+		if !pkgFilter(pkg) {
+			preserve[pkg] = true
+			for _, in := range ie.Internal {
+				preserve[in] = true
+			}
+		}
+	}
+
+	for ip := range t.Packages {
+		if !preserve[pkg] {
+			delete(t2.Packages, ip)
+		}
+	}
+
+	return t2
+}
+
 // wmToReach takes an internal "workmap" constructed by
 // PackageTree.ExternalReach(), transitively walks (via depth-first traversal)
 // all internal imports until they reach an external path or terminate, then
