@@ -114,6 +114,17 @@ func TestBadSolveOpts(t *testing.T) {
 	} else if !strings.Contains(err.Error(), "multiple packages given as both required and ignored:") {
 		t.Error("Prepare should have given error with multiple ignore/require conflict error, but gave:", err)
 	}
+
+	params.Manifest = simpleRootManifest{
+		ig:  map[string]bool{"foo*": true},
+		req: map[string]bool{"foo/bar": true},
+	}
+	_, err = Prepare(params, sm)
+	if err == nil {
+		t.Errorf("Should have errored on pkg both ignored (with wildcard) and required")
+	} else if !strings.Contains(err.Error(), "was given as both a required and ignored package") {
+		t.Error("Prepare should have given error with single ignore/require conflict error, but gave:", err)
+	}
 	params.Manifest = nil
 
 	params.ToChange = []ProjectRoot{"foo"}

@@ -36,6 +36,12 @@ You might also try [virtualgo](https://github.com/GetStream/vg), which installs 
 ignored = ["github.com/user/project/badpkg"]
 ```
 
+Use wildcard character (*) to define a package prefix to be ignored. Use this
+to ignore any package and their subpackages.
+```toml
+ignored = ["github.com/user/project/badpkg*"]
+```
+
 **Use this for:** preventing a package and any of that package's unique
 dependencies from being installed.
 

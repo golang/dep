@@ -7,6 +7,8 @@ package gps
 import (
 	"reflect"
 	"testing"
+
+	"github.com/golang/dep/internal/gps/pkgtree"
 )
 
 func TestRootdataExternalImports(t *testing.T) {
@@ -218,6 +220,61 @@ func TestGetApplicableConstraints(t *testing.T) {
 			got := rd.getApplicableConstraints(params.stdLibFn)
 			if !reflect.DeepEqual(fix.result, got) {
 				t.Errorf("unexpected applicable constraint set:\n\t(GOT): %+v\n\t(WNT): %+v", got, fix.result)
+			}
+		})
+	}
+}
+
+func TestIsIgnored(t *testing.T) {
+	cases := []struct {
+		name           string
+		ignorePkgs     map[string]bool
+		wantIgnored    []string
+		wantNotIgnored []string
+	}{
+		{
+			name: "no ignore",
+		},
+		{
+			name: "ignores without wildcard",
+			ignorePkgs: map[string]bool{
+				"a/b/c":   true,
+				"m/n":     true,
+				"gophers": true,
+			},
+			wantIgnored:    []string{"a/b/c", "m/n", "gophers"},
+			wantNotIgnored: []string{"somerandomstring"},
+		},
+		{
+			name: "ignores with wildcard",
+			ignorePkgs: map[string]bool{
+				"a/b/c*":    true,
+				"m/n*/o":    true,
+				"*x/y/z":    true,
+				"A/B*/C/D*": true,
+			},
+			wantIgnored:    []string{"a/b/c", "a/b/c/d", "a/b/c-d", "m/n*/o", "*x/y/z", "A/B*/C/D", "A/B*/C/D/E"},
+			wantNotIgnored: []string{"m/n/o", "m/n*", "x/y/z", "*x/y/z/a", "*x", "A/B", "A/B*/C"},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			rd := rootdata{
+				ig:    c.ignorePkgs,
+				igpfx: pkgtree.CreateIgnorePrefixTree(c.ignorePkgs),
+			}
+
+			for _, p := range c.wantIgnored {
+				if !rd.isIgnored(p) {
+					t.Fatalf("expected %q to be ignored", p)
+				}
+			}
+
+			for _, p := range c.wantNotIgnored {
+				if rd.isIgnored(p) {
+					t.Fatalf("expected %q to be not ignored", p)
+				}
 			}
 		})
 	}

@@ -1,0 +1,5 @@
+ignored = ["github.com/golang/notexist/samples*"]
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/sdboyer/deptest"
