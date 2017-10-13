@@ -85,7 +85,10 @@ func (s *solver) writeHashingInputs(w io.Writer) {
 	ig := s.rd.ir.ToSlice()
 	sort.Strings(ig)
 	for _, igp := range ig {
-		if !strings.HasPrefix(igp, s.rd.rpt.ImportRoot) || !isPathPrefixOrEqual(s.rd.rpt.ImportRoot, igp) {
+		// Typical prefix comparison checks will erroneously fail if the wildcard
+		// is present. Trim it off, if present.
+		tigp := strings.TrimSuffix(igp, "*")
+		if !strings.HasPrefix(tigp, s.rd.rpt.ImportRoot) || !isPathPrefixOrEqual(s.rd.rpt.ImportRoot, tigp) {
 			writeString(igp)
 		}
 	}
