@@ -13,6 +13,8 @@ import (
 	"strings"
 )
 
+const wcIgnoreSuffix = "*"
+
 // string headers used to demarcate sections in hash input creation
 const (
 	hhConstraints = "-CONSTRAINTS-"
@@ -81,10 +83,24 @@ func (s *solver) writeHashingInputs(w io.Writer) {
 	writeString(hhIgnores)
 	ig := make([]string, 0, len(s.rd.ig))
 	for pkg := range s.rd.ig {
+		// Skip wildcard ignore. They are handled separately below.
+		if strings.HasSuffix(pkg, wcIgnoreSuffix) {
+			continue
+		}
+
 		if !strings.HasPrefix(pkg, s.rd.rpt.ImportRoot) || !isPathPrefixOrEqual(s.rd.rpt.ImportRoot, pkg) {
 			ig = append(ig, pkg)
 		}
 	}
+
+	// Add wildcard ignores to ignore list.
+	if s.rd.igpfx != nil {
+		s.rd.igpfx.Walk(func(s string, v interface{}) bool {
+			ig = append(ig, s+"*")
+			return false
+		})
+	}
+
 	sort.Strings(ig)
 
 	for _, igp := range ig {

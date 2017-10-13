@@ -206,10 +206,13 @@ func (params SolveParameters) toRootdata() (rootdata, error) {
 		rd.ovr = make(ProjectConstraints)
 	}
 
+	// Create ignore prefix tree using the provided ignore packages
+	rd.igpfx = pkgtree.CreateIgnorePrefixTree(rd.ig)
+
 	if len(rd.ig) != 0 {
 		var both []string
 		for pkg := range params.Manifest.RequiredPackages() {
-			if rd.ig[pkg] {
+			if rd.isIgnored(pkg) {
 				both = append(both, pkg)
 			}
 		}
@@ -658,7 +661,7 @@ func (s *solver) getImportsAndConstraintsOf(a atomWithPackages) ([]string, []com
 	// explicitly listed in the atom
 	for _, pkg := range a.pl {
 		// Skip ignored packages
-		if s.rd.ig[pkg] {
+		if s.rd.isIgnored(pkg) {
 			continue
 		}
 
