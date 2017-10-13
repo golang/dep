@@ -17,6 +17,9 @@ type rootdata struct {
 	// Path to the root of the project on which gps is operating.
 	dir string
 
+	// Ruleset for ignored import paths.
+	ir *pkgtree.IgnoredRuleset
+
 	// Map of packages to ignore.
 	ig map[string]bool
 
@@ -57,7 +60,7 @@ type rootdata struct {
 // Ignores and requires are taken into consideration, stdlib is excluded, and
 // errors within the local set of package are not backpropagated.
 func (rd rootdata) externalImportList(stdLibFn func(string) bool) []string {
-	rm, _ := rd.rpt.ToReachMap(true, true, false, rd.ig)
+	rm, _ := rd.rpt.ToReachMap(true, true, false, rd.ir)
 	reach := rm.FlattenFn(stdLibFn)
 
 	// If there are any requires, slide them into the reach list, as well.
@@ -194,7 +197,7 @@ func (rd rootdata) rootAtom() atomWithPackages {
 
 	list := make([]string, 0, len(rd.rpt.Packages))
 	for path, pkg := range rd.rpt.Packages {
-		if pkg.Err != nil && !rd.ig[path] {
+		if pkg.Err != nil && !rd.ir.IsIgnored(path) {
 			list = append(list, path)
 		}
 	}
@@ -204,21 +207,4 @@ func (rd rootdata) rootAtom() atomWithPackages {
 		a:  a,
 		pl: list,
 	}
-}
-
-// isIgnored checks if a given path is ignored, comparing with the list of
-// ignore packages and ignore prefixes.
-func (rd rootdata) isIgnored(path string) bool {
-	// Check if the path is present in ignore packages.
-	if rd.ig[path] {
-		return true
-	}
-
-	if rd.igpfx != nil {
-		// Check if the path matches any of the ignore prefixes.
-		_, _, ok := rd.igpfx.LongestPrefix(path)
-		return ok
-	}
-
-	return false
 }

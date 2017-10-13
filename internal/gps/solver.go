@@ -184,7 +184,7 @@ func (params SolveParameters) toRootdata() (rootdata, error) {
 	}
 
 	rd := rootdata{
-		ig:      params.Manifest.IgnoredPackages(),
+		ir:      params.Manifest.IgnoredPackages(),
 		req:     params.Manifest.RequiredPackages(),
 		ovr:     params.Manifest.Overrides(),
 		rpt:     params.RootPackageTree.Copy(),
@@ -206,13 +206,10 @@ func (params SolveParameters) toRootdata() (rootdata, error) {
 		rd.ovr = make(ProjectConstraints)
 	}
 
-	// Create ignore prefix tree using the provided ignore packages
-	rd.igpfx = pkgtree.CreateIgnorePrefixTree(rd.ig)
-
-	if len(rd.ig) != 0 {
+	if rd.ir.Len() > 0 {
 		var both []string
 		for pkg := range params.Manifest.RequiredPackages() {
-			if rd.isIgnored(pkg) {
+			if rd.ir.IsIgnored(pkg) {
 				both = append(both, pkg)
 			}
 		}
@@ -633,7 +630,7 @@ func (s *solver) getImportsAndConstraintsOf(a atomWithPackages) ([]string, []com
 		return nil, nil, err
 	}
 
-	rm, em := ptree.ToReachMap(true, false, true, s.rd.ig)
+	rm, em := ptree.ToReachMap(true, false, true, s.rd.ir)
 	// Use maps to dedupe the unique internal and external packages.
 	exmap, inmap := make(map[string]struct{}), make(map[string]struct{})
 
@@ -661,14 +658,14 @@ func (s *solver) getImportsAndConstraintsOf(a atomWithPackages) ([]string, []com
 	// explicitly listed in the atom
 	for _, pkg := range a.pl {
 		// Skip ignored packages
-		if s.rd.isIgnored(pkg) {
+		if s.rd.ir.IsIgnored(pkg) {
 			continue
 		}
 
 		ie, exists := rm[pkg]
 		if !exists {
 			// Missing package here *should* only happen if the target pkg was
-			// poisoned. Check the errors map
+			// poisoned; check the errors map.
 			if importErr, eexists := em[pkg]; eexists {
 				return nil, nil, importErr
 			}

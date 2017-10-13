@@ -81,30 +81,13 @@ func (s *solver) writeHashingInputs(w io.Writer) {
 	// those will have already been implicitly incorporated by the import
 	// lister.
 	writeString(hhIgnores)
-	ig := make([]string, 0, len(s.rd.ig))
-	for pkg := range s.rd.ig {
-		// Skip wildcard ignore. They are handled separately below.
-		if strings.HasSuffix(pkg, wcIgnoreSuffix) {
-			continue
-		}
 
-		if !strings.HasPrefix(pkg, s.rd.rpt.ImportRoot) || !isPathPrefixOrEqual(s.rd.rpt.ImportRoot, pkg) {
-			ig = append(ig, pkg)
-		}
-	}
-
-	// Add wildcard ignores to ignore list.
-	if s.rd.igpfx != nil {
-		s.rd.igpfx.Walk(func(s string, v interface{}) bool {
-			ig = append(ig, s+"*")
-			return false
-		})
-	}
-
+	ig := s.rd.ir.ToSlice()
 	sort.Strings(ig)
-
 	for _, igp := range ig {
-		writeString(igp)
+		if !strings.HasPrefix(igp, s.rd.rpt.ImportRoot) || !isPathPrefixOrEqual(s.rd.rpt.ImportRoot, igp) {
+			writeString(igp)
+		}
 	}
 
 	// Overrides *also* need their own special entry distinct from basic
