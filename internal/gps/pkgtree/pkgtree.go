@@ -22,9 +22,6 @@ import (
 	"github.com/armon/go-radix"
 )
 
-// wildcard ignore suffix
-const wcIgnoreSuffix = "*"
-
 // Package represents a Go package. It contains a subset of the information
 // go/build.Package does.
 type Package struct {
@@ -1046,36 +1043,27 @@ func uniq(a []string) []string {
 // CreateIgnorePrefixTree takes a set of strings to be ignored and returns a
 // trie consisting of strings prefixed with wildcard ignore suffix (*).
 func CreateIgnorePrefixTree(ig map[string]bool) *radix.Tree {
-	var xt *radix.Tree
-
-	// Create a sorted list of all the ignores to have a proper order in
-	// ignores parsing.
-	sortedIgnores := make([]string, len(ig))
+	// Create a sorted list of all the recursive ignores to have a proper
+	// order in ignores parsing.
+	var recursive []string
 	for k := range ig {
-		sortedIgnores = append(sortedIgnores, k)
-	}
-	sort.Strings(sortedIgnores)
-
-	for _, i := range sortedIgnores {
-		// Skip global ignore.
-		if i == "*" {
-			continue
+		// Skip global and non-recursive ignore.
+		if len(k) > 1 && k[len(k)-1] == '*' {
+			recursive = append(recursive, k)
 		}
+	}
+	if len(recursive) == 0 {
+		return nil
+	}
+	sort.Strings(recursive)
 
-		// Check if it's a recursive ignore.
-		if strings.HasSuffix(i, wcIgnoreSuffix) {
-			// Create trie if it doesn't exists.
-			if xt == nil {
-				xt = radix.New()
-			}
-			// Check if it is ineffectual.
-			_, _, ok := xt.LongestPrefix(i)
-			if ok {
-				// Skip ineffectual wildcard ignore.
-				continue
-			}
+	xt := radix.New()
+	for _, i := range recursive {
+		// Check if it is ineffectual.
+		_, _, ineffectual := xt.LongestPrefix(i)
+		if !ineffectual {
 			// Create the ignore prefix and insert in the radix tree.
-			xt.Insert(i[:len(i)-len(wcIgnoreSuffix)], true)
+			xt.Insert(i[:len(i)-1], true)
 		}
 	}
 
