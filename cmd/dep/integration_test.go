@@ -123,8 +123,12 @@ func testIntegration(name, relPath, wd string, run integration.RunFunc) func(t *
 		// Check error raised in final command
 		testCase.CompareError(err, testProj.GetStderr())
 
-		// Check output
-		testCase.CompareOutput(testProj.GetStdout())
+		if *test.UpdateGolden {
+			testCase.UpdateOutput(testProj.GetStdout())
+		} else {
+			// Check output
+			testCase.CompareOutput(testProj.GetStdout())
+		}
 
 		// Check vendor paths
 		testProj.CompareImportPaths()
