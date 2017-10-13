@@ -11,6 +11,7 @@ import (
 	"context"
 	"os"
 	"os/exec"
+	"syscall"
 	"time"
 
 	"github.com/pkg/errors"
@@ -51,6 +52,17 @@ func (c cmd) CombinedOutput() ([]byte, error) {
 	var b bytes.Buffer
 	c.Cmd.Stdout = &b
 	c.Cmd.Stderr = &b
+
+	// Force subprocesses into their own process group, rather than being in the
+	// same process group as the dep process. Ctrl-C sent from a terminal will
+	// send the signal to the entire running process group, so This allows us to
+	// directly manage the issuance of signals to subprocesses in that common
+	// case.
+	c.Cmd.SysProcAttr = &syscall.SysProcAttr{
+		Setpgid: true,
+		Pgid:    0,
+	}
+
 	if err := c.Cmd.Start(); err != nil {
 		return nil, err
 	}
