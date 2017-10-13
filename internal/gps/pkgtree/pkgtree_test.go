@@ -2127,3 +2127,171 @@ func TestCreateIgnorePrefixTree(t *testing.T) {
 		})
 	}
 }
+
+func TestIgnoredRuleset(t *testing.T) {
+	type tfixm []struct {
+		path string
+		wild bool
+	}
+	cases := []struct {
+		name            string
+		inputs          map[string]struct{}
+		wantInTree      tfixm
+		wantEmptyTree   bool
+		shouldIgnore    []string
+		shouldNotIgnore []string
+	}{
+		{
+			name:          "only skip global ignore",
+			inputs:        map[string]struct{}{wcIgnoreSuffix: struct{}{}},
+			wantEmptyTree: true,
+		},
+		{
+			name: "ignores without ignore suffix",
+			inputs: map[string]struct{}{
+				"x/y/z":   struct{}{},
+				"*a/b/c":  struct{}{},
+				"gophers": struct{}{},
+			},
+			wantInTree: tfixm{
+				{path: "x/y/z", wild: false},
+				{path: "*a/b/c", wild: false},
+				{path: "gophers", wild: false},
+			},
+			shouldIgnore: []string{
+				"x/y/z",
+				"gophers",
+			},
+			shouldNotIgnore: []string{
+				"x/y/z/q",
+				"x/y",
+				"gopher",
+				"gopherss",
+			},
+		},
+		{
+			name: "ignores with ignore suffix",
+			inputs: map[string]struct{}{
+				"x/y/z*":  struct{}{},
+				"a/b/c":   struct{}{},
+				"gophers": struct{}{},
+			},
+			wantInTree: tfixm{
+				{path: "x/y/z", wild: true},
+				{path: "a/b/c", wild: false},
+				{path: "gophers", wild: false},
+			},
+			shouldIgnore: []string{
+				"x/y/z",
+				"x/y/zz",
+				"x/y/z/",
+				"x/y/z/q",
+			},
+			shouldNotIgnore: []string{
+				"x/y",
+				"gopher",
+			},
+		},
+		{
+			name: "global ignore with other strings",
+			inputs: map[string]struct{}{
+				"*":        struct{}{},
+				"gophers*": struct{}{},
+				"x/y/z*":   struct{}{},
+				"a/b/c":    struct{}{},
+			},
+			wantInTree: tfixm{
+				{path: "x/y/z", wild: true},
+				{path: "a/b/c", wild: false},
+				{path: "gophers", wild: true},
+			},
+			shouldIgnore: []string{
+				"x/y/z",
+				"x/y/z/",
+				"x/y/z/q",
+				"gophers",
+				"gopherss",
+				"gophers/foo",
+			},
+			shouldNotIgnore: []string{
+				"x/y",
+				"gopher",
+			},
+		},
+		{
+			name: "ineffectual ignore with wildcard",
+			inputs: map[string]struct{}{
+				"a/b*":    struct{}{},
+				"a/b/c*":  struct{}{},
+				"a/b/x/y": struct{}{},
+				"a/c*":    struct{}{},
+			},
+			wantInTree: tfixm{
+				{path: "a/c", wild: true},
+				{path: "a/b", wild: true},
+			},
+			shouldIgnore: []string{
+				"a/cb",
+			},
+			shouldNotIgnore: []string{
+				"a/",
+				"a/d",
+			},
+		},
+		{
+			name: "same path with and without wildcard",
+			inputs: map[string]struct{}{
+				"a/b*": struct{}{},
+				"a/b":  struct{}{},
+			},
+			wantInTree: tfixm{
+				{path: "a/b", wild: true},
+			},
+			shouldIgnore: []string{
+				"a/b",
+				"a/bb",
+			},
+			shouldNotIgnore: []string{
+				"a/",
+				"a/d",
+			},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			igm := NewIgnoredRuleset(c.inputs)
+
+			if c.wantEmptyTree {
+				if igm != nil && igm.t != nil {
+					t.Fatalf("wanted empty tree, got non-nil tree")
+				}
+			}
+
+			// Check if the wildcard suffix ignores are in the tree.
+			for _, p := range c.wantInTree {
+				wildi, has := igm.t.Get(p.path)
+				if !has {
+					t.Fatalf("expected %q to be in the tree", p.path)
+				} else if wildi.(bool) != p.wild {
+					if p.wild {
+						t.Fatalf("expected %q to be a wildcard matcher, but it was not", p.path)
+					} else {
+						t.Fatalf("expected %q not to be a wildcard matcher, but it was", p.path)
+					}
+				}
+			}
+
+			for _, p := range c.shouldIgnore {
+				if !igm.IsIgnored(p) {
+					t.Fatalf("%q should be ignored, but it was not", p)
+				}
+			}
+			for _, p := range c.shouldNotIgnore {
+				if igm.IsIgnored(p) {
+					t.Fatalf("%q should not be ignored, but it was", p)
+				}
+			}
+		})
+	}
+}
