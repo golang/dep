@@ -25,11 +25,15 @@ type cmd struct {
 }
 
 func commandContext(ctx context.Context, name string, arg ...string) cmd {
-	// Grab the caller's context and pass a derived one to CommandContext.
-	c := cmd{ctx: ctx}
-	ctx, cancel := context.WithCancel(ctx)
-	c.Cmd = exec.CommandContext(ctx, name, arg...)
-	c.cancel = cancel
+	// Create a one-off cancellable context for use by the CommandContext, in
+	// the event that we have to force a Process.Kill().
+	ctx2, cancel := context.WithCancel(context.Background())
+
+	c := cmd{
+		Cmd:    exec.CommandContext(ctx2, name, arg...),
+		cancel: cancel,
+		ctx:    ctx,
+	}
 	return c
 }
 
