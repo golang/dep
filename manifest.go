@@ -14,6 +14,7 @@ import (
 	"sync"
 
 	"github.com/golang/dep/internal/gps"
+	"github.com/golang/dep/internal/gps/pkgtree"
 	"github.com/pelletier/go-toml"
 	"github.com/pkg/errors"
 )
@@ -53,7 +54,7 @@ type rawProject struct {
 	Source   string `toml:"source,omitempty"`
 }
 
-// NewManifest instantites a new manifest.
+// NewManifest instantiates a new manifest.
 func NewManifest() *Manifest {
 	return &Manifest{
 		Constraints: make(gps.ProjectConstraints),
@@ -376,17 +377,8 @@ func (m *Manifest) Overrides() gps.ProjectConstraints {
 }
 
 // IgnoredPackages returns a set of import paths to ignore.
-func (m *Manifest) IgnoredPackages() map[string]bool {
-	if len(m.Ignored) == 0 {
-		return nil
-	}
-
-	mp := make(map[string]bool, len(m.Ignored))
-	for _, i := range m.Ignored {
-		mp[i] = true
-	}
-
-	return mp
+func (m *Manifest) IgnoredPackages() *pkgtree.IgnoredRuleset {
+	return pkgtree.NewIgnoredRuleset(m.Ignored)
 }
 
 // HasConstraintsOn checks if the manifest contains either constraints or
