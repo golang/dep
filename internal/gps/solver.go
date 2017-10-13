@@ -195,10 +195,7 @@ func (params SolveParameters) toRootdata() (rootdata, error) {
 		an:      params.ProjectAnalyzer,
 	}
 
-	// Ensure the required, ignore and overrides maps are at least initialized
-	if rd.ig == nil {
-		rd.ig = make(map[string]bool)
-	}
+	// Ensure the required and overrides maps are at least initialized
 	if rd.req == nil {
 		rd.req = make(map[string]bool)
 	}

@@ -20,12 +20,6 @@ type rootdata struct {
 	// Ruleset for ignored import paths.
 	ir *pkgtree.IgnoredRuleset
 
-	// Map of packages to ignore.
-	ig map[string]bool
-
-	// Radix tree of ignore prefixes.
-	igpfx *radix.Tree
-
 	// Map of packages to require.
 	req map[string]bool
 
