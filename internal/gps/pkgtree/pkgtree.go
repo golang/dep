@@ -1081,3 +1081,76 @@ func CreateIgnorePrefixTree(ig map[string]bool) *radix.Tree {
 
 	return xt
 }
+
+// IgnoredRuleset comprises a set of rules for ignoring import paths. It can
+// manage both literal and prefix-wildcard matches.
+type IgnoredRuleset struct {
+	t *radix.Tree
+}
+
+// NewIgnoredRuleset processes a set of strings into an IgnoredRuleset. Strings
+// that end in "*" are treated as wildcards, where any import path with a
+// matching prefix will be ignored. IgnoredRulesets are immutable once created.
+//
+// Duplicate and redundant (i.e. a literal path that has a prefix of a wildcard
+// path) declarations are discarded, resulting in the most efficient
+// representation.
+func NewIgnoredRuleset(ig map[string]struct{}) IgnoredRuleset {
+	if len(ig) == 0 {
+		return IgnoredRuleset{}
+	}
+
+	ir := IgnoredRuleset{
+		t: radix.New(),
+	}
+
+	// Create a sorted list of all the ignores in order to ensure that wildcard
+	// precedence is recorded correctly in the trie.
+	sortedIgnores := make([]string, len(ig))
+	for k := range ig {
+		sortedIgnores = append(sortedIgnores, k)
+	}
+	sort.Strings(sortedIgnores)
+
+	for _, i := range sortedIgnores {
+		// Skip global ignore.
+		if i == wcIgnoreSuffix {
+			continue
+		}
+
+		_, wildi, has := ir.t.LongestPrefix(i)
+		// We may not always have a value here, but if we do, then it's a bool.
+		wild, _ := wildi.(bool)
+		// Check if it's a wildcard ignore.
+		if strings.HasSuffix(i, wcIgnoreSuffix) {
+			// Check if it is ineffectual.
+			if has && wild {
+				// Skip ineffectual wildcard ignore.
+				continue
+			}
+			// Create the ignore prefix and insert in the radix tree.
+			ir.t.Insert(i[:len(i)-len(wcIgnoreSuffix)], true)
+		} else if !has || !wild {
+			ir.t.Insert(i, false)
+		}
+	}
+
+	// The radix tree implementation is initialized with a single element
+	// representing the empty string.
+	if ir.t.Len() == 1 {
+		ir.t = nil
+	}
+
+	return ir
+}
+
+// IsIgnored indicates whether the provided path should be ignored, according to
+// the ruleset.
+func (ir IgnoredRuleset) IsIgnored(path string) bool {
+	if ir.t == nil {
+		return false
+	}
+
+	prefix, wildi, has := ir.t.LongestPrefix(path)
+	return has && (wildi.(bool) || path == prefix)
+}
