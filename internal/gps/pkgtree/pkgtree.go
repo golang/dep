@@ -550,14 +550,7 @@ type PackageTree struct {
 // 	"A": []string{},
 // 	"A/bar": []string{"B/baz"},
 //  }
-func (t PackageTree) ToReachMap(main, tests, backprop bool, ignore map[string]bool) (ReachMap, map[string]*ProblemImportError) {
-	if ignore == nil {
-		ignore = make(map[string]bool)
-	}
-
-	// Radix tree for ignore prefixes.
-	xt := CreateIgnorePrefixTree(ignore)
-
+func (t PackageTree) ToReachMap(main, tests, backprop bool, ignore *IgnoredRuleset) (ReachMap, map[string]*ProblemImportError) {
 	// world's simplest adjacency list
 	workmap := make(map[string]wm)
 
@@ -576,16 +569,8 @@ func (t PackageTree) ToReachMap(main, tests, backprop bool, ignore map[string]bo
 			continue
 		}
 		// Skip ignored packages
-		if ignore[ip] {
+		if ignore.IsIgnored(ip) {
 			continue
-		}
-
-		if xt != nil {
-			// Skip ignored packages prefix matches
-			_, _, ok := xt.LongestPrefix(ip)
-			if ok {
-				continue
-			}
 		}
 
 		// TODO (kris-nova) Disable to get staticcheck passing
@@ -605,7 +590,7 @@ func (t PackageTree) ToReachMap(main, tests, backprop bool, ignore map[string]bo
 		// For each import, decide whether it should be ignored, or if it
 		// belongs in the external or internal imports list.
 		for _, imp := range imps {
-			if ignore[imp] || imp == "." {
+			if ignore.IsIgnored(imp) || imp == "." {
 				continue
 			}
 
@@ -1093,28 +1078,23 @@ type IgnoredRuleset struct {
 // matching prefix will be ignored. IgnoredRulesets are immutable once created.
 //
 // Duplicate and redundant (i.e. a literal path that has a prefix of a wildcard
-// path) declarations are discarded, resulting in the most efficient
-// representation.
-func NewIgnoredRuleset(ig map[string]struct{}) IgnoredRuleset {
+// path) declarations are discarded. Consequently, it is possible that the
+// returned IgnoredRuleset may have a smaller Len() than the input slice.
+func NewIgnoredRuleset(ig []string) *IgnoredRuleset {
 	if len(ig) == 0 {
-		return IgnoredRuleset{}
+		return &IgnoredRuleset{}
 	}
 
-	ir := IgnoredRuleset{
+	ir := &IgnoredRuleset{
 		t: radix.New(),
 	}
 
-	// Create a sorted list of all the ignores in order to ensure that wildcard
+	// Sort the list of all the ignores in order to ensure that wildcard
 	// precedence is recorded correctly in the trie.
-	sortedIgnores := make([]string, len(ig))
-	for k := range ig {
-		sortedIgnores = append(sortedIgnores, k)
-	}
-	sort.Strings(sortedIgnores)
-
-	for _, i := range sortedIgnores {
-		// Skip global ignore.
-		if i == wcIgnoreSuffix {
+	sort.Strings(ig)
+	for _, i := range ig {
+		// Skip global ignore and empty string.
+		if i == wcIgnoreSuffix || i == "" {
 			continue
 		}
 
@@ -1135,9 +1115,7 @@ func NewIgnoredRuleset(ig map[string]struct{}) IgnoredRuleset {
 		}
 	}
 
-	// The radix tree implementation is initialized with a single element
-	// representing the empty string.
-	if ir.t.Len() == 1 {
+	if ir.t.Len() == 0 {
 		ir.t = nil
 	}
 
@@ -1146,11 +1124,44 @@ func NewIgnoredRuleset(ig map[string]struct{}) IgnoredRuleset {
 
 // IsIgnored indicates whether the provided path should be ignored, according to
 // the ruleset.
-func (ir IgnoredRuleset) IsIgnored(path string) bool {
-	if ir.t == nil {
+func (ir *IgnoredRuleset) IsIgnored(path string) bool {
+	if path == "" || ir == nil || ir.t == nil {
 		return false
 	}
 
 	prefix, wildi, has := ir.t.LongestPrefix(path)
 	return has && (wildi.(bool) || path == prefix)
+}
+
+// Len indicates the number of rules in the ruleset.
+func (ir *IgnoredRuleset) Len() int {
+	if ir == nil || ir.t == nil {
+		return 0
+	}
+
+	return ir.t.Len()
+}
+
+// ToSlice converts the contents of the IgnoredRuleset to a string slice.
+//
+// This operation is symmetrically dual to NewIgnoredRuleset.
+func (ir *IgnoredRuleset) ToSlice() []string {
+	irlen := ir.Len()
+	if irlen == 0 {
+		return nil
+	}
+
+	items := make([]string, 0, irlen)
+	ir.t.Walk(func(s string, v interface{}) bool {
+		if s != "" {
+			if v.(bool) {
+				items = append(items, s+wcIgnoreSuffix)
+			} else {
+				items = append(items, s)
+			}
+		}
+		return false
+	})
+
+	return items
 }
