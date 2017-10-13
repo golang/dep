@@ -2038,3 +2038,92 @@ func getTestdataRootDir(t *testing.T) string {
 	}
 	return filepath.Join(cwd, "..", "_testdata")
 }
+
+func TestCreateIgnorePrefixTree(t *testing.T) {
+	cases := []struct {
+		name          string
+		ignoreMap     map[string]bool
+		wantInTree    []string
+		notWantInTree []string
+		wantNilTree   bool
+	}{
+		{
+			name:        "empty ignore",
+			wantNilTree: true,
+		},
+		{
+			name: "ignores without ignore suffix",
+			ignoreMap: map[string]bool{
+				"x/y/z":   true,
+				"*a/b/c":  true,
+				"gophers": true,
+			},
+			wantNilTree: true,
+		},
+		{
+			name: "ignores with ignore suffix",
+			ignoreMap: map[string]bool{
+				"x/y/z*":  true,
+				"a/b/c":   true,
+				"gophers": true,
+			},
+			wantInTree:    []string{"x/y/z"},
+			notWantInTree: []string{"a/b/c", "gophers"},
+		},
+		{
+			name:        "only skip global ignore",
+			ignoreMap:   map[string]bool{"*": true},
+			wantNilTree: true,
+		},
+		{
+			name: "global ignore with other strings",
+			ignoreMap: map[string]bool{
+				"*":        true,
+				"gophers*": true,
+				"x/y/z*":   true,
+				"a/b/c":    true,
+			},
+			wantInTree:    []string{"gophers", "x/y/z"},
+			notWantInTree: []string{"*", "a/b/c"},
+		},
+		{
+			name: "ineffectual ignore with wildcard",
+			ignoreMap: map[string]bool{
+				"a/b*":    true,
+				"a/b/c*":  true,
+				"a/b/x/y": true,
+				"a/c*":    true,
+			},
+			wantInTree:    []string{"a/b", "a/c"},
+			notWantInTree: []string{"a/b/c", "a/b/x/y"},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			gotTree := CreateIgnorePrefixTree(c.ignoreMap)
+
+			if c.wantNilTree {
+				if gotTree != nil {
+					t.Fatalf("expected nil tree, got non-nil tree")
+				}
+			}
+
+			// Check if the wildcard suffix ignores are in the tree.
+			for _, p := range c.wantInTree {
+				_, has := gotTree.Get(p)
+				if !has {
+					t.Fatalf("expected %q to be in the tree", p)
+				}
+			}
+
+			// Check if non-wildcard suffix ignores are not in the tree.
+			for _, p := range c.notWantInTree {
+				_, has := gotTree.Get(p)
+				if has {
+					t.Fatalf("expected %q to not be in the tree", p)
+				}
+			}
+		})
+	}
+}

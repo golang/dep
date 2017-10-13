@@ -18,7 +18,12 @@ import (
 	"strconv"
 	"strings"
 	"unicode"
+
+	"github.com/armon/go-radix"
 )
+
+// wildcard ignore suffix
+const wcIgnoreSuffix = "*"
 
 // Package represents a Go package. It contains a subset of the information
 // go/build.Package does.
@@ -550,6 +555,9 @@ func (t PackageTree) ToReachMap(main, tests, backprop bool, ignore map[string]bo
 		ignore = make(map[string]bool)
 	}
 
+	// Radix tree for ignore prefixes.
+	xt := CreateIgnorePrefixTree(ignore)
+
 	// world's simplest adjacency list
 	workmap := make(map[string]wm)
 
@@ -570,6 +578,14 @@ func (t PackageTree) ToReachMap(main, tests, backprop bool, ignore map[string]bo
 		// Skip ignored packages
 		if ignore[ip] {
 			continue
+		}
+
+		if xt != nil {
+			// Skip ignored packages prefix matches
+			_, _, ok := xt.LongestPrefix(ip)
+			if ok {
+				continue
+			}
 		}
 
 		// TODO (kris-nova) Disable to get staticcheck passing
@@ -1025,4 +1041,43 @@ func uniq(a []string) []string {
 		}
 	}
 	return a[:i]
+}
+
+// CreateIgnorePrefixTree takes a set of strings to be ignored and returns a
+// trie consisting of strings prefixed with wildcard ignore suffix (*).
+func CreateIgnorePrefixTree(ig map[string]bool) *radix.Tree {
+	var xt *radix.Tree
+
+	// Create a sorted list of all the ignores to have a proper order in
+	// ignores parsing.
+	sortedIgnores := make([]string, len(ig))
+	for k := range ig {
+		sortedIgnores = append(sortedIgnores, k)
+	}
+	sort.Strings(sortedIgnores)
+
+	for _, i := range sortedIgnores {
+		// Skip global ignore.
+		if i == "*" {
+			continue
+		}
+
+		// Check if it's a recursive ignore.
+		if strings.HasSuffix(i, wcIgnoreSuffix) {
+			// Create trie if it doesn't exists.
+			if xt == nil {
+				xt = radix.New()
+			}
+			// Check if it is ineffectual.
+			_, _, ok := xt.LongestPrefix(i)
+			if ok {
+				// Skip ineffectual wildcard ignore.
+				continue
+			}
+			// Create the ignore prefix and insert in the radix tree.
+			xt.Insert(i[:len(i)-len(wcIgnoreSuffix)], true)
+		}
+	}
+
+	return xt
 }
