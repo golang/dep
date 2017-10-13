@@ -83,21 +83,38 @@ func (tc *TestCase) CompareFile(goldenPath, working string) {
 
 	gotExists, got, err := getFile(working)
 	if err != nil {
-		tc.t.Fatalf("Error reading project file %s: %s", goldenPath, err)
+		tc.t.Fatalf("Error reading project file %q: %s", goldenPath, err)
 	}
 	wantExists, want, err := getFile(golden)
 	if err != nil {
-		tc.t.Fatalf("Error reading testcase file %s: %s", goldenPath, err)
+		tc.t.Fatalf("Error reading testcase file %q: %s", goldenPath, err)
 	}
 
 	if wantExists && gotExists {
 		if want != got {
-			tc.t.Errorf("expected %s, got %s", want, got)
+			tc.t.Errorf("%s was not as expected\n(WNT):\n%s\n(GOT):\n%s", filepath.Base(goldenPath), want, got)
 		}
 	} else if !wantExists && gotExists {
-		tc.t.Errorf("%s created where none was expected", goldenPath)
+		tc.t.Errorf("%q created where none was expected", goldenPath)
 	} else if wantExists && !gotExists {
-		tc.t.Errorf("%s not created where one was expected", goldenPath)
+		tc.t.Errorf("%q not created where one was expected", goldenPath)
+	}
+}
+
+// UpdateFile updates the golden file with the working result.
+func (tc *TestCase) UpdateOutput(stdout string) {
+	stdoutPath := filepath.Join(tc.rootPath, "stdout.txt")
+	_, err := os.Stat(stdoutPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			// Don't update the stdout.txt file if it doesn't exist.
+			return
+		}
+		panic(err)
+	}
+
+	if err := tc.WriteFile(stdoutPath, stdout); err != nil {
+		tc.t.Fatal(err)
 	}
 }
 
@@ -116,7 +133,7 @@ func (tc *TestCase) CompareOutput(stdout string) {
 	stdout = normalizeLines(stdout)
 
 	if expStr != stdout {
-		tc.t.Errorf("(WNT):\n%s\n(GOT):\n%s\n", expStr, stdout)
+		tc.t.Errorf("stdout was not as expected\n(WNT):\n%s\n(GOT):\n%s\n", expStr, stdout)
 	}
 }
 
