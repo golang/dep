@@ -11,6 +11,8 @@ import (
 	"strings"
 	"testing"
 	"text/tabwriter"
+
+	"github.com/golang/dep/internal/gps/pkgtree"
 )
 
 func TestHashInputs(t *testing.T) {
@@ -64,10 +66,7 @@ func TestHashInputsReqsIgs(t *testing.T) {
 	fix := basicFixtures["shared dependency with overlapping constraints"]
 
 	rm := fix.rootmanifest().(simpleRootManifest).dup()
-	rm.ig = map[string]bool{
-		"foo": true,
-		"bar": true,
-	}
+	rm.ig = pkgtree.NewIgnoredRuleset([]string{"foo", "bar"})
 
 	params := SolveParameters{
 		RootDir:         string(fix.ds[0].n),
@@ -611,7 +610,7 @@ func TestHashInputsIneffectualWildcardIgs(t *testing.T) {
 
 	cases := []struct {
 		name      string
-		ignoreMap map[string]bool
+		ignoreMap []string
 		elems     []string
 	}{
 		{
@@ -634,10 +633,10 @@ func TestHashInputsIneffectualWildcardIgs(t *testing.T) {
 		},
 		{
 			name: "different wildcard ignores",
-			ignoreMap: map[string]bool{
-				"foobar*":    true,
-				"foobarbaz*": true,
-				"foozapbar*": true,
+			ignoreMap: []string{
+				"foobar*",
+				"foobarbaz*",
+				"foozapbar*",
 			},
 			elems: []string{
 				hhConstraints,
@@ -662,7 +661,7 @@ func TestHashInputsIneffectualWildcardIgs(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 
-			rm.ig = c.ignoreMap
+			rm.ig = pkgtree.NewIgnoredRuleset(c.ignoreMap)
 
 			params.Manifest = rm
 

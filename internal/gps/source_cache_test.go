@@ -7,6 +7,7 @@ package gps
 import (
 	"io/ioutil"
 	"log"
+	"reflect"
 	"sort"
 	"testing"
 	"time"
@@ -100,14 +101,11 @@ func (test singleSourceCacheTest) run(t *testing.T) {
 					Constraint: testSemverConstraint(t, "2.0.0"),
 				},
 			},
-			ig: map[string]bool{
-				"a": true,
-				"b": true,
-			},
 			req: map[string]bool{
 				"c": true,
 				"d": true,
 			},
+			ig: pkgtree.NewIgnoredRuleset([]string{"a", "b"}),
 		}
 		var l Lock = &safeLock{
 			h: []byte("test_hash"),
@@ -149,14 +147,11 @@ func (test singleSourceCacheTest) run(t *testing.T) {
 					Constraint: testSemverConstraint(t, "2.0.0"),
 				},
 			},
-			ig: map[string]bool{
-				"c": true,
-				"d": true,
-			},
 			req: map[string]bool{
 				"a": true,
 				"b": true,
 			},
+			ig: pkgtree.NewIgnoredRuleset([]string{"c", "d"}),
 		}
 		l = &safeLock{
 			h: []byte("different_test_hash"),
@@ -416,7 +411,7 @@ func compareManifests(t *testing.T, want, got Manifest) {
 
 	{
 		want, got := wantRM.IgnoredPackages(), gotRM.IgnoredPackages()
-		if !mapStringBoolEqual(want, got) {
+		if !reflect.DeepEqual(want.ToSlice(), got.ToSlice()) {
 			t.Errorf("unexpected ignored packages:\n\t(GOT): %#v\n\t(WNT): %#v", got, want)
 		}
 	}

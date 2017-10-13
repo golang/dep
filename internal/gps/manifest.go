@@ -4,6 +4,8 @@
 
 package gps
 
+import "github.com/golang/dep/internal/gps/pkgtree"
+
 // Manifest represents manifest-type data for a project at a particular version.
 // The constraints expressed in a manifest determine the set of versions that
 // are acceptable to try for a given project.
@@ -36,14 +38,15 @@ type RootManifest interface {
 	// them can harm the ecosystem as a whole.
 	Overrides() ProjectConstraints
 
-	// IngoredPackages returns a set of import paths to ignore. These import
-	// paths can be within the root project, or part of other projects. Ignoring
-	// a package means that both it and its (unique) imports will be disregarded
-	// by all relevant solver operations.
+	// IngoredPackages returns a pkgtree.IgnoredRuleset, which comprises a set
+	// of import paths, or import path patterns, that are to be ignored during
+	// solving. These ignored import paths can be within the root project, or
+	// part of other projects. Ignoring a package means that both it and its
+	// (unique) imports will be disregarded by all relevant solver operations.
 	//
 	// It is an error to include a package in both the ignored and required
 	// sets.
-	IgnoredPackages() map[string]bool
+	IgnoredPackages() *pkgtree.IgnoredRuleset
 
 	// RequiredPackages returns a set of import paths to require. These packages
 	// are required to be present in any solution. The list can include main
@@ -76,8 +79,9 @@ func (m SimpleManifest) DependencyConstraints() ProjectConstraints {
 // simpleRootManifest exists so that we have a safe value to swap into solver
 // params when a nil Manifest is provided.
 type simpleRootManifest struct {
-	c, ovr  ProjectConstraints
-	ig, req map[string]bool
+	c, ovr ProjectConstraints
+	ig     *pkgtree.IgnoredRuleset
+	req    map[string]bool
 }
 
 func (m simpleRootManifest) DependencyConstraints() ProjectConstraints {
@@ -86,7 +90,7 @@ func (m simpleRootManifest) DependencyConstraints() ProjectConstraints {
 func (m simpleRootManifest) Overrides() ProjectConstraints {
 	return m.ovr
 }
-func (m simpleRootManifest) IgnoredPackages() map[string]bool {
+func (m simpleRootManifest) IgnoredPackages() *pkgtree.IgnoredRuleset {
 	return m.ig
 }
 func (m simpleRootManifest) RequiredPackages() map[string]bool {
@@ -96,7 +100,6 @@ func (m simpleRootManifest) dup() simpleRootManifest {
 	m2 := simpleRootManifest{
 		c:   make(ProjectConstraints, len(m.c)),
 		ovr: make(ProjectConstraints, len(m.ovr)),
-		ig:  make(map[string]bool, len(m.ig)),
 		req: make(map[string]bool, len(m.req)),
 	}
 
@@ -106,12 +109,12 @@ func (m simpleRootManifest) dup() simpleRootManifest {
 	for k, v := range m.ovr {
 		m2.ovr[k] = v
 	}
-	for k, v := range m.ig {
-		m2.ig[k] = v
-	}
 	for k, v := range m.req {
 		m2.req[k] = v
 	}
+
+	// IgnoredRulesets are immutable, and safe to reuse.
+	m2.ig = m.ig
 
 	return m2
 }

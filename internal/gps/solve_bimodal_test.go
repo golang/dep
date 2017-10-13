@@ -1345,11 +1345,8 @@ func (f bimodalFixture) rootmanifest() RootManifest {
 	m := simpleRootManifest{
 		c:   pcSliceToMap(f.ds[0].deps),
 		ovr: f.ovr,
-		ig:  make(map[string]bool),
+		ig:  pkgtree.NewIgnoredRuleset(f.ignore),
 		req: make(map[string]bool),
-	}
-	for _, ig := range f.ignore {
-		m.ig[ig] = true
 	}
 	for _, req := range f.require {
 		m.req[req] = true

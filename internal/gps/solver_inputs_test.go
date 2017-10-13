@@ -94,7 +94,7 @@ func TestBadSolveOpts(t *testing.T) {
 	}
 
 	params.Manifest = simpleRootManifest{
-		ig:  map[string]bool{"foo": true},
+		ig:  pkgtree.NewIgnoredRuleset([]string{"foo"}),
 		req: map[string]bool{"foo": true},
 	}
 	_, err = Prepare(params, sm)
@@ -105,7 +105,7 @@ func TestBadSolveOpts(t *testing.T) {
 	}
 
 	params.Manifest = simpleRootManifest{
-		ig:  map[string]bool{"foo": true, "bar": true},
+		ig:  pkgtree.NewIgnoredRuleset([]string{"foo", "bar"}),
 		req: map[string]bool{"foo": true, "bar": true},
 	}
 	_, err = Prepare(params, sm)
@@ -116,7 +116,7 @@ func TestBadSolveOpts(t *testing.T) {
 	}
 
 	params.Manifest = simpleRootManifest{
-		ig:  map[string]bool{"foo*": true},
+		ig:  pkgtree.NewIgnoredRuleset([]string{"foo*"}),
 		req: map[string]bool{"foo/bar": true},
 	}
 	_, err = Prepare(params, sm)
