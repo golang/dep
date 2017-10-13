@@ -101,7 +101,7 @@ func (tc *TestCase) CompareFile(goldenPath, working string) {
 	}
 }
 
-// UpdateFile updates the golden file with the working result.
+// UpdateOutput updates the golden file for stdout with the working result.
 func (tc *TestCase) UpdateOutput(stdout string) {
 	stdoutPath := filepath.Join(tc.rootPath, "stdout.txt")
 	_, err := os.Stat(stdoutPath)
