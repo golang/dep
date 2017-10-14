@@ -104,7 +104,7 @@ func cachePutManifest(b *bolt.Bucket, m Manifest) error {
 		return nil
 	}
 
-	ignored := rm.IgnoredPackages()
+	ignored := rm.IgnoredPackages().ToSlice()
 	if len(ignored) > 0 {
 		ig, err := b.CreateBucket(cacheKeyIgnored)
 		if err != nil {
@@ -112,13 +112,11 @@ func cachePutManifest(b *bolt.Bucket, m Manifest) error {
 		}
 		key := make(nuts.Key, nuts.KeyLen(uint64(len(ignored)-1)))
 		var i uint64
-		for ip, ok := range ignored {
-			if ok {
-				key.Put(i)
-				i++
-				if err := ig.Put(key, []byte(ip)); err != nil {
-					return err
-				}
+		for _, ip := range ignored {
+			key.Put(i)
+			i++
+			if err := ig.Put(key, []byte(ip)); err != nil {
+				return err
 			}
 		}
 	}
@@ -173,7 +171,6 @@ func cacheGetManifest(b *bolt.Bucket) (RootManifest, error) {
 	m := &simpleRootManifest{
 		c:   make(ProjectConstraints),
 		ovr: make(ProjectConstraints),
-		ig:  make(map[string]bool),
 		req: make(map[string]bool),
 	}
 
@@ -198,10 +195,12 @@ func cacheGetManifest(b *bolt.Bucket) (RootManifest, error) {
 
 	// Ignored
 	if ig := b.Bucket(cacheKeyIgnored); ig != nil {
+		var igslice []string
 		err := ig.ForEach(func(_, v []byte) error {
-			m.ig[string(v)] = true
+			igslice = append(igslice, string(v))
 			return nil
 		})
+		m.ig = pkgtree.NewIgnoredRuleset(igslice)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to get ignored")
 		}

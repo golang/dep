@@ -1,0 +1,1 @@
+ignored = ["github.com/sdboyer/deptest*", "github.com/golang/notexist/samples*"]

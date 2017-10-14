@@ -22,9 +22,6 @@ import (
 	"github.com/armon/go-radix"
 )
 
-// wildcard ignore suffix
-const wcIgnoreSuffix = "*"
-
 // Package represents a Go package. It contains a subset of the information
 // go/build.Package does.
 type Package struct {
@@ -550,14 +547,7 @@ type PackageTree struct {
 // 	"A": []string{},
 // 	"A/bar": []string{"B/baz"},
 //  }
-func (t PackageTree) ToReachMap(main, tests, backprop bool, ignore map[string]bool) (ReachMap, map[string]*ProblemImportError) {
-	if ignore == nil {
-		ignore = make(map[string]bool)
-	}
-
-	// Radix tree for ignore prefixes.
-	xt := CreateIgnorePrefixTree(ignore)
-
+func (t PackageTree) ToReachMap(main, tests, backprop bool, ignore *IgnoredRuleset) (ReachMap, map[string]*ProblemImportError) {
 	// world's simplest adjacency list
 	workmap := make(map[string]wm)
 
@@ -576,16 +566,8 @@ func (t PackageTree) ToReachMap(main, tests, backprop bool, ignore map[string]bo
 			continue
 		}
 		// Skip ignored packages
-		if ignore[ip] {
+		if ignore.IsIgnored(ip) {
 			continue
-		}
-
-		if xt != nil {
-			// Skip ignored packages prefix matches
-			_, _, ok := xt.LongestPrefix(ip)
-			if ok {
-				continue
-			}
 		}
 
 		// TODO (kris-nova) Disable to get staticcheck passing
@@ -605,7 +587,7 @@ func (t PackageTree) ToReachMap(main, tests, backprop bool, ignore map[string]bo
 		// For each import, decide whether it should be ignored, or if it
 		// belongs in the external or internal imports list.
 		for _, imp := range imps {
-			if ignore[imp] || imp == "." {
+			if ignore.IsIgnored(imp) || imp == "." {
 				continue
 			}
 
@@ -1043,41 +1025,101 @@ func uniq(a []string) []string {
 	return a[:i]
 }
 
-// CreateIgnorePrefixTree takes a set of strings to be ignored and returns a
-// trie consisting of strings prefixed with wildcard ignore suffix (*).
-func CreateIgnorePrefixTree(ig map[string]bool) *radix.Tree {
-	var xt *radix.Tree
+// IgnoredRuleset comprises a set of rules for ignoring import paths. It can
+// manage both literal and prefix-wildcard matches.
+type IgnoredRuleset struct {
+	t *radix.Tree
+}
 
-	// Create a sorted list of all the ignores to have a proper order in
-	// ignores parsing.
-	sortedIgnores := make([]string, len(ig))
-	for k := range ig {
-		sortedIgnores = append(sortedIgnores, k)
+// NewIgnoredRuleset processes a set of strings into an IgnoredRuleset. Strings
+// that end in "*" are treated as wildcards, where any import path with a
+// matching prefix will be ignored. IgnoredRulesets are immutable once created.
+//
+// Duplicate and redundant (i.e. a literal path that has a prefix of a wildcard
+// path) declarations are discarded. Consequently, it is possible that the
+// returned IgnoredRuleset may have a smaller Len() than the input slice.
+func NewIgnoredRuleset(ig []string) *IgnoredRuleset {
+	if len(ig) == 0 {
+		return &IgnoredRuleset{}
 	}
-	sort.Strings(sortedIgnores)
 
-	for _, i := range sortedIgnores {
-		// Skip global ignore.
-		if i == "*" {
+	ir := &IgnoredRuleset{
+		t: radix.New(),
+	}
+
+	// Sort the list of all the ignores in order to ensure that wildcard
+	// precedence is recorded correctly in the trie.
+	sort.Strings(ig)
+	for _, i := range ig {
+		// Skip global ignore and empty string.
+		if i == "*" || i == "" {
 			continue
 		}
 
-		// Check if it's a recursive ignore.
-		if strings.HasSuffix(i, wcIgnoreSuffix) {
-			// Create trie if it doesn't exists.
-			if xt == nil {
-				xt = radix.New()
-			}
+		_, wildi, has := ir.t.LongestPrefix(i)
+		// We may not always have a value here, but if we do, then it's a bool.
+		wild, _ := wildi.(bool)
+		// Check if it's a wildcard ignore.
+		if strings.HasSuffix(i, "*") {
 			// Check if it is ineffectual.
-			_, _, ok := xt.LongestPrefix(i)
-			if ok {
+			if has && wild {
 				// Skip ineffectual wildcard ignore.
 				continue
 			}
 			// Create the ignore prefix and insert in the radix tree.
-			xt.Insert(i[:len(i)-len(wcIgnoreSuffix)], true)
+			ir.t.Insert(i[:len(i)-1], true)
+		} else if !has || !wild {
+			ir.t.Insert(i, false)
 		}
 	}
 
-	return xt
+	if ir.t.Len() == 0 {
+		ir.t = nil
+	}
+
+	return ir
+}
+
+// IsIgnored indicates whether the provided path should be ignored, according to
+// the ruleset.
+func (ir *IgnoredRuleset) IsIgnored(path string) bool {
+	if path == "" || ir == nil || ir.t == nil {
+		return false
+	}
+
+	prefix, wildi, has := ir.t.LongestPrefix(path)
+	return has && (wildi.(bool) || path == prefix)
+}
+
+// Len indicates the number of rules in the ruleset.
+func (ir *IgnoredRuleset) Len() int {
+	if ir == nil || ir.t == nil {
+		return 0
+	}
+
+	return ir.t.Len()
+}
+
+// ToSlice converts the contents of the IgnoredRuleset to a string slice.
+//
+// This operation is symmetrically dual to NewIgnoredRuleset.
+func (ir *IgnoredRuleset) ToSlice() []string {
+	irlen := ir.Len()
+	if irlen == 0 {
+		return nil
+	}
+
+	items := make([]string, 0, irlen)
+	ir.t.Walk(func(s string, v interface{}) bool {
+		if s != "" {
+			if v.(bool) {
+				items = append(items, s+"*")
+			} else {
+				items = append(items, s)
+			}
+		}
+		return false
+	})
+
+	return items
 }

@@ -1524,10 +1524,10 @@ func TestToReachMap(t *testing.T) {
 	var want ReachMap
 	var name string
 	var main, tests bool
-	var ignore map[string]bool
+	var ignore []string
 
 	validate := func() {
-		got, em := vptree.ToReachMap(main, tests, true, ignore)
+		got, em := vptree.ToReachMap(main, tests, true, NewIgnoredRuleset(ignore))
 		if len(em) != 0 {
 			t.Errorf("Should not have any error packages from ToReachMap, got %s", em)
 		}
@@ -1687,9 +1687,7 @@ func TestToReachMap(t *testing.T) {
 
 	// ignoring the "varied" pkg has same effect as disabling main pkgs
 	name = "ignore root"
-	ignore = map[string]bool{
-		b(""): true,
-	}
+	ignore = []string{b("")}
 	main = true
 	validate()
 
@@ -1723,9 +1721,7 @@ func TestToReachMap(t *testing.T) {
 	// now, the fun stuff. punch a hole in the middle by cutting out
 	// varied/simple
 	name = "ignore varied/simple"
-	ignore = map[string]bool{
-		b("simple"): true,
-	}
+	ignore = []string{b("simple")}
 	except(
 		// root pkg loses on everything in varied/simple/another
 		// FIXME this is a bit odd, but should probably exclude m1p as well,
@@ -1738,9 +1734,9 @@ func TestToReachMap(t *testing.T) {
 
 	// widen the hole by excluding otherpath
 	name = "ignore varied/{otherpath,simple}"
-	ignore = map[string]bool{
-		b("otherpath"): true,
-		b("simple"):    true,
+	ignore = []string{
+		b("otherpath"),
+		b("simple"),
 	}
 	except(
 		// root pkg loses on everything in varied/simple/another and varied/m1p
@@ -1752,7 +1748,7 @@ func TestToReachMap(t *testing.T) {
 
 	// remove namemismatch, though we're mostly beating a dead horse now
 	name = "ignore varied/{otherpath,simple,namemismatch}"
-	ignore[b("namemismatch")] = true
+	ignore = append(ignore, b("namemismatch"))
 	except(
 		// root pkg loses on everything in varied/simple/another and varied/m1p
 		bl("", "simple", "simple/another", "m1p", "otherpath", "namemismatch")+" hash encoding/binary go/parser github.com/golang/dep/internal/gps sort os github.com/Masterminds/semver",
@@ -1851,9 +1847,9 @@ func TestFlattenReachMap(t *testing.T) {
 			isStdLibFn: nil,
 			main:       true,
 			tests:      true,
-			ignore: map[string]bool{
-				"nomatch": true,
-			},
+			ignore: NewIgnoredRuleset([]string{
+				"nomatch",
+			}),
 		},
 		// should have the same effect as ignoring main
 		{
@@ -1862,9 +1858,9 @@ func TestFlattenReachMap(t *testing.T) {
 			isStdLibFn: nil,
 			main:       true,
 			tests:      true,
-			ignore: map[string]bool{
-				"github.com/example/varied": true,
-			},
+			ignore: NewIgnoredRuleset([]string{
+				"github.com/example/varied",
+			}),
 		},
 		// now drop a more interesting one
 		// we get github.com/golang/dep/internal/gps from m1p, too, so it should still be there
@@ -1874,9 +1870,9 @@ func TestFlattenReachMap(t *testing.T) {
 			isStdLibFn: nil,
 			main:       true,
 			tests:      true,
-			ignore: map[string]bool{
-				"github.com/example/varied/simple": true,
-			},
+			ignore: NewIgnoredRuleset([]string{
+				"github.com/example/varied/simple",
+			}),
 		},
 		// now drop two
 		{
@@ -1885,10 +1881,10 @@ func TestFlattenReachMap(t *testing.T) {
 			isStdLibFn: nil,
 			main:       true,
 			tests:      true,
-			ignore: map[string]bool{
-				"github.com/example/varied/simple":       true,
-				"github.com/example/varied/namemismatch": true,
-			},
+			ignore: NewIgnoredRuleset([]string{
+				"github.com/example/varied/simple",
+				"github.com/example/varied/namemismatch",
+			}),
 		},
 		// make sure tests and main play nice with ignore
 		{
@@ -1897,10 +1893,10 @@ func TestFlattenReachMap(t *testing.T) {
 			isStdLibFn: nil,
 			main:       true,
 			tests:      false,
-			ignore: map[string]bool{
-				"github.com/example/varied/simple":       true,
-				"github.com/example/varied/namemismatch": true,
-			},
+			ignore: NewIgnoredRuleset([]string{
+				"github.com/example/varied/simple",
+				"github.com/example/varied/namemismatch",
+			}),
 		},
 		{
 			name:       "ignore simple and namemismatch, and no main",
@@ -1908,10 +1904,10 @@ func TestFlattenReachMap(t *testing.T) {
 			isStdLibFn: nil,
 			main:       false,
 			tests:      true,
-			ignore: map[string]bool{
-				"github.com/example/varied/simple":       true,
-				"github.com/example/varied/namemismatch": true,
-			},
+			ignore: NewIgnoredRuleset([]string{
+				"github.com/example/varied/simple",
+				"github.com/example/varied/namemismatch",
+			}),
 		},
 		{
 			name:       "ignore simple and namemismatch, and no main or tests",
@@ -1919,10 +1915,10 @@ func TestFlattenReachMap(t *testing.T) {
 			isStdLibFn: nil,
 			main:       false,
 			tests:      false,
-			ignore: map[string]bool{
-				"github.com/example/varied/simple":       true,
-				"github.com/example/varied/namemismatch": true,
-			},
+			ignore: NewIgnoredRuleset([]string{
+				"github.com/example/varied/simple",
+				"github.com/example/varied/namemismatch",
+			}),
 		},
 		// ignore two that should knock out gps
 		{
@@ -1931,10 +1927,10 @@ func TestFlattenReachMap(t *testing.T) {
 			isStdLibFn: nil,
 			main:       true,
 			tests:      true,
-			ignore: map[string]bool{
-				"github.com/example/varied/simple": true,
-				"github.com/example/varied/m1p":    true,
-			},
+			ignore: NewIgnoredRuleset([]string{
+				"github.com/example/varied/simple",
+				"github.com/example/varied/m1p",
+			}),
 		},
 		// finally, directly ignore some external packages
 		{
@@ -1943,11 +1939,11 @@ func TestFlattenReachMap(t *testing.T) {
 			isStdLibFn: nil,
 			main:       true,
 			tests:      true,
-			ignore: map[string]bool{
-				"github.com/golang/dep/internal/gps": true,
-				"go/parser":                          true,
-				"sort":                               true,
-			},
+			ignore: NewIgnoredRuleset([]string{
+				"github.com/golang/dep/internal/gps",
+				"go/parser",
+				"sort",
+			}),
 		},
 	} {
 		t.Run(testCase.name, testFlattenReachMap(&vptree, testCase))
@@ -1971,7 +1967,7 @@ func TestFlattenReachMap(t *testing.T) {
 type flattenReachMapCase struct {
 	expect      []string
 	name        string
-	ignore      map[string]bool
+	ignore      *IgnoredRuleset
 	main, tests bool
 	isStdLibFn  func(string) bool
 }
@@ -2039,91 +2035,199 @@ func getTestdataRootDir(t *testing.T) string {
 	return filepath.Join(cwd, "..", "_testdata")
 }
 
-func TestCreateIgnorePrefixTree(t *testing.T) {
+func TestIgnoredRuleset(t *testing.T) {
+	type tfixm []struct {
+		path string
+		wild bool
+	}
 	cases := []struct {
-		name          string
-		ignoreMap     map[string]bool
-		wantInTree    []string
-		notWantInTree []string
-		wantNilTree   bool
+		name            string
+		inputs          []string
+		wantInTree      tfixm
+		wantEmptyTree   bool
+		shouldIgnore    []string
+		shouldNotIgnore []string
 	}{
 		{
-			name:        "empty ignore",
-			wantNilTree: true,
+			name:          "only skip global ignore",
+			inputs:        []string{"*"},
+			wantEmptyTree: true,
 		},
 		{
 			name: "ignores without ignore suffix",
-			ignoreMap: map[string]bool{
-				"x/y/z":   true,
-				"*a/b/c":  true,
-				"gophers": true,
+			inputs: []string{
+				"x/y/z",
+				"*a/b/c",
+				"gophers",
 			},
-			wantNilTree: true,
+			wantInTree: tfixm{
+				{path: "x/y/z", wild: false},
+				{path: "*a/b/c", wild: false},
+				{path: "gophers", wild: false},
+			},
+			shouldIgnore: []string{
+				"x/y/z",
+				"gophers",
+			},
+			shouldNotIgnore: []string{
+				"x/y/z/q",
+				"x/y",
+				"gopher",
+				"gopherss",
+			},
 		},
 		{
 			name: "ignores with ignore suffix",
-			ignoreMap: map[string]bool{
-				"x/y/z*":  true,
-				"a/b/c":   true,
-				"gophers": true,
+			inputs: []string{
+				"x/y/z*",
+				"a/b/c",
+				"gophers",
 			},
-			wantInTree:    []string{"x/y/z"},
-			notWantInTree: []string{"a/b/c", "gophers"},
-		},
-		{
-			name:        "only skip global ignore",
-			ignoreMap:   map[string]bool{"*": true},
-			wantNilTree: true,
+			wantInTree: tfixm{
+				{path: "x/y/z", wild: true},
+				{path: "a/b/c", wild: false},
+				{path: "gophers", wild: false},
+			},
+			shouldIgnore: []string{
+				"x/y/z",
+				"x/y/zz",
+				"x/y/z/",
+				"x/y/z/q",
+			},
+			shouldNotIgnore: []string{
+				"x/y",
+				"gopher",
+			},
 		},
 		{
 			name: "global ignore with other strings",
-			ignoreMap: map[string]bool{
-				"*":        true,
-				"gophers*": true,
-				"x/y/z*":   true,
-				"a/b/c":    true,
+			inputs: []string{
+				"*",
+				"gophers*",
+				"x/y/z*",
+				"a/b/c",
 			},
-			wantInTree:    []string{"gophers", "x/y/z"},
-			notWantInTree: []string{"*", "a/b/c"},
+			wantInTree: tfixm{
+				{path: "x/y/z", wild: true},
+				{path: "a/b/c", wild: false},
+				{path: "gophers", wild: true},
+			},
+			shouldIgnore: []string{
+				"x/y/z",
+				"x/y/z/",
+				"x/y/z/q",
+				"gophers",
+				"gopherss",
+				"gophers/foo",
+			},
+			shouldNotIgnore: []string{
+				"x/y",
+				"gopher",
+			},
 		},
 		{
 			name: "ineffectual ignore with wildcard",
-			ignoreMap: map[string]bool{
-				"a/b*":    true,
-				"a/b/c*":  true,
-				"a/b/x/y": true,
-				"a/c*":    true,
+			inputs: []string{
+				"a/b*",
+				"a/b/c*",
+				"a/b/x/y",
+				"a/c*",
 			},
-			wantInTree:    []string{"a/b", "a/c"},
-			notWantInTree: []string{"a/b/c", "a/b/x/y"},
+			wantInTree: tfixm{
+				{path: "a/c", wild: true},
+				{path: "a/b", wild: true},
+			},
+			shouldIgnore: []string{
+				"a/cb",
+			},
+			shouldNotIgnore: []string{
+				"a/",
+				"a/d",
+			},
+		},
+		{
+			name: "same path with and without wildcard",
+			inputs: []string{
+				"a/b*",
+				"a/b",
+			},
+			wantInTree: tfixm{
+				{path: "a/b", wild: true},
+			},
+			shouldIgnore: []string{
+				"a/b",
+				"a/bb",
+			},
+			shouldNotIgnore: []string{
+				"a/",
+				"a/d",
+			},
+		},
+		{
+			name: "empty paths",
+			inputs: []string{
+				"",
+				"a/b*",
+			},
+			wantInTree: tfixm{
+				{path: "a/b", wild: true},
+			},
+			shouldNotIgnore: []string{
+				"",
+			},
+		},
+		{
+			name: "single wildcard",
+			inputs: []string{
+				"a/b*",
+			},
+			wantInTree: tfixm{
+				{path: "a/b", wild: true},
+			},
+			shouldIgnore: []string{
+				"a/b/c",
+			},
 		},
 	}
 
 	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			gotTree := CreateIgnorePrefixTree(c.ignoreMap)
+		igm := NewIgnoredRuleset(c.inputs)
+		f := func(t *testing.T) {
 
-			if c.wantNilTree {
-				if gotTree != nil {
-					t.Fatalf("expected nil tree, got non-nil tree")
+			if c.wantEmptyTree {
+				if igm.Len() != 0 {
+					t.Fatalf("wanted empty tree, but had %v elements", igm.Len())
 				}
 			}
 
 			// Check if the wildcard suffix ignores are in the tree.
 			for _, p := range c.wantInTree {
-				_, has := gotTree.Get(p)
+				wildi, has := igm.t.Get(p.path)
 				if !has {
-					t.Fatalf("expected %q to be in the tree", p)
+					t.Fatalf("expected %q to be in the tree", p.path)
+				} else if wildi.(bool) != p.wild {
+					if p.wild {
+						t.Fatalf("expected %q to be a wildcard matcher, but it was not", p.path)
+					} else {
+						t.Fatalf("expected %q not to be a wildcard matcher, but it was", p.path)
+					}
 				}
 			}
 
-			// Check if non-wildcard suffix ignores are not in the tree.
-			for _, p := range c.notWantInTree {
-				_, has := gotTree.Get(p)
-				if has {
-					t.Fatalf("expected %q to not be in the tree", p)
+			for _, p := range c.shouldIgnore {
+				if !igm.IsIgnored(p) {
+					t.Fatalf("%q should be ignored, but it was not", p)
 				}
 			}
-		})
+			for _, p := range c.shouldNotIgnore {
+				if igm.IsIgnored(p) {
+					t.Fatalf("%q should not be ignored, but it was", p)
+				}
+			}
+		}
+		t.Run(c.name, f)
+
+		igm = NewIgnoredRuleset(igm.ToSlice())
+		t.Run(c.name+"/inandout", f)
 	}
 }
