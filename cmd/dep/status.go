@@ -171,7 +171,8 @@ type dotOutput struct {
 func (out *dotOutput) BasicHeader() {
 	out.g = new(graphviz).New()
 
-	ptree, _ := pkgtree.ListPackages(out.p.ResolvedAbsRoot, string(out.p.ImportRoot))
+	ptree, _ := out.p.ParseRootPackageTree()
+	// TODO(sdboyer) should be true, true, false, out.p.Manifest.IgnoredPackages()
 	prm, _ := ptree.ToReachMap(true, false, false, nil)
 
 	out.g.createNode(string(out.p.ImportRoot), "", prm.FlattenFn(paths.IsStandardImportPath))
@@ -358,9 +359,9 @@ type MissingStatus struct {
 func runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceManager) (hasMissingPkgs bool, errCount int, err error) {
 	// While the network churns on ListVersions() requests, statically analyze
 	// code from the current project.
-	ptree, err := pkgtree.ListPackages(p.ResolvedAbsRoot, string(p.ImportRoot))
+	ptree, err := p.ParseRootPackageTree()
 	if err != nil {
-		return false, 0, errors.Wrapf(err, "analysis of local packages failed")
+		return false, 0, err
 	}
 
 	// Set up a solver in order to check the InputHash.
@@ -437,7 +438,7 @@ func runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceMana
 						errListPkgCh <- err
 					}
 
-					prm, _ := ptr.ToReachMap(true, false, false, nil)
+					prm, _ := ptr.ToReachMap(true, true, false, p.Manifest.IgnoredPackages())
 					bs.Children = prm.FlattenFn(paths.IsStandardImportPath)
 				}
 
