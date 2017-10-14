@@ -659,15 +659,24 @@ func (t PackageTree) Copy() PackageTree {
 // a set of tree-external imports; calling ToReachMap and FlattenFn will achieve
 // the same effect.
 func (t PackageTree) TrimHiddenPackages(main, tests, keepIgnored bool, ignore *IgnoredRuleset) PackageTree {
-	rm, _ := t.ToReachMap(main, tests, false, ignore)
+	rm, pie := t.ToReachMap(main, tests, false, ignore)
 	t2 := t.Copy()
 	preserve := make(map[string]bool)
+
 	for pkg, ie := range rm {
 		if pkgFilter(pkg) && (keepIgnored || !ignore.IsIgnored(pkg)) {
 			preserve[pkg] = true
 			for _, in := range ie.Internal {
 				preserve[in] = true
 			}
+		}
+	}
+
+	// Also process the problem map, as packages in the visible set with errors
+	// need to be included in the return values.
+	for pkg := range pie {
+		if pkgFilter(pkg) && (keepIgnored || !ignore.IsIgnored(pkg)) {
+			preserve[pkg] = true
 		}
 	}
 
