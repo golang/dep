@@ -2050,7 +2050,7 @@ func TestIgnoredRuleset(t *testing.T) {
 	}{
 		{
 			name:          "only skip global ignore",
-			inputs:        []string{wcIgnoreSuffix},
+			inputs:        []string{"*"},
 			wantEmptyTree: true,
 		},
 		{
