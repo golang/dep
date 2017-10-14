@@ -634,10 +634,11 @@ func (t PackageTree) Copy() PackageTree {
 	return t2
 }
 
-// TrimHiddenPackages returns a new PackageTree with packages removed that
-// are either ignored, or both hidden and unreachable.
+// TrimHiddenPackages returns a new PackageTree where packages that are both
+// hidden and unreachable have been removed. Ignored packages are optionally
+// removed, as well.
 //
-// The package list is partitioned into two sets: normal, and hidden, where
+// The package list is partitioned into two sets: visible, and hidden, where
 // packages are considered hidden if they are within or beneath directories
 // with:
 //
@@ -646,20 +647,27 @@ func (t PackageTree) Copy() PackageTree {
 //  * the exact name "testdata"
 //
 // Packages in the hidden set are dropped from the returned PackageTree, unless
-// they are transitively reachable from imports in the normal set.
+// they are transitively reachable from imports in the visible set.
 //
 // The "main", "tests" and "ignored" parameters have the same behavior as with
 // PackageTree.ToReachMap(): the first two determine, respectively, whether
 // imports from main packages, and imports from tests, should be considered for
-// reachability checks. "ignored" designates packages, or patterns of packages,
-// whose imports should be excluded from reachability checks, if encountered.
-func (t PackageTree) TrimHiddenPackages(main, tests bool, ignore map[string]bool) PackageTree {
+// reachability checks.
+//
+// "ignored" designates import paths, or patterns of import paths, where the
+// corresponding packages should be excluded from reachability checks, if
+// encountered. Ignored packages are also removed from the final set.
+//
+// Note that it is not recommended to call this method if the goal is to obtain
+// a set of tree-external imports; calling ToReachMap and FlattenFn will achieve
+// the same effect.
+func (t PackageTree) TrimHiddenPackages(main, tests, keepIgnored bool, ignore *IgnoredRuleset) PackageTree {
 	rm, _ := t.ToReachMap(main, tests, false, ignore)
 	t2 := t.Copy()
 
 	preserve := make(map[string]bool)
 	for pkg, ie := range rm {
-		if !pkgFilter(pkg) {
+		if pkgFilter(pkg) && (keepIgnored || !ignore.IsIgnored(pkg)) {
 			preserve[pkg] = true
 			for _, in := range ie.Internal {
 				preserve[in] = true
@@ -668,7 +676,7 @@ func (t PackageTree) TrimHiddenPackages(main, tests bool, ignore map[string]bool
 	}
 
 	for ip := range t.Packages {
-		if !preserve[pkg] {
+		if !preserve[ip] {
 			delete(t2.Packages, ip)
 		}
 	}
