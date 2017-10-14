@@ -13,8 +13,6 @@ import (
 	"strings"
 )
 
-const wcIgnoreSuffix = "*"
-
 // string headers used to demarcate sections in hash input creation
 const (
 	hhConstraints = "-CONSTRAINTS-"

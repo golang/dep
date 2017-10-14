@@ -22,9 +22,6 @@ import (
 	"github.com/armon/go-radix"
 )
 
-// wildcard ignore suffix
-const wcIgnoreSuffix = "*"
-
 // Package represents a Go package. It contains a subset of the information
 // go/build.Package does.
 type Package struct {
@@ -1055,7 +1052,7 @@ func NewIgnoredRuleset(ig []string) *IgnoredRuleset {
 	sort.Strings(ig)
 	for _, i := range ig {
 		// Skip global ignore and empty string.
-		if i == wcIgnoreSuffix || i == "" {
+		if i == "*" || i == "" {
 			continue
 		}
 
@@ -1063,14 +1060,14 @@ func NewIgnoredRuleset(ig []string) *IgnoredRuleset {
 		// We may not always have a value here, but if we do, then it's a bool.
 		wild, _ := wildi.(bool)
 		// Check if it's a wildcard ignore.
-		if strings.HasSuffix(i, wcIgnoreSuffix) {
+		if strings.HasSuffix(i, "*") {
 			// Check if it is ineffectual.
 			if has && wild {
 				// Skip ineffectual wildcard ignore.
 				continue
 			}
 			// Create the ignore prefix and insert in the radix tree.
-			ir.t.Insert(i[:len(i)-len(wcIgnoreSuffix)], true)
+			ir.t.Insert(i[:len(i)-1], true)
 		} else if !has || !wild {
 			ir.t.Insert(i, false)
 		}
@@ -1116,7 +1113,7 @@ func (ir *IgnoredRuleset) ToSlice() []string {
 	ir.t.Walk(func(s string, v interface{}) bool {
 		if s != "" {
 			if v.(bool) {
-				items = append(items, s+wcIgnoreSuffix)
+				items = append(items, s+"*")
 			} else {
 				items = append(items, s)
 			}
