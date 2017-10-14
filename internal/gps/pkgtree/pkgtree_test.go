@@ -936,27 +936,6 @@ func TestListPackages(t *testing.T) {
 				},
 			},
 		},
-		// New code allows this because it doesn't care if the code compiles (kinda) or not,
-		// so maybe this is actually not an error anymore?
-		//
-		// TODO re-enable this case after the full and proper ListPackages()
-		// refactor in #99
-		/*"two pkgs": {
-			fileRoot:   j("twopkgs"),
-			importRoot: "twopkgs",
-			out: PackageTree{
-				ImportRoot: "twopkgs",
-				Packages: map[string]PackageOrErr{
-					"twopkgs": {
-						Err: &build.MultiplePackageError{
-							Dir:      j("twopkgs"),
-							Packages: []string{"simple", "m1p"},
-							Files:    []string{"a.go", "b.go"},
-						},
-					},
-				},
-			},
-		}, */
 		// imports a missing pkg
 		"missing import": {
 			fileRoot:   j("missing"),
