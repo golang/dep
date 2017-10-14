@@ -140,20 +140,11 @@ func ListPackages(fileRoot, importRoot string) (PackageTree, error) {
 		}
 		err = fillPackage(p)
 
-		var pkg Package
-		if err == nil {
-			pkg = Package{
-				ImportPath:  ip,
-				CommentPath: p.ImportComment,
-				Name:        p.Name,
-				Imports:     p.Imports,
-				TestImports: dedupeStrings(p.TestImports, p.XTestImports),
-			}
-		} else {
+		if err != nil {
 			switch err.(type) {
-			case gscan.ErrorList, *gscan.Error, *build.NoGoError:
-				// This happens if we encounter malformed or nonexistent Go
-				// source code
+			case gscan.ErrorList, *gscan.Error, *build.NoGoError, *ConflictingImportComments:
+				// Assorted cases in which we've encounter malformed or
+				// nonexistent Go source code.
 				ptree.Packages[ip] = PackageOrErr{
 					Err: err,
 				}
@@ -161,6 +152,14 @@ func ListPackages(fileRoot, importRoot string) (PackageTree, error) {
 			default:
 				return err
 			}
+		}
+
+		pkg := Package{
+			ImportPath:  ip,
+			CommentPath: p.ImportComment,
+			Name:        p.Name,
+			Imports:     p.Imports,
+			TestImports: dedupeStrings(p.TestImports, p.XTestImports),
 		}
 
 		if pkg.CommentPath != "" && !strings.HasPrefix(pkg.CommentPath, importRoot) {
