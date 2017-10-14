@@ -11,6 +11,7 @@ import (
 
 	"github.com/golang/dep/internal/fs"
 	"github.com/golang/dep/internal/gps"
+	"github.com/golang/dep/internal/gps/pkgtree"
 	"github.com/pkg/errors"
 )
 
@@ -131,6 +132,19 @@ func (p *Project) MakeParams() gps.SolveParameters {
 	}
 
 	return params
+}
+
+// ParseRootPackageTree analyzes the root project's disk contents to create a
+// PackageTree, trimming out packages that are not relevant for root projects
+// along the way.
+func (p *Project) ParseRootPackageTree() (pkgtree.PackageTree, error) {
+	ptree, err := pkgtree.ListPackages(p.ResolvedAbsRoot, string(p.ImportRoot))
+	if err != nil {
+		return pkgtree.PackageTree{}, errors.Wrap(err, "analysis of current project's packages failed")
+	}
+	// We don't care about (unreachable) hidden packages for the root project,
+	// so drop all of those.
+	return ptree.TrimHiddenPackages(true, true, false, p.Manifest.IgnoredPackages()), nil
 }
 
 // BackupVendor looks for existing vendor directory and if it's not empty,
