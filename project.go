@@ -144,7 +144,11 @@ func (p *Project) ParseRootPackageTree() (pkgtree.PackageTree, error) {
 	}
 	// We don't care about (unreachable) hidden packages for the root project,
 	// so drop all of those.
-	return ptree.TrimHiddenPackages(true, true, false, p.Manifest.IgnoredPackages()), nil
+	var ig *pkgtree.IgnoredRuleset
+	if p.Manifest != nil {
+		ig = p.Manifest.IgnoredPackages()
+	}
+	return ptree.TrimHiddenPackages(true, true, false, ig), nil
 }
 
 // BackupVendor looks for existing vendor directory and if it's not empty,
