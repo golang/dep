@@ -19,6 +19,11 @@ import (
 	"github.com/golang/dep"
 )
 
+var (
+	successExitCode = 0
+	errorExitCode   = 1
+)
+
 type command interface {
 	Name() string           // "foobar"
 	Args() string           // "<baz> [quux...]"
@@ -54,7 +59,7 @@ type Config struct {
 }
 
 // Run executes a configuration and returns an exit code.
-func (c *Config) Run() (exitCode int) {
+func (c *Config) Run() int {
 	// Build the list of available commands.
 	commands := [...]command{
 		&initCommand{},
@@ -114,8 +119,7 @@ func (c *Config) Run() (exitCode int) {
 	cmdName, printCommandHelp, exit := parseArgs(c.Args)
 	if exit {
 		usage()
-		exitCode = 1
-		return exitCode
+		return errorExitCode
 	}
 
 	for _, cmd := range commands {
@@ -133,16 +137,14 @@ func (c *Config) Run() (exitCode int) {
 
 			if printCommandHelp {
 				fs.Usage()
-				exitCode = 1
-				return exitCode
+				return errorExitCode
 			}
 
 			// Parse the flags the user gave us.
 			// flag package automatically prints usage and error message in err != nil
 			// or if '-h' flag provided
 			if err := fs.Parse(c.Args[2:]); err != nil {
-				exitCode = 1
-				return exitCode
+				return errorExitCode
 			}
 
 			// Set up dep context.
@@ -159,19 +161,17 @@ func (c *Config) Run() (exitCode int) {
 			// Run the command with the post-flag-processing args.
 			if err := cmd.Run(ctx, fs.Args()); err != nil {
 				errLogger.Printf("%v\n", err)
-				exitCode = 1
-				return exitCode
+				return errorExitCode
 			}
 
 			// Easy peasy livin' breezy.
-			return exitCode
+			return successExitCode
 		}
 	}
 
 	errLogger.Printf("dep: %s: no such command\n", cmdName)
 	usage()
-	exitCode = 1
-	return exitCode
+	return errorExitCode
 }
 
 func resetUsage(logger *log.Logger, fs *flag.FlagSet, name, args, longHelp string) {
