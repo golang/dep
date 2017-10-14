@@ -11,6 +11,7 @@ import (
 	"context"
 	"os"
 	"os/exec"
+	"syscall"
 	"time"
 
 	"github.com/pkg/errors"
@@ -25,11 +26,26 @@ type cmd struct {
 }
 
 func commandContext(ctx context.Context, name string, arg ...string) cmd {
-	// Grab the caller's context and pass a derived one to CommandContext.
-	c := cmd{ctx: ctx}
-	ctx, cancel := context.WithCancel(ctx)
-	c.Cmd = exec.CommandContext(ctx, name, arg...)
-	c.cancel = cancel
+	// Create a one-off cancellable context for use by the CommandContext, in
+	// the event that we have to force a Process.Kill().
+	ctx2, cancel := context.WithCancel(context.Background())
+
+	c := cmd{
+		Cmd:    exec.CommandContext(ctx2, name, arg...),
+		cancel: cancel,
+		ctx:    ctx,
+	}
+
+	// Force subprocesses into their own process group, rather than being in the
+	// same process group as the dep process. Because Ctrl-C sent from a
+	// terminal will send the signal to the entire currently running process
+	// group, this allows us to directly manage the issuance of signals to
+	// subprocesses.
+	c.Cmd.SysProcAttr = &syscall.SysProcAttr{
+		Setpgid: true,
+		Pgid:    0,
+	}
+
 	return c
 }
 
@@ -47,6 +63,7 @@ func (c cmd) CombinedOutput() ([]byte, error) {
 	var b bytes.Buffer
 	c.Cmd.Stdout = &b
 	c.Cmd.Stderr = &b
+
 	if err := c.Cmd.Start(); err != nil {
 		return nil, err
 	}

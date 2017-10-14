@@ -741,6 +741,29 @@ const (
 	ctExportTree
 )
 
+func (ct callType) String() string {
+	switch ct {
+	case ctHTTPMetadata:
+		return "Retrieving go get metadata"
+	case ctListVersions:
+		return "Retrieving latest version list"
+	case ctGetManifestAndLock:
+		return "Reading manifest and lock data"
+	case ctListPackages:
+		return "Parsing PackageTree"
+	case ctSourcePing:
+		return "Checking for upstream existence"
+	case ctSourceInit:
+		return "Initializing local source cache"
+	case ctSourceFetch:
+		return "Fetching latest data into local source cache"
+	case ctExportTree:
+		return "Writing code tree out to disk"
+	default:
+		panic("unknown calltype")
+	}
+}
+
 // callInfo provides metadata about an ongoing call.
 type callInfo struct {
 	name string
