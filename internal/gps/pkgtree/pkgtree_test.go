@@ -1296,12 +1296,18 @@ func TestListPackages(t *testing.T) {
 		"conflicting canonical comments": {
 			fileRoot:   j("canon_confl"),
 			importRoot: "canon_confl",
-			out:        PackageTree{},
-			err: &ConflictingImportComments{
-				ImportPath: "canon_confl",
-				ConflictingImportComments: []string{
-					"vanity1",
-					"vanity2",
+			out: PackageTree{
+				ImportRoot: "canon_confl",
+				Packages: map[string]PackageOrErr{
+					"canon_confl": {
+						Err: &ConflictingImportComments{
+							ImportPath: "canon_confl",
+							ConflictingImportComments: []string{
+								"vanity1",
+								"vanity2",
+							},
+						},
+					},
 				},
 			},
 		},
