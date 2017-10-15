@@ -1409,7 +1409,7 @@ func TestListPackagesNoPerms(t *testing.T) {
 		// It's not a big deal, though, because the os.IsPermission() call we
 		// use in the real code is effectively what's being tested here, and
 		// that's designed to be cross-platform. So, if the unix tests pass, we
-		// have every reason to believe windows tests would to, if the situation
+		// have every reason to believe windows tests would too, if the situation
 		// arises.
 		t.Skip()
 	}
@@ -2018,4 +2018,39 @@ func getTestdataRootDir(t *testing.T) string {
 		t.Fatal(err)
 	}
 	return filepath.Join(cwd, "..", "_testdata")
+}
+
+// Canary regression test to make sure that if PackageTree ever gains new
+// fields, we update the Copy method accordingly.
+func TestCanaryPackageTreeCopy(t *testing.T) {
+	ptreeFields := []string{
+		"ImportRoot",
+		"Packages",
+	}
+	packageFields := []string{
+		"Name",
+		"ImportPath",
+		"CommentPath",
+		"Imports",
+		"TestImports",
+	}
+
+	fieldNames := func(typ reflect.Type) []string {
+		var names []string
+		for i := 0; i < typ.NumField(); i++ {
+			names = append(names, typ.Field(i).Name)
+		}
+		return names
+	}
+
+	ptreeRefl := fieldNames(reflect.TypeOf(PackageTree{}))
+	packageRefl := fieldNames(reflect.TypeOf(Package{}))
+
+	if !reflect.DeepEqual(ptreeFields, ptreeRefl) {
+		t.Errorf("PackageTree.Copy is designed to work with an exact set of fields in the PackageTree struct - make sure it (and this test) have been updated!\n\t(GOT):%s\n\t(WNT):%s", ptreeFields, ptreeRefl)
+	}
+
+	if !reflect.DeepEqual(packageFields, packageRefl) {
+		t.Errorf("PackageTree.Copy is designed to work with an exact set of fields in the Package struct - make sure it (and this test) have been updated!\n\t(GOT):%s\n\t(WNT):%s", packageFields, packageRefl)
+	}
 }

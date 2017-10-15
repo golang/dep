@@ -14,6 +14,7 @@ import (
 	"go/token"
 	"os"
 	"path/filepath"
+	"reflect"
 	"sort"
 	"strconv"
 	"strings"
@@ -608,21 +609,33 @@ func (t PackageTree) ToReachMap(main, tests, backprop bool, ignore *IgnoredRules
 func (t PackageTree) Copy() PackageTree {
 	t2 := PackageTree{
 		ImportRoot: t.ImportRoot,
-		Packages:   map[string]PackageOrErr{},
+		Packages:   make(map[string]PackageOrErr, len(t.Packages)),
 	}
 
+	// Walk through and count up the total number of string slice elements we'll
+	// need, then allocate them all at once.
+	strcount := 0
+	for _, poe := range t.Packages {
+		strcount = strcount + len(poe.P.Imports) + len(poe.P.TestImports)
+	}
+	pool := make([]string, strcount)
+
 	for path, poe := range t.Packages {
-		poe2 := PackageOrErr{
-			Err: poe.Err,
-			P:   poe.P,
-		}
-		if len(poe.P.Imports) > 0 {
-			poe2.P.Imports = make([]string, len(poe.P.Imports))
-			copy(poe2.P.Imports, poe.P.Imports)
-		}
-		if len(poe.P.TestImports) > 0 {
-			poe2.P.TestImports = make([]string, len(poe.P.TestImports))
-			copy(poe2.P.TestImports, poe.P.TestImports)
+		var poe2 PackageOrErr
+
+		if poe.Err != nil {
+			poe2.Err = reflect.New(reflect.ValueOf(poe.Err).Elem().Type()).Interface().(error)
+		} else {
+			poe2.P = poe.P
+			il, til := len(poe.P.Imports), len(poe.P.TestImports)
+			if il > 0 {
+				poe2.P.Imports, pool = pool[:il], pool[il:]
+				copy(poe2.P.Imports, poe.P.Imports)
+			}
+			if til > 0 {
+				poe2.P.TestImports, pool = pool[:til], pool[til:]
+				copy(poe2.P.TestImports, poe.P.TestImports)
+			}
 		}
 
 		t2.Packages[path] = poe2
