@@ -624,7 +624,21 @@ func (t PackageTree) Copy() PackageTree {
 		var poe2 PackageOrErr
 
 		if poe.Err != nil {
-			poe2.Err = reflect.New(reflect.ValueOf(poe.Err).Elem().Type()).Interface().(error)
+			refl := reflect.ValueOf(poe.Err)
+			switch refl.Kind() {
+			case reflect.Ptr:
+				poe2.Err = reflect.New(refl.Elem().Type()).Interface().(error)
+			case reflect.Slice:
+				err2 := reflect.MakeSlice(refl.Type(), refl.Len(), refl.Len())
+				reflect.Copy(err2, refl)
+				poe2.Err = err2.Interface().(error)
+			default:
+				// This shouldn't be too onerous to maintain - the set of errors
+				// we can get here is restricted by what ListPackages() allows.
+				// So just panic if one is outside the expected kinds of ptr or
+				// slice, as that would mean we've missed something notable.
+				panic(fmt.Sprintf("unrecognized PackgeOrErr error type, %T", poe.Err))
+			}
 		} else {
 			poe2.P = poe.P
 			il, til := len(poe.P.Imports), len(poe.P.TestImports)
