@@ -644,9 +644,8 @@ func (t PackageTree) Copy() PackageTree {
 	return t2
 }
 
-// TrimHiddenPackages returns a new PackageTree where packages that are both
-// hidden and unreachable have been removed. Ignored packages are optionally
-// removed, as well.
+// TrimHiddenPackages returns a new PackageTree where packages that are ignored,
+// or both hidden and unreachable, have been removed.
 //
 // The package list is partitioned into two sets: visible, and hidden, where
 // packages are considered hidden if they are within or beneath directories
@@ -662,7 +661,8 @@ func (t PackageTree) Copy() PackageTree {
 // The "main", "tests" and "ignored" parameters have the same behavior as with
 // PackageTree.ToReachMap(): the first two determine, respectively, whether
 // imports from main packages, and imports from tests, should be considered for
-// reachability checks.
+// reachability checks. Setting 'main' to true will additionally result in main
+// packages being trimmed.
 //
 // "ignored" designates import paths, or patterns of import paths, where the
 // corresponding packages should be excluded from reachability checks, if
@@ -671,13 +671,13 @@ func (t PackageTree) Copy() PackageTree {
 // Note that it is not recommended to call this method if the goal is to obtain
 // a set of tree-external imports; calling ToReachMap and FlattenFn will achieve
 // the same effect.
-func (t PackageTree) TrimHiddenPackages(main, tests, keepIgnored bool, ignore *IgnoredRuleset) PackageTree {
+func (t PackageTree) TrimHiddenPackages(main, tests bool, ignore *IgnoredRuleset) PackageTree {
 	rm, pie := t.ToReachMap(main, tests, false, ignore)
 	t2 := t.Copy()
 	preserve := make(map[string]bool)
 
 	for pkg, ie := range rm {
-		if pkgFilter(pkg) && (keepIgnored || !ignore.IsIgnored(pkg)) {
+		if pkgFilter(pkg) && !ignore.IsIgnored(pkg) {
 			preserve[pkg] = true
 			for _, in := range ie.Internal {
 				preserve[in] = true
@@ -688,7 +688,7 @@ func (t PackageTree) TrimHiddenPackages(main, tests, keepIgnored bool, ignore *I
 	// Also process the problem map, as packages in the visible set with errors
 	// need to be included in the return values.
 	for pkg := range pie {
-		if pkgFilter(pkg) && (keepIgnored || !ignore.IsIgnored(pkg)) {
+		if pkgFilter(pkg) && !ignore.IsIgnored(pkg) {
 			preserve[pkg] = true
 		}
 	}
