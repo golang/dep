@@ -178,12 +178,12 @@ func (cmd *ensureCommand) Run(ctx *dep.Ctx, args []string) error {
 		return cmd.runVendorOnly(ctx, args, p, sm, params)
 	}
 
-	params.RootPackageTree, err = pkgtree.ListPackages(p.ResolvedAbsRoot, string(p.ImportRoot))
+	params.RootPackageTree, err = p.ParseRootPackageTree()
 	if err != nil {
-		return errors.Wrap(err, "ensure ListPackage for project")
+		return err
 	}
 
-	if fatal, err := checkErrors(params.RootPackageTree.Packages); err != nil {
+	if fatal, err := checkErrors(params.RootPackageTree.Packages, p.Manifest.IgnoredPackages()); err != nil {
 		if fatal {
 			return err
 		} else if ctx.Verbose {
@@ -761,13 +761,17 @@ func getProjectConstraint(arg string, sm gps.SourceManager) (gps.ProjectConstrai
 	return gps.ProjectConstraint{Ident: pi, Constraint: c}, arg, nil
 }
 
-func checkErrors(m map[string]pkgtree.PackageOrErr) (fatal bool, err error) {
+func checkErrors(m map[string]pkgtree.PackageOrErr, ignore *pkgtree.IgnoredRuleset) (fatal bool, err error) {
 	var (
 		noGoErrors    int
 		pkgtreeErrors = make(pkgtreeErrs, 0, len(m))
 	)
 
-	for _, poe := range m {
+	for ip, poe := range m {
+		if ignore.IsIgnored(ip) {
+			continue
+		}
+
 		if poe.Err != nil {
 			switch poe.Err.(type) {
 			case *build.NoGoError:

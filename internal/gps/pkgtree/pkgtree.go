@@ -14,12 +14,11 @@ import (
 	"go/token"
 	"os"
 	"path/filepath"
+	"reflect"
 	"sort"
 	"strconv"
 	"strings"
 	"unicode"
-
-	"github.com/armon/go-radix"
 )
 
 // Package represents a Go package. It contains a subset of the information
@@ -140,20 +139,11 @@ func ListPackages(fileRoot, importRoot string) (PackageTree, error) {
 		}
 		err = fillPackage(p)
 
-		var pkg Package
-		if err == nil {
-			pkg = Package{
-				ImportPath:  ip,
-				CommentPath: p.ImportComment,
-				Name:        p.Name,
-				Imports:     p.Imports,
-				TestImports: dedupeStrings(p.TestImports, p.XTestImports),
-			}
-		} else {
+		if err != nil {
 			switch err.(type) {
-			case gscan.ErrorList, *gscan.Error, *build.NoGoError:
-				// This happens if we encounter malformed or nonexistent Go
-				// source code
+			case gscan.ErrorList, *gscan.Error, *build.NoGoError, *ConflictingImportComments:
+				// Assorted cases in which we've encounter malformed or
+				// nonexistent Go source code.
 				ptree.Packages[ip] = PackageOrErr{
 					Err: err,
 				}
@@ -161,6 +151,14 @@ func ListPackages(fileRoot, importRoot string) (PackageTree, error) {
 			default:
 				return err
 			}
+		}
+
+		pkg := Package{
+			ImportPath:  ip,
+			CommentPath: p.ImportComment,
+			Name:        p.Name,
+			Imports:     p.Imports,
+			TestImports: dedupeStrings(p.TestImports, p.XTestImports),
 		}
 
 		if pkg.CommentPath != "" && !strings.HasPrefix(pkg.CommentPath, importRoot) {
@@ -611,24 +609,108 @@ func (t PackageTree) ToReachMap(main, tests, backprop bool, ignore *IgnoredRules
 func (t PackageTree) Copy() PackageTree {
 	t2 := PackageTree{
 		ImportRoot: t.ImportRoot,
-		Packages:   map[string]PackageOrErr{},
+		Packages:   make(map[string]PackageOrErr, len(t.Packages)),
 	}
 
+	// Walk through and count up the total number of string slice elements we'll
+	// need, then allocate them all at once.
+	strcount := 0
+	for _, poe := range t.Packages {
+		strcount = strcount + len(poe.P.Imports) + len(poe.P.TestImports)
+	}
+	pool := make([]string, strcount)
+
 	for path, poe := range t.Packages {
-		poe2 := PackageOrErr{
-			Err: poe.Err,
-			P:   poe.P,
-		}
-		if len(poe.P.Imports) > 0 {
-			poe2.P.Imports = make([]string, len(poe.P.Imports))
-			copy(poe2.P.Imports, poe.P.Imports)
-		}
-		if len(poe.P.TestImports) > 0 {
-			poe2.P.TestImports = make([]string, len(poe.P.TestImports))
-			copy(poe2.P.TestImports, poe.P.TestImports)
+		var poe2 PackageOrErr
+
+		if poe.Err != nil {
+			refl := reflect.ValueOf(poe.Err)
+			switch refl.Kind() {
+			case reflect.Ptr:
+				poe2.Err = reflect.New(refl.Elem().Type()).Interface().(error)
+			case reflect.Slice:
+				err2 := reflect.MakeSlice(refl.Type(), refl.Len(), refl.Len())
+				reflect.Copy(err2, refl)
+				poe2.Err = err2.Interface().(error)
+			default:
+				// This shouldn't be too onerous to maintain - the set of errors
+				// we can get here is restricted by what ListPackages() allows.
+				// So just panic if one is outside the expected kinds of ptr or
+				// slice, as that would mean we've missed something notable.
+				panic(fmt.Sprintf("unrecognized PackgeOrErr error type, %T", poe.Err))
+			}
+		} else {
+			poe2.P = poe.P
+			il, til := len(poe.P.Imports), len(poe.P.TestImports)
+			if il > 0 {
+				poe2.P.Imports, pool = pool[:il], pool[il:]
+				copy(poe2.P.Imports, poe.P.Imports)
+			}
+			if til > 0 {
+				poe2.P.TestImports, pool = pool[:til], pool[til:]
+				copy(poe2.P.TestImports, poe.P.TestImports)
+			}
 		}
 
 		t2.Packages[path] = poe2
+	}
+
+	return t2
+}
+
+// TrimHiddenPackages returns a new PackageTree where packages that are ignored,
+// or both hidden and unreachable, have been removed.
+//
+// The package list is partitioned into two sets: visible, and hidden, where
+// packages are considered hidden if they are within or beneath directories
+// with:
+//
+//  * leading dots
+//  * leading underscores
+//  * the exact name "testdata"
+//
+// Packages in the hidden set are dropped from the returned PackageTree, unless
+// they are transitively reachable from imports in the visible set.
+//
+// The "main", "tests" and "ignored" parameters have the same behavior as with
+// PackageTree.ToReachMap(): the first two determine, respectively, whether
+// imports from main packages, and imports from tests, should be considered for
+// reachability checks. Setting 'main' to true will additionally result in main
+// packages being trimmed.
+//
+// "ignored" designates import paths, or patterns of import paths, where the
+// corresponding packages should be excluded from reachability checks, if
+// encountered. Ignored packages are also removed from the final set.
+//
+// Note that it is not recommended to call this method if the goal is to obtain
+// a set of tree-external imports; calling ToReachMap and FlattenFn will achieve
+// the same effect.
+func (t PackageTree) TrimHiddenPackages(main, tests bool, ignore *IgnoredRuleset) PackageTree {
+	rm, pie := t.ToReachMap(main, tests, false, ignore)
+	t2 := t.Copy()
+	preserve := make(map[string]bool)
+
+	for pkg, ie := range rm {
+		if pkgFilter(pkg) && !ignore.IsIgnored(pkg) {
+			preserve[pkg] = true
+			for _, in := range ie.Internal {
+				preserve[in] = true
+			}
+		}
+	}
+
+	// Also process the problem map, as packages in the visible set with errors
+	// need to be included in the return values.
+	for pkg := range pie {
+		if pkgFilter(pkg) && !ignore.IsIgnored(pkg) {
+			preserve[pkg] = true
+		}
+	}
+
+	for ip := range t.Packages {
+		if !preserve[ip] {
+			delete(t2.Packages, ip)
+		}
 	}
 
 	return t2
@@ -1023,103 +1105,4 @@ func uniq(a []string) []string {
 		}
 	}
 	return a[:i]
-}
-
-// IgnoredRuleset comprises a set of rules for ignoring import paths. It can
-// manage both literal and prefix-wildcard matches.
-type IgnoredRuleset struct {
-	t *radix.Tree
-}
-
-// NewIgnoredRuleset processes a set of strings into an IgnoredRuleset. Strings
-// that end in "*" are treated as wildcards, where any import path with a
-// matching prefix will be ignored. IgnoredRulesets are immutable once created.
-//
-// Duplicate and redundant (i.e. a literal path that has a prefix of a wildcard
-// path) declarations are discarded. Consequently, it is possible that the
-// returned IgnoredRuleset may have a smaller Len() than the input slice.
-func NewIgnoredRuleset(ig []string) *IgnoredRuleset {
-	if len(ig) == 0 {
-		return &IgnoredRuleset{}
-	}
-
-	ir := &IgnoredRuleset{
-		t: radix.New(),
-	}
-
-	// Sort the list of all the ignores in order to ensure that wildcard
-	// precedence is recorded correctly in the trie.
-	sort.Strings(ig)
-	for _, i := range ig {
-		// Skip global ignore and empty string.
-		if i == "*" || i == "" {
-			continue
-		}
-
-		_, wildi, has := ir.t.LongestPrefix(i)
-		// We may not always have a value here, but if we do, then it's a bool.
-		wild, _ := wildi.(bool)
-		// Check if it's a wildcard ignore.
-		if strings.HasSuffix(i, "*") {
-			// Check if it is ineffectual.
-			if has && wild {
-				// Skip ineffectual wildcard ignore.
-				continue
-			}
-			// Create the ignore prefix and insert in the radix tree.
-			ir.t.Insert(i[:len(i)-1], true)
-		} else if !has || !wild {
-			ir.t.Insert(i, false)
-		}
-	}
-
-	if ir.t.Len() == 0 {
-		ir.t = nil
-	}
-
-	return ir
-}
-
-// IsIgnored indicates whether the provided path should be ignored, according to
-// the ruleset.
-func (ir *IgnoredRuleset) IsIgnored(path string) bool {
-	if path == "" || ir == nil || ir.t == nil {
-		return false
-	}
-
-	prefix, wildi, has := ir.t.LongestPrefix(path)
-	return has && (wildi.(bool) || path == prefix)
-}
-
-// Len indicates the number of rules in the ruleset.
-func (ir *IgnoredRuleset) Len() int {
-	if ir == nil || ir.t == nil {
-		return 0
-	}
-
-	return ir.t.Len()
-}
-
-// ToSlice converts the contents of the IgnoredRuleset to a string slice.
-//
-// This operation is symmetrically dual to NewIgnoredRuleset.
-func (ir *IgnoredRuleset) ToSlice() []string {
-	irlen := ir.Len()
-	if irlen == 0 {
-		return nil
-	}
-
-	items := make([]string, 0, irlen)
-	ir.t.Walk(func(s string, v interface{}) bool {
-		if s != "" {
-			if v.(bool) {
-				items = append(items, s+"*")
-			} else {
-				items = append(items, s)
-			}
-		}
-		return false
-	})
-
-	return items
 }
