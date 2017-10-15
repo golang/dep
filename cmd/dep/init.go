@@ -227,9 +227,9 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 }
 
 func getDirectDependencies(sm gps.SourceManager, p *dep.Project) (pkgtree.PackageTree, map[string]bool, error) {
-	pkgT, err := pkgtree.ListPackages(p.ResolvedAbsRoot, string(p.ImportRoot))
+	pkgT, err := p.ParseRootPackageTree()
 	if err != nil {
-		return pkgtree.PackageTree{}, nil, errors.Wrap(err, "gps.ListPackages")
+		return pkgtree.PackageTree{}, nil, err
 	}
 
 	directDeps := map[string]bool{}

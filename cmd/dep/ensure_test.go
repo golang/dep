@@ -135,7 +135,7 @@ func TestCheckErrors(t *testing.T) {
 
 	for _, tc := range tt {
 		t.Run(tc.name, func(t *testing.T) {
-			fatal, err := checkErrors(tc.pkgOrErrMap)
+			fatal, err := checkErrors(tc.pkgOrErrMap, nil)
 			if tc.fatal != fatal {
 				t.Fatalf("expected fatal flag to be %T, got %T", tc.fatal, fatal)
 			}
