@@ -11,6 +11,7 @@ import (
 	"go/token"
 	"io/ioutil"
 	"os"
+	"path"
 	"path/filepath"
 	"reflect"
 	"runtime"
@@ -1208,6 +1209,114 @@ func TestListPackages(t *testing.T) {
 				},
 			},
 		},
+		"varied with hidden dirs": {
+			fileRoot:   j("varied_hidden"),
+			importRoot: "varied",
+			out: PackageTree{
+				ImportRoot: "varied",
+				Packages: map[string]PackageOrErr{
+					"varied": {
+						P: Package{
+							ImportPath:  "varied",
+							CommentPath: "",
+							Name:        "main",
+							Imports: []string{
+								"net/http",
+								"varied/_frommain",
+								"varied/simple",
+							},
+						},
+					},
+					"varied/always": {
+						P: Package{
+							ImportPath:  "varied/always",
+							CommentPath: "",
+							Name:        "always",
+							Imports:     []string{},
+							TestImports: []string{
+								"varied/.onlyfromtests",
+							},
+						},
+					},
+					"varied/.onlyfromtests": {
+						P: Package{
+							ImportPath:  "varied/.onlyfromtests",
+							CommentPath: "",
+							Name:        "onlyfromtests",
+							Imports: []string{
+								"github.com/golang/dep/internal/gps",
+								"os",
+								"sort",
+								"varied/_secondorder",
+							},
+						},
+					},
+					"varied/simple": {
+						P: Package{
+							ImportPath:  "varied/simple",
+							CommentPath: "",
+							Name:        "simple",
+							Imports: []string{
+								"github.com/golang/dep/internal/gps",
+								"go/parser",
+								"varied/simple/testdata",
+							},
+						},
+					},
+					"varied/simple/testdata": {
+						P: Package{
+							ImportPath:  "varied/simple/testdata",
+							CommentPath: "",
+							Name:        "testdata",
+							Imports: []string{
+								"varied/dotdotslash",
+							},
+						},
+					},
+					"varied/_secondorder": {
+						P: Package{
+							ImportPath:  "varied/_secondorder",
+							CommentPath: "",
+							Name:        "secondorder",
+							Imports: []string{
+								"hash",
+							},
+						},
+					},
+					"varied/_never": {
+						P: Package{
+							ImportPath:  "varied/_never",
+							CommentPath: "",
+							Name:        "never",
+							Imports: []string{
+								"github.com/golang/dep/internal/gps",
+								"sort",
+							},
+						},
+					},
+					"varied/_frommain": {
+						P: Package{
+							ImportPath:  "varied/_frommain",
+							CommentPath: "",
+							Name:        "frommain",
+							Imports: []string{
+								"github.com/golang/dep/internal/gps",
+								"sort",
+							},
+						},
+					},
+					"varied/dotdotslash": {
+						Err: &LocalImportsError{
+							Dir:        j("varied_hidden/dotdotslash"),
+							ImportPath: "varied/dotdotslash",
+							LocalImports: []string{
+								"../github.com/golang/dep/internal/gps",
+							},
+						},
+					},
+				},
+			},
+		},
 		"invalid buildtag like comments should be ignored": {
 			fileRoot:   j("buildtag"),
 			importRoot: "buildtag",
@@ -1392,6 +1501,113 @@ func TestListPackages(t *testing.T) {
 								}
 							}
 						}
+					}
+				}
+			}
+		})
+	}
+}
+
+// Transform Table Test that operates solely on the varied_hidden fixture.
+func TestTrimHiddenPackages(t *testing.T) {
+	base, err := ListPackages(filepath.Join(getTestdataRootDir(t), "src", "varied_hidden"), "varied")
+	if err != nil {
+		panic(err)
+	}
+
+	table := map[string]struct {
+		main, tests bool     // literal params to TrimHiddenPackages
+		ignore      []string // transformed into IgnoredRuleset param to TrimHiddenPackages
+		trimmed     []string // list of packages that should be trimmed in result PackageTree
+	}{
+		// All of these implicitly verify that the varied/_never pkg is always
+		// trimmed, and that the varied/dotdotslash pkg is not trimmed even
+		// though it has errors.
+		"minimal trim": {
+			main:  true,
+			tests: true,
+		},
+		"ignore simple, lose testdata": {
+			main:    true,
+			tests:   true,
+			ignore:  []string{"simple"},
+			trimmed: []string{"simple", "simple/testdata"},
+		},
+		"no tests": {
+			main:    true,
+			tests:   false,
+			trimmed: []string{".onlyfromtests", "_secondorder"},
+		},
+		"ignore a reachable hidden": {
+			main:    true,
+			tests:   true,
+			ignore:  []string{"_secondorder"},
+			trimmed: []string{"_secondorder"},
+		},
+		"ignore a reachable hidden with another hidden solely reachable through it": {
+			main:    true,
+			tests:   true,
+			ignore:  []string{".onlyfromtests"},
+			trimmed: []string{".onlyfromtests", "_secondorder"},
+		},
+		"no main": {
+			main:    false,
+			tests:   true,
+			trimmed: []string{"", "_frommain"},
+		},
+		"no main or tests": {
+			main:    false,
+			tests:   false,
+			trimmed: []string{"", "_frommain", ".onlyfromtests", "_secondorder"},
+		},
+		"no main or tests and ignore simple": {
+			main:    false,
+			tests:   false,
+			ignore:  []string{"simple"},
+			trimmed: []string{"", "_frommain", ".onlyfromtests", "_secondorder", "simple", "simple/testdata"},
+		},
+	}
+
+	for name, fix := range table {
+		t.Run(name, func(t *testing.T) {
+			want := base.Copy()
+
+			var ig []string
+			for _, v := range fix.ignore {
+				ig = append(ig, path.Join("varied", v))
+			}
+			got := base.TrimHiddenPackages(fix.main, fix.tests, NewIgnoredRuleset(ig))
+
+			for _, ip := range append(fix.trimmed, "_never") {
+				ip = path.Join("varied", ip)
+				if _, has := want.Packages[ip]; !has {
+					panic(fmt.Sprintf("bad input, %s does not exist in fixture ptree", ip))
+				}
+				delete(want.Packages, ip)
+			}
+
+			if !reflect.DeepEqual(want, got) {
+				if len(want.Packages) < 2 {
+					t.Errorf("Did not get expected PackageOrErrs:\n\t(GOT): %#v\n\t(WNT): %#v", got, want)
+				} else {
+					seen := make(map[string]bool)
+					for path, perr := range want.Packages {
+						seen[path] = true
+						if operr, exists := got.Packages[path]; !exists {
+							t.Errorf("Expected PackageOrErr for path %s was missing from output:\n\t%s", path, perr)
+						} else {
+							if !reflect.DeepEqual(perr, operr) {
+								t.Errorf("PkgOrErr for path %s was not as expected:\n\t(GOT): %#v\n\t(WNT): %#v", path, operr, perr)
+							}
+						}
+					}
+
+					for path, operr := range got.Packages {
+						if seen[path] {
+							continue
+						}
+
+						t.Errorf("Got PackageOrErr for path %s, but none was expected:\n\t%s", path, operr)
 					}
 				}
 			}
