@@ -148,7 +148,7 @@ func (p *Project) ParseRootPackageTree() (pkgtree.PackageTree, error) {
 	if p.Manifest != nil {
 		ig = p.Manifest.IgnoredPackages()
 	}
-	return ptree.TrimHiddenPackages(true, true, false, ig), nil
+	return ptree.TrimHiddenPackages(true, true, ig), nil
 }
 
 // BackupVendor looks for existing vendor directory and if it's not empty,
