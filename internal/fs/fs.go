@@ -480,6 +480,24 @@ func cloneSymlink(sl, dst string) error {
 	return os.Symlink(resolved, dst)
 }
 
+// IsValidPath checks if the given string is a valid path.
+func IsValidPath(fp string) bool {
+	// See https://stackoverflow.com/questions/35231846/golang-check-if-string-is-valid-path
+	// Check if file/dir already exists
+	if _, err := os.Stat(fp); err == nil {
+		return true
+	}
+
+	// Attempt to create it
+	var d []byte
+	if err := ioutil.WriteFile(fp, d, 0644); err == nil {
+		os.Remove(fp) // And delete it
+		return true
+	}
+
+	return false
+}
+
 // IsDir determines is the path given is a directory or not.
 func IsDir(name string) (bool, error) {
 	fi, err := os.Stat(name)

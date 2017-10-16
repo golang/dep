@@ -837,6 +837,47 @@ func setupInaccessibleDir(t *testing.T, op func(dir string) error) func() {
 	return cleanup
 }
 
+func TestIsValidPath(t *testing.T) {
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var dn string
+
+	cleanup := setupInaccessibleDir(t, func(dir string) error {
+		dn = filepath.Join(dir, "dir")
+		return os.Mkdir(dn, 0777)
+	})
+	defer cleanup()
+
+	tests := map[string]bool{
+		wd: true,
+		filepath.Join(wd, "testdata"):                       true,
+		filepath.Join(wd, "main.go"):                        true,
+		filepath.Join(wd, "this_file_does_not_exist.thing"): true,
+		dn:              false,
+		"":              false,
+		"/invalid/path": false,
+	}
+
+	if runtime.GOOS == "windows" {
+		// This test doesn't work on Microsoft Windows because
+		// of the differences in how file permissions are
+		// implemented. For this to work, the directory where
+		// the directory exists should be inaccessible.
+		delete(tests, dn)
+	}
+
+	for fp, want := range tests {
+		got := IsValidPath(fp)
+
+		if got != want {
+			t.Fatalf("expected %t for %s, got %t", want, fp, got)
+		}
+	}
+}
+
 func TestIsRegular(t *testing.T) {
 	wd, err := os.Getwd()
 	if err != nil {
