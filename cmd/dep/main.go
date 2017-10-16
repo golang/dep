@@ -18,6 +18,7 @@ import (
 	"text/tabwriter"
 
 	"github.com/golang/dep"
+	"github.com/golang/dep/internal/fs"
 )
 
 var (
@@ -158,31 +159,37 @@ func (c *Config) Run() int {
 	for _, cmd := range commands {
 		if cmd.Name() == cmdName {
 			// Build flag set with global flags in there.
-			fs := flag.NewFlagSet(cmdName, flag.ContinueOnError)
-			fs.SetOutput(c.Stderr)
-			verbose := fs.Bool("v", false, "enable verbose logging")
+			flags := flag.NewFlagSet(cmdName, flag.ContinueOnError)
+			flags.SetOutput(c.Stderr)
+			verbose := flags.Bool("v", false, "enable verbose logging")
 
 			// Register the subcommand flags in there, too.
-			cmd.Register(fs)
+			cmd.Register(flags)
 
 			// Override the usage text to something nicer.
-			resetUsage(errLogger, fs, cmdName, cmd.Args(), cmd.LongHelp())
+			resetUsage(errLogger, flags, cmdName, cmd.Args(), cmd.LongHelp())
 
 			if printCommandHelp {
-				fs.Usage()
+				flags.Usage()
 				return errorExitCode
 			}
 
 			// Parse the flags the user gave us.
 			// flag package automatically prints usage and error message in err != nil
 			// or if '-h' flag provided
-			if err := fs.Parse(c.Args[2:]); err != nil {
+			if err := flags.Parse(c.Args[2:]); err != nil {
 				return errorExitCode
 			}
 
 			// Cachedir is loaded from env if present. `$GOPATH/pkg/dep` is used as the
 			// fallback cache location.
 			cachedir := getEnv(c.Env, "DEPCACHEDIR")
+			if cachedir != "" && !fs.IsValidPath(cachedir) {
+				errLogger.Printf(
+					"dep: $DEPCACHEDIR set to an invalid or inaccessible path: %q\n", cachedir,
+				)
+				return errorExitCode
+			}
 
 			// Set up dep context.
 			ctx := &dep.Ctx{
@@ -197,7 +204,7 @@ func (c *Config) Run() int {
 			ctx.SetPaths(c.WorkingDir, GOPATHS...)
 
 			// Run the command with the post-flag-processing args.
-			if err := cmd.Run(ctx, fs.Args()); err != nil {
+			if err := cmd.Run(ctx, flags.Args()); err != nil {
 				errLogger.Printf("%v\n", err)
 				return errorExitCode
 			}
