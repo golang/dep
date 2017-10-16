@@ -1,0 +1,6 @@
+{
+  "commands": [
+    ["init", "-no-examples", "-v"]
+  ],
+  "error-expected": "v0.3.0: unable to parse"
+}

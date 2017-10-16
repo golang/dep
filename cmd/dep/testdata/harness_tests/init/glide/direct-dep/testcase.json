@@ -1,0 +1,8 @@
+{
+  "commands": [
+    ["init", "-no-examples", "-v"]
+  ],
+  "vendor-final": [
+    "github.com/ChinmayR/deptestglideB"
+  ]
+}

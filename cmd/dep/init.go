@@ -159,8 +159,7 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 		}
 	}
 
-	rootAnalyzer.skipTools = true // Don't import external config during solve for now
-	copyLock := *p.Lock           // Copy lock before solving. Use this to separate new lock projects from solved lock
+	copyLock := *p.Lock // Copy lock before solving. Use this to separate new lock projects from solved lock
 
 	params := gps.SolveParameters{
 		RootDir:         root,

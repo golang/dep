@@ -1,5 +1,8 @@
 # v0.3.3 (Unreleased)
 
+WIP:
+
+* dep: Enable importing other tools and add integration tests (#1277)
 
 # v0.3.2
 
@@ -43,7 +46,6 @@ WIP:
 
 * gps: Process canonical import paths. (#1017)
 * gps: Persistent cache. (#1127, #1215)
-
 
 # v0.3.1
 
