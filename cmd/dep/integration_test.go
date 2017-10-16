@@ -65,31 +65,57 @@ func TestDepCachedir(t *testing.T) {
 
 	initPath := filepath.Join("testdata", "cachedir")
 
-	testProj := integration.NewTestProject(t, initPath, wd, runMain)
-	defer testProj.Cleanup()
+	t.Run("env-cachedir", func(t *testing.T) {
+		t.Parallel()
+		testProj := integration.NewTestProject(t, initPath, wd, runMain)
+		defer testProj.Cleanup()
 
-	testProj.TempDir("cachedir")
-	cachedir := testProj.Path("cachedir")
-	testProj.Setenv("DEPCACHEDIR", cachedir)
+		testProj.TempDir("cachedir")
+		cachedir := testProj.Path("cachedir")
+		testProj.Setenv("DEPCACHEDIR", cachedir)
 
-	// Running `dep ensure` will pull in the dependency into cachedir.
-	err = testProj.DoRun([]string{"ensure"})
-	if err != nil {
-		// Log the error output from running `dep ensure`, could be useful.
-		t.Log(testProj.GetStderr())
-		t.Fatalf("got an unexpected error: %s", err.Error())
-	}
-
-	// Check that the cache was created in the cachedir. Our fixture has the dependency
-	// `github.com/sdboyer/deptest`
-	_, err = os.Stat(testProj.Path("cachedir", "sources", "https---github.com-sdboyer-deptest"))
-	if err != nil {
-		if os.IsNotExist(err) {
-			t.Fatal("Expected cachedir to have been populated but none was found")
-		} else {
-			t.Fatalf("Got unexpected error: %s", err)
+		// Running `dep ensure` will pull in the dependency into cachedir.
+		err = testProj.DoRun([]string{"ensure"})
+		if err != nil {
+			// Log the error output from running `dep ensure`, could be useful.
+			t.Logf("`dep ensure` error output: \n%s", testProj.GetStderr())
+			t.Errorf("got an unexpected error: %s", err)
 		}
-	}
+
+		// Check that the cache was created in the cachedir. Our fixture has the dependency
+		// `github.com/sdboyer/deptest`
+		_, err = os.Stat(testProj.Path("cachedir", "sources", "https---github.com-sdboyer-deptest"))
+		if err != nil {
+			if os.IsNotExist(err) {
+				t.Error("expected cachedir to have been populated but none was found")
+			} else {
+				t.Errorf("got an unexpected error: %s", err)
+			}
+		}
+	})
+	t.Run("env-invalid-cachedir", func(t *testing.T) {
+		t.Parallel()
+		testProj := integration.NewTestProject(t, initPath, wd, runMain)
+		defer testProj.Cleanup()
+
+		cachedir := "/invalid/path"
+		testProj.Setenv("DEPCACHEDIR", cachedir)
+		wantErr := fmt.Sprintf(
+			"dep: $DEPCACHEDIR set to an invalid or inaccessible path: %q", cachedir,
+		)
+
+		// Running `dep ensure` will pull in the dependency into cachedir.
+		err = testProj.DoRun([]string{"ensure"})
+
+		if err == nil {
+			// Log the output from running `dep ensure`, could be useful.
+			t.Logf("test run output: \n%s\n%s", testProj.GetStdout(), testProj.GetStderr())
+			t.Error("unexpected result: \n\t(GOT) nil\n\t(WNT) exit status 1")
+		} else if gotErr := strings.TrimSpace(testProj.GetStderr()); gotErr != wantErr {
+			t.Errorf("unexpected error output: \n\t(GOT) %s\n\t(WNT) %s", gotErr, wantErr)
+		}
+	})
+
 }
 
 // execCmd is a test.RunFunc which runs the program in another process.
