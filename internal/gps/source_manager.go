@@ -738,6 +738,7 @@ const (
 	ctSourceInit
 	ctSourceFetch
 	ctExportTree
+	ctValidateLocal
 )
 
 func (ct callType) String() string {
