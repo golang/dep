@@ -111,6 +111,7 @@ func (r *gitRepo) fetch(ctx context.Context) error {
 		"--tags",
 		"--prune",
 		r.RemoteLocation,
+		"refs/tags/*:refs/tags/*",
 	)
 	cmd.SetDir(r.LocalPath())
 	if out, err := cmd.CombinedOutput(); err != nil {
