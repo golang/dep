@@ -5,6 +5,8 @@ NEW FEATURES:
 * Wildcard ignore support. (#1156)
 * Disable SourceManager lock by setting `DEPNOLOCK` environment variable.
 (#1206)
+* `dep ensure -no-vendor -dry-run` now exits with an error when changes would
+have to be made to `Gopkg.lock`. This is useful for CI. (#1256)
 
 BUG FIXES:
 
