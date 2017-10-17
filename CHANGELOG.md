@@ -2,6 +2,9 @@
 
 NEW FEATURES:
 
+* Add support for importing from [gvt](https://github.com/FiloSottile/gvt)
+and [gb](https://godoc.org/github.com/constabulary/gb/cmd/gb-vendor).
+(#1149)
 * Wildcard ignore support. (#1156)
 * Disable SourceManager lock by setting `DEPNOLOCK` environment variable.
 (#1206)
