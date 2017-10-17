@@ -105,9 +105,11 @@ func (m maybeGitSource) try(ctx context.Context, cachedir string, c singleSource
 	if r.CheckLocal() {
 		state |= sourceExistsLocally
 
-		// If repository already exists on disk, make a pass to be sure
-		// everything's clean.
-		if err = src.cleanup(ctx); err != nil {
+		if err := superv.do(ctx, "git", ctValidateLocal, func(ctx context.Context) error {
+			// If repository already exists on disk, make a pass to be sure
+			// everything's clean.
+			return src.cleanup(ctx)
+		}); err != nil {
 			return nil, 0, err
 		}
 	}
