@@ -22,6 +22,8 @@ import (
 
 const initShortHelp = `Initialize a new project with manifest and lock files`
 const initLongHelp = `
+Wizard
+
 Initialize the project at filepath root by parsing its dependencies, writing
 manifest and lock files, and vendoring the dependencies. If root isn't
 specified, use the current directory.
@@ -183,10 +185,13 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 		return errors.Wrap(err, "prepare solver")
 	}
 
+	partial := true
+	vendorBehavior := dep.VendorAlways
 	soln, err := s.Solve()
 	if err != nil {
 		handleAllTheFailuresOfTheWorld(err)
-		return err
+		partial = true
+		vendorBehavior = dep.VendorNever
 	}
 	p.Lock = dep.LockFromSolution(soln)
 
@@ -201,16 +206,18 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 
 	p.Lock.SolveMeta.InputsDigest = s.HashInputs()
 
-	// Pass timestamp (yyyyMMddHHmmss format) as suffix to backup name.
-	vendorbak, err := dep.BackupVendor(vpath, time.Now().Format("20060102150405"))
-	if err != nil {
-		return err
-	}
-	if vendorbak != "" {
-		ctx.Err.Printf("Old vendor backed up to %v", vendorbak)
+	if vendorBehavior == dep.VendorAlways {
+		// Pass timestamp (yyyyMMddHHmmss format) as suffix to backup name.
+		vendorbak, err := dep.BackupVendor(vpath, time.Now().Format("20060102150405"))
+		if err != nil {
+			return err
+		}
+		if vendorbak != "" {
+			ctx.Err.Printf("Old vendor backed up to %v", vendorbak)
+		}
 	}
 
-	sw, err := dep.NewSafeWriter(p.Manifest, nil, p.Lock, dep.VendorAlways)
+	sw, err := dep.NewSafeWriter(p.Manifest, nil, p.Lock, vendorBehavior)
 	if err != nil {
 		return err
 	}
@@ -219,7 +226,7 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 	if !ctx.Verbose {
 		logger = log.New(ioutil.Discard, "", 0)
 	}
-	if err := sw.Write(root, sm, !cmd.noExamples, logger); err != nil {
+	if err := sw.Write(root, sm, !cmd.noExamples, partial, logger); err != nil {
 		return errors.Wrap(err, "safe write of manifest and lock")
 	}
 
