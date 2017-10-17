@@ -40,7 +40,7 @@ func TestReadLock(t *testing.T) {
 	}
 
 	if diff, equal := test.Diff(got, want); !equal {
-		t.Error("Valid lock did not parse as expected:\n%s", diff)
+		t.Errorf("Valid lock did not parse as expected:\n%s", diff)
 	}
 
 	golden = "lock/golden1.toml"
@@ -66,7 +66,7 @@ func TestReadLock(t *testing.T) {
 	}
 
 	if diff, equal := test.Diff(got, want); !equal {
-		t.Error("Valid lock did not parse as expected:\n%s", diff)
+		t.Errorf("Valid lock did not parse as expected:\n%s", diff)
 	}
 }
 

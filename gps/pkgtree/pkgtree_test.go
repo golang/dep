@@ -1694,7 +1694,7 @@ func TestListPackagesNoPerms(t *testing.T) {
 		}
 
 		if diff, equal := test.Diff(got.Packages["ren/m1p"].P.Imports, want.Packages["ren/m1p"].P.Imports); !equal {
-			t.Error("Mismatch between imports in m1p:\n%s", diff)
+			t.Errorf("Mismatch between imports in m1p:\n%s", diff)
 		}
 	}
 }

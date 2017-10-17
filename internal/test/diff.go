@@ -9,7 +9,11 @@ import (
 	"github.com/sergi/go-diff/diffmatchpatch"
 )
 
-func Diff(a, b interface{}) (diff string, ok bool) {
+// Diff compares structs, arrays and strings and provides pretty output.
+// Return values are diff which is the difference between values in
+// string format meant to be output in the console. equal is boolean flag
+// indicating if the values are equal.
+func Diff(a, b interface{}) (diff string, equal bool) {
 	as, aok := a.(string)
 	bs, bok := b.(string)
 	if aok && bok {
@@ -17,8 +21,7 @@ func Diff(a, b interface{}) (diff string, ok bool) {
 		dmp := diffmatchpatch.New()
 		diff := dmp.DiffMain(as, bs, false)
 		return dmp.DiffPrettyText(diff), as == bs
-	} else {
-		// otherwise compare them as structs
-		return messagediff.PrettyDiff(a, b)
 	}
+	// otherwise compare them as structs
+	return messagediff.PrettyDiff(a, b)
 }
