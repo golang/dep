@@ -123,6 +123,74 @@ type gitSource struct {
 	baseVCSSource
 }
 
+// ensureClean sees to it that a git repository is clean and in working order,
+// or returns an error if it can't.
+func (s *gitSource) cleanup(ctx context.Context) error {
+	r := s.repo.(*gitRepo)
+	cmd := commandContext(
+		ctx,
+		"git",
+		"status",
+		"--porcelain",
+	)
+	cmd.SetDir(r.LocalPath())
+
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		// An error on simple git status indicates some aggressive repository
+		// corruption, outside of the purview that we can deal with here.
+		return err
+	}
+
+	if len(bytes.TrimSpace(out)) == 0 {
+		// No output from status indicates a clean tree, without any modified or
+		// untracked files - we're in good shape.
+		return nil
+	}
+
+	// We could be more parsimonious about this, but it's probably not worth it
+	// - it's a rare case to have to do any cleanup anyway, so when we do, we
+	// might as well just throw the kitchen sink at it.
+	cmd = commandContext(
+		ctx,
+		"git",
+		"reset",
+		"--hard",
+	)
+	cmd.SetDir(r.LocalPath())
+	_, err = cmd.CombinedOutput()
+	if err != nil {
+		return err
+	}
+
+	// We also need to git clean -df; just reuse defendAgainstSubmodules here,
+	// even though it's a bit layer-breaky.
+	err = r.defendAgainstSubmodules(ctx)
+	if err != nil {
+		return err
+	}
+
+	// Check status one last time. If it's still not clean, give up.
+	cmd = commandContext(
+		ctx,
+		"git",
+		"status",
+		"--porcelain",
+	)
+	cmd.SetDir(r.LocalPath())
+
+	out, err = cmd.CombinedOutput()
+	if err != nil {
+		return err
+	}
+
+	if len(bytes.TrimSpace(out)) != 0 {
+		return errors.Errorf("failed to clean up git repository at %s - dirty? corrupted? status output: \n%s", r.LocalPath(), string(out))
+	}
+
+	return nil
+}
+
 func (s *gitSource) exportRevisionTo(ctx context.Context, rev Revision, to string) error {
 	r := s.repo
 
