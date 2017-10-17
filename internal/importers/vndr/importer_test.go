@@ -8,7 +8,6 @@ import (
 	"bytes"
 	"log"
 	"path/filepath"
-	"reflect"
 	"testing"
 
 	"github.com/golang/dep"
@@ -104,8 +103,8 @@ func TestVndrConfig_Import(t *testing.T) {
 	wantM.Constraints["github.com/sdboyer/deptestdos"] = gps.ProjectProperties{
 		Constraint: c2,
 	}
-	if !reflect.DeepEqual(wantM, m) {
-		t.Errorf("unexpected manifest\nhave=%+v\nwant=%+v", m, wantM)
+	if diff, equal := test.Diff(wantM, m); !equal {
+		t.Errorf("Unexpected manifest:\n%s", diff)
 	}
 
 	wantL := &dep.Lock{
@@ -127,20 +126,20 @@ func TestVndrConfig_Import(t *testing.T) {
 			),
 		},
 	}
-	if !reflect.DeepEqual(wantL, l) {
-		t.Errorf("unexpected lock\nhave=%+v\nwant=%+v", l, wantL)
+	if diff, equal := test.Diff(wantL, l); !equal {
+		t.Errorf("Unexpected lock:\n%s", diff)
 	}
 
 	goldenFile := "golden.txt"
 	got := logOutput.String()
 	want := h.GetTestFileString(goldenFile)
-	if want != got {
+	if diff, equal := test.Diff(want, got); !equal {
 		if *test.UpdateGolden {
 			if err := h.WriteTestFile(goldenFile, got); err != nil {
 				t.Fatalf("%+v", errors.Wrapf(err, "Unable to write updated golden file %s", goldenFile))
 			}
 		} else {
-			t.Fatalf("expected %s, got %s", want, got)
+			t.Fatalf("Different golden file:\n%s", diff)
 		}
 	}
 }
@@ -159,8 +158,8 @@ func TestParseVndrLine(t *testing.T) {
 					t.Errorf("expected non-nil package %v, have nil", wantPkg)
 				}
 			default:
-				if !reflect.DeepEqual(havePkg, wantPkg) {
-					t.Errorf("unexpected package, have=%v, want=%v", *havePkg, *wantPkg)
+				if diff, equal := test.Diff(havePkg, wantPkg); !equal {
+					t.Errorf("Unexpected package:\n%s", diff)
 				}
 			}
 

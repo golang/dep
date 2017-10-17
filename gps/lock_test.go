@@ -5,9 +5,10 @@
 package gps
 
 import (
-	"reflect"
 	"sort"
 	"testing"
+
+	"github.com/golang/dep/internal/test"
 )
 
 func TestLockedProjectSorting(t *testing.T) {
@@ -27,8 +28,8 @@ func TestLockedProjectSorting(t *testing.T) {
 
 	// only the two should have switched positions
 	lps[0], lps[2] = lps[2], lps[0]
-	if !reflect.DeepEqual(lps, lps2) {
-		t.Errorf("SortLockedProject did not sort as expected:\n\t(GOT) %s\n\t(WNT) %s", lps2, lps)
+	if diff, equal := test.Diff(lps, lps2); !equal {
+		t.Errorf("SortLockedProject did not sort as expected:\n%s", diff)
 	}
 }
 

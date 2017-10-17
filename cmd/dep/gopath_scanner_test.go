@@ -7,7 +7,6 @@ package main
 import (
 	"io/ioutil"
 	"log"
-	"reflect"
 	"testing"
 
 	"github.com/golang/dep"
@@ -182,8 +181,8 @@ func TestGetProjectPropertiesFromVersion(t *testing.T) {
 
 	for _, c := range cases {
 		actualProp := getProjectPropertiesFromVersion(c.version.(gps.Version))
-		if !reflect.DeepEqual(c.want, actualProp.Constraint) {
-			t.Fatalf("Constraints are not as expected: \n\t(GOT) %v\n\t(WNT) %v", actualProp.Constraint, c.want)
+		if diff, equal := test.Diff(c.want, actualProp.Constraint); !equal {
+			t.Fatalf("Constraints are not as expected:\n%s", diff)
 		}
 	}
 }

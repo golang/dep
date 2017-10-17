@@ -10,58 +10,14 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
-	"reflect"
 	"strings"
 	"testing"
 
-	"github.com/d4l3k/messagediff"
 	"github.com/golang/dep/gps"
 	"github.com/golang/dep/internal/test"
-	"github.com/sergi/go-diff/diffmatchpatch"
 )
 
-func TestReadManifest_Old(t *testing.T) {
-	h := test.NewHelper(t)
-	defer h.Cleanup()
-
-	mf := h.GetTestFile("manifest/golden.toml")
-	defer mf.Close()
-	got, _, err := readManifest(mf)
-	if err != nil {
-		t.Fatalf("Should have read Manifest correctly, but got err %q", err)
-	}
-
-	c, _ := gps.NewSemverConstraint("^0.12.0")
-	want := Manifest{
-		Constraints: map[gps.ProjectRoot]gps.ProjectProperties{
-			gps.ProjectRoot("github.com/golang/dep/internal/gps"): {
-				Constraint: c,
-			},
-			gps.ProjectRoot("github.com/babble/brook"): {
-				Constraint: gps.Revision("d05d5aca9f895d19e9265839bffeadd74a2d2ecb"),
-			},
-		},
-		Ovr: map[gps.ProjectRoot]gps.ProjectProperties{
-			gps.ProjectRoot("github.com/golang/dep/internal/gps"): {
-				Source:     "https://github.com/golang/dep/internal/gps",
-				Constraint: gps.NewBranch("master"),
-			},
-		},
-		Ignored: []string{"github.com/foo/bar"},
-	}
-
-	if !reflect.DeepEqual(got.Constraints, want.Constraints) {
-		t.Error("Valid manifest's dependencies did not parse as expected")
-	}
-	if !reflect.DeepEqual(got.Ovr, want.Ovr) {
-		t.Error("Valid manifest's overrides did not parse as expected")
-	}
-	if !reflect.DeepEqual(got.Ignored, want.Ignored) {
-		t.Error("Valid manifest's ignored did not parse as expected")
-	}
-}
-
-func TestReadManifest_New(t *testing.T) {
+func TestReadManifest(t *testing.T) {
 	h := test.NewHelper(t)
 	defer h.Cleanup()
 
@@ -96,54 +52,18 @@ func TestReadManifest_New(t *testing.T) {
 		},
 	}
 
-	if diff, equal := messagediff.PrettyDiff(want.Constraints, got.Constraints); !equal {
+	if diff, equal := test.Diff(want.Constraints, got.Constraints); !equal {
 		t.Errorf("Valid manifest's dependencies did not parse as expected:\n%s", diff)
 	}
-	if diff, equal := messagediff.PrettyDiff(want.Ovr, got.Ovr); !equal {
+	if diff, equal := test.Diff(want.Ovr, got.Ovr); !equal {
 		t.Errorf("Valid manifest's overrides did not parse as expected:\n%s", diff)
 	}
-	if diff, equal := messagediff.PrettyDiff(want.Ignored, got.Ignored); !equal {
+	if diff, equal := test.Diff(want.Ignored, got.Ignored); !equal {
 		t.Errorf("Valid manifest's ignored did not parse as expected:\n%s", diff)
 	}
 }
 
-func TestWriteManifest_Old(t *testing.T) {
-	h := test.NewHelper(t)
-	defer h.Cleanup()
-
-	golden := "manifest/golden.toml"
-	want := h.GetTestFileString(golden)
-	c, _ := gps.NewSemverConstraint("^0.12.0")
-	m := NewManifest()
-	m.Constraints[gps.ProjectRoot("github.com/golang/dep/internal/gps")] = gps.ProjectProperties{
-		Constraint: c,
-	}
-	m.Constraints[gps.ProjectRoot("github.com/babble/brook")] = gps.ProjectProperties{
-		Constraint: gps.Revision("d05d5aca9f895d19e9265839bffeadd74a2d2ecb"),
-	}
-	m.Ovr[gps.ProjectRoot("github.com/golang/dep/internal/gps")] = gps.ProjectProperties{
-		Source:     "https://github.com/golang/dep/internal/gps",
-		Constraint: gps.NewBranch("master"),
-	}
-	m.Ignored = []string{"github.com/foo/bar"}
-
-	got, err := m.MarshalTOML()
-	if err != nil {
-		t.Fatalf("Error while marshaling valid manifest to TOML: %q", err)
-	}
-
-	if string(got) != want {
-		if *test.UpdateGolden {
-			if err = h.WriteTestFile(golden, string(got)); err != nil {
-				t.Fatal(err)
-			}
-		} else {
-			t.Errorf("Valid manifest did not marshal to TOML as expected:\n\t(GOT): %s\n\t(WNT): %s", string(got), want)
-		}
-	}
-}
-
-func TestWriteManifest_New(t *testing.T) {
+func TestWriteManifest(t *testing.T) {
 	h := test.NewHelper(t)
 	defer h.Cleanup()
 
@@ -168,15 +88,13 @@ func TestWriteManifest_New(t *testing.T) {
 		t.Fatalf("error while marshaling valid manifest to TOML: %q", err)
 	}
 
-	if want != string(got) {
+	if diff, equal := test.Diff(want, string(got)); !equal {
 		if *test.UpdateGolden {
 			if err = h.WriteTestFile(golden, string(got)); err != nil {
 				t.Fatal(err)
 			}
 		} else {
-			dmp := diffmatchpatch.New()
-			diff := dmp.DiffMain(want, string(got), false)
-			t.Errorf("Valid manifest did not marshal to TOML as expected:\n%s", dmp.DiffPrettyText(diff))
+			t.Errorf("Valid manifest did not marshal to TOML as expected:\n%s", diff)
 		}
 	}
 }

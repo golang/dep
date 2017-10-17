@@ -20,6 +20,7 @@ import (
 
 	"github.com/golang/dep/gps/paths"
 	"github.com/golang/dep/internal/fs"
+	"github.com/golang/dep/internal/test"
 )
 
 // PackageTree.ToReachMap() uses an easily separable algorithm, wmToReach(),
@@ -448,13 +449,11 @@ func TestWorkmapToReach(t *testing.T) {
 			}
 
 			rm, em := wmToReach(fix.workmap, fix.backprop)
-			if !reflect.DeepEqual(rm, fix.rm) {
-				//t.Error(pretty.Sprintf("wmToReach(%q): Did not get expected reach map:\n\t(GOT): %s\n\t(WNT): %s", name, rm, fix.rm))
-				t.Errorf("Did not get expected reach map:\n\t(GOT): %s\n\t(WNT): %s", rm, fix.rm)
+			if diff, equal := test.Diff(rm, fix.rm); !equal {
+				t.Errorf("Did not get expected reach map:\n%s", diff)
 			}
-			if !reflect.DeepEqual(em, fix.em) {
-				//t.Error(pretty.Sprintf("wmToReach(%q): Did not get expected error map:\n\t(GOT): %# v\n\t(WNT): %# v", name, em, fix.em))
-				t.Errorf("Did not get expected error map:\n\t(GOT): %v\n\t(WNT): %v", em, fix.em)
+			if diff, equal := test.Diff(em, fix.em); !equal {
+				t.Errorf("Did not get expected error map:\n%s", diff)
 			}
 		})
 	}
@@ -1456,8 +1455,8 @@ func TestListPackages(t *testing.T) {
 			} else if fix.err != nil && err == nil {
 				t.Errorf("Error expected but none received")
 			} else if fix.err != nil && err != nil {
-				if !reflect.DeepEqual(fix.err, err) {
-					t.Errorf("Did not receive expected error:\n\t(GOT): %s\n\t(WNT): %s", err, fix.err)
+				if diff, equal := test.Diff(fix.err, err); !equal {
+					t.Errorf("Did not receive expected error:\n%s", diff)
 				}
 			}
 
@@ -1486,8 +1485,8 @@ func TestListPackages(t *testing.T) {
 									if operr, exists := out.Packages[path]; !exists {
 										t.Errorf("Expected PackageOrErr for path %s was missing from output:\n\t%s", path, perr)
 									} else {
-										if !reflect.DeepEqual(perr, operr) {
-											t.Errorf("PkgOrErr for path %s was not as expected:\n\t(GOT): %#v\n\t(WNT): %#v", path, operr, perr)
+										if diff, equal := test.Diff(perr, operr); !equal {
+											t.Errorf("PkgOrErr for path %s was not as expected:\n%s", path, diff)
 										}
 									}
 								}
@@ -1596,8 +1595,8 @@ func TestTrimHiddenPackages(t *testing.T) {
 						if operr, exists := got.Packages[path]; !exists {
 							t.Errorf("Expected PackageOrErr for path %s was missing from output:\n\t%s", path, perr)
 						} else {
-							if !reflect.DeepEqual(perr, operr) {
-								t.Errorf("PkgOrErr for path %s was not as expected:\n\t(GOT): %#v\n\t(WNT): %#v", path, operr, perr)
+							if diff, equal := test.Diff(perr, operr); !equal {
+								t.Errorf("PkgOrErr for path %s was not as expected:\n%s", path, diff)
 							}
 						}
 					}
@@ -1680,8 +1679,8 @@ func TestListPackagesNoPerms(t *testing.T) {
 		t.Fatalf("Expected ImportRoot %s, got %s", want.ImportRoot, got.ImportRoot)
 	}
 
-	if !reflect.DeepEqual(got, want) {
-		t.Errorf("Did not get expected PackageOrErrs:\n\t(GOT): %#v\n\t(WNT): %#v", got, want)
+	if diff, equal := test.Diff(got, want); !equal {
+		t.Errorf("Did not get expected PackageOrErrs:\n%s", diff)
 		if len(got.Packages) != 2 {
 			if len(got.Packages) == 3 {
 				t.Error("Wrong number of PackageOrErrs - did 'simple' subpackage make it into results somehow?")
@@ -1694,8 +1693,8 @@ func TestListPackagesNoPerms(t *testing.T) {
 			t.Error("Should have gotten error on empty root directory")
 		}
 
-		if !reflect.DeepEqual(got.Packages["ren/m1p"].P.Imports, want.Packages["ren/m1p"].P.Imports) {
-			t.Error("Mismatch between imports in m1p")
+		if diff, equal := test.Diff(got.Packages["ren/m1p"].P.Imports, want.Packages["ren/m1p"].P.Imports); !equal {
+			t.Error("Mismatch between imports in m1p:\n%s", diff)
 		}
 	}
 }
@@ -2181,8 +2180,8 @@ func testFlattenReachMap(ptree *PackageTree, testCase *flattenReachMapCase) func
 			t.Errorf("Should not have any error pkgs from ToReachMap, got %s", em)
 		}
 		result := rm.FlattenFn(testCase.isStdLibFn)
-		if !reflect.DeepEqual(testCase.expect, result) {
-			t.Errorf("Wrong imports in %q case:\n\t(GOT): %s\n\t(WNT): %s", testCase.name, result, testCase.expect)
+		if diff, equal := test.Diff(testCase.expect, result); !equal {
+			t.Errorf("Wrong imports in %q case:\n%s", testCase.name, diff)
 		}
 	}
 }
@@ -2262,11 +2261,11 @@ func TestCanaryPackageTreeCopy(t *testing.T) {
 	ptreeRefl := fieldNames(reflect.TypeOf(PackageTree{}))
 	packageRefl := fieldNames(reflect.TypeOf(Package{}))
 
-	if !reflect.DeepEqual(ptreeFields, ptreeRefl) {
-		t.Errorf("PackageTree.Copy is designed to work with an exact set of fields in the PackageTree struct - make sure it (and this test) have been updated!\n\t(GOT):%s\n\t(WNT):%s", ptreeFields, ptreeRefl)
+	if diff, equal := test.Diff(ptreeFields, ptreeRefl); !equal {
+		t.Errorf("PackageTree.Copy is designed to work with an exact set of fields in the PackageTree struct - make sure it (and this test) have been updated!\n%s", diff)
 	}
 
-	if !reflect.DeepEqual(packageFields, packageRefl) {
-		t.Errorf("PackageTree.Copy is designed to work with an exact set of fields in the Package struct - make sure it (and this test) have been updated!\n\t(GOT):%s\n\t(WNT):%s", packageFields, packageRefl)
+	if diff, equal := test.Diff(packageFields, packageRefl); !equal {
+		t.Errorf("PackageTree.Copy is designed to work with an exact set of fields in the Package struct - make sure it (and this test) have been updated!\n%s", diff)
 	}
 }

@@ -5,10 +5,10 @@
 package gps
 
 import (
-	"reflect"
 	"testing"
 
 	"github.com/golang/dep/gps/pkgtree"
+	"github.com/golang/dep/internal/test"
 )
 
 func TestRootdataExternalImports(t *testing.T) {
@@ -31,8 +31,8 @@ func TestRootdataExternalImports(t *testing.T) {
 
 	want := []string{"a", "b"}
 	got := rd.externalImportList(params.stdLibFn)
-	if !reflect.DeepEqual(want, got) {
-		t.Errorf("Unexpected return from rootdata.externalImportList:\n\t(GOT): %s\n\t(WNT): %s", got, want)
+	if diff, equal := test.Diff(want, got); !equal {
+		t.Errorf("Unexpected return from rootdata.externalImportList:\n%s", diff)
 	}
 
 	// Add a require
@@ -40,8 +40,8 @@ func TestRootdataExternalImports(t *testing.T) {
 
 	want = []string{"a", "b", "c"}
 	got = rd.externalImportList(params.stdLibFn)
-	if !reflect.DeepEqual(want, got) {
-		t.Errorf("Unexpected return from rootdata.externalImportList:\n\t(GOT): %s\n\t(WNT): %s", got, want)
+	if diff, equal := test.Diff(want, got); !equal {
+		t.Errorf("Unexpected return from rootdata.externalImportList:\n%s", diff)
 	}
 
 	// Add same path as import
@@ -51,8 +51,8 @@ func TestRootdataExternalImports(t *testing.T) {
 
 	// should still be the same
 	got = rd.externalImportList(params.stdLibFn)
-	if !reflect.DeepEqual(want, got) {
-		t.Errorf("Unexpected return from rootdata.externalImportList:\n\t(GOT): %s\n\t(WNT): %s", got, want)
+	if diff, equal := test.Diff(want, got); !equal {
+		t.Errorf("Unexpected return from rootdata.externalImportList:\n%s", diff)
 	}
 
 	// Add an ignore, but not on the required path (Prepare makes that
@@ -61,8 +61,8 @@ func TestRootdataExternalImports(t *testing.T) {
 	rd.ir = pkgtree.NewIgnoredRuleset([]string{"b"})
 	want = []string{"a", "c"}
 	got = rd.externalImportList(params.stdLibFn)
-	if !reflect.DeepEqual(want, got) {
-		t.Errorf("Unexpected return from rootdata.externalImportList:\n\t(GOT): %s\n\t(WNT): %s", got, want)
+	if diff, equal := test.Diff(want, got); !equal {
+		t.Errorf("Unexpected return from rootdata.externalImportList:\n%s", diff)
 	}
 }
 
@@ -218,8 +218,8 @@ func TestGetApplicableConstraints(t *testing.T) {
 			fix.mut()
 
 			got := rd.getApplicableConstraints(params.stdLibFn)
-			if !reflect.DeepEqual(fix.result, got) {
-				t.Errorf("unexpected applicable constraint set:\n\t(GOT): %+v\n\t(WNT): %+v", got, fix.result)
+			if diff, equal := test.Diff(fix.result, got); !equal {
+				t.Errorf("unexpected applicable constraint set:\n%s", diff)
 			}
 		})
 	}

@@ -8,7 +8,6 @@ import (
 	"io/ioutil"
 	"log"
 	"path/filepath"
-	"reflect"
 	"sort"
 	"testing"
 
@@ -44,7 +43,7 @@ func TestCalculatePrune(t *testing.T) {
 		h.Path(filepath.Join(vendorDir, "github.com/prune")),
 	}
 
-	if !reflect.DeepEqual(want, got) {
-		t.Fatalf("calculated prune paths are not as expected.\n(WNT) %s\n(GOT) %s", want, got)
+	if diff, equal := test.Diff(want, got); !equal {
+		t.Fatalf("calculated prune paths are not as expected.\n%s", diff)
 	}
 }

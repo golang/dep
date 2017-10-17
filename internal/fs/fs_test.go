@@ -324,8 +324,8 @@ func TestReadActualFilenames(t *testing.T) {
 			[]string{"test2.txt", "test3.TXT"},
 			[]string{"test2.txt", "Test3.txt", "Test4.txt"},
 			map[string]string{
-				"test2.txt": "test2.txt",
-				"Test3.txt": "test3.TXT",
+				"tXest2.txt": "test2.txt",
+				"Test3.txt":  "test3.TXT",
 			},
 		},
 	}
@@ -341,6 +341,7 @@ func TestReadActualFilenames(t *testing.T) {
 			t.Fatalf("returned value does not match expected: \n\t(GOT) %v\n\t(WNT) %v",
 				got, c.want)
 		}
+		// TODO: This test passes even if I mismatch names and wants. How do I make this test fail?
 	}
 }
 

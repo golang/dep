@@ -5,8 +5,9 @@
 package gps
 
 import (
-	"reflect"
 	"testing"
+
+	"github.com/golang/dep/internal/test"
 )
 
 // Regression test for https://github.com/sdboyer/gps/issues/174
@@ -43,8 +44,8 @@ func TestUnselectedRemoval(t *testing.T) {
 	if len(u.sl) != 2 {
 		t.Fatalf("removal of matching bmi did not work, slice should have 2 items but has %v", len(u.sl))
 	}
-	if !reflect.DeepEqual(u.sl, want) {
-		t.Fatalf("wrong item removed from slice:\n\t(GOT): %v\n\t(WNT): %v", u.sl, want)
+	if diff, equal := test.Diff(u.sl, want); !equal {
+		t.Fatalf("wrong item removed from slice:\n%s", diff)
 	}
 
 	u.remove(bmi3)
@@ -57,7 +58,7 @@ func TestUnselectedRemoval(t *testing.T) {
 	if len(u.sl) != 1 {
 		t.Fatalf("removal of matching bmi did not work, slice should have 1 items but has %v", len(u.sl))
 	}
-	if !reflect.DeepEqual(u.sl, want) {
-		t.Fatalf("wrong item removed from slice:\n\t(GOT): %v\n\t(WNT): %v", u.sl, want)
+	if diff, equal := test.Diff(u.sl, want); !equal {
+		t.Fatalf("wrong item removed from slice:\n%s", diff)
 	}
 }

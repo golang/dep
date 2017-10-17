@@ -12,7 +12,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"reflect"
 	"strings"
 	"sync"
 	"testing"
@@ -118,8 +117,8 @@ func testGitSourceInteractions(t *testing.T) {
 			NewBranch("v1.1").Pair(Revision("f1fbc520489a98306eb28c235204e39fa8a89c84")),
 			NewBranch("v3").Pair(Revision("4a54adf81c75375d26d376459c00d5ff9b703e5e")),
 		}
-		if !reflect.DeepEqual(vlist, evl) {
-			t.Errorf("Version list was not what we expected:\n\t(GOT): %s\n\t(WNT): %s", vlist, evl)
+		if diff, equal := test.Diff(vlist, evl); !equal {
+			t.Errorf("Version list was not what we expected:\n%s", diff)
 		}
 	}
 
@@ -217,8 +216,8 @@ func testGopkginSourceInteractions(t *testing.T) {
 			t.Errorf("gopkgin test repo (%s) should've produced %v versions, got %v.\n%v", un, len(evl), len(vlist), vlist)
 		} else {
 			SortForUpgrade(vlist)
-			if !reflect.DeepEqual(vlist, evl) {
-				t.Errorf("Version list for %s was not what we expected:\n\t(GOT): %#v\n\t(WNT): %#v", un, vlist, evl)
+			if diff, equal := test.Diff(vlist, evl); !equal {
+				t.Errorf("Version list was not what we expected:\n%s", diff)
 			}
 		}
 
@@ -233,8 +232,8 @@ func testGopkginSourceInteractions(t *testing.T) {
 			t.Errorf("gopkgin test repo should've produced %v versions, got %v", len(evl), len(vlist))
 		} else {
 			SortForUpgrade(vlist)
-			if !reflect.DeepEqual(vlist, evl) {
-				t.Errorf("Version list for %s was not what we expected:\n\t(GOT): %#v\n\t(WNT): %#v", un, vlist, evl)
+			if diff, equal := test.Diff(vlist, evl); !equal {
+				t.Errorf("Version list was not what we expected:\n%s", diff)
 			}
 		}
 
@@ -381,8 +380,8 @@ func testBzrSourceInteractions(t *testing.T) {
 		t.Errorf("bzr test repo should've produced two versions, got %v", len(vlist))
 	} else {
 		SortForUpgrade(vlist)
-		if !reflect.DeepEqual(vlist, evl) {
-			t.Errorf("bzr version list was not what we expected:\n\t(GOT): %s\n\t(WNT): %s", vlist, evl)
+		if diff, equal := test.Diff(vlist, evl); !equal {
+			t.Errorf("bzr version list was not what we expected:\n%s", diff)
 		}
 	}
 
@@ -397,8 +396,8 @@ func testBzrSourceInteractions(t *testing.T) {
 		t.Errorf("bzr test repo should've produced two versions, got %v", len(vlist))
 	} else {
 		SortForUpgrade(vlist)
-		if !reflect.DeepEqual(vlist, evl) {
-			t.Errorf("bzr version list was not what we expected:\n\t(GOT): %s\n\t(WNT): %s", vlist, evl)
+		if diff, equal := test.Diff(vlist, evl); !equal {
+			t.Errorf("bzr version list was not what we expected:\n%s", diff)
 		}
 	}
 
@@ -490,8 +489,8 @@ func testHgSourceInteractions(t *testing.T) {
 			t.Errorf("hg test repo should've produced %v versions, got %v", len(evl), len(vlist))
 		} else {
 			SortForUpgrade(vlist)
-			if !reflect.DeepEqual(vlist, evl) {
-				t.Errorf("Version list was not what we expected:\n\t(GOT): %s\n\t(WNT): %s", vlist, evl)
+			if diff, equal := test.Diff(vlist, evl); !equal {
+				t.Errorf("Version list was not what we expected:\n%s", diff)
 			}
 		}
 
@@ -506,8 +505,8 @@ func testHgSourceInteractions(t *testing.T) {
 			t.Errorf("hg test repo should've produced %v versions, got %v", len(evl), len(vlist))
 		} else {
 			SortForUpgrade(vlist)
-			if !reflect.DeepEqual(vlist, evl) {
-				t.Errorf("Version list was not what we expected:\n\t(GOT): %s\n\t(WNT): %s", vlist, evl)
+			if diff, equal := test.Diff(vlist, evl); !equal {
+				t.Errorf("Version list was not what we expected:\n%s", diff)
 			}
 		}
 

@@ -10,8 +10,6 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
-	"path/filepath"
-	"reflect"
 	"testing"
 
 	"github.com/golang/dep/gps/pkgtree"
@@ -91,8 +89,8 @@ func testSourceGateway(t *testing.T) {
 					NewVersion("v0.8.0").Pair(Revision("ff2948a2ac8f538c4ecd55962e919d1e13e74baf")),
 					newDefaultBranch("master").Pair(Revision("3f4c3bea144e112a69bbe5d8d01c1b09a544253f")),
 				}
-				if !reflect.DeepEqual(vlist, evl) {
-					t.Fatalf("Version list was not what we expected:\n\t(GOT): %s\n\t(WNT): %s", vlist, evl)
+				if diff, equal := test.Diff(vlist, evl); !equal {
+					t.Fatalf("Version list was not what we expected:\n%s", diff)
 				}
 			}
 
@@ -159,16 +157,16 @@ func testSourceGateway(t *testing.T) {
 			if err != nil {
 				t.Fatalf("unexpected err when getting package tree with known rev: %s", err)
 			}
-			if !reflect.DeepEqual(wantptree, ptree) {
-				t.Fatalf("got incorrect PackageTree:\n\t(GOT): %#v\n\t(WNT): %#v", ptree, wantptree)
+			if diff, equal := test.Diff(wantptree, ptree); !equal {
+				t.Fatalf("got incorrect PackageTree:\n%s", diff)
 			}
 
 			ptree, err = sg.listPackages(ctx, ProjectRoot("github.com/sdboyer/deptest"), NewVersion("v1.0.0"))
 			if err != nil {
 				t.Fatalf("unexpected err when getting package tree with unpaired good version: %s", err)
 			}
-			if !reflect.DeepEqual(wantptree, ptree) {
-				t.Fatalf("got incorrect PackageTree:\n\t(GOT): %#v\n\t(WNT): %#v", ptree, wantptree)
+			if diff, equal := test.Diff(wantptree, ptree); !equal {
+				t.Fatalf("got incorrect PackageTree:\n%s", diff)
 			}
 		}
 	}

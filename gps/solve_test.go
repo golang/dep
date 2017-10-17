@@ -9,7 +9,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"reflect"
 	"sort"
 	"testing"
 
@@ -192,8 +191,8 @@ func fixtureSolveSimpleChecks(fix specfix, soln Solution, err error, t *testing.
 					t.Errorf("Expected version %q of project %q, but actual version was %q", pv(flp.Version()), ppi(id), pv(lp.Version()))
 				}
 
-				if !reflect.DeepEqual(lp.pkgs, flp.pkgs) {
-					t.Errorf("Package list was not not as expected for project %s@%s:\n\t(GOT) %s\n\t(WNT) %s", ppi(id), pv(lp.Version()), lp.pkgs, flp.pkgs)
+				if diff, equal := test.Diff(lp.pkgs, flp.pkgs); !equal {
+					t.Errorf("Package list was not not as expected for project %s@%s:\n%s", ppi(id), pv(lp.Version()), diff)
 				}
 			}
 		}

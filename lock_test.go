@@ -6,7 +6,6 @@ package dep
 
 import (
 	"encoding/hex"
-	"reflect"
 	"strings"
 	"testing"
 
@@ -40,8 +39,8 @@ func TestReadLock(t *testing.T) {
 		},
 	}
 
-	if !reflect.DeepEqual(got, want) {
-		t.Error("Valid lock did not parse as expected")
+	if diff, equal := test.Diff(got, want); !equal {
+		t.Error("Valid lock did not parse as expected:\n%s", diff)
 	}
 
 	golden = "lock/golden1.toml"
@@ -66,8 +65,8 @@ func TestReadLock(t *testing.T) {
 		},
 	}
 
-	if !reflect.DeepEqual(got, want) {
-		t.Error("Valid lock did not parse as expected")
+	if diff, equal := test.Diff(got, want); !equal {
+		t.Error("Valid lock did not parse as expected:\n%s", diff)
 	}
 }
 

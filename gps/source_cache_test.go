@@ -7,7 +7,6 @@ package gps
 import (
 	"io/ioutil"
 	"log"
-	"reflect"
 	"sort"
 	"testing"
 	"time"
@@ -411,8 +410,8 @@ func compareManifests(t *testing.T, want, got Manifest) {
 
 	{
 		want, got := wantRM.IgnoredPackages(), gotRM.IgnoredPackages()
-		if !reflect.DeepEqual(want.ToSlice(), got.ToSlice()) {
-			t.Errorf("unexpected ignored packages:\n\t(GOT): %#v\n\t(WNT): %#v", got, want)
+		if diff, equal := test.Diff(want.ToSlice(), got.ToSlice()); !equal {
+			t.Errorf("unexpected ignored packages:\n%s", diff)
 		}
 	}
 
