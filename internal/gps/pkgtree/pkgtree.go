@@ -366,7 +366,7 @@ func findImportComment(pkgName *ast.Ident, c *ast.CommentGroup) string {
 // ConflictingImportComments indicates that the package declares more than one
 // different canonical path.
 type ConflictingImportComments struct {
-	ImportPath                string   // An import path refering to this package
+	ImportPath                string   // An import path referring to this package
 	ConflictingImportComments []string // All distinct "canonical" paths encountered in the package files
 }
 
