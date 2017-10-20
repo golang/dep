@@ -1,4 +1,4 @@
-# v0.3.2 (Unreleased)
+# v0.3.2
 
 NEW FEATURES:
 
