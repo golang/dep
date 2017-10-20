@@ -124,11 +124,11 @@ authenticated repository.
 
 First, configure `git` to use the credentials option for the specific repository.
 
-For example, if you use gitlab, and you wish to access `https://gitlab.example.com/example/package.git`,
+For example, if you use gitlab, and you wish to access `https://gitlab.example.com/username/package.git`,
 then you would want to use the following configuration:
 
 ```
-$ git config --global credential.https://gitlab.example.com.example yourusername
+$ git config --global credential.https://gitlab.example.com.username yourusername
 ```
 
 In the example the hostname `gitlab.example.com.username` string seems incorrect, but
