@@ -1,5 +1,8 @@
 # v0.3.3 (Unreleased)
 
+BUG FIXES:
+
+* Releases targeting Windows now have a `.exe` suffix (#1291).
 
 # v0.3.2
 
