@@ -26,8 +26,8 @@ type ctxRepo interface {
 	//ping(context.Context) (bool, error)
 }
 
-func newCtxRepo(s vcs.Type, ustr, path string) (r ctxRepo, err error) {
-	r, err = getVCSRepo(s, ustr, path)
+func newCtxRepo(s vcs.Type, ustr, path string) (ctxRepo, error) {
+	r, err := getVCSRepo(s, ustr, path)
 	if err != nil {
 		// if vcs could not initialize the repo due to a local error
 		// then the local repo is in an incorrect state. Remove and
@@ -41,7 +41,7 @@ func newCtxRepo(s vcs.Type, ustr, path string) (r ctxRepo, err error) {
 	return r, err
 }
 
-func getVCSRepo(s vcs.Type, ustr, path string) (r ctxRepo, err error) {
+func getVCSRepo(s vcs.Type, ustr, path string) (ctxRepo, error) {
 	switch s {
 	case vcs.Git:
 		repo, err := vcs.NewGitRepo(ustr, path)
