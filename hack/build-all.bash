@@ -17,6 +17,9 @@ DATE=$(date "+%Y-%m-%d")
 GO_BUILD_CMD="go build -a -installsuffix cgo"
 GO_BUILD_LDFLAGS="-s -w -X main.commitHash=$COMMIT_HASH -X main.buildDate=$DATE -X main.version=$VERSION"
 
+declare -A PLATFORM_FILE_EXTENSIONS
+PLATFORM_FILE_EXTENSIONS["windows"]=.exe
+
 if [ -z "$DEP_BUILD_PLATFORMS" ]; then
     DEP_BUILD_PLATFORMS="linux windows darwin"
 fi
@@ -30,8 +33,9 @@ mkdir -p release
 for OS in ${DEP_BUILD_PLATFORMS[@]}; do
   for ARCH in ${DEP_BUILD_ARCHS[@]}; do
     echo "Building for $OS/$ARCH"
+    BINARY="dep-$OS-$ARCH${PLATFORM_FILE_EXTENSIONS[$OS]}"
     GOARCH=$ARCH GOOS=$OS CGO_ENABLED=0 $GO_BUILD_CMD -ldflags "$GO_BUILD_LDFLAGS"\
-     -o "release/dep-$OS-$ARCH" ./cmd/dep/
-    shasum -a 256 "release/dep-$OS-$ARCH" > "release/dep-$OS-$ARCH".sha256
+     -o "release/${BINARY}" ./cmd/dep/
+    shasum -a 256 "release/${BINARY}" > "release/${BINARY}".sha256
   done
 done
