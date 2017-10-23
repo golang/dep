@@ -20,33 +20,23 @@ import (
 type cmd struct {
 	// ctx is provided by the caller; SIGINT is sent when it is cancelled.
 	ctx context.Context
-	// cancel is called when the graceful shutdown timeout expires.
-	cancel context.CancelFunc
-	Cmd    *exec.Cmd
+	Cmd *exec.Cmd
 }
 
 func commandContext(ctx context.Context, name string, arg ...string) cmd {
-	// Create a one-off cancellable context for use by the CommandContext, in
-	// the event that we have to force a Process.Kill().
-	ctx2, cancel := context.WithCancel(context.Background())
-
-	c := cmd{
-		Cmd:    exec.CommandContext(ctx2, name, arg...),
-		cancel: cancel,
-		ctx:    ctx,
-	}
+	c := exec.Command(name, arg...)
 
 	// Force subprocesses into their own process group, rather than being in the
 	// same process group as the dep process. Because Ctrl-C sent from a
 	// terminal will send the signal to the entire currently running process
 	// group, this allows us to directly manage the issuance of signals to
 	// subprocesses.
-	c.Cmd.SysProcAttr = &syscall.SysProcAttr{
+	c.SysProcAttr = &syscall.SysProcAttr{
 		Setpgid: true,
 		Pgid:    0,
 	}
 
-	return c
+	return cmd{ctx: ctx, Cmd: c}
 }
 
 // CombinedOutput is like (*os/exec.Cmd).CombinedOutput except that it
@@ -63,7 +53,6 @@ func (c cmd) CombinedOutput() ([]byte, error) {
 	var b bytes.Buffer
 	c.Cmd.Stdout = &b
 	c.Cmd.Stderr = &b
-
 	if err := c.Cmd.Start(); err != nil {
 		return nil, err
 	}
@@ -77,11 +66,12 @@ func (c cmd) CombinedOutput() ([]byte, error) {
 			if err := c.Cmd.Process.Signal(os.Interrupt); err != nil {
 				// If an error comes back from attempting to signal, proceed
 				// immediately to hard kill.
-				c.cancel()
+				_ = c.Cmd.Process.Kill()
 			} else {
-				stopCancel := time.AfterFunc(time.Minute, c.cancel).Stop
+				defer time.AfterFunc(time.Minute, func() {
+					_ = c.Cmd.Process.Kill()
+				}).Stop()
 				<-waitDone
-				stopCancel()
 			}
 		case <-waitDone:
 		}
