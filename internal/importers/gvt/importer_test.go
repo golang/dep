@@ -18,6 +18,8 @@ import (
 )
 
 func TestGvtConfig_Convert(t *testing.T) {
+	t.Parallel()
+
 	testCases := map[string]struct {
 		importertest.TestCase
 		gvtConfig gvtManifest
@@ -114,6 +116,7 @@ func TestGvtConfig_Convert(t *testing.T) {
 		name := name
 		testCase := testCase
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 			err := testCase.Execute(t, func(logger *log.Logger, sm gps.SourceManager) (*dep.Manifest, *dep.Lock, error) {
 				g := NewImporter(logger, true, sm)
 				g.gvtConfig = testCase.gvtConfig
@@ -129,6 +132,7 @@ func TestGvtConfig_Convert(t *testing.T) {
 func TestGvtConfig_Import(t *testing.T) {
 	h := test.NewHelper(t)
 	defer h.Cleanup()
+	h.Parallel()
 
 	cacheDir := "gps-repocache"
 	h.TempDir(cacheDir)
@@ -202,6 +206,7 @@ func TestGvtConfig_JsonLoad(t *testing.T) {
 
 	h := test.NewHelper(t)
 	defer h.Cleanup()
+	h.Parallel()
 
 	ctx := importertest.NewTestContext(h)
 
