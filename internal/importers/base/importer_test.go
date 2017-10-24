@@ -16,6 +16,8 @@ import (
 )
 
 func TestBaseImporter_IsTag(t *testing.T) {
+	t.Parallel()
+
 	testcases := map[string]struct {
 		input     string
 		wantIsTag bool
@@ -51,10 +53,8 @@ func TestBaseImporter_IsTag(t *testing.T) {
 		tc := tc
 		t.Run(name, func(t *testing.T) {
 			h := test.NewHelper(t)
+			h.Parallel()
 			defer h.Cleanup()
-			// Disable parallel tests until we can resolve this error on the Windows builds:
-			// "remote repository at https://github.com/carolynvs/deptest-importers does not exist, or is inaccessible"
-			//h.Parallel()
 
 			ctx := importertest.NewTestContext(h)
 			sm, err := ctx.SourceManager()
@@ -79,6 +79,8 @@ func TestBaseImporter_IsTag(t *testing.T) {
 }
 
 func TestBaseImporter_LookupVersionForLockedProject(t *testing.T) {
+	t.Parallel()
+
 	testcases := map[string]struct {
 		revision    gps.Revision
 		constraint  gps.Constraint
@@ -120,10 +122,8 @@ func TestBaseImporter_LookupVersionForLockedProject(t *testing.T) {
 		tc := tc
 		t.Run(name, func(t *testing.T) {
 			h := test.NewHelper(t)
+			h.Parallel()
 			defer h.Cleanup()
-			// Disable parallel tests until we can resolve this error on the Windows builds:
-			// "remote repository at https://github.com/carolynvs/deptest-importers does not exist, or is inaccessible"
-			//h.Parallel()
 
 			ctx := importertest.NewTestContext(h)
 			sm, err := ctx.SourceManager()
@@ -143,6 +143,8 @@ func TestBaseImporter_LookupVersionForLockedProject(t *testing.T) {
 }
 
 func TestBaseImporter_ImportProjects(t *testing.T) {
+	t.Parallel()
+
 	testcases := map[string]struct {
 		importertest.TestCase
 		projects []ImportedPackage

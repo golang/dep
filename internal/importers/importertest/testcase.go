@@ -46,10 +46,8 @@ func NewTestContext(h *test.Helper) *dep.Ctx {
 // Execute and validate the test case.
 func (tc TestCase) Execute(t *testing.T, convert func(logger *log.Logger, sm gps.SourceManager) (*dep.Manifest, *dep.Lock)) error {
 	h := test.NewHelper(t)
+	h.Parallel()
 	defer h.Cleanup()
-	// Disable parallel tests until we can resolve this error on the Windows builds:
-	// "remote repository at https://github.com/carolynvs/deptest-importers does not exist, or is inaccessible"
-	//h.Parallel()
 
 	ctx := NewTestContext(h)
 	sm, err := ctx.SourceManager()
