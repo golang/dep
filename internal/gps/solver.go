@@ -584,7 +584,7 @@ func (s *solver) solve(ctx context.Context) (map[atom]map[string]struct{}, error
 				}
 				return nil, err
 			}
-			err = s.selectAtom(nawp, false)
+			err = s.selectAtom(nawp, true)
 			s.mtr.pop()
 			if err != nil {
 				// Only a released SourceManager should be able to cause this.
