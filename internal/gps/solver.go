@@ -1077,7 +1077,9 @@ func (s *solver) backtrack(ctx context.Context) (bool, error) {
 				var err error
 				awp, proj, err = s.unselectLast()
 				if err != nil {
-					// Should only be possible if SourceManager was released
+					if !contextCanceledOrSMReleased(err) {
+						panic(fmt.Sprintf("canary - should only have been able to get a context cancellation or SM release, got %T %s", err, err))
+					}
 					return false, err
 				}
 				s.traceBacktrack(awp.bmi(), !proj)
@@ -1095,7 +1097,9 @@ func (s *solver) backtrack(ctx context.Context) (bool, error) {
 			var err error
 			awp, proj, err = s.unselectLast()
 			if err != nil {
-				// Should only be possible if SourceManager was released
+				if !contextCanceledOrSMReleased(err) {
+					panic(fmt.Sprintf("canary - should only have been able to get a context cancellation or SM release, got %T %s", err, err))
+				}
 				return false, err
 			}
 			s.traceBacktrack(awp.bmi(), !proj)
@@ -1118,7 +1122,9 @@ func (s *solver) backtrack(ctx context.Context) (bool, error) {
 				awp.a.v = q.current()
 				err := s.selectAtom(awp, false)
 				if err != nil {
-					// Only a released SourceManager should be able to cause this.
+					if !contextCanceledOrSMReleased(err) {
+						panic(fmt.Sprintf("canary - should only have been able to get a context cancellation or SM release, got %T %s", err, err))
+					}
 					return false, err
 				}
 				break
