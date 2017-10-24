@@ -71,7 +71,7 @@ type bridge struct {
 
 	// The cancellation context provided to the solver. Threading it through the
 	// various solver methods is needlessly verbose so long as we maintain the
-	// lifetime guarantees that a solver can only be run once, so we
+	// lifetime guarantees that a solver can only be run once.
 	ctx context.Context
 }
 
