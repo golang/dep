@@ -350,8 +350,7 @@ type Solver interface {
 	// Name returns a string identifying the particular solver backend.
 	//
 	// Different solvers likely have different invariants, and likely will not
-	// have identical possible result sets for any particular inputs; in some
-	// cases, they may even be disjoint.
+	// have the same result sets for any particular inputs.
 	Name() string
 
 	// Version returns an int indicating the version of the solver of the given

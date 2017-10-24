@@ -5,6 +5,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"io/ioutil"
 	"log"
@@ -183,7 +184,7 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 		return errors.Wrap(err, "prepare solver")
 	}
 
-	soln, err := s.Solve()
+	soln, err := s.Solve(context.TODO())
 	if err != nil {
 		handleAllTheFailuresOfTheWorld(err)
 		return err
