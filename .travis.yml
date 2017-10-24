@@ -66,8 +66,8 @@ jobs:
             - release/dep-linux-amd64.sha256
             - release/dep-darwin-amd64
             - release/dep-darwin-amd64.sha256
-            - release/dep-windows-amd64
-            - release/dep-windows-amd64.sha256
+            - release/dep-windows-amd64.exe
+            - release/dep-windows-amd64.exe.sha256
           skip_cleanup: true
           on:
             repo: golang/dep
