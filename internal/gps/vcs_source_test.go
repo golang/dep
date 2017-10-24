@@ -21,6 +21,7 @@ import (
 
 // Parent test that executes all the slow vcs interaction tests in parallel.
 func TestSlowVcs(t *testing.T) {
+	t.Parallel()
 	t.Run("write-deptree", testWriteDepTree)
 	t.Run("source-gateway", testSourceGateway)
 	t.Run("bzr-repo", testBzrRepo)

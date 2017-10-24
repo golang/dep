@@ -139,6 +139,7 @@ func TestSourceInit(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping project manager init test in short mode")
 	}
+	t.Parallel()
 
 	cpath, err := ioutil.TempDir("", "smcache")
 	if err != nil {
@@ -280,6 +281,7 @@ func TestDefaultBranchAssignment(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping default branch assignment test in short mode")
 	}
+	t.Parallel()
 
 	sm, clean := mkNaiveSM(t)
 	defer clean()
@@ -405,6 +407,7 @@ func TestSourceCreationCounts(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping slow test in short mode")
 	}
+	t.Parallel()
 
 	fixtures := map[string]sourceCreationTestFixture{
 		"gopkgin uniqueness": {
@@ -447,6 +450,7 @@ func TestGetSources(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping source setup test in short mode")
 	}
+	t.Parallel()
 	requiresBins(t, "git", "hg", "bzr")
 
 	sm, clean := mkNaiveSM(t)
@@ -513,6 +517,7 @@ func TestFSCaseSensitivityConvergesSources(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping slow test in short mode")
 	}
+	t.Parallel()
 
 	f := func(name string, pi1, pi2 ProjectIdentifier) {
 		t.Run(name, func(t *testing.T) {
@@ -571,6 +576,7 @@ func TestGetInfoListVersionsOrdering(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping slow test in short mode")
 	}
+	t.Parallel()
 
 	sm, clean := mkNaiveSM(t)
 	defer clean()
@@ -675,6 +681,7 @@ func TestMultiFetchThreadsafe(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping slow test in short mode")
 	}
+	t.Parallel()
 
 	projects := []ProjectIdentifier{
 		mkPI("github.com/sdboyer/gps"),
@@ -782,6 +789,7 @@ func TestListVersionsRacey(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping slow test in short mode")
 	}
+	t.Parallel()
 
 	sm, clean := mkNaiveSM(t)
 	defer clean()
@@ -937,6 +945,7 @@ func TestUnreachableSource(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping slow test in short mode")
 	}
+	t.Parallel()
 
 	sm, clean := mkNaiveSM(t)
 	defer clean()

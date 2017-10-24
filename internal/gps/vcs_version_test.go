@@ -17,6 +17,7 @@ func TestVCSVersion(t *testing.T) {
 	}
 
 	h := test.NewHelper(t)
+	h.Parallel()
 	defer h.Cleanup()
 	requiresBins(t, "git")
 
