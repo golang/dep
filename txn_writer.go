@@ -382,7 +382,7 @@ func (sw *SafeWriter) Write(root string, sm gps.SourceManager, examples bool, lo
 			if _, err := os.Stat(vendorbak); err == nil {
 				// If the adjacent dir already exists, bite the bullet and move
 				// to a proper tempdir.
-				vendorbak = filepath.Join(td, "vendor.orig")
+				vendorbak = filepath.Join(td, ".vendor.orig")
 			}
 
 			failerr = fs.RenameWithFallback(vpath, vendorbak)
