@@ -439,7 +439,7 @@ func ValidateParams(params SolveParameters, sm SourceManager) error {
 // This is the entry point to the main gps workhorse.
 func (s *solver) Solve(ctx context.Context) (Solution, error) {
 	// Solving can only be run once per solver.
-	if atomic.LoadInt32(&s.hasrun) == 1 {
+	if !atomic.CompareAndSwapInt32(&s.hasrun, 0, 1) {
 		return nil, errors.New("solve method can only be run once per instance")
 	}
 	// Make sure the bridge has the context before we start.
