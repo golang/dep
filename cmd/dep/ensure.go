@@ -280,8 +280,7 @@ func (cmd *ensureCommand) runDefault(ctx *dep.Ctx, args []string, p *dep.Project
 
 	solution, err := solver.Solve(context.TODO())
 	if err != nil {
-		handleAllTheFailuresOfTheWorld(err)
-		return errors.Wrap(err, "ensure Solve()")
+		return handleAllTheFailuresOfTheWorld(err)
 	}
 
 	vendorBehavior := dep.VendorOnChanged
@@ -375,8 +374,7 @@ func (cmd *ensureCommand) runUpdate(ctx *dep.Ctx, args []string, p *dep.Project,
 		// TODO(sdboyer) special handling for warning cases as described in spec
 		// - e.g., named projects did not upgrade even though newer versions
 		// were available.
-		handleAllTheFailuresOfTheWorld(err)
-		return errors.Wrap(err, "ensure Solve()")
+		return handleAllTheFailuresOfTheWorld(err)
 	}
 
 	sw, err := dep.NewSafeWriter(nil, p.Lock, dep.LockFromSolution(solution), dep.VendorOnChanged)
@@ -635,8 +633,7 @@ func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm
 	solution, err := solver.Solve(context.TODO())
 	if err != nil {
 		// TODO(sdboyer) detect if the failure was specifically about some of the -add arguments
-		handleAllTheFailuresOfTheWorld(err)
-		return errors.Wrap(err, "ensure Solve()")
+		return handleAllTheFailuresOfTheWorld(err)
 	}
 
 	// Prep post-actions and feedback from adds.
