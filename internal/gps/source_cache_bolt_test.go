@@ -15,6 +15,8 @@ import (
 )
 
 func TestBoltCacheTimeout(t *testing.T) {
+	t.Parallel()
+
 	const root = "example.com/test"
 	cpath, err := ioutil.TempDir("", "singlesourcecache")
 	if err != nil {

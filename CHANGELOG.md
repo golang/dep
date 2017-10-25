@@ -1,5 +1,9 @@
 # v0.3.3 (Unreleased)
 
+BUG FIXES:
+
+* Releases targeting Windows now have a `.exe` suffix (#1291).
+
 WIP:
 
 * dep: Enable importing other tools and add integration tests (#1277)

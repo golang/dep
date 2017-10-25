@@ -29,9 +29,13 @@ mkdir -p release
 
 for OS in ${DEP_BUILD_PLATFORMS[@]}; do
   for ARCH in ${DEP_BUILD_ARCHS[@]}; do
+    NAME="dep-$OS-$ARCH"
+    if [ "$OS" == "windows" ]; then
+      NAME="$NAME.exe"
+    fi
     echo "Building for $OS/$ARCH"
     GOARCH=$ARCH GOOS=$OS CGO_ENABLED=0 $GO_BUILD_CMD -ldflags "$GO_BUILD_LDFLAGS"\
-     -o "release/dep-$OS-$ARCH" ./cmd/dep/
-    shasum -a 256 "release/dep-$OS-$ARCH" > "release/dep-$OS-$ARCH".sha256
+     -o "release/$NAME" ./cmd/dep/
+    shasum -a 256 "release/$NAME" > "release/$NAME".sha256
   done
 done
