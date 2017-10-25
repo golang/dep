@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"path"
 	"syscall"
+	"path/filepath"
 )
 
 const loginShortHelp = `Login to a registry server and save configuration`
@@ -74,15 +75,13 @@ func (cmd *loginCommand) Run(ctx *dep.Ctx, args []string) error {
 	}
 
 	p.RegistryConfig = dep.NewRegistryConfig(args[0], token)
-
-	var sw *dep.SafeWriter
-	sw, err = dep.NewSafeWriter(nil, nil, nil, p.RegistryConfig, dep.VendorNever)
+	rc, err := p.RegistryConfig.MarshalTOML()
 	if err != nil {
 		return err
 	}
 
-	if err := sw.Write(p.AbsRoot, nil, false, ctx.Err); err != nil {
-		return errors.Wrap(err, "safe write of registry configuration")
+	if err = ioutil.WriteFile(filepath.Join(p.AbsRoot, dep.RegistryConfigName), rc, 0666); err != nil {
+		return errors.Wrap(err, "write of registry configuration")
 	}
 
 	return nil

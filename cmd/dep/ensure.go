@@ -125,7 +125,6 @@ func (cmd *ensureCommand) Register(fs *flag.FlagSet) {
 	fs.BoolVar(&cmd.add, "add", false, "add new dependencies, or populate Gopkg.toml with constraints for existing dependencies")
 	fs.BoolVar(&cmd.vendorOnly, "vendor-only", false, "populate vendor/ from Gopkg.lock without updating it first")
 	fs.BoolVar(&cmd.noVendor, "no-vendor", false, "update Gopkg.lock (if needed), but do not update vendor/")
-	fs.BoolVar(&cmd.noRegistry, "no-registry", false, "disable downloading dependencies using registry config")
 	fs.BoolVar(&cmd.dryRun, "dry-run", false, "only report the changes that would be made")
 }
 
@@ -135,7 +134,6 @@ type ensureCommand struct {
 	add        bool
 	noVendor   bool
 	vendorOnly bool
-	noRegistry bool
 	dryRun     bool
 }
 
@@ -154,7 +152,7 @@ func (cmd *ensureCommand) Run(ctx *dep.Ctx, args []string) error {
 		return err
 	}
 
-	sm, err := ctx.SourceManager(cmd.noRegistry)
+	sm, err := ctx.SourceManager()
 	if err != nil {
 		return err
 	}
@@ -247,7 +245,7 @@ func (cmd *ensureCommand) runDefault(ctx *dep.Ctx, args []string, p *dep.Project
 		// that "verification" is supposed to look like (#121); in the meantime,
 		// we unconditionally write out vendor/ so that `dep ensure`'s behavior
 		// is maximally compatible with what it will eventually become.
-		sw, err := dep.NewSafeWriter(nil, p.Lock, p.Lock, nil, dep.VendorAlways)
+		sw, err := dep.NewSafeWriter(nil, p.Lock, p.Lock, dep.VendorAlways)
 		if err != nil {
 			return err
 		}
@@ -273,7 +271,7 @@ func (cmd *ensureCommand) runDefault(ctx *dep.Ctx, args []string, p *dep.Project
 	if cmd.noVendor {
 		vendorBehavior = dep.VendorNever
 	}
-	sw, err := dep.NewSafeWriter(nil, p.Lock, dep.LockFromSolution(solution), nil, vendorBehavior)
+	sw, err := dep.NewSafeWriter(nil, p.Lock, dep.LockFromSolution(solution), vendorBehavior)
 	if err != nil {
 		return err
 	}
@@ -298,7 +296,7 @@ func (cmd *ensureCommand) runVendorOnly(ctx *dep.Ctx, args []string, p *dep.Proj
 	}
 	// Pass the same lock as old and new so that the writer will observe no
 	// difference and choose not to write it out.
-	sw, err := dep.NewSafeWriter(nil, p.Lock, p.Lock, nil, dep.VendorAlways)
+	sw, err := dep.NewSafeWriter(nil, p.Lock, p.Lock, dep.VendorAlways)
 	if err != nil {
 		return err
 	}
@@ -394,7 +392,7 @@ func (cmd *ensureCommand) runUpdate(ctx *dep.Ctx, args []string, p *dep.Project,
 		return errors.Wrap(err, "ensure Solve()")
 	}
 
-	sw, err := dep.NewSafeWriter(nil, p.Lock, dep.LockFromSolution(solution), nil, dep.VendorOnChanged)
+	sw, err := dep.NewSafeWriter(nil, p.Lock, dep.LockFromSolution(solution), dep.VendorOnChanged)
 	if err != nil {
 		return err
 	}
@@ -651,7 +649,7 @@ func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm
 	}
 	sort.Strings(reqlist)
 
-	sw, err := dep.NewSafeWriter(nil, p.Lock, dep.LockFromSolution(solution), nil, dep.VendorOnChanged)
+	sw, err := dep.NewSafeWriter(nil, p.Lock, dep.LockFromSolution(solution), dep.VendorOnChanged)
 	if err != nil {
 		return err
 	}

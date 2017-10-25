@@ -126,7 +126,7 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 	}
 	p.ImportRoot = gps.ProjectRoot(ip)
 
-	sm, err := ctx.SourceManager(false)
+	sm, err := ctx.SourceManager()
 	if err != nil {
 		return errors.Wrap(err, "getSourceManager")
 	}
@@ -210,7 +210,7 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 		ctx.Err.Printf("Old vendor backed up to %v", vendorbak)
 	}
 
-	sw, err := dep.NewSafeWriter(p.Manifest, nil, p.Lock, nil, dep.VendorAlways)
+	sw, err := dep.NewSafeWriter(p.Manifest, nil, p.Lock, dep.VendorAlways)
 	if err != nil {
 		return err
 	}

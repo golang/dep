@@ -460,7 +460,7 @@ func TestValidateProjectRoots(t *testing.T) {
 		Err:    errLogger,
 	}
 
-	sm, err := ctx.SourceManager(false)
+	sm, err := ctx.SourceManager()
 	h.Must(err)
 	defer sm.Release()
 

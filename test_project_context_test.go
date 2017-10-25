@@ -42,7 +42,7 @@ func NewTestProjectContext(h *test.Helper, projectName string) *TestProjectConte
 		Out:    discardLogger,
 		Err:    discardLogger,
 	}
-	pc.SourceManager, err = pc.Context.SourceManager(false)
+	pc.SourceManager, err = pc.Context.SourceManager()
 	h.Must(errors.Wrap(err, "Unable to create a SourceManager"))
 
 	return pc

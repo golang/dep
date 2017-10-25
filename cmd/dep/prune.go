@@ -47,7 +47,7 @@ func (cmd *pruneCommand) Run(ctx *dep.Ctx, args []string) error {
 		return err
 	}
 
-	sm, err := ctx.SourceManager(false)
+	sm, err := ctx.SourceManager()
 	if err != nil {
 		return err
 	}

@@ -74,7 +74,7 @@ func TestVndrConfig_Import(t *testing.T) {
 	defer h.Cleanup()
 
 	ctx := newTestContext(h)
-	sm, err := ctx.SourceManager(false)
+	sm, err := ctx.SourceManager()
 	h.Must(err)
 	defer sm.Release()
 

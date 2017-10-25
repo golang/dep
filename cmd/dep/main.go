@@ -126,6 +126,7 @@ func (c *Config) Run() (exitCode int) {
 			fs := flag.NewFlagSet(cmdName, flag.ContinueOnError)
 			fs.SetOutput(c.Stderr)
 			verbose := fs.Bool("v", false, "enable verbose logging")
+			noRegistry := fs.Bool("no-registry", false, "disable using registry config")
 
 			// Register the subcommand flags in there, too.
 			cmd.Register(fs)
@@ -149,9 +150,10 @@ func (c *Config) Run() (exitCode int) {
 
 			// Set up dep context.
 			ctx := &dep.Ctx{
-				Out:     outLogger,
-				Err:     errLogger,
-				Verbose: *verbose,
+				Out:        outLogger,
+				Err:        errLogger,
+				Verbose:    *verbose,
+				NoRegistry: *noRegistry,
 			}
 
 			GOPATHS := filepath.SplitList(getEnv(c.Env, "GOPATH"))

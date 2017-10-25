@@ -38,6 +38,7 @@ type Ctx struct {
 	GOPATH     string      // Selected Go path, containing WorkingDir.
 	GOPATHs    []string    // Other Go paths.
 	Out, Err   *log.Logger // Required loggers.
+	NoRegistry bool        // Disable registry.
 	Verbose    bool        // Enables more verbose logging.
 }
 
@@ -85,7 +86,7 @@ func defaultGOPATH() string {
 
 // SourceManager produces an instance of gps's built-in SourceManager
 // initialized to log to the receiver's logger.
-func (c *Ctx) SourceManager(noRegistry bool) (*gps.SourceMgr, error) {
+func (c *Ctx) SourceManager() (*gps.SourceMgr, error) {
 	var registry *registryConfig
 	if root, err := findProjectRoot(c.WorkingDir); err == nil {
 		registry, err = c.getRegistryConfig(root)
@@ -97,10 +98,10 @@ func (c *Ctx) SourceManager(noRegistry bool) (*gps.SourceMgr, error) {
 		Cachedir: filepath.Join(c.GOPATH, "pkg", "dep"),
 		Logger:   c.Out,
 	}
-	if registry != nil && !noRegistry {
-		return gps.NewSourceManager(smc, registry)
+	if registry == nil || c.NoRegistry {
+		return gps.NewSourceManager(smc, nil)
 	}
-	return gps.NewSourceManager(smc, nil)
+	return gps.NewSourceManager(smc, registry)
 }
 
 func (c *Ctx) getRegistryConfig(rootPath string) (*registryConfig, error) {

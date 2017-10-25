@@ -78,7 +78,7 @@ func TestBaseImporter_IsTag(t *testing.T) {
 			h.Parallel()
 
 			ctx := newTestContext(h)
-			sm, err := ctx.SourceManager(false)
+			sm, err := ctx.SourceManager()
 			h.Must(err)
 			defer sm.Release()
 
@@ -147,7 +147,7 @@ func TestBaseImporter_LookupVersionForLockedProject(t *testing.T) {
 			//h.Parallel()
 
 			ctx := newTestContext(h)
-			sm, err := ctx.SourceManager(false)
+			sm, err := ctx.SourceManager()
 			h.Must(err)
 			defer sm.Release()
 
@@ -431,7 +431,7 @@ func (tc convertTestCase) Exec(t *testing.T, convert func(logger *log.Logger, sm
 	//h.Parallel()
 
 	ctx := newTestContext(h)
-	sm, err := ctx.SourceManager(false)
+	sm, err := ctx.SourceManager()
 	h.Must(err)
 	defer sm.Release()
 
