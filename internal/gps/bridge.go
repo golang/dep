@@ -5,7 +5,6 @@
 package gps
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -72,7 +71,8 @@ type bridge struct {
 	// The cancellation context provided to the solver. Threading it through the
 	// various solver methods is needlessly verbose so long as we maintain the
 	// lifetime guarantees that a solver can only be run once.
-	ctx context.Context
+	// TODO(sdboyer) uncomment this and thread it through SourceManager methods
+	//ctx context.Context
 }
 
 // mkBridge creates a bridge
