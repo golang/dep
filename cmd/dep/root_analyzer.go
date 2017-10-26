@@ -5,8 +5,11 @@
 package main
 
 import (
+	"context"
 	"io/ioutil"
 	"log"
+
+	"golang.org/x/sync/errgroup"
 
 	"github.com/golang/dep"
 	fb "github.com/golang/dep/internal/feedback"
@@ -45,12 +48,62 @@ func (a *rootAnalyzer) InitializeRootManifestAndLock(dir string, pr gps.ProjectR
 
 	if rootM == nil {
 		rootM = dep.NewManifest()
+
+		// Since we didn't find anything to import, dep's cache is empty.
+		// We are prefetching dependencies and logging so that the subsequent solve step
+		// doesn't spend a long time retrieving dependencies without feedback for the user.
+		if err := a.cacheDeps(pr); err != nil {
+			return nil, nil, err
+		}
 	}
 	if rootL == nil {
 		rootL = &dep.Lock{}
 	}
 
 	return
+}
+
+func (a *rootAnalyzer) cacheDeps(pr gps.ProjectRoot) error {
+	logger := a.ctx.Err
+	g, _ := errgroup.WithContext(context.TODO())
+	concurrency := 4
+
+	syncDep := func(pr gps.ProjectRoot, sm gps.SourceManager) error {
+		if err := sm.SyncSourceFor(gps.ProjectIdentifier{ProjectRoot: pr}); err != nil {
+			logger.Printf("Unable to cache %s - %s", pr, err)
+			return err
+		}
+		return nil
+	}
+
+	deps := make(chan string)
+
+	for i := 0; i < concurrency; i++ {
+		g.Go(func() error {
+			for d := range deps {
+				err := syncDep(gps.ProjectRoot(d), a.sm)
+				if err != nil {
+					return err
+				}
+			}
+			return nil
+		})
+	}
+
+	g.Go(func() error {
+		defer close(deps)
+		for pr := range a.directDeps {
+			logger.Printf("Caching package %q", pr)
+			deps <- pr
+		}
+		return nil
+	})
+
+	if err := g.Wait(); err != nil {
+		return err
+	}
+	logger.Printf("Successfully cached all deps.")
+	return nil
 }
 
 func (a *rootAnalyzer) importManifestAndLock(dir string, pr gps.ProjectRoot, suppressLogs bool) (*dep.Manifest, *dep.Lock, error) {
