@@ -4,6 +4,10 @@ BUG FIXES:
 
 * Releases targeting Windows now have a `.exe` suffix (#1291).
 
+IMPROVEMENTS:
+
+* Log as dependencies are pre-fetched during dep init ([#1176](https://github.com/golang/dep/pull/1176)).
+
 # v0.3.2
 
 NEW FEATURES:
@@ -61,7 +65,7 @@ importer would drop the imported version of a project (#1100)
 * Import analyzer now always uses the same name, fixing the lock mismatch
 immediately after dep init issue (#1099)
 * Add support for importing from [govend](https://github.com/govend/govend)
-(#1040) and [LK4D4/vndr](https://github.com/LK4D4/vndr) (#978) based projects 
+(#1040) and [LK4D4/vndr](https://github.com/LK4D4/vndr) (#978) based projects
 * gps: gps no longer assumes that every git repo has a HEAD (#1053)
 * `os.Chmod` failures on Windows due to long path length has been fixed (#925)
 * Add `version` command (#996)
