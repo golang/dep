@@ -124,8 +124,8 @@ type gitSource struct {
 }
 
 // ensureClean sees to it that a git repository is clean and in working order,
-// or returns an error if it can't.
-func (s *gitSource) cleanup(ctx context.Context) error {
+// or returns an error if the adaptive recovery attempts fail.
+func (s *gitSource) ensureClean(ctx context.Context) error {
 	r := s.repo.(*gitRepo)
 	cmd := commandContext(
 		ctx,

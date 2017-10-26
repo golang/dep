@@ -259,12 +259,6 @@ func TestSourceInit(t *testing.T) {
 
 	os.Stat(filepath.Join(cpath, "metadata", "github.com", "sdboyer", "gpkt", "cache.json"))
 
-	// TODO(sdboyer) disabled until we get caching working
-	//_, err = os.Stat(filepath.Join(cpath, "metadata", "github.com", "sdboyer", "gpkt", "cache.json"))
-	//if err != nil {
-	//t.Error("Metadata cache json file does not exist in expected location")
-	//}
-
 	// Ensure source existence values are what we expect
 	var exists bool
 	exists, err = sm.SourceExists(id)
