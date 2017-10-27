@@ -440,22 +440,20 @@ func (s *solver) Solve() (Solution, error) {
 	all, err := s.solve()
 
 	s.mtr.pop()
-	var soln solution
-	if err == nil {
-		soln = solution{
-			att:  s.attempts,
-			solv: s,
-		}
-		soln.analyzerInfo = s.rd.an.Info()
-		soln.hd = s.HashInputs()
 
-		// Convert ProjectAtoms into LockedProjects
-		soln.p = make([]LockedProject, len(all))
-		k := 0
-		for pa, pl := range all {
-			soln.p[k] = pa2lp(pa, pl)
-			k++
-		}
+	soln := solution{
+		att:  s.attempts,
+		solv: s,
+	}
+	soln.analyzerInfo = s.rd.an.Info()
+	soln.hd = s.HashInputs()
+
+	// Convert ProjectAtoms into LockedProjects
+	soln.p = make([]LockedProject, len(all))
+	k := 0
+	for pa, pl := range all {
+		soln.p[k] = pa2lp(pa, pl)
+		k++
 	}
 
 	s.traceFinish(soln, err)
@@ -463,6 +461,26 @@ func (s *solver) Solve() (Solution, error) {
 		s.mtr.dump(s.tl)
 	}
 	return soln, err
+}
+
+func (s *solver) combine() map[atom]map[string]struct{} {
+	projs := make(map[atom]map[string]struct{})
+
+	// Skip the first project. It's always the root, and that shouldn't be
+	// included in results.
+	for _, sel := range s.sel.projects[1:] {
+		pm, exists := projs[sel.a.a]
+		if !exists {
+			pm = make(map[string]struct{})
+			projs[sel.a.a] = pm
+		}
+
+		for _, path := range sel.a.pl {
+			pm[path] = struct{}{}
+		}
+	}
+
+	return projs
 }
 
 // solve is the top-level loop for the solving process.
@@ -496,7 +514,7 @@ func (s *solver) solve() (map[atom]map[string]struct{}, error) {
 					// backtracking succeeded, move to the next unselected id
 					continue
 				}
-				return nil, err
+				return s.combine(), err
 			}
 
 			if queue.current() == nil {
@@ -544,7 +562,7 @@ func (s *solver) solve() (map[atom]map[string]struct{}, error) {
 					continue
 				}
 				s.mtr.pop()
-				return nil, err
+				return s.combine(), err
 			}
 			s.selectAtom(nawp, true)
 			// We don't add anything to the stack of version queues because the
@@ -556,22 +574,8 @@ func (s *solver) solve() (map[atom]map[string]struct{}, error) {
 
 	// Getting this far means we successfully found a solution. Combine the
 	// selected projects and packages.
-	projs := make(map[atom]map[string]struct{})
 
-	// Skip the first project. It's always the root, and that shouldn't be
-	// included in results.
-	for _, sel := range s.sel.projects[1:] {
-		pm, exists := projs[sel.a.a]
-		if !exists {
-			pm = make(map[string]struct{})
-			projs[sel.a.a] = pm
-		}
-
-		for _, path := range sel.a.pl {
-			pm[path] = struct{}{}
-		}
-	}
-	return projs, nil
+	return s.combine(), nil
 }
 
 // selectRoot is a specialized selectAtom, used solely to initially

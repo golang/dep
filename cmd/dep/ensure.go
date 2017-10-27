@@ -270,7 +270,7 @@ func (cmd *ensureCommand) runDefault(ctx *dep.Ctx, args []string, p *dep.Project
 		if !ctx.Verbose {
 			logger = log.New(ioutil.Discard, "", 0)
 		}
-		return errors.WithMessage(sw.Write(p.AbsRoot, sm, true, logger), "grouped write of manifest, lock and vendor")
+		return errors.WithMessage(sw.Write(p.AbsRoot, sm, true, false, logger), "grouped write of manifest, lock and vendor")
 	}
 
 	if cmd.noVendor && cmd.dryRun {
@@ -299,7 +299,7 @@ func (cmd *ensureCommand) runDefault(ctx *dep.Ctx, args []string, p *dep.Project
 	if !ctx.Verbose {
 		logger = log.New(ioutil.Discard, "", 0)
 	}
-	return errors.Wrap(sw.Write(p.AbsRoot, sm, false, logger), "grouped write of manifest, lock and vendor")
+	return errors.Wrap(sw.Write(p.AbsRoot, sm, false, false, logger), "grouped write of manifest, lock and vendor")
 }
 
 func (cmd *ensureCommand) runVendorOnly(ctx *dep.Ctx, args []string, p *dep.Project, sm gps.SourceManager, params gps.SolveParameters) error {
@@ -325,7 +325,7 @@ func (cmd *ensureCommand) runVendorOnly(ctx *dep.Ctx, args []string, p *dep.Proj
 	if !ctx.Verbose {
 		logger = log.New(ioutil.Discard, "", 0)
 	}
-	return errors.WithMessage(sw.Write(p.AbsRoot, sm, true, logger), "grouped write of manifest, lock and vendor")
+	return errors.WithMessage(sw.Write(p.AbsRoot, sm, true, false, logger), "grouped write of manifest, lock and vendor")
 }
 
 func (cmd *ensureCommand) runUpdate(ctx *dep.Ctx, args []string, p *dep.Project, sm gps.SourceManager, params gps.SolveParameters) error {
@@ -390,7 +390,7 @@ func (cmd *ensureCommand) runUpdate(ctx *dep.Ctx, args []string, p *dep.Project,
 	if !ctx.Verbose {
 		logger = log.New(ioutil.Discard, "", 0)
 	}
-	return errors.Wrap(sw.Write(p.AbsRoot, sm, false, logger), "grouped write of manifest, lock and vendor")
+	return errors.Wrap(sw.Write(p.AbsRoot, sm, false, false, logger), "grouped write of manifest, lock and vendor")
 }
 
 func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm gps.SourceManager, params gps.SolveParameters) error {
@@ -691,7 +691,7 @@ func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm
 	if !ctx.Verbose {
 		logger = log.New(ioutil.Discard, "", 0)
 	}
-	if err := errors.Wrap(sw.Write(p.AbsRoot, sm, true, logger), "grouped write of manifest, lock and vendor"); err != nil {
+	if err := errors.Wrap(sw.Write(p.AbsRoot, sm, true, false, logger), "grouped write of manifest, lock and vendor"); err != nil {
 		return err
 	}
 
