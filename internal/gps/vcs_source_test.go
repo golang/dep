@@ -697,11 +697,10 @@ func TestGitSourceAdaptiveCleanup(t *testing.T) {
 
 	// Create a file that git will see as untracked.
 	untrackedPath := filepath.Join(repodir, "untrackedfile")
-	f, err := os.Create(untrackedPath)
+	err = ioutil.WriteFile(untrackedPath, []byte("foo"), 0644)
 	if err != nil {
 		t.Fatal(err)
 	}
-	f.Close()
 
 	mkSM()
 	err = sm.SyncSourceFor(id)
