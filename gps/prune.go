@@ -140,7 +140,6 @@ func pruneUnusedPackages(lp LockedProject, projectDir string, logger *log.Logger
 
 // calculateUnusedPackages generates a list of unused packages in lp.
 func calculateUnusedPackages(lp LockedProject, projectDir string) (map[string]struct{}, error) {
-	// TODO(ibrasho): optimize this...
 	unused := make(map[string]struct{})
 	imported := make(map[string]struct{})
 	for _, pkg := range lp.Packages() {
@@ -175,7 +174,6 @@ func calculateUnusedPackages(lp LockedProject, projectDir string) (map[string]st
 
 // collectUnusedPackagesFiles returns a slice of all files in the unused packages in projectDir.
 func collectUnusedPackagesFiles(projectDir string, unusedPackages map[string]struct{}) ([]string, error) {
-	// TODO(ibrasho): is this useful?
 	files := make([]string, 0, len(unusedPackages))
 
 	err := filepath.Walk(projectDir, func(path string, info os.FileInfo, err error) error {
