@@ -10,8 +10,8 @@ import (
 	"io"
 	"sort"
 
+	"github.com/BurntSushi/toml"
 	"github.com/golang/dep/internal/gps"
-	"github.com/pelletier/go-toml"
 	"github.com/pkg/errors"
 )
 
@@ -172,9 +172,15 @@ func (l *Lock) toRaw() rawLock {
 
 // MarshalTOML serializes this lock into TOML via an intermediate raw form.
 func (l *Lock) MarshalTOML() ([]byte, error) {
+	buf := &bytes.Buffer{}
 	raw := l.toRaw()
-	result, err := toml.Marshal(raw)
-	return result, errors.Wrap(err, "Unable to marshal lock to TOML string")
+
+	err := toml.NewEncoder(buf).Encode(raw)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to marshal lock to TOML string")
+	}
+
+	return buf.Bytes(), nil
 }
 
 // LockFromSolution converts a gps.Solution to dep's representation of a lock.

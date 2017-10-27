@@ -1,6 +1,6 @@
 [[constraint]]
-  branch = "parse-constraints-with-dash-in-pre"
   name = "github.com/Masterminds/semver"
+  branch = "parse-constraints-with-dash-in-pre"
   source = "https://github.com/carolynvs/semver.git"
 
 [[constraint]]
@@ -8,12 +8,12 @@
   version = "1.11.0"
 
 [[constraint]]
-  branch = "v2"
   name = "github.com/go-yaml/yaml"
+  branch = "v2"
 
 [[constraint]]
-  branch = "master"
   name = "github.com/pelletier/go-toml"
+  branch = "master"
 
 [[constraint]]
   name = "github.com/pkg/errors"
@@ -30,3 +30,7 @@
 [[constraint]]
   name = "github.com/golang/protobuf"
   branch = "master"
+
+[[constraint]]
+  name = "github.com/BurntSushi/toml"
+  version = "0.3.0"
