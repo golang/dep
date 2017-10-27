@@ -7,6 +7,7 @@ package dep
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"reflect"
@@ -47,7 +48,8 @@ func TestReadManifest(t *testing.T) {
 		Ignored:      []string{"github.com/foo/bar"},
 		PruneOptions: gps.PruneNestedVendorDirs | gps.PruneNonGoFiles,
 		PruneProjectOptions: gps.PruneProjectOptions{
-			gps.ProjectRoot("github.com/golang/dep"): gps.PruneNestedVendorDirs,
+			gps.ProjectRoot("github.com/golang/dep"):   gps.PruneNestedVendorDirs,
+			gps.ProjectRoot("github.com/babble/brook"): gps.PruneNestedVendorDirs | gps.PruneGoTestFiles,
 		},
 	}
 
@@ -81,11 +83,6 @@ func TestWriteManifest(t *testing.T) {
 		Constraint: gps.NewBranch("master"),
 	}
 	m.Ignored = []string{"github.com/foo/bar"}
-
-	m.PruneOptions = gps.PruneNestedVendorDirs | gps.PruneNonGoFiles
-	m.PruneProjectOptions = gps.PruneProjectOptions{
-		gps.ProjectRoot("github.com/golang/dep"): gps.PruneNestedVendorDirs,
-	}
 
 	got, err := m.MarshalTOML()
 	if err != nil {
@@ -364,7 +361,9 @@ func TestValidateManifest(t *testing.T) {
 			  name = "github.com/foo/bar"
 			  revision = "b86ad16"
 			`,
-			wantWarn:  []error{errors.New("revision \"b86ad16\" should not be in abbreviated form")},
+			wantWarn: []error{
+				errors.New("revision \"b86ad16\" should not be in abbreviated form"),
+			},
 			wantError: nil,
 		},
 		{
@@ -380,10 +379,6 @@ func TestValidateManifest(t *testing.T) {
 		{
 			name: "valid prune options",
 			tomlString: `
-			[[constraint]]
-			  name = "github.com/foo/bar"
-			  version = "1.0.0"
-
 			[prune]
 			  non-go = true
 			`,
@@ -393,26 +388,37 @@ func TestValidateManifest(t *testing.T) {
 		{
 			name: "invalid root prune options",
 			tomlString: `
-			[[constraint]]
-			  name = "github.com/foo/bar"
-			  version = "1.0.0"
-
 			[prune]
 			  non-go = false
 			`,
 			wantWarn:  []error{},
 			wantError: errInvalidRootPruneValue,
 		},
-	}
+		{
+			name: "root options should not contain a name",
+			tomlString: `
+			[prune]
+			  go-tests = true
+			  name = "github.com/golang/dep"
+			`,
+			wantWarn: []error{
+				fmt.Errorf("%q should not include a name", "prune"),
+			},
+			wantError: nil,
+		},
+		{
+			name: "invalid prune project",
+			tomlString: `
+			[prune]
+			  non-go = true
 
-	// contains for error
-	contains := func(s []error, e error) bool {
-		for _, a := range s {
-			if a.Error() == e.Error() {
-				return true
-			}
-		}
-		return false
+			  [prune.project]
+			    name = "github.com/org/project"
+			    non-go = true
+			`,
+			wantWarn:  []error{},
+			wantError: errInvalidPruneProject,
+		},
 	}
 
 	for _, c := range cases {
@@ -431,8 +437,49 @@ func TestValidateManifest(t *testing.T) {
 
 			// check if the expected errors exist in actual errors slice
 			for _, er := range errs {
-				if !contains(c.wantWarn, er) {
+				if !containsErr(c.wantWarn, er) {
 					t.Fatalf("manifest errors are not as expected: \n\t(MISSING) %v\n\t(FROM) %v", er, c.wantWarn)
+				}
+			}
+		})
+	}
+}
+
+func TestCheckRedundantPruneOptions(t *testing.T) {
+	cases := []struct {
+		name         string
+		pruneOptions rawPruneOptions
+		wantWarn     []error
+	}{
+		{
+			name: "redundant project prune options",
+			pruneOptions: rawPruneOptions{
+				NonGoFiles: true,
+				Projects: []rawPruneProjectOptions{
+					rawPruneProjectOptions{
+						Name:       "github.com/org/project",
+						NonGoFiles: true,
+					},
+				},
+			},
+			wantWarn: []error{
+				fmt.Errorf("redundant prune option %q set for %q", "non-go", "github.com/org/project"),
+			},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			errs := checkRedundantPruneOptions(rawManifest{PruneOptions: c.pruneOptions})
+
+			// compare length of error slice
+			if len(errs) != len(c.wantWarn) {
+				t.Fatalf("number of manifest errors are not as expected:\n\t(GOT) %v errors(%v)\n\t(WNT) %v errors(%v).", len(errs), errs, len(c.wantWarn), c.wantWarn)
+			}
+
+			for _, er := range errs {
+				if !containsErr(c.wantWarn, er) {
+					t.Fatalf("manifest errors are not as expected:\n\t(MISSING)\n%v\n\t(FROM)\n%v", er, c.wantWarn)
 				}
 			}
 		})
@@ -544,4 +591,17 @@ func TestValidateProjectRoots(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestPruneOptionsFor(t *testing.T) {
+
+}
+
+func containsErr(s []error, e error) bool {
+	for _, a := range s {
+		if a.Error() == e.Error() {
+			return true
+		}
+	}
+	return false
 }

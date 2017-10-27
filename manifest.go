@@ -226,6 +226,7 @@ func validatePruneOptions(val interface{}, root bool) (warns []error, err error)
 			if reflect.TypeOf(value).Kind() != reflect.Slice {
 				return warns, errInvalidPruneProject
 			}
+
 			for _, project := range value.([]interface{}) {
 				projectWarns, err := validatePruneOptions(project, false)
 				warns = append(warns, projectWarns...)
@@ -559,6 +560,10 @@ func (m *Manifest) RequiredPackages() map[string]bool {
 	return mp
 }
 
+// PruneOptionsFor returns the prune options for the passed project root.
+//
+// It will return the root prune options if the project does not have specific
+// options or if it does not exists in the manifest.
 func (m *Manifest) PruneOptionsFor(pr gps.ProjectRoot) gps.PruneOptions {
 	if po, ok := m.PruneProjectOptions[pr]; ok {
 		return po
