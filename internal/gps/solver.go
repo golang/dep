@@ -6,15 +6,18 @@ package gps
 
 import (
 	"container/heap"
+	"context"
 	"fmt"
 	"log"
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"github.com/armon/go-radix"
 	"github.com/golang/dep/internal/gps/paths"
 	"github.com/golang/dep/internal/gps/pkgtree"
+	"github.com/pkg/errors"
 )
 
 var rootRev = Revision("")
@@ -160,6 +163,10 @@ type solver struct {
 
 	// metrics for the current solve run.
 	mtr *metrics
+
+	// Indicates whether the solver has been run. It is invalid to run this type
+	// of solver more than once.
+	hasrun int32
 }
 
 func (params SolveParameters) toRootdata() (rootdata, error) {
@@ -332,15 +339,18 @@ type Solver interface {
 	// In such a case, it may not be necessary to run Solve() at all.
 	HashInputs() []byte
 
-	// Solve initiates a solving run. It will either complete successfully with
-	// a Solution, or fail with an informative error.
-	Solve() (Solution, error)
+	// Solve initiates a solving run. It will either abort due to a canceled
+	// Context, complete successfully with a Solution, or fail with an
+	// informative error.
+	//
+	// It is generally not allowed that this method be called twice for any
+	// given solver.
+	Solve(context.Context) (Solution, error)
 
 	// Name returns a string identifying the particular solver backend.
 	//
 	// Different solvers likely have different invariants, and likely will not
-	// have identical possible result sets for any particular inputs; in some
-	// cases, they may even be disjoint.
+	// have the same result sets for any particular inputs.
 	Name() string
 
 	// Version returns an int indicating the version of the solver of the given
@@ -427,7 +437,14 @@ func ValidateParams(params SolveParameters, sm SourceManager) error {
 // represented by the SolveParameters with which this Solver was created.
 //
 // This is the entry point to the main gps workhorse.
-func (s *solver) Solve() (Solution, error) {
+func (s *solver) Solve(ctx context.Context) (Solution, error) {
+	// Solving can only be run once per solver.
+	if !atomic.CompareAndSwapInt32(&s.hasrun, 0, 1) {
+		return nil, errors.New("solve method can only be run once per instance")
+	}
+	// Make sure the bridge has the context before we start.
+	//s.b.ctx = ctx
+
 	// Set up a metrics object
 	s.mtr = newMetrics()
 	s.vUnify.mtr = s.mtr
@@ -437,7 +454,7 @@ func (s *solver) Solve() (Solution, error) {
 		return nil, err
 	}
 
-	all, err := s.solve()
+	all, err := s.solve(ctx)
 
 	s.mtr.pop()
 	var soln solution
@@ -466,9 +483,19 @@ func (s *solver) Solve() (Solution, error) {
 }
 
 // solve is the top-level loop for the solving process.
-func (s *solver) solve() (map[atom]map[string]struct{}, error) {
+func (s *solver) solve(ctx context.Context) (map[atom]map[string]struct{}, error) {
+	// Pull out the donechan once up front so that we're not potentially
+	// triggering mutex cycling and channel creation on each iteration.
+	donechan := ctx.Done()
+
 	// Main solving loop
 	for {
+		select {
+		case <-donechan:
+			return nil, ctx.Err()
+		default:
+		}
+
 		bmi, has := s.nextUnselected()
 
 		if !has {
@@ -489,10 +516,13 @@ func (s *solver) solve() (map[atom]map[string]struct{}, error) {
 			// to create a version queue.
 			queue, err := s.createVersionQueue(bmi)
 			if err != nil {
+				s.mtr.pop()
 				// Err means a failure somewhere down the line; try backtracking.
 				s.traceStartBacktrack(bmi, err, false)
-				s.mtr.pop()
-				if s.backtrack() {
+				success, berr := s.backtrack(ctx)
+				if berr != nil {
+					err = berr
+				} else if success {
 					// backtracking succeeded, move to the next unselected id
 					continue
 				}
@@ -510,9 +540,14 @@ func (s *solver) solve() (map[atom]map[string]struct{}, error) {
 				},
 				pl: bmi.pl,
 			}
-			s.selectAtom(awp, false)
-			s.vqs = append(s.vqs, queue)
+			err = s.selectAtom(awp, false)
 			s.mtr.pop()
+			if err != nil {
+				// Only a released SourceManager should be able to cause this.
+				return nil, err
+			}
+
+			s.vqs = append(s.vqs, queue)
 		} else {
 			s.mtr.push("add-atom")
 			// We're just trying to add packages to an already-selected project.
@@ -537,20 +572,28 @@ func (s *solver) solve() (map[atom]map[string]struct{}, error) {
 			s.traceCheckPkgs(bmi)
 			err := s.check(nawp, true)
 			if err != nil {
+				s.mtr.pop()
 				// Err means a failure somewhere down the line; try backtracking.
 				s.traceStartBacktrack(bmi, err, true)
-				if s.backtrack() {
+				success, berr := s.backtrack(ctx)
+				if berr != nil {
+					err = berr
+				} else if success {
 					// backtracking succeeded, move to the next unselected id
 					continue
 				}
-				s.mtr.pop()
 				return nil, err
 			}
-			s.selectAtom(nawp, true)
+			err = s.selectAtom(nawp, true)
+			s.mtr.pop()
+			if err != nil {
+				// Only a released SourceManager should be able to cause this.
+				return nil, err
+			}
+
 			// We don't add anything to the stack of version queues because the
 			// backtracker knows not to pop the vqstack if it backtracks
 			// across a pure-package addition.
-			s.mtr.pop()
 		}
 	}
 
@@ -583,11 +626,14 @@ func (s *solver) selectRoot() error {
 	s.sel.pushSelection(awp, false)
 
 	// If we're looking for root's deps, get it from opts and local root
-	// analysis, rather than having the sm do it
+	// analysis, rather than having the sm do it.
 	deps, err := s.intersectConstraintsWithImports(s.rd.combineConstraints(), s.rd.externalImportList(s.stdLibFn))
 	if err != nil {
+		if contextCanceledOrSMReleased(err) {
+			return err
+		}
 		// TODO(sdboyer) this could well happen; handle it with a more graceful error
-		panic(fmt.Sprintf("shouldn't be possible %s", err))
+		panic(fmt.Sprintf("canary - shouldn't be possible %s", err))
 	}
 
 	for _, dep := range deps {
@@ -997,18 +1043,26 @@ func (s *solver) getLockVersionIfValid(id ProjectIdentifier) (Version, error) {
 
 // backtrack works backwards from the current failed solution to find the next
 // solution to try.
-func (s *solver) backtrack() bool {
+func (s *solver) backtrack(ctx context.Context) (bool, error) {
 	if len(s.vqs) == 0 {
 		// nothing to backtrack to
-		return false
+		return false, nil
 	}
 
+	donechan := ctx.Done()
 	s.mtr.push("backtrack")
+	defer s.mtr.pop()
 	for {
 		for {
+			select {
+			case <-donechan:
+				return false, ctx.Err()
+			default:
+			}
+
 			if len(s.vqs) == 0 {
 				// no more versions, nowhere further to backtrack
-				return false
+				return false, nil
 			}
 			if s.vqs[len(s.vqs)-1].failed {
 				break
@@ -1020,7 +1074,14 @@ func (s *solver) backtrack() bool {
 			var proj bool
 			var awp atomWithPackages
 			for !proj {
-				awp, proj = s.unselectLast()
+				var err error
+				awp, proj, err = s.unselectLast()
+				if err != nil {
+					if !contextCanceledOrSMReleased(err) {
+						panic(fmt.Sprintf("canary - should only have been able to get a context cancellation or SM release, got %T %s", err, err))
+					}
+					return false, err
+				}
 				s.traceBacktrack(awp.bmi(), !proj)
 			}
 		}
@@ -1033,7 +1094,14 @@ func (s *solver) backtrack() bool {
 		var proj bool
 		var awp atomWithPackages
 		for !proj {
-			awp, proj = s.unselectLast()
+			var err error
+			awp, proj, err = s.unselectLast()
+			if err != nil {
+				if !contextCanceledOrSMReleased(err) {
+					panic(fmt.Sprintf("canary - should only have been able to get a context cancellation or SM release, got %T %s", err, err))
+				}
+				return false, err
+			}
 			s.traceBacktrack(awp.bmi(), !proj)
 		}
 
@@ -1052,13 +1120,18 @@ func (s *solver) backtrack() bool {
 
 				// reusing the old awp is fine
 				awp.a.v = q.current()
-				s.selectAtom(awp, false)
+				err := s.selectAtom(awp, false)
+				if err != nil {
+					if !contextCanceledOrSMReleased(err) {
+						panic(fmt.Sprintf("canary - should only have been able to get a context cancellation or SM release, got %T %s", err, err))
+					}
+					return false, err
+				}
 				break
 			}
 		}
 
 		s.traceBacktrack(awp.bmi(), false)
-		//s.traceInfo("no more versions of %s, backtracking", q.id.errString())
 
 		// No solution found; continue backtracking after popping the queue
 		// we just inspected off the list
@@ -1066,13 +1139,12 @@ func (s *solver) backtrack() bool {
 		s.vqs, s.vqs[len(s.vqs)-1] = s.vqs[:len(s.vqs)-1], nil
 	}
 
-	s.mtr.pop()
 	// Backtracking was successful if loop ended before running out of versions
 	if len(s.vqs) == 0 {
-		return false
+		return false, nil
 	}
 	s.attempts++
-	return true
+	return true, nil
 }
 
 func (s *solver) nextUnselected() (bimodalIdentifier, bool) {
@@ -1175,7 +1247,7 @@ func (s *solver) fail(id ProjectIdentifier) {
 // the unselected priority queue.
 //
 // Behavior is slightly diffferent if pkgonly is true.
-func (s *solver) selectAtom(a atomWithPackages, pkgonly bool) {
+func (s *solver) selectAtom(a atomWithPackages, pkgonly bool) error {
 	s.mtr.push("select-atom")
 	s.unsel.remove(bimodalIdentifier{
 		id: a.a.id,
@@ -1184,6 +1256,9 @@ func (s *solver) selectAtom(a atomWithPackages, pkgonly bool) {
 
 	pl, deps, err := s.getImportsAndConstraintsOf(a)
 	if err != nil {
+		if contextCanceledOrSMReleased(err) {
+			return err
+		}
 		// This shouldn't be possible; other checks should have ensured all
 		// packages and deps are present for any argument passed to this method.
 		panic(fmt.Sprintf("canary - shouldn't be possible %s", err))
@@ -1267,15 +1342,21 @@ func (s *solver) selectAtom(a atomWithPackages, pkgonly bool) {
 
 	s.traceSelect(a, pkgonly)
 	s.mtr.pop()
+
+	return nil
 }
 
-func (s *solver) unselectLast() (atomWithPackages, bool) {
+func (s *solver) unselectLast() (atomWithPackages, bool, error) {
 	s.mtr.push("unselect")
+	defer s.mtr.pop()
 	awp, first := s.sel.popSelection()
 	heap.Push(s.unsel, bimodalIdentifier{id: awp.a.id, pl: awp.pl})
 
 	_, deps, err := s.getImportsAndConstraintsOf(awp)
 	if err != nil {
+		if contextCanceledOrSMReleased(err) {
+			return atomWithPackages{}, false, err
+		}
 		// This shouldn't be possible; other checks should have ensured all
 		// packages and deps are present for any argument passed to this method.
 		panic(fmt.Sprintf("canary - shouldn't be possible %s", err))
@@ -1296,8 +1377,7 @@ func (s *solver) unselectLast() (atomWithPackages, bool) {
 		}
 	}
 
-	s.mtr.pop()
-	return awp, first
+	return awp, first, nil
 }
 
 // simple (temporary?) helper just to convert atoms into locked projects
@@ -1334,4 +1414,8 @@ func pa2lp(pa atom, pkgs map[string]struct{}) LockedProject {
 	sort.Strings(lp.pkgs)
 
 	return lp
+}
+
+func contextCanceledOrSMReleased(err error) bool {
+	return err == context.Canceled || err == context.DeadlineExceeded || err == ErrSourceManagerIsReleased
 }
