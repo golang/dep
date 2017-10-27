@@ -249,7 +249,7 @@ func getDirectDependencies(sm gps.SourceManager, p *dep.Project) (pkgtree.Packag
 // in handling them and informing the user appropriately
 func handleAllTheFailuresOfTheWorld(err error) error {
 	switch errors.Cause(err) {
-	case context.Canceled, context.DeadlineExceeded, gps.SourceManagerIsReleased:
+	case context.Canceled, context.DeadlineExceeded, gps.ErrSourceManagerIsReleased:
 		return nil
 	}
 

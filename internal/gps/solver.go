@@ -1417,5 +1417,5 @@ func pa2lp(pa atom, pkgs map[string]struct{}) LockedProject {
 }
 
 func contextCanceledOrSMReleased(err error) bool {
-	return err == context.Canceled || err == context.DeadlineExceeded || err == SourceManagerIsReleased
+	return err == context.Canceled || err == context.DeadlineExceeded || err == ErrSourceManagerIsReleased
 }

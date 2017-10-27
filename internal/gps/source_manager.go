@@ -169,10 +169,10 @@ type SourceMgr struct {
 
 var _ SourceManager = &SourceMgr{}
 
-// SourceManagerIsReleased is the error returned by any SourceManager method
+// ErrSourceManagerIsReleased is the error returned by any SourceManager method
 // called after the SourceManager has been released, rendering its methods no
 // longer safe to call.
-var SourceManagerIsReleased error = fmt.Errorf("this SourceManager has been released, its methods can no longer be called")
+var ErrSourceManagerIsReleased error = fmt.Errorf("this SourceManager has been released, its methods can no longer be called")
 
 // SourceManagerConfig holds configuration information for creating SourceMgrs.
 type SourceManagerConfig struct {
@@ -405,7 +405,7 @@ func (sm *SourceMgr) Release() {
 // DeriveManifestAndLock() method.
 func (sm *SourceMgr) GetManifestAndLock(id ProjectIdentifier, v Version, an ProjectAnalyzer) (Manifest, Lock, error) {
 	if atomic.LoadInt32(&sm.releasing) == 1 {
-		return nil, nil, SourceManagerIsReleased
+		return nil, nil, ErrSourceManagerIsReleased
 	}
 
 	srcg, err := sm.srcCoord.getSourceGatewayFor(context.TODO(), id)
@@ -420,7 +420,7 @@ func (sm *SourceMgr) GetManifestAndLock(id ProjectIdentifier, v Version, an Proj
 // of the given ProjectIdentifier, at the given version.
 func (sm *SourceMgr) ListPackages(id ProjectIdentifier, v Version) (pkgtree.PackageTree, error) {
 	if atomic.LoadInt32(&sm.releasing) == 1 {
-		return pkgtree.PackageTree{}, SourceManagerIsReleased
+		return pkgtree.PackageTree{}, ErrSourceManagerIsReleased
 	}
 
 	srcg, err := sm.srcCoord.getSourceGatewayFor(context.TODO(), id)
@@ -445,7 +445,7 @@ func (sm *SourceMgr) ListPackages(id ProjectIdentifier, v Version) (pkgtree.Pack
 // went away), an error will be returned.
 func (sm *SourceMgr) ListVersions(id ProjectIdentifier) ([]PairedVersion, error) {
 	if atomic.LoadInt32(&sm.releasing) == 1 {
-		return nil, SourceManagerIsReleased
+		return nil, ErrSourceManagerIsReleased
 	}
 
 	srcg, err := sm.srcCoord.getSourceGatewayFor(context.TODO(), id)
@@ -461,7 +461,7 @@ func (sm *SourceMgr) ListVersions(id ProjectIdentifier) ([]PairedVersion, error)
 // repository.
 func (sm *SourceMgr) RevisionPresentIn(id ProjectIdentifier, r Revision) (bool, error) {
 	if atomic.LoadInt32(&sm.releasing) == 1 {
-		return false, SourceManagerIsReleased
+		return false, ErrSourceManagerIsReleased
 	}
 
 	srcg, err := sm.srcCoord.getSourceGatewayFor(context.TODO(), id)
@@ -477,7 +477,7 @@ func (sm *SourceMgr) RevisionPresentIn(id ProjectIdentifier, r Revision) (bool, 
 // for the provided ProjectIdentifier.
 func (sm *SourceMgr) SourceExists(id ProjectIdentifier) (bool, error) {
 	if atomic.LoadInt32(&sm.releasing) == 1 {
-		return false, SourceManagerIsReleased
+		return false, ErrSourceManagerIsReleased
 	}
 
 	srcg, err := sm.srcCoord.getSourceGatewayFor(context.TODO(), id)
@@ -495,7 +495,7 @@ func (sm *SourceMgr) SourceExists(id ProjectIdentifier) (bool, error) {
 // The primary use case for this is prefetching.
 func (sm *SourceMgr) SyncSourceFor(id ProjectIdentifier) error {
 	if atomic.LoadInt32(&sm.releasing) == 1 {
-		return SourceManagerIsReleased
+		return ErrSourceManagerIsReleased
 	}
 
 	srcg, err := sm.srcCoord.getSourceGatewayFor(context.TODO(), id)
@@ -510,7 +510,7 @@ func (sm *SourceMgr) SyncSourceFor(id ProjectIdentifier) error {
 // ProjectRoot, at the provided version, to the provided directory.
 func (sm *SourceMgr) ExportProject(ctx context.Context, id ProjectIdentifier, v Version, to string) error {
 	if atomic.LoadInt32(&sm.releasing) == 1 {
-		return SourceManagerIsReleased
+		return ErrSourceManagerIsReleased
 	}
 
 	srcg, err := sm.srcCoord.getSourceGatewayFor(ctx, id)
@@ -530,7 +530,7 @@ func (sm *SourceMgr) ExportProject(ctx context.Context, id ProjectIdentifier, v 
 // activity, as its behavior is well-structured)
 func (sm *SourceMgr) DeduceProjectRoot(ip string) (ProjectRoot, error) {
 	if atomic.LoadInt32(&sm.releasing) == 1 {
-		return "", SourceManagerIsReleased
+		return "", ErrSourceManagerIsReleased
 	}
 
 	pd, err := sm.deduceCoord.deduceRootPath(context.TODO(), ip)
