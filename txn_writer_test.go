@@ -465,16 +465,16 @@ func TestSafeWriter_NewLockSkipVendor(t *testing.T) {
 
 	// Verify prepared actions
 	if sw.HasManifest() {
-		t.Fatal("Did not expect the payload to contain the manifest")
+		t.Fatal("did not expect the payload to contain the manifest")
 	}
 	if !sw.HasLock() {
-		t.Fatal("Expected the payload to contain the lock")
+		t.Fatal("expected the payload to contain the lock")
 	}
 	if !sw.writeLock {
-		t.Fatal("Expected that the writer should plan to write the lock")
+		t.Fatal("expected that the writer should plan to write the lock")
 	}
 	if sw.writeVendor {
-		t.Fatal("Did not expect the payload to contain the vendor directory")
+		t.Fatal("did not expect the payload to contain the vendor directory")
 	}
 
 	// Write changes

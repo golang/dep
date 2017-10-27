@@ -136,7 +136,7 @@ func (pc *TestProjectContext) ShouldMatchGolden(goldenFile string, got string) e
 				return errors.Wrapf(err, "Unable to write updated golden file %s", goldenFile)
 			}
 		} else {
-			return errors.Errorf("expected %s, got %s", want, got)
+			return errors.Errorf("(WNT):\n%s\n(GOT):\n%s\n", want, got)
 		}
 	}
 

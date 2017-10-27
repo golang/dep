@@ -13,22 +13,25 @@ import (
 	"sort"
 	"sync"
 
+	"github.com/BurntSushi/toml"
 	"github.com/golang/dep/internal/gps"
 	"github.com/golang/dep/internal/gps/pkgtree"
-	"github.com/pelletier/go-toml"
 	"github.com/pkg/errors"
 )
 
 // ManifestName is the manifest file name used by dep.
 const ManifestName = "Gopkg.toml"
 
-// Errors
 var (
+	// Errors
 	errInvalidConstraint  = errors.New("\"constraint\" must be a TOML array of tables")
 	errInvalidOverride    = errors.New("\"override\" must be a TOML array of tables")
 	errInvalidRequired    = errors.New("\"required\" must be a TOML list of strings")
 	errInvalidIgnored     = errors.New("\"ignored\" must be a TOML list of strings")
 	errInvalidProjectRoot = errors.New("ProjectRoot name validation failed")
+
+	// match abbreviated git hash (7chars) or hg hash (12chars)
+	abbrevRevHash = regexp.MustCompile("^[a-f0-9]{7}([a-f0-9]{5})?$")
 )
 
 // Manifest holds manifest file data and implements gps.RootManifest.
@@ -62,18 +65,38 @@ func NewManifest() *Manifest {
 	}
 }
 
+// readManifest returns a Manifest read from r and a slice of validation warnings.
+func readManifest(r io.Reader) (*Manifest, []error, error) {
+	buf := &bytes.Buffer{}
+	_, err := buf.ReadFrom(r)
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "unable to read byte stream")
+	}
+
+	warns, err := validateManifest(buf.String())
+	if err != nil {
+		return nil, warns, errors.Wrap(err, "manifest validation failed")
+	}
+
+	raw := rawManifest{}
+	_, err = toml.Decode(buf.String(), &raw)
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "manfiest decoding failed")
+	}
+
+	m, err := fromRawManifest(raw)
+	return m, warns, err
+}
+
 func validateManifest(s string) ([]error, error) {
 	var warns []error
-	// Load the TomlTree from string
-	tree, err := toml.Load(s)
-	if err != nil {
-		return warns, errors.Wrap(err, "Unable to load TomlTree from string")
-	}
-	// Convert tree to a map
-	manifest := tree.ToMap()
 
-	// match abbreviated git hash (7chars) or hg hash (12chars)
-	abbrevRevHash := regexp.MustCompile("^[a-f0-9]{7}([a-f0-9]{5})?$")
+	manifest := make(map[string]interface{})
+	_, err := toml.Decode(s, &manifest)
+	if err != nil {
+		return warns, errors.Wrap(err, "manifest decoding failed")
+	}
+
 	// Look for unknown fields and collect errors
 	for prop, val := range manifest {
 		switch prop {
@@ -83,52 +106,40 @@ func validateManifest(s string) ([]error, error) {
 				warns = append(warns, errors.New("metadata should be a TOML table"))
 			}
 		case "constraint", "override":
-			valid := true
 			// Invalid if type assertion fails. Not a TOML array of tables.
-			if rawProj, ok := val.([]interface{}); ok {
-				// Check element type. Must be a map. Checking one element would be
-				// enough because TOML doesn't allow mixing of types.
-				if reflect.TypeOf(rawProj[0]).Kind() != reflect.Map {
-					valid = false
-				}
-
-				if valid {
-					// Iterate through each array of tables
-					for _, v := range rawProj {
-						// Check the individual field's key to be valid
-						for key, value := range v.(map[string]interface{}) {
-							// Check if the key is valid
-							switch key {
-							case "name", "branch", "version", "source":
-								// valid key
-							case "revision":
-								if valueStr, ok := value.(string); ok {
-									if abbrevRevHash.MatchString(valueStr) {
-										warns = append(warns, fmt.Errorf("revision %q should not be in abbreviated form", valueStr))
-									}
-								}
-							case "metadata":
-								// Check if metadata is of Map type
-								if reflect.TypeOf(value).Kind() != reflect.Map {
-									warns = append(warns, fmt.Errorf("metadata in %q should be a TOML table", prop))
-								}
-							default:
-								// unknown/invalid key
-								warns = append(warns, fmt.Errorf("Invalid key %q in %q", key, prop))
-							}
-						}
-					}
-				}
-			} else {
-				valid = false
-			}
-
-			if !valid {
+			projects, ok := val.([]map[string]interface{})
+			if !ok {
 				if prop == "constraint" {
 					return warns, errInvalidConstraint
 				}
 				if prop == "override" {
 					return warns, errInvalidOverride
+				}
+			}
+
+			// Iterate through each array of tables
+			for _, project := range projects {
+				// Check the individual field's key to be valid
+				for key, value := range project {
+					// Check if the key is valid
+					switch key {
+					case "name", "branch", "version", "source":
+						// valid key
+					case "revision":
+						if valueStr, ok := value.(string); ok {
+							if abbrevRevHash.MatchString(valueStr) {
+								warns = append(warns, fmt.Errorf("revision %q should not be in abbreviated form", valueStr))
+							}
+						}
+					case "metadata":
+						// Check if metadata is of Map type
+						if reflect.TypeOf(value).Kind() != reflect.Map {
+							warns = append(warns, fmt.Errorf("metadata in %q should be a TOML table", prop))
+						}
+					default:
+						// unknown/invalid key
+						warns = append(warns, fmt.Errorf("invalid key %q in %q", key, prop))
+					}
 				}
 			}
 		case "ignored", "required":
@@ -152,7 +163,7 @@ func validateManifest(s string) ([]error, error) {
 				}
 			}
 		default:
-			warns = append(warns, fmt.Errorf("Unknown field in manifest: %v", prop))
+			warns = append(warns, fmt.Errorf("unknown field in manifest: %v", prop))
 		}
 	}
 
@@ -199,29 +210,6 @@ func ValidateProjectRoots(c *Ctx, m *Manifest, sm gps.SourceManager) error {
 	}
 
 	return valErr
-}
-
-// readManifest returns a Manifest read from r and a slice of validation warnings.
-func readManifest(r io.Reader) (*Manifest, []error, error) {
-	buf := &bytes.Buffer{}
-	_, err := buf.ReadFrom(r)
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "Unable to read byte stream")
-	}
-
-	warns, err := validateManifest(buf.String())
-	if err != nil {
-		return nil, warns, errors.Wrap(err, "Manifest validation failed")
-	}
-
-	raw := rawManifest{}
-	err = toml.Unmarshal(buf.Bytes(), &raw)
-	if err != nil {
-		return nil, warns, errors.Wrap(err, "Unable to parse the manifest as TOML")
-	}
-
-	m, err := fromRawManifest(raw)
-	return m, warns, err
 }
 
 func fromRawManifest(raw rawManifest) (*Manifest, error) {
@@ -331,9 +319,15 @@ func (s sortedRawProjects) Less(i, j int) bool {
 
 // MarshalTOML serializes this manifest into TOML via an intermediate raw form.
 func (m *Manifest) MarshalTOML() ([]byte, error) {
+	buf := &bytes.Buffer{}
 	raw := m.toRaw()
-	result, err := toml.Marshal(raw)
-	return result, errors.Wrap(err, "Unable to marshal the lock to a TOML string")
+
+	err := toml.NewEncoder(buf).Encode(raw)
+	if err != nil {
+		return []byte{}, errors.Wrap(err, "unable to marshal the manifest to a TOML string")
+	}
+
+	return buf.Bytes(), nil
 }
 
 func toRawProject(name gps.ProjectRoot, project gps.ProjectProperties) rawProject {
