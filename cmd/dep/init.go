@@ -5,6 +5,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"io/ioutil"
 	"log"
@@ -183,10 +184,9 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 		return errors.Wrap(err, "prepare solver")
 	}
 
-	soln, err := s.Solve()
+	soln, err := s.Solve(context.TODO())
 	if err != nil {
-		handleAllTheFailuresOfTheWorld(err)
-		return err
+		return handleAllTheFailuresOfTheWorld(err)
 	}
 	p.Lock = dep.LockFromSolution(soln)
 
@@ -247,5 +247,11 @@ func getDirectDependencies(sm gps.SourceManager, p *dep.Project) (pkgtree.Packag
 
 // TODO solve failures can be really creative - we need to be similarly creative
 // in handling them and informing the user appropriately
-func handleAllTheFailuresOfTheWorld(err error) {
+func handleAllTheFailuresOfTheWorld(err error) error {
+	switch errors.Cause(err) {
+	case context.Canceled, context.DeadlineExceeded, gps.ErrSourceManagerIsReleased:
+		return nil
+	}
+
+	return errors.Wrap(err, "Solving failure")
 }
