@@ -190,7 +190,7 @@ func (cmd *ensureCommand) Run(ctx *dep.Ctx, args []string) error {
 		return err
 	}
 
-	if fatal, err := checkErrors(params.RootPackageTree.Packages, p.Manifest.IgnoredPackages()); err != nil {
+	if fatal, err := checkErrors(params.RootPackageTree.Packages, p.Manifest.IgnoredPackages(), cmd.add); err != nil {
 		if fatal {
 			return err
 		} else if ctx.Verbose {
@@ -769,7 +769,7 @@ func getProjectConstraint(arg string, sm gps.SourceManager) (gps.ProjectConstrai
 	return gps.ProjectConstraint{Ident: pi, Constraint: c}, arg, nil
 }
 
-func checkErrors(m map[string]pkgtree.PackageOrErr, ignore *pkgtree.IgnoredRuleset) (fatal bool, err error) {
+func checkErrors(m map[string]pkgtree.PackageOrErr, ignore *pkgtree.IgnoredRuleset, allowNoGo bool) (fatal bool, err error) {
 	var (
 		noGoErrors    int
 		pkgtreeErrors = make(pkgtreeErrs, 0, len(m))
@@ -788,6 +788,10 @@ func checkErrors(m map[string]pkgtree.PackageOrErr, ignore *pkgtree.IgnoredRules
 				pkgtreeErrors = append(pkgtreeErrors, poe.Err)
 			}
 		}
+	}
+
+	if allowNoGo {
+		noGoErrors = 0
 	}
 
 	// If pkgtree was empty or all dirs lacked any Go code, return an error.
