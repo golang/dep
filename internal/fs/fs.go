@@ -190,7 +190,11 @@ func renameByCopy(src, dst string) error {
 		return errors.Wrapf(cerr, "rename fallback failed: cannot rename %s to %s", src, dst)
 	}
 
-	return errors.Wrapf(os.RemoveAll(src), "cannot delete %s", src)
+	rmerr := os.RemoveAll(src)
+	if rmerr != nil {
+		rmerr = os.RemoveAll(src)
+	}
+	return errors.Wrapf(rmerr, "cannot delete %s", src)
 }
 
 // IsCaseSensitiveFilesystem determines if the filesystem where dir
