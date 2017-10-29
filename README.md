@@ -237,7 +237,7 @@ see [changing dependencies](#changing-dependencies).
 
 ## Semantic Versioning
 
-`dep ensure` a uses an external [semver library](https://github.com/Masterminds/semver) to interpret the version constraints you specify in the manifest. The comparison operators are:
+`dep ensure` uses an external [semver library](https://github.com/Masterminds/semver) to interpret the version constraints you specify in the manifest. The comparison operators are:
 
 * `=`: equal
 * `!=`: not equal
