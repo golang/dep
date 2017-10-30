@@ -1,0 +1,10 @@
+hash: 669250c565b9b56491a70e800261e704dbcd8c176a046cecfd5971c9a5fc601d
+updated: 2017-07-24T16:49:38.444448384-07:00
+imports:
+- name: github.com/chriswhelix/deptestglide1
+  version: a537ced77a626dadc23dfb36140e815be819a037
+- name: github.com/chriswhelix/deptestglide2
+  version: ee5909194b70b9781e210ffd394ffd47dda7a137
+- name: github.com/sdboyer/deptest
+  version: 3f4c3bea144e112a69bbe5d8d01c1b09a544253f
+testImports: []

@@ -1,0 +1,1 @@
+Two transitive references, one with unspecified version.

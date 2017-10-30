@@ -1,0 +1,6 @@
+package: .
+import:
+- package: github.com/sdboyer/deptest
+  version: "^1.0.0"
+- package: github.com/chriswhelix/deptestglide1
+  version: gt080

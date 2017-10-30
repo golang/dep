@@ -14,8 +14,8 @@
   version = "v2.0.0"
 
 [solve-meta]
-  analyzer-name = "dep"
+  analyzer-name = "dep+import"
   analyzer-version = 1
-  inputs-digest = "1ed417a0bec57ffe988fae1cba8f3d49994fb893394d61844e0b3c96d69573fe"
+  inputs-digest = "4f789c5181842782eb895de762c28c87fde8bf448a8e4d0194d566e05c381438"
   solver-name = "gps-cdcl"
   solver-version = 1

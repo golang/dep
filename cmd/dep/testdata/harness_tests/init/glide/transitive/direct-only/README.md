@@ -1,0 +1,1 @@
+Baseline case for single direct reference to deptest.

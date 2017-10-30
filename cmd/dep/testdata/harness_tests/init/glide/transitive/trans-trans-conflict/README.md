@@ -1,0 +1,1 @@
+Two transitive references, with conflicting constraints.

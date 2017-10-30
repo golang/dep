@@ -1,0 +1,1 @@
+Test that if we can only accept versions of a dependency that have a broken glide.yaml, we will fail.

@@ -1,0 +1,1 @@
+Both direct and transitive references, with overlapping versions available.
