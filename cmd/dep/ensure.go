@@ -283,7 +283,7 @@ func (cmd *ensureCommand) runDefault(ctx *dep.Ctx, args []string, p *dep.Project
 		return handleAllTheFailuresOfTheWorld(err)
 	}
 
-	vendorBehavior := dep.VendorOnChanged
+	vendorBehavior := dep.VendorAlways
 	if cmd.noVendor {
 		vendorBehavior = dep.VendorNever
 	}
@@ -377,7 +377,7 @@ func (cmd *ensureCommand) runUpdate(ctx *dep.Ctx, args []string, p *dep.Project,
 		return handleAllTheFailuresOfTheWorld(err)
 	}
 
-	sw, err := dep.NewSafeWriter(nil, p.Lock, dep.LockFromSolution(solution), dep.VendorOnChanged)
+	sw, err := dep.NewSafeWriter(nil, p.Lock, dep.LockFromSolution(solution), dep.VendorAlways)
 	if err != nil {
 		return err
 	}
@@ -676,7 +676,7 @@ func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm
 	}
 	sort.Strings(reqlist)
 
-	sw, err := dep.NewSafeWriter(nil, p.Lock, dep.LockFromSolution(solution), dep.VendorOnChanged)
+	sw, err := dep.NewSafeWriter(nil, p.Lock, dep.LockFromSolution(solution), dep.VendorAlways)
 	if err != nil {
 		return err
 	}
