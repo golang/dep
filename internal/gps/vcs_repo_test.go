@@ -9,6 +9,7 @@ import (
 	"compress/gzip"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
@@ -99,7 +100,7 @@ func TestNewCtxRepoRecovery(t *testing.T) {
 	defer f.Close()
 
 	dest := filepath.Join(tempDir, ".git")
-	err = untar(dest, f)
+	err = untar(dest, f, true)
 	if err != nil {
 		t.Fatalf("could not untar corrupt repo into temp folder: %v\n", err)
 	}
@@ -418,14 +419,17 @@ func testBzrRepo(t *testing.T) {
 	}
 }
 
-func untar(dst string, r io.Reader) error {
-	gzr, err := gzip.NewReader(r)
-	if err != nil {
-		return err
+func untar(dst string, r io.Reader, gz bool) error {
+	if gz {
+		gzr, err := gzip.NewReader(r)
+		if err != nil {
+			return err
+		}
+		defer gzr.Close()
+		r = gzr
 	}
-	defer gzr.Close()
 
-	tr := tar.NewReader(gzr)
+	tr := tar.NewReader(r)
 
 	for {
 		header, err := tr.Next()
@@ -447,16 +451,27 @@ func untar(dst string, r io.Reader) error {
 					return err
 				}
 			}
-		case tar.TypeReg:
+		case tar.TypeReg, tar.TypeRegA, tar.TypeChar, tar.TypeBlock, tar.TypeFifo:
 			f, err := os.OpenFile(target, os.O_CREATE|os.O_RDWR, os.FileMode(header.Mode))
 			if err != nil {
 				return err
 			}
-			defer f.Close()
 
 			if _, err := io.Copy(f, tr); err != nil {
+				f.Close()
 				return err
 			}
+			f.Close()
+		case tar.TypeSymlink:
+			if err := os.Symlink(header.Linkname, target); err != nil {
+				return err
+			}
+		case tar.TypeLink:
+			if err := os.Link(header.Linkname, target); err != nil {
+				return err
+			}
+		default:
+			panic(fmt.Sprintf("unrecognized tar type %v", header.Typeflag))
 		}
 	}
 }

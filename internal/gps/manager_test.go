@@ -13,8 +13,10 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"reflect"
 	"runtime"
 	"sort"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -40,6 +42,77 @@ func (a naiveAnalyzer) Info() ProjectAnalyzerInfo {
 	}
 }
 
+var sharedFixtureRepos = make(map[string]string)
+
+func init() {
+	// Unarchive the shared set of repositories.
+	cwd, err := os.Getwd()
+	if err != nil {
+		panic(err)
+	}
+
+	tgt := filepath.Join(cwd, "_testdata", "repos", "shared")
+	err = os.RemoveAll(tgt)
+	if err != nil && !os.IsNotExist(err) {
+		panic(err)
+	}
+
+	f, err := os.Open(filepath.Join(cwd, "_testdata", "repos", "shared.tar"))
+	if err != nil {
+		panic(err)
+	}
+	untar(tgt, f, false)
+
+	dir, err := os.Open(tgt)
+	if err != nil {
+		panic(err)
+	}
+
+	names, err := dir.Readdirnames(-1)
+	if err != nil {
+		panic(err)
+	}
+
+	for _, n := range names {
+		sharedFixtureRepos[strings.Replace(n, "-", "/", 2)] = filepath.Join(tgt, n)
+	}
+}
+
+type sharedRepoDeducer struct {
+	real *deductionCoordinator
+	t    *testing.T
+}
+
+func (d *sharedRepoDeducer) deduceRootPath(ctx context.Context, ip string) (pathDeduction, error) {
+	pd, err := d.real.deduceRootPath(ctx, ip)
+	if err != nil {
+		return pathDeduction{}, err
+	}
+
+	localpath, has := sharedFixtureRepos[pd.root]
+	if !has {
+		fmt.Printf("%q passed through for real deduction\n", ip)
+		d.t.Logf("%q passed through for real deduction", ip)
+		return pd, nil
+	}
+
+	fmt.Printf("%q captured with local deduction\n", ip)
+	// Source type detection can be pretty unsophisticated here as we're only
+	// ever going to be working on a finite set.
+	u := mkurl("file://" + localpath)
+	switch {
+	case strings.HasPrefix(pd.root, "launchpad"):
+		pd.mb = maybeBzrSource{url: u}
+	case strings.HasPrefix(pd.root, "bitbucket"):
+		pd.mb = maybeHgSource{url: u}
+	default:
+		pd.mb = maybeGitSource{url: u}
+	}
+
+	return pd, nil
+}
+
+//func mkNaiveSM(t *testing.T, shared bool) (*SourceMgr, func()) {
 func mkNaiveSM(t *testing.T) (*SourceMgr, func()) {
 	cpath, err := ioutil.TempDir("", "smcache")
 	if err != nil {
@@ -54,6 +127,14 @@ func mkNaiveSM(t *testing.T) (*SourceMgr, func()) {
 		t.Fatalf("Unexpected error on SourceManager creation: %s", err)
 	}
 
+	//if shared {
+	// If shared flag is on, then use the special intermediate deducer.
+	sm.srcCoord.deducer = &sharedRepoDeducer{
+		real: sm.deduceCoord,
+		t:    t,
+	}
+	//}
+
 	return sm, func() {
 		sm.Release()
 		err := os.RemoveAll(cpath)
@@ -64,20 +145,26 @@ func mkNaiveSM(t *testing.T) (*SourceMgr, func()) {
 }
 
 func remakeNaiveSM(osm *SourceMgr, t *testing.T) (*SourceMgr, func()) {
-	cpath := osm.cachedir
 	osm.Release()
 
 	sm, err := NewSourceManager(SourceManagerConfig{
-		Cachedir: cpath,
+		Cachedir: osm.cachedir,
 		Logger:   log.New(test.Writer{TB: t}, "", 0),
 	})
 	if err != nil {
 		t.Fatalf("unexpected error on SourceManager recreation: %s", err)
 	}
 
+	if _, is := osm.srcCoord.deducer.(*sharedRepoDeducer); is {
+		sm.srcCoord.deducer = &sharedRepoDeducer{
+			real: sm.deduceCoord,
+			t:    t,
+		}
+	}
+
 	return sm, func() {
 		sm.Release()
-		err := os.RemoveAll(cpath)
+		err := os.RemoveAll(osm.cachedir)
 		if err != nil {
 			t.Errorf("removeAll failed: %s", err)
 		}
@@ -257,14 +344,6 @@ func TestSourceInit(t *testing.T) {
 	if err != nil {
 		t.Error("Cache repo does not exist in expected location")
 	}
-
-	os.Stat(filepath.Join(cpath, "metadata", "github.com", "sdboyer", "gpkt", "cache.json"))
-
-	// TODO(sdboyer) disabled until we get caching working
-	//_, err = os.Stat(filepath.Join(cpath, "metadata", "github.com", "sdboyer", "gpkt", "cache.json"))
-	//if err != nil {
-	//t.Error("Metadata cache json file does not exist in expected location")
-	//}
 
 	// Ensure source existence values are what we expect
 	var exists bool
@@ -684,24 +763,21 @@ func TestMultiFetchThreadsafe(t *testing.T) {
 	t.Parallel()
 
 	projects := []ProjectIdentifier{
-		mkPI("github.com/sdboyer/gps"),
+		mkPI("github.com/sdboyer/deptest"),
 		mkPI("github.com/sdboyer/gpkt"),
 		{
 			ProjectRoot: ProjectRoot("github.com/sdboyer/gpkt"),
 			Source:      "https://github.com/sdboyer/gpkt",
 		},
-		mkPI("github.com/sdboyer/gogl"),
-		mkPI("github.com/sdboyer/gliph"),
-		mkPI("github.com/sdboyer/frozone"),
+		mkPI("github.com/sdboyer/deptestdos"),
+		mkPI("github.com/sdboyer/deptesttres"),
 		mkPI("gopkg.in/sdboyer/gpkt.v1"),
 		mkPI("gopkg.in/sdboyer/gpkt.v2"),
 		mkPI("github.com/Masterminds/VCSTestRepo"),
-		mkPI("github.com/go-yaml/yaml"),
-		mkPI("github.com/sirupsen/logrus"),
-		mkPI("github.com/Masterminds/semver"),
-		mkPI("github.com/Masterminds/vcs"),
-		//mkPI("bitbucket.org/sdboyer/withbm"),
-		//mkPI("bitbucket.org/sdboyer/nobm"),
+		mkPI("github.com/carolynvs/go-dep-test"),
+		mkPI("github.com/carolynvs/deptest"),
+		mkPI("github.com/carolynvs/deptest-importers"),
+		mkPI("github.com/carolynvs/deptestglide"),
 	}
 
 	do := func(name string, sm SourceManager) {
