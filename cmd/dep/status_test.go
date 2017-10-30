@@ -17,6 +17,7 @@ import (
 	"github.com/golang/dep"
 	"github.com/golang/dep/gps"
 	"github.com/golang/dep/internal/test"
+	"github.com/pkg/errors"
 )
 
 func TestStatusFormatVersion(t *testing.T) {
@@ -402,6 +403,64 @@ func TestCollectConstraints(t *testing.T) {
 
 			if !reflect.DeepEqual(gotConstraints, c.wantConstraints) {
 				t.Fatalf("Unexpected collected constraints: \n\t(GOT): %v\n\t(WNT): %v", gotConstraints, c.wantConstraints)
+			}
+		})
+	}
+}
+
+func TestValidateFlags(t *testing.T) {
+	testCases := []struct {
+		name    string
+		cmd     statusCommand
+		wantErr error
+	}{
+		{
+			name:    "no flags",
+			cmd:     statusCommand{},
+			wantErr: nil,
+		},
+		{
+			name:    "-dot only",
+			cmd:     statusCommand{dot: true},
+			wantErr: nil,
+		},
+		{
+			name:    "-dot with template",
+			cmd:     statusCommand{dot: true, template: "foo"},
+			wantErr: errors.New("cannot pass template string with -dot"),
+		},
+		{
+			name:    "-dot with -json",
+			cmd:     statusCommand{dot: true, json: true},
+			wantErr: errors.New("cannot pass multiple output format flags"),
+		},
+		{
+			name:    "-dot with operating mode",
+			cmd:     statusCommand{dot: true, old: true},
+			wantErr: errors.New("-dot generates dependency graph; cannot pass other flags"),
+		},
+		{
+			name:    "single operating mode",
+			cmd:     statusCommand{unused: true},
+			wantErr: nil,
+		},
+		{
+			name:    "multiple operating modes",
+			cmd:     statusCommand{missing: true, old: true},
+			wantErr: errors.Wrapf(errors.New("cannot pass multiple operating mode flags"), "[-old -missing]"),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := tc.cmd.validateFlags()
+
+			if err == nil {
+				if tc.wantErr != nil {
+					t.Errorf("unexpected error: \n\t(GOT): %v\n\t(WNT): %v", err, tc.wantErr)
+				}
+			} else if err.Error() != tc.wantErr.Error() {
+				t.Errorf("unexpected error: \n\t(GOT): %v\n\t(WNT): %v", err, tc.wantErr)
 			}
 		})
 	}
