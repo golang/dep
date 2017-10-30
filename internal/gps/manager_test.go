@@ -91,12 +91,10 @@ func (d *sharedRepoDeducer) deduceRootPath(ctx context.Context, ip string) (path
 
 	localpath, has := sharedFixtureRepos[pd.root]
 	if !has {
-		fmt.Printf("%q passed through for real deduction\n", ip)
 		d.t.Logf("%q passed through for real deduction", ip)
 		return pd, nil
 	}
 
-	fmt.Printf("%q captured with local deduction\n", ip)
 	// Source type detection can be pretty unsophisticated here as we're only
 	// ever going to be working on a finite set.
 	u := mkurl("file://" + localpath)

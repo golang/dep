@@ -370,7 +370,7 @@ func testBzrRepo(t *testing.T) {
 		}
 	}()
 
-	rep, err := vcs.NewBzrRepo("https://launchpad.net/govcstestbzrrepo", tempDir+"/govcstestbzrrepo")
+	rep, err := vcs.NewBzrRepo("file://"+sharedFixtureRepos["launchpad.net/govcstestbzrrepo"], tempDir+"/govcstestbzrrepo")
 	if err != nil {
 		t.Fatal(err)
 	}

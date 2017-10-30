@@ -175,17 +175,15 @@ func TestBadSolveOpts(t *testing.T) {
 }
 
 func TestValidateParams(t *testing.T) {
+	// This test is a tad slow, so skip it on -short
+	if testing.Short() {
+		t.Skip("Skipping slow failed HTTP deductions in short mode")
+	}
 	h := test.NewHelper(t)
 	defer h.Cleanup()
 
-	cacheDir := "gps-cache"
-	h.TempDir(cacheDir)
-	sm, err := NewSourceManager(SourceManagerConfig{
-		Cachedir: h.Path(cacheDir),
-		Logger:   log.New(test.Writer{TB: t}, "", 0),
-	})
-	h.Must(err)
-	defer sm.Release()
+	sm, clean := mkNaiveSM(t)
+	defer clean()
 
 	h.TempDir("src")
 
@@ -195,8 +193,8 @@ func TestValidateParams(t *testing.T) {
 	}{
 		{[]string{"google.com/non-existing/package"}, true},
 		{[]string{"google.com/non-existing/package/subpkg"}, true},
-		{[]string{"github.com/sdboyer/testrepo"}, false},
-		{[]string{"github.com/sdboyer/testrepo/subpkg"}, false},
+		{[]string{"github.com/sdboyer/deptesttres"}, false},
+		{[]string{"github.com/sdboyer/deptesttres/subp"}, false},
 	}
 
 	params := SolveParameters{
@@ -218,7 +216,7 @@ func TestValidateParams(t *testing.T) {
 			},
 		}
 
-		err = ValidateParams(params, sm)
+		err := ValidateParams(params, sm)
 		if tc.err && err == nil {
 			t.Fatalf("expected an error when deducing package fails, got none")
 		} else if !tc.err && err != nil {

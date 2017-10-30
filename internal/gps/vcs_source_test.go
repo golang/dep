@@ -301,15 +301,8 @@ func testBzrSourceInteractions(t *testing.T) {
 		}
 	}()
 
-	n := "launchpad.net/govcstestbzrrepo"
-	un := "https://" + n
-	u, err := url.Parse(un)
-	if err != nil {
-		t.Fatalf("Error parsing URL %s: %s", un, err)
-	}
-	mb := maybeBzrSource{
-		url: u,
-	}
+	un := "file://" + sharedFixtureRepos["launchpad.net/govcstestbzrrepo"]
+	mb := maybeBzrSource{url: mkurl(un)}
 
 	ctx := context.Background()
 	superv := newSupervisor(ctx)
@@ -601,14 +594,7 @@ func TestGitSourceListVersionsNoDupes(t *testing.T) {
 	}()
 
 	n := "github.com/carolynvs/deptest-importers"
-	un := "https://" + n
-	u, err := url.Parse(un)
-	if err != nil {
-		t.Fatalf("Error parsing URL %s: %s", un, err)
-	}
-	mb := maybeGitSource{
-		url: u,
-	}
+	mb := maybeGitSource{mkurl("file://" + sharedFixtureRepos[n])}
 
 	ctx := context.Background()
 	superv := newSupervisor(ctx)
@@ -665,13 +651,7 @@ func Test_bzrSource_exportRevisionTo_removeVcsFiles(t *testing.T) {
 
 	rev := Revision("matt@mattfarina.com-20150731135137-pbphasfppmygpl68")
 	n := "launchpad.net/govcstestbzrrepo"
-	un := "https://" + n
-	u, err := url.Parse(un)
-	if err != nil {
-		t.Errorf("URL was bad, lolwut? errtext: %s", err)
-		return
-	}
-	mb := maybeBzrSource{u}
+	mb := maybeBzrSource{mkurl("file://" + sharedFixtureRepos[n])}
 
 	ctx := context.Background()
 	superv := newSupervisor(ctx)
@@ -719,13 +699,7 @@ func Test_hgSource_exportRevisionTo_removeVcsFiles(t *testing.T) {
 
 	rev := Revision("6f55e1f03d91f8a7cce35d1968eb60a2352e4d59")
 	n := "bitbucket.org/golang-dep/dep-test"
-	un := "https://" + n
-	u, err := url.Parse(un)
-	if err != nil {
-		t.Errorf("URL was bad, lolwut? errtext: %s", err)
-		return
-	}
-	mb := maybeHgSource{u}
+	mb := maybeHgSource{mkurl("file://" + sharedFixtureRepos[n])}
 
 	ctx := context.Background()
 	superv := newSupervisor(ctx)
