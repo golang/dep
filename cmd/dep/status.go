@@ -211,6 +211,10 @@ func (out *templateOutput) MissingLine(ms *MissingStatus) {
 }
 
 func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
+	if err := cmd.validateFlags(); err != nil {
+		return err
+	}
+
 	p, err := ctx.LoadProject()
 	if err != nil {
 		return err
@@ -297,6 +301,54 @@ func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
 
 	// Print the status output
 	ctx.Out.Print(buf.String())
+
+	return nil
+}
+
+func (cmd *statusCommand) validateFlags() error {
+	// Operating mode flags.
+	opModes := []string{}
+
+	if cmd.detailed {
+		opModes = append(opModes, "-detailed")
+	}
+
+	if cmd.old {
+		opModes = append(opModes, "-old")
+	}
+
+	if cmd.missing {
+		opModes = append(opModes, "-missing")
+	}
+
+	if cmd.unused {
+		opModes = append(opModes, "-unused")
+	}
+
+	if cmd.modified {
+		opModes = append(opModes, "-modified")
+	}
+
+	// Check if any other flags are passed with -dot.
+	if cmd.dot {
+		if cmd.template != "" {
+			return errors.New("cannot pass template string with -dot")
+		}
+
+		if cmd.json {
+			return errors.New("cannot pass multiple output format flags")
+		}
+
+		if len(opModes) > 0 {
+			return errors.New("-dot generates dependency graph; cannot pass other flags")
+		}
+	}
+
+	if len(opModes) > 1 {
+		// List the flags because which flags are for operation mode might not
+		// be apparent to the users.
+		return errors.Wrapf(errors.New("cannot pass multiple operating mode flags"), "%v", opModes)
+	}
 
 	return nil
 }
