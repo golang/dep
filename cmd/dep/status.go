@@ -91,6 +91,9 @@ type outputter interface {
 	MissingHeader()
 	MissingLine(*MissingStatus)
 	MissingFooter()
+	UnusedHeader()
+	UnusedLine(*UnusedStatus)
+	UnusedFooter()
 }
 
 type tableOutput struct{ w *tabwriter.Writer }
@@ -115,6 +118,8 @@ func (out *tableOutput) BasicLine(bs *BasicStatus) {
 	)
 }
 
+// Missing Table Output
+
 func (out *tableOutput) MissingHeader() {
 	fmt.Fprintln(out.w, "PROJECT\tMISSING PACKAGES")
 }
@@ -131,10 +136,25 @@ func (out *tableOutput) MissingFooter() {
 	out.w.Flush()
 }
 
+// Unused Table Output
+
+func (out *tableOutput) UnusedHeader() {
+	fmt.Fprintln(out.w, "PROJECT")
+}
+
+func (out *tableOutput) UnusedLine(us *UnusedStatus) {
+	fmt.Fprintf(out.w, "%s\n", us.ProjectRoot)
+}
+
+func (out *tableOutput) UnusedFooter() {
+	out.w.Flush()
+}
+
 type jsonOutput struct {
 	w       io.Writer
 	basic   []*rawStatus
 	missing []*MissingStatus
+	unused  []*UnusedStatus
 }
 
 func (out *jsonOutput) BasicHeader() {
@@ -149,6 +169,8 @@ func (out *jsonOutput) BasicLine(bs *BasicStatus) {
 	out.basic = append(out.basic, bs.marshalJSON())
 }
 
+// Missing JSON Output
+
 func (out *jsonOutput) MissingHeader() {
 	out.missing = []*MissingStatus{}
 }
@@ -159,6 +181,20 @@ func (out *jsonOutput) MissingLine(ms *MissingStatus) {
 
 func (out *jsonOutput) MissingFooter() {
 	json.NewEncoder(out.w).Encode(out.missing)
+}
+
+// Unused JSON Output
+
+func (out *jsonOutput) UnusedHeader() {
+	out.unused = []*UnusedStatus{}
+}
+
+func (out *jsonOutput) UnusedLine(us *UnusedStatus) {
+	out.unused = append(out.unused, us)
+}
+
+func (out *jsonOutput) UnusedFooter() {
+	json.NewEncoder(out.w).Encode(out.unused)
 }
 
 type dotOutput struct {
@@ -191,6 +227,10 @@ func (out *dotOutput) MissingHeader()                {}
 func (out *dotOutput) MissingLine(ms *MissingStatus) {}
 func (out *dotOutput) MissingFooter()                {}
 
+func (out *dotOutput) UnusedHeader()               {}
+func (out *dotOutput) UnusedLine(us *UnusedStatus) {}
+func (out *dotOutput) UnusedFooter()               {}
+
 func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
 	p, err := ctx.LoadProject()
 	if err != nil {
@@ -212,8 +252,6 @@ func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
 	var out outputter
 	switch {
 	case cmd.modified:
-		return errors.Errorf("not implemented")
-	case cmd.unused:
 		return errors.Errorf("not implemented")
 	case cmd.missing:
 		return errors.Errorf("not implemented")
@@ -242,29 +280,35 @@ func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
 		return errors.Errorf("no Gopkg.lock found. Run `dep ensure` to generate lock file")
 	}
 
-	hasMissingPkgs, errCount, err := runStatusAll(ctx, out, p, sm)
-	if err != nil {
-		switch err {
-		case errFailedUpdate:
-			// Print the results with unknown data
-			ctx.Out.Println(buf.String())
-			// Print the help when in non-verbose mode
-			if !ctx.Verbose {
-				ctx.Out.Printf("The status of %d projects are unknown due to errors. Rerun with `-v` flag to see details.\n", errCount)
-			}
-		case errInputDigestMismatch:
-			// Tell the user why mismatch happened and how to resolve it.
-			if hasMissingPkgs {
-				ctx.Err.Printf("Lock inputs-digest mismatch due to the following packages missing from the lock:\n\n")
-				ctx.Out.Print(buf.String())
-				ctx.Err.Printf("\nThis happens when a new import is added. Run `dep ensure` to install the missing packages.\n")
-			} else {
-				ctx.Err.Printf("Lock inputs-digest mismatch. This happens when Gopkg.toml is modified.\n" +
-					"Run `dep ensure` to regenerate the inputs-digest.")
-			}
+	if cmd.unused {
+		if err := runStatusUnused(ctx, out, p, sm); err != nil {
+			return err
 		}
+	} else {
+		hasMissingPkgs, errCount, err := runStatusAll(ctx, out, p, sm)
+		if err != nil {
+			switch err {
+			case errFailedUpdate:
+				// Print the results with unknown data
+				ctx.Out.Println(buf.String())
+				// Print the help when in non-verbose mode
+				if !ctx.Verbose {
+					ctx.Out.Printf("The status of %d projects are unknown due to errors. Rerun with `-v` flag to see details.\n", errCount)
+				}
+			case errInputDigestMismatch:
+				// Tell the user why mismatch happened and how to resolve it.
+				if hasMissingPkgs {
+					ctx.Err.Printf("Lock inputs-digest mismatch due to the following packages missing from the lock:\n\n")
+					ctx.Out.Print(buf.String())
+					ctx.Err.Printf("\nThis happens when a new import is added. Run `dep ensure` to install the missing packages.\n")
+				} else {
+					ctx.Err.Printf("Lock inputs-digest mismatch. This happens when Gopkg.toml is modified.\n" +
+						"Run `dep ensure` to regenerate the inputs-digest.")
+				}
+			}
 
-		return err
+			return err
+		}
 	}
 
 	// Print the status output
@@ -354,6 +398,11 @@ func (bs *BasicStatus) marshalJSON() *rawStatus {
 type MissingStatus struct {
 	ProjectRoot     string
 	MissingPackages []string
+}
+
+// UnusedStatus contains name of the unused packages in a project.
+type UnusedStatus struct {
+	ProjectRoot string
 }
 
 func runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceManager) (hasMissingPkgs bool, errCount int, err error) {
@@ -620,6 +669,51 @@ outer:
 
 	// We are here because of an input-digest mismatch. Return error.
 	return hasMissingPkgs, 0, errInputDigestMismatch
+}
+
+func runStatusUnused(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceManager) error {
+	ptree, err := pkgtree.ListPackages(p.AbsRoot, string(p.ImportRoot))
+	if err != nil {
+		return errors.Wrap(err, "analysis of the local packages failed")
+	}
+
+	rm, _ := ptree.ToReachMap(true, true, false, p.Manifest.IgnoredPackages())
+	external := rm.FlattenFn(paths.IsStandardImportPath)
+
+	// Convert all the imports to their project roots.
+	// TODO: Deduce ProjectRoot concurrently.
+	externalPRs := []string{}
+	for _, ip := range external {
+		pr, err := sm.DeduceProjectRoot(ip)
+		if err != nil {
+			return err
+		}
+		externalPRs = append(externalPRs, string(pr))
+	}
+
+	var unusedConstraints []string
+	for pr := range p.Manifest.Constraints {
+		if !contains(externalPRs, string(pr)) {
+			unusedConstraints = append(unusedConstraints, string(pr))
+		}
+	}
+
+	// Sort for consistent order in the result.
+	sort.Strings(unusedConstraints)
+
+	if len(unusedConstraints) > 0 {
+		out.UnusedHeader()
+	} else {
+		ctx.Out.Printf("No unused constraints")
+	}
+
+	for _, pr := range unusedConstraints {
+		out.UnusedLine(&UnusedStatus{ProjectRoot: pr})
+	}
+
+	out.UnusedFooter()
+
+	return nil
 }
 
 func formatVersion(v gps.Version) string {

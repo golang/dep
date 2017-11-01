@@ -1,0 +1,10 @@
+{
+  "commands": [
+    ["ensure"],
+    ["status", "-unused"]
+  ],
+  "error-expected": "",
+  "vendor-final": [
+    "github.com/sdboyer/deptest"
+  ]
+}
