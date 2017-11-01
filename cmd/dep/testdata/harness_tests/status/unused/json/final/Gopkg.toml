@@ -1,0 +1,11 @@
+[[constraint]]
+  name = "github.com/sdboyer/deptest"
+  version = "1.0.0"
+
+[[constraint]]
+  name = "github.com/sdboyer/deptestdos"
+  branch = "master"
+
+[[constraint]]
+  name = "github.com/sdboyer/dep-test"
+  branch = "master"
