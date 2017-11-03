@@ -7,6 +7,7 @@ package gps
 import (
 	"fmt"
 	"sort"
+	"strconv"
 
 	"github.com/Masterminds/semver"
 	"github.com/golang/dep/internal/gps/internal/pb"
@@ -23,6 +24,17 @@ const (
 	IsSemver
 	IsBranch
 )
+
+func (vt VersionType) String() string {
+	name := []string{"revision", "version", "semver", "branch"}
+	i := uint8(vt)
+	switch {
+	case i <= uint8(IsBranch):
+		return name[i]
+	default:
+		return strconv.Itoa(int(i))
+	}
+}
 
 // Version represents one of the different types of versions used by gps.
 //

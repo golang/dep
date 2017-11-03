@@ -170,8 +170,8 @@ type disjointConstraintFailure struct {
 
 func (e *disjointConstraintFailure) Error() string {
 	if len(e.failsib) == 1 {
-		str := "Could not introduce %s, as it has a dependency on %s with constraint %s, which has no overlap with existing constraint %s from %s"
-		return fmt.Sprintf(str, a2vs(e.goal.depender), e.goal.dep.Ident, e.goal.dep.Constraint.String(), e.failsib[0].dep.Constraint.String(), a2vs(e.failsib[0].depender))
+		str := "Could not introduce %s, as it has a dependency on %s with constraint %s (%s), which has no overlap with existing constraint %s (%s) from %s"
+		return fmt.Sprintf(str, a2vs(e.goal.depender), e.goal.dep.Ident, e.goal.dep.Constraint.String(), e.goal.depender.v.Type(), e.failsib[0].dep.Constraint.String(), e.failsib[0].depender.v.Type(), a2vs(e.failsib[0].depender))
 	}
 
 	var buf bytes.Buffer
@@ -180,17 +180,17 @@ func (e *disjointConstraintFailure) Error() string {
 	if len(e.failsib) > 1 {
 		sibs = e.failsib
 
-		str := "Could not introduce %s, as it has a dependency on %s with constraint %s, which has no overlap with the following existing constraints:\n"
-		fmt.Fprintf(&buf, str, a2vs(e.goal.depender), e.goal.dep.Ident, e.goal.dep.Constraint.String())
+		str := "Could not introduce %s, as it has a dependency on %s with constraint %s (%s), which has no overlap with the following existing constraints:\n"
+		fmt.Fprintf(&buf, str, a2vs(e.goal.depender), e.goal.dep.Ident, e.goal.dep.Constraint.String(), e.goal.depender.v.Type())
 	} else {
 		sibs = e.nofailsib
 
-		str := "Could not introduce %s, as it has a dependency on %s with constraint %s, which does not overlap with the intersection of existing constraints from other currently selected packages:\n"
-		fmt.Fprintf(&buf, str, a2vs(e.goal.depender), e.goal.dep.Ident, e.goal.dep.Constraint.String())
+		str := "Could not introduce %s, as it has a dependency on %s with constraint %s (%s), which does not overlap with the intersection of existing constraints from other currently selected packages:\n"
+		fmt.Fprintf(&buf, str, a2vs(e.goal.depender), e.goal.dep.Ident, e.goal.dep.Constraint.String(), e.goal.depender.v.Type())
 	}
 
 	for _, c := range sibs {
-		fmt.Fprintf(&buf, "\t%s from %s\n", c.dep.Constraint.String(), a2vs(c.depender))
+		fmt.Fprintf(&buf, "\t%s (%s) from %s\n", c.dep.Constraint.String(), c.depender.v.Type(), a2vs(c.depender))
 	}
 
 	return buf.String()
