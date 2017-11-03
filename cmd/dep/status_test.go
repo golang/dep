@@ -12,7 +12,7 @@ import (
 	"strings"
 
 	"github.com/golang/dep"
-	"github.com/golang/dep/internal/gps"
+	"github.com/golang/dep/gps"
 )
 
 func TestStatusFormatVersion(t *testing.T) {

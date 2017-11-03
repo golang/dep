@@ -8,7 +8,7 @@ import (
 	"log"
 
 	"github.com/golang/dep"
-	"github.com/golang/dep/internal/gps"
+	"github.com/golang/dep/gps"
 	"github.com/golang/dep/internal/importers/glide"
 	"github.com/golang/dep/internal/importers/godep"
 	"github.com/golang/dep/internal/importers/govend"

@@ -9,4 +9,4 @@ set -e
 PKGS=$(go list ./... | grep -vF /vendor/)
 go vet $PKGS
 golint $PKGS
-megacheck -unused.exported -ignore "github.com/golang/dep/internal/test/test.go:U1000 github.com/golang/dep/internal/gps/prune.go:U1000" $PKGS
+megacheck -unused.exported -ignore "github.com/golang/dep/internal/test/test.go:U1000 github.com/golang/dep/gps/prune.go:U1000" $PKGS
