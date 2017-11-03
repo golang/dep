@@ -10,7 +10,7 @@ ratings:
     - "**.go"
 exclude_paths:
   - vendor/
-  - internal/gps/_testdata
+  - gps/_testdata
   - cmd/dep/testdata
   - testdata
-  - internal/gps/internal/pb
+  - gps/internal/pb

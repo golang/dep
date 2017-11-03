@@ -14,8 +14,8 @@ import (
 
 	"github.com/go-yaml/yaml"
 	"github.com/golang/dep"
+	"github.com/golang/dep/gps"
 	"github.com/golang/dep/internal/fs"
-	"github.com/golang/dep/internal/gps"
 	"github.com/golang/dep/internal/importers/base"
 	"github.com/pkg/errors"
 )
