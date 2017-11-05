@@ -35,6 +35,9 @@ func TestMain(m *testing.M) {
 		os.Setenv("CCACHE_DIR", filepath.Join(home, ".ccache"))
 	}
 	os.Setenv("HOME", "/test-dep-home-does-not-exist")
+	if os.Getenv("GOCACHE") == "" {
+		os.Setenv("GOCACHE", "off") // because $HOME is gone
+	}
 
 	r := m.Run()
 
