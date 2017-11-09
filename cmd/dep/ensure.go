@@ -226,6 +226,13 @@ func (cmd *ensureCommand) validateFlags() error {
 	return nil
 }
 
+func (cmd *ensureCommand) vendorBehavior() dep.VendorBehavior {
+	if cmd.noVendor {
+		return dep.VendorNever
+	}
+	return dep.VendorOnChanged
+}
+
 func (cmd *ensureCommand) runDefault(ctx *dep.Ctx, args []string, p *dep.Project, sm gps.SourceManager, params gps.SolveParameters) error {
 	// Bare ensure doesn't take any args.
 	if len(args) != 0 {
@@ -283,11 +290,7 @@ func (cmd *ensureCommand) runDefault(ctx *dep.Ctx, args []string, p *dep.Project
 		return handleAllTheFailuresOfTheWorld(err)
 	}
 
-	vendorBehavior := dep.VendorOnChanged
-	if cmd.noVendor {
-		vendorBehavior = dep.VendorNever
-	}
-	sw, err := dep.NewSafeWriter(nil, p.Lock, dep.LockFromSolution(solution), vendorBehavior)
+	sw, err := dep.NewSafeWriter(nil, p.Lock, dep.LockFromSolution(solution), cmd.vendorBehavior())
 	if err != nil {
 		return err
 	}
@@ -377,7 +380,7 @@ func (cmd *ensureCommand) runUpdate(ctx *dep.Ctx, args []string, p *dep.Project,
 		return handleAllTheFailuresOfTheWorld(err)
 	}
 
-	sw, err := dep.NewSafeWriter(nil, p.Lock, dep.LockFromSolution(solution), dep.VendorOnChanged)
+	sw, err := dep.NewSafeWriter(nil, p.Lock, dep.LockFromSolution(solution), cmd.vendorBehavior())
 	if err != nil {
 		return err
 	}
