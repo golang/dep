@@ -467,3 +467,26 @@ before_install:
 install:
   - dep ensure
 ```
+
+Caching can also be enabled but there are a couple of caveats you should be aware of:
+
+> Until recently, we have had intermittent cache corruption that would have been super annoying if it was breaking Travis build too.
+>
+> Also according to https://docs.travis-ci.com/user/caching/#Things-not-to-cache, they don't recommend it for larger caches.
+>
+> https://docs.travis-ci.com/user/caching/#How-does-the-caching-work%3F
+>
+> > Note that this makes our cache not network-local, it's still bound to network bandwidth and DNS resolutions for S3.
+> > That impacts what you can and should store in the cache. If you store archives larger than a few hundred megabytes in the cache, it's unlikely that you'll see a big speed improvement.
+>
+> [@carolynvs in #1293](https://github.com/golang/dep/pull/1293#issuecomment-342969292)
+
+If you are sure you want to enable caching on travis, it can be done by adding `$GOPATH/pkg/dep`, the default location for `dep` cache, to the cached directories:
+
+```yml
+# ...
+
+cache:
+  directories:
+    - $GOPATH/pkg/dep
+```
