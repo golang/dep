@@ -7,6 +7,7 @@ package gps
 import (
 	"context"
 	"io/ioutil"
+	"log"
 	"net/url"
 	"os"
 	"os/exec"
@@ -21,7 +22,6 @@ import (
 
 // Parent test that executes all the slow vcs interaction tests in parallel.
 func TestSlowVcs(t *testing.T) {
-	t.Parallel()
 	t.Run("write-deptree", testWriteDepTree)
 	t.Run("source-gateway", testSourceGateway)
 	t.Run("bzr-repo", testBzrRepo)
@@ -646,6 +646,100 @@ func TestGitSourceListVersionsNoDupes(t *testing.T) {
 			}
 		}
 	}
+}
+
+func TestGitSourceAdaptiveCleanup(t *testing.T) {
+	t.Parallel()
+
+	// This test is slowish, skip it on -short
+	if testing.Short() {
+		t.Skip("Skipping git adaptive failure recovery test in short mode")
+	}
+	requiresBins(t, "git")
+
+	cpath, err := ioutil.TempDir("", "smcache")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %s", err)
+	}
+
+	var sm *SourceMgr
+	mkSM := func() {
+		// If sm is already set, make sure it's released, then create a new one.
+		if sm != nil {
+			sm.Release()
+		}
+
+		var err error
+		sm, err = NewSourceManager(SourceManagerConfig{
+			Cachedir: cpath,
+			Logger:   log.New(test.Writer{TB: t}, "", 0),
+		})
+		if err != nil {
+			t.Fatalf("Unexpected error on SourceManager creation: %s", err)
+		}
+	}
+
+	mkSM()
+	id := mkPI("github.com/sdboyer/gpkt")
+	err = sm.SyncSourceFor(id)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	repodir := filepath.Join(sm.cachedir, "sources", "https---github.com-sdboyer-gpkt")
+	if _, err := os.Stat(repodir); err != nil {
+		if os.IsNotExist(err) {
+			t.Fatalf("expected location for repodir did not exist: %q", repodir)
+		} else {
+			t.Fatal(err)
+		}
+	}
+
+	// Create a file that git will see as untracked.
+	untrackedPath := filepath.Join(repodir, "untrackedfile")
+	err = ioutil.WriteFile(untrackedPath, []byte("foo"), 0644)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	mkSM()
+	err = sm.SyncSourceFor(id)
+	if err != nil {
+		t.Fatalf("choked after adding dummy file: %q", err)
+	}
+
+	if _, err := os.Stat(untrackedPath); err == nil {
+		t.Fatal("untracked file still existed after cleanup should've been triggered")
+	}
+
+	// Remove a file that we know exists, which `git status` checks should catch.
+	readmePath := filepath.Join(repodir, "README.md")
+	os.Remove(readmePath)
+
+	mkSM()
+	err = sm.SyncSourceFor(id)
+	if err != nil {
+		t.Fatalf("choked after removing known file: %q", err)
+	}
+
+	if _, err := os.Stat(readmePath); err != nil {
+		t.Fatal("README was still absent after cleanup should've been triggered")
+	}
+
+	// Remove .git/objects directory, which should make git bite it.
+	err = os.RemoveAll(filepath.Join(repodir, ".git", "objects"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	mkSM()
+	err = sm.SyncSourceFor(id)
+	if err != nil {
+		t.Fatalf("choked after removing .git/objects directory: %q", err)
+	}
+
+	sm.Release()
+	os.RemoveAll(cpath)
 }
 
 func Test_bzrSource_exportRevisionTo_removeVcsFiles(t *testing.T) {

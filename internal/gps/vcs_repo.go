@@ -7,6 +7,7 @@ package gps
 import (
 	"context"
 	"encoding/xml"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -25,8 +26,8 @@ type ctxRepo interface {
 	//ping(context.Context) (bool, error)
 }
 
-func newCtxRepo(s vcs.Type, ustr, path string) (r ctxRepo, err error) {
-	r, err = getVCSRepo(s, ustr, path)
+func newCtxRepo(s vcs.Type, ustr, path string) (ctxRepo, error) {
+	r, err := getVCSRepo(s, ustr, path)
 	if err != nil {
 		// if vcs could not initialize the repo due to a local error
 		// then the local repo is in an incorrect state. Remove and
@@ -37,30 +38,26 @@ func newCtxRepo(s vcs.Type, ustr, path string) (r ctxRepo, err error) {
 		r, err = getVCSRepo(s, ustr, path)
 	}
 
-	return
+	return r, err
 }
 
-func getVCSRepo(s vcs.Type, ustr, path string) (r ctxRepo, err error) {
+func getVCSRepo(s vcs.Type, ustr, path string) (ctxRepo, error) {
 	switch s {
 	case vcs.Git:
-		var repo *vcs.GitRepo
-		repo, err = vcs.NewGitRepo(ustr, path)
-		r = &gitRepo{repo}
+		repo, err := vcs.NewGitRepo(ustr, path)
+		return &gitRepo{repo}, err
 	case vcs.Bzr:
-		var repo *vcs.BzrRepo
-		repo, err = vcs.NewBzrRepo(ustr, path)
-		r = &bzrRepo{repo}
+		repo, err := vcs.NewBzrRepo(ustr, path)
+		return &bzrRepo{repo}, err
 	case vcs.Hg:
-		var repo *vcs.HgRepo
-		repo, err = vcs.NewHgRepo(ustr, path)
-		r = &hgRepo{repo}
+		repo, err := vcs.NewHgRepo(ustr, path)
+		return &hgRepo{repo}, err
 	case vcs.Svn:
-		var repo *vcs.SvnRepo
-		repo, err = vcs.NewSvnRepo(ustr, path)
-		r = &svnRepo{repo}
+		repo, err := vcs.NewSvnRepo(ustr, path)
+		return &svnRepo{repo}, err
+	default:
+		panic(fmt.Sprintf("Unrecognized format: %v", s))
 	}
-
-	return
 }
 
 // original implementation of these methods come from

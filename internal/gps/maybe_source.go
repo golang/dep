@@ -100,13 +100,21 @@ func (m maybeGitSource) try(ctx context.Context, cachedir string, c singleSource
 		return nil, 0, err
 	}
 
-	c.setVersionMap(vl)
 	state := sourceIsSetUp | sourceExistsUpstream | sourceHasLatestVersionList
 
 	if r.CheckLocal() {
 		state |= sourceExistsLocally
+
+		if err := superv.do(ctx, "git", ctValidateLocal, func(ctx context.Context) error {
+			// If repository already exists on disk, make a pass to be sure
+			// everything's clean.
+			return src.ensureClean(ctx)
+		}); err != nil {
+			return nil, 0, err
+		}
 	}
 
+	c.setVersionMap(vl)
 	return src, state, nil
 }
 

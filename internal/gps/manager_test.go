@@ -139,7 +139,6 @@ func TestSourceInit(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping project manager init test in short mode")
 	}
-	t.Parallel()
 
 	cpath, err := ioutil.TempDir("", "smcache")
 	if err != nil {
@@ -260,12 +259,6 @@ func TestSourceInit(t *testing.T) {
 
 	os.Stat(filepath.Join(cpath, "metadata", "github.com", "sdboyer", "gpkt", "cache.json"))
 
-	// TODO(sdboyer) disabled until we get caching working
-	//_, err = os.Stat(filepath.Join(cpath, "metadata", "github.com", "sdboyer", "gpkt", "cache.json"))
-	//if err != nil {
-	//t.Error("Metadata cache json file does not exist in expected location")
-	//}
-
 	// Ensure source existence values are what we expect
 	var exists bool
 	exists, err = sm.SourceExists(id)
@@ -281,7 +274,6 @@ func TestDefaultBranchAssignment(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping default branch assignment test in short mode")
 	}
-	t.Parallel()
 
 	sm, clean := mkNaiveSM(t)
 	defer clean()
@@ -407,7 +399,6 @@ func TestSourceCreationCounts(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping slow test in short mode")
 	}
-	t.Parallel()
 
 	fixtures := map[string]sourceCreationTestFixture{
 		"gopkgin uniqueness": {
@@ -450,7 +441,6 @@ func TestGetSources(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping source setup test in short mode")
 	}
-	t.Parallel()
 	requiresBins(t, "git", "hg", "bzr")
 
 	sm, clean := mkNaiveSM(t)
@@ -517,7 +507,6 @@ func TestFSCaseSensitivityConvergesSources(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping slow test in short mode")
 	}
-	t.Parallel()
 
 	f := func(name string, pi1, pi2 ProjectIdentifier) {
 		t.Run(name, func(t *testing.T) {
@@ -576,7 +565,6 @@ func TestGetInfoListVersionsOrdering(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping slow test in short mode")
 	}
-	t.Parallel()
 
 	sm, clean := mkNaiveSM(t)
 	defer clean()
@@ -681,7 +669,6 @@ func TestMultiFetchThreadsafe(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping slow test in short mode")
 	}
-	t.Parallel()
 
 	projects := []ProjectIdentifier{
 		mkPI("github.com/sdboyer/gps"),
@@ -789,7 +776,6 @@ func TestListVersionsRacey(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping slow test in short mode")
 	}
-	t.Parallel()
 
 	sm, clean := mkNaiveSM(t)
 	defer clean()
@@ -818,57 +804,57 @@ func TestErrAfterRelease(t *testing.T) {
 	_, err := sm.SourceExists(id)
 	if err == nil {
 		t.Errorf("SourceExists did not error after calling Release()")
-	} else if terr, ok := err.(smIsReleased); !ok {
-		t.Errorf("SourceExists errored after Release(), but with unexpected error: %T %s", terr, terr.Error())
+	} else if err != ErrSourceManagerIsReleased {
+		t.Errorf("SourceExists errored after Release(), but with unexpected error: %T %s", err, err.Error())
 	}
 
 	err = sm.SyncSourceFor(id)
 	if err == nil {
 		t.Errorf("SyncSourceFor did not error after calling Release()")
-	} else if terr, ok := err.(smIsReleased); !ok {
-		t.Errorf("SyncSourceFor errored after Release(), but with unexpected error: %T %s", terr, terr.Error())
+	} else if err != ErrSourceManagerIsReleased {
+		t.Errorf("SyncSourceFor errored after Release(), but with unexpected error: %T %s", err, err.Error())
 	}
 
 	_, err = sm.ListVersions(id)
 	if err == nil {
 		t.Errorf("ListVersions did not error after calling Release()")
-	} else if terr, ok := err.(smIsReleased); !ok {
-		t.Errorf("ListVersions errored after Release(), but with unexpected error: %T %s", terr, terr.Error())
+	} else if err != ErrSourceManagerIsReleased {
+		t.Errorf("ListVersions errored after Release(), but with unexpected error: %T %s", err, err.Error())
 	}
 
 	_, err = sm.RevisionPresentIn(id, "")
 	if err == nil {
 		t.Errorf("RevisionPresentIn did not error after calling Release()")
-	} else if terr, ok := err.(smIsReleased); !ok {
-		t.Errorf("RevisionPresentIn errored after Release(), but with unexpected error: %T %s", terr, terr.Error())
+	} else if err != ErrSourceManagerIsReleased {
+		t.Errorf("RevisionPresentIn errored after Release(), but with unexpected error: %T %s", err, err.Error())
 	}
 
 	_, err = sm.ListPackages(id, nil)
 	if err == nil {
 		t.Errorf("ListPackages did not error after calling Release()")
-	} else if terr, ok := err.(smIsReleased); !ok {
-		t.Errorf("ListPackages errored after Release(), but with unexpected error: %T %s", terr, terr.Error())
+	} else if err != ErrSourceManagerIsReleased {
+		t.Errorf("ListPackages errored after Release(), but with unexpected error: %T %s", err, err.Error())
 	}
 
 	_, _, err = sm.GetManifestAndLock(id, nil, naiveAnalyzer{})
 	if err == nil {
 		t.Errorf("GetManifestAndLock did not error after calling Release()")
-	} else if terr, ok := err.(smIsReleased); !ok {
-		t.Errorf("GetManifestAndLock errored after Release(), but with unexpected error: %T %s", terr, terr.Error())
+	} else if err != ErrSourceManagerIsReleased {
+		t.Errorf("GetManifestAndLock errored after Release(), but with unexpected error: %T %s", err, err.Error())
 	}
 
 	err = sm.ExportProject(context.Background(), id, nil, "")
 	if err == nil {
 		t.Errorf("ExportProject did not error after calling Release()")
-	} else if terr, ok := err.(smIsReleased); !ok {
-		t.Errorf("ExportProject errored after Release(), but with unexpected error: %T %s", terr, terr.Error())
+	} else if err != ErrSourceManagerIsReleased {
+		t.Errorf("ExportProject errored after Release(), but with unexpected error: %T %s", err, err.Error())
 	}
 
 	_, err = sm.DeduceProjectRoot("")
 	if err == nil {
 		t.Errorf("DeduceProjectRoot did not error after calling Release()")
-	} else if terr, ok := err.(smIsReleased); !ok {
-		t.Errorf("DeduceProjectRoot errored after Release(), but with unexpected error: %T %s", terr, terr.Error())
+	} else if err != ErrSourceManagerIsReleased {
+		t.Errorf("DeduceProjectRoot errored after Release(), but with unexpected error: %T %s", err, err.Error())
 	}
 }
 
@@ -945,7 +931,6 @@ func TestUnreachableSource(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping slow test in short mode")
 	}
-	t.Parallel()
 
 	sm, clean := mkNaiveSM(t)
 	defer clean()

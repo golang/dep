@@ -18,8 +18,6 @@ import (
 )
 
 func Test_singleSourceCache(t *testing.T) {
-	t.Parallel()
-
 	newMem := func(*testing.T, string, string) (singleSourceCache, func() error) {
 		return newMemoryCache(), func() error { return nil }
 	}
@@ -72,8 +70,6 @@ type singleSourceCacheTest struct {
 // run tests singleSourceCache methods of caches returned by test.newCache.
 // For test.persistent caches, test.newCache is periodically called mid-test to ensure persistence.
 func (test singleSourceCacheTest) run(t *testing.T) {
-	t.Parallel()
-
 	const root = "example.com/test"
 	cpath, err := ioutil.TempDir("", "singlesourcecache")
 	if err != nil {
