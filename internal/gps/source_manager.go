@@ -32,7 +32,7 @@ var sanitizer = strings.NewReplacer("-", "--", ":", "-", "/", "-", "+", "-")
 // interfering with one-another.
 //
 // Currently, anything that can either TryLock(), Unlock(), or GetOwner()
-// satifies that need.
+// satisfies that need.
 type locker interface {
 	TryLock() error
 	Unlock() error
@@ -53,12 +53,12 @@ func (fl falseLocker) GetOwner() (*os.Process, error) {
 	return nil, fmt.Errorf("falseLocker always fails")
 }
 
-// Does nothing and returns a nil error so caller beleives locking succeeded.
+// Does nothing and returns a nil error so caller believes locking succeeded.
 func (fl falseLocker) TryLock() error {
 	return nil
 }
 
-// Does nothing and returns a nil error so caller beleives unlocking succeeded.
+// Does nothing and returns a nil error so caller believes unlocking succeeded.
 func (fl falseLocker) Unlock() error {
 	return nil
 }
