@@ -262,7 +262,7 @@ func DigestFromDirectory(osDirname string) ([]byte, error) {
 }
 
 // VendorStatus represents one of a handful of possible status conditions for a
-// particular file sytem node in the vendor directory tree.
+// particular file system node in the vendor directory tree.
 type VendorStatus uint8
 
 const (
