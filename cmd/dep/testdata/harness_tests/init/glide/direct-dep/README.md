@@ -1,1 +1,0 @@
-Take a direct dependency where the version is defined by glide.

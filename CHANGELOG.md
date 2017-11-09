@@ -7,7 +7,7 @@ BUG FIXES:
 
 WIP:
 
-* dep: Enable importing other tools and add integration tests (#1277)
+* dep: Enable importing external configuration from dependencies during init (#1277)
 
 IMPROVEMENTS:
 

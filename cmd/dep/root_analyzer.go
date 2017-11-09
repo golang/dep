@@ -119,6 +119,7 @@ func (a *rootAnalyzer) importManifestAndLock(dir string, pr gps.ProjectRoot, sup
 			if err != nil {
 				return nil, nil, err
 			}
+			a.removeTransitiveDependencies(m)
 			return m, l, err
 		}
 	}
@@ -164,11 +165,6 @@ func (a *rootAnalyzer) DeriveManifestAndLock(dir string, pr gps.ProjectRoot) (gp
 }
 
 func (a *rootAnalyzer) FinalizeRootManifestAndLock(m *dep.Manifest, l *dep.Lock, ol dep.Lock) {
-	// Transitive dependencies could sneak into the manifest when other importers are used
-	if !a.skipTools {
-		a.removeTransitiveDependencies(m)
-	}
-
 	// Iterate through the new projects in solved lock and add them to manifest
 	// if they are direct deps and log feedback for all the new projects.
 	for _, y := range l.Projects() {
