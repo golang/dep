@@ -1,1 +1,1 @@
-Import glide config in dependencies.
+Import glide config in direct dependencies.

@@ -1,0 +1,10 @@
+package: github.com/golang/notexist
+homepage: http://example.com
+license: MIT
+owners:
+- name: Sam Boyer
+  email: sdboyer@example.com
+  homepage: http://sdboyer.io
+import:
+- package: github.com/ChinmayR/deptestglideA
+  version: v0.3.0

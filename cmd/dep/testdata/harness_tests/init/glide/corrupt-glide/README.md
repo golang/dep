@@ -1,0 +1,1 @@
+Import deptestglideA tag v0.3.0 which has a corrupt glide manifest.
