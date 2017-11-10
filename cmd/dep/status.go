@@ -237,6 +237,10 @@ func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
 		return err
 	}
 
+	if len(args) > 0 {
+		return runProjectStatus(ctx, args, p, sm)
+	}
+
 	var buf bytes.Buffer
 	var out outputter
 	switch {
@@ -831,3 +835,78 @@ type byProject []projectConstraint
 func (p byProject) Len() int           { return len(p) }
 func (p byProject) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
 func (p byProject) Less(i, j int) bool { return p[i].Project < p[j].Project }
+
+type projectStatus struct {
+	Project               string
+	Version               string
+	Constraints           []string
+	Source                string
+	AltSource             string
+	PubVersions           []string
+	Revision              string
+	LatestAllowed         string
+	SourceType            string
+	Packages              string
+	ProjectImporters      map[string]string
+	PackageImporters      map[string]string
+	UpstreamExists        bool
+	UpstreamVersionExists bool
+}
+
+func (ps projectStatus) String() string {
+	return fmt.Sprintf(`
+PROJECT:			%s
+VERSION:			%s
+CONSTRAINTS:			%s
+SOURCE:				%s
+ALT SOURCE:			%s
+PUB VERSION:			%s
+REVISION:			%s
+LATEST ALLOWED:			%s
+SOURCE TYPE:			%s
+PACKAGES:			%s
+PROJECT IMPORTERS:		%s
+PACKAGE IMPORTERS:		%s
+UPSTREAM EXISTS:		%t
+UPSTREAM VERSION EXISTS:	%t
+`,
+		ps.Project, ps.Version, ps.Constraints, ps.Source, ps.AltSource,
+		ps.PubVersions, ps.Revision, ps.LatestAllowed, ps.SourceType, ps.Packages,
+		ps.ProjectImporters, ps.PackageImporters, ps.UpstreamExists,
+		ps.UpstreamVersionExists)
+}
+
+func runProjectStatus(ctx *dep.Ctx, args []string, p *dep.Project, sm gps.SourceManager) error {
+	// Collect all the project roots from the arguments.
+	var prs []gps.ProjectRoot
+
+	for _, arg := range args {
+		pr, err := sm.DeduceProjectRoot(arg)
+		if err != nil {
+			return err
+		}
+		prs = append(prs, pr)
+	}
+
+	for _, pr := range prs {
+		// Create projectStatus and add Project name.
+		projStatus := projectStatus{
+			Project: string(pr),
+		}
+
+		// Get the currently selected version from from lock.
+		for _, pl := range p.Lock.Projects() {
+			if pr == pl.Ident().ProjectRoot {
+				projStatus.Version = pl.Version().String()
+				projStatus.Source = projStatus.Project
+				projStatus.AltSource = pl.Ident().Source
+				rev, _, _ := gps.VersionComponentStrings(pl.Version())
+				projStatus.Revision = rev
+			}
+		}
+
+		fmt.Println(projStatus)
+	}
+
+	return nil
+}
