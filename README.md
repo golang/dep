@@ -252,7 +252,7 @@ see [changing dependencies](#changing-dependencies).
 
 You might, for example, include a constraint in your manifest that specifies `version = "=2.0.0"` to pin a dependency to version 2.0.0, or constrain to minor releases with: `version = "2.*"`. Refer to the [semver library](https://github.com/Masterminds/semver) documentation for more info.
 
-**Note**: When you specify a version *without an operator*, `dep` automatically uses the `^` operator by default. `dep ensure` will interpret the given version as the min-boundry of a range, for example:
+**Note**: When you specify a version *without an operator*, `dep` automatically uses the `^` operator by default. `dep ensure` will interpret the given version as the min-boundary of a range, for example:
 
 * `1.2.3` becomes the range `>=1.2.3, <2.0.0`
 * `0.2.3` becomes the range `>=0.2.3, <0.3.0`
