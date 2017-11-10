@@ -67,7 +67,7 @@ dep ensure
 
 dep ensure -vendor-only
 
-    Write vendor/ from an exising Gopkg.lock file, without first verifying that
+    Write vendor/ from an existing Gopkg.lock file, without first verifying that
     the lock is in sync with imports and Gopkg.toml. (This may be useful for
     e.g. strategically layering a Docker images)
 
@@ -449,7 +449,7 @@ func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm
 		exrmap[root] = true
 	}
 
-	// Note: these flags are only partialy used by the latter parts of the
+	// Note: these flags are only partially used by the latter parts of the
 	// algorithm; rather, it relies on inference. However, they remain in their
 	// entirety as future needs may make further use of them, being a handy,
 	// terse way of expressing the original context of the arg inputs.
