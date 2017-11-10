@@ -185,7 +185,7 @@ func collectUnusedPackagesFiles(projectDir string, unusedPackages map[string]str
 			return nil
 		}
 
-		// Ignore perserved files.
+		// Ignore preserved files.
 		if isPreservedFile(info.Name()) {
 			return nil
 		}
@@ -242,7 +242,7 @@ func collectNonGoFiles(baseDir string, logger *log.Logger) ([]string, error) {
 			return nil
 		}
 
-		// Ignore perserved files.
+		// Ignore preserved files.
 		if isPreservedFile(info.Name()) {
 			return nil
 		}

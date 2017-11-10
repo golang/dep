@@ -34,10 +34,10 @@ type Package struct {
 // vcsRoots is a set of directories we should not descend into in ListPackages when
 // searching for Go packages
 var vcsRoots = map[string]struct{}{
-	".git": struct{}{},
-	".bzr": struct{}{},
-	".svn": struct{}{},
-	".hg":  struct{}{},
+	".git": {},
+	".bzr": {},
+	".svn": {},
+	".hg":  {},
 }
 
 // ListPackages reports Go package information about all directories in the tree
