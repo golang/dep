@@ -1491,6 +1491,10 @@ func (sm *depspecSourceManager) GetSourceType(id ProjectIdentifier) (SourceType,
 	return InvalidSource, fmt.Errorf("dummy sm doesn't implement GetSourceType")
 }
 
+func (sm *depspecSourceManager) ExistsUpstream(id ProjectIdentifier) (bool, error) {
+	return false, fmt.Errorf("dummy sm doesn't implement ExistsUpstream")
+}
+
 func (sm *depspecSourceManager) rootSpec() depspec {
 	return sm.specs[0]
 }

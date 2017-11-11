@@ -130,6 +130,9 @@ type SourceManager interface {
 	// GetSourceType returns SourceType for the provided ProjectIdentifier.
 	GetSourceType(ProjectIdentifier) (SourceType, error)
 
+	// ExistsUpstream indicates whether the provided Project exists upstream.
+	ExistsUpstream(ProjectIdentifier) (bool, error)
+
 	// ExportProject writes out the tree of the provided import path, at the
 	// provided version, to the provided directory.
 	ExportProject(context.Context, ProjectIdentifier, Version, string) error
@@ -464,6 +467,20 @@ func (sm *SourceMgr) GetSourceType(id ProjectIdentifier) (SourceType, error) {
 	}
 
 	return srcg.getSourceType(), nil
+}
+
+// ExistsUpstream indicates whether the provided Project exists upstream.
+func (sm *SourceMgr) ExistsUpstream(id ProjectIdentifier) (bool, error) {
+	if atomic.LoadInt32(&sm.releasing) == 1 {
+		return false, ErrSourceManagerIsReleased
+	}
+
+	srcg, err := sm.srcCoord.getSourceGatewayFor(context.TODO(), id)
+	if err != nil {
+		return false, err
+	}
+
+	return srcg.existsUpstream(context.TODO()), nil
 }
 
 // ListPackages parses the tree of the Go packages at and below the ProjectRoot

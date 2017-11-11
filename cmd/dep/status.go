@@ -900,13 +900,21 @@ func runProjectStatus(ctx *dep.Ctx, args []string, p *dep.Project, sm gps.Source
 				projStatus.Version = pl.Version().String()
 				projStatus.Source = projStatus.Project
 				projStatus.AltSource = pl.Ident().Source
+
 				rev, _, _ := gps.VersionComponentStrings(pl.Version())
 				projStatus.Revision = rev
+
 				vcsType, err := sm.GetVcsType(pl.Ident())
 				if err != nil {
 					return err
 				}
 				projStatus.SourceType = vcsType
+
+				existsUpstream, err := sm.ExistsUpstream(pl.Ident())
+				if err != nil {
+					return err
+				}
+				projStatus.UpstreamExists = existsUpstream
 			}
 		}
 
