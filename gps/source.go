@@ -388,6 +388,10 @@ func (sg *sourceGateway) getManifestAndLock(ctx context.Context, pr ProjectRoot,
 	return m, l, nil
 }
 
+func (sg *sourceGateway) getSourceType() SourceType {
+	return sg.src.sourceType()
+}
+
 // FIXME ProjectRoot input either needs to parameterize the cache, or be
 // incorporated on the fly on egress...?
 func (sg *sourceGateway) listPackages(ctx context.Context, pr ProjectRoot, v Version) (pkgtree.PackageTree, error) {
@@ -570,7 +574,7 @@ func (sg *sourceGateway) require(ctx context.Context, wanted sourceState) (errSt
 			case sourceIsSetUp:
 				sg.src, addlState, err = sg.maybe.try(ctx, sg.cachedir, sg.cache, sg.suprvsr)
 			case sourceExistsUpstream:
-				err = sg.suprvsr.do(ctx, sg.src.sourceType(), ctSourcePing, func(ctx context.Context) error {
+				err = sg.suprvsr.do(ctx, sg.src.sourceType().String(), ctSourcePing, func(ctx context.Context) error {
 					if !sg.src.existsUpstream(ctx) {
 						return fmt.Errorf("%s does not exist upstream", sg.src.upstreamURL())
 					}
@@ -578,7 +582,7 @@ func (sg *sourceGateway) require(ctx context.Context, wanted sourceState) (errSt
 				})
 			case sourceExistsLocally:
 				if !sg.src.existsLocally(ctx) {
-					err = sg.suprvsr.do(ctx, sg.src.sourceType(), ctSourceInit, func(ctx context.Context) error {
+					err = sg.suprvsr.do(ctx, sg.src.sourceType().String(), ctSourceInit, func(ctx context.Context) error {
 						return sg.src.initLocal(ctx)
 					})
 
@@ -590,7 +594,7 @@ func (sg *sourceGateway) require(ctx context.Context, wanted sourceState) (errSt
 				}
 			case sourceHasLatestVersionList:
 				var pvl []PairedVersion
-				err = sg.suprvsr.do(ctx, sg.src.sourceType(), ctListVersions, func(ctx context.Context) error {
+				err = sg.suprvsr.do(ctx, sg.src.sourceType().String(), ctListVersions, func(ctx context.Context) error {
 					pvl, err = sg.src.listVersions(ctx)
 					return err
 				})
@@ -599,7 +603,7 @@ func (sg *sourceGateway) require(ctx context.Context, wanted sourceState) (errSt
 					sg.cache.setVersionMap(pvl)
 				}
 			case sourceHasLatestLocally:
-				err = sg.suprvsr.do(ctx, sg.src.sourceType(), ctSourceFetch, func(ctx context.Context) error {
+				err = sg.suprvsr.do(ctx, sg.src.sourceType().String(), ctSourceFetch, func(ctx context.Context) error {
 					return sg.src.updateLocal(ctx)
 				})
 			}
@@ -634,5 +638,5 @@ type source interface {
 	revisionPresentIn(Revision) (bool, error)
 	disambiguateRevision(context.Context, Revision) (Revision, error)
 	exportRevisionTo(context.Context, Revision, string) error
-	sourceType() string
+	sourceType() SourceType
 }

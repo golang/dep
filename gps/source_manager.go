@@ -26,6 +26,33 @@ import (
 	"github.com/sdboyer/constext"
 )
 
+// SourceType is the type of project source (VCS, packaged file, etc).
+type SourceType uint8
+
+// SourceType constants.
+const (
+	InvalidSource = iota
+	VcsGit
+	VcsHg
+	VcsBzr
+	VcsSvn
+)
+
+func (st SourceType) String() string {
+	switch st {
+	case VcsGit:
+		return "git"
+	case VcsHg:
+		return "hg"
+	case VcsBzr:
+		return "bzr"
+	case VcsSvn:
+		return "svn"
+	default:
+		return fmt.Sprintf("%#v does not represent a known source type, this probably indicates a bug", st)
+	}
+}
+
 // Used to compute a friendly filepath from a URL-shaped input.
 var sanitizer = strings.NewReplacer("-", "--", ":", "-", "/", "-", "+", "-")
 
@@ -99,6 +126,9 @@ type SourceManager interface {
 	// necessitating that the ProjectIdentifier's ProjectRoot must also be a
 	// repository root.
 	GetManifestAndLock(ProjectIdentifier, Version, ProjectAnalyzer) (Manifest, Lock, error)
+
+	// GetSourceType returns SourceType for the provided ProjectIdentifier.
+	GetSourceType(ProjectIdentifier) (SourceType, error)
 
 	// ExportProject writes out the tree of the provided import path, at the
 	// provided version, to the provided directory.
@@ -420,6 +450,20 @@ func (sm *SourceMgr) GetManifestAndLock(id ProjectIdentifier, v Version, an Proj
 	}
 
 	return srcg.getManifestAndLock(context.TODO(), id.ProjectRoot, v, an)
+}
+
+// GetSourceType returns SourceType for the provided ProjectIdentifier.
+func (sm *SourceMgr) GetSourceType(id ProjectIdentifier) (SourceType, error) {
+	if atomic.LoadInt32(&sm.releasing) == 1 {
+		return InvalidSource, ErrSourceManagerIsReleased
+	}
+
+	srcg, err := sm.srcCoord.getSourceGatewayFor(context.TODO(), id)
+	if err != nil {
+		return InvalidSource, err
+	}
+
+	return srcg.getSourceType(), nil
 }
 
 // ListPackages parses the tree of the Go packages at and below the ProjectRoot

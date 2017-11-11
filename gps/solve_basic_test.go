@@ -1487,6 +1487,10 @@ func (sm *depspecSourceManager) SourceURLsForPath(ip string) ([]*url.URL, error)
 	return nil, fmt.Errorf("dummy sm doesn't implement SourceURLsForPath")
 }
 
+func (sm *depspecSourceManager) GetSourceType(id ProjectIdentifier) (SourceType, error) {
+	return InvalidSource, fmt.Errorf("dummy sm doesn't implement GetSourceType")
+}
+
 func (sm *depspecSourceManager) rootSpec() depspec {
 	return sm.specs[0]
 }

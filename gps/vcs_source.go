@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	"github.com/Masterminds/semver"
+	"github.com/Masterminds/vcs"
 	"github.com/golang/dep/gps/pkgtree"
 	"github.com/golang/dep/internal/fs"
 	"github.com/pkg/errors"
@@ -23,8 +24,19 @@ type baseVCSSource struct {
 	repo ctxRepo
 }
 
-func (bs *baseVCSSource) sourceType() string {
-	return string(bs.repo.Vcs())
+func (bs *baseVCSSource) sourceType() SourceType {
+	switch bs.repo.Vcs() {
+	case vcs.Git:
+		return VcsGit
+	case vcs.Hg:
+		return VcsHg
+	case vcs.Bzr:
+		return VcsBzr
+	case vcs.Svn:
+		return VcsSvn
+	default:
+		return InvalidSource
+	}
 }
 
 func (bs *baseVCSSource) existsLocally(ctx context.Context) bool {

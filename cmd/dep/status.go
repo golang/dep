@@ -902,6 +902,11 @@ func runProjectStatus(ctx *dep.Ctx, args []string, p *dep.Project, sm gps.Source
 				projStatus.AltSource = pl.Ident().Source
 				rev, _, _ := gps.VersionComponentStrings(pl.Version())
 				projStatus.Revision = rev
+				vcsType, err := sm.GetVcsType(pl.Ident())
+				if err != nil {
+					return err
+				}
+				projStatus.SourceType = vcsType
 			}
 		}
 
