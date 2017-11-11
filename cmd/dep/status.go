@@ -14,6 +14,7 @@ import (
 	"io/ioutil"
 	"log"
 	"sort"
+	"strings"
 	"sync"
 	"text/tabwriter"
 
@@ -842,11 +843,11 @@ type projectStatus struct {
 	Constraints           []string
 	Source                string
 	AltSource             string
-	PubVersions           []string
+	PubVersions           map[string][]string
 	Revision              string
 	LatestAllowed         string
 	SourceType            string
-	Packages              string
+	Packages              []string
 	ProjectImporters      map[string]string
 	PackageImporters      map[string]string
 	UpstreamExists        bool
@@ -871,7 +872,8 @@ UPSTREAM EXISTS:		%t
 UPSTREAM VERSION EXISTS:	%t
 `,
 		ps.Project, ps.Version, ps.Constraints, ps.Source, ps.AltSource,
-		ps.PubVersions, ps.Revision, ps.LatestAllowed, ps.SourceType, ps.Packages,
+		ps.PubVersions, ps.Revision, ps.LatestAllowed, ps.SourceType,
+		strings.Join(ps.Packages, ", "),
 		ps.ProjectImporters, ps.PackageImporters, ps.UpstreamExists,
 		ps.UpstreamVersionExists)
 }
@@ -888,37 +890,99 @@ func runProjectStatus(ctx *dep.Ctx, args []string, p *dep.Project, sm gps.Source
 		prs = append(prs, pr)
 	}
 
+	// This ptree would not be required with the new collectConstraints() implementation.
+	ptree, err := p.ParseRootPackageTree()
+	if err != nil {
+		return err
+	}
+	// Collect all the constraints.
+	cc := collectConstraints(ptree, p, sm)
+
 	for _, pr := range prs {
 		// Create projectStatus and add Project name.
 		projStatus := projectStatus{
 			Project: string(pr),
 		}
 
-		// Get the currently selected version from from lock.
+		// Get the currently selected version from lock.
 		for _, pl := range p.Lock.Projects() {
-			if pr == pl.Ident().ProjectRoot {
-				projStatus.Version = pl.Version().String()
-				projStatus.Source = projStatus.Project
-				projStatus.AltSource = pl.Ident().Source
+			if pr != pl.Ident().ProjectRoot {
+				continue
+			}
 
-				rev, _, _ := gps.VersionComponentStrings(pl.Version())
-				projStatus.Revision = rev
+			// VERSION
+			projStatus.Version = pl.Version().String()
+			// SOURCE
+			projStatus.Source = projStatus.Project
+			// ALT SOURCE
+			projStatus.AltSource = pl.Ident().Source
 
-				vcsType, err := sm.GetVcsType(pl.Ident())
-				if err != nil {
-					return err
+			// REVISION
+			projStatus.Revision, _, _ = gps.VersionComponentStrings(pl.Version())
+
+			srcType, err := sm.GetSourceType(pl.Ident())
+			if err != nil {
+				return err
+			}
+			// SOURCE TYPE
+			projStatus.SourceType = srcType.String()
+
+			existsUpstream, err := sm.ExistsUpstream(pl.Ident())
+			if err != nil {
+				return err
+			}
+			// UPSTREAM EXISTS
+			projStatus.UpstreamExists = existsUpstream
+
+			// Fetch all the versions.
+			pvs, err := sm.ListVersions(pl.Ident())
+			if err != nil {
+				return err
+			}
+
+			// UPSTREAM VERSION EXISTS
+			for _, pv := range pvs {
+				if pv.Unpair().String() == pl.Version().String() {
+					projStatus.UpstreamVersionExists = true
+					break
 				}
-				projStatus.SourceType = vcsType
+			}
 
-				existsUpstream, err := sm.ExistsUpstream(pl.Ident())
-				if err != nil {
-					return err
+			pkgtree, err := sm.ListPackages(pl.Ident(), pl.Version())
+			if err != nil {
+				return err
+			}
+
+			// PACKAGES
+			for pkgPath := range pkgtree.Packages {
+				projStatus.Packages = append(projStatus.Packages, pkgPath)
+			}
+
+			// PUB VERSION
+			var semvers, branches, nonsemvers []string
+			for _, pv := range pvs {
+				switch pv.Type() {
+				case gps.IsSemver:
+					semvers = append(semvers, pv.Unpair().String())
+				case gps.IsBranch:
+					branches = append(branches, pv.Unpair().String())
+				default:
+					nonsemvers = append(nonsemvers, pv.Unpair().String())
 				}
-				projStatus.UpstreamExists = existsUpstream
+			}
+			projStatus.PubVersions = make(map[string][]string)
+			projStatus.PubVersions["semver"] = semvers
+			projStatus.PubVersions["branches"] = branches
+			projStatus.PubVersions["nonsemvers"] = nonsemvers
+
+			// CONSTRAINTS
+			constraints := cc[string(pr)]
+			for _, c := range constraints {
+				projStatus.Constraints = append(projStatus.Constraints, c.String())
 			}
 		}
 
-		fmt.Println(projStatus)
+		ctx.Out.Println(projStatus)
 	}
 
 	return nil
