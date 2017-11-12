@@ -133,13 +133,17 @@ func validateManifest(s string) ([]error, error) {
 				if valid {
 					// Iterate through each array of tables
 					for _, v := range rawProj {
+						ruleProvided := false
+						props := v.(map[string]interface{})
 						// Check the individual field's key to be valid
-						for key, value := range v.(map[string]interface{}) {
+						for key, value := range props {
 							// Check if the key is valid
 							switch key {
-							case "name", "branch", "version", "source":
-								// valid key
+							case "name":
+							case "branch", "version", "source":
+								ruleProvided = true
 							case "revision":
+								ruleProvided = true
 								if valueStr, ok := value.(string); ok {
 									if abbrevRevHash.MatchString(valueStr) {
 										warns = append(warns, fmt.Errorf("revision %q should not be in abbreviated form", valueStr))
@@ -154,6 +158,9 @@ func validateManifest(s string) ([]error, error) {
 								// unknown/invalid key
 								warns = append(warns, fmt.Errorf("invalid key %q in %q", key, prop))
 							}
+						}
+						if !ruleProvided && len(props) > 0 {
+							warns = append(warns, fmt.Errorf("version rule or source should be provided in %q", prop))
 						}
 					}
 				}
