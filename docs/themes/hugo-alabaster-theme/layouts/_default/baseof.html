@@ -1,0 +1,35 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+	{{ partial "head" . }}
+
+	<body role="document">
+		<div class="document">
+			<div class="documentwrapper">
+				<div class="bodywrapper">
+					<div class="body" role="main">
+						{{ block "main" . }}{{ end }}
+
+						{{ if not .IsHome -}}
+						{{ template "_internal/disqus.html" . }}
+						{{- end }}
+					</div>
+				</div>
+			</div>
+			
+			{{ partial "sidebar/sidebar" . }}
+			{{ partial "footer" . }}
+
+			{{ range .Site.Params.custom_js -}}
+				<script src="{{ $.Site.BaseURL }}{{ . }}"></script>
+			{{- end }}
+
+			{{ with .Site.Params.highlightjs -}}
+			<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.3.0/highlight.min.js"></script>
+			<script>hljs.initHighlightingOnLoad();</script>
+			{{ end }}
+
+			{{ template "_internal/google_analytics.html" . }}
+		</div>
+	</body>
+</html>

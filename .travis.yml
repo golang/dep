@@ -52,11 +52,19 @@ jobs:
         - go test -race ./...
     - go: 1.9.x
       stage: deploy
+      env:
+        global:
+          # Use the values from Travis directly instead of retrieving from git
+          - DEP_VERSION=$TRAVIS_TAG
+          - DEP_BRANCH=$TRAVIS_BRANCH
       go_import_path: github.com/golang/dep
       install: skip
       script: skip
       before_deploy:
         - ./hack/build-all.bash
+        - openssl aes-256-cbc -K $encrypted_af6b7bb16246_key -iv $encrypted_af6b7bb16246_iv -in hack/travis.deploy.pem.enc -out hack/travis.deploy.pem -d
+        - chmod 600 hack/travis.deploy.pem
+        - eval "$(ssh-agent -s)" && ssh-add hack/travis.deploy.pem
       deploy:
         - provider: releases
           api_key:
@@ -71,5 +79,11 @@ jobs:
           skip_cleanup: true
           on:
             repo: golang/dep
-            branch: master
             tags: true
+        - provider: script
+          script: ./hack/depdocs.sh publish
+          skip_cleanup: true
+          on:
+            repo: golang/dep
+            # Deploy the master branch and all tags
+            condition: $TRAVIS_BRANCH == "master" || -n $TRAVIS_TAG

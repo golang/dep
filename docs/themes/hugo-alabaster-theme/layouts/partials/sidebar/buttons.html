@@ -1,0 +1,32 @@
+{{ if .Site.Params.github_user | and .Site.Params.github_repo -}}
+	{{ $path := printf "%s/%s" .Site.Params.github_user .Site.Params.github_repo }}
+
+	{{ if .Site.Params.sidebar.github_button -}}
+	<p>
+		<iframe src="https://ghbtns.com/github-btn.html?user={{ .Site.Params.github_user }}&repo={{ .Site.Params.github_repo }}&type=watch&count=true&size=large"
+		allowtransparency="true" frameborder="0" scrolling="0" width="200px" height="35px"></iframe>
+	</p>
+	{{- end }}
+
+	{{ if .Site.Params.sidebar.travis_button -}}
+	<p>
+		<a href="https://travis-ci.org/{{ $path }}">
+			<img
+			alt="https://secure.travis-ci.org/{{ $path }}.svg?branch=master"
+			src="https://secure.travis-ci.org/{{ $path }}.svg?branch=master"
+			/>
+		</a>
+	</p>
+	{{- end }}
+
+	{{ if .Site.Params.sidebar.codecov_button -}}
+	<p>
+		<a href="https://codecov.io/github/{{ $path }}">
+			<img
+			alt="https://codecov.io/github/{{ $path }}/coverage.svg?branch=master"
+			src="https://codecov.io/github/{{ $path }}/coverage.svg?branch=master"
+			/>
+		</a>
+	</p>
+	{{- end }}
+{{- end }}

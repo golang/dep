@@ -1,0 +1,10 @@
+{{ define "main" }}
+	{{ range where .Site.Pages "Type" "homepage" }}
+		{{ if eq .Site.Params.depver "" }}
+		<h1>{{ .Title }}</h1>
+		{{ else }}
+		<h1>{{ .Title }} @ {{ .Site.Params.depver }}</h1>
+		{{ end }}
+		{{ .Content }}
+	{{ end }}
+{{ end }}

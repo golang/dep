@@ -1,0 +1,20 @@
+languageCode = "en-us"
+title = "dep"
+baseurl = "https://golang.github.io/dep/"
+theme = "hugo-alabaster-theme"
+
+[params]
+  depver = ""
+
+[params.sidebar]
+  logo = "images/logo.png"
+  show_relations = false
+
+# When we have doc for older releases, use the template below to add them to
+# the sidebar menu
+#[[menu.releases]]
+#    name = "v0.4.0"
+#    pre = "<i class='fa fa-heart'></i>"
+#    weight = 0
+#    identifier = "v0.4.0"
+#    url = "/releases/v0.4.0/"
