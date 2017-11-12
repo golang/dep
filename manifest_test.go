@@ -255,6 +255,7 @@ func TestValidateManifest(t *testing.T) {
 			`,
 			wantWarn: []error{
 				errInvalidMetadata,
+				errors.New("version rule or source should be provided in \"constraint\""),
 			},
 			wantError: nil,
 		},
@@ -264,7 +265,9 @@ func TestValidateManifest(t *testing.T) {
 			[[constraint]]
 			  name = "github.com/foo/bar"
 			`,
-			wantWarn:  []error{},
+			wantWarn: []error{
+				errors.New("version rule or source should be provided in \"constraint\""),
+			},
 			wantError: nil,
 		},
 		{
@@ -297,7 +300,9 @@ func TestValidateManifest(t *testing.T) {
 			[[override]]
 			  name = "github.com/foo/bar"
 			`,
-			wantWarn:  []error{},
+			wantWarn: []error{
+				errors.New("version rule or source should be provided in \"override\""),
+			},
 			wantError: nil,
 		},
 		{
@@ -337,10 +342,12 @@ func TestValidateManifest(t *testing.T) {
 			  nick = "foo"
 			`,
 			wantWarn: []error{
-				errors.New("invalid key \"location\" in \"constraint\""),
-				errors.New("invalid key \"link\" in \"constraint\""),
-				errors.New("invalid key \"nick\" in \"override\""),
+				errors.New("Invalid key \"location\" in \"constraint\""),
+				errors.New("Invalid key \"link\" in \"constraint\""),
+				errors.New("version rule or source should be provided in \"constraint\""),
+				errors.New("Invalid key \"nick\" in \"override\""),
 				errors.New("metadata in \"constraint\" should be a TOML table"),
+				errors.New("version rule or source should be provided in \"override\""),
 			},
 			wantError: nil,
 		},
@@ -353,7 +360,9 @@ func TestValidateManifest(t *testing.T) {
 			  [constraint.metadata]
 			    color = "blue"
 			`,
-			wantWarn:  []error{},
+			wantWarn: []error{
+				errors.New("version rule or source should be provided in \"constraint\""),
+			},
 			wantError: nil,
 		},
 		{
