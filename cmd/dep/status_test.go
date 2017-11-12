@@ -300,7 +300,7 @@ func TestCollectConstraints(t *testing.T) {
 	cases := []struct {
 		name            string
 		project         dep.Project
-		wantConstraints map[string][]gps.Constraint
+		wantConstraints constraintsCollection
 	}{
 		{
 			name: "without any constraints",
@@ -315,7 +315,7 @@ func TestCollectConstraints(t *testing.T) {
 					},
 				},
 			},
-			wantConstraints: map[string][]gps.Constraint{},
+			wantConstraints: constraintsCollection{},
 		},
 		{
 			name: "with multiple constraints",
@@ -340,10 +340,17 @@ func TestCollectConstraints(t *testing.T) {
 					},
 				},
 			},
-			wantConstraints: map[string][]gps.Constraint{
-				"github.com/sdboyer/deptest":    []gps.Constraint{ver1, ver08},
-				"github.com/sdboyer/deptestdos": []gps.Constraint{ver2},
-				"github.com/sdboyer/dep-test":   []gps.Constraint{ver1},
+			wantConstraints: constraintsCollection{
+				"github.com/sdboyer/deptest": []projectConstraint{
+					{"github.com/darkowlzz/deptest-project-1", ver1},
+					{"github.com/darkowlzz/deptest-project-2", ver08},
+				},
+				"github.com/sdboyer/deptestdos": []projectConstraint{
+					{"github.com/darkowlzz/deptest-project-2", ver2},
+				},
+				"github.com/sdboyer/dep-test": []projectConstraint{
+					{"github.com/darkowlzz/deptest-project-2", ver1},
+				},
 			},
 		},
 		{
@@ -364,8 +371,10 @@ func TestCollectConstraints(t *testing.T) {
 					},
 				},
 			},
-			wantConstraints: map[string][]gps.Constraint{
-				"github.com/sdboyer/deptest": []gps.Constraint{ver1},
+			wantConstraints: constraintsCollection{
+				"github.com/sdboyer/deptest": []projectConstraint{
+					{"github.com/darkowlzz/deptest-project-1", ver1},
+				},
 			},
 		},
 	}
