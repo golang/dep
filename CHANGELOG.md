@@ -8,6 +8,7 @@ BUG FIXES:
 IMPROVEMENTS:
 
 * Log as dependencies are pre-fetched during dep init ([#1176](https://github.com/golang/dep/pull/1176)).
+* Made the disjoint constraint failure error message more descriptive (#TODO).
 
 # v0.3.2
 
