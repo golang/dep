@@ -460,7 +460,7 @@ func runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceMana
 				} else {
 					bs.Constraint = gps.Any()
 					for _, c := range cm[bs.ProjectRoot] {
-						bs.Constraint = c.Intersect(bs.Constraint)
+						bs.Constraint = c.Constraint.Intersect(bs.Constraint)
 					}
 				}
 
@@ -643,9 +643,20 @@ func formatVersion(v gps.Version) string {
 	return v.String()
 }
 
+// projectConstraint stores ProjectRoot and Constraint for that project.
+type projectConstraint struct {
+	Project    gps.ProjectRoot
+	Constraint gps.Constraint
+}
+
+// constraintsCollection is a map of ProjectRoot(dependency) and a collection of
+// projectConstraint for the dependencies. This can be used to find constraints
+// on a dependency and the projects that apply those constraints.
+type constraintsCollection map[string][]projectConstraint
+
 // collectConstraints collects constraints declared by all the dependencies.
-func collectConstraints(ctx *dep.Ctx, p *dep.Project, sm gps.SourceManager) map[string][]gps.Constraint {
-	constraintCollection := make(map[string][]gps.Constraint)
+func collectConstraints(ctx *dep.Ctx, p *dep.Project, sm gps.SourceManager) constraintsCollection {
+	constraintCollection := make(constraintsCollection)
 
 	// Get direct deps of the root project.
 	_, directDeps, err := getDirectDependencies(sm, p)
@@ -669,7 +680,10 @@ func collectConstraints(ctx *dep.Ctx, p *dep.Project, sm gps.SourceManager) map[
 		// Iterate through the project constraints to get individual dependency
 		// project and constraint values.
 		for pr, pp := range pc {
-			constraintCollection[string(pr)] = append(constraintCollection[string(pr)], pp.Constraint)
+			constraintCollection[string(pr)] = append(
+				constraintCollection[string(pr)],
+				projectConstraint{proj.Ident().ProjectRoot, pp.Constraint},
+			)
 		}
 	}
 
