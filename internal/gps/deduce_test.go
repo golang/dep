@@ -348,7 +348,7 @@ var pathDeductionFixtures = map[string][]pathDeductionFixture{
 		},
 		{
 			in:   "git.launchpad.net/repo root",
-			rerr: errors.New("git.launchpad.net/repo root is not a valid path for a source on launchpad.net"),
+			rerr: errors.New("git.launchpad.net/repo root is not a valid path for a source on git.launchpad.net"),
 		},
 	},
 	"apache": {
@@ -658,6 +658,7 @@ func TestVanityDeductionSchemeMismatch(t *testing.T) {
 	cm := newSupervisor(ctx)
 	dc := newDeductionCoordinator(cm)
 	_, err := dc.deduceRootPath(ctx, "ssh://golang.org/exp")
+	// TODO(sdboyer) this is not actually the error that it should be
 	if err == nil {
 		t.Error("should have errored on scheme mismatch between input and go-get metadata")
 	}
