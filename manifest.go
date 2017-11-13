@@ -31,8 +31,7 @@ var (
 	errInvalidPrune        = errors.Errorf("%q must be a TOML table of booleans", "prune")
 	errInvalidPruneProject = errors.Errorf("%q must be a TOML array of tables", "prune.project")
 	errInvalidMetadata     = errors.New("metadata should be a TOML table")
-
-	errInvalidProjectRoot = errors.New("ProjectRoot name validation failed")
+	errInvalidProjectRoot  = errors.New("ProjectRoot name validation failed")
 
 	errInvalidPruneValue = errors.New("prune options values must be booleans")
 	errPruneSubProject   = errors.New("prune projects should not contain sub projects")
