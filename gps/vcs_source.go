@@ -242,6 +242,16 @@ func (s *gitSource) listVersions(ctx context.Context) (vlist []PairedVersion, er
 	r := s.repo
 
 	cmd := commandContext(ctx, "git", "ls-remote", r.Remote())
+	// We want to invoke from a place where it's not possible for there to be a
+	// .git file instead of a .git directory, as git ls-remote will choke on the
+	// former and erroneously quit. However, we can't be sure that the repo
+	// exists on disk yet at this point; if it doesn't, then instead use the
+	// parent of the local path, as that's still likely a good bet.
+	if r.CheckLocal() {
+		cmd.SetDir(r.LocalPath())
+	} else {
+		cmd.SetDir(filepath.Dir(r.LocalPath()))
+	}
 	// Ensure no prompting for PWs
 	cmd.SetEnv(append([]string{"GIT_ASKPASS=", "GIT_TERMINAL_PROMPT=0"}, os.Environ()...))
 	out, err := cmd.CombinedOutput()
