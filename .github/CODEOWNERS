@@ -22,4 +22,4 @@
 /cmd/dep/graphviz*                        @darkowlzz
 
 # gps caching
-/internal/gps/source_cache* @jmank88
+/gps/source_cache* @jmank88

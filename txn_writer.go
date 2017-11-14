@@ -12,8 +12,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/golang/dep/gps"
 	"github.com/golang/dep/internal/fs"
-	"github.com/golang/dep/internal/gps"
 	"github.com/pelletier/go-toml"
 	"github.com/pkg/errors"
 )

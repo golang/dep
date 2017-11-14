@@ -13,7 +13,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/golang/dep/internal/gps"
+	"github.com/golang/dep/gps"
 	"github.com/golang/dep/internal/test"
 )
 
@@ -31,7 +31,7 @@ func TestReadManifest(t *testing.T) {
 	c, _ := gps.NewSemverConstraint("^0.12.0")
 	want := Manifest{
 		Constraints: map[gps.ProjectRoot]gps.ProjectProperties{
-			gps.ProjectRoot("github.com/golang/dep/internal/gps"): {
+			gps.ProjectRoot("github.com/golang/dep/gps"): {
 				Constraint: c,
 			},
 			gps.ProjectRoot("github.com/babble/brook"): {
@@ -39,8 +39,8 @@ func TestReadManifest(t *testing.T) {
 			},
 		},
 		Ovr: map[gps.ProjectRoot]gps.ProjectProperties{
-			gps.ProjectRoot("github.com/golang/dep/internal/gps"): {
-				Source:     "https://github.com/golang/dep/internal/gps",
+			gps.ProjectRoot("github.com/golang/dep/gps"): {
+				Source:     "https://github.com/golang/dep/gps",
 				Constraint: gps.NewBranch("master"),
 			},
 		},
@@ -66,14 +66,14 @@ func TestWriteManifest(t *testing.T) {
 	want := h.GetTestFileString(golden)
 	c, _ := gps.NewSemverConstraint("^0.12.0")
 	m := NewManifest()
-	m.Constraints[gps.ProjectRoot("github.com/golang/dep/internal/gps")] = gps.ProjectProperties{
+	m.Constraints[gps.ProjectRoot("github.com/golang/dep/gps")] = gps.ProjectProperties{
 		Constraint: c,
 	}
 	m.Constraints[gps.ProjectRoot("github.com/babble/brook")] = gps.ProjectProperties{
 		Constraint: gps.Revision("d05d5aca9f895d19e9265839bffeadd74a2d2ecb"),
 	}
-	m.Ovr[gps.ProjectRoot("github.com/golang/dep/internal/gps")] = gps.ProjectProperties{
-		Source:     "https://github.com/golang/dep/internal/gps",
+	m.Ovr[gps.ProjectRoot("github.com/golang/dep/gps")] = gps.ProjectProperties{
+		Source:     "https://github.com/golang/dep/gps",
 		Constraint: gps.NewBranch("master"),
 	}
 	m.Ignored = []string{"github.com/foo/bar"}
