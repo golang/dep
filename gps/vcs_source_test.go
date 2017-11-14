@@ -525,7 +525,7 @@ func testHgSourceInteractions(t *testing.T) {
 }
 
 func TestGitSourceListVersionsNoHEAD(t *testing.T) {
-	t.Parallel()
+	// t.Parallel()
 
 	requiresBins(t, "git")
 
@@ -582,7 +582,7 @@ func TestGitSourceListVersionsNoHEAD(t *testing.T) {
 }
 
 func TestGitSourceListVersionsNoDupes(t *testing.T) {
-	t.Parallel()
+	// t.Parallel()
 
 	// This test is slowish, skip it on -short
 	if testing.Short() {
@@ -649,7 +649,7 @@ func TestGitSourceListVersionsNoDupes(t *testing.T) {
 }
 
 func TestGitSourceAdaptiveCleanup(t *testing.T) {
-	t.Parallel()
+	// t.Parallel()
 
 	// This test is slowish, skip it on -short
 	if testing.Short() {
