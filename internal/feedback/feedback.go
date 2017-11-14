@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/golang/dep/internal/gps"
+	"github.com/golang/dep/gps"
 )
 
 const (

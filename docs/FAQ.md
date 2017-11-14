@@ -179,7 +179,7 @@ Once you have set that up, dep will automatically use that Token to authenticate
 
 The full algorithm is complex, but the most important thing to understand is
 that `dep` tries versions in a [certain
-order](https://godoc.org/github.com/golang/dep/internal/gps#SortForUpgrade),
+order](https://godoc.org/github.com/golang/dep/gps#SortForUpgrade),
 checking to see a version is acceptable according to specified constraints.
 
 - All semver versions come first, and sort mostly according to the semver 2.0
