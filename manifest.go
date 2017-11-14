@@ -39,6 +39,7 @@ var (
 	errRootPruneContainsName   = errors.Errorf("%q should not include a name", "prune")
 	errInvalidRootPruneValue   = errors.New("root prune options must be omitted instead of being set to false")
 	errInvalidPruneProjectName = errors.Errorf("%q in %q must be a string", "name", "prune.project")
+	errNoName                  = errors.New("no name provided")
 )
 
 // Manifest holds manifest file data and implements gps.RootManifest.
@@ -158,8 +159,10 @@ func validateManifest(s string) ([]error, error) {
 								warns = append(warns, fmt.Errorf("invalid key %q in %q", key, prop))
 							}
 						}
-						if !ruleProvided && len(props) > 0 {
-							warns = append(warns, fmt.Errorf("version rule or source should be provided in %q", prop))
+						if _, ok := props["name"]; !ok {
+							warns = append(warns, errNoName)
+						} else if !ruleProvided && prop == "constraint" {
+							warns = append(warns, fmt.Errorf("branch, version, revision, or source should be provided for %q", props["name"]))
 						}
 					}
 				}

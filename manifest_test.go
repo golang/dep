@@ -255,7 +255,7 @@ func TestValidateManifest(t *testing.T) {
 			`,
 			wantWarn: []error{
 				errInvalidMetadata,
-				errors.New("version rule or source should be provided in \"constraint\""),
+				errors.New("branch, version, revision, or source should be provided for \"github.com/foo/bar\""),
 			},
 			wantError: nil,
 		},
@@ -266,7 +266,7 @@ func TestValidateManifest(t *testing.T) {
 			  name = "github.com/foo/bar"
 			`,
 			wantWarn: []error{
-				errors.New("version rule or source should be provided in \"constraint\""),
+				errors.New("branch, version, revision, or source should be provided for \"github.com/foo/bar\""),
 			},
 			wantError: nil,
 		},
@@ -275,7 +275,9 @@ func TestValidateManifest(t *testing.T) {
 			tomlString: `
 			[[constraint]]
 			`,
-			wantWarn:  []error{},
+			wantWarn: []error{
+				errNoName,
+			},
 			wantError: nil,
 		},
 		{
@@ -300,9 +302,7 @@ func TestValidateManifest(t *testing.T) {
 			[[override]]
 			  name = "github.com/foo/bar"
 			`,
-			wantWarn: []error{
-				errors.New("version rule or source should be provided in \"override\""),
-			},
+			wantWarn:  []error{},
 			wantError: nil,
 		},
 		{
@@ -310,7 +310,9 @@ func TestValidateManifest(t *testing.T) {
 			tomlString: `
 			[[override]]
 			`,
-			wantWarn:  []error{},
+			wantWarn: []error{
+				errNoName,
+			},
 			wantError: nil,
 		},
 		{
@@ -344,10 +346,10 @@ func TestValidateManifest(t *testing.T) {
 			wantWarn: []error{
 				errors.New("Invalid key \"location\" in \"constraint\""),
 				errors.New("Invalid key \"link\" in \"constraint\""),
-				errors.New("version rule or source should be provided in \"constraint\""),
-				errors.New("Invalid key \"nick\" in \"override\""),
 				errors.New("metadata in \"constraint\" should be a TOML table"),
-				errors.New("version rule or source should be provided in \"override\""),
+				errors.New("branch, version, revision, or source should be provided for \"github.com/foo/bar\""),
+				errors.New("Invalid key \"nick\" in \"override\""),
+				errNoName,
 			},
 			wantError: nil,
 		},
@@ -361,7 +363,7 @@ func TestValidateManifest(t *testing.T) {
 			    color = "blue"
 			`,
 			wantWarn: []error{
-				errors.New("version rule or source should be provided in \"constraint\""),
+				errors.New("branch, version, revision, or source should be provided for \"github.com/foo/bar\""),
 			},
 			wantError: nil,
 		},
