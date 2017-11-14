@@ -92,6 +92,8 @@ func (r *gitRepo) get(ctx context.Context) error {
 		r.Remote(),
 		r.LocalPath(),
 	)
+	// Ensure no prompting for PWs
+	cmd.SetEnv(append([]string{"GIT_ASKPASS=", "GIT_TERMINAL_PROMPT=0"}, os.Environ()...))
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return newVcsRemoteErrorOr(err, cmd.Args(), string(out),
 			"unable to get repository")
@@ -110,6 +112,8 @@ func (r *gitRepo) fetch(ctx context.Context) error {
 		r.RemoteLocation,
 	)
 	cmd.SetDir(r.LocalPath())
+	// Ensure no prompting for PWs
+	cmd.SetEnv(append([]string{"GIT_ASKPASS=", "GIT_TERMINAL_PROMPT=0"}, os.Environ()...))
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return newVcsRemoteErrorOr(err, cmd.Args(), string(out),
 			"unable to update repository")
@@ -142,6 +146,8 @@ func (r *gitRepo) defendAgainstSubmodules(ctx context.Context) error {
 			"--recursive",
 		)
 		cmd.SetDir(r.LocalPath())
+		// Ensure no prompting for PWs
+		cmd.SetEnv(append([]string{"GIT_ASKPASS=", "GIT_TERMINAL_PROMPT=0"}, os.Environ()...))
 		if out, err := cmd.CombinedOutput(); err != nil {
 			return newVcsLocalErrorOr(err, cmd.Args(), string(out),
 				"unexpected error while defensively updating submodules")
