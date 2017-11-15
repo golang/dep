@@ -10,6 +10,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"path/filepath"
 	"reflect"
 	"testing"
 
@@ -36,6 +37,7 @@ func testSourceGateway(t *testing.T) {
 		os.RemoveAll(cachedir)
 		cancelFunc()
 	}()
+	os.Mkdir(filepath.Join(cachedir, "sources"), 0777)
 
 	do := func(wantstate sourceState) func(t *testing.T) {
 		return func(t *testing.T) {
