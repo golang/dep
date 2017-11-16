@@ -848,8 +848,8 @@ type projectStatus struct {
 	LatestAllowed         string
 	SourceType            string
 	Packages              []string
-	ProjectImporters      map[string]string
-	PackageImporters      map[string]string
+	ProjectImporters      map[string]bool
+	PackageImporters      map[string][]string
 	UpstreamExists        bool
 	UpstreamVersionExists bool
 }
@@ -866,7 +866,7 @@ REVISION:			%s
 LATEST ALLOWED:			%s
 SOURCE TYPE:			%s
 PACKAGES:			%s
-PROJECT IMPORTERS:		%s
+PROJECT IMPORTERS:		%v
 PACKAGE IMPORTERS:		%s
 UPSTREAM EXISTS:		%t
 UPSTREAM VERSION EXISTS:	%t
@@ -902,18 +902,57 @@ func runProjectStatus(ctx *dep.Ctx, args []string, p *dep.Project, sm gps.Source
 		// Create projectStatus and add Project name.
 		projStatus := projectStatus{
 			Project: string(pr),
+			Source:  string(pr),
 		}
 
-		// Get the currently selected version from lock.
 		for _, pl := range p.Lock.Projects() {
+			// Get the corresponding locked project for the target project.
 			if pr != pl.Ident().ProjectRoot {
+				// PROJECT IMPORTERS & PACKAGE IMPORTERS
+				// Since this project is not the target project, we should
+				// check if this project imports the target project.
+				// Get the Package List and check for existence of target
+				// project's import paths in the list.
+				// Add the Project to PROJECT IMPORTERS and package to PACKAGE
+				// IMPORTERS if they import the target project.
+				pkgtree, err := sm.ListPackages(pl.Ident(), pl.Version())
+				if err != nil {
+					return err
+				}
+
+				proot := string(pl.Ident().ProjectRoot)
+
+				// Get the reachmap. Reachmap contains package name and imports
+				// of the package.
+				prm, _ := pkgtree.ToReachMap(true, true, false, p.Manifest.IgnoredPackages())
+				for pkg, ie := range prm {
+					// Iterate through the external imports and check if they
+					// import any package from the target project.
+					for _, p := range ie.External {
+						if strings.HasPrefix(p, string(pr)) {
+							// Initialize ProjectImporters map if it's the first entry.
+							if len(projStatus.ProjectImporters) == 0 {
+								projStatus.ProjectImporters = make(map[string]bool)
+							}
+							// Add to ProjectImporters if it doesn't exists.
+							if _, ok := projStatus.ProjectImporters[proot]; !ok {
+								projStatus.ProjectImporters[proot] = true
+							}
+							// Initialize PackageImporters map if it's the first entry.
+							if len(projStatus.PackageImporters[proot]) == 0 {
+								projStatus.PackageImporters = make(map[string][]string)
+							}
+							// List Packages that import packages from target project.
+							projStatus.PackageImporters[p] = append(projStatus.PackageImporters[p], pkg)
+						}
+					}
+				}
+
 				continue
 			}
 
 			// VERSION
 			projStatus.Version = pl.Version().String()
-			// SOURCE
-			projStatus.Source = projStatus.Project
 			// ALT SOURCE
 			projStatus.AltSource = pl.Ident().Source
 
