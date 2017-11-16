@@ -190,13 +190,18 @@ func (c *Config) Run() int {
 				DisableLocking: getEnv(c.Env, "DEPNOLOCK") != "",
 			}
 
-			registryUrl, err := url.Parse(getEnv(c.Env, "DEPREGISTRYURL"))
-			if err != nil {
-				errLogger.Printf("%v\n", err)
-				return errorExitCode
-			}
+			registryUrl := getEnv(c.Env, "DEPREGISTRYURL")
 			token := getEnv(c.Env, "DEPREGISTRYTOKEN")
-			ctx.Registry = gps.NewRegistryConfig(registryUrl, token)
+
+			// check if url is not define do not create registry
+			if registryUrl != "" && token != "" {
+				registryUrl, err := url.Parse(registryUrl)
+				if err != nil {
+					errLogger.Printf("%v\n", err)
+					return errorExitCode
+				}
+				ctx.Registry = gps.NewRegistryConfig(registryUrl, token)
+			}
 
 			GOPATHS := filepath.SplitList(getEnv(c.Env, "GOPATH"))
 			ctx.SetPaths(c.WorkingDir, GOPATHS...)

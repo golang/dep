@@ -171,6 +171,8 @@ func dependency(w http.ResponseWriter, r *http.Request) {
 		getDependency(w, r)
 	case http.MethodPut:
 		putDependency(w, r)
+	case http.MethodHead:
+		projectName(w, r)
 	default:
 		http.NotFound(w, r)
 	}
@@ -178,7 +180,7 @@ func dependency(w http.ResponseWriter, r *http.Request) {
 
 // Simple impl to get project name from import path
 func projectName(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
+	if r.Method != http.MethodHead {
 		http.NotFound(w, r)
 		return
 	}
@@ -197,18 +199,12 @@ func projectName(w http.ResponseWriter, r *http.Request) {
 
 	for _, v := range files {
 		if isRootProject(v.Name(), importPath) {
-			projectName := &rawProjectName{ProjectName: strings.Replace(v.Name(), "%2F", "/", -1)}
-			requestContent, err := json.Marshal(projectName)
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
-			w.Write(requestContent)
+			w.Header().Set("X-Go-Project-Name", strings.Replace(v.Name(), "%2F", "/", -1))
 			return
 		}
 	}
 
-	http.Error(w, "could not find project name", http.StatusInternalServerError)
+	http.Error(w, "could not find project name", http.StatusNotFound)
 	return
 }
 
@@ -224,7 +220,6 @@ func notFound(w http.ResponseWriter, r *http.Request) {
 func SetupAndRun(addr string) error {
 	http.HandleFunc("/api/v1/auth/token", token)
 	http.HandleFunc("/api/v1/versions/", versions)
-	http.HandleFunc("/api/v1/projects/root/", projectName)
 	http.HandleFunc("/api/v1/projects/", dependency)
 	http.HandleFunc("/", notFound)
 	return http.ListenAndServe(addr, nil)

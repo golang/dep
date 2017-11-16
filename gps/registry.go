@@ -19,8 +19,6 @@ import (
 	"path/filepath"
 )
 
-var errNotFound = errors.New(http.StatusText(http.StatusNotFound))
-
 // Registry configuration interface
 // Set env vars: DEPREGISTRYURL, DEPREGISTRYTOKEN
 type Registry interface {
@@ -99,9 +97,6 @@ func (s *registrySource) execGetVersions() (*rawVersions, error) {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		if resp.StatusCode == http.StatusNotFound {
-			return nil, errNotFound
-		}
 		return nil, errors.Errorf("%s %s", u.String(), http.StatusText(resp.StatusCode))
 	}
 
@@ -129,9 +124,6 @@ func (s *registrySource) execDownloadDependency(ctx context.Context, pr ProjectR
 		return nil, err
 	}
 	if resp.StatusCode != http.StatusOK {
-		if resp.StatusCode == http.StatusNotFound {
-			return nil, errNotFound
-		}
 		return nil, errors.Errorf("%s %s", u, http.StatusText(resp.StatusCode))
 	}
 	return resp, nil

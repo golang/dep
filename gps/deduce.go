@@ -16,10 +16,8 @@ import (
 	"strings"
 	"sync"
 
-	"encoding/json"
 	"github.com/armon/go-radix"
 	"github.com/pkg/errors"
-	"io/ioutil"
 )
 
 var (
@@ -580,7 +578,6 @@ func newRegistryDeductionCoordinator(superv *supervisor, registry Registry) dedu
 		deducext: pathDeducerTrie(),
 		registry: registry,
 	}
-
 	return dc
 }
 
@@ -611,13 +608,11 @@ func (dc *registryDeductionCoordinator) deduceRootPath(ctx context.Context, path
 		panic(fmt.Sprintf("unexpected %T in deductionCoordinator.rootxt: %v", data, data))
 	}
 
-	// The err indicates no known path matched. It's still possible that
-	// retrieving go get metadata might do the trick.
-	rmd := &registryDeducer{
+	rd := &registryDeducer{
 		basePath: path,
 		registry: dc.registry,
 		suprvsr:  dc.suprvsr,
-		// The vanity deducer will call this func with a completed
+		// The registry deducer will call this func with a completed
 		// pathDeduction if it succeeds in finding one. We process it
 		// back through the action channel to ensure serialized
 		// access to the rootxt map.
@@ -628,14 +623,14 @@ func (dc *registryDeductionCoordinator) deduceRootPath(ctx context.Context, path
 		},
 	}
 
-	// Save the hmd in the rootxt so that calls checking on similar
+	// Save the rd in the rootxt so that calls checking on similar
 	// paths made while the request is in flight can be folded together.
 	dc.mut.Lock()
-	dc.rootxt.Insert(path, rmd)
+	dc.rootxt.Insert(path, rd)
 	dc.mut.Unlock()
 
 	// Trigger the HTTP-backed deduction process for this requestor.
-	return rmd.deduce(ctx, path)
+	return rd.deduce(ctx, path)
 }
 
 // deduceRootPath takes an import path and attempts to deduce various
@@ -780,7 +775,7 @@ func (rd *registryDeducer) getProjectName(importPath string) (string, error) {
 		return "", err
 	}
 	u.Path = path.Join(u.Path, "api/v1/projects/root", url.PathEscape(importPath))
-	req, err := http.NewRequest("GET", u.String(), nil)
+	req, err := http.NewRequest("HEAD", u.String(), nil)
 	if err != nil {
 		return "", err
 	}
@@ -791,19 +786,10 @@ func (rd *registryDeducer) getProjectName(importPath string) (string, error) {
 		return "", err
 	}
 	if resp.StatusCode != http.StatusOK {
-		if resp.StatusCode == http.StatusNotFound {
-			return "", errNotFound
-		}
 		return "", errors.Errorf("%s %s", u, http.StatusText(resp.StatusCode))
 	}
 
-	var projectName struct {
-		ProjectName string `json:"project_name"`
-	}
-	var bytes []byte
-	bytes, err = ioutil.ReadAll(resp.Body)
-	err = json.Unmarshal(bytes, &projectName)
-	return projectName.ProjectName, nil
+	return resp.Header.Get("X-Go-Project-Name"), nil
 }
 
 func (rd *registryDeducer) deduce(ctx context.Context, path string) (pathDeduction, error) {
