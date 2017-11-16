@@ -41,7 +41,7 @@ type TestProject struct {
 }
 
 // NewTestProject initializes a new test's project directory.
-func NewTestProject(t *testing.T, initPath, wd string, run RunFunc) *TestProject {
+func NewTestProject(t *testing.T, initPath, wd string, env map[string]string, run RunFunc) *TestProject {
 	new := &TestProject{
 		t:      t,
 		origWd: wd,
@@ -53,6 +53,9 @@ func NewTestProject(t *testing.T, initPath, wd string, run RunFunc) *TestProject
 	new.CopyTree(initPath)
 
 	new.Setenv("GOPATH", new.tempdir)
+	for k, v := range env {
+		new.Setenv(k, v)
+	}
 
 	return new
 }

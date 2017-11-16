@@ -16,8 +16,10 @@ import (
 	"strings"
 	"sync"
 
-	radix "github.com/armon/go-radix"
+	"encoding/json"
+	"github.com/armon/go-radix"
 	"github.com/pkg/errors"
+	"io/ioutil"
 )
 
 var (
@@ -561,7 +563,7 @@ type deductionCoordinator struct {
 	deducext *deducerTrie
 }
 
-func newDeductionCoordinator(superv *supervisor) *deductionCoordinator {
+func newDeductionCoordinator(superv *supervisor) deducer {
 	dc := &deductionCoordinator{
 		suprvsr:  superv,
 		rootxt:   radix.New(),
@@ -569,6 +571,71 @@ func newDeductionCoordinator(superv *supervisor) *deductionCoordinator {
 	}
 
 	return dc
+}
+
+func newRegistryDeductionCoordinator(superv *supervisor, registry Registry) deducer {
+	dc := &registryDeductionCoordinator{
+		suprvsr:  superv,
+		rootxt:   radix.New(),
+		deducext: pathDeducerTrie(),
+		registry: registry,
+	}
+
+	return dc
+}
+
+type registryDeductionCoordinator struct {
+	suprvsr  *supervisor
+	mut      sync.RWMutex
+	rootxt   *radix.Tree
+	deducext *deducerTrie
+	registry Registry
+}
+
+func (dc *registryDeductionCoordinator) deduceRootPath(ctx context.Context, path string) (pathDeduction, error) {
+	if err := dc.suprvsr.ctx.Err(); err != nil {
+		return pathDeduction{}, err
+	}
+	// First, check the rootxt to see if there's a prefix match - if so, we
+	// can return that and move on.
+	dc.mut.RLock()
+	prefix, data, has := dc.rootxt.LongestPrefix(path)
+	dc.mut.RUnlock()
+	if has && isPathPrefixOrEqual(prefix, path) {
+		switch d := data.(type) {
+		case maybeSource:
+			return pathDeduction{root: prefix, mb: d}, nil
+		case *registryDeducer:
+			return d.deduce(ctx, path)
+		}
+		panic(fmt.Sprintf("unexpected %T in deductionCoordinator.rootxt: %v", data, data))
+	}
+
+	// The err indicates no known path matched. It's still possible that
+	// retrieving go get metadata might do the trick.
+	rmd := &registryDeducer{
+		basePath: path,
+		registry: dc.registry,
+		suprvsr:  dc.suprvsr,
+		// The vanity deducer will call this func with a completed
+		// pathDeduction if it succeeds in finding one. We process it
+		// back through the action channel to ensure serialized
+		// access to the rootxt map.
+		returnFunc: func(pd pathDeduction) {
+			dc.mut.Lock()
+			dc.rootxt.Insert(pd.root, pd.mb)
+			dc.mut.Unlock()
+		},
+	}
+
+	// Save the hmd in the rootxt so that calls checking on similar
+	// paths made while the request is in flight can be folded together.
+	dc.mut.Lock()
+	dc.rootxt.Insert(path, rmd)
+	dc.mut.Unlock()
+
+	// Trigger the HTTP-backed deduction process for this requestor.
+	return rmd.deduce(ctx, path)
 }
 
 // deduceRootPath takes an import path and attempts to deduce various
@@ -695,6 +762,72 @@ func (dc *deductionCoordinator) deduceKnownPaths(path string) (pathDeduction, er
 	}
 
 	return pathDeduction{}, errNoKnownPathMatch
+}
+
+type registryDeducer struct {
+	once       sync.Once
+	deduced    pathDeduction
+	deduceErr  error
+	basePath   string
+	registry   Registry
+	returnFunc func(pathDeduction)
+	suprvsr    *supervisor
+}
+
+func (rd *registryDeducer) getProjectName(importPath string) (string, error) {
+	u, err := url.Parse(rd.registry.URL())
+	if err != nil {
+		return "", err
+	}
+	u.Path = path.Join(u.Path, "api/v1/projects/root", url.PathEscape(importPath))
+	req, err := http.NewRequest("GET", u.String(), nil)
+	if err != nil {
+		return "", err
+	}
+
+	req.Header.Set("Authorization", "BEARER "+rd.registry.Token())
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return "", err
+	}
+	if resp.StatusCode != http.StatusOK {
+		if resp.StatusCode == http.StatusNotFound {
+			return "", errNotFound
+		}
+		return "", errors.Errorf("%s %s", u, http.StatusText(resp.StatusCode))
+	}
+
+	var projectName struct {
+		ProjectName string `json:"project_name"`
+	}
+	var bytes []byte
+	bytes, err = ioutil.ReadAll(resp.Body)
+	err = json.Unmarshal(bytes, &projectName)
+	return projectName.ProjectName, nil
+}
+
+func (rd *registryDeducer) deduce(ctx context.Context, path string) (pathDeduction, error) {
+	rd.once.Do(func() {
+		projectName, err := rd.getProjectName(path)
+		if err != nil {
+			rd.deduceErr = err
+			return
+		}
+		var u *url.URL
+		u, err = url.Parse(rd.registry.URL())
+		if err != nil {
+			return
+		}
+
+		rd.deduced = pathDeduction{mb: maybeRegistrySource{path: projectName, url: u, token: rd.registry.Token()}, root: projectName}
+		rd.returnFunc(rd.deduced)
+		return
+
+		if rd.deduced.mb == nil {
+			rd.deduceErr = errors.Errorf("unable to find root path for: %s", path)
+		}
+	})
+	return rd.deduced, rd.deduceErr
 }
 
 type httpMetadataDeducer struct {

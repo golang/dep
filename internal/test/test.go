@@ -20,6 +20,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/golang/dep/internal/test/registry"
 	"github.com/pkg/errors"
 )
 
@@ -245,6 +246,16 @@ func NeedsExternalNetwork(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping test: no external network in -short mode")
 	}
+}
+
+// SetupRegistry sets and runs mock registry for the tests.
+func SetupRegistry(t *testing.T) {
+	go func(t *testing.T) {
+		if err := registry.SetupAndRun(":9090"); err != nil {
+			t.Fatal(err)
+			t.Skip(err)
+		}
+	}(t)
 }
 
 // NeedsGit will make sure the tests that require git will be skipped if the

@@ -18,6 +18,8 @@ import (
 	"text/tabwriter"
 
 	"github.com/golang/dep"
+	"github.com/golang/dep/gps"
+	"net/url"
 )
 
 var (
@@ -187,6 +189,14 @@ func (c *Config) Run() int {
 				Verbose:        *verbose,
 				DisableLocking: getEnv(c.Env, "DEPNOLOCK") != "",
 			}
+
+			registryUrl, err := url.Parse(getEnv(c.Env, "DEPREGISTRYURL"))
+			if err != nil {
+				errLogger.Printf("%v\n", err)
+				return errorExitCode
+			}
+			token := getEnv(c.Env, "DEPREGISTRYTOKEN")
+			ctx.Registry = gps.NewRegistryConfig(registryUrl, token)
 
 			GOPATHS := filepath.SplitList(getEnv(c.Env, "GOPATH"))
 			ctx.SetPaths(c.WorkingDir, GOPATHS...)

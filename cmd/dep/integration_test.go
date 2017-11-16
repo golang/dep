@@ -23,6 +23,7 @@ func TestIntegration(t *testing.T) {
 
 	test.NeedsExternalNetwork(t)
 	test.NeedsGit(t)
+	test.SetupRegistry(t)
 
 	wd, err := os.Getwd()
 	if err != nil {
@@ -94,7 +95,7 @@ func testIntegration(name, relPath, wd string, run integration.RunFunc) func(t *
 
 		// Set up environment
 		testCase := integration.NewTestCase(t, filepath.Join(wd, relPath), name)
-		testProj := integration.NewTestProject(t, testCase.InitialPath(), wd, run)
+		testProj := integration.NewTestProject(t, testCase.InitialPath(), wd, testCase.Env, run)
 		defer testProj.Cleanup()
 
 		// Create and checkout the vendor revisions

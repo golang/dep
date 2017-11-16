@@ -155,16 +155,16 @@ func (p ProjectAnalyzerInfo) String() string {
 // There's no (planned) reason why it would need to be reimplemented by other
 // tools; control via dependency injection is intended to be sufficient.
 type SourceMgr struct {
-	cachedir    string                // path to root of cache dir
-	lf          locker                // handle for the sm lock file on disk
-	suprvsr     *supervisor           // subsystem that supervises running calls/io
-	cancelAll   context.CancelFunc    // cancel func to kill all running work
-	deduceCoord *deductionCoordinator // subsystem that manages import path deduction
-	srcCoord    *sourceCoordinator    // subsystem that manages sources
-	sigmut      sync.Mutex            // mutex protecting signal handling setup/teardown
-	qch         chan struct{}         // quit chan for signal handler
-	relonce     sync.Once             // once-er to ensure we only release once
-	releasing   int32                 // flag indicating release of sm has begun
+	cachedir    string             // path to root of cache dir
+	lf          locker             // handle for the sm lock file on disk
+	suprvsr     *supervisor        // subsystem that supervises running calls/io
+	cancelAll   context.CancelFunc // cancel func to kill all running work
+	deduceCoord deducer            // subsystem that manages import path deduction
+	srcCoord    *sourceCoordinator // subsystem that manages sources
+	sigmut      sync.Mutex         // mutex protecting signal handling setup/teardown
+	qch         chan struct{}      // quit chan for signal handler
+	relonce     sync.Once          // once-er to ensure we only release once
+	releasing   int32              // flag indicating release of sm has begun
 }
 
 var _ SourceManager = &SourceMgr{}
@@ -179,6 +179,11 @@ type SourceManagerConfig struct {
 	Cachedir       string      // Where to store local instances of upstream sources.
 	Logger         *log.Logger // Optional info/warn logger. Discards if nil.
 	DisableLocking bool        // True if the SourceManager should NOT use a lock file to protect the Cachedir from multiple processes.
+	Registry       Registry
+}
+
+func (smc *SourceManagerConfig) usingRegistry() bool {
+	return smc.Registry != nil && smc.Registry.URL() != "" && smc.Registry.Token() != ""
 }
 
 // NewSourceManager produces an instance of gps's built-in SourceManager.
@@ -276,7 +281,12 @@ func NewSourceManager(c SourceManagerConfig) (*SourceMgr, error) {
 
 	ctx, cf := context.WithCancel(context.TODO())
 	superv := newSupervisor(ctx)
-	deducer := newDeductionCoordinator(superv)
+	var deducer deducer
+	if c.usingRegistry() {
+		deducer = newRegistryDeductionCoordinator(superv, c.Registry)
+	} else {
+		deducer = newDeductionCoordinator(superv)
+	}
 
 	sm := &SourceMgr{
 		cachedir:    c.Cachedir,

@@ -23,6 +23,7 @@ type TestCase struct {
 	rootPath      string
 	initialPath   string
 	finalPath     string
+	Env           map[string]string `json:"env"`
 	Commands      [][]string        `json:"commands"`
 	ErrorExpected string            `json:"error-expected"`
 	GopathInitial map[string]string `json:"gopath-initial"`

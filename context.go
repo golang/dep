@@ -40,6 +40,7 @@ type Ctx struct {
 	Out, Err       *log.Logger // Required loggers.
 	Verbose        bool        // Enables more verbose logging.
 	DisableLocking bool        // When set, no lock file will be created to protect against simultaneous dep processes.
+	Registry       gps.Registry
 }
 
 // SetPaths sets the WorkingDir and GOPATHs fields. If GOPATHs is empty, then
@@ -91,6 +92,7 @@ func (c *Ctx) SourceManager() (*gps.SourceMgr, error) {
 		Cachedir:       filepath.Join(c.GOPATH, "pkg", "dep"),
 		Logger:         c.Out,
 		DisableLocking: c.DisableLocking,
+		Registry:       c.Registry,
 	})
 }
 

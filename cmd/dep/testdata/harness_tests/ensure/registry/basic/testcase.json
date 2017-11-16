@@ -1,0 +1,14 @@
+{
+  "env": {
+    "DEPREGISTRYURL": "http://localhost:9090",
+    "DEPREGISTRYTOKEN": "2erygdasE45rty5JKwewrr75cb15rdeE"
+  },
+  "commands": [
+    ["init", "-no-examples"],
+    ["ensure", "-add", "github.com/sdboyer/deptest"]
+  ],
+  "vendor-final": [
+      "github.com/sdboyer/deptest",
+      "github.com/sdboyer/deptesttres"
+  ]
+}
