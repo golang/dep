@@ -77,7 +77,7 @@ func PruneProject(baseDir string, lp LockedProject, options PruneOptions, logger
 
 	if (options & PruneNestedVendorDirs) != 0 {
 		if err := pruneNestedVendorDirs(projectDir); err != nil {
-			return err
+			return errors.Wrapf(err, "failed to prune nested vendor directories")
 		}
 	}
 
