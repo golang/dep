@@ -253,7 +253,9 @@ func TestValidateManifest(t *testing.T) {
 			[[constraint]]
 			  name = "github.com/foo/bar"
 			`,
-			wantWarn:  []error{errors.New("metadata should be a TOML table")},
+			wantWarn: []error{
+				errInvalidMetadata,
+			},
 			wantError: nil,
 		},
 		{
@@ -402,7 +404,7 @@ func TestValidateManifest(t *testing.T) {
 			  name = "github.com/golang/dep"
 			`,
 			wantWarn: []error{
-				fmt.Errorf("%q should not include a name", "prune"),
+				errRootPruneContainsName,
 			},
 			wantError: nil,
 		},
