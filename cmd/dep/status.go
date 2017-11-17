@@ -6,6 +6,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -1018,6 +1019,37 @@ func runProjectStatus(ctx *dep.Ctx, args []string, p *dep.Project, sm gps.Source
 			constraints := cc[string(pr)]
 			for _, c := range constraints {
 				projStatus.Constraints = append(projStatus.Constraints, c.String())
+			}
+
+			// LATEST ALLOWED
+			// Perform a solve to get the latest allowed revision.
+			params := p.MakeParams()
+			if ctx.Verbose {
+				params.TraceLogger = ctx.Err
+			}
+
+			params.RootPackageTree, err = p.ParseRootPackageTree()
+			if err != nil {
+				return err
+			}
+
+			params.ToChange = append(params.ToChange, pr)
+
+			solver, err := gps.Prepare(params, sm)
+			if err != nil {
+				return err
+			}
+			solution, err := solver.Solve(context.TODO())
+			if err != nil {
+				return err
+			}
+
+			prjcts := solution.Projects()
+			for _, prj := range prjcts {
+				if pr == prj.Ident().ProjectRoot {
+					r, _, _ := gps.VersionComponentStrings(prj.Version())
+					projStatus.LatestAllowed = r
+				}
 			}
 		}
 
