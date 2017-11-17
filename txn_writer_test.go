@@ -25,7 +25,7 @@ func TestSafeWriter_BadInput_MissingRoot(t *testing.T) {
 	pc := NewTestProjectContext(h, safeWriterProject)
 	defer pc.Release()
 
-	sw, _ := NewSafeWriter(nil, nil, nil, VendorOnChanged)
+	sw, _ := NewSafeWriter(nil, nil, nil, nil, VendorOnChanged)
 	err := sw.Write("", pc.SourceManager, true, discardLogger())
 
 	if err == nil {
@@ -43,7 +43,7 @@ func TestSafeWriter_BadInput_MissingSourceManager(t *testing.T) {
 	pc.CopyFile(LockName, safeWriterGoldenLock)
 	pc.Load()
 
-	sw, _ := NewSafeWriter(nil, nil, pc.Project.Lock, VendorAlways)
+	sw, _ := NewSafeWriter(nil, nil, nil, pc.Project.Lock, VendorAlways)
 	err := sw.Write(pc.Project.AbsRoot, nil, true, discardLogger())
 
 	if err == nil {
@@ -59,7 +59,7 @@ func TestSafeWriter_BadInput_ForceVendorMissingLock(t *testing.T) {
 	pc := NewTestProjectContext(h, safeWriterProject)
 	defer pc.Release()
 
-	_, err := NewSafeWriter(nil, nil, nil, VendorAlways)
+	_, err := NewSafeWriter(nil, nil, nil, nil, VendorAlways)
 	if err == nil {
 		t.Fatal("should have errored without a lock when forceVendor is true, but did not")
 	} else if !strings.Contains(err.Error(), "newLock") {
@@ -75,7 +75,7 @@ func TestSafeWriter_BadInput_OldLockOnly(t *testing.T) {
 	pc.CopyFile(LockName, safeWriterGoldenLock)
 	pc.Load()
 
-	_, err := NewSafeWriter(nil, pc.Project.Lock, nil, VendorAlways)
+	_, err := NewSafeWriter(nil, nil, pc.Project.Lock, nil, VendorAlways)
 	if err == nil {
 		t.Fatal("should have errored with only an old lock, but did not")
 	} else if !strings.Contains(err.Error(), "oldLock") {
@@ -89,7 +89,7 @@ func TestSafeWriter_BadInput_NonexistentRoot(t *testing.T) {
 	pc := NewTestProjectContext(h, safeWriterProject)
 	defer pc.Release()
 
-	sw, _ := NewSafeWriter(nil, nil, nil, VendorOnChanged)
+	sw, _ := NewSafeWriter(nil, nil, nil, nil, VendorOnChanged)
 
 	missingroot := filepath.Join(pc.Project.AbsRoot, "nonexistent")
 	err := sw.Write(missingroot, pc.SourceManager, true, discardLogger())
@@ -107,7 +107,7 @@ func TestSafeWriter_BadInput_RootIsFile(t *testing.T) {
 	pc := NewTestProjectContext(h, safeWriterProject)
 	defer pc.Release()
 
-	sw, _ := NewSafeWriter(nil, nil, nil, VendorOnChanged)
+	sw, _ := NewSafeWriter(nil, nil, nil, nil, VendorOnChanged)
 
 	fileroot := pc.CopyFile("fileroot", "txn_writer/badinput_fileroot")
 	err := sw.Write(fileroot, pc.SourceManager, true, discardLogger())
@@ -131,7 +131,7 @@ func TestSafeWriter_Manifest(t *testing.T) {
 	pc.CopyFile(ManifestName, safeWriterGoldenManifest)
 	pc.Load()
 
-	sw, _ := NewSafeWriter(pc.Project.Manifest, nil, nil, VendorOnChanged)
+	sw, _ := NewSafeWriter(pc.Project.Manifest, nil, nil, nil, VendorOnChanged)
 
 	// Verify prepared actions
 	if !sw.HasManifest() {
@@ -173,7 +173,7 @@ func TestSafeWriter_ManifestAndUnmodifiedLock(t *testing.T) {
 	pc.CopyFile(LockName, safeWriterGoldenLock)
 	pc.Load()
 
-	sw, _ := NewSafeWriter(pc.Project.Manifest, pc.Project.Lock, pc.Project.Lock, VendorOnChanged)
+	sw, _ := NewSafeWriter(pc.Project.Manifest, nil, pc.Project.Lock, pc.Project.Lock, VendorOnChanged)
 
 	// Verify prepared actions
 	if !sw.HasManifest() {
@@ -218,7 +218,7 @@ func TestSafeWriter_ManifestAndUnmodifiedLockWithForceVendor(t *testing.T) {
 	pc.CopyFile(LockName, safeWriterGoldenLock)
 	pc.Load()
 
-	sw, _ := NewSafeWriter(pc.Project.Manifest, pc.Project.Lock, pc.Project.Lock, VendorAlways)
+	sw, _ := NewSafeWriter(pc.Project.Manifest, nil, pc.Project.Lock, pc.Project.Lock, VendorAlways)
 
 	// Verify prepared actions
 	if !sw.HasManifest() {
@@ -268,7 +268,7 @@ func TestSafeWriter_ModifiedLock(t *testing.T) {
 	originalLock := new(Lock)
 	*originalLock = *pc.Project.Lock
 	originalLock.SolveMeta.InputsDigest = []byte{} // zero out the input hash to ensure non-equivalency
-	sw, _ := NewSafeWriter(nil, originalLock, pc.Project.Lock, VendorOnChanged)
+	sw, _ := NewSafeWriter(nil, nil, originalLock, pc.Project.Lock, VendorOnChanged)
 
 	// Verify prepared actions
 	if sw.HasManifest() {
@@ -318,7 +318,7 @@ func TestSafeWriter_ModifiedLockSkipVendor(t *testing.T) {
 	originalLock := new(Lock)
 	*originalLock = *pc.Project.Lock
 	originalLock.SolveMeta.InputsDigest = []byte{} // zero out the input hash to ensure non-equivalency
-	sw, _ := NewSafeWriter(nil, originalLock, pc.Project.Lock, VendorNever)
+	sw, _ := NewSafeWriter(nil, nil, originalLock, pc.Project.Lock, VendorNever)
 
 	// Verify prepared actions
 	if sw.HasManifest() {
@@ -362,12 +362,12 @@ func TestSafeWriter_ForceVendorWhenVendorAlreadyExists(t *testing.T) {
 	pc.CopyFile(LockName, safeWriterGoldenLock)
 	pc.Load()
 
-	sw, _ := NewSafeWriter(nil, pc.Project.Lock, pc.Project.Lock, VendorAlways)
+	sw, _ := NewSafeWriter(nil, nil, pc.Project.Lock, pc.Project.Lock, VendorAlways)
 	err := sw.Write(pc.Project.AbsRoot, pc.SourceManager, true, discardLogger())
 	h.Must(errors.Wrap(err, "SafeWriter.Write failed"))
 
 	// Verify prepared actions
-	sw, _ = NewSafeWriter(nil, nil, pc.Project.Lock, VendorAlways)
+	sw, _ = NewSafeWriter(nil, nil, nil, pc.Project.Lock, VendorAlways)
 	if sw.HasManifest() {
 		t.Fatal("Did not expect the payload to contain the manifest")
 	}
@@ -414,7 +414,7 @@ func TestSafeWriter_NewLock(t *testing.T) {
 	defer lf.Close()
 	newLock, err := readLock(lf)
 	h.Must(err)
-	sw, _ := NewSafeWriter(nil, nil, newLock, VendorOnChanged)
+	sw, _ := NewSafeWriter(nil, nil, nil, newLock, VendorOnChanged)
 
 	// Verify prepared actions
 	if sw.HasManifest() {
@@ -461,7 +461,7 @@ func TestSafeWriter_NewLockSkipVendor(t *testing.T) {
 	defer lf.Close()
 	newLock, err := readLock(lf)
 	h.Must(err)
-	sw, _ := NewSafeWriter(nil, nil, newLock, VendorNever)
+	sw, _ := NewSafeWriter(nil, nil, nil, newLock, VendorNever)
 
 	// Verify prepared actions
 	if sw.HasManifest() {
@@ -510,7 +510,7 @@ func TestSafeWriter_DiffLocks(t *testing.T) {
 	updatedLock, err := readLock(ulf)
 	h.Must(err)
 
-	sw, _ := NewSafeWriter(nil, pc.Project.Lock, updatedLock, VendorOnChanged)
+	sw, _ := NewSafeWriter(nil, nil, pc.Project.Lock, updatedLock, VendorOnChanged)
 
 	// Verify lock diff
 	diff := sw.lockDiff
@@ -555,7 +555,7 @@ func TestSafeWriter_VendorDotGitPreservedWithForceVendor(t *testing.T) {
 	pc.CopyFile(LockName, safeWriterGoldenLock)
 	pc.Load()
 
-	sw, _ := NewSafeWriter(pc.Project.Manifest, pc.Project.Lock, pc.Project.Lock, VendorAlways)
+	sw, _ := NewSafeWriter(pc.Project.Manifest, nil, pc.Project.Lock, pc.Project.Lock, VendorAlways)
 
 	// Verify prepared actions
 	if !sw.HasManifest() {

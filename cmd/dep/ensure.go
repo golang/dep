@@ -12,8 +12,6 @@ import (
 	"go/build"
 	"io/ioutil"
 	"log"
-	"os"
-	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
@@ -258,7 +256,7 @@ func (cmd *ensureCommand) runDefault(ctx *dep.Ctx, args []string, p *dep.Project
 		// that "verification" is supposed to look like (#121); in the meantime,
 		// we unconditionally write out vendor/ so that `dep ensure`'s behavior
 		// is maximally compatible with what it will eventually become.
-		sw, err := dep.NewSafeWriter(nil, p.Lock, p.Lock, dep.VendorAlways)
+		sw, err := dep.NewSafeWriter(nil, nil, p.Lock, p.Lock, dep.VendorAlways)
 		if err != nil {
 			return err
 		}
@@ -287,7 +285,7 @@ func (cmd *ensureCommand) runDefault(ctx *dep.Ctx, args []string, p *dep.Project
 	if cmd.noVendor {
 		vendorBehavior = dep.VendorNever
 	}
-	sw, err := dep.NewSafeWriter(nil, p.Lock, dep.LockFromSolution(solution), vendorBehavior)
+	sw, err := dep.NewSafeWriter(nil, nil, p.Lock, dep.LockFromSolution(solution), vendorBehavior)
 	if err != nil {
 		return err
 	}
@@ -312,7 +310,7 @@ func (cmd *ensureCommand) runVendorOnly(ctx *dep.Ctx, args []string, p *dep.Proj
 	}
 	// Pass the same lock as old and new so that the writer will observe no
 	// difference and choose not to write it out.
-	sw, err := dep.NewSafeWriter(nil, p.Lock, p.Lock, dep.VendorAlways)
+	sw, err := dep.NewSafeWriter(nil, nil, p.Lock, p.Lock, dep.VendorAlways)
 	if err != nil {
 		return err
 	}
@@ -377,7 +375,7 @@ func (cmd *ensureCommand) runUpdate(ctx *dep.Ctx, args []string, p *dep.Project,
 		return handleAllTheFailuresOfTheWorld(err)
 	}
 
-	sw, err := dep.NewSafeWriter(nil, p.Lock, dep.LockFromSolution(solution), dep.VendorOnChanged)
+	sw, err := dep.NewSafeWriter(nil, nil, p.Lock, dep.LockFromSolution(solution), dep.VendorOnChanged)
 	if err != nil {
 		return err
 	}
@@ -670,13 +668,14 @@ func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm
 		}
 	}
 
-	extra, err := appender.MarshalTOML()
-	if err != nil {
-		return errors.Wrap(err, "could not marshal manifest into TOML")
-	}
 	sort.Strings(reqlist)
 
-	sw, err := dep.NewSafeWriter(nil, p.Lock, dep.LockFromSolution(solution), dep.VendorOnChanged)
+	ep, err := ctx.LoadProject()
+	if err != nil {
+		errors.Wrap(err, "failed to locate project root from current working directory")
+	}
+
+	sw, err := dep.NewSafeWriter(ep.Manifest, appender, p.Lock, dep.LockFromSolution(solution), dep.VendorOnChanged)
 	if err != nil {
 		return err
 	}
@@ -689,19 +688,8 @@ func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm
 	if !ctx.Verbose {
 		logger = log.New(ioutil.Discard, "", 0)
 	}
-	if err := errors.Wrap(sw.Write(p.AbsRoot, sm, true, logger), "grouped write of manifest, lock and vendor"); err != nil {
+	if err := errors.Wrap(sw.Write(p.AbsRoot, sm, false, logger), "grouped write of manifest, lock and vendor"); err != nil {
 		return err
-	}
-
-	// FIXME(sdboyer) manifest writes ABSOLUTELY need verification - follow up!
-	f, err := os.OpenFile(filepath.Join(p.AbsRoot, dep.ManifestName), os.O_APPEND|os.O_WRONLY, 0666)
-	if err != nil {
-		return errors.Wrapf(err, "opening %s failed", dep.ManifestName)
-	}
-
-	if _, err := f.Write(extra); err != nil {
-		f.Close()
-		return errors.Wrapf(err, "writing to %s failed", dep.ManifestName)
 	}
 
 	switch len(reqlist) {
@@ -727,7 +715,7 @@ func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm
 		}
 	}
 
-	return errors.Wrapf(f.Close(), "closing %s", dep.ManifestName)
+	return nil
 }
 
 func getProjectConstraint(arg string, sm gps.SourceManager) (gps.ProjectConstraint, string, error) {
