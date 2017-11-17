@@ -24,17 +24,20 @@ const ManifestName = "Gopkg.toml"
 
 // Errors
 var (
-	errInvalidConstraint = errors.Errorf("%q must be a TOML array of tables", "constraint")
-	errInvalidOverride   = errors.Errorf("%q must be a TOML array of tables", "override")
-	errInvalidRequired   = errors.Errorf("%q must be a TOML list of strings", "required")
-	errInvalidIgnored    = errors.Errorf("%q must be a TOML list of strings", "ignored")
-	errInvalidPrune      = errors.Errorf("%q must be a TOML table of booleans", "prune")
-
-	errInvalidProjectRoot  = errors.New("ProjectRoot name validation failed")
-	errInvalidPruneValue   = errors.New("prune options values must be booleans")
+	errInvalidConstraint   = errors.Errorf("%q must be a TOML array of tables", "constraint")
+	errInvalidOverride     = errors.Errorf("%q must be a TOML array of tables", "override")
+	errInvalidRequired     = errors.Errorf("%q must be a TOML list of strings", "required")
+	errInvalidIgnored      = errors.Errorf("%q must be a TOML list of strings", "ignored")
+	errInvalidPrune        = errors.Errorf("%q must be a TOML table of booleans", "prune")
 	errInvalidPruneProject = errors.Errorf("%q must be a TOML array of tables", "prune.project")
-	errPruneSubProject     = errors.New("prune projects should not contain sub projects")
+	errInvalidMetadata     = errors.New("metadata should be a TOML table")
 
+	errInvalidProjectRoot = errors.New("ProjectRoot name validation failed")
+
+	errInvalidPruneValue = errors.New("prune options values must be booleans")
+	errPruneSubProject   = errors.New("prune projects should not contain sub projects")
+
+	errRootPruneContainsName   = errors.Errorf("%q should not include a name", "prune")
 	errInvalidRootPruneValue   = errors.New("root prune options must be omitted instead of being set to false")
 	errInvalidPruneProjectName = errors.Errorf("%q in %q must be a string", "name", "prune.project")
 )
@@ -115,7 +118,7 @@ func validateManifest(s string) ([]error, error) {
 		case "metadata":
 			// Check if metadata is of Map type
 			if reflect.TypeOf(val).Kind() != reflect.Map {
-				warns = append(warns, errors.New("metadata should be a TOML table"))
+				warns = append(warns, errInvalidMetadata)
 			}
 		case "constraint", "override":
 			valid := true
@@ -215,7 +218,7 @@ func validatePruneOptions(val interface{}, root bool) (warns []error, err error)
 			}
 		case "name":
 			if root {
-				warns = append(warns, errors.Errorf("%q should not include a name", "prune"))
+				warns = append(warns, errRootPruneContainsName)
 			} else if _, ok := value.(string); !ok {
 				return warns, errInvalidPruneProjectName
 			}
