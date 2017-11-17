@@ -903,6 +903,34 @@ func runProjectStatus(ctx *dep.Ctx, args []string, p *dep.Project, sm gps.Source
 	// Collect all the constraints.
 	cc := collectConstraints(ptree, p, sm)
 
+	// Collect list of packages in target projects.
+	pkgs := make(map[gps.ProjectRoot][]string)
+
+	// Collect reachmap of all the locked projects.
+	reachmaps := make(map[string]pkgtree.ReachMap)
+
+	// Collect and store all the necessary data from pkgtree(s).
+	// TODO: Make this concurrent.
+	for _, pl := range p.Lock.Projects() {
+		pkgtree, err := sm.ListPackages(pl.Ident(), pl.Version())
+		if err != nil {
+			return err
+		}
+
+		// Collect reachmaps.
+		prm, _ := pkgtree.ToReachMap(true, true, false, p.Manifest.IgnoredPackages())
+		reachmaps[string(pl.Ident().ProjectRoot)] = prm
+
+		// Collect list of packages if it's one of the target projects.
+		for _, pr := range prs {
+			if pr == pl.Ident().ProjectRoot {
+				for pkg := range pkgtree.Packages {
+					pkgs[pr] = append(pkgs[pr], pkg)
+				}
+			}
+		}
+	}
+
 	for _, pr := range prs {
 		// Create projectStatus and add project name and source.
 		projStatus := projectStatus{
@@ -911,49 +939,41 @@ func runProjectStatus(ctx *dep.Ctx, args []string, p *dep.Project, sm gps.Source
 		}
 		resultStatus = append(resultStatus, &projStatus)
 
-		for _, pl := range p.Lock.Projects() {
-			// Get the corresponding locked project for the target project.
-			if pr != pl.Ident().ProjectRoot {
-				// PROJECT IMPORTERS & PACKAGE IMPORTERS
-				// Since this project is not the target project, we should
-				// check if this project imports the target project.
-				// Get the Package List and check for existence of target
-				// project's import paths in the list.
-				// Add the Project to PROJECT IMPORTERS and package to PACKAGE
-				// IMPORTERS if they import the target project.
-				pkgtree, err := sm.ListPackages(pl.Ident(), pl.Version())
-				if err != nil {
-					return err
-				}
+		// Gather PROJECT IMPORTERS & PACKAGE IMPORTERS data.
+		for projectroot, rmap := range reachmaps {
+			// If it's not the target project, check if it imports the target
+			// project.
+			if string(pr) == projectroot {
+				continue
+			}
 
-				proot := string(pl.Ident().ProjectRoot)
-
-				// Get the PackageTree reachmap. Reachmap contains package name
-				// and imports of the package.
-				prm, _ := pkgtree.ToReachMap(true, true, false, p.Manifest.IgnoredPackages())
-				for pkg, ie := range prm {
-					// Iterate through the external imports and check if they
-					// import any package from the target project.
-					for _, p := range ie.External {
-						if strings.HasPrefix(p, string(pr)) {
-							// Initialize ProjectImporters map if it's the first entry.
-							if len(projStatus.ProjectImporters) == 0 {
-								projStatus.ProjectImporters = make(map[string]bool)
-							}
-							// Add to ProjectImporters if it doesn't exists.
-							if _, ok := projStatus.ProjectImporters[proot]; !ok {
-								projStatus.ProjectImporters[proot] = true
-							}
-							// Initialize PackageImporters map if it's the first entry.
-							if len(projStatus.PackageImporters[proot]) == 0 {
-								projStatus.PackageImporters = make(map[string][]string)
-							}
-							// List Packages that import packages from target project.
-							projStatus.PackageImporters[p] = append(projStatus.PackageImporters[p], pkg)
+			for pkg, ie := range rmap {
+				// Iterate through the external imports and check if they
+				// import any package from the target project.
+				for _, p := range ie.External {
+					if strings.HasPrefix(p, string(pr)) {
+						// Initialize ProjectImporters map if it's the first entry.
+						if len(projStatus.ProjectImporters) == 0 {
+							projStatus.ProjectImporters = make(map[string]bool)
 						}
+						// Add to ProjectImporters if it doesn't exists.
+						if _, ok := projStatus.ProjectImporters[projectroot]; !ok {
+							projStatus.ProjectImporters[projectroot] = true
+						}
+						// Initialize PackageImporters map if it's the first entry.
+						if len(projStatus.PackageImporters[p]) == 0 {
+							projStatus.PackageImporters = make(map[string][]string)
+						}
+						// List Packages that import packages from target project.
+						projStatus.PackageImporters[p] = append(projStatus.PackageImporters[p], pkg)
 					}
 				}
+			}
+		}
 
+		// Gather data from the locked project.
+		for _, pl := range p.Lock.Projects() {
+			if pr != pl.Ident().ProjectRoot {
 				continue
 			}
 
@@ -961,7 +981,6 @@ func runProjectStatus(ctx *dep.Ctx, args []string, p *dep.Project, sm gps.Source
 			projStatus.Version = pl.Version().String()
 			// ALT SOURCE
 			projStatus.AltSource = pl.Ident().Source
-
 			// REVISION
 			projStatus.Revision, _, _ = gps.VersionComponentStrings(pl.Version())
 
@@ -993,15 +1012,8 @@ func runProjectStatus(ctx *dep.Ctx, args []string, p *dep.Project, sm gps.Source
 				}
 			}
 
-			pkgtree, err := sm.ListPackages(pl.Ident(), pl.Version())
-			if err != nil {
-				return err
-			}
-
 			// PACKAGES
-			for pkgPath := range pkgtree.Packages {
-				projStatus.Packages = append(projStatus.Packages, pkgPath)
-			}
+			projStatus.Packages = pkgs[pr]
 
 			// PUB VERSION
 			var semvers, branches, nonsemvers []string
@@ -1040,15 +1052,14 @@ func runProjectStatus(ctx *dep.Ctx, args []string, p *dep.Project, sm gps.Source
 		return err
 	}
 
-	// Add all the projects in params.ToChange.
-	for _, rs := range resultStatus {
-		params.ToChange = append(params.ToChange, gps.ProjectRoot(rs.Project))
-	}
+	// Add all the target projects in params.ToChange.
+	params.ToChange = append(params.ToChange, prs...)
 
 	solver, err := gps.Prepare(params, sm)
 	if err != nil {
 		return err
 	}
+
 	solution, err := solver.Solve(context.TODO())
 	if err != nil {
 		return err
