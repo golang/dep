@@ -53,6 +53,7 @@ func testGitSourceInteractions(t *testing.T) {
 			t.Errorf("removeAll failed: %s", err)
 		}
 	}()
+	os.Mkdir(filepath.Join(cpath, "sources"), 0777)
 
 	n := "github.com/sdboyer/gpkt"
 	un := "https://" + n
@@ -149,6 +150,7 @@ func testGopkginSourceInteractions(t *testing.T) {
 			t.Errorf("removeAll failed: %s", err)
 		}
 	}()
+	os.Mkdir(filepath.Join(cpath, "sources"), 0777)
 
 	tfunc := func(opath, n string, major uint64, evl []Version) {
 		un := "https://" + opath
@@ -550,6 +552,8 @@ func TestGitSourceListVersionsNoHEAD(t *testing.T) {
 	defer h.Cleanup()
 	h.TempDir("smcache")
 	cpath := h.Path("smcache")
+	os.Mkdir(filepath.Join(cpath, "sources"), 0777)
+
 	h.TempDir("repo")
 	repoPath := h.Path("repo")
 
@@ -616,6 +620,7 @@ func TestGitSourceListVersionsNoDupes(t *testing.T) {
 			t.Errorf("removeAll failed: %s", err)
 		}
 	}()
+	os.Mkdir(filepath.Join(cpath, "sources"), 0777)
 
 	n := "github.com/carolynvs/deptest-importers"
 	un := "https://" + n

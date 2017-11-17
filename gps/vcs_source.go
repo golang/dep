@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/Masterminds/semver"
@@ -116,6 +117,10 @@ func (bs *baseVCSSource) exportRevisionTo(ctx context.Context, r Revision, to st
 
 	return fs.CopyDir(bs.repo.LocalPath(), to)
 }
+
+var (
+	gitHashRE = regexp.MustCompile(`^[a-f0-9]{40}$`)
+)
 
 // gitSource is a generic git repository implementation that should work with
 // all standard git remotes.
@@ -238,10 +243,24 @@ func (s *gitSource) exportRevisionTo(ctx context.Context, rev Revision, to strin
 	return nil
 }
 
+func (s *gitSource) isValidHash(hash []byte) bool {
+	return gitHashRE.Match(hash)
+}
+
 func (s *gitSource) listVersions(ctx context.Context) (vlist []PairedVersion, err error) {
 	r := s.repo
 
 	cmd := commandContext(ctx, "git", "ls-remote", r.Remote())
+	// We want to invoke from a place where it's not possible for there to be a
+	// .git file instead of a .git directory, as git ls-remote will choke on the
+	// former and erroneously quit. However, we can't be sure that the repo
+	// exists on disk yet at this point; if it doesn't, then instead use the
+	// parent of the local path, as that's still likely a good bet.
+	if r.CheckLocal() {
+		cmd.SetDir(r.LocalPath())
+	} else {
+		cmd.SetDir(filepath.Dir(r.LocalPath()))
+	}
 	// Ensure no prompting for PWs
 	cmd.SetEnv(append([]string{"GIT_ASKPASS=", "GIT_TERMINAL_PROMPT=0"}, os.Environ()...))
 	out, err := cmd.CombinedOutput()
@@ -288,6 +307,13 @@ func (s *gitSource) listVersions(ctx context.Context) (vlist []PairedVersion, er
 	vlist = make([]PairedVersion, len(all))
 	for _, pair := range all {
 		var v PairedVersion
+		// Valid `git ls-remote` output should start with hash, be at least
+		// 45 chars long and 40th character should be '\t'
+		//
+		// See: https://github.com/golang/dep/pull/1160#issuecomment-328843519
+		if len(pair) < 45 || pair[40] != '\t' || !s.isValidHash(pair[:40]) {
+			continue
+		}
 		if string(pair[41:]) == "HEAD" {
 			// If HEAD is present, it's always first
 			headrev = Revision(pair[:40])
