@@ -2,6 +2,6 @@
   "commands": [
     ["init"]
   ],
-  "error-expected": "manifest already exists:",
+  "error-expected": "init aborted: manifest already exists",
   "vendor-final": []
 }
