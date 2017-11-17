@@ -883,6 +883,10 @@ func runProjectStatus(ctx *dep.Ctx, args []string, p *dep.Project, sm gps.Source
 	// Collect all the project roots from the arguments.
 	var prs []gps.ProjectRoot
 
+	// Collect pointers to resultant projectStatus.
+	var resultStatus []*projectStatus
+
+	// Get the proper project root of the projects.
 	for _, arg := range args {
 		pr, err := sm.DeduceProjectRoot(arg)
 		if err != nil {
@@ -900,11 +904,12 @@ func runProjectStatus(ctx *dep.Ctx, args []string, p *dep.Project, sm gps.Source
 	cc := collectConstraints(ptree, p, sm)
 
 	for _, pr := range prs {
-		// Create projectStatus and add Project name.
+		// Create projectStatus and add project name and source.
 		projStatus := projectStatus{
 			Project: string(pr),
 			Source:  string(pr),
 		}
+		resultStatus = append(resultStatus, &projStatus)
 
 		for _, pl := range p.Lock.Projects() {
 			// Get the corresponding locked project for the target project.
@@ -923,8 +928,8 @@ func runProjectStatus(ctx *dep.Ctx, args []string, p *dep.Project, sm gps.Source
 
 				proot := string(pl.Ident().ProjectRoot)
 
-				// Get the reachmap. Reachmap contains package name and imports
-				// of the package.
+				// Get the PackageTree reachmap. Reachmap contains package name
+				// and imports of the package.
 				prm, _ := pkgtree.ToReachMap(true, true, false, p.Manifest.IgnoredPackages())
 				for pkg, ie := range prm {
 					// Iterate through the external imports and check if they
@@ -1020,40 +1025,45 @@ func runProjectStatus(ctx *dep.Ctx, args []string, p *dep.Project, sm gps.Source
 			for _, c := range constraints {
 				projStatus.Constraints = append(projStatus.Constraints, c.String())
 			}
+		}
+	}
 
-			// LATEST ALLOWED
-			// Perform a solve to get the latest allowed revision.
-			params := p.MakeParams()
-			if ctx.Verbose {
-				params.TraceLogger = ctx.Err
-			}
+	// LATEST ALLOWED
+	// Perform a solve to get the latest allowed revisions.
+	params := p.MakeParams()
+	if ctx.Verbose {
+		params.TraceLogger = ctx.Err
+	}
 
-			params.RootPackageTree, err = p.ParseRootPackageTree()
-			if err != nil {
-				return err
-			}
+	params.RootPackageTree, err = p.ParseRootPackageTree()
+	if err != nil {
+		return err
+	}
 
-			params.ToChange = append(params.ToChange, pr)
+	// Add all the projects in params.ToChange.
+	for _, rs := range resultStatus {
+		params.ToChange = append(params.ToChange, gps.ProjectRoot(rs.Project))
+	}
 
-			solver, err := gps.Prepare(params, sm)
-			if err != nil {
-				return err
-			}
-			solution, err := solver.Solve(context.TODO())
-			if err != nil {
-				return err
-			}
+	solver, err := gps.Prepare(params, sm)
+	if err != nil {
+		return err
+	}
+	solution, err := solver.Solve(context.TODO())
+	if err != nil {
+		return err
+	}
 
-			prjcts := solution.Projects()
-			for _, prj := range prjcts {
-				if pr == prj.Ident().ProjectRoot {
-					r, _, _ := gps.VersionComponentStrings(prj.Version())
-					projStatus.LatestAllowed = r
-				}
+	// Iterate through the solution and get the revisions for the target projects.
+	projects := solution.Projects()
+	for _, rs := range resultStatus {
+		for _, project := range projects {
+			if gps.ProjectRoot(rs.Project) == project.Ident().ProjectRoot {
+				r, _, _ := gps.VersionComponentStrings(project.Version())
+				rs.LatestAllowed = r
 			}
 		}
-
-		ctx.Out.Println(projStatus)
+		ctx.Out.Println(rs)
 	}
 
 	return nil
