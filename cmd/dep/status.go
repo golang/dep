@@ -5,6 +5,7 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -838,45 +839,162 @@ func (p byProject) Len() int           { return len(p) }
 func (p byProject) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
 func (p byProject) Less(i, j int) bool { return p[i].Project < p[j].Project }
 
+// pubVersion type to store Public Version data of a project.
+type pubVersions map[string][]string
+
+// TabString returns a tabwriter compatible string of pubVersion.
+func (pv pubVersions) TabString() string {
+	var buf bytes.Buffer
+	w := bufio.NewWriter(&buf)
+
+	// Create a list of version categories and sort it for consistent results.
+	var catgs []string
+
+	for catg := range pv {
+		catgs = append(catgs, catg)
+	}
+
+	// Sort the list of categories.
+	sort.Strings(catgs)
+
+	// Count the number of different version categories. Use this count to add
+	// a newline("\n") and tab("\t") in all the version string list except the
+	// first one. This is required to maintain the indentation of the strings
+	// when used with tabwriter.
+	// semver:...\n \tbranches:...\n \tnonsemvers:...
+	count := 0
+	for _, catg := range catgs {
+		count++
+		if count > 1 {
+			fmt.Fprintf(w, "\n \t")
+		}
+
+		vers := pv[catg]
+
+		// Sort the versions list for consistent result.
+		sort.Strings(vers)
+
+		fmt.Fprintf(w, "%s: %s", catg, strings.Join(vers, ", "))
+	}
+	w.Flush()
+
+	return buf.String()
+}
+
+type projectImporters map[string]bool
+
+func (pi projectImporters) String() string {
+	var projects []string
+
+	for p := range pi {
+		projects = append(projects, p)
+	}
+
+	// Sort the projects for a consistent result.
+	sort.Strings(projects)
+
+	return strings.Join(projects, ", ")
+}
+
+type packageImporters map[string][]string
+
+func (pi packageImporters) TabString() string {
+	var buf bytes.Buffer
+	w := bufio.NewWriter(&buf)
+
+	// Create a list of packages in the map and sort it for consistent results.
+	var pkgs []string
+
+	for pkg := range pi {
+		pkgs = append(pkgs, pkg)
+	}
+
+	// Sort the list of packages.
+	sort.Strings(pkgs)
+
+	// Count the number of different packages. Use this count to add
+	// a newline("\n") and tab("\t") in all the package string header except the
+	// first one. This is required to maintain the indentation of the strings
+	// when used with tabwriter.
+	// github.com/x/y\n \t  github.com/a/b/foo\n \t  github.com/a/b/bar
+	count := 0
+	for _, pkg := range pkgs {
+		count++
+		if count > 1 {
+			fmt.Fprintf(w, "\n \t")
+		}
+
+		fmt.Fprintf(w, "%s", pkg)
+
+		importers := pi[pkg]
+
+		// Sort the importers list for consistent result.
+		sort.Strings(importers)
+
+		for _, p := range importers {
+			fmt.Fprintf(w, "\n \t  %s", p)
+		}
+	}
+	w.Flush()
+
+	return buf.String()
+}
+
 type projectStatus struct {
 	Project               string
 	Version               string
 	Constraints           []string
 	Source                string
 	AltSource             string
-	PubVersions           map[string][]string
+	PubVersions           pubVersions
 	Revision              string
 	LatestAllowed         string
 	SourceType            string
 	Packages              []string
-	ProjectImporters      map[string]bool
-	PackageImporters      map[string][]string
+	ProjectImporters      projectImporters
+	PackageImporters      packageImporters
 	UpstreamExists        bool
 	UpstreamVersionExists bool
 }
 
 func (ps projectStatus) String() string {
-	return fmt.Sprintf(`
-PROJECT:			%s
-VERSION:			%s
-CONSTRAINTS:			%s
-SOURCE:				%s
-ALT SOURCE:			%s
-PUB VERSION:			%s
-REVISION:			%s
-LATEST ALLOWED:			%s
-SOURCE TYPE:			%s
-PACKAGES:			%s
-PROJECT IMPORTERS:		%v
-PACKAGE IMPORTERS:		%s
-UPSTREAM EXISTS:		%t
-UPSTREAM VERSION EXISTS:	%t
-`,
+	var buf bytes.Buffer
+
+	w := tabwriter.NewWriter(&buf, 0, 4, 2, ' ', 0)
+
+	upstreamExists := "no"
+	if ps.UpstreamExists {
+		upstreamExists = "yes"
+	}
+
+	upstreamVersionExists := "no"
+	if ps.UpstreamVersionExists {
+		upstreamVersionExists = "yes"
+	}
+
+	fmt.Fprintf(w, "\n"+
+		"PROJECT:\t%s\n"+
+		"VERSION:\t%s\n"+
+		"CONSTRAINTS:\t%s\n"+
+		"SOURCE:\t%s\n"+
+		"ALT SOURCE:\t%s\n"+
+		"PUB VERSION:\t%s\n"+
+		"REVISION:\t%s\n"+
+		"LATEST ALLOWED:\t%s\n"+
+		"SOURCE TYPE:\t%s\n"+
+		"PACKAGES:\t%s\n"+
+		"PROJECT IMPORTERS:\t%s\n"+
+		"PACKAGE IMPORTERS:\t%s\n"+
+		"UPSTREAM EXISTS:\t%s\n"+
+		"UPSTREAM VERSION EXISTS:\t%s",
 		ps.Project, ps.Version, ps.Constraints, ps.Source, ps.AltSource,
-		ps.PubVersions, ps.Revision, ps.LatestAllowed, ps.SourceType,
-		strings.Join(ps.Packages, ", "),
-		ps.ProjectImporters, ps.PackageImporters, ps.UpstreamExists,
-		ps.UpstreamVersionExists)
+		ps.PubVersions.TabString(), ps.Revision, ps.LatestAllowed, ps.SourceType,
+		strings.Join(ps.Packages, ", "), ps.ProjectImporters,
+		ps.PackageImporters.TabString(), upstreamExists, upstreamVersionExists,
+	)
+	w.Flush()
+
+	return buf.String()
 }
 
 func runProjectStatus(ctx *dep.Ctx, args []string, p *dep.Project, sm gps.SourceManager) error {
@@ -1028,7 +1146,7 @@ func runProjectStatus(ctx *dep.Ctx, args []string, p *dep.Project, sm gps.Source
 				}
 			}
 			projStatus.PubVersions = make(map[string][]string)
-			projStatus.PubVersions["semver"] = semvers
+			projStatus.PubVersions["semvers"] = semvers
 			projStatus.PubVersions["branches"] = branches
 			projStatus.PubVersions["nonsemvers"] = nonsemvers
 
