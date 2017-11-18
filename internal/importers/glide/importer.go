@@ -183,7 +183,7 @@ func (g *Importer) convert(pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock, error)
 		packages = append(packages, ip)
 	}
 
-	err := g.ImportPackages(packages, false)
+	err := g.ImportPackages(packages, true)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "invalid glide configuration")
 	}
