@@ -1,0 +1,20 @@
+
+PROJECT:                  github.com/sdboyer/deptest
+VERSION:                  v1.0.0
+CONSTRAINTS:              []
+SOURCE:                   github.com/sdboyer/deptest
+ALT SOURCE:
+PUB VERSION:              branches: master
+                          nonsemvers:
+                          semvers: v0.8.0, v0.8.1, v1.0.0
+REVISION:                 ff2948a2ac8f538c4ecd55962e919d1e13e74baf
+LATEST ALLOWED:           ff2948a2ac8f538c4ecd55962e919d1e13e74baf
+SOURCE TYPE:              git
+PACKAGES:                 github.com/sdboyer/deptest
+PROJECT IMPORTERS:        github.com/darkowlzz/deptest-project-status, github.com/sdboyer/deptestdos
+PACKAGE IMPORTERS:        github.com/sdboyer/deptest
+                            github.com/darkowlzz/deptest-project-status/pkgbar
+                            github.com/darkowlzz/deptest-project-status/pkgfoo
+                            github.com/sdboyer/deptestdos
+UPSTREAM EXISTS:          yes
+UPSTREAM VERSION EXISTS:  yes
