@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"html/template"
 	"io"
 	"io/ioutil"
 	"log"
@@ -191,6 +192,25 @@ func (out *dotOutput) MissingHeader()                {}
 func (out *dotOutput) MissingLine(ms *MissingStatus) {}
 func (out *dotOutput) MissingFooter()                {}
 
+type templateOutput struct {
+	w    io.Writer
+	tmpl *template.Template
+}
+
+func (out *templateOutput) BasicHeader() {}
+func (out *templateOutput) BasicFooter() {}
+
+func (out *templateOutput) BasicLine(bs *BasicStatus) {
+	out.tmpl.Execute(out.w, bs)
+}
+
+func (out *templateOutput) MissingHeader() {}
+func (out *templateOutput) MissingFooter() {}
+
+func (out *templateOutput) MissingLine(ms *MissingStatus) {
+	out.tmpl.Execute(out.w, ms)
+}
+
 func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
 	p, err := ctx.LoadProject()
 	if err != nil {
@@ -206,6 +226,11 @@ func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
 
 	if err := dep.ValidateProjectRoots(ctx, p.Manifest, sm); err != nil {
 		return err
+	}
+
+	templateOut := false
+	if cmd.template != "" {
+		templateOut = true
 	}
 
 	var buf bytes.Buffer
@@ -230,6 +255,15 @@ func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
 			p: p,
 			o: cmd.output,
 			w: &buf,
+		}
+	case templateOut:
+		tmpl, err := template.New("status").Parse(cmd.template)
+		if err != nil {
+			return err
+		}
+		out = &templateOutput{
+			w:    &buf,
+			tmpl: tmpl,
 		}
 	default:
 		out = &tableOutput{
