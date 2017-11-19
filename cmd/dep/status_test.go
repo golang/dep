@@ -441,7 +441,7 @@ func TestValidateFlags(t *testing.T) {
 		},
 		{
 			name:    "single operating mode",
-			cmd:     statusCommand{unused: true},
+			cmd:     statusCommand{old: true},
 			wantErr: nil,
 		},
 		{

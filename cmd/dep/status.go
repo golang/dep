@@ -62,26 +62,20 @@ func (cmd *statusCommand) LongHelp() string  { return statusLongHelp }
 func (cmd *statusCommand) Hidden() bool      { return false }
 
 func (cmd *statusCommand) Register(fs *flag.FlagSet) {
-	fs.BoolVar(&cmd.detailed, "detailed", false, "report more detailed status")
 	fs.BoolVar(&cmd.json, "json", false, "output in JSON format")
 	fs.StringVar(&cmd.template, "f", "", "output in text/template format")
 	fs.BoolVar(&cmd.dot, "dot", false, "output the dependency graph in GraphViz format")
 	fs.BoolVar(&cmd.old, "old", false, "only show out-of-date dependencies")
 	fs.BoolVar(&cmd.missing, "missing", false, "only show missing dependencies")
-	fs.BoolVar(&cmd.unused, "unused", false, "only show unused dependencies")
-	fs.BoolVar(&cmd.modified, "modified", false, "only show modified dependencies")
 }
 
 type statusCommand struct {
-	detailed bool
 	json     bool
 	template string
 	output   string
 	dot      bool
 	old      bool
 	missing  bool
-	unused   bool
-	modified bool
 }
 
 type outputter interface {
@@ -234,15 +228,9 @@ func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
 	var buf bytes.Buffer
 	var out outputter
 	switch {
-	case cmd.modified:
-		return errors.Errorf("not implemented")
-	case cmd.unused:
-		return errors.Errorf("not implemented")
 	case cmd.missing:
 		return errors.Errorf("not implemented")
 	case cmd.old:
-		return errors.Errorf("not implemented")
-	case cmd.detailed:
 		return errors.Errorf("not implemented")
 	case cmd.json:
 		out = &jsonOutput{
@@ -309,24 +297,12 @@ func (cmd *statusCommand) validateFlags() error {
 	// Operating mode flags.
 	opModes := []string{}
 
-	if cmd.detailed {
-		opModes = append(opModes, "-detailed")
-	}
-
 	if cmd.old {
 		opModes = append(opModes, "-old")
 	}
 
 	if cmd.missing {
 		opModes = append(opModes, "-missing")
-	}
-
-	if cmd.unused {
-		opModes = append(opModes, "-unused")
-	}
-
-	if cmd.modified {
-		opModes = append(opModes, "-modified")
 	}
 
 	// Check if any other flags are passed with -dot.
