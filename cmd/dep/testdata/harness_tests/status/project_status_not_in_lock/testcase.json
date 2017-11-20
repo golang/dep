@@ -1,0 +1,12 @@
+{
+  "commands": [
+    ["ensure"],
+    ["status", "github.com/golang/dep"]
+  ],
+  "error-expected": "github.com/golang/dep is not in the lock file. Ensure that the project is being used and run `dep ensure` to generate a new lock file.",
+  "vendor-final": [
+    "github.com/darkowlzz/deptest-project-status",
+    "github.com/sdboyer/deptest",
+    "github.com/sdboyer/deptestdos"
+  ]
+}

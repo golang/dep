@@ -1010,6 +1010,12 @@ func runProjectStatus(ctx *dep.Ctx, args []string, p *dep.Project, sm gps.Source
 		if err != nil {
 			return err
 		}
+
+		// Check if the target project is in the lock.
+		if !p.Lock.HasProjectWithRoot(pr) {
+			return errors.Errorf("%s is not in the lock file. Ensure that the project is being used and run `dep ensure` to generate a new lock file.", pr)
+		}
+
 		prs = append(prs, pr)
 	}
 
