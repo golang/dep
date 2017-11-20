@@ -16,9 +16,12 @@ import (
 // PruneOptions represents the pruning options used to write the dependecy tree.
 type PruneOptions uint8
 
+// PruneProjectOptions is map of prune options per project name.
+type PruneProjectOptions map[ProjectRoot]PruneOptions
+
 const (
 	// PruneNestedVendorDirs indicates if nested vendor directories should be pruned.
-	PruneNestedVendorDirs = 1 << iota
+	PruneNestedVendorDirs PruneOptions = 1 << iota
 	// PruneUnusedPackages indicates if unused Go packages should be pruned.
 	PruneUnusedPackages
 	// PruneNonGoFiles indicates if non-Go files should be pruned.
@@ -137,7 +140,6 @@ func pruneUnusedPackages(lp LockedProject, projectDir string, logger *log.Logger
 
 // calculateUnusedPackages generates a list of unused packages in lp.
 func calculateUnusedPackages(lp LockedProject, projectDir string) (map[string]struct{}, error) {
-	// TODO(ibrasho): optimize this...
 	unused := make(map[string]struct{})
 	imported := make(map[string]struct{})
 	for _, pkg := range lp.Packages() {
@@ -172,7 +174,6 @@ func calculateUnusedPackages(lp LockedProject, projectDir string) (map[string]st
 
 // collectUnusedPackagesFiles returns a slice of all files in the unused packages in projectDir.
 func collectUnusedPackagesFiles(projectDir string, unusedPackages map[string]struct{}) ([]string, error) {
-	// TODO(ibrasho): is this useful?
 	files := make([]string, 0, len(unusedPackages))
 
 	err := filepath.Walk(projectDir, func(path string, info os.FileInfo, err error) error {
