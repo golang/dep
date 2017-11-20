@@ -228,11 +228,6 @@ func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
 		return err
 	}
 
-	templateOut := false
-	if cmd.template != "" {
-		templateOut = true
-	}
-
 	var buf bytes.Buffer
 	var out outputter
 	switch {
@@ -256,7 +251,7 @@ func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
 			o: cmd.output,
 			w: &buf,
 		}
-	case templateOut:
+	case cmd.template != "":
 		tmpl, err := template.New("status").Parse(cmd.template)
 		if err != nil {
 			return err
