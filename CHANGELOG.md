@@ -7,6 +7,7 @@ BUG FIXES:
 * Suppress git password prompts in more places (#1357).
 * Fix `-no-vendor` flag for `ensure -update` (#1361).
 * Validate `git ls-remote` output and ignore all malformed lines (#1379)
+* Support [gopkg.in version zero](http://labix.org/gopkg.in#VersionZero) (#1243).
 
 IMPROVEMENTS:
 
