@@ -480,3 +480,93 @@ func TestValidateFlags(t *testing.T) {
 		})
 	}
 }
+
+func TestProjectStatusString(t *testing.T) {
+	testCases := []struct {
+		name       string
+		ps         projectStatus
+		wantString string
+	}{
+		{
+			name: "basic projectStatus",
+			ps: projectStatus{
+				Project:     "github.com/x/y",
+				Version:     "v1.0",
+				Constraints: nil,
+				Source:      "github.com/x/y",
+				AltSource:   "https://github.com/z/y",
+				PubVersions: pubVersions{
+					"semvers":    []string{"v0.5", "v0.7", "v1.0", "v1.5"},
+					"branches":   []string{"master", "dev"},
+					"nonsemvers": []string{"v1.0-rc1", "v1.5-rc"},
+				},
+				Revision:      "some-rev",
+				LatestAllowed: "some-other-rev",
+				SourceType:    "git",
+				Packages:      []string{"github.com/x/y/pkgA", "github.com/x/y/pkgB", "github.com/x/y/pkgB/foo"},
+				ProjectImporters: projectImporters{
+					"github.com/a/b":     true,
+					"github.com/foo/bar": true,
+				},
+				PackageImporters: packageImporters{
+					"github.com/x/y/pkgA":     []string{"github.com/a/b/z", "github.com/foo/bar/k"},
+					"github.com/x/y/pkgB/foo": []string{"github.com/a/b/j"},
+				},
+				UpstreamExists:        true,
+				UpstreamVersionExists: true,
+			},
+			wantString: `
+PROJECT:                  github.com/x/y
+VERSION:                  v1.0
+CONSTRAINTS:              []
+SOURCE:                   github.com/x/y
+ALT SOURCE:               https://github.com/z/y
+PUB VERSION:              branches: dev, master
+                          nonsemvers: v1.0-rc1, v1.5-rc
+                          semvers: v0.5, v0.7, v1.0, v1.5
+REVISION:                 some-rev
+LATEST ALLOWED:           some-other-rev
+SOURCE TYPE:              git
+PACKAGES:                 github.com/x/y/pkgA, github.com/x/y/pkgB, github.com/x/y/pkgB/foo
+PROJECT IMPORTERS:        github.com/a/b, github.com/foo/bar
+PACKAGE IMPORTERS:        github.com/x/y/pkgA
+                            github.com/a/b/z
+                            github.com/foo/bar/k
+                          github.com/x/y/pkgB/foo
+                            github.com/a/b/j
+UPSTREAM EXISTS:          yes
+UPSTREAM VERSION EXISTS:  yes`,
+		},
+		{
+			name: "projectStatus with no upstream exists",
+			ps: projectStatus{
+				UpstreamExists:        false,
+				UpstreamVersionExists: false,
+			},
+			wantString: `
+PROJECT:                  
+VERSION:                  
+CONSTRAINTS:              []
+SOURCE:                   
+ALT SOURCE:               
+PUB VERSION:              
+REVISION:                 
+LATEST ALLOWED:           
+SOURCE TYPE:              
+PACKAGES:                 
+PROJECT IMPORTERS:        
+PACKAGE IMPORTERS:        
+UPSTREAM EXISTS:          no
+UPSTREAM VERSION EXISTS:  no`,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			gotString := tc.ps.String()
+			if gotString != tc.wantString {
+				t.Errorf("unexpected projectStatus string: \n\t(GOT): %v\n\t(WNT): %v", gotString, tc.wantString)
+			}
+		})
+	}
+}
