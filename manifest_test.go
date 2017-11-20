@@ -7,6 +7,7 @@ package dep
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"reflect"
@@ -25,7 +26,7 @@ func TestReadManifest(t *testing.T) {
 	defer mf.Close()
 	got, _, err := readManifest(mf)
 	if err != nil {
-		t.Fatalf("Should have read Manifest correctly, but got err %q", err)
+		t.Fatalf("should have read manifest correctly, but got err %q", err)
 	}
 
 	c, _ := gps.NewSemverConstraint("^0.12.0")
@@ -44,7 +45,12 @@ func TestReadManifest(t *testing.T) {
 				Constraint: gps.NewBranch("master"),
 			},
 		},
-		Ignored: []string{"github.com/foo/bar"},
+		Ignored:      []string{"github.com/foo/bar"},
+		PruneOptions: gps.PruneNestedVendorDirs | gps.PruneNonGoFiles,
+		PruneProjectOptions: gps.PruneProjectOptions{
+			gps.ProjectRoot("github.com/golang/dep"):   gps.PruneNestedVendorDirs,
+			gps.ProjectRoot("github.com/babble/brook"): gps.PruneNestedVendorDirs | gps.PruneGoTestFiles,
+		},
 	}
 
 	if !reflect.DeepEqual(got.Constraints, want.Constraints) {
@@ -80,7 +86,7 @@ func TestWriteManifest(t *testing.T) {
 
 	got, err := m.MarshalTOML()
 	if err != nil {
-		t.Fatalf("Error while marshaling valid manifest to TOML: %q", err)
+		t.Fatalf("error while marshaling valid manifest to TOML: %q", err)
 	}
 
 	if string(got) != want {
@@ -89,7 +95,7 @@ func TestWriteManifest(t *testing.T) {
 				t.Fatal(err)
 			}
 		} else {
-			t.Errorf("Valid manifest did not marshal to TOML as expected:\n\t(GOT): %s\n\t(WNT): %s", string(got), want)
+			t.Errorf("valid manifest did not marshal to TOML as expected:\n(GOT):\n%s\n(WNT):\n%s", string(got), want)
 		}
 	}
 }
@@ -113,20 +119,22 @@ func TestReadManifestErrors(t *testing.T) {
 		defer mf.Close()
 		_, _, err = readManifest(mf)
 		if err == nil {
-			t.Errorf("Reading manifest with %s should have caused error, but did not", tst.name)
+			t.Errorf("reading manifest with %s should have caused error, but did not", tst.name)
 		} else if !strings.Contains(err.Error(), tst.name) {
-			t.Errorf("Unexpected error %q; expected %s error", err, tst.name)
+			t.Errorf("unexpected error %q; expected %s error", err, tst.name)
 		}
 	}
 }
 
 func TestValidateManifest(t *testing.T) {
 	cases := []struct {
+		name       string
 		tomlString string
 		wantWarn   []error
 		wantError  error
 	}{
 		{
+			name: "valid required",
 			tomlString: `
 			required = ["github.com/foo/bar"]
 			`,
@@ -134,6 +142,7 @@ func TestValidateManifest(t *testing.T) {
 			wantError: nil,
 		},
 		{
+			name: "invalid required",
 			tomlString: `
 			required = "github.com/foo/bar"
 			`,
@@ -141,6 +150,7 @@ func TestValidateManifest(t *testing.T) {
 			wantError: errInvalidRequired,
 		},
 		{
+			name: "empty required",
 			tomlString: `
 			required = []
 			`,
@@ -148,6 +158,7 @@ func TestValidateManifest(t *testing.T) {
 			wantError: nil,
 		},
 		{
+			name: "invalid required list",
 			tomlString: `
 			required = [1, 2, 3]
 			`,
@@ -155,6 +166,7 @@ func TestValidateManifest(t *testing.T) {
 			wantError: errInvalidRequired,
 		},
 		{
+			name: "invalid required format",
 			tomlString: `
 			[[required]]
 			  name = "foo"
@@ -163,6 +175,7 @@ func TestValidateManifest(t *testing.T) {
 			wantError: errInvalidRequired,
 		},
 		{
+			name: "valid ignored",
 			tomlString: `
 			ignored = ["foo"]
 			`,
@@ -170,6 +183,7 @@ func TestValidateManifest(t *testing.T) {
 			wantError: nil,
 		},
 		{
+			name: "invalid ignored",
 			tomlString: `
 			ignored = "foo"
 			`,
@@ -177,6 +191,7 @@ func TestValidateManifest(t *testing.T) {
 			wantError: errInvalidIgnored,
 		},
 		{
+			name: "empty ignored",
 			tomlString: `
 			ignored = []
 			`,
@@ -184,6 +199,7 @@ func TestValidateManifest(t *testing.T) {
 			wantError: nil,
 		},
 		{
+			name: "invalid ignored list",
 			tomlString: `
 			ignored = [1, 2, 3]
 			`,
@@ -191,6 +207,7 @@ func TestValidateManifest(t *testing.T) {
 			wantError: errInvalidIgnored,
 		},
 		{
+			name: "invalid ignored format",
 			tomlString: `
 			[[ignored]]
 			  name = "foo"
@@ -199,6 +216,7 @@ func TestValidateManifest(t *testing.T) {
 			wantError: errInvalidIgnored,
 		},
 		{
+			name: "valid metadata",
 			tomlString: `
 			[metadata]
 			  authors = "foo"
@@ -208,6 +226,7 @@ func TestValidateManifest(t *testing.T) {
 			wantError: nil,
 		},
 		{
+			name: "invalid metadata",
 			tomlString: `
 			foo = "some-value"
 			version = 14
@@ -220,23 +239,27 @@ func TestValidateManifest(t *testing.T) {
 			  version = ""
 			`,
 			wantWarn: []error{
-				errors.New("Unknown field in manifest: foo"),
-				errors.New("Unknown field in manifest: bar"),
-				errors.New("Unknown field in manifest: version"),
+				errors.New("unknown field in manifest: foo"),
+				errors.New("unknown field in manifest: bar"),
+				errors.New("unknown field in manifest: version"),
 			},
 			wantError: nil,
 		},
 		{
+			name: "invalid metadata format",
 			tomlString: `
 			metadata = "project-name"
 
 			[[constraint]]
 			  name = "github.com/foo/bar"
 			`,
-			wantWarn:  []error{errors.New("metadata should be a TOML table")},
+			wantWarn: []error{
+				errInvalidMetadata,
+			},
 			wantError: nil,
 		},
 		{
+			name: "plain constraint",
 			tomlString: `
 			[[constraint]]
 			  name = "github.com/foo/bar"
@@ -245,6 +268,7 @@ func TestValidateManifest(t *testing.T) {
 			wantError: nil,
 		},
 		{
+			name: "empty constraint",
 			tomlString: `
 			[[constraint]]
 			`,
@@ -252,6 +276,7 @@ func TestValidateManifest(t *testing.T) {
 			wantError: nil,
 		},
 		{
+			name: "invalid constraint",
 			tomlString: `
 			constraint = "foo"
 			`,
@@ -259,6 +284,7 @@ func TestValidateManifest(t *testing.T) {
 			wantError: errInvalidConstraint,
 		},
 		{
+			name: "invalid constraint list",
 			tomlString: `
 			constraint = ["foo", "bar"]
 			`,
@@ -266,6 +292,7 @@ func TestValidateManifest(t *testing.T) {
 			wantError: errInvalidConstraint,
 		},
 		{
+			name: "valid override",
 			tomlString: `
 			[[override]]
 			  name = "github.com/foo/bar"
@@ -274,6 +301,7 @@ func TestValidateManifest(t *testing.T) {
 			wantError: nil,
 		},
 		{
+			name: "empty override",
 			tomlString: `
 			[[override]]
 			`,
@@ -281,6 +309,7 @@ func TestValidateManifest(t *testing.T) {
 			wantError: nil,
 		},
 		{
+			name: "invalid override",
 			tomlString: `
 			override = "bar"
 			`,
@@ -288,6 +317,7 @@ func TestValidateManifest(t *testing.T) {
 			wantError: errInvalidOverride,
 		},
 		{
+			name: "invalid override list",
 			tomlString: `
 			override = ["foo", "bar"]
 			`,
@@ -295,6 +325,7 @@ func TestValidateManifest(t *testing.T) {
 			wantError: errInvalidOverride,
 		},
 		{
+			name: "invalid fields",
 			tomlString: `
 			[[constraint]]
 			  name = "github.com/foo/bar"
@@ -306,14 +337,15 @@ func TestValidateManifest(t *testing.T) {
 			  nick = "foo"
 			`,
 			wantWarn: []error{
-				errors.New("Invalid key \"location\" in \"constraint\""),
-				errors.New("Invalid key \"link\" in \"constraint\""),
-				errors.New("Invalid key \"nick\" in \"override\""),
+				errors.New("invalid key \"location\" in \"constraint\""),
+				errors.New("invalid key \"link\" in \"constraint\""),
+				errors.New("invalid key \"nick\" in \"override\""),
 				errors.New("metadata in \"constraint\" should be a TOML table"),
 			},
 			wantError: nil,
 		},
 		{
+			name: "constraint metadata",
 			tomlString: `
 			[[constraint]]
 			  name = "github.com/foo/bar"
@@ -325,15 +357,19 @@ func TestValidateManifest(t *testing.T) {
 			wantError: nil,
 		},
 		{
+			name: "invalid revision",
 			tomlString: `
 			[[constraint]]
 			  name = "github.com/foo/bar"
 			  revision = "b86ad16"
 			`,
-			wantWarn:  []error{errors.New("revision \"b86ad16\" should not be in abbreviated form")},
+			wantWarn: []error{
+				errors.New("revision \"b86ad16\" should not be in abbreviated form"),
+			},
 			wantError: nil,
 		},
 		{
+			name: "invalid hg revision",
 			tomlString: `
 			[[constraint]]
 			  name = "foobar.com/hg"
@@ -342,37 +378,113 @@ func TestValidateManifest(t *testing.T) {
 			wantWarn:  []error{errors.New("revision \"8d43f8c0b836\" should not be in abbreviated form")},
 			wantError: nil,
 		},
-	}
+		{
+			name: "valid prune options",
+			tomlString: `
+			[prune]
+			  non-go = true
+			`,
+			wantWarn:  []error{},
+			wantError: nil,
+		},
+		{
+			name: "invalid root prune options",
+			tomlString: `
+			[prune]
+			  non-go = false
+			`,
+			wantWarn:  []error{},
+			wantError: errInvalidRootPruneValue,
+		},
+		{
+			name: "root options should not contain a name",
+			tomlString: `
+			[prune]
+			  go-tests = true
+			  name = "github.com/golang/dep"
+			`,
+			wantWarn: []error{
+				errRootPruneContainsName,
+			},
+			wantError: nil,
+		},
+		{
+			name: "invalid prune project",
+			tomlString: `
+			[prune]
+			  non-go = true
 
-	// contains for error
-	contains := func(s []error, e error) bool {
-		for _, a := range s {
-			if a.Error() == e.Error() {
-				return true
-			}
-		}
-		return false
+			  [prune.project]
+			    name = "github.com/org/project"
+			    non-go = true
+			`,
+			wantWarn:  []error{},
+			wantError: errInvalidPruneProject,
+		},
 	}
 
 	for _, c := range cases {
-		errs, err := validateManifest(c.tomlString)
+		t.Run(c.name, func(t *testing.T) {
+			errs, err := validateManifest(c.tomlString)
 
-		// compare validation errors
-		if err != c.wantError {
-			t.Fatalf("Manifest errors are not as expected: \n\t(GOT) %v \n\t(WNT) %v", err, c.wantError)
-		}
-
-		// compare length of error slice
-		if len(errs) != len(c.wantWarn) {
-			t.Fatalf("Number of manifest errors are not as expected: \n\t(GOT) %v errors(%v)\n\t(WNT) %v errors(%v).", len(errs), errs, len(c.wantWarn), c.wantWarn)
-		}
-
-		// check if the expected errors exist in actual errors slice
-		for _, er := range errs {
-			if !contains(c.wantWarn, er) {
-				t.Fatalf("Manifest errors are not as expected: \n\t(MISSING) %v\n\t(FROM) %v", er, c.wantWarn)
+			// compare validation errors
+			if err != c.wantError {
+				t.Fatalf("manifest errors are not as expected: \n\t(GOT) %v \n\t(WNT) %v", err, c.wantError)
 			}
-		}
+
+			// compare length of error slice
+			if len(errs) != len(c.wantWarn) {
+				t.Fatalf("number of manifest errors are not as expected: \n\t(GOT) %v errors(%v)\n\t(WNT) %v errors(%v).", len(errs), errs, len(c.wantWarn), c.wantWarn)
+			}
+
+			// check if the expected errors exist in actual errors slice
+			for _, er := range errs {
+				if !containsErr(c.wantWarn, er) {
+					t.Fatalf("manifest errors are not as expected: \n\t(MISSING) %v\n\t(FROM) %v", er, c.wantWarn)
+				}
+			}
+		})
+	}
+}
+
+func TestCheckRedundantPruneOptions(t *testing.T) {
+	cases := []struct {
+		name         string
+		pruneOptions rawPruneOptions
+		wantWarn     []error
+	}{
+		{
+			name: "redundant project prune options",
+			pruneOptions: rawPruneOptions{
+				NonGoFiles: true,
+				Projects: []rawPruneProjectOptions{
+					rawPruneProjectOptions{
+						Name:       "github.com/org/project",
+						NonGoFiles: true,
+					},
+				},
+			},
+			wantWarn: []error{
+				fmt.Errorf("redundant prune option %q set for %q", "non-go", "github.com/org/project"),
+			},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			errs := checkRedundantPruneOptions(rawManifest{PruneOptions: c.pruneOptions})
+
+			// compare length of error slice
+			if len(errs) != len(c.wantWarn) {
+				t.Fatalf("number of manifest errors are not as expected:\n\t(GOT) %v errors(%v)\n\t(WNT) %v errors(%v).", len(errs), errs, len(c.wantWarn), c.wantWarn)
+			}
+
+			for _, er := range errs {
+				if !containsErr(c.wantWarn, er) {
+					t.Fatalf("manifest errors are not as expected:\n\t(MISSING)\n%v\n\t(FROM)\n%v", er, c.wantWarn)
+				}
+			}
+		})
 	}
 }
 
@@ -470,15 +582,28 @@ func TestValidateProjectRoots(t *testing.T) {
 			stderrOutput.Reset()
 			err := ValidateProjectRoots(ctx, &c.manifest, sm)
 			if err != c.wantError {
-				t.Fatalf("Unexpected error while validating project roots:\n\t(GOT): %v\n\t(WNT): %v", err, c.wantError)
+				t.Fatalf("unexpected error while validating project roots:\n\t(GOT): %v\n\t(WNT): %v", err, c.wantError)
 			}
 
 			warnings := stderrOutput.String()
 			for _, warn := range c.wantWarn {
 				if !strings.Contains(warnings, warn) {
-					t.Fatalf("Expected ValidateProjectRoot errors to contain: %q", warn)
+					t.Fatalf("expected ValidateProjectRoot errors to contain: %q", warn)
 				}
 			}
 		})
 	}
+}
+
+func TestPruneOptionsFor(t *testing.T) {
+
+}
+
+func containsErr(s []error, e error) bool {
+	for _, a := range s {
+		if a.Error() == e.Error() {
+			return true
+		}
+	}
+	return false
 }
