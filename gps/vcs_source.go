@@ -410,23 +410,34 @@ func (s *gopkginSource) listVersions(ctx context.Context) ([]PairedVersion, erro
 	k := 0
 	var dbranch int // index of branch to be marked default
 	var bsv semver.Version
+	var defaultBranch PairedVersion
+	tryDefaultAsV0 := s.major == 0
 	for _, v := range ovlist {
 		// all git versions will always be paired
 		pv := v.(versionPair)
 		switch tv := pv.v.(type) {
 		case semVersion:
+			tryDefaultAsV0 = false
 			if tv.sv.Major() == s.major && !s.unstable {
 				vlist[k] = v
 				k++
 			}
 		case branchVersion:
+			if tv.isDefault && defaultBranch == nil {
+				defaultBranch = pv
+			}
+
 			// The semver lib isn't exactly the same as gopkg.in's logic, but
 			// it's close enough that it's probably fine to use. We can be more
 			// exact if real problems crop up.
 			sv, err := semver.NewVersion(tv.name)
-			if err != nil || sv.Major() != s.major {
-				// not a semver-shaped branch name at all, or not the same major
-				// version as specified in the import path constraint
+			if err != nil {
+				continue
+			}
+			tryDefaultAsV0 = false
+
+			if sv.Major() != s.major {
+				// not the same major version as specified in the import path constraint
 				continue
 			}
 
@@ -459,6 +470,12 @@ func (s *gopkginSource) listVersions(ctx context.Context) ([]PairedVersion, erro
 			name:      dbv.v.(branchVersion).name,
 			isDefault: true,
 		}.Pair(dbv.r)
+	}
+
+	// Treat the default branch as v0 only when no other semver branches/tags exist
+	// See http://labix.org/gopkg.in#VersionZero
+	if tryDefaultAsV0 && defaultBranch != nil {
+		vlist = append(vlist, defaultBranch)
 	}
 
 	return vlist, nil
