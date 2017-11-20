@@ -1027,6 +1027,15 @@ func runProjectStatus(ctx *dep.Ctx, args []string, p *dep.Project, sm gps.Source
 	// Collect reachmap of all the locked projects.
 	reachmaps := make(map[string]pkgtree.ReachMap)
 
+	// Create a list of depgraph packages to be used to exclude packages that
+	// the root project does not use.
+	rootPkgTree, err := p.ParseRootPackageTree()
+	if err != nil {
+		return err
+	}
+	rootrm, _ := rootPkgTree.ToReachMap(true, true, false, p.Manifest.IgnoredPackages())
+	depgraphPkgs := rootrm.FlattenFn(paths.IsStandardImportPath)
+
 	// Collect and store all the necessary data from pkgtree(s).
 	// TODO: Make this concurrent.
 	for _, pl := range p.Lock.Projects() {
@@ -1066,6 +1075,11 @@ func runProjectStatus(ctx *dep.Ctx, args []string, p *dep.Project, sm gps.Source
 			}
 
 			for pkg, ie := range rmap {
+				// Exclude packages not used by root project.
+				if !contains(depgraphPkgs, pkg) {
+					continue
+				}
+
 				// Iterate through the external imports and check if they
 				// import any package from the target project.
 				for _, p := range ie.External {

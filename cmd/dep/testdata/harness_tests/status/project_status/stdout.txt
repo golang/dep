@@ -13,7 +13,6 @@ SOURCE TYPE:              git
 PACKAGES:                 github.com/sdboyer/deptest
 PROJECT IMPORTERS:        github.com/darkowlzz/deptest-project-status, github.com/sdboyer/deptestdos
 PACKAGE IMPORTERS:        github.com/sdboyer/deptest
-                            github.com/darkowlzz/deptest-project-status/pkgbar
                             github.com/darkowlzz/deptest-project-status/pkgfoo
                             github.com/sdboyer/deptestdos
 UPSTREAM EXISTS:          yes
