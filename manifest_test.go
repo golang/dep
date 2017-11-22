@@ -344,11 +344,11 @@ func TestValidateManifest(t *testing.T) {
 			  nick = "foo"
 			`,
 			wantWarn: []error{
-				errors.New("Invalid key \"location\" in \"constraint\""),
-				errors.New("Invalid key \"link\" in \"constraint\""),
+				errors.New("invalid key \"location\" in \"constraint\""),
+				errors.New("invalid key \"link\" in \"constraint\""),
 				errors.New("metadata in \"constraint\" should be a TOML table"),
 				errors.New("branch, version, revision, or source should be provided for \"github.com/foo/bar\""),
-				errors.New("Invalid key \"nick\" in \"override\""),
+				errors.New("invalid key \"nick\" in \"override\""),
 				errNoName,
 			},
 			wantError: nil,

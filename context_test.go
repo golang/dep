@@ -327,8 +327,8 @@ func TestCaseInsentitiveGOPATH(t *testing.T) {
 	h.TempDir("src/test1")
 	h.TempFile(filepath.Join("src/test1", ManifestName), `
 	[[constraint]]
-		name = github.com/foo/bar
-		branch = master`)
+		name = "github.com/foo/bar"
+		branch = "master"`)
 
 	// Shuffle letter case
 	rs := []rune(strings.ToLower(h.Path(".")))
