@@ -221,10 +221,6 @@ func fillPackage(p *build.Package) error {
 		return err
 	}
 
-	if len(gofiles) == 0 {
-		return &build.NoGoError{Dir: p.Dir}
-	}
-
 	var testImports []string
 	var imports []string
 	var importComments []string

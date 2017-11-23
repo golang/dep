@@ -6,7 +6,6 @@ package pkgtree
 
 import (
 	"fmt"
-	"go/build"
 	"go/scanner"
 	"go/token"
 	"io/ioutil"
@@ -489,8 +488,9 @@ func TestListPackages(t *testing.T) {
 				ImportRoot: "empty",
 				Packages: map[string]PackageOrErr{
 					"empty": {
-						Err: &build.NoGoError{
-							Dir: j("empty"),
+						P: Package{
+							ImportPath: "empty",
+							Imports:    []string{},
 						},
 					},
 				},
@@ -733,8 +733,9 @@ func TestListPackages(t *testing.T) {
 				ImportRoot: "ren",
 				Packages: map[string]PackageOrErr{
 					"ren": {
-						Err: &build.NoGoError{
-							Dir: j("ren"),
+						P: Package{
+							ImportPath: "ren",
+							Imports:    []string{},
 						},
 					},
 					"ren/m1p": {
@@ -1653,8 +1654,9 @@ func TestListPackagesNoPerms(t *testing.T) {
 		ImportRoot: "ren",
 		Packages: map[string]PackageOrErr{
 			"ren": {
-				Err: &build.NoGoError{
-					Dir: workdir,
+				P: Package{
+					ImportPath: "ren",
+					Imports:    []string{},
 				},
 			},
 			"ren/m1p": {
@@ -1688,10 +1690,6 @@ func TestListPackagesNoPerms(t *testing.T) {
 			} else {
 				t.Error("Wrong number of PackageOrErrs")
 			}
-		}
-
-		if got.Packages["ren"].Err == nil {
-			t.Error("Should have gotten error on empty root directory")
 		}
 
 		if !reflect.DeepEqual(got.Packages["ren/m1p"].P.Imports, want.Packages["ren/m1p"].P.Imports) {
