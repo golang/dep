@@ -6,6 +6,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -270,6 +271,36 @@ func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
 	// Print the status output
 	ctx.Out.Print(buf.String())
 
+	return nil
+}
+
+func (cmd *statusCommand) runOld(ctx *dep.Ctx, args []string, p *dep.Project, sm gps.SourceManager, params gps.SolveParameters) error {
+	solver, err := gps.Prepare(params, sm)
+	if err != nil {
+		return errors.Wrap(err, "fastpath solver prepare")
+	}
+
+	solution, err := solver.Solve(context.TODO())
+	if err != nil {
+		return errors.Wrap(err, "runOld")
+	}
+
+	var oldLockProjects []gps.LockedProject
+	lockProjects := p.Lock.Projects()
+	solutionProjects := solution.Projects()
+
+	for _, sp := range solutionProjects {
+		for _, lp := range lockProjects {
+			spr, _, _ := gps.VersionComponentStrings(sp.Version())
+			lpr, _, _ := gps.VersionComponentStrings(lp.Version())
+
+			if spr != lpr {
+				oldLockProjects = append(oldLockProjects, lp)
+			}
+		}
+	}
+
+	// TODO: Print output
 	return nil
 }
 
