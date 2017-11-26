@@ -1,5 +1,9 @@
 # v0.3.3 (Unreleased)
 
+NEW FEATURES:
+* Add support for importing from [govendor](https://github.com/kardianos/govendor)
+  based projects (#815).
+
 BUG FIXES:
 
 * Releases targeting Windows now have a `.exe` suffix (#1291).
