@@ -1,0 +1,14 @@
+{
+  "commands": [
+    ["init", "-no-examples", "-gopath"]
+  ],
+  "error-expected": "",
+  "gopath-initial": {
+    "github.com/sdboyer/deptest": "3f4c3bea144e112a69bbe5d8d01c1b09a544253f",
+    "github.com/sdboyer/deptestdos": "5c607206be5decd28e6263ffffdcee067266015e"
+  },
+  "vendor-final": [
+    "github.com/sdboyer/deptest",
+    "github.com/sdboyer/deptestdos"
+  ]
+}

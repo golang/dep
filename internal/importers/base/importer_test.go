@@ -382,7 +382,7 @@ func TestBaseImporter_ImportProjects(t *testing.T) {
 				},
 			},
 		},
-		"ignoring default source": {
+		"ignore default source": {
 			importertest.TestCase{
 				WantConstraint: "*",
 				WantSourceRepo: "",
@@ -391,6 +391,19 @@ func TestBaseImporter_ImportProjects(t *testing.T) {
 				{
 					Name:   importertest.Project,
 					Source: "https://" + importertest.Project,
+				},
+			},
+		},
+		"ignore vendored source": {
+			importertest.TestCase{
+				WantConstraint: "*",
+				WantSourceRepo: "",
+				WantWarning:    "vendored sources aren't supported",
+			},
+			[]ImportedPackage{
+				{
+					Name:   importertest.Project,
+					Source: "example.com/vendor/" + importertest.Project,
 				},
 			},
 		},

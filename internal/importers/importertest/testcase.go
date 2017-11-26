@@ -79,7 +79,7 @@ func (tc TestCase) validate(manifest *dep.Manifest, lock *dep.Lock, convertErr e
 	}
 
 	if !equalSlice(manifest.Ignored, tc.WantIgnored) {
-		return errors.Errorf("unexpected set of ignored projects: \n\t(GOT) %v \n\t(WNT) %v",
+		return errors.Errorf("unexpected set of ignored projects: \n\t(GOT) %#v \n\t(WNT) %#v",
 			manifest.Ignored, tc.WantIgnored)
 	}
 
