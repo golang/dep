@@ -275,6 +275,9 @@ func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
 }
 
 func (cmd *statusCommand) runOld(ctx *dep.Ctx, args []string, p *dep.Project, sm gps.SourceManager, params gps.SolveParameters) error {
+	// Check update for all the projects
+	params.ChangeAll = true
+
 	solver, err := gps.Prepare(params, sm)
 	if err != nil {
 		return errors.Wrap(err, "fastpath solver prepare")
