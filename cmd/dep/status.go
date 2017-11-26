@@ -289,18 +289,19 @@ func (cmd *statusCommand) runOld(ctx *dep.Ctx, args []string, p *dep.Project, sm
 	lockProjects := p.Lock.Projects()
 	solutionProjects := solution.Projects()
 
-	for _, sp := range solutionProjects {
-		for _, lp := range lockProjects {
-			spr, _, _ := gps.VersionComponentStrings(sp.Version())
-			lpr, _, _ := gps.VersionComponentStrings(lp.Version())
+	for i := range solutionProjects {
+		spr, _, _ := gps.VersionComponentStrings(solutionProjects[i].Version())
+		lpr, _, _ := gps.VersionComponentStrings(lockProjects[i].Version())
 
-			if spr != lpr {
-				oldLockProjects = append(oldLockProjects, lp)
-			}
+		if spr != lpr {
+			oldLockProjects = append(oldLockProjects, lockProjects[i])
 		}
 	}
 
-	// TODO: Print output
+	for _, oldLockProject := range oldLockProjects {
+		ctx.Out.Println(oldLockProject)
+	}
+
 	return nil
 }
 
