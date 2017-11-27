@@ -1,0 +1,11 @@
+{
+  "commands": [
+    ["ensure"],
+    ["status", "-f=PROJECT: {{.ProjectRoot}}, VERSION: {{.Version}}\n"]
+  ],
+  "error-expected": "",
+  "vendor-final": [
+    "github.com/sdboyer/deptest",
+    "github.com/sdboyer/deptestdos"
+  ]
+}
