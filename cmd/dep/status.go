@@ -274,7 +274,23 @@ func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
 	return nil
 }
 
-func (cmd *statusCommand) runOld(ctx *dep.Ctx, args []string, p *dep.Project, sm gps.SourceManager, params gps.SolveParameters) error {
+func (cmd *statusCommand) runOld(ctx *dep.Ctx, args []string, p *dep.Project, sm gps.SourceManager) error {
+	// While the network churns on ListVersions() requests, statically analyze
+	// code from the current project.
+	ptree, err := p.ParseRootPackageTree()
+	if err != nil {
+		return err
+	}
+
+	// Set up a solver in order to check the InputHash.
+	params := gps.SolveParameters{
+		ProjectAnalyzer: dep.Analyzer{},
+		RootDir:         p.AbsRoot,
+		RootPackageTree: ptree,
+		Manifest:        p.Manifest,
+		// Locks aren't a part of the input hash check, so we can omit it.
+	}
+
 	// Check update for all the projects
 	params.ChangeAll = true
 
