@@ -219,7 +219,7 @@ func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
 	case cmd.missing:
 		return errors.Errorf("not implemented")
 	case cmd.old:
-		return errors.Errorf("not implemented")
+		cmd.runOld(ctx, args, p, sm)
 	case cmd.detailed:
 		return errors.Errorf("not implemented")
 	case cmd.json:
