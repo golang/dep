@@ -407,8 +407,7 @@ func CopyDir(src, dst string) error {
 // copyFile copies the contents of the file named src to the file named
 // by dst. The file will be created if it does not already exist. If the
 // destination file exists, all its contents will be replaced by the contents
-// of the source file. The file mode will be copied from the source and
-// the copied data is synced/flushed to stable storage.
+// of the source file. The file mode will be copied from the source.
 func copyFile(src, dst string) (err error) {
 	if sym, err := IsSymlink(src); err != nil {
 		return errors.Wrap(err, "symlink check failed")
@@ -442,13 +441,14 @@ func copyFile(src, dst string) (err error) {
 	if err != nil {
 		return
 	}
-	defer out.Close()
 
 	if _, err = io.Copy(out, in); err != nil {
+		out.Close()
 		return
 	}
 
-	if err = out.Sync(); err != nil {
+	// Check for write errors on Close
+	if err = out.Close(); err != nil {
 		return
 	}
 
