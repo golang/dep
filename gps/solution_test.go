@@ -97,12 +97,12 @@ func testWriteDepTree(t *testing.T) {
 	}
 
 	// nil lock/result should err immediately
-	err = WriteDepTree(tmp, nil, sm, true, discardLogger())
+	err = WriteDepTree(tmp, nil, sm, DefaultRootPruneOptions(), discardLogger())
 	if err == nil {
 		t.Errorf("Should error if nil lock is passed to WriteDepTree")
 	}
 
-	err = WriteDepTree(tmp, r, sm, true, discardLogger())
+	err = WriteDepTree(tmp, r, sm, DefaultRootPruneOptions(), discardLogger())
 	if err != nil {
 		t.Errorf("Unexpected error while creating vendor tree: %s", err)
 	}
@@ -154,7 +154,7 @@ func BenchmarkCreateVendorTree(b *testing.B) {
 			// ease manual inspection
 			os.RemoveAll(exp)
 			b.StartTimer()
-			err = WriteDepTree(exp, r, sm, true, logger)
+			err = WriteDepTree(exp, r, sm, DefaultRootPruneOptions(), logger)
 			b.StopTimer()
 			if err != nil {
 				b.Errorf("unexpected error after %v iterations: %s", i, err)

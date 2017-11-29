@@ -45,11 +45,13 @@ func TestReadManifest(t *testing.T) {
 				Constraint: gps.NewBranch("master"),
 			},
 		},
-		Ignored:      []string{"github.com/foo/bar"},
-		PruneOptions: gps.PruneNestedVendorDirs | gps.PruneNonGoFiles,
-		PruneProjectOptions: gps.PruneProjectOptions{
-			gps.ProjectRoot("github.com/golang/dep"):   gps.PruneNestedVendorDirs,
-			gps.ProjectRoot("github.com/babble/brook"): gps.PruneNestedVendorDirs | gps.PruneGoTestFiles,
+		Ignored: []string{"github.com/foo/bar"},
+		PruneOptions: gps.RootPruneOptions{
+			PruneOptions: gps.PruneNestedVendorDirs | gps.PruneNonGoFiles,
+			ProjectOptions: gps.PruneProjectOptions{
+				gps.ProjectRoot("github.com/golang/dep"):   gps.PruneNestedVendorDirs,
+				gps.ProjectRoot("github.com/babble/brook"): gps.PruneNestedVendorDirs | gps.PruneGoTestFiles,
+			},
 		},
 	}
 
@@ -593,10 +595,6 @@ func TestValidateProjectRoots(t *testing.T) {
 			}
 		})
 	}
-}
-
-func TestPruneOptionsFor(t *testing.T) {
-
 }
 
 func containsErr(s []error, e error) bool {

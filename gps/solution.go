@@ -50,16 +50,15 @@ type solution struct {
 
 const concurrentWriters = 16
 
-// WriteDepTree takes a basedir and a Lock, and exports all the projects
-// listed in the lock to the appropriate target location within the basedir.
+// WriteDepTree takes a basedir, a Lock and a RootPruneOptions and exports all
+// the projects listed in the lock to the appropriate target location within basedir.
 //
 // If the goal is to populate a vendor directory, basedir should be the absolute
 // path to that vendor directory, not its parent (a project root, typically).
 //
-// It requires a SourceManager to do the work, and takes a flag indicating
-// whether or not to strip vendor directories contained in the exported
-// dependencies.
-func WriteDepTree(basedir string, l Lock, sm SourceManager, sv bool, logger *log.Logger) error {
+// It requires a SourceManager to do the work. Prune options are read from the
+// passed manifest.
+func WriteDepTree(basedir string, l Lock, sm SourceManager, rpo RootPruneOptions, logger *log.Logger) error {
 	if l == nil {
 		return fmt.Errorf("must provide non-nil Lock to WriteDepTree")
 	}
@@ -96,14 +95,13 @@ func WriteDepTree(basedir string, l Lock, sm SourceManager, sv bool, logger *log
 					return errors.Wrapf(err, "failed to export %s", projectRoot)
 				}
 
-				if sv {
-					if err := ctx.Err(); err != nil {
-						return err
-					}
+				err := PruneProject(to, p, rpo.PruneOptionsFor(ident.ProjectRoot), logger)
+				if err != nil {
+					return errors.Wrapf(err, "failed to prune %s", projectRoot)
+				}
 
-					if err := filepath.Walk(to, stripVendor); err != nil {
-						return errors.Wrapf(err, "failed to strip vendor from %s", projectRoot)
-					}
+				if err := ctx.Err(); err != nil {
+					return err
 				}
 
 				return nil

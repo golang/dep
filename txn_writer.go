@@ -312,7 +312,12 @@ func (sw *SafeWriter) Write(root string, sm gps.SourceManager, examples bool, lo
 	}
 
 	if sw.writeVendor {
-		err = gps.WriteDepTree(filepath.Join(td, "vendor"), sw.lock, sm, true, logger)
+		opts := gps.DefaultRootPruneOptions()
+		if sw.HasManifest() {
+			opts = sw.Manifest.PruneOptions
+		}
+
+		err = gps.WriteDepTree(filepath.Join(td, "vendor"), sw.lock, sm, opts, logger)
 		if err != nil {
 			return errors.Wrap(err, "error while writing out vendor tree")
 		}

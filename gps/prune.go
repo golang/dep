@@ -20,6 +20,13 @@ type PruneOptions uint8
 // PruneProjectOptions is map of prune options per project name.
 type PruneProjectOptions map[ProjectRoot]PruneOptions
 
+// RootPruneOptions represents the root prune options for the project.
+// It contains the global options and a map of options per project.
+type RootPruneOptions struct {
+	PruneOptions   PruneOptions
+	ProjectOptions PruneProjectOptions
+}
+
 const (
 	// PruneNestedVendorDirs indicates if nested vendor directories should be pruned.
 	PruneNestedVendorDirs PruneOptions = 1 << iota
@@ -32,6 +39,26 @@ const (
 	// PruneGoTestFiles indicates if Go test files should be pruned.
 	PruneGoTestFiles
 )
+
+// DefaultRootPruneOptions instantiates a copy of the default root prune options.
+func DefaultRootPruneOptions() RootPruneOptions {
+	return RootPruneOptions{
+		PruneOptions:   PruneNestedVendorDirs,
+		ProjectOptions: PruneProjectOptions{},
+	}
+}
+
+// PruneOptionsFor returns the prune options for the passed project root.
+//
+// It will return the root prune options if the project does not have specific
+// options or if it does not exists in the manifest.
+func (o *RootPruneOptions) PruneOptionsFor(pr ProjectRoot) PruneOptions {
+	if po, ok := o.ProjectOptions[pr]; ok {
+		return po
+	}
+
+	return o.PruneOptions
+}
 
 var (
 	// licenseFilePrefixes is a list of name prefixes for license files.
