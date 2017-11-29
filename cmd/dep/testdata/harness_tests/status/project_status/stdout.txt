@@ -1,7 +1,7 @@
 
 PROJECT:                  github.com/sdboyer/deptest
 VERSION:                  v1.0.0
-CONSTRAINTS:              []
+CONSTRAINTS:
 SOURCE:                   github.com/sdboyer/deptest
 ALT SOURCE:
 PUB VERSION:              branches: master

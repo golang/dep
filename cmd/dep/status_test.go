@@ -482,6 +482,9 @@ func TestValidateFlags(t *testing.T) {
 }
 
 func TestProjectStatusString(t *testing.T) {
+	ver1, _ := gps.NewSemverConstraintIC("v1.0.0")
+	ver05, _ := gps.NewSemverConstraintIC("v0.5.0")
+
 	testCases := []struct {
 		name       string
 		ps         projectStatus
@@ -490,11 +493,14 @@ func TestProjectStatusString(t *testing.T) {
 		{
 			name: "basic projectStatus",
 			ps: projectStatus{
-				Project:     "github.com/x/y",
-				Version:     "v1.0",
-				Constraints: nil,
-				Source:      "github.com/x/y",
-				AltSource:   "https://github.com/z/y",
+				Project: "github.com/x/y",
+				Version: "v1.0",
+				Constraints: projectConstraints{
+					{"gh.com/f/b", ver1},
+					{"btb.com/x/y", ver05},
+				},
+				Source:    "github.com/x/y",
+				AltSource: "https://github.com/z/y",
 				PubVersions: pubVersions{
 					"semvers":    []string{"v0.5", "v0.7", "v1.0", "v1.5"},
 					"branches":   []string{"master", "dev"},
@@ -518,7 +524,8 @@ func TestProjectStatusString(t *testing.T) {
 			wantString: `
 PROJECT:                  github.com/x/y
 VERSION:                  v1.0
-CONSTRAINTS:              []
+CONSTRAINTS:              ^0.5.0(btb.com/x/y)
+                          ^1.0.0(gh.com/f/b)
 SOURCE:                   github.com/x/y
 ALT SOURCE:               https://github.com/z/y
 PUB VERSION:              branches: dev, master
@@ -546,7 +553,7 @@ UPSTREAM VERSION EXISTS:  yes`,
 			wantString: `
 PROJECT:                  
 VERSION:                  
-CONSTRAINTS:              []
+CONSTRAINTS:              
 SOURCE:                   
 ALT SOURCE:               
 PUB VERSION:              

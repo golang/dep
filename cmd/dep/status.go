@@ -23,6 +23,7 @@ import (
 	"github.com/golang/dep"
 	"github.com/golang/dep/gps"
 	"github.com/golang/dep/gps/paths"
+	"github.com/golang/dep/gps/pkgtree"
 	"github.com/pkg/errors"
 )
 
@@ -747,6 +748,10 @@ type projectConstraint struct {
 	Constraint gps.Constraint
 }
 
+func (pc projectConstraint) String() string {
+	return fmt.Sprintf("%s(%s)", pc.Constraint.String(), string(pc.Project))
+}
+
 // constraintsCollection is a map of ProjectRoot(dependency) and a collection of
 // projectConstraint for the dependencies. This can be used to find constraints
 // on a dependency and the projects that apply those constraints.
@@ -881,6 +886,7 @@ func (pv pubVersions) TabString() string {
 	return buf.String()
 }
 
+// projectImporters stores a map of project names that import a specific project.
 type projectImporters map[string]bool
 
 func (pi projectImporters) String() string {
@@ -896,6 +902,7 @@ func (pi projectImporters) String() string {
 	return strings.Join(projects, ", ")
 }
 
+// packageImporters stores a map of package and projects that import them.
 type packageImporters map[string][]string
 
 func (pi packageImporters) TabString() string {
@@ -940,10 +947,37 @@ func (pi packageImporters) TabString() string {
 	return buf.String()
 }
 
+// projectConstraints is a slice of projectConstraint
+type projectConstraints []projectConstraint
+
+func (pcs projectConstraints) TabString() string {
+	var buf bytes.Buffer
+	w := bufio.NewWriter(&buf)
+
+	// Sort for consistent result.
+	sort.Sort(byProject(pcs))
+
+	// Count lines and add newlines("\n") and tabs("\t"), compatible with
+	// tabwriter.
+	// ^0.5.0(btb.com/x/y)\n \t^1.0.0(gh.com/f/b)\t \t^1.5.0(gh.com/a/c)
+	count := 0
+	for _, c := range pcs {
+		count++
+		if count > 1 {
+			fmt.Fprintf(w, "\n \t")
+		}
+
+		fmt.Fprintf(w, "%s", c)
+	}
+	w.Flush()
+
+	return buf.String()
+}
+
 type projectStatus struct {
 	Project               string
 	Version               string
-	Constraints           []string
+	Constraints           projectConstraints
 	Source                string
 	AltSource             string
 	PubVersions           pubVersions
@@ -987,7 +1021,7 @@ func (ps projectStatus) String() string {
 		"PACKAGE IMPORTERS:\t%s\n"+
 		"UPSTREAM EXISTS:\t%s\n"+
 		"UPSTREAM VERSION EXISTS:\t%s",
-		ps.Project, ps.Version, ps.Constraints, ps.Source, ps.AltSource,
+		ps.Project, ps.Version, ps.Constraints.TabString(), ps.Source, ps.AltSource,
 		ps.PubVersions.TabString(), ps.Revision, ps.LatestAllowed, ps.SourceType,
 		strings.Join(ps.Packages, ", "), ps.ProjectImporters,
 		ps.PackageImporters.TabString(), upstreamExists, upstreamVersionExists,
@@ -1019,13 +1053,19 @@ func runProjectStatus(ctx *dep.Ctx, args []string, p *dep.Project, sm gps.Source
 		prs = append(prs, pr)
 	}
 
-	// This ptree would not be required with the new collectConstraints() implementation.
-	ptree, err := p.ParseRootPackageTree()
-	if err != nil {
-		return err
-	}
 	// Collect all the constraints.
-	cc := collectConstraints(ptree, p, sm)
+	cc, ccerrs := collectConstraints(ctx, p, sm)
+	// If found any errors, print to stderr.
+	if len(ccerrs) > 0 {
+		if ctx.Verbose {
+			for _, e := range ccerrs {
+				ctx.Err.Println(e)
+			}
+		} else {
+			ctx.Out.Println("Got errors while collecting constraints. Rerun with `-v` flag to see details.")
+		}
+		return errors.New("errors while collecting constraints")
+	}
 
 	// Collect list of packages in target projects.
 	pkgs := make(map[gps.ProjectRoot][]string)
@@ -1173,7 +1213,7 @@ func runProjectStatus(ctx *dep.Ctx, args []string, p *dep.Project, sm gps.Source
 			// CONSTRAINTS
 			constraints := cc[string(pr)]
 			for _, c := range constraints {
-				projStatus.Constraints = append(projStatus.Constraints, c.String())
+				projStatus.Constraints = append(projStatus.Constraints, c)
 			}
 		}
 	}
