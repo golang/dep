@@ -11,170 +11,170 @@ import "testing"
 func TestStripVendorSymlinks(t *testing.T) {
 	// On windows, we skip symlinks, even if they're named 'vendor', because
 	// they're too hard to distinguish from junctions.
-	t.Run("vendor symlink", stripVendorTestCase(fsTestCase{
+	t.Run("vendor symlink", pruneVendorDirsTestCase(fsTestCase{
 		before: filesystemState{
-			dirs: []fsPath{
-				{"package"},
-				{"package", "_vendor"},
+			dirs: []string{
+				"package",
+				"package/_vendor",
 			},
 			links: []fsLink{
 				{
-					path: fsPath{"package", "vendor"},
+					path: "package/vendor",
 					to:   "_vendor",
 				},
 			},
 		},
 		after: filesystemState{
-			dirs: []fsPath{
-				{"package"},
-				{"package", "_vendor"},
+			dirs: []string{
+				"package",
+				"package/_vendor",
 			},
 			links: []fsLink{
 				{
-					path: fsPath{"package", "vendor"},
+					path: "package/vendor",
 					to:   "_vendor",
 				},
 			},
 		},
 	}))
 
-	t.Run("nonvendor symlink", stripVendorTestCase(fsTestCase{
+	t.Run("nonvendor symlink", pruneVendorDirsTestCase(fsTestCase{
 		before: filesystemState{
-			dirs: []fsPath{
-				{"package"},
-				{"package", "_vendor"},
+			dirs: []string{
+				"package",
+				"package/_vendor",
 			},
 			links: []fsLink{
 				{
-					path: fsPath{"package", "link"},
+					path: "package/link",
 					to:   "_vendor",
 				},
 			},
 		},
 		after: filesystemState{
-			dirs: []fsPath{
-				{"package"},
-				{"package", "_vendor"},
+			dirs: []string{
+				"package",
+				"package/_vendor",
 			},
 			links: []fsLink{
 				{
-					path: fsPath{"package", "link"},
+					path: "package/link",
 					to:   "_vendor",
 				},
 			},
 		},
 	}))
 
-	t.Run("vendor symlink to file", stripVendorTestCase(fsTestCase{
+	t.Run("vendor symlink to file", pruneVendorDirsTestCase(fsTestCase{
 		before: filesystemState{
-			files: []fsPath{
-				{"file"},
+			files: []string{
+				"file",
 			},
 			links: []fsLink{
 				{
-					path: fsPath{"vendor"},
+					path: "vendor",
 					to:   "file",
 				},
 			},
 		},
 		after: filesystemState{
-			files: []fsPath{
-				{"file"},
+			files: []string{
+				"file",
 			},
 			links: []fsLink{
 				{
-					path: fsPath{"vendor"},
+					path: "vendor",
 					to:   "file",
 				},
 			},
 		},
 	}))
 
-	t.Run("broken vendor symlink", stripVendorTestCase(fsTestCase{
+	t.Run("broken vendor symlink", pruneVendorDirsTestCase(fsTestCase{
 		before: filesystemState{
-			dirs: []fsPath{
-				{"package"},
+			dirs: []string{
+				"package",
 			},
 			links: []fsLink{
 				{
-					path: fsPath{"package", "vendor"},
+					path: "package/vendor",
 					to:   "nonexistence",
 				},
 			},
 		},
 		after: filesystemState{
-			dirs: []fsPath{
-				{"package"},
+			dirs: []string{
+				"package",
 			},
 			links: []fsLink{
 				{
-					path: fsPath{"package", "vendor"},
+					path: "package/vendor",
 					to:   "nonexistence",
 				},
 			},
 		},
 	}))
 
-	t.Run("chained symlinks", stripVendorTestCase(fsTestCase{
+	t.Run("chained symlinks", pruneVendorDirsTestCase(fsTestCase{
 		// Curiously, if a symlink on windows points to *another* symlink which
 		// eventually points at a directory, we'll correctly remove that first
 		// symlink, because the first symlink doesn't appear to Go to be a
 		// directory.
 		before: filesystemState{
-			dirs: []fsPath{
-				{"_vendor"},
+			dirs: []string{
+				"_vendor",
 			},
 			links: []fsLink{
 				{
-					path: fsPath{"vendor"},
+					path: "vendor",
 					to:   "vendor2",
 				},
 				{
-					path: fsPath{"vendor2"},
+					path: "vendor2",
 					to:   "_vendor",
 				},
 			},
 		},
 		after: filesystemState{
-			dirs: []fsPath{
-				{"_vendor"},
+			dirs: []string{
+				"_vendor",
 			},
 			links: []fsLink{
 				{
-					path: fsPath{"vendor2"},
+					path: "vendor2",
 					to:   "_vendor",
 				},
 			},
 		},
 	}))
 
-	t.Run("circular symlinks", stripVendorTestCase(fsTestCase{
+	t.Run("circular symlinks", pruneVendorDirsTestCase(fsTestCase{
 		before: filesystemState{
-			dirs: []fsPath{
-				{"package"},
+			dirs: []string{
+				"package",
 			},
 			links: []fsLink{
 				{
-					path: fsPath{"package", "link1"},
+					path: "package/link1",
 					to:   "link2",
 				},
 				{
-					path: fsPath{"package", "link2"},
+					path: "package/link2",
 					to:   "link1",
 				},
 			},
 		},
 		after: filesystemState{
-			dirs: []fsPath{
-				{"package"},
+			dirs: []string{
+				"package",
 			},
 			links: []fsLink{
 				{
-					path: fsPath{"package", "link1"},
+					path: "package/link1",
 					to:   "link2",
 				},
 				{
-					path: fsPath{"package", "link2"},
+					path: "package/link2",
 					to:   "link1",
 				},
 			},
