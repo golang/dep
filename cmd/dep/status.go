@@ -734,10 +734,15 @@ func collectConstraints(ctx *dep.Ctx, p *dep.Project, sm gps.SourceManager) cons
 			// Iterate through the project constraints to get individual dependency
 			// project and constraint values.
 			for pr, pp := range pc {
-				constraintCollection[string(pr)] = append(
+				tempCC := append(
 					constraintCollection[string(pr)],
 					projectConstraint{proj.Ident().ProjectRoot, pp.Constraint},
 				)
+
+				// Sort the inner projectConstraint slice by Project string.
+				// Required for consistent returned value.
+				sort.Sort(byProject(tempCC))
+				constraintCollection[string(pr)] = tempCC
 			}
 		}(proj)
 	}
@@ -753,3 +758,9 @@ func collectConstraints(ctx *dep.Ctx, p *dep.Project, sm gps.SourceManager) cons
 
 	return constraintCollection
 }
+
+type byProject []projectConstraint
+
+func (p byProject) Len() int           { return len(p) }
+func (p byProject) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
+func (p byProject) Less(i, j int) bool { return p[i].Project > p[j].Project }
