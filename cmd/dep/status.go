@@ -693,7 +693,7 @@ func collectConstraints(ctx *dep.Ctx, p *dep.Project, sm gps.SourceManager) cons
 		ctx.Err.Println("Error getting direct deps:", err)
 	}
 	// Create a root analyzer.
-	rootAnalyzer := newRootAnalyzer(false, ctx, directDeps, sm)
+	rootAnalyzer := newRootAnalyzer(true, ctx, directDeps, sm)
 
 	// Iterate through the locked projects and collect constraints of all the projects.
 	for _, proj := range p.Lock.Projects() {
