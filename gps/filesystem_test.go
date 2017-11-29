@@ -12,54 +12,34 @@ import (
 
 // This file contains utilities for running tests around file system state.
 
-// fspath represents a file system path in an OS-agnostic way.
-type fsPath []string
-
-func (f fsPath) String() string { return filepath.Join(f...) }
-
-func (f fsPath) prepend(prefix string) fsPath {
-	p := fsPath{filepath.FromSlash(prefix)}
-	return append(p, f...)
-}
-
 type fsTestCase struct {
 	before, after filesystemState
 }
 
-// filesystemState represents the state of a file system. It has a setup method
-// which inflates its state to the actual host file system, and an assert
-// method which checks that the actual file system matches the described state.
-type filesystemState struct {
-	root  string
-	dirs  []fsPath
-	files []fsPath
-	links []fsLink
-}
-
-// assert makes sure that the fs state matches the state of the actual host
-// file system
-func (fs filesystemState) assert(t *testing.T) {
+// assert makes sure that the tc.after state matches the state of the actual host
+// file system at tc.after.root.
+func (tc fsTestCase) assert(t *testing.T) {
 	dirMap := make(map[string]bool)
 	fileMap := make(map[string]bool)
 	linkMap := make(map[string]bool)
 
-	for _, d := range fs.dirs {
-		dirMap[d.prepend(fs.root).String()] = true
+	for _, d := range tc.after.dirs {
+		dirMap[filepath.Join(tc.after.root, d)] = true
 	}
-	for _, f := range fs.files {
-		fileMap[f.prepend(fs.root).String()] = true
+	for _, f := range tc.after.files {
+		fileMap[filepath.Join(tc.after.root, f)] = true
 	}
-	for _, l := range fs.links {
-		linkMap[l.path.prepend(fs.root).String()] = true
+	for _, l := range tc.after.links {
+		linkMap[filepath.Join(tc.after.root, l.path)] = true
 	}
 
-	err := filepath.Walk(fs.root, func(path string, info os.FileInfo, err error) error {
+	err := filepath.Walk(tc.after.root, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			t.Errorf("filepath.Walk path=%q  err=%q", path, err)
 			return err
 		}
 
-		if path == fs.root {
+		if path == tc.after.root {
 			return nil
 		}
 
@@ -106,32 +86,27 @@ func (fs filesystemState) assert(t *testing.T) {
 	}
 }
 
-// fsLink represents a symbolic link.
-type fsLink struct {
-	path fsPath
-	to   string
+// setup inflates fs onto the actual host file system at tc.before.root.
+// It doesn't delete existing files and should be used on empty roots only.
+func (tc fsTestCase) setup(t *testing.T) {
+	tc.setupDirs(t)
+	tc.setupFiles(t)
+	tc.setupLinks(t)
 }
 
-// setup inflates fs onto the actual host file system
-func (fs filesystemState) setup(t *testing.T) {
-	fs.setupDirs(t)
-	fs.setupFiles(t)
-	fs.setupLinks(t)
-}
-
-func (fs filesystemState) setupDirs(t *testing.T) {
-	for _, dir := range fs.dirs {
-		p := dir.prepend(fs.root)
-		if err := os.MkdirAll(p.String(), 0777); err != nil {
+func (tc fsTestCase) setupDirs(t *testing.T) {
+	for _, dir := range tc.before.dirs {
+		p := filepath.Join(tc.before.root, dir)
+		if err := os.MkdirAll(p, 0777); err != nil {
 			t.Fatalf("os.MkdirAll(%q, 0777) err=%q", p, err)
 		}
 	}
 }
 
-func (fs filesystemState) setupFiles(t *testing.T) {
-	for _, file := range fs.files {
-		p := file.prepend(fs.root)
-		f, err := os.Create(p.String())
+func (tc fsTestCase) setupFiles(t *testing.T) {
+	for _, file := range tc.before.files {
+		p := filepath.Join(tc.before.root, file)
+		f, err := os.Create(p)
 		if err != nil {
 			t.Fatalf("os.Create(%q) err=%q", p, err)
 		}
@@ -141,17 +116,17 @@ func (fs filesystemState) setupFiles(t *testing.T) {
 	}
 }
 
-func (fs filesystemState) setupLinks(t *testing.T) {
-	for _, link := range fs.links {
-		p := link.path.prepend(fs.root)
+func (tc fsTestCase) setupLinks(t *testing.T) {
+	for _, link := range tc.before.links {
+		p := filepath.Join(tc.before.root, link.path)
 
 		// On Windows, relative symlinks confuse filepath.Walk. This is golang/go
 		// issue 17540. So, we'll just sigh and do absolute links, assuming they are
 		// relative to the directory of link.path.
-		dir := filepath.Dir(p.String())
+		dir := filepath.Dir(p)
 		to := filepath.Join(dir, link.to)
 
-		if err := os.Symlink(to, p.String()); err != nil {
+		if err := os.Symlink(to, p); err != nil {
 			t.Fatalf("os.Symlink(%q, %q) err=%q", to, p, err)
 		}
 	}
