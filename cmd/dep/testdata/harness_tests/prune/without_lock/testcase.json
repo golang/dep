@@ -1,6 +1,0 @@
-{
-  "commands": [
-    ["prune"]
-  ],
-  "error-expected": "Gopkg.lock must exist"
-}
