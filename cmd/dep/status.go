@@ -274,6 +274,15 @@ func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
 	return nil
 }
 
+// OldStatus contains information about all the out of date packages in a project.
+type OldStatus struct {
+	ProjectRoot string
+	Constraint  gps.Constraint
+	Version     gps.UnpairedVersion
+	Revision    gps.Revision
+	Latest      gps.Version
+}
+
 func (cmd *statusCommand) runOld(ctx *dep.Ctx, args []string, p *dep.Project, sm gps.SourceManager) error {
 	// While the network churns on ListVersions() requests, statically analyze
 	// code from the current project.
