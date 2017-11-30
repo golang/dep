@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"io/ioutil"
 	"log"
+	"path/filepath"
 	"reflect"
 	"testing"
 	"text/tabwriter"
@@ -299,45 +300,42 @@ func TestCollectConstraints(t *testing.T) {
 
 	cases := []struct {
 		name            string
-		project         dep.Project
+		lock            dep.Lock
 		wantConstraints constraintsCollection
+		wantErr         bool
 	}{
 		{
 			name: "without any constraints",
-			project: dep.Project{
-				Lock: &dep.Lock{
-					P: []gps.LockedProject{
-						gps.NewLockedProject(
-							gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot("github.com/sdboyer/deptest")},
-							gps.NewVersion("v1.0.0"),
-							[]string{"."},
-						),
-					},
+			lock: dep.Lock{
+				P: []gps.LockedProject{
+					gps.NewLockedProject(
+						gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot("github.com/sdboyer/deptest")},
+						gps.NewVersion("v1.0.0"),
+						[]string{"."},
+					),
 				},
 			},
 			wantConstraints: constraintsCollection{},
 		},
 		{
 			name: "with multiple constraints",
-			project: dep.Project{
-				Lock: &dep.Lock{
-					P: []gps.LockedProject{
-						gps.NewLockedProject(
-							gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot("github.com/sdboyer/deptest")},
-							gps.NewVersion("v1.0.0"),
-							[]string{"."},
-						),
-						gps.NewLockedProject(
-							gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot("github.com/darkowlzz/deptest-project-1")},
-							gps.NewVersion("v0.1.0"),
-							[]string{"."},
-						),
-						gps.NewLockedProject(
-							gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot("github.com/darkowlzz/deptest-project-2")},
-							gps.NewBranch("master").Pair(gps.Revision("824a8d56a4c6b2f4718824a98cd6d70d3dbd4c3e")),
-							[]string{"."},
-						),
-					},
+			lock: dep.Lock{
+				P: []gps.LockedProject{
+					gps.NewLockedProject(
+						gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot("github.com/sdboyer/deptest")},
+						gps.NewVersion("v1.0.0"),
+						[]string{"."},
+					),
+					gps.NewLockedProject(
+						gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot("github.com/darkowlzz/deptest-project-1")},
+						gps.NewVersion("v0.1.0"),
+						[]string{"."},
+					),
+					gps.NewLockedProject(
+						gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot("github.com/darkowlzz/deptest-project-2")},
+						gps.NewBranch("master").Pair(gps.Revision("824a8d56a4c6b2f4718824a98cd6d70d3dbd4c3e")),
+						[]string{"."},
+					),
 				},
 			},
 			wantConstraints: constraintsCollection{
@@ -355,20 +353,18 @@ func TestCollectConstraints(t *testing.T) {
 		},
 		{
 			name: "skip projects with invalid versions",
-			project: dep.Project{
-				Lock: &dep.Lock{
-					P: []gps.LockedProject{
-						gps.NewLockedProject(
-							gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot("github.com/darkowlzz/deptest-project-1")},
-							gps.NewVersion("v0.1.0"),
-							[]string{"."},
-						),
-						gps.NewLockedProject(
-							gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot("github.com/darkowlzz/deptest-project-2")},
-							gps.NewVersion("v1.0.0"),
-							[]string{"."},
-						),
-					},
+			lock: dep.Lock{
+				P: []gps.LockedProject{
+					gps.NewLockedProject(
+						gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot("github.com/darkowlzz/deptest-project-1")},
+						gps.NewVersion("v0.1.0"),
+						[]string{"."},
+					),
+					gps.NewLockedProject(
+						gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot("github.com/darkowlzz/deptest-project-2")},
+						gps.NewVersion("v1.0.0"),
+						[]string{"."},
+					),
 				},
 			},
 			wantConstraints: constraintsCollection{
@@ -376,6 +372,7 @@ func TestCollectConstraints(t *testing.T) {
 					{"github.com/darkowlzz/deptest-project-1", ver1},
 				},
 			},
+			wantErr: true,
 		},
 	}
 
@@ -396,12 +393,23 @@ func TestCollectConstraints(t *testing.T) {
 	h.Must(err)
 	defer sm.Release()
 
+	// Create new project and set root. Setting root is required for PackageList
+	// to run properly.
+	p := new(dep.Project)
+	p.SetRoot(filepath.Join(pwd, "src"))
+
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			gotConstraints := collectConstraints(ctx, &c.project, sm)
+			p.Lock = &c.lock
+			gotConstraints, err := collectConstraints(ctx, p, sm)
+			if len(err) > 0 && !c.wantErr {
+				t.Fatalf("unexpected errors while collecting constraints: %v", err)
+			} else if len(err) == 0 && c.wantErr {
+				t.Fatalf("expected errors while collecting constraints, but got none")
+			}
 
 			if !reflect.DeepEqual(gotConstraints, c.wantConstraints) {
-				t.Fatalf("Unexpected collected constraints: \n\t(GOT): %v\n\t(WNT): %v", gotConstraints, c.wantConstraints)
+				t.Fatalf("unexpected collected constraints: \n\t(GOT): %v\n\t(WNT): %v", gotConstraints, c.wantConstraints)
 			}
 		})
 	}

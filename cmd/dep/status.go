@@ -417,7 +417,12 @@ func runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceMana
 		return false, 0, errors.Wrapf(err, "could not set up solver for input hashing")
 	}
 
-	cm := collectConstraints(ctx, p, sm)
+	// Errors while collecting constraints should not fail the whole status run.
+	// It should count the error and tell the user about incomplete results.
+	cm, ccerrs := collectConstraints(ctx, p, sm)
+	if len(ccerrs) > 0 {
+		errCount += len(ccerrs)
+	}
 
 	// Get the project list and sort it so that the printed output users see is
 	// deterministically ordered. (This may be superfluous if the lock is always
@@ -566,7 +571,7 @@ func runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceMana
 
 			// Count ListVersions error because we get partial results when
 			// this happens.
-			errCount = len(errListVerCh)
+			errCount += len(errListVerCh)
 			if ctx.Verbose {
 				for err := range errListVerCh {
 					ctx.Err.Println(err.Error())
@@ -684,7 +689,9 @@ type projectConstraint struct {
 type constraintsCollection map[string][]projectConstraint
 
 // collectConstraints collects constraints declared by all the dependencies.
-func collectConstraints(ctx *dep.Ctx, p *dep.Project, sm gps.SourceManager) constraintsCollection {
+// It returns constraintsCollection and a slice of errors encountered while
+// collecting the constraints, if any.
+func collectConstraints(ctx *dep.Ctx, p *dep.Project, sm gps.SourceManager) (constraintsCollection, []error) {
 	logger := ctx.Err
 	if !ctx.Verbose {
 		logger = log.New(ioutil.Discard, "", 0)
@@ -692,19 +699,20 @@ func collectConstraints(ctx *dep.Ctx, p *dep.Project, sm gps.SourceManager) cons
 
 	logger.Println("Collecting project constraints:")
 
+	var mutex sync.Mutex
+	constraintCollection := make(constraintsCollection)
+
 	// Get direct deps of the root project.
 	_, directDeps, err := getDirectDependencies(sm, p)
 	if err != nil {
-		logger.Println("Error getting direct deps:", err)
+		// Return empty collection, not nil, if we fail here.
+		return constraintCollection, []error{errors.Wrap(err, "failed to get direct dependencies")}
 	}
 
 	// Create a root analyzer.
 	rootAnalyzer := newRootAnalyzer(true, ctx, directDeps, sm)
 
 	lp := p.Lock.Projects()
-
-	var mutex sync.Mutex
-	constraintCollection := make(constraintsCollection)
 
 	// Channel for receiving all the errors.
 	errCh := make(chan error, len(lp))
@@ -750,13 +758,15 @@ func collectConstraints(ctx *dep.Ctx, p *dep.Project, sm gps.SourceManager) cons
 	wg.Wait()
 	close(errCh)
 
+	var errs []error
 	if len(errCh) > 0 {
-		for err := range errCh {
-			logger.Println(err.Error())
+		for e := range errCh {
+			errs = append(errs, e)
+			logger.Println(e.Error())
 		}
 	}
 
-	return constraintCollection
+	return constraintCollection, errs
 }
 
 type byProject []projectConstraint
