@@ -101,8 +101,7 @@ func (out *tableOutput) BasicHeader() error {
 }
 
 func (out *tableOutput) BasicFooter() error {
-	err := out.w.Flush()
-	return err
+	return out.w.Flush()
 }
 
 func (out *tableOutput) BasicLine(bs *BasicStatus) error {
@@ -133,8 +132,7 @@ func (out *tableOutput) MissingLine(ms *MissingStatus) error {
 }
 
 func (out *tableOutput) MissingFooter() error {
-	err := out.w.Flush()
-	return err
+	return out.w.Flush()
 }
 
 type jsonOutput struct {
@@ -149,8 +147,7 @@ func (out *jsonOutput) BasicHeader() error {
 }
 
 func (out *jsonOutput) BasicFooter() error {
-	err := json.NewEncoder(out.w).Encode(out.basic)
-	return err
+	return json.NewEncoder(out.w).Encode(out.basic)
 }
 
 func (out *jsonOutput) BasicLine(bs *BasicStatus) error {
@@ -169,8 +166,7 @@ func (out *jsonOutput) MissingLine(ms *MissingStatus) error {
 }
 
 func (out *jsonOutput) MissingFooter() error {
-	err := json.NewEncoder(out.w).Encode(out.missing)
-	return err
+	return json.NewEncoder(out.w).Encode(out.missing)
 }
 
 type dotOutput struct {
@@ -216,16 +212,14 @@ func (out *templateOutput) BasicHeader() error { return nil }
 func (out *templateOutput) BasicFooter() error { return nil }
 
 func (out *templateOutput) BasicLine(bs *BasicStatus) error {
-	err := out.tmpl.Execute(out.w, bs)
-	return err
+	return out.tmpl.Execute(out.w, bs)
 }
 
 func (out *templateOutput) MissingHeader() error { return nil }
 func (out *templateOutput) MissingFooter() error { return nil }
 
 func (out *templateOutput) MissingLine(ms *MissingStatus) error {
-	err := out.tmpl.Execute(out.w, ms)
-	return err
+	return out.tmpl.Execute(out.w, ms)
 }
 
 func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
