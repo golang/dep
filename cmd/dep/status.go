@@ -486,14 +486,12 @@ func runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceMana
 				if pp, has := p.Manifest.Ovr[proj.Ident().ProjectRoot]; has && pp.Constraint != nil {
 					bs.hasOverride = true
 					bs.Constraint = pp.Constraint
+				} else if pp, has := p.Manifest.Constraints[proj.Ident().ProjectRoot]; has && pp.Constraint != nil {
+					bs.Constraint = pp.Constraint
 				} else {
-					if pp, has := p.Manifest.Constraints[proj.Ident().ProjectRoot]; has && pp.Constraint != nil {
-						bs.Constraint = pp.Constraint
-					} else {
-						bs.Constraint = gps.Any()
-						for _, c := range cm[bs.ProjectRoot] {
-							bs.Constraint = c.Constraint.Intersect(bs.Constraint)
-						}
+					bs.Constraint = gps.Any()
+					for _, c := range cm[bs.ProjectRoot] {
+						bs.Constraint = c.Constraint.Intersect(bs.Constraint)
 					}
 				}
 
