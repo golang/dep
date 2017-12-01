@@ -217,7 +217,7 @@ about what's going on.
 During `dep init` configuration from other dependency managers is detected
 and imported, unless `-skip-tools` is specified.
 
-The following tools are supported: `glide`, `godep`, `vndr`, `govend`, `gb`, `gvt` and `govendor`.
+The following tools are supported: `glide`, `godep`, `vndr`, `govend`, `gb`, `gvt`, `govendor` and `glock`.
 
 See [#186](https://github.com/golang/dep/issues/186#issuecomment-306363441) for
 how to add support for another tool.
