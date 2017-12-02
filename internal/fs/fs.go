@@ -480,22 +480,21 @@ func cloneSymlink(sl, dst string) error {
 	return os.Symlink(resolved, dst)
 }
 
-// IsValidPath checks if the given string is a valid path.
-func IsValidPath(fp string) bool {
-	// See https://stackoverflow.com/questions/35231846/golang-check-if-string-is-valid-path
-	// Check if file/dir already exists
-	if _, err := os.Stat(fp); err == nil {
-		return true
+// EnsureDir tries to ensure that a directory is present at the given path. It first
+// checks if the directory already exists at the given path. If there isn't one, it tries
+// to create it with the given permissions. However, it does not try to create the
+// directory recursively.
+func EnsureDir(path string, perm os.FileMode) error {
+	_, err := IsDir(path)
+
+	if os.IsNotExist(err) {
+		err = os.Mkdir(path, perm)
+		if err != nil {
+			return errors.Wrapf(err, "failed to ensure directory at %q", path)
+		}
 	}
 
-	// Attempt to create it
-	var d []byte
-	if err := ioutil.WriteFile(fp, d, 0644); err == nil {
-		os.Remove(fp) // And delete it
-		return true
-	}
-
-	return false
+	return err
 }
 
 // IsDir determines is the path given is a directory or not.
