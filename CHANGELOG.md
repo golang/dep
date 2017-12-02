@@ -1,6 +1,7 @@
 # v0.3.3 (Unreleased)
 
 NEW FEATURES:
+* Add support for importing from [glock](https://github.com/robfig/glock) based projects (#1422).
 * Add support for importing from [govendor](https://github.com/kardianos/govendor)
   based projects (#815).
 
