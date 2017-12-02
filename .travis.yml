@@ -29,7 +29,7 @@ jobs:
       install: skip
       env:
         - DEPTESTBYPASS501=1
-      script: go test -race $(go list ./... | grep -v vendor)
+      script: go test -race -timeout 200s $(go list ./... | grep -v vendor)
     - <<: *simple-test
       go: tip
     - <<: *simple-test
@@ -37,8 +37,9 @@ jobs:
       go: 1.9.x
       install:
         # brew takes horribly long to update itself despite the above caching
-        # attempt; only bzr install if it's not on the $PATH
+        # attempt; only install bzr or hg if they're not on the $PATH
         - test $(which bzr) || brew install bzr
+        - brew upgrade hg
       env:
         - HOMEBREW_NO_AUTO_UPDATE=1
         - DEPTESTBYPASS501=1
