@@ -491,7 +491,7 @@ func TestDepCachedir(t *testing.T) {
 	defer h.Cleanup()
 
 	h.TempDir("cache")
-	// Create the directory for fallback cachedir location.
+	// Create the directory for default cachedir location.
 	h.TempDir(filepath.Join("go", "pkg", "dep"))
 
 	testCachedir := h.Path("cache")

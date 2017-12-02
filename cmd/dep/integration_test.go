@@ -7,6 +7,7 @@ package main
 import (
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -98,21 +99,36 @@ func TestDepCachedir(t *testing.T) {
 		testProj := integration.NewTestProject(t, initPath, wd, runMain)
 		defer testProj.Cleanup()
 
-		cachedir := "/invalid/path"
-		testProj.Setenv("DEPCACHEDIR", cachedir)
-		wantErr := fmt.Sprintf(
-			"dep: $DEPCACHEDIR set to an invalid or inaccessible path: %q", cachedir,
-		)
+		var d []byte
+		tmpFp := testProj.Path("tmp-file")
+		ioutil.WriteFile(tmpFp, d, 0644)
+		cases := []string{
+			// invalid path
+			"\000",
+			// parent directory does not exist
+			testProj.Path("non-existent-fldr", "cachedir"),
+			// path is a regular file
+			tmpFp,
+			// invalid path, tmp-file is a regular file
+			testProj.Path("tmp-file", "cachedir"),
+		}
 
-		// Running `dep ensure` will pull in the dependency into cachedir.
-		err = testProj.DoRun([]string{"ensure"})
+		wantErr := "dep: $DEPCACHEDIR set to an invalid or inaccessible path"
+		for _, c := range cases {
+			testProj.Setenv("DEPCACHEDIR", c)
 
-		if err == nil {
-			// Log the output from running `dep ensure`, could be useful.
-			t.Logf("test run output: \n%s\n%s", testProj.GetStdout(), testProj.GetStderr())
-			t.Error("unexpected result: \n\t(GOT) nil\n\t(WNT) exit status 1")
-		} else if gotErr := strings.TrimSpace(testProj.GetStderr()); gotErr != wantErr {
-			t.Errorf("unexpected error output: \n\t(GOT) %s\n\t(WNT) %s", gotErr, wantErr)
+			err = testProj.DoRun([]string{"ensure"})
+
+			if err == nil {
+				// Log the output from running `dep ensure`, could be useful.
+				t.Logf("test run output: \n%s\n%s", testProj.GetStdout(), testProj.GetStderr())
+				t.Error("unexpected result: \n\t(GOT) nil\n\t(WNT) exit status 1")
+			} else if stderr := testProj.GetStderr(); !strings.Contains(stderr, wantErr) {
+				t.Errorf(
+					"unexpected error output: \n\t(GOT) %s\n\t(WNT) %s",
+					strings.TrimSpace(stderr), wantErr,
+				)
+			}
 		}
 	})
 
