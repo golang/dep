@@ -182,13 +182,16 @@ func (c *Config) Run() int {
 			}
 
 			// Cachedir is loaded from env if present. `$GOPATH/pkg/dep` is used as the
-			// fallback cache location.
+			// default cache location.
 			cachedir := getEnv(c.Env, "DEPCACHEDIR")
-			if cachedir != "" && !fs.IsValidPath(cachedir) {
-				errLogger.Printf(
-					"dep: $DEPCACHEDIR set to an invalid or inaccessible path: %q\n", cachedir,
-				)
-				return errorExitCode
+			if cachedir != "" {
+				if err := fs.EnsureDir(cachedir, 0777); err != nil {
+					errLogger.Printf(
+						"dep: $DEPCACHEDIR set to an invalid or inaccessible path: %q\n", cachedir,
+					)
+					errLogger.Printf("dep: failed to ensure cache directory: %v\n", err)
+					return errorExitCode
+				}
 			}
 
 			// Set up dep context.

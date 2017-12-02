@@ -90,8 +90,12 @@ func defaultGOPATH() string {
 func (c *Ctx) SourceManager() (*gps.SourceMgr, error) {
 	cachedir := c.Cachedir
 	if cachedir == "" {
-		// When `DEPCACHEDIR` isn't set in the env, fallback to `$GOPATH/pkg/dep`.
+		// When `DEPCACHEDIR` isn't set in the env, use the default - `$GOPATH/pkg/dep`.
 		cachedir = filepath.Join(c.GOPATH, "pkg", "dep")
+		// Create the default cachedir if it does not exist.
+		if err := os.MkdirAll(cachedir, 0777); err != nil {
+			return nil, errors.Wrap(err, "failed to create default cache directory")
+		}
 	}
 
 	return gps.NewSourceManager(gps.SourceManagerConfig{

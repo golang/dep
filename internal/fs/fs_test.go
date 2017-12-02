@@ -837,14 +837,15 @@ func setupInaccessibleDir(t *testing.T, op func(dir string) error) func() {
 	return cleanup
 }
 
-func TestIsValidPath(t *testing.T) {
-	wd, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
+func TestEnsureDir(t *testing.T) {
+	h := test.NewHelper(t)
+	defer h.Cleanup()
+	h.TempDir(".")
+	h.TempFile("file", "")
+
+	tmpPath := h.Path(".")
 
 	var dn string
-
 	cleanup := setupInaccessibleDir(t, func(dir string) error {
 		dn = filepath.Join(dir, "dir")
 		return os.Mkdir(dn, 0777)
@@ -852,13 +853,16 @@ func TestIsValidPath(t *testing.T) {
 	defer cleanup()
 
 	tests := map[string]bool{
-		wd: true,
-		filepath.Join(wd, "testdata"):                       true,
-		filepath.Join(wd, "main.go"):                        true,
-		filepath.Join(wd, "this_file_does_not_exist.thing"): true,
-		dn:              false,
-		"":              false,
-		"/invalid/path": false,
+		// [success] A dir already exists for the given path.
+		tmpPath: true,
+		// [success] Dir does not exist but parent dir exists, so should get created.
+		filepath.Join(tmpPath, "testdir"): true,
+		// [failure] Dir and parent dir do not exist, should return an error.
+		filepath.Join(tmpPath, "notexist", "testdir"): false,
+		// [failure] Regular file present at given path.
+		h.Path("file"): false,
+		// [failure] Path inaccessible.
+		dn: false,
 	}
 
 	if runtime.GOOS == "windows" {
@@ -869,11 +873,17 @@ func TestIsValidPath(t *testing.T) {
 		delete(tests, dn)
 	}
 
-	for fp, want := range tests {
-		got := IsValidPath(fp)
-
-		if got != want {
-			t.Fatalf("expected %t for %s, got %t", want, fp, got)
+	for path, shouldEnsure := range tests {
+		err := EnsureDir(path, 0777)
+		if shouldEnsure {
+			if err != nil {
+				t.Fatalf("unexpected error %q for %q", err, path)
+			} else if ok, err := IsDir(path); !ok {
+				t.Fatalf("expected directory to be preset at %q", path)
+				t.Fatal(err)
+			}
+		} else if err == nil {
+			t.Fatalf("expected error for path %q, got none", path)
 		}
 	}
 }
