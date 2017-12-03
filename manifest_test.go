@@ -255,6 +255,7 @@ func TestValidateManifest(t *testing.T) {
 			`,
 			wantWarn: []error{
 				errInvalidMetadata,
+				errors.New("branch, version, revision, or source should be provided for \"github.com/foo/bar\""),
 			},
 			wantError: nil,
 		},
@@ -264,7 +265,9 @@ func TestValidateManifest(t *testing.T) {
 			[[constraint]]
 			  name = "github.com/foo/bar"
 			`,
-			wantWarn:  []error{},
+			wantWarn: []error{
+				errors.New("branch, version, revision, or source should be provided for \"github.com/foo/bar\""),
+			},
 			wantError: nil,
 		},
 		{
@@ -272,7 +275,9 @@ func TestValidateManifest(t *testing.T) {
 			tomlString: `
 			[[constraint]]
 			`,
-			wantWarn:  []error{},
+			wantWarn: []error{
+				errNoName,
+			},
 			wantError: nil,
 		},
 		{
@@ -305,7 +310,9 @@ func TestValidateManifest(t *testing.T) {
 			tomlString: `
 			[[override]]
 			`,
-			wantWarn:  []error{},
+			wantWarn: []error{
+				errNoName,
+			},
 			wantError: nil,
 		},
 		{
@@ -339,8 +346,10 @@ func TestValidateManifest(t *testing.T) {
 			wantWarn: []error{
 				errors.New("invalid key \"location\" in \"constraint\""),
 				errors.New("invalid key \"link\" in \"constraint\""),
-				errors.New("invalid key \"nick\" in \"override\""),
 				errors.New("metadata in \"constraint\" should be a TOML table"),
+				errors.New("branch, version, revision, or source should be provided for \"github.com/foo/bar\""),
+				errors.New("invalid key \"nick\" in \"override\""),
+				errNoName,
 			},
 			wantError: nil,
 		},
@@ -353,7 +362,9 @@ func TestValidateManifest(t *testing.T) {
 			  [constraint.metadata]
 			    color = "blue"
 			`,
-			wantWarn:  []error{},
+			wantWarn: []error{
+				errors.New("branch, version, revision, or source should be provided for \"github.com/foo/bar\""),
+			},
 			wantError: nil,
 		},
 		{
