@@ -19,6 +19,7 @@ IMPROVEMENTS:
 * Log as dependencies are pre-fetched during dep init ([#1176](https://github.com/golang/dep/pull/1176)).
 * Make the gps package importable ([#1349](https://github.com/golang/dep/pull/1349)).
 * Improve file copy performance by not forcing a file sync (PR #1408).
+* Skip empty constraints during import ([#1414](https://github.com/golang/dep/pull/1349))
 
 # v0.3.2
 

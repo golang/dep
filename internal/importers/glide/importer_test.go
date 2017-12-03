@@ -138,8 +138,7 @@ func TestGlideConfig_Convert(t *testing.T) {
 				}},
 			glideLock{},
 			importertest.TestCase{
-				WantConstraint: "*",
-				WantWarning:    "specified an os",
+				WantWarning: "specified an os",
 			},
 		},
 		"warn unused arch field": {
@@ -152,8 +151,7 @@ func TestGlideConfig_Convert(t *testing.T) {
 				}},
 			glideLock{},
 			importertest.TestCase{
-				WantConstraint: "*",
-				WantWarning:    "specified an arch",
+				WantWarning: "specified an arch",
 			},
 		},
 	}
