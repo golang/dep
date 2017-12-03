@@ -1,0 +1,4 @@
+<div class="admonition {{ .Get "type" | lower }}">
+<p class="first admonition-title">{{ .Get "title" }}</p>
+<p>{{ string .Inner | markdownify }}</p>
+</div>

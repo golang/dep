@@ -1,0 +1,28 @@
+<head {{ with .Site.LanguageCode }}lang="{{ . }}"{{ end }}>
+	<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+	{{ with .Site.Params.description -}}
+	<meta name="description" content="{{ . }}">
+	{{- end }}
+	{{ .Hugo.Generator }}
+
+	<title>{{ if not .IsHome }}{{ .Title }} &mdash;{{ end }} {{ .Site.Title }}</title>
+
+	<link rel="stylesheet" href="{{ .Site.BaseURL }}css/alabaster.css" type="text/css" />
+	<link rel="stylesheet" href="{{ .Site.BaseURL }}css/custom.css" type="text/css" />
+	{{ with .Site.Params.highlightjs -}}
+	<link rel="stylesheet" href="{{ $.Site.BaseURL }}{{ . }}" type="text/css" />
+	{{- else -}}
+	<link rel="stylesheet" href="{{ $.Site.BaseURL }}css/pygments.css" type="text/css" />
+	{{- end }}
+
+	{{ range .Site.Params.custom_css -}}
+	<link rel="stylesheet" href="{{ $.Site.BaseURL }}{{ . }}">
+	{{- end }}
+
+	{{ with .Site.Params.favicon -}}
+	<link rel="shortcut icon" href="{{ $.Site.BaseURL }}{{ . }}" type="image/x-icon"/>
+	{{- else -}}
+	<link rel="shortcut icon" href="{{ $.Site.BaseURL }}favicon.ico" type="image/x-icon"/>
+	{{- end }}
+</head>

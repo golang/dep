@@ -1,0 +1,18 @@
+name = "Alabaster"
+license = "BSD"
+licenselink = "https://github.com/digitalcraftsman/hugo-alabaster-theme/blob/master/LICENSE.md"
+description = "A documentation theme ported from Sphinx to Hugo"
+homepage = "https://github.com/digitalcraftsman/hugo-alabaster-theme"
+tags = ["documentation", "sphinx"]
+features = []
+min_version = 0.20
+
+[author]
+  name = "Digitalcraftsman"
+  homepage = "https://github.com/digitalcraftsman"
+
+# If porting an existing theme
+[original]
+  name = "Jeff Forcier"
+  homepage = "http://bitprophet.org/"
+  repo = "https://github.com/bitprophet/alabaster"

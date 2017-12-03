@@ -8,3 +8,9 @@
 /licenseok
 /profile.out
 /coverage.txt
+
+# docs site artifacts
+/docs/_deploy/
+/docs/_preview/
+/docs/config.toml.bak
+/hack/travis.deploy.pem

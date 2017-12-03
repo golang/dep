@@ -1,0 +1,12 @@
+{{ if .Site.Params.sidebar.show_relations | and .IsPage -}}
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="{{ .Site.BaseURL }}">Documentation overview</a><ul>
+  {{ with .PrevInSection -}}
+  <li>Previous: <a href="{{ .Permalink }}" title="{{ .Title }}">{{ .Title }}</a></li>
+  {{- end }}
+  {{ with .NextInSection -}}
+  <li>Next: <a href="{{ .Permalink }}" title="{{ .Title }}">{{ .Title }}</a></li>
+  {{- end }}
+</ul>
+{{- end }}

@@ -1,0 +1,10 @@
+/* Fix TOC extra li level
+ * See https://stackoverflow.com/questions/37241028/hugo-table-of-contents-have-extra-dot-in-front
+ */
+#TableOfContents ul {
+  list-style-type: none;
+}
+
+#TableOfContents ul ul {
+  list-style-type: disc;
+}
