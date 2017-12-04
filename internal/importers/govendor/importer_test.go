@@ -133,7 +133,7 @@ func TestGovendorConfig_Convert(t *testing.T) {
 				},
 			},
 			importertest.TestCase{
-				WantConstraint: "*",
+				WantWarning: "constraint is empty",
 			},
 		},
 	}

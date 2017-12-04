@@ -1,6 +1,7 @@
 # v0.3.3 (Unreleased)
 
 NEW FEATURES:
+* Add support for importing from [glock](https://github.com/robfig/glock) based projects (#1422).
 * Add support for importing from [govendor](https://github.com/kardianos/govendor)
   based projects (#815).
 
@@ -18,6 +19,7 @@ IMPROVEMENTS:
 * Log as dependencies are pre-fetched during dep init ([#1176](https://github.com/golang/dep/pull/1176)).
 * Make the gps package importable ([#1349](https://github.com/golang/dep/pull/1349)).
 * Improve file copy performance by not forcing a file sync (PR #1408).
+* Skip empty constraints during import ([#1414](https://github.com/golang/dep/pull/1349))
 
 # v0.3.2
 

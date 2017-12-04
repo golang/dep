@@ -5,7 +5,6 @@
   name = "github.com/sdboyer/deptest"
   packages = ["."]
   revision = "3f4c3bea144e112a69bbe5d8d01c1b09a544253f"
-  source = "https://github.com/carolynvs/deptest"
   version = "v0.8.1"
 
 [[projects]]
@@ -14,15 +13,9 @@
   revision = "5c607206be5decd28e6263ffffdcee067266015e"
   version = "v2.0.0"
 
-[[projects]]
-  branch = "v2"
-  name = "gopkg.in/yaml.v2"
-  packages = ["."]
-  revision = "f7716cbe52baa25d2e9b0d0da546fcf909fc16b4"
-
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "d1681978cbca0e845950451461e0d69b58c5e896d9fd10ec5c159a4db3175161"
+  inputs-digest = "1ed417a0bec57ffe988fae1cba8f3d49994fb893394d61844e0b3c96d69573fe"
   solver-name = "gps-cdcl"
   solver-version = 1

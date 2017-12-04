@@ -34,6 +34,7 @@ jobs:
       go: tip
     - <<: *simple-test
       os: osx
+      osx_image: xcode7.3
       go: 1.9.x
       install:
         # brew takes horribly long to update itself despite the above caching
