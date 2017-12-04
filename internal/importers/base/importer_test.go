@@ -146,11 +146,10 @@ func TestBaseImporter_ImportProjects(t *testing.T) {
 		importertest.TestCase
 		projects []ImportedPackage
 	}{
-		"tag constraints are ignored": {
+		"tag constraints are skipped": {
 			importertest.TestCase{
-				WantConstraint: "*",
-				WantVersion:    importertest.Beta1Tag,
-				WantRevision:   importertest.Beta1Rev,
+				WantVersion:  importertest.Beta1Tag,
+				WantRevision: importertest.Beta1Rev,
 			},
 			[]ImportedPackage{
 				{
@@ -162,9 +161,8 @@ func TestBaseImporter_ImportProjects(t *testing.T) {
 		},
 		"tag lock hints Lock to tagged revision": {
 			importertest.TestCase{
-				WantConstraint: "*",
-				WantVersion:    importertest.Beta1Tag,
-				WantRevision:   importertest.Beta1Rev,
+				WantVersion:  importertest.Beta1Tag,
+				WantRevision: importertest.Beta1Rev,
 			},
 			[]ImportedPackage{
 				{
@@ -175,8 +173,7 @@ func TestBaseImporter_ImportProjects(t *testing.T) {
 		},
 		"untagged revision ignores range constraint": {
 			importertest.TestCase{
-				WantConstraint: "*",
-				WantRevision:   importertest.UntaggedRev,
+				WantRevision: importertest.UntaggedRev,
 			},
 			[]ImportedPackage{
 				{
@@ -270,11 +267,10 @@ func TestBaseImporter_ImportProjects(t *testing.T) {
 				},
 			},
 		},
-		"Revision constraints are ignored": {
+		"Revision constraints are skipped": {
 			importertest.TestCase{
-				WantConstraint: "*",
-				WantVersion:    importertest.V1Tag,
-				WantRevision:   importertest.V1Rev,
+				WantVersion:  importertest.V1Tag,
+				WantRevision: importertest.V1Rev,
 			},
 			[]ImportedPackage{
 				{
@@ -298,11 +294,10 @@ func TestBaseImporter_ImportProjects(t *testing.T) {
 				},
 			},
 		},
-		"Non-matching semver constraint is ignored": {
+		"Non-matching semver constraint is skipped": {
 			importertest.TestCase{
-				WantConstraint: "*",
-				WantVersion:    importertest.V1Tag,
-				WantRevision:   importertest.V1Rev,
+				WantVersion:  importertest.V1Tag,
+				WantRevision: importertest.V1Rev,
 			},
 			[]ImportedPackage{
 				{
@@ -312,10 +307,9 @@ func TestBaseImporter_ImportProjects(t *testing.T) {
 				},
 			},
 		},
-		"git describe constraint is ignored": {
+		"git describe constraint is skipped": {
 			importertest.TestCase{
-				WantConstraint: "*",
-				WantRevision:   importertest.UntaggedRev,
+				WantRevision: importertest.UntaggedRev,
 			},
 			[]ImportedPackage{
 				{
@@ -342,10 +336,9 @@ func TestBaseImporter_ImportProjects(t *testing.T) {
 				},
 			},
 		},
-		"ignore duplicate packages": {
+		"skip duplicate packages": {
 			importertest.TestCase{
-				WantConstraint: "*",
-				WantRevision:   importertest.UntaggedRev,
+				WantRevision: importertest.UntaggedRev,
 			},
 			[]ImportedPackage{
 				{
@@ -360,8 +353,8 @@ func TestBaseImporter_ImportProjects(t *testing.T) {
 		},
 		"skip empty lock hints": {
 			importertest.TestCase{
-				WantConstraint: "*",
-				WantRevision:   "",
+				WantRevision: "",
+				WantWarning:  "constraint is empty",
 			},
 			[]ImportedPackage{
 				{
@@ -382,10 +375,10 @@ func TestBaseImporter_ImportProjects(t *testing.T) {
 				},
 			},
 		},
-		"ignore default source": {
+		"skip default source": {
 			importertest.TestCase{
-				WantConstraint: "*",
 				WantSourceRepo: "",
+				WantWarning:    "constraint is empty",
 			},
 			[]ImportedPackage{
 				{
@@ -394,9 +387,8 @@ func TestBaseImporter_ImportProjects(t *testing.T) {
 				},
 			},
 		},
-		"ignore vendored source": {
+		"skip vendored source": {
 			importertest.TestCase{
-				WantConstraint: "*",
 				WantSourceRepo: "",
 				WantWarning:    "vendored sources aren't supported",
 			},

@@ -217,7 +217,7 @@ about what's going on.
 During `dep init` configuration from other dependency managers is detected
 and imported, unless `-skip-tools` is specified.
 
-The following tools are supported: `glide`, `godep`, `vndr`, `govend`, `gb`, `gvt` and `govendor`.
+The following tools are supported: `glide`, `godep`, `vndr`, `govend`, `gb`, `gvt`, `govendor` and `glock`.
 
 See [#186](https://github.com/golang/dep/issues/186#issuecomment-306363441) for
 how to add support for another tool.
@@ -347,7 +347,7 @@ It's up to you:
 **Cons**
 
 - Your repo will be bigger, potentially a lot bigger,
-  though `dep prune` can help minimize this problem.
+  though [`prune`](Gopkg.toml.md#prune) can help minimize this problem.
 - PR diffs will include changes for files under `vendor/` when Gopkg.lock is modified,
   however files in `vendor/` are [hidden by default](https://github.com/github/linguist/blob/v5.2.0/lib/linguist/generated.rb#L328) on Github.
 

@@ -251,11 +251,18 @@ func (i *Importer) ImportPackages(packages []ImportedPackage, defaultConstraintF
 			pc.Constraint = gps.Any()
 		}
 
-		i.Manifest.Constraints[pc.Ident.ProjectRoot] = gps.ProjectProperties{
-			Source:     pc.Ident.Source,
-			Constraint: pc.Constraint,
+		// Add constraint to manifest that is not empty (has a branch, version or source)
+		if !gps.IsAny(pc.Constraint) || pc.Ident.Source != "" {
+			i.Manifest.Constraints[pc.Ident.ProjectRoot] = gps.ProjectProperties{
+				Source:     pc.Ident.Source,
+				Constraint: pc.Constraint,
+			}
+			fb.NewConstraintFeedback(pc, fb.DepTypeImported).LogFeedback(i.Logger)
+		} else {
+			if i.Verbose {
+				i.Logger.Printf("  Skipping import of %v because its constraint is empty.\n", pc.Ident)
+			}
 		}
-		fb.NewConstraintFeedback(pc, fb.DepTypeImported).LogFeedback(i.Logger)
 
 		if version != nil {
 			lp := gps.NewLockedProject(pc.Ident, version, nil)

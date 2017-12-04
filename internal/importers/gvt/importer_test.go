@@ -56,9 +56,8 @@ func TestGvtConfig_Convert(t *testing.T) {
 		},
 		"package with HEAD branch": {
 			importertest.TestCase{
-				WantConstraint: "*",
-				WantRevision:   importertest.V1Rev,
-				WantVersion:    importertest.V1Tag,
+				WantRevision: importertest.V1Rev,
+				WantVersion:  importertest.V1Tag,
 			},
 			gvtManifest{
 				Deps: []gvtPkg{
