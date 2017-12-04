@@ -606,7 +606,10 @@ func runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceMana
 			}
 		}
 
-		err = out.BasicFooter()
+		footerErr := out.BasicFooter()
+		if footerErr != nil {
+			return false, 0, footerErr
+		}
 
 		return false, errCount, err
 	}
