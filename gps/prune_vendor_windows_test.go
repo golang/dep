@@ -8,7 +8,7 @@ package gps
 
 import "testing"
 
-func TestStripVendorSymlinks(t *testing.T) {
+func TestPruneVendorSymlinks(t *testing.T) {
 	// On windows, we skip symlinks, even if they're named 'vendor', because
 	// they're too hard to distinguish from junctions.
 	t.Run("vendor symlink", pruneVendorDirsTestCase(fsTestCase{
