@@ -7,6 +7,7 @@ NEW FEATURES:
 BUG FIXES:
 
 IMPROVEMENTS:
+* dep ensure does not depend on Go code (#1434)
 
 # v0.4.1
 
