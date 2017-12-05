@@ -66,6 +66,12 @@ func TestCheckErrors(t *testing.T) {
 		pkgOrErrMap map[string]pkgtree.PackageOrErr
 	}{
 		{
+			name:  "noErrorsAndEmpty",
+			fatal: false,
+			pkgOrErrMap: map[string]pkgtree.PackageOrErr{
+			},
+		},
+		{
 			name:  "noErrors",
 			fatal: false,
 			pkgOrErrMap: map[string]pkgtree.PackageOrErr{
@@ -112,7 +118,7 @@ func TestCheckErrors(t *testing.T) {
 		},
 		{
 			name:  "allGoErrors",
-			fatal: true,
+			fatal: false,
 			pkgOrErrMap: map[string]pkgtree.PackageOrErr{
 				"github.com/me/pkg": {
 					Err: &build.NoGoError{},
@@ -137,10 +143,10 @@ func TestCheckErrors(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			fatal, err := checkErrors(tc.pkgOrErrMap, nil)
 			if tc.fatal != fatal {
-				t.Fatalf("expected fatal flag to be %T, got %T", tc.fatal, fatal)
+				t.Fatalf("%s: expected fatal flag to be %t, got %t", tc.name, tc.fatal, fatal)
 			}
 			if err == nil && fatal {
-				t.Fatal("unexpected fatal flag value while err is nil")
+				t.Fatalf("%s: unexpected fatal flag value while err is nil", tc.name)
 			}
 		})
 	}
