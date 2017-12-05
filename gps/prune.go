@@ -87,36 +87,37 @@ var (
 // PruneProject remove excess files according to the options passed, from
 // the lp directory in baseDir.
 func PruneProject(baseDir string, lp LockedProject, options PruneOptions, logger *log.Logger) error {
-	fs, err := deriveFilesystemState(baseDir)
+	fsState, err := deriveFilesystemState(baseDir)
+
 	if err != nil {
 		return errors.Wrap(err, "could not derive filesystem state")
 	}
 
 	if (options & PruneNestedVendorDirs) != 0 {
-		if err := pruneVendorDirs(fs); err != nil {
+		if err := pruneVendorDirs(fsState); err != nil {
 			return errors.Wrapf(err, "failed to prune nested vendor directories")
 		}
 	}
 
 	if (options & PruneUnusedPackages) != 0 {
-		if _, err := pruneUnusedPackages(lp, fs); err != nil {
+		if _, err := pruneUnusedPackages(lp, fsState); err != nil {
 			return errors.Wrap(err, "failed to prune unused packages")
 		}
 	}
 
 	if (options & PruneNonGoFiles) != 0 {
-		if err := pruneNonGoFiles(fs); err != nil {
+		if err := pruneNonGoFiles(fsState); err != nil {
 			return errors.Wrap(err, "failed to prune non-Go files")
 		}
 	}
 
 	if (options & PruneGoTestFiles) != 0 {
-		if err := pruneGoTestFiles(fs); err != nil {
+		if err := pruneGoTestFiles(fsState); err != nil {
 			return errors.Wrap(err, "failed to prune Go test files")
 		}
 	}
 
-	if err := deleteEmptyDirs(fs); err != nil {
+	if err := deleteEmptyDirs(fsState); err != nil {
 		return errors.Wrap(err, "could not delete empty dirs")
 	}
 
@@ -124,11 +125,11 @@ func PruneProject(baseDir string, lp LockedProject, options PruneOptions, logger
 }
 
 // pruneVendorDirs deletes all nested vendor directories within baseDir.
-func pruneVendorDirs(fs filesystemState) error {
-	toDelete := collectNestedVendorDirs(fs)
+func pruneVendorDirs(fsState filesystemState) error {
+	toDelete := collectNestedVendorDirs(fsState)
 
 	for _, path := range toDelete {
-		if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+		if err := os.RemoveAll(path); err != nil && !os.IsNotExist(err) {
 			return err
 		}
 	}
@@ -302,30 +303,6 @@ func deleteEmptyDirs(fsState filesystemState) error {
 
 		if !notEmpty {
 			if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
-				return err
-			}
-		}
-	}
-
-	return nil
-}
-
-func deleteEmptyDirsFromSlice(deletedFiles []string) error {
-	dirs := make(map[string]struct{})
-
-	for _, path := range deletedFiles {
-		dirs[filepath.Dir(path)] = struct{}{}
-	}
-
-	for path := range dirs {
-		notEmpty, err := fs.IsNonEmptyDir(path)
-		if err != nil {
-			return err
-		}
-
-		if !notEmpty {
-			err := os.Remove(path)
-			if err != nil && !os.IsNotExist(err) {
 				return err
 			}
 		}
