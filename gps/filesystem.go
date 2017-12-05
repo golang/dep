@@ -7,6 +7,7 @@ package gps
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 )
 
 // filesystemState represents the state of a file system.
@@ -44,7 +45,22 @@ func deriveFilesystemState(root string) (filesystemState, error) {
 			return err
 		}
 
-		if (info.Mode() & os.ModeSymlink) != 0 {
+		symlink := (info.Mode() & os.ModeSymlink) == os.ModeSymlink
+		dir := info.IsDir()
+
+		if runtime.GOOS == "windows" && symlink && dir {
+			// This could be a Windows junction directory. Support for these in the
+			// standard library is spotty, and we could easily delete an important
+			// folder if we called os.Remove or os.RemoveAll. Just skip these.
+			//
+			// TODO: If we could distinguish between junctions and Windows symlinks,
+			// we might be able to safely delete symlinks, even though junctions are
+			// dangerous.
+
+			return nil
+		}
+
+		if symlink {
 			eval, err := filepath.EvalSymlinks(path)
 			if err != nil {
 				return err
@@ -58,7 +74,7 @@ func deriveFilesystemState(root string) (filesystemState, error) {
 			return nil
 		}
 
-		if info.IsDir() {
+		if dir {
 			fs.dirs = append(fs.dirs, relPath)
 
 			return nil
