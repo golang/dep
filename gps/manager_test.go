@@ -110,8 +110,15 @@ func (d *sharedRepoDeducer) deduceRootPath(ctx context.Context, ip string) (path
 	return pd, nil
 }
 
-//func mkNaiveSM(t *testing.T, shared bool) (*SourceMgr, func()) {
-func mkNaiveSM(t *testing.T) (*SourceMgr, func()) {
+func mkNaiveSourceManager(t *testing.T) (*SourceMgr, func()) {
+	return mkNaiveSM(t, false)
+}
+
+func mkSharedNaiveSourceManager(t *testing.T) (*SourceMgr, func()) {
+	return mkNaiveSM(t, true)
+}
+
+func mkNaiveSM(t *testing.T, shared bool) (*SourceMgr, func()) {
 	cpath, err := ioutil.TempDir("", "smcache")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %s", err)
@@ -125,13 +132,13 @@ func mkNaiveSM(t *testing.T) (*SourceMgr, func()) {
 		t.Fatalf("Unexpected error on SourceManager creation: %s", err)
 	}
 
-	//if shared {
-	// If shared flag is on, then use the special intermediate deducer.
-	sm.srcCoord.deducer = &sharedRepoDeducer{
-		real: sm.deduceCoord,
-		t:    t,
+	if shared {
+		// If shared flag is on, then use the special intermediate deducer.
+		sm.srcCoord.deducer = &sharedRepoDeducer{
+			real: sm.deduceCoord,
+			t:    t,
+		}
 	}
-	//}
 
 	return sm, func() {
 		sm.Release()
@@ -358,7 +365,7 @@ func TestDefaultBranchAssignment(t *testing.T) {
 		t.Skip("Skipping default branch assignment test in short mode")
 	}
 
-	sm, clean := mkNaiveSM(t)
+	sm, clean := mkSharedNaiveSourceManager(t)
 	defer clean()
 
 	id := mkPI("github.com/sdboyer/test-multibranch")
@@ -401,7 +408,7 @@ func TestDefaultBranchAssignment(t *testing.T) {
 func TestMgrMethodsFailWithBadPath(t *testing.T) {
 	// a symbol will always bork it up
 	bad := mkPI("foo/##&^").normalize()
-	sm, clean := mkNaiveSM(t)
+	sm, clean := mkSharedNaiveSourceManager(t)
 	defer clean()
 
 	var err error
@@ -435,7 +442,7 @@ type sourceCreationTestFixture struct {
 
 func (f sourceCreationTestFixture) run(t *testing.T) {
 	t.Parallel()
-	sm, clean := mkNaiveSM(t)
+	sm, clean := mkNaiveSourceManager(t)
 	defer clean()
 
 	for _, pi := range f.roots {
@@ -526,7 +533,7 @@ func TestGetSources(t *testing.T) {
 	}
 	requiresBins(t, "git", "hg", "bzr")
 
-	sm, clean := mkNaiveSM(t)
+	sm, clean := mkNaiveSourceManager(t)
 
 	pil := []ProjectIdentifier{
 		mkPI("github.com/Masterminds/VCSTestRepo").normalize(),
@@ -594,7 +601,7 @@ func TestFSCaseSensitivityConvergesSources(t *testing.T) {
 	f := func(name string, pi1, pi2 ProjectIdentifier) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			sm, clean := mkNaiveSM(t)
+			sm, clean := mkSharedNaiveSourceManager(t)
 			defer clean()
 
 			sm.SyncSourceFor(pi1)
@@ -649,7 +656,7 @@ func TestGetInfoListVersionsOrdering(t *testing.T) {
 		t.Skip("Skipping slow test in short mode")
 	}
 
-	sm, clean := mkNaiveSM(t)
+	sm, clean := mkSharedNaiveSourceManager(t)
 	defer clean()
 
 	// setup done, now do the test
@@ -672,7 +679,7 @@ func TestGetInfoListVersionsOrdering(t *testing.T) {
 }
 
 func TestDeduceProjectRoot(t *testing.T) {
-	sm, clean := mkNaiveSM(t)
+	sm, clean := mkSharedNaiveSourceManager(t)
 	defer clean()
 
 	in := "github.com/sdboyer/gps"
@@ -831,7 +838,7 @@ func TestMultiFetchThreadsafe(t *testing.T) {
 		})
 	}
 
-	sm, _ := mkNaiveSM(t)
+	sm, _ := mkSharedNaiveSourceManager(t)
 	do("first", sm)
 
 	// Run the thing twice with a remade sm so that we cover both the cases of
@@ -857,7 +864,7 @@ func TestListVersionsRacey(t *testing.T) {
 		t.Skip("Skipping slow test in short mode")
 	}
 
-	sm, clean := mkNaiveSM(t)
+	sm, clean := mkSharedNaiveSourceManager(t)
 	defer clean()
 
 	wg := &sync.WaitGroup{}
@@ -877,7 +884,7 @@ func TestListVersionsRacey(t *testing.T) {
 }
 
 func TestErrAfterRelease(t *testing.T) {
-	sm, clean := mkNaiveSM(t)
+	sm, clean := mkSharedNaiveSourceManager(t)
 	clean()
 	id := ProjectIdentifier{}
 
@@ -943,7 +950,7 @@ func TestSignalHandling(t *testing.T) {
 		t.Skip("Skipping slow test in short mode")
 	}
 
-	sm, clean := mkNaiveSM(t)
+	sm, clean := mkSharedNaiveSourceManager(t)
 
 	sigch := make(chan os.Signal)
 	sm.HandleSignals(sigch)
@@ -958,7 +965,7 @@ func TestSignalHandling(t *testing.T) {
 	clean()
 
 	// Test again, this time with a running call
-	sm, clean = mkNaiveSM(t)
+	sm, clean = mkSharedNaiveSourceManager(t)
 	sm.HandleSignals(sigch)
 
 	errchan := make(chan error)
@@ -978,7 +985,7 @@ func TestSignalHandling(t *testing.T) {
 	}
 	clean()
 
-	sm, clean = mkNaiveSM(t)
+	sm, clean = mkSharedNaiveSourceManager(t)
 	// Ensure that handling also works after stopping and restarting itself,
 	// and that Release happens only once.
 	sm.UseDefaultSignalHandling()
@@ -1012,7 +1019,7 @@ func TestUnreachableSource(t *testing.T) {
 		t.Skip("Skipping slow test in short mode")
 	}
 
-	sm, clean := mkNaiveSM(t)
+	sm, clean := mkSharedNaiveSourceManager(t)
 	defer clean()
 
 	id := mkPI("github.com/golang/notexist").normalize()

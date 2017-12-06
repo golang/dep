@@ -86,7 +86,7 @@ func testWriteDepTree(t *testing.T) {
 		},
 	}
 
-	sm, clean := mkNaiveSM(t)
+	sm, clean := mkSharedNaiveSourceManager(t)
 	defer clean()
 
 	// Trigger simultaneous fetch of all three to speed up test execution time

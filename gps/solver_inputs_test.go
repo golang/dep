@@ -182,7 +182,7 @@ func TestValidateParams(t *testing.T) {
 	h := test.NewHelper(t)
 	defer h.Cleanup()
 
-	sm, clean := mkNaiveSM(t)
+	sm, clean := mkSharedNaiveSourceManager(t)
 	defer clean()
 
 	h.TempDir("src")

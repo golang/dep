@@ -597,7 +597,7 @@ func TestVanityDeduction(t *testing.T) {
 		t.Skip("Skipping slow test in short mode")
 	}
 
-	sm, clean := mkNaiveSM(t)
+	sm, clean := mkSharedNaiveSourceManager(t)
 	defer clean()
 
 	vanities := pathDeductionFixtures["vanity"]
