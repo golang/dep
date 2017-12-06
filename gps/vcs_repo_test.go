@@ -23,7 +23,7 @@ import (
 // original implementation of these test files come from
 // https://github.com/Masterminds/vcs test files
 
-const gitRemoteTestRepo = "https://github.com/Masterminds/VCSTestRepo"
+const gitRemoteTestRepo = "github.com/Masterminds/VCSTestRepo"
 
 func TestErrs(t *testing.T) {
 	err := newVcsLocalErrorOr(context.Canceled, nil, "", "")
@@ -67,7 +67,7 @@ func TestNewCtxRepoHappyPath(t *testing.T) {
 		}
 	}()
 
-	_, err = newCtxRepo(vcs.Git, gitRemoteTestRepo, tempDir)
+	_, err = newCtxRepo(vcs.Git, sharedFixtureRepos[gitRemoteTestRepo], tempDir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -105,7 +105,7 @@ func TestNewCtxRepoRecovery(t *testing.T) {
 		t.Fatalf("could not untar corrupt repo into temp folder: %v\n", err)
 	}
 
-	_, err = getVCSRepo(vcs.Git, gitRemoteTestRepo, tempDir)
+	_, err = getVCSRepo(vcs.Git, sharedFixtureRepos[gitRemoteTestRepo], tempDir)
 	if err != nil {
 		if _, ok := err.(*vcs.LocalError); !ok {
 			t.Fatalf("expected a local error but got: %v\n", err)
@@ -114,7 +114,7 @@ func TestNewCtxRepoRecovery(t *testing.T) {
 		t.Fatal("expected getVCSRepo to fail when pointing to a corrupt local path. It is possible that vcs.GitNewRepo updated to gracefully handle this test scenario. Check the return of vcs.GitNewRepo.")
 	}
 
-	_, err = newCtxRepo(vcs.Git, gitRemoteTestRepo, tempDir)
+	_, err = newCtxRepo(vcs.Git, sharedFixtureRepos[gitRemoteTestRepo], tempDir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -293,7 +293,7 @@ func testGitRepo(t *testing.T) {
 		}
 	}()
 
-	rep, err := vcs.NewGitRepo(gitRemoteTestRepo, tempDir+"/VCSTestRepo")
+	rep, err := vcs.NewGitRepo(sharedFixtureRepos[gitRemoteTestRepo], tempDir+"/VCSTestRepo")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -370,7 +370,7 @@ func testBzrRepo(t *testing.T) {
 		}
 	}()
 
-	rep, err := vcs.NewBzrRepo("file://"+sharedFixtureRepos["launchpad.net/govcstestbzrrepo"], tempDir+"/govcstestbzrrepo")
+	rep, err := vcs.NewBzrRepo(sharedFixtureRepos["launchpad.net/govcstestbzrrepo"], tempDir+"/govcstestbzrrepo")
 	if err != nil {
 		t.Fatal(err)
 	}

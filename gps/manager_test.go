@@ -73,8 +73,12 @@ func init() {
 		panic(err)
 	}
 
+	var prefix string
+	if runtime.GOOS != "windows" {
+		prefix = "file://"
+	}
 	for _, n := range names {
-		sharedFixtureRepos[strings.Replace(n, "-", "/", 2)] = filepath.Join(tgt, n)
+		sharedFixtureRepos[strings.Replace(n, "-", "/", 2)] = prefix + filepath.Join(tgt, n)
 	}
 }
 
@@ -97,7 +101,7 @@ func (d *sharedRepoDeducer) deduceRootPath(ctx context.Context, ip string) (path
 
 	// Source type detection can be pretty unsophisticated here as we're only
 	// ever going to be working on a finite set.
-	u := mkurl("file://" + localpath)
+	u := mkurl(localpath)
 	switch {
 	case strings.HasPrefix(pd.root, "launchpad"):
 		pd.mb = maybeBzrSource{url: u}
