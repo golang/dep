@@ -85,10 +85,11 @@ func TestDepCachedir(t *testing.T) {
 
 		// Check that the cache was created in the cachedir. Our fixture has the dependency
 		// `github.com/sdboyer/deptest`
-		_, err = os.Stat(testProj.Path("cachedir", "sources", "https---github.com-sdboyer-deptest"))
+		path := testProj.Path("cachedir", "sources", "https---github.com-sdboyer-deptest")
+		_, err = os.Stat(path)
 		if err != nil {
 			if os.IsNotExist(err) {
-				t.Error("expected cachedir to have been populated but none was found")
+				t.Errorf("expected cachedir to have been populated but none was found: %v", path)
 			} else {
 				t.Errorf("got an unexpected error: %s", err)
 			}
