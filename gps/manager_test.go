@@ -121,17 +121,23 @@ func TestSourceManagerInit(t *testing.T) {
 		t.Fatalf("Global cache lock file not cleared correctly on Release()")
 	}
 
+	err = os.MkdirAll(cpath, 0777)
+	if err != nil {
+		t.Errorf("Failed to re-create temp dir: %s", err)
+	}
+	defer func() {
+		err = os.RemoveAll(cpath)
+		if err != nil {
+			t.Errorf("removeAll failed: %s", err)
+		}
+	}()
 	// Set another one up at the same spot now, just to be sure
 	sm, err = NewSourceManager(cfg)
 	if err != nil {
-		t.Errorf("Creating a second SourceManager should have succeeded when the first was released, but failed with err %s", err)
+		t.Fatalf("Creating a second SourceManager should have succeeded when the first was released, but failed with err %s", err)
 	}
 
 	sm.Release()
-	err = os.RemoveAll(cpath)
-	if err != nil {
-		t.Errorf("removeAll failed: %s", err)
-	}
 }
 
 func TestSourceInit(t *testing.T) {
