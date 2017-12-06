@@ -2,7 +2,7 @@
 <p align="center">
   <a href="https://travis-ci.org/golang/dep"><img src="https://travis-ci.org/golang/dep.svg?branch=master" alt="Build Status"></img></a>
   <a href="https://ci.appveyor.com/project/golang/dep"><img src="https://ci.appveyor.com/api/projects/status/github/golang/dep?svg=true&branch=master&passingText=Windows%20-%20OK&failingText=Windows%20-%20failed&pendingText=Windows%20-%20pending" alt="Windows Build Status"></a>
-  <a href="https://codeclimate.com/github/golang/dep"><img src="https://codeclimate.com/github/golang/dep/badges/gpa.svg" alt="Code Climate"></img></a>
+  <a href="https://goreportcard.com/report/github.com/golang/dep"><img src="https://goreportcard.com/badge/github.com/golang/dep" /></a>
   <a href="https://codeclimate.com/github/golang/dep/coverage"><img src="https://codeclimate.com/github/golang/dep/badges/coverage.svg" /></a>
 </p>
 
@@ -22,7 +22,7 @@
 That said, keep in mind the following:
 
 * `dep init` on an existing project can be a rocky experience - we try to automatically convert from other tools' metadata files, and that process is often complex and murky. Once your project is converted and you're using `dep ensure`, its behavior is quite stable.
-* `dep` still has nasty bugs, but in general these are comparable or fewer to other tools out there.
+* `dep` still has nasty bugs, but in general these are comparable to or fewer than other tools out there.
 * `dep` is [pretty slow right now](https://github.com/golang/dep/blob/master/docs/FAQ.md#why-is-dep-slow), especially on the first couple times you run it. Just know that there is a _lot_ of headroom for improvement, and work is actively underway.
 * `dep` is still changing rapidly. If you need stability (e.g. for CI), it's best to rely on a released version, not tip.
 * `dep`'s exported API interface will continue to change in unpredictable, backwards-incompatible ways until we tag a v1.0.0 release.
@@ -237,7 +237,7 @@ see [changing dependencies](#changing-dependencies).
 
 ## Semantic Versioning
 
-`dep ensure` a uses an external [semver library](https://github.com/Masterminds/semver) to interpret the version constraints you specify in the manifest. The comparison operators are:
+`dep ensure` uses an external [semver library](https://github.com/Masterminds/semver) to interpret the version constraints you specify in the manifest. The comparison operators are:
 
 * `=`: equal
 * `!=`: not equal
@@ -252,7 +252,7 @@ see [changing dependencies](#changing-dependencies).
 
 You might, for example, include a constraint in your manifest that specifies `version = "=2.0.0"` to pin a dependency to version 2.0.0, or constrain to minor releases with: `version = "2.*"`. Refer to the [semver library](https://github.com/Masterminds/semver) documentation for more info.
 
-**Note**: When you specify a version *without an operator*, `dep` automatically uses the `^` operator by default. `dep ensure` will interpret the given version as the min-boundry of a range, for example:
+**Note**: When you specify a version *without an operator*, `dep` automatically uses the `^` operator by default. `dep ensure` will interpret the given version as the min-boundary of a range, for example:
 
 * `1.2.3` becomes the range `>=1.2.3, <2.0.0`
 * `0.2.3` becomes the range `>=0.2.3, <0.3.0`

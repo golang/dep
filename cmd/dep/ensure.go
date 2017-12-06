@@ -6,6 +6,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"flag"
 	"fmt"
 	"go/build"
@@ -18,9 +19,9 @@ import (
 	"sync"
 
 	"github.com/golang/dep"
-	"github.com/golang/dep/internal/gps"
-	"github.com/golang/dep/internal/gps/paths"
-	"github.com/golang/dep/internal/gps/pkgtree"
+	"github.com/golang/dep/gps"
+	"github.com/golang/dep/gps/paths"
+	"github.com/golang/dep/gps/pkgtree"
 	"github.com/pkg/errors"
 )
 
@@ -66,7 +67,7 @@ dep ensure
 
 dep ensure -vendor-only
 
-    Write vendor/ from an exising Gopkg.lock file, without first verifying that
+    Write vendor/ from an existing Gopkg.lock file, without first verifying that
     the lock is in sync with imports and Gopkg.toml. (This may be useful for
     e.g. strategically layering a Docker images)
 
@@ -225,6 +226,13 @@ func (cmd *ensureCommand) validateFlags() error {
 	return nil
 }
 
+func (cmd *ensureCommand) vendorBehavior() dep.VendorBehavior {
+	if cmd.noVendor {
+		return dep.VendorNever
+	}
+	return dep.VendorOnChanged
+}
+
 func (cmd *ensureCommand) runDefault(ctx *dep.Ctx, args []string, p *dep.Project, sm gps.SourceManager, params gps.SolveParameters) error {
 	// Bare ensure doesn't take any args.
 	if len(args) != 0 {
@@ -277,17 +285,12 @@ func (cmd *ensureCommand) runDefault(ctx *dep.Ctx, args []string, p *dep.Project
 		return errors.New("Gopkg.lock was not up to date")
 	}
 
-	solution, err := solver.Solve()
+	solution, err := solver.Solve(context.TODO())
 	if err != nil {
-		handleAllTheFailuresOfTheWorld(err)
-		return errors.Wrap(err, "ensure Solve()")
+		return handleAllTheFailuresOfTheWorld(err)
 	}
 
-	vendorBehavior := dep.VendorOnChanged
-	if cmd.noVendor {
-		vendorBehavior = dep.VendorNever
-	}
-	sw, err := dep.NewSafeWriter(nil, p.Lock, dep.LockFromSolution(solution), vendorBehavior)
+	sw, err := dep.NewSafeWriter(nil, p.Lock, dep.LockFromSolution(solution), cmd.vendorBehavior())
 	if err != nil {
 		return err
 	}
@@ -369,16 +372,15 @@ func (cmd *ensureCommand) runUpdate(ctx *dep.Ctx, args []string, p *dep.Project,
 	if err != nil {
 		return errors.Wrap(err, "fastpath solver prepare")
 	}
-	solution, err := solver.Solve()
+	solution, err := solver.Solve(context.TODO())
 	if err != nil {
 		// TODO(sdboyer) special handling for warning cases as described in spec
 		// - e.g., named projects did not upgrade even though newer versions
 		// were available.
-		handleAllTheFailuresOfTheWorld(err)
-		return errors.Wrap(err, "ensure Solve()")
+		return handleAllTheFailuresOfTheWorld(err)
 	}
 
-	sw, err := dep.NewSafeWriter(nil, p.Lock, dep.LockFromSolution(solution), dep.VendorOnChanged)
+	sw, err := dep.NewSafeWriter(nil, p.Lock, dep.LockFromSolution(solution), cmd.vendorBehavior())
 	if err != nil {
 		return err
 	}
@@ -450,7 +452,7 @@ func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm
 		exrmap[root] = true
 	}
 
-	// Note: these flags are only partialy used by the latter parts of the
+	// Note: these flags are only partially used by the latter parts of the
 	// algorithm; rather, it relies on inference. However, they remain in their
 	// entirety as future needs may make further use of them, being a handy,
 	// terse way of expressing the original context of the arg inputs.
@@ -631,11 +633,10 @@ func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm
 	if err != nil {
 		return errors.Wrap(err, "fastpath solver prepare")
 	}
-	solution, err := solver.Solve()
+	solution, err := solver.Solve(context.TODO())
 	if err != nil {
 		// TODO(sdboyer) detect if the failure was specifically about some of the -add arguments
-		handleAllTheFailuresOfTheWorld(err)
-		return errors.Wrap(err, "ensure Solve()")
+		return handleAllTheFailuresOfTheWorld(err)
 	}
 
 	// Prep post-actions and feedback from adds.

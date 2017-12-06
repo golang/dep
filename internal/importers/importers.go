@@ -8,10 +8,12 @@ import (
 	"log"
 
 	"github.com/golang/dep"
-	"github.com/golang/dep/internal/gps"
+	"github.com/golang/dep/gps"
 	"github.com/golang/dep/internal/importers/glide"
+	"github.com/golang/dep/internal/importers/glock"
 	"github.com/golang/dep/internal/importers/godep"
 	"github.com/golang/dep/internal/importers/govend"
+	"github.com/golang/dep/internal/importers/govendor"
 	"github.com/golang/dep/internal/importers/gvt"
 	"github.com/golang/dep/internal/importers/vndr"
 )
@@ -37,5 +39,7 @@ func BuildAll(logger *log.Logger, verbose bool, sm gps.SourceManager) []Importer
 		vndr.NewImporter(logger, verbose, sm),
 		govend.NewImporter(logger, verbose, sm),
 		gvt.NewImporter(logger, verbose, sm),
+		govendor.NewImporter(logger, verbose, sm),
+		glock.NewImporter(logger, verbose, sm),
 	}
 }

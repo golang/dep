@@ -6,38 +6,38 @@ package base
 
 import (
 	"log"
+	"strings"
 
 	"github.com/golang/dep"
+	"github.com/golang/dep/gps"
 	fb "github.com/golang/dep/internal/feedback"
-	"github.com/golang/dep/internal/gps"
 	"github.com/pkg/errors"
 )
 
 // Importer provides a common implementation for importing from other
 // dependency managers.
 type Importer struct {
-	sm gps.SourceManager
-
-	Logger   *log.Logger
-	Verbose  bool
-	Manifest *dep.Manifest
-	Lock     *dep.Lock
+	SourceManager gps.SourceManager
+	Logger        *log.Logger
+	Verbose       bool
+	Manifest      *dep.Manifest
+	Lock          *dep.Lock
 }
 
 // NewImporter creates a new Importer for embedding in an importer.
 func NewImporter(logger *log.Logger, verbose bool, sm gps.SourceManager) *Importer {
 	return &Importer{
-		Logger:   logger,
-		Verbose:  verbose,
-		Manifest: dep.NewManifest(),
-		Lock:     &dep.Lock{},
-		sm:       sm,
+		Logger:        logger,
+		Verbose:       verbose,
+		Manifest:      dep.NewManifest(),
+		Lock:          &dep.Lock{},
+		SourceManager: sm,
 	}
 }
 
 // isTag determines if the specified value is a tag (plain or semver).
 func (i *Importer) isTag(pi gps.ProjectIdentifier, value string) (bool, gps.Version, error) {
-	versions, err := i.sm.ListVersions(pi)
+	versions, err := i.SourceManager.ListVersions(pi)
 	if err != nil {
 		return false, nil, errors.Wrapf(err, "unable to list versions for %s(%s)", pi.ProjectRoot, pi.Source)
 	}
@@ -61,7 +61,7 @@ func (i *Importer) isTag(pi gps.ProjectIdentifier, value string) (bool, gps.Vers
 // manifest, then finally the revision.
 func (i *Importer) lookupVersionForLockedProject(pi gps.ProjectIdentifier, c gps.Constraint, rev gps.Revision) (gps.Version, error) {
 	// Find the version that goes with this revision, if any
-	versions, err := i.sm.ListVersions(pi)
+	versions, err := i.SourceManager.ListVersions(pi)
 	if err != nil {
 		return rev, errors.Wrapf(err, "Unable to lookup the version represented by %s in %s(%s). Falling back to locking the revision only.", rev, pi.ProjectRoot, pi.Source)
 	}
@@ -130,7 +130,7 @@ func (i *Importer) loadPackages(packages []ImportedPackage) ([]importedProject, 
 
 	projects := make(map[gps.ProjectRoot]*importedProject, len(packages))
 	for _, pkg := range packages {
-		pr, err := i.sm.DeduceProjectRoot(pkg.Name)
+		pr, err := i.SourceManager.DeduceProjectRoot(pkg.Name)
 		if err != nil {
 			return nil, errors.Wrapf(err, "Cannot determine the project root for %s", pkg.Name)
 		}
@@ -188,6 +188,9 @@ func (i *Importer) ImportPackages(packages []ImportedPackage, defaultConstraintF
 				source = ""
 			} else if isDefault {
 				source = ""
+			} else if strings.Contains(source, "/vendor/") {
+				i.Logger.Printf("  Ignoring imported source %s for %s because vendored sources aren't supported", source, prj.Root)
+				source = ""
 			}
 		}
 
@@ -198,7 +201,7 @@ func (i *Importer) ImportPackages(packages []ImportedPackage, defaultConstraintF
 			},
 		}
 
-		pc.Constraint, err = i.sm.InferConstraint(prj.ConstraintHint, pc.Ident)
+		pc.Constraint, err = i.SourceManager.InferConstraint(prj.ConstraintHint, pc.Ident)
 		if err != nil {
 			pc.Constraint = gps.Any()
 		}
@@ -248,11 +251,18 @@ func (i *Importer) ImportPackages(packages []ImportedPackage, defaultConstraintF
 			pc.Constraint = gps.Any()
 		}
 
-		i.Manifest.Constraints[pc.Ident.ProjectRoot] = gps.ProjectProperties{
-			Source:     pc.Ident.Source,
-			Constraint: pc.Constraint,
+		// Add constraint to manifest that is not empty (has a branch, version or source)
+		if !gps.IsAny(pc.Constraint) || pc.Ident.Source != "" {
+			i.Manifest.Constraints[pc.Ident.ProjectRoot] = gps.ProjectProperties{
+				Source:     pc.Ident.Source,
+				Constraint: pc.Constraint,
+			}
+			fb.NewConstraintFeedback(pc, fb.DepTypeImported).LogFeedback(i.Logger)
+		} else {
+			if i.Verbose {
+				i.Logger.Printf("  Skipping import of %v because its constraint is empty.\n", pc.Ident)
+			}
 		}
-		fb.NewConstraintFeedback(pc, fb.DepTypeImported).LogFeedback(i.Logger)
 
 		if version != nil {
 			lp := gps.NewLockedProject(pc.Ident, version, nil)
@@ -306,12 +316,12 @@ func (i *Importer) convertToConstraint(v gps.Version) gps.Constraint {
 func (i *Importer) isDefaultSource(projectRoot gps.ProjectRoot, sourceURL string) (bool, error) {
 	// this condition is mainly for gopkg.in imports,
 	// as some importers specify the repository url as https://gopkg.in/...,
-	// but sm.SourceURLsForPath() returns https://github.com/... urls for gopkg.in
+	// but SourceManager.SourceURLsForPath() returns https://github.com/... urls for gopkg.in
 	if sourceURL == "https://"+string(projectRoot) {
 		return true, nil
 	}
 
-	sourceURLs, err := i.sm.SourceURLsForPath(string(projectRoot))
+	sourceURLs, err := i.SourceManager.SourceURLsForPath(string(projectRoot))
 	if err != nil {
 		return false, err
 	}

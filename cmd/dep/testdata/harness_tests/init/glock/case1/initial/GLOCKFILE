@@ -1,0 +1,3 @@
+cmd github.com/golang/lint
+github.com/sdboyer/deptest 3f4c3bea144e112a69bbe5d8d01c1b09a544253f
+github.com/sdboyer/deptestdos 5c607206be5decd28e6263ffffdcee067266015e

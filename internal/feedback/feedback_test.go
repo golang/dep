@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/golang/dep/internal/gps"
+	"github.com/golang/dep/gps"
 )
 
 func TestFeedback_Constraint(t *testing.T) {

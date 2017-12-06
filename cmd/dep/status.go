@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"html/template"
 	"io"
 	"io/ioutil"
 	"log"
@@ -17,9 +18,8 @@ import (
 	"text/tabwriter"
 
 	"github.com/golang/dep"
-	"github.com/golang/dep/internal/gps"
-	"github.com/golang/dep/internal/gps/paths"
-	"github.com/golang/dep/internal/gps/pkgtree"
+	"github.com/golang/dep/gps"
+	"github.com/golang/dep/gps/paths"
 	"github.com/pkg/errors"
 )
 
@@ -191,6 +191,25 @@ func (out *dotOutput) MissingHeader()                {}
 func (out *dotOutput) MissingLine(ms *MissingStatus) {}
 func (out *dotOutput) MissingFooter()                {}
 
+type templateOutput struct {
+	w    io.Writer
+	tmpl *template.Template
+}
+
+func (out *templateOutput) BasicHeader() {}
+func (out *templateOutput) BasicFooter() {}
+
+func (out *templateOutput) BasicLine(bs *BasicStatus) {
+	out.tmpl.Execute(out.w, bs)
+}
+
+func (out *templateOutput) MissingHeader() {}
+func (out *templateOutput) MissingFooter() {}
+
+func (out *templateOutput) MissingLine(ms *MissingStatus) {
+	out.tmpl.Execute(out.w, ms)
+}
+
 func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
 	p, err := ctx.LoadProject()
 	if err != nil {
@@ -230,6 +249,15 @@ func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
 			p: p,
 			o: cmd.output,
 			w: &buf,
+		}
+	case cmd.template != "":
+		tmpl, err := template.New("status").Parse(cmd.template)
+		if err != nil {
+			return err
+		}
+		out = &templateOutput{
+			w:    &buf,
+			tmpl: tmpl,
 		}
 	default:
 		out = &tableOutput{
@@ -389,7 +417,7 @@ func runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceMana
 		return false, 0, errors.Wrapf(err, "could not set up solver for input hashing")
 	}
 
-	cm := collectConstraints(ptree, p, sm)
+	cm := collectConstraints(ctx, p, sm)
 
 	// Get the project list and sort it so that the printed output users see is
 	// deterministically ordered. (This may be superfluous if the lock is always
@@ -461,7 +489,7 @@ func runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceMana
 				} else {
 					bs.Constraint = gps.Any()
 					for _, c := range cm[bs.ProjectRoot] {
-						bs.Constraint = c.Intersect(bs.Constraint)
+						bs.Constraint = c.Constraint.Intersect(bs.Constraint)
 					}
 				}
 
@@ -470,7 +498,12 @@ func runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceMana
 				if bs.Version != nil && bs.Version.Type() != gps.IsVersion {
 					c, has := p.Manifest.Constraints[proj.Ident().ProjectRoot]
 					if !has {
-						c.Constraint = gps.Any()
+						// Get constraint for locked project
+						for _, lockedP := range p.Lock.P {
+							if lockedP.Ident().ProjectRoot == proj.Ident().ProjectRoot {
+								c.Constraint = lockedP.Version()
+							}
+						}
 					}
 					// TODO: This constraint is only the constraint imposed by the
 					// current project, not by any transitive deps. As a result,
@@ -639,7 +672,49 @@ func formatVersion(v gps.Version) string {
 	return v.String()
 }
 
-func collectConstraints(ptree pkgtree.PackageTree, p *dep.Project, sm gps.SourceManager) map[string][]gps.Constraint {
-	// TODO
-	return map[string][]gps.Constraint{}
+// projectConstraint stores ProjectRoot and Constraint for that project.
+type projectConstraint struct {
+	Project    gps.ProjectRoot
+	Constraint gps.Constraint
+}
+
+// constraintsCollection is a map of ProjectRoot(dependency) and a collection of
+// projectConstraint for the dependencies. This can be used to find constraints
+// on a dependency and the projects that apply those constraints.
+type constraintsCollection map[string][]projectConstraint
+
+// collectConstraints collects constraints declared by all the dependencies.
+func collectConstraints(ctx *dep.Ctx, p *dep.Project, sm gps.SourceManager) constraintsCollection {
+	constraintCollection := make(constraintsCollection)
+
+	// Get direct deps of the root project.
+	_, directDeps, err := getDirectDependencies(sm, p)
+	if err != nil {
+		ctx.Err.Println("Error getting direct deps:", err)
+	}
+	// Create a root analyzer.
+	rootAnalyzer := newRootAnalyzer(true, ctx, directDeps, sm)
+
+	// Iterate through the locked projects and collect constraints of all the projects.
+	for _, proj := range p.Lock.Projects() {
+		manifest, _, err := sm.GetManifestAndLock(proj.Ident(), proj.Version(), rootAnalyzer)
+		if err != nil {
+			ctx.Err.Println("Error getting manifest and lock:", err)
+			continue
+		}
+
+		// Get project constraints.
+		pc := manifest.DependencyConstraints()
+
+		// Iterate through the project constraints to get individual dependency
+		// project and constraint values.
+		for pr, pp := range pc {
+			constraintCollection[string(pr)] = append(
+				constraintCollection[string(pr)],
+				projectConstraint{proj.Ident().ProjectRoot, pp.Constraint},
+			)
+		}
+	}
+
+	return constraintCollection
 }

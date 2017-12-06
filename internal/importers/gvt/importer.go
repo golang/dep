@@ -12,7 +12,7 @@ import (
 	"path/filepath"
 
 	"github.com/golang/dep"
-	"github.com/golang/dep/internal/gps"
+	"github.com/golang/dep/gps"
 	"github.com/golang/dep/internal/importers/base"
 	"github.com/pkg/errors"
 )
@@ -107,7 +107,7 @@ func (g *Importer) convert(pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock, error)
 			contstraintHint = pkg.Revision
 		} else if pkg.Branch != "master" {
 			// both gvt & gb-vendor set "branch" to "master" unless a different branch was requested.
-			// so it's not realy a constraint unless it's a different branch
+			// so it's not really a constraint unless it's a different branch
 			contstraintHint = pkg.Branch
 		}
 

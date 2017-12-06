@@ -1,8 +1,25 @@
 # v0.3.3 (Unreleased)
 
+NEW FEATURES:
+* Add support for importing from [glock](https://github.com/robfig/glock) based projects (#1422).
+* Add support for importing from [govendor](https://github.com/kardianos/govendor)
+  based projects (#815).
+
 BUG FIXES:
 
 * Releases targeting Windows now have a `.exe` suffix (#1291).
+* Adaptively recover from dirty and corrupted git repositories in cache (#1279).
+* Suppress git password prompts in more places (#1357).
+* Fix `-no-vendor` flag for `ensure -update` (#1361).
+* Validate `git ls-remote` output and ignore all malformed lines (#1379)
+* Support [gopkg.in version zero](http://labix.org/gopkg.in#VersionZero) (#1243).
+
+IMPROVEMENTS:
+
+* Log as dependencies are pre-fetched during dep init ([#1176](https://github.com/golang/dep/pull/1176)).
+* Make the gps package importable ([#1349](https://github.com/golang/dep/pull/1349)).
+* Improve file copy performance by not forcing a file sync (PR #1408).
+* Skip empty constraints during import ([#1414](https://github.com/golang/dep/pull/1349))
 
 # v0.3.2
 
@@ -61,7 +78,7 @@ importer would drop the imported version of a project (#1100)
 * Import analyzer now always uses the same name, fixing the lock mismatch
 immediately after dep init issue (#1099)
 * Add support for importing from [govend](https://github.com/govend/govend)
-(#1040) and [LK4D4/vndr](https://github.com/LK4D4/vndr) (#978) based projects 
+(#1040) and [LK4D4/vndr](https://github.com/LK4D4/vndr) (#978) based projects
 * gps: gps no longer assumes that every git repo has a HEAD (#1053)
 * `os.Chmod` failures on Windows due to long path length has been fixed (#925)
 * Add `version` command (#996)
