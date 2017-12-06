@@ -811,10 +811,11 @@ func Test_hgSource_exportRevisionTo_removeVcsFiles(t *testing.T) {
 	defer h.Cleanup()
 	h.TempDir("smcache")
 	cpath := h.Path("smcache")
+	os.MkdirAll(filepath.Join(cpath, "sources"), 0777)
 	repoPath := filepath.Join(h.Path("."), "repo")
 
-	rev := Revision("6f55e1f03d91f8a7cce35d1968eb60a2352e4d59")
-	n := "bitbucket.org/golang-dep/dep-test"
+	rev := Revision("aa110802a0c64195d0a6c375c9f66668827c90b4")
+	n := "bitbucket.org/sdboyer/withbm"
 	mb := maybeHgSource{mkurl("file://" + sharedFixtureRepos[n])}
 
 	ctx := context.Background()
