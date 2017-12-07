@@ -20,7 +20,7 @@ IMPROVEMENTS:
 * Make the gps package importable ([#1349](https://github.com/golang/dep/pull/1349)).
 * Improve file copy performance by not forcing a file sync (PR #1408).
 * Skip empty constraints during import ([#1414](https://github.com/golang/dep/pull/1349))
-* Handle errors when writing output ([#1420](https://github.com/golang/dep/pull/1420))
+* Handle errors when writing status output ([#1420](https://github.com/golang/dep/pull/1420))
 
 # v0.3.2
 
