@@ -444,8 +444,7 @@ func runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceMana
 		// complete picture of all deps. That eliminates the need for at least
 		// some checks.
 
-		err := out.BasicHeader()
-		if err != nil {
+		if err := out.BasicHeader(); err != nil {
 			return false, 0, err
 		}
 
@@ -600,14 +599,12 @@ func runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceMana
 
 		// Use the collected BasicStatus in outputter.
 		for _, proj := range slp {
-			err := out.BasicLine(bsMap[string(proj.Ident().ProjectRoot)])
-			if err != nil {
+			if err := out.BasicLine(bsMap[string(proj.Ident().ProjectRoot)]); err != nil {
 				return false, 0, err
 			}
 		}
 
-		footerErr := out.BasicFooter()
-		if footerErr != nil {
+		if footerErr := out.BasicFooter(); footerErr != nil {
 			return false, 0, footerErr
 		}
 
@@ -655,8 +652,7 @@ func runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceMana
 		return false, 0, errors.New("address issues with undeducible import paths to get more status information")
 	}
 
-	err = out.MissingHeader()
-	if err != nil {
+	if err = out.MissingHeader(); err != nil {
 		return false, 0, err
 	}
 
@@ -676,8 +672,7 @@ outer:
 			return false, 0, err
 		}
 	}
-	err = out.MissingFooter()
-	if err != nil {
+	if err = out.MissingFooter(); err != nil {
 		return false, 0, err
 	}
 
