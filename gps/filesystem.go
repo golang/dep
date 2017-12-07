@@ -27,9 +27,7 @@ type fsLink struct {
 // deriveFilesystemState returns a filesystemState based on the state of
 // the filesystem on root.
 func deriveFilesystemState(root string) (filesystemState, error) {
-	fs := filesystemState{
-		root: root,
-	}
+	fs := filesystemState{root: root}
 
 	err := filepath.Walk(fs.root, func(path string, info os.FileInfo, err error) error {
 		if err != nil {

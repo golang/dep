@@ -51,7 +51,7 @@ func DefaultRootPruneOptions() RootPruneOptions {
 // PruneOptionsFor returns the prune options for the passed project root.
 //
 // It will return the root prune options if the project does not have specific
-// options or if it does not exists in the manifest.
+// options or if it does not exist in the manifest.
 func (o *RootPruneOptions) PruneOptionsFor(pr ProjectRoot) PruneOptions {
 	if po, ok := o.ProjectOptions[pr]; ok {
 		return po
@@ -203,13 +203,12 @@ func collectUnusedPackagesFiles(fsState filesystemState, unusedPackages map[stri
 //
 // Files matching licenseFilePrefixes and legalFileSubstrings are not pruned.
 func pruneNonGoFiles(fsState filesystemState) error {
-	// TODO(ibrasho) detemine a sane capacity
 	toDelete := make([]string, 0, len(fsState.files)/4)
 
 	for _, path := range fsState.files {
 		ext := fileExt(path)
 
-		// Refer to: https://sourcegraph.com/github.com/golang/go/-/blob/src/go/build/build.go#L750
+		// Refer to: https://github.com/golang/go/blob/release-branch.go1.9/src/go/build/build.go#L750
 		switch ext {
 		case ".go":
 			continue
@@ -274,7 +273,6 @@ func isPreservedFile(name string) bool {
 
 // pruneGoTestFiles deletes all Go test files (*_test.go) in fsState.
 func pruneGoTestFiles(fsState filesystemState) error {
-	// TODO(ibrasho) detemine a sane capacity
 	toDelete := make([]string, 0, len(fsState.files)/2)
 
 	for _, path := range fsState.files {
