@@ -85,26 +85,27 @@ type statusCommand struct {
 }
 
 type outputter interface {
-	BasicHeader()
-	BasicLine(*BasicStatus)
-	BasicFooter()
-	MissingHeader()
-	MissingLine(*MissingStatus)
-	MissingFooter()
+	BasicHeader() error
+	BasicLine(*BasicStatus) error
+	BasicFooter() error
+	MissingHeader() error
+	MissingLine(*MissingStatus) error
+	MissingFooter() error
 }
 
 type tableOutput struct{ w *tabwriter.Writer }
 
-func (out *tableOutput) BasicHeader() {
-	fmt.Fprintf(out.w, "PROJECT\tCONSTRAINT\tVERSION\tREVISION\tLATEST\tPKGS USED\n")
+func (out *tableOutput) BasicHeader() error {
+	_, err := fmt.Fprintf(out.w, "PROJECT\tCONSTRAINT\tVERSION\tREVISION\tLATEST\tPKGS USED\n")
+	return err
 }
 
-func (out *tableOutput) BasicFooter() {
-	out.w.Flush()
+func (out *tableOutput) BasicFooter() error {
+	return out.w.Flush()
 }
 
-func (out *tableOutput) BasicLine(bs *BasicStatus) {
-	fmt.Fprintf(out.w,
+func (out *tableOutput) BasicLine(bs *BasicStatus) error {
+	_, err := fmt.Fprintf(out.w,
 		"%s\t%s\t%s\t%s\t%s\t%d\t\n",
 		bs.ProjectRoot,
 		bs.getConsolidatedConstraint(),
@@ -113,22 +114,25 @@ func (out *tableOutput) BasicLine(bs *BasicStatus) {
 		bs.getConsolidatedLatest(shortRev),
 		bs.PackageCount,
 	)
+	return err
 }
 
-func (out *tableOutput) MissingHeader() {
-	fmt.Fprintln(out.w, "PROJECT\tMISSING PACKAGES")
+func (out *tableOutput) MissingHeader() error {
+	_, err := fmt.Fprintln(out.w, "PROJECT\tMISSING PACKAGES")
+	return err
 }
 
-func (out *tableOutput) MissingLine(ms *MissingStatus) {
-	fmt.Fprintf(out.w,
+func (out *tableOutput) MissingLine(ms *MissingStatus) error {
+	_, err := fmt.Fprintf(out.w,
 		"%s\t%s\t\n",
 		ms.ProjectRoot,
 		ms.MissingPackages,
 	)
+	return err
 }
 
-func (out *tableOutput) MissingFooter() {
-	out.w.Flush()
+func (out *tableOutput) MissingFooter() error {
+	return out.w.Flush()
 }
 
 type jsonOutput struct {
@@ -137,28 +141,32 @@ type jsonOutput struct {
 	missing []*MissingStatus
 }
 
-func (out *jsonOutput) BasicHeader() {
+func (out *jsonOutput) BasicHeader() error {
 	out.basic = []*rawStatus{}
+	return nil
 }
 
-func (out *jsonOutput) BasicFooter() {
-	json.NewEncoder(out.w).Encode(out.basic)
+func (out *jsonOutput) BasicFooter() error {
+	return json.NewEncoder(out.w).Encode(out.basic)
 }
 
-func (out *jsonOutput) BasicLine(bs *BasicStatus) {
+func (out *jsonOutput) BasicLine(bs *BasicStatus) error {
 	out.basic = append(out.basic, bs.marshalJSON())
+	return nil
 }
 
-func (out *jsonOutput) MissingHeader() {
+func (out *jsonOutput) MissingHeader() error {
 	out.missing = []*MissingStatus{}
+	return nil
 }
 
-func (out *jsonOutput) MissingLine(ms *MissingStatus) {
+func (out *jsonOutput) MissingLine(ms *MissingStatus) error {
 	out.missing = append(out.missing, ms)
+	return nil
 }
 
-func (out *jsonOutput) MissingFooter() {
-	json.NewEncoder(out.w).Encode(out.missing)
+func (out *jsonOutput) MissingFooter() error {
+	return json.NewEncoder(out.w).Encode(out.missing)
 }
 
 type dotOutput struct {
@@ -168,46 +176,50 @@ type dotOutput struct {
 	p *dep.Project
 }
 
-func (out *dotOutput) BasicHeader() {
+func (out *dotOutput) BasicHeader() error {
 	out.g = new(graphviz).New()
 
-	ptree, _ := out.p.ParseRootPackageTree()
+	ptree, err := out.p.ParseRootPackageTree()
 	// TODO(sdboyer) should be true, true, false, out.p.Manifest.IgnoredPackages()
 	prm, _ := ptree.ToReachMap(true, false, false, nil)
 
 	out.g.createNode(string(out.p.ImportRoot), "", prm.FlattenFn(paths.IsStandardImportPath))
+
+	return err
 }
 
-func (out *dotOutput) BasicFooter() {
+func (out *dotOutput) BasicFooter() error {
 	gvo := out.g.output()
-	fmt.Fprintf(out.w, gvo.String())
+	_, err := fmt.Fprintf(out.w, gvo.String())
+	return err
 }
 
-func (out *dotOutput) BasicLine(bs *BasicStatus) {
+func (out *dotOutput) BasicLine(bs *BasicStatus) error {
 	out.g.createNode(bs.ProjectRoot, bs.getConsolidatedVersion(), bs.Children)
+	return nil
 }
 
-func (out *dotOutput) MissingHeader()                {}
-func (out *dotOutput) MissingLine(ms *MissingStatus) {}
-func (out *dotOutput) MissingFooter()                {}
+func (out *dotOutput) MissingHeader() error                { return nil }
+func (out *dotOutput) MissingLine(ms *MissingStatus) error { return nil }
+func (out *dotOutput) MissingFooter() error                { return nil }
 
 type templateOutput struct {
 	w    io.Writer
 	tmpl *template.Template
 }
 
-func (out *templateOutput) BasicHeader() {}
-func (out *templateOutput) BasicFooter() {}
+func (out *templateOutput) BasicHeader() error { return nil }
+func (out *templateOutput) BasicFooter() error { return nil }
 
-func (out *templateOutput) BasicLine(bs *BasicStatus) {
-	out.tmpl.Execute(out.w, bs)
+func (out *templateOutput) BasicLine(bs *BasicStatus) error {
+	return out.tmpl.Execute(out.w, bs)
 }
 
-func (out *templateOutput) MissingHeader() {}
-func (out *templateOutput) MissingFooter() {}
+func (out *templateOutput) MissingHeader() error { return nil }
+func (out *templateOutput) MissingFooter() error { return nil }
 
-func (out *templateOutput) MissingLine(ms *MissingStatus) {
-	out.tmpl.Execute(out.w, ms)
+func (out *templateOutput) MissingLine(ms *MissingStatus) error {
+	return out.tmpl.Execute(out.w, ms)
 }
 
 func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
@@ -432,7 +444,9 @@ func runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceMana
 		// complete picture of all deps. That eliminates the need for at least
 		// some checks.
 
-		out.BasicHeader()
+		if err := out.BasicHeader(); err != nil {
+			return false, 0, err
+		}
 
 		logger.Println("Checking upstream projects:")
 
@@ -585,10 +599,14 @@ func runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceMana
 
 		// Use the collected BasicStatus in outputter.
 		for _, proj := range slp {
-			out.BasicLine(bsMap[string(proj.Ident().ProjectRoot)])
+			if err := out.BasicLine(bsMap[string(proj.Ident().ProjectRoot)]); err != nil {
+				return false, 0, err
+			}
 		}
 
-		out.BasicFooter()
+		if footerErr := out.BasicFooter(); footerErr != nil {
+			return false, 0, footerErr
+		}
 
 		return false, errCount, err
 	}
@@ -634,7 +652,9 @@ func runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceMana
 		return false, 0, errors.New("address issues with undeducible import paths to get more status information")
 	}
 
-	out.MissingHeader()
+	if err = out.MissingHeader(); err != nil {
+		return false, 0, err
+	}
 
 outer:
 	for root, pkgs := range roots {
@@ -647,9 +667,14 @@ outer:
 		}
 
 		hasMissingPkgs = true
-		out.MissingLine(&MissingStatus{ProjectRoot: string(root), MissingPackages: pkgs})
+		err := out.MissingLine(&MissingStatus{ProjectRoot: string(root), MissingPackages: pkgs})
+		if err != nil {
+			return false, 0, err
+		}
 	}
-	out.MissingFooter()
+	if err = out.MissingFooter(); err != nil {
+		return false, 0, err
+	}
 
 	// We are here because of an input-digest mismatch. Return error.
 	return hasMissingPkgs, 0, errInputDigestMismatch
