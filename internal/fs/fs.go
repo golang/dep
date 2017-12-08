@@ -480,6 +480,23 @@ func cloneSymlink(sl, dst string) error {
 	return os.Symlink(resolved, dst)
 }
 
+// EnsureDir tries to ensure that a directory is present at the given path. It first
+// checks if the directory already exists at the given path. If there isn't one, it tries
+// to create it with the given permissions. However, it does not try to create the
+// directory recursively.
+func EnsureDir(path string, perm os.FileMode) error {
+	_, err := IsDir(path)
+
+	if os.IsNotExist(err) {
+		err = os.Mkdir(path, perm)
+		if err != nil {
+			return errors.Wrapf(err, "failed to ensure directory at %q", path)
+		}
+	}
+
+	return err
+}
+
 // IsDir determines is the path given is a directory or not.
 func IsDir(name string) (bool, error) {
 	fi, err := os.Stat(name)
