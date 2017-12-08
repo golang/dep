@@ -5,9 +5,13 @@
 package gps
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
+
+	"github.com/golang/dep/internal/test"
 )
 
 // This file contains utilities for running tests around file system state.
@@ -89,45 +93,128 @@ func (tc fsTestCase) assert(t *testing.T) {
 // setup inflates fs onto the actual host file system at tc.before.root.
 // It doesn't delete existing files and should be used on empty roots only.
 func (tc fsTestCase) setup(t *testing.T) {
-	tc.setupDirs(t)
-	tc.setupFiles(t)
-	tc.setupLinks(t)
-}
-
-func (tc fsTestCase) setupDirs(t *testing.T) {
-	for _, dir := range tc.before.dirs {
-		p := filepath.Join(tc.before.root, dir)
-		if err := os.MkdirAll(p, 0777); err != nil {
-			t.Fatalf("os.MkdirAll(%q, 0777) err=%q", p, err)
-		}
+	if err := tc.before.setup(); err != nil {
+		t.Fatal(err)
 	}
 }
 
-func (tc fsTestCase) setupFiles(t *testing.T) {
-	for _, file := range tc.before.files {
-		p := filepath.Join(tc.before.root, file)
-		f, err := os.Create(p)
+func TestDeriveFilesystemState(t *testing.T) {
+	testcases := []struct {
+		name string
+		fs   fsTestCase
+	}{
+		{
+			name: "simple-case",
+			fs: fsTestCase{
+				before: filesystemState{
+					dirs: []string{
+						"simple-dir",
+					},
+					files: []string{
+						"simple-file",
+					},
+				},
+				after: filesystemState{
+					dirs: []string{
+						"simple-dir",
+					},
+					files: []string{
+						"simple-file",
+					},
+				},
+			},
+		},
+		{
+			name: "simple-symlink-case",
+			fs: fsTestCase{
+				before: filesystemState{
+					dirs: []string{
+						"simple-dir",
+					},
+					files: []string{
+						"simple-file",
+					},
+					links: []fsLink{
+						fsLink{
+							path:   "link",
+							to:     "nonexisting",
+							broken: true,
+						},
+					},
+				},
+				after: filesystemState{
+					dirs: []string{
+						"simple-dir",
+					},
+					files: []string{
+						"simple-file",
+					},
+					links: []fsLink{
+						fsLink{
+							path:   "link",
+							to:     "",
+							broken: true,
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "complex-symlink-case",
+			fs: fsTestCase{
+				before: filesystemState{
+					links: []fsLink{
+						fsLink{
+							path:     "link1",
+							to:       "link2",
+							circular: true,
+						},
+						fsLink{
+							path:     "link2",
+							to:       "link1",
+							circular: true,
+						},
+					},
+				},
+				after: filesystemState{
+					links: []fsLink{
+						fsLink{
+							path:     "link1",
+							to:       "",
+							circular: true,
+						},
+						fsLink{
+							path:     "link2",
+							to:       "",
+							circular: true,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for _, tc := range testcases {
+		h := test.NewHelper(t)
+
+		h.TempDir(tc.name)
+
+		tc.fs.before.root = h.Path(tc.name)
+		tc.fs.after.root = h.Path(tc.name)
+
+		tc.fs.setup(t)
+
+		state, err := deriveFilesystemState(h.Path(tc.name))
 		if err != nil {
-			t.Fatalf("os.Create(%q) err=%q", p, err)
+			t.Fatal(err)
 		}
-		if err := f.Close(); err != nil {
-			t.Fatalf("file %q Close() err=%q", p, err)
+
+		if !reflect.DeepEqual(tc.fs.after, state) {
+			fmt.Println(tc.fs.after)
+			fmt.Println(state)
+			t.Fatal("filesystem state mismatch")
 		}
-	}
-}
 
-func (tc fsTestCase) setupLinks(t *testing.T) {
-	for _, link := range tc.before.links {
-		p := filepath.Join(tc.before.root, link.path)
-
-		// On Windows, relative symlinks confuse filepath.Walk. This is golang/go
-		// issue 17540. So, we'll just sigh and do absolute links, assuming they are
-		// relative to the directory of link.path.
-		dir := filepath.Dir(p)
-		to := filepath.Join(dir, link.to)
-
-		if err := os.Symlink(to, p); err != nil {
-			t.Fatalf("os.Symlink(%q, %q) err=%q", to, p, err)
-		}
+		h.Cleanup()
 	}
 }

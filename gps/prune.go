@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/golang/dep/internal/fs"
@@ -126,11 +127,21 @@ func PruneProject(baseDir string, lp LockedProject, options PruneOptions, logger
 
 // pruneVendorDirs deletes all nested vendor directories within baseDir.
 func pruneVendorDirs(fsState filesystemState) error {
-	toDelete := collectNestedVendorDirs(fsState)
+	for _, dir := range fsState.dirs {
+		if filepath.Base(dir) == "vendor" {
+			err := os.RemoveAll(filepath.Join(fsState.root, dir))
+			if err != nil && !os.IsNotExist(err) {
+				return err
+			}
+		}
+	}
 
-	for _, path := range toDelete {
-		if err := os.RemoveAll(path); err != nil && !os.IsNotExist(err) {
-			return err
+	for _, link := range fsState.links {
+		if filepath.Base(link.path) == "vendor" {
+			err := os.Remove(filepath.Join(fsState.root, link.path))
+			if err != nil && !os.IsNotExist(err) {
+				return err
+			}
 		}
 	}
 
@@ -291,6 +302,8 @@ func pruneGoTestFiles(fsState filesystemState) error {
 }
 
 func deleteEmptyDirs(fsState filesystemState) error {
+	toDelete := make(sort.StringSlice, 0)
+
 	for _, dir := range fsState.dirs {
 		path := filepath.Join(fsState.root, dir)
 
@@ -300,9 +313,14 @@ func deleteEmptyDirs(fsState filesystemState) error {
 		}
 
 		if !notEmpty {
-			if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
-				return err
-			}
+			toDelete = append(toDelete, path)
+		}
+	}
+
+	sort.Sort(sort.Reverse(sort.StringSlice(toDelete)))
+	for _, path := range toDelete {
+		if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+			return err
 		}
 	}
 

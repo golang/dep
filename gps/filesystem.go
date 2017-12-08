@@ -7,8 +7,24 @@ package gps
 import (
 	"os"
 	"path/filepath"
-	"runtime"
+	"strings"
+
+	"github.com/pkg/errors"
 )
+
+// fsLink represents a symbolic link.
+type fsLink struct {
+	path string
+	to   string
+
+	// circular denotes if evaluating the symlink fails with "too many links" error.
+	// This errors means that it's very likely that the symlink has circual refernce.
+	circular bool
+
+	// broken denotes that attempting to resolve the link fails, most likely because
+	// the destaination doesn't exist.
+	broken bool
+}
 
 // filesystemState represents the state of a file system.
 type filesystemState struct {
@@ -18,10 +34,51 @@ type filesystemState struct {
 	links []fsLink
 }
 
-// fsLink represents a symbolic link.
-type fsLink struct {
-	path string
-	to   string
+func (s filesystemState) setup() error {
+	for _, dir := range s.dirs {
+		p := filepath.Join(s.root, dir)
+
+		if err := os.MkdirAll(p, 0777); err != nil {
+			return errors.Errorf("os.MkdirAll(%q, 0777) err=%q", p, err)
+		}
+	}
+
+	for _, file := range s.files {
+		p := filepath.Join(s.root, file)
+
+		f, err := os.Create(p)
+		if err != nil {
+			return errors.Errorf("os.Create(%q) err=%q", p, err)
+		}
+
+		if err := f.Close(); err != nil {
+			return errors.Errorf("file %q Close() err=%q", p, err)
+		}
+	}
+
+	for _, link := range s.links {
+		p := filepath.Join(s.root, link.path)
+
+		// On Windows, relative symlinks confuse filepath.Walk. So, we'll just sigh
+		// and do absolute links, assuming they are relative to the directory of
+		// link.path.
+		//
+		// Reference: https://github.com/golang/go/issues/17540
+		//
+		// TODO(ibrasho): This was fixed in Go 1.9. Remove this when support for
+		// 1.8 is dropped.
+		dir := filepath.Dir(p)
+		to := ""
+		if link.to != "" {
+			to = filepath.Join(dir, link.to)
+		}
+
+		if err := os.Symlink(to, p); err != nil {
+			return errors.Errorf("os.Symlink(%q, %q) err=%q", to, p, err)
+		}
+	}
+
+	return nil
 }
 
 // deriveFilesystemState returns a filesystemState based on the state of
@@ -43,36 +100,24 @@ func deriveFilesystemState(root string) (filesystemState, error) {
 			return err
 		}
 
-		symlink := (info.Mode() & os.ModeSymlink) == os.ModeSymlink
-		dir := info.IsDir()
+		if (info.Mode() & os.ModeSymlink) != 0 {
+			l := fsLink{path: relPath}
 
-		if runtime.GOOS == "windows" && symlink && dir {
-			// This could be a Windows junction directory. Support for these in the
-			// standard library is spotty, and we could easily delete an important
-			// folder if we called os.Remove or os.RemoveAll. Just skip these.
-			//
-			// TODO: If we could distinguish between junctions and Windows symlinks,
-			// we might be able to safely delete symlinks, even though junctions are
-			// dangerous.
-
-			return nil
-		}
-
-		if symlink {
-			eval, err := filepath.EvalSymlinks(path)
-			if err != nil {
+			l.to, err = filepath.EvalSymlinks(path)
+			if err != nil && strings.HasSuffix(err.Error(), "too many links") {
+				l.circular = true
+			} else if err != nil && os.IsNotExist(err) {
+				l.broken = true
+			} else if err != nil {
 				return err
 			}
 
-			fs.links = append(fs.links, fsLink{
-				path: relPath,
-				to:   eval,
-			})
+			fs.links = append(fs.links, l)
 
 			return nil
 		}
 
-		if dir {
+		if info.IsDir() {
 			fs.dirs = append(fs.dirs, relPath)
 
 			return nil

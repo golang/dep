@@ -7,6 +7,7 @@ package gps
 import (
 	"io/ioutil"
 	"log"
+	"os"
 	"testing"
 
 	"github.com/golang/dep/internal/test"
@@ -50,19 +51,6 @@ func TestPruneProject(t *testing.T) {
 		t.Fatal(err)
 	}
 }
-
-// func TestPruneVendorDirs(t *testing.T) {
-// 	h := test.NewHelper(t)
-// 	defer h.Cleanup()
-
-// 	h.TempDir(".")
-// 	baseDir := h.Path(".")
-
-// 	err := pruneVendorDirs(baseDir)
-// 	if err != nil {
-// 		t.Fatal(err)
-// 	}
-// }
 
 func TestPruneUnusedPackages(t *testing.T) {
 	h := test.NewHelper(t)
@@ -387,5 +375,245 @@ func TestPruneGoTestFiles(t *testing.T) {
 
 			tc.fs.assert(t)
 		})
+	}
+}
+
+func TestPruneVendorDirs(t *testing.T) {
+	tests := []struct {
+		name string
+		test fsTestCase
+	}{
+		{
+			name: "vendor directory",
+			test: fsTestCase{
+				before: filesystemState{
+					dirs: []string{
+						"package",
+						"package/vendor",
+					},
+				},
+				after: filesystemState{
+					dirs: []string{
+						"package",
+					},
+				},
+			},
+		},
+		{
+			name: "vendor file",
+			test: fsTestCase{
+				before: filesystemState{
+					dirs: []string{
+						"package",
+					},
+					files: []string{
+						"package/vendor",
+					},
+				},
+				after: filesystemState{
+					dirs: []string{
+						"package",
+					},
+					files: []string{
+						"package/vendor",
+					},
+				},
+			},
+		},
+		{
+			name: "vendor symlink",
+			test: fsTestCase{
+				before: filesystemState{
+					dirs: []string{
+						"package",
+						"package/_vendor",
+					},
+					links: []fsLink{
+						{
+							path: "package/vendor",
+							to:   "_vendor",
+						},
+					},
+				},
+				after: filesystemState{
+					dirs: []string{
+						"package",
+						"package/_vendor",
+					},
+				},
+			},
+		},
+		{
+			name: "nonvendor symlink",
+			test: fsTestCase{
+				before: filesystemState{
+					dirs: []string{
+						"package",
+						"package/_vendor",
+					},
+					links: []fsLink{
+						{
+							path: "package/link",
+							to:   "_vendor",
+						},
+					},
+				},
+				after: filesystemState{
+					dirs: []string{
+						"package",
+						"package/_vendor",
+					},
+					links: []fsLink{
+						{
+							path: "package/link",
+							to:   "_vendor",
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "vendor symlink to file",
+			test: fsTestCase{
+				before: filesystemState{
+					files: []string{
+						"file",
+					},
+					links: []fsLink{
+						{
+							path: "vendor",
+							to:   "file",
+						},
+					},
+				},
+				after: filesystemState{
+					files: []string{
+						"file",
+					},
+				},
+			},
+		},
+		{
+			name: "broken vendor symlink",
+			test: fsTestCase{
+				before: filesystemState{
+					dirs: []string{
+						"package",
+					},
+					links: []fsLink{
+						{
+							path: "package/vendor",
+							to:   "nonexistence",
+						},
+					},
+				},
+				after: filesystemState{
+					dirs: []string{
+						"package",
+					},
+					links: []fsLink{},
+				},
+			},
+		},
+		{
+			name: "chained symlinks",
+			test: fsTestCase{
+				before: filesystemState{
+					dirs: []string{
+						"_vendor",
+					},
+					links: []fsLink{
+						{
+							path: "vendor",
+							to:   "vendor2",
+						},
+						{
+							path: "vendor2",
+							to:   "_vendor",
+						},
+					},
+				},
+				after: filesystemState{
+					dirs: []string{
+						"_vendor",
+					},
+					links: []fsLink{
+						{
+							path: "vendor2",
+							to:   "_vendor",
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "circular symlinks",
+			test: fsTestCase{
+				before: filesystemState{
+					dirs: []string{
+						"package",
+					},
+					links: []fsLink{
+						{
+							path: "package/link1",
+							to:   "link2",
+						},
+						{
+							path: "package/link2",
+							to:   "link1",
+						},
+					},
+				},
+				after: filesystemState{
+					dirs: []string{
+						"package",
+					},
+					links: []fsLink{
+						{
+							path: "package/link1",
+							to:   "link2",
+						},
+						{
+							path: "package/link2",
+							to:   "link1",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, pruneVendorDirsTestCase(test.test))
+	}
+}
+
+func pruneVendorDirsTestCase(tc fsTestCase) func(*testing.T) {
+	return func(t *testing.T) {
+		tempDir, err := ioutil.TempDir("", "pruneVendorDirsTestCase")
+		if err != nil {
+			t.Fatalf("ioutil.TempDir err=%q", err)
+		}
+		defer func() {
+			if err := os.RemoveAll(tempDir); err != nil {
+				t.Errorf("os.RemoveAll(%q) err=%q", tempDir, err)
+			}
+		}()
+
+		tc.before.root = tempDir
+		tc.after.root = tempDir
+
+		tc.setup(t)
+
+		fs, err := deriveFilesystemState(tempDir)
+		if err != nil {
+			t.Fatalf("deriveFilesystemState failed: %s", err)
+		}
+
+		if err := pruneVendorDirs(fs); err != nil {
+			t.Errorf("pruneVendorDirs err=%q", err)
+		}
+
+		tc.assert(t)
 	}
 }
