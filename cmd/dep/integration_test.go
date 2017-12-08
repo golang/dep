@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -54,6 +55,13 @@ func TestIntegration(t *testing.T) {
 }
 
 func TestDepCachedir(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		// This test is unreliable on Windows and fails at random which makes it very
+		// difficult to debug. It might have something to do with parallel execution.
+		// Since the test doesn't test any specific behavior of Windows, it should be okay
+		// to skip.
+		t.Skip("skipping on windows")
+	}
 	t.Parallel()
 
 	test.NeedsExternalNetwork(t)
