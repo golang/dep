@@ -302,7 +302,7 @@ func pruneGoTestFiles(fsState filesystemState) error {
 }
 
 func deleteEmptyDirs(fsState filesystemState) error {
-	toDelete := make(sort.StringSlice, 0)
+	sort.Sort(sort.Reverse(sort.StringSlice(fsState.dirs)))
 
 	for _, dir := range fsState.dirs {
 		path := filepath.Join(fsState.root, dir)
@@ -313,14 +313,9 @@ func deleteEmptyDirs(fsState filesystemState) error {
 		}
 
 		if !notEmpty {
-			toDelete = append(toDelete, path)
-		}
-	}
-
-	sort.Sort(sort.Reverse(sort.StringSlice(toDelete)))
-	for _, path := range toDelete {
-		if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
-			return err
+			if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+				return err
+			}
 		}
 	}
 
