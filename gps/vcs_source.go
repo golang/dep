@@ -13,7 +13,6 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/Masterminds/semver"
 	"github.com/golang/dep/gps/pkgtree"
 	"github.com/golang/dep/internal/fs"
 	"github.com/pkg/errors"
@@ -382,103 +381,6 @@ func (s *gitSource) listVersions(ctx context.Context) (vlist []PairedVersion, er
 	}
 
 	return
-}
-
-// gopkginSource is a specialized git source that performs additional filtering
-// according to the input URL.
-type gopkginSource struct {
-	gitSource
-	major    uint64
-	unstable bool
-	// The aliased URL we report as being the one we talk to, even though we're
-	// actually talking directly to GitHub.
-	aliasURL string
-}
-
-func (s *gopkginSource) upstreamURL() string {
-	return s.aliasURL
-}
-
-func (s *gopkginSource) listVersions(ctx context.Context) ([]PairedVersion, error) {
-	ovlist, err := s.gitSource.listVersions(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	// Apply gopkg.in's filtering rules
-	vlist := make([]PairedVersion, len(ovlist))
-	k := 0
-	var dbranch int // index of branch to be marked default
-	var bsv semver.Version
-	var defaultBranch PairedVersion
-	tryDefaultAsV0 := s.major == 0
-	for _, v := range ovlist {
-		// all git versions will always be paired
-		pv := v.(versionPair)
-		switch tv := pv.v.(type) {
-		case semVersion:
-			tryDefaultAsV0 = false
-			if tv.sv.Major() == s.major && !s.unstable {
-				vlist[k] = v
-				k++
-			}
-		case branchVersion:
-			if tv.isDefault && defaultBranch == nil {
-				defaultBranch = pv
-			}
-
-			// The semver lib isn't exactly the same as gopkg.in's logic, but
-			// it's close enough that it's probably fine to use. We can be more
-			// exact if real problems crop up.
-			sv, err := semver.NewVersion(tv.name)
-			if err != nil {
-				continue
-			}
-			tryDefaultAsV0 = false
-
-			if sv.Major() != s.major {
-				// not the same major version as specified in the import path constraint
-				continue
-			}
-
-			// Gopkg.in has a special "-unstable" suffix which we need to handle
-			// separately.
-			if s.unstable != strings.HasSuffix(tv.name, gopkgUnstableSuffix) {
-				continue
-			}
-
-			// Turn off the default branch marker unconditionally; we can't know
-			// which one to mark as default until we've seen them all
-			tv.isDefault = false
-			// Figure out if this is the current leader for default branch
-			if bsv == (semver.Version{}) || bsv.LessThan(sv) {
-				bsv = sv
-				dbranch = k
-			}
-			pv.v = tv
-			vlist[k] = pv
-			k++
-		}
-		// The switch skips plainVersions because they cannot possibly meet
-		// gopkg.in's requirements
-	}
-
-	vlist = vlist[:k]
-	if bsv != (semver.Version{}) {
-		dbv := vlist[dbranch].(versionPair)
-		vlist[dbranch] = branchVersion{
-			name:      dbv.v.(branchVersion).name,
-			isDefault: true,
-		}.Pair(dbv.r)
-	}
-
-	// Treat the default branch as v0 only when no other semver branches/tags exist
-	// See http://labix.org/gopkg.in#VersionZero
-	if tryDefaultAsV0 && defaultBranch != nil {
-		vlist = append(vlist, defaultBranch)
-	}
-
-	return vlist, nil
 }
 
 // bzrSource is a generic bzr repository implementation that should work with

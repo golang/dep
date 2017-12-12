@@ -12,11 +12,10 @@ import (
 	"net/url"
 	"path"
 	"regexp"
-	"strconv"
 	"strings"
 	"sync"
 
-	radix "github.com/armon/go-radix"
+	"github.com/armon/go-radix"
 	"github.com/pkg/errors"
 )
 
@@ -27,8 +26,6 @@ var (
 	svnSchemes     = []string{"https", "http", "svn", "svn+ssh"}
 	gopkginSchemes = []string{"https", "http"}
 )
-
-const gopkgUnstableSuffix = "-unstable"
 
 func validateVCSScheme(scheme, typ string) bool {
 	// everything allows plain ssh
@@ -286,29 +283,11 @@ func (m gopkginDeducer) deduceSource(p string, u *url.URL) (maybeSource, error) 
 		u.Path = path.Join(v[2], v[3])
 	}
 
-	unstable := false
-	majorStr := v[4]
-
-	if strings.HasSuffix(majorStr, gopkgUnstableSuffix) {
-		unstable = true
-		majorStr = strings.TrimSuffix(majorStr, gopkgUnstableSuffix)
-	}
-	major, err := strconv.ParseUint(majorStr[1:], 10, 64)
-	if err != nil {
-		// this should only be reachable if there's an error in the regex
-		return nil, fmt.Errorf("could not parse %q as a gopkg.in major version", majorStr[1:])
-	}
-
 	mb := make(maybeSources, len(gopkginSchemes))
 	for k, scheme := range gopkginSchemes {
 		u2 := *u
 		u2.Scheme = scheme
-		mb[k] = maybeGopkginSource{
-			opath:    v[1],
-			url:      &u2,
-			major:    major,
-			unstable: unstable,
-		}
+		mb[k] = maybeGitSource{url: &u2}
 	}
 
 	return mb, nil
