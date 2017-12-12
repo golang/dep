@@ -487,6 +487,7 @@ func runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceMana
 					bs.hasOverride = true
 					bs.Constraint = pp.Constraint
 				} else if pp, has := p.Manifest.Constraints[proj.Ident().ProjectRoot]; has && pp.Constraint != nil {
+					// If the manifest has a constraint then set that as the constraint.
 					bs.Constraint = pp.Constraint
 				} else {
 					bs.Constraint = gps.Any()
