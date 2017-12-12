@@ -6,6 +6,9 @@ package main
 
 import (
 	"bytes"
+	"io/ioutil"
+	"log"
+	"reflect"
 	"testing"
 	"text/tabwriter"
 
@@ -13,6 +16,7 @@ import (
 
 	"github.com/golang/dep"
 	"github.com/golang/dep/gps"
+	"github.com/golang/dep/internal/test"
 )
 
 func TestStatusFormatVersion(t *testing.T) {
@@ -283,6 +287,121 @@ func TestBasicStatusGetConsolidatedLatest(t *testing.T) {
 			gotRev := tc.basicStatus.getConsolidatedLatest(tc.revSize)
 			if gotRev != tc.wantLatest {
 				t.Errorf("unexpected consolidated latest: \n\t(GOT) %v \n\t(WNT) %v", gotRev, tc.wantLatest)
+			}
+		})
+	}
+}
+
+func TestCollectConstraints(t *testing.T) {
+	ver1, _ := gps.NewSemverConstraintIC("v1.0.0")
+	ver08, _ := gps.NewSemverConstraintIC("v0.8.0")
+	ver2, _ := gps.NewSemverConstraintIC("v2.0.0")
+
+	cases := []struct {
+		name            string
+		project         dep.Project
+		wantConstraints constraintsCollection
+	}{
+		{
+			name: "without any constraints",
+			project: dep.Project{
+				Lock: &dep.Lock{
+					P: []gps.LockedProject{
+						gps.NewLockedProject(
+							gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot("github.com/sdboyer/deptest")},
+							gps.NewVersion("v1.0.0"),
+							[]string{"."},
+						),
+					},
+				},
+			},
+			wantConstraints: constraintsCollection{},
+		},
+		{
+			name: "with multiple constraints",
+			project: dep.Project{
+				Lock: &dep.Lock{
+					P: []gps.LockedProject{
+						gps.NewLockedProject(
+							gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot("github.com/sdboyer/deptest")},
+							gps.NewVersion("v1.0.0"),
+							[]string{"."},
+						),
+						gps.NewLockedProject(
+							gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot("github.com/darkowlzz/deptest-project-1")},
+							gps.NewVersion("v0.1.0"),
+							[]string{"."},
+						),
+						gps.NewLockedProject(
+							gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot("github.com/darkowlzz/deptest-project-2")},
+							gps.NewBranch("master").Pair(gps.Revision("824a8d56a4c6b2f4718824a98cd6d70d3dbd4c3e")),
+							[]string{"."},
+						),
+					},
+				},
+			},
+			wantConstraints: constraintsCollection{
+				"github.com/sdboyer/deptest": []projectConstraint{
+					{"github.com/darkowlzz/deptest-project-1", ver1},
+					{"github.com/darkowlzz/deptest-project-2", ver08},
+				},
+				"github.com/sdboyer/deptestdos": []projectConstraint{
+					{"github.com/darkowlzz/deptest-project-2", ver2},
+				},
+				"github.com/sdboyer/dep-test": []projectConstraint{
+					{"github.com/darkowlzz/deptest-project-2", ver1},
+				},
+			},
+		},
+		{
+			name: "skip projects with invalid versions",
+			project: dep.Project{
+				Lock: &dep.Lock{
+					P: []gps.LockedProject{
+						gps.NewLockedProject(
+							gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot("github.com/darkowlzz/deptest-project-1")},
+							gps.NewVersion("v0.1.0"),
+							[]string{"."},
+						),
+						gps.NewLockedProject(
+							gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot("github.com/darkowlzz/deptest-project-2")},
+							gps.NewVersion("v1.0.0"),
+							[]string{"."},
+						),
+					},
+				},
+			},
+			wantConstraints: constraintsCollection{
+				"github.com/sdboyer/deptest": []projectConstraint{
+					{"github.com/darkowlzz/deptest-project-1", ver1},
+				},
+			},
+		},
+	}
+
+	h := test.NewHelper(t)
+	defer h.Cleanup()
+
+	h.TempDir("src")
+	pwd := h.Path(".")
+	discardLogger := log.New(ioutil.Discard, "", 0)
+
+	ctx := &dep.Ctx{
+		GOPATH: pwd,
+		Out:    discardLogger,
+		Err:    discardLogger,
+	}
+
+	sm, err := ctx.SourceManager()
+	h.Must(err)
+	defer sm.Release()
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			gotConstraints := collectConstraints(ctx, &c.project, sm)
+
+			if !reflect.DeepEqual(gotConstraints, c.wantConstraints) {
+				t.Fatalf("Unexpected collected constraints: \n\t(GOT): %v\n\t(WNT): %v", gotConstraints, c.wantConstraints)
 			}
 		})
 	}

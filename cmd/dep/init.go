@@ -30,7 +30,7 @@ specified, use the current directory.
 When configuration for another dependency management tool is detected, it is
 imported into the initial manifest and lock. Use the -skip-tools flag to
 disable this behavior. The following external tools are supported:
-glide, godep, vndr, govend, gb, gvt.
+glide, godep, vndr, govend, gb, gvt, govendor, glock.
 
 Any dependencies that are not constrained by external configuration use the
 GOPATH analysis below.
@@ -85,19 +85,19 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 			root = filepath.Join(ctx.WorkingDir, args[0])
 		}
 		if err := os.MkdirAll(root, os.FileMode(0777)); err != nil {
-			return errors.Wrapf(err, "unable to create directory %s", root)
+			return errors.Wrapf(err, "init failed: unable to create a directory at %s", root)
 		}
 	}
 
 	var err error
 	p := new(dep.Project)
 	if err = p.SetRoot(root); err != nil {
-		return errors.Wrap(err, "NewProject")
+		return errors.Wrapf(err, "init failed: unable to set the root project to %s", root)
 	}
 
 	ctx.GOPATH, err = ctx.DetectProjectGOPATH(p)
 	if err != nil {
-		return errors.Wrapf(err, "ctx.DetectProjectGOPATH")
+		return errors.Wrapf(err, "init failed: unable to detect the containing GOPATH")
 	}
 
 	mf := filepath.Join(root, dep.ManifestName)
@@ -106,30 +106,30 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 
 	mok, err := fs.IsRegular(mf)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "init failed: unable to check for an existing manifest at %s", mf)
 	}
 	if mok {
-		return errors.Errorf("manifest already exists: %s", mf)
+		return errors.Errorf("init aborted: manifest already exists at %s", mf)
 	}
 	// Manifest file does not exist.
 
 	lok, err := fs.IsRegular(lf)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "init failed: unable to check for an existing lock at %s", lf)
 	}
 	if lok {
-		return errors.Errorf("invalid state: manifest %q does not exist, but lock %q does", mf, lf)
+		return errors.Errorf("invalid aborted: lock already exists at %s", lf)
 	}
 
 	ip, err := ctx.ImportForAbs(root)
 	if err != nil {
-		return errors.Wrap(err, "root project import")
+		return errors.Wrapf(err, "init failed: unable to determine the import path for the root project %s", root)
 	}
 	p.ImportRoot = gps.ProjectRoot(ip)
 
 	sm, err := ctx.SourceManager()
 	if err != nil {
-		return errors.Wrap(err, "getSourceManager")
+		return errors.Wrap(err, "init failed: unable to create a source manager")
 	}
 	sm.UseDefaultSignalHandling()
 	defer sm.Release()
@@ -139,7 +139,7 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 	}
 	pkgT, directDeps, err := getDirectDependencies(sm, p)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "init failed: unable to determine direct dependencies")
 	}
 	if ctx.Verbose {
 		ctx.Out.Printf("Checked %d directories for packages.\nFound %d direct dependencies.\n", len(pkgT.Packages), len(directDeps))
@@ -149,14 +149,14 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 	rootAnalyzer := newRootAnalyzer(cmd.skipTools, ctx, directDeps, sm)
 	p.Manifest, p.Lock, err = rootAnalyzer.InitializeRootManifestAndLock(root, p.ImportRoot)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "init failed: unable to prepare an initial manifest and lock for the solver")
 	}
 
 	if cmd.gopath {
 		gs := newGopathScanner(ctx, directDeps, sm)
 		err = gs.InitializeRootManifestAndLock(p.Manifest, p.Lock)
 		if err != nil {
-			return err
+			return errors.Wrap(err, "init failed: unable to scan the GOPATH for dependencies")
 		}
 	}
 
@@ -176,17 +176,18 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 	}
 
 	if err := ctx.ValidateParams(sm, params); err != nil {
-		return err
+		return errors.Wrapf(err, "init failed: validation of solve parameters failed")
 	}
 
 	s, err := gps.Prepare(params, sm)
 	if err != nil {
-		return errors.Wrap(err, "prepare solver")
+		return errors.Wrap(err, "init failed: unable to prepare the solver")
 	}
 
 	soln, err := s.Solve(context.TODO())
 	if err != nil {
-		return handleAllTheFailuresOfTheWorld(err)
+		err = handleAllTheFailuresOfTheWorld(err)
+		return errors.Wrap(err, "init failed: unable to solve the dependency graph")
 	}
 	p.Lock = dep.LockFromSolution(soln)
 
@@ -196,7 +197,7 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 	// to generate the final lock memo.
 	s, err = gps.Prepare(params, sm)
 	if err != nil {
-		return errors.Wrap(err, "prepare solver")
+		return errors.Wrap(err, "init failed: unable to recalculate the lock digest")
 	}
 
 	p.Lock.SolveMeta.InputsDigest = s.HashInputs()
@@ -204,7 +205,7 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 	// Pass timestamp (yyyyMMddHHmmss format) as suffix to backup name.
 	vendorbak, err := dep.BackupVendor(vpath, time.Now().Format("20060102150405"))
 	if err != nil {
-		return err
+		return errors.Wrap(err, "init failed: first backup vendor/, delete it, and then retry the previous command: failed to backup existing vendor directory")
 	}
 	if vendorbak != "" {
 		ctx.Err.Printf("Old vendor backed up to %v", vendorbak)
@@ -212,7 +213,7 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 
 	sw, err := dep.NewSafeWriter(p.Manifest, nil, p.Lock, dep.VendorAlways)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "init failed: unable to create a SafeWriter")
 	}
 
 	logger := ctx.Err
@@ -220,7 +221,7 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 		logger = log.New(ioutil.Discard, "", 0)
 	}
 	if err := sw.Write(root, sm, !cmd.noExamples, logger); err != nil {
-		return errors.Wrap(err, "safe write of manifest and lock")
+		return errors.Wrap(err, "init failed: unable to write the manifest, lock and vendor directory to disk")
 	}
 
 	return nil

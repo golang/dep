@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/Masterminds/semver"
@@ -116,6 +117,10 @@ func (bs *baseVCSSource) exportRevisionTo(ctx context.Context, r Revision, to st
 
 	return fs.CopyDir(bs.repo.LocalPath(), to)
 }
+
+var (
+	gitHashRE = regexp.MustCompile(`^[a-f0-9]{40}$`)
+)
 
 // gitSource is a generic git repository implementation that should work with
 // all standard git remotes.
@@ -238,6 +243,10 @@ func (s *gitSource) exportRevisionTo(ctx context.Context, rev Revision, to strin
 	return nil
 }
 
+func (s *gitSource) isValidHash(hash []byte) bool {
+	return gitHashRE.Match(hash)
+}
+
 func (s *gitSource) listVersions(ctx context.Context) (vlist []PairedVersion, err error) {
 	r := s.repo
 
@@ -298,6 +307,13 @@ func (s *gitSource) listVersions(ctx context.Context) (vlist []PairedVersion, er
 	vlist = make([]PairedVersion, len(all))
 	for _, pair := range all {
 		var v PairedVersion
+		// Valid `git ls-remote` output should start with hash, be at least
+		// 45 chars long and 40th character should be '\t'
+		//
+		// See: https://github.com/golang/dep/pull/1160#issuecomment-328843519
+		if len(pair) < 45 || pair[40] != '\t' || !s.isValidHash(pair[:40]) {
+			continue
+		}
 		if string(pair[41:]) == "HEAD" {
 			// If HEAD is present, it's always first
 			headrev = Revision(pair[:40])
@@ -394,23 +410,34 @@ func (s *gopkginSource) listVersions(ctx context.Context) ([]PairedVersion, erro
 	k := 0
 	var dbranch int // index of branch to be marked default
 	var bsv semver.Version
+	var defaultBranch PairedVersion
+	tryDefaultAsV0 := s.major == 0
 	for _, v := range ovlist {
 		// all git versions will always be paired
 		pv := v.(versionPair)
 		switch tv := pv.v.(type) {
 		case semVersion:
+			tryDefaultAsV0 = false
 			if tv.sv.Major() == s.major && !s.unstable {
 				vlist[k] = v
 				k++
 			}
 		case branchVersion:
+			if tv.isDefault && defaultBranch == nil {
+				defaultBranch = pv
+			}
+
 			// The semver lib isn't exactly the same as gopkg.in's logic, but
 			// it's close enough that it's probably fine to use. We can be more
 			// exact if real problems crop up.
 			sv, err := semver.NewVersion(tv.name)
-			if err != nil || sv.Major() != s.major {
-				// not a semver-shaped branch name at all, or not the same major
-				// version as specified in the import path constraint
+			if err != nil {
+				continue
+			}
+			tryDefaultAsV0 = false
+
+			if sv.Major() != s.major {
+				// not the same major version as specified in the import path constraint
 				continue
 			}
 
@@ -443,6 +470,12 @@ func (s *gopkginSource) listVersions(ctx context.Context) ([]PairedVersion, erro
 			name:      dbv.v.(branchVersion).name,
 			isDefault: true,
 		}.Pair(dbv.r)
+	}
+
+	// Treat the default branch as v0 only when no other semver branches/tags exist
+	// See http://labix.org/gopkg.in#VersionZero
+	if tryDefaultAsV0 && defaultBranch != nil {
+		vlist = append(vlist, defaultBranch)
 	}
 
 	return vlist, nil

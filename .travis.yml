@@ -73,3 +73,5 @@ jobs:
             repo: golang/dep
             branch: master
             tags: true
+addons:
+  ssh_known_hosts: github.com

@@ -1,0 +1,21 @@
+{
+	"comment": "",
+	"ignore": "test github.com/sdboyer/dep-test samples/",
+	"package": [
+		{
+			"checksumSHA1": "4R6TQcq0/gI/I2kKeUunuO/pEec=",
+			"path": "github.com/sdboyer/deptest",
+			"revision": "3f4c3bea144e112a69bbe5d8d01c1b09a544253f",
+			"revisionTime": "2017-02-22T03:31:47Z"
+		},
+		{
+			"checksumSHA1": "96YwrJjpE07ENey/eDWWnCWKQOw=",
+			"path": "github.com/sdboyer/deptestdos",
+			"revision": "5c607206be5decd28e6263ffffdcee067266015e",
+			"revisionTime": "2017-02-22T03:34:58Z",
+			"version": "v2",
+			"versionExact": "v2.0.0"
+		}
+	],
+	"rootPath": "github.com/golang/notexist"
+}

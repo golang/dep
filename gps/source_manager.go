@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/golang/dep/gps/pkgtree"
+	"github.com/golang/dep/internal/fs"
 	"github.com/nightlyone/lockfile"
 	"github.com/pkg/errors"
 	"github.com/sdboyer/constext"
@@ -202,7 +203,7 @@ func NewSourceManager(c SourceManagerConfig) (*SourceMgr, error) {
 		c.Logger = log.New(ioutil.Discard, "", 0)
 	}
 
-	err := os.MkdirAll(filepath.Join(c.Cachedir, "sources"), 0777)
+	err := fs.EnsureDir(filepath.Join(c.Cachedir, "sources"), 0777)
 	if err != nil {
 		return nil, err
 	}
@@ -299,6 +300,11 @@ func NewSourceManager(c SourceManagerConfig) (*SourceMgr, error) {
 	}
 
 	return sm, nil
+}
+
+// Cachedir returns the location of the cache directory.
+func (sm *SourceMgr) Cachedir() string {
+	return sm.cachedir
 }
 
 // UseDefaultSignalHandling sets up typical os.Interrupt signal handling for a

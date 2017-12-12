@@ -325,7 +325,10 @@ func TestCaseInsentitiveGOPATH(t *testing.T) {
 
 	h.TempDir("src")
 	h.TempDir("src/test1")
-	h.TempFile(filepath.Join("src/test1", ManifestName), `[[constraint]]`)
+	h.TempFile(filepath.Join("src/test1", ManifestName), `
+	[[constraint]]
+		name = "github.com/foo/bar"
+		branch = "master"`)
 
 	// Shuffle letter case
 	rs := []rune(strings.ToLower(h.Path(".")))
@@ -482,6 +485,45 @@ func TestDetectGOPATH(t *testing.T) {
 		}
 		if GOPATH != tc.GOPATH {
 			t.Errorf("expected GOPATH to be %s, got %s", GOPATH, tc.GOPATH)
+		}
+	}
+}
+
+func TestDepCachedir(t *testing.T) {
+	h := test.NewHelper(t)
+	defer h.Cleanup()
+
+	h.TempDir("cache")
+	// Create the directory for default cachedir location.
+	h.TempDir(filepath.Join("go", "pkg", "dep"))
+
+	testCachedir := h.Path("cache")
+	gopath := h.Path("go")
+	discardLgr := discardLogger()
+
+	cases := []struct {
+		cachedir     string
+		wantCachedir string
+	}{
+		// If `Cachedir` is not set in the context, it should use `$GOPATH/pkg/dep`.
+		{cachedir: "", wantCachedir: h.Path(filepath.Join("go", "pkg", "dep"))},
+		// If `Cachedir` is set in the context, it should use that.
+		{cachedir: testCachedir, wantCachedir: testCachedir},
+	}
+
+	for _, c := range cases {
+		ctx := &Ctx{
+			GOPATH:   gopath,
+			Cachedir: c.cachedir,
+			Out:      discardLgr,
+			Err:      discardLgr,
+		}
+		sm, err := ctx.SourceManager()
+		h.Must(err)
+		defer sm.Release()
+
+		if sm.Cachedir() != c.wantCachedir {
+			t.Errorf("expected cachedir to be %s, got %s", c.wantCachedir, sm.Cachedir())
 		}
 	}
 }

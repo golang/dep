@@ -77,8 +77,6 @@ func (c cmd) CombinedOutput() ([]byte, error) {
 		}
 	}()
 
-	if err := c.Cmd.Wait(); err != nil {
-		return nil, err
-	}
-	return b.Bytes(), nil
+	err := c.Cmd.Wait()
+	return b.Bytes(), err
 }

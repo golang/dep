@@ -407,8 +407,7 @@ func CopyDir(src, dst string) error {
 // copyFile copies the contents of the file named src to the file named
 // by dst. The file will be created if it does not already exist. If the
 // destination file exists, all its contents will be replaced by the contents
-// of the source file. The file mode will be copied from the source and
-// the copied data is synced/flushed to stable storage.
+// of the source file. The file mode will be copied from the source.
 func copyFile(src, dst string) (err error) {
 	if sym, err := IsSymlink(src); err != nil {
 		return errors.Wrap(err, "symlink check failed")
@@ -442,13 +441,14 @@ func copyFile(src, dst string) (err error) {
 	if err != nil {
 		return
 	}
-	defer out.Close()
 
 	if _, err = io.Copy(out, in); err != nil {
+		out.Close()
 		return
 	}
 
-	if err = out.Sync(); err != nil {
+	// Check for write errors on Close
+	if err = out.Close(); err != nil {
 		return
 	}
 
@@ -478,6 +478,23 @@ func cloneSymlink(sl, dst string) error {
 	}
 
 	return os.Symlink(resolved, dst)
+}
+
+// EnsureDir tries to ensure that a directory is present at the given path. It first
+// checks if the directory already exists at the given path. If there isn't one, it tries
+// to create it with the given permissions. However, it does not try to create the
+// directory recursively.
+func EnsureDir(path string, perm os.FileMode) error {
+	_, err := IsDir(path)
+
+	if os.IsNotExist(err) {
+		err = os.Mkdir(path, perm)
+		if err != nil {
+			return errors.Wrapf(err, "failed to ensure directory at %q", path)
+		}
+	}
+
+	return err
 }
 
 // IsDir determines is the path given is a directory or not.

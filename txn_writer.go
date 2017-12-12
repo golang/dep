@@ -21,8 +21,7 @@ import (
 // Example string to be written to the manifest file
 // if no dependencies are found in the project
 // during `dep init`
-var exampleTOML = []byte(`
-# Gopkg.toml example
+var exampleTOML = []byte(`# Gopkg.toml example
 #
 # Refer to https://github.com/golang/dep/blob/master/docs/Gopkg.toml.md
 # for detailed Gopkg.toml documentation.
