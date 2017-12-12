@@ -26,19 +26,23 @@ type Registry interface {
 	Token() string
 }
 
+// NewRegistryConfig creates new registry config using provided url and token
 func NewRegistryConfig(url *url.URL, token string) Registry {
 	return &RegitryConfig{url: url.String(), token: token}
 }
 
+// RegistryConfig holds url and token of Golang registry
 type RegitryConfig struct {
 	url   string
 	token string
 }
 
+// URL returns registry URL
 func (s *RegitryConfig) URL() string {
 	return s.url
 }
 
+// Token returns registry token
 func (s *RegitryConfig) Token() string {
 	return s.token
 }
@@ -84,7 +88,7 @@ func (s *registrySource) execGetVersions() (*rawVersions, error) {
 	if err != nil {
 		return nil, err
 	}
-	u.Path = path.Join(u.Path, "api/v1/versions", url.PathEscape(s.path))
+	u.Path = path.Join(u.Path, "api/v1/projects", url.PathEscape(s.path), "info")
 	req, err := http.NewRequest("GET", u.String(), nil)
 	if err != nil {
 		return nil, err
@@ -112,7 +116,7 @@ func (s *registrySource) execDownloadDependency(ctx context.Context, pr ProjectR
 	if err != nil {
 		return nil, err
 	}
-	u.Path = path.Join(u.Path, "api/v1/projects", url.PathEscape(s.path), r.String())
+	u.Path = path.Join(u.Path, "api/v1/projects", url.PathEscape(s.path), "versions", r.String())
 	req, err := http.NewRequest("GET", u.String(), nil)
 	if err != nil {
 		return nil, err
@@ -208,16 +212,16 @@ func extractDependency(r io.Reader, target string) error {
 			return err
 		}
 
-		path := filepath.Join(target, header.Name)
+		filePath := filepath.Join(target, header.Name)
 		info := header.FileInfo()
 		if info.IsDir() {
-			if err = os.MkdirAll(path, info.Mode()); err != nil {
+			if err = os.MkdirAll(filePath, info.Mode()); err != nil {
 				return err
 			}
 			continue
 		}
 
-		file, err := os.OpenFile(path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, info.Mode())
+		file, err := os.OpenFile(filePath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, info.Mode())
 		if err != nil {
 			return err
 		}

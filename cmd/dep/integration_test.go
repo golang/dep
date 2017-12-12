@@ -77,7 +77,7 @@ func TestDepCachedir(t *testing.T) {
 
 	t.Run("env-cachedir", func(t *testing.T) {
 		t.Parallel()
-		testProj := integration.NewTestProject(t, initPath, wd, runMain)
+		testProj := integration.NewTestProject(t, initPath, wd, nil, runMain)
 		defer testProj.Cleanup()
 
 		testProj.TempDir("cachedir")
@@ -105,7 +105,7 @@ func TestDepCachedir(t *testing.T) {
 	})
 	t.Run("env-invalid-cachedir", func(t *testing.T) {
 		t.Parallel()
-		testProj := integration.NewTestProject(t, initPath, wd, runMain)
+		testProj := integration.NewTestProject(t, initPath, wd, nil, runMain)
 		defer testProj.Cleanup()
 
 		var d []byte

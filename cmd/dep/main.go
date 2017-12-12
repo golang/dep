@@ -205,12 +205,12 @@ func (c *Config) Run() int {
 				Cachedir:       cachedir,
 			}
 
-			registryUrl := getEnv(c.Env, "DEPREGISTRYURL")
+			registryURL := getEnv(c.Env, "DEPREGISTRYURL")
 			token := getEnv(c.Env, "DEPREGISTRYTOKEN")
 
 			// check if url is not define do not create registry
-			if registryUrl != "" && token != "" {
-				registryUrl, err := url.Parse(registryUrl)
+			if registryURL != "" && token != "" {
+				registryUrl, err := url.Parse(registryURL)
 				if err != nil {
 					errLogger.Printf("%v\n", err)
 					return errorExitCode

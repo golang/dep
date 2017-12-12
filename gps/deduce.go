@@ -774,7 +774,7 @@ func (rd *registryDeducer) getProjectName(importPath string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	u.Path = path.Join(u.Path, "api/v1/projects/root", url.PathEscape(importPath))
+	u.Path = path.Join(u.Path, "api/v1/projects/", url.PathEscape(importPath))
 	req, err := http.NewRequest("HEAD", u.String(), nil)
 	if err != nil {
 		return "", err
@@ -808,10 +808,6 @@ func (rd *registryDeducer) deduce(ctx context.Context, path string) (pathDeducti
 		rd.deduced = pathDeduction{mb: maybeRegistrySource{path: projectName, url: u, token: rd.registry.Token()}, root: projectName}
 		rd.returnFunc(rd.deduced)
 		return
-
-		if rd.deduced.mb == nil {
-			rd.deduceErr = errors.Errorf("unable to find root path for: %s", path)
-		}
 	})
 	return rd.deduced, rd.deduceErr
 }

@@ -14,9 +14,9 @@ import (
 	"strings"
 )
 
-const TOKEN_AUTH = "2erygdasE45rty5JKwewrr75cb15rdeE"
+const TokenAuth = "2erygdasE45rty5JKwewrr75cb15rdeE"
 
-var tokenResp = "{\"token\": \"" + TOKEN_AUTH + "\"}"
+var tokenResp = "{\"token\": \"" + TokenAuth + "\"}"
 
 type rawVersions struct {
 	Versions map[string]rawPublished `json:"versions"`
@@ -34,7 +34,7 @@ func verifyToken(r *http.Request) error {
 	if ok && len(tokens) >= 1 {
 		token := tokens[0]
 		token = strings.TrimPrefix(token, "BEARER ")
-		if token == TOKEN_AUTH {
+		if token == TokenAuth {
 			return nil
 		}
 	}
@@ -78,7 +78,7 @@ func token(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprint(w, tokenResp) // send data to client side
 }
 
-func versions(w http.ResponseWriter, r *http.Request) {
+func getInfo(w http.ResponseWriter, r *http.Request, projectName string) {
 	if r.Method != http.MethodGet {
 		http.NotFound(w, r)
 		return
@@ -89,8 +89,7 @@ func versions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	depName := strings.TrimPrefix(r.URL.Path, "/api/v1/versions/")
-	versions := getVersions(depName)
+	versions := getVersions(projectName)
 	if len(versions.Versions) == 0 {
 		http.NotFound(w, r)
 		return
@@ -104,26 +103,14 @@ func versions(w http.ResponseWriter, r *http.Request) {
 	w.Write(requestContent)
 }
 
-func getDependency(w http.ResponseWriter, r *http.Request) {
-	if err := verifyToken(r); err != nil {
-		http.Error(w, err.Error(), http.StatusUnauthorized)
-		return
-	}
-
-	dep := strings.TrimPrefix(r.URL.Path, "/api/v1/projects/")
-	nameVer := strings.Split(dep, "/")
-	if len(nameVer) != 2 {
-		http.NotFound(w, r)
-		return
-	}
-
+func getDependency(w http.ResponseWriter, r *http.Request, projectName, version string) {
 	sourcesPath, err := getSourcesPath()
 	if err != nil {
 		http.NotFound(w, r)
 		return
 	}
 
-	f, err := os.OpenFile(filepath.Join(sourcesPath, dep, nameVer[0]+".tar.gz"), os.O_RDONLY, 0666)
+	f, err := os.OpenFile(filepath.Join(sourcesPath, projectName, version, projectName+".tar.gz"), os.O_RDONLY, 0666)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -138,13 +125,33 @@ func getDependency(w http.ResponseWriter, r *http.Request) {
 	h := sha256.New()
 	h.Write(b)
 
-	w.Header().Add("X-Go-Project-Name", strings.Replace(nameVer[0], "%2F", "/", -1))
-	w.Header().Add("X-Go-Project-Version", nameVer[1])
+	w.Header().Add("X-Go-Project-Name", strings.Replace(projectName, "%2F", "/", -1))
+	w.Header().Add("X-Go-Project-Version", version)
 	w.Header().Add("X-Checksum-Sha256", hex.EncodeToString(h.Sum(nil)))
 	w.Write(b)
 }
 
-func putDependency(w http.ResponseWriter, r *http.Request) {
+func getProject(w http.ResponseWriter, r *http.Request) {
+	if err := verifyToken(r); err != nil {
+		http.Error(w, err.Error(), http.StatusUnauthorized)
+		return
+	}
+
+	dep := strings.TrimPrefix(r.URL.Path, "/api/v1/projects/")
+	pathComponents := strings.Split(dep, "/")
+
+	switch pathComponents[1] {
+	case "info":
+		getInfo(w, r, pathComponents[0])
+		return
+	case "versions":
+		getDependency(w, r, pathComponents[0], pathComponents[2])
+		return
+	}
+	http.NotFound(w, r)
+}
+
+func putProject(w http.ResponseWriter, r *http.Request) {
 	if err := verifyToken(r); err != nil {
 		http.Error(w, err.Error(), http.StatusUnauthorized)
 		return
@@ -168,9 +175,9 @@ func putDependency(w http.ResponseWriter, r *http.Request) {
 func dependency(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
-		getDependency(w, r)
+		getProject(w, r)
 	case http.MethodPut:
-		putDependency(w, r)
+		putProject(w, r)
 	case http.MethodHead:
 		projectName(w, r)
 	default:
@@ -185,7 +192,7 @@ func projectName(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	importPath := strings.TrimPrefix(r.URL.Path, "/api/v1/projects/root/")
+	importPath := strings.TrimPrefix(r.URL.Path, "/api/v1/projects/")
 	sourcePath, err := getSourcesPath()
 	if err != nil {
 		http.NotFound(w, r)
@@ -217,9 +224,9 @@ func notFound(w http.ResponseWriter, r *http.Request) {
 	http.NotFound(w, r)
 }
 
+// SetupAndRun starts the registry mock for testing purposes
 func SetupAndRun(addr string) error {
 	http.HandleFunc("/api/v1/auth/token", token)
-	http.HandleFunc("/api/v1/versions/", versions)
 	http.HandleFunc("/api/v1/projects/", dependency)
 	http.HandleFunc("/", notFound)
 	return http.ListenAndServe(addr, nil)
