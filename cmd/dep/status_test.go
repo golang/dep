@@ -187,6 +187,13 @@ func TestBasicStatusGetConsolidatedConstraint(t *testing.T) {
 			},
 			wantConstraint: "1.2.1 (override)",
 		},
+		{
+			name: "BasicStatus with Revision Constraint",
+			basicStatus: BasicStatus{
+				Constraint: gps.Revision("ddeb6f5d27091ff291b16232e99076a64fb375b8"),
+			},
+			wantConstraint: "ddeb6f5",
+		},
 	}
 
 	for _, tc := range testCases {
