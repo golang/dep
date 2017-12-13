@@ -347,7 +347,7 @@ It's up to you:
 **Cons**
 
 - Your repo will be bigger, potentially a lot bigger,
-  though [`prune`](Gopkg.toml.md#prune) can help minimize this problem.
+  though `dep prune` can help minimize this problem.
 - PR diffs will include changes for files under `vendor/` when Gopkg.lock is modified,
   however files in `vendor/` are [hidden by default](https://github.com/github/linguist/blob/v5.2.0/lib/linguist/generated.rb#L328) on Github.
 
