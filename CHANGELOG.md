@@ -6,6 +6,7 @@ NEW FEATURES:
   based projects (#815).
 * Allow override of cache directory location using environment variable
 `DEPCACHEDIR`. ([#1234](https://github.com/golang/dep/pull/1234))
+* Add support for template output in `dep status`. (#1389)
 
 BUG FIXES:
 
@@ -15,6 +16,7 @@ BUG FIXES:
 * Fix `-no-vendor` flag for `ensure -update` (#1361).
 * Validate `git ls-remote` output and ignore all malformed lines (#1379)
 * Support [gopkg.in version zero](http://labix.org/gopkg.in#VersionZero) (#1243).
+* Fix how dep status print revision constraints. (#1421)
 
 IMPROVEMENTS:
 
@@ -23,6 +25,7 @@ IMPROVEMENTS:
 * Improve file copy performance by not forcing a file sync (PR #1408).
 * Skip empty constraints during import ([#1414](https://github.com/golang/dep/pull/1349))
 * Handle errors when writing status output ([#1420](https://github.com/golang/dep/pull/1420))
+* Add constraint for locked projects in `status`. (#962)
 
 # v0.3.2
 
