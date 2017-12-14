@@ -617,3 +617,98 @@ func pruneVendorDirsTestCase(tc fsTestCase) func(*testing.T) {
 		tc.assert(t)
 	}
 }
+
+func TestDeleteEmptyDirs(t *testing.T) {
+	testcases := []struct {
+		name string
+		fs   fsTestCase
+	}{
+		{
+			name: "empty-dir",
+			fs: fsTestCase{
+				before: filesystemState{
+					dirs: []string{
+						"pkg1",
+					},
+				},
+				after: filesystemState{},
+			},
+		},
+		{
+			name: "nested-empty-dirs",
+			fs: fsTestCase{
+				before: filesystemState{
+					dirs: []string{
+						"pkg1",
+						"pkg1/pkg2",
+					},
+				},
+				after: filesystemState{},
+			},
+		},
+		{
+			name: "non-empty-dir",
+			fs: fsTestCase{
+				before: filesystemState{
+					dirs: []string{
+						"pkg1",
+					},
+					files: []string{
+						"pkg1/file1",
+					},
+				},
+				after: filesystemState{
+					dirs: []string{
+						"pkg1",
+					},
+					files: []string{
+						"pkg1/file1",
+					},
+				},
+			},
+		},
+		{
+			name: "mixed-dirs",
+			fs: fsTestCase{
+				before: filesystemState{
+					dirs: []string{
+						"pkg1",
+						"pkg1/pkg2",
+					},
+					files: []string{
+						"pkg1/file1",
+					},
+				},
+				after: filesystemState{
+					dirs: []string{
+						"pkg1",
+					},
+					files: []string{
+						"pkg1/file1",
+					},
+				},
+			},
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			h := test.NewHelper(t)
+			h.Cleanup()
+			h.TempDir(".")
+
+			tc.fs.before.root = h.Path(".")
+			tc.fs.after.root = h.Path(".")
+
+			if err := tc.fs.before.setup(); err != nil {
+				t.Fatal("unexpected error in fs setup: ", err)
+			}
+
+			if err := deleteEmptyDirs(tc.fs.before); err != nil {
+				t.Fatal("unexpected error in deleteEmptyDirs: ", err)
+			}
+
+			tc.fs.assert(t)
+		})
+	}
+}
