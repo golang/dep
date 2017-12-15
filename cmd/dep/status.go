@@ -6,6 +6,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -249,7 +250,7 @@ func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
 	case cmd.missing:
 		return errors.Errorf("not implemented")
 	case cmd.old:
-		return errors.Errorf("not implemented")
+		cmd.runOld(ctx, args, p, sm)
 	case cmd.detailed:
 		return errors.Errorf("not implemented")
 	case cmd.json:
@@ -309,6 +310,65 @@ func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
 
 	// Print the status output
 	ctx.Out.Print(buf.String())
+
+	return nil
+}
+
+// OldStatus contains information about all the out of date packages in a project.
+type OldStatus struct {
+	ProjectRoot string
+	Constraint  gps.Constraint
+	Version     gps.UnpairedVersion
+	Revision    gps.Revision
+	Latest      gps.Version
+}
+
+func (cmd *statusCommand) runOld(ctx *dep.Ctx, args []string, p *dep.Project, sm gps.SourceManager) error {
+	// While the network churns on ListVersions() requests, statically analyze
+	// code from the current project.
+	ptree, err := p.ParseRootPackageTree()
+	if err != nil {
+		return err
+	}
+
+	// Set up a solver in order to check the InputHash.
+	params := gps.SolveParameters{
+		ProjectAnalyzer: dep.Analyzer{},
+		RootDir:         p.AbsRoot,
+		RootPackageTree: ptree,
+		Manifest:        p.Manifest,
+		// Locks aren't a part of the input hash check, so we can omit it.
+	}
+
+	// Check update for all the projects
+	params.ChangeAll = true
+
+	solver, err := gps.Prepare(params, sm)
+	if err != nil {
+		return errors.Wrap(err, "fastpath solver prepare")
+	}
+
+	solution, err := solver.Solve(context.TODO())
+	if err != nil {
+		return errors.Wrap(err, "runOld")
+	}
+
+	var oldLockProjects []gps.LockedProject
+	lockProjects := p.Lock.Projects()
+	solutionProjects := solution.Projects()
+
+	for i := range solutionProjects {
+		spr, _, _ := gps.VersionComponentStrings(solutionProjects[i].Version())
+		lpr, _, _ := gps.VersionComponentStrings(lockProjects[i].Version())
+
+		if spr != lpr {
+			oldLockProjects = append(oldLockProjects, lockProjects[i])
+		}
+	}
+
+	for _, oldLockProject := range oldLockProjects {
+		ctx.Out.Println(oldLockProject)
+	}
 
 	return nil
 }
