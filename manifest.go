@@ -417,6 +417,23 @@ func fromRawPruneOptions(raw rawPruneOptions) gps.RootPruneOptions {
 	return opts
 }
 
+func toRawPruneOptions(options gps.PruneOptions) rawPruneOptions {
+	raw := rawPruneOptions{}
+
+	if (options & gps.PruneUnusedPackages) != 0 {
+		raw.UnusedPackages = true
+	}
+
+	if (options & gps.PruneNonGoFiles) != 0 {
+		raw.NonGoFiles = true
+	}
+
+	if (options & gps.PruneGoTestFiles) != 0 {
+		raw.GoTests = true
+	}
+	return raw
+}
+
 // toProject interprets the string representations of project information held in
 // a rawProject, converting them into a proper gps.ProjectProperties. An
 // error is returned if the rawProject contains some invalid combination -
@@ -462,11 +479,10 @@ func (m *Manifest) MarshalTOML() ([]byte, error) {
 // toRaw converts the manifest into a representation suitable to write to the manifest file
 func (m *Manifest) toRaw() rawManifest {
 	raw := rawManifest{
-		Constraints:  make([]rawProject, 0, len(m.Constraints)),
-		Overrides:    make([]rawProject, 0, len(m.Ovr)),
-		Ignored:      m.Ignored,
-		Required:     m.Required,
-		PruneOptions: rawPruneOptions{},
+		Constraints: make([]rawProject, 0, len(m.Constraints)),
+		Overrides:   make([]rawProject, 0, len(m.Ovr)),
+		Ignored:     m.Ignored,
+		Required:    m.Required,
 	}
 
 	for n, prj := range m.Constraints {
@@ -479,7 +495,7 @@ func (m *Manifest) toRaw() rawManifest {
 	}
 	sort.Sort(sortedRawProjects(raw.Overrides))
 
-	// TODO(ibrasho): write out prune options.
+	raw.PruneOptions = toRawPruneOptions(m.PruneOptions.PruneOptions)
 
 	return raw
 }

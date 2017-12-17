@@ -39,8 +39,13 @@ var exampleTOML = []byte(`# Gopkg.toml example
 #   source = "github.com/myfork/project2"
 #
 # [[override]]
-#  name = "github.com/x/y"
-#  version = "2.4.0"
+#   name = "github.com/x/y"
+#   version = "2.4.0"
+#
+# [prune]
+#   non-go = false
+#   go-tests = true
+#   unused-packages = true
 
 `)
 

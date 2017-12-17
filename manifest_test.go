@@ -608,6 +608,43 @@ func TestValidateProjectRoots(t *testing.T) {
 	}
 }
 
+func TestToRawPruneOptions(t *testing.T) {
+	cases := []struct {
+		name         string
+		pruneOptions gps.PruneOptions
+		wantOptions  rawPruneOptions
+	}{
+		{
+			name:         "all options",
+			pruneOptions: 15,
+			wantOptions: rawPruneOptions{
+				UnusedPackages: true,
+				NonGoFiles:     true,
+				GoTests:        true,
+			},
+		},
+		{
+			name:         "no options",
+			pruneOptions: 1,
+			wantOptions: rawPruneOptions{
+				UnusedPackages: false,
+				NonGoFiles:     false,
+				GoTests:        false,
+			},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			raw := toRawPruneOptions(c.pruneOptions)
+
+			if !reflect.DeepEqual(raw, c.wantOptions) {
+				t.Fatalf("rawPruneOptions are not as expected:\n\t(GOT) %v\n\t(WNT) %v", raw, c.wantOptions)
+			}
+		})
+	}
+}
+
 func containsErr(s []error, e error) bool {
 	for _, a := range s {
 		if a.Error() == e.Error() {
