@@ -10,7 +10,10 @@
 [[projects]]
   branch = "master"
   name = "github.com/sdboyer/deptesttres"
-  packages = [".","subp"]
+  packages = [
+    ".",
+    "subp"
+  ]
   revision = "54aaeb0023e1f3dcf5f98f31dd8c565457945a12"
 
 [solve-meta]

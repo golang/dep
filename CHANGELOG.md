@@ -7,6 +7,7 @@ NEW FEATURES:
 * Allow override of cache directory location using environment variable
 `DEPCACHEDIR`. ([#1234](https://github.com/golang/dep/pull/1234))
 * Add support for template output in `dep status`. (#1389)
+* Each element in a multi-item TOML array is output on its own line. (#1461)
 
 BUG FIXES:
 
