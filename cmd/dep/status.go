@@ -62,26 +62,20 @@ func (cmd *statusCommand) LongHelp() string  { return statusLongHelp }
 func (cmd *statusCommand) Hidden() bool      { return false }
 
 func (cmd *statusCommand) Register(fs *flag.FlagSet) {
-	fs.BoolVar(&cmd.detailed, "detailed", false, "report more detailed status")
 	fs.BoolVar(&cmd.json, "json", false, "output in JSON format")
 	fs.StringVar(&cmd.template, "f", "", "output in text/template format")
 	fs.BoolVar(&cmd.dot, "dot", false, "output the dependency graph in GraphViz format")
 	fs.BoolVar(&cmd.old, "old", false, "only show out-of-date dependencies")
 	fs.BoolVar(&cmd.missing, "missing", false, "only show missing dependencies")
-	fs.BoolVar(&cmd.unused, "unused", false, "only show unused dependencies")
-	fs.BoolVar(&cmd.modified, "modified", false, "only show modified dependencies")
 }
 
 type statusCommand struct {
-	detailed bool
 	json     bool
 	template string
 	output   string
 	dot      bool
 	old      bool
 	missing  bool
-	unused   bool
-	modified bool
 }
 
 type outputter interface {
@@ -223,6 +217,10 @@ func (out *templateOutput) MissingLine(ms *MissingStatus) error {
 }
 
 func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
+	if err := cmd.validateFlags(); err != nil {
+		return err
+	}
+
 	p, err := ctx.LoadProject()
 	if err != nil {
 		return err
@@ -242,15 +240,9 @@ func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
 	var buf bytes.Buffer
 	var out outputter
 	switch {
-	case cmd.modified:
-		return errors.Errorf("not implemented")
-	case cmd.unused:
-		return errors.Errorf("not implemented")
 	case cmd.missing:
 		return errors.Errorf("not implemented")
 	case cmd.old:
-		return errors.Errorf("not implemented")
-	case cmd.detailed:
 		return errors.Errorf("not implemented")
 	case cmd.json:
 		out = &jsonOutput{
@@ -309,6 +301,42 @@ func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
 
 	// Print the status output
 	ctx.Out.Print(buf.String())
+
+	return nil
+}
+
+func (cmd *statusCommand) validateFlags() error {
+	// Operating mode flags.
+	opModes := []string{}
+
+	if cmd.old {
+		opModes = append(opModes, "-old")
+	}
+
+	if cmd.missing {
+		opModes = append(opModes, "-missing")
+	}
+
+	// Check if any other flags are passed with -dot.
+	if cmd.dot {
+		if cmd.template != "" {
+			return errors.New("cannot pass template string with -dot")
+		}
+
+		if cmd.json {
+			return errors.New("cannot pass multiple output format flags")
+		}
+
+		if len(opModes) > 0 {
+			return errors.New("-dot generates dependency graph; cannot pass other flags")
+		}
+	}
+
+	if len(opModes) > 1 {
+		// List the flags because which flags are for operation mode might not
+		// be apparent to the users.
+		return errors.Wrapf(errors.New("cannot pass multiple operating mode flags"), "%v", opModes)
+	}
 
 	return nil
 }
