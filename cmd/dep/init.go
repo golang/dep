@@ -211,7 +211,7 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 		ctx.Err.Printf("Old vendor backed up to %v", vendorbak)
 	}
 
-	sw, err := dep.NewSafeWriter(p.Manifest, nil, p.Lock, dep.VendorAlways)
+	sw, err := dep.NewSafeWriter(p.Manifest, nil, p.Lock, dep.VendorAlways, gps.DefaultRootPruneOptions())
 	if err != nil {
 		return errors.Wrap(err, "init failed: unable to create a SafeWriter")
 	}
