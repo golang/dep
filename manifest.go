@@ -454,8 +454,10 @@ func toProject(raw rawProject) (n gps.ProjectRoot, pp gps.ProjectProperties, err
 // MarshalTOML serializes this manifest into TOML via an intermediate raw form.
 func (m *Manifest) MarshalTOML() ([]byte, error) {
 	raw := m.toRaw()
-	result, err := toml.Marshal(raw)
-	return result, errors.Wrap(err, "unable to marshal the lock to a TOML string")
+	var buf bytes.Buffer
+	enc := toml.NewEncoder(&buf).ArraysWithOneElementPerLine(true)
+	err := enc.Encode(raw)
+	return buf.Bytes(), errors.Wrap(err, "unable to marshal the lock to a TOML string")
 }
 
 // toRaw converts the manifest into a representation suitable to write to the manifest file
