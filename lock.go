@@ -173,8 +173,10 @@ func (l *Lock) toRaw() rawLock {
 // MarshalTOML serializes this lock into TOML via an intermediate raw form.
 func (l *Lock) MarshalTOML() ([]byte, error) {
 	raw := l.toRaw()
-	result, err := toml.Marshal(raw)
-	return result, errors.Wrap(err, "Unable to marshal lock to TOML string")
+	var buf bytes.Buffer
+	enc := toml.NewEncoder(&buf).ArraysWithOneElementPerLine(true)
+	err := enc.Encode(raw)
+	return buf.Bytes(), errors.Wrap(err, "Unable to marshal lock to TOML string")
 }
 
 // LockFromSolution converts a gps.Solution to dep's representation of a lock.

@@ -1,4 +1,7 @@
-ignored = ["github.com/golang/notexist/samples*","github.com/sdboyer/dep-test*"]
+ignored = [
+  "github.com/golang/notexist/samples*",
+  "github.com/sdboyer/dep-test*"
+]
 
 [[constraint]]
   name = "github.com/sdboyer/deptestdos"

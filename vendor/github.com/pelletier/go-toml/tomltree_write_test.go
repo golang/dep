@@ -16,31 +16,55 @@ type failingWriter struct {
 	buffer  bytes.Buffer
 }
 
-func (f failingWriter) Write(p []byte) (n int, err error) {
+func (f *failingWriter) Write(p []byte) (n int, err error) {
 	count := len(p)
-	toWrite := f.failAt - count + f.written
+	toWrite := f.failAt - (count + f.written)
 	if toWrite < 0 {
 		toWrite = 0
 	}
 	if toWrite > count {
 		f.written += count
-		f.buffer.WriteString(string(p))
+		f.buffer.Write(p)
 		return count, nil
 	}
 
-	f.buffer.WriteString(string(p[:toWrite]))
+	f.buffer.Write(p[:toWrite])
 	f.written = f.failAt
-	return f.written, fmt.Errorf("failingWriter failed after writting %d bytes", f.written)
+	return toWrite, fmt.Errorf("failingWriter failed after writing %d bytes", f.written)
 }
 
 func assertErrorString(t *testing.T, expected string, err error) {
 	expectedErr := errors.New(expected)
-	if err.Error() != expectedErr.Error() {
+	if err == nil || err.Error() != expectedErr.Error() {
 		t.Errorf("expecting error %s, but got %s instead", expected, err)
 	}
 }
 
-func TestTomlTreeWriteToTomlString(t *testing.T) {
+func TestTreeWriteToEmptyTable(t *testing.T) {
+	doc := `[[empty-tables]]
+[[empty-tables]]`
+
+	toml, err := Load(doc)
+	if err != nil {
+		t.Fatal("Unexpected Load error:", err)
+	}
+	tomlString, err := toml.ToTomlString()
+	if err != nil {
+		t.Fatal("Unexpected ToTomlString error:", err)
+	}
+
+	expected := `
+[[empty-tables]]
+
+[[empty-tables]]
+`
+
+	if tomlString != expected {
+		t.Fatalf("Expected:\n%s\nGot:\n%s", expected, tomlString)
+	}
+}
+
+func TestTreeWriteToTomlString(t *testing.T) {
 	toml, err := Load(`name = { first = "Tom", last = "Preston-Werner" }
 points = { x = 1, y = 2 }`)
 
@@ -63,7 +87,7 @@ points = { x = 1, y = 2 }`)
 	})
 }
 
-func TestTomlTreeWriteToTomlStringSimple(t *testing.T) {
+func TestTreeWriteToTomlStringSimple(t *testing.T) {
 	tree, err := Load("[foo]\n\n[[foo.bar]]\na = 42\n\n[[foo.bar]]\na = 69\n")
 	if err != nil {
 		t.Errorf("Test failed to parse: %v", err)
@@ -79,7 +103,7 @@ func TestTomlTreeWriteToTomlStringSimple(t *testing.T) {
 	}
 }
 
-func TestTomlTreeWriteToTomlStringKeysOrders(t *testing.T) {
+func TestTreeWriteToTomlStringKeysOrders(t *testing.T) {
 	for i := 0; i < 100; i++ {
 		tree, _ := Load(`
 		foobar = true
@@ -119,7 +143,7 @@ func testMaps(t *testing.T, actual, expected map[string]interface{}) {
 	}
 }
 
-func TestTomlTreeWriteToMapSimple(t *testing.T) {
+func TestTreeWriteToMapSimple(t *testing.T) {
 	tree, _ := Load("a = 42\nb = 17")
 
 	expected := map[string]interface{}{
@@ -130,58 +154,58 @@ func TestTomlTreeWriteToMapSimple(t *testing.T) {
 	testMaps(t, tree.ToMap(), expected)
 }
 
-func TestTomlTreeWriteToInvalidTreeSimpleValue(t *testing.T) {
-	tree := TomlTree{values: map[string]interface{}{"foo": int8(1)}}
+func TestTreeWriteToInvalidTreeSimpleValue(t *testing.T) {
+	tree := Tree{values: map[string]interface{}{"foo": int8(1)}}
 	_, err := tree.ToTomlString()
 	assertErrorString(t, "invalid value type at foo: int8", err)
 }
 
-func TestTomlTreeWriteToInvalidTreeTomlValue(t *testing.T) {
-	tree := TomlTree{values: map[string]interface{}{"foo": &tomlValue{int8(1), Position{}}}}
+func TestTreeWriteToInvalidTreeTomlValue(t *testing.T) {
+	tree := Tree{values: map[string]interface{}{"foo": &tomlValue{value: int8(1), comment: "", position: Position{}}}}
 	_, err := tree.ToTomlString()
 	assertErrorString(t, "unsupported value type int8: 1", err)
 }
 
-func TestTomlTreeWriteToInvalidTreeTomlValueArray(t *testing.T) {
-	tree := TomlTree{values: map[string]interface{}{"foo": &tomlValue{[]interface{}{int8(1)}, Position{}}}}
+func TestTreeWriteToInvalidTreeTomlValueArray(t *testing.T) {
+	tree := Tree{values: map[string]interface{}{"foo": &tomlValue{value: int8(1), comment: "", position: Position{}}}}
 	_, err := tree.ToTomlString()
 	assertErrorString(t, "unsupported value type int8: 1", err)
 }
 
-func TestTomlTreeWriteToFailingWriterInSimpleValue(t *testing.T) {
+func TestTreeWriteToFailingWriterInSimpleValue(t *testing.T) {
 	toml, _ := Load(`a = 2`)
 	writer := failingWriter{failAt: 0, written: 0}
-	_, err := toml.WriteTo(writer)
-	assertErrorString(t, "failingWriter failed after writting 0 bytes", err)
+	_, err := toml.WriteTo(&writer)
+	assertErrorString(t, "failingWriter failed after writing 0 bytes", err)
 }
 
-func TestTomlTreeWriteToFailingWriterInTable(t *testing.T) {
+func TestTreeWriteToFailingWriterInTable(t *testing.T) {
 	toml, _ := Load(`
 [b]
 a = 2`)
 	writer := failingWriter{failAt: 2, written: 0}
-	_, err := toml.WriteTo(writer)
-	assertErrorString(t, "failingWriter failed after writting 2 bytes", err)
+	_, err := toml.WriteTo(&writer)
+	assertErrorString(t, "failingWriter failed after writing 2 bytes", err)
 
 	writer = failingWriter{failAt: 13, written: 0}
-	_, err = toml.WriteTo(writer)
-	assertErrorString(t, "failingWriter failed after writting 13 bytes", err)
+	_, err = toml.WriteTo(&writer)
+	assertErrorString(t, "failingWriter failed after writing 13 bytes", err)
 }
 
-func TestTomlTreeWriteToFailingWriterInArray(t *testing.T) {
+func TestTreeWriteToFailingWriterInArray(t *testing.T) {
 	toml, _ := Load(`
 [[b]]
 a = 2`)
 	writer := failingWriter{failAt: 2, written: 0}
-	_, err := toml.WriteTo(writer)
-	assertErrorString(t, "failingWriter failed after writting 2 bytes", err)
+	_, err := toml.WriteTo(&writer)
+	assertErrorString(t, "failingWriter failed after writing 2 bytes", err)
 
 	writer = failingWriter{failAt: 15, written: 0}
-	_, err = toml.WriteTo(writer)
-	assertErrorString(t, "failingWriter failed after writting 15 bytes", err)
+	_, err = toml.WriteTo(&writer)
+	assertErrorString(t, "failingWriter failed after writing 15 bytes", err)
 }
 
-func TestTomlTreeWriteToMapExampleFile(t *testing.T) {
+func TestTreeWriteToMapExampleFile(t *testing.T) {
 	tree, _ := LoadFile("example.toml")
 	expected := map[string]interface{}{
 		"title": "TOML Example",
@@ -217,7 +241,7 @@ func TestTomlTreeWriteToMapExampleFile(t *testing.T) {
 	testMaps(t, tree.ToMap(), expected)
 }
 
-func TestTomlTreeWriteToMapWithTablesInMultipleChunks(t *testing.T) {
+func TestTreeWriteToMapWithTablesInMultipleChunks(t *testing.T) {
 	tree, _ := Load(`
 	[[menu.main]]
         a = "menu 1"
@@ -238,7 +262,7 @@ func TestTomlTreeWriteToMapWithTablesInMultipleChunks(t *testing.T) {
 	testMaps(t, treeMap, expected)
 }
 
-func TestTomlTreeWriteToMapWithArrayOfInlineTables(t *testing.T) {
+func TestTreeWriteToMapWithArrayOfInlineTables(t *testing.T) {
 	tree, _ := Load(`
     	[params]
 	language_tabs = [
@@ -269,3 +293,66 @@ func TestTomlTreeWriteToMapWithArrayOfInlineTables(t *testing.T) {
 	treeMap := tree.ToMap()
 	testMaps(t, treeMap, expected)
 }
+
+func TestTreeWriteToFloat(t *testing.T) {
+	tree, err := Load(`a = 3.0`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	str, err := tree.ToTomlString()
+	if err != nil {
+		t.Fatal(err)
+	}
+	expected := `a = 3.0`
+	if strings.TrimSpace(str) != strings.TrimSpace(expected) {
+		t.Fatalf("Expected:\n%s\nGot:\n%s", expected, str)
+	}
+}
+
+func BenchmarkTreeToTomlString(b *testing.B) {
+	toml, err := Load(sampleHard)
+	if err != nil {
+		b.Fatal("Unexpected error:", err)
+	}
+
+	for i := 0; i < b.N; i++ {
+		_, err := toml.ToTomlString()
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+var sampleHard = `# Test file for TOML
+# Only this one tries to emulate a TOML file written by a user of the kind of parser writers probably hate
+# This part you'll really hate
+
+[the]
+test_string = "You'll hate me after this - #"          # " Annoying, isn't it?
+
+    [the.hard]
+    test_array = [ "] ", " # "]      # ] There you go, parse this!
+    test_array2 = [ "Test #11 ]proved that", "Experiment #9 was a success" ]
+    # You didn't think it'd as easy as chucking out the last #, did you?
+    another_test_string = " Same thing, but with a string #"
+    harder_test_string = " And when \"'s are in the string, along with # \""   # "and comments are there too"
+    # Things will get harder
+
+        [the.hard."bit#"]
+        "what?" = "You don't think some user won't do that?"
+        multi_line_array = [
+            "]",
+            # ] Oh yes I did
+            ]
+
+# Each of the following keygroups/key value pairs should produce an error. Uncomment to them to test
+
+#[error]   if you didn't catch this, your parser is broken
+#string = "Anything other than tabs, spaces and newline after a keygroup or key value pair has ended should produce an error unless it is a comment"   like this
+#array = [
+#         "This might most likely happen in multiline arrays",
+#         Like here,
+#         "or here,
+#         and here"
+#         ]     End of array comment, forgot the #
+#number = 3.14  pi <--again forgot the #         `

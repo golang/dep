@@ -51,16 +51,10 @@
   revision = "e83dc5e7bba095e8d32fb2124714bf41f2a30cb5"
 
 [[projects]]
-  name = "github.com/pelletier/go-buffruneio"
-  packages = ["."]
-  revision = "c37440a7cf42ac63b919c752ca73a85067e05992"
-  version = "v0.2.0"
-
-[[projects]]
   branch = "master"
   name = "github.com/pelletier/go-toml"
   packages = ["."]
-  revision = "fe206efb84b2bc8e8cfafe6b4c1826622be969e3"
+  revision = "b8b5e7696574464b2f9bf303a7b37781bb52889f"
 
 [[projects]]
   name = "github.com/pkg/errors"

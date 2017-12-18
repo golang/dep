@@ -6,10 +6,7 @@ import (
 	"time"
 )
 
-// supported values:
-// string, bool, int64, uint64, float64, time.Time, int, int8, int16, int32, uint, uint8, uint16, uint32, float32
-
-var kindToTypeMapping = map[reflect.Kind]reflect.Type{
+var kindToType = [reflect.String + 1]reflect.Type{
 	reflect.Bool:    reflect.TypeOf(true),
 	reflect.String:  reflect.TypeOf(""),
 	reflect.Float32: reflect.TypeOf(float64(1)),
@@ -24,6 +21,16 @@ var kindToTypeMapping = map[reflect.Kind]reflect.Type{
 	reflect.Uint16:  reflect.TypeOf(uint64(1)),
 	reflect.Uint32:  reflect.TypeOf(uint64(1)),
 	reflect.Uint64:  reflect.TypeOf(uint64(1)),
+}
+
+// typeFor returns a reflect.Type for a reflect.Kind, or nil if none is found.
+// supported values:
+// string, bool, int64, uint64, float64, time.Time, int, int8, int16, int32, uint, uint8, uint16, uint32, float32
+func typeFor(k reflect.Kind) reflect.Type {
+	if k > 0 && int(k) < len(kindToType) {
+		return kindToType[k]
+	}
+	return nil
 }
 
 func simpleValueCoercion(object interface{}) (interface{}, error) {
@@ -51,7 +58,7 @@ func simpleValueCoercion(object interface{}) (interface{}, error) {
 	case fmt.Stringer:
 		return original.String(), nil
 	default:
-		return nil, fmt.Errorf("cannot convert type %T to TomlTree", object)
+		return nil, fmt.Errorf("cannot convert type %T to Tree", object)
 	}
 }
 
@@ -59,7 +66,7 @@ func sliceToTree(object interface{}) (interface{}, error) {
 	// arrays are a bit tricky, since they can represent either a
 	// collection of simple values, which is represented by one
 	// *tomlValue, or an array of tables, which is represented by an
-	// array of *TomlTree.
+	// array of *Tree.
 
 	// holding the assumption that this function is called from toTree only when value.Kind() is Array or Slice
 	value := reflect.ValueOf(object)
@@ -70,19 +77,19 @@ func sliceToTree(object interface{}) (interface{}, error) {
 	}
 	if insideType.Kind() == reflect.Map {
 		// this is considered as an array of tables
-		tablesArray := make([]*TomlTree, 0, length)
+		tablesArray := make([]*Tree, 0, length)
 		for i := 0; i < length; i++ {
 			table := value.Index(i)
 			tree, err := toTree(table.Interface())
 			if err != nil {
 				return nil, err
 			}
-			tablesArray = append(tablesArray, tree.(*TomlTree))
+			tablesArray = append(tablesArray, tree.(*Tree))
 		}
 		return tablesArray, nil
 	}
 
-	sliceType := kindToTypeMapping[insideType.Kind()]
+	sliceType := typeFor(insideType.Kind())
 	if sliceType == nil {
 		sliceType = insideType
 	}
@@ -97,7 +104,7 @@ func sliceToTree(object interface{}) (interface{}, error) {
 		}
 		arrayValue = reflect.Append(arrayValue, reflect.ValueOf(simpleValue))
 	}
-	return &tomlValue{arrayValue.Interface(), Position{}}, nil
+	return &tomlValue{value: arrayValue.Interface(), position: Position{}}, nil
 }
 
 func toTree(object interface{}) (interface{}, error) {
@@ -120,7 +127,7 @@ func toTree(object interface{}) (interface{}, error) {
 			}
 			values[key.String()] = newValue
 		}
-		return &TomlTree{values, Position{}}, nil
+		return &Tree{values: values, position: Position{}}, nil
 	}
 
 	if value.Kind() == reflect.Array || value.Kind() == reflect.Slice {
@@ -131,5 +138,5 @@ func toTree(object interface{}) (interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &tomlValue{simpleValue, Position{}}, nil
+	return &tomlValue{value: simpleValue, position: Position{}}, nil
 }
