@@ -429,7 +429,12 @@ func runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceMana
 		return false, 0, errors.Wrapf(err, "could not set up solver for input hashing")
 	}
 
-	cm := collectConstraints(ctx, p, sm)
+	// Errors while collecting constraints should not fail the whole status run.
+	// It should count the error and tell the user about incomplete results.
+	cm, ccerrs := collectConstraints(ctx, p, sm)
+	if len(ccerrs) > 0 {
+		errCount += len(ccerrs)
+	}
 
 	// Get the project list and sort it so that the printed output users see is
 	// deterministically ordered. (This may be superfluous if the lock is always
@@ -583,7 +588,7 @@ func runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceMana
 
 			// Count ListVersions error because we get partial results when
 			// this happens.
-			errCount = len(errListVerCh)
+			errCount += len(errListVerCh)
 			if ctx.Verbose {
 				for err := range errListVerCh {
 					ctx.Err.Println(err.Error())
@@ -712,37 +717,88 @@ type projectConstraint struct {
 type constraintsCollection map[string][]projectConstraint
 
 // collectConstraints collects constraints declared by all the dependencies.
-func collectConstraints(ctx *dep.Ctx, p *dep.Project, sm gps.SourceManager) constraintsCollection {
+// It returns constraintsCollection and a slice of errors encountered while
+// collecting the constraints, if any.
+func collectConstraints(ctx *dep.Ctx, p *dep.Project, sm gps.SourceManager) (constraintsCollection, []error) {
+	logger := ctx.Err
+	if !ctx.Verbose {
+		logger = log.New(ioutil.Discard, "", 0)
+	}
+
+	logger.Println("Collecting project constraints:")
+
+	var mutex sync.Mutex
 	constraintCollection := make(constraintsCollection)
 
 	// Get direct deps of the root project.
 	_, directDeps, err := getDirectDependencies(sm, p)
 	if err != nil {
-		ctx.Err.Println("Error getting direct deps:", err)
+		// Return empty collection, not nil, if we fail here.
+		return constraintCollection, []error{errors.Wrap(err, "failed to get direct dependencies")}
 	}
+
 	// Create a root analyzer.
 	rootAnalyzer := newRootAnalyzer(true, ctx, directDeps, sm)
 
+	lp := p.Lock.Projects()
+
+	// Channel for receiving all the errors.
+	errCh := make(chan error, len(lp))
+
+	var wg sync.WaitGroup
+
 	// Iterate through the locked projects and collect constraints of all the projects.
-	for _, proj := range p.Lock.Projects() {
-		manifest, _, err := sm.GetManifestAndLock(proj.Ident(), proj.Version(), rootAnalyzer)
-		if err != nil {
-			ctx.Err.Println("Error getting manifest and lock:", err)
-			continue
-		}
+	for i, proj := range lp {
+		wg.Add(1)
+		logger.Printf("(%d/%d) %s\n", i+1, len(lp), proj.Ident().ProjectRoot)
 
-		// Get project constraints.
-		pc := manifest.DependencyConstraints()
+		go func(proj gps.LockedProject) {
+			defer wg.Done()
 
-		// Iterate through the project constraints to get individual dependency
-		// project and constraint values.
-		for pr, pp := range pc {
-			constraintCollection[string(pr)] = append(
-				constraintCollection[string(pr)],
-				projectConstraint{proj.Ident().ProjectRoot, pp.Constraint},
-			)
+			manifest, _, err := sm.GetManifestAndLock(proj.Ident(), proj.Version(), rootAnalyzer)
+			if err != nil {
+				errCh <- errors.Wrap(err, "error getting manifest and lock")
+				return
+			}
+
+			// Get project constraints.
+			pc := manifest.DependencyConstraints()
+
+			// Obtain a lock for constraintCollection.
+			mutex.Lock()
+			defer mutex.Unlock()
+			// Iterate through the project constraints to get individual dependency
+			// project and constraint values.
+			for pr, pp := range pc {
+				tempCC := append(
+					constraintCollection[string(pr)],
+					projectConstraint{proj.Ident().ProjectRoot, pp.Constraint},
+				)
+
+				// Sort the inner projectConstraint slice by Project string.
+				// Required for consistent returned value.
+				sort.Sort(byProject(tempCC))
+				constraintCollection[string(pr)] = tempCC
+			}
+		}(proj)
+	}
+
+	wg.Wait()
+	close(errCh)
+
+	var errs []error
+	if len(errCh) > 0 {
+		for e := range errCh {
+			errs = append(errs, e)
+			logger.Println(e.Error())
 		}
 	}
 
-	return constraintCollection
+	return constraintCollection, errs
 }
+
+type byProject []projectConstraint
+
+func (p byProject) Len() int           { return len(p) }
+func (p byProject) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
+func (p byProject) Less(i, j int) bool { return p[i].Project > p[j].Project }
