@@ -551,7 +551,8 @@ func runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceMana
 						// Get constraint for locked project
 						for _, lockedP := range p.Lock.P {
 							if lockedP.Ident().ProjectRoot == proj.Ident().ProjectRoot {
-								c.Constraint = lockedP.Version()
+								// Use the unpaired version as the constraint for checking updates.
+								c.Constraint = bs.Version
 							}
 						}
 					}
