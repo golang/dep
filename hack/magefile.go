@@ -231,12 +231,11 @@ func ChkLicense() error {
 func ChkVendor() error {
 
 	if os.Getenv("VALIDATE_UPSTREAM") == "" {
-		repo:="https://github.com/golang/dep.git"
-		branch :="master"
+		repo := "https://github.com/golang/dep.git"
+		branch := "master"
 
-		
-		sh.Run("git", "fetch", "-q", repo, "refs/heads/" + branch)
-		
+		sh.Run("git", "fetch", "-q", repo, "refs/heads/"+branch)
+
 		head, err := sh.Output("git", "rev-parse", "--verify", "HEAD")
 		if err != nil {
 			return err
@@ -245,18 +244,22 @@ func ChkVendor() error {
 		if err != nil {
 			return err
 		}
-		
-	// 	validate_diff() {
-	// 		if [ "$VALIDATE_UPSTREAM" != "$VALIDATE_HEAD" ]; then
-	// 			git diff "$VALIDATE_COMMIT_DIFF" "$@"
-	// 		fi
-	// 	}
-	// fi
-	
+
+		if head != upstream {
+			sh.Run("git", "diff", upstream+"..."+head)
+		}
+
+		// 	validate_diff() {
+		// 		if [ "$VALIDATE_UPSTREAM" != "$VALIDATE_HEAD" ]; then
+		// 			git diff "$VALIDATE_COMMIT_DIFF" "$@"
+		// 		fi
+		// 	}
+		// fi
+	}
 	// IFS=$'\n'
 	// files=( $(validate_diff --diff-filter=ACMR --name-only -- 'Gopkg.toml' 'Gopkg.lock' 'vendor/' || true) )
 	// unset IFS
-	
+
 	// if [ ${#files[@]} -gt 0 ]; then
 	// 	go build ./cmd/dep
 	// 	./dep ensure -vendor-only
@@ -279,9 +282,8 @@ func ChkVendor() error {
 	// else
 	// 	echo 'No vendor changes in diff.'
 	// fi
+	return nil
 }
-
-
 
 // flags returns the properly formatted value for ldflags, setting the current
 // date, commit hash, and tag (version).
