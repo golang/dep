@@ -14,6 +14,8 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"runtime"
+	"runtime/pprof"
 	"strings"
 	"text/tabwriter"
 
@@ -36,19 +38,39 @@ type command interface {
 }
 
 func main() {
+	p := &profile{}
+	flag.StringVar(&p.cpuProfile, "cpuprofile", "", "Writes a CPU profile to the specified file before exiting.")
+	flag.StringVar(&p.memProfile, "memprofile", "", "Writes a memory profile to the specified file before exiting.")
+	flag.IntVar(&p.memProfileRate, "memprofilerate", 0, "Enable more precise memory profiles by setting runtime.MemProfileRate.")
+	flag.StringVar(&p.mutexProfile, "mutexprofile", "", "Writes a mutex profile to the specified file before exiting.")
+	flag.IntVar(&p.mutexProfileFraction, "mutexprofilefraction", 0, "Enable more precise mutex profiles by runtime.SetMutexProfileFraction.")
+	flag.Parse()
+
 	wd, err := os.Getwd()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "failed to get working directory", err)
 		os.Exit(1)
 	}
+
+	args := append([]string{os.Args[0]}, flag.Args()...)
 	c := &Config{
-		Args:       os.Args,
+		Args:       args,
 		Stdout:     os.Stdout,
 		Stderr:     os.Stderr,
 		WorkingDir: wd,
 		Env:        os.Environ(),
 	}
-	os.Exit(c.Run())
+
+	if err := p.start(); err != nil {
+		fmt.Fprintf(os.Stderr, "failed to profile: %v\n", err)
+		os.Exit(1)
+	}
+	exit := c.Run()
+	if err := p.finish(); err != nil {
+		fmt.Fprintf(os.Stderr, "failed to finish the profile: %v\n", err)
+		os.Exit(1)
+	}
+	os.Exit(exit)
 }
 
 // A Config specifies a full configuration for a dep execution.
@@ -311,4 +333,67 @@ func (c *commentWriter) Write(p []byte) (int, error) {
 		}
 	}
 	return len(p), nil
+}
+
+type profile struct {
+	cpuProfile string
+
+	memProfile     string
+	memProfileRate int
+
+	mutexProfile         string
+	mutexProfileFraction int
+
+	// TODO(jbd): Add block profile and -trace.
+
+	f *os.File // file to write the profiling output to
+}
+
+func (p *profile) start() error {
+	switch {
+	case p.cpuProfile != "":
+		if err := p.createOutput(p.cpuProfile); err != nil {
+			return err
+		}
+		return pprof.StartCPUProfile(p.f)
+	case p.memProfile != "":
+		if p.memProfileRate > 0 {
+			runtime.MemProfileRate = p.memProfileRate
+		}
+		return p.createOutput(p.memProfile)
+	case p.mutexProfile != "":
+		if p.mutexProfileFraction > 0 {
+			runtime.SetMutexProfileFraction(p.mutexProfileFraction)
+		}
+		return p.createOutput(p.mutexProfile)
+	}
+	return nil
+}
+
+func (p *profile) finish() error {
+	if p.f == nil {
+		return nil
+	}
+	switch {
+	case p.cpuProfile != "":
+		pprof.StopCPUProfile()
+	case p.memProfile != "":
+		if err := pprof.WriteHeapProfile(p.f); err != nil {
+			return err
+		}
+	case p.mutexProfile != "":
+		if err := pprof.Lookup("mutex").WriteTo(p.f, 2); err != nil {
+			return err
+		}
+	}
+	return p.f.Close()
+}
+
+func (p *profile) createOutput(name string) error {
+	f, err := os.Create(name)
+	if err != nil {
+		return err
+	}
+	p.f = f
+	return nil
 }
