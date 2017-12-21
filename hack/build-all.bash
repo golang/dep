@@ -18,11 +18,11 @@ GO_BUILD_CMD="go build -a -installsuffix cgo"
 GO_BUILD_LDFLAGS="-s -w -X main.commitHash=$COMMIT_HASH -X main.buildDate=$DATE -X main.version=$VERSION"
 
 if [ -z "$DEP_BUILD_PLATFORMS" ]; then
-    DEP_BUILD_PLATFORMS="linux windows darwin"
+    DEP_BUILD_PLATFORMS="linux windows darwin freebsd"
 fi
 
 if [ -z "$DEP_BUILD_ARCHS" ]; then
-    DEP_BUILD_ARCHS="amd64"
+    DEP_BUILD_ARCHS="amd64 386"
 fi
 
 mkdir -p release
