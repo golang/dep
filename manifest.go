@@ -15,7 +15,7 @@ import (
 
 	"github.com/golang/dep/gps"
 	"github.com/golang/dep/gps/pkgtree"
-	"github.com/pelletier/go-toml"
+	toml "github.com/pelletier/go-toml"
 	"github.com/pkg/errors"
 )
 
@@ -417,18 +417,25 @@ func fromRawPruneOptions(raw rawPruneOptions) gps.RootPruneOptions {
 	return opts
 }
 
-func toRawPruneOptions(options gps.PruneOptions) rawPruneOptions {
+// toRawPruneOptions converts a gps.RootPruneOption's PruneOptions to rawPruneOptions
+//
+// Will panic if gps.RootPruneOption includes ProjectPruneOptions
+// See https://github.com/golang/dep/pull/1460#discussion_r158128740 for more information
+func toRawPruneOptions(root gps.RootPruneOptions) rawPruneOptions {
+	if len(root.ProjectOptions) != 0 {
+		panic("toRawPruneOptions cannot convert ProjectOptions to rawPruneOptions")
+	}
 	raw := rawPruneOptions{}
 
-	if (options & gps.PruneUnusedPackages) != 0 {
+	if (root.PruneOptions & gps.PruneUnusedPackages) != 0 {
 		raw.UnusedPackages = true
 	}
 
-	if (options & gps.PruneNonGoFiles) != 0 {
+	if (root.PruneOptions & gps.PruneNonGoFiles) != 0 {
 		raw.NonGoFiles = true
 	}
 
-	if (options & gps.PruneGoTestFiles) != 0 {
+	if (root.PruneOptions & gps.PruneGoTestFiles) != 0 {
 		raw.GoTests = true
 	}
 	return raw
@@ -495,7 +502,7 @@ func (m *Manifest) toRaw() rawManifest {
 	}
 	sort.Sort(sortedRawProjects(raw.Overrides))
 
-	raw.PruneOptions = toRawPruneOptions(m.PruneOptions.PruneOptions)
+	raw.PruneOptions = toRawPruneOptions(m.PruneOptions)
 
 	return raw
 }

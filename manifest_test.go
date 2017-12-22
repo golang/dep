@@ -611,12 +611,12 @@ func TestValidateProjectRoots(t *testing.T) {
 func TestToRawPruneOptions(t *testing.T) {
 	cases := []struct {
 		name         string
-		pruneOptions gps.PruneOptions
+		pruneOptions gps.RootPruneOptions
 		wantOptions  rawPruneOptions
 	}{
 		{
 			name:         "all options",
-			pruneOptions: 15,
+			pruneOptions: gps.RootPruneOptions{PruneOptions: 15},
 			wantOptions: rawPruneOptions{
 				UnusedPackages: true,
 				NonGoFiles:     true,
@@ -625,7 +625,7 @@ func TestToRawPruneOptions(t *testing.T) {
 		},
 		{
 			name:         "no options",
-			pruneOptions: 1,
+			pruneOptions: gps.RootPruneOptions{PruneOptions: 1},
 			wantOptions: rawPruneOptions{
 				UnusedPackages: false,
 				NonGoFiles:     false,
@@ -643,6 +643,19 @@ func TestToRawPruneOptions(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestToRawPruneOptions_Panic(t *testing.T) {
+	pruneOptions := gps.RootPruneOptions{
+		PruneOptions:   1,
+		ProjectOptions: gps.PruneProjectOptions{"github.com/carolynvs/deptest": 1},
+	}
+	defer func() {
+		if err := recover(); err == nil {
+			t.Error("toRawPruneOptions did not panic with non-empty ProjectOptions")
+		}
+	}()
+	_ = toRawPruneOptions(pruneOptions)
 }
 
 func containsErr(s []error, e error) bool {
