@@ -89,10 +89,13 @@ func (g *Importer) Import(dir string, pr gps.ProjectRoot) (*dep.Manifest, *dep.L
 		return nil, nil, err
 	}
 
-	return g.convert(pr)
+	m, l := g.convert(pr)
+	return m, l, nil
 }
 
-// load the glide configuration files.
+// load the glide configuration files. Failure to load `glide.yaml` is considered
+// unrecoverable and an error is returned for it. But if there is any error while trying
+// to load the lock file, only a warning is logged.
 func (g *Importer) load(projectDir string) error {
 	g.Logger.Println("Detected glide configuration files...")
 	y := filepath.Join(projectDir, glideYamlName)
@@ -113,16 +116,18 @@ func (g *Importer) load(projectDir string) error {
 		if g.Verbose {
 			g.Logger.Printf("  Loading %s", l)
 		}
-		g.lockFound = true
 		lb, err := ioutil.ReadFile(l)
 		if err != nil {
-			return errors.Wrapf(err, "unable to read %s", l)
+			g.Logger.Printf("  Warning: Unable to read %s: %s\n", l, err)
+			return nil
 		}
 		lock := glideLock{}
 		err = yaml.Unmarshal(lb, &lock)
 		if err != nil {
-			return errors.Wrapf(err, "unable to parse %s", l)
+			g.Logger.Printf("  Warning: Unable to parse %s: %s\n", l, err)
+			return nil
 		}
+		g.lockFound = true
 		g.glideLock = lock
 	}
 
@@ -130,7 +135,7 @@ func (g *Importer) load(projectDir string) error {
 }
 
 // convert the glide configuration files into dep configuration files.
-func (g *Importer) convert(pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock, error) {
+func (g *Importer) convert(pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock) {
 	projectName := string(pr)
 
 	task := bytes.NewBufferString("Converting from glide.yaml")
@@ -147,7 +152,8 @@ func (g *Importer) convert(pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock, error)
 	for _, pkg := range append(g.glideConfig.Imports, g.glideConfig.TestImports...) {
 		// Validate
 		if pkg.Name == "" {
-			return nil, nil, errors.New("invalid glide configuration: Name is required")
+			g.Logger.Println("  Warning: Invalid glide configuration: Name is required")
+			continue
 		}
 
 		// Warn
@@ -172,7 +178,8 @@ func (g *Importer) convert(pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock, error)
 	for _, pkg := range append(g.glideLock.Imports, g.glideLock.TestImports...) {
 		// Validate
 		if pkg.Name == "" {
-			return nil, nil, errors.New("invalid glide lock: Name is required")
+			g.Logger.Println("  Warning: Invalid glide lock: Name is required")
+			continue
 		}
 
 		ip := base.ImportedPackage{
@@ -183,10 +190,7 @@ func (g *Importer) convert(pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock, error)
 		packages = append(packages, ip)
 	}
 
-	err := g.ImportPackages(packages, false)
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "invalid glide configuration")
-	}
+	g.ImportPackages(packages, false)
 
 	// Ignores
 	g.Manifest.Ignored = append(g.Manifest.Ignored, g.glideConfig.Ignores...)
@@ -201,5 +205,5 @@ func (g *Importer) convert(pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock, error)
 		}
 	}
 
-	return g.Manifest, g.Lock, nil
+	return g.Manifest, g.Lock
 }

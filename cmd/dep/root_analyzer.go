@@ -40,10 +40,7 @@ func newRootAnalyzer(skipTools bool, ctx *dep.Ctx, directDeps map[string]bool, s
 
 func (a *rootAnalyzer) InitializeRootManifestAndLock(dir string, pr gps.ProjectRoot) (rootM *dep.Manifest, rootL *dep.Lock, err error) {
 	if !a.skipTools {
-		rootM, rootL, err = a.importManifestAndLock(dir, pr, false)
-		if err != nil {
-			return
-		}
+		rootM, rootL = a.importManifestAndLock(dir, pr, false)
 	}
 
 	if rootM == nil {
@@ -106,7 +103,7 @@ func (a *rootAnalyzer) cacheDeps(pr gps.ProjectRoot) error {
 	return nil
 }
 
-func (a *rootAnalyzer) importManifestAndLock(dir string, pr gps.ProjectRoot, suppressLogs bool) (*dep.Manifest, *dep.Lock, error) {
+func (a *rootAnalyzer) importManifestAndLock(dir string, pr gps.ProjectRoot, suppressLogs bool) (*dep.Manifest, *dep.Lock) {
 	logger := a.ctx.Err
 	if suppressLogs {
 		logger = log.New(ioutil.Discard, "", 0)
@@ -117,16 +114,20 @@ func (a *rootAnalyzer) importManifestAndLock(dir string, pr gps.ProjectRoot, sup
 			a.ctx.Err.Printf("Importing configuration from %s. These are only initial constraints, and are further refined during the solve process.", i.Name())
 			m, l, err := i.Import(dir, pr)
 			if err != nil {
-				return nil, nil, err
+				a.ctx.Err.Printf(
+					"Warning: Encountered an unrecoverable error while trying to import %s config from %q: %s",
+					i.Name(), dir, err,
+				)
+				break
 			}
 			a.removeTransitiveDependencies(m)
-			return m, l, err
+			return m, l
 		}
 	}
 
 	var emptyManifest = dep.NewManifest()
 
-	return emptyManifest, nil, nil
+	return emptyManifest, nil
 }
 
 func (a *rootAnalyzer) removeTransitiveDependencies(m *dep.Manifest) {
@@ -151,14 +152,14 @@ func (a *rootAnalyzer) DeriveManifestAndLock(dir string, pr gps.ProjectRoot) (gp
 		// The assignment back to an interface prevents interface-based nil checks from failing later
 		var manifest gps.Manifest = gps.SimpleManifest{}
 		var lock gps.Lock
-		im, il, err := a.importManifestAndLock(dir, pr, true)
+		im, il := a.importManifestAndLock(dir, pr, true)
 		if im != nil {
 			manifest = im
 		}
 		if il != nil {
 			lock = il
 		}
-		return manifest, lock, err
+		return manifest, lock, nil
 	}
 
 	return gps.SimpleManifest{}, nil, nil
