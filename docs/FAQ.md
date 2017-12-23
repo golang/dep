@@ -243,7 +243,7 @@ Unable to update checked out version: fatal: reference is not a tree: 4dfc6a8a7e
 
 > The lock file represents a set of precise, typically immutable versions for the entire transitive closure of dependencies for a project. But "the project" can be, and is, decomposed into just a bunch of arguments to an algorithm. When those inputs change, the lock may need to change as well.
 >
-> Under most circumstances, if those arguments don't change, then the lock remains fine and correct. You've hit one one of the few cases where that guarantee doesn't apply. The fact that you ran dep ensure and it DID a solve is a product of some arguments changing; that solving failed because this particular commit had become stale is a separate problem.
+> Under most circumstances, if those arguments don't change, then the lock remains fine and correct. You've hit one of the few cases where that guarantee doesn't apply. The fact that you ran dep ensure and it DID a solve is a product of some arguments changing; that solving failed because this particular commit had become stale is a separate problem.
 >
 > [@sdboyer in #405](https://github.com/golang/dep/issues/405#issuecomment-295998489)
 
