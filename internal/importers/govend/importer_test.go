@@ -6,6 +6,7 @@ package govend
 
 import (
 	"bytes"
+	"fmt"
 	"log"
 	"path/filepath"
 	"testing"
@@ -46,7 +47,7 @@ func TestGovendConfig_Convert(t *testing.T) {
 				},
 			},
 			importertest.TestCase{
-				WantConvertErr: true,
+				WantWarning: "Warning: Invalid govend configuration, path is required",
 			},
 		},
 
@@ -59,7 +60,10 @@ func TestGovendConfig_Convert(t *testing.T) {
 				},
 			},
 			importertest.TestCase{
-				WantConvertErr: true,
+				WantWarning: fmt.Sprintf(
+					"Warning: Invalid govend configuration, rev not found for Path %q",
+					importertest.Project,
+				),
 			},
 		},
 	}
@@ -68,7 +72,7 @@ func TestGovendConfig_Convert(t *testing.T) {
 		name := name
 		testCase := testCase
 		t.Run(name, func(t *testing.T) {
-			err := testCase.Execute(t, func(logger *log.Logger, sm gps.SourceManager) (*dep.Manifest, *dep.Lock, error) {
+			err := testCase.Execute(t, func(logger *log.Logger, sm gps.SourceManager) (*dep.Manifest, *dep.Lock) {
 				g := NewImporter(logger, true, sm)
 				g.yaml = testCase.yaml
 				return g.convert(importertest.RootProject)

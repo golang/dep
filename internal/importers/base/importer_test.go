@@ -405,10 +405,10 @@ func TestBaseImporter_ImportProjects(t *testing.T) {
 		name := name
 		tc := tc
 		t.Run(name, func(t *testing.T) {
-			err := tc.Execute(t, func(logger *log.Logger, sm gps.SourceManager) (*dep.Manifest, *dep.Lock, error) {
+			err := tc.Execute(t, func(logger *log.Logger, sm gps.SourceManager) (*dep.Manifest, *dep.Lock) {
 				i := NewImporter(logger, true, sm)
-				convertErr := i.ImportPackages(tc.projects, tc.DefaultConstraintFromLock)
-				return i.Manifest, i.Lock, convertErr
+				i.ImportPackages(tc.projects, tc.DefaultConstraintFromLock)
+				return i.Manifest, i.Lock
 			})
 			if err != nil {
 				t.Fatalf("%#v", err)
