@@ -20,6 +20,7 @@ import (
 	"github.com/golang/dep"
 	"github.com/golang/dep/gps"
 	"github.com/golang/dep/gps/paths"
+	"github.com/golang/dep/gps/pkgtree"
 	"github.com/pkg/errors"
 )
 
@@ -793,12 +794,23 @@ func collectConstraints(ctx *dep.Ctx, p *dep.Project, sm gps.SourceManager) (con
 			// Get project constraints.
 			pc := manifest.DependencyConstraints()
 
+			imports, err := projectImports(sm, proj)
+			if err != nil {
+				errCh <- errors.Wrapf(err, "error listing imports used in %s", proj.Ident().ProjectRoot)
+				return
+			}
+
 			// Obtain a lock for constraintCollection.
 			mutex.Lock()
 			defer mutex.Unlock()
 			// Iterate through the project constraints to get individual dependency
 			// project and constraint values.
 			for pr, pp := range pc {
+				// Check if the project constraint is imported in the project
+				if _, ok := imports[string(pr)]; !ok {
+					continue
+				}
+
 				tempCC := append(
 					constraintCollection[string(pr)],
 					projectConstraint{proj.Ident().ProjectRoot, pp.Constraint},
@@ -824,6 +836,29 @@ func collectConstraints(ctx *dep.Ctx, p *dep.Project, sm gps.SourceManager) (con
 	}
 
 	return constraintCollection, errs
+}
+
+// projectImports creates a set of all imports paths used in a project.
+// The set of imports be used to check if an package is imported in a project.
+func projectImports(sm gps.SourceManager, proj gps.LockedProject) (map[string]bool, error) {
+	pkgTree, err := sm.ListPackages(proj.Ident(), proj.Version())
+	if err != nil {
+		return nil, err
+	}
+	return packageTreeImports(pkgTree), nil
+}
+
+func packageTreeImports(pkgTree pkgtree.PackageTree) map[string]bool {
+	imports := make(map[string]bool)
+	for _, pkg := range pkgTree.Packages {
+		if pkg.Err != nil {
+			continue
+		}
+		for _, imp := range pkg.P.Imports {
+			imports[imp] = true
+		}
+	}
+	return imports
 }
 
 type byProject []projectConstraint

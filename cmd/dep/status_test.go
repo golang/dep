@@ -382,6 +382,23 @@ func TestCollectConstraints(t *testing.T) {
 			},
 			wantErr: true,
 		},
+		{
+			name: "collect only applicable constraints",
+			lock: dep.Lock{
+				P: []gps.LockedProject{
+					gps.NewLockedProject(
+						gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot("github.com/JackyChiu/deptest")},
+						gps.NewVersion("v1.0.0"),
+						[]string{"."},
+					),
+				},
+			},
+			wantConstraints: constraintsCollection{
+				"github.com/sdboyer/deptest": []projectConstraint{
+					{"github.com/JackyChiu/deptest", ver08},
+				},
+			},
+		},
 	}
 
 	h := test.NewHelper(t)
@@ -418,6 +435,65 @@ func TestCollectConstraints(t *testing.T) {
 
 			if !reflect.DeepEqual(gotConstraints, c.wantConstraints) {
 				t.Fatalf("unexpected collected constraints: \n\t(GOT): %v\n\t(WNT): %v", gotConstraints, c.wantConstraints)
+			}
+		})
+	}
+}
+
+func TestProjectImports(t *testing.T) {
+	cases := []struct {
+		name     string
+		proj     gps.LockedProject
+		expected map[string]bool
+	}{
+		{
+			name: "no imports",
+			proj: gps.NewLockedProject(
+				gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot("github.com/sdboyer/deptest")},
+				gps.NewVersion("v1.0.0"),
+				[]string{"."},
+			),
+			expected: map[string]bool{},
+		},
+		{
+			name: "mutilple imports",
+			proj: gps.NewLockedProject(
+				gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot("github.com/darkowlzz/deptest-project-1")},
+				gps.NewVersion("v0.1.0"),
+				[]string{"."},
+			),
+			expected: map[string]bool{
+				"fmt": true,
+				"github.com/sdboyer/deptest": true,
+			},
+		},
+	}
+
+	h := test.NewHelper(t)
+	defer h.Cleanup()
+
+	h.TempDir("src")
+	pwd := h.Path(".")
+	discardLogger := log.New(ioutil.Discard, "", 0)
+
+	ctx := &dep.Ctx{
+		GOPATH: pwd,
+		Out:    discardLogger,
+		Err:    discardLogger,
+	}
+
+	sm, err := ctx.SourceManager()
+	h.Must(err)
+	defer sm.Release()
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			imports, err := projectImports(sm, c.proj)
+			if err != nil {
+				t.Fatalf("unexpected error while getting project imports: %v", err)
+			}
+			if !reflect.DeepEqual(imports, c.expected) {
+				t.Fatalf("unexpected project imports: \n\t(GOT): %v\n\t(WNT): %v", imports, c.expected)
 			}
 		})
 	}
