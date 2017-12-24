@@ -608,6 +608,56 @@ func TestValidateProjectRoots(t *testing.T) {
 	}
 }
 
+func TestToRawPruneOptions(t *testing.T) {
+	cases := []struct {
+		name         string
+		pruneOptions gps.RootPruneOptions
+		wantOptions  rawPruneOptions
+	}{
+		{
+			name:         "all options",
+			pruneOptions: gps.RootPruneOptions{PruneOptions: 15},
+			wantOptions: rawPruneOptions{
+				UnusedPackages: true,
+				NonGoFiles:     true,
+				GoTests:        true,
+			},
+		},
+		{
+			name:         "no options",
+			pruneOptions: gps.RootPruneOptions{PruneOptions: 1},
+			wantOptions: rawPruneOptions{
+				UnusedPackages: false,
+				NonGoFiles:     false,
+				GoTests:        false,
+			},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			raw := toRawPruneOptions(c.pruneOptions)
+
+			if !reflect.DeepEqual(raw, c.wantOptions) {
+				t.Fatalf("rawPruneOptions are not as expected:\n\t(GOT) %v\n\t(WNT) %v", raw, c.wantOptions)
+			}
+		})
+	}
+}
+
+func TestToRawPruneOptions_Panic(t *testing.T) {
+	pruneOptions := gps.RootPruneOptions{
+		PruneOptions:   1,
+		ProjectOptions: gps.PruneProjectOptions{"github.com/carolynvs/deptest": 1},
+	}
+	defer func() {
+		if err := recover(); err == nil {
+			t.Error("toRawPruneOptions did not panic with non-empty ProjectOptions")
+		}
+	}()
+	_ = toRawPruneOptions(pruneOptions)
+}
+
 func containsErr(s []error, e error) bool {
 	for _, a := range s {
 		if a.Error() == e.Error() {

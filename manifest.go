@@ -15,7 +15,7 @@ import (
 
 	"github.com/golang/dep/gps"
 	"github.com/golang/dep/gps/pkgtree"
-	"github.com/pelletier/go-toml"
+	toml "github.com/pelletier/go-toml"
 	"github.com/pkg/errors"
 )
 
@@ -417,6 +417,30 @@ func fromRawPruneOptions(raw rawPruneOptions) gps.RootPruneOptions {
 	return opts
 }
 
+// toRawPruneOptions converts a gps.RootPruneOption's PruneOptions to rawPruneOptions
+//
+// Will panic if gps.RootPruneOption includes ProjectPruneOptions
+// See https://github.com/golang/dep/pull/1460#discussion_r158128740 for more information
+func toRawPruneOptions(root gps.RootPruneOptions) rawPruneOptions {
+	if len(root.ProjectOptions) != 0 {
+		panic("toRawPruneOptions cannot convert ProjectOptions to rawPruneOptions")
+	}
+	raw := rawPruneOptions{}
+
+	if (root.PruneOptions & gps.PruneUnusedPackages) != 0 {
+		raw.UnusedPackages = true
+	}
+
+	if (root.PruneOptions & gps.PruneNonGoFiles) != 0 {
+		raw.NonGoFiles = true
+	}
+
+	if (root.PruneOptions & gps.PruneGoTestFiles) != 0 {
+		raw.GoTests = true
+	}
+	return raw
+}
+
 // toProject interprets the string representations of project information held in
 // a rawProject, converting them into a proper gps.ProjectProperties. An
 // error is returned if the rawProject contains some invalid combination -
@@ -462,11 +486,10 @@ func (m *Manifest) MarshalTOML() ([]byte, error) {
 // toRaw converts the manifest into a representation suitable to write to the manifest file
 func (m *Manifest) toRaw() rawManifest {
 	raw := rawManifest{
-		Constraints:  make([]rawProject, 0, len(m.Constraints)),
-		Overrides:    make([]rawProject, 0, len(m.Ovr)),
-		Ignored:      m.Ignored,
-		Required:     m.Required,
-		PruneOptions: rawPruneOptions{},
+		Constraints: make([]rawProject, 0, len(m.Constraints)),
+		Overrides:   make([]rawProject, 0, len(m.Ovr)),
+		Ignored:     m.Ignored,
+		Required:    m.Required,
 	}
 
 	for n, prj := range m.Constraints {
@@ -479,7 +502,7 @@ func (m *Manifest) toRaw() rawManifest {
 	}
 	sort.Sort(sortedRawProjects(raw.Overrides))
 
-	// TODO(ibrasho): write out prune options.
+	raw.PruneOptions = toRawPruneOptions(m.PruneOptions)
 
 	return raw
 }

@@ -152,6 +152,9 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 		return errors.Wrap(err, "init failed: unable to prepare an initial manifest and lock for the solver")
 	}
 
+	// Set default prune options for go-tests and unused-packages
+	p.Manifest.PruneOptions.PruneOptions = gps.PruneNestedVendorDirs + gps.PruneGoTestFiles + gps.PruneUnusedPackages
+
 	if cmd.gopath {
 		gs := newGopathScanner(ctx, directDeps, sm)
 		err = gs.InitializeRootManifestAndLock(p.Manifest, p.Lock)
