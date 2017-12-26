@@ -122,67 +122,6 @@ func (m maybeGitSource) possibleURLs() []*url.URL {
 	return []*url.URL{m.url}
 }
 
-type maybeGopkginSource struct {
-	// the original gopkg.in import path. this is used to create the on-disk
-	// location to avoid duplicate resource management - e.g., if instances of
-	// a gopkg.in project are accessed via different schemes, or if the
-	// underlying github repository is accessed directly.
-	opath string
-	// the actual upstream URL - always github
-	url *url.URL
-	// the major version to apply for filtering
-	major uint64
-	// whether or not the source package is "unstable"
-	unstable bool
-}
-
-func (m maybeGopkginSource) try(ctx context.Context, cachedir string, c singleSourceCache, superv *supervisor) (source, sourceState, error) {
-	// We don't actually need a fully consistent transform into the on-disk path
-	// - just something that's unique to the particular gopkg.in domain context.
-	// So, it's OK to just dumb-join the scheme with the path.
-	aliasURL := m.url.Scheme + "://" + m.opath
-	path := sourceCachePath(cachedir, aliasURL)
-	ustr := m.url.String()
-
-	r, err := newCtxRepo(vcs.Git, ustr, path)
-	if err != nil {
-		return nil, 0, unwrapVcsErr(err)
-	}
-
-	src := &gopkginSource{
-		gitSource: gitSource{
-			baseVCSSource: baseVCSSource{
-				repo: r,
-			},
-		},
-		major:    m.major,
-		unstable: m.unstable,
-		aliasURL: aliasURL,
-	}
-
-	var vl []PairedVersion
-	if err := superv.do(ctx, "git:lv:maybe", ctListVersions, func(ctx context.Context) error {
-		var err error
-		vl, err = src.listVersions(ctx)
-		return errors.Wrapf(err, "remote repository at %s does not exist, or is inaccessible", ustr)
-	}); err != nil {
-		return nil, 0, err
-	}
-
-	c.setVersionMap(vl)
-	state := sourceIsSetUp | sourceExistsUpstream | sourceHasLatestVersionList
-
-	if r.CheckLocal() {
-		state |= sourceExistsLocally
-	}
-
-	return src, state, nil
-}
-
-func (m maybeGopkginSource) possibleURLs() []*url.URL {
-	return []*url.URL{m.url}
-}
-
 type maybeBzrSource struct {
 	url *url.URL
 }

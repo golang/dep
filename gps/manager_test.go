@@ -376,24 +376,26 @@ func (f sourceCreationTestFixture) run(t *testing.T) {
 		t.Errorf("want %v gateways in the sources map, but got %v", f.srccount, len(sm.srcCoord.srcs))
 	}
 
-	var keys []string
-	for k := range sm.srcCoord.nameToURL {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
+	if t.Failed() {
+		var keys []string
+		for k := range sm.srcCoord.nameToURL {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
 
-	var buf bytes.Buffer
-	w := tabwriter.NewWriter(&buf, 0, 4, 2, ' ', 0)
-	fmt.Fprint(w, "NAME\tMAPPED URL\n")
-	for _, r := range keys {
-		fmt.Fprintf(w, "%s\t%s\n", r, sm.srcCoord.nameToURL[r])
-	}
-	w.Flush()
-	t.Log("\n", buf.String())
+		var buf bytes.Buffer
+		w := tabwriter.NewWriter(&buf, 0, 4, 2, ' ', 0)
+		fmt.Fprint(w, "NAME\tMAPPED URL\n")
+		for _, r := range keys {
+			fmt.Fprintf(w, "%s\t%s\n", r, sm.srcCoord.nameToURL[r])
+		}
+		w.Flush()
+		t.Log("\n", buf.String())
 
-	t.Log("SRC KEYS")
-	for k := range sm.srcCoord.srcs {
-		t.Log(k)
+		t.Log("SRC KEYS")
+		for k := range sm.srcCoord.srcs {
+			t.Log(k)
+		}
 	}
 }
 
@@ -407,22 +409,22 @@ func TestSourceCreationCounts(t *testing.T) {
 	}
 
 	fixtures := map[string]sourceCreationTestFixture{
-		"gopkgin uniqueness": {
+		"gopkgin merge": {
 			roots: []ProjectIdentifier{
 				mkPI("gopkg.in/sdboyer/gpkt.v1"),
 				mkPI("gopkg.in/sdboyer/gpkt.v2"),
 				mkPI("gopkg.in/sdboyer/gpkt.v3"),
 			},
-			namecount: 6,
-			srccount:  3,
+			namecount: 4,
+			srccount:  1,
 		},
-		"gopkgin separation from github": {
+		"gopkgin maps to github": {
 			roots: []ProjectIdentifier{
 				mkPI("gopkg.in/sdboyer/gpkt.v1"),
 				mkPI("github.com/sdboyer/gpkt"),
 			},
-			namecount: 4,
-			srccount:  2,
+			namecount: 3,
+			srccount:  1,
 		},
 		"case variance across path and URL-based access": {
 			roots: []ProjectIdentifier{
