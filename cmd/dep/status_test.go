@@ -305,7 +305,6 @@ func TestCollectConstraints(t *testing.T) {
 	ver1, _ := gps.NewSemverConstraintIC("v1.0.0")
 	ver08, _ := gps.NewSemverConstraintIC("v0.8.0")
 	ver2, _ := gps.NewSemverConstraintIC("v2.0.0")
-	master := gps.NewBranch("master")
 
 	cases := []struct {
 		name            string
@@ -396,7 +395,7 @@ func TestCollectConstraints(t *testing.T) {
 			},
 			wantConstraints: constraintsCollection{
 				"github.com/boltdb/bolt": []projectConstraint{
-					{"github.com/JackyChiu/dep-applicable-constraints", master},
+					{"github.com/JackyChiu/dep-applicable-constraints", gps.NewBranch("master")},
 				},
 				"github.com/sdboyer/deptest": []projectConstraint{
 					{"github.com/JackyChiu/dep-applicable-constraints", ver08},
