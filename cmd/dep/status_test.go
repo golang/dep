@@ -354,8 +354,8 @@ func TestCollectConstraints(t *testing.T) {
 					{"github.com/darkowlzz/deptest-project-2", ver1},
 				},
 				"github.com/sdboyer/deptest": []projectConstraint{
-					{"github.com/darkowlzz/deptest-project-2", ver08},
 					{"github.com/darkowlzz/deptest-project-1", ver1},
+					{"github.com/darkowlzz/deptest-project-2", ver08},
 				},
 			},
 		},
