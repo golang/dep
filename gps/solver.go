@@ -645,6 +645,13 @@ func (s *solver) selectRoot() error {
 		}
 
 		s.sel.pushDep(dependency{depender: awp.a, dep: dep})
+
+		if dep.isTransitive {
+			// Do not add transitive dependencies to the queue immediately,
+			// instead wait until they are directly used
+			continue
+		}
+
 		// Add all to unselected queue
 		heap.Push(s.unsel, bimodalIdentifier{id: dep.Ident, pl: dep.pl, fromRoot: true})
 	}
@@ -789,6 +796,17 @@ func (s *solver) intersectConstraintsWithImports(deps []workingConstraint, reach
 		dmap[root] = completeDep{
 			workingConstraint: pd,
 			pl:                []string{rp},
+		}
+	}
+
+	// Include transitive constraints, flagging them as transitive for special handling later on
+	for _, wc := range deps {
+		root := wc.Ident.ProjectRoot
+		if _, ok := dmap[root]; !ok {
+			dmap[root] = completeDep{
+				workingConstraint: wc, // TODO(carolynvs): deal with overrides and package prefix-foo (not sure if that's needed?)
+				isTransitive:      true,
+			}
 		}
 	}
 

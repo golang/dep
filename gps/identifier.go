@@ -215,6 +215,8 @@ type completeDep struct {
 	workingConstraint
 	// The specific packages required from the ProjectDep
 	pl []string
+	// Flags the constraint as being defined on an indirect/transitive dependency
+	isTransitive bool
 }
 
 // dependency represents an incomplete edge in the depgraph. It has a
