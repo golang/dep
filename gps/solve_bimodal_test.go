@@ -152,6 +152,22 @@ var bimodalFixtures = map[string]bimodalFixture{
 			"baz 1.0.0",
 		),
 	},
+	"unused transitive constraint": {
+		ds: []depspec{
+			dsp(mkDepspec("root 1.0.0", "foo 1.0.0"),
+				pkg("root", "foo", "baz"),
+			),
+			dsp(mkDepspec("foo 1.0.0", "baz =1.0.0"),
+				pkg("foo"),
+			),
+			dsp(mkDepspec("baz 1.0.1"), pkg("baz")),
+			dsp(mkDepspec("baz 1.0.0"), pkg("baz")),
+		},
+		r: mksolution(
+			"foo 1.0.0",
+			"baz 1.0.1",
+		),
+	},
 	// Constraints apply only if the project that declares them has a
 	// reachable import
 	"constraints activated by import": {
