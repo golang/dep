@@ -1,0 +1,8 @@
+
+[[constraint]]
+  name = "github.com/carolynvs/deptest-transcons-a"
+  version = "1.0.0"
+
+[prune]
+  go-tests = true
+  unused-packages = true

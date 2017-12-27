@@ -1,0 +1,10 @@
+{
+  "commands": [
+    ["init", "--no-examples"]
+  ],
+  "vendor-final": [
+    "github.com/carolynvs/deptest-transcons-a",
+    "github.com/carolynvs/deptest-transcons-b",
+    "github.com/carolynvs/deptest-transcons-c"
+  ]
+}
