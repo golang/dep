@@ -5,6 +5,7 @@
 package base
 
 import (
+	"fmt"
 	"log"
 	"testing"
 
@@ -396,6 +397,32 @@ func TestBaseImporter_ImportProjects(t *testing.T) {
 				{
 					Name:   importertest.Project,
 					Source: "example.com/vendor/" + importertest.Project,
+				},
+			},
+		},
+		"invalid project root": {
+			importertest.TestCase{
+				WantSourceRepo: "",
+				WantWarning:    "Warning: Skipping project. Cannot determine the project root for invalid-project",
+			},
+			[]ImportedPackage{
+				{
+					Name: "invalid-project",
+				},
+			},
+		},
+		"nonexistent project": {
+			importertest.TestCase{
+				WantSourceRepo: "",
+				WantWarning: fmt.Sprintf(
+					"Warning: Unable to apply constraint %q for %s",
+					importertest.V1Tag, importertest.NonexistentPrj,
+				),
+			},
+			[]ImportedPackage{
+				{
+					Name:     importertest.NonexistentPrj,
+					LockHint: importertest.V1Tag,
 				},
 			},
 		},
