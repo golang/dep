@@ -1,0 +1,4 @@
+
+[[constraint]]
+  name = "github.com/carolynvs/deptest-transcons-a"
+  version = "1.0.0"
