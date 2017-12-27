@@ -193,6 +193,15 @@ func TestValidateUpdateArgs(t *testing.T) {
 			},
 			lockedProjects: []string{"github.com/golang/dep"},
 		},
+		{
+			name:      "flags after spec",
+			args:      []string{"github.com/golang/dep@master", "-v"},
+			wantError: errUpdateArgsValidation,
+			wantWarn: []string{
+				"could not infer project root from dependency path",
+			},
+			lockedProjects: []string{"github.com/golang/dep"},
+		},
 	}
 
 	h := test.NewHelper(t)
