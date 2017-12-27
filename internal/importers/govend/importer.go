@@ -93,14 +93,19 @@ func (g *Importer) convert(pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock) {
 	for _, pkg := range g.yaml.Imports {
 		// Path must not be empty
 		if pkg.Path == "" {
-			g.Logger.Println("  Warning: Invalid govend configuration, path is required")
+			g.Logger.Println(
+				"  Warning: Skipping package. Invalid govend configuration, path is required",
+			)
 			continue
 		}
 
 		if pkg.Revision == "" {
+			// Do not add 'empty constraints' to the manifest. Solve will add to lock if required.
 			g.Logger.Printf(
-				"  Warning: Invalid govend configuration, rev not found for Path %q\n", pkg.Path,
+				"  Warning: Skipping package. Invalid govend configuration, rev not found for Path %q\n",
+				pkg.Path,
 			)
+			continue
 		}
 
 		ip := base.ImportedPackage{

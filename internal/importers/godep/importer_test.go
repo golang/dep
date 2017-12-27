@@ -56,7 +56,7 @@ func TestGodepConfig_Convert(t *testing.T) {
 		},
 		"missing package name": {
 			importertest.TestCase{
-				WantWarning: "Warning: Invalid godep configuration, ImportPath is required",
+				WantWarning: "Warning: Skipping package. Invalid godep configuration, ImportPath is required",
 			},
 			godepJSON{
 				Imports: []godepPackage{{ImportPath: ""}},

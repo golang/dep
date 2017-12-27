@@ -118,13 +118,13 @@ func (g *Importer) load(projectDir string) error {
 		}
 		lb, err := ioutil.ReadFile(l)
 		if err != nil {
-			g.Logger.Printf("  Warning: Unable to read %s: %s\n", l, err)
+			g.Logger.Printf("  Warning: Ignoring lock file. Unable to read %s: %s\n", l, err)
 			return nil
 		}
 		lock := glideLock{}
 		err = yaml.Unmarshal(lb, &lock)
 		if err != nil {
-			g.Logger.Printf("  Warning: Unable to parse %s: %s\n", l, err)
+			g.Logger.Printf("  Warning: Ignoring lock file. Unable to parse %s: %s\n", l, err)
 			return nil
 		}
 		g.lockFound = true
@@ -152,7 +152,9 @@ func (g *Importer) convert(pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock) {
 	for _, pkg := range append(g.glideConfig.Imports, g.glideConfig.TestImports...) {
 		// Validate
 		if pkg.Name == "" {
-			g.Logger.Println("  Warning: Invalid glide configuration: Name is required")
+			g.Logger.Println(
+				"  Warning: Skipping package. Invalid glide configuration, Name is required",
+			)
 			continue
 		}
 
@@ -178,7 +180,7 @@ func (g *Importer) convert(pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock) {
 	for _, pkg := range append(g.glideLock.Imports, g.glideLock.TestImports...) {
 		// Validate
 		if pkg.Name == "" {
-			g.Logger.Println("  Warning: Invalid glide lock: Name is required")
+			g.Logger.Println("  Warning: Skipping package. Invalid glide lock, Name is required")
 			continue
 		}
 

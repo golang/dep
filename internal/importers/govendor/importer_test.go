@@ -121,7 +121,7 @@ func TestGovendorConfig_Convert(t *testing.T) {
 				},
 			},
 			importertest.TestCase{
-				WantWarning: "Warning: Invalid govendor configuration, Path is required",
+				WantWarning: "Warning: Skipping package. Invalid govendor configuration, Path is required",
 			},
 		},
 		"missing package revision doesn't cause an error": {

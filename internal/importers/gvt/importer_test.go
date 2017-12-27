@@ -90,7 +90,7 @@ func TestGvtConfig_Convert(t *testing.T) {
 		},
 		"missing package name": {
 			importertest.TestCase{
-				WantWarning: "Warning: Invalid gvt configuration, ImportPath is required",
+				WantWarning: "Warning: Skipping package. Invalid gvt configuration, ImportPath is required",
 			},
 			gvtManifest{
 				Deps: []gvtPkg{{ImportPath: ""}},

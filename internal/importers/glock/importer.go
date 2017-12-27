@@ -80,7 +80,7 @@ func (g *Importer) load(projectDir string) error {
 	for scanner.Scan() {
 		pkg, err := parseGlockLine(scanner.Text())
 		if err != nil {
-			g.Logger.Printf("  Warning: Unable to parse line: %s\n", err)
+			g.Logger.Printf("  Warning: Skipping line. Unable to parse: %s\n", err)
 			continue
 		}
 		if pkg == nil {
@@ -90,7 +90,7 @@ func (g *Importer) load(projectDir string) error {
 	}
 
 	if err := scanner.Err(); err != nil {
-		g.Logger.Printf("  Warning: Scanner for the file %s encountered an error:%s\n", path, err)
+		g.Logger.Printf("  Warning: Ignoring errors found while parsing %s: %s\n", path, err)
 	}
 
 	return nil
@@ -123,15 +123,19 @@ func (g *Importer) convert(pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock) {
 	for _, pkg := range g.packages {
 		// Validate
 		if pkg.importPath == "" {
-			g.Logger.Println("  Warning: Invalid glock configuration, import path is required")
+			g.Logger.Println(
+				"  Warning: Skipping package. Invalid glock configuration, import path is required",
+			)
 			continue
 		}
 
 		if pkg.revision == "" {
+			// Do not add 'empty constraints' to the manifest. Solve will add to lock if required.
 			g.Logger.Printf(
-				"  Warning: Invalid glock configuration, revision not found for import path %q\n",
+				"  Warning: Skipping package. Invalid glock configuration, revision not found for import path %q\n",
 				pkg.importPath,
 			)
+			continue
 		}
 
 		packages = append(packages, base.ImportedPackage{

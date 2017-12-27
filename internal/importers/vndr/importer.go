@@ -68,7 +68,7 @@ func (v *Importer) loadVndrFile(dir string) error {
 	for scanner.Scan() {
 		pkg, err := parseVndrLine(scanner.Text())
 		if err != nil {
-			v.Logger.Printf("  Warning: Unable to parse line: %s\n", err)
+			v.Logger.Printf("  Warning: Skipping line. Unable to parse: %s\n", err)
 			continue
 		}
 		if pkg == nil {
@@ -79,7 +79,7 @@ func (v *Importer) loadVndrFile(dir string) error {
 	}
 
 	if err := scanner.Err(); err != nil {
-		v.Logger.Printf("  Warning: Scanner for the file %s encountered an error:%s\n", path, err)
+		v.Logger.Printf("  Warning: Ignoring errors found while parsing %s: %s\n", path, err)
 	}
 
 	return nil
@@ -90,7 +90,9 @@ func (v *Importer) convert(pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock) {
 	for _, pkg := range v.packages {
 		// Validate
 		if pkg.importPath == "" {
-			v.Logger.Println("  Warning: Invalid vndr configuration, import path is required")
+			v.Logger.Println(
+				"  Warning: Skipping package. Invalid vndr configuration, import path is required",
+			)
 			continue
 		}
 

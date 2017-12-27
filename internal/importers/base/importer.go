@@ -133,7 +133,7 @@ func (i *Importer) loadPackages(packages []ImportedPackage) []importedProject {
 		pr, err := i.SourceManager.DeduceProjectRoot(pkg.Name)
 		if err != nil {
 			i.Logger.Printf(
-				"  Warning: Cannot determine the project root for %s: %s\n",
+				"  Warning: Skipping project. Cannot determine the project root for %s: %s\n",
 				pkg.Name, err,
 			)
 			continue

@@ -47,7 +47,7 @@ func TestGovendConfig_Convert(t *testing.T) {
 				},
 			},
 			importertest.TestCase{
-				WantWarning: "Warning: Invalid govend configuration, path is required",
+				WantWarning: "Warning: Skipping package. Invalid govend configuration, path is required",
 			},
 		},
 
@@ -61,7 +61,7 @@ func TestGovendConfig_Convert(t *testing.T) {
 			},
 			importertest.TestCase{
 				WantWarning: fmt.Sprintf(
-					"Warning: Invalid govend configuration, rev not found for Path %q",
+					"Warning: Skipping package. Invalid govend configuration, rev not found for Path %q",
 					importertest.Project,
 				),
 			},

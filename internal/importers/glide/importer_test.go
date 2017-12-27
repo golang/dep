@@ -125,7 +125,7 @@ func TestGlideConfig_Convert(t *testing.T) {
 			},
 			glideLock{},
 			importertest.TestCase{
-				WantWarning: "Warning: Invalid glide configuration: Name is required",
+				WantWarning: "Warning: Skipping package. Invalid glide configuration, Name is required",
 			},
 		},
 		"warn unused os field": {

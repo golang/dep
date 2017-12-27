@@ -92,7 +92,9 @@ func (g *Importer) convert(pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock) {
 	for _, pkg := range g.gvtConfig.Deps {
 		// Validate
 		if pkg.ImportPath == "" {
-			g.Logger.Println("  Warning: Invalid gvt configuration, ImportPath is required")
+			g.Logger.Println(
+				"  Warning: Skipping package. Invalid gvt configuration, ImportPath is required",
+			)
 			continue
 		}
 
