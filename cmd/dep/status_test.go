@@ -387,7 +387,7 @@ func TestCollectConstraints(t *testing.T) {
 			lock: dep.Lock{
 				P: []gps.LockedProject{
 					gps.NewLockedProject(
-						gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot("github.com/JackyChiu/dep-applicable-constraints")},
+						gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot("github.com/darkowlzz/dep-applicable-constraints")},
 						gps.NewVersion("v1.0.0"),
 						[]string{"."},
 					),
@@ -395,10 +395,10 @@ func TestCollectConstraints(t *testing.T) {
 			},
 			wantConstraints: constraintsCollection{
 				"github.com/boltdb/bolt": []projectConstraint{
-					{"github.com/JackyChiu/dep-applicable-constraints", gps.NewBranch("master")},
+					{"github.com/darkowlzz/dep-applicable-constraints", gps.NewBranch("master")},
 				},
 				"github.com/sdboyer/deptest": []projectConstraint{
-					{"github.com/JackyChiu/dep-applicable-constraints", ver08},
+					{"github.com/darkowlzz/dep-applicable-constraints", ver08},
 				},
 			},
 		},
