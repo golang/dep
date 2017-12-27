@@ -15,8 +15,6 @@ import (
 
 	"github.com/golang/dep"
 	"github.com/golang/dep/gps"
-	"github.com/golang/dep/gps/paths"
-	"github.com/golang/dep/gps/pkgtree"
 	"github.com/golang/dep/internal/fs"
 	"github.com/pkg/errors"
 )
@@ -137,7 +135,13 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 	if ctx.Verbose {
 		ctx.Out.Println("Getting direct dependencies...")
 	}
-	pkgT, directDeps, err := getDirectDependencies(sm, p)
+
+	pkgT, err := p.ParseRootPackageTree()
+	if err != nil {
+		return errors.Wrap(err, "init failed: unable to determine root packages")
+	}
+
+	directDeps, err := p.DirectDependencies(sm)
 	if err != nil {
 		return errors.Wrap(err, "init failed: unable to determine direct dependencies")
 	}
@@ -225,25 +229,6 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 	}
 
 	return nil
-}
-
-func getDirectDependencies(sm gps.SourceManager, p *dep.Project) (pkgtree.PackageTree, map[string]bool, error) {
-	pkgT, err := p.ParseRootPackageTree()
-	if err != nil {
-		return pkgtree.PackageTree{}, nil, err
-	}
-
-	directDeps := map[string]bool{}
-	rm, _ := pkgT.ToReachMap(true, true, false, nil)
-	for _, ip := range rm.FlattenFn(paths.IsStandardImportPath) {
-		pr, err := sm.DeduceProjectRoot(ip)
-		if err != nil {
-			return pkgtree.PackageTree{}, nil, err
-		}
-		directDeps[string(pr)] = true
-	}
-
-	return pkgT, directDeps, nil
 }
 
 // TODO solve failures can be really creative - we need to be similarly creative

@@ -30,7 +30,7 @@ func TestGetDirectDependencies_ConsolidatesRootProjects(t *testing.T) {
 	testpath := h.Path(testdir)
 	prj := &dep.Project{AbsRoot: testpath, ResolvedAbsRoot: testpath, ImportRoot: gps.ProjectRoot(testprj)}
 
-	_, dd, err := getDirectDependencies(sm, prj)
+	dd, err := prj.DirectDependencies(sm)
 	h.Must(err)
 
 	wantpr := "github.com/carolynvs/deptest-subpkg"

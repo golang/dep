@@ -152,9 +152,8 @@ func (p *Project) ParseRootPackageTree() (pkgtree.PackageTree, error) {
 	return ptree.TrimHiddenPackages(true, true, ig), nil
 }
 
-// DirectDependencies creates a map of dependencies imported in the project,
-// excludeding standard packages.
-func (p *Project) DirectDependencies() (map[string]bool, error) {
+// DirectDependencies creates a map of direct dependencies imported in the project.
+func (p *Project) DirectDependencies(sm gps.SourceManager) (map[string]bool, error) {
 	pkgT, err := p.ParseRootPackageTree()
 	if err != nil {
 		return nil, err
@@ -162,8 +161,12 @@ func (p *Project) DirectDependencies() (map[string]bool, error) {
 
 	directDeps := make(map[string]bool)
 	rm, _ := pkgT.ToReachMap(true, true, false, nil)
-	for _, pr := range rm.FlattenFn(paths.IsStandardImportPath) {
-		directDeps[pr] = true
+	for _, ip := range rm.FlattenFn(paths.IsStandardImportPath) {
+		pr, err := sm.DeduceProjectRoot(ip)
+		if err != nil {
+			return nil, err
+		}
+		directDeps[string(pr)] = true
 	}
 
 	return directDeps, nil
