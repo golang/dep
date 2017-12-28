@@ -198,7 +198,7 @@ func (rd rootdata) rootAtom() atomWithPackages {
 	sort.Strings(list)
 
 	return atomWithPackages{
-		a:  a,
-		pl: list,
+		a:   a,
+		bmi: bimodalIdentifier{id: a.id, pl: list},
 	}
 }

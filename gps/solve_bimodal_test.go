@@ -132,7 +132,7 @@ var bimodalFixtures = map[string]bimodalFixture{
 			"b 1.0.0",
 		),
 	},
-	"transitive constraint": {
+	"used transitive constraint": {
 		ds: []depspec{
 			dsp(mkDepspec("root 1.0.0", "foo 1.0.0"),
 				pkg("root", "foo"),

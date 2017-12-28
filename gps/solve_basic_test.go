@@ -226,14 +226,15 @@ func mkDepspec(pi string, deps ...string) depspec {
 
 func mkDep(atom, pdep string, pl ...string) dependency {
 	return dependency{
-		depender: mkAtom(atom),
+		depender: atomWithPackages{a: mkAtom(atom)},
 		dep:      mkCDep(pdep, pl...),
 	}
 }
 
 func mkADep(atom, pdep string, c Constraint, pl ...string) dependency {
 	return dependency{
-		depender: mkAtom(atom),
+		// TODO(carolynvs): I don't think we need to set the bmi (specifically the path to the atom) in the fixture data.
+		depender: atomWithPackages{a: mkAtom(atom)},
 		dep: completeDep{
 			workingConstraint: workingConstraint{
 				Ident: ProjectIdentifier{

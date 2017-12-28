@@ -140,9 +140,9 @@ func (s *solver) traceSelect(awp atomWithPackages, pkgonly bool) {
 
 	var msg string
 	if pkgonly {
-		msg = fmt.Sprintf("%s%s include %v more pkgs from %s", innerIndent, successChar, len(awp.pl), a2vs(awp.a))
+		msg = fmt.Sprintf("%s%s include %v more pkgs from %s", innerIndent, successChar, len(awp.bmi.pl), a2vs(awp.a))
 	} else {
-		msg = fmt.Sprintf("%s select %s w/%v pkgs", successChar, a2vs(awp.a), len(awp.pl))
+		msg = fmt.Sprintf("%s select %s w/%v pkgs", successChar, a2vs(awp.a), len(awp.bmi.pl))
 	}
 
 	prefix := getprei(len(s.sel.projects) - 1)
