@@ -780,7 +780,7 @@ func (rd *registryDeducer) getProjectName(importPath string) (string, error) {
 		return "", err
 	}
 
-	req.Header.Set("Authorization", "BEARER "+rd.registry.Token())
+	req.Header.Set("Authorization", "Bearer "+rd.registry.Token())
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return "", err

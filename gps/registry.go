@@ -94,7 +94,7 @@ func (s *registrySource) execGetVersions() (*rawVersions, error) {
 		return nil, err
 	}
 
-	req.Header.Set("Authorization", "BEARER "+s.token)
+	req.Header.Set("Authorization", "Bearer "+s.token)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, err
@@ -122,7 +122,7 @@ func (s *registrySource) execDownloadDependency(ctx context.Context, pr ProjectR
 		return nil, err
 	}
 
-	req.Header.Set("Authorization", "BEARER "+s.token)
+	req.Header.Set("Authorization", "Bearer "+s.token)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, err

@@ -33,7 +33,7 @@ func verifyToken(r *http.Request) error {
 	tokens, ok := r.Header["Authorization"]
 	if ok && len(tokens) >= 1 {
 		token := tokens[0]
-		token = strings.TrimPrefix(token, "BEARER ")
+		token = strings.TrimPrefix(token, "Bearer ")
 		if token == TokenAuth {
 			return nil
 		}
