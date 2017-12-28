@@ -105,11 +105,12 @@ func (bi brokenImport) String() string {
 	)
 }
 
-// ConstraintFeedback holds project constraint feedback data
+// BrokenImportFeedback holds problematic lock feedback data
 type BrokenImportFeedback struct {
 	brokenImports []brokenImport
 }
 
+// NewBrokenImportFeedback builds a feedback entry for problems with imports from a diff of the pre- and post- solved locks
 func NewBrokenImportFeedback(ld *gps.LockDiff) *BrokenImportFeedback {
 	bi := &BrokenImportFeedback{}
 	for _, lpd := range ld.Modify {
@@ -123,6 +124,7 @@ func NewBrokenImportFeedback(ld *gps.LockDiff) *BrokenImportFeedback {
 	return bi
 }
 
+// LogFeedback logs a warning for all changes between the initially imported and post- solve locks
 func (b BrokenImportFeedback) LogFeedback(logger *log.Logger) {
 	for _, bi := range b.brokenImports {
 		logger.Printf("Warning: Unable to preserve imported lock %v\n", bi)
