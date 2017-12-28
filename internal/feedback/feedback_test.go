@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/golang/dep"
 	"github.com/golang/dep/gps"
 )
 
@@ -90,5 +91,44 @@ func TestFeedback_LockedProject(t *testing.T) {
 		if c.want != got {
 			t.Errorf("Feedbacks are not expected: \n\t(GOT) '%s'\n\t(WNT) '%s'", got, c.want)
 		}
+	}
+}
+
+func TestFeedback_BrokenImport(t *testing.T) {
+	ov := gps.NewVersion("v1.1.4").Pair("bc29b4f")
+	lv := gps.NewVersion("v1.2.0").Pair("ia3da28")
+	pi := gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot("github.com/foo/bar")}
+
+	ol := dep.Lock{
+		P: []gps.LockedProject{gps.NewLockedProject(pi, ov, nil)},
+	}
+	l := dep.Lock{
+		P: []gps.LockedProject{gps.NewLockedProject(pi, lv, nil)},
+	}
+
+	diff := gps.DiffLocks(&ol, &l)
+
+	cases := []struct {
+		feedback *BrokenImportFeedback
+		want     string
+		name     string
+	}{
+		{
+			feedback: NewBrokenImportFeedback(diff),
+			want:     "Warning: Unable to preserve imported lock v1.1.4 (bc29b4f) for github.com/foo/bar. Locking in v1.2.0 (ia3da28)",
+			name:     "Basic broken import",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			buf := &bytes.Buffer{}
+			log := log2.New(buf, "", 0)
+			c.feedback.LogFeedback(log)
+			got := strings.TrimSpace(buf.String())
+			if c.want != got {
+				t.Errorf("Feedbacks are not expected: \n\t(GOT) '%s'\n\t(WNT) '%s'", got, c.want)
+			}
+		})
 	}
 }

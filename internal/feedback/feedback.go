@@ -82,6 +82,53 @@ func (cf ConstraintFeedback) LogFeedback(logger *log.Logger) {
 	}
 }
 
+type brokenImport struct {
+	projectPath string
+	version     *gps.StringDiff
+	revision    *gps.StringDiff
+}
+
+func (bi brokenImport) String() string {
+	var pr string
+	var cr string
+	if bi.revision != nil {
+		pr = fmt.Sprintf("(%s)", trimSHA(bi.revision.Previous))
+		cr = fmt.Sprintf("(%s)", trimSHA(bi.revision.Current))
+	}
+
+	return fmt.Sprintf("%v %s for %s. Locking in %v %s",
+		bi.version.Previous,
+		pr,
+		bi.projectPath,
+		bi.version.Current,
+		cr,
+	)
+}
+
+// ConstraintFeedback holds project constraint feedback data
+type BrokenImportFeedback struct {
+	brokenImports []brokenImport
+}
+
+func NewBrokenImportFeedback(ld *gps.LockDiff) *BrokenImportFeedback {
+	bi := &BrokenImportFeedback{}
+	for _, lpd := range ld.Modify {
+		bi.brokenImports = append(bi.brokenImports, brokenImport{
+			projectPath: string(lpd.Name),
+			version:     lpd.Version,
+			revision:    lpd.Revision,
+		})
+	}
+
+	return bi
+}
+
+func (b BrokenImportFeedback) LogFeedback(logger *log.Logger) {
+	for _, bi := range b.brokenImports {
+		logger.Printf("Warning: Unable to preserve imported lock %v\n", bi)
+	}
+}
+
 // GetUsingFeedback returns a dependency "using" feedback message. For example:
 //
 //    Using ^1.0.0 as constraint for direct dep github.com/foo/bar
@@ -114,4 +161,15 @@ func GetLockingFeedback(version, revision, depType, projectPath string) string {
 		return fmt.Sprintf("Trying %s (%s) as initial lock for %s %s", version, revision, depType, projectPath)
 	}
 	return fmt.Sprintf("Locking in %s (%s) for %s %s", version, revision, depType, projectPath)
+}
+
+func trimSHA(revision string) string {
+	if len(revision) == 40 {
+		if _, err := hex.DecodeString(revision); err == nil {
+			// Valid SHA1 digest
+			revision = revision[0:7]
+		}
+	}
+
+	return revision
 }
