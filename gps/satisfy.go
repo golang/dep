@@ -11,8 +11,7 @@ package gps
 // The goal is to determine whether selecting the atom would result in a state
 // where all the solver requirements are still satisfied.
 func (s *solver) check(a atomWithPackages, pkgonly bool) error {
-	pa := a.a
-	if nilpa == pa {
+	if nilpa == a.a {
 		// This shouldn't be able to happen, but if it does, it unequivocally
 		// indicates a logical bug somewhere, so blowing up is preferable
 		panic("canary - checking version of empty ProjectAtom")
@@ -30,7 +29,7 @@ func (s *solver) check(a atomWithPackages, pkgonly bool) error {
 	// If we're pkgonly, then base atom was already determined to be allowable,
 	// so we can skip the checkAtomAllowable step.
 	if !pkgonly {
-		if err = s.checkAtomAllowable(pa); err != nil {
+		if err = s.checkAtomAllowable(a); err != nil {
 			return err
 		}
 	}
@@ -78,24 +77,24 @@ func (s *solver) check(a atomWithPackages, pkgonly bool) error {
 
 // checkAtomAllowable ensures that an atom itself is acceptable with respect to
 // the constraints established by the current solution.
-func (s *solver) checkAtomAllowable(pa atom) error {
-	constraint := s.sel.getConstraint(pa.id)
-	if s.vUnify.matches(pa.id, constraint, pa.v) {
+func (s *solver) checkAtomAllowable(awp atomWithPackages) error {
+	constraint := s.sel.getConstraint(awp.a.id, awp.bmi)
+	if s.vUnify.matches(awp.a.id, constraint, awp.a.v) {
 		return nil
 	}
 	// TODO(sdboyer) collect constraint failure reason (wait...aren't we, below?)
 
-	deps := s.sel.getDependenciesOn(pa.id)
+	deps := s.sel.getDependenciesOn(awp.a.id)
 	var failparent []dependency
 	for _, dep := range deps {
-		if !s.vUnify.matches(pa.id, dep.dep.Constraint, pa.v) {
-			s.fail(dep.depender.id)
+		if !s.vUnify.matches(awp.a.id, dep.dep.Constraint, awp.a.v) {
+			s.fail(dep.depender.a.id)
 			failparent = append(failparent, dep)
 		}
 	}
 
 	err := &versionNotAllowedFailure{
-		goal:       pa,
+		goal:       awp.a,
 		failparent: failparent,
 		c:          constraint,
 	}
@@ -120,14 +119,14 @@ func (s *solver) checkRequiredPackagesExist(a atomWithPackages) error {
 	for _, dep := range deps {
 		for _, pkg := range dep.dep.pl {
 			if errdep, seen := fp[pkg]; seen {
-				errdep.deppers = append(errdep.deppers, dep.depender)
+				errdep.deppers = append(errdep.deppers, dep.depender.a)
 				fp[pkg] = errdep
 			} else {
 				perr, has := ptree.Packages[pkg]
 				if !has || perr.Err != nil {
 					fp[pkg] = errDeppers{
 						err:     perr.Err,
-						deppers: []atom{dep.depender},
+						deppers: []atom{dep.depender.a},
 					}
 				}
 			}
@@ -147,7 +146,7 @@ func (s *solver) checkRequiredPackagesExist(a atomWithPackages) error {
 // given dep are valid with respect to existing constraints.
 func (s *solver) checkDepsConstraintsAllowable(a atomWithPackages, cdep completeDep) error {
 	dep := cdep.workingConstraint
-	constraint := s.sel.getConstraint(dep.Ident)
+	constraint := s.sel.getConstraint(dep.Ident, a.bmi)
 	// Ensure the constraint expressed by the dep has at least some possible
 	// intersection with the intersection of existing constraints.
 	if s.vUnify.matchesAny(dep.Ident, constraint, dep.Constraint) {
@@ -160,7 +159,7 @@ func (s *solver) checkDepsConstraintsAllowable(a atomWithPackages, cdep complete
 	var nofailsib []dependency
 	for _, sibling := range siblings {
 		if !s.vUnify.matchesAny(dep.Ident, sibling.dep.Constraint, dep.Constraint) {
-			s.fail(sibling.depender.id)
+			s.fail(sibling.depender.a.id)
 			failsib = append(failsib, sibling)
 		} else {
 			nofailsib = append(nofailsib, sibling)
@@ -168,7 +167,7 @@ func (s *solver) checkDepsConstraintsAllowable(a atomWithPackages, cdep complete
 	}
 
 	return &disjointConstraintFailure{
-		goal:      dependency{depender: a.a, dep: cdep},
+		goal:      dependency{depender: a, dep: cdep},
 		failsib:   failsib,
 		nofailsib: nofailsib,
 		c:         constraint,
@@ -185,7 +184,7 @@ func (s *solver) checkDepsDisallowsSelected(a atomWithPackages, cdep completeDep
 		s.fail(dep.Ident)
 
 		return &constraintNotAllowedFailure{
-			goal: dependency{depender: a.a, dep: cdep},
+			goal: dependency{depender: a, dep: cdep},
 			v:    selected.a.v,
 		}
 	}
@@ -206,7 +205,7 @@ func (s *solver) checkIdentMatches(a atomWithPackages, cdep completeDep) error {
 		// Fail all the other deps, as there's no way atom can ever be
 		// compatible with them
 		for _, d := range deps {
-			s.fail(d.depender.id)
+			s.fail(d.depender.a.id)
 		}
 
 		return &sourceMismatchFailure{
@@ -236,7 +235,7 @@ func (s *solver) checkRootCaseConflicts(a atomWithPackages, cdep completeDep) er
 	curid, _ := s.sel.getIdentFor(current)
 	deps := s.sel.getDependenciesOn(curid)
 	for _, d := range deps {
-		s.fail(d.depender.id)
+		s.fail(d.depender.a.id)
 	}
 
 	// If a project has multiple packages that import each other, we treat that
@@ -260,13 +259,13 @@ func (s *solver) checkRootCaseConflicts(a atomWithPackages, cdep completeDep) er
 	if current == a.a.id.ProjectRoot {
 		return &wrongCaseFailure{
 			correct: pr,
-			goal:    dependency{depender: a.a, dep: cdep},
+			goal:    dependency{depender: a, dep: cdep},
 			badcase: deps,
 		}
 	}
 
 	return &caseMismatchFailure{
-		goal:    dependency{depender: a.a, dep: cdep},
+		goal:    dependency{depender: a, dep: cdep},
 		current: current,
 		failsib: deps,
 	}
@@ -289,7 +288,7 @@ func (s *solver) checkPackageImportsFromDepExist(a atomWithPackages, cdep comple
 
 	e := &depHasProblemPackagesFailure{
 		goal: dependency{
-			depender: a.a,
+			depender: a,
 			dep:      cdep,
 		},
 		v:    sel.a.v,
@@ -329,7 +328,7 @@ func (s *solver) checkRevisionExists(a atomWithPackages, cdep completeDep) error
 
 	return &nonexistentRevisionFailure{
 		goal: dependency{
-			depender: a.a,
+			depender: a,
 			dep:      cdep,
 		},
 		r: r,

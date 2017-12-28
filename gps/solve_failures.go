@@ -78,16 +78,16 @@ type caseMismatchFailure struct {
 func (e *caseMismatchFailure) Error() string {
 	if len(e.failsib) == 1 {
 		str := "Could not introduce %s due to a case-only variation: it depends on %q, but %q was already established as the case variant for that project root by depender %s"
-		return fmt.Sprintf(str, a2vs(e.goal.depender), e.goal.dep.Ident.ProjectRoot, e.current, a2vs(e.failsib[0].depender))
+		return fmt.Sprintf(str, a2vs(e.goal.depender.a), e.goal.dep.Ident.ProjectRoot, e.current, a2vs(e.failsib[0].depender.a))
 	}
 
 	var buf bytes.Buffer
 
 	str := "Could not introduce %s due to a case-only variation: it depends on %q, but %q was already established as the case variant for that project root by the following other dependers:\n"
-	fmt.Fprintf(&buf, str, a2vs(e.goal.depender), e.goal.dep.Ident.ProjectRoot, e.current)
+	fmt.Fprintf(&buf, str, a2vs(e.goal.depender.a), e.goal.dep.Ident.ProjectRoot, e.current)
 
 	for _, c := range e.failsib {
-		fmt.Fprintf(&buf, "\t%s\n", a2vs(c.depender))
+		fmt.Fprintf(&buf, "\t%s\n", a2vs(c.depender.a))
 	}
 
 	return buf.String()
@@ -97,7 +97,7 @@ func (e *caseMismatchFailure) traceString() string {
 	var buf bytes.Buffer
 	fmt.Fprintf(&buf, "case-only variation in dependency on %q; %q already established by:\n", e.goal.dep.Ident.ProjectRoot, e.current)
 	for _, f := range e.failsib {
-		fmt.Fprintf(&buf, "%s\n", a2vs(f.depender))
+		fmt.Fprintf(&buf, "%s\n", a2vs(f.depender.a))
 	}
 
 	return buf.String()
@@ -122,16 +122,16 @@ type wrongCaseFailure struct {
 func (e *wrongCaseFailure) Error() string {
 	if len(e.badcase) == 1 {
 		str := "Could not introduce %s; imports amongst its packages establish %q as the canonical casing for root, but %s tried to import it as %q"
-		return fmt.Sprintf(str, a2vs(e.goal.depender), e.correct, a2vs(e.badcase[0].depender), e.badcase[0].dep.Ident.ProjectRoot)
+		return fmt.Sprintf(str, a2vs(e.goal.depender.a), e.correct, a2vs(e.badcase[0].depender.a), e.badcase[0].dep.Ident.ProjectRoot)
 	}
 
 	var buf bytes.Buffer
 
 	str := "Could not introduce %s; imports amongst its packages establish %q as the canonical casing for root, but the following projects tried to import it as %q"
-	fmt.Fprintf(&buf, str, a2vs(e.goal.depender), e.correct, e.badcase[0].dep.Ident.ProjectRoot)
+	fmt.Fprintf(&buf, str, a2vs(e.goal.depender.a), e.correct, e.badcase[0].dep.Ident.ProjectRoot)
 
 	for _, c := range e.badcase {
-		fmt.Fprintf(&buf, "\t%s\n", a2vs(c.depender))
+		fmt.Fprintf(&buf, "\t%s\n", a2vs(c.depender.a))
 	}
 
 	return buf.String()
@@ -141,7 +141,7 @@ func (e *wrongCaseFailure) traceString() string {
 	var buf bytes.Buffer
 	fmt.Fprintf(&buf, "internal imports establish %q as correct casing; %q was used by:\n", e.correct, e.goal.dep.Ident.ProjectRoot)
 	for _, f := range e.badcase {
-		fmt.Fprintf(&buf, "%s\n", a2vs(f.depender))
+		fmt.Fprintf(&buf, "%s\n", a2vs(f.depender.a))
 	}
 
 	return buf.String()
@@ -171,7 +171,7 @@ type disjointConstraintFailure struct {
 func (e *disjointConstraintFailure) Error() string {
 	if len(e.failsib) == 1 {
 		str := "Could not introduce %s, as it has a dependency on %s with constraint %s, which has no overlap with existing constraint %s from %s"
-		return fmt.Sprintf(str, a2vs(e.goal.depender), e.goal.dep.Ident, e.goal.dep.Constraint.String(), e.failsib[0].dep.Constraint.String(), a2vs(e.failsib[0].depender))
+		return fmt.Sprintf(str, a2vs(e.goal.depender.a), e.goal.dep.Ident, e.goal.dep.Constraint.String(), e.failsib[0].dep.Constraint.String(), a2vs(e.failsib[0].depender.a))
 	}
 
 	var buf bytes.Buffer
@@ -181,16 +181,16 @@ func (e *disjointConstraintFailure) Error() string {
 		sibs = e.failsib
 
 		str := "Could not introduce %s, as it has a dependency on %s with constraint %s, which has no overlap with the following existing constraints:\n"
-		fmt.Fprintf(&buf, str, a2vs(e.goal.depender), e.goal.dep.Ident, e.goal.dep.Constraint.String())
+		fmt.Fprintf(&buf, str, a2vs(e.goal.depender.a), e.goal.dep.Ident, e.goal.dep.Constraint.String())
 	} else {
 		sibs = e.nofailsib
 
 		str := "Could not introduce %s, as it has a dependency on %s with constraint %s, which does not overlap with the intersection of existing constraints from other currently selected packages:\n"
-		fmt.Fprintf(&buf, str, a2vs(e.goal.depender), e.goal.dep.Ident, e.goal.dep.Constraint.String())
+		fmt.Fprintf(&buf, str, a2vs(e.goal.depender.a), e.goal.dep.Ident, e.goal.dep.Constraint.String())
 	}
 
 	for _, c := range sibs {
-		fmt.Fprintf(&buf, "\t%s from %s\n", c.dep.Constraint.String(), a2vs(c.depender))
+		fmt.Fprintf(&buf, "\t%s from %s\n", c.dep.Constraint.String(), a2vs(c.depender.a))
 	}
 
 	return buf.String()
@@ -204,7 +204,7 @@ func (e *disjointConstraintFailure) traceString() string {
 			&buf,
 			"%s from %s (no overlap)\n",
 			f.dep.Constraint.String(),
-			a2vs(f.depender),
+			a2vs(f.depender.a),
 		)
 	}
 	for _, f := range e.nofailsib {
@@ -212,7 +212,7 @@ func (e *disjointConstraintFailure) traceString() string {
 			&buf,
 			"%s from %s (some overlap)\n",
 			f.dep.Constraint.String(),
-			a2vs(f.depender),
+			a2vs(f.depender.a),
 		)
 	}
 
@@ -234,7 +234,7 @@ type constraintNotAllowedFailure struct {
 func (e *constraintNotAllowedFailure) Error() string {
 	return fmt.Sprintf(
 		"Could not introduce %s, as it has a dependency on %s with constraint %s, which does not allow the currently selected version of %s",
-		a2vs(e.goal.depender),
+		a2vs(e.goal.depender.a),
 		e.goal.dep.Ident,
 		e.goal.dep.Constraint,
 		e.v,
@@ -244,7 +244,7 @@ func (e *constraintNotAllowedFailure) Error() string {
 func (e *constraintNotAllowedFailure) traceString() string {
 	return fmt.Sprintf(
 		"%s depends on %s with %s, but that's already selected at %s",
-		a2vs(e.goal.depender),
+		a2vs(e.goal.depender.a),
 		e.goal.dep.Ident.ProjectRoot,
 		e.goal.dep.Constraint,
 		e.v,
@@ -274,7 +274,7 @@ func (e *versionNotAllowedFailure) Error() string {
 			"Could not introduce %s, as it is not allowed by constraint %s from project %s.",
 			a2vs(e.goal),
 			e.failparent[0].dep.Constraint.String(),
-			e.failparent[0].depender.id,
+			e.failparent[0].depender.a.id,
 		)
 	}
 
@@ -283,7 +283,7 @@ func (e *versionNotAllowedFailure) Error() string {
 	fmt.Fprintf(&buf, "Could not introduce %s, as it is not allowed by constraints from the following projects:\n", a2vs(e.goal))
 
 	for _, f := range e.failparent {
-		fmt.Fprintf(&buf, "\t%s from %s\n", f.dep.Constraint.String(), a2vs(f.depender))
+		fmt.Fprintf(&buf, "\t%s from %s\n", f.dep.Constraint.String(), a2vs(f.depender.a))
 	}
 
 	return buf.String()
@@ -294,7 +294,7 @@ func (e *versionNotAllowedFailure) traceString() string {
 
 	fmt.Fprintf(&buf, "%s not allowed by constraint %s:\n", a2vs(e.goal), e.c.String())
 	for _, f := range e.failparent {
-		fmt.Fprintf(&buf, "  %s from %s\n", f.dep.Constraint.String(), a2vs(f.depender))
+		fmt.Fprintf(&buf, "  %s from %s\n", f.dep.Constraint.String(), a2vs(f.depender.a))
 	}
 
 	return buf.String()
@@ -333,7 +333,7 @@ type sourceMismatchFailure struct {
 func (e *sourceMismatchFailure) Error() string {
 	var cur []string
 	for _, c := range e.sel {
-		cur = append(cur, string(c.depender.id.ProjectRoot))
+		cur = append(cur, string(c.depender.a.id.ProjectRoot))
 	}
 
 	str := "Could not introduce %s, as it depends on %s from %s, but %s is already marked as coming from %s by %s"
@@ -346,7 +346,7 @@ func (e *sourceMismatchFailure) traceString() string {
 
 	fmt.Fprintf(&buf, "  %s from %s\n", e.mismatch, e.prob.id)
 	for _, dep := range e.sel {
-		fmt.Fprintf(&buf, "  %s from %s\n", e.current, dep.depender.id)
+		fmt.Fprintf(&buf, "  %s from %s\n", e.current, dep.depender.a.id)
 	}
 
 	return buf.String()
@@ -485,7 +485,7 @@ func (e *depHasProblemPackagesFailure) Error() string {
 
 		return fmt.Sprintf(
 			"Could not introduce %s, as it requires package %s from %s, but in version %s that package %s",
-			a2vs(e.goal.depender),
+			a2vs(e.goal.depender.a),
 			pkg,
 			e.goal.dep.Ident,
 			e.v,
@@ -496,7 +496,7 @@ func (e *depHasProblemPackagesFailure) Error() string {
 	var buf bytes.Buffer
 	fmt.Fprintf(
 		&buf, "Could not introduce %s, as it requires problematic packages from %s (current version %s):",
-		a2vs(e.goal.depender),
+		a2vs(e.goal.depender.a),
 		e.goal.dep.Ident,
 		e.v,
 	)
@@ -526,7 +526,7 @@ func (e *depHasProblemPackagesFailure) traceString() string {
 
 	fmt.Fprintf(
 		&buf, "%s depping on %s at %s has problem subpkg(s):",
-		a2vs(e.goal.depender),
+		a2vs(e.goal.depender.a),
 		e.goal.dep.Ident,
 		e.v,
 	)
@@ -556,7 +556,7 @@ type nonexistentRevisionFailure struct {
 func (e *nonexistentRevisionFailure) Error() string {
 	return fmt.Sprintf(
 		"Could not introduce %s, as it requires %s at revision %s, but that revision does not exist",
-		a2vs(e.goal.depender),
+		a2vs(e.goal.depender.a),
 		e.goal.dep.Ident,
 		e.r,
 	)
@@ -565,7 +565,7 @@ func (e *nonexistentRevisionFailure) Error() string {
 func (e *nonexistentRevisionFailure) traceString() string {
 	return fmt.Sprintf(
 		"%s wants missing rev %s of %s",
-		a2vs(e.goal.depender),
+		a2vs(e.goal.depender.a),
 		e.r,
 		e.goal.dep.Ident,
 	)
