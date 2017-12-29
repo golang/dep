@@ -148,13 +148,7 @@ func GetUsingFeedback(version, consType, depType, projectPath string) string {
 //    Locking in v1.1.4 (bc29b4f) for direct dep github.com/foo/bar
 //    Locking in master (436f39d) for transitive dep github.com/baz/qux
 func GetLockingFeedback(version, revision, depType, projectPath string) string {
-	// Check if it's a valid SHA1 digest and trim to 7 characters.
-	if len(revision) == 40 {
-		if _, err := hex.DecodeString(revision); err == nil {
-			// Valid SHA1 digest
-			revision = revision[0:7]
-		}
-	}
+	revision = trimSHA(revision)
 
 	if depType == DepTypeImported {
 		if version == "" {
@@ -165,6 +159,7 @@ func GetLockingFeedback(version, revision, depType, projectPath string) string {
 	return fmt.Sprintf("Locking in %s (%s) for %s %s", version, revision, depType, projectPath)
 }
 
+// trimSHA checks if revision is a valid SHA1 digest and trims to 7 characters.
 func trimSHA(revision string) string {
 	if len(revision) == 40 {
 		if _, err := hex.DecodeString(revision); err == nil {
