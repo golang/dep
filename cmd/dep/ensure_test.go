@@ -66,10 +66,9 @@ func TestCheckErrors(t *testing.T) {
 		pkgOrErrMap map[string]pkgtree.PackageOrErr
 	}{
 		{
-			name:  "noErrorsAndEmpty",
-			fatal: false,
-			pkgOrErrMap: map[string]pkgtree.PackageOrErr{
-			},
+			name:        "noErrorsAndEmpty",
+			fatal:       false,
+			pkgOrErrMap: map[string]pkgtree.PackageOrErr{},
 		},
 		{
 			name:  "noErrors",
