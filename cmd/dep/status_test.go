@@ -409,7 +409,7 @@ func TestCollectConstraints(t *testing.T) {
 
 	testdir := filepath.Join("src", "collect_constraints_test")
 	h.TempDir(testdir)
-	h.TempCopy(filepath.Join(testdir, "main.go"), "status/collect_constraints/main.go")
+	h.TempCopy(filepath.Join(testdir, "main.go"), filepath.Join("status", "collect_constraints", "main.go"))
 	testProjPath := h.Path(testdir)
 
 	discardLogger := log.New(ioutil.Discard, "", 0)
