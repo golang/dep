@@ -33,6 +33,7 @@ var (
 	errInvalidMetadata     = errors.New("metadata should be a TOML table")
 
 	errInvalidProjectRoot = errors.New("ProjectRoot name validation failed")
+	errInefficientRules   = errors.New("Inefficient rules found in the manifest")
 
 	errInvalidPruneValue = errors.New("prune options values must be booleans")
 	errPruneSubProject   = errors.New("prune projects should not contain sub projects")
@@ -322,6 +323,78 @@ func ValidateProjectRoots(c *Ctx, m *Manifest, sm gps.SourceManager) error {
 	}
 
 	return valErr
+}
+
+// ValidatePackageRules ensure that there are no ineffectual package declarations
+// in the constraints, overrides, required, and ignored rules in the manifest.
+func ValidatePackageRules(c *Ctx, proj *Project, sm gps.SourceManager) (err error) {
+	directDeps, err := proj.DirectDependencies(sm)
+	if err != nil {
+		return err
+	}
+
+	ic := FindIneffectualConstraints(proj.Manifest, directDeps)
+	if len(ic) > 0 {
+		err = errInefficientRules
+		c.Err.Printf("The following constraints aren't imported:\n\n")
+		for _, pr := range ic {
+			c.Err.Println("  ", pr)
+		}
+		c.Err.Println()
+	}
+
+	ig := FindIneffectualIgnores(proj.Manifest, directDeps)
+	if len(ig) > 0 {
+		err = errInefficientRules
+		c.Err.Printf("The following ignored packages aren't imported:\n\n")
+		for _, pr := range ig {
+			c.Err.Println("  ", pr)
+		}
+		c.Err.Println()
+	}
+
+	return err
+}
+
+// FindIneffectualConstraints looks for constraints decleared in the project
+// manifest that aren't directly used in the project. Required packages are an
+// exception to this check.
+func FindIneffectualConstraints(m *Manifest, directDeps map[string]bool) []gps.ProjectRoot {
+	// Treat required packages as if they were direct dependencies
+	for pr, _ := range m.RequiredPackages() {
+		directDeps[string(pr)] = true
+	}
+
+	ineffectuals := make([]gps.ProjectRoot, 0)
+	// Check constraints
+	pc := m.DependencyConstraints()
+	for pr, _ := range pc {
+		if !directDeps[string(pr)] {
+			ineffectuals = append(ineffectuals, pr)
+		}
+	}
+
+	// Check overrides as well
+	for pr, _ := range m.Overrides() {
+		if !directDeps[string(pr)] {
+			ineffectuals = append(ineffectuals, pr)
+		}
+	}
+
+	return ineffectuals
+}
+
+// FindIneffectualIgnores looks for ignored packages decleared in the project
+// manifest that aren't directly used in the project.
+func FindIneffectualIgnores(m *Manifest, directDeps map[string]bool) []gps.ProjectRoot {
+	ineffectuals := make([]gps.ProjectRoot, 0)
+	ignoredPkgs := m.IgnoredPackages()
+	for _, pr := range ignoredPkgs.ToSlice() {
+		if !directDeps[pr] {
+			ineffectuals = append(ineffectuals, gps.ProjectRoot(pr))
+		}
+	}
+	return ineffectuals
 }
 
 // readManifest returns a Manifest read from r and a slice of validation warnings.

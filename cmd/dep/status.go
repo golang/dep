@@ -237,6 +237,10 @@ func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
 		return err
 	}
 
+	if err := dep.ValidatePackageRules(ctx, p, sm); err != nil {
+		return err
+	}
+
 	var buf bytes.Buffer
 	var out outputter
 	switch {
