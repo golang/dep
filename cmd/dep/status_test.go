@@ -407,23 +407,15 @@ func TestCollectConstraints(t *testing.T) {
 	h := test.NewHelper(t)
 	defer h.Cleanup()
 
-	h.TempDir("src")
-	pwd := h.Path(".")
-	h.TempFile(filepath.Join("src", "dep.go"), `
-		package dep
-		import (
-			_ "github.com/boltdb/bolt"
-			_ "github.com/sdboyer/deptest"
-			_ "github.com/sdboyer/dep-test"
-			_ "github.com/sdboyer/deptestdos"
-		)
-		type FooBar int
-	`)
+	testdir := filepath.Join("src", "collect_constraints_test")
+	h.TempDir(testdir)
+	h.TempCopy(filepath.Join(testdir, "main.go"), "status/collect_constraints/main.go")
+	testProjPath := h.Path(testdir)
 
 	discardLogger := log.New(ioutil.Discard, "", 0)
 
 	ctx := &dep.Ctx{
-		GOPATH: pwd,
+		GOPATH: testProjPath,
 		Out:    discardLogger,
 		Err:    discardLogger,
 	}
@@ -435,7 +427,7 @@ func TestCollectConstraints(t *testing.T) {
 	// Create new project and set root. Setting root is required for PackageList
 	// to run properly.
 	p := new(dep.Project)
-	p.SetRoot(filepath.Join(pwd, "src"))
+	p.SetRoot(testProjPath)
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
