@@ -18,6 +18,7 @@ BUG FIXES:
 * Validate `git ls-remote` output and ignore all malformed lines (#1379)
 * Support [gopkg.in version zero](http://labix.org/gopkg.in#VersionZero) (#1243).
 * Fix how dep status print revision constraints. (#1421)
+* Add optional `-v` flag to ensure sub command's syntax. (#1458)
 
 IMPROVEMENTS:
 

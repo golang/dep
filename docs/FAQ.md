@@ -169,7 +169,8 @@ and configure it inside the [`.netrc` file](https://www.gnu.org/software/inetuti
 as the following example:
 ```
 machine github.com
-    login [YOUR_GITHUB_TOKEN]
+    login [YOUR_GITHUB_USERNAME]
+    password [YOUR_GITHUB_TOKEN]
 ```
 
 Once you have set that up, dep will automatically use that Token to authenticate to the repositories.

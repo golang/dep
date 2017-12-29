@@ -354,8 +354,8 @@ func TestCollectConstraints(t *testing.T) {
 					{"github.com/darkowlzz/deptest-project-2", ver1},
 				},
 				"github.com/sdboyer/deptest": []projectConstraint{
-					{"github.com/darkowlzz/deptest-project-2", ver08},
 					{"github.com/darkowlzz/deptest-project-1", ver1},
+					{"github.com/darkowlzz/deptest-project-2", ver08},
 				},
 			},
 		},
@@ -382,17 +382,40 @@ func TestCollectConstraints(t *testing.T) {
 			},
 			wantErr: true,
 		},
+		{
+			name: "collect only applicable constraints",
+			lock: dep.Lock{
+				P: []gps.LockedProject{
+					gps.NewLockedProject(
+						gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot("github.com/darkowlzz/dep-applicable-constraints")},
+						gps.NewVersion("v1.0.0"),
+						[]string{"."},
+					),
+				},
+			},
+			wantConstraints: constraintsCollection{
+				"github.com/boltdb/bolt": []projectConstraint{
+					{"github.com/darkowlzz/dep-applicable-constraints", gps.NewBranch("master")},
+				},
+				"github.com/sdboyer/deptest": []projectConstraint{
+					{"github.com/darkowlzz/dep-applicable-constraints", ver08},
+				},
+			},
+		},
 	}
 
 	h := test.NewHelper(t)
 	defer h.Cleanup()
 
-	h.TempDir("src")
-	pwd := h.Path(".")
+	testdir := filepath.Join("src", "collect_constraints_test")
+	h.TempDir(testdir)
+	h.TempCopy(filepath.Join(testdir, "main.go"), filepath.Join("status", "collect_constraints", "main.go"))
+	testProjPath := h.Path(testdir)
+
 	discardLogger := log.New(ioutil.Discard, "", 0)
 
 	ctx := &dep.Ctx{
-		GOPATH: pwd,
+		GOPATH: testProjPath,
 		Out:    discardLogger,
 		Err:    discardLogger,
 	}
@@ -404,7 +427,7 @@ func TestCollectConstraints(t *testing.T) {
 	// Create new project and set root. Setting root is required for PackageList
 	// to run properly.
 	p := new(dep.Project)
-	p.SetRoot(filepath.Join(pwd, "src"))
+	p.SetRoot(testProjPath)
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
