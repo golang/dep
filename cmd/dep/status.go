@@ -799,6 +799,11 @@ func collectConstraints(ctx *dep.Ctx, p *dep.Project, sm gps.SourceManager) (con
 			// Iterate through the project constraints to get individual dependency
 			// project and constraint values.
 			for pr, pp := range pc {
+				// Check if the project constraint is imported in the root project
+				if _, ok := directDeps[string(pr)]; !ok {
+					continue
+				}
+
 				tempCC := append(
 					constraintCollection[string(pr)],
 					projectConstraint{proj.Ident().ProjectRoot, pp.Constraint},

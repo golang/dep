@@ -382,6 +382,26 @@ func TestCollectConstraints(t *testing.T) {
 			},
 			wantErr: true,
 		},
+		{
+			name: "collect only applicable constraints",
+			lock: dep.Lock{
+				P: []gps.LockedProject{
+					gps.NewLockedProject(
+						gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot("github.com/darkowlzz/dep-applicable-constraints")},
+						gps.NewVersion("v1.0.0"),
+						[]string{"."},
+					),
+				},
+			},
+			wantConstraints: constraintsCollection{
+				"github.com/boltdb/bolt": []projectConstraint{
+					{"github.com/darkowlzz/dep-applicable-constraints", gps.NewBranch("master")},
+				},
+				"github.com/sdboyer/deptest": []projectConstraint{
+					{"github.com/darkowlzz/dep-applicable-constraints", ver08},
+				},
+			},
+		},
 	}
 
 	h := test.NewHelper(t)
@@ -389,6 +409,17 @@ func TestCollectConstraints(t *testing.T) {
 
 	h.TempDir("src")
 	pwd := h.Path(".")
+	h.TempFile(filepath.Join("src", "dep.go"), `
+		package dep
+		import (
+			_ "github.com/boltdb/bolt"
+			_ "github.com/sdboyer/deptest"
+			_ "github.com/sdboyer/dep-test"
+			_ "github.com/sdboyer/deptestdos"
+		)
+		type FooBar int
+	`)
+
 	discardLogger := log.New(ioutil.Discard, "", 0)
 
 	ctx := &dep.Ctx{
