@@ -806,7 +806,7 @@ func checkErrors(m map[string]pkgtree.PackageOrErr, ignore *pkgtree.IgnoredRules
 		}
 	}
 
-	// If pkgtree was empty or all dirs lacked any Go code, return an error.
+	// If pkgtree was empty or all dirs lacked any Go code, return a warning.
 	if len(m) == 0 || len(m) == noGoErrors {
 		return false, errors.New("no dirs contained any Go code")
 	}
