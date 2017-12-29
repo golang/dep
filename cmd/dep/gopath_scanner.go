@@ -136,16 +136,15 @@ func (g *gopathScanner) overlay(rootM *dep.Manifest, rootL *dep.Lock) {
 	missingStr := ""
 	missingVCSStr := ""
 	if len(missing) > 0 {
-		missingStr = fmt.Sprintf("Following dependencies were not found in GOPATH:\n  %s\n",
+		missingStr = fmt.Sprintf("The following dependencies were not found in GOPATH:\n  %s\n\n",
 			strings.Join(missing, "\n  "))
 	}
 	if len(missingVCS) > 0 {
-		missingVCSStr = fmt.Sprintf("Following dependencies found in GOPATH were missing VCS information:\n  %s\n",
+		missingVCSStr = fmt.Sprintf("The following dependencies found in GOPATH were missing VCS information (a remote source is required):\n  %s\n\n",
 			strings.Join(missingVCS, "\n  "))
 	}
 	if len(missingVCS)+len(missing) > 0 {
-		g.ctx.Err.Printf("%s%sDep will use the most recent versions of these projects."+
-			" (Dep will not work if a remote source for these projects doesn't exist)\n\n", missingStr, missingVCSStr)
+		g.ctx.Err.Printf("\n%s%sThe most recent version of these projects will be used.\n\n", missingStr, missingVCSStr)
 	}
 }
 
