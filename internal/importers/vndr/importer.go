@@ -91,7 +91,7 @@ func (v *Importer) convert(pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock) {
 		// Validate
 		if pkg.importPath == "" {
 			v.Logger.Println(
-				"  Warning: Skipping package. Invalid vndr configuration, import path is required",
+				"  Warning: Skipping project. Invalid vndr configuration, import path is required",
 			)
 			continue
 		}

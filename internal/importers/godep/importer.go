@@ -92,7 +92,7 @@ func (g *Importer) convert(pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock) {
 		// Validate
 		if pkg.ImportPath == "" {
 			g.Logger.Println(
-				"  Warning: Skipping package. Invalid godep configuration, ImportPath is required",
+				"  Warning: Skipping project. Invalid godep configuration, ImportPath is required",
 			)
 			continue
 		}

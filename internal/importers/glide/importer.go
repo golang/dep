@@ -153,7 +153,7 @@ func (g *Importer) convert(pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock) {
 		// Validate
 		if pkg.Name == "" {
 			g.Logger.Println(
-				"  Warning: Skipping package. Invalid glide configuration, Name is required",
+				"  Warning: Skipping project. Invalid glide configuration, Name is required",
 			)
 			continue
 		}
@@ -180,7 +180,7 @@ func (g *Importer) convert(pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock) {
 	for _, pkg := range append(g.glideLock.Imports, g.glideLock.TestImports...) {
 		// Validate
 		if pkg.Name == "" {
-			g.Logger.Println("  Warning: Skipping package. Invalid glide lock, Name is required")
+			g.Logger.Println("  Warning: Skipping project. Invalid glide lock, Name is required")
 			continue
 		}
 

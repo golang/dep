@@ -124,7 +124,7 @@ func (g *Importer) convert(pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock) {
 		// Validate
 		if pkg.importPath == "" {
 			g.Logger.Println(
-				"  Warning: Skipping package. Invalid glock configuration, import path is required",
+				"  Warning: Skipping project. Invalid glock configuration, import path is required",
 			)
 			continue
 		}
@@ -132,7 +132,8 @@ func (g *Importer) convert(pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock) {
 		if pkg.revision == "" {
 			// Do not add 'empty constraints' to the manifest. Solve will add to lock if required.
 			g.Logger.Printf(
-				"  Warning: Skipping package. Invalid glock configuration, revision not found for import path %q\n",
+				"  Warning: Skipping import with empty constraints. "+
+					"The solve step will add the dependency to the lock if needed: %q\n",
 				pkg.importPath,
 			)
 			continue

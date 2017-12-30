@@ -100,7 +100,7 @@ func (g *Importer) convert(pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock) {
 		// Path must not be empty
 		if pkg.Path == "" {
 			g.Logger.Println(
-				"  Warning: Skipping package. Invalid govendor configuration, Path is required",
+				"  Warning: Skipping project. Invalid govendor configuration, Path is required",
 			)
 			continue
 		}

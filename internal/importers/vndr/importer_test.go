@@ -42,7 +42,7 @@ func TestVndrConfig_Convert(t *testing.T) {
 				reference: importertest.V1Tag,
 			}},
 			importertest.TestCase{
-				WantWarning: "Warning: Skipping package. Invalid vndr configuration, import path is required",
+				WantWarning: "Warning: Skipping project. Invalid vndr configuration, import path is required",
 			},
 		},
 		"missing reference": {

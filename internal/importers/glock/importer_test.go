@@ -38,14 +38,15 @@ func TestGlockConfig_Convert(t *testing.T) {
 		},
 		"missing package name": {
 			importertest.TestCase{
-				WantWarning: "Warning: Skipping package. Invalid glock configuration, import path is required",
+				WantWarning: "Warning: Skipping project. Invalid glock configuration, import path is required",
 			},
 			[]glockPackage{{importPath: ""}},
 		},
 		"missing revision": {
 			importertest.TestCase{
 				WantWarning: fmt.Sprintf(
-					"Warning: Skipping package. Invalid glock configuration, revision not found for import path %q",
+					"  Warning: Skipping import with empty constraints. "+
+						"The solve step will add the dependency to the lock if needed: %q",
 					importertest.Project,
 				),
 			},

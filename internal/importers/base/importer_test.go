@@ -415,7 +415,7 @@ func TestBaseImporter_ImportProjects(t *testing.T) {
 			importertest.TestCase{
 				WantSourceRepo: "",
 				WantWarning: fmt.Sprintf(
-					"Warning: Unable to apply constraint %q for %s",
+					"Warning: Skipping project. Unable to apply constraint %q for %s",
 					importertest.V1Tag, importertest.NonexistentPrj,
 				),
 			},

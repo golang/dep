@@ -212,28 +212,29 @@ func (i *Importer) ImportPackages(packages []ImportedPackage, defaultConstraintF
 		if prj.LockHint != "" {
 			var isTag bool
 			// Determine if the lock hint is a revision or tag
-			if isTag, version, err = i.isTag(pc.Ident, prj.LockHint); err != nil {
+			isTag, version, err = i.isTag(pc.Ident, prj.LockHint)
+			if err != nil {
 				i.Logger.Printf(
-					"  Warning: Unable to apply constraint %q for %v: %s\n",
+					"  Warning: Skipping project. Unable to apply constraint %q for %v: %s\n",
 					prj.LockHint, pc.Ident, err,
 				)
-			} else {
-				// If the hint is a revision, check if it is tagged
-				if !isTag {
-					revision := gps.Revision(prj.LockHint)
-					version, err = i.lookupVersionForLockedProject(pc.Ident, pc.Constraint, revision)
-					if err != nil {
-						version = nil
-						i.Logger.Println(err)
-					}
+				continue
+			}
+			// If the hint is a revision, check if it is tagged
+			if !isTag {
+				revision := gps.Revision(prj.LockHint)
+				version, err = i.lookupVersionForLockedProject(pc.Ident, pc.Constraint, revision)
+				if err != nil {
+					version = nil
+					i.Logger.Println(err)
 				}
+			}
 
-				// Default the constraint based on the locked version
-				if defaultConstraintFromLock && prj.ConstraintHint == "" && version != nil {
-					c := i.convertToConstraint(version)
-					if c != nil {
-						pc.Constraint = c
-					}
+			// Default the constraint based on the locked version
+			if defaultConstraintFromLock && prj.ConstraintHint == "" && version != nil {
+				c := i.convertToConstraint(version)
+				if c != nil {
+					pc.Constraint = c
 				}
 			}
 		}

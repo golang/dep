@@ -94,7 +94,7 @@ func (g *Importer) convert(pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock) {
 		// Path must not be empty
 		if pkg.Path == "" {
 			g.Logger.Println(
-				"  Warning: Skipping package. Invalid govend configuration, path is required",
+				"  Warning: Skipping project. Invalid govend configuration, path is required",
 			)
 			continue
 		}
@@ -102,7 +102,8 @@ func (g *Importer) convert(pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock) {
 		if pkg.Revision == "" {
 			// Do not add 'empty constraints' to the manifest. Solve will add to lock if required.
 			g.Logger.Printf(
-				"  Warning: Skipping package. Invalid govend configuration, rev not found for Path %q\n",
+				"  Warning: Skipping import with empty constraints. "+
+					"The solve step will add the dependency to the lock if needed: %q\n",
 				pkg.Path,
 			)
 			continue
