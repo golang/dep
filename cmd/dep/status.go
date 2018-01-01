@@ -61,6 +61,7 @@ func (cmd *statusCommand) Register(fs *flag.FlagSet) {
 	fs.BoolVar(&cmd.dot, "dot", false, "output the dependency graph in GraphViz format")
 	fs.BoolVar(&cmd.old, "old", false, "only show out-of-date dependencies")
 	fs.BoolVar(&cmd.missing, "missing", false, "only show missing dependencies")
+	fs.BoolVar(&cmd.offline, "offline", false, "show an offline status as per the manifest and lock files, without reaching the network")
 }
 
 type statusCommand struct {
@@ -70,6 +71,7 @@ type statusCommand struct {
 	dot      bool
 	old      bool
 	missing  bool
+	offline  bool
 }
 
 type outputter interface {
@@ -268,7 +270,7 @@ func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
 		return errors.Errorf("no Gopkg.lock found. Run `dep ensure` to generate lock file")
 	}
 
-	hasMissingPkgs, errCount, err := runStatusAll(ctx, out, p, sm)
+	hasMissingPkgs, errCount, err := runStatusAll(ctx, out, p, sm, cmd.offline)
 	if err != nil {
 		switch err {
 		case errFailedUpdate:
@@ -418,7 +420,12 @@ type MissingStatus struct {
 	MissingPackages []string
 }
 
-func runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceManager) (hasMissingPkgs bool, errCount int, err error) {
+func runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceManager, offline bool) (hasMissingPkgs bool, errCount int, err error) {
+	if offline {
+		errCount, err = getStatus(ctx, out, p, sm, constraintsCollection{}, offline)
+		return false, errCount, err
+	}
+
 	// While the network churns on ListVersions() requests, statically analyze
 	// code from the current project.
 	ptree, err := p.ParseRootPackageTree()
@@ -435,11 +442,8 @@ func runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceMana
 		// Locks aren't a part of the input hash check, so we can omit it.
 	}
 
-	logger := ctx.Err
 	if ctx.Verbose {
 		params.TraceLogger = ctx.Err
-	} else {
-		logger = log.New(ioutil.Discard, "", 0)
 	}
 
 	if err := ctx.ValidateParams(sm, params); err != nil {
@@ -458,191 +462,13 @@ func runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceMana
 		errCount += len(ccerrs)
 	}
 
-	// Get the project list and sort it so that the printed output users see is
-	// deterministically ordered. (This may be superfluous if the lock is always
-	// written in alpha order, but it doesn't hurt to double down.)
-	slp := p.Lock.Projects()
-	sort.Slice(slp, func(i, j int) bool {
-		return slp[i].Ident().Less(slp[j].Ident())
-	})
-
 	if bytes.Equal(s.HashInputs(), p.Lock.SolveMeta.InputsDigest) {
 		// If these are equal, we're guaranteed that the lock is a transitively
 		// complete picture of all deps. That eliminates the need for at least
 		// some checks.
 
-		if err := out.BasicHeader(); err != nil {
-			return false, 0, err
-		}
-
-		logger.Println("Checking upstream projects:")
-
-		// BasicStatus channel to collect all the BasicStatus.
-		bsCh := make(chan *BasicStatus, len(slp))
-
-		// Error channels to collect different errors.
-		errListPkgCh := make(chan error, len(slp))
-		errListVerCh := make(chan error, len(slp))
-
-		var wg sync.WaitGroup
-
-		for i, proj := range slp {
-			wg.Add(1)
-			logger.Printf("(%d/%d) %s\n", i+1, len(slp), proj.Ident().ProjectRoot)
-
-			go func(proj gps.LockedProject) {
-				bs := BasicStatus{
-					ProjectRoot:  string(proj.Ident().ProjectRoot),
-					PackageCount: len(proj.Packages()),
-				}
-
-				// Get children only for specific outputers
-				// in order to avoid slower status process.
-				switch out.(type) {
-				case *dotOutput:
-					ptr, err := sm.ListPackages(proj.Ident(), proj.Version())
-
-					if err != nil {
-						bs.hasError = true
-						errListPkgCh <- err
-					}
-
-					prm, _ := ptr.ToReachMap(true, true, false, p.Manifest.IgnoredPackages())
-					bs.Children = prm.FlattenFn(paths.IsStandardImportPath)
-				}
-
-				// Split apart the version from the lock into its constituent parts.
-				switch tv := proj.Version().(type) {
-				case gps.UnpairedVersion:
-					bs.Version = tv
-				case gps.Revision:
-					bs.Revision = tv
-				case gps.PairedVersion:
-					bs.Version = tv.Unpair()
-					bs.Revision = tv.Revision()
-				}
-
-				// Check if the manifest has an override for this project. If so,
-				// set that as the constraint.
-				if pp, has := p.Manifest.Ovr[proj.Ident().ProjectRoot]; has && pp.Constraint != nil {
-					bs.hasOverride = true
-					bs.Constraint = pp.Constraint
-				} else if pp, has := p.Manifest.Constraints[proj.Ident().ProjectRoot]; has && pp.Constraint != nil {
-					// If the manifest has a constraint then set that as the constraint.
-					bs.Constraint = pp.Constraint
-				} else {
-					bs.Constraint = gps.Any()
-					for _, c := range cm[bs.ProjectRoot] {
-						bs.Constraint = c.Constraint.Intersect(bs.Constraint)
-					}
-				}
-
-				// Only if we have a non-rev and non-plain version do/can we display
-				// anything wrt the version's updateability.
-				if bs.Version != nil && bs.Version.Type() != gps.IsVersion {
-					c, has := p.Manifest.Constraints[proj.Ident().ProjectRoot]
-					if !has {
-						// Get constraint for locked project
-						for _, lockedP := range p.Lock.P {
-							if lockedP.Ident().ProjectRoot == proj.Ident().ProjectRoot {
-								// Use the unpaired version as the constraint for checking updates.
-								c.Constraint = bs.Version
-							}
-						}
-					}
-					// TODO: This constraint is only the constraint imposed by the
-					// current project, not by any transitive deps. As a result,
-					// transitive project deps will always show "any" here.
-					bs.Constraint = c.Constraint
-
-					vl, err := sm.ListVersions(proj.Ident())
-					if err == nil {
-						gps.SortPairedForUpgrade(vl)
-
-						for _, v := range vl {
-							// Because we've sorted the version list for
-							// upgrade, the first version we encounter that
-							// matches our constraint will be what we want.
-							if c.Constraint.Matches(v) {
-								// Latest should be of the same type as the Version.
-								if bs.Version.Type() == gps.IsSemver {
-									bs.Latest = v
-								} else {
-									bs.Latest = v.Revision()
-								}
-								break
-							}
-						}
-					} else {
-						// Failed to fetch version list (could happen due to
-						// network issue).
-						bs.hasError = true
-						errListVerCh <- err
-					}
-				}
-
-				bsCh <- &bs
-
-				wg.Done()
-			}(proj)
-		}
-
-		wg.Wait()
-		close(bsCh)
-		close(errListPkgCh)
-		close(errListVerCh)
-
-		// Newline after printing the status progress output.
-		logger.Println()
-
-		// List Packages errors. This would happen only for dot output.
-		if len(errListPkgCh) > 0 {
-			err = errFailedListPkg
-			if ctx.Verbose {
-				for err := range errListPkgCh {
-					ctx.Err.Println(err.Error())
-				}
-				ctx.Err.Println()
-			}
-		}
-
-		// List Version errors.
-		if len(errListVerCh) > 0 {
-			if err == nil {
-				err = errFailedUpdate
-			} else {
-				err = errMultipleFailures
-			}
-
-			// Count ListVersions error because we get partial results when
-			// this happens.
-			errCount += len(errListVerCh)
-			if ctx.Verbose {
-				for err := range errListVerCh {
-					ctx.Err.Println(err.Error())
-				}
-				ctx.Err.Println()
-			}
-		}
-
-		// A map of ProjectRoot and *BasicStatus. This is used in maintain the
-		// order of BasicStatus in output by collecting all the BasicStatus and
-		// then using them in order.
-		bsMap := make(map[string]*BasicStatus)
-		for bs := range bsCh {
-			bsMap[bs.ProjectRoot] = bs
-		}
-
-		// Use the collected BasicStatus in outputter.
-		for _, proj := range slp {
-			if err := out.BasicLine(bsMap[string(proj.Ident().ProjectRoot)]); err != nil {
-				return false, 0, err
-			}
-		}
-
-		if footerErr := out.BasicFooter(); footerErr != nil {
-			return false, 0, footerErr
-		}
+		errCountStatus, err := getStatus(ctx, out, p, sm, cm, false)
+		errCount += errCountStatus
 
 		return false, errCount, err
 	}
@@ -696,7 +522,7 @@ outer:
 	for root, pkgs := range roots {
 		// TODO also handle the case where the project is present, but there
 		// are items missing from just the package list
-		for _, lp := range slp {
+		for _, lp := range p.Lock.Projects() {
 			if lp.Ident().ProjectRoot == root {
 				continue outer
 			}
@@ -714,6 +540,238 @@ outer:
 
 	// We are here because of an input-digest mismatch. Return error.
 	return hasMissingPkgs, 0, errInputDigestMismatch
+}
+
+// getStatus fetches and renders the status output.
+func getStatus(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceManager, cm constraintsCollection, offline bool) (errCount int, err error) {
+	// Get the project list and sort it so that the printed output users see is
+	// deterministically ordered. (This may be superfluous if the lock is always
+	// written in alpha order, but it doesn't hurt to double down.)
+	slp := p.Lock.Projects()
+	sort.Slice(slp, func(i, j int) bool {
+		return slp[i].Ident().Less(slp[j].Ident())
+	})
+
+	// Render headers.
+	if err := out.BasicHeader(); err != nil {
+		return 0, err
+	}
+
+	// Check if dotOutput is required.
+	isDotOutput := false
+	switch out.(type) {
+	case *dotOutput:
+		isDotOutput = true
+	}
+
+	var bsMap map[string]*BasicStatus
+	if offline {
+		bsMap = getOfflineStatus(p)
+	} else {
+		bsMap, errCount, err = getCompleteStatus(ctx, p, sm, cm, isDotOutput)
+	}
+
+	// Use the collected BasicStatus in outputter.
+	for _, proj := range slp {
+		if err := out.BasicLine(bsMap[string(proj.Ident().ProjectRoot)]); err != nil {
+			return 0, err
+		}
+	}
+
+	if footerErr := out.BasicFooter(); footerErr != nil {
+		return 0, footerErr
+	}
+
+	return errCount, err
+}
+
+// getCompleteStatus fetches project details and updates from network, and
+// generates a complete up-to-date status.
+func getCompleteStatus(ctx *dep.Ctx, p *dep.Project, sm gps.SourceManager, cm constraintsCollection, isDotOutput bool) (bsMap map[string]*BasicStatus, errCount int, err error) {
+	logger := ctx.Err
+	if !ctx.Verbose {
+		logger = log.New(ioutil.Discard, "", 0)
+	}
+
+	logger.Println("Checking upstream projects:")
+
+	lp := p.Lock.Projects()
+
+	// BasicStatus channel to collect all the BasicStatus.
+	bsCh := make(chan *BasicStatus, len(lp))
+
+	// Error channels to collect different errors.
+	errListPkgCh := make(chan error, len(lp))
+	errListVerCh := make(chan error, len(lp))
+
+	var wg sync.WaitGroup
+
+	for i, proj := range lp {
+		wg.Add(1)
+		logger.Printf("(%d/%d) %s\n", i+1, len(lp), proj.Ident().ProjectRoot)
+
+		go func(proj gps.LockedProject) {
+			bs := createBasicStatus(proj, p, cm)
+
+			// Get children only if it's dotOutput outputer
+			// in order to avoid slower status process.
+			if isDotOutput {
+				ptr, err := sm.ListPackages(proj.Ident(), proj.Version())
+
+				if err != nil {
+					bs.hasError = true
+					errListPkgCh <- err
+				}
+
+				prm, _ := ptr.ToReachMap(true, true, false, p.Manifest.IgnoredPackages())
+				bs.Children = prm.FlattenFn(paths.IsStandardImportPath)
+			}
+
+			// Only if we have a non-rev and non-plain version do/can we display
+			// anything wrt the version's updateability.
+			if bs.Version != nil && bs.Version.Type() != gps.IsVersion {
+				c, has := p.Manifest.Constraints[proj.Ident().ProjectRoot]
+				if !has {
+					// Get constraint for locked project
+					for _, lockedP := range p.Lock.P {
+						if lockedP.Ident().ProjectRoot == proj.Ident().ProjectRoot {
+							// Use the unpaired version as the constraint for checking updates.
+							c.Constraint = bs.Version
+						}
+					}
+				}
+				// TODO: This constraint is only the constraint imposed by the
+				// current project, not by any transitive deps. As a result,
+				// transitive project deps will always show "any" here.
+				bs.Constraint = c.Constraint
+
+				vl, err := sm.ListVersions(proj.Ident())
+				if err == nil {
+					gps.SortPairedForUpgrade(vl)
+
+					for _, v := range vl {
+						// Because we've sorted the version list for
+						// upgrade, the first version we encounter that
+						// matches our constraint will be what we want.
+						if c.Constraint.Matches(v) {
+							// Latest should be of the same type as the Version.
+							if bs.Version.Type() == gps.IsSemver {
+								bs.Latest = v
+							} else {
+								bs.Latest = v.Revision()
+							}
+							break
+						}
+					}
+				} else {
+					// Failed to fetch version list (could happen due to
+					// network issue).
+					bs.hasError = true
+					errListVerCh <- err
+				}
+			}
+
+			bsCh <- bs
+
+			wg.Done()
+		}(proj)
+	}
+
+	wg.Wait()
+	close(bsCh)
+	close(errListPkgCh)
+	close(errListVerCh)
+
+	// Newline after printing the status progress output.
+	logger.Println()
+
+	// List Packages errors. This would happen only for dot output.
+	if len(errListPkgCh) > 0 {
+		err = errFailedListPkg
+		if ctx.Verbose {
+			for err := range errListPkgCh {
+				ctx.Err.Println(err.Error())
+			}
+			ctx.Err.Println()
+		}
+	}
+
+	// List Version errors.
+	if len(errListVerCh) > 0 {
+		if err == nil {
+			err = errFailedUpdate
+		} else {
+			err = errMultipleFailures
+		}
+
+		// Count ListVersions error because we get partial results when
+		// this happens.
+		errCount += len(errListVerCh)
+		if ctx.Verbose {
+			for err := range errListVerCh {
+				ctx.Err.Println(err.Error())
+			}
+			ctx.Err.Println()
+		}
+	}
+
+	// A map of ProjectRoot and *BasicStatus. This is used in maintain the
+	// order of BasicStatus in output by collecting all the BasicStatus and
+	// then using them in order.
+	bsMap = make(map[string]*BasicStatus)
+	for bs := range bsCh {
+		bsMap[bs.ProjectRoot] = bs
+	}
+
+	return bsMap, errCount, err
+}
+
+func createBasicStatus(proj gps.LockedProject, p *dep.Project, cm constraintsCollection) *BasicStatus {
+	bs := &BasicStatus{
+		ProjectRoot:  string(proj.Ident().ProjectRoot),
+		PackageCount: len(proj.Packages()),
+	}
+
+	// Split apart the version from the lock into its constituent parts.
+	switch tv := proj.Version().(type) {
+	case gps.UnpairedVersion:
+		bs.Version = tv
+	case gps.Revision:
+		bs.Revision = tv
+	case gps.PairedVersion:
+		bs.Version = tv.Unpair()
+		bs.Revision = tv.Revision()
+	}
+
+	// Check if the manifest has an override for this project. If so,
+	// set that as the constraint.
+	if pp, has := p.Manifest.Ovr[proj.Ident().ProjectRoot]; has && pp.Constraint != nil {
+		bs.hasOverride = true
+		bs.Constraint = pp.Constraint
+	} else if pp, has := p.Manifest.Constraints[proj.Ident().ProjectRoot]; has && pp.Constraint != nil {
+		// If the manifest has a constraint then set that as the constraint.
+		bs.Constraint = pp.Constraint
+	} else {
+		bs.Constraint = gps.Any()
+		for _, c := range cm[bs.ProjectRoot] {
+			bs.Constraint = c.Constraint.Intersect(bs.Constraint)
+		}
+	}
+
+	return bs
+}
+
+// getOfflineStatus generates offline status based on the manifest and lock files only.
+func getOfflineStatus(p *dep.Project) map[string]*BasicStatus {
+	lp := p.Lock.Projects()
+
+	bsMap := make(map[string]*BasicStatus)
+	for _, proj := range lp {
+		bs := createBasicStatus(proj, p, constraintsCollection{})
+		bsMap[bs.ProjectRoot] = bs
+	}
+
+	return bsMap
 }
 
 func formatVersion(v gps.Version) string {
