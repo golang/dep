@@ -1,3 +1,8 @@
+--
+id: faq.md
+title: FAQ
+--
+
 # FAQ
 
 _The first rule of FAQ is don't bikeshed the FAQ, leave that for

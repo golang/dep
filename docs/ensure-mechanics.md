@@ -1,0 +1,174 @@
+---
+title: dep ensure mechanics
+---
+
+As `dep ensure` is dep's sole state-mutating command, its mechanics are essentially the mechanics of dep as a whole.
+
+
+
+## Functional flow
+
+Dep's operation centers around the idea of the "four state system" - a model for organizing the on-disk state a package manager deals with, originally articulated in [this (very long) article](https://medium.com/@sdboyer/so-you-want-to-write-a-package-manager-4ae9c17d9527). Those states are:
+
+1. The [current project's](glossary.md#current-project) source code.
+2. A [manifest](glossary.md#manifest) - a file describing the current project's dependency requirements. In dep, this is the `Gopkg.toml` file.
+3. A [lock](glossary.md#lock) - a file containing a transitively-complete, reproducible description of the dependency graph. In dep, this is the `Gopkg.lock` file.
+4. The source code of the dependences themselves. In dep's current design, this is the `vendor/` directory.
+
+Let's visually represent these four states as follows:
+
+![dep's four states](img/four-states.png)
+
+It's best to think of `dep ensure` as a unidirectional series of functions, analyzing and transforming inputs into outputs. Specifically, there are two functions:
+
+* A _solving function_, that takes as its input the set of imports in the current project and the rules in `Gopkg.toml`, and returns as its output a transitively-complete, immutable dependency graph - the information in a `Gopkg.lock`.
+* A _vendoring function_, that takes the information in a `Gopkg.lock` as its input and ensures an on-disk arrangement of source files such that the compiler will use the versions designated in the lock.
+
+We can represent these two functions visually:
+
+![dep's two main functions](img/annotated-func-arrows.png)
+
+This diagram directly corresponds directly to code, as well. The solving function is actually split into a constructor and a method - we first create a [`Solver`](https://godoc.org/github.com/golang/dep/gps#Solver) type, then call its `Solve()` method. The inputs to the constructor are wrapped up in a [`SolveParameters`](https://godoc.org/github.com/golang/dep/gps#SolveParameters), which should look familiar:
+
+```go
+type SolveParameters struct {
+	RootPackageTree pkgtree.PackageTree // Parsed project src; contains lists of imports
+	Manifest gps.RootManifest // Gopkg.toml
+	...
+}
+```
+
+The vendoring function is [`gps.WriteDepTree()`](https://godoc.org/github.com/golang/dep/gps#WriteDepTree). It takes a handful of arguments, but the key one is a [`Lock`](https://godoc.org/github.com/golang/dep/gps#Lock) - that is, the data held in `Gopkg.lock`.
+
+Almost all of dep's behaviors are best understood with respect to this functional model. If you want to understand dep's mechanics, keep this model centered in your mind.
+
+## Functional optimizations
+
+It is one of dep's foundational design goals that both of its functions do as little work as possible, and result in as little change for their outputs as possible. Consequently, both "functions" peek ahead at the their current result to understand what work, if any, actually needs to be done:
+
+* The solving function checks the existing `Gopkg.lock` to determine if all of its inputs (project import statements + `Gopkg.toml` rules) are satisfied. If they are, the solving function can be bypassed entirely. If not, the solving function proceeds, but attempts to change as few of the selections in `Gopkg.lock` as possible.
+  * WIP: The current implementation's check relies on a coarse heuristic check that can be wrong in some cases. There is a [plan to fix this](https://github.com/golang/dep/issues/1496).
+* The vendoring function hashes each discrete project already in `vendor/` to see if the code present on disk is what `Gopkg.lock` indicates it should be. Only projects that deviate from expectations are written out.
+  * WIP: the hashing check is generally referred to as "vendor verification," and [is not yet complete](https://github.com/golang/dep/issues/121). Without this verification, dep is blind to whether code in `vendor/` is correct or not; as such, dep must defensively re-write all projects to ensure the state of `vendor/` is correct.
+
+## Flags and behavior variations
+
+Each of `dep ensure`'s various flags affects the behavior of these functions - or even whether they run at all. 
+
+
+
+## `-no-vendor` and `-vendor-only`
+
+These two flags are mutually exclusive, and determine which of `dep ensure`'s two functions are actually performed. Passing `-no-vendor` will cause only the solving function to be run, resulting in the creation of a new `Gopkg.lock`;  `-vendor-only` will skip solving and run only the vendoring function, causing `vendor/` to be repopulated from the pre-existing `Gopkg.lock`.
+
+![Flags to run only one or the other of dep's functions](img/func-toggles.png)
+
+Passing `-no-vendor` has the additional effect of causing the solving function to run unconditionally,  bypassing the pre-check ordinarily made against `Gopkg.lock` to see if it already satisfies all inputs.
+
+## `-add`
+
+The general purpose of `dep ensure -add`  is to facilitate the introduction of new dependencies into the depgraph. There are two parts to this:
+
+1. Running the solving function in order to generate a new `Gopkg.lock`  with the new dependency
+2. If no version constraint is already set in `Gopkg.toml` for a named dependency, then inferring appropriate version constraint(s) and appending them into `Gopkg.toml`
+
+In keeping with these output goals, if `Gopkg.lock` and `Gopkg.toml` both contain entries for the provided arguments, then there is no work to be done, and `dep ensure -add` will abort early with an error.
+
+However, this is complicated a bit by the fact that `dep ensure -add` takes _package_ import paths, rather than only _project root_ import paths. This design is intended to allow the user to add additional subpackages from a dependency that they already include. Thus, the check made against the existing `Gopkg.lock` is actually a two-step check: 1) is there a `[[project]]` entry for the project root of the argument, and 2) does the argument appear in the `packages` list within that dependency's stanza.
+
+As long as there is at least one package/project not present in `Gopkg.lock`, thus necessitating a solve, then the mechanism by which `dep ensure -add` achieves its goal is to perform an in-memory-only modification of the `required` list it reads out of `Gopkg.toml` and passes to the solving function:
+
+![Model modifications made by -add](img/required-arrows.png)
+
+Because this modification of `required` is ephemeral, a successful `dep ensure -add` run of this type will result in an on-disk state which is immediately out of sync with the current project. If this is the case, it will warn the user accordingly:
+
+```
+$ dep ensure -add github.com/foo/bar
+"github.com/foo/bar" is not imported by your project, and has been temporarily added to Gopkg.lock and vendor/.
+If you run "dep ensure" again before actually importing it, it will disappear from Gopkg.lock and vendor/.
+```
+
+
+
+## `-update`
+
+The behavior of `dep ensure -update` is intimately linked to the behavior of the solver itself. Full detail on that is a topic for the [solver reference material](the-solver.md), but for the purposes of understanding `-update`, we can simplify a bit.
+
+First, to solidify an implication in the discussion of [functional optimizations](#functional-optimizations), the solving function actually takes into account the pre-existing `Gopkg.lock` when it runs:
+
+![Pre-existing lock feeds back into solving function](img/lock-back.png)
+
+Injecting `Gopkg.lock` into the solver is a necessity. We want the solver to preserve previously-selected versions by default, but unless `Gopkg.lock` is injected somewhere, then the solver can't know what versions it's trying to preserve.
+
+As such, the lock is another one of the properties encoded onto the `SolveParameters` struct, discussed [previously](#functional-flow). That, plus two other properties, are the salient ones for `-update`:
+
+```go
+type SolveParameters struct {
+ 	...
+	Lock gps.Lock // Gopkg.lock
+	ToChange []gps.ProjectRoot // args to -update
+	ChangeAll bool // true if no -update args passed
+	...
+}
+```
+
+Ordinarily, when the solver encounters a project name for which there's an entry in `Gopkg.lock`, it pulls that version out and puts it at the head of the queue of possible versions for that project. When a specific dependency is passed to `dep ensure -update`, however, it is added to the `ToChange` list; when the solver encounters a project listed in `ToChange`, it simply skips pulling the version from the lock.
+
+"Skips pulling the version from the lock" would imply that `dep ensure -update github.com/foo/bar` is equivalent to removing the `[[project]]` stanza for `github.com/foo/bar` from your `Gopkg.lock`, then running `dep ensure`. And indeed it is - however, that approach is not recommended, and subtle changes may be introduced in the future that complicate the equivalency.
+
+If `-update` is passed with no arguments, then `ChangeAll` is set to `true`, resulting in the solver ignoring `Gopkg.lock` for all newly-encountered project names. This is equivalent to explicitly passing all of your dependences as arguments to `dep ensure -update`, as well as `rm Gopkg.lock && dep ensure`. Again, however, neither of these approaches are recommended, and future changes may introduce subtle differences.
+
+When a version hint from `Gopkg.lock` is not placed at the head of the version queue, it means that dep will explore the set of possible versions for a particular dependency. This exploration is performed according to a [fixed sort order](https://godoc.org/github.com/golang/dep/gps#SortForUpgrade), where newer versions are tried first, resulting in an update. 
+
+For example, say there is a project, `github.com/foo/bar`, with the following versions:
+
+```
+v1.2.0, v1.1.1, v1.1.0, v1.0.0, master
+```
+
+If we depend on that project with `^1.1.0`, and have `v1.1.0` in our `Gopkg.lock` , then it means there are three versions that match our constraint, and two of them are newer than the one currently selected. (There's also an older version, `v1.0.0`, and a `master` branch, but these aren't allowed by a `^1.1.0` constraint.) An ordinary `dep ensure` run will duplicate and push `v1.1.0` ahead of all the others in the queue:
+
+```
+[v1.1.0, v1.2.0, v1.1.1, v1.1.0, v1.0.0, master]
+```
+
+And `v1.1.0` will be selected again, unless some other condition is presented that forces the solver to discard it. When running `dep ensure -update github.com/foo/bar`, however, the locked version is not prepended:
+
+```
+[v1.2.0, v1.1.1, v1.1.0, v1.0.0, master]
+```
+
+So, barring some other conflict, `v1.2.0` is selected, resulting in the desired update.
+
+### `-update` and constraint types
+
+Continuing with our example, it's important to note that updates with `-update` are achieved incidentally - the solver never explicitly targets a newer version by the solver. It just removes the hint from the lock, then selects the first version in the queue that satisfies constraints. Consequently, `-update` is only effective with certain types of constraints.
+
+It does work with branch constraints, which we can observe by including the underlying revision. If the user has constrained on `branch = "master"`, and `Gopkg.lock` points at an older revision (say, `aabbccd`) than the canonical source's `master` branch points to (`bbccdde`), then `dep ensure` will end up contructing a queue that looks like this:
+
+```
+[master@aabbccd, v1.1.0, v1.2.0, v1.1.1, v1.1.0, v1.0.0, master@bbccdde]
+```
+
+With `-update`, the hint at the head will be omitted, and `branch = "master"` will reject all of the semantic versions, finally settling on `master@bbccdde`.
+
+All versions in the version queue keep track of an underlying revision, which means the same is true if, for example, some upstream project force-pushes a git tag:
+
+```
+[v1.1.0@aabbccd, v1.1.0, v1.2.0, v1.1.1, v1.1.0@bbccdde, v1.0.0, master]
+```
+
+Thus, even if an upstream tag is force-pushed in one of your project's dependences, dep will retain the original revision until you explicitly allow it to change via a `dep ensure -update`.
+
+The bottom line here is that `-update`'s behavior is governed by the type of constraints specified:
+
+| `Gopkg.toml` constraint type | Constraint example | `dep ensure -update` behavior            |
+| ---------------------------- | ------------------ | ---------------------------------------- |
+| `version` (semver range)     | `"^1.0.0"`         | Tries to get the latest version allowed by the range |
+| `branch`                     | `"master"`         | Tries to move to the current tip of the named branch |
+| `version` (non-range semver) | `"=1.0.0"`         | Change can only occur if the upstream release was moved |
+| `version` (non-semver)       | `"foo"`            | Change can only occur if the upstream release was moved |
+| `revision`                   | `aabbccd...`       | No change is possible                    |
+| (none)                       |                    | The first version that works, according to [the sort order](https://godoc.org/github.com/golang/dep/gps#SortForUpgrade) (not recommended) |
+
+
