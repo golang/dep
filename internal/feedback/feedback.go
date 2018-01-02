@@ -154,7 +154,7 @@ func (ri removedImport) String() string {
 	}
 
 	// Warning: Unable to preserve imported lock VERSION/BRANCH (REV) for PROJECT(SOURCE). Locking in VERSION/BRANCH (REV) for PROJECT(SOURCE)
-	return fmt.Sprintf("%v %s for %s.  The project was removed from the lock because it is not used.",
+	return fmt.Sprintf("%v %s for %s. The project was removed from the lock because it is not used.",
 		pv,
 		pr,
 		pp,
