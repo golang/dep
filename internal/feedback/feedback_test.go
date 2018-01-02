@@ -95,34 +95,36 @@ func TestFeedback_LockedProject(t *testing.T) {
 }
 
 func TestFeedback_BrokenImport(t *testing.T) {
-	ov := gps.NewVersion("v1.1.4").Pair("bc29b4f")
-	lv := gps.NewVersion("v1.2.0").Pair("ia3da28")
 	pi := gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot("github.com/foo/bar")}
 
-	ol := dep.Lock{
-		P: []gps.LockedProject{gps.NewLockedProject(pi, ov, nil)},
-	}
-	l := dep.Lock{
-		P: []gps.LockedProject{gps.NewLockedProject(pi, lv, nil)},
-	}
-
 	cases := []struct {
-		diff *gps.LockDiff
-		want string
-		name string
+		diff           *gps.LockDiff
+		oldVersion     gps.Version
+		currentVersion gps.Version
+		pID            gps.ProjectIdentifier
+		want           string
+		name           string
 	}{
 		{
-			diff: gps.DiffLocks(&ol, &l),
-			want: "Warning: Unable to preserve imported lock v1.1.4 (bc29b4f) for github.com/foo/bar. Locking in v1.2.0 (ia3da28)",
-			name: "Basic broken import",
+			oldVersion:     gps.NewVersion("v1.1.4").Pair("bc29b4f"),
+			currentVersion: gps.NewVersion("v1.2.0").Pair("ia3da28"),
+			pID:            pi,
+			want:           "Warning: Unable to preserve imported lock v1.1.4 (bc29b4f) for github.com/foo/bar. Locking in v1.2.0 (ia3da28)",
+			name:           "Basic broken import",
 		},
 	}
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			buf := &bytes.Buffer{}
+			ol := dep.Lock{
+				P: []gps.LockedProject{gps.NewLockedProject(c.pID, c.oldVersion, nil)},
+			}
+			l := dep.Lock{
+				P: []gps.LockedProject{gps.NewLockedProject(c.pID, c.currentVersion, nil)},
+			}
 			log := log2.New(buf, "", 0)
-			feedback := NewBrokenImportFeedback(c.diff)
+			feedback := NewBrokenImportFeedback(gps.DiffLocks(&ol, &l))
 			feedback.LogFeedback(log)
 			got := strings.TrimSpace(buf.String())
 			if c.want != got {
