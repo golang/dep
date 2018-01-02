@@ -106,17 +106,15 @@ func TestFeedback_BrokenImport(t *testing.T) {
 		P: []gps.LockedProject{gps.NewLockedProject(pi, lv, nil)},
 	}
 
-	diff := gps.DiffLocks(&ol, &l)
-
 	cases := []struct {
-		feedback *BrokenImportFeedback
-		want     string
-		name     string
+		diff *gps.LockDiff
+		want string
+		name string
 	}{
 		{
-			feedback: NewBrokenImportFeedback(diff),
-			want:     "Warning: Unable to preserve imported lock v1.1.4 (bc29b4f) for github.com/foo/bar. Locking in v1.2.0 (ia3da28)",
-			name:     "Basic broken import",
+			diff: gps.DiffLocks(&ol, &l),
+			want: "Warning: Unable to preserve imported lock v1.1.4 (bc29b4f) for github.com/foo/bar. Locking in v1.2.0 (ia3da28)",
+			name: "Basic broken import",
 		},
 	}
 
@@ -124,7 +122,8 @@ func TestFeedback_BrokenImport(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			buf := &bytes.Buffer{}
 			log := log2.New(buf, "", 0)
-			c.feedback.LogFeedback(log)
+			feedback := NewBrokenImportFeedback(c.diff)
+			feedback.LogFeedback(log)
 			got := strings.TrimSpace(buf.String())
 			if c.want != got {
 				t.Errorf("Feedbacks are not expected: \n\t(GOT) '%s'\n\t(WNT) '%s'", got, c.want)

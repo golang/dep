@@ -82,26 +82,82 @@ func (cf ConstraintFeedback) LogFeedback(logger *log.Logger) {
 	}
 }
 
-type brokenImport struct {
-	projectPath string
-	version     *gps.StringDiff
-	revision    *gps.StringDiff
+type brokenImport interface {
+	String() string
 }
 
-func (bi brokenImport) String() string {
+type modifiedImport struct {
+	source, branch, revision, version *gps.StringDiff
+	projectPath                       string
+}
+
+func (mi modifiedImport) String() string {
+	var pv string
 	var pr string
+	pp := mi.projectPath
+
 	var cr string
-	if bi.revision != nil {
-		pr = fmt.Sprintf("(%s)", trimSHA(bi.revision.Previous))
-		cr = fmt.Sprintf("(%s)", trimSHA(bi.revision.Current))
+	var cv string
+	cp := ""
+
+	if mi.revision != nil {
+		pr = fmt.Sprintf("(%s)", trimSHA(mi.revision.Previous))
+		cr = fmt.Sprintf("(%s)", trimSHA(mi.revision.Current))
 	}
 
-	return fmt.Sprintf("%v %s for %s. Locking in %v %s",
-		bi.version.Previous,
+	if mi.version != nil {
+		pv = mi.version.Previous
+		cv = mi.version.Current
+	} else if mi.branch != nil {
+		pv = mi.branch.Previous
+		cv = mi.branch.Current
+	}
+
+	if mi.source != nil {
+		pp = fmt.Sprintf("%s(%s)", mi.projectPath, mi.source.Previous)
+		cp = fmt.Sprintf(" for %s(%s)", mi.projectPath, mi.source.Current)
+	}
+
+	// Warning: Unable to preserve imported lock VERSION/BRANCH (REV) for PROJECT(SOURCE). Locking in VERSION/BRANCH (REV) for PROJECT(SOURCE)
+	return fmt.Sprintf("%v %s for %s. Locking in %v %s%s",
+		pv,
 		pr,
-		bi.projectPath,
-		bi.version.Current,
+		pp,
+		cv,
 		cr,
+		cp,
+	)
+}
+
+type removedImport struct {
+	source, branch, revision, version *gps.StringDiff
+	projectPath                       string
+}
+
+func (ri removedImport) String() string {
+	var pr string
+	var pv string
+	pp := ri.projectPath
+
+	if ri.revision != nil {
+		pr = fmt.Sprintf("(%s)", trimSHA(ri.revision.Previous))
+	}
+
+	if ri.version != nil {
+		pv = ri.version.Previous
+	} else if ri.branch != nil {
+		pv = ri.branch.Previous
+	}
+
+	if ri.source != nil {
+		pp = fmt.Sprintf("%s(%s)", ri.projectPath, ri.source.Previous)
+	}
+
+	// Warning: Unable to preserve imported lock VERSION/BRANCH (REV) for PROJECT(SOURCE). Locking in VERSION/BRANCH (REV) for PROJECT(SOURCE)
+	return fmt.Sprintf("%v %s for %s.  The project was removed from the lock because it is not used.",
+		pv,
+		pr,
+		pp,
 	)
 }
 
@@ -114,10 +170,22 @@ type BrokenImportFeedback struct {
 func NewBrokenImportFeedback(ld *gps.LockDiff) *BrokenImportFeedback {
 	bi := &BrokenImportFeedback{}
 	for _, lpd := range ld.Modify {
-		bi.brokenImports = append(bi.brokenImports, brokenImport{
+		bi.brokenImports = append(bi.brokenImports, modifiedImport{
 			projectPath: string(lpd.Name),
-			version:     lpd.Version,
+			source:      lpd.Source,
+			branch:      lpd.Branch,
 			revision:    lpd.Revision,
+			version:     lpd.Version,
+		})
+	}
+
+	for _, lpd := range ld.Remove {
+		bi.brokenImports = append(bi.brokenImports, removedImport{
+			projectPath: string(lpd.Name),
+			source:      lpd.Source,
+			branch:      lpd.Branch,
+			revision:    lpd.Revision,
+			version:     lpd.Version,
 		})
 	}
 
