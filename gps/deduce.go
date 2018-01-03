@@ -608,6 +608,23 @@ func (dc *registryDeductionCoordinator) deduceRootPath(ctx context.Context, path
 		panic(fmt.Sprintf("unexpected %T in deductionCoordinator.rootxt: %v", data, data))
 	}
 
+	if _, mtch, has := dc.deducext.LongestPrefix(path); has {
+		root, err := mtch.deduceRoot(path)
+		if err == nil {
+			var u *url.URL
+			u, err = url.Parse(dc.registry.URL())
+			if err != nil {
+				return pathDeduction{}, err
+			}
+			mb := maybeRegistrySource{path: root, url: u, token: dc.registry.Token()}
+
+			dc.mut.Lock()
+			dc.rootxt.Insert(root, mb)
+			dc.mut.Unlock()
+			return pathDeduction{root: root, mb: mb}, nil
+		}
+	}
+
 	rd := &registryDeducer{
 		basePath: path,
 		registry: dc.registry,

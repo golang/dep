@@ -18,8 +18,8 @@ import (
 	"text/tabwriter"
 
 	"github.com/golang/dep"
-	"github.com/golang/dep/internal/fs"
 	"github.com/golang/dep/gps"
+	"github.com/golang/dep/internal/fs"
 	"net/url"
 )
 
@@ -208,7 +208,7 @@ func (c *Config) Run() int {
 			registryURL := getEnv(c.Env, "DEPREGISTRYURL")
 			token := getEnv(c.Env, "DEPREGISTRYTOKEN")
 
-			// check if url is not define do not create registry
+			// If the url or the token is not defined do not create registry config
 			if registryURL != "" && token != "" {
 				registryUrl, err := url.Parse(registryURL)
 				if err != nil {
