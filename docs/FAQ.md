@@ -132,7 +132,7 @@ then you would want to use the following configuration:
 $ git config --global credential.https://gitlab.example.com.example yourusername
 ```
 
-In the example the hostname `gitlab.example.com.username` string seems incorrect, but
+In the example the hostname `gitlab.example.com.example` string seems incorrect, but
 it's actually the hostname plus the name of the repo you are accessing which is `username`.
 The trailing 'yourusername' is the username you would use for the actual authentication.
 
