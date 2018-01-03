@@ -4,8 +4,6 @@ title: dep ensure mechanics
 
 As `dep ensure` is dep's sole state-mutating command, its mechanics are essentially the mechanics of dep as a whole.
 
-
-
 ## Functional flow
 
 Dep's operation centers around the idea of the "four state system" - a model for organizing the on-disk state a package manager deals with, originally articulated in [this (very long) article](https://medium.com/@sdboyer/so-you-want-to-write-a-package-manager-4ae9c17d9527). Those states are:
@@ -51,6 +49,16 @@ It is one of dep's foundational design goals that both of its functions do as li
 * The vendoring function hashes each discrete project already in `vendor/` to see if the code present on disk is what `Gopkg.lock` indicates it should be. Only projects that deviate from expectations are written out.
   * WIP: the hashing check is generally referred to as "vendor verification," and [is not yet complete](https://github.com/golang/dep/issues/121). Without this verification, dep is blind to whether code in `vendor/` is correct or not; as such, dep must defensively re-write all projects to ensure the state of `vendor/` is correct.
 
+## Sync
+
+It's easy to think about 
+
+
+
+## Imports, and the package tree
+
+
+
 ## Flags and behavior variations
 
 Each of `dep ensure`'s various flags affects the behavior of these functions - or even whether they run at all. 
@@ -67,28 +75,53 @@ Passing `-no-vendor` has the additional effect of causing the solving function t
 
 ## `-add`
 
-The general purpose of `dep ensure -add`  is to facilitate the introduction of new dependencies into the depgraph. There are two parts to this:
+The general purpose of `dep ensure -add`  is to facilitate the introduction of new dependencies into the depgraph. Whereas `-update` is restricted to [source roots](glossary.md#source-root), (e.g. `github.com/foo/bar`), `-add` can take any package import path as an argument (e.g. `github.com/foo/bar` OR `github.com/foo/bar/baz`).
 
-1. Running the solving function in order to generate a new `Gopkg.lock`  with the new dependency
-2. If no version constraint is already set in `Gopkg.toml` for a named dependency, then inferring appropriate version constraint(s) and appending them into `Gopkg.toml`
+Conceptually, there are two possible things that `-add` might be introducing. Any `dep ensure -add` run will do at least one of these:
 
-In keeping with these output goals, if `Gopkg.lock` and `Gopkg.toml` both contain entries for the provided arguments, then there is no work to be done, and `dep ensure -add` will abort early with an error.
+1. Running the solving function in order to generate a new `Gopkg.lock`  with the new dependenc(ies)
+2. Appending a version constraint into `Gopkg.toml`
 
-However, this is complicated a bit by the fact that `dep ensure -add` takes _package_ import paths, rather than only _project root_ import paths. This design is intended to allow the user to add additional subpackages from a dependency that they already include. Thus, the check made against the existing `Gopkg.lock` is actually a two-step check: 1) is there a `[[project]]` entry for the project root of the argument, and 2) does the argument appear in the `packages` list within that dependency's stanza.
+This implies two preconditions for `dep ensure -add`, at least one of which must be met:
 
-As long as there is at least one package/project not present in `Gopkg.lock`, thus necessitating a solve, then the mechanism by which `dep ensure -add` achieves its goal is to perform an in-memory-only modification of the `required` list it reads out of `Gopkg.toml` and passes to the solving function:
+1. The named import path is not currently in the project's import statements, or in `Gopkg.toml`'s `required` list
+2. There is no `[[constraint]]` stanza in `Gopkg.toml` for the project root corresponding to the named import path
+
+
+It is also possible to explicitly specify a version constraint:
+
+```
+$ dep ensure -add github.com/foo/bar@v1.0.0
+```
+
+When no version constraint is included in the argument, the solving function will select the latest version that works (generally, the newest semver release, or the default branch if there are no semver releases). Either this inferred version, or the specified version, will be appended into `Gopkg.toml`.
+
+The behavioral variations that arise from the assorted differences in input and current project state are best expressed as a matrix: 
+
+| Argument to `dep ensure -add` | Has `[[constraint]]` stanza in `Gopkg.toml` | In imports or `required` | Result                                   |
+| ----------------------------- | ---------------------------------------- | ------------------------ | ---------------------------------------- |
+| `github.com/foo/bar`          | N                                        | N                        | Added temporarily to `Gopkg.lock` & `vendor/`; inferred version constraint appended to `Gopkg.toml` |
+| `github.com/foo/bar@v1.0.0`   | N                                        | N                        | Added temporarily to `Gopkg.lock` & `vendor/`; specified version constraint appended to `Gopkg.toml` |
+| `github.com/foo/bar`          | Y                                        | N                        | Added temporarily to `Gopkg.lock` & `vendor/` |
+| `github.com/foo/bar@v1.0.0`   | Y                                        | -                        | **Immediate error**: constraint already present in `Gopkg.toml` |
+| `github.com/foo/bar`          | N                                        | Y                        | Infer version constraint from `Gopkg.lock` and add to `Gopkg.toml` |
+| `github.com/foo/bar`          | Y                                        | Y                        | **Immediate error:** nothing to do       |
+
+For any of the paths where `dep ensure -add` needs to run the solving function in order to generate an updated `Gopkg.lock`, the relevant information from CLI arguments is applied to the in-memory representation of `Gopkg.toml`:
 
 ![Model modifications made by -add](img/required-arrows.png)
 
-Because this modification of `required` is ephemeral, a successful `dep ensure -add` run of this type will result in an on-disk state which is immediately out of sync with the current project. If this is the case, it will warn the user accordingly:
+Import path arguments that need to be added are injected via the `required` list, and if an explicit version requirement was specified, the equivalent of a `[[constraint]]` is created. 
+
+Though these rules may ultimately be persisted if solving succeeds, they are ephemeral at least until solving succeeds. And, from the solver's perspective, the ephemeral rules are indistinguishable from rules sourced directly from disk. Thus, to the solver, `dep ensure -add foo@v1.0.0` is identical to modifying `Gopkg.toml` by adding `"foo"` to the `required` list, plus a `[[constraint]]` stanza with `version = "v1.0.0"`, then running `dep ensure`.
+
+However, because these modifications are ephemeral, a successful `dep ensure -add` may actually push the project out of sync. Constraint modifications generally do not, but if the `required` list is modified, then the project will desync. The user is warned accordingly:
 
 ```
 $ dep ensure -add github.com/foo/bar
 "github.com/foo/bar" is not imported by your project, and has been temporarily added to Gopkg.lock and vendor/.
 If you run "dep ensure" again before actually importing it, it will disappear from Gopkg.lock and vendor/.
 ```
-
-
 
 ## `-update`
 
@@ -160,15 +193,15 @@ All versions in the version queue keep track of an underlying revision, which me
 
 Thus, even if an upstream tag is force-pushed in one of your project's dependences, dep will retain the original revision until you explicitly allow it to change via a `dep ensure -update`.
 
-The bottom line here is that `-update`'s behavior is governed by the type of constraints specified:
+The key takeaway here is that `-update`'s behavior is governed by the type of constraints specified:
 
-| `Gopkg.toml` constraint type | Constraint example | `dep ensure -update` behavior            |
-| ---------------------------- | ------------------ | ---------------------------------------- |
-| `version` (semver range)     | `"^1.0.0"`         | Tries to get the latest version allowed by the range |
-| `branch`                     | `"master"`         | Tries to move to the current tip of the named branch |
-| `version` (non-range semver) | `"=1.0.0"`         | Change can only occur if the upstream release was moved |
-| `version` (non-semver)       | `"foo"`            | Change can only occur if the upstream release was moved |
-| `revision`                   | `aabbccd...`       | No change is possible                    |
-| (none)                       |                    | The first version that works, according to [the sort order](https://godoc.org/github.com/golang/dep/gps#SortForUpgrade) (not recommended) |
+| `Gopkg.toml` version constraint type | Constraint example | `dep ensure -update` behavior            |
+| ------------------------------------ | ------------------ | ---------------------------------------- |
+| `version` (semver range)             | `"^1.0.0"`         | Tries to get the latest version allowed by the range |
+| `branch`                             | `"master"`         | Tries to move to the current tip of the named branch |
+| `version` (non-range semver)         | `"=1.0.0"`         | Change can only occur if the upstream release was moved |
+| `version` (non-semver)               | `"foo"`            | Change can only occur if the upstream release was moved |
+| `revision`                           | `aabbccd...`       | No change is possible                    |
+| (none)                               | (none)             | The first version that works, according to [the sort order](https://godoc.org/github.com/golang/dep/gps#SortForUpgrade) (not recommended) |
 
 

@@ -46,7 +46,7 @@ Once dep has compiled its set of inferences, it proceeds to solving.
 
 ### The Solving Phase
 
-Once the inference phase is completed, the set of rules and hints dep has assembled will be passed to its [solver]() to work out a transitively complete depgraph, which will ultimately be recorded as the `Gopkg.lock`. This is the same solving process used by `dep ensure`, and completing it successfully means that dep has found a combination of dependency versions that respects all inferred rules, and as many inferred hints as possible. If solving succeeds, then the hard work is done; most of what remains is writing out `Gopkg.toml`, `Gopkg.lock`, and `vendor/`. 
+Once the inference phase is completed, the set of rules and hints dep has assembled will be passed to its [solver](solver.md) to work out a transitively complete depgraph, which will ultimately be recorded as the `Gopkg.lock`. This is the same solving process used by `dep ensure`, and completing it successfully means that dep has found a combination of dependency versions that respects all inferred rules, and as many inferred hints as possible. If solving succeeds, then the hard work is done; most of what remains is writing out `Gopkg.toml`, `Gopkg.lock`, and `vendor/`. 
 
 The solver returns a solution, which itself is just [a representation](https://godoc.org/github.com/golang/dep/gps#Solution) of [the data stored in a `Gopkg.lock`](https://godoc.org/github.com/golang/dep#Lock): a transitively-complete, reproducible snapshot of the entire dependency graph. Writing out the `Gopkg.lock` from a solution is little more than a copy-and-encode operation, and writing `vendor/` is a matter of placing each project listed in the solution into its appropriate place, at the designated revision. This is exactly the same as `dep ensure`'s behavior.
 
@@ -104,7 +104,7 @@ _Note: all three of the other hard failure types can sometimes be reported as th
 
 Because the solver, and all its possible failures, are the same for `dep init` as for `dep ensure`, there's a separate section for understanding and dealing with them: [dealing with solving failures](). It can be trickier with `dep init`, however, as many remediations require tweaking `Gopkg.toml`.
 
-Unfortunately, `dep init` does not write out a partial `Gopkg.toml` when it fails ([though we are working on this](https://github.com/golang/dep/issues/909)), so if the particular errors you are encountering do entail such tweaks, you may need to skip `dep init` entirely, create an empty `Gopkg.toml`, and populate it with rules by hand; the [`Gopkg.toml` reference documentation]() explains the various properties. Before resorting to that, make sure you've run `dep init` with various combinations of the inferencing flags (`-skip-tools` and `-gopath`) to see if they can at least give you something to start from.
+Unfortunately, `dep init` does not write out a partial `Gopkg.toml` when it fails ([though we are working on this](https://github.com/golang/dep/issues/909)), so if the particular errors you are encountering do entail such tweaks, you may need to skip `dep init` entirely, create an empty `Gopkg.toml`, and populate it with rules by hand; the [`Gopkg.toml` reference documentation](#gopkg.toml.md) explains the various properties. Before resorting to that, make sure you've run `dep init` with various combinations of the inferencing flags (`-skip-tools` and `-gopath`) to see if they can at least give you something to start from.
 
 ### Soft failures
 
@@ -114,8 +114,7 @@ If you do encounter problems like this, `dep status` is your first diagnostic st
 
 Once you've identified the problematic dependenc(ies), the next step is exerting appropriate controls over them via `Gopkg.toml`. (Note - this advice is intentionally terse; look at [Zen of Constraints and Locks]() if you want a deeper understanding of how to optimally utilize dep's controls)
 
-* For each of the following items, assume that you should run `dep ensure` after making the suggested change. If that fails, consult [dealing with solving failures]().
-
+For each of the following items, assume that you should run `dep ensure` after making the suggested change. If that fails, consult [dealing with solving failures]().
 
 * If the wrong `[[constraint]]` was inferred for one of your direct dependencies, change it. Then, file an issue against dep, please - while `dep init` may choose to omit a constraint, converting one incorrectly is considered a bug.
 * If one of your transitive dependencies is at the wrong version, define an `[[override]]` on it to force it to the version you need.

@@ -35,7 +35,7 @@ Also called the "root project."
 
 ## Deduction
 
-Deduction is the process of determining a source root from an import path. See the reference on [import path deduction]() for specifics.
+Deduction is the process of determining a source root from an import path. See the reference on [import path deduction](deduction.md) for specifics.
 
 ## Direct Dependency
 
