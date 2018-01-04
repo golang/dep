@@ -33,7 +33,7 @@ var (
 	errInvalidMetadata     = errors.New("metadata should be a TOML table")
 
 	errInvalidProjectRoot = errors.New("ProjectRoot name validation failed")
-	errInefficientRules   = errors.New("Inefficient rules found in the manifest")
+	errInefficientRules   = errors.New("inefficient rules found in the manifest")
 
 	errInvalidPruneValue = errors.New("prune options values must be booleans")
 	errPruneSubProject   = errors.New("prune projects should not contain sub projects")
@@ -326,7 +326,7 @@ func ValidateProjectRoots(c *Ctx, m *Manifest, sm gps.SourceManager) error {
 }
 
 // ValidatePackageRules ensure that there are no ineffectual package declarations
-// in the constraints, overrides, required, and ignored rules in the manifest.
+// in the constraints, overrides, and ignored rules in the manifest.
 func ValidatePackageRules(c *Ctx, proj *Project, sm gps.SourceManager) (err error) {
 	directDeps, err := proj.DirectDependencies(sm)
 	if err != nil {
@@ -357,25 +357,18 @@ func ValidatePackageRules(c *Ctx, proj *Project, sm gps.SourceManager) (err erro
 }
 
 // FindIneffectualConstraints looks for constraints decleared in the project
-// manifest that aren't directly used in the project. Required packages are an
-// exception to this check.
+// manifest that aren't directly used in the project.
 func FindIneffectualConstraints(m *Manifest, directDeps map[string]bool) []gps.ProjectRoot {
-	// Treat required packages as if they were direct dependencies
-	for pr, _ := range m.RequiredPackages() {
-		directDeps[string(pr)] = true
-	}
-
 	ineffectuals := make([]gps.ProjectRoot, 0)
-	// Check constraints
-	pc := m.DependencyConstraints()
-	for pr, _ := range pc {
+	// Check constraints in the manifest.
+	for pr := range m.DependencyConstraints() {
 		if !directDeps[string(pr)] {
 			ineffectuals = append(ineffectuals, pr)
 		}
 	}
 
-	// Check overrides as well
-	for pr, _ := range m.Overrides() {
+	// Check overrides in the manifest.
+	for pr := range m.Overrides() {
 		if !directDeps[string(pr)] {
 			ineffectuals = append(ineffectuals, pr)
 		}
