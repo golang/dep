@@ -1,5 +1,9 @@
---
+---
 id: faq.md
+---
+
+
+
 title: FAQ
 --
 
@@ -289,7 +293,7 @@ There's another major performance issue that's much harder - the process of pick
 ## How does `dep` handle symbolic links?
 
 > because we're not crazy people who delight in inviting chaos into our lives, we need to work within one `GOPATH` at a time.
--[@sdboyer in #247](https://github.com/golang/dep/pull/247#issuecomment-284181879)
+> -[@sdboyer in #247](https://github.com/golang/dep/pull/247#issuecomment-284181879)
 
 Out of convenience, one might create a symlink to a directory within their `GOPATH/src`, e.g. `ln -s ~/go/src/github.com/user/awesome-project ~/Code/awesome-project`.
 

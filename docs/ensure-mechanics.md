@@ -151,7 +151,7 @@ Ordinarily, when the solver encounters a project name for which there's an entry
 
 If `-update` is passed with no arguments, then `ChangeAll` is set to `true`, resulting in the solver ignoring `Gopkg.lock` for all newly-encountered project names. This is equivalent to explicitly passing all of your dependences as arguments to `dep ensure -update`, as well as `rm Gopkg.lock && dep ensure`. Again, however, neither of these approaches are recommended, and future changes may introduce subtle differences.
 
-When a version hint from `Gopkg.lock` is not placed at the head of the version queue, it means that dep will explore the set of possible versions for a particular dependency. This exploration is performed according to a [fixed sort order](https://godoc.org/github.com/golang/dep/gps#SortForUpgrade), where newer versions are tried first, resulting in an update. 
+When a version hint from `Gopkg.lock` is not placed at the head of the version queue, it means that dep will explore the set of possible versions for a particular dependency. This exploration is performed according to a [fixed sort order](https://godoc.org/github.com/golang/dep/gps#SortForUpgrade), where newer versions are tried first, resulting in an update.
 
 For example, say there is a project, `github.com/foo/bar`, with the following versions:
 
@@ -175,7 +175,7 @@ So, barring some other conflict, `v1.2.0` is selected, resulting in the desired 
 
 ### `-update` and constraint types
 
-Continuing with our example, it's important to note that updates with `-update` are achieved incidentally - the solver never explicitly targets a newer version by the solver. It just removes the hint from the lock, then selects the first version in the queue that satisfies constraints. Consequently, `-update` is only effective with certain types of constraints.
+Continuing with our example, it's important to note that updates with `-update` are achieved incidentally - the solver never explicitly targets a newer version. It just skips adding a hint from the lock, then selects the first version in the queue that satisfies constraints. Consequently, `-update` is only effective with certain types of constraints.
 
 It does work with branch constraints, which we can observe by including the underlying revision. If the user has constrained on `branch = "master"`, and `Gopkg.lock` points at an older revision (say, `aabbccd`) than the canonical source's `master` branch points to (`bbccdde`), then `dep ensure` will end up contructing a queue that looks like this:
 
@@ -199,7 +199,7 @@ The key takeaway here is that `-update`'s behavior is governed by the type of co
 | ------------------------------------ | ------------------ | ---------------------------------------- |
 | `version` (semver range)             | `"^1.0.0"`         | Tries to get the latest version allowed by the range |
 | `branch`                             | `"master"`         | Tries to move to the current tip of the named branch |
-| `version` (non-range semver)         | `"=1.0.0"`         | Change can only occur if the upstream release was moved |
+| `version` (non-range semver)         | `"=1.0.0"`         | Change can only occur if the upstream release was moved (e.g. `git push --force <tag>`) |
 | `version` (non-semver)               | `"foo"`            | Change can only occur if the upstream release was moved |
 | `revision`                           | `aabbccd...`       | No change is possible                    |
 | (none)                               | (none)             | The first version that works, according to [the sort order](https://godoc.org/github.com/golang/dep/gps#SortForUpgrade) (not recommended) |

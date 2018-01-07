@@ -1,6 +1,5 @@
 ---
 title: Migrating to dep
-sidebar_label: Migrating existing projects
 ---
 
 Ideally, migrating an existing Go project to dep is straightforward:
@@ -60,7 +59,7 @@ The solver returns a solution, which itself is just [a representation](https://g
 
 First and foremost, make sure that you're running `dep init` with the `-v` flag. That will provide a lot more information.
 
-`dep init` has both hard and soft failure modes. Hard failures result in the process hanging or aborting entirely, without anything being written to disk. Soft failures may or may not include warnings, but do ultimately write out a `Gopkg.toml`, `Gopkg.lock`, and `vendor/` - just, not the ones you wanted. Before we dig into those, though, let's set some context.
+`dep init`, like dep in general, has both hard and soft failure modes. Hard failures result in the process hanging or aborting entirely, without anything being written to disk. Soft failures may or may not include warnings, but do ultimately write out a `Gopkg.toml`, `Gopkg.lock`, and `vendor/` - just, not the ones you wanted. Before we dig into those, though, let's set some context.
 
 While dep contributors have invested enormous effort into creating automated migration paths into dep, these paths will always best-effort and imprecise. It's simply not always possible to convert from other tools or GOPATH with full fidelity. dep is an opinionated tool, with a correspondingly opinionated model, and that model does sometimes fundamentally differ from that of other tools. Sometimes these model mismatches result in hard failures, sometimes soft, and sometimes there's no harm at all.
 
@@ -72,11 +71,11 @@ Because these are deep assumptions, their symptoms can be varied and surprising.
 - dep generally does not care about what's on your GOPATH; it deals exclusively with projects sourced from remote network locations. (Hint inference is the only exception to this; once solving begins, GOPATH - and any custom changes you've made to code therein - is ignored.)
 - dep generally prefers semantic versioning-tagged releases to branches (when not given any additional rules). This is a significant shift from the "default branch" model of `go get` and some other tools. It can result in dep making surprising choices for dependencies for which it could not infer a rule.
 
-Some projects that have been unable, thus far, to find a reasonable way of adapting to these requirements. If you can't figure out how to make your project fit, please file an issue - dep's goal is to define rules that everyone is reasonably able to adapt to.
+A small number of projects that have reported being unable, thus far, to find a reasonable way of adapting to these requirements. If you can't figure out how to make your project fit, please file an issue - while dep necessarily cannot accommodate every single existing approach, it is dep's goal is define rules to which all Go projects can reasonably adapt.
 
 ### Hard failures
 
-Hard failures are mostly going to come in four flavors:
+Hard failures come in four flavors:
 
 * Deduction failures
 * Local cache errors
