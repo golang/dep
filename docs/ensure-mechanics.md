@@ -111,7 +111,7 @@ For any of the paths where `dep ensure -add` needs to run the solving function i
 
 ![Model modifications made by -add](img/required-arrows.png)
 
-Import path arguments that need to be added are injected via the `required` list, and if an explicit version requirement was specified, the equivalent of a `[[constraint]]` is created. 
+Import path arguments that need to be added are injected via the `required` list, and if an explicit version requirement was specified, the equivalent of a `[[constraint]]` is created.
 
 Though these rules may ultimately be persisted if solving succeeds, they are ephemeral at least until solving succeeds. And, from the solver's perspective, the ephemeral rules are indistinguishable from rules sourced directly from disk. Thus, to the solver, `dep ensure -add foo@v1.0.0` is identical to modifying `Gopkg.toml` by adding `"foo"` to the `required` list, plus a `[[constraint]]` stanza with `version = "v1.0.0"`, then running `dep ensure`.
 
@@ -131,9 +131,9 @@ First, to solidify an implication in the discussion of [functional optimizations
 
 ![Pre-existing lock feeds back into solving function](img/lock-back.png)
 
-Injecting `Gopkg.lock` into the solver is a necessity. We want the solver to preserve previously-selected versions by default, but unless `Gopkg.lock` is injected somewhere, then the solver can't know what versions it's trying to preserve.
+Injecting `Gopkg.lock` into the solver is a necessity. If we want the solver to preserve previously-selected versions by default, then the solver has to learn about the existing `Gopkg.lock` from somewhere. Otherwise, it wouldn't know what to preserve!
 
-As such, the lock is another one of the properties encoded onto the `SolveParameters` struct, discussed [previously](#functional-flow). That, plus two other properties, are the salient ones for `-update`:
+As such, the lock is another one of the properties encoded onto the [previously-discussed](#functional-flow) `SolveParameters` struct. That, plus two other properties, are the salient ones for `-update`:
 
 ```go
 type SolveParameters struct {
@@ -177,13 +177,13 @@ So, barring some other conflict, `v1.2.0` is selected, resulting in the desired 
 
 Continuing with our example, it's important to note that updates with `-update` are achieved incidentally - the solver never explicitly targets a newer version. It just skips adding a hint from the lock, then selects the first version in the queue that satisfies constraints. Consequently, `-update` is only effective with certain types of constraints.
 
-It does work with branch constraints, which we can observe by including the underlying revision. If the user has constrained on `branch = "master"`, and `Gopkg.lock` points at an older revision (say, `aabbccd`) than the canonical source's `master` branch points to (`bbccdde`), then `dep ensure` will end up contructing a queue that looks like this:
+It does work with branch constraints, which we can observe by including the underlying revision. If the user has constrained on `branch = "master"`, and `Gopkg.lock` points at a topologically older revision (say, `aabbccd`) than the tip of the canonical source's `master` branch (say, `bbccdde`), then `dep ensure` will end up contructing a queue that looks like this:
 
 ```
 [master@aabbccd, v1.1.0, v1.2.0, v1.1.1, v1.1.0, v1.0.0, master@bbccdde]
 ```
 
-With `-update`, the hint at the head will be omitted, and `branch = "master"` will reject all of the semantic versions, finally settling on `master@bbccdde`.
+With `-update`, the hint at the head will be omitted; `branch = "master"` will cause the solver to reject all of the semantic versions, and finally settle on `master@bbccdde`.
 
 All versions in the version queue keep track of an underlying revision, which means the same is true if, for example, some upstream project force-pushes a git tag:
 

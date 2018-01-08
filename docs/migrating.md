@@ -109,13 +109,13 @@ Unfortunately, `dep init` does not write out a partial `Gopkg.toml` when it fail
 
 Soft failures are usually obvious: `dep init` exits cleanly, but subsequent builds or tests fail. dep's soft failures are usually more drastically than subtly wrong - an explosion of type errors when you try to build, because a wildly incorrect version for some dependency got selected. 
 
-If you do encounter problems like this, `dep status` is your first diagnostic step. This will tell you what versions were selected for all your dependencies. You may know which dependencies are a problem simply from your building or testing error messages; if not, compare the `dep status` list against the versions recorded by your previous tool to find the differences.
+If you do encounter problems like this, `dep status` is your first diagnostic step; it will report what versions were selected for all your dependencies. It may be clear which dependencies are a problem simply from your building or testing error messages. If not, compare the `dep status` list against the versions recorded by your previous tool to find the differences.
 
 Once you've identified the problematic dependenc(ies), the next step is exerting appropriate controls over them via `Gopkg.toml`. (Note - this advice is intentionally terse; look at [Zen of Constraints and Locks]() if you want a deeper understanding of how to optimally utilize dep's controls)
 
 For each of the following items, assume that you should run `dep ensure` after making the suggested change. If that fails, consult [dealing with solving failures]().
 
-* If the wrong `[[constraint]]` was inferred for one of your direct dependencies, change it. Then, file an issue against dep, please - while `dep init` may choose to omit a constraint, converting one incorrectly is considered a bug.
+* If the wrong `[[constraint]]` was inferred for one of your direct dependencies, change it. Then, file an issue against dep (please!) - while `dep init` may choose to omit a constraint, converting one incorrectly is considered a bug.
 * If one of your transitive dependencies is at the wrong version, define an `[[override]]` on it to force it to the version you need.
   * If the version you need is a specific git commit, it's preferable to instead manually change the `revision` to the desired hash in `Gopkg.lock` for that project, then drop the `version` or `branch` fields (if any).
 * If one of your direct dependencies is at the wrong version and there's no `[[constraint]]` on it in `Gopkg.toml` already, then define an appropriate one.

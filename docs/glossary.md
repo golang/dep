@@ -5,6 +5,7 @@ title: Glossary
 
 dep uses some specialized terminology. Learn about it here!
 
+* [Atom](#atom)
 * [Constraint](#constraint)
 * [Current Project](#current-project)
 * [Deduction](#deduction)
@@ -22,6 +23,10 @@ dep uses some specialized terminology. Learn about it here!
 * [Transitive Dependency](#transitive-dependency)
 
 ---
+
+## Atom
+
+Atoms are a source at a particular version. In practice, this means a two-tuple of [project root](#project-root) and version, e.g. `github.com/foo/bar@master`. Atoms are primarily internal to the [solver](#solver), and the term is rarely used elsewhere.
 
 ## Constraint
 
@@ -68,19 +73,19 @@ The root import path for a project. A project root is defined as:
 * For the current project, the location of the `Gopkg.toml` file defines the project root
 * For dependencies, the root of the network [source](#source) (VCS repository) is treated as the project root
 
-These are generally one and the same, though not always. When using dep inside a monorepo, multiple `Gopkg.toml` files may exist at subpaths for discrete projects, defining each of those import paths as Project Roots. This works fine when working directly on those projects. If, however, any project not in the repository seeks to import the monorepo, dep will treat the monorepo's as one big Project, with the root directory being the Project Root; it will disregard any and all  `Gopkg.toml` files in subdirectories.
+These are generally one and the same, though not always. When using dep inside a monorepo, multiple `Gopkg.toml` files may exist at subpaths for discrete projects, designating each of those import paths as Project Roots. This works fine when working directly on those projects. If, however, any project not in the repository seeks to import the monorepo, dep will treat the monorepo's as one big Project, with the root directory being the Project Root; it will disregard any and all  `Gopkg.toml` files in subdirectories.
 
 This may also be referred to as the "import root" or "root import path."
 
 ## Solver
 
-"The solver" is a reference to the domain-specific SAT solver contained in [gps](#gps). More detail can be found on its [reference page](solver.md).
+"The solver" is a reference to the domain-specific SAT solver contained in [gps](#gps). More detail can be found on its [reference page](the-solver.md).
 
 ## Source
 
-The remote entities that hold versioned code. Sources are specifically the entity containing the code, not any particular version of thecode itself. 
+The remote entities that hold versioned code. Sources are specifically the entity containing the code, not any particular version of thecode itself.
 
-Used in lieu of "VCS" because Go package management tools will soon learn to use more than just VCS systems.
+"Source" is used in lieu of "VCS" because Go package management tools will soon learn to use more than just VCS systems.
 
 ## Source Root
 
