@@ -75,8 +75,8 @@ They are respected by dep whether coming from the Gopkg.toml of the current proj
   # Optional: an alternate location (URL or import path) for the project's source.
   source = "https://github.com/myfork/package.git"
 
-  # Optional: metadata about the constraint or override that could be used by other independent systems
-  [metadata]
+  # Optional: metadata about the constraint that could be used by other independent systems
+  [constraint.metadata]
   key1 = "value that convey data to other systems"
   system1-data = "value that is used by a system"
   system2-data = "value that is used by another system"
@@ -100,8 +100,8 @@ An `override` has the same structure as a `constraint` declaration, but supersed
   # Optional: specifying an alternate source location as an override will enforce that the alternate location is used for that project, regardless of what source location any dependent projects specify.
   source = "https://github.com/myfork/package.git"
 
-  # Optional: metadata about the constraint or override that could be used by other independent systems
-  [metadata]
+  # Optional: metadata about the override that could be used by other independent systems
+  [override.metadata]
   key1 = "value that convey data to other systems"
   system1-data = "value that is used by a system"
   system2-data = "value that is used by another system"
@@ -156,7 +156,7 @@ codename = "foo"
   name = "github.com/user/project"
   version = "1.0.0"
 
-  [metadata]
+  [constraint.metadata]
   property1 = "value1"
   property2 = 10
 
@@ -169,6 +169,6 @@ codename = "foo"
   name = "github.com/x/y"
   version = "2.4.0"
 
-  [metadata]
+  [override.metadata]
   propertyX = "valueX"
 ```
