@@ -33,7 +33,6 @@ var (
 	errInvalidMetadata     = errors.New("metadata should be a TOML table")
 
 	errInvalidProjectRoot = errors.New("ProjectRoot name validation failed")
-	errInefficientRules   = errors.New("inefficient rules found in the manifest")
 
 	errInvalidPruneValue = errors.New("prune options values must be booleans")
 	errPruneSubProject   = errors.New("prune projects should not contain sub projects")
@@ -325,40 +324,59 @@ func ValidateProjectRoots(c *Ctx, m *Manifest, sm gps.SourceManager) error {
 	return valErr
 }
 
+type errInefficientRules struct {
+	constraints []gps.ProjectRoot
+	ignores     []gps.ProjectRoot
+}
+
+func (e errInefficientRules) notEmpty() bool {
+	return len(e.constraints) > 0 || len(e.ignores) > 0
+}
+
+func (e errInefficientRules) Error() string {
+	var err bytes.Buffer
+	if len(e.constraints) > 0 {
+		err.WriteString("The following constraints aren't imported:\n\n")
+		for _, pr := range e.constraints {
+			str := fmt.Sprintf("  ✗ %s\n", pr)
+			err.WriteString(str)
+		}
+	}
+	if len(e.ignores) > 0 {
+		err.WriteString("The following ignored packages aren't imported:\n\n")
+		for _, pr := range e.ignores {
+			str := fmt.Sprintf("  ✗ %s\n", pr)
+			err.WriteString(str)
+		}
+	}
+	return err.String()
+}
+
 // ValidatePackageRules ensure that there are no ineffectual package declarations
 // in the constraints, overrides, and ignored rules in the manifest.
-func ValidatePackageRules(c *Ctx, proj *Project, sm gps.SourceManager) (err error) {
+func ValidatePackageRules(proj *Project, sm gps.SourceManager) error {
 	directDeps, err := proj.DirectDependencies(sm)
 	if err != nil {
 		return err
 	}
 
-	ic := FindIneffectualConstraints(proj.Manifest, directDeps)
-	if len(ic) > 0 {
-		err = errInefficientRules
-		c.Err.Printf("The following constraints aren't imported:\n\n")
-		for _, pr := range ic {
-			c.Err.Println("  ", pr)
-		}
-		c.Err.Println()
+	var errRules errInefficientRules
+	ic := findIneffectualConstraints(proj.Manifest, directDeps)
+	errRules.constraints = append(errRules.constraints, ic...)
+
+	ig := findIneffectualIgnores(proj.Manifest, directDeps)
+	errRules.ignores = append(errRules.ignores, ig...)
+
+	if errRules.notEmpty() {
+		return errRules
 	}
 
-	ig := FindIneffectualIgnores(proj.Manifest, directDeps)
-	if len(ig) > 0 {
-		err = errInefficientRules
-		c.Err.Printf("The following ignored packages aren't imported:\n\n")
-		for _, pr := range ig {
-			c.Err.Println("  ", pr)
-		}
-		c.Err.Println()
-	}
-
-	return err
+	return nil
 }
 
-// FindIneffectualConstraints looks for constraints decleared in the project
+// findIneffectualConstraints looks for constraints decleared in the project
 // manifest that aren't directly used in the project.
-func FindIneffectualConstraints(m *Manifest, directDeps map[string]bool) []gps.ProjectRoot {
+func findIneffectualConstraints(m *Manifest, directDeps map[string]bool) []gps.ProjectRoot {
 	ineffectuals := make([]gps.ProjectRoot, 0)
 	// Check constraints in the manifest.
 	for pr := range m.DependencyConstraints() {
@@ -377,9 +395,9 @@ func FindIneffectualConstraints(m *Manifest, directDeps map[string]bool) []gps.P
 	return ineffectuals
 }
 
-// FindIneffectualIgnores looks for ignored packages decleared in the project
+// findIneffectualIgnores looks for ignored packages decleared in the project
 // manifest that aren't directly used in the project.
-func FindIneffectualIgnores(m *Manifest, directDeps map[string]bool) []gps.ProjectRoot {
+func findIneffectualIgnores(m *Manifest, directDeps map[string]bool) []gps.ProjectRoot {
 	ineffectuals := make([]gps.ProjectRoot, 0)
 	ignoredPkgs := m.IgnoredPackages()
 	for _, pr := range ignoredPkgs.ToSlice() {
