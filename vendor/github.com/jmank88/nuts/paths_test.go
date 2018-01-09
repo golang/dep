@@ -1,4 +1,4 @@
-//go:generate rm -r testdata
+//go:generate rm -rf testdata
 //
 //go:generate go run cmd/testpaths/main.go testdata standard 10 100 1000 10000 100000 1000000
 //go:generate go run cmd/testpaths/main.go testdata segmentCount 1 5 10 50 100

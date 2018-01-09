@@ -9,12 +9,6 @@
 
 [[projects]]
   branch = "master"
-  name = "github.com/dgryski/go-metro"
-  packages = ["."]
-  revision = "0f6473574cdfd7be3962c41fb23dc4768b1f7deb"
-
-[[projects]]
-  branch = "master"
   name = "golang.org/x/sys"
   packages = ["unix"]
   revision = "7ddbeae9ae08c6a06a59597f0c9edbc5ff2444ce"
@@ -22,6 +16,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "051cec76ab73ca227eb718f999fe302404bd5b6673fc29b438eb5945e97f571b"
+  inputs-digest = "568758fa97eac2946d6043bc72b7e728f802aeba2169c527f8fbad2222e74700"
   solver-name = "gps-cdcl"
   solver-version = 1

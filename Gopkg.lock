@@ -41,8 +41,8 @@
 [[projects]]
   name = "github.com/jmank88/nuts"
   packages = ["."]
-  revision = "a1e02c788669d022c325a8ee674f15360d7104f4"
-  version = "v0.2.0"
+  revision = "8b28145dffc87104e66d074f62ea8080edfad7c8"
+  version = "v0.3.0"
 
 [[projects]]
   branch = "master"
@@ -89,6 +89,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "05c1cd69be2c917c0cc4b32942830c2acfa044d8200fdc94716aae48a8083702"
+  inputs-digest = "e70d26b359aed7af66f3393fc9d4985bbcf499c0b5ed3b5661a5912b4c71a32e"
   solver-name = "gps-cdcl"
   solver-version = 1
