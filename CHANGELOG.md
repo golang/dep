@@ -28,6 +28,7 @@ IMPROVEMENTS:
 * Skip empty constraints during import ([#1414](https://github.com/golang/dep/pull/1349))
 * Handle errors when writing status output ([#1420](https://github.com/golang/dep/pull/1420))
 * Add constraint for locked projects in `status`. (#962)
+* Show LATEST and VERSION as the same type in status. (#1515)
 
 # v0.3.2
 
