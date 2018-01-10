@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 
 	"github.com/golang/dep/gps"
+	"github.com/golang/dep/gps/paths"
 	"github.com/golang/dep/gps/pkgtree"
 	"github.com/golang/dep/internal/fs"
 	"github.com/pkg/errors"
@@ -149,6 +150,26 @@ func (p *Project) ParseRootPackageTree() (pkgtree.PackageTree, error) {
 		ig = p.Manifest.IgnoredPackages()
 	}
 	return ptree.TrimHiddenPackages(true, true, ig), nil
+}
+
+// DirectDependencies creates a map of direct dependencies imported in the project.
+func (p *Project) DirectDependencies(sm gps.SourceManager) (map[string]bool, error) {
+	pkgT, err := p.ParseRootPackageTree()
+	if err != nil {
+		return nil, err
+	}
+
+	directDeps := make(map[string]bool)
+	rm, _ := pkgT.ToReachMap(true, true, false, nil)
+	for _, ip := range rm.FlattenFn(paths.IsStandardImportPath) {
+		pr, err := sm.DeduceProjectRoot(ip)
+		if err != nil {
+			return nil, err
+		}
+		directDeps[string(pr)] = true
+	}
+
+	return directDeps, nil
 }
 
 // BackupVendor looks for existing vendor directory and if it's not empty,

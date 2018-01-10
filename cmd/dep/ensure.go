@@ -176,6 +176,10 @@ func (cmd *ensureCommand) Run(ctx *dep.Ctx, args []string) error {
 		return err
 	}
 
+	if err := dep.ValidatePackageRules(p, sm); err != nil {
+		return err
+	}
+
 	params := p.MakeParams()
 	if ctx.Verbose {
 		params.TraceLogger = ctx.Err
