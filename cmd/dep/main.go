@@ -67,6 +67,7 @@ func (c *Config) Run() int {
 		&initCommand{},
 		&statusCommand{},
 		&ensureCommand{},
+		&pruneCommand{},
 		&hashinCommand{},
 		&versionCommand{},
 	}
