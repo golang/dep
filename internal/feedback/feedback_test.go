@@ -98,7 +98,6 @@ func TestFeedback_BrokenImport(t *testing.T) {
 	pi := gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot("github.com/foo/bar")}
 
 	cases := []struct {
-		diff           *gps.LockDiff
 		oldVersion     gps.Version
 		currentVersion gps.Version
 		pID            gps.ProjectIdentifier
