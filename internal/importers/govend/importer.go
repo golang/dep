@@ -63,7 +63,8 @@ func (g *Importer) Import(dir string, pr gps.ProjectRoot) (*dep.Manifest, *dep.L
 		return nil, nil, err
 	}
 
-	return g.convert(pr)
+	m, l := g.convert(pr)
+	return m, l, nil
 }
 
 // load the govend configuration files.
@@ -85,14 +86,27 @@ func (g *Importer) load(projectDir string) error {
 }
 
 // convert the govend configuration files into dep configuration files.
-func (g *Importer) convert(pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock, error) {
+func (g *Importer) convert(pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock) {
 	g.Logger.Println("Converting from vendor.yaml...")
 
 	packages := make([]base.ImportedPackage, 0, len(g.yaml.Imports))
 	for _, pkg := range g.yaml.Imports {
 		// Path must not be empty
-		if pkg.Path == "" || pkg.Revision == "" {
-			return nil, nil, errors.New("invalid govend configuration, path and rev are required")
+		if pkg.Path == "" {
+			g.Logger.Println(
+				"  Warning: Skipping project. Invalid govend configuration, path is required",
+			)
+			continue
+		}
+
+		if pkg.Revision == "" {
+			// Do not add 'empty constraints' to the manifest. Solve will add to lock if required.
+			g.Logger.Printf(
+				"  Warning: Skipping import with empty constraints. "+
+					"The solve step will add the dependency to the lock if needed: %q\n",
+				pkg.Path,
+			)
+			continue
 		}
 
 		ip := base.ImportedPackage{
@@ -102,10 +116,6 @@ func (g *Importer) convert(pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock, error)
 		packages = append(packages, ip)
 	}
 
-	err := g.ImportPackages(packages, true)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	return g.Manifest, g.Lock, nil
+	g.ImportPackages(packages, true)
+	return g.Manifest, g.Lock
 }

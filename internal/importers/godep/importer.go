@@ -62,7 +62,8 @@ func (g *Importer) Import(dir string, pr gps.ProjectRoot) (*dep.Manifest, *dep.L
 		return nil, nil, err
 	}
 
-	return g.convert(pr)
+	m, l := g.convert(pr)
+	return m, l, nil
 }
 
 func (g *Importer) load(projectDir string) error {
@@ -83,20 +84,24 @@ func (g *Importer) load(projectDir string) error {
 	return nil
 }
 
-func (g *Importer) convert(pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock, error) {
+func (g *Importer) convert(pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock) {
 	g.Logger.Println("Converting from Godeps.json ...")
 
 	packages := make([]base.ImportedPackage, 0, len(g.json.Imports))
 	for _, pkg := range g.json.Imports {
 		// Validate
 		if pkg.ImportPath == "" {
-			err := errors.New("invalid godep configuration, ImportPath is required")
-			return nil, nil, err
+			g.Logger.Println(
+				"  Warning: Skipping project. Invalid godep configuration, ImportPath is required",
+			)
+			continue
 		}
 
 		if pkg.Rev == "" {
-			err := errors.New("invalid godep configuration, Rev is required")
-			return nil, nil, err
+			g.Logger.Printf(
+				"  Warning: Invalid godep configuration, Rev not found for ImportPath %q\n",
+				pkg.ImportPath,
+			)
 		}
 
 		ip := base.ImportedPackage{
@@ -107,10 +112,6 @@ func (g *Importer) convert(pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock, error)
 		packages = append(packages, ip)
 	}
 
-	err := g.ImportPackages(packages, true)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	return g.Manifest, g.Lock, nil
+	g.ImportPackages(packages, true)
+	return g.Manifest, g.Lock
 }

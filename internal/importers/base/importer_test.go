@@ -5,6 +5,7 @@
 package base
 
 import (
+	"fmt"
 	"log"
 	"testing"
 
@@ -399,16 +400,42 @@ func TestBaseImporter_ImportProjects(t *testing.T) {
 				},
 			},
 		},
+		"invalid project root": {
+			importertest.TestCase{
+				WantSourceRepo: "",
+				WantWarning:    "Warning: Skipping project. Cannot determine the project root for invalid-project",
+			},
+			[]ImportedPackage{
+				{
+					Name: "invalid-project",
+				},
+			},
+		},
+		"nonexistent project": {
+			importertest.TestCase{
+				WantSourceRepo: "",
+				WantWarning: fmt.Sprintf(
+					"Warning: Skipping project. Unable to apply constraint %q for %s",
+					importertest.V1Tag, importertest.NonexistentPrj,
+				),
+			},
+			[]ImportedPackage{
+				{
+					Name:     importertest.NonexistentPrj,
+					LockHint: importertest.V1Tag,
+				},
+			},
+		},
 	}
 
 	for name, tc := range testcases {
 		name := name
 		tc := tc
 		t.Run(name, func(t *testing.T) {
-			err := tc.Execute(t, func(logger *log.Logger, sm gps.SourceManager) (*dep.Manifest, *dep.Lock, error) {
+			err := tc.Execute(t, func(logger *log.Logger, sm gps.SourceManager) (*dep.Manifest, *dep.Lock) {
 				i := NewImporter(logger, true, sm)
-				convertErr := i.ImportPackages(tc.projects, tc.DefaultConstraintFromLock)
-				return i.Manifest, i.Lock, convertErr
+				i.ImportPackages(tc.projects, tc.DefaultConstraintFromLock)
+				return i.Manifest, i.Lock
 			})
 			if err != nil {
 				t.Fatalf("%#v", err)

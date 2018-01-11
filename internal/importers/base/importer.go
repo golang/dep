@@ -123,7 +123,7 @@ type importedProject struct {
 }
 
 // loadPackages consolidates all package references into a set of project roots.
-func (i *Importer) loadPackages(packages []ImportedPackage) ([]importedProject, error) {
+func (i *Importer) loadPackages(packages []ImportedPackage) []importedProject {
 	// preserve the original order of the packages so that messages that
 	// are printed as they are processed are in a consistent order.
 	orderedProjects := make([]importedProject, 0, len(packages))
@@ -132,7 +132,11 @@ func (i *Importer) loadPackages(packages []ImportedPackage) ([]importedProject, 
 	for _, pkg := range packages {
 		pr, err := i.SourceManager.DeduceProjectRoot(pkg.Name)
 		if err != nil {
-			return nil, errors.Wrapf(err, "Cannot determine the project root for %s", pkg.Name)
+			i.Logger.Printf(
+				"  Warning: Skipping project. Cannot determine the project root for %s: %s\n",
+				pkg.Name, err,
+			)
+			continue
 		}
 		pkg.Name = string(pr)
 
@@ -159,7 +163,7 @@ func (i *Importer) loadPackages(packages []ImportedPackage) ([]importedProject, 
 		}
 	}
 
-	return orderedProjects, nil
+	return orderedProjects
 }
 
 // ImportPackages loads imported packages into the manifest and lock.
@@ -173,11 +177,8 @@ func (i *Importer) loadPackages(packages []ImportedPackage) ([]importedProject, 
 // * Revision constraints are ignored.
 // * Versions that don't satisfy the constraint, drop the constraint.
 // * Untagged revisions ignore non-branch constraint hints.
-func (i *Importer) ImportPackages(packages []ImportedPackage, defaultConstraintFromLock bool) (err error) {
-	projects, err := i.loadPackages(packages)
-	if err != nil {
-		return err
-	}
+func (i *Importer) ImportPackages(packages []ImportedPackage, defaultConstraintFromLock bool) {
+	projects := i.loadPackages(packages)
 
 	for _, prj := range projects {
 		source := prj.Source
@@ -201,6 +202,7 @@ func (i *Importer) ImportPackages(packages []ImportedPackage, defaultConstraintF
 			},
 		}
 
+		var err error
 		pc.Constraint, err = i.SourceManager.InferConstraint(prj.ConstraintHint, pc.Ident)
 		if err != nil {
 			pc.Constraint = gps.Any()
@@ -212,9 +214,12 @@ func (i *Importer) ImportPackages(packages []ImportedPackage, defaultConstraintF
 			// Determine if the lock hint is a revision or tag
 			isTag, version, err = i.isTag(pc.Ident, prj.LockHint)
 			if err != nil {
-				return err
+				i.Logger.Printf(
+					"  Warning: Skipping project. Unable to apply constraint %q for %v: %s\n",
+					prj.LockHint, pc.Ident, err,
+				)
+				continue
 			}
-
 			// If the hint is a revision, check if it is tagged
 			if !isTag {
 				revision := gps.Revision(prj.LockHint)
@@ -270,8 +275,6 @@ func (i *Importer) ImportPackages(packages []ImportedPackage, defaultConstraintF
 			fb.NewLockedProjectFeedback(lp, fb.DepTypeImported).LogFeedback(i.Logger)
 		}
 	}
-
-	return nil
 }
 
 // isConstraintPinned returns if a constraint is pinned to a specific revision.

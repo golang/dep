@@ -63,7 +63,8 @@ func (g *Importer) Import(dir string, pr gps.ProjectRoot) (*dep.Manifest, *dep.L
 		return nil, nil, err
 	}
 
-	return g.convert(pr)
+	m, l := g.convert(pr)
+	return m, l, nil
 }
 
 func (g *Importer) load(projectDir string) error {
@@ -84,20 +85,24 @@ func (g *Importer) load(projectDir string) error {
 	return nil
 }
 
-func (g *Importer) convert(pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock, error) {
+func (g *Importer) convert(pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock) {
 	g.Logger.Println("Converting from vendor/manifest ...")
 
 	packages := make([]base.ImportedPackage, 0, len(g.gvtConfig.Deps))
 	for _, pkg := range g.gvtConfig.Deps {
 		// Validate
 		if pkg.ImportPath == "" {
-			err := errors.New("invalid gvt configuration, ImportPath is required")
-			return nil, nil, err
+			g.Logger.Println(
+				"  Warning: Skipping project. Invalid gvt configuration, ImportPath is required",
+			)
+			continue
 		}
 
 		if pkg.Revision == "" {
-			err := errors.New("invalid gvt configuration, Revision is required")
-			return nil, nil, err
+			g.Logger.Printf(
+				"  Warning: Invalid gvt configuration, Revision not found for ImportPath %q\n",
+				pkg.ImportPath,
+			)
 		}
 
 		var contstraintHint = ""
@@ -120,10 +125,6 @@ func (g *Importer) convert(pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock, error)
 		packages = append(packages, ip)
 	}
 
-	err := g.ImportPackages(packages, true)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	return g.Manifest, g.Lock, nil
+	g.ImportPackages(packages, true)
+	return g.Manifest, g.Lock
 }

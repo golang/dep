@@ -70,7 +70,9 @@ func (g *Importer) Import(dir string, pr gps.ProjectRoot) (*dep.Manifest, *dep.L
 	if err != nil {
 		return nil, nil, err
 	}
-	return g.convert(pr)
+
+	m, l := g.convert(pr)
+	return m, l, nil
 }
 
 func (g *Importer) load(projectDir string) error {
@@ -90,15 +92,17 @@ func (g *Importer) load(projectDir string) error {
 	return nil
 }
 
-func (g *Importer) convert(pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock, error) {
+func (g *Importer) convert(pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock) {
 	g.Logger.Println("Converting from vendor.json...")
 
 	packages := make([]base.ImportedPackage, 0, len(g.file.Package))
 	for _, pkg := range g.file.Package {
 		// Path must not be empty
 		if pkg.Path == "" {
-			err := errors.New("invalid govendor configuration, Path is required")
-			return nil, nil, err
+			g.Logger.Println(
+				"  Warning: Skipping project. Invalid govendor configuration, Path is required",
+			)
+			continue
 		}
 
 		// There are valid govendor configs in the wild that don't have a revision set
@@ -112,10 +116,7 @@ func (g *Importer) convert(pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock, error)
 		packages = append(packages, ip)
 	}
 
-	err := g.ImportPackages(packages, true)
-	if err != nil {
-		return nil, nil, err
-	}
+	g.ImportPackages(packages, true)
 
 	if len(g.file.Ignore) > 0 {
 		// Govendor has three use cases here
@@ -146,5 +147,5 @@ func (g *Importer) convert(pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock, error)
 		}
 	}
 
-	return g.Manifest, g.Lock, nil
+	return g.Manifest, g.Lock
 }

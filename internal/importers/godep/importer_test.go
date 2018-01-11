@@ -6,6 +6,7 @@ package godep
 
 import (
 	"bytes"
+	"fmt"
 	"log"
 	"path/filepath"
 	"testing"
@@ -55,7 +56,7 @@ func TestGodepConfig_Convert(t *testing.T) {
 		},
 		"missing package name": {
 			importertest.TestCase{
-				WantConvertErr: true,
+				WantWarning: "Warning: Skipping project. Invalid godep configuration, ImportPath is required",
 			},
 			godepJSON{
 				Imports: []godepPackage{{ImportPath: ""}},
@@ -63,7 +64,10 @@ func TestGodepConfig_Convert(t *testing.T) {
 		},
 		"missing revision": {
 			importertest.TestCase{
-				WantConvertErr: true,
+				WantWarning: fmt.Sprintf(
+					"Warning: Invalid godep configuration, Rev not found for ImportPath %q",
+					importertest.Project,
+				),
 			},
 			godepJSON{
 				Imports: []godepPackage{
@@ -79,7 +83,7 @@ func TestGodepConfig_Convert(t *testing.T) {
 		name := name
 		testCase := testCase
 		t.Run(name, func(t *testing.T) {
-			err := testCase.Execute(t, func(logger *log.Logger, sm gps.SourceManager) (*dep.Manifest, *dep.Lock, error) {
+			err := testCase.Execute(t, func(logger *log.Logger, sm gps.SourceManager) (*dep.Manifest, *dep.Lock) {
 				g := NewImporter(logger, true, sm)
 				g.json = testCase.json
 				return g.convert(importertest.RootProject)

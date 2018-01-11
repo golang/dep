@@ -6,6 +6,7 @@ package gvt
 
 import (
 	"bytes"
+	"fmt"
 	"log"
 	"path/filepath"
 	"testing"
@@ -89,7 +90,7 @@ func TestGvtConfig_Convert(t *testing.T) {
 		},
 		"missing package name": {
 			importertest.TestCase{
-				WantConvertErr: true,
+				WantWarning: "Warning: Skipping project. Invalid gvt configuration, ImportPath is required",
 			},
 			gvtManifest{
 				Deps: []gvtPkg{{ImportPath: ""}},
@@ -97,7 +98,10 @@ func TestGvtConfig_Convert(t *testing.T) {
 		},
 		"missing revision": {
 			importertest.TestCase{
-				WantConvertErr: true,
+				WantWarning: fmt.Sprintf(
+					"Warning: Invalid gvt configuration, Revision not found for ImportPath %q",
+					importertest.Project,
+				),
 			},
 			gvtManifest{
 				Deps: []gvtPkg{
@@ -113,7 +117,7 @@ func TestGvtConfig_Convert(t *testing.T) {
 		name := name
 		testCase := testCase
 		t.Run(name, func(t *testing.T) {
-			err := testCase.Execute(t, func(logger *log.Logger, sm gps.SourceManager) (*dep.Manifest, *dep.Lock, error) {
+			err := testCase.Execute(t, func(logger *log.Logger, sm gps.SourceManager) (*dep.Manifest, *dep.Lock) {
 				g := NewImporter(logger, true, sm)
 				g.gvtConfig = testCase.gvtConfig
 				return g.convert(importertest.RootProject)
