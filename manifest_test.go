@@ -618,6 +618,20 @@ func TestValidateProjectRoots(t *testing.T) {
 			wantError: errInvalidProjectRoot,
 			wantWarn:  []string{},
 		},
+		{
+			name: "skip project root deduction for alternate source",
+			manifest: Manifest{
+				Constraints: map[gps.ProjectRoot]gps.ProjectProperties{
+					// bad ProjectRoot
+					gps.ProjectRoot("golang.org/x"): {
+						Constraint: gps.NewBranch("master"),
+						Source:     "github.com/golang/text",
+					},
+				},
+			},
+			wantError: nil,
+			wantWarn:  []string{},
+		},
 	}
 
 	h := test.NewHelper(t)

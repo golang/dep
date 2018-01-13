@@ -304,15 +304,37 @@ func ValidateProjectRoots(c *Ctx, m *Manifest, sm gps.SourceManager) error {
 		}
 	}
 
-	for pr := range m.Constraints {
+	// A map to register projects with alternate source.
+	projectsWithAltSrc := make(map[gps.ProjectRoot]bool)
+
+	for pr, pp := range m.Constraints {
+		// If an alternate source is specified, it could be to bypass some network
+		// reachability issue. Trying to deduce ProjectRoot would fail if the
+		// the project isn't reachable. Do not validate such ProjectRoots.
+		if pp.Source != "" {
+			projectsWithAltSrc[pr] = true
+			continue
+		}
+
 		wg.Add(1)
 		go validate(pr)
 	}
-	for pr := range m.Ovr {
+	for pr, pp := range m.Ovr {
+		// Skip validation for alternate source.
+		if pp.Source != "" {
+			projectsWithAltSrc[pr] = true
+			continue
+		}
+
 		wg.Add(1)
 		go validate(pr)
 	}
 	for pr := range m.PruneOptions.PerProjectOptions {
+		// Skip validation for alternate source.
+		if projectsWithAltSrc[pr] {
+			continue
+		}
+
 		wg.Add(1)
 		go validate(pr)
 	}
