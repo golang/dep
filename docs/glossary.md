@@ -6,13 +6,16 @@ title: Glossary
 dep uses some specialized terminology. Learn about it here!
 
 * [Atom](#atom)
+* [Cache lock](#cache-lock)
 * [Constraint](#constraint)
 * [Current Project](#current-project)
 * [Deduction](#deduction)
 * [Direct Dependency](#direct-dependency)
 * [GPS](#gps)
+* [Local cache](#local-cache)
 * [Lock](#lock)
 * [Manifest](#manifest)
+* [Metadata Service](#metadata-service)
 * [Override](#override)
 * [Project](#project)
 * [Project Root](#project-root)
@@ -28,6 +31,10 @@ dep uses some specialized terminology. Learn about it here!
 
 Atoms are a source at a particular version. In practice, this means a two-tuple of [project root](#project-root) and version, e.g. `github.com/foo/bar@master`. Atoms are primarily internal to the [solver](#solver), and the term is rarely used elsewhere.
 
+## Cache lock
+
+Also "cache lock file." A file, named `sm.lock`, used to ensure only a single dep process operates on the [local cache](#local-cache) at a time, as it is unsafe in dep's current design for multiple processes to access the local cache.
+
 ## Constraint
 
 Constraints have both a narrow and a looser meaning. The narrow sense refers to a [`[[constraint]]`](Gopkg.toml.md#constraint) stanza in `Gopkg.toml`. However, in some contexts, the word may be used more loosely to refer to the idea of applying rules and requirements to dependency management in general.
@@ -38,9 +45,13 @@ The project on which dep is operating - writing its `Gopkg.lock` and populating 
 
 Also called the "root project."
 
+## Deducible
+
+A shorthand way of referring to whether or not import path [deduction](#deduction) will return successfully for a given import path. "Undeducible" is also often used, to refer to an import path for which deduction fails.
+
 ## Deduction
 
-Deduction is the process of determining a source root from an import path. See the reference on [import path deduction](deduction.md) for specifics.
+Deduction is the process of determining the subset of an import path that corresponds to a source root. Some patterns are known a priori (static); others must be discovered via network requests (dynamic). See the reference on [import path deduction](deduction.md) for specifics.
 
 ## Direct Dependency
 
@@ -50,6 +61,12 @@ A project's direct dependencies are those that it imports from one or more of it
 
 Stands for "Go packaging solver", it is [a subtree of library-style packages within dep](https://godoc.org/github.com/golang/dep/gps), and is the engine around which dep is built. Most commonly referred to as "gps." 
 
+## Local cache
+
+dep maintains its own, pristine set of upstream sources (so, generally, git repository clones). This is kept separate from `$GOPATH/src` so that there is no obligation to maintain disk state within `$GOPATH`, as dep frequently needs to change disk state in order to do its work.
+
+By default, the local cache lives at `$GOPATH/pkg/dep`. If you have multiple `$GOPATH` entries, dep will use whichever is the logical parent of the process' working directory. Alternatively, the location can be forced via the `DEPCACHEDIR` environment variable.
+
 ## Lock
 
 A generic term, used across many language package managers, for the kind of information dep keeps in a `Gopkg.lock` file.
@@ -57,6 +74,14 @@ A generic term, used across many language package managers, for the kind of info
 ## Manifest
 
 A generic term, used across many language package managers, for the kind of information dep keeps in a `Gopkg.toml` file.
+
+## Metadata Service
+
+An HTTP service that, when it receives an HTTP request containing a `go-get=1` in the query string, treats interprets the path portion of the request as an import path, and responds by embedding data in HTML `<meta>` tags that indicate the type and URL of of the underlying source root. This is the server-side component of dynamic [deduction](#deduction).
+
+The behavior of metadata services is defined in the [Go documentation on remote import paths](https://golang.org/cmd/go/#hdr-Remote_import_paths).
+
+Variously referenced as "HTTP metadata service", "`go-get` HTTP metadata service", "`go-get` service", etc.
 
 ## Override
 
