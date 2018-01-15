@@ -18,6 +18,8 @@ import (
 
 	radix "github.com/armon/go-radix"
 	"github.com/pkg/errors"
+	"golang.org/x/net/proxy"
+	"os"
 )
 
 var (
@@ -837,18 +839,43 @@ func fetchMetadata(ctx context.Context, path, scheme string) (rc io.ReadCloser, 
 	return
 }
 
+// getPorxyClient returns a *http.Client with proxy transport if HTTP_PROXY is set in env
+// otherwise it will return a normal *http.Client
+func getProxyClient()*http.Client{
+	if envproxy,isset:=os.LookupEnv("HTTP_PROXY");isset{
+		proxyurl ,err := url.Parse(envproxy)
+		if err == nil {
+			dialer,err := proxy.FromURL(proxyurl,proxy.Direct)
+			if err == nil{
+				client := &http.Client{
+					Transport: &http.Transport{
+						Dial:dialer.Dial,
+					},
+				}
+				return client
+			}else{
+				fmt.Errorf("%v",err)
+			}
+		}else{
+			fmt.Errorf("proxy parse error: %+v",err)
+		}
+	}
+	return http.DefaultClient
+}
+
 func doFetchMetadata(ctx context.Context, scheme, path string) (io.ReadCloser, error) {
-	url := fmt.Sprintf("%s://%s?go-get=1", scheme, path)
+	u := fmt.Sprintf("%s://%s?go-get=1", scheme, path)
 	switch scheme {
 	case "https", "http":
-		req, err := http.NewRequest("GET", url, nil)
+		req, err := http.NewRequest("GET", u, nil)
 		if err != nil {
-			return nil, errors.Wrapf(err, "unable to build HTTP request for URL %q", url)
+			return nil, errors.Wrapf(err, "unable to build HTTP request for URL %q", u)
 		}
 
-		resp, err := http.DefaultClient.Do(req.WithContext(ctx))
+		// resp, err := http.DefaultClient.Do(req.WithContext(ctx))
+		resp, err := getProxyClient().Do(req.WithContext(ctx))
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed HTTP request to URL %q", url)
+			return nil, errors.Wrapf(err, "failed HTTP request to URL %q", u)
 		}
 
 		return resp.Body, nil
