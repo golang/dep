@@ -854,11 +854,7 @@ func getProxyClient() *http.Client {
 					},
 				}
 				return client
-			} else {
-				fmt.Errorf("%v", err)
 			}
-		} else {
-			fmt.Errorf("proxy parse error: %+v", err)
 		}
 	}
 	return http.DefaultClient
