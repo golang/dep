@@ -81,7 +81,7 @@ func ListPackages(fileRoot, importRoot string) (PackageTree, error) {
 			}
 			return err
 		}
-		if !fi.IsDir() {
+		if !fi.IsDir() && !(fi.Mode()&os.ModeSymlink == os.ModeSymlink) {
 			return nil
 		}
 
