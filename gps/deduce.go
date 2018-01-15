@@ -16,10 +16,11 @@ import (
 	"strings"
 	"sync"
 
-	radix "github.com/armon/go-radix"
+	"os"
+
+	"github.com/armon/go-radix"
 	"github.com/pkg/errors"
 	"golang.org/x/net/proxy"
-	"os"
 )
 
 var (
@@ -841,23 +842,23 @@ func fetchMetadata(ctx context.Context, path, scheme string) (rc io.ReadCloser, 
 
 // getPorxyClient returns a *http.Client with proxy transport if HTTP_PROXY is set in env
 // otherwise it will return a normal *http.Client
-func getProxyClient()*http.Client{
-	if envproxy,isset:=os.LookupEnv("HTTP_PROXY");isset{
-		proxyurl ,err := url.Parse(envproxy)
+func getProxyClient() *http.Client {
+	if envproxy, isset := os.LookupEnv("HTTP_PROXY"); isset {
+		proxyurl, err := url.Parse(envproxy)
 		if err == nil {
-			dialer,err := proxy.FromURL(proxyurl,proxy.Direct)
-			if err == nil{
+			dialer, err := proxy.FromURL(proxyurl, proxy.Direct)
+			if err == nil {
 				client := &http.Client{
 					Transport: &http.Transport{
-						Dial:dialer.Dial,
+						Dial: dialer.Dial,
 					},
 				}
 				return client
-			}else{
-				fmt.Errorf("%v",err)
+			} else {
+				fmt.Errorf("%v", err)
 			}
-		}else{
-			fmt.Errorf("proxy parse error: %+v",err)
+		} else {
+			fmt.Errorf("proxy parse error: %+v", err)
 		}
 	}
 	return http.DefaultClient
