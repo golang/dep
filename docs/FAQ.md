@@ -206,7 +206,7 @@ So, given a slice of the following versions:
 
 Sorting for upgrade will result in the following slice.
 
-`[v1.1.0 v1.0.0 v1.1.0-alpha1 footag devel master f6e74e8d]`
+`[v1.1.0 v1.0.0 v1.1.0-alpha1 master devel footag f6e74e8d]`
 
 There are a number of factors that can eliminate a version from consideration,
 the simplest of which is that it doesn't match a constraint. But if you're
