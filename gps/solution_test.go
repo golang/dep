@@ -10,6 +10,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/golang/dep/internal/test"
@@ -68,6 +69,17 @@ func testWriteDepTree(t *testing.T) {
 	}
 	defer os.RemoveAll(tmp)
 
+	// bzr appears to not be consistent across...versions? platforms? (who
+	// knows) with respect to its internal object identifiers. This has tanked
+	// our Windows tests, because it's sniffing for this one revision, but the
+	// rev is reported differently on some Windows versions, with some versions
+	// of bzr. It's especially vexing because these tests worked fine for years,
+	// then abruptly broke for no obvious reason.
+	var bzrv Version = NewVersion("1.0.0")
+	if runtime.GOOS != "windows" {
+		bzrv = bzrv.(semVersion).Pair(Revision("matt@mattfarina.com-20150731135137-pbphasfppmygpl68"))
+	}
+
 	r := solution{
 		att: 1,
 		p: []LockedProject{
@@ -77,7 +89,7 @@ func testWriteDepTree(t *testing.T) {
 			}, nil),
 			pa2lp(atom{
 				id: pi("launchpad.net/govcstestbzrrepo"),
-				v:  NewVersion("1.0.0").Pair(Revision("matt@mattfarina.com-20150731135137-pbphasfppmygpl68")),
+				v:  bzrv,
 			}, nil),
 			pa2lp(atom{
 				id: pi("bitbucket.org/sdboyer/withbm"),

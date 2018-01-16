@@ -38,13 +38,17 @@ func TestGlockConfig_Convert(t *testing.T) {
 		},
 		"missing package name": {
 			importertest.TestCase{
-				WantConvertErr: true,
+				WantWarning: "Warning: Skipping project. Invalid glock configuration, import path is required",
 			},
 			[]glockPackage{{importPath: ""}},
 		},
 		"missing revision": {
 			importertest.TestCase{
-				WantConvertErr: true,
+				WantWarning: fmt.Sprintf(
+					"  Warning: Skipping import with empty constraints. "+
+						"The solve step will add the dependency to the lock if needed: %q",
+					importertest.Project,
+				),
 			},
 			[]glockPackage{{importPath: importertest.Project}},
 		},
@@ -54,7 +58,7 @@ func TestGlockConfig_Convert(t *testing.T) {
 		name := name
 		testCase := testCase
 		t.Run(name, func(t *testing.T) {
-			err := testCase.Execute(t, func(logger *log.Logger, sm gps.SourceManager) (*dep.Manifest, *dep.Lock, error) {
+			err := testCase.Execute(t, func(logger *log.Logger, sm gps.SourceManager) (*dep.Manifest, *dep.Lock) {
 				g := NewImporter(logger, true, sm)
 				g.packages = testCase.packages
 				return g.convert(importertest.RootProject)
