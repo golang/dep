@@ -570,7 +570,12 @@ func runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceMana
 							// upgrade, the first version we encounter that
 							// matches our constraint will be what we want.
 							if c.Constraint.Matches(v) {
-								bs.Latest = v.Revision()
+								// Latest should be of the same type as the Version.
+								if bs.Version.Type() == gps.IsSemver {
+									bs.Latest = v
+								} else {
+									bs.Latest = v.Revision()
+								}
 								break
 							}
 						}
