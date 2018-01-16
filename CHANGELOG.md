@@ -29,6 +29,7 @@ IMPROVEMENTS:
 * Add constraint for locked projects in `dep status`. ([#962](https://github.com/golang/dep/pull/962)
 * Make external config importers error tolerant. ([#1315](https://github.com/golang/dep/pull/1315))
 * Show LATEST and VERSION as the same type in status. ([#1515](https://github.com/golang/dep/pull/1515)
+* Warn when [[constraint]] rules that will have no effect. ([#1534](https://github.com/golang/dep/pull/1534))
 
 # v0.3.2
 
