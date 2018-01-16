@@ -143,7 +143,7 @@ func (p *Project) MakeParams() gps.SolveParameters {
 //
 // The resulting tree is cached internally at p.RootPackageTree.
 func (p *Project) ParseRootPackageTree() (pkgtree.PackageTree, error) {
-	if len(p.RootPackageTree.Packages) == 0 {
+	if p.RootPackageTree.Packages == nil {
 		ptree, err := pkgtree.ListPackages(p.ResolvedAbsRoot, string(p.ImportRoot))
 		if err != nil {
 			return pkgtree.PackageTree{}, errors.Wrap(err, "analysis of current project's packages failed")
@@ -174,10 +174,10 @@ func (p *Project) ParseRootPackageTree() (pkgtree.PackageTree, error) {
 // This function will correctly utilize ignores and requireds from an existing
 // manifest, if one is present, but will also do the right thing without a
 // manifest.
-func (p *Project) GetDirectDependencyNames(sm gps.SourceManager) (map[gps.ProjectRoot]bool, error) {
+func (p *Project) GetDirectDependencyNames(sm gps.SourceManager) (pkgtree.PackageTree, map[gps.ProjectRoot]bool, error) {
 	ptree, err := p.ParseRootPackageTree()
 	if err != nil {
-		return nil, err
+		return pkgtree.PackageTree{}, nil, err
 	}
 
 	var ig *pkgtree.IgnoredRuleset
@@ -211,26 +211,26 @@ func (p *Project) GetDirectDependencyNames(sm gps.SourceManager) (map[gps.Projec
 	for _, ip := range reach {
 		pr, err := sm.DeduceProjectRoot(ip)
 		if err != nil {
-			return nil, err
+			return pkgtree.PackageTree{}, nil, err
 		}
 		directDeps[pr] = true
 	}
 
-	return directDeps, nil
+	return ptree, directDeps, nil
 }
 
 // FindIneffectualConstraints looks for constraint rules expressed in the
 // manifest that will have no effect during solving, as they are specified for
 // projects that are not direct dependencies of the Project.
 //
-// "Direct dependency" here is as implemented by GetDirectDependencyNames() -
-// after all "ignored" and "required" rules have been considered.
+// "Direct dependency" here is as implemented by GetDirectDependencyNames();
+// it correctly incorporates all "ignored" and "required" rules.
 func (p *Project) FindIneffectualConstraints(sm gps.SourceManager) []gps.ProjectRoot {
 	if p.Manifest == nil {
 		return nil
 	}
 
-	dd, err := p.GetDirectDependencyNames(sm)
+	_, dd, err := p.GetDirectDependencyNames(sm)
 	if err != nil {
 		return nil
 	}

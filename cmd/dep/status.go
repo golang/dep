@@ -766,7 +766,7 @@ func collectConstraints(ctx *dep.Ctx, p *dep.Project, sm gps.SourceManager) (con
 
 	// Collect the complete set of direct project dependencies, incorporating
 	// requireds and ignores appropriately.
-	directDeps, err := p.GetDirectDependencyNames(sm)
+	_, directDeps, err := p.GetDirectDependencyNames(sm)
 	if err != nil {
 		// Return empty collection, not nil, if we fail here.
 		return constraintCollection, []error{errors.Wrap(err, "failed to get direct dependencies")}

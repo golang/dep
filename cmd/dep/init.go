@@ -88,6 +88,9 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 	}
 
 	p, err := cmd.establishProjectAt(root, ctx)
+	if err != nil {
+		return err
+	}
 
 	sm, err := ctx.SourceManager()
 	if err != nil {
@@ -100,9 +103,7 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 		ctx.Out.Println("Getting direct dependencies...")
 	}
 
-	// If this errors, the next call will too; don't bother handling it twice.
-	ptree, _ := p.ParseRootPackageTree()
-	directDeps, err := p.GetDirectDependencyNames(sm)
+	ptree, directDeps, err := p.GetDirectDependencyNames(sm)
 	if err != nil {
 		return errors.Wrap(err, "init failed: unable to determine direct dependencies")
 	}
