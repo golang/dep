@@ -539,6 +539,10 @@ func (sm *SourceMgr) DeduceProjectRoot(ip string) (ProjectRoot, error) {
 		return "", ErrSourceManagerIsReleased
 	}
 
+	if !pathvld.MatchString(ip) {
+		return "", errors.Errorf("%q is not a valid import path", ip)
+	}
+
 	pd, err := sm.deduceCoord.deduceRootPath(context.TODO(), ip)
 	return ProjectRoot(pd.root), err
 }
