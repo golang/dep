@@ -539,6 +539,8 @@ func (sm *SourceMgr) DeduceProjectRoot(ip string) (ProjectRoot, error) {
 		return "", ErrSourceManagerIsReleased
 	}
 
+	// TODO(sdboyer) refactor deduceRootPath() so that this validation can move
+	// back down below a cache point, rather than executing on every call.
 	if !pathvld.MatchString(ip) {
 		return "", errors.Errorf("%q is not a valid import path", ip)
 	}

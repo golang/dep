@@ -1,35 +1,34 @@
-# v0.3.3 (Unreleased)
+# v0.4.0 (Unreleased)
 
 NEW FEATURES:
-* Add support for importing from [glock](https://github.com/robfig/glock) based projects (#1422).
-* Add support for importing from [govendor](https://github.com/kardianos/govendor)
-  based projects (#815).
-* Allow override of cache directory location using environment variable
-`DEPCACHEDIR`. ([#1234](https://github.com/golang/dep/pull/1234))
-* Add support for template output in `dep status`. (#1389)
-* Each element in a multi-item TOML array is output on its own line. (#1461)
+* Add support for importing from [glock](https://github.com/robfig/glock) based projects. ([#1422](https://github.com/golang/dep/pull/1422)
+* Add support for importing from [govendor](https://github.com/kardianos/govendor) based projects. ([#815](https://github.com/golang/dep/pull/815)
+* Allow override of cache directory location using environment variable `DEPCACHEDIR`. ([#1234](https://github.com/golang/dep/pull/1234))
+* Add support for template output in `dep status`. ([#1389](https://github.com/golang/dep/pull/1389)
+* Each element in a multi-item TOML array is output on its own line. ([#1461](https://github.com/golang/dep/pull/1461)
 
 BUG FIXES:
 
-* Releases targeting Windows now have a `.exe` suffix (#1291).
-* Adaptively recover from dirty and corrupted git repositories in cache (#1279).
-* Suppress git password prompts in more places (#1357).
-* Fix `-no-vendor` flag for `ensure -update` (#1361).
-* Validate `git ls-remote` output and ignore all malformed lines (#1379)
-* Support [gopkg.in version zero](http://labix.org/gopkg.in#VersionZero) (#1243).
-* Fix how dep status print revision constraints. (#1421)
-* Add optional `-v` flag to ensure sub command's syntax. (#1458)
+* Releases targeting Windows now have a `.exe` suffix. ([#1291](https://github.com/golang/dep/pull/1291)
+* Adaptively recover from dirty and corrupted git repositories in cache. ([#1279](https://github.com/golang/dep/pull/1279)
+* Suppress git password prompts in more places. ([#1357](https://github.com/golang/dep/pull/1357)
+* Fix `-no-vendor` flag for `ensure -update`. ([#1361](https://github.com/golang/dep/pull/1361)
+* Validate `git ls-remote` output and ignore all malformed lines. ([#1379](https://github.com/golang/dep/pull/1379)
+* Support [gopkg.in version zero](http://labix.org/gopkg.in#VersionZero). ([#1243](https://github.com/golang/dep/pull/1243)
+* Fix how dep status print revision constraints. ([#1421](https://github.com/golang/dep/pull/1421)
+* Add optional `-v` flag to ensure sub command's syntax. ([#1458](https://github.com/golang/dep/pull/1458)
+* Allow URLs containing ports in `Gopkg.toml` `source` fields. ([#1509](https://github.com/golang/dep/pull/1509)
 
 IMPROVEMENTS:
 
-* Log as dependencies are pre-fetched during dep init ([#1176](https://github.com/golang/dep/pull/1176)).
-* Make the gps package importable ([#1349](https://github.com/golang/dep/pull/1349)).
-* Improve file copy performance by not forcing a file sync (PR #1408).
-* Skip empty constraints during import ([#1414](https://github.com/golang/dep/pull/1349))
-* Handle errors when writing status output ([#1420](https://github.com/golang/dep/pull/1420))
-* Add constraint for locked projects in `status`. (#962)
+* Log as dependencies are pre-fetched during dep init. ([#1176](https://github.com/golang/dep/pull/1176))
+* Make the gps package importable. ([#1349](https://github.com/golang/dep/pull/1349))
+* Improve file copy performance by not forcing a file sync. ([#1408](https://github.com/golang/dep/pull/1408)
+* Skip empty constraints during import. ([#1414](https://github.com/golang/dep/pull/1349))
+* Handle errors when writing status output. ([#1420](https://github.com/golang/dep/pull/1420))
+* Add constraint for locked projects in `dep status`. ([#962](https://github.com/golang/dep/pull/962)
 * Make external config importers error tolerant. ([#1315](https://github.com/golang/dep/pull/1315))
-* Show LATEST and VERSION as the same type in status. (#1515)
+* Show LATEST and VERSION as the same type in status. ([#1515](https://github.com/golang/dep/pull/1515)
 
 # v0.3.2
 
