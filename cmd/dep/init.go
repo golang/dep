@@ -101,7 +101,7 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 	if ctx.Verbose {
 		ctx.Out.Println("Getting direct dependencies...")
 	}
-	pkgT, directDeps, err := cmd.getDirectDependencies(sm, p)
+	pkgT, directDeps, err := getDirectDependencies(sm, p)
 	if err != nil {
 		return errors.Wrap(err, "init failed: unable to determine direct dependencies")
 	}
