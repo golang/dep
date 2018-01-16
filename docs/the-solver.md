@@ -4,7 +4,7 @@ title: The Solver
 
 At the heart of dep is a constraint solving engine - a [CDCL]()-style [SMT]() solver, tailored specifically to the domain of Go package management. It lives in the `github.com/golang/dep/gps` package, and is where the work of determining a valid, transitively complete dependency graph (aka, the contents of `Gopkg.lock`) is performed.
 
-This page will eventually detail the solver's mechanics, but in the meantime, there are [docs for an older version of the solver]() that are still accurate enough to provide a rough picture of its behavior.
+This page will eventually detail the solver's mechanics, but in the meantime, there are [docs for an older version of the solver](https://github.com/sdboyer/gps/wiki/gps-for-Contributors) that are still accurate enough to provide a rough picture of its behavior.
 
 ## Solving invariants
 
@@ -19,7 +19,7 @@ The solver is an iterative algorithm, working its way project-by-project through
 
 ### `[[constraint]]` rules
 
-As described in the `Gopkg.toml` docs, each [`[[constraint]]`](gopkg.toml.md#constraint) stanza is associated with a single project, and each stanza can contain both [a version rule](gopkg.toml.md#version-rules) and a [source rule](gopkg.toml.md#source). For any given project `P`, all dependers on `P` whose constraint rules are "activated" must express mutually compatible rules. That means:
+As described in the `Gopkg.toml` docs, each [`[[constraint]]`](gopkg.toml.md#constraint) stanza is associated with a single project, and each stanza can contain both [a version rule](Gopkg.toml.md#version-rules) and a [source rule](Gopkg.toml.md#source). For any given project `P`, all dependers on `P` whose constraint rules are "activated" must express mutually compatible rules. That means:
 
 * For version rules, all activated constraints on `P` must [intersect](https://en.wikipedia.org/wiki/Intersection_(set_theory)), and and there must be at least one published version must exist in the intersecting space. Intersection varies depending on version rule type:
   * For `revision` and `branch`, it must be a string-literal match.
@@ -69,7 +69,9 @@ will result in an error, as `C` imports a package that will necessarily result i
 
 Go 1.4 introduced [import comments](https://golang.org/cmd/go/#hdr-Import_path_checking), which allow a package to specify the import path that must be used when addressing it. For example, `import "github.com/golang/net/dict"` would point to a valid package, but because [it uses an import comment](https://github.com/golang/net/blob/42fe2e1c20de1054d3d30f82cc9fb5b41e2e3767/dict/dict.go#L7) to enforce that it must be imported as `golang.org/x/net/dict`, dep would reject any project attempting to import it directly through its github address.
 
-**Remediation:** Because most projects are consistent about their import comment use over time, this issue typically only occurs when adding a new dependency or attempting to revive an older project. However, if you do encounter it, your only recourse is to change the code by fixing the offending import paths. If the offending import paths are in a dependency, not your/the current project, that may entail forking the dependency.
+Because most projects are consistent about their import comment use over time, this issue typically only occurs when adding a new dependency or attempting to revive an older project. 
+
+**Remediation:** change the code by fixing the offending import paths. If the offending import paths are not in the current project and you don't directly control the dependency, you'll have to fork and fix it yourself, then use `source` to point to your fork.
 
 ### Import path casing
 
@@ -77,17 +79,4 @@ The standard Go toolchain compiler [does not](https://github.com/golang/go/issue
 
 The solver keeps track of the accepted case variant for each import path it's processed. Any subsequent projects it sees that introduces a case-only variation for a known import path will be rejected.
 
-**Remediation:** 
-
----
-
-
-
-The solving algorithm works by iteratively constructing a depgraph, working one project at a time. For each project, it walks through a [sorted queue]() of the project's published versions, searching for a version that satisfies all of the these invariants. The first version encountered that satisfies all invariants will be selected.
-
-At any given point in the algorithm, it is impossible to know _a priori_ if all the rules that will ultimately be discovered for a given project have been discovered. As such, it is possible that, if new dependencies are discovered on an already-selected 
-
-whether all rules that will eventually be needed for a given project are known at the time that project is visited, it is possible that a project for which a version is selected may need to be revisited later, through a backtracking process. 
-
-This process is complicated by the fact that, for any given project being evaluated by the algorithm, it cannot be known _a priori_ whether we know all of the invariants for a project. 
-
+**Remediation:** Pick a casing variation (all lowercase is usually the right answer), and enforce it universally across the depgraph. As it has to be respected in all dependencies, as well, this may necessitate pull requests and possibly forking of dependencies, if you don't control them directly.

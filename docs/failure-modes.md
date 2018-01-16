@@ -16,6 +16,8 @@ In general, these problems aren't things we can reasonably program around in dep
 
 ### Network failures
 
+> **Remediation tl;dr:** most network issues are ephemeral, even if they may last for a few minutes, and can be addressed simply by re-running the same command. Always try this before attempting more invasive solutions.
+
 dep talks to the network at several different points. These vary somewhat depending on source (VCS) type and local disk state, but this list of operations is generally instructive:
 
 * When dep cannot [statically deduce](deduction.md#static-deduction) the source root of an import path, it issues a `go-get` HTTP metadata request to a URL constructed from the import path.
@@ -29,12 +31,11 @@ Network failures that you actually may observe are biased towards the earlier it
 
 #### Persistent network failures
 
-Most of the time, errors from the above list will be ephemeral, and **simply re-running the command will result in success**. However, there are three well-defined cases where that's not true:
+Although most network failures are ephemeral, there are three well-defined cases where that's not true. These are those cases, and their respective remediations:
 
 * **The network on which the source resides is permanently unreachable from the user's location:** in practice, this generally means one of two things: you've forgotten to log into your company VPN, or you're behind [the GFW](https://en.wikipedia.org/wiki/Great_Firewall). In the latter case, setting the *de facto* standard HTTP proxy environment variables that [`http.ProxyFromEnvironment()`](https://golang.org/pkg/net/http/#ProxyFromEnvironment) respects will cause dep's `go-get` HTTP metadata requests, as well as git, bzr, and hg subcommands, to utilize the proxy.
 
-
-* * Remediation is also exactly the same when the custom `go-get` HTTP metadata service for a source is similarly unreachable. The failure messages, however, will look like [deduction failures](#deduction-failures).
+  * Remediation is also exactly the same when the custom `go-get` HTTP metadata service for a source is similarly unreachable. The failure messages, however, will look like [deduction failures](#deduction-failures).
 
 * **The source has been permanently deleted or moved:** these are [left-pad](https://www.theregister.co.uk/2016/03/23/npm_left_pad_chaos/) events, though note that [GitHub automatically redirects traffic after renames](https://help.github.com/articles/renaming-a-repository/), mitigating the rename problem. But, if an upstream source is removed, dep will be unable to proceed until a new upstream source is established for the import path. To that end:
 
@@ -50,6 +51,8 @@ The exact error text will vary depending on which of the operations is running, 
 
 #### Hangs
 
+> **Remediation tl;dr:** hangs are almost always network congestion, or sheer amount of network data to fetch. Wait, or cancel and try again with `-v` to try to get more context.
+
 Almost any case where a dep command, run with `-v`, hangs for more than ten minutes will ultimately be a bug. However, the most common explanation for an apparent dep hangs is actually normal behavior: because dep's operation requires that it keep its own copies of upstream sources hidden away in the [local cache](glossary.md#local-cache), the first run of dep against a project, especially large projects, can take a long time while it populates the cache.
 
 The only known case where dep may hang indefinitely is if one of the underlying VCS binaries it calls is prompting for some kind of input. Typically this means credentials (though not always - make sure to accept remote hosts' SSH keys into your known hosts!), and dep's normal assumption is that necessary credentials have been provided via environmental mechanisms - [configuration files or daemons](FAQ.md#how-do-i-get-dep-to-authenticate-to-a-git-repo), SSH agents, etc. This assumption is necessary for dep's concurrent network activity to work. If your use case absolutely cannot support the use of any such environmental caching mechanism, [please weigh in on this issue]().
@@ -57,6 +60,8 @@ The only known case where dep may hang indefinitely is if one of the underlying 
 Unfortunately, until dep [improves the observability of its ongoing I/O operations](), it cannot accurately report to the user which operations are actually underway at any given moment. This can make it difficult to differentiate from other hangs - credentials prompts, long network timeouts induced by firewalls, sluggish TCP when faced with packet loss, etc.
 
 ### Bad local cache state
+
+> **Remediation tl;dr:** Remove the local cache dir: `rm -rf $GOPATH/pkg/dep/sources`.
 
 It is possible for parts of the [local cache](glossary.md#local-cache) maintained by dep to get into a bad state. This primarily happens when dep processes are forcibly terminated (e.g. Ctrl-C). This can, for example, terminate a `git` command partway through, leaving bad state on disk. By dep's definition, a [dirty git working copy]() is bad state.
 
@@ -72,7 +77,7 @@ There are no known cases where, in the course of normal operations, dep can irre
 
 ### `vendor` write errors
 
-dep may encounter errors while attempting to write out the `vendor` directory itself (any such errors will result in a full rollback; causing no changes to be made to disk). To help pinpoint where the problem may be, know that this is the flow for populating `vendor`:
+Dep may encounter errors while attempting to write out the `vendor` directory itself (any such errors will result in a full rollback; causing no changes to be made to disk). To help pinpoint where the problem may be, know that this is the flow for populating `vendor`:
 
 1. Allocate a new temporary directory within the system temporary directory.
 2. Rename the existing `vendor` directory to `vendor.orig`. Do this within the current project's root directory if possible; if not, rename and move it to the tempdir.
@@ -117,6 +122,8 @@ In all of these cases, your last recourse will be to add a [`source`](Gopkg.toml
 
 #### Undeducible paths
 
+> **Remediation tl;dr:** You made a typo; fix it. If not, you may need a `source`, but be sparing with those.
+
 The most likely cause of deduction failure is minor user error. Specifically, the user is the _current_ user (you), and the error is there is a mistyped import path somewhere in the current (your) project. The problem may be in your `Gopkg.toml`, or one of your imports, but the error message should point you directly at the problem, and the solution is usually obvious - e.g., "gihtub".
 
 Validation of the inputs from the current project are made fast and up front in dep, so these errors will tend to present themselves immediately. Between this fast validation, and the fact that projects are typically uncompilable, or at least not `go get`-able, with these kinds of errors, they tend to be caught early. This is why truly undeducible paths pop up primarily as temporary accidents while hacking on your own projects - you have to fix them to move on.
@@ -141,6 +148,8 @@ Of course, defunct _private_ metadata services may be much more common, as they 
 If you think you've encountered a defunct metadata service, try probing the domain portion of the import path directly to see if there is an HTTP(S) server there at all. If not, you can only force with `source` - assuming you know what source URL you should use. If not, you may need to refactor your code (if the problem is in your project), pick a different version of the problem dependency, or drop the problem dependency entirely; sometimes, you just have to get rid of dead code.
 
 #### Static rule changes
+
+> **Remediation tl;dr:** make sure you have the latest released version of dep.
 
 Static rule changes are very unlikely to be the cause of your deduction failures.
 
@@ -168,13 +177,28 @@ init failed: unable to solve the dependency graph: Solving failure: No versions 
 	master: (another error)
 ```
 
-It means that the solver was unable to find a combination of versions for all dependencies that satisfy all the rules enforced by the solver. These rules are described in detail in the section on [solver invariants](the-solver.md#solving-invariants), but here's a summary:
+_Note: all three of the other hard failure types can sometimes be reported as the errors for individual versions in a list like this. This primarily happens because dep is in need of a [thorough refactor of its error handling](https://github.com/golang/dep/issues/288)._
+
+It means that the solver was unable to find a combination of versions for all dependencies that satisfy all the rules enforced by the solver. It is crucial to note that, just because dep provides a big list of reasons why each version failed _doesn't mean_ you have to address each one! That's just dep telling you why it ultimately couldn't use each of those versions in a solution.
+
+These rules, and specific remediations for failing to meet them, are described in detail in the section on [solver invariants](the-solver.md#solving-invariants). This section is about the steps to take when solving failures occur in general. But, to set context, here's a quick summary:
 
 * **`[[constraint]]` conflicts:** when projects in the dependency graph disagree on what [versions](gopkg.toml.md#version-rules) are acceptable for a project, or where to [source](gopkg.toml.md#source) it from.
-* **Package validity failure:** when an imported package is quite obviously not capable of being built.
+  * Remediation will usually be either changing a `[[constraint]]` or adding an `[[override]]`, but genuine conflicts may require forking and hacking code.
+* **Package validity failure:** when an imported package is quite obviously not capable of being built. 
+  * There usually isn't much remediation here beyond "stop importing that," as it indicates something broken at a particular version.
 * **Import comment failure:** when the import path used to address a package differs from the [import comment](https://golang.org/cmd/go/#hdr-Import_path_checking) the package uses to specify how it should be imported.
+  * Remediation is to use the specified import path, instead of whichever one you used.
 * **Case-only import variation failure:** when two equal-except-for-case imports exist in the same build.
+  * Remediation is to pick one case variation to use throughout your project, then manually update all projects in your depgraph to use the new casing.
 
 
+Let's break down the process of addressing a solving failure into a series of steps:
 
+1. First, look through the failed versions list for a version of the dependency that works for you (or a failure that seems fixable), then try to work that one out. Often enough, you'll see a single failure repeated across the entire version list, which makes it pretty clear what problem you need to solve.
+2. Take the remediation steps specific to that failure.
+3. Re-run the same command you ran that produced the failure. There are three possible outcomes:
+   1. Success!
+   2. Your fix was ineffective - the same failure re-occurs. Either re-examine your fix (step 2), or look for a new failure to fix (step 1).
+   3. Your fix was effective, but some new failure arose. Return to step 1 with the new failure list.
 

@@ -9,13 +9,13 @@ $ cd $GOPATH/src/path/to/project/root
 $ dep init
 ```
 
-For many projects, this will just work. `dep init` will make educated guesses about what versions to use for your dependencies, generate sane `Gopkg.toml`, `Gopkg.lock`, and `vendor/`, and if your tests pass and builds work, then you're probably all done.
+For many projects, this will just work. `dep init` will make educated guesses about what versions to use for your dependencies, generate sane `Gopkg.toml`, `Gopkg.lock`, and `vendor/`, and if your tests pass and builds work, then you're probably done. (Congratulations! You should check out [Daily Dep](daily-dep.md) next.)
 
 The migration process is still difficult for some projects. If you're trying dep for the first time, this can be particularly frustrating, as you're trying to simultaneously learn how to use dep, and how your project *should* be managed in dep. The good news is,  `dep init` is usually the big difficulty hump; once you're over it, things get much easier.
 
 The goal of this guide is to provide enough information for you to reason about what's happening during `dep init`, so that you can at least understand what class of problems you're encountering, and what steps you might take to address them. To that end, we'll start with an overview of what  `dep init` is doing. 
 
-One advisory up front, though: the first run of `dep init` can take quite a long time, as dep is creating fresh clones of all your dependencies into a special location, `$GOPATH/pkg/dep/sources/`. This is necessary for dep's normal operations, and is a one-time cost.
+> Note: the first run of `dep init` can take quite a long time, as dep is creating fresh clones of all your dependencies into a special location, `$GOPATH/pkg/dep/sources/`. This is necessary for dep's normal operations, and is a one-time cost.
 
 ## `dep init` mechanics
 
@@ -63,7 +63,7 @@ First and foremost, make sure that you're running `dep init` with the `-v` flag.
 
 While dep contributors have invested enormous effort into creating automated migration paths into dep, these paths will always best-effort and imprecise. It's simply not always possible to convert from other tools or GOPATH with full fidelity. dep is an opinionated tool, with a correspondingly opinionated model, and that model does sometimes fundamentally differ from that of other tools. Sometimes these model mismatches result in hard failures, sometimes soft, and sometimes there's no harm at all.
 
-Because these are deep assumptions, their symptoms can be varied and surprising. Keeping these assumptions in mind could save you some hair-pulling later on. 
+Because these are deep assumptions, their symptoms can be varied and surprising. Keeping these assumptions in mind could save you some hair-pulling later on.
 
 - dep does not allow nested `vendor/` directories; it flattens all dependencies to the topmost `vendor/` directory, at the root of your project. This is foundational to dep's model, and cannot be disabled.
 - dep wholly controls `vendor`, and will blow away any manual changes or additions made to it that deviate from the version of an upstream source dep selects.
@@ -75,43 +75,23 @@ A small number of projects that have reported being unable, thus far, to find a 
 
 ### Hard failures
 
-Hard failures come in four flavors:
+Hard failures involve actual 
 
-* Deduction failures
-* Local cache errors
-* Network errors
-* Solving failures
+All of these failure modes are covered extensively in the reference on [failure modes](failure-modes.md)
 
-Deduction failures occur when dep can't figure out what remote source corresponds to an import path it encounters in either your project, or one of your dependencies. As dep [follows the same rules for deduction as `go get`](), these types of errors generally only occur if a project contains dependencies that cannot be fetched by `go get`. This primarily occurs only when your project was relying on a capability provided by your previous tool to specify an alternate source location. This is [currently a problem in dep](https://github.com/golang/dep/issues/860), as the `source` field can only specify an alternate location for import paths that are already deducible. If this is a hard requirement for your case, then unfortunately, you will need to wait for this to be fixed before migrating - or, you need a server that properly responds to `go-get` HTTP metadata requests.
+Because the solver, and all its possible failures, are the same for `dep init` as for `dep ensure`, there's a separate section for understanding and dealing with them: [dealing with solving failures](failure-modes.md#solving-failures). It can be trickier with `dep init`, however, as many remediations require tweaking `Gopkg.toml`.
 
-Local cache errors occur when dep somehow mishandles the state of its local repository cache (`$GOPATH/pkg/dep/sources` by default). They generally manifest as VCS complaints about some files existing when they shouldn't, or vice-versa. These errors are quite rare now, as dep has implemented adaptive recovery logic that kicks in when it detects such problems. If an issue does occur, it's always safe to `rm -rf $GOPATH/pkg/dep/sources`; dep will automatically reconstruct it on the next run. (Also, please file an issue!)
+Unfortunately, `dep init` does not write out a partial `Gopkg.toml` when it fails. This is a known, critical problem, and [we have an open issue (help wanted!)](https://github.com/golang/dep/issues/909).
 
-Network problems are almost always transient, so re-executing the command will usually fix them. They may manifest as hangs, or as network i/o timeouts (though these usually indicate non-ephemeral firewall issues), or underlying VCS (usually git) errors. The ephemeral issues, especially hangs, occur a disproportionately high percentage of the time on `dep init`, as your local cache tends to be empty, which means dep has a lot of cloning to do.
-
-Other hard failures are most likely going to be actual solving failures. These occur when some invariant that dep enforces (e.g. version constraints are met, imported packages have Go code, [et al.]() SOLVER MODEL LINK) prevent dep from finding a solution - that is, a transitively complete dependency graph. The CLI output of solving failures looks something like this:
-
-```
-$ dep init
-init failed: unable to solve the dependency graph: Solving failure: No versions of github.com/foo/bar met constraints:
-	v1.0.1: Could not introduce github.com/foo/bar@v1.13.1, as its subpackage github.com/foo/bar/foo is missing. (Package is required by (root).)
-	v1.0.0: Could not introduce github.com/foo/bar@v1.13.0, as... 
-	v0.1.0: (another error)
-	master: (another error)
-```
-
-_Note: all three of the other hard failure types can sometimes be reported as the errors for individual versions in a list like this. This primarily happens because dep is in need of a [thorough refactor of its error handling](https://github.com/golang/dep/issues/288)._
-
-Because the solver, and all its possible failures, are the same for `dep init` as for `dep ensure`, there's a separate section for understanding and dealing with them: [dealing with solving failures](). It can be trickier with `dep init`, however, as many remediations require tweaking `Gopkg.toml`.
-
-Unfortunately, `dep init` does not write out a partial `Gopkg.toml` when it fails ([though we are working on this](https://github.com/golang/dep/issues/909)), so if the particular errors you are encountering do entail such tweaks, you may need to skip `dep init` entirely, create an empty `Gopkg.toml`, and populate it with rules by hand; the [`Gopkg.toml` reference documentation](#gopkg.toml.md) explains the various properties. Before resorting to that, make sure you've run `dep init` with various combinations of the inferencing flags (`-skip-tools` and `-gopath`) to see if they can at least give you something to start from.
+In the meantime, if the particular errors you are encountering do entail `Gopkg.toml` tweaks, you unfortunately may have to do without the automation of `dep init`: create an empty [`Gopkg.toml`](Gopkg.toml.md), and populate it with rules by hand. Before resorting to that, make sure you've run `dep init` with various combinations of the inferencing flags (`-skip-tools` and `-gopath`) to see if they can at least give you something to start from.
 
 ### Soft failures
 
-Soft failures are usually obvious: `dep init` exits cleanly, but subsequent builds or tests fail. dep's soft failures are usually more drastically than subtly wrong - an explosion of type errors when you try to build, because a wildly incorrect version for some dependency got selected. 
+Soft failures are cases where `dep init` appears to exit cleanly, but a subsequent `go build` or `go test` fails. Dep's soft failures are usually more drastically than subtly wrong - e.g., an explosion of type errors when you try to build, because a wildly incorrect version for some dependency got selected. 
 
 If you do encounter problems like this, `dep status` is your first diagnostic step; it will report what versions were selected for all your dependencies. It may be clear which dependencies are a problem simply from your building or testing error messages. If not, compare the `dep status` list against the versions recorded by your previous tool to find the differences.
 
-Once you've identified the problematic dependenc(ies), the next step is exerting appropriate controls over them via `Gopkg.toml`. (Note - this advice is intentionally terse; look at [Zen of Constraints and Locks]() if you want a deeper understanding of how to optimally utilize dep's controls)
+Once you've identified the problematic dependenc(ies), the next step is exerting appropriate controls over them via `Gopkg.toml`. (Note - this advice is intentionally terse; check out [Zen of Dep]() if you want a deeper understanding of how to optimally utilize dep's controls)
 
 For each of the following items, assume that you should run `dep ensure` after making the suggested change. If that fails, consult [dealing with solving failures]().
 

@@ -1,23 +1,27 @@
 ---
-title: dep ensure mechanics
+title: Models and Mechanics
 ---
 
-As `dep ensure` is dep's sole state-mutating command, its mechanics are essentially the mechanics of dep as a whole.
+While dep has many discrete components and moving parts, all of these parts revolve around a central model. This document explains that model, then explores the major mechanisms of dep as they relate to it.
 
-## Functional flow
+## States and flows
 
-Dep's operation centers around the idea of the "four state system" - a model for organizing the on-disk state a package manager deals with, originally articulated in [this (very long) article](https://medium.com/@sdboyer/so-you-want-to-write-a-package-manager-4ae9c17d9527). Those states are:
+Dep is centered around the idea of the "four state system" - a model for classifying and organizing the on-disk state with which a package manager interacts. This was first articulated as a coherent, general model in [this (long) article](https://medium.com/@sdboyer/so-you-want-to-write-a-package-manager-4ae9c17d9527), though many of the principles in the four state model were derived from existing package managers.
+
+Briefly, the four states are:
 
 1. The [current project's](glossary.md#current-project) source code.
-2. A [manifest](glossary.md#manifest) - a file describing the current project's dependency requirements. In dep, this is the `Gopkg.toml` file.
-3. A [lock](glossary.md#lock) - a file containing a transitively-complete, reproducible description of the dependency graph. In dep, this is the `Gopkg.lock` file.
+2. A [manifest](glossary.md#manifest) - a file describing the current project's dependency requirements. In dep, this is the [`Gopkg.toml`](Gopkg.toml.md) file.
+3. A [lock](glossary.md#lock) - a file containing a transitively-complete, reproducible description of the dependency graph. In dep, this is the [`Gopkg.lock`](Gopkg.lock.md) file.
 4. The source code of the dependences themselves. In dep's current design, this is the `vendor/` directory.
 
-Let's visually represent these four states as follows:
+We can visually represent these four states as follows:
 
 ![dep's four states](img/four-states.png)
 
-It's best to think of `dep ensure` as a unidirectional series of functions, analyzing and transforming inputs into outputs. Specifically, there are two functions:
+### Functional flow
+
+It's useful to think of dep as a system that imposes a unidirectional, functional flow on the relationships between these states. These functions treat the above states as inputs and outputs, moving them from left to right. Specifically, there are two functions:
 
 * A _solving function_, that takes as its input the set of imports in the current project and the rules in `Gopkg.toml`, and returns as its output a transitively-complete, immutable dependency graph - the information in a `Gopkg.lock`.
 * A _vendoring function_, that takes the information in a `Gopkg.lock` as its input and ensures an on-disk arrangement of source files such that the compiler will use the versions designated in the lock.
@@ -25,6 +29,8 @@ It's best to think of `dep ensure` as a unidirectional series of functions, anal
 We can represent these two functions visually:
 
 ![dep's two main functions](img/annotated-func-arrows.png)
+
+This is `dep ensure` - the typical flow, used when a `Gopkg.toml` already exists. When a project does not yet have a `Gopkg.toml`, `dep init` can generate one. The essential flow remains the same, but with changed inputs: instead of reading from an existing `Gopkg.toml` file, `dep init` constructs one out of data inferred from the user's GOPATH, and/or [a metadata file from another tool](). (In other words, `dep init` automatically migrates a project from other approaches to organizing dependencies.)
 
 This diagram directly corresponds directly to code, as well. The solving function is actually split into a constructor and a method - we first create a [`Solver`](https://godoc.org/github.com/golang/dep/gps#Solver) type, then call its `Solve()` method. The inputs to the constructor are wrapped up in a [`SolveParameters`](https://godoc.org/github.com/golang/dep/gps#SolveParameters), which should look familiar:
 
@@ -36,36 +42,26 @@ type SolveParameters struct {
 }
 ```
 
-The vendoring function is [`gps.WriteDepTree()`](https://godoc.org/github.com/golang/dep/gps#WriteDepTree). It takes a handful of arguments, but the key one is a [`Lock`](https://godoc.org/github.com/golang/dep/gps#Lock) - that is, the data held in `Gopkg.lock`.
+The vendoring function is [`gps.WriteDepTree()`](https://godoc.org/github.com/golang/dep/gps#WriteDepTree). While it takes a handful of arguments, the relevant one is a [`gps.Lock`](https://godoc.org/github.com/golang/dep/gps#Lock) - an interface representing an abstracted form of the data held in a `Gopkg.lock`.
 
-Almost all of dep's behaviors are best understood with respect to this functional model. If you want to understand dep's mechanics, keep this model centered in your mind.
+The four state system, and these functional flows through it, are the foundation on which all of dep's behavior is built. If you want to understand dep's mechanics, keep this model at the forefront of your mind. 
 
-## Functional optimizations
+### Staying in sync
 
-It is one of dep's foundational design goals that both of its functions do as little work as possible, and result in as little change for their outputs as possible. Consequently, both "functions" peek ahead at the their current result to understand what work, if any, actually needs to be done:
+One of dep's design goals is that both of its "functions" minimize both the work they do, and the change they induce in their respective results. (Note: "minimize" is not currently formally defined with respect to a cost function.) Consequently, both functions peek ahead at the pre-existing result to understand what work actually needs to be done:
 
 * The solving function checks the existing `Gopkg.lock` to determine if all of its inputs (project import statements + `Gopkg.toml` rules) are satisfied. If they are, the solving function can be bypassed entirely. If not, the solving function proceeds, but attempts to change as few of the selections in `Gopkg.lock` as possible.
   * WIP: The current implementation's check relies on a coarse heuristic check that can be wrong in some cases. There is a [plan to fix this](https://github.com/golang/dep/issues/1496).
 * The vendoring function hashes each discrete project already in `vendor/` to see if the code present on disk is what `Gopkg.lock` indicates it should be. Only projects that deviate from expectations are written out.
   * WIP: the hashing check is generally referred to as "vendor verification," and [is not yet complete](https://github.com/golang/dep/issues/121). Without this verification, dep is blind to whether code in `vendor/` is correct or not; as such, dep must defensively re-write all projects to ensure the state of `vendor/` is correct.
 
-## Sync
+Of course, it's possible that, in peeking ahead, either function might discover that the pre-existing result is already correct - so no work need be done at all. Either way, when each function completes, we can be sure that the output, changed or not, is correct with respect to the inputs. In other words, the inputs and outputs are "in sync." Indeed, being in sync is the "known good state" of dep; `dep ensure` (without flags) guarantees that if it exits 0, all four states in the project are in sync.
 
-It's easy to think about 
+## `dep ensure` flags and behavior variations
 
+Each of `dep ensure`'s various flags affects the behavior of the solving and vendoring functions - or even whether they run at all. Some flags can also marginally push the project out of sync, temporarily. Thinking about these effects in the context of dep's basic model is the fastest path to understanding.
 
-
-## Imports, and the package tree
-
-
-
-## Flags and behavior variations
-
-Each of `dep ensure`'s various flags affects the behavior of these functions - or even whether they run at all. 
-
-
-
-## `-no-vendor` and `-vendor-only`
+### `-no-vendor` and `-vendor-only`
 
 These two flags are mutually exclusive, and determine which of `dep ensure`'s two functions are actually performed. Passing `-no-vendor` will cause only the solving function to be run, resulting in the creation of a new `Gopkg.lock`;  `-vendor-only` will skip solving and run only the vendoring function, causing `vendor/` to be repopulated from the pre-existing `Gopkg.lock`.
 
@@ -73,7 +69,7 @@ These two flags are mutually exclusive, and determine which of `dep ensure`'s tw
 
 Passing `-no-vendor` has the additional effect of causing the solving function to run unconditionally,  bypassing the pre-check ordinarily made against `Gopkg.lock` to see if it already satisfies all inputs.
 
-## `-add`
+### `-add`
 
 The general purpose of `dep ensure -add`  is to facilitate the introduction of new dependencies into the depgraph. Whereas `-update` is restricted to [source roots](glossary.md#source-root), (e.g. `github.com/foo/bar`), `-add` can take any package import path as an argument (e.g. `github.com/foo/bar` OR `github.com/foo/bar/baz`).
 
@@ -123,17 +119,17 @@ $ dep ensure -add github.com/foo/bar
 If you run "dep ensure" again before actually importing it, it will disappear from Gopkg.lock and vendor/.
 ```
 
-## `-update`
+### `-update`
 
 The behavior of `dep ensure -update` is intimately linked to the behavior of the solver itself. Full detail on that is a topic for the [solver reference material](the-solver.md), but for the purposes of understanding `-update`, we can simplify a bit.
 
-First, to solidify an implication in the discussion of [functional optimizations](#functional-optimizations), the solving function actually takes into account the pre-existing `Gopkg.lock` when it runs:
+First, to solidify an implication in the discussion of [functional optimizations](#staying-in-sync), the solving function actually takes into account the pre-existing `Gopkg.lock` when it runs:
 
 ![Pre-existing lock feeds back into solving function](img/lock-back.png)
 
 Injecting `Gopkg.lock` into the solver is a necessity. If we want the solver to preserve previously-selected versions by default, then the solver has to learn about the existing `Gopkg.lock` from somewhere. Otherwise, it wouldn't know what to preserve!
 
-As such, the lock is another one of the properties encoded onto the [previously-discussed](#functional-flow) `SolveParameters` struct. That, plus two other properties, are the salient ones for `-update`:
+As such, the lock is another one of the properties encoded onto the [previously-discussed]() `SolveParameters` struct. That, plus two other properties, are the salient ones for `-update`:
 
 ```go
 type SolveParameters struct {
@@ -173,7 +169,7 @@ And `v1.1.0` will be selected again, unless some other condition is presented th
 
 So, barring some other conflict, `v1.2.0` is selected, resulting in the desired update.
 
-### `-update` and constraint types
+#### `-update` and constraint types
 
 Continuing with our example, it's important to note that updates with `-update` are achieved incidentally - the solver never explicitly targets a newer version. It just skips adding a hint from the lock, then selects the first version in the queue that satisfies constraints. Consequently, `-update` is only effective with certain types of constraints.
 

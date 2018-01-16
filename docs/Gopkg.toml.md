@@ -110,7 +110,7 @@ ignored = ["github.com/user/project/badpkg*"]
 
 `metadata` declarations are ignored by dep and are meant for usage by other independent systems.
 
-The root `metadata` declaration defines informatino about the project itself, while a `metadata` declaration under a `[[constraint]]` or an `[[override]]` defines metadata about that rule, for the `name`d project.
+The root `metadata` declaration defines information about the project itself, while a `metadata` declaration under a `[[constraint]]` or an `[[override]]` defines metadata about that rule, for the `name`d project.
 ```toml
 [metadata]
 key1 = "value that convey data to other systems"

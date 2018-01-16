@@ -11,6 +11,7 @@ dep uses some specialized terminology. Learn about it here!
 * [Current Project](#current-project)
 * [Deduction](#deduction)
 * [Direct Dependency](#direct-dependency)
+* [External Import](#external-import)
 * [GPS](#gps)
 * [Local cache](#local-cache)
 * [Lock](#lock)
@@ -56,6 +57,10 @@ Deduction is the process of determining the subset of an import path that corres
 ## Direct Dependency
 
 A project's direct dependencies are those that it imports from one or more of its packages, or includes in its [`required`](Gopkg.toml.md#required) list in `Gopkg.toml`. If each letter in `A -> B -> C -> D` represents a project, then only `B` is  `A`'s direct dependency.
+
+## External Import
+
+An `import` statement that points to a package in a project other than the one in which it originates. For example, an `import` in package `github.com/foo/bar` will be considered an external import if it points to anything _other_ than stdlib or  `github.com/foo/bar/*`.
 
 ## GPS
 
@@ -118,9 +123,9 @@ The portion of an import path that corresponds to the network location of a sour
 
 ## Sync
 
-dep's interaction model is based around the idea of maintaining a well-defined relationship between your project's import statements and `Gopkg.toml`, and your project's `Gopkg.lock` - keeping them "in sync". When the `Gopkg.lock` has more or fewer entries than are necessary, or entries that are incompatible with constraint rules established in `Gopkg.toml`, your project is "out of sync".
+Dep's interaction model is based around the idea of maintaining a well-defined relationship between your project's import statements and `Gopkg.toml`, and your project's `Gopkg.lock` - keeping them "in sync". When the `Gopkg.lock` has more or fewer entries than are necessary, or entries that are incompatible with constraint rules established in `Gopkg.toml`, your project is "out of sync".
 
-When your project is out of sync, running `dep ensure` will always either fail with an informative message, or bring your project back in sync.
+This concept is explored in detail on [the ensure mechanics reference page](ensure-mechanics.md#staying-in-sync).
 
 ## Transitive Dependency
 
