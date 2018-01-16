@@ -26,10 +26,10 @@ type rootAnalyzer struct {
 	skipTools  bool
 	ctx        *dep.Ctx
 	sm         gps.SourceManager
-	directDeps map[string]bool
+	directDeps map[gps.ProjectRoot]bool
 }
 
-func newRootAnalyzer(skipTools bool, ctx *dep.Ctx, directDeps map[string]bool, sm gps.SourceManager) *rootAnalyzer {
+func newRootAnalyzer(skipTools bool, ctx *dep.Ctx, directDeps map[gps.ProjectRoot]bool, sm gps.SourceManager) *rootAnalyzer {
 	return &rootAnalyzer{
 		skipTools:  skipTools,
 		ctx:        ctx,
@@ -73,7 +73,7 @@ func (a *rootAnalyzer) cacheDeps(pr gps.ProjectRoot) error {
 		return nil
 	}
 
-	deps := make(chan string)
+	deps := make(chan gps.ProjectRoot)
 
 	for i := 0; i < concurrency; i++ {
 		g.Go(func() error {
@@ -132,7 +132,7 @@ func (a *rootAnalyzer) importManifestAndLock(dir string, pr gps.ProjectRoot, sup
 
 func (a *rootAnalyzer) removeTransitiveDependencies(m *dep.Manifest) {
 	for pr := range m.Constraints {
-		if _, isDirect := a.directDeps[string(pr)]; !isDirect {
+		if _, isDirect := a.directDeps[pr]; !isDirect {
 			delete(m.Constraints, pr)
 		}
 	}
@@ -172,7 +172,7 @@ func (a *rootAnalyzer) FinalizeRootManifestAndLock(m *dep.Manifest, l *dep.Lock,
 		var f *fb.ConstraintFeedback
 		pr := y.Ident().ProjectRoot
 		// New constraints: in new lock and dir dep but not in manifest
-		if _, ok := a.directDeps[string(pr)]; ok {
+		if _, ok := a.directDeps[pr]; ok {
 			if _, ok := m.Constraints[pr]; !ok {
 				pp := getProjectPropertiesFromVersion(y.Version())
 				if pp.Constraint != nil {

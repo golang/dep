@@ -764,8 +764,9 @@ func collectConstraints(ctx *dep.Ctx, p *dep.Project, sm gps.SourceManager) (con
 	var mutex sync.Mutex
 	constraintCollection := make(constraintsCollection)
 
-	// Get direct deps of the root project.
-	_, directDeps, err := getDirectDependencies(sm, p)
+	// Collect the complete set of direct project dependencies, incorporating
+	// requireds and ignores appropriately.
+	directDeps, err := p.GetDirectDependencyNames(sm)
 	if err != nil {
 		// Return empty collection, not nil, if we fail here.
 		return constraintCollection, []error{errors.Wrap(err, "failed to get direct dependencies")}
@@ -805,7 +806,7 @@ func collectConstraints(ctx *dep.Ctx, p *dep.Project, sm gps.SourceManager) (con
 			// project and constraint values.
 			for pr, pp := range pc {
 				// Check if the project constraint is imported in the root project
-				if _, ok := directDeps[string(pr)]; !ok {
+				if _, ok := directDeps[pr]; !ok {
 					continue
 				}
 

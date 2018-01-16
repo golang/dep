@@ -15,13 +15,11 @@ import (
 
 	"github.com/golang/dep"
 	"github.com/golang/dep/gps"
-	"github.com/golang/dep/gps/paths"
-	"github.com/golang/dep/gps/pkgtree"
 	"github.com/golang/dep/internal/fs"
 	"github.com/pkg/errors"
 )
 
-const initShortHelp = `Initialize a new project with manifest and lock files`
+const initShortHelp = `Set up a new Go project, or migrate an existing one`
 const initLongHelp = `
 Initialize the project at filepath root by parsing its dependencies, writing
 manifest and lock files, and vendoring the dependencies. If root isn't
@@ -101,12 +99,15 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 	if ctx.Verbose {
 		ctx.Out.Println("Getting direct dependencies...")
 	}
-	pkgT, directDeps, err := getDirectDependencies(sm, p)
+
+	// If this errors, the next call will too; don't bother handling it twice.
+	ptree, _ := p.ParseRootPackageTree()
+	directDeps, err := p.GetDirectDependencyNames(sm)
 	if err != nil {
 		return errors.Wrap(err, "init failed: unable to determine direct dependencies")
 	}
 	if ctx.Verbose {
-		ctx.Out.Printf("Checked %d directories for packages.\nFound %d direct dependencies.\n", len(pkgT.Packages), len(directDeps))
+		ctx.Out.Printf("Checked %d directories for packages.\nFound %d direct dependencies.\n", len(ptree.Packages), len(directDeps))
 	}
 
 	// Initialize with imported data, then fill in the gaps using the GOPATH
@@ -129,7 +130,7 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 
 	params := gps.SolveParameters{
 		RootDir:         root,
-		RootPackageTree: pkgT,
+		RootPackageTree: ptree,
 		Manifest:        p.Manifest,
 		Lock:            p.Lock,
 		ProjectAnalyzer: rootAnalyzer,
@@ -237,23 +238,4 @@ func (cmd *initCommand) establishProjectAt(root string, ctx *dep.Ctx) (*dep.Proj
 	p.ImportRoot = gps.ProjectRoot(ip)
 
 	return p, nil
-}
-
-func getDirectDependencies(sm gps.SourceManager, p *dep.Project) (pkgtree.PackageTree, map[string]bool, error) {
-	pkgT, err := p.ParseRootPackageTree()
-	if err != nil {
-		return pkgtree.PackageTree{}, nil, err
-	}
-
-	directDeps := map[string]bool{}
-	rm, _ := pkgT.ToReachMap(true, true, false, nil)
-	for _, ip := range rm.FlattenFn(paths.IsStandardImportPath) {
-		pr, err := sm.DeduceProjectRoot(ip)
-		if err != nil {
-			return pkgtree.PackageTree{}, nil, err
-		}
-		directDeps[string(pr)] = true
-	}
-
-	return pkgT, directDeps, nil
 }

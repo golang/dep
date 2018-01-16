@@ -167,8 +167,8 @@ func (p *Project) ParseRootPackageTree() (pkgtree.PackageTree, error) {
 // project's package tree.
 //
 // The returned map of Project Roots contains only boolean true values; this
-// makes a "false" value always indicate an absent key, which makes if checks
-// against the map more ergonomic.
+// makes a "false" value always indicate an absent key, which makes conditional
+// checks against the map more ergonomic.
 //
 // This function will correctly utilize ignores and requireds from an existing
 // manifest, if one is present, but will also do the right thing without a
