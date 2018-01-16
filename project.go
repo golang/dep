@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 
 	"github.com/golang/dep/gps"
 	"github.com/golang/dep/gps/paths"
@@ -216,6 +217,35 @@ func (p *Project) GetDirectDependencyNames(sm gps.SourceManager) (map[gps.Projec
 	}
 
 	return directDeps, nil
+}
+
+// FindIneffectualConstraints looks for constraint rules expressed in the
+// manifest that will have no effect during solving, as they are specified for
+// projects that are not direct dependencies of the Project.
+//
+// "Direct dependency" here is as implemented by GetDirectDependencyNames() -
+// after all "ignored" and "required" rules have been considered.
+func (p *Project) FindIneffectualConstraints(sm gps.SourceManager) []gps.ProjectRoot {
+	if p.Manifest == nil {
+		return nil
+	}
+
+	dd, err := p.GetDirectDependencyNames(sm)
+	if err != nil {
+		return nil
+	}
+
+	var ineff []gps.ProjectRoot
+	for pr := range p.Manifest.DependencyConstraints() {
+		if !dd[pr] {
+			ineff = append(ineff, pr)
+		}
+	}
+
+	sort.Slice(ineff, func(i, j int) bool {
+		return ineff[i] < ineff[j]
+	})
+	return ineff
 }
 
 // BackupVendor looks for existing vendor directory and if it's not empty,
