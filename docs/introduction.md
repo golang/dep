@@ -8,7 +8,4 @@ Welcome! This is documentation for dep, the "official experiment" dependency man
 
 This site has both guides and reference documents. The guides are practical explanations of how to actually do things with dep, whereas the reference material provides deeper dives on specific topics. Of particular note is the [glossary](#glossary.md) - if you're unfamiliar with terminology used in this documentation, make sure to check there!
 
-
-
-* link to guides
-* installing dep
+If you're trying dep for the first time, check out [Creating a New Project](new-project.md), or [Migrating to dep](migrating.md) if you have an existing Go project that you want to manage with dep.

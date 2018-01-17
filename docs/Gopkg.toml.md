@@ -120,21 +120,34 @@ system2-data = "value that is used by another system"
 
 
 
-----
-
-
-
 ## Version rules
 
 Version rules can be used in either `[[constraint]]` or `[[override]]` stanzas. There are three types of version rules - `version`, `branch`, and `revision`. At most one of the three types can be specified.
 
-TODOOOOOOOOOOOOO
-
 ### `version`
 
-`version` is a property of `constraint`s and `override`s. It is used to specify version constraint of a specific dependency.
+`version` is a property of `constraint`s and `override`s. It is used to specify version constraint of a specific dependency. It can be used to target an arbitrary VCS tag, or a semantic version, or a range of semantic versions.
 
-Internally, dep uses [Masterminds/semver](https://github.com/Masterminds/semver) to work with semver versioning.
+Specifying semantic version ranges can be done using the following operators:
+
+* `=`: equal
+* `!=`: not equal
+* `>`: greater than
+* `<`: less than
+* `>=`: greater than or equal to
+* `<=`: less than or equal to
+* `-`: literal range. Eg: 1.2 - 1.4.5 is equivalent to >= 1.2, <= 1.4.5
+* `~`: minor range. Eg: ~1.2.3 is equivalent to >= 1.2.3, < 1.3.0
+* `^`: major range. Eg: ^1.2.3 is equivalent to >= 1.2.3, < 2.0.0
+* `[xX*]`: wildcard. Eg: 1.2.x is equivalent to >= 1.2.0, < 1.3.0
+
+You might, for example, include a rule that specifies `version = "=2.0.0"` to pin a dependency to version 2.0.0, or constrain to minor releases with: `version = "~2.1.0"`. Refer to the [semver library](https://github.com/Masterminds/semver) documentation for more info.
+
+**Note**: When you specify a version *without an operator*, `dep` automatically uses the `^` operator by default. `dep ensure` will interpret the given version as the min-boundary of a range, for example:
+
+* `1.2.3` becomes the range `>=1.2.3, <2.0.0`
+* `0.2.3` becomes the range `>=0.2.3, <0.3.0`
+* `0.0.3` becomes the range `>=0.0.3, <0.1.0`
 
 `~` and `=` operators can be used with the versions. When a version is specified without any operator, `dep` automatically adds a caret operator, `^`. The caret operator pins the left-most non-zero digit in the version. For example:
 ```
@@ -150,11 +163,21 @@ To pin a version of direct dependency in manifest, prefix the version with `=`. 
   version = "=0.8.0"
 ```
 
-[Why is dep ignoring a version constraint in the manifest?](FAQ.md#why-is-dep-ignoring-a-version-constraint-in-the-manifest)
+### `branch`
+
+Using a `branch` constraint will cause dep to use the named branch (e.g., `branch = "master"`) for a particular dependency. The revision at the tip of the branch will be recorded into `Gopkg.lock`, and almost always remain the same until a change is requested, via `dep ensure -update`.
+
+In general, you should prefer semantic versions to branches, when a project has made them available.
+
+### `revision`
+
+A `revision` is the underlying immutable identifier - like a git commit SHA1. While it is allowed to constrain to a `revision`, doing so is almost always an antipattern. 
+
+Usually, folks are inclined to pin to a revision because they feel it will somehow improve their project's reproducibility. That is not a good reason. `Gopkg.lock` provides reproducibility. Only use `revision` if you have a good reason to believe that _no_ other version of that dependency _could_ work.
 
 # Example
 
-Here's an example of a sample Gopkg.toml with most of the elements
+A sample  `Gopkg.toml` with most elements present:
 
 ```toml
 required = ["github.com/user/thing/cmd/thing"]
