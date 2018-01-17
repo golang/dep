@@ -24,7 +24,7 @@ import (
 // It uses its results to fill-in any missing details left by the rootAnalyzer.
 type gopathScanner struct {
 	ctx        *dep.Ctx
-	directDeps map[string]bool
+	directDeps map[gps.ProjectRoot]bool
 	sm         gps.SourceManager
 
 	pd    projectData
@@ -32,7 +32,7 @@ type gopathScanner struct {
 	origL *dep.Lock
 }
 
-func newGopathScanner(ctx *dep.Ctx, directDeps map[string]bool, sm gps.SourceManager) *gopathScanner {
+func newGopathScanner(ctx *dep.Ctx, directDeps map[gps.ProjectRoot]bool, sm gps.SourceManager) *gopathScanner {
 	return &gopathScanner{
 		ctx:        ctx,
 		directDeps: directDeps,
@@ -113,7 +113,7 @@ func (g *gopathScanner) overlay(rootM *dep.Manifest, rootL *dep.Lock) {
 		rootL.P = append(rootL.P, lp)
 		lockedProjects[pkg] = true
 
-		if _, isDirect := g.directDeps[string(pkg)]; !isDirect {
+		if _, isDirect := g.directDeps[pkg]; !isDirect {
 			f := fb.NewLockedProjectFeedback(lp, fb.DepTypeTransitive)
 			f.LogFeedback(g.ctx.Err)
 		}
@@ -220,7 +220,10 @@ func (g *gopathScanner) scanGopathForDependencies() (projectData, error) {
 		return projectData{}, nil
 	}
 
-	for ip := range g.directDeps {
+	for ippr := range g.directDeps {
+		// TODO(sdboyer) these are not import paths by this point, they've
+		// already been worked down to project roots.
+		ip := string(ippr)
 		pr, err := g.sm.DeduceProjectRoot(ip)
 		if err != nil {
 			return projectData{}, errors.Wrap(err, "sm.DeduceProjectRoot")

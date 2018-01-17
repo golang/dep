@@ -197,6 +197,20 @@ func (cmd *ensureCommand) Run(ctx *dep.Ctx, args []string) error {
 			ctx.Out.Println(err)
 		}
 	}
+	if ineffs := p.FindIneffectualConstraints(sm); len(ineffs) > 0 {
+		ctx.Err.Printf("Warning: the following project(s) have [[constraint]] stanzas in %s:\n\n", dep.ManifestName)
+		for _, ineff := range ineffs {
+			ctx.Err.Println("  ✗ ", ineff)
+		}
+		// TODO(sdboyer) lazy wording, it does not mention ignores at all
+		ctx.Err.Printf("\nHowever, these projects are not direct dependencies of the current project:\n")
+		ctx.Err.Printf("they are not imported in any .go files, nor are they in the 'required' list in\n")
+		ctx.Err.Printf("%s. Dep only applies [[constraint]] rules to direct dependencies, so\n", dep.ManifestName)
+		ctx.Err.Printf("these rules will have no effect.\n\n")
+		ctx.Err.Printf("Either import/require packages from these projects so that they become direct\n")
+		ctx.Err.Printf("dependencies, or convert each [[constraint]] to an [[override]] to enforce rules\n")
+		ctx.Err.Printf("on these projects, if they happen to be transitive dependencies,\n\n")
+	}
 
 	if cmd.add {
 		return cmd.runAdd(ctx, args, p, sm, params)
@@ -515,7 +529,7 @@ func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm
 			}
 
 			inManifest := p.Manifest.HasConstraintsOn(pc.Ident.ProjectRoot)
-			inImports := exrmap[pc.Ident.ProjectRoot]
+			inImports := exmap[string(pc.Ident.ProjectRoot)]
 			if inManifest && inImports {
 				errCh <- errors.Errorf("nothing to -add, %s is already in %s and the project's direct imports or required list", pc.Ident.ProjectRoot, dep.ManifestName)
 				return
