@@ -170,6 +170,10 @@ type BrokenImportFeedback struct {
 func NewBrokenImportFeedback(ld *gps.LockDiff) *BrokenImportFeedback {
 	bi := &BrokenImportFeedback{}
 	for _, lpd := range ld.Modify {
+		// Ignore diffs where it's just a modified package set
+		if lpd.Branch == nil && lpd.Revision == nil && lpd.Source == nil && lpd.Version == nil {
+			continue
+		}
 		bi.brokenImports = append(bi.brokenImports, modifiedImport{
 			projectPath: string(lpd.Name),
 			source:      lpd.Source,
