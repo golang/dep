@@ -16,7 +16,8 @@ import (
 // string headers used to demarcate sections in hash input creation
 const (
 	hhConstraints = "-CONSTRAINTS-"
-	hhImportsReqs = "-IMPORTS/REQS-"
+	hhImports     = "-IMPORTS-"
+	hhRequires    = "-REQUIRES-"
 	hhIgnores     = "-IGNORES-"
 	hhOverrides   = "-OVERRIDES-"
 	hhAnalyzer    = "-ANALYZER-"
@@ -68,11 +69,24 @@ func (s *solver) writeHashingInputs(w io.Writer) {
 	}
 
 	// Write out each discrete import, including those derived from requires.
-	writeString(hhImportsReqs)
-	imports := s.rd.externalImportList(s.stdLibFn)
+	depList := s.rd.externalImportList(s.stdLibFn)
+	var imports, requires []string
+	for pr, fromRequired := range depList {
+		if fromRequired {
+			requires = append(requires, pr)
+		} else {
+			imports = append(imports, pr)
+		}
+	}
+	writeString(hhImports)
 	sort.Strings(imports)
 	for _, im := range imports {
 		writeString(im)
+	}
+	writeString(hhRequires)
+	sort.Strings(requires)
+	for _, req := range requires {
+		writeString(req)
 	}
 
 	// Add ignores, skipping any that point under the current project root;

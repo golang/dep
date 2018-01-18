@@ -419,7 +419,7 @@ func ValidateParams(params SolveParameters, sm SourceManager) error {
 		deducePkgsGroup.Done()
 	}
 
-	for _, ip := range rd.externalImportList(paths.IsStandardImportPath) {
+	for ip := range rd.externalImportList(paths.IsStandardImportPath) {
 		deducePkgsGroup.Add(1)
 		go deducePkg(ip, sm)
 	}
@@ -649,7 +649,7 @@ func (s *solver) selectRoot() error {
 			dep:      dep,
 		})
 		// Add all to unselected queue
-		heap.Push(s.unsel, bimodalIdentifier{id: dep.Ident, pl: dep.pl, fromRoot: true, path: []atom{awp.a}})
+		heap.Push(s.unsel, bimodalIdentifier{id: dep.Ident, fromRequired: dep.fromRequired, pl: dep.pl, fromRoot: true})
 	}
 
 	s.traceSelectRoot(s.rd.rpt, deps)
@@ -713,6 +713,9 @@ func (s *solver) getImportsAndConstraintsOf(a atomWithPackages) ([]string, []com
 			// Missing package here *should* only happen if the target pkg was
 			// poisoned; check the errors map.
 			if importErr, eexists := em[pkg]; eexists {
+				if shouldIgnorePackageError(a, importErr.Err) {
+					continue
+				}
 				return nil, nil, importErr
 			}
 
@@ -725,11 +728,10 @@ func (s *solver) getImportsAndConstraintsOf(a atomWithPackages) ([]string, []com
 		}
 	}
 
-	reach := make([]string, 0, len(exmap))
+	reach := make(map[string]bool, len(exmap))
 	for pkg := range exmap {
-		reach = append(reach, pkg)
+		reach[pkg] = true
 	}
-	sort.Strings(reach)
 
 	deps := s.rd.ovr.overrideAll(m.DependencyConstraints())
 	cd, err := s.intersectConstraintsWithImports(deps, reach)
@@ -740,7 +742,7 @@ func (s *solver) getImportsAndConstraintsOf(a atomWithPackages) ([]string, []com
 // externally reached packages, and creates a []completeDep that is guaranteed
 // to include all packages named by import reach, using constraints where they
 // are available, or Any() where they are not.
-func (s *solver) intersectConstraintsWithImports(deps []workingConstraint, reach []string) ([]completeDep, error) {
+func (s *solver) intersectConstraintsWithImports(deps []workingConstraint, imports map[string]bool) ([]completeDep, error) {
 	// Create a radix tree with all the projects we know from the manifest
 	xt := radix.New()
 	for _, dep := range deps {
@@ -750,7 +752,7 @@ func (s *solver) intersectConstraintsWithImports(deps []workingConstraint, reach
 	// Step through the reached packages; if they have prefix matches in
 	// the trie, assume (mostly) it's a correct correspondence.
 	dmap := make(map[ProjectRoot]completeDep)
-	for _, rp := range reach {
+	for rp, fromRequired := range imports {
 		// If it's a stdlib-shaped package, skip it.
 		if s.stdLibFn(rp) {
 			continue
@@ -770,6 +772,7 @@ func (s *solver) intersectConstraintsWithImports(deps []workingConstraint, reach
 				dmap[dep.Ident.ProjectRoot] = completeDep{
 					workingConstraint: dep,
 					pl:                []string{rp},
+					fromRequired:      fromRequired,
 				}
 			}
 			continue
@@ -791,6 +794,7 @@ func (s *solver) intersectConstraintsWithImports(deps []workingConstraint, reach
 		// And also put the complete dep into the dmap
 		dmap[root] = completeDep{
 			workingConstraint: pd,
+			fromRequired:      fromRequired,
 			pl:                []string{rp},
 		}
 	}
@@ -1337,8 +1341,9 @@ func (s *solver) selectAtom(a atomWithPackages, pkgonly bool) error {
 			// alternate source, and one without. See #969.
 			id, _ := s.sel.getIdentFor(dep.Ident.ProjectRoot)
 			bmi := bimodalIdentifier{
-				id: id,
-				pl: newp,
+				id:           id,
+				pl:           newp,
+				fromRequired: dep.fromRequired,
 				// This puts in a preferred version if one's in the map, else
 				// drops in the zero value (nil)
 				prefv: lmap[dep.Ident],
@@ -1358,7 +1363,7 @@ func (s *solver) unselectLast() (atomWithPackages, bool, error) {
 	s.mtr.push("unselect")
 	defer s.mtr.pop()
 	awp, first := s.sel.popSelection()
-	heap.Push(s.unsel, bimodalIdentifier{id: awp.a.id, pl: awp.bmi.pl, path: awp.bmi.path})
+	heap.Push(s.unsel, bimodalIdentifier{id: awp.a.id, pl: awp.bmi.pl, fromRequired: awp.bmi.fromRequired, path: awp.bmi.path})
 
 	_, deps, err := s.getImportsAndConstraintsOf(awp)
 	if err != nil {

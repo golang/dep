@@ -4,6 +4,10 @@
 
 package gps
 
+import (
+	"go/build"
+)
+
 // check performs constraint checks on the provided atom. The set of checks
 // differ slightly depending on whether the atom is pkgonly, or if it's the
 // entire project being added for the first time.
@@ -124,6 +128,9 @@ func (s *solver) checkRequiredPackagesExist(a atomWithPackages) error {
 			} else {
 				perr, has := ptree.Packages[pkg]
 				if !has || perr.Err != nil {
+					if shouldIgnorePackageError(a, perr.Err) {
+						continue
+					}
 					fp[pkg] = errDeppers{
 						err:     perr.Err,
 						deppers: []atom{dep.depender.a},
@@ -299,6 +306,9 @@ func (s *solver) checkPackageImportsFromDepExist(a atomWithPackages, cdep comple
 		perr, has := ptree.Packages[pkg]
 		if !has || perr.Err != nil {
 			if has {
+				if shouldIgnorePackageError(a, perr.Err) {
+					continue
+				}
 				e.prob[pkg] = perr.Err
 			} else {
 				e.prob[pkg] = nil
@@ -333,4 +343,17 @@ func (s *solver) checkRevisionExists(a atomWithPackages, cdep completeDep) error
 		},
 		r: r,
 	}
+}
+
+// shouldAllowPackageError determines if a an error for a dependency should be overlooked.
+// The following package errors should be ignored:
+// * The package originated from a "require" and the package does not contain Go code.
+func shouldIgnorePackageError(a atomWithPackages, err error) bool {
+	// Allow a package to not have go code only when it originated from a require, and not an import.
+	if a.bmi.fromRequired {
+		_, isNoGoErr := err.(*build.NoGoError)
+		return isNoGoErr
+	}
+
+	return false
 }

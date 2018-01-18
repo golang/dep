@@ -179,6 +179,8 @@ type bimodalIdentifier struct {
 	fromRoot bool
 	// The path to the atom in the graph, e.g. root -> foo -> bar
 	path []atom
+	// Indicates that the bmi originated from a require, vs an import
+	fromRequired bool
 }
 
 type atom struct {
@@ -203,6 +205,8 @@ type atomWithPackages struct {
 type completeDep struct {
 	// The base workingConstraint
 	workingConstraint
+	// Indicates that the bmi originated from a require, vs an import
+	fromRequired bool
 	// The specific packages required from the ProjectDep
 	pl []string
 }
