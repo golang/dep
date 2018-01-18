@@ -215,7 +215,7 @@ func (i *Importer) ImportPackages(packages []ImportedPackage, defaultConstraintF
 			isTag, version, err = i.isTag(pc.Ident, prj.LockHint)
 			if err != nil {
 				i.Logger.Printf(
-					"  Warning: Skipping project. Unable to apply constraint %q for %v: %s\n",
+					"  Warning: Skipping project. Unable to import lock %q for %v: %s\n",
 					prj.LockHint, pc.Ident, err,
 				)
 				continue
@@ -263,10 +263,6 @@ func (i *Importer) ImportPackages(packages []ImportedPackage, defaultConstraintF
 				Constraint: pc.Constraint,
 			}
 			fb.NewConstraintFeedback(pc, fb.DepTypeImported).LogFeedback(i.Logger)
-		} else {
-			if i.Verbose {
-				i.Logger.Printf("  Skipping import of %v because its constraint is empty.\n", pc.Ident)
-			}
 		}
 
 		if version != nil {

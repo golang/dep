@@ -150,8 +150,9 @@ func (tc TestCase) validate(manifest *dep.Manifest, lock *dep.Lock, output *byte
 	}
 
 	if tc.WantWarning != "" {
-		if !strings.Contains(output.String(), tc.WantWarning) {
-			return errors.Errorf("Expected the output to include the warning '%s'", tc.WantWarning)
+		gotWarning := output.String()
+		if !strings.Contains(gotWarning, tc.WantWarning) {
+			return errors.Errorf("Expected the output to include the warning '%s' but got '%s'\n", tc.WantWarning, gotWarning)
 		}
 	}
 
