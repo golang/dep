@@ -32,7 +32,7 @@ func TestRootdataExternalImports(t *testing.T) {
 	want := map[string]bool{"a": false, "b": false}
 	got := rd.externalImportList(params.stdLibFn)
 	if !reflect.DeepEqual(want, got) {
-		t.Errorf("Unexpected return from rootdata.externalImportList:\n\t(GOT): %s\n\t(WNT): %s", got, want)
+		t.Errorf("Unexpected return from rootdata.externalImportList:\n\t(GOT): %v\n\t(WNT): %v", got, want)
 	}
 
 	// Add a require
@@ -41,7 +41,7 @@ func TestRootdataExternalImports(t *testing.T) {
 	want = map[string]bool{"a": false, "b": false, "c": true}
 	got = rd.externalImportList(params.stdLibFn)
 	if !reflect.DeepEqual(want, got) {
-		t.Errorf("Unexpected return from rootdata.externalImportList:\n\t(GOT): %s\n\t(WNT): %s", got, want)
+		t.Errorf("Unexpected return from rootdata.externalImportList:\n\t(GOT): %v\n\t(WNT): %v", got, want)
 	}
 
 	// Add same path as import
@@ -52,7 +52,7 @@ func TestRootdataExternalImports(t *testing.T) {
 	want = map[string]bool{"a": false, "b": false, "c": false}
 	got = rd.externalImportList(params.stdLibFn)
 	if !reflect.DeepEqual(want, got) {
-		t.Errorf("Unexpected return from rootdata.externalImportList:\n\t(GOT): %s\n\t(WNT): %s", got, want)
+		t.Errorf("Unexpected return from rootdata.externalImportList:\n\t(GOT): %v\n\t(WNT): %v", got, want)
 	}
 
 	// Add an ignore, but not on the required path (Prepare makes that
@@ -62,7 +62,7 @@ func TestRootdataExternalImports(t *testing.T) {
 	want = map[string]bool{"a": false, "c": false}
 	got = rd.externalImportList(params.stdLibFn)
 	if !reflect.DeepEqual(want, got) {
-		t.Errorf("Unexpected return from rootdata.externalImportList:\n\t(GOT): %s\n\t(WNT): %s", got, want)
+		t.Errorf("Unexpected return from rootdata.externalImportList:\n\t(GOT): %v\n\t(WNT): %v", got, want)
 	}
 }
 

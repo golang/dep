@@ -20,6 +20,7 @@ import (
 	"github.com/pkg/errors"
 )
 
+// SolverVersion is the current version of the solver/hashing algorithm.
 const SolverVersion = 2
 
 var rootRev = Revision("")
