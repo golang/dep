@@ -20,6 +20,8 @@ import (
 	"github.com/pkg/errors"
 )
 
+const SolverVersion = 2
+
 var rootRev = Revision("")
 
 // SolveParameters hold all arguments to a solver run.

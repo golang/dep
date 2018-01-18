@@ -107,7 +107,7 @@ func TestAnalyzerInfo(t *testing.T) {
 
 	info := a.Info()
 
-	if info.Name != "dep" || info.Version != 1 {
-		t.Fatalf("expected name to be 'dep' and version to be 1: name -> %q vers -> %d", info.Name, info.Version)
+	if info.Name != "dep" || info.Version != 2 {
+		t.Fatalf("expected name to be 'dep' and version to be 2: name -> %q vers -> %d", info.Name, info.Version)
 	}
 }
