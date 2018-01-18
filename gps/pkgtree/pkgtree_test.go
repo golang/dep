@@ -20,6 +20,7 @@ import (
 
 	"github.com/golang/dep/gps/paths"
 	"github.com/golang/dep/internal/fs"
+	_ "github.com/golang/dep/internal/test" // DO NOT REMOVE, allows go test ./... -update to work
 )
 
 // PackageTree.ToReachMap() uses an easily separable algorithm, wmToReach(),
