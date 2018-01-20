@@ -119,14 +119,7 @@ func (mi modifiedImport) String() string {
 	}
 
 	// Warning: Unable to preserve imported lock VERSION/BRANCH (REV) for PROJECT(SOURCE). Locking in VERSION/BRANCH (REV) for PROJECT(SOURCE)
-	return fmt.Sprintf("%v %s for %s. Locking in %v %s%s",
-		pv,
-		pr,
-		pp,
-		cv,
-		cr,
-		cp,
-	)
+	return fmt.Sprintf("%v %s for %s. Locking in %v %s%s", pv, pr, pp, cv, cr, cp)
 }
 
 type removedImport struct {
@@ -154,11 +147,7 @@ func (ri removedImport) String() string {
 	}
 
 	// Warning: Unable to preserve imported lock VERSION/BRANCH (REV) for PROJECT(SOURCE). Locking in VERSION/BRANCH (REV) for PROJECT(SOURCE)
-	return fmt.Sprintf("%v %s for %s. The project was removed from the lock because it is not used.",
-		pv,
-		pr,
-		pp,
-	)
+	return fmt.Sprintf("%v %s for %s. The project was removed from the lock because it is not used.", pv, pr, pp)
 }
 
 // BrokenImportFeedback holds problematic lock feedback data
