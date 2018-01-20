@@ -34,6 +34,15 @@ With no arguments, print the status of each dependency of the project.
   LATEST      Latest VCS revision available
   PKGS USED   Number of packages from this project that are actually used
 
+You may use the -f flag to create a custom format for the output of the
+dep status command. The available flags you can utilize are as follows:
+ProjectRoot, Constraint, Version, Revision, Latest, and PackageCount.
+
+For example to display all package names constrained on the master branch
+you can run the following command:
+
+  dep status -f='{{if eq .Constraint "master"}}{{.ProjectRoot}} {{end}}'
+
 Status returns exit code zero if all dependencies are in a "good state".
 `
 
@@ -200,7 +209,18 @@ func (out *templateOutput) BasicHeader() error { return nil }
 func (out *templateOutput) BasicFooter() error { return nil }
 
 func (out *templateOutput) BasicLine(bs *BasicStatus) error {
-	return out.tmpl.Execute(out.w, bs)
+	data := struct {
+		ProjectRoot, Constraint, Version, Revision, Latest string
+		PackageCount                                       int
+	}{
+		ProjectRoot:  bs.ProjectRoot,
+		Constraint:   bs.Constraint.String(),
+		Version:      bs.Version.String(),
+		Revision:     bs.Revision.String(),
+		Latest:       bs.Latest.String(),
+		PackageCount: bs.PackageCount,
+	}
+	return out.tmpl.Execute(out.w, data)
 }
 
 func (out *templateOutput) MissingHeader() error { return nil }
