@@ -150,12 +150,13 @@ func (ri removedImport) String() string {
 	return fmt.Sprintf("%v %s for %s. The project was removed from the lock because it is not used.", pv, pr, pp)
 }
 
-// BrokenImportFeedback holds problematic lock feedback data
+// BrokenImportFeedback holds information on changes to locks pre- and post- solving.
 type BrokenImportFeedback struct {
 	brokenImports []brokenImport
 }
 
-// NewBrokenImportFeedback builds a feedback entry for problems with imports from a diff of the pre- and post- solved locks
+// NewBrokenImportFeedback builds a feedback entry that compares an initially
+// imported, unsolved lock to the same lock after it has been solved.
 func NewBrokenImportFeedback(ld *gps.LockDiff) *BrokenImportFeedback {
 	bi := &BrokenImportFeedback{}
 	for _, lpd := range ld.Modify {
