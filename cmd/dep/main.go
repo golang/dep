@@ -21,6 +21,15 @@ import (
 	"github.com/golang/dep/internal/fs"
 )
 
+const constraintSyntaxDescription = `Version contraint syntax:
+
+"dep ensure" uses an external semver library
+(https://github.com/Masterminds/semver) to interpret the
+version constraints you specify in the manifest.
+
+The comparison operators are:
+`
+
 var (
 	successExitCode = 0
 	errorExitCode   = 1
@@ -72,19 +81,6 @@ func (c *Config) Run() int {
 		&versionCommand{},
 	}
 
-	versionConstraints := [...][2]string{
-		{"=", "equal"},
-		{"!=", "not equal"},
-		{">", "greater than"},
-		{"<", "less than"},
-		{">=", "greater than or equal to"},
-		{"<=", "less than or equal to"},
-		{"-", "literal range. Eg: 1.2 - 1.4.5 is equivalent to >= 1.2, <= 1.4.5"},
-		{"~", "minor range. Eg: ~1.2.3 is equivalent to >= 1.2.3, < 1.3.0"},
-		{"^", "major range. Eg: ^1.2.3 is equivalent to >= 1.2.3, < 2.0.0"},
-		{"[xX*]", "wildcard. Eg: 1.2.x is equivalent to >= 1.2.0, < 1.3.0"},
-	}
-
 	examples := [...][2]string{
 		{
 			"dep init",
@@ -104,6 +100,19 @@ func (c *Config) Run() int {
 		},
 	}
 
+	versionConstraints := [...][2]string{
+		{"=", "equal"},
+		{"!=", "not equal"},
+		{">", "greater than"},
+		{"<", "less than"},
+		{">=", "greater than or equal to"},
+		{"<=", "less than or equal to"},
+		{"-", "literal range. Eg: 1.2 - 1.4.5 is equivalent to >= 1.2, <= 1.4.5"},
+		{"~", "minor range. Eg: ~1.2.3 is equivalent to >= 1.2.3, < 1.3.0"},
+		{"^", "major range. Eg: ^1.2.3 is equivalent to >= 1.2.3, < 2.0.0"},
+		{"[xX*]", "wildcard. Eg: 1.2.x is equivalent to >= 1.2.0, < 1.3.0"},
+	}
+
 	usage := func(w io.Writer) {
 		fmt.Fprintln(w, "Dep is a tool for managing dependencies for Go projects")
 		fmt.Fprintln(w)
@@ -117,6 +126,12 @@ func (c *Config) Run() int {
 				fmt.Fprintf(tw, "\t%s\t%s\n", cmd.Name(), cmd.ShortHelp())
 			}
 		}
+		fmt.Fprintf(
+			tw,
+			"\t%s\t%s\n",
+			"constraints",
+			`Prints version constraints syntax`,
+		)
 		tw.Flush()
 		fmt.Fprintln(w)
 		fmt.Fprintln(w, "Examples:")
@@ -126,6 +141,15 @@ func (c *Config) Run() int {
 		tw.Flush()
 		fmt.Fprintln(w)
 		fmt.Fprintln(w, "Use \"dep help [command]\" for more information about a command.")
+	}
+
+	versionContraintSyntax := func(w io.Writer) {
+		fmt.Fprintln(w, constraintSyntaxDescription)
+		for _, constraint := range versionConstraints {
+			fmt.Fprintln(w, fmt.Sprintf("  %-5s  %s", constraint[0], constraint[1]))
+		}
+		fmt.Fprintln(w)
+		fmt.Fprintln(w, `Use "dep help [command]" for more information about a command.`)
 	}
 
 	cmdName, printCommandHelp, exit := parseArgs(c.Args)
@@ -166,23 +190,9 @@ func (c *Config) Run() int {
 		return successExitCode
 	}
 
-	// 'dep help constraints' generates documentation on the exact syntax for version constraints
+	// 'dep help constraints' prints version constraints syntax documentation.
 	if printCommandHelp && cmdName == "constraints" {
-		fmt.Println("Version constraint syntax:")
-		fmt.Println()
-		firstSentence := `"dep ensure" uses an external semver (https://github.com/Masterminds/semver) `
-		firstSentence += "library to interpret the version constraints you specify in the manifest."
-		fmt.Println(firstSentence)
-		fmt.Println()
-		fmt.Println("The comparison operators are:")
-		fmt.Println()
-
-		for _, constraint := range versionConstraints {
-			fmt.Println(fmt.Sprintf("  %-5s  %s", constraint[0], constraint[1]))
-		}
-
-		fmt.Println()
-		fmt.Println(`Use "dep help [command]" for more information about a command.`)
+		versionContraintSyntax(os.Stdout)
 		return successExitCode
 	}
 
