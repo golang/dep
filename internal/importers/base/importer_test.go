@@ -355,7 +355,6 @@ func TestBaseImporter_ImportProjects(t *testing.T) {
 		"skip empty lock hints": {
 			importertest.TestCase{
 				WantRevision: "",
-				WantWarning:  "constraint is empty",
 			},
 			[]ImportedPackage{
 				{
@@ -379,7 +378,6 @@ func TestBaseImporter_ImportProjects(t *testing.T) {
 		"skip default source": {
 			importertest.TestCase{
 				WantSourceRepo: "",
-				WantWarning:    "constraint is empty",
 			},
 			[]ImportedPackage{
 				{
@@ -415,7 +413,7 @@ func TestBaseImporter_ImportProjects(t *testing.T) {
 			importertest.TestCase{
 				WantSourceRepo: "",
 				WantWarning: fmt.Sprintf(
-					"Warning: Skipping project. Unable to apply constraint %q for %s",
+					"Warning: Skipping project. Unable to import lock %q for %s",
 					importertest.V1Tag, importertest.NonexistentPrj,
 				),
 			},
