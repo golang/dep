@@ -34,12 +34,6 @@ With no arguments, print the status of each dependency of the project.
   LATEST      Latest VCS revision available
   PKGS USED   Number of packages from this project that are actually used
 
-With one or more explicitly specified packages, or with the -detailed flag,
-print an extended status output for each dependency of the project.
-
-  TODO    Another column description
-  FOOBAR  Another column description
-
 Status returns exit code zero if all dependencies are in a "good state".
 `
 
