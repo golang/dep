@@ -23,9 +23,8 @@ import (
 
 const constraintSyntaxDescription = `Version contraint syntax:
 
-"dep ensure" uses an external semver library
-(https://github.com/Masterminds/semver) to interpret the
-version constraints you specify in the manifest.
+dep uses an external semver library (https://github.com/Masterminds/semver) to
+interpret the version constraints specified in the manifest.
 
 The comparison operators are:
 `
@@ -126,12 +125,6 @@ func (c *Config) Run() int {
 				fmt.Fprintf(tw, "\t%s\t%s\n", cmd.Name(), cmd.ShortHelp())
 			}
 		}
-		fmt.Fprintf(
-			tw,
-			"\t%s\t%s\n",
-			"constraints",
-			`Prints version constraints syntax`,
-		)
 		tw.Flush()
 		fmt.Fprintln(w)
 		fmt.Fprintln(w, "Examples:")
@@ -149,7 +142,6 @@ func (c *Config) Run() int {
 			fmt.Fprintln(w, fmt.Sprintf("  %-5s  %s", constraint[0], constraint[1]))
 		}
 		fmt.Fprintln(w)
-		fmt.Fprintln(w, `Use "dep help [command]" for more information about a command.`)
 	}
 
 	cmdName, printCommandHelp, exit := parseArgs(c.Args)
