@@ -69,7 +69,9 @@ will result in an error, as `C` imports a package that will necessarily result i
 
 Go 1.4 introduced [import comments](https://golang.org/cmd/go/#hdr-Import_path_checking), which allow a package to specify the import path that must be used when addressing it. For example, `import "github.com/golang/net/dict"` would point to a valid package, but because [it uses an import comment](https://github.com/golang/net/blob/42fe2e1c20de1054d3d30f82cc9fb5b41e2e3767/dict/dict.go#L7) to enforce that it must be imported as `golang.org/x/net/dict`, dep would reject any project attempting to import it directly through its github address.
 
-Because most projects are consistent about their import comment use over time, this issue typically only occurs when adding a new dependency or attempting to revive an older project. 
+Because most projects are consistent about their import comment use over time, this issue typically only occurs when adding a new dependency or attempting to revive an older project.
+
+> Note: dep does not currently enforce this rule, but [it needs to](https://github.com/golang/dep/issues/902).
 
 **Remediation:** change the code by fixing the offending import paths. If the offending import paths are not in the current project and you don't directly control the dependency, you'll have to fork and fix it yourself, then use `source` to point to your fork.
 
