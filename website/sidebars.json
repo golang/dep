@@ -1,0 +1,6 @@
+{
+  "docs": {
+    "Guides": ["introduction", "installation", "new-project", "migrating", "daily-dep"],
+    "References": ["ensure-mechanics", "failure-modes", "the-solver", "deduction", "Gopkg.toml", "Gopkg.lock", "FAQ", "glossary"]
+  }
+}
