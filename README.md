@@ -1,4 +1,4 @@
-<p align="center"><img src="docs/img/DigbyShadows.png" width="360"></p>
+<p align="center"><img src="docs/assets/DigbyShadows.png" width="360"></p>
 <p align="center">
   <a href="https://travis-ci.org/golang/dep"><img src="https://travis-ci.org/golang/dep.svg?branch=master" alt="Build Status"></img></a>
   <a href="https://ci.appveyor.com/project/golang/dep"><img src="https://ci.appveyor.com/api/projects/status/github/golang/dep?svg=true&branch=master&passingText=Windows%20-%20OK&failingText=Windows%20-%20failed&pendingText=Windows%20-%20pending" alt="Windows Build Status"></a>
@@ -15,9 +15,9 @@ For guides and reference materials about `dep`, see [the documentation](https://
 
 ## Installation
 
-Unless you are hacking on dep, it is strongly recommended that you use a released version. You can grab the latest binary from the [releases](https://github.com/golang/dep/releases) page.
+It is strongly recommended that you use a released version. Release binaries are available on the [releases](https://github.com/golang/dep/releases) page.
 
-On macOS you can install or upgrade to the latest released version with Homebrew:
+On MacOS you can install or upgrade to the latest released version with Homebrew:
 
 ```sh
 $ brew install dep

@@ -1,5 +1,5 @@
 ---
-title: Import path deduction
+title: Import Path Deduction
 ---
 
 Deduction is dep's algorithm for looking at an import path and determining the portion of the path that corresponds to the source root. The algorithm has a static component, by which a small set of known, popular hosts like GitHub and Bitbucket have their roots deduced:

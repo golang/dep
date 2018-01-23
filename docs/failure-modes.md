@@ -2,7 +2,7 @@
 title: Failure Modes
 ---
 
-Like all complex, network-oriented software, dep has known failure modes. These generally fall into two categories: I/O and logical. I/O errors arise from unexpected responses to system calls when dep is interacting with the network or local disk. Logical failures occur when dep encounters issues within the package management problem domain.
+Like all complex, network-oriented software, dep has known failure modes. These generally fall into two categories: I/O and logical. I/O errors arise from unexpected responses to system calls that interact with the network or local disk. Logical failures occur when dep encounters issues within the package management problem domain.
 
 ## I/O errors
 
@@ -31,7 +31,7 @@ Network failures that you actually may observe are biased towards the earlier it
 
 #### Persistent network failures
 
-Although most network failures are ephemeral, there are three well-defined cases where that's not true. These are those cases, and their respective remediations:
+Although most network failures are ephemeral, there are three well-defined cases where they're more permanent:
 
 * **The network on which the source resides is permanently unreachable from the user's location:** in practice, this generally means one of two things: you've forgotten to log into your company VPN, or you're behind [the GFW](https://en.wikipedia.org/wiki/Great_Firewall). In the latter case, setting the *de facto* standard HTTP proxy environment variables that [`http.ProxyFromEnvironment()`](https://golang.org/pkg/net/http/#ProxyFromEnvironment) respects will cause dep's `go-get` HTTP metadata requests, as well as git, bzr, and hg subcommands, to utilize the proxy.
 
@@ -102,7 +102,7 @@ Some of these failures can be as straightforward as typos, and are just as easil
 
 Import path deduction, as detailed in the [deduction reference](deduction.md), has both static and dynamic phases. When neither of these phases is able to determine the source root for a given import path, it is considered to be a deduction failure. Deduction failures all have this key error text:
 
-```
+```bash
 unable to deduce repository and source type for "<bad path>"...
 ```
 
@@ -168,7 +168,7 @@ For the most part, static ("is it one of the handful of hosts we know?") and dyn
 
 When `dep ensure` or `dep init` exit with an error message looking something like this:
 
-```
+```bash
 $ dep init
 init failed: unable to solve the dependency graph: Solving failure: No versions of github.com/foo/bar met constraints:
 	v1.0.1: Could not introduce github.com/foo/bar@v1.13.1, as its subpackage github.com/foo/bar/foo is missing. (Package is required by (root).)
@@ -181,7 +181,7 @@ _Note: all three of the other hard failure types can sometimes be reported as th
 
 It means that the solver was unable to find a combination of versions for all dependencies that satisfy all the rules enforced by the solver. It is crucial to note that, just because dep provides a big list of reasons why each version failed _doesn't mean_ you have to address each one! That's just dep telling you why it ultimately couldn't use each of those versions in a solution.
 
-These rules, and specific remediations for failing to meet them, are described in detail in the section on [solver invariants](the-solver.md#solving-invariants). This section is about the steps to take when solving failures occur in general. But, to set context, here's a quick summary:
+These rules, and specific remediations for failing to meet them, are described in detail in the section on [solver invariants](the-solver.md#solving-invariants). This section is about the steps to take when solving failures occur in general. But, to set context, here's a summary:
 
 * **`[[constraint]]` conflicts:** when projects in the dependency graph disagree on what [versions](gopkg.toml.md#version-rules) are acceptable for a project, or where to [source](gopkg.toml.md#source) it from.
   * Remediation will usually be either changing a `[[constraint]]` or adding an `[[override]]`, but genuine conflicts may require forking and hacking code.

@@ -9,7 +9,7 @@ Dep is a tool you'll use regularly in the course of normal Go development. Regul
 * `dep ensure` is the primary workhorse command, and is the only command that changes disk state.
 * `dep status` reports on the state of your project, and the visible universe of Go software projects.
 
-This guide primarily centers on  `dep ensure`, as that's the command you run to effect changes on your project. The [ensure mechanics](ensure-mechanics.md) reference document details how the things work under the hood, and is worth reading if you're encountering a confusing `dep ensure` behavior (or just curious!).
+This guide primarily centers on  `dep ensure`, as that's the command you run to effect changes on your project. The [Models and Mechanisms](ensure-mechanics.md) reference document details how the things work under the hood, and is worth reading if you're encountering a confusing `dep ensure` behavior (or just curious!).
 
 ## Basics
 
@@ -41,7 +41,7 @@ Let's explore each of moments. To play along, you'll need to `cd` into a project
 
 Let's say that we want to introduce a new dependency on  `github.com/pkg/errors`. This can be accomplished with one command:
 
-```
+```bash
 $ dep ensure -add github.com/pkg/errors
 ```
 
@@ -49,14 +49,14 @@ $ dep ensure -add github.com/pkg/errors
 
 This should succeed, resulting in an updated `Gopkg.lock` and `vendor/` directory, as well as injecting a best-guess version constraint for `github.com/pkg/errors` into our `Gopkg.toml`. But, it will also report a warning:
 
-```
+```bash
 "github.com/pkg/errors" is not imported by your project, and has been temporarily added to Gopkg.lock and vendor/.
 If you run "dep ensure" again before actually importing it, it will disappear from Gopkg.lock and vendor/.
 ```
 
 As the warning suggests, you should introduce an `import "github.com/pkg/errors"` in your code, the sooner the better. If you don't, a later `dep ensure` run will interpret your newly-added dependency as unused, and automatically remove it from `Gopkg.lock` and `vendor/`. This also means that if you want to add multiple dependencies at once, you'll need to do it in a single command, rather than one after the other:
 
-```
+```bash
 $ dep ensure -add github.com/pkg/errors github.com/foo/bar
 ```
 
@@ -70,13 +70,13 @@ The [ensure mechanics section on `-add`](ensure-mechanics.md#add) has a more tho
 
 Ideally, updating a dependency project to a newer version is a single command:
 
-```
+```bash
 $ dep ensure -update github.com/foo/bar
 ```
 
 This also works without arguments to try to update all dependencies, though it's generally not recommended:
 
-```
+```bash
 $ dep ensure -update
 ```
 

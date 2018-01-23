@@ -1,19 +1,8 @@
 ---
-id: faq.md
+title: FAQ
 ---
 
-
-
-title: FAQ
---
-
-# FAQ
-
-_The first rule of FAQ is don't bikeshed the FAQ, leave that for
-[Create structure for managing docs](https://github.com/golang/dep/issues/331)._
-
-Please contribute to the FAQ! Found an explanation in an issue or pull request helpful?
-Summarize the question and quote the reply, linking back to the original comment.
+The FAQ predated the introduction of the rest of the documentation. If something in here conflicts with other guides or reference documents, it's probably here that it's wrong - please file a PR!
 
 ## Concepts
 * [Does `dep` replace `go get`?](#does-dep-replace-go-get)

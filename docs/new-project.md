@@ -2,9 +2,7 @@
 title: Creating a New Project
 ---
 
-First, we need a working Go workspace and GOPATH. If you're unfamiliar with Go workspaces and GOPATH, have a look at [the language documentation](https://golang.org/doc/code.html#Organization) and get your local workspace set up. (dep's model could eventually lead to being able to work without GOPATH, but we're not there yet.)
-
-Next, we need to pick a root directory for our project. This is primarily about picking the right root import path, and corresponding directory beneath `$GOPATH/src`, at which to situate your project. There are four basic possibilities:
+Once you have [dep installed](installation.md), we need to pick a root directory for our project. This is primarily about picking the right root import path, and corresponding directory beneath `$GOPATH/src`, at which to situate your project. There are four basic possibilities:
 
 1. A project that is now or eventually may be shared with or imported by other projects/people. In this case, pick the import path corresponding to the VCS root of its intended network location, e.g., `$GOPATH/src/github.com/golang/dep`.
 2. An entirely local project - one that you have no intention of pushing to a central server (like GitHub). In this case, any subdirectory beneath `$GOPATH/src` will do.
@@ -13,14 +11,14 @@ Next, we need to pick a root directory for our project. This is primarily about 
 
 We'll assume the first case, as it's the most common. Create and move into the directory:
 
-```
+```bash
 $ mkdir -p $GOPATH/src/github.com/me/example
 $ cd $GOPATH/src/github.com/me/example
 ```
 
 Now, we'll initialize the project:
 
-```
+```bash
 $ dep init
 $ ls
 Gopkg.toml Gopkg.lock vendor/
@@ -30,10 +28,10 @@ In a new project like this one, both files and the `vendor` directory will be ef
 
 This would also be a good time to set up a version control, such as [git](https://git-scm.com/). While dep in no way requires version control for your project, it can make inspecting the changes made by normal dep operations easier. Plus, it's basically best practice #1 of modern software development!
 
-At this point, we're initialized and ready to start writing code! You can open up a `.go` file in an editor and start hacking away. Or, if you already know some projects you'll need, you can pre-populate your `vendor` directory with them:
+At this point, our project is initialized, and we're ready to start writing code. You can open up a `.go` file in an editor and start hacking away. Or, if you already know some projects you'll need, you can pre-populate your `vendor` directory with them:
 
-```
+```bash
 $ dep ensure -add github.com/foo/bar github.com/baz/quux
 ```
 
-Great, your project's all set up! You're ready to move on to [Daily Dep](daily-dep.md).
+Now you're ready to move on to [Daily Dep](daily-dep.md)!

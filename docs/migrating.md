@@ -1,21 +1,21 @@
 ---
-title: Migrating to dep
+title: Migrating to Dep
 ---
 
 Ideally, migrating an existing Go project to dep is straightforward:
 
-```
+```bash
 $ cd $GOPATH/src/path/to/project/root
 $ dep init
 ```
 
-For many projects, this will just work. `dep init` will make educated guesses about what versions to use for your dependencies, generate sane `Gopkg.toml`, `Gopkg.lock`, and `vendor/`, and if your tests pass and builds work, then you're probably done. (Congratulations! You should check out [Daily Dep](daily-dep.md) next.)
+For many projects, this will just work. `dep init` will make educated guesses about what versions to use for your dependencies, generate sane `Gopkg.toml`, `Gopkg.lock`, and `vendor/`, and if your tests pass and builds work, then you're probably done. (If so, congratulations! You should check out [Daily Dep](daily-dep.md) next.)
 
 The migration process is still difficult for some projects. If you're trying dep for the first time, this can be particularly frustrating, as you're trying to simultaneously learn how to use dep, and how your project *should* be managed in dep. The good news is,  `dep init` is usually the big difficulty hump; once you're over it, things get much easier.
 
 The goal of this guide is to provide enough information for you to reason about what's happening during `dep init`, so that you can at least understand what class of problems you're encountering, and what steps you might take to address them. To that end, we'll start with an overview of what  `dep init` is doing. 
 
-> Note: the first run of `dep init` can take quite a long time, as dep is creating fresh clones of all your dependencies into a special location, `$GOPATH/pkg/dep/sources/`. This is necessary for dep's normal operations, and is a one-time cost.
+> Note: the first run of `dep init` can take quite a long time, as dep is creating fresh clones of all your dependencies into a special location, `$GOPATH/pkg/dep/sources/`. This is necessary for dep's normal operations, and is largely a one-time cost.
 
 ## `dep init` mechanics
 
@@ -70,14 +70,13 @@ Because these are deep assumptions, their symptoms can be varied and surprising.
 - dep requires that all packages from a given project/repository be at the same version.
 - dep generally does not care about what's on your GOPATH; it deals exclusively with projects sourced from remote network locations. (Hint inference is the only exception to this; once solving begins, GOPATH - and any custom changes you've made to code therein - is ignored.)
 - dep generally prefers semantic versioning-tagged releases to branches (when not given any additional rules). This is a significant shift from the "default branch" model of `go get` and some other tools. It can result in dep making surprising choices for dependencies for which it could not infer a rule.
+- dep assumes that all generated code exists, and has been committed to the source.
 
 A small number of projects that have reported being unable, thus far, to find a reasonable way of adapting to these requirements. If you can't figure out how to make your project fit, please file an issue - while dep necessarily cannot accommodate every single existing approach, it is dep's goal is define rules to which all Go projects can reasonably adapt.
 
 ### Hard failures
 
-Hard failures involve actual 
-
-All of these failure modes are covered extensively in the reference on [failure modes](failure-modes.md)
+All of the hard failure modes are covered extensively in the reference on [failure modes](failure-modes.md).
 
 Because the solver, and all its possible failures, are the same for `dep init` as for `dep ensure`, there's a separate section for understanding and dealing with them: [dealing with solving failures](failure-modes.md#solving-failures). It can be trickier with `dep init`, however, as many remediations require tweaking `Gopkg.toml`.
 
@@ -91,7 +90,7 @@ Soft failures are cases where `dep init` appears to exit cleanly, but a subseque
 
 If you do encounter problems like this, `dep status` is your first diagnostic step; it will report what versions were selected for all your dependencies. It may be clear which dependencies are a problem simply from your building or testing error messages. If not, compare the `dep status` list against the versions recorded by your previous tool to find the differences.
 
-Once you've identified the problematic dependenc(ies), the next step is exerting appropriate controls over them via `Gopkg.toml`. (Note - this advice is intentionally terse; check out [Zen of Dep]() if you want a deeper understanding of how to optimally utilize dep's controls)
+Once you've identified the problematic dependenc(ies), the next step is exerting appropriate controls over them via `Gopkg.toml`.
 
 For each of the following items, assume that you should run `dep ensure` after making the suggested change. If that fails, consult [dealing with solving failures]().
 

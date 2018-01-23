@@ -1,8 +1,8 @@
 ---
-title: Models and Mechanics
+title: Models and Mechanisms
 ---
 
-While dep has many discrete components and moving parts, all of these parts revolve around a central model. This document explains that model, then explores the major mechanisms of dep as they relate to it.
+While dep has many discrete components and moving parts, all of these parts revolve around a central model. This document explains that model, then explores the dep's primary mechanisms in the context of that model.
 
 ## States and flows
 
@@ -17,7 +17,7 @@ Briefly, the four states are:
 
 We can visually represent these four states as follows:
 
-![dep's four states](img/four-states.png)
+![dep's four states](assets/four-states.png)
 
 ### Functional flow
 
@@ -28,7 +28,7 @@ It's useful to think of dep as a system that imposes a unidirectional, functiona
 
 We can represent these two functions visually:
 
-![dep's two main functions](img/annotated-func-arrows.png)
+![dep's two main functions](assets/annotated-func-arrows.png)
 
 This is `dep ensure` - the typical flow, used when a `Gopkg.toml` already exists. When a project does not yet have a `Gopkg.toml`, `dep init` can generate one. The essential flow remains the same, but with changed inputs: instead of reading from an existing `Gopkg.toml` file, `dep init` constructs one out of data inferred from the user's GOPATH, and/or [a metadata file from another tool](). (In other words, `dep init` automatically migrates a project from other approaches to organizing dependencies.)
 
@@ -65,7 +65,7 @@ Each of `dep ensure`'s various flags affects the behavior of the solving and ven
 
 These two flags are mutually exclusive, and determine which of `dep ensure`'s two functions are actually performed. Passing `-no-vendor` will cause only the solving function to be run, resulting in the creation of a new `Gopkg.lock`;  `-vendor-only` will skip solving and run only the vendoring function, causing `vendor/` to be repopulated from the pre-existing `Gopkg.lock`.
 
-![Flags to run only one or the other of dep's functions](img/func-toggles.png)
+![Flags to run only one or the other of dep's functions](assets/func-toggles.png)
 
 Passing `-no-vendor` has the additional effect of causing the solving function to run unconditionally,  bypassing the pre-check ordinarily made against `Gopkg.lock` to see if it already satisfies all inputs.
 
@@ -86,13 +86,13 @@ This implies two preconditions for `dep ensure -add`, at least one of which must
 
 It is also possible to explicitly specify a version constraint:
 
-```
+```bash
 $ dep ensure -add github.com/foo/bar@v1.0.0
 ```
 
-When no version constraint is included in the argument, the solving function will select the latest version that works (generally, the newest semver release, or the default branch if there are no semver releases). Either this inferred version, or the specified version, will be appended into `Gopkg.toml`.
+When no version constraint is included in the argument, the solving function will select the latest version that works (generally, the newest semver release, or the default branch if there are no semver releases). If solving succeeds, then either the argument-specified version, or if none then the version selected by the solver, will be appended into `Gopkg.toml`.
 
-The behavioral variations that arise from the assorted differences in input and current project state are best expressed as a matrix: 
+The behavioral variations that arise from the assorted differences in input and current project state are best expressed as a matrix:
 
 | Argument to `dep ensure -add` | Has `[[constraint]]` stanza in `Gopkg.toml` | In imports or `required` | Result                                   |
 | ----------------------------- | ---------------------------------------- | ------------------------ | ---------------------------------------- |
@@ -105,7 +105,7 @@ The behavioral variations that arise from the assorted differences in input and 
 
 For any of the paths where `dep ensure -add` needs to run the solving function in order to generate an updated `Gopkg.lock`, the relevant information from CLI arguments is applied to the in-memory representation of `Gopkg.toml`:
 
-![Model modifications made by -add](img/required-arrows.png)
+![Model modifications made by -add](assets/required-arrows.png)
 
 Import path arguments that need to be added are injected via the `required` list, and if an explicit version requirement was specified, the equivalent of a `[[constraint]]` is created.
 
@@ -113,7 +113,7 @@ Though these rules may ultimately be persisted if solving succeeds, they are eph
 
 However, because these modifications are ephemeral, a successful `dep ensure -add` may actually push the project out of sync. Constraint modifications generally do not, but if the `required` list is modified, then the project will desync. The user is warned accordingly:
 
-```
+```bash
 $ dep ensure -add github.com/foo/bar
 "github.com/foo/bar" is not imported by your project, and has been temporarily added to Gopkg.lock and vendor/.
 If you run "dep ensure" again before actually importing it, it will disappear from Gopkg.lock and vendor/.
@@ -125,7 +125,7 @@ The behavior of `dep ensure -update` is intimately linked to the behavior of the
 
 First, to solidify an implication in the discussion of [functional optimizations](#staying-in-sync), the solving function actually takes into account the pre-existing `Gopkg.lock` when it runs:
 
-![Pre-existing lock feeds back into solving function](img/lock-back.png)
+![Pre-existing lock feeds back into solving function](assets/lock-back.png)
 
 Injecting `Gopkg.lock` into the solver is a necessity. If we want the solver to preserve previously-selected versions by default, then the solver has to learn about the existing `Gopkg.lock` from somewhere. Otherwise, it wouldn't know what to preserve!
 
@@ -151,19 +151,19 @@ When a version hint from `Gopkg.lock` is not placed at the head of the version q
 
 For example, say there is a project, `github.com/foo/bar`, with the following versions:
 
-```
+```bash
 v1.2.0, v1.1.1, v1.1.0, v1.0.0, master
 ```
 
 If we depend on that project with `^1.1.0`, and have `v1.1.0` in our `Gopkg.lock` , then it means there are three versions that match our constraint, and two of them are newer than the one currently selected. (There's also an older version, `v1.0.0`, and a `master` branch, but these aren't allowed by a `^1.1.0` constraint.) An ordinary `dep ensure` run will duplicate and push `v1.1.0` ahead of all the others in the queue:
 
-```
+```bash
 [v1.1.0, v1.2.0, v1.1.1, v1.1.0, v1.0.0, master]
 ```
 
 And `v1.1.0` will be selected again, unless some other condition is presented that forces the solver to discard it. When running `dep ensure -update github.com/foo/bar`, however, the locked version is not prepended:
 
-```
+```bash
 [v1.2.0, v1.1.1, v1.1.0, v1.0.0, master]
 ```
 
@@ -175,7 +175,7 @@ Continuing with our example, it's important to note that updates with `-update` 
 
 It does work with branch constraints, which we can observe by including the underlying revision. If the user has constrained on `branch = "master"`, and `Gopkg.lock` points at a topologically older revision (say, `aabbccd`) than the tip of the canonical source's `master` branch (say, `bbccdde`), then `dep ensure` will end up contructing a queue that looks like this:
 
-```
+```bash
 [master@aabbccd, v1.1.0, v1.2.0, v1.1.1, v1.1.0, v1.0.0, master@bbccdde]
 ```
 
@@ -183,7 +183,7 @@ With `-update`, the hint at the head will be omitted; `branch = "master"` will c
 
 All versions in the version queue keep track of an underlying revision, which means the same is true if, for example, some upstream project force-pushes a git tag:
 
-```
+```bash
 [v1.1.0@aabbccd, v1.1.0, v1.2.0, v1.1.1, v1.1.0@bbccdde, v1.0.0, master]
 ```
 
