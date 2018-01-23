@@ -6,7 +6,7 @@ Like all complex, network-oriented software, dep has known failure modes. These 
 
 ## I/O errors
 
-dep reads from the network, and reads and writes to disk, and is thus subject to all the typical errors that are possible with such activities: full disks, failed disks, lack of permissions, network partitions, firewalls, etc. However, there are three specific classes of I/O errors that are worth addressing specifically:
+dep reads from the network, and reads and writes to disk, and is thus subject to all the typical errors that are possible with such activities: full disks, failed disks, lack of permissions, network partitions, firewalls, etc. However, there are three classes of I/O errors that are worth addressing specifically:
 
 * Network failures
 * Bad local cache state
@@ -100,10 +100,10 @@ Some of these failures can be as straightforward as typos, and are just as easil
 
 ### Deduction failures
 
-Import path deduction, as detailed in the [deduction reference](deduction.md), has both static and dynamic phases. When neither of these phases is able to determine the source root for a given import path, it is considered to be a deduction failure. Deduction failures all have this key error text:
+Import path deduction, as detailed in the [deduction reference](deduction.md), has both static and dynamic phases. When neither of these phases is able to determine the source root for a given import path, it is considered to be a deduction failure. Deduction failures all contain this key error text:
 
 ```bash
-unable to deduce repository and source type for "<bad path>"...
+...unable to deduce repository and source type for "<bad path>"...
 ```
 
 _Note: there are [more varied error messages for the small subset of cases](#malformed-import-paths) where an import path appears to be deducible, but is somehow malformed._
