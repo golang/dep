@@ -58,7 +58,7 @@ func TestBasicLine(t *testing.T) {
 			wantDotStatus:      []string{`[label="github.com/foo/bar"];`},
 			wantJSONStatus:     []string{`"Version":""`, `"Revision":""`},
 			wantTableStatus:    []string{`github.com/foo/bar                                         0`},
-			wantTemplateStatus: []string{`->~~<-`},
+			wantTemplateStatus: []string{`PR:github.com/foo/bar, Const:, Ver:, Rev:, Lat:, PkgCt:0`},
 		},
 		{
 			name: "BasicStatus with Revision",
@@ -69,7 +69,7 @@ func TestBasicLine(t *testing.T) {
 			wantDotStatus:      []string{`[label="github.com/foo/bar\nflooboo"];`},
 			wantJSONStatus:     []string{`"Version":""`, `"Revision":"flooboofoobooo"`, `"Constraint":""`},
 			wantTableStatus:    []string{`github.com/foo/bar                       flooboo           0`},
-			wantTemplateStatus: []string{`->flooboofoobooo~~flooboo<-`},
+			wantTemplateStatus: []string{`PR:github.com/foo/bar, Const:, Ver:flooboo, Rev:flooboofoobooo, Lat:, PkgCt:0`},
 		},
 		{
 			name: "BasicStatus with Version and Revision",
@@ -81,7 +81,7 @@ func TestBasicLine(t *testing.T) {
 			wantDotStatus:      []string{`[label="github.com/foo/bar\n1.0.0"];`},
 			wantJSONStatus:     []string{`"Version":"1.0.0"`, `"Revision":"flooboofoobooo"`, `"Constraint":""`},
 			wantTableStatus:    []string{`github.com/foo/bar              1.0.0    flooboo           0`},
-			wantTemplateStatus: []string{`->flooboofoobooo~~1.0.0<-`},
+			wantTemplateStatus: []string{`PR:github.com/foo/bar, Const:, Ver:1.0.0, Rev:flooboofoobooo, Lat:, PkgCt:0`},
 		},
 		{
 			name: "BasicStatus with Constraint, Version and Revision",
@@ -94,7 +94,7 @@ func TestBasicLine(t *testing.T) {
 			wantDotStatus:      []string{`[label="github.com/foo/bar\n1.0.0"];`},
 			wantJSONStatus:     []string{`"Revision":"revxyz"`, `"Constraint":"1.2.3"`, `"Version":"1.0.0"`},
 			wantTableStatus:    []string{`github.com/foo/bar  1.2.3       1.0.0    revxyz            0`},
-			wantTemplateStatus: []string{`->revxyz~1.2.3~1.0.0<-`},
+			wantTemplateStatus: []string{`PR:github.com/foo/bar, Const:1.2.3, Ver:1.0.0, Rev:revxyz, Lat:, PkgCt:0`},
 		},
 		{
 			name: "BasicStatus with update error",
@@ -105,7 +105,7 @@ func TestBasicLine(t *testing.T) {
 			wantDotStatus:      []string{`[label="github.com/foo/bar"];`},
 			wantJSONStatus:     []string{`"Version":""`, `"Revision":""`, `"Latest":"unknown"`},
 			wantTableStatus:    []string{`github.com/foo/bar                                 unknown  0`},
-			wantTemplateStatus: []string{`->~~<-`},
+			wantTemplateStatus: []string{`PR:github.com/foo/bar, Const:, Ver:, Rev:, Lat:unknown, PkgCt:0`},
 		},
 	}
 
@@ -158,7 +158,7 @@ func TestBasicLine(t *testing.T) {
 			}
 
 			buf.Reset()
-			template, _ := template.New("status").Parse("->{{.Revision}}~{{.Constraint}}~{{.Version}}<-")
+			template, _ := template.New("status").Parse("PR:{{.ProjectRoot}}, Const:{{.Constraint}}, Ver:{{.Version}}, Rev:{{.Revision}}, Lat:{{.Latest}}, PkgCt:{{.PackageCount}}")
 			templateout := &templateOutput{w: &buf, tmpl: template}
 			templateout.BasicHeader()
 			templateout.BasicLine(&test.status)
