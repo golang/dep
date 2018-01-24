@@ -403,13 +403,13 @@ func fromRawPruneOptions(raw rawPruneOptions) gps.RootPruneOptions {
 		pr := gps.ProjectRoot(p.Name)
 		opts.ProjectOptions[pr] = gps.PruneNestedVendorDirs
 
-		if raw.UnusedPackages {
+		if p.UnusedPackages {
 			opts.ProjectOptions[pr] |= gps.PruneUnusedPackages
 		}
-		if raw.GoTests {
+		if p.GoTests {
 			opts.ProjectOptions[pr] |= gps.PruneGoTestFiles
 		}
-		if raw.NonGoFiles {
+		if p.NonGoFiles {
 			opts.ProjectOptions[pr] |= gps.PruneNonGoFiles
 		}
 	}

@@ -608,6 +608,69 @@ func TestValidateProjectRoots(t *testing.T) {
 	}
 }
 
+func TestFromRawPruneOptions(t *testing.T) {
+	cases := []struct {
+		name            string
+		rawPruneOptions rawPruneOptions
+		wantOptions     gps.RootPruneOptions
+	}{
+		{
+			name: "global all options project no options",
+			rawPruneOptions: rawPruneOptions{
+				UnusedPackages: true,
+				NonGoFiles:     true,
+				GoTests:        true,
+				Projects: []rawPruneProjectOptions{
+					{
+						Name:           "github.com/golang/dep/gps",
+						UnusedPackages: false,
+						NonGoFiles:     false,
+						GoTests:        false,
+					},
+				},
+			},
+			wantOptions: gps.RootPruneOptions{
+				PruneOptions: 15,
+				ProjectOptions: gps.PruneProjectOptions{
+					"github.com/golang/dep/gps": 1,
+				},
+			},
+		},
+		{
+			name: "global no options project all options",
+			rawPruneOptions: rawPruneOptions{
+				UnusedPackages: false,
+				NonGoFiles:     false,
+				GoTests:        false,
+				Projects: []rawPruneProjectOptions{
+					{
+						Name:           "github.com/golang/dep/gps",
+						UnusedPackages: true,
+						NonGoFiles:     true,
+						GoTests:        true,
+					},
+				},
+			},
+			wantOptions: gps.RootPruneOptions{
+				PruneOptions: 1,
+				ProjectOptions: gps.PruneProjectOptions{
+					"github.com/golang/dep/gps": 15,
+				},
+			},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			opts := fromRawPruneOptions(c.rawPruneOptions)
+
+			if !reflect.DeepEqual(opts, c.wantOptions) {
+				t.Fatalf("rawPruneOptions are not as expected:\n\t(GOT) %v\n\t(WNT) %v", opts, c.wantOptions)
+			}
+		})
+	}
+}
+
 func TestToRawPruneOptions(t *testing.T) {
 	cases := []struct {
 		name         string
