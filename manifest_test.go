@@ -32,7 +32,7 @@ func TestReadManifest(t *testing.T) {
 	c, _ := gps.NewSemverConstraint("^0.12.0")
 	want := Manifest{
 		Constraints: map[gps.ProjectRoot]gps.ProjectProperties{
-			gps.ProjectRoot("github.com/golang/dep/gps"): {
+			gps.ProjectRoot("github.com/golang/dep"): {
 				Constraint: c,
 			},
 			gps.ProjectRoot("github.com/babble/brook"): {
@@ -40,8 +40,8 @@ func TestReadManifest(t *testing.T) {
 			},
 		},
 		Ovr: map[gps.ProjectRoot]gps.ProjectProperties{
-			gps.ProjectRoot("github.com/golang/dep/gps"): {
-				Source:     "https://github.com/golang/dep/gps",
+			gps.ProjectRoot("github.com/golang/dep"): {
+				Source:     "https://github.com/golang/dep",
 				Constraint: gps.NewBranch("master"),
 			},
 		},
@@ -74,14 +74,14 @@ func TestWriteManifest(t *testing.T) {
 	want := h.GetTestFileString(golden)
 	c, _ := gps.NewSemverConstraint("^0.12.0")
 	m := NewManifest()
-	m.Constraints[gps.ProjectRoot("github.com/golang/dep/gps")] = gps.ProjectProperties{
+	m.Constraints[gps.ProjectRoot("github.com/golang/dep")] = gps.ProjectProperties{
 		Constraint: c,
 	}
 	m.Constraints[gps.ProjectRoot("github.com/babble/brook")] = gps.ProjectProperties{
 		Constraint: gps.Revision("d05d5aca9f895d19e9265839bffeadd74a2d2ecb"),
 	}
-	m.Ovr[gps.ProjectRoot("github.com/golang/dep/gps")] = gps.ProjectProperties{
-		Source:     "https://github.com/golang/dep/gps",
+	m.Ovr[gps.ProjectRoot("github.com/golang/dep")] = gps.ProjectProperties{
+		Source:     "https://github.com/golang/dep",
 		Constraint: gps.NewBranch("master"),
 	}
 	m.Ignored = []string{"github.com/foo/bar"}
@@ -622,7 +622,7 @@ func TestFromRawPruneOptions(t *testing.T) {
 				GoTests:        true,
 				Projects: []rawPruneProjectOptions{
 					{
-						Name:           "github.com/golang/dep/gps",
+						Name:           "github.com/golang/dep",
 						UnusedPackages: false,
 						NonGoFiles:     false,
 						GoTests:        false,
@@ -632,7 +632,7 @@ func TestFromRawPruneOptions(t *testing.T) {
 			wantOptions: gps.RootPruneOptions{
 				PruneOptions: 15,
 				ProjectOptions: gps.PruneProjectOptions{
-					"github.com/golang/dep/gps": 1,
+					"github.com/golang/dep": 1,
 				},
 			},
 		},
@@ -644,7 +644,7 @@ func TestFromRawPruneOptions(t *testing.T) {
 				GoTests:        false,
 				Projects: []rawPruneProjectOptions{
 					{
-						Name:           "github.com/golang/dep/gps",
+						Name:           "github.com/golang/dep",
 						UnusedPackages: true,
 						NonGoFiles:     true,
 						GoTests:        true,
@@ -654,7 +654,7 @@ func TestFromRawPruneOptions(t *testing.T) {
 			wantOptions: gps.RootPruneOptions{
 				PruneOptions: 1,
 				ProjectOptions: gps.PruneProjectOptions{
-					"github.com/golang/dep/gps": 15,
+					"github.com/golang/dep": 15,
 				},
 			},
 		},
