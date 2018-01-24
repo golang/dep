@@ -1,4 +1,12 @@
-# v0.4.0 (Unreleased)
+# (next version)
+
+NEW FEATURES:
+
+BUG FIXES:
+
+IMPROVEMENTS:
+
+# v0.4.0
 
 NEW FEATURES:
 * Add support for importing from [glock](https://github.com/robfig/glock) based projects. ([#1422](https://github.com/golang/dep/pull/1422)
