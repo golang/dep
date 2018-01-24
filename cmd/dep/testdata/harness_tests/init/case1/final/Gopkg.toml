@@ -2,3 +2,7 @@
 [[constraint]]
   name = "github.com/sdboyer/deptest"
   version = "0.8.0"
+
+[prune]
+  go-tests = true
+  unused-packages = true

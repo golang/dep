@@ -15,7 +15,7 @@ import (
 
 	"github.com/golang/dep/gps"
 	"github.com/golang/dep/gps/pkgtree"
-	"github.com/pelletier/go-toml"
+	toml "github.com/pelletier/go-toml"
 	"github.com/pkg/errors"
 )
 
@@ -51,8 +51,7 @@ type Manifest struct {
 	Ignored  []string
 	Required []string
 
-	PruneOptions        gps.PruneOptions
-	PruneProjectOptions gps.PruneProjectOptions
+	PruneOptions gps.RootPruneOptions
 }
 
 type rawManifest struct {
@@ -97,7 +96,7 @@ func NewManifest() *Manifest {
 	return &Manifest{
 		Constraints:  make(gps.ProjectConstraints),
 		Ovr:          make(gps.ProjectConstraints),
-		PruneOptions: gps.PruneNestedVendorDirs,
+		PruneOptions: gps.DefaultRootPruneOptions(),
 	}
 }
 
@@ -303,7 +302,7 @@ func ValidateProjectRoots(c *Ctx, m *Manifest, sm gps.SourceManager) error {
 		wg.Add(1)
 		go validate(pr)
 	}
-	for pr := range m.PruneProjectOptions {
+	for pr := range m.PruneOptions.ProjectOptions {
 		wg.Add(1)
 		go validate(pr)
 	}
@@ -379,41 +378,67 @@ func fromRawManifest(raw rawManifest) (*Manifest, error) {
 		m.Ovr[name] = prj
 	}
 
-	m.PruneOptions, m.PruneProjectOptions = fromRawPruneOptions(raw.PruneOptions)
+	m.PruneOptions = fromRawPruneOptions(raw.PruneOptions)
 
 	return m, nil
 }
 
-func fromRawPruneOptions(raw rawPruneOptions) (gps.PruneOptions, gps.PruneProjectOptions) {
-	rootOptions := gps.PruneNestedVendorDirs
-	pruneProjects := make(gps.PruneProjectOptions)
+func fromRawPruneOptions(raw rawPruneOptions) gps.RootPruneOptions {
+	opts := gps.RootPruneOptions{
+		PruneOptions:   gps.PruneNestedVendorDirs,
+		ProjectOptions: make(gps.PruneProjectOptions),
+	}
 
 	if raw.UnusedPackages {
-		rootOptions |= gps.PruneUnusedPackages
+		opts.PruneOptions |= gps.PruneUnusedPackages
 	}
 	if raw.GoTests {
-		rootOptions |= gps.PruneGoTestFiles
+		opts.PruneOptions |= gps.PruneGoTestFiles
 	}
 	if raw.NonGoFiles {
-		rootOptions |= gps.PruneNonGoFiles
+		opts.PruneOptions |= gps.PruneNonGoFiles
 	}
 
 	for _, p := range raw.Projects {
 		pr := gps.ProjectRoot(p.Name)
-		pruneProjects[pr] = gps.PruneNestedVendorDirs
+		opts.ProjectOptions[pr] = gps.PruneNestedVendorDirs
 
 		if raw.UnusedPackages {
-			pruneProjects[pr] |= gps.PruneUnusedPackages
+			opts.ProjectOptions[pr] |= gps.PruneUnusedPackages
 		}
 		if raw.GoTests {
-			pruneProjects[pr] |= gps.PruneGoTestFiles
+			opts.ProjectOptions[pr] |= gps.PruneGoTestFiles
 		}
 		if raw.NonGoFiles {
-			pruneProjects[pr] |= gps.PruneNonGoFiles
+			opts.ProjectOptions[pr] |= gps.PruneNonGoFiles
 		}
 	}
 
-	return rootOptions, pruneProjects
+	return opts
+}
+
+// toRawPruneOptions converts a gps.RootPruneOption's PruneOptions to rawPruneOptions
+//
+// Will panic if gps.RootPruneOption includes ProjectPruneOptions
+// See https://github.com/golang/dep/pull/1460#discussion_r158128740 for more information
+func toRawPruneOptions(root gps.RootPruneOptions) rawPruneOptions {
+	if len(root.ProjectOptions) != 0 {
+		panic("toRawPruneOptions cannot convert ProjectOptions to rawPruneOptions")
+	}
+	raw := rawPruneOptions{}
+
+	if (root.PruneOptions & gps.PruneUnusedPackages) != 0 {
+		raw.UnusedPackages = true
+	}
+
+	if (root.PruneOptions & gps.PruneNonGoFiles) != 0 {
+		raw.NonGoFiles = true
+	}
+
+	if (root.PruneOptions & gps.PruneGoTestFiles) != 0 {
+		raw.GoTests = true
+	}
+	return raw
 }
 
 // toProject interprets the string representations of project information held in
@@ -463,11 +488,10 @@ func (m *Manifest) MarshalTOML() ([]byte, error) {
 // toRaw converts the manifest into a representation suitable to write to the manifest file
 func (m *Manifest) toRaw() rawManifest {
 	raw := rawManifest{
-		Constraints:  make([]rawProject, 0, len(m.Constraints)),
-		Overrides:    make([]rawProject, 0, len(m.Ovr)),
-		Ignored:      m.Ignored,
-		Required:     m.Required,
-		PruneOptions: rawPruneOptions{},
+		Constraints: make([]rawProject, 0, len(m.Constraints)),
+		Overrides:   make([]rawProject, 0, len(m.Ovr)),
+		Ignored:     m.Ignored,
+		Required:    m.Required,
 	}
 
 	for n, prj := range m.Constraints {
@@ -480,7 +504,7 @@ func (m *Manifest) toRaw() rawManifest {
 	}
 	sort.Sort(sortedRawProjects(raw.Overrides))
 
-	// TODO(ibrasho): write out prune options.
+	raw.PruneOptions = toRawPruneOptions(m.PruneOptions)
 
 	return raw
 }
@@ -573,16 +597,4 @@ func (m *Manifest) RequiredPackages() map[string]bool {
 	}
 
 	return mp
-}
-
-// PruneOptionsFor returns the prune options for the passed project root.
-//
-// It will return the root prune options if the project does not have specific
-// options or if it does not exists in the manifest.
-func (m *Manifest) PruneOptionsFor(pr gps.ProjectRoot) gps.PruneOptions {
-	if po, ok := m.PruneProjectOptions[pr]; ok {
-		return po
-	}
-
-	return m.PruneOptions
 }

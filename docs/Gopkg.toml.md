@@ -58,6 +58,35 @@ system1-data = "value that is used by a system"
 system2-data = "value that is used by another system"
 ```
 
+## `prune`
+`prune` defines the global and per-project prune options for dependencies. The options control which files are not kept when writing the `vendor/` tree.
+
+The following is the current available options:
+* `unused-packages` prunes files in unused packages.
+* `non-go` prunes files that are not used by Go.
+* `go-tests` prunes Go test files.
+
+Some files are preversed by default (check the [isPreservedFile](../gps/prune.go#L254) function for the details).
+
+Prune options are off by default and can be turned on by setting them to `true` at the root level.
+```toml
+[prune]
+  non-go = true
+```
+
+The same prune options can be defined per-project. An addtional `name` field is required and should represent a project and not a package.
+
+
+```toml
+[prune]
+  non-go = true
+
+  [[prune.project]]
+    name = "github.com/project/name"
+    go-tests = true
+    non-go = false
+```
+
 ## `constraint`
 A `constraint` provides rules for how a [direct dependency](FAQ.md#what-is-a-direct-or-transitive-dependency) may be incorporated into the
 dependency graph.
@@ -171,4 +200,11 @@ codename = "foo"
 
   [override.metadata]
   propertyX = "valueX"
+
+[prune]
+  unused-packages = true
+
+  [[prune.project]]
+    name = "github.com/user/project2"
+    unused-packages = false
 ```

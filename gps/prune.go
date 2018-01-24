@@ -8,8 +8,10 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
+	"github.com/golang/dep/internal/fs"
 	"github.com/pkg/errors"
 )
 
@@ -18,6 +20,13 @@ type PruneOptions uint8
 
 // PruneProjectOptions is map of prune options per project name.
 type PruneProjectOptions map[ProjectRoot]PruneOptions
+
+// RootPruneOptions represents the root prune options for the project.
+// It contains the global options and a map of options per project.
+type RootPruneOptions struct {
+	PruneOptions   PruneOptions
+	ProjectOptions PruneProjectOptions
+}
 
 const (
 	// PruneNestedVendorDirs indicates if nested vendor directories should be pruned.
@@ -31,6 +40,26 @@ const (
 	// PruneGoTestFiles indicates if Go test files should be pruned.
 	PruneGoTestFiles
 )
+
+// DefaultRootPruneOptions instantiates a copy of the default root prune options.
+func DefaultRootPruneOptions() RootPruneOptions {
+	return RootPruneOptions{
+		PruneOptions:   PruneNestedVendorDirs,
+		ProjectOptions: PruneProjectOptions{},
+	}
+}
+
+// PruneOptionsFor returns the prune options for the passed project root.
+//
+// It will return the root prune options if the project does not have specific
+// options or if it does not exist in the manifest.
+func (o *RootPruneOptions) PruneOptionsFor(pr ProjectRoot) PruneOptions {
+	if po, ok := o.ProjectOptions[pr]; ok {
+		return po
+	}
+
+	return o.PruneOptions
+}
 
 var (
 	// licenseFilePrefixes is a list of name prefixes for license files.
@@ -56,204 +85,181 @@ var (
 	}
 )
 
-// Prune removes excess files from the dep tree whose root is baseDir based
-// on the PruneOptions passed.
-//
-// A Lock must be passed if PruneUnusedPackages is toggled on.
-func Prune(baseDir string, options PruneOptions, l Lock, logger *log.Logger) error {
-	// TODO(ibrasho) allow passing specific options per project
-	for _, lp := range l.Projects() {
-		projectDir := filepath.Join(baseDir, string(lp.Ident().ProjectRoot))
-		err := PruneProject(projectDir, lp, options, logger)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
 // PruneProject remove excess files according to the options passed, from
 // the lp directory in baseDir.
 func PruneProject(baseDir string, lp LockedProject, options PruneOptions, logger *log.Logger) error {
-	projectDir := filepath.Join(baseDir, string(lp.Ident().ProjectRoot))
+	fsState, err := deriveFilesystemState(baseDir)
+
+	if err != nil {
+		return errors.Wrap(err, "could not derive filesystem state")
+	}
 
 	if (options & PruneNestedVendorDirs) != 0 {
-		if err := pruneNestedVendorDirs(projectDir); err != nil {
+		if err := pruneVendorDirs(fsState); err != nil {
 			return errors.Wrapf(err, "failed to prune nested vendor directories")
 		}
 	}
 
 	if (options & PruneUnusedPackages) != 0 {
-		if err := pruneUnusedPackages(lp, projectDir, logger); err != nil {
+		if _, err := pruneUnusedPackages(lp, fsState); err != nil {
 			return errors.Wrap(err, "failed to prune unused packages")
 		}
 	}
 
 	if (options & PruneNonGoFiles) != 0 {
-		if err := pruneNonGoFiles(projectDir, logger); err != nil {
+		if err := pruneNonGoFiles(fsState); err != nil {
 			return errors.Wrap(err, "failed to prune non-Go files")
 		}
 	}
 
 	if (options & PruneGoTestFiles) != 0 {
-		if err := pruneGoTestFiles(projectDir, logger); err != nil {
+		if err := pruneGoTestFiles(fsState); err != nil {
 			return errors.Wrap(err, "failed to prune Go test files")
 		}
 	}
 
+	if err := deleteEmptyDirs(fsState); err != nil {
+		return errors.Wrap(err, "could not delete empty dirs")
+	}
+
 	return nil
 }
 
-// pruneNestedVendorDirs deletes all nested vendor directories within baseDir.
-func pruneNestedVendorDirs(baseDir string) error {
-	return filepath.Walk(baseDir, stripVendor)
+// pruneVendorDirs deletes all nested vendor directories within baseDir.
+func pruneVendorDirs(fsState filesystemState) error {
+	for _, dir := range fsState.dirs {
+		if filepath.Base(dir) == "vendor" {
+			err := os.RemoveAll(filepath.Join(fsState.root, dir))
+			if err != nil && !os.IsNotExist(err) {
+				return err
+			}
+		}
+	}
+
+	for _, link := range fsState.links {
+		if filepath.Base(link.path) == "vendor" {
+			err := os.Remove(filepath.Join(fsState.root, link.path))
+			if err != nil && !os.IsNotExist(err) {
+				return err
+			}
+		}
+	}
+
+	return nil
 }
 
-// pruneUnusedPackages deletes unimported packages found within baseDir.
+// pruneUnusedPackages deletes unimported packages found in fsState.
 // Determining whether packages are imported or not is based on the passed LockedProject.
-func pruneUnusedPackages(lp LockedProject, projectDir string, logger *log.Logger) error {
-	pr := string(lp.Ident().ProjectRoot)
-	logger.Printf("Calculating unused packages in %s to prune.\n", pr)
+func pruneUnusedPackages(lp LockedProject, fsState filesystemState) (map[string]interface{}, error) {
+	unusedPackages := calculateUnusedPackages(lp, fsState)
+	toDelete := collectUnusedPackagesFiles(fsState, unusedPackages)
 
-	unusedPackages, err := calculateUnusedPackages(lp, projectDir)
-	if err != nil {
-		return errors.Wrapf(err, "could not calculate unused packages in %s", pr)
+	for _, path := range toDelete {
+		if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+			return nil, err
+		}
 	}
 
-	logger.Printf("Found the following unused packages in %s:\n", pr)
-	for pkg := range unusedPackages {
-		logger.Printf("  * %s\n", filepath.Join(pr, pkg))
-	}
-
-	unusedPackagesFiles, err := collectUnusedPackagesFiles(projectDir, unusedPackages)
-	if err != nil {
-		return errors.Wrapf(err, "could not collect unused packages' files in %s", pr)
-	}
-
-	if err := deleteFiles(unusedPackagesFiles); err != nil {
-		return errors.Wrapf(err, "")
-	}
-
-	return nil
+	return unusedPackages, nil
 }
 
 // calculateUnusedPackages generates a list of unused packages in lp.
-func calculateUnusedPackages(lp LockedProject, projectDir string) (map[string]struct{}, error) {
-	unused := make(map[string]struct{})
-	imported := make(map[string]struct{})
+func calculateUnusedPackages(lp LockedProject, fsState filesystemState) map[string]interface{} {
+	unused := make(map[string]interface{})
+	imported := make(map[string]interface{})
+
 	for _, pkg := range lp.Packages() {
-		imported[pkg] = struct{}{}
+		imported[pkg] = nil
 	}
 
-	err := filepath.Walk(projectDir, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
+	// Add the root package if it's not imported.
+	if _, ok := imported["."]; !ok {
+		unused["."] = nil
+	}
 
-		// Ignore anything that's not a directory.
-		if !info.IsDir() {
-			return nil
-		}
+	for _, dirPath := range fsState.dirs {
+		pkg := filepath.ToSlash(dirPath)
 
-		pkg, err := filepath.Rel(projectDir, path)
-		if err != nil {
-			return errors.Wrap(err, "unexpected error while calculating unused packages")
-		}
-
-		pkg = filepath.ToSlash(pkg)
 		if _, ok := imported[pkg]; !ok {
-			unused[pkg] = struct{}{}
+			unused[pkg] = nil
 		}
+	}
 
-		return nil
-	})
-
-	return unused, err
+	return unused
 }
 
-// collectUnusedPackagesFiles returns a slice of all files in the unused packages in projectDir.
-func collectUnusedPackagesFiles(projectDir string, unusedPackages map[string]struct{}) ([]string, error) {
+// collectUnusedPackagesFiles returns a slice of all files in the unused
+// packages based on fsState.
+func collectUnusedPackagesFiles(fsState filesystemState, unusedPackages map[string]interface{}) []string {
+	// TODO(ibrasho): is this useful?
 	files := make([]string, 0, len(unusedPackages))
 
-	err := filepath.Walk(projectDir, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
+	for _, path := range fsState.files {
+		// Keep perserved files.
+		if isPreservedFile(filepath.Base(path)) {
+			continue
 		}
 
-		// Ignore directories.
-		if info.IsDir() {
-			return nil
-		}
+		pkg := filepath.ToSlash(filepath.Dir(path))
 
-		// Ignore preserved files.
-		if isPreservedFile(info.Name()) {
-			return nil
-		}
-
-		pkg, err := filepath.Rel(projectDir, filepath.Dir(path))
-		if err != nil {
-			return errors.Wrap(err, "unexpected error while calculating unused packages")
-		}
-
-		pkg = filepath.ToSlash(pkg)
 		if _, ok := unusedPackages[pkg]; ok {
-			files = append(files, path)
+			files = append(files, filepath.Join(fsState.root, path))
 		}
-
-		return nil
-	})
-
-	return files, err
-}
-
-// pruneNonGoFiles delete all non-Go files existing within baseDir.
-// Files with names that are prefixed by any entry in preservedNonGoFiles
-// are not deleted.
-func pruneNonGoFiles(baseDir string, logger *log.Logger) error {
-	files, err := collectNonGoFiles(baseDir, logger)
-	if err != nil {
-		return errors.Wrap(err, "could not collect non-Go files")
 	}
 
-	if err := deleteFiles(files); err != nil {
-		return errors.Wrap(err, "could not prune Go test files")
+	return files
+}
+
+// pruneNonGoFiles delete all non-Go files existing in fsState.
+//
+// Files matching licenseFilePrefixes and legalFileSubstrings are not pruned.
+func pruneNonGoFiles(fsState filesystemState) error {
+	toDelete := make([]string, 0, len(fsState.files)/4)
+
+	for _, path := range fsState.files {
+		ext := fileExt(path)
+
+		// Refer to: https://github.com/golang/go/blob/release-branch.go1.9/src/go/build/build.go#L750
+		switch ext {
+		case ".go":
+			continue
+		case ".c":
+			continue
+		case ".cc", ".cpp", ".cxx":
+			continue
+		case ".m":
+			continue
+		case ".h", ".hh", ".hpp", ".hxx":
+			continue
+		case ".f", ".F", ".for", ".f90":
+			continue
+		case ".s":
+			continue
+		case ".S":
+			continue
+		case ".swig":
+			continue
+		case ".swigcxx":
+			continue
+		case ".syso":
+			continue
+		}
+
+		// Ignore perserved files.
+		if isPreservedFile(filepath.Base(path)) {
+			continue
+		}
+
+		toDelete = append(toDelete, filepath.Join(fsState.root, path))
+	}
+
+	for _, path := range toDelete {
+		if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+			return err
+		}
 	}
 
 	return nil
-}
-
-// collectNonGoFiles returns a slice containing all non-Go files in baseDir.
-// Files meeting the checks in isPreservedFile are not returned.
-func collectNonGoFiles(baseDir string, logger *log.Logger) ([]string, error) {
-	files := make([]string, 0)
-
-	err := filepath.Walk(baseDir, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-
-		// Ignore directories.
-		if info.IsDir() {
-			return nil
-		}
-
-		// Ignore all Go files.
-		if strings.HasSuffix(info.Name(), ".go") {
-			return nil
-		}
-
-		// Ignore preserved files.
-		if isPreservedFile(info.Name()) {
-			return nil
-		}
-
-		files = append(files, path)
-
-		return nil
-	})
-
-	return files, err
 }
 
 // isPreservedFile checks if the file name indicates that the file should be
@@ -276,51 +282,50 @@ func isPreservedFile(name string) bool {
 	return false
 }
 
-// pruneGoTestFiles deletes all Go test files (*_test.go) within baseDir.
-func pruneGoTestFiles(baseDir string, logger *log.Logger) error {
-	files, err := collectGoTestFiles(baseDir)
-	if err != nil {
-		return errors.Wrap(err, "could not collect Go test files")
+// pruneGoTestFiles deletes all Go test files (*_test.go) in fsState.
+func pruneGoTestFiles(fsState filesystemState) error {
+	toDelete := make([]string, 0, len(fsState.files)/2)
+
+	for _, path := range fsState.files {
+		if strings.HasSuffix(path, "_test.go") {
+			toDelete = append(toDelete, filepath.Join(fsState.root, path))
+		}
 	}
 
-	if err := deleteFiles(files); err != nil {
-		return errors.Wrap(err, "could not prune Go test files")
+	for _, path := range toDelete {
+		if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+			return err
+		}
 	}
 
 	return nil
 }
 
-// collectGoTestFiles returns a slice contains all Go test files (any files
-// prefixed with _test.go) in baseDir.
-func collectGoTestFiles(baseDir string) ([]string, error) {
-	files := make([]string, 0)
+func deleteEmptyDirs(fsState filesystemState) error {
+	sort.Sort(sort.Reverse(sort.StringSlice(fsState.dirs)))
 
-	err := filepath.Walk(baseDir, func(path string, info os.FileInfo, err error) error {
+	for _, dir := range fsState.dirs {
+		path := filepath.Join(fsState.root, dir)
+
+		notEmpty, err := fs.IsNonEmptyDir(path)
 		if err != nil {
 			return err
 		}
 
-		// Ignore directories.
-		if info.IsDir() {
-			return nil
-		}
-
-		// Ignore any files that is not a Go test file.
-		if strings.HasSuffix(info.Name(), "_test.go") {
-			files = append(files, path)
-		}
-
-		return nil
-	})
-
-	return files, err
-}
-
-func deleteFiles(paths []string) error {
-	for _, path := range paths {
-		if err := os.Remove(path); err != nil {
-			return err
+		if !notEmpty {
+			if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+				return err
+			}
 		}
 	}
+
 	return nil
+}
+
+func fileExt(name string) string {
+	i := strings.LastIndex(name, ".")
+	if i < 0 {
+		return ""
+	}
+	return name[i:]
 }
