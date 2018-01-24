@@ -119,7 +119,7 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 	}
 
 	// Set default prune options for go-tests and unused-packages
-	p.Manifest.PruneOptions.PruneOptions = gps.PruneNestedVendorDirs + gps.PruneGoTestFiles + gps.PruneUnusedPackages
+	p.Manifest.PruneOptions.DefaultOptions = gps.PruneNestedVendorDirs | gps.PruneGoTestFiles | gps.PruneUnusedPackages
 
 	if cmd.gopath {
 		gs := newGopathScanner(ctx, directDeps, sm)

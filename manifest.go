@@ -51,7 +51,7 @@ type Manifest struct {
 	Ignored  []string
 	Required []string
 
-	PruneOptions gps.RootPruneOptions
+	PruneOptions gps.CascadingPruneOptions
 }
 
 type rawManifest struct {
@@ -75,14 +75,8 @@ type rawPruneOptions struct {
 	NonGoFiles     bool `toml:"non-go,omitempty"`
 	GoTests        bool `toml:"go-tests,omitempty"`
 
-	Projects []rawPruneProjectOptions `toml:"project,omitempty"`
-}
-
-type rawPruneProjectOptions struct {
-	Name           string `toml:"name"`
-	UnusedPackages bool   `toml:"unused-packages,omitempty"`
-	NonGoFiles     bool   `toml:"non-go,omitempty"`
-	GoTests        bool   `toml:"go-tests,omitempty"`
+	//Projects []map[string]interface{} `toml:"project,omitempty"`
+	Projects []map[string]interface{}
 }
 
 const (
@@ -91,12 +85,22 @@ const (
 	pruneOptionNonGo          = "non-go"
 )
 
+// Constants to represents per-project prune uint8 values.
+const (
+	pvnone  uint8 = 0 // No per-project prune value was set in Gopkg.toml.
+	pvtrue  uint8 = 1 // Per-project prune value was explicitly set to true.
+	pvfalse uint8 = 2 // Per-project prune value was explicitly set to false.
+)
+
 // NewManifest instantites a new manifest.
 func NewManifest() *Manifest {
 	return &Manifest{
-		Constraints:  make(gps.ProjectConstraints),
-		Ovr:          make(gps.ProjectConstraints),
-		PruneOptions: gps.DefaultRootPruneOptions(),
+		Constraints: make(gps.ProjectConstraints),
+		Ovr:         make(gps.ProjectConstraints),
+		PruneOptions: gps.CascadingPruneOptions{
+			DefaultOptions:    gps.PruneNestedVendorDirs,
+			PerProjectOptions: map[gps.ProjectRoot]gps.PruneOptionSet{},
+		},
 	}
 }
 
@@ -259,18 +263,24 @@ func validatePruneOptions(val interface{}, root bool) (warns []error, err error)
 	return warns, err
 }
 
-func checkRedundantPruneOptions(raw rawManifest) (warns []error) {
-	rootOptions := raw.PruneOptions
+func checkRedundantPruneOptions(co gps.CascadingPruneOptions) (warns []error) {
+	for name, project := range co.PerProjectOptions {
+		if project.UnusedPackages != pvnone {
+			if (co.DefaultOptions&gps.PruneUnusedPackages != 0) == (project.UnusedPackages == pvtrue) {
+				warns = append(warns, errors.Errorf("redundant prune option %q set for %q", pruneOptionUnusedPackages, name))
+			}
+		}
 
-	for _, project := range raw.PruneOptions.Projects {
-		if rootOptions.GoTests && project.GoTests {
-			warns = append(warns, errors.Errorf("redundant prune option %q set for %q", pruneOptionGoTests, project.Name))
+		if project.NonGoFiles != pvnone {
+			if (co.DefaultOptions&gps.PruneNonGoFiles != 0) == (project.NonGoFiles == pvtrue) {
+				warns = append(warns, errors.Errorf("redundant prune option %q set for %q", pruneOptionNonGo, name))
+			}
 		}
-		if rootOptions.NonGoFiles && project.NonGoFiles {
-			warns = append(warns, errors.Errorf("redundant prune option %q set for %q", pruneOptionNonGo, project.Name))
-		}
-		if rootOptions.UnusedPackages && project.UnusedPackages {
-			warns = append(warns, errors.Errorf("redundant prune option %q set for %q", pruneOptionUnusedPackages, project.Name))
+
+		if project.GoTests != pvnone {
+			if (co.DefaultOptions&gps.PruneGoTestFiles != 0) == (project.GoTests == pvtrue) {
+				warns = append(warns, errors.Errorf("redundant prune option %q set for %q", pruneOptionGoTests, name))
+			}
 		}
 	}
 
@@ -302,7 +312,7 @@ func ValidateProjectRoots(c *Ctx, m *Manifest, sm gps.SourceManager) error {
 		wg.Add(1)
 		go validate(pr)
 	}
-	for pr := range m.PruneOptions.ProjectOptions {
+	for pr := range m.PruneOptions.PerProjectOptions {
 		wg.Add(1)
 		go validate(pr)
 	}
@@ -342,13 +352,16 @@ func readManifest(r io.Reader) (*Manifest, []error, error) {
 		return nil, warns, errors.Wrap(err, "unable to parse the manifest as TOML")
 	}
 
-	warns = append(warns, checkRedundantPruneOptions(raw)...)
+	m, err := fromRawManifest(raw, buf)
+	if err != nil {
+		return nil, warns, err
+	}
 
-	m, err := fromRawManifest(raw)
-	return m, warns, err
+	warns = append(warns, checkRedundantPruneOptions(m.PruneOptions)...)
+	return m, warns, nil
 }
 
-func fromRawManifest(raw rawManifest) (*Manifest, error) {
+func fromRawManifest(raw rawManifest, buf *bytes.Buffer) (*Manifest, error) {
 	m := NewManifest()
 
 	m.Constraints = make(gps.ProjectConstraints, len(raw.Constraints))
@@ -378,39 +391,66 @@ func fromRawManifest(raw rawManifest) (*Manifest, error) {
 		m.Ovr[name] = prj
 	}
 
-	m.PruneOptions = fromRawPruneOptions(raw.PruneOptions)
+	// TODO(sdboyer) it is awful that we have to do this manual extraction
+	tree, err := toml.Load(buf.String())
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to load TomlTree from string")
+	}
+
+	iprunemap := tree.Get("prune")
+	if iprunemap == nil {
+		return m, nil
+	}
+	// Previous validation already guaranteed that, if it exists, it's this map
+	// type.
+	m.PruneOptions = fromRawPruneOptions(iprunemap.(*toml.Tree).ToMap())
 
 	return m, nil
 }
 
-func fromRawPruneOptions(raw rawPruneOptions) gps.RootPruneOptions {
-	opts := gps.RootPruneOptions{
-		PruneOptions:   gps.PruneNestedVendorDirs,
-		ProjectOptions: make(gps.PruneProjectOptions),
+func fromRawPruneOptions(prunemap map[string]interface{}) gps.CascadingPruneOptions {
+	opts := gps.CascadingPruneOptions{
+		DefaultOptions:    gps.PruneNestedVendorDirs,
+		PerProjectOptions: make(map[gps.ProjectRoot]gps.PruneOptionSet),
 	}
 
-	if raw.UnusedPackages {
-		opts.PruneOptions |= gps.PruneUnusedPackages
+	if val, has := prunemap[pruneOptionUnusedPackages]; has && val.(bool) {
+		opts.DefaultOptions |= gps.PruneUnusedPackages
 	}
-	if raw.GoTests {
-		opts.PruneOptions |= gps.PruneGoTestFiles
+	if val, has := prunemap[pruneOptionNonGo]; has && val.(bool) {
+		opts.DefaultOptions |= gps.PruneNonGoFiles
 	}
-	if raw.NonGoFiles {
-		opts.PruneOptions |= gps.PruneNonGoFiles
+	if val, has := prunemap[pruneOptionGoTests]; has && val.(bool) {
+		opts.DefaultOptions |= gps.PruneGoTestFiles
 	}
 
-	for _, p := range raw.Projects {
-		pr := gps.ProjectRoot(p.Name)
-		opts.ProjectOptions[pr] = gps.PruneNestedVendorDirs
-
-		if p.UnusedPackages {
-			opts.ProjectOptions[pr] |= gps.PruneUnusedPackages
+	trinary := func(v interface{}) uint8 {
+		b := v.(bool)
+		if b {
+			return pvtrue
 		}
-		if p.GoTests {
-			opts.ProjectOptions[pr] |= gps.PruneGoTestFiles
-		}
-		if p.NonGoFiles {
-			opts.ProjectOptions[pr] |= gps.PruneNonGoFiles
+		return pvfalse
+	}
+
+	if projprunes, has := prunemap["project"]; has {
+		for _, proj := range projprunes.([]interface{}) {
+			var pr gps.ProjectRoot
+			// This should be redundant, but being explicit doesn't hurt.
+			pos := gps.PruneOptionSet{NestedVendor: pvtrue}
+
+			for key, val := range proj.(map[string]interface{}) {
+				switch key {
+				case "name":
+					pr = gps.ProjectRoot(val.(string))
+				case pruneOptionNonGo:
+					pos.NonGoFiles = trinary(val)
+				case pruneOptionGoTests:
+					pos.GoTests = trinary(val)
+				case pruneOptionUnusedPackages:
+					pos.UnusedPackages = trinary(val)
+				}
+			}
+			opts.PerProjectOptions[pr] = pos
 		}
 	}
 
@@ -421,21 +461,21 @@ func fromRawPruneOptions(raw rawPruneOptions) gps.RootPruneOptions {
 //
 // Will panic if gps.RootPruneOption includes ProjectPruneOptions
 // See https://github.com/golang/dep/pull/1460#discussion_r158128740 for more information
-func toRawPruneOptions(root gps.RootPruneOptions) rawPruneOptions {
-	if len(root.ProjectOptions) != 0 {
+func toRawPruneOptions(co gps.CascadingPruneOptions) rawPruneOptions {
+	if len(co.PerProjectOptions) != 0 {
 		panic("toRawPruneOptions cannot convert ProjectOptions to rawPruneOptions")
 	}
 	raw := rawPruneOptions{}
 
-	if (root.PruneOptions & gps.PruneUnusedPackages) != 0 {
+	if (co.DefaultOptions & gps.PruneUnusedPackages) != 0 {
 		raw.UnusedPackages = true
 	}
 
-	if (root.PruneOptions & gps.PruneNonGoFiles) != 0 {
+	if (co.DefaultOptions & gps.PruneNonGoFiles) != 0 {
 		raw.NonGoFiles = true
 	}
 
-	if (root.PruneOptions & gps.PruneGoTestFiles) != 0 {
+	if (co.DefaultOptions & gps.PruneGoTestFiles) != 0 {
 		raw.GoTests = true
 	}
 	return raw

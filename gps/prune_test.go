@@ -13,18 +13,94 @@ import (
 	"github.com/golang/dep/internal/test"
 )
 
-func TestRootPruneOptions_PruneOptionsFor(t *testing.T) {
-	pr := ProjectRoot("github.com/golang/dep")
-
-	o := RootPruneOptions{
-		PruneOptions: PruneNestedVendorDirs,
-		ProjectOptions: PruneProjectOptions{
-			pr: PruneGoTestFiles,
+func TestCascadingPruneOptions(t *testing.T) {
+	cases := []struct {
+		name    string
+		co      CascadingPruneOptions
+		results map[ProjectRoot]PruneOptions
+	}{
+		{
+			name: "all empty values",
+			co: CascadingPruneOptions{
+				DefaultOptions: PruneNestedVendorDirs,
+				PerProjectOptions: map[ProjectRoot]PruneOptionSet{
+					ProjectRoot("github.com/golang/dep"): {},
+				},
+			},
+			results: map[ProjectRoot]PruneOptions{
+				ProjectRoot("github.com/golang/dep"): PruneNestedVendorDirs,
+			},
+		},
+		{
+			name: "all overriden",
+			co: CascadingPruneOptions{
+				DefaultOptions: PruneNestedVendorDirs,
+				PerProjectOptions: map[ProjectRoot]PruneOptionSet{
+					ProjectRoot("github.com/golang/dep"): {
+						NestedVendor:   2,
+						UnusedPackages: 1,
+						NonGoFiles:     1,
+						GoTests:        1,
+					},
+				},
+			},
+			results: map[ProjectRoot]PruneOptions{
+				ProjectRoot("github.com/golang/dep"): PruneUnusedPackages | PruneNonGoFiles | PruneGoTestFiles,
+			},
+		},
+		{
+			name: "all redundant",
+			co: CascadingPruneOptions{
+				DefaultOptions: PruneNestedVendorDirs,
+				PerProjectOptions: map[ProjectRoot]PruneOptionSet{
+					ProjectRoot("github.com/golang/dep"): {
+						NestedVendor:   1,
+						UnusedPackages: 2,
+						NonGoFiles:     2,
+						GoTests:        2,
+					},
+				},
+			},
+			results: map[ProjectRoot]PruneOptions{
+				ProjectRoot("github.com/golang/dep"): PruneNestedVendorDirs,
+			},
+		},
+		{
+			name: "multiple projects, all combos",
+			co: CascadingPruneOptions{
+				DefaultOptions: PruneNestedVendorDirs,
+				PerProjectOptions: map[ProjectRoot]PruneOptionSet{
+					ProjectRoot("github.com/golang/dep"): {
+						NestedVendor:   1,
+						UnusedPackages: 2,
+						NonGoFiles:     2,
+						GoTests:        2,
+					},
+					ProjectRoot("github.com/other/one"): {
+						NestedVendor:   2,
+						UnusedPackages: 1,
+						NonGoFiles:     1,
+						GoTests:        1,
+					},
+				},
+			},
+			results: map[ProjectRoot]PruneOptions{
+				ProjectRoot("github.com/golang/dep"): PruneNestedVendorDirs,
+				ProjectRoot("github.com/other/one"):  PruneUnusedPackages | PruneNonGoFiles | PruneGoTestFiles,
+				ProjectRoot("not/there"):             PruneNestedVendorDirs,
+			},
 		},
 	}
 
-	if (o.PruneOptionsFor(pr) & PruneGoTestFiles) != PruneGoTestFiles {
-		t.Fatalf("invalid prune options.\n\t(GOT): %d\n\t(WNT): %d", o.PruneOptionsFor(pr), PruneGoTestFiles)
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			for pr, wanted := range c.results {
+				if c.co.PruneOptionsFor(pr) != wanted {
+					t.Fatalf("did not get expected final PruneOptions value from cascade:\n\t(GOT): %d\n\t(WNT): %d", c.co.PruneOptionsFor(pr), wanted)
+				}
+
+			}
+		})
 	}
 }
 
