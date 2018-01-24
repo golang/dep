@@ -4,9 +4,15 @@ NEW FEATURES:
 
 BUG FIXES:
 
-* Fix per-project prune option handling ([#1562](https://github.com/golang/dep/pull/1562))
+* Fix per-project prune option handling ([#1570](https://github.com/golang/dep/pull/1570))
 
 IMPROVEMENTS:
+
+# v0.4.1
+
+BUG FIXES:
+
+* Fix per-project prune option handling ([#1570](https://github.com/golang/dep/pull/1570))
 
 # v0.4.0
 
