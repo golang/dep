@@ -1,0 +1,52 @@
+/* your custom css */
+
+.homeContainer {
+    flex: 1 0 auto;
+    padding-bottom: 1em;
+}
+
+.docMainWrapper {
+    flex: 1 0 auto;
+    padding-bottom: 1em;
+}
+
+.homeContainer .homeWrapper .projectLogo {
+    justify-content: center;
+    position: relative;
+    padding: 2em;
+}
+
+.homeContainer .homeWrapper .projectLogo img {
+    max-height: 360px;
+}
+
+body {
+    display: flex;
+    flex-direction: column;
+}
+
+div.navPusher {
+    display: flex;
+    flex-direction: column;
+}
+
+.footer-logo {
+    padding-top: 1em;
+    display: flex;
+    justify-content: center;
+}
+
+@media only screen and (min-device-width: 360px) and (max-device-width: 736px) {
+}
+
+@media only screen and (min-width: 1024px) {
+}
+
+@media only screen and (max-width: 1023px) {
+}
+
+@media only screen and (min-width: 1400px) {
+}
+
+@media only screen and (min-width: 1500px) {
+}
