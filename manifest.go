@@ -75,7 +75,8 @@ type rawPruneOptions struct {
 	NonGoFiles     bool `toml:"non-go,omitempty"`
 	GoTests        bool `toml:"go-tests,omitempty"`
 
-	Projects []map[string]interface{} `toml:"project,omitempty"`
+	//Projects []map[string]interface{} `toml:"project,omitempty"`
+	Projects []map[string]interface{}
 }
 
 const (
@@ -351,12 +352,16 @@ func readManifest(r io.Reader) (*Manifest, []error, error) {
 		return nil, warns, errors.Wrap(err, "unable to parse the manifest as TOML")
 	}
 
-	m, err := fromRawManifest(raw)
-	//warns = append(warns, checkRedundantPruneOptions(m)...)
-	return m, warns, err
+	m, err := fromRawManifest(raw, buf)
+	if err != nil {
+		return nil, warns, err
+	}
+
+	warns = append(warns, checkRedundantPruneOptions(m.PruneOptions)...)
+	return m, warns, nil
 }
 
-func fromRawManifest(raw rawManifest) (*Manifest, error) {
+func fromRawManifest(raw rawManifest, buf *bytes.Buffer) (*Manifest, error) {
 	m := NewManifest()
 
 	m.Constraints = make(gps.ProjectConstraints, len(raw.Constraints))
@@ -386,74 +391,70 @@ func fromRawManifest(raw rawManifest) (*Manifest, error) {
 		m.Ovr[name] = prj
 	}
 
-	var err error
-	m.PruneOptions, err = fromRawPruneOptions(raw.PruneOptions)
+	// TODO(sdboyer) it is awful that we have to do this manual extraction
+	tree, err := toml.Load(buf.String())
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "unable to load TomlTree from string")
 	}
+
+	iprunemap := tree.Get("prune")
+	if iprunemap == nil {
+		return m, nil
+	}
+	// Previous validation already guaranteed that, if it exists, it's this map
+	// type.
+	m.PruneOptions = fromRawPruneOptions(iprunemap.(*toml.Tree).ToMap())
 
 	return m, nil
 }
 
-func fromRawPruneOptions(raw rawPruneOptions) (gps.CascadingPruneOptions, error) {
+func fromRawPruneOptions(prunemap map[string]interface{}) gps.CascadingPruneOptions {
 	opts := gps.CascadingPruneOptions{
 		DefaultOptions:    gps.PruneNestedVendorDirs,
 		PerProjectOptions: make(map[gps.ProjectRoot]gps.PruneOptionSet),
 	}
 
-	if raw.UnusedPackages {
+	if val, has := prunemap[pruneOptionUnusedPackages]; has && val.(bool) {
 		opts.DefaultOptions |= gps.PruneUnusedPackages
 	}
-	if raw.GoTests {
-		opts.DefaultOptions |= gps.PruneGoTestFiles
-	}
-	if raw.NonGoFiles {
+	if val, has := prunemap[pruneOptionNonGo]; has && val.(bool) {
 		opts.DefaultOptions |= gps.PruneNonGoFiles
 	}
-
-	for _, p := range raw.Projects {
-		name, has := p["name"]
-		if !has {
-			return gps.CascadingPruneOptions{}, errors.Errorf("no name field declared for per-project prune options")
-		}
-		if name.(string) == "" {
-			return gps.CascadingPruneOptions{}, errors.Errorf("empty name field in per-project prune options")
-		}
-
-		pr := gps.ProjectRoot(name.(string))
-		pos := gps.PruneOptionSet{
-			// This should be redundant, but being explicit doesn't hurt.
-			NestedVendor: pvtrue,
-		}
-
-		if val, has := p[pruneOptionUnusedPackages]; has {
-			if val.(bool) {
-				pos.UnusedPackages = pvtrue
-			} else {
-				pos.UnusedPackages = pvfalse
-			}
-		}
-
-		if val, has := p[pruneOptionGoTests]; has {
-			if val.(bool) {
-				pos.GoTests = pvtrue
-			} else {
-				pos.GoTests = pvfalse
-			}
-		}
-
-		if val, has := p[pruneOptionNonGo]; has {
-			if val.(bool) {
-				pos.NonGoFiles = pvtrue
-			} else {
-				pos.NonGoFiles = pvfalse
-			}
-		}
-
-		opts.PerProjectOptions[pr] = pos
+	if val, has := prunemap[pruneOptionGoTests]; has && val.(bool) {
+		opts.DefaultOptions |= gps.PruneGoTestFiles
 	}
 
-	return opts, nil
+	trinary := func(v interface{}) uint8 {
+		b := v.(bool)
+		if b {
+			return pvtrue
+		}
+		return pvfalse
+	}
+
+	if projprunes, has := prunemap["project"]; has {
+		for _, proj := range projprunes.([]interface{}) {
+			var pr gps.ProjectRoot
+			// This should be redundant, but being explicit doesn't hurt.
+			pos := gps.PruneOptionSet{NestedVendor: pvtrue}
+
+			for key, val := range proj.(map[string]interface{}) {
+				switch key {
+				case "name":
+					pr = gps.ProjectRoot(val.(string))
+				case pruneOptionNonGo:
+					pos.NonGoFiles = trinary(val)
+				case pruneOptionGoTests:
+					pos.GoTests = trinary(val)
+				case pruneOptionUnusedPackages:
+					pos.UnusedPackages = trinary(val)
+				}
+			}
+			opts.PerProjectOptions[pr] = pos
+		}
+	}
+
+	return opts
 }
 
 // toRawPruneOptions converts a gps.RootPruneOption's PruneOptions to rawPruneOptions
