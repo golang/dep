@@ -89,7 +89,7 @@ const (
 const (
 	pvnone  uint8 = 0 // No per-project prune value was set in Gopkg.toml.
 	pvtrue  uint8 = 1 // Per-project prune value was explicitly set to true.
-	pvfalse uint8 = 2 // Per-project prune value was explicitly set to true.
+	pvfalse uint8 = 2 // Per-project prune value was explicitly set to false.
 )
 
 // NewManifest instantites a new manifest.
