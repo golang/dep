@@ -33,12 +33,11 @@ unset IFS
 if [ ${#files[@]} -gt 0 ]; then
 	go build ./cmd/dep
 	./dep ensure -vendor-only
-	./dep prune
 	# Let see if the working directory is clean
 	diffs="$(git status --porcelain -- vendor Gopkg.toml Gopkg.lock 2>/dev/null)"
 	if [ "$diffs" ]; then
 		{
-			echo 'The contents of vendor differ after "dep ensure && dep prune":'
+			echo 'The contents of vendor differ after "dep ensure":'
 			echo
 			echo "$diffs"
 			echo
