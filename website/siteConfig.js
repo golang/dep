@@ -7,7 +7,7 @@ const siteConfig = {
   tagline: 'Dependency management for Go',
   url: 'https://golang.github.io' /* your website url */,
   baseUrl: '/dep/' /* base url for your project */,
-  editURL: 'https://github.com/golang/dep/edit/master/docs/',
+  editUrl: 'https://github.com/golang/dep/edit/master/docs/',
   projectName: 'dep',
   headerLinks: [
     {doc: 'introduction', label: 'Documentation'},
@@ -23,6 +23,10 @@ const siteConfig = {
     secondaryColor: '#E0EBF5',
     primaryColor: '#375EAB',
   },
+  //algolia: {
+    //apiKey: "f2e26cf744b3d81c7e57499075753104",
+    //indexName: "dep-docs"
+  //},
   // This copyright info is used in /core/Footer.js and blog rss/atom feeds.
   copyright:
     'Copyright © ' +

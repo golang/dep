@@ -57,7 +57,11 @@ Deduction is the process of determining the subset of an import path that corres
 
 ### Direct Dependency
 
-A project's direct dependencies are those that it imports from one or more of its packages, or includes in its [`required`](Gopkg.toml.md#required) list in `Gopkg.toml`. If each letter in `A -> B -> C -> D` represents a project, then only `B` is  `A`'s direct dependency.
+A project's direct dependencies are those that it _imports_ from one or more of its packages, or includes in its [`required`](Gopkg.toml.md#required) list in `Gopkg.toml`.
+
+ If each letter in `A -> B -> C -> D` represents a distinct project containing only a single package, and `->` indicates an import statement, then `B` is  `A`'s direct dependency, whereas `C` and `D` are [transitive dependencies](#transitive-dependency) of `A`.
+
+Dep only incorporates the `required` rules from the [current project's](#current-project) `Gopkg.toml`. Therefore, if `=>` represents `required` rather than a standard import, and `A -> B => C`, then `C` is a direct dependency of `B` _only_ when `B` is the current project. Because the `B`-to-`C` link does not exist when `A` is the current project, then `C` won't actually be in the graph at all.
 
 ### External Import
 
@@ -120,7 +124,7 @@ The remote entities that hold versioned code. Sources are specifically the entit
 
 ### Source Root
 
-The portion of an import path that corresponds to the network location of a source. This is similar to [Project Root](#project-root), but refers strictly to the second definition, network-oriented.
+The portion of an import path that corresponds to the network location of a source. This is similar to [Project Root](#project-root), but refers strictly to the second, network-oriented definition.
 
 ### Sync
 
@@ -130,4 +134,6 @@ This concept is explored in detail on [the ensure mechanics reference page](ensu
 
 ### Transitive Dependency
 
-A project's transitive dependencies are those dependencies that it does not import itself, but are imported by one of its dependencies. If each letter in `A -> B -> C -> D` represents a project, then `C` and `D` are  `A`'s transitive dependencies.
+A project's transitive dependencies are those dependencies that it does not import itself, but are imported by one of its dependencies. 
+
+If each letter in `A -> B -> C -> D` represents a distinct project containing only a single package, and `->` indicates an import statement, then  `C` and `D` are  `A`'s transitive dependencies, whereas `B` is a [direct dependency](#transitive-dependency) of `A`.
