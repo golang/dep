@@ -46,12 +46,8 @@ func TestReadManifest(t *testing.T) {
 			},
 		},
 		Ignored: []string{"github.com/foo/bar"},
-		PruneOptions: gps.RootPruneOptions{
-			PruneOptions: gps.PruneNestedVendorDirs | gps.PruneNonGoFiles,
-			ProjectOptions: gps.PruneProjectOptions{
-				gps.ProjectRoot("github.com/golang/dep"):   gps.PruneNestedVendorDirs,
-				gps.ProjectRoot("github.com/babble/brook"): gps.PruneNestedVendorDirs | gps.PruneGoTestFiles,
-			},
+		PruneOptions: gps.CascadingPruneOptions{
+			DefaultPruneOptions: gps.PruneNestedVendorDirs | gps.PruneNonGoFiles,
 		},
 	}
 
@@ -63,6 +59,10 @@ func TestReadManifest(t *testing.T) {
 	}
 	if !reflect.DeepEqual(got.Ignored, want.Ignored) {
 		t.Error("Valid manifest's ignored did not parse as expected")
+	}
+	if !reflect.DeepEqual(got.PruneOptions, want.PruneOptions) {
+		t.Error("Valid manifest's prune options did not parse as expected")
+		t.Error(got.PruneOptions, want.PruneOptions)
 	}
 }
 
@@ -463,29 +463,74 @@ func TestValidateManifest(t *testing.T) {
 func TestCheckRedundantPruneOptions(t *testing.T) {
 	cases := []struct {
 		name         string
-		pruneOptions rawPruneOptions
+		pruneOptions gps.CascadingPruneOptions
 		wantWarn     []error
 	}{
 		{
-			name: "redundant project prune options",
-			pruneOptions: rawPruneOptions{
-				NonGoFiles: true,
-				Projects: []rawPruneProjectOptions{
-					rawPruneProjectOptions{
-						Name:       "github.com/org/project",
-						NonGoFiles: true,
+			name: "all redundant on true",
+			pruneOptions: gps.CascadingPruneOptions{
+				DefaultPruneOptions: 15,
+				PerProjectOptions: gps.PruneProjectOptions2{
+					"github.com/golang/dep": gps.PruneOptionSet{
+						NestedVendor:   gps.PruneValueTrue,
+						UnusedPackages: gps.PruneValueTrue,
+						NonGoFiles:     gps.PruneValueTrue,
+						GoTests:        gps.PruneValueTrue,
 					},
 				},
 			},
 			wantWarn: []error{
-				fmt.Errorf("redundant prune option %q set for %q", "non-go", "github.com/org/project"),
+				fmt.Errorf("redundant prune option %q set for %q", "unused-packages", "github.com/golang/dep"),
+				fmt.Errorf("redundant prune option %q set for %q", "non-go", "github.com/golang/dep"),
+				fmt.Errorf("redundant prune option %q set for %q", "go-tests", "github.com/golang/dep"),
+			},
+		},
+		{
+			name: "all redundant on false",
+			pruneOptions: gps.CascadingPruneOptions{
+				DefaultPruneOptions: 1,
+				PerProjectOptions: gps.PruneProjectOptions2{
+					"github.com/golang/dep": gps.PruneOptionSet{
+						NestedVendor:   gps.PruneValueTrue,
+						UnusedPackages: gps.PruneValueFalse,
+						NonGoFiles:     gps.PruneValueFalse,
+						GoTests:        gps.PruneValueFalse,
+					},
+				},
+			},
+			wantWarn: []error{
+				fmt.Errorf("redundant prune option %q set for %q", "unused-packages", "github.com/golang/dep"),
+				fmt.Errorf("redundant prune option %q set for %q", "non-go", "github.com/golang/dep"),
+				fmt.Errorf("redundant prune option %q set for %q", "go-tests", "github.com/golang/dep"),
+			},
+		},
+		{
+			name: "redundancy mix across multiple projects",
+			pruneOptions: gps.CascadingPruneOptions{
+				DefaultPruneOptions: 7,
+				PerProjectOptions: gps.PruneProjectOptions2{
+					"github.com/golang/dep": gps.PruneOptionSet{
+						NestedVendor: gps.PruneValueTrue,
+						NonGoFiles:   gps.PruneValueTrue,
+						GoTests:      gps.PruneValueTrue,
+					},
+					"github.com/other/project": gps.PruneOptionSet{
+						NestedVendor:   gps.PruneValueTrue,
+						UnusedPackages: gps.PruneValueFalse,
+						GoTests:        gps.PruneValueFalse,
+					},
+				},
+			},
+			wantWarn: []error{
+				fmt.Errorf("redundant prune option %q set for %q", "non-go", "github.com/golang/dep"),
+				fmt.Errorf("redundant prune option %q set for %q", "go-tests", "github.com/other/project"),
 			},
 		},
 	}
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			errs := checkRedundantPruneOptions(rawManifest{PruneOptions: c.pruneOptions})
+			errs := checkRedundantPruneOptions(c.pruneOptions)
 
 			// compare length of error slice
 			if len(errs) != len(c.wantWarn) {
@@ -612,7 +657,7 @@ func TestFromRawPruneOptions(t *testing.T) {
 	cases := []struct {
 		name            string
 		rawPruneOptions rawPruneOptions
-		wantOptions     gps.RootPruneOptions
+		wantOptions     gps.CascadingPruneOptions
 	}{
 		{
 			name: "global all options project no options",
@@ -620,19 +665,47 @@ func TestFromRawPruneOptions(t *testing.T) {
 				UnusedPackages: true,
 				NonGoFiles:     true,
 				GoTests:        true,
-				Projects: []rawPruneProjectOptions{
+				Projects: []map[string]interface{}{
 					{
-						Name:           "github.com/golang/dep",
-						UnusedPackages: false,
-						NonGoFiles:     false,
-						GoTests:        false,
+						"name": "github.com/golang/dep",
+						pruneOptionUnusedPackages: false,
+						pruneOptionNonGo:          false,
+						pruneOptionGoTests:        false,
 					},
 				},
 			},
-			wantOptions: gps.RootPruneOptions{
-				PruneOptions: 15,
-				ProjectOptions: gps.PruneProjectOptions{
-					"github.com/golang/dep": 1,
+			wantOptions: gps.CascadingPruneOptions{
+				DefaultPruneOptions: 15,
+				PerProjectOptions: gps.PruneProjectOptions2{
+					"github.com/golang/dep": gps.PruneOptionSet{
+						NestedVendor:   gps.PruneValueTrue,
+						UnusedPackages: gps.PruneValueFalse,
+						NonGoFiles:     gps.PruneValueFalse,
+						GoTests:        gps.PruneValueFalse,
+					},
+				},
+			},
+		},
+		{
+			name: "global all options project mixed options",
+			rawPruneOptions: rawPruneOptions{
+				UnusedPackages: true,
+				NonGoFiles:     true,
+				GoTests:        true,
+				Projects: []map[string]interface{}{
+					{
+						"name": "github.com/golang/dep",
+						pruneOptionUnusedPackages: false,
+					},
+				},
+			},
+			wantOptions: gps.CascadingPruneOptions{
+				DefaultPruneOptions: 15,
+				PerProjectOptions: gps.PruneProjectOptions2{
+					"github.com/golang/dep": gps.PruneOptionSet{
+						NestedVendor:   gps.PruneValueTrue,
+						UnusedPackages: gps.PruneValueFalse,
+					},
 				},
 			},
 		},
@@ -642,19 +715,24 @@ func TestFromRawPruneOptions(t *testing.T) {
 				UnusedPackages: false,
 				NonGoFiles:     false,
 				GoTests:        false,
-				Projects: []rawPruneProjectOptions{
+				Projects: []map[string]interface{}{
 					{
-						Name:           "github.com/golang/dep",
-						UnusedPackages: true,
-						NonGoFiles:     true,
-						GoTests:        true,
+						"name": "github.com/golang/dep",
+						pruneOptionUnusedPackages: true,
+						pruneOptionNonGo:          true,
+						pruneOptionGoTests:        true,
 					},
 				},
 			},
-			wantOptions: gps.RootPruneOptions{
-				PruneOptions: 1,
-				ProjectOptions: gps.PruneProjectOptions{
-					"github.com/golang/dep": 15,
+			wantOptions: gps.CascadingPruneOptions{
+				DefaultPruneOptions: 1,
+				PerProjectOptions: gps.PruneProjectOptions2{
+					"github.com/golang/dep": gps.PruneOptionSet{
+						NestedVendor:   gps.PruneValueTrue,
+						UnusedPackages: gps.PruneValueTrue,
+						NonGoFiles:     gps.PruneValueTrue,
+						GoTests:        gps.PruneValueTrue,
+					},
 				},
 			},
 		},
@@ -662,7 +740,10 @@ func TestFromRawPruneOptions(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			opts := fromRawPruneOptions(c.rawPruneOptions)
+			opts, err := fromRawPruneOptions(c.rawPruneOptions)
+			if err != nil {
+				t.Fatal(err)
+			}
 
 			if !reflect.DeepEqual(opts, c.wantOptions) {
 				t.Fatalf("rawPruneOptions are not as expected:\n\t(GOT) %v\n\t(WNT) %v", opts, c.wantOptions)
@@ -674,12 +755,12 @@ func TestFromRawPruneOptions(t *testing.T) {
 func TestToRawPruneOptions(t *testing.T) {
 	cases := []struct {
 		name         string
-		pruneOptions gps.RootPruneOptions
+		pruneOptions gps.CascadingPruneOptions
 		wantOptions  rawPruneOptions
 	}{
 		{
 			name:         "all options",
-			pruneOptions: gps.RootPruneOptions{PruneOptions: 15},
+			pruneOptions: gps.CascadingPruneOptions{DefaultPruneOptions: 15},
 			wantOptions: rawPruneOptions{
 				UnusedPackages: true,
 				NonGoFiles:     true,
@@ -688,7 +769,7 @@ func TestToRawPruneOptions(t *testing.T) {
 		},
 		{
 			name:         "no options",
-			pruneOptions: gps.RootPruneOptions{PruneOptions: 1},
+			pruneOptions: gps.CascadingPruneOptions{DefaultPruneOptions: 1},
 			wantOptions: rawPruneOptions{
 				UnusedPackages: false,
 				NonGoFiles:     false,
@@ -709,9 +790,13 @@ func TestToRawPruneOptions(t *testing.T) {
 }
 
 func TestToRawPruneOptions_Panic(t *testing.T) {
-	pruneOptions := gps.RootPruneOptions{
-		PruneOptions:   1,
-		ProjectOptions: gps.PruneProjectOptions{"github.com/carolynvs/deptest": 1},
+	pruneOptions := gps.CascadingPruneOptions{
+		DefaultPruneOptions: 1,
+		PerProjectOptions: gps.PruneProjectOptions2{
+			"github.com/carolynvs/deptest": gps.PruneOptionSet{
+				NestedVendor: gps.PruneValueTrue,
+			},
+		},
 	}
 	defer func() {
 		if err := recover(); err == nil {

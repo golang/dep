@@ -20,12 +20,75 @@ type PruneOptions uint8
 
 // PruneProjectOptions is map of prune options per project name.
 type PruneProjectOptions map[ProjectRoot]PruneOptions
+type PruneProjectOptions2 map[ProjectRoot]PruneOptionSet
+
+type PruneOptionSet struct {
+	NestedVendor   PruneValue
+	UnusedPackages PruneValue
+	NonGoFiles     PruneValue
+	GoTests        PruneValue
+}
 
 // RootPruneOptions represents the root prune options for the project.
 // It contains the global options and a map of options per project.
 type RootPruneOptions struct {
 	PruneOptions   PruneOptions
 	ProjectOptions PruneProjectOptions
+}
+
+type CascadingPruneOptions struct {
+	DefaultPruneOptions PruneOptions
+	PerProjectOptions   PruneProjectOptions2
+}
+
+type PruneValue uint8
+
+const (
+	PruneValueAbsent PruneValue = iota
+	PruneValueTrue
+	PruneValueFalse
+)
+
+func (o CascadingPruneOptions) PruneOptionsFor(pr ProjectRoot) PruneOptions {
+	po, has := o.PerProjectOptions[pr]
+	if !has {
+		return o.DefaultPruneOptions
+	}
+
+	ops := o.DefaultPruneOptions
+	if po.NestedVendor != PruneValueAbsent {
+		if po.NestedVendor == PruneValueTrue {
+			ops |= PruneNestedVendorDirs
+		} else {
+			ops &^= PruneNestedVendorDirs
+		}
+	}
+
+	if po.UnusedPackages != PruneValueAbsent {
+		if po.UnusedPackages == PruneValueTrue {
+			ops |= PruneUnusedPackages
+		} else {
+			ops &^= PruneUnusedPackages
+		}
+	}
+
+	if po.NonGoFiles != PruneValueAbsent {
+		if po.NonGoFiles == PruneValueTrue {
+			ops |= PruneNonGoFiles
+		} else {
+			ops &^= PruneNonGoFiles
+		}
+	}
+
+	if po.GoTests != PruneValueAbsent {
+		if po.GoTests == PruneValueTrue {
+			ops |= PruneGoTestFiles
+		} else {
+			ops &^= PruneGoTestFiles
+		}
+	}
+
+	return ops
 }
 
 const (
@@ -46,6 +109,13 @@ func DefaultRootPruneOptions() RootPruneOptions {
 	return RootPruneOptions{
 		PruneOptions:   PruneNestedVendorDirs,
 		ProjectOptions: PruneProjectOptions{},
+	}
+}
+
+func DefaultCascadingPruneOptions() CascadingPruneOptions {
+	return CascadingPruneOptions{
+		DefaultPruneOptions: PruneNestedVendorDirs,
+		PerProjectOptions:   PruneProjectOptions2{},
 	}
 }
 
