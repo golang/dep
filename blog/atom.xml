@@ -14,7 +14,7 @@
         <link href="https://golang.github.io/blog/2018/01/23/announce-v0.4.0.html">
         </link>
         <updated>2018-01-23T06:00:00Z</updated>
-        <summary type="html"><![CDATA[v0.4.0 of dep [has been released](https://github.com/golang/dep/releases/tag/v0.4.0) - and along with it, this site for documentation and announcements about dep! And, being that it's been nearly six months since [the last dep status update](https://]]></summary>
+        <summary type="html"><![CDATA[v0.4.0 of dep [has been released](https://github.com/golang/dep/releases/tag/v0.4.0) (with an immediate bugfix follow-up, v0.4.1) - and along with it, this site for documentation and announcements about dep! And, being that it's been nearly six month]]></summary>
         <author>
             <name>sam boyer</name>
             <uri>http://twitter.com/sdboyer</uri>
