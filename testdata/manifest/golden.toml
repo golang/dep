@@ -12,3 +12,15 @@ ignored = ["github.com/foo/bar"]
   branch = "master"
   name = "github.com/golang/dep"
   source = "https://github.com/golang/dep"
+
+[prune]
+  non-go = true
+
+  [[prune.project]]
+    name = "github.com/golang/dep"
+    non-go = false
+
+  [[prune.project]]
+    name = "github.com/babble/brook"
+    non-go = false
+    go-tests = true

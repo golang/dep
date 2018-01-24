@@ -64,6 +64,10 @@ func TestReadManifest(t *testing.T) {
 	if !reflect.DeepEqual(got.Ignored, want.Ignored) {
 		t.Error("Valid manifest's ignored did not parse as expected")
 	}
+	if !reflect.DeepEqual(got.PruneOptions, want.PruneOptions) {
+		t.Error("Valid manifest's prune options did not parse as expected")
+		t.Error(got.PruneOptions, want.PruneOptions)
+	}
 }
 
 func TestWriteManifest(t *testing.T) {
