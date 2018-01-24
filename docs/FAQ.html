@@ -1,0 +1,414 @@
+<html lang="en"><head><meta charset="utf-8"/><meta http-equiv="X-UA-Compatible" content="IE=edge"/><title>FAQ · dep</title><meta name="viewport" content="width=device-width"/><meta name="generator" content="Docusaurus"/><meta property="og:title" content="FAQ · dep"/><meta property="og:type" content="website"/><meta property="og:url" content="https://golang.github.io/dep/index.html"/><meta property="og:description" content="The FAQ predated the introduction of the rest of the documentation. If something in here conflicts with other guides or reference documents, it&#x27;s probably here that it&#x27;s wrong - please file a PR!"/><link rel="shortcut icon" href="/dep/docs/assets/DigbyScene2Flat.png"/><link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/default.min.css"/><link rel="alternate" type="application/atom+xml" href="https://golang.github.io/blog/atom.xml" title="dep Blog ATOM Feed"/><link rel="alternate" type="application/rss+xml" href="https://golang.github.io/blog/feed.xml" title="dep Blog RSS Feed"/><script type="text/javascript" src="https://buttons.github.io/buttons.js"></script><link rel="stylesheet" href="/dep/css/main.css"/></head><body class="sideNavVisible"><div class="fixedHeaderContainer"><div class="headerWrapper wrapper"><header><a href="/dep/"><img class="logo" src="/dep/docs/assets/DigbyFlat.svg"/><h2 class="headerTitle">dep</h2></a><div class="navigationWrapper navigationSlider"><nav class="slidingNav"><ul class="nav-site nav-site-internal"><li><a href="/dep/docs/introduction.html" target="_self">Documentation</a></li><li><a href="/dep/blog" target="_self">Blog</a></li></ul></nav></div></header></div></div><div class="navPusher"><div class="docMainWrapper wrapper"><div class="container docsNavContainer" id="docsNav"><nav class="toc"><div class="toggleNav"><section class="navWrapper wrapper"><div class="navBreadcrumb wrapper"><div class="navToggle" id="navToggler"><i></i></div><h2><i>›</i><span>References</span></h2></div><div class="navGroups"><div class="navGroup navGroupActive"><h3>Guides</h3><ul><li class="navListItem"><a class="navItem" href="/dep/docs/introduction.html">Getting Started</a></li><li class="navListItem"><a class="navItem" href="/dep/docs/installation.html">Installation</a></li><li class="navListItem"><a class="navItem" href="/dep/docs/new-project.html">Creating a New Project</a></li><li class="navListItem"><a class="navItem" href="/dep/docs/migrating.html">Migrating to Dep</a></li><li class="navListItem"><a class="navItem" href="/dep/docs/daily-dep.html">Daily Dep</a></li></ul></div><div class="navGroup navGroupActive"><h3>References</h3><ul><li class="navListItem"><a class="navItem" href="/dep/docs/ensure-mechanics.html">Models and Mechanisms</a></li><li class="navListItem"><a class="navItem" href="/dep/docs/failure-modes.html">Failure Modes</a></li><li class="navListItem"><a class="navItem" href="/dep/docs/the-solver.html">The Solver</a></li><li class="navListItem"><a class="navItem" href="/dep/docs/deduction.html">Import Path Deduction</a></li><li class="navListItem"><a class="navItem" href="/dep/docs/Gopkg.toml.html">Gopkg.toml</a></li><li class="navListItem"><a class="navItem" href="/dep/docs/Gopkg.lock.html">Gopkg.lock</a></li><li class="navListItem navListItemActive"><a class="navItem navItemActive" href="/dep/docs/FAQ.html">FAQ</a></li><li class="navListItem"><a class="navItem" href="/dep/docs/glossary.html">Glossary</a></li></ul></div></div></section></div><script>
+          var toggler = document.getElementById('navToggler');
+          var nav = document.getElementById('docsNav');
+          toggler.onclick = function() {
+            nav.classList.toggle('docsSliderActive');
+          };
+        </script></nav></div><div class="container mainContainer"><div class="wrapper"><div class="post"><header class="postHeader"><a class="edit-page-link button" href="https://github.com/golang/dep/edit/master/docs/FAQ.md" target="_blank">Edit</a><h1>FAQ</h1></header><article><div><span><p>The FAQ predated the introduction of the rest of the documentation. If something in here conflicts with other guides or reference documents, it's probably here that it's wrong - please file a PR!</p>
+<h2><a class="anchor" aria-hidden="true" name="concepts"></a><a href="#concepts" aria-hidden="true" class="hash-link" ><svg aria-hidden="true" height="16" version="1.1" viewBox="0 0 16 16" width="16"><path fill-rule="evenodd" d="M4 9h1v1H4c-1.5 0-3-1.69-3-3.5S2.55 3 4 3h4c1.45 0 3 1.69 3 3.5 0 1.41-.91 2.72-2 3.25V8.59c.58-.45 1-1.27 1-2.09C10 5.22 8.98 4 8 4H4c-.98 0-2 1.22-2 2.5S3 9 4 9zm9-3h-1v1h1c1 0 2 1.22 2 2.5S13.98 12 13 12H9c-.98 0-2-1.22-2-2.5 0-.83.42-1.64 1-2.09V6.25c-1.09.53-2 1.84-2 3.25C6 11.31 7.55 13 9 13h4c1.45 0 3-1.69 3-3.5S14.5 6 13 6z"></path></svg></a>Concepts</h2>
+<ul>
+<li><a href="#does-dep-replace-go-get">Does <code>dep</code> replace <code>go get</code>?</a></li>
+<li><a href="#why-is-it-dep-ensure-instead-of-dep-install">Why is it <code>dep ensure</code> instead of <code>dep install</code>?</a></li>
+<li><a href="#what-is-a-direct-or-transitive-dependency">What is a direct or transitive dependency?</a></li>
+</ul>
+<h2><a class="anchor" aria-hidden="true" name="configuration"></a><a href="#configuration" aria-hidden="true" class="hash-link" ><svg aria-hidden="true" height="16" version="1.1" viewBox="0 0 16 16" width="16"><path fill-rule="evenodd" d="M4 9h1v1H4c-1.5 0-3-1.69-3-3.5S2.55 3 4 3h4c1.45 0 3 1.69 3 3.5 0 1.41-.91 2.72-2 3.25V8.59c.58-.45 1-1.27 1-2.09C10 5.22 8.98 4 8 4H4c-.98 0-2 1.22-2 2.5S3 9 4 9zm9-3h-1v1h1c1 0 2 1.22 2 2.5S13.98 12 13 12H9c-.98 0-2-1.22-2-2.5 0-.83.42-1.64 1-2.09V6.25c-1.09.53-2 1.84-2 3.25C6 11.31 7.55 13 9 13h4c1.45 0 3-1.69 3-3.5S14.5 6 13 6z"></path></svg></a>Configuration</h2>
+<ul>
+<li><a href="#what-is-the-difference-between-gopkgtoml-the-manifest-and-gopkglock-the-lock">What is the difference between Gopkg.toml (the &quot;manifest&quot;) and Gopkg.lock (the &quot;lock&quot;)?</a></li>
+<li><a href="#how-do-i-constrain-a-transitive-dependencys-version">How do I constrain a transitive dependency's version?</a></li>
+<li><a href="#can-i-put-the-manifest-and-lock-in-the-vendor-directory">Can I put the manifest and lock in the vendor directory?</a></li>
+<li><a href="#how-do-i-get-dep-to-authenticate-to-a-git-repo">How do I get <code>dep</code> to authenticate to a <code>git</code> repo?</a></li>
+<li><a href="#how-do-i-get-dep-to-consume-private-git-repos-using-a-github-token">How do I get <code>dep</code> to consume private <code>git</code> repos using a Github Token?</a></li>
+</ul>
+<h2><a class="anchor" aria-hidden="true" name="behavior"></a><a href="#behavior" aria-hidden="true" class="hash-link" ><svg aria-hidden="true" height="16" version="1.1" viewBox="0 0 16 16" width="16"><path fill-rule="evenodd" d="M4 9h1v1H4c-1.5 0-3-1.69-3-3.5S2.55 3 4 3h4c1.45 0 3 1.69 3 3.5 0 1.41-.91 2.72-2 3.25V8.59c.58-.45 1-1.27 1-2.09C10 5.22 8.98 4 8 4H4c-.98 0-2 1.22-2 2.5S3 9 4 9zm9-3h-1v1h1c1 0 2 1.22 2 2.5S13.98 12 13 12H9c-.98 0-2-1.22-2-2.5 0-.83.42-1.64 1-2.09V6.25c-1.09.53-2 1.84-2 3.25C6 11.31 7.55 13 9 13h4c1.45 0 3-1.69 3-3.5S14.5 6 13 6z"></path></svg></a>Behavior</h2>
+<ul>
+<li><a href="#how-does-dep-decide-what-version-of-a-dependency-to-use">How does <code>dep</code> decide what version of a dependency to use?</a></li>
+<li><a href="#what-external-tools-are-supported">What external tools are supported?</a></li>
+<li><a href="#why-is-dep-ignoring-a-version-constraint-in-the-manifest">Why is <code>dep</code> ignoring a version constraint in the manifest?</a></li>
+<li><a href="#why-did-dep-use-a-different-revision-for-package-x-instead-of-the-revision-in-the-lock-file">Why did <code>dep</code> use a different revision for package X instead of the revision in the lock file?</a></li>
+<li><a href="#why-is-dep-slow">Why is <code>dep</code> slow?</a></li>
+<li><a href="#how-does-dep-handle-symbolic-links">How does <code>dep</code> handle symbolic links?</a></li>
+<li><a href="#does-dep-support-relative-imports">Does <code>dep</code> support relative imports?</a></li>
+<li><a href="#how-do-i-make-dep-resolve-dependencies-from-my-gopath">How do I make <code>dep</code> resolve dependencies from my <code>GOPATH</code>?</a></li>
+<li><a href="#will-dep-let-me-use-git-submodules-to-store-dependencies-in-vendor">Will <code>dep</code> let me use git submodules to store dependencies in <code>vendor</code>?</a></li>
+</ul>
+<h2><a class="anchor" aria-hidden="true" name="best-practices"></a><a href="#best-practices" aria-hidden="true" class="hash-link" ><svg aria-hidden="true" height="16" version="1.1" viewBox="0 0 16 16" width="16"><path fill-rule="evenodd" d="M4 9h1v1H4c-1.5 0-3-1.69-3-3.5S2.55 3 4 3h4c1.45 0 3 1.69 3 3.5 0 1.41-.91 2.72-2 3.25V8.59c.58-.45 1-1.27 1-2.09C10 5.22 8.98 4 8 4H4c-.98 0-2 1.22-2 2.5S3 9 4 9zm9-3h-1v1h1c1 0 2 1.22 2 2.5S13.98 12 13 12H9c-.98 0-2-1.22-2-2.5 0-.83.42-1.64 1-2.09V6.25c-1.09.53-2 1.84-2 3.25C6 11.31 7.55 13 9 13h4c1.45 0 3-1.69 3-3.5S14.5 6 13 6z"></path></svg></a>Best Practices</h2>
+<ul>
+<li><a href="#should-i-commit-my-vendor-directory">Should I commit my vendor directory?</a></li>
+<li><a href="#how-do-i-roll-releases-that-dep-will-be-able-to-use">How do I roll releases that <code>dep</code> will be able to use?</a></li>
+<li><a href="#what-semver-version-should-i-use">What semver version should I use?</a></li>
+<li><a href="#is-it-ok-to-make-backwards-incompatible-changes-now">Is it OK to make backwards-incompatible changes now?</a></li>
+<li><a href="#my-dependers-dont-use-dep-yet-what-should-i-do">My dependers don't use <code>dep</code> yet. What should I do?</a></li>
+<li><a href="#how-do-i-configure-a-dependency-that-doesnt-tag-its-releases">How do I configure a dependency that doesn't tag its releases?</a></li>
+<li><a href="#how-do-i-use-dep-with-docker">How do I use <code>dep</code> with Docker?</a></li>
+<li><a href="#how-do-i-use-dep-in-ci">How do I use <code>dep</code> in CI?</a></li>
+</ul>
+<h2><a class="anchor" aria-hidden="true" name="concepts"></a><a href="#concepts" aria-hidden="true" class="hash-link" ><svg aria-hidden="true" height="16" version="1.1" viewBox="0 0 16 16" width="16"><path fill-rule="evenodd" d="M4 9h1v1H4c-1.5 0-3-1.69-3-3.5S2.55 3 4 3h4c1.45 0 3 1.69 3 3.5 0 1.41-.91 2.72-2 3.25V8.59c.58-.45 1-1.27 1-2.09C10 5.22 8.98 4 8 4H4c-.98 0-2 1.22-2 2.5S3 9 4 9zm9-3h-1v1h1c1 0 2 1.22 2 2.5S13.98 12 13 12H9c-.98 0-2-1.22-2-2.5 0-.83.42-1.64 1-2.09V6.25c-1.09.53-2 1.84-2 3.25C6 11.31 7.55 13 9 13h4c1.45 0 3-1.69 3-3.5S14.5 6 13 6z"></path></svg></a>Concepts</h2>
+<h3><a class="anchor" aria-hidden="true" name="does-dep-replace-go-get"></a><a href="#does-dep-replace-go-get" aria-hidden="true" class="hash-link" ><svg aria-hidden="true" height="16" version="1.1" viewBox="0 0 16 16" width="16"><path fill-rule="evenodd" d="M4 9h1v1H4c-1.5 0-3-1.69-3-3.5S2.55 3 4 3h4c1.45 0 3 1.69 3 3.5 0 1.41-.91 2.72-2 3.25V8.59c.58-.45 1-1.27 1-2.09C10 5.22 8.98 4 8 4H4c-.98 0-2 1.22-2 2.5S3 9 4 9zm9-3h-1v1h1c1 0 2 1.22 2 2.5S13.98 12 13 12H9c-.98 0-2-1.22-2-2.5 0-.83.42-1.64 1-2.09V6.25c-1.09.53-2 1.84-2 3.25C6 11.31 7.55 13 9 13h4c1.45 0 3-1.69 3-3.5S14.5 6 13 6z"></path></svg></a>Does <code>dep</code> replace <code>go get</code>?</h3>
+<p>No. <code>dep</code> and <code>go get</code> serve mostly different purposes.</p>
+<p>Here are some suggestions for when you could use <code>dep</code> or <code>go get</code>:</p>
+<blockquote>
+<p>I would say that dep doesn't replace go get, but they both can do similar things. Here's how I use them:</p>
+<p><code>go get</code>: I want to download the source code for a go project so that I can work on it myself, or to install a tool. This clones the repo under GOPATH for all to use.</p>
+<p><code>dep ensure</code>: I have imported a new dependency in my code and want to download the dependency so I can start using it. My workflow is &quot;add the import to the code, and then run dep ensure so that the manifest/lock/vendor are updated&quot;. This clones the repo under my project's vendor directory, and remembers the revision used so that everyone who works on my project is guaranteed to be using the same version of dependencies.</p>
+<p><a href="https://github.com/golang/dep/issues/376#issuecomment-293964655">@carolynvs in #376</a></p>
+</blockquote>
+<blockquote>
+<p>The long term vision is a sane, overall-consistent go tool. My general take is that <code>go get</code>
+is for people consuming Go code, and dep-family commands are for people developing it.</p>
+<p><a href="https://github.com/golang/dep/issues/376#issuecomment-294045873">@sdboyer in #376</a></p>
+</blockquote>
+<h3><a class="anchor" aria-hidden="true" name="why-is-it-dep-ensure-instead-of-dep-install"></a><a href="#why-is-it-dep-ensure-instead-of-dep-install" aria-hidden="true" class="hash-link" ><svg aria-hidden="true" height="16" version="1.1" viewBox="0 0 16 16" width="16"><path fill-rule="evenodd" d="M4 9h1v1H4c-1.5 0-3-1.69-3-3.5S2.55 3 4 3h4c1.45 0 3 1.69 3 3.5 0 1.41-.91 2.72-2 3.25V8.59c.58-.45 1-1.27 1-2.09C10 5.22 8.98 4 8 4H4c-.98 0-2 1.22-2 2.5S3 9 4 9zm9-3h-1v1h1c1 0 2 1.22 2 2.5S13.98 12 13 12H9c-.98 0-2-1.22-2-2.5 0-.83.42-1.64 1-2.09V6.25c-1.09.53-2 1.84-2 3.25C6 11.31 7.55 13 9 13h4c1.45 0 3-1.69 3-3.5S14.5 6 13 6z"></path></svg></a>Why is it <code>dep ensure</code> instead of <code>dep install</code>?</h3>
+<blockquote>
+<p>Yeah, we went round and round on names. <a href="https://gist.github.com/jessfraz/315db91b272441f510e81e449f675a8b">A lot</a>.</p>
+<p>The idea of &quot;ensure&quot; is roughly, &quot;ensure that all my local states - code tree, manifest, lock, and vendor - are in sync with each other.&quot; When arguments are passed, it becomes &quot;ensure this argument is satisfied, along with synchronization between all my local states.&quot;</p>
+<p>We opted for this approach because we came to the conclusion that allowing the tool to perform partial work/exit in intermediate states ended up creating a tool that had more commands, had far more possible valid exit and input states, and was generally full of footguns. In this approach, the user has most of the same ultimate control, but exercises it differently (by modifying the code/manifest and re-running dep ensure).</p>
+<p><a href="https://github.com/golang/dep/issues/371#issuecomment-293246832">@sdboyer in #371</a></p>
+</blockquote>
+<h3><a class="anchor" aria-hidden="true" name="what-is-a-direct-or-transitive-dependency"></a><a href="#what-is-a-direct-or-transitive-dependency" aria-hidden="true" class="hash-link" ><svg aria-hidden="true" height="16" version="1.1" viewBox="0 0 16 16" width="16"><path fill-rule="evenodd" d="M4 9h1v1H4c-1.5 0-3-1.69-3-3.5S2.55 3 4 3h4c1.45 0 3 1.69 3 3.5 0 1.41-.91 2.72-2 3.25V8.59c.58-.45 1-1.27 1-2.09C10 5.22 8.98 4 8 4H4c-.98 0-2 1.22-2 2.5S3 9 4 9zm9-3h-1v1h1c1 0 2 1.22 2 2.5S13.98 12 13 12H9c-.98 0-2-1.22-2-2.5 0-.83.42-1.64 1-2.09V6.25c-1.09.53-2 1.84-2 3.25C6 11.31 7.55 13 9 13h4c1.45 0 3-1.69 3-3.5S14.5 6 13 6z"></path></svg></a>What is a direct or transitive dependency?</h3>
+<ul>
+<li>Direct dependencies are dependencies that are imported directly by your project: they appear in at least one import statement from your project.</li>
+<li>Transitive dependencies are the dependencies of your dependencies. Necessary to compile but are not directly used by your code.</li>
+</ul>
+<h2><a class="anchor" aria-hidden="true" name="configuration"></a><a href="#configuration" aria-hidden="true" class="hash-link" ><svg aria-hidden="true" height="16" version="1.1" viewBox="0 0 16 16" width="16"><path fill-rule="evenodd" d="M4 9h1v1H4c-1.5 0-3-1.69-3-3.5S2.55 3 4 3h4c1.45 0 3 1.69 3 3.5 0 1.41-.91 2.72-2 3.25V8.59c.58-.45 1-1.27 1-2.09C10 5.22 8.98 4 8 4H4c-.98 0-2 1.22-2 2.5S3 9 4 9zm9-3h-1v1h1c1 0 2 1.22 2 2.5S13.98 12 13 12H9c-.98 0-2-1.22-2-2.5 0-.83.42-1.64 1-2.09V6.25c-1.09.53-2 1.84-2 3.25C6 11.31 7.55 13 9 13h4c1.45 0 3-1.69 3-3.5S14.5 6 13 6z"></path></svg></a>Configuration</h2>
+<h3><a class="anchor" aria-hidden="true" name="what-is-the-difference-between-gopkgtoml-the-manifest-and-gopkglock-the-lock"></a><a href="#what-is-the-difference-between-gopkgtoml-the-manifest-and-gopkglock-the-lock" aria-hidden="true" class="hash-link" ><svg aria-hidden="true" height="16" version="1.1" viewBox="0 0 16 16" width="16"><path fill-rule="evenodd" d="M4 9h1v1H4c-1.5 0-3-1.69-3-3.5S2.55 3 4 3h4c1.45 0 3 1.69 3 3.5 0 1.41-.91 2.72-2 3.25V8.59c.58-.45 1-1.27 1-2.09C10 5.22 8.98 4 8 4H4c-.98 0-2 1.22-2 2.5S3 9 4 9zm9-3h-1v1h1c1 0 2 1.22 2 2.5S13.98 12 13 12H9c-.98 0-2-1.22-2-2.5 0-.83.42-1.64 1-2.09V6.25c-1.09.53-2 1.84-2 3.25C6 11.31 7.55 13 9 13h4c1.45 0 3-1.69 3-3.5S14.5 6 13 6z"></path></svg></a>What is the difference between <code>Gopkg.toml</code> (the &quot;manifest&quot;) and <code>Gopkg.lock</code> (the &quot;lock&quot;)?</h3>
+<blockquote>
+<p>The manifest describes user intent, and the lock describes computed outputs. There's flexibility in manifests that isn't present in locks..., as the &quot;branch&quot;: &quot;master&quot; constraint will match whatever revision master HAPPENS to be at right now, whereas the lock is nailed down to a specific revision.</p>
+<p>This flexibility is important because it allows us to provide easy commands (e.g. <code>dep ensure -update</code>) that can manage an update process for you, within the constraints you specify, AND because it allows your project, when imported by someone else, to collaboratively specify the constraints for your own dependencies.</p>
+<p><a href="https://github.com/golang/dep/issues/281#issuecomment-284118314">@sdboyer in #281</a></p>
+</blockquote>
+<h2><a class="anchor" aria-hidden="true" name="how-do-i-constrain-a-transitive-dependency-s-version"></a><a href="#how-do-i-constrain-a-transitive-dependency-s-version" aria-hidden="true" class="hash-link" ><svg aria-hidden="true" height="16" version="1.1" viewBox="0 0 16 16" width="16"><path fill-rule="evenodd" d="M4 9h1v1H4c-1.5 0-3-1.69-3-3.5S2.55 3 4 3h4c1.45 0 3 1.69 3 3.5 0 1.41-.91 2.72-2 3.25V8.59c.58-.45 1-1.27 1-2.09C10 5.22 8.98 4 8 4H4c-.98 0-2 1.22-2 2.5S3 9 4 9zm9-3h-1v1h1c1 0 2 1.22 2 2.5S13.98 12 13 12H9c-.98 0-2-1.22-2-2.5 0-.83.42-1.64 1-2.09V6.25c-1.09.53-2 1.84-2 3.25C6 11.31 7.55 13 9 13h4c1.45 0 3-1.69 3-3.5S14.5 6 13 6z"></path></svg></a>How do I constrain a transitive dependency's version?</h2>
+<p>First, if you're wondering about this because you're trying to keep the version
+of the transitive dependency from changing, then you're working against <code>dep</code>'s
+design. The lock file, <code>Gopkg.lock</code>, will keep the selected version of the
+transitive dependency stable, unless you explicitly request an upgrade or it's
+impossible to find a solution without changing that version.</p>
+<p>If that isn't your use case and you still need to constrain a transitive
+dependency, you have a couple of options:</p>
+<ol>
+<li>Make the transitive dependency a direct one, either with a dummy import or an entry in the <code>required</code> list in <code>Gopkg.toml</code>.</li>
+<li>Use an override.</li>
+</ol>
+<p>Overrides are a sledgehammer, and should only be used as a last resort. While
+constraints and overrides are declared in the same way in <code>Gopkg.toml</code>, they
+behave differently:</p>
+<ul>
+<li>Constraints:
+<ol>
+<li>Can be declared by any project's manifest, yours or a dependency</li>
+<li>Apply only to direct dependencies of the project declaring the constraint</li>
+<li>Must not conflict with the <code>constraint</code> entries declared in any other project's manifest</li>
+</ol></li>
+<li>Overrides:
+<ol>
+<li>Are only utilized from the current/your project's manifest</li>
+<li>Apply globally, to direct and transitive dependencies</li>
+<li>Supersede constraints declared in all manifests, yours or a dependency's</li>
+</ol></li>
+</ul>
+<p>Overrides are also discussed with some visuals in <a href="https://github.com/sdboyer/gps/wiki/gps-for-Implementors#overrides">the gps docs</a>.</p>
+<h2><a class="anchor" aria-hidden="true" name="can-i-put-the-manifest-and-lock-in-the-vendor-directory"></a><a href="#can-i-put-the-manifest-and-lock-in-the-vendor-directory" aria-hidden="true" class="hash-link" ><svg aria-hidden="true" height="16" version="1.1" viewBox="0 0 16 16" width="16"><path fill-rule="evenodd" d="M4 9h1v1H4c-1.5 0-3-1.69-3-3.5S2.55 3 4 3h4c1.45 0 3 1.69 3 3.5 0 1.41-.91 2.72-2 3.25V8.59c.58-.45 1-1.27 1-2.09C10 5.22 8.98 4 8 4H4c-.98 0-2 1.22-2 2.5S3 9 4 9zm9-3h-1v1h1c1 0 2 1.22 2 2.5S13.98 12 13 12H9c-.98 0-2-1.22-2-2.5 0-.83.42-1.64 1-2.09V6.25c-1.09.53-2 1.84-2 3.25C6 11.31 7.55 13 9 13h4c1.45 0 3-1.69 3-3.5S14.5 6 13 6z"></path></svg></a>Can I put the manifest and lock in the vendor directory?</h2>
+<p>No.</p>
+<blockquote>
+<p>Placing these files inside <code>vendor/</code> would concretely bind us to <code>vendor/</code> in the long term.
+We prefer to treat the <code>vendor/</code> as an implementation detail.</p>
+<p><a href="https://groups.google.com/d/msg/go-package-management/et1qFUjrkP4/LQFCHP4WBQAJ">@sdboyer on go package management list</a></p>
+</blockquote>
+<h2><a class="anchor" aria-hidden="true" name="how-do-i-get-dep-to-authenticate-to-a-git-repo"></a><a href="#how-do-i-get-dep-to-authenticate-to-a-git-repo" aria-hidden="true" class="hash-link" ><svg aria-hidden="true" height="16" version="1.1" viewBox="0 0 16 16" width="16"><path fill-rule="evenodd" d="M4 9h1v1H4c-1.5 0-3-1.69-3-3.5S2.55 3 4 3h4c1.45 0 3 1.69 3 3.5 0 1.41-.91 2.72-2 3.25V8.59c.58-.45 1-1.27 1-2.09C10 5.22 8.98 4 8 4H4c-.98 0-2 1.22-2 2.5S3 9 4 9zm9-3h-1v1h1c1 0 2 1.22 2 2.5S13.98 12 13 12H9c-.98 0-2-1.22-2-2.5 0-.83.42-1.64 1-2.09V6.25c-1.09.53-2 1.84-2 3.25C6 11.31 7.55 13 9 13h4c1.45 0 3-1.69 3-3.5S14.5 6 13 6z"></path></svg></a>How do I get dep to authenticate to a git repo?</h2>
+<p><code>dep</code> currently uses the <code>git</code> command under the hood, so configuring the credentials
+for each repository you wish to authenticate to will allow <code>dep</code> to use an
+authenticated repository.</p>
+<p>First, configure <code>git</code> to use the credentials option for the specific repository.</p>
+<p>For example, if you use gitlab, and you wish to access <code>https://gitlab.example.com/example/package.git</code>,
+then you would want to use the following configuration:</p>
+<pre><code class="hljs">$ git config --global credential<span class="hljs-selector-class">.https</span>:<span class="hljs-comment">//gitlab.example.com.example yourusername</span>
+</code></pre>
+<p>In the example the hostname <code>gitlab.example.com.example</code> string seems incorrect, but
+it's actually the hostname plus the name of the repo you are accessing which is <code>username</code>.
+The trailing 'yourusername' is the username you would use for the actual authentication.</p>
+<p>You also need to configure <code>git</code> with the authentication provider you wish to use. You can get
+a list of providers, with the command:</p>
+<pre><code class="hljs">$ git <span class="hljs-keyword">help</span> -a | grep credential-
+  credential-<span class="hljs-keyword">cache</span>          remote-fd
+  credential-<span class="hljs-keyword">cache</span><span class="hljs-comment">--daemon  remote-ftp</span>
+  credential-osxkeychain    remote-ftps
+  credential-<span class="hljs-keyword">store</span>          remote-<span class="hljs-keyword">http</span>
+</code></pre>
+<p>You would then choose an appropriate provider. For example, to use the osxkeychain, you
+would use the following:</p>
+<pre><code class="hljs">git<span class="hljs-built_in"> config </span>--global credential.helper osxkeychain
+</code></pre>
+<p>If you need to do this for a CI system, then you may want to use the &quot;store&quot; provider.
+Please see the documentation on how to configure that: <a href="https://git-scm.com/docs/git-credential-store">https://git-scm.com/docs/git-credential-store</a></p>
+<p>After configuring <code>git</code>, you may need to use <code>git</code> manually once to have it store the
+credentials. Once you've checked out the repo manually, it will then use the stored
+credentials. This at least appears to be the behavior for the osxkeychain provider.</p>
+<h3><a class="anchor" aria-hidden="true" name="how-do-i-get-dep-to-consume-private-git-repos-using-a-github-token"></a><a href="#how-do-i-get-dep-to-consume-private-git-repos-using-a-github-token" aria-hidden="true" class="hash-link" ><svg aria-hidden="true" height="16" version="1.1" viewBox="0 0 16 16" width="16"><path fill-rule="evenodd" d="M4 9h1v1H4c-1.5 0-3-1.69-3-3.5S2.55 3 4 3h4c1.45 0 3 1.69 3 3.5 0 1.41-.91 2.72-2 3.25V8.59c.58-.45 1-1.27 1-2.09C10 5.22 8.98 4 8 4H4c-.98 0-2 1.22-2 2.5S3 9 4 9zm9-3h-1v1h1c1 0 2 1.22 2 2.5S13.98 12 13 12H9c-.98 0-2-1.22-2-2.5 0-.83.42-1.64 1-2.09V6.25c-1.09.53-2 1.84-2 3.25C6 11.31 7.55 13 9 13h4c1.45 0 3-1.69 3-3.5S14.5 6 13 6z"></path></svg></a>How do I get dep to consume private git repos using a Github Token?</h3>
+<p>Another alternative to make <code>dep</code> work with private repos is to use a <a href="https://help.github.com/articles/creating-a-personal-access-token-for-the-command-line/">Personal Github
+Token</a>
+and configure it inside the <a href="https://www.gnu.org/software/inetutils/manual/html_node/The-_002enetrc-file.html"><code>.netrc</code> file</a>
+as the following example:</p>
+<pre><code class="hljs"><span class="hljs-selector-tag">machine</span> <span class="hljs-selector-tag">github</span><span class="hljs-selector-class">.com</span>
+    <span class="hljs-selector-tag">login</span> <span class="hljs-selector-attr">[YOUR_GITHUB_USERNAME]</span>
+    <span class="hljs-selector-tag">password</span> <span class="hljs-selector-attr">[YOUR_GITHUB_TOKEN]</span>
+</code></pre>
+<p>Once you have set that up, dep will automatically use that Token to authenticate to the repositories.</p>
+<h2><a class="anchor" aria-hidden="true" name="behavior"></a><a href="#behavior" aria-hidden="true" class="hash-link" ><svg aria-hidden="true" height="16" version="1.1" viewBox="0 0 16 16" width="16"><path fill-rule="evenodd" d="M4 9h1v1H4c-1.5 0-3-1.69-3-3.5S2.55 3 4 3h4c1.45 0 3 1.69 3 3.5 0 1.41-.91 2.72-2 3.25V8.59c.58-.45 1-1.27 1-2.09C10 5.22 8.98 4 8 4H4c-.98 0-2 1.22-2 2.5S3 9 4 9zm9-3h-1v1h1c1 0 2 1.22 2 2.5S13.98 12 13 12H9c-.98 0-2-1.22-2-2.5 0-.83.42-1.64 1-2.09V6.25c-1.09.53-2 1.84-2 3.25C6 11.31 7.55 13 9 13h4c1.45 0 3-1.69 3-3.5S14.5 6 13 6z"></path></svg></a>Behavior</h2>
+<h3><a class="anchor" aria-hidden="true" name="how-does-dep-decide-what-version-of-a-dependency-to-use"></a><a href="#how-does-dep-decide-what-version-of-a-dependency-to-use" aria-hidden="true" class="hash-link" ><svg aria-hidden="true" height="16" version="1.1" viewBox="0 0 16 16" width="16"><path fill-rule="evenodd" d="M4 9h1v1H4c-1.5 0-3-1.69-3-3.5S2.55 3 4 3h4c1.45 0 3 1.69 3 3.5 0 1.41-.91 2.72-2 3.25V8.59c.58-.45 1-1.27 1-2.09C10 5.22 8.98 4 8 4H4c-.98 0-2 1.22-2 2.5S3 9 4 9zm9-3h-1v1h1c1 0 2 1.22 2 2.5S13.98 12 13 12H9c-.98 0-2-1.22-2-2.5 0-.83.42-1.64 1-2.09V6.25c-1.09.53-2 1.84-2 3.25C6 11.31 7.55 13 9 13h4c1.45 0 3-1.69 3-3.5S14.5 6 13 6z"></path></svg></a>How does <code>dep</code> decide what version of a dependency to use?</h3>
+<p>The full algorithm is complex, but the most important thing to understand is
+that <code>dep</code> tries versions in a <a href="https://godoc.org/github.com/golang/dep/gps#SortForUpgrade">certain
+order</a>,
+checking to see a version is acceptable according to specified constraints.</p>
+<ul>
+<li>All semver versions come first, and sort mostly according to the semver 2.0
+spec, with one exception:
+<ul>
+<li>Semver versions with a prerelease are sorted after <em>all</em> non-prerelease
+semver. Within this subset they are sorted first by their numerical
+component, then lexicographically by their prerelease version.</li>
+</ul></li>
+<li>The default branch(es) are next; the semantics of what &quot;default branch&quot; means
+are specific to the underlying source type, but this is generally what you'd
+get from a <code>go get</code>.</li>
+<li>All other branches come next, sorted lexicographically.</li>
+<li>All non-semver versions (tags) are next, sorted lexicographically.</li>
+<li>Revisions, if any, are last, sorted lexicographically. Revisions do not
+typically appear in version lists, so the only invariant we maintain is
+determinism - deeper semantics, like chronology or topology, do not matter.</li>
+</ul>
+<p>So, given a slice of the following versions:</p>
+<ul>
+<li>Branch: <code>master</code> <code>devel</code></li>
+<li>Semver tags: <code>v1.0.0</code> <code>v1.1.0</code> <code>v1.1.0-alpha1</code></li>
+<li>Non-semver tags: <code>footag</code></li>
+<li>Revision: <code>f6e74e8d</code></li>
+</ul>
+<p>Sorting for upgrade will result in the following slice.</p>
+<p><code>[v1.1.0 v1.0.0 v1.1.0-alpha1 master devel footag f6e74e8d]</code></p>
+<p>There are a number of factors that can eliminate a version from consideration,
+the simplest of which is that it doesn't match a constraint. But if you're
+trying to figure out why <code>dep</code> is doing what it does, understanding that its
+basic action is to attempt versions in this order should help you to reason
+about what's going on.</p>
+<h2><a class="anchor" aria-hidden="true" name="what-external-tools-are-supported"></a><a href="#what-external-tools-are-supported" aria-hidden="true" class="hash-link" ><svg aria-hidden="true" height="16" version="1.1" viewBox="0 0 16 16" width="16"><path fill-rule="evenodd" d="M4 9h1v1H4c-1.5 0-3-1.69-3-3.5S2.55 3 4 3h4c1.45 0 3 1.69 3 3.5 0 1.41-.91 2.72-2 3.25V8.59c.58-.45 1-1.27 1-2.09C10 5.22 8.98 4 8 4H4c-.98 0-2 1.22-2 2.5S3 9 4 9zm9-3h-1v1h1c1 0 2 1.22 2 2.5S13.98 12 13 12H9c-.98 0-2-1.22-2-2.5 0-.83.42-1.64 1-2.09V6.25c-1.09.53-2 1.84-2 3.25C6 11.31 7.55 13 9 13h4c1.45 0 3-1.69 3-3.5S14.5 6 13 6z"></path></svg></a>What external tools are supported?</h2>
+<p>During <code>dep init</code> configuration from other dependency managers is detected
+and imported, unless <code>-skip-tools</code> is specified.</p>
+<p>The following tools are supported: <code>glide</code>, <code>godep</code>, <code>vndr</code>, <code>govend</code>, <code>gb</code>, <code>gvt</code>, <code>govendor</code> and <code>glock</code>.</p>
+<p>See <a href="https://github.com/golang/dep/issues/186#issuecomment-306363441">#186</a> for
+how to add support for another tool.</p>
+<h2><a class="anchor" aria-hidden="true" name="why-is-dep-ignoring-a-version-constraint-in-the-manifest"></a><a href="#why-is-dep-ignoring-a-version-constraint-in-the-manifest" aria-hidden="true" class="hash-link" ><svg aria-hidden="true" height="16" version="1.1" viewBox="0 0 16 16" width="16"><path fill-rule="evenodd" d="M4 9h1v1H4c-1.5 0-3-1.69-3-3.5S2.55 3 4 3h4c1.45 0 3 1.69 3 3.5 0 1.41-.91 2.72-2 3.25V8.59c.58-.45 1-1.27 1-2.09C10 5.22 8.98 4 8 4H4c-.98 0-2 1.22-2 2.5S3 9 4 9zm9-3h-1v1h1c1 0 2 1.22 2 2.5S13.98 12 13 12H9c-.98 0-2-1.22-2-2.5 0-.83.42-1.64 1-2.09V6.25c-1.09.53-2 1.84-2 3.25C6 11.31 7.55 13 9 13h4c1.45 0 3-1.69 3-3.5S14.5 6 13 6z"></path></svg></a>Why is <code>dep</code> ignoring a version constraint in the manifest?</h2>
+<p>Only your project's directly imported dependencies are affected by a <code>constraint</code> entry
+in the manifest. Transitive dependencies are unaffected. See <a href="#how-do-i-constrain-a-transitive-dependencys-version">How do I constrain a transitive dependency's version</a>?</p>
+<h2><a class="anchor" aria-hidden="true" name="why-did-dep-use-a-different-revision-for-package-x-instead-of-the-revision-in-the-lock-file"></a><a href="#why-did-dep-use-a-different-revision-for-package-x-instead-of-the-revision-in-the-lock-file" aria-hidden="true" class="hash-link" ><svg aria-hidden="true" height="16" version="1.1" viewBox="0 0 16 16" width="16"><path fill-rule="evenodd" d="M4 9h1v1H4c-1.5 0-3-1.69-3-3.5S2.55 3 4 3h4c1.45 0 3 1.69 3 3.5 0 1.41-.91 2.72-2 3.25V8.59c.58-.45 1-1.27 1-2.09C10 5.22 8.98 4 8 4H4c-.98 0-2 1.22-2 2.5S3 9 4 9zm9-3h-1v1h1c1 0 2 1.22 2 2.5S13.98 12 13 12H9c-.98 0-2-1.22-2-2.5 0-.83.42-1.64 1-2.09V6.25c-1.09.53-2 1.84-2 3.25C6 11.31 7.55 13 9 13h4c1.45 0 3-1.69 3-3.5S14.5 6 13 6z"></path></svg></a>Why did <code>dep</code> use a different revision for package X instead of the revision in the lock file?</h2>
+<p>Sometimes the revision specified in the lock file is no longer valid. There are a few
+ways this can occur:</p>
+<ul>
+<li>When you generated the lock file, you had an unpushed commit in your local copy of package X's repository in your <code>GOPATH</code>. (This case will be going away soon)</li>
+<li>After generating the lock file, new commits were force pushed to package X's repository, causing the commit revision in your lock file to no longer exist.</li>
+</ul>
+<p>To troubleshoot, you can revert dep's changes to your lock, and then run <code>dep ensure -v -n</code>.
+This retries the command in dry-run mode with verbose logs enabled. Check the output
+for a warning like the one below, indicating that a commit in the lock is no longer valid.</p>
+<pre><code class="hljs">Unable to <span class="hljs-keyword">update</span> checked <span class="hljs-keyword">out</span> <span class="hljs-keyword">version</span>: fatal: <span class="hljs-keyword">reference</span> <span class="hljs-keyword">is</span> <span class="hljs-keyword">not</span> a tree: <span class="hljs-number">4</span>dfc6a8a7e15229398c0a018b6d7a078cccae9c8
+</code></pre>
+<blockquote>
+<p>The lock file represents a set of precise, typically immutable versions for the entire transitive closure of dependencies for a project. But &quot;the project&quot; can be, and is, decomposed into just a bunch of arguments to an algorithm. When those inputs change, the lock may need to change as well.</p>
+<p>Under most circumstances, if those arguments don't change, then the lock remains fine and correct. You've hit one of the few cases where that guarantee doesn't apply. The fact that you ran dep ensure and it DID a solve is a product of some arguments changing; that solving failed because this particular commit had become stale is a separate problem.</p>
+<p><a href="https://github.com/golang/dep/issues/405#issuecomment-295998489">@sdboyer in #405</a></p>
+</blockquote>
+<h2><a class="anchor" aria-hidden="true" name="why-is-dep-slow"></a><a href="#why-is-dep-slow" aria-hidden="true" class="hash-link" ><svg aria-hidden="true" height="16" version="1.1" viewBox="0 0 16 16" width="16"><path fill-rule="evenodd" d="M4 9h1v1H4c-1.5 0-3-1.69-3-3.5S2.55 3 4 3h4c1.45 0 3 1.69 3 3.5 0 1.41-.91 2.72-2 3.25V8.59c.58-.45 1-1.27 1-2.09C10 5.22 8.98 4 8 4H4c-.98 0-2 1.22-2 2.5S3 9 4 9zm9-3h-1v1h1c1 0 2 1.22 2 2.5S13.98 12 13 12H9c-.98 0-2-1.22-2-2.5 0-.83.42-1.64 1-2.09V6.25c-1.09.53-2 1.84-2 3.25C6 11.31 7.55 13 9 13h4c1.45 0 3-1.69 3-3.5S14.5 6 13 6z"></path></svg></a>Why is <code>dep</code> slow?</h2>
+<p>There are two things that really slow <code>dep</code> down. One is unavoidable; for the other, we have a plan.</p>
+<p>The unavoidable part is the initial clone. <code>dep</code> relies on a cache of local
+repositories (stored under <code>$GOPATH/pkg/dep</code>), which is populated on demand.
+Unfortunately, the first <code>dep</code> run, especially for a large project, may take a
+while, as all dependencies are cloned into the cache.</p>
+<p>Fortunately, this is just an <em>initial</em> clone - pay it once, and you're done.
+The problem repeats itself a bit when you're running <code>dep</code> for the first time
+in a while and there's new changesets to fetch, but even then, these costs are
+only paid once per changeset.</p>
+<p>The other part is the work of retrieving information about dependencies. There are three parts to this:</p>
+<ol>
+<li>Getting an up-to-date list of versions from the upstream source</li>
+<li>Reading the <code>Gopkg.toml</code> for a particular version out of the local cache</li>
+<li>Parsing the tree of packages for import statements at a particular version</li>
+</ol>
+<p>The first requires one or more network calls; the second two usually mean
+something like a <code>git checkout</code>, and the third is a filesystem walk, plus
+loading and parsing <code>.go</code> files. All of these are expensive operations.</p>
+<p>Fortunately, we can cache the second and third. And that cache can be permanent
+when keyed on an immutable identifier for the version - like a git commit SHA1
+hash. The first is a bit trickier, but there are reasonable staleness tradeoffs
+we can consider to avoid the network entirely. There's an issue to <a href="https://github.com/golang/dep/issues/431">implement
+persistent caching</a> that's the
+gateway to all of these improvements.</p>
+<p>There's another major performance issue that's much harder - the process of picking versions itself is an NP-complete problem in <code>dep</code>'s current design. This is a much trickier problem 😜</p>
+<h2><a class="anchor" aria-hidden="true" name="how-does-dep-handle-symbolic-links"></a><a href="#how-does-dep-handle-symbolic-links" aria-hidden="true" class="hash-link" ><svg aria-hidden="true" height="16" version="1.1" viewBox="0 0 16 16" width="16"><path fill-rule="evenodd" d="M4 9h1v1H4c-1.5 0-3-1.69-3-3.5S2.55 3 4 3h4c1.45 0 3 1.69 3 3.5 0 1.41-.91 2.72-2 3.25V8.59c.58-.45 1-1.27 1-2.09C10 5.22 8.98 4 8 4H4c-.98 0-2 1.22-2 2.5S3 9 4 9zm9-3h-1v1h1c1 0 2 1.22 2 2.5S13.98 12 13 12H9c-.98 0-2-1.22-2-2.5 0-.83.42-1.64 1-2.09V6.25c-1.09.53-2 1.84-2 3.25C6 11.31 7.55 13 9 13h4c1.45 0 3-1.69 3-3.5S14.5 6 13 6z"></path></svg></a>How does <code>dep</code> handle symbolic links?</h2>
+<blockquote>
+<p>because we're not crazy people who delight in inviting chaos into our lives, we need to work within one <code>GOPATH</code> at a time.
+-<a href="https://github.com/golang/dep/pull/247#issuecomment-284181879">@sdboyer in #247</a></p>
+</blockquote>
+<p>Out of convenience, one might create a symlink to a directory within their <code>GOPATH/src</code>, e.g. <code>ln -s ~/go/src/github.com/user/awesome-project ~/Code/awesome-project</code>.</p>
+<p>When <code>dep</code> is invoked with a project root that is a symlink, it will be resolved according to the following rules:</p>
+<ul>
+<li>If the symlink is outside <code>GOPATH</code> and links to a directory within a <code>GOPATH</code>, or vice versa, then <code>dep</code> will choose whichever path is within <code>GOPATH</code>.</li>
+<li>If the symlink is within a <code>GOPATH</code> and the resolved path is within a <em>different</em> <code>GOPATH</code>, then an error is thrown.</li>
+<li>If both the symlink and the resolved path are in the same <code>GOPATH</code>, then an error is thrown.</li>
+<li>If neither the symlink nor the resolved path are in a <code>GOPATH</code>, then an error is thrown.</li>
+</ul>
+<p>This is the only symbolic link support that <code>dep</code> really intends to provide. In keeping with the general practices of the <code>go</code> tool, <code>dep</code> tends to either ignore symlinks (when walking) or copy the symlink itself, depending on the filesystem operation being performed.</p>
+<h2><a class="anchor" aria-hidden="true" name="does-dep-support-relative-imports"></a><a href="#does-dep-support-relative-imports" aria-hidden="true" class="hash-link" ><svg aria-hidden="true" height="16" version="1.1" viewBox="0 0 16 16" width="16"><path fill-rule="evenodd" d="M4 9h1v1H4c-1.5 0-3-1.69-3-3.5S2.55 3 4 3h4c1.45 0 3 1.69 3 3.5 0 1.41-.91 2.72-2 3.25V8.59c.58-.45 1-1.27 1-2.09C10 5.22 8.98 4 8 4H4c-.98 0-2 1.22-2 2.5S3 9 4 9zm9-3h-1v1h1c1 0 2 1.22 2 2.5S13.98 12 13 12H9c-.98 0-2-1.22-2-2.5 0-.83.42-1.64 1-2.09V6.25c-1.09.53-2 1.84-2 3.25C6 11.31 7.55 13 9 13h4c1.45 0 3-1.69 3-3.5S14.5 6 13 6z"></path></svg></a>Does <code>dep</code> support relative imports?</h2>
+<p>No.</p>
+<blockquote>
+<p>dep simply doesn't allow relative imports. this is one of the few places where we restrict a case that the toolchain itself allows. we disallow them only because:</p>
+<ul>
+<li>the toolchain already frowns heavily on them<br></li>
+<li>it's worse for our case, as we start venturing into <a href="http://doc.cat-v.org/plan_9/4th_edition/papers/lexnames">dot dot hell</a> territory when trying to prove that the import does not escape the tree of the project</li>
+</ul>
+<p><a href="https://github.com/golang/dep/issues/899#issuecomment-317904001">@sdboyer in #899</a></p>
+</blockquote>
+<p>For a refresher on Go's recommended workspace organization, see the <a href="https://golang.org/doc/code.html">&quot;How To Write Go Code&quot;</a> article in the Go docs. Organizing your code this way gives you a unique import path for every package.</p>
+<h2><a class="anchor" aria-hidden="true" name="how-do-i-make-dep-resolve-dependencies-from-my-gopath"></a><a href="#how-do-i-make-dep-resolve-dependencies-from-my-gopath" aria-hidden="true" class="hash-link" ><svg aria-hidden="true" height="16" version="1.1" viewBox="0 0 16 16" width="16"><path fill-rule="evenodd" d="M4 9h1v1H4c-1.5 0-3-1.69-3-3.5S2.55 3 4 3h4c1.45 0 3 1.69 3 3.5 0 1.41-.91 2.72-2 3.25V8.59c.58-.45 1-1.27 1-2.09C10 5.22 8.98 4 8 4H4c-.98 0-2 1.22-2 2.5S3 9 4 9zm9-3h-1v1h1c1 0 2 1.22 2 2.5S13.98 12 13 12H9c-.98 0-2-1.22-2-2.5 0-.83.42-1.64 1-2.09V6.25c-1.09.53-2 1.84-2 3.25C6 11.31 7.55 13 9 13h4c1.45 0 3-1.69 3-3.5S14.5 6 13 6z"></path></svg></a>How do I make <code>dep</code> resolve dependencies from my <code>GOPATH</code>?</h2>
+<p><code>dep init</code> provides an option to scan the <code>GOPATH</code> for dependencies by doing
+<code>dep init -gopath</code>, which falls back to network mode when the packages are not
+found in <code>GOPATH</code>. <code>dep ensure</code> doesn't work with projects in <code>GOPATH</code>.</p>
+<h2><a class="anchor" aria-hidden="true" name="will-dep-let-me-use-git-submodules-to-store-dependencies-in-vendor"></a><a href="#will-dep-let-me-use-git-submodules-to-store-dependencies-in-vendor" aria-hidden="true" class="hash-link" ><svg aria-hidden="true" height="16" version="1.1" viewBox="0 0 16 16" width="16"><path fill-rule="evenodd" d="M4 9h1v1H4c-1.5 0-3-1.69-3-3.5S2.55 3 4 3h4c1.45 0 3 1.69 3 3.5 0 1.41-.91 2.72-2 3.25V8.59c.58-.45 1-1.27 1-2.09C10 5.22 8.98 4 8 4H4c-.98 0-2 1.22-2 2.5S3 9 4 9zm9-3h-1v1h1c1 0 2 1.22 2 2.5S13.98 12 13 12H9c-.98 0-2-1.22-2-2.5 0-.83.42-1.64 1-2.09V6.25c-1.09.53-2 1.84-2 3.25C6 11.31 7.55 13 9 13h4c1.45 0 3-1.69 3-3.5S14.5 6 13 6z"></path></svg></a>Will <code>dep</code> let me use git submodules to store dependencies in <code>vendor</code>?</h2>
+<p>No, with just one tiny exception: <code>dep</code> preserves <code>/vendor/.git</code>, if it exists. This was added at <a href="https://github.com/cockroachdb/cockroach">cockroachdb</a>'s request, who rely on it to keep <code>vendor</code> from bloating their primary repository.</p>
+<p>The reasons why git submodules will not be a part of dep are best expressed as a pro/con list:</p>
+<p><strong>Pros</strong></p>
+<ul>
+<li>git submodules provide a well-structured way of nesting repositories within repositories.</li>
+</ul>
+<p><strong>Cons</strong></p>
+<ul>
+<li>The nesting that git submodules perform is no more powerful or expressive than what dep already does, but dep does it both more generally (for bzr and hg) and more domain-specifically (e.g. elimination of nested vendor directories).</li>
+<li>Incorporating git submodules in any way would new fork new paths in the logic to handle the submodule cases, meaning nontrivial complexity increases.</li>
+<li>dep does not currently know or care if the project it operates on is under version control. Relying on submodules would entail that dep start paying attention to that. That it would only be conditionally does not make it better - again, more forking paths in the logic, more complexity.</li>
+<li>Incorporating submodules in a way that is at all visible to the user (and why else would you do it?) makes dep's workflows both more complicated and less predictable: <em>sometimes</em> submodule-related actions are expected; <em>sometimes</em> submodule-derived workflows are sufficient.</li>
+<li>Nesting one repository within another implies that changes could, potentially, be made directly in that subrepository. This is directly contrary to dep's foundational principle that <code>vendor</code> is dead code, and directly modifying anything in there is an error.</li>
+</ul>
+<h2><a class="anchor" aria-hidden="true" name="best-practices"></a><a href="#best-practices" aria-hidden="true" class="hash-link" ><svg aria-hidden="true" height="16" version="1.1" viewBox="0 0 16 16" width="16"><path fill-rule="evenodd" d="M4 9h1v1H4c-1.5 0-3-1.69-3-3.5S2.55 3 4 3h4c1.45 0 3 1.69 3 3.5 0 1.41-.91 2.72-2 3.25V8.59c.58-.45 1-1.27 1-2.09C10 5.22 8.98 4 8 4H4c-.98 0-2 1.22-2 2.5S3 9 4 9zm9-3h-1v1h1c1 0 2 1.22 2 2.5S13.98 12 13 12H9c-.98 0-2-1.22-2-2.5 0-.83.42-1.64 1-2.09V6.25c-1.09.53-2 1.84-2 3.25C6 11.31 7.55 13 9 13h4c1.45 0 3-1.69 3-3.5S14.5 6 13 6z"></path></svg></a>Best Practices</h2>
+<h3><a class="anchor" aria-hidden="true" name="should-i-commit-my-vendor-directory"></a><a href="#should-i-commit-my-vendor-directory" aria-hidden="true" class="hash-link" ><svg aria-hidden="true" height="16" version="1.1" viewBox="0 0 16 16" width="16"><path fill-rule="evenodd" d="M4 9h1v1H4c-1.5 0-3-1.69-3-3.5S2.55 3 4 3h4c1.45 0 3 1.69 3 3.5 0 1.41-.91 2.72-2 3.25V8.59c.58-.45 1-1.27 1-2.09C10 5.22 8.98 4 8 4H4c-.98 0-2 1.22-2 2.5S3 9 4 9zm9-3h-1v1h1c1 0 2 1.22 2 2.5S13.98 12 13 12H9c-.98 0-2-1.22-2-2.5 0-.83.42-1.64 1-2.09V6.25c-1.09.53-2 1.84-2 3.25C6 11.31 7.55 13 9 13h4c1.45 0 3-1.69 3-3.5S14.5 6 13 6z"></path></svg></a>Should I commit my vendor directory?</h3>
+<p>It's up to you:</p>
+<p><strong>Pros</strong></p>
+<ul>
+<li>It's the only way to get truly reproducible builds, as it guards against upstream renames,
+deletes and commit history overwrites.</li>
+<li>You don't need an extra <code>dep ensure</code> step to sync <code>vendor/</code> with Gopkg.lock after most operations,
+such as <code>go get</code>, cloning, getting latest, merging, etc.</li>
+</ul>
+<p><strong>Cons</strong></p>
+<ul>
+<li>Your repo will be bigger, potentially a lot bigger,
+though <a href="/dep/docs/Gopkg.toml.html#prune"><code>prune</code></a> can help minimize this problem.</li>
+<li>PR diffs will include changes for files under <code>vendor/</code> when Gopkg.lock is modified,
+however files in <code>vendor/</code> are <a href="https://github.com/github/linguist/blob/v5.2.0/lib/linguist/generated.rb#L328">hidden by default</a> on Github.</li>
+</ul>
+<h2><a class="anchor" aria-hidden="true" name="how-do-i-roll-releases-that-dep-will-be-able-to-use"></a><a href="#how-do-i-roll-releases-that-dep-will-be-able-to-use" aria-hidden="true" class="hash-link" ><svg aria-hidden="true" height="16" version="1.1" viewBox="0 0 16 16" width="16"><path fill-rule="evenodd" d="M4 9h1v1H4c-1.5 0-3-1.69-3-3.5S2.55 3 4 3h4c1.45 0 3 1.69 3 3.5 0 1.41-.91 2.72-2 3.25V8.59c.58-.45 1-1.27 1-2.09C10 5.22 8.98 4 8 4H4c-.98 0-2 1.22-2 2.5S3 9 4 9zm9-3h-1v1h1c1 0 2 1.22 2 2.5S13.98 12 13 12H9c-.98 0-2-1.22-2-2.5 0-.83.42-1.64 1-2.09V6.25c-1.09.53-2 1.84-2 3.25C6 11.31 7.55 13 9 13h4c1.45 0 3-1.69 3-3.5S14.5 6 13 6z"></path></svg></a>How do I roll releases that <code>dep</code> will be able to use?</h2>
+<p>In short: make sure you've committed your <code>Gopkg.toml</code> and <code>Gopkg.lock</code>, then
+just create a tag in your version control system and push it to the canonical
+location. <code>dep</code> is designed to work automatically with this sort of metadata
+from <code>git</code>, <code>bzr</code>, and <code>hg</code>.</p>
+<p>It's strongly preferred that you use <a href="http://semver.org">semver</a>-compliant tag
+names. We hope to develop documentation soon that describes this more precisely,
+but in the meantime, the <a href="https://docs.npmjs.com/misc/semver">npm</a> docs match
+our patterns pretty well.</p>
+<h2><a class="anchor" aria-hidden="true" name="what-semver-version-should-i-use"></a><a href="#what-semver-version-should-i-use" aria-hidden="true" class="hash-link" ><svg aria-hidden="true" height="16" version="1.1" viewBox="0 0 16 16" width="16"><path fill-rule="evenodd" d="M4 9h1v1H4c-1.5 0-3-1.69-3-3.5S2.55 3 4 3h4c1.45 0 3 1.69 3 3.5 0 1.41-.91 2.72-2 3.25V8.59c.58-.45 1-1.27 1-2.09C10 5.22 8.98 4 8 4H4c-.98 0-2 1.22-2 2.5S3 9 4 9zm9-3h-1v1h1c1 0 2 1.22 2 2.5S13.98 12 13 12H9c-.98 0-2-1.22-2-2.5 0-.83.42-1.64 1-2.09V6.25c-1.09.53-2 1.84-2 3.25C6 11.31 7.55 13 9 13h4c1.45 0 3-1.69 3-3.5S14.5 6 13 6z"></path></svg></a>What semver version should I use?</h2>
+<p>This can be a nuanced question, and the community is going to have to work out
+some accepted standards for how semver should be applied to Go projects. At the
+highest level, though, these are the rules:</p>
+<ul>
+<li>Below <code>v1.0.0</code>, anything goes. Use these releases to figure out what you want
+your API to be.</li>
+<li>Above <code>v1.0.0</code>, the general Go best practices continue to apply - don't make
+backwards-incompatible changes - exported identifiers can be added to, but
+not changed or removed.</li>
+<li>If you must make a backwards-incompatible change, then bump the major version.</li>
+</ul>
+<p>It's important to note that having a <code>v1.0.0</code> does not preclude you from having
+alpha/beta/etc releases. The semver spec allows for <a href="http://semver.org/#spec-item-9">prerelease
+versions</a>, and <code>dep</code> is careful to <em>not</em> allow
+such versions unless <code>Gopkg.toml</code> contains a range constraint that explicitly
+includes prereleases: if there exists a version <code>v1.0.1-alpha4</code>, then the
+constraint <code>&gt;=1.0.0</code> will not match it, but <code>&gt;=1.0.1-alpha1</code> will.</p>
+<p>Some work has been done towards <a href="https://github.com/bradleyfalzon/apicompat">a tool
+to</a> that will analyze and compare
+your code with the last release, and suggest the next version you should use.</p>
+<h2><a class="anchor" aria-hidden="true" name="is-it-ok-to-make-backwards-incompatible-changes-now"></a><a href="#is-it-ok-to-make-backwards-incompatible-changes-now" aria-hidden="true" class="hash-link" ><svg aria-hidden="true" height="16" version="1.1" viewBox="0 0 16 16" width="16"><path fill-rule="evenodd" d="M4 9h1v1H4c-1.5 0-3-1.69-3-3.5S2.55 3 4 3h4c1.45 0 3 1.69 3 3.5 0 1.41-.91 2.72-2 3.25V8.59c.58-.45 1-1.27 1-2.09C10 5.22 8.98 4 8 4H4c-.98 0-2 1.22-2 2.5S3 9 4 9zm9-3h-1v1h1c1 0 2 1.22 2 2.5S13.98 12 13 12H9c-.98 0-2-1.22-2-2.5 0-.83.42-1.64 1-2.09V6.25c-1.09.53-2 1.84-2 3.25C6 11.31 7.55 13 9 13h4c1.45 0 3-1.69 3-3.5S14.5 6 13 6z"></path></svg></a>Is it OK to make backwards-incompatible changes now?</h2>
+<p>Yes. But.</p>
+<p><code>dep</code> will make it possible for the Go ecosystem to handle
+backwards-incompatible changes more gracefully. However, <code>dep</code> is not some
+magical panacea. Version and dependency management is hard, and dependency hell
+is real. The longstanding community wisdom about avoiding breaking changes
+remains important. Any <code>v1.0.0</code> release should be accompanied by a plan for how
+to avoid future breaking API changes.</p>
+<p>One good strategy may be to add to your API instead of changing it, deprecating
+old versions as you progress. Then, when the time is right, you can roll a new
+major version and clean out a bunch of deprecated symbols all at once.</p>
+<p>Note that providing an incremental migration path across breaking changes (i.e.,
+shims) is tricky, and something we <a href="https://groups.google.com/forum/#!topic/go-package-management/fp2uBMf6kq4">don't have a good answer for
+yet</a>.</p>
+<h2><a class="anchor" aria-hidden="true" name="my-dependers-don-t-use-dep-yet-what-should-i-do"></a><a href="#my-dependers-don-t-use-dep-yet-what-should-i-do" aria-hidden="true" class="hash-link" ><svg aria-hidden="true" height="16" version="1.1" viewBox="0 0 16 16" width="16"><path fill-rule="evenodd" d="M4 9h1v1H4c-1.5 0-3-1.69-3-3.5S2.55 3 4 3h4c1.45 0 3 1.69 3 3.5 0 1.41-.91 2.72-2 3.25V8.59c.58-.45 1-1.27 1-2.09C10 5.22 8.98 4 8 4H4c-.98 0-2 1.22-2 2.5S3 9 4 9zm9-3h-1v1h1c1 0 2 1.22 2 2.5S13.98 12 13 12H9c-.98 0-2-1.22-2-2.5 0-.83.42-1.64 1-2.09V6.25c-1.09.53-2 1.84-2 3.25C6 11.31 7.55 13 9 13h4c1.45 0 3-1.69 3-3.5S14.5 6 13 6z"></path></svg></a>My dependers don't use <code>dep</code> yet. What should I do?</h2>
+<p>For the most part, you needn't do anything differently.</p>
+<p>The only possible issue is if your project is ever consumed as a library. If
+so, then you may want to be wary about committing your <code>vendor/</code> directory, as
+it can <a href="https://groups.google.com/d/msg/golang-nuts/AnMr9NL6dtc/UnyUUKcMCAAJ">cause
+problems</a>.
+If your dependers are using <code>dep</code>, this is not a concern, as <code>dep</code> takes care of
+stripping out nested <code>vendor</code> directories.</p>
+<h2><a class="anchor" aria-hidden="true" name="how-do-i-configure-a-dependency-that-doesn-t-tag-its-releases"></a><a href="#how-do-i-configure-a-dependency-that-doesn-t-tag-its-releases" aria-hidden="true" class="hash-link" ><svg aria-hidden="true" height="16" version="1.1" viewBox="0 0 16 16" width="16"><path fill-rule="evenodd" d="M4 9h1v1H4c-1.5 0-3-1.69-3-3.5S2.55 3 4 3h4c1.45 0 3 1.69 3 3.5 0 1.41-.91 2.72-2 3.25V8.59c.58-.45 1-1.27 1-2.09C10 5.22 8.98 4 8 4H4c-.98 0-2 1.22-2 2.5S3 9 4 9zm9-3h-1v1h1c1 0 2 1.22 2 2.5S13.98 12 13 12H9c-.98 0-2-1.22-2-2.5 0-.83.42-1.64 1-2.09V6.25c-1.09.53-2 1.84-2 3.25C6 11.31 7.55 13 9 13h4c1.45 0 3-1.69 3-3.5S14.5 6 13 6z"></path></svg></a>How do I configure a dependency that doesn't tag its releases?</h2>
+<p>Add a constraint to <code>Gopkg.toml</code> that specifies <code>branch: &quot;master&quot;</code> (or whichever branch you need) in the <code>[[constraint]]</code> for that dependency. <code>dep ensure</code> will determine the current revision of your dependency's master branch, and place it in <code>Gopkg.lock</code> for you. See also: <a href="#what-is-the-difference-between-gopkgtoml-the-manifest-and-gopkglock-the-lock">What is the difference between Gopkg.toml and Gopkg.lock?</a></p>
+<h2><a class="anchor" aria-hidden="true" name="how-do-i-use-dep-with-docker"></a><a href="#how-do-i-use-dep-with-docker" aria-hidden="true" class="hash-link" ><svg aria-hidden="true" height="16" version="1.1" viewBox="0 0 16 16" width="16"><path fill-rule="evenodd" d="M4 9h1v1H4c-1.5 0-3-1.69-3-3.5S2.55 3 4 3h4c1.45 0 3 1.69 3 3.5 0 1.41-.91 2.72-2 3.25V8.59c.58-.45 1-1.27 1-2.09C10 5.22 8.98 4 8 4H4c-.98 0-2 1.22-2 2.5S3 9 4 9zm9-3h-1v1h1c1 0 2 1.22 2 2.5S13.98 12 13 12H9c-.98 0-2-1.22-2-2.5 0-.83.42-1.64 1-2.09V6.25c-1.09.53-2 1.84-2 3.25C6 11.31 7.55 13 9 13h4c1.45 0 3-1.69 3-3.5S14.5 6 13 6z"></path></svg></a>How do I use <code>dep</code> with Docker?</h2>
+<p><code>dep ensure -vendor-only</code> creates the vendor folder from a valid <code>Gopkg.toml</code> and <code>Gopkg.lock</code> without checking for Go code.
+This is especially useful for builds inside docker utilizing cache layers.</p>
+<p>Sample dockerfile:</p>
+<pre><code class="hljs css Dockerfile"><span class="hljs-keyword">FROM</span> golang:<span class="hljs-number">1.9</span> AS builder
+
+<span class="hljs-keyword">RUN</span><span class="bash"> curl -fsSL -o /usr/<span class="hljs-built_in">local</span>/bin/dep https://github.com/golang/dep/releases/download/vX.X.X/dep-linux-amd64 &amp;&amp; chmod +x /usr/<span class="hljs-built_in">local</span>/bin/dep
+</span>
+<span class="hljs-keyword">RUN</span><span class="bash"> mkdir -p /go/src/github.com/***
+</span><span class="hljs-keyword">WORKDIR</span><span class="bash"> /go/src/github.com/***
+</span>
+<span class="hljs-keyword">COPY</span><span class="bash"> Gopkg.toml Gopkg.lock ./
+</span><span class="hljs-comment"># copies the Gopkg.toml and Gopkg.lock to WORKDIR</span>
+
+<span class="hljs-keyword">RUN</span><span class="bash"> dep ensure -vendor-only
+</span><span class="hljs-comment"># install the dependencies without checking for go code</span>
+
+...
+</code></pre>
+<h2><a class="anchor" aria-hidden="true" name="how-do-i-use-dep-in-ci"></a><a href="#how-do-i-use-dep-in-ci" aria-hidden="true" class="hash-link" ><svg aria-hidden="true" height="16" version="1.1" viewBox="0 0 16 16" width="16"><path fill-rule="evenodd" d="M4 9h1v1H4c-1.5 0-3-1.69-3-3.5S2.55 3 4 3h4c1.45 0 3 1.69 3 3.5 0 1.41-.91 2.72-2 3.25V8.59c.58-.45 1-1.27 1-2.09C10 5.22 8.98 4 8 4H4c-.98 0-2 1.22-2 2.5S3 9 4 9zm9-3h-1v1h1c1 0 2 1.22 2 2.5S13.98 12 13 12H9c-.98 0-2-1.22-2-2.5 0-.83.42-1.64 1-2.09V6.25c-1.09.53-2 1.84-2 3.25C6 11.31 7.55 13 9 13h4c1.45 0 3-1.69 3-3.5S14.5 6 13 6z"></path></svg></a>How do I use <code>dep</code> in CI?</h2>
+<p>Since <code>dep</code> is expected to change until <code>v1.0.0</code> is released, it is recommended to rely on a released version.
+You can find the latest binary from the <a href="https://github.com/golang/dep/releases">releases</a> page.</p>
+<p>Sample configuration for Travis CI:</p>
+<pre><code class="hljs css yml"><span class="hljs-comment"># ...</span>
+
+<span class="hljs-attr">env:</span>
+<span class="hljs-bullet">  -</span> <span class="hljs-string">DEP_VERSION="X.X.X"</span>
+
+<span class="hljs-attr">before_install:</span>
+  <span class="hljs-comment"># Download the binary to bin folder in $GOPATH</span>
+<span class="hljs-bullet">  -</span> <span class="hljs-string">curl</span> <span class="hljs-bullet">-L</span> <span class="hljs-bullet">-s</span> <span class="hljs-attr">https://github.com/golang/dep/releases/download/v${DEP_VERSION}/dep-linux-amd64</span> <span class="hljs-bullet">-o</span> <span class="hljs-string">$GOPATH/bin/dep</span>
+  <span class="hljs-comment"># Make the binary executable</span>
+<span class="hljs-bullet">  -</span> <span class="hljs-string">chmod</span> <span class="hljs-string">+x</span> <span class="hljs-string">$GOPATH/bin/dep</span>
+
+<span class="hljs-attr">install:</span>
+<span class="hljs-bullet">  -</span> <span class="hljs-string">dep</span> <span class="hljs-string">ensure</span>
+</code></pre>
+<p>Caching can also be enabled but there are a couple of caveats you should be aware of:</p>
+<blockquote>
+<p>Until recently, we have had intermittent cache corruption that would have been super annoying if it was breaking Travis build too.</p>
+<p>Also according to <a href="https://docs.travis-ci.com/user/caching/#Things-not-to-cache">https://docs.travis-ci.com/user/caching/#Things-not-to-cache</a>, they don't recommend it for larger caches.</p>
+<p><a href="https://docs.travis-ci.com/user/caching/#How-does-the-caching-work%3F">https://docs.travis-ci.com/user/caching/#How-does-the-caching-work%3F</a></p>
+<blockquote>
+<p>Note that this makes our cache not network-local, it's still bound to network bandwidth and DNS resolutions for S3.
+That impacts what you can and should store in the cache. If you store archives larger than a few hundred megabytes in the cache, it's unlikely that you'll see a big speed improvement.</p>
+</blockquote>
+<p><a href="https://github.com/golang/dep/pull/1293#issuecomment-342969292">@carolynvs in #1293</a></p>
+</blockquote>
+<p>If you are sure you want to enable caching on travis, it can be done by adding <code>$GOPATH/pkg/dep</code>, the default location for <code>dep</code> cache, to the cached directories:</p>
+<pre><code class="hljs css yml"><span class="hljs-comment"># ...</span>
+
+<span class="hljs-attr">cache:</span>
+<span class="hljs-attr">  directories:</span>
+<span class="hljs-bullet">    -</span> <span class="hljs-string">$GOPATH/pkg/dep</span>
+</code></pre>
+</span></div></article></div><div class="docs-prevnext"><a class="docs-prev button" href="Gopkg.lock.html">← Gopkg.lock</a><a class="docs-next button" href="glossary.html">Glossary →</a></div></div></div></div><footer class="nav-footer" id="footer"><section class="copyright">Copyright © 2018 The Go Authors</section><section class="footer-logo"><a href="/dep/" class="nav-home"><img src="/dep/docs/assets/DigbyShadowsScene2.svg" alt="dep" width="75"/></a></section></footer></div></body></html>

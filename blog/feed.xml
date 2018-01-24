@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0">
+    <channel>
+        <title>dep Blog</title>
+        <link>https://golang.github.io/blog</link>
+        <description>The best place to stay up-to-date with the latest dep news and events.</description>
+        <lastBuildDate>Tue, 23 Jan 2018 06:00:00 GMT</lastBuildDate>
+        <docs>http://blogs.law.harvard.edu/tech/rss</docs>
+        <generator>Feed for Node.js</generator>
+        <image>
+            <title>dep Blog</title>
+            <url>https://golang.github.iodocs/assets/DigbyFlat.svg</url>
+            <link>https://golang.github.io/blog</link>
+        </image>
+        <copyright>Copyright © 2018 The Go Authors</copyright>
+        <item>
+            <title><![CDATA[Announcing dep v0.4.0 (with docs!)]]></title>
+            <link>https://golang.github.io/blog/2018/01/23/announce-v0.4.0.html</link>
+            <guid>https://golang.github.io/blog/2018/01/23/announce-v0.4.0.html</guid>
+            <pubDate>Tue, 23 Jan 2018 06:00:00 GMT</pubDate>
+            <description><![CDATA[v0.4.0 of dep [has been released](https://github.com/golang/dep/releases/tag/v0.4.0) - and along with it, this site for documentation and announcements about dep! And, being that it's been nearly six months since [the last dep status update](https://]]></description>
+        </item>
+    </channel>
+</rss>
