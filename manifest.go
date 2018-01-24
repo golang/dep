@@ -84,12 +84,22 @@ const (
 	pruneOptionNonGo          = "non-go"
 )
 
+// Constants to represents per-project prune uint8 values.
+const (
+	pvnone  uint8 = 0 // No per-project prune value was set in Gopkg.toml.
+	pvtrue  uint8 = 1 // Per-project prune value was explicitly set to true.
+	pvfalse uint8 = 2 // Per-project prune value was explicitly set to true.
+)
+
 // NewManifest instantites a new manifest.
 func NewManifest() *Manifest {
 	return &Manifest{
-		Constraints:  make(gps.ProjectConstraints),
-		Ovr:          make(gps.ProjectConstraints),
-		PruneOptions: gps.DefaultCascadingPruneOptions(),
+		Constraints: make(gps.ProjectConstraints),
+		Ovr:         make(gps.ProjectConstraints),
+		PruneOptions: gps.CascadingPruneOptions{
+			DefaultOptions:    gps.PruneNestedVendorDirs,
+			PerProjectOptions: map[gps.ProjectRoot]gps.PruneOptionSet{},
+		},
 	}
 }
 
@@ -254,20 +264,20 @@ func validatePruneOptions(val interface{}, root bool) (warns []error, err error)
 
 func checkRedundantPruneOptions(co gps.CascadingPruneOptions) (warns []error) {
 	for name, project := range co.PerProjectOptions {
-		if project.UnusedPackages != gps.PruneValueAbsent {
-			if (co.DefaultPruneOptions&gps.PruneUnusedPackages != 0) == (project.UnusedPackages == gps.PruneValueTrue) {
+		if project.UnusedPackages != pvnone {
+			if (co.DefaultOptions&gps.PruneUnusedPackages != 0) == (project.UnusedPackages == pvtrue) {
 				warns = append(warns, errors.Errorf("redundant prune option %q set for %q", pruneOptionUnusedPackages, name))
 			}
 		}
 
-		if project.NonGoFiles != gps.PruneValueAbsent {
-			if (co.DefaultPruneOptions&gps.PruneNonGoFiles != 0) == (project.NonGoFiles == gps.PruneValueTrue) {
+		if project.NonGoFiles != pvnone {
+			if (co.DefaultOptions&gps.PruneNonGoFiles != 0) == (project.NonGoFiles == pvtrue) {
 				warns = append(warns, errors.Errorf("redundant prune option %q set for %q", pruneOptionNonGo, name))
 			}
 		}
 
-		if project.GoTests != gps.PruneValueAbsent {
-			if (co.DefaultPruneOptions&gps.PruneGoTestFiles != 0) == (project.GoTests == gps.PruneValueTrue) {
+		if project.GoTests != pvnone {
+			if (co.DefaultOptions&gps.PruneGoTestFiles != 0) == (project.GoTests == pvtrue) {
 				warns = append(warns, errors.Errorf("redundant prune option %q set for %q", pruneOptionGoTests, name))
 			}
 		}
@@ -387,18 +397,18 @@ func fromRawManifest(raw rawManifest) (*Manifest, error) {
 
 func fromRawPruneOptions(raw rawPruneOptions) (gps.CascadingPruneOptions, error) {
 	opts := gps.CascadingPruneOptions{
-		DefaultPruneOptions: gps.PruneNestedVendorDirs,
-		PerProjectOptions:   make(gps.PruneProjectOptions2),
+		DefaultOptions:    gps.PruneNestedVendorDirs,
+		PerProjectOptions: make(map[gps.ProjectRoot]gps.PruneOptionSet),
 	}
 
 	if raw.UnusedPackages {
-		opts.DefaultPruneOptions |= gps.PruneUnusedPackages
+		opts.DefaultOptions |= gps.PruneUnusedPackages
 	}
 	if raw.GoTests {
-		opts.DefaultPruneOptions |= gps.PruneGoTestFiles
+		opts.DefaultOptions |= gps.PruneGoTestFiles
 	}
 	if raw.NonGoFiles {
-		opts.DefaultPruneOptions |= gps.PruneNonGoFiles
+		opts.DefaultOptions |= gps.PruneNonGoFiles
 	}
 
 	for _, p := range raw.Projects {
@@ -413,30 +423,30 @@ func fromRawPruneOptions(raw rawPruneOptions) (gps.CascadingPruneOptions, error)
 		pr := gps.ProjectRoot(name.(string))
 		pos := gps.PruneOptionSet{
 			// This should be redundant, but being explicit doesn't hurt.
-			NestedVendor: gps.PruneValueTrue,
+			NestedVendor: pvtrue,
 		}
 
 		if val, has := p[pruneOptionUnusedPackages]; has {
 			if val.(bool) {
-				pos.UnusedPackages = gps.PruneValueTrue
+				pos.UnusedPackages = pvtrue
 			} else {
-				pos.UnusedPackages = gps.PruneValueFalse
+				pos.UnusedPackages = pvfalse
 			}
 		}
 
 		if val, has := p[pruneOptionGoTests]; has {
 			if val.(bool) {
-				pos.GoTests = gps.PruneValueTrue
+				pos.GoTests = pvtrue
 			} else {
-				pos.GoTests = gps.PruneValueFalse
+				pos.GoTests = pvfalse
 			}
 		}
 
 		if val, has := p[pruneOptionNonGo]; has {
 			if val.(bool) {
-				pos.NonGoFiles = gps.PruneValueTrue
+				pos.NonGoFiles = pvtrue
 			} else {
-				pos.NonGoFiles = gps.PruneValueFalse
+				pos.NonGoFiles = pvfalse
 			}
 		}
 
@@ -456,15 +466,15 @@ func toRawPruneOptions(co gps.CascadingPruneOptions) rawPruneOptions {
 	}
 	raw := rawPruneOptions{}
 
-	if (co.DefaultPruneOptions & gps.PruneUnusedPackages) != 0 {
+	if (co.DefaultOptions & gps.PruneUnusedPackages) != 0 {
 		raw.UnusedPackages = true
 	}
 
-	if (co.DefaultPruneOptions & gps.PruneNonGoFiles) != 0 {
+	if (co.DefaultOptions & gps.PruneNonGoFiles) != 0 {
 		raw.NonGoFiles = true
 	}
 
-	if (co.DefaultPruneOptions & gps.PruneGoTestFiles) != 0 {
+	if (co.DefaultOptions & gps.PruneGoTestFiles) != 0 {
 		raw.GoTests = true
 	}
 	return raw

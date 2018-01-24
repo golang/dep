@@ -58,7 +58,7 @@ const concurrentWriters = 16
 //
 // It requires a SourceManager to do the work. Prune options are read from the
 // passed manifest.
-func WriteDepTree(basedir string, l Lock, sm SourceManager, rpo RootPruneOptions, logger *log.Logger) error {
+func WriteDepTree(basedir string, l Lock, sm SourceManager, co CascadingPruneOptions, logger *log.Logger) error {
 	if l == nil {
 		return fmt.Errorf("must provide non-nil Lock to WriteDepTree")
 	}
@@ -95,16 +95,12 @@ func WriteDepTree(basedir string, l Lock, sm SourceManager, rpo RootPruneOptions
 					return errors.Wrapf(err, "failed to export %s", projectRoot)
 				}
 
-				err := PruneProject(to, p, rpo.PruneOptionsFor(ident.ProjectRoot), logger)
+				err := PruneProject(to, p, co.PruneOptionsFor(ident.ProjectRoot), logger)
 				if err != nil {
 					return errors.Wrapf(err, "failed to prune %s", projectRoot)
 				}
 
-				if err := ctx.Err(); err != nil {
-					return err
-				}
-
-				return nil
+				return ctx.Err()
 			}()
 
 			switch err {

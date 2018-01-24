@@ -66,7 +66,7 @@ type SafeWriter struct {
 	lockDiff     *gps.LockDiff
 	writeVendor  bool
 	writeLock    bool
-	pruneOptions gps.RootPruneOptions
+	pruneOptions gps.CascadingPruneOptions
 }
 
 // NewSafeWriter sets up a SafeWriter to write a set of manifest, lock, and
@@ -84,7 +84,7 @@ type SafeWriter struct {
 // - If oldLock is provided without newLock, error.
 //
 // - If vendor is VendorAlways without a newLock, error.
-func NewSafeWriter(manifest *Manifest, oldLock, newLock *Lock, vendor VendorBehavior, prune gps.RootPruneOptions) (*SafeWriter, error) {
+func NewSafeWriter(manifest *Manifest, oldLock, newLock *Lock, vendor VendorBehavior, prune gps.CascadingPruneOptions) (*SafeWriter, error) {
 	sw := &SafeWriter{
 		Manifest:     manifest,
 		lock:         newLock,

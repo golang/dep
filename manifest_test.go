@@ -47,7 +47,8 @@ func TestReadManifest(t *testing.T) {
 		},
 		Ignored: []string{"github.com/foo/bar"},
 		PruneOptions: gps.CascadingPruneOptions{
-			DefaultPruneOptions: gps.PruneNestedVendorDirs | gps.PruneNonGoFiles,
+			DefaultOptions:    gps.PruneNestedVendorDirs | gps.PruneNonGoFiles,
+			PerProjectOptions: make(map[gps.ProjectRoot]gps.PruneOptionSet),
 		},
 	}
 
@@ -85,6 +86,10 @@ func TestWriteManifest(t *testing.T) {
 		Constraint: gps.NewBranch("master"),
 	}
 	m.Ignored = []string{"github.com/foo/bar"}
+	m.PruneOptions = gps.CascadingPruneOptions{
+		DefaultOptions:    gps.PruneNestedVendorDirs | gps.PruneNonGoFiles,
+		PerProjectOptions: make(map[gps.ProjectRoot]gps.PruneOptionSet),
+	}
 
 	got, err := m.MarshalTOML()
 	if err != nil {
@@ -469,13 +474,13 @@ func TestCheckRedundantPruneOptions(t *testing.T) {
 		{
 			name: "all redundant on true",
 			pruneOptions: gps.CascadingPruneOptions{
-				DefaultPruneOptions: 15,
-				PerProjectOptions: gps.PruneProjectOptions2{
+				DefaultOptions: 15,
+				PerProjectOptions: map[gps.ProjectRoot]gps.PruneOptionSet{
 					"github.com/golang/dep": gps.PruneOptionSet{
-						NestedVendor:   gps.PruneValueTrue,
-						UnusedPackages: gps.PruneValueTrue,
-						NonGoFiles:     gps.PruneValueTrue,
-						GoTests:        gps.PruneValueTrue,
+						NestedVendor:   pvtrue,
+						UnusedPackages: pvtrue,
+						NonGoFiles:     pvtrue,
+						GoTests:        pvtrue,
 					},
 				},
 			},
@@ -488,13 +493,13 @@ func TestCheckRedundantPruneOptions(t *testing.T) {
 		{
 			name: "all redundant on false",
 			pruneOptions: gps.CascadingPruneOptions{
-				DefaultPruneOptions: 1,
-				PerProjectOptions: gps.PruneProjectOptions2{
+				DefaultOptions: 1,
+				PerProjectOptions: map[gps.ProjectRoot]gps.PruneOptionSet{
 					"github.com/golang/dep": gps.PruneOptionSet{
-						NestedVendor:   gps.PruneValueTrue,
-						UnusedPackages: gps.PruneValueFalse,
-						NonGoFiles:     gps.PruneValueFalse,
-						GoTests:        gps.PruneValueFalse,
+						NestedVendor:   pvtrue,
+						UnusedPackages: pvfalse,
+						NonGoFiles:     pvfalse,
+						GoTests:        pvfalse,
 					},
 				},
 			},
@@ -507,17 +512,17 @@ func TestCheckRedundantPruneOptions(t *testing.T) {
 		{
 			name: "redundancy mix across multiple projects",
 			pruneOptions: gps.CascadingPruneOptions{
-				DefaultPruneOptions: 7,
-				PerProjectOptions: gps.PruneProjectOptions2{
+				DefaultOptions: 7,
+				PerProjectOptions: map[gps.ProjectRoot]gps.PruneOptionSet{
 					"github.com/golang/dep": gps.PruneOptionSet{
-						NestedVendor: gps.PruneValueTrue,
-						NonGoFiles:   gps.PruneValueTrue,
-						GoTests:      gps.PruneValueTrue,
+						NestedVendor: pvtrue,
+						NonGoFiles:   pvtrue,
+						GoTests:      pvtrue,
 					},
 					"github.com/other/project": gps.PruneOptionSet{
-						NestedVendor:   gps.PruneValueTrue,
-						UnusedPackages: gps.PruneValueFalse,
-						GoTests:        gps.PruneValueFalse,
+						NestedVendor:   pvtrue,
+						UnusedPackages: pvfalse,
+						GoTests:        pvfalse,
 					},
 				},
 			},
@@ -675,13 +680,13 @@ func TestFromRawPruneOptions(t *testing.T) {
 				},
 			},
 			wantOptions: gps.CascadingPruneOptions{
-				DefaultPruneOptions: 15,
-				PerProjectOptions: gps.PruneProjectOptions2{
+				DefaultOptions: 15,
+				PerProjectOptions: map[gps.ProjectRoot]gps.PruneOptionSet{
 					"github.com/golang/dep": gps.PruneOptionSet{
-						NestedVendor:   gps.PruneValueTrue,
-						UnusedPackages: gps.PruneValueFalse,
-						NonGoFiles:     gps.PruneValueFalse,
-						GoTests:        gps.PruneValueFalse,
+						NestedVendor:   pvtrue,
+						UnusedPackages: pvfalse,
+						NonGoFiles:     pvfalse,
+						GoTests:        pvfalse,
 					},
 				},
 			},
@@ -700,11 +705,11 @@ func TestFromRawPruneOptions(t *testing.T) {
 				},
 			},
 			wantOptions: gps.CascadingPruneOptions{
-				DefaultPruneOptions: 15,
-				PerProjectOptions: gps.PruneProjectOptions2{
+				DefaultOptions: 15,
+				PerProjectOptions: map[gps.ProjectRoot]gps.PruneOptionSet{
 					"github.com/golang/dep": gps.PruneOptionSet{
-						NestedVendor:   gps.PruneValueTrue,
-						UnusedPackages: gps.PruneValueFalse,
+						NestedVendor:   pvtrue,
+						UnusedPackages: pvfalse,
 					},
 				},
 			},
@@ -725,13 +730,13 @@ func TestFromRawPruneOptions(t *testing.T) {
 				},
 			},
 			wantOptions: gps.CascadingPruneOptions{
-				DefaultPruneOptions: 1,
-				PerProjectOptions: gps.PruneProjectOptions2{
+				DefaultOptions: 1,
+				PerProjectOptions: map[gps.ProjectRoot]gps.PruneOptionSet{
 					"github.com/golang/dep": gps.PruneOptionSet{
-						NestedVendor:   gps.PruneValueTrue,
-						UnusedPackages: gps.PruneValueTrue,
-						NonGoFiles:     gps.PruneValueTrue,
-						GoTests:        gps.PruneValueTrue,
+						NestedVendor:   pvtrue,
+						UnusedPackages: pvtrue,
+						NonGoFiles:     pvtrue,
+						GoTests:        pvtrue,
 					},
 				},
 			},
@@ -760,7 +765,7 @@ func TestToRawPruneOptions(t *testing.T) {
 	}{
 		{
 			name:         "all options",
-			pruneOptions: gps.CascadingPruneOptions{DefaultPruneOptions: 15},
+			pruneOptions: gps.CascadingPruneOptions{DefaultOptions: 15},
 			wantOptions: rawPruneOptions{
 				UnusedPackages: true,
 				NonGoFiles:     true,
@@ -769,7 +774,7 @@ func TestToRawPruneOptions(t *testing.T) {
 		},
 		{
 			name:         "no options",
-			pruneOptions: gps.CascadingPruneOptions{DefaultPruneOptions: 1},
+			pruneOptions: gps.CascadingPruneOptions{DefaultOptions: 1},
 			wantOptions: rawPruneOptions{
 				UnusedPackages: false,
 				NonGoFiles:     false,
@@ -791,10 +796,10 @@ func TestToRawPruneOptions(t *testing.T) {
 
 func TestToRawPruneOptions_Panic(t *testing.T) {
 	pruneOptions := gps.CascadingPruneOptions{
-		DefaultPruneOptions: 1,
-		PerProjectOptions: gps.PruneProjectOptions2{
+		DefaultOptions: 1,
+		PerProjectOptions: map[gps.ProjectRoot]gps.PruneOptionSet{
 			"github.com/carolynvs/deptest": gps.PruneOptionSet{
-				NestedVendor: gps.PruneValueTrue,
+				NestedVendor: pvtrue,
 			},
 		},
 	}

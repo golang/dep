@@ -18,79 +18,6 @@ import (
 // PruneOptions represents the pruning options used to write the dependecy tree.
 type PruneOptions uint8
 
-// PruneProjectOptions is map of prune options per project name.
-type PruneProjectOptions map[ProjectRoot]PruneOptions
-type PruneProjectOptions2 map[ProjectRoot]PruneOptionSet
-
-type PruneOptionSet struct {
-	NestedVendor   PruneValue
-	UnusedPackages PruneValue
-	NonGoFiles     PruneValue
-	GoTests        PruneValue
-}
-
-// RootPruneOptions represents the root prune options for the project.
-// It contains the global options and a map of options per project.
-type RootPruneOptions struct {
-	PruneOptions   PruneOptions
-	ProjectOptions PruneProjectOptions
-}
-
-type CascadingPruneOptions struct {
-	DefaultPruneOptions PruneOptions
-	PerProjectOptions   PruneProjectOptions2
-}
-
-type PruneValue uint8
-
-const (
-	PruneValueAbsent PruneValue = iota
-	PruneValueTrue
-	PruneValueFalse
-)
-
-func (o CascadingPruneOptions) PruneOptionsFor(pr ProjectRoot) PruneOptions {
-	po, has := o.PerProjectOptions[pr]
-	if !has {
-		return o.DefaultPruneOptions
-	}
-
-	ops := o.DefaultPruneOptions
-	if po.NestedVendor != PruneValueAbsent {
-		if po.NestedVendor == PruneValueTrue {
-			ops |= PruneNestedVendorDirs
-		} else {
-			ops &^= PruneNestedVendorDirs
-		}
-	}
-
-	if po.UnusedPackages != PruneValueAbsent {
-		if po.UnusedPackages == PruneValueTrue {
-			ops |= PruneUnusedPackages
-		} else {
-			ops &^= PruneUnusedPackages
-		}
-	}
-
-	if po.NonGoFiles != PruneValueAbsent {
-		if po.NonGoFiles == PruneValueTrue {
-			ops |= PruneNonGoFiles
-		} else {
-			ops &^= PruneNonGoFiles
-		}
-	}
-
-	if po.GoTests != PruneValueAbsent {
-		if po.GoTests == PruneValueTrue {
-			ops |= PruneGoTestFiles
-		} else {
-			ops &^= PruneGoTestFiles
-		}
-	}
-
-	return ops
-}
-
 const (
 	// PruneNestedVendorDirs indicates if nested vendor directories should be pruned.
 	PruneNestedVendorDirs PruneOptions = 1 << iota
@@ -104,31 +31,85 @@ const (
 	PruneGoTestFiles
 )
 
-// DefaultRootPruneOptions instantiates a copy of the default root prune options.
-func DefaultRootPruneOptions() RootPruneOptions {
-	return RootPruneOptions{
-		PruneOptions:   PruneNestedVendorDirs,
-		ProjectOptions: PruneProjectOptions{},
-	}
-}
-
-func DefaultCascadingPruneOptions() CascadingPruneOptions {
-	return CascadingPruneOptions{
-		DefaultPruneOptions: PruneNestedVendorDirs,
-		PerProjectOptions:   PruneProjectOptions2{},
-	}
-}
-
-// PruneOptionsFor returns the prune options for the passed project root.
+// PruneOptionSet represents trinary distinctions for each of the types of
+// prune rules (as expressed via PruneOptions): nested vendor directories,
+// unused packages, non-go files, and go test files.
 //
-// It will return the root prune options if the project does not have specific
-// options or if it does not exist in the manifest.
-func (o *RootPruneOptions) PruneOptionsFor(pr ProjectRoot) PruneOptions {
-	if po, ok := o.ProjectOptions[pr]; ok {
-		return po
+// The three-way distinction is between "none", "true", and "false", represented
+// by uint8 values of 0, 1, and 2, respectively.
+//
+// This trinary distinction is necessary in order to record, with full fidelity,
+// a cascading tree of pruning values, as expressed in CascadingPruneOptions; a
+// simple boolean cannot delineate between "false" and "none".
+type PruneOptionSet struct {
+	NestedVendor   uint8
+	UnusedPackages uint8
+	NonGoFiles     uint8
+	GoTests        uint8
+}
+
+// CascadingPruneOptions is a set of rules for pruning a dependency tree.
+//
+// The DefaultOptions are the global default pruning rules, expressed as a
+// single PruneOptions bitfield. These global rules will cascade down to
+// individual project rules, unless superseded.
+type CascadingPruneOptions struct {
+	DefaultOptions    PruneOptions
+	PerProjectOptions map[ProjectRoot]PruneOptionSet
+}
+
+// PruneOptionsFor returns the PruneOptions bits for the given project,
+// indicating which pruning rules should be applied to the project's code.
+//
+// It computes the cascade from default to project-specific options (if any) on
+// the fly.
+func (o CascadingPruneOptions) PruneOptionsFor(pr ProjectRoot) PruneOptions {
+	po, has := o.PerProjectOptions[pr]
+	if !has {
+		return o.DefaultOptions
 	}
 
-	return o.PruneOptions
+	ops := o.DefaultOptions
+	if po.NestedVendor != 0 {
+		if po.NestedVendor == 1 {
+			ops |= PruneNestedVendorDirs
+		} else {
+			ops &^= PruneNestedVendorDirs
+		}
+	}
+
+	if po.UnusedPackages != 0 {
+		if po.UnusedPackages == 1 {
+			ops |= PruneUnusedPackages
+		} else {
+			ops &^= PruneUnusedPackages
+		}
+	}
+
+	if po.NonGoFiles != 0 {
+		if po.NonGoFiles == 1 {
+			ops |= PruneNonGoFiles
+		} else {
+			ops &^= PruneNonGoFiles
+		}
+	}
+
+	if po.GoTests != 0 {
+		if po.GoTests == 1 {
+			ops |= PruneGoTestFiles
+		} else {
+			ops &^= PruneGoTestFiles
+		}
+	}
+
+	return ops
+}
+
+func defaultCascadingPruneOptions() CascadingPruneOptions {
+	return CascadingPruneOptions{
+		DefaultOptions:    PruneNestedVendorDirs,
+		PerProjectOptions: map[ProjectRoot]PruneOptionSet{},
+	}
 }
 
 var (
