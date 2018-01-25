@@ -41,9 +41,11 @@ func (cmd *pruneCommand) Register(fs *flag.FlagSet) {
 }
 
 func (cmd *pruneCommand) Run(ctx *dep.Ctx, args []string) error {
-	ctx.Out.Printf("Pruning is now performed automatically by dep ensure.\n")
-	ctx.Out.Printf("Set prune settings in %s and it it will be applied when running ensure.\n", dep.ManifestName)
-	ctx.Out.Printf("\ndep prune will be removed in a future version, and this command will exit non-0.\nPlease update your scripts.\n")
+	ctx.Err.Printf("Pruning is now performed automatically by dep ensure.\n")
+	ctx.Err.Printf("Set prune settings in %s and it it will be applied when running ensure.\n", dep.ManifestName)
+	ctx.Err.Printf("\nThis command currently still prunes as it always has, to ease the transition.\n")
+	ctx.Err.Printf("However, it will be removed in a future version of dep.\n")
+	ctx.Err.Printf("\nNow is the time to update your Gopkg.toml and remove `dep prune` from any scripts.\n")
 
 	p, err := ctx.LoadProject()
 	if err != nil {
