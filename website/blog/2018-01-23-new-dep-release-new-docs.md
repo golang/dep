@@ -1,5 +1,5 @@
 ---
-title: Announcing dep v0.4.0 (with docs!)
+title: A new dep release, and new docs!
 author: sam boyer
 authorURL: http://twitter.com/sdboyer
 ---
