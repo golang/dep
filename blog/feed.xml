@@ -18,7 +18,7 @@
             <link>https://golang.github.io/blog/2018/01/23/announce-v0.4.0.html</link>
             <guid>https://golang.github.io/blog/2018/01/23/announce-v0.4.0.html</guid>
             <pubDate>Tue, 23 Jan 2018 06:00:00 GMT</pubDate>
-            <description><![CDATA[v0.4.0 of dep [has been released](https://github.com/golang/dep/releases/tag/v0.4.0) (with an immediate bugfix follow-up, v0.4.1) - and along with it, this site for documentation and announcements about dep! And, being that it's been nearly six month]]></description>
+            <description><![CDATA[v0.4.0 of dep [has been released](https://github.com/golang/dep/releases/tag/v0.4.0) - and along with it, this site for documentation and announcements about dep! And, being that it's been nearly six months since [the last dep status update](https://]]></description>
         </item>
     </channel>
 </rss>
