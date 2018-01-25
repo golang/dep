@@ -15,6 +15,7 @@ BUG FIXES:
 # v0.4.0
 
 NEW FEATURES:
+* Absorb `dep prune` into `dep ensure`. ([#944](https://github.com/golang/dep/issues/944))
 * Add support for importing from [glock](https://github.com/robfig/glock) based projects. ([#1422](https://github.com/golang/dep/pull/1422)
 * Add support for importing from [govendor](https://github.com/kardianos/govendor) based projects. ([#815](https://github.com/golang/dep/pull/815)
 * Allow override of cache directory location using environment variable `DEPCACHEDIR`. ([#1234](https://github.com/golang/dep/pull/1234))
