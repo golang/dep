@@ -6,6 +6,8 @@ BUG FIXES:
 
 IMPROVEMENTS:
 
+* Only allow literal version strings as CLI constraints  ([#1036](https://github.com/golang/dep/issues/1036))
+
 # v0.4.1
 
 BUG FIXES:

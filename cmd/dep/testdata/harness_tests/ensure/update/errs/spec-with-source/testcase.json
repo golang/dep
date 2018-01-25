@@ -2,5 +2,5 @@
   "commands": [
     ["ensure", "-update", "github.com/sdboyer/deptest@1.0.0"]
   ],
-  "error-expected": "version constraint ^1.0.0 passed for github.com/sdboyer/deptest, but -update follows constraints declared in"
+  "error-expected": "version constraint 1.0.0 passed for github.com/sdboyer/deptest, but -update follows constraints declared in"
 }

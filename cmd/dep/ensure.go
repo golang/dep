@@ -14,6 +14,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -122,6 +123,12 @@ dep ensure -no-vendor -dry-run
 var (
 	errUpdateArgsValidation = errors.New("update arguments validation failed")
 	errAddDepsFailed        = errors.New("adding dependencies failed")
+
+	// lvRegexp is the Literal Version regular expression, which is meant to match
+	// only properly formatted semantic version strings (per SemVer 2.0.0).
+	lvRegexp = regexp.MustCompile(`v?(?:[0-9]+)(?:\.[0-9]+)?(?:\.[0-9]+)?` +
+		`(?:-([0-9A-Za-z\-]+(?:\.[0-9A-Za-z\-]+)*))?` +
+		`(?:\+([0-9A-Za-z\-]+(?:\.[0-9A-Za-z\-]+)*))?`)
 )
 
 func (cmd *ensureCommand) Name() string { return "ensure" }
@@ -779,11 +786,45 @@ func getProjectConstraint(arg string, sm gps.SourceManager) (gps.ProjectConstrai
 	}
 
 	pi := gps.ProjectIdentifier{ProjectRoot: pr, Source: source}
+
+	// check to see whether our versionStr contains what looks to be a semver
+	// tag -- this is so we can make sure it's a full version and not a range
+	if len(versionStr) > 0 {
+		vs := lvRegexp.FindString(versionStr)
+
+		switch true {
+		case len(vs) == 0:
+			// there is no semver value present -- do nothing
+		case versionStr == vs:
+			// the version is an absolute version -- prepend it with '='
+			versionStr = "=" + versionStr
+		case len(versionStr) > len(vs):
+			// the version string contains more than the semver string
+			// try to make sure it's not a range of versions
+			if versionContainsRange(versionStr) {
+				return emptyPC, "", errors.Errorf("version string %q is not valid: must be an absolute semantic version", versionStr)
+			}
+		}
+	}
+
 	c, err := sm.InferConstraint(versionStr, pi)
 	if err != nil {
 		return emptyPC, "", err
 	}
 	return gps.ProjectConstraint{Ident: pi, Constraint: c}, arg, nil
+}
+
+func versionContainsRange(full string) bool {
+	switch 0 {
+	case strings.Index(full, "^"), strings.Index(full, "~"), strings.Index(full, ">="):
+		return true
+	case strings.Index(full, "<="), strings.Index(full, "!="), strings.Index(full, "<"):
+		return true
+	case strings.Index(full, ">"), strings.Index(full, "-"):
+		return true
+	default:
+		return false
+	}
 }
 
 func checkErrors(m map[string]pkgtree.PackageOrErr, ignore *pkgtree.IgnoredRuleset) (fatal bool, err error) {
