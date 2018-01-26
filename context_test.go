@@ -171,7 +171,7 @@ func TestLoadProjectNotFoundErrors(t *testing.T) {
 	}
 
 	for _, testcase := range testcases {
-		ctx := &Ctx{GOPATHs: []string{tg.Path(".")}, WorkingDir: tg.Path(testcase.start)}
+		ctx := &Ctx{GOPATHs: []string{tg.Path(".")}, WorkingDir: tg.Path(testcase.start), Out: log.New(ioutil.Discard, "", log.LstdFlags)}
 
 		_, err := ctx.LoadProject()
 		if err == nil {
