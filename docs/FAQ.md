@@ -11,7 +11,7 @@ The FAQ predated the introduction of the rest of the documentation. If something
 
 ## Configuration
 * [What is the difference between Gopkg.toml (the "manifest") and Gopkg.lock (the "lock")?](#what-is-the-difference-between-gopkgtoml-the-manifest-and-gopkglock-the-lock)
-* [How do I constrain a transitive dependency's version?](#how-do-i-constrain-a-transitive-dependencys-version)
+* [How do I constrain a transitive dependency's version?](#how-do-i-constrain-a-transitive-dependency-s-version)
 * [Can I put the manifest and lock in the vendor directory?](#can-i-put-the-manifest-and-lock-in-the-vendor-directory)
 * [How do I get `dep` to authenticate to a `git` repo?](#how-do-i-get-dep-to-authenticate-to-a-git-repo)
 * [How do I get `dep` to consume private `git` repos using a Github Token?](#how-do-i-get-dep-to-consume-private-git-repos-using-a-github-token)
@@ -32,8 +32,8 @@ The FAQ predated the introduction of the rest of the documentation. If something
 * [How do I roll releases that `dep` will be able to use?](#how-do-i-roll-releases-that-dep-will-be-able-to-use)
 * [What semver version should I use?](#what-semver-version-should-i-use)
 * [Is it OK to make backwards-incompatible changes now?](#is-it-ok-to-make-backwards-incompatible-changes-now)
-* [My dependers don't use `dep` yet. What should I do?](#my-dependers-dont-use-dep-yet-what-should-i-do)
-* [How do I configure a dependency that doesn't tag its releases?](#how-do-i-configure-a-dependency-that-doesnt-tag-its-releases)
+* [My dependers don't use `dep` yet. What should I do?](#my-dependers-don-t-use-dep-yet-what-should-i-do)
+* [How do I configure a dependency that doesn't tag its releases?](#how-do-i-configure-a-dependency-that-doesn-t-tag-its-releases)
 * [How do I use `dep` with Docker?](#how-do-i-use-dep-with-docker)
 * [How do I use `dep` in CI?](#how-do-i-use-dep-in-ci)
 
