@@ -113,7 +113,7 @@ func (c *Ctx) SourceManager() (*gps.SourceMgr, error) {
 // present.  The import path is calculated as the remaining path segment
 // below Ctx.GOPATH/src.
 func (c *Ctx) LoadProject() (*Project, error) {
-	root, err := findProjectRoot(c.WorkingDir)
+	root, err := findProjectRoot(c, c.WorkingDir)
 	if err != nil {
 		return nil, err
 	}

@@ -22,7 +22,7 @@ var (
 
 // findProjectRoot searches from the starting directory upwards looking for a
 // manifest file until we get to the root of the filesystem.
-func findProjectRoot(from string) (string, error) {
+func findProjectRoot(c *Ctx, from string) (string, error) {
 	for {
 		mp := filepath.Join(from, ManifestName)
 
@@ -33,6 +33,10 @@ func findProjectRoot(from string) (string, error) {
 		if !os.IsNotExist(err) {
 			// Some err other than non-existence - return that out
 			return "", err
+		}
+
+		if c != nil && c.Out != nil {
+			c.Out.Printf("No %s, looking in parent", mp)
 		}
 
 		parent := filepath.Dir(from)
