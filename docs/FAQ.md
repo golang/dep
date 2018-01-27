@@ -79,7 +79,7 @@ Here are some suggestions for when you could use `dep` or `go get`:
 >
 > [@sdboyer in #281](https://github.com/golang/dep/issues/281#issuecomment-284118314)
 
-## How do I constrain a transitive dependency's version?
+## <a id="how-do-i-constrain-a-transitive-dependency-s-version"></a>How do I constrain a transitive dependency's version?
 First, if you're wondering about this because you're trying to keep the version
 of the transitive dependency from changing, then you're working against `dep`'s
 design. The lock file, `Gopkg.lock`, will keep the selected version of the
@@ -405,7 +405,7 @@ Note that providing an incremental migration path across breaking changes (i.e.,
 shims) is tricky, and something we [don't have a good answer for
 yet](https://groups.google.com/forum/#!topic/go-package-management/fp2uBMf6kq4).
 
-## My dependers don't use `dep` yet. What should I do?
+## <a id="my-dependers-don-t-use-dep-yet-what-should-i-do"></a>My dependers don't use `dep` yet. What should I do?
 
 For the most part, you needn't do anything differently.
 
@@ -416,7 +416,7 @@ problems](https://groups.google.com/d/msg/golang-nuts/AnMr9NL6dtc/UnyUUKcMCAAJ).
 If your dependers are using `dep`, this is not a concern, as `dep` takes care of
 stripping out nested `vendor` directories.
 
-## How do I configure a dependency that doesn't tag its releases?
+## <a id="how-do-i-configure-a-dependency-that-doesn-t-tag-its-releases"></a>How do I configure a dependency that doesn't tag its releases?
 
 Add a constraint to `Gopkg.toml` that specifies `branch: "master"` (or whichever branch you need) in the `[[constraint]]` for that dependency. `dep ensure` will determine the current revision of your dependency's master branch, and place it in `Gopkg.lock` for you. See also: [What is the difference between Gopkg.toml and Gopkg.lock?](#what-is-the-difference-between-gopkgtoml-the-manifest-and-gopkglock-the-lock)
 
