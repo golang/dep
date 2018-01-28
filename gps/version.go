@@ -695,7 +695,7 @@ func compareVersionType(l, r Version) int {
 //
 // Sorting for upgrade will result in the following slice.
 //
-//  [v1.1.0 v1.0.0 v1.1.0-alpha1 footag devel master f6e74e8d]
+//  [v1.1.0 v1.0.0 v1.1.0-alpha1 master devel footag f6e74e8d]
 func SortForUpgrade(vl []Version) {
 	sort.Sort(upgradeVersionSorter(vl))
 }
