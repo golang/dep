@@ -43,9 +43,7 @@ use GitHub pull requests for this purpose. Consult [GitHub Help] for more
 information on using pull requests.
 
 We check `dep`'s own `vendor` directory into git. For any PR to `dep` where you're
-updating `Gopkg.toml`, make sure to run `dep ensure` and
-([for now](https://github.com/golang/dep/issues/944)) `dep prune` and commit all
-changes to `vendor`.
+updating `Gopkg.toml`, make sure to run `dep ensure` and commit all changes to `vendor`.
 
 [GitHub Help]: https://help.github.com/articles/about-pull-requests/
 
