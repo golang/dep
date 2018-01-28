@@ -9,6 +9,8 @@
 # Environment variables:
 # - INSTALL_DIRECTORY (optional): defaults to $GOPATH/bin
 # - DEP_RELEASE_TAG (optional): defaults to fetching the latest release
+# - DEP_FAKE_OS (optional): use a fake value for OS (mostly for testing)
+# - DEP_FAKE_ARCH (optional): use a fake value for ARCH (mostly for testing)
 #
 # You can install using this script:
 # $ curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
@@ -34,9 +36,9 @@ downloadJSON() {
         exit 1
     fi
     if [ "$code" != 200 ]; then
-		echo "Request failed with code $code"
-		exit 1
-	fi
+        echo "Request failed with code $code"
+        exit 1
+    fi
 
     eval "$1='$body'"
 }
@@ -56,9 +58,9 @@ downloadFile() {
     fi
 
     if [ "$code" != 200 ]; then
-		echo "Request failed with code $code"
-		exit 1
-	fi
+        echo "Request failed with code $code"
+        exit 1
+    fi
 }
 
 findGoBinDirectory() {
@@ -77,34 +79,42 @@ findGoBinDirectory() {
 }
 
 initArch() {
-	ARCH=$(uname -m)
-	case $ARCH in
+    ARCH=$(uname -m)
+    if [ -n "$DEP_FAKE_ARCH" ]; then
+        echo "Using DEP_FAKE_ARCH"
+        ARCH="$DEP_FAKE_ARCH"
+    fi
+    case $ARCH in
         amd64) ARCH="amd64";;
-		x86_64) ARCH="amd64";;
+        x86_64) ARCH="amd64";;
         i386) ARCH="386";;
         *) echo "Architecture ${ARCH} is not supported by this installation script"; exit 1;;
-	esac
-	echo "ARCH = $ARCH"
+    esac
+    echo "ARCH = $ARCH"
 }
 
 initOS() {
-	OS=$(uname | tr '[:upper:]' '[:lower:]')
-
-	case "$OS" in
+    OS=$(uname | tr '[:upper:]' '[:lower:]')
+    if [ -n "$DEP_FAKE_OS" ]; then
+        echo "Using DEP_FAKE_OS"
+        OS="$DEP_FAKE_OS"
+    fi
+    case "$OS" in
         darwin) OS='darwin';;
         linux) OS='linux';;
         freebsd) OS='freebsd';;
-		mingw*) OS='windows';;
-		msys*) OS='windows';;
+        mingw*) OS='windows';;
+        msys*) OS='windows';;
         *) echo "OS ${OS} is not supported by this installation script"; exit 1;;
-	esac
-	echo "OS = $OS"
+    esac
+    echo "OS = $OS"
 }
 
 # identify platform based on uname output
 initArch
 initOS
 
+# determine install directory if required
 if [ -z "$INSTALL_DIRECTORY" ]; then
     findGoBinDirectory INSTALL_DIRECTORY
 fi
@@ -112,6 +122,11 @@ echo "Will install into $INSTALL_DIRECTORY"
 
 # assemble expected release artifact name
 BINARY="dep-${OS}-${ARCH}"
+
+# add .exe if on windows
+if [ "$OS" = "windows" ]; then
+    BINARY="$BINARY.exe"
+fi
 
 # if DEP_RELEASE_TAG was not provided, assume latest
 if [ -z "$DEP_RELEASE_TAG" ]; then
