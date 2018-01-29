@@ -198,7 +198,7 @@ Pruning is disabled by default. It can be enabled by setting them to `true` at t
   non-go = true
 ```
 
-The same prune options can be defined per-project. An addtional `name` field is required and, as with  should represent a project and not a package.
+The same prune options can be defined per-project. An addtional `name` field is required and, as with `[[constraint]]` and `[[override]]`, should be a [source root](glossary.md#source-root), not just any import path.
 
 
 ```toml
@@ -209,6 +209,14 @@ The same prune options can be defined per-project. An addtional `name` field is 
     name = "github.com/project/name"
     go-tests = true
     non-go = false
+```
+Most projects will be fine with enabling all the pruning rules globally, and needn't set any project-specific rules:
+
+```toml
+[prune]
+  unused-packages = true
+  non-go = true
+  go-tests = true
 ```
 # Example
 
