@@ -36,9 +36,9 @@ $ dep ensure -add github.com/foo/bar github.com/baz/quux
 
 ### One Final Note
 
-When you've finished adding / tweaking your dependencies you should make sure to check in both the [Gopkg.toml](Gopkg.toml.md) and the [Gopkg.lock](Gopkg.lock.md).
+When you've finished adding / tweaking your dependencies you should make sure to check in both [Gopkg.toml](Gopkg.toml.md) and [Gopkg.lock](Gopkg.lock.md).
 
-This two files work together to ensure that `dep` can provide reproducible builds. We hear you saying, "well, what about checking in vendor/".
+These two files work together to ensure that `dep` can provide reproducible builds. We hear you saying, "well, what about checking in vendor/".
 
 The decision to check in your `vendor/` is a bit more nuanced. You should check out the [pros/cons](FAQ.md#should-i-commit-my-vendor-directory).
 
