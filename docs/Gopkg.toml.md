@@ -210,14 +210,15 @@ The same prune options can be defined per-project. An addtional `name` field is 
     go-tests = true
     non-go = false
 ```
-Most projects will be fine with enabling all the pruning rules globally, and needn't set any project-specific rules:
+Almost all projects will be fine without setting any project-specific rules, and enabling the following pruning rules globally:
 
 ```toml
 [prune]
   unused-packages = true
-  non-go = true
   go-tests = true
 ```
+It is usually safe to set `non-go = true`, as well. However, as dep only has a clear model for the role played by Go files, and non-Go files necessarily fall outside that model, there can be no comparable general definition of safety.
+
 # Example
 
 A sample  `Gopkg.toml` with most elements present:
