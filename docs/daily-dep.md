@@ -101,7 +101,7 @@ Only if it is the first/last import of a project being added/removed - cases 3 a
 
 ### Rule changes in `Gopkg.toml`
 
-`Gopkg.toml` files contain five basic types of rules. The  [`Gopkg.toml` docs](gopkg.toml.md) explain them in detail, but here's an overview:
+`Gopkg.toml` files contain five basic types of rules. The  [`Gopkg.toml` docs](Gopkg.toml.md) explain them in detail, but here's an overview:
 
 * `required`, which are mostly equivalent to `import` statements in `.go` files, except that it's OK to list a `main` package here
 * `ignored`, which causes dep to black hole an import path (and any imports it uniquely introduces)
