@@ -21,6 +21,6 @@ If the static logic cannot identify the root for a given import path, the algori
 Import path deduction is applied to all of the following:
 
 * `import` statements found in all `.go` files
-* Import paths in the [`required`](gopkg.toml.md#required) list in `Gopkg.toml`
+* Import paths in the [`required`](Gopkg.toml.md#required) list in `Gopkg.toml`
 * `name` properties in both [`[[constraint]]`](Gopkg.toml.md#constraint) and [`[[override]]`](Gopkg.toml.md#override) stanzas in `Gopkg.toml`. This is solely for validation purposes, enforcing that these names correspond only to project/source roots.
 

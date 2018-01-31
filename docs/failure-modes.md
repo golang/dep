@@ -183,7 +183,7 @@ It means that the solver was unable to find a combination of versions for all de
 
 These rules, and specific remediations for failing to meet them, are described in detail in the section on [solver invariants](the-solver.md#solving-invariants). This section is about the steps to take when solving failures occur in general. But, to set context, here's a summary:
 
-* **`[[constraint]]` conflicts:** when projects in the dependency graph disagree on what [versions](gopkg.toml.md#version-rules) are acceptable for a project, or where to [source](gopkg.toml.md#source) it from.
+* **`[[constraint]]` conflicts:** when projects in the dependency graph disagree on what [versions](Gopkg.toml.md#version-rules) are acceptable for a project, or where to [source](Gopkg.toml.md#source) it from.
   * Remediation will usually be either changing a `[[constraint]]` or adding an `[[override]]`, but genuine conflicts may require forking and hacking code.
 * **Package validity failure:** when an imported package is quite obviously not capable of being built. 
   * There usually isn't much remediation here beyond "stop importing that," as it indicates something broken at a particular version.

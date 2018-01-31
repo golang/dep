@@ -19,7 +19,7 @@ The solver is an iterative algorithm, working its way project-by-project through
 
 ### `[[constraint]]` rules
 
-As described in the `Gopkg.toml` docs, each [`[[constraint]]`](gopkg.toml.md#constraint) stanza is associated with a single project, and each stanza can contain both [a version rule](Gopkg.toml.md#version-rules) and a [source rule](Gopkg.toml.md#source). For any given project `P`, all dependers on `P` whose constraint rules are "activated" must express mutually compatible rules. That means:
+As described in the `Gopkg.toml` docs, each [`[[constraint]]`](Gopkg.toml.md#constraint) stanza is associated with a single project, and each stanza can contain both [a version rule](Gopkg.toml.md#version-rules) and a [source rule](Gopkg.toml.md#source). For any given project `P`, all dependers on `P` whose constraint rules are "activated" must express mutually compatible rules. That means:
 
 * For version rules, all activated constraints on `P` must [intersect](https://en.wikipedia.org/wiki/Intersection_(set_theory)), and and there must be at least one published version must exist in the intersecting space. Intersection varies depending on version rule type:
   * For `revision` and `branch`, it must be a string-literal match.
@@ -27,7 +27,7 @@ As described in the `Gopkg.toml` docs, each [`[[constraint]]`](gopkg.toml.md#con
   * For `version` that are valid semantic version ranges, intersection is standard set-theoretic intersection of the possible values in each range range. Semantic versions without ranges are treated as a single element set (e.g., `version = "=v1.0.0"`) for intersection purposes.
 * For `source` rules, all projects with a particular dependency must either express a string-equal `source` value, or have no `source` value at all. This allows one dependency to specify an alternate `source`, and other dependencies to play along if they have no opinion. (NB: this play-along behavior may be removed in a future version.)
 
-If the current project's `Gopkg.toml` has an [`[[override]]`](gopkg.toml.md#override) on `P`, then all `[[constraint]]` declarations (including any in the current project) are ignored, obviating the possibility of conflict.
+If the current project's `Gopkg.toml` has an [`[[override]]`](Gopkg.toml.md#override) on `P`, then all `[[constraint]]` declarations (including any in the current project) are ignored, obviating the possibility of conflict.
 
 #### Activated constraints
 
