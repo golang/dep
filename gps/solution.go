@@ -47,6 +47,7 @@ type solution struct {
 	solv Solver
 }
 
+// WriteProgress informs about the progress of WriteDepTree.
 type WriteProgress struct {
 	Count   int
 	Total   int
