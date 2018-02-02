@@ -12,7 +12,7 @@ jobs:
       env:
         - DEPTESTBYPASS501=1
       os: linux
-      go: 1.9.x
+      go: "1.10"
       script:
         - go test -i ./...
         - ./hack/lint.bash
@@ -23,18 +23,18 @@ jobs:
         - codeclimate-test-reporter < coverage.txt
     # YAML alias, for settings shared across the simpler builds
     - &simple-test
-      go: 1.8.x
+      go: 1.9.x
       stage: test
       go_import_path: github.com/golang/dep
       install: skip
       env:
         - DEPTESTBYPASS501=1
-      script: go test -race $(go list ./... | grep -v vendor)
+      script: go test -race ./...
     - <<: *simple-test
       go: tip
     - <<: *simple-test
       os: osx
-      go: 1.9.x
+      go: "1.10"
       install:
         # brew takes horribly long to update itself despite the above caching
         # attempt; only bzr install if it's not on the $PATH
@@ -50,7 +50,7 @@ jobs:
         # Related: https://superuser.com/questions/1044130/why-am-i-having-how-can-i-fix-this-error-shell-session-update-command-not-f
         - trap EXIT
         - go test -race ./...
-    - go: 1.9.x
+    - go: "1.10"
       stage: deploy
       go_import_path: github.com/golang/dep
       install: skip

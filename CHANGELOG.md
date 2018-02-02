@@ -2,6 +2,8 @@
 
 NEW FEATURES:
 
+* Add CI tests against go1.10. Drop support for go1.8.
+
 BUG FIXES:
 
 IMPROVEMENTS:
