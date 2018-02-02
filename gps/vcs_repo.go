@@ -122,7 +122,7 @@ func (r *gitRepo) fetch(ctx context.Context) error {
 }
 
 func (r *gitRepo) updateVersion(ctx context.Context, v string) error {
-	cmd := commandContext(ctx, "git", "checkout", v)
+	cmd := commandContext(ctx, "git", "checkout", "-f",  v)
 	cmd.SetDir(r.LocalPath())
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return newVcsLocalErrorOr(err, cmd.Args(), string(out),
