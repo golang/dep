@@ -7,7 +7,6 @@ package main
 import (
 	"context"
 	"flag"
-	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
@@ -185,9 +184,9 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 		return errors.Wrap(err, "init failed: unable to create a SafeWriter")
 	}
 
-	logger := ctx.Err
-	if !ctx.Verbose {
-		logger = log.New(ioutil.Discard, "", 0)
+	var logger *log.Logger
+	if ctx.Verbose {
+		logger = ctx.Err
 	}
 	if err := sw.Write(root, sm, !cmd.noExamples, logger); err != nil {
 		return errors.Wrap(err, "init failed: unable to write the manifest, lock and vendor directory to disk")

@@ -5,7 +5,6 @@
 package gps
 
 import (
-	"log"
 	"os"
 	"path/filepath"
 	"sort"
@@ -138,7 +137,7 @@ var (
 
 // PruneProject remove excess files according to the options passed, from
 // the lp directory in baseDir.
-func PruneProject(baseDir string, lp LockedProject, options PruneOptions, logger *log.Logger) error {
+func PruneProject(baseDir string, lp LockedProject, options PruneOptions) error {
 	fsState, err := deriveFilesystemState(baseDir)
 
 	if err != nil {

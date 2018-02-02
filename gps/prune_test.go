@@ -6,7 +6,6 @@ package gps
 
 import (
 	"io/ioutil"
-	"log"
 	"os"
 	"testing"
 
@@ -120,9 +119,8 @@ func TestPruneProject(t *testing.T) {
 	}
 
 	options := PruneNestedVendorDirs | PruneNonGoFiles | PruneGoTestFiles | PruneUnusedPackages
-	logger := log.New(ioutil.Discard, "", 0)
 
-	err := PruneProject(baseDir, lp, options, logger)
+	err := PruneProject(baseDir, lp, options)
 	if err != nil {
 		t.Fatal(err)
 	}
