@@ -9,8 +9,8 @@
 # Environment variables:
 # - INSTALL_DIRECTORY (optional): defaults to $GOPATH/bin
 # - DEP_RELEASE_TAG (optional): defaults to fetching the latest release
-# - DEP_FAKE_OS (optional): use a fake value for OS (mostly for testing)
-# - DEP_FAKE_ARCH (optional): use a fake value for ARCH (mostly for testing)
+# - DEP_OS (optional): use a specific value for OS (mostly for testing)
+# - DEP_ARCH (optional): use a specific value for ARCH (mostly for testing)
 #
 # You can install using this script:
 # $ curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
@@ -80,9 +80,9 @@ findGoBinDirectory() {
 
 initArch() {
     ARCH=$(uname -m)
-    if [ -n "$DEP_FAKE_ARCH" ]; then
-        echo "Using DEP_FAKE_ARCH"
-        ARCH="$DEP_FAKE_ARCH"
+    if [ -n "$DEP_ARCH" ]; then
+        echo "Using DEP_ARCH"
+        ARCH="$DEP_ARCH"
     fi
     case $ARCH in
         amd64) ARCH="amd64";;
@@ -95,9 +95,9 @@ initArch() {
 
 initOS() {
     OS=$(uname | tr '[:upper:]' '[:lower:]')
-    if [ -n "$DEP_FAKE_OS" ]; then
-        echo "Using DEP_FAKE_OS"
-        OS="$DEP_FAKE_OS"
+    if [ -n "$DEP_OS" ]; then
+        echo "Using DEP_OS"
+        OS="$DEP_OS"
     fi
     case "$OS" in
         darwin) OS='darwin';;
