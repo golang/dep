@@ -12,12 +12,12 @@ import (
 	"path"
 	"path/filepath"
 
-	"github.com/go-yaml/yaml"
 	"github.com/golang/dep"
 	"github.com/golang/dep/gps"
 	"github.com/golang/dep/internal/fs"
 	"github.com/golang/dep/internal/importers/base"
 	"github.com/pkg/errors"
+	"gopkg.in/yaml.v2"
 )
 
 const glideYamlName = "glide.yaml"

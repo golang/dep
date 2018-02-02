@@ -27,16 +27,10 @@
   version = "v1.3.1"
 
 [[projects]]
-  branch = "v2"
-  name = "github.com/go-yaml/yaml"
-  packages = ["."]
-  revision = "cd8b52f8269e0feb286dfeef29f8fe4d5b397e0b"
-
-[[projects]]
-  branch = "master"
   name = "github.com/golang/protobuf"
   packages = ["proto"]
-  revision = "5afd06f9d81a86d6e3bb7dc702d6bd148ea3ff23"
+  revision = "925541529c1fa6821df4e44ce2723319eb2be768"
+  version = "v1.0.0"
 
 [[projects]]
   name = "github.com/jmank88/nuts"
@@ -51,10 +45,10 @@
   revision = "e83dc5e7bba095e8d32fb2124714bf41f2a30cb5"
 
 [[projects]]
-  branch = "master"
   name = "github.com/pelletier/go-toml"
   packages = ["."]
-  revision = "b8b5e7696574464b2f9bf303a7b37781bb52889f"
+  revision = "acdc4509485b587f5e675510c4f2c63e90ff68a8"
+  version = "v1.1.0"
 
 [[projects]]
   name = "github.com/pkg/errors"
@@ -86,9 +80,15 @@
   packages = ["unix"]
   revision = "bb24a47a89eac6c1227fbcb2ae37a8b9ed323366"
 
+[[projects]]
+  branch = "v2"
+  name = "gopkg.in/yaml.v2"
+  packages = ["."]
+  revision = "d670f9405373e636a5a2765eea47fac0c9bc91a4"
+
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "e70d26b359aed7af66f3393fc9d4985bbcf499c0b5ed3b5661a5912b4c71a32e"
+  inputs-digest = "215239f4e1109f268dd0eb48480c4987cd66da5deb9ae0b0da15b3cd35d02cd3"
   solver-name = "gps-cdcl"
   solver-version = 1
