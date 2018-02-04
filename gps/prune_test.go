@@ -329,6 +329,32 @@ func TestPruneNonGoFiles(t *testing.T) {
 			},
 			false,
 		},
+		{
+			"symlinks",
+			fsTestCase{
+				before: filesystemState{
+					files: []string{
+						"target.md",
+					},
+					links: []fsLink{
+						{path: "remove-1.md", to: "target.md"},
+						{path: "remove-2.md", to: "nonexistent", broken: true},
+						{path: "remove-3.md", to: "remove-3.md", circular: true},
+						{path: "retain-1.go", to: "target.md"},
+						{path: "retain-2.go", to: "nonexistent", broken: true},
+						{path: "retain-3.go", to: "retain-3.go", circular: true},
+					},
+				},
+				after: filesystemState{
+					links: []fsLink{
+						{path: "retain-1.go", to: "target.md"},
+						{path: "retain-2.go", to: "nonexistent", broken: true},
+						{path: "retain-3.go", to: "retain-3.go", circular: true},
+					},
+				},
+			},
+			false,
+		},
 	}
 
 	for _, tc := range testcases {
