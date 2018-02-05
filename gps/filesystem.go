@@ -18,7 +18,7 @@ type fsLink struct {
 	to   string
 
 	// circular denotes if evaluating the symlink fails with "too many links" error.
-	// This errors means that it's very likely that the symlink has circual refernce.
+	// This error means that it's very likely that the symlink has a circular reference.
 	circular bool
 
 	// broken denotes that attempting to resolve the link fails, most likely because
