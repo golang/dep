@@ -4,12 +4,31 @@ title: Installation
 
 It is strongly recommended that you use a released version of dep. While tip is never purposefully broken, its stability is not guaranteed.
 
-Pre-compiled binaries are available on the [releases](https://github.com/golang/dep/releases) page. On MacOS, you can also install or upgrade to the latest released version with Homebrew:
+
+## Binary Installation
+
+Pre-compiled binaries are available on the [releases](https://github.com/golang/dep/releases) page.
+
+## MacOS
+
+Install or upgrade to the latest released version with Homebrew:
 
 ```sh
 $ brew install dep
 $ brew upgrade dep
 ```
+
+## Arch Linux
+
+Install the `golang-dep` package [from the AUR](https://aur.archlinux.org/packages/golang-dep/)
+
+```sh
+git clone https://aur.archlinux.org/golang-dep.git
+cd golang-dep
+makepkg -si
+```
+
+## Development
 
 If you want to hack on dep, you can install via `go get`:
 
