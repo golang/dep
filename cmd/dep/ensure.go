@@ -209,7 +209,7 @@ func (cmd *ensureCommand) Run(ctx *dep.Ctx, args []string) error {
 		ctx.Err.Printf("these rules will have no effect.\n\n")
 		ctx.Err.Printf("Either import/require packages from these projects so that they become direct\n")
 		ctx.Err.Printf("dependencies, or convert each [[constraint]] to an [[override]] to enforce rules\n")
-		ctx.Err.Printf("on these projects, if they happen to be transitive dependencies,\n\n")
+		ctx.Err.Printf("on these projects, if they happen to be transitive dependencies.\n\n")
 	}
 
 	if cmd.add {
