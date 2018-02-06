@@ -5,7 +5,7 @@ title: Installation
 It is strongly recommended that you use a released version of dep. While tip is never purposefully broken, its stability is not guaranteed.
 
 
-## Manual Installation
+## Binary Installation
 
 Pre-compiled binaries are available on the [releases](https://github.com/golang/dep/releases) page.
 
