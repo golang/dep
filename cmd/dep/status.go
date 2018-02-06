@@ -24,6 +24,8 @@ import (
 	"github.com/pkg/errors"
 )
 
+const availableTemplateVariables = "ProjectRoot, Constraint, Version, Revision, Latest, and PackageCount."
+
 const statusShortHelp = `Report the status of the project's dependencies`
 const statusLongHelp = `
 With no arguments, print the status of each dependency of the project.
@@ -37,7 +39,7 @@ With no arguments, print the status of each dependency of the project.
 
 You may use the -f flag to create a custom format for the output of the
 dep status command. The available fields you can utilize are as follows:
-ProjectRoot, Constraint, Version, Revision, Latest, and PackageCount.
+` + availableTemplateVariables + `
 
 Status returns exit code zero if all dependencies are in a "good state".
 `
@@ -53,8 +55,8 @@ dep status -f='{{if eq .Constraint "master"}}{{.ProjectRoot}} {{end}}'
 
 	Display the list of package names constrained on the master branch.
 	The -f flag allows you to use Go templates along with it's various 
-	constructs for formating the output data. See -help for available 
-	variables for this flag.
+	constructs for formating the output data. Available flags are as follows:
+	` + availableTemplateVariables + `
 
 dep status -json
 
@@ -237,10 +239,7 @@ func (out *templateOutput) BasicHeader() error { return nil }
 func (out *templateOutput) BasicFooter() error { return nil }
 
 func (out *templateOutput) BasicLine(bs *BasicStatus) error {
-	data := struct {
-		ProjectRoot, Constraint, Version, Revision, Latest string
-		PackageCount                                       int
-	}{
+	data := rawStatus{
 		ProjectRoot:  bs.ProjectRoot,
 		Constraint:   bs.getConsolidatedConstraint(),
 		Version:      bs.getConsolidatedVersion(),
