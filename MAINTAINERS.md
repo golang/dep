@@ -9,9 +9,9 @@ General maintainers:
   * testing harness: (vacant)
 * gps
   * solver: (vacant)
-  * source manager: (vacant)
+  * source manager: (@jmank88)
   * root deduction: (vacant)
-  * source/vcs interaction: (vacant)
+  * source/vcs interaction: (@jmank88)
   * caching: Jordan Krage (@jmank88)
   * pkgtree: (vacant)
-  * versions and constraints: (vacant)
+  * versions and constraints: (@jmank88)
