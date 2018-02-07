@@ -215,6 +215,7 @@ func TestPruneUnusedPackages(t *testing.T) {
 						"COPYING",
 						"pkg/main.go",
 						"pkg/nestedpkg/main.go",
+						"pkg/nestedpkg/legal.go",
 						"pkg/nestedpkg/PATENT.md",
 						"pkg/nestedpkg/otherpkg/main.go",
 					},
