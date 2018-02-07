@@ -192,10 +192,12 @@ The following are the current available options:
 
 Out of an abundance of caution, dep non-optionally preserves files that may have legal significance.
 
-Pruning is disabled by default. It can be enabled by setting them to `true` at the root level.
+Pruning options are disabled by default. However, generating a `Gopkg.toml` via `dep init` will add lines to enable `go-tests` and `unused-packages` prune options at the root level.
+
 ```toml
 [prune]
-  non-go = true
+  go-tests = true
+  unused-packages = true
 ```
 
 The same prune options can be defined per-project. An addtional `name` field is required and, as with `[[constraint]]` and `[[override]]`, should be a [source root](glossary.md#source-root), not just any import path.
