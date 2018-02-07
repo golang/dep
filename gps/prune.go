@@ -261,6 +261,37 @@ func collectUnusedPackagesFiles(fsState filesystemState, unusedPackages map[stri
 	return files
 }
 
+func isSourceFile(path string) bool {
+	ext := fileExt(path)
+
+	// Refer to: https://github.com/golang/go/blob/release-branch.go1.9/src/go/build/build.go#L750
+	switch ext {
+	case ".go":
+		return true
+	case ".c":
+		return true
+	case ".cc", ".cpp", ".cxx":
+		return true
+	case ".m":
+		return true
+	case ".h", ".hh", ".hpp", ".hxx":
+		return true
+	case ".f", ".F", ".for", ".f90":
+		return true
+	case ".s":
+		return true
+	case ".S":
+		return true
+	case ".swig":
+		return true
+	case ".swigcxx":
+		return true
+	case ".syso":
+		return true
+	}
+	return false
+}
+
 // pruneNonGoFiles delete all non-Go files existing in fsState.
 //
 // Files matching licenseFilePrefixes and legalFileSubstrings are not pruned.
@@ -268,31 +299,7 @@ func pruneNonGoFiles(fsState filesystemState) error {
 	toDelete := make([]string, 0, len(fsState.files)/4)
 
 	for _, path := range fsState.files {
-		ext := fileExt(path)
-
-		// Refer to: https://github.com/golang/go/blob/release-branch.go1.9/src/go/build/build.go#L750
-		switch ext {
-		case ".go":
-			continue
-		case ".c":
-			continue
-		case ".cc", ".cpp", ".cxx":
-			continue
-		case ".m":
-			continue
-		case ".h", ".hh", ".hpp", ".hxx":
-			continue
-		case ".f", ".F", ".for", ".f90":
-			continue
-		case ".s":
-			continue
-		case ".S":
-			continue
-		case ".swig":
-			continue
-		case ".swigcxx":
-			continue
-		case ".syso":
+		if isSourceFile(path) {
 			continue
 		}
 
