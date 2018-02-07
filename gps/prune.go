@@ -322,7 +322,12 @@ func pruneNonGoFiles(fsState filesystemState) error {
 
 // isPreservedFile checks if the file name indicates that the file should be
 // preserved based on licenseFilePrefixes or legalFileSubstrings.
+// This applies only to non-source files.
 func isPreservedFile(name string) bool {
+	if isSourceFile(name) {
+		return false
+	}
+
 	name = strings.ToLower(name)
 
 	for _, prefix := range licenseFilePrefixes {
