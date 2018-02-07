@@ -426,6 +426,31 @@ func TestPruneGoTestFiles(t *testing.T) {
 			},
 			false,
 		},
+		{
+			"testdata-files",
+			fsTestCase{
+				before: filesystemState{
+					dirs: []string{
+						"dir",
+						"dir/testdata",
+					},
+					files: []string{
+						"dir/main.go",
+						"dir/main_test.go",
+						"dir/testdata/foo",
+					},
+				},
+				after: filesystemState{
+					dirs: []string{
+						"dir",
+					},
+					files: []string{
+						"dir/main.go",
+					},
+				},
+			},
+			false,
+		},
 	}
 
 	for _, tc := range testcases {

@@ -333,18 +333,32 @@ func isPreservedFile(name string) bool {
 	return false
 }
 
-// pruneGoTestFiles deletes all Go test files (*_test.go) in fsState.
+// pruneGoTestFiles deletes all Go test files (*_test.go and testdata/**/*)
+// in fsState.
 func pruneGoTestFiles(fsState filesystemState) error {
-	toDelete := make([]string, 0, len(fsState.files)/2)
+	filesToDelete := make([]string, 0, len(fsState.files)/2)
+	dirsToDelete := make([]string, 0)
 
 	for _, path := range fsState.files {
 		if strings.HasSuffix(path, "_test.go") {
-			toDelete = append(toDelete, filepath.Join(fsState.root, path))
+			filesToDelete = append(filesToDelete, filepath.Join(fsState.root, path))
 		}
 	}
 
-	for _, path := range toDelete {
+	for _, path := range fsState.dirs {
+		if filepath.Base(path) == "testdata" {
+			dirsToDelete = append(dirsToDelete, filepath.Join(fsState.root, path))
+		}
+	}
+
+	for _, path := range filesToDelete {
 		if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+			return err
+		}
+	}
+
+	for _, path := range dirsToDelete {
+		if err := os.RemoveAll(path); err != nil && !os.IsNotExist(err) {
 			return err
 		}
 	}
