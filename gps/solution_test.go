@@ -143,8 +143,7 @@ func BenchmarkCreateVendorTree(b *testing.B) {
 		Logger:   log.New(test.Writer{TB: b}, "", 0),
 	})
 	if err != nil {
-		b.Errorf("failed to create SourceManager: %q", err)
-		clean = false
+		b.Fatalf("failed to create SourceManager: %q", err)
 	}
 
 	// Prefetch the projects before timer starts
