@@ -191,6 +191,7 @@ The following are the current available options:
 * `go-tests` prunes Go test files.
 
 Out of an abundance of caution, dep non-optionally preserves files that may have legal significance.
+This includes files prefixed `license*`, `licence*`, `copying*`, `unlicense*`, `copyright*`, `copyleft*` or containing `*authors*`, `*contributors*`, `*legal*`, `*notice*`, `*disclaimer*`, `*patent*`, `*third-party*`, `*thirdparty*`.
 
 Pruning is disabled by default. It can be enabled by setting them to `true` at the root level.
 ```toml
@@ -218,6 +219,7 @@ Almost all projects will be fine without setting any project-specific rules, and
   go-tests = true
 ```
 It is usually safe to set `non-go = true`, as well. However, as dep only has a clear model for the role played by Go files, and non-Go files necessarily fall outside that model, there can be no comparable general definition of safety.
+Other preserved source file types supported in go builds include: `.c`, `.cc`, `.cpp`, `.cxx`, `.m`, `.h`, `.hh`, `.hpp`, `.hxx`, `.f`, `.F`, `.for`, `.f90`, `.s`, `.S`, `.swig`, `.swigcxx`, `.syso`.
 
 # Example
 
