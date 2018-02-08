@@ -267,6 +267,8 @@ func (sw SafeWriter) validate(root string, sm gps.SourceManager) error {
 // operations succeeded. It also does its best to roll back if any moves fail.
 // This mostly guarantees that dep cannot exit with a partial write that would
 // leave an undefined state on disk.
+//
+// If logger is not nil, progress will be logged after each project write.
 func (sw *SafeWriter) Write(root string, sm gps.SourceManager, examples bool, logger *log.Logger) error {
 	err := sw.validate(root, sm)
 	if err != nil {
@@ -319,7 +321,13 @@ func (sw *SafeWriter) Write(root string, sm gps.SourceManager, examples bool, lo
 	}
 
 	if sw.writeVendor {
-		err = gps.WriteDepTree(filepath.Join(td, "vendor"), sw.lock, sm, sw.pruneOptions, logger)
+		var onWrite func(gps.WriteProgress)
+		if logger != nil {
+			onWrite = func(progress gps.WriteProgress) {
+				logger.Println(progress)
+			}
+		}
+		err = gps.WriteDepTree(filepath.Join(td, "vendor"), sw.lock, sm, sw.pruneOptions, onWrite)
 		if err != nil {
 			return errors.Wrap(err, "error while writing out vendor tree")
 		}

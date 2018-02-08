@@ -10,7 +10,6 @@ import (
 	"flag"
 	"fmt"
 	"go/build"
-	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
@@ -288,9 +287,9 @@ func (cmd *ensureCommand) runDefault(ctx *dep.Ctx, args []string, p *dep.Project
 			return sw.PrintPreparedActions(ctx.Out, ctx.Verbose)
 		}
 
-		logger := ctx.Err
-		if !ctx.Verbose {
-			logger = log.New(ioutil.Discard, "", 0)
+		var logger *log.Logger
+		if ctx.Verbose {
+			logger = ctx.Err
 		}
 		return errors.WithMessage(sw.Write(p.AbsRoot, sm, true, logger), "grouped write of manifest, lock and vendor")
 	}
@@ -312,9 +311,9 @@ func (cmd *ensureCommand) runDefault(ctx *dep.Ctx, args []string, p *dep.Project
 		return sw.PrintPreparedActions(ctx.Out, ctx.Verbose)
 	}
 
-	logger := ctx.Err
-	if !ctx.Verbose {
-		logger = log.New(ioutil.Discard, "", 0)
+	var logger *log.Logger
+	if ctx.Verbose {
+		logger = ctx.Err
 	}
 	return errors.Wrap(sw.Write(p.AbsRoot, sm, false, logger), "grouped write of manifest, lock and vendor")
 }
@@ -338,9 +337,9 @@ func (cmd *ensureCommand) runVendorOnly(ctx *dep.Ctx, args []string, p *dep.Proj
 		return sw.PrintPreparedActions(ctx.Out, ctx.Verbose)
 	}
 
-	logger := ctx.Err
-	if !ctx.Verbose {
-		logger = log.New(ioutil.Discard, "", 0)
+	var logger *log.Logger
+	if ctx.Verbose {
+		logger = ctx.Err
 	}
 	return errors.WithMessage(sw.Write(p.AbsRoot, sm, true, logger), "grouped write of manifest, lock and vendor")
 }
@@ -402,9 +401,9 @@ func (cmd *ensureCommand) runUpdate(ctx *dep.Ctx, args []string, p *dep.Project,
 		return sw.PrintPreparedActions(ctx.Out, ctx.Verbose)
 	}
 
-	logger := ctx.Err
-	if !ctx.Verbose {
-		logger = log.New(ioutil.Discard, "", 0)
+	var logger *log.Logger
+	if ctx.Verbose {
+		logger = ctx.Err
 	}
 	return errors.Wrap(sw.Write(p.AbsRoot, sm, false, logger), "grouped write of manifest, lock and vendor")
 }
@@ -702,9 +701,9 @@ func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm
 		return sw.PrintPreparedActions(ctx.Out, ctx.Verbose)
 	}
 
-	logger := ctx.Err
-	if !ctx.Verbose {
-		logger = log.New(ioutil.Discard, "", 0)
+	var logger *log.Logger
+	if ctx.Verbose {
+		logger = ctx.Err
 	}
 	if err := errors.Wrap(sw.Write(p.AbsRoot, sm, true, logger), "grouped write of manifest, lock and vendor"); err != nil {
 		return err

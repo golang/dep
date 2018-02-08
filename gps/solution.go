@@ -7,7 +7,6 @@ package gps
 import (
 	"context"
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 	"sync"
@@ -48,6 +47,22 @@ type solution struct {
 	solv Solver
 }
 
+// WriteProgress informs about the progress of WriteDepTree.
+type WriteProgress struct {
+	Count   int
+	Total   int
+	LP      LockedProject
+	Failure bool
+}
+
+func (p WriteProgress) String() string {
+	msg := "Wrote"
+	if p.Failure {
+		msg = "Failed to write"
+	}
+	return fmt.Sprintf("(%d/%d) %s %s@%s", p.Count, p.Total, msg, p.LP.Ident(), p.LP.Version())
+}
+
 const concurrentWriters = 16
 
 // WriteDepTree takes a basedir, a Lock and a RootPruneOptions and exports all
@@ -58,7 +73,9 @@ const concurrentWriters = 16
 //
 // It requires a SourceManager to do the work. Prune options are read from the
 // passed manifest.
-func WriteDepTree(basedir string, l Lock, sm SourceManager, co CascadingPruneOptions, logger *log.Logger) error {
+//
+// If onWrite is not nil, it will be called after each project write. Calls are ordered and atomic.
+func WriteDepTree(basedir string, l Lock, sm SourceManager, co CascadingPruneOptions, onWrite func(WriteProgress)) error {
 	if l == nil {
 		return fmt.Errorf("must provide non-nil Lock to WriteDepTree")
 	}
@@ -95,7 +112,7 @@ func WriteDepTree(basedir string, l Lock, sm SourceManager, co CascadingPruneOpt
 					return errors.Wrapf(err, "failed to export %s", projectRoot)
 				}
 
-				err := PruneProject(to, p, co.PruneOptionsFor(ident.ProjectRoot), logger)
+				err := PruneProject(to, p, co.PruneOptionsFor(ident.ProjectRoot))
 				if err != nil {
 					return errors.Wrapf(err, "failed to prune %s", projectRoot)
 				}
@@ -105,18 +122,20 @@ func WriteDepTree(basedir string, l Lock, sm SourceManager, co CascadingPruneOpt
 
 			switch err {
 			case context.Canceled, context.DeadlineExceeded:
-				// Don't log "secondary" errors.
+				// Don't report "secondary" errors.
 			default:
-				msg := "Wrote"
-				if err != nil {
-					msg = "Failed to write"
+				if onWrite != nil {
+					// Increment and call atomically to prevent re-ordering.
+					cnt.Lock()
+					cnt.i++
+					onWrite(WriteProgress{
+						Count:   cnt.i,
+						Total:   len(lps),
+						LP:      p,
+						Failure: err != nil,
+					})
+					cnt.Unlock()
 				}
-
-				// Log and increment atomically to prevent re-ordering.
-				cnt.Lock()
-				cnt.i++
-				logger.Printf("(%d/%d) %s %s@%s\n", cnt.i, len(lps), msg, p.Ident(), p.Version())
-				cnt.Unlock()
 			}
 
 			return err

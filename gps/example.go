@@ -54,7 +54,10 @@ func main() {
 		// If no failure, blow away the vendor dir and write a new one out,
 		// stripping nested vendor directories as we go.
 		os.RemoveAll(filepath.Join(root, "vendor"))
-		gps.WriteDepTree(filepath.Join(root, "vendor"), solution, sourcemgr, true)
+		pruneOpts := gps.CascadingPruneOptions{
+			DefaultOptions: gps.PruneNestedVendorDirs | gps.PruneUnusedPackages | gps.PruneGoTestFiles,
+		}
+		gps.WriteDepTree(filepath.Join(root, "vendor"), solution, sourcemgr, pruneOpts, nil)
 	}
 }
 

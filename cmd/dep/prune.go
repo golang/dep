@@ -103,7 +103,10 @@ func pruneProject(p *dep.Project, sm gps.SourceManager, logger *log.Logger) erro
 	}
 	defer os.RemoveAll(td)
 
-	if err := gps.WriteDepTree(td, p.Lock, sm, gps.CascadingPruneOptions{DefaultOptions: gps.PruneNestedVendorDirs}, logger); err != nil {
+	onWrite := func(progress gps.WriteProgress) {
+		logger.Println(progress)
+	}
+	if err := gps.WriteDepTree(td, p.Lock, sm, gps.CascadingPruneOptions{DefaultOptions: gps.PruneNestedVendorDirs}, onWrite); err != nil {
 		return err
 	}
 
