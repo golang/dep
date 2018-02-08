@@ -167,7 +167,7 @@ func buildLockedProjectDiff(lp LockedProject) LockedProjectDiff {
 }
 
 // DiffProjects compares two projects and identifies the differences between them.
-// Returns nil if there are no differences
+// Returns nil if there are no differences.
 func DiffProjects(lp1 LockedProject, lp2 LockedProject) *LockedProjectDiff {
 	diff := LockedProjectDiff{Name: lp1.pi.ProjectRoot}
 

@@ -26,8 +26,8 @@ type Lock interface {
 }
 
 // LocksAreEq checks if two locks are equivalent. This checks that
-// all contained LockedProjects are equal, and optionally (if the third
-// parameter is true) whether the locks' input hashes are equal.
+// all contained LockedProjects are equal, and optionally (if `checkHash` is
+// true) whether the locks' input hashes are equal.
 func LocksAreEq(l1, l2 Lock, checkHash bool) bool {
 	// Cheapest ops first
 	if checkHash && !bytes.Equal(l1.InputsDigest(), l2.InputsDigest()) {

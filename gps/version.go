@@ -16,7 +16,7 @@ import (
 // semantics beyond that which is literally embedded on the Go type.
 type VersionType uint8
 
-// VersionTypes for the four major classes of version we deal with
+// VersionTypes for the four major classes of version.
 const (
 	IsRevision VersionType = iota
 	IsVersion
@@ -39,7 +39,7 @@ const (
 type Version interface {
 	Constraint
 
-	// Indicates the type of version - Revision, Branch, Version, or Semver
+	// Indicates the type of version - Revision, Branch, Version, or Semver.
 	Type() VersionType
 }
 
@@ -53,11 +53,11 @@ type PairedVersion interface {
 
 	// Unpair returns the surface-level UnpairedVersion that half of the pair.
 	//
-	// It does NOT modify the original PairedVersion
+	// It does NOT modify the original PairedVersion.
 	Unpair() UnpairedVersion
 
 	// Ensures it is impossible to be both a PairedVersion and an
-	// UnpairedVersion
+	// UnpairedVersion.
 	_pair(int)
 }
 
@@ -69,7 +69,7 @@ type UnpairedVersion interface {
 	// to and unites them into a PairedVersion.
 	Pair(Revision) PairedVersion
 	// Ensures it is impossible to be both a PairedVersion and an
-	// UnpairedVersion
+	// UnpairedVersion.
 	_pair(bool)
 }
 
@@ -693,7 +693,7 @@ func compareVersionType(l, r Version) int {
 //  - Non-semver tags: footag
 //  - Revision: f6e74e8d
 //
-// Sorting for upgrade will result in the following slice.
+// Sorting for upgrade will result in the following slice:
 //
 //  [v1.1.0 v1.0.0 v1.1.0-alpha1 master devel footag f6e74e8d]
 func SortForUpgrade(vl []Version) {
@@ -726,7 +726,7 @@ func SortPairedForUpgrade(vl []PairedVersion) {
 //  - Non-semver tags: footag
 //  - Revision: f6e74e8d
 //
-// Sorting for downgrade will result in the following slice.
+// Sorting for downgrade will result in the following slice:
 //
 //  [v1.0.0 v1.1.0 v1.1.0-alpha1 footag devel master f6e74e8d]
 func SortForDowngrade(vl []Version) {
@@ -854,7 +854,7 @@ func hidePair(pvl []PairedVersion) []Version {
 	return vl
 }
 
-// VersionComponentStrings decomposes a Version into the underlying number, branch and revision
+// VersionComponentStrings decomposes a Version into the underlying number, branch and revision.
 func VersionComponentStrings(v Version) (revision string, branch string, version string) {
 	switch tv := v.(type) {
 	case UnpairedVersion:
