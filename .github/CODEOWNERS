@@ -21,5 +21,8 @@
 /cmd/dep/testdata/harness_tests/status**  @darkowlzz
 /cmd/dep/graphviz*                        @darkowlzz
 
-# gps caching
-/gps/source_cache* @jmank88
+# gps components
+/gps/source*     @jmank88
+/gps/constraint* @jmank88
+/gps/version*    @jmank88
+/gps/vcs*        @jmank88
