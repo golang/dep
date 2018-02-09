@@ -105,7 +105,7 @@ $ dep status -dot | dot -T png | open -f -a /Applications/Preview.app
 > dep status -dot | dot -T png -o status.png; start status.png
 ```
 
-<p align="center"><img src="docs/assets/StatusGraph.png"></p>
+<p align="center"><img src="/dep/docs/assets/StatusGraph.png"></p>
 
 ### Adding and removing `import` statements
 
