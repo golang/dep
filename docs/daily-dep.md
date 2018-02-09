@@ -66,22 +66,6 @@ Of course, given this model, you don't _have to_ use `dep ensure -add` to add ne
 
 The [ensure mechanics section on `-add`](ensure-mechanics.md#add) has a more thorough exploration, including some ways that `dep ensure -add`'s behavior subtly varies depending on the state of your project.
 
-### Updating dependencies
-
-Ideally, updating a dependency project to a newer version is a single command:
-
-```bash
-$ dep ensure -update github.com/foo/bar
-```
-
-This also works without arguments to try to update all dependencies, though it's generally not recommended:
-
-```bash
-$ dep ensure -update
-```
-
-`dep ensure -update` searches for versions that work with the `branch`, `version`, or `revision` constraint defined in `Gopkg.toml`. These constraint types have different semantics, some of which allow `dep ensure -update` to effectively find a "newer" version, while others will necessitate hand-updating the `Gopkg.toml`. The [ensure mechanics](ensure-mechanics.md#update-and-constraint-types) guide explains this in greater detail, but if you want to know what effect a `dep ensure -update` is likely to have for a particular project, the `LATEST` field in `dep status` output will tell you.
-
 ### Visualizing dependencies
 
 Generate a visual representation of the dependency tree by piping the output of `dep status -dot` to [graphviz](http://www.graphviz.org/).
@@ -106,6 +90,22 @@ $ dep status -dot | dot -T png | open -f -a /Applications/Preview.app
 ```
 
 <p align="center"><img src="/dep/docs/assets/StatusGraph.png"></p>
+
+### Updating dependencies
+
+Ideally, updating a dependency project to a newer version is a single command:
+
+```bash
+$ dep ensure -update github.com/foo/bar
+```
+
+This also works without arguments to try to update all dependencies, though it's generally not recommended:
+
+```bash
+$ dep ensure -update
+```
+
+`dep ensure -update` searches for versions that work with the `branch`, `version`, or `revision` constraint defined in `Gopkg.toml`. These constraint types have different semantics, some of which allow `dep ensure -update` to effectively find a "newer" version, while others will necessitate hand-updating the `Gopkg.toml`. The [ensure mechanics](ensure-mechanics.md#update-and-constraint-types) guide explains this in greater detail, but if you want to know what effect a `dep ensure -update` is likely to have for a particular project, the `LATEST` field in `dep status` output will tell you.
 
 ### Adding and removing `import` statements
 
