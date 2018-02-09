@@ -82,6 +82,31 @@ $ dep ensure -update
 
 `dep ensure -update` searches for versions that work with the `branch`, `version`, or `revision` constraint defined in `Gopkg.toml`. These constraint types have different semantics, some of which allow `dep ensure -update` to effectively find a "newer" version, while others will necessitate hand-updating the `Gopkg.toml`. The [ensure mechanics](ensure-mechanics.md#update-and-constraint-types) guide explains this in greater detail, but if you want to know what effect a `dep ensure -update` is likely to have for a particular project, the `LATEST` field in `dep status` output will tell you.
 
+### Visualizing dependencies
+
+Generate a visual representation of the dependency tree by piping the output of `dep status -dot` to [graphviz](http://www.graphviz.org/).
+
+#### Linux
+
+```
+$ sudo apt-get install graphviz
+$ dep status -dot | dot -T png | display
+```
+#### MacOS
+```
+$ brew install graphviz
+$ dep status -dot | dot -T png | open -f -a /Applications/Preview.app
+```
+
+#### Windows
+
+```
+> choco install graphviz.portable
+> dep status -dot | dot -T png -o status.png; start status.png
+```
+
+<p align="center"><img src="docs/assets/StatusGraph.png"></p>
+
 ### Adding and removing `import` statements
 
 As noted in [the section on adding dependencies](#adding-a-new-dependency), dep relies on the import statements in your code to figure out which dependencies your project actually needs. Thus, when you add or remove import statements, dep might need to care about it.
