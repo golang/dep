@@ -89,7 +89,7 @@ $ dep status -dot | dot -T png | open -f -a /Applications/Preview.app
 > dep status -dot | dot -T png -o status.png; start status.png
 ```
 
-<p align="center"><img src="/dep/docs/assets/StatusGraph.png"></p>
+![status graph](assets/StatusGraph.png)
 
 ### Updating dependencies
 
