@@ -1445,7 +1445,7 @@ func (sm *bmSourceManager) ListPackages(id ProjectIdentifier, v Version) (pkgtre
 		}
 	}
 
-	return pkgtree.PackageTree{}, fmt.Errorf("Project %s at version %s could not be found", id, v)
+	return pkgtree.PackageTree{}, fmt.Errorf("project %s at version %s could not be found", id, v)
 }
 
 func (sm *bmSourceManager) GetManifestAndLock(id ProjectIdentifier, v Version, an ProjectAnalyzer) (Manifest, Lock, error) {
@@ -1460,7 +1460,7 @@ func (sm *bmSourceManager) GetManifestAndLock(id ProjectIdentifier, v Version, a
 	}
 
 	// TODO(sdboyer) proper solver-type errors
-	return nil, nil, fmt.Errorf("Project %s at version %s could not be found", id, v)
+	return nil, nil, fmt.Errorf("project %s at version %s could not be found", id, v)
 }
 
 // computeBimodalExternalMap takes a set of depspecs and computes an

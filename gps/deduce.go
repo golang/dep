@@ -16,7 +16,7 @@ import (
 	"strings"
 	"sync"
 
-	radix "github.com/armon/go-radix"
+	"github.com/armon/go-radix"
 	"github.com/pkg/errors"
 )
 

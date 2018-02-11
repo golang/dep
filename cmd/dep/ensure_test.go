@@ -231,7 +231,7 @@ func TestValidateUpdateArgs(t *testing.T) {
 			stderrOutput.Reset()
 
 			// Fill up the locked projects
-			lockedProjects := []gps.LockedProject{}
+			lockedProjects := make([]gps.LockedProject, 0, len(c.lockedProjects))
 			for _, lp := range c.lockedProjects {
 				pi := gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot(lp)}
 				lockedProjects = append(lockedProjects, gps.NewLockedProject(pi, gps.NewVersion("v1.0.0"), []string{}))

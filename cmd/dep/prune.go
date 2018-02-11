@@ -172,7 +172,7 @@ fail:
 func calculatePrune(vendorDir string, keep []string, logger *log.Logger) ([]string, error) {
 	logger.Println("Calculating prune. Checking the following packages:")
 	sort.Strings(keep)
-	toDelete := []string{}
+	var toDelete []string
 	err := filepath.Walk(vendorDir, func(path string, info os.FileInfo, err error) error {
 		if _, err := os.Lstat(path); err != nil {
 			return nil

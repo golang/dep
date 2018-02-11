@@ -10,10 +10,9 @@ import (
 	"log"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 	"text/tabwriter"
-
-	"strings"
 
 	"github.com/golang/dep"
 	"github.com/golang/dep/gps"

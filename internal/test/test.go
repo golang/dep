@@ -34,8 +34,8 @@ var (
 )
 
 const (
-	manifestName string = "Gopkg.toml"
-	lockName     string = "Gopkg.lock"
+	manifestName = "Gopkg.toml"
+	lockName     = "Gopkg.lock"
 )
 
 func init() {
