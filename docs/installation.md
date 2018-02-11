@@ -28,6 +28,19 @@ cd golang-dep
 makepkg -si
 ```
 
+## Install From Source
+The snippet below installs the latest release of dep from source and
+sets the version in the binary so that `dep version` works as expected.
+
+```sh
+go get -d -u github.com/golang/dep
+cd $(go env GOPATH)/src/github.com/golang/dep
+DEP_LATEST=$(git describe --abbrev=0 --tags)
+git checkout $DEP_LATEST
+go install -ldflags="-X main.version=$DEP_LATEST" ./cmd/dep
+git checkout master
+```
+
 ## Development
 
 If you want to hack on dep, you can install via `go get`:
