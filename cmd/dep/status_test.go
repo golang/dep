@@ -529,6 +529,16 @@ func TestValidateFlags(t *testing.T) {
 			cmd:     statusCommand{missing: true, old: true},
 			wantErr: errors.Wrapf(errors.New("cannot pass multiple operating mode flags"), "[-old -missing]"),
 		},
+		{
+			name:    "old with -dot",
+			cmd:     statusCommand{dot: true, old: true},
+			wantErr: errors.New("-dot generates dependency graph; cannot pass other flags"),
+		},
+		{
+			name:    "old with template",
+			cmd:     statusCommand{old: true, template: "foo"},
+			wantErr: errors.New("cannot pass template string with -old"),
+		},
 	}
 
 	for _, tc := range testCases {

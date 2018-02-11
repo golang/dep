@@ -121,6 +121,13 @@ type outputter interface {
 	MissingFooter() error
 }
 
+// Only a subset of the outputters should be able to output old statuses
+type oldOutputter interface {
+	OldHeader() error
+	OldLine(*OldStatus) error
+	OldFooter() error
+}
+
 type tableOutput struct{ w *tabwriter.Writer }
 
 func (out *tableOutput) BasicHeader() error {
@@ -163,10 +170,31 @@ func (out *tableOutput) MissingFooter() error {
 	return out.w.Flush()
 }
 
+func (out *tableOutput) OldHeader() error {
+	_, err := fmt.Fprintf(out.w, "PROJECT\tCONSTRAINT\tREVISION\tLATEST\n")
+	return err
+}
+
+func (out *tableOutput) OldLine(os *OldStatus) error {
+	_, err := fmt.Fprintf(out.w,
+		"%s\t%s\t%s\t%s\t\n",
+		os.ProjectRoot,
+		os.getConsolidatedConstraint(),
+		formatVersion(os.Revision),
+		os.getConsolidatedLatest(shortRev),
+	)
+	return err
+}
+
+func (out *tableOutput) OldFooter() error {
+	return out.w.Flush()
+}
+
 type jsonOutput struct {
 	w       io.Writer
 	basic   []*rawStatus
 	missing []*MissingStatus
+	old     []*rawOldStatus
 }
 
 func (out *jsonOutput) BasicHeader() error {
@@ -195,6 +223,20 @@ func (out *jsonOutput) MissingLine(ms *MissingStatus) error {
 
 func (out *jsonOutput) MissingFooter() error {
 	return json.NewEncoder(out.w).Encode(out.missing)
+}
+
+func (out *jsonOutput) OldHeader() error {
+	out.old = []*rawOldStatus{}
+	return nil
+}
+
+func (out *jsonOutput) OldLine(os *OldStatus) error {
+	out.old = append(out.old, os.marshalJSON())
+	return nil
+}
+
+func (out *jsonOutput) OldFooter() error {
+	return json.NewEncoder(out.w).Encode(out.old)
 }
 
 type dotOutput struct {
@@ -289,8 +331,6 @@ func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
 	switch {
 	case cmd.missing:
 		return errors.Errorf("not implemented")
-	case cmd.old:
-		cmd.runOld(ctx, args, p, sm)
 	case cmd.json:
 		out = &jsonOutput{
 			w: &buf,
@@ -319,6 +359,15 @@ func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
 	// Check if the lock file exists.
 	if p.Lock == nil {
 		return errors.Errorf("no Gopkg.lock found. Run `dep ensure` to generate lock file")
+	}
+
+	if cmd.old {
+		if _, ok := out.(oldOutputter); !ok {
+			return errors.Errorf("invalid output command usesed")
+		}
+		err = cmd.runOld(ctx, out.(oldOutputter), p, sm)
+		ctx.Out.Print(buf.String())
+		return err
 	}
 
 	hasMissingPkgs, errCount, err := runStatusAll(ctx, out, p, sm)
@@ -357,6 +406,9 @@ func (cmd *statusCommand) validateFlags() error {
 	var opModes []string
 
 	if cmd.old {
+		if cmd.template != "" {
+			return errors.New("cannot pass template string with -old")
+		}
 		opModes = append(opModes, "-old")
 	}
 
@@ -392,12 +444,49 @@ func (cmd *statusCommand) validateFlags() error {
 type OldStatus struct {
 	ProjectRoot string
 	Constraint  gps.Constraint
-	Version     gps.UnpairedVersion
 	Revision    gps.Revision
 	Latest      gps.Version
 }
 
-func (cmd *statusCommand) runOld(ctx *dep.Ctx, args []string, p *dep.Project, sm gps.SourceManager) error {
+type rawOldStatus struct {
+	ProjectRoot, Constraint, Revision, Latest string
+}
+
+func (os OldStatus) getConsolidatedConstraint() string {
+	var constraint string
+	if os.Constraint != nil {
+		if v, ok := os.Constraint.(gps.Version); ok {
+			constraint = formatVersion(v)
+		} else {
+			constraint = os.Constraint.String()
+		}
+	}
+	return constraint
+}
+
+func (os OldStatus) getConsolidatedLatest(revSize uint8) string {
+	latest := ""
+	if os.Latest != nil {
+		switch revSize {
+		case shortRev:
+			latest = formatVersion(os.Latest)
+		case longRev:
+			latest = os.Latest.String()
+		}
+	}
+	return latest
+}
+
+func (os OldStatus) marshalJSON() *rawOldStatus {
+	return &rawOldStatus{
+		ProjectRoot: os.ProjectRoot,
+		Constraint:  os.getConsolidatedConstraint(),
+		Revision:    string(os.Revision),
+		Latest:      os.getConsolidatedLatest(longRev),
+	}
+}
+
+func (cmd *statusCommand) runOld(ctx *dep.Ctx, out oldOutputter, p *dep.Project, sm gps.SourceManager) error {
 	// While the network churns on ListVersions() requests, statically analyze
 	// code from the current project.
 	ptree, err := p.ParseRootPackageTree()
@@ -427,22 +516,48 @@ func (cmd *statusCommand) runOld(ctx *dep.Ctx, args []string, p *dep.Project, sm
 		return errors.Wrap(err, "runOld")
 	}
 
-	var oldLockProjects []gps.LockedProject
-	lockProjects := p.Lock.Projects()
+	var oldStatuses []OldStatus
 	solutionProjects := solution.Projects()
 
-	for i := range solutionProjects {
-		spr, _, _ := gps.VersionComponentStrings(solutionProjects[i].Version())
-		lpr, _, _ := gps.VersionComponentStrings(lockProjects[i].Version())
+	for _, proj := range p.Lock.Projects() {
+		for i := range solutionProjects {
+			// Look for the same project in solution and lock
+			if solutionProjects[i].Ident().ProjectRoot != proj.Ident().ProjectRoot {
+				continue
+			}
 
-		if spr != lpr {
-			oldLockProjects = append(oldLockProjects, lockProjects[i])
+			// If revisions are not the same then it is old and we should display it
+			latestRev, _, _ := gps.VersionComponentStrings(solutionProjects[i].Version())
+			atRev, _, _ := gps.VersionComponentStrings(proj.Version())
+			if atRev == latestRev {
+				continue
+			}
+
+			// Generate the old status data and append it
+			os := OldStatus{
+				ProjectRoot: proj.Ident().String(),
+				Revision:    gps.Revision(atRev),
+				Latest:      gps.Revision(latestRev),
+			}
+			// Getting Constraint
+			if pp, has := p.Manifest.Ovr[proj.Ident().ProjectRoot]; has && pp.Constraint != nil {
+				// manifest has override for project
+				os.Constraint = pp.Constraint
+			} else if pp, has := p.Manifest.Constraints[proj.Ident().ProjectRoot]; has && pp.Constraint != nil {
+				// manifest has normal constraint
+				os.Constraint = pp.Constraint
+			} else {
+				os.Constraint = gps.Any()
+			}
+			oldStatuses = append(oldStatuses, os)
 		}
 	}
 
-	for _, oldLockProject := range oldLockProjects {
-		ctx.Out.Println(oldLockProject)
+	out.OldHeader()
+	for _, ostat := range oldStatuses {
+		out.OldLine(&ostat)
 	}
+	out.OldFooter()
 
 	return nil
 }
