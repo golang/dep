@@ -1355,7 +1355,7 @@ func (sm *depspecSourceManager) GetManifestAndLock(id ProjectIdentifier, v Versi
 		}
 	}
 
-	return nil, nil, fmt.Errorf("Project %s at version %s could not be found", id, v)
+	return nil, nil, fmt.Errorf("project %s at version %s could not be found", id, v)
 }
 
 func (sm *depspecSourceManager) ListPackages(id ProjectIdentifier, v Version) (pkgtree.PackageTree, error) {
@@ -1404,7 +1404,7 @@ func (sm *depspecSourceManager) ListPackages(id ProjectIdentifier, v Version) (p
 		}
 	}
 
-	return pkgtree.PackageTree{}, fmt.Errorf("Project %s at version %s could not be found", pid.n, v)
+	return pkgtree.PackageTree{}, fmt.Errorf("project %s at version %s could not be found", pid.n, v)
 }
 
 func (sm *depspecSourceManager) ListVersions(id ProjectIdentifier) ([]PairedVersion, error) {
@@ -1431,7 +1431,7 @@ func (sm *depspecSourceManager) ListVersions(id ProjectIdentifier) ([]PairedVers
 	}
 
 	if len(pvl) == 0 {
-		return nil, fmt.Errorf("Project %s could not be found", id)
+		return nil, fmt.Errorf("project %s could not be found", id)
 	}
 	return pvl, nil
 }
@@ -1444,7 +1444,7 @@ func (sm *depspecSourceManager) RevisionPresentIn(id ProjectIdentifier, r Revisi
 		}
 	}
 
-	return false, fmt.Errorf("Project %s has no revision %s", id, r)
+	return false, fmt.Errorf("project %s has no revision %s", id, r)
 }
 
 func (sm *depspecSourceManager) SourceExists(id ProjectIdentifier) (bool, error) {
@@ -1461,7 +1461,7 @@ func (sm *depspecSourceManager) SourceExists(id ProjectIdentifier) (bool, error)
 func (sm *depspecSourceManager) SyncSourceFor(id ProjectIdentifier) error {
 	// Ignore err because it can't happen
 	if exist, _ := sm.SourceExists(id); !exist {
-		return fmt.Errorf("Source %s does not exist", id)
+		return fmt.Errorf("source %s does not exist", id)
 	}
 	return nil
 }
@@ -1480,7 +1480,7 @@ func (sm *depspecSourceManager) DeduceProjectRoot(ip string) (ProjectRoot, error
 			return ProjectRoot(ip[:len(n)]), nil
 		}
 	}
-	return "", fmt.Errorf("Could not find %s, or any parent, in list of known fixtures", ip)
+	return "", fmt.Errorf("could not find %s, or any parent, in list of known fixtures", ip)
 }
 
 func (sm *depspecSourceManager) SourceURLsForPath(ip string) ([]*url.URL, error) {
@@ -1547,7 +1547,7 @@ func (b *depspecBridge) listVersions(id ProjectIdentifier) ([]Version, error) {
 func (b *depspecBridge) verifyRootDir(path string) error {
 	root := b.sm.(fixSM).rootSpec()
 	if string(root.n) != path {
-		return fmt.Errorf("Expected only root project %q to verifyRootDir(), got %q", root.n, path)
+		return fmt.Errorf("expected only root project %q to verifyRootDir(), got %q", root.n, path)
 	}
 
 	return nil

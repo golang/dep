@@ -301,7 +301,7 @@ func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
 
 func (cmd *statusCommand) validateFlags() error {
 	// Operating mode flags.
-	opModes := []string{}
+	var opModes []string
 
 	if cmd.old {
 		opModes = append(opModes, "-old")

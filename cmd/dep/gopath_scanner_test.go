@@ -15,8 +15,8 @@ import (
 	"github.com/golang/dep/internal/test"
 )
 
-const testProject1 string = "github.com/sdboyer/deptest"
-const testProject2 string = "github.com/sdboyer/deptestdos"
+const testProject1 = "github.com/sdboyer/deptest"
+const testProject2 = "github.com/sdboyer/deptestdos"
 
 // NewTestContext creates a unique context with its own GOPATH for a single test.
 func NewTestContext(h *test.Helper) *dep.Ctx {

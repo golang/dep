@@ -476,7 +476,7 @@ func TestCheckRedundantPruneOptions(t *testing.T) {
 			pruneOptions: gps.CascadingPruneOptions{
 				DefaultOptions: 15,
 				PerProjectOptions: map[gps.ProjectRoot]gps.PruneOptionSet{
-					"github.com/golang/dep": gps.PruneOptionSet{
+					"github.com/golang/dep": {
 						NestedVendor:   pvtrue,
 						UnusedPackages: pvtrue,
 						NonGoFiles:     pvtrue,
@@ -495,7 +495,7 @@ func TestCheckRedundantPruneOptions(t *testing.T) {
 			pruneOptions: gps.CascadingPruneOptions{
 				DefaultOptions: 1,
 				PerProjectOptions: map[gps.ProjectRoot]gps.PruneOptionSet{
-					"github.com/golang/dep": gps.PruneOptionSet{
+					"github.com/golang/dep": {
 						NestedVendor:   pvtrue,
 						UnusedPackages: pvfalse,
 						NonGoFiles:     pvfalse,
@@ -514,12 +514,12 @@ func TestCheckRedundantPruneOptions(t *testing.T) {
 			pruneOptions: gps.CascadingPruneOptions{
 				DefaultOptions: 7,
 				PerProjectOptions: map[gps.ProjectRoot]gps.PruneOptionSet{
-					"github.com/golang/dep": gps.PruneOptionSet{
+					"github.com/golang/dep": {
 						NestedVendor: pvtrue,
 						NonGoFiles:   pvtrue,
 						GoTests:      pvtrue,
 					},
-					"github.com/other/project": gps.PruneOptionSet{
+					"github.com/other/project": {
 						NestedVendor:   pvtrue,
 						UnusedPackages: pvfalse,
 						GoTests:        pvfalse,
@@ -798,7 +798,7 @@ func TestToRawPruneOptions_Panic(t *testing.T) {
 	pruneOptions := gps.CascadingPruneOptions{
 		DefaultOptions: 1,
 		PerProjectOptions: map[gps.ProjectRoot]gps.PruneOptionSet{
-			"github.com/carolynvs/deptest": gps.PruneOptionSet{
+			"github.com/carolynvs/deptest": {
 				NestedVendor: pvtrue,
 			},
 		},

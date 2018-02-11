@@ -135,7 +135,7 @@ func TestDeriveFilesystemState(t *testing.T) {
 						"simple-file",
 					},
 					links: []fsLink{
-						fsLink{
+						{
 							path:   "link",
 							to:     "nonexisting",
 							broken: true,
@@ -150,7 +150,7 @@ func TestDeriveFilesystemState(t *testing.T) {
 						"simple-file",
 					},
 					links: []fsLink{
-						fsLink{
+						{
 							path:   "link",
 							to:     "",
 							broken: true,
@@ -164,12 +164,12 @@ func TestDeriveFilesystemState(t *testing.T) {
 			fs: fsTestCase{
 				before: filesystemState{
 					links: []fsLink{
-						fsLink{
+						{
 							path:     "link1",
 							to:       "link2",
 							circular: true,
 						},
-						fsLink{
+						{
 							path:     "link2",
 							to:       "link1",
 							circular: true,
@@ -178,12 +178,12 @@ func TestDeriveFilesystemState(t *testing.T) {
 				},
 				after: filesystemState{
 					links: []fsLink{
-						fsLink{
+						{
 							path:     "link1",
 							to:       "",
 							circular: true,
 						},
-						fsLink{
+						{
 							path:     "link2",
 							to:       "",
 							circular: true,

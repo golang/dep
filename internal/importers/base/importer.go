@@ -68,7 +68,7 @@ func (i *Importer) lookupVersionForLockedProject(pi gps.ProjectIdentifier, c gps
 
 	var branchConstraint gps.PairedVersion
 	gps.SortPairedForUpgrade(versions) // Sort versions in asc order
-	matches := []gps.Version{}
+	var matches []gps.Version
 	for _, v := range versions {
 		if v.Revision() == rev {
 			matches = append(matches, v)

@@ -21,7 +21,7 @@ import (
 )
 
 const (
-	projectRoot string = "src/github.com/golang/notexist"
+	projectRoot = "src/github.com/golang/notexist"
 )
 
 // RunFunc defines the function signature for an integration test command to execute.
