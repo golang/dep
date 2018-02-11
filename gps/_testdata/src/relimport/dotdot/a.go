@@ -5,7 +5,7 @@
 package dotdot
 
 import (
-	".."
+	relimport ".."
 )
 
 var (
