@@ -66,31 +66,6 @@ Of course, given this model, you don't _have to_ use `dep ensure -add` to add ne
 
 The [ensure mechanics section on `-add`](ensure-mechanics.md#add) has a more thorough exploration, including some ways that `dep ensure -add`'s behavior subtly varies depending on the state of your project.
 
-### Visualizing dependencies
-
-Generate a visual representation of the dependency tree by piping the output of `dep status -dot` to [graphviz](http://www.graphviz.org/).
-
-#### Linux
-
-```
-$ sudo apt-get install graphviz
-$ dep status -dot | dot -T png | display
-```
-#### MacOS
-```
-$ brew install graphviz
-$ dep status -dot | dot -T png | open -f -a /Applications/Preview.app
-```
-
-#### Windows
-
-```
-> choco install graphviz.portable
-> dep status -dot | dot -T png -o status.png; start status.png
-```
-
-![status graph](assets/StatusGraph.png)
-
 ### Updating dependencies
 
 Ideally, updating a dependency project to a newer version is a single command:
@@ -135,6 +110,32 @@ Only if it is the first/last import of a project being added/removed - cases 3 a
 * `[prune]`, global and per-project rules that govern what kinds of files should be removed from `vendor/`
 
 Changes to any one of these rules will likely necessitate changes in `Gopkg.lock` and `vendor/`; a single successful `dep ensure` run will incorporate all such changes at once, bringing your project back in sync.
+
+## Visualizing dependencies
+
+Generate a visual representation of the dependency tree by piping the output of `dep status -dot` to [graphviz](http://www.graphviz.org/).
+
+### Linux
+
+```
+$ sudo apt-get install graphviz
+$ dep status -dot | dot -T png | display
+```
+
+### MacOS
+```
+$ brew install graphviz
+$ dep status -dot | dot -T png | open -f -a /Applications/Preview.app
+```
+
+### Windows
+
+```
+> choco install graphviz.portable
+> dep status -dot | dot -T png -o status.png; start status.png
+```
+
+![status graph](assets/StatusGraph.png)
 
 ## Key Takeaways
 
