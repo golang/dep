@@ -111,6 +111,32 @@ Only if it is the first/last import of a project being added/removed - cases 3 a
 
 Changes to any one of these rules will likely necessitate changes in `Gopkg.lock` and `vendor/`; a single successful `dep ensure` run will incorporate all such changes at once, bringing your project back in sync.
 
+## Visualizing dependencies
+
+Generate a visual representation of the dependency tree by piping the output of `dep status -dot` to [graphviz](http://www.graphviz.org/).
+
+### Linux
+
+```
+$ sudo apt-get install graphviz
+$ dep status -dot | dot -T png | display
+```
+
+### MacOS
+```
+$ brew install graphviz
+$ dep status -dot | dot -T png | open -f -a /Applications/Preview.app
+```
+
+### Windows
+
+```
+> choco install graphviz.portable
+> dep status -dot | dot -T png -o status.png; start status.png
+```
+
+![status graph](assets/StatusGraph.png)
+
 ## Key Takeaways
 
 Here are the key takeaways from this guide:
