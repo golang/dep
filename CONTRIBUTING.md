@@ -47,6 +47,20 @@ updating `Gopkg.toml`, make sure to run `dep ensure` and commit all changes to `
 
 [GitHub Help]: https://help.github.com/articles/about-pull-requests/
 
+## Contributing to the Documentation
+
+All the docs reside in the [`docs/`](docs/) directory. For any relatively small
+change - like fixing a typo or rewording something - the easiest way to
+contribute is directly on Github, using their web code editor.
+
+For relatively big change - changes in the design, links or adding a new page -
+the docs site can be run locally. We use [docusaurus](http://docusaurus.io/) to
+generate the docs site. [`website/`](website/) directory contains all the
+docusaurus configurations. To run the site locally, `cd` into `website/`
+directory and run `npm i --only=dev` to install all the dev dependencies. Then
+run `npm start` to start serving the site. By default, the site would be served
+at http://localhost:3000.
+
 ## Contributor License Agreement
 
 Contributions to this project must be accompanied by a Contributor License
