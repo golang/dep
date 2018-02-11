@@ -399,6 +399,17 @@ func (e DeductionErrs) Error() string {
 
 // ValidateParams validates the solver parameters to ensure solving can be completed.
 func ValidateParams(params SolveParameters, sm SourceManager) error {
+	// Create a list of projects to skip project root deduction. This is
+	// required for projects with an alternate source.
+	altSrc := make(map[string]bool)
+	if params.Manifest != nil {
+		for proj, prop := range params.Manifest.DependencyConstraints() {
+			if prop.Source != "" {
+				altSrc[string(proj)] = true
+			}
+		}
+	}
+
 	// Ensure that all packages are deducible without issues.
 	var deducePkgsGroup sync.WaitGroup
 	deductionErrs := make(DeductionErrs)
@@ -420,6 +431,10 @@ func ValidateParams(params SolveParameters, sm SourceManager) error {
 	}
 
 	for _, ip := range rd.externalImportList(paths.IsStandardImportPath) {
+		if altSrc[ip] {
+			// Skip project root deduction for project with alternate source.
+			continue
+		}
 		deducePkgsGroup.Add(1)
 		go deducePkg(ip, sm)
 	}
