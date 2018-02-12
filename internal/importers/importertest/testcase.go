@@ -27,6 +27,7 @@ type TestCase struct {
 	WantRevision              gps.Revision
 	WantVersion               string
 	WantIgnored               []string
+	WantRequired              []string
 	WantWarning               string
 }
 
@@ -69,6 +70,11 @@ func (tc TestCase) validate(manifest *dep.Manifest, lock *dep.Lock, output *byte
 	if !equalSlice(manifest.Ignored, tc.WantIgnored) {
 		return errors.Errorf("unexpected set of ignored projects: \n\t(GOT) %#v \n\t(WNT) %#v",
 			manifest.Ignored, tc.WantIgnored)
+	}
+
+	if !equalSlice(manifest.Required, tc.WantRequired) {
+		return errors.Errorf("unexpected set of required projects: \n\t(GOT) %#v \n\t(WNT) %#v",
+			manifest.Required, tc.WantRequired)
 	}
 
 	wantConstraintCount := 0
