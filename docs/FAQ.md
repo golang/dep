@@ -33,7 +33,7 @@ The FAQ predated the introduction of the rest of the documentation. If something
 * [How do I test changes to a dependency?](#how-do-i-test-changes-to-a-dependency)
 * [How do I roll releases that `dep` will be able to use?](#how-do-i-roll-releases-that-dep-will-be-able-to-use)
 * [What semver version should I use?](#what-semver-version-should-i-use)
-* [Is it OK to make backwards-incompatible changes now?](#is-it-ok-to-make-backwards-incompatible-changes-now)
+* [Is it OK to make backwards-incompatible changes now?](#is-it-ok-to-make-backwards-incompatible-changes -now)
 * [My dependers don't use `dep` yet. What should I do?](#my-dependers-don-t-use-dep-yet-what-should-i-do)
 * [How do I configure a dependency that doesn't tag its releases?](#how-do-i-configure-a-dependency-that-doesn-t-tag-its-releases)
 * [How do I use `dep` with Docker?](#how-do-i-use-dep-with-docker)
@@ -109,7 +109,7 @@ behave differently:
 
 Overrides are also discussed with some visuals in [the gps docs](https://github.com/sdboyer/gps/wiki/gps-for-Implementors#overrides).
 
-## <a id="how-do-i-change-change-the-version-of-a-dependecy"></a> How do I change change the version of a dependecy
+## How do I change change the version of a dependecy
 
 If you want to:
 
@@ -367,7 +367,7 @@ It's up to you:
 - PR diffs will include changes for files under `vendor/` when Gopkg.lock is modified,
   however files in `vendor/` are [hidden by default](https://github.com/github/linguist/blob/v5.2.0/lib/linguist/generated.rb#L328) on Github.
 
-## <a id="how-do-i-test-changes-to-a-dependency"></a> How do I test changes to a dependency? 
+## How do I test changes to a dependency? 
 
 Making changes in your `vendor/` directory directly is not recommended, as dep
 will overwrite any changes. Instead:
