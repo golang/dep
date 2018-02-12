@@ -81,6 +81,8 @@ func newVcsLocalErrorOr(err error, args []string, out, msg string) error {
 	return vcs.NewLocalError(msg, errors.Wrapf(err, "command failed: %v", args), out)
 }
 
+const envGitRefspecs = "DEP_GIT_REFSPECS"
+
 func (r *gitRepo) get(ctx context.Context) error {
 	cmd := commandContext(
 		ctx,
@@ -99,6 +101,12 @@ func (r *gitRepo) get(ctx context.Context) error {
 			"unable to get repository")
 	}
 
+	// If there are additional refspecs defined then make sure they are fetched
+	// after the initial clone operation.
+	if os.Getenv(envGitRefspecs) != "" {
+		return r.fetch(ctx)
+	}
+
 	return nil
 }
 
@@ -106,10 +114,13 @@ func (r *gitRepo) fetch(ctx context.Context) error {
 	cmd := commandContext(
 		ctx,
 		"git",
-		"fetch",
-		"--tags",
-		"--prune",
-		r.RemoteLocation,
+		append([]string{
+			"fetch",
+			"--tags",
+			"--prune",
+			r.RemoteLocation,
+		},
+			strings.Split(os.Getenv(envGitRefspecs), ",")...)...,
 	)
 	cmd.SetDir(r.LocalPath())
 	// Ensure no prompting for PWs
