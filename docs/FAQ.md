@@ -12,6 +12,7 @@ The FAQ predated the introduction of the rest of the documentation. If something
 ## Configuration
 * [What is the difference between Gopkg.toml (the "manifest") and Gopkg.lock (the "lock")?](#what-is-the-difference-between-gopkgtoml-the-manifest-and-gopkglock-the-lock)
 * [How do I constrain a transitive dependency's version?](#how-do-i-constrain-a-transitive-dependency-s-version)
+* [How do I change the version of a dependecy?](#how-do-i-change-the-version-of-a-dependecy)
 * [Can I put the manifest and lock in the vendor directory?](#can-i-put-the-manifest-and-lock-in-the-vendor-directory)
 * [How do I get `dep` to authenticate to a `git` repo?](#how-do-i-get-dep-to-authenticate-to-a-git-repo)
 * [How do I get `dep` to consume private `git` repos using a Github Token?](#how-do-i-get-dep-to-consume-private-git-repos-using-a-github-token)
@@ -29,11 +30,12 @@ The FAQ predated the introduction of the rest of the documentation. If something
 
 ## Best Practices
 * [Should I commit my vendor directory?](#should-i-commit-my-vendor-directory)
+* [How do I test changes to a dependency?](#how-do-i-test-changes-to-a-dependency)
 * [How do I roll releases that `dep` will be able to use?](#how-do-i-roll-releases-that-dep-will-be-able-to-use)
 * [What semver version should I use?](#what-semver-version-should-i-use)
 * [Is it OK to make backwards-incompatible changes now?](#is-it-ok-to-make-backwards-incompatible-changes-now)
 * [My dependers don't use `dep` yet. What should I do?](#my-dependers-don-t-use-dep-yet-what-should-i-do)
-* [How do I configure a dependency that doesn't tag its releases?](#how-do-i-configure-a-dependency-that-doesn-t-tag-its-releases)
+* [How do I configure a dependency that doesn't tag its release](#how-do-i-configure-a-dependency-that-doesn-t-tag-its-releases)
 * [How do I use `dep` with Docker?](#how-do-i-use-dep-with-docker)
 * [How do I use `dep` in CI?](#how-do-i-use-dep-in-ci)
 
@@ -107,6 +109,21 @@ behave differently:
 
 Overrides are also discussed with some visuals in [the gps docs](https://github.com/sdboyer/gps/wiki/gps-for-Implementors#overrides).
 
+## How do I change the version of a dependecy
+
+If you want to:
+
+* Change the allowed `version`/`branch`/`revision`
+* Switch to using a fork
+
+for one or more dependencies, do the following:
+
+1. Manually edit your `Gopkg.toml`.
+1. Run
+
+    ```sh
+    $ dep ensure
+    ```
 ## Can I put the manifest and lock in the vendor directory?
 No.
 
@@ -349,6 +366,36 @@ It's up to you:
   though [`prune`](Gopkg.toml.md#prune) can help minimize this problem.
 - PR diffs will include changes for files under `vendor/` when Gopkg.lock is modified,
   however files in `vendor/` are [hidden by default](https://github.com/github/linguist/blob/v5.2.0/lib/linguist/generated.rb#L328) on Github.
+
+## How do I test changes to a dependency? 
+
+Making changes in your `vendor/` directory directly is not recommended, as dep
+will overwrite any changes. Instead:
+
+1. Delete the dependency from the `vendor/` directory.
+
+    ```sh
+    rm -rf vendor/<dependency>
+    ```
+
+1. Add that dependency to your `GOPATH`, if it isn't already.
+
+    ```sh
+    $ go get <dependency>
+    ```
+
+1. Modify the dependency in `$GOPATH/src/<dependency>`.
+1. Test, build, etc.
+
+Don't run `dep ensure` until you're done. `dep ensure` will reinstall the
+dependency into `vendor/` based on your manifest, as if you were installing from
+scratch.
+
+This solution works for short-term use, but for something long-term, take a look
+at [virtualgo](https://github.com/GetStream/vg).
+
+To test out code that has been pushed as a new version, or to a branch or fork,
+see [changing dependencies](#how-do-i-change-change-the-version-of-a-dependecy).
 
 ## How do I roll releases that `dep` will be able to use?
 
