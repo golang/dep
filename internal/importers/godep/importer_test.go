@@ -77,6 +77,22 @@ func TestGodepConfig_Convert(t *testing.T) {
 				},
 			},
 		},
+		"package with requirements": {
+			importertest.TestCase{
+				WantRequired: []string{importertest.Project},
+			},
+			godepJSON{
+				Required: []string{importertest.Project},
+			},
+		},
+		"package with local requirements": {
+			importertest.TestCase{
+				WantRequired: nil,
+			},
+			godepJSON{
+				Required: []string{"./..."},
+			},
+		},
 	}
 
 	for name, testCase := range testCases {
