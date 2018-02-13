@@ -19,7 +19,7 @@ Dep's main command is `dep ensure`. The verb is "ensure" to imply that the actio
 
 > Hey dep, please make sure that [my project](glossary.md#current-project) is [in sync](glossary.md#sync): that [`Gopkg.lock`](Gopkg.lock.md) satisfies all the imports in my project, and all the rules in[ `Gopkg.toml`](Gopkg.toml.md), and that `vendor/` contains exactly what `Gopkg.lock` says it should."
 
-As the narrative indicates, `dep ensure` is a holistic operation; rather than offering a series of commands that you run in succession to incrementally achieve a some final state, each run of `dep ensure` delivers a safe, complete, and reproducible set of dependencies with respect to the current state of your project. You might imagine repeated runs of `dep ensure` as being a bit like a frog, hopping from one lilypad to the next.
+As the narrative indicates, `dep ensure` is a holistic operation; rather than offering a series of commands that you run in succession to incrementally achieve some final state, each run of `dep ensure` delivers a safe, complete, and reproducible set of dependencies with respect to the current state of your project. You might imagine repeated runs of `dep ensure` as being a bit like a frog, hopping from one lilypad to the next.
 
  `dep ensure` also guarantees that, barring `kill -9`, power failure, or a critical bug, its disk writes are all-or-nothing: on any given run, either nothing changes (and you get an error), or you're on the nearest safe lilypad. This makes `dep ensure` fine to run at most any time.
 

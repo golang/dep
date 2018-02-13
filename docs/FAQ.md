@@ -12,7 +12,7 @@ The FAQ predated the introduction of the rest of the documentation. If something
 ## Configuration
 * [What is the difference between Gopkg.toml (the "manifest") and Gopkg.lock (the "lock")?](#what-is-the-difference-between-gopkgtoml-the-manifest-and-gopkglock-the-lock)
 * [How do I constrain a transitive dependency's version?](#how-do-i-constrain-a-transitive-dependency-s-version)
-* [How do I change the version of a dependecy?](#how-do-i-change-the-version-of-a-dependecy)
+* [How do I change the version of a dependency?](#how-do-i-change-the-version-of-a-dependency)
 * [Can I put the manifest and lock in the vendor directory?](#can-i-put-the-manifest-and-lock-in-the-vendor-directory)
 * [How do I get `dep` to authenticate to a `git` repo?](#how-do-i-get-dep-to-authenticate-to-a-git-repo)
 * [How do I get `dep` to consume private `git` repos using a Github Token?](#how-do-i-get-dep-to-consume-private-git-repos-using-a-github-token)
@@ -109,7 +109,7 @@ behave differently:
 
 Overrides are also discussed with some visuals in [the gps docs](https://github.com/sdboyer/gps/wiki/gps-for-Implementors#overrides).
 
-## How do I change the version of a dependecy
+## How do I change the version of a dependency
 
 If you want to:
 
@@ -395,7 +395,7 @@ This solution works for short-term use, but for something long-term, take a look
 at [virtualgo](https://github.com/GetStream/vg).
 
 To test out code that has been pushed as a new version, or to a branch or fork,
-see [changing dependencies](#how-do-i-change-change-the-version-of-a-dependecy).
+see [changing dependencies](#how-do-i-change-change-the-version-of-a-dependency).
 
 ## How do I roll releases that `dep` will be able to use?
 
