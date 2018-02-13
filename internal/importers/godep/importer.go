@@ -10,6 +10,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/golang/dep"
 	"github.com/golang/dep/gps"
@@ -31,7 +32,8 @@ func NewImporter(logger *log.Logger, verbose bool, sm gps.SourceManager) *Import
 }
 
 type godepJSON struct {
-	Imports []godepPackage `json:"Deps"`
+	Required []string       `json:"Packages"`
+	Imports  []godepPackage `json:"Deps"`
 }
 
 type godepPackage struct {
@@ -113,5 +115,14 @@ func (g *Importer) convert(pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock) {
 	}
 
 	g.ImportPackages(packages, true)
+	required := make([]string, 0, len(g.json.Required))
+	for _, req := range g.json.Required {
+		if !strings.HasPrefix(req, ".") { // ignore project packages
+			required = append(required, req)
+		}
+	}
+	if len(required) > 0 {
+		g.Manifest.Required = required
+	}
 	return g.Manifest, g.Lock
 }
