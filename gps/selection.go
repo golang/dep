@@ -4,6 +4,11 @@
 
 package gps
 
+import (
+	"container/heap"
+	"context"
+)
+
 type selection struct {
 	// projects is a stack of the atoms that have currently been selected by the
 	// solver. It can also be thought of as the vertex set of the current
@@ -165,7 +170,7 @@ func (s *selection) getProjectImportMap() map[ProjectRoot]map[string]struct{} {
 	return importMap
 }
 
-func (s *selection) getConstraint(id ProjectIdentifier) Constraint {
+func (s *selection) getConstraint(ctx context.Context, id ProjectIdentifier) Constraint {
 	deps, exists := s.deps[id.ProjectRoot]
 	if !exists || len(deps) == 0 {
 		return any
@@ -206,28 +211,7 @@ func (s *selection) selected(id ProjectIdentifier) (atomWithPackages, bool) {
 
 type unselected struct {
 	sl  []bimodalIdentifier
-	cmp func(i, j int) bool
-}
-
-func (u unselected) Len() int {
-	return len(u.sl)
-}
-
-func (u unselected) Less(i, j int) bool {
-	return u.cmp(i, j)
-}
-
-func (u unselected) Swap(i, j int) {
-	u.sl[i], u.sl[j] = u.sl[j], u.sl[i]
-}
-
-func (u *unselected) Push(x interface{}) {
-	u.sl = append(u.sl, x.(bimodalIdentifier))
-}
-
-func (u *unselected) Pop() (v interface{}) {
-	v, u.sl = u.sl[len(u.sl)-1], u.sl[:len(u.sl)-1]
-	return v
+	cmp func(ctx context.Context, i, j int) bool
 }
 
 // remove takes a bimodalIdentifier out of the priority queue, if present. Only
@@ -261,4 +245,38 @@ outer:
 			break
 		}
 	}
+}
+
+// heap returns a heap.Interface backed by u coupled with ctx.
+func (u *unselected) heap(ctx context.Context) heap.Interface {
+	return &unselectedHeap{
+		unselected: u,
+		ctx:        ctx,
+	}
+}
+
+type unselectedHeap struct {
+	*unselected
+	ctx context.Context
+}
+
+func (u unselectedHeap) Len() int {
+	return len(u.sl)
+}
+
+func (u unselectedHeap) Less(i, j int) bool {
+	return u.cmp(u.ctx, i, j)
+}
+
+func (u unselectedHeap) Swap(i, j int) {
+	u.sl[i], u.sl[j] = u.sl[j], u.sl[i]
+}
+
+func (u *unselectedHeap) Push(x interface{}) {
+	u.sl = append(u.sl, x.(bimodalIdentifier))
+}
+
+func (u *unselectedHeap) Pop() (v interface{}) {
+	v, u.sl = u.sl[len(u.sl)-1], u.sl[:len(u.sl)-1]
+	return v
 }

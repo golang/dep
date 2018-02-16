@@ -5,6 +5,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"runtime"
 
@@ -31,7 +32,7 @@ func (cmd *versionCommand) Register(fs *flag.FlagSet) {}
 
 type versionCommand struct{}
 
-func (cmd *versionCommand) Run(ctx *dep.Ctx, args []string) error {
+func (cmd *versionCommand) Run(_ context.Context, ctx *dep.Ctx, args []string) error {
 	ctx.Out.Printf(`dep:
  version     : %s
  build date  : %s

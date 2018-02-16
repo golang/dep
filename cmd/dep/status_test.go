@@ -6,6 +6,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -774,7 +775,7 @@ func TestCollectConstraints(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			p.Lock = &c.lock
 			p.Manifest = &c.manifest
-			gotConstraints, err := collectConstraints(ctx, p, sm)
+			gotConstraints, err := collectConstraints(context.Background(), ctx, p, sm)
 			if len(err) > 0 && !c.wantErr {
 				t.Fatalf("unexpected errors while collecting constraints: %v", err)
 			} else if len(err) == 0 && c.wantErr {

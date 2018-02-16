@@ -1319,7 +1319,7 @@ func newdepspecSM(ds []depspec, ignore []string) *depspecSourceManager {
 	}
 }
 
-func (sm *depspecSourceManager) GetManifestAndLock(id ProjectIdentifier, v Version, an ProjectAnalyzer) (Manifest, Lock, error) {
+func (sm *depspecSourceManager) GetManifestAndLock(ctx context.Context, id ProjectIdentifier, v Version, an ProjectAnalyzer) (Manifest, Lock, error) {
 	// If the input version is a PairedVersion, look only at its top version,
 	// not the underlying. This is generally consistent with the idea that, for
 	// this class of lookup, the rev probably DOES exist, but upstream changed
@@ -1340,7 +1340,7 @@ func (sm *depspecSourceManager) GetManifestAndLock(id ProjectIdentifier, v Versi
 	return nil, nil, fmt.Errorf("project %s at version %s could not be found", id, v)
 }
 
-func (sm *depspecSourceManager) ListPackages(id ProjectIdentifier, v Version) (pkgtree.PackageTree, error) {
+func (sm *depspecSourceManager) ListPackages(ctx context.Context, id ProjectIdentifier, v Version) (pkgtree.PackageTree, error) {
 	pid := pident{n: ProjectRoot(toFold(id.normalizedSource())), v: v}
 	if pv, ok := v.(PairedVersion); ok && pv.Revision() == "FAKEREV" {
 		// An empty rev may come in here because that's what we produce in
@@ -1389,7 +1389,7 @@ func (sm *depspecSourceManager) ListPackages(id ProjectIdentifier, v Version) (p
 	return pkgtree.PackageTree{}, fmt.Errorf("project %s at version %s could not be found", pid.n, v)
 }
 
-func (sm *depspecSourceManager) ListVersions(id ProjectIdentifier) ([]PairedVersion, error) {
+func (sm *depspecSourceManager) ListVersions(ctx context.Context, id ProjectIdentifier) ([]PairedVersion, error) {
 	var pvl []PairedVersion
 	src := toFold(id.normalizedSource())
 	for _, ds := range sm.specs {
@@ -1418,7 +1418,7 @@ func (sm *depspecSourceManager) ListVersions(id ProjectIdentifier) ([]PairedVers
 	return pvl, nil
 }
 
-func (sm *depspecSourceManager) RevisionPresentIn(id ProjectIdentifier, r Revision) (bool, error) {
+func (sm *depspecSourceManager) RevisionPresentIn(ctx context.Context, id ProjectIdentifier, r Revision) (bool, error) {
 	src := toFold(id.normalizedSource())
 	for _, ds := range sm.specs {
 		if src == string(ds.n) && r == ds.v {
@@ -1429,7 +1429,7 @@ func (sm *depspecSourceManager) RevisionPresentIn(id ProjectIdentifier, r Revisi
 	return false, fmt.Errorf("project %s has no revision %s", id, r)
 }
 
-func (sm *depspecSourceManager) SourceExists(id ProjectIdentifier) (bool, error) {
+func (sm *depspecSourceManager) SourceExists(ctx context.Context, id ProjectIdentifier) (bool, error) {
 	src := toFold(id.normalizedSource())
 	for _, ds := range sm.specs {
 		if src == string(ds.n) {
@@ -1440,9 +1440,9 @@ func (sm *depspecSourceManager) SourceExists(id ProjectIdentifier) (bool, error)
 	return false, nil
 }
 
-func (sm *depspecSourceManager) SyncSourceFor(id ProjectIdentifier) error {
+func (sm *depspecSourceManager) SyncSourceFor(ctx context.Context, id ProjectIdentifier) error {
 	// Ignore err because it can't happen
-	if exist, _ := sm.SourceExists(id); !exist {
+	if exist, _ := sm.SourceExists(ctx, id); !exist {
 		return fmt.Errorf("source %s does not exist", id)
 	}
 	return nil
@@ -1458,7 +1458,7 @@ func (sm *depspecSourceManager) ExportPrunedProject(context.Context, LockedProje
 	return fmt.Errorf("dummy sm doesn't support exporting")
 }
 
-func (sm *depspecSourceManager) DeduceProjectRoot(ip string) (ProjectRoot, error) {
+func (sm *depspecSourceManager) DeduceProjectRoot(ctx context.Context, ip string) (ProjectRoot, error) {
 	fip := toFold(ip)
 	for _, ds := range sm.allSpecs() {
 		n := string(ds.n)
@@ -1469,7 +1469,7 @@ func (sm *depspecSourceManager) DeduceProjectRoot(ip string) (ProjectRoot, error
 	return "", fmt.Errorf("could not find %s, or any parent, in list of known fixtures", ip)
 }
 
-func (sm *depspecSourceManager) SourceURLsForPath(ip string) ([]*url.URL, error) {
+func (sm *depspecSourceManager) SourceURLsForPath(ctx context.Context, ip string) ([]*url.URL, error) {
 	return nil, fmt.Errorf("dummy sm doesn't implement SourceURLsForPath")
 }
 
@@ -1490,7 +1490,7 @@ func (sm *depspecSourceManager) ignore() map[string]bool {
 // is a panic because there's no current circumstance under which the depspecSourceManager
 // is useful outside of the gps solving tests, and it shouldn't be used anywhere else without a conscious and intentional
 // expansion of its semantics.
-func (sm *depspecSourceManager) InferConstraint(s string, pi ProjectIdentifier) (Constraint, error) {
+func (sm *depspecSourceManager) InferConstraint(ctx context.Context, s string, pi ProjectIdentifier) (Constraint, error) {
 	panic("depsecSourceManager is only for gps solving tests")
 }
 
@@ -1498,12 +1498,12 @@ type depspecBridge struct {
 	*bridge
 }
 
-func (b *depspecBridge) listVersions(id ProjectIdentifier) ([]Version, error) {
+func (b *depspecBridge) listVersions(ctx context.Context, id ProjectIdentifier) ([]Version, error) {
 	if vl, exists := b.vlists[id]; exists {
 		return vl, nil
 	}
 
-	pvl, err := b.sm.ListVersions(id)
+	pvl, err := b.sm.ListVersions(ctx, id)
 	if err != nil {
 		return nil, err
 	}
@@ -1539,8 +1539,8 @@ func (b *depspecBridge) verifyRootDir(path string) error {
 	return nil
 }
 
-func (b *depspecBridge) ListPackages(id ProjectIdentifier, v Version) (pkgtree.PackageTree, error) {
-	return b.sm.(fixSM).ListPackages(id, v)
+func (b *depspecBridge) ListPackages(ctx context.Context, id ProjectIdentifier, v Version) (pkgtree.PackageTree, error) {
+	return b.sm.(fixSM).ListPackages(ctx, id, v)
 }
 
 func (b *depspecBridge) vendorCodeExists(id ProjectIdentifier) (bool, error) {

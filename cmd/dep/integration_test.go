@@ -5,6 +5,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -143,7 +144,7 @@ func runMain(prog string, args []string, stdout, stderr io.Writer, dir string, e
 		WorkingDir: dir,
 		Env:        env,
 	}
-	if exitCode := m.Run(); exitCode != 0 {
+	if exitCode := m.Run(context.Background()); exitCode != 0 {
 		err = fmt.Errorf("exit status %d", exitCode)
 	}
 	return

@@ -6,6 +6,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -58,18 +59,18 @@ func (cmd *checkCommand) Register(fs *flag.FlagSet) {
 	fs.BoolVar(&cmd.quiet, "q", false, "Suppress non-error output")
 }
 
-func (cmd *checkCommand) Run(ctx *dep.Ctx, args []string) error {
-	logger := ctx.Out
+func (cmd *checkCommand) Run(ctx context.Context, depCtx *dep.Ctx, args []string) error {
+	logger := depCtx.Out
 	if cmd.quiet {
 		logger = log.New(ioutil.Discard, "", 0)
 	}
 
-	p, err := ctx.LoadProject()
+	p, err := depCtx.LoadProject()
 	if err != nil {
 		return err
 	}
 
-	sm, err := ctx.SourceManager()
+	sm, err := depCtx.SourceManager()
 	if err != nil {
 		return err
 	}

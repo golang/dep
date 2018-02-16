@@ -6,6 +6,7 @@ package vndr
 
 import (
 	"bufio"
+	"context"
 	"log"
 	"os"
 	"path/filepath"
@@ -42,7 +43,7 @@ func (v *Importer) HasDepMetadata(dir string) bool {
 }
 
 // Import the config found in the directory.
-func (v *Importer) Import(dir string, pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock, error) {
+func (v *Importer) Import(ctx context.Context, dir string, pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock, error) {
 	v.Logger.Println("Detected vndr configuration file...")
 
 	err := v.loadVndrFile(dir)
@@ -50,7 +51,7 @@ func (v *Importer) Import(dir string, pr gps.ProjectRoot) (*dep.Manifest, *dep.L
 		return nil, nil, errors.Wrapf(err, "unable to load vndr file")
 	}
 
-	m, l := v.convert(pr)
+	m, l := v.convert(ctx, pr)
 	return m, l, nil
 }
 
@@ -85,7 +86,7 @@ func (v *Importer) loadVndrFile(dir string) error {
 	return nil
 }
 
-func (v *Importer) convert(pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock) {
+func (v *Importer) convert(ctx context.Context, pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock) {
 	packages := make([]base.ImportedPackage, 0, len(v.packages))
 	for _, pkg := range v.packages {
 		// Validate
@@ -110,7 +111,7 @@ func (v *Importer) convert(pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock) {
 		}
 		packages = append(packages, ip)
 	}
-	v.ImportPackages(packages, true)
+	v.ImportPackages(ctx, packages, true)
 	return v.Manifest, v.Lock
 }
 

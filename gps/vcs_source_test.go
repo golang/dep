@@ -687,7 +687,7 @@ func TestGitSourceAdaptiveCleanup(t *testing.T) {
 
 	mkSM()
 	id := mkPI("github.com/sdboyer/gpkt")
-	err = sm.SyncSourceFor(id)
+	err = sm.SyncSourceFor(context.Background(), id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -709,7 +709,7 @@ func TestGitSourceAdaptiveCleanup(t *testing.T) {
 	}
 
 	mkSM()
-	err = sm.SyncSourceFor(id)
+	err = sm.SyncSourceFor(context.Background(), id)
 	if err != nil {
 		t.Fatalf("choked after adding dummy file: %q", err)
 	}
@@ -723,7 +723,7 @@ func TestGitSourceAdaptiveCleanup(t *testing.T) {
 	os.Remove(readmePath)
 
 	mkSM()
-	err = sm.SyncSourceFor(id)
+	err = sm.SyncSourceFor(context.Background(), id)
 	if err != nil {
 		t.Fatalf("choked after removing known file: %q", err)
 	}
@@ -739,7 +739,7 @@ func TestGitSourceAdaptiveCleanup(t *testing.T) {
 	}
 
 	mkSM()
-	err = sm.SyncSourceFor(id)
+	err = sm.SyncSourceFor(context.Background(), id)
 	if err != nil {
 		t.Fatalf("choked after removing .git/objects directory: %q", err)
 	}

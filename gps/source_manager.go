@@ -74,23 +74,23 @@ func (fl falseLocker) Unlock() error {
 type SourceManager interface {
 	// SourceExists checks if a repository exists, either upstream or in the
 	// SourceManager's central repository cache.
-	SourceExists(ProjectIdentifier) (bool, error)
+	SourceExists(context.Context, ProjectIdentifier) (bool, error)
 
 	// SyncSourceFor will attempt to bring all local information about a source
 	// fully up to date.
-	SyncSourceFor(ProjectIdentifier) error
+	SyncSourceFor(context.Context, ProjectIdentifier) error
 
 	// ListVersions retrieves a list of the available versions for a given
 	// repository name.
-	ListVersions(ProjectIdentifier) ([]PairedVersion, error)
+	ListVersions(context.Context, ProjectIdentifier) ([]PairedVersion, error)
 
 	// RevisionPresentIn indicates whether the provided Version is present in
 	// the given repository.
-	RevisionPresentIn(ProjectIdentifier, Revision) (bool, error)
+	RevisionPresentIn(context.Context, ProjectIdentifier, Revision) (bool, error)
 
 	// ListPackages parses the tree of the Go packages at or below root of the
 	// provided ProjectIdentifier, at the provided version.
-	ListPackages(ProjectIdentifier, Version) (pkgtree.PackageTree, error)
+	ListPackages(context.Context, ProjectIdentifier, Version) (pkgtree.PackageTree, error)
 
 	// GetManifestAndLock returns manifest and lock information for the provided
 	// root import path.
@@ -98,7 +98,7 @@ type SourceManager interface {
 	// gps currently requires that projects be rooted at their repository root,
 	// necessitating that the ProjectIdentifier's ProjectRoot must also be a
 	// repository root.
-	GetManifestAndLock(ProjectIdentifier, Version, ProjectAnalyzer) (Manifest, Lock, error)
+	GetManifestAndLock(context.Context, ProjectIdentifier, Version, ProjectAnalyzer) (Manifest, Lock, error)
 
 	// ExportProject writes out the tree of the provided import path, at the
 	// provided version, to the provided directory.
@@ -115,12 +115,12 @@ type SourceManager interface {
 
 	// DeduceProjectRoot takes an import path and deduces the corresponding
 	// project/source root.
-	DeduceProjectRoot(ip string) (ProjectRoot, error)
+	DeduceProjectRoot(ctx context.Context, ip string) (ProjectRoot, error)
 
 	// SourceURLsForPath takes an import path and deduces the set of source URLs
 	// that may refer to a canonical upstream source.
 	// In general, these URLs differ only by protocol (e.g. https vs. ssh), not path
-	SourceURLsForPath(ip string) ([]*url.URL, error)
+	SourceURLsForPath(ctx context.Context, ip string) ([]*url.URL, error)
 
 	// Release lets go of any locks held by the SourceManager. Once called, it
 	// is no longer allowed to call methods of that SourceManager; all
@@ -129,7 +129,7 @@ type SourceManager interface {
 
 	// InferConstraint tries to puzzle out what kind of version is given in a string -
 	// semver, a revision, or as a fallback, a plain tag
-	InferConstraint(s string, pi ProjectIdentifier) (Constraint, error)
+	InferConstraint(ctx context.Context, s string, pi ProjectIdentifier) (Constraint, error)
 }
 
 // A ProjectAnalyzer is responsible for analyzing a given path for Manifest and
@@ -143,7 +143,7 @@ type ProjectAnalyzer interface {
 	// version as unusable. As such, an error should generally only be returned
 	// if the code tree is somehow malformed, but not if the implementor's
 	// expected files containing Manifest and Lock data are merely absent.
-	DeriveManifestAndLock(path string, importRoot ProjectRoot) (Manifest, Lock, error)
+	DeriveManifestAndLock(ctx context.Context, path string, importRoot ProjectRoot) (Manifest, Lock, error)
 
 	// Info reports this project analyzer's info.
 	Info() ProjectAnalyzerInfo
@@ -435,32 +435,32 @@ func (sm *SourceMgr) Release() {
 // ProjectIdentifier, at the provided Version. The work of producing the
 // manifest and lock is delegated to the provided ProjectAnalyzer's
 // DeriveManifestAndLock() method.
-func (sm *SourceMgr) GetManifestAndLock(id ProjectIdentifier, v Version, an ProjectAnalyzer) (Manifest, Lock, error) {
+func (sm *SourceMgr) GetManifestAndLock(ctx context.Context, id ProjectIdentifier, v Version, an ProjectAnalyzer) (Manifest, Lock, error) {
 	if atomic.LoadInt32(&sm.releasing) == 1 {
 		return nil, nil, ErrSourceManagerIsReleased
 	}
 
-	srcg, err := sm.srcCoord.getSourceGatewayFor(context.TODO(), id)
+	srcg, err := sm.srcCoord.getSourceGatewayFor(ctx, id)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	return srcg.getManifestAndLock(context.TODO(), id.ProjectRoot, v, an)
+	return srcg.getManifestAndLock(ctx, id.ProjectRoot, v, an)
 }
 
 // ListPackages parses the tree of the Go packages at and below the ProjectRoot
 // of the given ProjectIdentifier, at the given version.
-func (sm *SourceMgr) ListPackages(id ProjectIdentifier, v Version) (pkgtree.PackageTree, error) {
+func (sm *SourceMgr) ListPackages(ctx context.Context, id ProjectIdentifier, v Version) (pkgtree.PackageTree, error) {
 	if atomic.LoadInt32(&sm.releasing) == 1 {
 		return pkgtree.PackageTree{}, ErrSourceManagerIsReleased
 	}
 
-	srcg, err := sm.srcCoord.getSourceGatewayFor(context.TODO(), id)
+	srcg, err := sm.srcCoord.getSourceGatewayFor(ctx, id)
 	if err != nil {
 		return pkgtree.PackageTree{}, err
 	}
 
-	return srcg.listPackages(context.TODO(), id.ProjectRoot, v)
+	return srcg.listPackages(ctx, id.ProjectRoot, v)
 }
 
 // ListVersions retrieves a list of the available versions for a given
@@ -475,49 +475,48 @@ func (sm *SourceMgr) ListPackages(id ProjectIdentifier, v Version) (pkgtree.Pack
 // calls will return a cached version of the first call's results. if upstream
 // is not accessible (network outage, access issues, or the resource actually
 // went away), an error will be returned.
-func (sm *SourceMgr) ListVersions(id ProjectIdentifier) ([]PairedVersion, error) {
+func (sm *SourceMgr) ListVersions(ctx context.Context, id ProjectIdentifier) ([]PairedVersion, error) {
 	if atomic.LoadInt32(&sm.releasing) == 1 {
 		return nil, ErrSourceManagerIsReleased
 	}
 
-	srcg, err := sm.srcCoord.getSourceGatewayFor(context.TODO(), id)
+	srcg, err := sm.srcCoord.getSourceGatewayFor(ctx, id)
 	if err != nil {
 		// TODO(sdboyer) More-er proper-er errors
 		return nil, err
 	}
 
-	return srcg.listVersions(context.TODO())
+	return srcg.listVersions(ctx)
 }
 
 // RevisionPresentIn indicates whether the provided Revision is present in the given
 // repository.
-func (sm *SourceMgr) RevisionPresentIn(id ProjectIdentifier, r Revision) (bool, error) {
+func (sm *SourceMgr) RevisionPresentIn(ctx context.Context, id ProjectIdentifier, r Revision) (bool, error) {
 	if atomic.LoadInt32(&sm.releasing) == 1 {
 		return false, ErrSourceManagerIsReleased
 	}
 
-	srcg, err := sm.srcCoord.getSourceGatewayFor(context.TODO(), id)
+	srcg, err := sm.srcCoord.getSourceGatewayFor(ctx, id)
 	if err != nil {
 		// TODO(sdboyer) More-er proper-er errors
 		return false, err
 	}
 
-	return srcg.revisionPresentIn(context.TODO(), r)
+	return srcg.revisionPresentIn(ctx, r)
 }
 
 // SourceExists checks if a repository exists, either upstream or in the cache,
 // for the provided ProjectIdentifier.
-func (sm *SourceMgr) SourceExists(id ProjectIdentifier) (bool, error) {
+func (sm *SourceMgr) SourceExists(ctx context.Context, id ProjectIdentifier) (bool, error) {
 	if atomic.LoadInt32(&sm.releasing) == 1 {
 		return false, ErrSourceManagerIsReleased
 	}
 
-	srcg, err := sm.srcCoord.getSourceGatewayFor(context.TODO(), id)
+	srcg, err := sm.srcCoord.getSourceGatewayFor(ctx, id)
 	if err != nil {
 		return false, err
 	}
 
-	ctx := context.TODO()
 	if err := srcg.existsInCache(ctx); err == nil {
 		return true, nil
 	}
@@ -531,17 +530,17 @@ func (sm *SourceMgr) SourceExists(id ProjectIdentifier) (bool, error) {
 // source are up to date with any network-acccesible information.
 //
 // The primary use case for this is prefetching.
-func (sm *SourceMgr) SyncSourceFor(id ProjectIdentifier) error {
+func (sm *SourceMgr) SyncSourceFor(ctx context.Context, id ProjectIdentifier) error {
 	if atomic.LoadInt32(&sm.releasing) == 1 {
 		return ErrSourceManagerIsReleased
 	}
 
-	srcg, err := sm.srcCoord.getSourceGatewayFor(context.TODO(), id)
+	srcg, err := sm.srcCoord.getSourceGatewayFor(ctx, id)
 	if err != nil {
 		return err
 	}
 
-	return srcg.syncLocal(context.TODO())
+	return srcg.syncLocal(ctx)
 }
 
 // ExportProject writes out the tree of the provided ProjectIdentifier's
@@ -581,7 +580,7 @@ func (sm *SourceMgr) ExportPrunedProject(ctx context.Context, lp LockedProject, 
 // determine the root of the path, such as, but not limited to, vanity import
 // paths. (A special exception is written for gopkg.in to minimize network
 // activity, as its behavior is well-structured)
-func (sm *SourceMgr) DeduceProjectRoot(ip string) (ProjectRoot, error) {
+func (sm *SourceMgr) DeduceProjectRoot(ctx context.Context, ip string) (ProjectRoot, error) {
 	if atomic.LoadInt32(&sm.releasing) == 1 {
 		return "", ErrSourceManagerIsReleased
 	}
@@ -592,21 +591,21 @@ func (sm *SourceMgr) DeduceProjectRoot(ip string) (ProjectRoot, error) {
 		return "", errors.Errorf("%q is not a valid import path", ip)
 	}
 
-	pd, err := sm.deduceCoord.deduceRootPath(context.TODO(), ip)
+	pd, err := sm.deduceCoord.deduceRootPath(ctx, ip)
 	return ProjectRoot(pd.root), err
 }
 
 // InferConstraint tries to puzzle out what kind of version is given in a
 // string. Preference is given first for branches, then semver constraints, then
 // plain tags, and then revisions.
-func (sm *SourceMgr) InferConstraint(s string, pi ProjectIdentifier) (Constraint, error) {
+func (sm *SourceMgr) InferConstraint(ctx context.Context, s string, pi ProjectIdentifier) (Constraint, error) {
 	if s == "" {
 		return Any(), nil
 	}
 
 	// Lookup the string in the repository
 	var version PairedVersion
-	versions, err := sm.ListVersions(pi)
+	versions, err := sm.ListVersions(ctx, pi)
 	if err != nil {
 		return nil, errors.Wrapf(err, "list versions for %s", pi) // means repo does not exist
 	}
@@ -635,7 +634,7 @@ func (sm *SourceMgr) InferConstraint(s string, pi ProjectIdentifier) (Constraint
 	}
 
 	// Revision, possibly abbreviated
-	r, err := sm.disambiguateRevision(context.TODO(), pi, Revision(s))
+	r, err := sm.disambiguateRevision(ctx, pi, Revision(s))
 	if err == nil {
 		return r, nil
 	}
@@ -646,8 +645,8 @@ func (sm *SourceMgr) InferConstraint(s string, pi ProjectIdentifier) (Constraint
 // SourceURLsForPath takes an import path and deduces the set of source URLs
 // that may refer to a canonical upstream source.
 // In general, these URLs differ only by protocol (e.g. https vs. ssh), not path
-func (sm *SourceMgr) SourceURLsForPath(ip string) ([]*url.URL, error) {
-	deduced, err := sm.deduceCoord.deduceRootPath(context.TODO(), ip)
+func (sm *SourceMgr) SourceURLsForPath(ctx context.Context, ip string) ([]*url.URL, error) {
+	deduced, err := sm.deduceCoord.deduceRootPath(ctx, ip)
 	if err != nil {
 		return nil, err
 	}
@@ -662,7 +661,7 @@ func (sm *SourceMgr) SourceURLsForPath(ip string) ([]*url.URL, error) {
 // abbreviated git commit hash. disambiguateRevision would return the complete
 // hash.
 func (sm *SourceMgr) disambiguateRevision(ctx context.Context, pi ProjectIdentifier, rev Revision) (Revision, error) {
-	srcg, err := sm.srcCoord.getSourceGatewayFor(context.TODO(), pi)
+	srcg, err := sm.srcCoord.getSourceGatewayFor(ctx, pi)
 	if err != nil {
 		return "", err
 	}

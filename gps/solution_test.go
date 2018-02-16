@@ -5,6 +5,7 @@
 package gps
 
 import (
+	"context"
 	"io/ioutil"
 	"log"
 	"os"
@@ -88,20 +89,21 @@ func testWriteDepTree(t *testing.T) {
 	sm, clean := mkNaiveSM(t)
 	defer clean()
 
+	ctx := context.Background()
 	// Trigger simultaneous fetch of all three to speed up test execution time
 	for _, p := range r.p {
 		go func(pi ProjectIdentifier) {
-			sm.SyncSourceFor(pi)
+			sm.SyncSourceFor(ctx, pi)
 		}(p.Ident())
 	}
 
 	// nil lock/result should err immediately
-	err = WriteDepTree(tmp, nil, sm, defaultCascadingPruneOptions(), nil)
+	err = WriteDepTree(ctx, tmp, nil, sm, defaultCascadingPruneOptions(), nil)
 	if err == nil {
 		t.Errorf("Should error if nil lock is passed to WriteDepTree")
 	}
 
-	err = WriteDepTree(tmp, r, sm, defaultCascadingPruneOptions(), nil)
+	err = WriteDepTree(ctx, tmp, r, sm, defaultCascadingPruneOptions(), nil)
 	if err != nil {
 		t.Errorf("Unexpected error while creating vendor tree: %s", err)
 	}
@@ -133,9 +135,10 @@ func BenchmarkCreateVendorTree(b *testing.B) {
 		b.Fatalf("failed to create SourceManager: %q", err)
 	}
 
+	ctx := context.Background()
 	// Prefetch the projects before timer starts
 	for _, lp := range r.p {
-		err := sm.SyncSourceFor(lp.Ident())
+		err := sm.SyncSourceFor(ctx, lp.Ident())
 		if err != nil {
 			b.Errorf("failed getting project info during prefetch: %s", err)
 			clean = false
@@ -151,7 +154,7 @@ func BenchmarkCreateVendorTree(b *testing.B) {
 			// ease manual inspection
 			os.RemoveAll(exp)
 			b.StartTimer()
-			err = WriteDepTree(exp, r, sm, defaultCascadingPruneOptions(), nil)
+			err = WriteDepTree(ctx, exp, r, sm, defaultCascadingPruneOptions(), nil)
 			b.StopTimer()
 			if err != nil {
 				b.Errorf("unexpected error after %v iterations: %s", i, err)

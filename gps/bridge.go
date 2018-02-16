@@ -5,6 +5,7 @@
 package gps
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -17,18 +18,18 @@ import (
 // single solve run.
 type sourceBridge interface {
 	// sourceBridge includes many methods from the SourceManager interface.
-	SourceExists(ProjectIdentifier) (bool, error)
-	SyncSourceFor(ProjectIdentifier) error
-	RevisionPresentIn(ProjectIdentifier, Revision) (bool, error)
-	ListPackages(ProjectIdentifier, Version) (pkgtree.PackageTree, error)
-	GetManifestAndLock(ProjectIdentifier, Version, ProjectAnalyzer) (Manifest, Lock, error)
-	ExportProject(ProjectIdentifier, Version, string) error
-	DeduceProjectRoot(ip string) (ProjectRoot, error)
+	SourceExists(context.Context, ProjectIdentifier) (bool, error)
+	SyncSourceFor(context.Context, ProjectIdentifier) error
+	RevisionPresentIn(context.Context, ProjectIdentifier, Revision) (bool, error)
+	ListPackages(context.Context, ProjectIdentifier, Version) (pkgtree.PackageTree, error)
+	GetManifestAndLock(context.Context, ProjectIdentifier, Version, ProjectAnalyzer) (Manifest, Lock, error)
+	ExportProject(context.Context, ProjectIdentifier, Version, string) error
+	DeduceProjectRoot(ctx context.Context, ip string) (ProjectRoot, error)
 
-	listVersions(ProjectIdentifier) ([]Version, error)
+	listVersions(context.Context, ProjectIdentifier) ([]Version, error)
 	verifyRootDir(path string) error
 	vendorCodeExists(ProjectIdentifier) (bool, error)
-	breakLock()
+	breakLock(context.Context)
 }
 
 // bridge is an adapter around a proper SourceManager. It provides localized
@@ -59,12 +60,6 @@ type bridge struct {
 
 	// Whether to sort version lists for downgrade.
 	down bool
-
-	// The cancellation context provided to the solver. Threading it through the
-	// various solver methods is needlessly verbose so long as we maintain the
-	// lifetime guarantees that a solver can only be run once.
-	// TODO(sdboyer) uncomment this and thread it through SourceManager methods
-	//ctx context.Context
 }
 
 // mkBridge creates a bridge
@@ -77,24 +72,24 @@ func mkBridge(s *solver, sm SourceManager, down bool) *bridge {
 	}
 }
 
-func (b *bridge) GetManifestAndLock(id ProjectIdentifier, v Version, an ProjectAnalyzer) (Manifest, Lock, error) {
+func (b *bridge) GetManifestAndLock(ctx context.Context, id ProjectIdentifier, v Version, an ProjectAnalyzer) (Manifest, Lock, error) {
 	if b.s.rd.isRoot(id.ProjectRoot) {
 		return b.s.rd.rm, b.s.rd.rl, nil
 	}
 
 	b.s.mtr.push("b-gmal")
-	m, l, e := b.sm.GetManifestAndLock(id, v, an)
+	m, l, e := b.sm.GetManifestAndLock(ctx, id, v, an)
 	b.s.mtr.pop()
 	return m, l, e
 }
 
-func (b *bridge) listVersions(id ProjectIdentifier) ([]Version, error) {
+func (b *bridge) listVersions(ctx context.Context, id ProjectIdentifier) ([]Version, error) {
 	if vl, exists := b.vlists[id]; exists {
 		return vl, nil
 	}
 
 	b.s.mtr.push("b-list-versions")
-	pvl, err := b.sm.ListVersions(id)
+	pvl, err := b.sm.ListVersions(ctx, id)
 	if err != nil {
 		b.s.mtr.pop()
 		return nil, err
@@ -112,16 +107,16 @@ func (b *bridge) listVersions(id ProjectIdentifier) ([]Version, error) {
 	return vl, nil
 }
 
-func (b *bridge) RevisionPresentIn(id ProjectIdentifier, r Revision) (bool, error) {
+func (b *bridge) RevisionPresentIn(ctx context.Context, id ProjectIdentifier, r Revision) (bool, error) {
 	b.s.mtr.push("b-rev-present-in")
-	i, e := b.sm.RevisionPresentIn(id, r)
+	i, e := b.sm.RevisionPresentIn(ctx, id, r)
 	b.s.mtr.pop()
 	return i, e
 }
 
-func (b *bridge) SourceExists(id ProjectIdentifier) (bool, error) {
+func (b *bridge) SourceExists(ctx context.Context, id ProjectIdentifier) (bool, error) {
 	b.s.mtr.push("b-source-exists")
-	i, e := b.sm.SourceExists(id)
+	i, e := b.sm.SourceExists(ctx, id)
 	b.s.mtr.pop()
 	return i, e
 }
@@ -142,18 +137,18 @@ func (b *bridge) vendorCodeExists(id ProjectIdentifier) (bool, error) {
 //
 // The root project is handled separately, as the source manager isn't
 // responsible for that code.
-func (b *bridge) ListPackages(id ProjectIdentifier, v Version) (pkgtree.PackageTree, error) {
+func (b *bridge) ListPackages(ctx context.Context, id ProjectIdentifier, v Version) (pkgtree.PackageTree, error) {
 	if b.s.rd.isRoot(id.ProjectRoot) {
 		return b.s.rd.rpt, nil
 	}
 
 	b.s.mtr.push("b-list-pkgs")
-	pt, err := b.sm.ListPackages(id, v)
+	pt, err := b.sm.ListPackages(ctx, id, v)
 	b.s.mtr.pop()
 	return pt, err
 }
 
-func (b *bridge) ExportProject(id ProjectIdentifier, v Version, path string) error {
+func (b *bridge) ExportProject(ctx context.Context, id ProjectIdentifier, v Version, path string) error {
 	panic("bridge should never be used to ExportProject")
 }
 
@@ -170,9 +165,9 @@ func (b *bridge) verifyRootDir(path string) error {
 	return nil
 }
 
-func (b *bridge) DeduceProjectRoot(ip string) (ProjectRoot, error) {
+func (b *bridge) DeduceProjectRoot(ctx context.Context, ip string) (ProjectRoot, error) {
 	b.s.mtr.push("b-deduce-proj-root")
-	pr, e := b.sm.DeduceProjectRoot(ip)
+	pr, e := b.sm.DeduceProjectRoot(ctx, ip)
 	b.s.mtr.pop()
 	return pr, e
 }
@@ -183,7 +178,7 @@ func (b *bridge) DeduceProjectRoot(ip string) (ProjectRoot, error) {
 //
 // Projects that have already been selected are skipped, as it's generally unlikely that the
 // solver will have to backtrack through and fully populate their version queues.
-func (b *bridge) breakLock() {
+func (b *bridge) breakLock(ctx context.Context) {
 	// No real conceivable circumstance in which multiple calls are made to
 	// this, but being that this is the entrance point to a bunch of async work,
 	// protect it with an atomic CAS in case things change in the future.
@@ -199,17 +194,17 @@ func (b *bridge) breakLock() {
 			pi, v := lp.Ident(), lp.Version()
 			go func() {
 				// Sync first
-				b.sm.SyncSourceFor(pi)
+				b.sm.SyncSourceFor(ctx, pi)
 				// Preload the package info for the locked version, too, as
 				// we're more likely to need that
-				b.sm.ListPackages(pi, v)
+				b.sm.ListPackages(ctx, pi, v)
 			}()
 		}
 	}
 }
 
-func (b *bridge) SyncSourceFor(id ProjectIdentifier) error {
+func (b *bridge) SyncSourceFor(ctx context.Context, id ProjectIdentifier) error {
 	// we don't track metrics here b/c this is often called in its own goroutine
 	// by the solver, and the metrics design is for wall time on a single thread
-	return b.sm.SyncSourceFor(id)
+	return b.sm.SyncSourceFor(ctx, id)
 }

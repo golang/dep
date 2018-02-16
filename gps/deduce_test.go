@@ -620,7 +620,7 @@ func TestVanityDeduction(t *testing.T) {
 			t.Run(fix.in, func(t *testing.T) {
 				t.Parallel()
 
-				pr, err := sm.DeduceProjectRoot(fix.in)
+				pr, err := sm.DeduceProjectRoot(ctx, fix.in)
 				if err != nil {
 					t.Errorf("Unexpected err on deducing project root: %s", err)
 					return
@@ -644,7 +644,7 @@ func TestVanityDeduction(t *testing.T) {
 					t.Errorf("Deduced repo ident does not match fixture:\n\t(GOT) %s\n\t(WNT) %s", goturl, wanturl)
 				}
 
-				urls, err := sm.SourceURLsForPath(fix.in)
+				urls, err := sm.SourceURLsForPath(ctx, fix.in)
 				if err != nil {
 					t.Errorf("Unexpected err on deducing source urls: %s", err)
 					return

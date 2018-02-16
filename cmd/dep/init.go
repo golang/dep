@@ -68,51 +68,51 @@ type initCommand struct {
 	gopath     bool
 }
 
-func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
+func (cmd *initCommand) Run(ctx context.Context, depCtx *dep.Ctx, args []string) error {
 	if len(args) > 1 {
 		return errors.Errorf("too many args (%d)", len(args))
 	}
 
 	var root string
 	if len(args) == 0 {
-		root = ctx.WorkingDir
+		root = depCtx.WorkingDir
 	} else {
 		root = args[0]
 		if !filepath.IsAbs(args[0]) {
-			root = filepath.Join(ctx.WorkingDir, args[0])
+			root = filepath.Join(depCtx.WorkingDir, args[0])
 		}
 		if err := os.MkdirAll(root, os.FileMode(0777)); err != nil {
 			return errors.Wrapf(err, "init failed: unable to create a directory at %s", root)
 		}
 	}
 
-	p, err := cmd.establishProjectAt(root, ctx)
+	p, err := cmd.establishProjectAt(root, depCtx)
 	if err != nil {
 		return err
 	}
 
-	sm, err := ctx.SourceManager()
+	sm, err := depCtx.SourceManager()
 	if err != nil {
 		return errors.Wrap(err, "init failed: unable to create a source manager")
 	}
 	sm.UseDefaultSignalHandling()
 	defer sm.Release()
 
-	if ctx.Verbose {
-		ctx.Out.Println("Getting direct dependencies...")
+	if depCtx.Verbose {
+		depCtx.Out.Println("Getting direct dependencies...")
 	}
 
-	directDeps, err := p.GetDirectDependencyNames(sm)
+	directDeps, err := p.GetDirectDependencyNames(ctx, sm)
 	if err != nil {
 		return errors.Wrap(err, "init failed: unable to determine direct dependencies")
 	}
-	if ctx.Verbose {
-		ctx.Out.Printf("Checked %d directories for packages.\nFound %d direct dependencies.\n", len(p.RootPackageTree.Packages), len(directDeps))
+	if depCtx.Verbose {
+		depCtx.Out.Printf("Checked %d directories for packages.\nFound %d direct dependencies.\n", len(p.RootPackageTree.Packages), len(directDeps))
 	}
 
 	// Initialize with imported data, then fill in the gaps using the GOPATH
-	rootAnalyzer := newRootAnalyzer(cmd.skipTools, ctx, directDeps, sm)
-	p.Manifest, p.Lock, err = rootAnalyzer.InitializeRootManifestAndLock(root, p.ImportRoot)
+	rootAnalyzer := newRootAnalyzer(cmd.skipTools, depCtx, directDeps, sm)
+	p.Manifest, p.Lock, err = rootAnalyzer.InitializeRootManifestAndLock(ctx, root, p.ImportRoot)
 	if err != nil {
 		return errors.Wrap(err, "init failed: unable to prepare an initial manifest and lock for the solver")
 	}
@@ -121,8 +121,8 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 	p.Manifest.PruneOptions.DefaultOptions = gps.PruneNestedVendorDirs | gps.PruneGoTestFiles | gps.PruneUnusedPackages
 
 	if cmd.gopath {
-		gs := newGopathScanner(ctx, directDeps, sm)
-		err = gs.InitializeRootManifestAndLock(p.Manifest, p.Lock)
+		gs := newGopathScanner(depCtx, directDeps, sm)
+		err = gs.InitializeRootManifestAndLock(ctx, p.Manifest, p.Lock)
 		if err != nil {
 			return errors.Wrap(err, "init failed: unable to scan the GOPATH for dependencies")
 		}
@@ -139,11 +139,11 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 		ProjectAnalyzer: rootAnalyzer,
 	}
 
-	if ctx.Verbose {
-		params.TraceLogger = ctx.Err
+	if depCtx.Verbose {
+		params.TraceLogger = depCtx.Err
 	}
 
-	if err := ctx.ValidateParams(sm, params); err != nil {
+	if err := depCtx.ValidateParams(ctx, sm, params); err != nil {
 		return errors.Wrapf(err, "init failed: validation of solve parameters failed")
 	}
 
@@ -152,7 +152,7 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 		return errors.Wrap(err, "init failed: unable to prepare the solver")
 	}
 
-	soln, err := s.Solve(context.TODO())
+	soln, err := s.Solve(ctx)
 	if err != nil {
 		err = handleAllTheFailuresOfTheWorld(err)
 		return errors.Wrap(err, "init failed: unable to solve the dependency graph")
@@ -167,7 +167,7 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 		return errors.Wrap(err, "init failed: first backup vendor/, delete it, and then retry the previous command: failed to backup existing vendor directory")
 	}
 	if vendorbak != "" {
-		ctx.Err.Printf("Old vendor backed up to %v", vendorbak)
+		depCtx.Err.Printf("Old vendor backed up to %v", vendorbak)
 	}
 
 	sw, err := dep.NewSafeWriter(p.Manifest, nil, p.Lock, dep.VendorAlways, p.Manifest.PruneOptions, nil)
@@ -176,10 +176,10 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 	}
 
 	var logger *log.Logger
-	if ctx.Verbose {
-		logger = ctx.Err
+	if depCtx.Verbose {
+		logger = depCtx.Err
 	}
-	if err := sw.Write(root, sm, !cmd.noExamples, logger); err != nil {
+	if err := sw.Write(ctx, root, sm, !cmd.noExamples, logger); err != nil {
 		return errors.Wrap(err, "init failed: unable to write the manifest, lock and vendor directory to disk")
 	}
 

@@ -37,9 +37,9 @@ func newRootAnalyzer(skipTools bool, ctx *dep.Ctx, directDeps map[gps.ProjectRoo
 	}
 }
 
-func (a *rootAnalyzer) InitializeRootManifestAndLock(dir string, pr gps.ProjectRoot) (rootM *dep.Manifest, rootL *dep.Lock, err error) {
+func (a *rootAnalyzer) InitializeRootManifestAndLock(ctx context.Context, dir string, pr gps.ProjectRoot) (rootM *dep.Manifest, rootL *dep.Lock, err error) {
 	if !a.skipTools {
-		rootM, rootL = a.importManifestAndLock(dir, pr, false)
+		rootM, rootL = a.importManifestAndLock(ctx, dir, pr, false)
 	}
 
 	if rootM == nil {
@@ -48,7 +48,7 @@ func (a *rootAnalyzer) InitializeRootManifestAndLock(dir string, pr gps.ProjectR
 		// Since we didn't find anything to import, dep's cache is empty.
 		// We are prefetching dependencies and logging so that the subsequent solve step
 		// doesn't spend a long time retrieving dependencies without feedback for the user.
-		if err := a.cacheDeps(pr); err != nil {
+		if err := a.cacheDeps(ctx, pr); err != nil {
 			return nil, nil, err
 		}
 	}
@@ -59,13 +59,13 @@ func (a *rootAnalyzer) InitializeRootManifestAndLock(dir string, pr gps.ProjectR
 	return
 }
 
-func (a *rootAnalyzer) cacheDeps(pr gps.ProjectRoot) error {
+func (a *rootAnalyzer) cacheDeps(ctx context.Context, pr gps.ProjectRoot) error {
 	logger := a.ctx.Err
-	g, _ := errgroup.WithContext(context.TODO())
+	g, _ := errgroup.WithContext(ctx)
 	concurrency := 4
 
 	syncDep := func(pr gps.ProjectRoot, sm gps.SourceManager) error {
-		if err := sm.SyncSourceFor(gps.ProjectIdentifier{ProjectRoot: pr}); err != nil {
+		if err := sm.SyncSourceFor(ctx, gps.ProjectIdentifier{ProjectRoot: pr}); err != nil {
 			logger.Printf("Unable to cache %s - %s", pr, err)
 			return err
 		}
@@ -102,7 +102,7 @@ func (a *rootAnalyzer) cacheDeps(pr gps.ProjectRoot) error {
 	return nil
 }
 
-func (a *rootAnalyzer) importManifestAndLock(dir string, pr gps.ProjectRoot, suppressLogs bool) (*dep.Manifest, *dep.Lock) {
+func (a *rootAnalyzer) importManifestAndLock(ctx context.Context, dir string, pr gps.ProjectRoot, suppressLogs bool) (*dep.Manifest, *dep.Lock) {
 	logger := a.ctx.Err
 	if suppressLogs {
 		logger = log.New(ioutil.Discard, "", 0)
@@ -111,7 +111,7 @@ func (a *rootAnalyzer) importManifestAndLock(dir string, pr gps.ProjectRoot, sup
 	for _, i := range importers.BuildAll(logger, a.ctx.Verbose, a.sm) {
 		if i.HasDepMetadata(dir) {
 			a.ctx.Err.Printf("Importing configuration from %s. These are only initial constraints, and are further refined during the solve process.", i.Name())
-			m, l, err := i.Import(dir, pr)
+			m, l, err := i.Import(ctx, dir, pr)
 			if err != nil {
 				a.ctx.Err.Printf(
 					"Warning: Encountered an unrecoverable error while trying to import %s config from %q: %s",
@@ -140,18 +140,18 @@ func (a *rootAnalyzer) removeTransitiveDependencies(m *dep.Manifest) {
 // DeriveManifestAndLock evaluates a dependency for existing dependency manager
 // configuration (ours or external) and passes any configuration found back
 // to the solver.
-func (a *rootAnalyzer) DeriveManifestAndLock(dir string, pr gps.ProjectRoot) (gps.Manifest, gps.Lock, error) {
+func (a *rootAnalyzer) DeriveManifestAndLock(ctx context.Context, dir string, pr gps.ProjectRoot) (gps.Manifest, gps.Lock, error) {
 	// Ignore other tools if we find dep configuration
 	var depAnalyzer dep.Analyzer
 	if depAnalyzer.HasDepMetadata(dir) {
-		return depAnalyzer.DeriveManifestAndLock(dir, pr)
+		return depAnalyzer.DeriveManifestAndLock(ctx, dir, pr)
 	}
 
 	if !a.skipTools {
 		// The assignment back to an interface prevents interface-based nil checks from failing later
 		var manifest gps.Manifest = gps.SimpleManifest{}
 		var lock gps.Lock
-		im, il := a.importManifestAndLock(dir, pr, true)
+		im, il := a.importManifestAndLock(ctx, dir, pr, true)
 		if im != nil {
 			manifest = im
 		}

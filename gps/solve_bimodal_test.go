@@ -5,6 +5,7 @@
 package gps
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -1401,7 +1402,7 @@ func newbmSM(bmf bimodalFixture) *bmSourceManager {
 	return sm
 }
 
-func (sm *bmSourceManager) ListPackages(id ProjectIdentifier, v Version) (pkgtree.PackageTree, error) {
+func (sm *bmSourceManager) ListPackages(ctx context.Context, id ProjectIdentifier, v Version) (pkgtree.PackageTree, error) {
 	// Deal with address-based root-switching with both case folding and
 	// alternate sources.
 	var src, fsrc, root, froot string
@@ -1448,7 +1449,7 @@ func (sm *bmSourceManager) ListPackages(id ProjectIdentifier, v Version) (pkgtre
 	return pkgtree.PackageTree{}, fmt.Errorf("project %s at version %s could not be found", id, v)
 }
 
-func (sm *bmSourceManager) GetManifestAndLock(id ProjectIdentifier, v Version, an ProjectAnalyzer) (Manifest, Lock, error) {
+func (sm *bmSourceManager) GetManifestAndLock(ctx context.Context, id ProjectIdentifier, v Version, an ProjectAnalyzer) (Manifest, Lock, error) {
 	src := toFold(id.normalizedSource())
 	for _, ds := range sm.specs {
 		if src == string(ds.n) && v.Matches(ds.v) {

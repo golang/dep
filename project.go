@@ -5,6 +5,7 @@
 package dep
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -221,7 +222,7 @@ func (p *Project) parseRootPackageTree() (pkgtree.PackageTree, error) {
 // This function will correctly utilize ignores and requireds from an existing
 // manifest, if one is present, but will also do the right thing without a
 // manifest.
-func (p *Project) GetDirectDependencyNames(sm gps.SourceManager) (map[gps.ProjectRoot]bool, error) {
+func (p *Project) GetDirectDependencyNames(ctx context.Context, sm gps.SourceManager) (map[gps.ProjectRoot]bool, error) {
 	var reach []string
 	if p.ChangedLock != nil {
 		reach = p.ChangedLock.InputImports()
@@ -235,7 +236,7 @@ func (p *Project) GetDirectDependencyNames(sm gps.SourceManager) (map[gps.Projec
 
 	directDeps := map[gps.ProjectRoot]bool{}
 	for _, ip := range reach {
-		pr, err := sm.DeduceProjectRoot(ip)
+		pr, err := sm.DeduceProjectRoot(ctx, ip)
 		if err != nil {
 			return nil, err
 		}
@@ -251,12 +252,12 @@ func (p *Project) GetDirectDependencyNames(sm gps.SourceManager) (map[gps.Projec
 //
 // "Direct dependency" here is as implemented by GetDirectDependencyNames();
 // it correctly incorporates all "ignored" and "required" rules.
-func (p *Project) FindIneffectualConstraints(sm gps.SourceManager) []gps.ProjectRoot {
+func (p *Project) FindIneffectualConstraints(ctx context.Context, sm gps.SourceManager) []gps.ProjectRoot {
 	if p.Manifest == nil {
 		return nil
 	}
 
-	dd, err := p.GetDirectDependencyNames(sm)
+	dd, err := p.GetDirectDependencyNames(ctx, sm)
 	if err != nil {
 		return nil
 	}

@@ -149,9 +149,9 @@ type ensureCommand struct {
 	dryRun     bool
 }
 
-func (cmd *ensureCommand) Run(ctx *dep.Ctx, args []string) error {
+func (cmd *ensureCommand) Run(ctx context.Context, depCtx *dep.Ctx, args []string) error {
 	if cmd.examples {
-		ctx.Err.Println(strings.TrimSpace(ensureExamples))
+		depCtx.Err.Println(strings.TrimSpace(ensureExamples))
 		return nil
 	}
 
@@ -159,51 +159,51 @@ func (cmd *ensureCommand) Run(ctx *dep.Ctx, args []string) error {
 		return err
 	}
 
-	p, err := ctx.LoadProject()
+	p, err := depCtx.LoadProject()
 	if err != nil {
 		return err
 	}
 
-	sm, err := ctx.SourceManager()
+	sm, err := depCtx.SourceManager()
 	if err != nil {
 		return err
 	}
 	sm.UseDefaultSignalHandling()
 	defer sm.Release()
 
-	if err := dep.ValidateProjectRoots(ctx, p.Manifest, sm); err != nil {
+	if err := dep.ValidateProjectRoots(ctx, depCtx, p.Manifest, sm); err != nil {
 		return err
 	}
 
 	params := p.MakeParams()
-	if ctx.Verbose {
-		params.TraceLogger = ctx.Err
+	if depCtx.Verbose {
+		params.TraceLogger = depCtx.Err
 	}
 
 	if cmd.vendorOnly {
-		return cmd.runVendorOnly(ctx, args, p, sm, params)
+		return cmd.runVendorOnly(ctx, depCtx, args, p, sm, params)
 	}
 
 	if fatal, err := checkErrors(params.RootPackageTree.Packages, p.Manifest.IgnoredPackages()); err != nil {
 		if fatal {
 			return err
-		} else if ctx.Verbose {
-			ctx.Out.Println(err)
+		} else if depCtx.Verbose {
+			depCtx.Out.Println(err)
 		}
 	}
-	if ineffs := p.FindIneffectualConstraints(sm); len(ineffs) > 0 {
-		ctx.Err.Printf("Warning: the following project(s) have [[constraint]] stanzas in %s:\n\n", dep.ManifestName)
+	if ineffs := p.FindIneffectualConstraints(ctx, sm); len(ineffs) > 0 {
+		depCtx.Err.Printf("Warning: the following project(s) have [[constraint]] stanzas in %s:\n\n", dep.ManifestName)
 		for _, ineff := range ineffs {
-			ctx.Err.Println("  ✗ ", ineff)
+			depCtx.Err.Println("  ✗ ", ineff)
 		}
 		// TODO(sdboyer) lazy wording, it does not mention ignores at all
-		ctx.Err.Printf("\nHowever, these projects are not direct dependencies of the current project:\n")
-		ctx.Err.Printf("they are not imported in any .go files, nor are they in the 'required' list in\n")
-		ctx.Err.Printf("%s. Dep only applies [[constraint]] rules to direct dependencies, so\n", dep.ManifestName)
-		ctx.Err.Printf("these rules will have no effect.\n\n")
-		ctx.Err.Printf("Either import/require packages from these projects so that they become direct\n")
-		ctx.Err.Printf("dependencies, or convert each [[constraint]] to an [[override]] to enforce rules\n")
-		ctx.Err.Printf("on these projects, if they happen to be transitive dependencies.\n\n")
+		depCtx.Err.Printf("\nHowever, these projects are not direct dependencies of the current project:\n")
+		depCtx.Err.Printf("they are not imported in any .go files, nor are they in the 'required' list in\n")
+		depCtx.Err.Printf("%s. Dep only applies [[constraint]] rules to direct dependencies, so\n", dep.ManifestName)
+		depCtx.Err.Printf("these rules will have no effect.\n\n")
+		depCtx.Err.Printf("Either import/require packages from these projects so that they become direct\n")
+		depCtx.Err.Printf("dependencies, or convert each [[constraint]] to an [[override]] to enforce rules\n")
+		depCtx.Err.Printf("on these projects, if they happen to be transitive dependencies.\n\n")
 	}
 
 	// Kick off vendor verification in the background. All of the remaining
@@ -211,11 +211,11 @@ func (cmd *ensureCommand) Run(ctx *dep.Ctx, args []string) error {
 	go p.VerifyVendor()
 
 	if cmd.add {
-		return cmd.runAdd(ctx, args, p, sm, params)
+		return cmd.runAdd(ctx, depCtx, args, p, sm, params)
 	} else if cmd.update {
-		return cmd.runUpdate(ctx, args, p, sm, params)
+		return cmd.runUpdate(ctx, depCtx, args, p, sm, params)
 	}
-	return cmd.runDefault(ctx, args, p, sm, params)
+	return cmd.runDefault(ctx, depCtx, args, p, sm, params)
 }
 
 func (cmd *ensureCommand) validateFlags() error {
@@ -245,13 +245,13 @@ func (cmd *ensureCommand) vendorBehavior() dep.VendorBehavior {
 	return dep.VendorOnChanged
 }
 
-func (cmd *ensureCommand) runDefault(ctx *dep.Ctx, args []string, p *dep.Project, sm gps.SourceManager, params gps.SolveParameters) error {
+func (cmd *ensureCommand) runDefault(ctx context.Context, depCtx *dep.Ctx, args []string, p *dep.Project, sm gps.SourceManager, params gps.SolveParameters) error {
 	// Bare ensure doesn't take any args.
 	if len(args) != 0 {
 		return errors.New("dep ensure only takes spec arguments with -add or -update")
 	}
 
-	if err := ctx.ValidateParams(sm, params); err != nil {
+	if err := depCtx.ValidateParams(ctx, sm, params); err != nil {
 		return err
 	}
 
@@ -260,8 +260,8 @@ func (cmd *ensureCommand) runDefault(ctx *dep.Ctx, args []string, p *dep.Project
 	if lock != nil {
 		lsat := verify.LockSatisfiesInputs(p.Lock, p.Manifest, params.RootPackageTree)
 		if !lsat.Satisfied() {
-			if ctx.Verbose {
-				ctx.Out.Printf("# Gopkg.lock is out of sync with Gopkg.toml and project imports:\n%s\n\n", sprintLockUnsat(lsat))
+			if depCtx.Verbose {
+				depCtx.Out.Printf("# Gopkg.lock is out of sync with Gopkg.toml and project imports:\n%s\n\n", sprintLockUnsat(lsat))
 			}
 			solve = true
 		} else if cmd.noVendor {
@@ -278,7 +278,7 @@ func (cmd *ensureCommand) runDefault(ctx *dep.Ctx, args []string, p *dep.Project
 			return errors.Wrap(err, "prepare solver")
 		}
 
-		solution, err := solver.Solve(context.TODO())
+		solution, err := solver.Solve(ctx)
 		if err != nil {
 			return handleAllTheFailuresOfTheWorld(err)
 		}
@@ -291,17 +291,17 @@ func (cmd *ensureCommand) runDefault(ctx *dep.Ctx, args []string, p *dep.Project
 	}
 
 	if cmd.dryRun {
-		return dw.PrintPreparedActions(ctx.Out, ctx.Verbose)
+		return dw.PrintPreparedActions(depCtx.Out, depCtx.Verbose)
 	}
 
 	var logger *log.Logger
-	if ctx.Verbose {
-		logger = ctx.Err
+	if depCtx.Verbose {
+		logger = depCtx.Err
 	}
-	return errors.WithMessage(dw.Write(p.AbsRoot, sm, true, logger), "grouped write of manifest, lock and vendor")
+	return errors.WithMessage(dw.Write(ctx, p.AbsRoot, sm, true, logger), "grouped write of manifest, lock and vendor")
 }
 
-func (cmd *ensureCommand) runVendorOnly(ctx *dep.Ctx, args []string, p *dep.Project, sm gps.SourceManager, params gps.SolveParameters) error {
+func (cmd *ensureCommand) runVendorOnly(ctx context.Context, depCtx *dep.Ctx, args []string, p *dep.Project, sm gps.SourceManager, params gps.SolveParameters) error {
 	if len(args) != 0 {
 		return errors.Errorf("dep ensure -vendor-only only populates vendor/ from %s; it takes no spec arguments", dep.LockName)
 	}
@@ -319,22 +319,22 @@ func (cmd *ensureCommand) runVendorOnly(ctx *dep.Ctx, args []string, p *dep.Proj
 	}
 
 	if cmd.dryRun {
-		return dw.PrintPreparedActions(ctx.Out, ctx.Verbose)
+		return dw.PrintPreparedActions(depCtx.Out, depCtx.Verbose)
 	}
 
 	var logger *log.Logger
-	if ctx.Verbose {
-		logger = ctx.Err
+	if depCtx.Verbose {
+		logger = depCtx.Err
 	}
-	return errors.WithMessage(dw.Write(p.AbsRoot, sm, true, logger), "grouped write of manifest, lock and vendor")
+	return errors.WithMessage(dw.Write(ctx, p.AbsRoot, sm, true, logger), "grouped write of manifest, lock and vendor")
 }
 
-func (cmd *ensureCommand) runUpdate(ctx *dep.Ctx, args []string, p *dep.Project, sm gps.SourceManager, params gps.SolveParameters) error {
+func (cmd *ensureCommand) runUpdate(ctx context.Context, depCtx *dep.Ctx, args []string, p *dep.Project, sm gps.SourceManager, params gps.SolveParameters) error {
 	if p.Lock == nil {
 		return errors.Errorf("-update works by updating the versions recorded in %s, but %s does not exist", dep.LockName, dep.LockName)
 	}
 
-	if err := ctx.ValidateParams(sm, params); err != nil {
+	if err := depCtx.ValidateParams(ctx, sm, params); err != nil {
 		return err
 	}
 
@@ -344,7 +344,7 @@ func (cmd *ensureCommand) runUpdate(ctx *dep.Ctx, args []string, p *dep.Project,
 		params.ChangeAll = true
 	}
 
-	if err := validateUpdateArgs(ctx, args, p, sm, &params); err != nil {
+	if err := validateUpdateArgs(ctx, depCtx, args, p, sm, &params); err != nil {
 		return err
 	}
 
@@ -353,7 +353,7 @@ func (cmd *ensureCommand) runUpdate(ctx *dep.Ctx, args []string, p *dep.Project,
 	if err != nil {
 		return errors.Wrap(err, "fastpath solver prepare")
 	}
-	solution, err := solver.Solve(context.TODO())
+	solution, err := solver.Solve(ctx)
 	if err != nil {
 		// TODO(sdboyer) special handling for warning cases as described in spec
 		// - e.g., named projects did not upgrade even though newer versions
@@ -366,22 +366,22 @@ func (cmd *ensureCommand) runUpdate(ctx *dep.Ctx, args []string, p *dep.Project,
 		return err
 	}
 	if cmd.dryRun {
-		return dw.PrintPreparedActions(ctx.Out, ctx.Verbose)
+		return dw.PrintPreparedActions(depCtx.Out, depCtx.Verbose)
 	}
 
 	var logger *log.Logger
-	if ctx.Verbose {
-		logger = ctx.Err
+	if depCtx.Verbose {
+		logger = depCtx.Err
 	}
-	return errors.Wrap(dw.Write(p.AbsRoot, sm, false, logger), "grouped write of manifest, lock and vendor")
+	return errors.Wrap(dw.Write(ctx, p.AbsRoot, sm, false, logger), "grouped write of manifest, lock and vendor")
 }
 
-func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm gps.SourceManager, params gps.SolveParameters) error {
+func (cmd *ensureCommand) runAdd(ctx context.Context, depCtx *dep.Ctx, args []string, p *dep.Project, sm gps.SourceManager, params gps.SolveParameters) error {
 	if len(args) == 0 {
 		return errors.New("must specify at least one project or package to -add")
 	}
 
-	if err := ctx.ValidateParams(sm, params); err != nil {
+	if err := depCtx.ValidateParams(ctx, sm, params); err != nil {
 		return err
 	}
 
@@ -440,19 +440,19 @@ func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm
 
 	var wg sync.WaitGroup
 
-	ctx.Out.Println("Fetching sources...")
+	depCtx.Out.Println("Fetching sources...")
 
 	for i, arg := range args {
 		wg.Add(1)
 
-		if ctx.Verbose {
-			ctx.Err.Printf("(%d/%d) %s\n", i+1, len(args), arg)
+		if depCtx.Verbose {
+			depCtx.Err.Printf("(%d/%d) %s\n", i+1, len(args), arg)
 		}
 
 		go func(arg string) {
 			defer wg.Done()
 
-			pc, path, err := getProjectConstraint(arg, sm)
+			pc, path, err := getProjectConstraint(ctx, arg, sm)
 			if err != nil {
 				// TODO(sdboyer) ensure these errors are contextualized in a sensible way for -add
 				errCh <- err
@@ -472,7 +472,7 @@ func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm
 				return
 			}
 
-			err = sm.SyncSourceFor(pc.Ident)
+			err = sm.SyncSourceFor(ctx, pc.Ident)
 			if err != nil {
 				errCh <- errors.Wrapf(err, "failed to fetch source for %s", pc.Ident.ProjectRoot)
 				return
@@ -546,15 +546,15 @@ func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm
 	close(errCh)
 
 	// Newline after printing the fetching source output.
-	ctx.Err.Println()
+	depCtx.Err.Println()
 
 	// Log all the errors.
 	if len(errCh) > 0 {
-		ctx.Err.Printf("Failed to add the dependencies:\n\n")
+		depCtx.Err.Printf("Failed to add the dependencies:\n\n")
 		for err := range errCh {
-			ctx.Err.Println("  ✗", err.Error())
+			depCtx.Err.Println("  ✗", err.Error())
 		}
-		ctx.Err.Println()
+		depCtx.Err.Println()
 		return errAddDepsFailed
 	}
 
@@ -584,7 +584,7 @@ func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm
 	if err != nil {
 		return errors.Wrap(err, "fastpath solver prepare")
 	}
-	solution, err := solver.Solve(context.TODO())
+	solution, err := solver.Solve(ctx)
 	if err != nil {
 		// TODO(sdboyer) detect if the failure was specifically about some of the -add arguments
 		return handleAllTheFailuresOfTheWorld(err)
@@ -636,14 +636,14 @@ func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm
 	}
 
 	if cmd.dryRun {
-		return dw.PrintPreparedActions(ctx.Out, ctx.Verbose)
+		return dw.PrintPreparedActions(depCtx.Out, depCtx.Verbose)
 	}
 
 	var logger *log.Logger
-	if ctx.Verbose {
-		logger = ctx.Err
+	if depCtx.Verbose {
+		logger = depCtx.Err
 	}
-	if err := errors.Wrap(dw.Write(p.AbsRoot, sm, true, logger), "grouped write of manifest, lock and vendor"); err != nil {
+	if err := errors.Wrap(dw.Write(ctx, p.AbsRoot, sm, true, logger), "grouped write of manifest, lock and vendor"); err != nil {
 		return err
 	}
 
@@ -663,28 +663,28 @@ func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm
 		// nothing to tell the user
 	case 1:
 		if cmd.noVendor {
-			ctx.Out.Printf("%q is not imported by your project, and has been temporarily added to %s.\n", reqlist[0], dep.LockName)
-			ctx.Out.Printf("If you run \"dep ensure\" again before actually importing it, it will disappear from %s. Running \"dep ensure -vendor-only\" is safe, and will guarantee it is present in vendor/.", dep.LockName)
+			depCtx.Out.Printf("%q is not imported by your project, and has been temporarily added to %s.\n", reqlist[0], dep.LockName)
+			depCtx.Out.Printf("If you run \"dep ensure\" again before actually importing it, it will disappear from %s. Running \"dep ensure -vendor-only\" is safe, and will guarantee it is present in vendor/.", dep.LockName)
 		} else {
-			ctx.Out.Printf("%q is not imported by your project, and has been temporarily added to %s and vendor/.\n", reqlist[0], dep.LockName)
-			ctx.Out.Printf("If you run \"dep ensure\" again before actually importing it, it will disappear from %s and vendor/.", dep.LockName)
+			depCtx.Out.Printf("%q is not imported by your project, and has been temporarily added to %s and vendor/.\n", reqlist[0], dep.LockName)
+			depCtx.Out.Printf("If you run \"dep ensure\" again before actually importing it, it will disappear from %s and vendor/.", dep.LockName)
 		}
 	default:
 		if cmd.noVendor {
-			ctx.Out.Printf("The following packages are not imported by your project, and have been temporarily added to %s:\n", dep.LockName)
-			ctx.Out.Printf("\t%s\n", strings.Join(reqlist, "\n\t"))
-			ctx.Out.Printf("If you run \"dep ensure\" again before actually importing them, they will disappear from %s. Running \"dep ensure -vendor-only\" is safe, and will guarantee they are present in vendor/.", dep.LockName)
+			depCtx.Out.Printf("The following packages are not imported by your project, and have been temporarily added to %s:\n", dep.LockName)
+			depCtx.Out.Printf("\t%s\n", strings.Join(reqlist, "\n\t"))
+			depCtx.Out.Printf("If you run \"dep ensure\" again before actually importing them, they will disappear from %s. Running \"dep ensure -vendor-only\" is safe, and will guarantee they are present in vendor/.", dep.LockName)
 		} else {
-			ctx.Out.Printf("The following packages are not imported by your project, and have been temporarily added to %s and vendor/:\n", dep.LockName)
-			ctx.Out.Printf("\t%s\n", strings.Join(reqlist, "\n\t"))
-			ctx.Out.Printf("If you run \"dep ensure\" again before actually importing them, they will disappear from %s and vendor/.", dep.LockName)
+			depCtx.Out.Printf("The following packages are not imported by your project, and have been temporarily added to %s and vendor/:\n", dep.LockName)
+			depCtx.Out.Printf("\t%s\n", strings.Join(reqlist, "\n\t"))
+			depCtx.Out.Printf("If you run \"dep ensure\" again before actually importing them, they will disappear from %s and vendor/.", dep.LockName)
 		}
 	}
 
 	return errors.Wrapf(f.Close(), "closing %s", dep.ManifestName)
 }
 
-func getProjectConstraint(arg string, sm gps.SourceManager) (gps.ProjectConstraint, string, error) {
+func getProjectConstraint(ctx context.Context, arg string, sm gps.SourceManager) (gps.ProjectConstraint, string, error) {
 	emptyPC := gps.ProjectConstraint{
 		Constraint: gps.Any(), // default to any; avoids panics later
 	}
@@ -710,13 +710,13 @@ func getProjectConstraint(arg string, sm gps.SourceManager) (gps.ProjectConstrai
 		source = parts[1]
 	}
 
-	pr, err := sm.DeduceProjectRoot(arg)
+	pr, err := sm.DeduceProjectRoot(ctx, arg)
 	if err != nil {
 		return emptyPC, "", errors.Wrapf(err, "could not infer project root from dependency path: %s", arg) // this should go through to the user
 	}
 
 	pi := gps.ProjectIdentifier{ProjectRoot: pr, Source: source}
-	c, err := sm.InferConstraint(versionStr, pi)
+	c, err := sm.InferConstraint(ctx, versionStr, pi)
 	if err != nil {
 		return emptyPC, "", err
 	}
@@ -779,7 +779,7 @@ func (e pkgtreeErrs) Error() string {
 	return fmt.Sprintf("found %d errors in the package tree:\n%s", len(e), strings.Join(errs, "\n"))
 }
 
-func validateUpdateArgs(ctx *dep.Ctx, args []string, p *dep.Project, sm gps.SourceManager, params *gps.SolveParameters) error {
+func validateUpdateArgs(ctx context.Context, depCtx *dep.Ctx, args []string, p *dep.Project, sm gps.SourceManager, params *gps.SolveParameters) error {
 	// Channel for receiving all the valid arguments.
 	argsCh := make(chan string, len(args))
 
@@ -797,7 +797,7 @@ func validateUpdateArgs(ctx *dep.Ctx, args []string, p *dep.Project, sm gps.Sour
 			defer wg.Done()
 
 			// Ensure the provided path has a deducible project root.
-			pc, path, err := getProjectConstraint(arg, sm)
+			pc, path, err := getProjectConstraint(ctx, arg, sm)
 			if err != nil {
 				// TODO(sdboyer) ensure these errors are contextualized in a sensible way for -update
 				errCh <- err
@@ -837,11 +837,11 @@ func validateUpdateArgs(ctx *dep.Ctx, args []string, p *dep.Project, sm gps.Sour
 
 	// Log all the errors.
 	if len(errCh) > 0 {
-		ctx.Err.Printf("Invalid arguments passed to ensure -update:\n\n")
+		depCtx.Err.Printf("Invalid arguments passed to ensure -update:\n\n")
 		for err := range errCh {
-			ctx.Err.Println("  ✗", err.Error())
+			depCtx.Err.Println("  ✗", err.Error())
 		}
-		ctx.Err.Println()
+		depCtx.Err.Println()
 		return errUpdateArgsValidation
 	}
 

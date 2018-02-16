@@ -7,6 +7,7 @@
 package main
 
 import (
+	"context"
 	"go/build"
 	"io/ioutil"
 	"log"
@@ -48,8 +49,9 @@ func main() {
 	defer sourcemgr.Release()
 
 	// Prep and run the solver
+	ctx := context.Background()
 	solver, _ := gps.Prepare(params, sourcemgr)
-	solution, err := solver.Solve()
+	solution, err := solver.Solve(ctx)
 	if err == nil {
 		// If no failure, blow away the vendor dir and write a new one out,
 		// stripping nested vendor directories as we go.
@@ -57,7 +59,7 @@ func main() {
 		pruneOpts := gps.CascadingPruneOptions{
 			DefaultOptions: gps.PruneNestedVendorDirs | gps.PruneUnusedPackages | gps.PruneGoTestFiles,
 		}
-		gps.WriteDepTree(filepath.Join(root, "vendor"), solution, sourcemgr, pruneOpts, nil)
+		gps.WriteDepTree(ctx, filepath.Join(root, "vendor"), solution, sourcemgr, pruneOpts, nil)
 	}
 }
 

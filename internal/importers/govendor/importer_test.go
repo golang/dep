@@ -6,6 +6,7 @@ package govendor
 
 import (
 	"bytes"
+	"context"
 	"log"
 	"path/filepath"
 	"testing"
@@ -41,7 +42,7 @@ func TestGovendorConfig_Import(t *testing.T) {
 		t.Fatal("Expected the importer to detect the govendor configuration files")
 	}
 
-	m, l, err := g.Import(projectRoot, testGovendorProjectRoot)
+	m, l, err := g.Import(context.Background(), projectRoot, testGovendorProjectRoot)
 	h.Must(err)
 
 	if m == nil {
@@ -138,6 +139,7 @@ func TestGovendorConfig_Convert(t *testing.T) {
 		},
 	}
 
+	ctx := context.Background()
 	for name, testCase := range testCases {
 		name := name
 		testCase := testCase
@@ -145,7 +147,7 @@ func TestGovendorConfig_Convert(t *testing.T) {
 			err := testCase.Execute(t, func(logger *log.Logger, sm gps.SourceManager) (*dep.Manifest, *dep.Lock) {
 				g := NewImporter(logger, true, sm)
 				g.file = testCase.file
-				return g.convert(importertest.RootProject)
+				return g.convert(ctx, importertest.RootProject)
 			})
 			if err != nil {
 				t.Fatalf("%#v", err)

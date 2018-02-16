@@ -5,6 +5,7 @@
 package dep
 
 import (
+	"context"
 	"path/filepath"
 	"testing"
 
@@ -22,7 +23,7 @@ func TestAnalyzerDeriveManifestAndLock(t *testing.T) {
 
 	a := Analyzer{}
 
-	m, l, err := a.DeriveManifestAndLock(h.Path("dep"), "my/fake/project")
+	m, l, err := a.DeriveManifestAndLock(context.Background(), h.Path("dep"), "my/fake/project")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -55,7 +56,7 @@ func TestAnalyzerDeriveManifestAndLockDoesNotExist(t *testing.T) {
 
 	a := Analyzer{}
 
-	m, l, err := a.DeriveManifestAndLock(h.Path("dep"), "my/fake/project")
+	m, l, err := a.DeriveManifestAndLock(context.Background(), h.Path("dep"), "my/fake/project")
 	if m != nil || l != nil || err != nil {
 		t.Fatalf("expected manifest & lock & err to be nil: m -> %#v l -> %#v err-> %#v", m, l, err)
 	}
@@ -79,7 +80,7 @@ func TestAnalyzerDeriveManifestAndLockCannotOpen(t *testing.T) {
 
 	// Verify that the solver rejects the manifest, rather than treating it as
 	// offering no constraints.
-	m, l, err := a.DeriveManifestAndLock(h.Path("dep"), "my/fake/project")
+	m, l, err := a.DeriveManifestAndLock(context.Background(), h.Path("dep"), "my/fake/project")
 	if m != nil || l != nil || err == nil {
 		t.Fatalf("expected manifest & lock to be nil, err to be not nil: m -> %#v l -> %#v err -> %#v", m, l, err)
 	}
@@ -96,7 +97,7 @@ func TestAnalyzerDeriveManifestAndLockInvalidManifest(t *testing.T) {
 
 	a := Analyzer{}
 
-	m, l, err := a.DeriveManifestAndLock(h.Path("dep"), "my/fake/project")
+	m, l, err := a.DeriveManifestAndLock(context.Background(), h.Path("dep"), "my/fake/project")
 	if m != nil || l != nil || err == nil {
 		t.Fatalf("expected manifest & lock & err to be nil: m -> %#v l -> %#v err-> %#v", m, l, err)
 	}

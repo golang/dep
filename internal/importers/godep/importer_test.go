@@ -6,6 +6,7 @@ package godep
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"log"
 	"path/filepath"
@@ -95,6 +96,7 @@ func TestGodepConfig_Convert(t *testing.T) {
 		},
 	}
 
+	ctx := context.Background()
 	for name, testCase := range testCases {
 		name := name
 		testCase := testCase
@@ -102,7 +104,7 @@ func TestGodepConfig_Convert(t *testing.T) {
 			err := testCase.Execute(t, func(logger *log.Logger, sm gps.SourceManager) (*dep.Manifest, *dep.Lock) {
 				g := NewImporter(logger, true, sm)
 				g.json = testCase.json
-				return g.convert(importertest.RootProject)
+				return g.convert(ctx, importertest.RootProject)
 			})
 			if err != nil {
 				t.Fatalf("%#v", err)
@@ -138,7 +140,7 @@ func TestGodepConfig_Import(t *testing.T) {
 		t.Fatal("Expected the importer to detect godep configuration file")
 	}
 
-	m, l, err := g.Import(projectRoot, importertest.RootProject)
+	m, l, err := g.Import(context.Background(), projectRoot, importertest.RootProject)
 	h.Must(err)
 
 	if m == nil {

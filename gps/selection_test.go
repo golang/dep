@@ -35,7 +35,7 @@ func TestUnselectedRemoval(t *testing.T) {
 	})
 
 	if len(u.sl) != 3 {
-		t.Fatalf("len of unselected slice should have been 2 after no-op removal, got %v", len(u.sl))
+		t.Fatalf("len of unselected slice should have been 3 after no-op removal, got %v", len(u.sl))
 	}
 
 	u.remove(bmi3)

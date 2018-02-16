@@ -187,7 +187,7 @@ func (sw SafeWriter) validate(root string, sm gps.SourceManager) error {
 // that would leave an undefined state on disk.
 //
 // If logger is not nil, progress will be logged after each project write.
-func (sw *SafeWriter) Write(root string, sm gps.SourceManager, examples bool, logger *log.Logger) error {
+func (sw *SafeWriter) Write(ctx context.Context, root string, sm gps.SourceManager, examples bool, logger *log.Logger) error {
 	err := sw.validate(root, sm)
 	if err != nil {
 		return err
@@ -234,7 +234,7 @@ func (sw *SafeWriter) Write(root string, sm gps.SourceManager, examples bool, lo
 				logger.Println(progress)
 			}
 		}
-		err = gps.WriteDepTree(filepath.Join(td, "vendor"), sw.lock, sm, sw.pruneOptions, onWrite)
+		err = gps.WriteDepTree(ctx, filepath.Join(td, "vendor"), sw.lock, sm, sw.pruneOptions, onWrite)
 		if err != nil {
 			return errors.Wrap(err, "error while writing out vendor tree")
 		}
@@ -542,7 +542,7 @@ func NewDeltaWriter(p *Project, newLock *Lock, behavior VendorBehavior) (TreeWri
 // This writes recreated projects to a new directory, then moves in existing,
 // unchanged projects from the original vendor directory. If any failures occur,
 // reasonable attempts are made to roll back the changes.
-func (dw *DeltaWriter) Write(path string, sm gps.SourceManager, examples bool, logger *log.Logger) error {
+func (dw *DeltaWriter) Write(ctx context.Context, path string, sm gps.SourceManager, examples bool, logger *log.Logger) error {
 	// TODO(sdboyer) remove path from the signature for this
 	if path != filepath.Dir(dw.vendorDir) {
 		return errors.Errorf("target path (%q) must be the parent of the original vendor path (%q)", path, dw.vendorDir)
@@ -596,7 +596,7 @@ func (dw *DeltaWriter) Write(path string, sm gps.SourceManager, examples bool, l
 
 		to := filepath.FromSlash(filepath.Join(vnewpath, string(pr)))
 		po := projs[pr].(verify.VerifiableProject).PruneOpts
-		if err := sm.ExportPrunedProject(context.TODO(), projs[pr], po, to); err != nil {
+		if err := sm.ExportPrunedProject(ctx, projs[pr], po, to); err != nil {
 			return errors.Wrapf(err, "failed to export %s", pr)
 		}
 
@@ -786,7 +786,7 @@ func (dw *DeltaWriter) PrintPreparedActions(output *log.Logger, verbose bool) er
 // Gopkg.lock, vendor, and possibly Gopkg.toml.
 type TreeWriter interface {
 	PrintPreparedActions(output *log.Logger, verbose bool) error
-	Write(path string, sm gps.SourceManager, examples bool, logger *log.Logger) error
+	Write(ctx context.Context, path string, sm gps.SourceManager, examples bool, logger *log.Logger) error
 }
 
 // trimSHA checks if revision is a valid SHA1 digest and trims to 10 characters.

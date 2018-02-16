@@ -6,6 +6,7 @@ package govend
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"log"
 	"path/filepath"
@@ -69,6 +70,7 @@ func TestGovendConfig_Convert(t *testing.T) {
 		},
 	}
 
+	ctx := context.Background()
 	for name, testCase := range testCases {
 		name := name
 		testCase := testCase
@@ -76,7 +78,7 @@ func TestGovendConfig_Convert(t *testing.T) {
 			err := testCase.Execute(t, func(logger *log.Logger, sm gps.SourceManager) (*dep.Manifest, *dep.Lock) {
 				g := NewImporter(logger, true, sm)
 				g.yaml = testCase.yaml
-				return g.convert(importertest.RootProject)
+				return g.convert(ctx, importertest.RootProject)
 			})
 			if err != nil {
 				t.Fatalf("%#v", err)
@@ -110,7 +112,7 @@ func TestGovendConfig_Import(t *testing.T) {
 		t.Fatal("Expected the importer to detect govend configuration file")
 	}
 
-	m, l, err := g.Import(projectRoot, importertest.RootProject)
+	m, l, err := g.Import(context.Background(), projectRoot, importertest.RootProject)
 	h.Must(err)
 
 	if m == nil {

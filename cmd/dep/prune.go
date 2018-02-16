@@ -5,6 +5,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"io/ioutil"
 	"log"
@@ -39,20 +40,20 @@ func (cmd *pruneCommand) Hidden() bool      { return true }
 func (cmd *pruneCommand) Register(fs *flag.FlagSet) {
 }
 
-func (cmd *pruneCommand) Run(ctx *dep.Ctx, args []string) error {
-	ctx.Err.Printf("Pruning is now performed automatically by dep ensure.\n")
-	ctx.Err.Printf("Set prune settings in %s and it will be applied when running ensure.\n", dep.ManifestName)
-	ctx.Err.Printf("\nThis command currently still prunes as it always has, to ease the transition.\n")
-	ctx.Err.Printf("However, it will be removed in a future version of dep.\n")
-	ctx.Err.Printf("\nNow is the time to update your Gopkg.toml and remove `dep prune` from any scripts.\n")
-	ctx.Err.Printf("\nFor more information, see: https://golang.github.io/dep/docs/Gopkg.toml.html#prune\n")
+func (cmd *pruneCommand) Run(ctx context.Context, depCtx *dep.Ctx, args []string) error {
+	depCtx.Err.Printf("Pruning is now performed automatically by dep ensure.\n")
+	depCtx.Err.Printf("Set prune settings in %s and it will be applied when running ensure.\n", dep.ManifestName)
+	depCtx.Err.Printf("\nThis command currently still prunes as it always has, to ease the transition.\n")
+	depCtx.Err.Printf("However, it will be removed in a future version of dep.\n")
+	depCtx.Err.Printf("\nNow is the time to update your Gopkg.toml and remove `dep prune` from any scripts.\n")
+	depCtx.Err.Printf("\nFor more information, see: https://golang.github.io/dep/docs/Gopkg.toml.html#prune\n")
 
-	p, err := ctx.LoadProject()
+	p, err := depCtx.LoadProject()
 	if err != nil {
 		return err
 	}
 
-	sm, err := ctx.SourceManager()
+	sm, err := depCtx.SourceManager()
 	if err != nil {
 		return err
 	}
@@ -70,23 +71,23 @@ func (cmd *pruneCommand) Run(ctx *dep.Ctx, args []string) error {
 	params := p.MakeParams()
 	params.RootPackageTree = ptree
 
-	if ctx.Verbose {
-		params.TraceLogger = ctx.Err
+	if depCtx.Verbose {
+		params.TraceLogger = depCtx.Err
 	}
 
 	if p.Lock == nil {
 		return errors.Errorf("Gopkg.lock must exist for prune to know what files are safe to remove.")
 	}
 
-	pruneLogger := ctx.Err
-	if !ctx.Verbose {
+	pruneLogger := depCtx.Err
+	if !depCtx.Verbose {
 		pruneLogger = log.New(ioutil.Discard, "", 0)
 	}
-	return pruneProject(p, sm, pruneLogger)
+	return pruneProject(ctx, p, sm, pruneLogger)
 }
 
 // pruneProject removes unused packages from a project.
-func pruneProject(p *dep.Project, sm gps.SourceManager, logger *log.Logger) error {
+func pruneProject(ctx context.Context, p *dep.Project, sm gps.SourceManager, logger *log.Logger) error {
 	td, err := ioutil.TempDir(os.TempDir(), "dep")
 	if err != nil {
 		return errors.Wrap(err, "error while creating temp dir for writing manifest/lock/vendor")
@@ -96,7 +97,7 @@ func pruneProject(p *dep.Project, sm gps.SourceManager, logger *log.Logger) erro
 	onWrite := func(progress gps.WriteProgress) {
 		logger.Println(progress)
 	}
-	if err := gps.WriteDepTree(td, p.Lock, sm, gps.CascadingPruneOptions{DefaultOptions: gps.PruneNestedVendorDirs}, onWrite); err != nil {
+	if err := gps.WriteDepTree(ctx, td, p.Lock, sm, gps.CascadingPruneOptions{DefaultOptions: gps.PruneNestedVendorDirs}, onWrite); err != nil {
 		return err
 	}
 

@@ -5,6 +5,7 @@
 package base
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"testing"
@@ -62,7 +63,7 @@ func TestBaseImporter_IsTag(t *testing.T) {
 			defer sm.Release()
 
 			i := NewImporter(ctx.Err, ctx.Verbose, sm)
-			gotIsTag, gotTag, err := i.isTag(pi, tc.input)
+			gotIsTag, gotTag, err := i.isTag(context.Background(), pi, tc.input)
 			h.Must(err)
 
 			if tc.wantIsTag != gotIsTag {
@@ -131,7 +132,7 @@ func TestBaseImporter_LookupVersionForLockedProject(t *testing.T) {
 			defer sm.Release()
 
 			i := NewImporter(ctx.Err, ctx.Verbose, sm)
-			v, err := i.lookupVersionForLockedProject(pi, tc.constraint, tc.revision)
+			v, err := i.lookupVersionForLockedProject(context.Background(), pi, tc.constraint, tc.revision)
 			h.Must(err)
 
 			gotVersion := v.String()
@@ -426,13 +427,14 @@ func TestBaseImporter_ImportProjects(t *testing.T) {
 		},
 	}
 
+	ctx := context.Background()
 	for name, tc := range testcases {
 		name := name
 		tc := tc
 		t.Run(name, func(t *testing.T) {
 			err := tc.Execute(t, func(logger *log.Logger, sm gps.SourceManager) (*dep.Manifest, *dep.Lock) {
 				i := NewImporter(logger, true, sm)
-				i.ImportPackages(tc.projects, tc.DefaultConstraintFromLock)
+				i.ImportPackages(ctx, tc.projects, tc.DefaultConstraintFromLock)
 				return i.Manifest, i.Lock
 			})
 			if err != nil {

@@ -6,6 +6,7 @@ package dep
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -629,21 +630,22 @@ func TestValidateProjectRoots(t *testing.T) {
 	// Capture the stderr to verify the warnings
 	stderrOutput := &bytes.Buffer{}
 	errLogger := log.New(stderrOutput, "", 0)
-	ctx := &Ctx{
+	depCtx := &Ctx{
 		GOPATH: pwd,
 		Out:    log.New(ioutil.Discard, "", 0),
 		Err:    errLogger,
 	}
 
-	sm, err := ctx.SourceManager()
+	sm, err := depCtx.SourceManager()
 	h.Must(err)
 	defer sm.Release()
 
+	ctx := context.Background()
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			// Empty the buffer for every case
 			stderrOutput.Reset()
-			err := ValidateProjectRoots(ctx, &c.manifest, sm)
+			err := ValidateProjectRoots(ctx, depCtx, &c.manifest, sm)
 			if err != c.wantError {
 				t.Fatalf("unexpected error while validating project roots:\n\t(GOT): %v\n\t(WNT): %v", err, c.wantError)
 			}

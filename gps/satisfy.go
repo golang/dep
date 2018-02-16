@@ -4,13 +4,15 @@
 
 package gps
 
+import "context"
+
 // check performs constraint checks on the provided atom. The set of checks
 // differ slightly depending on whether the atom is pkgonly, or if it's the
 // entire project being added for the first time.
 //
 // The goal is to determine whether selecting the atom would result in a state
 // where all the solver requirements are still satisfied.
-func (s *solver) check(a atomWithPackages, pkgonly bool) error {
+func (s *solver) check(ctx context.Context, a atomWithPackages, pkgonly bool) error {
 	pa := a.a
 	if nilpa == pa {
 		// This shouldn't be able to happen, but if it does, it unequivocally
@@ -30,17 +32,17 @@ func (s *solver) check(a atomWithPackages, pkgonly bool) error {
 	// If we're pkgonly, then base atom was already determined to be allowable,
 	// so we can skip the checkAtomAllowable step.
 	if !pkgonly {
-		if err = s.checkAtomAllowable(pa); err != nil {
+		if err = s.checkAtomAllowable(ctx, pa); err != nil {
 			return err
 		}
 	}
 
-	if err = s.checkRequiredPackagesExist(a); err != nil {
+	if err = s.checkRequiredPackagesExist(ctx, a); err != nil {
 		return err
 	}
 
 	var deps []completeDep
-	_, deps, err = s.getImportsAndConstraintsOf(a)
+	_, deps, err = s.getImportsAndConstraintsOf(ctx, a)
 	if err != nil {
 		// An err here would be from the package fetcher; pass it straight back
 		return err
@@ -57,16 +59,16 @@ func (s *solver) check(a atomWithPackages, pkgonly bool) error {
 		if err = s.checkRootCaseConflicts(a, dep); err != nil {
 			return err
 		}
-		if err = s.checkDepsConstraintsAllowable(a, dep); err != nil {
+		if err = s.checkDepsConstraintsAllowable(ctx, a, dep); err != nil {
 			return err
 		}
-		if err = s.checkDepsDisallowsSelected(a, dep); err != nil {
+		if err = s.checkDepsDisallowsSelected(ctx, a, dep); err != nil {
 			return err
 		}
-		if err = s.checkRevisionExists(a, dep); err != nil {
+		if err = s.checkRevisionExists(ctx, a, dep); err != nil {
 			return err
 		}
-		if err = s.checkPackageImportsFromDepExist(a, dep); err != nil {
+		if err = s.checkPackageImportsFromDepExist(ctx, a, dep); err != nil {
 			return err
 		}
 
@@ -78,8 +80,8 @@ func (s *solver) check(a atomWithPackages, pkgonly bool) error {
 
 // checkAtomAllowable ensures that an atom itself is acceptable with respect to
 // the constraints established by the current solution.
-func (s *solver) checkAtomAllowable(pa atom) error {
-	constraint := s.sel.getConstraint(pa.id)
+func (s *solver) checkAtomAllowable(ctx context.Context, pa atom) error {
+	constraint := s.sel.getConstraint(ctx, pa.id)
 	if constraint.Matches(pa.v) {
 		return nil
 	}
@@ -105,8 +107,8 @@ func (s *solver) checkAtomAllowable(pa atom) error {
 
 // checkRequiredPackagesExist ensures that all required packages enumerated by
 // existing dependencies on this atom are actually present in the atom.
-func (s *solver) checkRequiredPackagesExist(a atomWithPackages) error {
-	ptree, err := s.b.ListPackages(a.a.id, a.a.v)
+func (s *solver) checkRequiredPackagesExist(ctx context.Context, a atomWithPackages) error {
+	ptree, err := s.b.ListPackages(ctx, a.a.id, a.a.v)
 	if err != nil {
 		// TODO(sdboyer) handle this more gracefully
 		return err
@@ -145,9 +147,9 @@ func (s *solver) checkRequiredPackagesExist(a atomWithPackages) error {
 
 // checkDepsConstraintsAllowable checks that the constraints of an atom on a
 // given dep are valid with respect to existing constraints.
-func (s *solver) checkDepsConstraintsAllowable(a atomWithPackages, cdep completeDep) error {
+func (s *solver) checkDepsConstraintsAllowable(ctx context.Context, a atomWithPackages, cdep completeDep) error {
 	dep := cdep.workingConstraint
-	constraint := s.sel.getConstraint(dep.Ident)
+	constraint := s.sel.getConstraint(ctx, dep.Ident)
 	// Ensure the constraint expressed by the dep has at least some possible
 	// intersection with the intersection of existing constraints.
 	if constraint.MatchesAny(dep.Constraint) {
@@ -178,7 +180,7 @@ func (s *solver) checkDepsConstraintsAllowable(a atomWithPackages, cdep complete
 // checkDepsDisallowsSelected ensures that an atom's constraints on a particular
 // dep are not incompatible with the version of that dep that's already been
 // selected.
-func (s *solver) checkDepsDisallowsSelected(a atomWithPackages, cdep completeDep) error {
+func (s *solver) checkDepsDisallowsSelected(ctx context.Context, a atomWithPackages, cdep completeDep) error {
 	dep := cdep.workingConstraint
 	selected, exists := s.sel.selected(dep.Ident)
 	if exists && !dep.Constraint.Matches(selected.a.v) {
@@ -274,14 +276,14 @@ func (s *solver) checkRootCaseConflicts(a atomWithPackages, cdep completeDep) er
 
 // checkPackageImportsFromDepExist ensures that, if the dep is already selected,
 // the newly-required set of packages being placed on it exist and are valid.
-func (s *solver) checkPackageImportsFromDepExist(a atomWithPackages, cdep completeDep) error {
+func (s *solver) checkPackageImportsFromDepExist(ctx context.Context, a atomWithPackages, cdep completeDep) error {
 	sel, is := s.sel.selected(cdep.workingConstraint.Ident)
 	if !is {
 		// dep is not already selected; nothing to do
 		return nil
 	}
 
-	ptree, err := s.b.ListPackages(sel.a.id, sel.a.v)
+	ptree, err := s.b.ListPackages(ctx, sel.a.id, sel.a.v)
 	if err != nil {
 		// TODO(sdboyer) handle this more gracefully
 		return err
@@ -315,14 +317,14 @@ func (s *solver) checkPackageImportsFromDepExist(a atomWithPackages, cdep comple
 
 // checkRevisionExists ensures that if a dependency is constrained by a
 // revision, that that revision actually exists.
-func (s *solver) checkRevisionExists(a atomWithPackages, cdep completeDep) error {
+func (s *solver) checkRevisionExists(ctx context.Context, a atomWithPackages, cdep completeDep) error {
 	r, isrev := cdep.Constraint.(Revision)
 	if !isrev {
 		// Constraint is not a revision; nothing to do
 		return nil
 	}
 
-	present, _ := s.b.RevisionPresentIn(cdep.Ident, r)
+	present, _ := s.b.RevisionPresentIn(ctx, cdep.Ident, r)
 	if present {
 		return nil
 	}

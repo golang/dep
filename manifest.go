@@ -6,6 +6,7 @@ package dep
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"reflect"
@@ -295,7 +296,7 @@ func checkRedundantPruneOptions(co gps.CascadingPruneOptions) (warns []error) {
 }
 
 // ValidateProjectRoots validates the project roots present in manifest.
-func ValidateProjectRoots(c *Ctx, m *Manifest, sm gps.SourceManager) error {
+func ValidateProjectRoots(ctx context.Context, c *Ctx, m *Manifest, sm gps.SourceManager) error {
 	// Channel to receive all the errors
 	errorCh := make(chan error, len(m.Constraints)+len(m.Ovr))
 
@@ -303,7 +304,7 @@ func ValidateProjectRoots(c *Ctx, m *Manifest, sm gps.SourceManager) error {
 
 	validate := func(pr gps.ProjectRoot) {
 		defer wg.Done()
-		origPR, err := sm.DeduceProjectRoot(string(pr))
+		origPR, err := sm.DeduceProjectRoot(ctx, string(pr))
 		if err != nil {
 			errorCh <- err
 		} else if origPR != pr {

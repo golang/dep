@@ -5,6 +5,7 @@
 package godep
 
 import (
+	"context"
 	"encoding/json"
 	"io/ioutil"
 	"log"
@@ -58,13 +59,13 @@ func (g *Importer) HasDepMetadata(dir string) bool {
 }
 
 // Import the config found in the directory.
-func (g *Importer) Import(dir string, pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock, error) {
+func (g *Importer) Import(ctx context.Context, dir string, pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock, error) {
 	err := g.load(dir)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	m, l := g.convert(pr)
+	m, l := g.convert(ctx, pr)
 	return m, l, nil
 }
 
@@ -86,7 +87,7 @@ func (g *Importer) load(projectDir string) error {
 	return nil
 }
 
-func (g *Importer) convert(pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock) {
+func (g *Importer) convert(ctx context.Context, pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock) {
 	g.Logger.Println("Converting from Godeps.json ...")
 
 	packages := make([]base.ImportedPackage, 0, len(g.json.Imports))
@@ -114,7 +115,7 @@ func (g *Importer) convert(pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock) {
 		packages = append(packages, ip)
 	}
 
-	g.ImportPackages(packages, true)
+	g.ImportPackages(ctx, packages, true)
 	required := make([]string, 0, len(g.json.Required))
 	for _, req := range g.json.Required {
 		if !strings.HasPrefix(req, ".") { // ignore project packages

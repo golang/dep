@@ -430,9 +430,9 @@ func (out *templateOutput) MissingLine(ms *MissingStatus) error {
 	return out.tmpl.Execute(out.w, ms)
 }
 
-func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
+func (cmd *statusCommand) Run(ctx context.Context, depCtx *dep.Ctx, args []string) error {
 	if cmd.examples {
-		ctx.Err.Println(strings.TrimSpace(statusExamples))
+		depCtx.Err.Println(strings.TrimSpace(statusExamples))
 		return nil
 	}
 
@@ -440,19 +440,19 @@ func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
 		return err
 	}
 
-	p, err := ctx.LoadProject()
+	p, err := depCtx.LoadProject()
 	if err != nil {
 		return err
 	}
 
-	sm, err := ctx.SourceManager()
+	sm, err := depCtx.SourceManager()
 	if err != nil {
 		return err
 	}
 	sm.UseDefaultSignalHandling()
 	defer sm.Release()
 
-	if err := dep.ValidateProjectRoots(ctx, p.Manifest, sm); err != nil {
+	if err := dep.ValidateProjectRoots(ctx, depCtx, p.Manifest, sm); err != nil {
 		return err
 	}
 
@@ -504,21 +504,21 @@ func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
 		if _, ok := out.(oldOutputter); !ok {
 			return errors.Errorf("invalid output format used")
 		}
-		err = cmd.runOld(ctx, out.(oldOutputter), p, sm)
-		ctx.Out.Print(buf.String())
+		err = cmd.runOld(ctx, depCtx, out.(oldOutputter), p, sm)
+		depCtx.Out.Print(buf.String())
 		return err
 	}
 
-	_, errCount, runerr := cmd.runStatusAll(ctx, out, p, sm)
+	_, errCount, runerr := cmd.runStatusAll(ctx, depCtx, out, p, sm)
 	if runerr != nil {
 		switch runerr {
 		case errFailedUpdate:
 			// Print the help when in non-verbose mode
-			if !ctx.Verbose {
-				ctx.Out.Printf("The status of %d projects are unknown due to errors. Rerun with `-v` flag to see details.\n", errCount)
+			if !depCtx.Verbose {
+				depCtx.Out.Printf("The status of %d projects are unknown due to errors. Rerun with `-v` flag to see details.\n", errCount)
 			}
 		case errInputDigestMismatch:
-			ctx.Err.Printf("Gopkg.lock is out of sync with imports and/or Gopkg.toml. Run `dep check` for details.\n")
+			depCtx.Err.Printf("Gopkg.lock is out of sync with imports and/or Gopkg.toml. Run `dep check` for details.\n")
 		default:
 			return runerr
 		}
@@ -526,7 +526,7 @@ func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
 
 	if cmd.outFilePath == "" {
 		// Print the status output
-		ctx.Out.Print(buf.String())
+		depCtx.Out.Print(buf.String())
 	} else {
 		file, err := os.Create(cmd.outFilePath)
 		if err != nil {
@@ -638,7 +638,7 @@ func (os OldStatus) marshalJSON() *rawOldStatus {
 	}
 }
 
-func (cmd *statusCommand) runOld(ctx *dep.Ctx, out oldOutputter, p *dep.Project, sm gps.SourceManager) error {
+func (cmd *statusCommand) runOld(ctx context.Context, depCtx *dep.Ctx, out oldOutputter, p *dep.Project, sm gps.SourceManager) error {
 	// While the network churns on ListVersions() requests, statically analyze
 	// code from the current project.
 	ptree := p.RootPackageTree
@@ -652,9 +652,9 @@ func (cmd *statusCommand) runOld(ctx *dep.Ctx, out oldOutputter, p *dep.Project,
 		// Locks aren't a part of the input hash check, so we can omit it.
 	}
 
-	logger := ctx.Err
-	if ctx.Verbose {
-		params.TraceLogger = ctx.Err
+	logger := depCtx.Err
+	if depCtx.Verbose {
+		params.TraceLogger = depCtx.Err
 	} else {
 		logger = log.New(ioutil.Discard, "", 0)
 	}
@@ -668,7 +668,7 @@ func (cmd *statusCommand) runOld(ctx *dep.Ctx, out oldOutputter, p *dep.Project,
 	}
 
 	logger.Println("Solving dependency graph to determine which dependencies can be updated.")
-	solution, err := solver.Solve(context.TODO())
+	solution, err := solver.Solve(ctx)
 	if err != nil {
 		return errors.Wrap(err, "runOld")
 	}
@@ -885,7 +885,7 @@ type MissingStatus struct {
 	MissingPackages []string
 }
 
-func (cmd *statusCommand) runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceManager) (hasMissingPkgs bool, errCount int, err error) {
+func (cmd *statusCommand) runStatusAll(ctx context.Context, depCtx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceManager) (hasMissingPkgs bool, errCount int, err error) {
 	// While the network churns on ListVersions() requests, statically analyze
 	// code from the current project.
 	ptree := p.RootPackageTree
@@ -899,20 +899,20 @@ func (cmd *statusCommand) runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Proje
 		// Locks aren't a part of the input hash check, so we can omit it.
 	}
 
-	logger := ctx.Err
-	if ctx.Verbose {
-		params.TraceLogger = ctx.Err
+	logger := depCtx.Err
+	if depCtx.Verbose {
+		params.TraceLogger = depCtx.Err
 	} else {
 		logger = log.New(ioutil.Discard, "", 0)
 	}
 
-	if err := ctx.ValidateParams(sm, params); err != nil {
+	if err := depCtx.ValidateParams(ctx, sm, params); err != nil {
 		return false, 0, err
 	}
 
 	// Errors while collecting constraints should not fail the whole status run.
 	// It should count the error and tell the user about incomplete results.
-	cm, ccerrs := collectConstraints(ctx, p, sm)
+	cm, ccerrs := collectConstraints(ctx, depCtx, p, sm)
 	if len(ccerrs) > 0 {
 		errCount += len(ccerrs)
 	}
@@ -961,7 +961,7 @@ func (cmd *statusCommand) runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Proje
 				// in order to avoid slower status process.
 				switch out.(type) {
 				case *dotOutput:
-					ptr, err := sm.ListPackages(proj.Ident(), proj.Version())
+					ptr, err := sm.ListPackages(ctx, proj.Ident(), proj.Version())
 
 					if err != nil {
 						bs.hasError = true
@@ -1016,7 +1016,7 @@ func (cmd *statusCommand) runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Proje
 					// transitive project deps will always show "any" here.
 					bs.Constraint = c.Constraint
 
-					vl, err := sm.ListVersions(proj.Ident())
+					vl, err := sm.ListVersions(ctx, proj.Ident())
 					if err == nil {
 						gps.SortPairedForUpgrade(vl)
 
@@ -1070,11 +1070,11 @@ func (cmd *statusCommand) runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Proje
 		// List Packages errors. This would happen only for dot output.
 		if len(errListPkgCh) > 0 {
 			err = errFailedListPkg
-			if ctx.Verbose {
+			if depCtx.Verbose {
 				for err := range errListPkgCh {
-					ctx.Err.Println(err.Error())
+					depCtx.Err.Println(err.Error())
 				}
-				ctx.Err.Println()
+				depCtx.Err.Println()
 			}
 		}
 
@@ -1089,11 +1089,11 @@ func (cmd *statusCommand) runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Proje
 			// Count ListVersions error because we get partial results when
 			// this happens.
 			errCount += len(errListVerCh)
-			if ctx.Verbose {
+			if depCtx.Verbose {
 				for err := range errListVerCh {
-					ctx.Err.Println(err.Error())
+					depCtx.Err.Println(err.Error())
 				}
-				ctx.Err.Println()
+				depCtx.Err.Println()
 			}
 		}
 
@@ -1137,7 +1137,7 @@ func (cmd *statusCommand) runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Proje
 	}
 	var errs []fail
 	for _, e := range external {
-		root, err := sm.DeduceProjectRoot(e)
+		root, err := sm.DeduceProjectRoot(ctx, e)
 		if err != nil {
 			errs = append(errs, fail{
 				ex:  e,
@@ -1153,9 +1153,9 @@ func (cmd *statusCommand) runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Proje
 		// TODO this is just a fix quick so staticcheck doesn't complain.
 		// Visually reconciling failure to deduce project roots with the rest of
 		// the mismatch output is a larger problem.
-		ctx.Err.Printf("Failed to deduce project roots for import paths:\n")
+		depCtx.Err.Printf("Failed to deduce project roots for import paths:\n")
 		for _, fail := range errs {
-			ctx.Err.Printf("\t%s: %s\n", fail.ex, fail.err.Error())
+			depCtx.Err.Printf("\t%s: %s\n", fail.ex, fail.err.Error())
 		}
 
 		return false, 0, errors.New("address issues with undeducible import paths to get more status information")
@@ -1290,9 +1290,9 @@ type constraintsCollection map[string][]projectConstraint
 // collectConstraints collects constraints declared by all the dependencies and
 // constraints from the root project. It returns constraintsCollection and
 // a slice of errors encountered while collecting the constraints, if any.
-func collectConstraints(ctx *dep.Ctx, p *dep.Project, sm gps.SourceManager) (constraintsCollection, []error) {
-	logger := ctx.Err
-	if !ctx.Verbose {
+func collectConstraints(ctx context.Context, depCtx *dep.Ctx, p *dep.Project, sm gps.SourceManager) (constraintsCollection, []error) {
+	logger := depCtx.Err
+	if !depCtx.Verbose {
 		logger = log.New(ioutil.Discard, "", 0)
 	}
 
@@ -1303,14 +1303,14 @@ func collectConstraints(ctx *dep.Ctx, p *dep.Project, sm gps.SourceManager) (con
 
 	// Collect the complete set of direct project dependencies, incorporating
 	// requireds and ignores appropriately.
-	directDeps, err := p.GetDirectDependencyNames(sm)
+	directDeps, err := p.GetDirectDependencyNames(ctx, sm)
 	if err != nil {
 		// Return empty collection, not nil, if we fail here.
 		return constraintCollection, []error{errors.Wrap(err, "failed to get direct dependencies")}
 	}
 
 	// Create a root analyzer.
-	rootAnalyzer := newRootAnalyzer(true, ctx, directDeps, sm)
+	rootAnalyzer := newRootAnalyzer(true, depCtx, directDeps, sm)
 
 	lp := p.Lock.Projects()
 
@@ -1327,7 +1327,7 @@ func collectConstraints(ctx *dep.Ctx, p *dep.Project, sm gps.SourceManager) (con
 		go func(proj gps.LockedProject) {
 			defer wg.Done()
 
-			manifest, _, err := sm.GetManifestAndLock(proj.Ident(), proj.Version(), rootAnalyzer)
+			manifest, _, err := sm.GetManifestAndLock(ctx, proj.Ident(), proj.Version(), rootAnalyzer)
 			if err != nil {
 				errCh <- errors.Wrap(err, "error getting manifest and lock")
 				return

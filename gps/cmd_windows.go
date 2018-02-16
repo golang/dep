@@ -9,10 +9,15 @@ import (
 	"os/exec"
 )
 
-type cmd struct {
-	*exec.Cmd
+func commandContext(ctx context.Context, name string, arg ...string) cmd {
+	return cmd{ctx: ctx, Cmd: exec.CommandContext(ctx, name, arg...)}
 }
 
-func commandContext(ctx context.Context, name string, arg ...string) cmd {
-	return cmd{Cmd: exec.CommandContext(ctx, name, arg...)}
+func (c cmd) CombinedOutput() ([]byte, error) {
+	if release, err := c.acquire(); err != nil {
+		return nil, err
+	} else if release != nil {
+		defer release()
+	}
+	return c.Cmd.CombinedOutput()
 }

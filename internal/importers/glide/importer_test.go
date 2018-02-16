@@ -6,6 +6,7 @@ package glide
 
 import (
 	"bytes"
+	"context"
 	"log"
 	"path/filepath"
 	"testing"
@@ -156,6 +157,7 @@ func TestGlideConfig_Convert(t *testing.T) {
 		},
 	}
 
+	ctx := context.Background()
 	for name, testCase := range testCases {
 		name := name
 		testCase := testCase
@@ -164,7 +166,7 @@ func TestGlideConfig_Convert(t *testing.T) {
 				g := NewImporter(logger, true, sm)
 				g.glideConfig = testCase.yaml
 				g.glideLock = testCase.lock
-				return g.convert(importertest.RootProject)
+				return g.convert(ctx, importertest.RootProject)
 			})
 			if err != nil {
 				t.Fatalf("%#v", err)
@@ -196,7 +198,7 @@ func TestGlideConfig_Import(t *testing.T) {
 		t.Fatal("Expected the importer to detect the glide configuration files")
 	}
 
-	m, l, err := g.Import(projectRoot, importertest.RootProject)
+	m, l, err := g.Import(context.Background(), projectRoot, importertest.RootProject)
 	h.Must(err)
 
 	if m == nil {

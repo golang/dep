@@ -75,7 +75,7 @@ const concurrentWriters = 16
 // passed manifest.
 //
 // If onWrite is not nil, it will be called after each project write. Calls are ordered and atomic.
-func WriteDepTree(basedir string, l Lock, sm SourceManager, co CascadingPruneOptions, onWrite func(WriteProgress)) error {
+func WriteDepTree(ctx context.Context, basedir string, l Lock, sm SourceManager, co CascadingPruneOptions, onWrite func(WriteProgress)) error {
 	if l == nil {
 		return fmt.Errorf("must provide non-nil Lock to WriteDepTree")
 	}
@@ -84,7 +84,7 @@ func WriteDepTree(basedir string, l Lock, sm SourceManager, co CascadingPruneOpt
 		return err
 	}
 
-	g, ctx := errgroup.WithContext(context.TODO())
+	g, ctx := errgroup.WithContext(ctx)
 	lps := l.Projects()
 	sem := make(chan struct{}, concurrentWriters)
 	var cnt struct {

@@ -18,12 +18,7 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-type cmd struct {
-	// ctx is provided by the caller; SIGINT is sent when it is cancelled.
-	ctx context.Context
-	Cmd *exec.Cmd
-}
-
+// SIGINT is sent when ctx is cancelled.
 func commandContext(ctx context.Context, name string, arg ...string) cmd {
 	c := exec.Command(name, arg...)
 
@@ -44,6 +39,11 @@ func commandContext(ctx context.Context, name string, arg ...string) cmd {
 // terminates subprocesses gently (via os.Interrupt), but resorts to Kill if
 // the subprocess fails to exit after 1 minute.
 func (c cmd) CombinedOutput() ([]byte, error) {
+	if release, err := c.acquire(); err != nil {
+		return nil, err
+	} else if release != nil {
+		defer release()
+	}
 	// Adapted from (*os/exec.Cmd).CombinedOutput
 	if c.Cmd.Stdout != nil {
 		return nil, errors.New("exec: Stdout already set")

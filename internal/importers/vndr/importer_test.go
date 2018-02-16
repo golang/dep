@@ -6,6 +6,7 @@ package vndr
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"log"
 	"path/filepath"
@@ -58,6 +59,7 @@ func TestVndrConfig_Convert(t *testing.T) {
 		},
 	}
 
+	ctx := context.Background()
 	for name, testCase := range testCases {
 		name := name
 		testCase := testCase
@@ -65,7 +67,7 @@ func TestVndrConfig_Convert(t *testing.T) {
 			err := testCase.Execute(t, func(logger *log.Logger, sm gps.SourceManager) (*dep.Manifest, *dep.Lock) {
 				g := NewImporter(logger, true, sm)
 				g.packages = testCase.packages
-				return g.convert(importertest.RootProject)
+				return g.convert(ctx, importertest.RootProject)
 			})
 			if err != nil {
 				t.Fatalf("%#v", err)
@@ -95,7 +97,7 @@ func TestVndrConfig_Import(t *testing.T) {
 		t.Fatal("Expected the importer to detect vndr configuration file")
 	}
 
-	m, l, err := v.Import(projectRoot, importertest.RootProject)
+	m, l, err := v.Import(context.Background(), projectRoot, importertest.RootProject)
 	h.Must(err)
 
 	wantM := dep.NewManifest()

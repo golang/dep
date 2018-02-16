@@ -5,6 +5,7 @@
 package gps
 
 import (
+	"context"
 	"io/ioutil"
 	"log"
 	"math/rand"
@@ -207,6 +208,7 @@ func TestValidateParams(t *testing.T) {
 		},
 	}
 
+	ctx := context.Background()
 	for _, tc := range testcases {
 		params.RootPackageTree.Packages = map[string]pkgtree.PackageOrErr{
 			"github.com/sdboyer/dep": {
@@ -218,7 +220,7 @@ func TestValidateParams(t *testing.T) {
 			},
 		}
 
-		err = ValidateParams(params, sm)
+		err = ValidateParams(ctx, params, sm)
 		if tc.err && err == nil {
 			t.Fatalf("expected an error when deducing package fails, got none")
 		} else if !tc.err && err != nil {

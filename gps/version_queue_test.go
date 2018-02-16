@@ -5,6 +5,7 @@
 package gps
 
 import (
+	"context"
 	"testing"
 
 	"github.com/pkg/errors"
@@ -28,7 +29,7 @@ func init() {
 	SortForUpgrade(fakevl)
 }
 
-func (fb *fakeBridge) listVersions(id ProjectIdentifier) ([]Version, error) {
+func (fb *fakeBridge) listVersions(ctx context.Context, id ProjectIdentifier) ([]Version, error) {
 	// it's a fixture, we only ever do the one, regardless of id
 	return fb.vl, nil
 }
@@ -39,7 +40,7 @@ type fakeFailBridge struct {
 
 var errVQ = errors.New("vqerr")
 
-func (fb *fakeFailBridge) listVersions(id ProjectIdentifier) ([]Version, error) {
+func (fb *fakeFailBridge) listVersions(ctx context.Context, id ProjectIdentifier) ([]Version, error) {
 	return nil, errVQ
 }
 
@@ -50,12 +51,13 @@ func TestVersionQueueSetup(t *testing.T) {
 	fb := &fakeBridge{vl: fakevl}
 	ffb := &fakeFailBridge{}
 
-	_, err := newVersionQueue(id, nil, nil, ffb)
+	ctx := context.Background()
+	_, err := newVersionQueue(ctx, id, nil, nil, ffb)
 	if err == nil {
 		t.Error("Expected err when providing no prefv or lockv, and injected bridge returns err from ListVersions()")
 	}
 
-	vq, err := newVersionQueue(id, nil, nil, fb)
+	vq, err := newVersionQueue(ctx, id, nil, nil, fb)
 	if err != nil {
 		t.Errorf("Unexpected err on vq create: %s", err)
 	} else {
@@ -76,7 +78,7 @@ func TestVersionQueueSetup(t *testing.T) {
 
 	lockv := fakevl[0]
 	prefv := fakevl[1]
-	vq, err = newVersionQueue(id, lockv, nil, fb)
+	vq, err = newVersionQueue(ctx, id, lockv, nil, fb)
 	if err != nil {
 		t.Errorf("Unexpected err on vq create: %s", err)
 	} else {
@@ -94,7 +96,7 @@ func TestVersionQueueSetup(t *testing.T) {
 		}
 	}
 
-	vq, err = newVersionQueue(id, nil, prefv, fb)
+	vq, err = newVersionQueue(ctx, id, nil, prefv, fb)
 	if err != nil {
 		t.Errorf("Unexpected err on vq create: %s", err)
 	} else {
@@ -112,7 +114,7 @@ func TestVersionQueueSetup(t *testing.T) {
 		}
 	}
 
-	vq, err = newVersionQueue(id, lockv, prefv, fb)
+	vq, err = newVersionQueue(ctx, id, lockv, prefv, fb)
 	if err != nil {
 		t.Errorf("Unexpected err on vq create: %s", err)
 	} else {
@@ -138,14 +140,15 @@ func TestVersionQueueAdvance(t *testing.T) {
 	fb := &fakeBridge{vl: fakevl}
 	id := ProjectIdentifier{ProjectRoot: ProjectRoot("foo")}.normalize()
 
+	ctx := context.Background()
 	// First with no prefv or lockv
-	vq, err := newVersionQueue(id, nil, nil, fb)
+	vq, err := newVersionQueue(ctx, id, nil, nil, fb)
 	if err != nil {
 		t.Fatalf("Unexpected err on vq create: %s", err)
 	}
 
 	for k, v := range fakevl[1:] {
-		err = vq.advance(errors.Errorf("advancment fail for %s", fakevl[k]))
+		err = vq.advance(ctx, errors.Errorf("advancment fail for %s", fakevl[k]))
 		if err != nil {
 			t.Errorf("error on advancing vq from %s to %s", fakevl[k], v)
 			break
@@ -159,7 +162,7 @@ func TestVersionQueueAdvance(t *testing.T) {
 	if vq.isExhausted() {
 		t.Error("should not be exhausted until advancing 'past' the end")
 	}
-	if err = vq.advance(errors.Errorf("final advance failure")); err != nil {
+	if err = vq.advance(ctx, errors.Errorf("final advance failure")); err != nil {
 		t.Errorf("should not error on advance, even past end, but got %s", err)
 	}
 
@@ -173,7 +176,7 @@ func TestVersionQueueAdvance(t *testing.T) {
 	// now, do one with both a prefv and lockv
 	lockv := fakevl[2]
 	prefv := fakevl[0]
-	vq, err = newVersionQueue(id, lockv, prefv, fb)
+	vq, err = newVersionQueue(ctx, id, lockv, prefv, fb)
 	if err != nil {
 		t.Errorf("error creating version queue: %v", err)
 	}
@@ -184,7 +187,7 @@ func TestVersionQueueAdvance(t *testing.T) {
 		t.Error("can't be exhausted, we aren't even 'allLoaded' yet")
 	}
 
-	err = vq.advance(errors.Errorf("dequeue lockv"))
+	err = vq.advance(ctx, errors.Errorf("dequeue lockv"))
 	if err != nil {
 		t.Error("unexpected error when advancing past lockv", err)
 	} else {
@@ -196,7 +199,7 @@ func TestVersionQueueAdvance(t *testing.T) {
 		}
 	}
 
-	err = vq.advance(errors.Errorf("dequeue prefv"))
+	err = vq.advance(ctx, errors.Errorf("dequeue prefv"))
 	if err != nil {
 		t.Error("unexpected error when advancing past prefv", err)
 	} else {
@@ -212,46 +215,46 @@ func TestVersionQueueAdvance(t *testing.T) {
 	}
 
 	// make sure the queue ordering is still right even with a double-delete
-	vq.advance(nil)
+	vq.advance(ctx, nil)
 	if vq.current() != fakevl[3] {
 		t.Errorf("second elem after ListVersions() should be idx 3 of fakevl (%s), got %s", fakevl[3], vq.current())
 	}
-	vq.advance(nil)
+	vq.advance(ctx, nil)
 	if vq.current() != fakevl[4] {
 		t.Errorf("third elem after ListVersions() should be idx 4 of fakevl (%s), got %s", fakevl[4], vq.current())
 	}
-	vq.advance(nil)
+	vq.advance(ctx, nil)
 	if vq.current() != nil || !vq.isExhausted() {
 		t.Error("should be out of versions in the queue")
 	}
 
 	// Make sure we handle things correctly when listVersions adds nothing new
 	fb = &fakeBridge{vl: []Version{lockv, prefv}}
-	vq, err = newVersionQueue(id, lockv, prefv, fb)
+	vq, err = newVersionQueue(ctx, id, lockv, prefv, fb)
 	if err != nil {
 		t.Errorf("error creating version queue: %v", err)
 	}
-	vq.advance(nil)
-	vq.advance(nil)
+	vq.advance(ctx, nil)
+	vq.advance(ctx, nil)
 	if vq.current() != nil || !vq.isExhausted() {
 		t.Errorf("should have no versions left, as ListVersions() added nothing new, but still have %s", vq.String())
 	}
-	err = vq.advance(nil)
+	err = vq.advance(ctx, nil)
 	if err != nil {
 		t.Errorf("should be fine to advance on empty queue, per docs, but got err %s", err)
 	}
 
 	// Also handle it well when advancing calls ListVersions() and it gets an
 	// error
-	vq, err = newVersionQueue(id, lockv, nil, &fakeFailBridge{})
+	vq, err = newVersionQueue(ctx, id, lockv, nil, &fakeFailBridge{})
 	if err != nil {
 		t.Errorf("should not err on creation when preseeded with lockv, but got err %s", err)
 	}
-	err = vq.advance(nil)
+	err = vq.advance(ctx, nil)
 	if err == nil {
 		t.Error("advancing should trigger call to erroring bridge, but no err")
 	}
-	err = vq.advance(nil)
+	err = vq.advance(ctx, nil)
 	if err == nil {
 		t.Error("err should be stored for reuse on any subsequent calls")
 	}

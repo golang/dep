@@ -5,6 +5,7 @@
 package gps
 
 import (
+	"context"
 	"fmt"
 	"strings"
 )
@@ -25,7 +26,7 @@ type versionQueue struct {
 	adverr       error
 }
 
-func newVersionQueue(id ProjectIdentifier, lockv, prefv Version, b sourceBridge) (*versionQueue, error) {
+func newVersionQueue(ctx context.Context, id ProjectIdentifier, lockv, prefv Version, b sourceBridge) (*versionQueue, error) {
 	vq := &versionQueue{
 		id: id,
 		b:  b,
@@ -45,7 +46,7 @@ func newVersionQueue(id ProjectIdentifier, lockv, prefv Version, b sourceBridge)
 
 	if len(vq.pi) == 0 {
 		var err error
-		vq.pi, err = vq.b.listVersions(vq.id)
+		vq.pi, err = vq.b.listVersions(ctx, vq.id)
 		if err != nil {
 			// TODO(sdboyer) pushing this error this early entails that we
 			// unconditionally deep scan (e.g. vendor), as well as hitting the
@@ -68,7 +69,7 @@ func (vq *versionQueue) current() Version {
 
 // advance moves the versionQueue forward to the next available version,
 // recording the failure that eliminated the current version.
-func (vq *versionQueue) advance(fail error) error {
+func (vq *versionQueue) advance(ctx context.Context, fail error) error {
 	// Nothing in the queue means...nothing in the queue, nicely enough
 	if vq.adverr != nil || len(vq.pi) == 0 { // should be a redundant check, but just in case
 		return vq.adverr
@@ -91,7 +92,7 @@ func (vq *versionQueue) advance(fail error) error {
 		vq.allLoaded = true
 
 		var vltmp []Version
-		vltmp, vq.adverr = vq.b.listVersions(vq.id)
+		vltmp, vq.adverr = vq.b.listVersions(ctx, vq.id)
 		if vq.adverr != nil {
 			return vq.adverr
 		}

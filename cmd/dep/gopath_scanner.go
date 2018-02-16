@@ -5,6 +5,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -44,11 +45,11 @@ func newGopathScanner(ctx *dep.Ctx, directDeps map[gps.ProjectRoot]bool, sm gps.
 // at path, with the root import path importRoot, to determine the project's
 // constraints. Respect any initial constraints defined in the root manifest and
 // lock.
-func (g *gopathScanner) InitializeRootManifestAndLock(rootM *dep.Manifest, rootL *dep.Lock) error {
+func (g *gopathScanner) InitializeRootManifestAndLock(ctx context.Context, rootM *dep.Manifest, rootL *dep.Lock) error {
 	var err error
 
 	g.ctx.Err.Println("Searching GOPATH for projects...")
-	g.pd, err = g.scanGopathForDependencies()
+	g.pd, err = g.scanGopathForDependencies(ctx)
 	if err != nil {
 		return err
 	}
@@ -200,7 +201,7 @@ type projectData struct {
 	ondisk       map[gps.ProjectRoot]gps.Version // projects that were found on disk
 }
 
-func (g *gopathScanner) scanGopathForDependencies() (projectData, error) {
+func (g *gopathScanner) scanGopathForDependencies(ctx context.Context) (projectData, error) {
 	constraints := make(gps.ProjectConstraints)
 	dependencies := make(map[gps.ProjectRoot][]string)
 	packages := make(map[string]bool)
@@ -210,7 +211,7 @@ func (g *gopathScanner) scanGopathForDependencies() (projectData, error) {
 
 	var syncDepGroup sync.WaitGroup
 	syncDep := func(pr gps.ProjectRoot, sm gps.SourceManager) {
-		if err := sm.SyncSourceFor(gps.ProjectIdentifier{ProjectRoot: pr}); err != nil {
+		if err := sm.SyncSourceFor(ctx, gps.ProjectIdentifier{ProjectRoot: pr}); err != nil {
 			g.ctx.Err.Printf("%+v", errors.Wrapf(err, "Unable to cache %s", pr))
 		}
 		syncDepGroup.Done()
@@ -224,7 +225,7 @@ func (g *gopathScanner) scanGopathForDependencies() (projectData, error) {
 		// TODO(sdboyer) these are not import paths by this point, they've
 		// already been worked down to project roots.
 		ip := string(ippr)
-		pr, err := g.sm.DeduceProjectRoot(ip)
+		pr, err := g.sm.DeduceProjectRoot(ctx, ip)
 		if err != nil {
 			return projectData{}, errors.Wrap(err, "sm.DeduceProjectRoot")
 		}
@@ -277,7 +278,7 @@ func (g *gopathScanner) scanGopathForDependencies() (projectData, error) {
 		case white:
 			colors[pkg] = grey
 
-			pr, err := g.sm.DeduceProjectRoot(pkg)
+			pr, err := g.sm.DeduceProjectRoot(ctx, pkg)
 			if err != nil {
 				return errors.Wrap(err, "could not deduce project root for "+pkg)
 			}

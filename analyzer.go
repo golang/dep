@@ -5,6 +5,7 @@
 package dep
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 
@@ -24,7 +25,7 @@ func (a Analyzer) HasDepMetadata(path string) bool {
 
 // DeriveManifestAndLock reads and returns the manifest at path/ManifestName or nil if one is not found.
 // The Lock is always nil for now.
-func (a Analyzer) DeriveManifestAndLock(path string, n gps.ProjectRoot) (gps.Manifest, gps.Lock, error) {
+func (a Analyzer) DeriveManifestAndLock(ctx context.Context, path string, n gps.ProjectRoot) (gps.Manifest, gps.Lock, error) {
 	if !a.HasDepMetadata(path) {
 		return nil, nil, nil
 	}

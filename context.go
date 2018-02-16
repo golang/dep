@@ -5,6 +5,7 @@
 package dep
 
 import (
+	"context"
 	"log"
 	"os"
 	"path/filepath"
@@ -345,8 +346,8 @@ func (c *Ctx) AbsForImport(path string) (string, error) {
 }
 
 // ValidateParams ensure that solving can be completed with the specified params.
-func (c *Ctx) ValidateParams(sm gps.SourceManager, params gps.SolveParameters) error {
-	err := gps.ValidateParams(params, sm)
+func (c *Ctx) ValidateParams(ctx context.Context, sm gps.SourceManager, params gps.SolveParameters) error {
+	err := gps.ValidateParams(ctx, params, sm)
 	if err != nil {
 		if deduceErrs, ok := err.(gps.DeductionErrs); ok {
 			c.Err.Println("The following errors occurred while deducing packages:")

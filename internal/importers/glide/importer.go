@@ -6,6 +6,7 @@ package glide
 
 import (
 	"bytes"
+	"context"
 	"io/ioutil"
 	"log"
 	"os"
@@ -83,13 +84,13 @@ func (g *Importer) HasDepMetadata(dir string) bool {
 }
 
 // Import the config found in the directory.
-func (g *Importer) Import(dir string, pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock, error) {
+func (g *Importer) Import(ctx context.Context, dir string, pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock, error) {
 	err := g.load(dir)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	m, l := g.convert(pr)
+	m, l := g.convert(ctx, pr)
 	return m, l, nil
 }
 
@@ -135,7 +136,7 @@ func (g *Importer) load(projectDir string) error {
 }
 
 // convert the glide configuration files into dep configuration files.
-func (g *Importer) convert(pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock) {
+func (g *Importer) convert(ctx context.Context, pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock) {
 	projectName := string(pr)
 
 	task := bytes.NewBufferString("Converting from glide.yaml")
@@ -192,7 +193,7 @@ func (g *Importer) convert(pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock) {
 		packages = append(packages, ip)
 	}
 
-	g.ImportPackages(packages, false)
+	g.ImportPackages(ctx, packages, false)
 
 	// Ignores
 	g.Manifest.Ignored = append(g.Manifest.Ignored, g.glideConfig.Ignores...)

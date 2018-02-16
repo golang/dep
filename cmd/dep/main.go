@@ -8,6 +8,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"flag"
 	"fmt"
 	"io"
@@ -16,11 +17,13 @@ import (
 	"path/filepath"
 	"runtime"
 	"runtime/pprof"
+	"strconv"
 	"strings"
 	"text/tabwriter"
 	"time"
 
 	"github.com/golang/dep"
+	"github.com/golang/dep/gps"
 	"github.com/golang/dep/internal/fs"
 )
 
@@ -36,7 +39,7 @@ type command interface {
 	LongHelp() string       // "Foo the first bar meeting the following conditions..."
 	Register(*flag.FlagSet) // command-specific flags
 	Hidden() bool           // indicates whether the command should be hidden from help output
-	Run(*dep.Ctx, []string) error
+	Run(context.Context, *dep.Ctx, []string) error
 }
 
 // Helper type so that commands can fail without generating any additional
@@ -81,7 +84,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "failed to profile: %v\n", err)
 		os.Exit(1)
 	}
-	exit := c.Run()
+	exit := c.Run(context.Background())
 	if err := p.finish(); err != nil {
 		fmt.Fprintf(os.Stderr, "failed to finish the profile: %v\n", err)
 		os.Exit(1)
@@ -98,7 +101,7 @@ type Config struct {
 }
 
 // Run executes a configuration and returns an exit code.
-func (c *Config) Run() int {
+func (c *Config) Run(ctx context.Context) int {
 	commands := commandList()
 
 	cmdName, printCommandHelp, exit := parseArgs(c.Args)
@@ -196,7 +199,7 @@ func (c *Config) Run() int {
 			}
 
 			// Set up dep context.
-			ctx := &dep.Ctx{
+			depCtx := &dep.Ctx{
 				Out:            outLogger,
 				Err:            errLogger,
 				Verbose:        verbose,
@@ -204,12 +207,24 @@ func (c *Config) Run() int {
 				Cachedir:       cachedir,
 				CacheAge:       cacheAge,
 			}
+			if v := getEnv(c.Env, "DEPMAXSUBPROCS"); v != "" {
+				i, err := strconv.Atoi(v)
+				if err != nil {
+					errLogger.Printf("dep: $DEPMAXSUBPROCS (%s) must be a positive integer: %v\n", v, err)
+					return errorExitCode
+				}
+				ctx, err = gps.CtxWithCmdLimit(ctx, i)
+				if err != nil {
+					errLogger.Printf("dep: failed to initialize $DEPMAXSUBPROCS: %v\n", err)
+					return errorExitCode
+				}
+			}
 
 			GOPATHS := filepath.SplitList(getEnv(c.Env, "GOPATH"))
-			ctx.SetPaths(c.WorkingDir, GOPATHS...)
+			depCtx.SetPaths(c.WorkingDir, GOPATHS...)
 
 			// Run the command with the post-flag-processing args.
-			if err := cmd.Run(ctx, flags.Args()); err != nil {
+			if err := cmd.Run(ctx, depCtx, flags.Args()); err != nil {
 				if _, ok := err.(silentfail); !ok {
 					errLogger.Printf("%v\n", err)
 				}

@@ -29,7 +29,7 @@ import (
 // interpret this as open/Any constraints on everything in the import graph.
 type naiveAnalyzer struct{}
 
-func (naiveAnalyzer) DeriveManifestAndLock(string, ProjectRoot) (Manifest, Lock, error) {
+func (naiveAnalyzer) DeriveManifestAndLock(context.Context, string, ProjectRoot) (Manifest, Lock, error) {
 	return nil, nil, nil
 }
 
@@ -168,7 +168,8 @@ func TestSourceInit(t *testing.T) {
 	}()
 
 	id := mkPI("github.com/sdboyer/gpkt").normalize()
-	pvl, err := sm.ListVersions(id)
+	ctx := context.Background()
+	pvl, err := sm.ListVersions(ctx, id)
 	if err != nil {
 		t.Errorf("Unexpected error during initial project setup/fetching %s", err)
 	}
@@ -206,7 +207,7 @@ func TestSourceInit(t *testing.T) {
 		s:      &solver{mtr: newMetrics()},
 	}
 
-	vl, err := smc.listVersions(id)
+	vl, err := smc.listVersions(ctx, id)
 	if err != nil {
 		t.Errorf("Unexpected error during initial project setup/fetching %s", err)
 	}
@@ -244,7 +245,7 @@ func TestSourceInit(t *testing.T) {
 		}
 	}
 
-	present, err := smc.RevisionPresentIn(id, Revision("4a54adf81c75375d26d376459c00d5ff9b703e5e"))
+	present, err := smc.RevisionPresentIn(ctx, id, Revision("4a54adf81c75375d26d376459c00d5ff9b703e5e"))
 	if err != nil {
 		t.Errorf("Should have found revision in source, but got err: %s", err)
 	} else if !present {
@@ -252,7 +253,7 @@ func TestSourceInit(t *testing.T) {
 	}
 
 	// SyncSourceFor will ensure we have everything
-	err = smc.SyncSourceFor(id)
+	err = smc.SyncSourceFor(ctx, id)
 	if err != nil {
 		t.Errorf("SyncSourceFor failed with unexpected error: %s", err)
 	}
@@ -267,7 +268,7 @@ func TestSourceInit(t *testing.T) {
 
 	// Ensure source existence values are what we expect
 	var exists bool
-	exists, err = sm.SourceExists(id)
+	exists, err = sm.SourceExists(ctx, id)
 	if err != nil {
 		t.Errorf("Error on checking SourceExists: %s", err)
 	}
@@ -285,7 +286,7 @@ func TestDefaultBranchAssignment(t *testing.T) {
 	defer clean()
 
 	id := mkPI("github.com/sdboyer/test-multibranch")
-	v, err := sm.ListVersions(id)
+	v, err := sm.ListVersions(context.Background(), id)
 	if err != nil {
 		t.Errorf("Unexpected error during initial project setup/fetching %s", err)
 	}
@@ -327,26 +328,27 @@ func TestMgrMethodsFailWithBadPath(t *testing.T) {
 	sm, clean := mkNaiveSM(t)
 	defer clean()
 
+	ctx := context.Background()
 	var err error
-	if _, err = sm.SourceExists(bad); err == nil {
+	if _, err = sm.SourceExists(ctx, bad); err == nil {
 		t.Error("SourceExists() did not error on bad input")
 	}
-	if err = sm.SyncSourceFor(bad); err == nil {
+	if err = sm.SyncSourceFor(ctx, bad); err == nil {
 		t.Error("SyncSourceFor() did not error on bad input")
 	}
-	if _, err = sm.ListVersions(bad); err == nil {
+	if _, err = sm.ListVersions(ctx, bad); err == nil {
 		t.Error("ListVersions() did not error on bad input")
 	}
-	if _, err = sm.RevisionPresentIn(bad, Revision("")); err == nil {
+	if _, err = sm.RevisionPresentIn(ctx, bad, Revision("")); err == nil {
 		t.Error("RevisionPresentIn() did not error on bad input")
 	}
-	if _, err = sm.ListPackages(bad, nil); err == nil {
+	if _, err = sm.ListPackages(ctx, bad, nil); err == nil {
 		t.Error("ListPackages() did not error on bad input")
 	}
-	if _, _, err = sm.GetManifestAndLock(bad, nil, naiveAnalyzer{}); err == nil {
+	if _, _, err = sm.GetManifestAndLock(ctx, bad, nil, naiveAnalyzer{}); err == nil {
 		t.Error("GetManifestAndLock() did not error on bad input")
 	}
-	if err = sm.ExportProject(context.Background(), bad, nil, ""); err == nil {
+	if err = sm.ExportProject(ctx, bad, nil, ""); err == nil {
 		t.Error("ExportProject() did not error on bad input")
 	}
 }
@@ -361,8 +363,9 @@ func (f sourceCreationTestFixture) run(t *testing.T) {
 	sm, clean := mkNaiveSM(t)
 	defer clean()
 
+	ctx := context.Background()
 	for _, pi := range f.roots {
-		_, err := sm.SourceExists(pi)
+		_, err := sm.SourceExists(ctx, pi)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -518,19 +521,20 @@ func TestFSCaseSensitivityConvergesSources(t *testing.T) {
 		t.Skip("Skipping slow test in short mode")
 	}
 
+	ctx := context.Background()
 	f := func(name string, pi1, pi2 ProjectIdentifier) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			sm, clean := mkNaiveSM(t)
 			defer clean()
 
-			sm.SyncSourceFor(pi1)
+			sm.SyncSourceFor(ctx, pi1)
 			sg1, err := sm.srcCoord.getSourceGatewayFor(context.Background(), pi1)
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			sm.SyncSourceFor(pi2)
+			sm.SyncSourceFor(ctx, pi2)
 			sg2, err := sm.srcCoord.getSourceGatewayFor(context.Background(), pi2)
 			if err != nil {
 				t.Fatal(err)
@@ -581,12 +585,13 @@ func TestGetInfoListVersionsOrdering(t *testing.T) {
 
 	id := mkPI("github.com/sdboyer/gpkt").normalize()
 
-	_, _, err := sm.GetManifestAndLock(id, NewVersion("v1.0.0"), naiveAnalyzer{})
+	ctx := context.Background()
+	_, _, err := sm.GetManifestAndLock(ctx, id, NewVersion("v1.0.0"), naiveAnalyzer{})
 	if err != nil {
 		t.Errorf("Unexpected error from GetInfoAt %s", err)
 	}
 
-	v, err := sm.ListVersions(id)
+	v, err := sm.ListVersions(ctx, id)
 	if err != nil {
 		t.Errorf("Unexpected error from ListVersions %s", err)
 	}
@@ -600,8 +605,9 @@ func TestDeduceProjectRoot(t *testing.T) {
 	sm, clean := mkNaiveSM(t)
 	defer clean()
 
+	ctx := context.Background()
 	in := "github.com/sdboyer/gps"
-	pr, err := sm.DeduceProjectRoot(in)
+	pr, err := sm.DeduceProjectRoot(ctx, in)
 	if err != nil {
 		t.Errorf("Problem while detecting root of %q %s", in, err)
 	}
@@ -612,7 +618,7 @@ func TestDeduceProjectRoot(t *testing.T) {
 		t.Errorf("Root path trie should have one element after one deduction, has %v", sm.deduceCoord.rootxt.Len())
 	}
 
-	pr, err = sm.DeduceProjectRoot(in)
+	pr, err = sm.DeduceProjectRoot(ctx, in)
 	if err != nil {
 		t.Errorf("Problem while detecting root of %q %s", in, err)
 	} else if string(pr) != in {
@@ -624,7 +630,7 @@ func TestDeduceProjectRoot(t *testing.T) {
 
 	// Now do a subpath
 	sub := path.Join(in, "foo")
-	pr, err = sm.DeduceProjectRoot(sub)
+	pr, err = sm.DeduceProjectRoot(ctx, sub)
 	if err != nil {
 		t.Errorf("Problem while detecting root of %q %s", sub, err)
 	} else if string(pr) != in {
@@ -637,7 +643,7 @@ func TestDeduceProjectRoot(t *testing.T) {
 	// Now do a fully different root, but still on github
 	in2 := "github.com/bagel/lox"
 	sub2 := path.Join(in2, "cheese")
-	pr, err = sm.DeduceProjectRoot(sub2)
+	pr, err = sm.DeduceProjectRoot(ctx, sub2)
 	if err != nil {
 		t.Errorf("Problem while detecting root of %q %s", sub2, err)
 	} else if string(pr) != in2 {
@@ -649,7 +655,7 @@ func TestDeduceProjectRoot(t *testing.T) {
 
 	// Ensure that our prefixes are bounded by path separators
 	in4 := "github.com/bagel/loxx"
-	pr, err = sm.DeduceProjectRoot(in4)
+	pr, err = sm.DeduceProjectRoot(ctx, in4)
 	if err != nil {
 		t.Errorf("Problem while detecting root of %q %s", in4, err)
 	} else if string(pr) != in4 {
@@ -661,7 +667,7 @@ func TestDeduceProjectRoot(t *testing.T) {
 
 	// Ensure that vcs extension-based matching comes through
 	in5 := "ffffrrrraaaaaapppppdoesnotresolve.com/baz.git"
-	pr, err = sm.DeduceProjectRoot(in5)
+	pr, err = sm.DeduceProjectRoot(ctx, in5)
 	if err != nil {
 		t.Errorf("Problem while detecting root of %q %s", in5, err)
 	} else if string(pr) != in5 {
@@ -706,6 +712,7 @@ func TestMultiFetchThreadsafe(t *testing.T) {
 			ops := 4
 			cnum := len(projects) * ops * 10
 
+			ctx := context.Background()
 			for i := 0; i < cnum; i++ {
 				// Trigger all four ops on each project, then move on to the next
 				// project.
@@ -718,14 +725,14 @@ func TestMultiFetchThreadsafe(t *testing.T) {
 				case 0:
 					t.Run(fmt.Sprintf("deduce:%v:%s", opcount, id), func(t *testing.T) {
 						t.Parallel()
-						if _, err := sm.DeduceProjectRoot(string(id.ProjectRoot)); err != nil {
+						if _, err := sm.DeduceProjectRoot(ctx, string(id.ProjectRoot)); err != nil {
 							t.Error(err)
 						}
 					})
 				case 1:
 					t.Run(fmt.Sprintf("sync:%v:%s", opcount, id), func(t *testing.T) {
 						t.Parallel()
-						err := sm.SyncSourceFor(id)
+						err := sm.SyncSourceFor(ctx, id)
 						if err != nil {
 							t.Error(err)
 						}
@@ -733,7 +740,7 @@ func TestMultiFetchThreadsafe(t *testing.T) {
 				case 2:
 					t.Run(fmt.Sprintf("listVersions:%v:%s", opcount, id), func(t *testing.T) {
 						t.Parallel()
-						vl, err := sm.ListVersions(id)
+						vl, err := sm.ListVersions(ctx, id)
 						if err != nil {
 							t.Fatal(err)
 						}
@@ -744,7 +751,7 @@ func TestMultiFetchThreadsafe(t *testing.T) {
 				case 3:
 					t.Run(fmt.Sprintf("exists:%v:%s", opcount, id), func(t *testing.T) {
 						t.Parallel()
-						y, err := sm.SourceExists(id)
+						y, err := sm.SourceExists(ctx, id)
 						if err != nil {
 							t.Fatal(err)
 						}
@@ -788,12 +795,13 @@ func TestListVersionsRacey(t *testing.T) {
 	sm, clean := mkNaiveSM(t)
 	defer clean()
 
+	ctx := context.Background()
 	wg := &sync.WaitGroup{}
 	id := mkPI("github.com/sdboyer/gps")
 	for i := 0; i < 20; i++ {
 		wg.Add(1)
 		go func() {
-			_, err := sm.ListVersions(id)
+			_, err := sm.ListVersions(ctx, id)
 			if err != nil {
 				t.Errorf("listing versions failed with err %s", err.Error())
 			}
@@ -808,57 +816,58 @@ func TestErrAfterRelease(t *testing.T) {
 	sm, clean := mkNaiveSM(t)
 	clean()
 	id := ProjectIdentifier{}
+	ctx := context.Background()
 
-	_, err := sm.SourceExists(id)
+	_, err := sm.SourceExists(ctx, id)
 	if err == nil {
 		t.Errorf("SourceExists did not error after calling Release()")
 	} else if err != ErrSourceManagerIsReleased {
 		t.Errorf("SourceExists errored after Release(), but with unexpected error: %T %s", err, err.Error())
 	}
 
-	err = sm.SyncSourceFor(id)
+	err = sm.SyncSourceFor(ctx, id)
 	if err == nil {
 		t.Errorf("SyncSourceFor did not error after calling Release()")
 	} else if err != ErrSourceManagerIsReleased {
 		t.Errorf("SyncSourceFor errored after Release(), but with unexpected error: %T %s", err, err.Error())
 	}
 
-	_, err = sm.ListVersions(id)
+	_, err = sm.ListVersions(ctx, id)
 	if err == nil {
 		t.Errorf("ListVersions did not error after calling Release()")
 	} else if err != ErrSourceManagerIsReleased {
 		t.Errorf("ListVersions errored after Release(), but with unexpected error: %T %s", err, err.Error())
 	}
 
-	_, err = sm.RevisionPresentIn(id, "")
+	_, err = sm.RevisionPresentIn(ctx, id, "")
 	if err == nil {
 		t.Errorf("RevisionPresentIn did not error after calling Release()")
 	} else if err != ErrSourceManagerIsReleased {
 		t.Errorf("RevisionPresentIn errored after Release(), but with unexpected error: %T %s", err, err.Error())
 	}
 
-	_, err = sm.ListPackages(id, nil)
+	_, err = sm.ListPackages(ctx, id, nil)
 	if err == nil {
 		t.Errorf("ListPackages did not error after calling Release()")
 	} else if err != ErrSourceManagerIsReleased {
 		t.Errorf("ListPackages errored after Release(), but with unexpected error: %T %s", err, err.Error())
 	}
 
-	_, _, err = sm.GetManifestAndLock(id, nil, naiveAnalyzer{})
+	_, _, err = sm.GetManifestAndLock(ctx, id, nil, naiveAnalyzer{})
 	if err == nil {
 		t.Errorf("GetManifestAndLock did not error after calling Release()")
 	} else if err != ErrSourceManagerIsReleased {
 		t.Errorf("GetManifestAndLock errored after Release(), but with unexpected error: %T %s", err, err.Error())
 	}
 
-	err = sm.ExportProject(context.Background(), id, nil, "")
+	err = sm.ExportProject(ctx, id, nil, "")
 	if err == nil {
 		t.Errorf("ExportProject did not error after calling Release()")
 	} else if err != ErrSourceManagerIsReleased {
 		t.Errorf("ExportProject errored after Release(), but with unexpected error: %T %s", err, err.Error())
 	}
 
-	_, err = sm.DeduceProjectRoot("")
+	_, err = sm.DeduceProjectRoot(ctx, "")
 	if err == nil {
 		t.Errorf("DeduceProjectRoot did not error after calling Release()")
 	} else if err != ErrSourceManagerIsReleased {
@@ -889,9 +898,10 @@ func TestSignalHandling(t *testing.T) {
 	sm, clean = mkNaiveSM(t)
 	sm.HandleSignals(sigch)
 
+	ctx := context.Background()
 	errchan := make(chan error)
 	go func() {
-		_, callerr := sm.DeduceProjectRoot("k8s.io/kubernetes")
+		_, callerr := sm.DeduceProjectRoot(ctx, "k8s.io/kubernetes")
 		errchan <- callerr
 	}()
 	go func() { sigch <- os.Interrupt }()
@@ -914,7 +924,7 @@ func TestSignalHandling(t *testing.T) {
 	sm.HandleSignals(sigch)
 
 	go func() {
-		_, callerr := sm.DeduceProjectRoot("k8s.io/kubernetes")
+		_, callerr := sm.DeduceProjectRoot(ctx, "k8s.io/kubernetes")
 		errchan <- callerr
 	}()
 	go func() {
@@ -944,7 +954,7 @@ func TestUnreachableSource(t *testing.T) {
 	defer clean()
 
 	id := mkPI("github.com/golang/notexist").normalize()
-	err := sm.SyncSourceFor(id)
+	err := sm.SyncSourceFor(context.Background(), id)
 	if err == nil {
 		t.Error("expected err when listing versions of a bogus source, but got nil")
 	}

@@ -6,6 +6,7 @@ package glock
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"log"
 	"path/filepath"
@@ -54,6 +55,7 @@ func TestGlockConfig_Convert(t *testing.T) {
 		},
 	}
 
+	ctx := context.Background()
 	for name, testCase := range testCases {
 		name := name
 		testCase := testCase
@@ -61,7 +63,7 @@ func TestGlockConfig_Convert(t *testing.T) {
 			err := testCase.Execute(t, func(logger *log.Logger, sm gps.SourceManager) (*dep.Manifest, *dep.Lock) {
 				g := NewImporter(logger, true, sm)
 				g.packages = testCase.packages
-				return g.convert(importertest.RootProject)
+				return g.convert(ctx, importertest.RootProject)
 			})
 			if err != nil {
 				t.Fatalf("%#v", err)
@@ -111,7 +113,7 @@ func TestGlockConfig_Import(t *testing.T) {
 		t.Fatal("Expected the importer to detect the glock configuration files")
 	}
 
-	m, l, err := g.Import(projectRoot, importertest.RootProject)
+	m, l, err := g.Import(context.Background(), projectRoot, importertest.RootProject)
 	h.Must(err)
 
 	if m == nil {

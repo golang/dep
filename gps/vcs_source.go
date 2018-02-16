@@ -61,7 +61,7 @@ func (bs *baseVCSSource) getManifestAndLock(ctx context.Context, pr ProjectRoot,
 		return nil, nil, unwrapVcsErr(err)
 	}
 
-	m, l, err := an.DeriveManifestAndLock(bs.repo.LocalPath(), pr)
+	m, l, err := an.DeriveManifestAndLock(ctx, bs.repo.LocalPath(), pr)
 	if err != nil {
 		return nil, nil, err
 	}

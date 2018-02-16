@@ -5,6 +5,7 @@
 package base
 
 import (
+	"context"
 	"log"
 	"strings"
 
@@ -36,8 +37,8 @@ func NewImporter(logger *log.Logger, verbose bool, sm gps.SourceManager) *Import
 }
 
 // isTag determines if the specified value is a tag (plain or semver).
-func (i *Importer) isTag(pi gps.ProjectIdentifier, value string) (bool, gps.Version, error) {
-	versions, err := i.SourceManager.ListVersions(pi)
+func (i *Importer) isTag(ctx context.Context, pi gps.ProjectIdentifier, value string) (bool, gps.Version, error) {
+	versions, err := i.SourceManager.ListVersions(ctx, pi)
 	if err != nil {
 		return false, nil, errors.Wrapf(err, "unable to list versions for %s(%s)", pi.ProjectRoot, pi.Source)
 	}
@@ -59,9 +60,9 @@ func (i *Importer) isTag(pi gps.ProjectIdentifier, value string) (bool, gps.Vers
 // project based on the locked revision and the constraint from the manifest.
 // First try matching the revision to a version, then try the constraint from the
 // manifest, then finally the revision.
-func (i *Importer) lookupVersionForLockedProject(pi gps.ProjectIdentifier, c gps.Constraint, rev gps.Revision) (gps.Version, error) {
+func (i *Importer) lookupVersionForLockedProject(ctx context.Context, pi gps.ProjectIdentifier, c gps.Constraint, rev gps.Revision) (gps.Version, error) {
 	// Find the version that goes with this revision, if any
-	versions, err := i.SourceManager.ListVersions(pi)
+	versions, err := i.SourceManager.ListVersions(ctx, pi)
 	if err != nil {
 		return rev, errors.Wrapf(err, "Unable to lookup the version represented by %s in %s(%s). Falling back to locking the revision only.", rev, pi.ProjectRoot, pi.Source)
 	}
@@ -123,14 +124,14 @@ type importedProject struct {
 }
 
 // loadPackages consolidates all package references into a set of project roots.
-func (i *Importer) loadPackages(packages []ImportedPackage) []importedProject {
+func (i *Importer) loadPackages(ctx context.Context, packages []ImportedPackage) []importedProject {
 	// preserve the original order of the packages so that messages that
 	// are printed as they are processed are in a consistent order.
 	orderedProjects := make([]importedProject, 0, len(packages))
 
 	projects := make(map[gps.ProjectRoot]*importedProject, len(packages))
 	for _, pkg := range packages {
-		pr, err := i.SourceManager.DeduceProjectRoot(pkg.Name)
+		pr, err := i.SourceManager.DeduceProjectRoot(ctx, pkg.Name)
 		if err != nil {
 			i.Logger.Printf(
 				"  Warning: Skipping project. Cannot determine the project root for %s: %s\n",
@@ -177,13 +178,13 @@ func (i *Importer) loadPackages(packages []ImportedPackage) []importedProject {
 // * Revision constraints are ignored.
 // * Versions that don't satisfy the constraint, drop the constraint.
 // * Untagged revisions ignore non-branch constraint hints.
-func (i *Importer) ImportPackages(packages []ImportedPackage, defaultConstraintFromLock bool) {
-	projects := i.loadPackages(packages)
+func (i *Importer) ImportPackages(ctx context.Context, packages []ImportedPackage, defaultConstraintFromLock bool) {
+	projects := i.loadPackages(ctx, packages)
 
 	for _, prj := range projects {
 		source := prj.Source
 		if len(source) > 0 {
-			isDefault, err := i.isDefaultSource(prj.Root, source)
+			isDefault, err := i.isDefaultSource(ctx, prj.Root, source)
 			if err != nil {
 				i.Logger.Printf("  Ignoring imported source %s for %s: %s", source, prj.Root, err.Error())
 				source = ""
@@ -203,7 +204,7 @@ func (i *Importer) ImportPackages(packages []ImportedPackage, defaultConstraintF
 		}
 
 		var err error
-		pc.Constraint, err = i.SourceManager.InferConstraint(prj.ConstraintHint, pc.Ident)
+		pc.Constraint, err = i.SourceManager.InferConstraint(ctx, prj.ConstraintHint, pc.Ident)
 		if err != nil {
 			pc.Constraint = gps.Any()
 		}
@@ -212,7 +213,7 @@ func (i *Importer) ImportPackages(packages []ImportedPackage, defaultConstraintF
 		if prj.LockHint != "" {
 			var isTag bool
 			// Determine if the lock hint is a revision or tag
-			isTag, version, err = i.isTag(pc.Ident, prj.LockHint)
+			isTag, version, err = i.isTag(ctx, pc.Ident, prj.LockHint)
 			if err != nil {
 				i.Logger.Printf(
 					"  Warning: Skipping project. Unable to import lock %q for %v: %s\n",
@@ -223,7 +224,7 @@ func (i *Importer) ImportPackages(packages []ImportedPackage, defaultConstraintF
 			// If the hint is a revision, check if it is tagged
 			if !isTag {
 				revision := gps.Revision(prj.LockHint)
-				version, err = i.lookupVersionForLockedProject(pc.Ident, pc.Constraint, revision)
+				version, err = i.lookupVersionForLockedProject(ctx, pc.Ident, pc.Constraint, revision)
 				if err != nil {
 					version = nil
 					i.Logger.Println(err)
@@ -312,7 +313,7 @@ func (i *Importer) convertToConstraint(v gps.Version) gps.Constraint {
 	return v
 }
 
-func (i *Importer) isDefaultSource(projectRoot gps.ProjectRoot, sourceURL string) (bool, error) {
+func (i *Importer) isDefaultSource(ctx context.Context, projectRoot gps.ProjectRoot, sourceURL string) (bool, error) {
 	// this condition is mainly for gopkg.in imports,
 	// as some importers specify the repository url as https://gopkg.in/...,
 	// but SourceManager.SourceURLsForPath() returns https://github.com/... urls for gopkg.in
@@ -320,7 +321,7 @@ func (i *Importer) isDefaultSource(projectRoot gps.ProjectRoot, sourceURL string
 		return true, nil
 	}
 
-	sourceURLs, err := i.SourceManager.SourceURLsForPath(string(projectRoot))
+	sourceURLs, err := i.SourceManager.SourceURLsForPath(ctx, string(projectRoot))
 	if err != nil {
 		return false, err
 	}

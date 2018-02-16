@@ -6,6 +6,7 @@ package gvt
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"log"
 	"path/filepath"
@@ -113,6 +114,7 @@ func TestGvtConfig_Convert(t *testing.T) {
 		},
 	}
 
+	ctx := context.Background()
 	for name, testCase := range testCases {
 		name := name
 		testCase := testCase
@@ -120,7 +122,7 @@ func TestGvtConfig_Convert(t *testing.T) {
 			err := testCase.Execute(t, func(logger *log.Logger, sm gps.SourceManager) (*dep.Manifest, *dep.Lock) {
 				g := NewImporter(logger, true, sm)
 				g.gvtConfig = testCase.gvtConfig
-				return g.convert(importertest.RootProject)
+				return g.convert(ctx, importertest.RootProject)
 			})
 			if err != nil {
 				t.Fatalf("%#v", err)
@@ -156,7 +158,7 @@ func TestGvtConfig_Import(t *testing.T) {
 		t.Fatal("Expected the importer to detect gvt configuration file")
 	}
 
-	m, l, err := g.Import(projectRoot, importertest.RootProject)
+	m, l, err := g.Import(context.Background(), projectRoot, importertest.RootProject)
 	h.Must(err)
 
 	if m == nil {
