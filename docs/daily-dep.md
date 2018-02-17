@@ -19,7 +19,7 @@ Dep's main command is `dep ensure`. The verb is "ensure" to imply that the actio
 
 > Hey dep, please make sure that [my project](glossary.md#current-project) is [in sync](glossary.md#sync): that [`Gopkg.lock`](Gopkg.lock.md) satisfies all the imports in my project, and all the rules in[ `Gopkg.toml`](Gopkg.toml.md), and that `vendor/` contains exactly what `Gopkg.lock` says it should."
 
-As the narrative indicates, `dep ensure` is a holistic operation; rather than offering a series of commands that you run in succession to incrementally achieve a some final state, each run of `dep ensure` delivers a safe, complete, and reproducible set of dependencies with respect to the current state of your project. You might imagine repeated runs of `dep ensure` as being a bit like a frog, hopping from one lilypad to the next.
+As the narrative indicates, `dep ensure` is a holistic operation; rather than offering a series of commands that you run in succession to incrementally achieve some final state, each run of `dep ensure` delivers a safe, complete, and reproducible set of dependencies with respect to the current state of your project. You might imagine repeated runs of `dep ensure` as being a bit like a frog, hopping from one lilypad to the next.
 
  `dep ensure` also guarantees that, barring `kill -9`, power failure, or a critical bug, its disk writes are all-or-nothing: on any given run, either nothing changes (and you get an error), or you're on the nearest safe lilypad. This makes `dep ensure` fine to run at most any time.
 
@@ -35,17 +35,17 @@ There are four times when you'll run `dep ensure`:
 
 There's also an implicit fifth time: when you're not sure if one of the above has happened. Running `dep ensure` without any additional flags will get your project back in sync - a known good state. As such, it's generally safe to defensively run `dep ensure`  as a way of simply making sure that your project is in that state.
 
-Let's explore each of moments. To play along, you'll need to `cd` into a project that's already been set up by `dep init`. If you haven't done that yet, check out the guides for [new projects](new-project.md) and [migrations](migrating.md).
+Let's explore each of these moments. To play along, you'll need to `cd` into a project that's already been set up by `dep init`. If you haven't done that yet, check out the guides for [new projects](new-project.md) and [migrations](migrating.md).
 
 ### Adding a new dependency
 
-Let's say that we want to introduce a new dependency on  `github.com/pkg/errors`. This can be accomplished with one command:
+Let's say that we want to introduce a new dependency on `github.com/pkg/errors`. This can be accomplished with one command:
 
 ```bash
 $ dep ensure -add github.com/pkg/errors
 ```
 
-> Much like git, `dep status` and `dep ensure` can also be run from any subdirectory of your project root, which is determined by the presence of a `Gopkg.toml` file.
+> Much like git, `dep status` and `dep ensure` can also be run from any subdirectory of your project root (which is determined by the presence of a `Gopkg.toml` file).
 
 This should succeed, resulting in an updated `Gopkg.lock` and `vendor/` directory, as well as injecting a best-guess version constraint for `github.com/pkg/errors` into our `Gopkg.toml`. But, it will also report a warning:
 
@@ -74,7 +74,7 @@ Ideally, updating a dependency project to a newer version is a single command:
 $ dep ensure -update github.com/foo/bar
 ```
 
-This also works without arguments to try to update all dependencies, though it's generally not recommended:
+This also works without arguments to try to update all dependencies (though it's generally not recommended):
 
 ```bash
 $ dep ensure -update
@@ -95,7 +95,7 @@ It's only "might," though, because most of the time, adding or removing imports 
 
 In short, dep is concerned with the set of unique import paths across your entire project, and only cares when you make a change that adds or removes an import path from that set.
 
-Of course, especially on large projects, it can be tough to keep track of whether adding or removing (especially removing) a particular import statement actually does change the overall set. Fortunately, you needn't keep close track, as you can run `dep ensure` and it will automatically pick up any additions or removals, and bring your project back in sync.
+Of course, it can be tough to keep track of whether adding or removing (especially removing) a particular import statement actually does change the overall set—especially on large projects. Fortunately, you needn't keep close track, as you can run `dep ensure` and it will automatically pick up any additions or removals, and bring your project back in sync.
 
 Only if it is the first/last import of a project being added/removed - cases 3 and 4 - are additional steps needed: `Gopkg.toml` should be updated to add/remove the corresponding project's `[[constraint]]`.
 
