@@ -44,6 +44,7 @@ var exampleTOML = []byte(`# Gopkg.toml example
 #
 # [prune]
 #   non-go = false
+#   nested-vendor-dirs = true
 #   go-tests = true
 #   unused-packages = true
 

@@ -71,18 +71,20 @@ type rawProject struct {
 }
 
 type rawPruneOptions struct {
-	UnusedPackages bool `toml:"unused-packages,omitempty"`
-	NonGoFiles     bool `toml:"non-go,omitempty"`
-	GoTests        bool `toml:"go-tests,omitempty"`
+	UnusedPackages   bool `toml:"unused-packages,omitempty"`
+	NestedVendorDirs bool `toml:"nested-vendor-dirs,omitempty"`
+	NonGoFiles       bool `toml:"non-go,omitempty"`
+	GoTests          bool `toml:"go-tests,omitempty"`
 
 	//Projects []map[string]interface{} `toml:"project,omitempty"`
 	Projects []map[string]interface{}
 }
 
 const (
-	pruneOptionUnusedPackages = "unused-packages"
-	pruneOptionGoTests        = "go-tests"
-	pruneOptionNonGo          = "non-go"
+	pruneOptionUnusedPackages   = "unused-packages"
+	pruneOptionNestedVendorDirs = "nested-vendor-dirs"
+	pruneOptionGoTests          = "go-tests"
+	pruneOptionNonGo            = "non-go"
 )
 
 // Constants to represents per-project prune uint8 values.
@@ -223,7 +225,7 @@ func validatePruneOptions(val interface{}, root bool) (warns []error, err error)
 
 	for key, value := range val.(map[string]interface{}) {
 		switch key {
-		case pruneOptionNonGo, pruneOptionGoTests, pruneOptionUnusedPackages:
+		case pruneOptionNonGo, pruneOptionGoTests, pruneOptionUnusedPackages, pruneOptionNestedVendorDirs:
 			if option, ok := value.(bool); !ok {
 				return warns, errInvalidPruneValue
 			} else if root && !option {
@@ -268,6 +270,12 @@ func checkRedundantPruneOptions(co gps.CascadingPruneOptions) (warns []error) {
 		if project.UnusedPackages != pvnone {
 			if (co.DefaultOptions&gps.PruneUnusedPackages != 0) == (project.UnusedPackages == pvtrue) {
 				warns = append(warns, errors.Errorf("redundant prune option %q set for %q", pruneOptionUnusedPackages, name))
+			}
+		}
+
+		if project.NestedVendor != pvnone {
+			if (co.DefaultOptions&gps.PruneNestedVendorDirs != 0) == (project.NestedVendor == pvtrue) {
+				warns = append(warns, errors.Errorf("redundant prune option %q set for %q", pruneOptionNestedVendorDirs, name))
 			}
 		}
 
@@ -417,6 +425,9 @@ func fromRawPruneOptions(prunemap map[string]interface{}) gps.CascadingPruneOpti
 	if val, has := prunemap[pruneOptionUnusedPackages]; has && val.(bool) {
 		opts.DefaultOptions |= gps.PruneUnusedPackages
 	}
+	if val, has := prunemap[pruneOptionNestedVendorDirs]; has && val.(bool) {
+		opts.DefaultOptions |= gps.PruneNestedVendorDirs
+	}
 	if val, has := prunemap[pruneOptionNonGo]; has && val.(bool) {
 		opts.DefaultOptions |= gps.PruneNonGoFiles
 	}
@@ -448,6 +459,8 @@ func fromRawPruneOptions(prunemap map[string]interface{}) gps.CascadingPruneOpti
 					pos.GoTests = trinary(val)
 				case pruneOptionUnusedPackages:
 					pos.UnusedPackages = trinary(val)
+				case pruneOptionNestedVendorDirs:
+					pos.NestedVendor = trinary(val)
 				}
 			}
 			opts.PerProjectOptions[pr] = pos
@@ -469,6 +482,10 @@ func toRawPruneOptions(co gps.CascadingPruneOptions) rawPruneOptions {
 
 	if (co.DefaultOptions & gps.PruneUnusedPackages) != 0 {
 		raw.UnusedPackages = true
+	}
+
+	if (co.DefaultOptions & gps.PruneNestedVendorDirs) != 0 {
+		raw.NestedVendorDirs = true
 	}
 
 	if (co.DefaultOptions & gps.PruneNonGoFiles) != 0 {

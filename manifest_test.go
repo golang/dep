@@ -485,6 +485,7 @@ func TestCheckRedundantPruneOptions(t *testing.T) {
 				},
 			},
 			wantWarn: []error{
+				fmt.Errorf("redundant prune option %q set for %q", "nested-vendor-dirs", "github.com/golang/dep"),
 				fmt.Errorf("redundant prune option %q set for %q", "unused-packages", "github.com/golang/dep"),
 				fmt.Errorf("redundant prune option %q set for %q", "non-go", "github.com/golang/dep"),
 				fmt.Errorf("redundant prune option %q set for %q", "go-tests", "github.com/golang/dep"),
@@ -493,10 +494,10 @@ func TestCheckRedundantPruneOptions(t *testing.T) {
 		{
 			name: "all redundant on false",
 			pruneOptions: gps.CascadingPruneOptions{
-				DefaultOptions: 1,
+				DefaultOptions: 0,
 				PerProjectOptions: map[gps.ProjectRoot]gps.PruneOptionSet{
 					"github.com/golang/dep": {
-						NestedVendor:   pvtrue,
+						NestedVendor:   pvfalse,
 						UnusedPackages: pvfalse,
 						NonGoFiles:     pvfalse,
 						GoTests:        pvfalse,
@@ -504,6 +505,7 @@ func TestCheckRedundantPruneOptions(t *testing.T) {
 				},
 			},
 			wantWarn: []error{
+				fmt.Errorf("redundant prune option %q set for %q", "nested-vendor-dirs", "github.com/golang/dep"),
 				fmt.Errorf("redundant prune option %q set for %q", "unused-packages", "github.com/golang/dep"),
 				fmt.Errorf("redundant prune option %q set for %q", "non-go", "github.com/golang/dep"),
 				fmt.Errorf("redundant prune option %q set for %q", "go-tests", "github.com/golang/dep"),
@@ -767,18 +769,20 @@ func TestToRawPruneOptions(t *testing.T) {
 			name:         "all options",
 			pruneOptions: gps.CascadingPruneOptions{DefaultOptions: 15},
 			wantOptions: rawPruneOptions{
-				UnusedPackages: true,
-				NonGoFiles:     true,
-				GoTests:        true,
+				UnusedPackages:   true,
+				NestedVendorDirs: true,
+				NonGoFiles:       true,
+				GoTests:          true,
 			},
 		},
 		{
 			name:         "no options",
 			pruneOptions: gps.CascadingPruneOptions{DefaultOptions: 1},
 			wantOptions: rawPruneOptions{
-				UnusedPackages: false,
-				NonGoFiles:     false,
-				GoTests:        false,
+				UnusedPackages:   false,
+				NestedVendorDirs: false,
+				NonGoFiles:       false,
+				GoTests:          false,
 			},
 		},
 	}
