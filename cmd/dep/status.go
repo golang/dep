@@ -121,7 +121,7 @@ type outputter interface {
 	MissingFooter() error
 }
 
-// Only a subset of the outputters should be able to output old statuses
+// Only a subset of the outputters should be able to output old statuses.
 type oldOutputter interface {
 	OldHeader() error
 	OldLine(*OldStatus) error
@@ -363,7 +363,7 @@ func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
 
 	if cmd.old {
 		if _, ok := out.(oldOutputter); !ok {
-			return errors.Errorf("invalid output command usesed")
+			return errors.Errorf("invalid output format used")
 		}
 		err = cmd.runOld(ctx, out.(oldOutputter), p, sm)
 		ctx.Out.Print(buf.String())
@@ -503,7 +503,7 @@ func (cmd *statusCommand) runOld(ctx *dep.Ctx, out oldOutputter, p *dep.Project,
 		// Locks aren't a part of the input hash check, so we can omit it.
 	}
 
-	// Check update for all the projects
+	// Check update for all the projects.
 	params.ChangeAll = true
 
 	solver, err := gps.Prepare(params, sm)
@@ -517,40 +517,54 @@ func (cmd *statusCommand) runOld(ctx *dep.Ctx, out oldOutputter, p *dep.Project,
 	}
 
 	var oldStatuses []OldStatus
+	lockProjects := p.Lock.Projects()
 	solutionProjects := solution.Projects()
 
-	for _, proj := range p.Lock.Projects() {
-		for i := range solutionProjects {
-			// Look for the same project in solution and lock
-			if solutionProjects[i].Ident().ProjectRoot != proj.Ident().ProjectRoot {
-				continue
-			}
+	sort.Slice(solutionProjects, func(i, j int) bool {
+		return solutionProjects[i].Ident().Less(solutionProjects[j].Ident())
+	})
 
-			// If revisions are not the same then it is old and we should display it
-			latestRev, _, _ := gps.VersionComponentStrings(solutionProjects[i].Version())
-			atRev, _, _ := gps.VersionComponentStrings(proj.Version())
-			if atRev == latestRev {
-				continue
-			}
+	sort.Slice(lockProjects, func(i, j int) bool {
+		return lockProjects[i].Ident().Less(lockProjects[j].Ident())
+	})
 
-			// Generate the old status data and append it
-			os := OldStatus{
-				ProjectRoot: proj.Ident().String(),
-				Revision:    gps.Revision(atRev),
-				Latest:      gps.Revision(latestRev),
-			}
-			// Getting Constraint
-			if pp, has := p.Manifest.Ovr[proj.Ident().ProjectRoot]; has && pp.Constraint != nil {
-				// manifest has override for project
-				os.Constraint = pp.Constraint
-			} else if pp, has := p.Manifest.Constraints[proj.Ident().ProjectRoot]; has && pp.Constraint != nil {
-				// manifest has normal constraint
-				os.Constraint = pp.Constraint
-			} else {
-				os.Constraint = gps.Any()
-			}
-			oldStatuses = append(oldStatuses, os)
+	for i := range solutionProjects {
+		lProj := lockProjects[i]
+		sProj := solutionProjects[i]
+
+		if lProj.Ident().ProjectRoot != sProj.Ident().ProjectRoot {
+			// We should always be comparing the same projects and should enter be here.
+			return errors.New("Projects from the solution and lock are not in the same order")
 		}
+
+		// If revisions are not the same then it is old and we should display it.
+		latestRev, _, _ := gps.VersionComponentStrings(sProj.Version())
+		atRev, _, _ := gps.VersionComponentStrings(lProj.Version())
+		if atRev == latestRev {
+			continue
+		}
+
+		var constraint gps.Constraint
+		// Getting Constraint
+		if pp, has := p.Manifest.Ovr[lProj.Ident().ProjectRoot]; has && pp.Constraint != nil {
+			// Manifest has override for project.
+			constraint = pp.Constraint
+		} else if pp, has := p.Manifest.Constraints[lProj.Ident().ProjectRoot]; has && pp.Constraint != nil {
+			// Manifest has normal constraint.
+			constraint = pp.Constraint
+		} else {
+			// No constraint exists. No need to worry about displaying it
+			continue
+		}
+
+		// Generate the old status data and append it.
+		os := OldStatus{
+			ProjectRoot: lProj.Ident().String(),
+			Revision:    gps.Revision(atRev),
+			Latest:      gps.Revision(latestRev),
+			Constraint:  constraint,
+		}
+		oldStatuses = append(oldStatuses, os)
 	}
 
 	out.OldHeader()
