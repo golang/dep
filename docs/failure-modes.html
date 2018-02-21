@@ -145,7 +145,7 @@ init failed: unable to solve the dependency graph: Solving failure: No versions 
 <p>It means that the solver was unable to find a combination of versions for all dependencies that satisfy all the rules enforced by the solver. It is crucial to note that, just because dep provides a big list of reasons why each version failed <em>doesn't mean</em> you have to address each one! That's just dep telling you why it ultimately couldn't use each of those versions in a solution.</p>
 <p>These rules, and specific remediations for failing to meet them, are described in detail in the section on <a href="/dep/docs/the-solver.html#solving-invariants">solver invariants</a>. This section is about the steps to take when solving failures occur in general. But, to set context, here's a summary:</p>
 <ul>
-<li><strong><code>[[constraint]]</code> conflicts:</strong> when projects in the dependency graph disagree on what <a href="gopkg.toml.md#version-rules">versions</a> are acceptable for a project, or where to <a href="gopkg.toml.md#source">source</a> it from.
+<li><strong><code>[[constraint]]</code> conflicts:</strong> when projects in the dependency graph disagree on what <a href="/dep/docs/Gopkg.toml.html#version-rules">versions</a> are acceptable for a project, or where to <a href="/dep/docs/Gopkg.toml.html#source">source</a> it from.
 <ul>
 <li>Remediation will usually be either changing a <code>[[constraint]]</code> or adding an <code>[[override]]</code>, but genuine conflicts may require forking and hacking code.</li>
 </ul></li>

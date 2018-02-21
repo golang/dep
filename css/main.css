@@ -71,7 +71,7 @@ article p img, article iframe {
 }
 
 a {
-  color: #375EAB;
+  color: #375eab;
   text-decoration: none;
 }
 
@@ -117,7 +117,7 @@ blockquote {
 h1, h2, h3, h4 {
   font-family: -apple-system,system-ui,BlinkMacSystemFont,"Segoe UI",Roboto,Oxygen,Ubuntu,Cantarell,"Fira Sans","Droid Sans","Helvetica Neue",Arial,sans-serif;
   font-weight: 300;
-  color: #375EAB;
+  color: #375eab;
 }
 
 h4 {
@@ -131,7 +131,7 @@ header h2 {
 
 .homeContainer {
   background: #fff;
-  color: #375EAB;
+  color: #375eab;
   text-align: center;
 }
 
@@ -235,7 +235,7 @@ header h2 {
   text-align: left;
 }
 .container .wrapper h2 {
-  color: #375EAB;
+  color: #375eab;
   font-size: 22px;
   line-height: 1em;
   margin-top: 20px;
@@ -249,13 +249,13 @@ header h2 {
   padding: 10px 0;
 }
 .container .wrapper h3 {
-  color: #375EAB;
+  color: #375eab;
   font-size: 18px;
   margin-top: 10px;
   padding: 10px 0;
 }
 .container .wrapper h4 {
-  color: #375EAB;
+  color: #375eab;
   font-size: 16px;
   font-weight: 300;
   margin: 0;
@@ -342,7 +342,7 @@ header h2 {
   padding-top: 1em;
 }
 .mainContainer .wrapper .post .docPagination {
-  background: #375EAB;
+  background: #375eab;
   bottom: 0px;
   left: 0px;
   position: absolute;
@@ -515,7 +515,7 @@ header h2 {
 }
 .fixedHeaderContainer {
   box-sizing: border-box;
-  background: #375EAB;
+  background: #375eab;
   color: #fff;
   min-height: 50px;
   padding: 9px 0;
@@ -599,9 +599,9 @@ header h2 {
 }
 .button {
   margin: 4px;
-  border: 1px solid #375EAB;
+  border: 1px solid #375eab;
   border-radius: 3px;
-  color: #375EAB;
+  color: #375eab;
   display: inline-block;
   font-size: 14px;
   font-weight: 400;
@@ -612,7 +612,7 @@ header h2 {
   transition: background 0.3s, color 0.3s;
 }
 .button:hover {
-  background: #375EAB;
+  background: #375eab;
   color: #fff;
 }
 
@@ -669,19 +669,19 @@ input[type="search"] {
   right: 0 !important;
 }
 .navSearchWrapper .aa-dropdown-menu .algolia-docsearch-suggestion--category-header {
-  background: #375EAB;
+  background: #375eab;
   color: white;
   font-family: -apple-system,system-ui,BlinkMacSystemFont,"Segoe UI",Roboto,Oxygen,Ubuntu,Cantarell,"Fira Sans","Droid Sans","Helvetica Neue",Arial,sans-serif;
   font-weight: 400;
   font-size: 14px;
 }
 .navSearchWrapper .aa-dropdown-menu .algolia-docsearch-suggestion--category-header .algolia-docsearch-suggestion--highlight {
-  background-color: #375EAB;
+  background-color: #375eab;
   color: #fff;
 }
 .navSearchWrapper .aa-dropdown-menu .algolia-docsearch-suggestion--title .algolia-docsearch-suggestion--highlight,
 .navSearchWrapper .aa-dropdown-menu .algolia-docsearch-suggestion--subcategory-column .algolia-docsearch-suggestion--highlight {
-  color: #375EAB;
+  color: #375eab;
 }
 .navSearchWrapper .aa-dropdown-menu .algolia-docsearch-suggestion__secondary,
 .navSearchWrapper .aa-dropdown-menu .algolia-docsearch-suggestion--subcategory-column {
@@ -743,7 +743,7 @@ pre code {
   display:block;
   margin: 20px 0;
   padding:0.5em;
-  border-left: 4px solid #375EAB;
+  border-left: 4px solid #375eab;
   font-family: "SFMono-Regular",source-code-pro,Menlo,Monaco,Consolas,"Roboto Mono","Droid Sans Mono","Liberation Mono",Consolas,"Courier New",Courier,monospace;
   font-size: 13px;
   overflow-x:auto;
@@ -977,7 +977,7 @@ pre code {
   margin-top: 50px;
   width: 100%;
   padding: 0;
-  background: #E0EBF5;
+  background: #243f75;
   color: #fff;
 }
 .navigationSlider .slidingNav.slidingNavActive ul {
@@ -990,7 +990,7 @@ pre code {
   margin: 0;
 }
 .navigationSlider .slidingNav ul li a {
-  color: #375EAB;
+  color: #375eab;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1005,7 +1005,7 @@ pre code {
 }
 .navigationSlider .slidingNav ul li a:focus,
 .navigationSlider .slidingNav ul li a:hover {
-  background: #375EAB;
+  background: #375eab;
 }
 
 .languages-icon {
@@ -1025,7 +1025,7 @@ pre code {
 }
 ul#languages-dropdown-items {
   display: flex;
-  background-color: #375EAB;
+  background-color: #375eab;
   flex-direction: column;
   min-width: 120px;
   pointer-events: all;
@@ -1107,7 +1107,7 @@ ul#languages li {
     width: 100%;
   }
   .reactNavSearchWrapper input#search_input_react:focus, .reactNavSearchWrapper input#search_input_react:active {
-    background-color: #375EAB;
+    background-color: #375eab;
     color: #fff;
   }
   .reactNavSearchWrapper .algolia-docsearch-suggestion--subcategory-inline {
@@ -1139,7 +1139,7 @@ ul#languages li {
 
   ul#languages-dropdown-items {
     display: flex;
-    background-color: #375EAB;
+    background-color: #375eab;
     flex-direction: row;
   }
 }
@@ -1370,10 +1370,10 @@ nav.toc .toggleNav .navGroup h3 i:not(:empty) {
   transition: color 0.2s;
 }
 nav.toc .toggleNav .navGroup h3:hover {
-  color: #375EAB;
+  color: #375eab;
 }
 nav.toc .toggleNav .navGroup h3:hover i:not(:empty) {
-  color: #375EAB;
+  color: #375eab;
 }
 nav.toc .toggleNav .navGroup.navGroupActive {
   background: #e0e0e0;
@@ -1385,7 +1385,7 @@ nav.toc .toggleNav .navGroup.navGroupActive ul {
   padding-top: 10px;
 }
 nav.toc .toggleNav .navGroup.navGroupActive h3 {
-  background: #375EAB;
+  background: #375eab;
   color: #fff;
 }
 nav.toc .toggleNav ul {
@@ -1408,10 +1408,10 @@ nav.toc .toggleNav ul li a {
   transition: color 0.3s;
 }
 nav.toc .toggleNav ul li a:hover, nav.toc .toggleNav ul li a:focus {
-  color: #375EAB;
+  color: #375eab;
 }
 nav.toc .toggleNav ul li a.navItemActive {
-  color: #375EAB;
+  color: #375eab;
 }
 .docsSliderActive nav.toc .navBreadcrumb {
   background: #c6c6c6;
@@ -1630,7 +1630,7 @@ h6:hover .header-link {
   padding-bottom: 80px;
 }
 .productShowcaseSection h2 {
-  color: #375EAB;
+  color: #375eab;
   font-size: 30px;
   line-height: 1em;
   margin-top: 20px;
@@ -1674,7 +1674,7 @@ h6:hover .header-link {
   margin: 0 auto;
 }
 .showcaseSection .prose h1 {
-  color: #375EAB;
+  color: #375eab;
   font-family: -apple-system,system-ui,BlinkMacSystemFont,"Segoe UI",Roboto,Oxygen,Ubuntu,Cantarell,"Fira Sans","Droid Sans","Helvetica Neue",Arial,sans-serif;
   text-align: center;
   padding: 1.4em 0 0.4em;
@@ -1809,14 +1809,47 @@ footer .copyright {
   }
 }
 
-/* your custom css */
+/* 
+Contains custom styles for whole site.
+*/
 
-.homeContainer {
-    flex: 1 0 auto;
-    padding-bottom: 1em;
+html {
+    box-sizing: border-box;
 }
 
-.docMainWrapper {
+*, *:before, *:after {
+    box-sizing: inherit;
+}
+
+body {
+    min-height: 100vh;
+}
+
+.navPusher {
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+    justify-content: space-between;
+    min-height: 100%;
+    /* Resets default height: 100% */
+    height: auto;
+}
+
+.footer-logo {
+    padding-top: 1em;
+    display: flex;
+    justify-content: center;
+}
+
+/* Reset .navToggle box-sizing */
+.navToggle {
+    box-sizing: content-box;
+}
+
+
+/* HOME _____________________________________________________________________________________________________________ */
+
+.homeContainer {
     flex: 1 0 auto;
     padding-bottom: 1em;
 }
@@ -1831,20 +1864,59 @@ footer .copyright {
     max-height: 360px;
 }
 
-body {
-    display: flex;
-    flex-direction: column;
+
+/* DOCS _____________________________________________________________________________________________________________ */
+
+.docMainWrapper {
+    width: 100%;
 }
 
-div.navPusher {
-    display: flex;
-    flex-direction: column;
+
+/* HEADINGS _________________________________________________________________________________________________________ */
+
+.mainContainer .wrapper .post h2,
+.mainContainer .wrapper .post h3,
+.mainContainer .wrapper .post h4,
+.mainContainer .wrapper .post h5,
+.mainContainer .wrapper .post h6 {
+    margin-top: 2.5rem;
 }
 
-.footer-logo {
-    padding-top: 1em;
-    display: flex;
-    justify-content: center;
+.mainContainer .wrapper .post .postHeader h1 {
+    font-size: 2.909rem;
+}
+
+.mainContainer .wrapper .post h2 {
+    font-size: 2.218rem;
+}
+
+.mainContainer .wrapper .post h3 {
+    font-size: 1.798rem;
+    color: #a6a6a6;
+}
+
+.mainContainer .wrapper .post h4 {
+    font-size: 1.618rem;
+    color: #a6a6a6;
+    font-weight: 300;
+    line-height: 1.5;
+    padding: 10px 0;
+}
+
+.mainContainer .wrapper .post h5 {
+    font-size: 1.111rem;
+    color: #a6a6a6;
+    font-weight: 300;
+    line-height: 1.5;
+    padding: 10px 0;
+}
+
+.mainContainer .wrapper .post h6 {
+    font-size: 1rem;
+    color: #a6a6a6;
+    font-weight: 300;
+    line-height: 1.5;
+    padding: 10px 0;
 }
 
 @media only screen and (min-device-width: 360px) and (max-device-width: 736px) {
