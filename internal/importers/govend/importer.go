@@ -10,11 +10,11 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/go-yaml/yaml"
 	"github.com/golang/dep"
 	"github.com/golang/dep/gps"
 	"github.com/golang/dep/internal/importers/base"
 	"github.com/pkg/errors"
+	"gopkg.in/yaml.v2"
 )
 
 // ToDo: govend supports json and xml formats as well and we will add support for other formats in next PR - @RaviTezu
