@@ -38,7 +38,7 @@ type RootManifest interface {
 	// them can harm the ecosystem as a whole.
 	Overrides() ProjectConstraints
 
-	// IngoredPackages returns a pkgtree.IgnoredRuleset, which comprises a set
+	// IgnoredPackages returns a pkgtree.IgnoredRuleset, which comprises a set
 	// of import paths, or import path patterns, that are to be ignored during
 	// solving. These ignored import paths can be within the root project, or
 	// part of other projects. Ignoring a package means that both it and its
