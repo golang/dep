@@ -10,6 +10,10 @@ IMPROVEMENTS:
 
 # v0.4.1
 
+NEW FEATURES:
+
+* Added `install.sh` script. ([#1533](https://github.com/golang/dep/pull/1533))
+
 BUG FIXES:
 
 * Fix per-project prune option handling ([#1570](https://github.com/golang/dep/pull/1570))
@@ -17,6 +21,7 @@ BUG FIXES:
 # v0.4.0
 
 NEW FEATURES:
+
 * Absorb `dep prune` into `dep ensure`. ([#944](https://github.com/golang/dep/issues/944))
 * Add support for importing from [glock](https://github.com/robfig/glock) based projects. ([#1422](https://github.com/golang/dep/pull/1422))
 * Add support for importing from [govendor](https://github.com/kardianos/govendor) based projects. ([#815](https://github.com/golang/dep/pull/815))
