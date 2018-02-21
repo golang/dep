@@ -7,7 +7,11 @@ It is strongly recommended that you use a released version of dep. While tip is 
 
 ## Binary Installation
 
-Pre-compiled binaries are available on the [releases](https://github.com/golang/dep/releases) page.
+Pre-compiled binaries are available on the [releases](https://github.com/golang/dep/releases) page. You can use the `install.sh` script to automatically install one for your local platform:
+
+```sh
+$ curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
+```
 
 ## MacOS
 
@@ -29,8 +33,12 @@ makepkg -si
 ```
 
 ## Install From Source
-The snippet below installs the latest release of dep from source and
-sets the version in the binary so that `dep version` works as expected.
+The snippet below installs the latest release of dep from source and sets the
+version in the binary so that `dep version` works as expected.
+
+Note that this approach is not recommended for general use. We don't try to
+break tip, but we also don't guarantee its stability. At the same time, we love
+our users who are willing to be experimental and provide us with fast feedback!
 
 ```sh
 go get -d -u github.com/golang/dep
