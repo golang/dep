@@ -12,7 +12,7 @@ jobs:
       env:
         - DEPTESTBYPASS501=1
       os: linux
-      go: "1.10"
+      go: 1.10.x
       script:
         - make validate test
         - ./hack/coverage.bash
@@ -31,7 +31,7 @@ jobs:
       go: tip
     - <<: *simple-test
       os: osx
-      go: "1.10"
+      go: 1.10.x
       install:
         # brew takes horribly long to update itself despite the above caching
         # attempt; only bzr install if it's not on the $PATH
@@ -47,7 +47,7 @@ jobs:
         # Related: https://superuser.com/questions/1044130/why-am-i-having-how-can-i-fix-this-error-shell-session-update-command-not-f
         - trap EXIT
         - go test -race ./...
-    - go: "1.10"
+    - go: 1.10.x
       stage: deploy
       go_import_path: github.com/golang/dep
       install: skip
