@@ -114,7 +114,7 @@ func (p *Project) SetRoot(root string) error {
 		return err
 	}
 
-	p.ResolvedAbsRoot, p.AbsRoot = rroot, root
+	p.ResolvedAbsRoot, p.AbsRoot = rroot, filepath.Clean(root)
 	return nil
 }
 

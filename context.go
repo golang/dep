@@ -59,6 +59,10 @@ func (c *Ctx) SetPaths(wd string, GOPATHs ...string) error {
 		GOPATHs = filepath.SplitList(GOPATH)
 	}
 
+	for index, path := range GOPATHs {
+		GOPATHs[index] = filepath.Clean(path)
+	}
+
 	c.GOPATHs = append(c.GOPATHs, GOPATHs...)
 
 	return nil
