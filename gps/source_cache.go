@@ -13,6 +13,16 @@ import (
 	"github.com/golang/dep/gps/pkgtree"
 )
 
+// sourceCache is an interface for creating singleSourceCaches, and safely
+// releasing backing resources via close.
+type sourceCache interface {
+	// newSingleSourceCache creates a new singleSourceCache for id, which
+	// remains valid until close is called.
+	newSingleSourceCache(id ProjectIdentifier) singleSourceCache
+	// close releases background resources.
+	close() error
+}
+
 // singleSourceCache provides a method set for storing and retrieving data about
 // a single source.
 type singleSourceCache interface {
@@ -61,6 +71,15 @@ type singleSourceCache interface {
 	// with it, whatever happens to be the first is returned.
 	toUnpaired(v Version) (UnpairedVersion, bool)
 }
+
+// memoryCache is a sourceCache which creates singleSourceCacheMemory instances.
+type memoryCache struct{}
+
+func (memoryCache) newSingleSourceCache(ProjectIdentifier) singleSourceCache {
+	return newMemoryCache()
+}
+
+func (memoryCache) close() error { return nil }
 
 type singleSourceCacheMemory struct {
 	// Protects all fields.

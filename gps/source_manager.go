@@ -177,9 +177,10 @@ var ErrSourceManagerIsReleased = fmt.Errorf("this SourceManager has been release
 
 // SourceManagerConfig holds configuration information for creating SourceMgrs.
 type SourceManagerConfig struct {
-	Cachedir       string      // Where to store local instances of upstream sources.
-	Logger         *log.Logger // Optional info/warn logger. Discards if nil.
-	DisableLocking bool        // True if the SourceManager should NOT use a lock file to protect the Cachedir from multiple processes.
+	CacheAge       time.Duration // Maximum valid age of cached data. <=0: Don't cache.
+	Cachedir       string        // Where to store local instances of upstream sources.
+	Logger         *log.Logger   // Optional info/warn logger. Discards if nil.
+	DisableLocking bool          // True if the SourceManager should NOT use a lock file to protect the Cachedir from multiple processes.
 }
 
 // NewSourceManager produces an instance of gps's built-in SourceManager.
@@ -189,6 +190,10 @@ type SourceManagerConfig struct {
 // prior to invoking a solve run, it is recommended that they create this
 // SourceManager as early as possible and use it to their ends. That way, the
 // solver can benefit from any caches that may have already been warmed.
+//
+// A cacheEpoch is calculated from now()-cacheAge, and older persistent cache data
+// is discarded. When cacheAge is <= 0, the persistent cache is
+// not used.
 //
 // gps's SourceManager is intended to be threadsafe (if it's not, please file a
 // bug!). It should be safe to reuse across concurrent solving runs, even on
@@ -279,13 +284,25 @@ func NewSourceManager(c SourceManagerConfig) (*SourceMgr, error) {
 	superv := newSupervisor(ctx)
 	deducer := newDeductionCoordinator(superv)
 
+	var sc sourceCache
+	if c.CacheAge > 0 {
+		// Try to open the BoltDB cache from disk.
+		epoch := time.Now().Add(-c.CacheAge).Unix()
+		boltCache, err := newBoltCache(c.Cachedir, epoch, c.Logger)
+		if err != nil {
+			c.Logger.Println(errors.Wrapf(err, "failed to open persistent cache %q", c.Cachedir))
+		} else {
+			sc = newMultiCache(memoryCache{}, boltCache)
+		}
+	}
+
 	sm := &SourceMgr{
 		cachedir:    c.Cachedir,
 		lf:          lockfile,
 		suprvsr:     superv,
 		cancelAll:   cf,
 		deduceCoord: deducer,
-		srcCoord:    newSourceCoordinator(superv, deducer, c.Cachedir, c.Logger),
+		srcCoord:    newSourceCoordinator(superv, deducer, c.Cachedir, sc, c.Logger),
 		qch:         make(chan struct{}),
 	}
 
@@ -379,7 +396,7 @@ func (e CouldNotCreateLockError) Error() string {
 	return e.Err.Error()
 }
 
-// Release lets go of any locks held by the SourceManager. Once called, it is no
+// Release lets go of any resources held by the SourceManager. Once called, it is no
 // longer safe to call methods against it; all method calls will immediately
 // result in errors.
 func (sm *SourceMgr) Release() {
