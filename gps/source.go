@@ -214,12 +214,13 @@ func (sc *sourceCoordinator) getSourceGatewayFor(ctx context.Context, id Project
 			srcGate = sg
 			break
 		}
-
-		src, st, err := m.try(ctx, sc.cachedir, sc.supervisor)
+		src, err := m.try(ctx, sc.cachedir)
 		if err == nil {
-			srcGate = newSourceGateway(st, src, sc.supervisor, sc.cachedir)
-			sc.srcs[url] = srcGate
-			break
+			srcGate, err = newSourceGateway(ctx, src, sc.supervisor, sc.cachedir)
+			if err == nil {
+				sc.srcs[url] = srcGate
+				break
+			}
 		}
 		errs = append(errs, err)
 	}
@@ -257,16 +258,35 @@ type sourceGateway struct {
 	suprvsr  *supervisor
 }
 
-func newSourceGateway(st sourceState, src source, superv *supervisor, cachedir string) *sourceGateway {
+// newSourceGateway returns a new gateway for src. If the source exists locally,
+// the local state may be cleaned, otherwise we ping upstream.
+func newSourceGateway(ctx context.Context, src source, superv *supervisor, cachedir string) (*sourceGateway, error) {
+	var state sourceState
+	local := src.existsLocally(ctx)
+	if local {
+		state |= sourceExistsLocally
+		if err := superv.do(ctx, src.upstreamURL(), ctValidateLocal, func(ctx context.Context) error {
+			return src.maybeClean(ctx)
+		}); err != nil {
+			return nil, err
+		}
+	}
+
 	sg := &sourceGateway{
-		srcState: st,
+		srcState: state,
 		src:      src,
 		cachedir: cachedir,
 		suprvsr:  superv,
 	}
 	sg.cache = sg.createSingleSourceCache()
 
-	return sg
+	if !local {
+		if err := sg.require(ctx, sourceExistsUpstream); err != nil {
+			return nil, err
+		}
+	}
+
+	return sg, nil
 }
 
 func (sg *sourceGateway) syncLocal(ctx context.Context) error {
@@ -634,6 +654,8 @@ type source interface {
 	upstreamURL() string
 	initLocal(context.Context) error
 	updateLocal(context.Context) error
+	// maybeClean is a no-op when the underlying source does not support cleaning.
+	maybeClean(context.Context) error
 	listVersions(context.Context) ([]PairedVersion, error)
 	getManifestAndLock(context.Context, ProjectRoot, Revision, ProjectAnalyzer) (Manifest, Lock, error)
 	listPackages(context.Context, ProjectRoot, Revision) (pkgtree.PackageTree, error)

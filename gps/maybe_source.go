@@ -22,8 +22,8 @@ import (
 // * Allows control over when deduction logic triggers network activity
 // * Makes it easy to attempt multiple URLs for a given import path
 type maybeSource interface {
-	// try tries to set up a source and returns any *additional* sourceState.
-	try(ctx context.Context, cachedir string, superv *supervisor) (source, sourceState, error)
+	// try tries to set up a source.
+	try(ctx context.Context, cachedir string) (source, error)
 	URL() *url.URL
 	fmt.Stringer
 }
@@ -47,7 +47,7 @@ type maybeGitSource struct {
 	url *url.URL
 }
 
-func (m maybeGitSource) try(ctx context.Context, cachedir string, superv *supervisor) (source, sourceState, error) {
+func (m maybeGitSource) try(ctx context.Context, cachedir string) (source, error) {
 	ustr := m.url.String()
 	path := sourceCachePath(cachedir, ustr)
 
@@ -56,27 +56,15 @@ func (m maybeGitSource) try(ctx context.Context, cachedir string, superv *superv
 		os.RemoveAll(path)
 		r, err = vcs.NewGitRepo(ustr, path)
 		if err != nil {
-			return nil, 0, unwrapVcsErr(err)
-		}
-	}
-
-	repo := &gitRepo{r}
-
-	var state sourceState
-	if r.CheckLocal() {
-		state |= sourceExistsLocally
-		if err := superv.do(ctx, "git", ctValidateLocal, func(ctx context.Context) error {
-			return repo.ensureClean(ctx)
-		}); err != nil {
-			return nil, 0, err
+			return nil, unwrapVcsErr(err)
 		}
 	}
 
 	return &gitSource{
 		baseVCSSource: baseVCSSource{
-			repo: repo,
+			repo: &gitRepo{r},
 		},
-	}, state, nil
+	}, nil
 }
 
 func (m maybeGitSource) URL() *url.URL {
@@ -101,7 +89,7 @@ type maybeGopkginSource struct {
 	unstable bool
 }
 
-func (m maybeGopkginSource) try(ctx context.Context, cachedir string, superv *supervisor) (source, sourceState, error) {
+func (m maybeGopkginSource) try(ctx context.Context, cachedir string) (source, error) {
 	// We don't actually need a fully consistent transform into the on-disk path
 	// - just something that's unique to the particular gopkg.in domain context.
 	// So, it's OK to just dumb-join the scheme with the path.
@@ -114,32 +102,20 @@ func (m maybeGopkginSource) try(ctx context.Context, cachedir string, superv *su
 		os.RemoveAll(path)
 		r, err = vcs.NewGitRepo(ustr, path)
 		if err != nil {
-			return nil, 0, unwrapVcsErr(err)
-		}
-	}
-
-	repo := &gitRepo{r}
-
-	var state sourceState
-	if r.CheckLocal() {
-		state |= sourceExistsLocally
-		if err := superv.do(ctx, "git", ctValidateLocal, func(ctx context.Context) error {
-			return repo.ensureClean(ctx)
-		}); err != nil {
-			return nil, 0, err
+			return nil, unwrapVcsErr(err)
 		}
 	}
 
 	return &gopkginSource{
 		gitSource: gitSource{
 			baseVCSSource: baseVCSSource{
-				repo: repo,
+				repo: &gitRepo{r},
 			},
 		},
 		major:    m.major,
 		unstable: m.unstable,
 		aliasURL: aliasURL,
-	}, state, nil
+	}, nil
 }
 
 func (m maybeGopkginSource) URL() *url.URL {
@@ -157,7 +133,7 @@ type maybeBzrSource struct {
 	url *url.URL
 }
 
-func (m maybeBzrSource) try(ctx context.Context, cachedir string, superv *supervisor) (source, sourceState, error) {
+func (m maybeBzrSource) try(ctx context.Context, cachedir string) (source, error) {
 	ustr := m.url.String()
 	path := sourceCachePath(cachedir, ustr)
 
@@ -166,22 +142,15 @@ func (m maybeBzrSource) try(ctx context.Context, cachedir string, superv *superv
 		os.RemoveAll(path)
 		r, err = vcs.NewBzrRepo(ustr, path)
 		if err != nil {
-			return nil, 0, unwrapVcsErr(err)
+			return nil, unwrapVcsErr(err)
 		}
-	}
-
-	repo := &bzrRepo{r}
-
-	var state sourceState
-	if r.CheckLocal() {
-		state |= sourceExistsLocally
 	}
 
 	return &bzrSource{
 		baseVCSSource: baseVCSSource{
-			repo: repo,
+			repo: &bzrRepo{r},
 		},
-	}, state, nil
+	}, nil
 }
 
 func (m maybeBzrSource) URL() *url.URL {
@@ -196,7 +165,7 @@ type maybeHgSource struct {
 	url *url.URL
 }
 
-func (m maybeHgSource) try(ctx context.Context, cachedir string, superv *supervisor) (source, sourceState, error) {
+func (m maybeHgSource) try(ctx context.Context, cachedir string) (source, error) {
 	ustr := m.url.String()
 	path := sourceCachePath(cachedir, ustr)
 
@@ -205,22 +174,15 @@ func (m maybeHgSource) try(ctx context.Context, cachedir string, superv *supervi
 		os.RemoveAll(path)
 		r, err = vcs.NewHgRepo(ustr, path)
 		if err != nil {
-			return nil, 0, unwrapVcsErr(err)
+			return nil, unwrapVcsErr(err)
 		}
-	}
-
-	repo := &hgRepo{r}
-
-	var state sourceState
-	if r.CheckLocal() {
-		state |= sourceExistsLocally
 	}
 
 	return &hgSource{
 		baseVCSSource: baseVCSSource{
-			repo: repo,
+			repo: &hgRepo{r},
 		},
-	}, state, nil
+	}, nil
 }
 
 func (m maybeHgSource) URL() *url.URL {

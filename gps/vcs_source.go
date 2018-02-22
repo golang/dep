@@ -111,6 +111,18 @@ func (bs *baseVCSSource) updateLocal(ctx context.Context) error {
 	return nil
 }
 
+func (bs *baseVCSSource) maybeClean(ctx context.Context) error {
+	ec, ok := bs.repo.(ensureCleaner)
+	if !ok {
+		return nil
+	}
+
+	if err := ec.ensureClean(ctx); err != nil {
+		return unwrapVcsErr(err)
+	}
+	return nil
+}
+
 func (bs *baseVCSSource) listPackages(ctx context.Context, pr ProjectRoot, r Revision) (ptree pkgtree.PackageTree, err error) {
 	err = bs.repo.updateVersion(ctx, r.String())
 

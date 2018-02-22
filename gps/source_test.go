@@ -186,6 +186,6 @@ func testSourceGateway(t *testing.T) {
 	}
 
 	// Run test twice so that we cover both the existing and non-existing case.
-	t.Run("empty", do(0))
+	t.Run("empty", do(sourceExistsUpstream|sourceHasLatestVersionList))
 	t.Run("exists", do(sourceExistsLocally))
 }

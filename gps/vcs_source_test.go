@@ -67,14 +67,9 @@ func testGitSourceInteractions(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	superv := newSupervisor(ctx)
-	isrc, state, err := mb.try(ctx, cpath, superv)
+	isrc, err := mb.try(ctx, cpath)
 	if err != nil {
 		t.Fatalf("Unexpected error while setting up gitSource for test repo: %s", err)
-	}
-
-	if state != 0 {
-		t.Errorf("Expected return state to be %v, got %v", 0, state)
 	}
 
 	err = isrc.initLocal(ctx)
@@ -171,16 +166,10 @@ func testGopkginSourceInteractions(t *testing.T) {
 		}
 
 		ctx := context.Background()
-		superv := newSupervisor(ctx)
-		isrc, state, err := mb.try(ctx, cpath, superv)
+		isrc, err := mb.try(ctx, cpath)
 		if err != nil {
 			t.Errorf("Unexpected error while setting up gopkginSource for test repo: %s", err)
 			return
-		}
-
-		var wantstate sourceState
-		if state != wantstate {
-			t.Errorf("Expected return state to be %v, got %v", wantstate, state)
 		}
 
 		err = isrc.initLocal(ctx)
@@ -343,15 +332,9 @@ func testBzrSourceInteractions(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	superv := newSupervisor(ctx)
-	isrc, state, err := mb.try(ctx, cpath, superv)
+	isrc, err := mb.try(ctx, cpath)
 	if err != nil {
 		t.Fatalf("Unexpected error while setting up bzrSource for test repo: %s", err)
-	}
-
-	var wantstate sourceState
-	if state != wantstate {
-		t.Errorf("Expected return state to be %v, got %v", wantstate, state)
 	}
 
 	err = isrc.initLocal(ctx)
@@ -451,16 +434,10 @@ func testHgSourceInteractions(t *testing.T) {
 		}
 
 		ctx := context.Background()
-		superv := newSupervisor(ctx)
-		isrc, state, err := mb.try(ctx, cpath, superv)
+		isrc, err := mb.try(ctx, cpath)
 		if err != nil {
 			t.Errorf("Unexpected error while setting up hgSource for test repo: %s", err)
 			return
-		}
-
-		var wantstate sourceState
-		if state != wantstate {
-			t.Errorf("Expected return state to be %v, got %v", wantstate, state)
 		}
 
 		err = isrc.initLocal(ctx)
@@ -590,8 +567,7 @@ func TestGitSourceListVersionsNoHEAD(t *testing.T) {
 	mb := maybeGitSource{u}
 
 	ctx := context.Background()
-	superv := newSupervisor(ctx)
-	isrc, _, err := mb.try(ctx, cpath, superv)
+	isrc, err := mb.try(ctx, cpath)
 	if err != nil {
 		t.Fatalf("Unexpected error while setting up gitSource for test repo: %s", err)
 	}
@@ -647,15 +623,9 @@ func TestGitSourceListVersionsNoDupes(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	superv := newSupervisor(ctx)
-	src, state, err := mb.try(ctx, cpath, superv)
+	src, err := mb.try(ctx, cpath)
 	if err != nil {
 		t.Fatalf("Unexpected error while setting up gitSource for test repo: %s", err)
-	}
-
-	var wantstate sourceState
-	if state != wantstate {
-		t.Errorf("Expected return state to be %v, got %v", wantstate, state)
 	}
 
 	err = src.initLocal(ctx)
@@ -808,8 +778,7 @@ func Test_bzrSource_exportRevisionTo_removeVcsFiles(t *testing.T) {
 	mb := maybeBzrSource{u}
 
 	ctx := context.Background()
-	superv := newSupervisor(ctx)
-	isrc, _, err := mb.try(ctx, cpath, superv)
+	isrc, err := mb.try(ctx, cpath)
 	if err != nil {
 		t.Fatalf("unexpected error while setting up hgSource for test repo: %s", err)
 	}
@@ -862,8 +831,7 @@ func Test_hgSource_exportRevisionTo_removeVcsFiles(t *testing.T) {
 	mb := maybeHgSource{u}
 
 	ctx := context.Background()
-	superv := newSupervisor(ctx)
-	isrc, _, err := mb.try(ctx, cpath, superv)
+	isrc, err := mb.try(ctx, cpath)
 	if err != nil {
 		t.Fatalf("unexpected error while setting up hgSource for test repo: %s", err)
 	}
