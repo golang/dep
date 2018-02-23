@@ -234,7 +234,7 @@ only in the root project, _ie_ the project where `dep` runs.For example,
 
 You have a project: `github.com/yourusername/awesomeproject`. 
 
-`github.com/foo/bar` is dependecy for your project.
+`github.com/foo/bar` is a dependency  for your project.
 
 Here `dep` evaluates the `Gopkg.toml` files of both these packages as follows.
 
