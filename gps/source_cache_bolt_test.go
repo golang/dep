@@ -7,6 +7,7 @@ package gps
 import (
 	"io/ioutil"
 	"log"
+	"path"
 	"testing"
 	"time"
 
@@ -65,9 +66,19 @@ func TestBoltCacheTimeout(t *testing.T) {
 	ptree := pkgtree.PackageTree{
 		ImportRoot: root,
 		Packages: map[string]pkgtree.PackageOrErr{
-			"simple": {
+			root: {
 				P: pkgtree.Package{
-					ImportPath:  "simple",
+					ImportPath:  root,
+					CommentPath: "comment",
+					Name:        "test",
+					Imports: []string{
+						"sort",
+					},
+				},
+			},
+			path.Join(root, "simple"): {
+				P: pkgtree.Package{
+					ImportPath:  path.Join(root, "simple"),
 					CommentPath: "comment",
 					Name:        "simple",
 					Imports: []string{
@@ -76,9 +87,9 @@ func TestBoltCacheTimeout(t *testing.T) {
 					},
 				},
 			},
-			"m1p": {
+			path.Join(root, "m1p"): {
 				P: pkgtree.Package{
-					ImportPath:  "m1p",
+					ImportPath:  path.Join(root, "m1p"),
 					CommentPath: "",
 					Name:        "m1p",
 					Imports: []string{
@@ -113,7 +124,7 @@ func TestBoltCacheTimeout(t *testing.T) {
 			t.Errorf("lock differences:\n\t %#v", dl)
 		}
 
-		got, ok := c.getPackageTree(rev)
+		got, ok := c.getPackageTree(rev, root)
 		if !ok {
 			t.Errorf("no package tree found:\n\t(WNT): %#v", ptree)
 		}
@@ -155,7 +166,7 @@ func TestBoltCacheTimeout(t *testing.T) {
 			t.Errorf("lock differences:\n\t %#v", dl)
 		}
 
-		gotPtree, ok := c.getPackageTree(rev)
+		gotPtree, ok := c.getPackageTree(rev, root)
 		if !ok {
 			t.Errorf("no package tree found:\n\t(WNT): %#v", ptree)
 		}
@@ -188,7 +199,7 @@ func TestBoltCacheTimeout(t *testing.T) {
 			t.Errorf("lock differences:\n\t %#v", dl)
 		}
 
-		got, ok := c.getPackageTree(rev)
+		got, ok := c.getPackageTree(rev, root)
 		if !ok {
 			t.Errorf("no package tree found:\n\t(WNT): %#v", ptree)
 		}
@@ -231,9 +242,9 @@ func TestBoltCacheTimeout(t *testing.T) {
 	newPtree := pkgtree.PackageTree{
 		ImportRoot: root,
 		Packages: map[string]pkgtree.PackageOrErr{
-			"simple": {
+			path.Join(root, "simple"): {
 				P: pkgtree.Package{
-					ImportPath:  "simple",
+					ImportPath:  path.Join(root, "simple"),
 					CommentPath: "newcomment",
 					Name:        "simple",
 					Imports: []string{
@@ -242,9 +253,9 @@ func TestBoltCacheTimeout(t *testing.T) {
 					},
 				},
 			},
-			"m1p": {
+			path.Join(root, "m1p"): {
 				P: pkgtree.Package{
-					ImportPath:  "m1p",
+					ImportPath:  path.Join(root, "m1p"),
 					CommentPath: "",
 					Name:        "m1p",
 					Imports: []string{
@@ -276,7 +287,7 @@ func TestBoltCacheTimeout(t *testing.T) {
 			t.Errorf("lock differences:\n\t %#v", dl)
 		}
 
-		got, ok := c.getPackageTree(rev)
+		got, ok := c.getPackageTree(rev, root)
 		if !ok {
 			t.Errorf("no package tree found:\n\t(WNT): %#v", newPtree)
 		}

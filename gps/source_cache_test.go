@@ -7,6 +7,7 @@ package gps
 import (
 	"io/ioutil"
 	"log"
+	"path"
 	"reflect"
 	"sort"
 	"testing"
@@ -190,7 +191,7 @@ func (test singleSourceCacheTest) run(t *testing.T) {
 
 		const rev Revision = "rev_adsfjkl"
 
-		if got, ok := c.getPackageTree(rev); ok {
+		if got, ok := c.getPackageTree(rev, root); ok {
 			t.Fatalf("unexpected result before setting package tree: %v", got)
 		}
 
@@ -204,9 +205,19 @@ func (test singleSourceCacheTest) run(t *testing.T) {
 		pt := pkgtree.PackageTree{
 			ImportRoot: root,
 			Packages: map[string]pkgtree.PackageOrErr{
-				"simple": {
+				root: {
 					P: pkgtree.Package{
-						ImportPath:  "simple",
+						ImportPath:  root,
+						CommentPath: "comment",
+						Name:        "test",
+						Imports: []string{
+							"sort",
+						},
+					},
+				},
+				path.Join(root, "simple"): {
+					P: pkgtree.Package{
+						ImportPath:  path.Join(root, "simple"),
 						CommentPath: "comment",
 						Name:        "simple",
 						Imports: []string{
@@ -215,9 +226,9 @@ func (test singleSourceCacheTest) run(t *testing.T) {
 						},
 					},
 				},
-				"m1p": {
+				path.Join(root, "m1p"): {
 					P: pkgtree.Package{
-						ImportPath:  "m1p",
+						ImportPath:  path.Join(root, "m1p"),
 						CommentPath: "",
 						Name:        "m1p",
 						Imports: []string{
@@ -238,7 +249,7 @@ func (test singleSourceCacheTest) run(t *testing.T) {
 			c, close = test.newCache(t, cpath, root)
 		}
 
-		got, ok := c.getPackageTree(rev)
+		got, ok := c.getPackageTree(rev, root)
 		if !ok {
 			t.Errorf("no package tree found:\n\t(WNT): %#v", pt)
 		}
@@ -254,7 +265,7 @@ func (test singleSourceCacheTest) run(t *testing.T) {
 		pt = pkgtree.PackageTree{
 			ImportRoot: root,
 			Packages: map[string]pkgtree.PackageOrErr{
-				"test": {
+				path.Join(root, "test"): {
 					Err: errors.New("error"),
 				},
 			},
@@ -268,7 +279,7 @@ func (test singleSourceCacheTest) run(t *testing.T) {
 			c, close = test.newCache(t, cpath, root)
 		}
 
-		got, ok = c.getPackageTree(rev)
+		got, ok = c.getPackageTree(rev, root)
 		if !ok {
 			t.Errorf("no package tree found:\n\t(WNT): %#v", pt)
 		}
@@ -443,9 +454,9 @@ func comparePackageTree(t *testing.T, want, got pkgtree.PackageTree) {
 		} else {
 			for k, v := range want {
 				if v2, ok := got[k]; !ok {
-					t.Errorf("key %q: expected %v but got none", k, v)
+					t.Errorf("key %s: expected %v but got none", k, v)
 				} else if !packageOrErrEqual(v, v2) {
-					t.Errorf("key %q: expected %v but got %v", k, v, v2)
+					t.Errorf("key %s: expected %v but got %v", k, v, v2)
 				}
 			}
 		}
@@ -549,7 +560,7 @@ func (discardCache) getManifestAndLock(Revision, ProjectAnalyzerInfo) (Manifest,
 
 func (discardCache) setPackageTree(Revision, pkgtree.PackageTree) {}
 
-func (discardCache) getPackageTree(Revision) (pkgtree.PackageTree, bool) {
+func (discardCache) getPackageTree(Revision, ProjectRoot) (pkgtree.PackageTree, bool) {
 	return pkgtree.PackageTree{}, false
 }
 

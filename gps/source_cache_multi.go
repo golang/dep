@@ -43,13 +43,13 @@ func (c *multiCache) setPackageTree(r Revision, ptree pkgtree.PackageTree) {
 	c.disk.setPackageTree(r, ptree)
 }
 
-func (c *multiCache) getPackageTree(r Revision) (pkgtree.PackageTree, bool) {
-	ptree, ok := c.mem.getPackageTree(r)
+func (c *multiCache) getPackageTree(r Revision, pr ProjectRoot) (pkgtree.PackageTree, bool) {
+	ptree, ok := c.mem.getPackageTree(r, pr)
 	if ok {
 		return ptree, true
 	}
 
-	ptree, ok = c.disk.getPackageTree(r)
+	ptree, ok = c.disk.getPackageTree(r, pr)
 	if ok {
 		c.mem.setPackageTree(r, ptree)
 		return ptree, true

@@ -9,6 +9,9 @@ BUG FIXES:
 
 IMPROVEMENTS:
 
+* Reduce network access by trusting local source information and only pulling
+from upstream when necessary ([#1250](https://github.com/golang/dep/pull/1250)).
+
 # v0.4.1
 
 NEW FEATURES:

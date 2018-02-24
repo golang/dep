@@ -67,15 +67,9 @@ func testGitSourceInteractions(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	superv := newSupervisor(ctx)
-	isrc, state, err := mb.try(ctx, cpath, newMemoryCache(), superv)
+	isrc, err := mb.try(ctx, cpath)
 	if err != nil {
 		t.Fatalf("Unexpected error while setting up gitSource for test repo: %s", err)
-	}
-
-	wantstate := sourceIsSetUp | sourceExistsUpstream | sourceHasLatestVersionList
-	if state != wantstate {
-		t.Errorf("Expected return state to be %v, got %v", wantstate, state)
 	}
 
 	err = isrc.initLocal(ctx)
@@ -119,8 +113,11 @@ func testGitSourceInteractions(t *testing.T) {
 			NewBranch("v1.1").Pair(Revision("f1fbc520489a98306eb28c235204e39fa8a89c84")),
 			NewBranch("v3").Pair(Revision("4a54adf81c75375d26d376459c00d5ff9b703e5e")),
 		}
-		if !reflect.DeepEqual(vlist, evl) {
-			t.Errorf("Version list was not what we expected:\n\t(GOT): %s\n\t(WNT): %s", vlist, evl)
+		for k, e := range evl {
+			if !vlist[k].identical(e) {
+				t.Errorf("version list was not what we expected:\n\t(GOT): %#v\n\t(WNT): %#v", vlist, evl)
+				break
+			}
 		}
 	}
 
@@ -169,16 +166,10 @@ func testGopkginSourceInteractions(t *testing.T) {
 		}
 
 		ctx := context.Background()
-		superv := newSupervisor(ctx)
-		isrc, state, err := mb.try(ctx, cpath, newMemoryCache(), superv)
+		isrc, err := mb.try(ctx, cpath)
 		if err != nil {
 			t.Errorf("Unexpected error while setting up gopkginSource for test repo: %s", err)
 			return
-		}
-
-		wantstate := sourceIsSetUp | sourceExistsUpstream | sourceHasLatestVersionList
-		if state != wantstate {
-			t.Errorf("Expected return state to be %v, got %v", wantstate, state)
 		}
 
 		err = isrc.initLocal(ctx)
@@ -341,15 +332,9 @@ func testBzrSourceInteractions(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	superv := newSupervisor(ctx)
-	isrc, state, err := mb.try(ctx, cpath, newMemoryCache(), superv)
+	isrc, err := mb.try(ctx, cpath)
 	if err != nil {
 		t.Fatalf("Unexpected error while setting up bzrSource for test repo: %s", err)
-	}
-
-	wantstate := sourceIsSetUp | sourceExistsUpstream
-	if state != wantstate {
-		t.Errorf("Expected return state to be %v, got %v", wantstate, state)
 	}
 
 	err = isrc.initLocal(ctx)
@@ -362,9 +347,6 @@ func testBzrSourceInteractions(t *testing.T) {
 		t.Fatalf("Expected a bzrSource, got a %T", isrc)
 	}
 
-	if state != wantstate {
-		t.Errorf("Expected return state to be %v, got %v", wantstate, state)
-	}
 	if un != src.upstreamURL() {
 		t.Errorf("Expected %s as source URL, got %s", un, src.upstreamURL())
 	}
@@ -452,21 +434,16 @@ func testHgSourceInteractions(t *testing.T) {
 		}
 
 		ctx := context.Background()
-		superv := newSupervisor(ctx)
-		isrc, state, err := mb.try(ctx, cpath, newMemoryCache(), superv)
+		isrc, err := mb.try(ctx, cpath)
 		if err != nil {
 			t.Errorf("Unexpected error while setting up hgSource for test repo: %s", err)
 			return
 		}
 
-		wantstate := sourceIsSetUp | sourceExistsUpstream
-		if state != wantstate {
-			t.Errorf("Expected return state to be %v, got %v", wantstate, state)
-		}
-
 		err = isrc.initLocal(ctx)
 		if err != nil {
-			t.Fatalf("Error on cloning hg repo: %s", err)
+			t.Errorf("Error on cloning hg repo: %s", err)
+			return
 		}
 
 		src, ok := isrc.(*hgSource)
@@ -475,9 +452,6 @@ func testHgSourceInteractions(t *testing.T) {
 			return
 		}
 
-		if state != wantstate {
-			t.Errorf("Expected return state to be %v, got %v", wantstate, state)
-		}
 		if un != src.upstreamURL() {
 			t.Errorf("Expected %s as source URL, got %s", un, src.upstreamURL())
 		}
@@ -500,8 +474,12 @@ func testHgSourceInteractions(t *testing.T) {
 			t.Errorf("hg test repo should've produced %v versions, got %v", len(evl), len(vlist))
 		} else {
 			SortForUpgrade(vlist)
-			if !reflect.DeepEqual(vlist, evl) {
-				t.Errorf("Version list was not what we expected:\n\t(GOT): %s\n\t(WNT): %s", vlist, evl)
+
+			for k, e := range evl {
+				if !vlist[k].identical(e) {
+					t.Errorf("version list was not what we expected:\n\t(GOT): %#v\n\t(WNT): %#v", vlist, evl)
+					break
+				}
 			}
 		}
 
@@ -516,8 +494,11 @@ func testHgSourceInteractions(t *testing.T) {
 			t.Errorf("hg test repo should've produced %v versions, got %v", len(evl), len(vlist))
 		} else {
 			SortForUpgrade(vlist)
-			if !reflect.DeepEqual(vlist, evl) {
-				t.Errorf("Version list was not what we expected:\n\t(GOT): %s\n\t(WNT): %s", vlist, evl)
+			for k, e := range evl {
+				if !vlist[k].identical(e) {
+					t.Errorf("version list was not what we expected:\n\t(GOT): %#v\n\t(WNT): %#v", vlist, evl)
+					break
+				}
 			}
 		}
 
@@ -586,8 +567,7 @@ func TestGitSourceListVersionsNoHEAD(t *testing.T) {
 	mb := maybeGitSource{u}
 
 	ctx := context.Background()
-	superv := newSupervisor(ctx)
-	isrc, _, err := mb.try(ctx, cpath, newMemoryCache(), superv)
+	isrc, err := mb.try(ctx, cpath)
 	if err != nil {
 		t.Fatalf("Unexpected error while setting up gitSource for test repo: %s", err)
 	}
@@ -643,15 +623,9 @@ func TestGitSourceListVersionsNoDupes(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	superv := newSupervisor(ctx)
-	src, state, err := mb.try(ctx, cpath, newMemoryCache(), superv)
+	src, err := mb.try(ctx, cpath)
 	if err != nil {
 		t.Fatalf("Unexpected error while setting up gitSource for test repo: %s", err)
-	}
-
-	wantstate := sourceIsSetUp | sourceExistsUpstream | sourceHasLatestVersionList
-	if state != wantstate {
-		t.Errorf("Expected return state to be %v, got %v", wantstate, state)
 	}
 
 	err = src.initLocal(ctx)
@@ -804,8 +778,7 @@ func Test_bzrSource_exportRevisionTo_removeVcsFiles(t *testing.T) {
 	mb := maybeBzrSource{u}
 
 	ctx := context.Background()
-	superv := newSupervisor(ctx)
-	isrc, _, err := mb.try(ctx, cpath, newMemoryCache(), superv)
+	isrc, err := mb.try(ctx, cpath)
 	if err != nil {
 		t.Fatalf("unexpected error while setting up hgSource for test repo: %s", err)
 	}
@@ -858,8 +831,7 @@ func Test_hgSource_exportRevisionTo_removeVcsFiles(t *testing.T) {
 	mb := maybeHgSource{u}
 
 	ctx := context.Background()
-	superv := newSupervisor(ctx)
-	isrc, _, err := mb.try(ctx, cpath, newMemoryCache(), superv)
+	isrc, err := mb.try(ctx, cpath)
 	if err != nil {
 		t.Fatalf("unexpected error while setting up hgSource for test repo: %s", err)
 	}

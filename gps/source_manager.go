@@ -492,7 +492,13 @@ func (sm *SourceMgr) SourceExists(id ProjectIdentifier) (bool, error) {
 	}
 
 	ctx := context.TODO()
-	return srcg.existsInCache(ctx) || srcg.existsUpstream(ctx), nil
+	if err := srcg.existsInCache(ctx); err == nil {
+		return true, nil
+	}
+	if err := srcg.existsUpstream(ctx); err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 // SyncSourceFor will ensure that all local caches and information about a

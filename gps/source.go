@@ -5,6 +5,7 @@
 package gps
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"log"
@@ -21,34 +22,50 @@ import (
 type sourceState int32
 
 const (
-	sourceIsSetUp sourceState = 1 << iota
-	sourceExistsUpstream
+	// sourceExistsUpstream means the chosen source was verified upstream, during this execution.
+	sourceExistsUpstream sourceState = 1 << iota
+	// sourceExistsLocally means the repo was retrieved in the past.
 	sourceExistsLocally
+	// sourceHasLatestVersionList means the version list was refreshed within the cache window.
 	sourceHasLatestVersionList
+	// sourceHasLatestLocally means the repo was pulled fresh during this execution.
 	sourceHasLatestLocally
 )
 
-type srcReturnChans struct {
-	ret chan *sourceGateway
-	err chan error
+func (state sourceState) String() string {
+	var b bytes.Buffer
+	for _, s := range []struct {
+		sourceState
+		string
+	}{
+		{sourceExistsUpstream, "sourceExistsUpstream"},
+		{sourceExistsLocally, "sourceExistsLocally"},
+		{sourceHasLatestVersionList, "sourceHasLatestVersionList"},
+		{sourceHasLatestLocally, "sourceHasLatestLocally"},
+	} {
+		if state&s.sourceState > 0 {
+			if b.Len() > 0 {
+				b.WriteString("|")
+			}
+			b.WriteString(s.string)
+		}
+	}
+	return b.String()
 }
 
-func (rc srcReturnChans) awaitReturn() (sg *sourceGateway, err error) {
-	select {
-	case sg = <-rc.ret:
-	case err = <-rc.err:
-	}
-	return
+type srcReturn struct {
+	*sourceGateway
+	error
 }
 
 type sourceCoordinator struct {
 	supervisor *supervisor
-	srcmut     sync.RWMutex // guards srcs and nameToURL maps
+	deducer    deducer
+	srcmut     sync.RWMutex // guards srcs and srcIdx
 	srcs       map[string]*sourceGateway
 	nameToURL  map[string]string
 	psrcmut    sync.Mutex // guards protoSrcs map
-	protoSrcs  map[string][]srcReturnChans
-	deducer    deducer
+	protoSrcs  map[string][]chan srcReturn
 	cachedir   string
 	logger     *log.Logger
 }
@@ -61,7 +78,7 @@ func newSourceCoordinator(superv *supervisor, deducer deducer, cachedir string, 
 		logger:     logger,
 		srcs:       make(map[string]*sourceGateway),
 		nameToURL:  make(map[string]string),
-		protoSrcs:  make(map[string][]srcReturnChans),
+		protoSrcs:  make(map[string][]chan srcReturn),
 	}
 }
 
@@ -107,6 +124,7 @@ func (sc *sourceCoordinator) getSourceGatewayFor(ctx context.Context, id Project
 		// If the folded name differs from the input name, then there may
 		// already be an entry for it in the nameToURL map, so check again.
 		if url, has := sc.nameToURL[foldedNormalName]; has {
+			srcGate, has := sc.srcs[url]
 			// There was a match on the canonical folded variant. Upgrade to a
 			// write lock, so that future calls on this name don't need to
 			// burn cycles on folding.
@@ -118,8 +136,6 @@ func (sc *sourceCoordinator) getSourceGatewayFor(ctx context.Context, id Project
 			// words, these operations commute, so we can safely write here
 			// without checking again.
 			sc.nameToURL[normalizedName] = url
-
-			srcGate, has := sc.srcs[url]
 			sc.srcmut.Unlock()
 			if has {
 				return srcGate, nil
@@ -135,32 +151,22 @@ func (sc *sourceCoordinator) getSourceGatewayFor(ctx context.Context, id Project
 	if chans, has := sc.protoSrcs[foldedNormalName]; has {
 		// Another goroutine is already working on this normalizedName. Fold
 		// in with that work by attaching our return channels to the list.
-		rc := srcReturnChans{
-			ret: make(chan *sourceGateway, 1),
-			err: make(chan error, 1),
-		}
+		rc := make(chan srcReturn, 1)
 		sc.protoSrcs[foldedNormalName] = append(chans, rc)
 		sc.psrcmut.Unlock()
-		return rc.awaitReturn()
+		ret := <-rc
+		return ret.sourceGateway, ret.error
 	}
 
-	sc.protoSrcs[foldedNormalName] = []srcReturnChans{}
+	sc.protoSrcs[foldedNormalName] = []chan srcReturn{}
 	sc.psrcmut.Unlock()
 
 	doReturn := func(sg *sourceGateway, err error) {
+		ret := srcReturn{sourceGateway: sg, error: err}
 		sc.psrcmut.Lock()
-		if sg != nil {
-			for _, rc := range sc.protoSrcs[foldedNormalName] {
-				rc.ret <- sg
-			}
-		} else if err != nil {
-			for _, rc := range sc.protoSrcs[foldedNormalName] {
-				rc.err <- err
-			}
-		} else {
-			panic("sg and err both nil")
+		for _, rc := range sc.protoSrcs[foldedNormalName] {
+			rc <- ret
 		}
-
 		delete(sc.protoSrcs, foldedNormalName)
 		sc.psrcmut.Unlock()
 	}
@@ -178,7 +184,6 @@ func (sc *sourceCoordinator) getSourceGatewayFor(ctx context.Context, id Project
 	// sources map after the initial unlock, but before this goroutine got
 	// scheduled. Guard against that by checking the main sources map again
 	// and bailing out if we find an entry.
-	var srcGate *sourceGateway
 	sc.srcmut.RLock()
 	if url, has := sc.nameToURL[foldedNormalName]; has {
 		if srcGate, has := sc.srcs[url]; has {
@@ -190,36 +195,40 @@ func (sc *sourceCoordinator) getSourceGatewayFor(ctx context.Context, id Project
 	}
 	sc.srcmut.RUnlock()
 
-	srcGate = newSourceGateway(pd.mb, sc.supervisor, sc.cachedir)
-
-	// The normalized name is usually different from the source URL- e.g.
-	// github.com/sdboyer/gps vs. https://github.com/sdboyer/gps. But it's
-	// possible to arrive here with a full URL as the normalized name - and both
-	// paths *must* lead to the same sourceGateway instance in order to ensure
-	// disk access is correctly managed.
-	//
-	// Therefore, we now must query the sourceGateway to get the actual
-	// sourceURL it's operating on, and ensure it's *also* registered at
-	// that path in the map. This will cause it to actually initiate the
-	// maybeSource.try() behavior in order to settle on a URL.
-	url, err := srcGate.sourceURL(ctx)
-	if err != nil {
-		doReturn(nil, err)
-		return nil, err
-	}
-
-	// If the normalizedName and foldedNormalName differ, then we're pretty well
-	// guaranteed that returned URL will also need folding into canonical form.
-	var unfoldedURL string
-	if notFolded {
-		unfoldedURL = url
-		url = toFold(url)
-	}
-
-	// We know we have a working srcGateway at this point, and need to
-	// integrate it back into the main map.
 	sc.srcmut.Lock()
 	defer sc.srcmut.Unlock()
+
+	// Get or create a sourceGateway.
+	var srcGate *sourceGateway
+	var url, unfoldedURL string
+	var errs errorSlice
+	for _, m := range pd.mb {
+		url = m.URL().String()
+		if notFolded {
+			// If the normalizedName and foldedNormalName differ, then we're pretty well
+			// guaranteed that returned URL will also need folding into canonical form.
+			unfoldedURL = url
+			url = toFold(url)
+		}
+		if sg, has := sc.srcs[url]; has {
+			srcGate = sg
+			break
+		}
+		src, err := m.try(ctx, sc.cachedir)
+		if err == nil {
+			srcGate, err = newSourceGateway(ctx, src, sc.supervisor, sc.cachedir)
+			if err == nil {
+				sc.srcs[url] = srcGate
+				break
+			}
+		}
+		errs = append(errs, err)
+	}
+	if srcGate == nil {
+		doReturn(nil, errs)
+		return nil, errs
+	}
+
 	// Record the name -> URL mapping, making sure that we also get the
 	// self-mapping.
 	sc.nameToURL[foldedNormalName] = url
@@ -234,13 +243,6 @@ func (sc *sourceCoordinator) getSourceGatewayFor(ctx context.Context, id Project
 		sc.nameToURL[unfoldedURL] = url
 	}
 
-	if sa, has := sc.srcs[url]; has {
-		// URL already had an entry in the main map; use that as the result.
-		doReturn(sa, nil)
-		return sa, nil
-	}
-
-	sc.srcs[url] = srcGate
 	doReturn(srcGate, nil)
 	return srcGate, nil
 }
@@ -249,7 +251,6 @@ func (sc *sourceCoordinator) getSourceGatewayFor(ctx context.Context, id Project
 // and caching them as needed.
 type sourceGateway struct {
 	cachedir string
-	maybe    maybeSource
 	srcState sourceState
 	src      source
 	cache    singleSourceCache
@@ -257,54 +258,63 @@ type sourceGateway struct {
 	suprvsr  *supervisor
 }
 
-func newSourceGateway(maybe maybeSource, superv *supervisor, cachedir string) *sourceGateway {
+// newSourceGateway returns a new gateway for src. If the source exists locally,
+// the local state may be cleaned, otherwise we ping upstream.
+func newSourceGateway(ctx context.Context, src source, superv *supervisor, cachedir string) (*sourceGateway, error) {
+	var state sourceState
+	local := src.existsLocally(ctx)
+	if local {
+		state |= sourceExistsLocally
+		if err := superv.do(ctx, src.upstreamURL(), ctValidateLocal, func(ctx context.Context) error {
+			return src.maybeClean(ctx)
+		}); err != nil {
+			return nil, err
+		}
+	}
+
 	sg := &sourceGateway{
-		maybe:    maybe,
+		srcState: state,
+		src:      src,
 		cachedir: cachedir,
 		suprvsr:  superv,
 	}
 	sg.cache = sg.createSingleSourceCache()
 
-	return sg
+	if !local {
+		if err := sg.require(ctx, sourceExistsUpstream); err != nil {
+			return nil, err
+		}
+	}
+
+	return sg, nil
 }
 
 func (sg *sourceGateway) syncLocal(ctx context.Context) error {
 	sg.mu.Lock()
-	defer sg.mu.Unlock()
-
-	_, err := sg.require(ctx, sourceIsSetUp|sourceExistsLocally|sourceHasLatestLocally)
+	err := sg.require(ctx, sourceExistsLocally|sourceHasLatestLocally)
+	sg.mu.Unlock()
 	return err
 }
 
-func (sg *sourceGateway) existsInCache(ctx context.Context) bool {
+func (sg *sourceGateway) existsInCache(ctx context.Context) error {
 	sg.mu.Lock()
-	defer sg.mu.Unlock()
-
-	_, err := sg.require(ctx, sourceIsSetUp|sourceExistsLocally)
-	if err != nil {
-		return false
-	}
-
-	return sg.srcState&sourceExistsLocally != 0
+	err := sg.require(ctx, sourceExistsLocally)
+	sg.mu.Unlock()
+	return err
 }
 
-func (sg *sourceGateway) existsUpstream(ctx context.Context) bool {
+func (sg *sourceGateway) existsUpstream(ctx context.Context) error {
 	sg.mu.Lock()
-	defer sg.mu.Unlock()
-
-	_, err := sg.require(ctx, sourceIsSetUp|sourceExistsUpstream)
-	if err != nil {
-		return false
-	}
-
-	return sg.srcState&sourceExistsUpstream != 0
+	err := sg.require(ctx, sourceExistsUpstream)
+	sg.mu.Unlock()
+	return err
 }
 
 func (sg *sourceGateway) exportVersionTo(ctx context.Context, v Version, to string) error {
 	sg.mu.Lock()
 	defer sg.mu.Unlock()
 
-	_, err := sg.require(ctx, sourceIsSetUp|sourceExistsLocally)
+	err := sg.require(ctx, sourceExistsLocally)
 	if err != nil {
 		return err
 	}
@@ -325,7 +335,7 @@ func (sg *sourceGateway) exportVersionTo(ctx context.Context, v Version, to stri
 	// TODO(sdboyer) It'd be better if we could check the error to see if this
 	// actually was the cause of the problem.
 	if err != nil && sg.srcState&sourceHasLatestLocally == 0 {
-		if _, err = sg.require(ctx, sourceHasLatestLocally); err == nil {
+		if err = sg.require(ctx, sourceHasLatestLocally); err == nil {
 			err = sg.suprvsr.do(ctx, sg.src.upstreamURL(), ctExportTree, func(ctx context.Context) error {
 				return sg.src.exportRevisionTo(ctx, r, to)
 			})
@@ -349,7 +359,7 @@ func (sg *sourceGateway) getManifestAndLock(ctx context.Context, pr ProjectRoot,
 		return m, l, nil
 	}
 
-	_, err = sg.require(ctx, sourceIsSetUp|sourceExistsLocally)
+	err = sg.require(ctx, sourceExistsLocally)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -369,7 +379,7 @@ func (sg *sourceGateway) getManifestAndLock(ctx context.Context, pr ProjectRoot,
 	if err != nil && sg.srcState&sourceHasLatestLocally == 0 {
 		// TODO(sdboyer) we should warn/log/something in adaptive recovery
 		// situations like this
-		_, err = sg.require(ctx, sourceHasLatestLocally)
+		err = sg.require(ctx, sourceHasLatestLocally)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -388,8 +398,6 @@ func (sg *sourceGateway) getManifestAndLock(ctx context.Context, pr ProjectRoot,
 	return m, l, nil
 }
 
-// FIXME ProjectRoot input either needs to parameterize the cache, or be
-// incorporated on the fly on egress...?
 func (sg *sourceGateway) listPackages(ctx context.Context, pr ProjectRoot, v Version) (pkgtree.PackageTree, error) {
 	sg.mu.Lock()
 	defer sg.mu.Unlock()
@@ -399,12 +407,12 @@ func (sg *sourceGateway) listPackages(ctx context.Context, pr ProjectRoot, v Ver
 		return pkgtree.PackageTree{}, err
 	}
 
-	ptree, has := sg.cache.getPackageTree(r)
+	ptree, has := sg.cache.getPackageTree(r, pr)
 	if has {
 		return ptree, nil
 	}
 
-	_, err = sg.require(ctx, sourceIsSetUp|sourceExistsLocally)
+	err = sg.require(ctx, sourceExistsLocally)
 	if err != nil {
 		return pkgtree.PackageTree{}, err
 	}
@@ -424,7 +432,7 @@ func (sg *sourceGateway) listPackages(ctx context.Context, pr ProjectRoot, v Ver
 	if err != nil && sg.srcState&sourceHasLatestLocally == 0 {
 		// TODO(sdboyer) we should warn/log/something in adaptive recovery
 		// situations like this
-		_, err = sg.require(ctx, sourceHasLatestLocally)
+		err = sg.require(ctx, sourceHasLatestLocally)
 		if err != nil {
 			return pkgtree.PackageTree{}, err
 		}
@@ -443,6 +451,7 @@ func (sg *sourceGateway) listPackages(ctx context.Context, pr ProjectRoot, v Ver
 	return ptree, nil
 }
 
+// caller must hold sg.mu.
 func (sg *sourceGateway) convertToRevision(ctx context.Context, v Version) (Revision, error) {
 	// When looking up by Version, there are four states that may have
 	// differing opinions about version->revision mappings:
@@ -470,7 +479,7 @@ func (sg *sourceGateway) convertToRevision(ctx context.Context, v Version) (Revi
 
 	// The version list is out of date; it's possible this version might
 	// show up after loading it.
-	_, err := sg.require(ctx, sourceIsSetUp|sourceHasLatestVersionList)
+	err := sg.require(ctx, sourceHasLatestVersionList)
 	if err != nil {
 		return "", err
 	}
@@ -487,10 +496,11 @@ func (sg *sourceGateway) listVersions(ctx context.Context) ([]PairedVersion, err
 	sg.mu.Lock()
 	defer sg.mu.Unlock()
 
-	// TODO(sdboyer) The problem here is that sourceExistsUpstream may not be
-	// sufficient (e.g. bzr, hg), but we don't want to force local b/c git
-	// doesn't need it
-	_, err := sg.require(ctx, sourceIsSetUp|sourceExistsUpstream|sourceHasLatestVersionList)
+	if pvs, ok := sg.cache.getAllVersions(); ok {
+		return pvs, nil
+	}
+
+	err := sg.require(ctx, sourceHasLatestVersionList)
 	if err != nil {
 		return nil, err
 	}
@@ -504,7 +514,7 @@ func (sg *sourceGateway) revisionPresentIn(ctx context.Context, r Revision) (boo
 	sg.mu.Lock()
 	defer sg.mu.Unlock()
 
-	_, err := sg.require(ctx, sourceIsSetUp|sourceExistsLocally)
+	err := sg.require(ctx, sourceExistsLocally)
 	if err != nil {
 		return false, err
 	}
@@ -524,24 +534,12 @@ func (sg *sourceGateway) disambiguateRevision(ctx context.Context, r Revision) (
 	sg.mu.Lock()
 	defer sg.mu.Unlock()
 
-	_, err := sg.require(ctx, sourceIsSetUp|sourceExistsLocally)
+	err := sg.require(ctx, sourceExistsLocally)
 	if err != nil {
 		return "", err
 	}
 
 	return sg.src.disambiguateRevision(ctx, r)
-}
-
-func (sg *sourceGateway) sourceURL(ctx context.Context) (string, error) {
-	sg.mu.Lock()
-	defer sg.mu.Unlock()
-
-	_, err := sg.require(ctx, sourceIsSetUp)
-	if err != nil {
-		return "", err
-	}
-
-	return sg.src.upstreamURL(), nil
 }
 
 // createSingleSourceCache creates a singleSourceCache instance for use by
@@ -552,56 +550,84 @@ func (sg *sourceGateway) createSingleSourceCache() singleSourceCache {
 	return newMemoryCache()
 }
 
-func (sg *sourceGateway) require(ctx context.Context, wanted sourceState) (errState sourceState, err error) {
+// sourceExistsUpstream verifies that the source exists upstream and that the
+// upstreamURL has not changed and returns any additional sourceState, or an error.
+func (sg *sourceGateway) sourceExistsUpstream(ctx context.Context) (sourceState, error) {
+	if sg.src.existsCallsListVersions() {
+		return sg.loadLatestVersionList(ctx)
+	}
+	err := sg.suprvsr.do(ctx, sg.src.sourceType(), ctSourcePing, func(ctx context.Context) error {
+		if !sg.src.existsUpstream(ctx) {
+			return errors.Errorf("source does not exist upstream: %s: %s", sg.src.sourceType(), sg.src.upstreamURL())
+		}
+		return nil
+	})
+	return 0, err
+}
+
+// initLocal initializes the source locally and returns the resulting sourceState.
+func (sg *sourceGateway) initLocal(ctx context.Context) (sourceState, error) {
+	if err := sg.suprvsr.do(ctx, sg.src.sourceType(), ctSourceInit, func(ctx context.Context) error {
+		err := sg.src.initLocal(ctx)
+		return errors.Wrapf(err, "failed to fetch source for %s", sg.src.upstreamURL())
+	}); err != nil {
+		return 0, err
+	}
+	return sourceExistsUpstream | sourceExistsLocally | sourceHasLatestLocally, nil
+}
+
+// loadLatestVersionList loads the latest version list, possibly ensuring the source
+// exists locally first, and returns the resulting sourceState.
+func (sg *sourceGateway) loadLatestVersionList(ctx context.Context) (sourceState, error) {
+	var addlState sourceState
+	if sg.src.listVersionsRequiresLocal() && !sg.src.existsLocally(ctx) {
+		as, err := sg.initLocal(ctx)
+		if err != nil {
+			return 0, err
+		}
+		addlState |= as
+	}
+	var pvl []PairedVersion
+	if err := sg.suprvsr.do(ctx, sg.src.sourceType(), ctListVersions, func(ctx context.Context) error {
+		var err error
+		pvl, err = sg.src.listVersions(ctx)
+		return errors.Wrapf(err, "failed to list versions for %s", sg.src.upstreamURL())
+	}); err != nil {
+		return addlState, err
+	}
+	sg.cache.setVersionMap(pvl)
+	return addlState | sourceHasLatestVersionList, nil
+}
+
+// require ensures the sourceGateway has the wanted sourceState, fetching more
+// data if necessary. Returns an error if the state could not be reached.
+// caller must hold sg.mu
+func (sg *sourceGateway) require(ctx context.Context, wanted sourceState) (err error) {
 	todo := (^sg.srcState) & wanted
 	var flag sourceState = 1
 
 	for todo != 0 {
 		if todo&flag != 0 {
-			// Assign the currently visited bit to errState so that we can
-			// return easily later.
-			//
-			// Also set up addlState so that individual ops can easily attach
+			// Set up addlState so that individual ops can easily attach
 			// more states that were incidentally satisfied by the op.
-			errState = flag
 			var addlState sourceState
 
 			switch flag {
-			case sourceIsSetUp:
-				sg.src, addlState, err = sg.maybe.try(ctx, sg.cachedir, sg.cache, sg.suprvsr)
 			case sourceExistsUpstream:
-				err = sg.suprvsr.do(ctx, sg.src.sourceType(), ctSourcePing, func(ctx context.Context) error {
-					if !sg.src.existsUpstream(ctx) {
-						return fmt.Errorf("%s does not exist upstream", sg.src.upstreamURL())
-					}
-					return nil
-				})
+				addlState, err = sg.sourceExistsUpstream(ctx)
 			case sourceExistsLocally:
 				if !sg.src.existsLocally(ctx) {
-					err = sg.suprvsr.do(ctx, sg.src.sourceType(), ctSourceInit, func(ctx context.Context) error {
-						return sg.src.initLocal(ctx)
-					})
-
-					if err == nil {
-						addlState |= sourceHasLatestLocally
-					} else {
-						err = errors.Wrapf(err, "%s does not exist in the local cache and fetching failed", sg.src.upstreamURL())
-					}
+					addlState, err = sg.initLocal(ctx)
 				}
 			case sourceHasLatestVersionList:
-				var pvl []PairedVersion
-				err = sg.suprvsr.do(ctx, sg.src.sourceType(), ctListVersions, func(ctx context.Context) error {
-					pvl, err = sg.src.listVersions(ctx)
-					return err
-				})
-
-				if err == nil {
-					sg.cache.setVersionMap(pvl)
+				if _, ok := sg.cache.getAllVersions(); !ok {
+					addlState, err = sg.loadLatestVersionList(ctx)
 				}
 			case sourceHasLatestLocally:
 				err = sg.suprvsr.do(ctx, sg.src.sourceType(), ctSourceFetch, func(ctx context.Context) error {
 					return sg.src.updateLocal(ctx)
 				})
+				addlState = sourceExistsUpstream | sourceExistsLocally
 			}
 
 			if err != nil {
@@ -616,7 +642,7 @@ func (sg *sourceGateway) require(ctx context.Context, wanted sourceState) (errSt
 		flag <<= 1
 	}
 
-	return 0, nil
+	return nil
 }
 
 // source is an abstraction around the different underlying types (git, bzr, hg,
@@ -628,6 +654,8 @@ type source interface {
 	upstreamURL() string
 	initLocal(context.Context) error
 	updateLocal(context.Context) error
+	// maybeClean is a no-op when the underlying source does not support cleaning.
+	maybeClean(context.Context) error
 	listVersions(context.Context) ([]PairedVersion, error)
 	getManifestAndLock(context.Context, ProjectRoot, Revision, ProjectAnalyzer) (Manifest, Lock, error)
 	listPackages(context.Context, ProjectRoot, Revision) (pkgtree.PackageTree, error)
@@ -635,4 +663,10 @@ type source interface {
 	disambiguateRevision(context.Context, Revision) (Revision, error)
 	exportRevisionTo(context.Context, Revision, string) error
 	sourceType() string
+	// existsCallsListVersions returns true if calling existsUpstream actually lists
+	// versions underneath, meaning listVersions might as well be used instead.
+	existsCallsListVersions() bool
+	// listVersionsRequiresLocal returns true if calling listVersions first
+	// requires the source to exist locally.
+	listVersionsRequiresLocal() bool
 }

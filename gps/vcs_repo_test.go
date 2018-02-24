@@ -5,14 +5,10 @@
 package gps
 
 import (
-	"archive/tar"
-	"compress/gzip"
 	"context"
 	"errors"
-	"io"
 	"io/ioutil"
 	"os"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -49,73 +45,6 @@ func TestErrs(t *testing.T) {
 	err = newVcsRemoteErrorOr(errors.New("bar"), nil, "foo", "baz")
 	if _, is := err.(*vcs.RemoteError); !is {
 		t.Errorf("should have gotten remote error, got %T %v", err, err)
-	}
-}
-
-func TestNewCtxRepoHappyPath(t *testing.T) {
-	t.Parallel()
-
-	tempDir, err := ioutil.TempDir("", "go-ctx-repo-happy-test")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() {
-		err = os.RemoveAll(tempDir)
-		if err != nil {
-			t.Error(err)
-		}
-	}()
-
-	_, err = newCtxRepo(vcs.Git, gitRemoteTestRepo, tempDir)
-	if err != nil {
-		t.Fatal(err)
-	}
-}
-
-func TestNewCtxRepoRecovery(t *testing.T) {
-	t.Parallel()
-
-	tempDir, err := ioutil.TempDir("", "go-ctx-repo-recovery-test")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() {
-		err = os.RemoveAll(tempDir)
-		if err != nil {
-			t.Error(err)
-		}
-	}()
-
-	cwd, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	src := filepath.Join(cwd, "_testdata", "badrepo", "corrupt_dot_git_directory.tar")
-	f, err := os.Open(src)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer f.Close()
-
-	dest := filepath.Join(tempDir, ".git")
-	err = untar(dest, f)
-	if err != nil {
-		t.Fatalf("could not untar corrupt repo into temp folder: %v\n", err)
-	}
-
-	_, err = getVCSRepo(vcs.Git, gitRemoteTestRepo, tempDir)
-	if err != nil {
-		if _, ok := err.(*vcs.LocalError); !ok {
-			t.Fatalf("expected a local error but got: %v\n", err)
-		}
-	} else {
-		t.Fatal("expected getVCSRepo to fail when pointing to a corrupt local path. It is possible that vcs.GitNewRepo updated to gracefully handle this test scenario. Check the return of vcs.GitNewRepo.")
-	}
-
-	_, err = newCtxRepo(vcs.Git, gitRemoteTestRepo, tempDir)
-	if err != nil {
-		t.Fatal(err)
 	}
 }
 
@@ -415,48 +344,5 @@ func testBzrRepo(t *testing.T) {
 	}
 	if v != "2" {
 		t.Fatalf("Current failed to detect Bzr on rev 2 of branch. Got version: %s", v)
-	}
-}
-
-func untar(dst string, r io.Reader) error {
-	gzr, err := gzip.NewReader(r)
-	if err != nil {
-		return err
-	}
-	defer gzr.Close()
-
-	tr := tar.NewReader(gzr)
-
-	for {
-		header, err := tr.Next()
-
-		switch {
-		case err == io.EOF:
-			return nil
-		case err != nil:
-			return err
-		case header == nil:
-			continue
-		}
-
-		target := filepath.Join(dst, header.Name)
-		switch header.Typeflag {
-		case tar.TypeDir:
-			if _, err := os.Stat(target); err != nil {
-				if err := os.MkdirAll(target, 0755); err != nil {
-					return err
-				}
-			}
-		case tar.TypeReg:
-			f, err := os.OpenFile(target, os.O_CREATE|os.O_RDWR, os.FileMode(header.Mode))
-			if err != nil {
-				return err
-			}
-			defer f.Close()
-
-			if _, err := io.Copy(f, tr); err != nil {
-				return err
-			}
-		}
 	}
 }

@@ -5,9 +5,9 @@
 package gps
 
 import (
+	"bytes"
 	"context"
 	"encoding/xml"
-	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -26,38 +26,11 @@ type ctxRepo interface {
 	//ping(context.Context) (bool, error)
 }
 
-func newCtxRepo(s vcs.Type, ustr, path string) (ctxRepo, error) {
-	r, err := getVCSRepo(s, ustr, path)
-	if err != nil {
-		// if vcs could not initialize the repo due to a local error
-		// then the local repo is in an incorrect state. Remove and
-		// treat it as a new not-yet-cloned repo.
-
-		// TODO(marwan-at-work): warn/give progress of the above comment.
-		os.RemoveAll(path)
-		r, err = getVCSRepo(s, ustr, path)
-	}
-
-	return r, err
-}
-
-func getVCSRepo(s vcs.Type, ustr, path string) (ctxRepo, error) {
-	switch s {
-	case vcs.Git:
-		repo, err := vcs.NewGitRepo(ustr, path)
-		return &gitRepo{repo}, err
-	case vcs.Bzr:
-		repo, err := vcs.NewBzrRepo(ustr, path)
-		return &bzrRepo{repo}, err
-	case vcs.Hg:
-		repo, err := vcs.NewHgRepo(ustr, path)
-		return &hgRepo{repo}, err
-	case vcs.Svn:
-		repo, err := vcs.NewSvnRepo(ustr, path)
-		return &svnRepo{repo}, err
-	default:
-		panic(fmt.Sprintf("Unrecognized format: %v", s))
-	}
+// ensureCleaner is an optional extension of ctxRepo.
+type ensureCleaner interface {
+	// ensureClean ensures a repository is clean and in working order,
+	// or returns an error if the adaptive recovery attempts fail.
+	ensureClean(context.Context) error
 }
 
 // original implementation of these methods come from
@@ -181,6 +154,71 @@ func (r *gitRepo) defendAgainstSubmodules(ctx context.Context) error {
 			return newVcsLocalErrorOr(err, cmd.Args(), string(out),
 				"unexpected error while defensively cleaning up after possible derelict nested submodule directories")
 		}
+	}
+
+	return nil
+}
+
+func (r *gitRepo) ensureClean(ctx context.Context) error {
+	cmd := commandContext(
+		ctx,
+		"git",
+		"status",
+		"--porcelain",
+	)
+	cmd.SetDir(r.LocalPath())
+
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		// An error on simple git status indicates some aggressive repository
+		// corruption, outside of the purview that we can deal with here.
+		return err
+	}
+
+	if len(bytes.TrimSpace(out)) == 0 {
+		// No output from status indicates a clean tree, without any modified or
+		// untracked files - we're in good shape.
+		return nil
+	}
+
+	// We could be more parsimonious about this, but it's probably not worth it
+	// - it's a rare case to have to do any cleanup anyway, so when we do, we
+	// might as well just throw the kitchen sink at it.
+	cmd = commandContext(
+		ctx,
+		"git",
+		"reset",
+		"--hard",
+	)
+	cmd.SetDir(r.LocalPath())
+	_, err = cmd.CombinedOutput()
+	if err != nil {
+		return err
+	}
+
+	// We also need to git clean -df; just reuse defendAgainstSubmodules here,
+	// even though it's a bit layer-breaky.
+	err = r.defendAgainstSubmodules(ctx)
+	if err != nil {
+		return err
+	}
+
+	// Check status one last time. If it's still not clean, give up.
+	cmd = commandContext(
+		ctx,
+		"git",
+		"status",
+		"--porcelain",
+	)
+	cmd.SetDir(r.LocalPath())
+
+	out, err = cmd.CombinedOutput()
+	if err != nil {
+		return err
+	}
+
+	if len(bytes.TrimSpace(out)) != 0 {
+		return errors.Errorf("failed to clean up git repository at %s - dirty? corrupted? status output: \n%s", r.LocalPath(), string(out))
 	}
 
 	return nil
