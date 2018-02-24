@@ -14,6 +14,7 @@ DEP_ROOT=$(git rev-parse --show-toplevel)
 VERSION=$(git describe --tags --dirty)
 COMMIT_HASH=$(git rev-parse --short HEAD 2>/dev/null)
 DATE=$(date "+%Y-%m-%d")
+IMPORT_DURING_SOLVE=${IMPORT_DURING_SOLVE:-false}
 
 if [[ "$(pwd)" != "${DEP_ROOT}" ]]; then
   echo "you are not in the root of the repo" 1>&2
@@ -22,7 +23,7 @@ if [[ "$(pwd)" != "${DEP_ROOT}" ]]; then
 fi
 
 GO_BUILD_CMD="go build -a -installsuffix cgo"
-GO_BUILD_LDFLAGS="-s -w -X main.commitHash=${COMMIT_HASH} -X main.buildDate=${DATE} -X main.version=${VERSION}"
+GO_BUILD_LDFLAGS="-s -w -X main.commitHash=${COMMIT_HASH} -X main.buildDate=${DATE} -X main.version=${VERSION} -X main.flagImportDuringSolve=${IMPORT_DURING_SOLVE}"
 
 if [[ -z "${DEP_BUILD_PLATFORMS}" ]]; then
     DEP_BUILD_PLATFORMS="linux windows darwin freebsd"

@@ -6,5 +6,6 @@
     "github.com/ChinmayR/deptestglideA",
     "github.com/ChinmayR/deptestglideB",
     "github.com/ChinmayR/deptestglideC"
-  ]
+  ],
+  "feature": "ImportDuringSolve"
 }

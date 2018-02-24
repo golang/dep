@@ -12,6 +12,10 @@ IMPROVEMENTS:
 * Reduce network access by trusting local source information and only pulling
 from upstream when necessary ([#1250](https://github.com/golang/dep/pull/1250)).
 
+WIP:
+* Enable importing external configuration from dependencies during init (#1277). This
+is feature flagged and disabled by default.
+
 # v0.4.1
 
 NEW FEATURES:
@@ -42,10 +46,6 @@ BUG FIXES:
 * Fix how dep status print revision constraints. ([#1421](https://github.com/golang/dep/pull/1421))
 * Add optional `-v` flag to ensure sub command's syntax. ([#1458](https://github.com/golang/dep/pull/1458))
 * Allow URLs containing ports in `Gopkg.toml` `source` fields. ([#1509](https://github.com/golang/dep/pull/1509))
-
-WIP:
-
-* dep: Enable importing external configuration from dependencies during init (#1277)
 
 IMPROVEMENTS:
 
@@ -101,6 +101,7 @@ WIP:
 
 * gps: Process canonical import paths. ([#1017](https://github.com/golang/dep/pull/1017))
 * gps: Persistent cache. ([#1127](https://github.com/golang/dep/pull/1127), [#1215](https://github.com/golang/dep/pull/1215))
+
 
 # v0.3.1
 

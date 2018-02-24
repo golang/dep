@@ -39,7 +39,9 @@ func (cmd *versionCommand) Run(ctx *dep.Ctx, args []string) error {
  go version  : %s
  go compiler : %s
  platform    : %s/%s
+ features    : ImportDuringSolve=%v
 `, version, buildDate, commitHash,
-		runtime.Version(), runtime.Compiler, runtime.GOOS, runtime.GOARCH)
+		runtime.Version(), runtime.Compiler, runtime.GOOS, runtime.GOARCH,
+		importDuringSolve())
 	return nil
 }

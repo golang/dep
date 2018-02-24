@@ -9,12 +9,11 @@ import (
 	"io/ioutil"
 	"log"
 
-	"golang.org/x/sync/errgroup"
-
 	"github.com/golang/dep"
 	"github.com/golang/dep/gps"
 	fb "github.com/golang/dep/internal/feedback"
 	"github.com/golang/dep/internal/importers"
+	"golang.org/x/sync/errgroup"
 )
 
 // rootAnalyzer supplies manifest/lock data from both dep and external tool's
