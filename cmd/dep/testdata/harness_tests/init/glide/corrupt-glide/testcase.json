@@ -2,5 +2,9 @@
   "commands": [
     ["init", "-no-examples", "-v"]
   ],
-  "error-expected": "v0.3.0: unable to parse"
+  "vendor-final": [
+    "github.com/ChinmayR/deptestglideA",
+    "github.com/ChinmayR/deptestglideB",
+    "github.com/ChinmayR/deptestglideC"
+  ]
 }
