@@ -21,10 +21,10 @@ import (
 )
 
 var (
-	gitSchemes     = []string{"https", "ssh", "git", "http"}
-	bzrSchemes     = []string{"https", "bzr+ssh", "bzr", "http"}
-	hgSchemes      = []string{"https", "ssh", "http"}
-	svnSchemes     = []string{"https", "http", "svn", "svn+ssh"}
+	gitSchemes     = []string{"git+ssh", "https", "ssh", "git", "http"}
+	bzrSchemes     = []string{"bzr+ssh", "https", "bzr", "http"}
+	hgSchemes      = []string{"ssh", "https", "http"}
+	svnSchemes     = []string{"svn+ssh", "https", "http", "svn"}
 	gopkginSchemes = []string{"https", "http"}
 )
 
@@ -73,7 +73,7 @@ var (
 	//gcRegex      = regexp.MustCompile(`^(?P<root>code\.google\.com/[pr]/(?P<project>[a-z0-9\-]+)(\.(?P<subrepo>[a-z0-9\-]+))?)(/[A-Za-z0-9_.\-]+)*$`)
 	jazzRegex         = regexp.MustCompile(`^(?P<root>hub\.jazz\.net(/git/[a-z0-9]+/[A-Za-z0-9_.\-]+))((?:/[A-Za-z0-9_.\-]+)*)$`)
 	apacheRegex       = regexp.MustCompile(`^(?P<root>git\.apache\.org(/[a-z0-9_.\-]+\.git))((?:/[A-Za-z0-9_.\-]+)*)$`)
-	vcsExtensionRegex = regexp.MustCompile(`^(?P<root>([a-z0-9.\-]+\.)+[a-z0-9.\-]+(:[0-9]+)?/[A-Za-z0-9_.\-/~]*?\.(?P<vcs>bzr|git|hg|svn))((?:/[A-Za-z0-9_.\-]+)*)$`)
+	vcsExtensionRegex = regexp.MustCompile(`^(?P<root>(?P<repo>([a-z0-9.\-]+\.)+[a-z0-9.\-]+(:[0-9]+)?(/~?[A-Za-z0-9_.\-]+)+?)\.(?P<vcs>bzr|fossil|git|hg|svn))(/~?[A-Za-z0-9_.\-]+)*$`)
 )
 
 // Other helper regexes
@@ -486,19 +486,26 @@ func (m vcsExtensionDeducer) deduceSource(path string, u *url.URL) (maybeSources
 		return nil, fmt.Errorf("%s contains no vcs extension hints for matching", path)
 	}
 
-	switch v[4] {
+	match := map[string]string{}
+	for i, name := range m.regexp.SubexpNames() {
+		if name != "" && match[name] == "" {
+			match[name] = v[i]
+		}
+	}
+
+	switch match["vcs"] {
 	case "git", "hg", "bzr":
-		x := strings.SplitN(v[1], "/", 2)
+		x := strings.SplitN(match["repo"], "/", 2)
 		// TODO(sdboyer) is this actually correct for bzr?
 		u.Host = x[0]
 		u.Path = "/" + x[1]
 
 		if u.Scheme != "" {
-			if !validateVCSScheme(u.Scheme, v[4]) {
+			if !validateVCSScheme(u.Scheme, match["vcs"]) {
 				return nil, fmt.Errorf("%s is not a valid scheme for accessing %s repositories (path %s)", u.Scheme, v[4], path)
 			}
 
-			switch v[4] {
+			switch match["vcs"] {
 			case "git":
 				return maybeSources{maybeGitSource{url: u}}, nil
 			case "bzr":
@@ -512,7 +519,7 @@ func (m vcsExtensionDeducer) deduceSource(path string, u *url.URL) (maybeSources
 		var mb maybeSources
 		var f func(k int, u *url.URL)
 
-		switch v[4] {
+		switch match["vcs"] {
 		case "git":
 			schemes = gitSchemes
 			f = func(k int, u *url.URL) {
