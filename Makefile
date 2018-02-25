@@ -23,7 +23,7 @@ validate: build licenseok
 	./hack/validate-licence.bash
 
 test:
-	go test ./...
+	./hack/test.bash
 
 install: build
 	cp ./dep $(GOBIN)
