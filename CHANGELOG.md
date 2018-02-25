@@ -7,6 +7,8 @@ NEW FEATURES:
 
 BUG FIXES:
 
+* `dep` resolves private repos (including `git`) similarly to `go get` ([#1716](https://github.com/golang/dep/issues/1716))
+
 IMPROVEMENTS:
 
 * Reduce network access by trusting local source information and only pulling
