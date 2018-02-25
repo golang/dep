@@ -1,10 +1,8 @@
-# FAQ
+---
+title: FAQ
+---
 
-_The first rule of FAQ is don't bikeshed the FAQ, leave that for
-[Create structure for managing docs](https://github.com/golang/dep/issues/331)._
-
-Please contribute to the FAQ! Found an explanation in an issue or pull request helpful?
-Summarize the question and quote the reply, linking back to the original comment.
+The FAQ predated the introduction of the rest of the documentation. If something in here conflicts with other guides or reference documents, it's probably here that it's wrong - please file a PR!
 
 ## Concepts
 * [Does `dep` replace `go get`?](#does-dep-replace-go-get)
@@ -13,9 +11,11 @@ Summarize the question and quote the reply, linking back to the original comment
 
 ## Configuration
 * [What is the difference between Gopkg.toml (the "manifest") and Gopkg.lock (the "lock")?](#what-is-the-difference-between-gopkgtoml-the-manifest-and-gopkglock-the-lock)
-* [How do I constrain a transitive dependency's version?](#how-do-i-constrain-a-transitive-dependencys-version)
+* [How do I constrain a transitive dependency's version?](#how-do-i-constrain-a-transitive-dependency-s-version)
+* [How do I change the version of a dependecy?](#how-do-i-change-the-version-of-a-dependecy)
 * [Can I put the manifest and lock in the vendor directory?](#can-i-put-the-manifest-and-lock-in-the-vendor-directory)
 * [How do I get `dep` to authenticate to a `git` repo?](#how-do-i-get-dep-to-authenticate-to-a-git-repo)
+* [How do I get `dep` to consume private `git` repos using a Github Token?](#how-do-i-get-dep-to-consume-private-git-repos-using-a-github-token)
 
 ## Behavior
 * [How does `dep` decide what version of a dependency to use?](#how-does-dep-decide-what-version-of-a-dependency-to-use)
@@ -24,15 +24,20 @@ Summarize the question and quote the reply, linking back to the original comment
 * [Why did `dep` use a different revision for package X instead of the revision in the lock file?](#why-did-dep-use-a-different-revision-for-package-x-instead-of-the-revision-in-the-lock-file)
 * [Why is `dep` slow?](#why-is-dep-slow)
 * [How does `dep` handle symbolic links?](#how-does-dep-handle-symbolic-links)
+* [Does `dep` support relative imports?](#does-dep-support-relative-imports)
+* [How do I make `dep` resolve dependencies from my `GOPATH`?](#how-do-i-make-dep-resolve-dependencies-from-my-gopath)
+* [Will `dep` let me use git submodules to store dependencies in `vendor`?](#will-dep-let-me-use-git-submodules-to-store-dependencies-in-vendor)
 
 ## Best Practices
 * [Should I commit my vendor directory?](#should-i-commit-my-vendor-directory)
+* [How do I test changes to a dependency?](#how-do-i-test-changes-to-a-dependency)
 * [How do I roll releases that `dep` will be able to use?](#how-do-i-roll-releases-that-dep-will-be-able-to-use)
 * [What semver version should I use?](#what-semver-version-should-i-use)
 * [Is it OK to make backwards-incompatible changes now?](#is-it-ok-to-make-backwards-incompatible-changes-now)
-* [My dependers don't use `dep` yet. What should I do?](#my-dependers-dont-use-dep-yet-what-should-i-do)
-
-___
+* [My dependers don't use `dep` yet. What should I do?](#my-dependers-don-t-use-dep-yet-what-should-i-do)
+* [How do I configure a dependency that doesn't tag its release](#how-do-i-configure-a-dependency-that-doesn-t-tag-its-releases)
+* [How do I use `dep` with Docker?](#how-do-i-use-dep-with-docker)
+* [How do I use `dep` in CI?](#how-do-i-use-dep-in-ci)
 
 ## Concepts
 ### Does `dep` replace `go get`?
@@ -45,11 +50,13 @@ Here are some suggestions for when you could use `dep` or `go get`:
 > `go get`: I want to download the source code for a go project so that I can work on it myself, or to install a tool. This clones the repo under GOPATH for all to use.
 >
 > `dep ensure`: I have imported a new dependency in my code and want to download the dependency so I can start using it. My workflow is "add the import to the code, and then run dep ensure so that the manifest/lock/vendor are updated". This clones the repo under my project's vendor directory, and remembers the revision used so that everyone who works on my project is guaranteed to be using the same version of dependencies.
--[@carolynvs in #376](https://github.com/golang/dep/issues/376#issuecomment-293964655)
+>
+> [@carolynvs in #376](https://github.com/golang/dep/issues/376#issuecomment-293964655)
 
 > The long term vision is a sane, overall-consistent go tool. My general take is that `go get`
 > is for people consuming Go code, and dep-family commands are for people developing it.
--[@sdboyer in #376](https://github.com/golang/dep/issues/376#issuecomment-294045873)
+>
+> [@sdboyer in #376](https://github.com/golang/dep/issues/376#issuecomment-294045873)
 
 ### Why is it `dep ensure` instead of `dep install`?
 
@@ -58,7 +65,8 @@ Here are some suggestions for when you could use `dep` or `go get`:
 > The idea of "ensure" is roughly, "ensure that all my local states - code tree, manifest, lock, and vendor - are in sync with each other." When arguments are passed, it becomes "ensure this argument is satisfied, along with synchronization between all my local states."
 >
 > We opted for this approach because we came to the conclusion that allowing the tool to perform partial work/exit in intermediate states ended up creating a tool that had more commands, had far more possible valid exit and input states, and was generally full of footguns. In this approach, the user has most of the same ultimate control, but exercises it differently (by modifying the code/manifest and re-running dep ensure).
--[@sdboyer in #371](https://github.com/golang/dep/issues/371#issuecomment-293246832)
+>
+> [@sdboyer in #371](https://github.com/golang/dep/issues/371#issuecomment-293246832)
 
 ### What is a direct or transitive dependency?
 * Direct dependencies are dependencies that are imported directly by your project: they appear in at least one import statement from your project.
@@ -70,9 +78,10 @@ Here are some suggestions for when you could use `dep` or `go get`:
 > The manifest describes user intent, and the lock describes computed outputs. There's flexibility in manifests that isn't present in locks..., as the "branch": "master" constraint will match whatever revision master HAPPENS to be at right now, whereas the lock is nailed down to a specific revision.
 >
 > This flexibility is important because it allows us to provide easy commands (e.g. `dep ensure -update`) that can manage an update process for you, within the constraints you specify, AND because it allows your project, when imported by someone else, to collaboratively specify the constraints for your own dependencies.
--[@sdboyer in #281](https://github.com/golang/dep/issues/281#issuecomment-284118314)
+>
+> [@sdboyer in #281](https://github.com/golang/dep/issues/281#issuecomment-284118314)
 
-## How do I constrain a transitive dependency's version?
+## <a id="how-do-i-constrain-a-transitive-dependency-s-version"></a>How do I constrain a transitive dependency's version?
 First, if you're wondering about this because you're trying to keep the version
 of the transitive dependency from changing, then you're working against `dep`'s
 design. The lock file, `Gopkg.lock`, will keep the selected version of the
@@ -100,12 +109,28 @@ behave differently:
 
 Overrides are also discussed with some visuals in [the gps docs](https://github.com/sdboyer/gps/wiki/gps-for-Implementors#overrides).
 
+## How do I change the version of a dependecy
+
+If you want to:
+
+* Change the allowed `version`/`branch`/`revision`
+* Switch to using a fork
+
+for one or more dependencies, do the following:
+
+1. Manually edit your `Gopkg.toml`.
+1. Run
+
+    ```sh
+    $ dep ensure
+    ```
 ## Can I put the manifest and lock in the vendor directory?
 No.
 
 > Placing these files inside `vendor/` would concretely bind us to `vendor/` in the long term.
 > We prefer to treat the `vendor/` as an implementation detail.
--[@sdboyer on go package management list](https://groups.google.com/d/msg/go-package-management/et1qFUjrkP4/LQFCHP4WBQAJ)
+>
+> [@sdboyer on go package management list](https://groups.google.com/d/msg/go-package-management/et1qFUjrkP4/LQFCHP4WBQAJ)
 
 ## How do I get dep to authenticate to a git repo?
 
@@ -115,14 +140,14 @@ authenticated repository.
 
 First, configure `git` to use the credentials option for the specific repository.
 
-For example, if you use gitlab, and you wish to access `https://gitlab.example.com/example/package.git`, 
+For example, if you use gitlab, and you wish to access `https://gitlab.example.com/example/package.git`,
 then you would want to use the following configuration:
 
 ```
 $ git config --global credential.https://gitlab.example.com.example yourusername
 ```
 
-In the example the hostname `gitlab.example.com.username` string seems incorrect, but 
+In the example the hostname `gitlab.example.com.example` string seems incorrect, but
 it's actually the hostname plus the name of the repo you are accessing which is `username`.
 The trailing 'yourusername' is the username you would use for the actual authentication.
 
@@ -136,8 +161,8 @@ $ git help -a | grep credential-
   credential-osxkeychain    remote-ftps
   credential-store          remote-http
 ```
-  
-You would then choose an appropriate provider. For example, to use the osxkeychain, you 
+
+You would then choose an appropriate provider. For example, to use the osxkeychain, you
 would use the following:
 
 ```
@@ -151,12 +176,26 @@ After configuring `git`, you may need to use `git` manually once to have it stor
 credentials. Once you've checked out the repo manually, it will then use the stored
 credentials. This at least appears to be the behavior for the osxkeychain provider.
 
+### How do I get dep to consume private git repos using a Github Token?
+
+Another alternative to make `dep` work with private repos is to use a [Personal Github
+Token](https://help.github.com/articles/creating-a-personal-access-token-for-the-command-line/)
+and configure it inside the [`.netrc` file](https://www.gnu.org/software/inetutils/manual/html_node/The-_002enetrc-file.html)
+as the following example:
+```
+machine github.com
+    login [YOUR_GITHUB_USERNAME]
+    password [YOUR_GITHUB_TOKEN]
+```
+
+Once you have set that up, dep will automatically use that Token to authenticate to the repositories.
+
 ## Behavior
 ### How does `dep` decide what version of a dependency to use?
 
 The full algorithm is complex, but the most important thing to understand is
 that `dep` tries versions in a [certain
-order](https://godoc.org/github.com/golang/dep/internal/gps#SortForUpgrade),
+order](https://godoc.org/github.com/golang/dep/gps#SortForUpgrade),
 checking to see a version is acceptable according to specified constraints.
 
 - All semver versions come first, and sort mostly according to the semver 2.0
@@ -179,9 +218,10 @@ So, given a slice of the following versions:
 - Semver tags: `v1.0.0` `v1.1.0` `v1.1.0-alpha1`
 - Non-semver tags: `footag`
 - Revision: `f6e74e8d`
-Sorting for upgrade will result in the following slice.
 
-`[v1.1.0 v1.0.0 v1.1.0-alpha1 footag devel master f6e74e8d]`
+Sorting for upgrade will result in the following slice:
+
+`[v1.1.0 v1.0.0 v1.1.0-alpha1 master devel footag f6e74e8d]`
 
 There are a number of factors that can eliminate a version from consideration,
 the simplest of which is that it doesn't match a constraint. But if you're
@@ -193,21 +233,14 @@ about what's going on.
 During `dep init` configuration from other dependency managers is detected
 and imported, unless `-skip-tools` is specified.
 
-The following tools are supported: `glide` and `godep`.
+The following tools are supported: `glide`, `godep`, `vndr`, `govend`, `gb`, `gvt`, `govendor` and `glock`.
 
 See [#186](https://github.com/golang/dep/issues/186#issuecomment-306363441) for
 how to add support for another tool.
 
 ## Why is `dep` ignoring a version constraint in the manifest?
 Only your project's directly imported dependencies are affected by a `constraint` entry
-in the manifest. Transitive dependencies are unaffected.
-
-Use an `override` entry for transitive dependencies.
-```
-[[override]]
-  name = "github.com/pkg/errors"
-  version = "=0.8.0"
-```
+in the manifest. Transitive dependencies are unaffected. See [How do I constrain a transitive dependency's version](#how-do-i-constrain-a-transitive-dependency-s-version)?
 
 ## Why did `dep` use a different revision for package X instead of the revision in the lock file?
 Sometimes the revision specified in the lock file is no longer valid. There are a few
@@ -226,8 +259,9 @@ Unable to update checked out version: fatal: reference is not a tree: 4dfc6a8a7e
 
 > The lock file represents a set of precise, typically immutable versions for the entire transitive closure of dependencies for a project. But "the project" can be, and is, decomposed into just a bunch of arguments to an algorithm. When those inputs change, the lock may need to change as well.
 >
-> Under most circumstances, if those arguments don't change, then the lock remains fine and correct. You've hit one one of the few cases where that guarantee doesn't apply. The fact that you ran dep ensure and it DID a solve is a product of some arguments changing; that solving failed because this particular commit had become stale is a separate problem.
--[@sdboyer in #405](https://github.com/golang/dep/issues/405#issuecomment-295998489)
+> Under most circumstances, if those arguments don't change, then the lock remains fine and correct. You've hit one of the few cases where that guarantee doesn't apply. The fact that you ran dep ensure and it DID a solve is a product of some arguments changing; that solving failed because this particular commit had become stale is a separate problem.
+>
+> [@sdboyer in #405](https://github.com/golang/dep/issues/405#issuecomment-295998489)
 
 ## Why is `dep` slow?
 
@@ -265,7 +299,7 @@ There's another major performance issue that's much harder - the process of pick
 ## How does `dep` handle symbolic links?
 
 > because we're not crazy people who delight in inviting chaos into our lives, we need to work within one `GOPATH` at a time.
--[@sdboyer in #247](https://github.com/golang/dep/pull/247#issuecomment-284181879)
+> -[@sdboyer in #247](https://github.com/golang/dep/pull/247#issuecomment-284181879)
 
 Out of convenience, one might create a symlink to a directory within their `GOPATH/src`, e.g. `ln -s ~/go/src/github.com/user/awesome-project ~/Code/awesome-project`.
 
@@ -278,6 +312,42 @@ When `dep` is invoked with a project root that is a symlink, it will be resolved
 
 This is the only symbolic link support that `dep` really intends to provide. In keeping with the general practices of the `go` tool, `dep` tends to either ignore symlinks (when walking) or copy the symlink itself, depending on the filesystem operation being performed.
 
+## Does `dep` support relative imports?
+
+No.
+> dep simply doesn't allow relative imports. this is one of the few places where we restrict a case that the toolchain itself allows. we disallow them only because:
+>
+> * the toolchain already frowns heavily on them<br>
+> * it's worse for our case, as we start venturing into [dot dot hell](http://doc.cat-v.org/plan_9/4th_edition/papers/lexnames) territory when trying to prove that the import does not escape the tree of the project
+>
+> [@sdboyer in #899](https://github.com/golang/dep/issues/899#issuecomment-317904001)
+
+For a refresher on Go's recommended workspace organization, see the ["How To Write Go Code"](https://golang.org/doc/code.html) article in the Go docs. Organizing your code this way gives you a unique import path for every package.
+
+## How do I make `dep` resolve dependencies from my `GOPATH`?
+
+`dep init` provides an option to scan the `GOPATH` for dependencies by doing
+`dep init -gopath`, which falls back to network mode when the packages are not
+found in `GOPATH`. `dep ensure` doesn't work with projects in `GOPATH`.
+
+## Will `dep` let me use git submodules to store dependencies in `vendor`?
+
+No, with just one tiny exception: `dep` preserves `/vendor/.git`, if it exists. This was added at [cockroachdb](https://github.com/cockroachdb/cockroach)'s request, who rely on it to keep `vendor` from bloating their primary repository.
+
+The reasons why git submodules will not be a part of dep are best expressed as a pro/con list:
+
+**Pros**
+
+* git submodules provide a well-structured way of nesting repositories within repositories.
+
+**Cons**
+
+* The nesting that git submodules perform is no more powerful or expressive than what dep already does, but dep does it both more generally (for bzr and hg) and more domain-specifically (e.g. elimination of nested vendor directories).
+* Incorporating git submodules in any way would new fork new paths in the logic to handle the submodule cases, meaning nontrivial complexity increases.
+* dep does not currently know or care if the project it operates on is under version control. Relying on submodules would entail that dep start paying attention to that. That it would only be conditionally does not make it better - again, more forking paths in the logic, more complexity.
+* Incorporating submodules in a way that is at all visible to the user (and why else would you do it?) makes dep's workflows both more complicated and less predictable: _sometimes_ submodule-related actions are expected; _sometimes_ submodule-derived workflows are sufficient.
+* Nesting one repository within another implies that changes could, potentially, be made directly in that subrepository. This is directly contrary to dep's foundational principle that `vendor` is dead code, and directly modifying anything in there is an error.
+
 ## Best Practices
 ### Should I commit my vendor directory?
 
@@ -285,13 +355,47 @@ It's up to you:
 
 **Pros**
 
-- it's the only way to get truly reproducible builds, as it guards against upstream renames and deletes
-- you don't need an extra `dep ensure` step (to fetch dependencies) on fresh clones to build your repo
+- It's the only way to get truly reproducible builds, as it guards against upstream renames,
+  deletes and commit history overwrites.
+- You don't need an extra `dep ensure` step to sync `vendor/` with Gopkg.lock after most operations,
+  such as `go get`, cloning, getting latest, merging, etc.
 
 **Cons**
 
-- your repo will be bigger, potentially a lot bigger
-- PR diffs are more annoying
+- Your repo will be bigger, potentially a lot bigger,
+  though [`prune`](Gopkg.toml.md#prune) can help minimize this problem.
+- PR diffs will include changes for files under `vendor/` when Gopkg.lock is modified,
+  however files in `vendor/` are [hidden by default](https://github.com/github/linguist/blob/v5.2.0/lib/linguist/generated.rb#L328) on Github.
+
+## How do I test changes to a dependency? 
+
+Making changes in your `vendor/` directory directly is not recommended, as dep
+will overwrite any changes. Instead:
+
+1. Delete the dependency from the `vendor/` directory.
+
+    ```sh
+    rm -rf vendor/<dependency>
+    ```
+
+1. Add that dependency to your `GOPATH`, if it isn't already.
+
+    ```sh
+    $ go get <dependency>
+    ```
+
+1. Modify the dependency in `$GOPATH/src/<dependency>`.
+1. Test, build, etc.
+
+Don't run `dep ensure` until you're done. `dep ensure` will reinstall the
+dependency into `vendor/` based on your manifest, as if you were installing from
+scratch.
+
+This solution works for short-term use, but for something long-term, take a look
+at [virtualgo](https://github.com/GetStream/vg).
+
+To test out code that has been pushed as a new version, or to a branch or fork,
+see [changing dependencies](#how-do-i-change-change-the-version-of-a-dependecy).
 
 ## How do I roll releases that `dep` will be able to use?
 
@@ -348,7 +452,7 @@ Note that providing an incremental migration path across breaking changes (i.e.,
 shims) is tricky, and something we [don't have a good answer for
 yet](https://groups.google.com/forum/#!topic/go-package-management/fp2uBMf6kq4).
 
-## My dependers don't use `dep` yet. What should I do?
+## <a id="my-dependers-don-t-use-dep-yet-what-should-i-do"></a>My dependers don't use `dep` yet. What should I do?
 
 For the most part, you needn't do anything differently.
 
@@ -358,3 +462,77 @@ it can [cause
 problems](https://groups.google.com/d/msg/golang-nuts/AnMr9NL6dtc/UnyUUKcMCAAJ).
 If your dependers are using `dep`, this is not a concern, as `dep` takes care of
 stripping out nested `vendor` directories.
+
+## <a id="how-do-i-configure-a-dependency-that-doesn-t-tag-its-releases"></a>How do I configure a dependency that doesn't tag its releases?
+
+Add a constraint to `Gopkg.toml` that specifies `branch: "master"` (or whichever branch you need) in the `[[constraint]]` for that dependency. `dep ensure` will determine the current revision of your dependency's master branch, and place it in `Gopkg.lock` for you. See also: [What is the difference between Gopkg.toml and Gopkg.lock?](#what-is-the-difference-between-gopkgtoml-the-manifest-and-gopkglock-the-lock)
+
+## How do I use `dep` with Docker?
+
+`dep ensure -vendor-only` creates the vendor folder from a valid `Gopkg.toml` and `Gopkg.lock` without checking for Go code.
+This is especially useful for builds inside docker utilizing cache layers.
+
+Sample dockerfile:
+
+```Dockerfile
+FROM golang:1.9 AS builder
+
+RUN curl -fsSL -o /usr/local/bin/dep https://github.com/golang/dep/releases/download/vX.X.X/dep-linux-amd64 && chmod +x /usr/local/bin/dep
+
+RUN mkdir -p /go/src/github.com/***
+WORKDIR /go/src/github.com/***
+
+COPY Gopkg.toml Gopkg.lock ./
+# copies the Gopkg.toml and Gopkg.lock to WORKDIR
+
+RUN dep ensure -vendor-only
+# install the dependencies without checking for go code
+
+...
+```
+
+## How do I use `dep` in CI?
+
+Since `dep` is expected to change until `v1.0.0` is released, it is recommended to rely on a released version.
+You can find the latest binary from the [releases](https://github.com/golang/dep/releases) page.
+
+Sample configuration for Travis CI:
+
+```yml
+# ...
+
+env:
+  - DEP_VERSION="X.X.X"
+
+before_install:
+  # Download the binary to bin folder in $GOPATH
+  - curl -L -s https://github.com/golang/dep/releases/download/v${DEP_VERSION}/dep-linux-amd64 -o $GOPATH/bin/dep
+  # Make the binary executable
+  - chmod +x $GOPATH/bin/dep
+
+install:
+  - dep ensure
+```
+
+Caching can also be enabled but there are a couple of caveats you should be aware of:
+
+> Until recently, we have had intermittent cache corruption that would have been super annoying if it was breaking Travis build too.
+>
+> Also according to https://docs.travis-ci.com/user/caching/#Things-not-to-cache, they don't recommend it for larger caches.
+>
+> https://docs.travis-ci.com/user/caching/#How-does-the-caching-work%3F
+>
+> > Note that this makes our cache not network-local, it's still bound to network bandwidth and DNS resolutions for S3.
+> > That impacts what you can and should store in the cache. If you store archives larger than a few hundred megabytes in the cache, it's unlikely that you'll see a big speed improvement.
+>
+> [@carolynvs in #1293](https://github.com/golang/dep/pull/1293#issuecomment-342969292)
+
+If you are sure you want to enable caching on travis, it can be done by adding `$GOPATH/pkg/dep`, the default location for `dep` cache, to the cached directories:
+
+```yml
+# ...
+
+cache:
+  directories:
+    - $GOPATH/pkg/dep
+```

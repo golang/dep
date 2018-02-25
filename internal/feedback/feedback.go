@@ -9,22 +9,26 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/golang/dep/internal/gps"
+	"github.com/golang/dep/gps"
 )
 
-// Constraint types
-const ConsTypeConstraint = "constraint"
-const ConsTypeHint = "hint"
+const (
+	// ConsTypeConstraint represents a constraint
+	ConsTypeConstraint = "constraint"
 
-// DepTypeDirect represents a direct dependency
-const DepTypeDirect = "direct dep"
+	// ConsTypeHint represents a constraint type hint
+	ConsTypeHint = "hint"
 
-// DepTypeTransitive represents a transitive dependency,
-// or a dependency of a dependency
-const DepTypeTransitive = "transitive dep"
+	// DepTypeDirect represents a direct dependency
+	DepTypeDirect = "direct dep"
 
-// DepTypeImported represents a dependency imported by an external tool
-const DepTypeImported = "imported dep"
+	// DepTypeTransitive represents a transitive dependency,
+	// or a dependency of a dependency
+	DepTypeTransitive = "transitive dep"
+
+	// DepTypeImported represents a dependency imported by an external tool
+	DepTypeImported = "imported dep"
+)
 
 // ConstraintFeedback holds project constraint feedback data
 type ConstraintFeedback struct {
@@ -78,6 +82,117 @@ func (cf ConstraintFeedback) LogFeedback(logger *log.Logger) {
 	}
 }
 
+type brokenImport interface {
+	String() string
+}
+
+type modifiedImport struct {
+	source, branch, revision, version *gps.StringDiff
+	projectPath                       string
+}
+
+func (mi modifiedImport) String() string {
+	var pv string
+	var pr string
+	pp := mi.projectPath
+
+	var cr string
+	var cv string
+	cp := ""
+
+	if mi.revision != nil {
+		pr = fmt.Sprintf("(%s)", trimSHA(mi.revision.Previous))
+		cr = fmt.Sprintf("(%s)", trimSHA(mi.revision.Current))
+	}
+
+	if mi.version != nil {
+		pv = mi.version.Previous
+		cv = mi.version.Current
+	} else if mi.branch != nil {
+		pv = mi.branch.Previous
+		cv = mi.branch.Current
+	}
+
+	if mi.source != nil {
+		pp = fmt.Sprintf("%s(%s)", mi.projectPath, mi.source.Previous)
+		cp = fmt.Sprintf(" for %s(%s)", mi.projectPath, mi.source.Current)
+	}
+
+	// Warning: Unable to preserve imported lock VERSION/BRANCH (REV) for PROJECT(SOURCE). Locking in VERSION/BRANCH (REV) for PROJECT(SOURCE)
+	return fmt.Sprintf("%v %s for %s. Locking in %v %s%s", pv, pr, pp, cv, cr, cp)
+}
+
+type removedImport struct {
+	source, branch, revision, version *gps.StringDiff
+	projectPath                       string
+}
+
+func (ri removedImport) String() string {
+	var pr string
+	var pv string
+	pp := ri.projectPath
+
+	if ri.revision != nil {
+		pr = fmt.Sprintf("(%s)", trimSHA(ri.revision.Previous))
+	}
+
+	if ri.version != nil {
+		pv = ri.version.Previous
+	} else if ri.branch != nil {
+		pv = ri.branch.Previous
+	}
+
+	if ri.source != nil {
+		pp = fmt.Sprintf("%s(%s)", ri.projectPath, ri.source.Previous)
+	}
+
+	// Warning: Unable to preserve imported lock VERSION/BRANCH (REV) for PROJECT(SOURCE). Locking in VERSION/BRANCH (REV) for PROJECT(SOURCE)
+	return fmt.Sprintf("%v %s for %s. The project was removed from the lock because it is not used.", pv, pr, pp)
+}
+
+// BrokenImportFeedback holds information on changes to locks pre- and post- solving.
+type BrokenImportFeedback struct {
+	brokenImports []brokenImport
+}
+
+// NewBrokenImportFeedback builds a feedback entry that compares an initially
+// imported, unsolved lock to the same lock after it has been solved.
+func NewBrokenImportFeedback(ld *gps.LockDiff) *BrokenImportFeedback {
+	bi := &BrokenImportFeedback{}
+	for _, lpd := range ld.Modify {
+		// Ignore diffs where it's just a modified package set
+		if lpd.Branch == nil && lpd.Revision == nil && lpd.Source == nil && lpd.Version == nil {
+			continue
+		}
+		bi.brokenImports = append(bi.brokenImports, modifiedImport{
+			projectPath: string(lpd.Name),
+			source:      lpd.Source,
+			branch:      lpd.Branch,
+			revision:    lpd.Revision,
+			version:     lpd.Version,
+		})
+	}
+
+	for _, lpd := range ld.Remove {
+		bi.brokenImports = append(bi.brokenImports, removedImport{
+			projectPath: string(lpd.Name),
+			source:      lpd.Source,
+			branch:      lpd.Branch,
+			revision:    lpd.Revision,
+			version:     lpd.Version,
+		})
+	}
+
+	return bi
+}
+
+// LogFeedback logs a warning for all changes between the initially imported and post- solve locks
+func (b BrokenImportFeedback) LogFeedback(logger *log.Logger) {
+	for _, bi := range b.brokenImports {
+		logger.Printf("Warning: Unable to preserve imported lock %v\n", bi)
+	}
+}
+
 // GetUsingFeedback returns a dependency "using" feedback message. For example:
 //
 //    Using ^1.0.0 as constraint for direct dep github.com/foo/bar
@@ -95,13 +210,7 @@ func GetUsingFeedback(version, consType, depType, projectPath string) string {
 //    Locking in v1.1.4 (bc29b4f) for direct dep github.com/foo/bar
 //    Locking in master (436f39d) for transitive dep github.com/baz/qux
 func GetLockingFeedback(version, revision, depType, projectPath string) string {
-	// Check if it's a valid SHA1 digest and trim to 7 characters.
-	if len(revision) == 40 {
-		if _, err := hex.DecodeString(revision); err == nil {
-			// Valid SHA1 digest
-			revision = revision[0:7]
-		}
-	}
+	revision = trimSHA(revision)
 
 	if depType == DepTypeImported {
 		if version == "" {
@@ -110,4 +219,16 @@ func GetLockingFeedback(version, revision, depType, projectPath string) string {
 		return fmt.Sprintf("Trying %s (%s) as initial lock for %s %s", version, revision, depType, projectPath)
 	}
 	return fmt.Sprintf("Locking in %s (%s) for %s %s", version, revision, depType, projectPath)
+}
+
+// trimSHA checks if revision is a valid SHA1 digest and trims to 7 characters.
+func trimSHA(revision string) string {
+	if len(revision) == 40 {
+		if _, err := hex.DecodeString(revision); err == nil {
+			// Valid SHA1 digest
+			revision = revision[0:7]
+		}
+	}
+
+	return revision
 }

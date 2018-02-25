@@ -1,0 +1,10 @@
+{
+  "commands": [
+    ["init", "-no-examples"],
+    ["ensure", "-add", "github.com/sdboyer/deptesttres", "github.com/sdboyer/deptesttres/subp"]
+  ],
+  "vendor-final": [
+      "github.com/sdboyer/deptest",
+      "github.com/sdboyer/deptesttres"
+  ]
+}

@@ -117,7 +117,7 @@ func NewConstraint(in string) (Constraint, error) {
 	return newConstraint(in, false, constraintCache)
 }
 
-// NewConstraintIC (ImpliedConstraint) is the same as NewConstraint, except that
+// NewConstraintIC ("Implied Caret") is the same as NewConstraint, except that
 // it treats an absent operator as being equivalent to ^ instead of =.
 func NewConstraintIC(in string) (Constraint, error) {
 	return newConstraint(in, true, constraintCacheIC)

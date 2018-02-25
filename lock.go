@@ -10,7 +10,7 @@ import (
 	"io"
 	"sort"
 
-	"github.com/golang/dep/internal/gps"
+	"github.com/golang/dep/gps"
 	"github.com/pelletier/go-toml"
 	"github.com/pkg/errors"
 )
@@ -112,14 +112,28 @@ func fromRawLock(raw rawLock) (*Lock, error) {
 	return l, nil
 }
 
-// InputHash returns the hash of inputs which produced this lock data.
-func (l *Lock) InputHash() []byte {
+// InputsDigest returns the hash of inputs which produced this lock data.
+func (l *Lock) InputsDigest() []byte {
 	return l.SolveMeta.InputsDigest
 }
 
 // Projects returns the list of LockedProjects contained in the lock data.
 func (l *Lock) Projects() []gps.LockedProject {
 	return l.P
+}
+
+// HasProjectWithRoot checks if the lock contains a project with the provided
+// ProjectRoot.
+//
+// This check is O(n) in the number of projects.
+func (l *Lock) HasProjectWithRoot(root gps.ProjectRoot) bool {
+	for _, p := range l.P {
+		if p.Ident().ProjectRoot == root {
+			return true
+		}
+	}
+
+	return false
 }
 
 // toRaw converts the manifest into a representation suitable to write to the lock file
@@ -135,7 +149,9 @@ func (l *Lock) toRaw() rawLock {
 		Projects: make([]rawLockedProject, len(l.P)),
 	}
 
-	sort.Sort(SortedLockedProjects(l.P))
+	sort.Slice(l.P, func(i, j int) bool {
+		return l.P[i].Ident().Less(l.P[j].Ident())
+	})
 
 	for k, lp := range l.P {
 		id := lp.Ident()
@@ -157,8 +173,10 @@ func (l *Lock) toRaw() rawLock {
 // MarshalTOML serializes this lock into TOML via an intermediate raw form.
 func (l *Lock) MarshalTOML() ([]byte, error) {
 	raw := l.toRaw()
-	result, err := toml.Marshal(raw)
-	return result, errors.Wrap(err, "Unable to marshal lock to TOML string")
+	var buf bytes.Buffer
+	enc := toml.NewEncoder(&buf).ArraysWithOneElementPerLine(true)
+	err := enc.Encode(raw)
+	return buf.Bytes(), errors.Wrap(err, "Unable to marshal lock to TOML string")
 }
 
 // LockFromSolution converts a gps.Solution to dep's representation of a lock.
@@ -166,7 +184,7 @@ func (l *Lock) MarshalTOML() ([]byte, error) {
 // Data is defensively copied wherever necessary to ensure the resulting *lock
 // shares no memory with the original lock.
 func LockFromSolution(in gps.Solution) *Lock {
-	h, p := in.InputHash(), in.Projects()
+	h, p := in.InputsDigest(), in.Projects()
 
 	l := &Lock{
 		SolveMeta: SolveMeta{
@@ -182,22 +200,4 @@ func LockFromSolution(in gps.Solution) *Lock {
 	copy(l.SolveMeta.InputsDigest, h)
 	copy(l.P, p)
 	return l
-}
-
-// SortedLockedProjects implements sort.Interface.
-type SortedLockedProjects []gps.LockedProject
-
-func (s SortedLockedProjects) Len() int      { return len(s) }
-func (s SortedLockedProjects) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
-func (s SortedLockedProjects) Less(i, j int) bool {
-	l, r := s[i].Ident(), s[j].Ident()
-
-	if l.ProjectRoot < r.ProjectRoot {
-		return true
-	}
-	if r.ProjectRoot < l.ProjectRoot {
-		return false
-	}
-
-	return l.Source < r.Source
 }

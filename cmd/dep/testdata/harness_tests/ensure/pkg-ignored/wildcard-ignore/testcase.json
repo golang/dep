@@ -1,0 +1,10 @@
+{
+  "commands": [
+    ["ensure"],
+    ["hash-inputs"]
+  ],
+  "error-expected": "",
+  "vendor-final": [
+    "github.com/sdboyer/deptest"
+  ]
+}

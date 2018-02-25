@@ -1,0 +1,8 @@
+{
+  "commands": [
+    ["ensure"],
+    ["hash-inputs"]
+  ],
+  "error-expected": "",
+  "vendor-final": []
+}

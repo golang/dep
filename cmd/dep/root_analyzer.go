@@ -5,22 +5,17 @@
 package main
 
 import (
+	"context"
 	"io/ioutil"
 	"log"
 
-	"github.com/golang/dep"
-	fb "github.com/golang/dep/internal/feedback"
-	"github.com/golang/dep/internal/gps"
-	"github.com/pkg/errors"
-)
+	"golang.org/x/sync/errgroup"
 
-// importer handles importing configuration from other dependency managers into
-// the dep configuration format.
-type importer interface {
-	Name() string
-	Import(path string, pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock, error)
-	HasDepMetadata(dir string) bool
-}
+	"github.com/golang/dep"
+	"github.com/golang/dep/gps"
+	fb "github.com/golang/dep/internal/feedback"
+	"github.com/golang/dep/internal/importers"
+)
 
 // rootAnalyzer supplies manifest/lock data from both dep and external tool's
 // configuration files.
@@ -31,10 +26,10 @@ type rootAnalyzer struct {
 	skipTools  bool
 	ctx        *dep.Ctx
 	sm         gps.SourceManager
-	directDeps map[string]bool
+	directDeps map[gps.ProjectRoot]bool
 }
 
-func newRootAnalyzer(skipTools bool, ctx *dep.Ctx, directDeps map[string]bool, sm gps.SourceManager) *rootAnalyzer {
+func newRootAnalyzer(skipTools bool, ctx *dep.Ctx, directDeps map[gps.ProjectRoot]bool, sm gps.SourceManager) *rootAnalyzer {
 	return &rootAnalyzer{
 		skipTools:  skipTools,
 		ctx:        ctx,
@@ -45,16 +40,17 @@ func newRootAnalyzer(skipTools bool, ctx *dep.Ctx, directDeps map[string]bool, s
 
 func (a *rootAnalyzer) InitializeRootManifestAndLock(dir string, pr gps.ProjectRoot) (rootM *dep.Manifest, rootL *dep.Lock, err error) {
 	if !a.skipTools {
-		rootM, rootL, err = a.importManifestAndLock(dir, pr, false)
-		if err != nil {
-			return
-		}
+		rootM, rootL = a.importManifestAndLock(dir, pr, false)
 	}
 
 	if rootM == nil {
-		rootM = &dep.Manifest{
-			Constraints: make(gps.ProjectConstraints),
-			Ovr:         make(gps.ProjectConstraints),
+		rootM = dep.NewManifest()
+
+		// Since we didn't find anything to import, dep's cache is empty.
+		// We are prefetching dependencies and logging so that the subsequent solve step
+		// doesn't spend a long time retrieving dependencies without feedback for the user.
+		if err := a.cacheDeps(pr); err != nil {
+			return nil, nil, err
 		}
 	}
 	if rootL == nil {
@@ -64,36 +60,79 @@ func (a *rootAnalyzer) InitializeRootManifestAndLock(dir string, pr gps.ProjectR
 	return
 }
 
-func (a *rootAnalyzer) importManifestAndLock(dir string, pr gps.ProjectRoot, suppressLogs bool) (*dep.Manifest, *dep.Lock, error) {
+func (a *rootAnalyzer) cacheDeps(pr gps.ProjectRoot) error {
+	logger := a.ctx.Err
+	g, _ := errgroup.WithContext(context.TODO())
+	concurrency := 4
+
+	syncDep := func(pr gps.ProjectRoot, sm gps.SourceManager) error {
+		if err := sm.SyncSourceFor(gps.ProjectIdentifier{ProjectRoot: pr}); err != nil {
+			logger.Printf("Unable to cache %s - %s", pr, err)
+			return err
+		}
+		return nil
+	}
+
+	deps := make(chan gps.ProjectRoot)
+
+	for i := 0; i < concurrency; i++ {
+		g.Go(func() error {
+			for d := range deps {
+				err := syncDep(gps.ProjectRoot(d), a.sm)
+				if err != nil {
+					return err
+				}
+			}
+			return nil
+		})
+	}
+
+	g.Go(func() error {
+		defer close(deps)
+		for pr := range a.directDeps {
+			logger.Printf("Caching package %q", pr)
+			deps <- pr
+		}
+		return nil
+	})
+
+	if err := g.Wait(); err != nil {
+		return err
+	}
+	logger.Printf("Successfully cached all deps.")
+	return nil
+}
+
+func (a *rootAnalyzer) importManifestAndLock(dir string, pr gps.ProjectRoot, suppressLogs bool) (*dep.Manifest, *dep.Lock) {
 	logger := a.ctx.Err
 	if suppressLogs {
 		logger = log.New(ioutil.Discard, "", 0)
 	}
 
-	importers := []importer{
-		newGlideImporter(logger, a.ctx.Verbose, a.sm),
-		newGodepImporter(logger, a.ctx.Verbose, a.sm),
-	}
-
-	for _, i := range importers {
+	for _, i := range importers.BuildAll(logger, a.ctx.Verbose, a.sm) {
 		if i.HasDepMetadata(dir) {
 			a.ctx.Err.Printf("Importing configuration from %s. These are only initial constraints, and are further refined during the solve process.", i.Name())
 			m, l, err := i.Import(dir, pr)
 			if err != nil {
-				return nil, nil, err
+				a.ctx.Err.Printf(
+					"Warning: Encountered an unrecoverable error while trying to import %s config from %q: %s",
+					i.Name(), dir, err,
+				)
+				break
 			}
 			a.removeTransitiveDependencies(m)
-			return m, l, err
+			return m, l
 		}
 	}
 
-	var emptyManifest = &dep.Manifest{Constraints: make(gps.ProjectConstraints), Ovr: make(gps.ProjectConstraints)}
-	return emptyManifest, nil, nil
+	var emptyManifest = dep.NewManifest()
+
+	return emptyManifest, nil
 }
 
 func (a *rootAnalyzer) removeTransitiveDependencies(m *dep.Manifest) {
 	for pr := range m.Constraints {
-		if _, isDirect := a.directDeps[string(pr)]; !isDirect {
+		if _, isDirect := a.directDeps[pr]; !isDirect {
 			delete(m.Constraints, pr)
 		}
 	}
@@ -113,14 +152,14 @@ func (a *rootAnalyzer) DeriveManifestAndLock(dir string, pr gps.ProjectRoot) (gp
 		// The assignment back to an interface prevents interface-based nil checks from failing later
 		var manifest gps.Manifest = gps.SimpleManifest{}
 		var lock gps.Lock
-		im, il, err := a.importManifestAndLock(dir, pr, true)
+		im, il := a.importManifestAndLock(dir, pr, true)
 		if im != nil {
 			manifest = im
 		}
 		if il != nil {
 			lock = il
 		}
-		return manifest, lock, err
+		return manifest, lock, nil
 	}
 
 	return gps.SimpleManifest{}, nil, nil
@@ -129,11 +168,14 @@ func (a *rootAnalyzer) DeriveManifestAndLock(dir string, pr gps.ProjectRoot) (gp
 func (a *rootAnalyzer) FinalizeRootManifestAndLock(m *dep.Manifest, l *dep.Lock, ol dep.Lock) {
 	// Iterate through the new projects in solved lock and add them to manifest
 	// if they are direct deps and log feedback for all the new projects.
+	diff := gps.DiffLocks(&ol, l)
+	bi := fb.NewBrokenImportFeedback(diff)
+	bi.LogFeedback(a.ctx.Err)
 	for _, y := range l.Projects() {
 		var f *fb.ConstraintFeedback
 		pr := y.Ident().ProjectRoot
 		// New constraints: in new lock and dir dep but not in manifest
-		if _, ok := a.directDeps[string(pr)]; ok {
+		if _, ok := a.directDeps[pr]; ok {
 			if _, ok := m.Constraints[pr]; !ok {
 				pp := getProjectPropertiesFromVersion(y.Version())
 				if pp.Constraint != nil {
@@ -161,53 +203,10 @@ func (a *rootAnalyzer) FinalizeRootManifestAndLock(m *dep.Manifest, l *dep.Lock,
 	}
 }
 
+// Info provides metadata on the analyzer algorithm used during solve.
 func (a *rootAnalyzer) Info() gps.ProjectAnalyzerInfo {
-	name := "dep"
-	version := 1
-	if !a.skipTools {
-		name = "dep+import"
-	}
 	return gps.ProjectAnalyzerInfo{
-		Name:    name,
-		Version: version,
+		Name:    "dep",
+		Version: 1,
 	}
-}
-
-// lookupVersionForLockedProject figures out the appropriate version for a locked
-// project based on the locked revision and the constraint from the manifest.
-// First try matching the revision to a version, then try the constraint from the
-// manifest, then finally the revision.
-func lookupVersionForLockedProject(pi gps.ProjectIdentifier, c gps.Constraint, rev gps.Revision, sm gps.SourceManager) (gps.Version, error) {
-	// Find the version that goes with this revision, if any
-	versions, err := sm.ListVersions(pi)
-	if err != nil {
-		return rev, errors.Wrapf(err, "Unable to lookup the version represented by %s in %s(%s). Falling back to locking the revision only.", rev, pi.ProjectRoot, pi.Source)
-	}
-
-	gps.SortPairedForUpgrade(versions) // Sort versions in asc order
-	for _, v := range versions {
-		if v.Revision() == rev {
-			// If the constraint is semver, make sure the version is acceptable.
-			// This prevents us from suggesting an incompatible version, which
-			// helps narrow the field when there are multiple matching versions.
-			if c != nil {
-				_, err := gps.NewSemverConstraint(c.String())
-				if err == nil && !c.Matches(v) {
-					continue
-				}
-			}
-			return v, nil
-		}
-	}
-
-	// Use the version from the manifest as long as it wasn't a range
-	switch tv := c.(type) {
-	case gps.PairedVersion:
-		return tv.Unpair().Pair(rev), nil
-	case gps.UnpairedVersion:
-		return tv.Pair(rev), nil
-	}
-
-	// Give up and lock only to a revision
-	return rev, nil
 }

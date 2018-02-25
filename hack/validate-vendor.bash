@@ -31,26 +31,17 @@ files=( $(validate_diff --diff-filter=ACMR --name-only -- 'Gopkg.toml' 'Gopkg.lo
 unset IFS
 
 if [ ${#files[@]} -gt 0 ]; then
-	# This will delete memo section from Gopkg.lock
-	# See https://github.com/golang/dep/issues/645 for more info
-	# This should go away after -vendor-only flag will be implemented
-	# sed -i not used because it works different on MacOS and Linux
-	TMP_FILE=`mktemp /tmp/Gopkg.lock.XXXXXXXXXX`
-	sed '/memo = \S*/d' Gopkg.lock > $TMP_FILE
-	mv $TMP_FILE Gopkg.lock
-
-	# We run ensure to and see if we have a diff afterwards
 	go build ./cmd/dep
-	./dep ensure
+	./dep ensure -vendor-only
 	# Let see if the working directory is clean
 	diffs="$(git status --porcelain -- vendor Gopkg.toml Gopkg.lock 2>/dev/null)"
 	if [ "$diffs" ]; then
 		{
-			echo 'The result of ensure differs'
+			echo 'The contents of vendor differ after "dep ensure":'
 			echo
 			echo "$diffs"
 			echo
-			echo 'Please vendor your package with github.com/golang/dep.'
+			echo 'Make sure these commands have been run before committing.'
 			echo
 		} >&2
 		false

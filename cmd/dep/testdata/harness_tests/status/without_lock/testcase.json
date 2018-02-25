@@ -1,0 +1,6 @@
+{
+  "commands": [
+    ["status"]
+  ],
+  "error-expected": "no Gopkg.lock found. Run `dep ensure` to generate lock file"
+}

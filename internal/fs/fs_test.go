@@ -8,11 +8,13 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"reflect"
 	"runtime"
 	"strings"
 	"testing"
 
 	"github.com/golang/dep/internal/test"
+	"github.com/pkg/errors"
 )
 
 // This function tests HadFilepathPrefix. It should test it on both case
@@ -75,7 +77,11 @@ func TestHasFilepathPrefix(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if got := HasFilepathPrefix(c.path, c.prefix); c.want != got {
+		got, err := HasFilepathPrefix(c.path, c.prefix)
+		if err != nil {
+			t.Fatalf("unexpected error: %s", err)
+		}
+		if c.want != got {
 			t.Fatalf("dir: %q, prefix: %q, expected: %v, got: %v", c.path, c.prefix, c.want, got)
 		}
 	}
@@ -122,14 +128,67 @@ func TestHasFilepathPrefix_Files(t *testing.T) {
 		path   string
 		prefix string
 		want   bool
+		err    bool
 	}{
-		{existingFile, filepath.Join(dir2), true},
-		{nonExistingFile, filepath.Join(dir2), false},
+		{existingFile, filepath.Join(dir2), true, false},
+		{nonExistingFile, filepath.Join(dir2), false, true},
 	}
 
 	for _, c := range cases {
-		if got := HasFilepathPrefix(c.path, c.prefix); c.want != got {
+		got, err := HasFilepathPrefix(c.path, c.prefix)
+		if err != nil && !c.err {
+			t.Fatalf("unexpected error: %s", err)
+		}
+		if c.want != got {
 			t.Fatalf("dir: %q, prefix: %q, expected: %v, got: %v", c.path, c.prefix, c.want, got)
+		}
+	}
+}
+
+func TestEquivalentPaths(t *testing.T) {
+	h := test.NewHelper(t)
+	h.TempDir("dir")
+	h.TempDir("dir2")
+
+	h.TempFile("file", "")
+	h.TempFile("file2", "")
+
+	h.TempDir("DIR")
+	h.TempFile("FILE", "")
+
+	testcases := []struct {
+		p1, p2                   string
+		caseSensitiveEquivalent  bool
+		caseInensitiveEquivalent bool
+		err                      bool
+	}{
+		{h.Path("dir"), h.Path("dir"), true, true, false},
+		{h.Path("file"), h.Path("file"), true, true, false},
+		{h.Path("dir"), h.Path("dir2"), false, false, false},
+		{h.Path("file"), h.Path("file2"), false, false, false},
+		{h.Path("dir"), h.Path("file"), false, false, false},
+		{h.Path("dir"), h.Path("DIR"), false, true, false},
+		{strings.ToLower(h.Path("dir")), strings.ToUpper(h.Path("dir")), false, true, true},
+	}
+
+	caseSensitive, err := IsCaseSensitiveFilesystem(h.Path("dir"))
+	if err != nil {
+		t.Fatal("unexpcted error:", err)
+	}
+
+	for _, tc := range testcases {
+		got, err := EquivalentPaths(tc.p1, tc.p2)
+		if err != nil && !tc.err {
+			t.Error("unexpected error:", err)
+		}
+		if caseSensitive {
+			if tc.caseSensitiveEquivalent != got {
+				t.Errorf("expected EquivalentPaths(%q, %q) to be %t on case-sensitive filesystem, got %t", tc.p1, tc.p2, tc.caseSensitiveEquivalent, got)
+			}
+		} else {
+			if tc.caseInensitiveEquivalent != got {
+				t.Errorf("expected EquivalentPaths(%q, %q) to be %t on case-insensitive filesystem, got %t", tc.p1, tc.p2, tc.caseInensitiveEquivalent, got)
+			}
 		}
 	}
 }
@@ -172,6 +231,119 @@ func TestRenameWithFallback(t *testing.T) {
 	}
 }
 
+func TestIsCaseSensitiveFilesystem(t *testing.T) {
+	isLinux := runtime.GOOS == "linux"
+	isWindows := runtime.GOOS == "windows"
+	isMacOS := runtime.GOOS == "darwin"
+
+	if !isLinux && !isWindows && !isMacOS {
+		t.Skip("Run this test on Windows, Linux and macOS only")
+	}
+
+	dir, err := ioutil.TempDir("", "TestCaseSensitivity")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(dir)
+
+	var want bool
+	if isLinux {
+		want = true
+	} else {
+		want = false
+	}
+
+	got, err := IsCaseSensitiveFilesystem(dir)
+
+	if err != nil {
+		t.Fatalf("unexpected error message: \n\t(GOT) %+v", err)
+	}
+
+	if want != got {
+		t.Fatalf("unexpected value returned: \n\t(GOT) %t\n\t(WNT) %t", got, want)
+	}
+}
+
+func TestReadActualFilenames(t *testing.T) {
+	// We are trying to skip this test on file systems which are case-sensiive. We could
+	// have used `fs.IsCaseSensitiveFilesystem` for this check. However, the code we are
+	// testing also relies on `fs.IsCaseSensitiveFilesystem`. So a bug in
+	// `fs.IsCaseSensitiveFilesystem` could prevent this test from being run. This is the
+	// only scenario where we prefer the OS heuristic over doing the actual work of
+	// validating filesystem case sensitivity via `fs.IsCaseSensitiveFilesystem`.
+	if runtime.GOOS != "windows" && runtime.GOOS != "darwin" {
+		t.Skip("skip this test on non-Windows, non-macOS")
+	}
+
+	h := test.NewHelper(t)
+	defer h.Cleanup()
+
+	h.TempDir("")
+	tmpPath := h.Path(".")
+
+	// First, check the scenarios for which we expect an error.
+	_, err := ReadActualFilenames(filepath.Join(tmpPath, "does_not_exists"), []string{""})
+	switch {
+	case err == nil:
+		t.Fatal("expected err for non-existing folder")
+	// use `errors.Cause` because the error is wrapped and returned
+	case !os.IsNotExist(errors.Cause(err)):
+		t.Fatalf("unexpected error: %+v", err)
+	}
+	h.TempFile("tmpFile", "")
+	_, err = ReadActualFilenames(h.Path("tmpFile"), []string{""})
+	switch {
+	case err == nil:
+		t.Fatal("expected err for passing file instead of directory")
+	case err != errPathNotDir:
+		t.Fatalf("unexpected error: %+v", err)
+	}
+
+	cases := []struct {
+		createFiles []string
+		names       []string
+		want        map[string]string
+	}{
+		// If we supply no filenames to the function, it should return an empty map.
+		{nil, nil, map[string]string{}},
+		// If the directory contains the given file with different case, it should return
+		// a map which has the given filename as the key and actual filename as the value.
+		{
+			[]string{"test1.txt"},
+			[]string{"Test1.txt"},
+			map[string]string{"Test1.txt": "test1.txt"},
+		},
+		// 1. If the given filename is same as the actual filename, map should have the
+		//    same key and value for the file.
+		// 2. If the given filename is present with different case for file extension,
+		//    it should return a map which has the given filename as the key and actual
+		//    filename as the value.
+		// 3. If the given filename is not present even with a different case, the map
+		//    returned should not have an entry for that filename.
+		{
+			[]string{"test2.txt", "test3.TXT"},
+			[]string{"test2.txt", "Test3.txt", "Test4.txt"},
+			map[string]string{
+				"test2.txt": "test2.txt",
+				"Test3.txt": "test3.TXT",
+			},
+		},
+	}
+	for _, c := range cases {
+		for _, file := range c.createFiles {
+			h.TempFile(file, "")
+		}
+		got, err := ReadActualFilenames(tmpPath, c.names)
+		if err != nil {
+			t.Fatalf("unexpected error: %+v", err)
+		}
+		if !reflect.DeepEqual(c.want, got) {
+			t.Fatalf("returned value does not match expected: \n\t(GOT) %v\n\t(WNT) %v",
+				got, c.want)
+		}
+	}
+}
+
 func TestGenTestFilename(t *testing.T) {
 	cases := []struct {
 		str  string
@@ -197,11 +369,11 @@ func TestGenTestFilename(t *testing.T) {
 
 func BenchmarkGenTestFilename(b *testing.B) {
 	cases := []string{
-		"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-		"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
-		"αααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααααα",
-		"11111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111",
-		"⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘⌘",
+		strings.Repeat("a", 128),
+		strings.Repeat("A", 128),
+		strings.Repeat("α", 128),
+		strings.Repeat("1", 128),
+		strings.Repeat("⌘", 128),
 	}
 
 	for i := 0; i < b.N; i++ {
@@ -499,73 +671,85 @@ func TestCopyFile(t *testing.T) {
 }
 
 func TestCopyFileSymlink(t *testing.T) {
-	dir, err := ioutil.TempDir("", "dep")
+	h := test.NewHelper(t)
+	defer h.Cleanup()
+	h.TempDir(".")
+
+	testcases := map[string]string{
+		filepath.Join("./testdata/symlinks/file-symlink"):         filepath.Join(h.Path("."), "dst-file"),
+		filepath.Join("./testdata/symlinks/windows-file-symlink"): filepath.Join(h.Path("."), "windows-dst-file"),
+		filepath.Join("./testdata/symlinks/dir-symlink"):          filepath.Join(h.Path("."), "dst-dir"),
+		filepath.Join("./testdata/symlinks/invalid-symlink"):      filepath.Join(h.Path("."), "invalid-symlink"),
+	}
+
+	for symlink, dst := range testcases {
+		t.Run(symlink, func(t *testing.T) {
+			var err error
+			if err = copyFile(symlink, dst); err != nil {
+				t.Fatalf("failed to copy symlink: %s", err)
+			}
+
+			var want, got string
+
+			if runtime.GOOS == "windows" {
+				// Creating symlinks on Windows require an additional permission
+				// regular users aren't granted usually. So we copy the file
+				// content as a fall back instead of creating a real symlink.
+				srcb, err := ioutil.ReadFile(symlink)
+				h.Must(err)
+				dstb, err := ioutil.ReadFile(dst)
+				h.Must(err)
+
+				want = string(srcb)
+				got = string(dstb)
+			} else {
+				want, err = os.Readlink(symlink)
+				h.Must(err)
+
+				got, err = os.Readlink(dst)
+				if err != nil {
+					t.Fatalf("could not resolve symlink: %s", err)
+				}
+			}
+
+			if want != got {
+				t.Fatalf("resolved path is incorrect. expected %s, got %s", want, got)
+			}
+		})
+	}
+}
+
+func TestCopyFileLongFilePath(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		// We want to ensure the temporary fix actually fixes the issue with
+		// os.Chmod and long file paths. This is only applicable on Windows.
+		t.Skip("skipping on non-windows")
+	}
+
+	h := test.NewHelper(t)
+	h.TempDir(".")
+	defer h.Cleanup()
+
+	tmpPath := h.Path(".")
+
+	// Create a directory with a long-enough path name to cause the bug in #774.
+	dirName := ""
+	for len(tmpPath+string(os.PathSeparator)+dirName) <= 300 {
+		dirName += "directory"
+	}
+
+	h.TempDir(dirName)
+	h.TempFile(dirName+string(os.PathSeparator)+"src", "")
+
+	tmpDirPath := tmpPath + string(os.PathSeparator) + dirName + string(os.PathSeparator)
+
+	err := copyFile(tmpDirPath+"src", tmpDirPath+"dst")
 	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(dir)
-
-	srcPath := filepath.Join(dir, "src")
-	symlinkPath := filepath.Join(dir, "symlink")
-	dstPath := filepath.Join(dir, "dst")
-
-	srcf, err := os.Create(srcPath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	srcf.Close()
-
-	if err = os.Symlink(srcPath, symlinkPath); err != nil {
-		t.Fatalf("could not create symlink: %s", err)
-	}
-
-	if err = copyFile(symlinkPath, dstPath); err != nil {
-		t.Fatalf("failed to copy symlink: %s", err)
-	}
-
-	resolvedPath, err := os.Readlink(dstPath)
-	if err != nil {
-		t.Fatalf("could not resolve symlink: %s", err)
-	}
-
-	if resolvedPath != srcPath {
-		t.Fatalf("resolved path is incorrect. expected %s, got %s", srcPath, resolvedPath)
+		t.Fatalf("unexpected error while copying file: %v", err)
 	}
 }
 
-func TestCopyFileSymlinkToDirectory(t *testing.T) {
-	dir, err := ioutil.TempDir("", "dep")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(dir)
-
-	srcPath := filepath.Join(dir, "src")
-	symlinkPath := filepath.Join(dir, "symlink")
-	dstPath := filepath.Join(dir, "dst")
-
-	err = os.MkdirAll(srcPath, 0777)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if err = os.Symlink(srcPath, symlinkPath); err != nil {
-		t.Fatalf("could not create symlink: %v", err)
-	}
-
-	if err = copyFile(symlinkPath, dstPath); err != nil {
-		t.Fatalf("failed to copy symlink: %s", err)
-	}
-
-	resolvedPath, err := os.Readlink(dstPath)
-	if err != nil {
-		t.Fatalf("could not resolve symlink: %s", err)
-	}
-
-	if resolvedPath != srcPath {
-		t.Fatalf("resolved path is incorrect. expected %s, got %s", srcPath, resolvedPath)
-	}
-}
+// C:\Users\appveyor\AppData\Local\Temp\1\gotest639065787\dir4567890\dir4567890\dir4567890\dir4567890\dir4567890\dir4567890\dir4567890\dir4567890\dir4567890\dir4567890\dir4567890\dir4567890\dir4567890\dir4567890\dir4567890\dir4567890\dir4567890\dir4567890\dir4567890\dir4567890\dir4567890\dir4567890\dir4567890
 
 func TestCopyFileFail(t *testing.T) {
 	if runtime.GOOS == "windows" {
@@ -651,6 +835,57 @@ func setupInaccessibleDir(t *testing.T, op func(dir string) error) func() {
 	}
 
 	return cleanup
+}
+
+func TestEnsureDir(t *testing.T) {
+	h := test.NewHelper(t)
+	defer h.Cleanup()
+	h.TempDir(".")
+	h.TempFile("file", "")
+
+	tmpPath := h.Path(".")
+
+	var dn string
+	cleanup := setupInaccessibleDir(t, func(dir string) error {
+		dn = filepath.Join(dir, "dir")
+		return os.Mkdir(dn, 0777)
+	})
+	defer cleanup()
+
+	tests := map[string]bool{
+		// [success] A dir already exists for the given path.
+		tmpPath: true,
+		// [success] Dir does not exist but parent dir exists, so should get created.
+		filepath.Join(tmpPath, "testdir"): true,
+		// [failure] Dir and parent dir do not exist, should return an error.
+		filepath.Join(tmpPath, "notexist", "testdir"): false,
+		// [failure] Regular file present at given path.
+		h.Path("file"): false,
+		// [failure] Path inaccessible.
+		dn: false,
+	}
+
+	if runtime.GOOS == "windows" {
+		// This test doesn't work on Microsoft Windows because
+		// of the differences in how file permissions are
+		// implemented. For this to work, the directory where
+		// the directory exists should be inaccessible.
+		delete(tests, dn)
+	}
+
+	for path, shouldEnsure := range tests {
+		err := EnsureDir(path, 0777)
+		if shouldEnsure {
+			if err != nil {
+				t.Fatalf("unexpected error %q for %q", err, path)
+			} else if ok, err := IsDir(path); !ok {
+				t.Fatalf("expected directory to be preset at %q", path)
+				t.Fatal(err)
+			}
+		} else if err == nil {
+			t.Fatalf("expected error for path %q, got none", path)
+		}
+	}
 }
 
 func TestIsRegular(t *testing.T) {
@@ -814,13 +1049,6 @@ func TestIsNonEmptyDir(t *testing.T) {
 }
 
 func TestIsSymlink(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		// XXX: creating symlinks is not supported in Go on
-		// Microsoft Windows. Skipping this this until a solution
-		// for creating symlinks is is provided.
-		t.Skip("skipping on windows")
-	}
-
 	dir, err := ioutil.TempDir("", "dep")
 	if err != nil {
 		t.Fatal(err)
@@ -841,6 +1069,7 @@ func TestIsSymlink(t *testing.T) {
 
 	dirSymlink := filepath.Join(dir, "dirSymlink")
 	fileSymlink := filepath.Join(dir, "fileSymlink")
+
 	if err = os.Symlink(dirPath, dirSymlink); err != nil {
 		t.Fatal(err)
 	}
@@ -866,16 +1095,20 @@ func TestIsSymlink(t *testing.T) {
 	})
 	defer cleanup()
 
-	tests := map[string]struct {
-		expected bool
-		err      bool
-	}{
+	tests := map[string]struct{ expected, err bool }{
 		dirPath:             {false, false},
 		filePath:            {false, false},
 		dirSymlink:          {true, false},
 		fileSymlink:         {true, false},
 		inaccessibleFile:    {false, true},
 		inaccessibleSymlink: {false, true},
+	}
+
+	if runtime.GOOS == "windows" {
+		// XXX: setting permissions works differently in Windows. Skipping
+		// these cases until a compatible implementation is provided.
+		delete(tests, inaccessibleFile)
+		delete(tests, inaccessibleSymlink)
 	}
 
 	for path, want := range tests {

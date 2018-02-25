@@ -1,0 +1,12 @@
+ignored = [
+  "github.com/golang/notexist/samples*",
+  "github.com/sdboyer/dep-test*"
+]
+
+[[constraint]]
+  name = "github.com/sdboyer/deptestdos"
+  version = "2.0.0"
+
+[prune]
+  go-tests = true
+  unused-packages = true

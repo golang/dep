@@ -1,0 +1,7 @@
+Detected govendor configuration file...
+Converting from vendor.json...
+  Using ^0.8.1 as initial constraint for imported dep github.com/sdboyer/deptest
+  Trying v0.8.1 (3f4c3be) as initial lock for imported dep github.com/sdboyer/deptest
+  Using ^2.0.0 as initial constraint for imported dep github.com/sdboyer/deptestdos
+  Trying v2.0.0 (5c60720) as initial lock for imported dep github.com/sdboyer/deptestdos
+  Govendor was configured to ignore the test build tag, but that isn't supported by dep yet, and will be ignored. See https://github.com/golang/dep/issues/291.

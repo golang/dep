@@ -2,10 +2,11 @@
 
 
 [[projects]]
-  branch = "2.x"
+  branch = "parse-constraints-with-dash-in-pre"
   name = "github.com/Masterminds/semver"
   packages = ["."]
-  revision = "139cc0982c53f1367af5636b12b7643cd03757fc"
+  revision = "a93e51b5a57ef416dac8bb02d11407b6f55d8929"
+  source = "https://github.com/carolynvs/semver.git"
 
 [[projects]]
   name = "github.com/Masterminds/vcs"
@@ -20,10 +21,22 @@
   revision = "4239b77079c7b5d1243b7b4736304ce8ddb6f0f2"
 
 [[projects]]
-  branch = "v2"
-  name = "github.com/go-yaml/yaml"
+  name = "github.com/boltdb/bolt"
   packages = ["."]
-  revision = "cd8b52f8269e0feb286dfeef29f8fe4d5b397e0b"
+  revision = "2f1ce7a837dcb8da3ec595b1dac9d0632f0f99e8"
+  version = "v1.3.1"
+
+[[projects]]
+  name = "github.com/golang/protobuf"
+  packages = ["proto"]
+  revision = "925541529c1fa6821df4e44ce2723319eb2be768"
+  version = "v1.0.0"
+
+[[projects]]
+  name = "github.com/jmank88/nuts"
+  packages = ["."]
+  revision = "8b28145dffc87104e66d074f62ea8080edfad7c8"
+  version = "v0.3.0"
 
 [[projects]]
   branch = "master"
@@ -32,16 +45,10 @@
   revision = "e83dc5e7bba095e8d32fb2124714bf41f2a30cb5"
 
 [[projects]]
-  name = "github.com/pelletier/go-buffruneio"
-  packages = ["."]
-  revision = "c37440a7cf42ac63b919c752ca73a85067e05992"
-  version = "v0.2.0"
-
-[[projects]]
-  branch = "master"
   name = "github.com/pelletier/go-toml"
   packages = ["."]
-  revision = "fe206efb84b2bc8e8cfafe6b4c1826622be969e3"
+  revision = "acdc4509485b587f5e675510c4f2c63e90ff68a8"
+  version = "v1.1.0"
 
 [[projects]]
   name = "github.com/pkg/errors"
@@ -55,9 +62,33 @@
   packages = ["."]
   revision = "836a144573533ea4da4e6929c235fd348aed1c80"
 
+[[projects]]
+  branch = "master"
+  name = "golang.org/x/net"
+  packages = ["context"]
+  revision = "66aacef3dd8a676686c7ae3716979581e8b03c47"
+
+[[projects]]
+  branch = "master"
+  name = "golang.org/x/sync"
+  packages = ["errgroup"]
+  revision = "f52d1811a62927559de87708c8913c1650ce4f26"
+
+[[projects]]
+  branch = "master"
+  name = "golang.org/x/sys"
+  packages = ["unix"]
+  revision = "bb24a47a89eac6c1227fbcb2ae37a8b9ed323366"
+
+[[projects]]
+  branch = "v2"
+  name = "gopkg.in/yaml.v2"
+  packages = ["."]
+  revision = "d670f9405373e636a5a2765eea47fac0c9bc91a4"
+
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "48b2f69d59b2f321b14ee11547f4ac94468ac91bb99aad48337d42b75b791975"
+  inputs-digest = "215239f4e1109f268dd0eb48480c4987cd66da5deb9ae0b0da15b3cd35d02cd3"
   solver-name = "gps-cdcl"
   solver-version = 1

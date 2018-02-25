@@ -7,6 +7,7 @@ package main
 import (
 	"fmt"
 
+	_ "github.com/carolynvs/deptest-subpkg/subby"
 	"github.com/sdboyer/deptestdos"
 )
 

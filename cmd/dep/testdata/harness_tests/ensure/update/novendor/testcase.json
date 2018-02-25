@@ -1,0 +1,5 @@
+{
+  "commands": [
+    ["ensure", "-update", "-no-vendor"]
+  ]
+}

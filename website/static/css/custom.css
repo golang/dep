@@ -1,0 +1,124 @@
+/* 
+Contains custom styles for whole site.
+*/
+
+html {
+    box-sizing: border-box;
+}
+
+*, *:before, *:after {
+    box-sizing: inherit;
+}
+
+body {
+    min-height: 100vh;
+}
+
+.navPusher {
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+    justify-content: space-between;
+    min-height: 100%;
+    /* Resets default height: 100% */
+    height: auto;
+}
+
+.footer-logo {
+    padding-top: 1em;
+    display: flex;
+    justify-content: center;
+}
+
+/* Reset .navToggle box-sizing */
+.navToggle {
+    box-sizing: content-box;
+}
+
+
+/* HOME _____________________________________________________________________________________________________________ */
+
+.homeContainer {
+    flex: 1 0 auto;
+    padding-bottom: 1em;
+}
+
+.homeContainer .homeWrapper .projectLogo {
+    justify-content: center;
+    position: relative;
+    padding: 2em;
+}
+
+.homeContainer .homeWrapper .projectLogo img {
+    max-height: 360px;
+}
+
+
+/* DOCS _____________________________________________________________________________________________________________ */
+
+.docMainWrapper {
+    width: 100%;
+}
+
+
+/* HEADINGS _________________________________________________________________________________________________________ */
+
+.mainContainer .wrapper .post h2,
+.mainContainer .wrapper .post h3,
+.mainContainer .wrapper .post h4,
+.mainContainer .wrapper .post h5,
+.mainContainer .wrapper .post h6 {
+    margin-top: 2.5rem;
+}
+
+.mainContainer .wrapper .post .postHeader h1 {
+    font-size: 2.909rem;
+}
+
+.mainContainer .wrapper .post h2 {
+    font-size: 2.218rem;
+}
+
+.mainContainer .wrapper .post h3 {
+    font-size: 1.798rem;
+    color: #a6a6a6;
+}
+
+.mainContainer .wrapper .post h4 {
+    font-size: 1.618rem;
+    color: #a6a6a6;
+    font-weight: 300;
+    line-height: 1.5;
+    padding: 10px 0;
+}
+
+.mainContainer .wrapper .post h5 {
+    font-size: 1.111rem;
+    color: #a6a6a6;
+    font-weight: 300;
+    line-height: 1.5;
+    padding: 10px 0;
+}
+
+.mainContainer .wrapper .post h6 {
+    font-size: 1rem;
+    color: #a6a6a6;
+    font-weight: 300;
+    line-height: 1.5;
+    padding: 10px 0;
+}
+
+@media only screen and (min-device-width: 360px) and (max-device-width: 736px) {
+}
+
+@media only screen and (min-width: 1024px) {
+}
+
+@media only screen and (max-width: 1023px) {
+}
+
+@media only screen and (min-width: 1400px) {
+}
+
+@media only screen and (min-width: 1500px) {
+}

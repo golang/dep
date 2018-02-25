@@ -1,7 +1,0 @@
-{
-  "commands": [
-    ["ensure", "-n", "-update", "github.com/sdboyer/deptest"]
-  ],
-  "error-expected": "",
-  "vendor-final": []
-}

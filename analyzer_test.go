@@ -38,7 +38,7 @@ func TestAnalyzerDeriveManifestAndLock(t *testing.T) {
 				t.Fatal(err)
 			}
 		} else {
-			t.Fatalf("expected %s\n got %s", want, string(got))
+			t.Fatalf("(WNT):\n%s\n(GOT):\n%s", want, string(got))
 		}
 	}
 

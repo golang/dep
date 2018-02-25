@@ -22,13 +22,17 @@ The gophers there will answer or ask you to file an issue if you've tripped over
 
 ## Contributing code
 
+Let us know if you are interested in working on an issue by leaving a comment
+on the issue in GitHub. This helps avoid multiple people unknowingly 
+working on the same issue.
+
 Please read the [Contribution Guidelines](https://golang.org/doc/contribute.html)
 before sending patches.
 
 The
-[help-wanted](https://github.com/golang/dep/issues?q=is%3Aissue+is%3Aopen+label%3Ahelp-wanted)
+[help wanted](https://github.com/golang/dep/issues?q=is%3Aissue+is%3Aopen+label%3A%22help%20wanted%22)
 label highlights issues that are well-suited for folks to jump in on. The
-[good-first-pr](https://github.com/golang/dep/issues?q=is%3Aissue+is%3Aopen+label%3Agood-first-pr)
+[good first issue](https://github.com/golang/dep/issues?q=is%3Aissue+is%3Aopen+label%3A%22good%20first%20issue%22)
 label further identifies issues that are particularly well-sized for newcomers.
 
 Unless otherwise noted, the `dep` source files are distributed under
@@ -38,7 +42,24 @@ All submissions, including submissions by project members, require review. We
 use GitHub pull requests for this purpose. Consult [GitHub Help] for more
 information on using pull requests.
 
+We check `dep`'s own `vendor` directory into git. For any PR to `dep` where you're
+updating `Gopkg.toml`, make sure to run `dep ensure` and commit all changes to `vendor`.
+
 [GitHub Help]: https://help.github.com/articles/about-pull-requests/
+
+## Contributing to the Documentation
+
+All the docs reside in the [`docs/`](docs/) directory. For any relatively small
+change - like fixing a typo or rewording something - the easiest way to
+contribute is directly on Github, using their web code editor.
+
+For relatively big change - changes in the design, links or adding a new page -
+the docs site can be run locally. We use [docusaurus](http://docusaurus.io/) to
+generate the docs site. [`website/`](website/) directory contains all the
+docusaurus configurations. To run the site locally, `cd` into `website/`
+directory and run `npm i --only=dev` to install all the dev dependencies. Then
+run `npm start` to start serving the site. By default, the site would be served
+at http://localhost:3000.
 
 ## Contributor License Agreement
 
@@ -70,6 +91,7 @@ again.
 ### Issue management
 
 * We use [Zenhub](https://www.zenhub.com) to manage the queue, in addition to what we do with labels.
+  * You will need to install [ZenHub extension](https://www.zenhub.com/extension) to your browser to show the board.
   * Pipelines, and [the board](https://github.com/golang/dep#boards) are one thing we try to utilize:
     * **New Issues Pipeline**: When someone creates a new issue, it goes here first. Keep an eye out for issues that fall into your area. Add labels to them, and if it's something we should do, put it in the `Backlog` pipeline. If you aren't sure, throw it in the `Icebox`. It helps to sort this pipeline by date.
     * **Icebox Pipeline**: Issues that we aren't immediately closing but aren't really ready to be prioritized and started on. It's not a wontfix bucket, but a "not sure if we should/can fix right now" bucket.
@@ -77,7 +99,7 @@ again.
   * Marking dependencies/blockers is also quite useful where appropriate; please do that.
   * We use epics and milestones in roughly the same way (because OSS projects don't have real sprints). Epics should be duplicated as milestones; if there's a main epic issue, it should contain a checklist of the relevant issues to complete it.
 * The `area:` labels correspond to maintainership areas. Apply yours to any issues or PRs that fall under your purview. It's to be expected that multiple `area:` labels may be applied to a single issue.
-* The [`help-wanted`](https://github.com/golang/dep/issues?q=is%3Aissue+is%3Aopen+label%3Ahelp-wanted) and [`good-first-pr`](https://github.com/golang/dep/issues?q=is%3Aissue+is%3Aopen+label%3Agood-first-pr) labels are two of our most important tools for making the project accessible to newcomers - a key goal for our community. Here's how to use them well.
+* The [`help wanted`](https://github.com/golang/dep/issues?q=is%3Aissue+is%3Aopen+label%3A%22help+wanted%22) and [`good first issue`](https://github.com/golang/dep/labels/good%20first%20issue) labels are two of our most important tools for making the project accessible to newcomers - a key goal for our community. Here's how to use them well.
   * `good-first-pr` should be applied when there's a very straightforward, self-contained task that is very unlikely to have any hidden complexity. The real purpose of these is to provide a "chink in the armor", providing newcomers a lens through which to start understanding the project.
   * `help-wanted` should be applied to issues where there's a clear, stated goal, there is at most one significant question that needs answering, and it looks like the implementation won't be inordinately difficult, or disruptive to other parts of the system.
     * `help-wanted` should also be applied to all `good-first-pr` issues - it's duplicative, but not doing so seems unfriendly.

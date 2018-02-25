@@ -3,6 +3,6 @@
     ["init", "-no-examples", "-skip-tools"],
     ["ensure", "-update"]
   ],
-  "error-expected": "all dirs lacked any go code",
+  "error-expected": "no dirs contained any Go code",
   "vendor-final": []
 }

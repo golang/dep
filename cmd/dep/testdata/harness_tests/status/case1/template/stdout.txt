@@ -1,0 +1,2 @@
+PROJECT: github.com/sdboyer/deptest, VERSION: v0.8.0
+PROJECT: github.com/sdboyer/deptestdos, VERSION: v2.0.0

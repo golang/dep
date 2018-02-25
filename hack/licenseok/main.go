@@ -156,7 +156,7 @@ func addLicense(b []byte, path string, fmode os.FileMode) error {
 }
 
 func hashBang(b []byte) []byte {
-	var line []byte
+	var line = make([]byte, 0, len(b))
 	for _, c := range b {
 		line = append(line, c)
 		if c == '\n' {

@@ -5,6 +5,7 @@
 package dep
 
 import (
+	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
@@ -17,9 +18,9 @@ import (
 	"github.com/golang/dep/internal/test"
 )
 
-var (
-	discardLogger = log.New(ioutil.Discard, "", 0)
-)
+func discardLogger() *log.Logger {
+	return log.New(ioutil.Discard, "", 0)
+}
 
 func TestCtx_ProjectImport(t *testing.T) {
 	h := test.NewHelper(t)
@@ -132,8 +133,8 @@ func TestLoadProject(t *testing.T) {
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := &Ctx{
-				Out: discardLogger,
-				Err: discardLogger,
+				Out: discardLogger(),
+				Err: discardLogger(),
 			}
 
 			err := ctx.SetPaths(h.Path(tc.wd), h.Path("."))
@@ -205,8 +206,8 @@ func TestLoadProjectManifestParseError(t *testing.T) {
 	ctx := &Ctx{
 		GOPATH:     tg.Path("."),
 		WorkingDir: wd,
-		Out:        discardLogger,
-		Err:        discardLogger,
+		Out:        discardLogger(),
+		Err:        discardLogger(),
 	}
 
 	_, err = ctx.LoadProject()
@@ -236,8 +237,8 @@ func TestLoadProjectLockParseError(t *testing.T) {
 	ctx := &Ctx{
 		GOPATH:     tg.Path("."),
 		WorkingDir: wd,
-		Out:        discardLogger,
-		Err:        discardLogger,
+		Out:        discardLogger(),
+		Err:        discardLogger(),
 	}
 
 	_, err = ctx.LoadProject()
@@ -268,6 +269,55 @@ func TestLoadProjectNoSrcDir(t *testing.T) {
 	}
 }
 
+func TestLoadProjectGopkgFilenames(t *testing.T) {
+	// We are trying to skip this test on file systems which are case-sensiive. We could
+	// have used `fs.IsCaseSensitiveFilesystem` for this check. However, the code we are
+	// testing also relies on `fs.IsCaseSensitiveFilesystem`. So a bug in
+	// `fs.IsCaseSensitiveFilesystem` could prevent this test from being run. This is the
+	// only scenario where we prefer the OS heuristic over doing the actual work of
+	// validating filesystem case sensitivity via `fs.IsCaseSensitiveFilesystem`.
+	if runtime.GOOS != "windows" && runtime.GOOS != "darwin" {
+		t.Skip("skip this test on non-Windows, non-macOS")
+	}
+
+	// Here we test that a manifest filename with incorrect case throws an error. Similar
+	// error will also be thrown for the lock file as well which has been tested in
+	// `project_test.go#TestCheckGopkgFilenames`. So not repeating here.
+
+	h := test.NewHelper(t)
+	defer h.Cleanup()
+
+	invalidMfName := strings.ToLower(ManifestName)
+
+	wd := filepath.Join("src", "test")
+	h.TempFile(filepath.Join(wd, invalidMfName), "")
+
+	ctx := &Ctx{
+		Out: discardLogger(),
+		Err: discardLogger(),
+	}
+
+	err := ctx.SetPaths(h.Path(wd), h.Path("."))
+	if err != nil {
+		t.Fatalf("%+v", err)
+	}
+
+	_, err = ctx.LoadProject()
+
+	if err == nil {
+		t.Fatal("should have returned 'Manifest Filename' error")
+	}
+
+	expectedErrMsg := fmt.Sprintf(
+		"manifest filename %q does not match %q",
+		invalidMfName, ManifestName,
+	)
+
+	if err.Error() != expectedErrMsg {
+		t.Fatalf("unexpected error: %+v", err)
+	}
+}
+
 // TestCaseInsentitive is test for Windows. This should work even though set
 // difference letter cases in GOPATH.
 func TestCaseInsentitiveGOPATH(t *testing.T) {
@@ -280,7 +330,10 @@ func TestCaseInsentitiveGOPATH(t *testing.T) {
 
 	h.TempDir("src")
 	h.TempDir("src/test1")
-	h.TempFile(filepath.Join("src/test1", ManifestName), `[[constraint]]`)
+	h.TempFile(filepath.Join("src/test1", ManifestName), `
+	[[constraint]]
+		name = "github.com/foo/bar"
+		branch = "master"`)
 
 	// Shuffle letter case
 	rs := []rune(strings.ToLower(h.Path(".")))
@@ -325,22 +378,15 @@ func TestDetectProjectGOPATH(t *testing.T) {
 	h := test.NewHelper(t)
 	defer h.Cleanup()
 
-	h.TempDir("go")
-	h.TempDir("go-two")
+	h.TempDir(filepath.Join("sym", "symlink"))
+	h.TempDir(filepath.Join("go", "src", "sym", "path"))
+	h.TempDir(filepath.Join("go", "src", "real", "path"))
+	h.TempDir(filepath.Join("go-two", "src", "real", "path"))
+	h.TempDir(filepath.Join("go-two", "src", "sym"))
 
 	ctx := &Ctx{
 		GOPATHs: []string{h.Path("go"), h.Path("go-two")},
 	}
-
-	h.TempDir("go/src/real/path")
-
-	// Another directory used as a GOPATH
-	h.TempDir("go-two/src/sym")
-
-	h.TempDir(filepath.Join(".", "sym/symlink")) // Directory for symlinks
-	h.TempDir(filepath.Join("go", "src", "sym", "path"))
-	h.TempDir(filepath.Join("go", "src", " real", "path"))
-	h.TempDir(filepath.Join("go-two", "src", "real", "path"))
 
 	testcases := []struct {
 		name         string
@@ -394,7 +440,7 @@ func TestDetectProjectGOPATH(t *testing.T) {
 		{
 			name:         "AbsRoot-is-a-symlink-to-ResolvedAbsRoot",
 			root:         filepath.Join(h.Path("."), "sym", "symlink"),
-			resolvedRoot: filepath.Join(ctx.GOPATHs[0], "src", " real", "path"),
+			resolvedRoot: filepath.Join(ctx.GOPATHs[0], "src", "real", "path"),
 			GOPATH:       ctx.GOPATHs[0],
 		},
 	}
@@ -423,36 +469,72 @@ func TestDetectGOPATH(t *testing.T) {
 	th := test.NewHelper(t)
 	defer th.Cleanup()
 
-	th.TempDir("go")
-	th.TempDir("gotwo")
+	th.TempDir(filepath.Join("code", "src", "github.com", "username", "package"))
+	th.TempDir(filepath.Join("go", "src", "github.com", "username", "package"))
+	th.TempDir(filepath.Join("gotwo", "src", "github.com", "username", "package"))
 
 	ctx := &Ctx{GOPATHs: []string{
 		th.Path("go"),
 		th.Path("gotwo"),
 	}}
 
-	th.TempDir(filepath.Join("code", "src", "github.com", "username", "package"))
-	th.TempDir(filepath.Join("go", "src", "github.com", "username", "package"))
-	th.TempDir(filepath.Join("gotwo", "src", "github.com", "username", "package"))
-
 	testcases := []struct {
 		GOPATH string
 		path   string
 		err    bool
 	}{
-		{th.Path("go"), filepath.Join(th.Path("go"), "src/github.com/username/package"), false},
-		{th.Path("go"), filepath.Join(th.Path("go"), "src/github.com/username/package"), false},
-		{th.Path("gotwo"), filepath.Join(th.Path("gotwo"), "src/github.com/username/package"), false},
-		{"", filepath.Join(th.Path("."), "code/src/github.com/username/package"), true},
+		{th.Path("go"), th.Path(filepath.Join("go", "src", "github.com", "username", "package")), false},
+		{th.Path("go"), th.Path(filepath.Join("go", "src", "github.com", "username", "package")), false},
+		{th.Path("gotwo"), th.Path(filepath.Join("gotwo", "src", "github.com", "username", "package")), false},
+		{"", th.Path(filepath.Join("code", "src", "github.com", "username", "package")), true},
 	}
 
 	for _, tc := range testcases {
 		GOPATH, err := ctx.detectGOPATH(tc.path)
 		if tc.err && err == nil {
-			t.Error("Expected error but got none")
+			t.Error("expected error but got none")
 		}
 		if GOPATH != tc.GOPATH {
-			t.Errorf("Expected GOPATH to be %s, got %s", GOPATH, tc.GOPATH)
+			t.Errorf("expected GOPATH to be %s, got %s", GOPATH, tc.GOPATH)
+		}
+	}
+}
+
+func TestDepCachedir(t *testing.T) {
+	h := test.NewHelper(t)
+	defer h.Cleanup()
+
+	h.TempDir("cache")
+	// Create the directory for default cachedir location.
+	h.TempDir(filepath.Join("go", "pkg", "dep"))
+
+	testCachedir := h.Path("cache")
+	gopath := h.Path("go")
+	discardLgr := discardLogger()
+
+	cases := []struct {
+		cachedir     string
+		wantCachedir string
+	}{
+		// If `Cachedir` is not set in the context, it should use `$GOPATH/pkg/dep`.
+		{cachedir: "", wantCachedir: h.Path(filepath.Join("go", "pkg", "dep"))},
+		// If `Cachedir` is set in the context, it should use that.
+		{cachedir: testCachedir, wantCachedir: testCachedir},
+	}
+
+	for _, c := range cases {
+		ctx := &Ctx{
+			GOPATH:   gopath,
+			Cachedir: c.cachedir,
+			Out:      discardLgr,
+			Err:      discardLgr,
+		}
+		sm, err := ctx.SourceManager()
+		h.Must(err)
+		defer sm.Release()
+
+		if sm.Cachedir() != c.wantCachedir {
+			t.Errorf("expected cachedir to be %s, got %s", c.wantCachedir, sm.Cachedir())
 		}
 	}
 }

@@ -13,10 +13,6 @@ import (
 	"github.com/pkg/errors"
 )
 
-func rename(src, dst string) error {
-	return os.Rename(src, dst)
-}
-
 // renameFallback attempts to determine the appropriate fallback to failed rename
 // operation depending on the resulting error.
 func renameFallback(err error, src, dst string) error {

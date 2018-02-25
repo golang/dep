@@ -1,0 +1,10 @@
+.DS_Store
+
+build/
+node_modules/
+
+i18n/*
+!i18n/en.json
+
+lib/core/metadata.js
+lib/core/MetadataBlog.js

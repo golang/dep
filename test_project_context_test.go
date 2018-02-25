@@ -7,7 +7,7 @@ package dep
 import (
 	"path/filepath"
 
-	"github.com/golang/dep/internal/gps"
+	"github.com/golang/dep/gps"
 	"github.com/golang/dep/internal/test"
 	"github.com/pkg/errors"
 )
@@ -39,8 +39,8 @@ func NewTestProjectContext(h *test.Helper, projectName string) *TestProjectConte
 	var err error
 	pc.Context = &Ctx{
 		GOPATH: pc.tempDir,
-		Out:    discardLogger,
-		Err:    discardLogger,
+		Out:    discardLogger(),
+		Err:    discardLogger(),
 	}
 	pc.SourceManager, err = pc.Context.SourceManager()
 	h.Must(errors.Wrap(err, "Unable to create a SourceManager"))

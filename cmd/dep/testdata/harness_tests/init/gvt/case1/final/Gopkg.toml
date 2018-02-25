@@ -1,0 +1,16 @@
+
+[[constraint]]
+  name = "github.com/sdboyer/deptest"
+  source = "https://github.com/carolynvs/deptest"
+
+[[constraint]]
+  name = "github.com/sdboyer/deptestdos"
+  version = "2.0.0"
+
+[[constraint]]
+  branch = "v2"
+  name = "gopkg.in/yaml.v2"
+
+[prune]
+  go-tests = true
+  unused-packages = true

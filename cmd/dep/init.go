@@ -5,20 +5,20 @@
 package main
 
 import (
+	"context"
 	"flag"
+	"log"
 	"os"
 	"path/filepath"
 	"time"
 
 	"github.com/golang/dep"
+	"github.com/golang/dep/gps"
 	"github.com/golang/dep/internal/fs"
-	"github.com/golang/dep/internal/gps"
-	"github.com/golang/dep/internal/gps/paths"
-	"github.com/golang/dep/internal/gps/pkgtree"
 	"github.com/pkg/errors"
 )
 
-const initShortHelp = `Initialize a new project with manifest and lock files`
+const initShortHelp = `Set up a new Go project, or migrate an existing one`
 const initLongHelp = `
 Initialize the project at filepath root by parsing its dependencies, writing
 manifest and lock files, and vendoring the dependencies. If root isn't
@@ -26,7 +26,9 @@ specified, use the current directory.
 
 When configuration for another dependency management tool is detected, it is
 imported into the initial manifest and lock. Use the -skip-tools flag to
-disable this behavior. The following external tools are supported: glide, godep.
+disable this behavior. The following external tools are supported:
+glide, godep, vndr, govend, gb, gvt, govendor, glock.
+
 Any dependencies that are not constrained by external configuration use the
 GOPATH analysis below.
 
@@ -80,72 +82,49 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 			root = filepath.Join(ctx.WorkingDir, args[0])
 		}
 		if err := os.MkdirAll(root, os.FileMode(0777)); err != nil {
-			return errors.Errorf("unable to create directory %s , err %v", root, err)
+			return errors.Wrapf(err, "init failed: unable to create a directory at %s", root)
 		}
 	}
 
-	var err error
-	p := new(dep.Project)
-	if err = p.SetRoot(root); err != nil {
-		return errors.Wrap(err, "NewProject")
-	}
-
-	ctx.GOPATH, err = ctx.DetectProjectGOPATH(p)
-	if err != nil {
-		return errors.Wrapf(err, "ctx.DetectProjectGOPATH")
-	}
-
-	mf := filepath.Join(root, dep.ManifestName)
-	lf := filepath.Join(root, dep.LockName)
-	vpath := filepath.Join(root, "vendor")
-
-	mok, err := fs.IsRegular(mf)
+	p, err := cmd.establishProjectAt(root, ctx)
 	if err != nil {
 		return err
 	}
-	if mok {
-		return errors.Errorf("manifest already exists: %s", mf)
-	}
-	// Manifest file does not exist.
-
-	lok, err := fs.IsRegular(lf)
-	if err != nil {
-		return err
-	}
-	if lok {
-		return errors.Errorf("invalid state: manifest %q does not exist, but lock %q does", mf, lf)
-	}
-
-	ip, err := ctx.ImportPathForProject(p)
-	if err != nil {
-		return errors.Wrap(err, "failed to determine import path for project")
-	}
-	p.ImportRoot = gps.ProjectRoot(ip)
 
 	sm, err := ctx.SourceManager()
 	if err != nil {
-		return errors.Wrap(err, "getSourceManager")
+		return errors.Wrap(err, "init failed: unable to create a source manager")
 	}
 	sm.UseDefaultSignalHandling()
 	defer sm.Release()
 
-	pkgT, directDeps, err := getDirectDependencies(sm, p)
+	if ctx.Verbose {
+		ctx.Out.Println("Getting direct dependencies...")
+	}
+
+	ptree, directDeps, err := p.GetDirectDependencyNames(sm)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "init failed: unable to determine direct dependencies")
+	}
+	if ctx.Verbose {
+		ctx.Out.Printf("Checked %d directories for packages.\nFound %d direct dependencies.\n", len(ptree.Packages), len(directDeps))
 	}
 
 	// Initialize with imported data, then fill in the gaps using the GOPATH
 	rootAnalyzer := newRootAnalyzer(cmd.skipTools, ctx, directDeps, sm)
 	p.Manifest, p.Lock, err = rootAnalyzer.InitializeRootManifestAndLock(root, p.ImportRoot)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "init failed: unable to prepare an initial manifest and lock for the solver")
 	}
+
+	// Set default prune options for go-tests and unused-packages
+	p.Manifest.PruneOptions.DefaultOptions = gps.PruneNestedVendorDirs | gps.PruneGoTestFiles | gps.PruneUnusedPackages
 
 	if cmd.gopath {
 		gs := newGopathScanner(ctx, directDeps, sm)
 		err = gs.InitializeRootManifestAndLock(p.Manifest, p.Lock)
 		if err != nil {
-			return err
+			return errors.Wrap(err, "init failed: unable to scan the GOPATH for dependencies")
 		}
 	}
 
@@ -154,7 +133,7 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 
 	params := gps.SolveParameters{
 		RootDir:         root,
-		RootPackageTree: pkgT,
+		RootPackageTree: ptree,
 		Manifest:        p.Manifest,
 		Lock:            p.Lock,
 		ProjectAnalyzer: rootAnalyzer,
@@ -164,15 +143,19 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 		params.TraceLogger = ctx.Err
 	}
 
-	s, err := gps.Prepare(params, sm)
-	if err != nil {
-		return errors.Wrap(err, "prepare solver")
+	if err := ctx.ValidateParams(sm, params); err != nil {
+		return errors.Wrapf(err, "init failed: validation of solve parameters failed")
 	}
 
-	soln, err := s.Solve()
+	s, err := gps.Prepare(params, sm)
 	if err != nil {
-		handleAllTheFailuresOfTheWorld(err)
-		return err
+		return errors.Wrap(err, "init failed: unable to prepare the solver")
+	}
+
+	soln, err := s.Solve(context.TODO())
+	if err != nil {
+		err = handleAllTheFailuresOfTheWorld(err)
+		return errors.Wrap(err, "init failed: unable to solve the dependency graph")
 	}
 	p.Lock = dep.LockFromSolution(soln)
 
@@ -182,52 +165,80 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 	// to generate the final lock memo.
 	s, err = gps.Prepare(params, sm)
 	if err != nil {
-		return errors.Wrap(err, "prepare solver")
+		return errors.Wrap(err, "init failed: unable to recalculate the lock digest")
 	}
 
 	p.Lock.SolveMeta.InputsDigest = s.HashInputs()
 
 	// Pass timestamp (yyyyMMddHHmmss format) as suffix to backup name.
-	vendorbak, err := dep.BackupVendor(vpath, time.Now().Format("20060102150405"))
+	vendorbak, err := dep.BackupVendor(filepath.Join(root, "vendor"), time.Now().Format("20060102150405"))
 	if err != nil {
-		return err
+		return errors.Wrap(err, "init failed: first backup vendor/, delete it, and then retry the previous command: failed to backup existing vendor directory")
 	}
 	if vendorbak != "" {
 		ctx.Err.Printf("Old vendor backed up to %v", vendorbak)
 	}
 
-	sw, err := dep.NewSafeWriter(p.Manifest, nil, p.Lock, dep.VendorAlways)
+	sw, err := dep.NewSafeWriter(p.Manifest, nil, p.Lock, dep.VendorAlways, p.Manifest.PruneOptions)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "init failed: unable to create a SafeWriter")
 	}
 
-	if err := sw.Write(root, sm, !cmd.noExamples); err != nil {
-		return errors.Wrap(err, "safe write of manifest and lock")
+	var logger *log.Logger
+	if ctx.Verbose {
+		logger = ctx.Err
+	}
+	if err := sw.Write(root, sm, !cmd.noExamples, logger); err != nil {
+		return errors.Wrap(err, "init failed: unable to write the manifest, lock and vendor directory to disk")
 	}
 
 	return nil
 }
 
-func getDirectDependencies(sm gps.SourceManager, p *dep.Project) (pkgtree.PackageTree, map[string]bool, error) {
-	pkgT, err := pkgtree.ListPackages(p.ResolvedAbsRoot, string(p.ImportRoot))
+// establishProjectAt attempts to set up the provided path as the root for the
+// project to be created.
+//
+// It checks for being within a GOPATH, that there is no pre-existing manifest
+// and lock, and that we can successfully infer the root import path from
+// GOPATH.
+//
+// If successful, it returns a dep.Project, ready for further use.
+func (cmd *initCommand) establishProjectAt(root string, ctx *dep.Ctx) (*dep.Project, error) {
+	var err error
+	p := new(dep.Project)
+	if err = p.SetRoot(root); err != nil {
+		return nil, errors.Wrapf(err, "init failed: unable to set the root project to %s", root)
+	}
+
+	ctx.GOPATH, err = ctx.DetectProjectGOPATH(p)
 	if err != nil {
-		return pkgtree.PackageTree{}, nil, errors.Wrap(err, "gps.ListPackages")
+		return nil, errors.Wrapf(err, "init failed: unable to detect the containing GOPATH")
 	}
 
-	directDeps := map[string]bool{}
-	rm, _ := pkgT.ToReachMap(true, true, false, nil)
-	for _, ip := range rm.FlattenFn(paths.IsStandardImportPath) {
-		pr, err := sm.DeduceProjectRoot(ip)
-		if err != nil {
-			return pkgtree.PackageTree{}, nil, err
-		}
-		directDeps[string(pr)] = true
+	mf := filepath.Join(root, dep.ManifestName)
+	lf := filepath.Join(root, dep.LockName)
+
+	mok, err := fs.IsRegular(mf)
+	if err != nil {
+		return nil, errors.Wrapf(err, "init failed: unable to check for an existing manifest at %s", mf)
+	}
+	if mok {
+		return nil, errors.Errorf("init aborted: manifest already exists at %s", mf)
 	}
 
-	return pkgT, directDeps, nil
-}
+	lok, err := fs.IsRegular(lf)
+	if err != nil {
+		return nil, errors.Wrapf(err, "init failed: unable to check for an existing lock at %s", lf)
+	}
+	if lok {
+		return nil, errors.Errorf("invalid aborted: lock already exists at %s", lf)
+	}
 
-// TODO solve failures can be really creative - we need to be similarly creative
-// in handling them and informing the user appropriately
-func handleAllTheFailuresOfTheWorld(err error) {
+	ip, err := ctx.ImportPathForProject(p)
+	if err != nil {
+		return nil, errors.Wrapf(err, "init failed: unable to determine the import path for the root project %s", root)
+	}
+	p.ImportRoot = gps.ProjectRoot(ip)
+
+	return p, nil
 }

@@ -24,14 +24,18 @@ import (
 )
 
 var (
-	ExeSuffix string // ".exe" on Windows
+	// ExeSuffix is the suffix of executable files; ".exe" on Windows.
+	ExeSuffix string
 	mu        sync.Mutex
-	PrintLogs *bool = flag.Bool("logs", false, "log stdin/stdout of test commands")
+	// PrintLogs controls logging of test commands.
+	PrintLogs = flag.Bool("logs", false, "log stdin/stdout of test commands")
+	// UpdateGolden controls updating test fixtures.
+	UpdateGolden = flag.Bool("update", false, "update golden files")
 )
 
 const (
-	manifestName string = "Gopkg.toml"
-	lockName     string = "Gopkg.lock"
+	manifestName = "Gopkg.toml"
+	lockName     = "Gopkg.lock"
 )
 
 func init() {
@@ -190,7 +194,7 @@ func (h *Helper) DoRun(args []string) error {
 	return errors.Wrapf(status, "Error running %s\n%s", strings.Join(newargs, " "), h.stderr.String())
 }
 
-// run runs the test go command, and expects it to succeed.
+// Run runs the test go command, and expects it to succeed.
 func (h *Helper) Run(args ...string) {
 	if runtime.GOOS == "windows" {
 		mu.Lock()
@@ -445,7 +449,7 @@ func (h *Helper) WriteTestFile(src string, content string) error {
 	return err
 }
 
-// GetTestFile reads a file into memory
+// GetFile reads a file into memory
 func (h *Helper) GetFile(path string) io.ReadCloser {
 	content, err := os.Open(path)
 	if err != nil {
@@ -615,6 +619,8 @@ func (h *Helper) ReadLock() string {
 	return string(f)
 }
 
+// GetCommit treats repo as a path to a git repository and returns the current
+// revision.
 func (h *Helper) GetCommit(repo string) string {
 	repoPath := h.Path("pkg/dep/sources/https---" + strings.Replace(repo, "/", "-", -1))
 	cmd := exec.Command("git", "rev-parse", "HEAD")

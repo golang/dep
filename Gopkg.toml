@@ -1,19 +1,30 @@
+# https://github.com/Masterminds/semver/pull/60
 [[constraint]]
-  branch = "2.x"
   name = "github.com/Masterminds/semver"
+  source = "https://github.com/carolynvs/semver.git"
+  branch = "parse-constraints-with-dash-in-pre"
 
 [[constraint]]
   name = "github.com/Masterminds/vcs"
   version = "1.11.0"
 
 [[constraint]]
-  branch = "v2"
-  name = "github.com/go-yaml/yaml"
-
-[[constraint]]
-  branch = "master"
   name = "github.com/pelletier/go-toml"
+  version = "1.1.0"
 
 [[constraint]]
   name = "github.com/pkg/errors"
   version = "0.8.0"
+
+[[constraint]]
+  name = "github.com/boltdb/bolt"
+  version = "1.0.0"
+
+[[constraint]]
+  name = "github.com/jmank88/nuts"
+  version = "0.3.0"
+
+[prune]
+  non-go = true
+  go-tests = true
+  unused-packages = true

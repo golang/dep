@@ -2,3 +2,7 @@
 [[constraint]]
   name = "github.com/carolynvs/deptestglide"
   version = "0.1.1"
+
+[prune]
+  go-tests = true
+  unused-packages = true

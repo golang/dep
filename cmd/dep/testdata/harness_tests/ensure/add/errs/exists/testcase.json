@@ -1,0 +1,6 @@
+{
+  "commands": [
+    ["ensure", "-add", "github.com/sdboyer/deptest"]
+  ],
+  "error-expected": "nothing to -add, github.com/sdboyer/deptest is already in Gopkg.toml and the project's direct imports or required list"
+}

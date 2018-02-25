@@ -1,0 +1,6 @@
+{
+  "commands": [
+    ["ensure", "-add", "github.com/sdboyer/deptest@1.0.0"]
+  ],
+  "error-expected": "Gopkg.toml already contains rules for github.com/sdboyer/deptest, cannot specify a version constraint"
+}

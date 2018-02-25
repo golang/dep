@@ -9,14 +9,17 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"html/template"
 	"io"
+	"io/ioutil"
+	"log"
 	"sort"
+	"sync"
 	"text/tabwriter"
 
 	"github.com/golang/dep"
-	"github.com/golang/dep/internal/gps"
-	"github.com/golang/dep/internal/gps/paths"
-	"github.com/golang/dep/internal/gps/pkgtree"
+	"github.com/golang/dep/gps"
+	"github.com/golang/dep/gps/paths"
 	"github.com/pkg/errors"
 )
 
@@ -31,14 +34,20 @@ With no arguments, print the status of each dependency of the project.
   LATEST      Latest VCS revision available
   PKGS USED   Number of packages from this project that are actually used
 
-With one or more explicitly specified packages, or with the -detailed flag,
-print an extended status output for each dependency of the project.
-
-  TODO    Another column description
-  FOOBAR  Another column description
-
 Status returns exit code zero if all dependencies are in a "good state".
 `
+
+const (
+	shortRev uint8 = iota
+	longRev
+)
+
+var (
+	errFailedUpdate        = errors.New("failed to fetch updates")
+	errFailedListPkg       = errors.New("failed to list packages")
+	errMultipleFailures    = errors.New("multiple sources of failure")
+	errInputDigestMismatch = errors.New("input-digest mismatch")
+)
 
 func (cmd *statusCommand) Name() string      { return "status" }
 func (cmd *statusCommand) Args() string      { return "[package...]" }
@@ -47,109 +56,105 @@ func (cmd *statusCommand) LongHelp() string  { return statusLongHelp }
 func (cmd *statusCommand) Hidden() bool      { return false }
 
 func (cmd *statusCommand) Register(fs *flag.FlagSet) {
-	fs.BoolVar(&cmd.detailed, "detailed", false, "report more detailed status")
 	fs.BoolVar(&cmd.json, "json", false, "output in JSON format")
 	fs.StringVar(&cmd.template, "f", "", "output in text/template format")
 	fs.BoolVar(&cmd.dot, "dot", false, "output the dependency graph in GraphViz format")
 	fs.BoolVar(&cmd.old, "old", false, "only show out-of-date dependencies")
 	fs.BoolVar(&cmd.missing, "missing", false, "only show missing dependencies")
-	fs.BoolVar(&cmd.unused, "unused", false, "only show unused dependencies")
-	fs.BoolVar(&cmd.modified, "modified", false, "only show modified dependencies")
 }
 
 type statusCommand struct {
-	detailed bool
 	json     bool
 	template string
 	output   string
 	dot      bool
 	old      bool
 	missing  bool
-	unused   bool
-	modified bool
 }
 
 type outputter interface {
-	BasicHeader()
-	BasicLine(*BasicStatus)
-	BasicFooter()
-	MissingHeader()
-	MissingLine(*MissingStatus)
-	MissingFooter()
+	BasicHeader() error
+	BasicLine(*BasicStatus) error
+	BasicFooter() error
+	MissingHeader() error
+	MissingLine(*MissingStatus) error
+	MissingFooter() error
 }
 
 type tableOutput struct{ w *tabwriter.Writer }
 
-func (out *tableOutput) BasicHeader() {
-	fmt.Fprintf(out.w, "PROJECT\tCONSTRAINT\tVERSION\tREVISION\tLATEST\tPKGS USED\n")
+func (out *tableOutput) BasicHeader() error {
+	_, err := fmt.Fprintf(out.w, "PROJECT\tCONSTRAINT\tVERSION\tREVISION\tLATEST\tPKGS USED\n")
+	return err
 }
 
-func (out *tableOutput) BasicFooter() {
-	out.w.Flush()
+func (out *tableOutput) BasicFooter() error {
+	return out.w.Flush()
 }
 
-func (out *tableOutput) BasicLine(bs *BasicStatus) {
-	var constraint string
-	if v, ok := bs.Constraint.(gps.Version); ok {
-		constraint = formatVersion(v)
-	} else {
-		constraint = bs.Constraint.String()
-	}
-	fmt.Fprintf(out.w,
+func (out *tableOutput) BasicLine(bs *BasicStatus) error {
+	_, err := fmt.Fprintf(out.w,
 		"%s\t%s\t%s\t%s\t%s\t%d\t\n",
 		bs.ProjectRoot,
-		constraint,
+		bs.getConsolidatedConstraint(),
 		formatVersion(bs.Version),
 		formatVersion(bs.Revision),
-		formatVersion(bs.Latest),
+		bs.getConsolidatedLatest(shortRev),
 		bs.PackageCount,
 	)
+	return err
 }
 
-func (out *tableOutput) MissingHeader() {
-	fmt.Fprintln(out.w, "PROJECT\tMISSING PACKAGES")
+func (out *tableOutput) MissingHeader() error {
+	_, err := fmt.Fprintln(out.w, "PROJECT\tMISSING PACKAGES")
+	return err
 }
 
-func (out *tableOutput) MissingLine(ms *MissingStatus) {
-	fmt.Fprintf(out.w,
+func (out *tableOutput) MissingLine(ms *MissingStatus) error {
+	_, err := fmt.Fprintf(out.w,
 		"%s\t%s\t\n",
 		ms.ProjectRoot,
 		ms.MissingPackages,
 	)
+	return err
 }
 
-func (out *tableOutput) MissingFooter() {
-	out.w.Flush()
+func (out *tableOutput) MissingFooter() error {
+	return out.w.Flush()
 }
 
 type jsonOutput struct {
 	w       io.Writer
-	basic   []*BasicStatus
+	basic   []*rawStatus
 	missing []*MissingStatus
 }
 
-func (out *jsonOutput) BasicHeader() {
-	out.basic = []*BasicStatus{}
+func (out *jsonOutput) BasicHeader() error {
+	out.basic = []*rawStatus{}
+	return nil
 }
 
-func (out *jsonOutput) BasicFooter() {
-	json.NewEncoder(out.w).Encode(out.basic)
+func (out *jsonOutput) BasicFooter() error {
+	return json.NewEncoder(out.w).Encode(out.basic)
 }
 
-func (out *jsonOutput) BasicLine(bs *BasicStatus) {
-	out.basic = append(out.basic, bs)
+func (out *jsonOutput) BasicLine(bs *BasicStatus) error {
+	out.basic = append(out.basic, bs.marshalJSON())
+	return nil
 }
 
-func (out *jsonOutput) MissingHeader() {
+func (out *jsonOutput) MissingHeader() error {
 	out.missing = []*MissingStatus{}
+	return nil
 }
 
-func (out *jsonOutput) MissingLine(ms *MissingStatus) {
+func (out *jsonOutput) MissingLine(ms *MissingStatus) error {
 	out.missing = append(out.missing, ms)
+	return nil
 }
 
-func (out *jsonOutput) MissingFooter() {
-	json.NewEncoder(out.w).Encode(out.missing)
+func (out *jsonOutput) MissingFooter() error {
+	return json.NewEncoder(out.w).Encode(out.missing)
 }
 
 type dotOutput struct {
@@ -159,33 +164,57 @@ type dotOutput struct {
 	p *dep.Project
 }
 
-func (out *dotOutput) BasicHeader() {
+func (out *dotOutput) BasicHeader() error {
 	out.g = new(graphviz).New()
 
-	ptree, _ := pkgtree.ListPackages(out.p.ResolvedAbsRoot, string(out.p.ImportRoot))
+	ptree, err := out.p.ParseRootPackageTree()
+	// TODO(sdboyer) should be true, true, false, out.p.Manifest.IgnoredPackages()
 	prm, _ := ptree.ToReachMap(true, false, false, nil)
 
 	out.g.createNode(string(out.p.ImportRoot), "", prm.FlattenFn(paths.IsStandardImportPath))
+
+	return err
 }
 
-func (out *dotOutput) BasicFooter() {
+func (out *dotOutput) BasicFooter() error {
 	gvo := out.g.output()
-	fmt.Fprintf(out.w, gvo.String())
+	_, err := fmt.Fprintf(out.w, gvo.String())
+	return err
 }
 
-func (out *dotOutput) BasicLine(bs *BasicStatus) {
-	version := formatVersion(bs.Revision)
-	if bs.Version != nil {
-		version = formatVersion(bs.Version)
-	}
-	out.g.createNode(bs.ProjectRoot, version, bs.Children)
+func (out *dotOutput) BasicLine(bs *BasicStatus) error {
+	out.g.createNode(bs.ProjectRoot, bs.getConsolidatedVersion(), bs.Children)
+	return nil
 }
 
-func (out *dotOutput) MissingHeader()                {}
-func (out *dotOutput) MissingLine(ms *MissingStatus) {}
-func (out *dotOutput) MissingFooter()                {}
+func (out *dotOutput) MissingHeader() error                { return nil }
+func (out *dotOutput) MissingLine(ms *MissingStatus) error { return nil }
+func (out *dotOutput) MissingFooter() error                { return nil }
+
+type templateOutput struct {
+	w    io.Writer
+	tmpl *template.Template
+}
+
+func (out *templateOutput) BasicHeader() error { return nil }
+func (out *templateOutput) BasicFooter() error { return nil }
+
+func (out *templateOutput) BasicLine(bs *BasicStatus) error {
+	return out.tmpl.Execute(out.w, bs)
+}
+
+func (out *templateOutput) MissingHeader() error { return nil }
+func (out *templateOutput) MissingFooter() error { return nil }
+
+func (out *templateOutput) MissingLine(ms *MissingStatus) error {
+	return out.tmpl.Execute(out.w, ms)
+}
 
 func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
+	if err := cmd.validateFlags(); err != nil {
+		return err
+	}
+
 	p, err := ctx.LoadProject()
 	if err != nil {
 		return err
@@ -198,10 +227,16 @@ func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
 	sm.UseDefaultSignalHandling()
 	defer sm.Release()
 
+	if err := dep.ValidateProjectRoots(ctx, p.Manifest, sm); err != nil {
+		return err
+	}
+
 	var buf bytes.Buffer
 	var out outputter
 	switch {
-	case cmd.detailed:
+	case cmd.missing:
+		return errors.Errorf("not implemented")
+	case cmd.old:
 		return errors.Errorf("not implemented")
 	case cmd.json:
 		out = &jsonOutput{
@@ -213,31 +248,100 @@ func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
 			o: cmd.output,
 			w: &buf,
 		}
+	case cmd.template != "":
+		tmpl, err := template.New("status").Parse(cmd.template)
+		if err != nil {
+			return err
+		}
+		out = &templateOutput{
+			w:    &buf,
+			tmpl: tmpl,
+		}
 	default:
 		out = &tableOutput{
 			w: tabwriter.NewWriter(&buf, 0, 4, 2, ' ', 0),
 		}
 	}
 
-	digestMismatch, hasMissingPkgs, err := runStatusAll(ctx, out, p, sm)
+	// Check if the lock file exists.
+	if p.Lock == nil {
+		return errors.Errorf("no Gopkg.lock found. Run `dep ensure` to generate lock file")
+	}
+
+	hasMissingPkgs, errCount, err := runStatusAll(ctx, out, p, sm)
 	if err != nil {
+		switch err {
+		case errFailedUpdate:
+			// Print the results with unknown data
+			ctx.Out.Println(buf.String())
+			// Print the help when in non-verbose mode
+			if !ctx.Verbose {
+				ctx.Out.Printf("The status of %d projects are unknown due to errors. Rerun with `-v` flag to see details.\n", errCount)
+			}
+		case errInputDigestMismatch:
+			// Tell the user why mismatch happened and how to resolve it.
+			if hasMissingPkgs {
+				ctx.Err.Printf("Lock inputs-digest mismatch due to the following packages missing from the lock:\n\n")
+				ctx.Out.Print(buf.String())
+				ctx.Err.Printf("\nThis happens when a new import is added. Run `dep ensure` to install the missing packages.\n")
+			} else {
+				ctx.Err.Printf("Lock inputs-digest mismatch. This happens when Gopkg.toml is modified.\n" +
+					"Run `dep ensure` to regenerate the inputs-digest.")
+			}
+		}
+
 		return err
 	}
 
-	if digestMismatch {
-		if hasMissingPkgs {
-			ctx.Err.Printf("Lock inputs-digest mismatch due to the following packages missing from the lock:\n\n")
-			ctx.Out.Print(buf.String())
-			ctx.Err.Printf("\nThis happens when a new import is added. Run `dep ensure` to install the missing packages.\n")
-		} else {
-			ctx.Err.Printf("Lock inputs-digest mismatch. This happens when Gopkg.toml is modified.\n" +
-				"Run `dep ensure` to regenerate the inputs-digest.")
+	// Print the status output
+	ctx.Out.Print(buf.String())
+
+	return nil
+}
+
+func (cmd *statusCommand) validateFlags() error {
+	// Operating mode flags.
+	var opModes []string
+
+	if cmd.old {
+		opModes = append(opModes, "-old")
+	}
+
+	if cmd.missing {
+		opModes = append(opModes, "-missing")
+	}
+
+	// Check if any other flags are passed with -dot.
+	if cmd.dot {
+		if cmd.template != "" {
+			return errors.New("cannot pass template string with -dot")
 		}
-	} else {
-		ctx.Out.Print(buf.String())
+
+		if cmd.json {
+			return errors.New("cannot pass multiple output format flags")
+		}
+
+		if len(opModes) > 0 {
+			return errors.New("-dot generates dependency graph; cannot pass other flags")
+		}
+	}
+
+	if len(opModes) > 1 {
+		// List the flags because which flags are for operation mode might not
+		// be apparent to the users.
+		return errors.Wrapf(errors.New("cannot pass multiple operating mode flags"), "%v", opModes)
 	}
 
 	return nil
+}
+
+type rawStatus struct {
+	ProjectRoot  string
+	Constraint   string
+	Version      string
+	Revision     string
+	Latest       string
+	PackageCount int
 }
 
 // BasicStatus contains all the information reported about a single dependency
@@ -250,26 +354,76 @@ type BasicStatus struct {
 	Revision     gps.Revision
 	Latest       gps.Version
 	PackageCount int
+	hasOverride  bool
+	hasError     bool
 }
 
+func (bs *BasicStatus) getConsolidatedConstraint() string {
+	var constraint string
+	if bs.Constraint != nil {
+		if v, ok := bs.Constraint.(gps.Version); ok {
+			constraint = formatVersion(v)
+		} else {
+			constraint = bs.Constraint.String()
+		}
+	}
+
+	if bs.hasOverride {
+		constraint += " (override)"
+	}
+
+	return constraint
+}
+
+func (bs *BasicStatus) getConsolidatedVersion() string {
+	version := formatVersion(bs.Revision)
+	if bs.Version != nil {
+		version = formatVersion(bs.Version)
+	}
+	return version
+}
+
+func (bs *BasicStatus) getConsolidatedLatest(revSize uint8) string {
+	latest := ""
+	if bs.Latest != nil {
+		switch revSize {
+		case shortRev:
+			latest = formatVersion(bs.Latest)
+		case longRev:
+			latest = bs.Latest.String()
+		}
+	}
+
+	if bs.hasError {
+		latest += "unknown"
+	}
+
+	return latest
+}
+
+func (bs *BasicStatus) marshalJSON() *rawStatus {
+	return &rawStatus{
+		ProjectRoot:  bs.ProjectRoot,
+		Constraint:   bs.getConsolidatedConstraint(),
+		Version:      formatVersion(bs.Version),
+		Revision:     string(bs.Revision),
+		Latest:       bs.getConsolidatedLatest(longRev),
+		PackageCount: bs.PackageCount,
+	}
+}
+
+// MissingStatus contains information about all the missing packages in a project.
 type MissingStatus struct {
 	ProjectRoot     string
 	MissingPackages []string
 }
 
-func runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceManager) (bool, bool, error) {
-	var digestMismatch, hasMissingPkgs bool
-
-	if p.Lock == nil {
-		// TODO if we have no lock file, do...other stuff
-		return digestMismatch, hasMissingPkgs, nil
-	}
-
+func runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceManager) (hasMissingPkgs bool, errCount int, err error) {
 	// While the network churns on ListVersions() requests, statically analyze
 	// code from the current project.
-	ptree, err := pkgtree.ListPackages(p.ResolvedAbsRoot, string(p.ImportRoot))
+	ptree, err := p.ParseRootPackageTree()
 	if err != nil {
-		return digestMismatch, hasMissingPkgs, errors.Errorf("analysis of local packages failed: %v", err)
+		return false, 0, err
 	}
 
 	// Set up a solver in order to check the InputHash.
@@ -280,106 +434,217 @@ func runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceMana
 		Manifest:        p.Manifest,
 		// Locks aren't a part of the input hash check, so we can omit it.
 	}
+
+	logger := ctx.Err
 	if ctx.Verbose {
 		params.TraceLogger = ctx.Err
+	} else {
+		logger = log.New(ioutil.Discard, "", 0)
+	}
+
+	if err := ctx.ValidateParams(sm, params); err != nil {
+		return false, 0, err
 	}
 
 	s, err := gps.Prepare(params, sm)
 	if err != nil {
-		return digestMismatch, hasMissingPkgs, errors.Errorf("could not set up solver for input hashing: %s", err)
+		return false, 0, errors.Wrapf(err, "could not set up solver for input hashing")
 	}
 
-	cm := collectConstraints(ptree, p, sm)
+	// Errors while collecting constraints should not fail the whole status run.
+	// It should count the error and tell the user about incomplete results.
+	cm, ccerrs := collectConstraints(ctx, p, sm)
+	if len(ccerrs) > 0 {
+		errCount += len(ccerrs)
+	}
 
 	// Get the project list and sort it so that the printed output users see is
 	// deterministically ordered. (This may be superfluous if the lock is always
 	// written in alpha order, but it doesn't hurt to double down.)
 	slp := p.Lock.Projects()
-	sort.Sort(dep.SortedLockedProjects(slp))
+	sort.Slice(slp, func(i, j int) bool {
+		return slp[i].Ident().Less(slp[j].Ident())
+	})
 
 	if bytes.Equal(s.HashInputs(), p.Lock.SolveMeta.InputsDigest) {
 		// If these are equal, we're guaranteed that the lock is a transitively
 		// complete picture of all deps. That eliminates the need for at least
 		// some checks.
 
-		out.BasicHeader()
+		if err := out.BasicHeader(); err != nil {
+			return false, 0, err
+		}
 
-		for _, proj := range slp {
-			bs := BasicStatus{
-				ProjectRoot:  string(proj.Ident().ProjectRoot),
-				PackageCount: len(proj.Packages()),
-			}
+		logger.Println("Checking upstream projects:")
 
-			// Get children only for specific outputers
-			// in order to avoid slower status process
-			switch out.(type) {
-			case *dotOutput:
-				ptr, err := sm.ListPackages(proj.Ident(), proj.Version())
+		// BasicStatus channel to collect all the BasicStatus.
+		bsCh := make(chan *BasicStatus, len(slp))
 
-				if err != nil {
-					return digestMismatch, hasMissingPkgs, fmt.Errorf("analysis of %s package failed: %v", proj.Ident().ProjectRoot, err)
+		// Error channels to collect different errors.
+		errListPkgCh := make(chan error, len(slp))
+		errListVerCh := make(chan error, len(slp))
+
+		var wg sync.WaitGroup
+
+		for i, proj := range slp {
+			wg.Add(1)
+			logger.Printf("(%d/%d) %s\n", i+1, len(slp), proj.Ident().ProjectRoot)
+
+			go func(proj gps.LockedProject) {
+				bs := BasicStatus{
+					ProjectRoot:  string(proj.Ident().ProjectRoot),
+					PackageCount: len(proj.Packages()),
 				}
 
-				prm, _ := ptr.ToReachMap(true, false, false, nil)
-				bs.Children = prm.FlattenFn(paths.IsStandardImportPath)
-			}
+				// Get children only for specific outputers
+				// in order to avoid slower status process.
+				switch out.(type) {
+				case *dotOutput:
+					ptr, err := sm.ListPackages(proj.Ident(), proj.Version())
 
-			// Split apart the version from the lock into its constituent parts
-			switch tv := proj.Version().(type) {
-			case gps.UnpairedVersion:
-				bs.Version = tv
-			case gps.Revision:
-				bs.Revision = tv
-			case gps.PairedVersion:
-				bs.Version = tv.Unpair()
-				bs.Revision = tv.Revision()
-			}
+					if err != nil {
+						bs.hasError = true
+						errListPkgCh <- err
+					}
 
-			// Check if the manifest has an override for this project. If so,
-			// set that as the constraint.
-			if pp, has := p.Manifest.Ovr[proj.Ident().ProjectRoot]; has && pp.Constraint != nil {
-				// TODO note somehow that it's overridden
-				bs.Constraint = pp.Constraint
-			} else {
-				bs.Constraint = gps.Any()
-				for _, c := range cm[bs.ProjectRoot] {
-					bs.Constraint = c.Intersect(bs.Constraint)
+					prm, _ := ptr.ToReachMap(true, true, false, p.Manifest.IgnoredPackages())
+					bs.Children = prm.FlattenFn(paths.IsStandardImportPath)
 				}
-			}
 
-			// Only if we have a non-rev and non-plain version do/can we display
-			// anything wrt the version's updateability.
-			if bs.Version != nil && bs.Version.Type() != gps.IsVersion {
-				c, has := p.Manifest.Constraints[proj.Ident().ProjectRoot]
-				if !has {
-					c.Constraint = gps.Any()
+				// Split apart the version from the lock into its constituent parts.
+				switch tv := proj.Version().(type) {
+				case gps.UnpairedVersion:
+					bs.Version = tv
+				case gps.Revision:
+					bs.Revision = tv
+				case gps.PairedVersion:
+					bs.Version = tv.Unpair()
+					bs.Revision = tv.Revision()
 				}
-				// TODO: This constraint is only the constraint imposed by the
-				// current project, not by any transitive deps. As a result,
-				// transitive project deps will always show "any" here.
-				bs.Constraint = c.Constraint
 
-				vl, err := sm.ListVersions(proj.Ident())
-				if err == nil {
-					gps.SortPairedForUpgrade(vl)
-
-					for _, v := range vl {
-						// Because we've sorted the version list for
-						// upgrade, the first version we encounter that
-						// matches our constraint will be what we want.
-						if c.Constraint.Matches(v) {
-							bs.Latest = v.Revision()
-							break
-						}
+				// Check if the manifest has an override for this project. If so,
+				// set that as the constraint.
+				if pp, has := p.Manifest.Ovr[proj.Ident().ProjectRoot]; has && pp.Constraint != nil {
+					bs.hasOverride = true
+					bs.Constraint = pp.Constraint
+				} else if pp, has := p.Manifest.Constraints[proj.Ident().ProjectRoot]; has && pp.Constraint != nil {
+					// If the manifest has a constraint then set that as the constraint.
+					bs.Constraint = pp.Constraint
+				} else {
+					bs.Constraint = gps.Any()
+					for _, c := range cm[bs.ProjectRoot] {
+						bs.Constraint = c.Constraint.Intersect(bs.Constraint)
 					}
 				}
+
+				// Only if we have a non-rev and non-plain version do/can we display
+				// anything wrt the version's updateability.
+				if bs.Version != nil && bs.Version.Type() != gps.IsVersion {
+					c, has := p.Manifest.Constraints[proj.Ident().ProjectRoot]
+					if !has {
+						// Get constraint for locked project
+						for _, lockedP := range p.Lock.P {
+							if lockedP.Ident().ProjectRoot == proj.Ident().ProjectRoot {
+								// Use the unpaired version as the constraint for checking updates.
+								c.Constraint = bs.Version
+							}
+						}
+					}
+					// TODO: This constraint is only the constraint imposed by the
+					// current project, not by any transitive deps. As a result,
+					// transitive project deps will always show "any" here.
+					bs.Constraint = c.Constraint
+
+					vl, err := sm.ListVersions(proj.Ident())
+					if err == nil {
+						gps.SortPairedForUpgrade(vl)
+
+						for _, v := range vl {
+							// Because we've sorted the version list for
+							// upgrade, the first version we encounter that
+							// matches our constraint will be what we want.
+							if c.Constraint.Matches(v) {
+								// Latest should be of the same type as the Version.
+								if bs.Version.Type() == gps.IsSemver {
+									bs.Latest = v
+								} else {
+									bs.Latest = v.Revision()
+								}
+								break
+							}
+						}
+					} else {
+						// Failed to fetch version list (could happen due to
+						// network issue).
+						bs.hasError = true
+						errListVerCh <- err
+					}
+				}
+
+				bsCh <- &bs
+
+				wg.Done()
+			}(proj)
+		}
+
+		wg.Wait()
+		close(bsCh)
+		close(errListPkgCh)
+		close(errListVerCh)
+
+		// Newline after printing the status progress output.
+		logger.Println()
+
+		// List Packages errors. This would happen only for dot output.
+		if len(errListPkgCh) > 0 {
+			err = errFailedListPkg
+			if ctx.Verbose {
+				for err := range errListPkgCh {
+					ctx.Err.Println(err.Error())
+				}
+				ctx.Err.Println()
+			}
+		}
+
+		// List Version errors.
+		if len(errListVerCh) > 0 {
+			if err == nil {
+				err = errFailedUpdate
+			} else {
+				err = errMultipleFailures
 			}
 
-			out.BasicLine(&bs)
+			// Count ListVersions error because we get partial results when
+			// this happens.
+			errCount += len(errListVerCh)
+			if ctx.Verbose {
+				for err := range errListVerCh {
+					ctx.Err.Println(err.Error())
+				}
+				ctx.Err.Println()
+			}
 		}
-		out.BasicFooter()
 
-		return digestMismatch, hasMissingPkgs, nil
+		// A map of ProjectRoot and *BasicStatus. This is used in maintain the
+		// order of BasicStatus in output by collecting all the BasicStatus and
+		// then using them in order.
+		bsMap := make(map[string]*BasicStatus)
+		for bs := range bsCh {
+			bsMap[bs.ProjectRoot] = bs
+		}
+
+		// Use the collected BasicStatus in outputter.
+		for _, proj := range slp {
+			if err := out.BasicLine(bsMap[string(proj.Ident().ProjectRoot)]); err != nil {
+				return false, 0, err
+			}
+		}
+
+		if footerErr := out.BasicFooter(); footerErr != nil {
+			return false, 0, footerErr
+		}
+
+		return false, errCount, err
 	}
 
 	// Hash digest mismatch may indicate that some deps are no longer
@@ -388,8 +653,7 @@ func runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceMana
 	//
 	// It's possible for digests to not match, but still have a correct
 	// lock.
-	digestMismatch = true
-	rm, _ := ptree.ToReachMap(true, true, false, nil)
+	rm, _ := ptree.ToReachMap(true, true, false, p.Manifest.IgnoredPackages())
 
 	external := rm.FlattenFn(paths.IsStandardImportPath)
 	roots := make(map[gps.ProjectRoot][]string, len(external))
@@ -421,10 +685,12 @@ func runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceMana
 			ctx.Err.Printf("\t%s: %s\n", fail.ex, fail.err.Error())
 		}
 
-		return digestMismatch, hasMissingPkgs, errors.New("address issues with undeducible import paths to get more status information")
+		return false, 0, errors.New("address issues with undeducible import paths to get more status information")
 	}
 
-	out.MissingHeader()
+	if err = out.MissingHeader(); err != nil {
+		return false, 0, err
+	}
 
 outer:
 	for root, pkgs := range roots {
@@ -437,11 +703,17 @@ outer:
 		}
 
 		hasMissingPkgs = true
-		out.MissingLine(&MissingStatus{ProjectRoot: string(root), MissingPackages: pkgs})
+		err := out.MissingLine(&MissingStatus{ProjectRoot: string(root), MissingPackages: pkgs})
+		if err != nil {
+			return false, 0, err
+		}
 	}
-	out.MissingFooter()
+	if err = out.MissingFooter(); err != nil {
+		return false, 0, err
+	}
 
-	return digestMismatch, hasMissingPkgs, nil
+	// We are here because of an input-digest mismatch. Return error.
+	return hasMissingPkgs, 0, errInputDigestMismatch
 }
 
 func formatVersion(v gps.Version) string {
@@ -461,7 +733,106 @@ func formatVersion(v gps.Version) string {
 	return v.String()
 }
 
-func collectConstraints(ptree pkgtree.PackageTree, p *dep.Project, sm gps.SourceManager) map[string][]gps.Constraint {
-	// TODO
-	return map[string][]gps.Constraint{}
+// projectConstraint stores ProjectRoot and Constraint for that project.
+type projectConstraint struct {
+	Project    gps.ProjectRoot
+	Constraint gps.Constraint
 }
+
+// constraintsCollection is a map of ProjectRoot(dependency) and a collection of
+// projectConstraint for the dependencies. This can be used to find constraints
+// on a dependency and the projects that apply those constraints.
+type constraintsCollection map[string][]projectConstraint
+
+// collectConstraints collects constraints declared by all the dependencies.
+// It returns constraintsCollection and a slice of errors encountered while
+// collecting the constraints, if any.
+func collectConstraints(ctx *dep.Ctx, p *dep.Project, sm gps.SourceManager) (constraintsCollection, []error) {
+	logger := ctx.Err
+	if !ctx.Verbose {
+		logger = log.New(ioutil.Discard, "", 0)
+	}
+
+	logger.Println("Collecting project constraints:")
+
+	var mutex sync.Mutex
+	constraintCollection := make(constraintsCollection)
+
+	// Collect the complete set of direct project dependencies, incorporating
+	// requireds and ignores appropriately.
+	_, directDeps, err := p.GetDirectDependencyNames(sm)
+	if err != nil {
+		// Return empty collection, not nil, if we fail here.
+		return constraintCollection, []error{errors.Wrap(err, "failed to get direct dependencies")}
+	}
+
+	// Create a root analyzer.
+	rootAnalyzer := newRootAnalyzer(true, ctx, directDeps, sm)
+
+	lp := p.Lock.Projects()
+
+	// Channel for receiving all the errors.
+	errCh := make(chan error, len(lp))
+
+	var wg sync.WaitGroup
+
+	// Iterate through the locked projects and collect constraints of all the projects.
+	for i, proj := range lp {
+		wg.Add(1)
+		logger.Printf("(%d/%d) %s\n", i+1, len(lp), proj.Ident().ProjectRoot)
+
+		go func(proj gps.LockedProject) {
+			defer wg.Done()
+
+			manifest, _, err := sm.GetManifestAndLock(proj.Ident(), proj.Version(), rootAnalyzer)
+			if err != nil {
+				errCh <- errors.Wrap(err, "error getting manifest and lock")
+				return
+			}
+
+			// Get project constraints.
+			pc := manifest.DependencyConstraints()
+
+			// Obtain a lock for constraintCollection.
+			mutex.Lock()
+			defer mutex.Unlock()
+			// Iterate through the project constraints to get individual dependency
+			// project and constraint values.
+			for pr, pp := range pc {
+				// Check if the project constraint is imported in the root project
+				if _, ok := directDeps[pr]; !ok {
+					continue
+				}
+
+				tempCC := append(
+					constraintCollection[string(pr)],
+					projectConstraint{proj.Ident().ProjectRoot, pp.Constraint},
+				)
+
+				// Sort the inner projectConstraint slice by Project string.
+				// Required for consistent returned value.
+				sort.Sort(byProject(tempCC))
+				constraintCollection[string(pr)] = tempCC
+			}
+		}(proj)
+	}
+
+	wg.Wait()
+	close(errCh)
+
+	var errs []error
+	if len(errCh) > 0 {
+		for e := range errCh {
+			errs = append(errs, e)
+			logger.Println(e.Error())
+		}
+	}
+
+	return constraintCollection, errs
+}
+
+type byProject []projectConstraint
+
+func (p byProject) Len() int           { return len(p) }
+func (p byProject) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
+func (p byProject) Less(i, j int) bool { return p[i].Project < p[j].Project }

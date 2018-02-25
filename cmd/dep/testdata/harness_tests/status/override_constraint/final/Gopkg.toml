@@ -1,0 +1,3 @@
+[[override]]
+  name = "github.com/sdboyer/deptest"
+  version = "=0.8.1"

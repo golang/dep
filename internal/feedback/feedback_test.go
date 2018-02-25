@@ -10,7 +10,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/golang/dep/internal/gps"
+	"github.com/golang/dep"
+	"github.com/golang/dep/gps"
+	_ "github.com/golang/dep/internal/test" // DO NOT REMOVE, allows go test ./... -update to work
 )
 
 func TestFeedback_Constraint(t *testing.T) {
@@ -90,5 +92,70 @@ func TestFeedback_LockedProject(t *testing.T) {
 		if c.want != got {
 			t.Errorf("Feedbacks are not expected: \n\t(GOT) '%s'\n\t(WNT) '%s'", got, c.want)
 		}
+	}
+}
+
+func TestFeedback_BrokenImport(t *testing.T) {
+	pi := gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot("github.com/foo/bar")}
+
+	cases := []struct {
+		oldVersion     gps.Version
+		currentVersion gps.Version
+		pID            gps.ProjectIdentifier
+		altPID         gps.ProjectIdentifier
+		want           string
+		name           string
+	}{
+		{
+			oldVersion:     gps.NewVersion("v1.1.4").Pair("bc29b4f"),
+			currentVersion: gps.NewVersion("v1.2.0").Pair("ia3da28"),
+			pID:            pi,
+			altPID:         pi,
+			want:           "Warning: Unable to preserve imported lock v1.1.4 (bc29b4f) for github.com/foo/bar. Locking in v1.2.0 (ia3da28)",
+			name:           "Basic broken import",
+		},
+		{
+			oldVersion:     gps.NewBranch("master").Pair("bc29b4f"),
+			currentVersion: gps.NewBranch("dev").Pair("ia3da28"),
+			pID:            pi,
+			altPID:         pi,
+			want:           "Warning: Unable to preserve imported lock master (bc29b4f) for github.com/foo/bar. Locking in dev (ia3da28)",
+			name:           "Branches",
+		},
+		{
+			oldVersion:     gps.NewBranch("master").Pair("bc29b4f"),
+			currentVersion: gps.NewBranch("dev").Pair("ia3da28"),
+			pID:            pi,
+			altPID:         gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot("github.com/foo/boo")},
+			want:           "Warning: Unable to preserve imported lock master (bc29b4f) for github.com/foo/bar. The project was removed from the lock because it is not used.",
+			name:           "Branches",
+		},
+		{
+			oldVersion:     gps.NewBranch("master").Pair("bc29b4f"),
+			currentVersion: gps.NewBranch("dev").Pair("ia3da28"),
+			pID:            gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot("github.com/foo/boo"), Source: "github.com/das/foo"},
+			altPID:         gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot("github.com/foo/boo"), Source: "github.com/das/bar"},
+			want:           "Warning: Unable to preserve imported lock master (bc29b4f) for github.com/foo/boo(github.com/das/foo). Locking in dev (ia3da28) for github.com/foo/boo(github.com/das/bar)",
+			name:           "With a source",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			buf := &bytes.Buffer{}
+			ol := dep.Lock{
+				P: []gps.LockedProject{gps.NewLockedProject(c.pID, c.oldVersion, nil)},
+			}
+			l := dep.Lock{
+				P: []gps.LockedProject{gps.NewLockedProject(c.altPID, c.currentVersion, nil)},
+			}
+			log := log2.New(buf, "", 0)
+			feedback := NewBrokenImportFeedback(gps.DiffLocks(&ol, &l))
+			feedback.LogFeedback(log)
+			got := strings.TrimSpace(buf.String())
+			if c.want != got {
+				t.Errorf("Feedbacks are not expected: \n\t(GOT) '%s'\n\t(WNT) '%s'", got, c.want)
+			}
+		})
 	}
 }

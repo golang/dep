@@ -5,12 +5,14 @@
 package dep
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 
-	"github.com/golang/dep/internal/gps"
+	"github.com/golang/dep/gps"
 	"github.com/golang/dep/internal/test"
 )
 
@@ -61,11 +63,89 @@ func TestFindRoot(t *testing.T) {
 	}
 }
 
+func TestCheckGopkgFilenames(t *testing.T) {
+	// We are trying to skip this test on file systems which are case-sensiive. We could
+	// have used `fs.IsCaseSensitiveFilesystem` for this check. However, the code we are
+	// testing also relies on `fs.IsCaseSensitiveFilesystem`. So a bug in
+	// `fs.IsCaseSensitiveFilesystem` could prevent this test from being run. This is the
+	// only scenario where we prefer the OS heuristic over doing the actual work of
+	// validating filesystem case sensitivity via `fs.IsCaseSensitiveFilesystem`.
+	if runtime.GOOS != "windows" && runtime.GOOS != "darwin" {
+		t.Skip("skip this test on non-Windows, non-macOS")
+	}
+
+	errMsgFor := func(filetype, filename string) func(string) string {
+		return func(name string) string {
+			return fmt.Sprintf("%s filename %q does not match %q", filetype, name, filename)
+		}
+	}
+
+	manifestErrMsg := errMsgFor("manifest", ManifestName)
+	lockErrMsg := errMsgFor("lock", LockName)
+
+	invalidMfName := strings.ToLower(ManifestName)
+	invalidLfName := strings.ToLower(LockName)
+
+	cases := []struct {
+		wantErr     bool
+		createFiles []string
+		wantErrMsg  string
+	}{
+		// No error should be returned when the project contains a valid manifest file
+		// but no lock file.
+		{false, []string{ManifestName}, ""},
+		// No error should be returned when the project contains a valid manifest file as
+		// well as a valid lock file.
+		{false, []string{ManifestName, LockName}, ""},
+		// Error indicating the project was not found should be returned if a manifest
+		// file is not found.
+		{true, nil, errProjectNotFound.Error()},
+		// Error should be returned if the project has a manifest file with invalid name
+		// but no lock file.
+		{true, []string{invalidMfName}, manifestErrMsg(invalidMfName)},
+		// Error should be returned if the project has a valid manifest file and an
+		// invalid lock file.
+		{true, []string{ManifestName, invalidLfName}, lockErrMsg(invalidLfName)},
+	}
+
+	for _, c := range cases {
+		h := test.NewHelper(t)
+		defer h.Cleanup()
+
+		// Create a temporary directory which we will use as the project folder.
+		h.TempDir("")
+		tmpPath := h.Path(".")
+
+		// Create any files that are needed for the test before invoking
+		// `checkGopkgFilenames`.
+		for _, file := range c.createFiles {
+			h.TempFile(file, "")
+		}
+		err := checkGopkgFilenames(tmpPath)
+
+		if c.wantErr {
+			if err == nil {
+				// We were expecting an error but did not get one.
+				t.Fatalf("unexpected error message: \n\t(GOT) nil\n\t(WNT) %s", c.wantErrMsg)
+			} else if err.Error() != c.wantErrMsg {
+				// We got an error but it is not the one we were expecting.
+				t.Fatalf("unexpected error message: \n\t(GOT) %s\n\t(WNT) %s", err.Error(), c.wantErrMsg)
+			}
+		} else if err != nil {
+			// Error was not expected but still we got one
+			t.Fatalf("unexpected error message: \n\t(GOT) %+v", err)
+		}
+	}
+}
+
 func TestProjectMakeParams(t *testing.T) {
+	m := NewManifest()
+	m.Ignored = []string{"ignoring this"}
+
 	p := Project{
 		AbsRoot:    "someroot",
 		ImportRoot: gps.ProjectRoot("Some project root"),
-		Manifest:   &Manifest{Ignored: []string{"ignoring this"}},
+		Manifest:   m,
 		Lock:       &Lock{},
 	}
 
