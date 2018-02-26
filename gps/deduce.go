@@ -21,10 +21,10 @@ import (
 )
 
 var (
-	gitSchemes     = []string{"git+ssh", "https", "ssh", "git", "http"}
-	bzrSchemes     = []string{"bzr+ssh", "https", "bzr", "http"}
-	hgSchemes      = []string{"ssh", "https", "http"}
-	svnSchemes     = []string{"svn+ssh", "https", "http", "svn"}
+	gitSchemes     = []string{"https", "ssh", "git", "http"}
+	bzrSchemes     = []string{"https", "bzr+ssh", "bzr", "http"}
+	hgSchemes      = []string{"https", "ssh", "http"}
+	svnSchemes     = []string{"https", "http", "svn", "svn+ssh"}
 	gopkginSchemes = []string{"https", "http"}
 )
 
@@ -502,7 +502,7 @@ func (m vcsExtensionDeducer) deduceSource(path string, u *url.URL) (maybeSources
 
 		if u.Scheme != "" {
 			if !validateVCSScheme(u.Scheme, match["vcs"]) {
-				return nil, fmt.Errorf("%s is not a valid scheme for accessing %s repositories (path %s)", u.Scheme, v[4], path)
+				return nil, fmt.Errorf("%s is not a valid scheme for accessing %s repositories (path %s)", u.Scheme, match["vcs"], path)
 			}
 
 			switch match["vcs"] {
