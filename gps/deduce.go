@@ -21,10 +21,10 @@ import (
 )
 
 var (
-	gitSchemes     = []string{"ssh", "https", "git", "http"}
-	bzrSchemes     = []string{"bzr+ssh", "https", "bzr", "http"}
-	hgSchemes      = []string{"ssh", "https", "http"}
-	svnSchemes     = []string{"svn+ssh", "https", "http", "svn"}
+	gitSchemes     = []string{"https", "ssh", "git", "http"}
+	bzrSchemes     = []string{"https", "bzr+ssh", "bzr", "http"}
+	hgSchemes      = []string{"https", "ssh", "http"}
+	svnSchemes     = []string{"https", "http", "svn", "svn+ssh"}
 	gopkginSchemes = []string{"https", "http"}
 )
 
