@@ -280,7 +280,6 @@ type templateOutput struct {
 
 func (out *templateOutput) BasicHeader() error { return nil }
 func (out *templateOutput) BasicFooter() error { return nil }
-
 func (out *templateOutput) BasicLine(bs *BasicStatus) error {
 	data := rawStatus{
 		ProjectRoot:  bs.ProjectRoot,
@@ -293,9 +292,14 @@ func (out *templateOutput) BasicLine(bs *BasicStatus) error {
 	return out.tmpl.Execute(out.w, data)
 }
 
+func (out *templateOutput) OldHeader() error { return nil }
+func (out *templateOutput) OldFooter() error { return nil }
+func (out *templateOutput) OldLine(os *OldStatus) error {
+	return out.tmpl.Execute(out.w, os)
+}
+
 func (out *templateOutput) MissingHeader() error { return nil }
 func (out *templateOutput) MissingFooter() error { return nil }
-
 func (out *templateOutput) MissingLine(ms *MissingStatus) error {
 	return out.tmpl.Execute(out.w, ms)
 }
@@ -406,9 +410,6 @@ func (cmd *statusCommand) validateFlags() error {
 	var opModes []string
 
 	if cmd.old {
-		if cmd.template != "" {
-			return errors.New("cannot pass template string with -old")
-		}
 		opModes = append(opModes, "-old")
 	}
 
@@ -503,6 +504,13 @@ func (cmd *statusCommand) runOld(ctx *dep.Ctx, out oldOutputter, p *dep.Project,
 		// Locks aren't a part of the input hash check, so we can omit it.
 	}
 
+	logger := ctx.Err
+	if ctx.Verbose {
+		params.TraceLogger = ctx.Err
+	} else {
+		logger = log.New(ioutil.Discard, "", 0)
+	}
+
 	// Check update for all the projects.
 	params.ChangeAll = true
 
@@ -511,60 +519,51 @@ func (cmd *statusCommand) runOld(ctx *dep.Ctx, out oldOutputter, p *dep.Project,
 		return errors.Wrap(err, "fastpath solver prepare")
 	}
 
+	logger.Println("Solving dependency graph to determine which dependencies can be updated.")
 	solution, err := solver.Solve(context.TODO())
 	if err != nil {
 		return errors.Wrap(err, "runOld")
 	}
 
 	var oldStatuses []OldStatus
-	lockProjects := p.Lock.Projects()
 	solutionProjects := solution.Projects()
 
-	sort.Slice(solutionProjects, func(i, j int) bool {
-		return solutionProjects[i].Ident().Less(solutionProjects[j].Ident())
-	})
+	for _, proj := range p.Lock.Projects() {
+		for i := range solutionProjects {
+			// Look for the same project in solution and lock.
+			if solutionProjects[i].Ident().ProjectRoot != proj.Ident().ProjectRoot {
+				continue
+			}
 
-	sort.Slice(lockProjects, func(i, j int) bool {
-		return lockProjects[i].Ident().Less(lockProjects[j].Ident())
-	})
+			// If revisions are not the same then it is old and we should display it.
+			latestRev, _, _ := gps.VersionComponentStrings(solutionProjects[i].Version())
+			atRev, _, _ := gps.VersionComponentStrings(proj.Version())
+			if atRev == latestRev {
+				continue
+			}
 
-	for i := range solutionProjects {
-		lProj := lockProjects[i]
-		sProj := solutionProjects[i]
+			var constraint gps.Constraint
+			// Getting Constraint.
+			if pp, has := p.Manifest.Ovr[proj.Ident().ProjectRoot]; has && pp.Constraint != nil {
+				// manifest has override for project.
+				constraint = pp.Constraint
+			} else if pp, has := p.Manifest.Constraints[proj.Ident().ProjectRoot]; has && pp.Constraint != nil {
+				// manifest has normal constraint.
+				constraint = pp.Constraint
+			} else {
+				// No constraint exists. No need to worry about displaying it.
+				continue
+			}
 
-		if lProj.Ident().ProjectRoot != sProj.Ident().ProjectRoot {
-			// We should always be comparing the same projects and should enter be here.
-			return errors.New("Projects from the solution and lock are not in the same order")
+			// Generate the old status data and append it.
+			os := OldStatus{
+				ProjectRoot: proj.Ident().String(),
+				Revision:    gps.Revision(atRev),
+				Latest:      gps.Revision(latestRev),
+				Constraint:  constraint,
+			}
+			oldStatuses = append(oldStatuses, os)
 		}
-
-		// If revisions are not the same then it is old and we should display it.
-		latestRev, _, _ := gps.VersionComponentStrings(sProj.Version())
-		atRev, _, _ := gps.VersionComponentStrings(lProj.Version())
-		if atRev == latestRev {
-			continue
-		}
-
-		var constraint gps.Constraint
-		// Getting Constraint
-		if pp, has := p.Manifest.Ovr[lProj.Ident().ProjectRoot]; has && pp.Constraint != nil {
-			// Manifest has override for project.
-			constraint = pp.Constraint
-		} else if pp, has := p.Manifest.Constraints[lProj.Ident().ProjectRoot]; has && pp.Constraint != nil {
-			// Manifest has normal constraint.
-			constraint = pp.Constraint
-		} else {
-			// No constraint exists. No need to worry about displaying it
-			continue
-		}
-
-		// Generate the old status data and append it.
-		os := OldStatus{
-			ProjectRoot: lProj.Ident().String(),
-			Revision:    gps.Revision(atRev),
-			Latest:      gps.Revision(latestRev),
-			Constraint:  constraint,
-		}
-		oldStatuses = append(oldStatuses, os)
 	}
 
 	out.OldHeader()

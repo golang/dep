@@ -537,7 +537,7 @@ func TestValidateFlags(t *testing.T) {
 		{
 			name:    "old with template",
 			cmd:     statusCommand{old: true, template: "foo"},
-			wantErr: errors.New("cannot pass template string with -old"),
+			wantErr: nil,
 		},
 	}
 
