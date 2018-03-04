@@ -53,7 +53,7 @@ dep status
 
 dep status -f='{{if eq .Constraint "master"}}{{.ProjectRoot}} {{end}}'
 
-	Display the list of package names constrained on the master branch.
+	Displays the list of package names constrained on the master branch.
 	The -f flag allows you to use Go templates along with it's various 
 	constructs for formating the output data. Available flags are as follows:
 	` + availableTemplateVariables + `
@@ -68,7 +68,7 @@ Linux:   dep status -dot | dot -T png | display
 MacOS:   dep status -dot | dot -T png | open -f -a /Applications/Preview.app
 Windows: dep status -dot | dot -T png -o status.png; start status.png
 
-	Generate a visual representation of the dependency tree using GraphViz.
+	Generates a visual representation of the dependency tree using GraphViz.
 	(Note: in order for this example to work you must first have graphviz
 	installed on your system)
 
