@@ -9,19 +9,22 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"html/template"
 	"io"
 	"io/ioutil"
 	"log"
 	"sort"
+	"strings"
 	"sync"
 	"text/tabwriter"
+	"text/template"
 
 	"github.com/golang/dep"
 	"github.com/golang/dep/gps"
 	"github.com/golang/dep/gps/paths"
 	"github.com/pkg/errors"
 )
+
+const availableTemplateVariables = "ProjectRoot, Constraint, Version, Revision, Latest, and PackageCount."
 
 const statusShortHelp = `Report the status of the project's dependencies`
 const statusLongHelp = `
@@ -34,7 +37,41 @@ With no arguments, print the status of each dependency of the project.
   LATEST      Latest VCS revision available
   PKGS USED   Number of packages from this project that are actually used
 
+You may use the -f flag to create a custom format for the output of the
+dep status command. The available fields you can utilize are as follows:
+` + availableTemplateVariables + `
+
 Status returns exit code zero if all dependencies are in a "good state".
+`
+
+const statusExamples = `
+dep status
+
+	Displays a table of the various dependencies in the project along with
+	their properties such as the constraints they are bound by and the 
+	revision they are at.
+
+dep status -f='{{if eq .Constraint "master"}}{{.ProjectRoot}} {{end}}'
+
+	Display the list of package names constrained on the master branch.
+	The -f flag allows you to use Go templates along with it's various 
+	constructs for formating the output data. Available flags are as follows:
+	` + availableTemplateVariables + `
+
+dep status -json
+
+	Displays the dependency information in JSON format as a list of 
+	project objects. Each project object contains keys which correspond
+	to the table column names from the standard 'dep status' command.
+
+Linux:   dep status -dot | dot -T png | display
+MacOS:   dep status -dot | dot -T png | open -f -a /Applications/Preview.app
+Windows: dep status -dot | dot -T png -o status.png; start status.png
+
+	Generate a visual representation of the dependency tree using GraphViz.
+	(Note: in order for this example to work you must first have graphviz
+	installed on your system)
+
 `
 
 const (
@@ -56,6 +93,7 @@ func (cmd *statusCommand) LongHelp() string  { return statusLongHelp }
 func (cmd *statusCommand) Hidden() bool      { return false }
 
 func (cmd *statusCommand) Register(fs *flag.FlagSet) {
+	fs.BoolVar(&cmd.examples, "examples", false, "print detailed usage examples")
 	fs.BoolVar(&cmd.json, "json", false, "output in JSON format")
 	fs.StringVar(&cmd.template, "f", "", "output in text/template format")
 	fs.BoolVar(&cmd.dot, "dot", false, "output the dependency graph in GraphViz format")
@@ -64,6 +102,7 @@ func (cmd *statusCommand) Register(fs *flag.FlagSet) {
 }
 
 type statusCommand struct {
+	examples bool
 	json     bool
 	template string
 	output   string
@@ -200,7 +239,15 @@ func (out *templateOutput) BasicHeader() error { return nil }
 func (out *templateOutput) BasicFooter() error { return nil }
 
 func (out *templateOutput) BasicLine(bs *BasicStatus) error {
-	return out.tmpl.Execute(out.w, bs)
+	data := rawStatus{
+		ProjectRoot:  bs.ProjectRoot,
+		Constraint:   bs.getConsolidatedConstraint(),
+		Version:      bs.getConsolidatedVersion(),
+		Revision:     bs.Revision.String(),
+		Latest:       bs.getConsolidatedLatest(shortRev),
+		PackageCount: bs.PackageCount,
+	}
+	return out.tmpl.Execute(out.w, data)
 }
 
 func (out *templateOutput) MissingHeader() error { return nil }
@@ -211,6 +258,11 @@ func (out *templateOutput) MissingLine(ms *MissingStatus) error {
 }
 
 func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
+	if cmd.examples {
+		ctx.Err.Println(strings.TrimSpace(statusExamples))
+		return nil
+	}
+
 	if err := cmd.validateFlags(); err != nil {
 		return err
 	}
