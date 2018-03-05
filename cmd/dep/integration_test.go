@@ -182,8 +182,21 @@ func testIntegration(name, relPath, wd string, run integration.RunFunc) func(t *
 	return func(t *testing.T) {
 		t.Parallel()
 
-		// Set up environment
 		testCase := integration.NewTestCase(t, filepath.Join(wd, relPath), name)
+
+		// Skip tests for disabled features
+		if testCase.RequiredFeatureFlag != "" {
+			featureEnabled, err := readFeatureFlag(testCase.RequiredFeatureFlag)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if !featureEnabled {
+				t.Skipf("skipping %s, %s feature flag not enabled", name, testCase.RequiredFeatureFlag)
+			}
+		}
+
+		// Set up environment
 		testProj := integration.NewTestProject(t, testCase.InitialPath(), wd, run)
 		defer testProj.Cleanup()
 

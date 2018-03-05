@@ -29,6 +29,8 @@ type TestCase struct {
 	VendorInitial map[string]string `json:"vendor-initial"`
 	VendorFinal   []string          `json:"vendor-final"`
 	InitPath      string            `json:"init-path"`
+
+	RequiredFeatureFlag string `json:"feature"`
 }
 
 // NewTestCase creates a new TestCase.

@@ -1,0 +1,6 @@
+{
+  "commands": [
+    ["init", "-no-examples", "-v"]
+  ],
+  "error-expected": "master: Could not introduce github.com/ChinmayR/deptestglideA@master, as it is not allowed by constraint ^0.1.0 from project github.com/golang/notexist."
+}

@@ -1,0 +1,7 @@
+hash: 16053c82a71f9bd509b05a4523df6bc418aed2083e4b8bd97a870bbc003256f8
+updated: 2017-03-07T17:02:32.214383898-06:00
+imports:
+- name: github.com/ChinmayR/deptestglideA
+  version: 703f28fdee407d70dcc4cb774a0fbb82fa70daa9
+- name: github.com/ChinmayR/deptestglideB
+  version: 55b6737d9d84461196123a51baa02b156abc4543
