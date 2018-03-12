@@ -242,7 +242,7 @@ Here `dep` evaluates the `Gopkg.toml` files of these packages as follows.
 |--------------------------------|---------------------------|
 |[[constraint]] ✔                |      [[constraint]] ✔|
 |[[override] ✔                   |      [[override] ✖|
-|[[ignore]] ✔                    |      [[ignore]] ✖️|
+|[[ignore]] ✔                    |      [[ignore]] ️✖|
 |require ✔                       |      require ✖|
 |ignored ✔                       |      ignored ✖|
 
