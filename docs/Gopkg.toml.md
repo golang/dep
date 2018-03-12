@@ -221,6 +221,32 @@ Almost all projects will be fine without setting any project-specific rules, and
 ```
 It is usually safe to set `non-go = true`, as well. However, as dep only has a clear model for the role played by Go files, and non-Go files necessarily fall outside that model, there can be no comparable general definition of safety.
 
+## Scope
+
+`dep` evaluates
+* `[[override]]`
+* `required`
+* `ignored`
+
+only in the root project, i.e. the project where `dep` runs. For example,
+
+You have a project: `github.com/urname/goproject`. 
+
+`github.com/foo/bar` is a dependency  for your project.
+
+Here `dep` evaluates the `Gopkg.toml` files of these packages as follows.
+
+|github.com/urname/goproject     |      github.com/foo/bar|
+|--------------------------------|---------------------------|
+|[[constraint]] ✔                |      [[constraint]] ✔|
+|[[override]] ✔                   |      [[override]] ✖|
+|required ✔                       |      required ✖|
+|ignored ✔                       |      ignored ✖|
+
+️✔ : Evaluated
+✖ ️: Not evaluated
+
+
 # Example
 
 A sample  `Gopkg.toml` with most elements present:
