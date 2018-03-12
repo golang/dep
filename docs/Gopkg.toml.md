@@ -246,7 +246,7 @@ Here `dep` evaluates the `Gopkg.toml` files of these packages as follows.
 |require ✔                       |      require ✖|
 |ignored ✔                       |      ignored ✖|
 
-✔️ : Evaluated
+️✔ : Evaluated
 ✖ ️: Not evaluated
 
 
