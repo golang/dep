@@ -241,9 +241,9 @@ Here `dep` evaluates the `Gopkg.toml` files of these packages as follows.
 |github.com/urname/goproject     |      github.com/foo/bar|
 |--------------------------------|---------------------------|
 |[[constraint]] ✔                |      [[constraint]] ✔|
-|[[override] ✔                   |      [[override] ✖|
+|[[override]] ✔                   |      [[override]] ✖|
 |[[ignore]] ✔                    |      [[ignore]] ️✖|
-|require ✔                       |      require ✖|
+|required ✔                       |      required ✖|
 |ignored ✔                       |      ignored ✖|
 
 ️✔ : Evaluated
