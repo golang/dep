@@ -221,35 +221,34 @@ Almost all projects will be fine without setting any project-specific rules, and
 ```
 It is usually safe to set `non-go = true`, as well. However, as dep only has a clear model for the role played by Go files, and non-Go files necessarily fall outside that model, there can be no comparable general definition of safety.
 
-## Notes
+## Scope
 
 `dep` evaluates
 
 * `[[override]]`
 * `[[ignore]]`
-* `require`
+* `required`
 * `ignored`
 
-only in the root project, _ie_ the project where `dep` runs.For example,
+only in the root project, i.e. the project where `dep` runs. For example,
 
-You have a project: `github.com/yourusername/awesomeproject`. 
+You have a project: `github.com/urname/goproject`. 
 
 `github.com/foo/bar` is a dependency  for your project.
 
-Here `dep` evaluates the `Gopkg.toml` files of both these packages as follows.
+Here `dep` evaluates the `Gopkg.toml` files of these packages as follows.
 
-```
-github.com/urname/goproject     |      github.com/foo/bar
---------------------------------|---------------------------
-[[constraint]] ✔                |      [[constraint]] ✔
-[[override] ✔                   |      [[override] ✖
-[[ignore]] ✔️                    |      [[ignore]] ✖️
-require ✔                       |      require ✖
-ignored ✔                       |      ignored ✖
+|github.com/urname/goproject     |      github.com/foo/bar|
+|--------------------------------|---------------------------|
+|[[constraint]] ✔                |      [[constraint]] ✔|
+|[[override] ✔                   |      [[override] ✖|
+|[[ignore]] ✔️                    |      [[ignore]] ✖️|
+|require ✔                       |      require ✖|
+|ignored ✔                       |      ignored ✖|
 
 ✔️ : Evaluated
 ✖ ️: Not evaluated
-```
+
 
 # Example
 
