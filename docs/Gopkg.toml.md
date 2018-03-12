@@ -224,9 +224,7 @@ It is usually safe to set `non-go = true`, as well. However, as dep only has a c
 ## Scope
 
 `dep` evaluates
-
 * `[[override]]`
-* `[[ignore]]`
 * `required`
 * `ignored`
 
@@ -242,7 +240,6 @@ Here `dep` evaluates the `Gopkg.toml` files of these packages as follows.
 |--------------------------------|---------------------------|
 |[[constraint]] ✔                |      [[constraint]] ✔|
 |[[override]] ✔                   |      [[override]] ✖|
-|[[ignore]] ✔                    |      [[ignore]] ️✖|
 |required ✔                       |      required ✖|
 |ignored ✔                       |      ignored ✖|
 
