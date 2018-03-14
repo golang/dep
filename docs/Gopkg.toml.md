@@ -15,7 +15,7 @@ There is a full [example](#example) `Gopkg.toml` file at the bottom of this docu
 
 ## Dependency rules: `[[constraint]]` and `[[override]]`
 
-Most of the rule declarations in a `Gopkg.toml` will be either `[[constraint]]` or `[[override]]` stanzas.  Both of these types of stanzas allow exactly the same types of values, but dep interprets them differently. Each allows the following values:
+Most of the rule declarations in a `Gopkg.toml` will be either `[[constraint]]` or `[[override]]` stanzas. Both of these types of stanzas allow exactly the same types of values, but dep interprets them differently. Each allows the following values:
 
 * `name` - the import path corresponding to the [source root](glossary.md#source-root) of a dependency (generally: where the VCS root is)
 * At most one [version rule](#version-rules)
@@ -54,7 +54,7 @@ A `[[constraint]]` stanza defines rules for how a [direct dependency](glossary.m
 
 An `[[override]]` stanza differs from a `[[constraint]]` in that it applies to all dependencies, [direct](glossary.md#direct-dependency) and [transitive](glossary.md#transitive-dependency), and supersedes all other `[[constraint]]` declarations for that project. However, only overrides from the current project's `Gopkg.toml` are incorporated.
 
-**Use this for:** Overrides are primarily intended as a way of eliminating disagreements between multiple irreconcilable `[[constraint]]` declarations on a single dependency. However, they will also be your primary recourse if you need to [constrain a transitive dependency's version?](FAQ.md#how-do-i-constrain-a-transitive-dependencys-version) 
+**Use this for:** Overrides are primarily intended as a way of eliminating disagreements between multiple irreconcilable `[[constraint]]` declarations on a single dependency. However, they will also be your primary recourse if you need to [constrain a transitive dependency's version?](FAQ.md#how-do-i-constrain-a-transitive-dependencys-version)
 
 Overrides should be used cautiously and temporarily, when possible.
 
@@ -80,20 +80,21 @@ Specifying semantic version ranges can be done using the following operators:
 * `<`: less than
 * `>=`: greater than or equal to
 * `<=`: less than or equal to
-* `-`: literal range. Eg: 1.2 - 1.4.5 is equivalent to >= 1.2, <= 1.4.5
-* `~`: minor range. Eg: ~1.2.3 is equivalent to >= 1.2.3, < 1.3.0
-* `^`: major range. Eg: ^1.2.3 is equivalent to >= 1.2.3, < 2.0.0
-* `[xX*]`: wildcard. Eg: 1.2.x is equivalent to >= 1.2.0, < 1.3.0
+* `-`: literal range. E.g., 1.2 - 1.4.5 is equivalent to >= 1.2, <= 1.4.5
+* `~`: minor range. E.g., ~1.2.3 is equivalent to >= 1.2.3, < 1.3.0
+* `^`: major range. E.g., ^1.2.3 is equivalent to >= 1.2.3, < 2.0.0
+* `[xX*]`: wildcard. E.g., 1.2.x is equivalent to >= 1.2.0, < 1.3.0
 
 You might, for example, include a rule that specifies `version = "=2.0.0"` to pin a dependency to version 2.0.0, or constrain to minor releases with: `version = "~2.1.0"`. Refer to the [semver library](https://github.com/Masterminds/semver) documentation for more info.
 
-**Note**: When you specify a version *without an operator*, `dep` automatically uses the `^` operator by default. `dep ensure` will interpret the given version as the min-boundary of a range, for example:
+**Note**: When you specify a version _without an operator_, `dep` automatically uses the `^` operator by default. `dep ensure` will interpret the given version as the min-boundary of a range, for example:
 
 * `1.2.3` becomes the range `>=1.2.3, <2.0.0`
 * `0.2.3` becomes the range `>=0.2.3, <0.3.0`
 * `0.0.3` becomes the range `>=0.0.3, <0.1.0`
 
 `~` and `=` operators can be used with the versions. When a version is specified without any operator, `dep` automatically adds a caret operator, `^`. The caret operator pins the left-most non-zero digit in the version. For example:
+
 ```
 ^1.2.3 means 1.2.3 <= X < 2.0.0
 ^0.2.3 means 0.2.3 <= X < 0.3.0
@@ -101,6 +102,7 @@ You might, for example, include a rule that specifies `version = "=2.0.0"` to pi
 ```
 
 To pin a version of direct dependency in manifest, prefix the version with `=`. For example:
+
 ```toml
 [[constraint]]
   name = "github.com/pkg/errors"
@@ -115,7 +117,7 @@ In general, you should prefer semantic versions to branches, when a project has 
 
 #### `revision`
 
-A `revision` is the underlying immutable identifier - like a git commit SHA1. While it is allowed to constrain to a `revision`, doing so is almost always an antipattern. 
+A `revision` is the underlying immutable identifier - like a git commit SHA1. While it is allowed to constrain to a `revision`, doing so is almost always an antipattern.
 
 Usually, folks are inclined to pin to a revision because they feel it will somehow improve their project's reproducibility. That is not a good reason. `Gopkg.lock` provides reproducibility. Only use `revision` if you have a good reason to believe that _no_ other version of that dependency _could_ work.
 
@@ -126,6 +128,7 @@ As part of normal operation, dep analyzes import statements in Go code. These im
 ### `required`
 
 `required` lists a set of packages (not projects) that must be included in Gopkg.lock. This list is merged with the set of packages imported by the current project.
+
 ```toml
 required = ["github.com/user/thing/cmd/thing"]
 ```
@@ -136,7 +139,7 @@ required = ["github.com/user/thing/cmd/thing"]
 * Aren't `import`ed by your project, [directly or transitively](FAQ.md#what-is-a-direct-or-transitive-dependency)
 * You don't want to put them in your `GOPATH`, and/or you want to lock the version
 
-Please note that this only pulls in the sources of these dependencies. It does not install or compile them. So, if you need the tool to be installed you should still run the following (manually or from a `Makefile`)  after each `dep ensure`:
+Please note that this only pulls in the sources of these dependencies. It does not install or compile them. So, if you need the tool to be installed you should still run the following (manually or from a `Makefile`) after each `dep ensure`:
 
 ```bash
 cd vendor/pkg/to/install
@@ -152,8 +155,8 @@ export PATH=$GOBIN:$PATH
 
 You might also try [virtualgo](https://github.com/GetStream/vg), which installs dependencies in the `required` list automatically in a project specific `GOBIN`.
 
-
 ### `ignored`
+
 `ignored` lists a set of packages (not projects) that are ignored when dep statically analyzes source code. Ignored packages can be in this project, or in a dependency.
 
 ```toml
@@ -169,11 +172,13 @@ ignored = ["github.com/user/project/badpkg*"]
 **Use this for:** preventing a package, and any of that package's unique dependencies, from being incorporated in `Gopkg.lock`.
 
 ## `metadata`
+
 `metadata` can exist at the root as well as under `constraint` and `override` declarations.
 
 `metadata` declarations are ignored by dep and are meant for usage by other independent systems.
 
 The root `metadata` declaration defines information about the project itself, while a `metadata` declaration under a `[[constraint]]` or an `[[override]]` defines metadata about that rule, for the `name`d project.
+
 ```toml
 [metadata]
 key1 = "value that convey data to other systems"
@@ -186,6 +191,7 @@ system2-data = "value that is used by another system"
 `prune` defines the global and per-project prune options for dependencies. The options determine which files are discarded when writing the `vendor/` tree.
 
 The following are the current available options:
+
 * `unused-packages` indicates that files from directories that do not appear in the package import graph should be pruned.
 * `non-go` prunes files that are not used by Go.
 * `go-tests` prunes Go test files.
@@ -200,8 +206,7 @@ Pruning options are disabled by default. However, generating a `Gopkg.toml` via 
   unused-packages = true
 ```
 
-The same prune options can be defined per-project. An addtional `name` field is required and, as with `[[constraint]]` and `[[override]]`, should be a [source root](glossary.md#source-root), not just any import path.
-
+The same prune options can be defined per-project. An additional `name` field is required and, as with `[[constraint]]` and `[[override]]`, should be a [source root](glossary.md#source-root), not just any import path.
 
 ```toml
 [prune]
@@ -212,6 +217,7 @@ The same prune options can be defined per-project. An addtional `name` field is 
     go-tests = true
     non-go = false
 ```
+
 Almost all projects will be fine without setting any project-specific rules, and enabling the following pruning rules globally:
 
 ```toml
@@ -219,37 +225,38 @@ Almost all projects will be fine without setting any project-specific rules, and
   unused-packages = true
   go-tests = true
 ```
+
 It is usually safe to set `non-go = true`, as well. However, as dep only has a clear model for the role played by Go files, and non-Go files necessarily fall outside that model, there can be no comparable general definition of safety.
 
 ## Scope
 
 `dep` evaluates
+
 * `[[override]]`
 * `required`
 * `ignored`
 
 only in the root project, i.e. the project where `dep` runs. For example,
 
-You have a project: `github.com/urname/goproject`. 
+You have a project: `github.com/urname/goproject`.
 
-`github.com/foo/bar` is a dependency  for your project.
+`github.com/foo/bar` is a dependency for your project.
 
 Here `dep` evaluates the `Gopkg.toml` files of these packages as follows.
 
-|github.com/urname/goproject     |      github.com/foo/bar|
-|--------------------------------|---------------------------|
-|[[constraint]] ✔                |      [[constraint]] ✔|
-|[[override]] ✔                   |      [[override]] ✖|
-|required ✔                       |      required ✖|
-|ignored ✔                       |      ignored ✖|
+| github.com/urname/goproject | github.com/foo/bar |
+| --------------------------- | ------------------ |
+| [[constraint]] ✔            | [[constraint]] ✔   |
+| [[override]] ✔              | [[override]] ✖     |
+| required ✔                  | required ✖         |
+| ignored ✔                   | ignored ✖          |
 
 ️✔ : Evaluated
 ✖ ️: Not evaluated
 
-
 # Example
 
-A sample  `Gopkg.toml` with most elements present:
+A sample `Gopkg.toml` with most elements present:
 
 ```toml
 required = ["github.com/user/thing/cmd/thing"]

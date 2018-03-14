@@ -31,7 +31,7 @@ func TestCascadingPruneOptions(t *testing.T) {
 			},
 		},
 		{
-			name: "all overriden",
+			name: "all overridden",
 			co: CascadingPruneOptions{
 				DefaultOptions: PruneNestedVendorDirs,
 				PerProjectOptions: map[ProjectRoot]PruneOptionSet{

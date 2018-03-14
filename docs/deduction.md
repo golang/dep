@@ -4,8 +4,8 @@ title: Import Path Deduction
 
 Deduction is dep's algorithm for looking at an import path and determining the portion of the path that corresponds to the source root. The algorithm has a static component, by which a small set of known, popular hosts like GitHub and Bitbucket have their roots deduced:
 
-- `github.com/golang/dep/gps` -> `github.com/golang/dep`
-- `bitbucket.org/foo/bar/baz` -> `bitbucket.org/foo/bar`
+* `github.com/golang/dep/gps` -> `github.com/golang/dep`
+* `bitbucket.org/foo/bar/baz` -> `bitbucket.org/foo/bar`
 
 The set of hosts supported by static deduction are the same as [those supported by `go get`](https://golang.org/cmd/go/#hdr-Remote_import_paths):
 
@@ -23,4 +23,3 @@ Import path deduction is applied to all of the following:
 * `import` statements found in all `.go` files
 * Import paths in the [`required`](Gopkg.toml.md#required) list in `Gopkg.toml`
 * `name` properties in both [`[[constraint]]`](Gopkg.toml.md#constraint) and [`[[override]]`](Gopkg.toml.md#override) stanzas in `Gopkg.toml`. This is solely for validation purposes, enforcing that these names correspond only to project/source roots.
-
