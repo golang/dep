@@ -147,5 +147,11 @@ downloadFile "$BINARY_URL" "$DOWNLOAD_FILE"
 echo "Setting executable permissions."
 chmod +x "$DOWNLOAD_FILE"
 
-echo "Moving executable to $INSTALL_DIRECTORY/dep"
-mv "$DOWNLOAD_FILE" "$INSTALL_DIRECTORY/dep"
+INSTALL_NAME="dep"
+
+if [ "$OS" = "windows" ]; then
+    INSTALL_NAME="$INSTALL_NAME.exe"
+fi
+
+echo "Moving executable to $INSTALL_DIRECTORY/$INSTALL_NAME"
+mv "$DOWNLOAD_FILE" "$INSTALL_DIRECTORY/$INSTALL_NAME"
