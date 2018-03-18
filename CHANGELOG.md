@@ -6,6 +6,7 @@ NEW FEATURES:
 * Added `install.sh` script. ([#1533](https://github.com/golang/dep/pull/1533))
 * List out of date projects in dep status. ([#1553](https://github.com/golang/dep/pull/1553)).
 * Enabled opt-in persistent caching via $DEPCACHEAGE env var. ([#1711](https://github.com/golang/dep/pull/1711))
+* Added support for a file-based registry, `Gopkg.reg`, for resolving import paths. #174
 
 BUG FIXES:
 

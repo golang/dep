@@ -41,7 +41,7 @@ func testSourceGateway(t *testing.T) {
 	do := func(wantstate sourceState) func(t *testing.T) {
 		return func(t *testing.T) {
 			superv := newSupervisor(ctx)
-			deducer := newDeductionCoordinator(superv)
+			deducer := newDeductionCoordinator(superv, nil)
 			logger := log.New(test.Writer{TB: t}, "", 0)
 			sc := newSourceCoordinator(superv, deducer, cachedir, nil, logger)
 			defer sc.close()

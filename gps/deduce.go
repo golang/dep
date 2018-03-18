@@ -543,14 +543,14 @@ func (m vcsExtensionDeducer) deduceSource(path string, u *url.URL) (maybeSources
 	}
 }
 
-// A deducer takes an import path and inspects it to determine where the
+// A Deducer takes an import path and inspects it to determine where the
 // corresponding project root should be. It applies a number of matching
 // techniques, eventually falling back to an HTTP request for go-get metadata if
 // none of the explicit rules succeed.
 //
 // The only real implementation is deductionCoordinator. The interface is
 // primarily intended for testing purposes.
-type deducer interface {
+type Deducer interface {
 	deduceRootPath(ctx context.Context, path string) (pathDeduction, error)
 }
 
@@ -559,13 +559,15 @@ type deductionCoordinator struct {
 	mut      sync.RWMutex
 	rootxt   *radix.Tree
 	deducext *deducerTrie
+	registry Deducer
 }
 
-func newDeductionCoordinator(superv *supervisor) *deductionCoordinator {
+func newDeductionCoordinator(superv *supervisor, registry Deducer) *deductionCoordinator {
 	dc := &deductionCoordinator{
 		suprvsr:  superv,
 		rootxt:   radix.New(),
 		deducext: pathDeducerTrie(),
+		registry: registry,
 	}
 
 	return dc
@@ -604,6 +606,24 @@ func (dc *deductionCoordinator) deduceRootPath(ctx context.Context, path string)
 		panic(fmt.Sprintf("unexpected %T in deductionCoordinator.rootxt: %v", data, data))
 	}
 
+	// Begin by giving the local registry a chance to override everything
+	registry := dc.registry
+	if registry != nil {
+		pd, err := registry.deduceRootPath(dc.suprvsr.ctx, path)
+		if err == nil {
+			// Deduction worked; store it in the rootxt, send on retchan and
+			// terminate.
+			dc.mut.Lock()
+			dc.rootxt.Insert(pd.root, pd.mb)
+			dc.mut.Unlock()
+			return pd, nil
+		}
+
+		if err != errNoKnownPathMatch {
+			return pathDeduction{}, err
+		}
+	}
+
 	// No match. Try known path deduction first.
 	pd, err := dc.deduceKnownPaths(path)
 	if err == nil {
@@ -626,7 +646,7 @@ func (dc *deductionCoordinator) deduceRootPath(ctx context.Context, path string)
 	hmd := &httpMetadataDeducer{
 		basePath: path,
 		suprvsr:  dc.suprvsr,
-		// The vanity deducer will call this func with a completed
+		// The vanity Deducer will call this func with a completed
 		// pathDeduction if it succeeds in finding one. We process it
 		// back through the action channel to ensure serialized
 		// access to the rootxt map.

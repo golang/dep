@@ -1,0 +1,8 @@
+FROM golang:1.10
+#RUN apk --no-cache add build-base git bzr mercurial gcc make coreutils
+#RUN apk --no-cache add bash
+#RUN apk add --no-cache perl-utils  # shasum needed by make
+ADD . /go/src/github.com/golang/dep
+RUN cd /go/src/github.com/golang/dep && \
+    make SHELL=/bin/bash install
+RUN rm -rf /go/src/*

@@ -672,7 +672,7 @@ func TestVanityDeductionSchemeMismatch(t *testing.T) {
 
 	ctx := context.Background()
 	cm := newSupervisor(ctx)
-	dc := newDeductionCoordinator(cm)
+	dc := newDeductionCoordinator(cm, nil)
 	_, err := dc.deduceRootPath(ctx, "ssh://golang.org/exp")
 	// TODO(sdboyer) this is not actually the error that it should be
 	if err == nil {

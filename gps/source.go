@@ -60,7 +60,7 @@ type srcReturn struct {
 
 type sourceCoordinator struct {
 	supervisor *supervisor
-	deducer    deducer
+	deducer    Deducer
 	srcmut     sync.RWMutex // guards srcs and srcIdx
 	srcs       map[string]*sourceGateway
 	nameToURL  map[string]string
@@ -73,7 +73,7 @@ type sourceCoordinator struct {
 
 // newSourceCoordinator returns a new sourceCoordinator.
 // Passing a nil sourceCache defaults to an in-memory cache.
-func newSourceCoordinator(superv *supervisor, deducer deducer, cachedir string, cache sourceCache, logger *log.Logger) *sourceCoordinator {
+func newSourceCoordinator(superv *supervisor, deducer Deducer, cachedir string, cache sourceCache, logger *log.Logger) *sourceCoordinator {
 	if cache == nil {
 		cache = memoryCache{}
 	}
@@ -184,7 +184,7 @@ func (sc *sourceCoordinator) getSourceGatewayFor(ctx context.Context, id Project
 
 	pd, err := sc.deducer.deduceRootPath(ctx, normalizedName)
 	if err != nil {
-		// As in the deducer, don't cache errors so that externally-driven retry
+		// As in the Deducer, don't cache errors so that externally-driven retry
 		// strategies can be constructed.
 		doReturn(nil, err)
 		return nil, err

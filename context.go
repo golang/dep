@@ -43,6 +43,7 @@ type Ctx struct {
 	DisableLocking bool          // When set, no lock file will be created to protect against simultaneous dep processes.
 	Cachedir       string        // Cache directory loaded from environment.
 	CacheAge       time.Duration // Maximum valid age of cached source data. <=0: Don't cache.
+	Registry       gps.Deducer   // If there's an external registry
 }
 
 // SetPaths sets the WorkingDir and GOPATHs fields. If GOPATHs is empty, then
@@ -105,6 +106,7 @@ func (c *Ctx) SourceManager() (*gps.SourceMgr, error) {
 		Cachedir:       cachedir,
 		Logger:         c.Out,
 		DisableLocking: c.DisableLocking,
+		Registry:       c.Registry,
 	})
 }
 

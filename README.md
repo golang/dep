@@ -1,58 +1,40 @@
-<p align="center"><img src="docs/assets/DigbyShadows.png" width="360"></p>
-<p align="center">
-  <a href="https://travis-ci.org/golang/dep"><img src="https://travis-ci.org/golang/dep.svg?branch=master" alt="Build Status"></img></a>
-  <a href="https://ci.appveyor.com/project/golang/dep"><img src="https://ci.appveyor.com/api/projects/status/github/golang/dep?svg=true&branch=master&passingText=Windows%20-%20OK&failingText=Windows%20-%20failed&pendingText=Windows%20-%20pending" alt="Windows Build Status"></a>
-  <a href="https://goreportcard.com/report/github.com/golang/dep"><img src="https://goreportcard.com/badge/github.com/golang/dep" /></a>
-</p>
+# Dep with a local file registry
 
-## Dep
+## Use case: vendoring `foo.com/bar/*`
 
-`dep` is a prototype dependency management tool for Go. It requires Go 1.9 or newer to compile. **`dep` is safe for production use.**
+Add the following to `Gopkg.reg`:
 
-`dep` is the official _experiment_, but not yet the official tool. Check out the [Roadmap](https://github.com/golang/dep/wiki/Roadmap) for more on what this means!
-
-For guides and reference materials about `dep`, see [the documentation](https://golang.github.io/dep).
-
-## Installation
-
-It is strongly recommended that you use a released version. Release binaries are available on the [releases](https://github.com/golang/dep/releases) page.
-
-On MacOS you can install or upgrade to the latest released version with Homebrew:
-
-```sh
-$ brew install dep
-$ brew upgrade dep
+```
+^foo\.com/bar/([^/]*)(/.*)?$ foo.com/bar/$1 ssh://git@repo.internal:7999/my_mirror/$1
 ```
 
-On other platforms you can use the `install.sh` script:
+Here:
 
-```sh
-$ curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
+- the first field `^foo\.com/bar/([^/]*)(/.*)?$` matches import paths
+- the second field `foo.com/bar/$1` gives the resulting repo base path
+- the third field `ssh://git@repo.interal:7999/my_mirror/$1` gives the location to clone.
+
+Lines are matched on a first-match-wins basis.
+
+Subpackages work as expected.
+
+## use case: mirroring everything into a local proxy repo
+
+(Untested: I've only needed the first version for faas at present, but you might find this handy.)
+
+```
+^github.com/([^/]*)(/.*)?$ github.com/$1 https://my.proxy/github.com/$1
 ```
 
-It will install into your `$GOPATH/bin` directory by default or any other directory you specify using the `INSTALL_DIRECTORY` environment variable.
+# Docker files
 
-If your platform is not supported, you'll need to build it manually or let the team know and we'll consider adding your platform
-to the release builds.
+The various docker files should build libs and alpine versions of golang 1.9 and 1.10 with the modified
+`dep` command installed in `$GOBIN`.
 
-If you're interested in hacking on `dep`, you can install via `go get`:
+    docker build -t my-dep-image -f Dockerfile.alpine-1.10 .
 
-```sh
-go get -u github.com/golang/dep/cmd/dep
-```
 
-## Feedback
 
-Feedback is greatly appreciated.
-At this stage, the maintainers are most interested in feedback centered on the user experience (UX) of the tool.
-Do you have workflows that the tool supports well, or doesn't support at all?
-Do any of the commands have surprising effects, output, or results?
-Let us know by filing an issue, describing what you did or wanted to do, what you expected to happen, and what actually happened.
+## Dep itself
 
-## Contributing
-
-Contributions are greatly appreciated.
-The maintainers actively manage the issues list, and try to highlight issues suitable for newcomers.
-The project follows the typical GitHub pull request model.
-See [CONTRIBUTING.md](CONTRIBUTING.md) for more details.
-Before starting any work, please either comment on an existing issue, or file a new one.
+If you're reading this you probably already know what dep is. See https://github.com/golang/dep for details.

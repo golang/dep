@@ -318,6 +318,7 @@ func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
 	if err != nil {
 		return err
 	}
+	ctx.Registry = gps.NewFileRegistry(p.AbsRoot)
 
 	sm, err := ctx.SourceManager()
 	if err != nil {
