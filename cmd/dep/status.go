@@ -529,14 +529,14 @@ func (cmd *statusCommand) runOld(ctx *dep.Ctx, out oldOutputter, p *dep.Project,
 	solutionProjects := solution.Projects()
 
 	for _, proj := range p.Lock.Projects() {
-		for i := range solutionProjects {
+		for _, sProj := range solutionProjects {
 			// Look for the same project in solution and lock.
-			if solutionProjects[i].Ident().ProjectRoot != proj.Ident().ProjectRoot {
+			if sProj.Ident().ProjectRoot != proj.Ident().ProjectRoot {
 				continue
 			}
 
 			// If revisions are not the same then it is old and we should display it.
-			latestRev, _, _ := gps.VersionComponentStrings(solutionProjects[i].Version())
+			latestRev, _, _ := gps.VersionComponentStrings(sProj.Version())
 			atRev, _, _ := gps.VersionComponentStrings(proj.Version())
 			if atRev == latestRev {
 				continue
