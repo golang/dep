@@ -21,6 +21,7 @@ import (
 	"github.com/golang/dep/gps"
 	"github.com/golang/dep/gps/paths"
 	"github.com/golang/dep/gps/pkgtree"
+	"github.com/golang/dep/internal/kdep"
 	"github.com/pkg/errors"
 )
 
@@ -149,7 +150,7 @@ type ensureCommand struct {
 	dryRun     bool
 }
 
-func (cmd *ensureCommand) Run(ctx *dep.Ctx, args []string) error {
+func (cmd *ensureCommand) Run(ctx *kdep.Ctx, args []string) error {
 	if cmd.examples {
 		ctx.Err.Println(strings.TrimSpace(ensureExamples))
 		return nil
@@ -171,7 +172,7 @@ func (cmd *ensureCommand) Run(ctx *dep.Ctx, args []string) error {
 	sm.UseDefaultSignalHandling()
 	defer sm.Release()
 
-	if err := dep.ValidateProjectRoots(ctx, p.Manifest, sm); err != nil {
+	if err := dep.ValidateProjectRoots(ctx.Ctx, p.Manifest.Manifest, sm); err != nil {
 		return err
 	}
 
@@ -246,7 +247,7 @@ func (cmd *ensureCommand) vendorBehavior() dep.VendorBehavior {
 	return dep.VendorOnChanged
 }
 
-func (cmd *ensureCommand) runDefault(ctx *dep.Ctx, args []string, p *dep.Project, sm gps.SourceManager, params gps.SolveParameters) error {
+func (cmd *ensureCommand) runDefault(ctx *kdep.Ctx, args []string, p *kdep.Project, sm gps.SourceManager, params gps.SolveParameters) error {
 	// Bare ensure doesn't take any args.
 	if len(args) != 0 {
 		return errors.New("dep ensure only takes spec arguments with -add or -update")
@@ -291,7 +292,13 @@ func (cmd *ensureCommand) runDefault(ctx *dep.Ctx, args []string, p *dep.Project
 		if ctx.Verbose {
 			logger = ctx.Err
 		}
-		return errors.WithMessage(sw.Write(p.AbsRoot, sm, true, logger), "grouped write of manifest, lock and vendor")
+
+		err = sw.Write(p.AbsRoot, sm, true, logger)
+		if err != nil {
+			return errors.Wrap(err, "grouped write of manifest, lock and vendor")
+		}
+
+		return p.HackExtraVendorEntries()
 	}
 
 	if cmd.noVendor && cmd.dryRun {
@@ -315,10 +322,16 @@ func (cmd *ensureCommand) runDefault(ctx *dep.Ctx, args []string, p *dep.Project
 	if ctx.Verbose {
 		logger = ctx.Err
 	}
-	return errors.Wrap(sw.Write(p.AbsRoot, sm, false, logger), "grouped write of manifest, lock and vendor")
+
+	err = sw.Write(p.AbsRoot, sm, false, logger)
+	if err != nil {
+		return errors.Wrap(err, "grouped write of manifest, lock and vendor")
+	}
+
+	return p.HackExtraVendorEntries()
 }
 
-func (cmd *ensureCommand) runVendorOnly(ctx *dep.Ctx, args []string, p *dep.Project, sm gps.SourceManager, params gps.SolveParameters) error {
+func (cmd *ensureCommand) runVendorOnly(ctx *kdep.Ctx, args []string, p *kdep.Project, sm gps.SourceManager, params gps.SolveParameters) error {
 	if len(args) != 0 {
 		return errors.Errorf("dep ensure -vendor-only only populates vendor/ from %s; it takes no spec arguments", dep.LockName)
 	}
@@ -344,7 +357,7 @@ func (cmd *ensureCommand) runVendorOnly(ctx *dep.Ctx, args []string, p *dep.Proj
 	return errors.WithMessage(sw.Write(p.AbsRoot, sm, true, logger), "grouped write of manifest, lock and vendor")
 }
 
-func (cmd *ensureCommand) runUpdate(ctx *dep.Ctx, args []string, p *dep.Project, sm gps.SourceManager, params gps.SolveParameters) error {
+func (cmd *ensureCommand) runUpdate(ctx *kdep.Ctx, args []string, p *kdep.Project, sm gps.SourceManager, params gps.SolveParameters) error {
 	if p.Lock == nil {
 		return errors.Errorf("-update works by updating the versions recorded in %s, but %s does not exist", dep.LockName, dep.LockName)
 	}
@@ -405,10 +418,15 @@ func (cmd *ensureCommand) runUpdate(ctx *dep.Ctx, args []string, p *dep.Project,
 	if ctx.Verbose {
 		logger = ctx.Err
 	}
-	return errors.Wrap(sw.Write(p.AbsRoot, sm, false, logger), "grouped write of manifest, lock and vendor")
+	err = sw.Write(p.AbsRoot, sm, false, logger)
+	if err != nil {
+		return errors.Wrap(err, "grouped write of manifest, lock and vendor")
+	}
+
+	return p.HackExtraVendorEntries()
 }
 
-func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm gps.SourceManager, params gps.SolveParameters) error {
+func (cmd *ensureCommand) runAdd(ctx *kdep.Ctx, args []string, p *kdep.Project, sm gps.SourceManager, params gps.SolveParameters) error {
 	if len(args) == 0 {
 		return errors.New("must specify at least one project or package to -add")
 	}
@@ -841,7 +859,7 @@ func (e pkgtreeErrs) Error() string {
 	return fmt.Sprintf("found %d errors in the package tree:\n%s", len(e), strings.Join(errs, "\n"))
 }
 
-func validateUpdateArgs(ctx *dep.Ctx, args []string, p *dep.Project, sm gps.SourceManager, params *gps.SolveParameters) error {
+func validateUpdateArgs(ctx *kdep.Ctx, args []string, p *kdep.Project, sm gps.SourceManager, params *gps.SolveParameters) error {
 	// Channel for receiving all the valid arguments.
 	argsCh := make(chan string, len(args))
 

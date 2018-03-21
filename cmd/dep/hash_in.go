@@ -7,9 +7,9 @@ package main
 import (
 	"flag"
 
-	"github.com/golang/dep"
 	"github.com/golang/dep/gps"
 	"github.com/golang/dep/gps/pkgtree"
+	"github.com/golang/dep/internal/kdep"
 	"github.com/pkg/errors"
 )
 
@@ -23,7 +23,7 @@ func (cmd *hashinCommand) Register(fs *flag.FlagSet) {}
 
 type hashinCommand struct{}
 
-func (hashinCommand) Run(ctx *dep.Ctx, args []string) error {
+func (hashinCommand) Run(ctx *kdep.Ctx, args []string) error {
 	p, err := ctx.LoadProject()
 	if err != nil {
 		return err

@@ -13,6 +13,7 @@ import (
 	"github.com/golang/dep/gps"
 	fb "github.com/golang/dep/internal/feedback"
 	"github.com/golang/dep/internal/importers"
+	"github.com/golang/dep/internal/kdep"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -23,12 +24,12 @@ import (
 //   then external tools.
 type rootAnalyzer struct {
 	skipTools  bool
-	ctx        *dep.Ctx
+	ctx        *kdep.Ctx
 	sm         gps.SourceManager
 	directDeps map[gps.ProjectRoot]bool
 }
 
-func newRootAnalyzer(skipTools bool, ctx *dep.Ctx, directDeps map[gps.ProjectRoot]bool, sm gps.SourceManager) *rootAnalyzer {
+func newRootAnalyzer(skipTools bool, ctx *kdep.Ctx, directDeps map[gps.ProjectRoot]bool, sm gps.SourceManager) *rootAnalyzer {
 	return &rootAnalyzer{
 		skipTools:  skipTools,
 		ctx:        ctx,

@@ -22,6 +22,7 @@ import (
 	"github.com/golang/dep"
 	"github.com/golang/dep/gps"
 	"github.com/golang/dep/gps/paths"
+	"github.com/golang/dep/internal/kdep"
 	"github.com/pkg/errors"
 )
 
@@ -304,7 +305,7 @@ func (out *templateOutput) MissingLine(ms *MissingStatus) error {
 	return out.tmpl.Execute(out.w, ms)
 }
 
-func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
+func (cmd *statusCommand) Run(ctx *kdep.Ctx, args []string) error {
 	if cmd.examples {
 		ctx.Err.Println(strings.TrimSpace(statusExamples))
 		return nil
@@ -326,7 +327,7 @@ func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
 	sm.UseDefaultSignalHandling()
 	defer sm.Release()
 
-	if err := dep.ValidateProjectRoots(ctx, p.Manifest, sm); err != nil {
+	if err := dep.ValidateProjectRoots(ctx.Ctx, p.Manifest.Manifest, sm); err != nil {
 		return err
 	}
 
@@ -341,7 +342,7 @@ func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
 		}
 	case cmd.dot:
 		out = &dotOutput{
-			p: p,
+			p: p.Project,
 			o: cmd.output,
 			w: &buf,
 		}
@@ -487,7 +488,7 @@ func (os OldStatus) marshalJSON() *rawOldStatus {
 	}
 }
 
-func (cmd *statusCommand) runOld(ctx *dep.Ctx, out oldOutputter, p *dep.Project, sm gps.SourceManager) error {
+func (cmd *statusCommand) runOld(ctx *kdep.Ctx, out oldOutputter, p *kdep.Project, sm gps.SourceManager) error {
 	// While the network churns on ListVersions() requests, statically analyze
 	// code from the current project.
 	ptree, err := p.ParseRootPackageTree()
@@ -658,7 +659,7 @@ type MissingStatus struct {
 	MissingPackages []string
 }
 
-func runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceManager) (hasMissingPkgs bool, errCount int, err error) {
+func runStatusAll(ctx *kdep.Ctx, out outputter, p *kdep.Project, sm gps.SourceManager) (hasMissingPkgs bool, errCount int, err error) {
 	// While the network churns on ListVersions() requests, statically analyze
 	// code from the current project.
 	ptree, err := p.ParseRootPackageTree()
@@ -987,7 +988,7 @@ type constraintsCollection map[string][]projectConstraint
 // collectConstraints collects constraints declared by all the dependencies.
 // It returns constraintsCollection and a slice of errors encountered while
 // collecting the constraints, if any.
-func collectConstraints(ctx *dep.Ctx, p *dep.Project, sm gps.SourceManager) (constraintsCollection, []error) {
+func collectConstraints(ctx *kdep.Ctx, p *kdep.Project, sm gps.SourceManager) (constraintsCollection, []error) {
 	logger := ctx.Err
 	if !ctx.Verbose {
 		logger = log.New(ioutil.Discard, "", 0)

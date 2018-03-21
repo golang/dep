@@ -8,7 +8,7 @@ import (
 	"flag"
 	"runtime"
 
-	"github.com/golang/dep"
+	"github.com/golang/dep/internal/kdep"
 )
 
 var (
@@ -31,7 +31,7 @@ func (cmd *versionCommand) Register(fs *flag.FlagSet) {}
 
 type versionCommand struct{}
 
-func (cmd *versionCommand) Run(ctx *dep.Ctx, args []string) error {
+func (cmd *versionCommand) Run(ctx *kdep.Ctx, args []string) error {
 	ctx.Out.Printf(`dep:
  version     : %s
  build date  : %s

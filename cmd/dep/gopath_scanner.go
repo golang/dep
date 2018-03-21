@@ -17,13 +17,14 @@ import (
 	"github.com/golang/dep/gps/pkgtree"
 	fb "github.com/golang/dep/internal/feedback"
 	"github.com/golang/dep/internal/fs"
+	"github.com/golang/dep/internal/kdep"
 	"github.com/pkg/errors"
 )
 
 // gopathScanner supplies manifest/lock data by scanning the contents of GOPATH
 // It uses its results to fill-in any missing details left by the rootAnalyzer.
 type gopathScanner struct {
-	ctx        *dep.Ctx
+	ctx        *kdep.Ctx
 	directDeps map[gps.ProjectRoot]bool
 	sm         gps.SourceManager
 
@@ -32,7 +33,7 @@ type gopathScanner struct {
 	origL *dep.Lock
 }
 
-func newGopathScanner(ctx *dep.Ctx, directDeps map[gps.ProjectRoot]bool, sm gps.SourceManager) *gopathScanner {
+func newGopathScanner(ctx *kdep.Ctx, directDeps map[gps.ProjectRoot]bool, sm gps.SourceManager) *gopathScanner {
 	return &gopathScanner{
 		ctx:        ctx,
 		directDeps: directDeps,

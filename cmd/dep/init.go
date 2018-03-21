@@ -15,6 +15,7 @@ import (
 	"github.com/golang/dep"
 	"github.com/golang/dep/gps"
 	"github.com/golang/dep/internal/fs"
+	"github.com/golang/dep/internal/kdep"
 	"github.com/pkg/errors"
 )
 
@@ -68,7 +69,7 @@ type initCommand struct {
 	gopath     bool
 }
 
-func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
+func (cmd *initCommand) Run(ctx *kdep.Ctx, args []string) error {
 	if len(args) > 1 {
 		return errors.Errorf("too many args (%d)", len(args))
 	}
@@ -203,7 +204,7 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 // GOPATH.
 //
 // If successful, it returns a dep.Project, ready for further use.
-func (cmd *initCommand) establishProjectAt(root string, ctx *dep.Ctx) (*dep.Project, error) {
+func (cmd *initCommand) establishProjectAt(root string, ctx *kdep.Ctx) (*dep.Project, error) {
 	var err error
 	p := new(dep.Project)
 	if err = p.SetRoot(root); err != nil {

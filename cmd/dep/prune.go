@@ -18,6 +18,7 @@ import (
 	"github.com/golang/dep/gps"
 	"github.com/golang/dep/gps/pkgtree"
 	"github.com/golang/dep/internal/fs"
+	"github.com/golang/dep/internal/kdep"
 	"github.com/pkg/errors"
 )
 
@@ -40,7 +41,7 @@ func (cmd *pruneCommand) Hidden() bool      { return false }
 func (cmd *pruneCommand) Register(fs *flag.FlagSet) {
 }
 
-func (cmd *pruneCommand) Run(ctx *dep.Ctx, args []string) error {
+func (cmd *pruneCommand) Run(ctx *kdep.Ctx, args []string) error {
 	ctx.Err.Printf("Pruning is now performed automatically by dep ensure.\n")
 	ctx.Err.Printf("Set prune settings in %s and it will be applied when running ensure.\n", dep.ManifestName)
 	ctx.Err.Printf("\nThis command currently still prunes as it always has, to ease the transition.\n")
@@ -92,7 +93,7 @@ func (cmd *pruneCommand) Run(ctx *dep.Ctx, args []string) error {
 	if !ctx.Verbose {
 		pruneLogger = log.New(ioutil.Discard, "", 0)
 	}
-	return pruneProject(p, sm, pruneLogger)
+	return pruneProject(p.Project, sm, pruneLogger)
 }
 
 // pruneProject removes unused packages from a project.
