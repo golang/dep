@@ -79,7 +79,7 @@ again.
 
 ### General guidelines
 
-* _Be kind, respectful, and inclusive_. Really live [that CoC](https://github.com/golang/dep/blob/master/CODE_OF_CONDUCT.md). We've developed a reputation as one of the most welcoming and supportive project environments in the Go community, and we want to keep that up!
+* _Be kind, respectful, and inclusive_. Really live that [CoC](https://github.com/golang/dep/blob/master/CODE_OF_CONDUCT.md). We've developed a reputation as one of the most welcoming and supportive project environments in the Go community, and we want to keep that up!
 * The lines of responsibility between maintainership areas can be fuzzy. Get to know your fellow maintainers - it's important to work _with_ them when an issue falls in this grey area.
 * Remember, the long-term goal of `dep` is to disappear into the `go` toolchain. That's going to be a challenging process, no matter what. Minimizing that eventual difficulty should be a guiding light for all your decisions today.
   * Try to match the toolchain's assumptions as closely as possible ([example](https://github.com/golang/dep/issues/564#issuecomment-300994599)), and avoid introducing new rules the toolchain would later have to incorporate.
