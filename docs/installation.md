@@ -4,7 +4,6 @@ title: Installation
 
 It is strongly recommended that you use a released version of dep. While tip is never purposefully broken, its stability is not guaranteed.
 
-
 ## Binary Installation
 
 Pre-compiled binaries are available on the [releases](https://github.com/golang/dep/releases) page. You can use the `install.sh` script to automatically install one for your local platform:
@@ -33,6 +32,7 @@ makepkg -si
 ```
 
 ## Install From Source
+
 The snippet below installs the latest release of dep from source and sets the
 version in the binary so that `dep version` works as expected.
 
@@ -56,4 +56,5 @@ If you want to hack on dep, you can install via `go get`:
 ```sh
 go get -u github.com/golang/dep/cmd/dep
 ```
+
 Note that dep requires a functioning Go workspace and GOPATH. If you're unfamiliar with Go workspaces and GOPATH, have a look at [the language documentation](https://golang.org/doc/code.html#Organization) and get your local workspace set up. Dep's model could lead to being able to work without GOPATH, but we're not there yet.
