@@ -349,7 +349,7 @@ func findImportComment(pkgName *ast.Ident, c *ast.CommentGroup) string {
 			return ""
 		}
 		text = text[:end]
-		if bytes.IndexByte(text, '\n') > 0 {
+		if bytes.IndexByte(text, '\n') >= 0 {
 			// multiline comment, can't be an import comment
 			return ""
 		}
