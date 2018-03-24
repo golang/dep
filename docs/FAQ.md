@@ -34,7 +34,6 @@ The FAQ predated the introduction of the rest of the documentation. If something
 ## Best Practices
 
 * [Should I commit my vendor directory?](#should-i-commit-my-vendor-directory)
-* [How do I test changes to a dependency?](#how-do-i-test-changes-to-a-dependency)
 * [How do I roll releases that `dep` will be able to use?](#how-do-i-roll-releases-that-dep-will-be-able-to-use)
 * [What semver version should I use?](#what-semver-version-should-i-use)
 * [Is it OK to make backwards-incompatible changes now?](#is-it-ok-to-make-backwards-incompatible-changes-now)
@@ -383,36 +382,6 @@ It's up to you:
   though [`prune`](Gopkg.toml.md#prune) can help minimize this problem.
 * PR diffs will include changes for files under `vendor/` when Gopkg.lock is modified,
   however files in `vendor/` are [hidden by default](https://github.com/github/linguist/blob/v5.2.0/lib/linguist/generated.rb#L328) on GitHub.
-
-## How do I test changes to a dependency?
-
-Making changes in your `vendor/` directory directly is not recommended, as dep
-will overwrite any changes. Instead:
-
-1.  Delete the dependency from the `vendor/` directory.
-
-    ```sh
-    rm -rf vendor/<dependency>
-    ```
-
-1.  Add that dependency to your `GOPATH`, if it isn't already.
-
-    ```sh
-    $ go get <dependency>
-    ```
-
-1.  Modify the dependency in `$GOPATH/src/<dependency>`.
-1.  Test, build, etc.
-
-Don't run `dep ensure` until you're done. `dep ensure` will reinstall the
-dependency into `vendor/` based on your manifest, as if you were installing from
-scratch.
-
-This solution works for short-term use, but for something long-term, take a look
-at [virtualgo](https://github.com/GetStream/vg).
-
-To test out code that has been pushed as a new version, or to a branch or fork,
-see [changing dependencies](#how-do-i-change-change-the-version-of-a-dependecy).
 
 ## How do I roll releases that `dep` will be able to use?
 
