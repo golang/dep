@@ -1,0 +1,12 @@
+{
+  "commands": [
+    ["ensure"],
+    ["status", "-old"]
+  ],
+  "error-expected": "",
+  "vendor-final": [
+    "github.com/carolynvs/go-dep-test",
+    "github.com/sdboyer/deptest",
+    "github.com/sdboyer/deptestdos"
+  ]
+}

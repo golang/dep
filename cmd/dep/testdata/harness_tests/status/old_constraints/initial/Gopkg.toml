@@ -1,0 +1,11 @@
+[[constraint]]
+  name = "github.com/sdboyer/deptestdos"
+  version = "v2.0.0"
+
+[[constraint]]
+  name = "github.com/sdboyer/deptest"
+  version = "v1.0.0"
+
+[[constraint]]
+  name = "github.com/carolynvs/go-dep-test"
+  version = "v0.1.0"

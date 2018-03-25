@@ -1,0 +1,2 @@
+PROJECT                           CONSTRAINT  REVISION  LATEST
+github.com/carolynvs/go-dep-test  ^0.1.0      b9c5511   4069198
