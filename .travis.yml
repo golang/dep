@@ -80,5 +80,18 @@ jobs:
             repo: golang/dep
             branch: master
             tags: true
+    - stage: deploy
+      install: skip
+      script: skip
+      deploy:
+        - provider: script
+          script:
+            - git config --global user.email "$GITHUB_EMAIL"
+            - git config --global user.name "$GITHUB_USER"
+            - echo "machine github.com login $GITHUB_USER password $GITHUB_TOKEN" > ~/.netrc
+            - cd website && npm i --only=dev && npm run publish-gh-pages
+          skip_cleanup: true
+          on:
+            branch: master
 addons:
   ssh_known_hosts: github.com
