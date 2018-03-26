@@ -89,7 +89,9 @@ jobs:
           script:
             - git config --global user.email "fabulous-gopher@users.noreply.github.com"
             - git config --global user.name "Fabulous Gopher"
-            - echo "machine github.com\nlogin fabulous-gopher\npassword $DOCU_GITHUB_TOKEN" > ~/.netrc
+            - echo "machine github.com" > ~/.netrc
+            - echo "  login fabulous-gopher" >> ~/.netrc
+            - echo "  password $DOCU_GITHUB_TOKEN" >> ~/.netrc
             - cd website && npm i --only=dev && npm run publish-gh-pages
           skip_cleanup: true
           on:
