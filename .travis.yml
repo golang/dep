@@ -85,10 +85,11 @@ jobs:
       script: skip
       deploy:
         - provider: script
+          secure: "nRbXZmSISh9x2qVAFwy85mk3jrPFYBW5ZMfT4GAeM6fWmv6WUJcioIvDsdsN0+P9/TCdr830JNtnNY34WSIKUt+mtq09JPalXHVAgx9rTC1HOS4zIMTTMXZRawHOlLchEREQUHsZaOIPYXkMtkpAIED0dAToacoraryVu5RB18e0kbr5d9BGbK0X/sjlD6+OH0wyA8zvO9aDKorTs5Ibr1yc3VezjfjE+JM9oypuRt/DwXULNwpURl4+N9LIsbhtiCEm4AkwHoXxlBylXYCCKIcJVtsYTqZKOD7RpGSlIzbM068zXQpPgmYEsp6p33AcSo8DLGhOaHql5Vn8IyeoywjuRTcnhAEDw28lrF7YbjdjGNijrHNOviZ+PAJ5BnKJgKLxsXCWoosllwxry44k/fhNg7xAWp6kvis5tpKq6gYNlJeIVjqEuo392lQH3nrLXTNpj9jGUBCJWymUGoK4ipQdfwv1k0+RAEAYfmjRcquBpt1bCH0aQ4RvHTcSb7ZKRnBsKGX3E7+fqh0x+OVZNMVnST/MT8WZMVQ0OW5rakdwfnqAdmEVJ+dqNcKsWHjlSQhILV6N3+gpyYV851L/5nnVmXJY9HGWwvI1SJcI6v5MmNwhnd6hsX1w1+u96undA1gMPJG10TLK+i3lzcLHvuanHRadmEopDCjd6y+0Zgk="
           script:
-            - git config --global user.email "$GITHUB_EMAIL"
-            - git config --global user.name "$GITHUB_USER"
-            - echo "machine github.com login $GITHUB_USER password $GITHUB_TOKEN" > ~/.netrc
+            - git config --global user.email "fabulous-gopher@users.noreply.github.com"
+            - git config --global user.name "Fabulous Gopher"
+            - echo "machine github.com\nlogin fabulous-gopher\npassword $DOCU_GITHUB_TOKEN" > ~/.netrc
             - cd website && npm i --only=dev && npm run publish-gh-pages
           skip_cleanup: true
           on:
