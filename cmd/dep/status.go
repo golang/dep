@@ -13,6 +13,7 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
+	"os"
 	"sort"
 	"strings"
 	"sync"
@@ -49,19 +50,19 @@ const statusExamples = `
 dep status
 
 	Displays a table of the various dependencies in the project along with
-	their properties such as the constraints they are bound by and the 
+	their properties such as the constraints they are bound by and the
 	revision they are at.
 
 dep status -f='{{if eq .Constraint "master"}}{{.ProjectRoot}} {{end}}'
 
 	Displays the list of package names constrained on the master branch.
-	The -f flag allows you to use Go templates along with it's various 
+	The -f flag allows you to use Go templates along with it's various
 	constructs for formating the output data. Available flags are as follows:
 	` + availableTemplateVariables + `
 
 dep status -json
 
-	Displays the dependency information in JSON format as a list of 
+	Displays the dependency information in JSON format as a list of
 	project objects. Each project object contains keys which correspond
 	to the table column names from the standard 'dep status' command.
 
@@ -100,16 +101,18 @@ func (cmd *statusCommand) Register(fs *flag.FlagSet) {
 	fs.BoolVar(&cmd.dot, "dot", false, "output the dependency graph in GraphViz format")
 	fs.BoolVar(&cmd.old, "old", false, "only show out-of-date dependencies")
 	fs.BoolVar(&cmd.missing, "missing", false, "only show missing dependencies")
+	fs.StringVar(&cmd.outFilePath, "out", "", "path to a file to which to write the output. Blank value will be ignored")
 }
 
 type statusCommand struct {
-	examples bool
-	json     bool
-	template string
-	output   string
-	dot      bool
-	old      bool
-	missing  bool
+	examples    bool
+	json        bool
+	template    string
+	output      string
+	dot         bool
+	old         bool
+	missing     bool
+	outFilePath string
 }
 
 type outputter interface {
@@ -399,8 +402,20 @@ func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
 		return err
 	}
 
-	// Print the status output
-	ctx.Out.Print(buf.String())
+	if cmd.outFilePath == "" {
+		// Print the status output
+		ctx.Out.Print(buf.String())
+	} else {
+		file, err := os.Create(cmd.outFilePath)
+		if err != nil {
+			return fmt.Errorf("error creating output file: %v", err)
+		}
+
+		defer file.Close()
+		if _, err := io.Copy(file, bytes.NewReader(buf.Bytes())); err != nil {
+			return fmt.Errorf("error writing output file: %v", err)
+		}
+	}
 
 	return nil
 }
