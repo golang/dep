@@ -22,7 +22,7 @@ validate: build licenseok
 	./hack/validate-vendor.bash
 	./hack/validate-licence.bash
 
-test:
+test: build
 	./hack/test.bash
 
 install: build
