@@ -197,6 +197,230 @@ func TestBasicLine(t *testing.T) {
 	}
 }
 
+func TestDetailLine(t *testing.T) {
+	project := dep.Project{}
+	aSemverConstraint, _ := gps.NewSemverConstraint("1.2.3")
+
+	templateString := "PR:{{.ProjectRoot}}, Src:{{.Source}}, Const:{{.Constraint}}, Ver:{{.Locked.Version}}, Rev:{{.Locked.Revision}}, Lat:{{.Latest.Revision}}, PkgCt:{{.PackageCount}}, Pkgs:{{.Packages}}"
+	equalityTestTemplate := `{{if eq .Constraint "1.2.3"}}Constraint is 1.2.3{{end}}|{{if eq .Locked.Version "flooboo"}}Version is flooboo{{end}}|{{if eq .Locked.Revision "flooboofoobooo"}}Revision is flooboofoobooo{{end}}|{{if eq .Latest.Revision "unknown"}}Latest is unknown{{end}}`
+
+	tests := []struct {
+		name                 string
+		status               DetailStatus
+		wantDotStatus        []string
+		wantJSONStatus       []string
+		wantTableStatus      []string
+		wantTemplateStatus   []string
+		wantEqTemplateStatus []string
+	}{
+		{
+			name: "DetailStatus with ProjectRoot only",
+			status: DetailStatus{
+				BasicStatus: BasicStatus{
+					ProjectRoot: "github.com/foo/bar",
+				},
+				Packages: []string{},
+			},
+			wantDotStatus:        []string{`[label="github.com/foo/bar"];`},
+			wantJSONStatus:       []string{`"Locked":{}`},
+			wantTableStatus:      []string{`github.com/foo/bar                                                 []`},
+			wantTemplateStatus:   []string{`PR:github.com/foo/bar, Src:, Const:, Ver:, Rev:, Lat:, PkgCt:0, Pkgs:[]`},
+			wantEqTemplateStatus: []string{`||`},
+		},
+		{
+			name: "DetailStatus with Revision",
+			status: DetailStatus{
+				BasicStatus: BasicStatus{
+					ProjectRoot: "github.com/foo/bar",
+					Revision:    gps.Revision("flooboofoobooo"),
+				},
+				Packages: []string{},
+			},
+			wantDotStatus:        []string{`[label="github.com/foo/bar\nflooboo"];`},
+			wantJSONStatus:       []string{`"Locked":{"Revision":"flooboofoobooo"}`, `"Constraint":""`},
+			wantTableStatus:      []string{`github.com/foo/bar                               flooboo           []`},
+			wantTemplateStatus:   []string{`PR:github.com/foo/bar, Src:, Const:, Ver:, Rev:flooboofoobooo, Lat:, PkgCt:0, Pkgs:[]`},
+			wantEqTemplateStatus: []string{`|Revision is flooboofoobooo|`},
+		},
+		{
+			name: "DetailStatus with Source",
+			status: DetailStatus{
+				BasicStatus: BasicStatus{
+					ProjectRoot: "github.com/foo/bar",
+				},
+				Packages: []string{},
+				Source:   "github.com/baz/bar",
+			},
+			wantDotStatus:        []string{`[label="github.com/foo/bar"];`},
+			wantJSONStatus:       []string{`"Locked":{}`, `"Source":"github.com/baz/bar"`, `"Constraint":""`},
+			wantTableStatus:      []string{`github.com/foo/bar  github.com/baz/bar                                         []`},
+			wantTemplateStatus:   []string{`PR:github.com/foo/bar, Src:github.com/baz/bar, Const:, Ver:, Rev:, Lat:, PkgCt:0, Pkgs:[]`},
+			wantEqTemplateStatus: []string{`||`},
+		},
+		{
+			name: "DetailStatus with Version and Revision",
+			status: DetailStatus{
+				BasicStatus: BasicStatus{
+					ProjectRoot: "github.com/foo/bar",
+					Version:     gps.NewVersion("1.0.0"),
+					Revision:    gps.Revision("flooboofoobooo"),
+				},
+				Packages: []string{},
+			},
+			wantDotStatus:        []string{`[label="github.com/foo/bar\n1.0.0"];`},
+			wantJSONStatus:       []string{`"Version":"1.0.0"`, `"Revision":"flooboofoobooo"`, `"Constraint":""`},
+			wantTableStatus:      []string{`github.com/foo/bar                      1.0.0    flooboo           []`},
+			wantTemplateStatus:   []string{`PR:github.com/foo/bar, Src:, Const:, Ver:1.0.0, Rev:flooboofoobooo, Lat:, PkgCt:0, Pkgs:[]`},
+			wantEqTemplateStatus: []string{`||`},
+		},
+		{
+			name: "DetailStatus with Constraint, Version and Revision",
+			status: DetailStatus{
+				BasicStatus: BasicStatus{
+					ProjectRoot: "github.com/foo/bar",
+					Constraint:  aSemverConstraint,
+					Version:     gps.NewVersion("1.0.0"),
+					Revision:    gps.Revision("revxyz"),
+				},
+				Packages: []string{},
+			},
+			wantDotStatus:        []string{`[label="github.com/foo/bar\n1.0.0"];`},
+			wantJSONStatus:       []string{`"Revision":"revxyz"`, `"Constraint":"1.2.3"`, `"Version":"1.0.0"`},
+			wantTableStatus:      []string{`github.com/foo/bar          1.2.3       1.0.0    revxyz            []`},
+			wantTemplateStatus:   []string{`PR:github.com/foo/bar, Src:, Const:1.2.3, Ver:1.0.0, Rev:revxyz, Lat:, PkgCt:0, Pkgs:[]`},
+			wantEqTemplateStatus: []string{`Constraint is 1.2.3||`},
+		},
+		{
+			name: "DetailStatus with Constraint, Version, Revision, and Package",
+			status: DetailStatus{
+				BasicStatus: BasicStatus{
+					ProjectRoot:  "github.com/foo/bar",
+					Constraint:   aSemverConstraint,
+					Version:      gps.NewVersion("1.0.0"),
+					Revision:     gps.Revision("revxyz"),
+					PackageCount: 1,
+				},
+				Packages: []string{"."},
+			},
+			wantDotStatus:        []string{`[label="github.com/foo/bar\n1.0.0"];`},
+			wantJSONStatus:       []string{`"Revision":"revxyz"`, `"Constraint":"1.2.3"`, `"Version":"1.0.0"`, `"PackageCount":1`, `"Packages":["."]`},
+			wantTableStatus:      []string{`github.com/foo/bar          1.2.3       1.0.0    revxyz            [.]`},
+			wantTemplateStatus:   []string{`PR:github.com/foo/bar, Src:, Const:1.2.3, Ver:1.0.0, Rev:revxyz, Lat:, PkgCt:1, Pkgs:[.]`},
+			wantEqTemplateStatus: []string{`Constraint is 1.2.3||`},
+		},
+		{
+			name: "DetailStatus with Constraint, Version, Revision, and Packages",
+			status: DetailStatus{
+				BasicStatus: BasicStatus{
+					ProjectRoot:  "github.com/foo/bar",
+					Constraint:   aSemverConstraint,
+					Version:      gps.NewVersion("1.0.0"),
+					Revision:     gps.Revision("revxyz"),
+					PackageCount: 3,
+				},
+				Packages: []string{".", "foo", "bar"},
+			},
+			wantDotStatus:        []string{`[label="github.com/foo/bar\n1.0.0"];`},
+			wantJSONStatus:       []string{`"Revision":"revxyz"`, `"Constraint":"1.2.3"`, `"Version":"1.0.0"`, `"PackageCount":3`, `"Packages":[".","foo","bar"]`},
+			wantTableStatus:      []string{`github.com/foo/bar          1.2.3       1.0.0    revxyz            [., foo, bar]`},
+			wantTemplateStatus:   []string{`PR:github.com/foo/bar, Src:, Const:1.2.3, Ver:1.0.0, Rev:revxyz, Lat:, PkgCt:3, Pkgs:[. foo bar]`},
+			wantEqTemplateStatus: []string{`Constraint is 1.2.3||`},
+		},
+		{
+			name: "DetailStatus with update error",
+			status: DetailStatus{
+				BasicStatus: BasicStatus{
+					ProjectRoot: "github.com/foo/bar",
+					hasError:    true,
+				},
+				Packages: []string{},
+			},
+			wantDotStatus:        []string{`[label="github.com/foo/bar"];`},
+			wantJSONStatus:       []string{`"Locked":{}`, `"Latest":{"Revision":"unknown"}`},
+			wantTableStatus:      []string{`github.com/foo/bar                                         unknown  []`},
+			wantTemplateStatus:   []string{`PR:github.com/foo/bar, Src:, Const:, Ver:, Rev:, Lat:unknown, PkgCt:0, Pkgs:[]`},
+			wantEqTemplateStatus: []string{`||Latest is unknown`},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			var buf bytes.Buffer
+
+			dotout := &dotOutput{
+				p: &project,
+				w: &buf,
+			}
+			dotout.DetailHeader(nil)
+			dotout.DetailLine(&test.status)
+			dotout.DetailFooter(nil)
+
+			for _, wantStatus := range test.wantDotStatus {
+				if ok := strings.Contains(buf.String(), wantStatus); !ok {
+					t.Errorf("Did not find expected node status: \n\t(GOT) %v \n\t(WNT) %v", buf.String(), wantStatus)
+				}
+			}
+
+			buf.Reset()
+
+			jsonout := &jsonOutput{w: &buf}
+
+			jsonout.DetailHeader(nil)
+			jsonout.DetailLine(&test.status)
+			jsonout.DetailFooter(nil)
+
+			for _, wantStatus := range test.wantJSONStatus {
+				if ok := strings.Contains(buf.String(), wantStatus); !ok {
+					t.Errorf("Did not find expected JSON status: \n\t(GOT) %v \n\t(WNT) %v", buf.String(), wantStatus)
+				}
+			}
+
+			buf.Reset()
+
+			tabw := tabwriter.NewWriter(&buf, 0, 4, 2, ' ', 0)
+
+			tableout := &tableOutput{w: tabw}
+
+			tableout.DetailHeader(nil)
+			tableout.DetailLine(&test.status)
+			tableout.DetailFooter(nil)
+
+			for _, wantStatus := range test.wantTableStatus {
+				if ok := strings.Contains(buf.String(), wantStatus); !ok {
+					t.Errorf("Did not find expected Table status: \n\t(GOT) %v \n\t(WNT) %v", buf.String(), wantStatus)
+				}
+			}
+
+			buf.Reset()
+			template, _ := template.New("status").Parse(templateString)
+			templateout := &templateOutput{w: &buf, tmpl: template}
+			templateout.DetailHeader(nil)
+			templateout.DetailLine(&test.status)
+			templateout.DetailFooter(nil)
+
+			for _, wantStatus := range test.wantTemplateStatus {
+				if ok := strings.Contains(buf.String(), wantStatus); !ok {
+					t.Errorf("Did not find expected template status: \n\t(GOT) %v \n\t(WNT) %v", buf.String(), wantStatus)
+				}
+			}
+
+			// The following test is to ensure that certain fields usable with string operations such as .eq
+			buf.Reset()
+			template, _ = template.New("status").Parse(equalityTestTemplate)
+			templateout = &templateOutput{w: &buf, tmpl: template}
+			templateout.DetailHeader(nil)
+			templateout.DetailLine(&test.status)
+			templateout.DetailFooter(nil)
+
+			for _, wantStatus := range test.wantEqTemplateStatus {
+				if ok := strings.Contains(buf.String(), wantStatus); !ok {
+					t.Errorf("Did not find expected template status: \n\t(GOT) %v \n\t(WNT) %v", buf.String(), wantStatus)
+				}
+			}
+		})
+	}
+}
+
 func TestBasicStatusGetConsolidatedConstraint(t *testing.T) {
 	aSemverConstraint, _ := gps.NewSemverConstraint("1.2.1")
 
