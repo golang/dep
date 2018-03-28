@@ -28,6 +28,14 @@ import (
 )
 
 const availableTemplateVariables = "ProjectRoot, Constraint, Version, Revision, Latest, and PackageCount."
+const availableDefaultTemplateVariables = `.Projects[]{
+	    .ProjectRoot,.Source,.Constraint,.PackageCount,.Packages[],
+	    .Locked{.Branch,.Revision,.Version},.Latest{.Revision,.Version}
+	},
+	.Metadata{
+	    .AnalyzerName,.AnalyzerVersion,.InputsDigest,.SolverName,
+	    .SolverVersion
+	}`
 
 const statusShortHelp = `Report the status of the project's dependencies`
 const statusLongHelp = `
@@ -54,12 +62,29 @@ dep status
 	their properties such as the constraints they are bound by and the
 	revision they are at.
 
+dep status -detail
+
+	Displays a detailed table of the dependencies in the project including
+	the value of any source rules used and full list of packages used from
+	each project (instead of simply a count). Text wrapping may make this
+	output hard to read.
+
 dep status -f='{{if eq .Constraint "master"}}{{.ProjectRoot}} {{end}}'
 
 	Displays the list of package names constrained on the master branch.
 	The -f flag allows you to use Go templates along with it's various
-	constructs for formating the output data. Available flags are as follows:
+	constructs for formating output data. Available flags are as follows:
 	` + availableTemplateVariables + `
+
+dep status -detail -f='{{range $i, $p := .Projects}}{{if ne .Source "" -}}
+	    {{- if $i}},{{end}}{{$p.ProjectRoot}}:{{$p.Source}}{{end}}{{end}}'
+
+	Displays the package name and source for each package with a source
+	rule defined, with a comma between each name-source pair.
+
+	When used with -detail, the -f flag applies the supplied Go templates
+	to the full output document, instead of to packages one at a time.
+	Available flags are as follows: ` + availableDefaultTemplateVariables + `
 
 dep status -json
 
