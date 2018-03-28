@@ -19,12 +19,13 @@ import (
 	"text/tabwriter"
 	"text/template"
 
+	"sort"
+	"sync"
+
 	"github.com/golang/dep"
 	"github.com/golang/dep/gps"
 	"github.com/golang/dep/gps/paths"
 	"github.com/pkg/errors"
-	"sort"
-	"sync"
 )
 
 const availableTemplateVariables = "ProjectRoot, Constraint, Version, Revision, Latest, and PackageCount."
@@ -206,7 +207,7 @@ func (out *tableOutput) DetailLine(ds *DetailStatus) error {
 		formatVersion(ds.Version),
 		formatVersion(ds.Revision),
 		ds.getConsolidatedLatest(shortRev),
-		strings.Join(ds.Packages,", "),
+		strings.Join(ds.Packages, ", "),
 	)
 	return err
 }
@@ -756,11 +757,11 @@ type rawDetailVersion struct {
 }
 
 type rawDetailProject struct {
-	ProjectRoot string
-	Packages    []string
-	Locked      rawDetailVersion
-	Latest      rawDetailVersion
-	Source      string `json:"Source,omitempty"`
+	ProjectRoot  string
+	Packages     []string
+	Locked       rawDetailVersion
+	Latest       rawDetailVersion
+	Source       string `json:"Source,omitempty"`
 	Constraint   string
 	PackageCount int
 }
