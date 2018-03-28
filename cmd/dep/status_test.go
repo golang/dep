@@ -16,11 +16,12 @@ import (
 	"text/tabwriter"
 	"text/template"
 
+	"io"
+
 	"github.com/golang/dep"
 	"github.com/golang/dep/gps"
 	"github.com/golang/dep/internal/test"
 	"github.com/pkg/errors"
-	"io"
 )
 
 func TestStatusFormatVersion(t *testing.T) {
@@ -817,8 +818,8 @@ func TestStatusDetailTemplates(t *testing.T) {
 		data rawDetail
 	}{
 		{
-			name: "Default Template",
-			tpl:  defaultStatusTemplate,
+			name: "Lock Template",
+			tpl:  statusLockTemplate,
 			exp: fmt.Sprintf(expectedStatusDetail, `[[projects]]
   branch = "master"
   name = "github.com/akutz/one"
@@ -884,8 +885,8 @@ func TestStatusDetailTemplates(t *testing.T) {
 			},
 		},
 		{
-			name: "Default Template No Projects",
-			tpl:  defaultStatusTemplate,
+			name: "Lock Template No Projects",
+			tpl:  statusLockTemplate,
 			exp:  fmt.Sprintf(expectedStatusDetail, ""),
 			data: rawDetail{
 				Metadata: expectedStatusMetadata,
