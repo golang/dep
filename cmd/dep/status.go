@@ -15,12 +15,11 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"sort"
 	"strings"
+	"sync"
 	"text/tabwriter"
 	"text/template"
-
-	"sort"
-	"sync"
 
 	"github.com/golang/dep"
 	"github.com/golang/dep/gps"
