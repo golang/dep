@@ -1209,11 +1209,7 @@ func basicOutputAll(out outputter, slp []gps.LockedProject, bsMap map[string]*Ba
 		}
 	}
 
-	if footerErr := out.BasicFooter(); footerErr != nil {
-		return footerErr
-	}
-
-	return nil
+	return out.BasicFooter()
 }
 
 // detailOutputAll takes an outputter, a project list, and a map of ProjectRoot to *DetailStatus and
@@ -1231,11 +1227,7 @@ func detailOutputAll(out outputter, slp []gps.LockedProject, dsMap map[string]*D
 		}
 	}
 
-	if footerErr := out.DetailFooter(metadata); footerErr != nil {
-		return footerErr
-	}
-
-	return nil
+	return out.DetailFooter(metadata)
 }
 
 func formatVersion(v gps.Version) string {
