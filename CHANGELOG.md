@@ -14,6 +14,7 @@ IMPROVEMENTS:
 ([#1549](https://github.com/golang/dep/pull/1549)).
 * Reduce network access by trusting local source information and only pulling
 from upstream when necessary ([#1250](https://github.com/golang/dep/pull/1250)).
+* Update our dependency on Masterminds/semver to follow upstream again now that [Masterminds/semver#67](https://github.com/Masterminds/semver/pull/67) is merged([#1792](https://github.com/golang/dep/pull/1792)).
 
 WIP:
 * Enable importing external configuration from dependencies during init (#1277). This

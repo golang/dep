@@ -1,8 +1,6 @@
-# https://github.com/Masterminds/semver/pull/60
 [[constraint]]
   name = "github.com/Masterminds/semver"
-  source = "https://github.com/carolynvs/semver.git"
-  branch = "parse-constraints-with-dash-in-pre"
+  branch = "2.x"
 
 [[constraint]]
   name = "github.com/Masterminds/vcs"
