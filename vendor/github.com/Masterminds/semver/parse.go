@@ -13,9 +13,6 @@ func rewriteRange(i string) string {
 	}
 	o := i
 	for _, v := range m {
-		if strings.HasPrefix(v[0], "v") && versionRegex.MatchString(v[0]) {
-			continue
-		}
 		t := fmt.Sprintf(">= %s, <= %s", v[1], v[11])
 		o = strings.Replace(o, v[0], t, 1)
 	}

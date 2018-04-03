@@ -42,7 +42,7 @@ func init() {
 		cvRegex))
 
 	constraintRangeRegex = regexp.MustCompile(fmt.Sprintf(
-		`\s*(%s)\s*-\s*(%s)\s*`,
+		`\s*(%s)\s* - \s*(%s)\s*`,
 		cvRegex, cvRegex))
 }
 
