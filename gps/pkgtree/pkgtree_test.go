@@ -1463,49 +1463,54 @@ func TestListPackages(t *testing.T) {
 			}
 
 			if fix.out.ImportRoot != "" && fix.out.Packages != nil {
-				if !reflect.DeepEqual(out, fix.out) {
-					if fix.out.ImportRoot != out.ImportRoot {
-						t.Errorf("Expected ImportRoot %s, got %s", fix.out.ImportRoot, out.ImportRoot)
-					}
+				comparePackageTrees(t, fix.out, out)
+			}
+		})
+	}
+}
 
-					// overwrite the out one to see if we still have a real problem
-					out.ImportRoot = fix.out.ImportRoot
+func comparePackageTrees(t *testing.T, exp, got PackageTree) {
+	t.Helper()
+	if !reflect.DeepEqual(got, exp) {
+		if exp.ImportRoot != got.ImportRoot {
+			t.Errorf("Expected ImportRoot %s, got %s", exp.ImportRoot, got.ImportRoot)
+		}
 
-					if !reflect.DeepEqual(out, fix.out) {
-						// TODO (kris-nova) We need to disable this bypass here, and in the .travis.yml
-						// as soon as dep#501 is fixed
-						bypass := os.Getenv("DEPTESTBYPASS501")
-						if bypass != "" {
-							t.Log("bypassing fix.out.Packages check < 2")
+		// overwrite the got one to see if we still have a real problem
+		got.ImportRoot = exp.ImportRoot
+
+		if !reflect.DeepEqual(got, exp) {
+			// TODO (kris-nova) We need to disable this bypass here, and in the .travis.yml
+			// as soon as dep#501 is fixed
+			bypass := os.Getenv("DEPTESTBYPASS501")
+			if bypass != "" {
+				t.Log("bypassing exp.Packages check < 2")
+			} else {
+				if len(exp.Packages) < 2 {
+					t.Errorf("Did not get expected PackageOrErrs:\n\t(GOT): %#v\n\t(WNT): %#v", got, exp)
+				} else {
+					seen := make(map[string]bool)
+					for path, perr := range exp.Packages {
+						seen[path] = true
+						if operr, exists := got.Packages[path]; !exists {
+							t.Errorf("Expected PackageOrErr for path %s was missing from output:\n\t%s", path, perr)
 						} else {
-							if len(fix.out.Packages) < 2 {
-								t.Errorf("Did not get expected PackageOrErrs:\n\t(GOT): %#v\n\t(WNT): %#v", out, fix.out)
-							} else {
-								seen := make(map[string]bool)
-								for path, perr := range fix.out.Packages {
-									seen[path] = true
-									if operr, exists := out.Packages[path]; !exists {
-										t.Errorf("Expected PackageOrErr for path %s was missing from output:\n\t%s", path, perr)
-									} else {
-										if !reflect.DeepEqual(perr, operr) {
-											t.Errorf("PkgOrErr for path %s was not as expected:\n\t(GOT): %#v\n\t(WNT): %#v", path, operr, perr)
-										}
-									}
-								}
-
-								for path, operr := range out.Packages {
-									if seen[path] {
-										continue
-									}
-
-									t.Errorf("Got PackageOrErr for path %s, but none was expected:\n\t%s", path, operr)
-								}
+							if !reflect.DeepEqual(perr, operr) {
+								t.Errorf("PkgOrErr for path %s was not as expected:\n\t(GOT): %#v\n\t(WNT): %#v", path, operr, perr)
 							}
 						}
 					}
+
+					for path, operr := range got.Packages {
+						if seen[path] {
+							continue
+						}
+
+						t.Errorf("Got PackageOrErr for path %s, but none was expected:\n\t%s", path, operr)
+					}
 				}
 			}
-		})
+		}
 	}
 }
 
