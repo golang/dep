@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"runtime"
+	"sort"
 	"strings"
 	"testing"
 
@@ -1442,6 +1443,53 @@ func TestListPackages(t *testing.T) {
 				},
 			},
 		},
+		"k8slike": {
+			fileRoot:   j("k8slike"),
+			importRoot: "k8slike",
+			out: PackageTree{
+				ImportRoot: "k8slike",
+				Packages: map[string]PackageOrErr{
+					"k8slike": {
+						Err: &build.NoGoError{
+							Dir: j("k8slike"),
+						},
+					},
+					"k8slike/foo": {
+						P: Package{
+							ImportPath:  "k8slike/foo",
+							CommentPath: "",
+							Name:        "foo",
+							Imports: []string{
+								"k8slike2/bar",
+							},
+						},
+					},
+					"k8slike/staging": {
+						Err: &build.NoGoError{
+							Dir: j("k8slike/staging"),
+						},
+					},
+					"k8slike/staging/src": {
+						Err: &build.NoGoError{
+							Dir: j("k8slike/staging/src"),
+						},
+					},
+					"k8slike/staging/src/k8slike2": {
+						Err: &build.NoGoError{
+							Dir: j("k8slike/staging/src/k8slike2"),
+						},
+					},
+					"k8slike/staging/src/k8slike2/bar": {
+						P: Package{
+							ImportPath:  "k8slike/staging/src/k8slike2/bar",
+							CommentPath: "",
+							Name:        "bar",
+							Imports:     []string{},
+						},
+					},
+				},
+			},
+		},
 	}
 
 	for name, fix := range table {
@@ -1511,6 +1559,117 @@ func comparePackageTrees(t *testing.T, exp, got PackageTree) {
 				}
 			}
 		}
+	}
+}
+
+func TestSplitPackageTree(t *testing.T) {
+	srcdir := filepath.Join(getTestdataRootDir(t), "src")
+	j := func(s ...string) string {
+		return filepath.Join(srcdir, filepath.Join(s...))
+	}
+
+	table := map[string]struct {
+		fileRoot   string
+		importRoot string
+		split      LocalImportRootMap
+		out        []PackageTree // sorted by ImportRoot
+		err        error
+	}{
+		"k8slike": {
+			fileRoot:   j("k8slike"),
+			importRoot: "k8slike",
+			split: LocalImportRootMap{
+				"./staging/src/k8slike2": "k8slike2",
+				".": "k8slike",
+			},
+			out: []PackageTree{
+				PackageTree{
+					ImportRoot: "k8slike",
+					Packages: map[string]PackageOrErr{
+						"k8slike": {
+							Err: &build.NoGoError{
+								Dir: j("k8slike"),
+							},
+						},
+						"k8slike/foo": {
+							P: Package{
+								ImportPath:  "k8slike/foo",
+								CommentPath: "",
+								Name:        "foo",
+								Imports: []string{
+									"k8slike2/bar",
+								},
+							},
+						},
+						"k8slike/staging": {
+							Err: &build.NoGoError{
+								Dir: j("k8slike/staging"),
+							},
+						},
+						"k8slike/staging/src": {
+							Err: &build.NoGoError{
+								Dir: j("k8slike/staging/src"),
+							},
+						},
+					},
+				},
+				PackageTree{
+					ImportRoot: "k8slike2",
+					Packages: map[string]PackageOrErr{
+						"k8slike/staging/src/k8slike2": {
+							Err: &build.NoGoError{
+								Dir: j("k8slike/staging/src/k8slike2"),
+							},
+						},
+						"k8slike/staging/src/k8slike2/bar": {
+							P: Package{
+								ImportPath:  "k8slike2/bar",
+								CommentPath: "",
+								Name:        "bar",
+								Imports:     []string{},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for name, fix := range table {
+		t.Run(name, func(t *testing.T) {
+			if _, err := os.Stat(fix.fileRoot); err != nil {
+				t.Errorf("error on fileRoot %s: %s", fix.fileRoot, err)
+			}
+
+			base, err := ListPackages(fix.fileRoot, fix.importRoot)
+			if err != nil {
+				t.Errorf("Received error listing packages: %s", err)
+			}
+
+			out, err := base.Split(fix.split)
+
+			if err != nil && fix.err == nil {
+				t.Errorf("Received error but none expected: %s", err)
+			} else if fix.err != nil && err == nil {
+				t.Errorf("Error expected but none received")
+			} else if fix.err != nil && err != nil {
+				if !reflect.DeepEqual(fix.err, err) {
+					t.Errorf("Did not receive expected error:\n\t(GOT): %s\n\t(WNT): %s", err, fix.err)
+				}
+			}
+
+			sort.Slice(out, func(i, j int) bool {
+				return out[i].ImportRoot < out[j].ImportRoot
+			})
+
+			if len(fix.out) != len(out) {
+				t.Errorf("Expected %d PackageTrees, but go %d", len(fix.out), len(out))
+			} else {
+				for idx, pt := range out {
+					comparePackageTrees(t, fix.out[idx], pt)
+				}
+			}
+		})
 	}
 }
 

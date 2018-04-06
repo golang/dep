@@ -471,6 +471,67 @@ type PackageTree struct {
 	Packages   map[string]PackageOrErr
 }
 
+// A LocalImportRootMap maps local locations to their import root
+type LocalImportRootMap map[string]string
+
+func (t PackageTree) normalizeSource(src string) string {
+	if src == "." || strings.HasPrefix(src, "./") {
+		src = t.ImportRoot + src[1:]
+	}
+	return src
+}
+
+// Split partitions a PackageTree along the lines defined in a
+// LocalImportRootMap. If such a partition is not possible, an error is raised.
+func (t PackageTree) Split(m LocalImportRootMap) ([]PackageTree, error) {
+	pts := make(map[string]PackageTree)
+	prefixes := make([]string, 0, len(m))
+
+	for pr, ir := range m {
+		prefixes = append(prefixes, pr)
+		pts[ir] = PackageTree{
+			ImportRoot: ir,
+			Packages:   make(map[string]PackageOrErr),
+		}
+	}
+
+	// sort in reverse alphanumerical order so that we encounter the longest
+	// prefix first.
+	sort.Slice(prefixes, func(i, j int) bool {
+		return prefixes[i] > prefixes[j]
+	})
+
+	dispatched := 0
+	for path, pack := range t.Packages {
+		for _, pr := range prefixes {
+			npr := t.normalizeSource(pr)
+			if strings.HasPrefix(path, npr) {
+				ir := m[pr]
+				// leave errors alone, reparent packages
+				if pack.Err == nil {
+					ip := pack.P.ImportPath
+					ip = strings.TrimPrefix(ip, npr)
+					ip = filepath.Join(ir, ip)
+					pack.P.ImportPath = ip
+				}
+				pts[ir].Packages[path] = pack
+				dispatched++
+				break
+			}
+		}
+	}
+
+	if dispatched != len(t.Packages) {
+		return nil, fmt.Errorf("provided map doesn't cover all packages")
+	}
+
+	res := make([]PackageTree, 0, len(m))
+	for _, pt := range pts {
+		res = append(res, pt)
+	}
+	return res, nil
+}
+
 // ToReachMap looks through a PackageTree and computes the list of external
 // import statements (that is, import statements pointing to packages that are
 // not logical children of PackageTree.ImportRoot) that are transitively
