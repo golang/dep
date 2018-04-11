@@ -16,6 +16,7 @@ import (
 	"github.com/golang/dep"
 	"github.com/golang/dep/gps"
 	"github.com/golang/dep/gps/pkgtree"
+	"github.com/golang/dep/internal/kdep"
 	"github.com/golang/dep/internal/test"
 )
 
@@ -212,10 +213,12 @@ func TestValidateUpdateArgs(t *testing.T) {
 
 	stderrOutput := &bytes.Buffer{}
 	errLogger := log.New(stderrOutput, "", 0)
-	ctx := &dep.Ctx{
-		GOPATH: pwd,
-		Out:    log.New(ioutil.Discard, "", 0),
-		Err:    errLogger,
+	ctx := &kdep.Ctx{
+		&dep.Ctx{
+			GOPATH: pwd,
+			Out:    log.New(ioutil.Discard, "", 0),
+			Err:    errLogger,
+		},
 	}
 
 	sm, err := ctx.SourceManager()
@@ -240,7 +243,8 @@ func TestValidateUpdateArgs(t *testing.T) {
 			// Add lock to project
 			p.Lock = &dep.Lock{P: lockedProjects}
 
-			err := validateUpdateArgs(ctx, c.args, p, sm, &params)
+			kp, _ := kdep.WrapProject(p, ctx)
+			err := validateUpdateArgs(ctx, c.args, kp, sm, &params)
 			if err != c.wantError {
 				t.Fatalf("Unexpected error while validating update args:\n\t(GOT): %v\n\t(WNT): %v", err, c.wantError)
 			}

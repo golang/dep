@@ -39,6 +39,15 @@ type command interface {
 	Run(*kdep.Ctx, []string) error
 }
 
+func init() {
+	// integration tests use a binary named "testdep" and definitely expect dep
+	// semantics...
+	basename := filepath.Base(os.Args[0])
+	if strings.TrimSuffix(basename, filepath.Ext(basename)) == "testdep" {
+		kdep.FallbackToDep = true
+	}
+}
+
 func main() {
 	p := &profile{}
 	flag.StringVar(&p.cpuProfile, "cpuprofile", "", "Writes a CPU profile to the specified file before exiting.")

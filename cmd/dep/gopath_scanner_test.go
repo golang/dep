@@ -12,6 +12,7 @@ import (
 
 	"github.com/golang/dep"
 	"github.com/golang/dep/gps"
+	"github.com/golang/dep/internal/kdep"
 	"github.com/golang/dep/internal/test"
 )
 
@@ -52,7 +53,7 @@ func TestGopathScanner_OverlayManifestConstraints(t *testing.T) {
 	gs := gopathScanner{
 		origM: origM,
 		origL: &dep.Lock{},
-		ctx:   ctx,
+		ctx:   &kdep.Ctx{ctx},
 		pd: projectData{
 			ondisk: map[gps.ProjectRoot]gps.Version{
 				pi1.ProjectRoot: v2,
@@ -108,7 +109,7 @@ func TestGopathScanner_OverlayLockProjects(t *testing.T) {
 				gps.NewLockedProject(pi2, v3, []string{}), // should be added to the lock
 			},
 		},
-		ctx: ctx,
+		ctx: &kdep.Ctx{ctx},
 		pd: projectData{
 			ondisk: map[gps.ProjectRoot]gps.Version{
 				pi1.ProjectRoot: v2,
