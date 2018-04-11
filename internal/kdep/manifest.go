@@ -48,6 +48,11 @@ type Manifest struct {
 	Dependencies []string
 }
 
+// WrapManifest generates a kdep Manifest
+func WrapManifest(m *dep.Manifest) *Manifest {
+	return &Manifest{m, nil, nil, "", nil}
+}
+
 func manifestFromProject(p *dep.Project) *Manifest {
 	fname := filepath.Join(p.AbsRoot, dep.ManifestName)
 

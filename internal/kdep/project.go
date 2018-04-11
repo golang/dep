@@ -37,7 +37,17 @@ type Project struct {
 	extraVendorEntries map[string]string
 }
 
-func newProject(p *dep.Project, c *Ctx) (*Project, error) {
+// WrapProject wraps a dep.Project in a kdep.Project
+func WrapProject(p *dep.Project, c *Ctx) (*Project, error) {
+	if FallbackToDep {
+		var m *Manifest
+		if p != nil {
+			m = WrapManifest(p.Manifest)
+		} else {
+			m = WrapManifest(nil)
+		}
+		return &Project{p, m, nil, nil}, nil
+	}
 	m := manifestFromProject(p)
 	if m == nil || !m.Meta.IsKdepRoot {
 		return nil, fmt.Errorf("not a kdep project")
@@ -91,6 +101,9 @@ func newProject(p *dep.Project, c *Ctx) (*Project, error) {
 
 // MakeParams generates resolution parameters
 func (p *Project) MakeParams() gps.SolveParameters {
+	if FallbackToDep {
+		return p.Project.MakeParams()
+	}
 	params := gps.SolveParameters{
 		RootDir:         p.AbsRoot,
 		ProjectAnalyzer: dep.Analyzer{},
@@ -107,6 +120,9 @@ func (p *Project) MakeParams() gps.SolveParameters {
 
 // ParseRootPackageTree generates the pkgtree.PackageTree for a kdep multi-repo
 func (p *Project) ParseRootPackageTree() (pkgtree.PackageTree, error) {
+	if FallbackToDep {
+		return p.Project.ParseRootPackageTree()
+	}
 	tree, err := p.Project.ParseRootPackageTree()
 	if err != nil {
 		return tree, err
@@ -132,6 +148,9 @@ func (p *Project) ParseRootPackageTree() (pkgtree.PackageTree, error) {
 
 // HackExtraVendorEntries generates extra vendor entries for local packages
 func (p *Project) HackExtraVendorEntries() error {
+	if FallbackToDep {
+		return nil
+	}
 	vendorPath := filepath.Join(p.AbsRoot, "vendor")
 
 	for imp, path := range p.extraVendorEntries {

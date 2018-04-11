@@ -30,13 +30,18 @@ type Ctx struct {
 
 // LoadProject finds the first dep project with a kdep-project flag
 func (c *Ctx) LoadProject() (*Project, error) {
+	if FallbackToDep {
+		p, err := c.Ctx.LoadProject()
+		kp, _ := WrapProject(p, c)
+		return kp, err
+	}
 	for {
 		p, err := c.Ctx.LoadProject()
 		if err != nil {
 			return nil, err
 		}
 
-		proj, err := newProject(p, c)
+		proj, err := WrapProject(p, c)
 		if err == nil {
 			return proj, err
 		}
