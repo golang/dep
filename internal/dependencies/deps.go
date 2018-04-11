@@ -149,9 +149,5 @@ func (b *internalBuilder) isExternalDependency(pack string) bool {
 
 	cpts := strings.Split(pack, "/")
 	lead := cpts[0]
-	if strings.Contains(lead, ".") {
-		return true
-	}
-
-	return false
+	return strings.Contains(lead, ".")
 }

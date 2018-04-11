@@ -235,7 +235,7 @@ func (c *Config) Run() int {
 				Cachedir:       cachedir,
 			}
 
-			kctx := &kdep.Ctx{ctx}
+			kctx := &kdep.Ctx{Ctx: ctx}
 
 			GOPATHS := filepath.SplitList(getEnv(c.Env, "GOPATH"))
 			ctx.SetPaths(c.WorkingDir, GOPATHS...)

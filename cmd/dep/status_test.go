@@ -475,7 +475,7 @@ func TestCollectConstraints(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			p.Lock = &c.lock
-			kctx := &kdep.Ctx{ctx}
+			kctx := &kdep.Ctx{Ctx: ctx}
 			kp, _ := kdep.WrapProject(p, kctx)
 			gotConstraints, err := collectConstraints(kctx, kp, sm)
 			if len(err) > 0 && !c.wantErr {

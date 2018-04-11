@@ -53,7 +53,7 @@ func TestGopathScanner_OverlayManifestConstraints(t *testing.T) {
 	gs := gopathScanner{
 		origM: origM,
 		origL: &dep.Lock{},
-		ctx:   &kdep.Ctx{ctx},
+		ctx:   &kdep.Ctx{Ctx: ctx},
 		pd: projectData{
 			ondisk: map[gps.ProjectRoot]gps.Version{
 				pi1.ProjectRoot: v2,
@@ -109,7 +109,7 @@ func TestGopathScanner_OverlayLockProjects(t *testing.T) {
 				gps.NewLockedProject(pi2, v3, []string{}), // should be added to the lock
 			},
 		},
-		ctx: &kdep.Ctx{ctx},
+		ctx: &kdep.Ctx{Ctx: ctx},
 		pd: projectData{
 			ondisk: map[gps.ProjectRoot]gps.Version{
 				pi1.ProjectRoot: v2,
