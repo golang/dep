@@ -373,14 +373,14 @@ It's up to you:
 
 * It's the only way to get truly reproducible builds, as it guards against upstream renames,
   deletes and commit history overwrites.
-* You don't need an extra `dep ensure` step to sync `vendor/` with Gopkg.lock after most operations,
+* You don't need an extra `dep ensure` step to sync `vendor/` with `Gopkg.lock` after most operations,
   such as `go get`, cloning, getting latest, merging, etc.
 
 **Cons**
 
 * Your repo will be bigger, potentially a lot bigger,
   though [`prune`](Gopkg.toml.md#prune) can help minimize this problem.
-* PR diffs will include changes for files under `vendor/` when Gopkg.lock is modified,
+* PR diffs will include changes for files under `vendor/` when `Gopkg.lock` is modified,
   however files in `vendor/` are [hidden by default](https://github.com/github/linguist/blob/v5.2.0/lib/linguist/generated.rb#L328) on GitHub.
 
 ## How do I roll releases that `dep` will be able to use?
