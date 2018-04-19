@@ -22,6 +22,7 @@ The FAQ predated the introduction of the rest of the documentation. If something
 ## Behavior
 
 * [How does `dep` decide what version of a dependency to use?](#how-does-dep-decide-what-version-of-a-dependency-to-use)
+* [What is the default `dep ensure -update` behavior for dependencies that are imported but not included as a `[[Constraint]]` in `Gopkg.toml`?](#what-is-the-default-dep-ensure--update-behavior-for-dependencies-that-are-imported-but-not-included-as-a-constraint-in-gopkgtoml)
 * [What external tools are supported?](#what-external-tools-are-supported)
 * [Why is `dep` ignoring a version constraint in the manifest?](#why-is-dep-ignoring-a-version-constraint-in-the-manifest)
 * [Why did `dep` use a different revision for package X instead of the revision in the lock file?](#why-did-dep-use-a-different-revision-for-package-x-instead-of-the-revision-in-the-lock-file)
@@ -240,6 +241,9 @@ the simplest of which is that it doesn't match a constraint. But if you're
 trying to figure out why `dep` is doing what it does, understanding that its
 basic action is to attempt versions in this order should help you to reason
 about what's going on.
+
+## What is the default `dep ensure -update` behavior for dependencies that are imported but not included as a `[[Constraint]]` in `Gopkg.toml`?
+`dep` updates the dependency to the latest semver tag. If there are no semver tags, `dep` uses the tip of master.
 
 ## What external tools are supported?
 

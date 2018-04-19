@@ -191,10 +191,10 @@ Thus, even if an upstream tag is force-pushed in one of your project's dependenc
 The key takeaway here is that `-update`'s behavior is governed by the type of constraints specified:
 
 | `Gopkg.toml` version constraint type | Constraint example | `dep ensure -update` behavior                                                                                                             |
-| ------------------------------------ | ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| `version` (semver range)             | `"^1.0.0"`         | Tries to get the latest version allowed by the range                                                                                      |
-| `branch`                             | `"master"`         | Tries to move to the current tip of the named branch                                                                                      |
-| `version` (non-range semver)         | `"=1.0.0"`         | Change can only occur if the upstream release was moved (e.g. `git push --force <tag>`)                                                   |
-| `version` (non-semver)               | `"foo"`            | Change can only occur if the upstream release was moved                                                                                   |
-| `revision`                           | `aabbccd...`       | No change is possible                                                                                                                     |
-| (none)                               | (none)             | The first version that works, according to [the sort order](https://godoc.org/github.com/golang/dep/gps#SortForUpgrade) (not recommended) |
+| ------------------------------------ | ------------------ | ----------------------------------------------------------------------------------------------------------------------- |
+| `version` (semver range)             | `"^1.0.0"`         | Tries to get the latest version allowed by the range                                                               |
+| `branch`                             | `"master"`         | Tries to move to the current tip of the named branch                                                                   |
+| `version` (non-range semver)         | `"=1.0.0"`         | Change can only occur if the upstream release was moved (e.g. `git push --force <tag>`)                         |
+| `version` (non-semver)               | `"foo"`            | Change can only occur if the upstream release was moved                                                         |
+| `revision`                           | `aabbccd...`       | No change is possible                                                                                                   |
+| (none)                               | (none)             | The first version that works, according to [the sort order](https://godoc.org/github.com/golang/dep/gps#SortForUpgrade) |
