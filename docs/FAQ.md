@@ -31,6 +31,7 @@ The FAQ predated the introduction of the rest of the documentation. If something
 * [Does `dep` support relative imports?](#does-dep-support-relative-imports)
 * [How do I make `dep` resolve dependencies from my `GOPATH`?](#how-do-i-make-dep-resolve-dependencies-from-my-gopath)
 * [Will `dep` let me use git submodules to store dependencies in `vendor`?](#will-dep-let-me-use-git-submodules-to-store-dependencies-in-vendor)
+* [How does `dep` work without changing my packages imports?](#how-does-dep-work-without-changing-my-packages-imports)
 
 ## Best Practices
 
@@ -366,6 +367,10 @@ The reasons why git submodules will not be a part of dep are best expressed as a
 * dep does not currently know or care if the project it operates on is under version control. Relying on submodules would entail that dep start paying attention to that. That it would only be conditionally does not make it better - again, more forking paths in the logic, more complexity.
 * Incorporating submodules in a way that is at all visible to the user (and why else would you do it?) makes dep's workflows both more complicated and less predictable: _sometimes_ submodule-related actions are expected; _sometimes_ submodule-derived workflows are sufficient.
 * Nesting one repository within another implies that changes could, potentially, be made directly in that subrepository. This is directly contrary to dep's foundational principle that `vendor` is dead code, and directly modifying anything in there is an error.
+
+## How does `dep` work without changing my packages imports?
+
+`dep` doesn't require imports (or the `$GOPATH`) to be updated because [go has native support for a vendor directory since version 1.5](https://golang.org/cmd/go/#hdr-Vendor_Directories). You do not need to update import paths to be relative. For instance, `import github.com/user/awesome-project` will be found in the project's `/vendor/github.com/user/awesome-project` before looking to `$GOPATH/src/github.com/user/awesome-project`.
 
 ## Best Practices
 
