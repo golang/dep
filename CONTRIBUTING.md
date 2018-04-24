@@ -17,8 +17,9 @@ When [filing an issue](https://github.com/golang/dep/issues/new), make sure to a
 4. What did you expect to see?
 5. What did you see instead?
 
-General questions should go to the [golang-nuts mailing list](https://groups.google.com/group/golang-nuts) instead of the issue tracker.
+General questions should go to the [golang-nuts mailing list](https://groups.google.com/group/golang-nuts) or the [Gophers Slack #vendor channel](https://gophers.slack.com/messages/C0M5YP9LN/) instead of the issue tracker.
 The gophers there will answer or ask you to file an issue if you've tripped over a bug.
+For an invite to the Slack channel, [fill out this form](https://invite.slack.golangbridge.org/).
 
 ## Contributing code
 
