@@ -23,12 +23,10 @@ $ brew upgrade dep
 
 ## Arch Linux
 
-Install the `golang-dep` package [from the AUR](https://aur.archlinux.org/packages/golang-dep/)
+Install the `dep` package:
 
 ```sh
-git clone https://aur.archlinux.org/golang-dep.git
-cd golang-dep
-makepkg -si
+pacman -S dep
 ```
 
 ## Install From Source
