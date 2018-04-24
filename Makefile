@@ -7,7 +7,11 @@ GOBIN=$(GOPATH)/bin
 default: build validate test
 
 get-deps:
-	go get -u github.com/golang/lint/golint honnef.co/go/tools/cmd/megacheck
+	# Workaround https://github.com/golang/lint/issues/397
+	[ -d $(GOPATH)/src/golang.org/x ] || mkdir -p $(GOPATH)/src/golang.org/x
+	git clone --depth=1 https://github.com/golang/lint.git $(GOPATH)/src/golang.org/x/lint
+	# End workaround
+	go get -u golang.org/x/lint/golint honnef.co/go/tools/cmd/megacheck
 
 build:
 	go fmt ./...
