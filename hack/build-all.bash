@@ -33,6 +33,10 @@ if [[ -z "${DEP_BUILD_ARCHS}" ]]; then
     DEP_BUILD_ARCHS="amd64 386"
 fi
 
+if [[ -z "${DEP_CGO_ENABLED}" ]]; then
+    DEP_CGO_ENABLED="0"
+fi
+
 mkdir -p "${DEP_ROOT}/release"
 
 for OS in ${DEP_BUILD_PLATFORMS[@]}; do
@@ -42,7 +46,7 @@ for OS in ${DEP_BUILD_PLATFORMS[@]}; do
       NAME="${NAME}.exe"
     fi
     echo "Building for ${OS}/${ARCH}"
-    GOARCH=${ARCH} GOOS=${OS} CGO_ENABLED=0 ${GO_BUILD_CMD} -ldflags "${GO_BUILD_LDFLAGS}"\
+    GOARCH=${ARCH} GOOS=${OS} CGO_ENABLED=${DEP_CGO_ENABLED} ${GO_BUILD_CMD} -ldflags "${GO_BUILD_LDFLAGS}"\
      -o "${DEP_ROOT}/release/${NAME}" ./cmd/dep/
     shasum -a 256 "${DEP_ROOT}/release/${NAME}" > "${DEP_ROOT}/release/${NAME}".sha256
   done
