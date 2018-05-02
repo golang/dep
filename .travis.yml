@@ -48,12 +48,16 @@ jobs:
         - trap EXIT
         - make test
     - go: 1.10.x
+      os: osx
       stage: deploy
       go_import_path: github.com/golang/dep
       install: skip
       script: skip
       before_deploy:
-        - ./hack/build-all.bash
+        # Enable CGO for OS X so that DNS works correctly; see
+        # https://github.com/golang/dep/issues/1838 for more details
+        - DEP_CGO_ENABLED=1 DEP_BUILD_PLATFORMS="darwin" ./hack/build-all.bash
+        - DEP_CGO_ENABLED=0 DEP_BUILD_PLATFORMS="linux windows freebsd" ./hack/build-all.bash
       deploy:
         - provider: releases
           api_key:
