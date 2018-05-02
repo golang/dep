@@ -65,12 +65,13 @@ downloadFile() {
 }
 
 findGoBinDirectory() {
-    if [ -z "$GOPATH" ]; then
-        echo "Installation requires \$GOPATH to be set for your Golang environment."
+    EFFECTIVE_GOPATH=$(go env GOPATH)
+    if [ -z "$EFFECTIVE_GOPATH" ]; then
+        echo "Installation could not determine your \$GOPATH."
         exit 1
     fi
     if [ -z "$GOBIN" ]; then
-        GOBIN="$GOPATH/bin"
+        GOBIN="$EFFECTIVE_GOPATH/bin"
     fi
     if [ ! -d "$GOBIN" ]; then
         echo "Installation requires your GOBIN directory $GOBIN to exist. Please create it."
