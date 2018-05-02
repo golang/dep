@@ -66,8 +66,19 @@ downloadFile() {
 
 findGoBinDirectory() {
     if [ -z "$GOPATH" ]; then
-        echo "Installation requires \$GOPATH to be set for your Golang environment."
-        exit 1
+        echo "\$GOPATH environment variable not set, trying to use \"go env GOPATH\".."
+        if test -x "$(command -v go)"; then
+            path=$(go env GOPATH)
+            if [ -z "$path" ]; then
+                echo "Could not find the default GOPATH."
+                exit 1
+            else
+                GOPATH="$path"
+            fi
+        else
+            echo "Go binary not found when trying to use \"go env GOPATH\""
+            exit 1
+        fi
     fi
     if [ -z "$GOBIN" ]; then
         GOBIN="$GOPATH/bin"
