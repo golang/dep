@@ -48,6 +48,9 @@ jobs:
         - trap EXIT
         - make test
     - go: 1.10.x
+      # Run on OS X so that we get a CGO-enabled binary for this OS; see
+      # https://github.com/golang/dep/issues/1838 for more details.
+      os: osx
       stage: deploy
       go_import_path: github.com/golang/dep
       install: skip

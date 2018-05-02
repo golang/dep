@@ -14,6 +14,7 @@ DEP_ROOT=$(git rev-parse --show-toplevel)
 VERSION=$(git describe --tags --dirty)
 COMMIT_HASH=$(git rev-parse --short HEAD 2>/dev/null)
 DATE=$(date "+%Y-%m-%d")
+BUILD_PLATFORM=$(uname -a | awk '{print tolower($1);}')
 IMPORT_DURING_SOLVE=${IMPORT_DURING_SOLVE:-false}
 
 if [[ "$(pwd)" != "${DEP_ROOT}" ]]; then
@@ -41,8 +42,17 @@ for OS in ${DEP_BUILD_PLATFORMS[@]}; do
     if [[ "${OS}" == "windows" ]]; then
       NAME="${NAME}.exe"
     fi
-    echo "Building for ${OS}/${ARCH}"
-    GOARCH=${ARCH} GOOS=${OS} CGO_ENABLED=0 ${GO_BUILD_CMD} -ldflags "${GO_BUILD_LDFLAGS}"\
+
+    # Enable CGO if building for OS X on OS X; see
+    # https://github.com/golang/dep/issues/1838 for details.
+    if [[ "${OS}" == "darwin" && "${BUILD_PLATFORM}" == "darwin" ]]; then
+      CGO_ENABLED=1
+    else
+      CGO_ENABLED=0
+    fi
+
+    echo "Building for ${OS}/${ARCH} with CGO_ENABLED=${CGO_ENABLED}"
+    GOARCH=${ARCH} GOOS=${OS} CGO_ENABLED=${CGO_ENABLED} ${GO_BUILD_CMD} -ldflags "${GO_BUILD_LDFLAGS}"\
      -o "${DEP_ROOT}/release/${NAME}" ./cmd/dep/
     shasum -a 256 "${DEP_ROOT}/release/${NAME}" > "${DEP_ROOT}/release/${NAME}".sha256
   done
