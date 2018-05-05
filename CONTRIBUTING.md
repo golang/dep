@@ -10,16 +10,16 @@ Keep an eye on the [Roadmap](https://github.com/golang/dep/wiki/Roadmap) for a s
 
 Please check the existing issues and [FAQ](docs/FAQ.md) to see if your feedback has already been reported.
 
+General questions should go to the [golang-nuts mailing list](https://groups.google.com/group/golang-nuts) or the [Gophers Slack #vendor channel](https://gophers.slack.com/messages/C0M5YP9LN/) instead of the issue tracker.
+The gophers there will answer or ask you to file an issue if you've tripped over a bug.
+For an invite to the Slack channel, [fill out this form](https://invite.slack.golangbridge.org/).
+
 When [filing an issue](https://github.com/golang/dep/issues/new), make sure to answer these five questions:
 
 1. What version of Go (`go version`) and `dep` (`git describe --tags`) are you using??
 3. What `dep` command did you run?
 4. What did you expect to see?
 5. What did you see instead?
-
-General questions should go to the [golang-nuts mailing list](https://groups.google.com/group/golang-nuts) or the [Gophers Slack #vendor channel](https://gophers.slack.com/messages/C0M5YP9LN/) instead of the issue tracker.
-The gophers there will answer or ask you to file an issue if you've tripped over a bug.
-For an invite to the Slack channel, [fill out this form](https://invite.slack.golangbridge.org/).
 
 ## Contributing code
 
