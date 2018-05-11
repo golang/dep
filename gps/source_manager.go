@@ -787,3 +787,8 @@ type callInfo struct {
 	name string
 	typ  callType
 }
+
+func (sm *SourceMgr) SetGolangMirror() {
+	dxt := sm.deduceCoord.deducext
+	dxt.Insert("golang.org/x/", golangDeducer{regexp: golangRegex})
+}
