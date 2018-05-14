@@ -60,14 +60,12 @@ func (cmd *initCommand) Register(fs *flag.FlagSet) {
 	fs.BoolVar(&cmd.noExamples, "no-examples", false, "don't include example in Gopkg.toml")
 	fs.BoolVar(&cmd.skipTools, "skip-tools", false, "skip importing configuration from other dependency managers")
 	fs.BoolVar(&cmd.gopath, "gopath", false, "search in GOPATH for dependencies")
-	fs.BoolVar(&cmd.golangmirror, "golang-mirror", false, "use github mirror of golang.org packages")
 }
 
 type initCommand struct {
-	noExamples   bool
-	skipTools    bool
-	gopath       bool
-	golangmirror bool
+	noExamples bool
+	skipTools  bool
+	gopath     bool
 }
 
 func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
@@ -96,9 +94,6 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 	sm, err := ctx.SourceManager()
 	if err != nil {
 		return errors.Wrap(err, "init failed: unable to create a source manager")
-	}
-	if cmd.golangmirror {
-		sm.SetGolangMirror()
 	}
 
 	sm.UseDefaultSignalHandling()

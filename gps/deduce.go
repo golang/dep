@@ -26,6 +26,7 @@ var (
 	hgSchemes      = []string{"https", "ssh", "http"}
 	svnSchemes     = []string{"https", "http", "svn", "svn+ssh"}
 	gopkginSchemes = []string{"https", "http"}
+	golangXPrefix  = "golang.org/x"
 )
 
 const gopkgUnstableSuffix = "-unstable"
@@ -74,7 +75,7 @@ var (
 	jazzRegex         = regexp.MustCompile(`^(?P<root>hub\.jazz\.net(/git/[a-z0-9]+/[A-Za-z0-9_.\-]+))((?:/[A-Za-z0-9_.\-]+)*)$`)
 	apacheRegex       = regexp.MustCompile(`^(?P<root>git\.apache\.org(/[a-z0-9_.\-]+\.git))((?:/[A-Za-z0-9_.\-]+)*)$`)
 	vcsExtensionRegex = regexp.MustCompile(`^(?P<root>([a-z0-9.\-]+\.)+[a-z0-9.\-]+(:[0-9]+)?/[A-Za-z0-9_.\-/~]*?\.(?P<vcs>bzr|git|hg|svn))((?:/[A-Za-z0-9_.\-]+)*)$`)
-	golangRegex       = regexp.MustCompile(`^(?P<root>golang\.org/x(/[A-Za-z0-9_.\-]+))((?:/[A-Za-z0-9_.\-]+)*)$`)
+	golangXRegex      = regexp.MustCompile(`^(?P<root>golang\.org/x(/[A-Za-z0-9_.\-]+))((?:/[A-Za-z0-9_.\-]+)*)$`)
 )
 
 // Other helper regexes
@@ -468,20 +469,19 @@ func (m apacheDeducer) deduceSource(path string, u *url.URL) (maybeSources, erro
 	return mb, nil
 }
 
-type golangDeducer struct {
+type golangMirrorDeducer struct {
 	regexp *regexp.Regexp
 }
 
-func (m golangDeducer) deduceRoot(path string) (string, error) {
+func (m golangMirrorDeducer) deduceRoot(path string) (string, error) {
 	v := m.regexp.FindStringSubmatch(path)
 	if v == nil {
 		return "", fmt.Errorf("%s is not a valid path for a source on golang.org", path)
 	}
-
-	return "golang.org/x" + v[2], nil
+	return golangXPrefix + v[2], nil
 }
 
-func (m golangDeducer) deduceSource(path string, u *url.URL) (maybeSources, error) {
+func (m golangMirrorDeducer) deduceSource(path string, u *url.URL) (maybeSources, error) {
 	v := m.regexp.FindStringSubmatch(path)
 	if v == nil {
 		return nil, fmt.Errorf("%s is not a valid path for a source on hub.jazz.net", path)
