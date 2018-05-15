@@ -555,8 +555,8 @@ func (sm *SourceMgr) DeduceProjectRoot(ip string) (ProjectRoot, error) {
 
 	// as we can not deduce root path from golang.org,
 	// try github mirror and add golang.org/x rules to Trie tree
-	if err != nil && strings.HasPrefix(ip, golangXPrefix) {
-		sm.deduceCoord.deducext.Insert(golangXPrefix, golangMirrorDeducer{regexp: golangXRegex})
+	if err != nil && strings.HasPrefix(ip, stdlibPrefix) {
+		sm.deduceCoord.deducext.Insert(stdlibPrefix, stdlibDeducer{regexp: stdlibRegex})
 		pd, err = sm.deduceCoord.deduceKnownPaths(ip)
 	}
 	return ProjectRoot(pd.root), err
