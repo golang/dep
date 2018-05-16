@@ -266,7 +266,12 @@ func collectUnusedPackagesFiles(fsState filesystemState, unusedPackages map[stri
 func pruneNonGoFiles(fsState filesystemState) error {
 	toDelete := make([]string, 0, len(fsState.files)/4)
 
-	for _, path := range fsState.files {
+	paths := fsState.files
+	for _, link := range fsState.links {
+		paths = append(paths, link.path)
+	}
+
+	for _, path := range paths {
 		ext := fileExt(path)
 
 		// Refer to: https://github.com/golang/go/blob/release-branch.go1.9/src/go/build/build.go#L750
