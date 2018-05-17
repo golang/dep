@@ -539,14 +539,21 @@ func (s *hgSource) listVersionsRequiresLocal() bool {
 	return true
 }
 
+func (s *hgSource) hgCmd(ctx context.Context, args ...string) cmd {
+	r := s.repo
+	cmd := commandContext(ctx, "hg", args...)
+	cmd.SetDir(r.LocalPath())
+	// Let's make sure extensions don't interfere with our expectations
+	// regarding the output of commands.
+	cmd.Cmd.Env = append(cmd.Cmd.Env, "HGRCPATH=")
+	return cmd
+}
+
 func (s *hgSource) listVersions(ctx context.Context) ([]PairedVersion, error) {
 	var vlist []PairedVersion
 
-	r := s.repo
-
 	// Now, list all the tags
-	tagsCmd := commandContext(ctx, "hg", "tags", "--debug", "--verbose")
-	tagsCmd.SetDir(r.LocalPath())
+	tagsCmd := s.hgCmd(ctx, "tags", "--debug", "--verbose")
 	out, err := tagsCmd.CombinedOutput()
 	if err != nil {
 		return nil, errors.Wrap(err, string(out))
@@ -581,8 +588,7 @@ func (s *hgSource) listVersions(ctx context.Context) ([]PairedVersion, error) {
 	// bookmarks next, because the presence of the magic @ bookmark has to
 	// determine how we handle the branches
 	var magicAt bool
-	bookmarksCmd := commandContext(ctx, "hg", "bookmarks", "--debug")
-	bookmarksCmd.SetDir(r.LocalPath())
+	bookmarksCmd := s.hgCmd(ctx, "bookmarks", "--debug")
 	out, err = bookmarksCmd.CombinedOutput()
 	if err != nil {
 		// better nothing than partial and misleading
@@ -616,8 +622,7 @@ func (s *hgSource) listVersions(ctx context.Context) ([]PairedVersion, error) {
 		}
 	}
 
-	cmd := commandContext(ctx, "hg", "branches", "-c", "--debug")
-	cmd.SetDir(r.LocalPath())
+	cmd := s.hgCmd(ctx, "branches", "-c", "--debug")
 	out, err = cmd.CombinedOutput()
 	if err != nil {
 		// better nothing than partial and misleading
