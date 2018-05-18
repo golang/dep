@@ -71,7 +71,7 @@ findGoBinDirectory() {
         exit 1
     fi
     if [ -z "$GOBIN" ]; then
-        GOBIN="$EFFECTIVE_GOPATH/bin"
+        GOBIN=$(echo "${EFFECTIVE_GOPATH%%:*}/bin" | sed s#//*#/#g)
     fi
     if [ ! -d "$GOBIN" ]; then
         echo "Installation requires your GOBIN directory $GOBIN to exist. Please create it."
