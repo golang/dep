@@ -984,9 +984,9 @@ type projectConstraint struct {
 // on a dependency and the projects that apply those constraints.
 type constraintsCollection map[string][]projectConstraint
 
-// collectConstraints collects constraints declared by all the dependencies.
-// It returns constraintsCollection and a slice of errors encountered while
-// collecting the constraints, if any.
+// collectConstraints collects constraints declared by all the dependencies and
+// all effective constraints from the root project. It returns constraintsCollection and
+// a slice of errors encountered while collecting the constraints, if any.
 func collectConstraints(ctx *dep.Ctx, p *dep.Project, sm gps.SourceManager) (constraintsCollection, []error) {
 	logger := ctx.Err
 	if !ctx.Verbose {
@@ -1065,6 +1065,33 @@ func collectConstraints(ctx *dep.Ctx, p *dep.Project, sm gps.SourceManager) (con
 		for e := range errCh {
 			errs = append(errs, e)
 			logger.Println(e.Error())
+		}
+	}
+
+	// Incorporate constraints set in the manifest of the root project.
+	if p.Manifest != nil {
+
+		ineffCon := p.FindIneffectualConstraints(sm)
+
+		// Iterate through regular project constraints, append if it is not
+		// an ineffectual constraint
+		for pr, pp := range p.Manifest.Constraints {
+			i := sort.Search(len(ineffCon), func(i int) bool {
+				return pr == ineffCon[i]
+			})
+			if i < len(ineffCon) && ineffCon[i] == pr {
+				continue
+			}
+
+			tempCC := append(
+				constraintCollection[string(pr)],
+				projectConstraint{pr, pp.Constraint},
+			)
+
+			// Sort the inner projectConstraint slice by Project string.
+			// Required for consistent returned value.
+			sort.Sort(byProject(tempCC))
+			constraintCollection[string(pr)] = tempCC
 		}
 	}
 
