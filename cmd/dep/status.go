@@ -333,8 +333,6 @@ func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
 	var buf bytes.Buffer
 	var out outputter
 	switch {
-	case cmd.missing:
-		return errors.Errorf("not implemented")
 	case cmd.json:
 		out = &jsonOutput{
 			w: &buf,
@@ -397,6 +395,11 @@ func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
 		}
 
 		return err
+	}
+
+	if cmd.missing && !hasMissingPkgs {
+		buf.Reset()
+		buf.Write([]byte("No missing dependencies found.\n"))
 	}
 
 	// Print the status output
