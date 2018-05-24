@@ -18,14 +18,14 @@ type ReachMap map[string]struct {
 	Internal, External []string
 }
 
-// Eliminate import paths with any elements having leading dots, leading
-// underscores, or testdata. If these are internally reachable (which is
-// a no-no, but possible), any external imports will have already been
+// Eliminate import paths with any elements having leading dots or
+// testdata. If these are internally reachable (which is a no-no, but
+// possible), any external imports will have already been
 // pulled up through ExternalReach. The key here is that we don't want
 // to treat such packages as themselves being sources.
 func pkgFilter(pkg string) bool {
 	for _, elem := range strings.Split(pkg, "/") {
-		if strings.HasPrefix(elem, ".") || strings.HasPrefix(elem, "_") || elem == "testdata" {
+		if strings.HasPrefix(elem, ".") || elem == "testdata" {
 			return false
 		}
 	}

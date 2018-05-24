@@ -8,6 +8,8 @@ NEW FEATURES:
 
 BUG FIXES:
 
+* Allow underscores to prefix directory names ([#1688](https://github.com/golang/dep/issues/1688))
+
 IMPROVEMENTS:
 
 * Add template operations support in dep status template output.
