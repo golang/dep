@@ -372,6 +372,11 @@ func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
 		return err
 	}
 
+	if cmd.missing {
+		err := cmd.runStatusMissing(ctx, p)
+		return err
+	}
+
 	hasMissingPkgs, errCount, err := runStatusAll(ctx, out, p, sm)
 	if err != nil {
 		switch err {
@@ -395,11 +400,6 @@ func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
 		}
 
 		return err
-	}
-
-	if cmd.missing && !hasMissingPkgs {
-		buf.Reset()
-		buf.Write([]byte("No missing dependencies found.\n"))
 	}
 
 	// Print the status output
@@ -488,6 +488,41 @@ func (os OldStatus) marshalJSON() *rawOldStatus {
 		Revision:    string(os.Revision),
 		Latest:      os.getConsolidatedLatest(longRev),
 	}
+}
+
+// runStatusMissing analyses the project for missing dependencies in lock file.
+func (cmd *statusCommand) runStatusMissing(ctx *dep.Ctx, p *dep.Project) error {
+
+	ptree, err := p.ParseRootPackageTree()
+	if err != nil {
+		return err
+	}
+	rm, _ := ptree.ToReachMap(true, true, false, p.Manifest.IgnoredPackages())
+	external := rm.FlattenFn(paths.IsStandardImportPath)
+
+	var missingDeps []string
+
+missingOuter:
+	for _, d := range external {
+		for _, lp := range p.Lock.Projects() {
+			if string(lp.Ident().ProjectRoot) == d {
+				continue missingOuter
+			}
+		}
+
+		missingDeps = append(missingDeps, d)
+	}
+
+	if missingDeps != nil {
+		ctx.Err.Printf("Missing dependencies (not present in lock):\n")
+		for _, d := range missingDeps {
+			ctx.Err.Printf("  %v\n", d)
+		}
+	} else {
+		ctx.Err.Println("No missing dependencies found.")
+	}
+
+	return nil
 }
 
 func (cmd *statusCommand) runOld(ctx *dep.Ctx, out oldOutputter, p *dep.Project, sm gps.SourceManager) error {

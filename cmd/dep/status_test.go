@@ -5,6 +5,7 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"io/ioutil"
 	"log"
@@ -554,4 +555,103 @@ func TestValidateFlags(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestStatusMissing(t *testing.T) {
+
+	cases := []struct {
+		name       string
+		lock       dep.Lock
+		wantStatus string
+		wantErr    bool
+	}{
+		{
+			name: "no missing dependencies",
+			lock: dep.Lock{
+				P: []gps.LockedProject{
+					gps.NewLockedProject(
+						gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot("github.com/boltdb/bolt")},
+						gps.NewVersion("v1.0.0"),
+						[]string{"."},
+					),
+					gps.NewLockedProject(
+						gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot("github.com/sdboyer/dep-test")},
+						gps.NewVersion("v1.0.0"),
+						[]string{"."},
+					),
+					gps.NewLockedProject(
+						gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot("github.com/sdboyer/deptestdos")},
+						gps.NewVersion("v1.0.0"),
+						[]string{"."},
+					),
+				},
+			},
+			wantStatus: "No missing dependencies found.\n",
+		},
+		{
+			name: "two missing dependencies",
+			lock: dep.Lock{
+				P: []gps.LockedProject{
+					gps.NewLockedProject(
+						gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot("github.com/sdboyer/deptestdos")},
+						gps.NewVersion("v1.0.0"),
+						[]string{"."},
+					),
+				},
+			},
+			wantStatus: "Missing dependencies (not present in lock):\n" +
+				"  github.com/boltdb/bolt\n" +
+				"  github.com/sdboyer/dep-test\n",
+		},
+	}
+
+	h := test.NewHelper(t)
+	defer h.Cleanup()
+
+	testdir := filepath.Join("src", "status_missing_test")
+	h.TempDir(testdir)
+	h.TempCopy(filepath.Join(testdir, "main.go"), filepath.Join("status", "missing", "main.go"))
+	testProjPath := h.Path(testdir)
+
+	var buf bytes.Buffer
+	bufferWriter := bufio.NewWriter(&buf)
+	bufferLogger := log.New(bufferWriter, "", 0)
+	discardLogger := log.New(ioutil.Discard, "", 0)
+
+	ctx := &dep.Ctx{
+		GOPATH: testProjPath,
+		Out:    discardLogger,
+		Err:    bufferLogger,
+	}
+
+	sm, err := ctx.SourceManager()
+	h.Must(err)
+	defer sm.Release()
+
+	p := new(dep.Project)
+	p.SetRoot(testProjPath)
+
+	cmd := statusCommand{
+		missing: true,
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			buf.Reset()
+			p.Manifest = &dep.Manifest{} // needed for empty Ignored packages string
+			p.Lock = &c.lock
+
+			err = cmd.runStatusMissing(ctx, p)
+			bufferWriter.Flush()
+			actualStatus := buf.String()
+
+			if err != nil && !c.wantErr {
+				t.Fatalf("unexpected errors while collecting constraints: %v", err)
+			}
+			if actualStatus != c.wantStatus {
+				t.Fatalf("unexpected missign status: \n\t(GOT): %v\n\t(WNT): %v", actualStatus, c.wantStatus)
+			}
+		})
+	}
+
 }
