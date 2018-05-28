@@ -119,6 +119,9 @@ type outputter interface {
 	MissingHeader() error
 	MissingLine(*MissingStatus) error
 	MissingFooter() error
+	StatusMissingHeader() error
+	StatusMissingLine(gps.ProjectRoot) error
+	StatusMissingFooter() error
 }
 
 // Only a subset of the outputters should be able to output old statuses.
@@ -170,6 +173,20 @@ func (out *tableOutput) MissingFooter() error {
 	return out.w.Flush()
 }
 
+func (out *tableOutput) StatusMissingHeader() error {
+	_, err := fmt.Fprintln(out.w, "Missing dependencies (not present in lock):")
+	return err
+}
+
+func (out *tableOutput) StatusMissingLine(missingDep gps.ProjectRoot) error {
+	_, err := fmt.Fprintf(out.w, "  %v\n", missingDep)
+	return err
+}
+
+func (out *tableOutput) StatusMissingFooter() error {
+	return out.w.Flush()
+}
+
 func (out *tableOutput) OldHeader() error {
 	_, err := fmt.Fprintf(out.w, "PROJECT\tCONSTRAINT\tREVISION\tLATEST\n")
 	return err
@@ -191,10 +208,11 @@ func (out *tableOutput) OldFooter() error {
 }
 
 type jsonOutput struct {
-	w       io.Writer
-	basic   []*rawStatus
-	missing []*MissingStatus
-	old     []*rawOldStatus
+	w             io.Writer
+	basic         []*rawStatus
+	missing       []*MissingStatus
+	statusMissing []struct{ ProjectRoot gps.ProjectRoot }
+	old           []*rawOldStatus
 }
 
 func (out *jsonOutput) BasicHeader() error {
@@ -223,6 +241,21 @@ func (out *jsonOutput) MissingLine(ms *MissingStatus) error {
 
 func (out *jsonOutput) MissingFooter() error {
 	return json.NewEncoder(out.w).Encode(out.missing)
+}
+
+func (out *jsonOutput) StatusMissingHeader() error {
+	out.statusMissing = []struct{ ProjectRoot gps.ProjectRoot }{}
+	return nil
+}
+
+func (out *jsonOutput) StatusMissingLine(missingDep gps.ProjectRoot) error {
+	out.statusMissing = append(out.statusMissing,
+		struct{ ProjectRoot gps.ProjectRoot }{missingDep})
+	return nil
+}
+
+func (out *jsonOutput) StatusMissingFooter() error {
+	return json.NewEncoder(out.w).Encode(out.statusMissing)
 }
 
 func (out *jsonOutput) OldHeader() error {
@@ -269,9 +302,12 @@ func (out *dotOutput) BasicLine(bs *BasicStatus) error {
 	return nil
 }
 
-func (out *dotOutput) MissingHeader() error                { return nil }
-func (out *dotOutput) MissingLine(ms *MissingStatus) error { return nil }
-func (out *dotOutput) MissingFooter() error                { return nil }
+func (out *dotOutput) MissingHeader() error                               { return nil }
+func (out *dotOutput) MissingLine(ms *MissingStatus) error                { return nil }
+func (out *dotOutput) MissingFooter() error                               { return nil }
+func (out *dotOutput) StatusMissingHeader() error                         { return nil }
+func (out *dotOutput) StatusMissingLine(missingDep gps.ProjectRoot) error { return nil }
+func (out *dotOutput) StatusMissingFooter() error                         { return nil }
 
 type templateOutput struct {
 	w    io.Writer
@@ -303,6 +339,12 @@ func (out *templateOutput) MissingFooter() error { return nil }
 func (out *templateOutput) MissingLine(ms *MissingStatus) error {
 	return out.tmpl.Execute(out.w, ms)
 }
+func (out *templateOutput) StatusMissingHeader() error { return nil }
+func (out *templateOutput) StatusMissingLine(missingDep gps.ProjectRoot) error {
+	t := struct{ ProjectRoot gps.ProjectRoot }{missingDep}
+	return out.tmpl.Execute(out.w, t)
+}
+func (out *templateOutput) StatusMissingFooter() error { return nil }
 
 func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
 	if cmd.examples {
@@ -373,7 +415,10 @@ func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
 	}
 
 	if cmd.missing {
-		err := cmd.runStatusMissing(ctx, p)
+		err := cmd.runStatusMissing(ctx, out, p)
+		if len(buf.String()) > 0 {
+			ctx.Out.Print(buf.String())
+		}
 		return err
 	}
 
@@ -491,7 +536,7 @@ func (os OldStatus) marshalJSON() *rawOldStatus {
 }
 
 // runStatusMissing analyses the project for missing dependencies in lock file.
-func (cmd *statusCommand) runStatusMissing(ctx *dep.Ctx, p *dep.Project) error {
+func (cmd *statusCommand) runStatusMissing(ctx *dep.Ctx, out outputter, p *dep.Project) error {
 
 	ptree, err := p.ParseRootPackageTree()
 	if err != nil {
@@ -500,7 +545,7 @@ func (cmd *statusCommand) runStatusMissing(ctx *dep.Ctx, p *dep.Project) error {
 	rm, _ := ptree.ToReachMap(true, true, false, p.Manifest.IgnoredPackages())
 	external := rm.FlattenFn(paths.IsStandardImportPath)
 
-	var missingDeps []string
+	var missingDeps []gps.ProjectRoot
 
 missingOuter:
 	for _, d := range external {
@@ -510,16 +555,23 @@ missingOuter:
 			}
 		}
 
-		missingDeps = append(missingDeps, d)
+		missingDeps = append(missingDeps, gps.ProjectRoot(d))
 	}
 
 	if missingDeps != nil {
-		ctx.Err.Printf("Missing dependencies (not present in lock):\n")
+		if err = out.StatusMissingHeader(); err != nil {
+			return err
+		}
 		for _, d := range missingDeps {
-			ctx.Err.Printf("  %v\n", d)
+			if err = out.StatusMissingLine(d); err != nil {
+				return err
+			}
+		}
+		if err = out.StatusMissingFooter(); err != nil {
+			return err
 		}
 	} else {
-		ctx.Err.Println("No missing dependencies found.")
+		ctx.Err.Printf("No missing dependencies found.")
 	}
 
 	return nil

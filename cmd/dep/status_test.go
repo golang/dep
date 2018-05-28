@@ -560,10 +560,13 @@ func TestValidateFlags(t *testing.T) {
 func TestStatusMissing(t *testing.T) {
 
 	cases := []struct {
-		name       string
-		lock       dep.Lock
-		wantStatus string
-		wantErr    bool
+		name               string
+		lock               dep.Lock
+		cmds               []statusCommand
+		wantTableStatus    string
+		wantJSONStatus     string
+		wantTemplateStatus string
+		wantErr            bool
 	}{
 		{
 			name: "no missing dependencies",
@@ -586,7 +589,10 @@ func TestStatusMissing(t *testing.T) {
 					),
 				},
 			},
-			wantStatus: "No missing dependencies found.\n",
+			cmds: []statusCommand{
+				statusCommand{missing: true}, //default for table output
+			},
+			wantTableStatus: "No missing dependencies found.\n",
 		},
 		{
 			name: "two missing dependencies",
@@ -599,9 +605,16 @@ func TestStatusMissing(t *testing.T) {
 					),
 				},
 			},
-			wantStatus: "Missing dependencies (not present in lock):\n" +
+			cmds: []statusCommand{
+				statusCommand{missing: true}, //default for table output
+				statusCommand{missing: true, json: true},
+				statusCommand{missing: true, template: "Missing:{{.ProjectRoot}} "},
+			},
+			wantTableStatus: "Missing dependencies (not present in lock):\n" +
 				"  github.com/boltdb/bolt\n" +
 				"  github.com/sdboyer/dep-test\n",
+			wantJSONStatus:     `[{"ProjectRoot":"github.com/boltdb/bolt"},{"ProjectRoot":"github.com/sdboyer/dep-test"}]` + "\n",
+			wantTemplateStatus: "Missing:github.com/boltdb/bolt Missing:github.com/sdboyer/dep-test \n",
 		},
 	}
 
@@ -613,14 +626,13 @@ func TestStatusMissing(t *testing.T) {
 	h.TempCopy(filepath.Join(testdir, "main.go"), filepath.Join("status", "missing", "main.go"))
 	testProjPath := h.Path(testdir)
 
-	var buf bytes.Buffer
-	bufferWriter := bufio.NewWriter(&buf)
+	var bufW bytes.Buffer
+	bufferWriter := bufio.NewWriter(&bufW)
 	bufferLogger := log.New(bufferWriter, "", 0)
-	discardLogger := log.New(ioutil.Discard, "", 0)
 
 	ctx := &dep.Ctx{
 		GOPATH: testProjPath,
-		Out:    discardLogger,
+		Out:    bufferLogger,
 		Err:    bufferLogger,
 	}
 
@@ -631,25 +643,53 @@ func TestStatusMissing(t *testing.T) {
 	p := new(dep.Project)
 	p.SetRoot(testProjPath)
 
-	cmd := statusCommand{
-		missing: true,
-	}
+	var bufO bytes.Buffer
+	var out outputter
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			buf.Reset()
-			p.Manifest = &dep.Manifest{} // needed for empty Ignored packages string
-			p.Lock = &c.lock
 
-			err = cmd.runStatusMissing(ctx, p)
-			bufferWriter.Flush()
-			actualStatus := buf.String()
+			for _, statusCmd := range c.cmds {
+				bufO.Reset()
+				bufW.Reset()
 
-			if err != nil && !c.wantErr {
-				t.Fatalf("unexpected errors while collecting constraints: %v", err)
-			}
-			if actualStatus != c.wantStatus {
-				t.Fatalf("unexpected missign status: \n\t(GOT): %v\n\t(WNT): %v", actualStatus, c.wantStatus)
+				var wantStatus string
+				switch {
+				case statusCmd.json:
+					out = &jsonOutput{
+						w: &bufO,
+					}
+					wantStatus = c.wantJSONStatus
+				case statusCmd.template != "":
+					tmpl, _ := template.New("status").Parse(statusCmd.template)
+					out = &templateOutput{
+						w:    &bufO,
+						tmpl: tmpl,
+					}
+					wantStatus = c.wantTemplateStatus
+				default:
+					out = &tableOutput{
+						w: tabwriter.NewWriter(&bufO, 0, 4, 2, ' ', 0),
+					}
+					wantStatus = c.wantTableStatus
+				}
+
+				p.Manifest = &dep.Manifest{} // needed for empty Ignored packages string
+				p.Lock = &c.lock
+
+				err = statusCmd.runStatusMissing(ctx, out, p)
+				if len(bufO.String()) > 0 {
+					ctx.Out.Print(bufO.String())
+				}
+				bufferWriter.Flush()
+				actualStatus := bufW.String()
+
+				if err != nil && !c.wantErr {
+					t.Fatalf("unexpected errors while collecting constraints: %v", err)
+				}
+				if actualStatus != wantStatus {
+					t.Fatalf("unexpected missing status: \n\t(GOT): %v\n\t(WNT): %v", actualStatus, wantStatus)
+				}
 			}
 		})
 	}
