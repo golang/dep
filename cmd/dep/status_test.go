@@ -445,8 +445,7 @@ func TestCollectConstraints(t *testing.T) {
 				"github.com/sdboyer/deptest": []projectConstraint{
 					{"github.com/darkowlzz/deptest-project-1", ver1},
 					{"github.com/darkowlzz/deptest-project-2", ver08},
-					{"github.com/sdboyer/deptest",
-						gps.Revision("3f4c3bea144e112a69bbe5d8d01c1b09a544253f")},
+					{"root", gps.Revision("3f4c3bea144e112a69bbe5d8d01c1b09a544253f")},
 				},
 			},
 		},
